@@ -431,7 +431,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <button class="btn-ghost" id="tierManualBtn">이 티어로 적용</button>
         </div>
       </div>
-      <div class="hint" style="color:var(--amber,#f0a020)">⚠ 티어를 변경하면 채팅 LLM이 새 설정으로 재기동됩니다(약 30초, 진행 중 대화가 끊길 수 있습니다). 지식 검색(임베딩)은 영향 없습니다.</div>
+      <div class="hint" style="color:var(--amber,#f0a020)">⚠ 문맥 길이가 바뀔 때만 채팅 LLM이 재기동됩니다(약 30초, 그때만 진행 중 대화가 끊깁니다). 스탠다드↔프로처럼 바뀔 값이 없으면 엔진을 그대로 둡니다. 지식 검색(임베딩)은 언제나 영향 없습니다.</div>
       <div class="status-line" id="tierStatusLine"></div>
     </div>
 
@@ -1592,7 +1592,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       tierEl("tierGpuLabel").textContent = "NVIDIA GPU 없음 — 로컬 LLM 미지원 환경";
       tierEl("tierGpuFree").textContent = "";
     }
-    const curLabel = current.tier ? tierName(current.tier) : `기본값(LLM ${current.maxLoadedModels}개·${Math.round(current.ctxSize / 1024)}K)`;
+    const curLabel = current.tier ? tierName(current.tier) : `기본값(문맥 ${Math.round(current.ctxSize / 1024)}K)`;
     if (recommended) {
       const same = current.tier === recommended;
       tierEl("tierDiagBig").textContent = `이 서버는 ${tierName(recommended)} 권장`;

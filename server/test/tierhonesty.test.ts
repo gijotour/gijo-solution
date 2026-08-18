@@ -20,6 +20,9 @@ import { GIJO_TIERS } from "../src/engine/localengine";
 const 읽기 = (p: string) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
 const 엔진 = 읽기("../src/engine/localengine.ts");
 const 설정화면 = 읽기("../../client/src/renderer/pages/settings.html");
+// ⚠ **대시보드도 본다**(2026-08-18 회귀). 담당자가 매일 처음 보는 화면인데 검사 대상에 없어
+//   「채팅 LLM N개」가 그대로 나갔다. 「어디를 볼지」를 손으로 적으면 빠진 자리가 생긴다.
+const 대시보드 = 읽기("../../client/src/renderer/pages/dashboard.html");
 const 안내 = 읽기("../src/engine/screenguide.ts");
 // ⚠ 용어사전은 **RAG에 실린다**(docs-manifest.json) — 여기 적은 것은 챗봇이 고객에게 말한다.
 const 용어사전 = 읽기("../../GIJO_AS_용어사전.md");
@@ -47,8 +50,18 @@ describe("등급이 파는 것 = 등급이 하는 일", () => {
       ["등급 표(서버)", 엔진],
       ["챗봇 안내", 안내],
       ["용어사전(RAG)", 용어사전],
+      ["대시보드", 대시보드],
     ];
-    const 파는말 = /(A\/B\s*[·・]?\s*검증\s*병행|검증\s*병행|A\/B\s*병행|LLM\s*\d+\s*개|모델\s*\d+\s*개\s*병행|채팅\s*LLM\s*\d+\s*개)/g;
+    // ⚠⚠ **숫자만 보면 못 잡는다**(2026-08-18 회귀 — 5.24.0에 두 자리가 실려 나갔다).
+    //   `LLM ${current.maxLoadedModels}개`·`"채팅 LLM " + cur.maxLoadedModels + "개"`처럼
+    //   **변수로 조립하는** 자리는 `\d+`에 안 걸린다. 하필 그 둘이 「등급을 한 번도 안 고른
+    //   새 설치 고객」과 「매일 처음 보는 대시보드」였다.
+    //   ⇒ 숫자든 변수든 **「LLM … 개」 꼴**이면 잡는다.
+    //   ⚠ `maxLoadedModels …개`를 통째로 잡으면 **주석의 기술 설명**까지 걸린다
+    //     (「maxLoadedModels가 안 걸린다」를 설명하는 글도 그 낱말을 쓴다).
+    //     파는 문장은 「LLM …개」·「채팅 LLM …개」 꼴이므로 **그 모양만** 잡는다.
+    const 파는말 =
+      /((?:채팅\s*)?LLM\s*(?:\d+|\$\{[^}]{1,60}\}|"\s*\+\s*[\w.]{1,40}\s*\+\s*")\s*개|A\/B\s*[·・]?\s*검증\s*병행|검증\s*병행|A\/B\s*병행)/g;
     for (const [이름, 글] of 자리) {
       const 걸린것 = [...글.matchAll(파는말)]
         .map((m) => 글.slice(Math.max(0, m.index! - 110), m.index! + 40).replace(/\s+/g, " "))

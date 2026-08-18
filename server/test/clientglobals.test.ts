@@ -106,8 +106,15 @@ describe("Electron에서 네이티브 모달을 쓰지 않는다", () => {
       if (!/\.html$/.test(file)) continue;
       const 코드 = src.split("\n").filter((l) => !/^\s*(\/\/|\*|<!--)/.test(l)).join("\n");
       if (!/\bgijo(Ask|Tell|Prompt)\s*\(/.test(코드)) continue;
-      // 직접 싣거나(dialog.js), nav.js를 실어 그것이 실어 주거나 — 둘 중 하나면 된다.
-      if (!/dialog\.js/.test(src) && !/nav\.js/.test(src)) 위반.push(file);
+      // ⚠⚠ **`<script src=` 태그 모양으로 본다**(2026-08-18 회귀 — 5.24.0에 실려 나갔다).
+      //   예전엔 원본 글자에서 그냥 `nav.js`를 찾았는데, `lite-app.html`은 **주석에
+      //   「lite-nav.js」**가 적혀 있어 그대로 통과했다. 실제로는 스크립트를 하나도 안 실어
+      //   `gijoTell`이 undefined였고 **버튼 3개가 눌러도 아무 일도 안 일어났다.**
+      //   「있다고 적힌 것」이 아니라 **「실제로 싣는 태그」**를 봐야 한다.
+      const 싣는것 = [...src.matchAll(/<script[^>]*\bsrc=["']([^"']+)["']/g)].map((m) => m[1]);
+      // 직접 싣거나(dialog.js), nav.js 계열을 실어 그것이 실어 주거나 — 둘 중 하나면 된다.
+      // ⚠ `lite-nav.js`는 dialog.js를 안 실어 준다(공용 nav.js만 loadDialog를 갖는다).
+      if (!싣는것.some((s) => /(^|\/)dialog\.js$/.test(s) || /(^|\/)nav\.js$/.test(s))) 위반.push(file);
     }
     expect(위반.join(", "), "이 화면들은 gijoAsk를 부르는데 dialog.js도 nav.js도 안 싣는다 — 버튼이 조용히 죽는다").toBe("");
   });

@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 에이전트별 두뇌·위치 (GIJO AS 에이전트 AI)</title>
+<!--
+  시안 — "여러 개의 두뇌가 공동작업을 하는 것"을 실제로 고를 수 있게: 팀원(에이전트)마다
+  ① 어떤 두뇌(모델) ② 어디서(위치: 이 PC / 원격 GPU / 클라우드) 를 함께 정하는 화면.
+  작성: 2026-08-18 · gijo-mockup(읽기 전용 정찰 후 작성 — client/·server/ 미수정)
+  추천 1개 원칙(2026-08-09 사용자 결정) — 대안은 하단 "다른 길을 왜 안 골랐나"에서 글로만 비교.
+
+  ■ 대상 화면 (정찰로 직접 확인 — 아래 행 번호는 2026-08-18 기준)
+    · client/src/renderer/pages/agent.html
+        188-192  #rosterPanel — "우리 팀" 카드 그리드의 컨테이너
+        290-303  specialtyHtml() — 총괄은 어댑터가 없다는 잠금 문구의 실제 선례
+                  ("🎓 총괄은 어댑터를 두지 않습니다 — 지시 분배는 흔들리면 안 됩니다")
+        306-327  recommendationHtml()/modelSelectHtml() — 지금 있는 "두뇌" 한 줄 + 드롭다운.
+                  "위치"는 어디에도 없다 — 이 시안이 채우는 자리.
+        353-371  renderAgents() — 카드 조립 순서(desc→select→추천→전문분야)
+        456-465  "팀원별 담당 모델" 요약 — 지금은 이름+모델뿐. "한눈에" 요구의 기존 자리.
+        697-705  applyAdminGating() — ★비관리자는 #rosterPanel 전체가 안 보인다(카드 자체가
+                  없다, select만 disabled가 아니다). 이 시안의 "담당자 로그인" 데모가 그대로 반영.
+    · server/src/engine/agents.ts
+        45-90    AGENT_DEFS — 실제 6종 이름·역할·설명 원문(이 시안 카드 문구 그대로 인용).
+        122-143  setAgentAdapter() — "총괄엔 배정 불가" throw(138행). 위치 잠금의 실제 코드 선례.
+        145-154  setAgentModel() — 새 setAgentLocation()이 그대로 복제할 저장 패턴.
+    · server/src/engine/llm.ts
+        692-699  `원격목표 = remoteLlmTarget()` — agentId를 안 받는다. 전역 on/off 그 자체.
+        744-746  baseUrl 분기 — 원격이 있으면 ensureAgentModel(로컬 풀)을 아예 건너뛴다.
+        761-768  body에 `model:"local"` 고정 — 로컬이든 원격이든 같은 문자열을 보낸다.
+                 실제 모델 구분은 **포트/URL**로만 한다(원격 서버가 지금 무엇을 물리는지는
+                 클라이언트가 고를 수 없다 — 서버 하나에 모델 하나).
+    · server/src/engine/localengine.ts
+        110-138  GIJO_TIERS — Lite/Standard는 로컬 동시 1개, Pro는 2개("A/B 병행"이 아니라
+                 **용량**이다 — abTest·compareModels·crossVerify는 코드에 0건, 안 그린다).
+        1076-1089 ensureAgentModel(agentId) — ★로컬은 이미 에이전트별로 동작한다(실증됨).
+                 1083-1084행: 배정 모델 파일이 없으면 console.warn만 찍고 조용히 기본 모델로
+                 답한다 — 화면(드롭다운)엔 어떤 표시도 없다(아래 "잘못 고르면" ④가 이걸 고친다).
+        1091-1114 agentRequestExtras(agentId) — LoRA도 이미 에이전트별. 단, **로컬 전용**.
+    · server/src/engine/remotellm.ts — 1-27행 배경(VPN 전용·에어갭 차단·admin 전용 3중 경계),
+        84-96 remoteLlmTarget() 시그니처(agentId 없음), 98-113 remoteUrlProblem(사설 대역만),
+        132-136 /where(비관리자도 "지금 나가는지"만 봄, 주소는 안 보여줌).
+    · server/src/engine/cloudllm.ts — 1-9행(RAG를 구조적으로 안 태움), 28-46행(4개 제공자,
+        custom=임의 OpenAI 호환), 257-281 cloudComplete(agentId 없음), 322-341 askCloud
+        (agentId 없음, /api/cloud/ask 단독 라우트 — 에이전트 로스터의 chat()과 무관한 별도 경로).
+    · server/src/engine/docenrich.ts:14,77-92 — cloudComplete의 **유일한 실사용처**는 문서
+        번역(내부 대화 아님). 즉 클라우드는 지금 "에이전트별 선택지"가 아니라 완전히 다른 기능이다.
+    · server/src/engine/cloudegress.ts:1-40 — 질문 텍스트의 사내 식별자 2차 방어선.
+
+  ■ 설계 전 조사 (요청한 표준·모범사례, 2026-08-18 확인 — 우리 상황 적용 판단 포함)
+    · CrewAI 공식 문서, "Agents"(docs.crewai.com/en/concepts/agents) — 에이전트 객체가 자기
+      `llm=` 을 직접 들고 다니는 것이 멀티에이전트 프레임워크의 표준 패턴. → 적용: 이 제품도
+      팀원 카드 = "역할 + 자기 두뇌"가 한 단위여야 한다는 근거. 다만 CrewAI는 코드로 지정하고
+      우리는 화면으로 지정한다는 차이만 있다(우리 쪽이 비개발자 담당자에게 더 맞다).
+    · LM Studio Bionic 공식 문서, "Choose a Cloud, Local, or Remote Model"
+      (lmstudio.ai/docs/bionic/models, 2026) — 실제 출시 제품이 모델 배치 위치를 정확히
+      "로컬/원격/클라우드" 3분류로 쓴다(원격=본인 소유 다른 기기, 클라우드=벤더 호스팅).
+      → 적용: 이 시안의 위치 3분류·이름이 업계에서 이미 쓰이는 어휘와 일치함을 확인했다.
+      차이: Bionic의 "원격"은 개인 기기 간 연결(LM Link)이고, 우리는 VPN 안 사내 GPU라는
+      더 강한 신뢰 경계다 — 그래서 우리 쪽은 "원격도 RAG를 그대로 실어도 된다"는 판단이 가능.
+    · arXiv 2601.04861, "Confidence-Aware Routing for Efficient Multi-Agent Collaboration
+      across Multi-Scale Models"(arxiv.org/pdf/2601.04861) — 역할마다 잘 맞는 모델 크기가
+      다르고, 크기가 커질수록 비용·지연이 늘어난다는 것을 라우팅 정책이 명시적으로 다뤄야
+      한다는 연구. → 적용: "왜 총괄엔 90초짜리를 붙이면 안 되는가"의 학술적 뒷받침. 다만
+      이 연구는 자동 라우팅(모델이 결정)을 다루고, 우리는 사람(관리자)이 결정한다 — 온프렘
+      폐쇄망·GPU 1~2장 환경에서는 자동보다 사람이 정하는 편이 더 정직하다고 판단했다(추천만
+      하고 결정은 사람에게 남기는 이 저장소의 기존 원칙과 일치).
+    · Nielsen Norman Group, "10 Usability Heuristics" #1 Visibility of System Status /
+      #6 Recognition rather than recall(nngroup.com/articles/ten-usability-heuristics) —
+      선택 즉시 결과(지연시간·경고)가 같은 자리에 보여야 한다. → 적용: 위치를 누르면 셀렉트
+      박스 하나가 아니라 pill+정보줄로, 그 자리에서 바로 결과 문장이 바뀌게 설계했다.
+
+  ■ 오늘 실측(사장님 제공, gb10 원격 GPU · 일반 지식 질문 2건 평균 · 대화 응답시간이지
+    벤치마크가 아님) — 이 화면에 있는 유일한 초 단위 수치. 로컬(3090)·클라우드는 이번 조사에
+    없어 "측정 안 됨"으로 정직하게 비워 둔다.
+      14B — 적재 3초 · 답 17.4초 · 661자 · 23.0 tok/s
+      32B — 적재 13초 · 답 36.6초 · 623자 · 10.9 tok/s
+      72B — 적재 103초 · 답 89~90초 · 660자 · 4.5 tok/s
+    ⚠ 답 품질은 셋 다 눈에 띄는 차이 없음(랜섬웨어 초동 대응 등, 일반 지식 질문 기준).
+    ⚠ 취약점 판단·도구 고르기·사내 문서 인용 같은 "제품의 진짜 일"은 아직 안 쟀다.
+
+  ■ 범위 — 이 파일 하나(+ 같은 폴더 설명.md). 제품 코드는 전혀 건드리지 않았다. 모든 조작은
+    화면 미리보기이며 실제 요청을 보내지 않는다(맨 위 배너에 명시).
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+
+/* ── 목업 전용 배너/문서 요소 (실제 화면엔 없다) ───────────────────────── */
+.mockup-banner{background:#1f1e1d;border-bottom:1px dashed var(--amber);padding:10px 24px;font-size:12px;color:var(--muted);line-height:1.6;}
+.mockup-banner b{color:var(--amber);}
+.doc-wrap{max-width:1200px;margin:0 auto;padding:26px 24px 60px;}
+.doc-h1{font-size:19px;font-weight:800;color:#fff;margin-bottom:6px;}
+.doc-lead{font-size:12.5px;color:var(--muted);margin-bottom:20px;line-height:1.6;}
+.sec{margin:34px 0 0;padding-top:16px;border-top:1px solid var(--border);}
+.sec-title{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
+.sec-n{width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);border:1px solid var(--blue);color:var(--blue-light);font-size:11.75px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.sec-title h2{font-size:14.5px;font-weight:800;color:#fff;}
+.sec p, .sec li{font-size:12.25px;color:var(--muted);line-height:1.75;}
+.sec ul{margin:6px 0 6px 18px;}
+.sec b{color:var(--text);}
+.sec code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11.5px;color:var(--blue-light);font-family:Consolas,monospace;}
+.src-list{list-style:none;margin:8px 0 0;padding:0;}
+.src-list li{padding:8px 0;border-bottom:1px solid var(--border);}
+.src-list a{color:var(--blue-light);text-decoration:none;font-weight:700;}
+.metric-box{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:10px 0;}
+.metric-row{display:flex;justify-content:space-between;font-size:12.25px;padding:5px 0;border-bottom:1px dashed var(--border);}
+.metric-row:last-child{border-bottom:none;}
+.metric-row b{color:#fff;}
+.check-table{width:100%;border-collapse:collapse;margin-top:8px;}
+.check-table td{font-size:12.25px;padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+.check-table td:first-child{width:150px;color:var(--text);font-weight:700;}
+.ok-tag{color:var(--teal);font-weight:800;}
+
+/* ── 제품 화면 재현 프레임 ─────────────────────────────────────────── */
+.frame-cap{max-width:1200px;margin:18px auto 0;padding:0 24px;font-size:11.25px;color:var(--muted-2);font-family:Consolas,monospace;}
+.shell{max-width:1200px;margin:8px auto 0;padding:0 24px 6px;}
+.shell-inner{display:grid;grid-template-columns:200px 1fr;border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--bg);}
+.mock-topbar{grid-column:1 / -1;display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.mock-brand{font-size:14px;font-weight:800;color:#fff;}
+.mock-brand span{color:var(--blue-light);}
+.mock-user{display:flex;align-items:center;gap:8px;font-size:11.75px;color:var(--muted);}
+.mock-avatar{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;}
+.mock-sidebar{padding:16px 10px;border-right:1px solid var(--border);}
+.mock-nav-item{padding:9px 10px;border-radius:7px;font-size:12.25px;font-weight:600;color:var(--muted);margin-bottom:2px;}
+.mock-nav-item.active{background:rgba(59,130,246,.12);color:#fff;box-shadow:inset 3px 0 0 var(--blue);}
+.mock-main{padding:20px 22px 26px;}
+
+.page-title{font-size:18px;font-weight:800;color:#fff;}
+.page-sub{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.6;}
+
+/* ── 🧪 시연 컨트롤 (목업 전용 — 대시 테두리로 실제 화면과 시각적으로 구분) ── */
+.demo-ctrl{background:var(--panel-2);border:1.5px dashed var(--amber);border-radius:10px;padding:14px 16px;margin:16px 0 20px;}
+.demo-ctrl-h{font-size:12.75px;font-weight:800;color:var(--amber);margin-bottom:2px;}
+.demo-ctrl-sub{font-size:11.5px;color:var(--muted-2);margin-bottom:12px;}
+.demo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 16px;}
+.demo-field{display:flex;flex-direction:column;gap:4px;}
+.demo-field label{font-size:11.5px;font-weight:700;color:var(--muted);}
+.demo-field select,.demo-field .chk-row{background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;padding:6px 9px;color:var(--text);font-size:12px;outline:none;}
+.demo-field .chk-row{display:flex;align-items:center;gap:7px;cursor:pointer;}
+.demo-note{grid-column:1 / -1;font-size:11.5px;color:var(--muted-2);margin-top:2px;line-height:1.6;}
+
+/* ── 준비도 범례 ── */
+.readiness{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 4px;}
+.rd-item{flex:1 1 260px;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.rd-h{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;color:#fff;margin-bottom:4px;}
+.rd-badge{font-size:11px;font-weight:800;padding:1.5px 7px;border-radius:20px;}
+.rd-ready{background:rgba(30,185,128,.15);color:var(--teal);}
+.rd-partial{background:rgba(240,160,32,.15);color:var(--amber);}
+.rd-none{background:rgba(226,72,61,.15);color:#f5928a;}
+.rd-desc{font-size:11.5px;color:var(--muted);line-height:1.55;}
+
+/* ── 팀 한눈에 요약 ── */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px;}
+.panel-title{font-size:14px;font-weight:800;color:#fff;margin-bottom:3px;}
+.panel-sub{font-size:11.75px;color:var(--muted);margin-bottom:12px;}
+table.glance{width:100%;border-collapse:collapse;}
+table.glance th{text-align:left;font-size:11px;font-weight:700;color:var(--muted-2);text-transform:uppercase;letter-spacing:.4px;padding:8px 8px;border-bottom:1px solid var(--border);}
+table.glance td{padding:9px 8px;border-bottom:1px solid var(--border);font-size:12.25px;vertical-align:middle;}
+table.glance tr:last-child td{border-bottom:none;}
+.gl-loc{font-size:11.75px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.gl-local{background:rgba(59,130,246,.15);color:var(--blue-light);}
+.gl-remote{background:rgba(30,185,128,.15);color:var(--teal);}
+.gl-cloud{background:rgba(139,124,240,.15);color:var(--purple);}
+.gl-warn{color:var(--amber);}
+.gl-eta{font-size:11.75px;color:var(--muted-2);}
+
+/* ── swap 경고 배너 ── */
+.swap-banner{border-radius:9px;padding:10px 14px;font-size:12px;line-height:1.6;margin-bottom:14px;border:1px solid;}
+.swap-warn{background:rgba(240,160,32,.09);border-color:rgba(240,160,32,.35);color:#f3c775;}
+.swap-ok{background:rgba(30,185,128,.08);border-color:rgba(30,185,128,.3);color:#7fe0bb;}
+
+/* ── 로스터 카드 (agent.html 클래스 재사용/확장) ─────────────────────── */
+.agent-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.agent-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;display:flex;flex-direction:column;}
+.agent-top{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.agent-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.agent-name{font-size:13.5px;font-weight:800;color:#fff;}
+.agent-role{font-size:11.75px;color:var(--muted);margin-top:1px;}
+.agent-desc{font-size:11.75px;color:var(--muted);line-height:1.55;margin:2px 0 10px;}
+.agent-status{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;}
+.st-dot{width:7px;height:7px;border-radius:50%;}
+.st-working .st-dot{background:var(--teal);}
+.st-working{color:var(--teal);}
+.st-idle .st-dot{background:var(--muted-2);}
+.st-idle{color:var(--muted-2);}
+.st-watch .st-dot{background:var(--blue-light);}
+.st-watch{color:var(--blue-light);}
+
+/* 위치 pill 그룹 — 신규 */
+.loc-pills{display:flex;gap:5px;margin-bottom:6px;}
+.loc-pill{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:5px 4px;border-radius:7px;font-size:11.75px;font-weight:700;cursor:pointer;text-align:center;}
+.loc-pill:hover{border-color:var(--muted-2);}
+.loc-pill.active{background:rgba(59,130,246,.18);border-color:var(--blue);color:var(--blue-light);}
+.loc-pill.active.at-remote{background:rgba(30,185,128,.16);border-color:var(--teal);color:var(--teal);}
+.loc-pill.active.at-cloud{background:rgba(139,124,240,.18);border-color:var(--purple);color:var(--purple);}
+.loc-pill .dot-issue{color:var(--amber);}
+.loc-info{font-size:11.5px;line-height:1.6;color:var(--muted);margin-bottom:8px;min-height:17px;}
+.loc-info.iv-ok{color:var(--muted);}
+.loc-info.iv-warn{color:#f3c775;}
+.loc-info.iv-block{color:#f5928a;}
+.loc-locked-row{display:flex;align-items:center;gap:6px;font-size:11.75px;font-weight:700;color:var(--muted-2);background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:6px 9px;margin-bottom:6px;}
+.loc-locked-reason{font-size:11.5px;color:var(--muted-2);line-height:1.6;margin-bottom:8px;}
+
+.brain-select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11.75px;outline:none;cursor:pointer;margin-bottom:6px;}
+.brain-line{font-size:11.75px;color:var(--muted);line-height:1.5;margin-bottom:8px;}
+.brain-line b{color:var(--blue-light);}
+.brain-line .eta{color:var(--teal);font-weight:700;}
+.brain-line .eta-unk{color:var(--muted-2);font-weight:600;}
+
+.agent-spec{height:auto;min-height:17px;display:flex;align-items:flex-start;gap:6px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);line-height:1.55;}
+.spec-chip{font-size:11px;font-weight:800;padding:1px 7px;border-radius:5px;flex:0 0 auto;}
+
+.file-missing-badge{display:inline-block;background:rgba(226,72,61,.15);color:#f5928a;font-size:11px;font-weight:800;padding:1px 7px;border-radius:5px;margin-left:4px;}
+
+@media (max-width:1080px){ .agent-grid{grid-template-columns:repeat(2,1fr);} }
+</style>
+</head>
+<body>
+
+<div class="mockup-banner">
+  🧪 <b>이 파일은 시안(목업)입니다.</b> 아래 모든 조작(위치 버튼·시연 컨트롤)은 화면이 어떻게
+  반응할지 미리 보여주는 것이며, <b>실제로 어떤 요청도 서버에 보내지 않습니다</b>. 이 기능은
+  아직 구현 전입니다 — 승인 후 구현 방법은 문서 맨 아래 "구현 시 손댈 자리"에 정리했습니다.
+</div>
+
+<div class="frame-cap">재현: client/src/renderer/pages/agent.html — 사이드바 폭·상단바·"우리 팀" 로스터 그리드를 실제 화면 CSS 값 그대로 옮기고, 그 위에 <b style="color:var(--blue-light)">위치(어디서)</b> 선택을 새로 얹었다.</div>
+<div class="shell">
+  <div class="shell-inner">
+    <div class="mock-topbar">
+      <div class="mock-brand">GIJO <span>AS</span> · 에이전트 AI</div>
+      <div class="mock-user"><div class="mock-avatar">관</div>관리자</div>
+    </div>
+    <div class="mock-sidebar">
+      <div class="mock-nav-item">대시보드</div>
+      <div class="mock-nav-item active">에이전트 AI</div>
+      <div class="mock-nav-item">자산</div>
+      <div class="mock-nav-item">스캔</div>
+      <div class="mock-nav-item">설정</div>
+    </div>
+    <div class="mock-main">
+      <div class="page-title">에이전트 AI — 팀원별 두뇌 · 위치</div>
+      <div class="page-sub">여러 개의 두뇌가 함께 일합니다. 팀원마다 <b style="color:#fff">어떤 두뇌</b>를, <b style="color:#fff">어디서</b> 쓸지 여기서 정합니다.</div>
+
+      <div class="demo-ctrl">
+        <div class="demo-ctrl-h">🧪 시연 컨트롤 — 이 블록은 목업 전용입니다(실제 화면엔 없음)</div>
+        <div class="demo-ctrl-sub">아래 값을 바꾸면 로스터 카드와 팀 요약이 그 조합대로 다시 그려집니다. "위치" 버튼은 카드에서 직접 눌러 보세요.</div>
+        <div class="demo-grid">
+          <div class="demo-field">
+            <label>로그인 유형</label>
+            <select id="ctlAdmin">
+              <option value="1">관리자(admin)</option>
+              <option value="0">담당자(비-admin)</option>
+            </select>
+          </div>
+          <div class="demo-field">
+            <label>이 PC의 구동 티어(VRAM)</label>
+            <select id="ctlVram">
+              <option value="lite">Lite · 10GB급 (로컬 동시 1개)</option>
+              <option value="standard" selected>Standard · 24GB급 (로컬 동시 1개)</option>
+              <option value="pro">Pro · 48GB급 (로컬 동시 2개)</option>
+            </select>
+          </div>
+          <div class="demo-field">
+            <label>원격 GPU(VPN)</label>
+            <select id="ctlRemote">
+              <option value="unset">미설정</option>
+              <option value="off">설정됨 · 꺼짐</option>
+              <option value="on" selected>설정됨 · 켜짐</option>
+            </select>
+          </div>
+          <div class="demo-field">
+            <label>지금 원격 서버가 제공 중인 모델(데모용)</label>
+            <select id="ctlRemoteModel">
+              <option value="14b">14B급 (예상 답 ~17초)</option>
+              <option value="32b" selected>32B급 (예상 답 ~37초)</option>
+              <option value="72b">72B급 (예상 답 ~90초)</option>
+            </select>
+          </div>
+          <div class="demo-field">
+            <label>클라우드</label>
+            <select id="ctlCloud">
+              <option value="unset">미설정</option>
+              <option value="off" selected>설정됨 · 꺼짐</option>
+              <option value="on">설정됨 · 켜짐</option>
+            </select>
+          </div>
+          <div class="demo-field">
+            <label>클라우드 제공자(데모용)</label>
+            <select id="ctlCloudProvider">
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="claude">Anthropic Claude</option>
+              <option value="custom">직접 입력(OpenAI 호환)</option>
+            </select>
+          </div>
+          <div class="demo-field">
+            <label>에어갭 모드</label>
+            <div class="chk-row"><input type="checkbox" id="ctlAirgap"> 켜짐 — 외부·원격 연결 전부 차단</div>
+          </div>
+          <div class="demo-field">
+            <label>고장 상황 미리보기</label>
+            <div class="chk-row"><input type="checkbox" id="ctlMissing"> GIJO Agent 배정 모델 파일이 사라진 상태</div>
+          </div>
+        </div>
+        <div class="demo-note">※ "원격이 지금 제공 중인 모델"은 실제 설정 화면 항목이 아닙니다 — 오늘 gb10에서 잰 3개 모델의 응답 속도를 미리 보여주기 위한 데모 값입니다(원격 서버에 실제로 어떤 모델이 떠 있는지는 원격 쪽 관리자의 몫입니다).</div>
+      </div>
+
+      <div id="readinessBox"></div>
+
+      <div id="adminGateNotice" style="display:none;background:var(--panel-2);border:1px dashed var(--border-strong);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:12.25px;color:var(--muted);line-height:1.7;">
+        🔒 <b style="color:#fff">이 구역은 관리자 전용입니다.</b> 실제 코드(<code>agent.html:697-705 applyAdminGating</code>)도
+        비관리자에겐 카드 그리드 전체(#rosterPanel)를 숨깁니다 — select만 잠그는 게 아니라 패널째 안 보입니다.
+        담당자는 아래 "팀 한눈에" 요약(읽기 전용)만 봅니다.
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">팀 한눈에</div>
+        <div class="panel-sub">6명이 각각 어디서 · 어떤 두뇌로 · 얼마 만에 답하는지 한 표로.</div>
+        <table class="glance">
+          <thead><tr><th>에이전트</th><th>위치</th><th>두뇌 / 제공자</th><th>예상 응답</th><th>상태</th></tr></thead>
+          <tbody id="glanceBody"></tbody>
+        </table>
+      </div>
+
+      <div id="rosterBox">
+        <div class="panel" style="padding-bottom:14px;">
+          <div class="panel-title">우리 팀 — 보안 에이전트 로스터</div>
+          <div class="panel-sub">카드마다 위치(💻🖧☁) 버튼을 눌러 보세요 — 정보 줄이 그 자리에서 바뀝니다.</div>
+          <div class="agent-grid" id="agentGrid"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     시안 안 설명 블록 — "왜 이렇게 했나" (요청된 필수 구성요소)
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="doc-wrap">
+  <div class="doc-h1">왜 이렇게 했나</div>
+  <div class="doc-lead">이 문서는 결정을 받기 위한 설명입니다. 승인/반려만 해 주시면 됩니다 — 다른 방향을 원하시면 그때 대안을 새로 만듭니다.</div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">0</div><h2>이 시안이 푸는 문제</h2></div>
+    <p>지금은 팀원 카드에 "두뇌(모델)"만 고를 수 있고 "위치"는 어디에도 없습니다 — 원격 GPU를 켜면
+    <b>팀 전원</b>이 한꺼번에 원격으로 가고(<code>llm.ts:697 remoteLlmTarget()</code>가 agentId를 안 받음),
+    끄면 전원 로컬입니다. 오늘 실측(72B 원격 90초)은 이 문제를 숫자로 보여줍니다 — <b>총괄(라우팅 판단)에
+    90초짜리 두뇌를 붙이면 안 되는데, 지금 구조로는 "총괄만 로컬, 분석만 원격"이 불가능합니다.</b>
+    이 시안은 팀원 카드에 "위치" 한 줄을 더해 그 판단을 담당자가 직접 하게 합니다.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">1</div><h2>왜 이 안인가 · 다른 길을 왜 안 골랐나</h2></div>
+    <ul>
+      <li><b>안 A(채택) — 카드 안에 pill 3개 + 정보 한 줄.</b> 위치를 누르면 그 자리에서 결과 문장이
+      바뀝니다("원격 미설정 — 이 PC로 답함" 등). 근거: NN/g "Visibility of System Status"·
+      "Recognition rather than recall" — 선택과 결과를 같은 화면·같은 순간에 붙인다.</li>
+      <li><b>안 B(기각) — 설정 화면에 "에이전트별 원격 사용" 표를 새로 만든다.</b> 로스터 카드와
+      분리된 자리가 하나 더 생겨 "한눈에 팀 전체가 보이나"를 못 만족하고, 이 저장소가 줄여온
+      조작 표면(18→10)이 다시 늘어납니다. 기각.</li>
+      <li><b>안 C(기각) — 위치도 두뇌처럼 드롭다운 하나로 처리한다.</b> select는 "선택"만 되고
+      "이걸 고르면 무슨 일이 생기는지"를 같은 자리에서 못 보여줍니다. 지연시간·경고를 붙이려면
+      결국 별도 줄이 필요해 pill 방식과 결과가 같아지는데, pill 쪽이 지금 상태(active)를
+      한눈에 더 잘 보여줍니다. 기각.</li>
+      <li><b>클라우드를 3번째 자리로 당당히 줄 것인가</b> — 조사해 보니 이 6개 역할 에이전트는
+      전부 사내 데이터를 다루도록 설계돼 있어(스캔 결과·자산·RAG) 클라우드에 사실상 안 맞습니다
+      (섹션 4). 그래도 <b>숨기지 않고</b> 선택은 열어 두되 강한 경고로 대체했습니다 — 사장님이
+      "고를 수 있어야 하는 위치 셋"이라고 명시하셨고 코드도 실재하므로, 판단은 관리자에게
+      맡기고 결과를 정직하게 보여주는 쪽을 택했습니다.</li>
+      <li><b>총괄(orchestrator)의 위치</b> — pill 대신 잠금 배지로 처리(섹션 3). 어댑터 잠금
+      (<code>agents.ts:138</code>, "총괄엔 배정 불가")과 같은 자리에 같은 방식으로 둬서 규칙이
+      두 가지 모양으로 흩어지지 않게 했습니다.</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">2</div><h2>속도 예상 — 실측만 보여준다</h2></div>
+    <p>원격 GPU에서 위치를 <b>원격</b>으로 바꾸면, 지금 그 서버가 제공 중인 모델 크기(데모 컨트롤)에 맞춰
+    오늘 잰 세 값 중 하나가 그대로 보입니다. 로컬(이 PC)과 클라우드는 <b>이번 조사에 실측이 없어
+    숫자를 지어내지 않고 "측정 안 됨"으로 둡니다</b> — 로컬은 화면의 기존 "성능" 패널(최근 실측)을
+    참고하라고 안내합니다.</p>
+    <div class="metric-box">
+      <div class="metric-row"><span>14B급 (원격 실측)</span><b>적재 3초 · 답 17.4초 · 661자 · 23.0 tok/s</b></div>
+      <div class="metric-row"><span>32B급 (원격 실측)</span><b>적재 13초 · 답 36.6초 · 623자 · 10.9 tok/s</b></div>
+      <div class="metric-row"><span>72B급 (원격 실측)</span><b>적재 103초 · 답 89~90초 · 660자 · 4.5 tok/s</b></div>
+      <div class="metric-row" style="border-bottom:none;color:var(--muted-2)"><span>일반 지식 질문 2건 평균 · 답 품질 체감 차이 없음 · 취약점 판단 등 실제 업무는 아직 안 쟀음</span></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">3</div><h2>총괄(orchestrator)은 특별한가 — 위치도 잠갔다</h2></div>
+    <p><b>예, 잠갔습니다(판단 — 코드가 아직 강제하진 않음, 승인되면 구현 시 강제할지는 사용자가 결정).</b>
+    근거 셋:</p>
+    <ul>
+      <li>총괄은 "지시 → Scan/Analyze/Report 분배"를 매 지시마다 <b>여러 번</b> 반복합니다(도구 선택
+      JSON 호출, <code>llm.ts</code>의 <code>responseSchema</code> 경로). 원격 72B가 붙으면 지시 하나
+      나누는 데만 90초가 듭니다 — 파이프라인 전체가 그 위에서 대기합니다.</li>
+      <li>어댑터도 이미 같은 이유로 총괄만 예외입니다("지시 분배는 흔들리면 안 됩니다",
+      <code>agent.html:294</code>) — 결정성이 흔들리면 안 되는 자리에 왕복 지연·네트워크 불안정
+      까지 얹는 것은 같은 문제의 반복입니다.</li>
+      <li>학술 근거: 역할별 모델 크기·비용/지연 트레이드오프를 명시적으로 다뤄야 한다는 연구
+      (arXiv 2601.04861) — 총괄처럼 "빈도 높고 결정 하나하나가 짧은" 역할은 크고 느린 두뇌보다
+      작고 빠른 두뇌가 맞다는 결론과 일치합니다.</li>
+    </ul>
+    <p>화면에서는 총괄 카드에 pill 대신 <b>"💻 이 PC 고정"</b> 배지 + 이유 한 줄만 둡니다(어댑터 잠금과
+    같은 자리·같은 모양). 다만 이건 이 시안의 <b>제안</b>입니다 — 하드 락으로 코드에 넣을지, 관리자가
+    강제로 풀 수 있는 여지를 둘지는 승인 시 함께 정해 주세요.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">4</div><h2>클라우드가 이 팀엔 잘 안 맞는 이유 — 구조적 한계를 숨기지 않는다</h2></div>
+    <p>조사해서 확인한 사실: <code>cloudllm.ts</code>의 <code>askCloud</code>/<code>cloudComplete</code>는
+    <b>agentId를 받지 않습니다.</b> 지금 클라우드가 실제로 쓰이는 곳은 딱 하나, 문서 번역
+    (<code>docenrich.ts</code>) — 대화가 아닙니다. 즉 "에이전트별로 클라우드를 고른다"는 지금
+    <b>설계도 없는 기능</b>입니다(원격보다 훨씬 더 미구현). 게다가 클라우드는 구조적으로
+    RAG를 안 태우므로(<code>cloudllm.ts:1-9</code>), 이 6개 에이전트는 전부 사내 맥락(스캔 원문·
+    자산·우선순위·사내 지식)이 핵심이라 클라우드로 보내면 <b>그 에이전트의 존재 이유가 빠진 채
+    일반 지식 답변만</b> 하게 됩니다. 카드에서 클라우드를 고르면 역할별로 정확히 무엇이 빠지는지
+    경고로 보여줍니다(감추지 않는다).</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">5</div><h2>잘못 고르면 어떻게 되나 — 카드에서 직접 확인</h2></div>
+    <ul>
+      <li><b>원격 미설정/꺼짐</b> — 위치를 원격으로 눌러도 정보 줄이 "설정 안 됨 — 이 PC로 답합니다"로
+      뜹니다. 저장은 되지만(선호는 남는다) 지금 당장의 효과는 로컬입니다.</li>
+      <li><b>에어갭 켜짐</b> — 원격·클라우드 둘 다 "🔒 에어갭 — 이 PC로 답합니다"로 바뀝니다
+      (<code>remotellm.ts:19-20</code>·<code>airgap.ts</code> 이중 방어와 동일한 태도).</li>
+      <li><b>관리자 아님</b> — 로스터 전체가 안 보입니다(섹션 1 안 B가 아니라 실제 현재 코드 동작,
+      <code>agent.html:697-705</code>). 담당자는 "팀 한눈에" 표만 읽기 전용으로 봅니다.</li>
+      <li><b>배정 모델 파일 없음</b> — 지금 실제 화면은 이 경우 드롭다운이 <b>조용히 "전역 모델
+      따름"처럼 보입니다</b>(어떤 옵션도 selected가 안 돼 브라우저가 첫 항목을 보여주는 것 —
+      실제로는 여전히 없는 파일을 가리키고 있는데 화면은 마치 아무 배정도 없는 것처럼 보이는
+      겁니다). 시연 컨트롤의 "고장 상황 미리보기"를 켜면 이 시안이 그 자리를 어떻게 정직하게
+      고치는지(빨간 "파일 없음" 배지) 볼 수 있습니다.</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">6</div><h2>무엇을 포기했나</h2></div>
+    <ul>
+      <li>원격 서버가 팀원마다 <b>다른 크기 모델을 동시에</b> 제공하는 것 — 안 그렸다. 지금 구조는
+      원격 엔드포인트가 하나뿐이라(<code>remotellm.ts</code> 설정도 URL 하나) 크기는 팀 전체가 공유한다.
+      "누구를 원격으로 보낼지"만 팀원별로 다르게 고를 수 있다.</li>
+      <li>클라우드가 실제로 개별 대화에 연결된 것처럼 "동작하는 척" — 안 그렸다. 지금은 미리보기라고
+      명시했다.</li>
+      <li>Pro 등급의 "A/B 비교·검증 병행" — 안 그렸다. <code>abTest</code>·<code>compareModels</code>·
+      <code>crossVerify</code> 0건 확인. Pro의 "동시 2개"는 <b>용량</b>(스왑 없이 두 로컬 모델 유지)이지
+      비교 기능이 아니다.</li>
+      <li>LoRA 전문 분야 어댑터를 원격/클라우드에도 적용되는 것처럼 — 안 그렸다. 어댑터는 로컬 전용
+      (<code>localengine.ts agentRequestExtras</code>)이라 위치가 로컬이 아니면 "어댑터는 이 PC에서만
+      적용됩니다" 안내로 대체했다.</li>
+      <li>실시간 latency API 연동 — 안 했다(정적 데모 값). 실제 구현 때는 서버가 최근 응답시간을
+      내려주는 API가 새로 필요하다(섹션 9).</li>
+      <li>ⓘ ~screenguide 실연동 — 이 목업엔 서버가 없어 챗봇 패널을 못 연다. 실제 구현에서는
+      제품 원칙대로 설명을 화면 문구가 아니라 screenguide+ⓘ로 옮겨야 한다(섹션 8).</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">7</div><h2>밀도 숫자</h2></div>
+    <p>CSS 박스 모델 기준 추정치입니다(실제 Chrome devtools 측정이 아니라 <code>agent.html</code>의
+    패딩·마진·line-height 값으로 계산했습니다 — 참고용으로 보되, 실제 구현 후 다시 재는 것을 권합니다).</p>
+    <div class="metric-box">
+      <div class="metric-row"><span>카드 1장 — 기존(대략)</span><b>≈ 218px</b></div>
+      <div class="metric-row"><span>카드 1장 — 이 안, 위치=이 PC(일반 경우)</span><b>≈ 246px (+28px, +12.8%)</b></div>
+      <div class="metric-row"><span>카드 1장 — 이 안, 경고 2줄이 뜨는 경우(최악)</span><b>≈ 264px (+46px, +21.1%)</b></div>
+      <div class="metric-row"><span>로스터 그리드 전체 — 기존 (7장, 4열×2행)</span><b>≈ 448px</b></div>
+      <div class="metric-row" style="border-bottom:none;"><span>로스터 그리드 전체 — 이 안</span><b>≈ 504px (+56px, +12.5%)</b></div>
+    </div>
+    <p>새로 생기는 세로 한 줄은 <b>위치 pill 행(약 30px)</b> 하나뿐입니다 — 그 대신 "🧠 현재 추천 모델"
+    한 줄을 없애고 그 정보를 위치의 정보 줄에 합쳐서, 순증가를 카드당 1줄로 눌렀습니다. 새로 추가한
+    "팀 한눈에" 패널은 완전히 새 블록입니다(기존 "팀원별 담당 모델" 목록을 표로 확장 — 7행 기준
+    약 210~280px, 별도 산정).</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">8</div><h2>제품 원칙 자가점검</h2></div>
+    <table class="check-table">
+      <tr><td>자체완결 HTML</td><td><span class="ok-tag">충족</span> — 외부 CDN·폰트·이미지 0개, 더블클릭으로 열림.</td></tr>
+      <tr><td>제품 색 토큰 재사용</td><td><span class="ok-tag">충족</span> — agent.html의 :root 변수 그대로 복사.</td></tr>
+      <tr><td>추천 1개 원칙</td><td><span class="ok-tag">충족</span> — 대안(안 B·C)은 글로만 비교, 화면은 하나.</td></tr>
+      <tr><td>조작 최소화(메뉴는 보기용)</td><td><span class="ok-tag">충족(주의 필요)</span> — 카드당 신규 조작은 위치 pill 1행뿐. 다만 pill 3개는 엄연히 새 조작이라 "꼭 필요한 만큼만"인지는 승인 시 재확인 부탁드립니다.</td></tr>
+      <tr><td>정직한 구현</td><td><span class="ok-tag">충족</span> — 미구현 사실을 배너·경고로 명시. 없는 기능(A/B 비교, 원격 다중모델, 클라우드 실연동)을 안 그림.</td></tr>
+      <tr><td>11px 미만 금지</td><td><span class="ok-tag">충족</span> — 최소 11.25px(라벨류), 본문 11.5~13px.</td></tr>
+      <tr><td>설계 전 조사</td><td><span class="ok-tag">충족</span> — CrewAI·LM Studio Bionic·arXiv·NN/g 4건, 우리 상황 적용 판단 포함(섹션 9).</td></tr>
+      <tr><td>화면 설명은 챗봇으로</td><td>부분 보류 — 이 목업은 서버가 없어 화면 안 rationale 블록으로 대신함. 실제 구현 시 이 설명 대부분(위치의 의미·경고 사유)은 screenguide+ⓘ로 옮기고, 화면엔 정체성 한 줄만 남겨야 한다(섹션 6에 기록).</td></tr>
+    </table>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">9</div><h2>설계 전 조사 — 출처</h2></div>
+    <ul class="src-list">
+      <li><a href="https://docs.crewai.com/en/concepts/agents" target="_blank" rel="noopener">CrewAI 공식 문서 — Agents (docs.crewai.com/en/concepts/agents)</a><br>
+        에이전트 객체가 자기 <code>llm=</code>을 직접 갖는 것이 멀티에이전트 프레임워크의 표준.
+        <b>적용:</b> "팀원 카드 = 역할+두뇌"가 한 단위여야 한다는 근거로 그대로 옮김.</li>
+      <li><a href="https://lmstudio.ai/docs/bionic/models" target="_blank" rel="noopener">LM Studio Bionic 공식 문서 — Choose a Cloud, Local, or Remote Model (lmstudio.ai/docs/bionic/models, 2026)</a><br>
+        실제 출시 제품이 "로컬/원격/클라우드" 3분류를 그대로 씀. <b>적용:</b> 이름·분류 그대로 채택.
+        <b>차이:</b> Bionic의 "원격"은 개인 기기 간(LM Link)이고 우리는 VPN 안 사내 GPU라 신뢰 경계가
+        더 강함 — 그래서 "원격도 RAG를 그대로 실어도 된다"는 판단이 우리 쪽에서만 가능했다.</li>
+      <li><a href="https://arxiv.org/pdf/2601.04861" target="_blank" rel="noopener">arXiv 2601.04861 — Confidence-Aware Routing for Efficient Multi-Agent Collaboration across Multi-Scale Models</a><br>
+        역할마다 맞는 모델 크기가 다르고 크기가 클수록 지연·비용이 커진다는 것을 라우팅 정책이
+        명시적으로 다뤄야 한다는 연구. <b>적용:</b> 총괄=작고 빠른 두뇌 고정의 근거.
+        <b>차이:</b> 이 연구는 모델이 스스로 정하는 자동 라우팅을 다루고, 우리는 사람(관리자)이
+        정한다 — 폐쇄망·GPU 1~2장 환경에서는 자동보다 사람이 정하는 쪽이 더 정직하다고 판단.</li>
+      <li><a href="https://www.nngroup.com/articles/ten-usability-heuristics/" target="_blank" rel="noopener">Nielsen Norman Group — 10 Usability Heuristics (#1 Visibility of System Status, #6 Recognition rather than recall)</a><br>
+        선택과 결과를 같은 자리·같은 순간에. <b>적용:</b> pill을 누르면 바로 아래 정보 줄이 바뀌는 설계.</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><div class="sec-n">10</div><h2>구현 시 손댈 자리 (승인 시 메인 에이전트용 메모)</h2></div>
+    <ul>
+      <li><code>server/src/engine/agents.ts</code> — <code>AgentDefinition</code>에
+      <code>assignedLocation: "local"|"remote"|"cloud"|null</code> 추가. <code>modelKey</code>·
+      <code>adapterKey</code>(99-100, 123행)와 같은 자리에 <code>locationKey</code> 추가,
+      <code>getAgentLocation()</code>/<code>setAgentLocation()</code>을 145-154행
+      <code>setAgentModel()</code> 패턴 그대로 복제. <b>총괄 잠금은 138행 스타일 그대로</b>
+      (<code>if (agentId==="orchestrator" && location!=="local") throw ...</code>).</li>
+      <li><code>server/src/engine/llm.ts:692-699</code> — <b>가장 신경 쓸 자리.</b>
+      <code>remoteLlmTarget()</code>은 <code>searchrewrite.ts</code> 등 다른 소비자도 agentId 없이
+      부른다(주석에 명시). 시그니처를 바꾸지 말고 <b>호출부에서 먼저 갈라라</b>:
+      <code>const loc = getAgentLocation(args.agentId); const 원격목표 = loc==="remote" ? await remoteLlmTarget() : null;</code>
+      — 이러면 remotellm.ts 자체(전역 on/off·에어갭·admin 판정)는 그대로 재사용되고, 다른 소비자엔
+      영향이 없다. <code>loc==="cloud"</code>는 완전히 다른 분기가 필요(아래).</li>
+      <li><code>server/src/engine/llm.ts</code> 안에 <b>클라우드 분기 신설</b> — 지금 <code>chat()</code>은
+      로컬/원격만 안다. <code>loc==="cloud"</code>일 때는 RAG(<code>rag</code> 변수)를 절대 실으면 안
+      되므로 기존 messages 조립을 타면 안 된다 — <code>cloudllm.ts</code>의 저수준 provider 호출을
+      새로 export해 별도 경로로 불러야 하고, <code>cloudegress.ts</code> 게이트를 반드시 통과시켜야
+      한다. 원격보다 변경 범위가 크다(섹션 4 참고).</li>
+      <li><code>server/src/engine/localengine.ts</code> — 로컬은 <b>손댈 것 없음</b>
+      (<code>ensureAgentModel</code>·<code>agentRequestExtras</code> 이미 agentId 지원).
+      다만 "배정 모델 파일 없음"을 화면이 알 수 있게 <code>isModelAvailable()</code> 결과를
+      에이전트 목록 응답에 <code>modelFileMissing: boolean</code>로 얹는 것을 권한다
+      (지금은 콘솔 경고뿐, 1083-1084행).</li>
+      <li><code>client/src/renderer/pages/agent.html</code> — <code>modelSelectHtml()</code>
+      (316-327행) 옆에 위치 pill 렌더 함수 추가, <code>specialtyHtml()</code>(290-303행)처럼
+      총괄 잠금 문구 추가, <code>brainList</code> 요약(456-465행)에 위치·예상응답 컬럼 추가.</li>
+      <li><code>client/src/preload.ts:198</code> — <code>setAgentModel</code> 옆에
+      <code>setAgentLocation: (agentId, location) => api.agentsApi.setLocation(agentId, location)</code>
+      추가(같은 IPC 패턴 복제) + 서버 라우트 1개 신설.</li>
+      <li>속도 예상 배지를 실측으로 채우려면 — 서버에 "최근 N회 평균 응답시간(에이전트별)" API가
+      새로 필요하다(지금 <code>agent.html</code>의 "성능" 패널은 전역 1개 값만 집계, 216-225행).</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+// 데이터 — server/src/engine/agents.ts:45-90 AGENT_DEFS 원문 그대로 인용.
+// agent.html:264-274 AGENT_STYLE 아이콘/색 그대로 재사용(normaltic은 실제 화면에도
+// 전용 아이콘이 없다 — 그대로 두었다, ● 기본 표식).
+// ══════════════════════════════════════════════════════════════════════
+const AGENTS = [
+  { id:"orchestrator", name:"Security Orchestrator", role:"작업 분배 · 결과 취합",
+    desc:"지시를 해석해 Scan → Analyze → Report 순으로 작업을 나눠 맡기고, 각 단계 결과를 취합해 최종 응답으로 정리합니다.",
+    icon:"◆", color:"var(--blue-light)", bg:"rgba(59,130,246,0.18)", status:"watching", locked:true },
+  { id:"scan", name:"Scan Agent", role:"초기 데이터 해석 · 자산 반영",
+    desc:"업로드·스캔(ModelScan) 결과로 나온 모델 취약점을 위협 관점에서 해석·요약하고 자산 finding으로 반영합니다.",
+    icon:"▤", color:"var(--purple)", bg:"rgba(139,124,240,0.18)", status:"idle" },
+  { id:"analysis", name:"Analyze Agent", role:"AI 지식·모델 관리 · 우선순위 판단",
+    desc:"기억·학습(RAG)·온톨로지·학습 루프 등 AI 지식모델 관리를 담당하고, 스캔 finding의 우선순위를 판단합니다.",
+    icon:"◈", color:"var(--amber)", bg:"rgba(240,160,32,0.18)", status:"idle" },
+  { id:"report", name:"Report Agent", role:"내부 보고서 작성 · 결과 레포팅",
+    desc:"작업 결과를 내부 보고용 문서로 정리합니다. 파이프라인 마지막 단계에서 스캔·분석 결과를 받아 보고서를 만듭니다.",
+    icon:"▣", color:"var(--purple)", bg:"rgba(139,124,240,0.18)", status:"idle" },
+  { id:"ti", name:"TI Agent", role:"위협 인텔리전스 · CTI 모니터링",
+    desc:"딥웹·다크웹 CTI 피드 기반으로 유출정보·위협을 모니터링하고 자산 인벤토리와 대조해 영향 자산을 자동 매칭합니다.",
+    icon:"🛰", color:"var(--blue-light)", bg:"rgba(59,130,246,0.18)", status:"watching" },
+  { id:"normaltic", name:"GIJO Agent", role:"용어 해설 · 사례 부연(사내 지식)",
+    desc:"Scan·Analyze 결과에 나온 용어를 사내 지식베이스 근거로 해설하고 실제 사례를 부연합니다(엄격 그라운딩).",
+    icon:"●", color:"var(--muted)", bg:"var(--panel-2)", status:"watching" },
+];
+
+// 클라우드로 보내면 그 에이전트에서 정확히 무엇이 빠지는지 — 감추지 않고 역할별로 적는다.
+const CLOUD_LOSS = {
+  scan: "스캔 원문(모델 finding)은 사내 자료라 애초에 클라우드로 안 나갑니다 — 결과 반영 없이 일반적인 취약점 설명만 하게 됩니다.",
+  analysis: "RAG·온톨로지·finding 우선순위는 사내 맥락이 있어야 하는데 클라우드는 이걸 못 받습니다 — 우선순위 판단이 사실상 꺼집니다.",
+  report: "스캔·분석 결과를 받아야 보고서가 되는데 클라우드엔 그 내용이 안 실립니다 — 빈 틀 문장만 나올 수 있습니다.",
+  ti: "자산 인벤토리 대조가 핵심인데 클라우드는 사내 자산 목록을 못 받습니다 — 일반적 위협 설명만 가능합니다.",
+  normaltic: "이 에이전트의 존재 이유인 '사내 지식베이스 근거 해설'이 꺼집니다 — RAG를 클라우드로 안 보내기 때문입니다.",
+};
+
+// 로컬(이 PC) 모델 후보 — 실제 권장 카탈로그(modelcatalog.ts) 이름 그대로.
+const LOCAL_MODELS = [
+  { v:"global", label:"전역 모델 따름 (지금 Qwen3-14B)" },
+  { v:"gijo7b", label:"gijo-main-orchestrator (7.6B)" },
+  { v:"exaone", label:"EXAONE-3.5-7.8B-Instruct (7.8B · 비상업 라이선스)" },
+];
+const LOCAL_MODEL_LABEL = Object.fromEntries(LOCAL_MODELS.map(m=>[m.v,m.label]));
+
+const REMOTE_ETA = { "14b": {sec:"약 17초", detail:"적재 3초 · 661자 · 23.0 tok/s"},
+                      "32b": {sec:"약 37초", detail:"적재 13초 · 623자 · 10.9 tok/s"},
+                      "72b": {sec:"약 90초", detail:"적재 103초 · 660자 · 4.5 tok/s"} };
+
+// ── 상태 (데모 컨트롤 + 카드별 위치/모델 선호) ───────────────────────
+const state = { isAdmin:true, vram:"standard", remote:"on", remoteModel:"32b", cloud:"off", cloudProvider:"openai", airgap:false, missingDemo:false };
+const agentLoc = { orchestrator:"local", scan:"local", analysis:"remote", report:"local", ti:"local", normaltic:"local" };
+const agentModel = { scan:"global", analysis:"global", report:"exaone", ti:"global", normaltic:"global" };
+
+const VRAM_TIER = { lite:{label:"Lite · 10GB급", max:1}, standard:{label:"Standard · 24GB급", max:1}, pro:{label:"Pro · 48GB급", max:2} };
+
+function esc(s){ return String(s==null?"":s).replace(/</g,"&lt;"); }
+
+// ── 위치별 정보 줄 계산 ───────────────────────────────────────────────
+function locationInfo(agent, loc) {
+  if (loc === "local") {
+    const modelKey = (state.missingDemo && agent.id === "normaltic") ? "__missing__" : agentModel[agent.id];
+    if (modelKey === "__missing__") {
+      return { cls:"iv-block", text:`⚠ 배정 모델 <b>merged-lily-보안특화-14B</b> 파일 없음 <span class="file-missing-badge">파일 없음</span> — 기본 모델(Qwen3-14B)로 조용히 답합니다.` };
+    }
+    return { cls:"iv-ok", text:`💻 이 PC · <b>${esc(LOCAL_MODEL_LABEL[modelKey] || LOCAL_MODEL_LABEL.global)}</b> · 응답 속도는 이 PC 사양에 따라 다름 — <span class="eta-unk">실측은 '성능' 패널 참고</span>` };
+  }
+  if (loc === "remote") {
+    if (state.airgap) return { cls:"iv-block", text:"🔒 에어갭 모드 — 원격 연결 전체 차단, 지금은 이 PC로 답합니다." };
+    if (state.remote === "unset") return { cls:"iv-warn", text:"⚙ 원격 GPU 미설정 — 설정 &gt; 서버·AI에서 먼저 연결하세요. 지금은 이 PC로 답합니다." };
+    if (state.remote === "off") return { cls:"iv-warn", text:"⏸ 원격 GPU 꺼짐 — 지금은 이 PC로 답합니다." };
+    const eta = REMOTE_ETA[state.remoteModel];
+    return { cls:"iv-ok", text:`🖧 원격 서버 제공 모델 <b>${state.remoteModel.toUpperCase()}급</b> · 예상 응답 <span class="eta">${eta.sec}</span>(오늘 gb10 실측 · ${eta.detail}) · 사내망(VPN)이라 RAG는 그대로 실립니다.` };
+  }
+  // cloud
+  if (state.airgap) return { cls:"iv-block", text:"🔒 에어갭 모드 — 클라우드 전체 차단, 지금은 이 PC로 답합니다." };
+  if (state.cloud === "unset") return { cls:"iv-warn", text:"⚙ 클라우드 미설정 — 설정에서 제공자·키를 먼저 넣으세요. 지금은 이 PC로 답합니다." };
+  if (state.cloud === "off") return { cls:"iv-warn", text:"⏸ 클라우드 꺼짐 — 지금은 이 PC로 답합니다." };
+  const providerLabel = { openai:"OpenAI", gemini:"Google Gemini", claude:"Anthropic Claude", custom:"직접 입력(OpenAI 호환)" }[state.cloudProvider];
+  const loss = CLOUD_LOSS[agent.id] || "";
+  return { cls:"iv-block", text:`☁ ${providerLabel} · 예상 응답 <span class="eta-unk">측정 안 됨(외부 API)</span><br>⚠ ${loss}` };
+}
+
+// ── 카드 렌더 ──────────────────────────────────────────────────────
+function agentCardHtml(agent) {
+  const st = { idle:["대기중","st-idle"], working:["작업중","st-working"], watching:["모니터링","st-watch"] }[agent.status];
+  let locBlock;
+  if (agent.locked) {
+    locBlock = `<div class="loc-locked-row">💻 이 PC 고정 · 위치를 바꿀 수 없음</div>
+      <div class="loc-locked-reason">총괄은 지시마다 반복적으로 도구 선택 판단을 내립니다 — 원격·클라우드 왕복 지연이 붙으면 지시 분배 전체가 느려집니다(오늘 실측 원격 72B는 답 하나에 90초). 전문 분야 어댑터를 안 두는 규칙과 같은 이유입니다.</div>`;
+  } else {
+    const loc = agentLoc[agent.id];
+    const info = locationInfo(agent, loc);
+    const pill = (v,label,extraCls) => `<button class="loc-pill ${loc===v?"active "+(extraCls||""):""}" data-agent="${agent.id}" data-loc="${v}">${label}</button>`;
+    locBlock = `<div class="loc-pills">${pill("local","💻 PC")}${pill("remote","🖧 원격","at-remote")}${pill("cloud","☁ 클라우드","at-cloud")}</div>
+      <div class="loc-info ${info.cls}">${info.text}</div>`;
+    if (loc === "local") {
+      const modelKey = (state.missingDemo && agent.id === "normaltic") ? "__missing__" : agentModel[agent.id];
+      const opts = LOCAL_MODELS.map(m=>`<option value="${m.v}" ${modelKey===m.v?"selected":""}>${esc(m.label)}</option>`).join("")
+        + (modelKey==="__missing__" ? `<option value="__missing__" selected>merged-lily-보안특화-14B (파일 없음)</option>` : "");
+      locBlock += `<select class="brain-select" data-agent="${agent.id}">${opts}</select>`;
+    }
+  }
+  // 전문 분야(어댑터) — 실제 화면 규칙 그대로: 총괄은 없음, 위치≠local이면 "로컬 전용" 안내로 대체.
+  let spec;
+  if (agent.locked) {
+    spec = `<div class="agent-spec">🎓 총괄은 어댑터를 두지 않습니다 — 지시 분배는 흔들리면 안 됩니다.</div>`;
+  } else if (agentLoc[agent.id] !== "local") {
+    spec = `<div class="agent-spec">🎓 전문 분야 어댑터는 <b>이 PC(로컬)에서만</b> 적용됩니다 — 지금 위치에선 베이스 모델 그대로 답합니다.</div>`;
+  } else {
+    spec = `<div class="agent-spec">🎓 전문 분야: <span style="color:var(--muted-2)">베이스 그대로 — 두 회전(LoRA) 모두 불채택이라 배정할 어댑터가 없습니다.</span></div>`;
+  }
+  return `<div class="agent-card">
+    <div class="agent-status ${st[1]}"><span class="st-dot"></span>${st[0]}</div>
+    <div class="agent-top">
+      <div class="agent-icon" style="background:${agent.bg};color:${agent.color}">${agent.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="agent-name">${esc(agent.name)}</div>
+        <div class="agent-role">${esc(agent.role)}</div>
+      </div>
+    </div>
+    <div class="agent-desc">${esc(agent.desc)}</div>
+    ${locBlock}
+    ${spec}
+  </div>`;
+}
+
+function embeddingCardHtml() {
+  return `<div class="agent-card">
+    <div class="agent-status st-working"><span class="st-dot"></span>상주</div>
+    <div class="agent-top">
+      <div class="agent-icon" style="background:rgba(30,185,128,.14);color:var(--teal)">🔎</div>
+      <div style="flex:1;min-width:0;">
+        <div class="agent-name">임베딩 엔진</div>
+        <div class="agent-role">문서·매뉴얼 검색 벡터화 (RAG)</div>
+      </div>
+    </div>
+    <div class="agent-desc">업로드된 매뉴얼·문서를 벡터로 변환해 검색·질의(RAG)를 뒷받침합니다. 대화하지 않는 상주 모듈이라 위치 선택이 없습니다(항상 이 PC).</div>
+    <div class="brain-line" style="margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">🧠 <b>bge-m3-FP16</b> <span style="color:var(--muted-2)">임베딩 전용 · GPU 상주 · :8081</span></div>
+  </div>`;
+}
+
+// ── 준비도 범례 ──────────────────────────────────────────────────────
+function readinessHtml() {
+  return `<div class="readiness">
+    <div class="rd-item"><div class="rd-h">💻 이 PC <span class="rd-badge rd-ready">지금도 동작</span></div>
+      <div class="rd-desc">팀원마다 실제로 다른 로컬 모델을 씁니다(localengine.ts ensureAgentModel(agentId), 실증됨).</div></div>
+    <div class="rd-item"><div class="rd-h">🖧 원격 GPU <span class="rd-badge rd-partial">부분 구현</span></div>
+      <div class="rd-desc">지금은 전원 켜짐/꺼짐 하나뿐(llm.ts:697). 팀원별로 나누려면 remoteLlmTarget() 호출부에 agentId 분기 추가가 필요합니다.</div></div>
+    <div class="rd-item"><div class="rd-h">☁ 클라우드 <span class="rd-badge rd-none">설계만 있음</span></div>
+      <div class="rd-desc">개별 대화가 클라우드로 가는 경로 자체가 없습니다(cloudllm.ts는 문서 번역·독립 위젯에서만 쓰임). 이 카드의 클라우드는 미리보기입니다.</div></div>
+  </div>`;
+}
+
+// ── 스왑 비용 배너 (VRAM 티어 vs 로컬 위치 팀원들의 서로 다른 모델 수) ──
+function swapBannerHtml() {
+  const localAgents = AGENTS.filter(a => a.locked || agentLoc[a.id] === "local");
+  const distinct = new Set(localAgents.map(a => {
+    if (state.missingDemo && a.id === "normaltic") return "__missing__";
+    return a.locked ? "global" : (agentModel[a.id] || "global");
+  }));
+  const tier = VRAM_TIER[state.vram];
+  if (distinct.size > tier.max) {
+    return `<div class="swap-banner swap-warn">⚠ 지금 티어(<b>${tier.label}</b>)는 로컬 모델을 동시에 <b>${tier.max}개</b>까지 유지합니다.
+      이 PC를 고른 팀원들이 서로 다른 로컬 모델 <b>${distinct.size}종</b>을 쓰고 있어, 팀원을 오갈 때마다 모델을 다시 불러옵니다
+      (오늘 표의 적재시간 3초~103초 참고 — 모델이 클수록 더 걸립니다).</div>`;
+  }
+  return `<div class="swap-banner swap-ok">✅ 지금은 이 PC를 쓰는 팀원이 모두 티어 용량(${tier.max}개) 안의 로컬 모델을 씁니다 — 전환 비용이 없습니다.</div>`;
+}
+
+// ── 팀 한눈에 표 ──────────────────────────────────────────────────────
+function glanceRowHtml(agent) {
+  const loc = agent.locked ? "local" : agentLoc[agent.id];
+  const locTag = loc === "local" ? `<span class="gl-loc gl-local">💻 이 PC</span>` : loc === "remote" ? `<span class="gl-loc gl-remote">🖧 원격</span>` : `<span class="gl-loc gl-cloud">☁ 클라우드</span>`;
+  let brain, eta;
+  if (loc === "local") {
+    const modelKey = (state.missingDemo && agent.id === "normaltic") ? "__missing__" : (agent.locked ? "global" : agentModel[agent.id]);
+    brain = modelKey === "__missing__" ? `merged-lily-보안특화-14B <span class="gl-warn">(파일 없음)</span>` : esc(LOCAL_MODEL_LABEL[modelKey] || LOCAL_MODEL_LABEL.global);
+    eta = `<span class="gl-eta">성능 패널 참고</span>`;
+  } else if (loc === "remote") {
+    const ok = state.remote === "on" && !state.airgap;
+    brain = ok ? `${state.remoteModel.toUpperCase()}급(원격 공용)` : `<span class="gl-warn">미가동 — 이 PC로 대체</span>`;
+    eta = ok ? REMOTE_ETA[state.remoteModel].sec : `<span class="gl-eta">-</span>`;
+  } else {
+    const ok = state.cloud === "on" && !state.airgap;
+    const providerLabel = { openai:"OpenAI", gemini:"Gemini", claude:"Claude", custom:"직접입력" }[state.cloudProvider];
+    brain = ok ? providerLabel : `<span class="gl-warn">미가동 — 이 PC로 대체</span>`;
+    eta = ok ? `<span class="gl-eta">측정 안 됨</span>` : `<span class="gl-eta">-</span>`;
+  }
+  const st = { idle:["대기중","var(--muted-2)"], working:["작업중","var(--teal)"], watching:["모니터링","var(--blue-light)"] }[agent.status];
+  return `<tr><td><b style="color:#fff">${esc(agent.name)}</b><div style="color:var(--muted-2);font-size:11.25px">${esc(agent.role)}</div></td>
+    <td>${locTag}</td><td>${brain}</td><td>${eta}</td><td style="color:${st[1]}">${st[0]}</td></tr>`;
+}
+
+// ── 전체 렌더 ──────────────────────────────────────────────────────
+function render() {
+  document.getElementById("readinessBox").innerHTML = readinessHtml();
+
+  const showRoster = state.isAdmin;
+  document.getElementById("adminGateNotice").style.display = showRoster ? "none" : "block";
+  document.getElementById("rosterBox").style.display = showRoster ? "" : "none";
+
+  // 팀 한눈에는 관리자·담당자 모두에게 보인다(읽기 전용) — applyAdminGating은 카드 그리드만 숨긴다.
+  document.getElementById("glanceBody").innerHTML = AGENTS.map(glanceRowHtml).join("");
+
+  if (showRoster) {
+    const grid = document.getElementById("agentGrid");
+    grid.innerHTML = (state.vram ? swapBannerWrap() : "") + AGENTS.map(agentCardHtml).join("") + embeddingCardHtml();
+  }
+}
+function swapBannerWrap(){ return `<div style="grid-column:1/-1">${swapBannerHtml()}</div>`; }
+
+// ── 이벤트 배선 ──────────────────────────────────────────────────────
+document.getElementById("ctlAdmin").addEventListener("change", e => { state.isAdmin = e.target.value === "1"; render(); });
+document.getElementById("ctlVram").addEventListener("change", e => { state.vram = e.target.value; render(); });
+document.getElementById("ctlRemote").addEventListener("change", e => { state.remote = e.target.value; render(); });
+document.getElementById("ctlRemoteModel").addEventListener("change", e => { state.remoteModel = e.target.value; render(); });
+document.getElementById("ctlCloud").addEventListener("change", e => { state.cloud = e.target.value; render(); });
+document.getElementById("ctlCloudProvider").addEventListener("change", e => { state.cloudProvider = e.target.value; render(); });
+document.getElementById("ctlAirgap").addEventListener("change", e => { state.airgap = e.target.checked; render(); });
+document.getElementById("ctlMissing").addEventListener("change", e => { state.missingDemo = e.target.checked; render(); });
+
+document.getElementById("agentGrid").addEventListener("click", e => {
+  const btn = e.target.closest(".loc-pill");
+  if (!btn) return;
+  agentLoc[btn.dataset.agent] = btn.dataset.loc;
+  render();
+});
+document.getElementById("agentGrid").addEventListener("change", e => {
+  if (!e.target.classList.contains("brain-select")) return;
+  agentModel[e.target.dataset.agent] = e.target.value;
+  render();
+});
+
+render();
+</script>
+</body>
+</html>

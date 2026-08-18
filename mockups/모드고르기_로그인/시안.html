@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 로그인에서 모드 고르기(라이트·표준·프로) 시안</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS 시안 — 로그인 화면에서 라이트·표준·프로를 고르는 「추천 시안 1개」
+  파일: mockups/모드고르기_로그인/시안.html — 눌러 볼 수 있는 정지 데모. **같은 파일을 갱신**(새 파일 아님).
+  제품 코드(client/, server/)는 읽기만 했고 한 글자도 고치지 않았다.
+  근거: 추천 시안 1개 원칙(2026-07-25/2026-08-09 사용자 결정) · 사장님 지시(2026-08-18, 아래 원문)
+
+  ■ 2차 갱신(같은 날, 사장님이 1차를 보고 두 가지 추가 지시)
+    ① "3버튼이 좁고 답답하다 — 이거 선택하게 해줘" → 카드 380→440px, 버튼 면적 +43.7%(아래 "확대"·"밀도" 절).
+    ② "MD 스튜디오도 받을 수 있게" → 코드로 확인해 보니 "받을 설치본이 아직 없다"(아래 "Smart MD" 절) —
+       없는 걸 파는 시안이 되지 않도록, "열기/받기" 두 갈래를 정직하게 그리고 살릴 방법 세 갈래(ⓐⓑⓒ)를
+       비교해 추천 하나를 냈다.
+
+  ■ 사장님 지시 원문(세 번에 걸쳐 나옴, 요청서 그대로)
+    ① "3가지 모드를 하나의 클라이언트에서 테스트 가능했으면 해. 라이트모드는 링크 걸어주고. 나중에 불리하더라도"
+    ② "로그인 할 때 선택하게"
+    ③ "3가지 모드 배경색을 다르게 가자"
+
+  ■ win이 코드로 이미 확인한 사실(재조사 안 함 — 그대로 신뢰, 이 시안에서 직접 다시 읽어 줄까지 재확인함)
+    · settings.html:692-709 "제품 구성 3택" 패널(admin 전용) — 라이트🪶/스탠다드🏢/프로🚀 버튼 3개, 이미 있다.
+    · settings.html:2438-2489 loadEdition() — 라이트=editionSet('lite')+재시작 필요.
+      스탠다드↔프로=setLlmTier(...)+"엔진만 재기동"(라이트에서 오면 먼저 표준 전환+재시작 2단계).
+    · main.ts:444-462 에디션() — "부팅 때 한 번만 읽는다(캐시) … 모드 변경은 재시작을 요구한다.
+      실행 중에 바꿔 봐야 반만 바뀌어 더 나쁘다." (원문 그대로 인용, 451-452행)
+    · main.ts:483 editionSet 실패 문구 원문: "이 배포본은 라이트 전용이라 모드를 바꿀 수 없습니다."
+    · localengine.ts:127-129 GIJO_TIERS — lite=8K·1모델·10GB / standard=32K·1모델·24GB / pro=32K·2모델·48GB.
+      ⚠ 프로도 문맥은 32K로 스탠다드와 같다 — "프로가 문맥이 넓다"는 거짓, 이 시안에 안 넣었다.
+      ⚠ localengine.ts:129의 desc 원문에는 "A/B·검증 병행"이 적혀 있으나 win 실측(2026-08-18)으로
+        코드에 그 기능이 없음이 확인됐다 — 이 시안은 그 문구를 그대로 옮기지 않는다(정직 원칙).
+    · login.html — 이미 붐빈다: 서버주소·아이디·비번·저장체크·2차인증·최근로그인 목록·
+      "📝 Smart MD Studio"·"⬇ GIJO AS 라이트 무료"(free 구역, 2026-08-14 결정, 라이트 빌드에선 숨김).
+
+  ■ 이번 조사에서 직접 확인한 것(이 시안을 위해 새로 읽음)
+    · preload.ts:77-78 editionGet/editionSet = 순수 ipcRenderer.invoke (서버 HTTP 왕복 없음,
+      main.ts가 로컬 설정파일만 읽고 씀) → 로그인 전에도 호출 가능. login.html:436이 이미 로그인
+      "전"에 editionGet()을 부른다(free 박스 숨김 판단용) — 그러니 로그인 화면에서 "지금 모드"를
+      읽어 보여주는 것은 이미 쓰던 다리를 한 번 더 쓰는 것뿐, 새 통로가 필요 없다.
+    · client/src/api/llm-engine.ts:79-87 localEngineApi.tier()/setTier() = request() 경유,
+      즉 서버 HTTP(/api/localengine/tier) 호출.
+    · server/src/engine/localengine.ts:1171,1192-1193 — 그 라우트 둘 다 authMiddleware로 잠겨 있다
+      (GET·POST 모두). ⇒ **프로/스탠다드 전환은 로그인 성공 전엔 기술적으로 불가능**하다 — "로그인
+      화면에서 고른다"의 실제 뜻은 "로그인 화면에서 미리 정해 두고, 자격증명이 통과한 바로 다음
+      순간(화면 전환 전)에 그 값을 적용한다"가 정확하다. 이 시안의 모드 고르기는 그 전제로 짰다.
+    · main.ts:474-476 주석 — "화면은 아직 없다. 스위치 UI는 시안 승인 후에 얹는다"라고 적혀 있는데
+      settings.html에는 이미 그 화면(692-709)이 있다 — 주석이 settings.html보다 먼저 쓰여 갱신이
+      안 된 것으로 보인다(약속-코드 불일치의 작은 사례, 이 시안이 고치는 대상은 아니라 그대로 남김).
+
+  ■ 4차 갱신 — 사장님 지시(그대로 옮김) — "로그인창 오른쪽으로 배치 하자"
+    세로로 쌓지 말고 가로로 편다: 왼쪽=로그인(자격증명), 오른쪽=선택 패널(모드+AI위치).
+    지켜야 할 제약(사장님이 코드로 확인해 준 것) — main.ts:337-345 mainWindowBounds():
+      width:    Math.max(720, Math.min(1440, 작업영역너비-40))
+      minWidth: Math.min(900, Math.max(600, 작업영역너비-40))
+    → 창은 최소 900px, 좁은 화면(세로 모니터 등)에선 600px까지 줄어든다. 두 칸이 안 들어가는
+      폭에서는 반드시 한 칸(3차 모습)으로 접혀야 한다 — 이번 시안의 핵심 검토 대상은 "창 폭".
+
+  ■ 4차 갱신에서 새로 확인한 것
+    · localengine.ts:128-129 — standard·pro의 ctxSize(32768)·overheadMb(5000)가 완전히 같다.
+    · localengine.ts:481-504 makeRoomFor() — maxLoadedModels는 getFreeVramMb()가 null일 때만
+      쓰는 폴백 개수 상한이다. VRAM 실측이 되는 모든 지원 플랫폼에서는 실제 여유 VRAM이 기준이지
+      이 값이 아니다 — 사장님이 지적한 "지원 플랫폼 전부에서 안 걸리는 죽은 값"을 코드로 재확인.
+    → "프로" 설명에 "무엇이 좋아지는지"를 추가하지 않았다(적을 이득이 없다).
+
+  ■ 3차 갱신 — 사장님 새 원칙(그대로 옮김)
+    "llm 호출은 사용자의 선택이 기본이야. VRAM이 충분하면 내부, 부족하면 외부."
+    "프로는 gb10에서 큰모델을 호출해서 사용하는거 알지?"
+    "vram이 부족하면 원격으로도 사용할 수 있게끔 사용자가 선택"
+    확인된 자리·권한: 자리=로그인 화면(모드 3버튼과 같은 카드) · 권한=admin만 바꿀 수 있다(그대로 유지).
+    ★ 이 시안의 핵심 난제: 로그인 전엔 누가 admin인지 모른다 — 아이디로 미리 확인하는 것은
+      금지(계정 존재 여부 유출). 「골라 놓고 로그인해 보니 admin이 아니라 무시됨」을 어떻게
+      정직하게 처리할지가 이번 라운드의 중심 질문이다(아래 "AI 위치 — 세 갈래" 절에서 답함).
+
+  ■ 3차 갱신에서 새로 확인한 것(이번에 직접 읽음)
+    · server/src/engine/remotellm.ts:1-27 — VPN 전용 원격 LLM. 사장님 결정(2026-08-13) 그대로.
+      경계 셋(15-21행): ① VPN 전용(isVpnRangeIp, 호스트명도 거부) ② 에어갭이면 기능 자체 차단
+      ③ admin 전용("채팅이 어디로 가는지를 바꾸는 설정이다").
+    · remotellm.ts:117 `/api/llm/remote` GET = authMiddleware+adminMiddleware(조회도 admin 전용).
+      remotellm.ts:132 `/api/llm/remote/where` GET = authMiddleware만(admin 아니어도 "원격중 true/false"는
+      본다 — 주소는 안 알려줌, 검토관 지적 H4로 나뉜 라우트). ★ 둘 다 **로그인(authMiddleware) 전엔
+      호출 자체가 막힌다** — edition:get(로컬 IPC, 무인증)과 근본적으로 다르다. 로그인 화면에서
+      "지금 상태"를 안전하게 읽을 방법이 **지금 코드엔 없다.**
+    · localengine.ts:1171-1194 `/api/localengine/tier`는 authMiddleware만(admin 아님) — **모드
+      3버튼(표준/프로/라이트)은 로그인한 아무나 바꿀 수 있고, AI 위치는 admin만 바꿀 수 있다.**
+      같은 카드 안 두 조작의 권한 수준이 실제로 다르다(이게 난제의 뿌리).
+    · server/src/app.ts:251 `/api/health` — 유일하게 **완전 무인증**인 상태 조회 라우트. 지금은
+      `{ok, service, schema, serverTime, airgap}`만 준다(login.html의 2차 인증 시계힌트가 이미 씀).
+      **VRAM 총량은 아직 여기에 없다** — 로그인 화면에서 VRAM을 보여주려면 이 응답에 필드를 하나
+      추가해야 한다(구현 참고에 적음, 이 시안은 "있다고 치고" 그린다 — 정직하게 그 사실을 밝힘).
+    · gb10 실측(사장님이 이미 잰 값, 그대로 인용) — 72B 4.5자/초(500자≈110초) · 32B 10.6자/초(≈47초)
+      · 14B 39.7자/초(≈13초). 3090 대비 3.1배 느림(대역폭 273 vs 936GB/s).
+
+  ■ 2차 갱신에서 새로 확인한 것(이번에 직접 읽음)
+    · main.ts:340-341 mainWindowBounds() — 로그인·본화면이 같은 창을 쓴다. 높이=
+      max(600, min(900, 작업영역높이-40)) → 1280×800이면 창 높이 약 712~720px.
+    · main.ts:643 smartMdWindow — Smart MD는 별도 BrowserWindow(앱 안 창)로 뜬다. openSmartMd()가 그걸 연다.
+    · client/scripts/fetch-smartmd.mjs 전문 — 12-16행 "main.js·preload.js·package.json은 담지 않는다"가
+      곧 원본 저장소엔 그 셋이 있다는 뜻(웹 자산만 골라 담으므로). 81-86행이 package.json의 version을 읽는다
+      (실존 확인). electron-builder 설정 유무는 이 저장소 밖이라 확인 불가 — 단정하지 않았다.
+    · client/smartmd/ 폴더가 로컬에 이미 받아져 있음(과거 fetch 결과) — index.html·css·js·vendor·LICENSE·
+      GIJO-SMARTMD-VERSION.json뿐, main.js·package.json 없음(스크립트 설계대로).
+
+  ■ 설계 전 조사 — 표준·모범사례(직접 확인, 출처·원문 인용은 본문 표에도 다시 정리)
+    · Google Material Design 다크 테마(design.google/library/material-design-dark-theme,
+      codelabs.developers.google.com/codelabs/design-material-darktheme) — "순수 검정(#000) 대신
+      진회색(#121212)을 쓴다", "주요 색은 채도를 낮춰야 다크 표면 위에서 눈이 덜 피로하다",
+      "텍스트-배경 대비는 15.8:1 권장". → 큰 면(본문 캔버스)은 손대지 않고, 새 색은 저채도로만 쓴다.
+    · 배포 환경 색 구분 관행(madeleinesmith.uk/blog/color-code-deployment-environments,
+      drupal.org/project/environment_indicator) — "옆/위에 붙이는 색 스트립"이 널리 쓰이는 방식이고
+      "green for DEV, orange for STAGING, red for LIVE" 같은 배지·바 형태이지 화면 전체를 다시
+      칠하지 않는다. → 로그인 배경은 옅은 은은한 글로우로, 실제로 뚜렷한 색은 배지·테두리 줄(strip)에.
+    · WCAG 2.1 성공 기준 1.4.1(w3.org/WAI/WCAG21/Understanding/use-of-color.html) — "색은 정보를
+      전달하는 유일한 시각적 수단이 되어서는 안 된다"(원문: color is not used as the only visual
+      means of conveying information). 남성 12명 중 1명이 색각 이상. → 모드마다 아이콘·글자가 항상
+      같이 붙는다(색만으로 구분하지 않는다).
+
+  이 파일은 눌러 볼 수 있는 데모입니다. 모드 버튼은 실제로 배경·배지가 바뀝니다(그게 이 시안의
+  핵심 검토 대상이라서). 다만 "로그인" 버튼은 진짜로 로그인하지 않습니다(정직한 구현 원칙 — 가짜
+  성공을 꾸미지 않는다). 상단 "시연 컨트롤"은 실제 제품에 없는, 검토자가 여러 상태를 확인하기 위한
+  이 문서 전용 도구입니다(따로 표시했습니다).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ════════ 1) 실제 제품 색 토큰 — 두 출처를 각각 그대로 옮긴다(값 하나도 안 바꿈) ════════
+   1-A) login.html:7-15 :root (로그인 화면 자체 토큰 — --blue가 앱 셸과 다른 값이다, 아래 참고)
+   1-B) app.html/dashboard.html 계열 :root (앱 셸 공통 토큰) — 이 문서 기본값으로 쓴다. */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.08);
+  --border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;
+  /* ── 신규 3색(이번 시안) — 아래 "색 표" 절에 유도 근거 전부 설명 ── */
+  --acc-pro:#5b6b82;--acc-pro-bg:rgba(91,107,130,.18);--acc-pro-text:#a9b8cc;--acc-pro-border:rgba(91,107,130,.55);--acc-pro-glow:#2b3444;
+  --acc-lite:#6f8f52;--acc-lite-bg:rgba(111,143,82,.18);--acc-lite-text:#b9d49a;--acc-lite-border:rgba(111,143,82,.55);--acc-lite-glow:#313a26;
+  --acc-std-glow:#35342f; /* = 기존 login.html 그라디언트 하이라이트, 변경 없음 */
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+
+/* ════════ 2) login.html 실제 CSS — .login-mock 안에 그대로 옮김(1:1, 값 변경 없음) ════════
+   원문: client/src/renderer/pages/login.html:7-135. .login-mock으로 스코프만 추가했다
+   (원본은 unscoped body 셀렉터라 이 문서 안에 그대로 두면 문서 전체 스타일과 충돌한다). */
+.login-mock{--navy:#262624;--navy2:#0c2c6b;--orange:#dd5a1c;--blue:#5fa1ff;--lm-text:#e9e7e2;--lm-muted:#b3ada4;--lm-border:#3d3c38;}
+.login-mock{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:26px 0 30px;
+  background:radial-gradient(circle at 30% 20%, var(--glow,var(--acc-std-glow)) 0%, var(--navy) 60%);
+  font-family:"Pretendard","Segoe UI",-apple-system,sans-serif;color:var(--lm-text);border-radius:14px;transition:background .35s,width .25s;
+  /* 4차 — 이 테두리가 "창 경계"다. #loginStage에 JS가 폭을 직접 넣어(시연 컨트롤) 실제 창
+     폭을 흉내 낸다 — 테두리가 있어야 "여기까지가 창"이라는 게 눈에 보인다. */
+  border:1px solid rgba(255,255,255,.12);margin:0 auto;}
+/* ── 2차 갱신(요청①): 카드 폭 380→440px. 3버튼이 좁아 답답하다는 지적 — 버튼을 키우려면
+   카드가 넓어져야 한다. 440은 임의값이 아니다: 로그인 카드 업계 관행 360~420px 바로 위,
+   +20px만 그 관행을 넘긴 값이다(근거는 "왜 440px인가" 절에 출처와 함께 적음). ── */
+.login-mock .card{width:440px;background:rgba(14,20,36,.85);border:1px solid var(--lm-border);border-radius:14px;
+  padding:36px 32px;box-shadow:0 20px 60px rgba(0,0,0,.45);
+  /* ── 신규: 위 테두리만 1px→3px, 모드 색으로. 나머지 3변은 원래 1px 그대로(+2px만 늘어난다) ── */
+  border-top-width:3px;border-top-color:var(--acc,var(--lm-border));transition:border-top-color .35s;}
+.login-mock .logo{display:flex;align-items:center;gap:10px;margin-bottom:22px;}
+.login-mock .logo .wordmark{font-size:19px;font-weight:800;letter-spacing:.02em;color:#fff;}
+.login-mock .logo .wordmark b{color:var(--orange);}
+.login-mock .logo span{font-size:13px;color:var(--lm-muted);letter-spacing:.04em;}
+/* ── 신규: h1을 flex로 바꿔 모드 배지를 같은 줄에 얹는다(새 줄 아님 → 세로 0px 추가) ── */
+.login-mock h1{font-size:19px;margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.login-mock p.sub{color:var(--lm-muted);font-size:13px;margin:0 0 24px;}
+.login-mock label{display:block;font-size:12px;color:var(--lm-muted);margin-bottom:6px;}
+.login-mock input{width:100%;background:#1f1e1d;border:1px solid var(--lm-border);border-radius:8px;padding:10px 12px;
+  color:var(--lm-text);font-size:14px;margin-bottom:16px;outline:none;}
+.login-mock input:focus{border-color:var(--blue);}
+.login-mock .server-row{display:flex;gap:8px;align-items:center;margin-bottom:18px;}
+.login-mock .server-row input{margin-bottom:0;font-size:12px;color:var(--lm-muted);}
+.login-mock button.lm-submit{width:100%;background:var(--orange);border:none;border-radius:8px;padding:11px;color:#fff;
+  font-size:14px;font-weight:600;cursor:pointer;}
+.login-mock .savepw{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--lm-muted);margin:-4px 0 16px;cursor:pointer;}
+.login-mock .savepw input{width:auto;margin:0;cursor:pointer;}
+.login-mock .err{margin-top:12px;font-size:12.25px;color:#ff8a8a;min-height:14px;}
+.login-mock .hint{margin-top:18px;font-size:12.5px;color:var(--lm-muted);line-height:1.5;}
+.login-mock .ver{margin-top:14px;font-size:12px;color:var(--lm-muted);text-align:center;opacity:.8;}
+/* free 구역(login.html:121-134, 2026-08-14 결정). 2차 갱신 때는 폭을 카드에 맞춰(440px) 카드
+   "아래"에 뒀는데, 4차(이번)에서 오른쪽 패널 "안"으로 옮기며 고정폭을 없앴다 — 이제 패널의
+   안쪽 너비(auto)를 그대로 채운다(그래서 겹치거나 넘치지 않는다). */
+.login-mock .free{width:auto;}
+.login-mock .free-t{font-size:12.25px;color:var(--lm-muted);margin-bottom:8px;letter-spacing:.02em;}
+.login-mock .free-row{display:flex;gap:8px;}
+.login-mock .fc{flex:1;min-width:0;text-align:left;background:rgba(14,20,36,.6);border:1px solid var(--lm-border);
+  border-radius:10px;padding:11px 12px;cursor:pointer;color:var(--lm-text);font:inherit;}
+.login-mock .fc:hover{border-color:var(--blue);background:rgba(20,28,48,.75);}
+.login-mock .fc-h{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;}
+.login-mock .fc-b{flex:0 0 auto;font-size:11px;font-weight:700;color:#7fd88f;border:1px solid rgba(127,216,143,.4);
+  border-radius:999px;padding:1px 6px;}
+.login-mock .fc-d{margin-top:5px;font-size:11.5px;color:var(--lm-muted);line-height:1.5;}
+/* ── 신규(요청②) — Smart MD 타일만 "열기"/"받기" 두 갈래로 나눈다. 라이트 타일은 그대로
+   전체가 버튼(1개 행동)이라 안 바꿨다. */
+.login-mock .fc-actions{display:flex;gap:8px;margin-top:8px;}
+.login-mock .fc-act{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--lm-border);border-radius:7px;
+  padding:6px 8px;font-size:11.5px;font-weight:700;color:var(--lm-text);cursor:pointer;font-family:inherit;text-align:center;}
+.login-mock .fc-act:hover{border-color:var(--blue);}
+.login-mock .fc-act.primary{background:rgba(59,130,246,.16);border-color:rgba(95,161,255,.5);color:#cfe2ff;}
+.login-mock .fc-more{display:none;margin-top:8px;padding:8px 9px;border-radius:7px;font-size:11px;line-height:1.55;
+  background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.35);color:var(--lm-text);}
+.login-mock .fc-more.show{display:block;}
+.login-mock .fc-msg{margin-top:6px;font-size:11px;color:var(--lm-muted);min-height:13px;}
+
+/* ════════ 3) 신규 — 로그인 카드 안 「구동 모드」 고르기(mp-*) ════════
+   2차 갱신(요청①): "3버튼이 좁고 답답하다" — 패딩·글자·간격을 키워 누르는 면적을 늘렸다.
+   버튼 하나 약 119×60px(아래 "버튼 크기" 표에서 실측) — WCAG 2.5.5(AAA) 44×44px 권장의
+   2배 이상, 44×44 최소 기준(WCAG 2.5.8, AA)은 물론 넉넉히 넘는다. */
+.mp-row{display:flex;gap:10px;margin-bottom:14px;}
+.mp-btn{flex:1;background:#1f1e1d;border:1px solid var(--lm-border);border-radius:10px;padding:12px 10px;
+  text-align:center;cursor:pointer;font-family:inherit;color:var(--lm-text);transition:border-color .2s,background .2s;}
+.mp-btn .mp-top{font-size:13px;font-weight:700;white-space:nowrap;}
+.mp-btn .mp-tag{display:block;font-size:11.5px;color:var(--lm-muted);margin-top:4px;line-height:1.35;}
+.mp-btn.on{background:#242320;}
+.mp-btn[data-mode="standard"].on{border-color:#8f8a80;box-shadow:0 0 0 1px #8f8a80;}
+.mp-btn[data-mode="pro"].on{border-color:var(--acc-pro);box-shadow:0 0 0 1px var(--acc-pro);}
+.mp-btn[data-mode="pro"].on .mp-top{color:var(--acc-pro-text);}
+.mp-btn[data-mode="lite"]{border-style:dashed;}
+.mp-btn[data-mode="lite"].on{border-color:var(--acc-lite);box-shadow:0 0 0 1px var(--acc-lite);}
+.mp-btn[data-mode="lite"].on .mp-top{color:var(--acc-lite-text);}
+/* ── 3차 갱신 — AI 위치(어디서 AI를 돌릴지) 3버튼. mp-btn 그대로 재사용(라이트 where 패턴처럼
+   "이 PC"·"원격 GPU"는 같은 크기·같은 무게). "클라우드"만 점선 테두리(라이트 모드 버튼과 같은
+   기법 — 다른 성격의 조작임을 형태로 알린다) + 앰버 톤(기존 --amber=경고 재사용: 사외로 나가는
+   유일한 선택이라 재사용이 오히려 정확하다). ── */
+.mp-btn[data-loc="local"].on{border-color:#8f8a80;box-shadow:0 0 0 1px #8f8a80;}
+.mp-btn[data-loc="remote"].on{border-color:var(--acc-pro);box-shadow:0 0 0 1px var(--acc-pro);}
+.mp-btn[data-loc="remote"].on .mp-top{color:var(--acc-pro-text);}
+.mp-btn[data-loc="cloud"]{border-style:dashed;}
+.mp-btn[data-loc="cloud"] .mp-tag{color:#e8b866;}
+.mp-btn[data-loc="cloud"].on{border-color:#e8b866;box-shadow:0 0 0 1px #e8b866;}
+.mp-btn[data-loc="cloud"].on .mp-top{color:#f0c98a;}
+.mp-note.n-cloud{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.35);}
+/* ── free 박스 접기(요청: 넘치면 무엇을 접을지 제안) — 기본 접힘, 로그인에 필요한 것을
+   먼저 보이게 한다. 아래 "밀도" 절이 이 이유를 숫자로 설명한다. ── */
+.free-toggle{width:100%;background:transparent;border:1px dashed var(--lm-border);border-radius:10px;
+  padding:8px 12px;color:var(--lm-muted);font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;
+  text-align:left;display:flex;align-items:center;gap:6px;}
+.free-toggle:hover{border-color:var(--blue);color:var(--lm-text);}
+.free-toggle .car{transition:transform .2s;}
+.free-body{display:none;margin-top:10px;}
+.free-body.open{display:block;}
+.free-toggle.open .car{transform:rotate(90deg);}
+
+/* ════════ 4차 갱신 — 두 칸 배치(사장님 지시: "로그인창 오른쪽으로 배치하자") ════════
+   격자 기본 정렬(align-items:stretch)을 그대로 쓴다 — 카드가 더 길면 오른쪽 패널이 그 길이에
+   맞춰 늘어난다("같은 높이" 요구를 코드 한 줄로 만족, 별도 JS로 높이를 재지 않는다).
+   ⚠ 이 문서는 "가짜 창"(고정 폭 div)을 시연 컨트롤로 넓혔다 좁혔다 한다 — 실제 브라우저
+   뷰포트가 아니라서 @media가 안 먹는다. 그래서 JS가 폭을 보고 data-layout을 직접 정한다.
+   (실제 구현 시엔 login.html이 창 전체를 채우는 페이지라 @media (max-width:960px)로 충분하다
+   — 컨테이너 쿼리 같은 건 필요 없다. "구현 참고"에 적어 둠.) */
+.login-mock .two-col{display:grid;grid-template-columns:440px 440px;grid-template-areas:"card side";gap:16px;}
+.login-mock .two-col .card{grid-area:card;}
+.login-mock .two-col .side-panel{grid-area:side;display:flex;flex-direction:column;
+  background:rgba(14,20,36,.85);border:1px solid var(--lm-border);border-radius:14px;
+  padding:36px 32px;box-shadow:0 20px 60px rgba(0,0,0,.45);
+  border-top-width:3px;border-top-color:var(--acc,var(--lm-border));transition:border-top-color .35s;}
+.login-mock .side-panel .side-t{font-size:11.5px;color:var(--lm-muted);margin-bottom:8px;letter-spacing:.02em;}
+.login-mock .side-panel .free{margin-top:auto;width:auto;padding-top:14px;} /* 오른쪽 패널 안에서는 아래로 밀어 붙인다 */
+/* 좁을 때(<960px, 시연/실제 창이 두 칸을 못 담는 폭) — 1칸으로. side가 위, card가 아래
+   (3차 때의 "선택 먼저, 자격증명 나중" 순서를 그대로 재현 — grid-area 순서만 바꾸면 된다,
+   DOM은 그대로라 JS/상태 코드를 안 건드린다). */
+.login-mock[data-layout="narrow"] .two-col{grid-template-columns:440px;grid-template-areas:"side" "card";justify-content:center;row-gap:14px;}
+/* ⚠ 좁을 때 side-panel 자신의 배경·테두리·패딩(72px어치)을 없앤다 — 안 없애면 패딩이
+   "두 번"(카드 패딩+패널 패딩) 들어가 3차보다 오히려 세로가 늘어난다(직접 계산해서 발견,
+   아래 "밀도" 절에 그 계산을 남긴다). 패딩을 없애면 3차와 정확히 같은 세로로 돌아간다 —
+   두 칸 배치가 "좁을 때 더 나빠지지 않는다"는 것이 이 설계의 핵심 요건이다. */
+.login-mock[data-layout="narrow"] .two-col .side-panel{background:none;border:none;box-shadow:none;padding:0;}
+.login-mock[data-layout="narrow"] .side-panel .free{margin-top:14px;padding-top:0;}
+.mp-btn:disabled{opacity:.38;cursor:default;}
+/* ── 비교 전용(1차 시안 크기 재현) — 아래 "확대" 절의 "1차 시안" 스냅샷에만 쓴다.
+   실제 화면엔 없는, 이 문서의 before/after 비교를 위한 크기 고정 클래스. ── */
+.mp-row.v1size{gap:7px;}
+.mp-row.v1size .mp-btn{padding:8px 6px;border-radius:9px;}
+.mp-row.v1size .mp-top{font-size:12.5px;}
+.mp-row.v1size .mp-tag{font-size:11px;margin-top:3px;line-height:1.3;}
+.mp-note{display:none;margin:-2px 0 14px;font-size:11.5px;line-height:1.6;padding:8px 10px;border-radius:8px;color:var(--lm-text);}
+.mp-note.show{display:block;}
+.mp-note.n-pro{background:var(--acc-pro-bg);border:1px solid var(--acc-pro-border);}
+.mp-note.n-lite{background:var(--acc-lite-bg);border:1px solid var(--acc-lite-border);}
+.mp-note.n-locked{background:rgba(240,160,32,.09);border:1px solid rgba(240,160,32,.4);}
+.mode-badge{font-size:11px;font-weight:800;padding:2px 8px 3px;border-radius:20px;white-space:nowrap;
+  background:rgba(255,255,255,.06);border:1px solid var(--border-strong);color:var(--lm-muted);}
+.mode-badge.b-pro{background:var(--acc-pro-bg);border-color:var(--acc-pro-border);color:var(--acc-pro-text);}
+.mode-badge.b-lite{background:var(--acc-lite-bg);border-color:var(--acc-lite-border);color:var(--acc-lite-text);}
+.lm-toast{position:absolute;left:0;right:0;bottom:-30px;text-align:center;font-size:11.5px;color:var(--muted-2);opacity:0;transition:opacity .25s;}
+.lm-toast.show{opacity:1;}
+
+/* ════════ 4) 신규 — 앱 안 미니 재현(topbar 44px·사이드바 232px, app.html 토큰 그대로) ════════
+   app.html:10-11 :root · :46-49(.app 그리드) · :71-95(.topbar/#tbInfo) 값 재사용, 축소 재현. */
+.shell-mock{width:600px;max-width:100%;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg);}
+.sm-top{height:44px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:0 12px;background:var(--panel-2);border-bottom:2px solid var(--border);transition:border-color .35s;}
+.sm-left{font-size:12.25px;font-weight:700;color:var(--muted);}
+.sm-right{display:flex;align-items:center;gap:8px;}
+.sm-clock{font-size:12.25px;color:var(--muted);}
+.sm-body{display:flex;height:132px;}
+.sm-side{width:172px;flex:0 0 auto;border-right:2px solid var(--border);background:var(--panel-2);padding:8px;transition:border-color .35s;}
+.sm-side-item{padding:5px 7px;font-size:11.5px;color:var(--muted);border-radius:6px;}
+.sm-side-item.on{background:rgba(255,255,255,.05);color:#fff;font-weight:700;}
+.sm-main{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted-2);background:var(--bg);}
+
+/* ════════ 5) 이 문서(시안) 전용 설명 CSS — 실제 제품엔 없다 ════════ */
+.docwrap{max-width:1180px;margin:0 auto;padding:26px 30px 90px;}
+h1.doc{font-size:20px;font-weight:800;color:#fff;margin-bottom:6px;}
+.lead{font-size:12.5px;color:var(--muted);max-width:1020px;line-height:1.75;margin-bottom:16px;}
+.summary-box{border:1px solid var(--blue);background:rgba(59,130,246,.08);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:12.75px;line-height:1.8;}
+.summary-box b{color:#fff;}
+.summary-box ol{margin-left:18px;margin-top:4px;}
+.banner{border:1px solid rgba(240,160,32,.5);background:rgba(240,160,32,.08);color:#f0c060;border-radius:8px;padding:11px 15px;font-size:12.25px;margin-bottom:24px;line-height:1.65;}
+h2.doc{font-size:14.5px;font-weight:800;color:#fff;margin:34px 0 9px;padding-bottom:7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+h2.doc .n{color:var(--blue-light);font-size:11px;font-weight:700;letter-spacing:.4px;border:1px solid var(--blue-light);border-radius:4px;padding:2px 7px;}
+h3.doc{font-size:13px;font-weight:800;color:#fff;margin:18px 0 8px;}
+.note{font-size:12.25px;color:var(--muted);line-height:1.75;margin-bottom:10px;max-width:1040px;}
+.note b.hi{color:var(--text);}.note b.bad{color:#f5928a;}.note b.ok{color:var(--teal);}
+table.t{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0 6px;}
+table.t th{text-align:left;color:var(--muted-2);font-weight:700;padding:6px 9px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td{padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;}
+table.t tr:last-child td{border-bottom:none;}
+code{background:var(--panel-2);border-radius:4px;padding:1px 6px;font-size:11.5px;color:#dfe6ff;}
+.meas{font-size:12.25px;color:var(--muted-2);margin-top:8px;line-height:1.7;}
+.meas b{color:var(--teal);}
+.mock-shell{border:1px dashed var(--border-strong);border-radius:12px;padding:18px;margin:12px 0 8px;background:rgba(0,0,0,.1);position:relative;}
+.mock-shell-label{font-size:11px;color:var(--muted-2);margin-bottom:14px;letter-spacing:.3px;}
+.closeup-row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap;margin:14px 0 6px;}
+.closeup-col{flex:0 0 auto;}
+.closeup-tag{font-size:11.5px;font-weight:800;letter-spacing:.3px;color:var(--muted-2);margin-bottom:8px;}
+.closeup-tag.after{color:var(--teal);}
+.px-tag{display:inline-block;margin-top:8px;font-size:11.5px;color:var(--teal);font-weight:800;background:rgba(30,185,128,.1);border:1px solid rgba(30,185,128,.35);border-radius:6px;padding:3px 9px;}
+.px-tag.bad{color:#f0c060;background:rgba(240,160,32,.1);border-color:rgba(240,160,32,.35);}
+.evid-box{border:1px solid rgba(59,130,246,.4);border-radius:10px;padding:12px 14px;background:rgba(59,130,246,.05);margin:10px 0;font-size:12.25px;line-height:1.7;color:var(--text);}
+.evid-box .cap{font-size:11.5px;color:var(--blue-light);font-weight:800;margin-bottom:6px;}
+.warn-box{border:1px solid rgba(240,160,32,.5);border-radius:10px;padding:12px 14px;background:rgba(240,160,32,.07);margin:10px 0;font-size:12.25px;line-height:1.75;color:var(--text);}
+.warn-box .cap{font-size:11.5px;color:#f0c060;font-weight:800;margin-bottom:6px;}
+.reject-box{border:1px solid rgba(226,72,61,.4);border-radius:10px;padding:12px 14px;background:rgba(226,72,61,.05);margin:10px 0;font-size:12.25px;line-height:1.75;}
+.reject-cap{font-size:11.5px;color:#f5928a;font-weight:800;margin-bottom:8px;}
+.chk-table td:first-child{width:230px;color:var(--text);font-weight:600;}
+.chk-ok{color:var(--teal);font-weight:800;}
+.verdict{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:.2px;}
+.verdict.go{color:var(--teal);background:rgba(30,185,128,.16);}
+.verdict.demo{color:var(--amber);background:rgba(240,160,32,.16);}
+.swatch{display:inline-block;width:13px;height:13px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid rgba(255,255,255,.25);}
+/* 시연 컨트롤 바 — 실제 제품에 없는 검토용 도구임을 시각적으로도 분리한다 */
+.demobar{border:1px dashed rgba(240,160,32,.55);background:rgba(240,160,32,.06);border-radius:10px;padding:12px 16px;margin:10px 0 18px;}
+.demobar-t{font-size:11.5px;font-weight:800;color:#f0c060;margin-bottom:10px;}
+.demobar-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--muted);}
+.demobar-row:last-child{margin-bottom:0;}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
+.seg button{background:var(--panel-2);border:0;color:var(--muted);font-size:11.75px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:inherit;}
+.seg button.on{background:var(--blue);color:#fff;}
+.seg button:not(:last-child){border-right:1px solid var(--border-strong);}
+footer.docfoot{margin-top:50px;padding-top:14px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-2);}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+<h1 class="doc">로그인 화면에서 라이트·표준·프로 고르기 — 추천 시안 1개</h1>
+<p class="lead">
+  사장님 지시(2026-08-18) 세 가지 — <b>① 한 클라이언트에서 3모드 테스트</b> · <b>② 로그인 시점에 선택</b> ·
+  <b>③ 모드별 배경색 구분</b> — 을 하나의 안으로 묶었다. 이미 있는 것(<code>settings.html</code> 제품 구성 3택,
+  <code>login.html</code>의 라이트 다운로드 링크)은 그대로 살리고, <b>새로 필요한 것만</b> 더했다 — 이 화면은
+  이미 붐비므로 무엇을 더할지보다 <b>무엇을 안 더할지</b>를 더 오래 골랐다.
+</p>
+
+<div class="summary-box">
+  <b>한눈에 — 핵심 결정(4차 갱신 반영, 8줄)</b>
+  <ol>
+    <li>로그인 카드 안, 자격증명 위에 <b>3버튼 한 줄</b>(표준·프로·라이트)을 추가한다. 표준·프로는 <b>즉시(로그인 직후 엔진만 재기동)</b>,
+      라이트는 <b>링크 성격</b>(데이터 폴더 별도·앱 재시작)로 다르게 그린다 — 셋을 나란한 버튼으로만 두면 거짓말이 된다는 지적을 그대로 반영.</li>
+    <li>배경색은 <b>본문 캔버스(<code>--bg:#262624</code>)는 그대로 두고</b>, 로그인 화면의 은은한 배경 글로우 + 카드 위 테두리 줄(3px) +
+      작은 배지(항상 아이콘·글자 동반)로만 구분한다 — Material 다크테마·환경 색 스트립 근거를 따른 것.</li>
+    <li><b>[2차] "버튼이 좁고 답답하다"</b> — 카드 폭을 380→440px로 넓히고 버튼 면적을 43.7% 키웠다(101×50→119×60px).</li>
+    <li><b>[2차] Smart MD Studio</b> — "받기"는 아직 <b>받을 물건이 없다</b>(코드로 확인). "열기"/"받기" 두 갈래를 그리고
+      세 갈래(드라이브·GitHub·서버)를 비교해 <b>서버 배포(ⓒ)를 최종, 드라이브(ⓐ)를 과도기</b>로 추천했다.</li>
+    <li><b>[3차] AI 위치 3갈래(이 PC·원격 GPU·클라우드)</b> — <b>새 발명이 아니라 라이트에 이미 검증된 패턴</b>
+      (<code>lite-settings.html</code>의 "같은 크기·같은 무게" 원칙)을 가져왔다. 클라우드만 <b>다른 무게</b>로(점선 테두리+
+      기존 --amber 재사용) 표시.</li>
+    <li><b>[3차] 핵심 난제(admin만 바뀌는데 로그인 전엔 누가 admin인지 모른다)</b> — ⓐⓑⓒ 세 갈래를 비교해 <b>ⓒ(고르게 하고
+      로그인 직후 정직하게 뒤처리)를 추천</b>했다. VRAM은 <b>최소만 알리고 막지 않는다</b>(사장님 지시).</li>
+    <li><b>[4차] "로그인창 오른쪽으로 배치하자"</b> — 모드+AI위치(선택 6개)를 자격증명 <b>위에서 오른쪽으로</b> 옮겼다.
+      왼쪽 카드(자격증명)와 오른쪽 패널(선택)이 <b>격자 기본 정렬(stretch)</b>로 자동으로 같은 높이가 된다. free 박스는
+      오른쪽 패널 <b>맨 아래</b>(<code>margin-top:auto</code>)에 붙였다 — 넓을 땐 자리가 남아 기본 펼침.</li>
+    <li><b>[4차] 값 — 1280×800에서 <span class="ok" style="color:var(--teal)">스크롤이 사라진다</span></b>(화면 전체 622px,
+      창 712~720px보다 90~98px 작음). 단 <b>창을 960px 아래로 줄이면</b>(흔치 않지만 900px까지 줄일 수 있다) 1칸으로 접혀
+      3차와 거의 같은 828px로 돌아간다 — "항상"이 아니라 "기본 크기에서" 스크롤이 없어진다. "프로" 설명은 코드로 재확인해
+      (ctxSize·overheadMb 동일, maxLoadedModels는 죽은 값) <b>더할 이득이 없어 안 더했다.</b></li>
+  </ol>
+</div>
+
+<div class="banner">
+  ⚠ <b>정직한 구현 고지</b> — 아래 로그인 재현은 <b>실제로 클릭됩니다</b>: 모드 버튼·AI 위치 버튼을 누르면 배경 글로우·테두리·배지가
+  실시간으로 바뀌고, VRAM·에어갭·원격/클라우드 설정 여부·admin 여부를 바꾸면 태그·안내·「로그인」 결과 문구까지 달라집니다
+  (이게 이번 검토의 핵심이라 일부러 살아있게 만들었다). free 박스 접기도 실제로 접히고 펼쳐집니다. 다만
+  <b>「로그인」 버튼은 진짜로 로그인하지 않습니다</b> — 이 파일은 그림이지 제품이 아니다(로그인 뒤 뜨는 문구는 <b>그 뒤처리가
+  이렇게 생겼을 것</b>이라는 시연이다). 위쪽 노란 점선 "🧪 시연 컨트롤"은 검토자가 "지금 실제 설정된 모드"·"라이트 전용
+  설치본"·"VRAM"·"에어갭"·"관리자 여부"·<b>"창 폭"(4차 신규)</b> 같은 여러 상태를 눌러 보기 위한 <b>이 문서 전용 도구</b>이며
+  실제 제품에는 없다(따로 표시했다). <b>"창 폭"</b>은 이번 시안의 핵심 검토 대상이다 — 960px를 경계로 두 칸(로그인|선택)이
+  한 칸으로 접히는 것을 실제로 확인할 수 있다.
+</div>
+
+<h2 class="doc"><span class="n">근거</span>설계 전 조사 — 표준·모범사례</h2>
+<table class="t">
+  <tr><th style="width:250px">출처</th><th style="width:420px">확인한 내용(원문 인용)</th><th>이 시안에 반영</th></tr>
+  <tr>
+    <td>Google Material Design 다크 테마<br><span style="color:var(--muted-2)">design.google/library/material-design-dark-theme<br>codelabs.developers.google.com/codelabs/design-material-darktheme</span></td>
+    <td>"다크 테마는 순수 검정(#000000) 대신 진한 회색(#121212)을 권장한다 — 대비를 낮춰 눈의 피로를 줄인다." ·
+      "주요 색(accent)은 다크 표면 위에서 채도를 낮춰야 한다." · 텍스트-배경 대비 <b>15.8:1</b> 권장.</td>
+    <td>본문 캔버스 <code>--bg</code>는 손대지 않는다(이미 다크 회색 계열, #262624). 새 3색은 <b>저채도로만</b> 쓴다(아래 색 표의
+      hex가 전부 채도 20% 안팎) — 큰 면을 원색으로 칠하지 않는다.</td>
+  </tr>
+  <tr>
+    <td>배포 환경 색 구분 관행<br><span style="color:var(--muted-2)">madeleinesmith.uk/blog/color-code-deployment-environments<br>drupal.org/project/environment_indicator</span></td>
+    <td>"환경 표시기는 사이트 옆에 <b>색 스트립</b>을 붙여 각 버전을 표시한다" · "green for DEV, orange for STAGING, red for LIVE" —
+      화면 전체가 아니라 <b>가늘고 항상 보이는 띠/배지</b>로 구분하는 것이 널리 쓰이는 방식.</td>
+    <td>로그인 카드 위 3px 테두리 줄 + 앱 상단바 44px의 2px 아랫줄 + 배지 하나 — <b>큰 면 재도색이 아니라 얇은 띠</b>로 구현.</td>
+  </tr>
+  <tr>
+    <td>WCAG 2.1 성공기준 1.4.1(색의 사용)<br><span style="color:var(--muted-2)">w3.org/WAI/WCAG21/Understanding/use-of-color.html</span></td>
+    <td>"색은 정보를 전달하는 <b>유일한</b> 시각적 수단이 되어서는 안 된다"(원문: color is not used as the only visual means of
+      conveying information) — 남성 12명 중 1명이 색각 이상.</td>
+    <td>모드마다 <b>아이콘(🏢/🚀/🪶)+한글 글자(표준/프로/라이트)</b>가 색과 항상 같이 붙는다 — 색만 보고 판단할 자리를 안 만든다.</td>
+  </tr>
+  <tr>
+    <td>로그인 폼 카드 폭 관행<br><span style="color:var(--muted-2)">(2차 갱신에서 새로 조사)</span></td>
+    <td>"중앙 정렬 로그인 카드 컨테이너는 보통 <b>360~420px</b>" — 여러 실무 가이드가 공통으로 드는 범위.</td>
+    <td>카드 폭 380→440px 결정 근거(아래 "왜 440px인가" 절). 관행을 벗어나되 최소한으로만.</td>
+  </tr>
+  <tr>
+    <td>WCAG 2.5.5(AAA)/2.5.8(AA) 목표 크기<br><span style="color:var(--muted-2)">(2차 갱신에서 새로 조사)</span></td>
+    <td>클릭 대상 최소 <b>44×44px</b> 권장(애플 HIG·구글 Material도 같은 값) — 손가락 평균 폭 16~20mm 근거.</td>
+    <td>구동 모드 버튼 119×60px(양변 44px의 약 2.7배·1.4배) — "좁고 답답하다"는 지적을 숫자로 넘겼다.</td>
+  </tr>
+</table>
+
+<h2 class="doc"><span class="n">전제</span>기술적으로 무엇이 "즉시"이고 무엇이 "링크"인가</h2>
+<div class="evid-box">
+  <div class="cap">preload.ts:77-78 — 에디션(라이트↔표준)은 순수 로컬 IPC</div>
+  <code>editionGet: () =&gt; ipcRenderer.invoke("edition:get")</code> · <code>editionSet: (mode) =&gt; ipcRenderer.invoke("edition:set", mode)</code><br>
+  <span style="color:var(--muted-2)">→ 서버 왕복이 없다. main.ts가 로컬 설정 파일만 읽고/쓴다. <code>login.html:436</code>이 이미 <b>로그인 전에</b>
+  <code>editionGet()</code>을 불러 free 박스 표시 여부를 정한다 — 로그인 화면에서 "지금 모드"를 읽는 것은 <b>이미 있는 다리를 한 번 더 쓰는 것</b>뿐이다.</span>
+</div>
+<div class="warn-box">
+  <div class="cap">⚠ localengine.ts:1171,1192-1193 — 티어(표준↔프로)는 인증이 걸린 서버 라우트</div>
+  <code>app.get("/api/localengine/tier", authMiddleware, …)</code> · <code>app.post("/api/localengine/tier", authMiddleware, …)</code><br>
+  <span style="color:var(--muted-2)">→ <b>로그인 성공 전엔 호출 자체가 막힌다</b>(401). 그래서 "로그인 화면에서 프로를 고른다"의 정확한 뜻은
+  "로그인 화면에서 <b>미리 정해 두고</b>, 자격증명이 통과한 <b>바로 다음 순간</b>(app.html로 넘어가기 전)에 그 값을
+  <code>setLlmTier()</code>로 적용한다"이다 — 이 시안의 모드 고르기는 이 전제로 설계했다(구현 참고 절에 정확한 삽입 지점 적음).</span>
+</div>
+
+<h2 class="doc"><span class="n">대안</span>왜 이 안인가 — 검토하고 버린 4가지</h2>
+<table class="t">
+  <tr><th style="width:230px">대안</th><th>왜 이걸 안 골랐나</th></tr>
+  <tr><td>① 설정 화면에 그대로 두기(현행)</td><td>이미 <code>settings.html</code>에 있지만 <b>로그인 전엔 안 보인다</b>. 사장님이 원한 것은
+    "로그인 <b>때</b>" 정하는 것 — 이대로면 원하는 모드로 쓰려고 로그인→설정→모드 바꿈→(라이트면 재시작)→재로그인의 왕복이 생긴다.
+    "한 클라이언트에서 테스트"라는 요청과 정면으로 안 맞는다.</td></tr>
+  <tr><td>② 첫 실행에만 한 번 묻기(온보딩)</td><td>온보딩 자체가 이미 보류 상태다(<code>project_onboarding_deferred.md</code>,
+    <code>DISABLED=true</code>) — 되살리는 것부터 별건이 된다. 게다가 "테스트차 여러 번 바꿔 본다"는 목적과 안 맞는다 — 1회성 질문은
+    두 번째부터 다시 설정으로 가야 한다.</td></tr>
+  <tr><td>③ 로그인 전에 별도 "모드 고르기" 화면 하나 더 두기</td><td>화면 전환이 한 번(클릭+로드) 늘고, 자격증명과 분리되면 "왜 화면이
+    두 개가 됐나"는 질문이 남는다. 카드는 <b>폭을 늘려서라도(2차 갱신에서 380→440px)</b> 3택을 담을 수 있었다(아래 밀도 계산) —
+    폭을 못 늘렸다면 이 판단이 달랐을 수 있지만, 늘릴 수 있는 한 화면을 쪼갤 이유가 약하다. 쪼개면 유지할 파일이 하나 늘고,
+    두 화면 사이 상태를 옮기는 코드도 새로 생긴다.</td></tr>
+  <tr><td>④ 앱 아이콘 색만 다르게(선례 — max의 라이트 아이콘)</td><td>이미 하고 있고 <b>계속 유지할 가치가 있다</b>(실행 전, 작업표시줄에서도
+    구분된다) — 그래서 이 시안은 그것을 <b>대체하지 않고 병행</b>한다. 다만 그것만으로는 "같은 실행 파일 안에서 모드를 스스로
+    바꾸는" 조작을 못 준다 — 아이콘은 설치가 이미 고정된 뒤의 표시일 뿐이다.</td></tr>
+</table>
+<p class="meas">→ 남은 길은 <b class="ok">로그인 카드 안에 얹기</b>였다. 카드는 이미 화면의 중심이고, 서버 주소·아이디·비번보다
+  <b>먼저</b> 결정할 성격의 항목(모드)이라 맨 위(부제 바로 아래)에 둔다.</p>
+
+<h3 class="doc">왜 440px인가(2차 갱신, 요청①)</h3>
+<p class="note">사장님이 1차 시안을 보고 "3버튼이 좁고 답답하다"고 짚었다 — 380px 카드에서 버튼 하나가 약 101×50px이었다(패딩·간격을
+  다 뺀 실측). 두 근거로 폭과 버튼 크기를 다시 잡았다.</p>
+<table class="t">
+  <tr><th style="width:230px">근거</th><th>확인한 내용</th></tr>
+  <tr><td>로그인 카드 폭 업계 관행<br><span style="color:var(--muted-2)">(로그인 폼 디자인 가이드 검색 종합)</span></td>
+    <td>"중앙 정렬 로그인 카드는 보통 <b>360~420px</b>" — 대다수 웹앱이 이 범위를 쓴다. 우리 1차 시안(380px)은 이 범위 <b>안</b>이었다 —
+      즉 "카드가 원래 좁아서"가 아니라 <b>3택 버튼이 새로 들어와서</b> 좁아 보인 것이다. 그래서 관행 범위를 완전히 벗어나기보다,
+      <b>+20px만 넘긴 440px</b>로 정했다 — "이례적으로 큰 로그인창"이 아니라 "3택이 있는 로그인창치고 자연스러운" 정도를 노렸다.</td></tr>
+  <tr><td>WCAG 2.5.5(AAA)·2.5.8(AA) 목표 크기<br><span style="color:var(--muted-2)">(터치 타깃 최소 크기 가이드 검색 종합)</span></td>
+    <td>클릭·탭 대상은 최소 <b>44×44px</b>을 권장(AA는 24×24, AAA·애플/구글 관행은 44×44) — "손가락 평균 폭 16~20mm" 근거.
+      1차 버튼(101×50)은 이미 44×44를 넘지만, <b>가로가 세로보다 훨씬 큰 비대칭</b>이라 "눌러지는 면"이라기보다 "글자가 든 좁은 띠"처럼
+      보였다. 2차(119×60)는 가로세로 비율이 완만해지고 <b>면적이 43.7% 늘어</b> "누르는 자리"로 더 뚜렷하게 읽힌다.</td></tr>
+</table>
+
+<h2 class="doc"><span class="n">시안</span>로그인 화면 — 실제로 눌러 보는 재현</h2>
+<div class="demobar">
+  <div class="demobar-t">🧪 시연 컨트롤 — 이 문서 전용(실제 제품엔 없음)</div>
+  <div class="demobar-row">
+    <span>지금 이 PC에 실제로 설정된 모드:</span>
+    <span class="seg" id="segNow">
+      <button data-now="standard" class="on">표준</button>
+      <button data-now="pro">프로</button>
+      <button data-now="lite">라이트</button>
+    </span>
+    <span style="color:var(--muted-2)">— 실제 제품에서는 이 값을 <code>editionGet()</code>·<code>getLlmTier()</code>로 자동으로 읽는다(사람이 고르지 않는다).</span>
+  </div>
+  <div class="demobar-row">
+    <span>설치본 종류:</span>
+    <span class="seg" id="segLocked">
+      <button data-locked="0" class="on">표준/프로 설치본(전환 가능)</button>
+      <button data-locked="1">라이트 전용 설치본(빌드고정)</button>
+    </span>
+    <span style="color:var(--muted-2)">— 실제 제품에서는 <code>package.json</code>이 빌드 시점에 정한다(설치 뒤엔 못 바꾼다).</span>
+  </div>
+  <!-- 3차 갱신 — AI 위치 시연용 4개 추가 -->
+  <div class="demobar-row">
+    <span>이 PC의 VRAM(시연):</span>
+    <span class="seg" id="segVram">
+      <button data-vram="10">10GB</button>
+      <button data-vram="24" class="on">24GB</button>
+      <button data-vram="48">48GB</button>
+    </span>
+    <span style="color:var(--muted-2)">— 최소만 알린다(막지 않는다, 사장님 지시) — 골라도 항상 눌린다.</span>
+  </div>
+  <div class="demobar-row">
+    <span>원격 GPU(gb10) 주소:</span>
+    <span class="seg" id="segRemoteCfg">
+      <button data-remotecfg="0">미설정</button>
+      <button data-remotecfg="1" class="on">설정됨(gb10)</button>
+    </span>
+    <span>클라우드 키:</span>
+    <span class="seg" id="segCloudCfg">
+      <button data-cloudcfg="0">미설정</button>
+      <button data-cloudcfg="1" class="on">설정됨(OpenAI)</button>
+    </span>
+  </div>
+  <div class="demobar-row">
+    <span>에어갭 모드:</span>
+    <span class="seg" id="segAirgap">
+      <button data-airgap="0" class="on">꺼짐</button>
+      <button data-airgap="1">켜짐(봉인)</button>
+    </span>
+    <span>지금 로그인하는 계정:</span>
+    <span class="seg" id="segAdmin">
+      <button data-admin="0" class="on">일반 사용자</button>
+      <button data-admin="1">관리자(admin)</button>
+    </span>
+  </div>
+  <!-- 4차 갱신 — 이번 시안의 핵심 검토 대상: 창 폭. main.ts:337-345 mainWindowBounds()가 실제로
+       내는 값 그대로 프리셋으로 뒀다(1240=1280×800 기본 창, 900=통상 최소, 600=좁은 화면 최소). -->
+  <div class="demobar-row">
+    <span>🪟 창 폭(이번 시안의 핵심):</span>
+    <span class="seg" id="segWidth">
+      <button data-width="1240" class="on">1240px(1280×800 기본)</button>
+      <button data-width="1000">1000px</button>
+      <button data-width="900">900px(통상 최소)</button>
+      <button data-width="600">600px(좁은 화면 최소)</button>
+    </span>
+  </div>
+</div>
+
+<div class="mock-shell">
+  <div class="mock-shell-label">아래는 실제 <code>login.html</code>의 마크업·CSS를 재현한 것 — 모드 3버튼(1·2차)·Smart MD 두 갈래(2차)·AI 위치 3버튼(3차)에 이어, <b>두 칸 배치·창 폭 반응(4차, 신규)</b>이 이 시안이 더한 것. 위 "🪟 창 폭"을 눌러 실제로 접히는 것을 확인하세요.</div>
+  <div class="login-mock" id="loginStage" data-mode="standard" data-locked="0" data-layout="wide">
+   <div class="two-col" id="twoCol">
+    <div class="card" id="loginCard" style="position:relative">
+      <div class="logo"><span class="wordmark">GIJO<b>.</b>AI</span><span>AI SECURITY MANAGER</span></div>
+      <h1>GIJO AS 로그인 <span class="mode-badge" id="modeBadge">🏢 표준</span><span class="mode-badge" id="locBadge">💻 내 PC</span></h1>
+      <p class="sub">보안담당자 계정으로 서버에 연결합니다.</p>
+
+      <div class="server-row">
+        <input placeholder="서버 주소 (이 PC에 동봉된 서버면 비워 두세요)" aria-label="서버 주소" disabled>
+      </div>
+      <label>아이디</label>
+      <input placeholder="아이디" disabled>
+      <label>비밀번호</label>
+      <input type="password" placeholder="비밀번호" disabled>
+      <label class="savepw"><input type="checkbox" checked disabled> 이 PC에 로그인 정보 저장(서버·아이디·비밀번호)</label>
+      <button class="lm-submit" id="lmSubmit">로그인</button>
+      <div class="err"></div>
+      <div class="hint">단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 <b>비워 두세요</b> — 앱이 알아서 맞춥니다.<br>분산 모드: 사내망 GPU 서버 주소를 입력하세요.</div>
+      <div class="ver">GIJO AS 클라이언트 v6.x.x</div>
+      <div class="lm-toast" id="lmToast">이 시안은 정지 그림입니다 — 실제 로그인은 되지 않습니다</div>
+    </div>
+
+    <!-- ══ 4차 갱신 — 오른쪽 패널. 모드 3버튼·AI 위치 3버튼이 여기로 이사했다(자격증명 위에
+         쌓지 않는다). DOM만 옮겼을 뿐 id·JS 로직은 3차와 동일 — render()는 안 건드렸다. ══ -->
+    <div class="side-panel" id="sidePanel">
+      <div class="side-t">구동 모드 · AI 위치 — 로그인 직후 적용됩니다</div>
+      <div class="mp-row" id="mpRow">
+        <button type="button" class="mp-btn" data-mode="standard">
+          <span class="mp-top">🏢 표준</span><span class="mp-tag">로그인 직후 적용</span>
+        </button>
+        <button type="button" class="mp-btn" data-mode="pro">
+          <span class="mp-top">🚀 프로</span><span class="mp-tag">로그인 직후 적용<br>· 엔진 재기동</span>
+        </button>
+        <button type="button" class="mp-btn" data-mode="lite">
+          <span class="mp-top">🪶 라이트</span><span class="mp-tag">전환 안내 ↗</span>
+        </button>
+      </div>
+      <div class="mp-note" id="mpNote"></div>
+
+      <div class="mp-row" id="locRow">
+        <button type="button" class="mp-btn" data-loc="local" id="locLocalBtn">
+          <span class="mp-top">💻 이 PC 안</span><span class="mp-tag" id="locLocalTag">이 GPU만 사용</span>
+        </button>
+        <button type="button" class="mp-btn" data-loc="remote" id="locRemoteBtn">
+          <span class="mp-top">🖧 원격 GPU</span><span class="mp-tag" id="locRemoteTag">gb10 · 더 크지만 느림</span>
+        </button>
+        <button type="button" class="mp-btn" data-loc="cloud" id="locCloudBtn">
+          <span class="mp-top">☁ 클라우드</span><span class="mp-tag" id="locCloudTag">일반 질문만 · 사외</span>
+        </button>
+      </div>
+      <div class="mp-note" id="locNote"></div>
+
+      <!-- ══ 4차 — free 박스가 오른쪽 패널 "아래"로 이사(margin-top:auto로 붙임). 넓을 땐
+           자리가 남아 기본 펼침, 좁아지면(1칸) 3차처럼 기본 접힘 — JS가 레이아웃에 맞춰 정한다. ══ -->
+      <div class="free" id="freeArea">
+        <button type="button" class="free-toggle" id="freeToggle"><span class="car">▸</span> 무료로 함께 드리는 것(Smart MD·라이트) — 접기</button>
+        <div class="free-body open" id="freeBody">
+          <div class="free-row">
+            <div class="fc" id="smdTile">
+              <div class="fc-h"><span>📝 Smart MD Studio</span><span class="fc-b">무료</span></div>
+              <div class="fc-d">화면 캡처를 붙여 넣어 문서를 만드는 편집기 — <b>앱 안의 별도 창</b>으로 엽니다.</div>
+              <div class="fc-actions">
+                <button type="button" class="fc-act primary" id="smdOpenBtn">열기</button>
+                <button type="button" class="fc-act" id="smdGetBtn">받기 ▾</button>
+              </div>
+              <div class="fc-more" id="smdMore">
+                ⚠ 지금은 <b>받을 설치본이 없습니다</b>. Smart MD는 앱 안 창으로 여는 것만 있고, 따로 설치하는
+                배포본은 아직 안 만들어졌습니다 — 방식은 이 문서 아래 "Smart MD 받기 — 세 갈래"에서 비교했습니다.
+              </div>
+              <div class="fc-msg" id="smdMsg"></div>
+            </div>
+            <button class="fc" type="button" disabled>
+              <div class="fc-h"><span>⬇ GIJO AS 라이트</span><span class="fc-b">무료</span></div>
+              <div class="fc-d">서버 없이 <b>다른 PC</b>에서 혼자 도는 개인용 판. 설치본·안내서를 받습니다(NVIDIA GPU 10GB급).</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+   </div>
+  </div>
+</div>
+<p class="meas">
+  ⚠ 위 free 구역의 "⬇ GIJO AS 라이트"는 <b>이 시안이 새로 만든 것이 아니다</b>(2026-08-14 기존 결정). 용도가 다르다 — 새 구동 모드
+  버튼의 "라이트"는 <b>이 PC를 라이트로 바꾸는 것</b>이고, 여기 free 박스는 <b>다른 PC</b>에 줄 설치본을 받는 것이다. 헷갈리지 않게
+  free 박스 설명 글에 "다른 PC" 세 글자를 추가했다(원문엔 없던 3글자, 1차 시안부터 있던 손질).
+</p>
+<p class="meas">
+  ⚠ <b>2차 갱신(요청②)</b> — Smart MD 타일을 눌러 보면 "열기"는 진짜로 있는 동작(앱 안 별도 창 — 이 목업에선 토스트로만 알림)이고,
+  "받기 ▾"는 <b>지금 실제로는 받을 물건이 없다는 사실을 그대로 펼쳐 보인다</b>. 버튼을 만들어 두고 아무 말 없이 눌러도 반응이 없게
+  하는 것(가짜 무반응)과, 눌렀을 때 "왜 아직 안 되는지"를 정직하게 보여주는 것은 다르다 — 이 시안은 후자를 골랐다.
+  근거는 아래 "Smart MD 받기 — 세 갈래" 절.
+</p>
+
+<h2 class="doc"><span class="n">두칸</span>오른쪽 배치(4차 갱신) — "로그인창 오른쪽으로 배치하자"</h2>
+<p class="note">3차까지는 선택 6개(모드 3+AI위치 3)를 자격증명 <b>위에 세로로 쌓았다</b> — 카드가 724px까지 늘어 1280×800에서
+  스크롤이 났다. 사장님 지시대로 <b>세로 대신 가로로 편다</b> — 왼쪽 = 로그인(자격증명), 오른쪽 = 선택 패널(모드+AI 위치).
+  위 "🪟 창 폭" 시연 컨트롤을 눌러 실제로 접히는 것을 확인할 수 있다.</p>
+
+<h3 class="doc">왜 이렇게 나눴나 — 정렬·free 박스 위치 결정</h3>
+<table class="t">
+  <tr><th style="width:220px">결정</th><th>왜</th></tr>
+  <tr><td>세로 정렬 = <b>격자 기본값(stretch)</b></td><td>왼쪽 카드(574px, 자격증명만)가 오른쪽 패널(내용만 150px)보다 훨씬 길다.
+    <code>align-items</code>를 따로 안 주면(기본값 <code>stretch</code>) 오른쪽 패널이 왼쪽 카드 높이에 <b>자동으로</b> 맞춰
+    늘어난다 — "같은 높이로 서게 하라"는 요구를 <b>CSS 한 줄(값을 안 줌)</b>로 만족한다. 가운데 맞춤(<code>center</code>)을 썼다면
+    오른쪽 패널이 짧게 붕 떠 아래쪽에 빈 카드 테두리만 남았을 것이다.</td></tr>
+  <tr><td>Smart MD·라이트(free) = <b>오른쪽 패널 맨 아래</b>(<code>margin-top:auto</code>로 밀어붙임)</td><td>오른쪽 패널이 카드 높이(574px)까지
+    늘어나는데 모드+AI위치 내용은 150px뿐이라 <b>352px가 빈다</b>. 그 자리를 밀어서 채우는 대신(억지로 크게 그리면 정보가 없는데
+    커 보이는 거짓 신호가 된다), free 박스를 <b>맨 아래로 고정</b>해 빈 공간을 "다음에 볼 것"이 자연스럽게 채우게 했다.
+    <b>넓을 때(2칸)는 자리가 남아 기본 펼침</b>, <b>좁아져 1칸이 되면 3차처럼 기본 접힘</b>으로 자동 전환된다(시연 컨트롤로 확인 가능).</td></tr>
+</table>
+
+<h3 class="doc">몇 px에서 한 칸으로 접히나 — 960px 근거</h3>
+<div class="evid-box">
+  <div class="cap">계산 — 카드440 + 간격16 + 패널440 = 896px, 여유 더해 960px에서 접는다</div>
+  왼쪽 카드 440px(2차에서 확정한 값, 이번에 안 바꿈) + 오른쪽 패널도 <b>같은 폭 440px</b>(비대칭보다 대칭이 버튼 크기를 그대로
+  지킨다 — 패널을 좁히면 모드·AI위치 버튼이 다시 작아져 2차의 "버튼을 키우자" 작업이 무너진다) + 두 칸 사이 간격 16px =
+  <b>896px</b>. 여기에 최소한의 가장자리 여백(20px씩, 총 40px)을 더해 <b>936px</b>이 진짜 필요 폭이고, 딱 맞춰 끊으면
+  경계에서 툭툭 잘려 보이므로 <b>960px</b>(반올림 여유값)을 기준으로 정했다 — 960px 미만이면 1칸(3차 모습)으로 접힌다.
+</div>
+<table class="t">
+  <tr><th style="width:150px">창 폭</th><th style="width:130px">이 폭에서</th><th style="width:230px">레이아웃</th><th>비고</th></tr>
+  <tr><td>1240px</td><td>1280×800 화면의 <b>기본</b> 창 폭(<code>mainWindowBounds()</code> 계산값)</td><td><b class="ok">2칸</b>(896px 안쪽에 여유 344px)</td><td>사장님이 보는 가장 흔한 경우</td></tr>
+  <tr><td>1000px</td><td>사용자가 창을 살짝 줄인 경우</td><td><b class="ok">2칸</b>(여유 104px)</td><td>아직 넉넉</td></tr>
+  <tr><td>900px</td><td><code>minWidth</code>가 흔히 떨어지는 값(작업영역 940px 안팎일 때)</td><td><b class="bad">1칸</b>(900&lt;960)</td><td>3차 모습으로 자동 전환</td></tr>
+  <tr><td>600px</td><td><code>minWidth</code> 절대 하한(세로 모니터 등 아주 좁은 작업영역)</td><td><b class="bad">1칸</b></td><td>440px 카드가 600px 폭에도 들어간다(여백 160px)</td></tr>
+</table>
+
+<h3 class="doc">넓을 때 vs 좁을 때 — 실제로 눌러 본 재현</h3>
+<p class="note">위 로그인 재현에서 "🪟 창 폭"을 <b>900px</b>로 눌러 보면 즉시 1칸(3차 모습, free 박스는 다시 접힘)으로 바뀐다 —
+  DOM은 그대로 두고 CSS grid-area만 바꾼 것이라(<code>data-layout="narrow"</code>) 모드·AI위치를 고른 상태도 그대로 유지된다
+  (다시 고를 필요 없음).</p>
+
+<h3 class="doc">사장님이 짚은 것 ① — "프로" 설명, 무엇이 좋아지는지 넣을 수 있나</h3>
+<div class="warn-box">
+  <div class="cap">⚠ 코드로 직접 확인 — 넣을 것이 없다(사장님이 이미 확인하신 사실과 일치)</div>
+  <code>localengine.ts:128-129</code> — <code>standard</code>와 <code>pro</code>의 <code>ctxSize</code>(둘 다 32768)·
+  <code>overheadMb</code>(둘 다 5000)가 <b>완전히 같다.</b> <code>maxLoadedModels</code>(1 vs 2)만 다른데,
+  <code>makeRoomFor()</code>(:481-504)를 읽어 보면 이 값은 <b>VRAM 실측이 안 될 때만</b> 쓰는 폴백 개수 상한이다(:487
+  <code>while (pool.size >= tier.maxLoadedModels)</code> — <code>free === null</code> 분기 안에서만 실행). VRAM 실측이
+  되는 모든 지원 플랫폼(CUDA·Metal·GB10 통합메모리도 CUDA 런타임 API로 됨)에서는 <b>실제 여유 VRAM</b>이 기준이지
+  <code>maxLoadedModels</code>가 아니다 — 즉 이 값은 <b>사실상 죽은 값</b>이다. 그래서 오른쪽 패널에 자리가 생겼어도
+  "프로"의 <code>mp-tag</code>에 "무엇이 좋아지는지"를 <b>추가하지 않았다</b> — 있는 그대로 "로그인 직후 적용 · 엔진 재기동"
+  (어떻게 적용되는지)만 남겼다. 없는 이득을 적으면 정직 원칙에 어긋난다.
+</div>
+
+<h3 class="doc">사장님이 짚은 것 ② — VRAM 모자랄 때 "이 PC" 자리가 어떻게 바뀌나</h3>
+<p class="note">이미 3차부터 있던 기능이고 4차에서도 그대로 살아 있다 — 위 "🧪 시연 컨트롤"의 "이 PC의 VRAM"을 <b>10GB</b>로
+  누르면 오른쪽 패널 <code>💻 이 PC 안</code> 버튼의 태그가 <b>"24GB · 이 PC로 충분"</b>에서 <b>"10GB · 최소 10GB는 넘음"</b>으로
+  바뀐다 — 버튼은 계속 눌리고(막지 않는다, 사장님 지시), 다만 "충분"이라는 말은 안 쓴다.</p>
+
+<h2 class="doc"><span class="n">확대</span>카드 세로·가로 비교 — 최초 → 1차 시안 → 2차 갱신</h2>
+<p class="note">사장님 피드백 원문 — "3버튼이 좁고 답답합니다." 아래 왼쪽이 그 화면(1차 시안, 카드 380px)이고 오른쪽이 이번 갱신(카드 440px)이다.
+  버튼 하나의 가로·세로가 실제로 얼마나 커졌는지 이 재현 그대로 자로 잴 수 있다(정지 이미지가 아니라 같은 CSS로 그린 것).</p>
+<div class="closeup-row">
+  <div class="closeup-col">
+    <div class="closeup-tag bad">1차 시안 — 카드 380px</div>
+    <div class="login-mock" style="width:412px;padding:14px 0 16px" data-mode="standard">
+      <div class="card" style="width:380px;border-top-width:3px;border-top-color:#8f8a80">
+        <div class="logo"><span class="wordmark">GIJO<b>.</b>AI</span><span>AI SECURITY MANAGER</span></div>
+        <h1 style="margin-bottom:6px">GIJO AS 로그인 <span class="mode-badge">🏢 표준</span></h1>
+        <p class="sub">보안담당자 계정으로 서버에 연결합니다.</p>
+        <div class="mp-row v1size" style="pointer-events:none">
+          <button class="mp-btn on" data-mode="standard" tabindex="-1"><span class="mp-top">🏢 표준</span><span class="mp-tag">로그인 직후 적용</span></button>
+          <button class="mp-btn" data-mode="pro" tabindex="-1"><span class="mp-top">🚀 프로</span><span class="mp-tag">로그인 직후 적용<br>· 엔진 재기동</span></button>
+          <button class="mp-btn" data-mode="lite" tabindex="-1"><span class="mp-top">🪶 라이트</span><span class="mp-tag">전환 안내 ↗</span></button>
+        </div>
+        <div class="server-row"><input placeholder="서버 주소" disabled></div>
+        <label>아이디</label><input placeholder="아이디" disabled>
+        <label>비밀번호</label><input type="password" placeholder="비밀번호" disabled>
+        <label class="savepw"><input type="checkbox" checked disabled> 이 PC에 로그인 정보 저장</label>
+        <button class="lm-submit" disabled>로그인</button>
+        <div class="err"></div>
+        <div class="hint">단일 데스크톱 모드 안내 두 줄…</div>
+        <div class="ver">GIJO AS 클라이언트 v6.x.x</div>
+      </div>
+    </div>
+    <span class="px-tag bad">카드 380×640px · 버튼 약 101×50px</span>
+  </div>
+  <div class="closeup-col">
+    <div class="closeup-tag after">2차 갱신(이번) — 카드 440px</div>
+    <div class="login-mock" style="width:472px;padding:14px 0 16px" data-mode="standard">
+      <div class="card" style="width:440px;border-top-width:3px;border-top-color:#8f8a80">
+        <div class="logo"><span class="wordmark">GIJO<b>.</b>AI</span><span>AI SECURITY MANAGER</span></div>
+        <h1 style="margin-bottom:6px">GIJO AS 로그인 <span class="mode-badge">🏢 표준</span></h1>
+        <p class="sub">보안담당자 계정으로 서버에 연결합니다.</p>
+        <div class="mp-row" style="pointer-events:none">
+          <button class="mp-btn on" data-mode="standard" tabindex="-1"><span class="mp-top">🏢 표준</span><span class="mp-tag">로그인 직후 적용</span></button>
+          <button class="mp-btn" data-mode="pro" tabindex="-1"><span class="mp-top">🚀 프로</span><span class="mp-tag">로그인 직후 적용<br>· 엔진 재기동</span></button>
+          <button class="mp-btn" data-mode="lite" tabindex="-1"><span class="mp-top">🪶 라이트</span><span class="mp-tag">전환 안내 ↗</span></button>
+        </div>
+        <div class="server-row"><input placeholder="서버 주소" disabled></div>
+        <label>아이디</label><input placeholder="아이디" disabled>
+        <label>비밀번호</label><input type="password" placeholder="비밀번호" disabled>
+        <label class="savepw"><input type="checkbox" checked disabled> 이 PC에 로그인 정보 저장</label>
+        <button class="lm-submit" disabled>로그인</button>
+        <div class="err"></div>
+        <div class="hint">단일 데스크톱 모드 안내 두 줄…</div>
+        <div class="ver">GIJO AS 클라이언트 v6.x.x</div>
+      </div>
+    </div>
+    <span class="px-tag">카드 440×650px · 버튼 약 119×60px(+43.7% 면적)</span>
+  </div>
+</div>
+
+<h2 class="doc"><span class="n">AI 위치</span>AI를 어디서 돌릴지 — 세 갈래(3차 갱신)</h2>
+
+<div class="evid-box">
+  <div class="cap">★★ 새로 만드는 게 아니다 — 라이트에 이미 있는, 검증된 패턴을 가져온다</div>
+  <code>client/src/renderer/pages/lite-settings.html:58-72,124-150</code> — 2026-08-14 사장님 지시("lite는 llm 처음
+  선택할 때 옵션으로 두자")로 이미 만들어져 있다. 원문 그대로 인용한다:<br><br>
+  <i>"어디서 돌릴지 — 이 PC / 원격 GPU 두 갈래. <b>같은 크기·같은 무게로 둔다</b>: 한쪽을 크게 그리면 고르는 게
+  아니라 <b>떠미는 것</b>이 된다."</i><br>
+  <i>"원격 GPU는 <b>오류가 났을 때 안내하는 것이 아니라 처음 고르는 자리에서 같은 급의 선택지</b>여야 한다 —
+  이 PC에 GPU가 없어도 쓸 수 있다는 사실을 그때 알아야 한다."</i><br>
+  <i>"⚠ 처음부터 「선택됨(on)」으로 그리지 않는다 — 상태를 읽기 전에 그러면 원격이 켜져 있어도 「이 PC」로
+  보인다(검토관 지적 M9)."</i><br><br>
+  실제 문구도 그대로 재사용했다(<code>locRow</code> 버튼 라벨) — <code>💻 이 PC에 모델 두기</code>·
+  <code>🖧 원격 GPU(VPN)에 연결</code>의 표현을 로그인 카드 폭에 맞게 줄였을 뿐, 뜻은 같다.
+  <b>이 시안은 이 원칙을 표준·프로에도 가져오는 것이 핵심 가치다</b> — 이미 라이트에서 검증됐으니 위험이 낮다.
+  다만 자리는 다르다: 라이트는 <b>설정 안 모델 등록 자리</b>, 이번은 <b>로그인 화면</b>이다 — 그래서 그대로 복사가
+  아니라 같은 원칙으로 다시 그렸다(아래 "핵심 난제" 절이 그 차이의 핵심).
+</div>
+
+<h3 class="doc">세 갈래 — 무엇이 어디까지 나가는가</h3>
+<table class="t">
+  <tr><th style="width:130px">갈래</th><th style="width:230px">무엇</th><th style="width:170px">자료가 어디까지</th><th>근거(코드)</th></tr>
+  <tr><td>💻 <b>이 PC</b></td><td>로컬 GPU로 돌린다</td><td><b class="ok">밖으로 안 나감</b></td><td><code>localengine.ts</code></td></tr>
+  <tr><td>🖧 <b>원격 GPU(VPN)</b></td><td>VPN 안의 큰 기계(gb10 등)</td><td><b>VPN 안</b>까지</td><td><code>remotellm.ts</code> — gb10이 지금 이 순간 서빙 중(<code>qwen3-14b</code>, 포트 8080 — 사장님이 <code>ssh gb10</code>으로 직접 확인)</td></tr>
+  <tr><td>☁ <b>클라우드</b></td><td>Gemini · Claude · <b>OpenAI</b> · custom(임의 OpenAI 호환)</td><td>사외 — 단, <b>일반 질문만</b>(아래 상세)</td><td><code>cloudllm.ts:1,28-29</code></td></tr>
+</table>
+
+<h3 class="doc">왜 클라우드만 다르게 그렸나 — 무게가 다르다</h3>
+<p class="note">라이트의 원칙("같은 크기·같은 무게")은 <b>이 PC 대 원격 GPU</b> 사이의 것이었다 — 둘 다 온프렘·VPN 안이라
+  같은 급이 맞다. <b>클라우드는 자료가 회사 밖으로 나간다</b> — 온프렘이 이 제품의 정체성인데 셋을 완전히 같은 크기로
+  그리면 정체성을 스스로 흐리는 것이 된다. 그렇다고 작게 그리거나 뒤로 미루면(예: 3번째 자리에 숨기기) "떠밀지 않는다"는
+  원칙과 부딪힌다 — 있는 기능을 못 찾게 만드는 것도 정직하지 않다.</p>
+<p class="note"><b class="hi">내가 고른 절충</b> — 크기·위치(같은 행의 3번째 칸)는 <b>이 PC·원격과 동일</b>하게 둔다(찾기 쉬움·떠밀지
+  않음 유지). 대신 <b>형태</b>로만 다르게 표시한다: 점선 테두리(이 문서의 모드 3버튼에서 "라이트=링크 성격"에 이미 쓴 것과
+  같은 기법 — 다른 종류의 조작임을 색이 아니라 <b>모양</b>으로 알린다, WCAG 1.4.1과 같은 결) + 태그 글자를 기존 <code>--amber</code>
+  (경고) 톤으로. 새 색을 안 만들고 <b>이미 있는 의미색을 정확한 자리에 재사용</b>했다 — 클라우드는 이 카드에서 유일하게
+  실제로 "사외로 나간다"는 위험 성격을 가진 선택이라 재사용이 오히려 정확하다.</p>
+
+<h3 class="doc">클라우드의 진짜 사실 — 과장도, 축소도 안 한다</h3>
+<div class="evid-box">
+  <div class="cap">cloudllm.ts:1-9, cloudegress.ts:2-8 — 직접 읽고 확인</div>
+  <b>사실이 아닌 것</b>: "OpenAI를 쓰면 우리 취약점 자료가 나간다." — 이렇게 적으면 <b>과장</b>이다.<br>
+  <b>정확한 사실</b>: 클라우드로는 <b>RAG·도구 결과 없는 맨몸 일반 질문만</b> 나간다 — <code>cloudllm.ts</code>가 자체
+  시스템 프롬프트를 만들고 <code>llm.ts</code>의 RAG 주입 경로를 <b>타지 않는다</b>(구조적 분리, 회사 문서·자산·취약점은
+  애초에 실리지 않음). 2차 방어선(<code>cloudegress.ts</code>)이 질문 <b>문장 자체</b>에 내부 식별자(사설 IP·자산 id·
+  호스트명 꼴)가 있으면 또 막는다 — 원문: <i>"의심스러우면 무조건 차단하고 로컬로 답하게 한다(오차단은 허용, 유출은
+  절대 불가)."</i> 기본 <b>OFF·admin만 활성화</b>, 키는 암호화 저장, 모든 판정은 감사 로그에 남는다.<br><br>
+  <b>이걸 안 보여주면 있는 기능이 죽는다</b> — 담당자가 "우리 자료가 OpenAI로 간다"고 오해하면 있는 기능을 안 쓴다.
+  그래서 클라우드를 고르면(<code>locNote</code>) 이 두 문장을 그대로 보여준다: "회사 자료는 안 나갑니다" +
+  "질문 문장 자체는 사외로 나갑니다."
+</div>
+
+<h3 class="doc">VRAM은 최소만 알린다 — 막지 않는다(사장님 지시)</h3>
+<div class="warn-box">
+  <div class="cap">⚠ 코드 확인 — 서버는 이미 VRAM으로 막지 않는다</div>
+  <code>localengine.ts:1192-1213</code> <code>POST /api/localengine/tier</code>를 직접 다시 읽었다 — 모르는 등급·
+  「예정(planned)」 등급만 거부한다. <b><code>tierFits</code> 호출이 없다.</b> <code>tierFits</code>는
+  <code>recommendTier</code>(권장 계산, :204-213)에서만 쓰인다. <b>막는 것은 화면 문구뿐</b>이었다 —
+  <code>settings.html:704</code>의 "48GB급 GPU 권장"이 요구처럼 읽힌다(이 시안이 고치는 실제 대상은 아니지만,
+  같은 말투 문제라 아래 "구현 참고"에 남긴다).
+</div>
+<table class="t">
+  <tr><th style="width:120px"></th><th style="width:280px">막는 말투(고치기 전)</th><th>최소만 알리는 말투(이 시안이 쓴 것)</th></tr>
+  <tr><td>이 PC(로컬)</td><td>"NVIDIA GPU 10GB급 <b>필요</b>"</td><td>"최소 10GB부터 · 지금 이 PC는 <b id="vramExampleCell">24GB</b> · 골라도 됩니다"</td></tr>
+  <tr><td>프로 등급</td><td>"48GB급 GPU <b>권장</b>"(강요처럼 읽힘)</td><td>"프로는 최소 48GB부터 · 지금 이 PC는 24GB · <b>그래도 고를 수 있습니다</b>(들어가면 됩니다, 여유가 적을 뿐)"</td></tr>
+</table>
+<p class="meas">위 데모의 "이 PC의 VRAM" 컨트롤을 바꿔 보면 카드 안 <code>💻 이 PC 안</code> 버튼의 태그가 그 값을 그대로
+  반영한다 — <b>어떤 값을 골라도 버튼은 항상 눌린다</b>(막지 않는다). 10GB를 골라도 "최소 10GB는 넘음"이라고만
+  말하지 "부족합니다·막힙니다"라고 하지 않는다.</p>
+
+<h3 class="doc">라이트도 큰 모델을 쓸 수 있다 — 두 축은 별개다</h3>
+<p class="note"><code>remotellm.ts:11</code>가 이미 적어 둔 그대로다: <i>"라이트 10GB 기계가 원격 14B/32B를 쓰면
+  라우팅 손실·정리본 값 손실이 <b>모델을 안 바꾸고</b> 풀린다. 기계 교체 없이 「더 크게」가 실현된다."</i> 즉
+  <b>등급(화면·기능 개수)</b>과 <b>두뇌 크기</b>는 서로 다른 축이다 — 라이트는 "기능이 적은 판"이지 "머리가 나쁜 판"이
+  아니다. 지금 제품 문서는 이 둘을 뭉뚱그려 판다(라이트=작은 모델이라는 인상). 아래 표로 갈라 둔다.</p>
+<table class="t">
+  <tr><th style="width:150px"></th><th style="width:330px">축 1 — 에디션·등급(모드 3버튼)</th><th>축 2 — AI 위치(이번 신규)</th></tr>
+  <tr><td>무엇을 정하나</td><td>화면·도구 개수(라이트 10·표준 78) · 동시 채팅 모델 수(1~2) · 문맥(8K~32K)</td><td>모델이 물리적으로 <b>어디서</b> 도는가(이 PC·VPN·사외)</td></tr>
+  <tr><td>라이트 + 이 PC</td><td colspan="2">작은 모델(7.6B급) · 기능도 적음 — 지금까지의 "라이트" 인상 그대로</td></tr>
+  <tr><td><b>라이트 + 원격</b></td><td colspan="2"><b class="ok">기능은 적지만(10화면) 두뇌는 크다</b>(gb10의 72B까지) — 라이트=저사양의 등식이 깨지는 조합. 오늘 처음 이 시안에 등장.</td></tr>
+  <tr><td>프로 + 이 PC</td><td colspan="2">코드의 지금 "프로": 로컬 48GB에 <b>LLM 2개 동시 적재</b>·32K 문맥(A/B·검증은 없음)</td></tr>
+  <tr><td>프로 + 원격</td><td colspan="2">사장님이 말한 "프로 = gb10 큰 모델"에 가장 가까운 조합 — 아래 "「프로」와의 관계" 절에서 정리</td></tr>
+</table>
+
+<h3 class="doc">gb10 속도 — 맞바꿈을 정직하게 보인다</h3>
+<table class="t">
+  <tr><th>모델</th><th>초당 글자(벤치마크)</th><th>500자 답에 대략</th></tr>
+  <tr><td>72B</td><td>4.5</td><td>약 110초</td></tr>
+  <tr><td>32B</td><td>10.6</td><td>약 47초</td></tr>
+  <tr><td>14B</td><td>39.7</td><td>약 13초</td></tr>
+</table>
+<p class="meas">⚠ <b>이 값은 gb10 벤치마크(모델 자체 출력 속도) 값이다</b> — 3090 대비 3.1배 느림(대역폭 273 vs 936GB/s)이라는
+  사실은 확정이지만, <b>실제 대화 응답(맥락 주입·도구 호출 포함) 속도는 지금 재는 중</b>이다(프로 실측 예정, 사장님 지시).
+  값이 나오면 이 표를 그 값으로 갱신한다 — "측정 중"을 "이미 잰 값"인 것처럼 적지 않는다. 카드 안 <code>locNote</code>도
+  같은 문구("모델 자체 벤치마크 · 실제 응답은 재는 중")를 그대로 쓴다.</p>
+
+<h3 class="doc">에어갭이면 — 잠기되 이유가 보인다</h3>
+<p class="note">위 시연 컨트롤에서 "에어갭 모드: 켜짐"을 눌러 보면 카드 안 <code>🖧 원격 GPU</code>·<code>☁ 클라우드</code>
+  버튼이 회색으로 잠기고, 태그가 <b>"🔒 에어갭 — 막힘"</b>으로 바뀐다 — 그냥 사라지면 "왜 없지?"가 되므로,
+  버튼은 그대로 두고 <b>이유를 그 자리에서</b> 말한다(<code>remotellm.ts</code> 경계 ②·<code>settings.html</code>의
+  "에어갭 모드 — 사용 불가" 문구와 같은 결). 고르려고 눌러도(눌리지 않지만) 안내(<code>locNote</code>)가 같은 이유를
+  다시 말한다: "원격은 네트워크가 전제입니다. 이 PC만 됩니다."</p>
+
+<h3 class="doc">★ 핵심 난제 — admin만 바뀌는데 로그인 전엔 누가 admin인지 모른다</h3>
+<p class="note">아이디 칸에 친 이름으로 admin인지 미리 확인하는 것은 <b>하면 안 된다</b> — 계정 존재 여부가 새어
+  나간다(username enumeration). 그래서 「고르게 해 놓고 로그인해 보니 admin이 아니라 무시됨」이 되기 쉽다. 세 갈래를
+  비교하고 하나를 추천한다.</p>
+<table class="t">
+  <tr><th style="width:70px">안</th><th style="width:300px">방식</th><th style="width:270px">좋은 점</th><th>걸리는 점</th></tr>
+  <tr>
+    <td><b>ⓐ</b></td>
+    <td>로그인 화면엔 <b>지금 상태만 표시</b>하고, 바꾸기는 admin 로그인 후 같은 자리(설정)에서.</td>
+    <td>"선택했는데 무시됨"이 원천적으로 없다(애초에 로그인 화면에서 못 바꾸므로). 코드의 권한 경계(admin 전용)와
+      화면이 완전히 일치한다.</td>
+    <td>"표시"조차 로그인 전엔 안전하게 못 한다 — <b>직접 확인</b>: <code>/api/llm/remote</code>(admin 전용 조회)도
+      <code>/api/llm/remote/where</code>(비-admin도 보는 조회)도 <b>둘 다 authMiddleware</b>라 로그인 전엔 호출 자체가
+      막힌다(<code>edition:get</code>은 로컬 IPC라 무인증 — 근본적으로 다르다). 결국 "표시만"도 사실상 빈칸이 된다.
+      모드 3버튼과 인터랙션 방식도 달라져(하나는 누르는 카드, 하나는 그냥 텍스트) "다른 규칙이면 헷갈린다"는 사장님
+      걱정에 걸린다.</td>
+  </tr>
+  <tr>
+    <td><b>ⓑ</b></td>
+    <td>고르게 하되 "관리자 계정만 바뀝니다"를 미리 분명히 적어 둔다.</td>
+    <td>모드 3버튼과 인터랙션이 완전히 같다(같은 카드 안 리듬 일관 — 사장님이 요청한 "일관되게"에 정확히 부합).
+      조사 없이도 문구 하나로 기대치를 정직하게 맞춘다.</td>
+    <td>비-admin이 골랐을 때 "진짜 무시됐는지" 로그인 뒤 확인할 길이 문구만으로는 부족하다 — "분명 눌렀는데 왜
+      그대로지?"가 남는다.</td>
+  </tr>
+  <tr>
+    <td><b>ⓒ(추천)</b></td>
+    <td>ⓑ + <b>로그인 직후 정직한 뒤처리</b>. 고르게 하고 문구로 경고하는 것에 더해, <b>로그인이 끝난 바로 다음</b> —
+      적용 안 됐으면 "방금 고른 「○○」는 관리자 권한이 필요해 적용되지 않았습니다. 지금은 이 PC로 돕니다. 관리자에게
+      요청하세요"를 한 번 보여준다. <b>적용됐으면(admin이었으면) 아무 말 없이 조용히 넘어간다</b>("왜 항상 뜨지" 피로
+      방지). 아래 로그인 카드의 「로그인」 버튼 + 시연 컨트롤의 "지금 로그인하는 계정"으로 이 두 갈래를 실제로 눌러
+      비교할 수 있다.</td>
+    <td>ⓐ의 정직함(코드 경계와 안 어긋남)과 ⓑ의 일관성(모드와 같은 조작 리듬)을 같이 가져가면서, 둘 다의 약점을
+      뒤처리 한 번으로 닫는다 — "무시됨"이 "말없이 사라짐"이 아니라 "이유를 알려주고 사라짐"이 된다.</td>
+    <td>구현이 ⓑ보다 한 단계 많다(로그인 성공 응답에 "적용 실패" 신호를 실어야 한다 — 구현 참고에 적음).</td>
+  </tr>
+</table>
+
+<h3 class="doc">「프로」와의 관계 — 내 추천(결정은 사장님 몫)</h3>
+<p class="note">사장님은 프로를 <b>"gb10의 큰 모델을 부르는 것"</b>으로 생각하시는데, 코드의 프로는
+  <b>"로컬 48GB에 LLM 2개 올리기"</b>다(A/B·검증 병행은 코드에 없다 — 1·2·3차 내내 안 그렸고 이번에도 안 그린다).
+  AI 위치가 생기면서 이 간극을 메울 길이 생겼다.</p>
+<div class="evid-box">
+  <div class="cap">내 추천 — 두 축을 <b>독립으로 유지</b>한다(합치지 않는다)</div>
+  "프로"는 지금 뜻(로컬 48GB·2모델·32K) 그대로 두고, 사장님이 그리시는 "gb10 큰 모델 호출"은 <b>AI 위치=원격</b>이
+  정확히 그 기능이라고 본다 — <b>새로 이름 붙일 필요가 없다, 이미 이 시안에 있다.</b> 합치지 않는 이유:
+  ① 표준+원격·라이트+원격도 전부 유효한 조합이다(10GB 노트북이 큰 모델을 쓰려면 원격이 필수인데, 이건 "프로"와
+  무관하다). ② 로컬 임베딩(bge-m3)은 원격을 켜도 항상 로컬에서 돈다 — 로컬 티어 개념(동시 모델 수·문맥)은 원격
+  여부와 무관하게 여전히 뜻을 가진다. 합치면 이 정보를 잃는다.<br><br>
+  다만 <b>"프로"라는 이름이 주는 인상</b>("프로=더 강력함")과 실제 능력(로컬 2모델일 뿐, gb10과 무관) 사이의 간극은
+  진짜 문제다 — 화면·문서에서 "프로 ≠ 원격 GPU 자동 연결"이라는 점을 어딘가엔 밝혀야 오해가 안 생긴다(예:
+  <code>locNote</code>가 이미 하듯, 원격을 고르면 그 자리에서 무엇이 실제로 바뀌는지 말하는 식). <b>결정은 사장님
+  몫</b>이다 — 이름을 바꿀지(예: "프로"를 "로컬 확장"류로 재명명), 설명만 보강할지.
+</div>
+
+<h2 class="doc"><span class="n">Smart MD</span>Smart MD Studio 받기 — 세 갈래(요청②)</h2>
+<div class="warn-box">
+  <div class="cap">⚠ 먼저 — 지금 뭐가 있고 뭐가 없는지(코드로 확인, 직접 다시 읽음)</div>
+  <code>login.html:212-215</code>의 "📝 Smart MD Studio" 버튼은 <b>이미 있다</b> — 다만 설명 그대로 "로그인 없이 바로 열립니다":
+  <b>앱 안의 별도 창</b>을 여는 것이지 내려받기가 아니다(<code>main.ts:643</code> <code>smartMdWindow</code>,
+  <code>client/src/smartmd-preload.ts</code>가 그 창 전용 <code>window.gijoDesktop</code>을 준다). 진짜 내려받기는 옆의
+  <code>liteDlBtn</code>(<code>login.html:216-219,455-458</code>)뿐이고 그건 <b>라이트</b> 설치본용이다.<br><br>
+  Smart MD는 <b>독립 저장소</b> <code>git@github.com:gijotour/gijo-smart-md-studio.git</code>(MIT)다.
+  <code>client/scripts/fetch-smartmd.mjs</code>가 게시 직전 그 저장소에서 <b>웹 자산만</b>(index.html·css·js·vendor·assets·icon)
+  받아 <code>client/smartmd/</code>에 담는다 — 스크립트 주석 12-16행이 <code>main.js</code>·<code>preload.js</code>·
+  <code>package.json</code>은 "일부러 안 담는다"고 적어 뒀다(그 셋이 <b>저장소엔 있다</b>는 뜻 — 창은 우리 <code>main.ts</code>가
+  열어서다). <b>결론: 지금 「내려받을 설치본」이 존재하지 않는다.</b> 라이트처럼 드라이브에 올려 둔 물건이 없다 — 이 시안이
+  "받기" 버튼을 진짜 다운로드로 그리면 없는 것을 파는 시안이 된다.
+</div>
+
+<table class="t">
+  <tr><th style="width:70px">안</th><th style="width:260px">방식</th><th style="width:270px">좋은 점</th><th>걸리는 점</th></tr>
+  <tr>
+    <td><b>ⓐ</b></td>
+    <td>라이트와 같은 방식 — 구글 드라이브 폴더에 Smart MD 단독 설치본을 올리고 그 주소를 연다.</td>
+    <td>라이트가 이미 쓰는 절차를 그대로 재사용(새 인프라 0). <code>fetch-smartmd.mjs</code> 주석이 그 저장소에
+      <code>main.js</code>·<code>package.json</code>이 있다고 이미 알려 준다 — <b>electron-builder로 빌드할 재료 자체는 있어 보인다.</b>
+      가장 빨리 움직일 수 있는 길.</td>
+    <td>그 저장소에 <b>electron-builder 설정(빌드 스크립트·아이콘·서명)이 실제로 갖춰져 있는지는 이번 조사로 확인 못 했다</b> —
+      별도 저장소라 이 세션 권한 밖이다("된다"고 단정하지 않는다). 패치마다 사람이 다시 빌드해 드라이브에 <b>수동으로 올려야</b> 한다
+      (잊으면 낡은 판이 계속 돈다 — 라이트도 안고 있는 같은 위험).</td>
+  </tr>
+  <tr>
+    <td><b>ⓑ</b></td>
+    <td>GitHub 공개 저장소 주소를 <code>openExternal</code>로 연다.</td>
+    <td>구현 비용 <b>거의 0</b> — MIT라 공개해도 문제없고, 새로 만들 것이 없다.</td>
+    <td>이건 <b>소스코드</b>지 설치본이 아니다. 받는 사람이 직접 <code>npm install</code>·빌드해야 실행 파일이 나온다 — 보안담당자
+      (비개발자일 가능성이 높은 사용자층)에게는 실질적으로 못 쓰는 안내다. 이 제품의 주 시장(폐쇄망)에서는 GitHub 접근 자체가
+      막혀 있는 경우도 많다 — 에어갭 원칙과도 어긋난다.</td>
+  </tr>
+  <tr>
+    <td><b>ⓒ</b></td>
+    <td>서버가 배포처가 된다 — <code>LITE_DL</code> 주소 주석이 이미 "서버 배포로 옮기면 이 주소 한 줄만 바뀐다"고 적어 둔 그 길에
+      Smart MD도 얹는다.</td>
+    <td>이 제품의 정체성(온프렘·폐쇄망)과 <b>가장 잘 맞는다</b> — 사내망 안에서 받을 수 있어 인터넷이 막힌 고객도 받는다.
+      운영 서버가 배포처가 되면 버전 관리·다운로드 로그(누가 언제 받았는지)가 자연히 따라온다.</td>
+    <td>실제로 만들 게 가장 많다 — ① Smart MD를 electron-builder로 빌드하는 파이프라인(ⓐ의 첫 단계와 같다),
+      ② 서버에 설치 파일을 얹고 내려주는 라우트, ③ 최신 판을 누가·언제 올릴지(자동화 여부)까지 정해야 한다. 준비 기간이 셋 중 가장 길다.</td>
+  </tr>
+</table>
+<div class="evid-box">
+  <div class="cap">내 추천</div>
+  <b>최종 목적지는 ⓒ</b> — 이 제품 자체가 "폐쇄망에서 돈다"는 정체성이고(CLAUDE.md), Smart MD를 받는 사람도 결국 같은
+  보안담당자층이다. ⓐ(드라이브)·ⓑ(GitHub)는 둘 다 <b>인터넷이 열려 있어야</b> 뜻이 있는데, 이 제품을 쓰는 상당수 현장은 그렇지 않다.<br><br>
+  다만 <b>지금 당장 움직이려면 ⓐ가 가장 싼 다리</b>다 — ⓒ의 서버 인프라를 준비하는 동안 ⓐ로 먼저 열어 두고, 나중에 주소 한 줄만
+  바꿔 ⓒ로 넘어가는 것을 제안한다(라이트 다운로드가 이미 그 전환을 예정해 둔 것과 같은 모양). <b>ⓑ는 추천하지 않는다</b> —
+  "받기 버튼이 뭔가는 한다"는 겉모습만 채우고, 실제로 받은 사람이 쓸 수 없는 경우가 많아서다.
+</div>
+
+<h3 class="doc">라이트 빌드에서 Smart MD는 어떻게 되는 게 맞나(요청②-③)</h3>
+<p class="note">
+  지금 코드(<code>login.html:429-437</code>)는 free 박스 <b>전체</b>를 라이트 빌드에서 감춘다 — "라이트에서 라이트 받으라는
+  안내는 말이 안 된다"는 근거였다. 그런데 그 근거는 <b>라이트 다운로드 타일에만</b> 맞는 말이다. <b>내 판단: Smart MD 타일은
+  라이트 빌드에서도 보여야 한다</b> — Smart MD는 에디션(라이트/표준/프로)과 <b>무관한 독립 도구</b>라, 라이트를 쓰는 담당자도
+  똑같이 필요할 수 있다. 지금처럼 통째로 감추면 라이트 사용자만 Smart MD를 못 받는 손해를 본다. 이건 <code>freeBox</code>를
+  타일 단위로 쪼개는 코드 변경이 필요해 이 시안(그림)만으로는 못 고치고, "구현 참고"에 남겨 둔다.
+</p>
+
+<h2 class="doc"><span class="n">라이트</span>라이트 전용 설치본에서는 못 바꾼다</h2>
+<p class="note">위 "🧪 시연 컨트롤"에서 <b>설치본 종류를 "라이트 전용 설치본"</b>으로 눌러 보면 바로 이 상태가 된다. 문구는
+  <code>main.ts:483</code>의 실제 에러 문구("이 배포본은 라이트 전용이라 모드를 바꿀 수 없습니다.")와
+  <code>settings.html:2453</code>의 안내("이 설치본은 라이트 전용이라 여기서 못 바꿉니다 — 표준 설치본을 쓰세요.")를 그대로
+  이어받아, <b>같은 상황엔 같은 말</b>을 쓰게 했다(제품 안에서 문구가 두 번 다르게 적히는 것을 피함).</p>
+<div class="warn-box">
+  <div class="cap">🔒 라이트 전용 설치본일 때 카드 안에 보이는 문장(고정)</div>
+  이 설치본은 <b>라이트 전용</b>입니다 — 표준·프로로 쓰려면 표준 설치본이 따로 필요합니다. (여기서 되돌릴 방법을 만들지 않았다 —
+  실제로 없기 때문이다. 없는 버튼을 다는 대신 사실만 적었다.)
+</div>
+
+<h2 class="doc"><span class="n">되돌아오기</span>라이트 → 표준으로</h2>
+<p class="note">"지금 실제로 설정된 모드"를 <b>라이트</b>로, 설치본은 <b>표준/프로(전환 가능)</b>로 둔 채 카드 안에서
+  <b>표준</b>을 눌러 보면 아래 문구가 뜬다 — <code>settings.html:2461</code>의 실제 안내문("스탠다드(표준 구성)로 바꿉니다 …
+  적용은 앱 재시작 후입니다")과 같은 결로 썼다. 데이터 폴더가 갈려 있다는 사실도 숨기지 않는다.</p>
+<div class="evid-box">
+  <div class="cap">라이트(전환된 상태) 상태에서 "표준" 또는 "프로"를 고르면</div>
+  표준(프로 포함)으로 돌아갑니다 — <b>그 폴더</b>의 자산·기록이 다시 보입니다(라이트로 지내는 동안 쌓은 자료는 라이트 폴더에
+  그대로 남아 있고, 없어지지 않습니다). 로그인 후 <b>앱을 다시 시작</b>해야 적용됩니다.
+</div>
+
+<h2 class="doc"><span class="n">인앱</span>앱 안에서 — 지금 모드가 어떻게 보이나</h2>
+<p class="note">로그인 한 번으로 끝나는 표시가 아니라 <b>일하는 8시간 내내</b> 곁눈에 있어야 한다. 위 시연 컨트롤과 <b>같은 상태</b>를
+  공유한다 — 위에서 모드를 바꾸면 아래 미니 앱 셸도 같이 바뀐다. 큰 면(사이드바 232px·화면 영역)은 <code>var(--bg)</code> 그대로,
+  상단바 아랫줄 2px·사이드바 오른쪽 줄 2px·작은 배지 하나만 색이 있다(위 "환경 색 스트립" 근거와 동일한 절제).</p>
+<div class="mock-shell" style="max-width:640px">
+  <div class="mock-shell-label">app.html 상단바(44px)·사이드바(실제는 232px, 여기선 172px로 축소) 재현</div>
+  <div class="shell-mock" id="shellMock" data-mode="standard">
+    <div class="sm-top">
+      <div class="sm-left">☰ GIJO AS</div>
+      <div class="sm-right"><span class="sm-clock">08.18 (화) 오후 3:12</span><span class="mode-badge" id="smBadge">🏢 표준</span><span class="mode-badge" id="smLocBadge">💻 내 PC</span></div>
+    </div>
+    <div class="sm-body">
+      <div class="sm-side">
+        <div class="sm-side-item on">📊 대시보드</div>
+        <div class="sm-side-item">🔍 발견·수집</div>
+        <div class="sm-side-item">✅ 조치·승인</div>
+        <div class="sm-side-item">⚙ 설정</div>
+      </div>
+      <div class="sm-main">화면 영역(생략) — <code>--bg</code> 변경 없음</div>
+    </div>
+  </div>
+</div>
+
+<h2 class="doc"><span class="n">색표</span>세 모드의 정확한 색값과 근거</h2>
+<table class="t">
+  <tr><th style="width:80px">모드</th><th style="width:110px">본문 배경</th><th style="width:160px">배지·테두리 색(hex)</th><th style="width:230px">왜 이 색인가</th><th>기존 의미색과 안 부딪히는 근거</th></tr>
+  <tr>
+    <td><span class="swatch" style="background:#262624"></span>표준</td>
+    <td><code>#262624</code>(고정, 변경 없음)</td>
+    <td>없음(중립 회색 배지)<br><code>rgba(255,255,255,.06)</code></td>
+    <td>"기본값"이라는 뜻 자체가 <b>색이 없는 것</b>이다 — 셋 중 무언가 특별한 걸 표시할 때만 색이 뜨고, 표준은 "평소와 같다"로 읽히게 둔다.</td>
+    <td>해당 없음(색을 안 씀).</td>
+  </tr>
+  <tr>
+    <td><span class="swatch" style="background:#5b6b82"></span>프로</td>
+    <td><code>#262624</code>(고정) + 외곽 은은한 글로우 <code>#2b3444</code></td>
+    <td><code>#5b6b82</code>(steel)<br>배지 bg <code>rgba(91,107,130,.18)</code></td>
+    <td>차갑고 단단한 느낌(강판·계기판 계열)으로 "능력 확장"을 은유. <b>기존 --blue(#3b82f6)와 같은 파랑 계열이지만 채도를
+      크게 낮췄다</b>(HSL 채도 약 20% vs 91%) — 큰 필드로 안 쓰고 얇은 테두리·배지에만 쓴다.</td>
+    <td>--blue는 <b>진하고 채워진 버튼·포커스 테두리</b>로만 쓰인다(예: 로그인 input:focus, .fc:hover). 프로 색은 <b>얇은 테두리·저채도
+      배지</b>로만 쓰여 시각적 무게가 전혀 다르다 — 나란히 둬도 "이건 누를 수 있는 버튼"과 "이건 모드 표시"가 형태로 갈린다.</td>
+  </tr>
+  <tr>
+    <td><span class="swatch" style="background:#6f8f52"></span>라이트</td>
+    <td><code>#262624</code>(고정) + 외곽 은은한 글로우 <code>#313a26</code></td>
+    <td><code>#6f8f52</code>(모스그린)<br>배지 bg <code>rgba(111,143,82,.18)</code></td>
+    <td>max가 이미 라이트 앱 아이콘을 초록으로 가른 선례를 이어받는다(2026-08-13). 다만 <b>--teal(#1eb980, 청록)과는 다른
+      황록(모스)</b>을 골라 "정상" 배지와 헷갈리지 않게 했다.</td>
+    <td>--teal은 <b>상태 점(dot)·"정상/완료" 배지</b> 전용이고 채도가 훨씬 높다(밝은 청록 #1eb980). 라이트 색은 저채도 황록이라
+      나란히 봐도 다른 계열로 읽힌다 — 그래도 색만으로 가르지 않도록 🪶 아이콘과 "라이트" 글자를 항상 같이 둔다(WCAG 1.4.1).</td>
+  </tr>
+  <tr>
+    <td colspan="5" style="color:var(--muted-2);font-weight:700;padding-top:10px">3차 갱신 — AI 위치(모드와 다른 축이라 배지도 따로, 단 <b>재사용 위주</b>로 새 색을 안 늘렸다)</td>
+  </tr>
+  <tr>
+    <td>💻 이 PC</td>
+    <td><code>#262624</code>(고정, 글로우 변경 없음)</td>
+    <td>없음(표준과 같은 중립 배지)</td>
+    <td>기본값·안전값 — 회사 밖으로 아무것도 안 나가는 유일한 선택이라 "색 없음"이 정확하다.</td>
+    <td>해당 없음.</td>
+  </tr>
+  <tr>
+    <td>🖧 원격 GPU</td>
+    <td colspan="2"><code>#5b6b82</code>(프로와 <b>같은</b> steel 색을 재사용)</td>
+    <td>새 색을 만들지 않았다 — "더 큰 능력 방향"이라는 뜻이 프로와 같은 결이라(로컬 확장이든 원격 확장이든 "더 크게") 기존
+      프로 색의 의미를 확장해 썼다. 아이콘(🖧)·글자("원격 GPU")가 항상 같이 있어 프로 모드 배지와 헷갈리지 않는다.</td>
+    <td>프로 항목과 동일 근거 — 저채도·얇은 배지라 --blue 버튼과 안 부딪힘.</td>
+  </tr>
+  <tr>
+    <td>☁ 클라우드</td>
+    <td colspan="2"><code>#e8b866</code> — <b>기존 --amber(#f0a020, 경고)를 재사용</b>, 살짝 밝혀 배지 텍스트로 씀</td>
+    <td>클라우드는 이 카드에서 유일하게 "회사 밖으로 실제로 나간다"는 성격을 가진 선택이다 — <b>새 색을 만드는 대신 이미
+      "경고"를 뜻하는 --amber를 정확한 자리에 재사용</b>했다(색 남발 방지, 색표를 3개로 유지). 점선 테두리(라이트 모드
+      버튼과 같은 기법)까지 더해 색+모양 이중으로 "다른 종류"임을 알린다.</td>
+    <td>--amber는 원래도 "경고/주의" 뜻이라 <b>충돌이 아니라 정확한 재사용</b>이다 — 클라우드 선택은 실제로 그 뜻(사외
+      전송이 있으니 주의)에 부합한다.</td>
+  </tr>
+</table>
+<p class="meas">
+  밝기(대략 R+G+B 평균) 비교 — 표준 글로우 <code>#35342f</code> ≈ <b>51</b>, 프로 글로우 <code>#2b3444</code> ≈ <b>54</b>,
+  라이트 글로우 <code>#313a26</code> ≈ <b>48</b>. 셋의 편차가 6 이내라 <b>어느 모드도 더 밝거나 어둡게 느껴지지 않는다</b> —
+  Material 가이드의 "다크 표면 밝기를 일정하게 유지" 원칙과 같은 방향으로, 색만 다르고 <b>부담은 그대로</b>다(8시간 사용 전제).
+  배지 텍스트-배경 조합은 제품에 이미 있는 기법(<code>.sev-critical</code>·<code>.rv-kev</code> 등, rgba 14~18% 배경 + 밝은
+  텍스트)을 그대로 재사용했다 — 새 대비 계산을 따로 하지 않고 <b>이미 검증된 조합을 복제</b>했다.
+</p>
+
+<h2 class="doc"><span class="n">밀도</span>밀도 숫자 — 4차 재계산(두 칸의 값을 숫자로)</h2>
+<p class="note">사장님 표 그대로 채운다. <b>넓을 때(2칸, ≥960px)</b>와 <b>좁을 때(1칸, &lt;960px)</b>를 나눠 쟀다 — 좁을 때
+  수치는 3차와 <b>거의 같아야 정상</b>이다(두 칸 배치가 "좁아지면 3차로 돌아간다"고 설계했으므로, 더 나빠지면 이 설계가
+  실패한 것이다 — 실제로 계산해 보니 처음엔 더 나빠졌다가 손질로 바로잡은 과정도 아래에 남긴다).</p>
+<table class="t">
+  <tr><th style="width:250px">항목</th><th style="width:130px">3차</th><th style="width:170px">4차 — 넓음(≥960px)</th><th style="width:170px">4차 — 좁음(&lt;960px)</th></tr>
+  <tr><td>카드 세로(왼쪽, 자격증명만)</td><td>724px(모드+위치 포함)</td><td><b class="ok">574px</b>(모드+위치가 오른쪽으로 빠짐)</td><td>574px(동일 — 카드 내용 자체는 안 바뀐다)</td></tr>
+  <tr><td>오른쪽 패널 세로</td><td>—</td><td><b class="ok">574px</b>(격자 stretch로 카드에 맞춰 늘어남)</td><td>약 192px(모드74+위치74+free토글줄44, 패딩 없음)</td></tr>
+  <tr><td>화면 전체 <b>세로</b></td><td>818px(접힘 기준)</td><td><b class="ok">622px</b></td><td>약 828px</td></tr>
+  <tr><td>화면 전체 <b>가로</b></td><td>440px</td><td><b class="ok">896px</b>(440+16+440)</td><td>440px(동일)</td></tr>
+  <tr><td>1280×800(창 약 712~720px)에서 스크롤</td><td><b class="bad">남(+98~106px)</b></td><td><b class="ok">★ 안 남(90~98px 여유)</b></td><td><b class="bad">남(+108~116px)</b> — 3차와 사실상 동일</td></tr>
+  <tr><td>900px 폭에서</td><td>—</td><td>해당 없음(900&lt;960, 자동으로 좁음 모드)</td><td>레이아웃 그대로 1칸, 세로 828px</td></tr>
+  <tr><td>600px 폭에서</td><td>—</td><td>해당 없음(600&lt;960)</td><td>레이아웃 그대로 1칸, 세로 828px(440px 카드가 600px 폭에 들어감, 여백 160px)</td></tr>
+</table>
+<p class="meas">
+  <b>목표 달성 여부</b> — "1280×800에서 스크롤이 안 나는 것"이 목표였다. <b class="ok">넓은 창(1240px, 1280×800의 기본
+  창 폭)에서는 목표를 달성한다</b> — 622px는 창 높이(712~720px)보다 90~98px 작다. 다만 창을 <b>사용자가 900px 아래로
+  줄이면</b>(흔한 일은 아니지만 <code>minWidth</code>가 그 값까지 허용한다) 1칸으로 접혀 다시 스크롤이 난다 —
+  <b>"항상" 안 나는 것은 아니고 "기본 크기에서" 안 난다</b>가 정확한 답이다.
+</p>
+
+<h3 class="doc">좁을 때 처음엔 오히려 나빠졌다 — 계산으로 발견하고 고친 과정</h3>
+<div class="warn-box">
+  <div class="cap">⚠ 정직하게 남기는 실수 — "카드+패널을 그냥 나란히 뒀다가 접으면" 얼마나 나빠지는지 먼저 계산해 봤다</div>
+  오른쪽 패널을 왼쪽 카드와 <b>똑같은 방식</b>(패딩 36px·테두리·배경)으로 만들고 그대로 좁은 화면에서 위아래로 쌓으면:
+  패딩이 <b>두 번</b>(카드 패딩 72 + 패널 패딩 72) 들어가 좁음 모드 세로가 <b>48+(72+150)+16+574 ≈ 860px</b>로
+  3차(818px)보다 <b>오히려 42px 늘어난다</b> — "두 칸으로 나눴다가 접으면 더 나빠지는" 실패작이 될 뻔했다. 그래서
+  <b>좁을 때는 오른쪽 패널의 패딩·테두리·배경을 없앤다</b>(<code>[data-layout="narrow"] .side-panel</code>) — 내용(모드·
+  AI위치 버튼)만 남기면 3차와 거의 같은 828px로 돌아온다(+10px, 계산 오차 범위 안). <b>"좁아지면 최소한 3차만큼은 된다"</b>가
+  이 설계가 지켜야 할 최소선이었고, 계산으로 확인하고 나서야 지켜졌다.
+</div>
+
+<h3 class="doc">1280×800에서 — 넓은 창 스크린샷급 재현</h3>
+<p class="note">위 시연에서 "🪟 창 폭 = 1240px"(기본값)을 눌러 보면 오른쪽 패널이 카드와 같은 높이로 서고, free 박스가
+  펼쳐진 채로 패널 맨 아래 자연스럽게 붙는다 — 스크롤 없이 로그인 버튼까지 전부 한 화면에 들어온다.</p>
+
+<h2 class="doc"><span class="n">포기</span>무엇을 포기했나</h2>
+<table class="t">
+  <tr><th style="width:290px">포기한 것</th><th>왜</th></tr>
+  <tr><td>free 박스의 "⬇ GIJO AS 라이트" 타일을 새 모드 버튼과 합치기</td><td>겉보기엔 "라이트"라는 낱말이 화면에 두 번 뜨는
+    비효율처럼 보이지만, <b>다른 PC용 배포</b>(free 박스, 2026-08-14 기존 결정)와 <b>이 PC 전환</b>(새 모드 버튼)은 실제로
+    다른 행동이다. 합치면 "누르면 뭐가 되는지" 하나가 거짓말을 하게 된다 — 그래서 안 합쳤다. 대신 free 박스 설명에
+    "다른 PC" 세 글자만 보태 구분했다(이 시안이 기존 문구에 낸 유일한 손).</td></tr>
+  <tr><td>설정 화면의 "지금 것은 눌러도 잠긴다" 관행을 로그인에도 그대로 적용</td><td><code>settings.html</code>은 이미 로그인한
+    관리자가 오래 머무는 admin 패널이라 "잠금"이 소음을 줄인다. 로그인은 <b>1회성·가벼운 선택</b>이라 세그먼트 토글처럼
+    항상 눌리게 두고, 대신 지금 값은 기본 선택으로만 표시했다 — 관행이 다른 이유를 문서로 남긴다(다음에 "왜 다르지?"란
+    질문이 나올 수 있어서).</td></tr>
+  <tr><td>프로의 "A/B·검증 병행" 문구를 그대로 옮기기</td><td><code>localengine.ts:129</code> desc에 있는 문구지만 win 실측으로
+    코드에 없다고 확인됐다. 이 시안은 실제로 있는 능력(문맥 32K·LLM 2개 동시 적재)만 적었다 — 없는 기능을 그리지 않는다는
+    원칙이 시안에도 적용된다.</td></tr>
+  <tr><td>배경을 모드마다 뚜렷하게(채도 높게) 칠하기</td><td>Material 다크테마 근거("다크 표면은 저채도")와 "8시간 안 아파야 한다"는
+    요구를 우선했다 — 사장님이 원한 "배경색을 다르게"는 <b>얇은 테두리·은은한 글로우·배지</b>로 만족시키고, 본문 캔버스
+    <code>--bg</code>는 손대지 않았다. 더 강한 색이 필요하면(예: 실제로 눈에 안 띈다는 피드백이 오면) 채도만 올리는 2차 조정은 쉽다.</td></tr>
+  <tr><td>로그인 화면에 서버 주소·아이디 외 입력칸 늘리기</td><td>안 늘렸다 — 모드 고르기는 전부 버튼(클릭)이지 텍스트 입력이 아니다.</td></tr>
+  <tr><td>카드를 440px보다 더 넓히기(예: 500·520px)</td><td>버튼은 더 커지겠지만 로그인 카드 관행(360~420px)에서 점점 더 멀어진다.
+    440은 "3택이 있는 로그인창"으로 설명 가능한 최소 초과분이라고 판단했다 — 이 정도로도 버튼 면적이 43.7% 늘어 "좁고 답답하다"는
+    지적을 충분히 넘긴다고 봤다. 더 큰 폭이 필요하면(예: 실제 화면에서도 여전히 좁아 보인다는 피드백이 오면) 다음 조정은 쉽다.</td></tr>
+  <tr><td>"받기"를 눌렀을 때 실제로 무언가 다운로드되는 것처럼 꾸미기</td><td>안 했다 — 지금 받을 설치본이 없다는 사실을
+    감추지 않았다(위 "Smart MD 받기 — 세 갈래" 절 근거). 대신 "왜 아직 안 되는지"와 "어떻게 하면 되는지"를 그 자리에서 바로 보여준다.</td></tr>
+  <tr><td>[3차] "이 PC" 표시만 하고 AI 위치 고르기 자체를 로그인 화면에서 뺀다(ⓐ안)</td><td>가장 안전해 보이지만, 로그인 전엔
+    "지금 상태" 표시조차 못 한다는 것을 코드로 확인했다(<code>/api/llm/remote(/where)</code> 전부 authMiddleware). 결국 표시할
+    것도 없이 빈 자리만 남고, 모드 3버튼과 인터랙션까지 달라져 사장님이 걱정한 "다른 규칙이면 헷갈린다"에 걸린다 — 그래서
+    ⓒ(고르게 하고 로그인 직후 정직하게 뒤처리)를 골랐다.</td></tr>
+  <tr><td>[3차] 클라우드를 이 PC·원격보다 작게 그리거나 뒤로 미루기</td><td>"떠밀지 않는다"는 라이트 원칙을 클라우드에도
+    지키기로 했다 — 크기·위치는 같게 두고, <b>점선 테두리+기존 --amber 재사용</b>이라는 "형태"로만 다르게 알렸다(색+모양
+    이중 신호, WCAG 1.4.1 결).</td></tr>
+  <tr><td>[3차] 등급(모드)마다 AI 위치의 VRAM 권장 문구를 같이 다시 튜닝하기</td><td>이번 요청은 AI 위치 쪽 VRAM 문구
+    ("최소만 알린다")였다. 모드 3버튼의 "프로 · 48GB급" 류 문구는 실제 화면(<code>settings.html:704</code>)에 있는 것이고
+    이 시안이 직접 그리진 않았다 — 범위를 이번 요청에 묶어 두려고 손대지 않았다. 같은 말투 문제라는 점은 "구현 참고"에 남겼다.</td></tr>
+  <tr><td>[4차] "프로" 태그에 "무엇이 좋아지는지" 한 줄 추가</td><td>오른쪽 패널로 옮기며 자리는 생겼지만, <code>localengine.ts</code>를
+    다시 읽어 확인한 결과 적을 이득이 없다(ctxSize·overheadMb 표준과 동일, maxLoadedModels는 VRAM 실측이 되는 모든 지원
+    플랫폼에서 안 쓰이는 죽은 값). 없는 것을 적느니 <b>안 적는 쪽</b>을 골랐다 — 이 사실 자체를 "두 칸 배치" 절에 근거와 함께 남겼다.</td></tr>
+  <tr><td>[4차] 세 칸 이상(예: 로그인|모드|AI위치)으로 더 쪼개기</td><td>모드·AI위치를 같은 "선택" 성격으로 묶어 한 패널에
+    둔 것 — 성격이 다른 조작(신원 확인 vs 엔진 설정)마다 칸을 나누면 창이 더 넓어야 하고, 900px 근처에서 접는 로직도
+    3단계(넓음/중간/좁음)로 복잡해진다. 2칸이 "접히면 3차로 돌아간다"는 단순한 규칙을 지킬 수 있는 최대치라고 판단했다.</td></tr>
+  <tr><td>[4차] 오른쪽 패널을 카드보다 넓게(예: 500px) 잡아 빈 공간을 없애기</td><td>패널을 넓히면 모드·AI위치 버튼이 필요
+    이상 커진다(2차에서 "적당한 크기"로 이미 확정한 119×60px을 넘어설 이유가 없다). 빈 공간은 free 박스를 <b>아래로 붙여</b>
+    채우는 쪽을 택했다 — 크기를 억지로 키우는 것보다 정직하다(내용 없는 큰 버튼보다, 내용 있는 것을 적절한 크기로 채우는 편).</td></tr>
+</table>
+
+<h2 class="doc"><span class="n">점검</span>제품 원칙 자가점검</h2>
+<table class="t chk-table">
+  <tr><th style="width:230px">원칙</th><th>이 시안에서</th></tr>
+  <tr><td>정직한 구현</td><td><span class="chk-ok">✓</span> 표준·프로="즉시(로그인 직후 엔진만 재기동)", 라이트="링크 성격(데이터 폴더
+    별도·앱 재시작)"으로 문구·모양을 다르게 했다. 없는 기능(A/B·검증 병행)은 안 그렸다. "로그인" 버튼은 실제로 로그인하지 않는다고
+    토스트로 알린다. <b>Smart MD "받기"는 존재하지 않는 다운로드를 흉내 내지 않고, "아직 없다"는 사실과 세 갈래 대안을 그 자리에서
+    보여준다.</b> <b>AI 위치도 같은 결 — 클라우드는 "회사 자료는 안 나가고 질문만 나간다"를 과장·축소 없이 그대로 적었고, gb10
+    속도표는 "모델 벤치마크 값·실제 응답은 재는 중"이라고 미완성 상태를 숨기지 않았다.</b> 1280×800에서 스크롤이 난다는 사실도
+    숨기지 않고 표로 남겼다.</td></tr>
+  <tr><td>처음 켠 사람이 헷갈리면 안 된다</td><td><span class="chk-ok">✓</span> 아무것도 안 골라도 "지금 설정"이 기본 선택돼 있어
+    그대로 로그인이 된다(기본값 있음) — 모드·AI 위치 고르기는 <b>둘 다 선택 사항</b>이지 필수 관문이 아니다. AI 위치는 항상
+    "이 PC"(가장 안전한 값)가 기본이다.</td></tr>
+  <tr><td>다크 팔레트·순수 HTML/CSS/JS</td><td><span class="chk-ok">✓</span> <code>--bg:#262624</code> 불변, CDN·웹폰트·원격
+    이미지 0개, 외부 파일 0개(로고도 텍스트로 대체 — 원본 svg는 임베디드 래스터라 자체완결 취지에 안 맞아 뺐다).</td></tr>
+  <tr><td>11px 미만 글자 금지</td><td><span class="chk-ok">✓</span> 이 시안에서 가장 작은 글자는 모드·AI 위치 배지·태그의
+    <b>11px</b>(미만 아님, 정확히 하한). 그 외 12px 이상 유지.</td></tr>
+  <tr><td>로그인 화면에 자격증명 외 입력칸 늘리지 않기</td><td><span class="chk-ok">✓</span> 새로 늘어난 조작은 전부 버튼
+    (모드 3개+AI 위치 3개)뿐 — text/password input을 하나도 추가하지 않았다.</td></tr>
+  <tr><td>막지 않는다(VRAM은 최소만)</td><td><span class="chk-ok">✓</span> 시연 컨트롤에서 VRAM을 어떤 값(10/24/48GB)으로
+    바꿔도 "이 PC" 버튼은 <b>항상 눌린다</b> — 태그 문구만 바뀐다("최소 10GB는 넘음"류), 비활성화하지 않는다.</td></tr>
+  <tr><td>에어갭이면 잠기되 이유가 보인다</td><td><span class="chk-ok">✓</span> 원격·클라우드 버튼이 회색으로 비활성화되면서
+    태그가 "🔒 에어갭 — 막힘"으로 바뀐다 — 조용히 사라지지 않는다.</td></tr>
+  <tr><td>[4차] 좁은 창에서도 정상 동작</td><td><span class="chk-ok">✓</span> <code>main.ts</code>의 실제 <code>minWidth</code>
+    공식(900px 통상·600px 하한)을 코드로 재확인해 그대로 시연값으로 썼다. 두 값 모두 카드(440px)가 들어가고, 두 값 모두
+    자동으로 1칸(3차 모습)으로 접힌다 — "가로가 부족하면 반드시 한 칸으로 접혀야 한다"는 지시를 지켰다.</td></tr>
+  <tr><td>[4차] 밀도 숫자를 다시 냈다</td><td><span class="chk-ok">✓</span> 요청한 표(카드 세로·화면 세로·화면 가로·1280×800·
+    900px·600px)를 전부 채웠고, <b>처음 계산에서 나온 "오히려 나빠짐"(+42px)을 숨기지 않고 그대로 적은 뒤</b> 고친 과정까지
+    남겼다(위 "좁을 때 처음엔 오히려 나빠졌다" 절).</td></tr>
+</table>
+
+<h2 class="doc"><span class="n">참고</span>구현 참고(메인 에이전트용 — 시안 승인 후)</h2>
+<table class="t">
+  <tr><th style="width:220px">항목</th><th>내용</th></tr>
+  <tr><td>표시할 "지금 모드"</td><td>로그인 화면 로드 시 <code>editionGet()</code>(이미 로그인 전 호출 중, login.html:436)과
+    <b>새로</b> "인증 없이 지금 티어를 읽는 통로"가 필요하다 — <code>getLlmTier()</code>는 authMiddleware라 로그인 전엔 401.
+    가장 싼 방법: <code>edition:get</code> IPC 응답에 로컬 설정파일에 이미 저장돼 있는 <code>storedTier()</code> 값(있으면)을
+    같이 얹어 반환(서버 왕복 없이 main.ts가 로컬 상태만 읽음) — 서버가 죽어 있어도 로그인 화면에 "지금 모드"는 보이게 된다.</td></tr>
+  <tr><td>표준↔프로 적용 시점</td><td><code>login.html</code>의 <code>doLogin()</code>에서 <code>result.ok===true</code>가 된
+    직후, <code>finishLogin()</code>이 <code>navigateTo("app.html")</code>을 부르기 <b>전</b>에 고른 티어가 지금과 다르면
+    <code>window.gijo.setLlmTier(picked)</code>를 부른다(이제 토큰이 있어 401을 안 맞는다) — 버튼 문구를 "연결 중..."에서
+    "엔진을 프로로 올리는 중..."으로 잠깐 바꿔 진행을 숨기지 않는다.</td></tr>
+  <tr><td>라이트 선택 시</td><td>즉시 전환하지 않는다 — "링크"다. 클릭하면 이 시안의 <code>mp-note</code>처럼 안내만 펼치고,
+    실제 전환은 로그인 성공 뒤 설정 화면의 기존 <code>editionSet('lite')</code> 경로로 유도(또는 그 확인창을 로그인 직후
+    한 번 띄우는 것은 별도 결정 — 이 시안은 "안내"까지만 다뤘다).</td></tr>
+  <tr><td>소스 감시</td><td>이 저장소의 반복 함정("설계는 됐고 안 쓰인다")을 피하려면, 로그인 화면에서 고른 모드가 실제로
+    <code>setLlmTier</code>·<code>editionSet</code> 호출까지 이어지는지 세는 테스트를 붙일 것을 권한다(QA전수조사 패턴 참고).</td></tr>
+  <tr><td>손대지 않은 것</td><td><code>settings.html</code>의 제품 구성 3택 패널은 그대로 둔다(관리자가 로그인 후에도 바꿀 수
+    있어야 하므로 중복이 아니라 <b>두 번째 입구</b>다) — 이 시안은 <b>새 입구를 하나 더</b> 여는 것이지 기존 것을 없애지 않는다.</td></tr>
+  <tr><td>[3차] AI 위치 — ⓒ안(추천) 구현</td><td>로그인 성공 응답에 "적용 실패" 신호가 필요하다 — 예: <code>doLogin()</code>이
+    성공한 직후 고른 위치가 <code>local</code>이 아니면 <code>remoteLlmSet</code>/클라우드 설정 API를 호출하고, 403이 오면
+    <code>finishLogin()</code> 전에 "관리자 권한이 필요해 적용되지 않았습니다" 안내를 한 번 띄운다(성공하면 조용히 넘어감).
+    이 신호를 로그인 API 응답 자체에 실을지, 클라이언트가 곧바로 호출해 보고 실패를 잡을지는 서버 팀과 상의할 결정.</td></tr>
+  <tr><td>[3차] "지금 상태" 무인증 조회 — 필요 여부 재검토</td><td>지금은 로그인 화면에서 원격/클라우드의 "지금 상태"를 안전하게
+    읽을 방법이 없다(위 난제 절). ⓒ안은 이 문제를 "표시 안 함"으로 우회하지만, VRAM 총량을 로그인 화면에서 보여주려면
+    <code>server/src/app.ts:251</code> <code>/api/health</code>에 VRAM 필드를 추가해야 한다(이 시안은 "있다고 치고" 그렸다) —
+    <b>이게 사설 정보 노출인지는 보안 검토가 먼저다</b>(이미 노출 중인 <code>airgap.on</code>과 같은 급인지 확인 필요).</td></tr>
+  <tr><td>[3차] free 박스 접기</td><td><code>freeToggle</code>/<code>freeBody</code> 패턴은 이 시안에서 실제로 동작한다 —
+    구현 시 그대로 옮기면 된다(새 CSS 24줄, JS 5줄 정도의 작은 diff).</td></tr>
+  <tr><td>[3차] 등급 화면 VRAM 문구 재검토(발견, 이번 범위 밖)</td><td><code>settings.html:704</code>의 "48GB급 GPU 권장"을
+    "최소 48GB부터 · 지금 이 PC는 ○○GB · 골라도 됩니다"로 바꾸는 것을 권한다 — 이 시안이 새로 만든 AI 위치 카드와 같은
+    말투로 통일된다. 이번 시안은 손대지 않았다(범위 밖).</td></tr>
+  <tr><td>Smart MD "받기" 살리기(요청②)</td><td>사장님이 방식(ⓐ/ⓑ/ⓒ)을 정하면: ⓐ는 <code>gijo-smart-md-studio</code> 저장소에
+    electron-builder 설정이 있는지 먼저 확인 → 있으면 그 저장소에서 <code>npm run dist</code>류로 설치본을 뽑아 라이트와 같은
+    드라이브 폴더에 올리고 <code>login.html</code>에 두 번째 <code>LITE_DL</code>류 상수(예: <code>SMARTMD_DL</code>)만 추가.
+    ⓒ는 서버에 배포 라우트를 새로 만드는 별도 작업(계획서 항목과의 관계를 먼저 물을 것 — CLAUDE.md 작업 규칙).</td></tr>
+  <tr><td>라이트 빌드에서 Smart MD 타일 보이기(요청②-③)</td><td><code>login.html:434-443</code>의 <code>freeBox</code> 표시/숨김
+    로직을 타일 단위로 쪼갠다 — 지금은 <code>if (e.현재 === "lite") return;</code>로 <b>박스 전체</b>를 감추는데, Smart MD
+    <code>&lt;div class="fc"&gt;</code>는 그대로 두고 라이트 다운로드 <code>&lt;button id="liteDlBtn"&gt;</code>만 감추도록
+    조건을 타일에 개별로 옮긴다(작은 diff).</td></tr>
+  <tr><td>[4차] 두 칸 breakpoint — 실제 구현은 이 시안보다 <b>더 간단하다</b></td><td>이 시안은 문서 안에 "가짜 창"(고정폭 div)을
+    두고 시연 컨트롤로 폭을 바꾸는 방식이라 JS로 <code>data-layout</code>을 계산했다. 실제 <code>login.html</code>은 창
+    전체를 채우는 페이지라 <b>순수 CSS <code>@media (max-width:960px)</code></b>로 충분하다 — 이 시안의 <code>[data-layout=
+    "narrow"]</code> 선택자를 그대로 미디어쿼리 안에 옮기면 된다(JS 폭 계산·ResizeObserver 등은 불필요).</td></tr>
+  <tr><td>[4차] 오른쪽 패널 실제 마크업 위치</td><td><code>login.html</code>의 <code>.card</code> 바깥에 <code>.two-col</code>
+    래퍼를 하나 두고 <code>.card</code>·새 <code>.side-panel</code>을 그 자식으로 만든다 — 지금 자격증명 마크업은 그대로,
+    모드 3택(<code>settings.html</code> 제품구성 패널의 축소판 로직)과 새 AI 위치 3택만 side-panel로 옮겨 붙인다.</td></tr>
+</table>
+
+<footer class="docfoot">
+  mockups/모드고르기_로그인/시안.html · GIJO AS 시안 · 제품 코드는 읽기만 했고 수정하지 않았다.
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // 3차 갱신 — loc(AI 위치: local/remote/cloud)·vram·remoteCfg·cloudCfg·airgap·isAdmin 추가.
+  // 4차 갱신 — stageWidth(창 폭 시연)·layout(wide/narrow, 폭에서 계산) 추가.
+  var state = { now: "standard", picked: "standard", locked: false,
+    loc: "local", vram: 24, remoteCfg: true, cloudCfg: true, airgap: false, isAdmin: false,
+    stageWidth: 1240, layout: "wide" };
+  var LAYOUT_BREAK = 960; // px — 계산 근거는 "왜 960px" 절(카드440+간격16+패널440=896 + 여백)
+
+  var ICON = { standard: "🏢", pro: "🚀", lite: "🪶" };
+  var NAME = { standard: "표준", pro: "프로", lite: "라이트" };
+  var GLOW = { standard: "var(--acc-std-glow)", pro: "var(--acc-pro-glow)", lite: "var(--acc-lite-glow)" };
+  var LOC_ICON = { local: "💻", remote: "🖧", cloud: "☁" };
+  var LOC_NAME = { local: "내 PC", remote: "원격 GPU", cloud: "클라우드" };
+  var BORDER = { standard: "#8f8a80", pro: "var(--acc-pro)", lite: "var(--acc-lite)" };
+
+  function noteFor(){
+    if (state.locked) {
+      return { cls: "n-locked", html: "🔒 이 설치본은 <b>라이트 전용</b>입니다 — 표준·프로로 쓰려면 표준 설치본이 따로 필요합니다." };
+    }
+    if (state.picked === state.now) return null; // 바꾼 게 없으면 안내 없음(조용함 우선)
+    if (state.picked === "lite") {
+      return { cls: "n-lite", html: "⚠ 라이트는 <b>데이터 폴더가 다릅니다</b>. 로그인 후 설정에서 전환하며, 적용에는 <b>앱 재시작</b>이 필요합니다." };
+    }
+    if (state.now === "lite") {
+      return { cls: "n-lite", html: NAME[state.picked] + "(으)로 돌아갑니다 — <b>그 폴더</b>의 자산·기록이 다시 보입니다(라이트 동안 쌓은 자료는 라이트 폴더에 그대로 남습니다). 앱 재시작 후 적용됩니다." };
+    }
+    return { cls: "n-pro", html: "로그인 직후 <b>엔진만</b> 다시 시작합니다(화면은 그대로, 약 10~30초)." };
+  }
+
+  // ── 3차 갱신 — AI 위치 태그(VRAM 최소만 알림, 막지 않는다)·안내 ──────────────────
+  var VRAM_MIN = { local: 10 }; // 라이트급 최소 — "이 PC"는 최소만 있고 상한이 없다(사장님 지시)
+  function locTags(){
+    var local = state.vram >= 24 ? state.vram + "GB · 이 PC로 충분" : state.vram + "GB · 최소 10GB는 넘음";
+    var remote = !state.airgap ? (state.remoteCfg ? "gb10 · 더 크지만 느림" : "⚠ 아직 미설정") : "🔒 에어갭 — 막힘";
+    var cloud = !state.airgap ? (state.cloudCfg ? "일반 질문만 · 사외" : "⚠ 아직 미설정") : "🔒 에어갭 — 막힘";
+    return { local: local, remote: remote, cloud: cloud };
+  }
+  function locNoteFor(){
+    if (state.loc === "local") return null; // 기본값·안전값이라 안내 없음
+    if (state.airgap) return { cls: "n-locked", html: "🔒 에어갭 모드에서는 원격·클라우드를 못 씁니다 — 원격은 네트워크가 전제입니다. 이 PC만 됩니다." };
+    if (state.loc === "remote") {
+      if (!state.remoteCfg) return { cls: "n-locked", html: "⚠ 이 서버엔 아직 원격 GPU 주소가 등록돼 있지 않습니다 — 관리자가 설정에서 등록해야 이 선택이 뜻을 가집니다." };
+      return { cls: "n-pro", html: "⚠ 질문이 <b>VPN으로</b> gb10에 나갑니다. 더 큰 모델(최대 72B)을 쓰지만 3090보다 느립니다" +
+        "(500자 기준: 14B 13초 · 32B 47초 · 72B 110초 — <b>이 값은 모델 자체 벤치마크</b>이고, 실제 대화 응답 속도는 지금 재는 중입니다).<br>" +
+        "관리자 계정만 바뀝니다 — 아니면 로그인 뒤 반영 안 됐다고 알려 드립니다." };
+    }
+    if (state.loc === "cloud") {
+      if (!state.cloudCfg) return { cls: "n-locked", html: "⚠ 이 서버엔 아직 클라우드 키가 등록돼 있지 않습니다 — 관리자가 설정에서 등록해야 이 선택이 뜻을 가집니다." };
+      return { cls: "n-cloud", html: "⚠ <b>회사 자료는 안 나갑니다</b> — RAG 검색 결과·자산·취약점 상세는 클라우드 호출에 애초에 안 실립니다(구조적 분리). " +
+        "다만 <b>질문 문장 자체</b>는 사외(Gemini/Claude/OpenAI 등)로 나갑니다 — 의심스러우면 무조건 차단하고 로컬로 답합니다(오차단은 허용, 유출은 불가).<br>" +
+        "관리자 계정만 바뀝니다 — 아니면 로그인 뒤 반영 안 됐다고 알려 드립니다." };
+    }
+    return null;
+  }
+
+  // ── 4차 갱신 — 창 폭 → 레이아웃(wide/narrow). 실제 브라우저 뷰포트가 아니라 "가짜 창"(고정폭
+  // div)이라 @media가 안 먹는다 — 그래서 JS가 폭을 보고 data-layout을 정한다(실제 구현은
+  // @media (max-width:960px)면 충분, "구현 참고" 절 근거). 레이아웃이 바뀌는 순간에만 free
+  // 박스 기본 열림/닫힘을 다시 정한다(그 전엔 사용자가 손으로 누른 상태를 존중). ──
+  var prevLayout = null;
+  function applyLayout(){
+    var stage = document.getElementById("loginStage");
+    stage.style.width = state.stageWidth + "px";
+    var layout = state.stageWidth >= LAYOUT_BREAK ? "wide" : "narrow";
+    stage.dataset.layout = layout;
+    if (layout !== prevLayout) {
+      var body = document.getElementById("freeBody");
+      var toggle = document.getElementById("freeToggle");
+      var open = layout === "wide"; // 넓으면 자리가 남아 기본 펼침, 좁으면 3차처럼 기본 접힘
+      body.classList.toggle("open", open);
+      toggle.classList.toggle("open", open);
+      toggle.innerHTML = '<span class="car">▸</span> 무료로 함께 드리는 것(Smart MD·라이트) — ' + (open ? "접기" : "펼치기");
+      prevLayout = layout;
+    }
+  }
+
+  function render(){
+    applyLayout();
+    var stage = document.getElementById("loginStage");
+    var shell = document.getElementById("shellMock");
+    var effective = state.locked ? "lite" : state.picked;
+
+    stage.style.setProperty("--glow", GLOW[effective]);
+    document.getElementById("loginCard").style.setProperty("--acc", BORDER[effective]);
+    shell.dataset.mode = effective;
+    shell.querySelector(".sm-top").style.borderBottomColor = state.locked || effective !== "standard" ? BORDER[effective] : "var(--border)";
+    shell.querySelector(".sm-side").style.borderRightColor = state.locked || effective !== "standard" ? BORDER[effective] : "var(--border)";
+
+    var badgeCls = "mode-badge" + (effective === "pro" ? " b-pro" : effective === "lite" ? " b-lite" : "");
+    var badgeHtml = ICON[effective] + " " + NAME[effective];
+    document.getElementById("modeBadge").className = badgeCls;
+    document.getElementById("modeBadge").textContent = badgeHtml;
+    document.getElementById("smBadge").className = badgeCls;
+    document.getElementById("smBadge").textContent = badgeHtml;
+
+    document.querySelectorAll("#mpRow .mp-btn").forEach(function(b){
+      var m = b.dataset.mode;
+      b.classList.toggle("on", m === effective);
+      b.disabled = state.locked && m !== "lite";
+    });
+
+    var note = document.getElementById("mpNote");
+    var n = noteFor();
+    if (n) { note.className = "mp-note show " + n.cls; note.innerHTML = n.html; }
+    else { note.className = "mp-note"; note.innerHTML = ""; }
+
+    // ── 3차 갱신 — AI 위치 ──────────────────────────────────────────────
+    var tags = locTags();
+    document.getElementById("locLocalTag").textContent = tags.local;
+    document.getElementById("locRemoteTag").textContent = tags.remote;
+    document.getElementById("locCloudTag").textContent = tags.cloud;
+    document.querySelectorAll("#locRow .mp-btn").forEach(function(b){
+      var loc = b.dataset.loc;
+      b.classList.toggle("on", loc === state.loc);
+      b.disabled = state.airgap && loc !== "local";
+    });
+    var locBadge = document.getElementById("locBadge");
+    locBadge.className = "mode-badge" + (state.loc === "remote" ? " b-pro" : "");
+    if (state.loc === "cloud") locBadge.style.cssText = "background:rgba(240,160,32,.16);border-color:rgba(232,184,102,.5);color:#f0c98a;";
+    else locBadge.style.cssText = "";
+    locBadge.textContent = LOC_ICON[state.loc] + " " + LOC_NAME[state.loc];
+    var locNote = document.getElementById("locNote");
+    var ln = locNoteFor();
+    if (ln) { locNote.className = "mp-note show " + ln.cls; locNote.innerHTML = ln.html; }
+    else { locNote.className = "mp-note"; locNote.innerHTML = ""; }
+
+    var shellLoc = document.getElementById("smLocBadge");
+    if (shellLoc) { shellLoc.className = locBadge.className; shellLoc.style.cssText = locBadge.style.cssText; shellLoc.textContent = locBadge.textContent; }
+  }
+
+  document.querySelectorAll("#mpRow .mp-btn").forEach(function(b){
+    b.addEventListener("click", function(){
+      if (b.disabled) return;
+      state.picked = b.dataset.mode;
+      render();
+    });
+  });
+
+  document.querySelectorAll("#segNow button").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll("#segNow button").forEach(function(x){ x.classList.remove("on"); });
+      b.classList.add("on");
+      state.now = b.dataset.now;
+      state.picked = state.now; // 새 "지금"으로 리셋 — 데모를 깔끔하게 시작
+      render();
+    });
+  });
+  document.querySelectorAll("#segLocked button").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll("#segLocked button").forEach(function(x){ x.classList.remove("on"); });
+      b.classList.add("on");
+      state.locked = b.dataset.locked === "1";
+      if (state.locked) { state.now = "lite"; state.picked = "lite";
+        document.querySelectorAll("#segNow button").forEach(function(x){ x.classList.toggle("on", x.dataset.now === "lite"); });
+      }
+      render();
+    });
+  });
+
+  // ── 3차 갱신 — AI 위치 버튼 + 시연 컨트롤 4종 ─────────────────────────────
+  document.querySelectorAll("#locRow .mp-btn").forEach(function(b){
+    b.addEventListener("click", function(){
+      if (b.disabled) return;
+      state.loc = b.dataset.loc;
+      render();
+    });
+  });
+  function wireSeg(id, key, parse){
+    document.querySelectorAll("#" + id + " button").forEach(function(b){
+      b.addEventListener("click", function(){
+        document.querySelectorAll("#" + id + " button").forEach(function(x){ x.classList.remove("on"); });
+        b.classList.add("on");
+        state[key] = parse(b);
+        render();
+      });
+    });
+  }
+  wireSeg("segVram", "vram", function(b){ return Number(b.dataset.vram); });
+  wireSeg("segRemoteCfg", "remoteCfg", function(b){ return b.dataset.remotecfg === "1"; });
+  wireSeg("segCloudCfg", "cloudCfg", function(b){ return b.dataset.cloudcfg === "1"; });
+  wireSeg("segAirgap", "airgap", function(b){ return b.dataset.airgap === "1"; });
+  wireSeg("segAdmin", "isAdmin", function(b){ return b.dataset.admin === "1"; });
+  wireSeg("segWidth", "stageWidth", function(b){ return Number(b.dataset.width); });
+
+  // 로그인 버튼 — ⓒ 추천안의 핵심: admin 아니고 원격/클라우드를 골랐으면 로그인 "직후" 정직하게 알린다.
+  var toast = document.getElementById("lmToast");
+  document.getElementById("lmSubmit").addEventListener("click", function(){
+    var 비로컬선택 = state.loc !== "local";
+    if (비로컬선택 && !state.isAdmin) {
+      toast.textContent = "로그인되었습니다 — 방금 고른 「" + LOC_NAME[state.loc] + "」는 관리자 권한이 필요해 적용되지 않았습니다. 지금은 이 PC로 돕니다. 관리자에게 요청하세요.";
+    } else {
+      toast.textContent = "이 시안은 정지 그림입니다 — 실제 로그인은 되지 않습니다";
+    }
+    toast.classList.add("show");
+    setTimeout(function(){ toast.classList.remove("show"); }, 3200);
+  });
+
+  // ── 신규(요청②) — Smart MD "열기"/"받기" ────────────────────────────────
+  var smdMsg = document.getElementById("smdMsg");
+  document.getElementById("smdOpenBtn").addEventListener("click", function(){
+    smdMsg.textContent = "Smart MD 창이 열립니다 — 이 목업에서는 실제로 열리지 않습니다(실제로는 이미 있는 기능).";
+  });
+  var smdMore = document.getElementById("smdMore");
+  document.getElementById("smdGetBtn").addEventListener("click", function(){
+    smdMore.classList.toggle("show");
+    smdMsg.textContent = "";
+  });
+
+  // ── 3차 갱신 — free 박스 기본 접힘(밀도 완화) ────────────────────────────
+  var freeToggle = document.getElementById("freeToggle");
+  var freeBody = document.getElementById("freeBody");
+  freeToggle.addEventListener("click", function(){
+    var open = freeBody.classList.toggle("open");
+    freeToggle.classList.toggle("open", open);
+    freeToggle.innerHTML = '<span class="car">▸</span> 무료로 함께 드리는 것(Smart MD·라이트) — ' + (open ? "접기" : "펼치기");
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

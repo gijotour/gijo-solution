@@ -72,6 +72,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="page-title">🛡 원격 정기점검 관제</div>
       </div>
       <button class="g-btn g-primary" id="addBtn">＋ 대상 등록</button>
+      <!-- ⚠ 관리자가 아니면 왜 못 누르는지 **미리** 알린다 — 눌러 보고 알게 하지 않는다. -->
+      <div class="hint" id="adminNote" style="display:none;font-size:12.25px;color:var(--muted-2);margin-top:6px">장비 점검의 등록·실행·일정은 <b>관리자만</b> 할 수 있습니다 — 우리 서버가 바깥으로 접속하는 일이라서입니다. 대상은 <b>사내망 IP</b>만 등록됩니다.</div>
     </div>
 
     <div id="gijoChatWidget" data-prompts='["하드닝 점검해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
@@ -270,6 +272,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => removeTarget(b.dataset.del)));
     document.querySelectorAll("[data-sched]").forEach((b) => b.addEventListener("click", () => openSched(b.dataset.sched)));
     document.querySelectorAll("[data-toggle]").forEach((el) => el.addEventListener("click", () => toggleSched(el.dataset.toggle, el.dataset.on !== "1")));
+    // ⚠ 목록은 30초마다 다시 그려진다 — 그때마다 잠금을 다시 걸지 않으면 **풀린 채로 보인다.**
+    if (typeof isAdmin !== "undefined" && !isAdmin) {
+      document.querySelectorAll("[data-scan],[data-del],[data-sched],[data-toggle]").forEach((b) => { b.disabled = true; b.title = "관리자만 할 수 있습니다"; });
+    }
   }
 
   async function loadAll() {
@@ -352,8 +358,30 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     await window.gijo.hardeningSchedules.toggle(id, enabled); toast(enabled ? "정기점검 켜짐" : "정기점검 꺼짐"); await loadAll();
   }
 
+  // ⚠⚠ **관리자인지 먼저 알린다**(2026-08-18 회귀 수리). 서버가 대상 등록·삭제·점검 실행·
+  //   일정 걸기를 관리자 전용으로 잠갔는데(hardeningtargets.ts), 화면엔 권한 판별이 **0줄**이었다.
+  //   담당자는 폼을 다 채우고 제출한 뒤에야 「관리자만 접근할 수 있습니다」를 본다.
+  //   ⚠ 같은 날 만든 `agent.html`이 스스로 원칙을 적어 뒀다 —
+  //     「화면만 막으면 라우트로 새고, **서버만 막으면 눌렀다가 오류를 보는 경험이 된다**」.
+  //     하드닝만 그 원칙 밖에 있었다. 양쪽에서 막는다.
+  // ⚠ 못 읽으면 **막는 쪽**으로 둔다 — 눌러서 실패하는 것보다 낫다(덜 약속한다).
+  let isAdmin = false;
+  async function 권한읽기() {
+    try { isAdmin = (await window.gijo.me()).role === "admin"; } catch (e) { isAdmin = false; }
+    const 안내 = document.getElementById("adminNote");
+    if (안내) 안내.style.display = isAdmin ? "none" : "";
+    for (const id of ["addBtn"]) {
+      const b = document.getElementById(id);
+      if (b) { b.disabled = !isAdmin; b.title = isAdmin ? "" : "관리자만 등록할 수 있습니다 — 채팅이 어디로 나가는지와 같은 급의 설정입니다"; }
+    }
+    document.querySelectorAll("[data-scan],[data-del],[data-sched],[data-toggle]").forEach((b) => {
+      if (!isAdmin) { b.disabled = true; b.title = "관리자만 할 수 있습니다"; }
+    });
+  }
+
   async function init() {
     await loadAll();
+    await 권한읽기();
     $("addBtn").addEventListener("click", openReg);
     $("rCancel").addEventListener("click", () => $("regModal").classList.remove("g-on"));
     $("rSubmit").addEventListener("click", submitReg);

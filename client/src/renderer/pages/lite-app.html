@@ -98,7 +98,14 @@
     <!-- 무료로 함께 드리는 문서 작성 도구(Smart MD Studio). 별도 창으로 열린다. -->
     <button class="smd" id="smdBtn" type="button" title="GIJO Smart MD Studio — 무료 문서 작성 도구(별도 창)">📝 문서 작성</button>
   </div>
-  <script>
+  <!-- ⚠⚠ **dialog.js를 반드시 싣는다**(2026-08-18 회귀 수리). 이 셸은 gijoTell을 3곳에서 부르는데
+     (185·189·258행) 스크립트를 하나도 안 실어 **gijoTell이 undefined**였다 — 버튼을 눌러도
+     TypeError로 **아무 일도 안 일어났다.** 5.24.0에 그대로 실려 나갔다.
+     ⚠ 감시 시험이 못 잡은 이유: 원본 글자에서 「nav.js」를 찾았는데 **주석의 lite-nav.js**에
+       걸려 통과했다. 이제 시험이  태그 모양으로 좁혀 본다.
+     ⚠ 라이트는 max 담당이지만 **뿌리가 공용(dialog.js·감시 시험)이라 win이 고친다**(CLAUDE.md). -->
+<script src="dialog.js"></script>
+<script>
     // 🖧 원격 GPU로 전송 중 — 켜졌을 때만 제목줄에 뜬다(2026-08-14 재검토 A-1).
     //   라이트는 1인용이라 쓰는 사람이 곧 admin이지만, **표시가 있는 것과 없는 것은 다르다** —
     //   설정 화면을 열어야 알 수 있으면 「지금 어디로 가는지」를 모르는 채 질문하게 된다.

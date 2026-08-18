@@ -399,8 +399,9 @@
         var cur = t.current || {};
         $("tierSub").textContent = cur.tier
           ? "구동 티어 " + cur.tier.charAt(0).toUpperCase() + cur.tier.slice(1) +
-            (cur.maxLoadedModels ? " — 채팅 LLM " + cur.maxLoadedModels + "개" : "") +
-            (cur.ctxSize ? " · " + Math.round(cur.ctxSize / 1024) + "K 컨텍스트" : "")
+            // ⚠ 예전엔 「채팅 LLM N개」 + 「NK 컨텍스트」 둘이었다. 개수는 등급이 정하지 않으므로
+            //   뺐는데(2026-08-18), 그 자리에 문맥을 넣어 **문맥이 두 번** 나오게 됐다. 한 번만 적는다.
+            (cur.ctxSize ? " — 문맥 " + Math.round(cur.ctxSize / 1024) + "K" : "")
           : "";
         $("vramBox").style.display = "";
       }
