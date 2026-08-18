@@ -181,8 +181,24 @@ describe("작업 내역 구분 — 배관이 살아 있나", () => {
     expect(화면, "축 통로를 안 쓴다").toContain("listWorkSessionsWithAxes");
     // 옛 판(다리 없는 preload)에서도 화면이 죽지 않아야 한다.
     expect(화면, "옛 판 대비가 없다 — 다리가 없으면 목록이 통째로 안 뜬다").toMatch(
-      /if \(window\.gijo\.listWorkSessionsWithAxes\)[\s\S]{0,400}else[\s\S]{0,200}listWorkSessions\(\)/
+      /if \(window\.gijo\.listWorkSessionsWithAxes\)[\s\S]{0,600}else[\s\S]{0,200}listWorkSessions\(\)/
     );
+  });
+
+  it("★★ **서버가 옛 판일 때** 목록이 통째로 비지 않는다 (2026-08-18 실화면에서 잡음)", () => {
+    // ⚠ 이 결함은 시험이 못 잡았고 **실화면에서만** 드러났다:
+    //   클라를 먼저 올리고 서버를 나중에 배포하면, 옛 서버는 `?axes=1`을 모르고 그냥
+    //   **배열**을 준다. 그때 `r.items`를 읽으면 undefined라 목록이 통째로 빈다 —
+    //   오류도 안 나고 「내역이 없습니다」라고 시치미를 뗀다(실측 0건, 고친 뒤 8건).
+    //   담당자는 기록이 날아간 줄 안다. **모양을 보고 갈라야 한다.**
+    expect(화면, "옛 서버가 준 배열을 못 알아본다 — 목록이 통째로 빈다").toMatch(
+      /if \(Array\.isArray\(r\)\) \{\s*\n\s*sessions = r;/
+    );
+    // 그때 축 칩은 **감춘다** — 남겨 두면 눌러도 아무 일 없는 죽은 버튼이 된다.
+    expect(화면, "서버가 축을 모르는데 칩을 남긴다 — 눌러도 안 되는 버튼이 된다").toMatch(
+      /축쓸수있나[\s\S]{0,200}\.axis-row[\s\S]{0,80}display = 축쓸수있나 \? "" : "none"/
+    );
+    expect(화면, "왜 칩이 없는지 안 알린다").toMatch(/서버가 올라간 뒤에 켜집니다/);
   });
 
   it("기본값이 시안대로다 — 주체=내가 · 종류=전체 · QA=숨김", () => {
