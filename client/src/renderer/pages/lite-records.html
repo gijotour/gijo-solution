@@ -24,7 +24,9 @@
   :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px}
-  .wrap{padding:18px 22px;display:flex;flex-direction:column;gap:16px;height:100vh;overflow:auto}
+  /* ⚠ max-width:900px — 라이트 10화면 중 **이 화면만 없었다**(2026-08-19 QA). 넓은 모니터에서
+   할 일 한 줄이 화면 끝까지 늘어나 「완료」 버튼이 1700px 지점에 홀로 섰다. 다른 화면과 통일. */
+.wrap{padding:18px 22px;display:flex;flex-direction:column;gap:16px;height:100vh;overflow:auto;max-width:900px}
   .scr-id{font-size:12.5px;color:var(--muted)}
   .scr-id b{color:var(--text);font-weight:800}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}

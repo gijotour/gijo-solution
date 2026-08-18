@@ -133,6 +133,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .footer{display:flex;align-items:center;gap:10px;margin-top:32px;color:var(--muted-2);font-size:12.25px;}
 .footer img{height:16px;opacity:.6;}
 .empty{color:var(--muted-2);font-size:13px;padding:30px;text-align:center;}
+/* ⚠ 세로 모니터 대응(2026-08-19 QA). 세로 1080px에서 허브 무대 폭이 644px인데 고정열
+   격자가 버텨 가로로 넘쳤다. 이 화면엔 @media가 없었다 — 좁으면 세로로 쌓는다. */
+@media (max-width:900px){
+  .cols{grid-template-columns:1fr;}
+  .kpis{grid-template-columns:1fr 1fr;}
+  /* select min-width:280px가 좁은 칸을 뚫었다(실측 733px) */
+  #targetSelect{min-width:0 !important;max-width:100%;} /* 인라인 style이라 !important 필요 */
+}
 </style>
 </head>
 <body>

@@ -138,6 +138,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .trend-name{font-size:12.5px;font-weight:700;color:var(--text);}
 .trend-now{font-size:16px;font-weight:800;}
 .trend-note{font-size:12.25px;color:var(--muted-2);margin-top:6px;}
+/* ⚠ 세로 모니터 대응(2026-08-19 QA 실측). 세로 1080px 주모니터에서 허브 무대 폭이 644px인데
+   .hero의 300px 고정열 + .headline 3열이 그대로 버텨 **가로로 넘쳤다**(kpiRoot·hero·headline).
+   이 화면엔 @media가 하나도 없었다 — 좁으면 세로로 쌓는다. */
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr;}
+  .headline{grid-template-columns:1fr;}
+}
 </style>
 </head>
 <body>

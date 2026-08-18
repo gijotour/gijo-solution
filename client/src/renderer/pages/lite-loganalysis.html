@@ -75,6 +75,11 @@
   .kpi .k{font-size:11px;color:var(--muted-2)}
   .kpi .v{font-size:19px;font-weight:800;color:var(--text);margin-top:2px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kpi .v.warn-v{color:var(--red)}
+/* ⚠ 취약점확인()이 그리는 결과가 이 두 클래스를 쓰는데 **여기엔 CSS가 없었다**(lite-scan.html에만
+   있었다 — 2026-08-19 QA에서 확인). .nessus를 넣으면 심각도 줄이 정렬 없이 뭉개지고
+   「읽기 전용 확인」 경고가 색 없이 떠 **경고로 안 보였다.** lite-scan과 같은 값으로 맞춘다. */
+.run{display:flex;gap:9px;align-items:baseline;padding:7px 2px;border-bottom:1px solid var(--border);font-size:12.5px}
+.guard{font-size:11.5px;color:var(--amber);line-height:1.7;margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
 </style>
 </head>
 <body>

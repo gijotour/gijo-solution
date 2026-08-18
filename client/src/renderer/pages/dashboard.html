@@ -643,8 +643,8 @@
         nodes.forEach(function (n, i) {
           out += '<g><circle cx="' + xs[i] + '" cy="' + y + '" r="15" fill="' + n.색 + '" stroke="rgba(255,255,255,.28)" stroke-width="2"/>' +
             '<text x="' + xs[i] + '" y="' + (y + 5) + '" text-anchor="middle" font-size="15">' + n.아이콘 + "</text>" +
-            '<text x="' + xs[i] + '" y="' + (y + 28) + '" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">' + e2(n.라벨) + "</text>" +
-            (n.밑 ? '<text x="' + xs[i] + '" y="' + (y + 39) + '" text-anchor="middle" font-size="8.5" fill="#7f88a3">' + e2(n.밑) + "</text>" : "") + "</g>";
+            '<text x="' + xs[i] + '" y="' + (y + 28) + '" text-anchor="middle" font-size="11" font-weight="700" fill="#d3daec">' + e2(n.라벨) + "</text>" +
+            (n.밑 ? '<text x="' + xs[i] + '" y="' + (y + 39) + '" text-anchor="middle" font-size="11" fill="#7f88a3">' + e2(n.밑) + "</text>" : "") + "</g>";
         });
         return out;
       };

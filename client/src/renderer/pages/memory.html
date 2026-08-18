@@ -150,6 +150,11 @@ tr:last-child td{border-bottom:none;}
 .result-box{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;color:var(--text);}
 .result-chunk{padding:7px 0;border-bottom:1px solid var(--border);line-height:1.6;}
 .result-chunk:last-child{border-bottom:none;}
+/* ⚠ 세로 모니터 대응(2026-08-19 QA). 세로 1080px에서 허브 무대 폭이 644px인데 고정열
+   격자가 버텨 가로로 넘쳤다. 이 화면엔 @media가 없었다 — 좁으면 세로로 쌓는다. */
+@media (max-width:900px){
+  .dm-wrap{grid-template-columns:1fr;}
+}
 </style>
 <script src="viz.js"></script>
 </head>

@@ -132,6 +132,12 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .tp-unassigned{color:var(--muted-2);}
 .tp-due{font-size:12px;color:var(--muted);}
 .tp-overdue{color:#f5928a;font-weight:800;}
+/* ⚠ 세로 모니터 대응(2026-08-19 QA 실측). 무대 폭 644px에서 히트맵 옆판(.mv-side 300px 고정)이
+   지도 자리를 344px로 짓눌러 타일이 넘쳤다(mv-tiles·mv-tile). 좁으면 옆판을 아래로 내린다. */
+@media (max-width:900px){
+  .mv-stage{flex-direction:column;}
+  .mv-side{width:auto;border-left:0;border-top:1px solid var(--border);}
+}
 </style>
 <script src="viz.js"></script>
 </head>
