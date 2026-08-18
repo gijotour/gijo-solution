@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 프로 셸 팝업 배치 시안</title>
+<!--
+════════════════════════════════════════════════════════════════════════════
+GIJO AS 시안 — 프로 전용 「대화창은 늘 메인, 화면은 별도 창(팝업)」 셸
+파일: mockups/프로_팝업배치/시안.html (자체완결 정지+실동작 데모, CDN·웹폰트·원격 이미지 0개)
+제품 코드(client/, server/)는 읽기만 했고 한 글자도 고치지 않았다. 표준·라이트 셸은 그대로 둔다 —
+이 시안은 settings.html "🚀 프로"를 고른 경우에만 적용되는 셸 제안이다.
+
+■ 사장님 지시 원문(2026-08-19)
+  ① "프로에서 대화창이 메인이되고 내용은 팝업으로 안될까? 나눠서 보이는것보단"
+  ② "지금 팝업 기능 있으니 그거 적용하면되고"
+  ③ "팝업이 안뜨는건 대화창이 없어지고 보여줘도돼"
+  ④ "설정같은거?"
+  ⑤ "전부 팝업 기능 있으니 가능할것 같은데"
+
+■ 지금 상태 — 프로 셸은 이미 배포돼 있다(클라 5.25.1). 이 시안이 바꾸자는 자리는 「화면(탭)이
+  열리면 캔버스 604~804px + 대화 380px로 나뉘는」 그 지점 하나다(app.html:198
+  .work.console-side{grid-template-columns:minmax(0,1fr) var(--console-w,380px)}). 대화 홈
+  (탭 0개, app.html:66-76 body.chat-home)은 이미 있고 이 시안이 그대로 재사용한다.
+
+■ 이미 있는 팝업 통로 넷 — 전부 client/src/main.ts에서 직접 확인했다. 새로 만들지 않는다:
+  · office:open(597-623) 팀 사무실 — 900~1100×700~840
+  · docbox:open(628-652) 문서함 — 920~1180×640~860
+  · smartmd:open(676-754) 문서 작성 — 900~1300×640~900(전용 세션+CSP, 바깥 유출 차단 3중)
+  · shell:popout(800-850) "⧉ 창으로" — 작업영역 오른쪽 절반, 최소폭 760(popoutBounds 784-798),
+    같은 page를 다시 부르면 새로 안 열고 focus()만 한다(802-807) — "다시 부르면?"의 답은 이미 코드에 있다.
+  · windows:list/focus/close(871-910) — 🗔 열린 창 목록. app.html:280-283 winPop이 이미 쓰고 있다.
+
+■ 이 시안이 하는 일 — 넷을 그대로 쓰되 **기본 동작을 바꾼다**: 오늘은 "탭을 먼저 열고 ⧉로
+  분리"였는데, 이 시안은 "화면을 고르면 처음부터 shell:popout으로 뜬다"(탭을 아예 안 거친다).
+  탭이 한 번도 안 생기므로 body.chat-home이 **영구히** 유지된다 — 새 CSS 상태를 안 만들고
+  이미 있는 상태를 상시화하는 것이 이 시안의 핵심이다(아래 ① 참고).
+
+■ 정직하게 조사해 밝힌 기술 난제 — gijo:select/gijo:view/gijo:scope는 전부
+  `window.top.postMessage`/`window.parent.postMessage`로 셸에 닿는다(코드 근거는 본문 ②에 파일:줄로
+  전부 나열). 별도 창(BrowserWindow)은 window.top이 **자기 자신**이라 이 메시지가 아무 데도 안
+  닿는다 — grouphub.js:103의 주석이 그 사실을 이미 알고 있다("셸 밖이면 없던 일로"),
+  map-view.js:118은 아예 `window.top !== window`로 막고 보낸다. Electron 공식 문서·이슈로도
+  같은 제약을 재확인했다(아래 조사 절 인용) — BrowserWindow끼리는 window.opener/postMessage가
+  없고 반드시 메인 프로세스(IPC)를 거쳐야 한다.
+
+이 파일은 실제로 눌러 볼 수 있는 데모입니다. 팝업 창은 실제 Electron BrowserWindow 대신 이 페이지
+안의 절대위치 div로 흉내 냈습니다(끌어서 옮길 수 있습니다) — 더블클릭 한 번으로 외부 파일 없이
+열려야 하기 때문입니다(자체완결 원칙). 입력창에 무엇을 쳐도 실제 LLM을 부르지 않고, 정해진
+각본대로만 움직입니다. 오늘 코드로 안 되는 상호작용(행 선택 되먹임)은 "안 됩니다"라고 직접
+보여줍니다 — 되는 것처럼 꾸미지 않습니다(정직한 구현 원칙).
+════════════════════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.09);
+  --border-strong:rgba(255,255,255,.16);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
+  --blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:#141312;color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{padding:18px 16px 60px;}
+
+/* ── 시연 전용 바 ── */
+.demo-bar{max-width:1400px;margin:0 auto 12px;background:var(--panel-2);border:1px dashed var(--amber);
+  border-radius:10px;padding:11px 15px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;}
+.demo-bar b{color:#fff;}
+.demo-bar .lbl{color:var(--muted-2);font-size:11.5px;white-space:nowrap;}
+.demo-bar button{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);
+  border-radius:7px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.demo-bar button:hover{color:#fff;border-color:var(--blue);}
+.demo-bar button.warn{border-color:rgba(240,160,32,.5);color:var(--amber);}
+.demo-bar label{display:flex;align-items:center;gap:5px;font-size:11.75px;color:var(--muted);cursor:pointer;white-space:nowrap;}
+.demo-bar input[type=checkbox]{width:14px;height:14px;accent-color:var(--blue);cursor:pointer;}
+.demo-bar .sep{width:1px;align-self:stretch;background:var(--border);margin:0 2px;}
+.demo-bar .note{width:100%;font-size:11.25px;color:var(--muted-2);}
+#popCount,#railCount{font-weight:800;color:var(--blue-light);}
+
+/* ── 무대(가상 데스크톱) — 본창 + 팝업들이 함께 산다 ── */
+.stage-wrap{max-width:1560px;margin:0 auto;position:relative;overflow-x:auto;}
+.stage{position:relative;width:100%;min-width:1560px;height:760px;border-radius:10px;overflow:visible;
+  background-color:#151413;background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.05) 1px, transparent 0);
+  background-size:22px 22px;border:1px solid #26241f;}
+.stage-caption{max-width:1400px;margin:8px auto 0;text-align:center;font-size:11.25px;color:var(--muted-2);}
+
+/* ── 본창(메인 윈도우) — 대화가 전부다. 캔버스라는 개념 자체가 없다 ── */
+.device{position:absolute;left:24px;top:24px;width:900px;height:700px;background:var(--bg);
+  border:1px solid var(--border-strong);border-radius:9px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55);
+  display:flex;flex-direction:column;z-index:10;transition:box-shadow .15s;}
+.device.focused{border-color:var(--blue);box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px rgba(59,130,246,.4);}
+.device.flash{animation:devFlash 1.9s ease-in-out 2;}
+@keyframes devFlash{0%,100%{box-shadow:0 20px 60px rgba(0,0,0,.55);}50%{box-shadow:0 20px 60px rgba(0,0,0,.55),0 0 0 3px rgba(240,160,32,.9);}}
+
+.dv-top{flex:0 0 auto;height:44px;display:flex;align-items:center;gap:10px;padding:0 12px;
+  background:var(--panel-2);border-bottom:1px solid var(--border);cursor:move;}
+.dv-top .ttl{font-size:12px;font-weight:800;color:var(--muted-2);}
+.dv-top .spacer{flex:1;}
+.dv-top .clock{font-size:11.75px;color:var(--muted);}
+.dv-top .winctl{display:flex;gap:9px;margin-left:8px;color:var(--muted-2);font-size:11px;opacity:.4;}
+
+.dv-body{flex:1 1 auto;display:flex;min-height:0;}
+/* 레일 56px — app.html:58-64 값 그대로. 4개뿐(문서3·검색은 상단으로 이미 옮겨간 원칙 유지) */
+.rail{flex:0 0 56px;width:56px;background:var(--panel-2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:5px;}
+.rail button{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid transparent;
+  color:var(--muted);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  font-family:inherit;position:relative;}
+.rail button:hover{background:rgba(255,255,255,.06);color:#fff;border-color:var(--border);}
+.rail .badge{position:absolute;top:-3px;right:-3px;min-width:14px;height:14px;border-radius:8px;
+  background:var(--blue);color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 3px;}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;}
+.rail-foot .av{width:26px;height:26px;border-radius:50%;background:rgba(59,130,246,.22);color:var(--blue-light);
+  font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+
+/* 레일 오른쪽 전부 — 세로로 쌓인다(가상 시나리오 배너 · 대화 · 대체 캔버스가 여기 순서대로 산다) */
+.main-col{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0;}
+
+/* ── 대화 패널(chat-home 상태를 영구 재사용) — console.js 실제 클래스·색값 그대로 ── */
+.chat{flex:1 1 auto;display:flex;flex-direction:column;background:var(--panel-2);min-width:0;min-height:0;}
+.cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12.25px;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.05);}
+.cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;font-size:11.75px;}
+.cs-ctx.dim{background:transparent;border-style:dashed;color:var(--muted-2);font-weight:600;}
+.cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:11.5px;}
+.cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;}
+.cs-body>*:first-child{margin-top:auto;}
+.cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:12.25px;}
+.cs-row.instr .ci{background:rgba(30,185,128,.16);}
+.cs-row.sys .ci{background:rgba(255,255,255,.06);}
+.cs-row .cb{flex:1;min-width:0;}
+.cs-row .cn{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:2px;}
+.cs-row .cm{font-size:12.5px;color:var(--text);word-break:break-word;line-height:1.62;}
+.cs-open{display:inline-block;margin-top:8px;font-size:12.5px;font-weight:700;color:var(--blue-light);
+  background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:6px 12px;
+  cursor:pointer;min-height:28px;font-family:inherit;}
+.cs-open:hover{background:rgba(59,130,246,.18);}
+.cs-sel{font-size:11.5px;font-weight:700;color:#ffd9a8;border:1px solid rgba(240,160,32,.45);border-radius:12px;padding:1px 9px;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;}
+.cs-sel .x{margin-left:5px;color:var(--muted-2);cursor:pointer;}
+.cs-row .cs-ap{margin-top:8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:9px 11px;}
+.cs-aph{font-size:12px;font-weight:800;color:var(--amber);margin-bottom:3px;}
+.cs-apsub{font-size:11.75px;color:var(--muted);margin-bottom:7px;}
+.cs-apf{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;}
+.cs-apk{flex:0 0 92px;color:var(--muted-2);}
+.cs-apin{flex:1;background:var(--bg);border:1px solid var(--border-strong);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;font-family:inherit;}
+.cs-apb{display:flex;gap:8px;margin-top:9px;}
+.cs-apgo{background:rgba(30,185,128,.18);border:1px solid rgba(30,185,128,.5);color:#7be0b4;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;}
+.cs-apno{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;}
+.cs-apd{font-size:12px;color:var(--muted-2);}
+.cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}
+.cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;color:var(--text);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}
+.cs-dock input:focus{border-color:var(--blue);}
+.cs-send{background:var(--blue);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;font-family:inherit;}
+.cs-chips{display:flex;flex-wrap:wrap;gap:5px;padding:8px 11px;border-bottom:1px solid rgba(255,255,255,.08);}
+.cs-chip{font-size:11.75px;border:1px solid var(--border);border-radius:13px;padding:2px 10px;cursor:pointer;color:var(--text);background:transparent;white-space:nowrap;font-family:inherit;}
+.cs-chip:hover{border-color:var(--teal);color:var(--teal);}
+.toast{font-size:11.75px;color:var(--muted-2);background:var(--bg);border:1px dashed var(--border-strong);border-radius:7px;padding:6px 9px;margin-top:6px;line-height:1.5;}
+.toast.gap{border-color:rgba(226,72,61,.45);color:#f5928a;}
+.toast.future{border-color:rgba(59,130,246,.45);color:var(--blue-light);}
+
+/* ── 팝업 창(가상 BrowserWindow) ── */
+.popwin{position:absolute;background:var(--bg);border:1px solid var(--border-strong);border-radius:9px;
+  overflow:hidden;box-shadow:0 16px 46px rgba(0,0,0,.5);display:flex;flex-direction:column;min-width:340px;min-height:220px;}
+.popwin.focused{border-color:rgba(255,255,255,.35);box-shadow:0 16px 46px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.2);}
+.pw-top{flex:0 0 auto;height:32px;display:flex;align-items:center;gap:7px;padding:0 9px;background:var(--panel-2);
+  border-bottom:1px solid var(--border);cursor:move;font-size:11.75px;font-weight:700;color:var(--text);}
+.pw-top .ic{opacity:.8;}
+.pw-top .x{margin-left:auto;width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;
+  color:var(--muted-2);cursor:pointer;font-size:12px;}
+.pw-top .x:hover{background:rgba(226,72,61,.35);color:#fff;}
+.pw-body{flex:1 1 auto;overflow-y:auto;padding:12px 14px;font-size:12.5px;color:var(--text);line-height:1.6;}
+.pw-body h4{font-size:12.75px;color:#fff;margin-bottom:6px;}
+.pw-note{font-size:11.5px;color:var(--muted-2);background:var(--panel-2);border:1px solid var(--border);
+  border-radius:7px;padding:7px 9px;margin-top:8px;line-height:1.55;}
+
+/* 목록 행 — nav.js 목록양식CSS().gj-row 값 그대로 */
+.gj-row{display:flex;gap:10px;align-items:baseline;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.045);font-size:12px;line-height:1.35;cursor:pointer;border-radius:5px;}
+.gj-row:hover{background:rgba(59,130,246,.06);}
+.gj-row.picked{background:rgba(59,130,246,.14);}
+.gj-row .k{color:var(--muted-2);font-size:11.5px;white-space:nowrap;width:44px;flex:0 0 auto;}
+.gj-row .tag{font-size:11px;font-weight:800;padding:1px 6px;border-radius:4px;white-space:nowrap;flex:0 0 auto;}
+.t-red{background:rgba(226,72,61,.16);color:#f5928a;}
+.t-amber{background:rgba(240,160,32,.16);color:var(--amber);}
+.t-blue{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.gj-row .bd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+.gj-row .asset{color:var(--muted-2);font-size:11.5px;flex:0 0 auto;}
+.pw-selbtn{font-size:11px;color:var(--muted-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;cursor:pointer;flex:0 0 auto;background:transparent;font-family:inherit;}
+.pw-selbtn:hover{border-color:var(--blue);color:var(--blue-light);}
+
+/* ── 열린 창 목록(winpop) — app.html:150-166 값 그대로 ── */
+.winmenu{position:relative;}
+.winpop{display:none;position:absolute;left:44px;bottom:6px;z-index:200;min-width:230px;background:var(--panel);
+  border:1px solid var(--border-strong);border-radius:10px;padding:5px;box-shadow:0 12px 34px rgba(0,0,0,.5);}
+.winpop.on{display:block;}
+.winpop .wp-h{font-size:12px;color:var(--muted-2);padding:5px 8px 6px;}
+.wp-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--text);}
+.wp-row:hover{background:rgba(59,130,246,.14);}
+.wp-row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.wp-row .tag2{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);}
+.wp-row.now .nm{color:var(--blue-light);font-weight:700;}
+.wp-empty{padding:8px;font-size:12px;color:var(--muted-2);line-height:1.6;}
+
+/* ── 팔레트(☰ 전체 메뉴) ── */
+.palette-wrap{display:none;position:absolute;inset:0;background:rgba(10,10,9,.55);z-index:300;align-items:center;justify-content:center;}
+.palette-wrap.on{display:flex;}
+.palette{width:560px;max-height:520px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:12px;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;}
+.pal-head{flex:0 0 auto;padding:10px 12px;border-bottom:1px solid var(--border);}
+.pal-head input{width:100%;background:var(--bg);border:1px solid var(--border-strong);border-radius:9px;
+  padding:9px 11px;color:var(--text);font-size:13px;outline:none;font-family:inherit;}
+.pal-grid{flex:1 1 auto;overflow-y:auto;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.pal-item{border:1px solid var(--border);border-radius:9px;padding:10px 12px;cursor:pointer;background:var(--panel);}
+.pal-item:hover{border-color:var(--blue);background:rgba(59,130,246,.08);}
+.pal-item .t{font-size:12.75px;font-weight:800;color:#fff;}
+.pal-item .s{font-size:11.25px;color:var(--muted-2);margin-top:2px;}
+.pal-item.hidden{display:none;}
+
+/* ── 가상 시나리오: 팝업이 막히면(대화 접힘) ── */
+.blocked-note{display:none;flex:0 0 auto;background:rgba(226,72,61,.1);border-bottom:1px solid rgba(226,72,61,.4);
+  padding:8px 12px;font-size:11.5px;color:#f5928a;align-items:center;gap:8px;}
+.blocked-note button{margin-left:auto;background:transparent;border:1px solid rgba(226,72,61,.5);color:#f5928a;
+  border-radius:6px;padding:4px 9px;font-size:11.25px;cursor:pointer;font-family:inherit;}
+body.blocked-demo .blocked-note{display:flex;}
+.blocked-canvas{display:none;flex:1 1 auto;flex-direction:column;background:var(--bg);border-top:1px solid var(--border);}
+body.blocked-demo .chat{display:none;}
+body.blocked-demo .blocked-canvas{display:flex;}
+.blk-hd{flex:0 0 auto;padding:9px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.blk-hd .t{font-size:13px;font-weight:800;color:#fff;}
+.blk-back{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.12);
+  border:1px solid rgba(59,130,246,.4);border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;}
+.blk-body{flex:1;overflow-y:auto;padding:10px 14px;}
+
+/* ── 설명 절(페이지 안) — 프로_대화창메인/시안.html의 .explain 값 그대로 ── */
+.explain{max-width:1400px;margin:34px auto 0;background:var(--panel-2);border:1px solid var(--border);
+  border-radius:12px;padding:24px 28px;font-size:13px;line-height:1.75;}
+.explain h2{font-size:16px;color:#fff;margin:22px 0 8px;border-left:3px solid var(--blue);padding-left:9px;}
+.explain h2:first-child{margin-top:0;}
+.explain h3{font-size:13px;color:var(--blue-light);margin:14px 0 6px;}
+.explain p{margin:6px 0;color:var(--text);}
+.explain ul,.explain ol{margin:6px 0 10px 20px;}
+.explain li{margin:4px 0;}
+.explain table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:12.25px;}
+.explain th,.explain td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top;}
+.explain th{background:var(--panel);color:var(--muted);}
+.explain code{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11.75px;}
+.explain .src{font-size:11.75px;color:var(--muted-2);}
+.explain .tag{display:inline-block;font-size:11px;font-weight:800;border-radius:4px;padding:1px 6px;margin-right:4px;}
+.explain .tag.ok{background:rgba(30,185,128,.16);color:var(--teal);}
+.explain .tag.warn{background:rgba(240,160,32,.16);color:var(--amber);}
+.explain .tag.no{background:rgba(226,72,61,.16);color:#f5928a;}
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <b>🧪 시연 컨트롤(제품에 없음)</b>
+  <span class="sep"></span>
+  <span class="lbl">화면 열기 →</span>
+  <button data-open="find">① 발견·수집</button>
+  <button data-open="report">⑤ 보고</button>
+  <button data-open="settings">설정</button>
+  <button data-open="sessions">작업 내역</button>
+  <button data-open="office">🏢 팀 사무실</button>
+  <button data-open="docbox">📚 문서함</button>
+  <span class="sep"></span>
+  <button id="btnApproval" class="warn">🗂 결재판 도착 시뮬레이션</button>
+  <button id="btnCloseAll">열린 창 전부 닫기</button>
+  <span class="sep"></span>
+  <label><input type="checkbox" id="chkFuture"> 선택 되먹임 — 구현됐다면(예상 미리보기)</label>
+  <label><input type="checkbox" id="chkBlocked"> 가상 시나리오: 팝업이 막히면</label>
+  <div class="note">열린 팝업 <span id="popCount">0</span>개(권장 상한 5) · 본창 상시 클릭표적
+    <span id="railCount">6</span>개(팝업 개수와 무관 — ④ 밀도 숫자 참고) · 팝업 창은 실제 Electron
+    BrowserWindow 대신 이 페이지 안 div로 흉내 냈습니다(끌어서 옮길 수 있습니다).</div>
+</div>
+
+<div class="stage-wrap">
+  <div class="stage" id="stage">
+
+    <!-- ── 본창(메인 윈도우) ── -->
+    <div class="device focused" id="device">
+      <div class="dv-top" id="deviceDrag">
+        <span class="ttl">GIJO AS — AI Security Manager OS (Pro)</span>
+        <span class="spacer"></span>
+        <span class="clock">09:41</span>
+        <span class="winctl">— ▢ ✕</span>
+      </div>
+      <div class="dv-body">
+        <nav class="rail">
+          <button id="railMenu" title="전체 메뉴(Ctrl+K) — 고르면 별도 창으로 뜹니다">☰</button>
+          <button id="railWork" title="작업 내역">🕘</button>
+          <button id="railFav" title="즐겨찾기 — 전체 메뉴와 같은 목록을 씁니다">⭐</button>
+          <div class="winmenu">
+            <button id="railWin" title="열려 있는 창 목록">🗔<span class="badge" id="railWinBadge" style="display:none">0</span></button>
+            <div class="winpop" id="winPop"></div>
+          </div>
+          <div class="rail-foot">
+            <span class="av" title="문서함 열기(창)">📚</span>
+            <span class="av" title="계정 · 설정">나</span>
+          </div>
+        </nav>
+
+        <div class="main-col">
+          <div class="blocked-note">
+            ⚠ 가상 시나리오 — 오늘 코드 기준으로 실제로 막히는 화면은 0개입니다(조사 결과, ②참고).
+            이건 안전망을 미리 보여 달라는 사장님 지시③에 따른 <b>가정</b> 데모입니다.
+            <button id="blkExit">시나리오 끄기</button>
+          </div>
+
+          <div class="chat">
+            <div class="cs-head">
+              <span class="cs-ctx dim" id="ctxPill">대화 홈 — 지금 보고 있는 화면 없음</span>
+              <span class="cs-hint">지시는 여기서만 합니다. 화면은 골라서 부르는 창입니다.</span>
+            </div>
+            <div class="cs-chips">
+              <button class="cs-chip" data-ask="긴급 취약점 몇 건이야?">긴급 취약점 몇 건이야?</button>
+              <button class="cs-chip" data-ask="정기점검 잡아줘">정기점검 잡아줘</button>
+              <button class="cs-chip" data-ask="① 발견·수집 열어줘">① 발견·수집 열어줘</button>
+            </div>
+            <div class="cs-body" id="chatBody"></div>
+            <div class="cs-dock">
+              <input id="chatInput" type="text" placeholder="지시를 입력하세요 (예: 정기점검 잡아줘)">
+              <button class="cs-send" id="chatSend">전송</button>
+            </div>
+          </div>
+
+          <div class="blocked-canvas" id="blockedCanvas">
+            <div class="blk-hd">
+              <span class="t">① 발견·수집</span>
+              <button class="blk-back" id="blkBack">🗨 대화 다시 보기</button>
+            </div>
+            <div class="blk-body" id="blockedBody"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="palette-wrap" id="paletteWrap">
+      <div class="palette">
+        <div class="pal-head"><input id="palSearch" type="text" placeholder="화면 찾기 — 이름으로 좁히기"></div>
+        <div class="pal-grid" id="palGrid"></div>
+      </div>
+    </div>
+
+    <!-- 팝업 창들이 여기에 JS로 추가됩니다 -->
+  </div>
+  <div class="stage-caption">가상 데스크톱(실제 화면 크기 아님) — 본창 900×700 + 레일 56px, 팝업은
+    main.ts의 실제 창 크기 비율을 축소해 배치했습니다. 제목줄을 끌면 옮길 수 있고, 아무 창이나
+    누르면 맨 앞으로 옵니다(z-index만 바뀝니다 — OS 포커스를 흉내낸 것입니다).</div>
+</div>
+
+<div class="explain">
+
+<h2>① 왜 이 안인가 · 다른 길을 왜 안 골랐나</h2>
+<p><b>채택안</b> — 화면을 고르면 캔버스(옆 604~804px)가 아니라 <b>별도 창</b>이 뜬다. 본창은
+  <code>body.chat-home</code>(app.html:66-76)이 <b>영구히</b> 유지되어 대화가 늘 폭 100%다.
+  이미 배포된 프로 셸의 캔버스-옆 배치(app.html:198 <code>.work.console-side</code>)는 이
+  시안에서 <b>한 번도 켜지지 않는다</b> — 새 CSS 상태를 만드는 게 아니라 이미 있는 idle 상태를
+  상시화하는 쪽이라 구현 위험이 낮다(실측 아님, 코드 구조로 판단).</p>
+
+<h3>결재판이 가려지는 문제 — 이전 시안(mockups/프로_대화창메인)이 기각한 바로 그 자리</h3>
+<p>그 시안은 "캔버스를 풀스크린 모달로 띄운다"를 <b>기각</b>했다: "대화(결재판 포함)가 완전히
+  뒤로 가려진다." 이 시안도 같은 위험이 있다 — 팝업 창이 여러 개 뜨면 본창(대화)이 다른 창들
+  뒤에 가려질 수 있다. 세 갈래를 직접 검토했다:</p>
+<table>
+<tr><th>갈래</th><th>내용</th><th>판정</th><th>근거</th></tr>
+<tr><td>A. 승인이 오면 팝업이 물러난다</td><td>결재판 도착 시 팝업 창들을 자동으로 최소화하거나
+  본창을 강제로 맨 앞으로</td><td><span class="tag no">기각</span></td>
+  <td>사람이 읽던 창을 말없이 치우는 것 — "탭이 말없이 닫히는" 사고(app.html:493-504 주석)와
+  같은 패턴. Windows는 애초에 다른 프로세스가 SetForegroundWindow로 자기 창을 강제로 앞세우는
+  것을 제한한다(위키백과 "Focus stealing" — 아래 조사 인용). 강제로 되지도 않고, 된다 해도
+  나쁜 습관이다.</td></tr>
+<tr><td>B. 승인 카드를 팝업 위에도 복제해서 띄운다</td><td>모든 열린 팝업 창에 결재판을
+  토스트로 복제</td><td><span class="tag no">기각</span></td>
+  <td>승인 상태(값 수정·승인·취소)가 원본(대화)과 복제본(팝업 토스트) 두 곳에 있으면 반드시
+  어긋난다 — 이 저장소가 반복해 겪은 "같은 것을 여러 곳에 적으면 어긋난다"(CLAUDE.md)를
+  결재판이라는 가장 위험한 자리에서 재현하는 꼴이다.</td></tr>
+<tr><td>C. 본창은 스스로를 앞세우지 않고 "봐 달라"고만 알린다</td><td>Electron
+  <code>BrowserWindow.flashFrame(true)</code>로 작업표시줄 아이콘을 깜빡인다(강제 포커스
+  아님) + 결재판은 <b>오직 본창 안에서만</b> 존재(원본 하나)</td><td><span class="tag ok">채택</span></td>
+  <td>Electron 공식 문서: "창이 주의가 필요하지만 지금 포커스가 없다는 것을 알리려 창을
+  깜빡인다"(아래 조사 인용) — Windows의 포커스 강탈 제한과 <b>정확히 같은 방향</b>이다. 그리고
+  이 시안 특유의 강점: 대화가 <b>다른 OS 창</b>이라, 자기 자신의 내용(캔버스) 뒤에 가려질 수 없다
+  — 이전 시안이 겪은 "같은 창 안에서 캔버스가 대화를 밀어낸다"는 유형의 문제 자체가 구조적으로
+  없다. 남는 위험은 "다른 창들 <i>뒤</i>에 깔린다"뿐이고, 그건 OS의 표준 알림 관례(작업표시줄
+  깜빡임)로 이미 풀려 있는 문제다.</td></tr>
+</table>
+<p class="src">⚠ <code>flashFrame</code>은 오늘 client/src/main.ts에 <b>없다</b>(grep 결과 0건) —
+  이 시안이 채택한 해법을 실제로 쓰려면 새로 붙여야 한다(작은 추가, 아래 ③에서 정직하게 밝힘).
+  데모에서는 본창 테두리 pulse + 토스트로 그 효과를 흉내 냈다 — 실제 작업표시줄 깜빡임은 브라우저
+  탭 안에서 재현할 수 없기 때문이다.</p>
+
+<h3>왜 "화면이 대화를 나눠 갖는" 오늘 배치를 버리나</h3>
+<p>사장님 지시①이 명확하다 — "나눠서 보이는것보단". 오늘의 캔버스-옆 배치(604~804px + 380px)는
+  본질적으로 "나눠 보이는" 것이고, 이 시안은 그걸 "따로 뜨는" 것으로 바꾼다. 이미 있는 팝업
+  통로 넷(사장님 지시②·⑤, main.ts에서 직접 확인)을 그대로 쓰는 것도 여기서 나온다 — 새 창 종류를
+  만들 필요가 없다.</p>
+
+<h2>② 정직하게 조사해 밝힌 기술 난제 — "화면에서 고른 것"이 대화로 안 돌아온다</h2>
+<p>화면(iframe/탭) 쪽 코드는 전부 <b>자신이 iframe 안에 있다</b>고 가정하고 <code>window.top</code>
+  또는 <code>window.parent</code>로 셸에 말을 건다. 별도 창(BrowserWindow)에서는
+  <code>window.top === window</code> 자기 자신이라 이 메시지가 아무 데도 안 닿는다 — 코드가 이미
+  그 사실을 알고 있다:</p>
+<ul>
+<li><code>grouphub.js:103</code> — <code>window.top.postMessage({type:"gijo:view"},"*")</code>
+  뒤에 주석 "셸 밖이면 <b>없던 일로</b>"라고 스스로 적어 뒀다.</li>
+<li><code>map-view.js:118</code> — 아예 <code>이름 && window.top !== window</code>로 막고 보낸다
+  (별도 창일 땐 시도조차 안 한다).</li>
+<li><code>scopefilter.js:103</code>, <code>assets.html:140/171/251</code>,
+  <code>dashboard.html:555/591</code>, <code>sessions.html:365</code>,
+  <code>console.js:304</code> — 전부 같은 패턴(<code>window.top</code>/<code>window.parent</code>
+  postMessage)을 쓴다. 예외가 없다.</li>
+</ul>
+<p>Electron 공식 자료로도 재확인했다(아래 조사 인용) — BrowserWindow는 렌더러가 여러 개의
+  <b>독립된 프로세스</b>라 <code>window.opener</code>도 없고, 창끼리 직접 postMessage를 주고받는
+  길이 없다. 반드시 메인 프로세스(ipcMain/ipcRenderer)를 거쳐야 한다.</p>
+<p>더 정밀하게 보면 <b>난제가 두 겹</b>이다 — 뭉뚱그려 "안 된다"고 하지 않고 실제로 갈라서 확인했다:</p>
+<table>
+<tr><th>겹</th><th>무엇</th><th>오늘 상태</th><th>근거(파일:줄)</th></tr>
+<tr><td>얕은 겹 — "지금 어느 화면 얘기중" (맥락 알약)</td>
+  <td>팝업 창이 포커스를 받으면 그 라벨이 대화 맥락 알약(.cs-ctx)에 뜨는가</td>
+  <td><span class="tag no">도킹 상태에서는 안 됨</span> — IPC 자체는 이미 있다
+    (<code>shell:popoutFocus</code>가 실제로 쏜다)</td>
+  <td><code>main.ts:839</code> focus 이벤트 발신 → <code>app.html:873-879</code>
+    <code>onPopoutContext</code>가 받아 <code>setCtx(label)</code> 호출 → 그런데
+    <code>app.html:564-575 setCtx()</code>는 그 <code>label</code>을 <b>도킹 상태에서는 그냥
+    버린다</b>(팝업일 때만 쓰는 <code>if(popped …)</code> 분기 안에만 있음) → 대신
+    <code>window.gijoConsoleSyncCtx()</code>를 불러 <code>console.js:1225-1230
+    readCtxFromShell()</code>이 <code>window.gijoTabs.activeScreen()</code>(=활성 <b>탭</b>)을
+    다시 읽는다. 팝업은 탭이 아니므로 무시된다.</td></tr>
+<tr><td>깊은 겹 — "이 항목을 골랐다" (📌 칩)</td>
+  <td>팝업 안에서 목록 행을 클릭하면 대화에 선택 칩이 붙는가</td>
+  <td><span class="tag no">전혀 안 됨</span> — 중계할 IPC 채널 자체가 없음</td>
+  <td>위 코드 목록 전부(<code>window.top.postMessage(gijo:select/view/scope)</code>) +
+    <code>preload.ts:142-183</code>·<code>238-242</code>를 전수 확인 — select/view/scope를
+    나르는 ipcRenderer 채널이 <b>하나도 없다</b>(focus/tab/closed 셋만 있음).</td></tr>
+</table>
+<p><b>얕은 겹은 작은 수정</b>이다(이미 도착한 IPC를 도킹 상태에서도 반영하도록
+  <code>readCtxFromShell</code>을 고치면 된다). <b>깊은 겹은 새 배관</b>이 필요하다
+  (<code>console:context</code>와 같은 모양으로 select/view/scope용 IPC 채널을 새로 만들고,
+  10곳 넘는 화면의 <code>window.top.postMessage</code> 호출부를 "별도 창이면 IPC로,
+  iframe이면 postMessage로" 갈래 짓는 헬퍼가 필요하다). <b>이 시안(정지+실동작 데모)은 둘 다
+  만들지 않는다</b> — 데모의 "선택 되먹임" 버튼은 기본적으로 "오늘은 안 됩니다"를 그대로
+  보여주고, "예상 미리보기" 체크박스를 켰을 때만 <i>구현됐다면 이렇게 보인다</i>를 따로 보여준다
+  (가짜로 되는 척하지 않는다).</p>
+<p><b>맥락 자체가 사라지는 문제도 있다</b> — 오늘 부팅(app.html:906-908)은 항상
+  <code>open("dashboard.html","대시보드")</code>로 탭을 하나 열고 시작한다. 이 시안대로
+  화면 열기를 전부 팝업으로 돌리면 탭이 원천적으로 안 생기므로, <b>이 첫 탭도 다시 생각해야
+  한다</b> — 대시보드를 뭘로 대신할지는 이 시안의 범위 밖이라 정하지 않는다(아래 ⑦에 남김).</p>
+
+<h2>③ 무엇을 포기했나</h2>
+<ul>
+<li><b>같은 창 안에서 화면과 대화를 동시에 보기</b> — 오늘의 캔버스-옆(64.8%+30.6%)이 주는
+  "한눈에 같이 보인다"는 감각을 포기한다. 대신 실제 창 두 개를 나란히 놓을 수 있다(모니터가
+  넓으면 오히려 더 크게 볼 수 있다) — 그러나 그건 담당자가 직접 창을 배치해야 하는 수고다.</li>
+<li><b>선택 되먹임(📌 칩)의 즉시 동작</b> — ②에서 밝혔듯 오늘 코드로는 안 된다. 이 시안 자체는
+  그 배관을 새로 만들지 않는다(범위 밖으로 명시).</li>
+<li><b>부팅 시 대시보드 자동 오픈</b> — 탭이 없어지므로 이 관행도 다시 정해야 한다(⑦에 남김).</li>
+<li><b>"⧉ 창으로"·"▥ 옆으로"·"모두 닫기" 세 버튼의 존재 이유</b> — 탭·캔버스 개념이 없어지면
+  이 셋은 의미를 잃는다(레일 🗔로 흡수 제안, ④ 참고) — 단, 이건 코드 변경 제안이지 오늘 이미
+  없어진 것은 아니다.</li>
+<li><b>대화창을 별도 창으로 빼는 기능(console:popout)의 필요성</b> — 이 시안에서는 본창 자체가
+  이미 "대화 전용 창"이라 그 창을 또 빼낼 이유가 옅어진다. 지우자는 제안은 아니다(다른 셸에서는
+  여전히 쓰인다) — 프로 셸에서는 버튼을 안 보이는 정도로 충분할 수 있다는 관찰만 남긴다.</li>
+</ul>
+
+<h2>④ 밀도 숫자</h2>
+<p>방법: devtools 실측이 아니라 <code>app.html</code>·<code>main.ts</code>의 실제 CSS 상수·창
+  크기 상수를 코드에서 그대로 읽어 계산했다. 기준 창 폭 1240px(캔버스-옆 배치의 실제 최소폭에
+  가까운 값, 이전 시안 mockups/프로_대화창메인과 같은 기준으로 비교 가능하게 맞췄다).</p>
+<h3>가로 — 대화가 차지하는 폭</h3>
+<table>
+<tr><th>상태</th><th>오늘(배포된 프로 셸)</th><th>이 시안</th></tr>
+<tr><td>idle(화면 안 부름)</td><td>대화 1184px(95.5%) · 레일 56px(4.5%)</td>
+  <td>대화 1184px(95.5%) · 레일 56px(4.5%) — <b>동일</b>(같은 chat-home 상태 재사용)</td></tr>
+<tr><td>화면 하나 봄</td><td>캔버스 804px(64.8%) · 대화 380px(30.6%) · 레일 56px(4.5%)
+  <span class="src">(app.html:54 레일56 · app.html:198 --console-w 기본 380)</span></td>
+  <td>대화 <b>1184px(95.5%) — 변화 없음</b>(팝업이 몇 개든 본창 폭은 안 나뉜다). 팝업 창 자체는
+  본창과 무관한 별개 크기(아래 표).</td></tr>
+</table>
+<h3>세로 — 상시 조작줄(창 높이 720px 기준)</h3>
+<table>
+<tr><th>줄</th><th>오늘 · idle</th><th>오늘 · 화면 봄</th><th>이 시안(항상)</th></tr>
+<tr><td>상단바</td><td>44px</td><td>44px</td><td>44px</td></tr>
+<tr><td>하단 탭+조작줄(app.html:25-26)</td><td>0(숨김, chat-home)</td><td>40px</td><td>0(영구 숨김)</td></tr>
+<tr><td>본문에 남는 세로</td><td>676px</td><td>636px</td><td><b>676px — 오늘 화면-봄 대비 +40px(+6.3%), 상시</b></td></tr>
+</table>
+<h3>상시 노출 클릭 표적(팝업 개수와 무관 — 이게 이 시안의 핵심 주장)</h3>
+<table>
+<tr><th>상태</th><th>개수</th><th>구성</th></tr>
+<tr><td>오늘 · idle</td><td>6개</td><td>레일 4(☰🕘⭐💬) + rail-foot 2(문서함·계정)</td></tr>
+<tr><td>오늘 · 화면 봄</td><td>10개</td><td>레일 4 + rail-foot 2 + 하단바 4(⧉창으로/모두닫기/▥옆으로/🗔창)</td></tr>
+<tr><td><b>이 시안 · 언제나</b></td><td><b>6개</b></td><td>레일 4(☰🕘⭐🗔 — 💬「대화 홈」은 항상
+  홈이라 불필요, 대신 창 목록 🗔를 레일로 승격 제안) + rail-foot 2. 팝업이 0개든 5개든
+  <b>불변</b> — 오늘 화면-봄 대비 <b>-4개(-40%)</b>.</td></tr>
+</table>
+<p class="src">방법 근거: <code>app.html:250-260</code> 레일 4버튼 정의, <code>app.html:269-283</code>
+  하단바 4버튼 정의, <code>titlebar.js:338-352</code> rail-foot 2요소(문서함 gear+계정 row).
+  레일 구성 변경(💬→🗔)은 이 시안의 <b>제안</b>이며 오늘 코드에 없다 — 실측이 아니라 설계
+  주장으로 표기한다.</p>
+<h3>팝업 창 자체 크기(참고 — 본창과 무관, main.ts 실제 상수)</h3>
+<table>
+<tr><th>창</th><th>크기</th><th>근거</th></tr>
+<tr><td>⧉ 화면 창(shell:popout)</td><td>작업영역 오른쪽 절반, 최소폭 760px</td><td>main.ts:784-798</td></tr>
+<tr><td>팀 사무실</td><td>900~1100 × 700~840</td><td>main.ts:606-609</td></tr>
+<tr><td>문서함</td><td>920~1180 × 640~860</td><td>main.ts:635-639</td></tr>
+<tr><td>문서 작성</td><td>900~1300 × 640~900</td><td>main.ts:690-694</td></tr>
+</table>
+
+<h2>⑤ 제품 원칙 자가점검</h2>
+<table>
+<tr><th>원칙</th><th>상태</th></tr>
+<tr><td>대화창이 메인(사장님 지시①)</td><td><span class="tag ok">충족</span> — 모든 시간대에서
+  대화 95.5%, 오늘의 idle 한 상태만이 아니라 <b>상시</b>가 됐다</td></tr>
+<tr><td>기존 팝업 기능 재사용(사장님 지시②·⑤)</td><td><span class="tag ok">충족</span> — 새 창
+  종류를 만들지 않고 office/docbox/smartmd/shell:popout 넷을 그대로 씀</td></tr>
+<tr><td>팝업 막히면 대화 접고 보여주기(사장님 지시③)</td><td><span class="tag warn">데모로 구현,
+  실사용 근거는 0건</span> — 조사 결과 오늘 코드에서 실제로 막히는 화면이 없어 이 경로가 지금
+  당장 필요하진 않다(⑥ 버릴 조건과 연동)</td></tr>
+<tr><td>결재판이 안 가려짐</td><td><span class="tag ok">구조적으로 충족</span> — 원본이 하나뿐인
+  창(본창)에만 있고, 다른 창 뒤에 깔리는 문제는 flashFrame(추가 필요)로 완화</td></tr>
+<tr><td>메뉴는 보기용, 새 화면 입력칸 금지</td><td><span class="tag ok">충족</span> — 팔레트엔
+  목록 좁히는 검색칸만(허용 예외), 지시 입력은 대화창 하나뿐</td></tr>
+<tr><td>조작 개수 줄이기</td><td><span class="tag warn">제안 단계, 실측 필요</span> —
+  10→6(-40%) 주장이지만 레일 구성 변경은 구현 전이라 추정</td></tr>
+<tr><td>자체완결 HTML</td><td><span class="tag ok">충족</span> — 외부 CDN·폰트·이미지 0개</td></tr>
+<tr><td>제품 색·부품 재사용</td><td><span class="tag ok">충족</span> — app.html <code>:root</code>,
+  console.js <code>.cs-*</code>, nav.js <code>.gj-row</code>, app.html <code>.winpop</code>
+  값을 그대로 옮김</td></tr>
+<tr><td>추천 1개 원칙</td><td><span class="tag ok">충족</span> — 대안(A/B 결재판 해법)은 표로만,
+  화면은 하나</td></tr>
+<tr><td>11px 미만 금지</td><td><span class="tag ok">충족</span> — 최소 11.25px</td></tr>
+<tr><td>없는 기능 안 그리기</td><td><span class="tag warn">부분</span> — "가상 시나리오"·"예상
+  미리보기" 두 상태는 명시적으로 <b>가정/미구현</b> 라벨을 달아 구분(안 만들면 사장님 지시③을
+  못 보여줌)</td></tr>
+<tr><td>정직한 구현(가짜 동작 없음)</td><td><span class="tag ok">충족</span> — 선택 되먹임 버튼은
+  기본이 "안 됩니다" 실토, 미리보기는 켜야만 보임</td></tr>
+</table>
+
+<h2>⑥ 버릴 조건 — 무엇을 재서 어떤 값이면 접나</h2>
+<table>
+<tr><th>#</th><th>재는 것</th><th>접는 기준</th></tr>
+<tr><td>1</td><td>동시에 열려 있는 팝업 창 개수(실사용 평균)</td><td>평균 3개를 넘게 상시
+  유지되면(작업표시줄이 이미 붐빈다는 뜻) — 캡·자동정리 정책이 별도로 필요, 그래도 안 줄면
+  "창 대신 다시 패널"로 되돌리는 것 검토</td></tr>
+<tr><td>2</td><td>gijo:select/view/scope 되먹임(②의 "깊은 겹") 배관을 실제로 만들 필요가
+  체감되는지</td><td>실사용에서 "화면에서 고른 걸 그대로 지시에 쓰는" 빈도가 낮고 대부분
+  타이핑으로 재지시하면 — 그 배관은 안 만들어도 된다(만드는 비용 자체를 아낌)</td></tr>
+<tr><td>3</td><td>결재판 도착을 알아채는 데 걸리는 시간(flashFrame 구현 후 실측)</td>
+  <td>기존 캔버스-옆 방식(즉시 시야 안)보다 평균 인지 지연이 뚜렷이 늘면(예: 10초 초과) —
+  "구조적으로 안 가려진다"는 이 시안의 핵심 주장이 체감으로는 "못 알아챈다"와 다를 게 없다는 뜻
+  → 접는다</td></tr>
+<tr><td>4</td><td>여러 화면을 나란히 비교하는 빈도(오늘의 탭 8개 관례가 여전히 쓰이는지)</td>
+  <td>실측 결과 오히려 늘면(진짜 창이라 배치가 자유로워서) 긍정 신호, 반대로 "창 열고 옮기는"
+  수고 때문에 줄면 — 캔버스-옆 배치를 다시 검토</td></tr>
+<tr><td>5</td><td>표준·라이트 셸과의 이질감(전환 시 학습비용)</td><td>프로 전환 사용자의 불만이
+  뚜렷하면 — 이 시안을 프로 전용으로 계속 격리할지, 접을지 재검토</td></tr>
+<tr><td>6</td><td>동시에 열린 팝업들의 메모리 실측(각각 완전한 렌더러 프로세스라 탭(iframe)보다
+  무겁다)</td><td>5개 동시 상황에서 관측 메모리가 오늘 탭 8개 상황보다 유의하게 높으면 —
+  권장 상한을 더 낮추거나 재고</td></tr>
+</table>
+
+<h2>⑦ 구현 시 더 정해야 할 것(이 시안이 답을 안 낸 것 — 정직 표기)</h2>
+<ul>
+<li>부팅 첫 화면 — 대시보드 자동 오픈을 대신할 것(환영 메시지? 오늘의 요약? 아무것도 안 함?)</li>
+<li>레일 💬→🗔 교체, 하단바 4버튼 정리 — 실제 코드 변경이 필요하고 이 시안은 설계만 제안</li>
+<li>맥락 알약의 "얕은 겹" 수정(<code>app.html:564-575</code>·<code>console.js:1225-1230</code>) —
+  ②에서 정확히 짚었으니 규모가 작은 다음 작업으로 바로 옮길 수 있다</li>
+<li>flashFrame 연결(<code>main.ts</code> 팝업 <code>focus</code>/결재판 도착 시점에 본창
+  <code>flashFrame(true)</code>, 본창이 포커스를 받으면 <code>false</code>)</li>
+<li>팝업 상한 정책(⑥ 1번이 답을 준 뒤 <code>popoutWindows</code>·<code>officeWindow</code> 등에
+  카운트 상한을 걸지 결정)</li>
+</ul>
+
+<h2>설계 전 조사 — 표준·모범사례</h2>
+<ul>
+<li><b>Electron 공식 문서, "Inter-Process Communication"</b> —
+  https://www.electronjs.org/docs/latest/tutorial/ipc — 렌더러(창)끼리는 직접 통신 경로가 없고
+  메인 프로세스를 거쳐야 한다. <b>적용</b>: ②의 "깊은 겹" 판단(별도 창은 postMessage로 셸에
+  못 닿는다)을 코드 조사에 더해 공식 문서로 재확인.</li>
+<li><b>Electron GitHub 이슈 #7193, "IPC from renderer to renderer"</b> —
+  https://github.com/electron/electron/issues/7193 — renderer-renderer 직접 통신이 지원되지
+  않고 메인 프로세스를 경유하는 프록시 패턴이 표준 해법으로 논의됨. <b>적용</b>: 이 시안의
+  ⑦(select/view/scope IPC를 console:context와 같은 모양으로 새로 만든다)이 바로 이 프록시
+  패턴이다 — 새 방식을 지어내지 않고 이미 검증된 관례를 따른다.</li>
+<li><b>Electron 공식 문서, "Windows Taskbar"(flashFrame)</b> —
+  https://www.electronjs.org/docs/latest/tutorial/windows-taskbar — "창이 주의가 필요하지만
+  포커스가 없을 때 작업표시줄 버튼을 깜빡인다." <b>적용</b>: ①의 채택 갈래(C)가 그대로 이
+  API를 가리킨다 — 강제 포커스가 아니라 "봐 달라"는 요청.</li>
+<li><b>위키백과, "Focus stealing"</b> — https://en.wikipedia.org/wiki/Focus_stealing —
+  다른 프로세스가 사용자 동의 없이 자기 창을 강제로 앞세우는 것은 널리 알려진 안티패턴이며
+  현대 OS(Windows 포함)는 이를 제한한다. <b>적용</b>: ①에서 갈래 A("팝업이 물러난다")를
+  기각하는 직접 근거.</li>
+<li><b>Nielsen Norman Group, "Opening Links in New Browser Windows and Tabs"</b> —
+  https://www.nngroup.com/articles/new-browser-windows-and-tabs/ — 새 창은 사용자를
+  방향감 상실시키고("새 창이 열린 걸 못 알아챈다"), 인지 부하를 늘리며, 뒤로가기를 못 쓰게 한다.
+  <b>적용</b>: 이 위험을 그대로 인정하고, 이미 있는 열린 창 목록(🗔, app.html:279-283)을
+  레일로 승격해 "방향감 상실" 위험을 낮추는 상시 안전망으로 삼았다(사용자가 뭘 열어놨는지
+  항상 한 곳에서 확인 가능) — 조사가 지적한 문제에 이미 있는 제품 부품으로 정면 대응.</li>
+<li><b>Microsoft Learn, "Windows Application Development - Best Practices"</b> —
+  https://learn.microsoft.com/en-us/windows/apps/get-started/best-practices — Windows 11
+  사용자는 "최신 멀티윈도우 워크플로와 셸 통합 지점"을 기대하며, Snap Layout(1/2·1/3·1/4
+  화면 배치)이 표준 기대치다. <b>적용</b>: 여러 화면을 별도 창으로 다루는 것이 Windows에서는
+  이례적인 패턴이 아니라 <b>플랫폼이 이미 지원을 전제하는</b> 패턴이라는 근거로 삼았다 —
+  다만 이 조사가 다중 창을 권장한다고 해서 NN/g가 지적한 방향감 상실 위험이 사라지는 것은
+  아니므로, 위 NN/g 대응(열린 창 목록)은 그대로 유지한다.</li>
+<li>(계승) <b>Hatchworks, "Agent UX Patterns"</b> —
+  https://hatchworks.com/blog/ai-agents/agent-ux-patterns/ — "체크포인트 게이트"(승인이
+  로깅되고 무엇이 바뀌는지 보여줌) 패턴은 이전 시안이 이미 확인했고, 이 시안은 결재판이
+  <b>물리적으로 다른 창에 가려질 수 있다</b>는 새로운 위험에 대해 같은 조사를 다시 적용했다
+  (①의 표).</li>
+</ul>
+
+<h2>사용법(눌러서 확인)</h2>
+<ol>
+<li>시연 컨트롤에서 "① 발견·수집"을 눌러 본다 — 팝업 창이 뜨고, 본창(대화)의 폭은 <b>바뀌지
+  않는다</b>(이게 이 시안의 핵심).</li>
+<li>이어서 "⑤ 보고"·"설정"도 열어 본다 — 팝업이 쌓인다. 레일의 🗔를 눌러 열린 창 목록에서
+  아무거나 골라 맨 앞으로 가져와 본다("다시 부르면 focus"의 시연).</li>
+<li>팝업들이 본창을 가리도록 겹쳐 본 다음(끌어서 옮기면 됨) "🗂 결재판 도착 시뮬레이션"을
+  누른다 — 본창 테두리가 pulse하고 토스트가 뜬다(작업표시줄 깜빡임의 대역, ① 갈래 C).</li>
+<li>발견·수집 팝업 안에서 목록 행 옆 "선택" 버튼을 눌러 본다 — 기본 상태에서는 "오늘은 안
+  됩니다"가 그대로 뜬다. 시연 바의 "선택 되먹임 — 구현됐다면" 체크박스를 켜고 다시 눌러
+  차이를 확인한다.</li>
+<li>"가상 시나리오: 팝업이 막히면"을 켜 본다 — 대화가 사라지고 화면이 본창 안에서 전체를
+  차지한다("🗨 대화 다시 보기"로 되돌아온다). 이건 사장님 지시③을 위한 가정 데모이고, 오늘
+  코드로는 이 경로가 실제로 필요한 화면이 없다(②·⑤ 참고).</li>
+</ol>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(id){return document.getElementById(id);};
+  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+  var MAX_POP=5; // ⑥ 버릴 조건 1번이 답을 낼 때까지의 임시 권장값(제안, 코드 상수 아님)
+  var stage=$("stage");
+  var pops={};        // id -> {el, focused}
+  var zTop=20;
+  var futureMode=false;
+
+  // ── 화면 스펙(정지 데모 데이터) ──────────────────────────────────────
+  var FIND_ROWS=[
+    {sev:"긴급",cls:"t-red",asset:"web-legacy-02",title:"Apache Struts2 원격코드실행(CVE-2017-5638)",d:"08-16"},
+    {sev:"긴급",cls:"t-red",asset:"db-prod-01",title:"PostgreSQL 권한상승(CVE-2026-1122)",d:"08-15"},
+    {sev:"높음",cls:"t-amber",asset:"vpn-gw-01",title:"OpenVPN 인증 우회",d:"08-15"},
+    {sev:"중간",cls:"t-blue",asset:"app-internal-03",title:"jQuery XSS 취약점",d:"08-12"}
+  ];
+  function findRowsHtml(){
+    return FIND_ROWS.map(function(r,i){
+      return '<div class="gj-row" data-i="'+i+'">'+
+        '<span class="k">'+r.d+'</span>'+
+        '<span class="tag '+r.cls+'">'+r.sev+'</span>'+
+        '<span class="bd">'+esc(r.title)+'</span>'+
+        '<span class="asset">'+esc(r.asset)+'</span>'+
+        '<span class="pw-selbtn" data-pick="'+i+'">선택</span>'+
+        '</div>';
+    }).join("");
+  }
+  var SCREENS={
+    find:{id:"find",title:"① 발견·수집",icon:"🔎",w:520,h:420,
+      body:function(){ return '<h4>① 발견·수집 — 최근 발견 42건 중 4건 표시(데모)</h4>'+
+        '<div id="findRows">'+findRowsHtml()+'</div>'+
+        '<div class="pw-note" id="findFeedback">행 옆 "선택"을 눌러 되먹임 여부를 확인하세요.</div>'; }},
+    report:{id:"report",title:"⑤ 보고",icon:"📊",w:460,h:340,
+      body:function(){ return '<h4>⑤ 보고</h4><div class="pw-note">이 카드는 정지 데모의
+        자리표시자입니다 — 실제 구현에서는 reporting.html이 이 창 안에 그대로 뜹니다(파일
+        그대로, shell:popout이 이미 그렇게 연다).</div>'; }},
+    settings:{id:"settings",title:"설정",icon:"⚙",w:480,h:380,
+      body:function(){ return '<h4>설정</h4><div class="pw-note">settings.html이 이 창 안에
+        그대로 뜹니다. 사장님 지시④ "설정같은거?" — 자주 안 여는 화면일수록 팝업으로 빼는 것의
+        이득이 큽니다(대화 폭을 늘 100%로 유지).</div>'; }},
+    sessions:{id:"sessions",title:"작업 내역",icon:"🕘",w:440,h:340,
+      body:function(){ return '<h4>작업 내역</h4><div class="pw-note">sessions.html — 진행 중
+        3건(데모 값). ⚠ 오늘 nav.js TOP 항목 중 page가 있는 것은 이 화면과 대시보드뿐이라 탭
+        경로가 남는다 — 나머지(팀 사무실·문서함·문서 작성)는 이미 win 항목(별도 창)입니다.</div>'; }},
+    office:{id:"office",title:"팀 사무실",icon:"🏢",w:560,h:420,
+      body:function(){ return '<h4>🏢 팀 사무실</h4><div class="pw-note">office:open(main.ts:597)
+        — 오늘 이미 별도 창입니다. 이 시안은 이 넷(사무실·문서함·문서작성·⧉화면창)과 <b>같은
+        패턴</b>을 나머지 모든 화면에도 적용하자는 제안입니다.</div>'; }},
+    docbox:{id:"docbox",title:"문서함",icon:"📚",w:560,h:420,
+      body:function(){ return '<h4>📚 문서함</h4><div class="pw-note">docbox:open(main.ts:628)
+        — 오늘 이미 별도 창입니다.</div>'; }}
+  };
+
+  // ── 팝업 창 열기/닫기/앞으로 ──────────────────────────────────────────
+  // 기본 자리는 본창 오른쪽(겹치지 않음) — "본창 폭이 안 나뉜다"를 처음부터 눈으로 보여준다.
+  // 겹쳐서 결재판 가림을 시연하려면 제목줄을 끌어 본창 위로 옮기면 된다(사용법 3번).
+  function cascadePos(n){ return {x:940+ (n%4)*22, y:24+(n%5)*24}; }
+  function openPopup(key){
+    if (pops[key]) { focusPopup(key); return; }
+    var n=Object.keys(pops).length;
+    if (n>=MAX_POP){
+      alert("팝업은 한 번에 "+MAX_POP+"개까지를 권장합니다(⑥ 버릴 조건 1번 — 실측으로 조정).\n\n"+
+        "필요 없는 창을 닫고 다시 열어 주세요.");
+      return;
+    }
+    var spec=SCREENS[key]; if(!spec) return;
+    var pos=cascadePos(n);
+    var el=document.createElement("div");
+    el.className="popwin";
+    el.style.left=pos.x+"px"; el.style.top=pos.y+"px";
+    el.style.width=spec.w+"px"; el.style.height=spec.h+"px";
+    el.style.zIndex=String(++zTop);
+    el.innerHTML='<div class="pw-top" data-drag="'+key+'"><span class="ic">'+spec.icon+'</span>'+
+      '<span>'+esc(spec.title)+'</span><span class="x" data-close="'+key+'">✕</span></div>'+
+      '<div class="pw-body">'+spec.body()+'</div>';
+    stage.appendChild(el);
+    pops[key]={el:el,label:spec.title,icon:spec.icon};
+    bindDrag(el, el.querySelector("[data-drag]"));
+    el.addEventListener("mousedown", function(){ focusPopup(key); });
+    el.querySelector("[data-close]").addEventListener("click", function(ev){ ev.stopPropagation(); closePopup(key); });
+    if (key==="find"){
+      el.querySelectorAll("[data-pick]").forEach(function(b){
+        b.addEventListener("click", function(ev){
+          ev.stopPropagation();
+          var row=FIND_ROWS[Number(b.dataset.pick)];
+          var fb=el.querySelector("#findFeedback");
+          if (!futureMode){
+            fb.className="toast gap";
+            fb.innerHTML='⚠ 오늘 코드로는 이 선택이 대화창에 <b>전달되지 않습니다</b> —'+
+              ' window.top.postMessage가 이 창(별도 BrowserWindow)에서는 자기 자신에게만 갑니다'+
+              '(map-view.js:118, grouphub.js:103 등). 실제로 아무 일도 안 일어납니다.';
+          } else {
+            fb.className="toast future";
+            fb.innerHTML='🔧 예상 미리보기 — IPC 중계가 구현됐다면 아래처럼 대화 맥락에 칩이 붙습니다.';
+            addSelChip(row.title);
+          }
+        });
+      });
+    }
+    focusPopup(key);
+    renderWinPop(); updateCounts();
+  }
+  function closePopup(key){
+    if (!pops[key]) return;
+    pops[key].el.remove();
+    delete pops[key];
+    renderWinPop(); updateCounts();
+  }
+  function closeAllPopups(){ Object.keys(pops).forEach(closePopup); }
+  function focusPopup(key){
+    Object.keys(pops).forEach(function(k){ pops[k].el.classList.toggle("focused", k===key); });
+    if (pops[key]){ pops[key].el.style.zIndex=String(++zTop); deviceFocused=false; $("device").classList.remove("focused"); }
+    renderWinPop();
+  }
+  var deviceFocused=true;
+  function focusDevice(){
+    deviceFocused=true;
+    $("device").classList.add("focused");
+    Object.keys(pops).forEach(function(k){ pops[k].el.classList.remove("focused"); });
+    $("device").style.zIndex=String(++zTop);
+    renderWinPop();
+  }
+  $("device").addEventListener("mousedown", function(ev){
+    if (ev.target.closest(".winpop")||ev.target.closest(".palette-wrap")) return;
+    focusDevice();
+  });
+
+  // ── 끌기(드래그) ─────────────────────────────────────────────────────
+  function bindDrag(win, handle){
+    var sx,sy,ox,oy,dragging=false;
+    handle.addEventListener("mousedown", function(ev){
+      if (ev.target.closest(".x")) return;
+      dragging=true; sx=ev.clientX; sy=ev.clientY;
+      ox=parseInt(win.style.left,10)||0; oy=parseInt(win.style.top,10)||0;
+      ev.preventDefault();
+    });
+    window.addEventListener("mousemove", function(ev){
+      if (!dragging) return;
+      win.style.left=Math.max(0, ox+(ev.clientX-sx))+"px";
+      win.style.top=Math.max(0, oy+(ev.clientY-sy))+"px";
+    });
+    window.addEventListener("mouseup", function(){ dragging=false; });
+  }
+  bindDrag($("device"), $("deviceDrag"));
+
+  // ── 열린 창 목록(🗔) — app.html:150-166·819-851 값 그대로 흉내 ──────────
+  function renderWinPop(){
+    var pop=$("winPop");
+    var rows=[{key:"__main",label:"본 창(대화)",icon:"💬",focused:deviceFocused}];
+    Object.keys(pops).forEach(function(k){ rows.push({key:k,label:pops[k].label,icon:pops[k].icon,focused:pops[k].el.classList.contains("focused")}); });
+    pop.innerHTML='<div class="wp-h">열려 있는 창</div>'+
+      rows.map(function(r){
+        return '<div class="wp-row'+(r.focused?" now":"")+'" data-focus="'+r.key+'">'+
+          '<span>'+r.icon+'</span><span class="nm">'+esc(r.label)+'</span>'+
+          '<span class="tag2">'+(r.focused?"지금 여기":"")+'</span></div>';
+      }).join("");
+    pop.querySelectorAll("[data-focus]").forEach(function(row){
+      row.addEventListener("click", function(){
+        var k=row.dataset.focus;
+        closeWinPop();
+        if (k==="__main") focusDevice(); else focusPopup(k);
+      });
+    });
+    var badge=$("railWinBadge");
+    var n=Object.keys(pops).length;
+    badge.style.display=n?"flex":"none"; badge.textContent=String(n);
+  }
+  function closeWinPop(){ $("winPop").classList.remove("on"); }
+  $("railWin").addEventListener("click", function(ev){
+    ev.stopPropagation();
+    renderWinPop();
+    $("winPop").classList.toggle("on");
+  });
+  document.addEventListener("click", closeWinPop);
+  $("winPop").addEventListener("click", function(ev){ ev.stopPropagation(); });
+
+  function updateCounts(){ $("popCount").textContent=String(Object.keys(pops).length); }
+
+  // ── 팔레트(☰ 전체 메뉴) — nav.js GROUPS 실제 라벨 ────────────────────
+  var PAL_ITEMS=[
+    {key:"assets",label:"⓪ 자산",sub:"자산 고르기 — assets.html"},
+    {key:"find",label:"① 발견·수집",sub:"discover.html"},
+    {key:"triage",label:"② 우선순위",sub:"triage.html"},
+    {key:"fix",label:"③ 조치",sub:"fix.html"},
+    {key:"verify",label:"④ 검증",sub:"verify.html"},
+    {key:"report",label:"⑤ 보고",sub:"reporting.html"},
+    {key:"registry",label:"등록부 · 보안제품",sub:"products.html"},
+    {key:"ai",label:"AI",sub:"aihub.html"},
+    {key:"settings",label:"설정",sub:"settings.html"},
+    {key:"sessions",label:"작업 내역",sub:"sessions.html"}
+  ];
+  function renderPalette(filter){
+    var grid=$("palGrid");
+    grid.innerHTML="";
+    PAL_ITEMS.forEach(function(it){
+      var hit=!filter || (it.label+it.sub).toLowerCase().indexOf(filter.toLowerCase())>=0;
+      var el=document.createElement("div");
+      el.className="pal-item"+(hit?"":" hidden");
+      el.innerHTML='<div class="t">'+esc(it.label)+'</div><div class="s">'+esc(it.sub)+'</div>';
+      el.addEventListener("click", function(){
+        closePalette();
+        if (SCREENS[it.key]) { openPopup(it.key); return; }
+        // 데모에 자리표시자가 없는 항목도 실제 라벨 그대로 창을 띄운다(엉뚱한 이름으로 안 보인다).
+        SCREENS[it.key] = { id: it.key, title: it.label, icon: "🗔", w: 460, h: 300, body: function () {
+          return '<h4>' + esc(it.label) + '</h4><div class="pw-note">이 카드는 정지 데모의 자리표시자입니다 — ' +
+            '실제 구현에서는 ' + esc(it.sub) + ' 화면(파일 그대로)이 이 창 안에 그대로 뜹니다' +
+            '(shell:popout이 이미 그렇게 연다, main.ts:800-850).</div>';
+        } };
+        openPopup(it.key);
+      });
+      grid.appendChild(el);
+    });
+  }
+  function openPalette(){ renderPalette($("palSearch").value); $("paletteWrap").classList.add("on"); $("palSearch").value=""; $("palSearch").focus(); }
+  function closePalette(){ $("paletteWrap").classList.remove("on"); }
+  $("railMenu").addEventListener("click", openPalette);
+  $("railFav").addEventListener("click", openPalette);
+  $("paletteWrap").addEventListener("click", function(ev){ if (ev.target===$("paletteWrap")) closePalette(); });
+  $("palSearch").addEventListener("input", function(){ renderPalette($("palSearch").value); });
+  $("railWork").addEventListener("click", function(){ openPopup("sessions"); });
+
+  // ── 대화 ─────────────────────────────────────────────────────────────
+  function scrollChat(){ var c=$("chatBody"); c.scrollTop=c.scrollHeight; }
+  function appendUser(t){
+    var el=document.createElement("div"); el.className="cs-row instr";
+    el.innerHTML='<span class="ci">🧑</span><div class="cb"><div class="cn">나</div><div class="cm">'+esc(t)+"</div></div>";
+    $("chatBody").appendChild(el); scrollChat();
+  }
+  function appendAi(html){
+    var el=document.createElement("div"); el.className="cs-row";
+    el.innerHTML='<span class="ci">🧭</span><div class="cb"><div class="cn">AI 팀</div><div class="cm">'+html+"</div></div>";
+    $("chatBody").appendChild(el); scrollChat();
+    return el;
+  }
+  function appendSys(t){
+    var el=document.createElement("div"); el.className="cs-row sys";
+    el.innerHTML='<span class="ci">ℹ</span><div class="cb"><div class="cm">'+esc(t)+"</div></div>";
+    $("chatBody").appendChild(el); scrollChat();
+  }
+  function addSelChip(title){
+    var el=document.createElement("div"); el.className="cs-row";
+    el.innerHTML='<span class="ci">📌</span><div class="cb"><div class="cn">선택됨</div>'+
+      '<div class="cm"><span class="cs-sel">'+esc(title.slice(0,40))+'<span class="x">✕</span></span></div></div>';
+    $("chatBody").appendChild(el); scrollChat();
+  }
+  function seedChat(){
+    $("chatBody").innerHTML="";
+    appendSys("대화 홈입니다 — 화면은 왼쪽 레일이나 지시로 부르면 별도 창으로 뜹니다. 이 창은 항상 폭 100%입니다.");
+  }
+  seedChat();
+
+  function scriptedReply(text){
+    appendUser(text);
+    setTimeout(function(){
+      if (/발견|수집/.test(text)){
+        var el=appendAi("발견·수집 화면을 열까요? 최근 심각도 긴급 4건이 있습니다.");
+        var b=document.createElement("button"); b.className="cs-open"; b.textContent="🗔 발견·수집 열기";
+        b.addEventListener("click", function(){ openPopup("find"); });
+        el.querySelector(".cb").appendChild(b);
+      } else if (/정기점검/.test(text)){
+        var el2=appendAi("정기점검을 잡으려면 아래 값을 확인하고 승인해 주세요.");
+        var ap=document.createElement("div"); ap.className="cs-ap";
+        ap.innerHTML=approvalHtml();
+        el2.querySelector(".cb").appendChild(ap);
+        bindApproval(ap);
+      } else if (/긴급/.test(text)){
+        appendAi("지금 긴급 취약점은 4건입니다(데모 값). ①발견·수집에서 KEV 표시된 2건이 우선입니다.");
+      } else {
+        appendAi("정해진 각본에 없는 문장입니다 — 이 데모는 실제 LLM을 부르지 않습니다.");
+      }
+    }, 260);
+  }
+  $("chatSend").addEventListener("click", function(){
+    var v=$("chatInput").value.trim(); if(!v) return;
+    $("chatInput").value="";
+    scriptedReply(v);
+  });
+  $("chatInput").addEventListener("keydown", function(ev){ if(ev.key==="Enter") $("chatSend").click(); });
+  document.querySelectorAll(".cs-chip").forEach(function(b){
+    b.addEventListener("click", function(){ scriptedReply(b.dataset.ask); });
+  });
+
+  // ── 결재판(승인 카드) ────────────────────────────────────────────────
+  function approvalHtml(){
+    return '<div class="cs-aph">🗂 실행 승인 — 정기 점검 예약</div>'+
+      '<div class="cs-apsub">아래 내용대로 실행합니다. 값을 확인·수정한 뒤 승인하세요.</div>'+
+      '<div class="cs-apf"><span class="cs-apk">대상 자산</span><input class="cs-apin" value="web-legacy-02"></div>'+
+      '<div class="cs-apf"><span class="cs-apk">주기</span><input class="cs-apin" value="매주 월 09:00"></div>'+
+      '<div class="cs-apb"><button class="cs-apgo">✓ 승인하고 실행</button><button class="cs-apno">취소</button></div>';
+  }
+  function bindApproval(ap){
+    ap.querySelector(".cs-apgo").addEventListener("click", function(){
+      ap.innerHTML='<div class="cs-apd">✅ 실행 완료(데모) — 정기 점검 예약</div>';
+    });
+    ap.querySelector(".cs-apno").addEventListener("click", function(){
+      ap.innerHTML='<div class="cs-apd">✕ 실행하지 않았습니다 — 정기 점검 예약</div>';
+    });
+  }
+  $("btnApproval").addEventListener("click", function(){
+    var el=appendAi("결재판이 도착했습니다.");
+    var ap=document.createElement("div"); ap.className="cs-ap"; ap.innerHTML=approvalHtml();
+    el.querySelector(".cb").appendChild(ap);
+    bindApproval(ap);
+    if (!deviceFocused){
+      var dv=$("device");
+      dv.classList.add("flash");
+      setTimeout(function(){ dv.classList.remove("flash"); }, 3800);
+      var toast=document.createElement("div"); toast.className="toast future";
+      toast.style.position="fixed"; toast.style.top="14px"; toast.style.right="16px"; toast.style.zIndex="999";
+      toast.style.maxWidth="320px";
+      toast.textContent="🔔 결재판 도착 — 실제로는 작업표시줄 아이콘이 깜빡입니다(Electron flashFrame, 오늘 코드에 없음 — 추가 필요). 본창을 강제로 앞세우지 않습니다.";
+      document.body.appendChild(toast);
+      setTimeout(function(){ toast.remove(); }, 4200);
+    }
+  });
+
+  // ── 시연 바 — 화면 열기 버튼들 ───────────────────────────────────────
+  document.querySelectorAll("[data-open]").forEach(function(b){
+    b.addEventListener("click", function(){ openPopup(b.dataset.open); });
+  });
+  $("btnCloseAll").addEventListener("click", closeAllPopups);
+  $("chkFuture").addEventListener("change", function(){ futureMode=this.checked; });
+
+  // ── 가상 시나리오: 팝업이 막히면 ─────────────────────────────────────
+  $("chkBlocked").addEventListener("change", function(){
+    document.body.classList.toggle("blocked-demo", this.checked);
+    if (this.checked){
+      $("blockedBody").innerHTML='<h4 style="margin-bottom:6px;color:#fff;font-size:12.75px;">① 발견·수집</h4>'+findRowsHtml()+
+        '<div class="pw-note">이 가상 시나리오에서는 "선택" 버튼을 동작시키지 않았습니다 — 이 상태의 목적은'+
+        ' 배치(대화 대신 화면이 전체를 차지)만 보여 주는 것이고, 선택 되먹임 여부는 위 시연 컨트롤의'+
+        ' "선택 되먹임" 체크박스·팝업 창 데모에서 이미 확인할 수 있습니다.</div>';
+    }
+  });
+  $("blkExit").addEventListener("click", function(){ $("chkBlocked").checked=false; document.body.classList.remove("blocked-demo"); });
+  $("blkBack").addEventListener("click", function(){ $("chkBlocked").checked=false; document.body.classList.remove("blocked-demo"); });
+
+  updateCounts(); renderWinPop();
+})();
+</script>
+</body>
+</html>
