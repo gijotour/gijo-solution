@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — ⓪ 자산 시안(추천 1개)</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS 시안 — 「0.자산」 신설 화면 (사장님 지시 2026-08-18, QA 중)
+  파일: mockups/자산_0단계/시안.html — 제품 코드는 읽기만 했고 고치지 않았다.
+  이 파일은 **정지 그림이 아니다** — 목록 고르기·범위 유지(✕ 전까지)·5단계 미리보기 이동이
+  순수 HTML/CSS/JS로 실제 동작한다. 서버 연결은 없다(자산 15건은 전부 예시 데이터, 배너로 표시).
+
+  ■ 사장님 지시 원문(2026-08-18)
+    "발견수집에 자산 목록은 별도의 메뉴에 있었으면 해. 0.자산으로.
+     우리 자산을 선택하면 발견수집부터 우선순위 조치 검증 보고까지 이어지도록"
+    확정: 발견·수집 안의 자산 패널은 뺀다(자산은 0번 한 곳에만) · 고른 자산은 내가 ✕로
+    풀 때까지 유지된다(단계를 옮기거나 화면을 바꿔도 계속 따라다닌다).
+
+  ■ 코드로 확인한 사실(설계 전 조사 — 이 저장소)
+    · server/src/engine/workflow.ts:30 STAGE_SCREENS = {1:discover,2:triage,3:fix,4:verify,5:reporting}
+      가 5단계의 단일 출처. workflowrail.js·console.js·nav.js·workflow.test.ts가 전부 이 표를 받아 쓴다.
+    · server/test/workflow.test.ts:23-35 — nav.js의 `id: "s${no}-"`(no=1..5)만 파싱해 STAGE_SCREENS와
+      대조한다. **s로 시작 안 하는 그룹은 이 시험이 아예 안 본다** — 등록부·AI·설정이 이미 그렇게
+      "절차가 아닌 그룹"으로 존재한다(전례 있음). 이 시안도 `id:"assets0"`로 같은 자리를 쓴다.
+    · client/src/renderer/pages/console.js:984-994 — 화면이 바뀌면 `setSelection(null)`로
+      **선택을 지운다**("옆 화면 항목을 계속 가리키면 「이거」가 거짓말이 된다"). 이 규칙은
+      화면 안에서 고른 낱개 항목(finding 한 줄)에는 옳다. 그런데 사장님 지시는 정반대다 —
+      **자산은 화면이 바뀌어도 유지**돼야 한다. 그래서 둘은 같은 상자에 담을 수 없다(아래 ④).
+    · inventory.html:849-911 — 행을 펴면(아코디언) 이미 `.ad-act` 버튼 3개가 있다:
+      "이 자산 취약점 보기"(`vulnscan.html?host=`)·"AI-BOM 보기"·"명령창으로 접속". **"자산을 골라
+      필터링된 화면으로 간다"는 패턴이 이미 있다** — 이 시안은 그 패턴을 3곳에서 5곳(①~⑤)으로
+      넓히고, 3번 클릭 뒤(행 펴기)가 아니라 **첫 화면**으로 끌어올리는 일이다.
+    · client/src/renderer/pages/triage.html:70 · vulnscan.html:563 확인 — `?host=`는 **vulnscan.html
+      panel 하나만** 읽는다. fix.html·verify.html·reporting.html은 오늘 **어떤 쿼리도 자산으로
+      거르지 않는다**(grep 결과 0건). "이어진다"의 실제 구현비용은 대부분 여기 있다(아래 ⑧).
+    · server/src/engine/approvals.ts — finding_approvals에 assetId 있음(③ 조치 자산별 집계 가능).
+      server/src/engine/hardeningtargets.ts — hardening_targets에는 **assetId가 없다**(④ 검증
+      자산별 집계 **지금 불가능** — 아래 진행현황에서 정직하게 "—"로 비운다).
+
+  ■ 설계 전 조사 — 표준·모범사례(직접 확인)
+    · PatternFly Context Selector 설계지침(patternfly.org, WebFetch 직접 확인):
+      "A context selector takes a set of content and changes it to a different set of content" —
+      **필터와 다르다**(필터는 한 데이터셋을 줄이고, 컨텍스트 선택기는 보여줄 데이터셋 자체를 바꾼다).
+      배치 규칙: "애플리케이션 전체에 영향이면 마스트헤드(상단 전역 바)에 둔다." → 이 시안이
+      「지금 범위」 알약을 화면 최상단·대화창 고정 자리(마스트헤드급)에 두고, 화면 안 목록
+      필터 칩과는 다른 자리·다른 색으로 둔 근거.
+    · Tenable Vulnerability Management "Use the Assets Page"(docs.tenable.com, WebFetch 직접 확인):
+      자산 행에서 드롭다운을 펴면 그 자산의 findings가 나오고, "자산을 선택해 그 취약점의
+      해법을 본다"는 흐름이 표준 패턴. → 대화창 텍스트 질의가 아니라 **표+드릴다운**으로
+      고르게 한 근거(아래 "대안 3" 기각 사유).
+    · Nielsen Norman Group, Progressive Disclosure(직전 시안 vuln-plain-line-extend에서 확인,
+      재사용): "처음엔 가장 중요한 몇 개만 보여주고, 나머지는 요청 시 제공한다." → 고르는 목록
+      줄에는 위험도·미조치·담당만 두고, 5단계 전체 숫자는 **고른 뒤에만** 펼친다(아래 밀도 근거).
+
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ════ 1) 실제 화면 색 토큰 — discover.html·inventory.html :root와 동일(글자 하나 안 다름) ════ */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+button{font-family:inherit;}
+
+/* ════ 2) 레이아웃 — nav.js 실측 232px 사이드바 + 본문 ════ */
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh;}
+.sidebar{background:var(--panel-2);border-right:1px solid var(--border);padding:8px 6px;display:flex;flex-direction:column;gap:2px;}
+.main{padding:16px 22px 60px;max-width:1180px;}
+
+/* 화면 정체성 한 줄 + ⚠경고만(제품 원칙 — 사용법 설명은 이 화면에 없다, 챗봇 ⓘ로) */
+.scr-id{font-size:12.5px;color:var(--muted);margin-bottom:4px;line-height:1.6;}
+.scr-id b{color:var(--text);font-weight:800;}
+.scr-warn{color:#f7c777;}
+.demo-banner{font-size:11.5px;color:var(--muted-2);background:rgba(255,255,255,.03);border:1px dashed var(--border-strong);
+  border-radius:8px;padding:5px 10px;margin-bottom:14px;}
+
+/* ════ 3) 사이드바 목업 — nav.js 실측값 그대로(gn-item 30px·gn-g 헤더·단선 아이콘) ════ */
+.gn-g{display:flex;align-items:center;gap:6px;height:24px;font-size:11px;font-weight:700;color:var(--muted-2);
+  letter-spacing:.6px;margin:9px 6px 1px;padding:0 5px;}
+.gn-g .gn-line{flex:1;height:1px;background:var(--border);min-width:8px;}
+.gn-g .gn-num{flex:0 0 auto;width:14px;height:14px;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;border:1px solid var(--border-strong);border-radius:3px;opacity:.8;}
+.gn-item{display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:6px;font-size:12.5px;
+  font-weight:500;color:var(--muted);white-space:nowrap;position:relative;}
+.gn-item .gn-ic{flex:0 0 auto;width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.62;}
+.gn-item.on{color:#fff;background:rgba(255,255,255,.055);font-weight:600;}
+.gn-item.on::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--blue-light);}
+.gn-item.on .gn-ic{opacity:1;color:var(--blue-light);}
+.gn-item.clickable{cursor:pointer;}
+.gn-item.clickable:hover{color:#fff;background:rgba(255,255,255,.04);}
+.gn-item.inert{opacity:.5;cursor:default;}
+/* 11px 미만 금지(uireadability 게이트) — 처음부터 11px로 못박는다(줄여 놓고 나중에 덮지 않는다) */
+.gn-new{margin-left:auto;font-size:11px;font-weight:800;background:rgba(59,130,246,.22);color:var(--blue-light);
+  border-radius:20px;padding:0 5px;flex:0 0 auto;}
+
+/* ════ 4) 스코프 알약(마스트헤드급) — 콘솔이 아니라 **이 화면 자체 상단**에도 확인용으로 보인다 ════ */
+.scope-bar{display:none;align-items:center;gap:10px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.4);
+  border-radius:12px;padding:10px 16px;margin-bottom:14px;}
+.scope-bar.on{display:flex;}
+.scope-bar .ico{font-size:16px;}
+.scope-bar .body{flex:1;min-width:0;}
+.scope-bar .t{font-size:13.5px;font-weight:800;color:#fff;}
+.scope-bar .s{font-size:11.75px;color:var(--muted);margin-top:1px;}
+.scope-bar .x{flex:0 0 auto;background:transparent;border:1px solid var(--border-strong);color:var(--muted);
+  border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;}
+.scope-bar .x:hover{border-color:#f5928a;color:#f5928a;}
+
+/* ════ 5) 고르는 목록 — 공용 목록 양식(.gj-*) 계열, nav.js 목록양식CSS()에서 값 가져옴 ════ */
+.pk-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;}
+.pk-search{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border-strong);
+  border-radius:8px;padding:7px 12px;min-width:220px;}
+.pk-search input{background:transparent;border:none;outline:none;color:var(--text);font-size:12.5px;width:100%;}
+.pk-search input::placeholder{color:var(--muted-2);}
+.pk-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:6px 13px;
+  border-radius:20px;font-size:11.75px;font-weight:700;cursor:pointer;}
+.pk-chip.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
+.pk-count{margin-left:auto;font-size:12px;color:var(--muted);}
+.pk-count b{color:#fff;}
+
+.pk-list{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:6px;}
+/* 밀도 근거: padding 8px 14px + line-height 17px(고정) + border 1px = 행 34px. 본문 아래 ⑦ 참조. */
+.pk-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.045);
+  font-size:12.5px;line-height:17px;cursor:pointer;}
+.pk-row:last-child{border-bottom:none;}
+.pk-row:hover{background:rgba(59,130,246,.05);}
+.pk-row.picked{background:rgba(59,130,246,.13);}
+.pk-name{flex:1 1 260px;min-width:0;display:flex;align-items:baseline;gap:7px;overflow:hidden;}
+.pk-name b{color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pk-type{font-size:11.25px;color:var(--muted-2);white-space:nowrap;flex:0 0 auto;}
+.pk-risk{flex:0 0 auto;font-size:11.75px;font-weight:800;display:flex;align-items:center;gap:5px;width:96px;}
+.pk-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+.r-high .pk-dot{background:var(--red);} .r-high{color:#f5928a;}
+.r-mid .pk-dot{background:var(--amber);} .r-mid{color:#f7c777;}
+.r-low .pk-dot{background:var(--teal);} .r-low{color:#6fdcb5;}
+.r-none .pk-dot{background:var(--muted-2);} .r-none{color:var(--muted-2);}
+.pk-kev{font-size:11px;font-weight:800;color:#ff8a80;background:rgba(226,72,61,.18);border-radius:5px;padding:0 5px;}
+.pk-open{flex:0 0 auto;font-size:11.75px;color:var(--muted);width:78px;}
+.pk-open b{color:var(--text);}
+.pk-owner{flex:0 0 auto;font-size:11.75px;color:var(--muted);width:112px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pk-owner.gap{color:#f5928a;font-weight:700;}
+.pk-act{flex:0 0 auto;font-size:11.75px;font-weight:800;color:var(--blue-light);width:66px;text-align:right;}
+.pk-row.picked .pk-act{color:var(--teal);}
+.pk-empty{padding:24px;text-align:center;color:var(--muted-2);font-size:12.5px;}
+
+/* ════ 6) 진행 현황(고른 뒤에만) — 5단계 카드, ④⑤는 정직하게 "—" ════ */
+.prog-wrap{display:none;margin-bottom:16px;}
+.prog-wrap.on{display:block;}
+.prog-h{font-size:12.5px;font-weight:800;color:#fff;margin-bottom:8px;}
+.prog-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+.prog-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 11px;cursor:pointer;}
+.prog-card:hover{border-color:rgba(59,130,246,.5);}
+.prog-card .no{width:15px;height:15px;border-radius:4px;background:rgba(59,130,246,.2);color:var(--blue-light);
+  font-size:11px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;margin-right:5px;}
+.prog-card .lb{font-size:12.25px;font-weight:800;color:#fff;}
+.prog-card .val{font-size:17px;font-weight:900;color:var(--blue-light);margin-top:5px;}
+.prog-card .val.warn{color:#f5928a;}
+.prog-card .val.gap{color:var(--muted-2);font-size:13px;font-weight:700;}
+.prog-card .sub{font-size:11.25px;color:var(--muted-2);margin-top:2px;line-height:1.4;}
+.prog-card .go{margin-top:7px;font-size:11.25px;font-weight:800;color:var(--blue-light);}
+.prog-card .go::after{content:' →';}
+
+/* ════ 7) 5단계 미리보기 — 실제 화면(triage/fix/verify/reporting)이 열리는 모습을 흉내 ════ */
+.prev-wrap{display:none;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;margin-bottom:16px;}
+.prev-wrap.on{display:block;}
+.prev-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.prev-title{font-size:13.5px;font-weight:800;color:#fff;}
+.prev-tag{font-size:11.5px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,.14);
+  border:1px solid rgba(59,130,246,.4);border-radius:20px;padding:2px 10px;}
+.prev-tag.all{color:var(--muted);background:var(--panel-2);border-color:var(--border-strong);}
+.prev-close{margin-left:auto;font-size:11.75px;color:var(--muted);cursor:pointer;}
+.prev-close:hover{color:#fff;}
+.prev-note{font-size:11.75px;color:var(--muted-2);margin-bottom:9px;line-height:1.6;}
+.prev-row{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;font-size:12.25px;cursor:pointer;}
+.prev-row:hover{background:rgba(255,255,255,.04);}
+.prev-row.picked{background:rgba(240,160,32,.12);}
+.prev-sev{font-size:11px;font-weight:800;padding:1px 6px;border-radius:5px;flex:0 0 auto;width:34px;text-align:center;}
+.sev-high{background:rgba(226,72,61,.16);color:#f5928a;}
+.sev-mid{background:rgba(240,160,32,.14);color:#f7c777;}
+.prev-body{flex:1;min-width:0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.prev-empty{color:var(--muted-2);font-size:12px;padding:8px 4px;}
+.prev-gap{color:var(--muted-2);font-size:12.25px;padding:8px 4px;line-height:1.6;background:var(--panel-2);
+  border-radius:8px;border:1px dashed var(--border-strong);padding:10px 12px;}
+
+/* ════ 8) 대화창 모사(마스트헤드급 자리) — console.js 실제 클래스값을 그대로 옮김 ════ */
+.mock-console{position:fixed;right:18px;bottom:18px;width:302px;background:var(--panel-2);border:1px solid var(--border-strong);
+  border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.5);overflow:hidden;z-index:50;}
+.mc-head{font-size:11.5px;font-weight:800;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);
+  background:var(--panel);}
+.mc-body{padding:9px 10px;display:flex;flex-direction:column;gap:8px;min-height:52px;}
+/* 🗂 지금 범위 — 신설. 파란 계열(마스트헤드 톤) — 🎯 지금 다루는 것(주황)과 색부터 다르게 해
+   "같은 것이 아니다"를 한눈에 표시한다(PatternFly: context selector ≠ item selection). */
+.cs-scope{display:none;border:1px solid rgba(59,130,246,.45);background:rgba(59,130,246,.09);border-radius:9px;padding:7px 9px;}
+.cs-scope.on{display:block;}
+.cs-scope .h{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:#8fb8ff;margin-bottom:3px;}
+.cs-scope .h .x{margin-left:auto;color:var(--muted-2);cursor:pointer;font-weight:400;}
+.cs-scope .h .x:hover{color:#f5928a;}
+.cs-scope .t{font-size:12.5px;font-weight:700;color:var(--text);}
+.cs-scope .m{font-size:11.25px;color:var(--muted);margin-top:2px;}
+/* 🎯 지금 다루는 것 — console.js:75-85 값 그대로(주황) — 화면이 바뀌면 여기만 지워진다 */
+.cs-state{display:none;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:7px 9px;}
+.cs-state.on{display:block;}
+.cs-state .h{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:#ffd9a8;margin-bottom:4px;}
+.cs-state .h .x{margin-left:auto;color:var(--muted-2);cursor:pointer;font-weight:400;}
+.cs-state .h .x:hover{color:#f5928a;}
+.cs-state .t{font-size:12.5px;font-weight:700;color:var(--text);line-height:1.45;}
+.cs-state .m{font-size:11.25px;color:var(--muted);margin-top:3px;}
+.mc-empty{font-size:11.5px;color:var(--muted-2);}
+.mc-hint{font-size:11px;color:var(--muted-2);padding:6px 10px 9px;border-top:1px solid var(--border);line-height:1.5;}
+
+/* ════ 9) 발견·수집 개편 전/후 — discover.html 실제 .gh-* CSS 그대로 옮김 ════ */
+.exp{margin-top:34px;border-top:1px solid var(--border-strong);padding-top:22px;}
+.exp h2{font-size:16px;font-weight:800;color:#fff;margin:26px 0 10px;}
+.exp h2:first-child{margin-top:0;}
+.exp h3{font-size:13px;font-weight:800;color:#fff;margin:14px 0 6px;}
+.exp p,.exp li{font-size:12.5px;color:var(--muted);line-height:1.75;}
+.exp ul{padding-left:18px;margin:4px 0 10px;}
+.exp .box{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:8px 0 14px;}
+.exp table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0 14px;}
+.exp th{text-align:left;padding:6px 9px;background:var(--panel-2);color:var(--muted-2);font-weight:800;
+  border-bottom:1px solid var(--border-strong);font-size:11.5px;}
+.exp td{padding:6px 9px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;}
+.ok{color:var(--teal);font-weight:800;} .warn2{color:#f7c777;font-weight:800;}
+.gh-tabs{display:flex;gap:6px;margin-bottom:10px;}
+.gh-tab{font-size:11.75px;font-weight:700;color:var(--muted);background:var(--panel-2);border:1px solid var(--border-strong);
+  border-radius:20px;padding:5px 13px;cursor:pointer;}
+.gh-tab.on{color:var(--blue-light);border-color:var(--blue);background:rgba(59,130,246,.12);}
+.gh-strip4{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
+.gh-strip2{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}
+.gh-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 12px;position:relative;}
+.gh-card.removed{opacity:.4;}
+.gh-card.removed::after{content:'제거됨';position:absolute;top:8px;right:10px;font-size:11px;font-weight:800;color:#f5928a;}
+.gh-head{font-size:11.75px;font-weight:800;color:var(--muted);margin-bottom:6px;}
+.gh-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;}
+.gh-row b{color:var(--text);}
+.gh-foot{font-size:11.25px;color:var(--muted-2);margin-top:6px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ══ 사이드바 목업 — ⓪ 자산이 절차 5단계 바로 위, id는 s로 시작하지 않는 "assets0"(전례: 등록부·AI) ══ -->
+  <aside class="sidebar" id="sbNav"></aside>
+
+  <div class="main">
+    <div class="scr-id">
+      <b>자산</b> — 다룰 자산을 고르면 <b>발견·수집→우선순위→조치→검증→보고</b>가 이 자산 기준으로 이어집니다.
+      <span class="scr-warn">⚠ 이 화면에서 자산 정보를 고치지 않습니다</span> — 등록·수정·CSV는 <u title="전체 관리(inventory.html) — 이 목업에서는 이동하지 않습니다">전체 관리 열기</u>에서.
+    </div>
+    <div class="demo-banner">🧪 이 시안은 실제로 눌립니다. 자산 15건은 전부 예시 데이터입니다 — 서버에 연결되어 있지 않습니다.</div>
+
+    <!-- 스코프 알약(화면 자체 상단본) -->
+    <div class="scope-bar" id="scopeBar">
+      <span class="ico">🗂</span>
+      <div class="body">
+        <div class="t" id="scopeBarTitle">—</div>
+        <div class="s" id="scopeBarSub">—</div>
+      </div>
+      <button class="x" id="scopeBarClear">✕ 선택 해제</button>
+    </div>
+
+    <!-- 고르는 도구: 검색·필터·정렬(제품 원칙 — 「고르는 것」이라 남아도 된다, 대화창 지시가 아니다) -->
+    <div class="pk-toolbar">
+      <div class="pk-search"><span style="color:var(--muted-2)">⌕</span>
+        <input id="pkSearch" placeholder="자산명 · 담당부서로 찾기" aria-label="자산명, 담당부서로 찾기"></div>
+      <span class="pk-chip on" data-f="all">전체</span>
+      <span class="pk-chip" data-f="high">고위험만</span>
+      <span class="pk-chip" data-f="kev">🔴 KEV만</span>
+      <span class="pk-chip" data-f="gap">담당부서 없음</span>
+      <span class="pk-chip" data-f="unassigned">미배정 있음</span>
+      <span class="pk-count"><b id="pkCount">15</b>건 · 위험도 높은 순(기존 자산목록과 같은 기준)</span>
+    </div>
+
+    <div class="pk-list" id="pkList"></div>
+
+    <!-- 안 고르고 바로 가기 — 0번을 안 거쳐도 절차는 막히지 않는다 -->
+    <div style="font-size:11.75px;color:var(--muted-2);margin-bottom:18px;">
+      자산을 고르지 않아도 됩니다 — <span style="color:var(--blue-light);cursor:pointer;font-weight:700" id="skipPick">선택 없이 「① 발견·수집」 열어보기 →</span>
+      (전체 보기로 열립니다. 필터가 없을 뿐 막히지 않습니다.)
+    </div>
+
+    <!-- 진행 현황(고른 뒤) -->
+    <div class="prog-wrap" id="progWrap">
+      <div class="prog-h">🧭 <span id="progAssetName">-</span> — 5단계 진행 현황</div>
+      <div class="prog-grid" id="progGrid"></div>
+    </div>
+
+    <!-- 5단계 미리보기 -->
+    <div class="prev-wrap" id="prevWrap">
+      <div class="prev-top">
+        <span class="prev-title" id="prevTitle">-</span>
+        <span class="prev-tag" id="prevTag">-</span>
+        <span class="prev-close" id="prevClose">닫기 ✕</span>
+      </div>
+      <div class="prev-note" id="prevNote"></div>
+      <div id="prevBody"></div>
+    </div>
+
+    <!-- ════════════════ 설명 4종 ════════════════ -->
+    <div class="exp">
+      <h2>① 왜 이 안인지 — 다른 길을 왜 안 골랐나</h2>
+      <table>
+        <tr><th style="width:230px">검토한 대안</th><th>왜 안 골랐나(한 줄)</th></tr>
+        <tr><td>자산을 사이드바 <b>기반</b> 구역(등록부 옆)에 두기</td>
+          <td>기반 구역은 nav.js 주석대로 "절차가 아니라 참조하는 대장"이다. 사장님 지시는 자산이 <b>절차의 입구</b>여야 한다는 것 — 대장 칸에 두면 "여기서 시작해 흘러간다"는 방향이 안 생긴다. 그래서 절차 그룹 <b>맨 앞</b>에 두되, id는 등록부처럼 비-절차로 남긴다(서버 감시 시험이 그 자리를 안 본다 — 위 조사 참조).</td></tr>
+        <tr><td>발견·수집에 그대로 두고 이름만 바꾸기</td>
+          <td>사장님이 "별도의 메뉴"를 명시했다. 지금도 discover 허브 안 4판 중 1판(🖥 자산)으로 있지만 존재감이 약해 곁다리 취급됐다 — 같은 화면 안에 있으면 "고르기"와 "발견 결과 보기"가 또 섞인다.</td></tr>
+        <tr><td>전용 화면 없이 대화창에서만 고르기</td>
+          <td>제품 원칙 "메뉴는 한눈에 파악하고 고르는 곳"과 정면으로 어긋난다. 15개 자산을 위험도·미조치 건수로 비교하며 고르는 일은 표/목록이 필요하다 — Tenable Assets 페이지도 표+드릴다운이지 챗봇 질의가 아니다(위 조사).</td></tr>
+        <tr><td>절차 띠(workflowrail)를 6칸으로 늘려 ⓪을 넣기</td>
+          <td>자산 수는 이미 ①발견의 count다(workflow.ts:125, <code>assets.length</code>) — 6번째 칸을 또 만들면 "같은 숫자를 두 자리가 말한다"가 된다. 자산 선택은 <b>단계가 아니라 축이 다르다</b>(언제 vs 무엇을) — 그래서 카운트가 있는 단계 대신 콘솔의 지속 알약(아래 ④)으로 처리한다.</td></tr>
+        <tr><td>inventory.html 자체를 고치기(재사용)</td>
+          <td>1,837줄짜리 이미 무거운 CRUD 화면(CSV·컬럼 드로어·지도 보기·일괄삭제)이다. "고르기"와 "관리하기"는 다른 일이라 사장님도 별도 메뉴를 요청했다 — 대신 <b>같은 데이터(listAssets·assetHubDetail)를 새 얇은 화면(가칭 assets.html)에서 다시 그리고</b>, inventory.html은 CRUD 전용으로 그대로 둔 채 "전체 관리 열기" 버튼으로만 연결한다(아래 ⑧).</td></tr>
+      </table>
+
+      <h2>② 무엇을 포기했는지</h2>
+      <ul>
+        <li><b>절차 띠 6칸화</b> — 위 표 4번째 사유로 포기. ⓪ 화면엔 절차 띠를 아예 안 그린다(오늘 products.html·aihub.html이 이미 그렇듯 <code>stageOfScreen()</code>이 null인 비-절차 화면으로 둔다).</li>
+        <li><b>④검증·⑤보고의 자산별 실숫자</b> — hardening_targets에 assetId가 없고, 보고서는 폴더 단위로만 집계된다(자산 태깅 없음). 지어내지 않고 진행 현황 카드에서 <b>"—"로 비운다</b>(정직 원칙). 아래에서 직접 눌러 확인할 수 있다.</li>
+        <li><b>자산 고치는 조작 전부</b> — 등록·수정·삭제·카테고리 지정·SBOM 생성·CSV. 전부 inventory.html에 남긴다. 0번은 고르기만 한다(결재판 원칙).</li>
+        <li><b>사용법 설명</b> — 화면엔 정체성 한 줄과 ⚠경고만 남겼다. "왜 이 자산이 1위인가" 같은 설명은 챗봇(ⓘ)의 몫으로 남겨 뒀다(이 목업엔 ⓘ를 안 달았다 — 실구현 때 screenguide 카드 하나 추가).</li>
+      </ul>
+
+      <h2>③ 밀도 숫자</h2>
+      <div class="box">
+        <p><b>줄 높이</b> — 이 목업 목록(.pk-row): padding 8px+8px + line-height 17px(고정) + 테두리 1px = <b>34px/행</b>(코드에 명시된 값 그대로, 어림 아님).<br>
+        기존 inventory.html 자산 표(td): padding 13px+13px(코드 그대로, inventory.html:125) + 줄높이는 CSS 미지정이라 브라우저 기본값(약 13px 폰트×1.15≈15px, <u>이 부분만 어림</u>) + 테두리 1px ≈ <b>42px/행</b>.</p>
+        <p><b>한 화면에 보이는 자산 수</b> — 같은 510px 안에서 계산하면 inventory 표는 510÷42≈<b>12건</b>, 이 시안은 510÷34=<b>15건</b> — <b>기존 대비 +25%</b>. 실제로 이 시안은 예시 15건 전부가 스크롤 없이 한 화면에 보인다(직접 확인 가능).</p>
+        <p><b>왜 더 조여도 되나</b> — NN/g Progressive Disclosure(위 조사): 목록 줄엔 "고르는 데 필요한 최소"(이름·위험도·미조치·담당)만 두고, 5단계 전체 숫자·미리보기는 <b>고른 뒤에만</b> 펼친다. inventory 표는 반대로 9개 컬럼까지 늘릴 수 있는 <b>관리용</b> 밀도라 더 낮다 — 용도가 다르므로 밀도가 다른 게 맞다.</p>
+      </div>
+
+      <h2>④ 제품 원칙 자가점검</h2>
+      <table>
+        <tr><th style="width:250px">원칙</th><th>판정</th></tr>
+        <tr><td>메뉴는 고르는 곳, 입력은 대화창</td><td><span class="ok">✅</span> 입력칸 없음. 검색·필터·정렬만 있고(고르는 도구), 지시 텍스트를 받는 칸이 없다.</td></tr>
+        <tr><td>쓰기는 결재판을 거친다</td><td><span class="ok">✅</span> 이 화면엔 자산을 고치는 조작이 하나도 없다(고르기만). 수정·삭제·SBOM 생성은 전체 관리(inventory.html)에 남겨 뒀다.</td></tr>
+        <tr><td>정직 — 없으면 없다고</td><td><span class="ok">✅</span> ④검증·⑤보고는 실제로 자산별 데이터가 없어 "—"로 비웠다(지어내지 않음). 단 15개 자산 자체와 ①②③ 숫자는 이 목업의 예시 데이터다(배너로 표시).</td></tr>
+        <tr><td>다크 팔레트 · 순수 HTML/CSS/JS · gijo-ui 톤</td><td><span class="ok">✅</span> :root 토큰은 discover.html·inventory.html에서 그대로 복사. 외부 CDN·웹폰트·원격 이미지 0건, 더블클릭으로 열림.</td></tr>
+        <tr><td>11px 미만 글자 금지</td><td><span class="ok">✅</span> 이 파일의 최소 폰트는 11px(사이드바 <code>.gn-new</code> 배지) 하나뿐이고 나머지는 11.25px 이상 — uireadability 게이트 기준을 넘지 않는다.</td></tr>
+      </table>
+
+      <h2>⑤ 서버·클라가 바뀌어야 하는 것(표시만 — 구현은 win)</h2>
+      <div class="box">
+        <p><b>건드리지 않는 것(권장)</b></p>
+        <ul>
+          <li><code>server/src/engine/workflow.ts</code> — STAGE_SCREENS는 1~5 그대로. ⓪은 "단계"가 아니라 "범위 축"이라 카운트 의미가 겹친다(위 ① 4번째 사유).</li>
+          <li><code>workflowrail.js</code>·<code>workflow.test.ts</code> — 무변경. 0번 화면은 <code>stageOfScreen()</code>이 null을 주는 비-절차 화면으로 둔다(오늘 products.html 등과 같은 취급).</li>
+        </ul>
+        <p><b>건드려야 하는 것</b></p>
+        <ul>
+          <li><code>nav.js</code> GROUPS — <code>s1-find</code> 앞에 <code>{id:"assets0", label:"⓪ 자산", items:[{page:"assets.html"(가칭), label:"자산"}]}</code> 추가. ⚠ id를 <code>"s0-…"</code>로 짓지 말 것 — workflow.test.ts는 1~5만 보므로 안 걸리는 게 의도지만, <code>s</code>로 시작하면 다음 사람이 "왜 시험이 이걸 안 잡지"로 헤맨다.</li>
+          <li><code>nav.js</code> TAB_REDIRECT — <code>"inventory.html": "discover.html?panel=assets"</code>(227-228행)를 <code>"assets.html"</code>로 변경. 안 바꾸면 옛 링크가 사라진 자산판으로 돌아간다.</li>
+          <li><code>grouppanels.js</code> discover 배열 — <code>id:"assets"</code> 판 제거(사장님 확정사항). 이 시안 지시문은 "관제·위협 둘만 남는다"로 못박았으므로 <code>id:"posture"</code>(보안 태세)도 함께 빠진다 — win이 사장님과 한 번 더 확인 권장(문서상 표현이 좀 애매했음, 이 시안은 지시문을 문자 그대로 따름).</li>
+          <li><b>새 화면 assets.html(가칭)</b> — 이 시안의 고르기 목록 + 진행현황을 실제로 그린다. 데이터는 새 API가 필요 없다 — 기존 <code>listAssets()</code>·<code>assetHubDetail()</code>로 충분(①②는 자산의 findings에서, ③은 finding_approvals를 assetId로 묶는 새 집계 함수 하나만 필요).</li>
+          <li><b>지속 범위(스코프) 메커니즘 신설</b> — <code>gijo:select</code>(기존, 화면 바뀌면 지워짐)와 <b>다른 메시지 타입</b> <code>gijo:scope</code>를 새로 만든다. app.html이 받아 localStorage(<code>gijo:scope:asset</code>)에 저장 + console.js에 새 상자(.cs-scope, 이 시안의 파란 알약)로 렌더한다. console.js:994의 <code>setSelection(null)</code>(화면 전환 시 지우기)은 <b>손대지 않는다</b> — 그 줄은 🎯 아이템에만 해당하고 🗂 범위는 별도 변수라 안 지워진다.</li>
+          <li><b>가장 큰 실작업</b> — triage.html·fix.html·verify.html·reporting.html(과 안의 panel들)이 오늘 <b>자산으로 거르는 코드가 0건</b>이다(vulnscan.html의 <code>?host=</code> 하나만 예외, 그것도 triage 허브를 통해선 안 먹는다). 각 화면이 로드 시 <code>gijo:scope:asset</code>을 읽어 목록을 선(先)필터하고 "🗂 범위: OO자산(전체 보기)" 칩을 얹는 작업이 필요 — 화면 4~5곳 × 필터 로직 1개씩.</li>
+          <li><code>hardening_targets</code> 테이블에 assetId 없음 — ④검증의 자산별 숫자를 나중에 채우려면 스키마 추가가 필요(이번 범위 아님, 기록만 남김).</li>
+        </ul>
+      </div>
+
+      <h2>⑥ 발견·수집에서 자산을 뺀 뒤 모습(참고 — 직접 눌러 비교)</h2>
+      <div class="gh-tabs">
+        <span class="gh-tab on" data-t="before">지금(4판)</span>
+        <span class="gh-tab" data-t="after">개편 후(2판)</span>
+      </div>
+      <div id="ghDemo"></div>
+      <p style="margin-top:8px">개편 후엔 판 폭이 1/4→1/2로 넓어진다 — 남은 두 판(관제·위협)에 더 많은 정보를 담을 여유가 생긴다(부수 효과, 이번 범위는 아님).</p>
+    </div>
+  </div>
+</div>
+
+<!-- 대화창 모사 — 실제로는 셸 오른쪽 도킹 패널(console.js) -->
+<div class="mock-console">
+  <div class="mc-head">💬 대화창(모사) — 실제 제품에선 화면 오른쪽 도킹 패널입니다</div>
+  <div class="mc-body">
+    <div class="cs-scope" id="csScope">
+      <div class="h">🗂 지금 범위<span class="x" id="csScopeX">✕ 풀기</span></div>
+      <div class="t" id="csScopeT">-</div>
+      <div class="m" id="csScopeM">단계를 옮기거나 화면을 바꿔도 유지됩니다</div>
+    </div>
+    <div class="cs-state" id="csState">
+      <div class="h">🎯 지금 다루는 것<span class="x" id="csStateX">✕ 풀기</span></div>
+      <div class="t" id="csStateT">-</div>
+      <div class="m" id="csStateM">-</div>
+    </div>
+    <div class="mc-empty" id="mcEmpty">자산을 고르면 여기에 🗂 범위 알약이 뜨고, 미리보기에서 항목 하나를 누르면 🎯 상자가 <u>따로</u> 뜹니다.</div>
+  </div>
+  <div class="mc-hint">🗂 범위(파랑)는 ✕까지 유지 · 🎯 아이템(주황)은 화면이 바뀌면 자동으로 지워집니다(기존 규칙 그대로) — 이 둘은 <b>다른 상자</b>입니다.</div>
+</div>
+
+<script>
+"use strict";
+/* ════════════════════════ 데이터(예시 15건) ════════════════════════ */
+var ASSETS = [
+  {id:"pay-api-01", name:"결제-API-01", type:"server", typeLabel:"서버", owner:"결제개발팀", risk:"high", kev:2, findings:14, fixProg:3, fixUnassigned:2, maintTotal:1, maintOverdue:0},
+  {id:"shop-front-01", name:"온라인쇼핑몰-프론트", type:"server", typeLabel:"서버", owner:"커머스개발팀", risk:"high", kev:1, findings:11, fixProg:4, fixUnassigned:1, maintTotal:0, maintOverdue:0},
+  {id:"cust-db-01", name:"고객DB-마스터", type:"server", typeLabel:"서버", owner:"데이터베이스팀", risk:"high", kev:0, findings:9, fixProg:2, fixUnassigned:4, maintTotal:0, maintOverdue:0},
+  {id:"mes-plc-01", name:"물류-MES-PLC", type:"endpoint", typeLabel:"단말/제어", owner:"스마트팩토리팀", risk:"high", kev:0, findings:7, fixProg:0, fixUnassigned:3, maintTotal:1, maintOverdue:1},
+  {id:"vpn-gw-01", name:"사내 VPN 게이트웨이", type:"network", typeLabel:"네트워크 장비", owner:"네트워크팀", risk:"high", kev:1, findings:6, fixProg:1, fixUnassigned:0, maintTotal:2, maintOverdue:1},
+  {id:"acct-was-01", name:"회계시스템-WAS", type:"server", typeLabel:"서버", owner:"", risk:"high", kev:0, findings:5, fixProg:0, fixUnassigned:5, maintTotal:0, maintOverdue:0},
+  {id:"hr-was-01", name:"인사포털-WAS", type:"server", typeLabel:"서버", owner:"개발2팀", risk:"mid", kev:0, findings:5, fixProg:1, fixUnassigned:1, maintTotal:0, maintOverdue:0},
+  {id:"repo-rd-01", name:"R&D-깃허브-저장소", type:"repo", typeLabel:"코드 저장소", owner:"연구소", risk:"mid", kev:0, findings:4, fixProg:1, fixUnassigned:0, maintTotal:0, maintOverdue:0},
+  {id:"llm-svc-01", name:"챗봇-LLM-서비스", type:"llm-service", typeLabel:"AI 서비스", owner:"AI플랫폼팀", risk:"mid", kev:0, findings:3, fixProg:0, fixUnassigned:0, maintTotal:0, maintOverdue:0},
+  {id:"nas-backup-01", name:"백업스토리지-NAS", type:"infra-host", typeLabel:"인프라 호스트", owner:"인프라운영팀", risk:"mid", kev:0, findings:3, fixProg:0, fixUnassigned:0, maintTotal:2, maintOverdue:2},
+  {id:"iot-door-01", name:"IoT-출입통제-게이트웨이", type:"endpoint", typeLabel:"단말", owner:"시설관리팀", risk:"mid", kev:0, findings:3, fixProg:1, fixUnassigned:0, maintTotal:1, maintOverdue:0},
+  {id:"mkt-cms-01", name:"마케팅-CMS", type:"server", typeLabel:"서버", owner:"마케팅팀", risk:"mid", kev:0, findings:2, fixProg:0, fixUnassigned:1, maintTotal:0, maintOverdue:0},
+  {id:"fw-busan-01", name:"지사 방화벽(부산)", type:"network", typeLabel:"네트워크 장비", owner:"네트워크팀", risk:"low", kev:0, findings:1, fixProg:0, fixUnassigned:0, maintTotal:1, maintOverdue:0},
+  {id:"exec-mobile-01", name:"임원용 모바일단말", type:"endpoint", typeLabel:"단말", owner:"비서실", risk:"low", kev:0, findings:1, fixProg:0, fixUnassigned:0, maintTotal:0, maintOverdue:0},
+  {id:"laptop-std-01", name:"임직원 노트북 표준이미지", type:"endpoint", typeLabel:"단말", owner:"IT지원팀", risk:"none", kev:0, findings:0, fixProg:0, fixUnassigned:0, maintTotal:0, maintOverdue:0},
+];
+var RISK_RANK = {high:3, mid:2, low:1, none:0};
+var RISK_LABEL = {high:"높음", mid:"중간", low:"낮음", none:"양호"};
+ASSETS.sort(function(a,b){ return RISK_RANK[b.risk]-RISK_RANK[a.risk] || b.kev-a.kev || b.findings-a.findings; });
+
+var FINDING_POOL = [
+  {t:"OpenSSL 취약 버전(다중 CVE)", s:"high"}, {t:"만료된 TLS 인증서", s:"mid"},
+  {t:"기본 관리자 비밀번호 사용", s:"high"}, {t:"SQL Injection 가능 파라미터", s:"high"},
+  {t:"불필요한 포트 개방(23/tcp Telnet)", s:"mid"}, {t:"권한 상승 가능 설정(sudo NOPASSWD)", s:"high"},
+  {t:"로그에 개인정보 평문 저장", s:"mid"}, {t:"Apache 취약 버전(RCE 가능)", s:"high"},
+];
+
+var esc = function(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+
+/* ════════════════════════ 상태 ════════════════════════ */
+var state = { pickedId: null, filter: "all", q: "", stage: null };
+
+/* ════════════════════════ 사이드바 ════════════════════════ */
+var ICON = {
+  box: '<rect x="2.5" y="5" width="11" height="8"/><path d="M2.5 5 8 2l5.5 3"/><path d="M8 8v5"/>',
+  search: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>',
+  target: '<circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="2.4"/>',
+  check: '<path d="M2.5 8.4 6 11.9l7.5-7.8"/>',
+  shield: '<path d="M8 1.8 13.6 4v4c0 3.4-2.4 5.4-5.6 6.2C4.8 13.4 2.4 11.4 2.4 8V4z"/><path d="M5.8 7.9 7.4 9.5l3-3.2"/>',
+  chart: '<path d="M2.4 13.4h11.2"/><path d="M4.6 13.4V8M8 13.4V3.8M11.4 13.4V6.4"/>',
+  drawer: '<rect x="2.2" y="3.4" width="11.6" height="2.8"/><path d="M3.4 6.2v6.4h9.2V6.2M6.4 8.9h3.2"/>',
+  chip: '<rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><path d="M6.6 2.2v2.4M9.4 2.2v2.4M6.6 11.4v2.4M9.4 11.4v2.4M2.2 6.6h2.4M2.2 9.4h2.4M11.4 6.6h2.4M11.4 9.4h2.4"/>',
+  slider: '<path d="M2.4 4.6h11.2M2.4 8h11.2M2.4 11.4h11.2"/><circle cx="5.6" cy="4.6" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="6.8" cy="11.4" r="1.5"/>',
+};
+function svgIcon(name){ return '<svg class="gn-ic" viewBox="0 0 16 16" aria-hidden="true">'+(ICON[name]||"")+"</svg>"; }
+function groupHead(no, label){
+  return '<div class="gn-g">' + (no!=null ? '<span class="gn-num">'+no+"</span>" : "") +
+    "<span>"+label+"</span><span class=\"gn-line\"></span></div>";
+}
+function navItem(icon, label, opts){
+  opts = opts || {};
+  var cls = "gn-item" + (opts.on ? " on" : "") + (opts.click ? " clickable" : " inert");
+  return '<div class="'+cls+'" data-stage="'+(opts.stage||"")+'">' + svgIcon(icon) + "<span>"+label+"</span>" +
+    (opts.badge ? '<span class="gn-new">'+opts.badge+"</span>" : "") + "</div>";
+}
+function renderSidebar(){
+  var h = "";
+  h += groupHead(null, "자산");
+  h += navItem("box", "⓪ 자산", {on:true});
+  h += groupHead(1, "발견·수집");
+  h += navItem("search", "발견·수집", {click:true, stage:1});
+  h += groupHead(2, "우선순위");
+  h += navItem("target", "우선순위", {click:true, stage:2});
+  h += groupHead(3, "조치");
+  h += navItem("check", "조치", {click:true, stage:3});
+  h += groupHead(4, "검증");
+  h += navItem("shield", "검증", {click:true, stage:4});
+  h += groupHead(5, "보고");
+  h += navItem("chart", "보고", {click:true, stage:5});
+  h += groupHead(null, "등록부");
+  h += navItem("drawer", "보안제품", {});
+  h += groupHead(null, "AI");
+  h += navItem("chip", "AI", {});
+  h += groupHead(null, "설정");
+  h += navItem("slider", "설정", {});
+  document.getElementById("sbNav").innerHTML = h;
+  document.querySelectorAll("#sbNav .gn-item.clickable").forEach(function(el){
+    el.addEventListener("click", function(){ openStage(Number(el.dataset.stage)); });
+  });
+}
+
+/* ════════════════════════ 고르는 목록 ════════════════════════ */
+function passesFilter(a){
+  if (state.filter === "high" && a.risk !== "high") return false;
+  if (state.filter === "kev" && !a.kev) return false;
+  if (state.filter === "gap" && a.owner) return false;
+  if (state.filter === "unassigned" && !a.fixUnassigned) return false;
+  var q = state.q.trim().toLowerCase();
+  if (q && a.name.toLowerCase().indexOf(q) < 0 && (a.owner||"").toLowerCase().indexOf(q) < 0) return false;
+  return true;
+}
+function renderList(){
+  var visible = ASSETS.filter(passesFilter);
+  document.getElementById("pkCount").textContent = visible.length;
+  var body = document.getElementById("pkList");
+  if (!visible.length){ body.innerHTML = '<div class="pk-empty">이 조건에 맞는 자산이 없습니다.</div>'; return; }
+  body.innerHTML = visible.map(function(a){
+    var picked = state.pickedId === a.id;
+    return '<div class="pk-row'+(picked?" picked":"")+'" data-id="'+a.id+'">' +
+      '<div class="pk-name"><b title="'+esc(a.name)+'">'+esc(a.name)+'</b><span class="pk-type">'+esc(a.typeLabel)+'</span></div>' +
+      '<div class="pk-risk r-'+a.risk+'"><span class="pk-dot"></span>'+RISK_LABEL[a.risk]+(a.kev?' <span class="pk-kev">KEV '+a.kev+'</span>':'')+'</div>' +
+      '<div class="pk-open">미조치 <b>'+a.findings+'</b>건</div>' +
+      '<div class="pk-owner'+(a.owner?'':' gap')+'">'+(a.owner ? esc(a.owner) : "⚠ 담당없음")+'</div>' +
+      '<div class="pk-act">'+(picked ? "✓ 선택됨" : "선택 →")+'</div>' +
+    '</div>';
+  }).join("");
+  body.querySelectorAll(".pk-row").forEach(function(el){
+    el.addEventListener("click", function(){ pickAsset(el.dataset.id); });
+  });
+}
+
+/* ════════════════════════ 고르기 → 범위 설정(✕ 전까지 유지) ════════════════════════ */
+function assetById(id){ return ASSETS.filter(function(a){ return a.id===id; })[0]; }
+
+function pickAsset(id){
+  state.pickedId = id;
+  var a = assetById(id);
+  renderList();
+  // 화면 자체 상단 알약
+  var bar = document.getElementById("scopeBar");
+  bar.classList.add("on");
+  document.getElementById("scopeBarTitle").textContent = "🗂 지금 범위: " + a.name;
+  document.getElementById("scopeBarSub").textContent =
+    RISK_LABEL[a.risk] + (a.kev ? " · KEV "+a.kev+"건" : "") + " · " + (a.owner || "담당부서 없음") + " — ✕를 누르기 전까지 ①~⑤ 전 단계에 유지됩니다";
+  // 콘솔 모사(파란 알약) — 이후 어느 단계로 가도(openStage) 이 값은 안 지워진다
+  var cs = document.getElementById("csScope");
+  cs.classList.add("on");
+  document.getElementById("csScopeT").textContent = a.name;
+  document.getElementById("mcEmpty").style.display = "none";
+  // 진행 현황
+  renderProgress(a);
+  document.getElementById("progWrap").classList.add("on");
+  // 새 자산을 고르면 이전 미리보기의 🎯 아이템은 지운다(화면이 사실상 바뀐 것과 같다)
+  clearItemBox();
+}
+function clearPick(){
+  state.pickedId = null;
+  renderList();
+  document.getElementById("scopeBar").classList.remove("on");
+  document.getElementById("csScope").classList.remove("on");
+  document.getElementById("progWrap").classList.remove("on");
+  document.getElementById("prevWrap").classList.remove("on");
+  clearItemBox();
+  if (!document.getElementById("csScope").classList.contains("on")) document.getElementById("mcEmpty").style.display = "";
+}
+document.getElementById("scopeBarClear").addEventListener("click", clearPick);
+document.getElementById("csScopeX").addEventListener("click", clearPick);
+
+/* ════════════════════════ 진행 현황(5단계) ════════════════════════ */
+var STAGE_DEF = [
+  {no:1, label:"발견·수집", page:"discover.html"},
+  {no:2, label:"우선순위", page:"triage.html"},
+  {no:3, label:"조치", page:"fix.html"},
+  {no:4, label:"검증", page:"verify.html"},
+  {no:5, label:"보고", page:"reporting.html"},
+];
+function renderProgress(a){
+  document.getElementById("progAssetName").textContent = a.name;
+  var cards = STAGE_DEF.map(function(s){
+    var val, sub;
+    if (s.no === 1) { val = a.findings + "건"; sub = "원문 발견 건수"; }
+    else if (s.no === 2) { val = a.findings + "건"; sub = a.kev ? "실제 악용(KEV) "+a.kev+"건 포함" : "실제 악용 없음"; }
+    else if (s.no === 3) { val = a.fixProg + "건"; sub = "진행중" + (a.fixUnassigned ? " · 미배정 "+a.fixUnassigned+"건" : "") + (a.maintTotal ? " · 정기점검 "+a.maintTotal+"건"+(a.maintOverdue?"(지연 "+a.maintOverdue+")":"") : ""); }
+    else if (s.no === 4) { val = "—"; sub = "자산-정기점검 연결 없음(hardening_targets에 assetId 없음)"; }
+    else { val = "—"; sub = "보고서는 자산 단위로 태깅되지 않음"; }
+    var isGap = val === "—";
+    return '<div class="prog-card" data-stage="'+s.no+'"><span class="no">'+s.no+'</span><span class="lb">'+s.label+'</span>' +
+      '<div class="val'+(isGap?' gap':(s.no===3 && a.fixUnassigned ? ' warn':''))+'">'+val+'</div>' +
+      '<div class="sub">'+sub+'</div><div class="go">'+(isGap?'그래도 열어보기':'이 단계로')+'</div></div>';
+  }).join("");
+  document.getElementById("progGrid").innerHTML = cards;
+  document.querySelectorAll("#progGrid .prog-card").forEach(function(el){
+    el.addEventListener("click", function(){ openStage(Number(el.dataset.stage)); });
+  });
+}
+
+/* ════════════════════════ 5단계 미리보기(모사) ════════════════════════ */
+function openStage(no){
+  var s = STAGE_DEF[no-1];
+  var a = state.pickedId ? assetById(state.pickedId) : null;
+  var wrap = document.getElementById("prevWrap");
+  wrap.classList.add("on");
+  document.getElementById("prevTitle").textContent = s.no + " " + s.label + " 미리보기 (" + s.page + ")";
+  var tag = document.getElementById("prevTag");
+  if (a) { tag.textContent = "🗂 " + a.name + "로 필터"; tag.className = "prev-tag"; }
+  else { tag.textContent = "필터 없음 · 전체 보기"; tag.className = "prev-tag all"; }
+  document.getElementById("prevNote").textContent =
+    "실제로는 " + s.page + " 화면이 새 탭으로 열립니다. 이 상자는 그 화면이 이 자산으로 걸러졌을 때의 모습을 흉내 낸 미리보기입니다.";
+  document.getElementById("prevBody").innerHTML = stageBodyHtml(s.no, a);
+  wireStageBody(s.no, a);
+  // ⚠ 화면(=단계)이 바뀐 것이므로 🎯 아이템은 지운다(console.js:994와 같은 규칙) — 🗂 범위는 그대로 둔다.
+  clearItemBox();
+  wrap.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+document.getElementById("prevClose").addEventListener("click", function(){
+  document.getElementById("prevWrap").classList.remove("on");
+});
+document.getElementById("skipPick").addEventListener("click", function(){ openStage(1); });
+
+function stageBodyHtml(no, a){
+  if (no === 4 || no === 5) {
+    var why = no === 4
+      ? "④ 검증(정기점검 대상)은 지금 자산 registry와 연결하는 값(assetId)이 없습니다 — 자산별로 거를 수 없어 전체 목록이 그대로 보입니다."
+      : "⑤ 보고서는 폴더 단위로만 집계됩니다 — 자산별 태깅이 없어 이 자산만 걸러 보여드릴 수 없습니다.";
+    return '<div class="prev-gap">🚧 ' + why + ' (정직하게 표시 — 지어내지 않았습니다)</div>';
+  }
+  var rows;
+  if (!a) {
+    rows = FINDING_POOL.slice(0,4).map(function(f,i){ return {t:f.t, s:f.s, asset: ASSETS[i % ASSETS.length].name}; });
+  } else if (no === 3 && a.fixProg === 0 && a.fixUnassigned === 0) {
+    return '<div class="prev-empty">이 자산은 진행 중인 조치가 없습니다.</div>';
+  } else {
+    var n = no === 3 ? Math.max(a.fixProg, 1) : Math.min(a.findings, 5) || 1;
+    rows = [];
+    for (var i=0;i<n;i++) rows.push({t: FINDING_POOL[(i + a.id.length) % FINDING_POOL.length].t, s: FINDING_POOL[(i + a.id.length) % FINDING_POOL.length].s, asset: a.name});
+  }
+  return rows.map(function(r,i){
+    return '<div class="prev-row" data-i="'+i+'" data-t="'+esc(r.t)+'" data-s="'+r.s+'" data-asset="'+esc(r.asset)+'">' +
+      '<span class="prev-sev sev-'+r.s+'">'+(r.s==="high"?"상":"중")+'</span>' +
+      '<span class="prev-body">'+esc(r.asset)+' · '+esc(r.t)+'</span></div>';
+  }).join("");
+}
+function wireStageBody(no, a){
+  if (no === 4 || no === 5) return;
+  document.querySelectorAll("#prevBody .prev-row").forEach(function(el){
+    el.addEventListener("click", function(ev){
+      ev.stopPropagation();
+      document.querySelectorAll("#prevBody .prev-row").forEach(function(x){ x.classList.remove("picked"); });
+      el.classList.add("picked");
+      setItemBox(el.dataset.asset, el.dataset.t, el.dataset.s);
+    });
+  });
+}
+
+/* ════════════════════════ 🎯 지금 다루는 것(항목, 화면 바뀌면 지워짐) ════════════════════════ */
+function setItemBox(asset, title, sev){
+  var box = document.getElementById("csState");
+  box.classList.add("on");
+  document.getElementById("csStateT").textContent = (sev==="high"?"[상] ":"[중] ") + title;
+  document.getElementById("csStateM").textContent = asset;
+  document.getElementById("mcEmpty").style.display = "none";
+}
+function clearItemBox(){
+  document.getElementById("csState").classList.remove("on");
+  document.querySelectorAll("#prevBody .prev-row").forEach(function(x){ x.classList.remove("picked"); });
+  var noScope = !document.getElementById("csScope").classList.contains("on");
+  document.getElementById("mcEmpty").style.display = noScope ? "" : "none";
+}
+document.getElementById("csStateX").addEventListener("click", clearItemBox);
+
+/* ════════════════════════ 필터·검색 ════════════════════════ */
+document.querySelectorAll(".pk-chip").forEach(function(el){
+  el.addEventListener("click", function(){
+    document.querySelectorAll(".pk-chip").forEach(function(x){ x.classList.remove("on"); });
+    el.classList.add("on");
+    state.filter = el.dataset.f;
+    renderList();
+  });
+});
+document.getElementById("pkSearch").addEventListener("input", function(e){ state.q = e.target.value; renderList(); });
+
+/* ════════════════════════ 발견·수집 개편 전/후 데모(참고) ════════════════════════ */
+function ghCardsBefore(){
+  return '<div class="gh-strip4">' +
+    '<div class="gh-card"><div class="gh-head">📊 보안 태세</div><div class="gh-row"><span>종합 점수</span><b>72/100</b></div><div class="gh-row"><span>미조치</span><b>38</b></div></div>' +
+    '<div class="gh-card"><div class="gh-head">🚨 통합 관제</div><div class="gh-row"><span>P0</span><b>2</b></div><div class="gh-row"><span>P1</span><b>5</b></div></div>' +
+    '<div class="gh-card"><div class="gh-head">🌐 위협 인텔</div><div class="gh-row"><span>긴급</span><b>1</b></div><div class="gh-row"><span>주의</span><b>4</b></div></div>' +
+    '<div class="gh-card removed"><div class="gh-head">🖥 자산</div><div class="gh-row"><span>고위험</span><b>6/15</b></div><div class="gh-foot">↳ 0.자산으로 이전</div></div>' +
+    '</div>';
+}
+function ghCardsAfter(){
+  return '<div class="gh-strip2">' +
+    '<div class="gh-card"><div class="gh-head">🚨 통합 관제</div><div class="gh-row"><span>P0</span><b>2</b></div><div class="gh-row"><span>P1</span><b>5</b></div><div class="gh-foot">판 폭 2배 — 더 그릴 여유</div></div>' +
+    '<div class="gh-card"><div class="gh-head">🌐 위협 인텔</div><div class="gh-row"><span>긴급</span><b>1</b></div><div class="gh-row"><span>주의</span><b>4</b></div><div class="gh-foot">판 폭 2배 — 더 그릴 여유</div></div>' +
+    '</div>';
+}
+document.getElementById("ghDemo").innerHTML = ghCardsBefore();
+document.querySelectorAll(".gh-tab").forEach(function(el){
+  el.addEventListener("click", function(){
+    document.querySelectorAll(".gh-tab").forEach(function(x){ x.classList.remove("on"); });
+    el.classList.add("on");
+    document.getElementById("ghDemo").innerHTML = el.dataset.t === "before" ? ghCardsBefore() : ghCardsAfter();
+  });
+});
+
+/* ════════════════════════ 초기 렌더 ════════════════════════ */
+renderSidebar();
+renderList();
+</script>
+</body>
+</html>
