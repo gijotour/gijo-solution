@@ -347,8 +347,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         if (cur) renderDetail(cur); else clearDetail();
       }
     } catch (e) {
+      상세칸구하기(list); // ⚠ 여기서도 목록을 통째로 지운다 — 아래 renderList와 같은 파괴다
       list.innerHTML = '<div class="rv-empty" style="color:#f5928a">불러오지 못했습니다: ' + esc(e.message) + "</div>";
     }
+  }
+
+  /** 목록을 `innerHTML`로 지우기 **전에** 자세히 칸을 원래 자리로 구해 낸다.
+   *
+   * ⚠ nav.js `gijo자세히아래로`가 #rvDetail을 **목록 안**(누른 줄 아래)으로 옮긴다.
+   *   그 상태에서 목록을 지우면 칸이 같이 사라져 다음 renderDetail이 터졌다(2026-08-18 실사고).
+   *   ⚠ **목록을 지우는 자리가 둘이다** — renderList와 loadReviews의 catch. 한 곳만 막으면
+   *   서버 오류·네트워크 끊김 때 같은 결함이 그대로 난다(검토관 지적 2026-08-18).
+   *   같은 노드를 옮기므로 nav.js가 잡고 있는 참조도 그대로 살아 있다. */
+  function 상세칸구하기(list) {
+    const 자세히 = list && list.querySelector("#rvDetail");
+    if (!자세히) return;
+    const wrap = document.querySelector(".rv-wrap");
+    if (wrap) wrap.appendChild(자세히);
+    else 자세히.remove();
   }
 
   // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
@@ -404,18 +420,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   function renderList() {
     const list = document.getElementById("rvList");
-    // ⚠ **자세히 칸을 먼저 구해 낸다**(2026-08-18 실화면 CDP로 잡은 실사고).
-    //   nav.js의 `gijo자세히아래로`가 #rvDetail을 **누른 줄 아래(=이 목록 안)로 옮긴다.**
-    //   그 상태에서 아래 `list.innerHTML = …`을 하면 **칸이 목록과 함께 지워져**
-    //   다음 renderDetail이 `Cannot set properties of null`로 터졌다 — 두 번째 클릭부터
-    //   상세가 안 열렸다. 지우기 전에 원래 자리(.rv-wrap)로 되돌려 놓으면 살아남는다.
-    //   (옮기기는 nav.js가 렌더 뒤에 다시 하므로 화면 모양은 그대로다.)
-    const 자세히 = list && list.querySelector("#rvDetail");
-    if (자세히) {
-      const wrap = document.querySelector(".rv-wrap");
-      if (wrap) wrap.appendChild(자세히);
-      else 자세히.remove();
-    }
+    상세칸구하기(list); // 아래 innerHTML이 자세히 칸까지 지우는 것을 막는다(위 함수 주석 참고)
     const filtered = allReviews.filter(matchFilter).sort((a, b) => {
       if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
       return SEV_ORD[a.finding.severity] - SEV_ORD[b.finding.severity];
