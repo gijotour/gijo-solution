@@ -694,7 +694,26 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 「기계 교체 없이 더 크게」가 반쪽이 된다. 원격이면 표준 32K 예산을 쓴다.
   // ⚠ 토큰까지 포함한 목표를 받는다(2026-08-16) — baseUrl(토큰 뗀 것)과 headers(토큰)로 갈린다.
   //   `원격`은 아래 여러 곳이 「원격인가」 불리언으로 쓰므로 baseUrl만 뽑아 유지한다.
-  const 원격목표 = await import("./remotellm.js").then((m) => m.remoteLlmTarget()).catch(() => null);
+  // ★ **팀원별 두뇌 위치**(2026-08-18 사장님 지시: "여러 개의 두뇌가 공동작업").
+  //   원격은 지금까지 **전역 on/off 하나**였다 — 켜면 전원 원격, 끄면 전원 로컬.
+  //   그래서 「총괄은 로컬 빠른 두뇌로 판단하고, 분석가는 원격 큰 두뇌로 깊게」가 불가능했다.
+  //
+  //   관문이 **두 겹**이다 (순서가 중요하다):
+  //     ① 전역이 켜졌나 — 주소·on/off는 여전히 하나다(`remotellm.ts` STATE_KEY="remote_llm")
+  //     ② 이 팀원이 쓰겠다 했나 — `agents.ts getAgentLocation(agentId)`
+  //   ②가 "local"이면 **전역이 켜져 있어도 이 PC에서 돈다.** 비었으면(기본) 전역을 그대로 따른다
+  //   — 지금까지와 한 글자도 다르지 않게 돈다(무변경 보장).
+  //
+  // ⚠ `agentId`는 ChatArgs의 **필수 인자**다(:29) — 늘 있다. 다만 `searchrewrite.ts`처럼
+  //   `chat()`을 안 거치고 `remoteLlmTarget()`을 직접 부르는 내부 도우미는 **전역을 그대로 따른다**
+  //   — 거기엔 팀원 개념이 없어 새 판정을 끼우면 뜻 없는 분기가 된다.
+  const 팀원위치 = await import("./agents.js")
+    .then((m) => m.getAgentLocation(args.agentId))
+    .catch(() => null);
+  const 원격목표 =
+    팀원위치 === "local"
+      ? null // 이 팀원은 이 PC 고정 — 전역 원격을 타지 않는다
+      : await import("./remotellm.js").then((m) => m.remoteLlmTarget()).catch(() => null);
   const 원격 = 원격목표?.baseUrl ?? null;
   const 원격헤더 = 원격목표?.headers ?? {};
 

@@ -142,6 +142,60 @@ export function setAgentAdapter(agentId: string, adapterId: string | null): void
   setModelStmt.run(adapterKey(agentId), adapterId);
 }
 
+// ── 팀원별 두뇌 **위치** (2026-08-18 사장님 지시: "여러 개의 두뇌가 공동작업") ──────────
+//
+// ■ 무엇을 푸는가
+//   로컬 모델은 이미 팀원별로 갈린다(`localengine.ts ensureAgentModel`). 어댑터도 요청별로 갈린다
+//   (`agentRequestExtras`). 그런데 **원격은 전역 on/off 하나**였다(`llm.ts`가 부르는
+//   `remoteLlmTarget()`이 agentId를 안 받는다) — 켜면 전원 원격, 끄면 전원 로컬.
+//   그래서 「총괄은 로컬 빠른 두뇌로 판단하고, 분석가는 원격 큰 두뇌로 깊게」가 **불가능**했다.
+//   여기 한 칸을 더해 그것을 연다.
+//
+// ■ 값의 뜻 — 셋뿐이다
+//   · null(기본) — **전역을 따른다.** 지금까지와 똑같이 동작한다(무변경 보장).
+//   · "local"    — 이 팀원은 **원격이 켜져 있어도** 이 PC에서 돈다.
+//   · "remote"   — 이 팀원은 원격을 쓴다. ⚠ **전역 원격이 꺼져 있으면 소용없다** —
+//                  주소·on/off는 여전히 전역 하나(`remotellm.ts` STATE_KEY="remote_llm")다.
+//                  즉 관문이 두 겹이다: ① 전역이 켜졌나 ② 이 팀원이 쓰겠다 했나.
+//
+// ⚠ **"cloud"는 아직 받지 않는다.** `cloudllm.ts`의 `askCloud`/`cloudComplete`가 agentId를
+//   아예 안 받고, 클라우드는 RAG를 구조적으로 안 싣는 별도 경로다(`cloudllm.ts:5`).
+//   저장만 하고 라우팅이 안 되면 「설계는 됐는데 쓰인 적 없는 값」이 된다 — 이 저장소가 반복해
+//   겪은 그 함정이라, **쓸 수 있게 되기 전에는 저장도 안 한다.**
+const AGENT_LOCATIONS = ["local", "remote"] as const;
+export type AgentLocation = (typeof AGENT_LOCATIONS)[number];
+const locationKey = (agentId: string) => `agentLocation:${agentId}`;
+
+export function getAgentLocation(agentId: string): AgentLocation | null {
+  const v = (getModelStmt.get(locationKey(agentId)) as { value: string } | undefined)?.value ?? null;
+  return v && (AGENT_LOCATIONS as readonly string[]).includes(v) ? (v as AgentLocation) : null;
+}
+
+/**
+ * location=null 이면 해제(전역 따름).
+ *
+ * ⚠ **총괄(orchestrator)은 이 PC 고정**이다 — 어댑터 금지(:138)와 같은 이유이고, 오늘 실측이 근거다:
+ *   같은 질문에 gb10 원격이 14B 17.4초 / 32B 36.6초 / **72B 89~90초**였다(2026-08-18).
+ *   총괄이 하는 일은 **어느 도구를 쓸지 고르는 판단**이고 그 앞에서 담당자가 기다린다.
+ *   거기에 90초짜리 두뇌를 붙이면 제품이 못 쓰게 된다. 답 품질 차이도 눈에 띄지 않았다.
+ */
+export function setAgentLocation(agentId: string, location: AgentLocation | null): void {
+  if (!AGENT_DEFS.some((a) => a.id === agentId)) throw new Error(`존재하지 않는 에이전트: ${agentId}`);
+  if (location === null) {
+    delModelStmt.run(locationKey(agentId));
+    return;
+  }
+  if (!(AGENT_LOCATIONS as readonly string[]).includes(location)) {
+    throw new Error(`위치는 ${AGENT_LOCATIONS.join("·")} 중 하나여야 합니다 (받은 값: ${location})`);
+  }
+  if (agentId === "orchestrator" && location !== "local") {
+    throw new Error(
+      "총괄(orchestrator)은 이 PC에서만 돕니다 — 도구를 고르는 판단 앞에서 담당자가 기다리는데, 원격 큰 두뇌는 답까지 90초가 걸립니다(2026-08-18 실측)."
+    );
+  }
+  setModelStmt.run(locationKey(agentId), location);
+}
+
 // modelId=null 이면 할당 해제(전역 모델 따름). 존재하지 않는 모델은 거부한다.
 export function setAgentModel(agentId: string, modelId: string | null): void {
   if (!AGENT_DEFS.some((a) => a.id === agentId)) throw new Error(`존재하지 않는 에이전트: ${agentId}`);
@@ -207,6 +261,19 @@ export function registerAgentsRoutes(app: Express): void {
   app.post("/api/agents/:id/adapter", authMiddleware, adminMiddleware, (req, res) => {
     try {
       setAgentAdapter(String(req.params.id), req.body.adapterId ?? null);
+      res.json(getAgentById(String(req.params.id)));
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // 팀원별 두뇌 **위치** — admin만. body.location=null 이면 해제(전역 따름).
+  // ⚠ 「채팅이 어디로 가는지」를 정하는 설정이라 원격 전역 스위치와 같은 급으로 admin에 둔다
+  //   (`remotellm.ts` 경계 ③과 같은 이유).
+  // ⚠ 총괄은 이 PC 고정 — setAgentLocation이 강제한다(근거는 그 함수 주석).
+  app.post("/api/agents/:id/location", authMiddleware, adminMiddleware, (req, res) => {
+    try {
+      setAgentLocation(String(req.params.id), req.body.location ?? null);
       res.json(getAgentById(String(req.params.id)));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });

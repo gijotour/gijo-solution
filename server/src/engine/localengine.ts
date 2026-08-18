@@ -124,8 +124,8 @@ export const GIJO_TIERS: GijoTierSpec[] = [
   // ⚠ ctx는 8192로 내렸는데 TIER_COST.lite(6.5/7.6)는 **16K 기준 옛 값 그대로**다.
   //   실측 전까지 **일부러 안 내린다** — 낮춰 잡으면 안 들어가는 기계에 권하게 된다.
   //   보수적으로 두면 조금 엄격할 뿐이다. 재측정하면 그때 낮춘다.
-  { id: "lite", label: "Lite (일부 기능 제약)", vramLabel: "10GB급", minVramGb: 10, maxLoadedModels: 1, ctxSize: 8192, overheadMb: 3500, desc: "채팅 LLM 1개 · 8K — 작은 모델(7.6B급) 전제. 긴 문서 요약·다인 동시 사용에 제약이 있고, 표준 기능 전량은 24GB급부터입니다." },
-  { id: "standard", label: "Standard", vramLabel: "24GB급", minVramGb: 24, maxLoadedModels: 1, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 1개 · 32K — 표준 구성(14B 기준 15.7GB 점유)" },
+  { id: "lite", label: "Lite (일부 기능 제약)", vramLabel: "10GB급", minVramGb: 10, maxLoadedModels: 1, ctxSize: 8192, overheadMb: 3500, desc: "문맥 8K — 작은 모델(7.6B급) 전제. 긴 문서 요약·다인 동시 사용에 제약이 있고, 표준 기능 전량은 24GB급부터입니다." },
+  { id: "standard", label: "Standard", vramLabel: "24GB급", minVramGb: 24, maxLoadedModels: 1, ctxSize: 32768, overheadMb: 5000, desc: "문맥 32K — 표준 구성(14B 기준 15.7GB 점유). ⚠ 모델을 몇 개 올려 둘지는 등급이 아니라 남은 VRAM이 정합니다." },
   // ⚠ **정직 표기**(2026-08-18 사장님 결정 ⓑ — 「남기되 사실대로 적는다」).
   //   예전 desc는 "채팅 LLM 2개 · 32K — A/B·검증 병행"이었는데 **둘 다 사실이 아니었다**:
   //     · A/B·검증 병행 — 제품 코드에 `abTest`·`compareModels`·`crossVerify` **0건**
@@ -141,7 +141,7 @@ export const GIJO_TIERS: GijoTierSpec[] = [
   //     지금 구조는 칸당 12,288토큰이 필요하고 모델 native 40,960이 상한이라 **3칸이 물리적 한계**다.
   //     4명 이상은 VRAM이 아니라 **프롬프트 축소**(도구 카탈로그 13,674자)가 선결이다.
   { id: "max", label: "Max (관제용 · 예정)", vramLabel: "대용량 GPU (사양 확정 전)", maxLoadedModels: 3, ctxSize: 32768, overheadMb: 5000, planned: true,
-    desc: "관제 상시 운영용 — 대화 LLM 2개 + **배치 전용 1개**(야간 회귀·자동 스캔·리포트를 담당자 대화와 분리) + 임베딩. 준비 중인 등급이라 아직 고를 수 없고, 필요 사양·동시 인원은 확정되면 여기에 적습니다." },
+    desc: "관제 상시 운영용 — **배치 전용 두뇌를 따로 두어**(야간 회귀·자동 스캔·리포트를 담당자 대화와 분리) + 임베딩. 준비 중인 등급이라 아직 고를 수 없고, 필요 사양·동시 인원은 확정되면 여기에 적습니다." },
 ];
 function storedTier(): GijoTierSpec | null {
   try {
