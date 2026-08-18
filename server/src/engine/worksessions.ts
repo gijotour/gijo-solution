@@ -758,15 +758,35 @@ export function registerWorkSessionRoutes(app: Express): void {
   }));
 
   // 일괄 정리 — /:id보다 먼저 등록해 'prune'·'delete-all'이 id로 안 잡히게 한다.
+  //
+  // ⚠ 「지우기 전에 파일로 남긴다」(2026-08-19 D3). 뼈대는 이 파일에 이미 있다 —
+  //   archiveOldSessions(:468)의 「쓰고 → 디스크 확인 → 그때 삭제」 계약을 두 라우트에 씌운다.
+  //   전에는 **여러 담당자의** 작업 내역·대화 전문이 확인 한 번에 영영 사라졌고 감사에도 안 남았다.
+  // ⚠ archive를 deleteAllSessions() **함수 안에 넣지 않는다** — 시험들이 그 함수를
+  //   beforeEach 청소용으로 부른다. 함수에 넣으면 시험이 돌 때마다 JSONL이 쏟아진다.
   app.post("/api/work-sessions/prune", authMiddleware, (req, res) => {
+    const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? null;
     try {
-      res.json({ deleted: pruneSessions(Number(req.body?.olderThanDays)) });
+      const arch = archiveOldSessions(0); // 전부 파일로 먼저 — 못 쓰면 여기서 던져 삭제까지 못 간다
+      const deleted = pruneSessions(Number(req.body?.olderThanDays));
+      recordAudit({ kind: "write", actor, action: "작업 세션 정리", target: `${deleted}건`,
+        detail: `보관 ${arch.file ?? "이미 보관됨"}`, result: "ok" });
+      res.json({ deleted, archived: arch.archived, file: arch.file });
     } catch (e) {
       res.status(400).json({ error: (e as Error).message });
     }
   });
-  app.post("/api/work-sessions/delete-all", authMiddleware, (_req, res) => {
-    res.json({ deleted: deleteAllSessions() });
+  app.post("/api/work-sessions/delete-all", authMiddleware, (req, res) => {
+    const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? null;
+    try {
+      const arch = archiveOldSessions(0); // keep=0 → 전 행이 파일로 간다(:469 가드 통과)
+      const deleted = deleteAllSessions();
+      recordAudit({ kind: "write", actor, action: "작업 세션 전체 삭제", target: `${deleted}건`,
+        detail: `보관 ${arch.file ?? "이미 보관됨"} · 모든 담당자의 내역이 지워짐`, result: "ok" });
+      res.json({ deleted, archived: arch.archived, file: arch.file });
+    } catch (e) {
+      res.status(400).json({ error: (e as Error).message });
+    }
   });
   // 오래된 세션을 지금 바로 파일로 옮긴다(평소엔 5분 스위프가 알아서 한다).
   // keep을 주면 그만큼만 남긴다 — 기본은 SESSION_KEEP(100).

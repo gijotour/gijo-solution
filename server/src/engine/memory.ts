@@ -611,21 +611,44 @@ export async function ingestText(documentId: string, raw: string, scope: string 
       await db.dropTable(TABLE_NAME);
       await db.createTable(TABLE_NAME, records);
     } else {
-      try {
-        // 재인입 멱등성: 같은 documentId의 옛 청크를 먼저 지운다. 안 그러면 add만 해서 옛/새 청크가
-        // 중복 누적된다(2026-07-25 실측: 같은 파일 재업로드/재시드가 KB에 중복 조각을 남김).
-        // ⚠ 순서 중요: category 컬럼 보장이 add보다 먼저다. 옛 스키마 테이블에 category 든 행을
-        // add하면 스키마 에러 → 아래 최후 안전망(테이블 재생성)이 발동해 기존 지식 전체가 날아간다.
-        await ensureCategoryColumn(table);
-        await table.delete(`documentId = '${escapeLiteral(documentId)}'`);
-        await table.add(records);
-        // 새 조각을 전문 검색(BM25)에서도 찾을 수 있게 인덱스를 갱신한다. 인덱스는 생성 시점의
-        // 데이터만 담으므로, 이걸 빠뜨리면 방금 올린 문서가 코드 검색에서만 조용히 빠진다.
-        await refreshFtsIndex(table);
-      } catch (err) {
-        // 최후의 안전망: 위 검사로 못 잡은 스키마 불일치로 add가 실패해도 채팅/수집이
-        // 죽지 않게 재생성한다(빈 테이블이 옛 스키마인 경우 등).
-        console.warn(`[memory] add() 실패 — 지식 베이스를 재생성합니다: ${err instanceof Error ? err.message : String(err)}`);
+      // ⚠ 스키마 보정은 **안전망 밖**에서 한다(2026-08-19 D6). Merge 트랜잭션이라 경쟁에 가장
+      //   약한데, 예전엔 이게 실패하면 아래 catch가 「테이블을 버려라」로 이어졌다.
+      //   컬럼 보정이 실패하면 이번 인입 한 건만 실패시키는 게 맞다 — 문서 한 건 < 지식 전체.
+      await ensureCategoryColumn(table);
+      // ⚠ lance는 커밋 경합 때 오류 문구에 대놓고 "retry"라고 적는다 — 3회 지수 백오프
+      //   (embedWithRetry와 같은 모양). 이것만으로 재현된 commit-conflict 방아쇠가 닫힌다.
+      let 마지막오류: unknown;
+      for (let 시도 = 0; 시도 < 3; 시도++) {
+        try {
+          // 재인입 멱등성: 같은 documentId의 옛 청크를 먼저 지운다. 안 그러면 add만 해서 옛/새 청크가
+          // 중복 누적된다(2026-07-25 실측: 같은 파일 재업로드/재시드가 KB에 중복 조각을 남김).
+          await table.delete(`documentId = '${escapeLiteral(documentId)}'`);
+          await table.add(records);
+          // 새 조각을 전문 검색(BM25)에서도 찾을 수 있게 인덱스를 갱신한다.
+          await refreshFtsIndex(table);
+          마지막오류 = undefined;
+          break;
+        } catch (err) {
+          마지막오류 = err;
+          await new Promise((s) => setTimeout(s, 300 * 2 ** 시도));
+        }
+      }
+      if (마지막오류 !== undefined) {
+        // ★ 드롭 전에 **무엇을 버리는지 센다**(2026-08-19 D6). 예전엔 어떤 실패든 여기서
+        //   테이블을 통째로 재생성해 — 방금 올린 문서 1건을 뺀 **모든 지식(실측 5,631조각)**이
+        //   조용히 사라질 수 있었다. 자가복구는 「버릴 게 없을 때」만 한다.
+        //   버릴 게 있으면 이번 인입만 실패시킨다(라우트가 400으로 정직하게 보고) —
+        //   채팅·검색은 기존 지식으로 계속 돈다. 진짜 스키마 드리프트는 위 명시 검사가 이미 잡는다.
+        const 남은 = new Set(
+          ((await table.query().select(["documentId"]).limit(1_000_000).toArray()) as { documentId: string }[])
+            .map((r) => r.documentId)
+        );
+        남은.delete(documentId);
+        if (남은.size > 0) {
+          console.error(`[memory] add() 3회 실패 — 기존 문서 ${남은.size}건이 있어 재생성하지 않고 이번 인입만 실패시킵니다`);
+          throw 마지막오류;
+        }
+        console.warn(`[memory] add() 실패·기존 지식 0건 — 지식 베이스를 재생성합니다: ${마지막오류 instanceof Error ? 마지막오류.message : String(마지막오류)}`);
         await db.dropTable(TABLE_NAME);
         await db.createTable(TABLE_NAME, records);
       }

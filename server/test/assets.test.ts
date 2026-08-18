@@ -89,7 +89,11 @@ describe("assets", () => {
     expect(res.status).toBe(404);
   });
 
-  it("re-registering the same id resets its findings/scan state", async () => {
+  // ⚠ 2026-08-19 D5로 **계약이 뒤집혔다.** 예전엔 재등록이 findings·scan_runs를 초기화했는데,
+  //   그 동작이 「같은 이름으로 다시 등록하는 순간 취약점·이력이 담당자 모르게 통째로 사라지는」
+  //   자료 유실로 판정됐다(실패스캔 사고와 같은 결과, 다른 경로). 이제 재등록 = 메타 갱신이고
+  //   findings·scan_runs는 **보존**된다. 이 시험은 그 새 계약을 지킨다.
+  it("re-registering the same id preserves findings/scan history (D5: 재등록은 메타 갱신)", async () => {
     await request(app)
       .post("/api/assets")
       .set("Authorization", `Bearer ${token}`)
@@ -104,7 +108,9 @@ describe("assets", () => {
       .set("Authorization", `Bearer ${token}`)
       .send({ id: "a1", name: "a1", path: "x" });
     const after = await request(app).get("/api/assets/a1").set("Authorization", `Bearer ${token}`);
-    expect(after.body.findings).toEqual([]);
+    // 보존된다 — 지워지면 D5 회귀다.
+    expect(after.body.findings.length).toBeGreaterThan(0);
+    expect(after.body.scanHistory.length).toBeGreaterThan(0);
   });
 
   it("findings reflect only the latest scan, while scanHistory keeps every past run (regression: used to append findings forever)", async () => {

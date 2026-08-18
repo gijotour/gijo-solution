@@ -121,6 +121,9 @@ export interface BackupVerifyResult {
   schemaMatchesNow: boolean | null; // 지금 코드의 스키마와 같은가
   lanceIncluded: boolean;
   lanceSizeBytes: number;
+  // 짝 세션 아카이브(오래된 작업 세션 전문 JSONL) — lance와 같은 모양(2026-08-19 D8)
+  archiveIncluded: boolean;
+  archiveSizeBytes: number;
   problems: string[]; // 복구를 **막는** 것만 넣는다(비어 있으면 이 백업으로 복구할 수 있다)
   // 알아두면 좋지만 복구를 막지는 않는 것. problems에 섞으면 정상 상황에서도 경고가 떠
   // 자가 진단이 늘 노랑이 되고, 그러면 아무도 안 본다.
@@ -143,6 +146,7 @@ export function verifyBackupSnapshot(fileName?: string): BackupVerifyResult {
   const empty: BackupVerifyResult = {
     ok: false, file: null, createdAt: null, sizeBytes: 0, integrity: null, tables: {},
     schemaLatest: null, schemaMatchesNow: null, lanceIncluded: false, lanceSizeBytes: 0,
+    archiveIncluded: false, archiveSizeBytes: 0,
     problems: [], notes: [], restoreSteps: RESTORE_STEPS,
   };
   let target = fileName ?? null;
@@ -241,9 +245,28 @@ export function verifyBackupSnapshot(fileName?: string): BackupVerifyResult {
   if (!lanceIncluded) problems.push("짝 지식베이스(.lancedb) 폴더가 없습니다 — 복원하면 지식 검색이 빈 상태가 됩니다.");
   else if (lanceSizeBytes === 0) problems.push("짝 지식베이스 폴더가 비어 있습니다 — 복원하면 지식 검색이 빈 상태가 됩니다.");
 
+  // 짝 세션 아카이브 — 오래된 작업 세션 전문(JSONL)이 여기 산다. 빠진 채 복원하면
+  // 100건을 넘겨 파일로 넘어간 대화가 전부 사라진다(2026-08-19 D8).
+  // ⚠ **판정은 조건부다.** 라이브에 보관할 아카이브가 실제로 있는데 짝이 없을 때만 problems.
+  //   세션 100건 미만인 신규·소규모 사이트는 아카이브가 원래 없다 — 그때 problems로 넣으면
+  //   자가 진단이 상시 노랑이 되어 「늘 노랑이라 아무도 안 봄」을 그대로 재현한다.
+  const archiveDirTarget = path.join(dir, target.replace(/\.sqlite$/, ".session-archive"));
+  const archiveIncluded = fs.existsSync(archiveDirTarget);
+  const archiveSizeBytes = archiveIncluded ? dirSize(archiveDirTarget) : 0;
+  try {
+    const liveDir = sessionArchiveDir();
+    const liveFiles = fs.existsSync(liveDir) ? fs.readdirSync(liveDir).filter((f) => f.endsWith(".jsonl")) : [];
+    if (liveFiles.length > 0 && !archiveIncluded) {
+      problems.push("짝 세션 아카이브 폴더가 없습니다 — 복원하면 파일로 옮겨 둔 오래된 작업 세션 전문이 사라집니다.");
+    } else if (liveFiles.length === 0) {
+      notes.push("보관할 세션 아카이브가 아직 없습니다(세션이 보관 문턱을 안 넘음) — 정상입니다.");
+    }
+  } catch { notes.push("세션 아카이브 상태를 확인하지 못했습니다."); }
+
   return {
     ok: problems.length === 0,
     file: target, createdAt, sizeBytes, integrity, tables, schemaLatest, schemaMatchesNow,
+    archiveIncluded, archiveSizeBytes,
     lanceIncluded, lanceSizeBytes, problems, notes, restoreSteps: RESTORE_STEPS,
   };
 }

@@ -36,6 +36,12 @@ async function makeBackup(ageHours: number) {
   // 짝 지식베이스 폴더 — 없으면 "복원 시 지식 검색이 빈 상태"로 경고가 뜬다.
   const lance = path.join(dir, `${base}.lancedb`);
   fs.mkdirSync(lance, { recursive: true });
+  // 짝 세션 아카이브 폴더(2026-08-19 D8) — 같은 프로세스의 다른 시험이 라이브 아카이브에
+  // JSONL을 남겨 두면, 짝이 없는 스냅샷은 「복원 시 세션 전문 소실」 problems로 잡힌다.
+  // lance와 같은 취급으로 짝을 만들어 준다.
+  const arch = path.join(dir, `${base}.session-archive`);
+  fs.mkdirSync(arch, { recursive: true });
+  fs.writeFileSync(path.join(arch, "sessions-test.jsonl"), "{}\n");
   fs.writeFileSync(path.join(lance, "data.lance"), "vector-store-stub");
   const t = Date.now() - ageHours * 3600000;
   fs.utimesSync(f, t / 1000, t / 1000);

@@ -225,11 +225,18 @@ export function registerAlertScheduleRoutes(app: Express): void {
     }
   });
   app.post("/api/alert-schedules/:id/enabled", authMiddleware, adminMiddleware, (req, res) => {
-    setAlertEnabled(String(req.params.id), (req.body as { enabled?: boolean })?.enabled !== false);
+    const 켬 = (req.body as { enabled?: boolean })?.enabled !== false;
+    setAlertEnabled(String(req.params.id), 켬);
+    // 「알림이 왜 안 왔지」의 답이 감사에 있어야 한다(2026-08-19 D4).
+    const sch = listAlertSchedules().find((x) => x.id === String(req.params.id));
+    recordAudit({ kind: "config", actor: (req as { user?: { displayName?: string } }).user?.displayName ?? null, action: 켬 ? "정기 알림 가동" : "정기 알림 중지", target: sch ? `${sch.kind} ${sch.hourLocal}시` : String(req.params.id), result: "ok" });
     res.json({ ok: true });
   });
   app.delete("/api/alert-schedules/:id", authMiddleware, adminMiddleware, (req, res) => {
+    // ⚠ 지우기 전에 읽는다 — detail의 지워진 값이 손으로 되살릴 유일한 근거다(2026-08-19 D4).
+    const sch = listAlertSchedules().find((x) => x.id === String(req.params.id));
     deleteAlertSchedule(String(req.params.id));
+    recordAudit({ kind: "config", actor: (req as { user?: { displayName?: string } }).user?.displayName ?? null, action: "정기 알림 삭제", target: sch ? `${sch.kind} ${sch.hourLocal}시` : String(req.params.id), detail: sch ? `수신 ${sch.recipients} · ${sch.enabled ? "가동" : "중지"} 상태였음` : "이미 없던 id", result: "ok" });
     res.json({ ok: true });
   });
   // 지금 한 번 보내 보기 — 등록해 두고 "오나 안 오나" 몰라 불안한 상태를 없앤다.

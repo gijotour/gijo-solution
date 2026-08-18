@@ -103,13 +103,17 @@ export function createUser(args: {
   return toPublic(row);
 }
 
-export function deleteUser(id: string): void {
+// ⚠ 지운 행을 **돌려준다**(2026-08-19 D1). users는 하드 삭제 + 소프트삭제·보관본·FK 전무라
+//   지운 뒤에는 내부 id를 아이디·이름으로 되돌릴 길이 없다 — 감사에 신원을 적으려면
+//   지우기 전에 읽은 이 행이 유일한 원천이다.
+export function deleteUser(id: string): UserRow {
   const row = getByIdStmt.get(id) as UserRow | undefined;
   if (!row) throw new Error("존재하지 않는 계정입니다");
   if (row.role === "admin" && (countAdminsStmt.get() as { n: number }).n <= 1) {
     throw new Error("마지막 관리자 계정은 삭제할 수 없습니다");
   }
   deleteStmt.run(id);
+  return row;
 }
 
 export function changePassword(id: string, newPassword: string): void {
@@ -183,6 +187,9 @@ function seedDefaultAdminIfEmpty(): void {
   if (existing.length > 0) return;
   const a = computeInitialAdmin();
   createUser({ username: a.username, password: a.password, displayName: a.displayName, role: "admin" });
+  // ⚠ 시드는 HTTP를 안 타서 전역 감사(activityaudit) 밖이다 — 이 계정 생성만은 여기서 남겨야
+  //   감사가 「관리자 계정이 언제 어떻게 생겼나」에 답할 수 있다(2026-08-19 D1).
+  recordAudit({ kind: "config", actor: "system", action: "초기 관리자 계정 생성", target: a.username, result: "ok" });
   if (a.generated) {
     console.log("════════════════════════════════════════════════");
     console.log(`[setup] 초기 관리자 계정 생성 — 아이디: ${a.username}`);
@@ -235,7 +242,14 @@ export function registerUsersRoutes(app: Express): void {
         displayName: string;
         role: GijoUser["role"];
       };
-      res.json(createUser({ username, password, displayName, role }));
+      const created = createUser({ username, password, displayName, role });
+      // ⚠ 전역 감사(activityaudit)는 target="-"라 **어느 계정을 만들었는지가 어디에도 없었다**
+      //   (2026-08-19 D1 실측: 만든 계정 아이디가 감사 전체에 0건). 신원은 여기서만 적을 수 있다.
+      //   actor는 반드시 displayName — username을 쓰면 auditactor 소스 감시가 실패한다.
+      const requester = (req as Request & { user?: GijoUser }).user;
+      recordAudit({ kind: "write", actor: requester?.displayName ?? null, action: "계정 생성",
+        target: `${created.username}(${created.id})`, detail: `역할 ${created.role} · 이름 ${created.displayName}`, result: "ok" });
+      res.json(created);
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }
@@ -249,7 +263,10 @@ export function registerUsersRoutes(app: Express): void {
       return;
     }
     try {
-      deleteUser(targetId);
+      const removed = deleteUser(targetId);
+      // ⚠ 비밀번호 해시를 감사로 흘리지 않는다 — 행을 통째로 싣지 말고 필드를 골라 적는다.
+      recordAudit({ kind: "write", actor: requester?.displayName ?? null, action: "계정 삭제",
+        target: `${removed.username}(${targetId})`, detail: `역할 ${removed.role} · 이름 ${removed.displayName}`, result: "ok" });
       res.json({ ok: true });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });

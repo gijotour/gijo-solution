@@ -274,8 +274,10 @@ export function registerHardeningTargetRoutes(app: Express): void {
   }));
   app.delete("/api/hardening/targets/:id", authMiddleware, adminMiddleware, (req, res) => {
     const t = getTarget(req.params.id);
+    // ⚠ 동반 삭제 건수는 **삭제 전에** 센다 — 뒤에 세면 항상 0이 나와 「없었다」는 거짓을 적는다.
+    const 딸린스케줄 = listSchedules().filter((x) => x.targetId === req.params.id).length;
     deleteTarget(req.params.id);
-    if (t) recordAudit({ kind: "config", actor: actorOf(req), action: "하드닝 점검 대상 삭제", target: t.label, result: "ok" });
+    if (t) recordAudit({ kind: "config", actor: actorOf(req), action: "하드닝 점검 대상 삭제", target: t.label, detail: `${t.host}:${t.port} (${t.standard})${딸린스케줄 ? ` · 정기점검 스케줄 ${딸린스케줄}건 함께 삭제` : ""}`, result: "ok" });
     res.json({ ok: true });
   });
 
@@ -312,11 +314,20 @@ export function registerHardeningTargetRoutes(app: Express): void {
     res.json({ schedule: sch });
   }));
   app.patch("/api/hardening/schedules/:id", authMiddleware, adminMiddleware, (req, res) => {
-    if (typeof req.body?.enabled === "boolean") setScheduleEnabled(req.params.id, req.body.enabled);
+    if (typeof req.body?.enabled === "boolean") {
+      setScheduleEnabled(req.params.id, req.body.enabled);
+      // 켜기/끄기도 남긴다 — 「자동 점검이 왜 안 돌았지」의 답이 감사에 있어야 한다(2026-08-19 D4).
+      const sch = listSchedules().find((x) => x.id === req.params.id);
+      if (sch) recordAudit({ kind: "config", actor: actorOf(req), action: req.body.enabled ? "하드닝 정기점검 가동" : "하드닝 정기점검 중지", target: sch.targetLabel, detail: `${sch.standard.toUpperCase()} · ${sch.intervalHours}시간마다`, result: "ok" });
+    }
     res.json({ ok: true });
   });
   app.delete("/api/hardening/schedules/:id", authMiddleware, adminMiddleware, (req, res) => {
+    // ⚠ **지우기 전에** 행을 읽는다 — 뒤에는 못 읽는다. detail에 지워진 값을 적어 두면
+    //   행이 사라져도 「무엇이 있었는지」를 감사에서 읽어 손으로 되살릴 수 있다(되돌리기의 실질 대체).
+    const sch = listSchedules().find((x) => x.id === req.params.id);
     deleteSchedule(req.params.id);
+    if (sch) recordAudit({ kind: "config", actor: actorOf(req), action: "하드닝 정기점검 스케줄 삭제", target: sch.targetLabel, detail: `${sch.standard.toUpperCase()} · ${sch.intervalHours}시간마다 · ${sch.enabled ? "가동" : "중지"} 상태였음`, result: "ok" });
     res.json({ ok: true });
   });
 

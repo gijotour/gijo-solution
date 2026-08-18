@@ -334,8 +334,25 @@ export function registerAsset(args: {
   service?: string;
   components?: AssetComponent[];
 }): Asset {
-  // 재등록은 스캔 이력/현재 findings를 초기화한다 (기존 동작 유지).
-  deleteScanRunsStmt.run(args.id);
+  // ⚠ **이미 있는 id는 「재등록」이 아니라 메타 갱신이다**(2026-08-19 D5).
+  //   예전엔 여기서 scan_runs를 지우고 findings를 []로 덮어써서, 같은 이름으로 다시 등록하는
+  //   순간 그 자산의 취약점·스캔 이력·SBOM이 **담당자 모르게 통째로 사라졌다** —
+  //   「실패 스캔이 취약점 지운다」(2026-08-02)와 같은 결과를 다른 경로로 내던 자리다.
+  //   scan_runs는 findingsrestore가 되살릴 **유일한 원본**이라 절대 손대지 않는다.
+  const 기존 = getAssetRowStmt.get(args.id) as { assetType: string; owner: string; service: string | null } | undefined;
+  if (기존) {
+    db.prepare("UPDATE assets SET name=?, path=?, assetType=?, owner=?, service=? WHERE id=?").run(
+      args.name, args.path,
+      args.assetType ?? 기존.assetType,
+      args.owner ?? 기존.owner,
+      args.service?.trim() || 기존.service,
+      args.id
+    );
+    touchAsset(args.id);
+    const updated = getAsset(args.id)!;
+    broadcastAssetUpdated(updated);
+    return updated;
+  }
   upsertAssetStmt.run({
     id: args.id,
     name: args.name,
