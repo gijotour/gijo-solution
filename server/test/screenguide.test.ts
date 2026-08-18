@@ -397,14 +397,35 @@ describe("screenguide — 라이트는 자기 안내를 받는다", () => {
     for (const 말 of 표준전용) expect(lite.includes(말), `라이트 안내에 ${말}`).toBe(false);
   });
 
-  it("라이트 안내가 약속하는 것은 라이트에 실제로 있다", () => {
-    // 결재판·스트리밍은 lite-chat.html이 실제로 그린다 — 약속과 코드가 어긋나면 안 된다.
+  it("★ 라이트 안내가 약속하는 것은 라이트에 실제로 있다", () => {
+    // ⚠ **2026-08-18 검토관이 잡은 거짓 통과.** 예전엔 `toContain("renderApproval")`처럼
+    //   **함수 이름이 파일에 있는지**만 봤다 — 그 함수가 **불릴 수 있는 조건**은 안 봤다.
+    //   그 사이로 「＋로 파일 올리기」와 「승인 창」이 새어 들어왔고 둘 다 라이트엔 없었다.
+    //   (＋는 표준 콘솔 전용 부품, 승인 창은 라이트 도구가 전부 write:false라 원리상 못 뜬다.)
+    //   ⇒ 이제 **약속마다 그 근거를 코드에서 직접 센다.**
     const lite = fs.readFileSync(new URL("../../client/src/renderer/pages/lite-chat.html", import.meta.url), "utf8");
-    const 본문 = JSON.stringify(getScreenGuide(undefined, true));
-    if (본문.includes("승인 창")) {
-      expect(lite, "라이트 안내가 승인 창을 약속하는데 화면에 결재판이 없다").toContain("renderApproval");
+    const 안내 = JSON.stringify(getScreenGuide(undefined, true));
+
+    // ① ＋ 파일 올리기 — 라이트 챗엔 그 자리가 없다
+    if (/＋|파일을 올리|첨부/.test(안내)) {
+      expect(/type="file"|dockUpload|첨부/.test(lite), "라이트 안내가 파일 올리기를 약속하는데 lite-chat에 그 자리가 없다").toBe(true);
     }
-    if (본문.includes("흐릅니다")) {
+
+    // ② 승인 창 — 라이트 허용목록에 write:true 도구가 하나라도 있어야 뜰 수 있다
+    if (/승인 창|결재판/.test(안내)) {
+      const lt = JSON.parse(fs.readFileSync(new URL("../src/lite/lite-tools.json", import.meta.url), "utf8"));
+      const arr = (Array.isArray(lt) ? lt : (lt.tools ?? Object.values(lt).find(Array.isArray))) as unknown[];
+      const names = arr.map((x) => (typeof x === "string" ? x : String((x as Record<string, unknown>).name ?? "")));
+      const reg = fs.readFileSync(new URL("../src/engine/agenttools/registry.ts", import.meta.url), "utf8");
+      const 쓰기있나 = names.some((n) => {
+        const i = reg.indexOf('name: "' + n + '"');
+        return i >= 0 && /write:\s*true/.test(reg.slice(i, i + 500));
+      });
+      expect(쓰기있나, "라이트 안내가 승인 창을 약속하는데 라이트 도구가 전부 write:false라 원리상 못 뜬다").toBe(true);
+    }
+
+    // ③ 스트리밍 — 약속하면 화면이 실제로 스트림을 써야 한다
+    if (/흐릅니다/.test(안내)) {
       expect(lite, "라이트 안내가 스트리밍을 약속하는데 화면이 스트림을 안 쓴다").toContain("sendInstructionStream");
     }
   });
