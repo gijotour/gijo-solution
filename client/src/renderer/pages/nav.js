@@ -1422,7 +1422,12 @@
     //   셸의 활성탭 검사에 걸러질 뿐이다. select(고른 것)·scope(범위)·openTab(화면 열기)만.
     window.addEventListener("message", function (ev) {
       var d = ev.data;
-      if (!d || ev.source !== window) return;               // 자기에게 돌아온 것만
+      // ⚠ ev.source 검사를 **하지 않는다**(2026-08-19 프로 사용자 테스트 P4). 처음엔
+      //   「자기에게 돌아온 것만」(source===window)으로 걸렀는데, 허브형 화면(우선순위 등)을
+      //   창으로 열면 안쪽 iframe(vulnscan)이 top으로 보낸 선택의 source가 iframe이라
+      //   **조용히 버려져** 본창에 안 닿았다. 이 창에 실리는 문서는 전부 우리 로컬 파일이고
+      //   아래 타입 화이트리스트가 지키므로, top에 도달한 gijo:*는 출처 불문 릴레이한다.
+      if (!d) return;
       if (d.type !== "gijo:select" && d.type !== "gijo:scope" && d.type !== "gijo:openTab") return;
       if (window.gijo && window.gijo.bridgeToShell) window.gijo.bridgeToShell(d);
     });

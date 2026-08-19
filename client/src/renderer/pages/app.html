@@ -53,6 +53,9 @@
        프로 규칙을 보고 실패한다. 순서가 시험의 전제다. */
   body.pro-shell .app{grid-template-columns:56px minmax(0,1fr);}
   body.pro-shell #gijoNav{display:none;}
+  /* 프로는 탭 개념이 없다(화면=별도 창, 승인 시안) — 탭줄·탭 조작 띠를 통째로 감춘다.
+     2026-08-19 사용자 테스트 P2: 빈 탭바 띠와 옛 탭 2개가 남아 「대화가 주인공」을 깼다. */
+  body.pro-shell .shellfoot{display:none;}
   /* 56px 아이콘 레일 — 사이드바를 대신한다. 계정·문서함이 여기 아래에 붙는다
      (titlebar.js mountUserArea의 세 번째 갈래) — 안 붙이면 통째로 사라진다. */
   #gijoRail{display:none;flex-direction:column;align-items:center;gap:5px;padding:10px 0;
@@ -904,6 +907,19 @@
   function boot() {
     if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) {
       if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo("login.html");
+      return;
+    }
+    // 🚀 프로는 저장 탭을 복원하지 않는다(2026-08-19 사용자 테스트 P1). 프로에서 open()은
+    // 별도 창을 띄우므로, 표준 시절 탭 8개가 로그인 직후 **창 폭탄**으로 쏟아졌다.
+    // 저장값(gijo:tabs:v1)은 건드리지 않는다 — 표준으로 돌아가면 그 탭들이 그대로 살아난다.
+    // 프로의 첫 화면은 대화 홈이고, 화면은 ☰(Ctrl+K)로 필요할 때 하나씩 연다.
+    if (프로인가()) {
+      대화홈갱신(); redraw();
+      var wasPopped0 = "0";
+      try { wasPopped0 = localStorage.getItem("gijo:console:popped") || "0"; } catch (e) {}
+      if (wasPopped0 === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(); }
+      로그인선택_못한것알리기();
+      프로레일();
       return;
     }
     var st = null;

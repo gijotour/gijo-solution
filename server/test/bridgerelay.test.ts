@@ -40,9 +40,14 @@ describe("팝업 릴레이 — 목록이 어긋나면 팝업에서만 조용히 
     expect(빠진것, "릴레이 목록에 없는 타입 — 팝업에서 이 신호가 조용히 죽는다. 넣거나, 위 제외 목록에 이유와 함께 적어라").toEqual([]);
   });
 
-  it("★ 릴레이는 자기에게 돌아온 것만 잡는다 — 남의 창 것을 가로채면 안 된다", () => {
+  it("★ 릴레이는 출처(source)로 거르지 않는다 — 허브 안 iframe의 선택이 조용히 죽는다(P4)", () => {
+    // 2026-08-19 계약 반전: 처음엔 source===window만 잡았는데, 허브형 화면을 창으로 열면
+    // 안쪽 iframe發 선택의 source가 iframe이라 버려졌다(프로 사용자 테스트 P4 실측).
+    // 이 창의 문서는 전부 로컬 파일 + 타입 화이트리스트가 지키므로 source 검사를 하지 않는다.
     const i = nav.indexOf("function applyPopout()");
-    expect(nav.slice(i, i + 2500), "ev.source 검사가 없다").toContain("ev.source !== window");
+    const 구간 = nav.slice(i, i + 2800);
+    expect(구간, "source 필터가 되살아났다 — 허브-인-팝업 선택이 다시 죽는다").not.toContain("ev.source !== window");
+    expect(구간, "빈 데이터 방어는 유지").toContain("if (!d) return;");
   });
 
   it("★ 본창은 받은 것을 재주입한다 — 처리 코드를 복제하지 않는다", () => {
