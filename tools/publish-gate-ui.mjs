@@ -193,8 +193,19 @@ for (let i = 0; i < 10 && !자동카드; i++) {
 ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
 {
   // ★ 확정 계약(2026-08-20 사장님 ×3): 메뉴성 열기는 화면을 열지 않는다 — 카드가 전부.
-  const 안열림 = !(ctx.pages().some((p) => p.frames().some((f) => f.url().includes("assets.html"))));
-  ok("메뉴 열기는 화면을 열지 않는다(카드가 전부)", 안열림);
+  // ⚠ assets는 앞선 검사(행 클릭 등)가 이미 열어 iframe이 잔존하고, 셸은 iframe을
+  //   재사용하므로 assets로는 「안 열림」을 못 잰다(수 비교도 재사용이면 거짓 통과).
+  //   이 관문에서 한 번도 안 연 sessions.html(신설 작업내역 카드)로 0→0을 확인한다.
+  const 프레임수 = (nm) => ctx.pages().reduce((n, p) => n + p.frames().filter((f) => f.url().includes(nm)).length, 0);
+  const 전 = 프레임수("sessions.html");
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("sessions.html", "작업 내역"));
+  let 세션카드 = false;
+  for (let i = 0; i < 10 && !세션카드; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    세션카드 = await 셸.evaluate(() => [...document.querySelectorAll(".dc-card")].some((c) => (c.textContent || "").includes("작업 내역 — 대화 세션")));
+  }
+  const 후 = 프레임수("sessions.html");
+  ok("메뉴 열기는 화면을 열지 않는다(카드가 전부)", 세션카드 && 전 === 0 && 후 === 0, "신설카드 " + 세션카드 + " · 프레임 " + 전 + "→" + 후);
 }
 // assets 부품 확인 — 방금 ④′가 assets를 열었으니 프레임이 살아 있다(순서 계약).
 {
@@ -229,11 +240,11 @@ ok("히트맵 토글·색사전", 히트.seg && JSON.stringify(히트.cls) === '
 // ── ⑤′ AI 팀 가시화(2026-08-20) — 레일 로스터(팀6+부품4·약자)·대시보드 팀 카드·지식창고 ──
 const 가시화 = await 셸.evaluate(async () => {
   const 로스터 = [...document.querySelectorAll("#gijoRail .rr-item")];
-  const 약자들 = 로스터.slice(0, 6).map((b) => (b.textContent || "").trim());
+  const 약자들 = 로스터.slice(0, 6).map((b) => (b.title || ""));
   // 대시보드 프레임(도킹)에서 팀 카드·지식창고 확인
   return {
     로스터수: 로스터.length,
-    약자적용: 약자들.filter((t) => /^[가-힣]{2}$/.test(t)).length, // 등록부 abbr(2글자 한글) 반영 수
+    약자적용: 약자들.filter((t) => /^\[[가-힣]{2}\] /.test(t)).length, // 툴팁 [약자] 이름(표시는 아이콘 — 사장님 정정)
   };
 });
 ok("레일 로스터 10개(팀6+부품4)", 가시화.로스터수 === 10, "개수=" + 가시화.로스터수);

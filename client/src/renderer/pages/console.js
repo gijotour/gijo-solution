@@ -1742,10 +1742,10 @@
     var scope = 범위 && 범위.kind === "asset" ? String(범위.id) : undefined;
     return window.gijo.screenCard(p, scope).then(function (r) {
       if (!r || r.none || !r.dataCard) return false; // 카드 없는 화면 — 셸이 종전대로 연다
-      화면카드직전 = p;
       var row = append("event", { icon: "🗔", name: (label || p) + " — 현황", message: "", full: true });
       var P = window.gijoChatParts;
-      if (!row || !P) return;
+      if (!row || !P) return false; // 카드를 못 그렸다 — 셸이 화면이라도 연다(직전 기억도 안 남긴다)
+      화면카드직전 = p;
       if (P.dataCard) P.dataCard(row, r.dataCard, {
         navigate: function (pg, lb) {
           if (window.gijoTabs) { window.gijoTabs.open(pg, lb, { dock: true }); return true; } // 🗔=명시 열기
@@ -1760,7 +1760,9 @@
         },
       });
       if (P.nextChips) P.nextChips(row, r.nextChips, function (q) { submit(q); });
-    }).catch(function () { /* 조회 실패는 조용히 — 화면 열기 자체를 막지 않는다 */ });
+      return true; // 카드가 전부 — 셸은 화면을 열지 않는다(then 끝의 암묵 undefined가 도킹 폴백을
+      // 태워 카드+화면이 둘 다 열렸던 실결함, 2026-08-20 관문 「프레임 0→1」이 잡았다)
+    }).catch(function () { return false; /* 조회 실패는 조용히 — 셸이 화면을 연다 */ });
   }
   // ── 새 대화(세션) 시작 — 💬 대화 홈(2026-08-20 사장님 「새로운 세션을 열겠습니까 알림 주고」) ──
   // 이전 대화는 서버 작업 세션에 이미 저장돼 있다(작업 내역에서 다시 본다) — 여기는 화면과
