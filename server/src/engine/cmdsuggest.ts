@@ -2,10 +2,10 @@
 // 여기서는 "제안"만 한다 — 실제 실행은 클라이언트(담당자 PC 터미널)가 허용목록·위험검사·사람 승인을
 // 모두 통과한 뒤에만 한다. 서버는 명령을 만들 뿐 실행하지 않는다(온프렘·최소권한 원칙).
 //
-// ⚠ 지금 **화면 소비자가 0곳**이다(2026-08-19 — terminal.html의 자연어 칸을 미니 챗봇 정리로
-//   떼면서 유일한 호출부가 사라졌다. preload.suggestCommand는 노출만 남아 있다).
-//   지우지 않는 이유: 「명령 추천해줘」류를 대화창 도구(registry)로 잇는 것이 다음 후보라서다.
-//   그 도구를 만들면 이 주석을 지우고, 안 만들기로 정하면 라우트째 걷어낼 것.
+// 소비자(2026-08-19 정리): 대화창 도구 suggest_command(registry.ts)가 suggestCommand()를 쓴다 —
+// 터미널 화면의 자연어 칸을 미니 챗봇 정리로 뗀 뒤 대화창으로 이은 것. HTTP 라우트
+// (/api/terminal/suggest)와 preload.suggestCommand는 화면 호출부가 0곳이나, 외부 자동화·
+// 구버전 호환으로 남긴다(gateUserInput 관문 포함이라 무해).
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";

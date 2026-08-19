@@ -793,6 +793,31 @@ const TOOLS: AgentTool[] = [
   },
   {
     // 에어갭 봉인 현황(후-4) — 인터넷으로 나가는 길이 전부 막혔는지 대화창에서 확인.
+    // 명령 제안(2026-08-19) — 터미널 화면의 자연어 칸을 미니 챗봇 정리로 떼면서(소비자 0이 된
+    // cmdsuggest.ts를) 대화창 도구로 이었다. 제안만 한다 — 실행은 터미널 화면에서 사람이
+    // 허용목록·승인 검사를 거쳐 직접 한다(최소권한 원칙, cmdsuggest.ts 머리 주석과 동일).
+    name: "suggest_command",
+    label: "CLI 명령 제안",
+    domain: "cross",
+    write: false,
+    description:
+      '보안 점검·조회용 CLI(PowerShell) 명령 한 줄을 만들어 준다. "포트 스캔 명령 알려줘", ' +
+      '"디스크 사용량 보는 명령", "nmap으로 10.0.0.5 훑는 명령" 같은 물음에 쓴다. 실행은 하지 않는다.',
+    params: [{ name: "request", label: "무엇을 하고 싶은가", description: "만들고 싶은 명령을 우리말로 (예: 10.0.0.5 열린 포트 확인)", required: true }],
+    directAnswer: true,
+    run: async (args) => {
+      const { suggestCommand } = await import("../cmdsuggest.js");
+      const r = await suggestCommand(String(args.request ?? ""));
+      if (!r.command) return r.explanation;
+      return [
+        `제안 명령: \`${r.command}\``,
+        r.explanation,
+        "",
+        "실행은 ③ 조치 › 터미널 화면에서 직접 하세요 — 붙여넣으면 허용목록·위험 검사를 거치고, 실행·차단이 작업 기록에 남습니다.",
+      ].join("\n");
+    },
+  },
+  {
     name: "airgap_status",
     label: "에어갭 봉인 현황",
     domain: "cross",
