@@ -74,6 +74,8 @@ async function main() {
     ctiFindings: await g("/api/cti/findings"),
     serviceImpact: await g("/api/service-impact"),
     assets: await g("/api/assets"),
+    // ⓪ 자산 화면(35번, 2026-08-19) — assetHub 개요를 안 채우면 「등록된 자산 없음」 빈 화면이 찍힌다.
+    assetHub: await g("/api/assethub"),
     maintenance,
     maintenanceDue: await g("/api/maintenance/due"),
     maintenanceNotify: await g("/api/maintenance/notify"),
@@ -153,6 +155,9 @@ async function main() {
       getServiceImpact: () => R(DATA.serviceImpact),
       listAssets: () => R(DATA.assets),
       getAsset: (id) => R((DATA.assets || []).find((a) => a.id === id)),
+      assetHub: () => R(DATA.assetHub),
+      // 진행 칸은 「—」가 정직 기본값이라 스텁이 값을 지어내지 않는다 — 개요만 실으면 목록은 찬다.
+      assetProgress: () => R(null),
       listMaintenance: () => R(DATA.maintenance),
       listDueMaintenance: () => R(DATA.maintenanceDue),
       getMaintenanceNotify: () => R(DATA.maintenanceNotify),
@@ -303,7 +308,11 @@ async function main() {
       // 탭 주소(settings.html?s=ai)도 찍는다 — 파일 경로와 질의문자열을 나눠 붙여야 한다
       // (통째로 pathToFileURL에 넣으면 "?"까지 파일명이 되어 ERR_FILE_NOT_FOUND, 2026-08-06 실측).
       const [파일, 질의] = s.page.split("?");
-      const 주소 = pathToFileURL(path.join(PAGES_DIR, 파일)).href + (질의 ? `?${질의}` : "");
+      // ⚠ 쿼리가 없으면 무해한 shot=1을 붙인다(2026-08-19). 08-09 재편의 **파일명 흡수**
+      //   (nav.js TAB_REDIRECT — 쿼리 없는 직접 링크를 허브로 보냄) 때문에, 파일을 직접 여는
+      //   이 도구에서는 boot이 navigateTo(스텁 noop)를 부르고 조기 종료해 **사이드바가 통째로
+      //   안 그려진 채** 찍혔다. nav.js 규칙이 「쿼리가 있으면 흡수를 안 탄다」이므로 쿼리를 준다.
+      const 주소 = pathToFileURL(path.join(PAGES_DIR, 파일)).href + (질의 ? `?${질의}` : "?shot=1");
       await page.goto(주소, { waitUntil: "load", timeout: 15000 });
       // 헤더 로고는 gijo.ai에서 받아오는데 오프라인이라 차단된다 → 깨진 이미지 아이콘이 남으므로 숨긴다.
       // (옆에 "GIJO AS" 텍스트가 이미 있어 로고가 빠져도 헤더가 비지 않는다.)
