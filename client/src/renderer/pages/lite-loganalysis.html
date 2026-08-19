@@ -20,7 +20,7 @@
   ■ 다리: analysisIngest · analysisEvents · analysisAnalyze · logAnalysisFiles · queryMemory
 -->
 <style>
-  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  :root{--bg:#EBF4EB;--panel:#FFFFFF;--border:rgba(24,48,16,.14);--text:#16241A;--muted:#55684C;--muted-2:#5C6F52;--blue:#2563EB;--teal:#0D6B37;--red:#B3261E;--amber:#7A4E00;}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;overflow-y:auto}
@@ -31,9 +31,9 @@
   .card h2{font-size:13px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
   .card .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:10px;line-height:1.6}
   .ask{display:flex;gap:8px;margin-bottom:6px}
-  .ask input{flex:1;background:#262624;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font:inherit}
+  .ask input{flex:1;background:#EBF4EB;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font:inherit}
   button{background:transparent;border:1px solid var(--border);border-radius:8px;padding:7px 13px;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer}
-  button.go{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  button.go{background:var(--blue);border-color:var(--blue);color:var(--text);font-weight:700}
   button:disabled{opacity:.5;cursor:default}
   .ev{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border)}
   .ev:last-child{border-bottom:0}
@@ -57,7 +57,7 @@
   .viz h3{font-size:12px;font-weight:800;color:var(--text);margin:0 0 8px}
   .bar{display:flex;align-items:center;gap:8px;margin:3px 0}
   .bar .lab{flex:0 0 84px;font-size:11.5px;color:var(--muted-2)}
-  .bar .track{flex:1;background:rgba(255,255,255,.05);border-radius:5px;height:15px;overflow:hidden}
+  .bar .track{flex:1;background:rgba(24,48,16,.05);border-radius:5px;height:15px;overflow:hidden}
   .bar .fill{display:block;height:100%;border-radius:5px;min-width:2px}
   .bar .val{flex:0 0 40px;font-size:11.5px;font-weight:700;color:var(--text);text-align:right}
   .top .bar .lab{flex:0 0 150px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -71,7 +71,7 @@
   .hm-row.wknd .hm-lab{color:var(--amber)}
   .viz .note{font-size:11px;color:var(--muted-2);margin-top:7px;line-height:1.6}
   .kpis{display:flex;flex-wrap:wrap;gap:8px}
-  .kpi{flex:1 1 120px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
+  .kpi{flex:1 1 120px;background:rgba(24,48,16,.03);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
   .kpi .k{font-size:11px;color:var(--muted-2)}
   .kpi .v{font-size:19px;font-weight:800;color:var(--text);margin-top:2px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kpi .v.warn-v{color:var(--red)}
@@ -161,8 +161,8 @@
   //   analysisEvents(전체)로부터: ①심각도 분포 막대 ②요일×시간 히트맵(at=epoch) ③상위 출처 Top5.
   //   외부 라이브러리 없이(폐쇄망) 인라인 SVG/CSS만 쓴다.
   var 심각도표 = {
-    critical: { 나: "긴급", 색: "#e2483d" }, high: { 나: "높음", 색: "#f0803c" },
-    medium: { 나: "중간", 색: "#e6c229" }, low: { 나: "낮음", 색: "#3b82f6" }, info: { 나: "정보", 색: "#8a8f98" }
+    critical: { 나: "긴급", 색: "#B3261E" }, high: { 나: "높음", 색: "#f0803c" },
+    medium: { 나: "중간", 색: "#e6c229" }, low: { 나: "낮음", 색: "#2563EB" }, info: { 나: "정보", 색: "#8a8f98" }
   };
   function 심각도키(e) {
     var s = String((e && (e.severity || e.level)) || "").toLowerCase();

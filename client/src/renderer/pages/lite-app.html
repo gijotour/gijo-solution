@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <title>GIJO AS Lite</title>
 <link rel="stylesheet" href="gijo-ui.css">
+<!-- 라이트 연초록(2026-08-20 사장님 확정 — 배색=에디션 이름표). 공용 gijo-ui.css(다크·표준과
+     공유)는 못 건드리므로 라이트 전용 덮어쓰기 층을 뒤에 얹는다. -->
+<link rel="stylesheet" href="lite-green.css">
 <!--
   lite-app.html — 라이트 에디션 셸.
 
@@ -126,7 +129,7 @@
             chip.id = "liteRemoteChip";
             chip.style.cssText = "-webkit-app-region:no-drag;margin-left:auto;margin-right:8px;" +
               "font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:14px;" +
-              "background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.45);color:#f0a020;";
+              "background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.45);color:#7A4E00;";
             chip.title = "이 PC 대신 VPN 안의 원격 GPU가 답하고 있습니다 — 질문이 그 기계로 전송됩니다. ⚙ 설정 › 원격 GPU에서 끕니다.";
             chip.textContent = "🖧 원격 GPU로 전송 중";
             bar.insertBefore(chip, btn);
@@ -171,13 +174,13 @@
             chip.textContent = "🌐 오픈망 " + n;
             chip.style.background = 외부 ? "rgba(240,160,32,.14)" : "rgba(30,185,128,.14)";
             chip.style.border = "1px solid " + (외부 ? "rgba(240,160,32,.45)" : "rgba(30,185,128,.4)");
-            chip.style.color = 외부 ? "#f0a020" : "#1eb980";
+            chip.style.color = 외부 ? "#7A4E00" : "#0D6B37";
             chip.title = "지금 " + n + "개 통로가 바깥과 통합니다" + (외부 ? " (외부로 나가는 것 포함)" : " (사내 유지)") + " — 누르면 ⚙ 설정 › 바깥 연결.";
           } else {
             chip.textContent = "🔒 폐쇄망";
             chip.style.background = "rgba(30,185,128,.12)";
             chip.style.border = "1px solid rgba(30,185,128,.35)";
-            chip.style.color = "#1eb980";
+            chip.style.color = "#0D6B37";
             chip.title = "바깥으로 나가는 통로가 없습니다 — 이 PC 안에서만 답합니다. 누르면 ⚙ 설정 › 바깥 연결.";
           }
         }).catch(function () { /* 못 읽은 회차는 다음 회차가 온다 */ });
@@ -232,6 +235,10 @@
     var l = document.createElement("link");
     l.id = "gijoUiCss"; l.rel = "stylesheet"; l.href = "gijo-ui.css";
     document.head.appendChild(l);
+    // 라이트 연초록 덮어쓰기(2026-08-20) — 반드시 gijo-ui.css **뒤에**(순서가 곧 승부다).
+    var g = document.createElement("link");
+    g.id = "liteGreenCss"; g.rel = "stylesheet"; g.href = "lite-green.css";
+    document.head.appendChild(g);
   })();
 
   function 그리기() {

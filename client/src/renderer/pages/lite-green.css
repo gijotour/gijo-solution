@@ -1,0 +1,47 @@
+/* lite-green.css — 라이트 에디션 연초록 배색(2026-08-20 사장님 확정 · 승인 시안 mockups/lite-green).
+ *
+ * ■ 왜 별도 파일인가: 라이트는 공용 gijo-ui.css(다크 토큰)를 그대로 받는데, 그 파일은 표준
+ *   에디션(다크 유지 확정)과 나눠 쓴다. 공용을 건드리면 표준이 같이 물든다 — 그래서
+ *   **gijo-ui.css 뒤에 얹는 라이트 전용 덮어쓰기 층**이다(lite-app <link> · lite-nav 주입기).
+ * ■ 배색 = 에디션 이름표(사장님 「구분을 위해 필요」): 라이트=연초록 · 표준=다크 · 프로=흰(웜톤).
+ * ■ 모든 값은 시안의 WCAG 계산을 그대로 옮겼다(본문 4.5:1 이상·비텍스트 3:1 이상).
+ *   다크의 「반투명 밝은 잉크」는 전부 진초록 잉크(rgba(24,48,16,…))로 반전.
+ */
+:root {
+  --g-bg: #E3EEDD;
+  --g-surface-1: #FFFFFF;            /* 카드·패널 = 흰색(옅은 초록 카드는 경고색 대비가 줄어 기각 — 시안 §3) */
+  --g-surface-2: #EBF4EB;            /* 중첩·입력 */
+  --g-surface-3: #CFE4C4;            /* 레일·제목줄 — 본문보다 진한 초록(리세스드 크롬 관계 유지) */
+  --g-border: rgba(24, 48, 16, 0.14);
+  --g-border-strong: rgba(24, 48, 16, 0.50);
+  --g-blue: #2563EB;
+  --g-blue-light: #1D4ED8;           /* 다크의 「밝은 파랑」 역할 = 라이트에선 「더 진한 파랑」(잉크 반전) */
+  --g-teal: #0D6B37;
+  --g-amber: #7A4E00;
+  --g-red: #B3261E;
+  --g-purple: #6D28D9;
+  --g-text: #16241A;
+  --g-muted: #55684C;
+  --g-muted-2: #5C6F52;
+  --g-zebra: rgba(24, 48, 16, 0.045);
+  --g-shadow-1: 0 2px 8px rgba(24, 48, 16, 0.12);
+  --g-shadow-2: 0 8px 24px rgba(24, 48, 16, 0.16);
+  /* 라이트 셸(lite-app) 전용 토큰 — gijo-ui엔 없고 lite-app이 어두운 폴백(#0f1115류)으로
+     쓰던 것들. 여기서 정의하지 않으면 셸(제목줄·사이드바)만 다크로 남는다. */
+  --g-panel: #CFE4C4;
+  --g-fg: #16241A;
+  --g-hover: rgba(24, 48, 16, 0.09);
+  --g-accent: #2563EB;
+  --g-accent-weak: rgba(37, 99, 235, 0.14);
+}
+/* 심각도 배지 — 다크 공식(반투명 배경+밝은 글자)을 라이트 공식(옅은 배경+진한 글자)으로 반전.
+ * 글자색이 곧 의미색이라 배경 알파를 낮춰 흰 카드 위에서도 배경이 「옅은 색조」로 남는다. */
+.g-b-crit { background: rgba(179, 38, 30, 0.12); color: #B3261E; }
+.g-b-high { background: rgba(122, 78, 0, 0.12); color: #7A4E00; }
+.g-b-med  { background: rgba(37, 99, 235, 0.12); color: #1D4ED8; }
+.g-b-low  { background: rgba(24, 48, 16, 0.07); color: var(--g-muted-2); }
+.g-b-ok   { background: rgba(13, 107, 55, 0.12); color: #0D6B37; }
+/* 스크롤바·표 호버 — 다크의 흰 잉크 오버레이 반전 */
+::-webkit-scrollbar-thumb { background: rgba(24, 48, 16, 0.22); }
+::-webkit-scrollbar-thumb:hover { background: rgba(24, 48, 16, 0.34); }
+.g-table tbody tr:hover { background: rgba(24, 48, 16, 0.05); }

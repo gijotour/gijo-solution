@@ -17,7 +17,7 @@
   ■ 직접 연락: g.openExternal(mailto:·tel:) + 복사 폴백. (main.ts 허용스킴에 mailto·tel 추가함)
 -->
 <style>
-  :root{--bg:#262624;--panel:#30302e;--panel-2:#262624;--border:rgba(255,255,255,.09);--border-strong:rgba(255,255,255,.16);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;}
+  :root{--bg:#EBF4EB;--panel:#FFFFFF;--panel-2:#EBF4EB;--border:rgba(24,48,16,.14);--border-strong:rgba(24,48,16,.50);--text:#16241A;--muted:#55684C;--muted-2:#5C6F52;--blue:#2563EB;--teal:#0D6B37;--red:#B3261E;--amber:#7A4E00;--purple:#6D28D9;}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;overflow-y:auto}
@@ -28,10 +28,10 @@
   .card h2{font-size:13px;font-weight:800;margin-bottom:4px}
   .card .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:12px;line-height:1.6}
   button{background:transparent;border:1px solid var(--border);border-radius:8px;padding:7px 13px;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer}
-  button.go{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  button.go{background:var(--blue);border-color:var(--blue);color:var(--text);font-weight:700}
   button.sm{padding:4px 9px;font-size:11.5px}
   button:disabled{opacity:.5;cursor:default}
-  input,select{background:#262624;border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font:inherit;font-size:12.5px}
+  input,select{background:#EBF4EB;border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font:inherit;font-size:12.5px}
   /* 커버리지 매트릭스 */
   .mx-wrap{overflow-x:auto;padding-bottom:4px}
   table.mx{border-collapse:separate;border-spacing:4px;min-width:100%}
@@ -42,7 +42,7 @@
   td.cov-in{background:rgba(30,185,128,.18);color:#7fe3bf;border-color:rgba(30,185,128,.4)}
   td.cov-ven{background:rgba(240,160,32,.16);color:#f3c06a;border-color:rgba(240,160,32,.38)}
   td.cov-gap{background:rgba(226,72,61,.13);color:#e88a82;border-color:rgba(226,72,61,.32)}
-  td .cnt{font-size:11px;opacity:.8;font-weight:600}
+  td .cnt{font-size:11px;color:var(--muted-2);font-weight:600} /* opacity 흐림→계산색(연초록 대비 4.85:1 — 시안 §5) */
   .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .sw{width:12px;height:12px;border-radius:4px;display:inline-block}
@@ -71,8 +71,8 @@
   .form label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px}
   .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{font-size:11px;border:1px solid var(--border);border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--muted)}
-  .chip.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
-  .detail{background:#262624;border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;margin-top:8px}
+  .chip.on{background:var(--blue);border-color:var(--blue);color:var(--text);font-weight:700}
+  .detail{background:#EBF4EB;border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;margin-top:8px}
   .detail .dh{font-weight:800;font-size:13.5px;margin-bottom:6px}
   .detail .row{display:flex;gap:8px;align-items:center;margin:5px 0;font-size:12.5px}
   .detail .row .k{color:var(--muted-2);min-width:52px}

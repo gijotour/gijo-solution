@@ -135,12 +135,18 @@ describe("바탕·글자 색 — 눈부심과 대비", () => {
     expect(main).toMatch(/maximizable:\s*true/);
   });
 
-  it("모든 화면이 같은 바탕색을 쓴다", () => {
-    const 바탕 = new Set<string>();
+  it("에디션 안에서는 같은 바탕색을 쓴다 — 배색=에디션 이름표(2026-08-20 사장님 확정)", () => {
+    // 계약 개정: 「전 화면 단일」→「에디션별 단일」. 라이트=연초록·표준/프로=다크가 확정이라
+    // 저장소 전체 단일은 이제 틀린 계약이다. 에디션 **안**에서 갈라지는 것은 여전히 결함.
+    const 본체바탕 = new Set<string>();
+    const 라이트바탕 = new Set<string>();
     for (const f of fs.readdirSync(화면들).filter((x) => x.endsWith(".html"))) {
       const c = 색(fs.readFileSync(path.join(화면들, f), "utf-8"), "bg");
-      if (c) 바탕.add(c.toLowerCase());
+      if (!c) continue;
+      (f.startsWith("lite-") ? 라이트바탕 : 본체바탕).add(c.toLowerCase());
     }
-    expect([...바탕], "화면마다 바탕색이 다르면 탭을 옮길 때 눈이 다시 적응해야 한다").toHaveLength(1);
+    expect([...본체바탕], "본체(표준·프로) 화면끼리 바탕색이 갈라졌다").toHaveLength(1);
+    expect([...라이트바탕], "라이트 화면끼리 바탕색이 갈라졌다").toHaveLength(1);
+    expect([...라이트바탕][0], "라이트가 본체와 같은 색이면 에디션 구분(사장님 확정)이 사라진 것").not.toBe([...본체바탕][0]);
   });
 });

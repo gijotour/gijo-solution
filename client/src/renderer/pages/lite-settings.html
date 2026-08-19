@@ -21,7 +21,7 @@
   ■ 다리는 전부 preload(window.gijo). 생 fetch 금지 — 토큰이 거기 한 곳에 있다.
 -->
 <style>
-  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  :root{--bg:#EBF4EB;--panel:#FFFFFF;--border:rgba(24,48,16,.14);--text:#16241A;--muted:#55684C;--muted-2:#5C6F52;--blue:#2563EB;--teal:#0D6B37;--red:#B3261E;--amber:#7A4E00;}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px}
   /* ⚠ 스크롤은 **바깥이 맡는다.** wrap이 max-width면서 동시에 스크롤 상자면
@@ -43,11 +43,11 @@
   .row:last-child{border-bottom:0}
   .row .k{flex:0 0 140px;color:var(--muted)}
   .row .v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
-  input,select{background:#262624;border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font:inherit;font-size:12.5px}
+  input,select{background:#EBF4EB;border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font:inherit;font-size:12.5px}
   input{flex:1;min-width:0}
   button{background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer}
   button:hover{border-color:var(--blue)}
-  button.go{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  button.go{background:var(--blue);border-color:var(--blue);color:var(--text);font-weight:700}
   button:disabled{opacity:.5;cursor:default}
   .pill{font-size:11px;padding:1px 8px;border-radius:999px}
   .pill.on{background:rgba(30,185,128,.16);color:var(--teal)}
@@ -60,7 +60,7 @@
   /* 어디서 돌릴지 — 이 PC / 원격 GPU 두 갈래(2026-08-14). 같은 크기·같은 무게로 둔다:
      한쪽을 크게 그리면 고르는 게 아니라 떠미는 것이 된다. */
   .where{display:flex;gap:8px;margin:10px 0 8px}
-  .wc{flex:1;min-width:0;text-align:left;background:#262624;border:1px solid var(--border);border-radius:10px;
+  .wc{flex:1;min-width:0;text-align:left;background:#EBF4EB;border:1px solid var(--border);border-radius:10px;
       padding:10px 11px;cursor:pointer;color:var(--text);font:inherit}
   .wc:hover{border-color:var(--accent,#5fa1ff)}
   .wc.on{border-color:var(--teal);background:rgba(30,185,128,.08)}
@@ -188,7 +188,7 @@
         <b style="font-size:12px">HuggingFace 토큰</b> <span id="hfState" style="font-size:11.5px;color:var(--muted)">확인 중…</span><br>
         <span style="font-size:11.5px;color:var(--muted-2)">GIJO가 준 모델이나 라이선스 동의가 필요한 모델은 토큰이 있어야 받아집니다.</span>
         <div class="row" style="margin-top:8px">
-          <input id="hfTok" type="password" placeholder="hf_ 로 시작하는 토큰" style="flex:1;background:#262624;border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font:inherit">
+          <input id="hfTok" type="password" placeholder="hf_ 로 시작하는 토큰" style="flex:1;background:#EBF4EB;border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font:inherit">
           <button id="hfSave" class="go">저장</button>
           <button id="hfClear">삭제</button>
         </div>

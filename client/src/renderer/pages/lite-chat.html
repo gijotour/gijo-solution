@@ -16,7 +16,7 @@
   ■ 다리: sendInstruction(text, sessionId) → { output, toolCalls }
 -->
 <style>
-  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  :root{--bg:#EBF4EB;--panel:#FFFFFF;--border:rgba(24,48,16,.14);--text:#16241A;--muted:#55684C;--muted-2:#5C6F52;--blue:#2563EB;--teal:#0D6B37;--red:#B3261E;--amber:#7A4E00;}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;
@@ -25,7 +25,7 @@
   .scr-id b{color:var(--text);font-weight:800}
   #log{flex:1 1 auto;overflow-y:auto;padding:6px 22px 12px;display:flex;flex-direction:column;gap:12px}
   .msg{max-width:760px;line-height:1.75}
-  .me{align-self:flex-end;background:var(--blue);color:#fff;border-radius:12px 12px 3px 12px;padding:9px 13px;white-space:pre-wrap}
+  .me{align-self:flex-end;background:var(--blue);color:var(--text);border-radius:12px 12px 3px 12px;padding:9px 13px;white-space:pre-wrap}
   .ai{align-self:flex-start;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 12px 3px;padding:11px 14px;white-space:pre-wrap}
   .ai .tools{font-size:11px;color:var(--muted-2);margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
   .ai .foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
@@ -42,9 +42,9 @@
   .empty .ex{display:inline-block;margin:4px 6px 0 0;padding:5px 11px;border:1px solid var(--border);border-radius:999px;cursor:pointer;color:var(--text)}
   .empty .ex:hover{border-color:var(--blue);color:var(--blue)}
   .bar{flex:0 0 auto;display:flex;gap:8px;padding:10px 22px 16px;border-top:1px solid var(--border);background:var(--bg)}
-  .bar textarea{flex:1;resize:none;height:44px;max-height:140px;background:#262624;border:1px solid var(--border);border-radius:10px;
+  .bar textarea{flex:1;resize:none;height:44px;max-height:140px;background:#EBF4EB;border:1px solid var(--border);border-radius:10px;
     padding:11px 13px;color:var(--text);font:inherit;line-height:1.5}
-  .bar button{flex:0 0 auto;background:var(--blue);border:1px solid var(--blue);color:#fff;font:inherit;font-weight:700;
+  .bar button{flex:0 0 auto;background:var(--blue);border:1px solid var(--blue);color:var(--text);font:inherit;font-weight:700;
     border-radius:10px;padding:0 18px;cursor:pointer}
   .bar button:disabled{opacity:.5;cursor:default}
   .warn{font-size:11px;color:var(--muted-2);padding:0 22px 8px}
@@ -186,7 +186,7 @@
       '<div style="color:var(--muted);font-size:12px;margin:4px 0 6px">지시를 아래와 같이 정리했습니다. 값을 확인한 뒤 승인하면 실행합니다.</div>' +
       fields.map(function (f) {
         return '<div style="margin:3px 0"><span style="color:var(--muted);font-size:12px">' + esc(f.label || f.key) + (f.required ? " *" : "") + "</span> " +
-          '<input class="ap-in" data-k="' + esc(f.key) + '" value="' + esc(f.value || "") + '" placeholder="' + esc(f.hint || "") + '" style="width:60%;background:transparent;border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:3px 7px;color:inherit"></div>';
+          '<input class="ap-in" data-k="' + esc(f.key) + '" value="' + esc(f.value || "") + '" placeholder="' + esc(f.hint || "") + '" style="width:60%;background:transparent;border:1px solid rgba(24,48,16,.50);border-radius:6px;padding:3px 7px;color:inherit"></div>';
       }).join("") +
       '<div style="margin-top:7px"><button class="ap-go">✓ 승인하고 실행</button> <button class="ap-no">취소</button></div>';
     var go = 자리.querySelector(".ap-go"), no = 자리.querySelector(".ap-no");

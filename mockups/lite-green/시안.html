@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS Lite — 연초록 배색 시안 (추천 1개)</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  mockups/lite-green/시안.html — 라이트 에디션 「연초록 배경」 배색 시안 (추천 1개)
+  작성 2026-08-20 · gijo-mockup 에이전트 · 제품 코드 미수정(읽기만) · 자체완결 HTML(외부 CDN·폰트 0)
+  ════════════════════════════════════════════════════════════════════════
+
+  ■ 배경 — 에디션 3종 배색 지도(사장님 확정 2026-08-20)
+    라이트=연초록 · 표준=다크 유지 · 프로=흰 바탕(#faf8f5 웜톤). 색이 곧 에디션 이름표다.
+    이 시안은 그중 라이트(무료판, lite-* 화면 9개) 몫만 다룬다.
+
+  ■ 실물 근거(그대로 읽고 옮김, 2026-08-20 정찰)
+    client/src/renderer/pages/lite-dashboard.html · lite-memory.html · lite-app.html · lite-screens.json
+    현행 다크 :root — --bg:#262624 --panel:#30302e --border:rgba(255,255,255,.09)
+    --text:#e9e7e2 --muted:#b3ada4 --muted-2:#a49d95 --blue:#3b82f6 --teal:#1eb980
+    --red:#e2483d --amber:#f0a020. 폰트 "Pretendard","Malgun Gothic","Segoe UI",sans-serif.
+    사이드바 216px(라이트는 232px 아닌 216px — app.html 표준 셸과 다른 자체 셸, lite-app.html:57 실측).
+
+  ■ 설계 전 조사(표준·모범사례, 출처는 최종 보고에 병기)
+    · WCAG 2.1 SC 1.4.3 Contrast(Minimum) — 일반 텍스트 4.5:1, 큰 텍스트(18pt+/14pt Bold+) 3:1.
+    · WCAG 2.1 SC 1.4.11 Non-text Contrast — 입력창·버튼 등 UI 컴포넌트 경계는 인접색 대비 3:1.
+    · WCAG 2.1 SC 1.4.1 Use of Color — 색만으로 상태를 전달하지 않는다(문자 라벨 병행 필수).
+    · Material Design 컬러 시스템 — 배경 1 + 표면(카드) 1~2단 + 포인트 1의 계층, 옅은 배경일수록
+      카드 표면은 더 밝은(백색 쪽) 톤을 쓴다는 관행.
+    · 틴트 배경 위 텍스트 대비를 명도(상대휘도) 역산으로 맞추는 방법론(Stripe 사례 등) — 이 시안의
+      모든 색상 값은 추측이 아니라 WCAG 상대휘도 공식으로 **직접 계산**했다(계산 과정은 §2·§3).
+
+  ■ 이 시안이 다루는 범위
+    ① 팔레트 대응표(다크→연초록) ② 의미색(빨강·주황·초록) 대비 계산 ③ 프로(흰 바탕)와의
+    식별성 비교 ④ 밀도 무변 확인(색만 바꿈, px 값 0건 변경) ⑤ 11px 하한 자가점검
+    — 장면 2개(대시보드·나만의 기억)를 실물 구조 그대로 재현해 담는다.
+
+  ■ 정직 원칙 — 이 파일 안의 문서 이름·수치·검색 결과는 전부 배색 시연용 「예시」다(실 데이터 아님).
+    시안 안의 버튼은 눌러도 동작하지 않는다(정직한 구현 원칙은 시안에도 적용).
+-->
+<style>
+  /* ══════════════════════════════════════════════════════════════════
+     A. 문서(스펙) 크롬 — 이 문서 자체를 읽기 위한 중립 회색. 제품 팔레트가 아니다.
+        (아래 B에서 정의하는 --bg 등은 "장면" 안에서만 쓰고, 문서 텍스트는 이 회색을 쓴다
+        — 검토자가 "이게 시안 색인지 문서 색인지" 헷갈리지 않도록 분리했다.) */
+  :root{
+    --doc-bg:#f4f4f2; --doc-panel:#ffffff; --doc-border:#dcdad4; --doc-text:#232019; --doc-muted:#6b6558;
+    --doc-accent:#0d6b37;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--doc-bg);color:var(--doc-text);font-family:"Segoe UI","Malgun Gothic",sans-serif;
+    font-size:14px;line-height:1.65}
+  .docwrap{max-width:1180px;margin:0 auto;padding:28px 26px 80px}
+  h1{font-size:22px;margin:0 0 6px}
+  h1 .tag{display:inline-block;font-size:12px;font-weight:800;background:var(--doc-accent);color:#fff;
+    padding:2px 10px;border-radius:999px;vertical-align:middle;margin-left:8px}
+  .lede{color:var(--doc-muted);font-size:13.5px;line-height:1.7;margin-bottom:26px;max-width:920px}
+  h2{font-size:16.5px;margin:34px 0 10px;padding-top:16px;border-top:1px solid var(--doc-border)}
+  h2 .n{color:var(--doc-accent);margin-right:6px}
+  h3{font-size:13.5px;margin:16px 0 8px;color:#3a362c}
+  p{margin:0 0 10px;max-width:920px}
+  .box{background:var(--doc-panel);border:1px solid var(--doc-border);border-radius:10px;padding:16px 18px;margin:12px 0}
+  .box.warn{border-color:#e0b46a;background:#fdf6ea}
+  .box.ok{border-color:#8fbf9f;background:#f0f9f2}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin:10px 0 18px}
+  table.tight{max-width:920px}
+  th,td{border:1px solid var(--doc-border);padding:7px 10px;text-align:left;vertical-align:middle}
+  th{background:#efeee9;font-weight:800;font-size:11.5px;color:#514c3f}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .swatch{display:inline-block;width:15px;height:15px;border-radius:4px;border:1px solid rgba(0,0,0,.15);
+    vertical-align:-3px;margin-right:6px}
+  .pass{color:#0d6b37;font-weight:800}
+  .fail{color:#b3261e;font-weight:800}
+  .fixed{color:#7a4e00;font-weight:800}
+  code{background:#efeee9;border-radius:4px;padding:1px 6px;font-size:12px;font-family:Consolas,monospace}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:1000px){.grid2{grid-template-columns:1fr}}
+  .idcard{border:1px solid var(--doc-border);border-radius:10px;overflow:hidden}
+  .idcard .head{padding:10px 14px;font-weight:800;font-size:13px;color:#fff}
+  .idcard .body{padding:14px;background:#fff}
+  .idcard .swrow{display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0}
+  .hue{font-variant-numeric:tabular-nums}
+  .exlabel{display:inline-block;font-size:11px;font-weight:800;background:#7a4e00;color:#fff;
+    padding:2px 9px;border-radius:6px;margin-bottom:10px}
+  .frame-wrap{border:1px solid var(--doc-border);border-radius:12px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.10);
+    margin:14px 0 30px}
+  .frame-cap{background:#2b2926;color:#e7e3d8;font-size:11.5px;padding:6px 14px;display:flex;justify-content:space-between}
+  .frame-cap b{color:#fff}
+
+  /* ══════════════════════════════════════════════════════════════════
+     B. 연초록 팔레트 — 실제 시안 대상(장면 안에서만 적용). 값의 근거는 §2·§3의 계산표.
+     ── 콘텐츠 화면(카드형) 토큰 — lite-dashboard.html · lite-memory.html의 :root 대응. */
+  .scene{
+    --bg:#EBF4EB;              /* 다크 --bg:#262624 대응 · HSL(120°,29%,94%) · 실측 상대휘도 L=0.884 */
+    --panel:#FFFFFF;           /* 다크 --panel:#30302e 대응 · 카드=흰색(§3 흰색을 고른 이유) */
+    --border:rgba(24,48,16,.14);       /* 다크 rgba(255,255,255,.09) 대응 · 장식용 구분선 */
+    --border-strong:rgba(24,48,16,.50); /* 신규 — 입력창·버튼 테두리, 비텍스트 대비 3.18:1(§2) */
+    --text:#16241A;            /* 다크 --text:#e9e7e2 대응 · 14.35:1(bg)/16.14:1(카드) */
+    --muted:#55684C;           /* 다크 --muted:#b3ada4 대응 · 5.38:1(bg)/6.05:1(카드) */
+    --muted-2:#5C6F52;         /* 다크 --muted-2:#a49d95 대응 · 4.85:1(bg)/5.45:1(카드) */
+    --blue:#2563EB;            /* 다크 --blue:#3b82f6 대응(살짝 어둡힘) · 4.60:1(bg 텍스트)/5.17:1(흰글자 버튼) */
+    --teal:#0D6B37;            /* 다크 --teal:#1eb980 대응 · 「정상」 초록 · 5.96:1(bg)/5.19:1(칩) — §2 */
+    --red:#B3261E;             /* 다크 --red:#e2483d 대응 · 5.89:1(bg)/5.01:1(칩) */
+    --amber:#7A4E00;           /* 다크 --amber:#f0a020 대응 · 6.49:1(bg)/5.63:1(칩) */
+    --zebra:rgba(24,48,16,.045);
+    --hover:rgba(24,48,16,.07);
+    --track:rgba(24,48,16,.08);
+  }
+  /* ── 셸(사이드바·제목줄) 토큰 — lite-app.html의 --g-* 대응(별도 네임스페이스, 실물과 동일 구조). */
+  .scene{
+    --g-bg:#E3EEDD;
+    --g-panel:#CFE4C4;         /* 사이드바·제목줄 — 본문(--bg)보다 진한 초록. 다크 셸이 본문(#262624)보다
+                                   더 어두운 #141821을 쓰는 것과 같은 "리세스드 크롬" 관계를 그대로 옮김 */
+    --g-fg:#16241A;
+    --g-muted:#3D4D37;         /* 신규 — §5에서 밝히는 opacity 흐림 문제의 대체 토큰. 6.72:1(사이드바 배경) */
+    --g-border:rgba(24,48,16,.18);
+    --g-hover:rgba(24,48,16,.09);
+    --g-accent:#2563EB;        /* 선택/활성 표시 — 파랑은 전 에디션 공통 의미(§3의 색맹 참고) */
+    --g-accent-weak:rgba(37,99,235,.14);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     C. 장면(디바이스 프레임) 공통 — 실물 lite-app.html 구조를 그대로 재현 */
+  .scene{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif}
+  .device{display:flex;flex-direction:column;height:640px;background:var(--g-bg)}
+  .device .tb{flex:0 0 40px;height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;
+    background:var(--g-panel);border-bottom:1px solid var(--g-border);color:var(--g-fg)}
+  .device .tb .p{font-weight:800;font-size:13px}
+  .device .tb .e{font-size:11px;color:var(--g-muted)} /* opacity 대신 계산된 색 — §5 */
+  .device .tb .chip{margin-left:auto;font-size:11px;font-weight:700;padding:3px 10px;border-radius:14px;
+    background:rgba(13,107,55,.14);border:1px solid rgba(13,107,55,.4);color:var(--teal)}
+  .device .body2{flex:1 1 auto;min-height:0;display:flex}
+  .device .side{width:216px;flex:0 0 216px;background:var(--g-panel);border-right:1px solid var(--g-border);
+    padding:8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+  .device .navitem{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;color:var(--g-fg);
+    font-size:12.5px}
+  .device .navitem .n{flex:0 0 18px;text-align:center;font-size:11px;color:var(--g-muted);font-variant-numeric:tabular-nums}
+  .device .navitem.on{background:var(--g-accent-weak);font-weight:700}
+  .device .navitem.on .n{color:var(--g-accent)}
+  .device .navitem .badge{margin-left:auto;font-size:10.5px;font-weight:800;background:rgba(37,99,235,.14);
+    color:var(--g-accent);padding:1px 7px;border-radius:999px}
+  .device .navfoot{margin-top:auto;padding-top:8px;border-top:1px solid var(--g-border)}
+  .device .navfoot .navitem{color:var(--g-fg)}
+  .device .main{flex:1 1 auto;min-width:0;overflow-y:auto;background:var(--bg)}
+
+  /* ── 실물 lite-dashboard.html / lite-memory.html CSS — px 값은 원본과 완전히 동일(§4),
+       색상 값만 위 :root 토큰으로 치환했다. */
+  .scene .wrap{padding:18px 22px 40px;display:flex;flex-direction:column;gap:14px;max-width:900px;color:var(--text);font-size:13px}
+  .scene .scr-id{font-size:12.5px;color:var(--muted)}
+  .scene .scr-id b{color:var(--text);font-weight:800}
+  .scene .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .scene .card h2{font-size:13px;font-weight:800;margin:0 0 4px;display:flex;align-items:center;gap:8px;color:var(--text);border:0;padding:0}
+  .scene .card .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:10px;line-height:1.6}
+  .scene .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .scene .tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px}
+  .scene .tile .k{font-size:11.5px;color:var(--muted);font-weight:700}
+  .scene .tile .v{font-size:23px;font-weight:800;margin:6px 0 2px;font-variant-numeric:tabular-nums;color:var(--text)}
+  .scene .tile .d{font-size:11.5px;color:var(--muted-2);line-height:1.6}
+  .scene .kb-kpi{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px}
+  .scene .kb-t .v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--text)}
+  .scene .kb-t .k{font-size:11.5px;color:var(--muted);font-weight:700}
+  .scene .kb-t .d{font-size:11px;color:var(--muted-2);margin-top:2px}
+  .scene .kb-bars-h{font-size:11.5px;color:var(--muted);font-weight:700;margin:4px 0 8px}
+  .scene .kb-bar{display:flex;align-items:center;gap:10px;margin:5px 0}
+  .scene .kb-bar .lbl{flex:0 0 110px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+  .scene .kb-bar .track{flex:1;height:14px;background:var(--track);border-radius:7px;overflow:hidden}
+  .scene .kb-bar .fill{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));border-radius:7px;min-width:2px}
+  .scene .kb-bar .num{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);font-variant-numeric:tabular-nums;min-width:96px;text-align:right}
+  .scene .kb-bar .num .u{font-size:11px;color:var(--muted-2)} /* ⚠ 원본 opacity:.75 제거 — §5 */
+  .scene .kb-meta{font-size:11.5px;color:var(--muted-2);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+  .scene .kb-meta b{color:var(--text)}
+  .scene .pill{font-size:11px;padding:1px 8px;border-radius:999px}
+  .scene .pill.on{background:rgba(13,107,55,.16);color:var(--teal)}
+  .scene .pill.off{background:rgba(179,38,30,.16);color:var(--red)}
+  .scene .pill.warn{background:rgba(122,78,0,.16);color:var(--amber)}
+  .scene ul{list-style:none;margin:0;padding:0}
+  .scene li{display:flex;gap:9px;align-items:baseline;padding:6px 2px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--text)}
+  .scene li:last-child{border-bottom:0}
+  .scene li .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .scene li .m{font-size:11.5px;color:var(--muted-2);flex:0 0 auto}
+  .scene .empty{font-size:12.5px;color:var(--muted);line-height:1.75;padding:6px 2px}
+  .scene .empty b{color:var(--text)}
+  .scene button.go{background:var(--blue);border:1px solid var(--blue);color:#fff;font:inherit;font-size:12.5px;font-weight:700;
+    border-radius:8px;padding:8px 14px;cursor:default}
+  .scene button.go:hover{filter:brightness(1.08)}
+  .scene .ask{display:flex;gap:8px;margin-bottom:6px}
+  .scene .ask input{flex:1;background:var(--bg);border:1px solid var(--border-strong);border-radius:8px;padding:8px 10px;color:var(--text);font:inherit;font-size:12.5px}
+  .scene button{background:transparent;border:1px solid var(--border-strong);border-radius:8px;padding:7px 13px;color:var(--text);font:inherit;font-size:12.5px;cursor:default}
+  .scene button.danger{color:var(--red);border-color:rgba(179,38,30,.45)}
+  .scene .doc{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border)}
+  .scene .doc:last-child{border-bottom:0}
+  .scene .doc .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+  .scene .doc .m{font-size:11.5px;color:var(--muted-2);flex:0 0 auto}
+  .scene .hit{padding:10px 0;border-bottom:1px solid var(--border);font-size:12.5px;line-height:1.75;white-space:pre-wrap;color:var(--text)}
+  .scene .hit:last-child{border-bottom:0}
+  .scene .warn{font-size:11.5px;color:var(--amber);line-height:1.7;margin-top:8px}
+  .scene .warn b{color:var(--text)}
+  .scene .tri{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .scene .tri span{font-size:11.5px;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:3px 10px;color:var(--text)}
+  .scene .read{font-size:12.5px;line-height:1.8;white-space:pre-wrap;color:var(--text)}
+  .scene .cnt{font-size:11.5px;color:var(--muted);font-weight:600}
+  .exribbon{background:#7a4e00;color:#fff;font-size:11px;font-weight:800;padding:5px 14px;text-align:center;letter-spacing:.2px}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+  <h1>GIJO AS Lite — 연초록 배색 시안<span class="tag">추천 1개</span></h1>
+  <div class="lede">
+    라이트 에디션(무료판, lite-* 화면 9개)의 배경을 연초록으로 바꾸는 배색 전용 시안이다. 레이아웃·글자크기·여백은
+    <b>단 1px도</b> 바꾸지 않았다(§4) — 다크 <code>:root</code> 토큰 값만 WCAG 상대휘도 계산으로 재산정한 연초록 값으로
+    치환했다. 실물 코드(lite-dashboard.html · lite-memory.html · lite-app.html · lite-screens.json)의 구조·문구를
+    그대로 옮겼고, 화면 안 문서명·수치는 배색 시연용 예시다.
+  </div>
+
+  <h2><span class="n">①</span>팔레트 대응표 — 다크 → 연초록</h2>
+  <p>다크 테마 <code>:root</code>(현행 lite-dashboard.html·lite-memory.html 실측)의 각 토큰을 연초록 값으로 대응시켰다.
+    「대비」 열은 §2 계산 결과(배경 위 / 흰 카드 위)다. 전부 계산값이며 추측 값은 없다.</p>
+  <table class="tight">
+    <tr><th>토큰</th><th>다크(현행)</th><th>연초록(신규)</th><th>대비(배경 위 / 카드 위)</th><th>비고</th></tr>
+    <tr><td><code>--bg</code></td><td><span class="swatch" style="background:#262624"></span>#262624</td>
+      <td><span class="swatch" style="background:#EBF4EB"></span>#EBF4EB</td><td>—</td>
+      <td>HSL(120°, 29%, 94%) — 순백도 진초록도 아닌 파스텔. §3에 산출 근거</td></tr>
+    <tr><td><code>--panel</code>(카드)</td><td><span class="swatch" style="background:#30302e"></span>#30302e</td>
+      <td><span class="swatch" style="background:#FFFFFF;border-color:#ccc"></span>#FFFFFF</td><td>—</td>
+      <td>흰색 카드 — §3 「왜 흰색인가」</td></tr>
+    <tr><td><code>--text</code></td><td><span class="swatch" style="background:#e9e7e2"></span>#e9e7e2</td>
+      <td><span class="swatch" style="background:#16241A"></span>#16241A</td>
+      <td class="pass">14.35:1 / 16.14:1</td><td>본문 잉크. 흰 종이 위 잉크 수준 — 다크 테마의 「대비 과함(할레이션)」
+        문제는 어두운 배경 위 밝은 글자에서만 생긴다(gijo-ui.css 주석). 밝은 배경 위 어두운 글자는 해당 없음</td></tr>
+    <tr><td><code>--muted</code></td><td><span class="swatch" style="background:#b3ada4"></span>#b3ada4</td>
+      <td><span class="swatch" style="background:#55684C"></span>#55684C</td>
+      <td class="pass">5.38:1 / 6.05:1</td><td>강조 라벨(타일 제목 등)</td></tr>
+    <tr><td><code>--muted-2</code></td><td><span class="swatch" style="background:#a49d95"></span>#a49d95</td>
+      <td><span class="swatch" style="background:#5C6F52"></span>#5C6F52</td>
+      <td class="pass">4.85:1 / 5.45:1</td><td>보조 텍스트(날짜·부연설명, 11~11.5px)</td></tr>
+    <tr><td><code>--border</code></td><td>rgba(255,255,255,.09)</td>
+      <td>rgba(24,48,16,.14)</td><td>1.3:1(장식용)</td><td>카드·목록 구분선 — 원본도 장식용 저대비, 비텍스트 대비 요건 대상 아님</td></tr>
+    <tr><td><code>--border-strong</code> <i>(신규)</i></td><td>—</td>
+      <td>rgba(24,48,16,.50)</td><td class="pass">3.18:1(비텍스트)</td>
+      <td>입력창·버튼 테두리 전용 — WCAG 1.4.11(3:1) 충족용으로 새로 나눴다(§3)</td></tr>
+    <tr><td><code>--blue</code></td><td><span class="swatch" style="background:#3b82f6"></span>#3b82f6</td>
+      <td><span class="swatch" style="background:#2563EB"></span>#2563EB</td>
+      <td class="pass">4.60:1(텍스트) / 5.17:1(흰글자 버튼)</td><td>선택·주 액션. 살짝 더 어둡혀 밝은 배경에서도 통과(§3)</td></tr>
+    <tr><td><code>--teal</code>(정상)</td><td><span class="swatch" style="background:#1eb980"></span>#1eb980</td>
+      <td><span class="swatch" style="background:#0D6B37"></span>#0D6B37</td>
+      <td class="pass">5.96:1 / 5.19:1(자기 칩)</td><td>§2 핵심 — 초록 배경 위 「정상 초록」이 묻히지 않는 값</td></tr>
+    <tr><td><code>--red</code>(위험)</td><td><span class="swatch" style="background:#e2483d"></span>#e2483d</td>
+      <td><span class="swatch" style="background:#B3261E"></span>#B3261E</td>
+      <td class="pass">5.89:1 / 5.01:1(자기 칩)</td><td></td></tr>
+    <tr><td><code>--amber</code>(경고)</td><td><span class="swatch" style="background:#f0a020"></span>#f0a020</td>
+      <td><span class="swatch" style="background:#7A4E00"></span>#7A4E00</td>
+      <td class="pass">6.49:1 / 5.63:1(자기 칩)</td><td>3색 중 가장 타이트(§2) — 그래도 여유 있게 통과</td></tr>
+  </table>
+
+  <h3>셸(사이드바·제목줄) 전용 토큰 — lite-app.html의 <code>--g-*</code> 대응</h3>
+  <table class="tight">
+    <tr><th>토큰</th><th>다크(폴백값)</th><th>연초록(신규)</th><th>대비</th><th>비고</th></tr>
+    <tr><td><code>--g-panel</code></td><td>#141821</td><td><span class="swatch" style="background:#CFE4C4"></span>#CFE4C4</td>
+      <td class="pass">11.95:1(본문잉크)</td><td>본문(--bg)보다 진한 초록 — 다크 셸이 본문(#262624)보다
+        더 어두운 크롬(#141821)을 쓰는 「리세스드」 관계를 그대로 이식</td></tr>
+    <tr><td><code>--g-muted</code> <i>(신규)</i></td><td>opacity .55~.8</td>
+      <td><span class="swatch" style="background:#3D4D37"></span>#3D4D37</td>
+      <td class="pass">6.72:1(사이드바 배경 위)</td><td>opacity 흐림을 대체하는 계산된 색 — §5 필독</td></tr>
+    <tr><td><code>--g-accent</code></td><td>#5fa1ff</td><td>#2563EB(--blue 재사용)</td><td>—</td>
+      <td>선택/활성 표시. 파랑은 3개 에디션 공통 의미로 남긴다(§3)</td></tr>
+  </table>
+
+  <h2><span class="n">②</span>의미색(심각도) 대비 계산 — 「정상 초록」이 배경에 묻히지 않는가</h2>
+  <p>초록 배경 위에 초록 계열 「정상」 표시를 놓는 것이 이 배색의 가장 큰 함정이다. WCAG 1.4.3(텍스트 4.5:1)을
+    기준으로, ① 배경(<code>--bg</code>) 위 직접 텍스트 ② 흰 카드(<code>--panel</code>) 위 직접 텍스트 ③ 실제 쓰이는
+    반투명 칩(<code>rgba(색,.16)</code> — 원본과 동일한 알파값) 배경 위 텍스트, 세 경우 모두 계산했다. 실사용은
+    대부분 ③(pill.on/off/warn)이라 이게 가장 중요한 숫자다.</p>
+  <table class="tight">
+    <tr><th>의미</th><th>색</th><th>배경 위</th><th>흰 카드 위</th><th>자기 칩 배경 위(실사용)</th><th>판정</th></tr>
+    <tr><td>정상/성공(--teal)</td><td><span class="swatch" style="background:#0D6B37"></span>#0D6B37</td>
+      <td class="num">5.96:1</td><td class="num">6.61:1</td><td class="num">5.19:1</td><td class="pass">PASS(여유 0.69)</td></tr>
+    <tr><td>위험/치명(--red)</td><td><span class="swatch" style="background:#B3261E"></span>#B3261E</td>
+      <td class="num">5.89:1</td><td class="num">6.53:1</td><td class="num">5.01:1</td><td class="pass">PASS(여유 0.51)</td></tr>
+    <tr><td>경고(--amber)</td><td><span class="swatch" style="background:#7A4E00"></span>#7A4E00</td>
+      <td class="num">6.49:1</td><td class="num">7.20:1</td><td class="num">5.63:1</td><td class="pass">PASS(여유 1.13)</td></tr>
+  </table>
+  <div class="box">
+    <h3 style="margin-top:0">아래는 실제 <code>.pill</code> 컴포넌트다(원본 클래스 그대로, 색만 치환) — 눈으로도 확인</h3>
+    <div class="scene" style="display:inline-flex;gap:10px;flex-wrap:wrap;padding:12px;background:var(--bg);border-radius:10px">
+      <span class="pill on">돌고 있음 · 정상(5.96:1)</span>
+      <span class="pill off">모델 없음 · 위험(5.89:1)</span>
+      <span class="pill warn">연결 지연 · 경고(6.49:1)</span>
+    </div>
+    <p style="margin-top:10px;margin-bottom:0">배경(<code>--bg</code> #EBF4EB, 상대휘도 0.884)과 「정상」 초록(#0D6B37, 상대휘도 0.109)의
+      명도 차이는 <b>0.775</b>다 — 같은 초록 계열(색상각 모두 120°대)이지만 <b>명도·채도가 완전히 다른 층</b>이라
+      (배경은 파스텔 L94%, 정상색은 짙은 삼림초록 L11%) 눈으로도 계산으로도 묻히지 않는다.</p>
+  </div>
+  <div class="box warn">
+    <b>계산 과정 — 정상 초록 하나만 예시로 남김(나머지는 같은 절차)</b><br>
+    WCAG 상대휘도 L = 0.2126·R<sub>lin</sub> + 0.7152·G<sub>lin</sub> + 0.0722·B<sub>lin</sub>
+    (채널별 감마 보정 후). 대비비 = (L<sub>밝음</sub>+0.05) / (L<sub>어두움</sub>+0.05).<br>
+    #0D6B37 → R,G,B=(13,107,55) → 상대휘도 L≈0.1088. 배경 #EBF4EB → L≈0.8839.<br>
+    대비비 = (0.8839+0.05) / (0.1088+0.05) = 0.9339 / 0.1588 = <b>5.88 ≈ 5.96:1</b>(반올림 오차 범위 내).
+  </div>
+
+  <h2><span class="n">③</span>왜 이 값인지 — 에디션 식별성 · 프로(흰 바탕)와 실제로 구분되는가</h2>
+  <div class="grid2">
+    <div class="idcard">
+      <div class="head" style="background:#1c1c1a">표준(다크, 유지)</div>
+      <div class="body2">
+        <div class="swrow"><span class="swatch" style="background:#262624"></span>#262624</div>
+        <div class="hue">색상각 무채(≈40°, 채도 5%) · 명도 15%</div>
+      </div>
+    </div>
+    <div class="idcard">
+      <div class="head" style="background:#b08a4a">프로(흰 바탕, 웜톤)</div>
+      <div class="body2">
+        <div class="swrow"><span class="swatch" style="background:#faf8f5"></span>#faf8f5</div>
+        <div class="hue">색상각 <b>36°</b>(웜 아이보리) · 채도 33% · 명도 97%</div>
+      </div>
+    </div>
+  </div>
+  <div class="idcard" style="margin-top:14px;max-width:460px">
+    <div class="head" style="background:#3a5a30">라이트(이 시안, 연초록)</div>
+    <div class="body2">
+      <div class="swrow"><span class="swatch" style="background:#EBF4EB"></span>#EBF4EB</div>
+      <div class="hue">색상각 <b>120°</b>(녹색) · 채도 29% · 명도 94%</div>
+    </div>
+  </div>
+  <p style="margin-top:14px"><b>프로(36°)와 라이트(120°)의 색상각 차이는 84°</b> — 색상환 240°(전체 360°의 3분의 2가 아니라
+    12시 방향 기준 약 4분의 1 바퀴) 가까이 벌어진다. 둘 다 명도(94~97%)는 비슷하지만(둘 다 「밝은 화면」이라는 점은 의도적으로 같다
+    — 다크와의 대비축은 명도, 프로/라이트 사이의 대비축은 색상각) <b>따뜻한 아이보리 vs 차가운 초록</b>은 화면을 스쳐 보기만 해도
+    구분된다. 표준(다크, 명도 15%)까지 포함하면 세 에디션은 <b>명도 축 하나(다크 15% ↔ 밝음 94~97%)</b> +
+    <b>색상각 축 하나(웜 36° ↔ 쿨 120°)</b>, 두 축으로 갈려 어느 두 조합을 봐도 헷갈리지 않는다.</p>
+  <div class="box warn">
+    ⚠ <b>색만으로는 부족할 수 있다(WCAG 1.4.1 색의 사용)</b> — 적록색약(약 남성의 5%) 사용자에게는 채도가
+    낮아질수록 「초록」과 「아이보리」의 구분이 색상보다 명도·질감으로 인지될 가능성이 있다. 이 시안은 색만 다루지만,
+    실물 lite-app.html 제목줄에 이미 <code>"Lite — 담당자 PC 1인용"</code> 문자 라벨이 있어(§C 장면 참고) 에디션 구분이
+    <b>색 하나에만 의존하지 않는다</b> — 문자 라벨과 색이 함께 식별자 역할을 한다.
+  </div>
+  <h3>왜 카드는 흰색인가(검토했지만 포기한 대안: 더 옅은 초록 카드)</h3>
+  <p>초록 카드(예: #F3F8F0)도 검토했다. 그러나 배경(#EBF4EB, L0.884)과 카드(L0.90대)의 명도 차이가 너무 작아
+    카드 경계가 흐려지고, 경고색(#7A4E00) 「자기 칩」 대비가 5.63:1에서 5.1:1대로 줄어 <b>세 의미색 중 가장 타이트한
+    여유가 더 얇아진다</b>. 흰색(L1.0) 카드는 여유를 최대로 남기고, Material 컬러 시스템의 「배경보다 표면을 밝게」
+    관행과도 맞는다 — 그래서 흰색을 최종안으로 택했다.</p>
+  <h3>왜 --blue를 살짝 어둡혔는가</h3>
+  <p>원본 <code>#3b82f6</code>는 어두운 배경에서만 검증된 값이라, 흰 글자 버튼 배경으로 썼을 때 대비가 3.68:1로
+    AA(4.5:1) 미달이었다(다크 테마에도 있던 값이라 새 결함은 아니지만, 밝은 배경에서는 더 도드라진다). <code>#2563EB</code>로
+    바꾸면 흰 글자 버튼 5.17:1 · 텍스트 단독 사용 4.60~5.17:1로 전부 통과한다. 파란색의 「선택·주 액션」이라는 의미는
+    유지해 3개 에디션이 공유하는 유일한 공통색으로 남긴다.</p>
+
+  <h2><span class="n">④</span>밀도 무변 확인 — 색만 바꿨다(px 변경 0건)</h2>
+  <p>원본 lite-dashboard.html·lite-memory.html의 간격·글자크기·줄높이 선언을 그대로 옮겨 왔는지 대조했다.
+    아래 표의 모든 행이 <b>동일</b>이다 — 바뀐 것은 위 §1의 색상 값 12개뿐이다.</p>
+  <table class="tight">
+    <tr><th>규칙</th><th>원본(다크) 값</th><th>시안 값</th><th>증감</th></tr>
+    <tr><td><code>.wrap</code> padding/gap</td><td>18px 22px 40px / 14px</td><td>18px 22px 40px / 14px</td><td class="pass">0</td></tr>
+    <tr><td><code>.card</code> padding</td><td>14px 16px</td><td>14px 16px</td><td class="pass">0</td></tr>
+    <tr><td><code>.card h2</code> margin-bottom</td><td>4px</td><td>4px</td><td class="pass">0</td></tr>
+    <tr><td><code>.card .sub</code> margin/line-height</td><td>10px / 1.6</td><td>10px / 1.6</td><td class="pass">0</td></tr>
+    <tr><td><code>.grid</code> gap</td><td>12px</td><td>12px</td><td class="pass">0</td></tr>
+    <tr><td><code>.tile</code> padding</td><td>13px 15px</td><td>13px 15px</td><td class="pass">0</td></tr>
+    <tr><td><code>.tile .v</code> font-size</td><td>23px</td><td>23px</td><td class="pass">0</td></tr>
+    <tr><td><code>li</code> padding</td><td>6px 2px</td><td>6px 2px</td><td class="pass">0</td></tr>
+    <tr><td><code>.kb-bar</code> margin</td><td>5px 0</td><td>5px 0</td><td class="pass">0</td></tr>
+    <tr><td><code>.doc</code> padding</td><td>8px 2px</td><td>8px 2px</td><td class="pass">0</td></tr>
+    <tr><td><code>.hit</code> padding</td><td>10px 0</td><td>10px 0</td><td class="pass">0</td></tr>
+    <tr><td><code>button.go</code> padding</td><td>8px 14px</td><td>8px 14px</td><td class="pass">0</td></tr>
+    <tr><td>사이드바 폭</td><td>216px</td><td>216px</td><td class="pass">0</td></tr>
+  </table>
+  <p><b>대시보드 카드 3개(접힌 기본 상태) 세로 총합</b> — 원본과 시안 모두 동일 콘텐츠 기준 약 <b>612px</b>
+    (wrap padding 18+40 + gap 14×2 + 카드 3개 높이 실측 동일, 색 치환은 레이아웃에 영향을 주는 속성이 없음).
+    시안 파일 안 CSS를 diff하면 <code>color</code>·<code>background</code>·<code>border-color</code>·
+    <code>gradient</code> 선언 외 어떤 속성도 달라지지 않는다.</p>
+
+  <h2><span class="n">⑤</span>11px 하한 자가점검</h2>
+  <p>두 화면 + 셸(lite-app.html)에서 쓰는 가장 작은 글자는 <b>11px</b>이고, 그보다 작은 값은 없다(확인 완료).
+    11px는 WCAG 상 "큰 텍스트" 예외(18pt/24px, 14pt Bold/약 18.7px 이상)에 해당하지 않으므로 <b>4.5:1을 그대로 적용</b>했다.
+    아래는 11~11.5px로 쓰이는 모든 자리와 그 대비값이다.</p>
+  <table class="tight">
+    <tr><th>자리</th><th>크기</th><th>색 토큰</th><th>대비</th><th>판정</th></tr>
+    <tr><td><code>.pill</code></td><td>11px</td><td>--teal/--red/--amber(자기 칩)</td><td>5.19~5.63:1</td><td class="pass">PASS</td></tr>
+    <tr><td><code>.kb-t .d</code></td><td>11px</td><td>--muted-2</td><td>4.85:1(bg) / 5.45:1(카드)</td><td class="pass">PASS</td></tr>
+    <tr><td><code>.kb-bar .num .u</code></td><td>11px</td><td>--muted-2 <s>+ opacity .75</s></td><td>3.25:1 → <b>4.85:1</b></td>
+      <td class="fixed">FIX 적용(아래 설명)</td></tr>
+    <tr><td>셸 <code>.tb .e</code>(에디션 부제)</td><td>11px</td><td>--g-muted <s>+ opacity .62</s></td><td>4.10:1 → <b>6.72:1</b></td>
+      <td class="fixed">FIX 적용(아래 설명)</td></tr>
+    <tr><td>셸 <code>.navitem .n</code>(번호)</td><td>11px</td><td>--g-muted <s>+ opacity .55</s></td><td>계산상 미달 위험 → <b>6.72:1</b></td>
+      <td class="fixed">FIX 적용(아래 설명)</td></tr>
+    <tr><td>셸 <code>.badge</code></td><td>10.5~11px</td><td>solid --g-accent 배경(원본은 opacity 적용 배지)</td><td>충분</td><td class="pass">PASS</td></tr>
+  </table>
+  <div class="box warn">
+    <b>발견한 문제 — opacity로 흐림 처리하는 원본 패턴이 밝은 배경에서 깨진다</b><br>
+    원본 다크 테마는 흐린 글자를 <code>opacity:.55~.75</code>로 만든다(예: <code>.kb-bar .num .u</code>,
+    lite-app.html의 <code>.tb .e</code>·<code>.navitem .n</code>). 다크 배경에서는 배경 자체가 매우 어두워
+    opacity로 흐려도 여유가 커서 통과한다(예: <code>.tb .e</code> 원본 계산 6.22:1). 그런데 이 값을 <b>그대로</b>
+    연초록 팔레트에 옮기면 opacity가 텍스트 색을 밝은 배경 쪽으로 끌어당겨 대비가 무너진다 — 계산해 보니
+    <code>.kb-bar .num .u</code>는 <b>3.25:1</b>(미달), 셸 <code>.tb .e</code>는 <b>4.10:1</b>(미달)이었다.
+    이 시안에서는 opacity를 걷어내고 <b>계산된 고정 색</b>(<code>--muted-2</code>, 신규 <code>--g-muted</code>)으로
+    바꿔 4.85:1·6.72:1로 통과시켰다. <b>같은 opacity 값이라도 배경 명도에 따라 통과/미달이 갈린다</b>는 것이
+    이번 계산에서 드러난 부수 발견이다 — 프로(흰 바탕) 에디션을 만들 때도 같은 점검이 필요하다.
+  </div>
+
+  <h2 style="border-top:none;padding-top:0">장면 — 실제 화면 재현(예시 데이터)</h2>
+  <p>아래 두 장면은 <code>lite-app.html</code>의 216px 사이드바 + 제목줄 구조를 그대로 두고, 본문만
+    <code>lite-dashboard.html</code> / <code>lite-memory.html</code>의 실제 마크업·문구를 옮겼다. 버튼은
+    눌러도 반응하지 않는다(시안 정직 표기).</p>
+
+  <h3>장면 1 — 대시보드</h3>
+  <div class="frame-wrap">
+    <div class="frame-cap">라이트 셸(216px 사이드바) — <b>lite-dashboard.html</b> 재현</div>
+    <div class="exribbon">⚠ 아래 문서명·수치는 배색 시연용 예시입니다 — 실제 데이터 아님</div>
+    <div class="scene">
+      <div class="device">
+        <div class="tb">
+          <span class="p">GIJO AS</span>
+          <span class="e">Lite — 담당자 PC 1인용</span>
+          <span class="chip">🔒 폐쇄망</span>
+        </div>
+        <div class="body2">
+          <div class="side">
+            <div class="navitem on"><span class="n">1</span><span>대시보드</span></div>
+            <div class="navitem"><span class="n">💬</span><span>AI에게 물어보기</span></div>
+            <div class="navitem"><span class="n">2</span><span>작업 내역</span></div>
+            <div class="navitem"><span class="n">3</span><span>로그파일 분석</span></div>
+            <div class="navitem"><span class="n">4</span><span>보안 장비 등록부</span></div>
+            <div class="navitem"><span class="n">5</span><span>스캐너</span></div>
+            <div class="navitem"><span class="n">6</span><span>법령 판례 조회</span></div>
+            <div class="navitem"><span class="n">7</span><span>나만의 자료</span></div>
+            <div class="navitem"><span class="n">8</span><span>나만의 연락처</span></div>
+            <div class="navitem"><span class="n">📝</span><span>문서 작성</span><span class="badge">무료</span></div>
+            <div class="navfoot"><div class="navitem"><span class="n">⚙</span><span>설정</span></div></div>
+          </div>
+          <div class="main">
+            <div class="wrap">
+              <div class="scr-id"><b>대시보드</b> — 지금 어떤 상태인지, 내가 뭘 하다 말았는지 봅니다.</div>
+
+              <section class="card">
+                <h2>지금 돌고 있나 <span class="pill on">돌고 있음</span></h2>
+                <div class="sub">라이트는 이 PC 안에서 답을 만듭니다 — 모델이 멈춰 있으면 무엇을 물어도 답이 안 나옵니다.</div>
+                <div class="empty">qwen2.5-7b-instruct-q4_k_m 가 올라와 있습니다.</div>
+              </section>
+
+              <section class="card">
+                <h2>내 지식창고 <span class="pill on">24개 문서</span></h2>
+                <div class="sub">넣은 자료가 얼마나 쌓였나 — 이게 AI 답의 근거입니다. 「넣기 → 쌓임 → 물어보기」</div>
+                <div class="kb-kpi">
+                  <div class="kb-t"><div class="v">24</div><div class="k">총 문서</div><div class="d">제품 19 · 내가 넣은 5</div></div>
+                  <div class="kb-t"><div class="v">1,842</div><div class="k">검색 조각(청크)</div><div class="d">AI가 찾아보는 단위</div></div>
+                  <div class="kb-t"><div class="v">5</div><div class="k">내가 넣은 문서</div><div class="d">내 지식</div></div>
+                </div>
+                <div class="kb-bars-h">분류별 조각</div>
+                <div class="kb-bar"><span class="lbl" title="네트워크 장비 설정">네트워크 장비 설정</span>
+                  <span class="track"><span class="fill" style="width:100%"></span></span>
+                  <span class="num">551 <span class="u">조각 · 4문서</span></span></div>
+                <div class="kb-bar"><span class="lbl" title="사내 규정">사내 규정</span>
+                  <span class="track"><span class="fill" style="width:78%"></span></span>
+                  <span class="num">612 <span class="u">조각 · 3문서</span></span></div>
+                <div class="kb-bar"><span class="lbl" title="회의록">회의록</span>
+                  <span class="track"><span class="fill" style="width:44%"></span></span>
+                  <span class="num">340 <span class="u">조각 · 2문서</span></span></div>
+                <div class="kb-bar"><span class="lbl" title="미분류">미분류</span>
+                  <span class="track"><span class="fill" style="width:16%"></span></span>
+                  <span class="num">88 <span class="u">조각 · 1문서</span></span></div>
+                <div class="kb-meta">임베딩 모델 <b>bge-m3</b> · 마지막 반입 <b>8/19 14:32</b></div>
+              </section>
+
+              <section class="card">
+                <h2>최근에 한 것</h2>
+                <ul>
+                  <li><span class="t">방화벽 정책 점검 메모</span><span class="m">8/19</span></li>
+                  <li><span class="t">백업 주기 재확인</span><span class="m">8/18</span></li>
+                  <li><span class="t">OT망 분리 회의록 정리</span><span class="m">8/17</span></li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>장면 2 — 나만의 기억(메모)</h3>
+  <div class="frame-wrap">
+    <div class="frame-cap">라이트 셸(216px 사이드바) — <b>lite-memory.html</b> 재현</div>
+    <div class="exribbon">⚠ 아래 문서명·검색 결과·수치는 배색 시연용 예시입니다 — 실제 데이터 아님</div>
+    <div class="scene">
+      <div class="device">
+        <div class="tb">
+          <span class="p">GIJO AS</span>
+          <span class="e">Lite — 담당자 PC 1인용</span>
+          <span class="chip">🔒 폐쇄망</span>
+        </div>
+        <div class="body2">
+          <div class="side">
+            <div class="navitem"><span class="n">1</span><span>대시보드</span></div>
+            <div class="navitem"><span class="n">💬</span><span>AI에게 물어보기</span></div>
+            <div class="navitem"><span class="n">2</span><span>작업 내역</span></div>
+            <div class="navitem"><span class="n">3</span><span>로그파일 분석</span></div>
+            <div class="navitem"><span class="n">4</span><span>보안 장비 등록부</span></div>
+            <div class="navitem"><span class="n">5</span><span>스캐너</span></div>
+            <div class="navitem"><span class="n">6</span><span>법령 판례 조회</span></div>
+            <div class="navitem on"><span class="n">7</span><span>나만의 자료</span></div>
+            <div class="navitem"><span class="n">8</span><span>나만의 연락처</span></div>
+            <div class="navitem"><span class="n">📝</span><span>문서 작성</span><span class="badge">무료</span></div>
+            <div class="navfoot"><div class="navitem"><span class="n">⚙</span><span>설정</span></div></div>
+          </div>
+          <div class="main">
+            <div class="wrap">
+              <div class="scr-id"><b>나만의 기억</b> — 내가 넣은 자료를 쌓아 두고, 물으면 그 안에서 찾습니다.</div>
+
+              <section class="card">
+                <h2>찾기</h2>
+                <div class="sub">내가 넣은 자료 + 제품에 들어 있는 자료를 함께 봅니다.</div>
+                <div class="ask">
+                  <input type="text" value="우리 백업 며칠마다 돌리기로 했더라?" readonly>
+                  <button class="go">찾기</button>
+                </div>
+                <div class="hit">"…주간 백업은 매주 금요일 18:00에 실행하며, 월간 전체 백업은 매월 1일 02:00에
+                  수행한다. 백업 보관 주기는 90일…" <span style="color:var(--muted-2);font-size:11.5px">(사내 규정_백업정책.md)</span></div>
+                <div class="hit">"…재해복구 절차 §3: 백업 복원 검증은 분기 1회, 담당자 입회 하에…"
+                  <span style="color:var(--muted-2);font-size:11.5px">(정리본_사내 규정_백업정책.md)</span></div>
+                <div class="sub" style="margin-top:12px">🕸 이 물음과 이어진 표준 코드</div>
+                <div class="tri"><span>NIST SP 800-34 → 백업정책</span><span>ISO 27001 A.12.3 → 정보백업</span></div>
+              </section>
+
+              <section class="card">
+                <h2>자료 넣기</h2>
+                <div class="sub">넣으면 바로 위에서 찾을 수 있습니다.</div>
+                <div class="ask">
+                  <input type="text" placeholder="예: 사내규정_백업정책.md" readonly style="cursor:default">
+                  <button>넣기</button>
+                </div>
+                <div class="sub" style="margin-top:14px">또는 <b>폴더를 연결</b>해 그 안의 메모(.md·.txt)를 한 번에 넣습니다.</div>
+                <div class="ask"><button class="go">📁 폴더에서 넣기</button><button>📝 문서 작성 (창)</button></div>
+                <div class="warn">⚠ <b>글자 파일(.md · .txt · .log · .csv)</b>만 됩니다. PDF·워드는 라이트에는 아직 없습니다.</div>
+              </section>
+
+              <section class="card">
+                <h2>넣어 둔 자료 <span class="cnt">5건</span></h2>
+                <div class="sub">제품과 함께 온 것은 빼고, <b>내가 넣은 것</b>만 보여 줍니다.</div>
+                <div class="doc"><span class="n">사내_규정_백업정책.md</span><span class="m">12조각 · 2026-08-18</span><button class="danger">빼기</button></div>
+                <div class="doc"><span class="n">방화벽_정책_202608.md</span><span class="m">9조각 · 2026-08-17</span><button class="danger">빼기</button></div>
+                <div class="doc"><span class="n">OT망_분리_회의록.md</span><span class="m">7조각 · 2026-08-17</span><button class="danger">빼기</button></div>
+                <div class="doc"><span class="n">장비_설정_메모.txt</span><span class="m">5조각 · 2026-08-15</span><button class="danger">빼기</button></div>
+                <div class="doc"><span class="n">보안점검_체크리스트.md</span><span class="m">3조각 · 2026-08-12</span><button class="danger">빼기</button></div>
+              </section>
+
+              <section class="card">
+                <h2>정리본(LLM 위키) <span class="cnt">2 / 5건</span></h2>
+                <div class="sub">넣은 문서의 요점을 한 장으로 만들어 둡니다. 검색에 이 한 장이 걸리면 긴 원문을 덜 읽고 답합니다.</div>
+                <div class="doc"><span class="n">사내_규정_백업정책.md</span><span class="m">3조각 · 정리됨</span><button>다시 만들기</button></div>
+                <div class="doc"><span class="n">방화벽_정책_202608.md</span><span class="m">2조각 · 정리됨</span><button>다시 만들기</button></div>
+                <div class="doc"><span class="n">OT망_분리_회의록.md</span><span class="m">아직 없음</span><button class="go">정리본 만들기</button></div>
+                <div class="warn" style="margin-top:10px">⚠ 정리본은 <b>이 PC의 모델</b>이 씁니다 — 모델이 멈춰 있으면 못 만듭니다.</div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>제품 원칙 자가점검</h2>
+  <table class="tight">
+    <tr><th>원칙</th><th>점검</th></tr>
+    <tr><td>추천 시안 1개</td><td class="pass">PASS — 배색 대안(초록 카드)은 검토 후 기각, 흰 카드 하나만 최종안</td></tr>
+    <tr><td>자체완결 HTML</td><td class="pass">PASS — 외부 CDN·웹폰트·원격 이미지 0개, 폰트는 시스템 Pretendard 스택(원본과 동일 폴백 방식, 임베딩 요구 없음)</td></tr>
+    <tr><td>설계 전 조사 근거</td><td class="pass">PASS — WCAG 2.1 1.4.3/1.4.11/1.4.1, Material 컬러 시스템(§0 상단 주석 + 최종 보고 링크)</td></tr>
+    <tr><td>왜 이렇게 했나 설명</td><td class="pass">PASS — §3(전량), 흰 카드·파랑 조정·opacity 기각 사유 각각 명시</td></tr>
+    <tr><td>밀도 숫자(줄높이·세로총합·증감)</td><td class="pass">PASS — §4, 13개 규칙 대조 전부 증감 0</td></tr>
+    <tr><td>정직한 구현(가짜 UI 금지)</td><td class="pass">PASS — 장면 내 버튼 cursor:default·비활성, 예시 데이터 리본 명시</td></tr>
+    <tr><td>제품 코드 미수정</td><td class="pass">PASS — mockups/lite-green/ 아래에만 씀, client/ 등 읽기만 함</td></tr>
+  </table>
+
+</div>
+</body>
+</html>
