@@ -553,7 +553,10 @@
     // 서버 변경 없이 결재판 머리에 밝힌다. 맥락이 없으면 줄 자체를 안 그린다(빈 라벨 금지).
     var 범위줄 = (function () {
       var 조각 = [];
-      if (범위 && 범위.label) 조각.push("🗂 " + 범위.label);
+      // ⚠ 전송 조건과 똑같이(검토관 #5) — submit()은 #고른건이 있으면 #범위를 **안 보낸다**
+      //   (체크로 콕 집은 것이 우선). 그때 여기만 🗂를 찍으면 결재판이 안 보낸 범위를 보증한다.
+      var 고른건지시 = typeof ap.instruction === "string" && ap.instruction.indexOf("#고른건") >= 0;
+      if (범위 && 범위.label && !고른건지시) 조각.push("🗂 " + 범위.label);
       if (sel && sel.label) 조각.push("📌 " + sel.label);
       return 조각.length ? '<div class="cs-ape"><b>범위:</b> ' + esc(조각.join(" · ")) + "</div>" : "";
     })();
@@ -1305,6 +1308,15 @@
     var typed = typeof sendText !== "string";
     var text = typed ? (input.value || "").trim() : sendText.trim();
     if (!text || sending) return;
+    // 최근 지시 5개(승인 시안 도킹 묶음) — ☰ 팔레트 상단이 읽는다. 표식(#…)은 떼고 사람 말만.
+    try {
+      var 최근 = JSON.parse(localStorage.getItem("gijo:recent-instr:v1") || "[]");
+      var 사람말 = text.split("\n#")[0].trim().slice(0, 80);
+      if (사람말) {
+        최근 = [사람말].concat(최근.filter(function (x) { return x !== 사람말; })).slice(0, 5);
+        localStorage.setItem("gijo:recent-instr:v1", JSON.stringify(최근));
+      }
+    } catch (e) { /* 저장 못 해도 지시는 나간다 */ }
     if (typed) {
       input.value = "";
       try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}

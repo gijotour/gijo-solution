@@ -136,7 +136,9 @@ export function remoteUrlProblem(raw: string): string | null {
 export function registerRemoteLlmRoutes(app: Express): void {
   // 조회 — 화면 카드가 그린다. 자격증명은 애초에 저장하지 않으므로 새어 나갈 것도 없다.
   app.get("/api/llm/remote", authMiddleware, adminMiddleware, (_req, res) => {
-    res.json({ ...remoteLlmConfig(), airgap: isAirgapOn() });
+    // effective — **게터와 같은 계산**(검토관 #3). 사용 시점 재검증으로 차단된 상태에서
+    // 설정 화면이 「켜짐 — 원격으로 갑니다」라고 말하면 /where(대화창 칩)와 정면으로 어긋난다.
+    res.json({ ...remoteLlmConfig(), airgap: isAirgapOn(), effective: remoteLlmBaseUrl() !== null });
   });
 
   /**
@@ -204,17 +206,21 @@ export function registerRemoteLlmRoutes(app: Express): void {
         res.status(403).json({ error: "에어갭 모드에서는 원격 LLM을 켤 수 없습니다." });
         return;
       }
-      // URL이 실려 왔으면 켜든 끄든 검증한다(2026-08-19 검토 지적) — 예전엔 끌 때 검증을 건너뛰어,
-      // 규칙 밖 주소를 꺼 둔 채 심어 두었다가 나중에 켜기만 하는 길이 있었다. 끄기 자체(url 없이)는 늘 된다.
-      if (url) {
-        const 문제 = remoteUrlProblem(url);
-        if (문제) { res.status(400).json({ error: 문제 }); return; }
-      } else if (enabled) {
-        const 문제 = remoteUrlProblem(remoteLlmConfig().url);
-        if (문제) { res.status(400).json({ error: 문제 }); return; }
-      }
+      // 검증 규칙(검토관 2건을 함께 반영, 2026-08-19):
+      //   · 켤 때는 쓸 주소(실린 url 또는 저장값)가 규칙에 맞아야 한다 — 규칙 밖이면 400.
+      //   · **끄기는 항상 된다.** 처음 고친 판은 끌 때도 url을 검증해 400을 냈는데, 클라 4곳이
+      //     전부 현재 주소를 동봉해 보내서 **규칙 밖 주소가 저장돼 있으면 끌 방법이 없어졌다**
+      //     (이 수리가 겨냥한 바로 그 상황에서). 끌 때 규칙 밖 url이 실려 오면 저장하지 않고
+      //     끄기만 반영한다 — 「꺼 둔 채 심어 두기」 길도 그대로 막힌다.
       const prev = remoteLlmConfig();
-      saveConfig({ enabled, url: url || prev.url, lastCheck: prev.lastCheck });
+      let 저장url = url || prev.url;
+      if (enabled) {
+        const 문제 = remoteUrlProblem(저장url);
+        if (문제) { res.status(400).json({ error: 문제 }); return; }
+      } else if (url && remoteUrlProblem(url)) {
+        저장url = prev.url; // 규칙 밖 새 주소는 안 받는다 — 끄기만 통과
+      }
+      saveConfig({ enabled, url: 저장url, lastCheck: prev.lastCheck });
       차단기록한주소.clear(); // 주소가 바뀌었으니 다음 차단은 다시 한 번 기록한다
       // 채팅이 어디로 가는지를 바꾸는 admin 설정 — 작업 기록에 남긴다(2026-08-19 검토 지적:
       // 이 파일에 감사가 한 줄도 없었다). ⚠ URL 전체를 적지 않는다 — ?token=이 평문으로 딸려 온다.

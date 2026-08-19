@@ -382,6 +382,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       } else {
         버튼.push('<button class="btn' + (늦음 ? " prim" : "") + '" data-report="' + esc(m.id) + '">점검서 올리기</button>');
       }
+      // 기록 보기는 **모든 상태**에 둔다(검토관 #6) — 반려·승인대기 건의 감사 추적(누가 언제
+      // 보고했고 왜 반려됐나)을 볼 자리가 승인 완료 건에만 있었다. 완료 건은 위에서 이미 붙었다.
+      if (m.status !== "approved") 버튼.push('<button class="btn" data-history="' + esc(m.id) + '">기록</button>');
       return '<tr class="' + (늦음 ? "late" : "") + '">' +
         "<td>" + esc(m.scheduleDate) + 날짜부 + "</td>" +
         "<td>" + esc(m.title) + "</td>" +
@@ -444,7 +447,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         b.disabled = true;
         try {
           var h = await window.gijo.maintenanceHistory(b.dataset.history);
-          var 글 = (h || []).map(function (r) { return "· " + (r.at ? new Date(r.at).toLocaleString("ko-KR") : "") + " " + (r.action || "") + (r.actor ? " (" + r.actor + ")" : ""); }).join("\n");
+          // 서버 필드는 event다(검토관 #6 — r.action을 읽어 「무슨 일」이 통째로 빈칸이었다).
+          var 일이름 = { created: "일정 등록", reported: "점검 결과 보고", approved: "승인", rejected: "반려" };
+          var 글 = (h || []).map(function (r) {
+            return "· " + (r.at ? new Date(r.at).toLocaleString("ko-KR") : "") + " " + (일이름[r.event] || r.event || "") +
+              (r.actor ? " (" + r.actor + ")" : "") + (r.note ? " — " + r.note : "");
+          }).join("\n");
           await window.gijoTell("점검 기록\n\n" + (글 || "기록이 없습니다."));
         } catch (e) {
           await window.gijoTell("기록을 못 불러왔습니다 — " + String(e && e.message ? e.message : e));

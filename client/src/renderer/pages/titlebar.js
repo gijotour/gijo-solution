@@ -696,6 +696,31 @@
                  : 목록.slice(0, 12);
       고른것 = 0;
       list.innerHTML = "";
+      // 최근 지시 5(승인 시안 도킹 묶음, 프로 전용) — 빈 검색일 때만 맨 위에. 화면 항목과
+      // 구분되는 보조 블록이라 ↑↓ 선택 대상(걸린것)에는 안 넣는다 — 마우스로 누른다.
+      if (!q && document.body.classList.contains("pro-shell")) {
+        try {
+          var 최근 = JSON.parse(localStorage.getItem("gijo:recent-instr:v1") || "[]");
+          if (최근.length) {
+            var rb = document.createElement("div");
+            rb.style.cssText = "padding:4px 8px 8px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:4px;";
+            rb.innerHTML = '<div style="font-size:11.5px;color:var(--muted-2,#a49d95);padding:2px 4px 6px">🕘 최근 지시 — 누르면 그대로 보냅니다</div>';
+            최근.forEach(function (질문) {
+              var r = document.createElement("div");
+              r.textContent = "› " + 질문;
+              r.style.cssText = "padding:5px 8px;border-radius:7px;font-size:12.5px;color:var(--text,#e9e7e2);cursor:pointer;";
+              r.addEventListener("mouseenter", function () { r.style.background = "rgba(59,130,246,.14)"; });
+              r.addEventListener("mouseleave", function () { r.style.background = ""; });
+              r.addEventListener("click", function () {
+                closeFinder();
+                if (window.gijoConsole && window.gijoConsole.ask) window.gijoConsole.ask(질문);
+              });
+              rb.appendChild(r);
+            });
+            list.appendChild(rb);
+          }
+        } catch (e) { /* 최근 목록이 깨져도 팔레트는 돈다 */ }
+      }
       if (!걸린것.length) {
         var none = document.createElement("div");
         none.className = "gtb-fnone";

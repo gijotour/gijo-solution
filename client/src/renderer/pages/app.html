@@ -258,6 +258,7 @@
     <button id="railMenu" title="전체 메뉴 (Ctrl+K)">☰<span class="gn-workbadge"></span></button>
     <button id="railWork" title="작업 내역">🕘<span class="gn-sessbadge"></span></button>
     <button id="railFav" title="즐겨찾기">⭐</button>
+    <button id="railWins" title="열려 있는 창 목록 — 누르면 그 창이 앞으로">🗔</button>
     <button id="railHome" title="대화 홈으로 — 열린 화면을 닫고 대화만 봅니다">💬</button>
     <div class="rail-foot"></div>
   </nav>
@@ -316,6 +317,10 @@
   var active = null;
 
   function save() {
+    // 🚀 프로는 저장하지 않는다(검토관 #1, 2026-08-19) — 도킹 경로가 표준 탭 저장(gijo:tabs:v1)을
+    //   한 화면짜리로 덮어써, 표준으로 돌아온 담당자의 탭 8개(필터·스크롤)를 날릴 뻔했다.
+    //   도킹은 세션 한정이 시안 결정(§10-6)이라 저장 자체가 필요 없다.
+    if (프로인가()) return;
     try {
       localStorage.setItem(KEY_TABS, JSON.stringify({
         open: tabs.map(function (t) { return { page: t.page, label: t.label, pinned: !!t.pinned }; }),
@@ -745,6 +750,24 @@
     //
     // ⚠ 남는 것이라 **모든 열린 화면에 알려야** 한다. 한 화면만 걸러지면 옆 탭은 전체를
     //   보여 주고, 담당자는 어느 쪽이 맞는지 모른다. 셸이 퍼뜨리는 이유다.
+    // ⇤ 붙이기(승인 시안 §10-3) — 팝업 창이 「나를 도킹으로 되돌려 달라」고 보낸 것.
+    if (d.type === "gijo:dockback") {
+      if (!프로인가()) return;
+      var 붙일 = String(d.page || "").split(/[\\/]/).pop().slice(0, 80);
+      if (!/^[\w.-]+\.html$/.test(붙일)) return; // 파일명 꼴만 — iframe發 값을 그대로 믿지 않는다
+      if ((window.innerWidth - 56) < 1400) {
+        gijoTell("화면 폭이 좁아 붙일 수 없습니다 — 세로 모니터에서는 창으로 쓰는 것이 규칙입니다(1400px 필요).");
+        return;
+      }
+      if (tabs[0] && tabs[0].page !== 붙일) {
+        gijoTell("이미 「" + (tabs[0].label || "다른 화면") + "」이 도킹돼 있습니다 — 그쪽을 닫고 다시 시도하세요.");
+        return;
+      }
+      try { localStorage.setItem("gijo:pro:dockpref:v1", "dock"); } catch (e) { }
+      if (window.gijo.closeShellPopout) window.gijo.closeShellPopout(붙일);
+      open(붙일);
+      return;
+    }
     if (d.type === "gijo:scope") {
       // 여기서도 값을 다시 만든다 — iframe이 보낸 것을 그대로 믿지 않는다(gijo:view와 같은 규칙).
       var sc = null;
@@ -891,7 +914,8 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeWinPop(); });
   $("winPop").addEventListener("click", function (e) { e.stopPropagation(); });
   refreshWinCount();
-  window.gijoRefreshWinCount = refreshWinCount; // 아래 onPopoutContext 쪽에서도 부른다
+  window.gijoRefreshWinCount = refreshWinCount;
+  window.gijoOpenWinPop = openWinPop; // 프로 레일 🗔이 재사용(검토관 #4) // 아래 onPopoutContext 쪽에서도 부른다
   // ⚠ onPopoutContext는 removeAllListeners로 등록하므로 여기서 또 부르면 **앞서 붙인 것이
   //   지워진다**(맥락 전달이 죽는다). 그래서 따로 붙이지 않고, 원래 핸들러 안에서 같이 센다.
   // ⚠ 「⇤ 다시 붙이기」는 이제 **왼쪽 패널 안**에 있고 titlebar.js가 나중에 만든다 —
@@ -1027,6 +1051,21 @@
       else gijoTell("화면 찾기를 열지 못했습니다 — 상단 🔍를 눌러 주세요.");
     });
     눌러("railWork", function () { open("sessions.html", "작업 내역"); });
+    // 🗔 열린 창 목록(검토관 #4) — 유일한 진입점(#tbWins)이 탭줄(.shellfoot)과 함께 숨어,
+    //   창을 화면마다 띄우는 프로에서만 「숨은 창 되찾기」가 사라졌었다. 기존 winPop을
+    //   본문으로 옮겨(1회) 레일 옆에 고정으로 띄운다 — 목록 그리기·닫기 로직은 그대로 재사용.
+    var railWins = document.getElementById("railWins");
+    if (railWins) railWins.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var pop = document.getElementById("winPop");
+      if (!pop) return;
+      if (pop.parentNode !== document.body) {
+        document.body.appendChild(pop);
+        pop.style.cssText += "position:fixed;left:62px;bottom:14px;right:auto;top:auto;";
+      }
+      if (pop.classList.contains("on")) pop.classList.remove("on");
+      else if (window.gijoOpenWinPop) window.gijoOpenWinPop();
+    });
     눌러("railFav", function () {
       if (window.gijoOpenFinder) window.gijoOpenFinder();
     });

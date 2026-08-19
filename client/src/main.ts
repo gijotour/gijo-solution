@@ -927,6 +927,13 @@ ipcMain.on("gijo:broadcast", (_e, d: unknown) => {
 });
 // 결재판이 왔는데 본창이 뒤에 있으면 작업표시줄을 깜빡인다 — 강제 포커스 전환은
 // 표준 관행이 금하는 focus stealing이라 쓰지 않는다(시안이 대안 비교 후 채택).
+// ⇤ 붙이기(승인 시안 프로_도킹패널 §10-3) — 본창이 「이 팝업을 도킹으로 되돌리라」고 정한 뒤
+// 그 팝업 창을 닫아 달라고 부른다. 판단(폭·슬롯)은 전부 본창 몫 — 여기는 닫기만 한다.
+ipcMain.handle("shell:closePopout", (_e, page: string) => {
+  const w = popoutWindows.get(String(page));
+  if (w && !w.isDestroyed()) w.close();
+});
+
 ipcMain.on("shell:flash", () => {
   if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) mainWindow.flashFrame(true);
 });

@@ -2570,7 +2570,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     var url = document.getElementById("rgpuUrl"), on = document.getElementById("rgpuOn");
     var c = await window.gijo.remoteLlmGet();
     url.value = c.url || "";
-    st.textContent = c.airgap ? "에어갭 모드 — 사용 불가" : (c.enabled ? "지금 켜짐 — 채팅이 원격으로 갑니다" : "꺼짐(로컬 모델 사용)");
+    // effective — 서버 게터의 실판정(검토관 #3). 저장은 켜짐인데 주소가 규칙에 안 맞아
+    // 차단된 상태(DB 복원 등)면 「켜짐」이라고만 말하는 게 거짓이 된다.
+    st.textContent = c.airgap ? "에어갭 모드 — 사용 불가"
+      : c.enabled && c.effective === false ? "켜짐(저장값) — 주소가 규칙에 안 맞아 실제로는 로컬로 답합니다. 주소를 고치거나 끄세요."
+      : c.enabled ? "지금 켜짐 — 채팅이 원격으로 갑니다" : "꺼짐(로컬 모델 사용)";
     on.textContent = c.enabled ? "끄기(로컬로 복귀)" : "켜기";
     on.disabled = !!c.airgap;
     document.getElementById("rgpuTest").onclick = async function () {

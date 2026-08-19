@@ -1236,9 +1236,14 @@ export function formatScreenGuide(screen?: string, question?: string, lite = fal
   // 옛 출구(대시보드 팁 줄)는 08-28 개편에서 지워졌는데 아무도 몰랐다 — 상수·API·preload는
   // 살아 있는데 그리는 화면이 0곳이었다. 화면 안내는 챗봇 한 곳으로 모은다는 표준(ⓘ 컨벤션)대로
   // 여기 실으면 「이 화면 사용법」을 물을 때마다 함께 나간다. 시험: consoleguide.test.ts가 지킨다.
-  L.push("");
-  L.push("📋 알아두기 (제품 공통 규칙)");
-  for (const r of PRODUCT_RULES) L.push(`  · ${r}`);
+  // ⚠ 라이트에는 안 싣는다(검토관 #8, 2026-08-19) — 규칙 몇 줄(＋ 파일 자동 분류·📌 선택 칩·
+  //   법령 연동 등)이 라이트에 그대로 있는지 win이 보증할 수 없다. 없는 기능을 규칙이 약속하면
+  //   거짓이 된다. 라이트 몫 안내는 라이트 화면 안내(LITE_OVERVIEW·lite-screens)가 맡는다.
+  if (!lite) {
+    L.push("");
+    L.push("📋 알아두기 (제품 공통 규칙)");
+    for (const r of PRODUCT_RULES) L.push(`  · ${r}`);
+  }
   return L.join("\n");
 }
 

@@ -35,7 +35,10 @@ describe("팝업 릴레이 — 목록이 어긋나면 팝업에서만 조용히 
     //   gijo:explain·gijo:ask·gijo:prefill — 안내·대필은 화면 ⓘ가 셸 대화창을 부르는 것으로,
     //     팝업에는 자기 chatwidget이 있어 릴레이가 필요 없다
     //   gijo:scope:set — 방향이 반대다(셸→화면 배포용)
-    const 제외 = new Set(["gijo:view", "gijo:explain", "gijo:ask", "gijo:prefill", "gijo:scope:set"]);
+    const 제외 = new Set(["gijo:view", "gijo:explain", "gijo:ask", "gijo:prefill", "gijo:scope:set",
+      // dockback — 팝업의 ⇤ 버튼이 bridgeToShell(IPC)로 **직접** 보낸다. postMessage를 안 거치므로
+      // 릴레이 목록에 없어도 죽는 경로가 없다(2026-08-19 도킹 구현).
+      "gijo:dockback"]);
     const 빠진것 = 셸이받는타입().filter((t) => !제외.has(t) && !릴레이타입().includes(t));
     expect(빠진것, "릴레이 목록에 없는 타입 — 팝업에서 이 신호가 조용히 죽는다. 넣거나, 위 제외 목록에 이유와 함께 적어라").toEqual([]);
   });

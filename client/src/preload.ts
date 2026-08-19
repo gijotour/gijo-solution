@@ -135,6 +135,7 @@ const gijoApi = {
   // 별도 창으로 연다. 설치본에 안 담겼으면 {ok:false, error}를 준다 — 부르는 쪽이 안내한다.
   // 🚀 프로 팝업 배관(2026-08-19) — 별도 창에서는 window.top이 자기 자신이라 postMessage가
   // 셸에 못 닿는다. 이 세 다리가 그 길을 놓는다(처리 코드는 셸의 기존 리스너 재사용).
+  closeShellPopout: (page: string) => ipcRenderer.invoke("shell:closePopout", page),
   bridgeToShell: (d: unknown) => ipcRenderer.send("gijo:bridge", d),
   onShellBridge: (cb: (d: unknown) => void) => { ipcRenderer.on("gijo:bridge", (_e, d) => cb(d)); },
   broadcastToWindows: (d: unknown) => ipcRenderer.send("gijo:broadcast", d),

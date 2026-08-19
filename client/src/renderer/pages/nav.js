@@ -1469,6 +1469,21 @@
       paint();
     });
     document.body.appendChild(b);
+
+    // ⇤ 붙이기(승인 시안 프로_도킹패널 §10-3) — 이 창을 본창 도킹 패널로 되돌린다.
+    // 판단(폭 하한·슬롯)은 전부 본창이 한다 — 여기는 부탁만 보낸다(성공 시 본창이 이 창을 닫는다).
+    // 기존 어휘 「⇤ 대화 여기로 다시 붙이기」(app.html csBackBtn)와 같은 결.
+    if (window.gijo && window.gijo.bridgeToShell) {
+      var dk = document.createElement("div");
+      dk.className = "gijo-orient";
+      dk.style.right = "92px";
+      dk.textContent = "⇤ 붙이기";
+      dk.title = "이 화면을 본창 옆(도킹 패널)에 붙입니다 — 본창 폭이 좁으면 본창이 이유를 알려 줍니다";
+      dk.addEventListener("click", function () {
+        try { window.gijo.bridgeToShell({ type: "gijo:dockback", page: currentPage() }); } catch (e) {}
+      });
+      document.body.appendChild(dk);
+    }
   }
 
   // 화면 크기 단축키 — 데스크톱 앱 관례대로 Cmd/Ctrl + '＋·－·0'. 배율 계산·저장은 메인 프로세스가
