@@ -75,6 +75,23 @@
       ".dc-card tbody tr:nth-child(even){background:rgba(255,255,255,.025);}",
       ".dc-card .num{text-align:right;font-variant-numeric:tabular-nums;}",
       ".dc-more{padding:5px 11px;font-size:11.75px;color:var(--muted-2,#a49d95);}",
+      // 보기 전환(승인 시안 카드_보기전환) — 세그먼트는 titlebar.js .gtb-seg 언어의 압축판
+      ".dc-seg{display:inline-flex;margin-left:auto;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:2px;gap:2px;}",
+      ".dc-seg span{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:800;color:var(--muted-2,#a49d95);cursor:pointer;line-height:1.3;white-space:nowrap;}",
+      ".dc-seg span.on{background:rgba(59,130,246,.22);color:#fff;}",
+      ".dc-seg span:not(.on):hover{color:#fff;}",
+      ".dc-head.hasseg .dc-open{margin-left:0;}",
+      ".dc-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px;padding:8px 10px;}",
+      ".dc-tile{border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:6px 8px;cursor:pointer;background:rgba(255,255,255,.03);}",
+      ".dc-tile:hover{filter:brightness(1.18);}",
+      ".dc-tile.bad{background:rgba(245,146,138,.14);border-color:rgba(245,146,138,.45);}",
+      ".dc-tile.warn{background:rgba(240,160,32,.14);border-color:rgba(240,160,32,.45);}",
+      ".dc-tile.ok{background:rgba(30,185,128,.14);border-color:rgba(30,185,128,.45);}",
+      // ⚠ 시안은 10px였으나 가독성 계약(11px 미만 금지)에 맞춰 11px로 올렸다
+      ".dc-tv{font-size:11px;font-weight:800;letter-spacing:.2px;}",
+      ".dc-tv.bad{color:#f5928a;} .dc-tv.warn{color:var(--amber,#f0a020);} .dc-tv.ok{color:var(--teal,#1eb980);} .dc-tv.muted{color:var(--muted-2,#a49d95);}",
+      ".dc-tl{font-size:11.5px;font-weight:700;color:var(--text,#e9e7e2);line-height:1.3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
+      ".dc-ts{font-size:11px;color:var(--muted-2,#a49d95);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       // ➡ 다음 작업 칩(QA ④) — 답 꼬리의 낮은 존재감 한 줄(제안이지 재촉이 아니다)
       ".gcp-next{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:7px;border-top:1px dashed rgba(255,255,255,.10);}",
       ".gcp-nh{font-size:11.5px;color:var(--muted-2,#a49d95);flex:0 0 auto;}",
@@ -360,23 +377,85 @@
     }
     if (dc.table) {
       var cols = dc.table.cols || [];
-      var tbl = document.createElement("table");
-      tbl.innerHTML = "<thead><tr>" + cols.map(function (c) {
-        return '<th class="' + (c.align === "num" ? "num" : "") + '">' + esc(c.label) + "</th>";
-      }).join("") + "</tr></thead>";
-      var tb = document.createElement("tbody");
-      dc.table.shown.forEach(function (row) {
-        var tr = document.createElement("tr");
-        tr.innerHTML = cols.map(function (c) {
-          return '<td class="' + (c.align === "num" ? "num" : "") + '">' + esc(row[c.key] == null ? "" : row[c.key]) + "</td>";
-        }).join("");
-        if (opts && typeof opts.select === "function") {
-          tr.addEventListener("click", function () { opts.select(row, dc.pickKey || (cols[0] && cols[0].key)); });
-        }
-        tb.appendChild(tr);
-      });
-      tbl.appendChild(tb);
-      card.appendChild(tbl);
+      var 선택키 = dc.pickKey || (cols[0] && cols[0].key);
+      function buildTable() {
+        var tbl = document.createElement("table");
+        tbl.innerHTML = "<thead><tr>" + cols.map(function (c) {
+          return '<th class="' + (c.align === "num" ? "num" : "") + '">' + esc(c.label) + "</th>";
+        }).join("") + "</tr></thead>";
+        var tb = document.createElement("tbody");
+        dc.table.shown.forEach(function (row) {
+          var tr = document.createElement("tr");
+          tr.innerHTML = cols.map(function (c) {
+            return '<td class="' + (c.align === "num" ? "num" : "") + '">' + esc(row[c.key] == null ? "" : row[c.key]) + "</td>";
+          }).join("");
+          if (opts && typeof opts.select === "function") {
+            tr.addEventListener("click", function () { opts.select(row, 선택키); });
+          }
+          tb.appendChild(tr);
+        });
+        tbl.appendChild(tb);
+        return tbl;
+      }
+      function buildTiles() {
+        // 히트맵 보기(승인 시안 카드_보기전환) — 행 하나=타일 하나라 📌 선택 계약이 그대로다.
+        // 색은 서버가 안 보낸다 — 판정열(심각/우선/상태) 값을 고정 사전과 대조해 클라가 정한다.
+        var wrap = document.createElement("div");
+        wrap.className = "dc-tiles";
+        var 라벨열 = cols.filter(function (c) { return c.key === 선택키; })[0] || cols[0];
+        var 보조열 = cols.filter(function (c) { return c !== 판정열 && c !== 라벨열; })[0];
+        dc.table.shown.forEach(function (row) {
+          var cls = 타일색(row);
+          var t = document.createElement("div");
+          t.className = "dc-tile " + cls;
+          t.innerHTML =
+            (판정열 ? '<div class="dc-tv ' + cls + '">' + esc(row[판정열.key] == null ? "" : row[판정열.key]) + "</div>" : "") +
+            '<div class="dc-tl">' + esc(라벨열 && row[라벨열.key] != null ? row[라벨열.key] : "") + "</div>" +
+            (보조열 ? '<div class="dc-ts">' + esc(row[보조열.key] == null ? "" : row[보조열.key]) + "</div>" : "");
+          if (opts && typeof opts.select === "function") {
+            t.addEventListener("click", function () { opts.select(row, 선택키); });
+          }
+          wrap.appendChild(t);
+        });
+        return wrap;
+      }
+      var 색사전 = [
+        { re: /치명|매우\s*심각|critical|P0/i, cls: "bad" },
+        { re: /높음|high|경고|P1/i, cls: "warn" },
+        { re: /정상|양호|통과|compliant/i, cls: "ok" },
+      ];
+      var 판정열 = cols.filter(function (c) { return /심각|우선|상태/.test(c.label || ""); })[0] || null;
+      function 타일색(row) {
+        if (!판정열) return "muted";
+        var v = String(row[판정열.key] == null ? "" : row[판정열.key]);
+        for (var i = 0; i < 색사전.length; i++) if (색사전[i].re.test(v)) return 색사전[i].cls;
+        return "muted";
+      }
+      var 몸통 = document.createElement("div");
+      function 몸통그리기(view) {
+        몸통.innerHTML = "";
+        몸통.appendChild(view === "heat" ? buildTiles() : buildTable());
+      }
+      // 토글은 2줄 이상일 때만(1줄이면 바꿀 이유가 없다) · 기본은 목록 · 카드마다 독립(저장 안 함)
+      if (dc.table.shown.length > 1) {
+        var seg = document.createElement("span");
+        seg.className = "dc-seg";
+        var lb = document.createElement("span");
+        lb.textContent = "목록";
+        lb.className = "on";
+        var hb = document.createElement("span");
+        hb.textContent = "히트맵";
+        seg.appendChild(lb);
+        seg.appendChild(hb);
+        lb.addEventListener("click", function () { lb.className = "on"; hb.className = ""; 몸통그리기("list"); });
+        hb.addEventListener("click", function () { hb.className = "on"; lb.className = ""; 몸통그리기("heat"); });
+        head.classList.add("hasseg"); // 🗔의 margin-left:auto를 세그먼트가 넘겨받는다
+        var 열기버튼 = head.querySelector(".dc-open");
+        if (열기버튼) head.insertBefore(seg, 열기버튼);
+        else head.appendChild(seg);
+      }
+      몸통그리기("list");
+      card.appendChild(몸통);
       var 남음 = (dc.table.totalCount || 0) - dc.table.shown.length;
       if (남음 > 0) {
         var m = document.createElement("div");

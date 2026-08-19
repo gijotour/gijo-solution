@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 대화 데이터 카드 「보기 전환」(목록↔히트맵) · 추천 1개</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  시안: GIJO AS 프로 셸 — 대화창 데이터 카드에 [목록|히트맵] 보기 전환을 더한다
+  작성: gijo-mockup, 2026-08-19 · 산출물: mockups/카드_보기전환/시안.html
+        (자체완결 HTML — 더블클릭으로 오프라인에서 열림, 외부 CDN·웹폰트·원격 이미지 없음.
+         제품 코드는 client/·server/를 **읽기만** 했고 한 줄도 고치지 않았다.)
+
+  ── 사장님 지시(2026-08-19) ────────────────────────────────────────────────
+  「리스트 나올 때 히트맵이라든지 디자인이 가능한 것은 추가로 선택해서 볼 수 있게」
+  대상: 대화창 데이터 카드(2026-08-19 이미 게시된 승인 시안 mockups/대화_데이터카드 →
+  구현됨 chatparts.js dataCard()) — 지금은 KPI 4칸 + 표 10줄뿐이다.
+
+  ── 설계 전 조사 근거 ─────────────────────────────────────────────────────
+  1) 코드 근거(실제 파일, 읽고 인용만 — 제품 코드 무변경):
+     · client/src/renderer/pages/chatparts.js:60-77  dc-* CSS(카드 머리·KPI·표의 **실제 값**,
+       이 시안이 손대는 건 이 값이 아니라 그 옆에 더하는 것뿐이다).
+     · client/src/renderer/pages/chatparts.js:331-390 dataCard() — 실제로 지금 도는 함수.
+       head(제목+🗔) → kpis → table 순으로 만든다. 이 시안은 head에 토글을 끼우고
+       table 자리에 두 번째 렌더(타일)를 추가하는 것으로 구조를 바꾸지 않는다.
+     · client/src/renderer/pages/console.js:1490-1504 — P.dataCard() 호출부. opts.select(row,key)가
+       행 클릭 → 📌 선택으로 이미 배선돼 있다(console.js:1092-1099 setSelection, .cs-sel 칩).
+       타일 클릭도 **같은 콜백**을 그대로 쓴다 — 새 배관이 필요 없다.
+     · client/src/renderer/pages/titlebar.js:41-44 <code>.gtb-seg</code> — "Claude.ai 홈/Code 전환
+       패턴"이라 적힌, **이미 제품에 있는** 세그먼트 컨트롤(트랙+필, 파랑 강조 on-상태). 이 시안의
+       [목록|히트맵] 토글은 이 시각 언어를 그대로 가져오되, 카드 머리의 좁은 세로 예산(§⑥)에 맞춰
+       패딩만 압축했다 — 새 부품을 발명하지 않았다.
+     · server/src/engine/datacard.ts 전체 — DataCard 타입·표상한(10줄)·hardeningStatusAnswer·
+       assetStatusAnswer·opsStatusAnswer 세 장의 실제 카드. **이 시안은 이 파일을 한 글자도 바꾸지
+       않는다** — 보기 전환은 클라(chatparts.js)의 렌더 문제이지 서버 계산 문제가 아니다.
+     · server/src/engine/picklist.ts:154-219 findingListAnswer — 202-204행 주석 "표까지 넣으면
+       같은 목록이 세 벌"이라 **표를 안 준다**(KPI만). §⑤에서 이 사실을 정직하게 밝힌다 — §⑨의
+       "취약점 카드" 예시는 지금 운영 중인 응답이 아니라, 표가 붙는다면 이런 모양이라는 예시다.
+  2) 외부 표준(2026-08-19 조사):
+     · 세그먼트 컨트롤(view toggle) — "레이아웃 전환(목록/그리드/보드)은 세그먼트 컨트롤의 대표
+       활용 사례. 2~5개의 상호 배타적 옵션에 적합, 아이콘+라벨 병기가 안전하다."
+       eleken.co/blog-posts/segmented-control-ui
+     · 목록/그리드 보기 전환 — "사용자가 필요에 따라 두 보기를 오갈 수 있게 하라"
+       learn.microsoft.com/en-us/previous-versions/windows/hh465465(v=win.10)
+     · 히트맵 색맹 접근성 — "색만으로 구분하지 말 것. 아이콘·라벨·패턴을 색과 함께 써라."
+       safe.security/resources/insights/cyber-risk-heat-map (§⑤ 타일에 항상 글자를 병기하는 근거)
+     · 점진적 공개 — mockups/대화_데이터카드/시안.html이 이미 인용한 원칙(IxDF·Primer)을
+       재확인: "표는 상한, 넘치면 다음 층(🗔)으로." 보기를 바꿔도 이 상한(10줄)은 그대로 지킨다
+       (§③ 결정 3).
+
+  ── 이 파일의 상호작용 범위(정직 고지) ──────────────────────────────────────
+  §④의 [목록|히트맵] 토글과 행/타일 클릭(📌 선택)은 **이 문서 안에서 실제로 동작**한다 —
+  진짜 렌더 전환이고 자리표시자가 아니다. 반대로 🗔 열기·"외 N건" 버튼은 **누르면 안내 문구만
+  보여줄 뿐 아무 화면도 열지 않는다** — 버튼 자체에 "(이 시안에서는 비활성)"이라고 적었다.
+  §⑨에 "실제로는 아직 안 되는 것"을 따로 밝혔다.
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--teal:#1eb980;--amber:#f0a020;--bad:#f5928a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+    line-height:1.62;font-size:14px;}
+  .wrap{max-width:1460px;margin:0 auto;padding:28px 26px 90px;}
+  h1{font-size:22px;margin:0 0 6px;}
+  h2{font-size:16.5px;margin:40px 0 12px;padding-top:14px;border-top:1px solid var(--border);color:#fff;}
+  h2 .no{color:var(--blue-light);margin-right:6px;}
+  h3{font-size:13.5px;margin:16px 0 8px;color:var(--muted);}
+  p{margin:0 0 10px;color:var(--text);}
+  .lead{color:var(--muted);font-size:13px;}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;
+    background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);margin-right:6px;}
+  .tag.ok{background:rgba(30,185,128,.16);border-color:rgba(30,185,128,.4);color:var(--teal);}
+  .tag.rev{background:rgba(240,160,32,.16);border-color:rgba(240,160,32,.45);color:var(--amber);}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin:12px 0;}
+  .card.warn{border-color:rgba(240,160,32,.45);background:rgba(240,160,32,.07);}
+  .card.good{border-color:rgba(30,185,128,.4);background:rgba(30,185,128,.06);}
+  code, .code{font-family:"Consolas","Cascadia Code",monospace;font-size:12.25px;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:#ffd479;}
+  pre{font-family:"Consolas","Cascadia Code",monospace;font-size:11.75px;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;color:#cfe8ff;line-height:1.55;}
+  table.doc{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.75px;}
+  table.doc th,table.doc td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top;}
+  table.doc th{background:var(--panel-2);color:var(--muted);font-weight:700;font-size:12px;}
+  table.doc td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  ul{margin:6px 0 10px;padding-left:20px;} li{margin:3px 0;}
+  .src{color:var(--muted-2);font-size:11.5px;}
+  .toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.25px;color:var(--muted);margin:14px 0 4px;}
+  .toc a{color:var(--blue-light);text-decoration:none;}
+  .toc a:hover{text-decoration:underline;}
+  footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted-2);font-size:11.5px;}
+
+  /* ── 밀도 바(비례 시각화, 정적) ───────────────────────────────────────── */
+  .bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--border-strong);margin:6px 0 2px;}
+  .bar > div{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;color:#fff;}
+  .b-head{background:#3b6a8f;} .b-kpi{background:#5a4b8f;} .b-tab{background:#4b4b48;} .b-heat{background:#1eb980;color:#062;}
+  .barlabel{font-size:11px;color:var(--muted-2);display:flex;justify-content:space-between;margin-bottom:14px;}
+
+  /* ══════════════════════════════════════════════════════════════════════
+     §④ 시연 CSS — dc-*(chatparts.js:60-77 실제 값 그대로 복사) + cs-sel(console.js:80-83 실제 값)
+     + gtb-seg(titlebar.js:41-44)를 본뜬 압축 세그먼트 dc-seg + 새 타일 dc-tile 3종.
+     "새로 만든 것"은 dc-seg·dc-tiles·dc-tile 뿐이고 나머지는 지금 도는 코드 그대로다.
+     ══════════════════════════════════════════════════════════════════════ */
+  .demorow{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;margin-top:10px;}
+  .democol .cap{font-size:11px;color:var(--muted-2);margin-bottom:6px;}
+  .democol .cap b{color:#fff;}
+
+  /* 카드를 담는 자리 — 요구된 카드 폭 660px */
+  .cardslot{width:660px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:10px;}
+  .cardslot.narrow{width:380px;}
+
+  /* dc-card 계열 — chatparts.js:61-77의 실제 값(색·패딩·폰트) 그대로 */
+  .dc-card{border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:var(--panel-2);}
+  .dc-head{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12.75px;font-weight:800;color:var(--text);}
+  .dc-open{font-size:12px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:7px;padding:3px 9px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .dc-open:hover{background:rgba(59,130,246,.20);}
+  .dc-open[data-inert]{opacity:.65;}
+  .dc-kpis{display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,.08);}
+  .dc-kpi{flex:1;padding:7px 11px;border-right:1px solid rgba(255,255,255,.06);}
+  .dc-kpi:last-child{border-right:0;}
+  .dc-kl{font-size:11.5px;color:var(--muted-2);}
+  .dc-kv{font-size:15px;font-weight:800;color:var(--text);}
+  .dc-kv.ok{color:var(--teal);} .dc-kv.warn{color:var(--amber);} .dc-kv.bad{color:var(--bad);} .dc-kv.muted{color:var(--muted-2);}
+  .dc-card table{width:100%;border-collapse:collapse;font-size:12.25px;}
+  .dc-card th{text-align:left;padding:3px 10px;color:var(--muted-2);font-size:11.5px;border-bottom:1px solid rgba(255,255,255,.08);}
+  .dc-card td{padding:3px 10px;line-height:1.35;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0;}
+  .dc-card tbody tr{cursor:pointer;} .dc-card tbody tr:hover td{background:rgba(59,130,246,.08);}
+  .dc-card tbody tr:nth-child(even){background:rgba(255,255,255,.025);}
+  .dc-card tbody tr.picked td{background:rgba(240,160,32,.14);}
+  .dc-more{padding:5px 11px;font-size:11.75px;color:var(--muted-2);cursor:pointer;}
+  .dc-more:hover{color:var(--blue-light);}
+
+  /* ── 새 부품 1: 보기 전환 세그먼트(dc-seg) — gtb-seg(titlebar.js:41-44)를 카드 머리 예산에 맞춰 압축 ── */
+  .dc-seg{display:inline-flex;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:2px;gap:2px;margin-left:auto;}
+  .dc-seg span{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:800;color:var(--muted-2);cursor:pointer;line-height:1.3;white-space:nowrap;}
+  .dc-seg span.on{background:rgba(59,130,246,.22);color:#fff;}
+  .dc-seg span:not(.on):hover{color:#fff;}
+  /* 🗔 버튼은 세그먼트가 있을 때 margin-left:auto를 넘겨준다(§⑥ 구현 메모) */
+  .dc-head.hasseg .dc-open{margin-left:0;}
+
+  /* ── 새 부품 2: 타일 그리드(히트맵) — 색은 결정적 사전(§⑤)으로만 정한다 ── */
+  .dc-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px;padding:8px 10px;}
+  .dc-tile{border:1px solid var(--border-strong);border-radius:7px;padding:6px 8px;cursor:pointer;background:rgba(255,255,255,.03);}
+  .dc-tile:hover{filter:brightness(1.18);}
+  .dc-tile.picked{outline:2px solid var(--blue-light);outline-offset:-2px;}
+  .dc-tile.bad{background:rgba(245,146,138,.14);border-color:rgba(245,146,138,.45);}
+  .dc-tile.warn{background:rgba(240,160,32,.14);border-color:rgba(240,160,32,.45);}
+  .dc-tile.ok{background:rgba(30,185,128,.14);border-color:rgba(30,185,128,.45);}
+  .dc-tile.muted{background:rgba(255,255,255,.03);border-color:var(--border-strong);}
+  .dc-tv{font-size:10px;font-weight:800;letter-spacing:.2px;}
+  .dc-tv.bad{color:var(--bad);} .dc-tv.warn{color:var(--amber);} .dc-tv.ok{color:var(--teal);} .dc-tv.muted{color:var(--muted-2);}
+  .dc-tl{font-size:11.5px;font-weight:700;color:var(--text);line-height:1.3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dc-ts{font-size:10.25px;color:var(--muted-2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  /* 📌 선택 칩 — console.js:80-83 .cs-sel 실제 값 */
+  .cs-sel{display:none;margin-top:7px;font-size:11.5px;font-weight:700;color:#ffd9a8;border:1px solid rgba(240,160,32,.45);border-radius:12px;padding:1px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+  .cs-sel.on{display:inline-block;}
+  .cs-sel .x{margin-left:5px;color:var(--muted-2);cursor:pointer;font-weight:400;}
+  .cs-sel .x:hover{color:var(--bad);}
+
+  .democtl{margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;}
+  .demonote{font-size:11px;color:var(--muted-2);margin-top:8px;max-width:660px;}
+  .inertmsg{font-size:11px;color:var(--muted-2);margin-top:6px;display:none;}
+  .inertmsg.on{display:block;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="tag">시안 · 추천 1개</span><span class="tag ok">mockups/카드_보기전환/시안.html</span>
+  <h1>대화 데이터 카드 「보기 전환」 — 표 옆에 [목록|히트맵] 토글을 더한다</h1>
+  <p class="lead">새 화면·새 API를 만들지 않는다. 지금 도는 <code>chatparts.js dataCard()</code>의 표 자리에
+    렌더 방식을 하나 더 얹는다 — 서버가 내려주는 <code>dc.table</code> 데이터는 그대로, 클라가 그것을
+    <b>표로 그릴지 색 타일로 그릴지</b>만 고른다. 기본은 지금처럼 목록이다.</p>
+
+  <div class="toc">
+    <a href="#s1">① 배경</a>
+    <a href="#s2">② 실제로 눌러보기(시연)</a>
+    <a href="#s3">③ 핵심 결정</a>
+    <a href="#s4">④ 색 매핑 규칙(결정적)</a>
+    <a href="#s5">⑤ 왜 이 안 · 검토한 대안</a>
+    <a href="#s6">⑥ 밀도 숫자</a>
+    <a href="#s7">⑦ 구현 계약</a>
+    <a href="#s8">⑧ 무엇을 포기했나</a>
+    <a href="#s9">⑨ 제품 원칙 자가점검</a>
+  </div>
+
+  <!-- ══════════════════════ ① 배경 ══════════════════════ -->
+  <h2 id="s1"><span class="no">①</span>배경</h2>
+  <div class="card">
+    <p>사장님(2026-08-19): 「리스트 나올 때 히트맵이라든지 디자인이 가능한 것은 추가로 선택해서 볼 수
+      있게」 — 대화창 데이터 카드(같은 날 승인·구현된 <code>mockups/대화_데이터카드</code>)를 보고 나온
+      다음 요청이다. 지금 카드는 표 하나뿐이라 항목이 10줄 가까이 차면 <b>어디가 빨간불인지 훑어보는
+      데</b> 표를 한 줄씩 읽어야 한다 — 색으로 된 요약 보기가 있으면 그 훑어보기가 빨라진다.</p>
+  </div>
+
+  <!-- ══════════════════════ ② 시연 ══════════════════════ -->
+  <h2 id="s2"><span class="no">②</span>실제로 눌러보기 <span class="src">— 토글·행/타일 클릭(📌 선택)은 이 문서 안에서 실제로 동작합니다.
+    🗔·"외 N건"은 이 시안에서는 비활성입니다(§⑨).</span></h2>
+  <p class="lead">요구된 예시 2개를 카드 폭 <b>660px</b>로 나란히 둔다 — 취약점 카드(치명 47 · 높음 116 · 중간 30)
+    · 관제 카드(P0 5 · P1 159 · P2 29). 머리의 <span class="tag">목록</span><span class="tag">히트맵</span>
+    을 눌러 보기를 바꾸고, 행/타일을 눌러 📌 선택해 보라.</p>
+
+  <div class="demorow">
+    <div class="democol">
+      <div class="cap"><b>예시 A — 취약점 카드</b>(우선순위 — 조치할 취약점)</div>
+      <div class="cardslot"><div id="cardA"></div></div>
+      <div id="inertA" class="inertmsg"></div>
+    </div>
+    <div class="democol">
+      <div class="cap"><b>예시 B — 관제 카드</b>(발견·수집 — 통합 관제 현황)</div>
+      <div class="cardslot"><div id="cardB"></div></div>
+      <div id="inertB" class="inertmsg"></div>
+    </div>
+  </div>
+  <div class="demonote">예시 A(취약점)의 표는 <b>지금 운영 응답에는 없다</b> — <code>findingListAnswer</code>
+    (picklist.ts:202-204)가 "목록이 이미 두 벌(본문 텍스트+체크칸)"이라는 이유로 표를 안 준다고
+    이미 결정했다(2026-08-19 2차). 여기서는 <b>"표가 붙는다면 이런 모양"</b>이라는 예시로 실었다 —
+    실제 컬럼 구성(심각·유형·자산·담당)은 그 화면의 텍스트 답(picklist.ts:191-194 <code>[severity]
+    finding_type @ assetName — 담당</code>)과 같은 항목을 그대로 옮긴 것이다. 예시 B(관제)는 실제로
+    지금 응답하는 카드(<code>datacard.ts:230-247 opsStatusAnswer</code>)와 <b>같은 컬럼·같은 정렬
+    규칙</b>이다(P0 먼저, 그다음 P1 — 10줄 중 실제로 5+5가 되는 것도 그 규칙의 결과다).</div>
+
+  <!-- ══════════════════════ ③ 핵심 결정 ══════════════════════ -->
+  <h2 id="s3"><span class="no">③</span>핵심 결정</h2>
+  <div class="card good">
+    <ol style="margin:0;padding-left:20px;">
+      <li><b>토글은 카드 머리(같은 줄)에.</b> 새 줄을 만들지 않는다 — 제목 … [목록|히트맵] … 🗔의
+        순서로 <code>.dc-head</code> 한 줄 안에 넣는다(§⑥에서 높이 증가 +1px로 확인).</li>
+      <li><b>기본은 목록.</b> 2026-08-19 승인 원칙("표는 익숙한 형태가 먼저") 그대로 — 히트맵은
+        <i>선택해서 보는</i> 둘째 보기다.</li>
+      <li><b>상한(10줄)은 보기와 무관하게 그대로.</b> 히트맵도 <code>dc.table.shown</code> 그 10건만
+        타일로 그린다 — 보기를 바꿨다고 서버에 더 달라고 하지 않는다(새 API 없음).</li>
+      <li><b>행 클릭과 타일 클릭은 같은 콜백.</b> <code>opts.select(row, dc.pickKey)</code> 하나를
+        공유한다 — 두 보기가 "선택"이라는 다른 개념을 갖지 않는다.</li>
+      <li><b>토글은 표가 없으면(또는 1줄뿐이면) 안 만든다.</b> KPI만 있는 카드(예: 지금 운영 중인
+        진짜 우선순위 카드)나 1건짜리 표는 보기를 바꿀 이유가 없다 — 안 쓰는 조작을 얹지 않는다.</li>
+    </ol>
+  </div>
+
+  <!-- ══════════════════════ ④ 색 매핑 ══════════════════════ -->
+  <h2 id="s4"><span class="no">④</span>색 매핑 규칙 — 컬럼 값 기반, 결정적</h2>
+  <div class="card">
+    <p>서버는 색을 보내지 않는다(DataCard 타입 무변경). 클라가 <b>표의 컬럼 이름</b>에서 "판정성 열"을
+      찾고(정규식 하나), 그 열의 값을 <b>고정 사전</b>과 대조해 색을 정한다 — LLM도, 새 필드도 없다.
+      팔레트는 지금 카드가 이미 쓰는 4색 그대로다: <code>#1eb980</code>(ok)·<code>#f0a020</code>(warn)·
+      <code>#f5928a</code>(bad)·회색(muted, <code>--muted-2</code>).</p>
+    <table class="doc">
+      <tr><th style="width:16%">색</th><th style="width:30%">값 사전(정규식, 대소문자 무시)</th><th>쓰인 예</th></tr>
+      <tr><td><span class="dc-tv bad" style="font-size:12px;">■ bad</span></td>
+        <td><code>치명|매우\s*심각|critical|P0</code></td><td>취약점 「치명」 · 관제 「P0」</td></tr>
+      <tr><td><span class="dc-tv warn" style="font-size:12px;">■ warn</span></td>
+        <td><code>높음|high|경고|P1</code></td><td>취약점 「높음」 · 관제 「P1」</td></tr>
+      <tr><td><span class="dc-tv ok" style="font-size:12px;">■ ok</span></td>
+        <td><code>정상|양호|통과|compliant</code></td><td>검증 카드의 상태 열 「정상」(§⑦ 확장 시)</td></tr>
+      <tr><td><span class="dc-tv muted" style="font-size:12px;">■ muted</span></td>
+        <td>위 어느 것도 안 걸림(기본값)</td><td>취약점 「중간」 · 관제 「P2」 · 나머지 모든 값</td></tr>
+    </table>
+    <p class="src">판정성 열 찾기: <code>cols.find(c =&gt; /심각|우선|상태/.test(c.label))</code> — 못 찾으면
+      전 타일이 muted(회색)로만 그려진다(글자는 그대로 보인다, §⑨ "열 손실"과는 다른 상황).
+      ⚠ 색만으로 구분하지 않는다 — 타일에는 <b>항상</b> 그 열의 원문 글자(예: "치명"·"P0")가 같이
+      찍힌다(safe.security 근거, §조사 2).</p>
+  </div>
+
+  <!-- ══════════════════════ ⑤ 왜 이 안 ══════════════════════ -->
+  <h2 id="s5"><span class="no">⑤</span>왜 이 안 · 검토한 대안</h2>
+  <table class="doc">
+    <tr><th style="width:18%">대안</th><th>내용</th><th>판정·근거</th></tr>
+    <tr><td><b>A. 진짜 2차원 히트맵</b><br><span class="src">(가로=심각도, 세로=자산 등 행렬)</span></td>
+      <td>전통적 리스크 매트릭스처럼 두 축을 교차해 "칸마다 건수"를 색으로 채운다.</td>
+      <td><span class="tag rev">기각</span> 우리 표는 이미 <b>개별 항목(행) 하나하나가 고를 수 있는
+        대상</b>이다(📌 선택). 매트릭스는 칸이 "여러 건의 집계"가 되어 한 칸을 클릭해도 어떤 개별
+        건을 골랐다는 뜻이 안 선다 — <code>opts.select(row)</code> 계약과 정면으로 어긋난다. 집계하려면
+        서버가 새로 세야 해서 "새 API 없음" 원칙도 깬다.</td></tr>
+    <tr><td><b>B. 색만 다르게, 표는 그대로</b><br><span class="src">(행 배경색만 심각도로 칠하기)</span></td>
+      <td>표 형태를 유지한 채 <code>tr</code> 배경을 심각도색으로.</td>
+      <td><span class="tag rev">기각</span> "선택해서 볼 수 있게"라는 지시는 <b>다른 보기</b>를 요구한다
+        — 표에 색만 칠하면 보기가 하나뿐이라 지시에 못 미친다. (단, 이 색칠 자체는 좋은 아이디어라
+        §⑧에서 "포기하지 않고 표 안에도 작게 반영"으로 남긴다.)</td></tr>
+    <tr><td><b>C. 타일 그리드(심각도/우선순위 색)</b> <span class="tag ok">채택</span></td>
+      <td>표의 각 행을 그대로 색 타일 하나로 그린다 — 진짜 2축 행렬이 아니라 "색으로 태그된 카드
+        그리드"다(용어는 사장님 말대로 "히트맵"을 쓰되, 정확히는 심각도 타일 그리드).</td>
+      <td>개별 행=개별 타일이라 📌 선택 계약이 그대로 유지되고, 서버 계산도 필요 없다. 세그먼트
+        컨트롤(외부 표준 ①)로 표와 나란히 두는 것이 "레이아웃 전환"의 정석 활용이다.</td></tr>
+  </table>
+
+  <!-- ══════════════════════ ⑥ 밀도 숫자 ══════════════════════ -->
+  <h2 id="s6"><span class="no">⑥</span>밀도 숫자 — 머리 높이 증감 · 목록 vs 히트맵 세로 총합</h2>
+  <div class="card">
+    <h3 style="margin-top:0;">머리 줄 — 토글을 더해도 사실상 그대로</h3>
+    <p>머리는 이미 제목과 🗔 버튼이 <b>한 줄</b>이다(<code>.dc-head</code> flex, <code>.dc-open</code>이
+      <code>margin-left:auto</code>로 오른쪽에 붙는다). 토글도 같은 줄에 넣고 <code>margin-left:auto</code>를
+      토글 쪽으로 옮기면(§⑦ 구현 메모), 줄 자체가 늘지 않고 <b>그 안의 최대 높이</b>만 살짝 바뀐다.</p>
+    <table class="doc">
+      <tr><th>요소</th><th>계산(실제 CSS 값)</th><th class="num">px</th></tr>
+      <tr><td>제목 텍스트</td><td>12.75px × 줄높이 1.2</td><td class="num">15</td></tr>
+      <tr><td>🗔 버튼(기존)</td><td>패딩 3+3 + 글자 12px×1.2 + 테두리 2</td><td class="num">22</td></tr>
+      <tr><td>보기 토글(신설, .dc-seg)</td><td>바깥패딩 2+2 + 안쪽버튼(패딩2+2 + 글자11px×1.2) + 테두리 2</td><td class="num">23</td></tr>
+      <tr><td>머리 줄 내용(=최댓값)</td><td>토글 추가 전 22 → 추가 후 23</td><td class="num">22→23</td></tr>
+      <tr><td>머리 줄 전체(패딩 7+7 포함)</td><td>14 + 내용</td><td class="num"><b>36 → 37</b></td></tr>
+    </table>
+    <div class="bar"><div class="b-head" style="width:100%;">머리 36px → 37px (+1px, +2.8%)</div></div>
+    <div class="barlabel"><span>토글을 더해도 머리 줄은 사실상 그대로다</span><span>+1px</span></div>
+
+    <h3>몸통(표 10줄) — 목록 vs 히트맵 세로 총합</h3>
+    <table class="doc">
+      <tr><th style="width:26%">구간</th><th>목록(표)</th><th>히트맵(타일 5열×2행)</th></tr>
+      <tr><td>표 머리행(th)</td><td>패딩6 + 14 + 테두리1 = 21</td><td>—</td></tr>
+      <tr><td>몸통 10줄 / 타일 10개</td><td>(패딩6+줄높이17+테두리1)×10 = 240</td><td>타일(패딩12+내용44+테두리2=58)×2행+행간격6 = 122</td></tr>
+      <tr><td>타일 바깥 여백(.dc-tiles 패딩)</td><td>—</td><td>8+8 = 16</td></tr>
+      <tr><td>"외 N건" 안내줄</td><td>패딩10 + 14 = 24</td><td>24(동일 유지)</td></tr>
+      <tr><td><b>몸통 합계</b></td><td class="num"><b>285</b></td><td class="num"><b>162</b></td></tr>
+    </table>
+    <div class="bar">
+      <div class="b-tab" style="width:63.7%;">목록 285px</div>
+      <div class="b-heat" style="width:36.3%;">히트맵 162px</div>
+    </div>
+    <div class="barlabel"><span>같은 10건, 히트맵이 <b>123px(43%) 더 낮다</b></span><span>285 → 162</span></div>
+    <p class="src">머리(37) + KPI줄(47, 두 보기 공통·불변) + 몸통을 더하면 카드 세로 총합은
+      <b>목록 369px → 히트맵 246px</b> — 카드 전체 기준 <b>33% 압축</b>이다. 대신 §⑧에서 밝히듯
+      담당·기한 같은 나머지 컬럼은 타일에서 안 보인다 — "빨리 훑어보기"와 "자세히 보기"를 맞바꾸는
+      것이지 공짜로 줄어드는 것이 아니다.</p>
+  </div>
+
+  <!-- ══════════════════════ ⑦ 구현 계약 ══════════════════════ -->
+  <h2 id="s7"><span class="no">⑦</span>구현 계약(메인 에이전트용 — 승인 후)</h2>
+  <div class="card">
+    <h3 style="margin-top:0;">1) 서버 — 변경 없음</h3>
+    <p><code>server/src/engine/datacard.ts</code>의 <code>DataCard</code> 타입·세 카드 함수
+      (hardeningStatusAnswer·assetStatusAnswer·opsStatusAnswer)는 <b>그대로</b>다. 색은 서버가
+      안 보낸다 — 클라가 §④의 사전으로 컬럼 값을 보고 정한다.</p>
+    <h3>2) 클라 — chatparts.js <code>dataCard()</code> 안에서만</h3>
+    <pre>// chatparts.js — dataCard() 안, table 렌더 부분을 감싸는 확장(기존 함수 구조 유지)
+var 색사전 = [
+  { re: /치명|매우\s*심각|critical|P0/i, cls: "bad"  },
+  { re: /높음|high|경고|P1/i,             cls: "warn" },
+  { re: /정상|양호|통과|compliant/i,       cls: "ok"   },
+]; // 못 걸리면 "muted" — 새 서버 필드 없이 컬럼 값만으로 결정
+
+function 판정열(cols) { return cols.find(function (c) { return /심각|우선|상태/.test(c.label); }); }
+function 타일색(row, col) {
+  if (!col) return "muted";
+  var v = String(row[col.key] || "");
+  for (var i = 0; i < 색사전.length; i++) if (색사전[i].re.test(v)) return 색사전[i].cls;
+  return "muted";
+}
+
+function dataCard(el, dc, opts) {
+  // … 기존 head·kpis 렌더 동일 …
+  if (dc.table) {
+    var view = "list"; // 카드마다 독립, 기본 목록(§③ 결정2) — 새로고침·다음 답에는 안 남는다(§⑧)
+    var 판정 = 판정열(dc.table.cols);
+    if (dc.table.shown.length > 1) {
+      var seg = document.createElement("span"); seg.className = "dc-seg";
+      var lb = document.createElement("span"); lb.textContent = "목록"; lb.classList.add("on");
+      var hb = document.createElement("span"); hb.textContent = "히트맵";
+      seg.appendChild(lb); seg.appendChild(hb);
+      head.classList.add("hasseg");     // 🗔의 margin-left:auto를 넘겨받는다(§⑥ 표 참고)
+      head.appendChild(seg);
+      lb.onclick = function () { view = "list"; lb.classList.add("on"); hb.classList.remove("on"); render(); };
+      hb.onclick = function () { view = "heat"; hb.classList.add("on"); lb.classList.remove("on"); render(); };
+    }
+    var body = document.createElement("div");
+    function render() {
+      body.innerHTML = "";
+      body.appendChild(view === "heat" ? buildTiles(dc, 판정, opts) : buildTable(dc, opts));
+    }
+    render();
+    card.appendChild(body);
+  }
+}
+
+function buildTiles(dc, 판정, opts) {
+  var wrap = document.createElement("div"); wrap.className = "dc-tiles";
+  dc.table.shown.forEach(function (row) {
+    var cls = 타일색(row, 판정);
+    var t = document.createElement("div"); t.className = "dc-tile " + cls;
+    var 라벨열 = dc.table.cols.find(function (c) { return c.key === (dc.pickKey || dc.table.cols[0].key); });
+    var 보조열 = dc.table.cols.find(function (c) { return c !== 판정 && c !== 라벨열; });
+    t.innerHTML =
+      (판정 ? '&lt;div class="dc-tv ' + cls + '"&gt;' + esc(row[판정.key]) + '&lt;/div&gt;' : "") +
+      '&lt;div class="dc-tl"&gt;' + esc(row[라벨열.key]) + '&lt;/div&gt;' +
+      (보조열 ? '&lt;div class="dc-ts"&gt;' + esc(row[보조열.key]) + '&lt;/div&gt;' : "");
+    if (opts && typeof opts.select === "function") {
+      t.addEventListener("click", function () { opts.select(row, dc.pickKey || 라벨열.key); });
+    }
+    wrap.appendChild(t);
+  });
+  return wrap; // dc.table.shown 그대로 — 상한(10)도 "외 N건" 안내줄도 목록과 동일하게 뒤에 붙는다
+}</pre>
+    <h3>3) 선택 배관 — 새로 안 만든다</h3>
+    <p>타일 클릭도 표 행 클릭과 <b>같은 함수</b> <code>opts.select(row, dc.pickKey || 첫컬럼키)</code>를
+      부른다(console.js:1497-1503 이미 있는 콜백). 보기를 바꿔도 "무엇을 골랐는지"의 의미는 하나다.</p>
+  </div>
+
+  <!-- ══════════════════════ ⑧ 포기한 것 ══════════════════════ -->
+  <h2 id="s8"><span class="no">⑧</span>무엇을 포기했나</h2>
+  <ul>
+    <li><b>진짜 2차원 히트맵(행렬)</b> — §⑤ 대안 A에서 기각. 우리 데이터는 "고를 수 있는 개별 행"이라
+      집계형 매트릭스와 맞지 않는다.</li>
+    <li><b>타일에서 나머지 컬럼 보기</b> — 표는 4개 컬럼을 다 보여주지만 타일은 판정열+라벨+보조 <b>3개까지만</b>
+      싣는다(§⑥). 나머지(예: 담당·기한)는 목록으로 돌아가거나 타일을 클릭(📌)해 이어서 물어야 한다.</li>
+    <li><b>보기 상태 기억(localStorage)</b> — 카드마다 새로 뜰 때 <b>항상 목록부터</b>다. 기억하면
+      "서버는 무변경"이 클라 저장소로 슬쩍 새는 것이고, 카드 하나짜리 토글에 영속 상태까지 두는 건
+      과하다고 판단했다 — 필요해지면 그때 따로 시안.</li>
+    <li><b>정렬·필터를 히트맵에 추가</b> — 두 보기 다 서버가 이미 정렬해 보낸 순서(급한 순)를 그대로
+      쓴다. 다시 정렬하려면 🗔로 화면을 여는 것이 기존 원칙(대화_데이터카드 시안 §⑨)이다.</li>
+    <li><b>표 안 행 배경색(§⑤ 대안 B)</b> — 완전히 버리진 않았다. 목록 보기의 <code>&lt;tr&gt;</code>에도
+      §④ 사전으로 왼쪽 4px 띠 정도는 얹을 수 있다 — 다만 이번 시안의 범위는 "두 보기 전환"까지라
+      별도 판단으로 남긴다.</li>
+  </ul>
+
+  <!-- ══════════════════════ ⑨ 원칙 자가점검 ══════════════════════ -->
+  <h2 id="s9"><span class="no">⑨</span>제품 원칙 자가점검</h2>
+  <table class="doc">
+    <tr><th style="width:20%">원칙</th><th>점검</th></tr>
+    <tr><td>정직한 구현</td><td>§②의 토글·선택은 실제로 동작한다(자리표시자 아님). 🗔·"외 N건"은
+      누르면 "(이 시안에서는 비활성)"이 뜬다 — 동작하는 척하지 않는다. 예시 A(취약점 표)는 지금
+      운영에 없는 응답임을 §② 밑에 명시했다.</td></tr>
+    <tr><td>서버 데이터 그대로 · 새 API 없음</td><td>§⑦-1에서 확인 — datacard.ts 무변경. 색은
+      클라 사전(§④)이 컬럼 값만 보고 정한다. LLM은 관여하지 않는다(원래 dataCard 원칙 그대로 계승).</td></tr>
+    <tr><td>입력은 대화창에서만</td><td>토글·타일 클릭은 새 입력칸이 아니다 — 이미 있는 📌 선택
+      배관(console.js:1497-1503)을 그대로 쓴다(§⑦-3).</td></tr>
+    <tr><td>제품 룩앤필 그대로</td><td>새 색을 만들지 않았다(팔레트 4색은 지금 카드의 <code>.dc-kv</code>
+      색 그대로). 세그먼트 컨트롤은 titlebar.js의 기존 <code>.gtb-seg</code> 언어를 압축해 재사용했다
+      (§⑥에서 그 압축값을 정확히 계산했다).</td></tr>
+    <tr><td>접근성 — 색에만 기대지 않는다</td><td>모든 타일에 판정열 원문 글자(치명/P0 등)가 색과 함께
+      항상 찍힌다(§④, safe.security 근거) — 색맹이어도 무슨 등급인지 읽을 수 있다.</td></tr>
+    <tr><td>단일 출처</td><td>새 렌더 로직은 <code>chatparts.js</code> 한 곳(§⑦-2)뿐이다 — 콘솔·분리창
+      위젯이 같은 함수를 부르므로 한쪽에서만 히트맵이 되는 일이 없다.</td></tr>
+  </table>
+
+  <footer>
+    시안 작성: gijo-mockup · 2026-08-19. 제품 코드는 읽기만 했고 수정하지 않았다
+    (client/src/renderer/pages/chatparts.js·console.js·titlebar.js,
+    server/src/engine/datacard.ts·picklist.ts·approvals.ts 열람).
+    외부 근거: eleken.co/blog-posts/segmented-control-ui ·
+    learn.microsoft.com/en-us/previous-versions/windows/hh465465(v=win.10) ·
+    safe.security/resources/insights/cyber-risk-heat-map ·
+    mockups/대화_데이터카드/시안.html(progressive disclosure 재인용).
+    외부 CDN·웹폰트·원격 이미지 없음, 더블클릭으로 오프라인 실행.
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var esc = function (s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+
+  // ── 색 매핑 사전(§④) — 컬럼 "라벨"에서 판정열을 찾고, 그 값을 이 사전과 대조한다 ──
+  var 색사전 = [
+    { re: /치명|매우\s*심각|critical|P0/i, cls: "bad" },
+    { re: /높음|high|경고|P1/i, cls: "warn" },
+    { re: /정상|양호|통과|compliant/i, cls: "ok" },
+  ];
+  function 판정열(cols) { return cols.find(function (c) { return /심각|우선|상태/.test(c.label); }); }
+  function 타일색(row, col) {
+    if (!col) return "muted";
+    var v = String(row[col.key] || "");
+    for (var i = 0; i < 색사전.length; i++) if (색사전[i].re.test(v)) return 색사전[i].cls;
+    return "muted";
+  }
+
+  // ── (시연) dc.table 자리표시자 데이터 — §② 정직 고지 그대로 ─────────────
+  var DC_A = {
+    title: "우선순위 — 조치할 취약점",
+    kpis: [
+      { l: "조치할 취약점", v: "193", c: "" },
+      { l: "매우 심각(치명)", v: "47", c: "bad" },
+      { l: "담당 미배정", v: "58", c: "warn" },
+      { l: "기한 초과", v: "22", c: "bad" },
+    ],
+    cols: [ { k: "sev", l: "심각" }, { k: "type", l: "유형" }, { k: "asset", l: "자산" }, { k: "who", l: "담당" } ],
+    pickKey: "type",
+    rows: [
+      ["치명","원격 코드 실행(CVE-2024-21762)","WAS 서버 WAS-02","미배정"],
+      ["치명","SQL Injection","웹서버 WEB-03","김보안"],
+      ["치명","하드코딩된 자격증명","API 게이트웨이 API-01","미배정"],
+      ["치명","인증 우회(Auth Bypass)","VPN 게이트웨이 VPN-01","이현"],
+      ["치명","취약한 라이브러리(Log4Shell 계열)","배치서버 BATCH-01","미배정"],
+      ["치명","기본 비밀번호 사용","프린터 관리콘솔 PR-04","박민"],
+      ["높음","열린 관리 포트(23/텔넷)","코어 스위치 SW-01","미배정"],
+      ["높음","취약한 TLS 설정(TLS1.0 허용)","메일서버 MAIL-01","김보안"],
+      ["높음","디렉터리 탐색(Path Traversal)","사내 포털 PORTAL-01","이현"],
+      ["중간","만료 임박 인증서","프록시 PRX-01","미배정"],
+    ],
+    total: 193, screenLabel: "우선순위",
+  };
+  var DC_B = {
+    title: "발견·수집 — 통합 관제 현황",
+    kpis: [
+      { l: "열린 이벤트", v: "193", c: "" },
+      { l: "P0(긴급)", v: "5", c: "bad" },
+      { l: "P1", v: "159", c: "warn" },
+      { l: "오늘 신규", v: "14", c: "warn" },
+    ],
+    cols: [ { k: "pri", l: "우선" }, { k: "title", l: "이벤트" }, { k: "target", l: "대상" }, { k: "src", l: "소스" } ],
+    pickKey: "title",
+    rows: [
+      ["P0","방화벽 정책 대량 변경 탐지","FW-01","취약점"],
+      ["P0","무차별 대입 로그인 시도 급증","AD-01","보안로그"],
+      ["P0","랜섬웨어 시그니처 탐지","BAK-01","보안로그"],
+      ["P0","외부 C2 통신 의심 트래픽","WAS-02","보안로그"],
+      ["P0","치명 CVE 신규 등록(사내 자산 일치)","WEB-03","취약점"],
+      ["P1","관리자 계정 다중 로그인 실패","VPN-01","보안로그"],
+      ["P1","EDR 격리 실패 알림","MAIL-01","운영"],
+      ["P1","비인가 USB 장치 연결","PC-114","보안로그"],
+      ["P1","백업 작업 실패 반복","BATCH-01","운영"],
+      ["P1","인증서 만료 임박 경보","PRX-01","운영"],
+    ],
+    total: 193, screenLabel: "발견·수집",
+  };
+
+  function kvColor(c) { return c === "ok" ? "var(--teal)" : c === "warn" ? "var(--amber)" : c === "bad" ? "var(--bad)" : "var(--text)"; }
+
+  function buildCard(dc, mountId, inertId) {
+    var card = document.createElement("div"); card.className = "dc-card";
+    var view = "list";
+
+    // 머리
+    var head = document.createElement("div"); head.className = "dc-head";
+    var titleSpan = document.createElement("span"); titleSpan.textContent = dc.title; titleSpan.style.flex = "0 1 auto";
+    titleSpan.style.overflow = "hidden"; titleSpan.style.textOverflow = "ellipsis"; titleSpan.style.whiteSpace = "nowrap";
+    head.appendChild(titleSpan);
+
+    var seg = document.createElement("span"); seg.className = "dc-seg";
+    var lb = document.createElement("span"); lb.textContent = "목록"; lb.classList.add("on");
+    var hb = document.createElement("span"); hb.textContent = "히트맵";
+    seg.appendChild(lb); seg.appendChild(hb);
+    head.appendChild(seg);
+    head.classList.add("hasseg");
+
+    var openBtn = document.createElement("button"); openBtn.className = "dc-open"; openBtn.setAttribute("data-inert", "1");
+    openBtn.textContent = "🗔 " + dc.screenLabel + " 열기";
+    head.appendChild(openBtn);
+    card.appendChild(head);
+
+    // KPI
+    var kw = document.createElement("div"); kw.className = "dc-kpis";
+    dc.kpis.forEach(function (k) {
+      var d = document.createElement("div"); d.className = "dc-kpi";
+      d.innerHTML = '<div class="dc-kl">' + esc(k.l) + '</div><div class="dc-kv" style="color:' + kvColor(k.c) + '">' + esc(k.v) + "</div>";
+      kw.appendChild(d);
+    });
+    card.appendChild(kw);
+
+    // 몸통(전환 대상)
+    var body = document.createElement("div");
+    card.appendChild(body);
+
+    // 선택 칩
+    var selChip = document.createElement("div"); selChip.className = "cs-sel";
+    card.appendChild(selChip);
+
+    var 판정 = 판정열(dc.cols);
+    var picked = null;
+
+    function select(rowArr, label) {
+      picked = rowArr;
+      selChip.className = "cs-sel on";
+      selChip.innerHTML = "📌 " + esc(label) + ' <span class="x" title="선택을 풉니다">✕</span>';
+      selChip.querySelector(".x").addEventListener("click", function (e) {
+        e.stopPropagation(); picked = null; selChip.className = "cs-sel"; selChip.innerHTML = "";
+        card.querySelectorAll(".picked").forEach(function (x) { x.classList.remove("picked"); });
+      });
+    }
+
+    function buildTable() {
+      var tw = document.createElement("div");
+      var tbl = document.createElement("table");
+      tbl.innerHTML = "<thead><tr>" + dc.cols.map(function (c) { return "<th>" + esc(c.l) + "</th>"; }).join("") + "</tr></thead>";
+      var tb = document.createElement("tbody");
+      dc.rows.forEach(function (r) {
+        var tr = document.createElement("tr");
+        tr.innerHTML = r.map(function (v) { return "<td>" + esc(v) + "</td>"; }).join("");
+        tr.addEventListener("click", function () {
+          card.querySelectorAll(".picked").forEach(function (x) { x.classList.remove("picked"); });
+          tr.classList.add("picked");
+          var i = dc.cols.findIndex(function (c) { return c.k === dc.pickKey; });
+          select(r, r[i]);
+        });
+        tb.appendChild(tr);
+      });
+      tbl.appendChild(tb);
+      tw.appendChild(tbl);
+      var more = document.createElement("div"); more.className = "dc-more"; more.setAttribute("data-inert", "1");
+      more.textContent = "외 " + (dc.total - dc.rows.length) + "건 — 🗔 화면에서 보기 (총 " + dc.total + "건 중 " + dc.rows.length + "건 표시)";
+      tw.appendChild(more);
+      return tw;
+    }
+
+    function buildTiles() {
+      var wrap = document.createElement("div"); wrap.className = "dc-tiles";
+      var labelIdx = dc.cols.findIndex(function (c) { return c.k === dc.pickKey; });
+      var 판정Idx = 판정 ? dc.cols.findIndex(function (c) { return c === 판정; }) : -1;
+      var subIdx = dc.cols.findIndex(function (c, i) { return i !== labelIdx && i !== 판정Idx; });
+      dc.rows.forEach(function (r) {
+        var rowObj = {}; dc.cols.forEach(function (c, i) { rowObj[c.k] = r[i]; });
+        var cls = 타일색(rowObj, 판정);
+        var t = document.createElement("div"); t.className = "dc-tile " + cls;
+        t.innerHTML =
+          (판정Idx >= 0 ? '<div class="dc-tv ' + cls + '">' + esc(r[판정Idx]) + "</div>" : "") +
+          '<div class="dc-tl">' + esc(r[labelIdx]) + "</div>" +
+          (subIdx >= 0 ? '<div class="dc-ts">' + esc(r[subIdx]) + "</div>" : "");
+        t.addEventListener("click", function () {
+          card.querySelectorAll(".picked").forEach(function (x) { x.classList.remove("picked"); });
+          t.classList.add("picked");
+          select(r, r[labelIdx]);
+        });
+        wrap.appendChild(t);
+      });
+      var more = document.createElement("div"); more.className = "dc-more"; more.setAttribute("data-inert", "1");
+      more.style.margin = "0 10px 8px";
+      more.textContent = "외 " + (dc.total - dc.rows.length) + "건 — 🗔 화면에서 보기 (총 " + dc.total + "건 중 " + dc.rows.length + "건 표시)";
+      var box = document.createElement("div");
+      box.appendChild(wrap); box.appendChild(more);
+      return box;
+    }
+
+    function render() { body.innerHTML = ""; body.appendChild(view === "heat" ? buildTiles() : buildTable()); }
+    lb.addEventListener("click", function () { view = "list"; lb.classList.add("on"); hb.classList.remove("on"); render(); });
+    hb.addEventListener("click", function () { view = "heat"; hb.classList.add("on"); lb.classList.remove("on"); render(); });
+    render();
+
+    // ⚠ "외 N건" 버튼은 render()가 토글마다 새로 만든다 — 만들 때마다 리스너를 다는 대신
+    //   card 한 곳에 위임(delegation)해 두면 몇 번을 다시 그려도 빠짐없이 잡힌다.
+    var inertNote = document.getElementById(inertId);
+    card.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("[data-inert]");
+      if (!b) return;
+      inertNote.textContent = b === openBtn
+        ? "🗔 버튼은 이 시안에서는 비활성입니다 — 실제 제품에서는 프로 셸 도킹/팝업으로 「" + dc.screenLabel + "」 화면을 엽니다(기존 chatparts.js open() 배관 재사용, 새로 만들지 않습니다)."
+        : "\"외 N건\" 버튼도 이 시안에서는 비활성입니다 — 실제로는 위 🗔와 같은 동작(화면 열기)입니다.";
+      inertNote.classList.add("on");
+    });
+
+    document.getElementById(mountId).appendChild(card);
+  }
+
+  buildCard(DC_A, "cardA", "inertA");
+  buildCard(DC_B, "cardB", "inertB");
+})();
+</script>
+</body>
+</html>
