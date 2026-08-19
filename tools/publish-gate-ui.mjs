@@ -29,8 +29,18 @@ const { chromium } = require2("playwright-core");
 
 const EXE = path.join(repo, "client", "release", "win-unpacked", "GIJO AS.exe");
 const PORT = Number(process.env.GIJO_GATE_CDP_PORT || 9227);
+// 앱 로그인 계정 — 게시 계정(gijo-publish)은 서버 API 전용이라 여기 못 쓴다.
+// 게시 셸이 GIJO_PUBLISH_*만 실었을 수 있으므로(게시 문서 §4) User 스코프 env까지 스스로 읽는다
+// (검토관 S1 — 안 읽으면 문서대로 꾸린 게시 셸에서 관문이 기계적으로 멈춘다).
+function userEnv(name) {
+  if (process.env[name]) return process.env[name];
+  try {
+    return execFileSync("powershell", ["-NoProfile", "-Command",
+      `[Environment]::GetEnvironmentVariable('${name}','User')`], { encoding: "utf8" }).trim();
+  } catch { return ""; }
+}
 const USER = process.env.GIJO_ADMIN_USER || "claude-deploy";
-const PASS = process.env.GIJO_ADMIN_PASSWORD || "";
+const PASS = userEnv("GIJO_ADMIN_PASSWORD");
 const SERVER = process.env.GIJO_SERVER_URL || "http://localhost:4000";
 
 const 실패 = [];
@@ -39,29 +49,35 @@ function ok(name, cond, extra) {
   if (!cond) 실패.push(name);
 }
 
-// ── 선행 점검(fail-closed) ────────────────────────────────────────────────
-if (!PASS) { console.error("[ui관문] GIJO_ADMIN_PASSWORD가 없습니다 — 게시 중단"); process.exit(3); }
-if (!fs.existsSync(EXE)) { console.error("[ui관문] win-unpacked가 없습니다(먼저 npm run dist): " + EXE); process.exit(3); }
+// ── 선행 점검(fail-closed) — exit 3의 원인은 4가지다: ①비번 없음 ②win-unpacked 없음
+//    ③GIJO AS/electron 떠 있음 ④9227 점유. 메시지가 각각 원인을 말한다(검토관 S1 부수). ──
+if (!PASS) { console.error("[ui관문] exit 3 원인①: GIJO_ADMIN_PASSWORD가 없습니다(User 스코프에서도 못 읽음) — 게시 중단"); process.exit(3); }
+if (!fs.existsSync(EXE)) { console.error("[ui관문] exit 3 원인②: win-unpacked가 없습니다(먼저 npm run dist): " + EXE); process.exit(3); }
 try {
-  const out = execFileSync("powershell", ["-NoProfile", "-Command",
-    "Get-Process 'GIJO AS','electron' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path"],
-    { encoding: "utf8" }).trim();
-  if (out) {
-    console.error("[ui관문] GIJO AS/electron 프로세스가 이미 떠 있습니다 — 게시 중단(exit 3).");
-    console.error("  떠 있는 것: " + out.split(/\r?\n/).join(" · "));
+  // 개수로 센다(검토관 M4) — Path는 다른 사용자·승격 프로세스에서 접근 거부로 비어
+  // 「떠 있는데 없음」이 될 수 있다. PowerShell 자체가 실패하면 fail-closed(중단).
+  const cnt = Number(execFileSync("powershell", ["-NoProfile", "-Command",
+    "@(Get-Process 'GIJO AS','electron' -ErrorAction SilentlyContinue).Count"],
+    { encoding: "utf8" }).trim() || "0");
+  if (cnt > 0) {
+    console.error("[ui관문] exit 3 원인③: GIJO AS/electron 프로세스 " + cnt + "개가 떠 있습니다 — 게시 중단.");
     console.error("  사람이 쓰는 앱은 이 관문이 절대 닫지 않습니다. 앱을 닫고 다시 게시하세요.");
     process.exit(3);
   }
-} catch { /* Get-Process가 아무것도 못 찾으면 non-zero — 떠 있는 것 없음 */ }
+} catch {
+  console.error("[ui관문] exit 3: 프로세스 점검 자체가 실패했습니다 — 모호하면 게시를 멈춥니다(fail-closed).");
+  process.exit(3);
+}
 try {
   const r = await fetch("http://localhost:" + PORT + "/json/version", { signal: AbortSignal.timeout(1500) });
-  if (r.ok) { console.error("[ui관문] 포트 " + PORT + "에 이미 CDP가 떠 있습니다 — 게시 중단(exit 3)."); process.exit(3); }
+  if (r.ok) { console.error("[ui관문] exit 3 원인④: 포트 " + PORT + "에 이미 CDP가 떠 있습니다 — 게시 중단."); process.exit(3); }
 } catch { /* 닫혀 있음 — 정상 */ }
 
 // ── 앱 기동(전용 포트) ────────────────────────────────────────────────────
 const app = spawn(EXE, ["--remote-debugging-port=" + PORT], { stdio: "ignore" });
 const 정리 = () => { try { execFileSync("taskkill", ["/PID", String(app.pid), "/T", "/F"], { stdio: "ignore" }); } catch { /* 이미 종료 */ } };
 process.on("exit", 정리);
+process.on("SIGINT", () => { 정리(); process.exit(1); }); // Ctrl+C에도 앱이 남지 않게(검토관 L5)
 await new Promise((r) => setTimeout(r, 7000));
 
 let browser;
@@ -86,7 +102,7 @@ if (page.url().includes("login")) {
     const d = document.getElementById("dupBox");
     return d && d.style.display !== "none";
   }).catch(() => false);
-  if (dup) await page.click("#dupForce"); // 관문 전용 계정(claude-deploy)의 QA 세션만 끊긴다
+  if (dup) await page.click("#dupForce"); // claude-deploy 세션만 끊긴다 — 단 이 계정이 다른 머신에 로그인돼 있으면 그 세션도 끊긴다(사람 계정 아님)
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     if (ctx.pages().some((p) => p.url().includes("app.html"))) break;
@@ -117,7 +133,9 @@ async function 선택카드검사(label, fields) {
   }, { label, fields });
 }
 const 일반 = await 선택카드검사("관문-일반형", { title: "일반형 표본", status: "점검 2건" });
-ok("일반형: 담당 미배정 없음", !일반.txt.includes("담당 미배정"), 일반.txt.slice(0, 50));
+// ⚠ 부정 단언만 있으면 카드가 아예 안 그려져도 통과한다(검토관 L2) — 존재부터 단언.
+ok("일반형: 카드가 그려짐", 일반.txt.includes("일반형 표본"), 일반.txt.slice(0, 50));
+ok("일반형: 담당 미배정 없음", !일반.txt.includes("담당 미배정"));
 ok("일반형: 칩 1개(쉽게 설명)", 일반.chips.length === 1 && /쉽게 설명/.test(일반.chips[0] || ""), JSON.stringify(일반.chips));
 const 취약 = await 선택카드검사("관문-취약점형", { title: "SQLi 표본", severity: "높음", findingKey: "abcdef0123456789" });
 ok("취약점형: 담당 미배정 표시", 취약.txt.includes("담당 미배정"));

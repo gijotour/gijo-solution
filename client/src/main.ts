@@ -943,7 +943,9 @@ ipcMain.on("gijo:bridge", (e, d: unknown) => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("gijo:bridge", d);
 });
 // 본창 → 모든 팝업: 🗂 범위 같은 상태를 열린 창 전부에 퍼뜨린다(본창 제외).
-ipcMain.on("gijo:broadcast", (_e, d: unknown) => {
+ipcMain.on("gijo:broadcast", (e, d: unknown) => {
+  // 발신 창 검증(검토관 M5) — 퍼뜨리기는 본창만 할 수 있다(발신부가 실제로 app.html 하나다).
+  if (!mainWindow || mainWindow.isDestroyed() || e.sender.id !== mainWindow.webContents.id) return;
   for (const w of BrowserWindow.getAllWindows()) {
     if (mainWindow && w.id === mainWindow.id) continue;
     if (!w.isDestroyed()) w.webContents.send("gijo:bridge", d);
@@ -1090,6 +1092,8 @@ ipcMain.handle("console:context", async (_e, screenPage: string | null, label: s
 //   "앱을 그 화면으로 바꾸기"가 아니다. 그래서 셸에게 부탁하는 통로를 따로 둔다.
 ipcMain.handle("shell:openTab", async (_e, page: string, label?: string) => {
   if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, why: "본창이 없습니다" };
+  // 값 재조립(2026-08-20 검토관 L7) — postMessage 입구(app.html)와 같은 규칙을 IPC 입구에도.
+  if (!/^[\w.-]+\.html(\?[^\s"'<>`\\]*)?$/.test(String(page))) return { ok: false, why: "화면 주소 꼴이 아닙니다" };
   mainWindow.webContents.send("shell:openTab", { page: String(page), label: label ? String(label) : null });
   // 화면을 열었으면 그 창을 앞으로 — 안 그러면 "열었다는데 안 보인다"가 된다.
   if (mainWindow.isMinimized()) mainWindow.restore();

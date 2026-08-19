@@ -755,8 +755,10 @@
     // ① "이 화면 열어줘" — 자기 자리를 갈아치우지 않고 새 탭으로(대시보드 바로가기 타일 등).
     if (d.type === "gijo:openTab" && d.page) {
       // 값 재조립(dockback :817과 같은 규칙) — 이 값은 embedSrc를 거쳐 iframe src로 직행한다.
+      // ⚠ 쿼리는 금지목록이다(검토관 M2) — encodeURIComponent가 안 바꾸는 ! ~ * ' ( )가
+      //   실데이터(제품명 「V3 Net (기업용)」류)에 나오므로, 허용목록이면 딥링크가 조용히 죽는다.
       var page = String(d.page);
-      if (!/^[\w.-]+\.html(\?[\w&=%.-]*)?$/.test(page)) return;
+      if (!/^[\w.-]+\.html(\?[^\s"'<>`\\]*)?$/.test(page)) return;
       var known = window.gijoMenuLabel ? window.gijoMenuLabel(page) : null;
       open(page, d.label || known || page);
       return;

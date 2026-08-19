@@ -10,10 +10,15 @@ Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업�
    `Get-Process -Name electron,"GIJO AS" | Where-Object { $_.Path -like "D:\Connect AI\*" } | Stop-Process -Force`
    그 뒤 `cd client && npm run dist` (백그라운드 권장, 수 분 소요. **NSIS exe가 실제로 생겼는지 확인** —
    빌드 로그 tail만 보고 성공으로 판단하지 말 것)
-3. **게시 전 실화면 검증(필수)**: release/win-unpacked의 새 빌드를 `--remote-debugging-port=9223`으로 띄우고 playwright-core CDP로:
-   - claude-deploy 계정으로 로그인 (운영 localhost:4000)
-   - 이번 변경 화면 + 회귀 표본 1~2개 렌더·동작 확인, 스크린샷
-   - 허브 iframe은 스테일 중복 프레임이 있을 수 있음 — **렌더된 프레임을 골라** 검사할 것
+3. **게시 전 실화면 검증**: 게시 명령이 **UI 실화면 관문을 자동으로 태운다**(2026-08-20 도입,
+   `tools/publish-gate-ui.mjs` — publish-release가 강제 호출). 관문은 win-unpacked를 **전용 포트
+   9227**로 스스로 띄워 배선(선택카드·감사 행·부품 로드·허브 릴레이·히트맵)을 실측하고,
+   실패하면 게시가 중단된다. exit 3은 선행 점검 중단(원인 4가지를 메시지가 말한다 — 대표적으로
+   **앱이 떠 있음**: 사람이 쓰는 앱은 관문이 절대 닫지 않으니 닫고 다시).
+   - ⚠ 옛 방식(9223 수동 CDP)은 **남의 앱에 붙는 함정**이 있어 관문으로 대체했다. 이번 변경
+     화면이 관문 검사 목록에 없으면 **관문에 검사를 더하는 것**이 정석이고, 급하면 수동 CDP로
+     보완하되 9223에 뜬 것이 내 검사 대상이 맞는지 반드시 확인.
+   - 우회는 `--skip-ui-gate`뿐 — 사유를 게시 커밋에 남길 것.
 4. **게시**: **게시 전용 계정 gijo-publish**로 (사람이 쓰는 세션은 어느 것도 안 끊긴다):
    ```powershell
    cd "D:\Connect AI\client"
@@ -21,11 +26,13 @@ Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업�
    $env:GIJO_PUBLISH_PASSWORD=[Environment]::GetEnvironmentVariable("GIJO_PUBLISH_PASSWORD","User")
    npm run publish-release -- --force --notes "<버전 - 변경 요약>"
    ```
-   (User 스코프 env가 셸에 상속 안 되므로 위처럼 명시 로드)
+   (User 스코프 env가 셸에 상속 안 되므로 위처럼 명시 로드. UI 관문의 앱 로그인 비번
+   GIJO_ADMIN_PASSWORD는 관문이 User 스코프에서 **스스로 읽는다** — 따로 안 실어도 된다.)
    ⚠ **claude-deploy로 게시하지 말 것**(2026-07-26 실사고): 게시는 --force로 로그인하므로
    그 계정으로 앱에 로그인해 두면 작업 중이던 앱이 로그인 화면으로 튕긴다.
-   claude-deploy는 앱 테스트용, gijo-publish는 게시용으로 나눠 쓴다.
-5. **정리**: `git checkout -- client/server-dist/package.json client/server-dist/package-lock.json` (추적 산출물 원복) → 버전 bump 커밋("클라 X.Y.Z 게시 — …") → `git push hub main`.
+   claude-deploy는 앱 테스트·UI 관문용, gijo-publish는 게시용으로 나눠 쓴다.
+5. **정리**: 버전 bump 커밋("클라 X.Y.Z 게시 — …") → `git push hub main`.
+   (~~server-dist/package.json 원복~~ — 2026-08-13 추적 폐지로 필요 없어졌다.)
 6. 보고: 버전·sha256·게시 노트·검증 결과.
 
 전제: 사용자가 게시를 지시했을 때만 실행("빌드 및 게시" 등). 서버 변경이 함께 있으면 /GIJOAS배포를 먼저.

@@ -52,7 +52,7 @@ async function main() {
     const gate = spawnSync(process.execPath, [path.join(clientDir, "..", "tools", "publish-gate-ui.mjs")],
       { stdio: "inherit", env: process.env });
     if (gate.status !== 0) {
-      throw new Error(`UI 관문 실패(exit ${gate.status}) — 게시 중단. 수리 후 다시 시도하세요(불가피할 때만 --skip-ui-gate).`);
+      throw new Error(`UI 관문 실패(exit ${gate.status}) — 게시 중단. exit 3은 선행 점검(원인 4가지는 관문 메시지 참조 — 비번 없음·win-unpacked 없음·앱 떠 있음·9227 점유), exit 1은 실화면 검사 실패. 수리 후 다시(불가피할 때만 --skip-ui-gate).`);
     }
   } else {
     console.log("[publish-release] ⚠ --skip-ui-gate — UI 실화면 관문을 건너뜁니다(사유를 게시 기록에 남기세요).");
