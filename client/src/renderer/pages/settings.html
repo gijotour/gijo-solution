@@ -1654,6 +1654,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   async function loadSmtpConfig() {
+    // ⚠ 알림 상태는 SMTP 설정 여부와 무관하게 그린다 — 아래 `if (!config) return`(SMTP 미설정
+    //   조기 반환) 뒤에 뒀더니 미설정 서버에서 카드가 영영 「불러오는 중」이었다(2026-08-19 실화면).
+    loadAlertSchedules();
     try {
       const config = await window.gijo.getSmtpConfig();
       if (!config) return;
@@ -1666,7 +1669,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         ? "설정됨 — 변경하지 않으려면 비워두세요"
         : "변경하지 않으려면 비워두세요";
     } catch (e) {}
-    loadAlertSchedules(); // 정기 알림 상태 — SMTP와 같은 판에서 함께 읽는다(2026-08-19)
   }
 
   // 정기 알림(메일) 상태 — 등록은 대화창 도구가 하고 여기는 상태만 그린다.
