@@ -19,7 +19,7 @@ import fs from "node:fs";
 const pagesDir = new URL("../../client/src/renderer/pages/", import.meta.url);
 
 // 다른 문서(호스트 페이지·iframe)의 요소를 가리키는 공용 스크립트 — 자기 파일에 id가 없는 게 정상.
-const 공용스크립트 = new Set(["nav.js", "titlebar.js", "chatparts.js", "chatwidget.js", "console.js", "fold.js", "dialog.js", "longnotice.js", "progresscard.js", "session-explorer.js"]);
+const 공용스크립트 = new Set(["nav.js", "titlebar.js", "chatparts.js", "chatwidget.js", "console.js", "fold.js", "dialog.js", "longnotice.js", "progresscard.js", "session-explorer.js", "railroster.js" /* app.html 전용 — 레일·로스터 id가 셸 문서에 있고 자기 안에서 동적 생성(2026-08-20 AI 팀 가시화) */]);
 
 const 페이지 = fs
   .readdirSync(pagesDir)

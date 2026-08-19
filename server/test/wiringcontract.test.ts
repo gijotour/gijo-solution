@@ -244,6 +244,36 @@ describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님
   });
 });
 
+describe("AI 팀 가시화 — 실신호 배선(2026-08-20 사장님 「추천으로 작업 진행」)", () => {
+  // 원칙: 깜박임은 전부 서버 실신호 — 가짜 연출이 생기면 이 계약이 잡는다.
+  it("서버 신호 2종(search·guard)이 실동작 지점에 심어져 있다", () => {
+    const la = 코드만(join(__dirname, "..", "src", "engine", "llmactivity.ts"));
+    expect(la, "kind 유니언에 search·guard가 없다").toContain('"search" | "guard"');
+    const mem = 코드만(join(__dirname, "..", "src", "engine", "memory.ts"));
+    expect(mem, "RAG 신호가 hybridSearch(4경로 공용 지점)에 없다").toMatch(/hybridSearch[\s\S]{0,4000}kind: "search"/);
+    const gw = 코드만(join(__dirname, "..", "src", "engine", "gateway.ts"));
+    expect(gw, "가드 신호 래퍼가 없다(호출처 5곳 공용 지점)").toContain("gateUserInputInner");
+    expect(gw).toContain('kind: "guard"');
+  });
+  it("프로 레일 로스터 — 부품 로드·구성(팀 6+부품 4)·클릭은 화면 열기만", () => {
+    const s = 코드만(join(PAGES, "app.html"));
+    expect(s, "railroster.js 로드가 없다").toContain('src="railroster.js"');
+    const rr = 코드만(join(PAGES, "railroster.js"));
+    for (const id of ["orchestrator", "scan", "analysis", "report", "ti", "normaltic", "embed", "search", "guard", "lora"]) {
+      expect(rr, `로스터에 ${id}가 없다(팀 6+부품 4 기본 포함 — 사장님 지정)`).toContain(`"${id}"`);
+    }
+    expect(rr, "실신호 구독이 없다").toContain("onLlmActivity");
+    expect(rr, "신호 유실 대비 소등 타임아웃이 없다").toContain("소등타이머");
+    expect(rr, "지시 전송 금지 — 클릭은 화면 열기만").not.toContain("dispatch");
+  });
+  it("대시보드 — 팀 카드·부품·지식창고가 실데이터 API만 쓴다", () => {
+    const d = 코드만(join(PAGES, "dashboard.html"));
+    expect(d).toContain("aiteamRow");
+    expect(d, "지식창고(라이트 이식)가 없다").toContain("loadKnowledgeBox");
+    expect(d, "부품 실신호 플래시가 없다").toContain("부품플래시");
+  });
+});
+
 describe("배선 계약 ⑤층 — 반입 다음 칩", () => {
   it("업로드 응답에 다음 칩이 실리고 클라가 그린다(반입은 nextguide 사각지대)", () => {
     const up = readFileSync(join(__dirname, "..", "src", "engine", "autoupload.ts"), "utf8");

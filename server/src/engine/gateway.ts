@@ -258,7 +258,7 @@ export function maskPii(raw: string): PiiResult {
  * @param source 어느 입구인지(가드레일 로그에 남아 사후 추적에 쓰인다)
  * 돌아온 값의 `text`가 이후 경로에 써야 할 텍스트다(개인정보 가림 반영본).
  */
-export function gateUserInput(text: string, source: GateSource): GateResult {
+function gateUserInputInner(text: string, source: GateSource): GateResult {
   if (!text || !text.trim()) return { allowed: true, flagged: false, categories: [], text };
 
   // ⓪ 개인정보 가리기 — 검사(①②)보다 먼저. 차단 사유 기록(audit detail)에도 원문 대신
@@ -313,4 +313,20 @@ export function gateUserInput(text: string, source: GateSource): GateResult {
       : `🛡 가드레일이 이 요청을 차단했습니다 — 프롬프트 인젝션 시도로 판단(${guard.categories.join(", ")}). ` +
         `정상 요청이면 표현을 바꿔 다시 시도하거나, 설정에서 가드레일 모드를 조정하세요.`,
   };
+}
+
+/** 입구 검사 + 실동작 신호(2026-08-20 AI 팀 가시화). 검사 본문은 gateUserInputInner —
+ *  호출처 5곳(dispatcher·cloudllm·cmdsuggest·llm·memory)이 전부 이 껍데기를 지나므로
+ *  신호를 여기 한 곳에 심는다. 신호는 부가 기능 — 실패해도 검사 결과는 그대로 돌려준다. */
+export function gateUserInput(text: string, source: GateSource): GateResult {
+  const r = gateUserInputInner(text, source);
+  if (text && text.trim()) {
+    import("./llmactivity.js").then(({ emitLlmActivity }) => {
+      emitLlmActivity({
+        kind: "guard", phase: "done",
+        detail: !r.flagged ? "통과" : (r.allowed ? `허용(주의) · ${r.categories.join(",")}` : `차단 · ${r.categories.join(",")}`),
+      });
+    }).catch(() => { /* 신호 실패는 없던 일로 */ });
+  }
+  return r;
 }

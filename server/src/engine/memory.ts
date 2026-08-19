@@ -936,8 +936,16 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //    역할·화면보다 먼저 걸어, 그 위에 역할/화면 부스트가 더해진다. 벽이 아니라 올리기만 한다.
   const fused = applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds());
   const 역할영역 = categoryForRole(agentId);
-  if (역할영역) return applyCategoryBoost(fused, 역할영역, true).slice(0, topK);
-  return applyCategoryBoost(fused, categoryForScreen(screen)).slice(0, topK);
+  const 결과 = 역할영역
+    ? applyCategoryBoost(fused, 역할영역, true).slice(0, topK)
+    : applyCategoryBoost(fused, categoryForScreen(screen)).slice(0, topK);
+  // RAG 실동작 신호(2026-08-20 AI 팀 가시화) — 검색 4경로(queryMemory·Scored·Relevant·Graded)가
+  // 전부 이 함수를 지나므로 여기 한 곳이 전 경로를 커버한다. 레일 R 아이콘이 이 신호로 반짝인다.
+  try {
+    const { emitLlmActivity } = await import("./llmactivity.js");
+    emitLlmActivity({ kind: "search", phase: "done", agent: agentId, detail: `RAG 조회 · ${결과.length}건` });
+  } catch { /* 신호는 부가 기능 — 검색 자체를 막지 않는다 */ }
+  return 결과;
 }
 
 /** 거리까지 함께 돌려주는 검색. 그라운딩 판단(관련 자료가 있는가)에 쓴다. screen을 주면 그 화면의 업무영역 문서를 우선한다. */

@@ -59,7 +59,22 @@
   /* 56px 아이콘 레일 — 사이드바를 대신한다. 계정·문서함이 여기 아래에 붙는다
      (titlebar.js mountUserArea의 세 번째 갈래) — 안 붙이면 통째로 사라진다. */
   #gijoRail{display:none;flex-direction:column;align-items:center;gap:5px;padding:10px 0;
-    border-right:1px solid var(--border);background:var(--panel-2);min-height:0;}
+    border-right:1px solid var(--border);background:var(--panel-2);min-height:0;overflow-y:auto;}
+  /* AI 팀 로스터(승인 시안 AI팀_가시화, 2026-08-20) — 깜박임은 전부 서버 실신호(railroster.js) */
+  .rr-item{width:32px;height:32px;border-radius:9px;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:13.5px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;flex:0 0 auto;font-weight:800;}
+  .rr-item:hover{border-color:var(--border-strong);color:#fff;}
+  .rr-item.watching{border-color:rgba(95,161,255,.5);color:var(--blue-l,#5fa1ff);}
+  .rr-item.working{border-color:rgba(30,185,128,.6);color:var(--teal,#1eb980);animation:rrbreath 1.6s ease-in-out infinite;}
+  @keyframes rrbreath{0%,100%{box-shadow:0 0 0 0 rgba(30,185,128,.35);}50%{box-shadow:0 0 0 5px rgba(30,185,128,0);}}
+  .rr-item.flash-search{animation:rrflash .9s ease-out;}
+  .rr-item.flash-guard-ok{animation:rrflash .9s ease-out;}
+  .rr-item.flash-guard-warn{border-color:rgba(240,160,32,.7);color:var(--amber,#f0a020);animation:rrflash .9s ease-out;}
+  .rr-item.flash-guard-block{border-color:rgba(226,72,61,.7);color:#f5928a;animation:rrflashred .9s ease-out;}
+  @keyframes rrflash{0%{box-shadow:0 0 0 0 rgba(95,161,255,.5);}100%{box-shadow:0 0 0 8px rgba(95,161,255,0);}}
+  @keyframes rrflashred{0%{box-shadow:0 0 0 0 rgba(226,72,61,.55);}100%{box-shadow:0 0 0 8px rgba(226,72,61,0);}}
+  .rr-item.training{border-color:rgba(139,124,240,.65);color:var(--purple,#8b7cf0);animation:rrtrain 1.5s ease-in-out infinite;}
+  @keyframes rrtrain{0%,100%{box-shadow:0 0 0 0 rgba(139,124,240,.4);}50%{box-shadow:0 0 0 5px rgba(139,124,240,0);}}
+  .rr-div{width:26px;height:1px;background:var(--border-strong);margin:7px 0;flex:0 0 auto;}
   body.pro-shell #gijoRail{display:flex;}
   #gijoRail button{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid transparent;
     color:var(--muted);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;
@@ -1243,6 +1258,7 @@
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>
 <script src="console.js"></script>
+<script src="railroster.js"></script>
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>
 </body>

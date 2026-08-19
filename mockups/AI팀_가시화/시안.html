@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — AI 팀 가시화 (대시보드 카드 줄 · 프로 레일 로스터 · 내 지식창고)</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  mockups/AI팀_가시화/시안.html — 추천 시안 1개 (2026-07-25 규칙: 복수 시안 아님)
+  ════════════════════════════════════════════════════════════════════════
+  이 파일은 GIJO AS 제품 코드가 아닙니다. mockups/ 안에서만 존재하는 "결정을 받기 위한 그림"
+  입니다 — client/·server/는 이 시안을 만들며 읽기만 했고 한 글자도 고치지 않았습니다.
+
+  ── 요청 (사장님, 2026-08-20) ──────────────────────────────────────────
+  ① 대시보드에 AI 팀 카드 줄 부활 (2026-07-19~25 실존, 브리핑 재편 72cce13d 때 제거)
+  ② 프로 레일(56px)에 실동작 로스터 — 동작 시 깜박
+  ③ 로스터에 bge·가드레일·LoRA·RAG 기본 포함 (팀원 6인 + 기반 부품)
+  ④ 라이트 「내 지식창고」(lite-dashboard.html:80-208)를 프로 대시보드에도
+
+  ── 설계 전 조사 (제품 원칙: "설계 전 인터넷에서 표준·모범사례 조사 후 근거 제시") ──────
+  1) 에이전트 상태 표시 패턴 — aiuxdesign.guide/patterns/agent-status-monitoring (2026-08 조회)
+     "동작 중=pulsing dot/shimmer, 대기(idle)=표시 없음(무점), 차단/오류=red" — 이 시안의
+     idle=무표시 / watching=정지된 테두리(펄스 없음) / working=펄스 규칙이 이 패턴과 일치한다.
+     또한 "ambient status는 평상시 조용해야 한다"는 원칙 — 그래서 가드레일 「정상 통과」는
+     매번 깜박이지 않는다(신호가 흔해지면 무엇이 특별한지 못 알아본다).
+  2) 아이콘 전용 사이드바 탭 타깃 — smart-interface-design-patterns.com "accessible tap target
+     sizes": 아이콘 전용(라벨 없음) 사이드바는 최소 40×40px 권장, 일반 최소는 44×44.
+     ⚠ 우리 기존 프로 레일 버튼은 이미 38×38(app.html #gijoRail button) — 이 시안이 만든 값이
+     아니라 기존 제품 값이다. 신규 로스터 아이콘은 공간 제약으로 32×32까지 내려간다 —
+     권장 미달을 그대로 인정하고 아래 "제품 원칙 자가점검"에 적어 둔다(숨기지 않는다).
+  3) 제품 선례 재사용 — dashboard.html 93~95행의 tmbreath keyframes(테두리 링 확산)를
+     "재사용"하라는 지시대로 그대로 가져다 쓴다. 새 애니메이션을 만들지 않는다.
+     planA-2-hero.html의 pulse도 같은 문법(box-shadow 확산)이라 서로 어긋나지 않는다.
+
+  ── 정찰 확정 사실 (이 밖은 지어내지 않았다) ────────────────────────────
+  · 팀원 6인 = agents.ts AGENT_DEFS 그대로: orchestrator·scan·analysis·report·ti·normaltic.
+    아이콘도 dashboard.html의 기존 AGENT_ICON 맵 그대로(🧭⊘◎▣🛰📚) — 새로 안 만듦.
+  · 기반 부품 4개 = 실제로 있는 것만: bge 임베딩(1장) · 가드레일(1장) · LoRA(등록부) · RAG(검색).
+    "랭커·성능·분류"(임베딩 하위 다항목)나 "정책 필터"(가드레일 하위 다항목)는 제품에 없어
+    안 그린다 — 참고 사진의 ENGINE/GUARD "열(칼럼)" 구조만 빌리고 내용은 실측으로 채웠다.
+  · llm:event 채널(kind: chat·embed·load·swap)은 이미 있다(llmactivity.ts) — 재사용.
+  · collaboration:event(단계 전환)·learnloop:progress(run.stage)도 기존 채널 — LoRA 훈련중
+    표시는 learnloop:progress를 쓴다(새 신호 불필요, 아래 "구현 계약" 참고).
+  · kind:"search"·"guard"는 **없다** — 이 시안이 신설을 전제로 그린다(아래 구현 계약에 emit
+    위치까지 제안). 지금 이 파일 안의 로스터 깜박임은 전부 **시연용 가짜 신호**다.
+
+  ── 이 파일에 실제로 있는 것 ─────────────────────────────────────────
+  · 위: 결정 문서(사람이 읽고 승인/반려하는 부분) — 조사 근거·결정 3가지·버린 대안·포기한 것·
+    밀도 숫자·제품 원칙 자가점검·구현 계약(서버 신호 2종 + 클라 파일별 변경 지점).
+  · 아래: 실제 동작하는 미리보기 — 56px 레일 + 대시보드 재현. 로스터는 가짜 타이머로 실제로
+    깜박인다(색·타이밍은 구현 계약과 동일 규칙). 지식창고는 정적 예시 숫자로 렌더한다.
+    클릭하면 "실제로는 어디로 가는지"만 토스트로 보여준다 — 진짜 화면 이동은 없다(정직한
+    목업 원칙: 동작하지 않는 것은 동작하지 않는다고 표기).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+  /* 대시보드 실화면(client/src/renderer/pages/dashboard.html :root)에서 그대로 복사 */
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);
+    --blue:#3b82f6;--blue-l:#5fa1ff;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
+    --teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0; /* purple: 실제 제품 28개 화면에서 쓰는 톤(gijo-ui.css 밖 개별 정의) — LoRA 전용 색으로 채택 */
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.6;}
+
+  /* ── 문서(설명) 영역 ─────────────────────────────────────────────── */
+  .doc{max-width:980px;margin:0 auto;padding:28px 26px 10px;}
+  .doc h1{font-size:20px;font-weight:800;color:#fff;margin-bottom:4px;}
+  .doc .lead{font-size:12.5px;color:var(--muted);margin-bottom:22px;}
+  .sec{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+  .sec h2{font-size:14px;font-weight:800;color:#fff;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+  .sec h2 .no{flex:0 0 auto;width:22px;height:22px;border-radius:6px;background:rgba(59,130,246,.18);color:var(--blue-l);
+    font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  .sec p{font-size:12.75px;color:var(--muted);margin:6px 0;}
+  .sec p b{color:var(--text);}
+  .sec ul{margin:8px 0 4px 18px;font-size:12.75px;color:var(--muted);}
+  .sec li{margin:5px 0;}
+  .sec li b{color:var(--text);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;}
+  @media (max-width:760px){.grid2{grid-template-columns:1fr;}}
+  .box{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+  .box h3{font-size:12px;font-weight:800;margin-bottom:6px;}
+  .box.drop h3{color:#f5928a;} .box.keep h3{color:var(--teal);}
+  table.density{width:100%;border-collapse:collapse;font-size:12.25px;margin-top:6px;}
+  table.density th{text-align:left;padding:6px 8px;color:var(--muted-2);font-size:11.5px;font-weight:700;border-bottom:1px solid var(--border-strong);}
+  table.density td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;}
+  table.density td.n{color:var(--blue-l);font-weight:800;white-space:nowrap;}
+  table.density tr.sum td{font-weight:800;color:#fff;background:rgba(59,130,246,.06);}
+  .chk{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text);margin:6px 0;}
+  .chk .ok{color:var(--teal);flex:0 0 auto;font-weight:800;}
+  .chk .warn{color:var(--amber);flex:0 0 auto;font-weight:800;}
+  .chk b{display:block;}
+  .chk span.d{color:var(--muted);font-size:12px;}
+  pre{background:#1a1a19;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11.75px;
+    color:#8fd6a8;overflow-x:auto;line-height:1.65;margin:8px 0;font-family:"Consolas","Menlo",monospace;}
+  pre .cm{color:#6b7a70;}
+  .filepath{color:var(--blue-l);font-weight:700;}
+  .tag{display:inline-block;font-size:10.75px;font-weight:800;padding:1px 7px;border-radius:20px;margin-right:4px;}
+  .tag.new{background:rgba(30,185,128,.16);color:var(--teal);}
+  .tag.chg{background:rgba(240,160,32,.16);color:var(--amber);}
+
+  /* ── 미리보기 영역 ───────────────────────────────────────────────── */
+  .demo-banner{max-width:1600px;margin:26px auto 0;padding:9px 16px;background:rgba(240,160,32,.12);
+    border:1px solid rgba(240,160,32,.4);color:#f5c264;font-size:12.25px;font-weight:700;border-radius:9px 9px 0 0;
+    display:flex;align-items:center;gap:8px;}
+  .preview-shell{max-width:1600px;margin:0 auto 40px;display:flex;border:1px solid var(--border-strong);
+    border-radius:0 0 12px 12px;overflow:hidden;background:var(--bg);min-height:760px;}
+
+  /* ── 56px 프로 레일 재현(app.html #gijoRail 그대로 복사 + 로스터 신설분) ───────── */
+  .rail{width:56px;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 0;
+    border-right:1px solid var(--border);background:var(--panel-2);
+    overflow-y:auto; /* ⚠ 신설 — 로스터 10개가 들어가며 필요해진 값. app.html 원본엔 없었다(구현 계약 참고) */}
+  .rail button{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid transparent;
+    color:var(--muted);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+    font-family:inherit;position:relative;flex:0 0 auto;}
+  .rail button:hover{background:rgba(255,255,255,.06);color:#fff;border-color:var(--border);}
+  .rail .rail-foot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;padding-top:6px;}
+  .rail .rr-div{width:26px;height:1px;background:var(--border-strong);margin:7px 0;flex:0 0 auto;}
+
+  /* 로스터 — 팀원 6 + 부품 4. 자리 제약으로 32×32(권장 40 미달, 자가점검에 명시) */
+  .rr-item{width:32px;height:32px;border-radius:9px;background:transparent;border:1px solid var(--border);
+    color:var(--muted);font-size:13.5px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+    font-family:inherit;flex:0 0 auto;font-weight:800;}
+  .rr-item:hover{border-color:var(--border-strong);color:#fff;}
+  .rr-item.watching{border-color:rgba(95,161,255,.5);color:var(--blue-l);}
+  /* working — tmbreath 재사용(dashboard.html 93~95행 그대로, 이름도 그대로) */
+  .rr-item.working{border-color:rgba(30,185,128,.6);color:var(--teal);animation:tmbreath 1.6s ease-in-out infinite;}
+  @keyframes tmbreath{0%,100%{box-shadow:0 0 0 0 rgba(30,185,128,.35);}50%{box-shadow:0 0 0 5px rgba(30,185,128,0);}}
+  /* 부품 전용 — 짧은 단일 플래시(감지·조회는 순간적이라 "지속 펄스"가 아니라 "한 번 반짝"이 맞다) */
+  .rr-item.flash-search{animation:rrflash 0.9s ease-out;}
+  .rr-item.flash-guard-ok{animation:rrflash 0.9s ease-out;}
+  .rr-item.flash-guard-warn{border-color:rgba(240,160,32,.7);color:var(--amber);animation:rrflash 0.9s ease-out;}
+  .rr-item.flash-guard-block{border-color:rgba(226,72,61,.7);color:#f5928a;animation:rrflashred 0.9s ease-out;}
+  @keyframes rrflash{0%{box-shadow:0 0 0 0 rgba(95,161,255,.5);}100%{box-shadow:0 0 0 8px rgba(95,161,255,0);}}
+  @keyframes rrflashred{0%{box-shadow:0 0 0 0 rgba(226,72,61,.55);}100%{box-shadow:0 0 0 8px rgba(226,72,61,0);}}
+  .rr-item.training{border-color:rgba(139,124,240,.65);color:var(--purple);animation:rrtrain 1.5s ease-in-out infinite;}
+  @keyframes rrtrain{0%,100%{box-shadow:0 0 0 0 rgba(139,124,240,.4);}50%{box-shadow:0 0 0 5px rgba(139,124,240,0);}}
+
+  /* ── 대시보드 재현(dashboard.html 실제 마크업·클래스 축소 복제) ─────────────── */
+  .dash{flex:1 1 auto;min-width:0;padding:18px 22px 40px;overflow-y:auto;max-width:1800px;}
+  .scr-id{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;}
+  .scr-id b{color:var(--text);font-weight:800;}
+  .head{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;align-items:stretch;}
+  .hello{flex:1 1 420px;min-width:0;background:linear-gradient(180deg,rgba(59,130,246,.08),transparent);
+    border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;justify-content:center;}
+  .hi{font-size:21px;font-weight:800;color:#fff;}
+  .how{margin-top:8px;font-size:12.5px;color:var(--muted);}
+  .state{flex:0 1 380px;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;}
+  .state h4{font-size:12.25px;font-weight:800;color:var(--muted-2);margin-bottom:8px;}
+  .st-row{display:flex;align-items:center;gap:6px;font-size:12.25px;color:var(--muted);padding:3px 0;}
+  .st-row .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
+  .team-mini{display:flex;align-items:center;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.06);}
+  .team-mini .tm{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
+    font-size:13px;background:#1f1e1d;border:1px solid var(--border);color:var(--muted);} /* 13px = dashboard.html 실제 .tm 값 그대로(복사 오류 정정) */
+  .team-mini .sum{font-size:11.5px;color:var(--muted-2);margin-left:4px;}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;min-width:0;margin-bottom:12px;}
+  .card h3{font-size:12px;font-weight:800;margin-bottom:9px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .card h3 .cnt{margin-left:auto;color:var(--muted-2);font-weight:700;font-size:11.5px;}
+  .new-badge{background:var(--teal);color:#06281c;font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;}
+
+  /* ①③ 신규 — AI 팀 카드 줄 */
+  .aiteam-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .aiteam-chip{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:20px;background:var(--panel-2);
+    border:1px solid var(--border);cursor:pointer;font-size:12px;color:var(--text);}
+  .aiteam-chip:hover{border-color:var(--border-strong);}
+  .aiteam-chip .ic{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:11px;background:#1f1e1d;border:1px solid var(--border);flex:0 0 auto;}
+  .aiteam-chip.watching .ic{border-color:rgba(95,161,255,.5);color:var(--blue-l);}
+  .aiteam-chip.working .ic{border-color:rgba(30,185,128,.6);color:var(--teal);animation:tmbreath 1.6s ease-in-out infinite;}
+  .aiteam-parts{display:flex;gap:14px;align-items:center;margin-top:8px;padding-top:8px;
+    border-top:1px solid rgba(255,255,255,.06);font-size:11.5px;color:var(--muted-2);flex-wrap:wrap;}
+  .aiteam-parts .part{display:flex;align-items:center;gap:6px;cursor:pointer;}
+  .aiteam-parts .part:hover{color:var(--text);}
+  .aiteam-parts .part .lt{width:17px;height:17px;border-radius:4px;border:1px solid var(--border-strong);
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;opacity:.85;flex:0 0 auto;}
+  .aiteam-parts .part.flash-ok .lt{animation:rrflash 0.9s ease-out;border-color:rgba(95,161,255,.7);color:var(--blue-l);}
+  .aiteam-parts .part.flash-warn .lt{animation:rrflash 0.9s ease-out;border-color:rgba(240,160,32,.7);color:var(--amber);}
+  .aiteam-parts .part.flash-block .lt{animation:rrflashred 0.9s ease-out;border-color:rgba(226,72,61,.7);color:#f5928a;}
+  .aiteam-parts .part.training .lt{border-color:rgba(139,124,240,.7);color:var(--purple);animation:rrtrain 1.5s ease-in-out infinite;}
+  .aiteam-ticker{margin-top:8px;font-size:11px;color:var(--muted-2);min-height:15px;}
+
+  /* ④ 신규 — 내 지식창고(fold.js 패턴 인라인 재현) */
+  .gjf-h{display:flex;align-items:center;gap:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;
+    border:1px solid var(--border);border-radius:10px;background:var(--panel-2);user-select:none;}
+  .gjf-h:hover{border-color:var(--blue);background:rgba(59,130,246,.05);}
+  .gjf-h .car{color:var(--muted-2);font-size:11.75px;width:11px;flex:0 0 auto;transition:transform .15s;}
+  .gjf-h.on .car{transform:rotate(90deg);}
+  .gjf-h .nm{font-size:12.5px;font-weight:700;color:#dfe6ff;flex:1;}
+  .gjf-b{font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--muted);flex:0 0 auto;}
+  .kb-body{display:none;}
+  .kb-body.open{display:block;}
+  .kb-kpi{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;}
+  .kb-t .v{font-size:23px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .kb-t .k{font-size:11.5px;color:var(--muted);font-weight:700;}
+  .kb-t .d{font-size:11px;color:var(--muted-2);margin-top:2px;}
+  .kb-bars-h{font-size:11.5px;color:var(--muted);font-weight:700;margin:4px 0 8px;}
+  .kb-bar{display:flex;align-items:center;gap:10px;margin:5px 0;}
+  .kb-bar .lbl{flex:0 0 96px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .kb-bar .track{flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;overflow:hidden;}
+  .kb-bar .fill{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#1eb980);border-radius:7px;}
+  .kb-bar .num{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);min-width:96px;text-align:right;}
+  .kb-meta{font-size:11.5px;color:var(--muted-2);margin-top:12px;padding-top:10px;border-top:1px solid var(--border);}
+  .kb-meta b{color:var(--text);}
+
+  .stub{opacity:.55;font-size:12px;color:var(--muted-2);}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#0f0f0e;
+    border:1px solid var(--border-strong);border-radius:10px;padding:10px 16px;font-size:12.5px;color:#fff;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .18s;z-index:99;}
+  .toast.on{opacity:1;}
+</style>
+</head>
+<body>
+
+<div class="doc">
+  <h1>시안 — AI 팀 가시화</h1>
+  <div class="lead">추천 시안 1개 · 대상: 대시보드(client/src/renderer/pages/dashboard.html) · 프로 레일(app.html #gijoRail) · 파일: mockups/AI팀_가시화/시안.html</div>
+
+  <div class="sec">
+    <h2><span class="no">1</span>왜 이 안 — 그리고 왜 이렇게 공존하는가</h2>
+    <p><b>브리핑 재편(2026-08-06 "ai브리핑은 대화창으로 전부 이동")과 이번 부활은 부딪히지 않는다.</b>
+      그 재편이 걷어낸 것은 <b>글(문장으로 된 브리핑)</b>이었지 <b>상태 표시(누가 지금 일하는가)</b>가
+      아니었다 — 그 증거로 지금 코드에도 이미 <code>.team</code> 아이콘 줄(26px 원 6개, 상태판 안)이
+      2026-07-28에 되살아나 있다. 다만 그건 "아이콘만"이라 사장님이 말한 <b>"카드 줄"</b>과 다르다.</p>
+    <p>그래서 이번 시안은 <b>기존 상태판 안 요약(.team-mini)을 그대로 두고</b>, 그 아래 <b>새 섹션으로
+      "AI 팀" 카드 줄을 추가</b>한다. 지우고 바꾸지 않은 이유: 상태판 요약은 "서버·엔진과 함께 한눈에"
+      보는 성격(작업 전 상태 확인)이고, 새 카드는 "지금 무엇으로 일하는지 소상히"(BOM 투명성) 보는
+      성격이라 목적이 다르다 — 상태판에서 빼면 그 판이 서버·엔진만 남아 AI 팀 생사는 스크롤해야
+      보인다.</p>
+    <p><b>프로가 기준 모델</b>이므로(CLAUDE.md 2026-08-19: "신규 기능·UX는 프로 셸 기준으로 먼저") 로스터는
+      대시보드(표준 셸의 화면)뿐 아니라 <b>56px 프로 레일에도</b> 있어야 한다 — 프로에는 사이드바가
+      없고 레일이 유일한 상시 노출 자리다.</p>
+  </div>
+
+  <div class="sec">
+    <h2><span class="no">2</span>버린 대안 · 무엇을 포기했나</h2>
+    <div class="grid2">
+      <div class="box drop">
+        <h3>✗ 버림 — settings.html "AI팀 구성" 풀 카드 그대로 복제</h3>
+        <p style="margin:0;font-size:12px">역할 문장 + 배지 3종(어댑터·지식·예외모델)까지 담은 큰 박스(6장 그리드,
+        각 70~90px). 대시보드에 그대로 옮기면 밀도가 2배 이상 늘고, 그 정보는 이미 설정 화면에
+        있어 <b>중복</b>이다. 대시보드는 콘솔이 주인공이라 세로 예산이 없다.</p>
+      </div>
+      <div class="box drop">
+        <h3>✗ 버림 — 기존 .team-mini를 확장해 그 자리에서 카드로</h3>
+        <p style="margin:0;font-size:12px">상태판(서버·엔진·리소스) 안에서 카드까지 키우면 "지금 서버가
+        살아 있나"를 보는 판이 "팀이 뭘로 일하나"까지 떠안아 <b>위계가 흐려진다</b>. 두 목적은
+        따로 두는 게 각각 더 잘 읽힌다.</p>
+      </div>
+      <div class="box drop">
+        <h3>✗ 버림 — 레일 로스터를 대시보드에만 두고 레일은 생략</h3>
+        <p style="margin:0;font-size:12px">사장님이 명시적으로 ②를 요청했고, 프로 셸이 개발 기준
+        모델(2026-08-19)이라 프로에서 이 정보가 안 보이면 정작 <b>기준 화면에 빠진 기능</b>이 된다.</p>
+      </div>
+      <div class="box drop">
+        <h3>✗ 버림 — 로스터 클릭 = 대화창에 문장 프리필</h3>
+        <p style="margin:0;font-size:12px">"팀 현황 알려줘"를 프리필하면 사용자가 <b>한 번 더 전송</b>을
+        눌러야 하고, 그 의도("이 팀원 자세히 보기")와 대화 프리필의 의도("이걸 화제로 삼기")가
+        다르다. 기존 <code>.team</code> 줄이 이미 <code>go("agent.html")</code>로 <b>화면 이동</b>을
+        쓰고 있어 선례와도 맞지 않는다.</p>
+      </div>
+    </div>
+    <p style="margin-top:12px"><b>채택:</b> 대시보드=소상(이름+역할 툴팁, 독립 카드) / 레일=압축(아이콘만) —
+      두 자리 다 클릭하면 <b>화면을 연다</b>(팀원 6인 → <code>aihub.html?panel=team</code>, 부품 4종은
+      각각 해당 허브 패널). "메뉴는 보기용" 원칙과 일치 — 클릭이 지시를 보내지 않는다.</p>
+    <p><b>포기한 것:</b></p>
+    <ul>
+      <li>팀원 <b>role 설명 전문</b>을 화면에 늘어놓지 않는다 — 이름만 보이고, 역할은 <code>title</code>
+        툴팁으로만(정체성 한 줄 + ⓘ는 챗봇, 이 화면은 정체성만 원칙).</li>
+      <li>기반 부품 4종에 <b>이모지 아이콘</b>을 쓰지 않는다 — 팀원 이모지와 뒤섞여 "이것도 팀원인가"로
+        헷갈릴 수 있어 <b>알파벳 배지</b>(E·G·L·R)로 갈랐다. 참고 사진의 ENGINE/GUARD 열 구조는
+        "그룹으로 묶는다"는 뜻만 가져오고, 실제 없는 하위 항목(랭커·정책 필터)은 지어내지 않았다.</li>
+      <li>레일 로스터 아이콘 <b>32×32</b> — 접근성 권장(40×40) 미달을 그대로 인정한다. 자리 제약 때문에
+        내린 값이고, 다음 UX 라운드에서 재검토가 필요하다(아래 자가점검 참고).</li>
+      <li>가드레일 「정상 통과」는 <b>매번 깜박이지 않는다</b> — 조사 근거 1)의 "ambient 상태는 평소
+        조용해야 한다"를 따랐다. 플래그·차단일 때만 색이 바뀐다(파랑→주황→빨강).</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <h2><span class="no">3</span>밀도 숫자</h2>
+    <p>계산은 이 파일에 실제로 쓴 CSS 값(패딩·글자·여백)의 합이다 — 라이브 CDP 실측이 아니라
+      <b>공식 기반 추정</b>이며, 실구현 뒤에는 반드시 실측으로 재확인해야 한다(제품 원칙: "밀도는
+      줄 높이·세로 총합 숫자로").</p>
+    <table class="density">
+      <tr><th>위치</th><th>항목</th><th>추가 세로</th><th>근거</th></tr>
+      <tr><td>대시보드</td><td>① AI 팀 카드 줄(상시 노출)</td><td class="n">+118px</td>
+        <td>padding 13×2 + 헤더(글자15+margin9) + 칩줄 32 + 부품줄(padding-top8+글자16) + 카드 하단 margin 12</td></tr>
+      <tr><td>대시보드</td><td>④ 내 지식창고 — 접힌 기본</td><td class="n">+44px</td>
+        <td>fold 헤더 padding 10×2 + 글자 15 + 테두리 2 + margin-bottom 7</td></tr>
+      <tr><td>대시보드</td><td>④ 내 지식창고 — 펼쳤을 때(추가분)</td><td class="n">+266px</td>
+        <td>lite-dashboard.html 카드 그대로: padding 14×2 + h2 16 + sub 28 + KPI줄 64 + 막대헤더 20 + 막대3줄 72 + 메타줄 38</td></tr>
+      <tr class="sum"><td colspan="2">대시보드 합계 — 기본 상태(지식창고 접힘)</td><td class="n">+162px</td><td>118 + 44</td></tr>
+      <tr class="sum"><td colspan="2">대시보드 합계 — 지식창고까지 펼쳤을 때</td><td class="n">+428px</td><td>162 + 266</td></tr>
+      <tr><td>프로 레일</td><td>구분선 2개(액션↔로스터, 팀원↔부품)</td><td class="n">+34px</td><td>margin 7×2 + line 1, 두 곳</td></tr>
+      <tr><td>프로 레일</td><td>② 로스터 10개(32×32, gap 4)</td><td class="n">+356px</td><td>10×32 + 9×4</td></tr>
+      <tr class="sum"><td colspan="2">프로 레일 합계 — 기존 220px(액션 5개+상단여백) 대비</td><td class="n">→ 610px</td>
+        <td>220 + 34 + 356 (rail-foot 별도, titlebar.js가 붙이는 계정·문서함 — 이 파일에서 실측 안 됨, 대략 +70~90px 추정)</td></tr>
+    </table>
+    <p style="margin-top:8px">⚠ 레일 총합(≈680~700px)은 1366×768 창(사용 가능 높이 ≈724px)에서 <b>빠듯하거나 넘친다</b> —
+      그래서 아래 미리보기는 <code>#gijoRail{overflow-y:auto}</code>를 새로 건다(원본 app.html엔 없던 값,
+      구현 계약에 명시). 38×38로 유지했다면(접근성 권장에 더 가까운 옵션) 로스터만 439px로 더 크다 —
+      32px를 택한 것은 이 한 줄(overflow 허용) 없이는 더더욱 못 버텼을 것이기 때문이다.</p>
+  </div>
+
+  <div class="sec">
+    <h2><span class="no">4</span>제품 원칙 자가점검</h2>
+    <div class="chk"><span class="ok">✓</span><div><b>가짜 연출 금지</b><span class="d"> — 미리보기의 로스터 깜박임·지식창고 숫자는
+      전부 "시연용 가짜"라고 화면에 배너로 밝혔다. 실구현 전까지는 동작하지 않는다.</span></div></div>
+    <div class="chk"><span class="ok">✓</span><div><b>입력칸 금지</b><span class="d"> — 새 카드·로스터 어디에도 텍스트 입력칸이 없다.
+      클릭은 전부 "화면 열기"(네비게이션)뿐, 지시를 만들지 않는다.</span></div></div>
+    <div class="chk"><span class="ok">✓</span><div><b>11px 미만 금지</b><span class="d"> — 이 파일에서 11px 미만인 곳은
+      <code>.tag</code>(10.75px)·<code>.new-badge</code>였다가 11.25px로 올린 배지 2곳뿐이며, 문서 설명 영역
+      전용이거나 초안에서 잡아 고친 값이다(uireadability.test.ts가 real pages/ 만 훑지만, 실구현
+      전제라 여기서도 지켰다). 제품 화면 재현부(레일·대시보드)는 전부 11px 이상 — <code>.lt</code> 부품
+      배지도 10px였던 걸 11px로 고쳤다. 레일 로스터는 텍스트가 아예 없다(아이콘 + title 툴팁) — 규정
+      대상 밖이다.</span></div></div>
+    <div class="chk"><span class="ok">✓</span><div><b>색 토큰은 실제 화면에서 복사</b><span class="d"> — dashboard.html의 :root를 그대로
+      썼고, --purple만 추가했다(제품 28개 화면이 이미 쓰는 톤 — 새로 지어낸 색 아님).</span></div></div>
+    <div class="chk"><span class="ok">✓</span><div><b>프로 우선</b><span class="d"> — 레일 로스터를 대시보드 카드보다 먼저 설계했고,
+      표준 대시보드는 그 결과를 축소 반영했다(2026-08-19 결정대로).</span></div></div>
+    <div class="chk"><span class="warn">△</span><div><b>접근성 탭 타깃 40px 권장 미달</b><span class="d"> — 로스터 32×32는
+      의도적 절충이다(밀도 숫자 참고). 항목 수를 줄이거나(예: 부품 4종을 "엔진 상태" 버튼 1개로
+      합치는 대안) 레일을 넓히는 안은 이번엔 요청 범위(팀원+부품 전부 상시 노출) 밖이라 택하지
+      않았다 — 다음 라운드에서 재논의할 지점으로 남긴다.</div></div>
+    <div class="chk"><span class="warn">△</span><div><b>rail-foot 실측 미검증</b><span class="d"> — titlebar.js가 붙이는
+      계정·문서함 높이를 이 파일은 추정만 했다(구현 뒤 CDP로 재야 한다).</div></div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="no">5</span>구현 계약 — 서버 신호 2종 + 클라 변경 지점</h2>
+    <p><span class="tag new">신설</span> <b>kind: "search"</b> — RAG 조회가 실제로 일어났음(팀원 로스터의
+      "R" 배지 · 레일의 R 아이콘이 반응하는 신호). <span class="tag new">신설</span> <b>kind: "guard"</b> —
+      입구 검사(가드레일)가 실행됐음.</p>
+    <pre>// <span class="cm">server/src/engine/llmactivity.ts — kind 유니언에 2종 추가</span>
+export interface LlmActivityEvent {
+  kind: "chat" | "embed" | "load" | "swap" | "search" | "guard"; <span class="cm">// + 신설 2종</span>
+  ...
+}</pre>
+    <pre>// <span class="cm">server/src/engine/memory.ts — emit 위치는 hybridSearch(838행) 안, return 직전.</span>
+<span class="cm">// ⚠ 과제 지시는 "queryMemory"였지만, dispatcher(915행)가 실제 부르는 건 queryMemoryGraded다.</span>
+<span class="cm">// queryMemory·queryMemoryScored·queryMemoryRelevant·queryMemoryGraded 4개가 전부 hybridSearch를</span>
+<span class="cm">// 거치므로(944·955·977·1005행), 거기 한 곳에 심어야 네 경로가 다 커버된다.</span>
+async function hybridSearch(question, topK, agentId, screen, viewer) {
+  ...
+  const fused = <span class="cm">/* 기존 융합 로직 그대로 */</span>;
+  emitLlmActivity({ kind: "search", phase: "done", agent: agentId, detail: `RAG 조회 · ${fused.length}건` });
+  return fused;
+}</pre>
+    <pre>// <span class="cm">server/src/engine/gateway.ts — gateUserInput(261행) 자체를 감싼다.</span>
+<span class="cm">// ⚠ 과제 지시는 "dispatcher gateUserInput"이었지만, 함수의 실제 정의는 gateway.ts에 있고</span>
+<span class="cm">// dispatcher.ts(991행)는 이걸 부르는 다섯 곳 중 하나일 뿐이다(cloudllm.ts·cmdsuggest.ts·</span>
+<span class="cm">// llm.ts·memory.ts도 부른다). dispatcher.ts 안에만 심으면 나머지 네 경로는 신호가 안 뜬다.</span>
+function gateUserInputInner(text, source) { <span class="cm">/* 기존 본문 그대로, 이름만 바뀜 */</span> }
+export function gateUserInput(text, source) {
+  const r = gateUserInputInner(text, source);
+  if (text && text.trim()) {
+    emitLlmActivity({
+      kind: "guard", phase: "done",
+      detail: !r.flagged ? "통과" : (r.allowed ? `허용(주의)·${r.categories.join(",")}` : `차단·${r.categories.join(",")}`),
+    });
+  }
+  return r;
+}
+<span class="cm">// llmactivity.ts는 express·auth만 의존하는 잎 모듈이라 gateway.ts·memory.ts에서 불러도</span>
+<span class="cm">// 순환 참조 위험이 없다 — 단, 실구현 때 반드시 빌드로 재확인.</span></pre>
+    <p><span class="tag chg">변경</span> <b class="filepath">client/src/renderer/pages/app.html</b> —
+      <code>#gijoRail</code>에 <code>overflow-y:auto</code> 한 줄, <code>#railHome</code>과
+      <code>.rail-foot</code> 사이에 로스터 마크업(구분선+팀원6+구분선+부품4) 삽입,
+      <code>&lt;script src="railroster.js"&gt;</code> 한 줄 추가.</p>
+    <p><span class="tag new">신설</span> <b class="filepath">client/src/renderer/pages/railroster.js</b> —
+      <code>body.pro-shell</code>일 때만 동작. <code>listAgents()</code>로 초기 페인트,
+      <code>onLlmActivity(evt)</code>로 kind별 펄스 온/오프(타임아웃 포함 — "N초 내 done 없으면 소등"),
+      <code>learnloop:progress</code> 구독(LoRA 훈련중 표시), 클릭 시 <code>gijoOpenScreen(...)</code>.</p>
+    <p><span class="tag chg">변경</span> <b class="filepath">client/src/renderer/pages/dashboard.html</b> —
+      <code>.head</code>와 <code>#glanceGo</code> 사이에 <code>.aiteam-card</code>(신규)·
+      <code>.kb-card</code>(<code>data-gijo-fold-closed</code> 부착) 삽입. <code>&lt;script src="fold.js"&gt;</code>
+      추가(현재 미포함). 기존 <code>loadTeam()</code>을 확장해 새 칩까지 같이 그린다(같은
+      <code>listAgents()</code> 재사용 — 새 API 없음). 지식창고는 <code>listMemoryDocuments()</code> +
+      <code>knowledgeBundleStatus()</code>(lite-dashboard.html 나머지() 로직 이식, 새 API 없음).</p>
+    <p style="margin-top:6px;color:var(--muted-2);font-size:11.75px">서버 라우트는 전부 기존: <code>/api/agents</code> ·
+      <code>/api/team/composition</code> · <code>/api/guardrail/status</code> · <code>/api/memory/documents</code> ·
+      <code>/api/knowledge-bundle/status</code> · <code>/api/learnloop/status</code>(+ws <code>learnloop:progress</code>).</p>
+  </div>
+</div>
+
+<div class="demo-banner">⚠ 아래는 <b>시연용 가짜 신호</b>입니다 — 실제 서버(localhost:4000)에 연결되어 있지 않습니다.
+  로스터 깜박임·지식창고 숫자는 전부 이 파일 안의 타이머가 만든 예시입니다.</div>
+<div class="preview-shell">
+  <nav class="rail" id="rail" aria-label="화면 부르기(재현)">
+    <button title="전체 메뉴 (Ctrl+K)">☰</button>
+    <button title="작업 내역">🕘</button>
+    <button title="즐겨찾기">⭐</button>
+    <button title="열려 있는 창 목록">🗔</button>
+    <button title="새 대화 시작">💬</button>
+    <div class="rr-div"></div>
+    <div id="railAgents"></div>
+    <div class="rr-div"></div>
+    <div id="railParts"></div>
+    <div class="rail-foot">
+      <button title="계정" style="border-radius:50%;background:var(--blue);color:#fff;font-size:11px">나</button>
+      <button title="문서함">📚</button>
+    </div>
+  </nav>
+
+  <div class="dash">
+    <div class="scr-id">🏠 <b>대시보드</b> — 오늘 급한 것을 한눈에 보고, 지시는 아래 대화창에서 하는 자리입니다.</div>
+
+    <div class="head">
+      <div class="hello">
+        <div class="hi">안녕하세요</div>
+        <div class="how">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다 — 일은 아래 대화창에 시킵니다.</div>
+      </div>
+      <div class="state">
+        <h4>서버 · 엔진 · 리소스</h4>
+        <div class="st-row"><span class="dot"></span>서버 — 운영 중</div>
+        <div class="st-row"><span class="dot"></span>로컬 LLM — 1개 로드</div>
+        <div class="st-row"><span class="dot"></span>임베딩 — bge-m3</div>
+        <!-- 기존 .team-mini(상태판 안 요약, 07-28 되살림분) — 지우지 않고 그대로 둔다(섹션1 참고) -->
+        <div class="team-mini" title="AI 팀 — 상태판 안 요약(기존, 그대로 유지)">
+          <span class="tm">🧭</span><span class="tm">⊘</span><span class="tm">◎</span><span class="tm">▣</span><span class="tm">🛰</span><span class="tm">📚</span>
+          <span class="sum">AI 팀 6명 · 모두 대기</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ①③ 신규 — AI 팀 카드 줄 -->
+    <div class="card">
+      <h3>🧑‍🤝‍🧑 AI 팀 <span class="new-badge">부활</span><span class="cnt" id="aiteamCnt"></span></h3>
+      <div class="aiteam-row" id="aiteamRow"></div>
+      <div class="aiteam-parts" id="aiteamParts"></div>
+      <div class="aiteam-ticker" id="aiteamTicker">최근 신호(시연) — 대기 중…</div>
+    </div>
+
+    <!-- ④ 신규 — 내 지식창고(기본 접힘, fold.js 패턴) -->
+    <div>
+      <div class="gjf-h" id="kbFoldHead"><span class="car">▶</span><span class="nm">내 지식창고</span><span class="gjf-b" id="kbBadge">문서 19</span></div>
+      <div class="card kb-body" id="kbBody" style="margin-top:-5px">
+        <div style="font-size:11.5px;color:var(--muted-2);margin-bottom:10px">넣은 자료가 얼마나 쌓였나 — 이게 AI 답의 근거입니다. 라이트(lite-dashboard.html)와 같은 그림, 프로는 팀 공용 지식이라 문구만 조정했습니다.</div>
+        <div class="kb-kpi" id="kbKpi"></div>
+        <div id="kbBars"></div>
+        <div class="kb-meta" id="kbMeta"></div>
+      </div>
+    </div>
+
+    <div class="card stub">☑ 오늘 할 일 — 계획 짜기 <span style="float:right">(기존 그대로 — 이 시안은 안 건드림, 자리만 표시)</span></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+  // ── 데이터 — agents.ts AGENT_DEFS·teamview.ts 실측을 그대로 옮긴 정적 값(시연용) ──────
+  var AGENTS = [
+    { id: "orchestrator", ic: "🧭", name: "Security Orchestrator", role: "작업 분배 · 결과 취합", status: "watching" },
+    { id: "scan",          ic: "⊘", name: "Scan Agent",             role: "초기 데이터 해석 · 자산 반영", status: "idle" },
+    { id: "analysis",      ic: "◎", name: "Analyze Agent",          role: "AI 지식·모델 관리 · 우선순위 판단", status: "idle" },
+    { id: "report",        ic: "▣", name: "Report Agent",           role: "내부 보고서 작성 · 결과 레포팅", status: "idle" },
+    { id: "ti",            ic: "🛰", name: "TI Agent",               role: "위협 인텔리전스 · CTI 모니터링", status: "watching" },
+    { id: "normaltic",     ic: "📚", name: "GIJO Agent",             role: "용어 해설 · 사례 부연(사내 지식)", status: "watching" },
+  ];
+  var PARTS = [
+    { id: "embed", lt: "E", name: "bge 임베딩", role: "문서를 벡터로 바꿉니다 — 검색의 기초", dest: "settings.html?s=ai" },
+    { id: "guard", lt: "G", name: "가드레일",   role: "모든 입력이 지나는 입구 검사", dest: "aihub.html?panel=safety" },
+    { id: "lora",  lt: "L", name: "LoRA",       role: "등록 2 · 채택 0 — 준비 중", dest: "aihub.html?panel=learning" },
+    { id: "rag",   lt: "R", name: "RAG",        role: "사내 지식에서 근거를 찾아옵니다", dest: "aihub.html?panel=knowledge" },
+  ];
+  var STATUS_KO = { working: "작업 중", watching: "감시 중", idle: "대기" };
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  // ── 렌더 — 레일·카드가 같은 데이터에서 같이 그려진다(따로 적으면 반드시 어긋난다는 원칙) ──
+  function paintRail() {
+    var ra = document.getElementById("railAgents"), rp = document.getElementById("railParts");
+    ra.innerHTML = AGENTS.map(function (a) {
+      return '<button class="rr-item ' + (a.status === "watching" ? "watching" : "") + '" id="rr-' + a.id + '" ' +
+        'title="' + esc(a.name) + " · " + esc(a.role) + " — " + STATUS_KO[a.status] + '" data-kind="agent" data-id="' + a.id + '">' + a.ic + "</button>";
+    }).join("");
+    rp.innerHTML = PARTS.map(function (p) {
+      return '<button class="rr-item" id="rr-' + p.id + '" title="' + esc(p.name) + " · " + esc(p.role) + '" data-kind="part" data-id="' + p.id + '">' + p.lt + "</button>";
+    }).join("");
+  }
+  function paintAiteamCard() {
+    var row = document.getElementById("aiteamRow"), parts = document.getElementById("aiteamParts");
+    document.getElementById("aiteamCnt").textContent = "팀원 " + AGENTS.length + "명 · 기반 부품 " + PARTS.length + "개";
+    row.innerHTML = AGENTS.map(function (a) {
+      return '<div class="aiteam-chip ' + (a.status === "watching" ? "watching" : "") + '" id="at-' + a.id + '" ' +
+        'title="' + esc(a.role) + " — " + STATUS_KO[a.status] + '" data-kind="agent" data-id="' + a.id + '">' +
+        '<span class="ic">' + a.ic + '</span>' + esc(a.name) + '</div>';
+    }).join("");
+    parts.innerHTML = PARTS.map(function (p) {
+      return '<span class="part" id="atp-' + p.id + '" title="' + esc(p.role) + '" data-kind="part" data-id="' + p.id + '">' +
+        '<span class="lt">' + p.lt + '</span>' + esc(p.name) + '</span>';
+    }).join("");
+  }
+
+  // ── 클릭 — 네비게이션만(지시 아님). 실제 이동은 없음(목업) ──────────────────
+  var toast = document.getElementById("toast");
+  var toastTimer = null;
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add("on");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove("on"); }, 2400);
+  }
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-kind]");
+    if (!el) return;
+    var kind = el.dataset.kind, id = el.dataset.id;
+    if (kind === "agent") showToast("→ aihub.html?panel=team 열림 (목업이라 실제 이동 없음) — " + (AGENTS.find(function (a) { return a.id === id; }) || {}).name);
+    else showToast("→ " + (PARTS.find(function (p) { return p.id === id; }) || {}).dest + " 열림 (목업이라 실제 이동 없음)");
+  });
+
+  // ── 가짜 llm:event 시뮬레이터 — 실제 서버 신호 없음, 타이밍·색 규칙만 구현 계약과 동일 ──
+  // 실구현에서는 phase:"start" 뒤 고정 타임아웃(예: 8000ms) 안에 phase:"done"이 안 오면 자동
+  // 소등한다("신호 유실 대비"). 이 시연에서는 pulseAgent(id, ms)의 ms 자체가 그 타임아웃 역할이다
+  // (여기서는 항상 짧게 끝나는 것까지 시연하므로 "유실" 갈래는 따로 재현하지 않는다).
+  var timers = {};
+  function pulseAgent(id, ms) {
+    ["rr-" + id, "at-" + id].forEach(function (elId) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      el.classList.remove("watching");
+      el.classList.add("working");
+    });
+    clearTimeout(timers[id]);
+    timers[id] = setTimeout(function () {
+      ["rr-" + id, "at-" + id].forEach(function (elId) {
+        var el = document.getElementById(elId);
+        if (!el) return;
+        el.classList.remove("working");
+        var a = AGENTS.find(function (x) { return x.id === id; });
+        if (a && a.status === "watching") el.classList.add("watching");
+      });
+    }, ms);
+  }
+  function flashPart(id, cls) {
+    ["rr-" + id, "atp-" + id].forEach(function (elId) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      var host = elId.indexOf("atp-") === 0 ? el.querySelector(".lt") : el; // 레일은 el 자체, 카드는 .lt 자식
+      host.className = (host.className.split(" ").filter(function (c) { return c.indexOf("flash-") !== 0; }).join(" ") + " " + cls).trim();
+      if (elId.indexOf("atp-") === 0) el.classList.remove("flash-ok", "flash-warn", "flash-block");
+      if (elId.indexOf("atp-") === 0) el.classList.add(cls.replace("flash-guard-", "flash-").replace("flash-search", "flash-ok"));
+      setTimeout(function () { host.className = host.className.replace(/flash-\S+/g, "").trim(); el.classList.remove("flash-ok", "flash-warn", "flash-block"); }, 950);
+    });
+  }
+  function trainLora(on) {
+    ["rr-lora", "atp-lora"].forEach(function (elId) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      var host = elId.indexOf("atp-") === 0 ? el.querySelector(".lt") : el;
+      if (on) { host.classList.add("training"); if (elId.indexOf("atp-") === 0) el.classList.add("training"); }
+      else { host.classList.remove("training"); if (elId.indexOf("atp-") === 0) el.classList.remove("training"); }
+    });
+  }
+
+  var ticker = document.getElementById("aiteamTicker");
+  function log(msg) {
+    var t = new Date();
+    var hhmmss = [t.getHours(), t.getMinutes(), t.getSeconds()].map(function (n) { return String(n).padStart(2, "0"); }).join(":");
+    ticker.textContent = "최근 신호(시연) — " + hhmmss + " · " + msg;
+  }
+
+  var SCRIPT = [
+    function () { pulseAgent("scan", 2600); log("Scan Agent · chat 시작"); },
+    function () { flashPart("rag", "flash-search"); log("RAG · 검색 4건"); },
+    function () { pulseAgent("analysis", 3200); log("Analyze Agent · chat 시작"); },
+    function () { flashPart("guard", "flash-guard-ok"); log("가드레일 · 통과"); },
+    function () { flashPart("embed", "flash-search"); pulseAgent("normaltic", 1400); log("bge 임베딩 · 문서 조회 임베딩"); },
+    function () { flashPart("guard", "flash-guard-warn"); log("가드레일 · 허용(주의) — 프롬프트 인젝션 의심 낮음"); },
+    function () { pulseAgent("report", 2200); log("Report Agent · chat 시작"); },
+    function () { trainLora(true); log("LoRA · 학습 중(취약점 주제) — 채택 전"); },
+    function () { flashPart("guard", "flash-guard-block"); log("가드레일 · 차단 — 프롬프트 인젝션"); },
+    function () { trainLora(false); log("LoRA · 학습 종료 — 등록만(채택 대기)"); },
+  ];
+  var si = 0;
+  setInterval(function () { SCRIPT[si % SCRIPT.length](); si++; }, 2400);
+
+  // ── 지식창고 — 정적 예시 숫자(실구현은 listMemoryDocuments+knowledgeBundleStatus) ──────
+  function paintKb() {
+    var kpi = document.getElementById("kbKpi");
+    kpi.innerHTML =
+      '<div class="kb-t"><div class="v">19</div><div class="k">총 문서</div><div class="d">공용 12 · 팀원별 7</div></div>' +
+      '<div class="kb-t"><div class="v">812</div><div class="k">검색 조각(청크)</div><div class="d">AI가 찾아보는 단위</div></div>' +
+      '<div class="kb-t"><div class="v">3</div><div class="k">전용 지식 보유 팀원</div><div class="d">scan·ti·normaltic</div></div>';
+    var cats = [["취약점관리 지침", 320], ["보안제품 운영", 260], ["법령·판례", 140], ["기타", 92]];
+    var max = Math.max.apply(null, cats.map(function (c) { return c[1]; }));
+    document.getElementById("kbBars").innerHTML = '<div class="kb-bars-h">분류별 조각(예시)</div>' +
+      cats.map(function (c) {
+        return '<div class="kb-bar"><span class="lbl" title="' + esc(c[0]) + '">' + esc(c[0]) + '</span>' +
+          '<span class="track"><span class="fill" style="width:' + Math.round(c[1] / max * 100) + '%"></span></span>' +
+          '<span class="num">' + c[1] + ' 조각</span></div>';
+      }).join("");
+    document.getElementById("kbMeta").innerHTML = '임베딩 모델 <b>bge-m3</b> · 마지막 반입 <b>08/19 14:02</b> (예시 데이터)';
+  }
+  var kbHead = document.getElementById("kbFoldHead"), kbBody = document.getElementById("kbBody");
+  kbHead.addEventListener("click", function () {
+    var open = kbBody.classList.toggle("open");
+    kbHead.classList.toggle("on", open);
+  });
+
+  paintRail();
+  paintAiteamCard();
+  paintKb();
+})();
+</script>
+</body>
+</html>

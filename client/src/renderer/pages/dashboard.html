@@ -92,6 +92,38 @@
     font-size:13px;background:#1f1e1d;border:1px solid var(--border);color:var(--muted);}
   .tm.working{border-color:rgba(30,185,128,.55);color:var(--teal);animation:tmbreath 1.6s ease-in-out infinite;}
   .tm.watching{border-color:rgba(59,130,246,.45);color:var(--blue-l);}
+  /* ── AI 팀 카드 줄(부활 — 승인 시안 AI팀_가시화, 2026-08-20). 깜박임은 전부 실신호 ── */
+  .aiteam-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .aiteam-chip{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);font-size:12.25px;color:var(--muted);cursor:pointer;}
+  .aiteam-chip:hover{border-color:var(--border-strong);color:var(--text);}
+  .aiteam-chip .ic{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid var(--border-strong);font-size:12px;flex:0 0 auto;}
+  .aiteam-chip.watching .ic{border-color:rgba(95,161,255,.5);color:var(--blue-l,#5fa1ff);}
+  .aiteam-chip.working .ic{border-color:rgba(30,185,128,.6);color:var(--teal);animation:tmbreath 1.6s ease-in-out infinite;}
+  .aiteam-parts{display:flex;gap:14px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);flex-wrap:wrap;font-size:11.75px;color:var(--muted-2);}
+  .aiteam-parts .part{display:flex;align-items:center;gap:6px;cursor:pointer;}
+  .aiteam-parts .part:hover{color:var(--text);}
+  .aiteam-parts .part .lt{width:17px;height:17px;border-radius:4px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex:0 0 auto;}
+  .aiteam-parts .part.flash-ok .lt{animation:ptflash .9s ease-out;border-color:rgba(95,161,255,.7);color:var(--blue-l,#5fa1ff);}
+  .aiteam-parts .part.flash-warn .lt{animation:ptflash .9s ease-out;border-color:rgba(240,160,32,.7);color:var(--amber);}
+  .aiteam-parts .part.flash-block .lt{animation:ptflashred .9s ease-out;border-color:rgba(226,72,61,.7);color:#f5928a;}
+  .aiteam-parts .part.training .lt{border-color:rgba(139,124,240,.65);color:#8b7cf0;animation:pttrain 1.5s ease-in-out infinite;}
+  @keyframes ptflash{0%{box-shadow:0 0 0 0 rgba(95,161,255,.5);}100%{box-shadow:0 0 0 7px rgba(95,161,255,0);}}
+  @keyframes ptflashred{0%{box-shadow:0 0 0 0 rgba(226,72,61,.55);}100%{box-shadow:0 0 0 7px rgba(226,72,61,0);}}
+  @keyframes pttrain{0%,100%{box-shadow:0 0 0 0 rgba(139,124,240,.4);}50%{box-shadow:0 0 0 5px rgba(139,124,240,0);}}
+  /* ── 내 지식창고(라이트 lite-dashboard 이식) ── */
+  .kb-kpi{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px}
+  .kb-kpi .kv{font-size:20px;font-weight:800;color:#fff}
+  .kb-kpi .kl{font-size:11.75px;color:var(--muted-2)}
+  .kb-kpi .ks{font-size:11.5px;color:var(--muted-2)}
+  .kb-bars-h{font-size:11.75px;color:var(--muted-2);margin:4px 0 2px}
+  .kb-bar{display:flex;align-items:center;gap:10px;margin:5px 0}
+  .kb-bar .lbl{flex:0 0 100px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kb-bar .track{flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;overflow:hidden}
+  .kb-bar .fill{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#1eb980);border-radius:7px;min-width:2px}
+  .kb-bar .num{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);font-variant-numeric:tabular-nums;min-width:96px;text-align:right}
+  .kb-bar .num .u{font-size:11px;opacity:.75}
+  .kb-meta{font-size:11.5px;color:var(--muted-2);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+  .kb-empty{font-size:12.25px;color:var(--muted-2);padding:6px 0}
   @keyframes tmbreath{0%,100%{box-shadow:0 0 0 0 rgba(30,185,128,.35);}50%{box-shadow:0 0 0 5px rgba(30,185,128,0);}}
   .team-sum{font-size:12.5px;color:var(--muted-2);margin-left:auto;white-space:nowrap;}
 
@@ -251,6 +283,21 @@
          시각 언어는 analysis.html graphChain(공격자→외부노출→취약점→대상자산)과 동일 — 첫 화면과
          상세 화면이 같은 그림이어야 담당자가 딴 물건으로 읽지 않는다.
          데이터: window.gijo.analysisAttackPaths() (analysis.html이 쓰는 그 API — 새 서버 API 0개). -->
+    <!-- AI 팀 카드 줄(부활 — 승인 시안 AI팀_가시화, 2026-08-20 사장님 「보안팀이 준비되어 있다」).
+         팀원 6(등록부 실구성) + 기반 부품 4(bge·RAG·가드레일·LoRA — 사장님 지정 기본 포함).
+         칩·부품의 깜박임은 전부 서버 실신호(llm:event) — 가짜 연출 없음. 클릭=화면 열기만. -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:8px">🧑‍🤝‍🧑 AI 팀 <span id="aiteamCnt" style="font-size:11.75px;color:var(--muted-2);font-weight:600"></span></div>
+      <div class="aiteam-row" id="aiteamRow"><span style="font-size:12px;color:var(--muted-2)">불러오는 중…</span></div>
+      <div class="aiteam-parts" id="aiteamParts"></div>
+    </div>
+    <!-- 내 지식창고(라이트 이식 — 기본 접힘. 넣은 자료가 쌓이는 것이 AI 답의 근거) -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px" data-gijo-fold="📚 내 지식창고" data-gijo-fold-closed>
+      <div style="font-size:11.75px;color:var(--muted-2);margin-bottom:10px">넣은 자료가 얼마나 쌓였나 — 이게 AI 답의 근거입니다.</div>
+      <div class="kb-kpi" id="kbKpi"></div>
+      <div id="kbBars"></div>
+      <div class="kb-meta" id="kbMeta"></div>
+    </div>
     <div id="glanceGo" title="발견·수집 열기" style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px 16px 9px;margin-bottom:12px;cursor:pointer">
       <div style="height:20px;display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <b style="font-size:13.5px;font-weight:800;color:#fff">🧭 공격 경로</b>
@@ -432,6 +479,130 @@
     }
   }
   $("teamRow").addEventListener("click", function () { go("agent.html"); });
+
+  // ── AI 팀 카드 줄 + 기반 부품(승인 시안 AI팀_가시화) — 전부 실데이터·실신호 ──────────
+  var 부품정의 = [
+    { id: "embed", lt: "E", nm: "임베딩", tip: "임베딩 엔진(bge-m3) — 문서·질문을 숫자로", page: "aihub.html?panel=knowledge" },
+    { id: "search", lt: "R", nm: "RAG 검색", tip: "사내 지식에서 근거 찾기", page: "aihub.html?panel=knowledge" },
+    { id: "guard", lt: "G", nm: "가드레일", tip: "들어오는 지시 입구 검사", page: "redteam.html" },
+    { id: "lora", lt: "L", nm: "LoRA", tip: "전문가 어댑터", page: "aihub.html?panel=team" },
+  ];
+  async function loadTeamCards() {
+    var row = $("aiteamRow");
+    if (!row || !window.gijo || !window.gijo.listAgents) return;
+    try {
+      var agents = (await window.gijo.listAgents()) || [];
+      var 일하는중 = agents.filter(function (a) { return a.status === "working"; }).length;
+      $("aiteamCnt").textContent = agents.length + "명 · " + (일하는중 ? "작업 중 " + 일하는중 : "모두 대기");
+      row.innerHTML = agents.map(function (a) {
+        var st = STATUS_KO[a.status] ? a.status : "idle";
+        return '<span class="aiteam-chip ' + st + '" data-agent="' + esc(a.id) + '" title="' + esc((a.name || a.id) + " — " + STATUS_KO[st]) + '">' +
+          '<span class="ic">' + (AGENT_ICON[a.id] || "◆") + '</span>' +
+          '<span>' + esc(a.name || a.defaultName || a.id) + '</span>' +
+          '<span style="color:var(--muted-2);font-size:11.5px">' + esc(a.role || "") + '</span></span>';
+      }).join("");
+      row.querySelectorAll(".aiteam-chip").forEach(function (c) {
+        c.addEventListener("click", function () { go("aihub.html?panel=team"); });
+      });
+    } catch (e) { row.innerHTML = '<span style="font-size:12px;color:var(--muted-2)">AI 팀 상태를 불러오지 못했습니다</span>'; }
+    var parts = $("aiteamParts");
+    if (!parts) return;
+    parts.innerHTML = 부품정의.map(function (p) {
+      return '<span class="part" id="pt-' + p.id + '" title="' + esc(p.tip) + '"><span class="lt">' + p.lt + '</span><span>' + esc(p.nm) + '</span></span>';
+    }).join("");
+    var 부품el = {};
+    부품정의.forEach(function (p) {
+      var el = document.getElementById("pt-" + p.id);
+      부품el[p.id] = el;
+      if (el) el.addEventListener("click", function () { go(p.page); });
+    });
+    // 사실 값으로 툴팁 보강 — 가드레일 모드·차단/표시 수, 어댑터 등록/채택(채택 0=준비 중)
+    try {
+      if (window.gijo.guardrailStatus) {
+        var gs = await window.gijo.guardrailStatus();
+        var ge = 부품el.guard;
+        if (ge && gs) ge.title = "가드레일 — 모드 " + (gs.mode || "?") + " · 차단 " + (gs.blockedCount || 0) + " · 표시 " + (gs.flaggedCount || 0);
+      }
+      if (window.gijo.getTeamComposition) {
+        var tc = await window.gijo.getTeamComposition();
+        var le = 부품el.lora;
+        if (le && tc && tc.adapters) le.title = "LoRA — 등록 " + (tc.adapters.registered || 0) + " · 채택 " + (tc.adapters.adopted || 0) + ((tc.adapters.adopted || 0) === 0 ? " (준비 중)" : "");
+      }
+    } catch (e) { /* 툴팁 보강 실패는 없던 일로 */ }
+  }
+  loadTeamCards();
+  function 부품플래시(id, cls) {
+    var el = document.getElementById("pt-" + id);
+    if (!el) return;
+    el.classList.remove("flash-ok", "flash-warn", "flash-block");
+    void el.offsetWidth;
+    el.classList.add(cls);
+    setTimeout(function () { el.classList.remove(cls); }, 950);
+  }
+  if (window.gijo && window.gijo.onLlmActivity) {
+    try {
+      window.gijo.onLlmActivity(function (e) {
+        if (!e || e.phase !== "done") return;
+        if (e.kind === "embed") 부품플래시("embed", "flash-ok");
+        else if (e.kind === "search") 부품플래시("search", "flash-ok");
+        else if (e.kind === "guard") {
+          var d = String(e.detail || "");
+          부품플래시("guard", d.indexOf("차단") === 0 ? "flash-block" : d.indexOf("허용") === 0 ? "flash-warn" : "flash-ok");
+        }
+      });
+    } catch (e) { /* 실시간 없이도 카드·툴팁은 산다 */ }
+  }
+  if (window.gijo && window.gijo.onLearnloopProgress) {
+    try {
+      window.gijo.onLearnloopProgress(function (run) {
+        var el = 부품el && 부품el.lora;
+        if (!el) return;
+        el.classList.toggle("training", !!(run && run.stage && run.stage !== "done" && run.stage !== "error"));
+      });
+    } catch (e) { }
+  }
+
+  // ── 내 지식창고(라이트 lite-dashboard 로직 이식 — 새 API 없음) ─────────────────
+  async function loadKnowledgeBox() {
+    var g = window.gijo;
+    if (!g || !g.listMemoryDocuments || !$("kbKpi")) return;
+    var docs = [];
+    try { var dd = await g.listMemoryDocuments(); docs = Array.isArray(dd) ? dd : (dd && dd.documents) || []; }
+    catch (e) { $("kbKpi").innerHTML = '<div class="kb-empty">지식창고를 불러오지 못했습니다</div>'; return; }
+    // 제품이 넣은 것과 내가 넣은 것을 가른다(라이트 실측 교훈 — 첫날 「문서 19」가 전부 제품이었다)
+    var 번들 = new Set();
+    try {
+      var st2 = await g.knowledgeBundleStatus();
+      ((st2 && st2.docs && st2.docs.fingerprints) || []).forEach(function (x) { 번들.add(String(x.file || "").split("/").pop()); });
+    } catch (e) { }
+    var 제품수 = 번들.size ? docs.filter(function (d) { return 번들.has(String(d.documentId || "")); }).length : 0;
+    var 내것수 = 번들.size ? docs.length - 제품수 : docs.length;
+    var 청크 = docs.reduce(function (s2, d) { return s2 + (Number(d.chunks) || 0); }, 0);
+    function kbKpi(v, l, sub) {
+      return '<div><div class="kv">' + v + '</div><div class="kl">' + esc(l) + '</div>' + (sub ? '<div class="ks">' + esc(sub) + '</div>' : '') + '</div>';
+    }
+    $("kbKpi").innerHTML =
+      kbKpi(docs.length, "총 문서", 번들.size ? "제품 " + 제품수 + " · 내가 넣은 " + 내것수 : "") +
+      kbKpi(청크, "검색 조각(청크)", "AI가 찾아보는 단위") +
+      kbKpi(내것수, "내가 넣은 문서", "내 지식");
+    var cats = {};
+    docs.forEach(function (d) { var c = d.category || "미분류"; if (!cats[c]) cats[c] = { d: 0, k: 0 }; cats[c].d++; cats[c].k += (Number(d.chunks) || 0); });
+    var rows = Object.keys(cats).map(function (c) { return { c: c, d: cats[c].d, k: cats[c].k }; }).sort(function (a, b) { return b.k - a.k; });
+    var maxK = rows.reduce(function (m, r) { return r.k > m ? r.k : m; }, 1);
+    $("kbBars").innerHTML = rows.length
+      ? '<div class="kb-bars-h">분류별 조각</div>' + rows.map(function (r) {
+          return '<div class="kb-bar"><span class="lbl" title="' + esc(r.c) + '">' + esc(r.c) + '</span>' +
+            '<span class="track"><span class="fill" style="width:' + Math.round(r.k / maxK * 100) + '%"></span></span>' +
+            '<span class="num">' + r.k + ' <span class="u">조각 · ' + r.d + '문서</span></span></div>';
+        }).join("")
+      : '<div class="kb-empty"><b>아직 넣은 자료가 없습니다.</b> ＋로 문서를 넣으면 여기 쌓임이 보이고, AI가 그걸 근거로 답합니다.</div>';
+    var emb = (docs.find(function (d) { return d.embeddingModel; }) || {}).embeddingModel || "";
+    var last = docs.reduce(function (m, d) { var t = new Date(d.ingestedAt || 0).getTime(); return t > m ? t : m; }, 0);
+    $("kbMeta").innerHTML =
+      (emb ? '임베딩 모델 <b>' + esc(emb) + '</b>' : '') +
+      (last ? (emb ? ' · ' : '') + '마지막 반입 <b>' + esc(new Date(last).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })) + '</b>' : '');
+  }
+  loadKnowledgeBox();
   // 모델이 실제로 움직이면 상태가 바뀐다 — 알림이 오면 다시 읽는다(폴링하지 않는다).
   if (window.gijo && window.gijo.onLlmActivity) {
     try {
@@ -682,6 +853,7 @@
 })();
 </script>
 
+<script src="fold.js"></script>
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>
 <script src="progresscard.js"></script>

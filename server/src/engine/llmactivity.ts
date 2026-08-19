@@ -12,7 +12,9 @@ import type { WebSocketServer } from "ws";
 import { authMiddleware } from "../auth/auth";
 
 export interface LlmActivityEvent {
-  kind: "chat" | "embed" | "load" | "swap";
+  // search=RAG 조회(hybridSearch — 4개 검색 경로 공용 지점) · guard=입구 검사(gateway.gateUserInput)
+  // — 2026-08-20 AI 팀 가시화(레일 로스터 깜박임의 실신호. 값이 움직이면 실제로 일어난 것).
+  kind: "chat" | "embed" | "load" | "swap" | "search" | "guard";
   phase: "start" | "done" | "error";
   agent?: string; // 표시용 에이전트 이름
   model?: string; // 모델 파일 basename (또는 임베딩 모델)
