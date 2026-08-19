@@ -268,7 +268,10 @@
       <img src="gijo-wordmark.svg" alt="GIJO.AI" />
       <span>AI SECURITY MANAGER</span>
     </div>
-    <h1>GIJO AS 로그인<span class="mode-badge" id="modeBadge">🏢 표준</span><span class="mode-badge" id="locBadge">💻 이 PC</span></h1>
+    <!-- 배지를 하드코딩하지 않는다(2026-08-19 사장님 QA — 「프로가 메인」인데 표준이 박혀 있었다).
+         실제 저장된 셸 모드(기본=프로)를 아래 스크립트가 읽어 채운다 — 잠깐 비는 것이
+         표준→프로로 깜빡이는 것보다 낫다(main.ts 569줄 깜빡임 교훈과 같은 결). -->
+    <h1>GIJO AS 로그인<span class="mode-badge" id="modeBadge"></span><span class="mode-badge" id="locBadge">💻 이 PC</span></h1>
     <p class="sub">보안담당자 계정으로 서버에 연결합니다.</p>
 
     <div class="recent" id="recentBox" style="display:none">
@@ -595,6 +598,19 @@
         : "",
         l === "cloud" ? "n-warn" : l === "remote" ? "n-pro" : "");
     }));
+
+    // 처음 뜰 때 — 배지·선택 표시를 **저장된 실제 셸 모드**로 채운다(기본=프로, 2026-08-19
+    // 사장님 「프로가 메인」). 고른모드.값은 건드리지 않는다 — 표시는 사실이고, 적용은
+    // 사용자가 눌렀을 때만이다(안 누르면 「그대로」 의미 유지).
+    (async () => {
+      let m = "standard"; // shellModeGet이 없거나 실패하면 옛 표시 그대로(거짓 프로 표시 금지)
+      try {
+        const s = window.gijo.shellModeGet ? await window.gijo.shellModeGet() : null;
+        if (s && s.쓸수있나) m = s.현재 === "pro" ? "pro" : "standard";
+      } catch (e) {}
+      modeBadge.textContent = m === "pro" ? "🚀 프로" : "🏢 표준";
+      document.querySelectorAll("#mpRow .mp-btn").forEach((x) => x.classList.toggle("on", x.dataset.mode === m));
+    })();
 
     // 로그인 직후 — 고른 것을 **실제로** 적용한다. 못 하면 그 사실을 그대로 말한다.
     // ⚠ 여기서 실패해도 로그인을 되돌리지 않는다. 로그인은 이미 성공했고, 모드는 부가 선택이다.
