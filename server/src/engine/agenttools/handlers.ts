@@ -3286,3 +3286,31 @@ export async function runAddReportSchedule(args: Record<string, string>): Promis
   const sch = createSchedule({ type, format: "pdf", audience: "internal", dayOfWeek, hour, minute: 0 });
   return `${SCHEDULE_TYPE_LABEL[sch.type]} 리포트 스케줄을 걸었습니다 — 다음 실행 ${새시각(sch.nextRunAt)} (pdf · 내부용). 끄거나 지우는 것은 보고 화면 › 정기 리포트에서.`;
 }
+
+/** 지식 문서 삭제(삭제 일관화 ① — 「이 문서 지워줘」). 이름으로 정확히 1건만 잡는다 —
+ *  2건 이상이면 목록을 보여주고 거절(엉뚱한 문서가 지워지는 것이 최악의 사고다). */
+export async function runDeleteDocument(args: Record<string, string>): Promise<string> {
+  const { listVisibleDocuments, deleteDocument } = await import("../memory.js");
+  const name = (args.document ?? "").trim();
+  if (name.length < 2) return "어느 문서인지 이름으로 지목해 주세요 — \"새로 들어온 문서 알려줘\"로 이름을 확인할 수 있습니다.";
+  const docs = await listVisibleDocuments(); // 등급 밖 문서는 지목도 삭제도 안 된다
+  const hits = docs.filter((d) => {
+    const id = String((d as { documentId?: string }).documentId ?? "");
+    return id === name || id.toLowerCase().includes(name.toLowerCase());
+  });
+  if (!hits.length) return `"${name}"에 해당하는 문서가 검색되지 않았습니다 — "새로 들어온 문서 알려줘"로 이름을 확인해 주세요.`;
+  if (hits.length > 1) {
+    const 목록 = hits.slice(0, 6).map((d) => `- ${(d as { documentId?: string }).documentId}`).join("\n");
+    return `"${name}"에 ${hits.length}건이 걸립니다 — 파일 이름을 더 구체적으로 지목해 주세요:\n${목록}`;
+  }
+  const id = String((hits[0] as { documentId?: string }).documentId);
+  const withFile = /원본|파일까지|완전/.test(args.withFile ?? "");
+  const r = await deleteDocument(id, withFile);
+  const { recordAudit } = await import("../audit.js");
+  recordAudit({
+    kind: "write", actor: currentViewer()?.userId ? findUserById(currentViewer()!.userId!)?.displayName ?? null : null,
+    action: "지식베이스 문서 삭제(대화)", target: id,
+    detail: `조각 ${r.deletedChunks}건 제거${r.deletedFile ? " · 원본 파일까지 삭제(복구 불가)" : ""}`,
+  });
+  return `문서 「${id}」를 장기기억에서 지웠습니다 — 조각 ${r.deletedChunks}건 제거${r.deletedFile ? " · 원본 파일까지 삭제(복구 불가)" : " · 원본이 남아 있으면 재업로드로 복구할 수 있습니다"}. 답변에서 즉시 빠집니다.`;
+}

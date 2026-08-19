@@ -1618,6 +1618,8 @@
       const cb = tr.querySelector(".asset-cb");
       if (!cb) return;                       // 자산 줄이 아니다(안내 줄 등)
       자산상세펼치기(tr, cb.dataset.id);
+      // 🎯 고른 항목을 대화창에(B16 완결 2026-08-19 — 공용 부품 규격은 selectnotify.js)
+      if (window.gijoSelectNotify) window.gijoSelectNotify({ label: cb.dataset.name, text: "자산 " + cb.dataset.name, fields: { asset: cb.dataset.name, assetId: cb.dataset.id } });
     });
   }
 

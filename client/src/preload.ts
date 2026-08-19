@@ -437,8 +437,10 @@ const gijoApi = {
 
   // 통합 보안 분석(관제) 허브
   analysisEvents: () => api.analysisHubApi.events(),
+  analysisRemoveFile: (ref: string) => api.analysisHubApi.removeFile(ref),
   logAnalysisFiles: () => api.logAnalysisApi.files(),
   listProductIntros: () => api.productIntroApi.list(),
+  removeProductIntro: (id: string) => api.productIntroApi.remove(id),
   logAnalysisGuide: (eventId: string) => api.logAnalysisApi.guide(eventId),
   analysisAttackPaths: () => api.analysisHubApi.attackPaths(),
   analysisRebuildVuln: () => api.analysisHubApi.rebuildVuln(),
@@ -507,6 +509,7 @@ const gijoApi = {
   downloadReportFile: (name: string) => api.reportApi.file(name),
   listReportHistory: () => api.reportApi.history(),
   deleteReport: (base: string) => api.reportApi.remove(base),
+  maintenanceRemove: (id: string) => api.maintenanceApi.remove(id),
   pruneReports: (olderThanDays: number) => api.reportApi.prune(olderThanDays),
   deleteAllReports: () => api.reportApi.removeAll(),
 

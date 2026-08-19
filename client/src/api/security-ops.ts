@@ -46,6 +46,7 @@ export const maintenanceApi = {
   reject: (id: string, reason: string) =>
     request<MaintenanceItem>(`/api/maintenance/${id}/reject`, { method: "POST", body: { reason } }),
   history: (id: string) => request<MaintenanceEvent[]>(`/api/maintenance/${id}/history`),
+  remove: (id: string) => request<{ ok: boolean }>(`/api/maintenance/${encodeURIComponent(id)}`, { method: "DELETE" }),
   getNotify: () => request<{ recipients: string[]; dueCount: number }>("/api/maintenance/notify"),
   notify: (to: string[]) => request<{ sent: boolean; count: number }>("/api/maintenance/notify", { method: "POST", body: { to } }),
 };
@@ -240,6 +241,7 @@ export interface LogResponseGuide { kind: string; title: string; basis: string; 
 export interface ProductIntroItem { id: string; name: string; category: string; vendor: string | null; summary: string | null; docName: string | null; createdAt: number }
 export const productIntroApi = {
   list: () => request<{ items: ProductIntroItem[] }>("/api/product-intro"),
+  remove: (id: string) => request<{ ok: boolean }>(`/api/product-intro/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 
 export const logAnalysisApi = {
@@ -260,6 +262,8 @@ export const analysisHubApi = {
       body: { filename, content },
     }),
   attackPaths: () => request<{ paths: AttackPath[] }>("/api/analysis-hub/attack-paths"),
+  // 파일(ref) 단위 삭제(2026-08-19 삭제 일관화) — 스냅샷 후 삭제는 서버가 한다.
+  removeFile: (ref: string) => request<{ ok: boolean; deleted: number }>(`/api/analysis-hub/file?ref=${encodeURIComponent(ref)}`, { method: "DELETE" }),
 };
 
 export interface AttackPathStep { kind: "entry" | "foothold" | "lateral"; entity: string; label: string; source: string; severity: string }

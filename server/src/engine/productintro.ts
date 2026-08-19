@@ -6,7 +6,7 @@
 //   섞으면 담당자가 '운영 중'과 '검토 중'을 구분하지 못하게 된다.
 //
 // 등록·삭제는 대화창(결재판) 몫 — 화면(intro.html)은 보는 자리다(메뉴는 보기용 원칙).
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
 import { db, migrate } from "../db";
 import { recordAudit } from "./audit";
@@ -76,5 +76,13 @@ export function removeProductIntro(id: string, actor?: string | null): boolean {
 export function registerProductIntroRoutes(app: Express): void {
   app.get("/api/product-intro", authMiddleware, (_req, res) => {
     res.json({ items: listProductIntros() });
+  });
+  // 삭제(2026-08-19 사장님 「리스트에서 필요 없는 건 삭제 가능해야」 — 삭제 일관화 ①).
+  // removeProductIntro가 이미 감사까지 남긴다 — 라우트만 없어 화면이 막다른 길이었다.
+  app.delete("/api/product-intro/:id", authMiddleware, (req, res) => {
+    const user = (req as Request & { user?: { displayName?: string } }).user;
+    const ok = removeProductIntro(String(req.params.id), user?.displayName ?? null);
+    if (!ok) return res.status(404).json({ error: "해당 소개자료를 찾을 수 없습니다" });
+    res.json({ ok: true });
   });
 }

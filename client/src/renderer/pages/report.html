@@ -321,6 +321,8 @@ tr:last-child td{border-bottom:none;}
   async function openViewer(base) {
     const entry = historyReports.find((r) => r.base === base);
     if (!entry) return;
+      // 🎯 고른 항목을 대화창에(B16 완결 2026-08-19 — 공용 부품 규격은 selectnotify.js)
+      if (window.gijoSelectNotify) window.gijoSelectNotify({ label: TYPE_LABEL[entry.type] || entry.type, text: "리포트 " + (TYPE_LABEL[entry.type] || entry.type), fields: { title: TYPE_LABEL[entry.type] || entry.type, owner: entry.createdBy || "" } });
     const body = document.getElementById("viewBody");
     const note = document.getElementById("viewNote");
     document.getElementById("viewTitle").textContent =

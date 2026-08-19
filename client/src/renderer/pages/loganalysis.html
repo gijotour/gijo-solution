@@ -126,10 +126,27 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         (f.p0 ? '<span class="pri p0">P0 ' + f.p0 + "</span>" : "") +
         (f.p1 ? '<span class="pri p1">P1 ' + f.p1 + "</span>" : "") +
         '<span class="m">이벤트 ' + f.events + " · 열림 " + f.open + "</span>" +
-        '<span class="m">' + 때(f.latestAt) + "</span></div>";
+        '<span class="m">' + 때(f.latestAt) + "</span>" +
+        // 삭제(2026-08-19 삭제 일관화 ① — 사장님 「올린 파일 삭제 메뉴 있을까?」): 이 파일의
+        // 분석 이벤트를 지운다(서버가 스냅샷 후 삭제·감사 기록). 장기기억의 원문은 지식이라
+        // 남는다 — 문서 삭제는 AI › 지식 판 또는 「○○ 문서 지워줘」가 맡는다.
+        '<button class="lf-del" data-del="' + esc(f.ref) + '" title="이 파일의 분석 이벤트를 지웁니다(원문 지식은 남음)">🗑</button></div>';
     }).join("");
     box.querySelectorAll(".frow").forEach(function (r) {
       r.addEventListener("click", function () { 선택파일 = r.dataset.ref; 선택이벤트 = null; renderFiles(); renderEvents(); renderAssetStrip(); renderGuide(null, ""); });
+    });
+    box.querySelectorAll("[data-del]").forEach(function (b) {
+      b.addEventListener("click", function (ev) {
+        ev.stopPropagation(); // 행 선택과 분리
+        var ref = b.getAttribute("data-del");
+        window.gijoAsk("「" + ref + "」의 분석 이벤트를 전부 지울까요? (지우기 전 스냅샷이 남고, 장기기억의 원문은 남습니다)", { danger: true }).then(function (yes) {
+          if (!yes) return;
+          window.gijo.analysisRemoveFile(ref).then(function () {
+            if (선택파일 === ref) { 선택파일 = null; 선택이벤트 = null; }
+            불러오기();
+          }).catch(function (e) { window.gijoTell("삭제 실패: " + ((e && e.message) || e)); });
+        });
+      });
     });
   }
 
@@ -241,19 +258,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     });
   }
 
-  Promise.all([
-    window.gijo.logAnalysisFiles().catch(function () { return { files: [] }; }),
-    window.gijo.analysisEvents().catch(function () { return { events: [] }; }),
-    window.gijo.listAssets().catch(function () { return []; }),
-  ]).then(function (r) {
-    파일들 = (r[0] && r[0].files) || [];
-    이벤트들 = ((r[1] && r[1].events) || []).filter(function (e) { return e.source === "log"; });
-    자산들 = r[2] || [];
-    if (파일들.length) 선택파일 = 파일들[0].ref;
-    renderFiles();
-    renderEvents();
-    renderAssetStrip();
-  });
+  function 불러오기() {
+    return Promise.all([
+      window.gijo.logAnalysisFiles().catch(function () { return { files: [] }; }),
+      window.gijo.analysisEvents().catch(function () { return { events: [] }; }),
+      window.gijo.listAssets().catch(function () { return []; }),
+    ]).then(function (r) {
+      파일들 = (r[0] && r[0].files) || [];
+      이벤트들 = ((r[1] && r[1].events) || []).filter(function (e) { return e.source === "log"; });
+      자산들 = r[2] || [];
+      if (!선택파일 && 파일들.length) 선택파일 = 파일들[0].ref;
+      renderFiles();
+      renderEvents();
+      renderAssetStrip();
+    });
+  }
+  불러오기();
 })();
 </script>
 </body>

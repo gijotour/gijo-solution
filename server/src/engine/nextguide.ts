@@ -43,7 +43,7 @@ const 표: Record<string, string[]> = {
   analysis_status: ["새로 들어온 취약점 몇 건이야?", "공격 경로 보여줘"],
   threats: ["오늘 뭐부터 할까?", "공격 경로 보여줘"],
   law_lookup: ["개인정보 유출 관련 판례 찾아줘", "이거 해도 돼? (하려는 일)"],
-  knowledge_status: ["최근 반입 문서 보여줘", "중복 문서 있어?"],
+  knowledge_status: ["새로 들어온 문서 알려줘", "중복 문서 있어?"],
   recent_documents: ["지식 저장소 상태 알려줘", "중복 문서 있어?"],
   handover_status: ["업무 넘기기 어디서 해?", "작업 내역 뭐 있어?"],
   work_session_status: ["오늘 무슨 일 있었어?", "내 업무 뭐부터 하면 돼?"],

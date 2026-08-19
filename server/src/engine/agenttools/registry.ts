@@ -133,6 +133,7 @@ import {
   runUpdateFindingStatus,
   runVerifyFinding,
   runAddReportSchedule,
+  runDeleteDocument,
   BulkMatch,
   matchFindingsByFilter,
   matchFindingsByIds,
@@ -1459,6 +1460,22 @@ const TOOLS: AgentTool[] = [
       return filled;
     },
     run: runVerifyFinding,
+  },
+  {
+    // 삭제 일관화 ①(2026-08-19 사장님 「필요 없는 건 삭제 가능해야」) — 「이 문서 지워줘」.
+    name: "delete_document",
+    label: "지식 문서 삭제",
+    domain: "knowledge",
+    write: true,
+    description:
+      '지식베이스(장기기억)에 올린 문서를 지운다. "○○.pdf 지워줘", "그 문서 삭제해줘"에 쓴다. 이름으로 정확히 1건만 — 여러 건이 걸리면 목록을 주고 되묻는다. withFile에 "원본까지"라고 적으면 서버 원본 파일도 지운다(복구 불가). 예: {"document":"옛_보고서.pdf"}',
+    params: [
+      { name: "document", label: "문서 이름", description: "지울 문서의 파일 이름(일부만 적어도 됨 — 1건으로 좁혀져야 실행)", required: true },
+      { name: "withFile", label: "원본까지", description: '"원본까지"라고 적으면 서버 원본 파일도 삭제(복구 불가) — 비우면 장기기억만', required: false },
+    ],
+    effect: (args) => `문서 「${args.document}」를 장기기억에서 제거${/원본|파일까지|완전/.test(args.withFile ?? "") ? " + 서버 원본 파일 삭제(복구 불가)" : " (원본이 있으면 재업로드로 복구 가능)"}`,
+    undo: "장기기억만 지웠다면 원본 재업로드로 복구됩니다. 원본까지 지웠다면 복구되지 않습니다.",
+    run: runDeleteDocument,
   },
   {
     // 기능 가이드 ⑤(2026-08-19) — ⑤보고의 쓰기 짝: "주간 리포트 매주 금요일 17시로 걸어줘".

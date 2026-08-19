@@ -385,6 +385,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       // 기록 보기는 **모든 상태**에 둔다(검토관 #6) — 반려·승인대기 건의 감사 추적(누가 언제
       // 보고했고 왜 반려됐나)을 볼 자리가 승인 완료 건에만 있었다. 완료 건은 위에서 이미 붙었다.
       if (m.status !== "approved") 버튼.push('<button class="btn" data-history="' + esc(m.id) + '">기록</button>');
+      // 삭제(2026-08-19 삭제 일관화 ①) — 잘못 등록한 일정을 지운다(이력도 함께 — 서버가 트랜잭션).
+      버튼.push('<button class="btn" data-del="' + esc(m.id) + '" title="이 일정과 상태 이력을 지웁니다">🗑</button>');
       return '<tr class="' + (늦음 ? "late" : "") + '">' +
         "<td>" + esc(m.scheduleDate) + 날짜부 + "</td>" +
         "<td>" + esc(m.title) + "</td>" +
@@ -430,6 +432,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll("[data-reject]").forEach(function (b) {
       b.onclick = function () { 결재(b.dataset.reject, false, b); };
     });
+    // 삭제(2026-08-19 삭제 일관화 ①) — 확인 후 일정+이력을 지운다(서버가 트랜잭션·감사 기록).
+    document.querySelectorAll("[data-del]").forEach(function (b) {
+      b.onclick = function () {
+        var m = 항목.filter(function (x) { return x.id === b.dataset.del; })[0];
+        window.gijoAsk("「" + (m ? m.title : "이 일정") + "」을(를) 상태 이력까지 함께 지울까요?", { danger: true }).then(function (yes) {
+          if (!yes) return;
+          window.gijo.maintenanceRemove(b.dataset.del).then(불러오기).catch(function (e) {
+            window.gijoTell("삭제 실패: " + ((e && e.message) || e));
+          });
+        });
+      };
+    });
     document.querySelectorAll("[data-report]").forEach(function (b) {
       b.onclick = function () {
         // 점검서 첨부는 대화창(지휘소)이 맡는다 — 파일을 다루는 자리를 화면마다 만들지 않는다.
@@ -464,6 +478,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   async function 결재(id, 승인, btn) {
     var m = 항목.filter(function (x) { return x.id === id; })[0] || {};
+      // 🎯 고른 항목을 대화창에(B16 완결 2026-08-19 — 공용 부품 규격은 selectnotify.js)
+      if (window.gijoSelectNotify) window.gijoSelectNotify({ label: m.title || "점검", text: "유지보수 점검 「" + (m.title || "") + "」 (" + (m.productName || "") + ")", fields: { title: m.title, asset: m.productName || m.assetName, status: m.status, due: m.scheduleDate, assetId: m.assetId } });
     // ⚠ Electron에서 window.confirm은 렌더러를 멈춘다 — 화면 안에서 묻는다(dialog.js).
     var 머리 = "「" + (m.title || "") + "」 (" + (m.productName || "") + ")\n\n";
     if (승인) {

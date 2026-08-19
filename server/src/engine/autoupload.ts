@@ -357,7 +357,7 @@ export function registerAutoUploadRoutes(app: Express): void {
         vulnscan: ["자산 현황 보여줘", "미조치 취약점 뭐 있어?", "오늘 뭐부터 할까?"],
         analysis: ["통합 분석 현황 알려줘", "지금 손댈 일 뭐야?"],
         "product-manual": ["보안제품 현황 알려줘", "점검 일정 현황 알려줘"],
-        memory: ["최근 반입 문서 보여줘", "지식 저장소 상태 알려줘"],
+        memory: ["새로 들어온 문서 알려줘", "지식 저장소 상태 알려줘"],
       };
       const nextChips = routed ? 반입칩[routed] : undefined;
       res.json(nextChips ? { ...result, nextChips } : result);

@@ -74,6 +74,7 @@ td b{color:#fff;}
 <div id="gijoChatWidget"></div>
 
 <script src="dialog.js"></script>
+<script src="selectnotify.js"></script>
 <script src="nav.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>
@@ -121,7 +122,9 @@ td b{color:#fff;}
         '<span class="nm">' + esc(p.name) + "</span>" +
         '<span class="c-cat">' + esc(p.category || "기타") + "</span>" +
         '<span class="sub">' + 값(p.vendor) + (p.summary ? " · " + esc(p.summary) : "") + "</span>" +
-        '<span class="docs">' + 자료요약(p) + "</span></div>";
+        '<span class="docs">' + 자료요약(p) + "</span>" +
+        // 삭제(2026-08-19 삭제 일관화 ①) — 등록 실수·낡은 자료를 리스트에서 바로 지운다.
+        '<button class="pi-del" data-del="' + esc(p.id) + '" title="이 소개자료를 대장에서 지웁니다">🗑</button></div>';
     }).join("");
     box.querySelectorAll(".prow input").forEach(function (ck) {
       ck.addEventListener("change", function () {
@@ -129,6 +132,8 @@ td b{color:#fff;}
         if (ck.checked) {
           if (담김.length >= 3) { ck.checked = false; if (window.gijoTell) window.gijoTell("비교는 한 번에 3개까지입니다 — 하나를 빼고 담아 주세요."); return; }
           담김.push(id);
+          var _p = 제품들.filter(function (x) { return x.id === id; })[0];
+          if (_p && window.gijoSelectNotify) window.gijoSelectNotify({ label: _p.name, text: "보안제품 소개 " + _p.name + " · " + (_p.category || "기타"), fields: { title: _p.name } });
         } else {
           담김 = 담김.filter(function (x) { return x !== id; });
         }
@@ -154,6 +159,21 @@ td b{color:#fff;}
       "</table></div>" +
       '<div class="honest" style="margin-top:8px">더 깊은 비교(기능·성능)는 대화창에 「' + picked.map(function (p) { return p.name; }).join("와 ") + ' 비교해줘」라고 물으면 반입된 매뉴얼·소개서를 근거로 답합니다.</div>';
   }
+
+  document.getElementById("cardGrid").addEventListener("click", function (ev) {
+    var b = ev.target.closest ? ev.target.closest("[data-del]") : null;
+    if (!b) return;
+    ev.stopPropagation();
+    var id = b.getAttribute("data-del");
+    (window.gijoAsk ? window.gijoAsk("이 소개자료를 대장에서 지울까요? (연결된 소개서 문서는 지식베이스에 남습니다)", { danger: true }) : Promise.resolve(window.confirm ? false : false)).then(function (yes) {
+      if (!yes) return;
+      window.gijo.removeProductIntro(id).then(function () {
+        제품들 = 제품들.filter(function (p) { return p.id !== id; });
+        담김 = 담김.filter(function (x) { return x !== id; });
+        renderChips(); renderCards(); renderCompare();
+      }).catch(function (e) { if (window.gijoTell) window.gijoTell("삭제 실패: " + (e && e.message || e)); });
+    });
+  });
 
   window.gijo.listProductIntros().then(function (r) {
     제품들 = (r && r.items) || [];

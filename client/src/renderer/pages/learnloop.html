@@ -433,6 +433,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     btn.disabled = true;
     try {
       await window.gijo.decideLearnCandidate(id, btn.dataset.accept === "1");
+      // 🎯 고른 항목을 대화창에(B16 완결 2026-08-19 — 공용 부품 규격은 selectnotify.js)
+      if (window.gijoSelectNotify) window.gijoSelectNotify({ label: (((card.querySelector(".lc-q") || {}).textContent || "").replace(/^Q.s*/, "").slice(0, 60)), text: (btn.dataset.accept === "1" ? "학습 후보 승인 — " : "학습 후보 제외 — ") + (((card.querySelector(".lc-q") || {}).textContent || "").slice(0, 80)), fields: { title: ((card.querySelector(".lc-q") || {}).textContent || "").slice(0, 120), status: btn.dataset.accept === "1" ? "승인" : "제외" } });
       card.style.opacity = ".35";
       card.querySelectorAll("button").forEach((b) => (b.disabled = true));
       // 승인은 👍 수에 바로 반영된다 — KPI를 다시 읽어 화면 숫자가 거짓말하지 않게.

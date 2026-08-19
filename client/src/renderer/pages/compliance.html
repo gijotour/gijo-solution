@@ -278,6 +278,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     cats.querySelectorAll("[data-toggle]").forEach((el) => {
       el.addEventListener("click", () => {
         const code = el.dataset.toggle;
+        var _t = catalog.find(function (x) { return x.code === code; });
+        if (_t && !expanded.has(code) && window.gijoSelectNotify) window.gijoSelectNotify({ label: code + " " + _t.name, text: code + " " + _t.name, fields: { title: _t.name, status: String(_t.status || "") } });
         if (expanded.has(code)) expanded.delete(code); else expanded.add(code);
         render();
       });
@@ -339,6 +341,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
 
+<script src="selectnotify.js"></script>
 <script src="nav.js"></script>
 <script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>

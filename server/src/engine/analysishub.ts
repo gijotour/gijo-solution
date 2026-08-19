@@ -14,6 +14,7 @@
 import type { Express, Request } from "express";
 import * as crypto from "crypto";
 import { db, migrate } from "../db";
+import { recordAudit } from "./audit";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { listAssets } from "./assets";
@@ -906,6 +907,34 @@ export function registerAnalysisHubRoutes(app: Express): void {
     const events = listAnalysisEvents();
     res.json({ events, summary: analysisSummary(events), correlations: computeCorrelations(events) });
   });
+  // 파일(ref) 단위 삭제(2026-08-19 삭제 일관화 ① — 「올린 파일 대장」이 확인만 되고 지울 길이
+  // 없었다). datacleanup과 같은 결: 지우기 전 그 행들을 JSONL 스냅샷으로 남기고, 이벤트와
+  // 처리상태(자식)를 한 트랜잭션으로 지운다. 원문이 장기기억에도 갔다면 그쪽은 지식이라 남긴다
+  // (문서 삭제는 AI › 지식 판·delete_document가 맡는다 — 영토를 섞지 않는다).
+  app.delete("/api/analysis-hub/file", authMiddleware, asyncRoute(async (req, res) => {
+    const ref = String((req.query as { ref?: string }).ref ?? req.body?.ref ?? "").trim();
+    if (!ref) return void res.status(400).json({ error: "ref(파일 이름)가 필요합니다" });
+    const rows = db.prepare("SELECT * FROM analysis_events WHERE ref = ?").all(ref) as Record<string, unknown>[];
+    if (!rows.length) return void res.status(404).json({ error: `"${ref}"의 분석 이벤트가 없습니다` });
+    const fs = await import("fs");
+    const path = await import("path");
+    const dir = path.join(process.env.GIJO_BACKUP_DIR || path.join("data", "backups"), "cleanup");
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `logfile-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`);
+    fs.writeFileSync(file, rows.map((r) => JSON.stringify({ _table: "analysis_events", ...r })).join("\n") + "\n", "utf-8");
+    const ids = rows.map((r) => String(r.id));
+    const tx = db.transaction(() => {
+      for (const id of ids) db.prepare("DELETE FROM analysis_event_status WHERE eventId = ?").run(id);
+      db.prepare("DELETE FROM analysis_events WHERE ref = ?").run(ref);
+    });
+    tx();
+    const user = (req as Request & { user?: { displayName?: string } }).user;
+    recordAudit({
+      kind: "write", actor: user?.displayName ?? null, action: "로그 파일 분석분 삭제",
+      target: ref, detail: `이벤트 ${ids.length}건 삭제(스냅샷 ${path.basename(file)})`, result: "ok",
+    });
+    res.json({ ok: true, deleted: ids.length });
+  }));
   // 공격 경로·도달성(③) — 관측 신호로 구성한 진입→거점→인접 이동 경로.
   app.get("/api/analysis-hub/attack-paths", authMiddleware, (_req, res) => {
     res.json({ paths: computeAttackPaths(listAnalysisEvents()) });

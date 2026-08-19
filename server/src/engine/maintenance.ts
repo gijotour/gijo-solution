@@ -6,6 +6,7 @@
 
 import { 라이브모드 } from "./datacleanup";
 import type { Express, Request } from "express";
+import { recordAudit } from "./audit";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { todayLocal } from "../util/date";
@@ -550,5 +551,24 @@ export function registerMaintenanceRoutes(app: Express): void {
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }
+  });
+
+  // 삭제(2026-08-19 삭제 일관화 ①) — 일정과 그 이력(maintenance_events)을 함께 지운다
+  // (이력만 남기면 고아 — datacleanup FK 교훈과 같은 결: 자식 먼저).
+  app.delete("/api/maintenance/:id", authMiddleware, (req, res) => {
+    const id = String(req.params.id);
+    const row = db.prepare("SELECT id, title FROM maintenance_items WHERE id = ?").get(id) as { id: string; title?: string } | undefined;
+    if (!row) return res.status(404).json({ error: "해당 점검 일정을 찾을 수 없습니다" });
+    const user = (req as Request & { user?: GijoUser }).user;
+    const tx = db.transaction(() => {
+      db.prepare("DELETE FROM maintenance_events WHERE itemId = ?").run(id);
+      db.prepare("DELETE FROM maintenance_items WHERE id = ?").run(id);
+    });
+    tx();
+    recordAudit({
+      kind: "write", actor: user?.displayName ?? null, action: "유지보수 일정 삭제",
+      target: row.title ?? id, detail: id, result: "ok",
+    });
+    res.json({ ok: true });
   });
 }

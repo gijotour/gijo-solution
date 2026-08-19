@@ -345,6 +345,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     $("sInterval").value = s ? s.intervalHours : 24;
     $("schExisting").innerHTML = s ? `현재: ${s.standard.toUpperCase()} · ${s.intervalHours}시간마다 · ${s.enabled ? "활성" : "비활성"} · 다음 ${new Date(s.nextRunAt).toLocaleString("ko-KR")}` : "아직 스케줄이 없습니다. 저장하면 다음 점검 주기에 자동 실행됩니다.";
     $("schModal").classList.add("g-on");
+      // 🎯 고른 항목을 대화창에(B16 완결 2026-08-19 — 공용 부품 규격은 selectnotify.js)
+      if (window.gijoSelectNotify) window.gijoSelectNotify({ label: t.label, text: "정기점검 스케줄 — " + t.label, fields: { asset: t.label } });
   }
   async function submitSched() {
     if (!schTargetId) return;
