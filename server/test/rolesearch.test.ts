@@ -52,3 +52,18 @@ describe("부스트 — 세게, 그러나 벽은 아니다", () => {
     expect(applyCategoryBoost(목록, undefined)).toEqual(목록);
   });
 });
+
+// ③ 장비운영 영역 주인(2026-08-20 사장님 승인) — 주인 없는 영역이 없어야 한다
+import { categoriesForRole, ROLE_CATEGORY } from "../src/engine/hybridsearch";
+describe("장비운영 주인 — scan이 취약점+장비운영을 먼저 본다", () => {
+  it("scan은 두 영역을 갖는다(배열 구조)", () => {
+    expect(categoriesForRole("scan")).toEqual(["취약점", "장비운영"]);
+  });
+  it("장비운영의 주인이 존재한다 — 주인 없는 업무영역 재발 방지", () => {
+    const 전영역 = Object.values(ROLE_CATEGORY).flat();
+    expect(전영역).toContain("장비운영");
+  });
+  it("normaltic은 여전히 우선영역 없음(일반은 부스트 금지)", () => {
+    expect(categoriesForRole("normaltic")).toEqual([]);
+  });
+});

@@ -225,20 +225,28 @@ export function applyOriginBoost(chunks: FusedChunk[], builtinIds: Set<string>):
 
 // 에이전트(역할) → 그 전문가가 먼저 보는 업무영역. 화면 매핑과 별개다 —
 // 화면은 "지금 보고 있는 곳", 역할은 "누가 답하는가"다.
-export const ROLE_CATEGORY: Record<string, Category> = {
-  scan: "취약점",      // 스캔 해석 — 취약점 자료가 먼저
-  analysis: "취약점",  // 우선순위 판단 — 같은 축
-  ti: "위협대응",      // CTI·위협 모니터링
-  report: "사내규정",  // 보고서 서식·보고 규정
-  normaltic: "일반",   // 사내지식 해설 — 전 영역을 봐야 하므로 치우치지 않는다
+// 2026-08-20 사장님 승인 ③: 「장비운영」의 주인을 지정 — 그동안 주인 없는 영역이라
+// 장비 설정·점검 질문이 전문가 부스트를 못 받았다. 하드닝·장비 점검 해석은 스캔 해석과
+// 같은 전문성이라 해석(scan)이 맡는다(값이 배열이 된 이유 — 단일값 Record라 두 번째
+// 영역을 못 얹던 구조를 정찰이 지적).
+export const ROLE_CATEGORY: Record<string, Category[]> = {
+  scan: ["취약점", "장비운영"], // 스캔 해석 — 취약점·장비 점검 자료가 먼저
+  analysis: ["취약점"],  // 우선순위 판단 — 같은 축
+  ti: ["위협대응"],      // CTI·위협 모니터링
+  report: ["사내규정"],  // 보고서 서식·보고 규정
+  normaltic: ["일반"],   // 사내지식 해설 — 전 영역을 봐야 하므로 치우치지 않는다
 };
 
-/** 그 역할이 먼저 볼 업무영역. 없으면 undefined(부스트 없음 = 전 영역 평등). */
-export function categoryForRole(agentId?: string): Category | undefined {
-  if (!agentId) return undefined;
-  const c = ROLE_CATEGORY[agentId];
+/** 그 역할이 먼저 볼 업무영역들. 없으면 빈 배열(부스트 없음 = 전 영역 평등). */
+export function categoriesForRole(agentId?: string): Category[] {
+  if (!agentId) return [];
   // 「일반」은 우선영역으로 쓰지 않는다 — 미분류를 밀어 올리면 진짜 자료가 밀린다.
-  return c && c !== "일반" ? c : undefined;
+  return (ROLE_CATEGORY[agentId] || []).filter((c) => c !== "일반");
+}
+
+/** 하위호환 — 첫 우선영역 하나(옛 소비처·시험). 새 코드는 categoriesForRole을 쓸 것. */
+export function categoryForRole(agentId?: string): Category | undefined {
+  return categoriesForRole(agentId)[0];
 }
 
 export interface FusionInput {

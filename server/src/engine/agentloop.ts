@@ -668,8 +668,22 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], c
   const facts = (usefulCalls.length ? usefulCalls : calls)
     .map((c, i) => `[${i + 1}] ${c.tool}: ${c.result.slice(0, MAX_FACT_CHARS)}`)
     .join("\n");
+  // 최종 답 작성자를 도구 영역의 전문가로(2026-08-20 ③ — orchestrator 고정을 정찰이 지적).
+  // 취약점 결과는 우선순위 전문가(analysis)가, 장비 점검·SBOM은 해석(scan)이, 보고는 report가
+  // 말한다 — 답변 톤이 아니라 **역할 영역 RAG 부스트**(categoriesForRole)가 실익이다.
+  // 영역이 안 걸리는 도구(assets·cross 등)는 종전대로 orchestrator.
+  const 전문가 = (() => {
+    const 표: Record<string, string> = { vuln: "analysis", maintenance: "scan", sbom: "scan", report: "report" };
+    const 셈: Record<string, number> = {};
+    for (const c of usefulCalls.length ? usefulCalls : calls) {
+      const a = 표[findAgentTool(c.tool)?.domain || ""];
+      if (a) 셈[a] = (셈[a] || 0) + 1;
+    }
+    const top = Object.entries(셈).sort((a, b) => b[1] - a[1])[0];
+    return top ? top[0] : "orchestrator";
+  })();
   return chat({
-    agentId: "orchestrator",
+    agentId: 전문가,
     // explain: 도구 실행 후 사용자에게 그대로 보여주는 최종 답변이다.
     explain: true,
     // ⚠ trusted — 이 message는 사용자 입력이 아니라 **우리가 조립한 내부 프롬프트**다

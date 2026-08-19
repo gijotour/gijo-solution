@@ -27,7 +27,7 @@ import {
   applyCategoryBoost,
   applyOriginBoost,
   categoryForScreen,
-  categoryForRole,
+  categoriesForRole,
   fuseVariantVectors,
   CATEGORIES,
   REWRITE_RANK_PENALTY,
@@ -935,10 +935,17 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   // ③ 출처(내장인가): 우리 질문에 우리 지식(제품 내장)을 먼저 세운다(2026-08-10 ①ⓑ, RAG 오염 수리).
   //    역할·화면보다 먼저 걸어, 그 위에 역할/화면 부스트가 더해진다. 벽이 아니라 올리기만 한다.
   const fused = applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds());
-  const 역할영역 = categoryForRole(agentId);
-  const 결과 = 역할영역
-    ? applyCategoryBoost(fused, 역할영역, true).slice(0, topK)
-    : applyCategoryBoost(fused, categoryForScreen(screen)).slice(0, topK);
+  // 역할 영역이 여러 개면 전부 올린다(2026-08-20 ③ 장비운영 주인 — scan은 취약점+장비운영).
+  // 부스트는 벽이 아니라 올리기라, 겹쳐 걸어도 다른 영역 자료가 사라지지 않는다.
+  const 역할영역들 = categoriesForRole(agentId);
+  let 결과;
+  if (역할영역들.length) {
+    let boosted = fused;
+    for (const 영역 of 역할영역들) boosted = applyCategoryBoost(boosted, 영역, true);
+    결과 = boosted.slice(0, topK);
+  } else {
+    결과 = applyCategoryBoost(fused, categoryForScreen(screen)).slice(0, topK);
+  }
   // RAG 실동작 신호(2026-08-20 AI 팀 가시화) — 검색 4경로(queryMemory·Scored·Relevant·Graded)가
   // 전부 이 함수를 지나므로 여기 한 곳이 전 경로를 커버한다. 레일 R 아이콘이 이 신호로 반짝인다.
   try {
