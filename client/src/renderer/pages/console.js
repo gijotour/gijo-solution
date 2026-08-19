@@ -1716,7 +1716,40 @@
     input.focus();
     try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
   }
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; } };
+
+  // ── 화면 열기 → 현황 카드(2026-08-20 사장님 지시 — 「메뉴를 누르면 대화창에 상위 카드」) ──
+  // 셸(app.html open)이 화면을 열 때 부른다. 지시가 아니라 조회라 사용자 발화로 남기지 않고,
+  // 이벤트 카드(🗔)로 붙인다. 숫자·표는 전부 서버 결정적 계산(datacard.ts) — 지어내지 않는다.
+  var 화면카드직전 = null;
+  function screenCard(page, label) {
+    var p = String(page || "").split("?")[0];
+    if (!p) return;
+    if (p === 화면카드직전) return; // 같은 화면 연속 열기엔 도배하지 않는다(다른 화면을 열면 초기화)
+    if (!(window.gijo && window.gijo.screenCard)) return;
+    var scope = 범위 && 범위.kind === "asset" ? String(범위.id) : undefined;
+    window.gijo.screenCard(p, scope).then(function (r) {
+      if (!r || r.none || !r.dataCard) return; // 카드 없는 화면은 조용히 없던 일로
+      화면카드직전 = p;
+      var row = append("event", { icon: "🗔", name: (label || p) + " — 현황", message: "", full: true });
+      var P = window.gijoChatParts;
+      if (!row || !P) return;
+      if (P.dataCard) P.dataCard(row, r.dataCard, {
+        navigate: function (pg, lb) {
+          if (window.gijoTabs) { window.gijoTabs.open(pg, lb); return true; }
+          if (window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(pg); return true; }
+          return false;
+        },
+        select: function (rowData, key) {
+          var v = String((rowData && rowData[key]) || "").trim();
+          if (!v) return;
+          var all = Object.keys(rowData).map(function (k) { return k + " " + rowData[k]; }).join(" · ");
+          setSelection({ label: v, text: all });
+        },
+      });
+      if (P.nextChips) P.nextChips(row, r.nextChips, function (q) { submit(q); });
+    }).catch(function () { /* 조회 실패는 조용히 — 화면 열기 자체를 막지 않는다 */ });
+  }
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; }, screenCard: screenCard };
 
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.

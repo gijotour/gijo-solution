@@ -527,6 +527,8 @@
       if ((window.innerWidth - 56) < 1400) {                                                // ④
         window.gijo.openShellPopout(page, label || undefined);
         대화홈갱신();
+        // 메뉴로 연 화면의 현황 카드를 대화창에 자동으로(2026-08-20 사장님 — 「상위 카드가 보여야 돼」).
+        if (window.gijoConsole && window.gijoConsole.screenCard) window.gijoConsole.screenCard(page, label);
         return;
       }
       // ⑤ 도킹 — return하지 않고 아래 표준 탭 생성 경로를 그대로 탄다.
@@ -568,6 +570,9 @@
       tabs.push(t);
     }
     show(page);
+    // 메뉴로 연 화면의 현황 카드를 대화창에 자동으로(2026-08-20 사장님 — 「메뉴를 누르면
+    // 대화창에 상위 카드가 보여야 돼」, 사진3 흐름). 카드 없는 화면은 콘솔이 조용히 넘긴다.
+    if (window.gijoConsole && window.gijoConsole.screenCard) window.gijoConsole.screenCard(page, t.label);
   }
 
   function show(page) {

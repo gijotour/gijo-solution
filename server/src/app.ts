@@ -91,6 +91,7 @@ import { registerCmdSuggestRoutes } from "./engine/cmdsuggest";
 import { registerHardeningRoutes } from "./engine/hardeningscan";
 import { registerHardeningTargetRoutes } from "./engine/hardeningtargets";
 import { registerVerifyRoutes } from "./engine/verifyroutes";
+import { registerScreenCardRoute } from "./engine/datacard";
 import { registerVexRoutes } from "./engine/vexexport";
 import { registerReportScheduleRoutes } from "./engine/reportschedule";
 import { registerClientReleaseRoutes } from "./engine/clientrelease";
@@ -235,6 +236,7 @@ export function createApp(): Express {
   registerHardeningRoutes(app);
   registerHardeningTargetRoutes(app);
   registerVerifyRoutes(app); // 조치 검증(찾은 취약점이 닫혔는지 확인) — 하드닝과 수집 계층 공유
+  registerScreenCardRoute(app); // 화면 열기 → 현황 카드(2026-08-20 — 메뉴를 누르면 대화창에 상위 카드)
   registerVexRoutes(app);    // VEX 내보내기 — 승인 상태를 국제 표준(CycloneDX VEX)으로
   registerLlmActivityRoutes(app);
   registerKevRoutes(app);

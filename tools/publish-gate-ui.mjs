@@ -176,6 +176,19 @@ for (const [pg, lbl] of [["inventory.html", "자산"], ["hardening.html", "검�
   ok("부품 로드: " + pg, has, fr ? "" : "프레임 못 찾음");
 }
 
+// ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──
+const 카드전 = await 셸.evaluate(() => document.querySelectorAll(".dc-card").length);
+await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기"));
+let 자동카드 = false;
+for (let i = 0; i < 10 && !자동카드; i++) {
+  await new Promise((r) => setTimeout(r, 1000));
+  자동카드 = await 셸.evaluate((n) => {
+    const cards = [...document.querySelectorAll(".dc-card")];
+    return cards.length > n && cards.some((c) => (c.textContent || "").includes("자산 — 등록 현황"));
+  }, 카드전);
+}
+ok("화면 열기 → 현황 카드 자동(assets)", 자동카드);
+
 // ── ④ 데이터 카드 히트맵 보기(5.35.0 기능 회귀) ─────────────────────────
 const 히트 = await 셸.evaluate(() => {
   const host = document.createElement("div");

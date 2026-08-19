@@ -12,6 +12,8 @@
 
 import { listTargets, listSchedules, listRuns } from "./hardeningtargets";
 import { listAssets, getAsset } from "./assets";
+import { authMiddleware } from "../auth/auth";
+import { asyncRoute } from "../util/asyncRoute";
 import { 자산위험등급, isRealVulnerability } from "./agenttools/handlers";
 import { listFindingReviews, findingKey } from "./approvals";
 
@@ -282,4 +284,38 @@ export function 카드없는글로(answer: { output: string; dataCard: DataCard 
   const 줄들 = rows.map((r) => "- " + cols.map((c) => `${c.label} ${r[c.key] ?? "—"}`).join(" · "));
   const 남음 = (dc.table!.totalCount || 0) - rows.length;
   return [머리, "", ...줄들, ...(남음 > 0 ? [`(외 ${남음}건)`] : [])].join("\n");
+}
+
+// ── 화면 열기 → 현황 카드 (2026-08-20 사장님 지시 — 「메뉴를 누르면 대화창에 상위 카드가
+//    보여야 돼」, 사진3 흐름) ─────────────────────────────────────────────────
+// 메뉴·팔레트로 화면을 열면 셸(app.html open)이 이 라우트를 불러, 그 화면의 현황 카드를
+// 대화창에 자동으로 띄운다. 지시가 아니라 **조회**다 — 대화 기록에 가짜 사용자 발화를 남기지
+// 않으려고 dispatch를 거치지 않는다. 카드가 없는 화면은 none — 지어내지 않는다.
+const 화면파일카드: Record<string, "asset" | "ops" | "hardening" | "finding"> = {
+  "assets.html": "asset",
+  "discover.html": "ops", "analysis.html": "ops",
+  "verify.html": "hardening", "hardening.html": "hardening",
+  "triage.html": "finding", "vulnscan.html": "finding",
+};
+
+export function registerScreenCardRoute(app: import("express").Express): void {
+  app.get("/api/screen-card", authMiddleware, asyncRoute(async (req, res) => {
+    const page = String(req.query.page || "").split("?")[0];
+    const kind = 화면파일카드[page];
+    if (!kind) { res.json({ none: true }); return; }
+    const scope = String(req.query.scope || "").trim() || null; // 🗂 걸린 범위(자산 id) 반영
+    const { nextChipsFor } = await import("./nextguide.js");
+    if (kind === "finding") {
+      const { findingListAnswer } = await import("./picklist.js");
+      // picklist(체크칸)는 싣지 않는다 — 자동 카드에 조작 목록까지 뜨면 대화가 도배된다.
+      const { output, dataCard } = findingListAnswer("우선순위", scope);
+      res.json({ output, dataCard: dataCard ?? null, nextChips: nextChipsFor("분기:우선순위") });
+      return;
+    }
+    const 답 = kind === "asset" ? assetStatusAnswer(scope)
+      : kind === "ops" ? await opsStatusAnswer()
+      : hardeningStatusAnswer();
+    const 분기 = kind === "asset" ? "분기:자산현황" : kind === "ops" ? "분기:관제현황" : "분기:검증현황";
+    res.json({ output: 답.output, dataCard: 답.dataCard, nextChips: nextChipsFor(분기) });
+  }));
 }

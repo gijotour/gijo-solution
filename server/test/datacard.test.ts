@@ -356,3 +356,48 @@ describe("배선 감시 — 부품을 만들고 안 부르는 반쪽을 막는�
     expect(배선).toContain("setSelection");
   });
 });
+
+describe("분기 순서 — 화면이름 카드가 모호 되묻기보다 앞이다", () => {
+  // 2026-08-20 사장님 실측: 「자산」(2글자)을 쳤는데 카드가 아니라 「무엇을 도와드릴까요」가
+  // 나왔다 — isTooVague의 「두 글자 이하」 규칙이 자산·관제·검증(전부 2글자)을 먼저 삼켰다.
+  // 좁은 판정(화면이름 정확 일치)이 넓은 판정(모호)보다 앞이어야 한다(분기 순서가 기능을 죽인다).
+  it("★ dispatcher에서 screenNameCard 분기가 isTooVague 분기보다 앞에 있다", () => {
+    const s = readFileSync(join(__dirname, "..", "src", "engine", "dispatcher.ts"), "utf8");
+    const 카드 = s.indexOf("screenNameCard(instructionText)");
+    const 모호 = s.indexOf("isTooVague(instructionText)");
+    expect(카드, "화면이름 카드 분기가 없다").toBeGreaterThan(-1);
+    expect(모호, "모호 분기가 없다 — 지웠으면 '1'·'ㅁ' 입력이 LLM으로 흘러간다").toBeGreaterThan(-1);
+    expect(카드, "카드 분기가 모호 분기 뒤로 밀리면 2글자 화면 이름이 삼켜진다").toBeLessThan(모호);
+  });
+  it("2글자 화면 이름(자산·관제·검증)이 전부 카드 맵에 있다", async () => {
+    const { screenNameCard } = await import("../src/engine/datacard.js");
+    expect(screenNameCard("자산")).toBe("asset");
+    expect(screenNameCard("관제")).toBe("ops");
+    expect(screenNameCard("검증")).toBe("hardening");
+  });
+});
+
+describe("화면 열기 → 현황 카드 (2026-08-20 사장님 — 「메뉴를 누르면 대화창에 상위 카드」)", () => {
+  const 클라 = join(__dirname, "..", "..", "client");
+  it("서버 라우트가 등록돼 있고 화면 4갈래(자산·관제·검증·우선순위)를 안다", () => {
+    const dc = readFileSync(join(__dirname, "..", "src", "engine", "datacard.ts"), "utf8");
+    expect(dc).toContain('app.get("/api/screen-card"');
+    for (const p of ["assets.html", "analysis.html", "hardening.html", "vulnscan.html"]) {
+      expect(dc, `화면파일카드에 ${p}가 없다`).toContain(`"${p}"`);
+    }
+    const appTs = readFileSync(join(__dirname, "..", "src", "app.ts"), "utf8");
+    expect(appTs, "라우트를 만들고 등록을 안 했다(만들어만 두는 함정)").toContain("registerScreenCardRoute(app)");
+  });
+  it("배선 사슬이 이어져 있다 — 셸 open → 콘솔 screenCard → preload → API", () => {
+    const app = readFileSync(join(클라, "src", "renderer", "pages", "app.html"), "utf8");
+    expect(app, "셸 open()이 콘솔을 안 부른다").toContain("gijoConsole.screenCard(page");
+    const cs = readFileSync(join(클라, "src", "renderer", "pages", "console.js"), "utf8");
+    expect(cs, "콘솔에 screenCard가 없다").toContain("function screenCard(");
+    expect(cs, "gijoConsole에 노출 안 됨").toContain("screenCard: screenCard");
+    expect(cs, "같은 화면 연속 열기 도배 방지가 없다").toContain("화면카드직전");
+    const pre = readFileSync(join(클라, "src", "preload.ts"), "utf8");
+    expect(pre, "preload 노출이 없다(clientglobals 계약)").toContain("screenCard:");
+    const api = readFileSync(join(클라, "src", "api", "console.ts"), "utf8");
+    expect(api).toContain("/api/screen-card?page=");
+  });
+});

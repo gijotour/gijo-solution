@@ -236,6 +236,8 @@ const gijoApi = {
     onStart?: () => void
   ) => api.dispatchApi.sendStream(text, sessionId, screen, progressId, selection, { delta: onDelta, start: onStart }),
   dispatchProgress: (progressId: string) => api.dispatchApi.progress(progressId),
+  // 화면 열기 → 현황 카드(2026-08-20) — 셸이 메뉴 열기 때 부른다(조회 전용).
+  screenCard: (page: string, scope?: string) => api.dispatchApi.screenCard(page, scope),
   // 결재판 승인 실행 — 쓰기 도구는 이 경로로만 실행된다(지시만으로는 실행 안 됨).
   approveAgentTool: (tool: string, args: Record<string, string>, instruction = "") => api.dispatchApi.approve(tool, args, instruction),
   undoAgentTool: (id?: string) => api.dispatchApi.undo(id),

@@ -1014,19 +1014,12 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     };
   }
 
-  // 뜻을 알 수 없는 입력("1", ".", "ㅁ")은 LLM에 보내지 않는다 — 헤매다 10초를 쓰고
-  // 그게 "오래 걸리는 작업"으로 판정돼 리포트까지 만들어졌다(2026-07-26 실측).
-  if (isTooVague(instructionText)) {
-    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
-    completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: vagueAnswer() };
-  }
-
-  // 한 낱말만 던진 경우("취약점", "급한거") — 뜻은 분명한데 무엇을 원하는지가 없다.
-  // LLM에 보내면 34초를 헤매다 엉뚱한 답을 낸다(2026-08-01 실측). 그 낱말에 맞는 예시로 되묻는다.
   // 🃏 화면 이름 → 그 화면의 현황 카드(2026-08-19 사장님 실측 — 「자산고르기」를 쳤더니 LLM이
   //   일반 지식 개념 설명을 늘어놨다). 화면 이름을 친 사람이 원하는 것은 개념이 아니라 **그
-  //   화면의 데이터**다. 되묻기(아래 한낱말)보다 카드가 먼저다 — 카드가 곧 가장 좋은 답이다.
+  //   화면의 데이터**다. 되묻기(아래 한낱말·모호)보다 카드가 먼저다 — 카드가 곧 가장 좋은 답이다.
+  // ⚠ 이 분기는 모호(isTooVague)보다 **앞**이어야 한다(2026-08-20 사장님 실측 — 「자산」을
+  //   쳤는데 카드가 아니라 「무엇을 도와드릴까요」가 나왔다). isTooVague의 「두 글자 이하」
+  //   규칙이 자산·관제·검증(전부 2글자)을 삼켰다 — 좁은 판정(정확 일치)이 넓은 판정보다 먼저다.
   {
     const { screenNameCard, hardeningStatusAnswer, assetStatusAnswer, opsStatusAnswer, 카드없는글로 } = await import("./datacard.js");
     const 어느카드 = screenNameCard(instructionText);
@@ -1048,6 +1041,16 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     }
   }
 
+  // 뜻을 알 수 없는 입력("1", ".", "ㅁ")은 LLM에 보내지 않는다 — 헤매다 10초를 쓰고
+  // 그게 "오래 걸리는 작업"으로 판정돼 리포트까지 만들어졌다(2026-07-26 실측).
+  if (isTooVague(instructionText)) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: vagueAnswer() };
+  }
+
+  // 한 낱말만 던진 경우("취약점", "급한거") — 뜻은 분명한데 무엇을 원하는지가 없다.
+  // LLM에 보내면 34초를 헤매다 엉뚱한 답을 낸다(2026-08-01 실측). 그 낱말에 맞는 예시로 되묻는다.
   const 낱말 = 한낱말되묻기(instructionText);
   if (낱말) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });

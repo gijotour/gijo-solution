@@ -90,6 +90,11 @@ function currentScreen(): string | undefined {
 }
 
 export const dispatchApi = {
+  // 화면 열기 → 현황 카드(2026-08-20 사장님 지시) — 셸이 메뉴로 화면을 열 때 부른다.
+  // 지시가 아니라 조회라 dispatch를 안 거친다(대화 기록에 가짜 발화를 안 남긴다).
+  screenCard: (page: string, scope?: string) =>
+    request<{ none?: boolean; output?: string; dataCard?: unknown; nextChips?: string[] }>(
+      "/api/screen-card?page=" + encodeURIComponent(page) + (scope ? "&scope=" + encodeURIComponent(scope) : "")),
   // sessionId를 주면 지시·응답이 그 작업 세션의 턴으로 기록되고, 직전 대화가 맥락으로 실린다.
   // screen: 지시가 들어온 화면(예: "vulnscan.html"). 서버가 모호한 지시를 해석하는 힌트로 쓴다
   // — 취약점 화면에서 "정리해줘"는 우선순위 정리로 본다(server/engine/screencontext.ts).
