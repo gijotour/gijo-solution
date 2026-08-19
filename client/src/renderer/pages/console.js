@@ -45,6 +45,19 @@
       ".cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;}",
       ".cs-body > *:first-child{margin-top:auto;}",
       ".cs-empty{color:var(--muted-2,#a49d95);font-size:12px;padding:10px 0;}",
+      // 프로 홈 히어로(승인 시안 프로_홈_인사) — chat-home일 때만 히어로, 아니면 간결형. 순수 CSS 전환.
+      ".ce-hero{display:none;}",
+      "body.chat-home .ce-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:46vh;text-align:center;}",
+      "body.chat-home .ce-compact{display:none;}",
+      ".ce-greet{font-size:26px;font-weight:800;color:var(--text,#e9e7e2);letter-spacing:-.3px;}",
+      ".ce-honest{font-size:12.5px;color:var(--muted-2,#a49d95);max-width:560px;line-height:1.6;}",
+      ".ce-qrow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:640px;}",
+      ".ce-qrow .qchip{background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:18px;padding:7px 14px;font-size:12.75px;color:var(--text,#e9e7e2);cursor:pointer;}",
+      ".ce-qrow .qchip:hover{border-color:var(--blue,#3b82f6);}",
+      ".ce-div{font-size:11.5px;color:var(--muted-2,#a49d95);margin-top:4px;}",
+      ".ce-mrow{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;max-width:640px;}",
+      ".ce-mrow .mchip{background:transparent;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:9px;padding:6px 12px;font-size:12.25px;color:var(--muted,#b3ada4);cursor:pointer;}",
+      ".ce-mrow .mchip:hover{color:#fff;border-color:var(--blue,#3b82f6);}",
       ".cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);}",
       ".cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:12.25px;}",
       ".cs-row.instr .ci{background:rgba(30,185,128,.16);}",
@@ -268,11 +281,20 @@
       // 🎯 지금 다루는 것 — 고른 항목의 실제 값(2026-08-18). fields를 보내는 화면에서만 뜬다.
       '<div class="cs-state" id="csSelState" style="display:none"></div>' +
       '<div class="cs-drawer" id="csDrawer"></div>' +
-      // 빈 상태 4원칙 보강(2026-08-19 외부 조사) — 예시 한 개(그대로 쳐 볼 수 있는 것)와
-      // 한계 한 줄(정직)을 더한다. 예전엔 「행동 유도」만 있고 둘이 빠져 있었다.
-      '<div class="cs-body" id="csBody"><div class="cs-empty">지시하면 여기서 실시간으로 흐릅니다. 위 <b>무엇을 할 수 있나</b>에서 골라도 됩니다.' +
+      // 빈 상태 — 표준은 간결형(ce-compact), 프로 대화 홈(chat-home)은 히어로형(승인 시안
+      // 프로_홈_인사, 2026-08-19 사장님 참고화면 반영). 최상위 클래스는 .cs-empty 하나 유지 —
+      // 제거 지점 3곳(append·갈래카드·guideAsk)이 그 계약에 의존한다. 전환은 순수 CSS.
+      '<div class="cs-body" id="csBody"><div class="cs-empty">' +
+      '<div class="ce-compact">지시하면 여기서 실시간으로 흐릅니다. 위 <b>무엇을 할 수 있나</b>에서 골라도 됩니다.' +
       '<br>예: <b>"오늘 뭐부터 볼까?"</b> — 조치 우선순위를 근거(KEV·EPSS)와 함께 줍니다.' +
-      '<br><span style="color:var(--muted-2,#a49d95)">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</span></div></div>' +
+      '<br><span style="color:var(--muted-2,#a49d95)">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</span></div>' +
+      '<div class="ce-hero" id="ceHero">' +
+        '<div class="ce-greet" id="ceGreet">안녕하세요</div>' +
+        '<div class="ce-honest">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</div>' +
+        '<div class="ce-qrow" id="ceQrow"></div>' +
+        '<div class="ce-div">또는 메뉴에서 바로 가기</div>' +
+        '<div class="ce-mrow" id="ceMrow"></div>' +
+      '</div></div></div>' +
       '<div class="cs-dock">' +
         '<button class="cs-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>' +
         '<input id="chatInput" placeholder="지시를 입력하세요…" aria-label="지시를 입력하세요">' +
@@ -312,6 +334,9 @@
     //   ⚠ 이 한 줄이 없으면 값은 살아 지시에 실리는데 알약만 안 보인다 — 답이 왜 적은지
     //     담당자가 알 길이 없다(2026-08-18 실화면에서 그 상태를 직접 봤다).
     renderScope();
+    renderHero(); fillGreeting(); // 프로 홈 히어로(승인 시안) — chat-home일 때만 CSS가 보여준다
+    // nav.js(GROUPS 출처)가 이 스크립트보다 늦게 실릴 수 있다 — 메뉴 칩이 비면 한 번만 재시도.
+    setTimeout(function () { var m = document.getElementById("ceMrow"); if (m && !m.children.length) renderHero(); }, 700);
     document.getElementById("csCtx").addEventListener("click", function (e) {
       if (e.target && e.target.classList.contains("x")) { ctxOff = true; applyCtx(); return; }
       if (ctxOff) { ctxOff = false; applyCtx(); }
@@ -1587,6 +1612,47 @@
   }
 
   // ask() — 화면이 ⓘ로 "설명해줘"를 부탁할 때처럼, 담당자가 타이핑하지 않아도 콘솔이 대신 묻는다.
+  /** 프로 홈 히어로(승인 시안 프로_홈_인사 §9) — 질문 칩은 CAN[0] 처음 3개(새 문구 안 짓는다),
+   *  메뉴 칩은 nav GROUPS 단일 출처(⓪~⑤). 클릭은 기존 ask()/gijoTabs.open만 부른다 —
+   *  입력창·IPC를 새로 만들지 않는다. 빈 배열이면 그 줄만 비운다(죽지 않는다). */
+  function renderHero() {
+    var qrow = document.getElementById("ceQrow"), mrow = document.getElementById("ceMrow");
+    if (!qrow || !mrow) return;
+    try {
+      var qs = (CAN && CAN[0] && CAN[0].qs) ? fillQs(CAN[0].qs).slice(0, 3) : [];
+      qrow.innerHTML = qs.map(function (x) {
+        return '<span class="qchip" data-q="' + esc(x.q) + '">' + (x.ic || "💬") + " " + esc(x.q) + "</span>";
+      }).join("");
+      Array.prototype.forEach.call(qrow.querySelectorAll(".qchip"), function (b) {
+        b.addEventListener("click", function () { ask(b.dataset.q); });
+      });
+    } catch (e) { qrow.innerHTML = ""; }
+    try {
+      var STAGE = ["assets0", "s1-find", "s2-triage", "s3-fix", "s4-verify", "s5-report"];
+      var groups = (window.gijoNavGroups || []).filter(function (g) { return STAGE.indexOf(g.id) >= 0 && g.items && g.items[0]; });
+      mrow.innerHTML = groups.map(function (g) {
+        return '<span class="mchip" data-page="' + esc(g.items[0].page) + '" data-label="' + esc(g.items[0].label) + '">' + esc(g.label) + "</span>";
+      }).join("");
+      Array.prototype.forEach.call(mrow.querySelectorAll(".mchip"), function (b) {
+        b.addEventListener("click", function () {
+          if (window.gijoTabs && window.gijoTabs.open) window.gijoTabs.open(b.dataset.page, b.dataset.label);
+        });
+      });
+    } catch (e) { mrow.innerHTML = ""; }
+  }
+  function fillGreeting() {
+    var el = document.getElementById("ceGreet");
+    if (!el) return;
+    var h = new Date().getHours();
+    var 말 = h < 5 ? "늦은 시간까지 고생 많으세요" : h < 12 ? "좋은 아침입니다" : h < 18 ? "안녕하세요" : "늦은 시간까지 고생 많으세요";
+    el.textContent = 말; // 이름이 오기 전에도 빈 칸은 아니게
+    if (!window.gijo || !window.gijo.me) return;
+    window.gijo.me().then(function (u) {
+      var name = (u && (u.displayName || u.username)) || "";
+      if (name) el.textContent = 말 + ", " + name + "님";
+    }).catch(function () { /* 이름을 못 읽어도 인사말은 남는다 */ });
+  }
+
   function ask(text) {
     var input = document.getElementById("chatInput");
     if (!input) return;

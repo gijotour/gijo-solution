@@ -57,3 +57,20 @@ describe("팝업 릴레이 — 목록이 어긋나면 팝업에서만 조용히 
     expect(셸, "재주입이 없다 — 릴레이가 와도 처리가 안 된다").toMatch(/onShellBridge[\s\S]{0,300}window\.postMessage\(d/);
   });
 });
+
+// ── 프로 홈 히어로(승인 시안 프로_홈_인사) — .cs-empty 계약 감시 ─────────────────
+describe("프로 홈 히어로 — 빈 상태 계약", () => {
+  const 콘솔 = fs.readFileSync(new URL("../../client/src/renderer/pages/console.js", import.meta.url), "utf8");
+  it("★ .cs-empty는 build 마크업에 정확히 1곳 — 제거 지점 3곳(append·갈래카드·guideAsk)이 이 계약에 의존한다", () => {
+    const n = (콘솔.match(/class="cs-empty"/g) || []).length;
+    expect(n, `.cs-empty 마크업이 ${n}곳 — 1곳이어야 제거가 한 번에 된다`).toBe(1);
+  });
+  it("히어로 칩은 기존 통로만 부른다 — 새 입력칸·새 IPC 금지(시안 결정)", () => {
+    const i = 콘솔.indexOf("function renderHero()");
+    expect(i).toBeGreaterThan(0);
+    const 본문 = 콘솔.slice(i, i + 2200);
+    expect(본문).toContain("ask(b.dataset.q)");
+    expect(본문).toContain("gijoTabs.open");
+    expect(본문).not.toMatch(/<input|<textarea/i);
+  });
+});
