@@ -935,6 +935,17 @@
       var a3 = buildUserArea();
       // 56px 폭에 맞춘다 — 이름 글자는 자리를 못 잡으므로 아바타·아이콘만 세로로 세운다.
       a3.style.cssText += "flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;padding:0;";
+      // ⚠ 말로만 「아이콘만」이라 적고 실제로는 이름·긴 버튼이 그대로 붙어 레일 밖으로 잘려
+      //   나왔다(2026-08-19 프로 사용자 테스트 P3: 「…포 자동화 전용」). 이름은 숨기고
+      //   아바타 툴팁으로 옮기며, 되돌리기 버튼은 ⇤ 아이콘 하나로 줄인다(제목은 유지).
+      var nm3 = a3.querySelector(".ua-name");
+      var av3 = a3.querySelector(".ua-avatar");
+      if (nm3) {
+        nm3.style.display = "none";
+        if (av3) new MutationObserver(function () { av3.title = nm3.textContent || ""; }).observe(nm3, { childList: true, characterData: true, subtree: true });
+      }
+      var bb3 = a3.querySelector("#csBackBtn");
+      if (bb3) { bb3.textContent = "⇤"; bb3.style.cssText += "width:36px;padding:4px 0;"; }
       foot.appendChild(a3);
       return true;
     }
