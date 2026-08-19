@@ -117,6 +117,17 @@ describe("카드 내용 — 전부 DB에서 결정적으로", () => {
     expect(Object.keys(dataCard.table.shown[0])).not.toContain("_급함");
   });
 
+  it("★ 지워진 대상의 옛 이력은 평균에 안 섞인다 — 운영 실측 결함(등록 0인데 평균 48%)", async () => {
+    const t = createTarget({ label: "지워질-장비", host: "local", port: 22, authMethod: "local" });
+    createSchedule(t.id, "kisa", 24);
+    await runDueSchedules(Date.now(), () => fakeRunner());
+    const { deleteTarget } = await import("../src/engine/hardeningtargets");
+    deleteTarget(t.id);
+    const { dataCard } = hardeningStatusAnswer();
+    expect(dataCard.kpis[0].value).toBe("0");
+    expect(dataCard.kpis[2].value, "대상이 없으면 평균도 없어야 한다").toBe("—");
+  });
+
   it("🗔 화면 연결·📌 선택 열쇠가 계약대로다", () => {
     const { dataCard } = hardeningStatusAnswer();
     expect(dataCard.screen).toEqual({ page: "verify.html", label: "검증" });

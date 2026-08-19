@@ -42,8 +42,13 @@ export function hardeningStatusAnswer(): { output: string; dataCard: DataCard } 
   const schedules = listSchedules();
   const runs = listRuns(undefined, 500);
 
+  // ⚠ 지워진 대상의 옛 이력은 안 센다 — 운영 실측(2026-08-19)에서 「등록 장비 0 ·
+  //   평균 준수율 48%」가 나란히 나왔다. 이력(hardening_runs)은 대상을 지워도 남는데,
+  //   평균에 섞이면 카드가 없는 장비의 성적을 말하는 셈이다(0 vs 29와 같은 부류).
+  const 현존 = new Set(targets.map((t) => t.id));
   const 대상별최근 = new Map<string, { rate: number; at: number }>();
   for (const r of runs) {
+    if (!현존.has(r.targetId)) continue;
     const cur = 대상별최근.get(r.targetId);
     if (!cur || r.at > cur.at) 대상별최근.set(r.targetId, { rate: r.rate, at: r.at });
   }
