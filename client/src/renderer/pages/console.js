@@ -268,7 +268,11 @@
       // 🎯 지금 다루는 것 — 고른 항목의 실제 값(2026-08-18). fields를 보내는 화면에서만 뜬다.
       '<div class="cs-state" id="csSelState" style="display:none"></div>' +
       '<div class="cs-drawer" id="csDrawer"></div>' +
-      '<div class="cs-body" id="csBody"><div class="cs-empty">지시하면 여기서 실시간으로 흐릅니다. 위 <b>무엇을 할 수 있나</b>에서 골라도 됩니다.</div></div>' +
+      // 빈 상태 4원칙 보강(2026-08-19 외부 조사) — 예시 한 개(그대로 쳐 볼 수 있는 것)와
+      // 한계 한 줄(정직)을 더한다. 예전엔 「행동 유도」만 있고 둘이 빠져 있었다.
+      '<div class="cs-body" id="csBody"><div class="cs-empty">지시하면 여기서 실시간으로 흐릅니다. 위 <b>무엇을 할 수 있나</b>에서 골라도 됩니다.' +
+      '<br>예: <b>"오늘 뭐부터 볼까?"</b> — 조치 우선순위를 근거(KEV·EPSS)와 함께 줍니다.' +
+      '<br><span style="color:var(--muted-2,#a49d95)">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</span></div></div>' +
       '<div class="cs-dock">' +
         '<button class="cs-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>' +
         '<input id="chatInput" placeholder="지시를 입력하세요…" aria-label="지시를 입력하세요">' +
@@ -544,9 +548,19 @@
     var fields = ap.fields || [];
     var box = document.createElement("div");
     box.className = "cs-ap";
+    // HITL 4요소(액션·범위·영향·이유) 중 「범위」만 비어 있었다(2026-08-19 외부 조사).
+    // 지시에 실려 간 맥락(📌 고른 것·🗂 지금 범위)이 곧 범위다 — 본창이 이미 아는 값이라
+    // 서버 변경 없이 결재판 머리에 밝힌다. 맥락이 없으면 줄 자체를 안 그린다(빈 라벨 금지).
+    var 범위줄 = (function () {
+      var 조각 = [];
+      if (범위 && 범위.label) 조각.push("🗂 " + 범위.label);
+      if (sel && sel.label) 조각.push("📌 " + sel.label);
+      return 조각.length ? '<div class="cs-ape"><b>범위:</b> ' + esc(조각.join(" · ")) + "</div>" : "";
+    })();
     box.innerHTML =
       '<div class="cs-aph">🗂 실행 승인 — ' + esc(ap.label || ap.tool) + "</div>" +
       '<div class="cs-apsub">아래 내용대로 실행합니다. 값을 확인·수정한 뒤 승인하세요.</div>' +
+      범위줄 +
       fields.map(function (f) {
         return '<div class="cs-apf"><span class="cs-apk">' + esc(f.label || f.key) + (f.required ? "*" : "") + "</span>" +
           '<input class="cs-apin' + (f.source === "empty" && f.required ? " need" : "") + '" data-k="' + esc(f.key) +
