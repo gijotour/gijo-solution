@@ -111,6 +111,7 @@ export interface DispatchResult {
   // 대화 안 데이터 카드(승인 시안 대화_데이터카드, 2026-08-19) — KPI+표를 서버가 결정적으로
   // 계산해 내려준다. 클라 chatparts.dataCard가 그린다(모델이 채우는 자유 필드 없음).
   dataCard?: import("./datacard").DataCard;
+  nextChips?: string[]; // ➡ 다음 작업 제안(QA ④) — nextguide.ts 표에서, 실측 검증 문장만
   internalMiss?: boolean;
   // 답변 그라운딩에 쓰인(검색된) 사내 문서 ID — 화면이 "근거: 문서명" 배지로 표시한다.
   // 인수인계 자동 검증도 이 필드로 "올린 문서가 실제로 인용되는가"를 판정한다.
@@ -607,7 +608,17 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   );
   // 출구 관문은 여기 한 줄에 모은다 — 갈래마다 심으면 새 갈래가 생길 때 또 샌다.
   //   ① 거짓 완료(하지 않은 일을 했다는 답)  ② 기계 데이터 누출(저장소 원문 조각)
-  return 해석을단다(기계데이터를걸러낸다(instructionText, 거짓완료를걸러낸다(instructionText, result)));
+  const 걸러진 = 해석을단다(기계데이터를걸러낸다(instructionText, 거짓완료를걸러낸다(instructionText, result)));
+  // ➡ 다음 작업 칩(QA ④, 2026-08-19) — 답의 경로(도구/분기)별로 실측 검증된 후속 지시를
+  //   자동 동봉한다. LLM이 만들지 않는다(nextguide.ts 표 — 시나리오 실측 ✓ 문장만).
+  //   결재판이 떠 있으면 안 붙인다 — 다음 행동은 그 승인이지 딴 길이 아니다.
+  if (!걸러진.approval && !걸러진.nextChips) {
+    const { nextChipsFor, routeFromParts } = await import("./nextguide.js");
+    const 경로 = routeFromParts(걸러진);
+    const 칩 = 경로 ? nextChipsFor(경로) : [];
+    if (칩.length) return { ...걸러진, nextChips: 칩 };
+  }
+  return 걸러진;
 }
 
 /**

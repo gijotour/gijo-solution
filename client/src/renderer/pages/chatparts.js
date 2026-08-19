@@ -75,6 +75,11 @@
       ".dc-card tbody tr:nth-child(even){background:rgba(255,255,255,.025);}",
       ".dc-card .num{text-align:right;font-variant-numeric:tabular-nums;}",
       ".dc-more{padding:5px 11px;font-size:11.75px;color:var(--muted-2,#a49d95);}",
+      // ➡ 다음 작업 칩(QA ④) — 답 꼬리의 낮은 존재감 한 줄(제안이지 재촉이 아니다)
+      ".gcp-next{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:7px;border-top:1px dashed rgba(255,255,255,.10);}",
+      ".gcp-nh{font-size:11.5px;color:var(--muted-2,#a49d95);flex:0 0 auto;}",
+      ".gcp-nc{font-size:12px;color:var(--text,#e9e7e2);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:3px 10px;cursor:pointer;font-family:inherit;}",
+      ".gcp-nc:hover{background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.4);}",
       // 안전망 — 어쩌다 줄(.cs-row)에 직접 붙어도 **아래로** 가지 옆으로 가지 않게 한다.
       ".cs-row{flex-wrap:wrap;}",
       ".cs-row > .gcp-ev, .cs-row > .gcp-src, .cs-row > .gcp-src2, .cs-row > .gcp-open, .cs-row > .gcp-picks{flex:1 1 100%;}",
@@ -384,5 +389,29 @@
     return card;
   }
 
-  window.gijoChatParts = { quotes: quotes, picks: picks, open: open, dataCard: dataCard };
+  /** ➡ 다음 작업 칩(QA ④) — 답 끝에 자동으로 붙는 후속 지시 제안. 서버 표(nextguide.ts)의
+   *  실측 검증 문장만 온다 — 누르면 그 지시가 그대로 나간다(새 입력칸 아님). */
+  function nextChips(el, chips, submit) {
+    el = 붙일자리(el);
+    if (!el || !Array.isArray(chips) || !chips.length || typeof submit !== "function") return null;
+    ensureCss();
+    var wrap = document.createElement("div");
+    wrap.className = "gcp-next";
+    var head = document.createElement("span");
+    head.className = "gcp-nh";
+    head.textContent = "➡ 다음 작업"; // ➡ 다음 작업
+    wrap.appendChild(head);
+    chips.slice(0, 3).forEach(function (q) {
+      var b = document.createElement("button");
+      b.className = "gcp-nc";
+      b.textContent = q;
+      b.title = "누르면 이 지시가 그대로 나갑니다";
+      b.addEventListener("click", function () { submit(q); });
+      wrap.appendChild(b);
+    });
+    el.appendChild(wrap);
+    return wrap;
+  }
+
+  window.gijoChatParts = { quotes: quotes, picks: picks, open: open, dataCard: dataCard, nextChips: nextChips };
 })();

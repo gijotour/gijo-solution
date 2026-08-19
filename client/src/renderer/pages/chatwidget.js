@@ -278,6 +278,7 @@
               return false;
             },
           });
+          if (P.nextChips) P.nextChips(typing, r.nextChips, function (q) { send(q); });
         }
         // 실행이 필요한 지시면 여기서 끝내지 않고 확인 카드를 띄운다.
         if (r.approval) appendApproval(r.approval);

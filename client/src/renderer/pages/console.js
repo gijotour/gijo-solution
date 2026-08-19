@@ -1716,3 +1716,6 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 })();
+
+      // ➡ 다음 작업 칩(QA ④) — 답 경로별 실측 검증 후속 지시. 누르면 그대로 전송.
+      if (P.nextChips) P.nextChips(replyEl, r && r.nextChips, function (q) { submit(q); });
