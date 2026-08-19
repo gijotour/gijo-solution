@@ -1112,7 +1112,9 @@
     var cb = el.querySelector(".cb");
     if (!cb) return;
     var 태그 = (f.kev ? "🚨 " + esc(f.kev) + " · " : "") + (f.severity ? esc(f.severity) + " · " : "");
-    var 아래 = [f.status, f.owner ? "담당 " + f.owner : "담당 미배정", f.due ? "기한 " + f.due : ""]
+    // 「담당 미배정」은 취약점(findingKey 있음)에서만 진실이다 — 보안제품·위협 탐지처럼
+    // 담당 개념이 없는 선택에 그리면 거짓 줄이 된다(2026-08-20 검토관 심각2).
+    var 아래 = [f.status, f.owner ? "담당 " + f.owner : (f.findingKey ? "담당 미배정" : ""), f.due ? "기한 " + f.due : ""]
       .filter(Boolean).map(esc).join(" · ");
     var cm = cb.querySelector(".cm");
     if (cm) cm.innerHTML =
@@ -1122,16 +1124,20 @@
       // esc 먼저, 굵게 나중 — 순서가 바뀌면 주입 구멍(renderSelState와 같은 규칙).
       (f.plain ? "<div>→ " + esc(f.plain).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") + "</div>" : "");
     // 제안 칩 — 완성된 지시 문장(누르는 버튼, 새 입력칸 아님). 「이거」는 선택인자로 함께 간다.
-    // 자산형(취약점 키 없이 assetId만)과 취약점형은 이어서 할 일이 다르다(2026-08-19 자산 고르기 배선).
+    // 세 유형(2026-08-20 검토관 심각2 수리): 자산형(assetId만)·취약점형(findingKey 있음)·
+    // 일반형(둘 다 없음 — 보안제품·위협·관제 이벤트). 배정·반려는 취약점에만 뜻이 통한다.
     var 자산형 = f.assetId && !f.findingKey;
+    var 취약점형 = !!f.findingKey;
     var 칩들 = 자산형 ? [
       "이거로 범위 걸어줘",
       "이 자산 미조치 취약점 뭐 있어?",
       "이거 검증 실행해줘",
-    ] : [
+    ] : 취약점형 ? [
       "이거 쉽게 설명해줘",
       f.owner ? "이거 조치 완료 처리해줘" : "이거 담당자 배정해줘",
       "이거 반려할게",
+    ] : [
+      "이거 쉽게 설명해줘",
     ];
     var 줄 = document.createElement("div");
     줄.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-top:7px";

@@ -756,7 +756,7 @@ tr:last-child td{border-bottom:none;}
       renderAiAssets();
       // 셸(대화창)에도 알린다(B16, 2026-08-19) — 카드가 그린 실명 필드만.
       // 전송 규격(top 한 겹·팝업 릴레이·허용 키)은 공용 부품 selectnotify.js가 진다(2026-08-20 이관).
-      if (full) {
+      if (full && window.gijoSelectNotify) {
         const rob = full.robustness && full.robustness.score;
         window.gijoSelectNotify({
           label: String(full.name || "").slice(0, 40),

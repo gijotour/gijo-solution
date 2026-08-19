@@ -400,6 +400,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
   // fields — 대화창 「고른 항목」 카드의 재료(승인 시안 조치항목_대화창 B16 복제).
   // 전송 규격(top 한 겹·팝업 릴레이·허용 키·200자 컷)은 공용 부품 selectnotify.js 한 곳이 진다(2026-08-20 이관).
   function 선택알림(label, text, fields) {
+    if (!window.gijoSelectNotify) return; // 부품 미로드(단독 열람 등)면 조용히 없던 일로
     window.gijoSelectNotify(label && text ? { label: label, text: text, fields: fields || undefined } : undefined);
   }
 

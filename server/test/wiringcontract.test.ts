@@ -78,10 +78,15 @@ describe("배선 계약 ⑤층 — 선택→대화창 (전수)", () => {
   it("배선됨으로 적힌 화면에는 실제 배선 코드가 있다(약속-코드 일치)", () => {
     for (const [f, v] of Object.entries(선택배선대장)) {
       if (Array.isArray(v)) continue;
-      const s = readFileSync(join(PAGES, f), "utf8");
+      // HTML 주석을 지우고 대조한다(2026-08-20 외부 조사 1순위 권고) — 문자열 포함 검사는
+      // 주석 안 문구로도 참이 되는 것이 알려진 함정이고, 우리가 실제로 뚫렸다(검토관 심각1).
+      const s = readFileSync(join(PAGES, f), "utf8").replace(/<!--[\s\S]*?-->/g, "");
       if (v === "부품") {
-        expect(s, `${f} — 부품 선언인데 selectnotify 로드가 없다`).toContain("selectnotify.js");
-        expect(s, `${f} — 부품 선언인데 gijoSelectNotify 호출이 없다`).toContain("gijoSelectNotify");
+        // ⚠ 'selectnotify.js' 문자열 검사는 **주석으로도 통과**했다(2026-08-20 검토관 심각1 —
+        //   5화면이 호출만 있고 로드가 없어 선택이 조용히 죽었는데 이 시험이 초록이었다).
+        //   script 태그 원문으로 검사해야 거짓 통과가 없다.
+        expect(s, `${f} — 부품 선언인데 selectnotify 로드(script 태그)가 없다`).toContain('src="selectnotify.js"');
+        expect(s, `${f} — 부품 선언인데 gijoSelectNotify 호출이 없다`).toContain("gijoSelectNotify(");
       } else {
         expect(s, `${f} — 직접 선언인데 gijo:select가 없다`).toContain("gijo:select");
       }

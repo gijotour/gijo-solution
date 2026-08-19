@@ -171,7 +171,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         // 셸(대화창)에도 알린다(B16, 2026-08-19) — 렌더가 그린 실명 필드만 옮긴다.
         // 전송 규격(top 한 겹·팝업 릴레이·허용 키)은 공용 부품 selectnotify.js가 진다(2026-08-20 이관).
         var ev = 이벤트들.filter(function (x) { return x.id === r.dataset.id; })[0];
-        if (ev) {
+        if (ev && window.gijoSelectNotify) {
           window.gijoSelectNotify({
             label: String(ev.title || "").slice(0, 40),
             text: "로그 이벤트 " + (ev.entity ? ev.entity + " · " : "") + (ev.title || ""),

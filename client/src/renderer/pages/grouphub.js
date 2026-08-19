@@ -36,7 +36,16 @@
 
   window.addEventListener("message", function (ev) {
     var d = ev.data;
-    if (!d || d.type !== "gijo:scope:set") return;
+    if (!d) return;
+    // 허브는 탭(셸)과 무대(화면) 사이의 **한 겹**이다 — 무대가 parent로 보내는 탭 열기
+    // 요청(gijo:openTab)은 여기서 멈추면 허공에 떨어진다(2026-08-20 검토관 중간4:
+    // 발견·수집 허브 안 자산 관리의 유지보수·취약점 딥링크가 눌러도 무반응이었다).
+    // 셸까지 한 겹 더 올려 보낸다 — 내용은 건드리지 않는 순수 릴레이.
+    if (d.type === "gijo:openTab" && ev.source !== window.parent && window.parent !== window) {
+      try { window.parent.postMessage(d, "*"); } catch (e) { }
+      return;
+    }
+    if (d.type !== "gijo:scope:set") return;
     지금범위 = d.scope && d.scope.id && d.scope.label ? d.scope : null;
     무대에전하기(document.getElementById("ghStage"), 지금범위);
   });

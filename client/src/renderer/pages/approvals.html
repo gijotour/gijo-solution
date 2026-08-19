@@ -524,7 +524,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       findingKey: r.findingKey || "",
     };
     // 전송 규격(top 한 겹·허용 키·200자 컷)은 공용 부품 selectnotify.js가 진다(2026-08-20 이관).
-    window.gijoSelectNotify({ label: f.finding_type || r.assetName || "선택", text: text, fields: fields });
+    if (window.gijoSelectNotify) window.gijoSelectNotify({ label: f.finding_type || r.assetName || "선택", text: text, fields: fields });
   }
 
   // ── 배관: 「지금 보여 주고 있는 목록」을 대화창에 알린다(2026-08-18) ─────────────

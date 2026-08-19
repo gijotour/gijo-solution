@@ -476,7 +476,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // 선택을 셸(대화창)에도 알린다(B16, 2026-08-19) — 「이거」가 이 이벤트를 가리키고,
     // fields가 오면 대화에 「고른 항목」 카드가 뜬다(본보기 approvals·vulnscan과 같은 모양).
     // 전송 규격(top 한 겹·팝업 릴레이·허용 키)은 공용 부품 selectnotify.js가 진다(2026-08-20 이관).
-    if (e) {
+    if (e && window.gijoSelectNotify) {
       window.gijoSelectNotify({
         label: String(e.title || "").slice(0, 40),
         text: "관제 이벤트 " + (e.entity ? e.entity + " · " : "") + (e.title || ""),

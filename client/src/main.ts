@@ -562,6 +562,14 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   // 파일 경로와 쿼리를 분리해 loadFile에 넘긴다(settings.html?s=ai 같은 구역 딥링크 지원).
   const [요청파일, qs] = String(page).split("?");
   const file = 셸화면보정(요청파일);
+  // 로그아웃·인증 만료(login.html)면 별도 창들을 **함께** 닫는다(2026-08-20 검토관 중간6) —
+  // 본창만 로그인으로 돌아가고 팝업·대화·사무실 창이 남으면 사내 데이터가 화면에 그대로
+  // 떠 있다(서버 세션은 끊겼어도 이미 그려진 내용은 보인다). 보안 경계라 예외 없이 닫는다.
+  if (file === "login.html") {
+    for (const w of popoutWindows.values()) { try { if (!w.isDestroyed()) w.close(); } catch { /* 이미 닫힘 */ } }
+    try { if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.close(); } catch { /* 이미 닫힘 */ }
+    try { if (officeWindow && !officeWindow.isDestroyed()) officeWindow.close(); } catch { /* 이미 닫힘 */ }
+  }
   // ★ 프로 셸 이탈 금지(2026-08-19 사장님 실사고 — 「발견·수집을 누르니 표준 모드로 돌아가네」):
   //   구식 통로(navigateTo 폴백)가 본창을 화면 파일로 **직접** 로드하면 프로 셸이 통째로
   //   파괴되고 표준 사이드바 모양이 뜬다. 본창이 셸(app.html)로 떠 있는 한, 화면 파일 요청은

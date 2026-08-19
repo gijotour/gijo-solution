@@ -231,7 +231,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (!e) return;
     선택행id = row.dataset.id;
     하이라이트반영();
-    window.gijoSelectNotify({
+    if (window.gijoSelectNotify) window.gijoSelectNotify({
       label: String(e.action || "작업 기록").slice(0, 40),
       text: "작업 기록 " + fmtTime(e.at) + " · " + (e.actor || "-") + " · " + (e.action || "") + (e.target ? " → " + e.target : ""),
     });

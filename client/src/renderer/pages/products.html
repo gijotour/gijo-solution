@@ -588,6 +588,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           `</div>`
         );
       }).join("");
+      선택표시반영(); // 재렌더가 innerHTML을 갈아도 고른 카드 표시를 되살린다
     } catch (e) {
       root.innerHTML = `<div style="color:#f5928a;font-size:12px">불러오기 실패: ${esc(e.message || e)}</div>`;
     }
@@ -658,23 +659,37 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (zone) {
       const p = 제품목록.find((x) => String(x.id) === zone.dataset.pid);
       if (!p) return;
+      선택제품id = String(p.id);
+      선택표시반영(); // loadProducts 재렌더 뒤에도 같은 함수로 되살린다(audit 하이라이트반영과 같은 짝)
       const card = zone.closest(".prod");
-      document.querySelectorAll(".prod.selected").forEach((c) => c.classList.remove("selected"));
-      if (card) card.classList.add("selected");
       const meta = [p.vendor, p.model].filter(Boolean).join(" · ");
-      const 점검줄 = card && card.querySelector(".prod-maint") ? card.querySelector(".prod-maint").textContent.replace(/\s+/g, " ").trim() : "";
+      // 화면이 이미 그린 점검줄 그대로(재계산 금지) — 단 화면 조작 문구(「점검 등록 →」)는
+      // 데이터가 아니라서 떼어낸다(2026-08-20 검토관 낮음10).
+      const 점검줄 = (card && card.querySelector(".prod-maint") ? card.querySelector(".prod-maint").textContent : "")
+        .replace(/\s+/g, " ").trim().replace(/^🔧\s*/, "").replace(/\s*—\s*점검 등록\s*→\s*$/, "");
       // 전송 규격(top 한 겹·허용 키·200자 컷)은 공용 부품 selectnotify.js가 진다.
-      window.gijoSelectNotify({
+      if (window.gijoSelectNotify) window.gijoSelectNotify({
         label: p.name,
         text: "보안제품 " + p.name,
         fields: {
           title: p.name + (meta ? " · " + meta : ""),
           asset: p.assetName || "",
-          status: 점검줄.replace(/^🔧\s*/, ""), // 화면이 이미 그린 점검줄 그대로(재계산 금지)
+          status: 점검줄,
         },
       });
       return;
     }
+  }
+
+  // 선택 표시를 한 곳에서 — 재렌더(문서 추가·삭제 뒤 loadProducts)가 innerHTML을 통째
+  // 갈아치워도 이 함수를 다시 부르면 표시가 살아난다(검토관 낮음9).
+  let 선택제품id = null;
+  function 선택표시반영() {
+    document.querySelectorAll(".prod.selected").forEach((c) => c.classList.remove("selected"));
+    if (선택제품id == null) return;
+    const zone = document.querySelector(`[data-select-zone][data-pid="${선택제품id}"]`);
+    const card = zone && zone.closest(".prod");
+    if (card) card.classList.add("selected");
   }
 
   // 정형 정보 입력칸을 사람이 직접 고치면 배지를 "직접입력"으로 바꾼다(AI 초안·CSV 가져오기는
