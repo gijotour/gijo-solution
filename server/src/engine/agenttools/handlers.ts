@@ -1466,6 +1466,7 @@ export function runUpdateFindingStatus(args: Record<string, string>): string {
     // 위험수용은 기한·사유가 필수(영구 수용 금지 — approvals.ts가 최종 관문, 여기는 안내를 좋게).
     const until = args.acceptUntil?.trim();
     if (!until || !DUE_RE.test(until)) throw new Error("위험수용에는 기한이 필요합니다 — acceptUntil을 YYYY-MM-DD로 지정하세요(예: 분기 재검토면 3개월 뒤 날짜).");
+    // FAIL_MARKS-예외: 폴백이 아니라 진짜 입력 거부 오류문 — 사유 없는 위험수용을 서버가 막는 실오류다.
     if (!note) throw new Error("위험수용에는 사유(note)가 필요합니다 — 왜 수용하는지 없이는 감사에 답할 수 없습니다.");
     patch.acceptUntil = until;
   }

@@ -28,8 +28,17 @@ export interface TeamComposition {
   cloud: { enabled: boolean; activeProvider: string | null };
 }
 
+// AI 팀 감독(2026-08-20 ②) — 기간별 실측 지표. 호출=chat_logs(영속), 응답·오류=일 집계(도입일부터).
+export interface SupervisionData {
+  days: number;
+  calls: Record<string, number>;
+  daily: { day: string; agent: string; kind: string; calls: number; errors: number; latencyMsSum: number }[];
+  recentErrors: Record<string, { detail: string; timestamp: number }>;
+}
+
 export const agentsApi = {
   list: () => request<AgentInfo[]>("/api/agents"),
+  supervision: (days: number) => request<SupervisionData>(`/api/aiteam/supervision?days=${Math.max(1, Math.min(90, days || 1))}`),
   composition: () => request<TeamComposition>("/api/team/composition"),
   setModel: (agentId: string, modelId: string | null) =>
     request<AgentInfo>(`/api/agents/${agentId}/model`, { method: "POST", body: { modelId } }),

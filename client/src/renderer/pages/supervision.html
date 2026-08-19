@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — AI 팀 감독</title>
+<!--
+  AI 팀 감독(2026-08-20 사장님 승인 ② — 「에이전트 감독도 필요할 것 같은데」).
+  승인 시안: mockups/agent-supervision/시안.html — 카드(대화창 요약)+이 무대 화면(상세) 2단.
+  ■ 숫자는 전부 서버 실측 두 원천뿐이다(지어내는 칸 없음):
+    · 호출 수 = chat_logs(영속 — 과거 기간 즉시 가능)
+    · 응답·오류 = llm_activity_daily(도입일 2026-08-20부터 축적 — 그 전 기간은 "-"가 정직)
+  ■ 화면에 입력칸 없음(지시는 대화창) — 조작은 기간 전환과 행 선택(📌)뿐.
+  ■ 폴백(모델 미배정) 경고는 두지 않는다 — 재설계(2026-08-08)로 팀원별 모델 배정 개념이
+    없어졌다(기반 두뇌 1개 + 전문성). 죽은 경고를 두면 화면이 거짓말을 한다.
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+.main{padding:20px 24px 40px;max-width:1180px;margin:0 auto;}
+.head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;}
+.page-title{font-size:19px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.range{display:flex;gap:6px;}
+.range button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
+  padding:6px 14px;border-radius:18px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
+.range button.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.kpi b{display:block;font-size:19px;font-weight:800;color:#fff;margin-top:4px;}
+.kpi span{font-size:12.25px;color:var(--muted);font-weight:600;}
+.kpi b.warn{color:var(--amber);} .kpi b.bad{color:var(--red);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;margin-bottom:16px;}
+.ag{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;}
+.ag:hover{border-color:var(--border-strong);} .ag.on{border-color:var(--blue);}
+.ag-h{display:flex;align-items:baseline;gap:8px;margin-bottom:2px;}
+.ag-abbr{font-size:11.75px;font-weight:800;color:var(--blue-light);}
+.ag-name{font-size:14px;font-weight:800;color:#fff;}
+.ag-role{font-size:12px;color:var(--muted-2);margin-left:auto;}
+.ag-nums{display:flex;gap:14px;margin:8px 0 6px;font-size:12.5px;color:var(--muted);}
+.ag-nums b{color:var(--text);font-weight:700;}
+.ag-nums .err b{color:var(--red);}
+.bars{display:flex;align-items:flex-end;gap:3px;height:34px;margin-top:4px;}
+.bars i{flex:1 1 auto;background:rgba(95,161,255,.45);border-radius:2px 2px 0 0;min-height:2px;}
+.bars i.zero{background:rgba(255,255,255,.08);}
+.ag-err{font-size:11.75px;color:var(--muted-2);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ag-err.has{color:var(--amber);}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.panel h2{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;}
+.sup-line{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.75px;}
+.sup-line:last-child{border-bottom:0;}
+.sup-line .tag{flex:0 0 auto;font-size:11.75px;font-weight:800;padding:1px 8px;border-radius:10px;}
+.tag.idle{background:rgba(255,255,255,.08);color:var(--muted);}
+.tag.err{background:rgba(226,72,61,.16);color:#f5928a;}
+.tag.ok{background:rgba(30,185,128,.14);color:var(--teal);}
+.note{font-size:11.75px;color:var(--muted-2);margin-top:10px;}
+</style>
+</head>
+<body class="g-ui">
+<div class="main">
+  <div class="head">
+    <div>
+      <div class="page-title">AI 팀 감독</div>
+      <div class="page-sub">누가 얼마나 일하고 어디서 막히는지 — 숫자는 전부 실측 기록입니다. 지시는 대화창에서 합니다.</div>
+    </div>
+    <div class="range" id="range">
+      <button data-d="1" class="on">오늘</button>
+      <button data-d="7">7일</button>
+      <button data-d="30">30일</button>
+    </div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid" id="grid"></div>
+  <div class="panel">
+    <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+    <div id="sup"></div>
+    <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+  </div>
+</div>
+<script>
+(function () {
+  "use strict";
+  var days = 1;
+  var 선택행 = null;
+
+  function esc(s) { var d = document.createElement("i"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
+
+  function 알림(라벨, 글) {
+    if (!window.gijoSelectNotify) return; // 부품 미로드면 조용히 없던 일로
+    window.gijoSelectNotify({ label: String(라벨).slice(0, 40), text: 글 });
+  }
+
+  async function load() {
+    if (!window.gijo || !window.gijo.listAgents || !window.gijo.aiteamSupervision) return;
+    var agents, sup;
+    try {
+      agents = (await window.gijo.listAgents()) || [];
+      sup = await window.gijo.aiteamSupervision(days);
+    } catch (e) {
+      document.getElementById("kpis").innerHTML = '<div class="kpi"><span>불러오기 실패</span><b>' + esc((e && e.message) || "오류") + "</b></div>";
+      return;
+    }
+    var calls = sup.calls || {};
+    var daily = (sup.daily || []).filter(function (d) { return d.kind === "chat"; });
+    var recentErrors = sup.recentErrors || {};
+
+    // 에이전트별 합산(기간 전체) — 평균 응답 = latency 합 / 건수.
+    var byAgent = {};
+    daily.forEach(function (d) {
+      var a = byAgent[d.agent] || (byAgent[d.agent] = { calls: 0, errors: 0, lat: 0, byDay: {} });
+      a.calls += d.calls; a.errors += d.errors; a.lat += d.latencyMsSum;
+      a.byDay[d.day] = (a.byDay[d.day] || 0) + d.calls;
+    });
+
+    var 총호출 = agents.reduce(function (s, a) { return s + (calls[a.id] || 0); }, 0);
+    var 총오류 = agents.reduce(function (s, a) { return s + ((byAgent[a.id] || {}).errors || 0); }, 0);
+    var 무호출 = agents.filter(function (a) { return !(calls[a.id] > 0); });
+    var 응답있는 = agents.map(function (a) { return byAgent[a.id]; }).filter(function (x) { return x && x.calls > 0; });
+    var 평균응답 = 응답있는.length
+      ? (응답있는.reduce(function (s, x) { return s + x.lat / x.calls; }, 0) / 응답있는.length / 1000).toFixed(1) + "s" : "-";
+
+    document.getElementById("kpis").innerHTML =
+      '<div class="kpi"><span>호출(' + (days === 1 ? "오늘" : days + "일") + ')</span><b>' + 총호출 + "</b></div>" +
+      '<div class="kpi"><span>평균 응답</span><b>' + esc(평균응답) + "</b></div>" +
+      '<div class="kpi"><span>오류</span><b class="' + (총오류 ? "warn" : "") + '">' + 총오류 + "</b></div>" +
+      '<div class="kpi"><span>무호출 팀원</span><b>' + 무호출.length + "</b></div>";
+
+    // 일별 미니 막대 — 최근 N일 축(빈 날은 0). 최대값 기준 상대 높이(실측 상대 비교용).
+    var 날들 = [];
+    for (var i = days - 1; i >= 0; i--) 날들.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+
+    document.getElementById("grid").innerHTML = agents.map(function (a) {
+      var m = byAgent[a.id] || { calls: 0, errors: 0, lat: 0, byDay: {} };
+      var 평균 = m.calls ? (m.lat / m.calls / 1000).toFixed(1) + "s" : "-";
+      var vals = 날들.map(function (d) { return m.byDay[d] || 0; });
+      var max = Math.max.apply(null, vals.concat([1]));
+      var bars = days === 1 ? "" :
+        '<div class="bars">' + vals.map(function (v) {
+          return '<i class="' + (v ? "" : "zero") + '" style="height:' + Math.max(6, Math.round(v / max * 100)) + '%" title="' + v + '건"></i>';
+        }).join("") + "</div>";
+      var err = recentErrors[a.id];
+      return '<div class="ag" data-id="' + esc(a.id) + '" data-name="' + esc(a.name) + '">' +
+        '<div class="ag-h"><span class="ag-abbr">[' + esc(a.abbr || "-") + ']</span><span class="ag-name">' + esc(a.name) + '</span>' +
+        '<span class="ag-role">' + esc(a.role || "") + "</span></div>" +
+        '<div class="ag-nums"><span>호출 <b>' + (calls[a.id] || 0) + "</b></span><span>평균 <b>" + esc(평균) + "</b></span>" +
+        '<span class="err">오류 <b>' + m.errors + "</b></span></div>" + bars +
+        '<div class="ag-err' + (err ? " has" : "") + '">' + (err ? "⚠ " + esc(err.detail) : "최근 오류 없음") + "</div></div>";
+    }).join("");
+
+    // 감독 관점 — 전부 규칙 계산이다(무호출·오류율 상위). LLM이 쓰는 문장이 아니다.
+    var lines = [];
+    if (무호출.length) lines.push('<div class="sup-line"><span class="tag idle">무호출</span><span>' +
+      무호출.map(function (a) { return esc(a.name); }).join(" · ") + " — 이 기간 대화 호출이 없었습니다(구성 재검토 후보)</span></div>");
+    var 오류상위 = agents.map(function (a) { var m = byAgent[a.id]; return { a: a, e: (m && m.errors) || 0, c: (m && m.calls) || 0 }; })
+      .filter(function (x) { return x.e > 0; }).sort(function (x, y) { return y.e - x.e; }).slice(0, 3);
+    if (오류상위.length) lines.push('<div class="sup-line"><span class="tag err">오류 상위</span><span>' +
+      오류상위.map(function (x) { return esc(x.a.name) + " " + x.e + "건" + (x.c ? "(" + Math.round(x.e / (x.e + x.c) * 100) + "%)" : ""); }).join(" · ") + "</span></div>");
+    if (!lines.length) lines.push('<div class="sup-line"><span class="tag ok">정상</span><span>이 기간 무호출·오류 특이사항이 없습니다.</span></div>');
+    document.getElementById("sup").innerHTML = lines.join("");
+
+    // 행(카드) 선택 → 📌 (일반형 — 지시는 대화창에서)
+    Array.prototype.forEach.call(document.querySelectorAll(".ag"), function (el) {
+      el.addEventListener("click", function () {
+        if (선택행) 선택행.classList.remove("on");
+        선택행 = el; el.classList.add("on");
+        var id = el.getAttribute("data-id"), name = el.getAttribute("data-name");
+        var m = byAgent[id] || { calls: 0, errors: 0 };
+        알림(name, "에이전트 " + name + " · 호출 " + (calls[id] || 0) + "건 · 오류 " + m.errors + "건 (" + (days === 1 ? "오늘" : days + "일") + ")");
+      });
+    });
+  }
+
+  document.getElementById("range").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button");
+    if (!b) return;
+    Array.prototype.forEach.call(document.querySelectorAll("#range button"), function (x) { x.classList.remove("on"); });
+    b.classList.add("on");
+    days = Number(b.getAttribute("data-d")) || 1;
+    load();
+  });
+
+  load();
+})();
+</script>
+<script src="nav.js"></script>
+<script src="selectnotify.js"></script>
+</body>
+</html>

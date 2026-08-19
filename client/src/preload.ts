@@ -212,6 +212,8 @@ const gijoApi = {
 
   // 에이전트 AI / 지시(디스패처)
   listAgents: () => api.agentsApi.list(),
+  // AI 팀 감독(2026-08-20 ②) — ⚠ 위치 인자(객체로 바꾸면 500 — preload API 관례)
+  aiteamSupervision: (days: number) => api.agentsApi.supervision(days),
   setAgentModel: (agentId: string, modelId: string | null) => api.agentsApi.setModel(agentId, modelId),
   // 팀원별 두뇌 위치 — null이면 전역 따름. 총괄은 서버가 막는다(라우팅 판단에 느린 두뇌 금지).
   setAgentLocation: (agentId: string, location: string | null) => api.agentsApi.setLocation(agentId, location),

@@ -234,6 +234,19 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_chat_logs_createdAt ON chat_logs(createdAt);
 
+  -- AI 팀 감독(2026-08-20 ②) — llm:event의 일 단위 영속 집계. 실시간 로그(llmactivity)는
+  -- 인메모리 최근 200건이라 재시작에 사라져 7일/30일 감독 숫자를 못 냈다(시안 제작 중 발견).
+  -- 평균 응답 = latencyMsSum / calls. 숫자는 전부 실측 이벤트의 합 — 지어내는 칸이 없다.
+  CREATE TABLE IF NOT EXISTS llm_activity_daily (
+    day TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    calls INTEGER NOT NULL DEFAULT 0,
+    errors INTEGER NOT NULL DEFAULT 0,
+    latencyMsSum INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, agent, kind)
+  );
+
   -- 장기기억(RAG/LanceDB) 문서 메타데이터. LanceDB 행에는 documentId·chunk·vector만 있어
   -- 업로드 시각·원본 경로를 담을 수 없다(새 필드 추가 시 스키마 드리프트로 테이블이 재생성됨).
   -- 문서 단위 메타데이터는 여기 SQLite에 둔다. chunks/scope의 진실 원천은 LanceDB이고 여기 값은

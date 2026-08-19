@@ -294,7 +294,7 @@ export function 카드없는글로(answer: { output: string; dataCard: DataCard 
 // 메뉴·팔레트로 화면을 열면 셸(app.html open)이 이 라우트를 불러, 그 화면의 현황 카드를
 // 대화창에 자동으로 띄운다. 지시가 아니라 **조회**다 — 대화 기록에 가짜 사용자 발화를 남기지
 // 않으려고 dispatch를 거치지 않는다. 카드가 없는 화면은 none — 지어내지 않는다.
-type 화면카드종류 = "asset" | "ops" | "hardening" | "finding" | "sessions" | "fix" | "report" | "products" | "records" | "threat" | "aiteam";
+type 화면카드종류 = "asset" | "ops" | "hardening" | "finding" | "sessions" | "fix" | "report" | "products" | "records" | "threat" | "aiteam" | "supervision";
 const 화면파일카드: Record<string, 화면카드종류> = {
   "assets.html": "asset",
   "discover.html": "ops", "analysis.html": "ops", "loganalysis.html": "ops",
@@ -309,6 +309,7 @@ const 화면파일카드: Record<string, 화면카드종류> = {
   "records.html": "records", "audit.html": "records",
   "threat.html": "threat",
   "aihub.html": "aiteam", "agent.html": "aiteam",
+  "supervision.html": "supervision", // AI 팀 감독(2026-08-20 ② — 사장님 「에이전트 감독도 필요」)
 };
 
 export function registerScreenCardRoute(app: import("express").Express): void {
@@ -328,6 +329,7 @@ export function registerScreenCardRoute(app: import("express").Express): void {
     const 답 = kind === "asset" ? assetStatusAnswer(scope)
       : kind === "ops" ? await opsStatusAnswer()
       : kind === "hardening" ? hardeningStatusAnswer()
+      : kind === "supervision" ? supervisionStatusAnswer()
       : kind === "sessions" ? sessionsStatusAnswer()
       : kind === "fix" ? fixStatusAnswer()
       : kind === "report" ? await reportStatusAnswer()
@@ -341,6 +343,44 @@ export function registerScreenCardRoute(app: import("express").Express): void {
   }));
 }
 
+
+// AI 팀 감독 카드(2026-08-20 ② 사장님 승인 — 「에이전트 감독도 필요할 것 같은데」).
+// KPI는 구글 SRE 골든 시그널에서(지연·트래픽·오류 + 무호출=놀고 있는 팀원). 숫자 원천 둘뿐:
+// 호출=chat_logs(영속 — 과거 기간 즉시 가능) · 응답/오류=llm_activity_daily(도입일부터 축적).
+export function supervisionStatusAnswer(): { output: string; dataCard: DataCard } {
+  const { listAgents } = require("./agents") as typeof import("./agents");
+  const { chatCallsByAgent, activityDaily } = require("./llmactivity") as typeof import("./llmactivity");
+  const 팀 = listAgents();
+  const 호출 = chatCallsByAgent(1);
+  const 오늘 = new Date().toISOString().slice(0, 10);
+  const 오늘지표 = new Map(activityDaily(1).filter((d) => d.day === 오늘 && d.kind === "chat").map((d) => [d.agent, d]));
+  const 행 = 팀.map((a) => {
+    const d = 오늘지표.get(a.id);
+    const 평균 = d && d.calls ? `${(d.latencyMsSum / d.calls / 1000).toFixed(1)}s` : "-";
+    return { a: `[${(a as { abbr?: string }).abbr || "-"}] ${a.name}`, n: String(호출[a.id] || 0), r: 평균, e: String(d?.errors || 0) };
+  });
+  const 총호출 = 팀.reduce((s, a) => s + (호출[a.id] || 0), 0);
+  const 총오류 = 행.reduce((s, r) => s + Number(r.e), 0);
+  const 무호출 = 팀.filter((a) => !(호출[a.id] > 0)).length;
+  const 지연있음 = [...오늘지표.values()].some((d) => d.calls > 0);
+  const dataCard: DataCard = {
+    title: "AI 팀 감독 — 오늘",
+    kpis: [
+      { label: "오늘 호출", value: String(총호출) },
+      { label: "평균 응답", value: 지연있음 ? `${((행.reduce((s, r) => s + (r.r === "-" ? 0 : parseFloat(r.r)), 0)) / Math.max(1, 행.filter((r) => r.r !== "-").length)).toFixed(1)}s` : "-" },
+      { label: "오류", value: String(총오류), color: 총오류 ? "warn" : "ok" },
+      { label: "무호출 팀원", value: String(무호출), color: 무호출 === 팀.length ? "muted" : undefined },
+    ],
+    screen: { page: "supervision.html", label: "AI 팀 감독" },
+    pickKey: "a",
+    table: {
+      cols: [{ key: "a", label: "팀원" }, { key: "n", label: "호출" }, { key: "r", label: "평균 응답" }, { key: "e", label: "오류" }],
+      shown: 행,
+      totalCount: 행.length,
+    },
+  };
+  return { output: `AI 팀 감독 — 오늘 호출 ${총호출}건 · 오류 ${총오류}건 · 무호출 팀원 ${무호출}명. 응답·오류 지표는 도입일(2026-08-20)부터 쌓입니다 — 7일·30일은 🗔 화면에서 봅니다.`, dataCard };
+}
 
 // ── 전 메뉴 카드 7종(2026-08-20 사장님 확정) — 숫자는 전부 DB 직접 계산, 표는 급한 순 상한 ──
 export function sessionsStatusAnswer(): { output: string; dataCard: DataCard } {
