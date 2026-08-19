@@ -77,10 +77,15 @@ describe("배선 감시 — 부품·호출 두 자리", () => {
     expect(s).toContain("function nextChips(");
     expect(s).toMatch(/nextChips:\s*nextChips/);
   });
-  it("지휘소·분리창 둘 다 부른다", () => {
-    for (const f of ["console.js", "chatwidget.js"]) {
-      const s = readFileSync(join(pages, f), "utf8");
-      expect(s, f).toContain("P.nextChips");
-    }
+  it("지휘소·분리창 둘 다 **응답 처리 블록 안에서** 부른다 — 문자열 존재만 보면 IIFE 밖 죽은 줄도 통과한다(실사고: splice가 파일 끝에 떨어뜨려 칩이 영영 안 붙었다)", () => {
+    const c = readFileSync(join(pages, "console.js"), "utf8");
+    const i = c.indexOf("P.nextChips");
+    expect(i).toBeGreaterThan(0);
+    expect(i, "attachApproval(응답 처리 마지막) 앞에 있어야 같은 블록").toBeLessThan(c.indexOf("attachApproval(replyEl"));
+    expect(i, "IIFE 닫힘 뒤(파일 꼬리)에 떨어지면 죽은 줄").toBeLessThan(c.lastIndexOf("})();"));
+    const w = readFileSync(join(pages, "chatwidget.js"), "utf8");
+    const iw = w.indexOf("P.nextChips");
+    expect(iw).toBeGreaterThan(0);
+    expect(iw, "P 가드 블록 안").toBeLessThan(w.lastIndexOf("})();"));
   });
 });

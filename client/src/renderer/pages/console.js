@@ -1495,6 +1495,8 @@
           setSelection({ label: v, text: all });
         },
       });
+      // ➡ 다음 작업 칩(QA ④) — 답 경로별 실측 검증 후속 지시. 누르면 그대로 전송.
+      if (P.nextChips) P.nextChips(replyEl, r && r.nextChips, function (q) { submit(q); });
       // 쓰기 지시는 결재판으로 돌아온다 — 대화창에서 바로 확인·승인한다(없으면 막다른 길이다).
       attachApproval(replyEl, r && r.approval);
     } catch (e) {
@@ -1716,6 +1718,3 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 })();
-
-      // ➡ 다음 작업 칩(QA ④) — 답 경로별 실측 검증 후속 지시. 누르면 그대로 전송.
-      if (P.nextChips) P.nextChips(replyEl, r && r.nextChips, function (q) { submit(q); });
