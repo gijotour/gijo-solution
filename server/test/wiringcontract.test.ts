@@ -274,6 +274,22 @@ describe("AI 팀 가시화 — 실신호 배선(2026-08-20 사장님 「추천�
   });
 });
 
+describe("프로 확정 계약 — 메뉴는 카드가 전부(2026-08-20 사장님 ×3 최종)", () => {
+  it("open()이 메뉴성 열기를 카드로 보낸다 — 화면은 dock 명시·쿼리·카드 없음뿐", () => {
+    const s2 = 코드만(join(PAGES, "app.html"));
+    expect(s2, "카드 우선 갈래가 사라졌다 — 같은 요청이 네 번째 반복된다").toContain("카드가 전부");
+    expect(s2, "명시 열기(dock) 신호가 없다").toContain("{ dock: true }");
+    const c2 = 코드만(join(PAGES, "console.js"));
+    expect(c2, "🗔가 dock 신호를 안 단다 — 카드 경로에 먹혀 화면을 영영 못 연다").toContain("gijoTabs.open(page, label, { dock: true })");
+  });
+  it("카드 커버리지 — 전 메뉴 확장(창 예외 제외)", () => {
+    const d = 코드만(join(__dirname, "..", "src", "engine", "datacard.ts"));
+    for (const p of ["sessions.html", "fix.html", "reporting.html", "products.html", "records.html", "threat.html", "aihub.html"]) {
+      expect(d, p + " 카드 매핑이 없다(사장님 「나머지는 카드 다 만들어서」)").toContain(String.fromCharCode(34) + p + String.fromCharCode(34));
+    }
+  });
+});
+
 describe("배선 계약 ⑤층 — 반입 다음 칩", () => {
   it("업로드 응답에 다음 칩이 실리고 클라가 그린다(반입은 nextguide 사각지대)", () => {
     const up = readFileSync(join(__dirname, "..", "src", "engine", "autoupload.ts"), "utf8");

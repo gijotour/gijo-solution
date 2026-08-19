@@ -64,8 +64,8 @@
         이름표[a.name || a.defaultName] = a.id;
         var el = document.getElementById("rr-" + a.id);
         if (!el) return;
-        el.title = (a.name || a.defaultName) + " — " + (a.role || "");
-        if (a.abbr) el.textContent = a.abbr; // 실제 하는 일의 약자(2026-08-20 사장님 — 등록부 단일 출처)
+        // 표시는 아이콘, 약자·이름은 툴팁(2026-08-20 새벽 사장님 정정 — 「아이콘으로 표시하자, 이름은 그대로 두고」)
+        el.title = (a.abbr ? "[" + a.abbr + "] " : "") + (a.name || a.defaultName) + " — " + (a.role || "");
         // working 애니메이션은 llm:event가 켠 것을 폴링이 끄지 않게, 폴링은 watching/기본만 손댄다
         if (!el.classList.contains("working")) el.classList.toggle("watching", a.status === "watching");
         if (a.status === "working") el.classList.add("working");

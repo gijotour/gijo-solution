@@ -1498,7 +1498,7 @@
       if (P.dataCard) P.dataCard(replyEl, r && r.dataCard, {
         navigate: function (page, label) {
           if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) return window.gijo.openTabInShell(page, label);
-          if (window.gijoTabs) { window.gijoTabs.open(page, label); return true; }
+          if (window.gijoTabs) { window.gijoTabs.open(page, label, { dock: true }); return true; } // 🗔=사람이 화면을 열라 한 것
           if (window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(page); return true; }
           return false;
         },
@@ -1732,21 +1732,23 @@
   // 이벤트 카드(🗔)로 붙인다. 숫자·표는 전부 서버 결정적 계산(datacard.ts) — 지어내지 않는다.
   var 화면카드직전 = null;
   var 빈상태원본 = null; // 대화 홈(.cs-empty) 원본 — build가 저장, newSession이 되살린다
+  // 반환: Promise<boolean> — 카드를 띄웠으면 true(셸 open()이 「화면을 열지 않는다」 판단에 쓴다,
+  // 2026-08-20 사장님 확정 「화면 내용은 대화창에」). 같은 화면 연속도 true(카드는 이미 떠 있다).
   function screenCard(page, label) {
     var p = String(page || "").split("?")[0];
-    if (!p) return;
-    if (p === 화면카드직전) return; // 같은 화면 연속 열기엔 도배하지 않는다(다른 화면을 열면 초기화)
-    if (!(window.gijo && window.gijo.screenCard)) return;
+    if (!p) return Promise.resolve(false);
+    if (p === 화면카드직전) return Promise.resolve(true); // 같은 화면 연속 — 도배 안 하되 「카드 있음」
+    if (!(window.gijo && window.gijo.screenCard)) return Promise.resolve(false);
     var scope = 범위 && 범위.kind === "asset" ? String(범위.id) : undefined;
-    window.gijo.screenCard(p, scope).then(function (r) {
-      if (!r || r.none || !r.dataCard) return; // 카드 없는 화면은 조용히 없던 일로
+    return window.gijo.screenCard(p, scope).then(function (r) {
+      if (!r || r.none || !r.dataCard) return false; // 카드 없는 화면 — 셸이 종전대로 연다
       화면카드직전 = p;
       var row = append("event", { icon: "🗔", name: (label || p) + " — 현황", message: "", full: true });
       var P = window.gijoChatParts;
       if (!row || !P) return;
       if (P.dataCard) P.dataCard(row, r.dataCard, {
         navigate: function (pg, lb) {
-          if (window.gijoTabs) { window.gijoTabs.open(pg, lb); return true; }
+          if (window.gijoTabs) { window.gijoTabs.open(pg, lb, { dock: true }); return true; } // 🗔=명시 열기
           if (window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(pg); return true; }
           return false;
         },

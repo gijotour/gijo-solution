@@ -291,11 +291,21 @@ export function 카드없는글로(answer: { output: string; dataCard: DataCard 
 // 메뉴·팔레트로 화면을 열면 셸(app.html open)이 이 라우트를 불러, 그 화면의 현황 카드를
 // 대화창에 자동으로 띄운다. 지시가 아니라 **조회**다 — 대화 기록에 가짜 사용자 발화를 남기지
 // 않으려고 dispatch를 거치지 않는다. 카드가 없는 화면은 none — 지어내지 않는다.
-const 화면파일카드: Record<string, "asset" | "ops" | "hardening" | "finding"> = {
+type 화면카드종류 = "asset" | "ops" | "hardening" | "finding" | "sessions" | "fix" | "report" | "products" | "records" | "threat" | "aiteam";
+const 화면파일카드: Record<string, 화면카드종류> = {
   "assets.html": "asset",
-  "discover.html": "ops", "analysis.html": "ops",
+  "discover.html": "ops", "analysis.html": "ops", "loganalysis.html": "ops",
   "verify.html": "hardening", "hardening.html": "hardening",
   "triage.html": "finding", "vulnscan.html": "finding",
+  // ── 전 메뉴 확장(2026-08-20 사장님 「나머지는 카드 다 만들어서 대화창에」).
+  //    예외(창 유지)는 office·docbox·문서작성·설정뿐 — 맵에 안 넣는 것이 곧 예외 선언이다.
+  "sessions.html": "sessions",
+  "fix.html": "fix", "approvals.html": "fix", "maintenance.html": "fix",
+  "reporting.html": "report", "report.html": "report", "kpi.html": "report",
+  "products.html": "products",
+  "records.html": "records", "audit.html": "records",
+  "threat.html": "threat",
+  "aihub.html": "aiteam", "agent.html": "aiteam",
 };
 
 export function registerScreenCardRoute(app: import("express").Express): void {
@@ -314,8 +324,173 @@ export function registerScreenCardRoute(app: import("express").Express): void {
     }
     const 답 = kind === "asset" ? assetStatusAnswer(scope)
       : kind === "ops" ? await opsStatusAnswer()
-      : hardeningStatusAnswer();
-    const 분기 = kind === "asset" ? "분기:자산현황" : kind === "ops" ? "분기:관제현황" : "분기:검증현황";
+      : kind === "hardening" ? hardeningStatusAnswer()
+      : kind === "sessions" ? sessionsStatusAnswer()
+      : kind === "fix" ? fixStatusAnswer()
+      : kind === "report" ? await reportStatusAnswer()
+      : kind === "products" ? productsStatusAnswer()
+      : kind === "records" ? recordsStatusAnswer()
+      : kind === "threat" ? threatStatusAnswer()
+      : aiteamStatusAnswer();
+    const 분기 = kind === "asset" ? "분기:자산현황" : kind === "ops" ? "분기:관제현황" : kind === "hardening" ? "분기:검증현황"
+      : kind === "fix" ? "분기:내업무" : kind === "report" ? "분기:내업무" : "분기:내업무";
     res.json({ output: 답.output, dataCard: 답.dataCard, nextChips: nextChipsFor(분기) });
   }));
+}
+
+
+// ── 전 메뉴 카드 7종(2026-08-20 사장님 확정) — 숫자는 전부 DB 직접 계산, 표는 급한 순 상한 ──
+export function sessionsStatusAnswer(): { output: string; dataCard: DataCard } {
+  const { listSessions } = require("./worksessions") as typeof import("./worksessions");
+  const 목록 = listSessions(200);
+  const 최근 = 목록.slice().sort((a, b) => ((b as { updatedAt?: number }).updatedAt || 0) - ((a as { updatedAt?: number }).updatedAt || 0)).slice(0, 8);
+  const dataCard: DataCard = {
+    title: "작업 내역 — 대화 세션",
+    kpis: [
+      { label: "저장된 세션", value: String(목록.length) },
+      { label: "오늘 갱신", value: String(목록.filter((x) => Date.now() - ((x as { updatedAt?: number }).updatedAt || 0) < 86400000).length), color: "ok" },
+    ],
+    screen: { page: "sessions.html", label: "작업 내역" },
+    pickKey: "t",
+    table: {
+      cols: [{ key: "t", label: "제목" }, { key: "d", label: "갱신" }],
+      shown: 최근.map((x) => ({ t: String((x as { title?: string }).title || "(제목 없음)").slice(0, 60), d: new Date((x as { updatedAt?: number }).updatedAt || 0).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) })),
+      totalCount: 목록.length,
+    },
+  };
+  return { output: `작업 내역 — 저장된 세션 ${목록.length}건. 최근 것부터 카드로 보였습니다 — 이어서 보려면 행을 고르거나 🗔로 여세요.`, dataCard };
+}
+
+export function fixStatusAnswer(): { output: string; dataCard: DataCard } {
+  const { listFindingReviews } = require("./approvals") as typeof import("./approvals");
+  const { listMaintenanceItems } = require("./maintenance") as typeof import("./maintenance");
+  const rv = listFindingReviews();
+  const 대기 = rv.filter((r) => String(r.status) === "pending");
+  const mt = listMaintenanceItems();
+  const today = new Date().toISOString().slice(0, 10);
+  const 지연 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled" && String((m as { scheduleDate?: string }).scheduleDate || "") <= today).length;
+  const 예정 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled").length;
+  const dataCard: DataCard = {
+    title: "조치 — 승인·점검 현황",
+    kpis: [
+      { label: "검토 대기", value: String(대기.length), color: 대기.length ? "warn" : "ok" },
+      { label: "정기점검 예정", value: String(예정) },
+      { label: "점검 지연", value: String(지연), color: 지연 ? "bad" : "ok" },
+    ],
+    screen: { page: "fix.html", label: "조치" },
+    pickKey: "t",
+    table: 대기.length ? {
+      cols: [{ key: "t", label: "항목" }, { key: "a", label: "자산" }],
+      shown: 대기.slice(0, 8).map((r) => ({ t: String(r.finding?.finding_type || r.findingKey || "").slice(0, 50), a: String(r.assetName || "") })),
+      totalCount: 대기.length,
+    } : undefined,
+  };
+  return { output: `조치 현황 — 검토 대기 ${대기.length}건 · 정기점검 예정 ${예정}건(지연 ${지연}건).`, dataCard };
+}
+
+export async function reportStatusAnswer(): Promise<{ output: string; dataCard: DataCard }> {
+  const rp = require("./report") as typeof import("./report");
+  const 이력 = await rp.listReportHistory(50);
+  const 스케줄 = (rp as unknown as { listSchedules?: () => unknown[] }).listSchedules ? (rp as unknown as { listSchedules: () => unknown[] }).listSchedules() : [];
+  const dataCard: DataCard = {
+    title: "보고 — 리포트 현황",
+    kpis: [
+      { label: "만든 리포트", value: String(이력.length) },
+      { label: "정기 스케줄", value: String(스케줄.length), color: 스케줄.length ? "ok" : "muted" },
+    ],
+    screen: { page: "reporting.html", label: "보고" },
+    pickKey: "t",
+    table: 이력.length ? {
+      cols: [{ key: "t", label: "리포트" }, { key: "d", label: "생성" }],
+      shown: 이력.slice(0, 6).map((h) => ({ t: String((h as { title?: string; base?: string }).title || (h as { base?: string }).base || "리포트").slice(0, 50), d: new Date((h as { createdAt?: number }).createdAt || 0).toLocaleDateString("ko-KR") })),
+      totalCount: 이력.length,
+    } : undefined,
+  };
+  return { output: `보고 현황 — 만든 리포트 ${이력.length}건 · 정기 스케줄 ${스케줄.length}건.`, dataCard };
+}
+
+export function productsStatusAnswer(): { output: string; dataCard: DataCard } {
+  const { listProducts } = require("./securityproducts") as typeof import("./securityproducts");
+  const 목록 = listProducts();
+  const 종류 = new Set(목록.map((p) => (p as { category?: string }).category || "기타")).size;
+  const dataCard: DataCard = {
+    title: "보안제품 — 등록 현황",
+    kpis: [
+      { label: "등록 제품", value: String(목록.length), color: 목록.length ? "ok" : "muted" },
+      { label: "종류", value: String(종류) },
+    ],
+    screen: { page: "products.html", label: "보안제품" },
+    pickKey: "n",
+    table: 목록.length ? {
+      cols: [{ key: "n", label: "제품" }, { key: "c", label: "종류" }, { key: "v", label: "제조사" }],
+      shown: 목록.slice(0, 8).map((p) => ({ n: String((p as { name?: string }).name || ""), c: String((p as { category?: string }).category || ""), v: String((p as { vendor?: string }).vendor || "") })),
+      totalCount: 목록.length,
+    } : undefined,
+  };
+  return { output: 목록.length ? `보안제품 — 등록 ${목록.length}개(${종류}종류).` : "보안제품 — 아직 등록된 제품이 없습니다. 대화창에서 \"방화벽 ○○ 등록해줘\"로 등록합니다(승인 후 반영).", dataCard };
+}
+
+export function recordsStatusAnswer(): { output: string; dataCard: DataCard } {
+  const { listAudit } = require("./audit") as typeof import("./audit");
+  const 최근 = listAudit({ limit: 500 });
+  const 하루 = 최근.filter((e) => Date.now() - e.at < 86400000);
+  const 차단 = 하루.filter((e) => e.result === "blocked").length;
+  const dataCard: DataCard = {
+    title: "기록 — 작업 감사(24시간)",
+    kpis: [
+      { label: "오늘 기록", value: String(하루.length) },
+      { label: "차단", value: String(차단), color: 차단 ? "warn" : "ok" },
+    ],
+    screen: { page: "records.html", label: "기록" },
+    pickKey: "a",
+    table: 하루.length ? {
+      cols: [{ key: "k", label: "종류" }, { key: "a", label: "행위" }, { key: "w", label: "행위자" }],
+      shown: 하루.slice(0, 8).map((e) => ({ k: String(e.kind), a: String(e.action || "").slice(0, 50), w: String(e.actor || "-") })),
+      totalCount: 하루.length,
+    } : undefined,
+  };
+  return { output: `작업 기록 — 24시간 ${하루.length}건(차단 ${차단}건). 누가 언제 무엇을 했는지 그대로 남습니다.`, dataCard };
+}
+
+export function threatStatusAnswer(): { output: string; dataCard: DataCard } {
+  const { listFeeds } = require("./cti") as typeof import("./cti");
+  const 피드 = listFeeds();
+  const dataCard: DataCard = {
+    title: "위협 인텔 — CTI 피드",
+    kpis: [
+      { label: "구독 피드", value: String(피드.length), color: 피드.length ? "ok" : "muted" },
+    ],
+    screen: { page: "threat.html", label: "위협" },
+    pickKey: "n",
+    table: 피드.length ? {
+      cols: [{ key: "n", label: "피드" }, { key: "c", label: "항목" }],
+      shown: 피드.slice(0, 6).map((f) => ({ n: String((f as { name?: string; url?: string }).name || (f as { url?: string }).url || ""), c: String((f as { itemCount?: number; items?: number }).itemCount ?? (f as { items?: number }).items ?? "-") })),
+      totalCount: 피드.length,
+    } : undefined,
+  };
+  return { output: 피드.length ? `위협 인텔 — 구독 피드 ${피드.length}개. 우리 자산과의 매칭은 "새로 올라온 위협 중 우리 자산에 해당하는 게 있어?"로 물으면 근거와 함께 답합니다.` : "위협 인텔 — 구독 피드가 아직 없습니다.", dataCard };
+}
+
+export function aiteamStatusAnswer(): { output: string; dataCard: DataCard } {
+  const { getTeamComposition } = require("./teamview") as typeof import("./teamview");
+  const { listAgents } = require("./agents") as typeof import("./agents");
+  const c = getTeamComposition();
+  const agents = listAgents();
+  const 일하는중 = agents.filter((a) => a.status === "working").length;
+  const dataCard: DataCard = {
+    title: "AI 팀 — 구성 현황",
+    kpis: [
+      { label: "팀원", value: String(agents.length) },
+      { label: "작업 중", value: String(일하는중), color: 일하는중 ? "ok" : "muted" },
+      { label: "어댑터", value: `${c.adapters?.adopted ?? 0}/${c.adapters?.registered ?? 0}`, color: (c.adapters?.adopted ?? 0) ? "ok" : "muted" },
+    ],
+    screen: { page: "aihub.html?panel=team", label: "AI 팀" },
+    pickKey: "n",
+    table: {
+      cols: [{ key: "ab", label: "약자" }, { key: "n", label: "이름" }, { key: "r", label: "역할" }],
+      shown: agents.map((a) => ({ ab: String(a.abbr || ""), n: String(a.name || a.defaultName), r: String(a.role || "").slice(0, 40) })),
+      totalCount: agents.length,
+    },
+  };
+  return { output: `AI 팀 — 팀원 ${agents.length}명 · 작업 중 ${일하는중}명 · 어댑터 채택 ${c.adapters?.adopted ?? 0}/${c.adapters?.registered ?? 0}${(c.adapters?.adopted ?? 0) === 0 ? "(준비 중)" : ""}.`, dataCard };
 }

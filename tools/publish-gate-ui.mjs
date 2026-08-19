@@ -143,7 +143,7 @@ ok("취약점형: 배정 칩", 취약.chips.some((c) => /담당자 배정/.test(
 await 셸.evaluate(() => window.postMessage({ type: "gijo:select" }, "*")); // 해제
 
 // ── ② 감사(작업 기록) 행 배선 + 허브 릴레이 ─────────────────────────────
-await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("records.html", "기록"));
+await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("records.html", "기록", { dock: true }));
 const auditFrame = await 프레임찾기("audit.html");
 ok("records 무대(audit) 로드", !!auditFrame);
 if (auditFrame) {
@@ -173,7 +173,7 @@ if (auditFrame) {
 //   2026-08-02)이라 도킹으로 열면 assets로 넘어가 프레임이 없다. 팝업 시절(5.38까지)엔
 //   리다이렉트를 안 타 우연히 통과했다. assets 부품은 ④′(assets를 여는 검사) 뒤에서 확인.
 for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점검"], ["report.html", "보고"], ["learnloop.html", "학습"]]) {
-  await 셸.evaluate(({ pg, lbl }) => window.gijoTabs && window.gijoTabs.open(pg, lbl), { pg, lbl });
+  await 셸.evaluate(({ pg, lbl }) => window.gijoTabs && window.gijoTabs.open(pg, lbl, { dock: true }), { pg, lbl });
   const fr = await 프레임찾기(pg, 8);
   const has = fr ? await fr.evaluate(() => typeof window.gijoSelectNotify === "function").catch(() => false) : false;
   ok("부품 로드: " + pg, has, fr ? "" : "프레임 못 찾음");
@@ -181,7 +181,7 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
 
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──
 const 카드전 = await 셸.evaluate(() => document.querySelectorAll(".dc-card").length);
-await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기"));
+await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기")); // 무dock=메뉴성 — 카드만 떠야 한다(사장님 확정 계약)
 let 자동카드 = false;
 for (let i = 0; i < 10 && !자동카드; i++) {
   await new Promise((r) => setTimeout(r, 1000));
@@ -190,9 +190,15 @@ for (let i = 0; i < 10 && !자동카드; i++) {
     return cards.length > n && cards.some((c) => (c.textContent || "").includes("자산 — 등록 현황"));
   }, 카드전);
 }
-ok("화면 열기 → 현황 카드 자동(assets)", 자동카드);
+ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
+{
+  // ★ 확정 계약(2026-08-20 사장님 ×3): 메뉴성 열기는 화면을 열지 않는다 — 카드가 전부.
+  const 안열림 = !(ctx.pages().some((p) => p.frames().some((f) => f.url().includes("assets.html"))));
+  ok("메뉴 열기는 화면을 열지 않는다(카드가 전부)", 안열림);
+}
 // assets 부품 확인 — 방금 ④′가 assets를 열었으니 프레임이 살아 있다(순서 계약).
 {
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기", { dock: true })); // 부품 확인은 진짜 열어서
   const fr = await 프레임찾기("assets.html", 6);
   const has = fr ? await fr.evaluate(() => typeof window.gijoSelectNotify === "function").catch(() => false) : false;
   ok("부품 로드: assets.html", has, fr ? "" : "프레임 못 찾음");
@@ -233,7 +239,7 @@ const 가시화 = await 셸.evaluate(async () => {
 ok("레일 로스터 10개(팀6+부품4)", 가시화.로스터수 === 10, "개수=" + 가시화.로스터수);
 ok("로스터 약자(등록부 단일 출처) 반영", 가시화.약자적용 === 6, "약자 " + 가시화.약자적용 + "/6");
 {
-  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("dashboard.html", "대시보드"));
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("dashboard.html", "대시보드", { dock: true }));
   const df = await 프레임찾기("dashboard.html", 8);
   const r = df ? await df.evaluate(() => {
     const 카드 = document.getElementById("aiteamRow");

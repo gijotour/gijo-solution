@@ -512,7 +512,7 @@
     try { return JSON.parse(localStorage.getItem("gijo:scope:asset") || "null"); } catch (e) { return null; }
   }
 
-  function open(page, label) {
+  function open(page, label, opts) {
     if (!page) return;
     // 🚀 프로 팝업(사장님 지시 2026-08-19 「내용은 팝업으로, 나눠서 보이는 것보다」):
     //   프로 셸에서 화면은 탭이 아니라 **별도 창**으로 뜬다. 대화는 늘 전폭(chat-home 상시).
@@ -522,6 +522,20 @@
       // 이 화면이 ⧉로 창에 떠 있으면 먼저 닫는다(검토관 S2 — ④ 폐지로 「떠 있으면 포커스」
       // 갈래가 죽어, 메뉴 재선택 시 팝업+도킹 두 벌이 생겼다). 메뉴 선택 = 도킹으로 일원화.
       try { if (window.gijo.closeShellPopout) window.gijo.closeShellPopout(page); } catch (e) { }
+      // ★ 프로 확정(2026-08-20 사장님, 같은 요청 3회 끝의 최종 계약 — 「화면 내용은 대화창에」):
+      //   메뉴성 열기(쿼리 없는 page)는 화면을 열지 않는다 — 카드가 전부다. 화면(도킹)은
+      //   ① 카드의 🗔(opts.dock — 사람 명시) ② 쿼리 딥링크(특정 상태를 보려는 것)
+      //   ③ 카드가 없는 화면(창 예외·아직 카드 미신설)뿐이다. 카드 없는 화면이 줄어드는
+      //   것이 이 계약의 진행률이다(datacard 화면파일카드가 단일 출처).
+      if (!(opts && opts.dock) && page.indexOf("?") < 0 && !부팅복원중 &&
+          !document.body.classList.contains("console-popped") &&
+          window.gijoConsole && window.gijoConsole.screenCard) {
+        window.gijoConsole.screenCard(page, label).then(function (shown) {
+          if (shown) { 대화홈갱신(); return; } // 카드가 전부 — 화면은 🗔로만
+          open(page, label, { dock: true });   // 카드 없는 화면 — 종전 도킹
+        });
+        return;
+      }
       // 🚀 도킹 규칙(승인 시안 프로_도킹패널 §3 — 순서가 안전성의 전부다):
       //   ① 그 화면이 이미 도킹돼 있다 → 그 패널만 다시 보인다.
       //   ② 이미 팝업으로 떠 있다 → openShellPopout이 기존 창을 포커스한다(main.ts 기존 동작).
@@ -637,7 +651,7 @@
     if (window.gijo && window.gijo.onShellOpenTab) {
       // 지휘소가 "이 화면 열어 주세요" 하면 탭으로 연다(셸을 갈아치우지 않는다).
       window.gijo.onShellOpenTab(function (i) {
-        if (i && i.page && window.gijoTabs) window.gijoTabs.open(i.page, i.label || undefined);
+        if (i && i.page && window.gijoTabs) window.gijoTabs.open(i.page, i.label || undefined, { dock: true }); // IPC 열기=명시 의도(분리창 🗔 등)
       });
     }
     if (popped && window.gijo && window.gijo.sendConsoleContext) {
@@ -713,7 +727,7 @@
   // ★ 프로 셸 이탈 금지(2026-08-19 사장님 실사고) — 구식 통로(navigateTo)가 본창을 화면
   //   파일로 직접 로드하려 하면 main이 여기로 승격해 보낸다. 셸은 절대 안 무너진다.
   if (window.gijo && window.gijo.onOpenTabPush) {
-    window.gijo.onOpenTabPush(function (page) { if (page) open(page); });
+    window.gijo.onOpenTabPush(function (page) { if (page) open(page, null, { dock: true }); }); // 승격 안전망=열기 의도
   }
 
   window.gijoTabs = {
