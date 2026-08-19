@@ -799,7 +799,11 @@
       var page = String(d.page);
       if (!/^[\w.-]+\.html(\?[^\s"'<>`\\]*)?$/.test(page)) return;
       var known = window.gijoMenuLabel ? window.gijoMenuLabel(page) : null;
-      open(page, d.label || known || page);
+      // dock 명시 — 화면 안에서의 열기 부탁(바로가기 타일·무대 릴레이·「가서 하기」)은 사람이
+      // 그 화면을 보겠다고 누른 것이라 메뉴성이 아니다(확정 계약의 dock 경로 5곳 중 하나인데
+      // 이 자리만 빠져 있었다 — 종전엔 screenCard 결함이 무조건 도킹시켜 가려졌고, 관문
+      // 「허브 릴레이」가 잡았다).
+      open(page, d.label || known || page, { dock: true });
       return;
     }
     // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.
