@@ -765,7 +765,7 @@
       }
       try { localStorage.setItem("gijo:pro:dockpref:v1", "dock"); } catch (e) { }
       if (window.gijo.closeShellPopout) window.gijo.closeShellPopout(붙일);
-      open(붙일);
+      open(붙일, String(d.label || "").slice(0, 40) || undefined);
       return;
     }
     if (d.type === "gijo:scope") {
