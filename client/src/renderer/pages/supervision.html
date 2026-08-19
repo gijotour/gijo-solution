@@ -7,12 +7,11 @@
 <!--
   AI 팀 감독(2026-08-20 사장님 승인 ② — 「에이전트 감독도 필요할 것 같은데」).
   승인 시안: mockups/agent-supervision/시안.html — 카드(대화창 요약)+이 무대 화면(상세) 2단.
-  ■ 숫자는 전부 서버 실측 두 원천뿐이다(지어내는 칸 없음):
-    · 호출 수 = chat_logs(영속 — 과거 기간 즉시 가능)
-    · 응답·오류 = llm_activity_daily(도입일 2026-08-20부터 축적 — 그 전 기간은 "-"가 정직)
+  ■ 숫자 원천은 llm_activity_daily 하나다(도입일 2026-08-20부터 축적 — 그 전 기간은 0/"-"가
+    정직). chat_logs로 세지 않는다: 학습 자동수집 스위치를 끄면 전 팀원이 거짓 0이 된다(검토관 중7).
   ■ 화면에 입력칸 없음(지시는 대화창) — 조작은 기간 전환과 행 선택(📌)뿐.
-  ■ 폴백(모델 미배정) 경고는 두지 않는다 — 재설계(2026-08-08)로 팀원별 모델 배정 개념이
-    없어졌다(기반 두뇌 1개 + 전문성). 죽은 경고를 두면 화면이 거짓말을 한다.
+  ■ 폴백(모델 미배정) 경고는 두지 않는다 — 기본 설계가 기반 두뇌 1개+전문성(2026-08-08)이라
+    미배정=기본 두뇌 사용이 정상이다(배정 UI는 남아 있으나 예외 경로 — 경고 대상이 아니다).
 -->
 <style>
 :root{
@@ -131,8 +130,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       '<div class="kpi"><span>무호출 팀원</span><b>' + 무호출.length + "</b></div>";
 
     // 일별 미니 막대 — 최근 N일 축(빈 날은 0). 최대값 기준 상대 높이(실측 상대 비교용).
+    // ⚠ 로컬(KST) 달력으로 — toISOString은 UTC라 0~9시에 「오늘」이 어제가 된다(검토관 중6).
     var 날들 = [];
-    for (var i = days - 1; i >= 0; i--) 날들.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+    for (var i = days - 1; i >= 0; i--) {
+      var t = new Date(Date.now() - i * 86400000);
+      날들.push(new Date(t.getTime() - t.getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+    }
 
     document.getElementById("grid").innerHTML = agents.map(function (a) {
       var m = byAgent[a.id] || { calls: 0, errors: 0, lat: 0, byDay: {} };
@@ -181,6 +184,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     Array.prototype.forEach.call(document.querySelectorAll("#range button"), function (x) { x.classList.remove("on"); });
     b.classList.add("on");
     days = Number(b.getAttribute("data-d")) || 1;
+    // 다시 그리면 화면의 📌 표시가 사라진다 — 대화창의 선택도 함께 해제해 어긋남을 막는다
+    // (검토관 하6 — 무인자 호출이 해제 규격).
+    if (선택행 && window.gijoSelectNotify) { try { window.gijoSelectNotify(); } catch (e) { } }
+    선택행 = null;
     load();
   });
 

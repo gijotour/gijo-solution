@@ -108,7 +108,9 @@
     if (g.onLlmActivity) g.onLlmActivity(function (e) {
       if (!e || !e.kind) return;
       if (e.kind === "chat") {
-        var id = 이름표[e.agent] || null;
+        // e.agent가 id로 오면 그대로, 표시명으로 오면 이름표로 — 서버가 id+agentName 병행
+        // 송신으로 바뀌었다(검토관 상1: 집계는 id, 사람 눈은 agentName).
+        var id = 이름표[e.agent] || e.agent || null;
         if (!id) return;
         if (e.phase === "start") 켬(id);
         else 끔(id);

@@ -8,7 +8,7 @@ import { listFindingReviews, updateFindingReview } from "./approvals";
 import { listAssets, deleteAsset } from "./assets";
 import { recordAudit } from "./audit";
 
-interface ReviewState { status: string; assignee: string; dueDate: string; note: string }
+interface ReviewState { status: string; assignee: string; dueDate: string; note: string; acceptUntil: string } // acceptUntil 없이는 accepted 복원이 서버 검증(기한 필수)에 막힌다(검토관 중2)
 interface Snapshot {
   reviews: Map<string, ReviewState>;
   assetIds: Set<string>;
@@ -49,14 +49,15 @@ function snapshotReviews(): Map<string, ReviewState> {
       assignee: r.assignee ?? "",
       dueDate: r.dueDate ?? "",
       note: r.note ?? "",
+      acceptUntil: r.acceptUntil ?? "",
     });
   }
   return m;
 }
 
-const DEFAULT_STATE: ReviewState = { status: "pending", assignee: "", dueDate: "", note: "" };
+const DEFAULT_STATE: ReviewState = { status: "pending", assignee: "", dueDate: "", note: "", acceptUntil: "" };
 function sameState(a: ReviewState, b: ReviewState): boolean {
-  return a.status === b.status && a.assignee === b.assignee && a.dueDate === b.dueDate && a.note === b.note;
+  return a.status === b.status && a.assignee === b.assignee && a.dueDate === b.dueDate && a.note === b.note && a.acceptUntil === b.acceptUntil;
 }
 
 // 승인 실행 직전에 호출 — 현재 상태를 담아둔다.
@@ -98,7 +99,13 @@ export function performUndo(id?: string, actor?: string): { ok: boolean; message
   if (idx < 0) return { ok: false, message: "되돌릴 작업이 없습니다." };
   const entry = undoStack.splice(idx, 1)[0];
   for (const r of entry.restoreReviews) {
-    updateFindingReview(r.assetId, r.key, { status: r.prior.status as import("./approvals").ApprovalStatus, assignee: r.prior.assignee, dueDate: r.prior.dueDate, note: r.prior.note }, "undo");
+    // ⚠ 복원이 서버 검증(위험수용 기한·사유 필수 등)에 막혀도 스택 항목은 이미 지웠으므로
+    //   남은 건은 계속 복원하고 실패만 모아 알린다 — 중간에서 throw하면 영구 복구 불가(중2).
+    try {
+      updateFindingReview(r.assetId, r.key, { status: r.prior.status as import("./approvals").ApprovalStatus, assignee: r.prior.assignee, dueDate: r.prior.dueDate, note: r.prior.note, acceptUntil: r.prior.acceptUntil ?? "" }, "undo");
+    } catch (err) {
+      console.warn(`[undo] 검토 복원 실패(${r.assetId}/${r.key}): ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
   // ⚠ **지우기 전에 이름을 읽어 둔다.** 지운 뒤에는 못 읽는다(하드 삭제라 행이 사라진다) —
   //   그러면 감사에 내부 id만 남아 「무엇을 지웠나」를 영영 못 읽는다.

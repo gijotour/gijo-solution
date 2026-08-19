@@ -768,7 +768,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     .then((m) => m.agentRequestExtras(args.agentId))
     .catch(() => ({}) as Record<string, unknown>);
 
-  emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: "추론 요청" });
+  emitLlmActivity({ kind: "chat", phase: "start", agent: args.agentId ?? "-", agentName, detail: "추론 요청" });
 
   // json_schema와 grammar는 llama.cpp에서 동시에 못 쓴다 — 스키마 강제 시 스키마가 우선.
   const constrained = args.responseSchema
@@ -789,7 +789,7 @@ export async function chat(args: ChatArgs): Promise<string> {
 
   if (res === "timeout") {
     // GPU가 학습·병렬 작업에 잡혀 요청이 무한 대기하는 것을 상한으로 끊는다(실측: 채팅 5분 행).
-    emitLlmActivity({ kind: "chat", phase: "error", agent: agentName, detail: `응답 시간 초과(${Math.round(LLM_TIMEOUT_MS / 1000)}s)` });
+    emitLlmActivity({ kind: "chat", phase: "error", agent: args.agentId ?? "-", agentName, detail: `응답 시간 초과(${Math.round(LLM_TIMEOUT_MS / 1000)}s)` });
     return `⚠ 로컬 LLM 응답이 제한 시간(${Math.round(LLM_TIMEOUT_MS / 1000)}초)을 초과했습니다. GPU가 학습이나 다른 작업을 처리 중일 수 있습니다 — 잠시 후 다시 시도하세요.`;
   }
 
@@ -819,7 +819,7 @@ export async function chat(args: ChatArgs): Promise<string> {
         ` · baseUrl=${baseUrl} · 프롬프트 ${프롬프트길이}자 · lora=${JSON.stringify(loraExtras)}` +
         ` · 스키마=${args.responseSchema ? "있음" : "없음"} · 스트림=${싱크 ? "예" : "아니오"}`,
     );
-    emitLlmActivity({ kind: "chat", phase: "error", agent: agentName, detail: `로컬 LLM 실패 — ${진단.slice(0, 120)}` });
+    emitLlmActivity({ kind: "chat", phase: "error", agent: args.agentId ?? "-", agentName, detail: `로컬 LLM 실패 — ${진단.slice(0, 120)}` });
     // 최종 사용자용 안내(개발자용 원인 대신). 두 경로를 함께 제시한다:
     // ① 이 PC에서 완결 — 설정 > 서버·AI에서 모델 내려받아 로드  ② 사내 GPU 서버에 연결 — 설정에서 서버 주소 입력.
     return "⚠ AI 모델이 아직 준비되지 않았습니다. 다음 중 하나로 해결하세요 — ① 설정 > 서버·AI > 모델 검색·받기에서 모델을 내려받아 로드, 또는 ② 설정에서 모델이 있는 사내 GPU 서버 주소를 입력해 연결.";
@@ -842,7 +842,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     emitLlmActivity({
       kind: "chat",
       phase: "done",
-      agent: agentName,
+      agent: args.agentId ?? "-", agentName,
       model: modelBasename(data.model),
       promptTokens: data.usage?.prompt_tokens,
       completionTokens: data.usage?.completion_tokens,
@@ -884,7 +884,7 @@ export async function chat(args: ChatArgs): Promise<string> {
       : null;
 
   if (drift) {
-    emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: drift.detail });
+    emitLlmActivity({ kind: "chat", phase: "start", agent: args.agentId ?? "-", agentName, detail: drift.detail });
     const retryMessages = [...messages, { role: "assistant", content: rawContent }, { role: "user", content: drift.instruction }];
     const retryRes = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
@@ -922,7 +922,7 @@ export async function chat(args: ChatArgs): Promise<string> {
       reply = salvaged
         ? salvaged
         : "답변을 만들지 못했습니다(내부 지시문이 섞여 걷어냈습니다). 질문을 조금 더 구체적으로 적어 다시 시도해 주세요.";
-      emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: salvaged ? "복창 문장 제거" : "복창 지속 — 답변 대체" });
+      emitLlmActivity({ kind: "chat", phase: "start", agent: args.agentId ?? "-", agentName, detail: salvaged ? "복창 문장 제거" : "복창 지속 — 답변 대체" });
     }
   }
 
@@ -975,7 +975,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   emitLlmActivity({
     kind: "chat",
     phase: "done",
-    agent: agentName,
+    agent: args.agentId ?? "-", agentName,
     model: modelBasename(data.model),
     promptTokens: data.usage?.prompt_tokens,
     completionTokens: data.usage?.completion_tokens,

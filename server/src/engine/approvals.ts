@@ -108,7 +108,9 @@ export function isFindingRejected(assetId: string, f: StandardFinding): boolean 
 
 // 조치 기한이 지났고 아직 미해결이면 overdue. 반려(오탐/보상통제)·완료(해결)는 조치 대상이 아니라 제외.
 function isOverdue(dueDate: string | null | undefined, status: ApprovalStatus): boolean {
-  if (!dueDate || status === "rejected" || status === "approved") return false;
+  // accepted(위험수용)도 제외 — 수용 중 SLA 기한이 지나도 「지연」이 아니다(기한 관리는
+  // acceptUntil이 맡고, 만료는 acceptExpired로 따로 센다 — 검토관 중1: 빨간 점+수용 표기 충돌).
+  if (!dueDate || status === "rejected" || status === "approved" || status === "accepted") return false;
   return dueDate < todayLocal(); // 'YYYY-MM-DD' 로컬(KST) 달력 기준 비교
 }
 
@@ -225,7 +227,7 @@ export function prioritizedReviews(limit = 10, assetIds?: string[]): Prioritized
     .filter((r) => r.status !== "rejected" && r.finding.state !== "fixed")
     // 위험수용(accepted)은 기한 안이면 일감이 아니다 — 기한이 지나면 다시 부상한다
     // (재검토 대상 — 감춰지는 게 아니라 「수용 만료」로 돌아온다. 승인 화면에는 늘 보인다).
-    .filter((r) => !(r.status === "accepted" && r.acceptUntil && r.acceptUntil >= new Date().toISOString().slice(0, 10)))
+    .filter((r) => !(r.status === "accepted" && r.acceptUntil && r.acceptUntil >= todayLocal()))
     .filter((r) => !scope || scope.has(r.assetId))
     .map((r) => ({ ...r, score: priorityScore(r.finding) }))
     .sort((a, b) => b.score - a.score)
@@ -248,7 +250,7 @@ export function assetProgress(assetId: string): { inProgress: number; unassigned
       if (r.assetId !== assetId) continue;
       if (!isRealVulnerability(r.finding)) continue;   // 스캔 오류는 취약점이 아니다
       if (r.status === "in_progress") inProgress++;
-      if (!r.assignee && r.status !== "approved" && r.status !== "rejected") unassigned++;
+      if (!r.assignee && r.status !== "approved" && r.status !== "rejected" && r.status !== "accepted") unassigned++; // 수용 건은 담당자를 안 붙이는 게 정상(중3)
     }
   } catch { /* 대장을 못 읽으면 0 — 화면은 「—」로 그린다 */ }
   return { inProgress, unassigned };
@@ -314,7 +316,7 @@ export function approvalSummary(reviews: FindingReview[]): ApprovalSummary {
   //   감추지 않는다: scanFailed로 따로 세어 "스캔이 안 된 자산"이라는 다른 일감으로 보여준다.
   const 일감 = reviews.filter((r) => isRealVulnerability(r.finding));
   const s: ApprovalSummary = { total: 일감.length, pending: 0, in_progress: 0, verifying: 0, approved: 0, rejected: 0, accepted: 0, acceptExpired: 0, overdue: 0, scanFailed: reviews.length - 일감.length };
-  const 오늘 = new Date().toISOString().slice(0, 10);
+  const 오늘 = todayLocal();
   for (const r of 일감) {
     s[r.status]++;
     if (r.overdue) s.overdue++;

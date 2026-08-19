@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS 프로 셸 — 흰 바탕(화이트 테마) 시안</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  시안 근거 · 조사(설계 전 조사 원칙) — mockups/pro-white/시안.html
+  ════════════════════════════════════════════════════════════════════════
+  배경: 2026-08-20 사장님 확정 — 에디션 3종 배색 지도.
+    라이트=연초록 · 표준(화면 중심)=다크 유지 · 프로(대화 중심·메인)=흰 바탕.
+    원문: 「나는 흰색 바탕이 좋긴 한데」+「대화로 하는 제품 프로를 메인으로 하기로 했잖아」.
+
+  실제 화면에서 가져온 값(새로 지어내지 않음):
+    · client/src/renderer/pages/app.html:10-11 — 프로 셸 :root 다크 토큰
+      (--bg #262624 · --panel #30302e · --panel-2 #1f1e1d · --border rgba(255,255,255,.08)
+       · --border-strong rgba(255,255,255,.16) · --blue #3b82f6 · --blue-light #5fa1ff
+       · --text #e9e7e2 · --muted #b3ada4 · --muted-2 #a49d95 · --teal #1eb980
+       · --red #e2483d · --amber #f0a020)
+    · app.html:46-107 — 레일 56px(054행) · 아이콘 38×38px(064행) · 상단줄 44px(132행)
+      · 무대 10px 틈 + box-shadow 0 20px 34px rgba(0,0,0,.45)(104-107행)
+    · console.js:35-257 — 콘솔 CSS(히어로 46vh·50행, 도킹 190px 고정은 app.html:213)
+    · chatparts.js:60-108 — 데이터 카드(KPI 7px 11px 패딩·66행) · 히트맵 타일
+      (min 118px·84행, 판정값 11px — "가독성 계약(11px 미만 금지)에 맞춰 10→11px로 올렸다"·90행)
+    · railroster.js:24-33 — 레일 구성: 고정 5(☰🕘⭐🗔💬) + 팀 6(🧭◣◎▣🛰📚) + 부품 4(E R G L)
+      = 실제 15개. ⚠ 이번 요청 문구의 "10개"보다 많다 — 기억이 아니라 지금 코드를 따랐다
+      (railroster.js는 2026-08-20 당일 새로 붙은 화면이라 요청 작성 시점과 어긋났을 가능성이 큼).
+    · gijo-ui.css:53 — 타이포 스케일 최소 11px(--g-t-xs) · 348행 표 밀도(padding 3px 10px, 1.35)
+    · app.html:1209-1220 — 무대 머리(dockHead) 마크업·스타일 그대로 재현.
+
+  웹 조사(2026-08-20, 화이트 테마 설계 근거):
+    1) 순백(#fff) 전면 배경은 눈부심·피로를 유발하며, Material Design도 다크 표면을 순검정
+       대신 #121212 근방으로 두듯 라이트에서도 카드류만 순백을 쓰고 캔버스는 옅은 오프화이트를
+       권장한다 — "off-white reduces glare and eye strain, especially for long-form reading".
+       [Pure Black and Pure White in UI Design](https://supercharge.design/articles/pure-black-and-pure-white-in-ui-design)
+       [6 Alternative whites for your designs](https://medium.com/@Your_Designer_Babe/6-alternative-whites-for-your-designs-0617edb98a1a)
+    2) WCAG 2.1 AA 본문 대비 하한 4.5:1, 계산식 L=0.2126R+0.7152G+0.0722B(선형화 후),
+       대비=(L1+0.05)/(L2+0.05). [WCAG G18](https://www.w3.org/WAI/WCAG21/Techniques/general/G18)
+       [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/)
+    3) 라이트/다크 우열은 과업 성격에 갈린다 — "light mode provides better readability and
+       cognitive performance"는 특히 reading 비중이 큰 앱에서, 반대로 "dark mode improves
+       contrast … for data-heavy monitoring dashboards"는 시각 밀도가 높은 관제 화면에서
+       유리하다는 것이 2025 ETRA 안구추적 연구 등의 공통 결론이다. → 프로(대화=읽기 중심)는
+       라이트가 유리한 쪽, 표준(화면=관제 중심)은 다크를 유지하는 이번 결정과 정확히 들어맞는다.
+       [ETRA 2025 Dark/Light Eye Tracking Study](https://dl.acm.org/doi/10.1145/3715669.3725879)
+       [Dark Mode vs Light Mode UX Guide 2025](https://altersquare.medium.com/dark-mode-vs-light-mode-the-complete-ux-guide-for-2025-5cbdaf4e5366)
+
+  이 파일이 하는 일: 셸(레일·대화 홈·데이터 카드·무대 머리)의 화이트 배색 시안 1개.
+  이 파일이 하지 않는 일: 도킹되는 실제 화면 20여 종(inventory.html 등)의 다크 :root 전환 —
+    장면 C의 표는 "그 화면이 흰 배색이면 이렇게 보인다"는 참고 재현일 뿐 실제 코드가 아니다.
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+  /* ── 문서 바깥 껍데기(제품과 무관한 설명용 페이지 — 별도 중립 색) ───────── */
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#efeeea;color:#232220;line-height:1.6;}
+  .docwrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px;}
+  .dochead h1{font-size:20px;margin:0 0 6px;color:#181614;}
+  .dochead .lead{font-size:13.5px;color:#5a5347;max-width:920px;}
+  .dochead .quote{margin-top:8px;font-size:12.75px;color:#7a7266;border-left:3px solid #c8beac;padding:4px 0 4px 10px;}
+  .banner{margin:16px 0 18px;background:#fff7e0;border:1px solid #e8d68f;color:#6b5a12;font-size:12.5px;font-weight:700;
+    border-radius:8px;padding:9px 13px;}
+  .scene-switch{display:flex;gap:8px;margin:16px 0 14px;flex-wrap:wrap;}
+  .scene-switch button{font-family:inherit;font-size:13px;font-weight:800;padding:9px 16px;border-radius:9px;
+    border:1px solid #cfc6b6;background:#fff;color:#4b463d;cursor:pointer;}
+  .scene-switch button:hover{border-color:#9a8f78;}
+  .scene-switch button.on{background:#232220;border-color:#232220;color:#fdf9ee;}
+  .scene-cap{font-size:12px;color:#786f60;margin:-6px 0 14px;}
+
+  /* ── 앱 프레임(실제 GIJO AS 창을 축소 재현 — 여기서부터가 시안 본체) ───── */
+  .appframe{
+    --bg:#faf8f5; --panel:#ffffff; --panel-2:#f2efe9;
+    --border:rgba(43,38,33,.12); --border-strong:rgba(43,38,33,.22);
+    --text:#2b2621; --muted:#6b6259; --muted-2:#726960;
+    --blue:#3b82f6; --blue-ink:#1d4f91;
+    --teal:#1eb980; --teal-ink:#086b43;
+    --amber:#f0a020; --amber-ink:#8f4d02;
+    --red:#e2483d; --red-ink:#b3241a;
+    --zebra:rgba(43,38,33,.035);
+    --shadow-stage:0 20px 34px rgba(31,27,20,.16);
+    font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+    width:100%;height:702px;background:var(--bg);color:var(--text);
+    border:1px solid #ded5c4;border-radius:12px;overflow:hidden;
+    box-shadow:0 18px 40px rgba(60,52,36,.18);
+    display:flex;flex-direction:column;position:relative;
+  }
+  .appframe *{box-sizing:border-box;}
+
+  /* 상단 조작 줄 44px — app.html:132 그대로(패딩·높이·보더) */
+  .af-top{flex:0 0 auto;height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;
+    border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .af-top .spacer{flex:1;}
+  .af-top .clock{font-size:12.25px;color:var(--muted);}
+  .af-top .status{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--teal-ink);
+    background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);padding:3px 10px;border-radius:16px;}
+  .af-top .status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  .af-body{flex:1;min-height:0;display:flex;}
+
+  /* 레일 56px — app.html:54,61-83 그대로. railroster.js:24-33 실제 구성(15개) */
+  .af-rail{flex:0 0 56px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 0;
+    border-right:1px solid var(--border);background:var(--panel-2);overflow-y:auto;}
+  .rr-item{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid var(--border);
+    color:var(--muted);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:default;
+    font-weight:800;flex:0 0 auto;}
+  .rr-item.plain{border-color:transparent;font-size:16px;}
+  .rr-item:hover{border-color:var(--border-strong);color:var(--text);}
+  .rr-item.watching{border-color:rgba(37,99,235,.55);color:var(--blue-ink);box-shadow:inset 0 0 0 1px rgba(37,99,235,.30);}
+  .rr-item.working{border-color:rgba(8,107,67,.55);color:var(--teal-ink);animation:rrbreath 1.6s ease-in-out infinite;}
+  @keyframes rrbreath{0%,100%{box-shadow:0 0 0 0 rgba(8,107,67,.30);}50%{box-shadow:0 0 0 5px rgba(8,107,67,0);}}
+  .rr-div{width:26px;height:1px;background:var(--border-strong);margin:6px 0;flex:0 0 auto;}
+  .rr-foot{margin-top:auto;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 auto;}
+
+  .af-work{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--bg);}
+
+  /* ═══ 장면 A: 대화 홈(히어로) — console.js:50,291-297 ═══ */
+  .scA{display:none;flex:1;min-height:0;flex-direction:column;}
+  .scA .hero{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;padding:0 20px;text-align:center;}
+  .hero .greet{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.3px;}
+  .hero .honest{font-size:12.5px;color:var(--muted-2);max-width:520px;line-height:1.6;}
+  .qrow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:620px;}
+  .qchip{background:var(--panel);border:1px solid var(--border-strong);border-radius:18px;padding:7px 14px;
+    font-size:12.75px;color:var(--text);box-shadow:0 1px 2px rgba(43,38,33,.05);}
+  .qchip:hover{border-color:var(--blue);}
+  .divline{font-size:11.5px;color:var(--muted-2);margin-top:4px;}
+  .mrow{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;max-width:620px;}
+  .mchip{background:transparent;border:1px solid var(--border);border-radius:9px;padding:6px 12px;
+    font-size:12.25px;color:var(--muted);}
+  .mchip:hover{color:var(--text);border-color:var(--blue);}
+
+  /* ═══ 장면 B: 현황 카드 — console.js cs-head/cs-body + chatparts.js dc-* ═══ */
+  .scB{display:none;flex:1;min-height:0;flex-direction:column;}
+  .cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12.25px;
+    color:var(--muted);border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .cs-ctx{background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.38);color:var(--blue-ink);
+    border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}
+  .cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+  .cs-body{flex:1;min-height:0;overflow-y:auto;padding:10px 16px;}
+  .cs-row{display:flex;gap:9px;padding:8px 0;}
+  .cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(37,99,235,.10);
+    display:flex;align-items:center;justify-content:center;font-size:12px;}
+  .cs-row.instr .ci{background:rgba(8,107,67,.12);}
+  .cs-row .cn{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:2px;}
+  .cs-row .cn .ct{font-weight:500;color:var(--muted-2);margin-left:6px;}
+  .cs-row .cm{font-size:12.5px;color:var(--text);line-height:1.62;}
+
+  .dc-card{margin-top:8px;border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;background:var(--panel);}
+  .dc-head{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--border);
+    font-size:12.75px;font-weight:800;color:var(--text);background:var(--panel-2);}
+  .dc-open{margin-left:auto;font-size:12px;font-weight:700;color:var(--blue-ink);background:rgba(37,99,235,.10);
+    border:1px solid rgba(37,99,235,.30);border-radius:7px;padding:3px 9px;}
+  .dc-seg{display:inline-flex;margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);
+    border-radius:7px;padding:2px;gap:2px;}
+  .dc-seg span{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:800;color:var(--muted-2);}
+  .dc-seg span.on{background:var(--blue);color:#fff;}
+  .dc-head.hasseg .dc-open{margin-left:0;}
+  .dc-kpis{display:flex;border-bottom:1px solid var(--border);}
+  .dc-kpi{flex:1;padding:7px 11px;border-right:1px solid var(--border);}
+  .dc-kpi:last-child{border-right:0;}
+  .dc-kl{font-size:11.5px;color:var(--muted-2);}
+  .dc-kv{font-size:15px;font-weight:800;color:var(--text);}
+  .dc-kv.ok{color:var(--teal-ink);} .dc-kv.warn{color:var(--amber-ink);} .dc-kv.bad{color:var(--red-ink);} .dc-kv.muted{color:var(--muted-2);}
+  .dc-card table{width:100%;border-collapse:collapse;font-size:12.25px;}
+  .dc-card th{text-align:left;padding:3px 10px;color:var(--muted-2);font-size:11.5px;border-bottom:1px solid var(--border);
+    background:var(--panel-2);}
+  .dc-card td{padding:3px 10px;line-height:1.35;border-bottom:1px solid var(--border);}
+  .dc-card tbody tr:nth-child(even){background:var(--zebra);}
+  .dc-card .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .dc-more{padding:5px 11px;font-size:11.75px;color:var(--muted-2);}
+  .dc-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px;padding:8px 10px;}
+  .dc-tile{border:1px solid var(--border-strong);border-radius:7px;padding:6px 8px;background:var(--panel-2);}
+  .dc-tile.bad{background:#fdeceb;border-color:rgba(179,36,26,.35);}
+  .dc-tile.warn{background:#fdf1e2;border-color:rgba(143,77,2,.35);}
+  .dc-tile.mid{background:#fdf6dc;border-color:rgba(122,92,0,.35);}
+  .dc-tile.low{background:#eaf1fb;border-color:rgba(29,79,145,.30);}
+  .dc-tile.ok{background:#e3f6ec;border-color:rgba(8,107,67,.30);}
+  .dc-tv{font-size:11px;font-weight:800;letter-spacing:.2px;}
+  .dc-tv.bad{color:var(--red-ink);} .dc-tv.warn{color:var(--amber-ink);} .dc-tv.mid{color:#7a5c00;} .dc-tv.low{color:var(--blue-ink);} .dc-tv.ok{color:var(--teal-ink);}
+  .dc-tl{font-size:11.5px;font-weight:700;color:var(--text);line-height:1.3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dc-ts{font-size:11px;color:var(--muted-2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  .cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;border-top:1px solid var(--border);}
+  .cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;
+    color:var(--text);font-size:13px;padding:11px 14px;font-family:inherit;}
+  .cs-dock input::placeholder{color:var(--muted-2);}
+  .cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel);color:var(--muted);
+    border:1px solid var(--border-strong);font-size:17px;}
+  .cs-send{background:var(--blue);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;}
+
+  /* ═══ 장면 C: 무대(화면 도킹) — app.html:106-107,1209-1220 ═══ */
+  .scC{display:none;flex:1;min-height:0;flex-direction:column;}
+  .dockHead{display:flex;align-items:center;gap:8px;padding:4px 10px;font-size:12.5px;color:var(--muted);
+    background:var(--panel-2);border-bottom:1px solid var(--border);}
+  .dockHead .back{font-size:12.25px;font-weight:700;color:var(--muted);background:transparent;
+    border:1px solid var(--border-strong);border-radius:7px;padding:4px 9px;}
+  .dockHead b{color:var(--text);}
+  .stage-screen{flex:1;min-height:0;margin-bottom:10px;box-shadow:var(--shadow-stage);background:var(--panel);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .st-toolbar{flex:0 0 auto;display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);
+    background:var(--panel);flex-wrap:wrap;}
+  .st-toolbar input,.st-toolbar select{font-family:inherit;font-size:12px;color:var(--text);background:var(--panel-2);
+    border:1px solid var(--border-strong);border-radius:7px;padding:6px 10px;}
+  .st-toolbar .cnt{margin-left:auto;font-size:12px;color:var(--muted-2);align-self:center;}
+  .stage-screen table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .stage-screen thead th{position:sticky;top:0;background:var(--panel);text-align:left;color:var(--muted);
+    font-size:11.75px;font-weight:800;padding:6px 12px;border-bottom:1px solid var(--border-strong);}
+  .stage-screen tbody td{padding:6px 12px;border-bottom:1px solid var(--border);}
+  .stage-screen tbody tr:nth-child(even){background:var(--zebra);}
+  .stage-screen tbody tr:hover td{background:rgba(59,130,246,.06);}
+  .sev-badge{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:1px 7px;white-space:nowrap;}
+  .sev-bad{background:#fdeceb;color:var(--red-ink);border:1px solid rgba(179,36,26,.30);}
+  .sev-warn{background:#fdf1e2;color:var(--amber-ink);border:1px solid rgba(143,77,2,.30);}
+  .sev-mid{background:#fdf6dc;color:#7a5c00;border:1px solid rgba(122,92,0,.30);}
+  .sev-low{background:#eaf1fb;color:var(--blue-ink);border:1px solid rgba(29,79,145,.25);}
+  .sev-ok{background:#e3f6ec;color:var(--teal-ink);border:1px solid rgba(8,107,67,.25);}
+  .stage-peek{flex:0 0 auto;height:10px;} /* 무대 아래 10px 틈 — var(--bg)가 비쳐 "대화가 그대로 있다" 신호 */
+
+  /* 장면 표시 토글용 */
+  .appframe[data-scene="a"] .scA{display:flex;}
+  .appframe[data-scene="b"] .scB{display:flex;}
+  .appframe[data-scene="c"] .scC{display:flex;}
+
+  /* ── 설명 패널(항상 표시) ─────────────────────────────────────────── */
+  .notes{margin-top:30px;}
+  .notes h2{font-size:16.5px;margin:32px 0 10px;color:#181614;border-bottom:2px solid #ded5c4;padding-bottom:6px;}
+  .notes h2:first-child{margin-top:0;}
+  .notes p{font-size:13px;color:#3f3a32;max-width:960px;}
+  .note-card{background:#fff;border:1px solid #ded5c4;border-radius:10px;padding:14px 16px;margin:10px 0;}
+  .spec-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 4px;}
+  .spec-table th{text-align:left;background:#f3efe6;color:#5a5347;font-weight:800;padding:6px 10px;
+    border:1px solid #ded5c4;font-size:11.75px;}
+  .spec-table td{padding:6px 10px;border:1px solid #e7e1d4;vertical-align:middle;}
+  .spec-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .swatch{display:inline-block;width:16px;height:16px;border-radius:4px;border:1px solid rgba(0,0,0,.15);
+    vertical-align:middle;margin-right:6px;}
+  .swrow{display:flex;align-items:center;gap:4px;}
+  .pass{color:#0a7a4d;font-weight:800;}
+  .warn-txt{color:#8f4d02;font-weight:800;}
+  .fail{color:#b3241a;font-weight:800;}
+  .tag-example{font-size:10.5px;color:#8a8171;font-weight:700;}
+  .checklist{list-style:none;margin:8px 0;padding:0;}
+  .checklist li{font-size:13px;padding:5px 0 5px 26px;position:relative;}
+  .checklist li b.ok{position:absolute;left:0;color:#0a7a4d;}
+  .checklist li b.mid{position:absolute;left:0;color:#8f4d02;}
+  code{background:#f3efe6;border:1px solid #e7e1d4;border-radius:4px;padding:0 4px;font-size:12px;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+  <div class="dochead">
+    <h1>GIJO AS 프로 셸 — 흰 바탕(화이트 테마) 시안 · 추천 1개</h1>
+    <p class="lead">에디션 3종 배색 지도(2026-08-20 확정): 라이트=연초록 · 표준(화면 중심)=다크 유지 ·
+      <b>프로(대화 중심·메인)=흰 바탕</b>. 이 시안은 프로 셸의 실제 세 장면(대화 홈·현황 카드·무대)을
+      실제 코드의 구조·밀도 그대로 두고 <b>색 토큰만</b> 화이트로 바꾼 결과다.</p>
+    <p class="quote">"나는 흰색 바탕이 좋긴 한데" · "대화로 하는 제품 프로를 메인으로 하기로 했잖아" — 사장님, 2026-08-20</p>
+  </div>
+
+  <div class="banner">⚠ 이 페이지는 정적 그림입니다 — 장면 전환 버튼(장면 A/B/C)만 실제로 동작합니다.
+    입력칸·전송·칩·표 행은 실제 화면의 겉모습을 재현했을 뿐 눌러도 아무 일도 일어나지 않습니다.</div>
+
+  <div class="scene-switch" id="sceneBtns">
+    <button data-scene="a" class="on">장면 A · 대화 홈(인사·추천 질문)</button>
+    <button data-scene="b">장면 B · 현황 카드 2장(KPI·히트맵)</button>
+    <button data-scene="c">장면 C · 무대(화면이 대화창 자리에)</button>
+  </div>
+  <div class="scene-cap" id="sceneCap">인사말 + 추천 질문 칩 3개 + 메뉴 바로가기 칩 — 대화가 없을 때(chat-home)의 기본 모습. console.js:291-297</div>
+
+  <!-- ══════════════ 앱 프레임(실제 창 축소 재현) ══════════════ -->
+  <div class="appframe" data-scene="a" id="appFrame">
+    <div class="af-top">
+      <div class="spacer"></div>
+      <div class="clock">14:32</div>
+      <div class="status"><span class="dot"></span>서버 정상</div>
+    </div>
+    <div class="af-body">
+      <nav class="af-rail">
+        <button class="rr-item plain" title="전체 메뉴 (Ctrl+K)">☰</button>
+        <button class="rr-item plain" title="작업 내역">🕘</button>
+        <button class="rr-item plain" title="즐겨찾기">⭐</button>
+        <button class="rr-item plain" title="열려 있는 창 목록">🗔</button>
+        <button class="rr-item plain" title="새 대화 시작">💬</button>
+        <div class="rr-div"></div>
+        <button class="rr-item watching" title="[감독] 오케스트레이터 — 주시중">🧭</button>
+        <button class="rr-item" title="[스캔] 스캔 에이전트">◣</button>
+        <button class="rr-item working" title="[분석] 분석 에이전트 — 작업중">◎</button>
+        <button class="rr-item" title="[보고] 보고서 에이전트">▣</button>
+        <button class="rr-item" title="[인텔] 위협 인텔 에이전트">🛰</button>
+        <button class="rr-item" title="[지식] 표준·지침 정리 에이전트">📚</button>
+        <div class="rr-div"></div>
+        <button class="rr-item" title="임베딩 엔진(bge-m3)">E</button>
+        <button class="rr-item" title="RAG 검색">R</button>
+        <button class="rr-item" title="가드레일">G</button>
+        <button class="rr-item" title="LoRA 전문가 어댑터">L</button>
+        <div class="rr-foot">홍</div>
+      </nav>
+      <div class="af-work">
+
+        <!-- 장면 A -->
+        <div class="scA">
+          <div class="hero">
+            <div class="greet">안녕하세요, 홍길동님</div>
+            <div class="honest">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</div>
+            <div class="qrow">
+              <span class="qchip">💬 오늘 뭐부터 볼까?</span>
+              <span class="qchip">💬 치명 취약점 몇 건이야?</span>
+              <span class="qchip">💬 이번 주 조치 현황은?</span>
+            </div>
+            <div class="divline">또는 메뉴에서 바로 가기</div>
+            <div class="mrow">
+              <span class="mchip">자산 등록</span>
+              <span class="mchip">취약점 찾기</span>
+              <span class="mchip">우선순위 판단</span>
+              <span class="mchip">조치</span>
+              <span class="mchip">검증</span>
+              <span class="mchip">보고서</span>
+            </div>
+          </div>
+          <div class="cs-dock">
+            <button class="cs-plus">＋</button>
+            <input placeholder="지시를 입력하세요…">
+            <button class="cs-send">전송</button>
+          </div>
+        </div>
+
+        <!-- 장면 B -->
+        <div class="scB">
+          <div class="cs-head">
+            <span class="cs-ctx">대시보드</span>
+            <span class="cs-hint">보고 있는 화면 기준으로 지시합니다</span>
+          </div>
+          <div class="cs-body">
+            <div class="cs-row instr">
+              <div class="ci">🙂</div>
+              <div class="cb"><div class="cn">나</div><div class="cm">오늘 자산 현황 보여줘</div></div>
+            </div>
+            <div class="cs-row">
+              <div class="ci">🧭</div>
+              <div class="cb">
+                <div class="cn">GIJO AI<span class="ct">14:32</span></div>
+                <div class="cm">네, 요약입니다.</div>
+
+                <div class="dc-card">
+                  <div class="dc-head">자산 등록 현황
+                    <button class="dc-open">🗔 자산 목록 열기</button>
+                  </div>
+                  <div class="dc-kpis">
+                    <div class="dc-kpi"><div class="dc-kl">전체 자산</div><div class="dc-kv">128</div></div>
+                    <div class="dc-kpi"><div class="dc-kl">미분류</div><div class="dc-kv warn">6</div></div>
+                    <div class="dc-kpi"><div class="dc-kl">이번 주 등록</div><div class="dc-kv">12</div></div>
+                    <div class="dc-kpi"><div class="dc-kl">스캔 완료율</div><div class="dc-kv ok">92%</div></div>
+                  </div>
+                  <table>
+                    <thead><tr><th>자산명</th><th>유형</th><th>담당</th><th>최근 점검</th></tr></thead>
+                    <tbody>
+                      <tr><td>WEB-PROD-01</td><td>웹서버</td><td>김보안</td><td>08-18</td></tr>
+                      <tr><td>DB-CORE-02</td><td>DB서버</td><td>이감시</td><td>08-17</td></tr>
+                      <tr><td>SW-EDGE-03</td><td>스위치</td><td>미배정</td><td>08-02</td></tr>
+                    </tbody>
+                  </table>
+                  <div class="dc-more">외 125건 — 🗔 화면에서 전체를 봅니다</div>
+                </div>
+
+                <div class="dc-card">
+                  <div class="dc-head hasseg">발견된 취약점 현황
+                    <span class="dc-seg"><span>목록</span><span class="on">히트맵</span></span>
+                  </div>
+                  <div class="dc-kpis">
+                    <div class="dc-kpi"><div class="dc-kl">치명</div><div class="dc-kv bad">3</div></div>
+                    <div class="dc-kpi"><div class="dc-kl">높음</div><div class="dc-kv warn">11</div></div>
+                    <div class="dc-kpi"><div class="dc-kl">중간</div><div class="dc-kv">27</div></div>
+                    <div class="dc-kpi"><div class="dc-kl">낮음</div><div class="dc-kv muted">8</div></div>
+                  </div>
+                  <div class="dc-tiles">
+                    <div class="dc-tile bad"><div class="dc-tv bad">치명</div><div class="dc-tl">CVE-2024-3400</div><div class="dc-ts">WEB-PROD-01</div></div>
+                    <div class="dc-tile bad"><div class="dc-tv bad">치명</div><div class="dc-tl">CVE-2023-4966</div><div class="dc-ts">VPN-GW-01</div></div>
+                    <div class="dc-tile warn"><div class="dc-tv warn">높음</div><div class="dc-tl">CVE-2024-0001</div><div class="dc-ts">DB-CORE-02</div></div>
+                    <div class="dc-tile warn"><div class="dc-tv warn">높음</div><div class="dc-tl">CVE-2023-9999</div><div class="dc-ts">SW-EDGE-03</div></div>
+                    <div class="dc-tile mid"><div class="dc-tv mid">중간</div><div class="dc-tl">CVE-2022-1111</div><div class="dc-ts">WAS-APP-04</div></div>
+                    <div class="dc-tile low"><div class="dc-tv low">낮음</div><div class="dc-tl">CVE-2021-2222</div><div class="dc-ts">FILE-SRV-05</div></div>
+                    <div class="dc-tile ok"><div class="dc-tv ok">정상</div><div class="dc-tl">패치 완료</div><div class="dc-ts">MAIL-SRV-06</div></div>
+                    <div class="dc-tile ok"><div class="dc-tv ok">정상</div><div class="dc-tl">패치 완료</div><div class="dc-ts">NAS-STORE-07</div></div>
+                  </div>
+                  <div class="dc-more">외 41건 — 🗔 화면에서 전체를 봅니다</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cs-dock">
+            <button class="cs-plus">＋</button>
+            <input placeholder="지시를 입력하세요…">
+            <button class="cs-send">전송</button>
+          </div>
+        </div>
+
+        <!-- 장면 C -->
+        <div class="scC">
+          <div class="dockHead">
+            <button class="back">← 대화로</button>
+            <b>자산 목록</b>
+          </div>
+          <div class="stage-screen">
+            <div class="st-toolbar">
+              <input placeholder="자산명·IP 검색" style="flex:1;min-width:160px;">
+              <select><option>전체 유형</option></select>
+              <select><option>전체 등급</option></select>
+              <span class="cnt">128건 · 예시</span>
+            </div>
+            <table>
+              <thead><tr><th>자산명</th><th>유형</th><th>IP</th><th>등급</th><th>담당</th><th>최근 점검</th></tr></thead>
+              <tbody>
+                <tr><td>WEB-PROD-01</td><td>웹서버</td><td>10.20.1.11</td><td><span class="sev-badge sev-bad">치명</span></td><td>김보안</td><td>08-18</td></tr>
+                <tr><td>DB-CORE-02</td><td>DB서버</td><td>10.20.2.5</td><td><span class="sev-badge sev-warn">높음</span></td><td>이감시</td><td>08-17</td></tr>
+                <tr><td>SW-EDGE-03</td><td>스위치</td><td>10.20.0.1</td><td><span class="sev-badge sev-mid">중간</span></td><td>미배정</td><td>08-02</td></tr>
+                <tr><td>WAS-APP-04</td><td>WAS</td><td>10.20.1.22</td><td><span class="sev-badge sev-low">낮음</span></td><td>박운영</td><td>08-15</td></tr>
+                <tr><td>MAIL-SRV-06</td><td>메일서버</td><td>10.20.3.9</td><td><span class="sev-badge sev-ok">정상</span></td><td>김보안</td><td>08-19</td></tr>
+                <tr><td>NAS-STORE-07</td><td>스토리지</td><td>10.20.4.2</td><td><span class="sev-badge sev-ok">정상</span></td><td>이감시</td><td>08-19</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="stage-peek"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 설명 패널 ══════════════ -->
+  <div class="notes">
+
+    <h2>1. 화이트 팔레트 표 — 다크 토큰 → 화이트 대응</h2>
+    <div class="note-card">
+      <p><b>배경은 순백(#fff)이 아니라 웜톤 오프화이트(#faf8f5)를 캔버스로 쓰고, 카드류(--panel)만
+        순백을 쓴다.</b> 순백 전면 배경은 장시간 관제 화면에서 눈부심·피로를 낳는다는 것이 조사 결과의
+        공통점이다(위 조사 1). 다크 쪽도 같은 이유로 순검정(#000)이 아니라 #262624를 캔버스로 썼다 —
+        방향은 반대지만 "극단을 피한다"는 같은 원칙이다. --panel만 순백으로 두면 웜 캔버스 위에서
+        카드가 살짝 "떠 보이는" 단차가 생긴다(다크에서 --panel #30302e이 --bg #262624보다 밝아
+        떠 보이는 것과 같은 위계 — 방향만 반전).</p>
+      <table class="spec-table">
+        <thead><tr><th>토큰</th><th>다크(현재)</th><th></th><th>화이트(제안)</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td><code>--bg</code></td>
+            <td class="swrow"><span class="swatch" style="background:#262624"></span>#262624</td>
+            <td>→</td>
+            <td class="swrow"><span class="swatch" style="background:#faf8f5"></span>#faf8f5</td>
+            <td>캔버스. 순백 아님(눈부심 방지)</td></tr>
+          <tr><td><code>--panel</code></td>
+            <td class="swrow"><span class="swatch" style="background:#30302e"></span>#30302e</td>
+            <td>→</td>
+            <td class="swrow"><span class="swatch" style="background:#ffffff;border-color:#bbb"></span>#ffffff</td>
+            <td>카드·데이터카드. 캔버스보다 밝게(다크와 같은 위계 방향)</td></tr>
+          <tr><td><code>--panel-2</code></td>
+            <td class="swrow"><span class="swatch" style="background:#1f1e1d"></span>#1f1e1d</td>
+            <td>→</td>
+            <td class="swrow"><span class="swatch" style="background:#f2efe9"></span>#f2efe9</td>
+            <td>레일·상단바·콘솔헤더·무대머리. 캔버스보다 리세스드(그레이 강)</td></tr>
+          <tr><td><code>--border</code></td>
+            <td>rgba(255,255,255,.08)</td><td>→</td>
+            <td>rgba(43,38,33,.12)</td><td>흰 바탕은 밝은 알파보다 어두운 알파가 더 잘 보임</td></tr>
+          <tr><td><code>--border-strong</code></td>
+            <td>rgba(255,255,255,.16)</td><td>→</td>
+            <td>rgba(43,38,33,.22)</td><td>&nbsp;</td></tr>
+          <tr><td><code>--text</code></td>
+            <td class="swrow"><span class="swatch" style="background:#e9e7e2;border-color:#bbb"></span>#e9e7e2 (14.1:1)</td>
+            <td>→</td>
+            <td class="swrow"><span class="swatch" style="background:#2b2621"></span>#2b2621 (14.1:1)</td>
+            <td>순검정 아님(uxmovement: "never use pure black"). 값은 대칭</td></tr>
+          <tr><td><code>--muted</code></td>
+            <td>#b3ada4 (4.7:1)</td><td>→</td>
+            <td>#6b6259 (5.6~6.0:1)</td><td>&nbsp;</td></tr>
+          <tr style="background:#fff7e0;"><td><code>--muted-2</code></td>
+            <td class="fail">#a49d95 (3.5:1 — 다크에서도 미달)</td><td>→</td>
+            <td class="pass">#726960 (4.7~5.4:1 — 바로잡음)</td><td>2절 참고</td></tr>
+          <tr><td><code>지브라(짝수행)</code></td>
+            <td>rgba(255,255,255,.025)</td><td>→</td>
+            <td>rgba(43,38,33,.035)</td><td>&nbsp;</td></tr>
+          <tr><td><code>행 호버</code></td>
+            <td colspan="3">rgba(59,130,246,.08) — <b>그대로 재사용</b></td>
+            <td>파랑 알파 오버레이는 밝은/어두운 바탕 모두에서 자연히 옅은 색으로 뜬다 — 테마별로 새로 안 만들어도 됨</td></tr>
+          <tr><td><code>무대 그림자</code></td>
+            <td>0 20px 34px rgba(0,0,0,.45)</td><td>→</td>
+            <td>0 20px 34px rgba(31,27,20,.16)</td>
+            <td>다크는 어두운 화면 위라 진하게(45%) 써야 보인다. 흰 배경은 그 자체가 밝아 옅은 농도(16%)에서도
+              또렷이 진다 — 더 진하면 탁해 보인다</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:10px;"><b>신설(다크엔 없던 텍스트 전용 "진한" 변형)</b> — 다크는 원색 그대로를
+        글자색으로 썼다(<code>--blue-light #5fa1ff</code> 등, 어두운 바탕 위라 밝은 원색이 잘 읽힌다).
+        흰 바탕에서 원색(<code>#3b82f6</code> 등)을 그대로 글자에 쓰면 대비가 3~4:1대로 떨어진다 — 그래서
+        <b>버튼 배경·테두리·아이콘엔 원색을 그대로</b> 쓰고, <b>글자로 쓸 때만</b> 진하게 낮춘 "-ink" 토큰을
+        새로 둔다(2절에서 대비 실측).</p>
+      <table class="spec-table">
+        <thead><tr><th>신설 토큰</th><th>값</th><th>원색(그대로 쓰는 용도: 버튼·테두리·아이콘)</th></tr></thead>
+        <tbody>
+          <tr><td><code>--blue-ink</code></td><td class="swrow"><span class="swatch" style="background:#1d4f91"></span>#1d4f91</td><td>#3b82f6</td></tr>
+          <tr><td><code>--teal-ink</code></td><td class="swrow"><span class="swatch" style="background:#086b43"></span>#086b43</td><td>#1eb980</td></tr>
+          <tr><td><code>--amber-ink</code></td><td class="swrow"><span class="swatch" style="background:#8f4d02"></span>#8f4d02</td><td>#f0a020</td></tr>
+          <tr><td><code>--red-ink</code></td><td class="swrow"><span class="swatch" style="background:#b3241a"></span>#b3241a</td><td>#e2483d</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>2. 의미색 대비 숫자 — 심각도 배지, 다크 공식의 반전</h2>
+    <div class="note-card">
+      <p><b>다크 공식: "반투명 배경 + 밝은 글자".</b> 예) 히트맵 타일 치명 — 어두운 패널 위에
+        <code>rgba(245,146,138,.14)</code> 빨강 틴트를 얹고 글자는 밝은 <code>#f5928a</code>. 실측 합성 배경
+        <code>#3d2e2c</code> 위 <code>#f5928a</code> = <b>5.76:1</b>.</p>
+      <p><b>화이트는 정반대: "옅은 배경(거의 흰색에 가까운 틴트) + 진한 글자".</b> 원색을 그대로 옅게 깔면
+        배경이 이미 밝으므로, 그 위에 밝은 글자를 얹으면 대비가 무너진다 — 다크와 같은 공식을 그대로
+        가져오면 실패한다는 뜻이다. 그래서 배경은 원색의 저채도-고명도 틴트, 글자는 원색을 짙게 낮춘 값을 쓴다.
+        아래는 WCAG 2.1 공식(L=0.2126R+0.7152G+0.0722B, 대비=(L1+.05)/(L2+.05))으로 <b>직접 계산한 값</b>이다.</p>
+      <table class="spec-table">
+        <thead><tr><th>등급</th><th>배경</th><th>글자</th><th>대비율</th><th>WCAG 4.5:1</th><th>다크 참고</th></tr></thead>
+        <tbody>
+          <tr><td><span class="sev-badge sev-bad">치명</span></td>
+            <td class="swrow"><span class="swatch" style="background:#fdeceb"></span>#fdeceb</td>
+            <td class="swrow"><span class="swatch" style="background:#b3241a"></span>#b3241a</td>
+            <td class="num">5.77:1</td><td class="pass">통과</td><td>다크 실측 5.76:1 — 거의 동급</td></tr>
+          <tr><td><span class="sev-badge sev-warn">높음</span></td>
+            <td class="swrow"><span class="swatch" style="background:#fdf1e2"></span>#fdf1e2</td>
+            <td class="swrow"><span class="swatch" style="background:#8f4d02"></span>#8f4d02</td>
+            <td class="num">5.84:1</td><td class="pass">통과</td><td>—</td></tr>
+          <tr><td><span class="sev-badge sev-mid">중간</span></td>
+            <td class="swrow"><span class="swatch" style="background:#fdf6dc"></span>#fdf6dc</td>
+            <td class="swrow"><span class="swatch" style="background:#7a5c00"></span>#7a5c00</td>
+            <td class="num">5.77:1</td><td class="pass">통과</td><td>다크엔 없던 5단 세분화 제안(3절)</td></tr>
+          <tr><td><span class="sev-badge sev-low">낮음</span></td>
+            <td class="swrow"><span class="swatch" style="background:#eaf1fb"></span>#eaf1fb</td>
+            <td class="swrow"><span class="swatch" style="background:#1d4f91"></span>#1d4f91</td>
+            <td class="num">7.16:1</td><td class="pass">통과</td><td>〃</td></tr>
+          <tr><td><span class="sev-badge sev-ok">정상</span></td>
+            <td class="swrow"><span class="swatch" style="background:#e3f6ec"></span>#e3f6ec</td>
+            <td class="swrow"><span class="swatch" style="background:#086b43"></span>#086b43</td>
+            <td class="num">5.84:1</td><td class="pass">통과</td><td>—</td></tr>
+        </tbody>
+      </table>
+      <p>5단 모두 4.5:1을 최소 1.28배(치명) ~ 1.59배(낮음) 웃돈다. <b>현재 클라 색사전(chatparts.js:422-426)은
+        3단(치명/높음/정상)만 매핑</b>한다 — 이 시안은 5단 전부의 대비를 미리 검증해 두었으니, 실제 구현에서
+        중간·낮음을 추가해도 위 값을 그대로 쓰면 된다.</p>
+      <p><b>-ink 토큰의 최악 조건 검산</b> — dc-kv 등은 badge 전용 옅은 배경이 아니라 카드 배경(<code>--panel-2</code>,
+        가장 어두운 표면)에 직접 얹힐 수 있다. 그 조건에서도: --blue-ink 7.10:1 · --teal-ink 5.73:1 ·
+        --amber-ink 5.67:1 · --red-ink 5.74:1 — 전부 통과(최소 여유 1.26배).</p>
+    </div>
+
+    <h2>3. 왜 이 안인지 / 무엇을 포기했는지</h2>
+    <div class="note-card">
+      <p><b>왜:</b> 사장님 결정(2026-08-20)이 출발점이다 — 프로가 메인이고 대화(=읽기) 중심이므로 흰 바탕.
+        2025 안구추적 연구도 이 갈림을 뒷받침한다: <i>"light mode provides better readability and cognitive
+        performance"</i>는 읽기 비중이 큰 앱에서, <i>"dark mode improves contrast … for data-heavy monitoring
+        dashboards"</i>는 시각 밀도가 높은 관제 화면에서 유리하다 — 프로(대화)=화이트, 표준(화면·관제)=다크
+        유지라는 이번 3종 배색 지도와 정확히 들어맞는다.</p>
+      <p><b>무엇을 포기했는지:</b></p>
+      <ul class="checklist">
+        <li><b class="mid">△</b> <b>다크의 "정보가 도드라져 보이는" 인지 이점 일부</b> — 어두운 배경 위 밝은
+          배지·숫자는 시선을 바로 끈다(위 조사 3). 흰 배경에선 진한 글자로 대체했지만, 눈에 "튀는" 정도는
+          다크보다 약하다 — 관제 화면(표준)은 다크를 유지하는 이유이기도 하다.</li>
+        <li><b class="mid">△</b> <b>화면 20여 종의 실제 다크 하드코딩</b> — inventory.html 등은 <code>:root</code>에
+          다크 값을 직접 박아 둔다(공용 변수 참조가 아님). 장면 C의 표는 "그 화면이 흰 배색이면 이렇게
+          보인다"는 참고 재현일 뿐 실제 코드가 아니다 — 이 시안이 승인돼도 도킹 화면 자체는 여전히 다크로
+          뜬다. <b>공사 전제: 화면들이 두 벌 배색(다크/화이트)을 지원하도록 고치는 별도 작업이 필요하다.</b></li>
+        <li><b class="mid">△</b> <b>레일 아이콘 개수</b> — 요청 문구는 "10개"였지만 실제 코드(railroster.js,
+          2026-08-20)는 고정 5 + 팀 6 + 부품 4 = <b>15개</b>다. 기억이 아니라 지금 코드를 따라 15개로
+          그렸다 — 요청 시점과 코드가 같은 날 어긋났을 가능성이 크다(원칙: "구조가 자주 바뀌므로 기억이
+          아니라 현재 코드를 본다").</li>
+        <li><b class="mid">△</b> <b>인쇄 친화성은 화이트가 유리</b>하지만(다크 캡처를 인쇄하면 잉크 낭비·저대비),
+          이번 시안 범위(화면 3장) 밖이라 별도로 검증하지 않았다.</li>
+      </ul>
+    </div>
+
+    <h2>4. 밀도 숫자 — 다크 시안과 동일(배색만 바뀜)</h2>
+    <div class="note-card">
+      <p>이 시안은 <b>레이아웃·치수를 한 글자도 바꾸지 않았다</b> — 색 토큰만 교체했다. 아래는 실제 소스에서
+        가져온 값이며, 화이트 버전에서도 그대로다(증감 0px).</p>
+      <table class="spec-table">
+        <thead><tr><th>요소</th><th>값</th><th>근거(파일:행)</th><th>증감</th></tr></thead>
+        <tbody>
+          <tr><td>레일 폭</td><td class="num">56px</td><td>app.html:54</td><td class="num pass">0</td></tr>
+          <tr><td>레일 아이콘</td><td class="num">38×38px, gap 5px</td><td>app.html:64, 61</td><td class="num pass">0</td></tr>
+          <tr><td>상단 조작줄</td><td class="num">44px</td><td>app.html:132</td><td class="num pass">0</td></tr>
+          <tr><td>콘솔 도킹 높이(고정)</td><td class="num">190px</td><td>app.html:213(맥락34+대화4줄88+입력52+여백16)</td><td class="num pass">0</td></tr>
+          <tr><td>대화 홈 히어로 최소높이</td><td class="num">46vh</td><td>console.js:50</td><td class="num pass">0</td></tr>
+          <tr><td>데이터카드 KPI 칸 패딩</td><td class="num">7px 11px</td><td>chatparts.js:66</td><td class="num pass">0</td></tr>
+          <tr><td>표 행(엑셀급 밀도)</td><td class="num">padding 3px 10px, line-height 1.35</td><td>gijo-ui.css:348</td><td class="num pass">0</td></tr>
+          <tr><td>히트맵 타일</td><td class="num">min 118px, gap 6px, padding 6px 8px</td><td>chatparts.js:84-85</td><td class="num pass">0</td></tr>
+          <tr><td>무대 아래 틈</td><td class="num">10px + 그림자</td><td>app.html:106-107</td><td class="num pass">0</td></tr>
+        </tbody>
+      </table>
+      <p>세로 총합 변화 <b>0%</b> — 이 시안이 바꾸는 것은 <code>--bg·--panel·--panel-2·--border·--text·--muted·--muted-2</code>
+        7개 중립 토큰과 4개 신설 -ink 토큰뿐이다.</p>
+    </div>
+
+    <h2>5. 제품 원칙 자가점검</h2>
+    <div class="note-card">
+      <ul class="checklist">
+        <li><b class="ok">✓</b> <b>11px 미만 금지</b> — 이 시안에서 쓰인 가장 작은 글자는 11px(히트맵 판정값
+          <code>.dc-tv</code>, chatparts.js:91 — "가독성 계약(11px 미만 금지)에 맞춰 10→11px로 올렸다"는
+          코드 주석 그대로 유지). 더 줄이지 않았다.</li>
+        <li><b class="ok">✓</b> <b>muted 대비 결함 해소</b> — 다크에서 <code>--muted-2</code>가 3.5:1로 읽기
+          기준(4.5:1) 미달이던 것을, 화이트에서 가장 어두운 표면(--panel-2) 기준으로도 4.69:1까지 끌어올려
+          바로잡았다(1절 표 · 2절 -ink 검산).</li>
+        <li><b class="ok">✓</b> <b>자체완결 HTML</b> — 외부 CDN·웹폰트·원격 이미지 없음. 글꼴은 시스템 스택
+          <code>"Pretendard","Malgun Gothic","Segoe UI",sans-serif</code>뿐이고, 색·아이콘은 전부 CSS/유니코드
+          문자로 그렸다. 더블클릭으로 바로 열린다.</li>
+        <li><b class="ok">✓</b> <b>정직한 표기</b> — 상단 배너로 "정적 그림"임을 고지했다. 장면 전환 버튼만
+          실제로 동작하고 나머지(입력칸·전송·칩·표 행)는 겉모습만 재현했다.</li>
+        <li><b class="mid">△</b> <b>제품 룩앤필</b> — 색·구조·클래스명은 실제 화면(app.html·console.js·
+          chatparts.js·railroster.js·gijo-ui.css)에서 그대로 가져왔다. 단, 3절에서 밝힌 대로 도킹 화면
+          20여 종의 실제 다크 하드코딩 전환은 이번 범위 밖이다.</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  (function () {
+    var frame = document.getElementById("appFrame");
+    var btns = document.querySelectorAll("#sceneBtns button");
+    var cap = document.getElementById("sceneCap");
+    var caps = {
+      a: "인사말 + 추천 질문 칩 3개 + 메뉴 바로가기 칩 — 대화가 없을 때(chat-home)의 기본 모습. console.js:291-297",
+      b: "「오늘 자산 현황 보여줘」에 대한 답으로 데이터 카드 2장(KPI+표, KPI+히트맵)이 뜬 상태. chatparts.js:345-469",
+      c: "메뉴에서 「자산 목록」을 열어 화면이 대화창 자리를 차지한 상태 — 위 「← 대화로」를 누르면 대화로 돌아간다(대화는 사라지지 않고 숨어 있을 뿐). app.html:95-109,1209-1220"
+    };
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        btns.forEach(function (x) { x.classList.remove("on"); });
+        b.classList.add("on");
+        frame.setAttribute("data-scene", b.dataset.scene);
+        cap.textContent = caps[b.dataset.scene] || "";
+      });
+    });
+  })();
+</script>
+</body>
+</html>

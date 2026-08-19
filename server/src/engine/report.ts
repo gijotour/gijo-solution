@@ -229,7 +229,7 @@ export function vulnCases(assets: Asset[]): VulnCase[] {
   return cases.sort((x, y) => (rank[x.priority.code] ?? 9) - (rank[y.priority.code] ?? 9));
 }
 
-const RV_STATUS_LABEL: Record<string, string> = { pending: "미검토", approved: "승인(확정)", rejected: "반려(오탐)" };
+const RV_STATUS_LABEL: Record<string, string> = { pending: "미검토", approved: "승인(확정)", rejected: "반려(오탐)", in_progress: "진행중", verifying: "검증 대기", accepted: "위험수용" }; // 영문 낱값이 고객 문서에 새지 않게 전 상태 열거(검토관 중5)
 
 // 우선순위 조치 목록 표 — finding-level 조치 관리(담당자·기한·지연)를 보고서에 그대로 노출(개선 #2).
 function prioritiesTable(items: PrioritizedFinding[]): Table {

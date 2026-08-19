@@ -244,7 +244,7 @@ export function categoriesForRole(agentId?: string): Category[] {
   return (ROLE_CATEGORY[agentId] || []).filter((c) => c !== "일반");
 }
 
-/** 하위호환 — 첫 우선영역 하나(옛 소비처·시험). 새 코드는 categoriesForRole을 쓸 것. */
+/** 첫 우선영역 하나 — 지금 소비처는 시험뿐이다(제품 코드는 categoriesForRole 사용, 검토관 하4). */
 export function categoryForRole(agentId?: string): Category | undefined {
   return categoriesForRole(agentId)[0];
 }

@@ -60,7 +60,7 @@ export function listFpPatterns(minCount = 2, limit = 10): FpPattern[] {
     if (r.status === "rejected" && r.rejectReason === "false_positive") {
       if (!오탐.has(t)) 오탐.set(t, []);
       오탐.get(t)!.push(r);
-    } else if (["approved", "in_progress", "verifying"].includes(r.status)) {
+    } else if (["approved", "in_progress", "verifying", "accepted"].includes(r.status)) { // 위험수용=실재 확인된 취약점(검토관 하3)
       // 같은 유형인데 **진짜로 인정된** 이력 — 일반화가 위험하다는 증거다.
       // ⚠ approved만 봤다가 검토관이 잡았다(2026-08-07): 옆 자산에서 **지금 조치 중**(in_progress·
       //   verifying)인 것도 진짜로 인정된 것이다 — 이걸 빼면 ⚠ 없이 "오탐 3건"만 보이고,

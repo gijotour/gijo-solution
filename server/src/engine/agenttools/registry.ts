@@ -1434,6 +1434,15 @@ const TOOLS: AgentTool[] = [
       const st = normalizeStatus(args.status ?? "");
       if (st === "rejected") return "이 취약점을 오탐 처리 · SBOM 취약점과 '오늘의 조치'에서 제외됨";
       if (st === "approved") return "이 취약점을 조치완료로 확정 · 검토대장에 기록";
+      // ⚠ 실제 효과와 반대되는 문구가 결재판에 뜨면 사용자가 반대로 알고 승인한다(검토관 상2 —
+      //   위험수용이 「미검토로 원복」으로 보였다). 상태마다 제 효과를 말한다.
+      if (st === "accepted") {
+        const 기한 = (args.acceptUntil || "").trim();
+        const 사유 = (args.note || "").trim();
+        return `위험수용 처리(기한 ${기한 || "⚠없음 — 승인 시 거부됩니다"} · 사유 ${사유 ? "기록됨" : "⚠없음 — 승인 시 거부됩니다"}) · 기한까지 일감에서 제외, 지나면 재검토로 부상`;
+      }
+      if (st === "in_progress") return "조치 진행중으로 기록(담당 작업 착수)";
+      if (st === "verifying") return "검증 대기로 기록(재스캔·확인 차례)";
       return "판정을 미검토로 원복";
     },
     undo: "승인 화면에서 판정을 미검토로 되돌리면 원상복귀됩니다.",

@@ -11,6 +11,7 @@
 //   만드는 대신, 여기서만 세 값을 같은 원천(hardeningtargets)에서 함께 읽어 틈을 안 늘린다.
 
 import { listTargets, listSchedules, listRuns } from "./hardeningtargets";
+import { todayLocal } from "../util/date";
 import { listAssets, getAsset } from "./assets";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
@@ -127,7 +128,7 @@ export function isAssetStatusAsk(text: string): boolean {
 /** 검토대장에서 오탐·조치완료로 **판정이 끝난** 건의 키 집합 — 미조치 수에서 뺀다. */
 function 판정끝난키(): Set<string> {
   const s = new Set<string>();
-  const 오늘 = new Date().toISOString().slice(0, 10);
+  const 오늘 = todayLocal();
   for (const r of listFindingReviews()) {
     // 위험수용(accepted)은 기한 안일 때만 판정 끝 — 기한이 지나면 재검토로 부상한다(2026-08-20).
     if (r.status === "rejected" || r.status === "approved" ||
@@ -345,14 +346,15 @@ export function registerScreenCardRoute(app: import("express").Express): void {
 
 
 // AI 팀 감독 카드(2026-08-20 ② 사장님 승인 — 「에이전트 감독도 필요할 것 같은데」).
-// KPI는 구글 SRE 골든 시그널에서(지연·트래픽·오류 + 무호출=놀고 있는 팀원). 숫자 원천 둘뿐:
-// 호출=chat_logs(영속 — 과거 기간 즉시 가능) · 응답/오류=llm_activity_daily(도입일부터 축적).
+// KPI는 구글 SRE 골든 시그널에서(지연·트래픽·오류 + 무호출=놀고 있는 팀원). 숫자 원천은
+// llm_activity_daily 하나(도입일부터 축적) — chat_logs로 세지 않는다(학습수집 스위치에
+// 좌우되어 거짓 0이 된다 — 검토관 중7).
 export function supervisionStatusAnswer(): { output: string; dataCard: DataCard } {
   const { listAgents } = require("./agents") as typeof import("./agents");
   const { chatCallsByAgent, activityDaily } = require("./llmactivity") as typeof import("./llmactivity");
   const 팀 = listAgents();
   const 호출 = chatCallsByAgent(1);
-  const 오늘 = new Date().toISOString().slice(0, 10);
+  const 오늘 = todayLocal();
   const 오늘지표 = new Map(activityDaily(1).filter((d) => d.day === 오늘 && d.kind === "chat").map((d) => [d.agent, d]));
   const 행 = 팀.map((a) => {
     const d = 오늘지표.get(a.id);
@@ -379,7 +381,7 @@ export function supervisionStatusAnswer(): { output: string; dataCard: DataCard 
       totalCount: 행.length,
     },
   };
-  return { output: `AI 팀 감독 — 오늘 호출 ${총호출}건 · 오류 ${총오류}건 · 무호출 팀원 ${무호출}명. 응답·오류 지표는 도입일(2026-08-20)부터 쌓입니다 — 7일·30일은 🗔 화면에서 봅니다.`, dataCard };
+  return { output: `AI 팀 감독 — 오늘 호출 ${총호출}건 · 오류 ${총오류}건 · 무호출 팀원 ${무호출}명. 지표는 감독 도입일(2026-08-20)부터 쌓입니다 — 7일·30일 추이는 🗔 화면에서 봅니다.`, dataCard };
 }
 
 // ── 전 메뉴 카드 7종(2026-08-20 사장님 확정) — 숫자는 전부 DB 직접 계산, 표는 급한 순 상한 ──
@@ -418,7 +420,7 @@ export function fixStatusAnswer(): { output: string; dataCard: DataCard } {
   // 뜬 실사고의 재발 방지(workflow.ts:94와 같은 규칙). finding이 없으면 못 판단하니 남긴다.
   const 대기 = rv.filter((r) => (r.finding ? isRealVulnerability(r.finding) : true) && String(r.status) === "pending");
   const mt = listMaintenanceItems();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const 지연 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled" && String((m as { scheduleDate?: string }).scheduleDate || "") <= today).length;
   const 예정 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled").length;
   const dataCard: DataCard = {

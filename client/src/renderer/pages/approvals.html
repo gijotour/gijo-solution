@@ -104,6 +104,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <span class="fchip" data-f="in_progress">진행중 <b id="fcProg">0</b></span>
           <span class="fchip" data-f="verifying">검증 <b id="fcVerify">0</b></span>
           <span class="fchip" data-f="rejected">반려 <b id="fcRejected">0</b></span>
+          <span class="fchip" data-f="accepted">위험수용 <b id="fcAccepted">0</b></span>
           <span class="fchip" data-f="approved">완료 <b id="fcApproved">0</b></span>
           <span class="fchip" data-f="pending">미검토 <b id="fcPending">0</b></span>
           <span class="fchip" data-f="unassigned">미배정 <b id="fcUnassigned">0</b></span>
@@ -184,7 +185,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .rv-row:hover{background:var(--panel);}
   .rv-row.on{background:var(--panel);border-color:rgba(59,130,246,.4);}
   .rv-dot{width:8px;height:8px;border-radius:50%;flex:none;}
-  .d-pending{background:var(--amber);}.d-in_progress{background:var(--blue);}.d-verifying{background:var(--purple);}.d-approved{background:var(--teal);}.d-rejected{background:var(--muted-2);}.d-over{background:var(--red);}
+  .d-pending{background:var(--amber);}.d-in_progress{background:var(--blue);}.d-verifying{background:var(--purple);}.d-approved{background:var(--teal);}.d-rejected{background:var(--muted-2);}.d-over{background:var(--red);}.d-accepted{background:#8a7bd8;}
   .rv-rmain{flex:1;min-width:0;}
   .rv-rt{font-size:12.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .rv-rs{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -203,6 +204,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .st-verifying{color:var(--purple);background:rgba(139,124,240,.16);}
   .st-approved{color:var(--teal);background:rgba(30,185,128,.14);}
   .st-rejected{color:var(--muted);background:rgba(255,255,255,.06);}
+  .st-accepted{color:#b3a7ee;background:rgba(139,124,240,.14);}
   .rv-kev{color:#f5928a;background:rgba(226,72,61,.18);font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:6px;}
   .dt-over{color:#f5928a;background:rgba(226,72,61,.18);font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:6px;}
   .dt-title{font-size:17px;font-weight:800;color:#fff;}
@@ -254,7 +256,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const boldify = (s) => String(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 
 
-  const ST_LABEL = { pending: "미검토", in_progress: "진행중", verifying: "검증 대기", approved: "완료", rejected: "반려" };
+  const ST_LABEL = { pending: "미검토", in_progress: "진행중", verifying: "검증 대기", approved: "완료", rejected: "반려", accepted: "위험수용" };
   const REJ_LABEL = { false_positive: "오탐", compensating_control: "다른 보안으로 방어 중" };
   const SEV_ORD = { critical: 0, high: 1, medium: 2, low: 3 };
   const fmtDate = (ms) => ms ? new Date(ms).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
@@ -284,6 +286,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       case "in_progress": return r.status === "in_progress";
       case "verifying": return r.status === "verifying";
       case "rejected": return r.status === "rejected";
+      case "accepted": return r.status === "accepted";
       case "approved": return r.status === "approved";
       case "pending": return r.status === "pending";
       case "unassigned": return isUnassigned(r);
@@ -307,6 +310,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
             verifying: cnt((r) => r.status === "verifying"),
             approved: cnt((r) => r.status === "approved"),
             rejected: cnt((r) => r.status === "rejected"),
+            accepted: cnt((r) => r.status === "accepted"),
             overdue: cnt((r) => r.overdue),
           }
         : summary;
@@ -332,6 +336,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("fcProg").textContent = 요약.in_progress ?? 0;
       document.getElementById("fcVerify").textContent = 요약.verifying ?? 0;
       document.getElementById("fcRejected").textContent = 요약.rejected;
+      document.getElementById("fcAccepted").textContent = 요약.accepted ?? 0;
       document.getElementById("fcApproved").textContent = 요약.approved;
       document.getElementById("fcPending").textContent = 요약.pending;
       const unassigned = cnt(isUnassigned);
@@ -445,9 +450,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (r.assignee) bits.push(esc(r.assignee));
       if (r.status === "verifying") bits.push("검증 대기");
       else if (r.status === "rejected") bits.push(REJ_LABEL[r.rejectReason] || "반려");
+      else if (r.status === "accepted") {
+        // 수용 기한이 지났으면 재검토 대상임을 행에서 바로 알린다 — 감춰지는 상태가 아니다.
+        // 로컬(KST) 달력 비교 — UTC면 0~9시에 하루 어긋난다(검토관 중6).
+        const t0 = new Date();
+        const 만료 = r.acceptUntil && r.acceptUntil < new Date(t0.getTime() - t0.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        bits.push(만료 ? "⚠수용 만료(재검토)" : "수용 ~" + esc((r.acceptUntil || "").slice(5)));
+      }
       else if (r.overdue) bits.push("⚠지연");
       else if (r.dueDate) bits.push("📅" + esc(r.dueDate.slice(5)));
-      if (!r.assignee && r.status !== "rejected" && r.status !== "approved") bits.push("미배정");
+      if (!r.assignee && r.status !== "rejected" && r.status !== "approved" && r.status !== "accepted") bits.push("미배정");
       // 구분자(\0)는 HTML 속성에서 유실되므로 assetId·findingKey를 별도 data 속성으로 싣는다.
       const ck = r.status === "rejected" || r.status === "approved" ? "" :
         `<input type="checkbox" class="rv-ck" data-ck="1"${selected.has(keyOf(r)) ? " checked" : ""}>`;
@@ -629,7 +641,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const metaLine = [f.epss != null ? `EPSS ${Math.round(f.epss * 100)}%` : "", f.vpr != null ? `VPR ${f.vpr}` : "", esc(f.source_tool)].filter(Boolean).join(" · ");
 
     // 배정 폼 — 반려/완료가 아닐 때만 편집 가능.
-    const editable = r.status !== "rejected";
+    // accepted도 제외 — 수용 건에 SLA 기한 입력칸이 열려 있으면 「수용인데 지연」 충돌을 키운다(검토관 하2).
+    const editable = r.status !== "rejected" && r.status !== "accepted";
+    // 로컬(KST) 달력 오늘 — toISOString(UTC)은 0~9시에 어제가 된다(검토관 중6).
+    function 오늘로컬() { var t = new Date(); return new Date(t.getTime() - t.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
     const assignForm = editable ? `
       <div class="sec">
         <div class="sec-h">담당 배정</div>
@@ -662,6 +677,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } else if (r.status === "rejected") {
       stageActions = `<div class="reject-note">🛡 <b>${esc(REJ_LABEL[r.rejectReason] || "반려")}</b>${r.note ? " — " + esc(r.note) : ""}<br><span style="color:var(--muted-2)">반려: ${esc(r.reviewedBy || "-")} · ${r.reviewedAt ? new Date(r.reviewedAt).toLocaleDateString("ko-KR") : ""}</span></div>
         <div class="actions" style="margin-top:10px"><button class="btn" data-set="pending">↩ 검토 재개</button></div>`;
+    } else if (r.status === "accepted") {
+      // 감사 대응이 목적인 판정 — 사유·기한·처리자를 화면에서 바로 읽을 수 있어야 한다(검토관 하2).
+      const 만료됨 = r.acceptUntil && r.acceptUntil < 오늘로컬();
+      stageActions = `<div class="reject-note">⚖ <b>위험수용${만료됨 ? " — ⚠기한 만료(재검토 대상)" : ""}</b>${r.note ? " — " + esc(r.note) : ""}<br>
+        <span style="color:var(--muted-2)">기한 ${esc(r.acceptUntil || "-")} · 수용: ${esc(r.acceptedBy || r.reviewedBy || "-")} · ${r.reviewedAt ? new Date(r.reviewedAt).toLocaleDateString("ko-KR") : ""}</span></div>
+        <div class="actions" style="margin-top:10px"><button class="btn primary" data-set="in_progress">▶ 조치 시작(수용 해제)</button><button class="btn" data-set="pending">↩ 검토 재개</button></div>`;
     }
 
     // 진행 이력 타임라인

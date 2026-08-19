@@ -37,6 +37,8 @@ const SCREENS: Record<string, ScreenContext> = {
   "kpi.html": { label: "보안 KPI", domain: "보안 지표 추이" },
   "analysis.html": { label: "통합 관제", domain: "스캐너·로그·운영리포트 통합 분석", defaultAction: "analyze" },
   "sessions.html": { label: "작업 내역", domain: "진행 중인 작업 대화" }, // 1bc03f8 개명 누락분(2026-07-29 검토 #8)
+  // 이 줄이 없으면 화면 맥락·도구 좁히기가 조용히 죽는다(assets.html 전례 — 검토관 중8).
+  "supervision.html": { label: "AI 팀 감독", domain: "AI 팀 호출·응답·오류 실측 지표" },
 
   // 자산과 취약점은 붙어 다닌다 — 자산 목록에서 "이 자산 취약점 담당자 배정해줘"가 자연스럽다.
   "inventory.html": { label: "자산 목록", domain: "AI·IT 자산 인벤토리", defaultAction: "scan", toolDomains: ["assets", "vuln"] },

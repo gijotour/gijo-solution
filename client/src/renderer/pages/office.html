@@ -1031,7 +1031,8 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       window.gijo.onCollaborationEvent(onCollabEvent);
       // 실추론 신호 즉시 반영(2026-08-20 사장님) — 폴링 20초를 기다리지 않는다. 신호 유실 대비 폴링이 보정.
       if (window.gijo.onLlmActivity) window.gijo.onLlmActivity(function (ev) {
-        if (ev && ev.kind === "chat" && ev.agent) office.setAgentActivity(ev.agent, ev.phase === "start");
+        // agentName(표시명) 우선 — ev.agent는 이제 id다(검토관 상1). 사무실 인형은 표시명으로 찾는다.
+        if (ev && ev.kind === "chat" && (ev.agentName || ev.agent)) office.setAgentActivity(ev.agentName || ev.agent, ev.phase === "start");
       });
       setInterval(loadAgents, 20000);  // 상태는 휘발성 라이브 신호 — 주기 폴링으로 갱신
       setInterval(loadSessions, 15000); // 외부 콘솔 접속자 presence

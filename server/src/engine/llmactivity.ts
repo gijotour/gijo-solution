@@ -11,13 +11,18 @@ import type { Express } from "express";
 import type { WebSocketServer } from "ws";
 import { authMiddleware } from "../auth/auth";
 import { db } from "../db";
+import { todayLocal } from "../util/date";
 
 export interface LlmActivityEvent {
   // search=RAG 조회(hybridSearch — 4개 검색 경로 공용 지점) · guard=입구 검사(gateway.gateUserInput)
   // — 2026-08-20 AI 팀 가시화(레일 로스터 깜박임의 실신호. 값이 움직이면 실제로 일어난 것).
   kind: "chat" | "embed" | "load" | "swap" | "search" | "guard";
   phase: "start" | "done" | "error";
-  agent?: string; // 표시용 에이전트 이름
+  // ⚠ agent는 **에이전트 id**다(orchestrator·scan…) — 일 집계(llm_activity_daily)와 감독
+  //   카드가 id로 매칭한다. 표시명을 넣으면 지표가 영원히 0이 된다(검토관 2026-08-20 상1 —
+  //   표시명은 사용자가 바꿀 수 있어 집계 키로도 못 쓴다). 사람 눈용은 agentName에.
+  agent?: string;
+  agentName?: string; // 표시용 이름(레일·사무실 창) — 집계에는 안 쓴다
   model?: string; // 모델 파일 basename (또는 임베딩 모델)
   detail?: string; // 사람이 읽는 한 줄
   promptTokens?: number;
@@ -49,7 +54,7 @@ export function emitLlmActivity(evt: Omit<LlmActivityEvent, "timestamp">): void 
   // 감독용 일 단위 영속 집계(2026-08-20 ②) — start는 안 세고 done/error만(이중 셈 방지).
   if (full.phase !== "start") {
     try {
-      dailyUpsert.run(new Date().toISOString().slice(0, 10), full.agent || "-", full.kind,
+      dailyUpsert.run(todayLocal(), full.agent || "-", full.kind,
         full.phase === "done" ? 1 : 0, full.phase === "error" ? 1 : 0,
         full.phase === "done" && full.latencyMs ? Math.round(full.latencyMs) : 0);
     } catch { /* 집계는 부가 기능 — 방송 자체를 막지 않는다 */ }
@@ -74,25 +79,26 @@ export function resetLlmActivityForTests(): void {
 
 /** 감독 집계 — 최근 N일의 에이전트×종류 합(오늘 포함). 숫자는 전부 실측 이벤트의 합. */
 export function activityDaily(days: number): { day: string; agent: string; kind: string; calls: number; errors: number; latencyMsSum: number }[] {
-  const from = new Date(Date.now() - Math.max(0, days - 1) * 86400000).toISOString().slice(0, 10);
+  const from = todayLocal(new Date(Date.now() - Math.max(0, days - 1) * 86400000)); // 로컬(KST) 달력 — UTC면 0~9시에 하루 밀린다(중6)
   return db.prepare("SELECT day, agent, kind, calls, errors, latencyMsSum FROM llm_activity_daily WHERE day >= ? ORDER BY day")
     .all(from) as { day: string; agent: string; kind: string; calls: number; errors: number; latencyMsSum: number }[];
 }
 
-/** 에이전트별 대화 호출 수(chat_logs — 영속이라 과거 기간도 즉시 가능). */
+/** 에이전트별 대화 호출 수 — llm_activity_daily(kind=chat)에서. chat_logs로 세지 않는다:
+ *  그건 학습 자동수집 스위치·noLearn 계정에 좌우되어 「수집 끄면 전 팀원 0」이 되고(검토관
+ *  중7 — 규칙 계산인 척 잘못된 결론), 기록 키도 라우팅 id라 실제 일한 전문가가 0으로 남는다. */
 export function chatCallsByAgent(days: number): Record<string, number> {
-  const from = Date.now() - Math.max(1, days) * 86400000;
-  const rows = db.prepare("SELECT agentId, COUNT(*) AS n FROM chat_logs WHERE createdAt >= ? GROUP BY agentId")
-    .all(from) as { agentId: string; n: number }[];
   const out: Record<string, number> = {};
-  for (const r of rows) out[r.agentId] = r.n;
+  for (const d of activityDaily(days)) {
+    if (d.kind === "chat") out[d.agent] = (out[d.agent] || 0) + d.calls;
+  }
   return out;
 }
 
 export function registerLlmActivityRoutes(app: Express): void {
   app.get("/api/llm-activity/history", authMiddleware, (_req, res) => res.json(log.slice(-60)));
-  // AI 팀 감독(2026-08-20 ②) — 기간별 에이전트 일지표. 숫자는 chat_logs(호출)와
-  // llm_activity_daily(응답·오류 — 도입일부터 축적) 두 실측 원천뿐이다.
+  // AI 팀 감독(2026-08-20 ②) — 기간별 에이전트 일지표. 원천은 llm_activity_daily 하나
+  // (도입일부터 축적 — 호출·응답·오류 전부. 원천이 하나라 숫자가 서로 어긋날 길이 없다).
   app.get("/api/aiteam/supervision", authMiddleware, (req, res) => {
     const days = Math.min(90, Math.max(1, Number(req.query.days) || 1));
     // 최근 오류 1줄(에이전트별) — 인메모리 최근 200건에서. 재시작하면 비는 것이 정직한 한계

@@ -20,9 +20,11 @@ const pruneSnap = db.prepare("DELETE FROM briefing_snapshot WHERE id NOT IN (SEL
 const today = todayLocal;
 const plusDays = plusDaysLocal;
 
-// #4 SLA 알림 — 기한 초과 + 임박(D-2 이내). rejected(오탐)는 조치 대상 아님.
+// #4 SLA 알림 — 기한 초과 + 임박(D-2 이내). rejected(오탐)·accepted(위험수용)는 조치 대상 아님
+// (수용 만료는 SLA가 아니라 재검토 부상 — acceptExpired가 맡는다. 안 빼면 「기한 초과 즉시
+//  처리」와 「기한까지 수용」이 같은 건에서 충돌한다 — 검토관 2026-08-20 중1).
 export function slaAlerts(): { overdue: FindingReview[]; dueSoon: FindingReview[] } {
-  const reviews = listFindingReviews().filter((r) => r.dueDate && r.status !== "rejected");
+  const reviews = listFindingReviews().filter((r) => r.dueDate && r.status !== "rejected" && r.status !== "accepted");
   const t = today();
   const soon = plusDays(2);
   return {

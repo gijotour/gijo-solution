@@ -668,22 +668,14 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], c
   const facts = (usefulCalls.length ? usefulCalls : calls)
     .map((c, i) => `[${i + 1}] ${c.tool}: ${c.result.slice(0, MAX_FACT_CHARS)}`)
     .join("\n");
-  // 최종 답 작성자를 도구 영역의 전문가로(2026-08-20 ③ — orchestrator 고정을 정찰이 지적).
-  // 취약점 결과는 우선순위 전문가(analysis)가, 장비 점검·SBOM은 해석(scan)이, 보고는 report가
-  // 말한다 — 답변 톤이 아니라 **역할 영역 RAG 부스트**(categoriesForRole)가 실익이다.
-  // 영역이 안 걸리는 도구(assets·cross 등)는 종전대로 orchestrator.
-  const 전문가 = (() => {
-    const 표: Record<string, string> = { vuln: "analysis", maintenance: "scan", sbom: "scan", report: "report" };
-    const 셈: Record<string, number> = {};
-    for (const c of usefulCalls.length ? usefulCalls : calls) {
-      const a = 표[findAgentTool(c.tool)?.domain || ""];
-      if (a) 셈[a] = (셈[a] || 0) + 1;
-    }
-    const top = Object.entries(셈).sort((a, b) => b[1] - a[1])[0];
-    return top ? top[0] : "orchestrator";
-  })();
+  // ⚠ 작성자 orchestrator 고정 유지 — 「도구 영역 전문가가 최종 답을 쓰게」는 만들었다가
+  //   게시 전 검토에서 되돌렸다(2026-08-20 검토관 상4). 이 경로는 remember를 안 켜 RAG가
+  //   아예 안 돌므로 노린 실익(역할 영역 부스트)이 0인데, 부작용은 실재했다: 팀원별 두뇌
+  //   위치(원격이면 최종 답이 밖으로)·모델 배정(답마다 VRAM 스왑)·어댑터 cache_prompt:false가
+  //   전부 최종 답에 걸린다. 역할 부스트는 라우팅된 본답 경로(dispatcher→chat(remember))가
+  //   이미 받는다 — 장비운영 주인(categoriesForRole)의 실익은 그쪽에서 난다.
   return chat({
-    agentId: 전문가,
+    agentId: "orchestrator",
     // explain: 도구 실행 후 사용자에게 그대로 보여주는 최종 답변이다.
     explain: true,
     // ⚠ trusted — 이 message는 사용자 입력이 아니라 **우리가 조립한 내부 프롬프트**다

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS 프로 셸 — 「에이전트 감독 뷰」 시안 (추천 1개)
+  경로: mockups/agent-supervision/시안.html · 제품 코드(client/·server/)는 한 글자도 고치지 않았다(읽기만 했다).
+
+  ══════════════════════════════════════════════════════════════════════════════
+  ── 배경 ────────────────────────────────────────────────────────────────────
+  2026-08-20 사장님: 「에이전트 감독도 필요할 것 같은데」 → 「추천으로 진행」(승인).
+  GIJO AS 프로 셸엔 이미 팀원 6인의 "지금 이 순간"을 보는 장치가 둘 있다 —
+    · 56px 레일 로스터(5.40.0) — 실신호(chat/embed/search/guard)로 아이콘이 깜박인다.
+    · 팀 사무실(office.html) — 실시간 캔버스 + 협업 이벤트 말풍선.
+  이번 요청은 그 둘과 시간축이 다르다. "지금 뭘 하나"가 아니라 "오늘/이번 주/이번 달 누가
+  얼마나 일했고 어디서 실수했나"를 사후에 돌아보는 표다 — 늘 떠 있는 관제(ambient) 화면이
+  아니라 가끔 열어 보는 정기 점검(periodic review)이다. 그래서 레일·사무실을 대체하지 않고,
+  이미 확정된 카드+무대 계약 위에 새 진입점 하나만 얹는다.
+
+  ── 설계 전 조사 ────────────────────────────────────────────────────────────
+  [1] Google SRE 「네 가지 골든 시그널(Four Golden Signals)」 — 지연시간(latency)·트래픽
+      (traffic)·오류(errors)·포화도(saturation)가 사용자 대면 서비스 상태를 보는 최소 지표
+      집합이라고 정의한다.
+      https://sre.google/sre-book/monitoring-distributed-systems/
+      → 근거: 카드 KPI 4개를 "그럴듯해 보이는 숫자"로 지어내지 않고 이 네 축에서 그대로
+        골랐다 — 호출 수=트래픽, 평균 응답=지연시간, 오류/폴백=오류. "포화도"는 GPU 사용률
+        같은 자원 지표라 우리 팀(고정 6인)엔 안 맞아, 대신 "무호출 에이전트 수"로 재해석했다
+        (자원이 아니라 "팀 구성 활용도 편중"을 보는 우리 버전의 네 번째 축).
+  [2] AI 에이전트 관측(observability) 2026 정리 — "에이전트 함대 전반에 무슨 일이 일어나는
+      지 드러내는 것이 대시보드의 1차 가치"이고 "오류 개수보다 오류 분류가 실무에 값어치있다"
+      (몇 번 실패했는지보다 왜 실패했는지), "일부 에이전트가 예산의 80%를 쓴다"처럼 에이전트
+      별 편중은 놓치기 쉽다고 지적한다.
+      https://expanso.io/blog/ai-agent-observability-best-practices/
+      https://www.braintrust.dev/articles/agent-observability-complete-guide-2026
+      → 근거: 표에 "오류 건수"만 두지 않고 각 카드에 "최근 오류 1줄"(실제 오류 메시지)을
+        붙여 분류 정보를 살렸다. "무호출 에이전트"를 KPI로 승격해 편중(놀고 있는 팀원)을
+        놓치지 않게 했다.
+  [3] 화면 계약(5.41~5.42, 2026-08-20 확정) — 메뉴성 열기는 대화창 카드가 전부, 카드의
+      🗔로 무대(대화창 자리 전폭)가 뜬다. 같은 날 승인된 mockups/pro-stage/시안.html이 이미
+      이 계약의 정확한 구현 그림(CSS·상호작용: cs-*·dc-*·stage*)을 갖고 있어, 새로 짓지 않고
+      그대로 재사용했다 — "화면마다 새 시각언어"가 되는 것 자체가 다음 검토관이 잡을 결함이다.
+
+  ── 정찰 확정 사실(이 밖은 지어내지 않았다) ──────────────────────────────────
+  · 팀원 6인 = server/src/engine/agents.ts AGENT_DEFS 그대로 — Security Orchestrator[분배]·
+    Scan Agent[해석]·Analyze Agent[우선]·Report Agent[보고]·TI Agent[위협]·GIJO Agent[해설].
+    role 문구·약자·기본상태(defaultStatus)도 그 파일 그대로 옮겼다. 아이콘도 dashboard.html의
+    기존 AGENT_ICON 맵(🧭⊘◎▣🛰📚, dashboard.html:460) 그대로 — 새로 안 만들었다.
+  · 표의 호출·평균응답·오류 숫자는 전부 "(예시)"다. 실제로는:
+     - 호출 수 = chat_logs(agentId, createdAt — db.ts:226, 영속 테이블)를 기간으로 GROUP BY.
+     - 평균 응답·오류 = llmactivity.ts의 llm:event(kind=chat, phase=done/error, latencyMs)가
+       재료. ⚠ 이 로그는 **인메모리 최근 200건, 서버 재시작 시 소실**(collaboration.ts도 500건
+       링버퍼로 동일 구조) — "오늘"은 대체로 커버되지만 "7일/30일" 평균응답·오류는 지금
+       스키마로는 못 낸다. 감춘 게 아니라 아래 "구현 전 확인할 것" 절에 그대로 적었다.
+     - 폴백(모델 미배정) = agents.ts assignedModelId(app_state 영속) — 지금 그대로 조회 가능.
+  · 색 토큰은 client/src/renderer/pages/app.html :root(10~11행) 그대로 복사.
+
+  ── 이 파일에 실제로 있는 것 ─────────────────────────────────────────────────
+  · 위: 결정 문서(조사 근거·왜 이 안·데이터 출처 확인·포기한 것·밀도 숫자·자가점검).
+  · 아래: 실제로 동작하는 미리보기 — 장면① 카드(대화창)·장면② 무대(상세). 표 행 클릭(📌)·
+    🗔 열기·← 대화로·기간 탭(오늘/7일/30일 — 예시 데이터 3벌을 실제로 바꿔 보여줌)만 동작한다.
+    그 밖의 단추·입력칸은 "(목업) 동작하지 않음"이라 표기했다(정직한 목업 원칙).
+  ══════════════════════════════════════════════════════════════════════════════
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 에이전트 감독 뷰 시안</title>
+<style>
+  /* 제품 색 토큰 — client/src/renderer/pages/app.html :root 그대로 복사(2026-08-20 확인) */
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;
+    --mk-page:#161615;--mk-accent:#5fa1ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--mk-page);color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+
+  /* ── 시안 조작 바(제품 UI 아님) ─────────────────────────────────────────── */
+  .mk-bar{position:sticky;top:0;z-index:50;background:#101012;border-bottom:1px dashed rgba(95,161,255,.4);
+    padding:10px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .mk-badge{font-size:10.5px;font-weight:800;letter-spacing:.04em;color:#0b0b0c;background:var(--mk-accent);
+    border-radius:5px;padding:2px 7px;flex:0 0 auto;}
+  .mk-title{font-size:13.5px;font-weight:800;color:#fff;flex:0 0 auto;}
+  .mk-scenes{display:flex;gap:6px;flex:0 0 auto;}
+  .mk-scenebtn{font-size:12px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border-strong);
+    border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;}
+  .mk-scenebtn:hover{color:#fff;border-color:var(--mk-accent);}
+  .mk-scenebtn.on{color:#0b0b0c;background:var(--mk-accent);border-color:var(--mk-accent);}
+  .mk-scale{display:flex;gap:4px;flex:0 0 auto;margin-left:auto;align-items:center;}
+  .mk-scale button{font-size:11px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border);
+    border-radius:6px;padding:4px 8px;cursor:pointer;font-family:inherit;}
+  .mk-scale button.on{color:#fff;border-color:var(--mk-accent);}
+  .mk-docLink{font-size:12px;color:var(--mk-accent);text-decoration:none;flex:0 0 auto;}
+  .mk-docLink:hover{text-decoration:underline;}
+  .mk-caption{width:100%;font-size:12.25px;color:var(--muted);line-height:1.6;padding-top:2px;}
+  .mk-caption b{color:#fff;}
+
+  .stagewrap{display:flex;justify-content:center;padding:28px 16px 10px;}
+  .device-frame{overflow:hidden;border-radius:14px;box-shadow:0 30px 70px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);
+    width:1120px;height:630px;flex:0 0 auto;}
+  .device{width:1600px;height:900px;transform:scale(.7);transform-origin:top left;
+    background:var(--bg);display:flex;flex-direction:column;overflow:hidden;}
+
+  /* ── 제품 프레임 — 실제 셸 색·구조 재현(app.html·office.html 그대로) ───────────── */
+  .topbar{flex:0 0 auto;height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;
+    border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .topbar .spacer{flex:1;}
+  .tb-clock{font-size:12.25px;color:var(--muted);}
+  .tb-status{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--teal);
+    background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);padding:3px 10px;border-radius:16px;}
+  .tb-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  .appgrid{flex:1 1 auto;display:flex;min-height:0;}
+  .rail{width:56px;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 0;
+    border-right:1px solid var(--border);background:var(--panel-2);}
+  .rail button{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid transparent;
+    color:var(--muted);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+    font-family:inherit;flex:0 0 auto;}
+  .rail button:hover{background:rgba(255,255,255,.06);color:#fff;border-color:var(--border);}
+  .rail-foot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:5px;}
+  .rail-avatar{width:28px;height:28px;border-radius:50%;background:var(--panel);border:1px solid var(--border-strong);
+    display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;color:var(--muted);}
+
+  .workarea{flex:1 1 auto;position:relative;min-width:0;background:var(--bg);overflow:hidden;}
+  .scene{position:absolute;inset:0;display:none;flex-direction:column;min-height:0;}
+  .scene.on{display:flex;}
+
+  /* ── 대화창(장면①이 쓰는 뼈대) — console.js 렌더를 그대로 재현 ───────────────── */
+  .cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12.25px;
+    color:var(--muted);border-bottom:1px solid rgba(255,255,255,.05);}
+  .cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);
+    border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}
+  .cs-sel{font-size:11.5px;font-weight:700;color:#ffd9a8;border:1px solid rgba(240,160,32,.45);border-radius:12px;
+    padding:1px 9px;white-space:nowrap;display:none;}
+  .cs-sel.on{display:inline-block;}
+  .cs-sel .x{margin-left:5px;color:var(--muted-2);cursor:default;}
+  .cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+  .cs-btn{flex:0 0 auto;font-size:12.25px;font-weight:700;color:var(--muted);background:transparent;
+    border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:3px 9px;cursor:default;white-space:nowrap;}
+  .cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:4px;}
+  .cs-row{display:flex;gap:9px;padding:7px 0;}
+  .cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);
+    display:flex;align-items:center;justify-content:center;font-size:12.25px;}
+  .cs-row .cb{flex:1;min-width:0;}
+  .cs-row .cn{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:2px;}
+  .cs-row .cn .ct{font-weight:500;color:var(--muted-2);margin-left:6px;}
+  .cs-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    padding:22px 0 8px;text-align:center;}
+  .ce-greet{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.3px;}
+  .ce-honest{font-size:12px;color:var(--muted-2);max-width:520px;line-height:1.6;}
+  .cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;
+    border-top:1px solid var(--border);}
+  .cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;
+    color:var(--text);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}
+  .cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel);color:var(--muted);
+    border:1px solid var(--border-strong);font-size:17px;cursor:default;}
+  .cs-send{background:var(--blue);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;
+    padding:11px 18px;cursor:default;}
+
+  /* ── 현황 카드(chatparts.js dataCard·CSS 그대로, chatparts.js:61-95) ───────────── */
+  .dc-card{margin-top:2px;border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:var(--panel-2);}
+  .dc-head{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.08);
+    font-size:12.75px;font-weight:800;color:var(--text);}
+  .dc-tag{font-size:10.75px;font-weight:700;color:var(--muted-2);margin-left:2px;}
+  .dc-open{margin-left:auto;font-size:12px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.10);
+    border:1px solid rgba(59,130,246,.35);border-radius:7px;padding:3px 9px;cursor:pointer;font-family:inherit;}
+  .dc-open:hover{background:rgba(59,130,246,.18);}
+  .dc-kpis{display:flex;border-bottom:1px solid rgba(255,255,255,.08);}
+  .dc-kpi{flex:1;padding:7px 11px;border-right:1px solid rgba(255,255,255,.06);}
+  .dc-kpi:last-child{border-right:0;}
+  .dc-kl{font-size:11px;color:var(--muted-2);}
+  .dc-kv{font-size:15px;font-weight:800;color:#fff;}
+  .dc-kv.bad{color:#f5928a;}.dc-kv.warn{color:var(--amber);}.dc-kv.ok{color:var(--teal);}
+  .dc-star{font-size:10.5px;color:var(--muted-2);font-weight:400;}
+  .dc-card table{width:100%;border-collapse:collapse;font-size:12.25px;}
+  .dc-card th{text-align:left;padding:3px 10px;color:var(--muted-2);font-size:11.5px;border-bottom:1px solid rgba(255,255,255,.08);}
+  .dc-card th.num,.dc-card td.num{text-align:right;}
+  .dc-card td{padding:4px 10px;line-height:1.35;border-bottom:1px solid rgba(255,255,255,.05);}
+  .dc-card tbody tr{cursor:pointer;}
+  .dc-card tbody tr:hover td{background:rgba(59,130,246,.09);}
+  .dc-card tbody tr.sel td{background:rgba(240,160,32,.12);}
+  .dc-card tbody tr:nth-child(even){background:rgba(255,255,255,.025);}
+  .dc-card .ag-name{display:flex;align-items:center;gap:6px;}
+  .dc-card .ag-abbr{font-size:10.5px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,.12);
+    border-radius:5px;padding:0 5px;}
+  .dc-foot-note{padding:5px 11px 7px;font-size:11px;color:var(--muted-2);border-top:1px solid rgba(255,255,255,.05);}
+
+  /* ── 장면② 무대 ──────────────────────────────────────────────────────────── */
+  .stage{position:absolute;left:0;right:0;top:0;bottom:10px;background:var(--bg);
+    border-radius:0 0 12px 12px;box-shadow:0 20px 34px -12px rgba(0,0,0,.65);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .stagehead{flex:0 0 auto;height:40px;display:flex;align-items:center;gap:10px;padding:0 14px;
+    border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .stageback{font-size:12px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border-strong);
+    border-radius:7px;padding:5px 11px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .stageback:hover{color:#fff;border-color:var(--blue);}
+  .stagename{font-size:13px;font-weight:800;color:var(--text);}
+  .stagesample{margin-left:auto;font-size:11px;color:var(--muted-2);}
+  .stagebody{flex:1 1 auto;min-height:0;overflow-y:auto;padding:18px 22px;}
+
+  .periodbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .periodbar .ph{font-size:12.5px;font-weight:800;color:#fff;}
+  .periodseg{display:inline-flex;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:9px;padding:2px;gap:2px;}
+  .periodseg button{border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:700;
+    padding:6px 14px;border-radius:7px;cursor:pointer;font-family:inherit;}
+  .periodseg button.on{background:rgba(59,130,246,.22);color:#fff;}
+  .periodseg button:not(.on):hover{color:#fff;}
+  .periodnote{font-size:11.25px;color:var(--muted-2);}
+
+  .agentgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+  .agentcard{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;}
+  .agentcard:hover{border-color:var(--border-strong);}
+  .agentcard.sel{border-color:var(--blue);box-shadow:0 0 0 1px rgba(59,130,246,.45);background:rgba(59,130,246,.06);}
+  .ag-head{display:flex;align-items:center;gap:7px;}
+  .ag-icon{font-size:14px;flex:0 0 auto;}
+  .ag-dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;}
+  .ag-dot.watching{background:var(--blue-light);}
+  .ag-dot.working{background:var(--teal);animation:agbreath 1.6s ease-in-out infinite;}
+  .ag-dot.idle{background:transparent;} /* 대기=무표시(조사 근거 [2]와 별개로, AI팀_가시화 시안이 인용한
+    aiuxdesign.guide 패턴 "idle=표시 없음"을 그대로 따름) */
+  @keyframes agbreath{0%,100%{box-shadow:0 0 0 0 rgba(30,185,128,.35);}50%{box-shadow:0 0 0 4px rgba(30,185,128,0);}}
+  .ag-name{font-size:13px;font-weight:800;color:#fff;}
+  .ag-abbr{font-size:10.5px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,.12);
+    border-radius:5px;padding:0 5px;flex:0 0 auto;}
+  .ag-role{font-size:11.25px;color:var(--muted);line-height:1.45;margin-top:5px;min-height:32px;}
+  .ag-trend{margin-top:6px;}
+  .ag-trend-h{display:flex;justify-content:space-between;align-items:baseline;font-size:10.75px;color:var(--muted-2);margin-bottom:3px;}
+  .ag-trend-h b{color:var(--text);font-weight:700;}
+  .ag-bars{display:flex;align-items:flex-end;gap:3px;height:28px;}
+  .ag-bars i{display:block;flex:1;background:rgba(255,255,255,.14);border-radius:2px 2px 0 0;min-height:2px;}
+  .ag-bars i.today{background:var(--blue-light);}
+  .ag-err{margin-top:6px;font-size:10.75px;color:#f5928a;line-height:1.4;min-height:14px;}
+  .ag-err.none{color:var(--muted-2);}
+
+  .supervise{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .sv-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);
+    font-size:12.5px;font-weight:800;color:#fff;}
+  .rule-badge{font-size:10.25px;font-weight:800;color:var(--muted-2);background:rgba(255,255,255,.06);
+    border:1px solid var(--border-strong);border-radius:10px;padding:2px 8px;}
+  .sv-item{display:flex;gap:9px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);}
+  .sv-item:last-child{border-bottom:0;}
+  .sv-ic{flex:0 0 auto;font-size:14px;width:20px;text-align:center;}
+  .sv-b{flex:1;min-width:0;font-size:12px;color:var(--text);line-height:1.55;}
+  .sv-b b{color:#fff;}
+  .sv-b .cap{display:block;color:var(--muted-2);font-size:11px;margin-top:2px;}
+
+  /* ── 문서(설명) 패널 ─────────────────────────────────────────────────────── */
+  .doc{max-width:900px;margin:0 auto;padding:46px 22px 90px;}
+  .doc h1{font-size:19px;color:#fff;margin:0 0 6px;}
+  .doc .lead{font-size:13px;color:var(--muted);margin-bottom:26px;line-height:1.7;}
+  .tldr{border:1px solid var(--border-strong);background:var(--panel-2);border-radius:12px;padding:16px 20px;margin-bottom:30px;}
+  .tldr .h{font-size:12px;font-weight:800;color:var(--mk-accent);margin-bottom:8px;letter-spacing:.02em;}
+  .tldr li{font-size:13px;line-height:1.75;color:var(--text);}
+  .doc section{margin-bottom:32px;padding-left:16px;border-left:3px solid var(--border-strong);}
+  .doc section.why{border-left-color:var(--blue);}
+  .doc section.data{border-left-color:var(--amber);}
+  .doc section.give{border-left-color:#f5928a;}
+  .doc section.density{border-left-color:var(--teal);}
+  .doc section.check{border-left-color:#8b7cf0;}
+  .doc h2{font-size:14.5px;color:#fff;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .doc p{font-size:13px;line-height:1.75;color:var(--muted);margin:0 0 10px;}
+  .doc ul{margin:0 0 10px;padding-left:20px;}
+  .doc li{font-size:13px;line-height:1.75;color:var(--muted);margin-bottom:4px;}
+  .doc li b{color:var(--text);}
+  .doc code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:0 5px;
+    color:var(--blue-light);font-size:12.25px;}
+  .num-table{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:12.75px;}
+  .num-table th{text-align:left;padding:7px 10px;color:var(--muted-2);font-size:11.75px;border-bottom:1px solid var(--border-strong);}
+  .num-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);}
+  .num-table tr.sum td{font-weight:800;color:#fff;background:rgba(59,130,246,.06);}
+  .checklist{list-style:none;margin:0;padding:0;}
+  .checklist li{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.65;color:var(--text);margin-bottom:9px;}
+  .checklist .ok{color:var(--teal);flex:0 0 auto;font-weight:800;}
+  .checklist .warn{color:var(--amber);flex:0 0 auto;font-weight:800;}
+  .rejected{margin-top:12px;padding:12px 14px;background:rgba(255,255,255,.03);border-radius:8px;}
+  .rejected .h{font-size:11.75px;font-weight:800;color:var(--muted-2);margin-bottom:6px;}
+  .src{font-size:11.5px;color:var(--muted-2);margin-top:2px;}
+  .src a{color:var(--blue-light);}
+  footer.doc-foot{max-width:900px;margin:0 auto;padding:0 22px 60px;font-size:11.5px;color:var(--muted-2);line-height:1.7;}
+</style>
+</head>
+<body>
+
+  <!-- ── 시안 조작 바(제품 UI 아님) ─────────────────────────────────────────── -->
+  <div class="mk-bar">
+    <span class="mk-badge">시안 · MOCKUP</span>
+    <span class="mk-title">에이전트 감독 뷰 — 카드 + 무대</span>
+    <div class="mk-scenes">
+      <button class="mk-scenebtn" data-scene="A">장면① · 카드(대화창)</button>
+      <button class="mk-scenebtn" data-scene="B">장면② · 무대(상세)</button>
+    </div>
+    <a class="mk-docLink" href="#doc">↓ 설명(왜·데이터 출처·포기·숫자·자가점검) 보기</a>
+    <div class="mk-scale">
+      <button data-scale="0.7" class="on">70%</button>
+      <button data-scale="1">100%</button>
+    </div>
+    <div class="mk-caption" id="mkCaption"></div>
+  </div>
+
+  <!-- ── 장치 프레임 — 1600×900 창을 그대로 그리고 축소 표시 ─────────────────────── -->
+  <div class="stagewrap">
+    <div class="device-frame" id="deviceFrame">
+      <div class="device" id="device">
+
+        <div class="topbar">
+          <div class="spacer"></div>
+          <span class="tb-clock">14:32</span>
+          <span class="tb-status"><span class="dot"></span>연결됨</span>
+        </div>
+
+        <div class="appgrid">
+          <nav class="rail">
+            <button title="전체 메뉴 (Ctrl+K) — (목업) 동작하지 않음">☰</button>
+            <button title="작업 내역 — (목업) 동작하지 않음">🕘</button>
+            <button title="즐겨찾기 — (목업) 동작하지 않음">⭐</button>
+            <button title="열려 있는 창 목록 — (목업) 동작하지 않음">🗔</button>
+            <button title="새 대화 시작 — (목업) 동작하지 않음">💬</button>
+            <div class="rail-foot"><div class="rail-avatar" title="계정 — (목업)">담당</div></div>
+          </nav>
+
+          <div class="workarea">
+
+            <!-- ══ 장면① — 카드(대화창) ══ -->
+            <div class="scene sceneA" id="sceneA">
+              <div class="cs-head">
+                <span class="cs-ctx">AI 팀 감독</span>
+                <span class="cs-sel" id="selChip">📌 <span id="selChipText"></span><span class="x">✕</span></span>
+                <span class="cs-hint">지시는 이 입력줄에서 — 화면은 보고 고르는 곳입니다</span>
+                <button class="cs-btn" title="(목업) 동작하지 않음">⧉ 창으로</button>
+              </div>
+              <div class="cs-body">
+                <div class="cs-hero">
+                  <div class="ce-greet">안녕하세요, 김보안 담당자님</div>
+                  <div class="ce-honest">"우리 AI 팀 오늘 어땠어?"라고 물으면 아래 같은 카드가 뜹니다 — 숫자는 전부 로그를 센 값입니다.</div>
+                </div>
+
+                <div class="cs-row event">
+                  <div class="ci">🧭</div>
+                  <div class="cb">
+                    <div class="cn">AI 팀 감독 — 오늘<span class="ct">14:32:41</span></div>
+                    <div class="dc-card">
+                      <div class="dc-head">
+                        AI 팀 감독 — 오늘<span class="dc-tag">(예시 데이터)</span>
+                        <button class="dc-open" id="cardOpenBtn">🗔 AI 팀 감독 열기</button>
+                      </div>
+                      <div class="dc-kpis" id="cardKpis"></div>
+                      <table>
+                        <thead><tr><th>이름</th><th class="num">호출</th><th class="num">평균 응답</th><th class="num">오류</th></tr></thead>
+                        <tbody id="cardRows"></tbody>
+                      </table>
+                      <div class="dc-foot-note">행을 클릭하면 대화창 머리에 📌로 선택됩니다 · 🗔은 기간별 상세(무대)를 엽니다</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="cs-dock">
+                <button class="cs-plus" title="(목업) 동작하지 않음">＋</button>
+                <input readonly placeholder="AI 팀 감독에 대해 지시… (예: &quot;위협 에이전트는 왜 계속 안 써?&quot;)" title="(목업) 입력되지 않습니다">
+                <button class="cs-send" title="(목업) 동작하지 않음">전송</button>
+              </div>
+            </div>
+
+            <!-- ══ 장면② — 무대(상세) ══ -->
+            <div class="scene sceneB" id="sceneB">
+              <div class="stage">
+                <div class="stagehead">
+                  <button class="stageback" id="stageBackBtn">← 대화로</button>
+                  <span class="stagename">AI 팀 감독</span>
+                  <span class="stagesample">예시 데이터</span>
+                </div>
+                <div class="stagebody">
+
+                  <div class="periodbar">
+                    <span class="ph">기간</span>
+                    <div class="periodseg" id="periodSeg">
+                      <button data-period="today" class="on">오늘</button>
+                      <button data-period="7d">7일</button>
+                      <button data-period="30d">30일</button>
+                    </div>
+                    <span class="periodnote">— 이 화면의 유일한 조작입니다. 카드 속 미니 막대(최근 7일)는 기간 탭과 무관하게 항상 같습니다.</span>
+                  </div>
+
+                  <div class="agentgrid" id="agentGrid"></div>
+
+                  <div class="supervise">
+                    <div class="sv-head">감독 관점 <span class="rule-badge">규칙 계산 · 문장 생성 없음</span></div>
+                    <div id="svBody"></div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 설명 문서 ─────────────────────────────────────────────────────────────── -->
+  <div class="doc" id="doc">
+    <h1>에이전트 감독 뷰 — 시안 설명</h1>
+    <p class="lead">
+      추천 시안 1개(2026-07-25 결정에 따라 복수 시안 아님). 위 장면 전환 버튼으로 직접 눌러 볼
+      수 있다 — <b>🗔 열기·← 대화로·표/카드 클릭(📌)·기간 탭(오늘/7일/30일)</b>만 실제로
+      동작하며, 그 밖의 단추·입력칸은 눌러도 반응하지 않는다(마우스를 올리면
+      "(목업) 동작하지 않음"이 뜬다).
+    </p>
+
+    <div class="tldr">
+      <div class="h">한눈에</div>
+      <ol style="margin:0;padding-left:18px;">
+        <li>새 화면을 만들지 않는다 — 이미 확정된 <b>카드(요약)+🗔+무대(상세)</b> 계약(5.41~5.42)에
+          「AI 팀 감독」 한 벌만 얹는다. 레일 로스터·팀 사무실(실시간)과는 시간축이 달라 대체하지 않는다.</li>
+        <li>숫자는 지어내지 않았다 — 재료(chat_logs·llm-activity·agents.ts)까지 실제로 확인했고,
+          그중 <b>평균 응답·오류의 7일/30일 집계는 지금 서버에 영속 데이터가 없다</b>(아래
+          "구현 전 확인할 것"). 이 시안은 화면만 다루므로 그 작업은 구현 단계 과제로 남긴다.</li>
+        <li>카드는 6행 전부를 보여준다(자산 128건처럼 "외 N건"으로 자르지 않는다) — 팀 규모가
+          고정 6명이라 자를 이유가 없다. 무대는 표가 아니라 카드형 6장 그리드로 바꿔 추이·역할·
+          최근 오류까지 한 번에 보여준다.</li>
+      </ol>
+    </div>
+
+    <section class="why">
+      <h2>왜 이 안인지</h2>
+      <ul>
+        <li><b>제품 계약을 그대로 따른다.</b> 프로 셸은 "메뉴성 열기=대화창 카드, 🗔=무대"로 이미
+          확정됐다(5.41~5.42, 2026-08-20). 이 시안이 새 창·새 팝업·새 사이드 패널을 만들지 않고
+          그 계약 위에 얹은 이유는 하나 — 새 시각언어가 하나 늘 때마다 "이 화면은 왜 다르게
+          생겼나"를 사람이 매번 다시 배워야 한다.</li>
+        <li><b>KPI 4개는 SRE 골든 시그널에서 그대로 가져왔다.</b> 지연시간·트래픽·오류를 호출
+          수·평균 응답·오류로, 포화도는 우리 팀(고정 6인)엔 안 맞아 "무호출 에이전트 수"로
+          재해석했다<span class="src">(조사 [1])</span>.</li>
+        <li><b>"오류 개수"만 두지 않았다.</b> 2026년 AI 에이전트 관측 정리가 공통으로 짚는 것 —
+          몇 번 실패했는지보다 왜 실패했는지가 실무에 값어치있다<span class="src">(조사 [2])</span>.
+          그래서 카드마다 "최근 오류 1줄"에 실제 오류 메시지 형식(예: 응답 시간 초과)을 넣었다.</li>
+        <li><b>기존 관제(레일·사무실)와 겹치지 않는다.</b> 그 둘은 "지금"을 본다(움직이면 깜박이는
+          방식). 감독 뷰는 "지난 기간 실적을 돌아본다" — 다른 목적이라 다른 진입점(카드+무대)을
+          쓰되, 서로 대체하지 않는다.</li>
+      </ul>
+      <div class="rejected">
+        <div class="h">기각한 대안</div>
+        <ul style="margin:0;">
+          <li><b>새 사이드바 메뉴 화면(항시 접근 가능한 독립 화면)</b> — "메뉴는 보기용, 지시는
+            대화창" 원칙과 "화면 열기=카드+무대" 계약 둘 다에 어긋난다. 굳이 만들 이유가 없다
+            (계약을 그대로 쓰면 공짜로 따라온다).</li>
+          <li><b>레일 로스터 깜박임에 통계까지 얹기(호버 시 숫자 표시 등)</b> — 레일은 38px 아이콘
+            한 칸이라 밀도상 6명분 시계열·오류 메시지를 넣을 자리가 없고, 로스터의 존재 이유
+            ("지금 움직이는지")와 감독 뷰의 목적("돌아보기")이 섞이면 둘 다 흐려진다.</li>
+          <li><b>팀 사무실(office.html)에 탭 추가</b> — 팀 사무실은 상시 관제 창(2026-08-20
+            사용자 지시로 여전히 예외로 남는 창)이다. 사후 집계 표를 그 안에 넣으면 "실시간
+            애니메이션이 도는 창에서 어제 통계를 읽는" 어색한 조합이 된다.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="data">
+      <h2>구현 전 확인할 것 — 데이터 출처(정직성 각주)</h2>
+      <p>"숫자는 서버가 결정적으로 계산한다"는 이 제품의 원칙이다. 설계 전에 실제로 재료가
+        있는지 서버 코드를 읽어 확인했고, 하나는 지금 없다는 것을 발견했다 — 숨기지 않고 여기
+        적는다.</p>
+      <ul>
+        <li><b>호출 수(오늘/7일/30일)</b> — <code>chat_logs</code> 테이블(agentId·createdAt,
+          db.ts:226)이 영속 저장한다. <span style="color:var(--teal);font-weight:700;">지금 그대로 구현 가능.</span></li>
+        <li><b>평균 응답·오류/폴백</b> — 재료는 <code>llmactivity.ts</code>의 <code>llm:event</code>
+          (kind=chat, phase=done/error, latencyMs)다. 그런데 이 로그는 <b>인메모리 최근 200건
+          링버퍼</b>이고 서버가 재시작되면 사라진다(collaboration.ts도 최근 500건, 동일 구조).
+          "오늘"은 대체로 커버되지만, <b>"7일/30일" 평균 응답·오류는 지금 스키마로는 계산할
+          수 없다.</b> <span style="color:var(--amber);font-weight:700;">구현하려면 chat_logs에
+          latencyMs·error 컬럼을 추가하거나 별도 일별 집계 테이블을 신설해야 한다</span> —
+          이 시안은 화면만 다루므로 그 작업은 범위 밖에 남겨 둔다.</li>
+        <li><b>폴백(모델 미배정)</b> — <code>agents.ts</code>의 <code>assignedModelId</code>는
+          app_state에 영속돼 있어 <span style="color:var(--teal);font-weight:700;">지금 그대로
+          조회 가능</span>하다. 다만 이 값이 null(미배정)인 것은 팀 구성의 <b>기본값이자 권장값</b>
+          이다(teamview.ts 주석 — "overrideModelId: null이면 기반 두뇌를 따른다. 이것이 기본이자
+          권장"). 그래서 이 시안은 미배정 자체를 "결함"으로 색칠하지 않고, "지금 상태를 확인하는
+          스냅샷"으로만 표시한다(아래 무대 화면 참고) — 정책상 정상인 값을 경고색으로 칠하면
+          그 자체가 또 다른 부정확한 표기가 된다.</li>
+      </ul>
+    </section>
+
+    <section class="give">
+      <h2>무엇을 포기했는지</h2>
+      <ul>
+        <li><b>실시간 스트림 뷰(초 단위로 흐르는 로그).</b> 이 화면은 "돌아보기"(기간 집계)이지
+          "지켜보기"(실시간 스트림)가 아니다. 실시간은 이미 팀 사무실의 LIVE 채팅·레일 로스터
+          깜박임이 담당한다 — 같은 것을 두 번 만들지 않는다.</li>
+        <li><b>에이전트별 대화 로그(질문/답변 원문) 열람.</b> chat_logs에는 question·answer 원문이
+          있지만, 이 시안은 "집계"만 다룬다. 원문 열람은 개인정보·업무 맥락이 섞인 내용이라
+          접근 권한·마스킹 정책을 따로 정해야 하는 별도 범위다 — 이번 요청("얼마나 일하고 어디서
+          실수하나")은 집계로 충분히 답이 된다고 판단해 뺐다.</li>
+        <li><b>완화 — 최근 오류 1줄은 남긴다.</b> 원문 로그를 열지 않아도 "무엇이 잘못됐는지"
+          정도는 카드의 "최근 오류 1줄"(실제 오류 메시지 요약)로 파악할 수 있다.</li>
+        <li><b>완화 — 필요해지면 카드에서 바로 물을 수 있다.</b> 대화창이 옆에 없는 게 아니라
+          무대 "아래"에 있을 뿐이다(← 대화로 1클릭). "그 에이전트가 뭘 잘못 답했는지 보여줘"
+          같은 지시는 이 시안 밖의 별도 기능(원문 열람)으로 이어질 수 있다 — 이번 범위에선 안 만든다.</li>
+      </ul>
+    </section>
+
+    <section class="density">
+      <h2>밀도 숫자</h2>
+      <p>이 기능은 기존 화면의 리디자인이 아니라 <b>새 기능</b>이라 "이전 대비 증감"을 잴 대상이
+        없다. 대신 두 가지를 숫자로 확인한다 — ① 카드가 대화 스크롤에 더하는 길이, ② 무대
+        콘텐츠가 이미 확정된 무대 예산(가용 세로 806px, mockups/pro-stage/시안.html 실측,
+        2026-08-20 승인) 안에 스크롤 없이 들어가는지.</p>
+      <table class="num-table">
+        <thead><tr><th>구성 요소</th><th>계산(작성한 CSS 수치를 그대로 더한 값)</th><th>높이</th></tr></thead>
+        <tbody>
+          <tr><td>장면① 카드 — 머리(dc-head)</td><td>패딩 7+7 · 텍스트 1줄 ≈15</td><td>≈29px</td></tr>
+          <tr><td>장면① 카드 — KPI 줄(dc-kpis)</td><td>패딩 7+7 · 라벨+값 2줄 ≈32</td><td>≈46px</td></tr>
+          <tr><td>장면① 카드 — 표 머리글</td><td>패딩 3+3 · 텍스트 ≈14</td><td>≈20px</td></tr>
+          <tr><td>장면① 카드 — 표 6행</td><td>(패딩 3+3 · 텍스트 ≈15) × 6</td><td>≈126px</td></tr>
+          <tr class="sum"><td>장면① 카드 합계</td><td>+안내줄·테두리</td><td>≈235px</td></tr>
+          <tr><td>장면② 기간 탭 줄</td><td>텍스트 1줄 + 세그 버튼 28 + 여백</td><td>≈40px</td></tr>
+          <tr><td>장면② 카드 그리드 6장(3×2)</td><td>카드당(패딩 12+12·머리18·역할32·추이46·오류14+간격) ≈156 × 2행 + 간격10</td><td>≈322px</td></tr>
+          <tr><td>장면② 감독 관점 패널</td><td>머리 37 + 항목 3개(49+49+62)</td><td>≈197px</td></tr>
+          <tr class="sum"><td>장면② 무대 콘텐츠 합계(간격 포함)</td><td>40+14+322+14+197</td><td>≈589px</td></tr>
+        </tbody>
+      </table>
+      <p><b>정직하게 말하면:</b> 무대 콘텐츠 ≈589px는 이미 확정된 무대 가용 세로 806px보다
+        217px 여유가 있다 — 1600×900 창에서 스크롤 없이 들어간다는 뜻이다(더 채워도 되지만,
+        "감독 뷰"는 한눈에 훑어보는 화면이라 일부러 빽빽하게 채우지 않았다). 카드가 대화
+        스크롤에 더하는 길이(≈235px)는 기존 제품에 이미 있는 dc-card 한 장과 같은 급이라
+        새로운 밀도 문제를 만들지 않는다.</p>
+    </section>
+
+    <section class="check">
+      <h2>제품 원칙 자가점검</h2>
+      <ul class="checklist">
+        <li><span class="ok">✅</span><span><b>새 입력칸 0개.</b> 카드·무대 어디에도 텍스트
+          입력칸이 없다. 유일한 조작은 표/카드 클릭(📌 선택)·🗔 열기·← 대화로·기간 탭 4가지뿐
+          — 전부 "고르기/펼치기"이지 "값 넣기"가 아니다.</span></li>
+        <li><span class="ok">✅</span><span><b>숫자는 전부(설계상) 서버 결정적 계산.</b> 다만
+          위 "구현 전 확인할 것"에 적었듯 평균 응답·오류의 7일/30일 집계는 지금 서버에 영속
+          재료가 없다 — 이 시안은 그 사실을 감추지 않고 명시했다. 화면을 승인해도 그 서버
+          작업은 구현 단계에서 별도로 처리해야 한다.</span></li>
+        <li><span class="ok">✅</span><span><b>설명은 ⓘ/screenguide로.</b> 이 문서(왜·근거)는
+          시안에만 있는 결정 문서이지 제품 화면 문구가 아니다. 실제 화면엔 사용법 설명을
+          넣지 않고, "감독 관점" 같은 해석 텍스트도 규칙 계산 결과이지 안내문이 아니다 —
+          "사용법"이 필요해지면 그건 ⓘ·screenguide 몫으로 남긴다(이번 화면엔 없음).</span></li>
+        <li><span class="warn">⚠</span><span><b>미배정=경고 색이 아니다.</b> "폴백(모델
+          미배정)"을 붉은/주황 "결함" 취급하지 않고 정보성 스냅샷으로 표시했다 — 정책상
+          기본값을 경고로 칠하면 그 자체가 정직성 원칙에 어긋난다(위 "데이터 출처" 절 참고).
+          자가점검에 ✅ 대신 ⚠로 표기한 이유: 이 판단은 "지어내지 않는다"의 해석이 하나 들어간
+          결정이라, 승인권자가 다르게 볼 여지를 열어 둔다.</span></li>
+      </ul>
+    </section>
+  </div>
+
+  <footer class="doc-foot">
+    mockups/agent-supervision/시안.html · 제품 코드(client/·server/) 미수정 · 외부 리소스 없음(폐쇄망에서 더블클릭으로 열림) ·
+    표·카드 속 이름 외 모든 수치는 예시입니다.
+  </footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ── 팀원 6인 — server/src/engine/agents.ts AGENT_DEFS 그대로 ─────────────────
+  var AGENTS = [
+    { id:"orchestrator", name:"Security Orchestrator", abbr:"분배", icon:"🧭", role:"작업 분배 · 결과 취합", status:"watching" },
+    { id:"scan",          name:"Scan Agent",             abbr:"해석", icon:"⊘",  role:"초기 데이터 해석 · 자산 반영", status:"idle" },
+    { id:"analysis",      name:"Analyze Agent",          abbr:"우선", icon:"◎",  role:"AI 지식·모델 관리 · 우선순위 판단", status:"idle" },
+    { id:"report",        name:"Report Agent",           abbr:"보고", icon:"▣",  role:"내부 보고서 작성 · 결과 레포팅", status:"idle" },
+    { id:"ti",            name:"TI Agent",                abbr:"위협", icon:"🛰",  role:"위협 인텔리전스 · CTI 피드-자산 매칭 해석", status:"idle" },
+    { id:"normaltic",     name:"GIJO Agent",              abbr:"해설", icon:"📚", role:"용어 해설 · 사례 부연(사내 지식)", status:"watching" }
+  ];
+
+  // 최근 7일 호출 추이 — 기간 탭과 무관하게 항상 이 값(마지막 값=오늘). 합계는 아래 today.calls와,
+  // 7일 총합은 PERIODS["7d"].calls와 일치하게 맞췄다(예시 데이터의 내적 일관성만 목적).
+  var BARS7 = {
+    orchestrator: [34,39,41,37,40,36,41],
+    scan:         [15,17,20,16,19,16,18],
+    analysis:     [8,9,7,10,8,7,9],
+    report:       [5,6,7,5,6,4,6],
+    ti:           [0,1,0,1,0,1,0],
+    normaltic:    [21,24,22,26,20,18,23]
+  };
+
+  // 기간별 예시 데이터 — 실제로는 chat_logs(호출)·llm:event(응답시간·오류)를 기간으로 집계한 값.
+  // "평균 응답·오류의 7일/30일"은 위 문서 "데이터 출처" 절에 적었듯 지금 서버엔 영속 재료가 없다 —
+  // 아래 숫자는 그 값이 있다고 가정했을 때의 예시일 뿐이다.
+  var PERIODS = {
+    today: { label:"오늘", stats:{
+      orchestrator:{calls:41, avg:2.1, err:0, recentError:null},
+      scan:{calls:18, avg:3.4, err:0, recentError:null},
+      analysis:{calls:9, avg:4.9, err:1, recentError:"14:12 · 응답 시간 초과(120s)"},
+      report:{calls:6, avg:5.2, err:0, recentError:null},
+      ti:{calls:0, avg:null, err:0, recentError:null},
+      normaltic:{calls:23, avg:3.7, err:0, recentError:null}
+    }},
+    "7d": { label:"최근 7일", stats:{
+      orchestrator:{calls:268, avg:2.3, err:1, recentError:"08-17 09:41 · 응답 시간 초과(120s)"},
+      scan:{calls:121, avg:3.6, err:0, recentError:null},
+      analysis:{calls:58, avg:5.1, err:4, recentError:"08-20 14:12 · 응답 시간 초과(120s)"},
+      report:{calls:39, avg:5.4, err:0, recentError:null},
+      ti:{calls:3, avg:6.2, err:0, recentError:null},
+      normaltic:{calls:154, avg:3.9, err:1, recentError:"08-16 11:05 · 로컬 LLM 실패 — 연결 거부(ECONNREFUSED)"}
+    }},
+    "30d": { label:"최근 30일", stats:{
+      orchestrator:{calls:1140, avg:2.4, err:3, recentError:"08-14 16:20 · 응답 시간 초과(120s)"},
+      scan:{calls:512, avg:3.7, err:2, recentError:"08-05 10:02 · 로컬 LLM 실패 — 연결 거부(ECONNREFUSED)"},
+      analysis:{calls:244, avg:5.3, err:15, recentError:"08-20 14:12 · 응답 시간 초과(120s)"},
+      report:{calls:168, avg:5.6, err:1, recentError:"07-29 08:55 · 응답 시간 초과(120s)"},
+      ti:{calls:11, avg:6.5, err:0, recentError:null},
+      normaltic:{calls:655, avg:4.0, err:4, recentError:"08-16 11:05 · 로컬 LLM 실패 — 연결 거부(ECONNREFUSED)"}
+    }}
+  };
+
+  // 폴백(모델 미배정) 스냅샷 — 기간과 무관(agents.ts assignedModelId의 지금 상태). 정책상 기본값이라
+  // 전원 미배정이면 "경고"가 아니라 "확인용 스냅샷"으로 적는다(위 문서 "데이터 출처" 절 근거).
+  var FALLBACK_NOTE = "현재 6명 전원 전용 모델 미배정(팀 공통 두뇌 사용 중) — 정책상 기본값입니다. 방금 특정 팀원에게 전용 모델을 배정했는데 이 목록에서 안 사라졌다면 반영 실패로 의심하십시오.";
+
+  var esc = function(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+  var byId = function(id){ return AGENTS.filter(function(a){return a.id===id;})[0]; };
+
+  // ── 장면① 카드 렌더 — "오늘" 고정(카드 KPI는 항상 오늘 기준, 스펙 그대로) ────────
+  function renderCard(){
+    var t = PERIODS.today.stats;
+    var totalCalls = 0, weighted = 0, weightedN = 0, totalErr = 0, idleCount = 0;
+    AGENTS.forEach(function(a){
+      var s = t[a.id];
+      totalCalls += s.calls; totalErr += s.err;
+      if (s.calls === 0) idleCount++;
+      if (s.avg != null) { weighted += s.avg * s.calls; weightedN += s.calls; }
+    });
+    var avgAll = weightedN ? (weighted / weightedN) : null;
+
+    var kw = document.getElementById("cardKpis");
+    kw.innerHTML =
+      '<div class="dc-kpi"><div class="dc-kl">오늘 호출 수</div><div class="dc-kv">' + totalCalls + '</div></div>' +
+      '<div class="dc-kpi"><div class="dc-kl">평균 응답</div><div class="dc-kv">' + (avgAll==null?"–":avgAll.toFixed(1)+"초") + '</div></div>' +
+      '<div class="dc-kpi"><div class="dc-kl">오류/폴백 수<span class="dc-star">*</span></div><div class="dc-kv ' + (totalErr>0?"warn":"ok") + '">' + totalErr + '</div></div>' +
+      '<div class="dc-kpi"><div class="dc-kl">무호출 에이전트</div><div class="dc-kv ' + (idleCount>0?"warn":"ok") + '">' + idleCount + '</div></div>';
+
+    var rows = document.getElementById("cardRows");
+    rows.innerHTML = "";
+    AGENTS.forEach(function(a){
+      var s = t[a.id];
+      var tr = document.createElement("tr");
+      tr.dataset.id = a.id;
+      tr.innerHTML =
+        '<td><span class="ag-name">' + a.icon + " " + esc(a.name) + '<span class="ag-abbr">' + esc(a.abbr) + '</span></span></td>' +
+        '<td class="num">' + s.calls + '</td>' +
+        '<td class="num">' + (s.avg==null?"–":s.avg.toFixed(1)+"초") + '</td>' +
+        '<td class="num" style="' + (s.err>0?"color:#f5928a;font-weight:700;":"") + '">' + s.err + '</td>';
+      tr.addEventListener("click", function(){ selectAgent(a.id, "card"); });
+      rows.appendChild(tr);
+    });
+  }
+
+  // ── 장면② 무대 렌더 ────────────────────────────────────────────────────────
+  var currentPeriod = "today";
+  function renderStage(){
+    var stats = PERIODS[currentPeriod].stats;
+    var grid = document.getElementById("agentGrid");
+    grid.innerHTML = "";
+    AGENTS.forEach(function(a){
+      var s = stats[a.id];
+      var bars = BARS7[a.id];
+      var max = Math.max.apply(null, bars.concat([1]));
+      var barsHtml = bars.map(function(v, i){
+        var h = Math.max(2, Math.round((v/max) * 26));
+        return '<i class="' + (i===bars.length-1?"today":"") + '" style="height:' + h + 'px" title="' + v + '건"></i>';
+      }).join("");
+      var card = document.createElement("div");
+      card.className = "agentcard";
+      card.dataset.id = a.id;
+      card.innerHTML =
+        '<div class="ag-head"><span class="ag-icon">' + a.icon + '</span>' +
+          '<span class="ag-dot ' + a.status + '" title="상태(예시): ' + a.status + '"></span>' +
+          '<span class="ag-name">' + esc(a.name) + '</span><span class="ag-abbr">' + esc(a.abbr) + '</span></div>' +
+        '<div class="ag-role">' + esc(a.role) + '</div>' +
+        '<div class="ag-trend"><div class="ag-trend-h"><span>최근 7일 호출</span><b>오늘 ' + (bars[bars.length-1]) + '</b></div>' +
+          '<div class="ag-bars">' + barsHtml + '</div></div>' +
+        '<div class="ag-err ' + (s.recentError?"":"none") + '">' + (s.recentError ? ("최근 오류 · " + esc(s.recentError)) : "이 기간 오류 없음") + '</div>';
+      card.addEventListener("click", function(){ selectAgent(a.id, "stage"); });
+      grid.appendChild(card);
+    });
+    renderSupervise(stats);
+    markSelectedIn(grid, "agentcard");
+  }
+
+  function renderSupervise(stats){
+    var noCall = AGENTS.filter(function(a){ return stats[a.id].calls === 0; });
+    var worst = null;
+    AGENTS.forEach(function(a){
+      var s = stats[a.id];
+      if (s.calls > 0 && s.err > 0) {
+        var rate = s.err / s.calls * 100;
+        if (!worst || rate > worst.rate) worst = { a:a, s:s, rate:rate };
+      }
+    });
+    var html = "";
+    html += '<div class="sv-item"><span class="sv-ic">🗂</span><div class="sv-b">' +
+      (noCall.length
+        ? '<b>무호출 에이전트 ' + noCall.length + '명</b> — ' + noCall.map(function(a){return a.name+"["+a.abbr+"]";}).join(", ") +
+          '<span class="cap">이번 기간 호출 0건. 다음 기간에도 0이면 팀 구성 재검토 후보입니다(요청응답형 에이전트는 원래 드물게 쓰일 수 있습니다 — TI Agent 참고).</span>'
+        : '<b>무호출 에이전트 없음</b><span class="cap">이번 기간 6명 전원 1건 이상 호출됐습니다.</span>') +
+      '</div></div>';
+    html += '<div class="sv-item"><span class="sv-ic">📈</span><div class="sv-b">' +
+      (worst
+        ? '<b>오류율 상위 — ' + worst.a.name + '[' + worst.a.abbr + ']</b> — 호출 ' + worst.s.calls + '건 중 오류 ' + worst.s.err + '건(' + worst.rate.toFixed(1) + '%)' +
+          '<span class="cap">최근: ' + esc(worst.s.recentError||"") + ' · 그 외 에이전트는 이 기간 오류 0건입니다.</span>'
+        : '<b>오류율 상위 대상 없음</b><span class="cap">이번 기간 전 에이전트 오류 0건입니다.</span>') +
+      '</div></div>';
+    html += '<div class="sv-item"><span class="sv-ic">🔀</span><div class="sv-b"><b>폴백(모델 미배정) 확인</b><span class="cap">' + esc(FALLBACK_NOTE) + ' (기간과 무관 · 지금 상태 스냅샷)</span></div></div>';
+    document.getElementById("svBody").innerHTML = html;
+  }
+
+  function markSelectedIn(root, cls){
+    var sel = root.querySelectorAll("." + cls);
+    sel.forEach && sel.forEach(function(el){ el.classList.toggle("sel", el.dataset.id === selectedId); });
+  }
+
+  // ── 선택(📌) — 실제 console.js/app.html 문구를 그대로 재현 ──────────────────
+  var selectedId = null;
+  function selectAgent(id, from){
+    selectedId = id;
+    var a = byId(id);
+    var chip = document.getElementById("selChip");
+    document.getElementById("selChipText").textContent = a.name + "[" + a.abbr + "]";
+    chip.classList.add("on");
+    var rows = document.querySelectorAll("#cardRows tr");
+    rows.forEach(function(tr){ tr.classList.toggle("sel", tr.dataset.id === id); });
+    var cards = document.querySelectorAll("#agentGrid .agentcard");
+    cards.forEach(function(c){ c.classList.toggle("sel", c.dataset.id === id); });
+
+    if (from === "stage") {
+      // app.html 실제 로직 그대로: 무대 머리 "← 대화로"가 2.6초간 "📌 골랐습니다 — ← 대화로"로 바뀐다.
+      var btn = document.getElementById("stageBackBtn");
+      btn.textContent = "📌 골랐습니다 — ← 대화로";
+      clearTimeout(btn._t);
+      btn._t = setTimeout(function(){ btn.textContent = "← 대화로"; }, 2600);
+    }
+  }
+
+  // ── 장면 전환 ──────────────────────────────────────────────────────────────
+  var CAPTIONS = {
+    A: "장면① — 대화창의 「AI 팀 감독」 카드. 오늘 KPI 4개 + 6행 표. 행을 클릭하면 📌로 선택되고, 🗔을 누르면 무대(상세)가 뜹니다.",
+    B: "장면② — 무대(상세). 위 기간 탭(오늘/7일/30일)이 이 화면의 유일한 조작이고, 6장의 카드와 아래 「감독 관점」(규칙 계산)이 함께 바뀝니다."
+  };
+  function showScene(key){
+    document.getElementById("sceneA").classList.toggle("on", key === "A");
+    document.getElementById("sceneB").classList.toggle("on", key === "B");
+    document.querySelectorAll(".mk-scenebtn").forEach(function(b){ b.classList.toggle("on", b.dataset.scene === key); });
+    document.getElementById("mkCaption").innerHTML = CAPTIONS[key];
+  }
+  document.querySelectorAll(".mk-scenebtn").forEach(function(b){
+    b.addEventListener("click", function(){ showScene(b.dataset.scene); });
+  });
+  document.getElementById("cardOpenBtn").addEventListener("click", function(){ showScene("B"); });
+  document.getElementById("stageBackBtn").addEventListener("click", function(){ showScene("A"); });
+  document.getElementById("selChip").querySelector(".x").addEventListener("click", function(){
+    selectedId = null;
+    document.getElementById("selChip").classList.remove("on");
+    document.querySelectorAll("#cardRows tr, #agentGrid .agentcard").forEach(function(el){ el.classList.remove("sel"); });
+  });
+
+  // ── 기간 탭 ────────────────────────────────────────────────────────────────
+  document.getElementById("periodSeg").addEventListener("click", function(e){
+    var btn = e.target.closest("button[data-period]");
+    if (!btn) return;
+    currentPeriod = btn.dataset.period;
+    document.querySelectorAll("#periodSeg button").forEach(function(b){ b.classList.toggle("on", b === btn); });
+    renderStage();
+  });
+
+  // ── 축소 배율 ─────────────────────────────────────────────────────────────
+  document.querySelectorAll(".mk-scale button").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll(".mk-scale button").forEach(function(x){ x.classList.remove("on"); });
+      b.classList.add("on");
+      var scale = parseFloat(b.dataset.scale);
+      document.getElementById("device").style.transform = "scale(" + scale + ")";
+      document.getElementById("deviceFrame").style.width = (1600*scale) + "px";
+      document.getElementById("deviceFrame").style.height = (900*scale) + "px";
+    });
+  });
+
+  renderCard();
+  renderStage();
+  showScene("A");
+})();
+</script>
+</body>
+</html>

@@ -93,7 +93,7 @@ export function workflowStages(): WorkflowStage[] {
     for (const r of listFindingReviews()) {
       if (!isRealVulnerability(r.finding)) continue;   // 스캔 오류는 취약점이 아니다
       if (r.status === "in_progress") 진행++;
-      if (!r.assignee && r.status !== "approved" && r.status !== "rejected") 미배정++;
+      if (!r.assignee && r.status !== "approved" && r.status !== "rejected" && r.status !== "accepted") 미배정++; // 수용 건 제외 — approvals.ts와 같은 규칙(중3)
     }
   } catch { /* 대장을 못 읽어도 나머지 단계는 보여준다 */ }
 
