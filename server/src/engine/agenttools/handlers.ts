@@ -1378,6 +1378,10 @@ export function resolveFinding(assetId: string, needle: string): { ok: true; hit
 export function normalizeStatus(raw: string): ApprovalStatus | null {
   const s = (raw ?? "").trim().toLowerCase();
   if (/오탐|false positive|false-positive|무시|반려|제외|아님|reject/.test(s)) return "rejected";
+  // ⚠ 순서: 시작·검증 요청을 **완료보다 먼저** 본다 — 「조치 시작」의 「조치」가 완료 정규식에
+  //   걸려 시작이 완료로 굳으면 안 된다(기능 가이드 ① 2026-08-19, 5단계 ③→④ 대화화).
+  if (/시작|착수|진행\s*중|진행할게|손대|붙잡|in.?progress/.test(s)) return "in_progress";
+  if (/검증\s*요청|재스캔\s*요청|검증\s*대기|검증으로|verify|verifying/.test(s)) return "verifying";
   if (/조치|완료|해결|해결했|확정|승인|고쳤|고침|고쳐|패치|끝났|끝냈|막았|적용했|처리했|처리 완료|됐어|됐다|approv|fix|done|patch|resolv|remediat/.test(s)) return "approved";
   if (/미검토|보류|대기|원복|되돌|pending/.test(s)) return "pending";
   return null;
@@ -1456,7 +1460,11 @@ export function runUpdateFindingStatus(args: Record<string, string>): string {
   const note = args.note?.trim();
   if (note) patch.note = note;
   updateFindingReview(r.hit.assetId, r.hit.key, patch, "orchestrator");
-  const label = status === "rejected" ? "오탐(SBOM·조치 대상에서 제외)" : status === "approved" ? "조치완료(확정)" : "미검토(원복)";
+  const label = status === "rejected" ? "오탐(SBOM·조치 대상에서 제외)"
+    : status === "approved" ? "조치완료(확정)"
+    : status === "in_progress" ? "조치 진행중"
+    : status === "verifying" ? "검증 대기(재스캔·확인 차례)"
+    : "미검토(원복)";
   return `${args.assetId} ${r.hit.label} → ${label} 처리했습니다.${note ? ` 사유: ${note}` : ""}`;
 }
 
@@ -3216,4 +3224,65 @@ export function runRedteamStatus(): string {
 function 새시각(ms: number): string {
   if (!ms) return "(시각 없음)";
   return new Date(ms).toLocaleString("ko-KR");
+}
+
+// ── 기능 가이드 ①·⑤ (2026-08-19 사장님 「추가 기능 가이드 진행」 — 시나리오 대장의 끊김) ──
+
+/** 조치 검증 실행 — approvals 화면의 [🔍 조치 검증 실행]과 같은 엔진(verifyroutes 재사용).
+ *  ⚠ 읽기 도구다(run_hardening_scan 선례): 장비에 읽기 명령만 보내고, 상태를 자동으로
+ *    완료로 올리지 않는다 — 확인은 사람이 한다(오판 하나가 조용히 완료로 굳으면 안 된다). */
+export async function runVerifyFinding(args: Record<string, string>): Promise<string> {
+  const { canVerifyAsset } = await import("../verifyaccess.js");
+  const { resolveTargetForAsset } = await import("../verifyroutes.js");
+  const { buildVerifyItems, runVerifyItems, summarize } = await import("../verifyengine.js");
+  const { targetRunner } = await import("../hardeningscan.js");
+  const { netmikoRunnerFor } = await import("../netmikorunner.js");
+  const asset = resolveAsset(args.assetId ?? "");
+  if (!asset) return `자산 "${args.assetId}"을(를) 찾을 수 없습니다. 자산 이름이나 id로 다시 지목해 주세요.`;
+  const v = currentViewer();
+  const user = v?.userId ? findUserById(v.userId) : undefined;
+  let onlyKey: string | undefined;
+  if (args.finding?.trim()) {
+    const r = resolveFinding(asset.id, args.finding);
+    if (!r.ok) return r.error;
+    onlyKey = r.hit.key;
+  }
+  const decision = canVerifyAsset(user ?? undefined, asset.id, onlyKey);
+  // FAIL_MARKS-예외: 보안 경계 거절문 — 권한 없는 장비 접속 시도를 막은 진짜 거절이지 빈 답이 아니다
+  if (!decision.allowed) return `조치 검증을 실행할 수 없습니다 — ${decision.reason.split("\n")[0]}`;
+  const target = resolveTargetForAsset(asset.id);
+  if (!target) {
+    // "검증했는데 이상 없음"처럼 보이면 안 된다 — 실행 자체를 거절한다(verifyroutes와 같은 원칙).
+    return `이 자산(${asset.name})에 연결된 점검 대상(호스트·계정)이 등록돼 있지 않습니다 — 검증 화면 › 원격 정기점검에서 대상을 먼저 등록해 주세요.`;
+  }
+  const items0 = buildVerifyItems(asset.id, asset.findings);
+  const items = onlyKey ? items0.filter((i) => i.findingKey === onlyKey) : items0;
+  if (!items.length) return `검증할 미해결 취약점이 없습니다 (${asset.name}).`;
+  const run = netmikoRunnerFor(target) ?? targetRunner(target);
+  const raw = await runVerifyItems(items, run);
+  const s = summarize(raw);
+  const lines = raw.slice(0, 8).map((r) => `- ${r.status === "PASS" ? "✅ 닫힘 확인" : r.status === "FAIL" ? "✕ 아직 열림" : "△ 확인 필요"} — ${r.title}`);
+  return [
+    `조치 검증(${asset.name} · 대상 ${target.label}) — 닫힘 확인 ${s.fixed} · 아직 열림 ${s.still} · 수동 확인 ${s.manual} (총 ${s.total})`,
+    ...lines,
+    raw.length > 8 ? `(외 ${raw.length - 8}건 — 검증 화면에서 전체)` : "",
+    s.fixed ? `${표식.다음} 닫힘이 확인된 건은 "이거 조치완료 처리해줘"로 확정하세요 — 확정은 사람 몫입니다.` : "",
+  ].filter(Boolean).join("\n");
+}
+
+/** 정기 리포트 스케줄 걸기 — "주간 리포트 매주 금요일 17시로 걸어줘"(⑤보고의 쓰기 짝). */
+export async function runAddReportSchedule(args: Record<string, string>): Promise<string> {
+  const { createSchedule, SCHEDULE_TYPE_LABEL } = await import("../reportschedule.js");
+  const typeMap: Record<string, "daily" | "weekly" | "monthly" | "quarterly"> = {
+    "일일": "daily", "매일": "daily", "주간": "weekly", "매주": "weekly",
+    "월간": "monthly", "매월": "monthly", "분기": "quarterly",
+  };
+  const type = typeMap[(args.type ?? "").trim()] ?? (["daily", "weekly", "monthly", "quarterly"].includes(args.type) ? (args.type as "daily") : null);
+  if (!type) return `주기를 해석하지 못했습니다 (받은 값: "${args.type}") — 일일/주간/매월/분기 중 하나로 말씀해 주세요.`;
+  const hour = Number(args.hour);
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return `시각(hour)은 0~23 사이여야 합니다 (받은 값: "${args.hour}").`;
+  const WEEKDAY: Record<string, number> = { "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6 };
+  const dayOfWeek = type === "weekly" ? (WEEKDAY[(args.dayOfWeek ?? "").trim().replace(/요일$/, "")] ?? 1) : null;
+  const sch = createSchedule({ type, format: "pdf", audience: "internal", dayOfWeek, hour, minute: 0 });
+  return `${SCHEDULE_TYPE_LABEL[sch.type]} 리포트 스케줄을 걸었습니다 — 다음 실행 ${새시각(sch.nextRunAt)} (pdf · 내부용). 끄거나 지우는 것은 보고 화면 › 정기 리포트에서.`;
 }

@@ -131,6 +131,8 @@ import {
   DUE_RE,
   runAssignFinding,
   runUpdateFindingStatus,
+  runVerifyFinding,
+  runAddReportSchedule,
   BulkMatch,
   matchFindingsByFilter,
   matchFindingsByIds,
@@ -1402,11 +1404,11 @@ const TOOLS: AgentTool[] = [
     domain: "vuln",
     write: true,
     description:
-      '취약점의 조치 결과·판정을 기록한다(상태 변경). 사용자가 "고쳤어", "패치했어", "조치했어", "조치완료", "다 해결했어", "이제 됐어"(→조치완료) 또는 "이건 오탐이야", "오탐 처리해", "무시해도 돼"(→오탐)라고 하면 단순 대화가 아니라 **반드시 이 도구로** 상태를 남긴다. status는 "조치완료" 또는 "오탐". assetId·finding은 today/search 결과에서 지목. 예: {"assetId":"ai-secbot-01","finding":"버전 노출","status":"조치완료"}',
+      '취약점의 조치 상태·판정을 기록한다(상태 변경). "고쳤어/패치했어/조치완료"(→조치완료) · "이건 오탐이야/무시해도 돼"(→오탐) · **"조치 시작할게/이거 착수한다"(→진행중) · "검증 요청해줘/재스캔 대기로"(→검증 대기)** — 전부 단순 대화가 아니라 **반드시 이 도구로** 상태를 남긴다(5단계 ③→④ 전이 포함, 2026-08-19 기능 가이드 ①). assetId·finding은 today/search 결과에서 지목. 예: {"assetId":"ai-secbot-01","finding":"버전 노출","status":"조치완료"}',
     params: [
       { name: "assetId", label: "자산 id", description: "대상 자산 id", required: true },
       { name: "finding", label: "대상 취약점", description: "심각도·유형으로 지목", required: true },
-      { name: "status", label: "판정", description: "조치완료 / 오탐 (미검토로 원복도 가능)", required: true },
+      { name: "status", label: "상태", description: "조치완료 / 오탐 / 조치 시작(진행중) / 검증 요청 / 미검토(원복)", required: true },
       { name: "note", label: "사유", description: "판정 근거·메모 (선택)", required: false },
     ],
     // status를 canonical("조치완료"/"오탐")로 정규화한다 — 모델이 준 값이든(예 "패치 완료") 안 줬든
@@ -1434,6 +1436,63 @@ const TOOLS: AgentTool[] = [
     },
     undo: "승인 화면에서 판정을 미검토로 되돌리면 원상복귀됩니다.",
     run: runUpdateFindingStatus,
+  },
+  {
+    // 기능 가이드 ①(2026-08-19) — 5단계 ④검증을 대화로: 승인 화면 [🔍 조치 검증 실행]과 같은 엔진.
+    // ⚠ 읽기 도구(run_hardening_scan 선례): 장비에 읽기 명령만 보내고 상태를 자동으로 안 올린다.
+    name: "verify_finding",
+    label: "조치 검증 실행",
+    domain: "vuln",
+    write: false,
+    description:
+      '조치가 실제로 닫혔는지 장비에 접속해 재확인한다(읽기 명령만). "이거 검증 실행해줘", "조치 검증 돌려줘", "정말 닫혔는지 확인해줘"에 쓴다. 검증만 하고 완료 확정은 하지 않는다 — 확정은 update_finding_status. 예: {"assetId":"web-01","finding":"critical Log4j"}',
+    params: [
+      { name: "assetId", label: "자산 id", description: "대상 자산 id", required: true },
+      { name: "finding", label: "대상 취약점", description: "심각도·유형으로 지목 (비우면 그 자산의 미해결 전부)", required: false },
+    ],
+    autoFill: (args, instruction) => {
+      const filled: Record<string, string> = {};
+      const 키 = /⌗(.+?)::([0-9a-f]{16})/.exec(instruction);
+      if (키) { filled.assetId = 키[1].trim(); filled.finding = "key:" + 키[2]; }
+      const resolved = resolveAsset(filled.assetId ?? args.assetId ?? "");
+      if (resolved && resolved.id !== (filled.assetId ?? args.assetId)) filled.assetId = resolved.id;
+      return filled;
+    },
+    run: runVerifyFinding,
+  },
+  {
+    // 기능 가이드 ⑤(2026-08-19) — ⑤보고의 쓰기 짝: "주간 리포트 매주 금요일 17시로 걸어줘".
+    name: "report_schedule_add",
+    label: "정기 리포트 스케줄 걸기",
+    domain: "report",
+    write: true,
+    description:
+      '정기 리포트 스케줄을 등록한다. "주간 리포트 매주 금요일 5시로 걸어줘", "매월 보고서 자동으로 만들어줘"에 쓴다(조회는 report_schedule_list). 예: {"type":"주간","dayOfWeek":"금","hour":"17"}',
+    params: [
+      { name: "type", label: "주기", description: "일일 / 주간 / 매월 / 분기", required: true },
+      { name: "dayOfWeek", label: "요일", description: "주간일 때만 — 월~일 (기본 월)", required: false },
+      { name: "hour", label: "시각(0~23)", description: "몇 시에 만들지 — 24시간제", required: true },
+    ],
+    // alert_schedule_add 선례 — "아침 9시"·"오후 5시"를 사람이 다시 안 적게 지시문에서 정정한다.
+    autoFill: (args, instruction) => {
+      const filled: Record<string, string> = {};
+      if (!/^(일일|주간|매월|분기|daily|weekly|monthly|quarterly)$/.test(args.type ?? "")) {
+        const m = /(일일|매일|주간|매주|월간|매월|분기)/.exec(instruction);
+        if (m) filled.type = m[1].replace("매일", "일일").replace("매주", "주간").replace("월간", "매월");
+      }
+      const h = /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시/.exec(instruction);
+      if (h) {
+        let 시 = Number(h[2]);
+        if ((h[1] === "오후" || h[1] === "저녁" || h[1] === "밤") && 시 < 12) 시 += 12;
+        if (!Number.isInteger(Number(args.hour)) || String(시) !== args.hour) filled.hour = String(시);
+      }
+      const d = /(월|화|수|목|금|토|일)요일/.exec(instruction);
+      if (d && !args.dayOfWeek) filled.dayOfWeek = d[1];
+      return filled;
+    },
+    effect: (args) => `${args.type ?? "정기"} 리포트가 자동 생성되도록 스케줄 등록 (pdf · 내부용)`,
+    undo: "보고 화면 › 정기 리포트에서 끄거나 지울 수 있습니다.",
+    run: runAddReportSchedule,
   },
   {
     name: "bulk_update",

@@ -112,6 +112,7 @@ export interface DispatchResult {
   // 계산해 내려준다. 클라 chatparts.dataCard가 그린다(모델이 채우는 자유 필드 없음).
   dataCard?: import("./datacard").DataCard;
   nextChips?: string[]; // ➡ 다음 작업 제안(QA ④) — nextguide.ts 표에서, 실측 검증 문장만
+  scopeSet?: import("./scopecmd").ScopeSet; // 🗂 범위 걸기/풀기 신호(기능 가이드 ②) — 실행은 클라 콘솔
   internalMiss?: boolean;
   // 답변 그라운딩에 쓰인(검색된) 사내 문서 ID — 화면이 "근거: 문서명" 배지로 표시한다.
   // 인수인계 자동 검증도 이 필드로 "올린 문서가 실제로 인용되는가"를 판정한다.
@@ -1242,6 +1243,29 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 검증(하드닝)·자산 현황 — 대화 안 데이터 카드(승인 시안, 2026-08-19 · 2차 확장 같은 날).
   // 결정적 트리거·결정적 숫자. ⚠ 새 카드를 더할 땐 앞 영토(스케줄·목록 도구 등)를 안 삼키는지
   // 음성 시험부터 — 1차 때 전체 게이트가 「점검 스케줄 알려줘」 과포착을 실측으로 잡았다.
+  // 🗂 범위 걸기/풀기(기능 가이드 ②) — 「web-01로 범위 걸어줘」·「범위 풀어줘」. 화면 클릭과
+  // 같은 일을 대화로 — 신호(scopeSet)만 주고 실행은 클라 콘솔(범위의 주인은 화면 상태 한 곳).
+  {
+    const { isScopeCommand, scopeCommandAnswer } = await import("./scopecmd.js");
+    if (isScopeCommand(instructionText)) {
+      const r = scopeCommandAnswer(instructionText, 선택);
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+      completeTask(task.id);
+      return { task, route: { agentId: "orchestrator", action: "chat" }, output: r.output, ...(r.scopeSet ? { scopeSet: r.scopeSet } : {}) };
+    }
+  }
+
+  // 📖 시나리오 실행(기능 가이드 ④ — 프롬프트북) — 대장의 실측 검증 사슬을 제품 안에서.
+  {
+    const { isScenarioAsk, scenarioAnswer } = await import("./scenarios.js");
+    if (isScenarioAsk(instructionText)) {
+      const r = scenarioAnswer(instructionText);
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+      completeTask(task.id);
+      return { task, route: { agentId: "orchestrator", action: "chat" }, output: r.output, ...(r.nextChips ? { nextChips: r.nextChips } : {}) };
+    }
+  }
+
   {
     const { isHardeningStatusAsk, hardeningStatusAnswer, isAssetStatusAsk, assetStatusAnswer, 카드없는글로 } = await import("./datacard.js");
     const 현황답 = isHardeningStatusAsk(instructionText) ? hardeningStatusAnswer()

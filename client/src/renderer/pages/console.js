@@ -1497,6 +1497,11 @@
       });
       // ➡ 다음 작업 칩(QA ④) — 답 경로별 실측 검증 후속 지시. 누르면 그대로 전송.
       if (P.nextChips) P.nextChips(replyEl, r && r.nextChips, function (q) { submit(q); });
+      // 🗂 범위 걸기/풀기 신호(기능 가이드 ②) — 서버는 신호만, 실행은 여기(범위 주인은 화면 상태).
+      if (r && r.scopeSet) {
+        if (r.scopeSet.kind === "clear") setScope(null);
+        else if (r.scopeSet.id && r.scopeSet.label) setScope({ kind: "asset", id: r.scopeSet.id, label: r.scopeSet.label });
+      }
       // 쓰기 지시는 결재판으로 돌아온다 — 대화창에서 바로 확인·승인한다(없으면 막다른 길이다).
       attachApproval(replyEl, r && r.approval);
     } catch (e) {
