@@ -161,7 +161,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const areas = t.aibomAreas.map((a) => `<span style="background:rgba(59,130,246,0.15);color:var(--blue-light);border-radius:4px;padding:1px 6px;font-size:11.75px;margin-right:3px;">${AREA_LABEL[a] || a}</span>`).join("");
     const opts = STATUS_OPTS.map((o) => `<option value="${o.v}" ${t.status === o.v ? "selected" : ""}>${o.label}</option>`).join("");
     const isOpen = expanded.has(t.code);
-    return `<div style="border-bottom:1px solid var(--border);padding:12px 0;display:grid;grid-template-columns:64px 1fr 150px;gap:12px;align-items:start;">
+    return `<div class="cpl-row" style="border-bottom:1px solid var(--border);padding:12px 0;display:grid;grid-template-columns:64px 1fr 150px;gap:12px;align-items:start;">
       <div><span data-toggle="${t.code}" style="font-weight:800;color:#fff;font-size:13px;cursor:pointer;user-select:none;">${isOpen ? "▾" : "▸"} ${t.code}</span></div>
       <div>
         <div data-toggle="${t.code}" style="font-weight:700;color:#fff;font-size:13px;margin-bottom:4px;cursor:pointer;">${esc(t.name)} ${areas}</div>

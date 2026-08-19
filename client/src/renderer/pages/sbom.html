@@ -681,7 +681,7 @@ tr:last-child td{border-bottom:none;}
             <td><div class="asset-name" style="cursor:pointer" data-select="${a.id}">${a.name}</div></td>
             <td class="owner">${a.owner}</td>
             <td>${a.sbomGeneratedAt ? '<span class="badge b-blue">CycloneDX 1.5</span>' : "—"}</td>
-            <td>${a.components.length ? a.components.length
+            <td class="num">${a.components.length ? a.components.length
               : (a.aibom ? '<span title="AI 자산이라 코드 의존성이 없습니다 — 알맹이는 AI-BOM 5영역입니다" style="color:var(--muted-2)">코드 의존성 없음</span>'
                          : '<span style="color:var(--muted-2)">0</span>')}</td>
             <td>${fmtDate(a.sbomGeneratedAt)}</td>

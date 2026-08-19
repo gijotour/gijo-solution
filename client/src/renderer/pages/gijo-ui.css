@@ -338,3 +338,32 @@ body.g-ui { line-height: 1.7; }
 .g-ui .kv-inline .pair { display: flex; gap: 7px; align-items: baseline; min-width: 0; }
 .g-ui .kv-inline dt { color: var(--muted-2, #a49d95); font-size: 12.5px; flex: 0 0 auto; }
 .g-ui .kv-inline dd { color: var(--text, #e9e7e2); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ══ 목록 밀도 — 엑셀급(2026-08-19, 사장님 「세부 리스트는 엑셀처럼 촘촘하게」) ══
+   근거: 목록밀도_실측견적_2026-08-19.md · mockups/목록밀도_엑셀급/시안.html
+   폰트는 안 건드린다(이미 하한 11px 근처) — padding·line-height로만 줄인다. */
+/* ① 표 8종 — vulnscan·sbom·report·threat·inventory·maintenance·kpi·handover.
+     .g-ui.g-ui로 두 번 적어 nav.js의 .main table td(0,1,2)를 특이도로 확실히 이긴다
+     (로드 순서가 두 적용 지점에서 보장되지 않아서다 — 이 파일의 .kpi-strip 3중과 같은 수법). */
+.g-ui.g-ui table td, .g-ui.g-ui table th { padding: 3px 10px; line-height: 1.35; }
+.g-ui.g-ui table tbody tr:nth-child(even) { background: var(--g-zebra, rgba(255,255,255,.025)); }
+.g-ui.g-ui table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--panel, #30302e);
+  box-shadow: 0 1px 0 var(--border, rgba(255,255,255,.08));
+}
+/* ② 숫자 우측정렬 — kpi.html 지역규칙(.tsv-table .num)을 전역 관례로 승격. */
+.g-ui .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* ③ div행(카드형) — 줄간격 공통 1.45(전역 1.7은 산문용으로 유지), 패딩 6px.
+     ⚠ .frow는 approvals·hardening의 「폼 필드 줄」과 이름이 겹친다 — loganalysis만
+     data-screen으로 좁힌다(마크업에 표식 추가됨). .pk-row(assets)는 이미 17px 고정이라 제외. */
+.g-ui .rv-row, .g-ui .risk-row, .g-ui .srow, .g-ui .aud {
+  padding-top: 6px; padding-bottom: 6px; line-height: 1.45;
+}
+body[data-screen="loganalysis"] .frow, .g-ui .erow { line-height: 1.45; }
+/* ④ div행 홀짝 — 자신이 hover/선택 배경도 받는 요소라 :not()으로 상태를 뺀다. */
+.g-ui .rv-row:nth-child(even):not(:hover):not(.on),
+.g-ui .risk-row:nth-child(even):not(:hover):not(.sel),
+.g-ui .srow:nth-child(even):not(:hover):not(.on),
+.g-ui .aud:nth-child(even) { background: var(--g-zebra, rgba(255,255,255,.025)); }
+:root { --g-zebra: rgba(255,255,255,.025); }

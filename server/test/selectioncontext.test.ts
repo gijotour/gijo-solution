@@ -124,7 +124,10 @@ describe("클라 배선 (소스 계약)", () => {
   it("3단계 확장 화면도 top으로 보낸다 — 취약점 목록(호스트·항목)·할 일 줄", () => {
     const vs = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "vulnscan.html"), "utf8");
     expect(vs, "취약점 화면에 선택 배선").toContain("gijo:select");
-    expect(vs, "허브 한 겹 함정 — parent 금지").toContain("window.top !== window");
+    // 2026-08-19 계약 갱신: 「parent 금지·top 사용」의 본뜻은 유지하되, top===window 예외는
+    // 제거됐다(프로 단독 팝업에서 선택이 죽던 결함 — 자기 top으로 보내면 applyPopout이 IPC로 잇는다).
+    expect(vs, "허브 한 겹 함정 — parent 금지, top으로").toContain("window.top.postMessage");
+    expect(vs, "단독 팝업 예외(top!==window)가 되살아나면 프로 팝업 선택이 다시 죽는다").not.toContain("window.top !== window");
     const db = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "dashboard.html"), "utf8");
     expect(db, "할 일 줄에 선택 배선").toContain("gijo:select");
     expect(db, "셸은 최상위 창").toContain("window.top.postMessage");

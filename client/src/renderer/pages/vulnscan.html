@@ -482,9 +482,9 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       .map((f) => {
         const epss =
           f.epss != null
-            ? `<span class="vd-epss ${f.epss >= 0.5 ? "hot" : ""}" title="EPSS — 30일 내 실제 악용될 확률">EPSS ${(f.epss * 100).toFixed(1)}%</span>`
+            ? `<span class="num vd-epss ${f.epss >= 0.5 ? "hot" : ""}" title="EPSS — 30일 내 실제 악용될 확률">EPSS ${(f.epss * 100).toFixed(1)}%</span>`
             : "";
-        const vpr = f.vpr != null ? `<span class="vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR ${f.vpr}</span>` : "";
+        const vpr = f.vpr != null ? `<span class="num vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR ${f.vpr}</span>` : "";
         const misfit = isMisfit(f) ? `<span class="vd-misfit" title="CVSS 등급은 낮지만 실제 악용확률이 높습니다 — 등급만 보면 놓치는 건">⚠ 등급↓ 악용↑</span>` : "";
         const kev = f.kev ? `<span class="vd-kev" title="CISA KEV — 실제 악용이 확인된 취약점. 최우선 조치.&#10;${esc((f.kevCves || []).join(', '))}">🔴 KEV 악용중</span>` : "";
         const STATE_LABEL = { new: "🆕 신규", resurfaced: "♻ 재발", fixed: "✓ 고쳐짐" };
