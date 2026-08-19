@@ -1471,6 +1471,24 @@
       // 붙일 자리(.cb)는 지휘소 고유라 여기서 정한다 — 부품은 만들어만 주고 자리는 안 정한다.
       var pickEl = P.picks(replyEl, r && r.picklist, function (보낼글, 보일글) { submit(보낼글, 보일글); });
       if (pickEl) (replyEl.querySelector(".cb") || replyEl).appendChild(pickEl);
+      // 데이터 카드 — 화면급 KPI+표를 대화 안에서(승인 시안 mockups/대화_데이터카드, 2026-08-19).
+      //   숫자·표는 전부 서버 결정적 계산(datacard.ts) — 모델이 채우는 칸이 없다.
+      //   행 클릭 = 📌 선택(콘솔 자체 setSelection — 별도 배관 없이 직접), 🗔 = 기존 탭 열기.
+      if (P.dataCard) P.dataCard(replyEl, r && r.dataCard, {
+        navigate: function (page, label) {
+          if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) return window.gijo.openTabInShell(page, label);
+          if (window.gijoTabs) { window.gijoTabs.open(page, label); return true; }
+          if (window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(page); return true; }
+          return false;
+        },
+        select: function (row, key) {
+          var v = String((row && row[key]) || "").trim();
+          if (!v) return;
+          // text는 행 전체를 담는다 — 「이거 어때」가 어느 행인지 서버가 알아야 한다.
+          var all = Object.keys(row).map(function (k) { return k + " " + row[k]; }).join(" · ");
+          setSelection({ label: v, text: all });
+        },
+      });
       // 쓰기 지시는 결재판으로 돌아온다 — 대화창에서 바로 확인·승인한다(없으면 막다른 길이다).
       attachApproval(replyEl, r && r.approval);
     } catch (e) {

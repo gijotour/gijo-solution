@@ -269,6 +269,15 @@
               return false;
             },
           });
+          // 데이터 카드 — 지휘소와 같은 부품(chatparts.js). 분리창엔 📌 선택칩이 없어
+          // select는 안 넘긴다(행 클릭 무동작) — 🗔 열기는 본창에 부탁하는 기존 통로 그대로.
+          if (P.dataCard) P.dataCard(typing, r.dataCard, {
+            navigate: function (page, label) {
+              if (window.gijo && window.gijo.openTabInShell) return window.gijo.openTabInShell(page, label);
+              if (window.gijo && window.gijo.navigateTo) return window.gijo.navigateTo(page);
+              return false;
+            },
+          });
         }
         // 실행이 필요한 지시면 여기서 끝내지 않고 확인 카드를 띄운다.
         if (r.approval) appendApproval(r.approval);

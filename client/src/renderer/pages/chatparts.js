@@ -57,6 +57,24 @@
       //   호박색은 이 제품에서 「주의·확인 필요」 자리다(근거 약함 배너의 ⚠와 같은 결).
       ".gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:#ffd88a;}",
       ".gcp-ev{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;min-width:0;}",
+      // 데이터 카드(승인 시안 대화_데이터카드, 2026-08-19) — KPI+표. 밀도는 전역 규격(25px)과 같게.
+      ".dc-card{margin-top:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:var(--panel-2,#1f1e1d);}",
+      ".dc-head{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12.75px;font-weight:800;color:var(--text,#e9e7e2);}",
+      ".dc-open{margin-left:auto;font-size:12px;font-weight:700;color:var(--blue-light,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:7px;padding:3px 9px;cursor:pointer;font-family:inherit;}",
+      ".dc-open:hover{background:rgba(59,130,246,.18);}",
+      ".dc-kpis{display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,.08);}",
+      ".dc-kpi{flex:1;padding:7px 11px;border-right:1px solid rgba(255,255,255,.06);}",
+      ".dc-kpi:last-child{border-right:0;}",
+      ".dc-kl{font-size:11.5px;color:var(--muted-2,#a49d95);}",
+      ".dc-kv{font-size:15px;font-weight:800;color:var(--text,#e9e7e2);}",
+      ".dc-kv.ok{color:var(--teal,#1eb980);} .dc-kv.warn{color:var(--amber,#f0a020);} .dc-kv.bad{color:#f5928a;} .dc-kv.muted{color:var(--muted-2,#a49d95);}",
+      ".dc-card table{width:100%;border-collapse:collapse;font-size:12.25px;}",
+      ".dc-card th{text-align:left;padding:3px 10px;color:var(--muted-2,#a49d95);font-size:11.5px;border-bottom:1px solid rgba(255,255,255,.08);}",
+      ".dc-card td{padding:3px 10px;line-height:1.35;border-bottom:1px solid rgba(255,255,255,.05);}",
+      ".dc-card tbody tr{cursor:pointer;} .dc-card tbody tr:hover td{background:rgba(59,130,246,.08);}",
+      ".dc-card tbody tr:nth-child(even){background:rgba(255,255,255,.025);}",
+      ".dc-card .num{text-align:right;font-variant-numeric:tabular-nums;}",
+      ".dc-more{padding:5px 11px;font-size:11.75px;color:var(--muted-2,#a49d95);}",
       // 안전망 — 어쩌다 줄(.cs-row)에 직접 붙어도 **아래로** 가지 옆으로 가지 않게 한다.
       ".cs-row{flex-wrap:wrap;}",
       ".cs-row > .gcp-ev, .cs-row > .gcp-src, .cs-row > .gcp-src2, .cs-row > .gcp-open, .cs-row > .gcp-picks{flex:1 1 100%;}",
@@ -302,5 +320,65 @@
     el.appendChild(b);
   }
 
-  window.gijoChatParts = { quotes: quotes, picks: picks, open: open };
+  /** 데이터 카드(승인 시안 대화_데이터카드) — 서버가 결정적으로 계산한 KPI+표를 그린다.
+   *  표는 서버가 이미 자른 것(shown)만 — 클라는 자르지 않는다(totalCount가 진짜 총계).
+   *  행 클릭은 opts.select(row)로 넘긴다(지휘소=setSelection, 위젯=없으면 생략). */
+  function dataCard(el, dc, opts) {
+    el = 붙일자리(el);
+    if (!el || !dc || !dc.table || !Array.isArray(dc.table.shown)) return null;
+    ensureCss();
+    var card = document.createElement("div");
+    card.className = "dc-card";
+    var head = document.createElement("div");
+    head.className = "dc-head";
+    head.textContent = dc.title || "";
+    if (dc.screen && opts && typeof opts.navigate === "function") {
+      var b = document.createElement("button");
+      b.className = "dc-open";
+      b.textContent = "🗔 " + (dc.screen.label || "") + " 열기"; // 🗔 — ⧉(창으로 빼기)와 뜻이 다르다
+      b.addEventListener("click", function () { opts.navigate(dc.screen.page, dc.screen.label); });
+      head.appendChild(b);
+    }
+    card.appendChild(head);
+    if (dc.kpis && dc.kpis.length) {
+      var kw = document.createElement("div");
+      kw.className = "dc-kpis";
+      dc.kpis.slice(0, 5).forEach(function (k) {
+        var d = document.createElement("div");
+        d.className = "dc-kpi";
+        d.innerHTML = '<div class="dc-kl">' + esc(k.label) + '</div><div class="dc-kv ' + esc(k.color || "") + '">' + esc(k.value) + "</div>";
+        kw.appendChild(d);
+      });
+      card.appendChild(kw);
+    }
+    var cols = dc.table.cols || [];
+    var tbl = document.createElement("table");
+    tbl.innerHTML = "<thead><tr>" + cols.map(function (c) {
+      return '<th class="' + (c.align === "num" ? "num" : "") + '">' + esc(c.label) + "</th>";
+    }).join("") + "</tr></thead>";
+    var tb = document.createElement("tbody");
+    dc.table.shown.forEach(function (row) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = cols.map(function (c) {
+        return '<td class="' + (c.align === "num" ? "num" : "") + '">' + esc(row[c.key] == null ? "" : row[c.key]) + "</td>";
+      }).join("");
+      if (opts && typeof opts.select === "function") {
+        tr.addEventListener("click", function () { opts.select(row, dc.pickKey || (cols[0] && cols[0].key)); });
+      }
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    card.appendChild(tbl);
+    var 남음 = (dc.table.totalCount || 0) - dc.table.shown.length;
+    if (남음 > 0) {
+      var m = document.createElement("div");
+      m.className = "dc-more";
+      m.textContent = "외 " + 남음 + "건 — 🗔 화면에서 전체를 봅니다";
+      card.appendChild(m);
+    }
+    el.appendChild(card);
+    return card;
+  }
+
+  window.gijoChatParts = { quotes: quotes, picks: picks, open: open, dataCard: dataCard };
 })();

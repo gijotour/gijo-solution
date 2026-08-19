@@ -108,6 +108,9 @@ export interface DispatchResult {
   // dataHits: 자산·취약점 등 특정 내부 데이터를 실제로 건드린 수 → 📄 리포트 알약을 그때만 띄운다.
   // internalMiss: 일반 질의인데 사내 RAG 근거가 0(내부자료 없음) → ☁ 외부(클라우드) 추가질의를 그때만 띄운다.
   dataHits?: number;
+  // 대화 안 데이터 카드(승인 시안 대화_데이터카드, 2026-08-19) — KPI+표를 서버가 결정적으로
+  // 계산해 내려준다. 클라 chatparts.dataCard가 그린다(모델이 채우는 자유 필드 없음).
+  dataCard?: import("./datacard").DataCard;
   internalMiss?: boolean;
   // 답변 그라운딩에 쓰인(검색된) 사내 문서 ID — 화면이 "근거: 문서명" 배지로 표시한다.
   // 인수인계 자동 검증도 이 필드로 "올린 문서가 실제로 인용되는가"를 판정한다.
@@ -1207,6 +1210,17 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       output,
       ...(picklist ? { picklist } : {}),
     };
+  }
+
+  // 검증(하드닝) 현황 — 대화 안 데이터 카드(승인 시안, 2026-08-19). 결정적 트리거·결정적 숫자.
+  {
+    const { isHardeningStatusAsk, hardeningStatusAnswer } = await import("./datacard.js");
+    if (isHardeningStatusAsk(instructionText)) {
+      const { output, dataCard } = hardeningStatusAnswer();
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
+      completeTask(task.id);
+      return { task, route: { agentId: "orchestrator", action: "chat" }, output, dataCard };
+    }
   }
 
   // 「○○은 어디서 해?」 — **우리 화면 이름**으로 자리를 찾아 준다(2026-08-03 실전 147상황).
