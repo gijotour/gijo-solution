@@ -186,10 +186,13 @@ export interface RecentDoc {
 export function listRecentDocs(days = 7): RecentDoc[] {
   const cutoff = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
   return db.prepare(
+    // ⚠ 개인 문서(personal:*)는 반입 소식에서 원천 제외 — 이 목록은 전 담당자에게 뿌려진다
+    //   (검토관 2026-08-20 상4). makeDigest 쪽도 안 만들지만, 옛 데이터·다른 인입 경로 대비
+    //   여기서도 거른다(벨트와 멜빵).
     `SELECT m.documentId, m.category, m.uploadedBy, m.ingestedAt,
             d.summary, d.keywords, d.matches, d.failedReason
        FROM memory_documents m LEFT JOIN doc_digests d ON d.documentId = m.documentId
-      WHERE m.ingestedAt >= ? ORDER BY m.ingestedAt DESC`
+      WHERE m.ingestedAt >= ? AND m.documentId NOT LIKE 'personal:%' ORDER BY m.ingestedAt DESC`
   ).all(cutoff) as RecentDoc[];
 }
 

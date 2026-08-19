@@ -70,10 +70,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <button data-f="shared">🏢 공유만</button>
   </div>
   <div class="list" id="list"><div class="empty">불러오는 중…</div></div>
-  <div class="note">
-    · <b>👤 AI 포함</b> = 이 문서를 내 AI가 읽습니다(내 질문에만 근거로 나옴). · <b>🏢 공유</b> = 팀 전체의 답변 근거가 될 수 있습니다 — 켜는 순간 비밀번호류는 자동으로 가려 담습니다.<br>
-    · 문서를 고치려면 ⬇로 내려받아 Smart MD에서 다듬고 다시 가져오세요(1단계는 파일 왕복 — 자동 동기화 아님).
-  </div>
+  <div class="note">개인 문서는 내 질문에만 근거로 나옵니다 — 자세한 사용법·「AI 포함」과 「공유」의 차이는 ⓘ로 보세요.</div>
 </div>
 <script>
 (function () {
@@ -152,7 +149,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     var text = await f.text();
     var title = f.name.replace(/\.(md|txt|markdown)$/i, "").slice(0, 120) || "가져온 문서";
     try {
-      await window.gijo.personalDocsCreate({ title: title, body: text.slice(0, 200000) });
+      var 잘림 = text.length > 200000;
+      var made = await window.gijo.personalDocsCreate({ title: title, body: text.slice(0, 200000) });
+      // 조용한 절단·조용한 비밀 무시 금지(검토관 중10) — 잘렸으면 잘렸다고, 비밀이 보이면 보인다고.
+      var 알릴 = [];
+      if (잘림) 알릴.push("⚠ 내용이 20만 자를 넘어 뒷부분이 잘렸습니다(" + text.length.toLocaleString() + "자 중).");
+      if (made && made.warnings && made.warnings.length) {
+        알릴.push("⚠ 비밀번호·계정 정보로 보이는 것이 " + made.warnings.length + "곳 있습니다 — 장비 접속 정보는 보안제품 등록부(암호화 보관)에 두세요.");
+      }
+      if (알릴.length && window.gijoTell) window.gijoTell(알릴.join("\n"));
       load();
     } catch (e) { if (window.gijoTell) window.gijoTell("가져오기 실패 — " + ((e && e.message) || "오류")); }
   });
@@ -174,13 +179,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (act === "rag") { await window.gijo.personalDocsRag(id, !doc.ragOptIn); }
       else if (act === "share") { await window.gijo.personalDocsShare(id, !doc.shared); }
       else if (act === "down") {
+        // 저장소 다운로드 관례(approvals·docbox와 동일 — 검토관 중9): appendChild→click→remove,
+        // revoke는 8초 뒤(같은 틱에 지우면 브라우저가 URL을 못 읽는 경합), 완료를 사람에게 알림.
         var full = await window.gijo.personalDocsRead(id);
         var blob = new Blob([full.body || ""], { type: "text/markdown" });
+        var url = URL.createObjectURL(blob);
         var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
+        a.href = url;
         a.download = (doc.title || "문서") + ".md";
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(a.href);
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
+        if (window.gijoTell) window.gijoTell("「" + doc.title + ".md」를 내려받습니다 — 다운로드 폴더를 확인하세요.\nSmart MD에서 다듬은 뒤 📥 가져오기로 되담으면 됩니다.");
         return; // 목록 변화 없음
       }
       else if (act === "del") {

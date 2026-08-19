@@ -44,3 +44,31 @@ describe("개인 문서 검색 격리 — hiddenDocIds 하드 필터", () => {
     expect(hiddenDocIds(undefined)).toEqual([]);
   });
 });
+
+// 검토관 하13 — hiddenDocIds만 재던 시험이 syncRag 무동작(상1)·마스킹 부재(상2)를 못 잡았다.
+// 인입 결정을 순수 함수(인입본문)로 떼어 직접 잰다.
+import { 인입본문 } from "../src/engine/personaldocs";
+
+describe("개인 문서 인입 결정(인입본문) — 공유·마스킹 계약", () => {
+  // secretscan은 「이름: 값」 꼴을 잡는다("비밀번호: xxx") — 설명문·이름 없는 값은 원리상 못 잡는다.
+  const 원문 = "장비 접속 메모 — 비밀번호: Passw0rd!23 (교체 예정)";
+
+  it("둘 다 꺼짐 → null(지식에서 뺀다)", () => {
+    expect(인입본문({ title: "t", body: 원문, ragOptIn: false, shared: false })).toBeNull();
+  });
+
+  it("AI 포함(나만) → 원문 그대로 — 격리 필터가 남을 막는다", () => {
+    const t = 인입본문({ title: "t", body: 원문, ragOptIn: true, shared: false });
+    expect(t).toContain("Passw0rd!23");
+  });
+
+  it("회사 공유 → 비밀은 가려 담는다(마스킹) — 원문 비밀번호가 전역 지식에 못 들어간다", () => {
+    const t = 인입본문({ title: "t", body: 원문, ragOptIn: false, shared: true });
+    expect(t).not.toBeNull();
+    expect(t!, "공유본에 비밀번호 원문이 남아 있다 — 상2 재발").not.toContain("Passw0rd!23");
+  });
+
+  it("공유 중이면 AI 포함을 꺼도 지식에서 빠지지 않는다(중5 — 공유가 조용히 깨지던 것)", () => {
+    expect(인입본문({ title: "t", body: 원문, ragOptIn: false, shared: true })).not.toBeNull();
+  });
+});

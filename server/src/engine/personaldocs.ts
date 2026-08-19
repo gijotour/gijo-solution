@@ -57,12 +57,8 @@ const updateStmt = db.prepare("UPDATE personal_docs SET title = @title, body = @
 const ragStmt = db.prepare("UPDATE personal_docs SET ragOptIn = @on, updatedAt = @at WHERE id = @id AND userId = @userId");
 const deleteStmt = db.prepare("DELETE FROM personal_docs WHERE id = ? AND userId = ?");
 const shareStmt = db.prepare("UPDATE personal_docs SET shared = @on, updatedAt = @at WHERE id = @id AND userId = @userId");
-const sharedIdsStmt = db.prepare("SELECT id FROM personal_docs WHERE shared = 1");
-
-/** 회사에 공유된 개인 문서의 RAG 문서 id 목록 — 검색 격리 필터(memory.hiddenDocIds)가 예외로 쓴다. */
-export function listSharedPersonalDocIds(): string[] {
-  return (sharedIdsStmt.all() as { id: string }[]).map((r) => `personal:${r.id}`);
-}
+// (공유 id 목록 함수는 두지 않는다 — 검색 격리 필터(memory.hiddenDocIds)가 personal_docs를
+//  직접 조회한다. 같은 규칙을 두 곳에 적으면 한쪽만 고쳐 어긋난다 — 검토관 하11.)
 
 /** 목록 — **자기 것만**. 본문은 빼고 준다(목록에 20만 자를 실을 이유가 없다). */
 export function listPersonalDocs(userId: string): Omit<PersonalDoc, "body">[] {
@@ -88,12 +84,26 @@ export function ragDocumentId(id: string): string {
   return `personal:${id}`;
 }
 
-/** 켜면 인입, 끄면 삭제. 끄기만 하고 안 지우면 "껐는데 계속 나온다"가 된다. */
+/** 인입할 본문을 정한다 — null이면 지식에서 뺀다(삭제). 순수 함수라 시험이 직접 잰다
+ *  (검토관 하13 — hiddenDocIds만 재던 시험이 syncRag 무동작(상1)·마스킹 부재(상2)를 못 잡았다). */
+export function 인입본문(doc: Pick<PersonalDoc, "title" | "body" | "ragOptIn" | "shared">): string | null {
+  if (!doc.ragOptIn && !doc.shared) return null;
+  // 공유본은 비밀 마스킹 후 인입 — 개인 메모의 비밀번호·계정이 회사 답변에 새지 않게(시안 약속).
+  // 옵트인(나만)은 원문 그대로 — 격리 필터(memory.hiddenDocIds)가 남에게 안 보이게 막는다.
+  const 본문 = doc.shared ? maskSecrets(doc.body).text : doc.body;
+  return `# ${doc.title}\n\n${본문}`;
+}
+
+/** 켜면 인입, 끄면 삭제. 끄기만 하고 안 지우면 "껐는데 계속 나온다"가 된다.
+ *  ⚠ ragOptIn(나만)·shared(회사) **둘 다 꺼졌을 때만** 삭제 — 한쪽만 보고 지우면
+ *    「AI 포함을 껐더니 공유도 조용히 깨진다」(검토관 중5)가 된다. */
 async function syncRag(doc: PersonalDoc, userId: string): Promise<void> {
   const docId = ragDocumentId(doc.id);
-  if (doc.ragOptIn) {
+  const text = 인입본문(doc);
+  if (text !== null) {
     const { ingestText, GLOBAL_SCOPE } = await import("./memory.js");
-    await ingestText(docId, `# ${doc.title}\n\n${doc.body}`, GLOBAL_SCOPE, undefined, false, userId);
+    // sourcePath에 사람이 읽을 이름을 — 근거 표시가 personal:<uuid>면 출처를 못 읽는다(검토관 하14).
+    await ingestText(docId, text, GLOBAL_SCOPE, `내 문서 · ${doc.title}`, false, userId);
   } else {
     const { deleteDocument } = await import("./memory.js");
     await deleteDocument(docId, false).catch(() => undefined); // 없어도 정상(한 번도 안 켰던 문서)

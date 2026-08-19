@@ -154,6 +154,7 @@ export interface Viewer {
 
 const gradedDocsStmt = db.prepare("SELECT documentId, grade FROM memory_documents");
 const personalDocsStmt = db.prepare("SELECT documentId, uploadedBy FROM memory_documents WHERE documentId LIKE 'personal:%'");
+const sharedPersonalStmt = db.prepare("SELECT id FROM personal_docs WHERE shared = 1"); // 검색마다 재컴파일 금지(검토관 하12)
 
 /** 이 사람이 못 보는 문서 id들 — 검색 후보에서 **원천 제외**(등급 필터와 같은 DB 레벨 하드 필터).
  *  ① 남의 개인 문서(personal:*) — LLM 위키 격리 1요건(2026-08-20, RAG 오염 53% 전례의 개인판
@@ -167,8 +168,7 @@ export function hiddenDocIds(viewer?: Viewer): string[] {
     // 공유 여부는 personal_docs를 직접 조회 — 모듈 import(순환·ESM/CJS 차이)에 기대면
     // 환경에 따라 조용히 fail-closed로 떨어져 공유가 안 먹는다(시험이 잡음).
     const 공유됨 = new Set(
-      (db.prepare("SELECT id FROM personal_docs WHERE shared = 1").all() as { id: string }[])
-        .map((r) => `personal:${r.id}`)
+      (sharedPersonalStmt.all() as { id: string }[]).map((r) => `personal:${r.id}`)
     );
     const 나 = viewer?.userId != null ? String(viewer.userId) : null;
     for (const p of personal) {
@@ -712,7 +712,10 @@ export async function ingestText(documentId: string, raw: string, scope: string 
   // 문서 반입 소식(2026-08-06) — 사람이 올린 문서(uploadedBy 있음)만 백그라운드로 세 줄 요약과
   // 온톨로지 접점을 만든다. docsbundle 같은 프로그램 수집은 uploadedBy가 없어 자연히 건너뛴다.
   // 실패해도 인입은 이미 성공 — 소식은 소식일 뿐, 여기서 죽지 않는다(동적 임포트 = 순환 차단).
-  if (uploadedBy) {
+  // ⚠ 개인 문서(personal:*)는 소식을 만들지 않는다 — 반입 소식은 전 담당자에게 뿌려지는
+  //   회사 문서 소식이라, 개인 메모의 세 줄 요약이 여기 실리면 격리가 요약 경로로 샌다
+  //   (검토관 2026-08-20 상4 — 「새로 들어온 문서 알려줘」에 남의 메모 내용이 나왔다).
+  if (uploadedBy && !documentId.startsWith("personal:")) {
     void import("./docdigest.js")
       .then((d) => d.makeDigest(documentId, raw, resolvedCategory))
       .catch((err) => console.warn(`[docdigest] 소식 생성 실패(${documentId}): ${err instanceof Error ? err.message : String(err)}`));
@@ -1292,11 +1295,25 @@ export function registerMemoryRoutes(app: Express): void {
     })
   );
   // 장기기억 문서 목록(올린 문서 확인) — documentId별 조각수·scope·업로드시각.
+  // 남의 개인 문서(personal:*)인가 — 목록·조각 라우트 공용 판별(검토관 2026-08-20 상3:
+  // 검색은 hiddenDocIds가 막는데 이 두 창구로 목록·본문 50조각이 그대로 새고 있었다).
+  // 공유된 것만 예외. 판별 불가(무기명)는 가리는 쪽 — 격리는 언제나 fail-closed.
+  const 남의개인문서인가 = (documentId: string, req: import("express").Request): boolean => {
+    if (!documentId.startsWith("personal:")) return false;
+    const 공유 = db.prepare("SELECT shared FROM personal_docs WHERE id = ?").get(documentId.slice("personal:".length)) as { shared?: number } | undefined;
+    if (공유?.shared === 1) return false;
+    const me = (req as import("express").Request & { user?: { id?: string | number; username?: string } }).user;
+    const myId = me?.id != null ? String(me.id) : (me?.username ?? null);
+    if (!myId) return true;
+    const row = db.prepare("SELECT uploadedBy FROM memory_documents WHERE documentId = ?").get(documentId) as { uploadedBy?: string | null } | undefined;
+    return String(row?.uploadedBy ?? "") !== myId;
+  };
   app.get(
     "/api/memory/documents",
     authMiddleware,
-    asyncRoute(async (_req, res) => {
-      res.json(await listDocuments());
+    asyncRoute(async (req, res) => {
+      const docs = (await listDocuments()) as { documentId: string }[];
+      res.json(docs.filter((d) => !남의개인문서인가(d.documentId, req)));
     })
   );
   // 특정 문서 조각 미리보기(어떻게 학습됐는지 확인). Korean/특수문자 파일명 대비 body로 받는다.
@@ -1307,6 +1324,11 @@ export function registerMemoryRoutes(app: Express): void {
       const { documentId, limit } = req.body as { documentId?: string; limit?: number };
       if (!documentId) {
         res.status(400).json({ error: "documentId가 필요합니다" });
+        return;
+      }
+      // ⚠ 404다, 403이 아니다 — 403은 「있긴 있다」를 흘린다(personaldocs와 같은 원칙).
+      if (남의개인문서인가(String(documentId), req)) {
+        res.status(404).json({ error: "그런 문서가 없습니다" });
         return;
       }
       res.json(await getDocumentChunks(documentId, Math.min(Math.max(1, limit ?? 10), 50)));

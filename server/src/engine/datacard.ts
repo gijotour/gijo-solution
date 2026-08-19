@@ -391,16 +391,18 @@ export function supervisionStatusAnswer(): { output: string; dataCard: DataCard 
 export function mydocsStatusAnswer(userId: string): { output: string; dataCard: DataCard } {
   const { listPersonalDocs } = require("./personaldocs") as typeof import("./personaldocs");
   const 목록 = listPersonalDocs(userId);
-  const 정리본 = 목록.filter((d) => d.title.startsWith("정리본_")).length; // 라이트 「정리본」 관례 그대로
+  // (「정리본」 칸은 두지 않는다 — 그 이름을 붙이는 생산자가 표준 제품에 없다. 생산자 없는
+  //  값은 영원한 0으로 화면이 거짓말을 한다 — 검토관 중6, 「그 값을 누가 넣는가」 계열.)
+  const AI포함 = 목록.filter((d) => d.ragOptIn).length;
   const 공유 = 목록.filter((d) => d.shared).length;
   const 오늘 = 목록.filter((d) => Date.now() - d.updatedAt < 86400000).length;
   const 최근 = 목록.slice(0, 8);
   const dataCard: DataCard = {
-    title: "내 문서 — 개인 메모·정리본",
+    title: "내 문서 — 개인 메모",
     kpis: [
       { label: "내 문서", value: String(목록.length), color: 목록.length ? undefined : "muted" },
       { label: "오늘 쓴 것", value: String(오늘) },
-      { label: "정리본", value: String(정리본) },
+      { label: "AI 포함", value: String(AI포함) },
       { label: "회사 공유", value: String(공유), color: 공유 ? "warn" : undefined }, // 공유=노출이라 눈에 띄게
     ],
     screen: { page: "mydocs.html", label: "내 문서" },
@@ -417,7 +419,7 @@ export function mydocsStatusAnswer(userId: string): { output: string; dataCard: 
   };
   return {
     output: 목록.length
-      ? `내 문서 — ${목록.length}건(정리본 ${정리본} · 회사 공유 ${공유}). 개인 문서는 내 질문에만 근거로 나옵니다 — 공유한 것만 팀 전체가 봅니다.`
+      ? `내 문서 — ${목록.length}건(AI 포함 ${AI포함} · 회사 공유 ${공유}). 개인 문서는 내 질문에만 근거로 나옵니다 — 공유한 것만 팀 전체가 봅니다.`
       : "내 문서가 아직 없습니다 — 🗔 화면에서 ✍ Smart MD로 쓰거나 .md 파일을 가져오세요. 개인 문서는 나만 봅니다.",
     dataCard,
   };
