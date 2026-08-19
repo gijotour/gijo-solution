@@ -37,6 +37,8 @@
   window.addEventListener("message", function (ev) {
     var d = ev.data;
     if (!d || d.type !== "gijo:scope:set") return;
+    // 발신자 검증(2026-08-20) — 부모(셸 또는 허브)와 자기 자신(⧉ 팝업의 nav.js 재주입)만.
+    if (ev.source !== window && ev.source !== window.parent) return;
     var sc = d.scope && d.scope.id && d.scope.label ? d.scope : null;
     var 바뀜 = (범위 && 범위.id) !== (sc && sc.id);
     범위 = sc;

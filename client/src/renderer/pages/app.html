@@ -729,14 +729,36 @@
     return false;
   }
 
+  /** 발신자 검증(2026-08-20 외부 조사 2순위) — Electron file://라 origin은 전 프레임이
+   *  같아서 못 쓴다. ev.source로 가린다: ① 셸 자신(=window — onShellBridge가 IPC로 받은
+   *  팝업·사무실·⇤붙이기 메시지를 자기 window에 되쏘는 경로) ② 내 프레임 트리의 자손
+   *  (탭 iframe 1겹 + 허브 무대 2겹 — 사슬 걷기 ≤6). 그 밖(남의 창·정체불명)은 버린다. */
+  function 내것인가(src) {
+    if (src === window) return true;
+    try {
+      var w = src, 깊이 = 0;
+      while (w && 깊이 < 6) {
+        if (w.parent === window) return true;
+        if (w.parent === w) return false; // 남의 top-level 창
+        w = w.parent;
+        깊이++;
+      }
+    } catch (e) { /* 못 닿으면 아닌 것으로 — 모호하면 안 받는 쪽이 안전하다 */ }
+    return false;
+  }
+
   // 탭 안 화면이 셸에 부탁하는 것들.
   window.addEventListener("message", function (ev) {
     var d = ev && ev.data;
     if (!d) return;
+    if (!ev.source || !내것인가(ev.source)) return; // 발신자 검증 — 내 창·내 자손만
     // ① "이 화면 열어줘" — 자기 자리를 갈아치우지 않고 새 탭으로(대시보드 바로가기 타일 등).
     if (d.type === "gijo:openTab" && d.page) {
-      var known = window.gijoMenuLabel ? window.gijoMenuLabel(d.page) : null;
-      open(d.page, d.label || known || d.page);
+      // 값 재조립(dockback :817과 같은 규칙) — 이 값은 embedSrc를 거쳐 iframe src로 직행한다.
+      var page = String(d.page);
+      if (!/^[\w.-]+\.html(\?[\w&=%.-]*)?$/.test(page)) return;
+      var known = window.gijoMenuLabel ? window.gijoMenuLabel(page) : null;
+      open(page, d.label || known || page);
       return;
     }
     // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.

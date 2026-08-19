@@ -44,7 +44,8 @@ mkdir -p "$DST_ROOT/client"
 # ⚠ electron-builder*.json도 가져간다(2026-08-13) — 라이트 에디션 시험이 **빌드 설정과 코드가
 #   짝을 이루는지**를 본다(lite-edition-shell: extraMetadata.gijoEdition ↔ main.ts). 빠뜨리면
 #   시험 파일이 수집 단계에서 죽어 「1 failed · 테스트 0」이 된다 — 제품 결함처럼 보이는 사본 결함이다.
-rsync -a --delete --include='src/***' --include='package.json' --include='electron-builder*.json' \
+# ⚠ scripts/도 가져간다(2026-08-20) — 게시 관문 감시(wiringcontract)가 publish-release.mjs를 읽는다.
+rsync -a --delete --include='src/***' --include='scripts/***' --include='package.json' --include='electron-builder*.json' \
   --exclude='*' "$SRC_ROOT/client/" "$DST_ROOT/client/" || { echo "✗ client 동기화 실패"; exit 1; }
 # 저장소 뿌리의 knowledge/·tools/·mockups/를 읽는 시험도 있다.
 for d in knowledge tools mockups; do

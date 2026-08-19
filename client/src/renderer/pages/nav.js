@@ -270,17 +270,8 @@
     return m ? file + "?s=" + m[1] : file;
   }
   function go(page) { if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page); }
-  // 지금 보고 있는 화면의 챗봇을 연다. 일반 화면은 같은 문서에 위젯이 있고(gijoOpenChat),
-  // 허브는 화면을 iframe으로 품으므로 보이는 프레임에 postMessage로 넘긴다. 열 대상이 없으면 false.
-  function openChatHere() {
-    if (window.gijoOpenChat) { window.gijoOpenChat(); return true; }
-    var sent = false;
-    Array.prototype.forEach.call(document.querySelectorAll("iframe"), function (f) {
-      if (!f.offsetParent) return; // 숨어 있는 탭 프레임은 건너뛴다
-      try { f.contentWindow.postMessage({ type: "gijo:openChat" }, "*"); sent = true; } catch (e) {}
-    });
-    return sent;
-  }
+  // (openChatHere 삭제, 2026-08-20 정찰 확인) — hub.html 삭제 뒤 호출부 0곳의 죽은 배관이었다.
+  // 챗봇 열기는 같은 문서의 window.gijoOpenChat 직접 호출만 남긴다(gijo:openChat 메시지 폐지).
   // 허브에서 현재 열려 있는 탭(3단계) — t 파라미터. 없으면 null(첫 탭이 활성).
   function currentTabPage() {
     var m = /[?&]t=([^&]+)/.exec(location.search || "");
@@ -1420,15 +1411,28 @@
     // 부모에게 보낸 gijo:*가 **자기 자신에게 돌아온다.** 여기서 잡아 IPC로 셸에 전한다.
     // ⚠ gijo:view는 안 보낸다 — 「보는 목록」은 활성 탭 기준의 개념이라 팝업에선 뜻이 없고,
     //   셸의 활성탭 검사에 걸러질 뿐이다. select(고른 것)·scope(범위)·openTab(화면 열기)만.
+    // 발신자 검증(2026-08-20 외부 조사 2순위) — 자기 자신(selectnotify가 top===window로
+    // 되돌아오는 경로) 또는 이 창 프레임 트리의 자손(허브형 화면 안 iframe)만 받는다.
+    // ⚠ P4(2026-08-19)가 깨졌던 원인은 「self만」 검사였지 검사 자체가 아니다 —
+    //   self+자손 둘 다 받으면 두 실경로가 살고, 남의 top-level 창發만 배제된다.
+    function 팝업발신자인가(src) {
+      if (src === window) return true;
+      try {
+        var w = src, n = 0;
+        while (w && n < 6) {
+          if (w.parent === window) return true;
+          if (w.parent === w) return false;
+          w = w.parent;
+          n++;
+        }
+      } catch (e) { /* 못 닿으면 아닌 것으로 */ }
+      return false;
+    }
     window.addEventListener("message", function (ev) {
       var d = ev.data;
-      // ⚠ ev.source 검사를 **하지 않는다**(2026-08-19 프로 사용자 테스트 P4). 처음엔
-      //   「자기에게 돌아온 것만」(source===window)으로 걸렀는데, 허브형 화면(우선순위 등)을
-      //   창으로 열면 안쪽 iframe(vulnscan)이 top으로 보낸 선택의 source가 iframe이라
-      //   **조용히 버려져** 본창에 안 닿았다. 이 창에 실리는 문서는 전부 우리 로컬 파일이고
-      //   아래 타입 화이트리스트가 지키므로, top에 도달한 gijo:*는 출처 불문 릴레이한다.
       if (!d) return;
       if (d.type !== "gijo:select" && d.type !== "gijo:scope" && d.type !== "gijo:openTab") return;
+      if (!ev.source || !팝업발신자인가(ev.source)) return;
       if (window.gijo && window.gijo.bridgeToShell) window.gijo.bridgeToShell(d);
     });
     // 셸이 퍼뜨린 범위를 이 창의 화면에도 먹인다(scopefilter가 받는 그 메시지로 재주입).

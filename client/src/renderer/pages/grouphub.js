@@ -41,11 +41,17 @@
     // 요청(gijo:openTab)은 여기서 멈추면 허공에 떨어진다(2026-08-20 검토관 중간4:
     // 발견·수집 허브 안 자산 관리의 유지보수·취약점 딥링크가 눌러도 무반응이었다).
     // 셸까지 한 겹 더 올려 보낸다 — 내용은 건드리지 않는 순수 릴레이.
-    if (d.type === "gijo:openTab" && ev.source !== window.parent && window.parent !== window) {
+    if (d.type === "gijo:openTab") {
+      // 발신자 검증(2026-08-20) — 무대 iframe만. 위(셸)發 되울림·다른 창發은 버린다.
+      var st = document.getElementById("ghStage");
+      if (!st || ev.source !== st.contentWindow) return;
+      // 팝업 단독(parent===window)이면 자기에게 되쏘고 nav.js applyPopout이 IPC로 본창에 잇는다.
       try { window.parent.postMessage(d, "*"); } catch (e) { }
       return;
     }
     if (d.type !== "gijo:scope:set") return;
+    // 발신자 검증 — 셸(탭일 때 parent) 또는 자기 자신(⧉ 팝업 재주입)만.
+    if (ev.source !== window.parent && ev.source !== window) return;
     지금범위 = d.scope && d.scope.id && d.scope.label ? d.scope : null;
     무대에전하기(document.getElementById("ghStage"), 지금범위);
   });

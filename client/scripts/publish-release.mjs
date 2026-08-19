@@ -42,6 +42,22 @@ async function main() {
     throw new Error(`설치파일이 없습니다: ${installerPath} — 먼저 npm run dist로 빌드하세요.`);
   }
 
+  // ── UI 실화면 관문(2026-08-20, tools/publish-gate-ui.mjs) ────────────────
+  // 정적 게이트가 원리상 못 잡는 「로드는 됐는데 안 눌리는」 부류를 게시 직전에 실측한다
+  // (2026-08-19~20 실사고 2건이 전부 이 부류). --skip-ui-gate로만 건너뛴다 —
+  // 건너뛴 사유는 게시 커밋에 적을 것. 관문이 exit 3이면 앱이 떠 있는 것 — 닫고 다시.
+  if (!process.argv.includes("--skip-ui-gate")) {
+    const { spawnSync } = await import("node:child_process");
+    console.log("[publish-release] UI 실화면 관문 실행(tools/publish-gate-ui.mjs)…");
+    const gate = spawnSync(process.execPath, [path.join(clientDir, "..", "tools", "publish-gate-ui.mjs")],
+      { stdio: "inherit", env: process.env });
+    if (gate.status !== 0) {
+      throw new Error(`UI 관문 실패(exit ${gate.status}) — 게시 중단. 수리 후 다시 시도하세요(불가피할 때만 --skip-ui-gate).`);
+    }
+  } else {
+    console.log("[publish-release] ⚠ --skip-ui-gate — UI 실화면 관문을 건너뜁니다(사유를 게시 기록에 남기세요).");
+  }
+
   console.log(`[publish-release] 로그인: ${serverUrl} (${username})`);
   const login = await fetch(`${serverUrl}/api/auth/login`, {
     method: "POST",

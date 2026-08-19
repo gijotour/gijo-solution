@@ -139,6 +139,62 @@ describe("배선 계약 ⑤층 — 이동 통로 (전수)", () => {
   });
 });
 
+describe("배선 계약 ⑤층 — 수신부 발신자 검증 (외부 조사 2순위, 2026-08-20)", () => {
+  // Electron file://라 origin은 전 프레임이 같다 — ev.source 기반 검증이 유일한 층이다.
+  // 이 검사들이 빠지면 프레임 트리 밖·정체불명 발신이 셸/화면에 그대로 주입된다.
+  it("셸(app.html) — 내것인가 가드 + openTab 값 재조립", () => {
+    const s = readFileSync(join(PAGES, "app.html"), "utf8").replace(/<!--[\s\S]*?-->/g, "");
+    expect(s, "발신자 검증 함수가 없다").toContain("function 내것인가(");
+    expect(s, "수신부 첫 줄 가드가 없다").toContain("내것인가(ev.source)");
+    expect(s, "openTab page 값 재조립(파일명 검증)이 없다").toContain("[\\w.-]+\\.html(\\?");
+  });
+  it("팝업 릴레이(nav.js) — self+자손 검사(P4 회귀 방지 포함)", () => {
+    const s = readFileSync(join(PAGES, "nav.js"), "utf8");
+    expect(s).toContain("function 팝업발신자인가(");
+    expect(s).toContain("팝업발신자인가(ev.source)");
+  });
+  it("scopefilter·assets — 부모(셸·허브) 또는 self(팝업 재주입)만", () => {
+    for (const f of ["scopefilter.js", "assets.html"]) {
+      const s = readFileSync(join(PAGES, f), "utf8");
+      expect(s, `${f} — 범위 수신부 가드가 없다`).toContain("ev.source !== window && ev.source !== window.parent");
+    }
+  });
+  it("허브(grouphub) — openTab은 무대 iframe만·scope는 부모/self만", () => {
+    const s = readFileSync(join(PAGES, "grouphub.js"), "utf8");
+    expect(s).toContain("ev.source !== st.contentWindow");
+    expect(s).toContain("ev.source !== window.parent && ev.source !== window");
+  });
+  it("keepalive(preload) — 자손 프레임만 활동 신호로 받는다(세션 정책 우회 방지)", () => {
+    const s = readFileSync(join(PAGES, "..", "..", "preload.ts"), "utf8");
+    const i = s.indexOf("__gijoActivity?: boolean }).__gijoActivity) return;");
+    expect(i, "keepalive 수신부에 발신자 검증이 없다").toBeGreaterThan(-1);
+    expect(s.slice(i, i + 600), "자손 사슬 걷기가 없다").toContain("m.source");
+  });
+  it("main IPC(gijo:bridge) — 우리가 만든 창의 렌더러만 릴레이한다", () => {
+    const s = readFileSync(join(PAGES, "..", "..", "main.ts"), "utf8");
+    const i = s.indexOf('ipcMain.on("gijo:bridge"');
+    expect(s.slice(i, i + 500), "발신 창 화이트리스트가 없다").toContain("e.sender.id");
+  });
+  it("죽은 배관(gijo:openChat)이 되살아나지 않는다", () => {
+    const s = readFileSync(join(PAGES, "chatwidget.js"), "utf8");
+    expect(s, "발신자 0곳의 수신부가 부활했다(2026-08-20 제거)").not.toMatch(/type === "gijo:openChat"/);
+  });
+});
+
+describe("배선 계약 ⑤층 — 게시 전 UI 실화면 관문 (외부 조사 3순위, 2026-08-20)", () => {
+  it("publish-release가 관문을 강제로 부른다(--skip-ui-gate로만 우회)", () => {
+    const s = readFileSync(join(__dirname, "..", "..", "client", "scripts", "publish-release.mjs"), "utf8");
+    expect(s, "게시가 UI 관문을 안 부른다").toContain("publish-gate-ui.mjs");
+    expect(s, "우회 플래그 처리(명시적 사유 경고)가 없다").toContain("--skip-ui-gate");
+  });
+  it("관문이 fail-closed다 — 남의 앱에 안 붙고(전용 포트), 떠 있으면 게시 중단", () => {
+    const s = readFileSync(join(__dirname, "..", "..", "tools", "publish-gate-ui.mjs"), "utf8");
+    expect(s, "전용 포트(9227)가 아니다 — 9223은 남의 앱에 붙는 사고 통로").toContain("9227");
+    expect(s, "선행 점검 실패 시 게시 중단(exit 3)이 없다").toContain("process.exit(3)");
+    expect(s, "자기가 띄운 프로세스만 정리해야 한다").toContain("String(app.pid)");
+  });
+});
+
 describe("배선 계약 ⑤층 — 반입 다음 칩", () => {
   it("업로드 응답에 다음 칩이 실리고 클라가 그린다(반입은 nextguide 사각지대)", () => {
     const up = readFileSync(join(__dirname, "..", "src", "engine", "autoupload.ts"), "utf8");

@@ -135,10 +135,7 @@
     }
     // 같은 문서에 네비가 있는 일반 화면용.
     window.gijoOpenChat = openChat;
-    // 허브(hub.html)는 화면을 iframe으로 품으므로 네비가 부모, 챗봇은 자식에 있다 → postMessage로 받는다.
-    window.addEventListener("message", function (ev) {
-      if (ev && ev.data && ev.data.type === "gijo:openChat") openChat();
-    });
+    // (gijo:openChat 수신부 삭제, 2026-08-20) — hub.html 삭제 뒤 발신자 0곳의 죽은 배관이었다.
 
     function appendRow(kind, html) {
       var em = msgs.querySelector(".gcw-empty"); if (em) em.remove();

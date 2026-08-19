@@ -935,7 +935,11 @@ function findAppWindow(id: string): BrowserWindow | null {
 //   렌더러끼리는 직접 통신이 불가하므로 메인이 다리를 놓는다.
 // 팝업 → 본창: 화면이 보낸 gijo:*를 본창에 그대로 전한다(본창은 자기 window에 재주입해
 //   기존 message 리스너가 처리 — 처리 코드를 복제하지 않는다).
-ipcMain.on("gijo:bridge", (_e, d: unknown) => {
+// 발신 창 검증(2026-08-20 외부 조사 2순위) — 우리가 만든 팝업·대화·사무실 창의 렌더러만.
+//   안 거르면 어느 창이든(최소 preload 창 포함) 본창에 gijo:*를 주입할 수 있다.
+ipcMain.on("gijo:bridge", (e, d: unknown) => {
+  const 허용창 = [...popoutWindows.values(), consoleWindow, officeWindow];
+  if (!허용창.some((w) => w && !w.isDestroyed() && w.webContents.id === e.sender.id)) return;
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("gijo:bridge", d);
 });
 // 본창 → 모든 팝업: 🗂 범위 같은 상태를 열린 창 전부에 퍼뜨린다(본창 제외).

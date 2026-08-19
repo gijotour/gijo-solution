@@ -150,6 +150,8 @@
   window.addEventListener("message", function (ev) {
     var d = ev.data;
     if (!d || d.type !== "gijo:scope:set") return;
+    // 발신자 검증(2026-08-20) — 부모(셸·허브)와 자기 자신(⧉ 팝업 재주입)만.
+    if (ev.source !== window && ev.source !== window.parent) return;
     if (!d.scope) { 고른것 = null; 범위그리기(null); 그리기(); 단계그리기(null); return;}
     고른것 = d.scope.id;
     범위그리기(d.scope);

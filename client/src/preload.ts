@@ -644,7 +644,21 @@ contextBridge.exposeInMainWorld("gijoRealtime", {
     ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, note, { passive: true, capture: true }));
     // iframe에서 전달된 활동 신호
     window.addEventListener("message", (m) => {
-      if (m && m.data && (m.data as { __gijoActivity?: boolean }).__gijoActivity) note();
+      if (!m || !m.data || !(m.data as { __gijoActivity?: boolean }).__gijoActivity) return;
+      // 발신자 검증(2026-08-20) — 내 프레임 트리의 자손(탭 iframe·허브 무대 2겹)만.
+      // ⚠ 한계: 자손 프레임이 입력 없이 위조 신호를 보내는 것까지는 못 막는다(전부 로컬 파일 전제).
+      try {
+        let w = m.source as Window | null;
+        let n = 0, ok = false;
+        while (w && n < 6) {
+          if (w === window) break;
+          if (w.parent === window) { ok = true; break; }
+          if (w.parent === w) break;
+          w = w.parent; n++;
+        }
+        if (!ok) return;
+      } catch { return; }
+      note();
     });
     setInterval(() => {
       if (!api.isAuthenticated()) return;                                    // 로그아웃 상태면 핑 안 함
