@@ -16,6 +16,7 @@ const 표: Record<string, string[]> = {
   "분기:우선순위": ["오늘 뭐부터 할까?", "긴급한 취약점 알려줘", "자산 현황 어때?"],
   "분기:검증현황": ["하드닝 점검 스케줄 알려줘", "미조치 취약점 뭐 있어?", "오늘 브리핑"],
   "분기:자산현황": ["미조치 취약점 뭐 있어?", "SBOM 없는 자산 알려줘", "인터넷에 노출된 자산 있어?"],
+  "분기:관제현황": ["오늘 뭐부터 할까?", "공격 경로 보여줘", "미조치 취약점 뭐 있어?"],
   // ── 도구(마지막 도구 이름으로 식별) — 실측 ✓ 문장만 ──
   today: ["긴급한 취약점 알려줘", "오늘 브리핑", "미조치 취약점 뭐 있어?"],
   briefing: ["오늘 뭐부터 할까?", "지금 손댈 일 뭐야?", "공격 경로 보여줘"],
@@ -71,6 +72,7 @@ export function routeFromParts(r: {
   if (r.picklist?.kind === "finding") return "분기:우선순위";
   const t = r.dataCard?.title ?? "";
   if (t.startsWith("검증")) return "분기:검증현황";
-  if (t.startsWith("자산")) return "분기:자산현황";
+  if (t.includes("자산 — 등록 현황")) return "분기:자산현황"; // 범위 제목이 앞에 붙어도 잡히게
+  if (t.startsWith("발견·수집")) return "분기:관제현황";
   return null;
 }

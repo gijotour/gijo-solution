@@ -255,6 +255,56 @@ describe("2차 ③ 자산 현황 카드", () => {
   });
 });
 
+describe("화면 이름 → 현황 카드 (사장님 실측 — 「자산고르기」에 LLM 일반론이 나오던 결함)", () => {
+  beforeEach(() => resetAssetsForTests());
+
+  it("트리거 — 화면 이름·짧은 별칭만 받고 문장은 기존 분기에 넘긴다", async () => {
+    const { screenNameCard } = await import("../src/engine/datacard");
+    expect(screenNameCard("자산고르기")).toBe("asset");
+    expect(screenNameCard("자산 고르기")).toBe("asset");
+    expect(screenNameCard("발견수집")).toBe("ops");
+    expect(screenNameCard("검증")).toBe("hardening");
+    expect(screenNameCard("우선순위")).toBe("finding");
+    expect(screenNameCard("자산 등록은 어떻게 해?"), "문장은 넘긴다").toBeNull();
+    expect(screenNameCard("설정"), "카드 없는 화면 이름은 기존 경로(되묻기·안내)로").toBeNull();
+  });
+
+  it("★ dispatcher 경유 — 「자산고르기」가 일반론이 아니라 자산 카드로 온다", async () => {
+    registerAsset({ id: "dc-sn1", name: "이름-자산", path: "-", assetType: "서버" });
+    const { dispatchInstruction } = await import("../src/engine/dispatcher");
+    const r = await dispatchInstruction("자산고르기", undefined, undefined, undefined, true);
+    expect(r.dataCard?.title).toContain("자산 — 등록 현황");
+    expect(r.output).not.toContain("핵심 단계"); // LLM 개념 설명이 아니다
+  });
+});
+
+describe("발견·수집(관제) 카드", () => {
+  it("트리거 — 관제 현황만 받고 기존 영토(검증·자산·취약점)는 지나간다", async () => {
+    const { isOpsStatusAsk } = await import("../src/engine/datacard");
+    expect(isOpsStatusAsk("통합 관제 현황 알려줘")).toBe(true);
+    expect(isOpsStatusAsk("발견 수집 현황 보여줘")).toBe(true);
+    expect(isOpsStatusAsk("검증 현황 보여줘")).toBe(false);
+    expect(isOpsStatusAsk("자산 현황 어때")).toBe(false);
+    expect(isOpsStatusAsk("관제 이벤트 처리해줘"), "실행 지시").toBe(false);
+  });
+
+  it("KPI·표가 이벤트 원장과 일치한다(취약점 반입 → 이벤트 재구성으로 시드)", async () => {
+    resetAssetsForTests();
+    registerAsset({ id: "dc-ops1", name: "관제-자산", path: "-", assetType: "서버" });
+    recordFindings("dc-ops1", [
+      { finding_type: "원격코드실행", severity: "critical", evidence: "CVE-2026-1", source_tool: "s", kev: true, kevCves: ["CVE-2026-1"] },
+    ]);
+    const { rebuildVulnEvents } = await import("../src/engine/analysishub");
+    rebuildVulnEvents();
+    const { opsStatusAnswer } = await import("../src/engine/datacard");
+    const { dataCard, output } = await opsStatusAnswer();
+    expect(Number(dataCard.kpis[0].value)).toBeGreaterThanOrEqual(1); // 열린 이벤트
+    expect(dataCard.table!.shown[0].소스).toBe("취약점");
+    expect(dataCard.screen).toEqual({ page: "discover.html", label: "발견·수집" });
+    expect(output).toContain("통합 관제");
+  });
+});
+
 describe("dispatcher 경유 — 카드가 응답에 실린다", () => {
   beforeEach(() => resetHardeningForTests());
 

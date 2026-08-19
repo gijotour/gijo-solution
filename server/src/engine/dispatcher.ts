@@ -1024,6 +1024,30 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
 
   // 한 낱말만 던진 경우("취약점", "급한거") — 뜻은 분명한데 무엇을 원하는지가 없다.
   // LLM에 보내면 34초를 헤매다 엉뚱한 답을 낸다(2026-08-01 실측). 그 낱말에 맞는 예시로 되묻는다.
+  // 🃏 화면 이름 → 그 화면의 현황 카드(2026-08-19 사장님 실측 — 「자산고르기」를 쳤더니 LLM이
+  //   일반 지식 개념 설명을 늘어놨다). 화면 이름을 친 사람이 원하는 것은 개념이 아니라 **그
+  //   화면의 데이터**다. 되묻기(아래 한낱말)보다 카드가 먼저다 — 카드가 곧 가장 좋은 답이다.
+  {
+    const { screenNameCard, hardeningStatusAnswer, assetStatusAnswer, opsStatusAnswer, 카드없는글로 } = await import("./datacard.js");
+    const 어느카드 = screenNameCard(instructionText);
+    if (어느카드 === "finding") {
+      const { output, picklist, dataCard } = findingListAnswer(
+        instructionText, 지금범위 && 지금범위.kind === "asset" ? 지금범위.id : null);
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
+      completeTask(task.id);
+      return { task, route: { agentId: "orchestrator", action: "chat" }, output, ...(picklist ? { picklist } : {}), ...(dataCard ? { dataCard } : {}) };
+    }
+    if (어느카드) {
+      const 답 = 어느카드 === "asset" ? assetStatusAnswer(지금범위 && 지금범위.kind === "asset" ? 지금범위.id : null)
+        : 어느카드 === "ops" ? await opsStatusAnswer()
+        : hardeningStatusAnswer();
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
+      completeTask(task.id);
+      if (에디션제한중()) return { task, route: { agentId: "orchestrator", action: "chat" }, output: 카드없는글로(답) };
+      return { task, route: { agentId: "orchestrator", action: "chat" }, output: 답.output, dataCard: 답.dataCard };
+    }
+  }
+
   const 낱말 = 한낱말되묻기(instructionText);
   if (낱말) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
@@ -1267,11 +1291,12 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   }
 
   {
-    const { isHardeningStatusAsk, hardeningStatusAnswer, isAssetStatusAsk, assetStatusAnswer, 카드없는글로 } = await import("./datacard.js");
+    const { isHardeningStatusAsk, hardeningStatusAnswer, isAssetStatusAsk, assetStatusAnswer, isOpsStatusAsk, opsStatusAnswer, 카드없는글로 } = await import("./datacard.js");
     const 현황답 = isHardeningStatusAsk(instructionText) ? hardeningStatusAnswer()
       // 🗂 범위를 넘긴다(검토관 심각4) — findings 경로에서 이미 고친 「범위가 걸렸는데
       // 전체가 왔다」가 카드에서 재발했었다. 이 분기도 agentloop 앞이라 직접 넘겨야 한다.
       : isAssetStatusAsk(instructionText) ? assetStatusAnswer(지금범위 && 지금범위.kind === "asset" ? 지금범위.id : null)
+      : isOpsStatusAsk(instructionText) ? await opsStatusAnswer()
       : null;
     if (현황답) {
       const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });

@@ -193,6 +193,83 @@ export function assetStatusAnswer(걸린범위?: string | null): { output: strin
   return { output, dataCard };
 }
 
+// ── 발견·수집(통합 관제) 현황 카드 (2026-08-19 사장님 「카드형은 대화창에」) ──────────────
+// 사장님이 본 발견·수집 팝업의 내용(P0/P1/P2·소스별·우선순위 목록)이 정확히 카드감인데
+// 카드가 없어 팝업으로만 봐야 했다 — 5단계 중 ①의 현황 카드를 채운다(②④⓪은 이미 있음).
+
+/** 「발견·수집/통합 관제 현황」 물음인가 — 기존 영토(검증·자산·취약점·스케줄) 제외. */
+export function isOpsStatusAsk(text: string): boolean {
+  const t = String(text || "").replace(/\s+/g, "");
+  if (!/(현황|상태|어때|보여줘|알려줘)/.test(t)) return false;
+  if (!/(발견수집|발견·수집|통합관제|관제)/.test(t)) return false;
+  return !/취약점|스캔결과|검증|하드닝|자산|스케줄|일정/.test(t);
+}
+
+/** 통합 관제 현황 — KPI 4 + 우선순위 상위 표(전부 analysis_events 원천 직접). */
+export async function opsStatusAnswer(): Promise<{ output: string; dataCard: DataCard }> {
+  const { listAnalysisEvents } = await import("./analysishub.js");
+  const 전부 = listAnalysisEvents();
+  const 열림 = 전부.filter((e) => {
+    const st = (e as { status?: string }).status;
+    return st !== "done" && st !== "ignored";
+  });
+  const p0 = 열림.filter((e) => e.priority === "P0");
+  const p1 = 열림.filter((e) => e.priority === "P1");
+  const 오늘 = Date.now() - 24 * 3600000;
+  const 신규 = 전부.filter((e) => (e as { at?: number }).at != null && (e as { at: number }).at >= 오늘);
+  const 순서 = { P0: 0, P1: 1, P2: 2 } as Record<string, number>;
+  const rows = [...열림]
+    .sort((a, b) => (순서[a.priority] ?? 9) - (순서[b.priority] ?? 9) || ((b as { at?: number }).at ?? 0) - ((a as { at?: number }).at ?? 0))
+    .map((e) => ({
+      우선: e.priority,
+      제목: e.title,
+      대상: e.entity || "—",
+      소스: e.source === "vuln" ? "취약점" : e.source === "log" ? "보안로그" : e.source === "product" ? "운영" : String(e.source),
+    }));
+  const shown = rows.slice(0, 표상한);
+  const dataCard: DataCard = {
+    title: "발견·수집 — 통합 관제 현황",
+    kpis: [
+      { label: "열린 이벤트", value: String(열림.length), color: 열림.length ? undefined : "ok" },
+      { label: "P0(긴급)", value: String(p0.length), color: p0.length ? "bad" : "ok" },
+      { label: "P1", value: String(p1.length), color: p1.length ? "warn" : "ok" },
+      { label: "오늘 신규", value: String(신규.length), color: 신규.length ? "warn" : "muted" },
+    ],
+    table: {
+      cols: [
+        { key: "우선", label: "우선" }, { key: "제목", label: "이벤트" },
+        { key: "대상", label: "대상" }, { key: "소스", label: "소스" },
+      ],
+      shown, totalCount: rows.length,
+    },
+    screen: { page: "discover.html", label: "발견·수집" },
+    pickKey: "제목",
+  };
+  const output = [
+    `발견·수집(통합 관제) 현황 — 열린 이벤트 ${열림.length} · P0 ${p0.length} · P1 ${p1.length} · 오늘 신규 ${신규.length}`,
+    rows.length
+      ? `급한 순으로 ${Math.min(표상한, rows.length)}건을 카드로 보였습니다 — 전체는 발견·수집 화면에서.`
+      : "열린 이벤트가 없습니다 — 스캐너 결과·보안로그를 올리면 여기에 쌓입니다.",
+  ].join("\n");
+  return { output, dataCard };
+}
+
+// ── 화면 이름 → 현황 카드 (2026-08-19 사장님 실측 — 「자산고르기」라고 쳤더니 LLM이 일반
+//    지식 개념 설명을 늘어놨다. 화면 이름을 친 사람이 원하는 것은 그 화면의 **데이터**다.) ──
+const 화면이름카드: Record<string, "asset" | "ops" | "hardening" | "finding"> = {
+  "자산고르기": "asset", "자산": "asset", "자산현황": "asset",
+  "발견수집": "ops", "발견·수집": "ops", "관제": "ops", "통합관제": "ops",
+  "검증": "hardening", "하드닝": "hardening",
+  "우선순위": "finding", "취약점": "finding", "미조치": "finding",
+};
+
+/** 짧은 입력이 화면 이름이면 어느 카드인지 — 아니면 null(다음 분기로). */
+export function screenNameCard(text: string): "asset" | "ops" | "hardening" | "finding" | null {
+  const t = String(text || "").replace(/[\s?!.]/g, "");
+  if (!t || t.length > 8) return null; // 문장이면 기존 분기들이 맡는다 — 낱말·이름만
+  return 화면이름카드[t] ?? null;
+}
+
 /** 카드 못 그리는 에디션(라이트)용 글 답 — max 인계(60acc4e5): output이 「카드로 보였습니다
  *  /○○ 화면에서」를 전제하는데 라이트는 chatparts 미배선·그 화면이 없다. 표 요약을 글로 접어
  *  넣고 화면 안내 문구를 뺀다 — 같은 숫자, 다른 형식(거짓 안내 금지). */
