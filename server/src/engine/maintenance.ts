@@ -4,6 +4,7 @@
 // 반려(rejected). 점검 결과에 파일을 첨부하면 dataset.ts로 텍스트를 추출해 memory.ts(RAG)에도
 // 수집한다 — 점검서 자체가 대시보드의 "올린 문서 검색"에서 바로 찾아지는 문서가 된다.
 
+import { 라이브모드 } from "./datacleanup";
 import type { Express, Request } from "express";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
@@ -392,6 +393,9 @@ const dstr = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 // 같은 패턴. 빈 화면 대신 바로 감을 잡게 한다. AI 자산 연결 건은 assets.ts의 SAMPLE_ASSET_IDS를
 // 가리킨다(자산 시드가 먼저 돌아 존재함). 각 샘플에 상태 변경 이력도 함께 심어 타임라인을 바로 본다.
 function seedSamplesIfEmpty(): void {
+  // 실사용 전환 뒤에는 샘플을 되살리지 않는다(2026-08-19 사장님 「진짜 빈 상태」 —
+  // 리셋 후 재기동 때 시드가 데모를 복원하던 함정을 datacleanup의 라이브 모드가 막는다).
+  if (라이브모드()) return;
   if (listStmt.all().length > 0) return;
   const now = Date.now();
 

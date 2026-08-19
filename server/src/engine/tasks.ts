@@ -1,5 +1,6 @@
 // engine/tasks.ts — 작업 큐 (서버 측, 전 클라이언트 공유, SQLite 영속화)
 
+import { 라이브모드 } from "./datacleanup";
 import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
 import type { GijoUser } from "../auth/users";
@@ -249,6 +250,9 @@ export function resetTasksForTests(): void {
 // 첫 실행에 "오늘 확인할 항목"·KPI SLA가 비어 보이지 않게 예시 조치 항목 3건을 시드한다
 // (assets.ts의 샘플 취약점 호스트와 연결). 취약점 연결 조치가 하나라도 있으면 끼어들지 않는다.
 export function seedSampleRemediationTasksIfEmpty(): void {
+  // 실사용 전환 뒤에는 샘플을 되살리지 않는다(2026-08-19 사장님 「진짜 빈 상태」 —
+  // 리셋 후 재기동 때 시드가 데모를 복원하던 함정을 datacleanup의 라이브 모드가 막는다).
+  if (라이브모드()) return;
   if (listTasks().some((t) => (t.ref ?? "").startsWith("vuln:"))) return;
   const day = 86400000;
   createTask({ text: "[조치] Apache Log4j RCE — 샘플-웹서버", priority: "P0", dueAt: Date.now() + 5 * day, assignee: "샘플담당", ref: "vuln:sample-web01" });

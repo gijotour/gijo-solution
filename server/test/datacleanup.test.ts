@@ -27,7 +27,9 @@ describe("POST /api/admin/data-cleanup", () => {
   });
 
   it("화이트리스트 밖 대상은 무시된다(임의 테이블 삭제 불가)", async () => {
-    const r = await request(app).post("/api/admin/data-cleanup").set("Authorization", `Bearer ${token}`).send({ targets: ["users", "assets"] });
+    // ⚠ 밖 예시는 **보존 계약 테이블**로 든다 — assets는 2026-08-19 실사용 전환 리셋으로
+    //   화이트리스트에 들어왔다(밖 예시로 쓰면 이 시험이 확장마다 깨진다).
+    const r = await request(app).post("/api/admin/data-cleanup").set("Authorization", `Bearer ${token}`).send({ targets: ["users", "audit_log", "chat_logs"] });
     expect(r.status).toBe(400); // 유효 대상이 하나도 없음
   });
 

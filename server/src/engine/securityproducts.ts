@@ -6,6 +6,7 @@
 // 각 제품에 제품 매뉴얼·로그 매뉴얼을 첨부하면 텍스트를 추출해 지식베이스(RAG)에도 수집한다
 // (maintenance 점검서와 같은 패턴) — "올린 문서 검색"에서 바로 찾아지는 문서가 된다.
 
+import { 라이브모드 } from "./datacleanup";
 import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
@@ -535,6 +536,9 @@ export function resetSecurityProductsForTests(): void {
 // 최초 기동 시(비어 있을 때) 종류별 감을 잡을 샘플 제품을 시드한다 — 다른 엔진의 seed 패턴과 동일.
 // 문서는 메타만(파일 미첨부) 몇 건 넣어 "제품 매뉴얼/로그 매뉴얼" 자리를 보여준다.
 export function seedSampleProductsIfEmpty(): void {
+  // 실사용 전환 뒤에는 샘플을 되살리지 않는다(2026-08-19 사장님 「진짜 빈 상태」 —
+  // 리셋 후 재기동 때 시드가 데모를 복원하던 함정을 datacleanup의 라이브 모드가 막는다).
+  if (라이브모드()) return;
   if ((listProductsStmt.all() as ProductRow[]).length > 0) return;
   const samples: { name: string; category: string; vendor?: string; model?: string; docs?: { kind: string; title: string }[] }[] = [
     {

@@ -11,6 +11,7 @@
 // 실시간으로 갱신되게 한다(collaboration.ts/finetune.ts와 동일한 브로드캐스트 패턴).
 // db.ts 도입(9.5절 "DB 영속화")으로 이 모든 상태가 서버 재시작 후에도 살아남는다.
 
+import { 라이브모드 } from "./datacleanup";
 import type { Express } from "express";
 import type { WebSocketServer } from "ws";
 import * as crypto from "crypto";
@@ -526,6 +527,9 @@ export function listAssets(): Asset[] {
 // 않으면) 절대 끼어들지 않는다.
 export const SAMPLE_ASSET_IDS = ["ai-secbot-01", "ai-doccls-02", "ai-anomaly-03"] as const;
 export function seedSampleAssetsIfEmpty(): void {
+  // 실사용 전환 뒤에는 샘플을 되살리지 않는다(2026-08-19 사장님 「진짜 빈 상태」 —
+  // 리셋 후 재기동 때 시드가 데모를 복원하던 함정을 datacleanup의 라이브 모드가 막는다).
+  if (라이브모드()) return;
   if ((listAssetRowsStmt.all() as AssetRow[]).length > 0) return;
   registerAsset({
     id: "ai-secbot-01",
@@ -584,6 +588,9 @@ export function 예시데이터뿐인가(): boolean {
   return rows.every((r) => 표본.has(r.id));
 }
 export function seedSampleVulnHostIfEmpty(): void {
+  // 실사용 전환 뒤에는 샘플을 되살리지 않는다(2026-08-19 사장님 「진짜 빈 상태」 —
+  // 리셋 후 재기동 때 시드가 데모를 복원하던 함정을 datacleanup의 라이브 모드가 막는다).
+  if (라이브모드()) return;
   const hasHost = (listAssetRowsStmt.all() as AssetRow[]).some((r) => r.assetType === "infra-host");
   if (hasHost) return;
   registerAsset({

@@ -3,6 +3,7 @@
 // 벤더 API 키는 cryptopack.ts(AES-256-GCM)로 암호화된 상태로만 SQLite(db.ts)에 저장한다 —
 // cryptopack.ts에 남아있던 "키 관리 정책 결정 후 사용처에 연결" TODO의 첫 실사용처.
 
+import { 라이브모드 } from "./datacleanup";
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
@@ -227,6 +228,9 @@ export async function listFindings(): Promise<CtiFinding[]> {
 // 시연할 수 있게 한다. source를 "샘플(데모)"로 명확히 표기한다(가짜 벤더 데이터로 오인 방지).
 const countFindingsStmt = db.prepare("SELECT COUNT(*) AS n FROM cti_findings");
 function seedSampleFindingsIfEmpty(): void {
+  // 실사용 전환 뒤에는 샘플을 되살리지 않는다(2026-08-19 사장님 「진짜 빈 상태」 —
+  // 리셋 후 재기동 때 시드가 데모를 복원하던 함정을 datacleanup의 라이브 모드가 막는다).
+  if (라이브모드()) return;
   if ((countFindingsStmt.get() as { n: number }).n > 0) return;
   const now = Date.now();
   const when = (daysAgo: number) => new Date(now - daysAgo * 86400000).toISOString().slice(0, 16).replace("T", " ");
