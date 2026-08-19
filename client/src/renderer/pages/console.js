@@ -1122,7 +1122,13 @@
       // esc 먼저, 굵게 나중 — 순서가 바뀌면 주입 구멍(renderSelState와 같은 규칙).
       (f.plain ? "<div>→ " + esc(f.plain).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") + "</div>" : "");
     // 제안 칩 — 완성된 지시 문장(누르는 버튼, 새 입력칸 아님). 「이거」는 선택인자로 함께 간다.
-    var 칩들 = [
+    // 자산형(취약점 키 없이 assetId만)과 취약점형은 이어서 할 일이 다르다(2026-08-19 자산 고르기 배선).
+    var 자산형 = f.assetId && !f.findingKey;
+    var 칩들 = 자산형 ? [
+      "이거로 범위 걸어줘",
+      "이 자산 미조치 취약점 뭐 있어?",
+      "이거 검증 실행해줘",
+    ] : [
       "이거 쉽게 설명해줘",
       f.owner ? "이거 조치 완료 처리해줘" : "이거 담당자 배정해줘",
       "이거 반려할게",
@@ -1369,8 +1375,9 @@
       // 서버 autoFill이 이 키로 배정·판정 인자를 강제 정정한다(표시명·IP 추정이 엉뚱한
       // 자산을 잡던 실사고의 수리). 키는 선택 텍스트 꼬리에만 붙고 화면에는 안 보인다.
       var 선택인자 = sel
-        ? sel.text + (sel.fields && sel.fields.assetId && sel.fields.findingKey
-            ? " ⌗" + sel.fields.assetId + "::" + sel.fields.findingKey : "")
+        ? sel.text + (sel.fields && sel.fields.assetId
+            ? " ⌗" + sel.fields.assetId + (sel.fields.findingKey ? "::" + sel.fields.findingKey : "")
+            : "")
         : undefined;
       // 「보고 있던 목록」을 표식으로만 싣는다(2026-08-18 배관).
       // ⚠ **보내는 글에만 붙이고 보이는 글에는 안 붙인다** — 표식은 기계용이다. 그대로 보이면
@@ -1620,6 +1627,9 @@
       return;
     }
     cm.textContent = name + " — " + uploadResultMsg(r);
+    // ➡ 반입 다음 칩(2026-08-19 사장님 QA) — 반입이 끝나면 다음 걸음을 칩으로 안내한다.
+    var P2 = window.gijoChatParts;
+    if (r.nextChips && P2 && P2.nextChips) P2.nextChips(row, r.nextChips, function (q) { submit(q); });
   }
   function wireUpload() {
     var btn = document.getElementById("dockUpload");

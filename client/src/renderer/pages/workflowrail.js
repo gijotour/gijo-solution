@@ -72,6 +72,11 @@
       el.addEventListener("click", function () {
         try {
           if (typeof window.gijoOpenScreen === "function") window.gijoOpenScreen(s.page, s.label);
+          // ⚠ 폴백 순서(2026-08-19 사장님 실사고 「발견·수집 누르니 표준 모드」): 팝업 창에는
+          //   gijoOpenScreen이 없어 navigateTo로 떨어졌고, 그게 본창을 화면 파일로 직접 로드해
+          //   프로 셸을 부쉈다. 본창 탭 열기(openTabInShell)가 먼저다 — navigateTo는 최후이며
+          //   main 쪽 승격 안전망이 한 번 더 받는다.
+          else if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell(s.page, s.label);
           else if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(s.page);
         } catch (e) { /* 못 가도 화면은 그대로 */ }
       });

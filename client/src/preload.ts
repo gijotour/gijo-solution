@@ -167,6 +167,11 @@ const gijoApi = {
     ipcRenderer.removeAllListeners("console:ask");
     ipcRenderer.on("console:ask", (_e, i) => cb(String((i && i.text) || ""), (i && i.sessionId) || null));
   },
+  // ★ 프로 셸 이탈 금지(2026-08-19) — main이 화면 파일 직접 로드 요청을 탭 열기로 승격해 보낸다.
+  onOpenTabPush: (cb: (page: string) => void) => {
+    ipcRenderer.removeAllListeners("shell:openTabPush");
+    ipcRenderer.on("shell:openTabPush", (_e, i) => cb(String((i && i.page) || "")));
+  },
   dockConsoleWindow: () => ipcRenderer.invoke("console:dock"),
   // 셸이 "지금 보고 있는 탭"을 콘솔 창에 알린다(별도 창은 활성 탭을 직접 못 본다).
   sendConsoleContext: (screen: string | null, label: string | null) => ipcRenderer.invoke("console:context", screen, label),

@@ -562,6 +562,15 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   // 파일 경로와 쿼리를 분리해 loadFile에 넘긴다(settings.html?s=ai 같은 구역 딥링크 지원).
   const [요청파일, qs] = String(page).split("?");
   const file = 셸화면보정(요청파일);
+  // ★ 프로 셸 이탈 금지(2026-08-19 사장님 실사고 — 「발견·수집을 누르니 표준 모드로 돌아가네」):
+  //   구식 통로(navigateTo 폴백)가 본창을 화면 파일로 **직접** 로드하면 프로 셸이 통째로
+  //   파괴되고 표준 사이드바 모양이 뜬다. 본창이 셸(app.html)로 떠 있는 한, 화면 파일 요청은
+  //   전부 **셸의 탭 열기로 승격**한다 — 발원지가 몇이든 여기 한 곳이 막는다.
+  if (file !== "app.html" && 저장된셸모드() === "pro" && mainWindow.webContents.getURL().includes("app.html")) {
+    mainWindow.webContents.send("shell:openTabPush", { page: String(page) });
+    mainWindow.focus();
+    return;
+  }
   const query: Record<string, string> = {};
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
   // ── 프로 셸 신호를 **주소에 실어** 보낸다(2026-08-18) ──────────────────────

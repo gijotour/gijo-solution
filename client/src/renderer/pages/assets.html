@@ -121,6 +121,7 @@
 </div>
 
 <script src="dialog.js"></script>
+<script src="selectnotify.js"></script>
 <script src="nav.js"></script>
 <!-- ⚠ chatparts.js가 chatwidget.js **앞**이어야 한다 — 뒤에 두면 위젯이 부를 때 부품이 아직
      없어 대화가 반쪽이 된다(clientglobals.test.ts가 순서까지 본다). -->
@@ -216,6 +217,22 @@
     var sc = { kind: "asset", id: id, label: r.displayName || r.name };
     범위그리기(sc);
     범위알리기(sc);
+    // 🎯 고른 항목을 대화창 카드로(2026-08-19 사장님 QA — 「자산 고르기 카드 대화창에 떠야
+    //   하는 거 아니야?」). 범위(🗂)만 걸고 카드를 안 보내던 미배선 자리 — B16 규칙 그대로:
+    //   화면이 이미 그린 값만 옮긴다(재계산 금지). 규격은 공용 부품(selectnotify.js) 한 곳.
+    var v = r.vuln || {};
+    if (window.gijoSelectNotify) window.gijoSelectNotify({
+      label: sc.label,
+      text: "자산 " + sc.label,
+      fields: {
+        asset: sc.label,
+        title: (r.isAi ? "AI 자산" : "자산") + " · " + (v.open != null ? "미조치 " + v.open + "건" : "깨끗함"),
+        severity: v.kev ? "KEV " + v.kev + "건" : "",
+        status: r.riskBand === "bad" ? "고위험" : r.riskBand === "warn" ? "주의" : "정상",
+        owner: r.owner && r.owner !== "-" ? r.owner : "",
+        assetId: id,
+      },
+    });
     그리기();
     단계열기(r);
   }

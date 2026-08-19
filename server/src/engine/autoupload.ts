@@ -349,7 +349,18 @@ export function registerAutoUploadRoutes(app: Express): void {
           target: filename.trim(), detail: `유형: ${(result as { type?: string }).type ?? valid ?? "?"}`, result: "ok",
         });
       }
-      res.json(result);
+      // ➡ 반입 다음 칩(2026-08-19 사장님 QA — 「파일 올리면 다른 가이드라인이 없는데?」):
+      //   반입은 대화 지시가 아니라 nextguide 경로 표를 안 타서 칩이 영영 안 붙던 사각지대다.
+      //   문장은 시나리오 실측 ✓ 확인된 것만(nextguide와 같은 원칙).
+      const routed = (result as { routedTo?: string }).routedTo;
+      const 반입칩: Record<string, string[]> = {
+        vulnscan: ["자산 현황 보여줘", "미조치 취약점 뭐 있어?", "오늘 뭐부터 할까?"],
+        analysis: ["통합 분석 현황 알려줘", "지금 손댈 일 뭐야?"],
+        "product-manual": ["보안제품 현황 알려줘", "점검 일정 현황 알려줘"],
+        memory: ["최근 반입 문서 보여줘", "지식 저장소 상태 알려줘"],
+      };
+      const nextChips = routed ? 반입칩[routed] : undefined;
+      res.json(nextChips ? { ...result, nextChips } : result);
     })
   );
 }

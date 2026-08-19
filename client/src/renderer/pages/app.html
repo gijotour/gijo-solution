@@ -676,6 +676,12 @@
   // nav.js가 메뉴 클릭 때 이걸 보고 "이동" 대신 "탭 열기"를 한다.
   // activeScreen()은 팝업 셸(window.gijoShell)이 쓰던 이름을 그대로 유지한다 — 콘솔·서버 쪽이
   // 그 이름으로 "지금 보는 화면"을 묻고 있어서, 이관 중에도 깨지지 않게 한다.
+  // ★ 프로 셸 이탈 금지(2026-08-19 사장님 실사고) — 구식 통로(navigateTo)가 본창을 화면
+  //   파일로 직접 로드하려 하면 main이 여기로 승격해 보낸다. 셸은 절대 안 무너진다.
+  if (window.gijo && window.gijo.onOpenTabPush) {
+    window.gijo.onOpenTabPush(function (page) { if (page) open(page); });
+  }
+
   window.gijoTabs = {
     open: open,
     show: show,

@@ -170,7 +170,8 @@ describe("배선 감시 — 생산(화면)→릴레이(셸)→전송(콘솔)→�
   });
   it("콘솔 전송부가 ⌗키를 조립한다", () => {
     const s = readFileSync(join(pages, "console.js"), "utf8");
-    expect(s).toContain('" ⌗" + sel.fields.assetId + "::" + sel.fields.findingKey');
+    // 자산만 고른 선택(findingKey 없음)도 ⌗assetId를 싣는다(2026-08-19 자산 고르기 배선)
+    expect(s).toContain('" ⌗" + sel.fields.assetId + (sel.fields.findingKey ? "::" + sel.fields.findingKey : "")');
   });
   it("★ 자산 목록·상세 API가 **같은 생산자**(fkey붙임)를 탄다 — 검토관 심각1: 상세에만 붙여서 목록으로 그리는 취약점 화면이 키를 영영 못 받았다", () => {
     const s = readFileSync(join(__dirname, "..", "src", "engine", "assets.ts"), "utf8");
