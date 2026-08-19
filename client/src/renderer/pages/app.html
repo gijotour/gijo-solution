@@ -101,7 +101,12 @@
        본창=화면 전폭이 원래 그 모양이라 이 상태를 따로 걸지 않는다. */
   body.pro-shell.stage-on .work.console-side{display:flex;flex-direction:column;}
   body.pro-shell.stage-on .work.console-side .console{display:none;}
-  body.pro-shell.stage-on .screens{display:block;flex:1 1 auto;min-height:0;}
+  /* 아래 10px 틈+그림자 = 「대화가 이 아래 그대로 있다」는 시각 신호(승인 시안 pro-stage —
+     검토관 중7이 코드에 빠진 것을 잡음). 밀도 셈도 이 틈을 전제로 −1.5%다. */
+  body.pro-shell.stage-on .screens{display:block;flex:1 1 auto;min-height:0;
+    margin-bottom:10px;box-shadow:0 20px 34px rgba(0,0,0,.45);}
+  /* 분리창(대화가 딴 창) 중에는 ← 대화로가 뜻이 없다 — 누르면 본창이 백지가 된다(검토관 상3). */
+  body.console-popped #stageBack{display:none;}
   #gijoNav{border-right:1px solid var(--border);background:var(--panel-2);min-height:0;display:flex;flex-direction:column;}
   .work{display:flex;flex-direction:column;min-width:0;min-height:0;}
 
@@ -340,7 +345,11 @@
   var 부팅복원중 = false; // 저장 탭 되열기 중 표시 — 현황 카드를 안 띄운다(검토관 M5)
   // 「← 대화로」가 켠다 — 화면(탭)을 닫지 않고 산 채로 숨긴다. 필터·스크롤이 보존되어
   // 카드의 🗔로 되올리면 보던 그대로다(프로 확정 2026-08-20 「대화창 자리 무대」).
-  var 무대숨김 = false;          // 살아있는 iframe이라 무한정 열면 메모리를 먹는다
+  var 무대숨김 = false;
+  // 카드 조회 세대 — 서버 왕복 중 사용자가 🗔·다른 메뉴를 누르면 옛 응답이 뒤늦게 무대를
+  // 내리거나(「🗔를 눌렀는데 화면이 안 뜬다」) 엉뚱한 화면을 열었다(검토관 중6). 최신
+  // 세대의 응답만 상태를 건드린다.
+  var 카드세대 = 0;          // 살아있는 iframe이라 무한정 열면 메모리를 먹는다
 
   var tabs = [];             // {page, label, el, frame, pinned}
   var active = null;
@@ -543,7 +552,9 @@
       if (!(opts && opts.dock) && page.indexOf("?") < 0 && !부팅복원중 &&
           !document.body.classList.contains("console-popped") &&
           window.gijoConsole && window.gijoConsole.screenCard) {
+        var 세대 = ++카드세대;
         window.gijoConsole.screenCard(page, label).then(function (shown) {
+          if (세대 !== 카드세대) return; // 낡은 응답 — 그 사이 사람이 딴 것을 눌렀다(중6)
           if (shown) {
             // 메뉴를 눌렀다는 것은 「대화창의 카드를 보겠다」는 뜻 — 무대 뒤(숨은 대화)에
             // 카드만 붙으면 사람 눈에는 아무 일도 안 일어난 것이 된다. 무대가 있으면 내린다.
@@ -632,7 +643,8 @@
     var t = find(page);
     if (!t) return;
     // 화면을 보이라는 모든 길(🗔·딥링크·되짚기·⇤)은 무대를 올린다 — 숨김 기억보다 세다.
-    if (프로인가()) 무대숨김 = false;
+    // 진행 중이던 카드 조회도 무효화한다(늦게 온 응답이 방금 올린 무대를 내리는 경합 — 중6).
+    if (프로인가()) { 무대숨김 = false; 카드세대++; }
     active = t;
     tabs.forEach(function (x) { x.frame.classList.toggle("on", x === t); });
     redraw();
@@ -687,7 +699,11 @@
     document.body.classList.toggle("console-popped", popped);
     try { localStorage.setItem("gijo:console:popped", popped ? "1" : "0"); } catch (e) {}
     if (popped) setCtx(active ? active.label : null); // 창에 지금 맥락을 즉시 알린다
-    빈본창안내();
+    // 무대와의 화해(검토관 상2·상3) — 빼기=본창은 화면을 보인다(숨김 해제), 되붙이기=대화를
+    // 보겠다는 뜻(무대 내림). 안 하면 되붙인 대화가 stage-on의 display:none에 가려 어디에도
+    // 없거나(상2), 분리+숨김 조합이 본창 백지를 만든다(상3).
+    if (프로인가()) 무대숨김 = popped ? false : tabs.length > 0;
+    대화홈갱신();
   }
 
   // QA ⑥(2026-08-19 사장님 스크린샷) — 화면·대화창을 전부 창으로 빼면 본창이 통째로 비어
@@ -702,7 +718,7 @@
     //   없어 ☰ 버튼이 죽고, 표준 빈 화면은 기존 .blank 안내가 이미 맡고 있다).
     var work = document.querySelector(".work");
     if (!work || !프로인가()) return;
-    var 빈가 = popped && tabs.length === 0;
+    var 빈가 = popped && (tabs.length === 0 || 무대숨김); // 무대숨김 조합 백지도 안내(검토관 상3 벨트)
     var el = document.getElementById("emptyShellGuide");
     if (!빈가) { if (el) el.remove(); return; }
     if (el) return;
@@ -757,6 +773,10 @@
     close: close,
     closeAll: closeAll,
     list: function () { return tabs.map(function (t) { return { page: t.page, label: t.label, pinned: t.pinned }; }); },
+    // 대화를 앞으로(무대 내림) — 대화창에 무언가를 보여 줘야 하는 부품(질문 얹기·ⓘ 안내 등)이
+    // 부른다. 무대 뒤(숨은 대화)에 쓰면 사람 눈엔 무반응이다(검토관 상4 — 적어 넣기·이어서
+    // 지시하기·물어보기 3종 실증).
+    toChat: function () { if (프로인가()) { 무대숨김 = tabs.length > 0; 대화홈갱신(); } },
     // 외부(팝업) 맥락이 있으면 그것이 「보고 있는 화면」이다 — 콘솔 칩·지시 screen 인자의 원천.
     activeScreen: function () { return 외부맥락 ? 외부맥락.page : (active ? active.page : null); },
     activeLabel: function () { return 외부맥락 ? 외부맥락.label : (active ? active.label : null); },
@@ -846,14 +866,18 @@
         if (!Object.keys(f).length) f = null;
       }
       window.gijoConsole.select(d.label && d.text ? { label: String(d.label), text: String(d.text), fields: f } : null);
-      // 골라서 복귀(프로 확정 2026-08-20) — 무대의 행을 고르면 📌를 달고 무대를 내려
-      // 대화로 돌아온다(「보고 고르는 곳」). 잘못 내려갔어도 화면은 산 채라 🗔로 되올리면
-      // 보던 그대로다(필터·스크롤 보존). 해제(null)는 내리지 않고, 분리창(console-popped)은
-      // 대화가 딴 창이라 내릴 이유가 없다.
-      if (d.label && d.text && 프로인가() && !document.body.classList.contains("console-popped") &&
-          tabs[0] && 활성탭안인가(ev.source, tabs[0].frame)) {
-        무대숨김 = true;
-        대화홈갱신();
+      // ⚠ 자동 복귀(고르면 무대 내림)는 폐지(검토관 상1) — gijo:select는 「행 클릭」 전용이
+      //   아니라서, 결재 확인창(점검 승인)·모달·상세 열기 직후에도 온다(발신 18곳 중 10곳
+      //   실증). 그때 무대를 내리면 방금 연 것이 통째로 숨는다 — 승인을 눌렀는데 확인창을
+      //   못 본 채 「됐다」고 오인하는 최악 부류. 내리기는 사람이 ← 대화로로 한다.
+      //   대신 골랐음을 무대 머리에 잠깐 알린다(📌가 대화창에 붙었다는 신호).
+      if (d.label && d.text && 프로인가() && document.body.classList.contains("stage-on")) {
+        var sb = document.getElementById("stageBack");
+        if (sb) {
+          sb.textContent = "📌 골랐습니다 — ← 대화로";
+          clearTimeout(sb._t);
+          sb._t = setTimeout(function () { try { sb.textContent = "← 대화로"; } catch (e) { } }, 2600);
+        }
       }
       return;
     }
@@ -916,7 +940,8 @@
       // 폐지 — 무대는 화면·대화가 자리를 나누지 않아 좁아도 성립하고, 자리가 하나뿐이라
       // 교체(open의 도킹중 갈래)가 정상 동작이다. 거절 문구가 남아 있으면 ⇤가 늘 막힌다.
       if (window.gijo.closeShellPopout) window.gijo.closeShellPopout(붙일);
-      open(붙일, String(d.label || "").slice(0, 40) || undefined);
+      // dock 명시(검토관 중8) — 안 실으면 카드 갈래로 빨려 창만 닫히고 화면이 어디에도 없다.
+      open(붙일, String(d.label || "").slice(0, 40) || undefined, { dock: true });
       return;
     }
     if (d.type === "gijo:scope") {
@@ -1172,16 +1197,16 @@
     document.body.classList.toggle("chat-home", tabs.length === 0 || 무대숨김);
     // 🚀 도킹 패널 머리(승인 시안 §10-1) — 탭줄이 프로에서 숨겨져 있으므로(P2) 도킹된 화면의
     //   이름과 ⧉/✕가 설 자리를 여기 만든다. 대화 폭 700 고정도 프로 전용 값이라 여기서 준다.
-    var work = document.querySelector(".work");
-    // 대화 폭: 넓으면 700 고정, 좁으면 절반, 380 아래로는 안 내려간다(검토관 S1 —
-    // 700 고정이던 시절 좁은 창에서 도킹 화면이 144px까지 찌그러졌다. ④ 자동 팝업을
-    // 없앤 뒤로는 이 클램프가 좁은 창의 대체 하한이다).
-    if (work) work.style.setProperty("--console-w", "clamp(380px, 50%, 700px)");
+    // (옛 대화 폭 클램프(--console-w)는 제거 — 무대 전환으로 프로에서 화면·대화가 폭을
+    //  나누는 조합이 없어졌다: 탭0=chat-home·무대=stage-on·내림=chat-home·분리=console-popped
+    //  전부 flex 한 칸이다. 죽은 값을 계약으로 지키면 감시가 형해화된다 — 검토관 중9①.)
     var head = document.getElementById("dockHead");
     if (!head) {
       head = document.createElement("div");
       head.id = "dockHead";
-      head.style.cssText = "grid-column:1;grid-row:1;align-self:start;display:flex;align-items:center;gap:8px;" +
+      // ⚠ align-self:start 금지 — 무대(flex 컬럼)에서 폭이 내용만큼 줄어 전폭 띠가 아니라
+      //   좌상단 토막이 된다(검토관 중7). grid 시절 유물이었다.
+      head.style.cssText = "display:flex;align-items:center;gap:8px;" +
         "padding:4px 10px;font-size:12.5px;color:var(--muted,#b3ada4);background:var(--panel-2,#1f1e1d);" +
         "border-bottom:1px solid rgba(255,255,255,.08);position:relative;z-index:3;";
       // 🚀 무대 머리(프로 확정 2026-08-20 「대화창 자리에 화면」) — 조작은 「← 대화로」 하나뿐.
@@ -1203,11 +1228,13 @@
     var t0 = tabs[0];
     var 전면 = !!t0 && !무대숨김; // 무대가 내려가 있으면(← 대화로) 머리도 함께 숨는다
     head.style.display = 전면 ? "flex" : "none";
-    // 머리 높이만큼 화면을 내린다 — 고정 30px로 적었더니 실제 머리(버튼 포함 ≈38px)가 화면
-    // 상단을 덮어 KPI 카드 윗줄이 잘렸다(2026-08-19 사장님 스크린샷). 실높이로 동기화한다.
-    var scr2 = document.getElementById("screens");
-    if (scr2) scr2.style.paddingTop = 전면 ? (head.offsetHeight || 34) + "px" : "";
+    // (옛 paddingTop 보정은 제거 — 그리드 시절 머리가 화면 위에 겹칠 때의 유물이다. 무대에서는
+    //  머리가 흐름 안(flex 첫 자식)이라 겹치지 않고, .screen{position:absolute}은 padding을
+    //  무시해 애초에 iframe엔 안 먹었다 — 검토관 하10.)
     if (전면) head.querySelector("#dockName").textContent = t0.label || "";
+    // 무대를 내리고 올린 모든 길에서 대화 맥락을 다시 읽게 한다(검토관 상5 — syncCtx는
+    // show/close에서만 불려, 카드·← 대화로 경로의 「마지막 카드=맥락」 갈래가 영영 안 닿았다).
+    if (window.gijoConsoleSyncCtx) { try { window.gijoConsoleSyncCtx(); } catch (e) { } }
   }
 
   function 프로레일() {

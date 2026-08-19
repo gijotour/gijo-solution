@@ -1297,6 +1297,8 @@
   /** ③ 화면 안내 카드 — ⓘ 답이 말풍선으로 쌓이지 않고 카드 한 장을 갈아끼운다(중복 구조 차단). */
   var guideBusy = false;
   function guideAsk() {
+    // ⓘ 안내도 대화에 그린다 — 무대 뒤면 앞으로(검토관 상4와 같은 부류, 2026-08-01 전례).
+    if (window.gijoTabs && window.gijoTabs.toChat) { try { window.gijoTabs.toChat(); } catch (e) { } }
     var body = document.getElementById("csBody");
     if (!body || guideBusy || !window.gijo || !window.gijo.sendInstruction) return;
     var card = document.getElementById("csGuide");
@@ -1330,8 +1332,12 @@
     // 프로에서 무대가 내려가 있으면(stage-on 아님) 사람이 보는 것은 마지막 현황 카드다 —
     // 지시의 화면 맥락도 그것이어야 한다. 숨은 탭을 맥락으로 잡으면 「정리해줘」가 사람이
     // 보는 카드가 아니라 아까 화면에 걸린다(검토관 중7). 무대가 떠 있으면 종전과 같다.
+    // ⚠ 같은 화면이면 탭 값(쿼리 포함)을 그대로 둔다 — 직전은 쿼리를 뗀 파일명이라
+    //   fix.html vs fix.html?panel=…이 「화면 전환」으로 오인되어 applyCtx가 방금 단
+    //   📌를 지운다(검토관 상5 부작용 경고).
     if (document.body.classList.contains("pro-shell") &&
-        !document.body.classList.contains("stage-on") && 화면카드직전) {
+        !document.body.classList.contains("stage-on") && 화면카드직전 &&
+        화면카드직전 !== String(s || "").split("?")[0]) {
       s = 화면카드직전;
       l = 화면카드라벨 || l;
     }
@@ -1722,6 +1728,9 @@
   }
 
   function ask(text) {
+    // 무대 뒤(숨은 대화)에 쓰면 무반응으로 보인다 — 대화를 앞으로(검토관 상4:
+    // 「이어서 지시하기」·「물어보기」가 숨은 콘솔에 쌓였다). 분리창(IS_WINDOW)엔 gijoTabs가 없다.
+    if (window.gijoTabs && window.gijoTabs.toChat) { try { window.gijoTabs.toChat(); } catch (e) { } }
     var input = document.getElementById("chatInput");
     if (!input) return;
     input.value = text;
@@ -1731,6 +1740,8 @@
   // "할 일 적어 넣기"처럼 뒷말을 담당자가 채워야 하는 자리에 쓴다. 빈 칸만 보여 주면
   // 무슨 말을 해야 할지 몰라 그 자리에서 멈춘다 — 첫 몇 글자가 그걸 막는다.
   function prefill(text) {
+    // 무대 뒤 입력칸에 얹으면 「적어 넣기」가 무반응으로 보인다 — 대화를 앞으로(검토관 상4).
+    if (window.gijoTabs && window.gijoTabs.toChat) { try { window.gijoTabs.toChat(); } catch (e) { } }
     var input = document.getElementById("chatInput");
     if (!input) return;
     input.value = text;

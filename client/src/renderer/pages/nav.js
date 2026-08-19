@@ -1482,7 +1482,7 @@
       dk.className = "gijo-orient";
       dk.style.right = "92px";
       dk.textContent = "⇤ 붙이기";
-      dk.title = "이 화면을 본창 옆(도킹 패널)에 붙입니다 — 본창 폭이 좁으면 본창이 이유를 알려 줍니다";
+      dk.title = "이 화면을 본창(대화창 자리 무대)으로 되돌립니다 — 창은 닫힙니다";
       dk.addEventListener("click", function () {
         // 라벨 동봉 — 없으면 본창 화면이름찾기가 빈손일 때 도킹 머리가 「화면」으로 떨어진다(실측).
         var 라벨 = (document.title || "").replace(/^GIJO AS( — )?/, "").trim();

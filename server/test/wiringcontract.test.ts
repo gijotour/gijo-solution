@@ -223,8 +223,8 @@ describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님
       .not.toContain("openShellPopout(t.page, t.label || undefined)");
     // 도킹 진입 전 그 화면의 팝업을 닫는다(검토관 S2 — 안 닫으면 메뉴 재선택 시 두 벌)
     expect(s, "메뉴 선택 시 기존 팝업 닫기(두 벌 방지)가 없다").toContain("closeShellPopout(page)");
-    // 대화 폭 클램프(검토관 S1 — 700 고정이면 좁은 창에서 화면이 144px까지 찌그러진다)
-    expect(s, "프로 대화 폭 클램프가 없다").toContain('"clamp(380px, 50%, 700px)"');
+    // (옛 대화 폭 클램프 계약은 폐지 — 무대 전환으로 프로에서 화면·대화가 폭을 나누는 조합이
+    //  없어져 --console-w가 죽은 값이 됐다. 죽은 값을 지키는 계약은 감시를 형해화한다 — 중9①.)
   });
   it("💬 대화 홈 = 새 세션 확인(작업 내역 저장 안내) 후 대화·선택·범위 초기화", () => {
     const s = 코드만(join(PAGES, "app.html"));
@@ -297,9 +297,25 @@ describe("프로 확정 계약 — 메뉴는 카드가 전부(2026-08-20 사장�
     expect(s, "전면 상태(stage-on)가 없다 — 화면이 대화창 자리를 못 쓴다").toContain("stage-on");
     expect(s, "← 대화로(무대숨김)가 없다 — 화면에서 대화로 돌아올 길이 없다").toContain("무대숨김");
     expect(s, "무대 머리의 복귀 단추가 없다").toContain("← 대화로");
-    // 골라서 복귀 — 행 선택(gijo:select)이 무대를 내린다. 발신자는 활성 탭 사슬로 검증.
-    expect(s, "골라서 복귀 배선이 없다 — 무대에서 고르면 대화로 돌아와야 한다")
-      .toMatch(/gijo:select[\s\S]{0,1600}활성탭안인가\(ev\.source, tabs\[0\]\.frame\)/);
+    // ⚠ 선택 자동 복귀는 금지 계약이다(검토관 상1) — gijo:select는 결재 확인창·모달·상세
+    //   열기 직후에도 오므로(발신 18곳 중 10곳) 무대를 내리면 방금 연 것이 통째로 숨는다.
+    //   허용은 표시(📌 골랐습니다)까지다.
+    expect(s, "선택 자동 복귀가 되살아났다 — 결재 확인창을 삼키는 부류(상1)")
+      .not.toMatch(/gijo:select[\s\S]{0,2000}무대숨김 = true/);
+    expect(s, "선택 표시(📌 골랐습니다) 피드백이 없다").toContain("📌 골랐습니다");
+    // 대화에 쓰는 부품(질문 얹기·ⓘ)은 무대를 내린다 — 숨은 콘솔에 쓰면 무반응(상4).
+    expect(s, "toChat(대화 앞으로) 노출이 없다").toContain("toChat:");
+    const c3 = 코드만(join(PAGES, "console.js"));
+    for (const fn of ["function ask(", "function prefill(", "function guideAsk("]) {
+      const i = c3.indexOf(fn);
+      expect(i, fn + "가 없다").toBeGreaterThan(-1);
+      expect(c3.slice(i, i + 400), fn + "가 무대를 안 내린다(숨은 콘솔에 쓰면 무반응 — 상4)").toContain("toChat");
+    }
+    // 분리창 되붙이기·빼기는 무대 상태를 다시 계산한다(상2·상3 — 안 하면 대화가 어디에도 없다).
+    expect(s, "setPopped가 무대 상태를 안 다룬다").toMatch(/function setPopped\([\s\S]{0,900}무대숨김 = popped \? false : tabs\.length > 0/);
+    // 무대를 오르내린 모든 길에서 대화 맥락을 다시 읽는다(상5 — syncCtx가 show/close에서만
+    // 불리면 「마지막 카드=맥락」 갈래가 실사용에서 영영 안 닿는다).
+    expect(s, "대화홈갱신이 syncCtx를 안 부른다(맥락 갱신 끊김 — 상5)").toMatch(/function 대화홈갱신\([\s\S]{0,3000}gijoConsoleSyncCtx/);
     // 카드가 뜨면 무대를 내린다 — 무대 뒤(숨은 대화)에 카드만 붙으면 사람 눈엔 무반응이다.
     expect(s, "메뉴 카드가 무대를 안 내린다(무대 뒤 카드=무반응)").toMatch(/if \(shown\) \{[\s\S]{0,400}무대숨김 = tabs\.length > 0/);
     const c = 코드만(join(PAGES, "console.js"));

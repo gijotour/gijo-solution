@@ -162,9 +162,13 @@ if (auditFrame) {
   ok("audit 부품·행 클릭·하이라이트", r.has부품 && r.rows > 0 && r.on, "rows=" + r.rows);
   const 칩 = await 셸.evaluate(() => (document.querySelector(".cs-sel") || {}).textContent || "");
   ok("행 클릭 → 셸 📌 칩", !!칩, String(칩).slice(0, 40));
-  // 골라서 복귀(무대 2026-08-20) — 행을 골랐으니 무대가 내려가고 대화가 앞이어야 한다.
-  const 복귀 = await 셸.evaluate(() => !document.body.classList.contains("stage-on"));
-  ok("골라서 복귀: 행 선택이 무대를 내린다", 복귀);
+  // 행 선택은 무대를 유지한다(검토관 상1 — 자동 복귀는 결재 확인창·모달을 삼켜 폐지).
+  // 📌는 달리고, 무대 머리가 「골랐습니다」를 알린다. 내리기는 ← 대화로(사람)뿐.
+  const 선택후 = await 셸.evaluate(() => ({
+    무대유지: document.body.classList.contains("stage-on"),
+    표시: /골랐습니다|← 대화로/.test((document.getElementById("stageBack") || {}).textContent || ""),
+  }));
+  ok("행 선택: 📌 달고 화면 유지(내리기는 ← 대화로)", 선택후.무대유지 && 선택후.표시, JSON.stringify(선택후));
   // 허브 릴레이 — 무대→허브→셸 두 겹을 실제로 올라가는가(2026-08-20 grouphub 릴레이+가드)
   await auditFrame.evaluate(() => window.parent.postMessage({ type: "gijo:openTab", page: "kpi.html", label: "지표" }, "*"));
   const kpiFrame = await 프레임찾기("kpi.html", 8);
