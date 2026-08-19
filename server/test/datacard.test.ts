@@ -14,11 +14,13 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-import { isHardeningStatusAsk, hardeningStatusAnswer } from "../src/engine/datacard";
+import { isHardeningStatusAsk, hardeningStatusAnswer, isAssetStatusAsk, assetStatusAnswer } from "../src/engine/datacard";
 import {
   createTarget, createSchedule, runDueSchedules, resetHardeningForTests,
 } from "../src/engine/hardeningtargets";
 import type { RunFn } from "../src/engine/hardeningscan";
+import { registerAsset, recordFindings, resetAssetsForTests } from "../src/engine/assets";
+import { findingListAnswer } from "../src/engine/picklist";
 
 // hardeningtargets.test.ts와 같은 결정적 러너 — 실 셸/원격 없이 점검 1회를 완주시킨다.
 function fakeRunner(): RunFn {
@@ -136,6 +138,84 @@ describe("카드 내용 — 전부 DB에서 결정적으로", () => {
   });
 });
 
+describe("2차 ① 우선순위 카드 — findingListAnswer가 KPI만 동봉한다", () => {
+  beforeEach(() => {
+    resetAssetsForTests();
+    registerAsset({ id: "dc-web", name: "웹서버-카드2", path: "-", assetType: "서버" });
+    recordFindings("dc-web", [
+      { finding_type: "원격코드실행", severity: "critical", evidence: "CVE-2026-9001", source_tool: "scanner" },
+      { finding_type: "약한 암호화", severity: "high", evidence: "TLS 1.0", source_tool: "scanner" },
+    ]);
+  });
+
+  it("KPI 4칸이 실데이터와 일치하고 ★표는 없다(목록 세 벌 금지)", () => {
+    const { output, picklist, dataCard } = findingListAnswer("미조치 취약점 뭐 있어?");
+    expect(dataCard, "카드가 동봉돼야 한다").toBeTruthy();
+    expect(dataCard!.kpis[0]).toMatchObject({ label: "조치할 취약점", value: "2" });
+    expect(dataCard!.kpis[1]).toMatchObject({ label: "매우 심각", value: "1", color: "bad" });
+    expect(dataCard!.table, "표를 넣으면 본문·체크칸과 같은 목록이 세 벌이 된다").toBeUndefined();
+    expect(dataCard!.screen).toEqual({ page: "triage.html", label: "우선순위" });
+    // 기존 계약은 그대로 — 본문 목록·체크칸이 안 죽는다
+    expect(output).toContain("원격코드실행");
+    expect(picklist?.items).toHaveLength(2);
+  });
+
+  it("0건이면 카드도 없다 — 빈 KPI 카드는 소음이다", () => {
+    resetAssetsForTests();
+    const { dataCard } = findingListAnswer("미조치 취약점 뭐 있어?");
+    expect(dataCard).toBeUndefined();
+  });
+
+  it("좁힌 범위가 카드 제목에도 적힌다 — 안 적으면 전체 수로 읽는다", () => {
+    const { dataCard } = findingListAnswer("웹서버-카드2 취약점만 보여줘");
+    expect(dataCard!.title).toContain("웹서버-카드2");
+  });
+});
+
+describe("2차 ③ 자산 현황 카드", () => {
+  beforeEach(() => resetAssetsForTests());
+
+  it("트리거 — 현황·상태만 받고 목록·취약점·검증은 기존 영토로 보낸다", () => {
+    expect(isAssetStatusAsk("자산 현황 보여줘")).toBe(true);
+    expect(isAssetStatusAsk("우리 자산 상태 어때")).toBe(true);
+    expect(isAssetStatusAsk("자산 목록 보여줘"), "list_assets 도구 영토").toBe(false);
+    expect(isAssetStatusAsk("고위험 자산 리스트"), "list_assets 등급 갈래 영토").toBe(false);
+    expect(isAssetStatusAsk("자산 취약점 현황"), "우선순위(findingList) 영토").toBe(false);
+    expect(isAssetStatusAsk("최근 등록된 자산 현황"), "list_assets 최근 갈래 영토").toBe(false);
+    expect(isAssetStatusAsk("검증 현황 보여줘"), "하드닝 카드 영토").toBe(false);
+    expect(isAssetStatusAsk("자산 등록 해줘"), "등록은 실행 지시").toBe(false);
+  });
+
+  it("KPI·표가 등록부와 일치하고 위험한 순으로 선다", () => {
+    registerAsset({ id: "dc-a1", name: "위험한-서버", path: "-", assetType: "서버" });
+    recordFindings("dc-a1", [
+      { finding_type: "원격코드실행", severity: "critical", evidence: "e", source_tool: "s" },
+      { finding_type: "권한 상승", severity: "high", evidence: "e", source_tool: "s" },
+    ]);
+    registerAsset({ id: "dc-a2", name: "조용한-서버", path: "-", assetType: "서버", owner: "김담당" });
+    // ★ 스캔 실패·조사 정보(info)는 취약점 수에 안 섞인다 — 소스 감시가 요구한 계약을 값으로도 확인
+    recordFindings("dc-a2", [
+      { finding_type: "scan_error", severity: "high", evidence: "연결 실패", source_tool: "s" },
+      { finding_type: "SSH 설치됨", severity: "info", evidence: "조사", source_tool: "s" },
+    ]);
+    const { output, dataCard } = assetStatusAnswer();
+    expect(dataCard.kpis[0].value).toBe("2");          // 등록 자산
+    expect(dataCard.kpis[2].value).toBe("2");          // 미조치 취약점 총계
+    expect(dataCard.kpis[3].value).toBe("1");          // 담당 미지정(dc-a1)
+    expect(dataCard.table!.shown[0].자산).toBe("위험한-서버"); // 위험 순
+    expect(dataCard.table!.shown[1].담당).toBe("김담당");
+    expect(dataCard.screen).toEqual({ page: "inventory.html", label: "자산" });
+    expect(output).toContain("등록 2개");
+  });
+
+  it("빈 등록부는 「아직 등록 전」으로 정직하게 — 0건≠없다", () => {
+    const { output, dataCard } = assetStatusAnswer();
+    expect(dataCard.kpis[0].value).toBe("0");
+    expect(dataCard.table!.totalCount).toBe(0);
+    expect(output).toContain("아직 등록 전");
+  });
+});
+
 describe("dispatcher 경유 — 카드가 응답에 실린다", () => {
   beforeEach(() => resetHardeningForTests());
 
@@ -146,8 +226,24 @@ describe("dispatcher 경유 — 카드가 응답에 실린다", () => {
     const { dispatchInstruction } = await import("../src/engine/dispatcher");
     const r = await dispatchInstruction("검증 현황 보여줘", undefined, undefined, undefined, true);
     expect(r.dataCard, "카드가 응답에 실려야 한다").toBeTruthy();
-    expect(r.dataCard!.table.shown[0].장비).toBe("경유-장비");
+    expect(r.dataCard!.table!.shown[0].장비).toBe("경유-장비");
     expect(r.output).toContain("검증(보안설정 점검) 현황"); // 옛 클라 호환 글 답도 함께
+  });
+
+  it("2차: 자산 현황 물음이 자산 카드를, 취약점 물음이 우선순위 KPI 카드를 달고 온다", async () => {
+    resetAssetsForTests();
+    registerAsset({ id: "dc-d1", name: "경유-자산", path: "-", assetType: "서버" });
+    recordFindings("dc-d1", [
+      { finding_type: "원격코드실행", severity: "critical", evidence: "e", source_tool: "s" },
+    ]);
+    const { dispatchInstruction } = await import("../src/engine/dispatcher");
+    const a = await dispatchInstruction("자산 현황 보여줘", undefined, undefined, undefined, true);
+    expect(a.dataCard?.title).toBe("자산 — 등록 현황");
+    expect(a.dataCard?.table?.shown[0].자산).toBe("경유-자산");
+    const f = await dispatchInstruction("미조치 취약점 뭐 있어?", undefined, undefined, undefined, true);
+    expect(f.dataCard?.title).toContain("우선순위");
+    expect(f.picklist, "체크칸(조치용)이 카드에 밀려 죽으면 안 된다").toBeTruthy();
+    expect(f.dataCard?.table).toBeUndefined();
   });
 });
 

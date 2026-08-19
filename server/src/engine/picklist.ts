@@ -151,7 +151,7 @@ function 대상자산고르기(text: string): { ids: string[] | null; 이름: st
  * ⚠ **문장 속 대상이 먼저다.** 「범위는 A인데 B 취약점은?」이면 B가 이긴다 —
  *   화면 상태가 사람 말을 조용히 덮으면 안 된다.
  */
-export function findingListAnswer(text = "", 걸린범위?: string | null): { output: string; picklist: PickList | null } {
+export function findingListAnswer(text = "", 걸린범위?: string | null): { output: string; picklist: PickList | null; dataCard?: import("./datacard").DataCard } {
   const 문장범위 = 대상자산고르기(text);
   const 범위 =
     문장범위.ids || 문장범위.못찾음 || !걸린범위
@@ -199,9 +199,23 @@ export function findingListAnswer(text = "", 걸린범위?: string | null): { ou
     `조치할 취약점 **${rows.length}건** — 담당자 미배정 ${미배정}건 · 기한 초과 ${초과}건`;
   const 꼬리 = rows.length > 보여줄.length ? `\n\n(급한 순으로 ${보여줄.length}건만 보여드립니다)` : "";
   const output = `${머리}\n\n${lines.join("\n")}${꼬리}`;
+  // 데이터 카드(2차, 2026-08-19) — **KPI만, 표는 없다.** 목록은 이미 두 벌이다:
+  // 본문 텍스트(위 lines — picklist.test가 계약으로 잡음)와 체크칸(조치용).
+  // 표까지 넣으면 같은 목록이 세 벌 — 「같은 것을 여러 곳에 적으면 어긋난다」가 화면에 생긴다.
+  const 심각 = rows.filter((r) => r.finding.severity === "critical").length;
+  const dataCard: import("./datacard").DataCard = {
+    title: (범위.이름 ? `${범위.이름} — ` : "") + "우선순위 — 조치할 취약점",
+    kpis: [
+      { label: "조치할 취약점", value: String(rows.length) },
+      { label: "매우 심각", value: String(심각), color: 심각 ? "bad" : "ok" },
+      { label: "담당 미배정", value: String(미배정), color: 미배정 ? "warn" : "ok" },
+      { label: "기한 초과", value: String(초과), color: 초과 ? "bad" : "ok" },
+    ],
+    screen: { page: "triage.html", label: "우선순위" },
+  };
   // 체크칸은 **방금 그린 그 줄들**에서 직접 만든다. 글자 대조로 되찾으면 같은 자산에 같은 유형이
   // 둘 있을 때 화면에 없는 것이 딸려 들어온다(글자만으로는 둘을 구별할 수 없다).
-  return { output, picklist: { kind: "finding", items: 보여줄.map(toPickItem), actions: PICK_ACTIONS } };
+  return { output, picklist: { kind: "finding", items: 보여줄.map(toPickItem), actions: PICK_ACTIONS }, dataCard };
 }
 
 // ── "내 업무 / 오늘 남은 일" — 규칙으로 목록 + 골라서 처리 ────────────────

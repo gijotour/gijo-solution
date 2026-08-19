@@ -325,7 +325,9 @@
    *  행 클릭은 opts.select(row)로 넘긴다(지휘소=setSelection, 위젯=없으면 생략). */
   function dataCard(el, dc, opts) {
     el = 붙일자리(el);
-    if (!el || !dc || !dc.table || !Array.isArray(dc.table.shown)) return null;
+    // 표는 선택이다(2026-08-19 2차) — 우선순위 카드는 KPI만 싣는다(목록은 본문·체크칸이 이미 두 벌).
+    if (!el || !dc || !Array.isArray(dc.kpis) || !dc.kpis.length) return null;
+    if (dc.table && !Array.isArray(dc.table.shown)) return null;
     ensureCss();
     var card = document.createElement("div");
     card.className = "dc-card";
@@ -351,30 +353,32 @@
       });
       card.appendChild(kw);
     }
-    var cols = dc.table.cols || [];
-    var tbl = document.createElement("table");
-    tbl.innerHTML = "<thead><tr>" + cols.map(function (c) {
-      return '<th class="' + (c.align === "num" ? "num" : "") + '">' + esc(c.label) + "</th>";
-    }).join("") + "</tr></thead>";
-    var tb = document.createElement("tbody");
-    dc.table.shown.forEach(function (row) {
-      var tr = document.createElement("tr");
-      tr.innerHTML = cols.map(function (c) {
-        return '<td class="' + (c.align === "num" ? "num" : "") + '">' + esc(row[c.key] == null ? "" : row[c.key]) + "</td>";
-      }).join("");
-      if (opts && typeof opts.select === "function") {
-        tr.addEventListener("click", function () { opts.select(row, dc.pickKey || (cols[0] && cols[0].key)); });
+    if (dc.table) {
+      var cols = dc.table.cols || [];
+      var tbl = document.createElement("table");
+      tbl.innerHTML = "<thead><tr>" + cols.map(function (c) {
+        return '<th class="' + (c.align === "num" ? "num" : "") + '">' + esc(c.label) + "</th>";
+      }).join("") + "</tr></thead>";
+      var tb = document.createElement("tbody");
+      dc.table.shown.forEach(function (row) {
+        var tr = document.createElement("tr");
+        tr.innerHTML = cols.map(function (c) {
+          return '<td class="' + (c.align === "num" ? "num" : "") + '">' + esc(row[c.key] == null ? "" : row[c.key]) + "</td>";
+        }).join("");
+        if (opts && typeof opts.select === "function") {
+          tr.addEventListener("click", function () { opts.select(row, dc.pickKey || (cols[0] && cols[0].key)); });
+        }
+        tb.appendChild(tr);
+      });
+      tbl.appendChild(tb);
+      card.appendChild(tbl);
+      var 남음 = (dc.table.totalCount || 0) - dc.table.shown.length;
+      if (남음 > 0) {
+        var m = document.createElement("div");
+        m.className = "dc-more";
+        m.textContent = "외 " + 남음 + "건 — 🗔 화면에서 전체를 봅니다";
+        card.appendChild(m);
       }
-      tb.appendChild(tr);
-    });
-    tbl.appendChild(tb);
-    card.appendChild(tbl);
-    var 남음 = (dc.table.totalCount || 0) - dc.table.shown.length;
-    if (남음 > 0) {
-      var m = document.createElement("div");
-      m.className = "dc-more";
-      m.textContent = "외 " + 남음 + "건 — 🗔 화면에서 전체를 봅니다";
-      card.appendChild(m);
     }
     el.appendChild(card);
     return card;

@@ -11,12 +11,16 @@
 //   만드는 대신, 여기서만 세 값을 같은 원천(hardeningtargets)에서 함께 읽어 틈을 안 늘린다.
 
 import { listTargets, listSchedules, listRuns } from "./hardeningtargets";
+import { listAssets } from "./assets";
+import { 자산위험등급, isRealVulnerability } from "./agenttools/handlers";
 
 export interface DataCardKpi { label: string; value: string; color?: "ok" | "warn" | "bad" | "muted" }
 export interface DataCard {
   title: string;
   kpis: DataCardKpi[];
-  table: {
+  // 표는 **선택**이다(2026-08-19 2차) — 우선순위 카드는 목록이 이미 두 벌 있어(본문 텍스트=
+  // 시험 계약·체크칸=조치용) 표까지 넣으면 같은 목록이 세 벌이 된다. KPI만 싣는다.
+  table?: {
     cols: { key: string; label: string; align?: "num" }[];
     shown: Record<string, string>[]; // 서버가 이미 자른 것 — 클라는 자르지 않는다
     totalCount: number;              // 상한 없이 센 진짜 총계
@@ -97,6 +101,70 @@ export function hardeningStatusAnswer(): { output: string; dataCard: DataCard } 
     `검증(보안설정 점검) 현황 — 등록 장비 ${targets.length} · 활성 스케줄 ${활성.length}` +
       ` · 평균 준수율 ${평균 == null ? "측정 전" : 평균 + "%"} · 점검 실패 ${실패.length}건`,
     rows.length ? `대상 ${rows.length}곳 중 급한 순 ${Math.min(표상한, rows.length)}곳을 카드로 보였습니다 — 전체는 검증 화면에서.` : "등록된 점검 대상이 없습니다 — 검증 화면에서 「+ 대상 등록」으로 시작하세요.",
+  ].join("\n");
+  return { output, dataCard };
+}
+
+// ── 자산 현황 카드 (2차, 시안 로드맵 ③) ─────────────────────────────────────
+
+/** 「자산 현황/상태」 물음인가 — 결정적 트리거.
+ *  ⚠ 「목록·리스트」는 **안 받는다** — 그 말은 기존 list_assets 도구 영토다(등급·최근·검색
+ *    같은 조건 갈래가 거기 있다). 여기서 삼키면 「고위험 자산 목록」이 카드에 채여 죽는다.
+ *  ⚠ 「취약점」이 붙으면 안 받는다 — isFindingListAsk(우선순위) 영토. */
+export function isAssetStatusAsk(text: string): boolean {
+  const t = String(text || "").replace(/\s+/g, "");
+  if (!/(현황|상태|어때)/.test(t)) return false;
+  if (!/자산/.test(t)) return false;
+  return !/취약점|스캔|목록|리스트|최근|등록|추가|삭제|검증|하드닝|점검/.test(t);
+}
+
+/** 자산 현황 — KPI 4개 + 위험 순 자산 표. 숫자는 전부 등록부(assets)에서 직접(결정적). */
+export function assetStatusAnswer(): { output: string; dataCard: DataCard } {
+  const all = listAssets();
+  // ⚠ 스캔 실패 행은 취약점이 아니다 — 그대로 세면 담당자가 그 숫자로 보고를 쓴다(소스 감시가 잡음)
+  const 진짜 = (a: (typeof all)[number]) => a.findings.filter(isRealVulnerability);
+  const 미조치총 = all.reduce((n, a) => n + 진짜(a).length, 0);
+  const 고위험 = all.filter((a) => 자산위험등급(a) === "high");
+  // ⚠ 담당 미지정은 null이 아니라 **"-"로 저장**된다(assets.ts registerAsset 기본값 — 시험이 잡음)
+  const 담당있음 = (o?: string | null) => !!o && o !== "-";
+  const 담당없음 = all.filter((a) => !담당있음(a.owner));
+
+  const 센다 = (a: (typeof all)[number], s: string) => 진짜(a).filter((f) => f.severity === s).length;
+  const rows = [...all]
+    .sort((a, b) => 센다(b, "critical") - 센다(a, "critical") || 센다(b, "high") - 센다(a, "high") || 진짜(b).length - 진짜(a).length)
+    .map((a) => ({
+      자산: a.displayName || a.name,
+      유형: a.assetType || "—",
+      심각: String(센다(a, "critical") + 센다(a, "high")),
+      미조치: String(진짜(a).length),
+      담당: 담당있음(a.owner) ? String(a.owner) : "미지정",
+    }));
+  const shown = rows.slice(0, 표상한);
+
+  const dataCard: DataCard = {
+    title: "자산 — 등록 현황",
+    kpis: [
+      { label: "등록 자산", value: String(all.length), color: all.length ? undefined : "muted" },
+      { label: "고위험 자산", value: String(고위험.length), color: 고위험.length ? "bad" : "ok" },
+      { label: "미조치 취약점", value: String(미조치총), color: 미조치총 ? "warn" : "ok" },
+      { label: "담당 미지정", value: String(담당없음.length), color: 담당없음.length ? "warn" : "ok" },
+    ],
+    table: {
+      cols: [
+        { key: "자산", label: "자산" }, { key: "유형", label: "유형" },
+        { key: "심각", label: "심각(치명·높음)", align: "num" }, { key: "미조치", label: "미조치", align: "num" },
+        { key: "담당", label: "담당" },
+      ],
+      shown, totalCount: rows.length,
+    },
+    screen: { page: "inventory.html", label: "자산" },
+    pickKey: "자산",
+  };
+  const output = [
+    `자산 현황 — 등록 ${all.length}개 · 고위험 ${고위험.length}개 · 미조치 취약점 ${미조치총}건 · 담당 미지정 ${담당없음.length}개`,
+    rows.length
+      ? `위험한 순으로 ${Math.min(표상한, rows.length)}개를 카드로 보였습니다 — 전체는 자산 화면에서.`
+      : "등록된 자산이 없습니다 — 아직 등록 전이라는 뜻입니다. 자산 화면에서 추가하거나 스캐너 결과를 올리면 자동으로 채워집니다.",
   ].join("\n");
   return { output, dataCard };
 }

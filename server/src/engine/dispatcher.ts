@@ -1198,7 +1198,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   if (isFindingListAsk(instructionText)) {
     // 🗂 범위를 **여기에도 넘긴다** — 이 경로는 agentloop를 안 타서 도구 인자 주입이 안 온다
     // (2026-08-18 실측: 범위가 걸렸는데 전체 3,008건이 왔다).
-    const { output, picklist } = findingListAnswer(
+    const { output, picklist, dataCard } = findingListAnswer(
       instructionText,
       지금범위 && 지금범위.kind === "asset" ? 지금범위.id : null
     );
@@ -1209,17 +1209,22 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       route: { agentId: "orchestrator", action: "chat" },
       output,
       ...(picklist ? { picklist } : {}),
+      ...(dataCard ? { dataCard } : {}),
     };
   }
 
-  // 검증(하드닝) 현황 — 대화 안 데이터 카드(승인 시안, 2026-08-19). 결정적 트리거·결정적 숫자.
+  // 검증(하드닝)·자산 현황 — 대화 안 데이터 카드(승인 시안, 2026-08-19 · 2차 확장 같은 날).
+  // 결정적 트리거·결정적 숫자. ⚠ 새 카드를 더할 땐 앞 영토(스케줄·목록 도구 등)를 안 삼키는지
+  // 음성 시험부터 — 1차 때 전체 게이트가 「점검 스케줄 알려줘」 과포착을 실측으로 잡았다.
   {
-    const { isHardeningStatusAsk, hardeningStatusAnswer } = await import("./datacard.js");
-    if (isHardeningStatusAsk(instructionText)) {
-      const { output, dataCard } = hardeningStatusAnswer();
+    const { isHardeningStatusAsk, hardeningStatusAnswer, isAssetStatusAsk, assetStatusAnswer } = await import("./datacard.js");
+    const 현황답 = isHardeningStatusAsk(instructionText) ? hardeningStatusAnswer()
+      : isAssetStatusAsk(instructionText) ? assetStatusAnswer()
+      : null;
+    if (현황답) {
       const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
       completeTask(task.id);
-      return { task, route: { agentId: "orchestrator", action: "chat" }, output, dataCard };
+      return { task, route: { agentId: "orchestrator", action: "chat" }, output: 현황답.output, dataCard: 현황답.dataCard };
     }
   }
 
