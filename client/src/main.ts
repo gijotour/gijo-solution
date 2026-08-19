@@ -959,6 +959,10 @@ ipcMain.handle("shell:closePopout", (_e, page: string) => {
   const w = popoutWindows.get(String(page));
   if (w && !w.isDestroyed()) w.close();
 });
+// ⧉ 팝업 창 전부 닫기(2026-08-20 💬 새 대화 — 확인창 약속 「열린 화면과 창은 닫고」와 일치).
+ipcMain.handle("shell:closeAllPopouts", () => {
+  for (const w of popoutWindows.values()) { try { if (!w.isDestroyed()) w.close(); } catch { /* 이미 닫힘 */ } }
+});
 
 ipcMain.on("shell:flash", () => {
   if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) mainWindow.flashFrame(true);

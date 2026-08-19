@@ -136,6 +136,7 @@ const gijoApi = {
   // 🚀 프로 팝업 배관(2026-08-19) — 별도 창에서는 window.top이 자기 자신이라 postMessage가
   // 셸에 못 닿는다. 이 세 다리가 그 길을 놓는다(처리 코드는 셸의 기존 리스너 재사용).
   closeShellPopout: (page: string) => ipcRenderer.invoke("shell:closePopout", page),
+  closeAllPopouts: () => ipcRenderer.invoke("shell:closeAllPopouts"), // 💬 새 대화 — 팝업 전부 닫기(2026-08-20)
   bridgeToShell: (d: unknown) => ipcRenderer.send("gijo:bridge", d),
   onShellBridge: (cb: (d: unknown) => void) => { ipcRenderer.on("gijo:bridge", (_e, d) => cb(d)); },
   broadcastToWindows: (d: unknown) => ipcRenderer.send("gijo:broadcast", d),

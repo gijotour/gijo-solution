@@ -335,6 +335,8 @@
     //     담당자가 알 길이 없다(2026-08-18 실화면에서 그 상태를 직접 봤다).
     renderScope();
     renderHero(); fillGreeting(); // 프로 홈 히어로(승인 시안) — chat-home일 때만 CSS가 보여준다
+    // 새 대화(newSession)가 처음 화면을 되살릴 때 쓸 원본(검토관 M4) — 지금이 가장 이르고 완전하다.
+    try { var _e0 = rows() && rows().querySelector(".cs-empty"); if (_e0) 빈상태원본 = _e0.outerHTML; } catch (e) { }
     // nav.js(GROUPS 출처)가 이 스크립트보다 늦게 실릴 수 있다 — 메뉴 칩이 비면 한 번만 재시도.
     setTimeout(function () { var m = document.getElementById("ceMrow"); if (m && !m.children.length) renderHero(); }, 700);
     document.getElementById("csCtx").addEventListener("click", function (e) {
@@ -1545,14 +1547,14 @@
     build();
     if (IS_WINDOW) {
       // 창 모드 — 셸이 알려주는 활성 탭이 맥락이다.
-      // 첫 컨텍스트 때 그 화면의 현황 카드를 이어받는다(2026-08-20 사장님 — 「창으로 빼면
-      // 기존 정보가 빠진다」). 글 대화는 restore()가, 카드는 재조회가 살린다(라이브 값이라
-      // 클릭도 살아 있다 — DOM 복사보다 정직하다). 이후 탭 전환마다 또 띄우진 않는다(도배).
-      var 첫컨텍스트 = true;
+      // 컨텍스트가 올 때마다 그 화면의 현황 카드를 띄운다(2026-08-20 사장님 「창으로 빼면
+      // 기존 정보가 빠진다」 + 검토관 M2 — 셸 훅은 숨은 콘솔에 그려서 분리창은 못 받는다.
+      // 이 창이 유일한 대화창이므로 여기가 띄운다). 글 대화는 restore()가, 카드는 재조회가
+      // 살린다(라이브 값이라 클릭도 산다). 같은 화면 연속은 화면카드직전 가드가 막는다.
       if (window.gijo.onConsoleContext) window.gijo.onConsoleContext(function (i) {
         ctx = { screen: i.screen, label: i.label };
         applyCtx();
-        if (첫컨텍스트 && i.screen) { 첫컨텍스트 = false; screenCard(i.screen, i.label); }
+        if (i.screen) screenCard(i.screen, i.label);
       });
     } else {
       readCtxFromShell();
@@ -1729,6 +1731,7 @@
   // 셸(app.html open)이 화면을 열 때 부른다. 지시가 아니라 조회라 사용자 발화로 남기지 않고,
   // 이벤트 카드(🗔)로 붙인다. 숫자·표는 전부 서버 결정적 계산(datacard.ts) — 지어내지 않는다.
   var 화면카드직전 = null;
+  var 빈상태원본 = null; // 대화 홈(.cs-empty) 원본 — build가 저장, newSession이 되살린다
   function screenCard(page, label) {
     var p = String(page || "").split("?")[0];
     if (!p) return;
@@ -1770,8 +1773,15 @@
     try { window.parent.postMessage({ type: "gijo:scope", scope: null }, "*"); } catch (err) { }
     화면카드직전 = null;
     var body = rows();
-    if (body) body.innerHTML = "";
-    append("event", { icon: "💬", name: "새 대화", message: "새 세션을 시작했습니다 — 이전 대화는 「작업 내역」에 저장되어 있습니다.", full: true });
+    if (body) {
+      body.innerHTML = "";
+      // 처음 화면(대화 홈)을 되살린다(검토관 M4 — 확인창 약속 「처음 화면으로 돌아갑니다」와
+      // 일치해야 한다. 이벤트 한 줄만 남기면 인사·추천질문·메뉴칩이 사라진 빈 대화가 된다).
+      if (빈상태원본) {
+        body.insertAdjacentHTML("afterbegin", 빈상태원본);
+        try { renderHero(); fillGreeting(); } catch (e) { /* 히어로 못 그려도 대화는 된다 */ }
+      }
+    }
   }
   window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; }, screenCard: screenCard, newSession: newSession };
 

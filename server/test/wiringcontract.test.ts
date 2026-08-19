@@ -211,11 +211,16 @@ describe("배선 계약 ⑤층 — 게시 전 UI 실화면 관문 (외부 조사
 describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님 확정)", () => {
   it("open()에 자동 팝업 갈래가 없다 — 팝업은 사람이 직접 누른 ⧉·「(창)」 메뉴뿐", () => {
     const s = 코드만(join(PAGES, "app.html"));
+    // ⚠ 정확 일치 부정 단언은 변형(label 없이 등)으로 우회된다(검토관 L4) — page 변수 직접 호출 자체를 금지.
     expect(s, "좁은 창 자동 팝업(④)이 되살아났다 — 프로에서 팝업이 저절로 생기면 안 된다")
-      .not.toContain("openShellPopout(page, label || undefined)");
+      .not.toMatch(/openShellPopout\(page[,)]/);
     // 명시적 ⧉ 두 곳(상단 버튼·도킹 머리)은 남아 있어야 한다 — 사장님 예외(「필요한 거 빼고」)
     expect(s).toContain("openShellPopout(active.page, active.label)");
     expect(s).toContain("openShellPopout(t.page, t.label || undefined)");
+    // 도킹 진입 전 그 화면의 팝업을 닫는다(검토관 S2 — 안 닫으면 메뉴 재선택 시 두 벌)
+    expect(s, "메뉴 선택 시 기존 팝업 닫기(두 벌 방지)가 없다").toContain("closeShellPopout(page)");
+    // 대화 폭 클램프(검토관 S1 — 700 고정이면 좁은 창에서 화면이 144px까지 찌그러진다)
+    expect(s, "프로 대화 폭 클램프가 없다").toContain('"clamp(380px, 50%, 700px)"');
   });
   it("💬 대화 홈 = 새 세션 확인(작업 내역 저장 안내) 후 대화·선택·범위 초기화", () => {
     const s = 코드만(join(PAGES, "app.html"));
@@ -226,10 +231,16 @@ describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님
     expect(c, "새 세션이 범위 해제를 화면들에 안 알린다").toMatch(/function newSession\([\s\S]{0,800}gijo:scope/);
     expect(c, "gijoConsole에 노출 안 됨").toContain("newSession: newSession");
   });
-  it("분리 대화창이 첫 컨텍스트에서 현황 카드를 이어받는다(창으로 빼면 정보가 빠지던 결함)", () => {
+  it("분리 대화창이 컨텍스트마다 현황 카드를 띄운다(창으로 빼면 정보가 빠지던 결함 — 검토관 M2)", () => {
     const c = 코드만(join(PAGES, "console.js"));
-    expect(c).toContain("첫컨텍스트");
-    expect(c).toMatch(/첫컨텍스트 = false; screenCard\(/);
+    expect(c, "분리창 onConsoleContext가 카드를 안 띄운다").toMatch(/onConsoleContext\(function \(i\) \{[\s\S]{0,400}screenCard\(i\.screen/);
+    const s = 코드만(join(PAGES, "app.html"));
+    expect(s, "셸 훅이 콘솔 분리 상태를 안 가린다(숨은 콘솔에 그리는 낭비)").toContain('console-popped');
+  });
+  it("새 세션 뒤는 처음 화면(대화 홈)이다 — 히어로 복원(검토관 M4)", () => {
+    const c = 코드만(join(PAGES, "console.js"));
+    expect(c, "build가 대화 홈 원본을 저장하지 않는다").toContain("빈상태원본 = _e0.outerHTML");
+    expect(c, "newSession이 대화 홈을 되살리지 않는다").toMatch(/function newSession\([\s\S]{0,900}빈상태원본/);
   });
 });
 
