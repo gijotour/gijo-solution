@@ -208,6 +208,31 @@ describe("배선 계약 ⑤층 — 게시 전 UI 실화면 관문 (외부 조사
   });
 });
 
+describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님 확정)", () => {
+  it("open()에 자동 팝업 갈래가 없다 — 팝업은 사람이 직접 누른 ⧉·「(창)」 메뉴뿐", () => {
+    const s = 코드만(join(PAGES, "app.html"));
+    expect(s, "좁은 창 자동 팝업(④)이 되살아났다 — 프로에서 팝업이 저절로 생기면 안 된다")
+      .not.toContain("openShellPopout(page, label || undefined)");
+    // 명시적 ⧉ 두 곳(상단 버튼·도킹 머리)은 남아 있어야 한다 — 사장님 예외(「필요한 거 빼고」)
+    expect(s).toContain("openShellPopout(active.page, active.label)");
+    expect(s).toContain("openShellPopout(t.page, t.label || undefined)");
+  });
+  it("💬 대화 홈 = 새 세션 확인(작업 내역 저장 안내) 후 대화·선택·범위 초기화", () => {
+    const s = 코드만(join(PAGES, "app.html"));
+    expect(s, "확인창에 「작업 내역에 저장」 안내가 없다 — 없으면 누르길 겁낸다").toContain("「작업 내역」에 저장");
+    expect(s, "새 세션 시작이 콘솔에 안 이어진다").toContain("gijoConsole.newSession()");
+    const c = 코드만(join(PAGES, "console.js"));
+    expect(c).toContain("function newSession(");
+    expect(c, "새 세션이 범위 해제를 화면들에 안 알린다").toMatch(/function newSession\([\s\S]{0,800}gijo:scope/);
+    expect(c, "gijoConsole에 노출 안 됨").toContain("newSession: newSession");
+  });
+  it("분리 대화창이 첫 컨텍스트에서 현황 카드를 이어받는다(창으로 빼면 정보가 빠지던 결함)", () => {
+    const c = 코드만(join(PAGES, "console.js"));
+    expect(c).toContain("첫컨텍스트");
+    expect(c).toMatch(/첫컨텍스트 = false; screenCard\(/);
+  });
+});
+
 describe("배선 계약 ⑤층 — 반입 다음 칩", () => {
   it("업로드 응답에 다음 칩이 실리고 클라가 그린다(반입은 nextguide 사각지대)", () => {
     const up = readFileSync(join(__dirname, "..", "src", "engine", "autoupload.ts"), "utf8");

@@ -211,6 +211,25 @@ const 히트 = await 셸.evaluate(() => {
 });
 ok("히트맵 토글·색사전", 히트.seg && JSON.stringify(히트.cls) === '["bad","warn","muted"]', JSON.stringify(히트.cls));
 
+// ── ⑥ 💬 새 세션(2026-08-20) — 확인창(작업 내역 저장 안내) → 확인 → 대화 초기화 ──
+// ⚠ 대화를 비우므로 반드시 **맨 마지막** 검사여야 한다(앞 검사들의 카드가 사라진다).
+const 새세션 = await 셸.evaluate(async () => {
+  const btn = document.getElementById("railHome");
+  if (!btn) return { no: "railHome 없음" };
+  btn.click();
+  await new Promise((r) => setTimeout(r, 600));
+  const dlg = document.getElementById("gijoDlg");
+  if (!dlg) return { no: "확인창 안 뜸" };
+  const 문구저장 = (dlg.textContent || "").includes("작업 내역");
+  const okBtn = dlg.querySelector("button.ok");
+  if (okBtn) okBtn.click();
+  await new Promise((r) => setTimeout(r, 1000));
+  const body = document.getElementById("csBody");
+  return { 문구저장, 새대화: !!body && (body.textContent || "").includes("새 세션을 시작했습니다") };
+});
+ok("💬 새 세션: 확인창+저장 안내", !!새세션.문구저장, 새세션.no || "");
+ok("💬 새 세션: 대화 초기화·안내 이벤트", !!새세션.새대화);
+
 await browser.close().catch(() => {});
 정리();
 console.log(실패.length ? "[ui관문] ✕ 실패 " + 실패.length + "건: " + 실패.join(", ") : "[ui관문] ✓ 전부 통과");

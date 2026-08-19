@@ -1545,7 +1545,15 @@
     build();
     if (IS_WINDOW) {
       // 창 모드 — 셸이 알려주는 활성 탭이 맥락이다.
-      if (window.gijo.onConsoleContext) window.gijo.onConsoleContext(function (i) { ctx = { screen: i.screen, label: i.label }; applyCtx(); });
+      // 첫 컨텍스트 때 그 화면의 현황 카드를 이어받는다(2026-08-20 사장님 — 「창으로 빼면
+      // 기존 정보가 빠진다」). 글 대화는 restore()가, 카드는 재조회가 살린다(라이브 값이라
+      // 클릭도 살아 있다 — DOM 복사보다 정직하다). 이후 탭 전환마다 또 띄우진 않는다(도배).
+      var 첫컨텍스트 = true;
+      if (window.gijo.onConsoleContext) window.gijo.onConsoleContext(function (i) {
+        ctx = { screen: i.screen, label: i.label };
+        applyCtx();
+        if (첫컨텍스트 && i.screen) { 첫컨텍스트 = false; screenCard(i.screen, i.label); }
+      });
     } else {
       readCtxFromShell();
       window.gijoConsoleSyncCtx = readCtxFromShell; // 셸이 탭을 바꿀 때 부른다
@@ -1749,7 +1757,23 @@
       if (P.nextChips) P.nextChips(row, r.nextChips, function (q) { submit(q); });
     }).catch(function () { /* 조회 실패는 조용히 — 화면 열기 자체를 막지 않는다 */ });
   }
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; }, screenCard: screenCard };
+  // ── 새 대화(세션) 시작 — 💬 대화 홈(2026-08-20 사장님 「새로운 세션을 열겠습니까 알림 주고」) ──
+  // 이전 대화는 서버 작업 세션에 이미 저장돼 있다(작업 내역에서 다시 본다) — 여기는 화면과
+  // 이번 세션 연결만 비운다. 📌 선택·🗂 범위·현황 카드 기억까지 함께 초기화 — 새로 시작인데
+  // 맥락이 남아 있으면 「이거」가 거짓말을 한다(사장님 조건).
+  function newSession() {
+    session = null;
+    try { localStorage.removeItem(SESS_KEY); } catch (e) { }
+    setSelection(null);
+    setScope(null);
+    // 화면들도 범위 해제를 알아야 목록이 되돌아온다 — 셸을 거쳐 모든 틀에(기존 풀기 경로와 동일).
+    try { window.parent.postMessage({ type: "gijo:scope", scope: null }, "*"); } catch (err) { }
+    화면카드직전 = null;
+    var body = rows();
+    if (body) body.innerHTML = "";
+    append("event", { icon: "💬", name: "새 대화", message: "새 세션을 시작했습니다 — 이전 대화는 「작업 내역」에 저장되어 있습니다.", full: true });
+  }
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; }, screenCard: screenCard, newSession: newSession };
 
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.

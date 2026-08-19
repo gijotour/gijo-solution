@@ -524,13 +524,11 @@
         close(도킹중.page, true);
         // return하지 않는다 — 아래 폭 검사(④)와 표준 탭 생성 경로를 그대로 탄다.
       }
-      if ((window.innerWidth - 56) < 1400) {                                                // ④
-        window.gijo.openShellPopout(page, label || undefined);
-        대화홈갱신();
-        // 메뉴로 연 화면의 현황 카드를 대화창에 자동으로(2026-08-20 사장님 — 「상위 카드가 보여야 돼」).
-        if (window.gijoConsole && window.gijoConsole.screenCard) window.gijoConsole.screenCard(page, label);
-        return;
-      }
+      // ④ (폐지, 2026-08-20 사장님 — 「프로는 팝업 기능을 없애, 필요한 거 빼고」)
+      //   좁은 창(폭<1400)에서 자동으로 팝업을 띄우던 갈래를 없앴다 — 프로에서 팝업이
+      //   저절로 생기는 마지막 통로였다. 좁아도 도킹으로 연다(스퀴즈 하한 644+380 실측).
+      //   정보 손실은 없다: 화면 내용은 도킹과 동일(중복)하고, 현황 카드가 대화창에 자동으로
+      //   뜬다. 팝업은 이제 사람이 직접 누른 ⧉와 「(창)」 메뉴(팀 사무실·문서함 등)뿐이다.
       // ⑤ 도킹 — return하지 않고 아래 표준 탭 생성 경로를 그대로 탄다.
     }
     // ⚠ 이름이 없으면 **사이드바에서 찾는다** — 없다고 파일명을 사람에게 보이면 안 된다
@@ -1175,13 +1173,21 @@
     눌러("railFav", function () {
       if (window.gijoOpenFinder) window.gijoOpenFinder();
     });
-    // 💬 대화 홈 — 열린 화면을 **닫는다**(감추지 않는다).
-    // ⚠ 감추기만 하면 active가 남아 대화창 맥락이 「닫은 화면」을 계속 가리킨다.
+    // 💬 대화 홈 = 새 대화(세션) 시작(2026-08-20 사장님 — 「새로운 세션을 열겠습니까 알림
+    // 주고 물어보는 거야」). 열린 화면을 닫고(감추지 않는다 — 감추면 active가 남아 맥락이
+    // 「닫은 화면」을 가리킨다) 대화·📌 선택·🗂 범위를 초기화한다.
+    // ⚠ 확인은 화면 내 창(gijoAsk)으로 — 네이티브 confirm은 렌더러가 통째로 멈춘다(알려진 함정).
     눌러("railHome", function () {
-      if (!tabs.length) return;
-      tabs.slice().forEach(function (t) { if (!t.pinned) close(t.page, true); });
-      대화홈갱신();
-      redraw();
+      var 화면있음 = tabs.length > 0;
+      var 물음 = "새 대화(세션)를 시작할까요?\n\n지금까지의 대화는 「작업 내역」에 저장되어 언제든 다시 볼 수 있습니다." +
+        (화면있음 ? "\n열린 화면은 닫고 처음 화면(대화 홈)으로 돌아갑니다." : "");
+      Promise.resolve(window.gijoAsk ? window.gijoAsk(물음) : true).then(function (ok) {
+        if (!ok) return;
+        tabs.slice().forEach(function (t) { if (!t.pinned) close(t.page, true); });
+        대화홈갱신();
+        redraw();
+        if (window.gijoConsole && window.gijoConsole.newSession) window.gijoConsole.newSession();
+      });
     });
     대화홈갱신();
   }
