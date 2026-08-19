@@ -1418,6 +1418,28 @@ function downloadToFile(urlStr: string, headers: Record<string, string>, destPat
   });
 }
 
+/** 순단에 강한 다운로드 — 전송 중 끊김(ECONNRESET 등)은 한 번 스스로 재시도한다.
+ *  ⚠ 왜(2026-08-19 사장님 실사고): 업데이트 내려받기 도중 서버 재시작·게시 순간과 겹치면
+ *    연결이 리셋되는데, 영문 오류(read ECONNRESET)가 그대로 화면에 나갔고 담당자는
+ *    다시 누르면 되는 일인지 알 수 없었다. 한 번은 기계가 다시 해 보고, 그래도 안 되면
+ *    한국어로 「다시 시도」를 알려 준다. 재시도는 새 파일로 처음부터(이어받기 없음 — 단순 우선). */
+async function downloadToFileRetry(urlStr: string, headers: Record<string, string>, destPath: string, onProgress: (pct: number) => void): Promise<void> {
+  const 순단인가 = (e: unknown) => /ECONNRESET|ECONNREFUSED|socket hang up|ETIMEDOUT|EPIPE/i.test(String((e as Error)?.message ?? e));
+  try {
+    await downloadToFile(urlStr, headers, destPath, onProgress);
+  } catch (e) {
+    if (!순단인가(e)) throw e;
+    try { fs.unlinkSync(destPath); } catch { /* 없거나 잠김 — 새 이름이라 무해 */ }
+    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      await downloadToFile(urlStr, headers, destPath, onProgress);
+    } catch (e2) {
+      if (순단인가(e2)) throw new Error("서버와의 연결이 도중에 끊겼습니다 — 서버가 재시작 중일 수 있습니다. 잠시 뒤 업데이트를 다시 눌러 주세요.");
+      throw e2;
+    }
+  }
+}
+
 // 다운로드 → NSIS 설치파일 실행 → 이 앱 종료 → 설치 후 새 버전 자동 실행.
 // 설치 프로그램이 실행 중인 exe를 덮어써야 하므로, spawn 직후 반드시 이 앱을 끝내야 한다.
 //
@@ -1454,7 +1476,7 @@ ipcMain.handle("update:install", async (event, version: string) => {
     } catch { /* 프레임이 이미 사라졌으면 아래 폴백 */ }
     try { event.sender.send("update:progress", pct); } catch { /* 창이 닫혔다 — 무시 */ }
   };
-  await downloadToFile(
+  await downloadToFileRetry(
     `${authState.serverUrl}/api/client/download/${encodeURIComponent(version)}`,
     { Authorization: `Bearer ${authState.accessToken}` },
     dest,
