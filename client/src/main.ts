@@ -792,6 +792,22 @@ function popoutBounds(portrait: boolean, ref?: Electron.Rectangle): { x?: number
   }
   const base = ref ?? (mainWindow && !mainWindow.isDestroyed() ? mainWindow.getBounds() : undefined);
   const disp = base ? screen.getDisplayMatching(base) : screen.getPrimaryDisplay();
+  // ★ 보조 모니터 자동 배치(2026-08-19 승인 시안 프로_도킹패널 §10-4).
+  //   본창이 좁은 디스플레이(세로 모니터 등 — 내부폭 1400 미만)에 있고 다른 디스플레이가 있으면,
+  //   팝업은 그중 가로(landscape) 우선 디스플레이의 작업영역에 크게 띄운다 — 세로=대화·판단,
+  //   가로=증거 화면(관제실 배치). 모니터가 하나면 이 분기를 안 타므로 기존 동작 그대로(회귀 없음).
+  //   표준 셸의 「⧉ 창으로」도 같은 함수라 이 개선을 함께 받는다(의도된 공유).
+  if (disp.workAreaSize.width - 56 < 1400) {
+    const others = screen.getAllDisplays().filter((d) => d.id !== disp.id);
+    if (others.length) {
+      const landscape = others
+        .filter((d) => d.workAreaSize.width > d.workAreaSize.height)
+        .sort((a, b) => b.workAreaSize.width - a.workAreaSize.width)[0];
+      const target = landscape ?? others[0];
+      const wa2 = target.workArea;
+      return { x: wa2.x + 20, y: wa2.y + 20, width: wa2.width - 40, height: wa2.height - 40 };
+    }
+  }
   const wa = disp.workArea;
   const half = Math.max(760, Math.round(wa.width / 2));
   return { x: wa.x + Math.max(0, wa.width - half), y: wa.y, width: Math.min(half, wa.width), height: wa.height };

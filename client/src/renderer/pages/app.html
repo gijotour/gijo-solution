@@ -497,9 +497,25 @@
     // ⚠ 탭 모델(open·show·close)은 그대로 둔다 — 표준 셸과 복원 로직이 그 위에 산다.
     if (프로인가() && window.gijo && window.gijo.openShellPopout) {
       if (!label) label = 화면이름찾기(page) || "";
-      window.gijo.openShellPopout(page, label || undefined);
-      대화홈갱신();
-      return;
+      // 🚀 도킹 규칙(승인 시안 프로_도킹패널 §3 — 순서가 안전성의 전부다):
+      //   ① 그 화면이 이미 도킹돼 있다 → 그 패널만 다시 보인다.
+      //   ② 이미 팝업으로 떠 있다 → openShellPopout이 기존 창을 포커스한다(main.ts 기존 동작).
+      //   ③ 도킹 슬롯(1개)이 다른 화면으로 차 있다 → 팝업으로 연다(탭 부활 금지).
+      //   ④ 내부 폭 < 1400px → 무조건 팝업. ★기억보다 먼저다 — 세로 모니터 「644+380 스퀴즈」
+      //      재발을 막는 절대 하한(사장님 실측이 이 제품이 팝업을 택한 이유였다).
+      //   ⑤ 기억된 선택이 「팝업」 → 팝업. ⑥ 그 외 → 도킹(아래 표준 탭 경로로 흘려보낸다 —
+      //      tabs[]에 실려야 대화 맥락·범위 배관이 표준과 같은 출처를 쓴다. 시안 §10-1).
+      var 도킹중 = tabs[0] || null;
+      if (도킹중 && 도킹중.page === page) { show(page); 대화홈갱신(); return; }            // ①
+      if (도킹중) { window.gijo.openShellPopout(page, label || undefined); 대화홈갱신(); return; } // ③(②는 main이 처리)
+      var 기억 = null;
+      try { 기억 = localStorage.getItem("gijo:pro:dockpref:v1"); } catch (e) { }
+      if ((window.innerWidth - 56) < 1400 || 기억 === "popup") {                            // ④·⑤
+        window.gijo.openShellPopout(page, label || undefined);
+        대화홈갱신();
+        return;
+      }
+      // ⑥ 도킹 — return하지 않고 아래 표준 탭 생성 경로를 그대로 탄다.
     }
     // ⚠ 이름이 없으면 **사이드바에서 찾는다** — 없다고 파일명을 사람에게 보이면 안 된다
     //   (2026-08-18 사장님 QA: 탭에 `discover.html?p…`). 자세한 사정은 화면이름찾기 주석.
@@ -789,7 +805,9 @@
     return true; // auto = 오른쪽(기본)
   }
   function 자리적용() {
-    var 옆 = 옆에둘까();
+    // 🚀 프로 도킹(승인 시안 프로_도킹패널): 프로에서 도킹은 항상 「옆」 그리드다 —
+    //   표준의 자리모드(아래로/옆으로)가 끼어들면 대화가 아래로 깔려 시안 배치가 깨진다.
+    var 옆 = 프로인가() ? true : 옆에둘까();
     document.querySelector(".work").classList.toggle("console-side", 옆);
     var b = $("tbConsoleSide");
     if (b) {
@@ -957,6 +975,42 @@
   function 대화홈갱신() {
     if (!프로인가()) return;
     document.body.classList.toggle("chat-home", tabs.length === 0);
+    // 🚀 도킹 패널 머리(승인 시안 §10-1) — 탭줄이 프로에서 숨겨져 있으므로(P2) 도킹된 화면의
+    //   이름과 ⧉/✕가 설 자리를 여기 만든다. 대화 폭 700 고정도 프로 전용 값이라 여기서 준다.
+    var work = document.querySelector(".work");
+    if (work) work.style.setProperty("--console-w", "700px");
+    var head = document.getElementById("dockHead");
+    if (!head) {
+      head = document.createElement("div");
+      head.id = "dockHead";
+      head.style.cssText = "grid-column:1;grid-row:1;align-self:start;display:flex;align-items:center;gap:8px;" +
+        "padding:4px 10px;font-size:12.5px;color:var(--muted,#b3ada4);background:var(--panel-2,#1f1e1d);" +
+        "border-bottom:1px solid rgba(255,255,255,.08);position:relative;z-index:3;";
+      head.innerHTML = '<b id="dockName" style="color:var(--text,#e9e7e2)"></b>' +
+        '<span style="margin-left:auto"></span>' +
+        '<button class="tb-btn" id="dockPop" title="이 화면을 별도 창으로 뺍니다 — 이 선택을 기억합니다">⧉ 창으로</button>' +
+        '<button class="tb-btn" id="dockClose" title="패널을 닫습니다 — 다시 열려면 ☰(Ctrl+K)">✕</button>';
+      var scr = document.getElementById("screens");
+      if (scr && scr.parentNode) scr.parentNode.insertBefore(head, scr);
+      head.querySelector("#dockPop").addEventListener("click", function () {
+        var t = tabs[0];
+        if (!t) return;
+        try { localStorage.setItem("gijo:pro:dockpref:v1", "popup"); } catch (e) { }
+        window.gijo.openShellPopout(t.page, t.label || undefined);
+        close(t.page, true);
+        대화홈갱신();
+      });
+      head.querySelector("#dockClose").addEventListener("click", function () {
+        var t = tabs[0];
+        if (t) { close(t.page, true); 대화홈갱신(); }
+      });
+    }
+    var t0 = tabs[0];
+    head.style.display = t0 ? "flex" : "none";
+    // screens가 grid 1행을 dockHead와 나눠 쓰도록 — 머리(28px) 아래로 화면을 내린다.
+    var scr2 = document.getElementById("screens");
+    if (scr2) scr2.style.paddingTop = t0 ? "30px" : "";
+    if (t0) head.querySelector("#dockName").textContent = t0.label || "";
   }
 
   function 프로레일() {
