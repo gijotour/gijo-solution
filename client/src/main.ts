@@ -493,8 +493,8 @@ const 셸모드파일 = () => path.join(app.getPath("userData"), "gijo-shell-mod
 function 저장된셸모드(): string {
   try {
     const v = fs.readFileSync(셸모드파일(), "utf8").trim();
-    return v === "pro" ? "pro" : "standard";
-  } catch { return "standard"; }
+    return v === "standard" ? "standard" : "pro";
+  } catch { return "pro"; } // 기본=프로(사장님 2026-08-19 「표준은 프로」 — 프로가 기준 모델)
 }
 ipcMain.handle("shell:get", () => ({
   현재: 저장된셸모드(),
