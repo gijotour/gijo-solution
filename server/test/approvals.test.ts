@@ -57,7 +57,7 @@ describe("approvals (finding 검토 워크플로우)", () => {
     expect(res.body.reviews[0].status).toBe("pending");
     expect(res.body.reviews[0].assetName).toBe("모델1");
     // scanFailed 추가(2026-08-01) — 스캐너 오류를 취약점과 분리해 세면서 생긴 칸.
-    expect(res.body.summary).toEqual({ total: 1, pending: 1, in_progress: 0, verifying: 0, approved: 0, rejected: 0, overdue: 0, scanFailed: 0 });
+    expect(res.body.summary).toEqual({ total: 1, pending: 1, in_progress: 0, verifying: 0, approved: 0, rejected: 0, accepted: 0, acceptExpired: 0, overdue: 0, scanFailed: 0 });
   });
 
   it("조치 관리: 담당자·기한(SLA) 배정 — status 없이 배정만 가능", async () => {
@@ -285,5 +285,68 @@ describe("★ 스캐너 오류는 취약점이 아니다 (2026-08-01 하루 실�
     expect(s.total, "일감은 1건이다").toBe(1);
     expect(s.pending).toBe(1);
     expect(s.scanFailed, "스캔 실패는 사라지지 않고 따로 세어진다").toBe(3);
+  });
+});
+
+// 중-외부검증 1순위(2026-08-20 사장님 승인): 위험수용 판정 — 기한부 수용·만료 부상
+describe("위험수용(accepted) — 기한부 수용과 만료 부상", () => {
+  let app: ReturnType<typeof createApp>;
+  let token: string;
+  const auth = () => ({ Authorization: `Bearer ${token}` });
+  const key = () => findingKey("m1", FINDING);
+
+  beforeEach(async () => {
+    resetAssetsForTests();
+    resetApprovalsForTests();
+    app = createApp();
+    token = await login(app);
+    await request(app).post("/api/assets").set(auth())
+      .send({ id: "m1", name: "모델1", path: "models/m1.gguf", components: [{ name: "weights.bin", version: "1", license: "MIT" }] });
+    recordFindings("m1", [FINDING]);
+  });
+
+  it("기한 없는 수용은 거부된다 — 영구 수용 금지", async () => {
+    const res = await request(app).post(`/api/approvals/m1/${key()}`).set(auth())
+      .send({ status: "accepted", note: "차기 개편에서 교체 예정" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("기한");
+  });
+
+  it("사유 없는 수용은 거부된다 — 감사에 답할 수 없다", async () => {
+    const res = await request(app).post(`/api/approvals/m1/${key()}`).set(auth())
+      .send({ status: "accepted", acceptUntil: "2099-12-31" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("사유");
+  });
+
+  it("기한 안 수용은 일감(prioritizedReviews)에서 빠지되 요약에는 보인다", async () => {
+    const ok = await request(app).post(`/api/approvals/m1/${key()}`).set(auth())
+      .send({ status: "accepted", acceptUntil: "2099-12-31", note: "격리망 내부라 실공격 경로 없음 — 분기 재검토" });
+    expect(ok.status).toBe(200);
+    expect(prioritizedReviews(10).map((r) => r.findingKey)).not.toContain(key());
+    const res = await request(app).get("/api/approvals").set(auth());
+    expect(res.body.summary.accepted).toBe(1);
+    expect(res.body.summary.acceptExpired).toBe(0);
+    expect(res.body.reviews[0].acceptUntil).toBe("2099-12-31");
+    expect(res.body.reviews[0].acceptedBy).toBeTruthy();
+  });
+
+  it("기한이 지난 수용은 일감으로 부상하고 acceptExpired로 세어진다", async () => {
+    const ok = await request(app).post(`/api/approvals/m1/${key()}`).set(auth())
+      .send({ status: "accepted", acceptUntil: "2020-01-01", note: "옛 수용 — 만료 시나리오" });
+    expect(ok.status).toBe(200);
+    expect(prioritizedReviews(10).map((r) => r.findingKey), "만료된 수용은 다시 일감이다").toContain(key());
+    const res = await request(app).get("/api/approvals").set(auth());
+    expect(res.body.summary.acceptExpired).toBe(1);
+  });
+
+  it("수용에서 다른 상태로 벗어나면 기한·처리자가 비워진다(반려 사유와 같은 관례)", async () => {
+    await request(app).post(`/api/approvals/m1/${key()}`).set(auth())
+      .send({ status: "accepted", acceptUntil: "2099-12-31", note: "수용" });
+    await request(app).post(`/api/approvals/m1/${key()}`).set(auth())
+      .send({ status: "in_progress" });
+    const res = await request(app).get("/api/approvals").set(auth());
+    expect(res.body.reviews[0].acceptUntil).toBeUndefined();
+    expect(res.body.reviews[0].acceptedBy).toBeUndefined();
   });
 });

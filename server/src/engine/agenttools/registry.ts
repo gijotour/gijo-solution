@@ -1401,16 +1401,17 @@ const TOOLS: AgentTool[] = [
   },
   {
     name: "update_finding_status",
-    label: "취약점 판정(오탐·조치완료)",
+    label: "취약점 판정(오탐·조치완료·위험수용)",
     domain: "vuln",
     write: true,
     description:
-      '취약점의 조치 상태·판정을 기록한다(상태 변경). "고쳤어/패치했어/조치완료"(→조치완료) · "이건 오탐이야/무시해도 돼"(→오탐) · **"조치 시작할게/이거 착수한다"(→진행중) · "검증 요청해줘/재스캔 대기로"(→검증 대기)** — 전부 단순 대화가 아니라 **반드시 이 도구로** 상태를 남긴다(5단계 ③→④ 전이 포함, 2026-08-19 기능 가이드 ①). assetId·finding은 today/search 결과에서 지목. 예: {"assetId":"ai-secbot-01","finding":"버전 노출","status":"조치완료"}',
+      '취약점의 조치 상태·판정을 기록한다(상태 변경). "고쳤어/패치했어/조치완료"(→조치완료) · "이건 오탐이야/무시해도 돼"(→오탐) · **"조치 시작할게/이거 착수한다"(→진행중) · "검증 요청해줘/재스캔 대기로"(→검증 대기) · "위험 수용 처리해줘"(→위험수용, acceptUntil 기한·note 사유 필수 — 기한이 지나면 재검토로 부상)** — 전부 단순 대화가 아니라 **반드시 이 도구로** 상태를 남긴다(5단계 ③→④ 전이 포함, 2026-08-19 기능 가이드 ①). assetId·finding은 today/search 결과에서 지목. 예: {"assetId":"ai-secbot-01","finding":"버전 노출","status":"조치완료"}',
     params: [
       { name: "assetId", label: "자산 id", description: "대상 자산 id", required: true },
       { name: "finding", label: "대상 취약점", description: "심각도·유형으로 지목", required: true },
-      { name: "status", label: "상태", description: "조치완료 / 오탐 / 조치 시작(진행중) / 검증 요청 / 미검토(원복)", required: true },
-      { name: "note", label: "사유", description: "판정 근거·메모 (선택)", required: false },
+      { name: "status", label: "상태", description: "조치완료 / 오탐 / 위험수용 / 조치 시작(진행중) / 검증 요청 / 미검토(원복)", required: true },
+      { name: "note", label: "사유", description: "판정 근거·메모 (위험수용은 필수)", required: false },
+      { name: "acceptUntil", label: "수용 기한", description: "위험수용일 때만 — YYYY-MM-DD, 지나면 재검토로 부상 (위험수용은 필수)", required: false },
     ],
     // status를 canonical("조치완료"/"오탐")로 정규화한다 — 모델이 준 값이든(예 "패치 완료") 안 줬든
     // 지시문에서 규칙 추론한다. 실측(2026-07-18): 모델이 지시문에 없는 status("패치 완료")를 넣으면

@@ -127,8 +127,11 @@ export function isAssetStatusAsk(text: string): boolean {
 /** 검토대장에서 오탐·조치완료로 **판정이 끝난** 건의 키 집합 — 미조치 수에서 뺀다. */
 function 판정끝난키(): Set<string> {
   const s = new Set<string>();
+  const 오늘 = new Date().toISOString().slice(0, 10);
   for (const r of listFindingReviews()) {
-    if (r.status === "rejected" || r.status === "approved") s.add(`${r.assetId}::${r.findingKey}`);
+    // 위험수용(accepted)은 기한 안일 때만 판정 끝 — 기한이 지나면 재검토로 부상한다(2026-08-20).
+    if (r.status === "rejected" || r.status === "approved" ||
+        (r.status === "accepted" && !!r.acceptUntil && r.acceptUntil >= 오늘)) s.add(`${r.assetId}::${r.findingKey}`);
   }
   return s;
 }

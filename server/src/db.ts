@@ -409,6 +409,8 @@ for (const col of [
   "verifyRequestedBy TEXT",
   "resolvedAt INTEGER",       // 재스캔에서 사라져 해결 확인된 시각(→완료)
   "snapshot TEXT",            // finding 내용 스냅샷(재스캔 후 목록 표시용)
+  "acceptUntil TEXT",         // 위험수용 기한 'YYYY-MM-DD' — 지나면 재검토로 부상(2026-08-20)
+  "acceptedBy TEXT",          // 위험수용 처리자 — reviewedBy는 이후 전이에 덮이므로 따로 보존
 ]) {
   try { db.exec(`ALTER TABLE finding_approvals ADD COLUMN ${col}`); } catch { /* 이미 있으면 무시 */ }
 }

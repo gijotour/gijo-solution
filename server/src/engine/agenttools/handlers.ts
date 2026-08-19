@@ -1377,6 +1377,9 @@ export function resolveFinding(assetId: string, needle: string): { ok: true; hit
 // 완료 표현을 폭넓게 잡는다 — 실측(2026-07-18): "패치 다 했어"가 status로 안 잡혀 승인이 막혔다.
 export function normalizeStatus(raw: string): ApprovalStatus | null {
   const s = (raw ?? "").trim().toLowerCase();
+  // ⚠ 순서: 위험수용을 반려보다 먼저 — 「위험 수용 제외」류 문장에서 「제외」가 반려로
+  //   굳으면 안 된다. 수용은 오탐(취약점 아님)과 다르게 「실재하지만 안 고치기로 결정」이다.
+  if (/위험\s*수용|리스크\s*수용|수용\s*처리|수용하|수용해|수용으로|^수용$|risk.?accept|accept/.test(s)) return "accepted";
   if (/오탐|false positive|false-positive|무시|반려|제외|아님|reject/.test(s)) return "rejected";
   // ⚠ 순서: 시작·검증 요청을 **완료보다 먼저** 본다 — 「조치 시작」의 「조치」가 완료 정규식에
   //   걸려 시작이 완료로 굳으면 안 된다(기능 가이드 ① 2026-08-19, 5단계 ③→④ 대화화).
@@ -1390,7 +1393,7 @@ export function normalizeStatus(raw: string): ApprovalStatus | null {
 // status가 비면 지시문에서 규칙 추론한 canonical 한국어("조치완료"/"오탐")를 돌려준다(autoFill용).
 export function inferStatusWord(instruction: string): string | undefined {
   const st = normalizeStatus(instruction);
-  return st === "approved" ? "조치완료" : st === "rejected" ? "오탐" : undefined;
+  return st === "approved" ? "조치완료" : st === "rejected" ? "오탐" : st === "accepted" ? "위험수용" : undefined;
 }
 
 export const WEEKDAY_MON0: Record<string, number> = { 월: 0, 화: 1, 수: 2, 목: 3, 금: 4, 토: 5, 일: 6 };
@@ -1455,15 +1458,23 @@ export function runUpdateFindingStatus(args: Record<string, string>): string {
   const r = resolveFinding(args.assetId, args.finding);
   if (!r.ok) throw new Error(r.error);
   const status = normalizeStatus(args.status);
-  if (!status) throw new Error(`상태 "${args.status}"를 해석하지 못했습니다. "조치완료" 또는 "오탐"으로 지정하세요.`);
+  if (!status) throw new Error(`상태 "${args.status}"를 해석하지 못했습니다. "조치완료"·"오탐"·"위험수용" 등으로 지정하세요.`);
   const patch: ReviewPatch = { status };
   const note = args.note?.trim();
   if (note) patch.note = note;
+  if (status === "accepted") {
+    // 위험수용은 기한·사유가 필수(영구 수용 금지 — approvals.ts가 최종 관문, 여기는 안내를 좋게).
+    const until = args.acceptUntil?.trim();
+    if (!until || !DUE_RE.test(until)) throw new Error("위험수용에는 기한이 필요합니다 — acceptUntil을 YYYY-MM-DD로 지정하세요(예: 분기 재검토면 3개월 뒤 날짜).");
+    if (!note) throw new Error("위험수용에는 사유(note)가 필요합니다 — 왜 수용하는지 없이는 감사에 답할 수 없습니다.");
+    patch.acceptUntil = until;
+  }
   updateFindingReview(r.hit.assetId, r.hit.key, patch, "orchestrator");
   const label = status === "rejected" ? "오탐(SBOM·조치 대상에서 제외)"
     : status === "approved" ? "조치완료(확정)"
     : status === "in_progress" ? "조치 진행중"
     : status === "verifying" ? "검증 대기(재스캔·확인 차례)"
+    : status === "accepted" ? `위험수용(기한 ${patch.acceptUntil} — 지나면 재검토로 부상)`
     : "미검토(원복)";
   return `${args.assetId} ${r.hit.label} → ${label} 처리했습니다.${note ? ` 사유: ${note}` : ""}`;
 }

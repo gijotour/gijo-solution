@@ -37,10 +37,14 @@ export interface VexAnalysis {
 }
 
 /** 승인 상태 → VEX 상태. 반려는 사유가 있을 때만 not_affected로 내보낸다. */
-export function toVexAnalysis(status: ApprovalStatus, rejectReason?: RejectReason | null, note?: string | null): VexAnalysis {
+export function toVexAnalysis(status: ApprovalStatus, rejectReason?: RejectReason | null, note?: string | null, acceptUntil?: string | null): VexAnalysis {
   switch (status) {
     case "approved":
       return { state: "fixed", ...(note ? { detail: note } : {}) };
+    case "accepted":
+      // 위험수용 — 취약점은 실재하므로 affected가 정직하다(not_affected로 내보내면 거짓).
+      // 수용 사실·기한을 detail에 남겨 받은 쪽이 재검토 시점을 안다.
+      return { state: "affected", detail: `위험 수용(기한 ${acceptUntil || "미기록"})${note ? ` — ${note}` : ""}` };
     case "in_progress":
     case "verifying":
       return { state: "affected", ...(note ? { detail: note } : {}) };
@@ -85,7 +89,7 @@ export function buildVexDocument(reviews: FindingReview[], now = Date.now()): Ve
   for (const r of reviews) {
     const cves = cvesOf(r);
     if (!cves.length) continue;
-    const analysis = toVexAnalysis(r.status, r.rejectReason as RejectReason | undefined, r.note);
+    const analysis = toVexAnalysis(r.status, r.rejectReason as RejectReason | undefined, r.note, r.acceptUntil);
     for (const cve of cves) {
       vulns.push({
         id: cve,

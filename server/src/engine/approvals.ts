@@ -22,7 +22,10 @@ import { recordAudit } from "./audit";
 // 조치 생애주기(2026-07-22 확장). 기존 3상태에 진행중·검증을 앞에 끼워 넣었다 — approved는
 // "완료(확정·해결)" 의미를 그대로 유지해 sbom/today/chatbot 등 기존 참조를 깨지 않는다.
 //   pending(미검토) → in_progress(진행중) → verifying(검증·재스캔대기) → approved(완료) / rejected(반려)
-export type ApprovalStatus = "pending" | "in_progress" | "verifying" | "approved" | "rejected";
+//   + accepted(위험수용, 2026-08-20 외부검증 1순위) — 「고치지 않기로 결정했다」를 기록하는 상태.
+//     반려(오탐)와 다르다: 취약점은 실재하지만 사업 판단으로 기한(acceptUntil)까지 수용한다.
+//     기한이 지나면 재검토로 부상한다(영구 수용 금지 — ISO 27005·NIST RMF 관례).
+export type ApprovalStatus = "pending" | "in_progress" | "verifying" | "approved" | "rejected" | "accepted";
 // 반려 사유(모범사례: 오탐과 보상통제를 반드시 구분). 증거·승인자·날짜는 note/reviewedBy/reviewedAt에 보존.
 export type RejectReason = "false_positive" | "compensating_control";
 
@@ -38,6 +41,8 @@ export interface FindingApprovalRow {
   securityOwner: string | null; // 보안담당자(감독·검토·SLA 책임)
   dueDate: string | null; // 조치 기한(SLA) 'YYYY-MM-DD'
   rejectReason: string | null; // 반려 사유(false_positive | compensating_control)
+  acceptUntil: string | null; // 위험수용 기한 'YYYY-MM-DD' — accepted일 때만 값이 있다
+  acceptedBy: string | null; // 위험수용 처리자(수용 시점의 actor)
   verifyRequestedAt: number | null; // 실수행담당자가 조치 완료 보고한 시각(→검증)
   verifyRequestedBy: string | null;
   resolvedAt: number | null; // 재스캔에서 사라져 해결 확인된 시각(→완료)
@@ -60,6 +65,8 @@ export interface FindingReview {
   verifyRequestedAt?: number;
   verifyRequestedBy?: string;
   resolvedAt?: number;
+  acceptUntil?: string; // 위험수용 기한 — accepted일 때만
+  acceptedBy?: string; // 위험수용 처리자
   overdue?: boolean; // dueDate가 지났고 아직 미해결(rejected·approved 제외)
   gone?: boolean; // 최신 스캔에 더는 없음(재스캔에서 사라짐) — 검증/완료 표시에 씀
 }
@@ -76,14 +83,15 @@ export function findingKey(assetId: string, f: StandardFinding): string {
 const getStmt = db.prepare("SELECT * FROM finding_approvals WHERE assetId = ? AND findingKey = ?");
 const allRowsStmt = db.prepare("SELECT * FROM finding_approvals");
 const upsertStmt = db.prepare(`
-  INSERT INTO finding_approvals (assetId, findingKey, status, reviewedBy, reviewedAt, note, assignee, securityOwner, dueDate, rejectReason, verifyRequestedAt, verifyRequestedBy, resolvedAt, snapshot)
-  VALUES (@assetId, @findingKey, @status, @reviewedBy, @reviewedAt, @note, @assignee, @securityOwner, @dueDate, @rejectReason, @verifyRequestedAt, @verifyRequestedBy, @resolvedAt, @snapshot)
+  INSERT INTO finding_approvals (assetId, findingKey, status, reviewedBy, reviewedAt, note, assignee, securityOwner, dueDate, rejectReason, verifyRequestedAt, verifyRequestedBy, resolvedAt, snapshot, acceptUntil, acceptedBy)
+  VALUES (@assetId, @findingKey, @status, @reviewedBy, @reviewedAt, @note, @assignee, @securityOwner, @dueDate, @rejectReason, @verifyRequestedAt, @verifyRequestedBy, @resolvedAt, @snapshot, @acceptUntil, @acceptedBy)
   ON CONFLICT(assetId, findingKey) DO UPDATE SET
     status = excluded.status, reviewedBy = excluded.reviewedBy, reviewedAt = excluded.reviewedAt,
     note = excluded.note, assignee = excluded.assignee, securityOwner = excluded.securityOwner,
     dueDate = excluded.dueDate, rejectReason = excluded.rejectReason,
     verifyRequestedAt = excluded.verifyRequestedAt, verifyRequestedBy = excluded.verifyRequestedBy,
-    resolvedAt = excluded.resolvedAt, snapshot = excluded.snapshot
+    resolvedAt = excluded.resolvedAt, snapshot = excluded.snapshot,
+    acceptUntil = excluded.acceptUntil, acceptedBy = excluded.acceptedBy
 `);
 const deleteStmt = db.prepare("DELETE FROM finding_approvals WHERE assetId = ? AND findingKey = ?");
 const setResolvedStmt = db.prepare("UPDATE finding_approvals SET status='approved', resolvedAt=@at WHERE assetId=@assetId AND findingKey=@findingKey");
@@ -121,6 +129,8 @@ function rowToReview(row: FindingApprovalRow, finding: StandardFinding, assetNam
     verifyRequestedAt: row.verifyRequestedAt ?? undefined,
     verifyRequestedBy: row.verifyRequestedBy ?? undefined,
     resolvedAt: row.resolvedAt ?? undefined,
+    acceptUntil: row.acceptUntil ?? undefined,
+    acceptedBy: row.acceptedBy ?? undefined,
     overdue: isOverdue(row.dueDate, row.status),
     gone,
   };
@@ -155,6 +165,8 @@ export function listFindingReviews(): FindingReview[] {
         verifyRequestedAt: row?.verifyRequestedAt ?? undefined,
         verifyRequestedBy: row?.verifyRequestedBy ?? undefined,
         resolvedAt: row?.resolvedAt ?? undefined,
+        acceptUntil: row?.acceptUntil ?? undefined,
+        acceptedBy: row?.acceptedBy ?? undefined,
         overdue: isOverdue(row?.dueDate, status),
         gone: false,
       });
@@ -165,7 +177,7 @@ export function listFindingReviews(): FindingReview[] {
   // 검증·진행중이던 것이 재스캔에서 사라졌으면 = 해결 확인 → 완료(approved)로 자동 확정한다(closed-loop).
   for (const row of allRowsStmt.all() as FindingApprovalRow[]) {
     if (seen.has(`${row.assetId}\0${row.findingKey}`)) continue;
-    if (!["in_progress", "verifying", "approved"].includes(row.status)) continue; // 미검토·반려는 사라지면 그냥 드롭
+    if (!["in_progress", "verifying", "approved", "accepted"].includes(row.status)) continue; // 미검토·반려는 사라지면 그냥 드롭
     let finding: StandardFinding;
     try {
       finding = row.snapshot ? (JSON.parse(row.snapshot) as StandardFinding) : { finding_type: "(내용 없음)", severity: "low", evidence: "", source_tool: "" };
@@ -173,7 +185,9 @@ export function listFindingReviews(): FindingReview[] {
       finding = { finding_type: "(내용 없음)", severity: "low", evidence: "", source_tool: "" };
     }
     let effective = { ...row };
-    if (row.status === "in_progress" || row.status === "verifying") {
+    if (row.status === "in_progress" || row.status === "verifying" || row.status === "accepted") {
+      // 수용 중이던 것도 재스캔에서 사라졌으면 해결된 것 — 없는 취약점의 수용 기한을
+      // 관리하는 것은 소음이다(closed-loop, 진행중·검증과 같은 규칙).
       const at = Date.now();
       setResolvedStmt.run({ assetId: row.assetId, findingKey: row.findingKey, at }); // 재스캔에서 사라짐 → 완료
       effective = { ...row, status: "approved", resolvedAt: at };
@@ -209,6 +223,9 @@ export function prioritizedReviews(limit = 10, assetIds?: string[]): Prioritized
     .filter((r) => isRealVulnerability(r.finding))
     // 오탐(rejected)과 조치완료(fixed)는 "오늘의 조치" 대상이 아니므로 제외한다.
     .filter((r) => r.status !== "rejected" && r.finding.state !== "fixed")
+    // 위험수용(accepted)은 기한 안이면 일감이 아니다 — 기한이 지나면 다시 부상한다
+    // (재검토 대상 — 감춰지는 게 아니라 「수용 만료」로 돌아온다. 승인 화면에는 늘 보인다).
+    .filter((r) => !(r.status === "accepted" && r.acceptUntil && r.acceptUntil >= new Date().toISOString().slice(0, 10)))
     .filter((r) => !scope || scope.has(r.assetId))
     .map((r) => ({ ...r, score: priorityScore(r.finding) }))
     .sort((a, b) => b.score - a.score)
@@ -283,6 +300,8 @@ export interface ApprovalSummary {
   verifying: number;
   approved: number; // 완료(해결·확정)
   rejected: number;
+  accepted: number; // 위험수용(기한부) — 일감은 아니지만 감춰지지 않는다
+  acceptExpired: number; // 수용 기한이 지나 재검토로 부상한 건
   overdue: number; // 기한 지난 미조치 건
   // 스캔이 실패해 결과를 못 받은 건수 — **취약점이 아니라 스캐너 문제**다.
   // 위 숫자들과 섞지 않고 따로 낸다. 0이 아니면 화면이 "스캔이 안 된 자산 N건"으로 안내한다.
@@ -294,16 +313,18 @@ export function approvalSummary(reviews: FindingReview[]): ApprovalSummary {
   //   화면에는 "검토 대기 602건"이 떴다. 실제 일감은 3건 — 담당자는 밀린 일이 602건인 줄 안다).
   //   감추지 않는다: scanFailed로 따로 세어 "스캔이 안 된 자산"이라는 다른 일감으로 보여준다.
   const 일감 = reviews.filter((r) => isRealVulnerability(r.finding));
-  const s: ApprovalSummary = { total: 일감.length, pending: 0, in_progress: 0, verifying: 0, approved: 0, rejected: 0, overdue: 0, scanFailed: reviews.length - 일감.length };
+  const s: ApprovalSummary = { total: 일감.length, pending: 0, in_progress: 0, verifying: 0, approved: 0, rejected: 0, accepted: 0, acceptExpired: 0, overdue: 0, scanFailed: reviews.length - 일감.length };
+  const 오늘 = new Date().toISOString().slice(0, 10);
   for (const r of 일감) {
     s[r.status]++;
     if (r.overdue) s.overdue++;
+    if (r.status === "accepted" && r.acceptUntil && r.acceptUntil < 오늘) s.acceptExpired++; // 수용 만료 — 재검토 대상
   }
   return s;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const VALID_STATUS: ApprovalStatus[] = ["pending", "in_progress", "verifying", "approved", "rejected"];
+const VALID_STATUS: ApprovalStatus[] = ["pending", "in_progress", "verifying", "approved", "rejected", "accepted"];
 const VALID_REJECT: RejectReason[] = ["false_positive", "compensating_control"];
 
 export interface ReviewPatch {
@@ -313,6 +334,7 @@ export interface ReviewPatch {
   securityOwner?: string; // 보안담당자(감독)
   dueDate?: string; // 'YYYY-MM-DD' 또는 ""(해제)
   rejectReason?: RejectReason | ""; // 반려 사유
+  acceptUntil?: string; // 위험수용 기한 'YYYY-MM-DD' — accepted로 갈 때 필수(영구 수용 금지)
 }
 
 // 저장 행에 남길 게 있는지 — pending이면서 담당·기한·메모·사유가 전부 비면 삭제(미검토·미배정 원복).
@@ -331,6 +353,9 @@ export function updateFindingReview(assetId: string, key: string, patch: ReviewP
   if (patch.rejectReason && !VALID_REJECT.includes(patch.rejectReason)) {
     throw new Error("rejectReason은 false_positive/compensating_control만 가능합니다");
   }
+  if (patch.acceptUntil && patch.acceptUntil !== "" && !DATE_RE.test(patch.acceptUntil)) {
+    throw new Error("acceptUntil은 'YYYY-MM-DD' 형식이어야 합니다");
+  }
   const prev = storedStatus(assetId, key);
   const status: ApprovalStatus = patch.status ?? prev?.status ?? "pending";
   const note = patch.note !== undefined ? (patch.note.trim() || null) : (prev?.note ?? null);
@@ -339,6 +364,15 @@ export function updateFindingReview(assetId: string, key: string, patch: ReviewP
   const dueDate = patch.dueDate !== undefined ? (patch.dueDate.trim() || null) : (prev?.dueDate ?? null);
   // 반려 사유는 반려 상태일 때만 유지 — 다른 상태로 넘어가면 비운다(오탐 사유가 완료건에 남지 않게).
   const rejectReason = status !== "rejected" ? null : (patch.rejectReason !== undefined ? (patch.rejectReason || null) : (prev?.rejectReason ?? null));
+  // 위험수용 기한·처리자 — accepted일 때만 산다(rejectReason과 같은 관례). 기한 없는 수용은
+  // 영구 수용이라 금지(ISO 27005·NIST RMF — 위험수용은 반드시 재검토 주기를 갖는다).
+  // 사유(note)도 필수 — 「왜 수용했나」가 없으면 감사에서 답할 수 없다.
+  const acceptUntil = status !== "accepted" ? null : (patch.acceptUntil !== undefined ? (patch.acceptUntil.trim() || null) : (prev?.acceptUntil ?? null));
+  const acceptedBy = status !== "accepted" ? null : (prev?.status === "accepted" ? (prev?.acceptedBy ?? actor) : actor);
+  if (status === "accepted") {
+    if (!acceptUntil) throw new Error("위험수용에는 기한(acceptUntil, 'YYYY-MM-DD')이 필수입니다 — 기한 없는 수용은 영구 수용이라 허용하지 않습니다");
+    if (!note) throw new Error("위험수용에는 사유(note)가 필수입니다 — 왜 수용하는지 없이는 감사에 답할 수 없습니다");
+  }
 
   if (isEmptyReview(status, note, assignee, securityOwner, dueDate)) {
     deleteStmt.run(assetId, key);
@@ -367,6 +401,7 @@ export function updateFindingReview(assetId: string, key: string, patch: ReviewP
   upsertStmt.run({
     assetId, findingKey: key, status, reviewedBy: actor, reviewedAt: Date.now(),
     note, assignee, securityOwner, dueDate, rejectReason, verifyRequestedAt, verifyRequestedBy, resolvedAt, snapshot,
+    acceptUntil, acceptedBy,
   });
 }
 
@@ -421,7 +456,7 @@ export function registerApprovalsRoutes(app: Express): void {
       updateFindingReview(
         String(req.params.assetId),
         String(req.params.key),
-        { status: body.status, note: body.note, assignee: body.assignee, securityOwner: body.securityOwner, dueDate: body.dueDate, rejectReason: body.rejectReason },
+        { status: body.status, note: body.note, assignee: body.assignee, securityOwner: body.securityOwner, dueDate: body.dueDate, rejectReason: body.rejectReason, acceptUntil: body.acceptUntil },
         user?.displayName ?? "-"
       );
       res.json({ ok: true });
