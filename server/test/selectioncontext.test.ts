@@ -181,3 +181,31 @@ describe("조치·승인 화면이 고른 항목을 대화창에 넘긴다", () 
     expect(ap, "한글 한 줄(plain)을 안 싣는다").toMatch(/plain:\s*f\.plain/);
   });
 });
+
+// ── 고른 항목 카드(승인 시안 mockups/조치항목_대화창 — 2026-08-19 구현) ──────────
+// 클릭 → 카드가 대화에 쌓이고 → 이어서 할 일은 제안 칩 → 기존 submit → 기존 결재판.
+// 「만들어만 두고 안 부르면 안 된다」가 이 저장소의 반복 함정이라, 배선을 소스로 잠근다.
+describe("고른 항목 카드 — 클릭이 대화창에서 이어진다", () => {
+  const fs = require("node:fs") as typeof import("node:fs");
+  const 콘솔 = fs.readFileSync(new URL("../../client/src/renderer/pages/console.js", import.meta.url), "utf8");
+  const 승인 = fs.readFileSync(new URL("../../client/src/renderer/pages/approvals.html", import.meta.url), "utf8");
+
+  it("★★ 화면(조치·승인)이 fields를 실어 보낸다 — 카드의 원료", () => {
+    expect(승인).toContain("gijo:select");
+    expect(승인).toMatch(/const fields = \{/);
+    expect(승인, "postMessage에 fields가 실려야 카드가 그린다").toMatch(/postMessage\(\{[^}]*fields/);
+  });
+  it("★★ setSelection이 fields가 오면 카드를 붙인다", () => {
+    expect(콘솔).toMatch(/if \(sel\.fields\) 선택카드\(sel\.fields\)/);
+  });
+  it("★ 제안 칩은 기존 submit으로만 나간다 — 새 입력칸을 만들지 않는다(시안 핵심 결정 3)", () => {
+    const i = 콘솔.indexOf("function 선택카드(");
+    expect(i).toBeGreaterThan(0);
+    const 본문 = 콘솔.slice(i, i + 2600);
+    expect(본문).toContain("submit(q)");
+    expect(본문, "카드 안에 입력칸이 생기면 「지시는 대화창 입력줄 하나」 원칙이 깨진다").not.toMatch(/<input|<textarea/i);
+  });
+  it("같은 항목 연타에 카드를 도배하지 않는다", () => {
+    expect(콘솔).toContain("선택카드.직전");
+  });
+});

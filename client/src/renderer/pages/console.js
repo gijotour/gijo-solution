@@ -1051,10 +1051,51 @@
     sel = s && s.label && s.text ? s : null;
     var el = document.getElementById("csSel");
     if (!el) return;
-    if (!sel) { el.style.display = "none"; el.innerHTML = ""; renderSelState(); return; }
+    if (!sel) { el.style.display = "none"; el.innerHTML = ""; renderSelState(); 선택카드.직전 = null; return; }
     el.style.display = "";
     el.innerHTML = "📌 " + esc(sel.label) + ' <span class="x" title="선택을 풉니다">✕</span>';
     renderSelState();
+    if (sel.fields) 선택카드(sel.fields);
+  }
+
+  /** 고른 항목 카드 — 대화 기록에 쌓인다(승인 시안 mockups/조치항목_대화창, 2026-08-19 구현).
+   *  fields를 보내는 화면(조치·승인)에서만 뜬다 — 다른 화면은 지금처럼 📌 칩뿐(무변경 호환).
+   *  이어서 할 일은 **제안 칩 → 기존 submit → 기존 결재판**으로만 나간다 —
+   *  새 입력칸도, 결재판을 대신할 새 승인 장치도 만들지 않는다(시안 핵심 결정 3). */
+  function 선택카드(f) {
+    var 키 = (f.asset || "") + "|" + (f.title || "");
+    if (선택카드.직전 === 키) return; // 같은 항목 연타에 카드를 도배하지 않는다
+    선택카드.직전 = 키;
+    var el = append("event", { icon: "🎯", name: "고른 항목", message: "", full: true });
+    var cb = el.querySelector(".cb");
+    if (!cb) return;
+    var 태그 = (f.kev ? "🚨 " + esc(f.kev) + " · " : "") + (f.severity ? esc(f.severity) + " · " : "");
+    var 아래 = [f.status, f.owner ? "담당 " + f.owner : "담당 미배정", f.due ? "기한 " + f.due : ""]
+      .filter(Boolean).map(esc).join(" · ");
+    var cm = cb.querySelector(".cm");
+    if (cm) cm.innerHTML =
+      (f.asset ? '<div style="color:var(--muted-2,#a49d95);font-size:12px">' + esc(f.asset) + "</div>" : "") +
+      "<div><b>" + 태그 + esc(f.title || "") + "</b></div>" +
+      (아래 ? '<div style="color:var(--muted,#b3ada4);font-size:12.25px">' + 아래 + "</div>" : "") +
+      // esc 먼저, 굵게 나중 — 순서가 바뀌면 주입 구멍(renderSelState와 같은 규칙).
+      (f.plain ? "<div>→ " + esc(f.plain).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") + "</div>" : "");
+    // 제안 칩 — 완성된 지시 문장(누르는 버튼, 새 입력칸 아님). 「이거」는 선택인자로 함께 간다.
+    var 칩들 = [
+      "이거 쉽게 설명해줘",
+      f.owner ? "이거 조치 완료 처리해줘" : "이거 담당자 배정해줘",
+      "이거 반려할게",
+    ];
+    var 줄 = document.createElement("div");
+    줄.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-top:7px";
+    칩들.forEach(function (q) {
+      var b = document.createElement("span");
+      b.className = "cs-chip";
+      b.textContent = q;
+      b.title = "누르면 이 지시가 그대로 나갑니다 — 바꾸는 일은 결재판 승인 후에만 실행됩니다";
+      b.addEventListener("click", function () { submit(q); });
+      줄.appendChild(b);
+    });
+    cb.appendChild(줄);
   }
 
   // ── 🗂 지금 범위(승인 시안 mockups/자산_0단계, 2026-08-18) ─────────────────────
