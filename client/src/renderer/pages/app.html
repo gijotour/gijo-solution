@@ -506,21 +506,21 @@
       //   ① 그 화면이 이미 도킹돼 있다 → 그 패널만 다시 보인다.
       //   ② 이미 팝업으로 떠 있다 → openShellPopout이 기존 창을 포커스한다(main.ts 기존 동작).
       //   ③ 도킹 슬롯(1개)이 다른 화면으로 차 있다 → 팝업으로 연다(탭 부활 금지).
-      //   ④ 내부 폭 < 1400px → 무조건 팝업. ★기억보다 먼저다 — 세로 모니터 「644+380 스퀴즈」
-      //      재발을 막는 절대 하한(사장님 실측이 이 제품이 팝업을 택한 이유였다).
-      //   ⑤ 기억된 선택이 「팝업」 → 팝업. ⑥ 그 외 → 도킹(아래 표준 탭 경로로 흘려보낸다 —
-      //      tabs[]에 실려야 대화 맥락·범위 배관이 표준과 같은 출처를 쓴다. 시안 §10-1).
+      //   ④ 내부 폭 < 1400px → 팝업(물리 제약 — 세로 모니터 「644+380 스퀴즈」 절대 하한).
+      //   ⑤ 그 외 → 도킹(아래 표준 탭 경로로 흘려보낸다 — tabs[]에 실려야 대화 맥락·범위
+      //      배관이 표준과 같은 출처를 쓴다. 시안 §10-1).
+      //   ⚠ 「기억=popup이면 팝업」 규칙은 2026-08-19 사장님 QA 지시로 폐지 — 한 번 ⧉로 뺀
+      //     화면이 영영 팝업으로 열려 「메뉴에서 고르면 왼쪽에 붙는다」는 기대가 깨졌다.
+      //     팝업은 ⧉를 누른 그 창뿐이고, 닫으면 다음 열기는 다시 도킹이 기본이다.
       var 도킹중 = tabs[0] || null;
       if (도킹중 && 도킹중.page === page) { show(page); 대화홈갱신(); return; }            // ①
       if (도킹중) { window.gijo.openShellPopout(page, label || undefined); 대화홈갱신(); return; } // ③(②는 main이 처리)
-      var 기억 = null;
-      try { 기억 = localStorage.getItem("gijo:pro:dockpref:v1"); } catch (e) { }
-      if ((window.innerWidth - 56) < 1400 || 기억 === "popup") {                            // ④·⑤
+      if ((window.innerWidth - 56) < 1400) {                                                // ④
         window.gijo.openShellPopout(page, label || undefined);
         대화홈갱신();
         return;
       }
-      // ⑥ 도킹 — return하지 않고 아래 표준 탭 생성 경로를 그대로 탄다.
+      // ⑤ 도킹 — return하지 않고 아래 표준 탭 생성 경로를 그대로 탄다.
     }
     // ⚠ 이름이 없으면 **사이드바에서 찾는다** — 없다고 파일명을 사람에게 보이면 안 된다
     //   (2026-08-18 사장님 QA: 탭에 `discover.html?p…`). 자세한 사정은 화면이름찾기 주석.
@@ -618,6 +618,44 @@
     document.body.classList.toggle("console-popped", popped);
     try { localStorage.setItem("gijo:console:popped", popped ? "1" : "0"); } catch (e) {}
     if (popped) setCtx(active ? active.label : null); // 창에 지금 맥락을 즉시 알린다
+    빈본창안내();
+  }
+
+  // QA ⑥(2026-08-19 사장님 스크린샷) — 화면·대화창을 전부 창으로 빼면 본창이 통째로 비어
+  // 「다음에 뭘 눌러야 하는지」를 화면이 말하지 않았다(위 269줄 주석은 안내를 약속만 하고
+  // 요소가 없었다 — 약속-코드 불일치). 빈 상태를 남기지 않는다: VS Code 빈 편집영역·브라우저
+  // 새 탭처럼, 그 자리에서 할 수 있는 행동을 보여준다. 마지막 창 빼기를 막는 길은 기각 —
+  // 듀얼 모니터에 다 빼놓고 쓰는 방식(사장님 시나리오)을 막게 된다.
+  function 빈본창안내() {
+    var scr = document.getElementById("screens");
+    if (!scr) return;
+    var 빈가 = popped && tabs.length === 0;
+    var el = document.getElementById("emptyShellGuide");
+    if (!빈가) { if (el) el.remove(); return; }
+    if (el) return;
+    el = document.createElement("div");
+    el.id = "emptyShellGuide";
+    el.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;";
+    el.innerHTML =
+      '<div style="text-align:center;max-width:440px;padding:26px 30px;border:1px solid rgba(255,255,255,.12);' +
+      'border-radius:12px;background:var(--panel-2,#1f1e1d);">' +
+      '<div style="font-size:15px;font-weight:800;margin-bottom:8px">🗔 모든 화면이 별도 창에 나가 있습니다</div>' +
+      '<div style="font-size:12.5px;color:var(--muted,#b3ada4);line-height:1.6;margin-bottom:14px">' +
+      '본창은 비어 있습니다 — 아래에서 이어 가거나, 대화 창의 <b>⇤ 앱에 붙이기</b>로 대화를 되가져올 수 있습니다.</div>' +
+      '<div style="display:flex;gap:8px;justify-content:center">' +
+      '<button class="tb-btn" id="esgMenu">☰ 메뉴에서 화면 열기</button>' +
+      '<button class="tb-btn" id="esgWins">🗔 열린 창 목록</button>' +
+      "</div></div>";
+    scr.appendChild(el);
+    var m = el.querySelector("#esgMenu");
+    if (m) m.addEventListener("click", function () {
+      var r = document.getElementById("railMenu");
+      if (r) r.click();
+    });
+    var w = el.querySelector("#esgWins");
+    if (w) w.addEventListener("click", function () {
+      if (window.gijoOpenWinPop) window.gijoOpenWinPop();
+    });
   }
   window.gijoConsoleHidden = setPopped; // console.js가 '창으로' 눌렀을 때 셸에 알린다
 
@@ -756,14 +794,17 @@
       var 붙일 = String(d.page || "").split(/[\\/]/).pop().slice(0, 80);
       if (!/^[\w.-]+\.html$/.test(붙일)) return; // 파일명 꼴만 — iframe發 값을 그대로 믿지 않는다
       if ((window.innerWidth - 56) < 1400) {
-        gijoTell("화면 폭이 좁아 붙일 수 없습니다 — 세로 모니터에서는 창으로 쓰는 것이 규칙입니다(1400px 필요).");
+        // QA ⑦(2026-08-19): 전엔 「세로 모니터에서는…」라고 원인을 지어 말했고 길도 안 줬다 —
+        // 사장님은 가로 모니터에서 본창을 반으로 줄여 쓰는 중이었다. 사실(지금 폭)과 길을 준다.
+        gijoTell("본창 폭이 좁아 붙일 수 없습니다 — 도킹에는 내부 1400px이 필요한데 지금 " +
+          Math.max(0, window.innerWidth - 56) + "px입니다.\n\n본창을 최대화하거나 넓힌 뒤 다시 ⇤를 누르면 붙습니다. " +
+          "세로 모니터라면 창으로 쓰는 것을 권합니다.");
         return;
       }
       if (tabs[0] && tabs[0].page !== 붙일) {
         gijoTell("이미 「" + (tabs[0].label || "다른 화면") + "」이 도킹돼 있습니다 — 그쪽을 닫고 다시 시도하세요.");
         return;
       }
-      try { localStorage.setItem("gijo:pro:dockpref:v1", "dock"); } catch (e) { }
       if (window.gijo.closeShellPopout) window.gijo.closeShellPopout(붙일);
       open(붙일, String(d.label || "").slice(0, 40) || undefined);
       return;
@@ -997,6 +1038,7 @@
 
   // 열린 탭이 없으면 「대화 홈」(대화만) — 있으면 캔버스가 옆에 선다.
   function 대화홈갱신() {
+    빈본창안내(); // 탭이 늘고 줄 때마다 — 빈 본창 안내는 표준·프로 공통(QA ⑥)
     if (!프로인가()) return;
     document.body.classList.toggle("chat-home", tabs.length === 0);
     // 🚀 도킹 패널 머리(승인 시안 §10-1) — 탭줄이 프로에서 숨겨져 있으므로(P2) 도킹된 화면의
@@ -1019,7 +1061,6 @@
       head.querySelector("#dockPop").addEventListener("click", function () {
         var t = tabs[0];
         if (!t) return;
-        try { localStorage.setItem("gijo:pro:dockpref:v1", "popup"); } catch (e) { }
         window.gijo.openShellPopout(t.page, t.label || undefined);
         close(t.page, true);
         대화홈갱신();
