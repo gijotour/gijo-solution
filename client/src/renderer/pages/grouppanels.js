@@ -48,13 +48,15 @@
         return window.gijo.listCtiFindings().then(function (fs) {
           fs = fs || [];
           var 셈 = function (k) { return fs.filter(function (f) { return f.severity === k; }).length; };
+          // 샘플(데모) 시드를 실적과 갈라 적는다 — 첫 화면 판에서 「위협 5건」으로 읽히면 거짓이다(2026-08-19).
+          var 샘플 = fs.filter(function (f) { return f.source === "샘플(데모)"; }).length;
           return {
             segments: [
               { key: "critical", label: "긴급", value: 셈("critical"), color: R },
               { key: "warning", label: "주의", value: 셈("warning"), color: A },
               { key: "info", label: "정보", value: 셈("info"), color: G },
             ],
-            foot: "전체 " + n(fs.length) + "건",
+            foot: 샘플 ? "실탐지 " + n(fs.length - 샘플) + "건 · 샘플 " + n(샘플) + "건" : "전체 " + n(fs.length) + "건",
           };
         });
       } },

@@ -585,6 +585,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </label>
       <button class="btn-primary" id="saveSmtpBtn">저장</button>
       <div class="status-line" id="smtpStatusLine"></div>
+
+      <!-- 정기 알림 상태(2026-08-19 신설) — 서버는 07-29부터 이 데이터를 줬는데 그리는 화면이
+           0곳이라, 알림이 왜 안 왔는지 챗봇에 물어야만 알 수 있었다. 등록·변경은 대화창에서
+           한다(「매일 아침 8시에 브리핑 메일 보내줘」) — 여기는 상태만 본다(메뉴는 보기용). -->
+      <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:6px">📧 정기 알림 상태</div>
+        <div id="alertSchedList" style="font-size:12.5px;color:var(--muted);line-height:1.8">불러오는 중…</div>
+        <div style="font-size:12px;color:var(--muted-2);margin-top:6px">등록·변경은 대화창에서 — 예: "매일 아침 8시에 브리핑 메일 보내줘"</div>
+      </div>
     </div>
 
     <div data-sec="link" class="panel" id="smtpInboundPanel" style="display:none">
@@ -1657,6 +1666,31 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         ? "설정됨 — 변경하지 않으려면 비워두세요"
         : "변경하지 않으려면 비워두세요";
     } catch (e) {}
+    loadAlertSchedules(); // 정기 알림 상태 — SMTP와 같은 판에서 함께 읽는다(2026-08-19)
+  }
+
+  // 정기 알림(메일) 상태 — 등록은 대화창 도구가 하고 여기는 상태만 그린다.
+  // 실패(lastError)를 보이는 것이 이 카드의 존재 이유다 — 데이터는 서버에 늘 있었는데 그릴 자리가 없었다.
+  async function loadAlertSchedules() {
+    const box = document.getElementById("alertSchedList");
+    if (!box) return;
+    try {
+      const { entries, kinds } = await window.gijo.listAlertSchedules();
+      if (!entries || !entries.length) {
+        box.innerHTML = '<span style="color:var(--muted-2)">등록된 정기 알림이 없습니다.</span>';
+        return;
+      }
+      box.innerHTML = entries.map((s) => {
+        const 이름 = (kinds && kinds[s.kind]) || s.kind;
+        const 최근 = !s.lastRunAt ? "아직 실행 전"
+          : s.lastResult === "error" ? `<span style="color:var(--amber)">✕ 실패 — ${esc(s.lastError || "원인 미상")}</span>`
+          : s.lastResult === "skipped" ? "보낼 내용 없어 건너뜀"
+          : "✓ 발송됨";
+        return `<div>${s.enabled ? "🟢" : "⚪"} <b style="color:var(--text)">${esc(이름)}</b> · 매일 ${s.hourLocal}시 · ${esc(s.recipients)} — ${최근}</div>`;
+      }).join("");
+    } catch (e) {
+      box.innerHTML = '<span style="color:var(--muted-2)">상태를 불러오지 못했습니다.</span>';
+    }
   }
 
   async function saveSmtp() {

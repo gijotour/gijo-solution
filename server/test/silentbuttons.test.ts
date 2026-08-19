@@ -14,7 +14,8 @@ const pagesDir = new URL("../../client/src/renderer/pages/", import.meta.url);
 
 // 고쳐 둔 자리 — 여기서 안내 문구가 사라지면 다시 조용해진다.
 const 지킬자리: { 파일: string; 함수: string; 안내: RegExp }[] = [
-  { 파일: "terminal.html", 함수: "askChatbot", 안내: /먼저 하고 싶은 일을 적어/ },
+  // terminal.html askChatbot은 2026-08-19에 칸째 제거됐다(미니 챗봇 정리 — 자연어는 대화 위젯이 맡는다).
+  { 파일: "maintenance.html", 함수: "kbQuery", 안내: /먼저 찾을 내용을 적어/ },
   { 파일: "memory.html", 함수: "ingest", 안내: /먼저 가져올 폴더나 파일 경로/ },
   { 파일: "memory.html", 함수: "convertDataset", 안내: /먼저 변환할 원문을 넣어/ },
 ];

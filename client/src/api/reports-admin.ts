@@ -54,6 +54,23 @@ export const smtpInboundApi = {
   getStatus: () => request<SmtpInboundStatus>("/api/smtp-inbound/status"),
 };
 
+// ── 정기 알림(메일) 상태 — 등록·변경은 대화창 도구가 하고, 화면은 상태만 본다(2026-08-19).
+//    서버는 이 API를 07-29부터 갖고 있었는데 그리는 화면이 0곳이라 「알림이 왜 안 왔지」를
+//    챗봇에 물어야만 알 수 있었다.
+export interface AlertScheduleRow {
+  id: string;
+  kind: string;
+  hourLocal: number;
+  recipients: string;
+  enabled: number;
+  lastRunAt: number | null;
+  lastResult: string | null; // sent | skipped | error
+  lastError: string | null;
+}
+export const alertScheduleApi = {
+  list: () => request<{ entries: AlertScheduleRow[]; kinds: Record<string, string>; summary: string }>("/api/alert-schedules"),
+};
+
 // 법령·판례 조회(법제처 OPEN API). 인증키는 서버가 암호화 보관하고 돌려주지 않는다 — 켜짐/꺼짐만 온다.
 // 신청 도메인은 비밀이 아니라 그대로 온다(담당자가 맞게 넣었는지 화면에서 봐야 하기 때문).
 export interface LawConfig { enabled: boolean; hasKey?: boolean; domain?: string; updatedAt: number | null }

@@ -210,6 +210,17 @@ describe("에어갭 관문 — globalThis.fetch를 봉인한다", () => {
 
       await globalThis.fetch("http://127.0.0.1:8081/health"); // 내부는 통과
       expect(stub).toHaveBeenCalledTimes(1);
+
+      // ★ 리다이렉트 금지(2026-08-19 검토 지적). 검사는 첫 URL에만 걸리므로, 내부 호스트가
+      //   302로 외부를 가리키면 follow가 재검사 없이 따라나간다 — 관문은 3xx 자체를 막아야 한다.
+      const 첫인자 = stub.mock.calls[0];
+      expect((첫인자[1] as RequestInit | undefined)?.redirect, "관문이 redirect:error를 강제하지 않는다 — 내부 302가 외부로 새는 길이 열려 있다").toBe("error");
+
+      // Request 객체로 불러도 같아야 한다 — Request 자체의 redirect가 init보다 우선하기 때문.
+      await globalThis.fetch(new Request("http://127.0.0.1:8081/x", { redirect: "follow" }));
+      const 둘째 = stub.mock.calls[1];
+      expect((둘째[0] as Request).redirect, "Request로 부르면 자체 redirect:follow가 살아남는다").toBe("error");
+      expect((둘째[1] as RequestInit | undefined)?.redirect).toBe("error");
     } finally {
       globalThis.fetch = realFetch;
       vi.unstubAllEnvs();

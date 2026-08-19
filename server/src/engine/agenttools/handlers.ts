@@ -2242,7 +2242,10 @@ export function runHardeningScheduleList(): string {
   const fmt = (t: number | null) => (t ? new Date(t).toLocaleString("ko-KR") : "-");
   const lines = rows.map((r) => {
     const state = r.enabled ? "가동" : "중지";
-    const last = r.lastRunAt ? `최근 ${fmt(r.lastRunAt)} · 준수율 ${r.lastRate ?? "-"}%${r.lastFail ? ` · 취약 ${r.lastFail}건` : ""}` : "아직 실행 전";
+    // 지난 실행이 실패였으면 그것부터 말한다 — 옛 성공 준수율만 말하면 몇 주째 안 도는 점검이 건강해 보인다(2026-08-19).
+    const last = r.lastResult === "fail"
+      ? `최근 ${fmt(r.lastRunAt)} ✕ 실패(${r.lastError || "원인 미상"}) — 표시 준수율은 그전 성공값`
+      : r.lastRunAt ? `최근 ${fmt(r.lastRunAt)} · 준수율 ${r.lastRate ?? "-"}%${r.lastFail ? ` · 취약 ${r.lastFail}건` : ""}` : "아직 실행 전";
     return `- ${r.targetLabel} — ${r.standard.toUpperCase()} 기준 · ${r.intervalHours}시간마다 · ${state} · 다음 ${fmt(r.nextRunAt)} (${last})`;
   });
   const on = rows.filter((r) => r.enabled).length;

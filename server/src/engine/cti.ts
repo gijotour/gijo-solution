@@ -15,6 +15,9 @@ export interface CtiFeedPublic {
   name: string;
   hasApiKey: boolean;
   connected: boolean;
+  /** 이 벤더의 실수집 어댑터가 있는가. connected(=키 등록됨)와 다르다 —
+   *  키만 있고 어댑터가 없으면 아무것도 안 가져오는데 「연결됨」으로 보이던 결함(2026-08-19). */
+  collects: boolean;
   planned?: boolean; // 지원 예정 벤더 — 키 설정 불가, UI에는 로드맵 안내용으로만 노출
 }
 
@@ -65,7 +68,14 @@ const getStmt = db.prepare("SELECT * FROM cti_feeds WHERE id = ?");
 const updateStmt = db.prepare("UPDATE cti_feeds SET encryptedApiKey = ?, connected = ? WHERE id = ?");
 
 function toPublic(row: CtiFeedRow): CtiFeedPublic {
-  return { id: row.id, name: row.name, hasApiKey: row.encryptedApiKey !== null, connected: row.connected === 1 };
+  return {
+    id: row.id,
+    name: row.name,
+    hasApiKey: row.encryptedApiKey !== null,
+    connected: row.connected === 1,
+    // FEED_ADAPTERS는 아래에서 선언되지만 toPublic은 호출 시점에 실행되므로 안전하다.
+    collects: FEED_ADAPTERS[row.id] !== undefined,
+  };
 }
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
@@ -82,6 +92,7 @@ export function listFeeds(): CtiFeedPublic[] {
     name: f.name,
     hasApiKey: false,
     connected: false,
+    collects: false,
     planned: true,
   }));
   return [...real, ...planned];

@@ -824,6 +824,14 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     return `<span>~${new Date(task.dueAt).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}</span>`;
   }
 
+  // 한 버튼이 상태에 따라 다른 일을 하면 라벨도 그 일을 말해야 한다(2026-08-19 결함 수리).
+  // 예전엔 늘 「운영 시작」이라, 빌 때 눌러 루틴이 채워지는 것을 예측할 수 없었다.
+  function CTA라벨() {
+    if (ctaBtn.dataset.hold) return; // 알림이 버튼 글자를 잡고 있는 동안은 덮지 않는다
+    const 오늘것 = allTasks.filter((t) => !t.done && isToday(t)).length;
+    ctaBtn.textContent = 오늘것 ? "▶ 운영 시작 — 최우선 할 일을 대화창에 지시" : "▶ 오늘 루틴 담기 — AI 추천으로 채우기";
+  }
+
   function renderTasks() {
     const open = allTasks.filter((t) => !t.done);
     const today = open.filter(isToday).sort((a, b) => {
@@ -853,8 +861,9 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
         (first.dueAt && first.dueAt < Date.now() ? ' <span style="color:#f5928a;font-weight:700">— 기한이 지났습니다</span>'
           : first.dueAt && first.dueAt <= endOfToday() ? ' <span style="color:var(--amber,#f0a020);font-weight:700">— 오늘 기한</span>' : "");
     } else nowBox.style.display = "none";
+    CTA라벨();
     if (!today.length) {
-      myTasks.innerHTML = '<div class="t-empty">오늘 처리할 일이 없어요 — 위에 직접 추가하거나, 아래 <b>운영 시작</b>을 누르면 AI 팀이 오늘의 루틴으로 채워줘요 📌</div>'
+      myTasks.innerHTML = '<div class="t-empty">오늘 처리할 일이 없어요 — 위에 직접 추가하거나, 아래 <b>오늘 루틴 담기</b>를 누르면 AI 추천 루틴으로 채워져요 📌</div>'
         + (later > 0 ? `<div class="t-more">이후 기한 할일 ${later}건은 에이전트 AI 페이지에서</div>` : "");
       return;
     }
@@ -902,6 +911,14 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       } else if (e.target.matches(".t-del")) {
         await window.gijo.deleteTask(id);
         await loadTasks();
+      } else if (e.target.closest(".t-text")) {
+        // 글자 클릭 = 선택 — 대시보드와 같은 동작(2026-08-19 결함 수리: 화면마다 다르면 못 믿는다).
+        // 이 창은 별도 창이라 window.top이 자기 자신 — postMessage 대신 IPC 다리로 본창에 보낸다.
+        const t = allTasks.find((x) => x.id === id);
+        if (t && t.text && window.gijo && window.gijo.bridgeToShell) {
+          window.gijo.bridgeToShell({ type: "gijo:select", label: t.text.slice(0, 40), text: "할 일 " + t.text });
+          알림(document.querySelector(".todo .t-head"), "→ 본창 대화창에 「이거」로 담겼습니다", "", 6000);
+        }
       }
     } catch (err) { 알림(document.querySelector(".todo .t-head"), "⚠ 할일 처리에 실패했습니다", "☑ 오늘의 할일", 15000); }
   });
@@ -942,7 +959,8 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     } finally {
       ctaBtn.disabled = false;
       // 알림()이 잡고 있는 동안은 글자를 되돌리지 않는다 — 안 그러면 알림이 뜨자마자 지워진다.
-      if (!ctaBtn.dataset.hold) ctaBtn.textContent = orig;
+      // 되돌릴 때도 옛 글자(orig)가 아니라 지금 상태의 라벨로 — 루틴을 담았으면 할 일이 생겼다.
+      if (!ctaBtn.dataset.hold) CTA라벨();
     }
   });
 

@@ -156,26 +156,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div id="kbUploadStatus" class="ops-hint"></div>
 
       <div class="kb-search-row">
-        <input id="kbQueryInput" placeholder="예: 방화벽 정책 점검 절차는?">
+        <!-- 질문형 placeholder를 검색형으로(2026-08-19) — 여기는 문서 조각 검색이지 AI 질의창이 아니다.
+             질문처럼 보이면 대화창과 경쟁하는 「미니 챗봇」으로 오해된다. -->
+        <input id="kbQueryInput" placeholder="문서 안에서 낱말 찾기 (예: 방화벽 정책)">
         <button id="kbQueryBtn">검색</button>
       </div>
       <div id="kbQueryResults" class="docsearch-results" style="display:none"></div>
     </div>
 
-    <!-- 옮겨 온 코드가 채우는 점검 KPI — 접기 배지도 이 값을 읽는다(kpiOverdue·kpiPending).
-         ⚠ 이 칸이 없으면 초기화가 여기서 멈추고 **아래 목록이 영영 "불러오는 중"**이 된다. -->
-    <div class="sum" data-gijo-summary style="margin-bottom:12px">
-      <div class="sum-card"><div class="l">전체</div><div class="v" id="kpiTotal">-</div></div>
-      <div class="sum-card"><div class="l">지연</div><div class="v" id="kpiOverdue">-</div></div>
-      <div class="sum-card"><div class="l">승인 대기</div><div class="v" id="kpiPending">-</div></div>
-      <div class="sum-card"><div class="l">승인됨</div><div class="v" id="kpiApproved">-</div></div>
-      <div class="sum-card"><div class="l">준수율</div><div class="v" id="kpiRate">-</div></div>
-    </div>
-    <div class="cat" data-gijo-fold="유지보수 일정 · 점검서 · 승인" data-gijo-fold-badges="kpiOverdue:지연:hot, kpiPending:대기:warn">
-      <div class="cat-head"><span style="font-size:18px">🔧</span><span class="cat-title">② 유지보수 일정 · 점검서 · 승인</span></div>
-      <div class="cat-intro">점검 일정을 등록하고, 마감이 되면 결과를 보고하세요. 관리자가 승인하면 완료되고(반복주기가 있으면 다음 회차가 자동 등록), 반려되면 사유와 함께 다시 보고해야 합니다.</div>
-
-      <div id="kpiByProduct" style="font-size:12.5px;color:var(--muted);margin-bottom:16px;line-height:1.9;"></div>
+    <!-- ② 이중 렌더 제거(2026-08-19 결함 수리) — 옛 화면의 점검 카드 목록·KPI 5칸·제품 좁히기 띠가
+         위의 새 표와 **같은 데이터를 두 번** 그리고 있었다(08-02 통합 미완). 승인·반려·점검서·기록은
+         위 표가 전부 하므로 옛 목록을 걷어냈다. 남긴 것: 일정 추가 폼·지연 메일(이 구역만의 기능). -->
+    <div class="cat" data-gijo-fold="점검 일정 추가 · 지연 알림">
+      <div class="cat-head"><span style="font-size:18px">🔧</span><span class="cat-title">② 점검 일정 추가 · 지연 알림</span></div>
+      <div class="cat-intro">여기서 일정을 추가하면 위 목록에 바로 나타납니다. 점검서 제출·승인·반려는 위 목록의 단추로 합니다.</div>
 
       <!-- 지연/마감 점검 이메일 알림 — 기존 SMTP 설정(설정 화면) 재사용. -->
       <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -200,16 +194,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <button type="submit">+ 일정 추가</button>
       </form>
 
-      <!-- 제품 좁히기 띠 — 보안제품 등록부에서 "이 제품의 점검"을 눌러 들어왔을 때만 나타난다.
-           좁혀진 줄 모르면 "왜 몇 건밖에 없지?"가 된다(2026-07-31). -->
-      <div id="opsScope" style="display:none;align-items:center;gap:8px;background:rgba(59,130,246,.10);
-        border:1px solid rgba(59,130,246,.32);border-radius:9px;padding:7px 11px;margin-bottom:10px;
-        font-size:12px;color:var(--blue-light)">
-        <span id="opsScopeText"></span>
-        <span id="opsScopeAll" style="margin-left:auto;font-size:12.25px;font-weight:700;color:var(--muted);
-          cursor:pointer;border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:3px 9px">전체 보기 ✕</span>
-      </div>
-      <div id="maintList" class="maint-list"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
     </div>
   </div>
 </div>
@@ -513,6 +497,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       관리자 = !!me && (me.role === "admin" || me.isAdmin === true);
     } catch (e) {}
     await 불러오기();
+    // 보안제품 등록부의 「이 제품의 점검」 진입(?product=) — 옛 카드 목록이 하던 좁히기를
+    // 새 표가 이어받는다(2026-08-19 이중 렌더 제거). 이름 표기가 조금 달라도 맞게 느슨 대조.
+    try {
+      var 제품쿼리 = new URLSearchParams(location.search).get("product");
+      if (제품쿼리) {
+        var 눌러 = function (t) { return (String(t || "").toLowerCase().match(/[a-z0-9가-힣]+/g) || []).join(""); };
+        var 맞는것 = 항목.filter(function (m) { return 눌러(m.productName) === 눌러(제품쿼리); })[0];
+        제품필터 = 맞는것 ? 맞는것.productName : 제품쿼리;
+        다시그리기();
+      }
+    } catch (e) {}
+    // 아래 「일정 추가」 폼(별도 IIFE)이 등록을 마치면 이 이벤트로 알린다.
+    window.addEventListener("gijo:maint-refresh", function () { 불러오기(); });
   })();
 
   // ── 제품 유지보수(옛 화면)에서 옮겨 온 부분 — 2026-08-02 통합 ─────────────
@@ -525,24 +522,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   //   없다. 처음엔 "없으면 그냥 넘어가게" 감싸 두었는데, 그건 죽은 코드를 남겨 두는 것이라
   //   나중에 이 자리에 통보를 적으면 **아무에게도 안 보인다**(deadelements 시험이 잡아냈다).
   //   시계·서버 상태·프로필은 이제 상단 바가 화면 하나로 보여 준다.
-  let currentUser = null;
-
-  async function loadUser() {
-    // 화면 그리기(maintRowHtml)가 role로 승인 버튼을 켜고 끄므로 이 값은 여전히 필요하다.
-    try { currentUser = await window.gijo.me(); } catch (e) {}
-  }
-
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
   const todayStr = () => new Date().toISOString().slice(0, 10);
 
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
   function utf8ToBase64(str) {
     const bytes = new TextEncoder().encode(str);
     let binary = "";
@@ -598,209 +580,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
-  // ── ② 유지보수 일정 · 점검서 · 승인 ──────────────────────────────────────
-  const STATUS_LABEL = { scheduled: "예정", reported: "승인 대기", approved: "승인됨", rejected: "반려" };
-  const STATUS_CLASS = { scheduled: "sched", reported: "rep", approved: "appr", rejected: "rej" };
-
-  function maintRowHtml(m) {
-    const isAdmin = currentUser && currentUser.role === "admin";
-    const overdue = m.status === "scheduled" && m.scheduleDate <= todayStr();
-    let actions = "";
-    if (m.status === "scheduled") {
-      actions = `<button class="maint-btn" data-action="report-open" data-id="${m.id}">점검 결과 등록</button>`;
-    } else if (m.status === "rejected") {
-      actions = `<button class="maint-btn" data-action="report-open" data-id="${m.id}">재점검 보고</button>`;
-    } else if (m.status === "reported" && isAdmin) {
-      actions =
-        `<button class="maint-btn ok" data-action="approve" data-id="${m.id}">승인</button>` +
-        `<button class="maint-btn danger" data-action="reject" data-id="${m.id}">반려</button>`;
-    }
-    // 이력 토글은 모든 항목에 제공한다(등록→보고→승인/반려 감사 추적).
-    actions += `<button class="maint-btn" data-action="history-toggle" data-id="${m.id}">이력</button>`;
-    const detail = [];
-    if (m.reportNote) {
-      detail.push(
-        `<div class="maint-note">📋 ${esc(m.reportNote)}${m.reportedBy ? " — " + esc(m.reportedBy) : ""}${m.reportDocName ? ` (첨부: ${esc(m.reportDocName)})` : ""}</div>`
-      );
-    }
-    if (m.status === "approved") detail.push(`<div class="maint-note ok">✓ 승인: ${esc(m.reviewedBy || "")}</div>`);
-    if (m.status === "rejected") detail.push(`<div class="maint-note rej">✗ 반려: ${esc(m.reviewedBy || "")} — ${esc(m.reviewNote || "")}</div>`);
-
-    return (
-      `<div class="maint-item" data-id="${m.id}">` +
-      `<div class="maint-main">` +
-      `<span class="maint-badge ${STATUS_CLASS[m.status]}">${STATUS_LABEL[m.status]}</span>` +
-      `<span class="maint-title">${esc(m.title)}</span>` +
-      `<span class="maint-product">${esc(m.productName)}</span>` +
-      (m.assetName ? `<span class="maint-asset" title="연결된 AI 자산">🧩 ${esc(m.assetName)}</span>` : "") +
-      `<span class="maint-date${overdue ? " overdue" : ""}">${esc(m.scheduleDate)}${m.intervalDays ? ` · ${m.intervalDays}일마다` : ""}</span>` +
-      `<span class="maint-actions">${actions}</span>` +
-      `</div>` +
-      detail.join("") +
-      `<div class="maint-report-form" id="report-form-${m.id}" style="display:none">` +
-      `<textarea placeholder="점검 결과 메모" id="report-note-${m.id}"></textarea>` +
-      `<input type="file" id="report-file-${m.id}">` +
-      `<button data-action="report-submit" data-id="${m.id}">제출</button>` +
-      `<button data-action="report-cancel" data-id="${m.id}">취소</button>` +
-      `</div>` +
-      `<div class="maint-timeline" id="timeline-${m.id}" style="display:none"></div>` +
-      `</div>`
-    );
-  }
-
-  // 이벤트 타입별 라벨/아이콘 — 타임라인 렌더링용.
-  const EVENT_LABEL = { created: "일정 등록", reported: "점검 결과 보고", approved: "승인", rejected: "반려" };
-  const EVENT_ICON = { created: "🗓", reported: "📋", approved: "✓", rejected: "✗" };
-  function fmtEventTime(ts) {
-    return new Date(ts).toLocaleString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-  }
-  async function renderTimeline(id) {
-    const box = document.getElementById(`timeline-${id}`);
-    box.innerHTML = '<div style="color:var(--muted);font-size:12.5px">이력 불러오는 중...</div>';
-    try {
-      const events = await window.gijo.getMaintenanceHistory(id);
-      box.innerHTML = events.length
-        ? events
-            .map(
-              (e) =>
-                `<div class="tl-event ${e.event}">` +
-                `<div class="tl-head">${EVENT_ICON[e.event] || "•"} ${EVENT_LABEL[e.event] || e.event}</div>` +
-                `<div class="tl-meta">${fmtEventTime(e.at)}${e.actor ? " · " + esc(e.actor) : ""}</div>` +
-                (e.note ? `<div class="tl-note">${esc(e.note)}</div>` : "") +
-                `</div>`
-            )
-            .join("")
-        : '<div style="color:var(--muted-2);font-size:12.5px">기록된 이력이 없습니다.</div>';
-    } catch (err) {
-      box.innerHTML = '<div style="color:#f5928a;font-size:12.5px">이력을 불러오지 못했습니다: ' + ((err && err.message) || err) + "</div>";
-    }
-  }
-
-  // 점검 목록 데이터로 상단 KPI 스트립을 채운다 — 추가 서버 호출 없이 클라이언트에서 집계.
-  function renderMaintKpis(items) {
-    const today = todayStr();
-    const total = items.length;
-    const overdue = items.filter((m) => m.status === "scheduled" && m.scheduleDate <= today).length;
-    const pending = items.filter((m) => m.status === "reported").length;
-    const approved = items.filter((m) => m.status === "approved").length;
-    const reviewed = approved + items.filter((m) => m.status === "rejected").length; // 검토 완료(승인+반려)
-    document.getElementById("kpiTotal").textContent = total;
-    document.getElementById("kpiOverdue").textContent = overdue;
-    document.getElementById("kpiPending").textContent = pending;
-    document.getElementById("kpiApproved").textContent = approved;
-    document.getElementById("kpiRate").textContent = reviewed ? Math.round((approved / reviewed) * 100) + "%" : "—";
-
-    // 제품별 요약 — 미완료(예정/승인대기) 건이 있는 제품만, 지연 건수를 붉게 표시.
-    const byProduct = {};
-    for (const m of items) {
-      const p = (byProduct[m.productName] = byProduct[m.productName] || { open: 0, overdue: 0 });
-      if (m.status === "scheduled" || m.status === "reported") p.open++;
-      if (m.status === "scheduled" && m.scheduleDate <= today) p.overdue++;
-    }
-    const chips = Object.keys(byProduct)
-      .filter((p) => byProduct[p].open > 0)
-      .sort((a, b) => byProduct[b].overdue - byProduct[a].overdue || byProduct[b].open - byProduct[a].open)
-      .map((p) => {
-        const s = byProduct[p];
-        const od = s.overdue ? ` <span style="color:#f5928a;font-weight:800">지연 ${s.overdue}</span>` : "";
-        return `<span style="display:inline-block;margin-right:14px">${esc(p)}: 미완료 ${s.open}${od}</span>`;
-      })
-      .join("");
-    document.getElementById("kpiByProduct").innerHTML = chips ? "제품별 미완료 — " + chips : "";
-  }
-
-  // 보안제품 등록부에서 "이 제품의 점검"을 눌러 들어왔는가 — ?product=<제품명>
-  // (2026-07-31: 특정 제품을 눌렀는데 전체 점검 목록이 열리던 것을 고침)
-  // 이름은 표기가 조금씩 달라(공백·대소문자) 느슨하게 맞춘다 — products.html과 같은 방식.
-  const squash = (s) => (String(s || "").toLowerCase().match(/[a-z0-9가-힣]+/g) || []).join("");
-  let scopeProduct = null;
-  try { scopeProduct = new URLSearchParams(location.search).get("product") || null; } catch (e) {}
-
-  function renderOpsScope(all, items) {
-    const bar = document.getElementById("opsScope");
-    if (!bar) return;
-    if (!scopeProduct) { bar.style.display = "none"; return; }
-    document.getElementById("opsScopeText").innerHTML =
-      `🎯 <b>${esc(scopeProduct)}</b> 의 점검만 보는 중 — ${items.length}건 (전체 ${all.length}건)`;
-    bar.style.display = "flex";
-  }
-
-  async function loadMaintenance() {
-    const list = document.getElementById("maintList");
-    try {
-      const all = await window.gijo.listMaintenance();
-      // 좁혀 보는 중이면 **위 KPI도 그 제품 것**이어야 한다. 목록 2건인데 위에 10이면
-      // 무엇을 믿을지 알 수 없다(취약점 화면에서 겪은 것과 같은 함정).
-      const items = scopeProduct ? all.filter((m) => squash(m.productName) === squash(scopeProduct)) : all;
-      renderMaintKpis(items);
-      renderOpsScope(all, items);
-      list.innerHTML = items.length
-        ? items.map(maintRowHtml).join("")
-        : scopeProduct
-          ? `<div style="color:var(--muted-2);font-size:12px">「${esc(scopeProduct)}」에 등록된 점검 일정이 없습니다 — 위에서 추가하세요.</div>`
-          : '<div style="color:var(--muted-2);font-size:12px">등록된 점검 일정이 없습니다.</div>';
-    } catch (e) {
-      list.innerHTML = '<div style="color:#f5928a;font-size:12px">불러오지 못했습니다: ' + e.message + "</div>";
-    }
-  }
-
-  async function onMaintAction(e) {
-    const btn = e.target.closest("[data-action]");
-    if (!btn) return;
-    const action = btn.dataset.action;
-    const id = btn.dataset.id;
-    if (action === "history-toggle") {
-      const box = document.getElementById(`timeline-${id}`);
-      if (box.style.display === "none") {
-        box.style.display = "flex";
-        renderTimeline(id);
-      } else {
-        box.style.display = "none";
-      }
-    } else if (action === "report-open") {
-      document.getElementById(`report-form-${id}`).style.display = "flex";
-    } else if (action === "report-cancel") {
-      document.getElementById(`report-form-${id}`).style.display = "none";
-    } else if (action === "report-submit") {
-      const note = document.getElementById(`report-note-${id}`).value.trim();
-      const fileInput = document.getElementById(`report-file-${id}`);
-      const file = fileInput.files[0];
-      btn.disabled = true;
-      btn.textContent = "제출 중...";
-      try {
-        const args = { note };
-        if (file) {
-          args.filename = file.name;
-          args.content = await fileToBase64(file);
-        }
-        await window.gijo.reportMaintenance(id, args);
-        await loadMaintenance();
-      } catch (err) {
-        gijoTell("보고 실패: " + ((err && err.message) || err));
-        btn.disabled = false;
-        btn.textContent = "제출";
-      }
-    } else if (action === "approve") {
-      if (!await gijoAsk("이 점검을 승인하시겠습니까?")) return;
-      try {
-        await window.gijo.approveMaintenance(id);
-        await loadMaintenance();
-      } catch (err) {
-        gijoTell("승인 실패: " + ((err && err.message) || err));
-      }
-    } else if (action === "reject") {
-      // prompt()도 렌더러를 멈추는 네이티브 모달(2026-07-29 검토) — 화면 안 입력으로.
-      const reason = await gijoPrompt("반려 사유를 입력하세요", { placeholder: "예: 점검 결과 증빙 누락", ok: "반려", danger: true });
-      if (!reason) return;
-      try {
-        await window.gijo.rejectMaintenance(id, reason);
-        await loadMaintenance();
-      } catch (err) {
-        gijoTell("반려 실패: " + ((err && err.message) || err));
-      }
-    }
-  }
-
   // 등록된 AI 자산을 점검 연결 드롭다운에 채운다. 자산이 없으면 기본 옵션만 남는다.
   async function loadAssetOptions() {
     try {
@@ -841,7 +620,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       });
       e.target.reset();
       document.getElementById("mDate").value = todayStr();
-      await loadMaintenance();
+      // 목록은 위(새 표) 스크립트가 그린다 — IIFE가 갈라져 있어 이벤트로 새로고침을 부탁한다.
+      window.dispatchEvent(new CustomEvent("gijo:maint-refresh"));
     } catch (err) {
       gijoTell("등록 실패: " + ((err && err.message) || err));
     }
@@ -876,14 +656,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   async function init() {
-    await loadUser(); // maintRowHtml이 currentUser.role로 승인 버튼 노출 여부를 결정하므로 먼저 기다린다.
     document.getElementById("mDate").value = todayStr();
-    loadMaintenance();
-    // 좁힌 상태에서 빠져나올 길 — 없으면 그 제품 안에 갇힌다.
-    document.getElementById("opsScopeAll").addEventListener("click", () => {
-      scopeProduct = null;
-      loadMaintenance();
-    });
     loadAssetOptions();
     loadProductOptions();
     loadNotify();
@@ -897,7 +670,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("kbQueryInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) kbQuery(); });
 
     document.getElementById("maintForm").addEventListener("submit", onMaintSubmit);
-    document.getElementById("maintList").addEventListener("click", onMaintAction);
     document.getElementById("notifyBtn").addEventListener("click", sendNotify);
   }
 

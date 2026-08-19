@@ -10,7 +10,7 @@
 
 import type { Express, Request } from "express";
 import { randomUUID } from "crypto";
-import { db } from "../db";
+import { db, migrate } from "../db";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 // ⚠ 대역 판정은 **한 곳**만 쓴다(airgap.ts) — 새 판정기를 만들면 원격 LLM 쪽과 기준이 어긋난다.
 import { isVpnRangeIp } from "./airgap";
@@ -162,9 +162,17 @@ export async function runScanForTarget(target: HardeningTarget, standard: Standa
 }
 
 // ── 스케줄 ────────────────────────────────────────────────────────────────────
+// 실패 자리(2026-08-19 검토 지적): 예전엔 점검이 던지면 감사에만 남고 lastRate/lastFail은
+// **직전 성공값이 그대로**라, 장비가 3주째 SSH로 안 붙어도 화면이 「92% 초록」이었다.
+migrate(
+  "hardening-schedules-lastresult-2026-08-19",
+  `ALTER TABLE hardening_schedules ADD COLUMN lastResult TEXT;
+   ALTER TABLE hardening_schedules ADD COLUMN lastError TEXT;`
+);
 export interface ScheduleRow {
   id: string; targetId: string; standard: string; intervalHours: number; enabled: number;
-  lastRunAt: number | null; nextRunAt: number; lastRate: number | null; lastFail: number | null; createdAt: number;
+  lastRunAt: number | null; nextRunAt: number; lastRate: number | null; lastFail: number | null;
+  lastResult: string | null; lastError: string | null; createdAt: number;
 }
 export function listSchedules(): (ScheduleRow & { targetLabel: string })[] {
   const rows = db.prepare("SELECT * FROM hardening_schedules ORDER BY createdAt").all() as ScheduleRow[];
@@ -198,13 +206,15 @@ export async function runDueSchedules(now = Date.now(), runnerFor?: (t: Hardenin
     if (!isStandard(sch.standard)) { db.prepare("UPDATE hardening_schedules SET nextRunAt = ? WHERE id = ?").run(next, sch.id); continue; }
     try {
       const report = await runScanForTarget(target, sch.standard, "scheduled", "scheduler", runnerFor ? runnerFor(target) : undefined);
-      db.prepare("UPDATE hardening_schedules SET lastRunAt = ?, nextRunAt = ?, lastRate = ?, lastFail = ? WHERE id = ?")
+      db.prepare("UPDATE hardening_schedules SET lastRunAt = ?, nextRunAt = ?, lastRate = ?, lastFail = ?, lastResult = 'success', lastError = NULL WHERE id = ?")
         .run(now, next, report.summary.rate, report.summary.fail, sch.id);
       ran++;
     } catch (e) {
       // 점검 실패(원격 접속 불가 등) — 감사에 남기고 다음 주기로 미룬다(하드루프 방지).
+      // lastResult/lastError를 함께 남긴다 — 감사에만 남기면 화면이 옛 성공값으로 초록을 그린다.
       recordAudit({ kind: "cli", actor: "scheduler", action: `하드닝 정기점검 실패 (${sch.standard})`, target: target.label, detail: (e as Error).message.slice(0, 200), result: "error" });
-      db.prepare("UPDATE hardening_schedules SET lastRunAt = ?, nextRunAt = ? WHERE id = ?").run(now, next, sch.id);
+      db.prepare("UPDATE hardening_schedules SET lastRunAt = ?, nextRunAt = ?, lastResult = 'fail', lastError = ? WHERE id = ?")
+        .run(now, next, (e as Error).message.slice(0, 500), sch.id);
     }
   }
   return ran;

@@ -607,7 +607,7 @@ tr:last-child td{border-bottom:none;}
         const statusChip = !s.enabled
           ? '<span class="chip-sm chip-off">꺼짐</span>'
           : s.lastResult === "fail"
-          ? '<span class="chip-sm chip-warn">주의</span>'
+          ? `<span class="chip-sm chip-warn" title="${esc(s.lastError || "지난 실행 실패 — 상세에서 이력 확인")}">주의</span>`
           : '<span class="chip-sm chip-on">켜짐</span>';
         const showNext = s.enabled && s.type !== "ondemand";
         return `<div class="sched-item${s.id === selectedScheduleId ? " active" : ""}" data-id="${s.id}">

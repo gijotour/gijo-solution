@@ -330,7 +330,7 @@ export interface HardeningChecklist { id: "kisa" | "cis"; label: string; count: 
 // 원격 SSH 정기점검 — 대상(장비)·스케줄·이력
 export type HardeningAuth = "local" | "key" | "password";
 export interface HardeningTargetPublic { id: string; label: string; host: string; port: number; username: string | null; authMethod: HardeningAuth; hasSecret: boolean }
-export interface HardeningScheduleRow { id: string; targetId: string; targetLabel: string; standard: "kisa" | "cis"; intervalHours: number; enabled: number; lastRunAt: number | null; nextRunAt: number; lastRate: number | null; lastFail: number | null; createdAt: number }
+export interface HardeningScheduleRow { id: string; targetId: string; targetLabel: string; standard: "kisa" | "cis"; intervalHours: number; enabled: number; lastRunAt: number | null; nextRunAt: number; lastRate: number | null; lastFail: number | null; lastResult: "success" | "fail" | null; lastError: string | null; createdAt: number }
 export interface HardeningRun { id: string; targetId: string; targetLabel: string; standard: string; at: number; rate: number; pass: number; fail: number; warn: number; na: number; source: string; summary: string | null }
 export interface NewTarget { label: string; host: string; port?: number; username?: string; authMethod: HardeningAuth; secret?: string }
 

@@ -58,6 +58,31 @@ describe("remoteLlmBaseUrl — 채팅이 실제로 볼 게터", () => {
       delete process.env.GIJO_AIRGAP;
     }
   });
+  // ★★ 사용 시점 재검증(2026-08-19 검토 지적) — 저장 관문을 안 거치고 들어온 값
+  //    (DB 복원·다른 설치본 이식·규칙이 조여진 뒤의 옛 값)이 실제 전송으로 새면 안 된다.
+  it("★★ DB에 심은 공인 IP 주소는 enabled여도 게터가 null을 준다", () => {
+    put.run("remote_llm", JSON.stringify({ enabled: true, url: "http://8.8.8.8:8080/v1", lastCheck: null }));
+    expect(remoteLlmBaseUrl()).toBeNull();
+  });
+  it("★★ 호스트명 주소도 마찬가지 — 이름은 어디로든 풀릴 수 있다", () => {
+    put.run("remote_llm", JSON.stringify({ enabled: true, url: "http://gpu.example.com/v1", lastCheck: null }));
+    expect(remoteLlmBaseUrl()).toBeNull();
+  });
+  it("★ 차단은 작업 기록에 남는다 — 조용히 로컬로 떨어지기만 하면 아무도 모른다", async () => {
+    const { listAudit } = await import("../src/engine/audit");
+    // 매번 다른 주소로 — 게터가 주소당 첫 1회만 기록하므로(도배 방지) 이 시험은 새 주소를 쓴다.
+    const 주소 = `http://8.8.4.${Math.floor(Math.random() * 250) + 1}:9/v1`;
+    put.run("remote_llm", JSON.stringify({ enabled: true, url: 주소, lastCheck: null }));
+    expect(remoteLlmBaseUrl()).toBeNull();
+    const 기록 = listAudit({ limit: 20 }).filter((a) => a.action.includes("원격 GPU 주소가 규칙에 안 맞아 차단"));
+    expect(기록.length, "차단이 감사에 안 남았다").toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(기록[0]), "감사에 토큰 쿼리가 실리면 안 된다").not.toContain("token=");
+  });
+  it("정상 사설 대역은 그대로 통과 — 재검증이 정상 사용을 깨면 안 된다", () => {
+    put.run("remote_llm", JSON.stringify({ enabled: true, url: "http://100.64.10.2:8080/v1", lastCheck: null }));
+    expect(remoteLlmBaseUrl()).toBe("http://100.64.10.2:8080/v1");
+  });
+
   it("깨진 저장값은 조용히 꺼짐으로 — 설정 하나가 채팅 전체를 죽이면 안 된다", () => {
     put.run("remote_llm", "{이건 JSON이 아님");
     expect(remoteLlmConfig().enabled).toBe(false);

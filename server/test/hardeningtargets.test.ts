@@ -99,6 +99,47 @@ describe("hardeningtargets — 스케줄러·이력·알림", () => {
     expect(alerts[0].result).toBe("error");
   });
 
+  // ★★ 조용한 실패 방지(2026-08-19 검토 지적) — 예전엔 점검이 던지면 감사에만 남고
+  //    lastRate/lastFail이 옛 성공값 그대로라, 몇 주째 안 도는 점검이 화면에서 초록이었다.
+  it("★★ 정기점검이 던지면 lastResult='fail'과 lastError가 남는다", async () => {
+    const t = createTarget({ label: "안 붙는 장비", host: "10.0.0.99", port: 22, username: "admin", authMethod: "key", secret: "/k" });
+    createSchedule(t.id, "kisa", 24);
+    const ran = await runDueSchedules(Date.now(), () => { throw new Error("SSH 접속 거부"); });
+    expect(ran).toBe(0);
+    const s = listSchedules()[0];
+    expect(s.lastResult).toBe("fail");
+    expect(s.lastError).toContain("SSH 접속 거부");
+    expect(s.nextRunAt, "실패해도 다음 주기로 밀려야 한다(하드루프 방지 — 기존 보장 유지)").toBeGreaterThan(Date.now());
+  });
+
+  it("★ 성공 1회 → 실패 1회면 「실패」로 읽힌다 — 옛 성공값이 상태를 가리면 안 된다", async () => {
+    const t = createTarget({ label: "간헐 장비", host: "10.0.0.98", port: 22, authMethod: "local" });
+    createSchedule(t.id, "kisa", 1);
+    await runDueSchedules(Date.now(), () => fakeRunner("strong"));
+    expect(listSchedules()[0].lastResult).toBe("success");
+    const { db } = await import("../src/db");
+    db.prepare("UPDATE hardening_schedules SET nextRunAt = 0 WHERE targetId = ?").run(t.id);
+    await runDueSchedules(Date.now(), () => { throw new Error("타임아웃"); });
+    const s = listSchedules()[0];
+    expect(s.lastResult).toBe("fail");
+    expect(s.lastError).toContain("타임아웃");
+    // lastRate는 그전 성공값이 남는다 — 화면·챗봇이 「그전 성공값」이라고 밝히는 근거.
+    expect(s.lastRate).not.toBeNull();
+  });
+
+  it("실패 뒤 성공하면 lastError가 지워진다 — 낫고도 빨간불이면 늑대소년이 된다", async () => {
+    const t = createTarget({ label: "복구 장비", host: "10.0.0.97", port: 22, authMethod: "local" });
+    createSchedule(t.id, "kisa", 1);
+    await runDueSchedules(Date.now(), () => { throw new Error("일시 오류"); });
+    expect(listSchedules()[0].lastResult).toBe("fail");
+    const { db } = await import("../src/db");
+    db.prepare("UPDATE hardening_schedules SET nextRunAt = 0 WHERE targetId = ?").run(t.id);
+    await runDueSchedules(Date.now(), () => fakeRunner("strong"));
+    const s = listSchedules()[0];
+    expect(s.lastResult).toBe("success");
+    expect(s.lastError).toBeNull();
+  });
+
   it("비활성 스케줄은 실행하지 않는다", async () => {
     const t = createTarget({ label: "off", host: "local", port: 22, authMethod: "local" });
     const sch = createSchedule(t.id, "cis", 12);

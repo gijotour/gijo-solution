@@ -253,12 +253,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const stdLabel = STD_SHORT[stdFor(t)] || "리눅스";
       const nextTxt = d.sched && d.sched.enabled ? `⏱ ${d.sched.intervalHours}시간 · ${new Date(d.sched.nextRunAt).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "정기점검 미설정";
       const hostTxt = t.host === "local" ? "🖥 로컬" : `${t.host}:${t.port}`;
-      return `<div class="tcard ${d.worsening ? "warn" : ""}">
-        <div class="tc-top"><span class="dot" style="background:${d.sched && d.sched.enabled ? rc(rate) : "#a49d95"}"></span>
+      // 지난 정기점검이 실패했으면 점·경고줄이 그것을 말해야 한다(2026-08-19 검토 지적).
+      // 예전엔 옛 성공값으로 초록을 그려, 장비가 몇 주째 안 붙어도 「92% 초록」이었다.
+      const 점검실패 = d.sched && d.sched.lastResult === "fail";
+      return `<div class="tcard ${d.worsening || 점검실패 ? "warn" : ""}">
+        <div class="tc-top"><span class="dot" style="background:${점검실패 ? "#e2483d" : d.sched && d.sched.enabled ? rc(rate) : "#a49d95"}"></span>
           <span class="tc-name" title="${esc(t.label)}">${esc(t.label)}</span><span class="g-badge g-b-med">${stdLabel}</span></div>
         <div class="tc-mid"><div class="tc-rate" style="color:${rc(rate)}">${rate == null ? "—" : rate + "%"}</div>
           <div style="flex:1;text-align:right">${spark(d.trend, 90, 26, rc(rate))}</div></div>
         <div class="tc-meta"><span>${esc(hostTxt)} · ${authBadge(t.authMethod)}</span><span>${nextTxt}</span></div>
+        ${점검실패 ? `<div class="tc-warn">✕ 지난 정기점검 실패 — ${esc(d.sched.lastError || "원인 미상")}${rate != null ? ` (표시된 ${rate}%는 그전 성공값)` : ""}</div>` : ""}
         ${d.worsening ? `<div class="tc-warn">▼ 지난 점검 대비 악화(${d.runs[d.runs.length - 2].rate}% → ${rate}%) — 확인 필요</div>` : ""}
         <div class="tc-acts">
           ${d.sched ? `<span class="g-toggle ${d.sched.enabled ? "g-on" : ""}" data-toggle="${d.sched.id}" data-on="${d.sched.enabled ? 1 : 0}"><span class="k"></span></span><span class="tog-lbl">정기점검 ${d.sched.enabled ? "켜짐" : "꺼짐"}</span>` : `<span class="tog-lbl">정기점검 없음</span>`}

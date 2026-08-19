@@ -366,7 +366,9 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel" data-gijo-fold="규칙 주입 미리보기">
       <div class="panel-title">🔎 규칙 주입 미리보기</div><div class="field-row">
-        <div class="field"><label for="expandInput">질문 / 텍스트</label><input id="expandInput" placeholder="예: 탈옥 위협에 어떻게 대응하나요?"></div>
+        <!-- 라벨을 「질문」에서 「시험할 문장」으로(2026-08-19) — 여기는 AI 질의창이 아니라
+             이 문장에 온톨로지 규칙이 몇 건 걸리는지 보는 진단칸이다(결정적 그래프 매칭, LLM 없음). -->
+        <div class="field"><label for="expandInput">시험할 문장</label><input id="expandInput" placeholder="예: 탈옥 위협에 어떻게 대응하나요? — 이 문장에 걸리는 규칙을 셉니다"></div>
         <button class="btn-primary" id="expandBtn" style="align-self:flex-end">확장</button>
       </div>
       <div class="result-box" id="expandResult" style="display:none"></div>

@@ -520,6 +520,8 @@ const gijoApi = {
   getSmtpInboundConfig: () => api.smtpInboundApi.getConfig(),
   saveSmtpInboundConfig: (config: { enabled: boolean; port: number; allowedIpsText?: string }) => api.smtpInboundApi.saveConfig(config),
   getSmtpInboundStatus: () => api.smtpInboundApi.getStatus(),
+  // 정기 알림(메일) 상태 — 등록·변경은 대화창, 화면은 상태만(2026-08-19).
+  listAlertSchedules: () => api.alertScheduleApi.list(),
   getSiemConfig: () => api.siemApi.getConfig(),
   saveSiemConfig: (config: Partial<import("./apiClient").SiemConfig>) => api.siemApi.saveConfig(config),
   testSiem: () => api.siemApi.test(),

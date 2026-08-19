@@ -214,7 +214,7 @@ finding 내용 해시로 상태를 저장해 **재스캔 후에도 검토 결과
 ![보안 KPI 대시보드 — 6개 도메인 통합 지표 + 일일 스냅샷 추세](screenshots/01-보안KPI대시보드.png)
 
 ### 4.11 📄 임원/팀장 보고서
-**목적:** KPI·점검 거버넌스·자산 상세를 담은 docx 보고서를 자동 생성 + 이메일 발송.
+**목적:** KPI·점검 거버넌스·자산 상세를 담은 docx 보고서를 자동 생성(공유는 파일 내려받기).
 경영진 요약은 로컬 LLM이 작성, 유지보수 거버넌스 섹션(승인/반려 감사 추적) 포함.
 ![컴플라이언스 — KISA 위협 21항목 대응 현황(거버넌스)](screenshots/09-컴플라이언스.png)
 
@@ -306,7 +306,7 @@ finding 내용 해시로 상태를 저장해 **재스캔 후에도 검토 결과
 | **문서/표준** | @cyclonedx/cyclonedx-library | SBOM CycloneDX 1.5 생성 |
 | | (직접 생성) SPDX-2.3 JSON | SBOM SPDX 내보내기 |
 | | docx | 임원/팀장 리포트(.docx) 생성 |
-| | nodemailer(SMTP) | 리포트·점검 지연 알림 이메일 |
+| | nodemailer(SMTP) | 조치 배정·점검 지연·정기 알림 이메일 |
 | | simple-git | 리포지토리 스캔(자산 자동 등록) |
 | **AI/데이터** | llama.cpp | 로컬 LLM 서빙(채팅 :8080+ 멀티모델 풀, 임베딩 :8081) |
 | | LanceDB · Apache Arrow | 장기 기억(RAG) 벡터 저장·검색 |

@@ -144,7 +144,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
 
 
 <div class="kpi-strip" style="grid-template-columns:repeat(4,1fr)" data-gijo-summary>
-  <div class="kpi-mini"><div class="kpi-mini-label">연동된 CTI 벤더</div><div class="kpi-mini-value" id="connectedFeedCount">-</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">수집 중인 CTI 벤더</div><div class="kpi-mini-value" id="connectedFeedCount">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">탐지 내역</div><div class="kpi-mini-value" id="findingCount">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">긴급 탐지</div><div class="kpi-mini-value" style="color:#f5928a" id="criticalCount">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">영향받는 내부 자산</div><div class="kpi-mini-value" style="color:var(--amber)" id="affectedAssetCount">-</div></div>
@@ -300,15 +300,35 @@ table th:last-child,table td:last-child{white-space:nowrap;}
     findingsBodyEl.innerHTML = 보일것
       .map((f) => {
         const badge = SEVERITY_BADGE[f.severity] || SEVERITY_BADGE.info;
-        return `<tr><td>${esc(f.detectedAt)}</td><td>${esc(f.type)}</td><td>${esc(f.target)}</td><td>${esc(f.source)}</td><td><span class="badge ${badge.cls}">${badge.label}</span></td></tr>`;
+        // 행 클릭 = 선택(2026-08-19 결함 수리 — 주 목록이 무반응이었다). 지시는 대화창이 한다.
+        return `<tr data-sel="${esc(f.target)}" style="cursor:pointer" title="누르면 대화창에 「이거」로 담깁니다"><td>${esc(f.detectedAt)}</td><td>${esc(f.type)}</td><td>${esc(f.target)}</td><td>${esc(f.source)}</td><td><span class="badge ${badge.cls}">${badge.label}</span></td></tr>`;
       })
       .join("");
   }
+
+  // 목록 클릭 → 셸 선택 칩. 탭에서는 window.top이 셸이고, 별도 창(팝업)에서는 자기 자신이라
+  // nav.js applyPopout이 같은 postMessage를 IPC 다리로 본창에 넘긴다 — 두 경우 다 이 한 줄로 된다.
+  function 선택보내기(라벨, 글) {
+    try { window.top.postMessage({ type: "gijo:select", label: String(라벨).slice(0, 40), text: 글 }, "*"); } catch (e) {}
+  }
+  findingsBodyEl.addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-sel]");
+    if (tr) 선택보내기(tr.dataset.sel, "위협 " + tr.dataset.sel);
+  });
+  document.getElementById("ctiMatchBody").addEventListener("click", (e) => {
+    const 카드 = e.target.closest("[data-sel]");
+    if (카드) 선택보내기(카드.dataset.sel, "위협 " + 카드.dataset.sel);
+  });
   // ───────────────────────────────────────────────────────────────────────
 
   function renderFindings(findings) {
-    findingCountEl.textContent = findings.length;
-    criticalCountEl.textContent = findings.filter((f) => f.severity === "critical").length;
+    // 샘플(데모) 시드를 실적과 갈라 센다 — 첫 화면 숫자가 「위협 5건」으로 읽히면 거짓이다(2026-08-19).
+    const 샘플수 = findings.filter((f) => f.source === "샘플(데모)").length;
+    const 실제 = findings.length - 샘플수;
+    findingCountEl.textContent = String(실제) + (샘플수 ? ` +샘플${샘플수}` : "");
+    const 긴급샘플 = findings.filter((f) => f.severity === "critical" && f.source === "샘플(데모)").length;
+    const 긴급실제 = findings.filter((f) => f.severity === "critical").length - 긴급샘플;
+    criticalCountEl.textContent = String(긴급실제) + (긴급샘플 ? ` +샘플${긴급샘플}` : "");
     // 접기 배지가 읽을 숫자를 먼저 적고 도우미에 알린다 — 접힌 채로도 건수가 보여야 한다.
     const 셈 = document.getElementById("feedCount");
     if (셈) 셈.textContent = String(findings.length);
@@ -345,7 +365,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
           const assets = m.matchedAssets
             .map((a) => `<span style="background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12.25px;color:var(--blue-light)">${esc(a.assetName)} <span style="color:var(--muted-2)">· ${a.matchedOn.map(esc).join(", ")}</span></span>`)
             .join(" ");
-          return `<div style="background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
+          return `<div data-sel="${esc(m.finding.target)}" title="누르면 대화창에 「이거」로 담깁니다" style="background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span class="badge ${sb.cls}">${sb.label}</span>
               <span style="font-size:12.5px;font-weight:700;color:#fff;">${esc(m.finding.target)}</span>
@@ -370,7 +390,8 @@ table th:last-child,table td:last-child{white-space:nowrap;}
   let feeds = [];
 
   function renderFeeds() {
-    connectedCountEl.textContent = feeds.filter((f) => f.connected).length;
+    // 「수집 중」만 센다 — 키만 등록된 벤더를 연동으로 세면 첫 화면 숫자가 거짓이 된다(2026-08-19).
+    connectedCountEl.textContent = feeds.filter((f) => f.connected && f.collects).length;
     feedListEl.innerHTML = feeds
       .map((f) => {
         if (f.planned) {
@@ -380,11 +401,21 @@ table th:last-child,table td:last-child{white-space:nowrap;}
         <div class="feed-actions"><span class="badge b-purple">지원 예정</span></div>
       </div>`;
         }
+        // 3상태 — 수집 중(어댑터+키) / 키 등록됨·수집 안 함(어댑터 없음) / 미연결.
+        // 예전엔 키만 넣어도 「연결됨」이라, 아무것도 안 가져오는 벤더가 연동된 것처럼 보였다.
+        const 배지 = f.connected && f.collects
+          ? '<span class="badge b-teal">수집 중</span>'
+          : f.connected
+            ? '<span class="badge b-amber">키 등록됨 · 수집 안 함</span>'
+            : '<span class="badge b-amber">미연결</span>';
+        const 부제 = f.connected && !f.collects
+          ? "이 벤더의 수집 연동은 아직 준비 중 — 키만 보관합니다"
+          : f.hasApiKey ? "API 키 등록됨" : "API 키 미등록";
         return `
       <div class="feed-row">
-        <div><div class="asset-name">${f.name}</div><div class="asset-sub">${f.hasApiKey ? "API 키 등록됨" : "API 키 미등록"}</div></div>
+        <div><div class="asset-name">${f.name}</div><div class="asset-sub">${부제}</div></div>
         <div class="feed-actions">
-          <span class="badge ${f.connected ? "b-teal" : "b-amber"}">${f.connected ? "연결됨" : "미연결"}</span>
+          ${배지}
           ${
             f.connected
               ? `<button class="link-btn" data-disconnect="${f.id}">연결 해제</button>`

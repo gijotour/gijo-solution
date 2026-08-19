@@ -81,11 +81,14 @@ describe("★ 특정 항목을 누르면 그 항목으로 좁혀 간다", () => 
 
   // 「제품 유지보수」는 2026-08-02에 「정기 점검」으로 합쳤다 — 코드가 옮겨 왔으니 시험도 옮긴다.
   it("정기 점검이 ?product= 를 읽어 그 제품 점검만 보여준다", () => {
+    // 2026-08-19 개편: 옛 카드 목록(renderMaintKpis·opsScope)이 이중 렌더라 걷혔고,
+    // 좁히기는 새 표의 제품필터 + 필터띠(「N건만 보는 중 · ✕」)가 이어받았다.
+    // 총계 원칙도 바뀌었다 — 「위 요약 숫자는 걸러도 줄지 않는다, 대신 띠가 보임/전체를 밝힌다」.
     const src = read("maintenance.html");
     expect(src).toContain('.get("product")');
-    expect(src, "목록만 걸러도 위 KPI가 전체면 무엇을 믿을지 알 수 없다").toContain("renderMaintKpis(items)");
-    expect(src, "좁혀진 줄 모르면 '왜 몇 건밖에 없지?'가 된다").toContain("의 점검만 보는 중");
-    expect(src, "빠져나올 길이 없으면 그 제품 안에 갇힌다").toContain("opsScopeAll");
+    expect(src, "쿼리로 들어온 제품이 표 필터로 이어져야 한다").toMatch(/제품쿼리[\s\S]{0,400}제품필터 =/);
+    expect(src, "좁혀진 줄 모르면 '왜 몇 건밖에 없지?'가 된다 — 필터띠가 보임/전체를 밝힌다").toContain("filterBar");
+    expect(src, "빠져나올 길이 없으면 그 제품 안에 갇힌다 — 띠의 해제 콜백").toMatch(/filterBar\(el,[\s\S]{0,200}제품필터 = null/);
   });
 
   it("★ 자산 목록의 '이 자산의 유지보수 점검'도 실어 보낸다", () => {

@@ -31,6 +31,7 @@ import { db } from "../db";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { isAirgapOn, isVpnRangeIp } from "./airgap";
+import { recordAudit } from "./audit";
 
 const getStateStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
 const setStateStmt = db.prepare(
@@ -66,10 +67,30 @@ function saveConfig(c: RemoteLlmConfig): void {
  *   한쪽만 고쳐져 어긋난다 — 이 저장소가 반복해 겪은 유형이다.
  * ⚠ 에어갭 검사를 여기서도 한다(저장 시에만 막으면, 저장 뒤 에어갭을 켠 경우가 샌다).
  */
+// 사용 시점 차단을 감사에 남길 때 같은 주소로 도배되지 않게 — 주소당 첫 1회만(airgap.ts 관례).
+const 차단기록한주소 = new Set<string>();
+
 export function remoteLlmBaseUrl(): string | null {
   if (isAirgapOn()) return null;
   const c = remoteLlmConfig();
-  return c.enabled && c.url ? c.url : null;
+  if (!c.enabled || !c.url) return null;
+  // ★ 사용 시점 재검증(2026-08-19 검토 지적). 저장 관문만 믿으면 관문을 안 거친 값이 샌다 —
+  //   DB 복원·다른 설치본 이식·규칙이 조여진 뒤의 옛 저장값. 저장과 **같은 판정기**를 쓴다.
+  const 문제 = remoteUrlProblem(c.url);
+  if (문제) {
+    if (!차단기록한주소.has(c.url)) {
+      차단기록한주소.add(c.url);
+      let 호스트 = c.url;
+      try { 호스트 = new URL(c.url).host; } catch { /* 파싱 불가면 원문 — 토큰 쿼리는 host에 없다 */ }
+      recordAudit({
+        kind: "block", actor: "시스템(원격 LLM)",
+        action: "저장된 원격 GPU 주소가 규칙에 안 맞아 차단", target: 호스트,
+        detail: 문제, result: "blocked",
+      });
+    }
+    return null; // 로컬로 폴백 — 조용히 밖으로 나가는 것보다 낫다
+  }
+  return c.url;
 }
 
 /**
@@ -130,9 +151,9 @@ export function registerRemoteLlmRoutes(app: Express): void {
    *   담당자에게 필요한 것은 「지금 바깥으로 나가는가」이고, 어디로 가는지는 설정 권한의 몫이다.
    */
   app.get("/api/llm/remote/where", authMiddleware, (_req, res) => {
-    const c = remoteLlmConfig();
-    const 원격중 = !isAirgapOn() && c.enabled && Boolean(c.url);
-    res.json({ remote: 원격중, airgap: isAirgapOn() });
+    // 게터와 같은 계산을 쓴다(2026-08-19) — 사용 시점 재검증으로 차단된 상태인데
+    // 여기만 「원격중」이라 답하면 화면이 거짓을 보증하게 된다.
+    res.json({ remote: remoteLlmBaseUrl() !== null, airgap: isAirgapOn() });
   });
 
   // 연결 테스트 — 저장 전에 도달을 확인한다. OpenAI 호환 /models를 찌른다.
@@ -179,16 +200,32 @@ export function registerRemoteLlmRoutes(app: Express): void {
     asyncRoute(async (req, res) => {
       const enabled = req.body?.enabled === true;
       const url = String(req.body?.url ?? "").trim();
-      if (enabled) {
-        if (isAirgapOn()) {
-          res.status(403).json({ error: "에어갭 모드에서는 원격 LLM을 켤 수 없습니다." });
-          return;
-        }
+      if (enabled && isAirgapOn()) {
+        res.status(403).json({ error: "에어갭 모드에서는 원격 LLM을 켤 수 없습니다." });
+        return;
+      }
+      // URL이 실려 왔으면 켜든 끄든 검증한다(2026-08-19 검토 지적) — 예전엔 끌 때 검증을 건너뛰어,
+      // 규칙 밖 주소를 꺼 둔 채 심어 두었다가 나중에 켜기만 하는 길이 있었다. 끄기 자체(url 없이)는 늘 된다.
+      if (url) {
         const 문제 = remoteUrlProblem(url);
+        if (문제) { res.status(400).json({ error: 문제 }); return; }
+      } else if (enabled) {
+        const 문제 = remoteUrlProblem(remoteLlmConfig().url);
         if (문제) { res.status(400).json({ error: 문제 }); return; }
       }
       const prev = remoteLlmConfig();
       saveConfig({ enabled, url: url || prev.url, lastCheck: prev.lastCheck });
+      차단기록한주소.clear(); // 주소가 바뀌었으니 다음 차단은 다시 한 번 기록한다
+      // 채팅이 어디로 가는지를 바꾸는 admin 설정 — 작업 기록에 남긴다(2026-08-19 검토 지적:
+      // 이 파일에 감사가 한 줄도 없었다). ⚠ URL 전체를 적지 않는다 — ?token=이 평문으로 딸려 온다.
+      let 호스트 = "(없음)";
+      try { 호스트 = new URL(url || prev.url).host; } catch { /* 주소 없이 끈 경우 */ }
+      recordAudit({
+        kind: "config", actor: (req as { user?: { displayName?: string } }).user?.displayName ?? null,
+        action: enabled ? "원격 GPU 켬" : "원격 GPU 끔", target: 호스트,
+        detail: enabled ? "이후 채팅 생성이 이 주소의 원격 LLM으로 간다" : "채팅 생성이 로컬 모델로 돌아온다",
+        result: "ok",
+      });
       res.json({ ...remoteLlmConfig(), airgap: isAirgapOn() });
     })
   );

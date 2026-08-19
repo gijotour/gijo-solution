@@ -187,7 +187,13 @@ export function installAirgapGuard(): void {
       }
       throw new Error(`에어갭 모드: 외부 호스트(${v.host}) 요청이 봉인으로 차단됐습니다.`);
     }
-    return 원래fetch(input, init);
+    // ★ 리다이렉트 금지(2026-08-19 검토 지적). 검사는 첫 URL에만 걸리는데 redirect 기본값이
+    //   "follow"라, 허용된 내부 호스트가 302로 외부를 가리키면 **재검사 없이** 따라나갔다 —
+    //   요청 본문·토큰이 그대로 실려서다. 봉인 배치의 정당한 목적지는 내부뿐이므로 3xx는
+    //   조용히 따라가는 대신 시끄럽게 깨지는 쪽이 default-deny 자세에 맞다.
+    //   input이 Request 객체면 자체 redirect 값이 init보다 우선하므로 Request도 다시 감싼다.
+    if (input instanceof Request) return 원래fetch(new Request(input, { redirect: "error" }), { ...init, redirect: "error" });
+    return 원래fetch(input, { ...init, redirect: "error" });
   };
   globalThis.fetch = guarded;
   console.log(`[airgap] 봉인 ON 🔒 — 비-내부 fetch 전량 차단(외부 통로 ${EGRESS_POINTS.length}종). 명시 허용: ${명시허용().join(", ") || "(없음)"}`);
@@ -265,6 +271,7 @@ export function airgapCertificate(blocks: { at: number; target: string | null; d
   L.push("");
   L.push("4. 이 증명의 한계 (정직하게 밝힙니다)");
   L.push("   · 관문은 **제품이 직접 여는 통로**(HTTP 요청·메일/SIEM 소켓)를 덮습니다.");
+  L.push("   · 봉인 중에는 HTTP 리다이렉트(3xx)를 따라가지 않습니다 — 내부 주소가 외부로 넘겨주는 길을 막기 위해서이며, 내부 서버가 3xx를 쓰면 해당 요청은 실패로 드러납니다.");
   L.push("   · 학습·모델 병합 등 **외부 프로그램(python)을 실행하는 기능은 제품 밖**에서 돌아 이 관문을 지나지 않습니다.");
   L.push("     봉인 시 오프라인 환경변수(HF_HUB_OFFLINE 등)로 누르지만 **완전한 차단은 아닙니다** —");
   L.push("     기밀 배치에서는 해당 기능을 쓰지 않거나 사전 반입 자료로만 쓰기를 권고합니다.");
