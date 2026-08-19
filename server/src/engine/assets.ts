@@ -628,10 +628,16 @@ export function registerAssetsRoutes(app: Express): void {
   app.get("/api/assets", authMiddleware, (_req, res) => res.json(listAssets().map(목록용)));
   // :id 라우트보다 먼저 — 뒤에 두면 "coverage"가 자산 id로 잡힌다.
   app.get("/api/assets/coverage", authMiddleware, (_req, res) => res.json(computeAssetCoverage(listAssets())));
-  app.get("/api/assets/:id", authMiddleware, (req, res) => {
+  app.get("/api/assets/:id", authMiddleware, async (req, res) => {
     const asset = getAsset(String(req.params.id));
     if (!asset) return res.status(404).json({ error: "asset not found" });
-    res.json(asset);
+    // fkey — 취약점마다 안정 기계 키(검토대장의 findingKey와 같은 sha1 16자)를 동봉한다.
+    //   화면이 「고른 항목」을 대화창에 넘길 때 이 키를 실어야, 배정·판정이 글자 대조가 아니라
+    //   키로 정확히 그 건을 잡는다(2026-08-19 QA 실사고: 같은 IP 두 자산에서 엉뚱한 자산으로
+    //   배정이 갔고, 표시명과 원문이 달라 실행이 400으로 죽었다).
+    //   ⚠ 지연 import — approvals.ts가 이 파일을 import하고 있어(정적이면 순환) 핸들러에서 푼다.
+    const { findingKey } = await import("./approvals.js");
+    res.json({ ...asset, findings: asset.findings.map((f) => ({ ...f, fkey: findingKey(asset.id, f) })) });
   });
   // 자산 기본 담당자 — 새 취약점이 이 사람에게 자동 배정된다(미배정 적체 재발 방지).
   app.post("/api/assets/:id/default-assignee", authMiddleware, (req, res) => {

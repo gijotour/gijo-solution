@@ -502,7 +502,9 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         // 고쳐진 것엔 조치 등록 버튼을 달지 않는다.
         const remediate = f.state === "fixed" ? "" : `<button class="vd-remediate" data-rem data-name="${esc(f.finding_type)}" data-sev="${f.severity}" data-kev="${f.kev ? 1 : 0}" title="이 취약점을 조치 항목(담당자·기한)으로 등록">＋ 조치 등록</button>`;
         return (
-          `<div class="vd-item ${f.state === "fixed" ? "is-fixed" : ""}">` +
+          // data-fkey — 서버가 동봉한 안정 키(sha1 16자). 「고른 항목」이 이 키를 대화창에
+          // 실어야 배정·판정이 표시명이 아니라 키로 그 건을 잡는다(2026-08-19 QA ③).
+          `<div class="vd-item ${f.state === "fixed" ? "is-fixed" : ""}" data-fkey="${esc(f.fkey || "")}">` +
           `<div class="vd-item-top">` +
           `<span class="sev ${SEV_CLASS[f.severity] || "sev-l"}">${SEV_LABEL[f.severity] || "?"}</span>` +
           `<span class="vd-name">${esc(f.finding_type)}</span>` +
@@ -655,6 +657,8 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         선택알림(이름.slice(0, 60), "자산 " + asset.name + "의 취약점 " + 이름, {
           asset: asset.name, title: 이름, severity: 심각도.trim(), plain: 한줄.replace(/^→\s*/, "").trim(),
           kev: item.textContent.indexOf("KEV") >= 0 ? "KEV" : "",
+          // ⌗기계 키(QA ③) — 배정·판정이 글자 대조 없이 정확히 이 건을 잡게 한다.
+          assetId: asset.id, findingKey: item.dataset.fkey || "",
         });
       } else if (asset) {
         선택알림(asset.name, "자산 " + asset.name); // 접으면 열어 둔 자산으로 되돌아간다

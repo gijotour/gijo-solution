@@ -1360,12 +1360,22 @@ const TOOLS: AgentTool[] = [
     //    파싱되면 YYYY-MM-DD로, 안 되면 비워서(선택값이므로) 사람이 직접 채우게 한다.
     autoFill: (args, instruction) => {
       const filled: Record<string, string> = {};
-      const resolved = resolveAsset(args.assetId ?? "");
-      if (resolved && resolved.id !== args.assetId) filled.assetId = resolved.id;
+      // ③ ⌗기계 키(2026-08-19 QA 실사고) — 화면에서 고른 항목이 실어 보낸 키가 지시문에 박혀
+      //   있으면 자산·취약점을 그 키로 **강제**한다(LLM이 IP·표시명으로 추정한 값을 덮는다 —
+      //   같은 IP 두 자산(sample-web01 vs vuln:10.0.0.100)에서 엉뚱한 쪽으로 배정이 간 사고).
+      const 키 = /⌗([^\s⌗]+)::([0-9a-f]{16})/.exec(instruction);
+      if (키) { filled.assetId = 키[1]; filled.finding = "key:" + 키[2]; }
+      const resolved = resolveAsset(filled.assetId ?? args.assetId ?? "");
+      if (resolved && resolved.id !== (filled.assetId ?? args.assetId)) filled.assetId = resolved.id;
       const due = args.dueDate?.trim();
       if (due && !DUE_RE.test(due)) {
         const parsed = parseRelativeDueDate(due) ?? parseRelativeDueDate(instruction);
         filled.dueDate = parsed ?? "";
+      } else if (due && !textHas(instruction, due) && !parseRelativeDueDate(instruction)) {
+        // ⑤ 형식은 맞는데 **사용자가 말한 적 없는** 날짜 — LLM이 지어낸 것(QA 실사고: 배정
+        //   지시에 기한 말이 없는데 과거 날짜 2026-07-24가 채워짐). 기한은 선택값이니
+        //   비워서 사람이 결재판에서 직접 채우게 한다 — 지어낸 기한이 SLA로 박히면 안 된다.
+        filled.dueDate = "";
       }
       return filled;
     },
@@ -1393,6 +1403,9 @@ const TOOLS: AgentTool[] = [
       const word = inferStatusWord(args.status ?? "") || inferStatusWord(instruction);
       const filled: Record<string, string> = {};
       if (word) filled.status = word;
+      // ③ ⌗기계 키 — assign_finding과 같은 강제 정정(고른 항목의 키가 있으면 추정을 덮는다).
+      const 키 = /⌗([^\s⌗]+)::([0-9a-f]{16})/.exec(instruction);
+      if (키) { filled.assetId = 키[1]; filled.finding = "key:" + 키[2]; }
       return filled;
     },
     effect: (args) => {

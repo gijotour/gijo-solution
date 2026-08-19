@@ -1365,7 +1365,13 @@
       // C. 맥락을 뗐으면(ctxOff) 화면을 싣지 않는다 — "NIST CSF가 뭐야?" 같은 일반 질문에
       //    화면 맥락이 오히려 해석을 비트는 경우가 있다(외부사례: VS Code implicit context 논쟁).
       var 화면인자 = (ctxOff ? undefined : ctx.screen) || undefined;
-      var 선택인자 = sel ? sel.text : undefined;
+      // 고른 항목의 ⌗기계 키(자산 id::취약점 sha1)를 함께 싣는다(2026-08-19 QA ③) —
+      // 서버 autoFill이 이 키로 배정·판정 인자를 강제 정정한다(표시명·IP 추정이 엉뚱한
+      // 자산을 잡던 실사고의 수리). 키는 선택 텍스트 꼬리에만 붙고 화면에는 안 보인다.
+      var 선택인자 = sel
+        ? sel.text + (sel.fields && sel.fields.assetId && sel.fields.findingKey
+            ? " ⌗" + sel.fields.assetId + "::" + sel.fields.findingKey : "")
+        : undefined;
       // 「보고 있던 목록」을 표식으로만 싣는다(2026-08-18 배관).
       // ⚠ **보내는 글에만 붙이고 보이는 글에는 안 붙인다** — 표식은 기계용이다. 그대로 보이면
       //   대화에 sha1 지문이 줄줄이 남아 담당자가 자기 대화를 못 알아본다(2026-07-31 실사고).

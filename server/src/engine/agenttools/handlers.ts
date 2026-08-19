@@ -1348,6 +1348,15 @@ export function resolveFinding(assetId: string, needle: string): { ok: true; hit
     const sample = asset.findings.slice(0, 6).map(findingLabel).join(" / ");
     return { ok: false, error: `어느 취약점인지 지목이 필요합니다. ${asset.id}의 취약점: ${sample}` };
   }
+  // ⌗기계 키 직행(2026-08-19 QA ③) — 화면이 「고른 항목」의 키(sha1 16자, 검토대장 findingKey)를
+  // 보냈으면 글자 대조를 하지 않는다. 표시명("< 2.15.0 RCE")과 원문("2.15.0 Remote Code Execution")이
+  // 달라 배정이 400으로 죽던 실사고의 수리 — 키는 문구가 어떻게 표기되든 같은 건을 잡는다.
+  const 키 = n.startsWith("key:") ? n.slice(4).trim() : /^[0-9a-f]{16}$/.test(n) ? n : null;
+  if (키) {
+    const byKey = asset.findings.find((f) => findingKey(asset.id, f) === 키);
+    if (byKey) return { ok: true, hit: { key: 키, label: findingLabel(byKey), assetId: asset.id } };
+    return { ok: false, error: `${asset.id}에 키 ${키}에 해당하는 취약점이 없습니다 — 화면을 새로고침하고 다시 골라 주세요(스캔으로 목록이 바뀌었을 수 있습니다).` };
+  }
   const hits = asset.findings.filter((f) => findingMatches(`${f.finding_type} ${f.severity} ${f.evidence}`, n));
   if (hits.length === 0) {
     const sample = asset.findings.slice(0, 6).map(findingLabel).join(" / ");
