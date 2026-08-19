@@ -126,12 +126,15 @@ describe("클라 배선 (소스 계약)", () => {
   });
 
   it("3단계 확장 화면도 top으로 보낸다 — 취약점 목록(호스트·항목)·할 일 줄", () => {
+    // 2026-08-20 계약 갱신: vulnscan은 공용 부품(selectnotify.js)으로 이관됐다 —
+    // 「top 전송·팝업 예외 금지」 계약은 부품 한 곳이 지고, 화면은 부품 호출만 감시한다.
     const vs = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "vulnscan.html"), "utf8");
-    expect(vs, "취약점 화면에 선택 배선").toContain("gijo:select");
-    // 2026-08-19 계약 갱신: 「parent 금지·top 사용」의 본뜻은 유지하되, top===window 예외는
-    // 제거됐다(프로 단독 팝업에서 선택이 죽던 결함 — 자기 top으로 보내면 applyPopout이 IPC로 잇는다).
-    expect(vs, "허브 한 겹 함정 — parent 금지, top으로").toContain("window.top.postMessage");
-    expect(vs, "단독 팝업 예외(top!==window)가 되살아나면 프로 팝업 선택이 다시 죽는다").not.toContain("window.top !== window");
+    expect(vs, "취약점 화면에 선택 배선(부품)").toContain("gijoSelectNotify");
+    expect(vs, "부품 로드가 없으면 호출이 조용히 죽는다").toContain('src="selectnotify.js"');
+    const sn = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "selectnotify.js"), "utf8");
+    expect(sn, "부품이 top으로 안 보낸다 — parent는 허브 한 겹에 막힌다").toContain("window.top.postMessage");
+    expect((sn.match(/window\.top\.postMessage/g) ?? []).length, "부품의 전송은 한 곳이어야 규격이 산다").toBe(1);
+    expect(sn, "단독 팝업 예외(top!==window)가 되살아나면 프로 팝업 선택이 다시 죽는다").not.toContain("window.top !== window");
     const db = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "dashboard.html"), "utf8");
     expect(db, "할 일 줄에 선택 배선").toContain("gijo:select");
     expect(db, "셸은 최상위 창").toContain("window.top.postMessage");
@@ -148,11 +151,11 @@ describe("조치·승인 화면이 고른 항목을 대화창에 넘긴다", () 
   const shell = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "app.html"), "utf8");
   const cs = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "console.js"), "utf8");
 
-  it("항목을 누르면 gijo:select를 보낸다 — 그리고 실제로 불린다", () => {
-    expect(ap, "approvals.html이 gijo:select를 안 보낸다").toContain("gijo:select");
+  it("항목을 누르면 선택 알림을 보낸다 — 그리고 실제로 불린다", () => {
+    // 2026-08-20 부품 이관: 전송(top·허용 키·200자 컷)은 selectnotify.js가 진다.
+    expect(ap, "approvals.html이 선택 알림(부품)을 안 부른다").toContain("gijoSelectNotify");
+    expect(ap, "부품 로드가 없으면 호출이 조용히 죽는다").toContain('src="selectnotify.js"');
     expect(ap, "알림 함수를 만들어만 두고 호출부가 없다").toContain("대화창에알림(r)");
-    // window.top — 셸 iframe 한 겹 위. parent면 허브가 낀 구성에서 죽는다(2026-08-09 함정).
-    expect(ap, "parent가 아니라 top으로 보내야 한다").toContain("window.top.postMessage");
   });
 
   it("셸이 fields를 걸러 버리지 않는다 — 아는 키만 문자열로 통과시킨다", () => {
@@ -198,9 +201,10 @@ describe("고른 항목 카드 — 클릭이 대화창에서 이어진다", () =
   const 승인 = fs.readFileSync(new URL("../../client/src/renderer/pages/approvals.html", import.meta.url), "utf8");
 
   it("★★ 화면(조치·승인)이 fields를 실어 보낸다 — 카드의 원료", () => {
-    expect(승인).toContain("gijo:select");
+    // 2026-08-20 부품 이관: 전송(postMessage)은 selectnotify.js가 진다 —
+    // 화면 몫은 fields 조립과 부품 호출에 fields를 싣는 것까지다.
     expect(승인).toMatch(/const fields = \{/);
-    expect(승인, "postMessage에 fields가 실려야 카드가 그린다").toMatch(/postMessage\(\{[^}]*fields/);
+    expect(승인, "부품 호출에 fields가 실려야 카드가 그린다").toMatch(/gijoSelectNotify\(\{[^}]*fields/);
   });
   it("★★ setSelection이 fields가 오면 카드를 붙인다", () => {
     expect(콘솔).toMatch(/if \(sel\.fields\) 선택카드\(sel\.fields\)/);

@@ -20,20 +20,20 @@ const PAGES = join(__dirname, "..", "..", "client", "src", "renderer", "pages");
 // (기존 5곳 — 부품 이관은 다음 라운드, 이관하면 "부품"으로 바꾼다).
 const 선택배선대장: Record<string, "부품" | "직접" | ["제외", string]> = {
   "assets.html": "부품",
-  "vulnscan.html": "직접",
-  "approvals.html": "직접",
-  "analysis.html": "직접",
-  "loganalysis.html": "직접",
-  "sbom.html": "직접",
-  // ── 목록이 있으나 아직 미배선 — B16 잔여(2026-08-19 기준 정직하게 「제외」로 두되 사유 명기.
-  //    배선하면 "부품"으로 올린다. 이 목록이 줄어드는 것이 B16 완결의 진행률이다.) ──
-  "threat.html": "직접", // 선택보내기(gijo:select)가 이미 있었다 — 조사(2026-08-19)로 확인
-  "records.html": ["제외", "B16 잔여 — 감사·로그 행 선택 미배선(항목이 행위 기록이라 카드 재료 설계 필요)"],
-  "audit.html": ["제외", "records로 흡수된 화면(리다이렉트) — 직접 열람은 레거시"],
-  "syslog.html": ["제외", "records로 흡수된 화면(리다이렉트)"],
+  // ── 2026-08-20 백로그 라운드: 기존 「직접」 6곳 전부 부품 이관 완료 — 전송 규격은
+  //    selectnotify.js 한 곳이 진다(top 한 겹·허용 키·200자 컷). 「직접」 분류는 이제 0이다.
+  "vulnscan.html": "부품",
+  "approvals.html": "부품",
+  "analysis.html": "부품",
+  "loganalysis.html": "부품",
+  "sbom.html": "부품",
+  "threat.html": "부품", // fields(title·plain: 유형·소스·탐지시각)도 보강(2026-08-20)
+  "records.html": ["제외", "허브 껍데기 — 무대는 audit(배선됨)·syslog. 행 렌더가 이 파일에 없다(grouphub가 iframe으로 끼움)"],
+  "audit.html": "부품", // records의 실제 무대 — 행 클릭=📌 선택(2026-08-20). 1단계: label+text만(감사 행은 자산이 아니라 fields를 실으면 선택카드가 「담당 미배정」 거짓 줄을 그린다)
+  "syslog.html": ["제외", "records로 흡수된 화면(리다이렉트) — 시스템 내부 로그 줄은 업무 항목이 아니라 고를 대상이 얇다"],
   "compliance.html": "부품",
   "handover.html": ["제외", "위저드 화면 — 담기 버튼은 행위지 선택이 아니다(조사 2026-08-19 재확인)"],
-  "products.html": ["제외", "카드 전체를 고르는 클릭이 없다(카드 안 개별 조작뿐 — 조사 2026-08-19). 카드 선택 UI가 생기면 배선"],
+  "products.html": "부품", // 카드 헤더 줄(.prod-top)만 선택 영역(승인 시안 보안제품_카드선택, 2026-08-20) — 카드 안 조작 7종과 안 겹친다
   "maintenance.html": "부품",
   "intro.html": "부품",
   "sessions.html": "부품",
@@ -100,15 +100,12 @@ describe("배선 계약 ⑤층 — 이동 통로 (전수)", () => {
   it("★ navigateTo 단독 사용이 **늘지 않는다**(동결 대장 — 본창 직접 로드는 프로 셸 파괴)", () => {
     // navigateTo( 를 부르면서 셸 통로(gijoOpenScreen|openTabInShell|gijoTabs)가 없는 파일은
     // 클릭이 본창을 화면 파일로 직접 로드할 수 있다(2026-08-19 사장님 실사고의 뿌리).
-    // 기존 25곳은 main의 승격 안전망이 전부 받아준다 — 그래서 지금 전부 고치는 대신
-    // **동결**한다: 아래 목록에서 늘어나면(새 화면이 구식 통로를 새로 쓰면) 실패.
+    // 2026-08-20 백로그 라운드에서 25곳 중 24곳 이관 완료(셸 통로 우선 + navigateTo 최후 폴백).
+    // ⚠ login.html 이동은 일부러 안 바꿨다 — 로그아웃·인증 만료는 본창 통째 교체가 맞다.
+    // 남은 1곳(syslog)은 login 가드뿐이라 이관할 화면 이동 자체가 없다.
     // 목록에서 지우는 것(셸 통로로 이관)만 허용 — 이 목록이 0이 되는 것이 이관 완결이다.
     const 동결 = new Set([
-      "agent.html", "analysis.html", "approvals.html", "audit.html", "compliance.html",
-      "handover.html", "hardening.html", "inventory.html", "kpi.html", "lawlookup.html",
-      "learnloop.html", "maintenance.html", "memory.html", "merge.html", "products.html",
-      "redteam.html", "report.html", "sbom.html", "sessions.html", "settings.html",
-      "syslog.html", "terminal.html", "threat.html", "vulnscan.html", "longnotice.js",
+      "syslog.html", // navigateTo가 login 가드 1곳뿐 — 화면 이동 통로가 없어 이관 대상 아님
     ]);
     const 예외 = new Set([
       "login.html", "setup.html", // 로그인 전 — 셸이 없다
@@ -129,6 +126,9 @@ describe("배선 계약 ⑤층 — 이동 통로 (전수)", () => {
     const s = readFileSync(join(PAGES, "..", "..", "main.ts"), "utf8");
     expect(s).toContain("shell:openTabPush");
     expect(s).toMatch(/file !== "app\.html" && 저장된셸모드\(\) === "pro"/);
+    // 2026-08-20 정찰 발견 구멍: login까지 승격하면 로그인이 셸 탭으로 열려 로그아웃이 안 된다.
+    expect(s, "승격 안전망에 login.html 예외가 없다 — 로그아웃·인증 만료는 본창 통째 교체가 맞다")
+      .toMatch(/저장된셸모드\(\) === "pro" && file !== "login\.html"/);
     const app = readFileSync(join(PAGES, "app.html"), "utf8");
     expect(app, "셸이 승격 신호를 구독해야 한다").toContain("onOpenTabPush");
   });

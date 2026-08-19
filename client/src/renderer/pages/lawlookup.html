@@ -216,7 +216,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
     var go = document.getElementById("goSet");
     if (go) go.addEventListener("click", function () {
-      if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo("settings.html?s=link");
+      if (window.gijoOpenScreen) window.gijoOpenScreen("settings.html?s=link", "설정"); else if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo("settings.html?s=link");
     });
   }
 

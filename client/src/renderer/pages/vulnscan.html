@@ -397,14 +397,10 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 
   // 선택 알림(2026-08-09 3단계) — 고른 것을 셸 📌칩에 싣는다. 「이거」가 이걸 가리키게 된다.
   // ⚠ parent가 아니라 top이다 — 이 화면은 허브 화면(triage) 안에 한 겹 더 들어간다(지도에서 실측).
-  // ⚠ top===window여도 보낸다(2026-08-19, B16) — 프로 단독 팝업에서는 top이 자기 자신인데,
-  //   예전 조건(top!==window)이 그 경우를 걸러 **팝업 단독 화면의 선택이 조용히 죽었다.**
-  //   자기에게 보낸 postMessage는 nav.js applyPopout 릴레이가 IPC로 본창에 넘긴다(P4 배관).
   // fields — 대화창 「고른 항목」 카드의 재료(승인 시안 조치항목_대화창 B16 복제).
+  // 전송 규격(top 한 겹·팝업 릴레이·허용 키·200자 컷)은 공용 부품 selectnotify.js 한 곳이 진다(2026-08-20 이관).
   function 선택알림(label, text, fields) {
-    try {
-      window.top.postMessage(label && text ? { type: "gijo:select", label: label, text: text, fields: fields || undefined } : { type: "gijo:select" }, "*");
-    } catch (e) { /* 셸 밖(단독 열람)에서는 조용히 없던 일로 */ }
+    window.gijoSelectNotify(label && text ? { label: label, text: text, fields: fields || undefined } : undefined);
   }
 
   function closeDetail() {
@@ -604,7 +600,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 
 
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
     // 스캔 파일 인입은 대시보드 ＋로 통일(2026-07-27). 비인증 스캔 경고도 그쪽 결과 카드로 옮겼다.
 
@@ -677,6 +673,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 
 
 <script src="nav.js"></script>
+<script src="selectnotify.js"></script>
 <script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

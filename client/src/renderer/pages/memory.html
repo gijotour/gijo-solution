@@ -1046,7 +1046,7 @@ tr:last-child td{border-bottom:none;}
 
     // learnloopLink 요소는 IA 통합 때 제거됨 — 잔존 배선이 null 크래시로 아래 업로드 버튼까지 죽였다(2026-07-25 스윕 발견).
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
     document.getElementById("ingestBtn").addEventListener("click", ingest);
     document.getElementById("dsConvertBtn").addEventListener("click", convertDataset);

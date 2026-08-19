@@ -301,23 +301,26 @@ table th:last-child,table td:last-child{white-space:nowrap;}
       .map((f) => {
         const badge = SEVERITY_BADGE[f.severity] || SEVERITY_BADGE.info;
         // 행 클릭 = 선택(2026-08-19 결함 수리 — 주 목록이 무반응이었다). 지시는 대화창이 한다.
-        return `<tr data-sel="${esc(f.target)}" style="cursor:pointer" title="누르면 대화창에 「이거」로 담깁니다"><td>${esc(f.detectedAt)}</td><td>${esc(f.type)}</td><td>${esc(f.target)}</td><td>${esc(f.source)}</td><td><span class="badge ${badge.cls}">${badge.label}</span></td></tr>`;
+        return `<tr data-sel="${esc(f.target)}" data-type="${esc(f.type)}" data-src="${esc(f.source)}" data-at="${esc(f.detectedAt)}" style="cursor:pointer" title="누르면 대화창에 「이거」로 담깁니다"><td>${esc(f.detectedAt)}</td><td>${esc(f.type)}</td><td>${esc(f.target)}</td><td>${esc(f.source)}</td><td><span class="badge ${badge.cls}">${badge.label}</span></td></tr>`;
       })
       .join("");
   }
 
-  // 목록 클릭 → 셸 선택 칩. 탭에서는 window.top이 셸이고, 별도 창(팝업)에서는 자기 자신이라
-  // nav.js applyPopout이 같은 postMessage를 IPC 다리로 본창에 넘긴다 — 두 경우 다 이 한 줄로 된다.
-  function 선택보내기(라벨, 글) {
-    try { window.top.postMessage({ type: "gijo:select", label: String(라벨).slice(0, 40), text: 글 }, "*"); } catch (e) {}
+  // 목록 클릭 → 셸 선택 칩. 전송 규격(top 한 겹·팝업 릴레이·허용 키)은 공용 부품
+  // selectnotify.js가 진다(2026-08-20 이관). fields는 행이 이미 그린 값만(재계산 금지).
+  function 선택보내기(라벨, 글, fields) {
+    window.gijoSelectNotify({ label: String(라벨).slice(0, 40), text: 글, fields: fields });
   }
   findingsBodyEl.addEventListener("click", (e) => {
     const tr = e.target.closest("tr[data-sel]");
-    if (tr) 선택보내기(tr.dataset.sel, "위협 " + tr.dataset.sel);
+    if (tr) 선택보내기(tr.dataset.sel, "위협 " + tr.dataset.sel, {
+      title: tr.dataset.sel,
+      plain: [tr.dataset.type, tr.dataset.src, tr.dataset.at].filter(Boolean).join(" · "),
+    });
   });
   document.getElementById("ctiMatchBody").addEventListener("click", (e) => {
     const 카드 = e.target.closest("[data-sel]");
-    if (카드) 선택보내기(카드.dataset.sel, "위협 " + 카드.dataset.sel);
+    if (카드) 선택보내기(카드.dataset.sel, "위협 " + 카드.dataset.sel, { title: 카드.dataset.sel });
   });
   // ───────────────────────────────────────────────────────────────────────
 
@@ -465,7 +468,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
   });
 
   document.querySelectorAll("[data-page]").forEach((el) => {
-    el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+    el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
   });
   document.getElementById("addFeedBtn").addEventListener("click", () => openModal());
   document.getElementById("addFeedBtn2").addEventListener("click", () => openModal());
@@ -501,6 +504,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
 
 
 <script src="nav.js"></script>
+<script src="selectnotify.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>

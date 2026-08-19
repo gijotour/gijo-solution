@@ -523,17 +523,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (!m) return;
       cat.querySelectorAll(".tile, .trend-card, .kv").forEach((el) => {
         el.classList.add("clk");
-        el.addEventListener("click", () => window.gijo.navigateTo(m.page));
+        el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(m.page) : window.gijo.navigateTo(m.page)));
       });
       const link = document.createElement("span");
       link.className = "cat-link";
       link.textContent = "→ 화면 열기";
-      link.addEventListener("click", () => window.gijo.navigateTo(m.page));
+      link.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(m.page) : window.gijo.navigateTo(m.page)));
       title.appendChild(link);
     });
     // AI 보안 타일 등 data-page 요소 → 해당 화면으로 이동.
     root.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
   }
 
@@ -546,7 +546,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     try {
       await window.gijo.generateReport({ type: "ondemand", format: "both" });
       toast("✅ 리포트 생성 완료 — 리포트 화면으로 이동합니다", 1500);
-      setTimeout(() => window.gijo.navigateTo("report.html"), 700);
+      setTimeout(() => (window.gijoOpenScreen ? window.gijoOpenScreen("report.html", "보고") : window.gijo.navigateTo("report.html")), 700);
     } catch (e) {
       toast("⚠ 리포트 생성 실패: " + String((e && e.message) || e), 4000);
     } finally {
@@ -571,7 +571,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function init() {
     load();
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
   }
 

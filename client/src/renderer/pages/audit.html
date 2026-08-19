@@ -55,6 +55,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:6px 0;}
 .aud{display:flex;gap:12px;align-items:flex-start;padding:11px 18px;border-bottom:1px solid var(--border);font-size:12.5px;}
 .aud:last-child{border-bottom:none;}
+/* 행 클릭 = 대화창 📌 선택(배선 계약 ⑤층, 2026-08-20) */
+.aud{cursor:pointer;}
+.aud:hover{background:rgba(59,130,246,.05);}
+.aud.on{background:rgba(59,130,246,.09);}
 .aud .tm{color:var(--muted-2);font-size:12.25px;white-space:nowrap;width:118px;flex:0 0 auto;}
 .aud .kind{font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:5px;white-space:nowrap;flex:0 0 auto;}
 .k-cli{background:rgba(30,185,128,.16);color:var(--teal);}
@@ -171,7 +175,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const rz = "rz-" + e.result;
     const rzLabel = { ok: "완료", blocked: "차단", error: "실패", pending: "대기" }[e.result] || e.result;
     return (
-      `<div class="aud">` +
+      `<div class="aud" data-id="${esc(e.id)}" title="누르면 대화창에 「이거」로 담깁니다">` +
       `<span class="tm">${fmtTime(e.at)}</span>` +
       `<span class="kind ${kc}">${KIND_LABEL[e.kind] || e.kind}</span>` +
       `<div class="body"><span class="act">${esc(e.action)}</span>${e.target ? `<span class="tgt">${esc(e.target)}</span>` : ""}` +
@@ -203,7 +207,35 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         : (rows.length > 한번에 ? `<div class="more-end">전체 ${rows.length}건을 다 보고 있습니다</div>` : ""));
     const b = document.getElementById("moreBtn");
     if (b) b.addEventListener("click", () => { 보이는수 += 한번에; render(); });
+    하이라이트반영(); // 15초 자동 새로고침·필터가 innerHTML을 통째 갈아도 선택 표시가 남게
   }
+
+  // ── 행 클릭 → 대화창 📌 선택(배선 계약 ⑤층, 2026-08-20) ──────────────────
+  // fields는 싣지 않는다(1단계) — 감사 행은 자산·취약점이 아니라서 선택카드가
+  // 「담당 미배정」 같은 거짓 줄을 그린다(console.js가 owner 없으면 그 줄을 채움).
+  // label+text만 보내면 📌칩과 서버 선택 문구만 실린다 — 정직한 최소.
+  let 선택행id = null;
+  function 하이라이트반영() {
+    panel.querySelectorAll(".aud.on").forEach((r) => r.classList.remove("on"));
+    if (선택행id == null) return;
+    const r = panel.querySelector(`.aud[data-id="${선택행id}"]`);
+    if (r) r.classList.add("on");
+  }
+  panel.addEventListener("click", (ev) => {
+    if (ev.target.closest(".more")) return; // ＋더 보기 버튼은 행이 아니다
+    const 드래그 = window.getSelection && String(window.getSelection());
+    if (드래그) return; // 상세(det) 글자 복사 중엔 선택으로 안 잡는다
+    const row = ev.target.closest(".aud");
+    if (!row || row.dataset.id == null) return;
+    const e = entries.find((x) => String(x.id) === row.dataset.id);
+    if (!e) return;
+    선택행id = row.dataset.id;
+    하이라이트반영();
+    window.gijoSelectNotify({
+      label: String(e.action || "작업 기록").slice(0, 40),
+      text: "작업 기록 " + fmtTime(e.at) + " · " + (e.actor || "-") + " · " + (e.action || "") + (e.target ? " → " + e.target : ""),
+    });
+  });
 
   // 조건이 바뀌면 처음 50건부터 다시 — 앞 조건에서 늘려 둔 상태가 남으면 갑자기 500줄이 쏟아진다.
   function 다시처음부터() { 보이는수 = 한번에; render(); }
@@ -269,7 +301,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     await load();
     setInterval(load, 15000); // 15초마다 새 기록 반영
 
-    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page))));
     document.getElementById("kindFilters").addEventListener("click", (e) => {
       const chip = e.target.closest("[data-kind]"); if (!chip) return;
       document.querySelectorAll("#kindFilters .filter-chip").forEach((c) => c.classList.remove("active"));
@@ -285,6 +317,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 <div id="gijoChatWidget" data-start="collapsed" data-prompts='["최근 작업 기록 알려줘"]'></div>
 <script src="nav.js"></script>
+<script src="selectnotify.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>

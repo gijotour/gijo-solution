@@ -566,7 +566,10 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   //   구식 통로(navigateTo 폴백)가 본창을 화면 파일로 **직접** 로드하면 프로 셸이 통째로
   //   파괴되고 표준 사이드바 모양이 뜬다. 본창이 셸(app.html)로 떠 있는 한, 화면 파일 요청은
   //   전부 **셸의 탭 열기로 승격**한다 — 발원지가 몇이든 여기 한 곳이 막는다.
-  if (file !== "app.html" && 저장된셸모드() === "pro" && mainWindow.webContents.getURL().includes("app.html")) {
+  //   ⚠ 단 login.html은 승격하지 않는다(2026-08-20 정찰 발견) — 로그아웃·인증 만료는
+  //   본창을 로그인으로 **통째 교체**하는 것이 맞다. 승격하면 로그인이 셸 탭으로 열려
+  //   로그아웃이 안 되는 화면이 된다(preload.ts navigateTo의 login 예외와 같은 이유).
+  if (file !== "app.html" && 저장된셸모드() === "pro" && file !== "login.html" && mainWindow.webContents.getURL().includes("app.html")) {
     mainWindow.webContents.send("shell:openTabPush", { page: String(page) });
     mainWindow.focus();
     return;

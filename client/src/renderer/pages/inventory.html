@@ -913,7 +913,7 @@
 
   function 묶기(row, d) {
     row.querySelectorAll("[data-go]").forEach((b) =>
-      b.addEventListener("click", (e) => { e.stopPropagation(); window.gijo.navigateTo(b.dataset.go); }));
+      b.addEventListener("click", (e) => { e.stopPropagation(); if (window.gijoOpenScreen) window.gijoOpenScreen(b.dataset.go); else window.gijo.navigateTo(b.dataset.go); }));
     row.querySelectorAll("[data-close]").forEach((b) =>
       b.addEventListener("click", (e) => { e.stopPropagation(); 자산상세닫기(); }));
   }
@@ -1699,12 +1699,12 @@
       if (e.target.dataset.openOps) {
         // 툴팁이 "이 자산의 유지보수 점검"이라 약속하므로 그 이름을 실어 보낸다.
         const nm = e.target.dataset.openOps;
-        window.gijo.navigateTo("maintenance.html" + (nm && nm !== "1" ? `?product=${encodeURIComponent(nm)}` : ""));
+        const 갈곳m = "maintenance.html" + (nm && nm !== "1" ? `?product=${encodeURIComponent(nm)}` : ""); if (window.gijoOpenScreen) window.gijoOpenScreen(갈곳m, "유지보수 점검"); else window.gijo.navigateTo(갈곳m);
         return;
       }
       if (e.target.dataset.vulns) {
         const id = e.target.dataset.vulns;
-        window.gijo.navigateTo("vulnscan.html" + (id && id !== "1" ? `?host=${encodeURIComponent(id)}` : ""));
+        const 갈곳v = "vulnscan.html" + (id && id !== "1" ? `?host=${encodeURIComponent(id)}` : ""); if (window.gijoOpenScreen) window.gijoOpenScreen(갈곳v, "취약점"); else window.gijo.navigateTo(갈곳v);
         return;
       }
       const setCat = e.target.closest("[data-set-cat]");
@@ -1806,7 +1806,7 @@
     document.getElementById("catModal").addEventListener("click", (e) => { if (e.target.id === "catModal") closeCatModal(); });
 
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
     document.getElementById("addAssetBtn").addEventListener("click", openModal);
     document.getElementById("modalCancelBtn").addEventListener("click", closeModal);

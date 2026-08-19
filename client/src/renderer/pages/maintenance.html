@@ -453,6 +453,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         // ⚠ 여기는 **알리는** 자리다 — 묻는 게 아니다. gijoAsk는 확인/취소를 묻는 창이라
         //   뜻이 안 맞고, 돌려주는 값을 안 쓰므로 취소를 눌러도 아무 차이가 없다(2026-08-18 정정).
         else if (window.gijoTell) window.gijoTell(말);
+        else if (window.gijo && window.gijo.openConsoleWindow) window.gijo.openConsoleWindow(); // 대화창은 분리창이 정식 통로 — 셸 탭으로 열면 안 된다
         else window.gijo.navigateTo("console.html");
       };
     });
@@ -686,7 +687,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     loadNotify();
 
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
 
     document.getElementById("kbSampleBtn").addEventListener("click", addSampleDocs);

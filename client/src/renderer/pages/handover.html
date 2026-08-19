@@ -299,7 +299,7 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
     document.getElementById("verifyFailBtn").addEventListener("click", () => runVerify(lastReport ? lastReport.results.filter((r) => !r.cited).map((r) => r.documentId) : [], true));
     document.getElementById("completeBtn").addEventListener("click", complete);
     document.getElementById("downloadBtn").addEventListener("click", download);
-    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page))));
     if (window.gijoRealtime) window.gijoRealtime.connect();
     refreshSteps();
   }

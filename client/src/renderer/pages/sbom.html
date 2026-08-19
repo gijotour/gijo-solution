@@ -401,7 +401,7 @@ tr:last-child td{border-bottom:none;}
     } catch (e) {}
     // 어느 자산의 견고성인지 실어 보낸다 — 안 실으면 레드팀 화면에서 다시 골라야 한다.
     document.getElementById("robDetailLink").addEventListener("click", () =>
-      window.gijo.navigateTo("redteam.html?asset=" + encodeURIComponent(asset.id)));
+      (window.gijoOpenScreen ? window.gijoOpenScreen("redteam.html?asset=" + encodeURIComponent(asset.id), "레드팀") : window.gijo.navigateTo("redteam.html?asset=" + encodeURIComponent(asset.id))));
     document.getElementById("robRunBtn").addEventListener("click", () => runRobustness(asset.id));
   }
   async function runRobustness(assetId) {
@@ -755,19 +755,17 @@ tr:last-child td{border-bottom:none;}
       if (full) { renderAiBom(full); document.getElementById("aibomPanel").scrollIntoView({ behavior: "smooth", block: "start" }); }
       renderAiAssets();
       // 셸(대화창)에도 알린다(B16, 2026-08-19) — 카드가 그린 실명 필드만.
-      // top===window(프로 단독 팝업)여도 보낸다 — applyPopout 릴레이가 IPC로 잇는다.
+      // 전송 규격(top 한 겹·팝업 릴레이·허용 키)은 공용 부품 selectnotify.js가 진다(2026-08-20 이관).
       if (full) {
-        try {
-          const rob = full.robustness && full.robustness.score;
-          window.top.postMessage({
-            type: "gijo:select", label: String(full.name || "").slice(0, 40),
-            text: "AI 자산 " + (full.name || "") + (full.assetType ? " (" + full.assetType + ")" : ""),
-            fields: {
-              asset: full.name || "", title: "AI-BOM · " + (full.assetType || "자산"),
-              owner: full.owner || "", status: rob != null ? "견고성 " + rob : "견고성 미점검",
-            },
-          }, "*");
-        } catch (err) { /* 셸 밖 — 없던 일로 */ }
+        const rob = full.robustness && full.robustness.score;
+        window.gijoSelectNotify({
+          label: String(full.name || "").slice(0, 40),
+          text: "AI 자산 " + (full.name || "") + (full.assetType ? " (" + full.assetType + ")" : ""),
+          fields: {
+            asset: full.name || "", title: "AI-BOM · " + (full.assetType || "자산"),
+            owner: full.owner || "", status: rob != null ? "견고성 " + rob : "견고성 미점검",
+          },
+        });
       }
     }));
   }
@@ -855,7 +853,7 @@ tr:last-child td{border-bottom:none;}
     });
 
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
     document.getElementById("bulkRegenBtn").addEventListener("click", bulkGenerate);
     document.getElementById("aibomSaveBtn").addEventListener("click", saveAiBom);
@@ -873,6 +871,7 @@ tr:last-child td{border-bottom:none;}
 
 
 <script src="nav.js"></script>
+<script src="selectnotify.js"></script>
 <script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

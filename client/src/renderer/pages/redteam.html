@@ -485,7 +485,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     finally{ runBtn.disabled = false; runBtn.textContent = orig; }
   });
 
-  document.querySelectorAll("[data-page]").forEach(el => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+  document.querySelectorAll("[data-page]").forEach(el => el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page))));
 
   if(!window.gijo.isAuthenticated()){ window.gijo.navigateTo("login.html"); }
   else {

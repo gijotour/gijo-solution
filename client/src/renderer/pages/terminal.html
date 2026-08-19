@@ -231,7 +231,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     });
     document.querySelectorAll(".chip[data-scan]").forEach((c) => c.addEventListener("click", () => runHardeningFromChat(c.dataset.scan)));
 
-    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page))));
   }
 
   if (!window.gijo.isAuthenticated()) window.gijo.navigateTo("login.html");

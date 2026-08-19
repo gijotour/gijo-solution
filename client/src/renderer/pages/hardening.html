@@ -394,7 +394,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     $("rAuth").addEventListener("change", syncCred); syncCred();
     $("sCancel").addEventListener("click", () => $("schModal").classList.remove("g-on"));
     $("sSubmit").addEventListener("click", submitSched);
-    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page))));
     // 모달 배경 클릭 시 닫기
     document.querySelectorAll(".g-modal-bg").forEach((bg) => bg.addEventListener("click", (e) => { if (e.target === bg) bg.classList.remove("g-on"); }));
     setInterval(loadAll, 30000); // 정기점검이 백그라운드로 돌므로 주기적 새로고침

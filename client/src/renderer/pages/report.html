@@ -839,7 +839,7 @@ tr:last-child td{border-bottom:none;}
     renderScheduleList();
 
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
     document.getElementById("genReportBtn").addEventListener("click", openModal);
     document.getElementById("modalCancelBtn").addEventListener("click", closeModal);

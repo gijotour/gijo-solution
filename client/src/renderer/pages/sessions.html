@@ -878,7 +878,7 @@
     await loadSessions(!openId); // 딥링크 없을 때만 최근 내역 자동 선택
     if (openId && sessions.some((s) => s.id === openId)) openSession(openId);
 
-    document.querySelectorAll(".header [data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    document.querySelectorAll(".header [data-page]").forEach((el) => el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page))));
     document.getElementById("pruneBtn").addEventListener("click", pruneOld);
     document.getElementById("deleteAllBtn").addEventListener("click", deleteAll);
     document.getElementById("statusFilters").querySelectorAll(".fchip").forEach((c) => c.addEventListener("click", () => {

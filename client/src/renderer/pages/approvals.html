@@ -523,8 +523,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       assetId: r.assetId || "",
       findingKey: r.findingKey || "",
     };
-    // ⚠ window.top — 이 화면은 셸(app.html)의 iframe 안이다. parent면 허브가 한 겹 더 있을 때 죽는다.
-    try { window.top.postMessage({ type: "gijo:select", label: f.finding_type || r.assetName || "선택", text, fields }, "*"); } catch (e) {}
+    // 전송 규격(top 한 겹·허용 키·200자 컷)은 공용 부품 selectnotify.js가 진다(2026-08-20 이관).
+    window.gijoSelectNotify({ label: f.finding_type || r.assetName || "선택", text: text, fields: fields });
   }
 
   // ── 배관: 「지금 보여 주고 있는 목록」을 대화창에 알린다(2026-08-18) ─────────────
@@ -919,7 +919,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (fails.length) gijoTell(`${ok}건 배정 완료 · ${fails.length}건 실패\n${fails[0]}`);
     });
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
   }
 
@@ -949,6 +949,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
 <script src="nav.js"></script>
+<script src="selectnotify.js"></script>
 <script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

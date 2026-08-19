@@ -475,22 +475,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     renderList();
     // 선택을 셸(대화창)에도 알린다(B16, 2026-08-19) — 「이거」가 이 이벤트를 가리키고,
     // fields가 오면 대화에 「고른 항목」 카드가 뜬다(본보기 approvals·vulnscan과 같은 모양).
-    // top===window(프로 단독 팝업)여도 보낸다 — applyPopout 릴레이가 IPC로 잇는다(P4 배관).
+    // 전송 규격(top 한 겹·팝업 릴레이·허용 키)은 공용 부품 selectnotify.js가 진다(2026-08-20 이관).
     if (e) {
-      try {
-        window.top.postMessage({
-          type: "gijo:select",
-          label: String(e.title || "").slice(0, 40),
-          text: "관제 이벤트 " + (e.entity ? e.entity + " · " : "") + (e.title || ""),
-          // 필드는 renderList가 그리는 실명 그대로(priority="P0"꼴·status·signals) — 지어내지 않는다.
-          fields: {
-            asset: e.entity || "", title: e.title || "",
-            severity: String(e.priority || ""),
-            status: (typeof STATUS_LABEL !== "undefined" && STATUS_LABEL[e.status]) || e.status || "open",
-            plain: (e.signals && e.signals.length ? e.signals.join(" · ") : "").slice(0, 160),
-          },
-        }, "*");
-      } catch (err) { /* 셸 밖 단독 열람 — 없던 일로 */ }
+      window.gijoSelectNotify({
+        label: String(e.title || "").slice(0, 40),
+        text: "관제 이벤트 " + (e.entity ? e.entity + " · " : "") + (e.title || ""),
+        // 필드는 renderList가 그리는 실명 그대로(priority="P0"꼴·status·signals) — 지어내지 않는다.
+        fields: {
+          asset: e.entity || "", title: e.title || "",
+          severity: String(e.priority || ""),
+          status: (typeof STATUS_LABEL !== "undefined" && STATUS_LABEL[e.status]) || e.status || "open",
+          plain: (e.signals && e.signals.length ? e.signals.join(" · ") : "").slice(0, 160),
+        },
+      });
     }
     const title = document.getElementById("anaTitle");
     const body = document.getElementById("anaBody");
@@ -729,7 +726,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     });
   })();
   document.getElementById("refreshBtn").addEventListener("click", refresh);
-  document.querySelectorAll("[data-page]").forEach(el => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+  document.querySelectorAll("[data-page]").forEach(el => el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page))));
 
   if(!window.gijo.isAuthenticated()){ window.gijo.navigateTo("login.html"); }
   else {
@@ -753,6 +750,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   })();
 </script>
 <script src="nav.js"></script>
+<script src="selectnotify.js"></script>
 <script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

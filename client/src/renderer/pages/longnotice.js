@@ -75,7 +75,7 @@
       b.addEventListener("click", function () {
         if (b.classList.contains("go")) {
           try { localStorage.setItem("gijo:report:focus", n.reportBase || ""); } catch (e) {}
-          if (api.navigateTo) api.navigateTo("report.html");
+          if (window.gijoOpenScreen) window.gijoOpenScreen("report.html", "보고"); else if (api.navigateTo) api.navigateTo("report.html");
         }
         el.remove();
       });

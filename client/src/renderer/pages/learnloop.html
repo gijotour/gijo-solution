@@ -644,7 +644,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     window.gijo.onLearnloopProgress(onProgress);
 
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
     document.getElementById("runBtn").addEventListener("click", onRun);
     document.getElementById("buildBtn").addEventListener("click", onBuild);
@@ -681,7 +681,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       loadCandidates();
     });
     document.getElementById("lcBulkBtn").addEventListener("click", onBulkAccept);
-    document.getElementById("lcGapGo").addEventListener("click", () => window.gijo.navigateTo("sessions.html"));
+    document.getElementById("lcGapGo").addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen("sessions.html", "작업 내역") : window.gijo.navigateTo("sessions.html")));
   }
 
   if (!window.gijo.isAuthenticated()) {

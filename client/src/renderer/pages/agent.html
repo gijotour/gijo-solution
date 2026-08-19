@@ -797,7 +797,7 @@ tr:last-child td{border-bottom:none;}
     window.gijo.onLlmActivity((evt) => { appendLlmEvent(evt); recordPerf(evt); });
 
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
     });
     // 지시바 배선도 걷었다(2026-08-01) — 부를 함수가 없어졌고, 애초에 붙일 요소도 없었다.
 
