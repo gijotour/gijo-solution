@@ -169,7 +169,10 @@ if (auditFrame) {
 }
 
 // ── ③ 부품 로드(배선 계약 — 「호출만 있고 로드 없음」 재발 방지 실측) ──────
-for (const [pg, lbl] of [["inventory.html", "자산"], ["hardening.html", "검증"], ["maintenance.html", "점검"], ["report.html", "보고"], ["learnloop.html", "학습"]]) {
+// ⚠ inventory.html은 검사하지 않는다 — assets.html로 흡수된 화면(nav.js TAB_REDIRECT,
+//   2026-08-02)이라 도킹으로 열면 assets로 넘어가 프레임이 없다. 팝업 시절(5.38까지)엔
+//   리다이렉트를 안 타 우연히 통과했다. assets 부품은 ④′(assets를 여는 검사) 뒤에서 확인.
+for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점검"], ["report.html", "보고"], ["learnloop.html", "학습"]]) {
   await 셸.evaluate(({ pg, lbl }) => window.gijoTabs && window.gijoTabs.open(pg, lbl), { pg, lbl });
   const fr = await 프레임찾기(pg, 8);
   const has = fr ? await fr.evaluate(() => typeof window.gijoSelectNotify === "function").catch(() => false) : false;
@@ -188,6 +191,12 @@ for (let i = 0; i < 10 && !자동카드; i++) {
   }, 카드전);
 }
 ok("화면 열기 → 현황 카드 자동(assets)", 자동카드);
+// assets 부품 확인 — 방금 ④′가 assets를 열었으니 프레임이 살아 있다(순서 계약).
+{
+  const fr = await 프레임찾기("assets.html", 6);
+  const has = fr ? await fr.evaluate(() => typeof window.gijoSelectNotify === "function").catch(() => false) : false;
+  ok("부품 로드: assets.html", has, fr ? "" : "프레임 못 찾음");
+}
 
 // ── ④ 데이터 카드 히트맵 보기(5.35.0 기능 회귀) ─────────────────────────
 const 히트 = await 셸.evaluate(() => {
