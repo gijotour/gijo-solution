@@ -295,7 +295,7 @@ export function 카드없는글로(answer: { output: string; dataCard: DataCard 
 // 메뉴·팔레트로 화면을 열면 셸(app.html open)이 이 라우트를 불러, 그 화면의 현황 카드를
 // 대화창에 자동으로 띄운다. 지시가 아니라 **조회**다 — 대화 기록에 가짜 사용자 발화를 남기지
 // 않으려고 dispatch를 거치지 않는다. 카드가 없는 화면은 none — 지어내지 않는다.
-type 화면카드종류 = "asset" | "ops" | "hardening" | "finding" | "sessions" | "fix" | "report" | "products" | "records" | "threat" | "aiteam" | "supervision";
+type 화면카드종류 = "asset" | "ops" | "hardening" | "finding" | "sessions" | "fix" | "report" | "products" | "records" | "threat" | "aiteam" | "supervision" | "mydocs";
 const 화면파일카드: Record<string, 화면카드종류> = {
   "assets.html": "asset",
   "discover.html": "ops", "analysis.html": "ops", "loganalysis.html": "ops",
@@ -311,6 +311,7 @@ const 화면파일카드: Record<string, 화면카드종류> = {
   "threat.html": "threat",
   "aihub.html": "aiteam", "agent.html": "aiteam",
   "supervision.html": "supervision", // AI 팀 감독(2026-08-20 ② — 사장님 「에이전트 감독도 필요」)
+  "mydocs.html": "mydocs", // 내 문서(2026-08-20 LLM 위키 — 개인 문서·정리본·공유)
 };
 
 export function registerScreenCardRoute(app: import("express").Express): void {
@@ -330,6 +331,7 @@ export function registerScreenCardRoute(app: import("express").Express): void {
     const 답 = kind === "asset" ? assetStatusAnswer(scope)
       : kind === "ops" ? await opsStatusAnswer()
       : kind === "hardening" ? hardeningStatusAnswer()
+      : kind === "mydocs" ? mydocsStatusAnswer(String((req as import("express").Request & { user?: { id?: string; username?: string } }).user?.id ?? (req as import("express").Request & { user?: { username?: string } }).user?.username ?? "unknown"))
       : kind === "supervision" ? supervisionStatusAnswer()
       : kind === "sessions" ? sessionsStatusAnswer()
       : kind === "fix" ? fixStatusAnswer()
@@ -382,6 +384,43 @@ export function supervisionStatusAnswer(): { output: string; dataCard: DataCard 
     },
   };
   return { output: `AI 팀 감독 — 오늘 호출 ${총호출}건 · 오류 ${총오류}건 · 무호출 팀원 ${무호출}명. 지표는 감독 도입일(2026-08-20)부터 쌓입니다 — 7일·30일 추이는 🗔 화면에서 봅니다.`, dataCard };
+}
+
+// 내 문서 카드(2026-08-20 LLM 위키 — 사장님 「나만의 문서 데이터 관리」). 이 카드만 **사람마다
+// 다르다**(userId 필수) — 개인 문서는 격리가 전부라, 호출자 것만 센다(personaldocs와 같은 원칙).
+export function mydocsStatusAnswer(userId: string): { output: string; dataCard: DataCard } {
+  const { listPersonalDocs } = require("./personaldocs") as typeof import("./personaldocs");
+  const 목록 = listPersonalDocs(userId);
+  const 정리본 = 목록.filter((d) => d.title.startsWith("정리본_")).length; // 라이트 「정리본」 관례 그대로
+  const 공유 = 목록.filter((d) => d.shared).length;
+  const 오늘 = 목록.filter((d) => Date.now() - d.updatedAt < 86400000).length;
+  const 최근 = 목록.slice(0, 8);
+  const dataCard: DataCard = {
+    title: "내 문서 — 개인 메모·정리본",
+    kpis: [
+      { label: "내 문서", value: String(목록.length), color: 목록.length ? undefined : "muted" },
+      { label: "오늘 쓴 것", value: String(오늘) },
+      { label: "정리본", value: String(정리본) },
+      { label: "회사 공유", value: String(공유), color: 공유 ? "warn" : undefined }, // 공유=노출이라 눈에 띄게
+    ],
+    screen: { page: "mydocs.html", label: "내 문서" },
+    pickKey: "t",
+    table: 목록.length ? {
+      cols: [{ key: "t", label: "제목" }, { key: "d", label: "수정" }, { key: "s", label: "범위" }],
+      shown: 최근.map((d) => ({
+        t: String(d.title).slice(0, 60),
+        d: new Date(d.updatedAt).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }),
+        s: d.shared ? "🏢 공유" : "👤 개인",
+      })),
+      totalCount: 목록.length,
+    } : undefined,
+  };
+  return {
+    output: 목록.length
+      ? `내 문서 — ${목록.length}건(정리본 ${정리본} · 회사 공유 ${공유}). 개인 문서는 내 질문에만 근거로 나옵니다 — 공유한 것만 팀 전체가 봅니다.`
+      : "내 문서가 아직 없습니다 — 🗔 화면에서 ✍ Smart MD로 쓰거나 .md 파일을 가져오세요. 개인 문서는 나만 봅니다.",
+    dataCard,
+  };
 }
 
 // ── 전 메뉴 카드 7종(2026-08-20 사장님 확정) — 숫자는 전부 DB 직접 계산, 표는 급한 순 상한 ──

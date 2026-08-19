@@ -596,6 +596,9 @@ migrate(
    );
    CREATE INDEX IF NOT EXISTS idx_personal_docs_user ON personal_docs(userId, updatedAt DESC);`
 );
+// LLM 위키(2026-08-20) — 개인 문서의 「회사에 공유」 표시. ragOptIn(내 AI가 읽게 — 나만)과
+// 다르다: shared=1이면 전 담당자의 답변 근거가 될 수 있다(명시적 옵트인·비밀 마스킹 후 인입).
+try { db.exec("ALTER TABLE personal_docs ADD COLUMN shared INTEGER NOT NULL DEFAULT 0"); } catch { /* 이미 있으면 무시 */ }
 
 // 업무정보 등급(기밀 C · 민감 S · 공개 O)과 계정별 열람 등급 — N2SF 대응(engine/grades.ts).
 //

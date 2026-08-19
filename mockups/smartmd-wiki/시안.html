@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS — 「문서작성(Smart MD) 업무 연계 + LLM 위키(나만의 문서) 1단계」 시안 (추천 1개)
+  경로: mockups/smartmd-wiki/시안.html · gijo-mockup(읽기 전용 정찰) · 제품 코드는 한 줄도 건드리지 않았다.
+
+  ── 배경(사장님 지시 2026-08-20, 판단 위임 후 반영 확정) ──────────────────────────────
+  ① 문서작성(Smart MD Studio — 동봉 독립 마크다운 편집기, 별도 창)을 인수인계·레포트 수정 등
+     기존 메뉴와 연계 ② LLM 위키로 나만의 문서 데이터 관리(제품 무관 개인 내용 포함)
+     ③ 보안담당자가 별도 편집기 없이 이걸로 일상 문서작업을 하게 유도.
+  확정 경계 2개(협상 대상 아님):
+    (a) 개인/회사 자료 검색 격리 — 1요건. 검색 범위 토글(개인만/회사만/둘 다), 개인 자료가
+        회사 답변에 안 샌다.
+    (b) 위키링크·백링크·그래프뷰 금지(범용 노트앱화 방지) — 위키 가치는 「정리본」(요약 문서)뿐.
+
+  ── 제품 확정 계약(지킴) ────────────────────────────────────────────────────────
+  프로 셸(2026-08-19 확정 "프로가 기준" — client/src/renderer/pages/app.html:49 주석
+  "🚀 프로 셸(2026-08-18 승인 시안)"): 메뉴성 열기 = 대화창 카드가 전부, 화면은 카드의 🗔로
+  무대(대화창 자리 전폭)에 — app.html:95-109 `body.pro-shell.stage-on`이 **이미 코드에 있다**
+  (2026-08-20 같은 날 반영, mockups/pro-stage/시안.html이 원안). 새 화면에 입력칸 금지(지시는
+  대화창) — 단 이 기능은 「쓰기」가 본질이라 예외 경계를 명확히 긋는다:
+    · 글 쓰기(제목·본문 작성) = Smart MD 별도 창(기존 관례 — 문서함·팀 사무실과 같은 「(창)」 예외,
+      nav.js:84 "이름 끝의 「(창)」은 규약이다").
+    · 무대 화면은 「내 문서」 목록·보기·정리본 **조작**뿐이다 — 검색범위 토글·필터·정리본
+      만들기·공유 버튼은 "AI에게 지시"가 아니라 기존 화면들에도 있는 평범한 CRUD 조작이라
+      원칙 위반이 아니다(아래 자가점검에서 근거를 댄다). 자유 텍스트 입력칸은 0개.
+
+  ── 대상 파일(정찰로 확인 — 추측 아님, 2026-08-20 기준 실제 코드) ────────────────────
+    · client/src/renderer/pages/app.html:46-54(격자: 표준 232px 사이드바 vs 프로 56px 레일)·
+      95-109(stage-on — 대화 숨김·화면 전폭, "10px 틈+그림자=대화가 이 아래 있다"는 시각 신호)·
+      213-249(console-side 도킹 380px 변수 `--console-w`).
+    · client/src/renderer/pages/console.js:36-83(cs-head/cs-body/cs-dock/cs-row/cs-sel 실제 CSS)·
+      485-493(근거 배지 실물: `"📄 근거: " + sources.join(" · ")`, `color:#6fdcb5` 인라인).
+    · client/src/renderer/pages/chatparts.js:61-83(dc-card/dc-kpis/dc-seg 카드 CSS)·319-339
+      ("여는 법을 모르면 버튼을 만들지 않는다" — 🗔 버튼 관례).
+    · client/src/renderer/pages/nav.js:65-88(TOP 고정열, `win:` 별도창 표기 규약)·153-162
+      (「추가 기능」 그룹 — 지금 로그분석·법령판례·제품소개·업무넘기기 4항목, 신규 「내 문서」 후보 자리).
+    · client/src/main.ts:674-786(Smart MD 창 — 전용 세션 `persist:gijo-smartmd`, CSP로 바깥
+      요청 차단, `setWindowOpenHandler`로 새 창 전부 거절) · client/src/smartmd-preload.ts
+      (그 창에 내주는 API는 **딱 둘**: `isElectron/platform` 상수와 `exportPdf` — **GIJO 서버·
+      인증·파일 API는 하나도 없다**, 검토관 지적 H6로 의도적으로 비움).
+    · server/src/engine/personaldocs.ts(전체) — **이미 있는** 개인 문서 CRUD(제목+본문,
+      `ragOptIn`). ⚠ 88행 `syncRag`가 켜면 `GLOBAL_SCOPE`로 인입한다 — "이번 요건(개인이 회사
+      답변에 안 샘)"과 정면으로 부딪히는 대목(아래 §기술근거에서 다룬다).
+    · server/src/engine/memory.ts:47(scope 컬럼)·864-874(`scope IN (...)` 하이브리드 검색
+      필터 — 이미 있는 메커니즘, 이번 요건이 그 위에 얹힐 자리).
+    · client/src/renderer/pages/docbox.html:169-175(GROUP.mine)·217-253(제품문서+개인문서
+      병합 로드)·297-460(개인 문서 편집기 실물 — 지금은 **문서함 창 안에만** 있다, 평범한
+      textarea).
+    · client/src/renderer/pages/lite-memory.html:188-375 — 「정리본」 관례가 **이미 구현·검증**돼
+      있다: 새 표를 안 만들고 `"정리본_" + 원본id`로 이름 붙인 **평범한 문서**로 인입한다.
+    · client/src/renderer/pages/handover.html:39-72(panel/doclist/docchip 스타일)·107-113
+      (2단계 "문서 올리기" — 다듬기 버튼을 붙일 실제 자리).
+    · client/src/renderer/pages/report.html:8-70(kpi-mini/panel/table 스타일)·156-160
+      (kpi-strip)·182-204("리포트 이력" 표 — 유형·대상자산·생성일시·조작 4열, 조작 열에
+      다듬기 버튼을 얹을 실제 자리).
+    · GIJO_AS_지식그래프_LLM위키_도입계획.md §8 — "ⓑ 위키 정리본(후-6)"은 2026-08-11 **실사용
+      신호 0건**으로 보류됐다. ⚠ 그 판정을 뒤집는 게 아니다 — 그건 "고객 보안 지식을 LLM이
+      자동 정리해 회사 전체가 근거로 쓰는" 안이었고, 이번 것은 "담당자 개인 메모"라 성격이
+      다르다(아래 §범위 밖 참고에서 한 번 더 정리).
+
+  ── 설계 전 조사(2026-08-20 확인) ──────────────────────────────────────────────
+  [외부 1] Pinecone, "Multi-Tenancy in Vector Databases"
+    https://www.pinecone.io/learn/series/vector-databases-in-production-for-busy-engineers/vector-database-multi-tenancy/
+    핵심: "격리는 벡터 DB 질의 계층에서 강제한다 — 시스템 프롬프트나 LLM 판단에 맡기지 않는다."
+    → 근거: 개인/회사 격리를 "모델에게 잘 답하라고 시키는" 방식이 아니라 **검색 쿼리 레벨
+      하드 필터**(scope 조건절)로 구현한다(아래 §기술근거·자가점검).
+  [외부 2] Apple HIG "Segmented Controls" / Material Design "Segmented Buttons" (Mobbin·Eleken
+    정리 요약, 2026-08-20 확인) — "세그먼트 컨트롤은 **같은 데이터를 다른 관점으로** 볼 때
+    적합하다(같은 문맥, 다른 필터)."
+    → 근거: 검색 범위 토글(개인만/회사만/둘 다)을 텍스트 드롭다운이 아니라 세그먼트 컨트롤로
+      그린다 — "내 문서라는 같은 자료를 어느 폭으로 볼지"의 전형적 사례. 우리 제품에 이미
+      같은 부품이 있다(chatparts.js `.dc-seg` — 목록/히트맵 전환에 실제로 쓰임, 그대로 재사용).
+  [내부 선례 1] server/src/engine/personaldocs.ts — "존재 자체를 안 새게" 원칙(403 아니라 404,
+      9-11행 주석)이 이미 있다. 이번 시안의 격리도 같은 태도의 연장(단, 검색 결과 후보 단계로
+      확장해야 한다는 것이 새로 드러난 간극).
+  [내부 선례 2] lite-memory.html의 "정리본" 관례 — LLM이 요약을 만들되 **원문 밖 내용을 지어내면
+      안 된다**는 프롬프트 원칙(276행), 저장은 새 테이블 없이 접두어 문서로.
+
+  ── 범위 — 이 파일 하나. 장면 4개(카드/무대/연계 다리/격리 증명) + 설명(왜·기각·포기·밀도·
+    구현메모·자가점검). 제품 코드는 전혀 건드리지 않았다.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — Smart MD 업무 연계 + LLM 위키(나만의 문서) 1단계 시안</title>
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;
+    --mk-page:#161615;--mk-accent:#5fa1ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--mk-page);color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+
+  /* ── 시안 조작 바(제품 UI 아님) ─────────────────────────────────────────────── */
+  .mk-bar{position:sticky;top:0;z-index:50;background:#101012;border-bottom:1px dashed rgba(95,161,255,.4);
+    padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .mk-badge{font-size:10.5px;font-weight:800;letter-spacing:.04em;color:#0b0b0c;background:var(--mk-accent);border-radius:5px;padding:2px 7px;flex:0 0 auto;}
+  .mk-title{font-size:13px;font-weight:800;color:#fff;flex:0 0 auto;}
+  .mk-scenes{display:flex;gap:6px;flex:0 0 auto;flex-wrap:wrap;}
+  .mk-scenebtn{font-size:11.75px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border-strong);
+    border-radius:8px;padding:6px 11px;cursor:pointer;font-family:inherit;}
+  .mk-scenebtn:hover{color:#fff;border-color:var(--mk-accent);}
+  .mk-scenebtn.on{color:#0b0b0c;background:var(--mk-accent);border-color:var(--mk-accent);}
+  .mk-docLink{font-size:11.75px;color:var(--mk-accent);text-decoration:none;flex:0 0 auto;margin-left:auto;}
+  .mk-docLink:hover{text-decoration:underline;}
+  .mk-caption{width:100%;font-size:12px;color:var(--muted);line-height:1.6;padding-top:2px;}
+  .mk-caption b{color:#fff;}
+  .mk-disclaimer{width:100%;font-size:11px;color:var(--muted-2);background:rgba(240,160,32,.06);
+    border:1px dashed rgba(240,160,32,.4);border-radius:6px;padding:5px 9px;margin-top:2px;line-height:1.6;}
+  .mk-disclaimer b{color:var(--amber);}
+
+  /* ── 장치 프레임 — 1600×900 창을 그대로 그리고 70%로 축소(수치는 1600×900 기준) ── */
+  .stagewrap{display:flex;justify-content:center;padding:26px 16px 10px;}
+  .device-frame{overflow:hidden;border-radius:14px;box-shadow:0 30px 70px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);
+    width:1120px;height:630px;flex:0 0 auto;}
+  .device{width:1600px;height:900px;transform:scale(.7);transform-origin:top left;background:var(--bg);
+    display:flex;flex-direction:column;overflow:hidden;}
+
+  /* ── 실제 셸 프레임(app.html 그대로) ───────────────────────────────────────── */
+  .topbar{flex:0 0 auto;height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;
+    border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .topbar .spacer{flex:1;}
+  .tb-clock{font-size:12.25px;color:var(--muted);}
+  .tb-status{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--teal);
+    background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);padding:3px 10px;border-radius:16px;}
+  .tb-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  .appgrid{flex:1 1 auto;display:flex;min-height:0;}
+  /* 프로 셸 56px 아이콘 레일(app.html:59-83 그대로, `#gijoRail`) */
+  .rail{width:56px;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 0;
+    border-right:1px solid var(--border);background:var(--panel-2);}
+  .rail button{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid transparent;
+    color:var(--muted);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:default;
+    font-family:inherit;flex:0 0 auto;}
+  .rail button:hover{background:rgba(255,255,255,.06);color:#fff;border-color:var(--border);}
+  .rail button.hi{border-color:rgba(95,161,255,.5);color:var(--blue-light);}
+  .rail-foot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:5px;}
+  .rail-avatar{width:28px;height:28px;border-radius:50%;background:var(--panel);border:1px solid var(--border-strong);
+    display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;color:var(--muted);}
+
+  .workarea{flex:1 1 auto;position:relative;min-width:0;background:var(--bg);overflow:hidden;}
+  .scene{position:absolute;inset:0;display:none;flex-direction:column;min-height:0;}
+  .scene.on{display:flex;}
+
+  /* ── 대화창 뼈대(console.js CSS 실측값 그대로: cs-head 36행·cs-body 45행·cs-dock 238행) ── */
+  .cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12.25px;
+    color:var(--muted);border-bottom:1px solid rgba(255,255,255,.05);}
+  .cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);
+    border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}
+  .cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+  .cs-btn{flex:0 0 auto;font-size:12.25px;font-weight:700;color:var(--muted);background:transparent;
+    border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:3px 9px;cursor:default;white-space:nowrap;}
+  .cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:2px;}
+  .cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+  .cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);
+    display:flex;align-items:center;justify-content:center;font-size:12.25px;}
+  .cs-row .cb{flex:1;min-width:0;}
+  .cs-row .cn{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:2px;}
+  .cs-row .cn .ct{font-weight:500;color:var(--muted-2);margin-left:6px;}
+  .cs-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px 0 8px;text-align:center;}
+  .ce-greet{font-size:24px;font-weight:800;color:var(--text);letter-spacing:-.3px;}
+  .ce-honest{font-size:11.75px;color:var(--muted-2);max-width:520px;line-height:1.6;}
+  .cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}
+  .cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;
+    color:var(--text);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}
+  .cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel);color:var(--muted);
+    border:1px solid var(--border-strong);font-size:17px;cursor:default;}
+  .cs-send{background:var(--blue);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;
+    padding:11px 18px;cursor:default;}
+
+  /* ── 현황 카드(chatparts.js CSS 실측값 그대로: 61-83행) ─────────────────────── */
+  .dc-card{margin-top:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:var(--panel-2);}
+  .dc-head{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.08);
+    font-size:12.75px;font-weight:800;color:var(--text);}
+  .dc-tag{font-size:10.75px;font-weight:700;color:var(--muted-2);margin-left:2px;}
+  .dc-open{margin-left:auto;font-size:12px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.10);
+    border:1px solid rgba(59,130,246,.35);border-radius:7px;padding:3px 9px;cursor:pointer;font-family:inherit;}
+  .dc-open:hover{background:rgba(59,130,246,.18);}
+  .dc-kpis{display:flex;border-bottom:1px solid rgba(255,255,255,.08);}
+  .dc-kpi{flex:1;padding:7px 11px;border-right:1px solid rgba(255,255,255,.06);}
+  .dc-kpi:last-child{border-right:0;}
+  .dc-kl{font-size:11px;color:var(--muted-2);}
+  .dc-kv{font-size:15px;font-weight:800;color:#fff;}
+  .dc-kv.warn{color:var(--amber);}.dc-kv.ok{color:var(--teal);}
+  .dc-card table{width:100%;border-collapse:collapse;font-size:12.25px;}
+  .dc-card th{text-align:left;padding:3px 10px;color:var(--muted-2);font-size:11.5px;border-bottom:1px solid rgba(255,255,255,.08);}
+  .dc-card td{padding:4px 10px;line-height:1.35;border-bottom:1px solid rgba(255,255,255,.05);}
+  .dc-card tbody tr:nth-child(even){background:rgba(255,255,255,.025);}
+  .dc-more{padding:5px 11px;font-size:11.75px;color:var(--muted-2);}
+  .gcp-next{margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .gcp-nh{font-size:11px;font-weight:800;color:var(--muted-2);margin-right:2px;}
+  .gcp-nc{font-size:11.75px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.08);
+    border:1px solid rgba(59,130,246,.3);border-radius:12px;padding:3px 10px;cursor:default;font-family:inherit;}
+
+  /* 범위 배지 — 이 시안의 핵심 신설 요소(👤 개인 / 🏢 회사 / 🏢+ 정리본) */
+  .scope-badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;border-radius:11px;padding:1.5px 8px;white-space:nowrap;}
+  .scope-badge.personal{background:rgba(139,124,240,.16);color:#c9beff;border:1px solid rgba(139,124,240,.45);}
+  .scope-badge.company{background:rgba(59,130,246,.14);color:var(--blue-light);border:1px solid rgba(59,130,246,.4);}
+  .scope-badge.digest{background:rgba(30,185,128,.14);color:var(--teal);border:1px solid rgba(30,185,128,.4);}
+
+  /* ── 장면 B: 무대(app.html stage-on 재현) ─────────────────────────────────── */
+  .stagepeek{position:absolute;left:0;right:0;bottom:0;height:30px;display:flex;align-items:flex-start;
+    justify-content:center;padding-top:6px;pointer-events:none;}
+  .stagepeek .peekdock{width:min(520px,84%);height:20px;border-radius:10px;background:var(--panel);
+    border:1px solid var(--border-strong);opacity:.5;display:flex;align-items:center;justify-content:center;
+    font-size:10.5px;color:var(--muted-2);}
+  .stage{position:absolute;left:0;right:0;top:0;bottom:10px;background:var(--bg);
+    border-radius:0 0 12px 12px;box-shadow:0 20px 34px -12px rgba(0,0,0,.65);
+    display:flex;flex-direction:column;overflow:hidden;z-index:3;}
+  .stagehead{flex:0 0 auto;height:40px;display:flex;align-items:center;gap:10px;padding:0 14px;
+    border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .stageback{font-size:12px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border-strong);
+    border-radius:7px;padding:5px 11px;cursor:pointer;font-family:inherit;}
+  .stageback:hover{color:#fff;border-color:var(--blue);}
+  .stagename{font-size:13px;font-weight:800;color:var(--text);}
+  .stagesample{margin-left:auto;font-size:11px;color:var(--muted-2);}
+  .stagebody{flex:1 1 auto;min-height:0;overflow-y:auto;padding:16px 20px;}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+  .kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 14px;}
+  .kpi-mini-label{font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:5px;}
+  .kpi-mini-value{font-size:18px;font-weight:800;color:#fff;}
+
+  /* 검색범위 세그먼트 컨트롤 — chatparts.js `.dc-seg`(79-82행)를 그대로 확대 재사용 */
+  .scope-toggle{display:inline-flex;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);
+    border-radius:9px;padding:3px;gap:2px;}
+  .scope-toggle span{padding:6px 13px;border-radius:6px;font-size:12px;font-weight:800;color:var(--muted-2);cursor:pointer;white-space:nowrap;}
+  .scope-toggle span.on{background:rgba(59,130,246,.24);color:#fff;}
+  .scope-toggle span:not(.on):hover{color:#fff;}
+
+  .stagetoolbar{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:10px 14px;margin-bottom:8px;flex-wrap:wrap;}
+  .stagetoolbar input{flex:1;min-width:180px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;
+    color:var(--text);font-size:12.5px;padding:8px 11px;outline:none;font-family:inherit;}
+  .stage-write{margin-left:auto;background:rgba(30,185,128,.14);border:1.5px dashed var(--teal);color:#fff;
+    border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .stage-write:hover{background:rgba(30,185,128,.22);}
+  .stagehint{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#ffd9a8;
+    border:1px dashed rgba(240,160,32,.5);background:rgba(240,160,32,.06);border-radius:8px;
+    padding:6px 11px;margin-bottom:10px;}
+  .stagehint b{font-weight:800;}
+  .stage-interactive{font-size:11px;color:var(--teal);margin-bottom:8px;}
+
+  .stagetable{width:100%;border-collapse:collapse;font-size:12.25px;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;overflow:hidden;}
+  .stagetable th{text-align:left;white-space:nowrap;padding:8px 12px;font-size:11.5px;font-weight:700;
+    color:var(--muted-2);background:var(--panel-2);border-bottom:1px solid var(--border);}
+  .stagetable td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--text);vertical-align:middle;}
+  .stagetable tbody tr:last-child td{border-bottom:0;}
+  .row-acts{display:flex;gap:5px;flex-wrap:wrap;}
+  .act-btn{font-size:11px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.08);
+    border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:3px 8px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .act-btn:hover{background:rgba(59,130,246,.16);}
+  .act-btn.ghost{color:var(--muted-2);background:transparent;border-color:var(--border-strong);cursor:default;}
+  .share-confirm{display:none;margin-top:6px;padding:9px 11px;background:rgba(240,160,32,.06);
+    border:1px dashed rgba(240,160,32,.45);border-radius:8px;font-size:11.25px;color:var(--muted);line-height:1.65;}
+  .share-confirm.show{display:block;}
+  .share-confirm b{color:#ffd9a8;}
+  .share-confirm .yn{margin-top:6px;display:flex;gap:6px;}
+  .share-confirm .yn button{font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;cursor:default;font-family:inherit;}
+  .share-confirm .yn .yes{background:rgba(30,185,128,.16);border:1px solid var(--teal);color:#6fdcb5;}
+  .share-confirm .yn .no{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+  .digest-note{display:none;margin-top:6px;font-size:11px;color:var(--teal);}
+  .digest-note.show{display:block;}
+
+  /* ── 연계 다리(장면 C) — 실제 다른 두 화면 재현 + 플로우 다이어그램 ─────────────── */
+  .bridgewrap{max-width:1180px;margin:0 auto;padding:26px 20px 10px;}
+  .frame-cap{font-size:11px;color:var(--muted-2);font-family:Consolas,"Cascadia Mono",monospace;margin-bottom:5px;}
+  .frame-cap b{color:var(--blue-light);font-family:inherit;}
+  .bridge-cols{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;margin-bottom:22px;}
+  .bridge-col{flex:1 1 380px;min-width:340px;}
+
+  /* handover.html 재현(39-72행 CSS 실측값) */
+  .ho-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .ho-title{font-size:13px;font-weight:800;color:#fff;margin-bottom:9px;}
+  .ho-doclist{display:flex;flex-wrap:wrap;gap:5px;}
+  .ho-chip{font-size:11.75px;color:#cfd6ea;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;
+    padding:3px 8px;display:inline-flex;align-items:center;gap:6px;}
+  .ho-newbtn{font-size:11.75px;font-weight:700;color:#fff;background:rgba(30,185,128,.16);
+    border:1.5px dashed var(--teal);border-radius:6px;padding:4px 9px;cursor:default;display:inline-flex;align-items:center;gap:5px;}
+
+  /* report.html 재현(8-70행 CSS 실측값) */
+  .rp-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .rp-title{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:10px;}
+  .rp-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .rp-table th{text-align:left;font-size:10.75px;font-weight:700;padding:8px 8px;color:var(--muted-2);
+    text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);}
+  .rp-table td{padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+  .rp-table tr:last-child td{border-bottom:none;}
+  .rp-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;background:rgba(59,130,246,.15);color:var(--blue-light);}
+
+  .flowrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;margin:18px 0;}
+  .flowbox{background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;
+    font-size:12px;color:var(--text);text-align:center;max-width:190px;line-height:1.55;}
+  .flowbox .k{font-size:10.5px;color:var(--muted-2);font-weight:800;margin-bottom:4px;letter-spacing:.03em;}
+  .flowarrow{font-size:18px;color:var(--muted-2);flex:0 0 auto;}
+  .flow-manual{border-style:dashed;border-color:rgba(240,160,32,.5);background:rgba(240,160,32,.05);}
+
+  .smd-mini{width:220px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 14px 30px rgba(0,0,0,.5);background:#0f172a;}
+  .smd-mini .tb{height:22px;background:#161d2e;display:flex;align-items:center;gap:5px;padding:0 8px;border-bottom:1px solid #232c40;}
+  .smd-mini .tb span{width:6px;height:6px;border-radius:50%;background:#39415a;}
+  .smd-mini .hd{height:26px;background:linear-gradient(135deg,#1a2036,#151a2c);display:flex;align-items:center;padding:0 8px;
+    font-size:10px;color:#c8cede;font-weight:700;border-bottom:1px solid #232c40;}
+  .smd-mini .bd{padding:8px;display:flex;gap:6px;}
+  .smd-mini .ed,.smd-mini .pv{flex:1;}
+  .smd-mini .ln{height:5px;border-radius:3px;background:#232c40;margin-bottom:5px;}
+  .smd-mini .ln.w80{width:80%}.smd-mini .ln.w60{width:60%}.smd-mini .ln.w40{width:40%}
+
+  /* ── 설명(doc) 패널 — pro-stage 시안과 같은 결 ───────────────────────────────── */
+  .doc{max-width:960px;margin:0 auto;padding:44px 22px 90px;}
+  .doc h1{font-size:19px;color:#fff;margin:0 0 6px;}
+  .doc .lead{font-size:12.5px;color:var(--muted);margin-bottom:24px;line-height:1.7;}
+  .tldr{border:1px solid var(--border-strong);background:var(--panel-2);border-radius:12px;padding:15px 18px;margin-bottom:28px;}
+  .tldr .h{font-size:11.5px;font-weight:800;color:var(--mk-accent);margin-bottom:7px;letter-spacing:.02em;}
+  .tldr li{font-size:12.75px;line-height:1.75;color:var(--text);}
+  .doc section{margin-bottom:30px;padding-left:16px;border-left:3px solid var(--border-strong);}
+  .doc section.why{border-left-color:var(--blue);}
+  .doc section.give{border-left-color:var(--amber);}
+  .doc section.density{border-left-color:var(--teal);}
+  .doc section.impl{border-left-color:var(--purple);}
+  .doc section.check{border-left-color:#8b7cf0;}
+  .doc h2{font-size:14.25px;color:#fff;margin:0 0 9px;display:flex;align-items:center;gap:8px;}
+  .doc p{font-size:12.75px;line-height:1.75;color:var(--muted);margin:0 0 9px;}
+  .doc ul{margin:0 0 9px;padding-left:19px;}
+  .doc li{font-size:12.75px;line-height:1.72;color:var(--muted);margin-bottom:4px;}
+  .doc li b{color:var(--text);}
+  .doc code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:0 5px;color:var(--blue-light);font-size:12px;}
+  .num-table{width:100%;border-collapse:collapse;margin:9px 0 6px;font-size:12.5px;}
+  .num-table th{text-align:left;padding:6px 9px;color:var(--muted-2);font-size:11.5px;border-bottom:1px solid var(--border-strong);}
+  .num-table td{padding:6px 9px;border-bottom:1px solid var(--border);color:var(--text);}
+  .num-table td.delta{color:var(--teal);font-weight:700;}
+  .num-table td.delta.flat{color:var(--muted-2);font-weight:400;}
+  .num-table td.delta.bad{color:#fca5a5;font-weight:700;}
+  .checklist{list-style:none;margin:0;padding:0;}
+  .checklist li{display:flex;gap:8px;align-items:flex-start;font-size:12.75px;line-height:1.6;color:var(--text);margin-bottom:9px;}
+  .checklist .ok{color:var(--teal);flex:0 0 auto;font-weight:800;}
+  .rejected{margin-top:11px;padding:12px 14px;background:rgba(255,255,255,.03);border-radius:8px;}
+  .rejected .h{font-size:11.5px;font-weight:800;color:var(--muted-2);margin-bottom:6px;}
+  .src{font-size:11.25px;color:var(--muted-2);margin-top:2px;}
+  .src a{color:var(--blue-light);}
+  footer.doc-foot{max-width:960px;margin:0 auto;padding:0 22px 60px;font-size:11.25px;color:var(--muted-2);line-height:1.7;}
+</style>
+</head>
+<body>
+
+  <!-- ── 시안 조작 바(제품 UI 아님) ─────────────────────────────────────────── -->
+  <div class="mk-bar">
+    <span class="mk-badge">시안 · MOCKUP</span>
+    <span class="mk-title">Smart MD 업무 연계 + LLM 위키(나만의 문서) 1단계</span>
+    <div class="mk-scenes">
+      <button class="mk-scenebtn on" data-scene="A">장면1 · 「내 문서」 카드</button>
+      <button class="mk-scenebtn" data-scene="B">장면2 · 내 문서 무대</button>
+      <button class="mk-scenebtn" data-scene="C">장면3 · 연계 다리</button>
+      <button class="mk-scenebtn" data-scene="D">장면4 · 격리 증명</button>
+    </div>
+    <a class="mk-docLink" href="#doc">↓ 설명(왜·기각·포기·숫자·구현메모·자가점검)</a>
+    <div class="mk-caption" id="mkCaption"></div>
+    <div class="mk-disclaimer">이 페이지는 <b>정적 시안</b>입니다. 눌러도 반응하는 것은 <b>장면 전환</b>·
+      <b>장면1의 🗔 열기</b>·<b>장면2의 검색범위 토글(실제 표 필터링)</b>·<b>회사에 공유/정리본 만들기의
+      안내문 펼치기</b>뿐입니다 — 그 밖의 모든 버튼·입력칸은 그림이며 동작하지 않습니다(정직한
+      구현 원칙은 시안에도 적용).</div>
+  </div>
+
+  <!-- ══════════════════ 장면 1·2·4 — 프로 셸 장치 프레임 ══════════════════ -->
+  <div class="stagewrap" id="deviceWrap">
+    <div class="device-frame">
+      <div class="device">
+
+        <div class="topbar">
+          <div class="spacer"></div>
+          <span class="tb-clock">10:14</span>
+          <span class="tb-status"><span class="dot"></span>연결됨</span>
+        </div>
+
+        <div class="appgrid">
+          <nav class="rail">
+            <button title="전체 메뉴(Ctrl+K) — 「추가 기능 > 📝 내 문서」가 여기서 열립니다(목업 동작 안 함)">☰</button>
+            <button title="작업 내역 — (목업) 동작하지 않음">🕘</button>
+            <button title="즐겨찾기 — (목업) 동작하지 않음">⭐</button>
+            <button title="열려 있는 창 목록 — (목업) 동작하지 않음">🗔</button>
+            <button title="새 대화 시작 — (목업) 동작하지 않음">💬</button>
+            <div class="rail-foot"><div class="rail-avatar" title="계정">담당</div></div>
+          </nav>
+
+          <div class="workarea">
+
+            <!-- ══ 장면 A — 「내 문서」 카드(대화창, 메뉴로 자동 뜬 현황 카드) ══ -->
+            <div class="scene on" id="sceneA">
+              <div class="cs-head">
+                <span class="cs-hint">사이드바 「추가 기능 › 📝 내 문서」를 누르면 자동으로 뜨는 카드입니다 — dispatch(AI 호출) 없이 서버 집계만으로 그려집니다</span>
+                <button class="cs-btn" title="(목업) 동작하지 않음">⧉ 창으로</button>
+              </div>
+              <div class="cs-body">
+                <div class="cs-hero">
+                  <div class="ce-greet">안녕하세요, 김보안 담당자님</div>
+                  <div class="ce-honest">이 AI는 사내 자료로만 답합니다 — 개인 문서는 담당자 본인 질문에만, 회사에 공유한 것만 다른 담당자 질문의 근거가 됩니다.</div>
+                </div>
+
+                <div class="cs-row event">
+                  <div class="ci">🗔</div>
+                  <div class="cb">
+                    <div class="cn">내 문서 — 현황<span class="ct">10:14:02</span></div>
+                    <div class="dc-card">
+                      <div class="dc-head">
+                        내 문서 — 현황<span class="dc-tag">(예시 데이터)</span>
+                        <button class="dc-open" id="cardOpenBtn">🗔 내 문서 열기</button>
+                      </div>
+                      <div class="dc-kpis">
+                        <div class="dc-kpi"><div class="dc-kl">내 문서</div><div class="dc-kv">18</div></div>
+                        <div class="dc-kpi"><div class="dc-kl">오늘 쓴 것</div><div class="dc-kv ok">2</div></div>
+                        <div class="dc-kpi"><div class="dc-kl">정리본</div><div class="dc-kv">5</div></div>
+                        <div class="dc-kpi"><div class="dc-kl">회사 공유</div><div class="dc-kv warn">3</div></div>
+                      </div>
+                      <table>
+                        <thead><tr><th>최근 문서</th><th>수정일</th><th>범위</th></tr></thead>
+                        <tbody>
+                          <tr><td>점검메모_0819_방화벽정책변경.md</td><td>2026-08-19</td><td><span class="scope-badge personal">👤 개인</span></td></tr>
+                          <tr><td>정리본_웹취약점_점검보고서_v1.0.md</td><td>2026-08-18</td><td><span class="scope-badge digest">🏢 정리본</span></td></tr>
+                          <tr><td>인수인계_방화벽운영노하우.md</td><td>2026-08-14</td><td><span class="scope-badge company">🏢 공유</span></td></tr>
+                        </tbody>
+                      </table>
+                      <div class="dc-more">외 15건 — 🗔 화면에서 전체를 봅니다</div>
+                    </div>
+                    <div class="gcp-next">
+                      <span class="gcp-nh">➡ 다음 작업</span>
+                      <span class="gcp-nc" title="(목업) 동작하지 않음">정리본만 보여줘</span>
+                      <span class="gcp-nc" title="(목업) 동작하지 않음">회사에 공유한 문서 뭐 있어?</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="cs-dock">
+                <button class="cs-plus" title="(목업) 동작하지 않음">＋</button>
+                <input readonly placeholder="「내 문서」 화면에 대해 지시…" title="(목업) 입력되지 않습니다">
+                <button class="cs-send" title="(목업) 동작하지 않음">전송</button>
+              </div>
+            </div>
+
+            <!-- ══ 장면 B — 내 문서 무대(🗔를 누른 순간, app.html stage-on 재현) ══ -->
+            <div class="scene" id="sceneB">
+              <div class="stagepeek"><div class="peekdock">＋　지시를 입력하세요…　　전송</div></div>
+              <div class="stage">
+                <div class="stagehead">
+                  <button class="stageback" id="stageBackBtn">← 대화로</button>
+                  <span class="stagename">📝 내 문서</span>
+                  <span class="stagesample">예시 데이터</span>
+                </div>
+                <div class="stagebody">
+                  <div class="kpi-strip">
+                    <div class="kpi-mini"><div class="kpi-mini-label">내 문서</div><div class="kpi-mini-value">18</div></div>
+                    <div class="kpi-mini"><div class="kpi-mini-label">오늘 쓴 것</div><div class="kpi-mini-value">2</div></div>
+                    <div class="kpi-mini"><div class="kpi-mini-label">정리본</div><div class="kpi-mini-value">5</div></div>
+                    <div class="kpi-mini"><div class="kpi-mini-label">회사 공유</div><div class="kpi-mini-value">3</div></div>
+                  </div>
+
+                  <div class="stagetoolbar">
+                    <span style="font-size:11.5px;color:var(--muted-2);font-weight:700;flex:0 0 auto">검색 범위</span>
+                    <div class="scope-toggle" id="scopeToggle">
+                      <span data-v="personal">👤 개인만</span>
+                      <span data-v="company">🏢 회사만</span>
+                      <span class="on" data-v="both">둘 다</span>
+                    </div>
+                    <input readonly placeholder="제목·태그로 좁히기(필터 — AI 지시 아님)" title="(목업) 입력되지 않습니다">
+                    <button class="stage-write" id="smdOpenBtn">✍ Smart MD로 쓰기</button>
+                  </div>
+                  <div class="stage-interactive">☞ 위 「검색 범위」를 눌러 보세요 — 아래 표가 실제로 걸러집니다(이 시안에서 유일하게 데이터가 진짜로 바뀌는 조작).</div>
+                  <div class="stagehint">☞ <b>회사에 공유</b>를 누르면 비밀번호·계정정보를 자동 검사(마스킹)한 뒤 한 번 더 확인을 받습니다 — 개인 문서는 기본이 비공개입니다.</div>
+
+                  <table class="stagetable" id="stageDocTable">
+                    <thead><tr><th>제목</th><th>태그</th><th>범위</th><th>수정일</th><th>조치</th></tr></thead>
+                    <tbody>
+                      <tr data-scope="personal">
+                        <td>점검메모_0819_방화벽정책변경.md</td><td>방화벽</td><td><span class="scope-badge personal">👤 개인</span></td><td>2026-08-19</td>
+                        <td>
+                          <div class="row-acts">
+                            <button class="act-btn demo-digest">정리본 만들기</button>
+                            <button class="act-btn" id="shareBtn1">회사에 공유</button>
+                          </div>
+                          <div class="digest-note">정리본은 이 PC의 모델이 만듭니다 — 30초~1분쯤 걸립니다(lite-memory.html 실제 문구 재사용).</div>
+                          <div class="share-confirm" id="shareConfirm1">
+                            <b>이 문서를 회사 전체 검색에 포함할까요?</b><br>
+                            다른 담당자 질문에도 근거로 나올 수 있습니다. 비밀번호·계정정보는 저장 전 자동으로 가려집니다(마스킹) —
+                            그래도 내용을 한 번 더 확인해 주세요.
+                            <div class="yn"><button class="yes">그래도 공유</button><button class="no">취소</button></div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr data-scope="personal">
+                        <td>이직인수인계_체크리스트.md</td><td>인수인계</td><td><span class="scope-badge personal">👤 개인</span></td><td>2026-08-17</td>
+                        <td><div class="row-acts"><button class="act-btn demo-digest">정리본 만들기</button><button class="act-btn">회사에 공유</button></div><div class="digest-note">정리본은 이 PC의 모델이 만듭니다 — 30초~1분쯤 걸립니다.</div></td>
+                      </tr>
+                      <tr data-scope="company">
+                        <td>정리본_웹취약점_점검보고서_v1.0.md</td><td>취약점</td><td><span class="scope-badge digest">🏢 정리본</span></td><td>2026-08-18</td>
+                        <td><div class="row-acts"><button class="act-btn ghost">원본 보기</button></div></td>
+                      </tr>
+                      <tr data-scope="company">
+                        <td>인수인계_방화벽운영노하우.md</td><td>인수인계</td><td><span class="scope-badge company">🏢 공유</span></td><td>2026-08-14</td>
+                        <td><div class="row-acts"><button class="act-btn ghost">공유 중(관리자만 취소)</button></div></td>
+                      </tr>
+                      <tr data-scope="personal">
+                        <td>회의록_0812_주간보안점검.md</td><td>회의록</td><td><span class="scope-badge personal">👤 개인</span></td><td>2026-08-12</td>
+                        <td><div class="row-acts"><button class="act-btn demo-digest">정리본 만들기</button><button class="act-btn">회사에 공유</button></div><div class="digest-note">정리본은 이 PC의 모델이 만듭니다 — 30초~1분쯤 걸립니다.</div></td>
+                      </tr>
+                      <tr data-scope="personal">
+                        <td>개인메모_비밀번호규칙초안.md</td><td>메모</td><td><span class="scope-badge personal">👤 개인</span></td><td>2026-08-10</td>
+                        <td><div class="row-acts"><button class="act-btn demo-digest">정리본 만들기</button><button class="act-btn">회사에 공유</button></div><div class="digest-note">정리본은 이 PC의 모델이 만듭니다 — 30초~1분쯤 걸립니다.</div></td>
+                      </tr>
+                      <tr data-scope="company">
+                        <td>정리본_KISA_21대위협_요약.md</td><td>표준</td><td><span class="scope-badge digest">🏢 정리본</span></td><td>2026-08-09</td>
+                        <td><div class="row-acts"><button class="act-btn ghost">원본 보기</button></div></td>
+                      </tr>
+                      <tr data-scope="personal">
+                        <td>장애대응_방화벽포트차단_절차.md</td><td>절차</td><td><span class="scope-badge personal">👤 개인</span></td><td>2026-08-05</td>
+                        <td><div class="row-acts"><button class="act-btn demo-digest">정리본 만들기</button><button class="act-btn">회사에 공유</button></div><div class="digest-note">정리본은 이 PC의 모델이 만듭니다 — 30초~1분쯤 걸립니다.</div></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- ══ 장면 D — 격리 증명 ══ -->
+            <div class="scene" id="sceneD">
+              <div class="cs-head">
+                <span class="cs-hint">같은 담당자가 연달아 두 번 물었을 때 — 범위가 다르면 근거도 다릅니다</span>
+                <button class="cs-btn" title="(목업) 동작하지 않음">⧉ 창으로</button>
+              </div>
+              <div class="cs-body">
+                <div class="cs-row">
+                  <div class="ci">🙋</div>
+                  <div class="cb">
+                    <div class="cn">질문<span class="ct">10:21:05</span> <span class="scope-badge personal" style="margin-left:6px">👤 개인 범위</span></div>
+                    <div style="font-size:13px;color:#fff">"지난주 점검 메모 뭐였지?"</div>
+                  </div>
+                </div>
+                <div class="cs-row">
+                  <div class="ci">🤖</div>
+                  <div class="cb">
+                    <div class="cn">답<span class="ct">10:21:07</span></div>
+                    <div style="font-size:12.5px;color:var(--text);line-height:1.7">8월 19일에 남기신 메모에 방화벽 정책 변경 절차가 적혀 있습니다 — 1) 변경 티켓 등록 2) 룰셋 백업 3) 적용 4) 트래픽 확인 순입니다.</div>
+                    <div style="margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5">📄 근거: 점검메모_0819_방화벽정책변경.md <span class="scope-badge personal" style="margin-left:2px;padding:0 6px">👤</span></div>
+                  </div>
+                </div>
+
+                <div style="height:14px;border-bottom:1px dashed var(--border-strong);margin-bottom:14px"></div>
+
+                <div class="cs-row">
+                  <div class="ci">🙋</div>
+                  <div class="cb">
+                    <div class="cn">질문<span class="ct">10:22:40</span> <span class="scope-badge company" style="margin-left:6px">🏢 회사 범위(기본)</span></div>
+                    <div style="font-size:13px;color:#fff">"이번 주 미조치 취약점 뭐 있어?"</div>
+                  </div>
+                </div>
+                <div class="cs-row">
+                  <div class="ci">🤖</div>
+                  <div class="cb">
+                    <div class="cn">답<span class="ct">10:22:43</span></div>
+                    <div style="font-size:12.5px;color:var(--text);line-height:1.7">웹취약점 점검보고서 기준 미조치 3건입니다 — SQL Injection(상) 1건, XSS(중) 2건.</div>
+                    <div style="margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5">📄 근거: 웹취약점_점검보고서_v1.0.md <span class="scope-badge company" style="margin-left:2px;padding:0 6px">🏢</span></div>
+                  </div>
+                </div>
+
+                <div class="cs-row">
+                  <div class="ci">⚠</div>
+                  <div class="cb">
+                    <div class="cn" style="color:#ffd9a8">눈여겨볼 점</div>
+                    <div style="font-size:11.75px;color:var(--muted);line-height:1.75">
+                      방금 회사 질문에도 <b style="color:var(--text)">「방화벽」</b> 낱말이 겹칩니다 — 그런데
+                      개인 메모(<code style="background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--blue-light);font-size:11px">점검메모_0819</code>)는
+                      후보에도 오르지 않았습니다. <b style="color:var(--text)">순위를 낮춘 것이 아니라</b>,
+                      검색이 <code style="background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--blue-light);font-size:11px">scope</code>
+                      조건 자체에서 개인 스코프를 요청하지 않으면 그 스코프를 조회하지 않는 방식(쿼리 단계 하드 필터)입니다.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="cs-dock">
+                <button class="cs-plus" title="(목업) 동작하지 않음">＋</button>
+                <input readonly placeholder="지시…" title="(목업) 입력되지 않습니다">
+                <button class="cs-send" title="(목업) 동작하지 않음">전송</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ 장면 3 — 연계 다리(별도 섹션, 다른 두 화면 재현) ══════════════════ -->
+  <div class="bridgewrap" id="bridgeWrap" style="display:none">
+
+    <div class="bridge-cols">
+      <div class="bridge-col">
+        <div class="frame-cap">재현 — <b>handover.html</b> "2. 문서 올리기"(39-72행 CSS 실측, 107-113행 자리)</div>
+        <div class="ho-panel">
+          <div class="ho-title">2. 문서 올리기 <span style="font-size:11px;font-weight:700;color:var(--muted-2)">3개</span></div>
+          <div class="ho-doclist">
+            <span class="ho-chip">📎 방화벽_정책변경_절차.md ✕</span>
+            <span class="ho-chip">📎 예외계정_승인라인.md ✕</span>
+            <span class="ho-chip">📎 협력사_연락망.xlsx ✕</span>
+            <button class="ho-newbtn" title="(목업) 동작하지 않음">✍ Smart MD로 다듬기 ← 신설</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bridge-col">
+        <div class="frame-cap">재현 — <b>report.html</b> "리포트 이력"(8-70행 CSS 실측, 182-204행 표)</div>
+        <div class="rp-panel">
+          <div class="rp-title">리포트 이력</div>
+          <table class="rp-table">
+            <tr><th>유형</th><th>대상 자산</th><th>생성일시</th><th></th></tr>
+            <tr><td><span class="rp-badge">주간 요약</span></td><td>전체</td><td>2026-08-18 09:00</td>
+              <td><button class="ho-newbtn" style="padding:3px 8px;font-size:11px" title="(목업) 동작하지 않음">✍ 다듬기 ← 신설</button></td></tr>
+            <tr><td><span class="rp-badge">취약점 리포트</span></td><td>web-01 외 3</td><td>2026-08-17 14:20</td>
+              <td><button class="ho-newbtn" style="padding:3px 8px;font-size:11px" title="(목업) 동작하지 않음">✍ 다듬기 ← 신설</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame-cap" style="text-align:center">흐름 — 내용을 .md로 내보내 Smart MD가 그 파일을 여는 모습(1단계: 파일 왕복, 실시간 연결 아님)</div>
+    <div class="flowrow">
+      <div class="flowbox"><div class="k">① 신설 버튼</div>「✍ Smart MD로 다듬기」 클릭</div>
+      <div class="flowarrow">→</div>
+      <div class="flowbox flow-manual"><div class="k">② 내보내기</div>내용을 <code style="font-size:11px">.md</code> 파일로 저장<br>(기존 파일 저장 경로 재사용)</div>
+      <div class="flowarrow">→</div>
+      <div class="smd-mini">
+        <div class="tb"><span></span><span></span><span></span></div>
+        <div class="hd">📝 GIJO Smart MD</div>
+        <div class="bd"><div class="ed"><div class="ln w80"></div><div class="ln w60"></div><div class="ln w40"></div></div>
+          <div class="pv"><div class="ln w60"></div><div class="ln w80"></div><div class="ln w40"></div></div></div>
+      </div>
+      <div class="flowarrow">→</div>
+      <div class="flowbox flow-manual"><div class="k">③ 저장(Ctrl+S)</div>사람이 Smart MD에서<br>고쳐 쓰고 저장</div>
+      <div class="flowarrow">→</div>
+      <div class="flowbox"><div class="k">④ 가져오기</div>「내 문서」 화면의<br>[가져오기]로 다시 불러옴</div>
+    </div>
+    <div style="text-align:center;font-size:11.5px;color:var(--muted-2);line-height:1.7;max-width:760px;margin:0 auto 10px">
+      ②③④는 <b style="color:#ffd9a8">사람이 손으로 하는 왕복</b>입니다 — 자동 연결이 아닙니다.
+      이유는 아래 "왜 이 안인지"에서 다룬다: <code style="font-size:11px">smartmd-preload.ts</code>가
+      그 창에 GIJO 서버 API를 <b style="color:var(--text)">하나도</b> 안 준다(의도적 보안 경계,
+      검토관 지적 H6) — 1단계에서는 그 경계를 다시 열지 않는다.
+    </div>
+  </div>
+
+  <!-- ── 설명 문서 ─────────────────────────────────────────────────────────── -->
+  <div class="doc" id="doc">
+    <h1>Smart MD 업무 연계 + LLM 위키(나만의 문서) 1단계 — 시안 설명</h1>
+    <p class="lead">
+      추천 시안 1개(2026-07-25 결정 — 복수 시안 아님). 위 장면 전환 버튼으로 네 장면을 직접 눌러
+      볼 수 있다. 실제로 동작하는 것은 장면 전환·장면1의 🗔 열기·장면2의 <b>검색 범위 토글</b>
+      (표가 실제로 걸러진다)·<b>정리본 만들기/회사에 공유의 안내문 펼치기</b>뿐이다.
+    </p>
+
+    <div class="tldr">
+      <div class="h">한눈에</div>
+      <ol style="margin:0;padding-left:18px;">
+        <li><b>격리는 순위가 아니라 쿼리 조건이다.</b> 검색 범위 토글이 곧 <code>scope</code> 조건절이고,
+          "회사만" 질문에는 개인 문서가 후보에도 오르지 않는다(장면4에서 직접 확인 가능).</li>
+        <li><b>새 저장소·새 편집기를 안 만든다.</b> 개인 문서 CRUD는 이미 있다
+          (<code>personaldocs.ts</code>) — 이번에 새로 붙는 것은 무대 화면·범위 토글·정리본/공유
+          버튼·Smart MD 연결 자리뿐이다. 정리본도 새 표가 아니라 접두어 문서다(lite-memory.html 관례).</li>
+        <li><b>글쓰기는 Smart MD, 지시는 대화창 — 무대엔 자유 입력 0개.</b> 무대의 유일한 텍스트
+          칸은 "제목·태그 필터"(AI 지시 아님)이고, 그마저 목업에서는 읽기 전용으로 그렸다.</li>
+      </ol>
+    </div>
+
+    <section class="why">
+      <h2>왜 이 안인지</h2>
+      <ul>
+        <li><b>격리를 검색 쿼리 계층에서 강제한다(순위 아님, 시스템프롬프트 아님).</b>
+          Pinecone의 멀티테넌시 권고 — "격리는 벡터 DB 질의 계층에서 강제한다. 시스템 프롬프트나
+          LLM 판단에 맡기지 않는다"<span class="src">(pinecone.io, 상단 조사 [외부1])</span>를
+          그대로 따른다. 우리 코드에 이미 이 자리가 있다 — <code>memory.ts:864-874</code>의
+          <code>scope IN (...)</code> 필터가 하이브리드 검색에 이미 걸려 있다. 이번 요건은 그
+          목록에 "개인 스코프를 명시적으로 요청했을 때만" 넣는 조건 하나를 더하는 것이다.</li>
+        <li><b>정리본은 새 표가 아니라 접두어 문서다.</b> <code>lite-memory.html:188-375</code>가
+          이미 이 방식으로 구현·검증돼 있다 — <code>"정리본_" + 원본id</code>로 이름 붙인 평범한
+          문서로 인입한다. 검색·삭제·백업이 문서 하나 다루는 것과 똑같이 돌아간다(주석: "따로
+          표를 만들면 검색·삭제·백업이 다 따로 놀아 라이트가 감당할 물건이 아니게 된다").</li>
+        <li><b>Smart MD를 새로 뜯어고치지 않는다.</b> <code>smartmd-preload.ts</code>가 그 창에
+          내주는 것은 <code>isElectron/platform/exportPdf</code>뿐이고, GIJO 서버·인증·파일 API는
+          의도적으로 0개다(main.ts 674-786행, 검토관 지적 H6 — "저쪽 저장소 push 한 번이 인증된
+          API 전부를 얻는 구조"였던 것을 막은 결과). 1단계에서 이 경계를 다시 여는 대신, 이미
+          있는 "파일 내보내기 → 사람이 열어서 고침 → 가져오기" 왕복으로 연결한다.</li>
+        <li><b>세그먼트 컨트롤로 범위를 보여준다.</b> "같은 내 문서를 다른 폭으로 보는" 전형적
+          사례라 텍스트 드롭다운이 아니라 세그먼트 컨트롤을 쓴다<span class="src">(Apple HIG ·
+          Material Design, 상단 조사 [외부2])</span>. 새 부품이 아니라 <code>chatparts.js</code>의
+          <code>.dc-seg</code>(목록/히트맵 전환에 실제로 쓰이는 부품)를 그대로 확대해 재사용했다.</li>
+      </ul>
+      <div class="rejected">
+        <div class="h">기각한 대안</div>
+        <ul style="margin:0;">
+          <li><b>문서함(창) 안 "내 문서" 탭만 키운다</b> — 겹치지 않으므로 없애지 않는다. 다만
+            신규 UX는 "프로가 기준"(2026-08-19 확정)이라 프로 셸의 카드→무대 흐름을 먼저 만든다.
+            문서함 창은 그대로 살아 있고, 백엔드도 같다(<code>personaldocs.ts</code> 공유) — 진입로가
+            하나 늘 뿐이다.</li>
+          <li><b>순위만 낮추는 소프트 필터(온톨로지 계획 §5의 C-1과 같은 발상)</b> — 기각. 그
+            계획서 자체가 "가중치를 세게 주면 안 된다"고 경고했던 것과 반대로, 이번 요건은
+            "안 새야 한다"는 확답이 필요해 순위 조정으로는 부족하다.</li>
+          <li><b>Smart MD ↔ GIJO 실시간 IPC 신설</b> — 기각(1단계에서는). GIJO API를 그 창에
+            새로 내주는 순간 검토관이 막았던 문(H6)을 다시 여는 셈이다. 아래 "다음 단계 후보"로만
+            남긴다.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="give">
+      <h2>무엇을 포기했는지</h2>
+      <ul>
+        <li><b>위키링크·백링크·그래프뷰</b> — 과제 확정 경계 (b) 그대로. 이유는 "범용 노트앱화
+          방지"(2026-08-20 지시)다. 덧붙이면: <code>GIJO_AS_지식그래프_LLM위키_도입계획.md</code>가
+          이미 온톨로지(2,186 트리플)라는 그래프를 갖고 있고, 노트 사이의 그래프는 그와 다른
+          목적(개인 메모 탐색)이라 지금 만들면 "그래프가 두 벌"이 된다.</li>
+        <li><b>실시간 공동 편집</b> — 범위 밖. Smart MD는 로그인 세션이 갈리지 않는 <b>단일 창</b>
+          전제로 설계됐다(main.ts 주석 "새 창도 authState를 공유해서 로그인하면 무료가 그냥
+          된다") — 여러 담당자가 같은 문서를 동시에 고치는 것은 그 전제를 넘어선다.</li>
+        <li><b>Smart MD ↔ 내 문서의 자동 왕복(1클릭)</b> — 1단계에서는 사람이 손으로 내보내고
+          가져온다(장면3). 완화책: 버튼이 "다듬기"라는 이름으로 의도를 분명히 하고, 가져오기
+          단계에서 한 번 더 확인시켜 실수로 옛 버전을 덮어쓰는 일을 막는다.</li>
+        <li><b>정리본 자동 갱신(원본이 바뀌면 정리본도 자동으로)</b> — 1단계는 수동 "정리본
+          만들기"뿐이다. 자동 갱신은 <code>GIJO_AS_지식그래프_LLM위키_도입계획.md</code> §4의
+          B-2(상충·신선도 표시)와 겹치는 영역이라, 그 계획의 "실사용 신호가 온 뒤" 원칙을 그대로
+          따른다.</li>
+      </ul>
+    </section>
+
+    <section class="impl">
+      <h2>구현 메모 — 그 숫자·그 격리를 누가 만드는가</h2>
+      <p>이 시안의 숫자는 전부 <b>[예시]</b> 데이터다. 화면을 구현할 때 "이 값을 누가 넣는가"를
+        먼저 확인해야 폴백 문구나 상시 0으로 굳지 않는다(반복 원칙 — 실측 없이 화면부터 그리면
+        생산자 없는 값이 생긴다).</p>
+      <table class="num-table">
+        <tr><th>화면에 쓴 값</th><th>지금 생산자</th><th>구현 시 할 일</th></tr>
+        <tr><td>내 문서 총 개수</td><td class="delta">있음 — <code>countPersonalDocs()</code></td><td class="delta flat">그대로 호출</td></tr>
+        <tr><td>오늘 쓴 것</td><td class="delta bad">없음</td><td>createdAt 당일 필터 집계 신설</td></tr>
+        <tr><td>정리본 N</td><td class="delta bad">없음</td><td><code>documentId LIKE '정리본_%'</code> 카운트(lite-memory 관례 재사용)</td></tr>
+        <tr><td>회사 공유 N</td><td class="delta">컬럼은 있음 — <code>ragOptIn</code></td><td><code>WHERE ragOptIn=1</code> 카운트 신설(컬럼 재사용, 새 테이블 아님)</td></tr>
+        <tr><td>검색 범위 격리(하드 필터)</td><td class="delta bad">없음 — 지금은 <code>ragOptIn</code>이 켜지면 <code>GLOBAL_SCOPE</code>로 들어간다(personaldocs.ts:88)</td>
+          <td>전용 스코프(예 <code>personal:&lt;userId&gt;</code>)로 저장 → 회사 질문 검색에서 그 스코프를 조회 목록에서 제외 → "회사에 공유"를 눌러야만 <code>GLOBAL_SCOPE</code>로 승격(그 승격 로직은 지금 <code>syncRag</code>를 그대로 재사용 가능)</td></tr>
+      </table>
+      <p style="margin-top:10px"><b style="color:#ffd9a8">⚠ 가장 중요한 줄은 마지막 행이다.</b>
+        지금 코드는 "공유(=ragOptIn)"와 "격리 없는 전역 검색"을 구분하지 않는다 — 이번 확정 경계
+        (a)가 그 둘을 갈라야 한다고 명시적으로 요구한다. 이 간극을 시안 단계에서 찾아 적어 둔다
+        (구현 착수 전 반드시 이 표부터 다시 확인).</p>
+    </section>
+
+    <section class="density">
+      <h2>밀도 숫자</h2>
+      <table class="num-table">
+        <tr><th>구역</th><th>지금</th><th>시안</th><th>증감</th></tr>
+        <tr><td>대화창 카드(장면1)<br><span style="color:var(--muted-2);font-size:11px">dc-head 34 + dc-kpis 44 + 표머리 24 + 행3×28 + more 24 + 다음작업 30</span></td>
+          <td>—(신설 카드)</td><td>약 240px</td><td class="delta flat">기존 "자산 목록" 카드(약 230px, pro-stage 시안)와 같은 규격 — 새 규격 안 만듦</td></tr>
+        <tr><td>무대 화면(장면2)<br><span style="color:var(--muted-2);font-size:11px">stagehead 40 + kpi띠 65 + 툴바 46 + 힌트 34+26 + 표머리 24 + 행8×34</span></td>
+          <td>—(신설 화면)</td><td>약 507px</td><td class="delta">가용 stagebody(900−44−10−40≈806px)의 63% — 스크롤 없이 8건이 들어간다</td></tr>
+        <tr><td>표준 사이드바 「추가 기능」 그룹<br><span style="color:var(--muted-2);font-size:11px">nav.js 항목당 30px(기존 4항목 위에)</span></td>
+          <td>4항목×30=120px</td><td>5항목×30=150px</td><td class="delta bad">+30px(+25%) — <b>단, 프로 셸은 56px 아이콘 레일이라 이 증가가 화면에 안 보인다</b>(☰ 전체메뉴 검색에서만 노출, 표준 에디션에서만 실제로 보임)</td></tr>
+        <tr><td>Smart MD 창</td><td>—</td><td>별도 BrowserWindow(기존 패턴)</td><td class="delta flat">세로 0px</td></tr>
+        <tr><td>handover.html "문서 올리기"</td><td>doclist 칩 N개, 1줄</td><td>+칩 1개("✍ Smart MD로 다듬기")</td><td class="delta flat">보통 0px(같은 줄에 이어붙음) · 칩이 줄바꿈되는 경우만 +18~20px(어림, 구현 시 확인)</td></tr>
+        <tr><td>report.html "리포트 이력" 표 행</td><td>조작 열 버튼 1~2개</td><td>+버튼 1개</td><td class="delta bad">행마다 약 +4~6px(어림 — 버튼 높이 24px가 기존 셀 padding을 살짝 밈, 구현 시 확인 필요)</td></tr>
+      </table>
+      <p style="margin-top:8px">전체적으로 <b>기존 화면(handover·report)에는 거의 안 얹힌다</b>(칩·버튼 1개씩) —
+        무게는 <b>새 화면 둘(카드+무대)</b>에 실었고, 그 둘은 pro-stage가 이미 확정한 "무대는
+        가로만 쓰고 세로는 그대로"라는 예산 안에 들어간다(무대 세로 507px < 가용 806px).</p>
+    </section>
+
+    <section class="check">
+      <h2>제품 원칙 자가점검</h2>
+      <table class="num-table">
+        <tr><th>원칙</th><th>지킴?</th><th>근거</th></tr>
+        <tr><td>메뉴는 보기용 · 지시는 대화창 · 새 입력칸 금지</td><td class="delta">지킴(예외 명시)</td>
+          <td>무대(장면2)의 텍스트 칸은 "제목·태그 필터" 1개뿐이고, 이건 AI에게 보내는 지시가
+          아니라 client-side 목록 좁히기다(기존 화면에도 흔한 검색창과 같은 급) — 목업에서도
+          <code>readonly</code>로 그렸다. 글을 실제로 "쓰는" 자리는 전부 Smart MD 별도 창이다.</td></tr>
+        <tr><td>화면엔 정체성 한 줄 + ⚠경고만</td><td class="delta">지킴</td>
+          <td>무대 상단엔 "📝 내 문서" 한 줄과 공유 확인 경고뿐 — "왜 정리본이 필요한가" 같은
+          설명은 화면에 없고 ⓘ/screenguide로 미룬다(구현 단계에서 붙일 자리, 이 시안은 안 그림).</td></tr>
+        <tr><td>다크 팔레트 고정</td><td class="delta">지킴</td>
+          <td>전 요소 <code>--bg:#262624</code> 계열(app.html:10-11 그대로 복사). Smart MD 내부만
+          자기 색(기존 채택 이유 그대로 — 별도 웹앱이라 다시 칠하면 원본 갱신 때마다 또 손봄).</td></tr>
+        <tr><td>기존 부품 재사용(카드·세그먼트·근거배지)</td><td class="delta">지킴</td>
+          <td>dc-card/dc-kpis(chatparts.js) · cs-head/cs-body(console.js) · .dc-seg(chatparts.js,
+          확대 재사용) · "📄 근거: " 배지 형식(console.js:491, <code>color:#6fdcb5</code> 그대로)
+          — 새 시각 언어를 하나도 안 만들었다.</td></tr>
+        <tr><td>정직한 구현 — 가짜 UI 금지</td><td class="delta">주의 표시</td>
+          <td>대부분 버튼은 "(목업) 동작하지 않음"이지만, <b>검색 범위 토글은 실제로 표를
+          거른다</b> — 이건 이 시안이 증명하려는 핵심 메커니즘(격리)이라 클라이언트 필터로나마
+          진짜로 보여주는 쪽을 택했다. 회사공유/정리본 버튼은 안내문 펼치기만 진짜로 동작한다
+          (서버 호출은 없음). 전부 툴팁·캡션으로 구분해 뒀다.</td></tr>
+        <tr><td>RAG 오염 전례 대응</td><td class="delta">설계 반영</td>
+          <td>2026-08-10 실사고("남의 회사 문서가 근거로 나옴")의 교훈을 그대로 가져와 <b>쿼리
+          레벨 하드 필터</b>로 설계했다(위 §구현메모 마지막 행) — Pinecone 권고와 일치, "순위만
+          낮추는" 이전 온톨로지 C-1 시도가 역효과였던 전례(RAG_오염_해결_계획.md 판정)도 피한다.</td></tr>
+        <tr><td>자체완결 HTML(외부 리소스 0)</td><td class="delta">지킴</td>
+          <td>CDN·웹폰트·원격 이미지 없음 — 이모지·CSS 도형만 사용.</td></tr>
+      </table>
+    </section>
+
+    <div class="rejected" style="margin-top:4px">
+      <div class="h">범위 밖 참고 — 옛 "ⓑ 위키 정리본(후-6)" 판정과의 관계</div>
+      <p style="margin:0 0 6px;font-size:12.5px;color:var(--muted);line-height:1.7">
+        <code>GIJO_AS_지식그래프_LLM위키_도입계획.md</code> §8은 2026-08-11에 "ⓑ 위키 정리본"을
+        실사용 신호 0건으로 보류했다. <b style="color:var(--text)">이번 시안은 그 판정을 뒤집는
+        것이 아니다.</b> 그 계획의 ⓑ는 "고객이 넣은 보안 문서를 LLM이 자동 정리해 <b>회사 전체
+        검색의 근거</b>로 쓰는" 안이었다(§2가 "RAG를 위키로 대체하면 안 된다"고 경고한 그 대상).
+        이번 것은 <b style="color:var(--text)">담당자 개인 메모</b>이고, 정리본도 원 문서를 쓴
+        사람이 <b style="color:var(--text)">수동으로</b> 누를 때만 만들어지며, 회사 검색에 들어가는
+        것은 "회사에 공유"를 따로 눌렀을 때뿐이다 — 자동성·범위·트리거가 전부 다르다.
+      </p>
+    </div>
+
+    <div class="rejected">
+      <div class="h">다음 단계 후보(이 시안 범위 밖 — 결정된 것 아님, 신호로만 남김)</div>
+      <ul style="margin:0;">
+        <li>Smart MD ↔ 내 문서 자동 왕복(파일 감시 등) — 지금은 수동 내보내기/가져오기.</li>
+        <li>정리본 자동 갱신·상충 표시 — <code>kbhygiene.ts</code> 연동(계획서 §4 B-2와 동일 영역).</li>
+        <li>문서함(창) "내 문서" 탭과의 통합 정리 — 지금은 진입로 2개(창+카드/무대)가 같은
+          백엔드를 보는 상태로 둔다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="doc-foot">
+    mockups/smartmd-wiki/시안.html · gijo-mockup · 2026-08-20 · 제품 코드 미수정(읽기만 함:
+    app.html·console.js·chatparts.js·nav.js·main.ts·smartmd-preload.ts·personaldocs.ts·memory.ts·
+    docbox.html·lite-memory.html·handover.html·report.html·mockups/pro-stage/시안.html·
+    GIJO_AS_지식그래프_LLM위키_도입계획.md) · 조사 출처:
+    <span class="src"><a href="#" onclick="return false">Pinecone, "Multi-Tenancy in Vector Databases"</a></span> ·
+    <span class="src">Apple HIG "Segmented Controls" / Material Design "Segmented Buttons"(Mobbin·Eleken 정리)</span>
+  </footer>
+
+<script>
+  // ── 장면 전환(제품 UI 아님) ──────────────────────────────────────────────
+  var CAPTIONS = {
+    A: "장면1 · 「내 문서」 카드 — 메뉴 클릭 한 번으로(dispatch 없이) 뜨는 현황 카드. 🗔를 누르면 장면2로.",
+    B: "장면2 · 내 문서 무대 — app.html의 stage-on을 재현. 검색범위 토글을 눌러 표가 실제로 걸러지는 것을 확인하세요.",
+    C: "장면3 · 연계 다리 — handover.html·report.html에 붙는 「Smart MD로 다듬기」와 1단계 왕복 흐름.",
+    D: "장면4 · 격리 증명 — 같은 질문 패턴이라도 범위가 다르면 후보 자체가 다릅니다(쿼리 단계 하드 필터)."
+  };
+  var btns = document.querySelectorAll(".mk-scenebtn");
+  var deviceWrap = document.getElementById("deviceWrap");
+  var bridgeWrap = document.getElementById("bridgeWrap");
+  function showScene(key) {
+    btns.forEach(function (b) { b.classList.toggle("on", b.dataset.scene === key); });
+    document.getElementById("mkCaption").textContent = CAPTIONS[key] || "";
+    if (key === "C") {
+      deviceWrap.style.display = "none";
+      bridgeWrap.style.display = "block";
+      return;
+    }
+    deviceWrap.style.display = "flex";
+    bridgeWrap.style.display = "none";
+    ["A", "B", "D"].forEach(function (id) {
+      var el = document.getElementById("scene" + id);
+      if (el) el.classList.toggle("on", id === key);
+    });
+  }
+  btns.forEach(function (b) { b.addEventListener("click", function () { showScene(b.dataset.scene); }); });
+  showScene("A");
+
+  // 장면1 카드 🗔 열기 → 장면2 무대로(pro-stage 시안과 같은 실제 동작)
+  var openBtn = document.getElementById("cardOpenBtn");
+  if (openBtn) openBtn.addEventListener("click", function () { showScene("B"); });
+  var backBtn = document.getElementById("stageBackBtn");
+  if (backBtn) backBtn.addEventListener("click", function () { showScene("A"); });
+
+  // 검색 범위 토글 — 실제로 표를 거른다(이 시안에서 데이터가 진짜로 바뀌는 유일한 조작)
+  var scopeToggle = document.getElementById("scopeToggle");
+  if (scopeToggle) {
+    scopeToggle.querySelectorAll("span").forEach(function (s) {
+      s.addEventListener("click", function () {
+        scopeToggle.querySelectorAll("span").forEach(function (x) { x.classList.remove("on"); });
+        s.classList.add("on");
+        var v = s.dataset.v;
+        document.querySelectorAll("#stageDocTable tbody tr").forEach(function (row) {
+          var scope = row.dataset.scope;
+          row.style.display = (v === "both" || scope === v) ? "" : "none";
+        });
+      });
+    });
+  }
+
+  // 정리본 만들기 — 안내문 펼치기(서버 호출 없음, 안내문 표시만)
+  document.querySelectorAll(".demo-digest").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var note = b.closest("td").querySelector(".digest-note");
+      if (note) note.classList.toggle("show");
+    });
+  });
+
+  // 회사에 공유(첫 행) — 실제 확인 문구 펼치기(docbox.html toggleRag와 같은 문안)
+  var shareBtn1 = document.getElementById("shareBtn1");
+  var shareConfirm1 = document.getElementById("shareConfirm1");
+  if (shareBtn1 && shareConfirm1) {
+    shareBtn1.addEventListener("click", function () { shareConfirm1.classList.toggle("show"); });
+  }
+
+  // Smart MD 창 열기(장면2) — (목업) 안내만
+  var smdBtn = document.getElementById("smdOpenBtn");
+  if (smdBtn) smdBtn.addEventListener("click", function () {
+    smdBtn.textContent = "✍ (목업) Smart MD는 별도 창으로 뜹니다 — 동작 안 함";
+  });
+</script>
+</body>
+</html>

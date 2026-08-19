@@ -177,7 +177,7 @@ export const ontologyApi = {
 };
 
 // ── 개인 문서함(2026-07-31) — 담당자가 자기 메모를 넣는 자리. 서버가 userId로 격리한다.
-export interface PersonalDocMeta { id: string; title: string; ragOptIn: boolean; createdAt: number; updatedAt: number }
+export interface PersonalDocMeta { id: string; title: string; ragOptIn: boolean; shared: boolean; createdAt: number; updatedAt: number }
 export interface PersonalDoc extends PersonalDocMeta { body: string; warnings?: { kind: string; masked: string; hint: string }[] }
 export const personalDocsApi = {
   list: () => request<{ documents: PersonalDocMeta[] }>("/api/personaldocs"),
@@ -187,6 +187,9 @@ export const personalDocsApi = {
     request<PersonalDoc>(`/api/personaldocs/${encodeURIComponent(id)}`, { method: "PUT", body: b }),
   setRag: (id: string, on: boolean) =>
     request<PersonalDoc>(`/api/personaldocs/${encodeURIComponent(id)}/rag`, { method: "POST", body: { on } }),
+  // 회사에 공유(2026-08-20 LLM 위키) — 켜면 전 담당자 근거 가능(비밀 마스킹 인입), 끄면 회수.
+  setShared: (id: string, on: boolean) =>
+    request<PersonalDoc>(`/api/personaldocs/${encodeURIComponent(id)}/share`, { method: "POST", body: { on } }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/personaldocs/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 

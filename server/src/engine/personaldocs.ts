@@ -28,14 +28,15 @@ export interface PersonalDoc {
   id: string;
   title: string;
   body: string;
-  ragOptIn: boolean;
+  ragOptIn: boolean; // 내 AI가 읽게 — 격리 필터 덕에 **내 질문에만** 근거로 나온다(2026-08-20부터)
+  shared: boolean;   // 회사에 공유 — 전 담당자의 근거가 될 수 있다(명시 옵트인·비밀 마스킹 후 인입)
   createdAt: number;
   updatedAt: number;
 }
 
 interface Row {
   id: string; userId: string; title: string; body: string;
-  ragOptIn: number; createdAt: number; updatedAt: number;
+  ragOptIn: number; shared: number; createdAt: number; updatedAt: number;
 }
 
 const MAX_TITLE = 120;
@@ -43,18 +44,25 @@ const MAX_BODY = 200_000; // 20만 자 — 메모로 충분하고, 실수로 통
 const MAX_DOCS_PER_USER = 200;
 
 function fromRow(r: Row): PersonalDoc {
-  return { id: r.id, title: r.title, body: r.body, ragOptIn: r.ragOptIn === 1, createdAt: r.createdAt, updatedAt: r.updatedAt };
+  return { id: r.id, title: r.title, body: r.body, ragOptIn: r.ragOptIn === 1, shared: r.shared === 1, createdAt: r.createdAt, updatedAt: r.updatedAt };
 }
 
 const listStmt = db.prepare("SELECT * FROM personal_docs WHERE userId = ? ORDER BY updatedAt DESC");
 const getStmt = db.prepare("SELECT * FROM personal_docs WHERE id = ? AND userId = ?");
 const countStmt = db.prepare("SELECT COUNT(*) AS n FROM personal_docs WHERE userId = ?");
 const insertStmt = db.prepare(
-  "INSERT INTO personal_docs (id, userId, title, body, ragOptIn, createdAt, updatedAt) VALUES (@id, @userId, @title, @body, @ragOptIn, @createdAt, @updatedAt)"
+  "INSERT INTO personal_docs (id, userId, title, body, ragOptIn, shared, createdAt, updatedAt) VALUES (@id, @userId, @title, @body, @ragOptIn, @shared, @createdAt, @updatedAt)"
 );
 const updateStmt = db.prepare("UPDATE personal_docs SET title = @title, body = @body, updatedAt = @updatedAt WHERE id = @id AND userId = @userId");
 const ragStmt = db.prepare("UPDATE personal_docs SET ragOptIn = @on, updatedAt = @at WHERE id = @id AND userId = @userId");
 const deleteStmt = db.prepare("DELETE FROM personal_docs WHERE id = ? AND userId = ?");
+const shareStmt = db.prepare("UPDATE personal_docs SET shared = @on, updatedAt = @at WHERE id = @id AND userId = @userId");
+const sharedIdsStmt = db.prepare("SELECT id FROM personal_docs WHERE shared = 1");
+
+/** 회사에 공유된 개인 문서의 RAG 문서 id 목록 — 검색 격리 필터(memory.hiddenDocIds)가 예외로 쓴다. */
+export function listSharedPersonalDocIds(): string[] {
+  return (sharedIdsStmt.all() as { id: string }[]).map((r) => `personal:${r.id}`);
+}
 
 /** 목록 — **자기 것만**. 본문은 빼고 준다(목록에 20만 자를 실을 이유가 없다). */
 export function listPersonalDocs(userId: string): Omit<PersonalDoc, "body">[] {
@@ -121,8 +129,8 @@ export function registerPersonalDocsRoutes(app: Express): void {
       res.status(400).json({ error: `개인 문서는 ${MAX_DOCS_PER_USER}건까지입니다 — 안 쓰는 것을 지워 주세요` }); return;
     }
     const now = Date.now();
-    const doc: PersonalDoc = { id: randomUUID(), title, body, ragOptIn: false, createdAt: now, updatedAt: now };
-    insertStmt.run({ ...doc, userId: u.id, ragOptIn: 0 });
+    const doc: PersonalDoc = { id: randomUUID(), title, body, ragOptIn: false, shared: false, createdAt: now, updatedAt: now };
+    insertStmt.run({ ...doc, userId: u.id, ragOptIn: 0, shared: 0 });
     recordAudit({ kind: "config", actor: u.name, action: "개인 문서 작성", target: doc.id, detail: title, result: "ok" });
     res.json({ ...doc, warnings: secretWarning(body) });
   }));
@@ -139,7 +147,7 @@ export function registerPersonalDocsRoutes(app: Express): void {
     updateStmt.run({ id: cur.id, userId: u.id, title, body, updatedAt: Date.now() });
     const next = getPersonalDoc(cur.id, u.id)!;
     // 지식베이스에 실려 있던 문서면 **고친 내용으로 다시 실어야** 한다 — 안 그러면 옛 내용으로 답한다.
-    if (next.ragOptIn) await syncRag(next, u.id);
+    if (next.ragOptIn || next.shared) await syncRag(next, u.id);
     recordAudit({ kind: "config", actor: u.name, action: "개인 문서 수정", target: cur.id, detail: title, result: "ok" });
     res.json({ ...next, warnings: secretWarning(body) });
   }));
@@ -154,9 +162,30 @@ export function registerPersonalDocsRoutes(app: Express): void {
     await syncRag(next, u.id);
     recordAudit({
       kind: "config", actor: u.name,
-      action: on ? "개인 문서를 AI 지식에 포함" : "개인 문서를 AI 지식에서 제외",
+      action: on ? "개인 문서를 내 AI 지식에 포함" : "개인 문서를 AI 지식에서 제외",
       target: cur.id,
-      detail: on ? `${cur.title} — 이제 다른 담당자 질문에도 근거로 나올 수 있습니다` : cur.title,
+      // 2026-08-20 격리 축 도입 — 옵트인은 이제 **내 질문에만** 근거로 나온다(전 담당자 공개는 공유가 담당).
+      detail: on ? `${cur.title} — 내 질문에만 근거로 나옵니다(회사 공유는 별도)` : cur.title,
+      result: "ok",
+    });
+    res.json(next);
+  }));
+
+  // 회사에 공유(2026-08-20 LLM 위키) — 켜면 전 담당자의 답변 근거가 될 수 있다.
+  // 비밀 마스킹본으로 인입되고, 끄면 즉시 회수(재인입 — 옵트인이 남아 있으면 원문으로 나만).
+  app.post("/api/personaldocs/:id/share", authMiddleware, asyncRoute(async (req, res) => {
+    const u = who(req);
+    const cur = getPersonalDoc(String(req.params.id), u.id);
+    if (!cur) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
+    const on = (req.body as { on?: boolean }).on === true;
+    shareStmt.run({ id: cur.id, userId: u.id, on: on ? 1 : 0, at: Date.now() });
+    const next = getPersonalDoc(cur.id, u.id)!;
+    await syncRag(next, u.id);
+    recordAudit({
+      kind: "config", actor: u.name,
+      action: on ? "개인 문서를 회사에 공유" : "개인 문서 공유 해제",
+      target: cur.id,
+      detail: on ? `${cur.title} — 이제 다른 담당자 질문에도 근거로 나올 수 있습니다(비밀 마스킹 적용)` : cur.title,
       result: "ok",
     });
     res.json(next);
@@ -167,7 +196,7 @@ export function registerPersonalDocsRoutes(app: Express): void {
     const cur = getPersonalDoc(String(req.params.id), u.id);
     if (!cur) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
     // 지식베이스에 실려 있으면 **거기서도 지운다** — 문서만 지우면 답변에는 계속 나온다.
-    if (cur.ragOptIn) await syncRag({ ...cur, ragOptIn: false }, u.id);
+    if (cur.ragOptIn || cur.shared) await syncRag({ ...cur, ragOptIn: false, shared: false }, u.id);
     deleteStmt.run(cur.id, u.id);
     recordAudit({ kind: "config", actor: u.name, action: "개인 문서 삭제", target: cur.id, detail: cur.title, result: "ok" });
     res.json({ ok: true });

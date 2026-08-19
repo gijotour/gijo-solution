@@ -153,15 +153,36 @@ export interface Viewer {
 }
 
 const gradedDocsStmt = db.prepare("SELECT documentId, grade FROM memory_documents");
+const personalDocsStmt = db.prepare("SELECT documentId, uploadedBy FROM memory_documents WHERE documentId LIKE 'personal:%'");
 
-/** 이 사람이 못 보는 문서 id들. viewer가 없으면 빈 배열(가리지 않음). */
+/** 이 사람이 못 보는 문서 id들 — 검색 후보에서 **원천 제외**(등급 필터와 같은 DB 레벨 하드 필터).
+ *  ① 남의 개인 문서(personal:*) — LLM 위키 격리 1요건(2026-08-20, RAG 오염 53% 전례의 개인판
+ *     예방). 회사에 공유(shared)한 것만 예외. **viewer를 모르면 개인 문서 전부를 가린다**
+ *     (fail-closed — 내부·무기명 호출이 남의 메모를 근거로 쓰면 안 된다).
+ *  ② 등급(grade) — 종전 규칙 그대로(viewer 없으면 등급은 안 가림 — 기존 동작 유지). */
 export function hiddenDocIds(viewer?: Viewer): string[] {
-  if (!viewer) return [];
+  const hidden: string[] = [];
+  const personal = personalDocsStmt.all() as { documentId: string; uploadedBy: string | null }[];
+  if (personal.length) {
+    // 공유 여부는 personal_docs를 직접 조회 — 모듈 import(순환·ESM/CJS 차이)에 기대면
+    // 환경에 따라 조용히 fail-closed로 떨어져 공유가 안 먹는다(시험이 잡음).
+    const 공유됨 = new Set(
+      (db.prepare("SELECT id FROM personal_docs WHERE shared = 1").all() as { id: string }[])
+        .map((r) => `personal:${r.id}`)
+    );
+    const 나 = viewer?.userId != null ? String(viewer.userId) : null;
+    for (const p of personal) {
+      if (공유됨.has(p.documentId)) continue;
+      if (!나 || String(p.uploadedBy ?? "") !== 나) hidden.push(p.documentId);
+    }
+  }
+  if (!viewer) return hidden;
   const 열람 = clearanceOf(viewer.clearance);
   const 막힌등급 = new Set(blockedGrades(열람));
-  if (막힌등급.size === 0) return [];
+  if (막힌등급.size === 0) return hidden;
   const rows = gradedDocsStmt.all() as { documentId: string; grade: string | null }[];
-  return rows.filter((r) => 막힌등급.has(gradeOf(r.grade))).map((r) => r.documentId);
+  for (const r of rows) if (막힌등급.has(gradeOf(r.grade))) hidden.push(r.documentId);
+  return hidden;
 }
 
 // LanceDB where/delete 절에 문자열 리터럴로 들어가는 documentId(파일명)의 작은따옴표를 이스케이프.

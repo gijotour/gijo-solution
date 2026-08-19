@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 내 문서</title>
+<!--
+  내 문서(2026-08-20 사장님 — 「LLM 위키로 나만의 문서 데이터 관리, 별도 편집기 없이」).
+  승인 시안: mockups/smartmd-wiki/시안.html.
+  ■ 격리가 이 화면의 전부다: 목록은 서버가 **내 것만** 준다(personaldocs — 남의 것은 404).
+    검색(RAG)도 쿼리 레벨 하드 필터(memory.hiddenDocIds) — 내 문서는 내 질문에만 근거로 나온다.
+  ■ 쓰기는 Smart MD 별도 창(✍ — (창) 예외 관례)·이 화면은 목록·범위·공유 관리다.
+    자유 텍스트 입력칸 0(지시는 대화창) — 파일 가져오기(선택 대화상자)만 있다.
+  ■ 위키링크·백링크·그래프뷰는 만들지 않는다(사장님 판단 위임 후 확정 경계 — 정리본 방식).
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+.main{padding:20px 24px 40px;max-width:1080px;margin:0 auto;}
+.head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
+.page-title{font-size:19px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.acts{display:flex;gap:8px;}
+.btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+  padding:8px 14px;border-radius:8px;font-size:12.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+.seg{display:flex;gap:6px;margin-bottom:12px;}
+.seg button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
+  padding:6px 14px;border-radius:18px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
+.seg button.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
+.list{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;}
+.row:last-child{border-bottom:0;}
+.row:hover{background:rgba(255,255,255,.03);} .row.on{background:rgba(59,130,246,.08);}
+.row .t{flex:1 1 auto;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row .d{flex:0 0 auto;font-size:12px;color:var(--muted-2);}
+.badge{flex:0 0 auto;font-size:11.75px;font-weight:800;padding:1px 8px;border-radius:10px;}
+.badge.personal{background:rgba(255,255,255,.08);color:var(--muted);}
+.badge.shared{background:rgba(240,160,32,.16);color:var(--amber);}
+.badge.rag{background:rgba(30,185,128,.14);color:var(--teal);}
+.row .bt{flex:0 0 auto;display:flex;gap:6px;}
+.row .bt button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);
+  padding:3px 8px;border-radius:6px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+.row .bt button:hover{color:#fff;}
+.empty{padding:28px 16px;text-align:center;color:var(--muted-2);font-size:12.75px;}
+.note{font-size:11.75px;color:var(--muted-2);margin-top:10px;line-height:1.6;}
+</style>
+</head>
+<body class="g-ui">
+<div class="main">
+  <div class="head">
+    <div>
+      <div class="page-title">내 문서</div>
+      <div class="page-sub">개인 메모·조사 노트·정리본 — 개인 문서는 <b>내 질문에만</b> 근거로 나옵니다. 공유한 것만 팀 전체가 봅니다.</div>
+    </div>
+    <div class="acts">
+      <button class="btn primary" id="btnWrite" title="Smart MD Studio(문서 작성 창)를 엽니다 — 다듬은 .md는 「가져오기」로 여기에 담습니다">✍ Smart MD로 쓰기</button>
+      <button class="btn" id="btnImport" title=".md/.txt 파일을 내 문서로 가져옵니다 — 인수인계·리포트를 Smart MD로 다듬은 결과를 담는 자리">📥 .md 가져오기</button>
+      <input type="file" id="fileIn" accept=".md,.txt,.markdown" style="display:none">
+    </div>
+  </div>
+  <div class="seg" id="seg">
+    <button data-f="all" class="on">전부</button>
+    <button data-f="personal">👤 개인만</button>
+    <button data-f="shared">🏢 공유만</button>
+  </div>
+  <div class="list" id="list"><div class="empty">불러오는 중…</div></div>
+  <div class="note">
+    · <b>👤 AI 포함</b> = 이 문서를 내 AI가 읽습니다(내 질문에만 근거로 나옴). · <b>🏢 공유</b> = 팀 전체의 답변 근거가 될 수 있습니다 — 켜는 순간 비밀번호류는 자동으로 가려 담습니다.<br>
+    · 문서를 고치려면 ⬇로 내려받아 Smart MD에서 다듬고 다시 가져오세요(1단계는 파일 왕복 — 자동 동기화 아님).
+  </div>
+</div>
+<script>
+(function () {
+  "use strict";
+  var filter = "all";
+  var docs = [];
+  var 선택행 = null;
+
+  function esc(s) { var d = document.createElement("i"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
+
+  function 알림(라벨, 글) {
+    if (!window.gijoSelectNotify) return;
+    window.gijoSelectNotify({ label: String(라벨).slice(0, 40), text: 글 });
+  }
+
+  function render() {
+    var el = document.getElementById("list");
+    var rows = docs.filter(function (d) {
+      return filter === "all" || (filter === "shared" ? d.shared : !d.shared);
+    });
+    if (!rows.length) {
+      el.innerHTML = '<div class="empty">' + (docs.length ? "이 범위에 문서가 없습니다." :
+        "아직 문서가 없습니다 — ✍ Smart MD로 쓰거나 📥 .md를 가져오세요.") + "</div>";
+      return;
+    }
+    el.innerHTML = rows.map(function (d) {
+      return '<div class="row" data-id="' + esc(d.id) + '">' +
+        '<span class="t">' + esc(d.title) + "</span>" +
+        (d.ragOptIn ? '<span class="badge rag">AI 포함</span>' : "") +
+        '<span class="badge ' + (d.shared ? "shared" : "personal") + '">' + (d.shared ? "🏢 공유" : "👤 개인") + "</span>" +
+        '<span class="d">' + new Date(d.updatedAt).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) + "</span>" +
+        '<span class="bt">' +
+        '<button data-act="rag" title="내 AI가 이 문서를 읽게/안 읽게 — 내 질문에만 근거로 나옵니다">' + (d.ragOptIn ? "AI 제외" : "AI 포함") + "</button>" +
+        '<button data-act="share" title="팀 전체의 답변 근거가 될 수 있습니다 — 비밀번호류는 가려 담습니다">' + (d.shared ? "공유 해제" : "🏢 공유") + "</button>" +
+        '<button data-act="down" title=".md로 내려받기 — Smart MD에서 다듬은 뒤 가져오기로 되담습니다">⬇</button>' +
+        '<button data-act="del" title="삭제 — AI 지식에 실려 있으면 함께 회수합니다">✕</button>' +
+        "</span></div>";
+    }).join("");
+  }
+
+  async function load() {
+    if (!window.gijo || !window.gijo.personalDocsList) return;
+    try {
+      docs = ((await window.gijo.personalDocsList()) || {}).documents || [];
+    } catch (e) {
+      document.getElementById("list").innerHTML = '<div class="empty">불러오기 실패 — ' + esc((e && e.message) || "오류") + "</div>";
+      return;
+    }
+    render();
+  }
+
+  document.getElementById("seg").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button");
+    if (!b) return;
+    Array.prototype.forEach.call(document.querySelectorAll("#seg button"), function (x) { x.classList.remove("on"); });
+    b.classList.add("on");
+    filter = b.getAttribute("data-f") || "all";
+    if (선택행 && window.gijoSelectNotify) { try { window.gijoSelectNotify(); } catch (e) { } } // 다시 그리면 📌도 해제
+    선택행 = null;
+    render();
+  });
+
+  document.getElementById("btnWrite").addEventListener("click", async function () {
+    if (!(window.gijo && window.gijo.openSmartMd)) return;
+    var r = await window.gijo.openSmartMd();
+    if (r && r.ok === false && r.error && window.gijoTell) window.gijoTell(r.error);
+  });
+
+  document.getElementById("btnImport").addEventListener("click", function () {
+    document.getElementById("fileIn").click();
+  });
+  document.getElementById("fileIn").addEventListener("change", async function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    ev.target.value = "";
+    if (!f || !window.gijo || !window.gijo.personalDocsCreate) return;
+    var text = await f.text();
+    var title = f.name.replace(/\.(md|txt|markdown)$/i, "").slice(0, 120) || "가져온 문서";
+    try {
+      await window.gijo.personalDocsCreate({ title: title, body: text.slice(0, 200000) });
+      load();
+    } catch (e) { if (window.gijoTell) window.gijoTell("가져오기 실패 — " + ((e && e.message) || "오류")); }
+  });
+
+  document.getElementById("list").addEventListener("click", async function (ev) {
+    var row = ev.target.closest(".row");
+    if (!row) return;
+    var id = row.getAttribute("data-id");
+    var doc = docs.find(function (d) { return d.id === id; });
+    if (!doc) return;
+    var act = ev.target.closest("button") && ev.target.closest("button").getAttribute("data-act");
+    if (!act) {
+      if (선택행) 선택행.classList.remove("on");
+      선택행 = row; row.classList.add("on");
+      알림(doc.title, "내 문서 「" + doc.title + "」 · " + (doc.shared ? "회사 공유" : "개인") + " · 수정 " + new Date(doc.updatedAt).toLocaleDateString("ko-KR"));
+      return;
+    }
+    try {
+      if (act === "rag") { await window.gijo.personalDocsRag(id, !doc.ragOptIn); }
+      else if (act === "share") { await window.gijo.personalDocsShare(id, !doc.shared); }
+      else if (act === "down") {
+        var full = await window.gijo.personalDocsRead(id);
+        var blob = new Blob([full.body || ""], { type: "text/markdown" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = (doc.title || "문서") + ".md";
+        a.click();
+        URL.revokeObjectURL(a.href);
+        return; // 목록 변화 없음
+      }
+      else if (act === "del") {
+        var ok = window.gijoAsk ? await window.gijoAsk("「" + doc.title + "」을 삭제할까요?\nAI 지식에 실려 있으면 함께 회수됩니다.") : false;
+        if (!ok) return;
+        await window.gijo.personalDocsDelete(id);
+      }
+      load();
+    } catch (e) { if (window.gijoTell) window.gijoTell("처리 실패 — " + ((e && e.message) || "오류")); }
+  });
+
+  load();
+})();
+</script>
+<script src="nav.js"></script>
+<script src="selectnotify.js"></script>
+</body>
+</html>

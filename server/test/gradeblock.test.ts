@@ -89,10 +89,14 @@ describe("★ 검색 '전에' 막는다 — 가져온 뒤 거르지 않는다", 
     expect(memSrc).toContain("SELECT documentId, grade FROM memory_documents");
   });
 
-  it("viewer가 없으면 가리지 않는다 — 내부 호출이 통째로 죽지 않게", () => {
+  it("viewer가 없으면 등급은 안 가리되 개인 문서는 가린다(2026-08-20 LLM 위키 격리로 계약 개정)", () => {
+    // 옛 계약(전부 안 가림)은 개인 문서 도입으로 절반만 남았다: 등급은 내부 호출을 안 죽이게
+    // 계속 안 가리지만, **남의 개인 메모는 무기명 경로로도 새면 안 되므로** fail-closed다.
+    // 동작 검증은 personalisolation.test.ts가 실데이터로 한다 — 여기는 구조 감시만.
     const i = memSrc.indexOf("export function hiddenDocIds");
-    const 함수 = memSrc.slice(i, i + 300);
-    expect(함수, "viewer 없을 때 빈 배열을 돌려줘야 한다").toContain("if (!viewer) return []");
+    const 함수 = memSrc.slice(i, i + 1600);
+    expect(함수, "viewer 없을 때 등급 필터로 내려가지 않고 (개인 목록만 담아) 반환해야 한다").toContain("if (!viewer) return hidden");
+    expect(함수, "개인 문서 fail-closed 갈래가 없다").toContain("personal");
   });
 });
 

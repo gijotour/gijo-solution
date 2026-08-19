@@ -38,6 +38,7 @@ const 선택배선대장: Record<string, "부품" | "직접" | ["제외", string
   "intro.html": "부품",
   "sessions.html": "부품",
   "supervision.html": "부품", // AI 팀 감독(2026-08-20 ②) — 팀원 카드 클릭=📌(일반형, label+text만)
+  "mydocs.html": "부품", // 내 문서(2026-08-20 LLM 위키) — 행 클릭=📌(일반형, label+text만)
   "lawlookup.html": ["제외", "결과가 대화창 답으로 오는 화면 — 고를 목록이 화면에 없음"],
   "kpi.html": ["제외", "숫자 대시보드 — 고를 항목 없음"],
   "report.html": "부품",
