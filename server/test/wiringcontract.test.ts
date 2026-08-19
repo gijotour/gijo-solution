@@ -214,9 +214,13 @@ describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님
     // ⚠ 정확 일치 부정 단언은 변형(label 없이 등)으로 우회된다(검토관 L4) — page 변수 직접 호출 자체를 금지.
     expect(s, "좁은 창 자동 팝업(④)이 되살아났다 — 프로에서 팝업이 저절로 생기면 안 된다")
       .not.toMatch(/openShellPopout\(page[,)]/);
-    // 명시적 ⧉ 두 곳(상단 버튼·도킹 머리)은 남아 있어야 한다 — 사장님 예외(「필요한 거 빼고」)
+    // 무대 전환(2026-08-20 사장님 「팝업 및 옆에 붙는 메뉴를 없애는」·「승인 추천안으로 끝까지
+    // 진행」이 같은 날 앞선 예외 「필요한 거 빼고」를 대체): 도킹 머리 ⧉(dockPop)는 폐지 —
+    // 프로의 창은 (창) 메뉴(팀 사무실·문서함)뿐이다. 상단 ⧉(tbPopout)는 표준 셸 전용으로
+    // 남는다(프로는 .shellfoot 자체가 숨음 — shelllayout.test가 마크업을 지킨다).
     expect(s).toContain("openShellPopout(active.page, active.label)");
-    expect(s).toContain("openShellPopout(t.page, t.label || undefined)");
+    expect(s, "도킹 머리 ⧉(dockPop)가 되살아났다 — 무대 전환으로 폐지된 조작이다")
+      .not.toContain("openShellPopout(t.page, t.label || undefined)");
     // 도킹 진입 전 그 화면의 팝업을 닫는다(검토관 S2 — 안 닫으면 메뉴 재선택 시 두 벌)
     expect(s, "메뉴 선택 시 기존 팝업 닫기(두 벌 방지)가 없다").toContain("closeShellPopout(page)");
     // 대화 폭 클램프(검토관 S1 — 700 고정이면 좁은 창에서 화면이 144px까지 찌그러진다)
@@ -287,6 +291,22 @@ describe("프로 확정 계약 — 메뉴는 카드가 전부(2026-08-20 사장�
     for (const p of ["sessions.html", "fix.html", "reporting.html", "products.html", "records.html", "threat.html", "aihub.html"]) {
       expect(d, p + " 카드 매핑이 없다(사장님 「나머지는 카드 다 만들어서」)").toContain(String.fromCharCode(34) + p + String.fromCharCode(34));
     }
+  });
+  it("무대(대화창 자리) — 전면/대화 상태·← 대화로·골라서 복귀(2026-08-20 사장님 승인)", () => {
+    const s = 코드만(join(PAGES, "app.html"));
+    expect(s, "전면 상태(stage-on)가 없다 — 화면이 대화창 자리를 못 쓴다").toContain("stage-on");
+    expect(s, "← 대화로(무대숨김)가 없다 — 화면에서 대화로 돌아올 길이 없다").toContain("무대숨김");
+    expect(s, "무대 머리의 복귀 단추가 없다").toContain("← 대화로");
+    // 골라서 복귀 — 행 선택(gijo:select)이 무대를 내린다. 발신자는 활성 탭 사슬로 검증.
+    expect(s, "골라서 복귀 배선이 없다 — 무대에서 고르면 대화로 돌아와야 한다")
+      .toMatch(/gijo:select[\s\S]{0,1600}활성탭안인가\(ev\.source, tabs\[0\]\.frame\)/);
+    // 카드가 뜨면 무대를 내린다 — 무대 뒤(숨은 대화)에 카드만 붙으면 사람 눈엔 무반응이다.
+    expect(s, "메뉴 카드가 무대를 안 내린다(무대 뒤 카드=무반응)").toMatch(/if \(shown\) \{[\s\S]{0,400}무대숨김 = tabs\.length > 0/);
+    const c = 코드만(join(PAGES, "console.js"));
+    // 무대가 내려간 동안의 대화 맥락은 마지막 카드다(검토관 중7) — 숨은 탭이 아니라.
+    expect(c, "무대 내림 상태의 화면 맥락(마지막 카드) 반영이 없다").toMatch(/stage-on[\s\S]{0,300}화면카드직전/);
+    // 같은 메뉴 재클릭은 무반응이 아니라 기존 카드를 비춰 준다(검토관 중5).
+    expect(c, "같은 메뉴 재클릭이 여전히 무반응이다").toContain("화면카드행.scrollIntoView");
   });
 });
 

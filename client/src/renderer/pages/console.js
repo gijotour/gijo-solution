@@ -1326,7 +1326,16 @@
   function readCtxFromShell() {
     if (IS_WINDOW || !window.gijoTabs) return;
     var 이전화면 = ctx && ctx.screen;
-    ctx = { screen: window.gijoTabs.activeScreen(), label: window.gijoTabs.activeLabel() };
+    var s = window.gijoTabs.activeScreen(), l = window.gijoTabs.activeLabel();
+    // 프로에서 무대가 내려가 있으면(stage-on 아님) 사람이 보는 것은 마지막 현황 카드다 —
+    // 지시의 화면 맥락도 그것이어야 한다. 숨은 탭을 맥락으로 잡으면 「정리해줘」가 사람이
+    // 보는 카드가 아니라 아까 화면에 걸린다(검토관 중7). 무대가 떠 있으면 종전과 같다.
+    if (document.body.classList.contains("pro-shell") &&
+        !document.body.classList.contains("stage-on") && 화면카드직전) {
+      s = 화면카드직전;
+      l = 화면카드라벨 || l;
+    }
+    ctx = { screen: s, label: l };
     // ⚠ 화면을 옮기면 「보고 있던 목록」을 **버린다.** 취약점 목록을 보다 설정으로 갔는데
     //   「이것들 배정해줘」가 아까 목록에 걸리면 그게 사고다. 새 화면이 다시 알려 줄 것이다.
     //   (전송부에도 화면 대조가 있지만, 안 쓰는 값을 들고 있는 것 자체를 없앤다 — 이중 방어.)
@@ -1733,13 +1742,27 @@
   // 셸(app.html open)이 화면을 열 때 부른다. 지시가 아니라 조회라 사용자 발화로 남기지 않고,
   // 이벤트 카드(🗔)로 붙인다. 숫자·표는 전부 서버 결정적 계산(datacard.ts) — 지어내지 않는다.
   var 화면카드직전 = null;
+  var 화면카드라벨 = null; // 직전 카드의 화면 이름 — 무대가 내려간 동안의 대화 맥락 표시용
+  var 화면카드행 = null;   // 직전 카드의 행(DOM) — 같은 메뉴 재클릭 때 다시 그리는 대신 비춰 준다
   var 빈상태원본 = null; // 대화 홈(.cs-empty) 원본 — build가 저장, newSession이 되살린다
   // 반환: Promise<boolean> — 카드를 띄웠으면 true(셸 open()이 「화면을 열지 않는다」 판단에 쓴다,
   // 2026-08-20 사장님 확정 「화면 내용은 대화창에」). 같은 화면 연속도 true(카드는 이미 떠 있다).
   function screenCard(page, label) {
     var p = String(page || "").split("?")[0];
     if (!p) return Promise.resolve(false);
-    if (p === 화면카드직전) return Promise.resolve(true); // 같은 화면 연속 — 도배 안 하되 「카드 있음」
+    if (p === 화면카드직전) {
+      // 같은 화면 연속 — 도배하지 않되, 「아무 일도 안 일어남」(검토관 중5)도 막는다:
+      // 그 카드가 아직 대화에 있으면 비춰 주고(스크롤+깜박), 사라졌으면(새 세션 등) 다시 그린다.
+      if (화면카드행 && 화면카드행.isConnected) {
+        try {
+          화면카드행.scrollIntoView({ block: "nearest" });
+          화면카드행.style.outline = "2px solid rgba(255,255,255,.35)";
+          setTimeout(function () { try { 화면카드행.style.outline = ""; } catch (e) { } }, 1200);
+        } catch (e) { }
+        return Promise.resolve(true);
+      }
+      화면카드직전 = null; // 카드가 사라졌다 — 아래에서 새로 그린다
+    }
     if (!(window.gijo && window.gijo.screenCard)) return Promise.resolve(false);
     var scope = 범위 && 범위.kind === "asset" ? String(범위.id) : undefined;
     return window.gijo.screenCard(p, scope).then(function (r) {
@@ -1748,6 +1771,8 @@
       var P = window.gijoChatParts;
       if (!row || !P) return false; // 카드를 못 그렸다 — 셸이 화면이라도 연다(직전 기억도 안 남긴다)
       화면카드직전 = p;
+      화면카드라벨 = label || p;
+      화면카드행 = row;
       if (P.dataCard) P.dataCard(row, r.dataCard, {
         navigate: function (pg, lb) {
           if (window.gijoTabs) { window.gijoTabs.open(pg, lb, { dock: true }); return true; } // 🗔=명시 열기
@@ -1778,6 +1803,8 @@
     // 화면들도 범위 해제를 알아야 목록이 되돌아온다 — 셸을 거쳐 모든 틀에(기존 풀기 경로와 동일).
     try { window.parent.postMessage({ type: "gijo:scope", scope: null }, "*"); } catch (err) { }
     화면카드직전 = null;
+    화면카드라벨 = null;
+    화면카드행 = null;
     var body = rows();
     if (body) {
       body.innerHTML = "";

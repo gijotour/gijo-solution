@@ -162,6 +162,9 @@ if (auditFrame) {
   ok("audit 부품·행 클릭·하이라이트", r.has부품 && r.rows > 0 && r.on, "rows=" + r.rows);
   const 칩 = await 셸.evaluate(() => (document.querySelector(".cs-sel") || {}).textContent || "");
   ok("행 클릭 → 셸 📌 칩", !!칩, String(칩).slice(0, 40));
+  // 골라서 복귀(무대 2026-08-20) — 행을 골랐으니 무대가 내려가고 대화가 앞이어야 한다.
+  const 복귀 = await 셸.evaluate(() => !document.body.classList.contains("stage-on"));
+  ok("골라서 복귀: 행 선택이 무대를 내린다", 복귀);
   // 허브 릴레이 — 무대→허브→셸 두 겹을 실제로 올라가는가(2026-08-20 grouphub 릴레이+가드)
   await auditFrame.evaluate(() => window.parent.postMessage({ type: "gijo:openTab", page: "kpi.html", label: "지표" }, "*"));
   const kpiFrame = await 프레임찾기("kpi.html", 8);
@@ -213,6 +216,35 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
   const fr = await 프레임찾기("assets.html", 6);
   const has = fr ? await fr.evaluate(() => typeof window.gijoSelectNotify === "function").catch(() => false) : false;
   ok("부품 로드: assets.html", has, fr ? "" : "프레임 못 찾음");
+
+  // ── 무대(대화창 자리) 실측 — 2026-08-20 사장님 승인 「팝업·옆 도킹 없애고 대화창 자리에」 ──
+  // 방금 dock으로 열었으니 무대가 떠 있어야 한다: 화면 전폭 + 대화 숨김 + ← 대화로.
+  const 무대 = await 셸.evaluate(() => ({
+    전면: document.body.classList.contains("stage-on"),
+    대화숨김: getComputedStyle(document.querySelector(".work .console")).display === "none",
+    복귀단추: !!document.getElementById("stageBack") && document.getElementById("stageBack").offsetParent !== null,
+    옛팝업단추: !!document.getElementById("dockPop"),
+  }));
+  ok("무대: 화면 전폭·대화 숨김·← 대화로", 무대.전면 && 무대.대화숨김 && 무대.복귀단추 && !무대.옛팝업단추,
+    JSON.stringify(무대));
+  // ← 대화로 — 대화가 앞으로, 화면(탭)은 산 채로 남는다(필터·스크롤 보존 계약).
+  await 셸.evaluate(() => document.getElementById("stageBack").click());
+  const 내림 = await 셸.evaluate(() => ({
+    대화앞: !document.body.classList.contains("stage-on") && document.body.classList.contains("chat-home"),
+    탭산다: !!(window.gijoTabs && window.gijoTabs.list && window.gijoTabs.list().some((t) => String(t.page || t).includes("assets.html"))),
+  }));
+  ok("← 대화로: 대화 복귀·화면 보존", 내림.대화앞 && 내림.탭산다, JSON.stringify(내림));
+  // 🗔 되올리기 — 같은 화면 dock 열기가 숨긴 무대를 그대로 되올린다.
+  await 셸.evaluate(() => window.gijoTabs.open("assets.html", "자산 고르기", { dock: true }));
+  await new Promise((r) => setTimeout(r, 400));
+  const 되올림 = await 셸.evaluate(() => document.body.classList.contains("stage-on"));
+  ok("🗔 되올리기: 보던 화면 복귀", 되올림);
+  // 팝업 0 — 프로에서 저절로 뜨는 창이 없다(창은 (창) 메뉴뿐 — 이 관문은 안 연다).
+  const 팝업0 = ctx.pages().every((p) => {
+    const u = p.url();
+    return u.includes("app.html") || u.includes("login.html") || u.includes("?embed=1") || u === "about:blank";
+  });
+  ok("팝업 0(프로 — 창은 (창) 메뉴뿐)", 팝업0);
 }
 
 // ── ④ 데이터 카드 히트맵 보기(5.35.0 기능 회귀) ─────────────────────────
