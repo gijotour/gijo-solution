@@ -1031,9 +1031,10 @@
     }
     var t0 = tabs[0];
     head.style.display = t0 ? "flex" : "none";
-    // screens가 grid 1행을 dockHead와 나눠 쓰도록 — 머리(28px) 아래로 화면을 내린다.
+    // 머리 높이만큼 화면을 내린다 — 고정 30px로 적었더니 실제 머리(버튼 포함 ≈38px)가 화면
+    // 상단을 덮어 KPI 카드 윗줄이 잘렸다(2026-08-19 사장님 스크린샷). 실높이로 동기화한다.
     var scr2 = document.getElementById("screens");
-    if (scr2) scr2.style.paddingTop = t0 ? "30px" : "";
+    if (scr2) scr2.style.paddingTop = t0 ? (head.offsetHeight || 34) + "px" : "";
     if (t0) head.querySelector("#dockName").textContent = t0.label || "";
   }
 
