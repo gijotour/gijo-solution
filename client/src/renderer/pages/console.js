@@ -1483,7 +1483,9 @@
           if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) {
             return window.gijo.openTabInShell(page, leaf).then(function (x) { return !!(x && x.ok); });
           }
-          if (window.gijoTabs) { window.gijoTabs.open(page, leaf); return true; }
+          // dock 명시 — 「가서 하기」는 사람이 그 화면을 열겠다고 누른 것(확정 계약의 명시 의도).
+          // 없으면 카드 갈래로 빨려 화면이 안 열리는데 버튼은 「열었습니다」가 된다(검토관 4번).
+          if (window.gijoTabs) { window.gijoTabs.open(page, leaf, { dock: true }); return true; }
           if (window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(page); return true; }
           return false;
         },

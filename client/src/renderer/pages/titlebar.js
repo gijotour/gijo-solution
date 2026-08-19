@@ -639,7 +639,10 @@
       hist.idx += d;
       이력쓰기(hist);
       되짚는중 = true;
-      try { window.gijoTabs.open(갈곳.page || 갈곳, 갈곳.label); } finally { 되짚는중 = false; }
+      // dock 명시 — 되짚기는 「보던 화면으로 돌아가겠다」는 명시 의도다. 없으면 프로에서
+      // 카드 갈래로 빨려 ①화면이 안 돌아오고 ②비동기라 되짚는중=false 이후 열려
+      // 이력이 다시 쌓인다(아래 :651 경고의 재발 — 검토관 6번).
+      try { window.gijoTabs.open(갈곳.page || 갈곳, 갈곳.label, { dock: true }); } finally { 되짚는중 = false; }
       window.gijoSyncTopbar();
       return;
     }

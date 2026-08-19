@@ -341,13 +341,19 @@ export function registerScreenCardRoute(app: import("express").Express): void {
 
 // ── 전 메뉴 카드 7종(2026-08-20 사장님 확정) — 숫자는 전부 DB 직접 계산, 표는 급한 순 상한 ──
 export function sessionsStatusAnswer(): { output: string; dataCard: DataCard } {
-  const { listSessions } = require("./worksessions") as typeof import("./worksessions");
-  const 목록 = listSessions(200);
+  const { listSessionsFiltered } = require("./worksessions") as typeof import("./worksessions");
+  // QA·시스템 세션 제외 — 화면(sessions.html 기본 보기)과 같은 모집단이어야 숫자가 맞는다
+  // (검토관 9번: 등록부 123건 중 121이 QA였던 전례 — 섞어 세면 카드가 화면과 어긋난다).
+  const 세션응답 = listSessionsFiltered(200, { origin: "user", includeQa: false });
+  const 목록 = 세션응답.items;
+  // 최근 200건 창 안에서 센 값이다 — 창이 가득 찼으면 「+」로 상한임을 밝힌다(검토관 8번:
+  // totalCount 계약은 진짜 총계인데 잘린 length를 총계처럼 적으면 지어낸 값이 된다).
+  const 세션표기 = 세션응답.counts.all >= 200 ? `${목록.length}+` : String(목록.length);
   const 최근 = 목록.slice().sort((a, b) => ((b as { updatedAt?: number }).updatedAt || 0) - ((a as { updatedAt?: number }).updatedAt || 0)).slice(0, 8);
   const dataCard: DataCard = {
     title: "작업 내역 — 대화 세션",
     kpis: [
-      { label: "저장된 세션", value: String(목록.length) },
+      { label: "저장된 세션", value: 세션표기 },
       { label: "오늘 갱신", value: String(목록.filter((x) => Date.now() - ((x as { updatedAt?: number }).updatedAt || 0) < 86400000).length), color: "ok" },
     ],
     screen: { page: "sessions.html", label: "작업 내역" },
@@ -358,14 +364,16 @@ export function sessionsStatusAnswer(): { output: string; dataCard: DataCard } {
       totalCount: 목록.length,
     },
   };
-  return { output: `작업 내역 — 저장된 세션 ${목록.length}건. 최근 것부터 카드로 보였습니다 — 이어서 보려면 행을 고르거나 🗔로 여세요.`, dataCard };
+  return { output: `작업 내역 — 저장된 세션 ${세션표기}건(QA·시스템 세션 제외). 최근 것부터 카드로 보였습니다 — 이어서 보려면 행을 고르거나 🗔로 여세요.`, dataCard };
 }
 
 export function fixStatusAnswer(): { output: string; dataCard: DataCard } {
   const { listFindingReviews } = require("./approvals") as typeof import("./approvals");
   const { listMaintenanceItems } = require("./maintenance") as typeof import("./maintenance");
   const rv = listFindingReviews();
-  const 대기 = rv.filter((r) => String(r.status) === "pending");
+  // 스캔 실패·조사 정보(info)는 취약점이 아니다 — 이걸 안 걸러 미조치 602건(실제 3건)이
+  // 뜬 실사고의 재발 방지(workflow.ts:94와 같은 규칙). finding이 없으면 못 판단하니 남긴다.
+  const 대기 = rv.filter((r) => (r.finding ? isRealVulnerability(r.finding) : true) && String(r.status) === "pending");
   const mt = listMaintenanceItems();
   const today = new Date().toISOString().slice(0, 10);
   const 지연 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled" && String((m as { scheduleDate?: string }).scheduleDate || "") <= today).length;
@@ -391,11 +399,14 @@ export function fixStatusAnswer(): { output: string; dataCard: DataCard } {
 export async function reportStatusAnswer(): Promise<{ output: string; dataCard: DataCard }> {
   const rp = require("./report") as typeof import("./report");
   const 이력 = await rp.listReportHistory(50);
-  const 스케줄 = (rp as unknown as { listSchedules?: () => unknown[] }).listSchedules ? (rp as unknown as { listSchedules: () => unknown[] }).listSchedules() : [];
+  // listSchedules는 report.ts가 아니라 reportschedule.ts에 있다 — 옵셔널 체크로 감싸면
+  // 영원히 0이 나오는데 예외도 안 난다(검토관 1번: 생산자 없는 값을 실측처럼 보임).
+  const { listSchedules } = require("./reportschedule") as typeof import("./reportschedule");
+  const 스케줄 = listSchedules();
   const dataCard: DataCard = {
     title: "보고 — 리포트 현황",
     kpis: [
-      { label: "만든 리포트", value: String(이력.length) },
+      { label: "만든 리포트", value: 이력.length >= 50 ? `${이력.length}+` : String(이력.length) },
       { label: "정기 스케줄", value: String(스케줄.length), color: 스케줄.length ? "ok" : "muted" },
     ],
     screen: { page: "reporting.html", label: "보고" },
@@ -406,7 +417,7 @@ export async function reportStatusAnswer(): Promise<{ output: string; dataCard: 
       totalCount: 이력.length,
     } : undefined,
   };
-  return { output: `보고 현황 — 만든 리포트 ${이력.length}건 · 정기 스케줄 ${스케줄.length}건.`, dataCard };
+  return { output: `보고 현황 — 만든 리포트 ${이력.length >= 50 ? `${이력.length}+` : 이력.length}건 · 정기 스케줄 ${스케줄.length}건.`, dataCard };
 }
 
 export function productsStatusAnswer(): { output: string; dataCard: DataCard } {
@@ -438,7 +449,7 @@ export function recordsStatusAnswer(): { output: string; dataCard: DataCard } {
   const dataCard: DataCard = {
     title: "기록 — 작업 감사(24시간)",
     kpis: [
-      { label: "오늘 기록", value: String(하루.length) },
+      { label: "오늘 기록", value: 최근.length >= 500 ? `${하루.length}+` : String(하루.length) },
       { label: "차단", value: String(차단), color: 차단 ? "warn" : "ok" },
     ],
     screen: { page: "records.html", label: "기록" },
@@ -449,26 +460,32 @@ export function recordsStatusAnswer(): { output: string; dataCard: DataCard } {
       totalCount: 하루.length,
     } : undefined,
   };
-  return { output: `작업 기록 — 24시간 ${하루.length}건(차단 ${차단}건). 누가 언제 무엇을 했는지 그대로 남습니다.`, dataCard };
+  return { output: `작업 기록 — 24시간 ${최근.length >= 500 ? `${하루.length}+` : 하루.length}건(차단 ${차단}건). 누가 언제 무엇을 했는지 그대로 남습니다.`, dataCard };
 }
 
 export function threatStatusAnswer(): { output: string; dataCard: DataCard } {
   const { listFeeds } = require("./cti") as typeof import("./cti");
   const 피드 = listFeeds();
+  // listFeeds는 시드 벤더(키 없음)와 지원 예정(planned)까지 항상 돌려준다 — 전체 수를
+  // 「구독」이라 부르면 키를 하나도 안 넣은 새 설치에서 거짓 초록이 뜬다(검토관 3번,
+  // 2026-08-19 「키만 있고 어댑터 없는데 연결됨」 정직 스윕과 같은 부류). 수집 중=connected+collects.
+  const 수집중 = 피드.filter((f) => f.connected && f.collects);
+  const 상태 = (f: (typeof 피드)[number]) => (f.planned ? "지원 예정" : f.connected && f.collects ? "수집 중" : f.connected ? "키만 등록" : "키 없음");
   const dataCard: DataCard = {
     title: "위협 인텔 — CTI 피드",
     kpis: [
-      { label: "구독 피드", value: String(피드.length), color: 피드.length ? "ok" : "muted" },
+      { label: "수집 중", value: String(수집중.length), color: 수집중.length ? "ok" : "muted" },
+      { label: "등록 벤더", value: String(피드.filter((f) => !f.planned).length) },
     ],
     screen: { page: "threat.html", label: "위협" },
     pickKey: "n",
     table: 피드.length ? {
-      cols: [{ key: "n", label: "피드" }, { key: "c", label: "항목" }],
-      shown: 피드.slice(0, 6).map((f) => ({ n: String((f as { name?: string; url?: string }).name || (f as { url?: string }).url || ""), c: String((f as { itemCount?: number; items?: number }).itemCount ?? (f as { items?: number }).items ?? "-") })),
+      cols: [{ key: "n", label: "피드" }, { key: "s", label: "상태" }],
+      shown: 피드.slice(0, 6).map((f) => ({ n: String(f.name || ""), s: 상태(f) })),
       totalCount: 피드.length,
     } : undefined,
   };
-  return { output: 피드.length ? `위협 인텔 — 구독 피드 ${피드.length}개. 우리 자산과의 매칭은 "새로 올라온 위협 중 우리 자산에 해당하는 게 있어?"로 물으면 근거와 함께 답합니다.` : "위협 인텔 — 구독 피드가 아직 없습니다.", dataCard };
+  return { output: 수집중.length ? `위협 인텔 — 수집 중인 피드 ${수집중.length}개(등록 벤더 ${피드.filter((f) => !f.planned).length}개). 우리 자산과의 매칭은 "새로 올라온 위협 중 우리 자산에 해당하는 게 있어?"로 물으면 근거와 함께 답합니다.` : "위협 인텔 — 아직 수집 중인 피드가 없습니다. 설정 → 위협 피드에서 벤더 API 키를 등록하면 수집이 시작됩니다.", dataCard };
 }
 
 export function aiteamStatusAnswer(): { output: string; dataCard: DataCard } {

@@ -401,3 +401,26 @@ describe("화면 열기 → 현황 카드 (2026-08-20 사장님 — 「메뉴를
     expect(api).toContain("/api/screen-card?page=");
   });
 });
+
+describe("신설 카드 7종 — 생산자 정직 감시(검토관 2026-08-20 상 1~3의 재발 방지)", () => {
+  const 소스 = readFileSync(join(__dirname, "..", "src", "engine", "datacard.ts"), "utf8");
+  it("보고 카드의 스케줄은 reportschedule.ts가 생산한다(옵셔널 체크 금지 — 영원한 0)", () => {
+    expect(소스).toContain('require("./reportschedule")');
+    expect(소스, "listSchedules를 옵셔널로 감싸면 없는 생산자를 조용히 0으로 만든다").not.toMatch(/listSchedules\s*\?/);
+  });
+  it("조치 카드 검토 대기는 스캔 실패·info를 거른다(602 vs 3 실사고 규칙)", () => {
+    const 함수 = 소스.slice(소스.indexOf("function fixStatusAnswer"), 소스.indexOf("function reportStatusAnswer"));
+    expect(함수).toContain("isRealVulnerability");
+  });
+  it("위협 카드 「수집 중」은 connected+collects만 센다(시드·지원예정 거짓 초록 금지)", () => {
+    const 함수 = 소스.slice(소스.indexOf("function threatStatusAnswer"), 소스.indexOf("function aiteamStatusAnswer"));
+    expect(함수).toContain("f.connected && f.collects");
+    expect(함수, "CtiFeedPublic에 없는 필드를 찍으면 전 행이 -가 된다").not.toContain("itemCount");
+  });
+  it("작업내역 카드는 QA·시스템 세션을 제외하고 센다(화면 기본 보기와 같은 모집단)", () => {
+    const 함수 = 소스.slice(소스.indexOf("function sessionsStatusAnswer"), 소스.indexOf("function fixStatusAnswer"));
+    expect(함수).toContain("listSessionsFiltered");
+    expect(함수).toContain('origin: "user"');
+    expect(함수).toContain("includeQa: false");
+  });
+});
