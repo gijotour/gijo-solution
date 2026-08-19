@@ -258,7 +258,7 @@ export const collaborationApi = {
 
 // ── 로컬 LLM 실동작 스트림 (llm:event) ────────────────────────────────
 export interface LlmActivityEvent {
-  kind: "chat" | "embed" | "load" | "swap";
+  kind: "chat" | "embed" | "load" | "swap" | "search" | "guard";
   phase: "start" | "done" | "error";
   agent?: string;
   model?: string;

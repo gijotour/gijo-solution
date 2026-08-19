@@ -220,6 +220,33 @@ const 히트 = await 셸.evaluate(() => {
 });
 ok("히트맵 토글·색사전", 히트.seg && JSON.stringify(히트.cls) === '["bad","warn","muted"]', JSON.stringify(히트.cls));
 
+// ── ⑤′ AI 팀 가시화(2026-08-20) — 레일 로스터(팀6+부품4·약자)·대시보드 팀 카드·지식창고 ──
+const 가시화 = await 셸.evaluate(async () => {
+  const 로스터 = [...document.querySelectorAll("#gijoRail .rr-item")];
+  const 약자들 = 로스터.slice(0, 6).map((b) => (b.textContent || "").trim());
+  // 대시보드 프레임(도킹)에서 팀 카드·지식창고 확인
+  return {
+    로스터수: 로스터.length,
+    약자적용: 약자들.filter((t) => /^[가-힣]{2}$/.test(t)).length, // 등록부 abbr(2글자 한글) 반영 수
+  };
+});
+ok("레일 로스터 10개(팀6+부품4)", 가시화.로스터수 === 10, "개수=" + 가시화.로스터수);
+ok("로스터 약자(등록부 단일 출처) 반영", 가시화.약자적용 === 6, "약자 " + 가시화.약자적용 + "/6");
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("dashboard.html", "대시보드"));
+  const df = await 프레임찾기("dashboard.html", 8);
+  const r = df ? await df.evaluate(() => {
+    const 카드 = document.getElementById("aiteamRow");
+    const 칩 = 카드 ? 카드.querySelectorAll(".aiteam-chip").length : 0;
+    // 지식창고는 기본 접힘 — 「접기는 접은 채로, 검증 땐 펴서 잰다」: 펴서 KPI가 그려졌는지
+    const head = document.querySelector("[data-gijo-fold] , .gjf-h");
+    const kb = document.getElementById("kbKpi");
+    return { 칩, kb있음: !!kb, kb내용: kb ? (kb.textContent || "").length : 0 };
+  }).catch(() => null) : null;
+  ok("대시보드 팀 카드 6칩", !!r && r.칩 === 6, r ? "칩=" + r.칩 : "프레임 못 찾음");
+  ok("지식창고 렌더(KPI)", !!r && r.kb있음 && r.kb내용 > 0, r ? "내용 " + r.kb내용 + "자" : "");
+}
+
 // ── ⑥ 💬 새 세션(2026-08-20) — 확인창(작업 내역 저장 안내) → 확인 → 대화 초기화 ──
 // ⚠ 대화를 비우므로 반드시 **맨 마지막** 검사여야 한다(앞 검사들의 카드가 사라진다).
 const 새세션 = await 셸.evaluate(async () => {

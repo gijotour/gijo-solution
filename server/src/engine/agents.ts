@@ -13,6 +13,7 @@ export interface AgentDefinition {
   name: string; // 표시 이름(커스텀 이름이 있으면 그것, 없으면 기본)
   defaultName: string; // 원래 기본 이름
   role: string;
+  abbr: string; // 실제 하는 일의 두 글자 약자(2026-08-20 사장님 — 레일·팀사무실 표기 단일 출처)
   desc: string; // 업무 연계 설명 — 파이프라인에서 누구와 어떻게 이어지는지(카드에 표시)
   status: AgentStatus;
   defaultStatus: AgentStatus;
@@ -35,6 +36,7 @@ interface AgentBase {
   id: string;
   name: string;
   role: string;
+  abbr: string;
   desc: string;
   defaultStatus: AgentStatus;
 }
@@ -49,6 +51,7 @@ const AGENT_DEFS: AgentBase[] = [
     id: "orchestrator",
     name: "Security Orchestrator",
     role: "작업 분배 · 결과 취합",
+    abbr: "분배",
     desc: "지시를 해석해 Scan → Analyze → Report 순으로 작업을 나눠 맡기고, 각 단계 결과를 취합해 최종 응답으로 정리합니다.",
     defaultStatus: "watching",
   },
@@ -56,6 +59,7 @@ const AGENT_DEFS: AgentBase[] = [
     id: "scan",
     name: "Scan Agent",
     role: "초기 데이터 해석 · 자산 반영",
+    abbr: "해석",
     desc: "업로드·스캔(ModelScan) 결과로 나온 모델 취약점을 위협 관점에서 해석·요약하고 자산 finding으로 반영합니다. 결과는 Analyze Agent와 GIJO Agent로 이어집니다.",
     defaultStatus: "idle",
   },
@@ -63,6 +67,7 @@ const AGENT_DEFS: AgentBase[] = [
     id: "analysis",
     name: "Analyze Agent",
     role: "AI 지식·모델 관리 · 우선순위 판단",
+    abbr: "우선",
     desc: "기억·학습(RAG)·온톨로지·학습 루프 등 AI 지식모델 관리를 담당하고, 스캔 finding의 우선순위를 판단합니다. 학습 데이터셋 Q&A 생성도 이 에이전트 담당입니다.",
     defaultStatus: "idle",
   },
@@ -70,6 +75,7 @@ const AGENT_DEFS: AgentBase[] = [
     id: "report",
     name: "Report Agent",
     role: "내부 보고서 작성 · 결과 레포팅",
+    abbr: "보고",
     desc: "작업 결과를 내부 보고용 문서로 정리합니다. 파이프라인 마지막 단계에서 스캔·분석·부연 결과를 받아 보고서를 만듭니다.",
     defaultStatus: "idle",
   },
@@ -78,7 +84,8 @@ const AGENT_DEFS: AgentBase[] = [
     id: "ti",
     name: "TI Agent",
     role: "위협 인텔리전스 · CTI 피드-자산 매칭 해석", // 2026-08-20 정직화 — 상시 감시 루프가 없는데 「모니터링」은 과장(외부 대조 검증)
-    desc: "딥웹·다크웹 CTI 피드 구독 기반으로 유출정보·위협을 모니터링합니다. 위협 인텔 텍스트를 자산 인벤토리(자산명·컴포넌트·CVE·AI-BOM)와 대조해 영향 자산을 자동 매칭해 알립니다.",
+    abbr: "위협",
+    desc: "딥웹·다크웹 CTI 피드에서 받은 유출정보·위협을 요청 시 해석합니다. 위협 인텔 텍스트를 자산 인벤토리(자산명·컴포넌트·CVE·AI-BOM)와 대조해 영향 자산을 자동 매칭해 알립니다.",
     defaultStatus: "idle", // watching(감시 중)은 상시 루프가 있을 때의 말 — 요청응답형이라 idle이 사실
   },
   // 사내 지식베이스(RAG)+온톨로지에 적재된 자료만 근거로 설명하고 실제 사례를 검색해 준다(엄격 그라운딩).
@@ -86,6 +93,7 @@ const AGENT_DEFS: AgentBase[] = [
     id: "normaltic",
     name: "GIJO Agent",
     role: "용어 해설 · 사례 부연(사내 지식)",
+    abbr: "해설",
     desc: "Scan·Analyze 결과에 나온 용어를 사내 지식베이스 근거로 해설하고 실제 사례를 부연합니다. 복합 지시에서 스캔·분석이 끝나면 자동 투입됩니다.",
     defaultStatus: "watching",
   },
@@ -215,6 +223,7 @@ function toAgent(base: AgentBase): AgentDefinition {
     name: getAgentName(base.id) ?? base.name, // 커스텀 이름이 있으면 우선
     defaultName: base.name, // 원래 기본 이름(되돌리기·비교용)
     role: base.role,
+    abbr: base.abbr,
     desc: base.desc,
     defaultStatus: base.defaultStatus,
     status: liveStatus.get(base.id) ?? base.defaultStatus,

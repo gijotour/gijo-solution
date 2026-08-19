@@ -669,7 +669,8 @@ tr:last-child td{border-bottom:none;}
 
   // ── 로컬 LLM 실동작 이벤트(llm:event) — 실제 추론/임베딩/모델 로드를 사람이 읽는 한 줄로 ──
   function fmtLlm(evt) {
-    const icon = evt.kind === "embed" ? "🔎" : (evt.kind === "load" || evt.kind === "swap") ? "⚙️" : "🧠";
+    // search·guard(2026-08-20 신설)는 LLM 추론이 아니다 — 🧠로 찍으면 추론처럼 읽힌다(검토관 M5).
+    const icon = evt.kind === "embed" ? "🔎" : evt.kind === "search" ? "📚" : evt.kind === "guard" ? "🛡" : (evt.kind === "load" || evt.kind === "swap") ? "⚙️" : "🧠";
     const who = evt.agent ? `[${evt.agent}] ` : "";
     const model = evt.model ? evt.model + " · " : "";
     let tail = evt.detail || "";
@@ -689,7 +690,9 @@ tr:last-child td{border-bottom:none;}
     const f = fmtLlm(evt);
     const dim = f.phase === "start" ? "opacity:.65;" : "";
     const color = f.phase === "error" ? "#e2483d" : (f.kind === "chat" ? "var(--blue-light)" : "var(--teal)");
-    return `<div class="chat-row" style="${dim}"><span style="color:${color};font-weight:700">${f.icon} LLM</span><span class="chat-msg">${f.text.replace(/</g, "&lt;")}</span></div>`;
+    // 라벨도 종류를 말한다 — search·guard를 「LLM」이라 부르면 추론이 일어난 것처럼 읽힌다(검토관 M5).
+    const label = f.kind === "search" ? "검색" : f.kind === "guard" ? "가드" : "LLM";
+    return `<div class="chat-row" style="${dim}"><span style="color:${color};font-weight:700">${f.icon} ${label}</span><span class="chat-msg">${f.text.replace(/</g, "&lt;")}</span></div>`;
   }
 
   function llmTerminalHtml(evt) {

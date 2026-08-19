@@ -16,7 +16,7 @@
   function boot() {
     if (!document.body.classList.contains("pro-shell")) return; // 프로 전용 — 표준은 사이드바가 있다
     var rail = document.getElementById("gijoRail");
-    if (!rail || document.getElementById("rrTeam")) return;
+    if (!rail || rail.querySelector(".rr-item")) return; // 재진입 가드 — 실존 요소 기준(검토관 L1: 없는 id는 가드가 아니다)
     var g = window.gijo;
     if (!g || !g.listAgents) return;
 
@@ -26,9 +26,9 @@
       { id: "report", 기호: "▣" }, { id: "ti", 기호: "🛰" }, { id: "normaltic", 기호: "📚" },
     ];
     var 부품 = [
-      { id: "embed", 기호: "E", title: "임베딩 엔진(bge-m3) — 문서·질문을 숫자로", page: "aihub.html?panel=knowledge", label: "AI 운영" },
-      { id: "search", 기호: "R", title: "RAG 검색 — 사내 지식에서 근거 찾기", page: "aihub.html?panel=knowledge", label: "AI 운영" },
-      { id: "guard", 기호: "G", title: "가드레일 — 들어오는 지시 입구 검사", page: "redteam.html", label: "레드팀" },
+      { id: "embed", 기호: "E", title: "임베딩 엔진(bge-m3) — 문서·질문을 숫자로", page: "aihub.html?panel=knowledge", label: "지식" },
+      { id: "search", 기호: "R", title: "RAG 검색 — 사내 지식에서 근거 찾기", page: "aihub.html?panel=knowledge", label: "지식" },
+      { id: "guard", 기호: "G", title: "가드레일 — 들어오는 지시 입구 검사", page: "aihub.html?panel=safety", label: "안전장치" } /* redteam.html은 aihub로 흡수(TAB_REDIRECT) — 도착지로 직접(검토관 L8) */,
       { id: "lora", 기호: "L", title: "LoRA 전문가 어댑터", page: "aihub.html?panel=team", label: "AI 팀" },
     ];
 
@@ -65,6 +65,7 @@
         var el = document.getElementById("rr-" + a.id);
         if (!el) return;
         el.title = (a.name || a.defaultName) + " — " + (a.role || "");
+        if (a.abbr) el.textContent = a.abbr; // 실제 하는 일의 약자(2026-08-20 사장님 — 등록부 단일 출처)
         // working 애니메이션은 llm:event가 켠 것을 폴링이 끄지 않게, 폴링은 watching/기본만 손댄다
         if (!el.classList.contains("working")) el.classList.toggle("watching", a.status === "watching");
         if (a.status === "working") el.classList.add("working");
@@ -126,7 +127,7 @@
       if (!el) return;
       var 학습중 = run && run.stage && run.stage !== "done" && run.stage !== "error";
       el.classList.toggle("training", !!학습중);
-      if (run && run.stage) el.title = "LoRA — 학습 " + (학습중 ? "진행 중(" + run.stage + ")" : "최근 완료: " + (run.topic || ""));
+      if (run && run.stage) el.title = "LoRA — " + (학습중 ? "학습 진행 중(" + run.stage + ")" : run.stage === "error" ? "최근 학습 실패" : "최근 학습 완료: " + (run.topic || "")); // error를 완료로 말하지 않는다(검토관 L3)
     });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

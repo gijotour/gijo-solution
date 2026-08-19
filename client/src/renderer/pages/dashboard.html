@@ -481,6 +481,7 @@
   $("teamRow").addEventListener("click", function () { go("agent.html"); });
 
   // ── AI 팀 카드 줄 + 기반 부품(승인 시안 AI팀_가시화) — 전부 실데이터·실신호 ──────────
+  var 부품el = {}; // 동적 생성 id 참조 맵 — IIFE 최상위(검토관 S1: 지역 스코프면 learnloop 콜백이 ReferenceError)
   var 부품정의 = [
     { id: "embed", lt: "E", nm: "임베딩", tip: "임베딩 엔진(bge-m3) — 문서·질문을 숫자로", page: "aihub.html?panel=knowledge" },
     { id: "search", lt: "R", nm: "RAG 검색", tip: "사내 지식에서 근거 찾기", page: "aihub.html?panel=knowledge" },
@@ -607,7 +608,7 @@
   if (window.gijo && window.gijo.onLlmActivity) {
     try {
       var teamTimer = null;
-      window.gijo.onLlmActivity(function () { clearTimeout(teamTimer); teamTimer = setTimeout(loadTeam, 600); });
+      window.gijo.onLlmActivity(function () { clearTimeout(teamTimer); teamTimer = setTimeout(function () { loadTeam(); loadTeamCards(); }, 600); }); // 카드 줄(aiteamRow)도 같이(검토관 M2 — 한쪽만 살면 「모두 대기」가 거짓이 된다)
     } catch (e) {}
   }
 

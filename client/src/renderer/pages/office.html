@@ -320,7 +320,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       agents = list.slice(0, 6).map((a, i) => {
         const prev = agents[i];
         return {
-          name: a.name, shortName: shortName(a.name), color: PALETTE[i % PALETTE.length],
+          name: a.name, shortName: a.abbr || shortName(a.name), color: PALETTE[i % PALETTE.length], // 약자(분배·해석·우선·보고·위협·해설)는 등록부 단일 출처(2026-08-20 사장님)
           state: a.status,
           x: prev ? prev.x : DESKS[i].x * 8 + 8,
           y: prev ? prev.y : DESKS[i].y * 8 + 26,
@@ -331,6 +331,12 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       // 보안총괄(오케스트레이터) 캐릭터를 이름으로 찾는다 — 방문자가 이 책상 옆으로 가 지시한다.
       const oi = agents.findIndex((a) => /orchestr|총괄|지휘|chief|lead/i.test(a.name));
       orchestratorIdx = oi >= 0 ? oi : 0;
+    }
+    // llm:event(실추론 신호)를 받아 20초 폴링을 기다리지 않고 즉시 반영(2026-08-20 사장님 — 「동작하는 거 팀사무실에서 볼 수 있게」)
+    function setAgentActivity(displayName, working) {
+      const i = agents.findIndex((a) => a.name === displayName);
+      if (i < 0) return;
+      agents[i].state = working ? "working" : "idle";
     }
     function shortName(name) {
       // "Security Orchestrator" → "Orchestrator" 같은 축약 — 캔버스 라벨용
@@ -652,7 +658,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       requestAnimationFrame(step);
     }
     step();
-    const api = { setAgents, setVisitors, showBubble, collabMove, sparkle, setTheme };
+    const api = { setAgents, setVisitors, showBubble, collabMove, sparkle, setTheme, setAgentActivity };
     window.__office = api; // e2e·디버깅용 훅(협업 이동/파티클을 코드로 유발해 육안 확인)
     return api;
   })();
@@ -1023,6 +1029,10 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       (history || []).slice(-40).forEach((e) => appendOlive(e.from, e.to, e.message)); // LIVE 채팅 초기 채움(v5)
       if (window.gijoRealtime) window.gijoRealtime.connect();
       window.gijo.onCollaborationEvent(onCollabEvent);
+      // 실추론 신호 즉시 반영(2026-08-20 사장님) — 폴링 20초를 기다리지 않는다. 신호 유실 대비 폴링이 보정.
+      if (window.gijo.onLlmActivity) window.gijo.onLlmActivity(function (ev) {
+        if (ev && ev.kind === "chat" && ev.agent) office.setAgentActivity(ev.agent, ev.phase === "start");
+      });
       setInterval(loadAgents, 20000);  // 상태는 휘발성 라이브 신호 — 주기 폴링으로 갱신
       setInterval(loadSessions, 15000); // 외부 콘솔 접속자 presence
       setInterval(loadTasks, 60000);
