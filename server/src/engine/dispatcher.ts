@@ -599,6 +599,16 @@ async function learnloopConfirmResult(instructionText: string, qa?: boolean): Pr
 // sessionId가 없으면 자동으로 새 세션을 만들어 기록한다(사용자 요청 2026-07-20 — "모든 행위를
 // 작업 세션에": 팀 사무실 CTA·에이전트 페이지 등 세션 없이 오던 지시도 이력에 남게).
 // 응답의 sessionId를 클라이언트가 저장하면 그 세션으로 "이어서" 지시가 된다.
+/** 선택 문자열 정리 — 한 줄로 눌러 200자에서 자르되 **⌗기계 키 꼬리는 보존**한다
+ *  (검토관 11: 키가 맨 뒤라 긴 선택에서 잘리면 배정 키 배관이 조용히 무효화된다). */
+function 선택정리(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || !raw.trim()) return undefined;
+  const 한줄 = raw.replace(/\s+/g, " ").trim();
+  const 키 = /⌗.+?::[0-9a-f]{16}\s*$/.exec(한줄)?.[0]?.trim();
+  const 본문 = 키 ? 한줄.slice(0, 한줄.length - 키.length).trim() : 한줄;
+  return (본문.slice(0, 200) + (키 ? " " + 키 : "")).trim();
+}
+
 export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer, 선택?: string): Promise<DispatchResult> {
   // ★ 이 요청이 끝날 때까지 "누가 묻는지"를 달아 둔다. 아래에서 도는 AI 도구(search·explain)는
   //   run(args) 한 모양이라 사람을 넘길 자리가 없다 — 꼬리표가 없으면 대화는 등급을 지키는데
@@ -852,7 +862,12 @@ export function 없다는답인가(output: string): boolean {
  *  다른 문서를 가리켰다 — Mac 실측 완전다름 103/150·평균겹침 8%). 답 경로(chat)와 배지가 이 한
  *  함수를 공유해 어긋남을 없앤다 — 조립 규칙을 두 벌로 두면 한쪽만 고쳐진다. */
 function buildRagQuery(instructionText: string, contextText: string): string {
-  return contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
+  // ⌗기계 키(선택 꼬리)는 검색 질의에서 뗀다 — sha1 16자가 임베딩 질의에 섞이면 랭킹을
+  // 흔들 수 있다(검토관 12 — 영향 크기는 미실측이지만 검색에 넣을 이유가 없는 글자다).
+  const 지움 = (s: string) => s.replace(/\s*⌗.+?::[0-9a-f]{16}/g, "");
+  const 지시 = 지움(instructionText);
+  const 맥락 = 지움(contextText);
+  return 맥락 ? `${맥락}\n\n[현재 지시] ${지시}` : 지시;
 }
 
 // 화면 액션 알약(리포트·클라우드) 조건부 노출용 신호를 계산한다.
@@ -1228,13 +1243,20 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 결정적 트리거·결정적 숫자. ⚠ 새 카드를 더할 땐 앞 영토(스케줄·목록 도구 등)를 안 삼키는지
   // 음성 시험부터 — 1차 때 전체 게이트가 「점검 스케줄 알려줘」 과포착을 실측으로 잡았다.
   {
-    const { isHardeningStatusAsk, hardeningStatusAnswer, isAssetStatusAsk, assetStatusAnswer } = await import("./datacard.js");
+    const { isHardeningStatusAsk, hardeningStatusAnswer, isAssetStatusAsk, assetStatusAnswer, 카드없는글로 } = await import("./datacard.js");
     const 현황답 = isHardeningStatusAsk(instructionText) ? hardeningStatusAnswer()
-      : isAssetStatusAsk(instructionText) ? assetStatusAnswer()
+      // 🗂 범위를 넘긴다(검토관 심각4) — findings 경로에서 이미 고친 「범위가 걸렸는데
+      // 전체가 왔다」가 카드에서 재발했었다. 이 분기도 agentloop 앞이라 직접 넘겨야 한다.
+      : isAssetStatusAsk(instructionText) ? assetStatusAnswer(지금범위 && 지금범위.kind === "asset" ? 지금범위.id : null)
       : null;
     if (현황답) {
       const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
       completeTask(task.id);
+      // 라이트(max 인계 60acc4e5) — 카드 미배선·해당 화면 없음이라 「카드로 보였습니다/
+      // ○○ 화면에서」가 거짓이 된다. 같은 숫자를 글 표로 접고 카드는 안 싣는다.
+      if (에디션제한중()) {
+        return { task, route: { agentId: "orchestrator", action: "chat" }, output: 카드없는글로(현황답) };
+      }
       return { task, route: { agentId: "orchestrator", action: "chat" }, output: 현황답.output, dataCard: 현황답.dataCard };
     }
   }
@@ -1693,9 +1715,7 @@ export function registerDispatcherRoutes(app: Express): void {
       const progressId = isValidProgressId(req.body?.progressId) ? (req.body.progressId as string) : null;
       // selection — 화면에서 골라 둔 항목(2026-08-09 2단계). 줄바꿈을 눌러 한 줄로 만들고 200자에서
       // 자른다 — 화면 라벨이 프롬프트 구조(줄 단위 지시)를 흔들지 못하게 하는 최소 방어다.
-      const 선택 = typeof req.body?.selection === "string" && req.body.selection.trim()
-        ? req.body.selection.replace(/\s+/g, " ").trim().slice(0, 200)
-        : undefined;
+      const 선택 = 선택정리(req.body?.selection);
 
       // 30초 안에 안 끝나면 "리포트로 작성해 드리겠다"고 답하고 물러난다(사용자 결정 2026-07-26, 10초→30초).
       // 작업은 뒤에서 계속 돌고, 끝나면 리포트로 저장한 뒤 화면에 팝업으로 알린다.
@@ -1789,9 +1809,7 @@ export function registerDispatcherRoutes(app: Express): void {
       const user = (req as Request & { user?: GijoUser }).user;
       const qa = req.body?.qa === true;
       const progressId = isValidProgressId(req.body?.progressId) ? (req.body.progressId as string) : null;
-      const 선택 = typeof req.body?.selection === "string" && req.body.selection.trim()
-        ? req.body.selection.replace(/\s+/g, " ").trim().slice(0, 200)
-        : undefined;
+      const 선택 = 선택정리(req.body?.selection);
 
       res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
       res.setHeader("Cache-Control", "no-cache");

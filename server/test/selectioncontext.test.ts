@@ -23,10 +23,14 @@ import { 선택을박는다, 지목된자산아이디, forcedToolFor } from "../
 const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "dispatcher.ts"), "utf8");
 
 describe("선택 항목 맥락 (소스 계약)", () => {
-  it("라우트가 selection을 한 줄로 눌러쓰고 200자에서 자른다 — 화면 라벨이 프롬프트 구조를 못 흔들게", () => {
-    expect(src).toContain('req.body?.selection');
-    // 문자열 그대로 대조 — 이 검사가 실제로 이스케이프 실수(\s가 s로)를 한 번 잡았다(2026-08-09).
-    expect(src).toContain('replace(/\\s+/g, " ").trim().slice(0, 200)');
+  it("라우트가 selection을 선택정리()로 눌러쓴다 — 한 줄·200자·⌗키 꼬리 보존(검토관 11)", () => {
+    // 두 REST 창구(일반·스트림)가 같은 함수를 타야 한다 — 옛날처럼 인라인 복붙이면 한쪽만 고친다.
+    expect(src).toContain("function 선택정리");
+    expect((src.match(/선택정리\(req\.body\?\.selection\)/g) || []).length).toBe(2);
+    // 눌러쓰기·상한·키 보존이 함수 안에 있는지(이스케이프 실수를 잡았던 문자열 대조 유지)
+    expect(src).toContain('replace(/\\s+/g, " ").trim()');
+    expect(src).toContain(".slice(0, 200)");
+    expect(src).toContain("⌗.+?::[0-9a-f]{16}");
   });
 
   it("선택이 맥락 앞머리에 실린다 — 「이거」는 대화 이력보다 방금 고른 것", () => {

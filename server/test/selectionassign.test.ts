@@ -45,8 +45,40 @@ describe("⌗기계 키 — autoFill 강제 정정", () => {
       `자산 샘플-웹서버 (10.0.0.100)의 취약점 Apache Log4j < 2.15.0 RCE ⌗sample-web01::${키} 담당자 배정해줘`
     );
     expect(filled.assetId).toBe("sample-web01");
-    expect(filled.finding).toBe("key:" + 키);
+    // 결재판에 해시만 보이면 승인자가 못 읽는다(검토관 6①) — 사람 라벨 + key: 꼬리를 함께.
+    expect(filled.finding).toContain("key:" + 키);
+    expect(filled.finding, "사람이 읽을 라벨이 앞에").toContain("Apache Log4j");
     expect(filled.dueDate, "말한 적 없는 기한은 비운다(⑤)").toBe("");
+  });
+
+  it("도구 결과에서 온 기한은 지우지 않는다(검토관 5① — found 근거)", () => {
+    시드();
+    const tool = findAgentTool("assign_finding")!;
+    const filled = tool.autoFill!(
+      { assetId: "sample-web01", finding: "Log4j", assignee: "김", dueDate: "2026-09-15" },
+      "Log4j 담당자 배정해줘",
+      "기한 2026-09-15 · 자산 sample-web01" // 앞선 조회 결과에 그 날짜가 있다
+    );
+    expect(filled.dueDate).toBeUndefined();
+  });
+
+  it("사용자가 상대 기한을 말했으면 그 값이 이긴다(검토관 5③ — 지어낸 절대 날짜 정정)", () => {
+    시드();
+    const tool = findAgentTool("assign_finding")!;
+    const filled = tool.autoFill!(
+      { assetId: "sample-web01", finding: "Log4j", assignee: "김", dueDate: "2026-07-24" },
+      "Log4j 내일까지 담당자 배정해줘"
+    );
+    expect(filled.dueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(filled.dueDate).not.toBe("2026-07-24");
+  });
+
+  it("「9월 1일까지」 절대 한국어 기한을 읽는다(검토관 5② — 말한 기한을 지우던 결함)", async () => {
+    시드();
+    const { parseRelativeDueDate } = await import("../src/engine/agenttools/handlers");
+    const v = parseRelativeDueDate("9월 1일까지 배정해줘", new Date(2026, 7, 19));
+    expect(v).toBe("2026-09-01");
+    expect(parseRelativeDueDate("1월 15일까지", new Date(2026, 7, 19)), "지난 달은 내년").toBe("2027-01-15");
   });
 
   it("사용자가 실제로 말한 기한은 지운지 않는다", () => {
@@ -67,8 +99,18 @@ describe("⌗기계 키 — autoFill 강제 정정", () => {
       `이 취약점 오탐 처리해줘 ⌗sample-web01::${키}`
     );
     expect(filled.assetId).toBe("sample-web01");
-    expect(filled.finding).toBe("key:" + 키);
+    expect(filled.finding).toContain("key:" + 키);
     expect(filled.status).toBe("오탐");
+  });
+
+  it("공백 있는 자산 id도 키가 잡힌다(검토관 10 — \\S+는 조용히 무효화됐다)", () => {
+    시드();
+    const tool = findAgentTool("assign_finding")!;
+    const filled = tool.autoFill!(
+      { assetId: "x", finding: "y", assignee: "김" },
+      "취약점 배정 ⌗내 자산 이름::0123456789abcdef 해줘"
+    );
+    expect(filled.assetId).toBe("내 자산 이름");
   });
 
   it("키 표식이 없으면 옛 동작 그대로 — 추정 정정만(무해)", () => {
@@ -130,8 +172,12 @@ describe("배선 감시 — 생산(화면)→릴레이(셸)→전송(콘솔)→�
     const s = readFileSync(join(pages, "console.js"), "utf8");
     expect(s).toContain('" ⌗" + sel.fields.assetId + "::" + sel.fields.findingKey');
   });
-  it("자산 상세 API가 fkey를 동봉한다(키의 생산자)", () => {
+  it("★ 자산 목록·상세 API가 **같은 생산자**(fkey붙임)를 탄다 — 검토관 심각1: 상세에만 붙여서 목록으로 그리는 취약점 화면이 키를 영영 못 받았다", () => {
     const s = readFileSync(join(__dirname, "..", "src", "engine", "assets.ts"), "utf8");
-    expect(s).toMatch(/fkey:\s*findingKey\(asset\.id,\s*f\)/);
+    expect(s).toContain("function fkey붙임");
+    const 목록 = /app\.get\("\/api\/assets",[\s\S]{0,200}?fkey붙임/.test(s);
+    const 상세 = /app\.get\("\/api\/assets\/:id",[\s\S]{0,400}?fkey붙임/.test(s);
+    expect(목록, "목록 라우트가 fkey붙임을 안 탄다").toBe(true);
+    expect(상세, "상세 라우트가 fkey붙임을 안 탄다").toBe(true);
   });
 });

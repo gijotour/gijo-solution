@@ -608,6 +608,9 @@
         const s = window.gijo.shellModeGet ? await window.gijo.shellModeGet() : null;
         if (s && s.쓸수있나) m = s.현재 === "pro" ? "pro" : "standard";
       } catch (e) {}
+      // ⚠ 응답이 오기 전에 사용자가 이미 눌렀으면(라이트 안내 포함) 덮지 않는다(검토관 13) —
+      //   덮으면 표시만 저장값으로 되돌아가고 고른모드.값은 사용자 선택이 남아 표시≠사실이 된다.
+      if (고른모드.값 !== null || modeBadge.textContent) return;
       modeBadge.textContent = m === "pro" ? "🚀 프로" : "🏢 표준";
       document.querySelectorAll("#mpRow .mp-btn").forEach((x) => x.classList.toggle("on", x.dataset.mode === m));
     })();

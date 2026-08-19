@@ -1358,23 +1358,36 @@ const TOOLS: AgentTool[] = [
     //    assetId에 넣어 실제 id(vuln:192.168.219.98)와 안 맞아 승인이 실패했다 — resolveAsset로 정정.
     // ② "이번주 금요일" 같은 상대 기한이 그대로 dueDate에 들어가 형식 검증에서 매번 실패했다 —
     //    파싱되면 YYYY-MM-DD로, 안 되면 비워서(선택값이므로) 사람이 직접 채우게 한다.
-    autoFill: (args, instruction) => {
+    autoFill: (args, instruction, toolResults) => {
       const filled: Record<string, string> = {};
       // ③ ⌗기계 키(2026-08-19 QA 실사고) — 화면에서 고른 항목이 실어 보낸 키가 지시문에 박혀
       //   있으면 자산·취약점을 그 키로 **강제**한다(LLM이 IP·표시명으로 추정한 값을 덮는다 —
       //   같은 IP 두 자산(sample-web01 vs vuln:10.0.0.100)에서 엉뚱한 쪽으로 배정이 간 사고).
-      const 키 = /⌗([^\s⌗]+)::([0-9a-f]{16})/.exec(instruction);
-      if (키) { filled.assetId = 키[1]; filled.finding = "key:" + 키[2]; }
+      //   비탐욕 .+? — 자산 id에 공백이 있어도 잡는다(검토관 10: \S+는 조용히 무효화됐다).
+      const 키 = /⌗(.+?)::([0-9a-f]{16})/.exec(instruction);
+      if (키) {
+        filled.assetId = 키[1].trim();
+        // 결재판의 「대상 취약점」이 해시로만 뜨면 승인자가 무엇을 배정하는지 못 읽는다(검토관
+        // 6① — 결재판의 존재 이유가 사람 확인이다). 사람 라벨과 key:를 함께 싣는다 —
+        // resolveFinding이 문자열 어디에 있든 key:를 우선 파싱한다.
+        const r = resolveFinding(filled.assetId, "key:" + 키[2]);
+        filled.finding = r.ok ? `${r.hit.label} (key:${키[2]})` : "key:" + 키[2];
+      }
       const resolved = resolveAsset(filled.assetId ?? args.assetId ?? "");
       if (resolved && resolved.id !== (filled.assetId ?? args.assetId)) filled.assetId = resolved.id;
       const due = args.dueDate?.trim();
+      const 지시기한 = parseRelativeDueDate(instruction);
       if (due && !DUE_RE.test(due)) {
-        const parsed = parseRelativeDueDate(due) ?? parseRelativeDueDate(instruction);
-        filled.dueDate = parsed ?? "";
-      } else if (due && !textHas(instruction, due) && !parseRelativeDueDate(instruction)) {
-        // ⑤ 형식은 맞는데 **사용자가 말한 적 없는** 날짜 — LLM이 지어낸 것(QA 실사고: 배정
-        //   지시에 기한 말이 없는데 과거 날짜 2026-07-24가 채워짐). 기한은 선택값이니
-        //   비워서 사람이 결재판에서 직접 채우게 한다 — 지어낸 기한이 SLA로 박히면 안 된다.
+        filled.dueDate = parseRelativeDueDate(due) ?? 지시기한 ?? "";
+      } else if (due && 지시기한 && 지시기한 !== due) {
+        // ⑤(검토관 5③) — 사용자가 상대 기한을 말했으면 **그 값이 이긴다**. 전엔 「내일까지」라고
+        //   말했는데 LLM이 엉뚱한 절대 날짜를 넣으면 그대로 통과했다.
+        filled.dueDate = 지시기한;
+      } else if (due && !지시기한 && !textHas(instruction, due) && !textHas(toolResults ?? "", due)) {
+        // ⑤ 형식은 맞는데 **사용자도 도구 결과도 말한 적 없는** 날짜 — LLM이 지어낸 것(QA
+        //   실사고: 배정 지시에 기한 말이 없는데 과거 날짜 2026-07-24가 채워짐). 비워서 사람이
+        //   결재판에서 직접 채우게 한다. ⚠ 도구 결과에서 복사한 값은 근거 있음(검토관 5① —
+        //   buildApproval의 found 판정과 어긋나지 않게 toolResults도 본다).
         filled.dueDate = "";
       }
       return filled;
@@ -1404,8 +1417,13 @@ const TOOLS: AgentTool[] = [
       const filled: Record<string, string> = {};
       if (word) filled.status = word;
       // ③ ⌗기계 키 — assign_finding과 같은 강제 정정(고른 항목의 키가 있으면 추정을 덮는다).
-      const 키 = /⌗([^\s⌗]+)::([0-9a-f]{16})/.exec(instruction);
-      if (키) { filled.assetId = 키[1]; filled.finding = "key:" + 키[2]; }
+      //   라벨+키 동봉·비탐욕도 같은 이유(검토관 6①·10 — 그쪽 주석 참조).
+      const 키 = /⌗(.+?)::([0-9a-f]{16})/.exec(instruction);
+      if (키) {
+        filled.assetId = 키[1].trim();
+        const r = resolveFinding(filled.assetId, "key:" + 키[2]);
+        filled.finding = r.ok ? `${r.hit.label} (key:${키[2]})` : "key:" + 키[2];
+      }
       return filled;
     },
     effect: (args) => {
@@ -1709,6 +1727,8 @@ export interface PendingApproval {
   undo: string;
   missing: string[]; // 필수인데 비어 있는 필드 — 화면이 빨갛게 강조하고 승인을 막는다
   instruction: string; // 이 결재판을 만든 원 지시 — 승인 시 파인튜닝 골드 예시로 누적(Phase 4)
+  args: Record<string, string>; // autoFill **정정 후** 값 — 세션 기억(setLastTarget)은 이걸 써야
+  //   한다(검토관 6②: 정정 전 LLM 추정값으로 기억하면 「아까 그거」가 엉뚱한 자산을 가리킨다)
 }
 
 // 값이 특정 텍스트(지시문·조회 결과)에 실제로 나왔는지 규칙으로 본다(LLM에게 출처를 묻지 않는다 — 부담·환각 회피).
@@ -1742,7 +1762,7 @@ export function buildApproval(
   instruction: string,
   toolResults = ""
 ): PendingApproval {
-  const autoFilled = tool.autoFill ? tool.autoFill(rawArgs, instruction) : {};
+  const autoFilled = tool.autoFill ? tool.autoFill(rawArgs, instruction, toolResults) : {};
   const args = { ...rawArgs, ...autoFilled };
   const fields: ApprovalField[] = tool.params.map((p) => {
     const value = (args[p.name] ?? "").trim();
@@ -1771,7 +1791,10 @@ export function buildApproval(
     effect: tool.effect ? tool.effect(args) : "",
     undo: tool.undo ?? "",
     missing: fields.filter((f) => f.required && !f.value).map((f) => f.key),
-    instruction,
+    // ⌗기계 키 꼬리는 저장본에서 뗀다 — 이 지시문은 파인튜닝 골드 예시로 누적되는데 sha1이
+    // 섞이면 모델이 해시를 흉내 낸다(검토관 12). autoFill 파싱은 위에서 이미 끝났다.
+    instruction: instruction.replace(/\s*⌗.+?::[0-9a-f]{16}/g, ""),
+    args, // autoFill 정정 후 값 — 세션 기억은 이걸 쓴다(검토관 6②)
   };
 }
 

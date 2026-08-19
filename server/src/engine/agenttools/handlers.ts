@@ -125,7 +125,7 @@ export interface AgentTool {
   description: string; // LLM에게 보여줄 한 줄 설명(한국어)
   params: AgentToolParam[];
   // 쓰기 도구용: LLM이 안 준 값을 서버 규칙으로 채운다(예: id를 이름에서 생성). 결재판에서 "자동생성"으로 표시된다.
-  autoFill?: (args: Record<string, string>, instruction: string) => Record<string, string>;
+  autoFill?: (args: Record<string, string>, instruction: string, toolResults?: string) => Record<string, string>;
   effect?: (args: Record<string, string>) => string; // "실행되면:" 고지
   undo?: string; // "되돌리기:" 고지
   run: (args: Record<string, string>) => Promise<string> | string;
@@ -1351,7 +1351,10 @@ export function resolveFinding(assetId: string, needle: string): { ok: true; hit
   // ⌗기계 키 직행(2026-08-19 QA ③) — 화면이 「고른 항목」의 키(sha1 16자, 검토대장 findingKey)를
   // 보냈으면 글자 대조를 하지 않는다. 표시명("< 2.15.0 RCE")과 원문("2.15.0 Remote Code Execution")이
   // 달라 배정이 400으로 죽던 실사고의 수리 — 키는 문구가 어떻게 표기되든 같은 건을 잡는다.
-  const 키 = n.startsWith("key:") ? n.slice(4).trim() : /^[0-9a-f]{16}$/.test(n) ? n : null;
+  // 형식 셋 다 받는다: "key:<hex>" · 맨 <hex> · "사람 라벨 (key:<hex>)"(검토관 6① — 결재판에
+  // 해시만 보이면 승인자가 못 읽어서, autoFill이 라벨+키를 함께 싣는다).
+  const 키m = /key:([0-9a-f]{16})/.exec(n);
+  const 키 = 키m ? 키m[1] : /^[0-9a-f]{16}$/.test(n) ? n : null;
   if (키) {
     const byKey = asset.findings.find((f) => findingKey(asset.id, f) === 키);
     if (byKey) return { ok: true, hit: { key: 키, label: findingLabel(byKey), assetId: asset.id } };
@@ -1410,6 +1413,17 @@ export function parseRelativeDueDate(text: string, now: Date = new Date()): stri
     const mondayThisWeek = addDays(now, -((now.getDay() + 6) % 7)); // 이번 주 월요일
     const base = /다음/.test(wd[1] ?? "") ? addDays(mondayThisWeek, 7) : mondayThisWeek;
     return iso(addDays(base, target));
+  }
+  // 「9월 1일까지」 — 절대 날짜의 한국어 표기(검토관 5②: 이걸 못 읽어서, 사용자가 분명히
+  // 말한 기한을 「말한 적 없는 날짜」로 오판해 지웠다). 이미 지난 달·날이면 내년으로 본다
+  // (기한은 미래를 가리키는 말이다 — 8월에 「1월 15일까지」는 내년 1월).
+  const md = s.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if (md) {
+    const m = Number(md[1]), d = Number(md[2]);
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      const 올해 = new Date(now.getFullYear(), m - 1, d);
+      return iso(올해 >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) ? 올해 : new Date(now.getFullYear() + 1, m - 1, d));
+    }
   }
   return undefined;
 }

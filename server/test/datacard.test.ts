@@ -200,12 +200,51 @@ describe("2차 ③ 자산 현황 카드", () => {
     ]);
     const { output, dataCard } = assetStatusAnswer();
     expect(dataCard.kpis[0].value).toBe("2");          // 등록 자산
+    // ★ 고위험 KPI(검토관 심각3): scan_error(high)가 등급을 끌어올리면 안 된다 — dc-a1만 고위험
+    expect(dataCard.kpis[1].value).toBe("1");
     expect(dataCard.kpis[2].value).toBe("2");          // 미조치 취약점 총계
     expect(dataCard.kpis[3].value).toBe("1");          // 담당 미지정(dc-a1)
     expect(dataCard.table!.shown[0].자산).toBe("위험한-서버"); // 위험 순
     expect(dataCard.table!.shown[1].담당).toBe("김담당");
     expect(dataCard.screen).toEqual({ page: "inventory.html", label: "자산" });
     expect(output).toContain("등록 2개");
+  });
+
+  it("★ 고쳐진 것(fixed)·판정 끝난 것은 「미조치」에 안 섞인다(검토관 심각3 — 우선순위와 어긋났다)", async () => {
+    registerAsset({ id: "dc-a3", name: "고친-서버", path: "-", assetType: "서버" });
+    recordFindings("dc-a3", [
+      { finding_type: "원격코드실행", severity: "critical", evidence: "e", source_tool: "s", state: "fixed" },
+      { finding_type: "약한 암호화", severity: "high", evidence: "e", source_tool: "s" },
+    ]);
+    const 첫 = assetStatusAnswer();
+    expect(첫.dataCard.kpis[2].value, "fixed 제외 — 미조치는 1건뿐").toBe("1");
+    expect(첫.dataCard.table!.shown[0].심각, "fixed critical은 심각 수에서도 빠진다").toBe("1");
+    // 남은 1건을 오탐 판정하면 미조치 0 · 고위험 0(등급이 진짜 목록 기준)
+    const { updateFindingReview, findingKey: fk } = await import("../src/engine/approvals");
+    const { getAsset } = await import("../src/engine/assets");
+    const a = getAsset("dc-a3")!;
+    const f = a.findings.find((x) => x.finding_type === "약한 암호화")!;
+    updateFindingReview("dc-a3", fk("dc-a3", f), { status: "rejected" }, "test");
+    const 둘 = assetStatusAnswer();
+    expect(둘.dataCard.kpis[2].value, "판정 끝난 건 제외").toBe("0");
+    expect(둘.dataCard.kpis[1].value, "고위험도 0").toBe("0");
+  });
+
+  it("★ 🗂 범위가 걸리면 그 자산으로 좁히고 제목에 적는다(검토관 심각4 — 재발 방지)", () => {
+    registerAsset({ id: "dc-r1", name: "범위-자산", path: "-", assetType: "서버" });
+    recordFindings("dc-r1", [{ finding_type: "권한 상승", severity: "high", evidence: "e", source_tool: "s" }]);
+    registerAsset({ id: "dc-r2", name: "딴-자산", path: "-", assetType: "서버" });
+    recordFindings("dc-r2", [{ finding_type: "약한 암호화", severity: "high", evidence: "e", source_tool: "s" }]);
+    const { dataCard, output } = assetStatusAnswer("dc-r1");
+    expect(dataCard.kpis[0].value, "범위 안 1개만").toBe("1");
+    expect(dataCard.kpis[2].value).toBe("1");
+    expect(dataCard.title).toContain("범위-자산");
+    expect(output).toContain("범위-자산");
+  });
+
+  it("「이 자산 현황 어때?」는 안 잡는다(심각4 — 선택 치환보다 앞 분기라 전체를 쏟는다)", () => {
+    expect(isAssetStatusAsk("이 자산 현황 어때?")).toBe(false);
+    expect(isAssetStatusAsk("선택한 자산 상태 알려줘")).toBe(false);
   });
 
   it("빈 등록부는 「아직 등록 전」으로 정직하게 — 0건≠없다", () => {

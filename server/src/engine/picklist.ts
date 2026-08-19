@@ -392,7 +392,10 @@ export function stripPickMarks(text: string): string {
       const line = raw.trim();
       return !marks.some((m) => line.startsWith(m + " "));
     });
-  return kept.join("\n").trim();
+  // ⌗기계 키(선택 꼬리)는 줄 표식이 아니라 **문장 안에 박힌다**(선택을박는다 치환) — 줄 필터로는
+  // 못 떼서 따로 지운다(검토관 12: 이걸 빼먹어 sha1이 기록·RAG 질의에 그대로 들어갔다.
+  // 2026-07-31 sha1 노출 사고와 같은 부류). 도구 인자 파싱(autoFill)은 strip 전 원문을 쓴다.
+  return kept.join("\n").replace(/\s*⌗.+?::[0-9a-f]{16}/g, "").trim();
 }
 
 /**

@@ -1882,7 +1882,9 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
       const toolResults = [calls.map((c) => c.result).join("\n"), ctx ? `직전 대상 자산 ${ctx.assetId} 취약점 ${ctx.finding}` : ""].filter(Boolean).join("\n");
       const approval = buildApproval(tool, args, instruction, toolResults);
       // 방금 다룬 취약점을 기억(후속 "아까 그거"용) — assetId·finding 인자가 있는 도구만.
-      if (args.assetId && args.finding) setLastTarget(args.assetId, args.finding, tool.label, scope?.대화);
+      // ⚠ autoFill **정정 후** 값(approval.args)으로 — 정정 전 LLM 추정값으로 기억하면
+      //   결재판은 옳은 대상인데 「아까 그거」는 엉뚱한 자산을 가리킨다(검토관 6②).
+      if (approval.args.assetId && approval.args.finding) setLastTarget(approval.args.assetId, approval.args.finding, tool.label, scope?.대화);
       emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인 대기: ${tool.label} — 값 검토 요청` });
       return { output: approvalMessage(approval), toolCalls: calls, approval };
     } else {

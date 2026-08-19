@@ -11,8 +11,9 @@
 //   만드는 대신, 여기서만 세 값을 같은 원천(hardeningtargets)에서 함께 읽어 틈을 안 늘린다.
 
 import { listTargets, listSchedules, listRuns } from "./hardeningtargets";
-import { listAssets } from "./assets";
+import { listAssets, getAsset } from "./assets";
 import { 자산위험등급, isRealVulnerability } from "./agenttools/handlers";
+import { listFindingReviews, findingKey } from "./approvals";
 
 export interface DataCardKpi { label: string; value: string; color?: "ok" | "warn" | "bad" | "muted" }
 export interface DataCard {
@@ -110,21 +111,43 @@ export function hardeningStatusAnswer(): { output: string; dataCard: DataCard } 
 /** 「자산 현황/상태」 물음인가 — 결정적 트리거.
  *  ⚠ 「목록·리스트」는 **안 받는다** — 그 말은 기존 list_assets 도구 영토다(등급·최근·검색
  *    같은 조건 갈래가 거기 있다). 여기서 삼키면 「고위험 자산 목록」이 카드에 채여 죽는다.
- *  ⚠ 「취약점」이 붙으면 안 받는다 — isFindingListAsk(우선순위) 영토. */
+ *  ⚠ 「취약점」이 붙으면 안 받는다 — isFindingListAsk(우선순위) 영토.
+ *  ⚠ 「이/그/선택한 자산」은 안 받는다(검토관 심각4) — 이 분기는 선택 치환보다 앞이라
+ *    여기서 잡으면 📌로 고른 한 대를 물었는데 전 자산 카드가 나간다. 대명사 경로에 넘긴다. */
 export function isAssetStatusAsk(text: string): boolean {
   const t = String(text || "").replace(/\s+/g, "");
   if (!/(현황|상태|어때)/.test(t)) return false;
   if (!/자산/.test(t)) return false;
+  if (/(이|그|저|해당|선택한?|고른)자산/.test(t)) return false;
   return !/취약점|스캔|목록|리스트|최근|등록|추가|삭제|검증|하드닝|점검/.test(t);
 }
 
-/** 자산 현황 — KPI 4개 + 위험 순 자산 표. 숫자는 전부 등록부(assets)에서 직접(결정적). */
-export function assetStatusAnswer(): { output: string; dataCard: DataCard } {
-  const all = listAssets();
-  // ⚠ 스캔 실패 행은 취약점이 아니다 — 그대로 세면 담당자가 그 숫자로 보고를 쓴다(소스 감시가 잡음)
-  const 진짜 = (a: (typeof all)[number]) => a.findings.filter(isRealVulnerability);
+/** 검토대장에서 오탐·조치완료로 **판정이 끝난** 건의 키 집합 — 미조치 수에서 뺀다. */
+function 판정끝난키(): Set<string> {
+  const s = new Set<string>();
+  for (const r of listFindingReviews()) {
+    if (r.status === "rejected" || r.status === "approved") s.add(`${r.assetId}::${r.findingKey}`);
+  }
+  return s;
+}
+
+/** 자산 현황 — KPI 4개 + 위험 순 자산 표. 숫자는 전부 등록부(assets)에서 직접(결정적).
+ *  @param 걸린범위 🗂 지금 범위(자산 id) — 걸려 있으면 그 자산으로 좁힌다(검토관 심각4:
+ *    findings 경로에서 이미 고친 「범위가 걸렸는데 전체가 왔다」의 재발 방지). */
+export function assetStatusAnswer(걸린범위?: string | null): { output: string; dataCard: DataCard } {
+  const 전체 = listAssets();
+  const 범위자산 = 걸린범위 ? 전체.find((a) => a.id === 걸린범위) ?? getAsset(걸린범위) : null;
+  const all = 범위자산 ? [범위자산] : 전체;
+  const 범위이름 = 범위자산 ? (범위자산.displayName || 범위자산.name) + " (🗂 지금 범위)" : null;
+  // ⚠ 스캔 실패·조사 정보는 취약점이 아니고(소스 감시), **고쳐진 것(fixed)·판정 끝난 것
+  //   (오탐·조치완료)도 「미조치」가 아니다**(검토관 심각3 — 이 카드만 fixed를 세서 우선순위
+  //   카드·KPI와 숫자가 어긋났다. 라벨이 미조치인데 고친 것을 세면 담당자가 그 수로 보고를 쓴다).
+  const 판정끝 = 판정끝난키();
+  const 진짜 = (a: (typeof all)[number]) =>
+    a.findings.filter((f) => isRealVulnerability(f) && f.state !== "fixed" && !판정끝.has(`${a.id}::${findingKey(a.id, f)}`));
   const 미조치총 = all.reduce((n, a) => n + 진짜(a).length, 0);
-  const 고위험 = all.filter((a) => 자산위험등급(a) === "high");
+  // 등급도 같은 목록으로 — raw findings로 재면 고쳐진 심각 건이 자산을 계속 「고위험」으로 만든다.
+  const 고위험 = all.filter((a) => 자산위험등급({ findings: 진짜(a) }) === "high");
   // ⚠ 담당 미지정은 null이 아니라 **"-"로 저장**된다(assets.ts registerAsset 기본값 — 시험이 잡음)
   const 담당있음 = (o?: string | null) => !!o && o !== "-";
   const 담당없음 = all.filter((a) => !담당있음(a.owner));
@@ -142,7 +165,7 @@ export function assetStatusAnswer(): { output: string; dataCard: DataCard } {
   const shown = rows.slice(0, 표상한);
 
   const dataCard: DataCard = {
-    title: "자산 — 등록 현황",
+    title: (범위이름 ? `${범위이름} — ` : "") + "자산 — 등록 현황",
     kpis: [
       { label: "등록 자산", value: String(all.length), color: all.length ? undefined : "muted" },
       { label: "고위험 자산", value: String(고위험.length), color: 고위험.length ? "bad" : "ok" },
@@ -161,10 +184,25 @@ export function assetStatusAnswer(): { output: string; dataCard: DataCard } {
     pickKey: "자산",
   };
   const output = [
-    `자산 현황 — 등록 ${all.length}개 · 고위험 ${고위험.length}개 · 미조치 취약점 ${미조치총}건 · 담당 미지정 ${담당없음.length}개`,
+    (범위이름 ? `${범위이름} — ` : "") +
+      `자산 현황 — 등록 ${all.length}개 · 고위험 ${고위험.length}개 · 미조치 취약점 ${미조치총}건 · 담당 미지정 ${담당없음.length}개`,
     rows.length
       ? `위험한 순으로 ${Math.min(표상한, rows.length)}개를 카드로 보였습니다 — 전체는 자산 화면에서.`
       : "등록된 자산이 없습니다 — 아직 등록 전이라는 뜻입니다. 자산 화면에서 추가하거나 스캐너 결과를 올리면 자동으로 채워집니다.",
   ].join("\n");
   return { output, dataCard };
+}
+
+/** 카드 못 그리는 에디션(라이트)용 글 답 — max 인계(60acc4e5): output이 「카드로 보였습니다
+ *  /○○ 화면에서」를 전제하는데 라이트는 chatparts 미배선·그 화면이 없다. 표 요약을 글로 접어
+ *  넣고 화면 안내 문구를 뺀다 — 같은 숫자, 다른 형식(거짓 안내 금지). */
+export function 카드없는글로(answer: { output: string; dataCard: DataCard }): string {
+  const dc = answer.dataCard;
+  const 머리 = answer.output.split("\n")[0]; // 숫자 요약 줄은 그대로(카드 전제 아님)
+  const rows = dc.table?.shown ?? [];
+  if (!rows.length) return 머리;
+  const cols = dc.table!.cols;
+  const 줄들 = rows.map((r) => "- " + cols.map((c) => `${c.label} ${r[c.key] ?? "—"}`).join(" · "));
+  const 남음 = (dc.table!.totalCount || 0) - rows.length;
+  return [머리, "", ...줄들, ...(남음 > 0 ? [`(외 ${남음}건)`] : [])].join("\n");
 }
