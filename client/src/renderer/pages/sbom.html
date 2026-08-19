@@ -754,6 +754,21 @@ tr:last-child td{border-bottom:none;}
       const full = allAssets.find((a) => a.id === aiSelId);
       if (full) { renderAiBom(full); document.getElementById("aibomPanel").scrollIntoView({ behavior: "smooth", block: "start" }); }
       renderAiAssets();
+      // 셸(대화창)에도 알린다(B16, 2026-08-19) — 카드가 그린 실명 필드만.
+      // top===window(프로 단독 팝업)여도 보낸다 — applyPopout 릴레이가 IPC로 잇는다.
+      if (full) {
+        try {
+          const rob = full.robustness && full.robustness.score;
+          window.top.postMessage({
+            type: "gijo:select", label: String(full.name || "").slice(0, 40),
+            text: "AI 자산 " + (full.name || "") + (full.assetType ? " (" + full.assetType + ")" : ""),
+            fields: {
+              asset: full.name || "", title: "AI-BOM · " + (full.assetType || "자산"),
+              owner: full.owner || "", status: rob != null ? "견고성 " + rob : "견고성 미점검",
+            },
+          }, "*");
+        } catch (err) { /* 셸 밖 — 없던 일로 */ }
+      }
     }));
   }
 

@@ -148,7 +148,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         '<span class="m" style="flex:0 0 auto;color:var(--muted-2);font-size:12px">' + 때(e.at) + "</span></div>";
     }).join("");
     box.querySelectorAll(".erow").forEach(function (r) {
-      r.addEventListener("click", function () { 선택이벤트 = r.dataset.id; renderEvents(); loadGuide(r.dataset.id); });
+      r.addEventListener("click", function () {
+        선택이벤트 = r.dataset.id; renderEvents(); loadGuide(r.dataset.id);
+        // 셸(대화창)에도 알린다(B16, 2026-08-19) — 렌더가 그린 실명 필드만 옮긴다.
+        // top===window(프로 단독 팝업)여도 보낸다 — applyPopout 릴레이가 IPC로 잇는다.
+        var ev = 이벤트들.filter(function (x) { return x.id === r.dataset.id; })[0];
+        if (ev) {
+          try {
+            window.top.postMessage({
+              type: "gijo:select", label: String(ev.title || "").slice(0, 40),
+              text: "로그 이벤트 " + (ev.entity ? ev.entity + " · " : "") + (ev.title || ""),
+              fields: { asset: ev.entity || "", title: ev.title || "", severity: String(ev.priority || ev.severity || ""), status: ev.status || "open" },
+            }, "*");
+          } catch (err) { /* 셸 밖 — 없던 일로 */ }
+        }
+      });
     });
   }
 
