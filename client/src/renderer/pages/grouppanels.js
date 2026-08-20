@@ -15,6 +15,24 @@
 //   빈 껍데기를 그리면 「눌러도 아무 일 없는」 자리가 된다).
 //     · rows()  : 하위 리스트(엑셀형). → { cols:[], grid:"1fr 90px", rows:[[셀…]] }
 //                 ⚠ 요약과 **같은 API·같은 잣대**를 쓴다. 여기서 새로 세지 않는다.
+//
+//       ★ **열 규약 — 판마다 새로 설계하지 않는다**(2026-08-20 사장님 「통합 관제 취약점
+//         조치승인 형태로 새로 만들지말고 변경해서 보여주면 안도?」). 먼저 만든 세 판이
+//         이미 같은 골격이었고, 그것을 전 판의 규약으로 못박는다:
+//
+//           1열 **무엇**   (필수·가변폭 1fr) — 그 줄이 가리키는 것의 이름. 없으면 그 줄을 못 고른다.
+//           2열 **어디/누구**(선택·110px)   — 자산·담당·주제·올린 이처럼 소속을 말하는 값.
+//           3열 **등급/상태**(선택·74~84px) — 심각도·상태·결과. **반드시 한글 사전을 거친다.**
+//           4열 **언제**    (선택·44~56px)  — 날짜·시각. 오른쪽 정렬.
+//
+//         · 열은 **3~4개**. 더 넣지 않는다 — 폭 210px 타일 안에서 훑는 목록이라 5열부터는
+//           1열이 잘려 「무엇인지 모르는 줄」이 된다.
+//         · 판마다 **이름표(cols)는 달라도 자리는 같다** — 담당자가 어느 판을 열어도 왼쪽부터
+//           「무엇 · 어디 · 어떤 상태 · 언제」로 읽는다. 자리를 바꾸면 판마다 읽는 법을 새로
+//           배워야 한다(그것이 「새로 만든다」는 뜻이고, 사장님이 안 된다고 한 것이다).
+//         · 그 판에 없는 자리는 **비운다**(열 자체를 뺀다) — 억지로 채우면 의미 없는 칸이 는다.
+//         · 목록이 원리상 성립하지 않는 판(통계만 주는 API 등)은 rows()를 **아예 안 단다** —
+//           빈 표를 그리는 것보다 단추가 없는 편이 정직하다.
 //     · pick    : 🎯 고르기 kind("vuln"|"asset"…) — pick.html이 아는 kind만(5.49.0 통일 계약).
 //     · agents  : 담당 AI 팀원 약자 — **근거가 있는 판만**. 근거는 server/src/engine/
 //                 hybridsearch.ts ROLE_CATEGORY(역할↔업무영역)와 agents.ts AGENT_DEFS(약자)다.
@@ -27,7 +45,9 @@
   var n = function (v) { return (v == null ? 0 : v).toLocaleString(); };
 
   // 스캔 오류는 취약점이 아니다(서버 isRealVulnerability와 같은 잣대) — 세는 자리마다 지킨다.
-  var SCAN_NOISE = { scan_error: true, info: true };
+  // ⚠ 서버 목록과 **같아야** 한다 — `scan_not_supported`가 빠져 있어 서버(handlers.ts:198)와
+  //   취약점 수가 갈렸다(2026-08-20 설계관 적발). info는 severity 쪽 잣대라 함께 둔다.
+  var SCAN_NOISE = { scan_error: true, scan_not_supported: true, info: true };
   var 진짜취약점 = function (f) { return !SCAN_NOISE[f.finding_type] && !SCAN_NOISE[f.severity]; };
 
   // ── 한글 표기 사전 — 하위 목록(rows)이 담당자에게 보이는 말로 적기 위한 것.
@@ -177,7 +197,15 @@
         return window.gijo.listAssets().then(function (assets) {
           assets = assets || [];
           var 있음 = assets.filter(function (a) { return a.sbomGeneratedAt; }).length;
-          var ai = assets.filter(function (a) { return a.assetType === "llm-service" || a.assetType === "ml-model"; }).length;
+          // ⚠ `llm-service`·`ml-model`은 **저장소에 존재하지 않는 값**이라 이 줄이 항상 0이었다
+          //   (2026-08-20 설계관 적발). 원천은 서버 assets.ts:100-106 isAiAsset — 자산 종류가
+          //   「LLM 서비스·분류 모델·이상탐지 모델」이거나 AI-BOM에 모델 참조가 채워진 것.
+          var AI종류 = { "LLM 서비스": 1, "분류 모델": 1, "이상탐지 모델": 1 };
+          var ai = assets.filter(function (a) {
+            if (AI종류[a.assetType]) return true;
+            var m = a.aibom && a.aibom.model;
+            return !!(m && (String(m.modelRef || "").trim() || String(m.foundationModel || "").trim()));
+          }).length;
           return {
             rows: [
               ["구성 명세(SBOM) 있음", n(있음)],
@@ -230,18 +258,25 @@
           };
         });
       } },
+      // ⚠ **필드명 오인 6번째 수리(2026-08-20 설계관 적발)** — 이 판은 `m.dueAt`과
+      //   `status === "done"`을 읽고 있었는데 MaintenanceItem에는 **둘 다 없다**
+      //   (security-ops.ts:7-27 — 실재는 scheduleDate와 scheduled|reported|approved|rejected).
+      //   그래서 「기한 초과」와 「완료」가 **영원히 0**이었다. 실화면(maintenance.html:208)과
+      //   서버가 쓰는 같은 잣대로 맞춘다: 기한 지남 = 예정일이 오늘 전 && 아직 승인 안 됨.
       { id: "maintenance", title: "🛠 정기 점검", page: "maintenance.html", load: function () {
         return window.gijo.listMaintenance().then(function (r) {
           var list = (r && r.items) || r || [];
-          var now = Date.now();
-          var 기한초과 = list.filter(function (m) { return m.dueAt && m.dueAt < now && m.status !== "done"; }).length;
-          var 예정 = list.filter(function (m) { return m.status !== "done"; }).length;
+          var 오늘 = new Date().toISOString().slice(0, 10);
+          var 지연인가 = function (m) { return String(m.scheduleDate || "") < 오늘 && m.status !== "approved"; };
+          var 기한초과 = list.filter(지연인가).length;
+          var 완료 = list.filter(function (m) { return m.status === "approved"; }).length;
+          var 예정 = list.length - 완료 - 기한초과;   // 남은 것 = 전체 − 완료 − 지연(겹치지 않게)
           return {
             badge: 기한초과 ? { text: "기한 초과 " + n(기한초과), color: R } : null,
             rows: [
               ["예정·진행", n(예정)],
               ["기한 초과", n(기한초과), 기한초과 ? R : ""],
-              ["완료", n(list.length - 예정)],
+              ["완료", n(완료)],
             ],
             foot: "점검 항목 " + n(list.length) + "건",
           };
@@ -249,11 +284,19 @@
       } },
       { id: "terminal", title: "⌨ 명령창", page: "terminal.html", load: function () {
         // 명령창은 "지금 몇 건"이 아니라 **최근에 무엇을 했나**가 요약이다(감사 기록 기준).
-        return window.gijo.listAudit("cli", 200).then(function (r) {
+        // ⚠ 차단은 kind가 **"block"**으로 남는다(audit.ts:15) — 여기서 "cli"만 불러 놓고
+        //   그 안에서 차단을 세고 있어 **영원히 0**이었다(2026-08-20 설계관 적발).
+        //   실행(cli)과 차단(block)을 각각 불러 센다.
+        return Promise.all([
+          window.gijo.listAudit("cli", 200),
+          window.gijo.listAudit("block", 200).catch(function () { return null; }),
+        ]).then(function (rr) {
+          var r = rr[0], rb = rr[1];
           var list = (r && r.entries) || r || [];
+          var blocks = (rb && rb.entries) || rb || [];
           var 하루 = Date.now() - 86400000;
           var 최근 = list.filter(function (e) { return (e.at || e.createdAt || 0) >= 하루; }).length;
-          var 차단 = list.filter(function (e) { return e.result === "blocked"; }).length;
+          var 차단 = blocks.length;
           return {
             rows: [
               ["최근 24시간 실행", n(최근)],
@@ -283,7 +326,9 @@
         ]).then(function (r) {
           // 응답은 껍데기에 담겨 온다({targets}/{schedules}/{runs}) — 배열로 벗겨 쓴다.
           var targets = (r[0] && r[0].targets) || r[0] || [], schedules = (r[1] && r[1].schedules) || r[1] || [], runs = (r[2] && r[2].runs) || r[2] || [];
-          var 활성 = schedules.filter(function (s) { return s.enabled !== false; }).length;
+          // ⚠ enabled는 0|1 숫자라 `!== false`는 **끈 것까지 전부 활성**으로 셌다
+          //   (2026-08-20 설계관 적발). 실화면(hardening.html:175)과 같이 truthy로 본다.
+          var 활성 = schedules.filter(function (s) { return !!s.enabled; }).length;
           // 준수율 = 대상별 **가장 최근** 결과만(옛 결과까지 더하면 고친 것이 계속 세어진다).
           var 최근 = {};
           runs.forEach(function (x) { if (!(x.targetId in 최근)) 최근[x.targetId] = x; });
@@ -310,8 +355,12 @@
         return window.gijo.listReportHistory().then(function (r) {
           var list = (r && r.reports) || r || [];
           var 주 = Date.now() - 7 * 86400000;
-          var 이번주 = list.filter(function (x) { return (x.createdAt || 0) >= 주 && !x.qa; }).length;
-          var 최근 = list.filter(function (x) { return !x.qa; })[0];
+          // ⚠ `x.qa`는 **ReportHistoryEntry에 없는 필드**다(report.ts:764-777) — 사이드카에만
+          //   있고 목록 응답에는 안 실린다. 즉 `!x.qa`는 항상 참인 **죽은 필터**였고,
+          //   「QA 리포트는 뺐다」는 거짓 전제를 하나 더 두는 셈이었다(2026-08-20 설계관 적발).
+          //   지금은 전부 세는 것이 사실이므로 필터를 걷고 그대로 센다.
+          var 이번주 = list.filter(function (x) { return (x.createdAt || 0) >= 주; }).length;
+          var 최근 = list[0];
           var 지난날 = 최근 ? Math.floor((Date.now() - 최근.createdAt) / 86400000) : null;
           return {
             rows: [
@@ -326,9 +375,14 @@
       { id: "kpi", title: "📈 보안 KPI", page: "kpi.html", load: function () {
         return window.gijo.getSecurityKpi().then(function (k) {
           var c = (k || {}).current || {};
-          var BAND = { good: "양호", warn: "주의", bad: "미흡" };
+          // ⚠ 서버가 주는 값은 **good|fair|poor**다(kpi.ts:67·217). warn|bad는 없는 값이라
+          //   fair·poor일 때 배지가 **빈 글자에 빨강**으로 나갔다(2026-08-20 설계관 적발).
+          //   색도 등급을 따른다 — 양호까지 빨갛게 두면 위험 신호가 흔해져 안 보인다.
+          var BAND = { good: "양호", fair: "보통", poor: "취약" };
+          var BAND_COLOR = { good: T, fair: A, poor: R };
           return {
-            badge: c.posture ? { text: BAND[c.posture.band] || "", color: R } : null,
+            badge: c.posture && BAND[c.posture.band]
+              ? { text: BAND[c.posture.band], color: BAND_COLOR[c.posture.band] || A } : null,
             rows: [
               ["종합 점수", c.posture ? c.posture.score + "/100" : "-"],
               ["미조치 취약점", c.vulnerabilities ? n(c.vulnerabilities.active) : "-", R],

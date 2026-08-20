@@ -553,7 +553,19 @@ export async function reportStatusAnswer(): Promise<{ output: string; dataCard: 
     pickKey: "t",
     table: 이력.length ? {
       cols: [{ key: "t", label: "리포트" }, { key: "d", label: "생성" }],
-      shown: 이력.slice(0, 6).map((h) => ({ t: String((h as { title?: string; base?: string }).title || (h as { base?: string }).base || "리포트").slice(0, 50), d: new Date((h as { createdAt?: number }).createdAt || 0).toLocaleDateString("ko-KR") })),
+      // ⚠ `title`은 ReportHistoryEntry에 **없는 필드**다(report.ts:764-777) — 항상 폴백인
+      //   `base`(원시 파일명 weekly-1755…)가 나가고 있었다(2026-08-20 설계관 적발, 오늘
+      //   listApprovals title 사고와 같은 계열). 실화면(report.html:286)이 쓰는 한글 이름표를
+      //   같은 말로 쓴다 — 같은 것을 두 곳이 다르게 부르면 담당자가 다른 것으로 읽는다.
+      shown: 이력.slice(0, 6).map((h) => {
+        const e = h as { type?: string; base?: string; createdAt?: number; audience?: string };
+        const TYPE_LABEL: Record<string, string> = {
+          weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드",
+          answer: "AI 작성 자료", ingest: "파일 처리 내역",
+        };
+        const 이름 = TYPE_LABEL[String(e.type ?? "")] ?? String(e.type ?? e.base ?? "리포트");
+        return { t: (e.audience ? `${이름} · ${e.audience}` : 이름).slice(0, 50), d: new Date(e.createdAt ?? 0).toLocaleDateString("ko-KR") };
+      }),
       totalCount: 이력.length,
     } : undefined,
   };
