@@ -160,8 +160,9 @@ if (auditFrame) {
     return { has부품, rows: document.querySelectorAll(".aud").length, on: !!document.querySelector(".aud.on") };
   });
   ok("audit 부품·행 클릭·하이라이트", r.has부품 && r.rows > 0 && r.on, "rows=" + r.rows);
-  const 칩 = await 셸.evaluate(() => (document.querySelector(".cs-sel") || {}).textContent || "");
-  ok("행 클릭 → 셸 📌 칩", !!칩, String(칩).slice(0, 40));
+  // 2026-08-20 B라운드: 📌 칩(.cs-sel) → 맥락 문장 한 줄(.cs-line, 「…을 다루는 중」)로 흡수.
+  const 칩 = await 셸.evaluate(() => (document.querySelector(".cs-line") || {}).textContent || "");
+  ok("행 클릭 → 맥락 문장(다루는 중)", /다루는 중/.test(칩), String(칩).slice(0, 60));
   // 행 선택은 무대를 유지한다(검토관 상1 — 자동 복귀는 결재 확인창·모달을 삼켜 폐지).
   // 📌는 달리고, 무대 머리가 「골랐습니다」를 알린다. 내리기는 ← 대화로(사람)뿐.
   const 선택후 = await 셸.evaluate(() => ({
@@ -184,6 +185,25 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
   const fr = await 프레임찾기(pg, 8);
   const has = fr ? await fr.evaluate(() => typeof window.gijoSelectNotify === "function").catch(() => false) : false;
   ok("부품 로드: " + pg, has, fr ? "" : "프레임 못 찾음");
+}
+
+// ── ③′ AI 지식 엑셀형(승인 시안 knowledge-rows, 2026-08-20) — 행 목록이 실데이터로 그려지는가.
+//    운영에 문서 90여 건이 있으므로 행 0이면 렌더가 죽은 것이다(옛 .dm-li로 되돌아간 것도 실패).
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("memory.html", "AI 지식", { dock: true }));
+  const fr = await 프레임찾기("memory.html", 8);
+  const r = fr ? await fr.evaluate(async () => {
+    for (let i = 0; i < 20; i++) {
+      if (document.querySelector(".g-rows--docs .g-rows-r")) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    return {
+      행: document.querySelectorAll(".g-rows--docs .g-rows-r").length,
+      그룹: document.querySelectorAll(".g-rows--docs .g-rows-gh").length,
+      옛것: document.querySelectorAll(".dm-li").length,
+    };
+  }).catch(() => null) : null;
+  ok("AI 지식 엑셀형(행·그룹·옛 목록 0)", !!r && r.행 > 0 && r.그룹 > 0 && r.옛것 === 0, JSON.stringify(r));
 }
 
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──

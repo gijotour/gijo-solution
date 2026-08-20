@@ -34,7 +34,7 @@
     st.textContent = [
       "#consoleHost{display:flex;flex-direction:column;min-height:0;height:100%;background:var(--panel-2,#1f1e1d);}",
       ".cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12.25px;color:var(--muted,#b3ada4);border-bottom:1px solid rgba(255,255,255,.05);}",
-      ".cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light,#5fa1ff);border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}",
+      ".cs-head{position:relative;}", // ⋯ 팝업(.cx-pop)의 기준 좌표
       ".cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}",
       ".cs-btn{flex:0 0 auto;font-size:12.25px;font-weight:700;color:var(--muted,#b3ada4);background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap;}",
       ".cs-btn:hover{color:#fff;border-color:var(--blue,#3b82f6);}",
@@ -78,35 +78,22 @@
       ".cs-live{margin-left:auto;font-size:11.5px;color:var(--muted,#b3ada4);white-space:nowrap;}",
       ".cs-live b{color:#f5928a;font-weight:800;}",
       // 📌 선택 칩 — 화면에서 고른 항목이 「이거」가 된다(2026-08-09 2단계)
-      ".cs-sel{font-size:11.5px;font-weight:700;color:#ffd9a8;border:1px solid rgba(240,160,32,.45);border-radius:12px;padding:1px 9px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;}",
-      ".cs-sel .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
-      ".cs-sel .x:hover{color:#f5928a;}",
+      // 맥락 한 줄(.cs-line) — 칩 3종(.cs-ctx/.cs-sel/.cs-scope)+상세 박스(.cs-state)를 사람 말
+      // 한 문장으로 합친다(승인 시안 mockups/pro-context-strip, 2026-08-20 QA 「보기 너무 어렵다」).
+      // 색은 토큰만 — 다크·흰 두 테마에서 같은 마크업이 성립해야 한다(강조색만 pro-white가 덮는다).
+      ".cs-line{flex:1;min-width:0;font-size:12.5px;font-weight:700;color:var(--text,#e9e7e2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}",
+      ".cs-line .rk{color:var(--blue-light,#5fa1ff);}",  // 🗂 범위 이름
+      ".cs-line .sk{color:var(--amber,#f0a020);}",        // 🎯 고른 항목 이름
+      ".cs-line.off{opacity:.6;font-weight:600;}",
+      ".cs-more{background:none;border:1px solid var(--border,rgba(255,255,255,.14));color:var(--muted,#b3ada4);border-radius:8px;padding:0 8px;height:22px;cursor:pointer;font-size:13px;line-height:1;}",
+      ".cs-more:hover{color:var(--text,#e9e7e2);border-color:var(--border-strong,rgba(255,255,255,.25));}",
+      ".cx-pop{position:absolute;top:34px;right:8px;z-index:40;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.2));border-radius:9px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:4px;min-width:180px;}",
+      ".cx-pop button{background:none;border:none;color:var(--text,#e9e7e2);font-size:12px;text-align:left;padding:5px 8px;border-radius:6px;cursor:pointer;}",
+      ".cx-pop button:hover{background:rgba(128,128,128,.15);}",
       // 🗂 지금 범위 — **파랑**. 🎯(주황)와 색이 달라야 한다: 수명이 반대인 두 개를 같은 색으로
       // 두면 담당자가 「아까 푼 줄 알았는데 아직 걸려 있네」를 겪는다(그게 범위의 위험이다).
-      ".cs-scope{font-size:11.5px;font-weight:700;color:#bcd7ff;border:1px solid rgba(59,130,246,.55);" +
-        "background:rgba(59,130,246,.12);border-radius:12px;padding:1px 9px;white-space:nowrap;" +
-        "max-width:200px;overflow:hidden;text-overflow:ellipsis;}",
-      ".cs-scope .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
-      ".cs-scope .x:hover{color:#f5928a;}",
-      // 🎯 지금 다루는 것 — 고른 항목의 **실제 값**을 펼쳐 보인다(2026-08-18 시안 승인).
-      // 왜 칩 말고 이것도 두나: 칩(.cs-sel)은 **이름표 한 줄**뿐이라 무엇을 다루는지가 안 보였다.
-      // ⚠ 이 값은 대화 이력(6턴·300자 감쇠) 밖이다 — 선택은 매 요청 따로 실린다(dispatcher.ts:597·668).
-      //    그래서 대화가 길어져도 「지금 다루는 것」은 안 잃는다.
-      ".cs-state{margin:0 12px 8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:7px 9px;}",
-      ".cs-state .h{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:#ffd9a8;margin-bottom:4px;}",
-      ".cs-state .h .x{margin-left:auto;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
-      ".cs-state .h .x:hover{color:#f5928a;}",
-      ".cs-state .t{font-size:12.5px;font-weight:700;color:var(--text,#e9e7e2);line-height:1.45;}",
-      ".cs-state .m{font-size:11.5px;color:var(--muted,#b3ada4);margin-top:3px;line-height:1.5;}",
-      ".cs-state .p{font-size:11.5px;color:var(--muted,#b3ada4);margin-top:4px;line-height:1.55;}",
-      ".cs-state .p b{color:var(--text,#e9e7e2);font-weight:700;}",
-      ".cs-state .tag{display:inline-block;font-size:11px;font-weight:800;border-radius:4px;padding:0 5px;margin-right:4px;}",
-      ".cs-state .tag.kev{background:rgba(245,80,80,.16);color:#ff9d9d;}",
-      ".cs-state .tag.sev{background:rgba(255,255,255,.08);color:var(--muted,#b3ada4);}",
-      // 맥락 떼기 ✕ — VS Code implicit context의 결론(보이게+뗄 수 있게)을 처음부터
-      ".cs-ctx .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
-      ".cs-ctx .x:hover{color:#f5928a;}",
-      ".cs-ctx.off{opacity:.55;text-decoration:line-through;}",
+      // (.cs-scope·.cs-state·.cs-ctx 칩 CSS는 2026-08-20 맥락 한 줄(.cs-line)로 흡수·폐지 —
+      //  🎯 상세 값은 대화 안 「고른 항목」 카드(선택카드)가 같은 데이터로 이미 보여 준다.)
       // 화면별 칩 — 그 화면에서 실제로 하는 물음 3~5개(첫 칩은 항상 ⓘ)
       ".cs-chips{display:flex;flex-wrap:wrap;gap:5px;padding:8px 11px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));}",
       ".cs-chip{font-size:11.75px;border:1px solid var(--border,rgba(255,255,255,.14));border-radius:13px;padding:2px 10px;",
@@ -263,13 +250,11 @@
     injectCss();
     host.innerHTML =
       '<div class="cs-head">' +
-        '<span class="cs-ctx" id="csCtx" title="지금 지시의 대상 화면 — ✕로 떼면 화면과 무관하게 묻습니다">대시보드</span>' +
-        '<span class="cs-sel" id="csSel" style="display:none" title="화면에서 고른 항목 — 「이거」가 이걸 가리킵니다"></span>' +
-        // 🗂 지금 범위 — **화면이 바뀌어도 남는다**(승인 시안 mockups/자산_0단계, 2026-08-18).
-        // 🎯(주황, .cs-sel)와 색부터 다르게 둔다. 둘 다 「고른 것」이지만 수명이 반대다:
-        //   🎯 고른 한 건 = 화면 바뀌면 지워짐 · 🗂 범위 = 풀 때까지 따라다님.
-        '<span class="cs-scope" id="csScope" style="display:none" title="지금 보고 있는 범위 — 화면을 옮겨도 따라갑니다. ✕로 풉니다"></span>' +
-        '<span class="cs-hint" id="csHint">보고 있는 화면 기준으로 지시합니다</span>' +
+        // 맥락 한 줄(승인 시안 mockups/pro-context-strip, 2026-08-20) — 칩 3종을 사람 말
+        // 한 문장으로. 가장 구체적인 것(선택>범위>화면)이 문장을 채운다. 개별 풀기는 ⋯ 메뉴.
+        // 🎯(선택)·🗂(범위) 수명 차이는 그대로다: 선택=화면 바뀌면 지워짐 · 범위=풀 때까지.
+        '<span class="cs-line" id="csCtx" title="지금 무엇을 다루는 중인지 — 누르면 화면 맥락을 뗐다 붙였다 합니다">지금 「대시보드」 화면을 보는 중</span>' +
+        '<button class="cs-more" id="csCtxMore" title="맥락 정리 — 선택 풀기·범위 풀기·화면 무관">⋯</button>' +
         '<button class="cs-btn" id="csToggleHost" title="' +
           (IS_WINDOW ? "이 창을 닫고 앱 아래에 다시 붙입니다" : "대화를 별도 창으로 빼냅니다 — 화면을 100%로 쓸 때") + '">' +
           (IS_WINDOW ? "⇤ 앱에 붙이기" : "⧉ 창으로") + "</button>" +
@@ -278,8 +263,8 @@
       '<div class="cs-flow" id="csFlow" style="display:none"></div>' +
       // 화면별 칩 — 지금 화면에서 실제로 하는 물음. 전체 갈래는 아래 서랍(무엇을 할 수 있나)에 보존
       '<div class="cs-chips" id="csChips"></div>' +
-      // 🎯 지금 다루는 것 — 고른 항목의 실제 값(2026-08-18). fields를 보내는 화면에서만 뜬다.
-      '<div class="cs-state" id="csSelState" style="display:none"></div>' +
+      // (🎯 상세 박스(.cs-state)는 2026-08-20 폐지 — 대화 안 「고른 항목」 카드(선택카드)가
+      //  같은 데이터(sel.fields)를 이미 보여 줬다. 같은 값을 두 곳에 그리면 어긋난다.)
       '<div class="cs-drawer" id="csDrawer"></div>' +
       // 빈 상태 — 표준은 간결형(ce-compact), 프로 대화 홈(chat-home)은 히어로형(승인 시안
       // 프로_홈_인사, 2026-08-19 사장님 참고화면 반영). 최상위 클래스는 .cs-empty 하나 유지 —
@@ -317,21 +302,36 @@
     wireUpload();
     renderDrawer();
 
-    // C. 맥락 떼기 — ✕를 누르면 화면 무관, 다시 칩을 누르면 붙는다.
-    //   칩 내용은 applyCtx가 매번 다시 그리므로, 리스너는 부모(고정 요소)에 한 번만 단다.
-    document.getElementById("csSel").addEventListener("click", function (e) {
-      if (e.target && e.target.classList.contains("x")) setSelection(null);
-    });
-    // 🗂 범위 풀기 — 범위는 화면을 옮겨도 남으므로 **푸는 길이 늘 손 닿는 곳에** 있어야 한다.
-    document.getElementById("csScope").addEventListener("click", function (e) {
-      if (e.target && e.target.classList.contains("x")) {
+    // ⋯ 맥락 정리 메뉴 — 개별 풀기(선택·범위·화면 무관)가 늘 손 닿는 곳에 있어야 한다는
+    //   기존 계약(보이게+뗄 수 있게)을 문장 체제에서 잇는 자리다. 있는 것만 단추로 보인다.
+    document.getElementById("csCtxMore").addEventListener("click", function (e) {
+      e.stopPropagation();
+      var old = document.getElementById("cxPop");
+      if (old) { old.remove(); return; }
+      var pop = document.createElement("div");
+      pop.className = "cx-pop"; pop.id = "cxPop";
+      var 단추들 = [];
+      if (sel) 단추들.push(["🎯 선택 풀기", function () { setSelection(null); }]);
+      if (범위) 단추들.push(["🗂 범위 풀기 — 전체를 다시 봅니다", function () {
         setScope(null);
         // 화면들도 알아야 목록이 되돌아온다 — 셸을 거쳐 모든 틀에 알린다.
         try { window.parent.postMessage({ type: "gijo:scope", scope: null }, "*"); } catch (err) { }
-      }
+      }]);
+      단추들.push([ctxOff ? "화면 맥락 다시 붙이기" : "화면 무관하게 묻기", function () { ctxOff = !ctxOff; applyCtx(); }]);
+      단추들.forEach(function (d) {
+        var b = document.createElement("button");
+        b.textContent = d[0];
+        b.addEventListener("click", function () { d[1](); pop.remove(); });
+        pop.appendChild(b);
+      });
+      document.querySelector(".cs-head").appendChild(pop);
+      // 바깥을 누르면 닫힌다 — 한 번만 듣고 떼는 일회용 리스너
+      setTimeout(function () {
+        document.addEventListener("click", function 닫기() { pop.remove(); document.removeEventListener("click", 닫기); });
+      }, 0);
     });
-    // ★ 되살린 범위를 **여기서 그린다.** 상자(#csScope)가 방금 생겼으므로 이 자리가 가장 이르다.
-    //   ⚠ 이 한 줄이 없으면 값은 살아 지시에 실리는데 알약만 안 보인다 — 답이 왜 적은지
+    // ★ 되살린 범위를 **여기서 그린다.** 문장 줄(#csCtx)이 방금 생겼으므로 이 자리가 가장 이르다.
+    //   ⚠ 이 한 줄이 없으면 값은 살아 지시에 실리는데 문장엔 안 보인다 — 답이 왜 적은지
     //     담당자가 알 길이 없다(2026-08-18 실화면에서 그 상태를 직접 봤다).
     renderScope();
     renderHero(); fillGreeting(); // 프로 홈 히어로(승인 시안) — chat-home일 때만 CSS가 보여준다
@@ -339,9 +339,9 @@
     try { var _e0 = rows() && rows().querySelector(".cs-empty"); if (_e0) 빈상태원본 = _e0.outerHTML; } catch (e) { }
     // nav.js(GROUPS 출처)가 이 스크립트보다 늦게 실릴 수 있다 — 메뉴 칩이 비면 한 번만 재시도.
     setTimeout(function () { var m = document.getElementById("ceMrow"); if (m && !m.children.length) renderHero(); }, 700);
-    document.getElementById("csCtx").addEventListener("click", function (e) {
-      if (e.target && e.target.classList.contains("x")) { ctxOff = true; applyCtx(); return; }
-      if (ctxOff) { ctxOff = false; applyCtx(); }
+    // 문장 줄 클릭 = 화면 맥락 토글(옛 ✕/재부착 계약을 한 자리로) — 개별 풀기는 ⋯ 메뉴.
+    document.getElementById("csCtx").addEventListener("click", function () {
+      ctxOff = !ctxOff; applyCtx();
     });
 
     // 답 안의 웹 링크 — **기본 브라우저로 바로 연다**(2026-08-18 사장님 QA 지시 "바로가기").
@@ -1071,11 +1071,7 @@
       setSelection(null); // 선택도 푼다 — 옆 화면 항목을 계속 가리키면 「이거」가 거짓말이 된다
     }
     prevScreen = ctx.screen || prevScreen;
-    // 맥락 칩 — 이름 + ✕(떼기). VS Code implicit context의 결론(보이게+뗄 수 있게)을 그대로.
-    chip.classList.toggle("off", ctxOff);
-    chip.innerHTML = esc(ctx.label || "대시보드") + (ctxOff ? "" : ' <span class="x" title="이번 질문들을 화면과 무관하게 묻습니다">✕</span>');
-    var hint = document.getElementById("csHint");
-    if (hint) hint.textContent = ctxOff ? "화면 무관 — 칩을 누르면 다시 붙습니다" : "보고 있는 화면 기준으로 지시합니다";
+    renderCtxLine(); // 문장 한 줄이 칩 3종을 대신한다(보이게+뗄 수 있게 계약은 문장+⋯로)
     input.placeholder = ctxOff ? "지시를 입력하세요… (화면 무관)"
       : ctx.label ? "「" + ctx.label + "」 화면에 대해 지시…" : "지시를 입력하세요…";
     renderChips();
@@ -1083,6 +1079,34 @@
     // 탭이 바뀌면 서랍의 「지금 화면」 순서도 따라 바뀌어야 한다(2026-08-06) —
     // 안 그리면 옆 화면 것이 위에 남아 "해당 메뉴에서 할 수 있는 것"이라는 약속이 깨진다.
     renderDrawer();
+  }
+
+  /** 맥락 문장 한 줄(승인 시안 mockups/pro-context-strip) — 가장 구체적인 것이 문장을 채운다.
+   *  선택>범위>화면 순: 사람도 "지금 srv-web-01의 CVE-…을 다루는 중"이라 말하지 매번 화면
+   *  이름부터 대지 않는다. 코드·IP 나열 금지 — 이름표(label)만 쓴다. */
+  function 을를(word) {
+    // 마지막 글자에 받침이 있으면 「을」, 없으면 「를」. 한글 밖(영문·숫자)은 「을(를)」로 안전하게.
+    var c = String(word || "").replace(/[)\]"'」』]+$/, "").slice(-1).charCodeAt(0);
+    if (c < 0xac00 || c > 0xd7a3) return "을(를)";
+    return (c - 0xac00) % 28 ? "을" : "를";
+  }
+  function renderCtxLine() {
+    var line = document.getElementById("csCtx");
+    if (!line) return;
+    line.classList.toggle("off", ctxOff);
+    if (ctxOff) { line.innerHTML = "화면 무관하게 묻는 중 — 누르면 화면 맥락이 다시 붙습니다"; return; }
+    var 화면 = esc(ctx.label || "대시보드");
+    var html;
+    if (sel && sel.label) {
+      html = "지금 " + (범위 ? '<b class="rk">' + esc(범위.label) + "</b>의 " : "") +
+        '<b class="sk">' + esc(sel.label) + "</b>" + 을를(sel.label) + " 다루는 중";
+    } else if (범위) {
+      var 건수 = 보는목록 && 보는목록.ids ? " " + 보는목록.ids.length + "건" : "";
+      html = "지금 " + '<b class="rk">' + esc(범위.label) + "</b>의 " + 화면 + 건수 + 을를(건수 ? "건" : ctx.label || "대시보드") + " 보는 중";
+    } else {
+      html = "지금 「" + 화면 + "」 화면을 보는 중";
+    }
+    line.innerHTML = html;
   }
 
   // ── 메뉴 연동 재설계(2026-08-09 시안 승인 + 외부사례 B·C) ────────────────
@@ -1093,12 +1117,8 @@
   var sel = null; // { label, text, fields? } | null — 화면(iframe)이 gijo:select로 알려 준다
   function setSelection(s) {
     sel = s && s.label && s.text ? s : null;
-    var el = document.getElementById("csSel");
-    if (!el) return;
-    if (!sel) { el.style.display = "none"; el.innerHTML = ""; renderSelState(); 선택카드.직전 = null; return; }
-    el.style.display = "";
-    el.innerHTML = "📌 " + esc(sel.label) + ' <span class="x" title="선택을 풉니다">✕</span>';
-    renderSelState();
+    renderCtxLine(); // 📌 칩 대신 문장에 실린다(「지금 …을 다루는 중」)
+    if (!sel) { 선택카드.직전 = null; return; }
     if (sel.fields) 선택카드(sel.fields);
   }
 
@@ -1156,7 +1176,7 @@
 
   // ── 🗂 지금 범위(승인 시안 mockups/자산_0단계, 2026-08-18) ─────────────────────
   //
-  // ⚠ 🎯 지금 다루는 것(.cs-sel)과 **다른 물건**이다. 헷갈리면 사고가 난다:
+  // ⚠ 🎯 지금 다루는 것(sel — 맥락 문장의 주황 강조)과 **다른 물건**이다. 헷갈리면 사고가 난다:
   //     🎯 = 사람이 화면에서 누른 **한 건**. 화면을 옮기면 지워진다(setSelection(null)).
   //     🗂 = 「이 자산 안에서만 본다」는 **범위**. 화면을 옮겨도 **남는다** — 그게 목적이다.
   //   그래서 `setSelection(null)`을 부르는 자리(화면 전환)를 손대지 않는다. 변수가 다르다.
@@ -1174,18 +1194,14 @@
     renderScope();
   }
   function renderScope() {
-    var el = document.getElementById("csScope");
-    if (!el) return;
-    if (!범위) { el.style.display = "none"; el.innerHTML = ""; return; }
-    el.style.display = "";
-    el.innerHTML = "🗂 " + esc(범위.label) + ' <span class="x" title="범위를 풉니다 — 전체를 다시 봅니다">✕</span>';
+    renderCtxLine(); // 알약 대신 문장에 실린다(「지금 {범위}의 … 보는 중」) — 푸는 길은 ⋯ 메뉴
   }
   // 새로고침·화면 이동 뒤에도 살아 있어야 하므로 저장소에서 되살린다.
   // ⚠ **값만 되살리고 안 그리면 더 나쁘다**(2026-08-18 실화면에서 잡음): 지시에는 실려 답이
   //   좁혀지는데 알약이 안 보인다 — 담당자는 범위가 풀린 줄 알고 묻고, 왜 답이 적은지 모른다.
   //   보이지 않는 범위는 범위가 아니라 함정이다. 되살렸으면 **반드시 그린다.**
-  //   ⚠ 여기서 곧바로 못 그린다 — 이 시점엔 `build()`가 아직 안 돌아 `#csScope`가 없다.
-  //     그래서 값만 되살리고, 상자를 만든 직후(build 끝)에서 `renderScope()`를 부른다.
+  //   ⚠ 여기서 곧바로 못 그린다 — 이 시점엔 `build()`가 아직 안 돌아 문장 줄(#csCtx)이 없다.
+  //     그래서 값만 되살리고, 줄을 만든 직후(build 끝)에서 `renderScope()`를 부른다.
   (function () {
     try {
       var raw = window.localStorage.getItem(SCOPE_KEY);
@@ -1204,33 +1220,14 @@
   var 보는목록 = null; // { screen, label, ids: [] } | null
   function setViewList(v) {
     보는목록 = v && Array.isArray(v.ids) && v.ids.length && v.ids.length <= 50 ? v : null;
+    renderCtxLine(); // 문장의 「N건」이 이 값에서 나온다 — 값만 바꾸고 안 그리면 낡은 수가 남는다
   }
 
   /** 🎯 지금 다루는 것 — fields가 온 화면에서만 그린다(2026-08-18 시안 승인).
    *  ⚠ fields가 없으면 **아무것도 그리지 않는다** — 기존 화면(vulnscan·dashboard·map-view)은
    *    label·text만 보내므로 지금과 똑같이 📌 칩만 뜬다(무변경 호환). */
-  function renderSelState() {
-    var box = document.getElementById("csSelState");
-    if (!box) return;
-    var f = sel && sel.fields;
-    if (!f) { box.style.display = "none"; box.innerHTML = ""; return; }
-    var 태그 = (f.kev ? '<span class="tag kev">🚨 ' + esc(f.kev) + "</span>" : "") +
-      (f.severity ? '<span class="tag sev">' + esc(f.severity) + "</span>" : "");
-    var 아래 = [f.status, f.owner ? "담당 " + f.owner : "", f.due ? "기한 " + f.due : ""].filter(Boolean).map(esc).join(" · ");
-    box.style.display = "";
-    box.innerHTML =
-      '<div class="h">🎯 지금 다루는 것<span class="x" title="선택을 풉니다">✕ 풀기</span></div>' +
-      (f.asset ? '<div class="m">' + esc(f.asset) + "</div>" : "") +
-      (f.title ? '<div class="t">' + 태그 + esc(f.title) + "</div>" : "") +
-      (아래 ? '<div class="m">' + 아래 + "</div>" : "") +
-      // 취약점 한글 한 줄(전-7③) — 화면이 이미 만든 문장을 그대로 재사용한다(다시 안 만든다).
-      // ⚠ **굵게(`**…**`)를 여기서 직접 푼다.** console.js엔 boldify가 없다 — 있는 줄 알고
-      //   부르면 TypeError로 조용히 죽는다(이 저장소의 반복 함정: 없는 함수를 부르는 버튼).
-      //   esc를 **먼저** 걸고 그다음 굵게를 푼다(순서가 바뀌면 주입 구멍이 된다).
-      (f.plain ? '<div class="p">→ ' + esc(f.plain).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") + "</div>" : "");
-    var x = box.querySelector(".x");
-    if (x) x.addEventListener("click", function () { setSelection(null); });
-  }
+  // (renderSelState는 2026-08-20 폐지 — 같은 데이터(sel.fields)를 대화 안 「고른 항목」
+  //  카드(선택카드)가 이미 그린다. 같은 값 두 곳 = 어긋남의 씨앗. 시안 pro-context-strip.)
 
   /** ② 화면별 칩 — 그 화면 갈래(CAN.screens)에서 3~4개 + 첫 칩은 항상 ⓘ. */
   function renderChips() {

@@ -169,18 +169,20 @@ describe("조치·승인 화면이 고른 항목을 대화창에 넘긴다", () 
     expect(구간, "아는 키만 통과시켜야 한다(허용 목록)").toMatch(/허용키|allow/);
   });
 
-  it("대화창이 fields를 받으면 「지금 다루는 것」을 그린다 — 없으면 지금 그대로", () => {
-    expect(cs, "상태 패널을 그리는 함수가 없다").toContain("renderSelState");
-    expect(cs, "붙일 자리(csSelState)가 DOM에 없다").toContain('id="csSelState"');
-    // fields가 없으면 아무것도 안 그린다 — 기존 화면(vulnscan·dashboard·map-view) 무변경 호환.
-    expect(cs, "fields 없을 때 빠져나가는 갈래가 없다").toMatch(/if\s*\(!f\)/);
+  // (2026-08-20 승인 시안 pro-context-strip: 🎯 상세 박스(renderSelState)는 폐지 —
+  //  같은 데이터(sel.fields)를 대화 안 「고른 항목」 카드(선택카드)가 그린다. 계약의 뜻
+  //  — 「fields가 온 화면에서만 상세가 보이고, 없으면 무변경 호환」 — 은 카드가 잇는다.)
+  it("대화창이 fields를 받으면 「고른 항목」 카드를 그린다 — 없으면 지금 그대로", () => {
+    expect(cs, "카드를 그리는 함수가 없다").toContain("function 선택카드");
+    // fields가 없으면 카드를 안 그린다 — 기존 화면(vulnscan·dashboard·map-view) 무변경 호환.
+    expect(cs, "fields 있을 때만 카드로 가는 갈래가 없다").toMatch(/if\s*\(sel\.fields\)\s*선택카드\(sel\.fields\)/);
   });
 
   it("없는 함수를 부르지 않는다 — boldify는 console.js에 없다", () => {
     // 2026-08-18에 실제로 이 실수를 했다가 잡았다. approvals.html엔 있고 console.js엔 없어서,
     // 옮겨 심으면 TypeError로 조용히 죽는다(버튼이 무반응이 되는 그 부류).
-    const i = cs.indexOf("renderSelState");
-    const 구간 = cs.slice(i, i + 1800);
+    const i = cs.indexOf("function 선택카드");
+    const 구간 = cs.slice(i, i + 2600);
     if (!/function boldify/.test(cs)) {
       expect(구간, "console.js에 boldify가 없는데 부르고 있다").not.toContain("boldify(");
     }

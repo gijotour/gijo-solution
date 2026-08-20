@@ -44,9 +44,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .dm-seg span{padding:5px 12px;border-radius:7px;font-size:12.25px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}
 .dm-seg span.on{background:rgba(59,130,246,.22);color:var(--text-strong, #fff);border-color:rgba(59,130,246,.5);}
 .dm-seg span b{font-weight:800;color:var(--muted-2);margin-left:4px;}
-.dm-gh{display:flex;align-items:center;gap:6px;padding:7px 11px;font-size:12.5px;font-weight:800;color:var(--text);background:rgba(88,166,255,.05);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;position:sticky;top:0;}
-.dm-gh .tri{color:var(--muted-2);font-size:11.75px;width:10px;}
-.dm-gh .cnt{color:var(--muted-2);font-weight:600;margin-left:auto;font-size:12px;}
+/* (.dm-gh 그룹 머리행 CSS는 2026-08-20 엑셀형 부품(.g-rows-gh, gijo-ui.css)으로 대체) */
 .dm-catb{border:1px solid rgba(45,212,191,.4);color:var(--teal);border-radius:20px;padding:0 7px;font-size:11.75px;white-space:nowrap;}
 .dm-catb.c일반{border-color:var(--border-strong);color:var(--muted);}
 /* 업무정보 등급 배지 — 색이 먼저 읽히게. 기밀은 눈에 띄어야 하고 공개는 조용해야 한다. */
@@ -115,16 +113,16 @@ tr:last-child td{border-bottom:none;}
 .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;min-width:150px;}
 .stat-num{font-size:26px;font-weight:800;color:var(--text-strong, #fff);}
 .stat-label{font-size:12.5px;color:var(--muted);margin-top:2px;}
-.triple-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
-.triple-row:last-child{border-bottom:none;}
-.chip{display:inline-block;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:3px 9px;font-weight:700;color:var(--text);}
-.chip-s{color:var(--blue-light);}
-.chip-o{color:var(--teal);}
+/* 관계 목록 — 엑셀형(.g-rows--rel, 승인 시안 knowledge-rows 2026-08-20): 칩(알약) 대신
+   글자 색만(주어=파랑·목적어=청록), 한 관계=한 줄 30px. 부품 본체는 gijo-ui.css. */
+.g-rows--rel .g-rows-head,.g-rows--rel .g-rows-r{grid-template-columns:1.1fr 110px 1.1fr 1fr 30px;gap:8px;}
+.g-rows--rel .g-rows-r{cursor:default;}
+.gtxt-s{color:var(--blue-light);font-weight:700;}
+.gtxt-o{color:var(--teal);font-weight:700;}
 .pred{color:var(--muted);font-size:12.5px;}
-.arrow{color:var(--muted-2);}
-.del-btn{margin-left:auto;background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px;}
+.del-btn{background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px;justify-self:end;}
 .del-btn:hover{color:var(--red);background:rgba(226,72,61,0.1);}
-.src-tag{font-size:11.75px;color:var(--muted-2);background:rgba(139,124,240,0.12);border-radius:5px;padding:2px 6px;margin-left:6px;}
+.gm2{color:var(--muted-2);} /* 출처 등 옅은 보조 글자 — 부품(.g-rows) 밖에서도 쓴다 */
 .list-box{max-height:360px;overflow-y:auto;}
 .graph-wrap{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
 .graph-wrap svg{display:block;width:100%;height:440px;}
@@ -214,17 +212,11 @@ tr:last-child td{border-bottom:none;}
 
     <style>
     .dm-wrap{display:grid;grid-template-columns:320px 1fr;gap:14px;margin-top:12px;}
-    .dm-list{border:1px solid var(--border);border-radius:10px;background:var(--panel-2);overflow:hidden;max-height:540px;overflow-y:auto;}
-    .dm-li{display:flex;align-items:center;gap:9px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer;}
-    .dm-li:last-child{border-bottom:none;}
-    .dm-li:hover{background:rgba(255,255,255,0.03);}
-    .dm-li.sel{background:rgba(59,130,246,0.12);box-shadow:inset 3px 0 0 var(--blue);}
-    .dm-li .ic{font-size:15px;flex:0 0 auto;}
-    /* min-width:0 — flex 자식은 이게 없으면 내용 폭 밑으로 안 줄어 말줄임이 무력화된다
-       (2026-08-19 실측: 좁은 무대(644px)에서 .nm이 29~178px 밀어내 내부 클리핑). */
-    .dm-li .nm{flex:1;min-width:0;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .dm-li.sel .nm{color:var(--text-strong, #fff);font-weight:700;}
-    .dm-li .ck{font-size:11.75px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,0.14);border-radius:6px;padding:2px 7px;flex:0 0 auto;}
+    /* (옛 .dm-list/.dm-li 카드형 목록 CSS는 2026-08-20 엑셀형(.g-rows, gijo-ui.css 공용)으로
+       교체 — 승인 시안 mockups/knowledge-rows. 열 폭 변형만 이 화면이 선언한다.) */
+    .g-rows--docs .g-rows-head,.g-rows--docs .g-rows-r{grid-template-columns:1fr 74px 56px 108px;gap:8px;}
+    /* 열 머리가 스크롤 상자 밖(형제)이라 그룹 머리행은 top:0에 붙는다(부품 기본 26px 아님) */
+    .g-rows--docs .g-rows-gh{top:0;}
     .dm-detail{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:16px;min-height:220px;}
     .dm-empty{padding:26px;text-align:center;color:var(--muted-2);font-size:12px;}
     .dm-dtop{display:flex;align-items:flex-start;gap:11px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px;}
@@ -296,7 +288,12 @@ tr:last-child td{border-bottom:none;}
       <div class="panel-title">📚 올린 문서 확인 · 관리 <span id="dmSummary" style="font-size:12.25px;font-weight:600;color:var(--muted-2);margin-left:6px"></span></div>
       <div class="dm-seg" id="dmSeg"></div>
       <div class="dm-wrap">
-        <div class="dm-list" id="dmList"><div class="dm-empty">불러오는 중...</div></div>
+        <!-- 엑셀형 행 목록(승인 시안 mockups/knowledge-rows, 2026-08-20) — 카드·알약 없이
+             한 항목=한 줄. 부품은 gijo-ui.css .g-rows(공용), 열 폭만 이 화면이 정한다. -->
+        <div class="g-rows g-rows--docs">
+          <div class="g-rows-head"><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입일</span></div>
+          <div class="g-rows-scroll" id="dmList"><div class="dm-empty">불러오는 중...</div></div>
+        </div>
         <div class="dm-detail" id="dmDetail"><div class="dm-empty">왼쪽에서 문서를 선택하세요.</div></div>
       </div>
     </div>
@@ -405,7 +402,10 @@ tr:last-child td{border-bottom:none;}
            이 띠는 **어떤 관계가 지식을 이루는가**를 말한다. 누르면 아래 목록이 그 관계만 남는다. -->
       <div id="vizStrip"></div>
       <div id="vizFilter" style="display:none"></div>
-      <div class="list-box" id="tripleList"></div>
+      <div class="g-rows g-rows--rel">
+        <div class="g-rows-head"><span>주어</span><span>관계</span><span>목적어</span><span>출처</span><span></span></div>
+        <div class="g-rows-scroll list-box" id="tripleList"></div>
+      </div>
     </div>
     </div>
 
@@ -679,30 +679,39 @@ tr:last-child td{border-bottom:none;}
       list.innerHTML = '<div class="dm-empty">이 영역에 문서가 없습니다.</div>';
       return;
     }
+    // 엑셀형(승인 시안 knowledge-rows): 그룹 머리행 + 행 묶음(.g-rows-body — 접기·얼룩 단위).
+    // 등급·영역 알약은 걷어냈다 — 등급은 글자 색(gtxt-*), 영역은 그룹 머리행이 이미 말한다.
+    const 등급글자 = (g) => {
+      const 이름 = GRADE_LABEL[g];
+      return 이름 ? `<span class="gtxt-${g}" title="열람 등급: ${이름}">${g} ${이름}</span>`
+        : `<span class="gm2" title="열람 등급 미지정">? 미지정</span>`;
+    };
+    const 날짜만 = (t) => t ? new Date(t).toLocaleDateString("ko-KR") : "—";
     list.innerHTML = groups.map((g) => {
       // 특정 영역만 볼 때는 항상 펼친다(접힌 채 하나만 보이면 빈 화면처럼 보임).
       const folded = dmSegSel === "전체" && dmCollapsed.has(g.c);
-      const rows = folded ? "" : g.docs.map((d) =>
-        `<div class="dm-li" data-id="${dmEsc(d.documentId)}"><span class="ic">${DM_ICON(d.documentId)}</span>` +
-        `<span class="nm" title="${dmEsc(d.documentId)}">${dmEsc(d.documentId)}</span>` +
-        `${gradeBadge(d.grade)}<span class="dm-catb c${dmEsc(dmCatOf(d))}">${dmEsc(dmCatOf(d))}</span><span class="ck">${d.chunks}</span></div>`
+      const rows = g.docs.map((d) =>
+        `<div class="g-rows-r" data-id="${dmEsc(d.documentId)}">` +
+        `<span class="trunc" title="${dmEsc(d.documentId)}">${DM_ICON(d.documentId)} ${dmEsc(d.documentId)}</span>` +
+        `${등급글자(d.grade)}<span class="ta-r gm">${d.chunks}</span><span class="ta-r gm2">${날짜만(d.ingestedAt)}</span></div>`
       ).join("");
-      return `<div class="dm-gh" data-g="${g.c}"><span class="tri">${folded ? "▸" : "▾"}</span>${g.icon} ${g.c}<span class="cnt">${g.docs.length}개</span></div>${rows}`;
+      return `<div class="g-rows-gh" data-g="${g.c}"><span class="tri">${folded ? "▸" : "▾"}</span>${g.icon} ${g.c}<span class="cnt">${g.docs.length}개</span></div>` +
+        `<div class="g-rows-body${folded ? " folded" : ""}">${rows}</div>`;
     }).join("");
-    list.querySelectorAll(".dm-gh").forEach((el) => el.addEventListener("click", () => {
+    list.querySelectorAll(".g-rows-gh").forEach((el) => el.addEventListener("click", () => {
       const c = el.dataset.g;
       if (dmSegSel !== "전체") return; // 필터 모드에선 접기 무의미
       if (dmCollapsed.has(c)) dmCollapsed.delete(c); else dmCollapsed.add(c);
       dmSaveCollapsed();
       renderDmList(dmSelected);
     }));
-    list.querySelectorAll(".dm-li").forEach((el) => el.addEventListener("click", () => {
+    list.querySelectorAll(".g-rows-r").forEach((el) => el.addEventListener("click", () => {
       selectDoc(el.dataset.id);
       // 🎯 고른 문서를 대화창에(B16 완결 2026-08-19) — 「이 문서 지워줘」가 이 선택으로 이어진다
       if (window.gijoSelectNotify) window.gijoSelectNotify({ label: el.dataset.id, text: "올린 문서 " + el.dataset.id, fields: { title: el.dataset.id } });
     }));
     // 선택 유지 — 방금 고른 문서가 현재 필터·접힘 상태에서 보이면 그대로, 아니면 첫 문서.
-    const visibleIds = [...list.querySelectorAll(".dm-li")].map((el) => el.dataset.id);
+    const visibleIds = [...list.querySelectorAll(".g-rows-body:not(.folded) .g-rows-r")].map((el) => el.dataset.id);
     const target = (keepSel && visibleIds.includes(keepSel)) ? keepSel
       : (dmSelected && visibleIds.includes(dmSelected)) ? dmSelected
       : visibleIds[0];
@@ -732,7 +741,7 @@ tr:last-child td{border-bottom:none;}
   async function selectDoc(documentId) {
     dmSelected = documentId;
     dmConfirmId = null;
-    document.querySelectorAll("#dmList .dm-li").forEach((el) => el.classList.toggle("sel", el.dataset.id === documentId));
+    document.querySelectorAll("#dmList .g-rows-r").forEach((el) => el.classList.toggle("sel", el.dataset.id === documentId));
     const d = dmDocs.find((x) => x.documentId === documentId);
     const detail = document.getElementById("dmDetail");
     if (!d || !detail) return;
@@ -1168,14 +1177,16 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("listCount").textContent =
       triples.length > LIST_CAP ? `· ${LIST_CAP}건 표시 (전체 ${triples.length.toLocaleString()}건)` : `· ${triples.length}건`;
     if (triples.length === 0) { box.innerHTML = `<div style="color:var(--muted-2);font-size:12.5px;padding:14px 0">등록된 관계가 없습니다. 위 "샘플 지식 불러오기"로 시작하거나 직접 추가하세요.</div>`; return; }
-    box.innerHTML = 보일것.map((t) => `
-      <div class="triple-row">
-        <span class="chip chip-s">${esc(t.subject)}</span>
-        <span class="arrow">—</span><span class="pred">${esc(t.predicate)}</span><span class="arrow">→</span>
-        <span class="chip chip-o">${esc(t.object)}</span>
-        ${t.source ? `<span class="src-tag">${esc(t.source)}</span>` : ""}
+    // 엑셀형 한 줄(승인 시안 knowledge-rows) — 칩 대신 글자 색, 열은 위 g-rows-head와 짝.
+    // ⚠ 얼룩이 행 순서로 돌게 행들만 .g-rows-flat 묶음에 담는다(안내문은 묶음 밖).
+    box.innerHTML = `<div class="g-rows-flat">` + 보일것.map((t) => `
+      <div class="g-rows-r">
+        <span class="trunc gtxt-s" title="${esc(t.subject)}">${esc(t.subject)}</span>
+        <span class="trunc pred" title="${esc(t.predicate)}">${esc(t.predicate)}</span>
+        <span class="trunc gtxt-o" title="${esc(t.object)}">${esc(t.object)}</span>
+        <span class="trunc gm2">${t.source ? esc(t.source) : ""}</span>
         <button class="del-btn" data-id="${t.id}" title="삭제">🗑</button>
-      </div>`).join("") +
+      </div>`).join("") + `</div>` +
       (triples.length > LIST_CAP
         ? `<div style="color:var(--muted-2);font-size:12.25px;padding:10px 0">앞 ${LIST_CAP}건만 보입니다 — 전체 ${triples.length.toLocaleString()}건입니다. 위 막대나 주어 찾기로 좁혀 보세요.</div>`
         : "");
@@ -1301,7 +1312,7 @@ tr:last-child td{border-bottom:none;}
       const hits = await window.gijo.expandOntology(text);
       if (!hits || hits.length === 0) { box.innerHTML = `<span style="color:var(--muted-2)">이 질문에 연결되는 규칙이 없습니다. (그래프에 관련 엔티티가 없거나 아직 등록 전)</span>`; return; }
       box.innerHTML = `<div style="color:var(--teal);font-weight:700;margin-bottom:8px">이 질문에 함께 주입될 규칙 ${hits.length}건:</div>` +
-        hits.map((t) => `<div class="result-chunk"><span class="chip chip-s">${esc(t.subject)}</span> <span class="pred">${esc(t.predicate)}</span> <span class="arrow">→</span> <span class="chip chip-o">${esc(t.object)}</span>${t.source ? ` <span class="src-tag">${esc(t.source)}</span>` : ""}</div>`).join("");
+        hits.map((t) => `<div class="result-chunk"><span class="gtxt-s">${esc(t.subject)}</span> <span class="pred">${esc(t.predicate)}</span> <span style="color:var(--muted-2)">→</span> <span class="gtxt-o">${esc(t.object)}</span>${t.source ? ` <span class="gm2" style="font-size:11.75px">${esc(t.source)}</span>` : ""}</div>`).join("");
     } catch (e) { box.innerHTML = `<span class="status-err">확장 실패: ${esc(e.message)}</span>`; }
   }
 

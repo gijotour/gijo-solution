@@ -342,6 +342,30 @@ body.g-ui { line-height: 1.7; }
 /* ══ 목록 밀도 — 엑셀급(2026-08-19, 사장님 「세부 리스트는 엑셀처럼 촘촘하게」) ══
    근거: 목록밀도_실측견적_2026-08-19.md · mockups/목록밀도_엑셀급/시안.html
    폰트는 안 건드린다(이미 하한 11px 근처) — padding·line-height로만 줄인다. */
+/* ⓪′ 엑셀형 행 목록(.g-rows) — 승인 시안 mockups/knowledge-rows(2026-08-20 사장님
+     「엑셀처럼 한 줄 한 줄로·표준 모델도 그렇게」). 원칙: 카드·알약·그림자 없음 —
+     색은 글자 색으로만, 얼룩(--g-zebra)만. 그룹 머리행+열 머리 고정, 행 30px.
+     토큰만 쓰므로 다크(표준)·흰(프로)·연초록(라이트)에서 같은 마크업이 성립한다.
+     열 폭은 화면이 .g-rows--이름으로 선언한다(--docs·--rel = AI 지식, memory.html). */
+.g-rows { border: 1px solid var(--border, rgba(255,255,255,.08)); border-radius: 8px; overflow: hidden; background: var(--panel, #30302e); }
+.g-rows-scroll { max-height: var(--gr-maxh, 540px); overflow-y: auto; }
+.g-rows-head { display: grid; align-items: center; height: 26px; padding: 0 12px; font-size: 11px; font-weight: 800; color: var(--muted-2, #a49d95); letter-spacing: .4px; background: var(--panel-2, #1f1e1d); border-bottom: 1px solid var(--border-strong, rgba(255,255,255,.16)); position: sticky; top: 0; z-index: 2; }
+.g-rows-gh { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px; font-size: 12px; font-weight: 800; color: var(--text, #e9e7e2); background: var(--panel-2, #1f1e1d); border-bottom: 1px solid var(--border, rgba(255,255,255,.08)); cursor: pointer; user-select: none; position: sticky; top: 26px; z-index: 1; }
+.g-rows-gh .tri { width: 10px; color: var(--muted-2, #a49d95); font-size: 11px; }
+.g-rows-gh .cnt { margin-left: auto; color: var(--muted-2, #a49d95); font-weight: 700; font-size: 11.5px; }
+.g-rows-body.folded { display: none; }
+.g-rows-r { display: grid; align-items: center; height: 30px; padding: 0 12px; font-size: 12.5px; color: var(--text, #e9e7e2); cursor: pointer; }
+.g-rows-body .g-rows-r:nth-child(even), .g-rows-flat .g-rows-r:nth-child(even) { background: var(--g-zebra, rgba(255,255,255,.025)); }
+.g-rows-r:hover { background: rgba(59,130,246,.07); }
+.g-rows-r.sel { background: rgba(59,130,246,.12); box-shadow: inset 3px 0 0 var(--blue, #3b82f6); }
+.g-rows .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-rows .ta-r { text-align: right; font-variant-numeric: tabular-nums; }
+.g-rows .gm { color: var(--muted, #b3ada4); }
+.g-rows .gm2 { color: var(--muted-2, #a49d95); }
+.g-rows .gtxt-C { color: var(--red, #e2483d); font-weight: 800; }
+.g-rows .gtxt-S { color: var(--amber, #f0a020); font-weight: 800; }
+.g-rows .gtxt-O { color: var(--muted, #b3ada4); font-weight: 700; }
+
 /* ① 표 8종 — vulnscan·sbom·report·threat·inventory·maintenance·kpi·handover.
      .g-ui.g-ui로 두 번 적어 nav.js의 .main table td(0,1,2)를 특이도로 확실히 이긴다
      (로드 순서가 두 적용 지점에서 보장되지 않아서다 — 이 파일의 .kpi-strip 3중과 같은 수법). */
