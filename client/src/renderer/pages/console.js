@@ -82,8 +82,6 @@
       ".cs-flow .st{border:1px solid var(--border,rgba(255,255,255,.12));border-radius:5px;padding:1px 7px;cursor:pointer;white-space:nowrap;}",
       ".cs-flow .st:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}",
       ".cs-flow .st.now{background:rgba(30,185,128,.12);border-color:rgba(30,185,128,.5);color:#5fe0aa;font-weight:800;cursor:default;}",
-      // 홈 모드의 경고 숫자(지연·KEV 등) — .cs-live b와 같은 위험색. 0이면 아예 안 그린다.
-      ".cs-flow .st b{color:#f5928a;font-weight:800;}",
       // 살아 있는 숫자 — 그 화면의 요약 1줄(절차 띠 데이터 재사용, 새 계산 없음)
       ".cs-live{margin-left:auto;font-size:11.5px;color:var(--muted,#b3ada4);white-space:nowrap;}",
       ".cs-live b{color:#f5928a;font-weight:800;}",
@@ -1374,12 +1372,15 @@
       // 「세 번째 길」). 새 렌더러가 아니라 같은 띠의 홈 모드다 — 숫자도 같은 API 그대로.
       var home = !screenFile;
       if (idx < 0 && !home) { el.style.display = "none"; return; } // 절차 밖 화면 — 띠를 안 그린다(빈 띠는 고장으로 읽힌다)
+      if (home && !stages.length) { el.style.display = "none"; return; } // 홈이라도 빈 띠는 안 그린다
       var html = "";
       if (home) {
         stages.forEach(function (s, i) {
-          // 칸마다 숫자를 붙인다 — count는 회색 그대로, alert는 0이면 안 그린다(늘 붙는 경고는 안 보인다).
-          var 숫자 = (s.count != null ? " " + s.count : "") +
-            (s.alert ? ' <b title="' + esc(s.alertLabel || "") + '">' + s.alert + "</b>" : "");
+          // 칸마다 count만 붙인다(천단위 구분 — 판과 같은 표기). ⚠ alert는 홈에서 안 그린다
+          // (검토관 3갈래 합치, 2026-08-21): 단계마다 뜻이 다르다 — ①은 「오늘 신규」(중립),
+          // ⑤는 「마지막 보고 후 N일」(건수가 아니라 날수)이라, 라벨 없이 붉은 숫자로 세우면
+          // 전부 경고 건수로 읽힌다. 경고는 바로 아래 현황판 배지가 라벨과 함께 말한다.
+          var 숫자 = s.count != null ? ' <span>' + Number(s.count).toLocaleString() + "</span>" : "";
           html += '<span class="st" data-page="' + esc(s.page) + '" data-label="' + esc(s.label) + '" title="누르면 이 단계 화면으로">' + s.no + " " + esc(s.label) + 숫자 + "</span>";
           if (i < stages.length - 1) html += '<span class="ar">→</span>';
         });
@@ -1387,7 +1388,9 @@
         el.style.display = "flex";
         el.querySelectorAll(".st").forEach(function (b) {
           b.addEventListener("click", function () {
-            if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label);
+            // dock 명시 — 띠 클릭은 「그 단계 화면으로 가겠다」는 뜻이다(title이 그렇게 약속한다).
+            // 프로에서 dock 없이 열면 카드만 떠서(「카드가 전부」 계약) 약속과 어긋난다(검토관 ③).
+            if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label, { dock: true });
             else if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell(b.dataset.page, b.dataset.label);
           });
         });
@@ -1409,11 +1412,20 @@
       el.style.display = "flex";
       el.querySelectorAll(".st:not(.now)").forEach(function (b) {
         b.addEventListener("click", function () {
-          if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label);
+          // dock 명시 — 홈 모드와 같은 이유(띠 클릭=이동 의지, 카드만 뜨면 약속 위반).
+          if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label, { dock: true });
           else if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell(b.dataset.page, b.dataset.label);
         });
       });
     };
+    // ⚠ 홈은 applyCtx(탭 전환)라는 재렌더 계기가 없어 숫자가 부팅 순간에 얼어붙는다(검토관 ①중3 —
+    //   현황판이 똑같은 함정을 밟고 고친 자리다). 현황판과 같은 90초 주기로 다시 잰다.
+    //   안 보이는 동안은 재지 않고 다음 차례로 미룬다.
+    clearTimeout(renderFlow._t);
+    renderFlow._t = setTimeout(function 다시재기() {
+      if (document.visibilityState === "visible") { stagesCache = { at: 0, stages: null }; renderFlow(); }
+      else renderFlow._t = setTimeout(다시재기, 90000);
+    }, 90000);
     if (stagesCache.stages && Date.now() - stagesCache.at < 60000) return draw(stagesCache.stages);
     if (!window.gijo || !window.gijo.workflowStages) { el.style.display = "none"; return; }
     window.gijo.workflowStages().then(function (r) {
@@ -2008,6 +2020,9 @@
         try { renderHero(); fillGreeting(); } catch (e) { /* 히어로 못 그려도 대화는 된다 */ }
       }
     }
+    // 맥락 표시(문장·칩·절차 띠)를 지금 상태로 다시 맞춘다(검토관 ①중4 — 화면카드직전을
+    // 비워 놓고 다시 안 그리면 띠가 직전 화면의 「지금 여기」를 계속 가리킨다).
+    try { readCtxFromShell(); } catch (e) { }
   }
   window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; }, screenCard: screenCard, newSession: newSession };
 

@@ -21,7 +21,8 @@ describe("현황판 📖 시나리오 칩 ↔ 시나리오 등록부 대조", ()
   it("판에 적힌 시나리오 이름이 전부 등록부에 글자까지 있다", () => {
     const names = 칩이름들();
     // 빈 검사 방지 — 대응표는 12판이다(kpi·report가 「경영 보고 준비」를 공유해 이름은 11종).
-    expect(names.length, "scenario 필드를 하나도 못 찾았다 — 추출 정규식부터 의심할 것").toBeGreaterThanOrEqual(10);
+    // 하한을 12로 못박는다 — 10으로 두면 판 2개가 지워져도 통과한다(검토관 ②).
+    expect(names.length, "scenario 필드 수가 대응표(12판)와 다르다").toBeGreaterThanOrEqual(12);
     for (const n of names) {
       expect(
         SCENARIOS.some((s) => s.name === n),

@@ -806,8 +806,11 @@ export function reportActivity(): { thisWeek: number; daysSinceLast: number | nu
       //   (실측 2026-08-02), 담당자는 그 칸을 영영 안 믿는다.
       //   · answer-  = 긴 답변이 리포트로 자동 전환된 것(longanswer.ts) — 사람이 쓴 보고가 아니다
       //   · ingest-  = 파일 반입 진행내역(ingestreport.ts) — 반입 기록이지 보고가 아니다
+      //   · session- = 작업 내역을 완료로 바꾸는 순간 서버가 만드는 대화 전문(worksessions.ts:750)
+      //     — 보고서 작성 행위가 아니다. 안 거르면 세션 5개를 닫은 날 「이번 주 보고 5건」이
+      //     된다(2026-08-21 검토관 ②중 — 판 쪽 자동종류와 같은 잣대로 맞춤).
       //   진짜 보고서는 `${req.type}-<시각>` 꼴이다(주간/월간/온디맨드 등).
-      if (/^(answer|ingest)-/.test(m[1])) continue;
+      if (/^(answer|ingest|session)-/.test(m[1])) continue;
       // QA·시험이 만든 것은 세지 않는다(메타의 qa 표식). 메타가 없으면 사람이 만든 것으로 본다 —
       // **모르는 것을 시험으로 몰아 숫자를 낮추면** 반대 방향의 거짓이 된다.
       if (qa표식(nodeFs, m[1])) continue;
@@ -847,10 +850,12 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
   const bases = [...byBase.entries()]
     .filter(([, e]) => e.docx || e.pdf || e.md) // 메타만 있고 문서 없는 건 제외
     .map(([base, e]) => {
-      // session-*: 작업 세션 종료 리포트(worksessions.ts) — 같은 이력에 함께 나열된다.
+      // session-*: 작업 내역 종료 리포트(worksessions.ts) — 같은 이력에 함께 나열된다.
       // answer-*: 긴 답변 자동 전환(longanswer.ts) — 여기 빠지면 ts=0으로 잡혀 **정렬 상한에서
       //   먼저 잘리고**, 사이드카가 깨진 파일은 type이 ondemand로 위장된다(2026-08-21 설계관 덤).
-      const fm = /^(?:weekly|quarterly|ondemand|session|ingest|answer)-(\d+)$/.exec(base);
+      // daily·monthly(reportschedule.ts ScheduleType)·work-progress(:1140 라우트)도 실제 생산자가
+      //   있다 — answer만 채우고 이 셋을 빠뜨렸었다(2026-08-21 검토관 ②상1, 같은 결함 세 사본).
+      const fm = /^(?:weekly|quarterly|ondemand|daily|monthly|work-progress|session|ingest|answer)-(\d+)$/.exec(base);
       return { base, e, ts: fm ? Number(fm[1]) : 0 };
     })
     .sort((a, b) => b.ts - a.ts)
@@ -858,7 +863,7 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
   // 2) 상한 안의 항목만 사이드카(대상 자산·독자·요약)로 보강한다.
   const out: ReportHistoryEntry[] = [];
   for (const { base, e, ts } of bases) {
-    const fm = /^(weekly|quarterly|ondemand|session|ingest|answer)-\d+$/.exec(base);
+    const fm = /^(weekly|quarterly|ondemand|daily|monthly|work-progress|session|ingest|answer)-\d+$/.exec(base);
     const entry: ReportHistoryEntry = {
       base,
       type: fm ? fm[1] : "ondemand",

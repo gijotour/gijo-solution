@@ -568,9 +568,12 @@ export async function reportStatusAnswer(): Promise<{ output: string; dataCard: 
       //   같은 말로 쓴다 — 같은 것을 두 곳이 다르게 부르면 담당자가 다른 것으로 읽는다.
       shown: 이력.slice(0, 6).map((h) => {
         const e = h as { type?: string; base?: string; createdAt?: number; audience?: string };
+        // ⚠ report.html:286·grouppanels.js TL과 글자까지 동일할 것 — 세 벌 중 이 사본만 키가
+        //   빠져 대화 카드에 영문 "session"이 그대로 나갔다(2026-08-21 검토관 ①상2·③중1).
         const TYPE_LABEL: Record<string, string> = {
           weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드",
-          answer: "AI 작성 자료", ingest: "파일 처리 내역",
+          daily: "정기 · 일일", monthly: "정기 · 매월", "work-progress": "업무 진행",
+          answer: "AI 작성 자료", ingest: "파일 처리 내역", session: "작업 내역",
         };
         const 이름 = TYPE_LABEL[String(e.type ?? "")] ?? String(e.type ?? e.base ?? "리포트");
         return { t: (e.audience ? `${이름} · ${e.audience}` : 이름).slice(0, 50), d: new Date(e.createdAt ?? 0).toLocaleDateString("ko-KR") };

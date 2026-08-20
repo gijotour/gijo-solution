@@ -480,7 +480,7 @@
         // 유형 한글(report.html:286 TYPE_LABEL)·2열은 대상 한글(:505 — 영문 그대로 금지).
         rows: function () {
           return window.gijo.listReportHistory().then(function (list) {
-            var TL = { weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드", answer: "AI 작성 자료", ingest: "파일 처리 내역", session: "작업 세션" }; // report.html TYPE_LABEL과 글자까지 동일(검토관 상2 — incident는 없는 키·answer·ingest 누락 / 2026-08-21 설계관 덤 — session도 없어 영문이 그대로 나갔다)
+            var TL = { weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드", daily: "정기 · 일일", monthly: "정기 · 매월", "work-progress": "업무 진행", answer: "AI 작성 자료", ingest: "파일 처리 내역", session: "작업 내역" }; // report.html TYPE_LABEL·datacard.ts 사본과 글자까지 동일. 원천 type은 9종이 실재한다(reportschedule ScheduleType의 daily·monthly / report.ts:1140 work-progress / worksessions session — 2026-08-21 검토관 ②가 3종 누락 적발). session 라벨은 화면 통일명 「작업 내역」(2026-07-28 개명)
             var AU = { internal: "내부용", official: "보고용" };
             return {
               cols: ["유형", "구분", "생성"], // 「대상」은 실화면에서 자산 이름의 자리(검토관 하9) — audience는 구분
@@ -502,7 +502,9 @@
           // ⚠ 다만 목록에는 **사람이 만든 보고서**가 아닌 것도 섞인다(2026-08-20 병렬 검토):
           //   answer-*(긴 답이 자동으로 넘어간 리포트)·ingest-*(파일 반입 진행내역). 「이번 주
           //   작성」에 그것들이 들어가면 실제보다 부풀려 읽힌다 — 종류로 갈라 꼬리에 밝힌다.
-          var 자동종류 = { answer: true, ingest: true };
+          // session도 자동이다 — 작업 내역을 완료로 바꾸는 순간 서버가 만드는 대화 전문이지
+          // 보고서 작성 행위가 아니다(2026-08-21 검토관 ② — 서버 reportActivity와 같은 잣대).
+          var 자동종류 = { answer: true, ingest: true, session: true };
           var 사람이만든 = list.filter(function (x) { return !자동종류[String(x.type || "")]; });
           var 자동 = list.length - 사람이만든.length;
           var 이번주 = 사람이만든.filter(function (x) { return (x.createdAt || 0) >= 주; }).length;
@@ -515,7 +517,9 @@
           var 잘림 = list.length >= 100;
           return {
             rows: [
-              ["이번 주 작성", n(이번주)],
+              // 「이번 주 작성」도 같은 잘린 목록에서 센다 — 표식을 한 줄에만 붙이면 나머지가
+              // 정확한 수처럼 읽힌다(2026-08-21 검토관 ①중5).
+              ["이번 주 작성", n(이번주) + (잘림 ? "+" : "")],
               ["마지막 보고 후", 지난날 == null ? "-" : 지난날 + "일"],
               ["보관 중", n(사람이만든.length) + (잘림 ? "+" : "")],
             ],
