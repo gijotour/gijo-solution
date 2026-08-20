@@ -34,8 +34,10 @@ const MAP = [
   ["#f0a020", "--amber"],
   ["#8b7cf0", "--purple"],
 ];
-// 제외: 라이트(자체 연초록 층) · 로그인/설치(별도 팔레트 --navy) · 공용 부품이 아닌 특수 창
-const EXCLUDE = /^(lite-|login\.html$|setup\.html$)/;
+// 제외: 라이트(자체 연초록 층) · 로그인/설치(별도 팔레트 --navy) · 팀 사무실(⚠ canvas —
+// ctx.fillStyle은 var()를 못 먹고 **조용히 무시**되어 직전 색으로 그려진다. 실제로 스윕이
+// 말풍선 글자를 지웠다 — 검토관 2026-08-20 배색 상3. 캔버스 색은 토큰화 대상이 아니다.)
+const EXCLUDE = /^(lite-|login\.html$|setup\.html$|office\.html$)/;
 
 const files = fs.readdirSync(pages).filter((f) => f.endsWith(".html") && !EXCLUDE.test(f));
 let 총치환 = 0;

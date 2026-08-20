@@ -41,7 +41,9 @@
 .g-b-med  { background: rgba(37, 99, 235, 0.12); color: #1D4ED8; }
 .g-b-low  { background: rgba(24, 48, 16, 0.07); color: var(--g-muted-2); }
 .g-b-ok   { background: rgba(13, 107, 55, 0.12); color: #0D6B37; }
-/* 스크롤바·표 호버 — 다크의 흰 잉크 오버레이 반전 */
-::-webkit-scrollbar-thumb { background: rgba(24, 48, 16, 0.22); }
-::-webkit-scrollbar-thumb:hover { background: rgba(24, 48, 16, 0.34); }
+/* 스크롤바·표 호버 — 다크의 흰 잉크 오버레이 반전.
+ * ⚠ .g-ui 접두 필수 — gijo-ui의 같은 규칙이 .g-ui 접두(특이도 0-1-1)라 접두 없인 진다
+ *   (검토관 배색 중7: 연초록 위 흰 썸 = 안 보이는 스크롤바). */
+.g-ui ::-webkit-scrollbar-thumb { background: rgba(24, 48, 16, 0.22); }
+.g-ui ::-webkit-scrollbar-thumb:hover { background: rgba(24, 48, 16, 0.34); }
 .g-table tbody tr:hover { background: rgba(24, 48, 16, 0.05); }

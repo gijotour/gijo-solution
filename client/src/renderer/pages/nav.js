@@ -1544,8 +1544,13 @@
     //    이 자리에서는 navigateTo(새 탭 열기)가 아니라 **그 자리 교체**(replace)여야 한다.
     if (IS_EMBED) {
       if (!/[?&]hub=1/.test(location.search)) {
-        var 흡수 = TAB_REDIRECT[currentPage() + (location.search || "")];
-        if (흡수) { location.replace(흡수); return; }
+        // 흡수 키는 주소 정확 일치인데, 프로가 표시용 theme=light를 붙이면 키가 안 맞아
+        // 폐지 화면 23종이 허브로 못 넘어간다(검토관 배색 중5 — 프로에서만 재발하는 부류).
+        // 표시용 파라미터는 키에서 떼고, 흡수 주소에는 도로 붙인다.
+        var 검색 = (location.search || "").replace(/([?&])theme=light(&|$)/, function (_, a, b) { return b === "&" ? a : ""; });
+        var 테마붙임 = /(^|[?&])theme=light(&|$)/.test(location.search) ? "&theme=light" : "";
+        var 흡수 = TAB_REDIRECT[currentPage() + 검색];
+        if (흡수) { location.replace(흡수 + 테마붙임); return; }
       }
       applyEmbed();
       return;

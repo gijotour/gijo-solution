@@ -254,6 +254,28 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
     배경: getComputedStyle(document.body).backgroundColor,
   })).catch(() => null) : null;
   ok("프로 흰 바탕: 무대 화면(theme=light 전달)", !!화면흰 && 화면흰.클래스 && 화면흰.배경 === "rgb(250, 248, 245)", JSON.stringify(화면흰));
+  // 허브 중첩 속살까지 흰가(검토관 배색 상2·중6 — assets 한 장 검사는 허브·부품 다크 박힘을 통과시켰다)
+  await 셸.evaluate(() => window.gijoTabs.open("fix.html", "조치", { dock: true }));
+  const hubFr = await 프레임찾기("fix.html", 8);
+  let 속살 = null;
+  if (hubFr) {
+    for (let i = 0; i < 10 && !속살; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      속살 = hubFr.childFrames().find((f) => f.url().includes("hub=1"));
+    }
+  }
+  const 속살흰 = 속살 ? await 속살.evaluate(() =>
+    document.documentElement.classList.contains("theme-light") &&
+    getComputedStyle(document.body).backgroundColor === "rgb(250, 248, 245)").catch(() => false) : false;
+  ok("프로 흰 바탕: 허브 무대 속살(theme 계승)", !!속살 && 속살흰, hubFr ? (속살 ? "" : "속살 프레임 못 찾음") : "허브 프레임 못 찾음");
+  // 대화창 카드 경계·배경 실측 — 부품 JS 다크 박힘(배색 상1) 재발 방지
+  const 카드경계 = await 셸.evaluate(() => {
+    const c = document.querySelector(".dc-card");
+    if (!c) return null;
+    const st = getComputedStyle(c);
+    return { bg: st.backgroundColor, b: st.borderTopColor };
+  });
+  ok("프로 흰 바탕: 카드 배경(부품 층)", !!카드경계 && 카드경계.bg === "rgb(255, 255, 255)", JSON.stringify(카드경계));
   // 팝업 0 — 프로에서 저절로 뜨는 창이 없다(창은 (창) 메뉴뿐 — 이 관문은 안 연다).
   const 팝업0 = ctx.pages().every((p) => {
     const u = p.url();

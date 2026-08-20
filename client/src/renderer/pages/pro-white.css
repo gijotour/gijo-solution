@@ -64,3 +64,25 @@ html.theme-light #gijoRail { background: var(--panel-2); border-color: var(--bor
 html.theme-light #gijoRail button { color: var(--muted); }
 html.theme-light #gijoRail button:hover { background: rgba(43, 38, 33, 0.06); color: var(--text); border-color: var(--border); }
 html.theme-light #dockHead { background: var(--panel-2); border-bottom: 1px solid var(--border); color: var(--muted); }
+/* ── 대화창 부품(콘솔·chatparts) — 프로의 기준 화면(검토관 배색 상1: 층이 토큰만 덮고
+ *    부품 JS의 박힌 다크 값(흰 글자·흰 테두리·밝은 경고색)을 안 덮어 카드·인용·굵은 글씨가
+ *    흰 바탕에서 사라졌다). 값은 시안 -ink 계산분. */
+html.theme-light .cs-row .cm strong, html.theme-light .cs-row .cm h1,
+html.theme-light .cs-row .cm h2, html.theme-light .cs-row .cm h3,
+html.theme-light .cs-guide .gh, html.theme-light .cs-dh b,
+html.theme-light .cs-updec .h, html.theme-light .cs-plus:hover { color: var(--text); }
+html.theme-light .dc-card { background: var(--panel); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(31, 27, 20, 0.06); }
+html.theme-light .gcp-qt { color: var(--text); }
+html.theme-light .dc-seg span.on { background: rgba(29, 79, 145, 0.12); color: #1d4f91; }
+html.theme-light .dc-kv.bad, html.theme-light .dc-tv.bad { color: #b3241a; }
+html.theme-light .dc-kv.warn, html.theme-light .dc-tv.warn { color: #8f4d02; }
+html.theme-light .dc-kv.ok, html.theme-light .dc-tv.ok { color: #086b43; }
+html.theme-light .dc-kv.muted { color: var(--muted-2); }
+/* 표 얼룩·구분선·칩 배경 — 흰 잉크 오버레이의 잉크 반전(부품 공통) */
+html.theme-light .dc-card table tr:nth-child(even) { background: rgba(43, 38, 33, 0.03); }
+html.theme-light .dc-card th, html.theme-light .dc-card td { border-color: var(--border); }
+/* 채움 버튼 위 근검정 글자(33곳, background:var(--teal)+color:#06281c 계열) — 잉크 teal 위에서는
+ * 흰 글자여야 읽힌다. 화면별 클래스가 제각각이라 토큰(--fill-contrast)으로 푼다(아래 스윕 짝). */
+html.theme-light { --fill-contrast: #ffffff; }
+/* 대시보드 별칭 토큰(pro-white 미커버 지적 — 하13) */
+html.theme-light { --blue-l: #1d4f91; }

@@ -108,7 +108,10 @@
       // 같은 화면 재클릭이면 다시 로드하지 않는다(끼움 창 초기화 비용).
       // hub=1: 허브 무대 표식 — nav.js의 탭 흡수(TAB_REDIRECT)가 이 창을 다시 허브로
       // 돌려보내면 무한 중첩이 된다. 쿼리가 달라 리다이렉트 키에 안 걸리게 한다.
-      var want = p.page + (p.page.indexOf("?") >= 0 ? "&" : "?") + "embed=1&hub=1";
+      // 🎨 부모(허브)가 받은 theme=light를 무대 실화면에도 잇는다 — 안 이으면 「흰 껍데기 +
+      //   다크 속살」이 된다(검토관 배색 상2: 통합 IA에서 사람이 보는 화면 대부분이 이 자리다).
+      var 테마 = /(^|[?&])theme=light(&|$)/.test(location.search) ? "&theme=light" : "";
+      var want = p.page + (p.page.indexOf("?") >= 0 ? "&" : "?") + "embed=1&hub=1" + 테마;
       if (!stage.getAttribute("src") || stage.getAttribute("src") !== want) {
         // ⚠ **판을 갈아 끼우기 전에 대화창의 「보던 목록」을 비운다**(2026-08-18 검토 지적).
         //   셸이 보는 탭 이름(ctx.screen)은 허브 하나로 고정이라(예: "fix.html") 판을 바꿔도

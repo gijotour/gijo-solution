@@ -30,11 +30,11 @@
     --bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.08);
     --blue:#3b82f6;--blue-l:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
     --teal:#1eb980;--red:#e2483d;--amber:#f0a020;
-  }
+  --panel-2:#1f1e1d;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
   .app{display:grid;grid-template-columns:212px 1fr;min-height:100vh;}
-  .sidebar{border-right:1px solid var(--border);background:#1f1e1d;}
+  .sidebar{border-right:1px solid var(--border);background:var(--panel-2);}
   /* 넓은 화면에서 오른쪽이 비지 않게 — 실측(2026-07-28) FHD에서 탭 안 2168px 중 948px가
      빈 채로 남았다(44%). 다만 **글과 목록은 성격이 다르다**:
        · 브리핑은 읽는 글이다. 한 줄이 너무 길면 눈이 다음 줄 첫머리를 못 찾는다 → 폭을 묶는다.
@@ -89,7 +89,7 @@
   .team-icons{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0;width:100%;}
   .team-load{font-size:12.5px;color:var(--muted-2);}
   .tm{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
-    font-size:13px;background:#1f1e1d;border:1px solid var(--border);color:var(--muted);}
+    font-size:13px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);}
   .tm.working{border-color:rgba(30,185,128,.55);color:var(--teal);animation:tmbreath 1.6s ease-in-out infinite;}
   .tm.watching{border-color:rgba(59,130,246,.45);color:var(--blue-l);}
   /* ── AI 팀 카드 줄(부활 — 승인 시안 AI팀_가시화, 2026-08-20). 깜박임은 전부 실신호 ── */
@@ -153,7 +153,7 @@
   .kv span:first-child{font-size:12.5px;color:var(--muted);}
   .kv b{font-size:13px;}
   .addrow{display:flex;gap:6px;margin-top:9px;}
-  .addrow input{flex:1;min-width:0;background:#1f1e1d;border:1px solid var(--border);border-radius:8px;
+  .addrow input{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
     padding:7px 9px;color:var(--text);font-size:12px;font-family:inherit;}
   .addrow input:focus{outline:none;border-color:rgba(59,130,246,.5);}
   .addrow button{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);
@@ -161,7 +161,7 @@
   .addrow button:hover{color:#fff;border-color:var(--blue);}
   /* 표준 상단바 — 조치·승인(approvals.html)과 같은 규칙. 허브 탭(embed)에서는 nav.js가
      숨기므로 단독 창에서만 보인다. 문구·수치까지 25화면과 동일하게 유지할 것. */
-  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2,#1f1e1d);}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2,var(--panel-2));}
   .header-left{display:flex;align-items:center;gap:12px;}
   .header-left img{height:22px;}
   .app-title{font-size:15px;font-weight:800;color:#fff;}
@@ -169,7 +169,7 @@
   .header-right{display:flex;align-items:center;gap:10px;}
   .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
   .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
-  .beta-tag{background:var(--teal);color:#06281c;font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+  .beta-tag{background:var(--teal);color:var(--fill-contrast,#06281c);font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
   .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 /* 오늘 계획 짜기 겹판 — 후보 행 26px(제목+가이드 한 줄), 시안 추천안 밀도 그대로 */

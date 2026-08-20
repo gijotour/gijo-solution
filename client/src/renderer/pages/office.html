@@ -56,7 +56,7 @@
   .office-col { order: 1; grid-column: 2; grid-row: 1; } /* 위 화면 꽉 차게 */
   .olive { order: 2; grid-column: 1 / -1; grid-row: 2; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; }
   .ol-h { padding: 10px 12px 6px; font-size: 12px; font-weight: 800; color: #fff; flex: 0 0 auto; }
-  .ol-h .lv { font-size: 11px; font-weight: 800; color: #fff; background: var(--red); border-radius: 8px; padding: 1px 6px; margin-left: 6px; letter-spacing: 1px; }
+  .ol-h .lv { font-size: 11px; font-weight: 800; color: #fff; background: #e2483d; border-radius: 8px; padding: 1px 6px; margin-left: 6px; letter-spacing: 1px; }
   .ol-feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 2px 12px 10px; }
   .ol-line { padding: 5px 0; border-bottom: 1px solid var(--border); }
   .ol-who { font-size: 11.75px; font-weight: 800; color: var(--blue-light, #7ab0ff); }
@@ -98,7 +98,7 @@
   .t-more { text-align: center; color: var(--muted-2); font-size: 12.25px; padding: 8px 0; }
 
   .cta-row { padding: 10px 18px 16px; flex: 0 0 auto; }
-  .cta { width: 100%; background: linear-gradient(135deg, var(--teal), #0f8f60); border: none; border-radius: 12px;
+  .cta { width: 100%; background: linear-gradient(135deg, #1eb980, #0f8f60); border: none; border-radius: 12px;
     height: 46px; color: #04110b; font-weight: 800; font-size: 14.5px; cursor: pointer;
     box-shadow: 0 4px 20px rgba(30,185,128,.3); }
   .cta:disabled { opacity: .5; cursor: wait; }
@@ -157,7 +157,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
            보는 창이므로 "지금 뭐가 남았나"만 보여준다. -->
       <div class="t-head">☑ 오늘의 할일 <span class="t-cnt" id="todoCnt"></span></div>
       <!-- 진행률 바(시안 추천안 2026-08-09) — 대시보드에서 짠 계획을 이 창이 하루 종일 따라간다 -->
-      <div id="todoProg" style="display:none;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin:2px 10px 6px"><div id="todoProgBar" style="height:100%;width:0;background:var(--teal)"></div></div>
+      <div id="todoProg" style="display:none;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin:2px 10px 6px"><div id="todoProgBar" style="height:100%;width:0;background:var(--teal,#1eb980)"></div></div>
       <div id="todoNow" style="display:none;margin:0 10px 6px;background:var(--panel-2,#1c2129);border:1px solid var(--border,#2a313c);border-radius:8px;padding:7px 9px;font-size:11.75px;color:var(--muted,#9aa4b2);line-height:1.5"></div>
       <div class="t-add">
         <button id="todoOpenBtn" style="width:100%" title="본창 대화창에서 오늘 할 일을 엽니다">대화창에서 열기 →</button>
@@ -183,7 +183,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
   // ── 픽셀 사무실 렌더러 — 시안 B 목업(pixel-office)을 실데이터 구동형으로 옮김 ──
   // 상태 의미: working=타이핑+초록 모니터, watching=주황 모니터·정지, idle=자리 비움(배회).
   // 말풍선은 연출이 아니라 실제 협업 이벤트(collaboration:event)의 message를 띄운다.
-  const PALETTE = ["var(--blue-light)", "var(--teal)", "#8b7cf0", "var(--amber)", "var(--red)", "#7dd3c0"];
+  const PALETTE = ["#5fa1ff", "#1eb980", "#8b7cf0", "#f0a020", "#e2483d", "#7dd3c0"];
   const office = (function () {
     const canvas = document.getElementById("office");
     const ctx = canvas.getContext("2d");
@@ -295,14 +295,14 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     // 아트 무드 3종 — 사용자 전환(☀🌃🌊), 선택은 localStorage 저장. 레이아웃·동작은 동일.
     const THEMES = {
       cozy: { wallTop: "#2a2320", base: "#241d18", floorA: "#5a4632", floorB: "#514029", plank: "rgba(0,0,0,.18)", grid: null,
-        rug: ["var(--teal)", "#17a06e"], deskTop: "#7a5a3a", deskFace: "#5f4530", deskEdge: "#8f6c48",
-        skyTop: "#7fb2e8", skyBottom: "#cfe3f5", sun: "#ffe9a8", sign: null, accent: "var(--amber)", shaft: "rgba(255,236,180,.05)" },
-      neon: { wallTop: "#0a0f1e", base: "#060a14", floorA: "#101828", floorB: "var(--panel-2)", plank: null, grid: "rgba(64,220,255,.10)",
+        rug: ["#1eb980", "#17a06e"], deskTop: "#7a5a3a", deskFace: "#5f4530", deskEdge: "#8f6c48",
+        skyTop: "#7fb2e8", skyBottom: "#cfe3f5", sun: "#ffe9a8", sign: null, accent: "#f0a020", shaft: "rgba(255,236,180,.05)" },
+      neon: { wallTop: "#0a0f1e", base: "#060a14", floorA: "#101828", floorB: "#1f1e1d", plank: null, grid: "rgba(64,220,255,.10)",
         rug: ["#12335a", "#0e2846"], deskTop: "#2a3a55", deskFace: "#1d2a40", deskEdge: "#3b5378",
         skyTop: "#0b1030", skyBottom: "#25164a", sun: "#cfd8ff", sign: "GIJO SOC", accent: "#40dcff", shaft: "rgba(64,220,255,.045)" },
-      deep: { wallTop: "var(--panel-2)", base: "var(--panel-2)", floorA: "#1c2440", floorB: "#171e35", plank: null, grid: "rgba(255,255,255,.03)",
+      deep: { wallTop: "#1f1e1d", base: "#1f1e1d", floorA: "#1c2440", floorB: "#171e35", plank: null, grid: "rgba(255,255,255,.03)",
         rug: ["#31406e", "#283457"], deskTop: "#5a4632", deskFace: "#463626", deskEdge: "#6d563e",
-        skyTop: "#1c2c55", skyBottom: "#3a2c66", sun: "#ffe9a8", sign: null, accent: "var(--blue-light)", shaft: "rgba(160,190,255,.05)" },
+        skyTop: "#1c2c55", skyBottom: "#3a2c66", sun: "#ffe9a8", sign: null, accent: "#5fa1ff", shaft: "rgba(160,190,255,.05)" },
     };
     let T = THEMES[localStorage.getItem("gijo:office:theme") || "neon"] || THEMES.neon;
     function setTheme(name) { if (THEMES[name]) { T = THEMES[name]; localStorage.setItem("gijo:office:theme", name); } }
@@ -417,31 +417,31 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       }
       // 벽 장식: 방패 로고·시계·(네온 테마) 사인
       px(4, 3, 8, 8, T.base); px(5, 4, 6, 5, T.accent); px(7, 5, 2, 4, "#fff");
-      px(100, 3, 7, 7, "var(--text)"); px(102, 4, 1, 3, "#333"); px(103, 6, 2, 1, "#333"); px(100, 3, 7, 1, T.base);
+      px(100, 3, 7, 7, "#e9e7e2"); px(102, 4, 1, 3, "#333"); px(103, 6, 2, 1, "#333"); px(100, 3, 7, 1, T.base);
       if (T.sign) { ctx.font = `bold ${4 * S}px monospace`; ctx.fillStyle = T.accent; ctx.shadowColor = T.accent; ctx.shadowBlur = 6; ctx.fillText(T.sign, 148 * S, 8 * S); ctx.shadowBlur = 0; }
       // 러그 + 회의 테이블(3톤 음영 + 서류)
       px(TABLE.x - 12, TABLE.y - 12, 52, 24, T.rug[0]); px(TABLE.x - 10, TABLE.y - 10, 48, 20, T.rug[1]);
       px(TABLE.x, TABLE.y - 2, 28, 4, T.deskEdge); px(TABLE.x, TABLE.y + 2, 28, 8, T.deskTop); px(TABLE.x, TABLE.y + 10, 28, 3, T.deskFace);
-      px(TABLE.x + 4, TABLE.y + 3, 5, 3, "var(--text)"); px(TABLE.x + 18, TABLE.y + 4, 5, 3, "#cfd8ff");
+      px(TABLE.x + 4, TABLE.y + 3, 5, 3, "#e9e7e2"); px(TABLE.x + 18, TABLE.y + 4, 5, 3, "#cfd8ff");
       // 작업존 러그(위쪽 데스크 뱅크를 시각적으로 묶는다) — 존 분리(gather.town식 배치 참고)
       px(2, 22, 68, 30, "rgba(59,130,246,.05)"); px(2, 22, 68, 0.5, "rgba(95,161,255,.2)");
       // 서버랙(SOC 정체성) — 오른쪽 벽, 깜빡이는 LED 랙 2기
       for (let k = 0; k < 2; k++) {
         const rx = 150 + k * 12, ry = 22;
-        px(rx, ry, 10, 30, "var(--panel-2)"); px(rx, ry, 10, 1, "#2a3a55"); px(rx, ry, 1, 30, "#2a3a55"); px(rx + 9, ry, 1, 30, "#1a2740");
+        px(rx, ry, 10, 30, "#1f1e1d"); px(rx, ry, 10, 1, "#2a3a55"); px(rx, ry, 1, 30, "#2a3a55"); px(rx + 9, ry, 1, 30, "#1a2740");
         for (let u = 0; u < 6; u++) {
           px(rx + 1, ry + 3 + u * 4, 8, 2, "#141c2e");
-          const led = (t + k * 7 + u * 3) % 40 < 20 ? (u % 2 ? "var(--teal)" : "#40dcff") : "#20304e";
+          const led = (t + k * 7 + u * 3) % 40 < 20 ? (u % 2 ? "#1eb980" : "#40dcff") : "#20304e";
           px(rx + 7, ry + 3 + u * 4, 1, 1, led);
         }
       }
       // 화분·책장·커피 코너 — 좌하단 화분은 넓어진 바닥 하단으로.
       plantAt(4, 130); plantAt(W - 10, 20);
       px(W - 26, 16, 14, 16, T.deskFace);
-      for (let i = 0; i < 3; i++) px(W - 25, 18 + i * 5, 12, 3, ["var(--red)", "var(--blue-light)", "var(--amber)"][i]);
+      for (let i = 0; i < 3; i++) px(W - 25, 18 + i * 5, 12, 3, ["#e2483d", "#5fa1ff", "#f0a020"][i]);
       px(COFFEE.x - 2, COFFEE.y - 12, 14, 16, T.deskFace);
       px(COFFEE.x, COFFEE.y - 10, 10, 12, "#3a4258");
-      px(COFFEE.x + 2, COFFEE.y - 8, 6, 3, "var(--red)"); px(COFFEE.x + 3, COFFEE.y - 2, 3, 2, "var(--text)");
+      px(COFFEE.x + 2, COFFEE.y - 8, 6, 3, "#e2483d"); px(COFFEE.x + 3, COFFEE.y - 2, 3, 2, "#e9e7e2");
       // 미팅룸 — 유리 파티션 바닥 + 상판 유리벽 + 미팅 테이블 + 의자 + 라벨.
       const m = MEETING;
       ctx.fillStyle = "rgba(64,160,255,.06)"; ctx.fillRect(m.x0 * S, m.y0 * S, (m.x1 - m.x0) * S, (m.y1 - m.y0) * S);
@@ -453,7 +453,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       px(MTABLE.x - 1, MTABLE.y - 1, MTABLE.w + 2, 2, T.deskEdge);
       px(MTABLE.x, MTABLE.y + 1, MTABLE.w, MTABLE.h, T.deskTop);
       px(MTABLE.x, MTABLE.y + MTABLE.h + 1, MTABLE.w, 2, T.deskFace);
-      px(MTABLE.x + 4, MTABLE.y + 2, 5, 3, "var(--text)"); px(MTABLE.x + 15, MTABLE.y + 2, 5, 3, "#cfd8ff");
+      px(MTABLE.x + 4, MTABLE.y + 2, 5, 3, "#e9e7e2"); px(MTABLE.x + 15, MTABLE.y + 2, 5, 3, "#cfd8ff");
       // 의자(상단 헤드=보안총괄, 하단=방문자)
       px(MTABLE.x + 5, MTABLE.y - 5, 4, 3, "#33405e");
       px(MTABLE.x + 4, MTABLE.y + MTABLE.h + 3, 4, 3, "#33405e"); px(MTABLE.x + 14, MTABLE.y + MTABLE.h + 3, 4, 3, "#33405e");
@@ -464,7 +464,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       // 출입문(프레임+명패) — 접속/퇴장 때 doorOpenT 동안 열린다
       px(DOOR.x - 1, DOOR.y - 1, 9, 18, T.deskEdge);
       if (doorOpenT > 0) { px(DOOR.x, DOOR.y, 8, 16, "#0d1322"); px(DOOR.x + 5, DOOR.y + 1, 2, 14, T.deskFace); }
-      else { px(DOOR.x, DOOR.y, 8, 16, T.deskFace); px(DOOR.x + 1, DOOR.y + 7, 1, 2, "var(--amber)"); }
+      else { px(DOOR.x, DOOR.y, 8, 16, T.deskFace); px(DOOR.x + 1, DOOR.y + 7, 1, 2, "#f0a020"); }
       // 책상들(그림자·3톤·키보드·머그·서류·모니터 헤일로+스캔라인)
       DESKS.forEach((d, i) => {
         const a = agents[i];
@@ -473,11 +473,11 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
         px(dx, dy + 6, 24, 2, T.deskEdge); px(dx, dy + 8, 24, 6, T.deskTop); px(dx, dy + 14, 24, 2, T.deskFace);
         px(dx + 1, dy + 16, 3, 4, T.deskFace); px(dx + 20, dy + 16, 3, 4, T.deskFace);
         px(dx + 8, dy + 11, 7, 2, "#141a2b");
-        px(dx + 18, dy + 9, 3, 3, "var(--red)");
-        px(dx + 2, dy + 9, 4, 2, "var(--text)");
+        px(dx + 18, dy + 9, 3, 3, "#e2483d");
+        px(dx + 2, dy + 9, 4, 2, "#e9e7e2");
         const st = a ? a.state : "idle";
         const on = st !== "idle";
-        const glow = st === "working" ? (Math.floor(t / 20) % 2 ? "#2ee6a0" : "var(--teal)") : st === "watching" ? "var(--amber)" : "#232c44";
+        const glow = st === "working" ? (Math.floor(t / 20) % 2 ? "#2ee6a0" : "#1eb980") : st === "watching" ? "#f0a020" : "#232c44";
         if (on) { ctx.fillStyle = st === "working" ? "rgba(46,230,160,.10)" : "rgba(240,160,32,.10)"; ctx.fillRect((dx + 5) * S, (dy - 4) * S, 14 * S, 12 * S); }
         px(dx + 7, dy - 2, 10, 8, "#1a1a19");
         px(dx + 8, dy - 1, 8, 6, glow);
@@ -536,7 +536,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     }
     function drawAgent(a) {
       const wy = a.y + (a.state === "idle" && !a.moving ? Math.sin(t / 30 + a.desk) * 1.5 : 0);
-      const dot = a.state === "working" ? "#2ee6a0" : a.state === "watching" ? "var(--amber)" : "var(--muted-2)";
+      const dot = a.state === "working" ? "#2ee6a0" : a.state === "watching" ? "#f0a020" : "#a49d95";
       const look = LOOKS[a.desk % LOOKS.length];
       drawChar(a.x, wy, a.color, look.col, {
         typing: a.state === "working", moving: a.moving, dot, tag: a.shortName,
@@ -590,7 +590,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       ctx.fillStyle = "#f4f6fb";
       ctx.fillRect(bx, by, w, 6 * S);
       ctx.fillRect((a.x + 3) * S, by + 6 * S, 2 * S, 2 * S);
-      ctx.fillStyle = "var(--bg)";
+      ctx.fillStyle = "#262624";
       ctx.fillText(bubble.msg, bx + 2 * S, by + 4.4 * S);
     }
 
@@ -865,7 +865,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       const first = today[0];
       nowBox.innerHTML = `<b style="color:var(--text,#e6e8eb)">지금 이것부터</b>: ${esc(first.text)}` +
         (first.dueAt && first.dueAt < Date.now() ? ' <span style="color:#f5928a;font-weight:700">— 기한이 지났습니다</span>'
-          : first.dueAt && first.dueAt <= endOfToday() ? ' <span style="color:var(--amber);font-weight:700">— 오늘 기한</span>' : "");
+          : first.dueAt && first.dueAt <= endOfToday() ? ' <span style="color:var(--amber,#f0a020);font-weight:700">— 오늘 기한</span>' : "");
     } else nowBox.style.display = "none";
     CTA라벨();
     if (!today.length) {
