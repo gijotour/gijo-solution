@@ -230,7 +230,9 @@
         asset: sc.label,
         title: (r.isAi ? "AI 자산" : "자산") + " · " + (v.open != null ? "미조치 " + v.open + "건" : "깨끗함"),
         severity: v.kev ? "KEV " + v.kev + "건" : "",
-        status: r.riskBand === "bad" ? "고위험" : r.riskBand === "warn" ? "주의" : "정상",
+        // ⚠ riskBand 실제 값은 critical|high|medium|ok (assethub.ts:45) — bad·warn은 저장소에
+        //   없는 값이라 이 판정이 **항상 「정상」**이었다(2026-08-21 설계관 적발, 필드값 오인).
+        status: (r.riskBand === "critical" || r.riskBand === "high") ? "고위험" : r.riskBand === "medium" ? "주의" : "정상",
         owner: r.owner && r.owner !== "-" ? r.owner : "",
         assetId: id,
       },

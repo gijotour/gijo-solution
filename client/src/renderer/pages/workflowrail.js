@@ -35,14 +35,14 @@
       "border-radius:9px;padding:7px 10px;cursor:pointer;transition:border-color .12s;}" +
       ".gjr-s:hover{border-color:var(--blue,#3b82f6);}" +
       ".gjr-s.on{border-color:var(--blue,#3b82f6);background:rgba(59,130,246,.1);}" +
-      ".gjr-s .t{font-size:12.25px;font-weight:800;color:#fff;display:flex;align-items:center;gap:5px;}" +
+      ".gjr-s .t{font-size:12.25px;font-weight:800;color:var(--text-strong,#fff);display:flex;align-items:center;gap:5px;}" +
       // ⚠ 11px 미만은 배율을 올려도 안 보인다(uireadability 시험이 막는다) — 번호도 예외 없다.
       ".gjr-s .t .no{width:16px;height:16px;border-radius:4px;background:rgba(59,130,246,.2);color:var(--blue-light,#5fa1ff);" +
       "font-size:11px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}" +
       ".gjr-s .v{font-size:11.75px;color:var(--muted-2,#a49d95);margin-top:2px;}" +
       ".gjr-s .v b{font-size:15px;font-weight:900;color:var(--blue-light,#5fa1ff);}" +
       // 0인 경고는 죽여서 — 색이 흔하면 위험 신호가 안 보인다.
-      ".gjr-s .v .al{color:#f5928a;font-weight:800;}" +
+      ".gjr-s .v .al{color:var(--red,#e2483d);font-weight:800;}" +
       ".gjr-s .v .al0{color:var(--muted-2,#a49d95);font-weight:600;}" +
       ".gjr-s .v .none{color:var(--muted-2,#a49d95);opacity:.6;}";
     document.head.appendChild(st);

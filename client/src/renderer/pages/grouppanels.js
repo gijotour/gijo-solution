@@ -43,6 +43,14 @@
       T = "var(--teal,#1eb980)", G = "#8a8478", O = "#e8823c";
   var 살아있는 = function (f) { return f.state !== "fixed"; };
   var n = function (v) { return (v == null ? 0 : v).toLocaleString(); };
+  // 목록 4열(언제)용 짧은 날짜 — mydocs.html 날짜()와 같은 꼴(MM-DD, 다른 해면 YY-MM-DD).
+  var 날 = function (t) {
+    if (!t) return "-";
+    var d = new Date(t);
+    if (isNaN(d)) return "-";
+    var mmdd = String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() === new Date().getFullYear() ? mmdd : String(d.getFullYear() % 100).padStart(2, "0") + "-" + mmdd;
+  };
 
   // 스캔 오류는 취약점이 아니다(서버 isRealVulnerability와 같은 잣대) — 세는 자리마다 지킨다.
   // ⚠ 서버 목록과 **같아야** 한다 — `scan_not_supported`가 빠져 있어 서버(handlers.ts:198)와
@@ -302,7 +310,22 @@
       //   (security-ops.ts:7-27 — 실재는 scheduleDate와 scheduled|reported|approved|rejected).
       //   그래서 「기한 초과」와 「완료」가 **영원히 0**이었다. 실화면(maintenance.html:208)과
       //   서버가 쓰는 같은 잣대로 맞춘다: 기한 지남 = 예정일이 오늘 전 && 아직 승인 안 됨.
-      { id: "maintenance", title: "🛠 정기 점검", page: "maintenance.html", load: function () {
+      { id: "maintenance", title: "🛠 정기 점검", page: "maintenance.html",
+        // rows: 요약과 같은 API. 상태 사전은 실화면 maintenance.html:212와 동일(재번역 금지).
+        rows: function () {
+          return window.gijo.listMaintenance().then(function (list) {
+            var MS = { scheduled: "예정", reported: "검토 대기", approved: "승인됨", rejected: "반려됨" };
+            return {
+              cols: ["점검", "제품", "상태", "예정일"],
+              grid: "1fr 96px 66px 66px",
+              rows: (list || []).map(function (m) {
+                return [String(m.title || "-"), String(m.productName || m.assetName || "-"),
+                  말(MS, m.status), String(m.scheduleDate || "-")];
+              }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.listMaintenance().then(function (r) {
           var list = (r && r.items) || r || [];
           // ⚠ **로컬 날짜**로 잡는다(2026-08-20 병렬 검토). toISOString은 UTC라 한국에서는
@@ -327,7 +350,26 @@
           };
         });
       } },
-      { id: "terminal", title: "⌨ 명령창", page: "terminal.html", load: function () {
+      { id: "terminal", title: "⌨ 명령창", page: "terminal.html",
+        // rows: 요약 1행이 「최근 24시간」이라 목록도 24h로 맞춘다(위는 3인데 아래는 200줄이
+        // 되는 중4 부류 — 설계관 ①-B). 결과 한글은 실화면 audit와 같은 사전.
+        rows: function () {
+          return window.gijo.listAudit("cli", 200).then(function (r) {
+            var RES = { ok: "성공", blocked: "차단", error: "오류", pending: "대기" };
+            var 컷 = Date.now() - 24 * 3600 * 1000;
+            var list = ((r && r.entries) || r || []).filter(function (e) { return (e.at || 0) >= 컷; });
+            return {
+              cols: ["명령", "누가", "결과", "시각"],
+              grid: "1fr 76px 56px 44px",
+              rows: list.map(function (e) {
+                var d = new Date(e.at || 0);
+                return [String(e.action || "-"), String(e.actor || "-"), 말(RES, e.result),
+                  String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")];
+              }),
+            };
+          });
+        },
+        load: function () {
         // 명령창은 "지금 몇 건"이 아니라 **최근에 무엇을 했나**가 요약이다(감사 기록 기준).
         // ⚠ 차단은 kind가 **"block"**으로 남는다(audit.ts:15) — 여기서 "cli"만 불러 놓고
         //   그 안에서 차단을 세고 있어 **영원히 0**이었다(2026-08-20 설계관 적발).
@@ -370,7 +412,30 @@
       // agents: scan(해석) — ROLE_CATEGORY.scan=["취약점","장비운영"](hybridsearch.ts:234) 근거.
       //   장비 점검 자료를 먼저 보는 역할이라 이 판의 주인이 맞다(검토관 하17 — 근거가 있는데
       //   빠뜨렸던 자리. 근거 없는 판에 다는 것만큼이나 있는 근거를 빠뜨리는 것도 들쭉날쭉이다).
-      { id: "hardening", title: "🛡 보안설정 점검", page: "hardening.html", agents: ["해석"], load: function () {
+      { id: "hardening", title: "🛡 보안설정 점검", page: "hardening.html", agents: ["해석"],
+        // rows: **targets에 있는 장비만** — runs만 잡으면 지워진 장비의 점수가 남는다
+        // (설계관 ③-3-2, 서버 datacard.ts:53-62의 「등록 장비 0 · 준수율 48%」 실사고 처방).
+        rows: function () {
+          return Promise.all([
+            window.gijo.hardeningTargets.list().catch(function () { return []; }),
+            window.gijo.hardeningRuns(undefined, 300).catch(function () { return []; }),
+          ]).then(function (r) {
+            var targets = (r[0] && r[0].targets) || r[0] || [];
+            var runs = (r[1] && r[1].runs) || r[1] || [];
+            var 최근 = {};
+            runs.forEach(function (x) { if (!최근[x.targetId] || x.at > 최근[x.targetId].at) 최근[x.targetId] = x; });
+            return {
+              cols: ["장비", "기준", "준수율", "점검"],
+              grid: "1fr 66px 66px 44px",
+              rows: targets.map(function (t) {
+                var run = 최근[t.id];
+                return [String(t.label || t.id || "-"), String(t.standard || "-").toUpperCase(),
+                  run && run.rate != null ? run.rate + "%" : "미점검", run ? 날(run.at) : "-"];
+              }),
+            };
+          });
+        },
+        load: function () {
         // ⚠ 실패를 삼켜 []로 바꾸면 화면은 그려지지만 **0이 사실인 척**한다. 못 본 것은
         //   못 봤다고 남긴다(확인못함) — 현황판이 그 표식을 보고 「값이 바뀌었다」로 오판하지
         //   않고 기준선도 안 덮는다(병렬 검토 중1: 서버 재시작만으로 거짓 「바뀜 4」가 떴다).
@@ -407,7 +472,23 @@
     // ⑤ 보고
     reporting: [
       // agents: report(보고) — ROLE_CATEGORY.report=["사내규정"](보고 서식·규정, hybridsearch.ts:237) 근거.
-      { id: "report", title: "📄 리포트", page: "report.html", agents: ["보고"], load: function () {
+      { id: "report", title: "📄 리포트", page: "report.html", agents: ["보고"],
+        // rows: title은 원천에 **없다**(reports-admin.ts:186 — 이미 한 번 밟은 자리). 1열은
+        // 유형 한글(report.html:286 TYPE_LABEL)·2열은 대상 한글(:505 — 영문 그대로 금지).
+        rows: function () {
+          return window.gijo.listReportHistory().then(function (list) {
+            var TL = { weekly: "주간 보고", quarterly: "분기 보고", ondemand: "요청 생성", incident: "사고 보고" };
+            var AU = { internal: "내부용", official: "보고용" };
+            return {
+              cols: ["유형", "대상", "생성"],
+              grid: "1fr 84px 56px",
+              rows: (list || []).map(function (r) {
+                return [말(TL, r.type), 말(AU, r.audience), 날(r.createdAt)];
+              }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.listReportHistory().then(function (r) {
           var list = (r && r.reports) || r || [];
           var 주 = Date.now() - 7 * 86400000;
@@ -461,16 +542,32 @@
           };
         });
       } },
-      { id: "compliance", title: "📋 컴플라이언스", page: "compliance.html", load: function () {
+      { id: "compliance", title: "📋 컴플라이언스", page: "compliance.html",
+        // rows: 상태 한글은 실화면 compliance.html:177과 동일 — 요약 조각 라벨도 아래에서
+        // 같은 사전으로 통일했다(같은 카드 안에서 「이행/미이행」과 「대응완료/미대응」이
+        // 병존하던 두 말 — 설계관 ①-B 적발).
+        rows: function () {
+          return window.gijo.listCompliance().then(function (list) {
+            var CS = { covered: "대응완료", partial: "부분", open: "미대응", na: "해당없음" };
+            return {
+              cols: ["항목", "분류", "상태", "갱신"],
+              grid: "1fr 96px 66px 44px",
+              rows: (list || []).map(function (c) {
+                return [String(c.name || "-"), String(c.categoryLabel || "-"), 말(CS, c.status), 날(c.updatedAt)];
+              }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.listCompliance().then(function (r) {
           var list = (r && r.items) || r || [];
           var 셈 = function (s) { return list.filter(function (x) { return x.status === s; }).length; };
           return {
             // 상태 값은 서버 정의 그대로(covered/partial/open/na) — 화면과 같은 말을 쓴다.
             segments: [
-              { key: "covered", label: "이행", value: 셈("covered"), color: T },
+              { key: "covered", label: "대응완료", value: 셈("covered"), color: T }, // 라벨은 실화면 compliance.html:177과 통일(설계관 ①-B — 같은 카드 안 두 말 금지)
               { key: "partial", label: "부분", value: 셈("partial"), color: A },
-              { key: "open", label: "미이행", value: 셈("open"), color: R },
+              { key: "open", label: "미대응", value: 셈("open"), color: R },
             ],
             foot: "항목 " + n(list.length) + "개",
           };
@@ -481,7 +578,22 @@
     // AI — 내 보안 AI의 구성·지식·학습·안전장치(2026-08-09 사용자 지시 "고객 가이드 화면으로").
     // 숫자는 각 화면과 같은 API. 데이터가 없어도 판 모양은 같다(0은 0으로).
     aiops: [
-      { id: "team", title: "🤖 AI 팀", page: "agent.html", load: function () {
+      { id: "team", title: "🤖 AI 팀", page: "agent.html",
+        // rows: 상태 한글은 실화면 agent.html:287 STATUS_LABEL과 동일. 시각 필드가 없어
+        // 4열은 두지 않는다(없는 값을 지어내지 않는다 — 열 규약 「없는 칸은 비운다」).
+        rows: function () {
+          return window.gijo.listAgents().then(function (agents) {
+            var AS = { idle: "대기중", working: "작업중", watching: "모니터링" };
+            return {
+              cols: ["팀원", "약자", "상태"],
+              grid: "1fr 66px 76px",
+              rows: (agents || []).map(function (a) {
+                return [String(a.name || a.id || "-"), String(a.abbr || "-"), 말(AS, a.status)];
+              }),
+            };
+          });
+        },
+        load: function () {
         var 못함 = [];   // 못 본 것은 못 봤다고 남긴다(병렬 검토 중1 — 0을 사실인 척하지 않는다)
         return Promise.all([
           window.gijo.listAgents().catch(function () { 못함.push("팀원 목록"); return []; }),
@@ -506,7 +618,27 @@
         });
       } },
       // agents: analysis(우선) — 역할 문장이 「AI 지식·모델 관리」다(agents.ts:69).
-      { id: "knowledge", title: "📚 지식", page: "memory.html", agents: ["우선"], load: function () {
+      { id: "knowledge", title: "📚 지식", page: "memory.html", agents: ["우선"],
+        // rows: 제목 필드가 원천에 없다 — documentId가 곧 이름(실화면 memory.html:703 동일).
+        // 등급 한글은 memory.html:664 GRADE_LABEL과 동일.
+        // ⚠ 내 개인 문서(personal: 접두)는 뺀다(설계관 ③-3-1 — 서버는 남의 것만 거르고 내
+        //   것은 포함해, 신설 「내 문서」 판과 같은 문서가 두 판에 세어진다). 실화면
+        //   mydocs.html 회사문서만()과 같은 잣대. 이 필터로 요약 수가 한 번 「바뀜」으로
+        //   서는 것은 정상(기준선 재설정).
+        rows: function () {
+          return window.gijo.listMemoryDocuments().then(function (docs) {
+            var GL = { O: "공개", S: "민감", C: "기밀" };
+            var ds = (docs || []).filter(function (x) { return String(x.documentId).indexOf("personal:") !== 0; });
+            return {
+              cols: ["문서", "영역", "등급", "반입"],
+              grid: "1fr 84px 56px 44px",
+              rows: ds.map(function (x) {
+                return [String(x.documentId || "-"), String(x.category || "일반"), 말(GL, x.grade, "미지정"), 날(x.ingestedAt)];
+              }),
+            };
+          });
+        },
+        load: function () {
         var 못함 = [];   // 못 본 것은 못 봤다고 남긴다(병렬 검토 중1)
         return Promise.all([
           window.gijo.listMemoryDocuments().catch(function () { 못함.push("문서 목록"); return []; }),
@@ -649,6 +781,151 @@
           };
         });
       } },
+    ],
+
+    // ══ 현황판 마무리 — 판 없던 화면 4곳 신설(2026-08-21, 사장님 승인 묶음 1번·승인 시안
+    //    panels-overview §9 「코드는 있는데 카드가 없으면 만든다」). 이 세 그룹 키를 읽는
+    //    허브 화면은 없다 — 현황판(전체 보기·대화 홈)에만 나온다(의도).
+    // ⚠ 필드는 전부 설계관 대조표(2026-08-21) 그대로 — 응답에 없는 필드를 지어내지 않는다.
+    assets0: [
+      // 🗺 자산 — **①발견·수집에서 뺐던 「🖥 자산」 판의 부활이 아니다.** 그 판정(자산은
+      //   판이 아니라 ⓪ 범위 축, 2026-08-18 승인)은 그대로이고, 이것은 **⓪ 자산 축 자체의
+      //   판**이다(assetscope.test가 지키는 옛 id·제목 조합과 다르게 id:"asset"·🗺).
+      // ⚠ 「미조치」 잣대는 취약점 판과 **같은 ㉡**(진짜취약점·미해결 — assetHub vuln.open이
+      //   같은 식)이다 — 같은 현황판에 같은 이름의 다른 수가 두 개 뜨면 안 된다(설계관 ③-1).
+      { id: "asset", title: "🗺 자산", page: "assets.html", pick: "asset",
+        rows: function () {
+          return window.gijo.assetHub().then(function (d) {
+            var rs = (d && d.rows) || [];
+            // riskBand 실제 값은 critical|high|medium|ok (assethub.ts:45 — bad·warn은 없는 값)
+            var BAND = { critical: "매우 위험", high: "위험", medium: "주의", ok: "정상" };
+            var 순위 = { critical: 0, high: 1, medium: 2, ok: 3 };
+            rs = rs.slice().sort(function (a, b) { return (순위[a.riskBand] == null ? 9 : 순위[a.riskBand]) - (순위[b.riskBand] == null ? 9 : 순위[b.riskBand]); });
+            return {
+              cols: ["자산", "담당", "위험", "미조치"],
+              grid: "1fr 86px 76px 52px",
+              rows: rs.map(function (a) {
+                var 미 = a.vuln ? (a.vuln.open || 0) : 0;
+                return [String(a.displayName || a.name || a.id), String(a.owner && a.owner !== "-" ? a.owner : "-"),
+                  말(BAND, a.riskBand), 미 ? String(미) : "-"];
+              }),
+            };
+          });
+        },
+        load: function () {
+          return window.gijo.assetHub().then(function (d) {
+            var s = (d && d.summary) || {};
+            // 담당 미지정 — 서버 잣대(owner !== "-", datacard.ts:161)와 같은 식. null이 아니라
+            // "-"로 저장된다 — 클라에서 !owner로 다시 짜면 반드시 밟는 자리(설계관 ③-2).
+            var 미지정 = ((d && d.rows) || []).filter(function (a) { return !a.owner || a.owner === "-"; }).length;
+            return {
+              badge: 미지정 ? { text: "담당 미지정 " + 미지정, color: A } : null,
+              rows: [
+                ["등록 자산", n(s.totalAssets || 0)],
+                ["고위험", n((s.vuln && (s.vuln.critical || 0) + (s.vuln.high || 0)) || 0), (s.vuln && (s.vuln.critical || s.vuln.high)) ? R : ""],
+                ["미조치 취약점", n((s.vuln && s.vuln.open) || 0)],
+              ],
+              foot: "AI " + n(s.aiAssets || 0) + " · IT " + n(s.itAssets || 0),
+            };
+          });
+        } },
+    ],
+    registry: [
+      // 🧰 보안제품 — status·lastCheck는 원천에 **없다**(security-ops.ts:65-77). 3열은
+      //   「매뉴얼 있음/없음」(products.html:500과 같은 잣대)으로 적는다 — 없는 값을 지어내지
+      //   않는다. 「종류」 수는 datacard 잣대(제품이 있는 카테고리 수)와 통일(설계관 ③-2).
+      { id: "products", title: "🧰 보안제품", page: "products.html",
+        rows: function () {
+          return window.gijo.listSecurityProductsGrouped().then(function (gs) {
+            var out = [];
+            (gs || []).forEach(function (g) {
+              (g.products || []).forEach(function (p) {
+                var 매뉴얼 = (p.docs || []).some(function (dc) { return dc.kind === "manual"; });
+                out.push([String(p.name || "-"), String(g.categoryLabel || g.category || "-"),
+                  매뉴얼 ? "매뉴얼 있음" : "매뉴얼 없음", 날(p.createdAt)]);
+              });
+            });
+            return { cols: ["제품", "종류", "문서", "등록"], grid: "1fr 96px 84px 44px", rows: out };
+          });
+        },
+        load: function () {
+          return window.gijo.listSecurityProductsGrouped().then(function (gs) {
+            gs = gs || [];
+            var 전체 = 0, 매뉴얼없음 = 0, 종류 = 0;
+            gs.forEach(function (g) {
+              var ps = g.products || [];
+              if (ps.length) 종류++;
+              전체 += ps.length;
+              ps.forEach(function (p) { if (!(p.docs || []).some(function (dc) { return dc.kind === "manual"; })) 매뉴얼없음++; });
+            });
+            return {
+              badge: 매뉴얼없음 ? { text: "매뉴얼 없음 " + 매뉴얼없음, color: A } : null,
+              rows: [["등록 제품", n(전체)], ["종류", n(종류)], ["매뉴얼 없음", n(매뉴얼없음), 매뉴얼없음 ? A : ""]],
+              foot: "장애 때 근거가 되는 등록부입니다",
+            };
+          });
+        } },
+    ],
+    personal: [
+      // 📓 내 문서 — 서버가 **로그인한 본인 것만** 준다(personaldocs.ts:119 격리) — 남의
+      //   개인 문서 수가 공용 화면에 보일 일은 원리상 없다(설계관 확인).
+      { id: "mydocs", title: "📓 내 문서", page: "mydocs.html",
+        rows: function () {
+          return window.gijo.personalDocsList().then(function (d) {
+            var ds = (d && d.documents) || [];
+            return {
+              cols: ["제목", "AI", "공유", "수정"],
+              grid: "1fr 64px 64px 44px",
+              rows: ds.map(function (x) {
+                return [String(x.title || "-"), x.ragOptIn ? "AI 포함" : "-", x.shared ? "공유" : "개인", 날(x.updatedAt)];
+              }),
+            };
+          });
+        },
+        load: function () {
+          return window.gijo.personalDocsList().then(function (d) {
+            var ds = (d && d.documents) || [];
+            var ai = ds.filter(function (x) { return x.ragOptIn; }).length;
+            var 공유 = ds.filter(function (x) { return x.shared; }).length;
+            return {
+              rows: [["내 문서", n(ds.length)], ["AI 포함", n(ai)], ["공유", n(공유)]],
+              foot: "내 질문에만 근거로 나옵니다(격리)",
+            };
+          });
+        } },
+      // 🗂 작업 내역 — 반드시 축 API(origin:user)로 — 옛 통로(listWorkSessions)는 QA·시스템
+      //   세션이 섞여 화면·카드와 수가 갈린다(worksessions.ts:713, 설계관 ①-A). 조회 상한이
+      //   서버 SESSION_KEEP=100이라 100건이 꽉 차면 「100+」로 정직하게 말한다(③-2).
+      { id: "sessions", title: "🗂 작업 내역", page: "sessions.html",
+        rows: function () {
+          return window.gijo.listWorkSessionsWithAxes({ origin: "user" }).then(function (d) {
+            var ST = { active: "진행중", done: "완료", ignored: "무시" };
+            var items = ((d && d.items) || []).filter(function (s) { return !s.qa; });
+            return {
+              cols: ["제목", "누가", "상태", "갱신"],
+              grid: "1fr 76px 56px 44px",
+              rows: items.map(function (s) {
+                return [String(s.title || "-"), String(s.doneBy || "-"), 말(ST, s.status || "active"), 날(s.updatedAt || s.createdAt)];
+              }),
+            };
+          });
+        },
+        load: function () {
+          return window.gijo.listWorkSessionsWithAxes({ origin: "user" }).then(function (d) {
+            var items = ((d && d.items) || []).filter(function (s) { return !s.qa; });
+            var 진행 = items.filter(function (s) { return (s.status || "active") === "active"; }).length;
+            var 오늘0시 = new Date(); 오늘0시.setHours(0, 0, 0, 0);
+            var 오늘 = items.filter(function (s) { return new Date(s.updatedAt || s.createdAt) >= 오늘0시; }).length;
+            return {
+              rows: [
+                ["저장된 세션", items.length >= 100 ? "100+" : n(items.length)],
+                ["진행중", n(진행)],
+                ["오늘 갱신", n(오늘)],
+              ],
+              foot: "AI와 한 일이 세션으로 남습니다",
+            };
+          });
+        } },
     ],
   };
 
