@@ -114,7 +114,25 @@
         });
       } },
       // agents: ti(위협) — ROLE_CATEGORY.ti=["위협대응"](hybridsearch.ts:236) 근거.
-      { id: "threat", title: "🌐 위협 인텔", page: "threat.html", agents: ["위협"], load: function () {
+      // rows: CtiFinding은 id·detectedAt·type·target·source·severity **6개가 전부**(cti.ts:25-32).
+      //   ⚠ 심각도 사전은 **CTI 전용**이다 — SEV_KO(매우 심각/높음/보통)를 재사용하면 요약
+      //   조각(긴급·주의·정보)과 한 카드 안에서 두 말이 된다(2026-08-20 설계관 경고).
+      //   ⚠ 샘플(데모)은 **빼지 않는다** — load도 세는 데서 안 뺀다. 출처 열로 드러낸다.
+      { id: "threat", title: "🌐 위협 인텔", page: "threat.html", agents: ["위협"],
+        rows: function () {
+          var CTI_KO = { critical: "긴급", warning: "주의", info: "정보" };
+          return window.gijo.listCtiFindings().then(function (fs) {
+            return {
+              cols: ["대상", "심각도", "출처"],
+              grid: "1fr 58px 96px",
+              // 서버가 이미 최신순으로 준다(cti.ts:158 ORDER BY detectedAt DESC) — 다시 정렬하지 않는다.
+              rows: (fs || []).map(function (f) {
+                return [String(f.target || "-"), 말(CTI_KO, f.severity), String(f.source || "-")];
+              }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.listCtiFindings().then(function (fs) {
           fs = fs || [];
           var 셈 = function (k) { return fs.filter(function (f) { return f.severity === k; }).length; };
@@ -193,7 +211,26 @@
           };
         });
       } },
-      { id: "sbom", title: "📦 AI-BOM · 구성", page: "sbom.html", load: function () {
+      // rows: 실화면 sbom.html:681·684·674와 같은 필드·같은 문구.
+      //   ⚠ 「AI 자산」 열은 넣지 않는다 — 판정이 방금 고쳐졌고(isAiAsset 잣대), 열을 늘리면
+      //   4열이 되어 첫 열이 좁아진다. AI 수는 요약 줄에 이미 있다.
+      { id: "sbom", title: "📦 AI-BOM · 구성", page: "sbom.html",
+        rows: function () {
+          return window.gijo.listAssets().then(function (assets) {
+            var list = (assets || []).slice();
+            // 미생성 먼저 — 이 판의 유일한 주황 신호이고, 200행 상한에서 볼 값어치가 큰 쪽이다.
+            list.sort(function (a, b) { return (a.sbomGeneratedAt ? 1 : 0) - (b.sbomGeneratedAt ? 1 : 0); });
+            return {
+              cols: ["자산", "부품", "구성 명세"],
+              grid: "1fr 52px 68px",
+              rows: list.map(function (a) {
+                return [String(a.name || a.hostname || a.id || "-"),
+                  String((a.components || []).length), a.sbomGeneratedAt ? "생성됨" : "미생성"];
+              }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.listAssets().then(function (assets) {
           assets = assets || [];
           var 있음 = assets.filter(function (a) { return a.sbomGeneratedAt; }).length;
@@ -509,7 +546,25 @@
 
     // 기록 — 작업 기록(감사)과 시스템 로그(2026-08-09 설정 그룹 정리, 사용자 승인).
     records: [
-      { id: "audit", title: "🗒 작업 기록", page: "audit.html", load: function () {
+      // rows: 실화면(audit.html:166·176)과 **같은 한글 사전**. 오늘 것만 — 요약의 잣대 그대로.
+      { id: "audit", title: "🗒 작업 기록", page: "audit.html",
+        rows: function () {
+          var KIND_KO = { cli: "CLI", approval: "승인", write: "쓰기", block: "차단", privacy: "개인정보", auth: "로그인", config: "설정" };
+          var RES_KO = { ok: "완료", blocked: "차단", error: "실패", pending: "대기" };
+          return window.gijo.listAudit(undefined, 500).then(function (r) {
+            var 항목 = (r && r.entries) || r || [];
+            var 오늘0시 = new Date(); 오늘0시.setHours(0, 0, 0, 0);
+            var 오늘 = 항목.filter(function (e) { return (e.at || 0) >= 오늘0시.getTime(); });
+            return {
+              cols: ["한 일", "종류", "결과"],
+              grid: "1fr 64px 56px",
+              rows: 오늘.map(function (e) {
+                return [String(e.action || e.detail || "-"), 말(KIND_KO, e.kind), 말(RES_KO, e.result)];
+              }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.listAudit(undefined, 500).then(function (r) {
           var 항목 = (r && r.entries) || r || [];
           var 오늘0시 = new Date(); 오늘0시.setHours(0, 0, 0, 0);
@@ -528,7 +583,24 @@
           };
         });
       } },
-      { id: "syslog", title: "⚙ 시스템 로그", page: "syslog.html", load: function () {
+      // rows: ⚠ listLogs()는 **오래된 것이 먼저** 온다(logs.ts push 순서) — 그대로 넘기면
+      //   앞 200건 상한에 걸려 **가장 오래된 200줄**만 보인다(2026-08-20 설계관 경고). 뒤집는다.
+      //   레벨 한글은 이 판의 요약 라벨(오류·경고·정보)이 유일한 선례라 그 말을 쓴다.
+      { id: "syslog", title: "⚙ 시스템 로그", page: "syslog.html",
+        rows: function () {
+          var LV_KO = { error: "오류", warn: "경고", log: "정보", info: "정보" };
+          return window.gijo.listLogs().then(function (list) {
+            var 오늘0시 = new Date(); 오늘0시.setHours(0, 0, 0, 0);
+            var 오늘 = (list || []).filter(function (e) { return (e.timestamp || 0) >= 오늘0시.getTime(); });
+            오늘.reverse();   // 최신이 위로
+            return {
+              cols: ["내용", "수준"],
+              grid: "1fr 56px",
+              rows: 오늘.map(function (e) { return [String(e.message || "-"), 말(LV_KO, e.level)]; }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.listLogs().then(function (list) {
           list = list || [];
           var 오늘0시 = new Date(); 오늘0시.setHours(0, 0, 0, 0);

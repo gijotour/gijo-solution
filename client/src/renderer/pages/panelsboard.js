@@ -199,8 +199,16 @@
     var 에이전트 = p.agents && p.agents.length
       ? '<span class="pv-ag" title="이 영역을 맡는 AI 팀원">' + p.agents.map(function (a) { return esc(a); }).join("·") + "</span>"
       : "";
+    // 조작 — 압축(대화 홈)에서는 **▾ 목록만** 낸다(2026-08-20 사장님 「메뉴 리스트들을 엑셀로
+    // 보고 싶은데 안 도나봐?」). 압축에 아무 단추도 안 두었더니 대화 홈에서는 목록에 닿을
+    // 길이 없었고, 「🗺 전체 보기」를 거쳐야만 나왔다 — 사장님이 첫 화면에서 찾으셨으면
+    // 있을 수가 없었다.
+    // ⚠ 압축에 셋을 다 넣지는 않는다: 화면 열기는 **타일 클릭**이 이미 하고(아래 위임),
+    //   🎯는 고른 것을 무대로 올리는 조작이라 좁은 자리에 두면 잘못 눌린다. 밀도도 지킨다.
     var 조작 = "";
-    if (!opt.compact) {
+    if (opt.compact) {
+      조작 = p.rows ? '<div class="pv-acts"><button data-act="rows" data-id="' + esc(p.id) + '">▾ 목록</button></div>' : "";
+    } else {
       조작 = '<div class="pv-acts">' +
         '<button data-act="open" data-id="' + esc(p.id) + '">🗔 화면 열기</button>' +
         (p.rows ? '<button data-act="rows" data-id="' + esc(p.id) + '">▾ 목록 보기</button>' : "") +
