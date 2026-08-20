@@ -593,6 +593,13 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   // ⚠ 그래서 `embed=1`·`popout=1`과 **같은 관례**를 쓴다 — 주소에 실으면 스크립트가
   //   첫 줄에서 동기로 읽는다. 새 통로를 만들지 않는다.
   if (file === "app.html" && 저장된셸모드() === "pro") query.shell = "pro";
+  // 🎨 창 조작 단추 띠(titleBarOverlay)도 셸을 따라 입는다(QA 결함 5호 — 프로 흰 바탕에서
+  //   우상단만 검은 네모로 남았다). 생성 시엔 셸을 모르니(로그인이 먼저) 여기서 갈아입힌다.
+  //   로그인·표준은 다크(원래 값), 프로 앱 셸만 흰 바탕 톤.
+  try {
+    const 프로 = file === "app.html" && query.shell === "pro";
+    mainWindow.setTitleBarOverlay({ color: 프로 ? "#f2efe9" : "#1f1e1d", symbolColor: 프로 ? "#6b6259" : "#b3ada4", height: 44 });
+  } catch { /* macOS 등 미지원이면 조용히 — 오버레이 자체가 없는 플랫폼 */ }
   let target = path.join(__dirname, `../src/renderer/pages/${file}`);
   // 없는 화면의 안전망(2026-07-29 검토 #8) — 삭제된 화면(hub.html 등)을 옛 바로가기·링크가
   // 부르면 loadFile이 실패해 흰 오류 화면이 뜬다. 예전엔 nav.js의 리다이렉트가 안전망인 척

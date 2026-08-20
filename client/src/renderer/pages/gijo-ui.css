@@ -74,7 +74,7 @@
 .g-btn.g-primary { background: var(--g-blue); color: #fff; }
 .g-btn.g-primary:hover { background: #3576e0; }
 .g-btn.g-ghost { background: transparent; border-color: var(--g-border-strong); color: var(--g-muted); }
-.g-btn.g-ghost:hover { color: #fff; border-color: var(--g-blue); }
+.g-btn.g-ghost:hover { color:var(--text-strong, #fff); border-color: var(--g-blue); }
 .g-btn.g-danger { background: rgba(226, 72, 61, 0.14); border-color: var(--g-red); color: #f5928a; }
 .g-btn.g-danger:hover { background: rgba(226, 72, 61, 0.22); }
 .g-btn.g-teal { background: rgba(30, 185, 128, 0.14); border-color: var(--g-teal); color: var(--g-teal); }
@@ -86,13 +86,13 @@
 .g-card { background: var(--g-surface-1); border: 1px solid var(--g-border); border-radius: var(--g-r); padding: var(--g-s5); box-shadow: var(--g-shadow-1); }
 .g-card-sm { padding: var(--g-s4); }
 .g-nested { background: var(--g-surface-2); border: 1px solid var(--g-border); border-radius: var(--g-r-sm); padding: var(--g-s3); }
-.g-ct { font-size: var(--g-t-md); font-weight: 800; color: #fff; margin-bottom: var(--g-s2); }
+.g-ct { font-size: var(--g-t-md); font-weight: 800; color:var(--text-strong, #fff); margin-bottom: var(--g-s2); }
 .g-cx { font-size: var(--g-t-sm); color: var(--g-muted); line-height: 1.55; }
 
 /* ── KPI 타일 ── */
 .g-kpis { display: grid; gap: var(--g-s3); }
 .g-kpi { background: var(--g-surface-2); border: 1px solid var(--g-border); border-radius: var(--g-r); padding: var(--g-s4) var(--g-s5); }
-.g-kpi .kv { font-size: var(--g-t-kpi); font-weight: 800; color: #fff; }
+.g-kpi .kv { font-size: var(--g-t-kpi); font-weight: 800; color:var(--text-strong, #fff); }
 .g-kpi .kl { font-size: var(--g-t-xs); color: var(--g-muted); margin-top: var(--g-s1); }
 
 /* ── 배지 (심각도·상태) ── */
@@ -107,7 +107,7 @@
 
 /* ── 칩 (필터·태그) ── */
 .g-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--g-surface-2); border: 1px solid var(--g-border-strong); border-radius: var(--g-r-pill); padding: 6px 13px; font-size: var(--g-t-sm); font-weight: 700; color: var(--g-text); cursor: pointer; }
-.g-chip:hover { border-color: var(--g-blue); color: #fff; }
+.g-chip:hover { border-color: var(--g-blue); color:var(--text-strong, #fff); }
 .g-chip.g-on { background: rgba(59, 130, 246, 0.14); border-color: var(--g-blue); color: var(--g-blue-light); }
 
 /* ── 입력 ── */
@@ -136,7 +136,7 @@ select.g-input { cursor: pointer; }
 .g-modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: none; align-items: center; justify-content: center; z-index: 1000; }
 .g-modal-bg.g-on { display: flex; }
 .g-modal { width: 380px; max-width: 92vw; background: var(--g-surface-1); border: 1px solid var(--g-border-strong); border-radius: var(--g-r); padding: var(--g-s5); box-shadow: var(--g-shadow-modal); }
-.g-modal .mt { font-size: var(--g-t-md); font-weight: 800; color: #fff; margin-bottom: var(--g-s4); }
+.g-modal .mt { font-size: var(--g-t-md); font-weight: 800; color:var(--text-strong, #fff); margin-bottom: var(--g-s4); }
 .g-modal .macts { display: flex; gap: var(--g-s2); justify-content: flex-end; margin-top: var(--g-s5); }
 
 /* ── 레거시 화면 정렬 (Phase 2 롤아웃) ─────────────────────────────────────

@@ -37,7 +37,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .grp.closed .doc{display:none;}
 .doc{padding:7px 9px 7px 26px;font-size:12.5px;color:var(--muted);cursor:pointer;border-radius:7px;line-height:1.45;}
 .doc:hover{background:rgba(255,255,255,.04);color:var(--text);}
-.doc.on{background:rgba(59,130,246,.12);color:#fff;box-shadow:inset 3px 0 0 var(--blue);}
+.doc.on{background:rgba(59,130,246,.12);color:var(--text-strong, #fff);box-shadow:inset 3px 0 0 var(--blue);}
 .doc .hit{color:var(--amber);font-size:12px;font-weight:800;margin-left:5px;}
 .toc-foot{margin-top:auto;padding-top:10px;border-top:1px solid var(--border);}
 .btn-req{width:100%;background:rgba(30,185,128,.10);border:1px solid var(--teal);color:#6ee7a0;
@@ -47,8 +47,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 /* 오른쪽 본문 — 내부 스크롤 */
 .view{padding:20px 26px 40px;overflow-y:auto;min-height:0;}
 .view .empty{color:var(--muted-2);font-size:13px;padding:40px 0;text-align:center;}
-.md h1{font-size:19px;margin:0 0 14px;color:#fff;line-height:1.4;}
-.md h2{font-size:15px;margin:22px 0 9px;color:#fff;padding-bottom:5px;border-bottom:1px solid var(--border);line-height:1.4;}
+.md h1{font-size:19px;margin:0 0 14px;color:var(--text-strong, #fff);line-height:1.4;}
+.md h2{font-size:15px;margin:22px 0 9px;color:var(--text-strong, #fff);padding-bottom:5px;border-bottom:1px solid var(--border);line-height:1.4;}
 .md h3{font-size:13.5px;margin:16px 0 7px;color:var(--blue-light);}
 .md p{color:var(--text);line-height:1.85;margin-bottom:10px;font-size:12.5px;}
 .md ul,.md ol{margin:0 0 12px 20px;color:var(--text);line-height:1.85;font-size:12.5px;}
@@ -63,9 +63,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .md blockquote{border-left:3px solid var(--border-strong);padding:2px 0 2px 12px;margin:0 0 12px;color:var(--muted);}
 .md hr{border:none;border-top:1px solid var(--border);margin:18px 0;}
 .md a{color:var(--blue-light);}
-.md strong{color:#fff;}
+.md strong{color:var(--text-strong, #fff);}
 .md img{max-width:100%;border-radius:8px;border:1px solid var(--border);}
-.md mark{background:rgba(240,160,32,.28);color:#fff;border-radius:3px;padding:0 2px;}
+.md mark{background:rgba(240,160,32,.28);color:var(--text-strong, #fff);border-radius:3px;padding:0 2px;}
 
 /* ── 작성 모드 (시안 mockups/docbox) ── */
 .chips{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;}
@@ -83,7 +83,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .shot{width:104px;height:68px;border:1px solid var(--border-strong);border-radius:7px;position:relative;
       overflow:hidden;background:var(--panel-2);}
 .shot img{width:100%;height:100%;object-fit:cover;}
-.shot .x{position:absolute;top:2px;right:5px;color:#fff;background:rgba(0,0,0,.6);border-radius:50%;
+.shot .x{position:absolute;top:2px;right:5px;color:var(--text-strong, #fff);background:rgba(0,0,0,.6);border-radius:50%;
          width:16px;height:16px;line-height:16px;text-align:center;font-size:12.25px;cursor:pointer;}
 .drop{border:1px dashed var(--border-strong);border-radius:8px;padding:14px;text-align:center;
       font-size:12.5px;color:var(--muted-2);}

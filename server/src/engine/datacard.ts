@@ -262,15 +262,44 @@ export async function opsStatusAnswer(): Promise<{ output: string; dataCard: Dat
 
 // ── 화면 이름 → 현황 카드 (2026-08-19 사장님 실측 — 「자산고르기」라고 쳤더니 LLM이 일반
 //    지식 개념 설명을 늘어놨다. 화면 이름을 친 사람이 원하는 것은 그 화면의 **데이터**다.) ──
-const 화면이름카드: Record<string, "asset" | "ops" | "hardening" | "finding"> = {
+const 화면이름카드: Record<string, 화면카드종류> = {
   "자산고르기": "asset", "자산": "asset", "자산현황": "asset",
   "발견수집": "ops", "발견·수집": "ops", "관제": "ops", "통합관제": "ops",
   "검증": "hardening", "하드닝": "hardening",
   "우선순위": "finding", "취약점": "finding", "미조치": "finding",
+  // 신설 카드들(QA 결함 1호 — 「내문서 확인」이 등록에 없어 일반 경로로 흘러가
+  // 무관 근거로 지어낸 답이 나갔다). 사전은 nav.js 실제 메뉴 이름을 따른다 —
+  // 메뉴에 없는 애매한 낱말(「승인」「작업」 단독)은 넣지 않는다(결재 확인 등 다른 문맥과 충돌).
+  "내문서": "mydocs", "내문서확인": "mydocs", "내문서보여줘": "mydocs",
+  "작업내역": "sessions",
+  "조치": "fix",
+  "보고": "report", "리포트": "report",
+  "보안제품": "products",
+  "기록": "records", "감사기록": "records",
+  "위협": "threat", "위협인텔": "threat",
+  "AI팀": "aiteam", "ai팀": "aiteam",
+  "AI팀감독": "supervision", "ai팀감독": "supervision", "팀감독": "supervision",
 };
 
+/** 화면카드종류별 답 한 곳 — 라우트(/api/screen-card)와 대화(화면이름 분기)가 같은 것을 쓴다.
+ *  두 곳이 각자 체인을 들고 있으면 새 카드가 한쪽에만 붙는다(QA 결함 1호가 정확히 그 병). */
+export async function 카드답변(kind: Exclude<화면카드종류, "finding">, scope: string | null, userId: string): Promise<{ output: string; dataCard: DataCard }> {
+  return kind === "asset" ? assetStatusAnswer(scope)
+    : kind === "ops" ? await opsStatusAnswer()
+    : kind === "hardening" ? hardeningStatusAnswer()
+    : kind === "mydocs" ? await mydocsStatusAnswer(userId)
+    : kind === "supervision" ? supervisionStatusAnswer()
+    : kind === "sessions" ? sessionsStatusAnswer()
+    : kind === "fix" ? fixStatusAnswer()
+    : kind === "report" ? await reportStatusAnswer()
+    : kind === "products" ? productsStatusAnswer()
+    : kind === "records" ? recordsStatusAnswer()
+    : kind === "threat" ? threatStatusAnswer()
+    : aiteamStatusAnswer();
+}
+
 /** 짧은 입력이 화면 이름이면 어느 카드인지 — 아니면 null(다음 분기로). */
-export function screenNameCard(text: string): "asset" | "ops" | "hardening" | "finding" | null {
+export function screenNameCard(text: string): 화면카드종류 | null {
   const t = String(text || "").replace(/[\s?!.]/g, "");
   if (!t || t.length > 8) return null; // 문장이면 기존 분기들이 맡는다 — 낱말·이름만
   return 화면이름카드[t] ?? null;
@@ -341,18 +370,8 @@ export function registerScreenCardRoute(app: import("express").Express): void {
       res.json({ output, dataCard: dataCard ?? null, nextChips: nextChipsFor("분기:우선순위") });
       return;
     }
-    const 답 = kind === "asset" ? assetStatusAnswer(scope)
-      : kind === "ops" ? await opsStatusAnswer()
-      : kind === "hardening" ? hardeningStatusAnswer()
-      : kind === "mydocs" ? mydocsStatusAnswer(String((req as import("express").Request & { user?: { id?: string; username?: string } }).user?.id ?? (req as import("express").Request & { user?: { username?: string } }).user?.username ?? "unknown"))
-      : kind === "supervision" ? supervisionStatusAnswer()
-      : kind === "sessions" ? sessionsStatusAnswer()
-      : kind === "fix" ? fixStatusAnswer()
-      : kind === "report" ? await reportStatusAnswer()
-      : kind === "products" ? productsStatusAnswer()
-      : kind === "records" ? recordsStatusAnswer()
-      : kind === "threat" ? threatStatusAnswer()
-      : aiteamStatusAnswer();
+    const me = (req as import("express").Request & { user?: { id?: string | number; username?: string } }).user;
+    const 답 = await 카드답변(kind, scope, String(me?.id ?? me?.username ?? "unknown"));
     const 분기 = kind === "asset" ? "분기:자산현황" : kind === "ops" ? "분기:관제현황" : kind === "hardening" ? "분기:검증현황"
       : kind === "fix" ? "분기:내업무" : kind === "report" ? "분기:내업무" : "분기:내업무";
     // 🗂 범위가 걸렸는데 이 카드가 범위를 모르는 종류면 제목에 밝힌다(검토관 5.41 중10 —
@@ -409,8 +428,10 @@ export function supervisionStatusAnswer(): { output: string; dataCard: DataCard 
 
 // 내 문서 카드(2026-08-20 LLM 위키 — 사장님 「나만의 문서 데이터 관리」). 이 카드만 **사람마다
 // 다르다**(userId 필수) — 개인 문서는 격리가 전부라, 호출자 것만 센다(personaldocs와 같은 원칙).
-export function mydocsStatusAnswer(userId: string): { output: string; dataCard: DataCard } {
-  const { listPersonalDocs } = require("./personaldocs") as typeof import("./personaldocs");
+export async function mydocsStatusAnswer(userId: string): Promise<{ output: string; dataCard: DataCard }> {
+  // require()가 아니라 await import — personaldocs는 이 파일 어디서도 정적으로 안 실리는
+  // 모듈이라 vitest(ESM)에서 require가 못 찾는다(2026-08-20 시험이 실제로 잡음).
+  const { listPersonalDocs } = await import("./personaldocs.js");
   const 목록 = listPersonalDocs(userId);
   // (「정리본」 칸은 두지 않는다 — 그 이름을 붙이는 생산자가 표준 제품에 없다. 생산자 없는
   //  값은 영원한 0으로 화면이 거짓말을 한다 — 검토관 중6, 「그 값을 누가 넣는가」 계열.)

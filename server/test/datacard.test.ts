@@ -267,6 +267,36 @@ describe("화면 이름 → 현황 카드 (사장님 실측 — 「자산고르�
     expect(screenNameCard("우선순위")).toBe("finding");
     expect(screenNameCard("자산 등록은 어떻게 해?"), "문장은 넘긴다").toBeNull();
     expect(screenNameCard("설정"), "카드 없는 화면 이름은 기존 경로(되묻기·안내)로").toBeNull();
+    // QA 결함 1호(2026-08-20) — 신설 카드가 사전에 빠져 「내문서 확인」이 일반 경로로
+    // 흘러가 무관 근거로 답을 지어냈다. 전 카드 종류가 화면 이름으로 닿아야 한다.
+    expect(screenNameCard("내문서")).toBe("mydocs");
+    expect(screenNameCard("내 문서 확인")).toBe("mydocs");
+    expect(screenNameCard("작업 내역")).toBe("sessions");
+    expect(screenNameCard("조치")).toBe("fix");
+    expect(screenNameCard("보고")).toBe("report");
+    expect(screenNameCard("보안제품")).toBe("products");
+    expect(screenNameCard("기록")).toBe("records");
+    expect(screenNameCard("위협")).toBe("threat");
+    expect(screenNameCard("AI 팀 감독")).toBe("supervision");
+    expect(screenNameCard("승인"), "메뉴 아닌 낱말은 안 삼킨다(결재 확인 문맥)").toBeNull();
+    expect(screenNameCard("작업"), "낱말 단독(작업)은 애매 — 안 삼킨다").toBeNull();
+  });
+
+  it("★ dispatcher 경유 — 「내문서」가 지어낸 답이 아니라 내 문서 카드로 온다 (QA 결함 1호)", async () => {
+    const { dispatchInstruction } = await import("../src/engine/dispatcher");
+    const r = await dispatchInstruction("내문서 확인", undefined, undefined, undefined, true);
+    expect(r.dataCard?.title).toContain("내 문서");
+    expect(r.output).not.toContain("수정 중"); // 날조된 상태 문구가 아니다
+  });
+
+  it("★ 내 문서 겨냥 문장 — 개인 조각 0건이면 지어내지 않고 「못 찾았다」로 (QA 결함 1b)", async () => {
+    const { dispatchInstruction } = await import("../src/engine/dispatcher");
+    const r = await dispatchInstruction("내 문서에 서버 실행 오류 해결법 있어?", undefined, undefined, undefined, true);
+    expect(r.output).toContain("내 문서에서 찾지 못했습니다");
+    expect(r.sources).toEqual([]); // 무관 회사 문서가 근거 배지로 붙지 않는다
+    // 쓰기 지시는 이 가드가 삼키지 않는다(찾기가 아니다)
+    const w = await dispatchInstruction("이 내용 내 문서에 저장해줘", undefined, undefined, undefined, true);
+    expect(String(w.output)).not.toContain("내 문서에서 찾지 못했습니다");
   });
 
   it("★ dispatcher 경유 — 「자산고르기」가 일반론이 아니라 자산 카드로 온다", async () => {

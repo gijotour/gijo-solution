@@ -22,12 +22,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
 .main{padding:28px 32px 48px;}
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
-.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-title{font-size:21px;font-weight:800;color:var(--text-strong, #fff);}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:860px;line-height:1.6;}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
 .header-left{display:flex;align-items:center;gap:12px;}
 .header-left img{height:22px;}
-.app-title{font-size:15px;font-weight:800;color:#fff;}
+.app-title{font-size:15px;font-weight:800;color:var(--text-strong, #fff);}
 .clock{font-size:12px;color:var(--blue-light);font-weight:600;}
 .header-right{display:flex;align-items:center;gap:10px;}
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
@@ -37,7 +37,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 
 .cat{margin-bottom:24px;max-width:1040px;}
-.cat-title{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;}
+.cat-title{font-size:14px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:10px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;}
 .cat-title:hover{color:var(--blue-light);}
 /* 접이식 — 제목 클릭으로 섹션 접기(카드가 너무 많아 기본은 첫 섹션만 펼침). */
 .cat.collapsed{margin-bottom:8px;}
@@ -52,12 +52,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .krow .cat-title{margin-bottom:0;flex:0 0 auto;min-width:150px;font-size:13px;gap:6px;}
 .krow .kvals{display:flex;flex-wrap:wrap;gap:2px 13px;font-size:12.5px;color:var(--muted);min-width:0;flex:1;}
 .krow .kv{white-space:nowrap;}
-.krow .kv b{color:#fff;font-weight:800;font-size:13.5px;margin-left:2px;}
+.krow .kv b{color:var(--text-strong, #fff);font-weight:800;font-size:13.5px;margin-left:2px;}
 .krow .cat-link{flex:0 0 auto;}
 .krow:hover{background:rgba(59,130,246,.05);}
 .tile{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
 .tile .t-label{font-size:12.25px;color:var(--muted);margin-bottom:6px;}
-.tile .t-value{font-size:22px;font-weight:800;color:#fff;}
+.tile .t-value{font-size:22px;font-weight:800;color:var(--text-strong, #fff);}
 .footer{margin-top:20px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);max-width:1040px;}
 .footer img{height:16px;opacity:0.6;}
 
@@ -116,7 +116,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 /* 숫자 칸은 절대 접지 않는다 — "85건"이 "85 / 건"으로 갈라져 두 줄이 됐다. */
 .tsv-table th.num,.tsv-table td.num{white-space:nowrap;}
 .tsv-own{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue-light);border:1px solid rgba(59,130,246,.35);border-radius:999px;padding:1px 6px;margin-left:6px;}
-.tsv-sum td{font-weight:800;color:#fff;border-top:1px solid var(--border-strong);}
+.tsv-sum td{font-weight:800;color:var(--text-strong, #fff);border-top:1px solid var(--border-strong);}
 .tsv-note{margin-top:12px;font-size:12.25px;line-height:1.7;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
 .tsv-note b{color:var(--text);}
 .tsv-admin{margin-left:auto;font-size:12px;font-weight:700;color:var(--blue-light);cursor:pointer;}

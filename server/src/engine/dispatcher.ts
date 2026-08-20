@@ -1021,7 +1021,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   쳤는데 카드가 아니라 「무엇을 도와드릴까요」가 나왔다). isTooVague의 「두 글자 이하」
   //   규칙이 자산·관제·검증(전부 2글자)을 삼켰다 — 좁은 판정(정확 일치)이 넓은 판정보다 먼저다.
   {
-    const { screenNameCard, hardeningStatusAnswer, assetStatusAnswer, opsStatusAnswer, 카드없는글로 } = await import("./datacard.js");
+    const { screenNameCard, 카드답변, 카드없는글로 } = await import("./datacard.js");
     const 어느카드 = screenNameCard(instructionText);
     if (어느카드 === "finding") {
       const { output, picklist, dataCard } = findingListAnswer(
@@ -1031,13 +1031,42 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       return { task, route: { agentId: "orchestrator", action: "chat" }, output, ...(picklist ? { picklist } : {}), ...(dataCard ? { dataCard } : {}) };
     }
     if (어느카드) {
-      const 답 = 어느카드 === "asset" ? assetStatusAnswer(지금범위 && 지금범위.kind === "asset" ? 지금범위.id : null)
-        : 어느카드 === "ops" ? await opsStatusAnswer()
-        : hardeningStatusAnswer();
+      // 전 카드 종류를 한 곳(카드답변)으로 — 대화·라우트가 각자 체인을 들면 새 카드가
+      // 한쪽에만 붙는다(QA 결함 1호: 「내문서 확인」이 여기 없어 일반 경로가 답을 지어냈다).
+      // mydocs는 사람별 카드 — viewer의 신원으로 그 사람 것만(격리 원칙 그대로).
+      const 답 = await 카드답변(어느카드, 지금범위 && 지금범위.kind === "asset" ? 지금범위.id : null,
+        String(viewer?.userId ?? "unknown"));
       const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
       completeTask(task.id);
       if (에디션제한중()) return { task, route: { agentId: "orchestrator", action: "chat" }, output: 카드없는글로(답) };
       return { task, route: { agentId: "orchestrator", action: "chat" }, output: 답.output, dataCard: 답.dataCard };
+    }
+  }
+
+  // 「내 문서」를 겨냥한 질문인데 **개인 문서 조각이 한 개도 안 잡히면** LLM에 보내지 않는다
+  // (QA 결함 1b, 2026-08-20 사장님 실측: 내 문서 내용을 물었는데 무관한 회사 문서 3건이
+  //  근거 배지로 붙고 「수정 중」이라는 상태까지 지어냈다. 0건은 재작성 금지 계열 —
+  //  회사 RAG로 흘러가 그럴듯하게 지어내는 길을 결정적으로 끊는다).
+  // ⚠ 좁게 잡는다: 「내문서/내 문서」가 명시된 입력만. 정확한 이름(「내문서」 단독)은 위
+  //   화면이름카드가 먼저 받았으므로 여기는 문장형이다. 개인 조각이 있으면 그대로 통과 —
+  //   일반 chat이 같은 질의로 그 조각을 근거 삼는다.
+  //   쓰기 지시(「내 문서에 저장/추가해줘」)는 찾기가 아니라서 제외 — 그건 내 문서 화면 몫이다.
+  if (/내\s?문서/.test(instructionText) && !/문서함/.test(instructionText)
+      && !/(저장|기록해|추가해|만들|올려|넣어|써\s?줘)/.test(instructionText)) {
+    const { queryMemoryScored } = await import("./memory.js");
+    const hits = await queryMemoryScored(instructionText, 8, undefined, screen, viewer).catch(() => []);
+    if (!hits.some((h) => h.documentId.startsWith("personal:"))) {
+      const { mydocsStatusAnswer } = await import("./datacard.js");
+      const 카드 = await mydocsStatusAnswer(String(viewer?.userId ?? "unknown"));
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
+      completeTask(task.id);
+      const output = [
+        "그 내용을 **내 문서에서 찾지 못했습니다** — 지어내지 않고 그대로 말씀드립니다.",
+        "내 문서가 대화에서 검색되려면 그 문서의 **AI 포함**이 켜져 있어야 합니다(내 문서 화면에서 문서별로 켭니다).",
+        "",
+        카드.output,
+      ].join("\n");
+      return { task, route: { agentId: "orchestrator", action: "chat" }, output, dataCard: 카드.dataCard, sources: [] };
     }
   }
 

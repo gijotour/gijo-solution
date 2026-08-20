@@ -15,7 +15,7 @@
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
 .header{display:flex;justify-content:space-between;align-items:center;padding:12px 22px;border-bottom:1px solid var(--border);}
 .header-left{display:flex;align-items:center;gap:16px;}.header img{height:22px;}
-.app-title{font-size:15px;font-weight:800;color:#fff;}.clock{font-size:12px;color:var(--muted);}
+.app-title{font-size:15px;font-weight:800;color:var(--text-strong, #fff);}.clock{font-size:12px;color:var(--muted);}
 .header-right{display:flex;align-items:center;gap:12px;}
 .status-pill{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.25);border-radius:20px;padding:5px 12px;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
@@ -32,10 +32,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
 .main{padding:26px 30px 48px;}
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;}
-.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-title{font-size:21px;font-weight:800;color:var(--text-strong, #fff);}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:820px;line-height:1.6;}
 .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border-strong);padding:0 15px;height:var(--g-btn-h);border-radius:var(--g-r);font-size:12.5px;font-weight:700;cursor:pointer;transition:.12s;}
-.btn-ghost:hover{color:#fff;border-color:var(--blue);}
+.btn-ghost:hover{color:var(--text-strong, #fff);border-color:var(--blue);}
 .btn-primary{background:var(--blue);color:#fff;border:none;padding:0 17px;height:var(--g-btn-h);border-radius:var(--g-r);font-size:12.5px;font-weight:700;cursor:pointer;}
 .btn-primary:hover{background:#3576e0;}
 
@@ -47,7 +47,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .tile .d{font-size:12px;color:var(--muted-2);margin-top:3px;}
 .tile.risk{background:linear-gradient(180deg,rgba(226,72,61,.1),transparent);border-color:rgba(226,72,61,.3);}
 .riskbar{background:linear-gradient(90deg,rgba(226,72,61,.1),transparent);border:1px solid rgba(226,72,61,.28);border-radius:12px;padding:10px 14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;}
-.riskbar .rb-main{font-size:15px;font-weight:800;color:#fff;}
+.riskbar .rb-main{font-size:15px;font-weight:800;color:var(--text-strong, #fff);}
 .riskbar .rb-lv{font-size:17px;}
 .riskbar .rb-pri{font-size:12px;font-weight:600;color:var(--muted);margin-left:8px;}
 .riskbar .rb-src{font-size:12.5px;color:var(--muted-2);padding-left:14px;border-left:1px solid rgba(255,255,255,.14);}
@@ -56,17 +56,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 .two{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;align-items:start;}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
-.ph{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:4px;}
+.ph{font-size:13.5px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:4px;}
 .psub{font-size:12.25px;color:var(--muted-2);margin-bottom:10px;}
 .path-scope{font-size:12.25px;font-weight:600;color:var(--blue-light);}
 .graph-toggle{font-size:11.75px;display:inline-flex;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
 .graph-toggle .gt{padding:3px 9px;cursor:pointer;color:var(--muted);background:var(--panel-2);}
-.graph-toggle .gt.on{background:rgba(59,130,246,.18);color:#fff;}
+.graph-toggle .gt.on{background:rgba(59,130,246,.18);color:var(--text-strong, #fff);}
 /* 상세 분석 / 공격경로 분석 탭 — 항목 선택 시에만 나타난다. */
 .ana-tabs{display:flex;gap:6px;margin:9px 0 11px;border-bottom:1px solid var(--border);padding-bottom:9px;}
 .atab{font-size:12.5px;font-weight:700;padding:5px 11px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;}
-.atab:hover{color:#fff;border-color:var(--blue);}
-.atab.on{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.45);color:#fff;}
+.atab:hover{color:var(--text-strong, #fff);border-color:var(--blue);}
+.atab.on{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.45);color:var(--text-strong, #fff);}
 .path-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 /* 그래프는 viewBox 자연 크기까지만 — 폭에 맞춰 늘리면 노드·글자가 몇 배로 커진다.
    실제 상한(max-width)은 내용(노드 수)에 따라 그리는 쪽에서 인라인으로 지정한다. */
@@ -78,7 +78,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .task-done{background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.4);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#8fe3c0;line-height:1.5;}
 .filters{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
 .fchip{font-size:12.5px;padding:5px 11px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;}
-.fchip.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#fff;}
+.fchip.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:var(--text-strong, #fff);}
 /* 목록 높이는 **창에 맞춰 JS가 정한다**(아래 목록높이맞추기) — 여기 숫자는 계산 전 한순간의 값이다.
    ⚠ 560px 고정이던 시절, 배율 125%·작은 창에서 목록이 창보다 길어져 위쪽 탭줄까지 밀려났다
    (2026-08-02 사용자 지적 "상단 메뉴가 안 보이지 않는 정도의 세로 길이로"). */
@@ -513,7 +513,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         '<div style="font-size:12.25px;color:var(--muted);margin-bottom:6px">처리 상태: <b style="color:var(--text)">'+STATUS_LABEL[e.status||"open"]+'</b>'+(e.statusNote?(' — '+esc(e.statusNote)):'')+'</div>'+
         '<div style="display:flex;gap:5px;flex-wrap:wrap">'+
           [["ack","확인"],["inprogress","처리중"],["done","완료"],["ignored","무시"],["open","열림"]].map(([v,l])=>
-            '<button class="btn-ghost" data-st="'+v+'" style="font-size:12.25px;padding:5px 11px'+((e.status||"open")===v?';border-color:var(--blue);color:#fff':'')+'">'+l+'</button>').join("")+
+            '<button class="btn-ghost" data-st="'+v+'" style="font-size:12.25px;padding:5px 11px'+((e.status||"open")===v?';border-color:var(--blue);color:var(--text-strong, #fff)':'')+'">'+l+'</button>').join("")+
         '</div>'+
       '</div>';
     const aiBtn = document.getElementById("aiBtn");

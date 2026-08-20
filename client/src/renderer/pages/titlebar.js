@@ -368,7 +368,7 @@
     area.appendChild(row);
     gear.addEventListener("click", function (e) {
       e.stopPropagation();
-      if (window.gijo && typeof window.gijo.openDocbox === "function") window.gijo.openDocbox();
+      if (window.gijo && typeof window.gijo.openDocbox === "function") window.gijo.openDocbox(document.documentElement.classList.contains("theme-light") ? "light" : undefined); // 프로=흰 문서함(QA 결함 2호 — 진입로마다 신호를 실어야 한다)
       else gijoTell("문서함을 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
     });
     // 이름·아바타를 누르면 **설정 › 내 설정**으로. 예전엔 이 줄이 ⚙ 메뉴를 열었는데 그 메뉴는 상단으로 갔다.
