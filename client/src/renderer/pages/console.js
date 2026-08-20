@@ -51,8 +51,11 @@
       // 현황판 스트립 — 히어로 가운데 정렬 안에서 **왼쪽 정렬 블록**으로 선다(타일 글이 가운데
       // 정렬되면 숫자를 훑을 수 없다). 폭은 히어로 안에서 넉넉히, 창이 좁으면 자동으로 준다.
       ".ce-panels{width:100%;max-width:880px;text-align:left;}",
+      // ⚠ :empty 규칙은 body.chat-home 선택자와 **같은 특이도 이상**이어야 한다(검토관 하13).
+      //   `.ce-panels:empty`(0,2,0)는 `body.chat-home .ce-panels`(0,2,1)에 져서 정작 대화 홈에서만
+      //   안 먹었다 — 스트립이 비었을 때 gap 14px짜리 빈 자리가 남는다.
       "body.chat-home .ce-panels{display:block;}",
-      ".ce-panels:empty{display:none;}",
+      "body.chat-home .ce-panels:empty{display:none;}",
       "body.chat-home .ce-compact{display:none;}",
       ".ce-greet{font-size:26px;font-weight:800;color:var(--text,#e9e7e2);letter-spacing:-.3px;}",
       ".ce-honest{font-size:12.5px;color:var(--muted-2,#a49d95);max-width:560px;line-height:1.6;}",
@@ -1758,6 +1761,10 @@
     var host = document.getElementById("cePanels");
     if (!host) return;
     if (!window.gijoPanelsBoard || !window.gijoGroupPanels || !window.gijoTabs) { host.innerHTML = ""; return; }
+    // ⚠ **표준 셸에서는 아예 재지 않는다**(검토관 하16). 스트립은 대화 홈(body.chat-home)에서만
+    //   보이는데 그 클래스는 프로 셸에만 붙는다 — 안 보이는 것을 위해 부팅마다 API 십수 개를
+    //   쏘면 순수한 낭비다. 홈이 아니면 자리만 비워 두고, 홈이 될 때 renderHero가 다시 부른다.
+    if (!document.body.classList.contains("chat-home")) { host.innerHTML = ""; host.removeAttribute("data-mounted"); return; }
     // 히어로 재렌더(부팅 재시도·새 세션)가 판을 **다시 재게 하지 않는다.** 단 딱지만 남고
     // 내용이 비어 있으면 다시 그린다 — 「시작했다」와 「그려졌다」를 딱지 하나로 뭉뚱그리면
     // 복원된 껍데기가 영영 안 채워진다(관문 적발).
@@ -1774,6 +1781,15 @@
       });
     } catch (e) { host.innerHTML = ""; }
   }
+  // chat-home은 **셸(app.html)이 탭 상태에 따라** 붙였다 뗀다 — 부팅 시점엔 아직 없을 수 있고,
+  // 화면을 다 닫아 홈으로 돌아올 때 붙는다. 그 순간을 부품이 스스로 알아야 「홈인데 스트립이
+  // 없는」 자리가 안 생긴다(위 표준 셸 가드를 넣으며 생길 뻔한 구멍).
+  // 표준 셸에서는 chat-home이 영영 안 붙으므로 이 감시는 그냥 아무 일도 하지 않는다.
+  try {
+    new MutationObserver(function () {
+      if (document.body.classList.contains("chat-home")) renderPanels();
+    }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  } catch (e) { /* 감시 못 걸어도 부팅 렌더는 돈다 */ }
   function fillGreeting() {
     var el = document.getElementById("ceGreet");
     if (!el) return;

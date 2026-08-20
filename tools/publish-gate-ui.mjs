@@ -493,16 +493,43 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
         if (펼침 > 타일.length) break;
       }
     }
+    // ⚠ **실패 판 수를 반드시 센다**(검토관 하18). 「확인 …」 꼬리는 실패해도 붙으므로 그것만
+    //   보면 17판 전부 「불러오지 못했습니다」여도 초록이 된다 — 관문이 헛초록을 내는 자리다.
+    const 실패 = [...document.querySelectorAll("#cePanels .pv-fail")].length;
+    // 목록을 실제로 펴서 **첫 열에 내용이 있는지**까지 본다(단추 개수만 세면 첫 열이 전부
+    //   「-」인 채로 통과한다 — 필드명 오인 5번째가 그렇게 초록이었다).
+    const 펴기 = document.querySelector('#cePanels button[data-act="rows"]');
+    let 목록행 = 0, 첫열있음 = false;
+    if (펴기) {
+      펴기.click();
+      for (let i = 0; i < 25; i++) {
+        await new Promise((x) => setTimeout(x, 400));
+        const rows = document.querySelectorAll("#cePanels .pv-rows .g-rows-r");
+        if (rows.length) {
+          목록행 = rows.length;
+          첫열있음 = [...rows].slice(0, 5).every((row) => {
+            const c = row.querySelector("span");
+            const t = (c && c.textContent || "").trim();
+            return t && t !== "-";
+          });
+          break;
+        }
+      }
+    }
     return {
       압축: 타일.length,
       확인시각: /확인 /.test(첫),          // 「조용함」과 「확인 못 함」을 가르는 정직 표시
+      실패,
       입력칸: document.querySelectorAll("#cePanels input, #cePanels textarea").length,
       펼침,
       목록단추: document.querySelectorAll('#cePanels button[data-act="rows"]').length,
+      목록행,
+      첫열있음,
     };
   }).catch(() => null);
-  ok("현황판: 홈 스트립·확인시각·전체보기 펼침·입력칸 0",
-    !!r && r.압축 > 0 && r.압축 <= 6 && r.확인시각 && r.입력칸 === 0 && r.펼침 > r.압축 && r.목록단추 > 0,
+  ok("현황판: 홈 스트립·확인시각·실패 0·전체보기·목록 첫 열 실내용·입력칸 0",
+    !!r && r.압축 > 0 && r.압축 <= 6 && r.확인시각 && r.실패 === 0 && r.입력칸 === 0
+      && r.펼침 > r.압축 && r.목록단추 > 0 && r.목록행 > 0 && r.첫열있음,
     JSON.stringify(r));
 }
 

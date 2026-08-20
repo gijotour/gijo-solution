@@ -30,6 +30,18 @@
   var SCAN_NOISE = { scan_error: true, info: true };
   var 진짜취약점 = function (f) { return !SCAN_NOISE[f.finding_type] && !SCAN_NOISE[f.severity]; };
 
+  // ── 한글 표기 사전 — 하위 목록(rows)이 담당자에게 보이는 말로 적기 위한 것.
+  //    ⚠ 영문 코드값을 그대로 내보내면 같은 카드 안에서 「매우 심각」과 「critical」이 나란히
+  //    선다(검토관 중7 — 2026-08-03 「영문 심각도가 담당자 화면 여덟 곳」 사고 계열).
+  //    출처는 각 실화면의 사전과 같은 말을 쓴다: analysis.html:228 · approvals.html:259.
+  var SEV_KO = { critical: "매우 심각", high: "높음", medium: "보통", low: "낮음" };
+  var EV_ST_KO = { open: "열림", ack: "확인", inprogress: "처리중", done: "완료", ignored: "무시" };
+  var AP_ST_KO = { pending: "미검토", in_progress: "진행중", verifying: "검증 대기", approved: "완료", rejected: "반려", accepted: "위험수용" };
+  var 말 = function (사전, v, 없을때) {
+    var k = String(v == null ? "" : v);
+    return Object.prototype.hasOwnProperty.call(사전, k) ? 사전[k] : (k || 없을때 || "-");
+  };
+
   var 그룹 = {
     // ① 발견·수집
     discover: [
@@ -39,18 +51,22 @@
       //   (reporting: kpi→kpi.html). 두 자리에 같은 것을 두면 「어디서 보는 게 맞나」를 매번 고민한다.
       // ⚠ **화면이 사라진 것이 아니다** — `kpi.html`은 ⑤보고에서 그대로 열린다.
       //   ⓪ 자산에서 「🖥 자산」을 뺀 것과 같은 정리다(자산은 ⓪로, 지표는 ⑤로).
-      // rows: 열린 이벤트만(요약의 열림 잣대 그대로 — 정리된 것을 목록에 섞으면 요약과 어긋난다).
+      // rows: 열린 이벤트만 + **요약이 세는 P0~P2만**(검토관 중4 — 요약은 P0/P1/P2 세 조각인데
+      //   목록에 P3까지 내리면 「위는 3인데 아래는 40줄」이 된다. approvals.ts:423의 그 사고와
+      //   같은 모양이다). 상태는 한글로(analysis.html:228과 같은 사전).
       { id: "analysis", title: "🚨 통합 관제", page: "analysis.html",
         rows: function () {
           return window.gijo.analysisEvents().then(function (d) {
-            var ev = ((d && d.events) || []).filter(function (e) { return !(e.status === "done" || e.status === "ignored"); });
             var 순위 = { P0: 0, P1: 1, P2: 2 };
-            ev.sort(function (a, b) { return (순위[a.priority] == null ? 9 : 순위[a.priority]) - (순위[b.priority] == null ? 9 : 순위[b.priority]); });
+            var ev = ((d && d.events) || []).filter(function (e) {
+              return !(e.status === "done" || e.status === "ignored") && 순위[e.priority] != null;
+            });
+            ev.sort(function (a, b) { return 순위[a.priority] - 순위[b.priority]; });
             return {
               cols: ["이벤트", "우선", "상태"],
               grid: "1fr 54px 74px",
               rows: ev.map(function (e) {
-                return [String(e.title || e.summary || e.id || "-"), String(e.priority || "-"), String(e.status || "열림")];
+                return [String(e.title || e.summary || e.id || "-"), String(e.priority || "-"), 말(EV_ST_KO, e.status, "열림")];
               }),
             };
           });
@@ -118,9 +134,11 @@
             return {
               cols: ["취약점", "자산", "심각도", "KEV"],
               grid: "1fr 130px 70px 46px",
+              // 심각도는 한글로 — 요약 조각이 「매우 심각/높음/보통」인데 목록만 영문이면
+              // 같은 카드 안에서 두 말이 병존한다(검토관 중7).
               rows: out.map(function (x) {
                 return [String(x.f.finding_type || x.f.id || "-"), String(x.자산 || "-"),
-                  String(x.f.severity || "-"), x.f.kev ? "KEV" : "-"];
+                  말(SEV_KO, x.f.severity), x.f.kev ? "KEV" : "-"];
               }),
             };
           });
@@ -172,12 +190,16 @@
           return window.gijo.listApprovals().then(function (r) {
             var rows = (r && r.reviews) || r || [];
             return {
-              cols: ["조치 항목", "담당", "상태"],
-              grid: "1fr 90px 74px",
-              // 요약의 미배정 잣대와 같은 말(빈 담당은 「미배정」으로 적는다 — "-"로 두면
-              // 「담당이 있는데 못 읽었다」와 구분이 안 된다).
+              cols: ["조치 항목", "자산", "담당", "상태"],
+              grid: "1fr 110px 84px 74px",
+              // ⚠ 필드는 **FindingReview 원천 그대로**다(security-ops.ts:373 — title·summary·id는
+              //   아예 없다. 처음엔 그것들을 읽어 첫 열이 전부 「-」였다: 검토관 상1, 이 저장소
+              //   필드명 오인 5번째). 실화면 approvals.html:468도 finding.finding_type + assetName을 쓴다.
+              // 빈 담당은 「미배정」으로 적는다 — "-"로 두면 「담당이 있는데 못 읽었다」와 구분이 안 된다.
               rows: rows.map(function (x) {
-                return [String(x.title || x.summary || x.id || "-"), String(x.assignee || "미배정"), String(x.status || "-")];
+                var f = x.finding || {};
+                return [String(f.finding_type || x.findingKey || "-"), String(x.assetName || x.assetId || "-"),
+                  String(x.assignee || "미배정"), 말(AP_ST_KO, x.status)];
               }),
             };
           });
@@ -236,7 +258,10 @@
 
     // ④ 검증 — 데이터가 없어도 **같은 모양**으로(2026-08-09 사용자 지시: 0이면 0으로 그린다)
     verify: [
-      { id: "hardening", title: "🛡 보안설정 점검", page: "hardening.html", load: function () {
+      // agents: scan(해석) — ROLE_CATEGORY.scan=["취약점","장비운영"](hybridsearch.ts:234) 근거.
+      //   장비 점검 자료를 먼저 보는 역할이라 이 판의 주인이 맞다(검토관 하17 — 근거가 있는데
+      //   빠뜨렸던 자리. 근거 없는 판에 다는 것만큼이나 있는 근거를 빠뜨리는 것도 들쭉날쭉이다).
+      { id: "hardening", title: "🛡 보안설정 점검", page: "hardening.html", agents: ["해석"], load: function () {
         return Promise.all([
           window.gijo.hardeningTargets.list().catch(function () { return []; }),
           window.gijo.hardeningSchedules.list().catch(function () { return []; }),

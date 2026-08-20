@@ -246,8 +246,13 @@ describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님
   });
   it("새 세션 뒤는 처음 화면(대화 홈)이다 — 히어로 복원(검토관 M4)", () => {
     const c = 코드만(join(PAGES, "console.js"));
-    expect(c, "build가 대화 홈 원본을 저장하지 않는다").toContain("빈상태원본 = _e0.outerHTML");
+    // 저장 **방식**이 아니라 「원본을 담고 되살린다」는 계약을 지킨다 — 2026-08-20에 현황판
+    // 자리를 비워 담도록 바뀌었고(관문 적발), 그때 문구를 못박은 이 단언이 함께 깨졌다.
+    expect(c, "build가 대화 홈 원본을 저장하지 않는다").toMatch(/빈상태원본 = [_\w]+\.outerHTML/);
     expect(c, "newSession이 대화 홈을 되살리지 않는다").toMatch(/function newSession\([\s\S]{0,900}빈상태원본/);
+    // 현황판 자리는 **비운 채로** 담아야 한다 — 「확인하는 중…」+딱지째 담기면 새 세션이
+    // 되살린 순간 renderPanels가 조기 반환해 홈에 스트립이 영영 안 뜬다(실화면 실측 0개).
+    expect(c, "홈 원본에 현황판 자리를 비우는 처리가 없다").toMatch(/cePanels[\s\S]{0,200}removeAttribute\("data-mounted"\)/);
   });
 });
 
