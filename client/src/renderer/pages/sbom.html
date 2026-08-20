@@ -58,11 +58,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
 .panel-title{font-size:14.5px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
-.ai-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);margin-bottom:8px;cursor:pointer;}
+/* 2026-08-21 밀도 — 줄 75→32px대: 여백 축소 + 이름·부제 가로 나란히(적층 해제) */
+.ai-card{display:flex;align-items:center;gap:10px;padding:3px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);margin-bottom:3px;cursor:pointer;}
 .ai-card:hover{border-color:var(--blue);}
 .ai-card.sel{border-color:rgba(59,130,246,.6);background:rgba(59,130,246,.1);}
 .ai-card .nm{font-size:13px;font-weight:700;color:var(--text-strong, #fff);}
-.ai-card .mt{font-size:12.25px;color:var(--muted-2);margin-top:2px;}
+.ai-card .mt{font-size:12.25px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ai-card .rt{margin-left:auto;text-align:right;font-size:12.25px;color:var(--muted);}
 .ai-chip{font-size:11.5px;border-radius:20px;padding:1px 7px;border:1px solid var(--border-strong);color:var(--muted);margin-left:6px;}
 .ai-chip.ok{border-color:rgba(30,185,128,.45);color:var(--teal);}
@@ -744,7 +745,7 @@ tr:last-child td{border-bottom:none;}
       const sbomChip = (full && full.sbomGeneratedAt) ? '<span class="ai-chip ok">SBOM ✓</span>' : '<span class="ai-chip warn">SBOM 미생성</span>';
       const bomChip = filled === 5 ? '<span class="ai-chip ok">5영역 완비</span>' : `<span class="ai-chip warn">5영역 ${filled}/5</span>`;
       return `<div class="ai-card${r.id === aiSelId ? " sel" : ""}" data-ai="${esc(r.id)}">
-        <div><div class="nm">${esc(r.name)}${sbomChip}${bomChip}</div>
+        <div style="display:flex;align-items:baseline;gap:8px;min-width:0"><div class="nm" style="white-space:nowrap">${esc(r.name)}${sbomChip}${bomChip}</div>
         <div class="mt">${esc(r.assetType || "")}${r.owner ? " · " + esc(r.owner) : ""}</div></div>
         <div class="rt">${rob != null ? `견고성 <b style="color:${rob >= 80 ? "var(--teal)" : "var(--amber)"}">${rob}</b>` : '<span style="color:var(--muted-2)">견고성 미점검</span>'}</div>
       </div>`;
