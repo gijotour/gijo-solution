@@ -297,13 +297,20 @@ describe("프로 확정 계약 — 메뉴는 카드가 전부(2026-08-20 사장�
   });
   it("메뉴 화면 = 카드 맵 ∪ 명시 예외 — 암묵 예외 금지(검토관 5.41 중11)", () => {
     const d = readFileSync(join(__dirname, "..", "src", "engine", "datacard.ts"), "utf8");
-    const 맵 = new Set([...d.matchAll(/"([\w-]+\.html)":\s*"/g)].map((m) => m[1]));
+    // 맵은 화면파일카드 블록만 잘라 뽑는다 — 전체 grep이면 카드예외 블록의 키까지 맵으로
+    // 오인한다(검토관 백로그 하6②).
+    const 맵블록 = d.slice(d.indexOf("const 화면파일카드"), d.indexOf("};", d.indexOf("const 화면파일카드")));
+    const 맵 = new Set([...맵블록.matchAll(/"([\w-]+\.html)":\s*"/g)].map((m) => m[1]));
     const 예외블록 = d.slice(d.indexOf("export const 카드예외"), d.indexOf("};", d.indexOf("export const 카드예외")));
     const 예외 = new Set([...예외블록.matchAll(/"([\w-]+\.html)":/g)].map((m) => m[1]));
     const nv = readFileSync(join(PAGES, "nav.js"), "utf8");
-    const 메뉴 = [...nv.matchAll(/page:\s*"([\w-]+\.html)"/g)].map((m) => m[1]);
+    // 쿼리 딸린 메뉴(settings.html?s=my 등)도 잡는다(하6① — 안 잡으면 새 암묵 통로).
+    const 메뉴 = [...nv.matchAll(/page:\s*"([\w-]+\.html)(?:\?[^"]*)?"/g)].map((m) => m[1]);
     const 미분류 = [...new Set(메뉴)].filter((p) => !맵.has(p) && !예외.has(p));
     expect(미분류, "새 메뉴 화면은 카드 맵 또는 카드예외(이유 명시)에 넣을 것").toEqual([]);
+    // 맵∩예외 = ∅ — 카드를 만들었으면 예외에서 지워야 두 곳이 다른 말을 안 한다(하6③).
+    const 겹침 = [...맵].filter((p) => 예외.has(p));
+    expect(겹침, "카드 맵과 카드예외에 같은 화면이 있다").toEqual([]);
   });
   it("무대(대화창 자리) — 전면/대화 상태·← 대화로·골라서 복귀(2026-08-20 사장님 승인)", () => {
     const s = 코드만(join(PAGES, "app.html"));

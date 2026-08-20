@@ -645,7 +645,7 @@ ipcMain.handle("office:open", async () => {
 // 문서함 — 가이드·아키텍처를 읽는 별도 창. 제품 화면 탭 안에 넣지 않는다:
 // 문서를 옆에 띄워두고 제품을 조작할 수 있어야 한다(사용자 지시 2026-07-30
 // "클라이언트 실행시 별도로 사용 — 제품 안에서 동작하는 게 아니고").
-ipcMain.handle("docbox:open", async () => {
+ipcMain.handle("docbox:open", async (_e, theme?: string) => {
   if (docboxWindow && !docboxWindow.isDestroyed()) {
     docboxWindow.focus();
     return;
@@ -668,7 +668,11 @@ ipcMain.handle("docbox:open", async () => {
   docboxWindow.removeMenu();
   bindZoom(docboxWindow); // 문서함도 같은 화면 크기(배율)를 따른다
   docboxWindow.on("closed", () => { docboxWindow = null; });
-  await docboxWindow.loadFile(path.join(__dirname, "../src/renderer/pages/docbox.html"));
+  // 🎨 프로면 문서함 창도 흰 바탕(검토관 백로그 중3 — 도킹은 희고 창만 검던 반쪽의 남은 절반).
+  //   ⚠ 팀 사무실(office)은 **일부러 안 잇는다** — 픽셀아트 캔버스 방이 창의 정체성이라
+  //   배색 예외로 확정된 화면이다(배색 라운드 예외 목록).
+  await docboxWindow.loadFile(path.join(__dirname, "../src/renderer/pages/docbox.html"),
+    theme === "light" ? { query: { theme: "light" } } : undefined);
 });
 
 // ── GIJO Smart MD Studio — 로그인한 고객에게 주는 **무료 문서 작성 도구** ────────────────
@@ -881,10 +885,11 @@ ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?:
   // ⚠ 로드 주소에 창 구분용 접미사를 섞으면 화면 자신의 쿼리(?s=ai 등)가 오염된다(실측 버그).
   const [file, qs] = String(page).split("?");
   const query: Record<string, string> = { popout: "1", orient: portrait ? "portrait" : "landscape" };
-  // 🎨 프로 셸이 요청한 팝업이면 흰 바탕 신호를 잇는다(배색 검토관 중8 — 같은 화면이
-  //   도킹은 희고 창은 검던 반쪽). 값은 요청한 셸이 실어 준다 — 창은 스스로 판단하지 않는다.
-  if (theme === "light") query.theme = "light";
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
+  // 🎨 프로 셸이 요청한 팝업이면 흰 바탕 신호를 잇는다(배색 검토관 중8 — 같은 화면이
+  //   도킹은 희고 창은 검던 반쪽). 값은 요청한 셸이 실어 준다 — 창은 스스로 판단하지
+  //   않으므로, 병합 **뒤에** 대입해 화면 자기 쿼리가 셸의 결정을 못 덮는다(백로그 하9).
+  if (theme === "light") query.theme = "light";
   await win.loadFile(path.join(__dirname, `../src/renderer/pages/${file}`), { query });
 });
 

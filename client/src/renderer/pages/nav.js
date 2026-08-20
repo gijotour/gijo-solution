@@ -646,7 +646,8 @@
       // 없으면 조용히 넘기지 않고 알린다: 예전엔 아무 일도 안 나서 "눌러도 안 열린다"는
       // 증상만 남고 원인을 찾을 단서가 하나도 없었다(4.9.0 문서함).
       el.addEventListener("click", function () {
-        if (window.gijo && typeof window.gijo[it.win] === "function") window.gijoOpenWindowResult(window.gijo[it.win](), it.label);
+        // 🎨 흰 바탕 신호(중3) — 문서함만 소비, 나머지 창은 인자 무시(무해).
+        if (window.gijo && typeof window.gijo[it.win] === "function") window.gijoOpenWindowResult(window.gijo[it.win](document.documentElement.classList.contains("theme-light") ? "light" : undefined), it.label);
         else gijoTell(it.label + "을(를) 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
       });
     } else if (window.gijoTabs) {

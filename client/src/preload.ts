@@ -42,7 +42,7 @@ const gijoApi = {
   personalDocsDelete: (id: string) => api.personalDocsApi.remove(id),
   docRequestBuild: (input: Parameters<typeof api.docRequestApi.build>[0]) => api.docRequestApi.build(input),
   docRequestList: () => api.docRequestApi.list(),
-  openDocbox: () => ipcRenderer.invoke("docbox:open"),
+  openDocbox: (theme?: string) => ipcRenderer.invoke("docbox:open", theme), // 프로=흰 문서함(위치 인자)
   // 챗 모델 폴더 — 화면이 실제 경로를 보여주고(getModelsFolderPath) 「폴더 열기」로 탐색기까지 연다.
   //   라이트 첫날 「.gguf 어디 넣지?」를 없앤다(순환 참조 수리, 2026-08-14).
   getModelsFolderPath: () => ipcRenderer.invoke("models:folder-path") as Promise<string>,

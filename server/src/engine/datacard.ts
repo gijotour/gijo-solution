@@ -357,7 +357,10 @@ export function registerScreenCardRoute(app: import("express").Express): void {
       : kind === "fix" ? "분기:내업무" : kind === "report" ? "분기:내업무" : "분기:내업무";
     // 🗂 범위가 걸렸는데 이 카드가 범위를 모르는 종류면 제목에 밝힌다(검토관 5.41 중10 —
     //   범위를 걸어 둔 사람이 전체 숫자를 자기 자산 것으로 읽는 사고 방지). 감추지 않고 말한다.
-    if (scope && kind !== "asset" && 답.dataCard) { // finding은 위에서 이미 반환됨
+    // 자산 범위가 **성립하는데 미적용인** 카드에만 붙인다 — mydocs(개인)·supervision·aiteam은
+    // 애초에 자산 축이 없어 「미적용」 표기가 오히려 잘못된 기대를 만든다(검토관 백로그 하7).
+    const 자산축없음 = kind === "mydocs" || kind === "supervision" || kind === "aiteam";
+    if (scope && kind !== "asset" && !자산축없음 && 답.dataCard) { // finding은 위에서 이미 반환됨
       답.dataCard.title += " (전체 기준 — 🗂 범위 미적용)";
     }
     res.json({ output: 답.output, dataCard: 답.dataCard, nextChips: nextChipsFor(분기) });
@@ -481,8 +484,10 @@ export function fixStatusAnswer(): { output: string; dataCard: DataCard } {
   const mt = listMaintenanceItems();
   const today = todayLocal();
   // < today — 오늘 예정 건은 「지연」이 아니다(검토관 하: <=로 세면 아침에 열 때마다
-  //   오늘 할 일이 빨간 「지연」으로 시작한다). maintenance 화면의 「오늘 마감」과도 갈라 센다.
-  const 지연 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled" && String((m as { scheduleDate?: string }).scheduleDate || "") !== "" && String((m as { scheduleDate?: string }).scheduleDate) < today).length;
+  //   오늘 할 일이 빨간 「지연」으로 시작한다). 모집단은 화면(maintenance)과 동일하게
+  //   「완료(approved) 아님」 전부 — scheduled만 세면 승인 대기(reported)인 기한 지난 건이
+  //   화면에선 지연, 카드에선 아님으로 갈라진다(검토관 백로그 하8).
+  const 지연 = mt.filter((m) => String((m as { status?: string }).status) !== "approved" && String((m as { scheduleDate?: string }).scheduleDate || "") !== "" && String((m as { scheduleDate?: string }).scheduleDate) < today).length;
   const 예정 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled").length;
   const dataCard: DataCard = {
     title: "조치 — 승인·점검 현황",

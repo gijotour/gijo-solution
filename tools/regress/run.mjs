@@ -130,7 +130,9 @@ for (const c of cases) {
     console.log(`✗ ${c.id} — 요청 실패: ${e.name || e.message}`);
   }
 }
-console.log(`\n결과: ${cases.length - fail}/${cases.length} 통과${flaky ? ` (FLAKY ${flaky})` : ""} (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
+// 건너뜀을 통과에 섞지 않는다(검토관 백로그 중4 — 「11/11 통과」가 거짓이 된다).
+const 건너뜀수 = caseResults.filter((c) => c.skipped).length;
+console.log(`\n결과: 통과 ${cases.length - fail - 건너뜀수} · 건너뜀 ${건너뜀수} · 실패 ${fail} / ${cases.length}${flaky ? ` (FLAKY ${flaky})` : ""} (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
 try {
   const outDir = new URL("../../.tmp-reports/", import.meta.url);
   await fs.mkdir(outDir, { recursive: true });

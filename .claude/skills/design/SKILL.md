@@ -94,7 +94,7 @@ GIJO AS는 정확히 그 제외 대상이다.
 - **라이트 = 연초록** — `lite-green.css`가 gijo-ui.css 뒤에 얹힌다.
 - 시안을 만들 때는 **대상 에디션의 배색**으로 그린다(팔레트 원천: mockups/pro-white·mockups/lite-green — WCAG 대비 계산 포함).
 - `prefers-color-scheme` 분기는 여전히 만들지 않는다 — 배색은 OS 설정이 아니라 **에디션**이 정한다.
-- ⚠ 색을 규칙에 직접 박지 말고 토큰(`var(--…)`)을 쓴다 — 박힌 색은 테마 층이 못 따라간다(tools/theme-sweep.mjs가 걸러 준다. 단 **canvas 색은 예외** — ctx.fillStyle은 var()를 조용히 무시한다).
+- ⚠ 색을 규칙에 직접 박지 말고 토큰(`var(--…)`)을 쓴다 — 박힌 색은 테마 층이 못 따라간다. tools/theme-sweep.mjs는 **수동 변환 스크립트**(기본 드라이런, `--write`로 실행)이지 자동 감시가 아니다 — 새 화면은 처음부터 토큰으로 쓸 것. 단 **canvas 색은 예외** — ctx.fillStyle은 var()를 조용히 무시한다(office 실사고).
 
 **온프렘 = 완전 오프라인.**
 - **CDN 링크 금지.** 폰트·아이콘·스크립트·이미지 전부. 외부 URL이 들어간 순간 고객사

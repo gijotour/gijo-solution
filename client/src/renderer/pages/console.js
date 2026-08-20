@@ -1776,11 +1776,12 @@
       화면카드직전 = null; // 카드가 사라졌다 — 아래에서 새로 그린다
     }
     if (!(window.gijo && window.gijo.screenCard)) return Promise.resolve(false);
-    // 연타 가드(검토관 하) — 첫 응답이 오기 전 같은 메뉴를 또 누르면 카드가 2장 쌓였다.
-    if (카드조회중 === p) return Promise.resolve(true);
-    카드조회중 = p;
+    // 연타 가드 — 진행 중인 조회의 **Promise 자체를 공유**한다. true를 지어 돌려주면
+    // 첫 응답이 「카드 없음」일 때 두 번째 클릭이 무대만 내리고 화면은 영영 안 열린다
+    // (검토관 백로그 중2 — 모르는 결과를 아는 척하지 않는다).
+    if (카드조회중 && 카드조회중.p === p) return 카드조회중.promise;
     var scope = 범위 && 범위.kind === "asset" ? String(범위.id) : undefined;
-    return window.gijo.screenCard(p, scope).then(function (r) {
+    var 조회 = window.gijo.screenCard(p, scope).then(function (r) {
       if (!r || r.none || !r.dataCard) return false; // 카드 없는 화면 — 셸이 종전대로 연다
       // 부품을 먼저 확인하고 줄을 붙인다(검토관 하 — 순서가 반대면 부품 미로드 때
       // 제목만 있는 빈 줄이 대화에 남는다).
@@ -1809,6 +1810,8 @@
       // 태워 카드+화면이 둘 다 열렸던 실결함, 2026-08-20 관문 「프레임 0→1」이 잡았다)
     }).catch(function () { return false; /* 조회 실패는 조용히 — 셸이 화면을 연다 */ })
       .finally(function () { 카드조회중 = null; });
+    카드조회중 = { p: p, promise: 조회 };
+    return 조회;
   }
   // ── 새 대화(세션) 시작 — 💬 대화 홈(2026-08-20 사장님 「새로운 세션을 열겠습니까 알림 주고」) ──
   // 이전 대화는 서버 작업 세션에 이미 저장돼 있다(작업 내역에서 다시 본다) — 여기는 화면과
