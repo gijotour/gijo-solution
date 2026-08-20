@@ -833,7 +833,7 @@ function popoutBounds(portrait: boolean, ref?: Electron.Rectangle): { x?: number
   return { x: wa.x + Math.max(0, wa.width - half), y: wa.y, width: Math.min(half, wa.width), height: wa.height };
 }
 
-ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?: string) => {
+ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?: string, theme?: string) => {
   const portrait = orient === "portrait";
   const key = String(page); // 페이지당 창 1개 — 가로/세로는 그 창 안에서 전환하므로 키에 넣지 않는다
   const existing = popoutWindows.get(key);
@@ -881,6 +881,9 @@ ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?:
   // ⚠ 로드 주소에 창 구분용 접미사를 섞으면 화면 자신의 쿼리(?s=ai 등)가 오염된다(실측 버그).
   const [file, qs] = String(page).split("?");
   const query: Record<string, string> = { popout: "1", orient: portrait ? "portrait" : "landscape" };
+  // 🎨 프로 셸이 요청한 팝업이면 흰 바탕 신호를 잇는다(배색 검토관 중8 — 같은 화면이
+  //   도킹은 희고 창은 검던 반쪽). 값은 요청한 셸이 실어 준다 — 창은 스스로 판단하지 않는다.
+  if (theme === "light") query.theme = "light";
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
   await win.loadFile(path.join(__dirname, `../src/renderer/pages/${file}`), { query });
 });
@@ -1026,7 +1029,7 @@ function 셸자리복구(): void {
   if (b.wasMaximized) mainWindow.maximize();
 }
 
-ipcMain.handle("console:popout", async () => {
+ipcMain.handle("console:popout", async (_e, theme?: string) => {
   if (consoleWindow && !consoleWindow.isDestroyed()) { consoleWindow.focus(); return { ok: true }; }
   const wa = screen.getPrimaryDisplay().workArea;
   const w = Math.max(420, Math.round(wa.width * 0.28));
@@ -1055,7 +1058,9 @@ ipcMain.handle("console:popout", async () => {
   consoleWindow.webContents.once("did-finish-load", () => {
     if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.webContents.send("console:context", lastConsoleContext);
   });
-  await consoleWindow.loadFile(path.join(__dirname, "../src/renderer/pages/console.html"));
+  // 🎨 프로 분리 대화창도 흰 바탕(배색 중8) — 신호는 요청한 셸이 실어 준다.
+  await consoleWindow.loadFile(path.join(__dirname, "../src/renderer/pages/console.html"),
+    theme === "light" ? { query: { theme: "light" } } : undefined);
   return { ok: true };
 });
 

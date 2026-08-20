@@ -314,6 +314,19 @@ const 화면파일카드: Record<string, 화면카드종류> = {
   "mydocs.html": "mydocs", // 내 문서(2026-08-20 LLM 위키 — 개인 문서·정리본·공유)
 };
 
+// 카드 없이 남는 메뉴 화면 — 「맵에 없음」이 암묵 예외였던 것을 이유와 함께 명시(검토관 5.41
+// 중11: 예외가 암묵이면 실수로 빠진 화면과 구분이 안 된다). 새 메뉴 화면은 맵이나 여기
+// 둘 중 하나에 반드시 들어가야 한다 — wiringcontract 「메뉴=맵∪예외」가 지킨다.
+export const 카드예외: Record<string, string> = {
+  "office.html": "(창) 상시 관제 모니터 — 동시 보기가 목적",
+  "docbox.html": "(창) 문서함 — 옆에 두고 읽는 창",
+  "settings.html": "설정 — 조작 화면이라 현황 카드가 성립 안 함",
+  "dashboard.html": "대시보드 자체가 요약판 — 카드의 카드는 중복",
+  "lawlookup.html": "결과가 대화 답으로 오는 화면 — 화면 현황이 없음",
+  "intro.html": "제품 소개(읽기 전용)",
+  "handover.html": "인수인계 위저드 — 행위 화면(현황은 작업내역 카드가 담당)",
+};
+
 export function registerScreenCardRoute(app: import("express").Express): void {
   app.get("/api/screen-card", authMiddleware, asyncRoute(async (req, res) => {
     const page = String(req.query.page || "").split("?")[0];
@@ -342,6 +355,11 @@ export function registerScreenCardRoute(app: import("express").Express): void {
       : aiteamStatusAnswer();
     const 분기 = kind === "asset" ? "분기:자산현황" : kind === "ops" ? "분기:관제현황" : kind === "hardening" ? "분기:검증현황"
       : kind === "fix" ? "분기:내업무" : kind === "report" ? "분기:내업무" : "분기:내업무";
+    // 🗂 범위가 걸렸는데 이 카드가 범위를 모르는 종류면 제목에 밝힌다(검토관 5.41 중10 —
+    //   범위를 걸어 둔 사람이 전체 숫자를 자기 자산 것으로 읽는 사고 방지). 감추지 않고 말한다.
+    if (scope && kind !== "asset" && 답.dataCard) { // finding은 위에서 이미 반환됨
+      답.dataCard.title += " (전체 기준 — 🗂 범위 미적용)";
+    }
     res.json({ output: 답.output, dataCard: 답.dataCard, nextChips: nextChipsFor(분기) });
   }));
 }
@@ -462,7 +480,9 @@ export function fixStatusAnswer(): { output: string; dataCard: DataCard } {
   const 대기 = rv.filter((r) => (r.finding ? isRealVulnerability(r.finding) : true) && String(r.status) === "pending");
   const mt = listMaintenanceItems();
   const today = todayLocal();
-  const 지연 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled" && String((m as { scheduleDate?: string }).scheduleDate || "") <= today).length;
+  // < today — 오늘 예정 건은 「지연」이 아니다(검토관 하: <=로 세면 아침에 열 때마다
+  //   오늘 할 일이 빨간 「지연」으로 시작한다). maintenance 화면의 「오늘 마감」과도 갈라 센다.
+  const 지연 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled" && String((m as { scheduleDate?: string }).scheduleDate || "") !== "" && String((m as { scheduleDate?: string }).scheduleDate) < today).length;
   const 예정 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled").length;
   const dataCard: DataCard = {
     title: "조치 — 승인·점검 현황",

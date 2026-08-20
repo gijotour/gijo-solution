@@ -358,7 +358,8 @@
   // 카드 조회 세대 — 서버 왕복 중 사용자가 🗔·다른 메뉴를 누르면 옛 응답이 뒤늦게 무대를
   // 내리거나(「🗔를 눌렀는데 화면이 안 뜬다」) 엉뚱한 화면을 열었다(검토관 중6). 최신
   // 세대의 응답만 상태를 건드린다.
-  var 카드세대 = 0;          // 살아있는 iframe이라 무한정 열면 메모리를 먹는다
+  var 카드세대 = 0;
+  var 방금카드없음 = null; // 카드 갈래가 「없음」을 확인한 직후의 page — 표준 훅 재조회 억제(이중 왕복)          // 살아있는 iframe이라 무한정 열면 메모리를 먹는다
 
   var tabs = [];             // {page, label, el, frame, pinned}
   var active = null;
@@ -575,6 +576,7 @@
             대화홈갱신();
             return; // 카드가 전부 — 화면은 🗔로만
           }
+          방금카드없음 = page; // 표준 훅의 재조회 억제(검토관 하 — 같은 카드 없음을 왕복 2회 묻던 것)
           open(page, label, { dock: true });   // 카드 없는 화면 — 전면(무대)으로
         });
         return;
@@ -648,7 +650,8 @@
     // 대화창에 상위 카드가 보여야 돼」, 사진3 흐름). 카드 없는 화면은 콘솔이 조용히 넘긴다.
     // ⚠ 부팅 복원(저장 탭 되열기)에서는 안 띄운다(검토관 M5 — 로그인마다 카드가 쏟아진다).
     //   콘솔이 분리돼 셸 콘솔이 숨어 있을 때도 안 띄운다(검토관 M2 — 분리창 쪽이 띄운다).
-    if (!부팅복원중 && !document.body.classList.contains("console-popped") &&
+    if (방금카드없음 === page) { 방금카드없음 = null; } // 카드 갈래가 방금 물었다 — 두 번 안 묻는다
+    else if (!부팅복원중 && !document.body.classList.contains("console-popped") &&
         window.gijoConsole && window.gijoConsole.screenCard) window.gijoConsole.screenCard(page, t.label);
   }
 
@@ -1143,7 +1146,7 @@
   }
   $("tbPopout").addEventListener("click", function () {
     if (!active) return;
-    if (window.gijo && window.gijo.openShellPopout) window.gijo.openShellPopout(active.page, active.label);
+    if (window.gijo && window.gijo.openShellPopout) window.gijo.openShellPopout(active.page, active.label, undefined, 프로인가() ? "light" : undefined);
     setTimeout(refreshWinCount, 700);
   });
 
@@ -1161,7 +1164,7 @@
       대화홈갱신(); redraw();
       var wasPopped0 = "0";
       try { wasPopped0 = localStorage.getItem("gijo:console:popped") || "0"; } catch (e) {}
-      if (wasPopped0 === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(); }
+      if (wasPopped0 === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
       로그인선택_못한것알리기();
       프로레일();
       return;
@@ -1184,7 +1187,7 @@
     // 지난번에 콘솔을 창으로 빼놨으면 그대로 이어간다(모니터가 여럿인 담당자는 한 번만 빼면 된다).
     var wasPopped = "0";
     try { wasPopped = localStorage.getItem("gijo:console:popped") || "0"; } catch (e) {}
-    if (wasPopped === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(); }
+    if (wasPopped === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
     로그인선택_못한것알리기();
     프로레일();
   }

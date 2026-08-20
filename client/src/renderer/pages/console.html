@@ -7,6 +7,13 @@
      안 걸면 Pretendard(@font-face)가 안 실려 맑은 고딕으로 떨어지고, 콘솔 창만 본 창과
      글꼴이 달라 보인다(2026-07-28 사용자 지적 "전체적인 폰트가 맞는건가"). -->
 <link rel="stylesheet" href="gijo-ui.css">
+<script>
+  // 🎨 프로 분리 대화창 흰 바탕(2026-08-20 배색 중8) — 셸이 실어 준 주소 신호로만 켠다.
+  if (/(^|[?&])theme=light(&|$)/.test(location.search)) {
+    document.documentElement.classList.add("theme-light");
+    document.write('<link rel="stylesheet" href="pro-white.css">');
+  }
+</script>
 <style>
   :root{--bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
     --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--teal:#1eb980;}

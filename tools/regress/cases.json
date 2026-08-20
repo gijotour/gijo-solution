@@ -91,6 +91,7 @@
     },
     {
       "id": "webreport-asset-query",
+      "requiresAsset": "안전대부",
       "q": "안전대부 웹서버 취약점 알려줘",
       "noRetry": true,
       "_왜": [

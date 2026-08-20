@@ -371,7 +371,7 @@
       if (IS_WINDOW) window.gijo.dockConsoleWindow();
       else {
         try { localStorage.setItem("gijo:console:popped", "1"); } catch (e) {}
-        window.gijo.openConsoleWindow();
+        window.gijo.openConsoleWindow(document.body.classList.contains("pro-shell") ? "light" : undefined); // 프로=흰 분리창(배색 중8)
         if (window.gijoConsoleHidden) window.gijoConsoleHidden(true); // 셸이 도킹 자리를 접는다
       }
     });
@@ -1755,6 +1755,7 @@
   var 화면카드직전 = null;
   var 화면카드라벨 = null; // 직전 카드의 화면 이름 — 무대가 내려간 동안의 대화 맥락 표시용
   var 화면카드행 = null;   // 직전 카드의 행(DOM) — 같은 메뉴 재클릭 때 다시 그리는 대신 비춰 준다
+  var 카드조회중 = null;   // 서버 왕복 중인 화면 — 연타로 카드가 2장 쌓이는 것을 막는다
   var 빈상태원본 = null; // 대화 홈(.cs-empty) 원본 — build가 저장, newSession이 되살린다
   // 반환: Promise<boolean> — 카드를 띄웠으면 true(셸 open()이 「화면을 열지 않는다」 판단에 쓴다,
   // 2026-08-20 사장님 확정 「화면 내용은 대화창에」). 같은 화면 연속도 true(카드는 이미 떠 있다).
@@ -1775,12 +1776,18 @@
       화면카드직전 = null; // 카드가 사라졌다 — 아래에서 새로 그린다
     }
     if (!(window.gijo && window.gijo.screenCard)) return Promise.resolve(false);
+    // 연타 가드(검토관 하) — 첫 응답이 오기 전 같은 메뉴를 또 누르면 카드가 2장 쌓였다.
+    if (카드조회중 === p) return Promise.resolve(true);
+    카드조회중 = p;
     var scope = 범위 && 범위.kind === "asset" ? String(범위.id) : undefined;
     return window.gijo.screenCard(p, scope).then(function (r) {
       if (!r || r.none || !r.dataCard) return false; // 카드 없는 화면 — 셸이 종전대로 연다
-      var row = append("event", { icon: "🗔", name: (label || p) + " — 현황", message: "", full: true });
+      // 부품을 먼저 확인하고 줄을 붙인다(검토관 하 — 순서가 반대면 부품 미로드 때
+      // 제목만 있는 빈 줄이 대화에 남는다).
       var P = window.gijoChatParts;
-      if (!row || !P) return false; // 카드를 못 그렸다 — 셸이 화면이라도 연다(직전 기억도 안 남긴다)
+      if (!P) return false;
+      var row = append("event", { icon: "🗔", name: (label || p) + " — 현황", message: "", full: true });
+      if (!row) return false; // 카드를 못 그렸다 — 셸이 화면이라도 연다(직전 기억도 안 남긴다)
       화면카드직전 = p;
       화면카드라벨 = label || p;
       화면카드행 = row;
@@ -1800,7 +1807,8 @@
       if (P.nextChips) P.nextChips(row, r.nextChips, function (q) { submit(q); });
       return true; // 카드가 전부 — 셸은 화면을 열지 않는다(then 끝의 암묵 undefined가 도킹 폴백을
       // 태워 카드+화면이 둘 다 열렸던 실결함, 2026-08-20 관문 「프레임 0→1」이 잡았다)
-    }).catch(function () { return false; /* 조회 실패는 조용히 — 셸이 화면을 연다 */ });
+    }).catch(function () { return false; /* 조회 실패는 조용히 — 셸이 화면을 연다 */ })
+      .finally(function () { 카드조회중 = null; });
   }
   // ── 새 대화(세션) 시작 — 💬 대화 홈(2026-08-20 사장님 「새로운 세션을 열겠습니까 알림 주고」) ──
   // 이전 대화는 서버 작업 세션에 이미 저장돼 있다(작업 내역에서 다시 본다) — 여기는 화면과

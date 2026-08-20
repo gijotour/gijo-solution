@@ -220,7 +220,8 @@ describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님
     // 진행」이 같은 날 앞선 예외 「필요한 거 빼고」를 대체): 도킹 머리 ⧉(dockPop)는 폐지 —
     // 프로의 창은 (창) 메뉴(팀 사무실·문서함)뿐이다. 상단 ⧉(tbPopout)는 표준 셸 전용으로
     // 남는다(프로는 .shellfoot 자체가 숨음 — shelllayout.test가 마크업을 지킨다).
-    expect(s).toContain("openShellPopout(active.page, active.label)");
+    // theme 4번째 인자(2026-08-20 배색 중8) — 프로 팝업도 흰 바탕 신호를 잇는다.
+    expect(s).toContain('openShellPopout(active.page, active.label, undefined, 프로인가() ? "light" : undefined)');
     expect(s, "도킹 머리 ⧉(dockPop)가 되살아났다 — 무대 전환으로 폐지된 조작이다")
       .not.toContain("openShellPopout(t.page, t.label || undefined)");
     // 도킹 진입 전 그 화면의 팝업을 닫는다(검토관 S2 — 안 닫으면 메뉴 재선택 시 두 벌)
@@ -293,6 +294,16 @@ describe("프로 확정 계약 — 메뉴는 카드가 전부(2026-08-20 사장�
     for (const p of ["sessions.html", "fix.html", "reporting.html", "products.html", "records.html", "threat.html", "aihub.html"]) {
       expect(d, p + " 카드 매핑이 없다(사장님 「나머지는 카드 다 만들어서」)").toContain(String.fromCharCode(34) + p + String.fromCharCode(34));
     }
+  });
+  it("메뉴 화면 = 카드 맵 ∪ 명시 예외 — 암묵 예외 금지(검토관 5.41 중11)", () => {
+    const d = readFileSync(join(__dirname, "..", "src", "engine", "datacard.ts"), "utf8");
+    const 맵 = new Set([...d.matchAll(/"([\w-]+\.html)":\s*"/g)].map((m) => m[1]));
+    const 예외블록 = d.slice(d.indexOf("export const 카드예외"), d.indexOf("};", d.indexOf("export const 카드예외")));
+    const 예외 = new Set([...예외블록.matchAll(/"([\w-]+\.html)":/g)].map((m) => m[1]));
+    const nv = readFileSync(join(PAGES, "nav.js"), "utf8");
+    const 메뉴 = [...nv.matchAll(/page:\s*"([\w-]+\.html)"/g)].map((m) => m[1]);
+    const 미분류 = [...new Set(메뉴)].filter((p) => !맵.has(p) && !예외.has(p));
+    expect(미분류, "새 메뉴 화면은 카드 맵 또는 카드예외(이유 명시)에 넣을 것").toEqual([]);
   });
   it("무대(대화창 자리) — 전면/대화 상태·← 대화로·골라서 복귀(2026-08-20 사장님 승인)", () => {
     const s = 코드만(join(PAGES, "app.html"));

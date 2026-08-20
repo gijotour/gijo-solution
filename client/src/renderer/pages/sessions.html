@@ -137,12 +137,12 @@
   .axis-label{font-size:11.5px;color:var(--muted-2);font-weight:700;min-width:30px;}
   .axis-chip{font-size:12px;padding:4px 9px;border-radius:7px;background:var(--panel-2);
     border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;}
-  .axis-chip:hover{border-color:var(--blue,var(--blue));}
+  .axis-chip:hover{border-color:var(--blue);}
   .axis-chip.on{background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.5);color:#fff;font-weight:700;}
   .axis-chip b{font-weight:700;color:var(--muted-2);margin-left:3px;font-size:11.25px;}
   .axis-chip.on b{color:#cfe0ff;}
   .qa-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;}
-  .qa-toggle input{accent-color:var(--blue,var(--blue));cursor:pointer;}
+  .qa-toggle input{accent-color:var(--blue);cursor:pointer;}
   /* 감췄으면 감췄다고 보인다 — 이 줄이 없으면 「내 기록이 사라졌다」로 읽힌다. */
   .hidden-note{font-size:11.5px;color:var(--muted-2);background:var(--panel-2);
     border:1px dashed var(--border);border-radius:7px;padding:6px 9px;margin:6px 0;line-height:1.55;}
@@ -259,10 +259,10 @@
         <button id="pickReportBtn" style="margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:4px 9px;color:var(--text);font-size:11.75px;cursor:pointer" title="진행사항을 골라 업무 진행 리포트를 만듭니다">📄 골라서 리포트</button>
       </div>
       <!-- 선택 모드 띠(시안 추천안 2026-08-09) — 3연결의 세 번째 고리: 계획→진행→리포트 -->
-      <div id="pickBar" style="display:none;align-items:center;gap:8px;background:rgba(59,130,246,.10);border:1px solid var(--blue,var(--blue));border-radius:8px;padding:6px 10px;margin:6px 0;font-size:12px">
+      <div id="pickBar" style="display:none;align-items:center;gap:8px;background:rgba(59,130,246,.10);border:1px solid var(--blue);border-radius:8px;padding:6px 10px;margin:6px 0;font-size:12px">
         <span id="pickCnt" style="font-weight:700">0건 선택</span>
         <span style="color:var(--muted-2)">— 리포트에 실을 진행사항을 목록에서 체크하세요</span>
-        <button id="pickGo" style="margin-left:auto;background:var(--blue,var(--blue));border:none;border-radius:7px;padding:4px 10px;color:#fff;font-size:11.75px;font-weight:700;cursor:pointer">리포트 만들기</button>
+        <button id="pickGo" style="margin-left:auto;background:var(--blue);border:none;border-radius:7px;padding:4px 10px;color:#fff;font-size:11.75px;font-weight:700;cursor:pointer">리포트 만들기</button>
         <button id="pickCancel" style="background:none;border:none;color:var(--muted-2);font-size:12px;cursor:pointer">취소</button>
       </div>
       <div class="search">🔎<input id="sessionSearch" placeholder="내역 검색…" aria-label="작업 내역 검색"></div>
@@ -497,7 +497,7 @@
       const 접은줄 = 접기(s.fold);
       const 밑줄 = 접은줄 || `<div class="sr-sub">${s.lastPreview ? esc(s.lastPreview) : "아직 대화 없음"}</div>`;
       return `<div class="srow ${s.id === currentId ? "on" : ""} ${s.opKind === "query" ? "op-query" : ""}" data-id="${s.id}">
-        ${pickMode ? `<input type="checkbox" class="spick" data-pick="${s.id}" ${picked.has(s.id) ? "checked" : ""} style="accent-color:var(--blue,var(--blue))">` : ""}
+        ${pickMode ? `<input type="checkbox" class="spick" data-pick="${s.id}" ${picked.has(s.id) ? "checked" : ""} style="accent-color:var(--blue)">` : ""}
         <span class="sdot ${st}"></span>
         <div class="sr-main"><div class="sr-title">${축표시(s)}${esc(s.title)}</div>${밑줄}</div>
         <div class="sr-meta"><span class="badge ${STATUS_BADGE[st] || "b-active"}">${label}</span> ${s.createdBy ? "· 👤 " + esc(s.createdBy) + " " : ""}· ${fmtTime(s.updatedAt)} · ${s.turnCount || 0}턴</div>

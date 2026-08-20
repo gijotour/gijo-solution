@@ -50,6 +50,19 @@ async function dispatch(text) {
   return { ms: Date.now() - t0, output: j.output || "", dataHits: j.dataHits, internalMiss: j.internalMiss };
 }
 
+// 표본 자산이 있어야 성립하는 케이스의 사전 점검(2026-08-20) — 운영 리셋(업무 데이터 0)으로
+// 표본이 사라진 케이스가 「제품 회귀」처럼 빨갛게 떠 진짜 실패를 가리던 것. 표본이 없으면
+// 실패가 아니라 「표본 없음(건너뜀)」으로 정직하게 구분한다 — 검사를 지우지 않는다(표본이
+// 다시 들어오면 그대로 되살아나는 검사다).
+async function assetExists(nameLike) {
+  try {
+    const r = await fetch(base + "/api/assets", { headers: { Authorization: "Bearer " + login.accessToken } });
+    const j = await r.json();
+    const list = Array.isArray(j) ? j : (j.assets || []);
+    return list.some((a) => String(a.name || "").includes(nameLike) || String(a.id || "").includes(nameLike));
+  } catch { return true; } // 못 읽으면 있는 것으로 친다 — 케이스가 돌아 실패로 드러나는 쪽이 정직
+}
+
 // 한 케이스를 1회 실행해 {ok, why, out, ms}를 돌려준다.
 async function runCase(c) {
   const why = [];
@@ -75,6 +88,11 @@ let fail = 0, flaky = 0;
 const t0 = Date.now();
 for (const c of cases) {
   try {
+    if (c.requiresAsset && !(await assetExists(c.requiresAsset))) {
+      console.log(`○ ${c.id} — 건너뜀(표본 자산 「${c.requiresAsset}」 없음 — 운영 리셋 뒤 상태. 표본이 들어오면 자동 재개)`);
+      caseResults.push({ id: c.id, pass: true, skipped: true });
+      continue;
+    }
     let r = await runCase(c);
     // noRetry — "가끔 맞는 것"이 결함인 케이스는 재시도로 가리면 안 된다.
     // 재시도는 원래 **드문 1회성 이탈**(2026-07-25 kisa-u01 1/4회)을 걸러 내려고 둔 것인데,

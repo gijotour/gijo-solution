@@ -276,6 +276,18 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
     return { bg: st.backgroundColor, b: st.borderTopColor };
   });
   ok("프로 흰 바탕: 카드 배경(부품 층)", !!카드경계 && 카드경계.bg === "rgb(255, 255, 255)", JSON.stringify(카드경계));
+  // SVG fill=var() 실기 계측(배색 검토관 「확인 필요」) — 스윕이 만든 presentation attribute의
+  // var()가 무효면 computed가 검정으로 떨어진다. 흰 바탕에서 검정 그래프는 그 자체가 답.
+  const hardFr = await 프레임찾기("hardening.html", 4);
+  if (hardFr) {
+    const svg색 = await hardFr.evaluate(() => {
+      const el = document.querySelector('svg [fill^="var("], svg [stroke^="var("]');
+      if (!el) return "대상 없음";
+      const st = getComputedStyle(el);
+      return el.hasAttribute("fill") ? st.fill : st.stroke;
+    }).catch(() => "평가 실패");
+    ok("SVG 토큰 색 해석(fill=var)", svg색 === "대상 없음" || (svg색 !== "rgb(0, 0, 0)" && svg색 !== "평가 실패"), String(svg색));
+  }
   // 팝업 0 — 프로에서 저절로 뜨는 창이 없다(창은 (창) 메뉴뿐 — 이 관문은 안 연다).
   const 팝업0 = ctx.pages().every((p) => {
     const u = p.url();

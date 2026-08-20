@@ -148,13 +148,13 @@ const gijoApi = {
   setOfficeAlwaysOnTop: (on: boolean) => ipcRenderer.invoke("office:setAlwaysOnTop", on),
   // 팝업 셸 "창으로 분리"(혼합 방식) — 팝업으로 보던 화면을 별도 창으로 떼어낸다(shell-popup.js가 사용).
   // orient="portrait"면 세로(피벗) 모니터용 길쭉한 창 — 세로 모니터가 있으면 거기 자동 배치.
-  openShellPopout: (page: string, title?: string, orient?: string) => ipcRenderer.invoke("shell:popout", page, title, orient),
+  openShellPopout: (page: string, title?: string, orient?: string, theme?: string) => ipcRenderer.invoke("shell:popout", page, title, orient, theme),
   // 분리창 자신이 가로/세로를 전환한다(hub.html 헤더 버튼) — 모니터 배치는 그 창에서.
   setPopoutOrientation: (orient: string) => ipcRenderer.invoke("shell:popoutOrient", orient),
   // 분리창이 "지금 보고 있는 탭"을 대시보드에 알린다 — 그 화면을 향해 바로 지시할 수 있게.
   reportPopoutTab: (page: string, label: string) => ipcRenderer.invoke("shell:popoutTab", page, label),
   // ── 대화 콘솔 창(4.0.0) — 기본은 셸 아래 도킹, 모니터가 여럿이면 창으로 빼낸다.
-  openConsoleWindow: () => ipcRenderer.invoke("console:popout"),
+  openConsoleWindow: (theme?: string) => ipcRenderer.invoke("console:popout", theme), // 위치 인자 관례
   // 지휘소(별도 대화 창)에서 본창에 탭을 연다. navigateTo와 다르다 — 그건 본창을 통째로
   // 갈아치워 열려 있던 탭이 다 사라진다. 이건 **탭 하나 추가**다.
   openTabInShell: (page: string, label?: string) => ipcRenderer.invoke("shell:openTab", page, label),

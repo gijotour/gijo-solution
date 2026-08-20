@@ -161,7 +161,7 @@
   .addrow button:hover{color:#fff;border-color:var(--blue);}
   /* 표준 상단바 — 조치·승인(approvals.html)과 같은 규칙. 허브 탭(embed)에서는 nav.js가
      숨기므로 단독 창에서만 보인다. 문구·수치까지 25화면과 동일하게 유지할 것. */
-  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2,var(--panel-2));}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
   .header-left{display:flex;align-items:center;gap:12px;}
   .header-left img{height:22px;}
   .app-title{font-size:15px;font-weight:800;color:#fff;}
@@ -197,15 +197,15 @@
 .plan-cand .why{font-size:11px;color:var(--muted);white-space:nowrap;background:var(--panel-2);
   border:1px solid var(--border);border-radius:5px;padding:0 6px;line-height:17px;}
 .plan-cand .why.hot{color:#ffb0a8;border-color:#4a3038;}
-.plan-cand .padd{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--teal,var(--teal));
+.plan-cand .padd{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--teal);
   border:1px solid #244b3c;border-radius:6px;padding:0 8px;line-height:18px;background:transparent;cursor:pointer;}
-.plan-cand:hover .padd{background:var(--teal,var(--teal));color:#0d1117;}
+.plan-cand:hover .padd{background:var(--teal);color:#0d1117;}
 .plan-cand.added .padd{color:var(--muted-2);border-color:var(--border);cursor:default;}
 .plan-cand.added:hover .padd{background:transparent;color:var(--muted-2);}
 .plan-trow{display:flex;align-items:center;gap:8px;min-height:26px;font-size:12.5px;border-bottom:1px solid var(--border);}
 .plan-trow:last-child{border-bottom:none;}
 .plan-trow .rm{color:var(--muted-2);cursor:pointer;font-size:12px;flex:0 0 auto;}
-.plan-p0{color:#f5928a;font-weight:800;} .plan-p1{color:var(--amber,var(--amber));font-weight:800;}
+.plan-p0{color:#f5928a;font-weight:800;} .plan-p1{color:var(--amber);font-weight:800;}
 </style>
 <script src="viz.js"></script>
 </head>
@@ -711,7 +711,7 @@
       .sort(function (a, b) { return b.createdAt - a.createdAt; }).slice(0, 3);
     var rowHtml = function (t) {
       return '<div class="plan-trow" data-id="' + esc(t.id) + '">' +
-        '<input type="checkbox" class="pck"' + (t.done ? " checked" : "") + ' title="완료 표시" style="accent-color:var(--teal,var(--teal))">' +
+        '<input type="checkbox" class="pck"' + (t.done ? " checked" : "") + ' title="완료 표시" style="accent-color:var(--teal)">' +
         '<span class="ptx" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer' + (t.done ? ";color:var(--muted-2);text-decoration:line-through" : "") + '" title="누르면 대화창이 이 할 일을 가리킵니다 (📌)">' +
         (t.priority && !t.done ? '<span class="plan-' + String(t.priority).toLowerCase() + '">' + esc(t.priority) + "</span> " : "") + esc(t.text) +
         "</span>" + (t.done ? "" : '<span class="rm" title="계획에서 빼기">✕</span>') + "</div>";
