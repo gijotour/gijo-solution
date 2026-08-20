@@ -348,7 +348,7 @@
       'fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round">' +
       '<path d="M3.4 3.2h4.2c.9 0 1.6.7 1.6 1.6v8c0-.7-.6-1.3-1.3-1.3H3.4z"/>' +
       '<path d="M12.6 3.2H9.2v10c0-.7.6-1.3 1.3-1.3h2.1z"/></svg>';
-    gear.title = "문서함 열기 — 가이드·아키텍처를 읽는 별도 창";
+    gear.title = "제품 안내 열기 — 내 문서의 📘 제품 안내 탭으로 갑니다";
     row.appendChild(av); row.appendChild(nm); row.appendChild(gear);
     // 「⇤ 대화 여기로 다시 붙이기」 — 문서함 줄 **바로 위**(2026-08-08 사용자 지시·시안 승인).
     // 예전 자리는 본문 아래 가로 한 줄(38px)이라, 대화창을 뺄수록 화면이 좁아지는 모순이 있었다.
@@ -368,8 +368,11 @@
     area.appendChild(row);
     gear.addEventListener("click", function (e) {
       e.stopPropagation();
-      if (window.gijo && typeof window.gijo.openDocbox === "function") window.gijo.openDocbox(document.documentElement.classList.contains("theme-light") ? "light" : undefined); // 프로=흰 문서함(QA 결함 2호 — 진입로마다 신호를 실어야 한다)
-      else gijoTell("문서함을 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
+      // 문서함(별도 창)은 내 문서 허브에 흡수됐다(2026-08-20 승인 시안 docs-hub-v3 §7) —
+      // 같은 자리(📚)를 유지하고 **대상만** 「내 문서 → 📘 제품 안내 탭」으로 바꾼다.
+      var 갈곳 = { page: "mydocs.html?tab=guide", label: "내 문서" };
+      if (typeof window.gijoOpenScreen === "function") window.gijoOpenScreen(갈곳);
+      else window.gijo.navigateTo(갈곳.page);
     });
     // 이름·아바타를 누르면 **설정 › 내 설정**으로. 예전엔 이 줄이 ⚙ 메뉴를 열었는데 그 메뉴는 상단으로 갔다.
     // ⚠ 두 번 데었다. ① 구역 키는 s=my다(s=me로 적으면 아무 구역도 안 걸려 빈 화면이 뜬다).

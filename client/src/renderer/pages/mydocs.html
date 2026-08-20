@@ -9,13 +9,32 @@
   통합하고 … 엑셀처럼 촘촘하게 쉽게 많이 보이게」). 승인 시안: mockups/docs-hub-v2/시안.html
   (mockups/docs-single-entry 승계 — 격리·업로드 창구·반입=영수증 결정 그대로).
 
-  ■ 탭 4: 👤 내 것(personal_docs CRUD) · 🏢 회사 지식(RAG 지식창고 열람) · 🎓 학습(수집 내역
-    열람 — **조작 없음**, 학습 실행·승인은 learnloop.html 몫) · 🩹 반입(＋로 올린 문서의 기록).
+  ■ v3 (2026-08-20 사장님 — 「내문서에서 모든 파일 통제 및 관리 그리고 수정까지 하나로」·
+    「업무용 템플릿도 많이 넣어서 실사용하게」·「모든 문서는 여기서」. 승인 시안:
+    mockups/docs-hub-v3/시안.html):
+    · 📘 제품 안내 탭 신설 — 문서함(별도 창, docbox.html)을 흡수했다. 제품 매뉴얼 12건
+      읽기(docboxList/Read)와 「📝 요청 만들기」(docRequestBuild)가 이 화면으로 왔다.
+      문서함 창과 이 화면이 personalDocsList()를 **이중 호출**하던 중복도 함께 없앴다.
+    · 👤 내 것 탭에 **전폭 편집 스테이지** — ＋ 새 문서·✏ 고치기. 업무 템플릿 7종(코드
+      상수 — LLM이 짓지 않는다)·원문/분할/미리보기. 저장은 personalDocsUpdate/Create
+      **이미 있던 라우트** 그대로(서버 신설 0건 — 시안 §5 대응표).
+    · Smart MD Studio 창은 **그대로 둔다**(서버 권한 0 격리 — smartmd-preload.ts 불변).
+      이 화면은 그 창을 iframe으로 품지 않는다. 「✍ Smart MD로 쓰기」는 지금처럼 별도 창.
+    · 신고 시한 연계 계약(시안 §6): {type:"gijo:newDocFromTemplate", templateId, prefill}
+      메시지를 받으면 내 것 탭·편집 스테이지를 열고 템플릿 골격을 채운다. 발신자는
+      부모 셸(window.parent)만 믿는다 — 발신자 검증 계약(5.37.0)과 같은 잣대.
+      (지금 발신자는 아직 없다 — 신고 시한 카운트다운 카드가 생기면 이 계약으로 들어온다.)
+  ■ 탭 5+1: 👤 내 것(personal_docs CRUD) · 🏢 회사 지식(RAG 지식창고 열람) · 📘 제품 안내
+    (출하 문서 읽기전용+요청 만들기) · 🎓 학습(수집 내역 열람 — **조작 없음**) · 🩹 반입
+    (＋로 올린 문서의 기록) · 🗂 산출물(예약 자리 — 눌러도 예약 안내만, 데이터인 척 안 한다).
   ■ 격리가 이 화면의 전부다: 내 것 목록은 서버가 **내 것만** 준다(personaldocs — 남의 것은
     404). 회사 지식 목록도 서버 라우트가 남의 개인 문서를 걸러 준다(memory 라우트).
   ■ 「보기·올리기는 창구, 위험한 관리는 전용 화면」 — 회사 지식의 삭제·등급 변경은 AI 지식
-    화면, 학습 승인·실행은 학습 화면. 여기는 바로가기만 잇는다.
-  ■ 자유 텍스트 입력칸 0(지시는 대화창) — 검색칸은 필터 전용, 파일 가져오기(대화상자)만 있다.
+    화면, 학습 승인·실행은 학습 화면. 여기는 바로가기만 잇는다. 제품 안내는 읽기전용 —
+    편집(✏·＋)은 👤 내 것 탭에서만 나온다.
+  ■ 자유 텍스트 입력칸 0(지시는 대화창) — 단 **편집기·요청 만들기는 예외**다: 본문 작성
+    자리는 저작 행위이지 지시가 아니다(Smart MD와 같은 지위 — 시안 §4 자가점검). 검색칸은
+    필터 전용.
   ■ 위키링크·백링크·그래프뷰는 만들지 않는다(확정 경계).
 -->
 <style>
@@ -39,6 +58,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   padding:6px 14px;border-radius:18px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
 .tabs button.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
 .tabs button .n{font-weight:800;margin-left:4px;}
+.tabs button.future{border-style:dashed;opacity:.75;}
+.tabs button.future .soon{font-size:11px;font-weight:800;color:var(--amber);margin-left:5px;}
 .filter{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;color:var(--text);
   font-size:12.5px;padding:7px 11px;outline:none;margin-bottom:8px;}
 .filter:focus{border-color:var(--blue);}
@@ -71,6 +92,96 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .gtxt-up{color:var(--teal);font-weight:700;} .gtxt-down{color:var(--red);font-weight:700;}
 .empty{padding:28px 16px;text-align:center;color:var(--muted-2);font-size:12.75px;}
 .note{font-size:11.75px;color:var(--muted-2);margin-top:10px;line-height:1.6;}
+
+/* ── 스테이지(편집·열람·요청) — 목록과 자리를 바꿔 쓴다(시안 v3: 300px 상세에 욱여넣지 않는다) ── */
+.stage{display:none;border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px 16px;}
+.stage.on{display:block;}
+.st-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.st-top .back{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;
+  padding:6px 12px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
+.st-top .back:hover{color:var(--text-strong, #fff);border-color:var(--blue);}
+.st-title-in{flex:1;min-width:220px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;
+  color:var(--text);font-size:13.5px;font-weight:700;padding:8px 12px;outline:none;font-family:inherit;}
+.st-title-in:focus{border-color:var(--blue);}
+.st-btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;
+  padding:7px 13px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
+.st-btn.save{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:800;}
+.st-btn.on{border-color:var(--blue);color:var(--blue-light);}
+.viewseg{display:flex;gap:0;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
+.viewseg button{background:var(--panel-2);border:none;color:var(--muted);padding:7px 11px;font-size:12px;
+  font-weight:700;cursor:pointer;font-family:inherit;}
+.viewseg button.on{background:rgba(59,130,246,.18);color:var(--blue-light);}
+.st-hook{display:none;border-left:3px solid var(--blue);background:rgba(59,130,246,.08);border-radius:8px;
+  padding:8px 11px;font-size:12.25px;line-height:1.6;margin-bottom:8px;color:var(--text);}
+.st-hook.on{display:block;}
+.st-warn{border-left:3px solid var(--amber);background:rgba(240,160,32,.07);border-radius:8px;
+  padding:8px 11px;font-size:12px;line-height:1.7;margin-bottom:8px;color:var(--muted);}
+.st-warn b{color:var(--amber);}
+.tpl-drawer{display:none;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);
+  padding:10px 12px;margin-bottom:8px;}
+.tpl-drawer.on{display:block;}
+.tpl-lead{font-size:11.75px;color:var(--muted-2);margin-bottom:8px;line-height:1.6;}
+.tpl-chip{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;background:var(--panel);
+  border:1px solid var(--border-strong);color:var(--text);border-radius:9px;padding:7px 11px;margin:0 6px 6px 0;
+  font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;max-width:280px;}
+.tpl-chip:hover{border-color:var(--blue);}
+.tpl-chip .tag{font-size:11px;font-weight:800;color:var(--teal);}
+.tpl-chip .ov{font-size:11px;font-weight:400;color:var(--muted-2);line-height:1.4;}
+.edit-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:340px;}
+.edit-split.mode-src{grid-template-columns:1fr;} .edit-split.mode-src .edit-prev{display:none;}
+.edit-split.mode-prev{grid-template-columns:1fr;} .edit-split.mode-prev .edit-src{display:none;}
+.edit-src textarea{width:100%;height:100%;min-height:340px;background:var(--panel-2);border:1px solid var(--border-strong);
+  border-radius:8px;color:var(--text);font:12px/1.7 Consolas,"Cascadia Mono","Malgun Gothic",monospace;
+  padding:11px 13px;outline:none;resize:vertical;}
+.edit-src textarea:focus{border-color:var(--blue);}
+.edit-prev{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);padding:12px 14px;
+  overflow-y:auto;max-height:70vh;min-height:340px;}
+/* 마크다운 렌더(gijomd 출력) — docbox의 .md 규격을 축약 승계(공용 렌더러라 클래스 결이 같다) */
+.md h1{font-size:18px;margin:0 0 12px;color:var(--text-strong, #fff);line-height:1.4;}
+.md h2{font-size:14.5px;margin:18px 0 8px;color:var(--text-strong, #fff);padding-bottom:5px;border-bottom:1px solid var(--border);line-height:1.4;}
+.md h3{font-size:13.25px;margin:14px 0 6px;color:var(--blue-light);}
+.md p{color:var(--text);line-height:1.85;margin-bottom:9px;font-size:12.5px;}
+.md ul,.md ol{margin:0 0 11px 20px;color:var(--text);line-height:1.85;font-size:12.5px;}
+.md li{margin-bottom:3px;}
+.md table{border-collapse:collapse;width:100%;margin:9px 0 14px;font-size:12px;display:block;overflow-x:auto;}
+.md th{background:var(--panel-2);color:var(--muted);text-align:left;padding:6px 9px;border:1px solid var(--border);font-weight:700;white-space:nowrap;}
+.md td{padding:6px 9px;border:1px solid var(--border);color:var(--text);}
+.md pre{background:#1a1a19;border:1px solid var(--border-strong);border-radius:8px;padding:11px;
+  overflow-x:auto;font:11.5px/1.6 Consolas,"Cascadia Mono",monospace;color:var(--muted);margin-bottom:11px;}
+.md code{background:rgba(255,255,255,.06);border-radius:4px;padding:1px 5px;font:11.5px Consolas,monospace;color:#a7d3ff;}
+.md pre code{background:none;padding:0;color:inherit;}
+.md blockquote{border-left:3px solid var(--border-strong);padding:2px 0 2px 12px;margin:0 0 11px;color:var(--muted);}
+.md hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
+.md a{color:var(--blue-light);}
+.md strong{color:var(--text-strong, #fff);}
+.md img{max-width:100%;border-radius:8px;border:1px solid var(--border);}
+/* 요청 만들기(문서함에서 자리 이전 — docbox.html의 규격 승계) */
+.cx-chips{display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap;}
+.cx-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
+  padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;}
+.cx-chip.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
+.cx-fld{margin-bottom:11px;}
+.cx-fld label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px;font-weight:700;}
+.cx-fld .hint{color:var(--muted-2);font-weight:400;}
+.cx-fld input,.cx-fld textarea{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);
+  border-radius:8px;padding:9px 11px;color:var(--text);font-size:12.5px;font-family:inherit;outline:none;}
+.cx-fld input:focus,.cx-fld textarea:focus{border-color:var(--blue);}
+.cx-fld textarea{min-height:90px;resize:vertical;line-height:1.7;}
+.shots{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px;}
+.shot{width:104px;height:68px;border:1px solid var(--border-strong);border-radius:7px;position:relative;
+  overflow:hidden;background:var(--panel-2);}
+.shot img{width:100%;height:100%;object-fit:cover;}
+.shot .x{position:absolute;top:2px;right:5px;color:#fff;background:rgba(0,0,0,.6);border-radius:50%;
+  width:16px;height:16px;line-height:16px;text-align:center;font-size:12.25px;cursor:pointer;}
+.drop{border:1px dashed var(--border-strong);border-radius:8px;padding:12px;text-align:center;
+  font-size:12.5px;color:var(--muted-2);}
+.drop.over{border-color:var(--teal);color:#6ee7a0;background:rgba(30,185,128,.06);}
+.auto{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+  font-size:12.5px;color:var(--muted);line-height:1.8;margin-bottom:10px;}
+.auto b{color:var(--text);}
+.cx-status{font-size:12.25px;color:var(--muted-2);margin-top:8px;min-height:16px;}
+.mask{display:inline-block;background:rgba(240,160,32,.14);color:var(--amber);font-size:12px;
+  font-weight:800;padding:1px 8px;border-radius:10px;}
 </style>
 </head>
 <body class="g-ui">
@@ -78,19 +189,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="head">
     <div>
       <div class="page-title">내 문서</div>
-      <div class="page-sub">개인 메모 · 회사 지식 · 학습 재료 · 반입 기록 — 문서의 정문입니다. 개인 문서는 <b>내 질문에만</b> 근거로 나옵니다.</div>
+      <div class="page-sub">개인 메모 · 회사 지식 · 제품 안내 · 학습 재료 · 반입 기록 — 문서의 정문입니다. 개인 문서는 <b>내 질문에만</b> 근거로 나옵니다.</div>
     </div>
     <div class="acts" id="acts">
-      <button class="btn primary" id="btnWrite" title="Smart MD Studio(문서 작성 창)를 엽니다 — 다듬은 .md는 「가져오기」로 여기에 담습니다">✍ Smart MD로 쓰기</button>
+      <button class="btn primary" id="btnNew" title="이 화면 안에서 새 문서를 씁니다 — 업무 템플릿 7종에서 고를 수 있습니다">＋ 새 문서</button>
       <button class="btn" id="btnImport" title=".md/.txt 파일을 내 문서로 가져옵니다">📥 .md 가져오기</button>
-      <input type="file" id="fileIn" accept=".md,.txt,.markdown" style="display:none">
+      <button class="btn" id="btnWrite" title="Smart MD Studio(무료·별도 창)를 엽니다 — 바깥으로 낼 문서를 정성껏 다듬을 때 좋습니다">✍ Smart MD로 쓰기</button>
+    </div>
+    <div class="acts" id="guideActs" style="display:none">
+      <button class="btn primary" id="btnRequest" title="개발팀에 보낼 요청 문서를 만듭니다 — 파일로 저장됩니다">📝 요청 만들기</button>
     </div>
   </div>
   <div class="tabs" id="tabs">
     <button data-t="mine" class="on">👤 내 것<span class="n" id="nMine"></span></button>
     <button data-t="know">🏢 회사 지식<span class="n" id="nKnow"></span></button>
+    <button data-t="guide">📘 제품 안내<span class="n" id="nGuide"></span></button>
     <button data-t="learn">🎓 학습<span class="n" id="nLearn"></span></button>
     <button data-t="ingest">🩹 반입<span class="n" id="nIngest"></span></button>
+    <button data-t="future" class="future" title="예약된 자리 — 리포트·공식 인수인계 열람을 모을 예정입니다(아직 동작하지 않습니다)">🗂 산출물<span class="soon">예정</span></button>
   </div>
   <input class="filter" id="q" placeholder="제목·이름으로 좁히기… (필터 전용 — 지시가 아닙니다)" aria-label="목록 좁히기">
   <div class="mineseg" id="mineSeg" style="display:none">
@@ -105,16 +221,57 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
     <div class="detail" id="detail"><div class="dm">행을 누르면 여기서 내용·조작을 봅니다.</div></div>
   </div>
+
+  <!-- 전폭 편집 스테이지(시안 v3 — 300px 상세에 분할 뷰를 욱여넣지 않는다) -->
+  <div class="stage" id="editStage">
+    <div class="st-top">
+      <button class="back" id="editBack">← 목록으로</button>
+      <input class="st-title-in" id="editTitle" maxlength="120" placeholder="제목을 적어 주세요">
+      <button class="st-btn" id="editTplToggle">📋 업무 템플릿</button>
+      <div class="viewseg" id="editViewSeg">
+        <button data-v="src">원문</button>
+        <button data-v="split" class="on">분할</button>
+        <button data-v="prev">미리보기</button>
+      </div>
+      <button class="st-btn save" id="editSave">💾 저장</button>
+      <button class="st-btn" id="editCancel">취소</button>
+    </div>
+    <div class="st-hook" id="editHook"></div>
+    <div class="st-warn">⚠ <b>비밀번호·계정 정보는 넣지 마세요.</b> 저장할 때 자동으로 살펴보고 보이면
+      알려 드립니다 — 장비 접속 정보는 <b>보안제품 등록부</b>(암호화 보관)에 두세요.</div>
+    <div class="tpl-drawer" id="tplDrawer"></div>
+    <div class="edit-split" id="editSplit">
+      <div class="edit-src"><textarea id="editBody" placeholder="본문을 적어 주세요 — ### 제목, - 목록을 쓰면 오른쪽 미리보기에 정리되어 보입니다."></textarea></div>
+      <div class="edit-prev md" id="editPrev"></div>
+    </div>
+  </div>
+
+  <!-- 제품 안내 열람 스테이지(문서함의 넓은 읽기 화면 승계) -->
+  <div class="stage" id="readStage">
+    <div class="st-top">
+      <button class="back" id="readBack">← 목록으로</button>
+      <span style="font-weight:800;font-size:13.5px" id="readTitle"></span>
+    </div>
+    <div class="md" id="readBody" style="max-height:72vh;overflow-y:auto"></div>
+  </div>
+
+  <!-- 요청 만들기 스테이지(문서함에서 자리 이전 — 로직은 docbox.html 456-627 승계) -->
+  <div class="stage" id="composeStage"><div id="cxWrap"></div></div>
+
   <div class="note" id="note">개인 문서는 내 질문에만 근거로 나옵니다 — 「AI 포함」과 「공유」의 차이는 ⓘ로 보세요.</div>
 </div>
+<!-- 공용 마크다운 렌더러 — 편집 미리보기·제품 안내 열람·요청 미리보기가 쓴다.
+     ⚠ 이 줄이 빠지면 gijoMd가 undefined라 열람이 TypeError로 죽는다(문서함 5.7.2 실사고와 같은 부류). -->
+<script src="gijomd.js"></script>
 <script>
 (function () {
   "use strict";
   var 탭 = "mine";
-  var mine = [], know = [], learn = [], learnTopics = [], learnKpis = null;
-  var 오류 = { mine: null, know: null, learn: null }; // 불러오기 실패는 「없음」과 다르다(검토관 상4)
+  var mine = [], know = [], learn = [], learnTopics = [], learnKpis = null, guide = [];
+  var 오류 = { mine: null, know: null, learn: null, guide: null }; // 불러오기 실패는 「없음」과 다르다(검토관 상4)
   var mineFilter = "all";
   var 선택 = null; // { 탭, id }
+  var 스테이지값 = "list"; // list | edit | read | compose
   // 회사 지식·반입에서 개인 문서(personal:*)는 뺀다(검토관 중3 — 서버 반입 소식도 같은 제외).
   // 개인 문서의 자리는 👤 내 것 탭이고, personal: id는 사람이 못 읽는 uuid다.
   var 회사문서만 = function () { return know.filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0; }); };
@@ -143,20 +300,58 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return 이름 ? '<span class="gtxt-' + g + '" title="열람 등급: ' + 이름 + '">' + g + " " + 이름 + "</span>"
       : '<span class="gm2" title="열람 등급 미지정">? 미지정</span>';
   }
+  // 제품 안내 그룹 — docbox.ts의 group 값(guide/policy)을 그대로 받는다(재발명 금지)
+  var GUIDE_GROUP = { guide: { icon: "📚", label: "사용 안내" }, policy: { icon: "📐", label: "업무 지침" } };
+  var GUIDE_ORDER = ["guide", "policy"];
+
+  // ── 업무 템플릿 7종 — **코드 상수**(승인 시안 §3 그대로 — LLM이 짓지 않는다).
+  //    침해사고·유출 신고 2종은 법정 신고 항목 골격(정보통신망법 24h 최초신고 3요소 ·
+  //    개인정보보호법 §34 72h). ⚠ 법률 자문 아님 — 본문에도 그 문구가 있다.
+  var LEGAL_NOTE = "⚠ 이 문서는 참고용 골격입니다 — 법률 자문이 아닙니다. 신고 의무·기한의 최종 판단은 정보보호책임자·법무팀 확인이 필요합니다.";
+  var TEMPLATES = [
+    { id: "incident_report", icon: "🚨", label: "침해사고 1차 보고", tag: "⏱ 24h 신고 연계", overlap: "",
+      body: "### 침해사고 1차 보고(최초신고)\n\n" + LEGAL_NOTE + "\n\n- 인지일시: \n- 발생(추정)일시: \n- 대상 시스템/자산: \n- 신고 기한: 인지 후 24시간 이내 최초신고(정보통신망법 침해사고 신고 의무) · 추가 확인 사항은 확인 시점부터 24시간 이내 보완신고\n\n### 1. 피해내용\n- \n\n### 2. 원인(추정)\n- \n\n### 3. 현재 대응현황\n- \n\n### 4. 향후 계획\n- \n\n### 5. 신고 여부\n- 신고기관: 한국인터넷진흥원(KISA)/과학기술정보통신부\n- 신고일시: \n- 접수번호: " },
+    { id: "breach_notice", icon: "📋", label: "개인정보 유출 신고서", tag: "⏱ 72h 신고 연계", overlap: "",
+      body: "### 개인정보 유출 신고서\n\n" + LEGAL_NOTE + " 신고 대상 여부(1천 명 이상 등)는 개인정보보호 담당자·법무팀 확인이 필요합니다.\n\n- 인지일시: \n- 신고 기한: 인지 후 72시간 이내(개인정보 유출신고제도)\n\n### 1. 유출 규모\n- 유출된 정보주체 수: \n\n### 2. 유출 항목\n- \n\n### 3. 유출 경위·원인\n- \n\n### 4. 조치 내용\n- \n\n### 5. 정보주체 통지 계획\n- 통지 방법: \n- 통지 예정일: \n\n### 6. 신고 여부\n- 신고기관: 개인정보보호위원회/한국인터넷진흥원(KISA)\n- 신고일시: " },
+    { id: "weekly_report", icon: "📅", label: "주간 보안 보고", tag: "", overlap: "",
+      body: "### 주간 보안 보고\n\n### 1. 이번 주 처리 현황\n- 신규 발견: \n- 조치 완료: \n- 진행 중: \n\n### 2. 주요 이슈\n- \n\n### 3. 다음 주 계획\n- " },
+    { id: "handover_note", icon: "🔁", label: "인수인계 메모", tag: "", overlap: "개인 초안 — 공식 인수인계 기록은 [인수인계] 화면에서",
+      body: "### 인수인계 메모(개인 초안)\n\n⚠ 이 문서는 개인 초안입니다 — 공식 인수인계 기록은 [인수인계] 화면에서 만드세요.\n\n### 1. 진행 중인 업무\n- \n\n### 2. 예정된 일정\n- \n\n### 3. 계정·접근 정보 위치\n- (직접 적지 마세요 — 보안제품 등록부의 암호화 보관 위치를 안내하세요)\n\n### 4. 유의사항\n- " },
+    { id: "remediation_plan", icon: "🛠", label: "취약점 조치 계획", tag: "", overlap: "",
+      body: "### 취약점 조치 계획\n\n### 대상\n- 자산: \n- 취약점: \n\n### 조치 방법\n- \n\n### 담당·일정\n- 담당자: \n- 목표일: \n\n### 검증 방법\n- " },
+    { id: "risk_accept", icon: "⚖", label: "보안 예외(위험수용) 신청", tag: "", overlap: "개인 초안 — 공식 등록·만료 관리는 [자산 › 위험수용] 화면에서",
+      body: "### 보안 예외(위험수용) 신청 — 개인 초안\n\n⚠ 이 문서는 개인 초안입니다 — 공식 위험수용 등록·만료 관리는 [자산 › 위험수용] 화면에서 하세요(기한·사유 필수).\n\n### 예외 대상\n- \n\n### 사유\n- \n\n### 위험도 평가\n- \n\n### 대안 통제\n- \n\n### 유효기간\n- 시작: \n- 만료(필수): " },
+    { id: "equipment_check", icon: "🔧", label: "장비 점검 기록", tag: "", overlap: "",
+      body: "### 장비 점검 기록\n\n- 점검일시: \n- 장비명: \n\n### 점검 항목·결과\n- \n\n### 특이사항·조치\n- " }
+  ];
+  var TEMPLATE_BLANK = { id: "blank", icon: "📄", label: "빈 문서", tag: "", overlap: "", body: "" };
+
+  // ── 스테이지 전환 — 목록(필터·세그 포함)과 스테이지는 자리를 바꿔 쓴다 ──────
+  function 스테이지(which) {
+    스테이지값 = which;
+    var 목록 = which === "list";
+    document.getElementById("cols").style.display = 목록 ? "grid" : "none";
+    document.getElementById("q").style.display = 목록 ? "" : "none";
+    document.getElementById("mineSeg").style.display = 목록 && 탭 === "mine" ? "flex" : "none";
+    document.getElementById("learnTop").style.display = 목록 && 탭 === "learn" ? "flex" : "none";
+    document.getElementById("acts").style.display = 목록 && 탭 === "mine" ? "flex" : "none";
+    document.getElementById("guideActs").style.display = 목록 && 탭 === "guide" ? "flex" : "none";
+    document.getElementById("editStage").classList.toggle("on", which === "edit");
+    document.getElementById("readStage").classList.toggle("on", which === "read");
+    document.getElementById("composeStage").classList.toggle("on", which === "compose");
+  }
 
   // ── 탭별 그리기(전부 .g-rows — 승인 시안 docs-hub-v2: 새 시각 언어 금지) ──────
   function 그리기() {
     var q = (document.getElementById("q").value || "").toLowerCase().trim();
     var list = document.getElementById("list");
     var 걸림 = function (s) { return !q || String(s).toLowerCase().indexOf(q) >= 0; };
-    document.getElementById("learnTop").style.display = 탭 === "learn" ? "flex" : "none";
-    document.getElementById("acts").style.display = 탭 === "mine" ? "flex" : "none";
-    document.getElementById("mineSeg").style.display = 탭 === "mine" ? "flex" : "none";
+    스테이지("list");
     document.getElementById("cols").classList.toggle("full", 탭 === "learn");
     document.getElementById("rowsBox").className = "g-rows g-rows--hub-" + 탭;
 
     // 불러오기 실패는 「없습니다」가 아니다(검토관 상4) — 그 탭의 원천이 죽었으면 그렇게 말한다.
-    var 탭오류 = 탭 === "mine" ? 오류.mine : 탭 === "learn" ? 오류.learn : 오류.know;
+    var 탭오류 = 탭 === "mine" ? 오류.mine : 탭 === "learn" ? 오류.learn : 탭 === "guide" ? 오류.guide : 오류.know;
     if (탭오류) {
       list.innerHTML = '<div class="empty">불러오기 실패 — ' + esc(탭오류) + "<br>서버 연결을 확인하고 새로고침해 주세요.</div>";
       탭수그리기(); 상세초기화();
@@ -177,7 +372,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
             '<span>' + (d.shared ? '<span class="gtxt-share">🏢 공유</span>' : '<span class="gm2">개인</span>') + "</span>" +
             '<span class="ta-r gm2">' + 날짜(d.updatedAt) + "</span></div>";
         }).join("") + "</div>"
-        : '<div class="empty">' + (mine.length ? "검색과 맞는 문서가 없습니다." : "아직 문서가 없습니다 — ✍ Smart MD로 쓰거나 📥 .md를 가져오세요.") + "</div>");
+        : '<div class="empty">' + (mine.length ? "검색과 맞는 문서가 없습니다." : "아직 문서가 없습니다 — ＋ 새 문서(템플릿)로 쓰거나 📥 .md를 가져오세요.") + "</div>");
     } else if (탭 === "know") {
       // 영역(category)별 그룹 — 분류 논리는 서버 값 그대로(재발명 금지). 개인 문서 제외(중3).
       var byCat = {};
@@ -198,6 +393,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
                 '<span class="ta-r gm2">' + 날짜(d.ingestedAt) + "</span></div>";
             }).join("") + "</div>";
         }).join("") : '<div class="empty">회사 지식 문서가 없습니다.</div>');
+    } else if (탭 === "guide") {
+      // 제품 안내 — 문서함(창) 흡수(승인 시안 v3). 읽기전용: 편집 조작이 아예 없다.
+      var byGrp = { guide: [], policy: [] };
+      guide.filter(function (d) { return 걸림(d.title); }).forEach(function (d) {
+        (byGrp[d.group] || byGrp.policy).push(d);
+      });
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 84px;gap:8px"><span>문서</span><span class="ta-r">유형</span></div>' +
+        (guide.length ? GUIDE_ORDER.map(function (g) {
+          var arr = byGrp[g];
+          if (!arr.length) return "";
+          var gk = "안내:" + g;
+          var folded = 접힘.has(gk);
+          return '<div class="g-rows-gh" data-cat="' + esc(gk) + '" style="top:26px"><span class="tri">' + (folded ? "▸" : "▾") + '</span>' + GUIDE_GROUP[g].icon + " " + GUIDE_GROUP[g].label + '<span class="cnt">' + arr.length + "개</span></div>" +
+            '<div class="g-rows-body' + (folded ? " folded" : "") + '">' + arr.map(function (d) {
+              return '<div class="g-rows-r" data-id="' + esc(d.id) + '" style="grid-template-columns:1fr 84px;gap:8px">' +
+                '<span class="trunc" title="' + esc(d.title) + '">' + esc(d.title) + "</span>" +
+                '<span class="ta-r gm2">읽기전용</span></div>';
+            }).join("") + "</div>";
+        }).join("") : '<div class="empty">제품 안내 문서를 불러오지 못했거나 없습니다.</div>');
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;
@@ -232,6 +446,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function 탭수그리기() {
     document.getElementById("nMine").textContent = mine.length || "";
     document.getElementById("nKnow").textContent = 회사문서만().length || "";
+    document.getElementById("nGuide").textContent = guide.length || "";
     // 학습 총계는 kpis(진짜 총계)로 — 조회 상한(100)을 총계처럼 말하면 거짓이다(중1)
     document.getElementById("nLearn").textContent = (learnKpis && learnKpis.total) || learn.length || "";
     document.getElementById("nIngest").textContent = 회사문서만().filter(function (d) { return d.uploadedBy; }).length || "";
@@ -245,8 +460,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     선택 = null;
     var d = document.getElementById("detail");
     if (탭 === "know") d.innerHTML = '<div class="dm">행을 누르면 문서 정보를 봅니다.<div class="dbt"><button class="go" data-go="memory.html" data-lb="AI 지식">🗔 AI 지식에서 관리(삭제·영역·등급)</button></div></div>';
+    else if (탭 === "guide") d.innerHTML = '<div class="dm">행을 누르면 문서 정보를 보고, 📖으로 전체를 펼쳐 읽습니다. 제품이 담아 온 읽기전용 문서라 여기서는 고치지 않습니다.</div>';
     else if (탭 === "ingest") d.innerHTML = '<div class="dm">＋로 올린 문서가 어디로 갔는지의 기록입니다.<div class="dbt"><button class="go" data-go="analysis.html" data-lb="발견·수집">🗔 발견·수집(스캐너·로그 반입)</button></div></div>';
-    else if (탭 === "mine") d.innerHTML = '<div class="dm">행을 누르면 여기서 내용·조작(AI 포함·공유·내려받기·삭제)을 봅니다.</div>';
+    else if (탭 === "mine") d.innerHTML = '<div class="dm">행을 누르면 여기서 내용·조작(고치기·AI 포함·공유·내려받기·삭제)을 봅니다.</div>';
     else d.innerHTML = ""; // learn — 전폭이라 숨겨져 있지만 이전 탭 문구를 남기지 않는다(중4)
   }
 
@@ -272,6 +488,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     catch (e) { mine = []; 오류.mine = (e && e.message) || "오류"; }
     try { know = (await window.gijo.listMemoryDocuments()) || []; 오류.know = null; }
     catch (e) { know = []; 오류.know = (e && e.message) || "오류"; }
+    try { guide = ((await window.gijo.docboxList()) || {}).documents || []; 오류.guide = null; }
+    catch (e) { guide = []; 오류.guide = (e && e.message) || "오류"; }
     try {
       var r = await window.gijo.listLearnloopLogs(100, 0);
       learn = (r && r.logs) || [];
@@ -287,6 +505,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   document.getElementById("tabs").addEventListener("click", function (ev) {
     var b = ev.target.closest("button");
     if (!b) return;
+    if (b.getAttribute("data-t") === "future") {
+      // 예약 자리 — 데이터인 척하지 않는다(정직 원칙). 눌러도 예약 안내만.
+      document.getElementById("note").textContent = "🗂 산출물 — 예약된 자리입니다(생성 리포트·공식 인수인계 기록의 읽기전용 열람을 모을 예정). 아직 동작하지 않습니다.";
+      return;
+    }
     Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function (x) { x.classList.remove("on"); });
     b.classList.add("on");
     탭 = b.getAttribute("data-t") || "mine";
@@ -313,7 +536,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (r && r.ok === false && r.error && window.gijoTell) window.gijoTell(r.error);
   });
   document.getElementById("btnImport").addEventListener("click", function () { document.getElementById("fileIn").click(); });
-  document.getElementById("fileIn").addEventListener("change", async function (ev) {
+  var fileIn = document.createElement("input");
+  fileIn.type = "file"; fileIn.id = "fileIn"; fileIn.accept = ".md,.txt,.markdown"; fileIn.style.display = "none";
+  document.body.appendChild(fileIn);
+  fileIn.addEventListener("change", async function (ev) {
     var f = ev.target.files && ev.target.files[0];
     ev.target.value = "";
     if (!f || !window.gijo || !window.gijo.personalDocsCreate) return;
@@ -333,9 +559,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } catch (e) { if (window.gijoTell) window.gijoTell("가져오기 실패 — " + ((e && e.message) || "오류")); }
   });
 
-  // 행 클릭 — 탭별 상세(조작은 내 것 탭에서만: 「위험한 관리는 전용 화면」 경계)
+  // 행 클릭 — 탭별 상세(편집 조작은 내 것 탭에서만: 「위험한 관리는 전용 화면」·읽기전용 경계)
   document.getElementById("list").addEventListener("click", function (ev) {
-    // 회사 지식 그룹 접기(검토관 중10 — ▾를 그려 놓고 배선이 없으면 죽은 조작)
+    // 그룹 접기(검토관 중10 — ▾를 그려 놓고 배선이 없으면 죽은 조작). 회사 지식·제품 안내 공용.
     var gh = ev.target.closest(".g-rows-gh");
     if (gh) {
       var c = gh.getAttribute("data-cat");
@@ -359,10 +585,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         "<br>" + (doc.ragOptIn ? '<span class="gtxt-rag">AI 포함</span> — 내 AI가 이 문서를 읽습니다' : "AI 제외 — 대화 검색에 안 나옵니다") +
         "<br>수정 " + new Date(doc.updatedAt).toLocaleString("ko-KR") + "</div>" +
         '<div class="dbt">' +
+        '<button data-act="edit">✏ 고치기</button>' +
         '<button data-act="rag">' + (doc.ragOptIn ? "AI 제외" : "AI 포함") + "</button>" +
         '<button data-act="share">' + (doc.shared ? "공유 해제" : "🏢 공유") + "</button>" +
         '<button data-act="down">⬇ .md 내려받기</button>' +
         '<button data-act="del" class="warn">✕ 삭제</button>' +
+        "</div>";
+    } else if (탭 === "guide") {
+      var gd = guide.find(function (x) { return x.id === id; });
+      if (!gd) return;
+      선택 = { 탭: "guide", id: id };
+      알림(gd.title, "제품 안내 「" + gd.title + "」 · " + (GUIDE_GROUP[gd.group] ? GUIDE_GROUP[gd.group].label : "업무 지침") + " · 읽기전용");
+      d.innerHTML = '<div class="dn">' + esc(gd.title) + "</div>" +
+        '<div class="dm">📘 ' + (GUIDE_GROUP[gd.group] ? GUIDE_GROUP[gd.group].label : "업무 지침") + " · 제품이 담아 온 읽기전용 문서 — 여기서는 고치지 않습니다.</div>" +
+        '<div class="dbt">' +
+        '<button data-act="read">📖 열어 보기</button>' +
+        '<button data-act="req">📝 요청 만들기</button>' +
         "</div>";
     } else if (탭 === "know" || 탭 === "ingest") {
       var kd = know.find(function (x) { return x.documentId === id; });
@@ -376,15 +614,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   });
 
-  // 내 것 탭 조작(상세 패널) — 기존 계약 그대로(삭제=회수 확인·다운로드 관례·조용한 실패 금지)
+  // 상세 패널 조작 — 기존 계약 그대로(삭제=회수 확인·다운로드 관례·조용한 실패 금지)
   document.getElementById("detail").addEventListener("click", async function (ev) {
     var b = ev.target.closest("button[data-act]");
-    if (!b || !선택 || 선택.탭 !== "mine") return;
+    if (!b || !선택) return;
+    var act = b.getAttribute("data-act");
+    if (선택.탭 === "guide") {
+      if (act === "read") 안내열기(선택.id);
+      else if (act === "req") 요청열기();
+      return;
+    }
+    if (선택.탭 !== "mine") return;
     var doc = mine.find(function (x) { return x.id === 선택.id; });
     if (!doc) return;
-    var act = b.getAttribute("data-act");
     try {
-      if (act === "rag") { await window.gijo.personalDocsRag(doc.id, !doc.ragOptIn); }
+      // ✏ 고치기 — 본문은 목록 응답에 없어 읽기 라우트로 가져와 연다(빈 본문으로 열면 저장이 본문을 지운다)
+      if (act === "edit") { 편집열기_기존(doc); return; }
+      else if (act === "rag") { await window.gijo.personalDocsRag(doc.id, !doc.ragOptIn); }
       else if (act === "share") { await window.gijo.personalDocsShare(doc.id, !doc.shared); }
       else if (act === "down") {
         // 저장소 다운로드 관례(approvals·docbox와 동일 — 검토관 중9): appendChild→click→remove,
@@ -396,7 +642,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         a.href = url; a.download = (doc.title || "문서") + ".md";
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
-        if (window.gijoTell) window.gijoTell("「" + doc.title + ".md」를 내려받습니다 — 다운로드 폴더를 확인하세요.\nSmart MD에서 다듬은 뒤 📥 가져오기로 되담으면 됩니다.");
+        if (window.gijoTell) window.gijoTell("「" + doc.title + ".md」를 내려받습니다 — 다운로드 폴더를 확인하세요.\n다듬은 뒤 📥 가져오기로 되담으면 됩니다.");
         return;
       } else if (act === "del") {
         var ok = window.gijoAsk ? await window.gijoAsk("「" + doc.title + "」을 삭제할까요?\nAI 지식에 실려 있으면 함께 회수됩니다.") : false;
@@ -406,6 +652,345 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       불러오기();
     } catch (e) { if (window.gijoTell) window.gijoTell("처리 실패 — " + ((e && e.message) || "오류")); }
   });
+
+  // ── 편집 스테이지(승인 시안 v3 §1) — 저장은 이미 있던 라우트 그대로(personalDocsUpdate/Create) ──
+  var 편집중 = null; // 고치는 중인 문서 id — 새 문서면 null
+  function 서랍그리기() {
+    var box = document.getElementById("tplDrawer");
+    var all = TEMPLATES.concat([TEMPLATE_BLANK]);
+    box.innerHTML = '<div class="tpl-lead">고르면 본문이 골격으로 채워집니다(이미 쓴 내용이 있으면 되묻습니다) — 본문은 코드 상수입니다, AI가 짓지 않습니다.</div>' +
+      all.map(function (t) {
+        return '<button class="tpl-chip" data-tpl="' + esc(t.id) + '">' + t.icon + " " + esc(t.label) +
+          (t.tag ? '<span class="tag">' + esc(t.tag) + '</span>' : "") +
+          (t.overlap ? '<span class="ov">' + esc(t.overlap) + '</span>' : "") + "</button>";
+      }).join("");
+  }
+  document.getElementById("tplDrawer").addEventListener("click", async function (ev) {
+    var btn = ev.target.closest(".tpl-chip");
+    if (!btn) return;
+    var all = TEMPLATES.concat([TEMPLATE_BLANK]);
+    var t = all.find(function (x) { return x.id === btn.getAttribute("data-tpl"); });
+    if (!t) return;
+    var bodyEl = document.getElementById("editBody");
+    if (bodyEl.value.trim()) {
+      // 되돌릴 수 없는 덮어쓰기라 화면 안에서 묻는다(window.confirm 금지 — 렌더러가 멈춘다)
+      var ok = window.gijoAsk ? await window.gijoAsk("이미 쓴 내용이 있습니다. 「" + t.label + "」 골격으로 바꿀까요?\n(지금 쓴 내용은 사라집니다)") : false;
+      if (!ok) return;
+    }
+    bodyEl.value = t.body;
+    if (!document.getElementById("editTitle").value.trim() && t.id !== "blank") document.getElementById("editTitle").value = t.label;
+    미리보기갱신();
+  });
+  function 미리보기갱신() {
+    var el = document.getElementById("editPrev");
+    // 공용 렌더러(gijomd) — 없으면 조용히 죽지 않고 원문 그대로라도 보여준다(무반응=TypeError 의심 계열)
+    var v = document.getElementById("editBody").value;
+    if (window.gijoMd && window.gijoMd.render) el.innerHTML = window.gijoMd.render(v);
+    else el.textContent = v;
+  }
+  function 편집열기(doc, opts) {
+    opts = opts || {};
+    편집중 = doc && doc.id ? doc.id : null;
+    document.getElementById("editTitle").value = doc ? doc.title || "" : "";
+    document.getElementById("editBody").value = opts.body != null ? opts.body : "";
+    var hook = document.getElementById("editHook");
+    hook.classList.toggle("on", !!opts.hook);
+    if (opts.hook) hook.textContent = opts.hook;
+    document.getElementById("editSplit").className = "edit-split";
+    Array.prototype.forEach.call(document.querySelectorAll("#editViewSeg button"), function (x) { x.classList.toggle("on", x.getAttribute("data-v") === "split"); });
+    서랍그리기();
+    document.getElementById("tplDrawer").classList.toggle("on", !!opts.openDrawer);
+    document.getElementById("editTplToggle").classList.toggle("on", !!opts.openDrawer);
+    미리보기갱신();
+    스테이지("edit");
+    document.getElementById("editTitle").focus();
+  }
+  async function 편집열기_기존(doc) {
+    // 본문은 목록 응답에 없다 — 읽기 라우트로 가져온다(빈 본문으로 열면 저장이 본문을 지운다)
+    try {
+      var full = await window.gijo.personalDocsRead(doc.id);
+      편집열기(doc, { body: (full && full.body) || "" });
+    } catch (e) { if (window.gijoTell) window.gijoTell("문서를 열지 못했습니다 — " + ((e && e.message) || "오류")); }
+  }
+  document.getElementById("btnNew").addEventListener("click", function () { 편집열기(null, { openDrawer: true, body: "" }); });
+  document.getElementById("editBack").addEventListener("click", function () { 그리기(); });
+  document.getElementById("editCancel").addEventListener("click", function () { 그리기(); });
+  document.getElementById("editTplToggle").addEventListener("click", function () {
+    var d = document.getElementById("tplDrawer");
+    d.classList.toggle("on");
+    this.classList.toggle("on", d.classList.contains("on"));
+  });
+  document.getElementById("editBody").addEventListener("input", 미리보기갱신);
+  document.getElementById("editViewSeg").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button"); if (!b) return;
+    Array.prototype.forEach.call(this.querySelectorAll("button"), function (x) { x.classList.remove("on"); });
+    b.classList.add("on");
+    var v = b.getAttribute("data-v");
+    document.getElementById("editSplit").className = "edit-split" + (v === "src" ? " mode-src" : v === "prev" ? " mode-prev" : "");
+  });
+  document.getElementById("editSave").addEventListener("click", async function () {
+    var title = document.getElementById("editTitle").value.trim();
+    if (!title) { document.getElementById("editTitle").focus(); return; }
+    var body = document.getElementById("editBody").value;
+    var btn = this;
+    btn.disabled = true; btn.textContent = "저장 중…";
+    try {
+      var saved = 편집중
+        ? await window.gijo.personalDocsUpdate(편집중, { title: title, body: body })
+        : await window.gijo.personalDocsCreate({ title: title, body: body });
+      // 비밀번호로 보이는 것이 있으면 저장 뒤에 알린다(막지는 않는다 — 오탐도 있고,
+      // 막으면 담당자는 포스트잇에 적는다). docbox saveMine과 같은 계약.
+      if (saved && saved.warnings && saved.warnings.length && window.gijoTell) {
+        window.gijoTell("⚠ 비밀번호로 보이는 것이 " + saved.warnings.length + "곳 있습니다 — 장비 접속 정보는 보안제품 등록부(암호화 보관)에 두세요.");
+      }
+      await 불러오기();
+    } catch (e) {
+      if (window.gijoTell) window.gijoTell("저장하지 못했습니다 — " + ((e && e.message) || "오류"));
+    } finally { btn.disabled = false; btn.textContent = "💾 저장"; }
+  });
+
+  // ── 제품 안내 열람 스테이지 — docbox의 넓은 읽기 화면 승계(300px 상세에 본문을 욱여넣지 않는다) ──
+  async function 안내열기(id) {
+    var body = document.getElementById("readBody");
+    document.getElementById("readTitle").textContent = "";
+    body.innerHTML = '<div class="empty">여는 중…</div>';
+    스테이지("read");
+    try {
+      var doc = await window.gijo.docboxRead(id);
+      document.getElementById("readTitle").textContent = doc.title || "";
+      body.innerHTML = window.gijoMd && window.gijoMd.render ? window.gijoMd.render(doc.markdown || "") : esc(doc.markdown || "");
+      body.scrollTop = 0;
+    } catch (e) {
+      var m = String((e && e.message) || e);
+      body.innerHTML = '<div class="empty">' +
+        (/unauthorized|401/i.test(m)
+          ? "로그인이 풀려 문서를 못 열었습니다 — 다시 로그인한 뒤 열어 주세요."
+          : "문서를 열지 못했습니다 — " + esc(m)) + "</div>";
+    }
+  }
+  document.getElementById("readBack").addEventListener("click", function () { 그리기(); });
+
+  // ── 요청 만들기(문서함에서 자리 이전 — docbox.html 456-627 로직 승계, 새로 짜지 않았다) ──
+  // 전달은 파일 저장뿐이다(사용자 결정 2026-07-30) — 메일 발송 기능은 없다.
+  var CX_KINDS = [
+    { id: "bug", label: "🐞 버그", tried: "무엇을 하려고 했는지 적어 주세요.", happened: "무슨 일이 일어났는지 적어 주세요. 화면을 캡처해 Ctrl+V로 붙여넣으면 좋습니다." },
+    { id: "feature", label: "✨ 기능 요청", tried: "지금은 이 일을 어떻게 하고 계신가요?", happened: "어떤 기능이 있으면 좋겠는지, 그게 왜 필요한지 적어 주세요." },
+    { id: "ui", label: "🎨 화면·사용성", tried: "어느 화면에서 무엇을 하려 하셨나요?", happened: "무엇이 불편했는지 적어 주세요. 캡처가 있으면 훨씬 빨리 고칩니다." },
+    { id: "etc", label: "💬 기타", tried: "", happened: "" }
+  ];
+  var cx = null; // { kind, images:[dataUrl], title, tried, happened, clientVersion, platform }
+
+  // 지금 입력란의 내용을 담아둔다 — 화면을 다시 그려도 글이 날아가지 않게(2026-07-31 실측:
+  // 미리보기 후 「계속 쓰기」에서 본문이 비었다. 쓴 글을 날리면 아무도 안 쓴다).
+  function cx담기() {
+    if (!cx) return;
+    var t = document.getElementById("cxTitle"), a = document.getElementById("cxTried"), b = document.getElementById("cxHappened");
+    if (t) cx.title = t.value;
+    if (a) cx.tried = a.value;
+    if (b) cx.happened = b.value;
+  }
+  function cx복원() {
+    var t = document.getElementById("cxTitle"), a = document.getElementById("cxTried"), b = document.getElementById("cxHappened");
+    if (t) t.value = cx.title || "";
+    if (a) a.value = cx.tried || "";
+    if (b) b.value = cx.happened || "";
+  }
+  function cx상태(글) { var el = document.getElementById("cxStatus"); if (el) el.textContent = 글 || ""; }
+
+  function 요청열기() {
+    cx = { kind: "bug", images: [], title: "", tried: "", happened: "" };
+    요청그리기();
+  }
+  function 요청그리기() {
+    var k = CX_KINDS.filter(function (x) { return x.id === cx.kind; })[0] || CX_KINDS[0];
+    var v = document.getElementById("cxWrap");
+    v.innerHTML =
+      '<div class="cx-chips">' +
+      CX_KINDS.map(function (x) {
+        return '<span class="cx-chip' + (x.id === cx.kind ? " on" : "") + '" data-k="' + x.id + '">' + x.label + "</span>";
+      }).join("") + "</div>" +
+      '<div class="cx-fld"><label>제목</label><input id="cxTitle" placeholder="한 줄로 요약해 주세요 (예: 설정 화면에서 저장이 안 됨)"></div>' +
+      '<div class="cx-fld"><label>무엇을 하려 했나</label><textarea id="cxTried" placeholder="' + esc(k.tried) + '"></textarea></div>' +
+      '<div class="cx-fld"><label>무슨 일이 일어났나 <span class="hint">— 화면을 캡처하고 Ctrl+V로 붙여넣으세요</span></label>' +
+      '<textarea id="cxHappened" placeholder="' + esc(k.happened) + '"></textarea>' +
+      '<div class="shots" id="cxShots"></div>' +
+      '<div class="drop" id="cxDrop">여기에 이미지를 끌어다 놓거나 <b>Ctrl + V</b>로 붙여넣기</div></div>' +
+      '<div class="auto" id="cxAuto">확인 중…</div>' +
+      '<div class="st-warn"><b>⚠ 파일로 저장하기 전에 확인하세요</b><br>' +
+      '글에 섞인 비밀번호·API 키는 <b>자동으로 가립니다</b>.<br>' +
+      '<b>그림 속 내용은 자동으로 가릴 수 없습니다.</b> 자산명·IP·담당자 이름이 찍혔는지 직접 확인해 주세요.</div>' +
+      '<div class="st-top" style="margin:0"><button class="st-btn save" id="cxSave">📄 파일로 저장</button>' +
+      '<button class="st-btn" id="cxPreview">미리보기</button>' +
+      '<button class="st-btn" id="cxCancel">취소</button></div>' +
+      '<div class="cx-status" id="cxStatus"></div>';
+    스테이지("compose");
+
+    v.querySelectorAll(".cx-chip").forEach(function (c) {
+      c.addEventListener("click", function () {
+        cx담기(); // 유형을 바꿔도 적던 글은 지킨다 — 다시 쓰게 하면 아무도 안 쓴다
+        cx.kind = c.getAttribute("data-k");
+        요청그리기();
+      });
+    });
+    document.getElementById("cxCancel").addEventListener("click", function () {
+      cx = null;
+      document.removeEventListener("paste", cx붙여넣기);
+      그리기();
+    });
+    document.getElementById("cxPreview").addEventListener("click", function () { 요청만들기(true); });
+    document.getElementById("cxSave").addEventListener("click", function () { 요청만들기(false); });
+
+    // Ctrl+V / 드래그&드롭 — Base64로 바꿔 문서에 내장한다(폐쇄망이라 이미지 서버가 없다)
+    var drop = document.getElementById("cxDrop");
+    document.removeEventListener("paste", cx붙여넣기);
+    document.addEventListener("paste", cx붙여넣기);
+    ["dragenter", "dragover"].forEach(function (e) {
+      drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.add("over"); });
+    });
+    ["dragleave", "drop"].forEach(function (e) {
+      drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.remove("over"); });
+    });
+    drop.addEventListener("drop", function (ev) {
+      var files = (ev.dataTransfer && ev.dataTransfer.files) || [];
+      for (var i = 0; i < files.length; i++) 이미지담기(files[i]);
+    });
+    cx복원(); // 화면을 다시 그린 뒤 쓰던 글을 되살린다
+    썸네일그리기();
+    자동정보();
+  }
+  function cx붙여넣기(e) {
+    if (!cx) { document.removeEventListener("paste", cx붙여넣기); return; }
+    var items = (e.clipboardData || window.clipboardData).items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) { 이미지담기(items[i].getAsFile()); e.preventDefault(); break; }
+    }
+  }
+  function 이미지담기(file) {
+    if (!file || !/^image\//.test(file.type)) return;
+    if (cx.images.length >= 10) { cx상태("이미지는 10장까지 담을 수 있습니다."); return; }
+    var r = new FileReader();
+    r.onload = function (ev) { cx.images.push(ev.target.result); 썸네일그리기(); };
+    r.readAsDataURL(file);
+  }
+  function 썸네일그리기() {
+    var box = document.getElementById("cxShots");
+    if (!box || !cx) return;
+    // 썸네일로 보여준다 — 본문에 거대한 Base64가 그대로 보이면 담당자가 놀란다
+    box.innerHTML = cx.images.map(function (src, i) {
+      return '<div class="shot"><img src="' + src + '"><span class="x" data-i="' + i + '">✕</span></div>';
+    }).join("");
+    box.querySelectorAll(".x").forEach(function (x) {
+      x.addEventListener("click", function () {
+        cx.images.splice(Number(x.getAttribute("data-i")), 1);
+        썸네일그리기();
+      });
+    });
+  }
+  async function 자동정보() {
+    var el = document.getElementById("cxAuto");
+    try {
+      var info = await window.gijo.getAppInfo();
+      cx.clientVersion = info.version;
+      cx.platform = info.platform + " " + info.osRelease + " / Electron " + info.electron;
+      el.innerHTML =
+        "<b>클라 버전</b> " + esc(info.version) + " &nbsp;·&nbsp; <b>환경</b> " + esc(cx.platform) + "<br>" +
+        "<b>보낸 사람</b>·<b>서버 커밋</b>·<b>발생 시각</b>·<b>최근 오류</b>·<b>자가 진단</b>은 저장할 때 함께 담깁니다.";
+    } catch (e) {
+      el.textContent = "환경 정보를 확인하지 못했습니다 — 저장은 됩니다.";
+    }
+  }
+  async function 요청만들기(previewOnly) {
+    cx담기();
+    var title = (document.getElementById("cxTitle").value || "").trim();
+    if (!title) { cx상태("제목을 적어 주세요."); document.getElementById("cxTitle").focus(); return; }
+    var btn = document.getElementById(previewOnly ? "cxPreview" : "cxSave");
+    if (btn) btn.disabled = true;
+    try {
+      var r = await window.gijo.docRequestBuild({
+        kind: cx.kind,
+        title: title,
+        tried: document.getElementById("cxTried").value || "",
+        happened: document.getElementById("cxHappened").value || "",
+        images: cx.images,
+        screen: "내 문서",
+        clientVersion: cx.clientVersion,
+        platform: cx.platform
+      });
+      var sizeText = (r.sizeBytes > 1048576 ? (r.sizeBytes / 1048576).toFixed(1) + "MB" : Math.round(r.sizeBytes / 1024) + "KB") + " · " + r.fileName;
+
+      if (previewOnly) {
+        // 미리보기는 **읽기와 같은 렌더러**로 — 저장될 모습 그대로 본다
+        var v = document.getElementById("cxWrap");
+        v.innerHTML =
+          '<div class="st-warn"><b>미리보기</b> — 아래가 파일에 담길 내용입니다. ' + esc(sizeText) +
+          (r.maskedCount ? ' <span class="mask">가려짐 ' + r.maskedCount + "곳</span>" : "") +
+          '<br><button class="st-btn" id="cxBackWrite" style="margin-top:8px">← 계속 쓰기</button></div>' +
+          '<div class="md">' + (window.gijoMd && window.gijoMd.render ? window.gijoMd.render(r.markdown) : esc(r.markdown)) + "</div>";
+        document.getElementById("cxBackWrite").addEventListener("click", function () {
+          요청그리기(); // cx담기로 담아둔 제목·본문·이미지가 그대로 되살아난다
+        });
+        return;
+      }
+
+      // 파일로 저장 — 담당자 PC에 떨어지고 여기서 끝난다. 밖으로 낼지는 담당자가 정한다.
+      var blob = new Blob([r.markdown], { type: "text/markdown;charset=utf-8" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = r.fileName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      if (window.gijoTell) window.gijoTell("저장했습니다 — " + r.fileName + (r.maskedCount ? " (자격증명 " + r.maskedCount + "곳 가림)" : "") + ".\n이 파일을 개발팀에 전달해 주세요.");
+      cx = null;
+      document.removeEventListener("paste", cx붙여넣기);
+      그리기();
+    } catch (e) {
+      cx상태("만들지 못했습니다: " + ((e && e.message) || e));
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+  document.getElementById("btnRequest").addEventListener("click", 요청열기);
+
+  // ── 신고 시한 연계 계약(승인 시안 §6) — {type:"gijo:newDocFromTemplate", templateId, prefill} ──
+  // 발신자는 부모 셸만 믿는다(발신자 검증 계약 5.37.0과 같은 잣대 — 아무 창이나 이 화면에
+  // 편집기를 열게 두지 않는다). prefill 값은 문자열만·길이 캡(선택정돈과 같은 정신).
+  // 지금은 발신자가 아직 없다 — 신고 시한 카운트다운 카드(미래 기능)가 이 계약으로 들어온다.
+  window.addEventListener("message", function (ev) {
+    if (ev.source !== window.parent && ev.source !== window.top) return;
+    var d = ev.data;
+    if (!d || d.type !== "gijo:newDocFromTemplate") return;
+    var t = TEMPLATES.find(function (x) { return x.id === d.templateId; });
+    if (!t) return; // 모르는 템플릿이면 열지 않는다 — 빈 편집기를 여는 것보다 안 여는 쪽이 정직하다
+    var body = t.body;
+    var 채움 = [];
+    if (d.prefill && typeof d.prefill === "object") {
+      Object.keys(d.prefill).slice(0, 12).forEach(function (k) {
+        var val = String(d.prefill[k] == null ? "" : d.prefill[k]).slice(0, 300);
+        var 앵커 = "- " + String(k).slice(0, 60) + ": ";
+        if (val && body.indexOf(앵커) >= 0) { body = body.replace(앵커, 앵커 + val); 채움.push(k); }
+      });
+    }
+    // 내 것 탭으로 전환하고 편집기를 연다
+    탭 = "mine";
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function (x) {
+      x.classList.toggle("on", x.getAttribute("data-t") === "mine");
+    });
+    편집열기({ id: null, title: t.label + " — " + new Date().toLocaleDateString("ko-KR") }, {
+      body: body,
+      hook: "🔗 " + t.label + " 템플릿이 열렸습니다" + (채움.length ? " — " + 채움.join("·") + " 항목이 자동으로 채워졌습니다. 나머지를 채우고 저장하세요." : ". 항목을 채우고 저장하세요."),
+    });
+  });
+
+  // ?tab= 딥링크 — 문서함(창)을 흡수하며 옛 진입로(하단 📚·설정의 가이드 링크)가
+  // 「제품 안내 탭이 선택된 내 문서」로 바로 오게 한다(승인 시안 §7 대응표).
+  var 첫탭 = new URLSearchParams(location.search).get("tab");
+  if (첫탭 && ["mine", "know", "guide", "learn", "ingest"].indexOf(첫탭) >= 0) {
+    탭 = 첫탭;
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function (x) {
+      x.classList.toggle("on", x.getAttribute("data-t") === 첫탭);
+    });
+  }
 
   불러오기();
 })();

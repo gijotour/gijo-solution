@@ -240,6 +240,50 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     JSON.stringify({ 전, 행: r && r.행, 무대내림: 후.무대내림, 문장: String(후.문장).slice(0, 50) }));
 }
 
+// ── ③‴ 문서 허브 v3(승인 시안 docs-hub-v3, 2026-08-20) — 제품 안내 탭 실렌더 + 편집 스테이지.
+//    문서함 창은 폐지됐다 — 이 탭이 제품 안내의 **유일한** 읽기 자리라, 행 0이면 제품 안내
+//    전체가 사라진 것이다(출하 문서 12건이 담겨 있어 0은 원리상 렌더 사망). 편집기는
+//    전(닫힘)→후(열림) 전이로 잰다(관문 헛계측 교훈 — 전 상태 단언 필수).
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("mydocs.html?tab=guide", "내 문서", { dock: true }));
+  const fr = await 프레임찾기("mydocs.html", 8);
+  const r = fr ? await fr.evaluate(async () => {
+    for (let i = 0; i < 20; i++) {
+      if (document.querySelector(".g-rows--hub-guide .g-rows-r")) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    const 행들 = document.querySelectorAll(".g-rows--hub-guide .g-rows-r");
+    if (!행들.length) return { 안내행: 0 };
+    행들[0].click();
+    await new Promise((x) => setTimeout(x, 200));
+    const 열어보기 = document.querySelector('#detail button[data-act="read"]');
+    if (열어보기) 열어보기.click();
+    let 본문 = false;
+    for (let i = 0; i < 15; i++) {
+      await new Promise((x) => setTimeout(x, 400));
+      const rb = document.getElementById("readBody");
+      if (rb && rb.textContent && rb.textContent.length > 200 && !/여는 중/.test(rb.textContent)) { 본문 = true; break; }
+    }
+    document.getElementById("readBack").click();
+    const mineBtn = document.querySelector('#tabs button[data-t="mine"]');
+    if (mineBtn) mineBtn.click();
+    await new Promise((x) => setTimeout(x, 300));
+    const 편집전 = document.getElementById("editStage").classList.contains("on"); // 전 상태 — false여야 전이를 잰 것
+    document.getElementById("btnNew").click();
+    await new Promise((x) => setTimeout(x, 200));
+    return {
+      안내행: 행들.length,
+      본문,
+      편집전,
+      편집열림: document.getElementById("editStage").classList.contains("on"),
+      템플릿: document.querySelectorAll("#tplDrawer .tpl-chip").length,
+    };
+  }).catch(() => null) : null;
+  ok("문서 허브: 제품 안내 렌더+열람 본문+편집 스테이지 전이+템플릿 8종(7+빈)",
+    !!r && r.안내행 > 0 && r.본문 && !r.편집전 && r.편집열림 && r.템플릿 === 8,
+    JSON.stringify(r));
+}
+
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──
 const 카드전 = await 셸.evaluate(() => document.querySelectorAll(".dc-card").length);
 await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기")); // 무dock=메뉴성 — 카드만 떠야 한다(사장님 확정 계약)

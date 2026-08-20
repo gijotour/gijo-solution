@@ -663,38 +663,9 @@ ipcMain.handle("office:open", async () => {
   await officeWindow.loadFile(path.join(__dirname, "../src/renderer/pages/office.html"));
 });
 
-// 문서함 — 가이드·아키텍처를 읽는 별도 창. 제품 화면 탭 안에 넣지 않는다:
-// 문서를 옆에 띄워두고 제품을 조작할 수 있어야 한다(사용자 지시 2026-07-30
-// "클라이언트 실행시 별도로 사용 — 제품 안에서 동작하는 게 아니고").
-ipcMain.handle("docbox:open", async (_e, theme?: string) => {
-  if (docboxWindow && !docboxWindow.isDestroyed()) {
-    docboxWindow.focus();
-    return;
-  }
-  docboxWindow = new BrowserWindow({
-    // 2단(목차 250 + 본문)이라 좁으면 표가 깨진다. 화면이 작으면 그 화면에 맞춘다.
-    width: Math.min(1180, Math.max(920, screen.getPrimaryDisplay().workAreaSize.width - 200)),
-    height: Math.min(860, Math.max(640, screen.getPrimaryDisplay().workAreaSize.height - 140)),
-    minWidth: 860,
-    minHeight: 560,
-    backgroundColor: "#262624",
-    title: "GIJO AS — 문서함",
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  docboxWindow.removeMenu();
-  bindZoom(docboxWindow); // 문서함도 같은 화면 크기(배율)를 따른다
-  docboxWindow.on("closed", () => { docboxWindow = null; });
-  // 🎨 프로면 문서함 창도 흰 바탕(검토관 백로그 중3 — 도킹은 희고 창만 검던 반쪽의 남은 절반).
-  //   ⚠ 팀 사무실(office)은 **일부러 안 잇는다** — 픽셀아트 캔버스 방이 창의 정체성이라
-  //   배색 예외로 확정된 화면이다(배색 라운드 예외 목록).
-  await docboxWindow.loadFile(path.join(__dirname, "../src/renderer/pages/docbox.html"),
-    theme === "light" ? { query: { theme: "light" } } : undefined);
-});
+// (문서함 별도 창은 2026-08-20 내 문서 허브에 흡수됐다 — 승인 시안 mockups/docs-hub-v3 §7.
+//  제품 안내 읽기·요청 만들기는 mydocs.html의 📘 제품 안내 탭이 맡는다. docbox:open IPC와
+//  창 코드는 함께 걷었다 — 옛 진입로(하단 📚·설정 가이드 링크)는 그 탭으로 재배선됐다.)
 
 // ── GIJO Smart MD Studio — 로그인한 고객에게 주는 **무료 문서 작성 도구** ────────────────
 //

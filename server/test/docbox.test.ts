@@ -128,11 +128,12 @@ describe("화면 이름을 부르는 말투도 안내로 간다", () => {
   it("'○○ 화면에서 뭘 할 수 있어?'가 전부 안내로 간다", async () => {
     const { isHelpIntent } = await import("../src/engine/screenguide");
     const 물음 = [
-      ["문서함 화면에서 뭘 할 수 있어?", "docbox.html"],
+      // 문서함 창은 내 문서 허브에 흡수됐다(2026-08-20) — 화면 맥락도 mydocs가 됐다.
+      ["문서함 화면에서 뭘 할 수 있어?", "mydocs.html"],
       ["취약점 화면에서 뭘 할 수 있어?", "vulnscan.html"],
       ["설정 화면에서 뭐 할 수 있어?", "settings.html"],
       ["기록 보기 메뉴에서 뭘 할 수 있어?", "audit.html"],
-      ["이 화면에서 뭘 할 수 있어?", "docbox.html"],
+      ["이 화면에서 뭘 할 수 있어?", "mydocs.html"],
     ] as const;
     for (const [q, s] of 물음) expect(isHelpIntent(q, s), `안내로 가야 한다: ${q}`).toBe(true);
   });
@@ -149,15 +150,16 @@ describe("화면 이름을 부르는 말투도 안내로 간다", () => {
     for (const [q, s] of 새면안됨) expect(isHelpIntent(q, s), `화면 안내로 새면 안 된다: ${q}`).toBe(false);
   });
 
-  it("문서함 안내에 실제 내용이 들어 있다 — 빈 껍데기가 아니다", async () => {
-    const { formatScreenGuide } = await import("../src/engine/screenguide");
-    const g = formatScreenGuide("docbox.html");
+  it("문서함을 물으면 새 자리(내 문서 📘 제품 안내)로 간다 — 흡수 뒤에도 옛 이름이 통한다", async () => {
+    // 문서함 창은 2026-08-20 내 문서 허브 v3에 흡수됐다. 담당자가 옛 이름으로 물어도
+    // 별칭이 mydocs.html로 잇고, 그 안내에 제품 안내·요청 만들기 내용이 실제로 있어야 한다.
+    const { formatScreenGuide, 이름으로화면찾기 } = await import("../src/engine/screenguide");
+    const hit = 이름으로화면찾기("문서함 어디서 봐?");
+    expect(hit?.screen, "별칭 「문서함」이 새 자리로 안 이어진다").toBe("mydocs.html");
+    const g = formatScreenGuide("mydocs.html");
     expect(g).toBeTruthy();
-    expect(g!).toContain("문서함");
-    expect(g!).toContain("별도 창");
-    // 구역 4개가 안내에 나열돼야 담당자가 이름을 넣어 되물을 수 있다
-    for (const 구역 of ["사용 안내", "업무 지침", "문서 검색", "요청 만들기"]) expect(g!).toContain(구역);
-    expect(g!).toContain("고객사에 나가도 되는 것만");
+    // 흡수된 내용이 실제로 들어 있어야 담당자가 이름을 넣어 되물을 수 있다
+    for (const 구역 of ["제품 안내", "요청 만들기", "업무 템플릿"]) expect(g!).toContain(구역);
     // 요청 만들기가 열렸으므로 안내도 실제 절차를 말해야 한다 — "준비 중"이 남아 있으면 거짓말이 된다
     expect(g!, "준비 중 문구가 남아 있다").not.toContain("아직 준비 중");
   });

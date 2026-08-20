@@ -286,6 +286,9 @@ async function main() {
     // 2026-08-19: ⓪ 자산(자산 현황 + 🗂 지금 범위 입구) — 시연 ①★가 이 화면을 쓴다.
     { page: "assets.html", name: "35-자산-지금범위" },
     { page: "report.html", name: "29-리포트" },
+    { page: "mydocs.html", name: "36-내문서-허브" },          // 2026-08-20 문서 허브 v3(문서함 흡수)
+    { page: "supervision.html", name: "37-AI팀감독-안전" },   // 2026-08-20 AI 허브 4탭 통합
+
   ];
 
   // GIJO_SHOT_ONLY="05,06" — 일부 화면만 다시 찍고 싶을 때(파일명 접두 번호로 필터). 없으면 전체.

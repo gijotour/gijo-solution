@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 시안: 현황판(가칭) · 대화 홈 통합</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  시안 — 「현황판」(가칭) — grouppanels.js 판(17)을 대화 홈 기준틀로 통합
+  경로: mockups/panels-overview/시안.html · 자체완결(외부 CDN·웹폰트·원격 이미지 0개)
+  ════════════════════════════════════════════════════════════════════════
+
+  ▣ 이 시안이 다루는 실물 코드(전부 읽고 그대로 옮김 — 숫자만 가짜)
+    · client/src/renderer/pages/grouppanels.js  — 판 17개 정의(그룹 7: discover·triage·fix·
+      verify·reporting·aiops·records). id·title·load()의 segments/rows/foot을 그대로 인용.
+    · client/src/renderer/pages/grouphub.js     — 판 그리드(.gh-card 138px)·요약 렌더 규약.
+    · client/src/renderer/pages/gijo-ui.css     — .g-rows 엑셀형 부품(행 30px·그룹머리 28px·
+      열머리 26px·얼룩 --g-zebra) — 2026-08-20 승인 시안 knowledge-rows의 확정 부품.
+    · client/src/renderer/pages/workflowrail.js + server/src/engine/workflow.ts — 업무 절차
+      5단계 띠(행동 축). 숫자는 서버 workflowStages() 한 곳, 화면은 안 센다.
+    · client/src/renderer/pages/railroster.js + server/src/engine/agents.ts — AI 팀 로스터
+      6명(orchestrator·scan·analysis·report·ti·normaltic, id·abbr·role 전부 실물) + 기반
+      부품 4(embed·search·guard·lora, 목적지 page까지 실물).
+    · server/src/engine/datacard.ts — 대화창 데이터 카드. 화면파일카드(13종 매핑)·
+      화면이름카드(키워드)·카드예외(제외 사유 명시)·assetStatusAnswer/mydocsStatusAnswer/
+      sessionsStatusAnswer/productsStatusAnswer(신설 카드 4개의 실제 원천, 아래 §5).
+    · client/src/renderer/pages/chatparts.js — .dc-card 대화 카드 렌더 + 🎯 고르기 버튼
+      (고르기kind 맵: inventory.html/assets.html→"asset", triage.html→"vuln" — 지금 딱 2종).
+    · client/src/renderer/pages/pick.html — 🎯 고르기 화면의 계약(gijo:pickdone 좁은 신호·
+      검색=필터 전용·fields 10키·"고르기는 맥락이 되지 않는다"의 예외).
+    · client/src/renderer/pages/console.js — 대화 홈(.cs-head·.cs-chips·.ce-hero min-height
+      46vh·.cs-dock) 실제 DOM·CSS. 맥락 문장 포맷 "지금 「◯◯」 다루는 중"(1107행) 그대로.
+    · client/src/renderer/pages/app.html — 프로 셸 .app 232px→56px 레일 전환, dock 계약.
+    · client/src/renderer/pages/nav.js — 메뉴 트리(TOP 6 + GROUPS 10) — 판 커버리지 대조 원천.
+    · GIJO_AS_대화시나리오_대장_2026-08-19.md — §2-1·§6-4·§5-1(아래 §4에 원문 인용, 지어내지 않음).
+
+  ▣ 설계 전 조사(외부 표준·모범사례, 2026-08-20)
+    1) Smashing Magazine, "From Data To Decisions: UX Strategies For Real-Time Dashboards"(2025)
+       — 실시간 갱신은 급격한 깜박임을 피하고 부드러운 강조(glow)·최종 갱신 시각 표기·수동
+       새로고침을 두라는 지침. 이 시안의 "움직임" 표시(테두리 링 확장 0.9s ease-out, 급한 점멸
+       금지)와 판마다 "n초 전" 타임스탬프 표기의 근거.
+       https://www.smashingmagazine.com/2025/09/ux-strategies-real-time-dashboards/
+    2) Microsoft Learn, "User experience guidelines for interactive UI widgets in declarative
+       agents"(Microsoft 365 Copilot) — 대화 안에 접히는 "chiclet card"·Adaptive Card 패턴:
+       위젯이 대화 표면에 압축 카드로 뜨고, 펼치면 더 큰 작업공간으로 이어진다. 이 시안의
+       "대화창에서 판 부르기 → .dc-card → 🗔 전체 열기/🎯 고르기"의 근거.
+       https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/declarative-agent-ui-widgets-guidelines
+    → 다크톤 색 토큰·11px 하한·행 30px 엑셀형은 **이 저장소 자체가 이미 조사·승인한 표준**
+      (mockups/knowledge-rows 2026-08-20 승인, gijo-ui.css 주석 344행 이하)이라 재조사하지
+      않고 그대로 재사용했다 — 같은 근거를 두 번 만들지 않는다는 원칙(CLAUDE.md).
+
+  ▣ 사장님 지시 — 누계 10건(verbatim, 전부 이 시안에 반영). 본문 <details id="orders">에도
+    그대로 다시 실어 화면에서 펼쳐 볼 수 있게 했다(원문 확인용).
+
+  ▣ 핵심 결정 3줄
+    1. 자리는 더 이상 "추천"이 아니라 지시 10번으로 **확정** — 프로 셸의 **대화 홈**
+       (console.js .ce-hero)이 초기 화면이고, 거기 현황판이 얹힌다. "전체 지도"(이 시안의
+       주 콘텐츠)는 같은 데이터의 펼친 표현이지 별도 화면이 아니다.
+    2. 정렬 기준은 **움직임**이 1순위, 도메인·시나리오는 골라 들어가는 층 — 기본 화면은
+       "지금 바뀌는 판"이 앞에 뜨는 단순한 그리드 하나.
+    3. 판→대화 카드(datacard.ts)→🎯 고르기(pick.html)→무대(맥락 문장)까지 이미 있는 계약을
+       그대로 잇는다 — 새 UI를 발명하지 않고, 빠진 이음매(판 4개·pick kind 6개·카드 예외 근거)만
+       코드에 근거해 채운다.
+-->
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.09);
+    --border-strong:rgba(255,255,255,.16);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
+    --blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;
+    --g-zebra:rgba(255,255,255,.025);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;}
+  .wrap{max-width:1360px;margin:0 auto;padding:20px 22px 80px;}
+  h1{font-size:19px;margin:0 0 4px;}
+  h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  h3{font-size:13px;margin:0 0 6px;color:var(--text);}
+  .stagepill{font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;letter-spacing:.3px;flex:0 0 auto;}
+  .stagepill.s1{background:rgba(59,130,246,.18);color:var(--blue-light);}
+  .stagepill.s2{background:rgba(30,185,128,.18);color:var(--teal);}
+  .stagepill.s3{background:rgba(240,160,32,.18);color:var(--amber);}
+  .sub{font-size:12px;color:var(--muted-2);margin:0 0 14px;line-height:1.6;}
+  section{margin:0 0 34px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .note{font-size:11.5px;color:var(--muted-2);line-height:1.6;}
+  .warn{color:#f5928a;}
+  .ok{color:var(--teal);}
+  code{background:rgba(255,255,255,.06);border-radius:4px;padding:0 4px;font-size:11.5px;}
+  a{color:var(--blue-light);}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{text-align:left;color:var(--muted-2);font-weight:800;font-size:11px;padding:5px 8px;border-bottom:1px solid var(--border-strong);white-space:nowrap;}
+  td{padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tr:nth-child(even) td{background:var(--g-zebra);}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+
+  /* ── 사장님 지시 원문 박스 ─────────────────────────────────────────── */
+  details#orders{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:10px 14px;margin-bottom:26px;}
+  details#orders summary{cursor:pointer;font-size:12.5px;font-weight:800;color:var(--text);}
+  details#orders ol{margin:10px 0 2px;padding-left:20px;font-size:12px;line-height:1.75;color:var(--muted);}
+  details#orders li b{color:var(--text);}
+  details#orders li{margin-bottom:6px;}
+
+  /* ══ HERO — 프로 대화 홈 재현(지시 10) ══════════════════════════════ */
+  .heroFrame{border:1px solid var(--border-strong);border-radius:14px;overflow:hidden;background:#1c1c1a;}
+  .heroTitlebar{height:44px;background:var(--panel-2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;font-size:11.5px;color:var(--muted-2);gap:8px;}
+  .heroTitlebar b{color:var(--text);font-size:12px;}
+  .heroBody{display:grid;grid-template-columns:56px 1fr;min-height:560px;}
+  .heroRail{background:var(--panel-2);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:10px;}
+  .heroRail .ri{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);background:rgba(255,255,255,.04);}
+  .heroRail .ri.on{color:var(--blue-light);background:rgba(59,130,246,.14);}
+  .heroMain{display:flex;flex-direction:column;min-height:0;}
+  .cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12.25px;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.05);}
+  .cs-line{cursor:pointer;}
+  .cs-line b{color:var(--amber);font-weight:800;}
+  .cs-more{margin-left:auto;background:none;border:1px solid var(--border);color:var(--muted-2);border-radius:6px;font-size:11px;padding:2px 7px;cursor:default;}
+  .cs-chips{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:5px;padding:8px 11px;border-bottom:1px solid var(--border);}
+  .cs-chip{font-size:11.5px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:14px;padding:3px 10px;color:var(--muted);}
+  .cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 14px 14px;}
+  .ce-hero{display:flex;flex-direction:column;align-items:center;gap:12px;padding-top:10px;}
+  .ce-greet{font-size:21px;font-weight:800;color:var(--text);}
+  .ce-honest{font-size:11.75px;color:var(--muted-2);max-width:560px;text-align:center;line-height:1.6;}
+  .pv-liveTag{font-size:11px;font-weight:800;color:var(--teal);display:flex;align-items:center;gap:5px;}
+  .pv-liveTag .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:pvbreath 1.6s ease-in-out infinite;}
+  @keyframes pvbreath{0%,100%{box-shadow:0 0 0 0 rgba(30,185,128,.4);}50%{box-shadow:0 0 0 5px rgba(30,185,128,0);}}
+  .miniGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:760px;}
+  .pv-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 10px;height:92px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;position:relative;}
+  .pv-mini:hover{border-color:rgba(59,130,246,.5);}
+  .pv-mini .mt{font-size:11.75px;font-weight:800;color:var(--text);display:flex;justify-content:space-between;gap:4px;}
+  .pv-mini .mv{font-size:11px;color:var(--muted);}
+  .pv-mini .mv b{color:var(--text);}
+  .pv-mini .mf{font-size:10.5px;color:var(--muted-2);}
+  .pv-mini.moved{animation:pvflash .9s ease-out;border-color:rgba(95,161,255,.6);}
+  @keyframes pvflash{0%{box-shadow:0 0 0 0 rgba(95,161,255,.55);}100%{box-shadow:0 0 0 9px rgba(95,161,255,0);}}
+  .heroMoreRow{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--muted-2);}
+  .heroMoreRow a.btn{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);border-radius:8px;padding:5px 11px;font-weight:800;text-decoration:none;font-size:11.5px;}
+  .cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;border-top:1px solid var(--border);}
+  .cs-plus{width:28px;height:28px;border-radius:8px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);font-size:15px;}
+  .cs-input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:7px 11px;color:var(--muted-2);font-size:12.5px;}
+  .cs-send{background:var(--blue);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:800;padding:8px 16px;}
+  .pv-heroNote{margin-top:10px;font-size:11px;color:var(--muted-2);text-align:center;line-height:1.7;}
+
+  /* ══ 도구줄(보기 방식·도메인 칩) ═════════════════════════════════════ */
+  .toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:12px;}
+  .segbtns{display:inline-flex;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:9px;padding:2px;gap:2px;}
+  .segbtns button{background:none;border:none;color:var(--muted);font-size:12px;font-weight:700;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:inherit;}
+  .segbtns button.on{background:rgba(59,130,246,.22);color:#fff;}
+  .domchips{display:flex;flex-wrap:wrap;gap:6px;}
+  .domchip{font-size:11.5px;font-weight:700;border-radius:14px;padding:4px 11px;border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;background:var(--panel-2);}
+  .domchip.on{border-color:var(--blue);color:#fff;background:rgba(59,130,246,.22);}
+  .liveCount{font-size:11.5px;color:var(--muted-2);margin-left:auto;}
+
+  /* ══ 전체 지도 — 판 타일 그리드 ═══════════════════════════════════════ */
+  .board{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;}
+  .grpHeadRow{grid-column:1/-1;font-size:11.5px;font-weight:800;color:var(--muted-2);margin:14px 0 -2px;letter-spacing:.3px;border-top:1px solid var(--border);padding-top:12px;}
+  .grpHeadRow:first-child{border-top:none;padding-top:0;margin-top:0;}
+  .tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;transition:border-color .12s;}
+  .tile:hover{border-color:rgba(59,130,246,.5);}
+  .tile.dim{opacity:.62;}
+  .tile.moved{animation:pvflash .9s ease-out;border-color:rgba(95,161,255,.6);}
+  .tile.ringed{box-shadow:0 0 0 2px rgba(59,130,246,.55);}
+  .t-head{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+  .t-title{font-size:12.25px;font-weight:800;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .t-badge{font-weight:800;font-size:11px;flex:0 0 auto;}
+  .t-grp{font-size:10px;color:var(--muted-2);background:rgba(255,255,255,.05);border-radius:5px;padding:1px 5px;flex:0 0 auto;}
+  .t-time{font-size:10px;color:var(--muted-2);flex:0 0 auto;}
+  .t-body{min-height:44px;margin-bottom:6px;}
+  .t-bars{display:flex;align-items:flex-end;gap:8px;height:44px;}
+  .t-bcol{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:30px;}
+  .t-bv{font-size:11px;color:var(--muted);}
+  .t-bar{width:100%;border-radius:3px 3px 0 0;min-height:4px;}
+  .t-bl{font-size:10.5px;color:var(--muted-2);white-space:nowrap;}
+  .t-row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);padding:1.5px 0;}
+  .t-row b{color:var(--text);}
+  .t-foot{font-size:10.75px;color:var(--muted-2);margin-bottom:6px;min-height:13px;}
+  .t-agents{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;min-height:18px;}
+  .t-ag{font-size:10px;font-weight:800;border-radius:5px;padding:1px 5px;background:rgba(255,255,255,.05);color:var(--muted-2);border:1px solid var(--border);}
+  .t-ag.real{color:var(--blue-light);border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.1);}
+  .t-ag.part{color:var(--teal);border-color:rgba(30,185,128,.4);background:rgba(30,185,128,.1);}
+  .t-actions{display:flex;gap:6px;}
+  .t-btn{font-size:10.75px;font-weight:800;border-radius:6px;padding:3px 7px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);cursor:pointer;}
+  .t-btn.pick{color:var(--amber);border-color:rgba(240,160,32,.4);background:rgba(240,160,32,.08);}
+  .t-btn:disabled{opacity:.35;cursor:default;}
+  .t-new{font-size:9.5px;font-weight:900;color:#fff;background:var(--teal);border-radius:4px;padding:0 4px;margin-left:4px;}
+
+  /* ── 엑셀형 하위 리스트(.g-rows — gijo-ui.css 사양 그대로 재현) ── */
+  .g-rows{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--panel);margin-top:8px;}
+  .g-rows-head{display:grid;align-items:center;height:26px;padding:0 10px;font-size:11px;font-weight:800;color:var(--muted-2);background:var(--panel-2);border-bottom:1px solid var(--border-strong);}
+  .g-rows-r{display:grid;align-items:center;height:30px;padding:0 10px;font-size:12px;color:var(--text);}
+  .g-rows-r:nth-child(even){background:var(--g-zebra);}
+  .g-rows .ta-r{text-align:right;font-variant-numeric:tabular-nums;}
+  .g-rows .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .g-rows .gm2{color:var(--muted-2);}
+
+  /* ══ 시나리오 스트립 ══════════════════════════════════════════════ */
+  .scenList{display:flex;flex-direction:column;gap:10px;}
+  .scen{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
+  .scen h4{font-size:12.5px;margin:0 0 3px;color:var(--text);}
+  .scen .src{font-size:10.75px;color:var(--muted-2);margin-bottom:8px;}
+  .scenChain{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .scStep{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:5px 9px;font-size:11.5px;color:var(--text);display:flex;align-items:center;gap:6px;}
+  .scStep.active{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+  .scStep.active .dot2{width:6px;height:6px;border-radius:50%;background:var(--blue-light);animation:pvbreath 1.6s ease-in-out infinite;}
+  .scArrow{color:var(--muted-2);font-size:13px;}
+
+  /* ══ 대화 카드 재현(.dc-card — chatparts.js 사양) ══════════════════ */
+  .dc-card{margin-top:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:var(--panel-2);max-width:420px;}
+  .dc-head{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12.5px;font-weight:800;color:var(--text);}
+  .dc-open{margin-left:auto;font-size:11px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:7px;padding:3px 8px;cursor:pointer;font-family:inherit;}
+  .dc-open.pick{color:var(--amber);background:rgba(240,160,32,.1);border-color:rgba(240,160,32,.35);}
+  .dc-kpis{display:flex;border-bottom:1px solid rgba(255,255,255,.08);}
+  .dc-kpi{flex:1;padding:7px 11px;border-right:1px solid rgba(255,255,255,.06);}
+  .dc-kpi:last-child{border-right:0;}
+  .dc-kl{font-size:11px;color:var(--muted-2);}
+  .dc-kv{font-size:14.5px;font-weight:800;color:var(--text);}
+  .dc-kv.warn{color:var(--amber);}
+  .dc-kv.ok{color:var(--teal);}
+
+  /* ══ 고르기 오버레이(pick.html 축약 데모) ═════════════════════════ */
+  .pickOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:99;}
+  .pickOverlay.on{display:flex;}
+  .pickBox{width:420px;background:var(--panel);border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;}
+  .pickBox .ph{padding:9px 13px;font-size:12px;font-weight:800;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;}
+  .pickBox input{width:calc(100% - 26px);margin:8px 13px 6px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:6px 9px;color:var(--text);font-size:12px;}
+  .pickBox .pr{padding:7px 13px;font-size:12px;border-top:1px solid var(--border);cursor:pointer;}
+  .pickBox .pr:hover{background:var(--panel-2);}
+  .pickBox .pf{padding:8px 13px;font-size:11px;color:var(--muted-2);border-top:1px solid var(--border);}
+
+  /* ══ 배지/작은 표기 ══════════════════════════════════════════════ */
+  .kicker{font-size:10.5px;font-weight:900;letter-spacing:.5px;color:var(--muted-2);text-transform:uppercase;}
+  .flag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:5px;padding:1px 6px;margin-left:6px;}
+  .flag.gap{background:rgba(240,160,32,.18);color:var(--amber);}
+  .flag.ok{background:rgba(30,185,128,.18);color:var(--teal);}
+  .flag.no{background:rgba(226,72,61,.18);color:#f5928a;}
+  .checkline{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.6;margin-bottom:6px;}
+  .checkline .ic{flex:0 0 auto;}
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-2);line-height:1.8;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>현황판(가칭) — 대화 홈을 판(grouppanels.js) 기준틀로</h1>
+  <p class="sub">사장님 지시: "대화창 사용이 현황판을 기준으로 하면 좋을것 같아서 하는거야" — 이 시안은 「전체보기 화면」이 아니라
+  <b style="color:var(--text)">대화창을 쓸 때 현황판이 출발점이 되는 경험</b>을 그린다. 아래 §1(대화 홈)이 이 경험의 실제 얼굴이고,
+  §2(전체 지도)는 그 안의 "🗺 전체 지도 열기"가 펼치는 같은 데이터다.</p>
+
+  <details id="orders">
+    <summary>📋 사장님 지시 원문 — 누계 10건(펼치기)</summary>
+    <ol>
+      <li><b>①</b> "위에 만든 카드는 머라고 부르면 될까? 해당 카드들을 한화면에서 보고 싶고 해당 카드 기준으로 코드가 통합되서 호출 되는지도 궁금해"</li>
+      <li><b>②</b> "해당 카드기준으로 하위 리스트들은 엑셀형태 데이터가 나오면 깔끔할것 같아"</li>
+      <li><b>③</b> "문서자료에는 어떤카드들을 호출하고 / 자산에는 어떤카드들이 호출하고 / 취약점 분석에는 어떤카드들이 움직이는 보였으면해"</li>
+      <li><b>④</b> "이런 행동기반의 카도도 다포함이야" (5단계 절차 띠 + 리포트/KPI/컴플라이언스 확인)</li>
+      <li><b>⑤</b> "카드들의 움직임이 기준이되면 보기 편할것 같아"</li>
+      <li><b>⑥</b> "해당 카드들이 사용하는 AI 에이젼트도 궁금하고"</li>
+      <li><b>⑦</b> "해당 카드들이 메뉴가 되었으면하고 쉽게 불러서 대화창에서썼으면하고"</li>
+      <li><b>⑧</b> "행동 행위 기반의 집합은 시나라오로 제공하고"</li>
+      <li><b>⑨</b> "코드는 있는데 카드가 없으면 만들어야도"</li>
+      <li><b>⑩</b> "해당 카드에서 너가 만들어준 🎯 고르기 단추를 쓰면좋을것 같아 통일"</li>
+      <li><b>⑪(자리 확정)</b> "대화창 사용이 현황판을 기준으로 하면 좋을것 같아서 하는거야" / "초기 대시보드에 현황판 보여줘 거기서 선택해서 바로 작업 하게" / "1단계 3단계까지 추천안으로 쭉 진행하자"</li>
+    </ol>
+  </details>
+
+  <!-- ═══════════════════ §1 HERO — 대화 홈 ═══════════════════ -->
+  <section id="hero">
+    <h2><span class="stagepill s1">1단계</span> §1. 앱을 켜면 보이는 화면 — 프로 대화 홈</h2>
+    <p class="sub">실물 재현: <code>console.js</code>의 <code>.cs-head</code>(맥락 문장)·<code>.cs-chips</code>·
+    <code>.ce-hero</code>(빈 상태, <code>min-height:46vh</code>, 276행)·<code>.cs-dock</code>(입력줄, 283행)를
+    그대로 재현했다. 바뀌는 것은 <code>.ce-hero</code> 안쪽뿐 — 지금은 인사말+빠른 질문 칩+메뉴 바로가기인데,
+    그 자리에 <b style="color:var(--text)">"지금 움직이는" 판 6개</b>를 얹는다. 서사: <b style="color:var(--text)">
+    앱을 켠다 → 현황판이 보인다(움직이는 카드가 앞) → 카드를 고른다 → 바로 그 자리에서 대화로 시킨다.</b></p>
+
+    <div class="heroFrame">
+      <div class="heroTitlebar">GIJO AS · <b>실물 재현</b> — 타이틀바 44px(titlebar.js BAR_H) · 아래 프레임은 이 시안의 목업(동작 안 함)</div>
+      <div class="heroBody">
+        <div class="heroRail">
+          <div class="ri on" title="대화(현재)">💬</div>
+          <div class="ri" title="Ctrl+K로 화면 열기">☰</div>
+          <div class="ri" title="AI 팀 레일(railroster.js)">🧭</div>
+        </div>
+        <div class="heroMain">
+          <div class="cs-head">
+            <span class="cs-line" id="ctxLine">지금 「대시보드」 화면을 보는 중</span>
+            <button class="cs-more">⋯</button>
+          </div>
+          <div class="cs-chips">
+            <span class="cs-chip">오늘 뭐부터 볼까?</span><span class="cs-chip">지금 손댈 일 뭐야?</span><span class="cs-chip">이번 주 보고서 썼어?</span>
+          </div>
+          <div class="cs-body">
+            <div class="ce-hero">
+              <div class="ce-greet">안녕하세요</div>
+              <div class="ce-honest">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</div>
+              <div class="pv-liveTag"><span class="dot"></span><span id="liveTagText">지금 움직이는 판 6개 — 8초마다 자동 확인(데모)</span></div>
+              <div class="miniGrid" id="miniGrid"></div>
+              <div class="heroMoreRow">
+                <span>전체는 판 21개(그룹 10) — </span>
+                <a class="btn" href="#board">🗺 전체 지도 열기 ↓</a>
+                <span>(실제로는 이 화면 안에서 그대로 펼쳐짐 — 새 탭·새 창 아님)</span>
+              </div>
+              <div class="pv-heroNote">🎯로 고르면 위 맥락 문장이 바뀌고, 이어지는 지시("이거 조치완료로 바꿔줘")는 그 판 기준으로 처리됩니다(아래 §3).</div>
+            </div>
+          </div>
+          <div class="cs-dock">
+            <div class="cs-plus">＋</div>
+            <div class="cs-input">지시를 입력하세요… (이 목업에선 동작하지 않습니다 — 실제 입력창은 별도 대화창입니다)</div>
+            <div class="cs-send">전송</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:8px;">
+      ⚠ 이 화면(mockups/panels-overview/시안.html) 자체에는 <b>동작하는 입력칸을 두지 않았다</b> — "메뉴는 보기용,
+      지시는 대화창에서만" 원칙(CLAUDE.md). 위 입력줄은 실물 <code>.cs-dock</code>의 모양만 보여주는 정지 이미지다.
+    </p>
+  </section>
+
+  <!-- ═══════════════════ §2 전체 지도 ═══════════════════ -->
+  <section id="board-section">
+    <h2><span class="stagepill s1">1단계</span> §2. 전체 지도 — 판 21개(그룹 10)</h2>
+    <p class="sub">§1의 "🗺 전체 지도 열기"가 펼치는 내용. 기본 정렬은 <b style="color:var(--text)">움직임 순</b>(지시⑤) —
+    도메인·시나리오는 아래 토글로 골라 들어가는 층(지시③④를 위한 보기 방식이지, 기본이 아니다).
+    판 17개는 <code>grouppanels.js</code> 그대로, <span class="flag ok">신설 4</span>는 §5에서 근거를 밝힌다.</p>
+
+    <div class="card" style="margin-bottom:14px;">
+      <h3>업무 절차 5단계 띠 — 행동 축(지시④)</h3>
+      <p class="note" style="margin-bottom:8px;">원천: <code>workflowrail.js</code> + 서버 <code>/api/workflow/stages</code>
+      (<code>workflow.ts STAGE_SCREENS</code>). 계약 그대로 재현: <b>숫자는 서버가 한 곳에서 센다</b> · <b>못 구한 값은 비운다(—)</b> ·
+      <b>0인 경고는 죽여서 그린다</b>. 아래 ②·③ 값은 사장님이 실측 캡처로 보여준 예시 그대로("②우선순위 198·KEV 11 / ③조치 0·미배정 178"),
+      나머지는 같은 형식의 가짜 예시.</p>
+      <div id="railStrip"></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="kicker">보기 방식</div>
+      <div class="segbtns" id="viewSeg">
+        <button data-v="move" class="on">🔥 움직이는 순(기본)</button>
+        <button data-v="domain">🗂 도메인별</button>
+        <button data-v="scenario">🧭 시나리오별</button>
+      </div>
+      <div class="liveCount" id="liveCount">21개 판 · 마지막 확인 방금 전</div>
+    </div>
+    <div class="toolbar" id="domRow">
+      <div class="kicker">도메인 강조(지시③)</div>
+      <div class="domchips" id="domChips"></div>
+    </div>
+
+    <div id="scenBlock" style="display:none;margin-bottom:16px;"></div>
+
+    <div class="board" id="board"></div>
+    <p class="note" style="margin-top:10px;">
+      판을 누르면 아래로 <b style="color:var(--text)">.g-rows 엑셀형 하위 리스트</b>가 펼쳐진다(지시②) — 부품은
+      <code>gijo-ui.css</code>의 <code>.g-rows</code> 그대로(행 30px·그룹머리 28px·열머리 26px·얼룩만, 카드·알약 없음).
+      🎯가 있는 판은 <b style="color:var(--amber)">고르기</b>(pick.html 재사용, 지시⑩) — 없는 판은 아직 kind가 없다는 뜻이고
+      §7에서 확장안을 낸다. "미상" 배지는 지어낸 것이 아니라 <b>아직 등록부에 대응이 없다는 정직한 표시</b>다(§6).
+    </p>
+  </section>
+
+  <!-- ═══════════════════ §3 대화창 계약 ═══════════════════ -->
+  <section id="chat-contract">
+    <h2><span class="stagepill s2">2단계</span> §3. 대화창에서 판 부르기 — 이미 있는 계약의 확장</h2>
+    <p class="sub">지시⑦: "카드가 메뉴가 되고 대화창에서 쉽게 불러 썼으면" — 이건 새 UI가 아니라
+    <code>datacard.ts</code>의 <b style="color:var(--text)">화면파일카드(13종)</b>·<b style="color:var(--text)">화면이름카드(키워드)</b>가
+    이미 하고 있는 일이다. 메뉴에서 화면을 열면 <code>app.html</code>이 <code>window.gijoConsole.screenCard(page,label)</code>을
+    불러 <code>/api/screen-card?page=…</code>로 대화에 카드를 띄운다(574·660·866행). 아래는 그 실물 재현.</p>
+
+    <div class="card" style="margin-bottom:14px;">
+      <h3>예시 — "지식 현황판 보여줘"</h3>
+      <div style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);margin-bottom:2px;">
+        <span style="background:var(--panel-2);border-radius:14px;padding:4px 11px;">담당자: 지식 현황판 보여줘</span>
+      </div>
+      <div class="dc-card">
+        <div class="dc-head">지식 — 문서 반입 현황
+          <button class="dc-open pick">🎯 고르기</button>
+          <button class="dc-open">🗔 지식 열기</button>
+        </div>
+        <div class="dc-kpis">
+          <div class="dc-kpi"><div class="dc-kl">올린 문서</div><div class="dc-kv">214</div></div>
+          <div class="dc-kpi"><div class="dc-kl">표준 관계망</div><div class="dc-kv">1,842</div></div>
+          <div class="dc-kpi"><div class="dc-kl">오늘 반입</div><div class="dc-kv ok">6</div></div>
+        </div>
+      </div>
+      <p class="note" style="margin-top:8px;">⚠ 정직 표기 — 지금 코드의 <code>화면이름카드</code>엔 <b class="warn">"지식"·"학습"
+      키워드가 없다</b>(대신 "AI팀"만 있음, datacard.ts 279~287행 실측). 그래서 지금은 지식 판을 콕 집어 부르면 카드가 아니라
+      일반 답으로 샐 수 있다 — 이 시안이 찾은 실제 공백이라 §5에 신설 항목으로 올린다.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ §4 AI 에이전트 배지 ═══════════════════ -->
+  <section id="agents">
+    <h2><span class="stagepill s2">2단계</span> §4. 판이 쓰는 AI 에이전트(지시⑥)</h2>
+    <p class="sub">원천: <code>server/src/engine/agents.ts</code>의 실제 로스터 6명(id·이름·역할·약자 그대로) +
+    <code>railroster.js</code>의 기반 부품 4(embed·search·guard·lora, 목적지 page까지 실물). <b style="color:var(--text)">
+    판↔에이전트 대응은 코드에 명시돼 있지 않다</b> — agents.ts의 역할 설명 문장이 그 판의 업무를 <u>글자 그대로</u> 가리키는
+    자리만 배지를 달았다(아래 표 "근거"). 나머지 13판은 배지 없이 <span class="flag gap">미상</span> — "구현 시 등록부의
+    도구 담당에서 도출"이라고 적었다(지어내지 않음, 제1 금기).</p>
+    <div class="card">
+      <table id="agentTable"></table>
+    </div>
+    <p class="note" style="margin-top:8px;">움직임과 배지를 잇는 안: 판이 "움직였다"고 판정될 때 그 판의 배지도 함께
+    깜박인다(railroster.js의 <code>llm:event</code> 실신호 — kind:"chat"/"embed"/"search"/"guard" 그대로 구독, 서버 신설 없음).
+    <b style="color:var(--text)">단, 이건 부품(embed·search·guard)에서만 정확하다</b> — 팀원 6명의 chat 신호는 agent 이름이
+    지금 "누가 이 판을 다뤘는지"까지는 안 밝혀서, 배지 깜박임은 "그 종류 일이 방금 있었다" 정도로 읽어야 한다(과장 금지).</p>
+  </section>
+
+  <!-- ═══════════════════ §5 시나리오 ═══════════════════ -->
+  <section id="scenarios">
+    <h2><span class="stagepill s3">3단계</span> §5. 시나리오 — 행동(행위) 기반 묶음(지시⑧)</h2>
+    <p class="sub">5단계 띠가 "일반 절차"라면 시나리오는 "구체 상황의 행동 흐름"이다. 아래 3개는
+    <code>GIJO_AS_대화시나리오_대장_2026-08-19.md</code>에 <b style="color:var(--text)">실재하는</b> 절 번호·제목 그대로
+    골랐다(지어내지 않음) — 원문 지시 문장까지 인용.</p>
+    <div class="scenList" id="scenListFull"></div>
+  </section>
+
+  <!-- ═══════════════════ §6 신설 카드 갭 조사 ═══════════════════ -->
+  <section id="gaps">
+    <h2><span class="stagepill s3">3단계</span> §6. 판 없는 화면 — 공백 조사표(지시⑨)</h2>
+    <p class="sub"><b style="color:var(--text)">nav.js의 메뉴 트리(TOP 6 + GROUPS 10)</b>와
+    <b style="color:var(--text)">grouppanels.js의 판(17, 그룹 7)</b>을 실코드로 대조했다. 결론:
+    <b style="color:var(--amber)">판 없는 화면 4개 → 신설 카드 4개</b>. 나머지는 <code>datacard.ts</code>의
+    <b style="color:var(--text)">카드예외</b>(7개, 코드에 이미 이유가 적혀 있음)이거나 별도 창(page 주소가 없어 판 개념이
+    안 맞음)이라 신설 대상이 아니다 — 추측이 아니라 실측이다.</p>
+
+    <div class="card" style="margin-bottom:12px;">
+      <h3>신설 카드 4개 — 원천은 이미 서버에 있다(datacard.ts 화면카드가 계산한 걸 그대로 판으로)</h3>
+      <table id="gapTable"></table>
+      <p class="note" style="margin-top:8px;">4곳 모두 <b style="color:var(--teal)">서버 계산 함수가 이미 존재</b>
+      (assetStatusAnswer·mydocsStatusAnswer·sessionsStatusAnswer·productsStatusAnswer, datacard.ts) —
+      새 API를 만들 필요 없이 판의 <code>load()</code>가 <code>window.gijo.screenCard(page)</code>
+      (preload.ts 244행, 이미 있음)를 불러 <code>dataCard.kpis</code>를 <code>segments</code>로 바꿔 그리면 된다.
+      "코드는 있는데 카드가 없다"의 가장 정직한 뜻 — 계산도, 대화 소환도 이미 있고, <b>그룹 허브 그리드 타일만 없다.</b></p>
+    </div>
+
+    <div class="card">
+      <h3>카드예외 7개 — 이미 코드가 근거를 적어 둔 제외(신설 대상 아님)</h3>
+      <table id="excTable"></table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ §7 🎯 고르기 확장 ═══════════════════ -->
+  <section id="pickext">
+    <h2><span class="stagepill s2">2단계</span> §7. 🎯 고르기 — 통일 + kind 확장(지시⑩)</h2>
+    <p class="sub"><code>pick.html</code>은 지금 <code>kind=vuln|asset</code> 2종뿐이다(계약: 행 클릭=<code>gijo:pickdone</code>
+    좁은 신호 · 검색=필터 전용 · fields 10키 고정 · "새 API 없이 재사용"). <b style="color:var(--text)">새 고르기 UI를
+    만들지 않는다</b> — 같은 계약을 판마다 이어 붙인다. <code>chatparts.js</code>의 <code>고르기kind</code> 맵(366행,
+    <code>dc.screen.page</code> 기준)과 <code>pick.html</code>의 kind 스위치에 항목을 늘리는 일이다.</p>
+    <div class="card"><table id="pickTable"></table></div>
+    <p class="note" style="margin-top:8px;">⚠ fields는 지금 10키 고정(<code>asset·title·severity·status·owner·due·plain·kev·assetId·findingKey</code>,
+    selectnotify.js 22행) — 문서·리포트류는 severity·kev 같은 칸이 없어 <b>있는 키만 채운다.</b> 새 키가 필요해지면
+    그건 별도 결정(selectnotify.js·console.js 파싱을 함께 넓혀야 한다) — 이 시안 범위 밖으로 명시해 둔다.</p>
+  </section>
+
+  <!-- ═══════════════════ §8 코드 통합 제안 ═══════════════════ -->
+  <section id="codeplan">
+    <h2><span class="stagepill s1">1단계</span> §8. 코드 통합 제안 — "판 기준으로 호출되는지"(지시①)</h2>
+    <div class="card">
+      <h3>지금(기존 계약, 안 바뀜)</h3>
+      <pre style="white-space:pre-wrap;font-size:11.5px;color:var(--muted);line-height:1.7;margin:0 0 10px;">discover.html/triage.html/… (그룹 허브 화면)
+  └ grouphub.js: window.gijoGroupHub.mount(host, { panels: grouppanels[그룹이름], initial })
+       └ 화면은 "그룹 이름"만 넘긴다 — 판 정의는 grouppanels.js 한 곳뿐(계약 유지)</pre>
+      <h3>확장 제안(이 시안)</h3>
+      <pre style="white-space:pre-wrap;font-size:11.5px;color:var(--text);line-height:1.7;margin:0;">grouppanels.js  (한 곳 — 신규 필드만 추가, 기존 판 구조 안 건드림)
+  { id, title, page, load(), rows()?, pick?, chatKind?, agents? }
+              └ rows()  : (선택) 하위 리스트 — 없으면 타일에 펼치기 화살표 자체를 안 그린다(정직)
+              └ pick    : (선택) "asset"|"vuln"|... — 있으면 🎯 버튼, pick.html이 그 kind로 로더 추가
+              └ chatKind: (선택) datacard.ts 화면카드 종류 재사용 — 대화 소환 연결
+              └ agents  : (선택) [{ab,sym}] — 근거 있는 판만, 없으면 배지를 아예 안 그린다
+
+신규 화면(가칭 panelsboard.js) — "전체 지도"
+  └ 모든 그룹의 판을 한 번에 받아 그린다: Object.values(grouppanels).flat()
+  └ 화면은 여전히 "판 배열"만 받는다(기존 grouphub.js 계약과 동형) — 새 개념 0개
+  └ 움직임 판정: load()가 돌 때 이전 값(세션 메모리, 서버 신설 없음)과 비교 → 바뀌면 movedAt=now
+       ⚠ 자가점검: "움직임 없음=문제 없음"이 아니다(스캔 실패로 조용할 수 있다) — 그래서 판마다
+         "마지막 확인" 타임스탬프를 항상 같이 보여준다(조용함과 확인 안 됨을 구분).
+
+대화 홈(console.js .ce-hero) — 압축 스트립
+  └ 같은 grouppanels 배열에서 움직인 순 상위 6개만 .pv-mini로 그린다(§1) — 정의는 여전히 한 곳.</pre>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ §9 자리 — 확정 기록 ═══════════════════ -->
+  <section id="placement">
+    <h2>§9. 자리 — 사장님 결정(2026-08-20)으로 확정, 표준 셸과의 관계만 정리</h2>
+    <table>
+      <tr><th>안</th><th>채택</th><th>이유</th></tr>
+      <tr><td><b>프로 대화 홈(.ce-hero)</b></td><td class="flag ok" style="display:table-cell;">채택 — 사장님 지시</td>
+        <td>"초기 대시보드에 현황판 보여줘 거기서 선택해서 바로 작업 하게" — 프로 셸의 첫 화면이 이미 대화 홈이다.
+        새 진입점을 안 만들고 그 자리를 채운다.</td></tr>
+      <tr><td>독립 사이드바 메뉴(11번째 그룹)</td><td class="flag no" style="display:table-cell;">기각</td>
+        <td>nav.js GROUPS는 "절차 축"으로 정리돼 있다(2026-08-02 결정). "전체 지도"는 절차가 아니라 메타 뷰라
+        억지로 넣으면 그 축이 깨진다 — 그리고 이미 대화 홈이 그 자리를 맡았다(중복).</td></tr>
+      <tr><td>기존 dashboard.html 전면 개편</td><td class="flag gap" style="display:table-cell;">낮은 우선순위(병존 제안)</td>
+        <td>표준 셸의 초기 화면. <code>datacard.ts</code> 카드예외 표가 이미 "대시보드 자체가 요약판"이라 적어 뒀다
+        (359행) — 그 취지를 따라 <b>같은 grouppanels 데이터</b>를 dashboard.html에도 압축 스트립으로 얹는 걸 제안하되,
+        "개발 기준은 프로"(CLAUDE.md, 2026-08-19) 원칙에 따라 <b>이번 구현 범위는 프로 한정</b>, 표준은 추후 판단.</td></tr>
+    </table>
+  </section>
+
+  <!-- ═══════════════════ §10 밀도 숫자 ═══════════════════ -->
+  <section id="density">
+    <h2>§10. 밀도 숫자 — 1280×800 기준</h2>
+    <div class="card" style="margin-bottom:12px;">
+      <h3>대화 홈(§1) — 입력창은 항상 하단 고정</h3>
+      <table>
+        <tr><th>구간</th><th class="num">높이</th><th>근거</th></tr>
+        <tr><td>타이틀바</td><td class="num">44px</td><td><code>titlebar.js</code> BAR_H(실물 상수, 2026-08-07 확정)</td></tr>
+        <tr><td>.cs-head(맥락 문장)</td><td class="num">≈34px</td><td>padding 7px×2 + 텍스트 줄(설계값, console.js 36행 padding 그대로 계산)</td></tr>
+        <tr><td>.cs-chips(빠른 질문)</td><td class="num">≈38px</td><td>padding 8px×2 + 칩 한 줄(console.js 98행)</td></tr>
+        <tr><td>.cs-dock(입력줄)</td><td class="num">≈49px</td><td>padding 9+12 + 입력칸(console.js 225행) — <b style="color:var(--teal)">flex:0 0 auto라 스크롤과 무관, 항상 하단</b></td></tr>
+        <tr><td>남는 자리(.cs-body, 스크롤 가능)</td><td class="num">800−44−121=635px</td><td>고정 크롬 121px(위 3줄 합)을 뺀 나머지</td></tr>
+        <tr><td>기존 .ce-hero 요구 공간</td><td class="num">46vh=368px</td><td>console.js 50행 <code>min-height:46vh</code>(실물, vh는 창 전체 기준)</td></tr>
+        <tr><td>압축 스트립 추가분(.pv-mini×6, 3열×2행)</td><td class="num">2×92+8=192px</td><td>이 시안이 설계한 타일 높이 92px(제목+수치 한 줄+foot)</td></tr>
+        <tr><td>인사말+안내문(기존 유지)</td><td class="num">≈132px</td><td>ce-greet(21px폰트)+ce-honest(2줄)+여백</td></tr>
+        <tr><td><b>합계(스트립 포함 hero)</b></td><td class="num"><b>≈324px</b></td><td>635px 예산 안(여유 311px) — <b style="color:var(--teal)">스크롤 없이 들어간다</b></td></tr>
+      </table>
+      <p class="note" style="margin-top:8px;">"전체 지도 열기"를 누르면 cs-body 안에서 내용이 635px를 넘어가지만
+      <b style="color:var(--teal)">입력창(.cs-dock)은 코드상 flex 형제라 절대 안 내려가지 않는다</b> — 스크롤은
+      cs-body 안에서만 일어난다(추측이 아니라 console.js DOM 구조 사실).</p>
+    </div>
+    <div class="card">
+      <h3>전체 지도(§2) — 타일·엑셀 행</h3>
+      <table>
+        <tr><th>항목</th><th class="num">기존</th><th class="num">이 시안</th><th class="num">증감</th><th>비고</th></tr>
+        <tr><td>판 타일 1개 높이</td><td class="num">138px(.gh-card, grouphub.js)</td><td class="num">≈172px</td><td class="num warn">+34px(+25%)</td><td>에이전트 배지 줄(+16)·🎯/🗔 버튼 줄(+18) 추가분</td></tr>
+        <tr><td>엑셀 하위 리스트 행</td><td class="num">30px(.g-rows-r)</td><td class="num">30px</td><td class="num ok">0%</td><td>gijo-ui.css 부품 그대로 재사용 — 새 CSS 0줄</td></tr>
+        <tr><td>화면 전환 횟수(현행)</td><td class="num">7회</td><td class="num">1회(스크롤)</td><td class="num ok">−6회</td><td>discover~records 7개 허브를 각각 열어야 다 보이던 것을 한 화면으로</td></tr>
+        <tr><td>보이는 판 행 수(스크롤 없이)</td><td class="num">—</td><td class="num">≈4.5행(21개 중 약 20개)</td><td>—</td><td>172+10gap=182px 기준, 위 고정 크롬(≈172px) 뺀 자리에서</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ §11 자가점검 ═══════════════════ -->
+  <section id="selfcheck">
+    <h2>§11. 제품 원칙 자가점검</h2>
+    <div class="card">
+      <div class="checkline"><span class="ic">✅</span><span><b>지시는 대화창에서만</b> — 이 시안엔 동작하는 입력칸이 없다.
+      보기 방식 토글·도메인 칩·판 펼치기는 "지시(쓰기)"가 아니라 "보기 필터"라 예외 성격인데, mydocs.html의
+      shared/personal 필터에도 이미 같은 성격의 필터가 있어 통과로 본다 — 다만 최종 판단은 사장님 확인.</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>메뉴는 보기용, 새 화면에 입력칸 금지</b> — 판·타일·시나리오
+      전부 보기+열기(🗔)+고르기(🎯)만. 쓰기는 전부 pick.html→gijo:pickdone→무대→대화창 지시로 넘어간다.</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>자체완결 HTML</b> — 외부 CDN·웹폰트·원격 이미지 0개. 더블클릭으로 열림.</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>다크톤·색 토큰</b> — 실제 화면(discover.html 등) :root 값을 그대로 복사.</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>11px 하한</b> — 본문 최소 11px(t-time·t-ag·g-rows-head), 그 아래로 내려간 글자 없음.</span></div>
+      <div class="checkline"><span class="ic">⚠</span><span><b>정직한 구현</b> — 판의 값·엑셀 하위 행·움직임 타이머는
+      전부 가짜(setInterval 데모)다. AI 에이전트 배지 13개는 "미상"으로 정직하게 비웠다. 🎯/🗔 버튼은 실제로는
+      pick.html·화면 열기로 이어져야 하는데 이 목업에선 안내 오버레이만 뜬다 — 코드 주석과 본문에 명시.</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>같은 것을 한 곳에만</b> — §8 코드 통합 제안이 grouppanels.js
+      단일 출처를 유지한다(대화 홈 스트립·전체 지도·향후 dashboard.html 병존까지 전부 같은 배열을 읽는다).</span></div>
+      <div class="checkline"><span class="ic">⚠</span><span><b>2026-08-18 결정과의 정합성</b> — "🖥 자산" 판은 그때
+      discover 그룹 <u>안에서</u> 빠졌다(요약이 kpi/reporting과 중복돼서). 이 시안이 되살리는 "🗺 자산" 판은 discover
+      그룹이 아니라 별도 <code>assets0</code> 그룹이고, 원천도 다르다(assetHub, 옛 listAssets 단순 카운트가 아님) —
+      충돌은 아니라고 판단하지만 최종 확인은 사장님 몫으로 남긴다.</span></div>
+    </div>
+  </section>
+
+  <footer>
+    산출물: <code>mockups/panels-overview/시안.html</code> · 시안 작성 2026-08-20 · gijo-mockup 서브에이전트<br>
+    참고 표준: Smashing Magazine "UX Strategies For Real-Time Dashboards"(2025) ·
+    Microsoft Learn "Declarative agent UI widget guidelines" · 내부 선례: mockups/knowledge-rows(2026-08-20 승인,
+    .g-rows 확정) · mockups/stage-picker(2026-08-20 승인, pick.html 확정) · mockups/pro-context-strip(맥락 문장)
+  </footer>
+</div>
+
+<div class="pickOverlay" id="pickOverlay">
+  <div class="pickBox">
+    <div class="ph"><span id="pickTitle">🎯 고르기</span><span style="cursor:pointer;color:var(--muted-2);" id="pickClose">✕</span></div>
+    <input placeholder="이름·CVE·자산명으로 좁히기… (필터 전용 — 지시가 아닙니다)" disabled>
+    <div id="pickRows"></div>
+    <div class="pf">행을 누르면 위 대화 홈의 맥락 문장이 바뀝니다(무대에 올라감) — 이 데모는 pick.html의 실제 계약(gijo:pickdone)을 흉내만 냅니다.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var R = "var(--red)", A = "var(--amber)", B = "var(--blue)", T = "var(--teal)", G = "#8a8478", O = "#e8823c";
+
+  // ── 도메인 정의(지시③) ──────────────────────────────────────────
+  var DOMAINS = [
+    { id: "doc", label: "📄 문서자료" }, { id: "asset", label: "🖥 자산" },
+    { id: "vuln", label: "🩹 취약점 분석" }, { id: "ops", label: "🛠 조치·운영" },
+    { id: "ai", label: "🤖 AI 운영" }, { id: "rec", label: "🗒 기록·감사" },
+  ];
+
+  // ── 에이전트 로스터(server/src/engine/agents.ts 실물) ────────────
+  var AGENTS = {
+    orchestrator: { sym: "🧭", abbr: "분배", name: "Security Orchestrator", role: "작업 분배 · 결과 취합" },
+    scan: { sym: "◣", abbr: "해석", name: "Scan Agent", role: "초기 데이터 해석 · 자산 반영" },
+    analysis: { sym: "◎", abbr: "우선", name: "Analyze Agent", role: "AI 지식·모델 관리 · 우선순위 판단" },
+    report: { sym: "▣", abbr: "보고", name: "Report Agent", role: "내부 보고서 작성 · 결과 레포팅" },
+    ti: { sym: "🛰", abbr: "위협", name: "TI Agent", role: "위협 인텔리전스 · CTI 피드-자산 매칭 해석" },
+    normaltic: { sym: "📚", abbr: "해설", name: "GIJO Agent", role: "용어 해설 · 사례 부연(사내 지식)" },
+  };
+  var PARTS = {
+    embed: { sym: "E", name: "임베딩(bge-m3)" }, search: { sym: "R", name: "RAG 검색" },
+    guard: { sym: "G", name: "가드레일" }, lora: { sym: "L", name: "LoRA 전문가 어댑터" },
+  };
+
+  // ── 판 21개(17 실물 + 4 신설) ────────────────────────────────────
+  // segType: "bars"(segments 막대) | "rows"(이름:값 줄) — grouppanels.js load() 반환 그대로.
+  var PANELS = [
+    { id: "analysis", grp: "discover", grpLabel: "① 발견·수집", title: "🚨 통합 관제", page: "discover.html?panel=analysis",
+      segType: "bars", data: [{ l: "P0", v: 4, c: R }, { l: "P1", v: 9, c: O }, { l: "P2", v: 15, c: A }],
+      foot: "정리됨 18/28", agents: [], domains: ["vuln", "ops"], pick: null, chatKind: "ops",
+      cols: ["이벤트", "소스", "우선순위", "자산"], rows: [["웹셸 의심 업로드", "취약점+로그", "P0", "srv-web-03"], ["EDR 미탐지 프로세스", "보안제품", "P1", "srv-db-01"], ["SSH 무차별 시도", "로그", "P1", "fw-edge-02"]] },
+    { id: "threat", grp: "discover", grpLabel: "① 발견·수집", title: "🌐 위협 인텔", page: "discover.html?panel=threat",
+      segType: "bars", data: [{ l: "긴급", v: 2, c: R }, { l: "주의", v: 7, c: A }, { l: "정보", v: 21, c: G }],
+      foot: "실탐지 6건 · 샘플 24건", agents: ["ti"], domains: ["vuln"], pick: null, chatKind: "threat",
+      cols: ["탐지", "등급", "대상", "자산 매칭"], rows: [["임직원 계정 유출", "긴급", "gijo.co.kr", "3건 매칭"], ["신규 CVE 언급", "주의", "OpenSSL", "1건 매칭"]] },
+    { id: "vuln", grp: "triage", grpLabel: "② 우선순위", title: "🔍 취약점", page: "triage.html?panel=vuln",
+      segType: "bars", data: [{ l: "매우 심각", v: 5, c: R }, { l: "높음", v: 22, c: O }, { l: "보통", v: 41, c: A }],
+      foot: "미조치 68건", agents: ["analysis"], domains: ["vuln", "asset"], pick: "vuln", chatKind: "finding",
+      cols: ["취약점", "자산", "심각도", "담당"], rows: [["디렉터리 리스팅", "srv-web-01", "높음", "김보안"], ["구버전 OpenSSL", "srv-app-04", "매우 심각", "미지정"], ["기본 계정 활성", "fw-edge-02", "높음", "이현우"]] },
+    { id: "sbom", grp: "triage", grpLabel: "② 우선순위", title: "📦 AI-BOM·구성", page: "triage.html?panel=sbom",
+      segType: "rows", data: [["구성 명세(SBOM) 있음", "31"], ["아직 없음", "9", A], ["AI 자산", "4"]],
+      foot: "전체 자산 40", agents: ["scan"], domains: ["doc", "asset"], pick: null, chatKind: null,
+      cols: ["자산", "SBOM 여부", "AI 자산", "생성일"], rows: [["srv-llm-01", "있음", "예", "08-18"], ["srv-web-01", "없음", "아니오", "—"]] },
+    { id: "approvals", grp: "fix", grpLabel: "③ 조치", title: "✅ 조치·승인", page: "fix.html?panel=approvals",
+      segType: "bars", data: [{ l: "검토 대기", v: 12, c: A }, { l: "진행 중", v: 5, c: B }, { l: "완료", v: 31, c: T }],
+      foot: "전체 48건", agents: [], domains: ["ops"], pick: null, chatKind: "fix",
+      cols: ["항목", "자산", "상태", "기한"], rows: [["디렉터리 리스팅 조치", "srv-web-01", "진행 중", "08-22"], ["OpenSSL 업데이트", "srv-app-04", "검토 대기", "08-25"]] },
+    { id: "maintenance", grp: "fix", grpLabel: "③ 조치", title: "🛠 정기 점검", page: "fix.html?panel=maintenance",
+      segType: "rows", data: [["예정·진행", "9"], ["기한 초과", "2", R], ["완료", "26"]],
+      foot: "점검 항목 37건", agents: [], domains: ["ops", "asset"], pick: null, chatKind: "fix",
+      cols: ["항목", "대상", "예정일", "상태"], rows: [["방화벽 정책 점검", "fw-edge-02", "08-21", "예정"], ["백업 복구 훈련", "srv-db-01", "08-15", "기한 초과"]] },
+    { id: "terminal", grp: "fix", grpLabel: "③ 조치", title: "⌨ 명령창", page: "fix.html?panel=terminal",
+      segType: "rows", data: [["최근 24시간 실행", "14"], ["차단된 위험 명령", "1", A], ["기록 보관", "512"]],
+      foot: "허용 목록 밖 명령은 실행 전에 막습니다", agents: [], domains: ["ops"], pick: null, chatKind: "fix",
+      cols: ["명령", "실행자", "결과", "시각"], rows: [["show running-config", "이현우", "허용", "09:14"], ["reload", "김보안", "차단", "09:20"]] },
+    { id: "hardening", grp: "verify", grpLabel: "④ 검증", title: "🛡 보안설정 점검", page: "verify.html?panel=hardening",
+      segType: "rows", data: [["등록 장비", "22"], ["활성 스케줄", "9"], ["평균 준수율", "87%"]],
+      foot: "점검 이력 213회", agents: [], domains: ["ops", "asset"], pick: null, chatKind: "hardening",
+      cols: ["대상 장비", "기준", "준수율", "최근 점검"], rows: [["fw-edge-02", "KISA U", "92%", "오늘 03:00"], ["srv-db-01", "CIS", "78%", "어제 03:00"]] },
+    { id: "report", grp: "reporting", grpLabel: "⑤ 보고", title: "📄 리포트", page: "reporting.html?panel=report",
+      segType: "rows", data: [["이번 주 작성", "2"], ["마지막 보고 후", "3일"], ["보관 중", "46"]],
+      foot: "정기·수시 보고서가 여기 쌓입니다", agents: ["report"], domains: ["doc"], pick: null, chatKind: "report",
+      cols: ["리포트명", "대상", "형식", "생성일"], rows: [["주간 보안 현황", "경영진", "PDF", "08-18"], ["AI 점검 결과보고서", "안전대부", "DOCX", "08-15"]] },
+    { id: "kpi", grp: "reporting", grpLabel: "⑤ 보고", title: "📈 보안 KPI", page: "reporting.html?panel=kpi",
+      segType: "rows", data: [["종합 점수", "78/100"], ["미조치 취약점", "68", R], ["기한 지난 조치", "5", A]],
+      foot: "지표는 서버가 한 곳에서 셉니다", agents: [], domains: ["doc", "vuln"], pick: null, chatKind: "report",
+      cols: ["지표", "이번 주", "지난 주", "증감"], rows: [["종합 점수", "78", "81", "▼3"], ["미조치", "68", "61", "▲7"]] },
+    { id: "compliance", grp: "reporting", grpLabel: "⑤ 보고", title: "📋 컴플라이언스", page: "reporting.html?panel=compliance",
+      segType: "bars", data: [{ l: "이행", v: 19, c: T }, { l: "부분", v: 7, c: A }, { l: "미이행", v: 4, c: R }],
+      foot: "항목 30개", agents: [], domains: ["doc"], pick: null, chatKind: "report",
+      cols: ["항목", "상태", "근거", "담당"], rows: [["M06 접근통제", "이행", "가드레일 적용", "김보안"], ["M12 로그보관", "부분", "—", "이현우"]] },
+    { id: "team", grp: "aiops", grpLabel: "AI 운영", title: "🤖 AI 팀", page: "aihub.html?panel=team",
+      segType: "rows", data: [["베이스 모델", "Fable-5"], ["팀원", "6명"], ["전문가 어댑터", "2채택 · 5후보"]],
+      foot: "모델 교체는 설정 > 서버·AI", agents: ["orchestrator"], parts: ["lora"], domains: ["ai"], pick: null, chatKind: "aiteam",
+      cols: ["팀원", "역할", "모델", "상태"], rows: [["Security Orchestrator", "분배", "Fable-5", "감시 중"], ["Scan Agent", "해석", "Fable-5", "대기"]] },
+    { id: "knowledge", grp: "aiops", grpLabel: "AI 운영", title: "📚 지식", page: "aihub.html?panel=knowledge",
+      segType: "rows", data: [["올린 문서", "214"], ["표준 관계망", "1,842"], ["오늘 반입", "6"]],
+      foot: "새 문서는 대화창 ＋로 올립니다", agents: ["analysis", "normaltic"], parts: ["embed", "search"], domains: ["doc", "ai"], pick: null, chatKind: null,
+      cols: ["문서", "등급", "조각", "반입"], rows: [["취약점관리_지침.md", "C 사내", "42", "08-18"], ["ISO27001_요약.pdf", "S 공개", "118", "08-10"]],
+      note: "화면이름카드에 '지식' 키워드 없음(§3 실측) — 대화 소환은 aihub 전체(aiteam)로 뭉뚱그려짐, 신설 후보." },
+    { id: "learning", grp: "aiops", grpLabel: "AI 운영", title: "🎓 학습", page: "aihub.html?panel=learning",
+      segType: "bars", data: [{ l: "취약점 112", v: 112, c: T }, { l: "장비 58", v: 58, c: B }, { l: "규정 34", v: 34, c: B }, { l: "위협 9", v: 9, c: B }],
+      foot: "300이 차면 전문가 어댑터를 학습할 수 있습니다", agents: ["analysis"], domains: ["ai"], pick: null, chatKind: null,
+      cols: ["주제", "승인 건수", "목표", "준비도"], rows: [["취약점", "112", "300", "준비 중"], ["장비운영", "58", "300", "준비 중"]] },
+    { id: "safety", grp: "aiops", grpLabel: "AI 운영", title: "🛡 팀 감독·안전", page: "aihub.html?panel=safety",
+      segType: "rows", data: [["팀·감독(오늘)", "6명 · 호출 214 · 오류 2"], ["가드레일(기동 후)", "기록만 · 막음 12"], ["모의 공격 견고성", "81/100"]],
+      foot: "쓰기 지시는 항상 결재판을 거칩니다", agents: [], parts: ["guard"], domains: ["ai"], pick: null, chatKind: "supervision",
+      cols: ["항목", "오늘", "어제", "상태"], rows: [["가드레일 차단", "12", "9", "정상"], ["모의공격 견고성", "81", "79", "상승"]] },
+    { id: "audit", grp: "records", grpLabel: "기록", title: "🗒 작업 기록", page: "records.html?panel=audit",
+      segType: "rows", data: [["오늘 기록", "341"], ["차단", "2", R], ["개인정보 가림", "5"]],
+      foot: "쓰기·승인·CLI가 전부 남습니다", agents: [], domains: ["rec"], pick: null, chatKind: "records",
+      cols: ["시각", "행위", "대상", "결과"], rows: [["09:14", "조치완료 처리", "디렉터리 리스팅", "허용"], ["09:20", "위험 명령 실행", "reload", "차단"]] },
+    { id: "syslog", grp: "records", grpLabel: "기록", title: "⚙ 시스템 로그", page: "records.html?panel=syslog",
+      segType: "rows", data: [["오늘 오류", "1", R], ["경고", "4", A], ["정보", "1,204"]],
+      foot: "서버·엔진의 동작 기록입니다", agents: [], domains: ["rec"], pick: null, chatKind: null,
+      cols: ["시각", "레벨", "컴포넌트", "메시지"], rows: [["08:02", "오류", "localengine", "모델 로드 지연"], ["07:40", "경고", "embed", "ubatch 근접"]],
+      note: "화면파일카드에 syslog.html 미등록(records.html·audit.html만 있음, §3 실측) — 대화 소환 신설 후보." },
+    // ── 신설 4(§6) ──────────────────────────────────────────────
+    { id: "asset", grp: "assets0", grpLabel: "⓪ 자산(신설)", title: "🗺 자산", page: "assets.html",
+      segType: "rows", data: [["등록 자산", "40"], ["고위험 자산", "7", R], ["미조치 취약점", "68", A], ["담당 미지정", "5", A]],
+      foot: "위험한 순으로 8개를 카드로 보였습니다", agents: [], domains: ["asset"], pick: "asset", chatKind: "asset", isNew: true,
+      cols: ["자산", "유형", "심각(치명·높음)", "미조치", "담당"], rows: [["srv-web-01", "infra-host", "3", "9", "김보안"], ["srv-llm-01", "llm-service", "1", "4", "미지정"]],
+      src: "datacard.ts assetStatusAnswer() 147행 — kpis 필드 그대로(등록/고위험/미조치/담당미지정)" },
+    { id: "products", grp: "registry", grpLabel: "등록부(신설)", title: "🧰 보안제품", page: "products.html",
+      segType: "rows", data: [["등록 제품", "26"], ["종류", "6"]],
+      foot: "등록 26개(6종류)", agents: [], domains: ["doc", "ops"], pick: null, chatKind: "products", isNew: true,
+      cols: ["제품", "종류", "제조사"], rows: [["AhnLab EDR", "EDR", "안랩"], ["Palo Alto 방화벽", "방화벽", "Palo Alto Networks"]],
+      src: "datacard.ts productsStatusAnswer() 561행 — kpis(등록 제품/종류) + table(제품/종류/제조사) 그대로" },
+    { id: "mydocs", grp: "personal", grpLabel: "개인(신설)", title: "📓 내 문서", page: "mydocs.html",
+      segType: "rows", data: [["내 문서", "12"], ["오늘 쓴 것", "1"], ["AI 포함", "8"], ["회사 공유", "3", A]],
+      foot: "개인 문서는 내 질문에만 근거로 나옵니다", agents: [], domains: ["doc"], pick: null, chatKind: "mydocs", isNew: true,
+      cols: ["제목", "수정", "범위"], rows: [["신규 방화벽 반입 메모", "08-19", "개인"], ["팀 온보딩 체크리스트", "08-12", "공유"]],
+      src: "datacard.ts mydocsStatusAnswer() 437행 — kpis(내 문서/오늘/AI 포함/공유) + table(제목/수정/범위) 그대로" },
+    { id: "sessions", grp: "personal", grpLabel: "개인(신설)", title: "🗂 작업 내역", page: "sessions.html",
+      segType: "rows", data: [["저장된 세션", "87"], ["오늘 갱신", "4", T]],
+      foot: "최근 것부터 카드로 보였습니다", agents: [], domains: ["rec"], pick: null, chatKind: "sessions", isNew: true,
+      cols: ["제목", "갱신"], rows: [["8/20 취약점 우선순위 정리", "10:02"], ["8/19 KPI 원인 추적", "어제"]],
+      src: "datacard.ts sessionsStatusAnswer() 477행 — kpis(저장된 세션/오늘 갱신) + table(제목/갱신) 그대로" },
+  ];
+
+  var movedAt = {}; // id -> ms ago(데모)
+  PANELS.forEach(function (p, i) { movedAt[p.id] = 4000 + i * 3100; }); // 초기 분산
+
+  // ── 워크플로 5단계 띠 재현 ─────────────────────────────────────
+  var STAGES = [
+    { no: 1, label: "발견·수집", count: 84, alert: 3, alertLabel: "오늘 신규" },
+    { no: 2, label: "우선순위", count: 198, alert: 11, alertLabel: "실제 악용(KEV)" },
+    { no: 3, label: "조치", count: 0, alert: 178, alertLabel: "미배정" },
+    { no: 4, label: "검증", count: 12, alert: 5, alertLabel: "미점검 대상" },
+    { no: 5, label: "보고", count: 2, alert: 3, alertLabel: "마지막 보고 후(일)" },
+  ];
+  (function renderRail() {
+    var css = document.createElement("style");
+    css.textContent = ".gjr{display:flex;gap:6px;flex-wrap:wrap;}.gjr-s{flex:1;min-width:132px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:7px 10px;}" +
+      ".gjr-s .t{font-size:12.25px;font-weight:800;color:#fff;display:flex;align-items:center;gap:5px;}" +
+      ".gjr-s .t .no{width:16px;height:16px;border-radius:4px;background:rgba(59,130,246,.2);color:var(--blue-light);font-size:11px;display:inline-flex;align-items:center;justify-content:center;}" +
+      ".gjr-s .v{font-size:11.75px;color:var(--muted-2);margin-top:2px;}.gjr-s .v b{font-size:15px;font-weight:900;color:var(--blue-light);}" +
+      ".gjr-s .v .al{color:#f5928a;font-weight:800;}.gjr-s .v .al0{color:var(--muted-2);font-weight:600;}";
+    document.head.appendChild(css);
+    document.getElementById("railStrip").innerHTML = '<div class="gjr">' + STAGES.map(function (s) {
+      var 경고 = s.alert == null || !s.alertLabel ? "" : ' · <span class="' + (s.alert ? "al" : "al0") + '">' + esc(s.alertLabel) + " " + s.alert + "</span>";
+      return '<div class="gjr-s"><div class="t"><span class="no">' + s.no + "</span>" + esc(s.label) + '</div><div class="v"><b>' + s.count + "</b>" + 경고 + "</div></div>";
+    }).join("") + "</div>";
+  })();
+
+  // ── 도메인 칩 ────────────────────────────────────────────────
+  var domOn = null;
+  function renderDomChips() {
+    document.getElementById("domChips").innerHTML = DOMAINS.map(function (d) {
+      var n = PANELS.filter(function (p) { return p.domains.indexOf(d.id) >= 0; }).length;
+      return '<span class="domchip' + (domOn === d.id ? " on" : "") + '" data-d="' + d.id + '">' + esc(d.label) + " · " + n + "판</span>";
+    }).join("") + '<span class="domchip' + (domOn === null ? " on" : "") + '" data-d="">전체</span>';
+    document.querySelectorAll(".domchip").forEach(function (el) {
+      el.addEventListener("click", function () { domOn = el.dataset.d || null; renderDomChips(); renderBoard(); });
+    });
+  }
+
+  // ── 🎯/🗔 미니 데모 ─────────────────────────────────────────
+  var PICK_SRC = {
+    vuln: "server 원천: listAssets() 평탄화(pick.html 실물 그대로) — 미조치 실취약점만",
+    asset: "server 원천: assetHub().rows(pick.html 실물 그대로)",
+  };
+  function openPick(kind, title) {
+    var box = document.getElementById("pickOverlay");
+    document.getElementById("pickTitle").textContent = "🎯 " + title + " 고르기 (kind=" + kind + ")";
+    var p = PANELS.find(function (x) { return x.pick === kind; }) || PANELS[0];
+    var demo = (p.rows || []).slice(0, 3);
+    document.getElementById("pickRows").innerHTML = demo.map(function (r) {
+      return '<div class="pr" data-l="' + esc(r[0]) + '">' + esc(r[0]) + '<span class="gm2" style="float:right;color:var(--muted-2);font-size:11px;">' + esc(r[1] || "") + "</span></div>";
+    }).join("");
+    document.querySelectorAll(".pr").forEach(function (el) {
+      el.addEventListener("click", function () {
+        document.getElementById("ctxLine").innerHTML = "지금 「<b>" + esc(el.dataset.l) + "</b>」 다루는 중";
+        box.classList.remove("on");
+      });
+    });
+    box.classList.add("on");
+  }
+  document.getElementById("pickClose").addEventListener("click", function () { document.getElementById("pickOverlay").classList.remove("on"); });
+
+  // ── 타일 빌더(전체 지도용) ──────────────────────────────────
+  function tileBody(p) {
+    if (p.segType === "bars") {
+      var max = Math.max.apply(null, p.data.map(function (s) { return s.v; }).concat([1]));
+      return '<div class="t-bars">' + p.data.map(function (s) {
+        var h = Math.max(4, Math.round((s.v / max) * 26));
+        return '<div class="t-bcol"><div class="t-bv">' + s.v + '</div><div class="t-bar" style="height:' + h + 'px;background:' + s.c + '"></div><div class="t-bl">' + esc(s.l) + "</div></div>";
+      }).join("") + "</div>";
+    }
+    return p.data.map(function (r) {
+      return '<div class="t-row"><span>' + esc(r[0]) + "</span><b" + (r[2] ? ' style="color:' + r[2] + '"' : "") + ">" + esc(r[1]) + "</b></div>";
+    }).join("");
+  }
+  function agentBadges(p) {
+    var out = (p.agents || []).map(function (aid) { var a = AGENTS[aid]; return '<span class="t-ag real" title="' + esc(a.name + " — " + a.role) + '">' + a.sym + " " + esc(a.abbr) + "</span>"; });
+    out = out.concat((p.parts || []).map(function (pid) { var pt = PARTS[pid]; return '<span class="t-ag part" title="' + esc(pt.name) + '">' + pt.sym + "</span>"; }));
+    if (!out.length) return '<span class="t-ag" title="구현 시 등록부의 도구 담당에서 도출">— 미상</span>';
+    return out.join("");
+  }
+  function excelHtml(p) {
+    return '<div class="g-rows"><div class="g-rows-head" style="grid-template-columns:repeat(' + p.cols.length + ',1fr);">' +
+      p.cols.map(function (c) { return "<span>" + esc(c) + "</span>"; }).join("") + "</div>" +
+      p.rows.map(function (r) {
+        return '<div class="g-rows-r" style="grid-template-columns:repeat(' + p.cols.length + ',1fr);">' +
+          r.map(function (v, i) { return '<span class="' + (i >= r.length - 1 && /^[0-9]/.test(String(v)) ? "ta-r" : "trunc") + '">' + esc(v) + "</span>"; }).join("") + "</div>";
+      }).join("") + "</div>" + (p.note ? '<div class="pf" style="padding:6px 10px;font-size:10.75px;color:var(--amber);">⚠ ' + esc(p.note) + "</div>" : "") +
+      (p.src ? '<div class="pf" style="padding:2px 10px 8px;font-size:10.5px;color:var(--muted-2);">원천: ' + esc(p.src) + "</div>" : "");
+  }
+  var openTiles = {};
+  function tileHtml(p, ago) {
+    var moved = ago < 6000;
+    return '<div class="tile' + (moved ? " moved" : "") + '" data-id="' + p.id + '">' +
+      '<div class="t-head"><span class="t-title">' + esc(p.title) + (p.isNew ? '<span class="t-new">NEW</span>' : "") + '</span>' +
+      '<span class="t-grp">' + esc(p.grpLabel) + '</span><span class="t-time">' + Math.round(ago / 1000) + "초 전</span></div>" +
+      '<div class="t-body">' + tileBody(p) + "</div>" +
+      '<div class="t-foot">' + esc(p.foot) + "</div>" +
+      '<div class="t-agents">' + agentBadges(p) + "</div>" +
+      '<div class="t-actions">' +
+        (p.pick ? '<button class="t-btn pick" data-act="pick" data-id="' + p.id + '">🎯 고르기</button>' : '<button class="t-btn" disabled>🎯 —</button>') +
+        '<button class="t-btn" data-act="open" data-id="' + p.id + '">🗔 열기</button>' +
+        '<button class="t-btn" data-act="excel" data-id="' + p.id + '">▾ 하위 리스트</button>' +
+      "</div>" +
+      (openTiles[p.id] ? excelHtml(p) : "") +
+      "</div>";
+  }
+
+  var viewMode = "move";
+  function renderBoard() {
+    var list = PANELS.slice();
+    if (domOn) list = list.filter(function (p) { return p.domains.indexOf(domOn) >= 0; });
+    var html = "";
+    if (viewMode === "move") {
+      list.sort(function (a, b) { return movedAt[a.id] - movedAt[b.id]; });
+      html = list.map(function (p) { return tileHtml(p, movedAt[p.id]); }).join("");
+    } else if (viewMode === "domain") {
+      var order = domOn ? [domOn] : DOMAINS.map(function (d) { return d.id; });
+      order.forEach(function (did) {
+        var d = DOMAINS.find(function (x) { return x.id === did; });
+        var sub = list.filter(function (p) { return p.domains.indexOf(did) >= 0; });
+        if (!sub.length) return;
+        html += '<div class="grpHeadRow">' + esc(d.label) + " — " + sub.length + "판</div>";
+        html += sub.map(function (p) { return tileHtml(p, movedAt[p.id]); }).join("");
+      });
+    } else { // grouped by grp(그룹)
+      var seen = {};
+      list.forEach(function (p) {
+        if (!seen[p.grp]) { html += '<div class="grpHeadRow">' + esc(p.grpLabel) + "</div>"; seen[p.grp] = true; }
+        html += tileHtml(p, movedAt[p.id]);
+      });
+    }
+    document.getElementById("board").innerHTML = html;
+    document.getElementById("liveCount").textContent = list.length + "개 판 · 마지막 확인 방금 전";
+    document.querySelectorAll(".t-btn[data-act]").forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var id = b.dataset.id, p = PANELS.find(function (x) { return x.id === id; });
+        if (b.dataset.act === "excel") { openTiles[id] = !openTiles[id]; renderBoard(); }
+        else if (b.dataset.act === "pick") { openPick(p.pick, p.title); }
+        else if (b.dataset.act === "open") { alert("실제로는 " + p.page + " 이(가) 열립니다(그룹 허브 무대 또는 dock) — 이 목업은 안내만 합니다."); }
+      });
+    });
+    // 타일 자체 클릭 = 엑셀 하위 리스트 펼치기/접기(본문 §2 설명 "판을 누르면 펼쳐진다"와
+    // 일치시킴 — 버튼만 반응하면 카드 커서:pointer·hover와 어긋나 거짓 상호작용이 된다).
+    document.querySelectorAll(".tile").forEach(function (t) {
+      t.addEventListener("click", function () {
+        var id = t.dataset.id;
+        openTiles[id] = !openTiles[id];
+        renderBoard();
+      });
+    });
+  }
+  document.querySelectorAll("#viewSeg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#viewSeg button").forEach(function (x) { x.classList.remove("on"); });
+      b.classList.add("on"); viewMode = b.dataset.v;
+      document.getElementById("scenBlock").style.display = viewMode === "scenario" ? "block" : "none";
+      renderBoard();
+    });
+  });
+
+  // ── 대화 홈 압축 스트립(§1) ──────────────────────────────────
+  function renderMini() {
+    var top6 = PANELS.slice().sort(function (a, b) { return movedAt[a.id] - movedAt[b.id]; }).slice(0, 6);
+    document.getElementById("miniGrid").innerHTML = top6.map(function (p) {
+      var first = p.segType === "bars" ? (p.data[0].l + " " + p.data[0].v) : (p.data[0][0] + " " + p.data[0][1]);
+      return '<div class="pv-mini' + (movedAt[p.id] < 6000 ? " moved" : "") + '" data-id="' + p.id + '"><div class="mt"><span>' + esc(p.title) + "</span></div>" +
+        '<div class="mv"><b>' + esc(first) + "</b></div><div class=\"mf\">" + esc(p.foot.slice(0, 26)) + "</div></div>";
+    }).join("");
+    document.querySelectorAll(".pv-mini").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var p = PANELS.find(function (x) { return x.id === el.dataset.id; });
+        document.getElementById("ctxLine").innerHTML = "지금 「<b>" + esc(p.title) + "</b>」 다루는 중";
+      });
+    });
+  }
+
+  // ── 움직임 데모(가짜 타이머 — 구현 시 실신호로 교체) ───────────
+  setInterval(function () {
+    for (var i = 0; i < 21; i++) { var id = PANELS[i].id; movedAt[id] += 900; }
+    var pick2 = PANELS[Math.floor(Math.random() * PANELS.length)];
+    movedAt[pick2.id] = 200;
+    renderMini();
+    if (document.getElementById("board").children.length) renderBoard();
+  }, 4200);
+
+  // ── 시나리오(§5, 대장 실물 인용) ───────────────────────────────
+  var SCEN = [
+    { title: "2-1. 아침 관제 훑기 — 우선순위 잡기", src: "GIJO_AS_대화시나리오_대장_2026-08-19.md §2 발견수집", chain: ["analysis", "vuln", "approvals"], active: "vuln",
+      quotes: ["오늘의 브리핑 알려줘", "미조치 취약점 뭐 있어?", "(체크칸 2건 체크 후) 고른 것 조치완료로 바꿔줘"] },
+    { title: "6-4. KPI 악화 원인 추적 → 조치 연계", src: "GIJO_AS_대화시나리오_대장_2026-08-19.md §6 보고", chain: ["kpi", "vuln", "approvals"], active: "kpi",
+      quotes: ["보안 KPI 현황 알려줘", "뭐가 점수를 깎아?", "미조치 취약점 뭐 있어?"] },
+    { title: "5-1. ① 아침 정기점검 관제 — 어젯밤 점검이 잘 돌았나", src: "GIJO_AS_대화시나리오_대장_2026-08-19.md §5 검증", chain: ["hardening", "report"], active: "hardening",
+      quotes: ["보안설정 점검 현황 알려줘", "정기점검 언제 돌아?"] },
+  ];
+  function scenHtml(s) {
+    return '<div class="scen"><h4>' + esc(s.title) + '</h4><div class="src">원문: ' + esc(s.src) + '</div>' +
+      '<div class="scenChain">' + s.chain.map(function (pid, i) {
+        var p = PANELS.find(function (x) { return x.id === pid; });
+        return (i > 0 ? '<span class="scArrow">→</span>' : "") + '<span class="scStep' + (pid === s.active ? " active" : "") + '">' + (pid === s.active ? '<span class="dot2"></span>' : "") + esc(p.title) + "</span>";
+      }).join("") + "</div>" +
+      '<div class="note" style="margin-top:8px;">지시 문장 그대로: ' + s.quotes.map(function (q) { return '"' + esc(q) + '"'; }).join(" → ") + "</div></div>";
+  }
+  document.getElementById("scenListFull").innerHTML = SCEN.map(scenHtml).join("");
+  document.getElementById("scenBlock").innerHTML = '<div class="scenList">' + SCEN.map(scenHtml).join("") + "</div>";
+
+  // ── §4 에이전트 표 ───────────────────────────────────────────
+  (function () {
+    var rows = "";
+    Object.keys(AGENTS).forEach(function (aid) {
+      var a = AGENTS[aid];
+      var used = PANELS.filter(function (p) { return (p.agents || []).indexOf(aid) >= 0; }).map(function (p) { return p.title; });
+      rows += "<tr><td>" + a.sym + " <b>" + esc(a.name) + "</b>(" + esc(a.abbr) + ")</td><td>" + esc(a.role) + "</td><td>" + (used.length ? used.join(", ") : '<span class="flag gap">특정 판 없음 — 전체 조율</span>') + "</td></tr>";
+    });
+    Object.keys(PARTS).forEach(function (pid) {
+      var pt = PARTS[pid];
+      var used = PANELS.filter(function (p) { return (p.parts || []).indexOf(pid) >= 0; }).map(function (p) { return p.title; });
+      rows += "<tr><td>" + pt.sym + " <b>" + esc(pt.name) + "</b>(부품)</td><td>railroster.js 목적지 page 그대로</td><td>" + (used.length ? used.join(", ") : "—") + "</td></tr>";
+    });
+    document.getElementById("agentTable").innerHTML = "<tr><th>이름(약자)</th><th>역할(agents.ts 원문)</th><th>근거로 배지 단 판</th></tr>" + rows;
+  })();
+
+  // ── §6 갭 표 ─────────────────────────────────────────────────
+  (function () {
+    var newOnes = PANELS.filter(function (p) { return p.isNew; });
+    document.getElementById("gapTable").innerHTML = "<tr><th>신설 판</th><th>대상 화면</th><th>그룹(신설)</th><th>세그먼트(원천 그대로)</th><th>원천 함수</th></tr>" +
+      newOnes.map(function (p) {
+        return "<tr><td><b>" + esc(p.title) + "</b></td><td><code>" + esc(p.page) + "</code></td><td>" + esc(p.grpLabel) + "</td><td>" + p.data.map(function (r) { return r[0]; }).join(" · ") + "</td><td>" + esc(p.src) + "</td></tr>";
+      }).join("");
+    var EXC = [
+      ["office.html", "(창) 상시 관제 모니터 — 동시 보기가 목적"],
+      ["docbox.html", "(창) 문서함 — 옆에 두고 읽는 창"],
+      ["settings.html", "설정 — 조작 화면이라 현황 카드가 성립 안 함"],
+      ["dashboard.html", "대시보드 자체가 요약판 — 카드의 카드는 중복"],
+      ["lawlookup.html", "결과가 대화 답으로 오는 화면 — 화면 현황이 없음"],
+      ["intro.html", "제품 소개(읽기 전용)"],
+      ["handover.html", "인수인계 위저드 — 행위 화면(현황은 작업내역 카드가 담당)"],
+    ];
+    document.getElementById("excTable").innerHTML = "<tr><th>화면</th><th>제외 사유(datacard.ts 카드예외, 원문)</th></tr>" +
+      EXC.map(function (r) { return "<tr><td><code>" + esc(r[0]) + "</code></td><td>" + esc(r[1]) + "</td></tr>"; }).join("");
+  })();
+
+  // ── §7 고르기 확장 표 ─────────────────────────────────────────
+  (function () {
+    var rows = [
+      ["asset", "assets.html / inventory.html", "채택됨(실물)", "assetHub().rows"],
+      ["vuln", "triage.html", "채택됨(실물)", "listAssets() 평탄화"],
+      ["doc", "mydocs.html", "신설 제안", "personalDocsList() — mydocsStatusAnswer가 이미 씀"],
+      ["session", "sessions.html", "신설 제안", "listWorkSessions()"],
+      ["product", "products.html", "신설 제안", "listSecurityProductsGrouped()"],
+      ["threat", "threat.html(discover.html?panel=threat)", "신설 제안", "listCtiFindings()"],
+      ["audit", "records.html(audit)", "신설 제안", "listAudit()"],
+      ["report", "reporting.html(report)", "신설 제안(fields 빈약 — title만)", "listReportHistory()"],
+    ];
+    document.getElementById("pickTable").innerHTML = "<tr><th>kind</th><th>screen.page(고르기kind 키)</th><th>상태</th><th>원천(새 API 없음)</th></tr>" +
+      rows.map(function (r) { return "<tr><td><code>" + esc(r[0]) + "</code></td><td><code>" + esc(r[1]) + "</code></td><td>" + esc(r[2]) + "</td><td>" + esc(r[3]) + "</td></tr>"; }).join("");
+  })();
+
+  renderDomChips();
+  renderMini();
+  renderBoard();
+})();
+</script>
+</body>
+</html>

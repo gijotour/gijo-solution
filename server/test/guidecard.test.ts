@@ -46,12 +46,14 @@ describe("이렇게 쓰면 됩니다 (문서함 매뉴얼)", () => {
     }
   });
 
-  it("화면 안내(screenguide)가 문서함으로 안내한다 — 없는 카드를 누르라고 하지 않는다", () => {
+  it("화면 안내(screenguide)가 새 자리(내 문서 📘 제품 안내)로 안내한다 — 없는 카드를 누르라고 하지 않는다", () => {
+    // 문서함 창은 2026-08-20 내 문서 허브에 흡수됐다(승인 시안 docs-hub-v3) — 안내가 옛 창을
+    // 가리키면 담당자가 없는 창을 찾는다.
     const sg = fs.readFileSync(path.join(repoRoot, "server", "src", "engine", "screenguide.ts"), "utf8");
     const i = sg.indexOf('"이렇게 쓰면 됩니다":');
     expect(i, "화면 안내에서 항목이 통째로 사라졌다 — 안내 없이 지우면 못 찾는다").toBeGreaterThan(0);
     const 본문 = sg.slice(i, i + 600);
-    expect(본문).toContain("문서함");
+    expect(본문).toContain("제품 안내 탭");
     expect(본문, "화면에 없는 [물어보기] 버튼을 안내하면 담당자가 없는 것을 찾는다").not.toContain("[물어보기]");
   });
 

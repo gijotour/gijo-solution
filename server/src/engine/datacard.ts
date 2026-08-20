@@ -337,7 +337,8 @@ const 화면파일카드: Record<string, 화면카드종류> = {
   "verify.html": "hardening", "hardening.html": "hardening",
   "triage.html": "finding", "vulnscan.html": "finding",
   // ── 전 메뉴 확장(2026-08-20 사장님 「나머지는 카드 다 만들어서 대화창에」).
-  //    예외(창 유지)는 office·docbox·문서작성·설정뿐 — 맵에 안 넣는 것이 곧 예외 선언이다.
+  //    예외(창 유지)는 office·문서작성·설정뿐 — 맵에 안 넣는 것이 곧 예외 선언이다.
+  //    (문서함 창은 2026-08-20 내 문서 허브에 흡수 — mydocs 카드가 그 자리까지 맡는다.)
   "sessions.html": "sessions",
   "fix.html": "fix", "approvals.html": "fix", "maintenance.html": "fix",
   "reporting.html": "report", "report.html": "report", "kpi.html": "report",
@@ -354,7 +355,6 @@ const 화면파일카드: Record<string, 화면카드종류> = {
 // 둘 중 하나에 반드시 들어가야 한다 — wiringcontract 「메뉴=맵∪예외」가 지킨다.
 export const 카드예외: Record<string, string> = {
   "office.html": "(창) 상시 관제 모니터 — 동시 보기가 목적",
-  "docbox.html": "(창) 문서함 — 옆에 두고 읽는 창",
   "settings.html": "설정 — 조작 화면이라 현황 카드가 성립 안 함",
   "dashboard.html": "대시보드 자체가 요약판 — 카드의 카드는 중복",
   "lawlookup.html": "결과가 대화 답으로 오는 화면 — 화면 현황이 없음",
