@@ -602,6 +602,47 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     JSON.stringify(r));
 }
 
+// ── ⑨ 전 화면 얕은 렌더(2026-08-21 — 사장님 승인 묶음 3번) ─────────────────────
+// ⚠ 왜: 위 검사들은 손으로 더한 목록이라 화면 43개 중 16개만 열어 봤다 — 나머지 27개는
+//   **렌더가 죽어도 게시됐다**(5.56.0이 고친 analysis·settings도 관문이 이름조차 안 불렀다).
+//   손 목록 자체가 구멍이므로, 목록을 **pages 디렉터리에서 자동 열거**한다 — 새 화면은
+//   저절로 검사에 들어오고, 빼려면 아래 제외표에 이유를 적어야 한다(암묵 예외 금지).
+// 검사는 얕게 — 프레임이 뜨고 본문에 실내용이 있는가(깊은 검사는 위 개별 검사 몫).
+// ⚠ hub=1로 연다 — TAB_REDIRECT(허브 흡수 화면)를 우회하는 공식 탈출구(nav.js:250)라
+//   원 파일명 프레임을 직접 확인할 수 있다.
+{
+  const 제외 = {
+    "app.html": "셸 자신(지금 이 검사가 그 안에서 돈다)",
+    "login.html": "입구 — 로그인 검사가 이미 앞에서 실제 로그인으로 확인",
+    "setup.html": "첫 실행 전용 — 로그인된 세션에서는 안 뜬다",
+    "console.html": "지휘소 부품 — app.html이 품어서 이미 돌고 있다",
+    "office.html": "팀 사무실(별도 창) — 도킹으로 못 연다",
+    "intro.html": "제품 소개(별도 진입) — 메뉴 밖",
+    "pick.html": "고르기 부품 — 단독 화면이 아니라 무대 부품(위 고르기 검사가 실측)",
+    "merge.html": "LLM 합성(관리 전용·메뉴 밖)",
+    "handover.html": "인수인계 — 메뉴 밖 별도 진입(딥링크)",
+    "lawlookup.html": "법령 — 대화창 갈래가 주 진입로",
+  };
+  const dir = path.join(repo, "client", "src", "renderer", "pages");
+  const 후보 = fs.readdirSync(dir)
+    .filter((f) => f.endsWith(".html") && !f.startsWith("lite-") && !제외[f]);
+  const 죽은화면 = [];
+  for (const pg of 후보) {
+    await 셸.evaluate((p) => window.gijoTabs && window.gijoTabs.open(p + "?hub=1", "관문-" + p, { dock: true }), pg).catch(() => {});
+    const fr = await 프레임찾기(pg, 6);
+    const 산다 = fr ? await fr.evaluate(async () => {
+      for (let i = 0; i < 8; i++) {
+        if ((document.body.innerText || "").trim().length > 30) return true;
+        await new Promise((x) => setTimeout(x, 500));
+      }
+      return (document.body.innerText || "").trim().length > 30;
+    }).catch(() => false) : false;
+    if (!산다) 죽은화면.push(pg + (fr ? "(빈 본문)" : "(프레임 없음)"));
+  }
+  ok("전 화면 얕은 렌더(" + 후보.length + "개 자동 열거 · 제외 " + Object.keys(제외).length + "개는 사유 명시)",
+    죽은화면.length === 0, 죽은화면.length ? "죽음: " + 죽은화면.join(", ") : "전부 그려짐");
+}
+
 await browser.close().catch(() => {});
 정리();
 console.log(실패.length ? "[ui관문] ✕ 실패 " + 실패.length + "건: " + 실패.join(", ") : "[ui관문] ✓ 전부 통과");
