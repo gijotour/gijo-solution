@@ -143,8 +143,9 @@
     // 에이전트·지식·학습·안전장치는 aihub 무대에서 열린다. 합성(merge)은 문서함 가이드로.
     { id: "aiops", icon: "chip", label: "AI", items: [
       { page: "aihub.html", label: "AI" },
-      // AI 팀 감독(2026-08-20 사장님 승인 ②) — 누가 얼마나 일하고 어디서 막히나(실측 지표).
-      { page: "supervision.html", label: "AI 팀 감독" },
+      // (「AI 팀 감독」 독립 메뉴는 2026-08-20 사장님 「AI팀 메뉴에 안전장치 통합」으로
+      //  AI 허브 4번째 탭(팀 감독·안전)에 흡수 — 승인 시안 aiteam-guard-merge. 옛 링크는
+      //  TAB_REDIRECT가 받는다.)
     ]},
     // 설정 5구역(2026-07-28) — 기준은 기능이 아니라 **결정권자**다.
     // 내 것 / 모두의 것(서버·AI) / 바깥과 잇는 것 / 관리자만 / 보기만.
@@ -221,6 +222,9 @@
     "learnloop.html?embed=1": "aihub.html?embed=1&panel=learning",
     "redteam.html": "aihub.html?panel=safety",
     "redteam.html?embed=1": "aihub.html?embed=1&panel=safety",
+    // AI 팀 감독 독립 메뉴 흡수(2026-08-20 aiteam-guard-merge) — 옛 링크·즐겨찾기 보호
+    "supervision.html": "aihub.html?panel=safety",
+    "supervision.html?embed=1": "aihub.html?embed=1&panel=safety",
     "vulnscan.html": "triage.html?panel=vuln",
     "vulnscan.html?embed=1": "triage.html?embed=1&panel=vuln",
     "sbom.html": "triage.html?panel=sbom",

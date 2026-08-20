@@ -64,8 +64,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <div class="main">
   <div class="head">
     <div>
-      <div class="page-title">AI 팀 감독</div>
-      <div class="page-sub">누가 얼마나 일하고 어디서 막히는지 — 숫자는 전부 실측 기록입니다. 지시는 대화창에서 합니다.</div>
+      <div class="page-title">AI 팀 감독 · 안전</div>
+      <div class="page-sub">누가 얼마나 일하고 어디서 막히는지, 그리고 안전장치가 잘 서 있는지 — 숫자는 전부 실측 기록입니다. 지시는 대화창에서 합니다.</div>
     </div>
     <div class="range" id="range">
       <button data-d="1" class="on">오늘</button>
@@ -79,6 +79,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
     <div id="sup"></div>
     <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+  </div>
+  <!-- 🛡 안전장치(2026-08-20 사장님 「AI팀 메뉴에 안전장치 통합」 — 승인 시안 aiteam-guard-merge).
+       여기는 **읽기 전용 요약**이다 — 레드팀 실행·가드레일 모드 변경은 안전장치 화면 몫(바로가기).
+       hub=1: 리다이렉트 우회(안 붙이면 redteam.html이 허브로 되돌아 영영 못 간다 — inventory 전례). -->
+  <div class="panel">
+    <h2>🛡 안전장치 — 지금 상태(읽기 전용)</h2>
+    <div id="safety"><div class="note">불러오는 중…</div></div>
+    <div class="note">레드팀 <b>실행</b>·가드레일 모드 <b>변경</b>은
+      <button class="go" id="goRedteam" style="background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;padding:3px 9px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit">🗔 안전장치 실행 화면</button>
+      에서 합니다 — 쓰기 지시는 항상 결재판을 거칩니다.</div>
   </div>
 </div>
 <script>
@@ -191,7 +201,29 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     load();
   });
 
+  // 🛡 안전 요약 — 판(grouppanels safety)과 같은 원천을 읽되 rows로 조금 더 편다(읽기 전용).
+  async function 안전그리기() {
+    var el = document.getElementById("safety");
+    if (!el || !window.gijo) return;
+    var g = null, rt = null, eff = null;
+    try { g = await window.gijo.guardrailStatus(); } catch (e) { }
+    try { rt = await window.gijo.lastRedTeam(); } catch (e) { }
+    try { eff = window.gijo.redteamEffectiveLast ? await window.gijo.redteamEffectiveLast() : null; } catch (e) { }
+    var MODE = { off: "꺼짐", flag: "기록만", block: "차단" };
+    var 줄 = function (k, v) {
+      return '<div class="sup-line"><span style="flex:1">' + k + '</span><b>' + v + "</b></div>";
+    };
+    el.innerHTML =
+      줄("가드레일", g ? esc(MODE[g.mode] || g.mode) + " 모드 · 막음 " + (g.blockedCount || 0) + "건" : "—") +
+      줄("모의 공격 견고성(최근)", rt && rt.robustnessScore != null ? esc(String(rt.robustnessScore)) + "/100 · 통과 " + esc(String(rt.blocked != null ? rt.blocked : "-")) + "/" + esc(String(rt.total != null ? rt.total : "-")) : "아직 실행 기록 없음") +
+      줄("제품 경로 실효 견고성(최근)", eff && eff.score != null ? esc(String(eff.score)) + "/100" : "—");
+  }
+  document.getElementById("goRedteam").addEventListener("click", function () {
+    try { window.top.postMessage({ type: "gijo:openTab", page: "redteam.html?hub=1", label: "안전장치" }, "*"); } catch (e) { }
+  });
+
   load();
+  안전그리기();
 })();
 </script>
 <script src="nav.js"></script>

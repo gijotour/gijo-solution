@@ -305,25 +305,29 @@
           };
         });
       } },
-      { id: "safety", title: "🛡 안전장치", page: "redteam.html", load: function () {
+      // 팀 감독·안전(2026-08-20 사장님 「AI팀 메뉴에 안전장치 통합」 — 승인 시안
+      // aiteam-guard-merge): 독립 메뉴였던 감독(supervision)을 이 판으로 흡수 — 무대 착지도
+      // supervision.html(감독+안전 화면). 판 요약은 팀/감독/안전 세 줄.
+      { id: "safety", title: "🛡 팀 감독·안전", page: "supervision.html", load: function () {
         // ⚠ 「쓰기 결재 대기」에 조치·승인 검토 대장을 갖다 쓰면 안 된다(2026-08-09 실측 4,830):
         //   그 대장은 스캔 발견 건 전체(스캔 오류 포함)라 결재판과 전혀 다른 숫자다.
-        //   여기는 **정확히 셀 수 있는 것만** 싣는다 — 가드레일·모의 공격·개인정보 가림.
+        //   여기는 **정확히 셀 수 있는 것만** 싣는다 — 팀·감독 실측·가드레일·모의 공격.
         return Promise.all([
           window.gijo.guardrailStatus().catch(function () { return null; }),
           window.gijo.lastRedTeam().catch(function () { return null; }),
-          window.gijo.listAudit("privacy", 300).catch(function () { return null; }),
+          window.gijo.listAgents ? window.gijo.listAgents().catch(function () { return null; }) : null,
+          window.gijo.aiteamSupervision ? window.gijo.aiteamSupervision(1).catch(function () { return null; }) : null,
         ]).then(function (r) {
-          var g = r[0], rt = r[1], pv = r[2];
-          var 항목 = (pv && pv.entries) || pv || [];
-          var 주 = Date.now() - 7 * 86400000;
-          var 가림 = 항목.filter ? 항목.filter(function (e) { return (e.at || 0) >= 주; }).length : null;
+          var g = r[0], rt = r[1], ags = r[2], sup = r[3];
           var MODE = { off: "꺼짐", flag: "기록만", block: "차단" };
+          var 호출 = 0, 오류 = 0;
+          ((sup && sup.daily) || []).forEach(function (d) { if (d.kind === "chat") { 호출 += d.done || 0; 오류 += d.error || 0; } });
           return {
             rows: [
+              ["팀", ags ? ags.length + "명 구성" : "-"],
+              ["감독(오늘)", sup ? "호출 " + 호출 + " · 오류 " + 오류 : "-"],
               ["가드레일", g ? (MODE[g.mode] || g.mode) + " 모드 · 막음 " + (g.blockedCount || 0) : "-"],
               ["모의 공격 견고성", rt && rt.robustnessScore != null ? rt.robustnessScore + "/100" : "-"],
-              ["개인정보 가림(이번 주)", 가림 == null ? "-" : String(가림)],
             ],
             foot: "쓰기 지시는 항상 결재판을 거칩니다",
           };
