@@ -378,8 +378,15 @@ export function registerScreenCardRoute(app: import("express").Express): void {
     }
     const me = (req as import("express").Request & { user?: { id?: string | number; username?: string } }).user;
     const 답 = await 카드답변(kind, scope, String(me?.id ?? me?.username ?? "unknown"));
+    // ⚠ 종류별로 제 갈래를 준다(2026-08-21 설계관 적발 — 예전엔 5분기로 접어서
+    //   products·records·threat·sessions·aiteam·mydocs가 전부 「분기:내업무」 칩
+    //   (오늘 뭐부터/자주 하는 일)을 받았다. 보안제품 카드를 열었는데 화면과 무관한
+    //   칩이 붙는 자리였다). 문장은 전부 nextguide 표에 이미 있는 결정적 지시다.
     const 분기 = kind === "asset" ? "분기:자산현황" : kind === "ops" ? "분기:관제현황" : kind === "hardening" ? "분기:검증현황"
-      : kind === "fix" ? "분기:내업무" : kind === "report" ? "분기:내업무" : "분기:내업무";
+      : kind === "products" ? "product_status" : kind === "threat" ? "threats"
+      : kind === "records" ? "audit_search" : kind === "sessions" ? "work_session_status"
+      : kind === "mydocs" ? "recent_documents" : kind === "aiteam" ? "adopt_adapter"
+      : "분기:내업무"; // fix·report·supervision — 내 업무 칩이 실제로 그 화면의 다음 걸음이다
     // 🗂 범위가 걸렸는데 이 카드가 범위를 모르는 종류면 제목에 밝힌다(검토관 5.41 중10 —
     //   범위를 걸어 둔 사람이 전체 숫자를 자기 자산 것으로 읽는 사고 방지). 감추지 않고 말한다.
     // 자산 범위가 **성립하는데 미적용인** 카드에만 붙인다 — mydocs(개인)·supervision·aiteam은

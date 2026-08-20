@@ -17,8 +17,10 @@ export const SCENARIOS: Scenario[] = [
     "오늘 브리핑", "지금 손댈 일 뭐야?", "오늘 할 일"] },
   { id: "assign", name: "취약점 담당자 배정", area: "②우선순위→③조치", steps: [
     "미조치 취약점 뭐 있어?", "이거 담당자 배정해줘", "이거 조치 절차 알려줘"] },
+  // ⚠ 첫 단계가 「이거」로 시작하면 안 된다(2026-08-21 — 홈에서 첫 칩을 누르면 고른 것이
+  //   없어 되묻기로 끝났다). 목록을 먼저 불러 고르게 하고, 그 뒤부터 「이거」가 성립한다.
   { id: "fix-close", name: "조치 마감(시작→검증→확정)", area: "③조치→④검증", steps: [
-    "이거 조치 시작할게", "이거 검증 실행해줘", "이거 조치완료 처리해줘"] },
+    "미조치 취약점 뭐 있어?", "이거 조치 시작할게", "이거 검증 실행해줘", "이거 조치완료 처리해줘"] },
   { id: "verify-status", name: "검증 현황 점검", area: "④검증", steps: [
     "검증 현황 보여줘", "하드닝 점검 스케줄 알려줘", "하드닝 점검해줘"] },
   { id: "exec-report", name: "경영 보고 준비", area: "⑤보고", steps: [
@@ -30,7 +32,7 @@ export const SCENARIOS: Scenario[] = [
   { id: "law-check", name: "법령·행동 대조", area: "법령·판례", steps: [
     "개인정보 보호법 제34조 알려줘", "개인정보 유출 관련 판례 찾아줘", "이거 해도 돼? (하려는 일)"] },
   { id: "handover", name: "인수인계 점검", area: "업무 넘기기", steps: [
-    "인수인계 어디까지 됐어?", "최근 반입 문서 보여줘", "작업 내역 뭐 있어?"] },
+    "인수인계 어디까지 됐어?", "새 문서 뭐 들어왔어?", "작업 내역 뭐 있어?"] },
   { id: "ai-ops", name: "AI 운영 점검", area: "AI", steps: [
     "어댑터 현황 알려줘", "레드팀 지난 결과 알려줘", "지식 저장소 상태 알려줘"] },
   { id: "incident", name: "침해 의심 초동", area: "비상", steps: [
@@ -43,6 +45,11 @@ const 시작_RE = /시나리오\s*[:：]?\s*(.+?)\s*(시작|실행|해\s*줘|할
 export function isScenarioAsk(text: string): boolean {
   const t = String(text || "").trim();
   if (!/시나리오/.test(t)) return false;
+  // ⚠ 「레드팀 시나리오」·「공격 시나리오」·「침해 시나리오」는 업무 프롬프트북이 아니라
+  //   보안 개념 질문이다(2026-08-21 설계관 실측 — 이 분기가 redteam_status 규칙보다 앞이라
+  //   그 질문들이 여기 삼켜져 엉뚱한 목록이 나갔다). 빼면 그 질문은 원래 주인
+  //   (FORCED redteam_status·LLM)이 받는다 — 빈 자리가 아니다.
+  if (/레드팀|공격|침해|위협/.test(t)) return false;
   return 목록_RE.test(t) || SCENARIOS.some((s) => t.includes(s.name)) || 시작_RE.test(t);
 }
 

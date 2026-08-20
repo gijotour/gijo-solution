@@ -40,7 +40,9 @@ function 화면줄들() {
 
 function 안내명령들() {
   // agenttools는 2026-08-06에 3파일로 나뉨 — 배럴만 읽으면 안내 문구를 몽땅 놓친다
-  const 줄들 = ["agenttools.ts", "agenttools/handlers.ts", "agenttools/registry.ts", "agentloop.ts", "dispatcher.ts", "screenguide.ts", "workflow.ts"]
+  // nextguide(다음 걸음 칩)·scenarios(시나리오 단계)도 「안내한 말」이다(2026-08-21 편입 —
+  // 설계관 대조에서 nextguide 41칩 중 26개가 검사 밖에서 근사 변형으로 쌓여 있었다).
+  const 줄들 = ["agenttools.ts", "agenttools/handlers.ts", "agenttools/registry.ts", "agentloop.ts", "dispatcher.ts", "screenguide.ts", "workflow.ts", "nextguide.ts", "scenarios.ts"]
     .flatMap((f) => { try { return 엔진(f).split("\n"); } catch { return []; } })
     .concat(화면줄들());
   const 끝맺음 = /(해줘|알려줘|보여줘|만들어줘|읽어줘|배정해줘|정리해줘|확인해줘|추천해줘|복구해줘|찾아줘)$/;
@@ -161,14 +163,25 @@ if (규칙.length < 20 || 안내.length < 10) {
  */
 const 쓰기말 = /(배정|맡겨|기한|조치해|처리해|등록해|삭제|수집해|생성해|만들어)/;
 
+// ⚠ **함수로 판단하는 결정적 경로** — 이 도구는 정규식만 읽으므로(위 주석) 함수·전용
+//   블록이 받는 문구는 원리상 「모델 판단」으로 오판한다. 그 경우에만, **근거(파일:줄과
+//   확인 날짜)를 반드시 적고** 여기 명단에 올린다. 근거 없는 항목은 넣지 말 것 —
+//   이 명단이 커지면 검사가 눈을 감는 것과 같아진다(항목마다 이유 강제, 소스감시 관례).
+const 함수경로확인 = [
+  { re: /^검증 현황 보여줘$/, 근거: "dispatcher.ts 데이터카드 결정 분기(2026-08-21 설계관 실측 — screenNameCard가 아니라 카드답변 결정 경로가 받는다)" },
+  { re: /^어댑터 현황 알려줘$/, 근거: "agentloop.ts:1449 어댑터 전용 블록(「어댑터」 낱말 결정 처리 — 2026-08-21 설계관 실측)" },
+];
+
 const 결정적 = [];
 const 모델판단 = [];
 const 쓰기안내 = [];
 for (const x of 안내) {
   const r = 규칙.find((g) => g.re.test(x.질문));
   const s = 특수.find((g) => g.re.test(x.질문));
+  const f = 함수경로확인.find((g) => g.re.test(x.질문));
   if (r) 결정적.push({ ...x, 도착: r.tool });
   else if (s) 결정적.push({ ...x, 도착: s.이름 });
+  else if (f) 결정적.push({ ...x, 도착: "함수경로(" + f.근거.slice(0, 30) + "…)" });
   else if (쓰기말.test(x.질문)) 쓰기안내.push(x);
   else 모델판단.push(x);
 }

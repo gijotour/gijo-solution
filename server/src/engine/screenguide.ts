@@ -1071,6 +1071,12 @@ const 화면별칭: Record<string, string> = {
   보고서: "report.html",
   감사로그: "audit.html",
   작업기록: "audit.html",
+  // 2026-08-21 연계성 라운드 — 「어디서 해?」가 길을 못 찾던 3화면(설계관 대조).
+  // ⚠ 「기록」 단독은 일부러 안 넣었다 — 「점검 기록」·「학습 기록」까지 삼키는 흔한 낱말이다
+  //   (screen-where.test가 성문화한 금지 부류).
+  로그분석: "loganalysis.html",
+  인수인계: "handover.html",
+  법령판례: "lawlookup.html",
   취약점목록: "vulnscan.html",
   자산: "inventory.html",
   자산목록: "inventory.html",

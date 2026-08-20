@@ -893,8 +893,34 @@
       { ic: "🔑", q: "복구 열쇠 재발급하려면 어떻게 해?" },
       { ic: "👤", q: "담당자 계정 추가하려면 어떻게 해?" },
     ]},
+    // 📖 업무 시나리오(2026-08-21 연계성 라운드) — 프롬프트북 12종의 **제품 안 첫 입구**.
+    //   지금까지는 「시나리오」를 타이핑해야만 열렸다(만든 목적 「문서로만 있으면 신규 담당자가
+    //   못 찾는다」가 그대로 재발한 자리). 문구는 서버 isScenarioAsk에 결정적으로 걸리는
+    //   것만(실측 ✓). ⚠ 배열 **끝**에 붙인다 — CAN[0]은 홈 인사 칩이 그대로 읽는다(설계관).
+    //   screens는 화면별 칩 자리(4칸)가 남는 화면 + 칩이 ⓘ뿐이던 화면들이다.
+    { cat: "업무 시나리오", kind: "here", screens: ["products.html","maintenance.html","report.html","compliance.html","audit.html","reporting.html","hardening.html","loganalysis.html","memory.html","learnloop.html","sessions.html","records.html","mydocs.html","assets.html","handover.html","lawlookup.html"], qs: [
+      { ic: "📖", q: "시나리오 목록 보여줘" },
+      { ic: "🧭", q: "시나리오: 아침 브리핑 시작" },
+    ]},
   ];
   var KIND_BADGE = { here: ["여기서 끝", "b-here"], ok: ["승인 후 실행", "b-ok"], go: ["가서 하기", "b-go"], mine: ["내가 등록", "b-mine"] };
+
+  // 🎯 일반형 선택(자산도 취약점도 아닌 것 — 이벤트·제품·리포트…)의 화면별 이어가기 칩
+  // (2026-08-21 연계성 라운드). 예전엔 어느 화면이든 「이거 쉽게 설명해줘」 하나뿐이었다.
+  // ⚠ 넣는 잣대(설계관 실측): **결정적 경로(FORCED·결정 분기)에 걸리는 문장만**. 확실하지
+  //   않은 화면(intro·memory·sessions)은 일부러 비워 뒀다 — 눌렀는데 엉뚱한 답이 오는 칩은
+  //   없느니만 못하다. 「이거」로 시작하는 문장만 선택 치환이 된다(「이 제품」은 안 됨).
+  var 일반형칩 = {
+    "analysis.html": ["최근 탐지 내역 알려줘"],
+    "threat.html": ["최근 탐지 내역 알려줘"],
+    "compliance.html": ["컴플라이언스 현황 알려줘"],
+    "hardening.html": ["검증 현황 보여줘"],
+    "learnloop.html": ["어댑터 현황 알려줘"],
+    "loganalysis.html": ["오늘 로그에서 이상 징후가 있어?"],
+    "products.html": ["이거 정기점검 잡아줘", "보안제품 현황 알려줘"],
+    "report.html": ["다음 정기 리포트 언제야?"],
+    "sbom.html": ["AI-BOM 현황 알려줘"],
+  };
 
   // ── 내가 등록한 지시(2026-08-02 사용자 지시 "무엇을 할 수 있나를 등록할 수 있는 메뉴") ──
   // 서랍의 기본 목록은 우리가 정한 것이라 담당자의 현장 말버릇과는 다르다. 자주 쓰는 말을
@@ -1230,9 +1256,7 @@
       "이거 쉽게 설명해줘",
       f.owner ? "이거 조치 완료 처리해줘" : "이거 담당자 배정해줘",
       "이거 반려할게",
-    ] : [
-      "이거 쉽게 설명해줘",
-    ];
+    ] : ["이거 쉽게 설명해줘"].concat(일반형칩[(ctx && ctx.screen) || ""] || []);
     var 줄 = document.createElement("div");
     줄.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-top:7px";
     칩들.forEach(function (q) {

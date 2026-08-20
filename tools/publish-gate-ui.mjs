@@ -136,7 +136,9 @@ const 일반 = await 선택카드검사("관문-일반형", { title: "일반형 
 // ⚠ 부정 단언만 있으면 카드가 아예 안 그려져도 통과한다(검토관 L2) — 존재부터 단언.
 ok("일반형: 카드가 그려짐", 일반.txt.includes("일반형 표본"), 일반.txt.slice(0, 50));
 ok("일반형: 담당 미배정 없음", !일반.txt.includes("담당 미배정"));
-ok("일반형: 칩 1개(쉽게 설명)", 일반.chips.length === 1 && /쉽게 설명/.test(일반.chips[0] || ""), JSON.stringify(일반.chips));
+// ⚠ 「정확히 1개」에서 완화(2026-08-21 연계성 라운드) — 화면별 이어가기 칩이 붙을 수 있다.
+//   하한(≥1)과 「쉽게 설명」 포함은 그대로 지킨다 — 0개 통과 구멍은 안 만든다.
+ok("일반형: 칩 ≥1(쉽게 설명 포함)", 일반.chips.length >= 1 && 일반.chips.some((c) => /쉽게 설명/.test(c)), JSON.stringify(일반.chips));
 const 취약 = await 선택카드검사("관문-취약점형", { title: "SQLi 표본", severity: "높음", findingKey: "abcdef0123456789" });
 ok("취약점형: 담당 미배정 표시", 취약.txt.includes("담당 미배정"));
 ok("취약점형: 배정 칩", 취약.chips.some((c) => /담당자 배정/.test(c)));
