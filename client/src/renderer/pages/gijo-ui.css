@@ -305,7 +305,9 @@ body[data-screen="settings"].g-ui .panel { max-width: 860px; }
  * ⚠ 앞선 주석이 근거로 든 "위협 인텔 77% — 목록이 고정 높이에서 멈춘다"는 **사실이 아니었다.**
  *   위협 인텔 목록은 .scroll-list이고 nav.js가 이미 창 높이를 따르게 하고 있다. 이 규칙은
  *   위협 인텔에 아무 영향이 없다 — 근거를 실측으로 다시 확인하지 않고 적었던 것이다. */
-.g-ui .dm-list { max-height: max(260px, calc(100vh - 360px)); }
+/* 2026-08-20 엑셀형 전환: .dm-list → #dmList(.g-rows-scroll) — 반응형 높이를 승계한다
+   (검토관 중3: 안 옮기면 큰 모니터에서 목록이 540px로 줄고 죽은 선택자가 남는다). */
+.g-ui #dmList { --gr-maxh: max(260px, calc(100vh - 360px)); }
 
 /* ── 읽기 편하게: 줄간격·대비 (2026-08-01 사용자 지적) ────────────────────────
  *
@@ -347,24 +349,24 @@ body.g-ui { line-height: 1.7; }
      색은 글자 색으로만, 얼룩(--g-zebra)만. 그룹 머리행+열 머리 고정, 행 30px.
      토큰만 쓰므로 다크(표준)·흰(프로)·연초록(라이트)에서 같은 마크업이 성립한다.
      열 폭은 화면이 .g-rows--이름으로 선언한다(--docs·--rel = AI 지식, memory.html). */
-.g-rows { border: 1px solid var(--border, rgba(255,255,255,.08)); border-radius: 8px; overflow: hidden; background: var(--panel, #30302e); }
+.g-rows { border: 1px solid var(--g-border, var(--border, rgba(255,255,255,.08))); border-radius: 8px; overflow: hidden; background: var(--g-surface-1, var(--panel, #30302e)); }
 .g-rows-scroll { max-height: var(--gr-maxh, 540px); overflow-y: auto; }
-.g-rows-head { display: grid; align-items: center; height: 26px; padding: 0 12px; font-size: 11px; font-weight: 800; color: var(--muted-2, #a49d95); letter-spacing: .4px; background: var(--panel-2, #1f1e1d); border-bottom: 1px solid var(--border-strong, rgba(255,255,255,.16)); position: sticky; top: 0; z-index: 2; }
-.g-rows-gh { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px; font-size: 12px; font-weight: 800; color: var(--text, #e9e7e2); background: var(--panel-2, #1f1e1d); border-bottom: 1px solid var(--border, rgba(255,255,255,.08)); cursor: pointer; user-select: none; position: sticky; top: 26px; z-index: 1; }
-.g-rows-gh .tri { width: 10px; color: var(--muted-2, #a49d95); font-size: 11px; }
-.g-rows-gh .cnt { margin-left: auto; color: var(--muted-2, #a49d95); font-weight: 700; font-size: 11.5px; }
+.g-rows-head { display: grid; align-items: center; height: 26px; padding: 0 12px; font-size: 11px; font-weight: 800; color: var(--g-muted-2, var(--muted-2, #a49d95)); letter-spacing: .4px; background: var(--g-surface-2, var(--panel-2, #1f1e1d)); border-bottom: 1px solid var(--g-border-strong, var(--border-strong, rgba(255,255,255,.16))); position: sticky; top: 0; z-index: 2; }
+.g-rows-gh { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px; font-size: 12px; font-weight: 800; color: var(--g-text, var(--text, #e9e7e2)); background: var(--g-surface-2, var(--panel-2, #1f1e1d)); border-bottom: 1px solid var(--g-border, var(--border, rgba(255,255,255,.08))); cursor: pointer; user-select: none; position: sticky; top: 26px; z-index: 1; }
+.g-rows-gh .tri { width: 10px; color: var(--g-muted-2, var(--muted-2, #a49d95)); font-size: 11px; }
+.g-rows-gh .cnt { margin-left: auto; color: var(--g-muted-2, var(--muted-2, #a49d95)); font-weight: 700; font-size: 11.5px; }
 .g-rows-body.folded { display: none; }
-.g-rows-r { display: grid; align-items: center; height: 30px; padding: 0 12px; font-size: 12.5px; color: var(--text, #e9e7e2); cursor: pointer; }
+.g-rows-r { display: grid; align-items: center; height: 30px; padding: 0 12px; font-size: 12.5px; color: var(--g-text, var(--text, #e9e7e2)); cursor: pointer; }
 .g-rows-body .g-rows-r:nth-child(even), .g-rows-flat .g-rows-r:nth-child(even) { background: var(--g-zebra, rgba(255,255,255,.025)); }
 .g-rows-r:hover { background: rgba(59,130,246,.07); }
-.g-rows-r.sel { background: rgba(59,130,246,.12); box-shadow: inset 3px 0 0 var(--blue, #3b82f6); }
+.g-rows-r.sel { background: rgba(59,130,246,.12); box-shadow: inset 3px 0 0 var(--g-blue, var(--blue, #3b82f6)); }
 .g-rows .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-rows .ta-r { text-align: right; font-variant-numeric: tabular-nums; }
-.g-rows .gm { color: var(--muted, #b3ada4); }
-.g-rows .gm2 { color: var(--muted-2, #a49d95); }
-.g-rows .gtxt-C { color: var(--red, #e2483d); font-weight: 800; }
-.g-rows .gtxt-S { color: var(--amber, #f0a020); font-weight: 800; }
-.g-rows .gtxt-O { color: var(--muted, #b3ada4); font-weight: 700; }
+.g-rows .gm { color: var(--g-muted, var(--muted, #b3ada4)); }
+.g-rows .gm2 { color: var(--g-muted-2, var(--muted-2, #a49d95)); }
+.g-rows .gtxt-C { color: var(--g-red, var(--red, #e2483d)); font-weight: 800; }
+.g-rows .gtxt-S { color: var(--g-amber, var(--amber, #f0a020)); font-weight: 800; }
+.g-rows .gtxt-O { color: var(--g-muted, var(--muted, #b3ada4)); font-weight: 700; }
 
 /* ① 표 8종 — vulnscan·sbom·report·threat·inventory·maintenance·kpi·handover.
      .g-ui.g-ui로 두 번 적어 nav.js의 .main table td(0,1,2)를 특이도로 확실히 이긴다

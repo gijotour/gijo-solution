@@ -895,7 +895,7 @@
       if (d.label && d.text && 프로인가() && document.body.classList.contains("stage-on")) {
         var sb = document.getElementById("stageBack");
         if (sb) {
-          sb.textContent = "📌 골랐습니다 — ← 대화로";
+          sb.textContent = "🎯 골랐습니다 — ← 대화로"; // 📌 칩 폐지(2026-08-20 맥락 문장) — 선택 기호는 🎯 하나로
           clearTimeout(sb._t);
           sb._t = setTimeout(function () { try { sb.textContent = "← 대화로"; } catch (e) { } }, 2600);
         }

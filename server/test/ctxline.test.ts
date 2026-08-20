@@ -18,14 +18,22 @@ describe("맥락 문장 한 줄 — 폐지 칩의 잔재가 기능 코드로 남
     expect(consoleJs).toContain("csCtxMore");
   });
 
-  it("폐지 식별자(csSel·csScope·csSelState·renderSelState)가 기능 코드에 없다", () => {
+  it("폐지 식별자(csSel·csScope·csSelState·renderSelState)가 console.js와 QA 도구에 없다", () => {
     // getElementById·마크업·CSS 선언 — 주석 속 언급은 걸리지 않는 구체 문자열만 본다.
-    for (const 잔재 of [
+    // ⚠ 검사 대상은 console.js + QA 하네스 2개(검토관 중1·중2 — tools에 잔재가 실재했고,
+    //   「기능 코드 전체」라 말하려면 실제로 그만큼 봐야 한다).
+    const 대상들: Array<[string, string]> = [
+      ["console.js", consoleJs],
+      ["tools/qa-shell.mjs", readFileSync(join(__dirname, "../../tools/qa-shell.mjs"), "utf8")],
+      ["tools/ui-check.mjs", readFileSync(join(__dirname, "../../tools/ui-check.mjs"), "utf8")],
+    ];
+    for (const [이름, src] of 대상들) for (const 잔재 of [
       'getElementById("csSel")', 'getElementById("csScope")', 'getElementById("csSelState")',
+      "getElementById('csSel')", "getElementById('csScope')",
       'class="cs-sel"', 'class="cs-scope"', 'class="cs-state"',
       '".cs-sel{', '".cs-scope{', '".cs-state{',
-      "function renderSelState",
-    ]) expect(consoleJs, `잔재: ${잔재}`).not.toContain(잔재);
+      "#csSel ", "'#csSel", "function renderSelState",
+    ]) expect(src, `${이름} 잔재: ${잔재}`).not.toContain(잔재);
   });
 
   it("게시 관문은 문장 줄을 검사한다(.cs-sel 검사로 되돌아가지 않는다)", () => {

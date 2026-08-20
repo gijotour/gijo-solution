@@ -214,9 +214,9 @@ tr:last-child td{border-bottom:none;}
     .dm-wrap{display:grid;grid-template-columns:320px 1fr;gap:14px;margin-top:12px;}
     /* (옛 .dm-list/.dm-li 카드형 목록 CSS는 2026-08-20 엑셀형(.g-rows, gijo-ui.css 공용)으로
        교체 — 승인 시안 mockups/knowledge-rows. 열 폭 변형만 이 화면이 선언한다.) */
-    .g-rows--docs .g-rows-head,.g-rows--docs .g-rows-r{grid-template-columns:1fr 74px 56px 108px;gap:8px;}
-    /* 열 머리가 스크롤 상자 밖(형제)이라 그룹 머리행은 top:0에 붙는다(부품 기본 26px 아님) */
-    .g-rows--docs .g-rows-gh{top:0;}
+    /* 좌측 열이 320px(.dm-wrap)이라 고정 열을 다이어트한다(검토관 확인필요 항목 — 시안은
+       전폭 기준 74/64/90이었다). 반입일은 MM-DD 5자. */
+    .g-rows--docs .g-rows-head,.g-rows--docs .g-rows-r{grid-template-columns:1fr 52px 40px 44px;gap:6px;}
     .dm-detail{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:16px;min-height:220px;}
     .dm-empty{padding:26px;text-align:center;color:var(--muted-2);font-size:12px;}
     .dm-dtop{display:flex;align-items:flex-start;gap:11px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px;}
@@ -289,9 +289,10 @@ tr:last-child td{border-bottom:none;}
       <div class="dm-seg" id="dmSeg"></div>
       <div class="dm-wrap">
         <!-- 엑셀형 행 목록(승인 시안 mockups/knowledge-rows, 2026-08-20) — 카드·알약 없이
-             한 항목=한 줄. 부품은 gijo-ui.css .g-rows(공용), 열 폭만 이 화면이 정한다. -->
+             한 항목=한 줄. 부품은 gijo-ui.css .g-rows(공용), 열 폭만 이 화면이 정한다.
+             ⚠ 열 머리는 렌더러가 스크롤 상자 **안에** 그린다(검토관 중5 — 밖에 두면 스크롤바
+             폭만큼 열이 어긋난다). -->
         <div class="g-rows g-rows--docs">
-          <div class="g-rows-head"><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입일</span></div>
           <div class="g-rows-scroll" id="dmList"><div class="dm-empty">불러오는 중...</div></div>
         </div>
         <div class="dm-detail" id="dmDetail"><div class="dm-empty">왼쪽에서 문서를 선택하세요.</div></div>
@@ -402,8 +403,8 @@ tr:last-child td{border-bottom:none;}
            이 띠는 **어떤 관계가 지식을 이루는가**를 말한다. 누르면 아래 목록이 그 관계만 남는다. -->
       <div id="vizStrip"></div>
       <div id="vizFilter" style="display:none"></div>
+      <!-- 열 머리는 renderList가 스크롤 안에 그린다(검토관 중5 — 스크롤바 폭 어긋남 방지) -->
       <div class="g-rows g-rows--rel">
-        <div class="g-rows-head"><span>주어</span><span>관계</span><span>목적어</span><span>출처</span><span></span></div>
         <div class="g-rows-scroll list-box" id="tripleList"></div>
       </div>
     </div>
@@ -682,12 +683,19 @@ tr:last-child td{border-bottom:none;}
     // 엑셀형(승인 시안 knowledge-rows): 그룹 머리행 + 행 묶음(.g-rows-body — 접기·얼룩 단위).
     // 등급·영역 알약은 걷어냈다 — 등급은 글자 색(gtxt-*), 영역은 그룹 머리행이 이미 말한다.
     const 등급글자 = (g) => {
-      const 이름 = GRADE_LABEL[g];
+      // 자기 열쇠만(검토관 하6) — DB 값이 constructor 같은 프로토타입 키면 상속 값이 참이 된다.
+      const 이름 = Object.prototype.hasOwnProperty.call(GRADE_LABEL, g) ? GRADE_LABEL[g] : null;
       return 이름 ? `<span class="gtxt-${g}" title="열람 등급: ${이름}">${g} ${이름}</span>`
         : `<span class="gm2" title="열람 등급 미지정">? 미지정</span>`;
     };
-    const 날짜만 = (t) => t ? new Date(t).toLocaleDateString("ko-KR") : "—";
-    list.innerHTML = groups.map((g) => {
+    const 날짜만 = (t) => {
+      if (!t) return "—";
+      const d = new Date(t);
+      return String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    };
+    // 열 머리를 스크롤 안 첫 요소로(검토관 중5 — 밖에 두면 스크롤바 폭만큼 어긋난다)
+    const 머리 = '<div class="g-rows-head"><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>';
+    list.innerHTML = 머리 + groups.map((g) => {
       // 특정 영역만 볼 때는 항상 펼친다(접힌 채 하나만 보이면 빈 화면처럼 보임).
       const folded = dmSegSel === "전체" && dmCollapsed.has(g.c);
       const rows = g.docs.map((d) =>
@@ -1098,7 +1106,9 @@ tr:last-child td{border-bottom:none;}
     const 걸기 = () => {
       if (typeof window.gijo자세히아래로 !== "function") return void (남은시도-- > 0 && setTimeout(걸기, 300));
       const 됐나 = window.gijo자세히아래로({
-        칸: ".dm-wrap", 목록: "#dmList", 자세히: "#dmDetail",
+        // 줄 선택자를 명시한다(검토관 2026-08-20 상1) — 엑셀형은 행이 그룹 묶음(.g-rows-body)
+        // 안에 있어 「직계 자식=줄」 추정이 그룹 전체를 줄로 오인한다.
+        칸: ".dm-wrap", 목록: "#dmList", 자세히: "#dmDetail", 줄: ".g-rows-r",
       });
       if (!됐나 && 남은시도-- > 0) setTimeout(걸기, 300);
     };
@@ -1177,9 +1187,10 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("listCount").textContent =
       triples.length > LIST_CAP ? `· ${LIST_CAP}건 표시 (전체 ${triples.length.toLocaleString()}건)` : `· ${triples.length}건`;
     if (triples.length === 0) { box.innerHTML = `<div style="color:var(--muted-2);font-size:12.5px;padding:14px 0">등록된 관계가 없습니다. 위 "샘플 지식 불러오기"로 시작하거나 직접 추가하세요.</div>`; return; }
-    // 엑셀형 한 줄(승인 시안 knowledge-rows) — 칩 대신 글자 색, 열은 위 g-rows-head와 짝.
+    // 엑셀형 한 줄(승인 시안 knowledge-rows) — 칩 대신 글자 색, 열 머리는 스크롤 안에(중5).
     // ⚠ 얼룩이 행 순서로 돌게 행들만 .g-rows-flat 묶음에 담는다(안내문은 묶음 밖).
-    box.innerHTML = `<div class="g-rows-flat">` + 보일것.map((t) => `
+    box.innerHTML = `<div class="g-rows-head"><span>주어</span><span>관계</span><span>목적어</span><span>출처</span><span></span></div>` +
+      `<div class="g-rows-flat">` + 보일것.map((t) => `
       <div class="g-rows-r">
         <span class="trunc gtxt-s" title="${esc(t.subject)}">${esc(t.subject)}</span>
         <span class="trunc pred" title="${esc(t.predicate)}">${esc(t.predicate)}</span>

@@ -145,10 +145,10 @@ try {
   // 가로 스크롤이 생기면 반응형이 깨진 것이다(2026-08-08 반응형 작업의 회귀 감시).
   기록("가로 스크롤이 없다", !!대시 && !대시.가로스크롤, 대시 && 대시.가로스크롤 ? "가로 스크롤 발생 — 반응형이 깨졌습니다" : "없음");
 
-  // ── ③ 📌 선택 칩 ─────────────────────────────────────────────────────────
-  // ⚠ **붙기 전에 숨어 있는 것부터 확인한다.** 늘 떠 있는 칩은 「붙었다」로 오판된다.
-  const 전 = await 평가(대상, `(()=>{const e=document.getElementById('csSel'); return e? getComputedStyle(e).display!=='none' : null;})()`);
-  기록("칩이 처음엔 숨어 있다", 전 === false, 전 === null ? "#csSel 없음" : 전 ? "이미 떠 있음" : "숨김");
+  // ── ③ 선택 → 맥락 문장(2026-08-20 개편: 📌 칩 → 「지금 △△ 다루는 중」 문장) ────────
+  // ⚠ **붙기 전에 안 실려 있는 것부터 확인한다.** 늘 「다루는 중」이면 「붙었다」로 오판된다.
+  const 전 = await 평가(대상, `(()=>{const e=document.getElementById('csCtx'); return e? e.textContent.includes('다루는 중') : null;})()`);
+  기록("문장이 처음엔 선택을 안 싣는다", 전 === false, 전 === null ? "#csCtx 없음" : 전 ? "이미 「다루는 중」" : "화면꼴");
 
   const 고른것 = await 평가(대상, `(()=>{
     const f=[...document.querySelectorAll('iframe')].find(x=>(x.src||'').includes('dashboard'));
@@ -156,15 +156,17 @@ try {
     if(!el) return null; const 글=el.textContent.trim(); el.click(); return 글;
   })()`);
   await 잠깐(2000);
-  const 후 = await 평가(대상, `(()=>{const e=document.getElementById('csSel'); return e&&getComputedStyle(e).display!=='none'? e.textContent.trim() : null;})()`);
-  기록("📌 칩이 선택을 싣는다", !!후 && 후.includes("📌"),
-    고른것 === null ? "고를 항목이 없습니다(대시보드 할 일 0건 — 데이터를 넣고 다시 도세요)" : (후 ?? "칩이 안 떴습니다"));
+  const 후 = await 평가(대상, `(()=>{const e=document.getElementById('csCtx'); return e&&e.textContent.includes('다루는 중')? e.textContent.trim() : null;})()`);
+  기록("맥락 문장이 선택을 싣는다(다루는 중)", !!후,
+    고른것 === null ? "고를 항목이 없습니다(대시보드 할 일 0건 — 데이터를 넣고 다시 도세요)" : (후 ?? "문장이 안 바뀌었습니다"));
 
-  // 붙기만 하고 안 풀리면 다음 지시가 엉뚱한 것을 가리킨다 — 푸는 것까지 본다.
-  await 평가(대상, `(()=>{const x=document.querySelector('#csSel .x'); if(x) x.click(); return !!x;})()`);
+  // 붙기만 하고 안 풀리면 다음 지시가 엉뚱한 것을 가리킨다 — ⋯ 메뉴로 푸는 것까지 본다.
+  await 평가(대상, `(()=>{document.getElementById('csCtxMore')?.click(); return true;})()`);
+  await 잠깐(400);
+  await 평가(대상, `(()=>{const b=[...document.querySelectorAll('#cxPop button')].find(x=>x.textContent.includes('선택 풀기')); if(b) b.click(); return !!b;})()`);
   await 잠깐(1200);
-  const 해제 = await 평가(대상, `(()=>{const e=document.getElementById('csSel'); return e? getComputedStyle(e).display==='none' : null;})()`);
-  기록("✕로 선택이 풀린다", 해제 === true, 해제 === true ? "숨김으로 복귀" : "안 풀립니다");
+  const 해제 = await 평가(대상, `(()=>{const e=document.getElementById('csCtx'); return e? !e.textContent.includes('다루는 중') : null;})()`);
+  기록("⋯ 메뉴로 선택이 풀린다", 해제 === true, 해제 === true ? "화면꼴로 복귀" : "안 풀립니다");
 } catch (e) {
   기록("검사", false, e.message);
 }

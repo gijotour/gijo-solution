@@ -362,10 +362,13 @@
       // 목록 줄을 **한 줄**로(2026-08-02 사용자 지시 "가능하면 한 줄로 나오게 하고").
       // 제목·부제가 위아래로 쌓이면 한 줄이 두세 줄이 된다 — 옆으로 잇고 넘치면 …으로 줄인다.
       // ⚠ 자세히 칸(.gj-underrow)은 여러 줄이 정상이라 건드리지 않는다.
-      + ".gj-rows1 > *:not(.gj-underrow){display:flex !important;align-items:baseline;gap:8px;" +
+      // ⚠ 엑셀형 부품(.g-rows-*)은 제외한다(검토관 2026-08-20 상1) — 이 flex 강제가
+      //   그룹 묶음(.g-rows-body)에 걸리면 그룹 안 행 전체가 한 줄로 눕고, grid 행에 걸리면
+      //   열 정렬이 죽는다. 그 목록은 스스로 30px 행을 보장하므로 여기 도움이 필요 없다.
+      + ".gj-rows1 > *:not(.gj-underrow):not(.g-rows-body):not(.g-rows-gh):not(.g-rows-head){display:flex !important;align-items:baseline;gap:8px;" +
         "white-space:nowrap;overflow:hidden;padding-top:5px;padding-bottom:5px;min-height:0;}"
-      + ".gj-rows1 > *:not(.gj-underrow) > *{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin:0;}"
-      + ".gj-rows1 > *:not(.gj-underrow) > *:nth-child(2){flex:1;}"
+      + ".gj-rows1 > *:not(.gj-underrow):not(.g-rows-body):not(.g-rows-gh):not(.g-rows-head) > *{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin:0;}"
+      + ".gj-rows1 > *:not(.gj-underrow):not(.g-rows-body):not(.g-rows-gh):not(.g-rows-head) > *:nth-child(2){flex:1;}"
       // ⚠ 「2번째가 제목」은 **체크박스가 없을 때만** 맞다(2026-08-08 실사고, 사용자 신고
       //   "색깔표시가 너무 길어"). 조치·승인 줄은 [체크박스][점][본문][배지]라 2번째가 점이었고,
       //   8px 점이 **307px 색 막대**로 늘어나 줄의 절반을 먹었다.

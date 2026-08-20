@@ -43,7 +43,7 @@ describe("대화창 조작이 안내에 실려 있다", () => {
     // 화면별 안내에 사본을 두면 화면 수만큼 어긋난다. 공통 한 벌을 어디서든 찾는 것이 계약.
     const a = 안내("선택 칩 사용법 알려줘", "vulnscan.html");
     const b = 안내("선택 칩 사용법 알려줘", "inventory.html");
-    expect(a).toContain("📌");
+    expect(a).toContain("다루는 중"); // 2026-08-20 맥락 문장 개편 — 📌 칩은 폐지, 문장이 싣는다
     expect(a).toBe(b);
   });
 

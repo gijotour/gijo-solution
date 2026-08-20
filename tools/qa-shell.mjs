@@ -75,10 +75,11 @@ const snap = () => page.evaluate(() => ({
   활성: document.querySelector("#tabBar .tab.on .nm")?.textContent || null,
   프레임: document.querySelectorAll("#screens iframe").length,
   보이는프레임: document.querySelectorAll("#screens iframe.on").length,
-  // ⚠ 맥락 칩은 **이름 + ✕(맥락 떼기)**다(2026-08-09 재설계). textContent를 통째로 읽으면
-  //   "조치 ✕"가 되어 활성 탭 이름("조치")과 영원히 안 맞는다 — 제품은 멀쩡한데 시험만 빨개진다
-  //   (실제로 이 회차에 그렇게 났다). 사람이 읽는 이름만 떼어 본다.
-  맥락: (document.getElementById("csCtx")?.firstChild?.textContent || "").trim() || null,
+  // ⚠ 맥락은 이제 **문장 한 줄**이다(2026-08-20 맥락 문장 개편 — 「지금 「조치」 화면을 보는 중」).
+  //   「…」 안 화면 이름만 떼어 본다. 선택·범위가 걸리면 화면 이름이 문장에서 빠지므로(자연어
+  //   압축) 그때는 문장 전체를 돌려준다 — 5)번 검사는 깨끗한 탭 전환 직후라 화면꼴이다.
+  맥락: ((document.getElementById("csCtx")?.textContent || "").match(/「(.+?)」/) || [])[1]
+    || (document.getElementById("csCtx")?.textContent || "").trim() || null,
   activeScreen: window.gijoTabs?.activeScreen() || null,
 }));
 const clickMenu = async (label) => {
@@ -181,14 +182,18 @@ const 칩 = await page.evaluate(async () => {
   if (!g || typeof g.select !== "function") return { 통로: false };
   g.select({ label: "QA선택시험", text: "자산 QA선택시험" });
   await new Promise((r) => setTimeout(r, 300));
-  const el = document.getElementById("csSel");
-  const 붙음 = !!el && el.style.display !== "none" && el.textContent.includes("📌");
-  el?.querySelector(".x")?.click();
+  // 2026-08-20 맥락 문장 개편 — 📌 칩 대신 문장에 「…QA선택시험… 다루는 중」이 실린다.
+  const line = document.getElementById("csCtx");
+  const 붙음 = !!line && line.textContent.includes("QA선택시험") && line.textContent.includes("다루는 중");
+  // 풀기는 ⋯ 메뉴 → 「선택 풀기」
+  document.getElementById("csCtxMore")?.click();
+  await new Promise((r) => setTimeout(r, 200));
+  [...document.querySelectorAll("#cxPop button")].find((b) => b.textContent.includes("선택 풀기"))?.click();
   await new Promise((r) => setTimeout(r, 300));
-  const 풀림 = !!el && el.style.display === "none";
+  const 풀림 = !!line && !line.textContent.includes("QA선택시험");
   return { 통로: true, 붙음, 풀림 };
 });
-ok("화면에서 고른 항목이 📌칩으로 붙고 ✕로 풀린다", 칩.통로 && 칩.붙음 && 칩.풀림, JSON.stringify(칩));
+ok("고른 항목이 맥락 문장(다루는 중)에 실리고 ⋯ 메뉴로 풀린다", 칩.통로 && 칩.붙음 && 칩.풀림, JSON.stringify(칩));
 
 // 9) 화면 안 챗봇 위젯은 뜨지 않는다(지시는 콘솔 한 곳)
 const widget = await page.evaluate((visSrc) => {
@@ -247,8 +252,8 @@ ok(
 );
 if (cw) {
   await cw.waitForTimeout(2500);
-  // 위 snap()과 같은 이유로 이름만 뗀다 — 칩에 ✕가 붙어 있다.
-  const wctx = await cw.evaluate(() => (document.getElementById("csCtx")?.firstChild?.textContent || "").trim() || null);
+  // 위 snap()과 같은 이유 — 문장에서 「…」 안 화면 이름만 뗀다(2026-08-20 맥락 문장).
+  const wctx = await cw.evaluate(() => ((document.getElementById("csCtx")?.textContent || "").match(/「(.+?)」/) || [])[1] || null);
   const cur = (await snap()).활성;
   ok("빼낸 창에도 맥락이 전달된다", wctx === cur, `창=${wctx} 활성=${cur}`);
   await cw.evaluate(() => document.getElementById("csToggleHost").click());

@@ -182,7 +182,7 @@ describe("조치·승인 화면이 고른 항목을 대화창에 넘긴다", () 
     // 2026-08-18에 실제로 이 실수를 했다가 잡았다. approvals.html엔 있고 console.js엔 없어서,
     // 옮겨 심으면 TypeError로 조용히 죽는다(버튼이 무반응이 되는 그 부류).
     const i = cs.indexOf("function 선택카드");
-    const 구간 = cs.slice(i, i + 2600);
+    const 구간 = cs.slice(i, i + 4200);
     if (!/function boldify/.test(cs)) {
       expect(구간, "console.js에 boldify가 없는데 부르고 있다").not.toContain("boldify(");
     }

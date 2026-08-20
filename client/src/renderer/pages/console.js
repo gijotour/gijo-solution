@@ -87,7 +87,7 @@
       ".cs-line.off{opacity:.6;font-weight:600;}",
       ".cs-more{background:none;border:1px solid var(--border,rgba(255,255,255,.14));color:var(--muted,#b3ada4);border-radius:8px;padding:0 8px;height:22px;cursor:pointer;font-size:13px;line-height:1;}",
       ".cs-more:hover{color:var(--text,#e9e7e2);border-color:var(--border-strong,rgba(255,255,255,.25));}",
-      ".cx-pop{position:absolute;top:34px;right:8px;z-index:40;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.2));border-radius:9px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:4px;min-width:180px;}",
+      ".cx-pop{position:absolute;top:40px;right:8px;z-index:40;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.2));border-radius:9px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:4px;min-width:180px;}",
       ".cx-pop button{background:none;border:none;color:var(--text,#e9e7e2);font-size:12px;text-align:left;padding:5px 8px;border-radius:6px;cursor:pointer;}",
       ".cx-pop button:hover{background:rgba(128,128,128,.15);}",
       // 🗂 지금 범위 — **파랑**. 🎯(주황)와 색이 달라야 한다: 수명이 반대인 두 개를 같은 색으로
@@ -307,7 +307,7 @@
     document.getElementById("csCtxMore").addEventListener("click", function (e) {
       e.stopPropagation();
       var old = document.getElementById("cxPop");
-      if (old) { old.remove(); return; }
+      if (old) { if (old._닫기) document.removeEventListener("click", old._닫기); old.remove(); return; } // 닫기 리스너도 함께 뗀다(검토관 하1 — 고아 리스너)
       var pop = document.createElement("div");
       pop.className = "cx-pop"; pop.id = "cxPop";
       var 단추들 = [];
@@ -325,10 +325,9 @@
         pop.appendChild(b);
       });
       document.querySelector(".cs-head").appendChild(pop);
-      // 바깥을 누르면 닫힌다 — 한 번만 듣고 떼는 일회용 리스너
-      setTimeout(function () {
-        document.addEventListener("click", function 닫기() { pop.remove(); document.removeEventListener("click", 닫기); });
-      }, 0);
+      // 바깥을 누르면 닫힌다 — 리스너 참조를 팝업에 실어 어느 닫힘 길이든 같이 뗀다(하1)
+      pop._닫기 = function 닫기() { pop.remove(); document.removeEventListener("click", 닫기); };
+      setTimeout(function () { document.addEventListener("click", pop._닫기); }, 0);
     });
     // ★ 되살린 범위를 **여기서 그린다.** 문장 줄(#csCtx)이 방금 생겼으므로 이 자리가 가장 이르다.
     //   ⚠ 이 한 줄이 없으면 값은 살아 지시에 실리는데 문장엔 안 보인다 — 답이 왜 적은지
@@ -340,7 +339,11 @@
     // nav.js(GROUPS 출처)가 이 스크립트보다 늦게 실릴 수 있다 — 메뉴 칩이 비면 한 번만 재시도.
     setTimeout(function () { var m = document.getElementById("ceMrow"); if (m && !m.children.length) renderHero(); }, 700);
     // 문장 줄 클릭 = 화면 맥락 토글(옛 ✕/재부착 계약을 한 자리로) — 개별 풀기는 ⋯ 메뉴.
+    // ⚠ ⋯ 팝업이 열려 있으면 **닫기만** 한다(검토관 중6) — 같은 클릭이 문서 닫기 리스너와
+    //   토글에 동시에 걸려 「메뉴만 닫으려 했는데 화면 무관이 켜지는」 오조작이 됐다.
     document.getElementById("csCtx").addEventListener("click", function () {
+      var p = document.getElementById("cxPop");
+      if (p) { if (p._닫기) document.removeEventListener("click", p._닫기); p.remove(); return; }
       ctxOff = !ctxOff; applyCtx();
     });
 
@@ -1085,26 +1088,31 @@
    *  선택>범위>화면 순: 사람도 "지금 srv-web-01의 CVE-…을 다루는 중"이라 말하지 매번 화면
    *  이름부터 대지 않는다. 코드·IP 나열 금지 — 이름표(label)만 쓴다. */
   function 을를(word) {
-    // 마지막 글자에 받침이 있으면 「을」, 없으면 「를」. 한글 밖(영문·숫자)은 「을(를)」로 안전하게.
+    // 마지막 글자에 받침이 있으면 「을」, 없으면 「를」. 한글 밖(영문·숫자 — srv-web-01·CVE-…)은
+    // 조사를 아예 뺀다(검토관 중7): 「CVE-…을(를) 다루는 중」은 기계 말이다 — 「CVE-… 다루는 중」이 사람 말.
     var c = String(word || "").replace(/[)\]"'」』]+$/, "").slice(-1).charCodeAt(0);
-    if (c < 0xac00 || c > 0xd7a3) return "을(를)";
+    if (c < 0xac00 || c > 0xd7a3) return "";
     return (c - 0xac00) % 28 ? "을" : "를";
   }
   function renderCtxLine() {
     var line = document.getElementById("csCtx");
     if (!line) return;
-    line.classList.toggle("off", ctxOff);
-    if (ctxOff) { line.innerHTML = "화면 무관하게 묻는 중 — 누르면 화면 맥락이 다시 붙습니다"; return; }
-    var 화면 = esc(ctx.label || "대시보드");
+    // ⚠ ctxOff여도 🎯 선택·🗂 범위는 **계속 보여야 한다**(검토관 상2) — 지시에는 계속 실리는
+    //   값이다. 「보이지 않는 범위는 범위가 아니라 함정이다」(2026-08-18). 화면 부분만 무관 표시.
+    line.classList.toggle("off", ctxOff && !sel && !범위);
+    var 무관 = ctxOff ? '<span class="gm2">[화면 무관] </span>' : "";
     var html;
     if (sel && sel.label) {
-      html = "지금 " + (범위 ? '<b class="rk">' + esc(범위.label) + "</b>의 " : "") +
+      html = 무관 + "지금 " + (범위 ? '<b class="rk">' + esc(범위.label) + "</b>의 " : "") +
         '<b class="sk">' + esc(sel.label) + "</b>" + 을를(sel.label) + " 다루는 중";
     } else if (범위) {
       var 건수 = 보는목록 && 보는목록.ids ? " " + 보는목록.ids.length + "건" : "";
-      html = "지금 " + '<b class="rk">' + esc(범위.label) + "</b>의 " + 화면 + 건수 + 을를(건수 ? "건" : ctx.label || "대시보드") + " 보는 중";
+      var 무엇 = ctxOff ? "목록" : esc(ctx.label || "대시보드");
+      html = 무관 + "지금 " + '<b class="rk">' + esc(범위.label) + "</b>의 " + 무엇 + 건수 + (건수 ? "을" : 을를(ctxOff ? "목록" : ctx.label || "대시보드")) + " 보는 중";
+    } else if (ctxOff) {
+      html = "화면 무관하게 묻는 중 — 누르면 화면 맥락이 다시 붙습니다";
     } else {
-      html = "지금 「" + 화면 + "」 화면을 보는 중";
+      html = "지금 「" + esc(ctx.label || "대시보드") + "」 화면을 보는 중";
     }
     line.innerHTML = html;
   }
@@ -1128,9 +1136,13 @@
    *  새 입력칸도, 결재판을 대신할 새 승인 장치도 만들지 않는다(시안 핵심 결정 3). */
   function 선택카드(f) {
     var 키 = (f.asset || "") + "|" + (f.title || "");
-    if (선택카드.직전 === 키) return; // 같은 항목 연타에 카드를 도배하지 않는다
+    // 같은 항목 연타에 카드를 도배하지 않는다 — 단, 그 카드가 이미 대화에 밀려 올라갔으면
+    // 다시 그린다(검토관 하4: 상세 박스 폐지 후 카드가 유일한 상세라 되불러올 길이 있어야 한다).
+    var 마지막 = rows() && rows().lastElementChild;
+    if (선택카드.직전 === 키 && 선택카드.마지막el && 선택카드.마지막el === 마지막) return;
     선택카드.직전 = 키;
     var el = append("event", { icon: "🎯", name: "고른 항목", message: "", full: true });
+    선택카드.마지막el = el; // 하4 — 이 카드가 대화 끝에 살아 있는 동안만 연타 억제
     var cb = el.querySelector(".cb");
     if (!cb) return;
     var 태그 = (f.kev ? "🚨 " + esc(f.kev) + " · " : "") + (f.severity ? esc(f.severity) + " · " : "");

@@ -164,7 +164,7 @@ if (auditFrame) {
   const 칩 = await 셸.evaluate(() => (document.querySelector(".cs-line") || {}).textContent || "");
   ok("행 클릭 → 맥락 문장(다루는 중)", /다루는 중/.test(칩), String(칩).slice(0, 60));
   // 행 선택은 무대를 유지한다(검토관 상1 — 자동 복귀는 결재 확인창·모달을 삼켜 폐지).
-  // 📌는 달리고, 무대 머리가 「골랐습니다」를 알린다. 내리기는 ← 대화로(사람)뿐.
+  // 맥락 문장이 「…다루는 중」으로 바뀌고, 무대 머리가 「골랐습니다」를 알린다. 내리기는 ← 대화로(사람)뿐.
   const 선택후 = await 셸.evaluate(() => ({
     무대유지: document.body.classList.contains("stage-on"),
     표시: /골랐습니다|← 대화로/.test((document.getElementById("stageBack") || {}).textContent || ""),

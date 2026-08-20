@@ -242,7 +242,7 @@ describe("★ 범위 배관 5고리 — 하나만 끊겨도 조용히 죽는다"
     // 담당자는 범위가 풀린 줄 알고 묻고, 답이 왜 적은지 모른다. 보이지 않는 범위는
     // 범위가 아니라 함정이다. 문장 줄을 만든 직후(build 끝) 반드시 다시 그려야 한다.
     expect(대화창, "되살린 범위를 안 그린다").toMatch(
-      /csCtxMore"\)\.addEventListener[\s\S]{0,2200}?\n\s*renderScope\(\);/
+      /csCtxMore"\)\.addEventListener[\s\S]{0,4000}?\n\s*renderScope\(\);/
     );
   });
 
