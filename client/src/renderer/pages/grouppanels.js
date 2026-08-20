@@ -320,13 +320,14 @@
         ]).then(function (r) {
           var g = r[0], rt = r[1], ags = r[2], sup = r[3];
           var MODE = { off: "꺼짐", flag: "기록만", block: "차단" };
+          // 실필드는 calls·errors다(llmactivity.ts — 검토관 상1: done/error는 존재하지 않아
+          // 영원히 0이 뜬다. supervision.html과 같은 원천·같은 이름을 쓴다).
           var 호출 = 0, 오류 = 0;
-          ((sup && sup.daily) || []).forEach(function (d) { if (d.kind === "chat") { 호출 += d.done || 0; 오류 += d.error || 0; } });
+          ((sup && sup.daily) || []).forEach(function (d) { if (d.kind === "chat") { 호출 += d.calls || 0; 오류 += d.errors || 0; } });
           return {
-            rows: [
-              ["팀", ags ? ags.length + "명 구성" : "-"],
-              ["감독(오늘)", sup ? "호출 " + 호출 + " · 오류 " + 오류 : "-"],
-              ["가드레일", g ? (MODE[g.mode] || g.mode) + " 모드 · 막음 " + (g.blockedCount || 0) : "-"],
+            rows: [ // 3줄 고정(판 카드 높이 계약 — 검토관 하1: 4줄이면 foot가 잘릴 수 있다)
+              ["팀·감독(오늘)", ags ? ags.length + "명 · 호출 " + 호출 + " · 오류 " + 오류 : "-"],
+              ["가드레일(기동 후)", g ? (MODE[g.mode] || g.mode) + " · 막음 " + (g.blockedCount || 0) : "-"],
               ["모의 공격 견고성", rt && rt.robustnessScore != null ? rt.robustnessScore + "/100" : "-"],
             ],
             foot: "쓰기 지시는 항상 결재판을 거칩니다",

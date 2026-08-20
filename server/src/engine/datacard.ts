@@ -421,7 +421,7 @@ export function supervisionStatusAnswer(): { output: string; dataCard: DataCard 
       { label: "오류", value: String(총오류), color: 총오류 ? "warn" : "ok" },
       { label: "무호출 팀원", value: String(무호출), color: 무호출 === 팀.length ? "muted" : undefined },
     ],
-    screen: { page: "supervision.html", label: "AI 팀 감독" },
+    screen: { page: "aihub.html?panel=safety", label: "AI 팀 감독" }, // 흡수 도착지 직접(검토관 중8 — railroster L8 선례: 리다이렉트 2겹 방지)
     pickKey: "a",
     table: {
       cols: [{ key: "a", label: "팀원" }, { key: "n", label: "호출" }, { key: "r", label: "평균 응답" }, { key: "e", label: "오류" }],

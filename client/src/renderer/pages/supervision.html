@@ -213,10 +213,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     var 줄 = function (k, v) {
       return '<div class="sup-line"><span style="flex:1">' + k + '</span><b>' + v + "</b></div>";
     };
+    // 실필드(검토관 상2): RedTeamReport = total·vulnerable·errored·robustnessScore(blocked 없음),
+    // EffectiveReport = effectiveScore(score 없음). 없는 필드를 읽으면 「쟀는데 못 읽었다」가
+    // 「안 쟀다」로 보인다 — 폴백을 정상 출력처럼 쓰는 부류.
     el.innerHTML =
-      줄("가드레일", g ? esc(MODE[g.mode] || g.mode) + " 모드 · 막음 " + (g.blockedCount || 0) + "건" : "—") +
-      줄("모의 공격 견고성(최근)", rt && rt.robustnessScore != null ? esc(String(rt.robustnessScore)) + "/100 · 통과 " + esc(String(rt.blocked != null ? rt.blocked : "-")) + "/" + esc(String(rt.total != null ? rt.total : "-")) : "아직 실행 기록 없음") +
-      줄("제품 경로 실효 견고성(최근)", eff && eff.score != null ? esc(String(eff.score)) + "/100" : "—");
+      줄("가드레일(서버 기동 후)", g ? esc(MODE[g.mode] || g.mode) + " 모드 · 막음 " + (g.blockedCount || 0) + "건" : "—") +
+      줄("모의 공격 견고성(최근)", rt && rt.robustnessScore != null ? esc(String(rt.robustnessScore)) + "/100 · 취약 " + esc(String(rt.vulnerable != null ? rt.vulnerable : "-")) + "/" + esc(String(rt.total != null ? rt.total : "-")) : "아직 실행 기록 없음") +
+      줄("제품 경로 실효 견고성(최근)", eff && eff.effectiveScore != null ? esc(String(eff.effectiveScore)) + "/100" : "—");
   }
   document.getElementById("goRedteam").addEventListener("click", function () {
     try { window.top.postMessage({ type: "gijo:openTab", page: "redteam.html?hub=1", label: "안전장치" }, "*"); } catch (e) { }

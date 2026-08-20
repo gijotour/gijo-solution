@@ -459,7 +459,7 @@ const GUIDES: Record<string, ScreenGuide> = {
     can: [
       "\"AI 팀 감독 보여줘\" — 대화창에 요약 카드가 뜹니다",
       "팀원 카드를 누르면 📌로 골라져 \"이 팀원 왜 오류가 났어?\"처럼 이어 물을 수 있습니다.",
-      "오늘·7일·30일 기간을 바꿔 봅니다(화면의 유일한 조작).",
+      "오늘·7일·30일 기간을 바꿔 봅니다.",
     ],
     panels: {
       "지표 읽는 법": "호출=그 기간 대화 처리 건수(과거 기간도 바로 나옵니다). 평균 응답·오류는 감독 도입일(2026-08-20)부터 쌓이는 실동작 일지 기준이라 그 전 기간은 「-」로 보입니다 — 없는 값을 채워 넣지 않는 것이 이 화면의 규칙입니다.",
@@ -1079,6 +1079,11 @@ const 화면별칭: Record<string, string> = {
   터미널: "terminal.html",
   명령창: "terminal.html",
   레드팀: "redteam.html",
+  // 제목이 「AI 팀 감독 · 안전」으로 바뀌며 「AI 팀 감독 어디서 봐?」 부분일치가 끊겼다
+  // (검토관 중6 — 이름으로화면찾기는 제목 포함 대조). 담당자가 부르던 이름으로 잇는다.
+  AI팀감독: "supervision.html",
+  팀감독: "supervision.html",
+  안전장치: "supervision.html", // 요약·현황은 여기(실행 화면 redteam은 「레드팀」으로)
   지식: "memory.html",
   문서함: "docbox.html",
   대시보드: "dashboard.html",
@@ -1183,6 +1188,19 @@ export function 화면위치안내(screen: string, title: string, pro = false): 
       g.what,
       "",
       "자세한 배경과 쓰는 법은 문서함(📚)의 안내 문서를 참고하세요.",
+    ].join("\n");
+  }
+  // 허브에 흡수된 화면(2026-08-20 검토관 중7) — 「사이드바에서 찾을 수 있습니다」 폴백이
+  // 거짓이 되는 자리다(메뉴에서 뺐으므로). 실제 가는 길을 말한다.
+  const 흡수자리: Record<string, string> = {
+    "supervision.html": "AI 메뉴 → 🛡 팀 감독·안전 탭에 있습니다(독립 메뉴는 2026-08-20 통합).",
+  };
+  if (흡수자리[screen]) {
+    return [
+      `**${title}** — ${흡수자리[screen]}`,
+      "",
+      g.what,
+      ...(g.can?.length ? ["", "여기서 하는 일:", ...g.can.slice(0, 5).map((c) => `- ${c}`)] : []),
     ].join("\n");
   }
   const 단계 = stageOfScreen(screen);

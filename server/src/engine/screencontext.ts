@@ -38,7 +38,7 @@ const SCREENS: Record<string, ScreenContext> = {
   "analysis.html": { label: "통합 관제", domain: "스캐너·로그·운영리포트 통합 분석", defaultAction: "analyze" },
   "sessions.html": { label: "작업 내역", domain: "진행 중인 작업 대화" }, // 1bc03f8 개명 누락분(2026-07-29 검토 #8)
   // 이 줄이 없으면 화면 맥락·도구 좁히기가 조용히 죽는다(assets.html 전례 — 검토관 중8).
-  "supervision.html": { label: "AI 팀 감독", domain: "AI 팀 호출·응답·오류 실측 지표" },
+  "supervision.html": { label: "AI 팀 감독", domain: "AI 팀 호출·응답·오류 실측 + 가드레일·모의 공격 견고성 요약" },
   // toolDomains는 안 건다 — 개인 문서 전용 도구가 없는 상태에서 knowledge로 좁히면
   // 빈 자리를 모델이 채운다(좁히기 전례 — 검토관 하16).
   "mydocs.html": { label: "내 문서", domain: "개인 메모 — 내 질문에만 근거로 나오는 개인 지식" },
