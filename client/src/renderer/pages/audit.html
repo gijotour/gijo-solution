@@ -20,7 +20,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .nav-item .ic{width:18px;text-align:center;font-size:14px;}
 .nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
 .nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
-.main{padding:28px 32px 48px;}
+/* 바깥 여백 — 위쪽은 목록을 위로 끌어올리는 자리라 줄인다(2026-08-20 밀도 라운드).
+   좌우는 글이 창 끝에 붙지 않게 남긴다. */
+.main{padding:12px 24px 24px;}
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:var(--text-strong, #fff);}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:900px;}
@@ -53,23 +55,34 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .dl:hover{border-color:var(--teal);color:var(--teal);}
 
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:6px 0;}
-.aud{display:flex;gap:12px;align-items:flex-start;padding:11px 18px;border-bottom:1px solid var(--border);font-size:12.5px;}
+/* ── 행 = 엑셀형 30px(2026-08-20 사장님 「메뉴에서도 대화창에서 나오는 형태로」,
+     승인 시안 screen-rows-unify 라운드1). 실측 51px → 30px, 주 모니터에서 13줄 → 22줄.
+     ⚠ 공용 부품(.g-rows, gijo-ui.css)의 격자·얼룩을 그대로 쓰고 여기서는 **열 폭만** 준다 —
+       새 시각 언어를 만들지 않는다. gijo-ui.css는 nav.js:1252가 모든 화면에 넣어 준다.
+     ⚠ 상세(det)는 행에서 뺐다 — 그것 때문에 행이 51px이었다. 상세는 행을 누르면 대화창이
+       받아 보여 준다(이 화면은 이미 행 클릭=📌 선택 배선을 갖고 있다). 값이 사라지는 게
+       아니라 **보는 자리가 옮겨간 것**이고, title에도 남겨 마우스만 올려도 보인다. */
+.aud{display:grid;grid-template-columns:1fr 96px 60px 104px;gap:8px;align-items:center;
+     height:30px;padding:0 12px;border-bottom:1px solid var(--border);font-size:12.5px;}
+.aud:nth-child(even){background:rgba(255,255,255,.022);}
 .aud:last-child{border-bottom:none;}
 /* 행 클릭 = 대화창 📌 선택(배선 계약 ⑤층, 2026-08-20) */
 .aud{cursor:pointer;}
 .aud:hover{background:rgba(59,130,246,.05);}
 .aud.on{background:rgba(59,130,246,.09);}
-.aud .tm{color:var(--muted-2);font-size:12.25px;white-space:nowrap;width:118px;flex:0 0 auto;}
-.aud .kind{font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:5px;white-space:nowrap;flex:0 0 auto;}
+.aud > *{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.aud .tm{color:var(--muted-2);font-size:12.25px;white-space:nowrap;text-align:right;}
+.aud .kind{font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:5px;white-space:nowrap;flex:0 0 auto;}
 .k-cli{background:rgba(30,185,128,.16);color:var(--teal);}
 .k-approval{background:rgba(240,160,32,.16);color:var(--amber);}
 .k-write{background:rgba(139,124,240,.16);color:var(--purple);}
 .k-block{background:rgba(226,72,61,.16);color:#f5928a;}
 .k-auth{background:rgba(59,130,246,.16);color:var(--blue-light);}
 .k-config{background:rgba(255,255,255,.08);color:var(--muted);}
-.aud .body{flex:1;min-width:0;}
-.aud .act{color:var(--text);font-weight:600;}
-.aud .tgt{color:var(--blue-light);font-size:12.25px;margin-left:6px;}
+/* 1열 = 「무엇을 했나」 — 종류 배지 + 한 일 + 대상을 한 줄에(열 규약 1열 무엇 필수) */
+.aud .body{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;}
+.aud .act{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.aud .tgt{color:var(--blue-light);font-size:12.25px;flex:0 0 auto;max-width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .aud .det{color:var(--muted-2);font-size:12.25px;margin-top:2px;white-space:pre-wrap;word-break:break-word;}
 .aud .who{color:var(--muted-2);font-size:12.25px;white-space:nowrap;flex:0 0 auto;}
 .aud .rz{font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:4px;flex:0 0 auto;}
@@ -102,11 +115,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="sidebar" id="gijoNav"></div>
 
   <div class="main">
-    <div class="topbar-row">
-      <div>
-        <div class="page-title">📜 작업 기록 (감사 로그)</div>
-      </div>
-    </div>
+    <!-- 제목줄(.topbar-row)을 통째로 걷었다(2026-08-20 밀도 라운드) — 화면 이름은 **도킹 머리
+         (app.html dockHead)와 탭·메뉴가 이미 말한다.** 같은 말을 두 번 하느라 제목 29px +
+         줄 여백 20px = 49px을 쓰고 있었고, 그만큼이 목록 자리로 간다.
+         ⚠ 빈 <div>만 남기면 여백은 그대로 남는다(첫 시도가 그랬다) — 줄 자체를 없앤다.
+         사용법·주의사항은 원래부터 챗봇(screenguide)+ⓘ 몫이다. -->
 
     <div class="kpi" id="kpiRow" data-gijo-summary></div>
 
@@ -175,13 +188,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const rz = "rz-" + e.result;
     const rzLabel = { ok: "완료", blocked: "차단", error: "실패", pending: "대기" }[e.result] || e.result;
     return (
-      `<div class="aud" data-id="${esc(e.id)}" title="누르면 대화창에 「이거」로 담깁니다">` +
-      `<span class="tm">${fmtTime(e.at)}</span>` +
-      `<span class="kind ${kc}">${KIND_LABEL[e.kind] || e.kind}</span>` +
-      `<div class="body"><span class="act">${esc(e.action)}</span>${e.target ? `<span class="tgt">${esc(e.target)}</span>` : ""}` +
-      `${e.detail ? `<div class="det">${esc(e.detail)}</div>` : ""}</div>` +
-      `<span class="rz ${rz}">${rzLabel}</span>` +
+      // 열 규약(2026-08-20): 1열 무엇 · 2열 누구 · 3열 상태 · 4열 언제.
+      // 상세(detail)는 행에 그리지 않고 **title**로만 남긴다 — 행이 51px로 커지던 주범이고,
+      // 누르면 대화창이 상세까지 받아 보여 준다(값이 사라지는 게 아니라 자리가 옮겨간 것).
+      `<div class="aud" data-id="${esc(e.id)}" title="${esc(e.detail || e.action)}${e.detail ? "\n\n" : ""}누르면 대화창에 「이거」로 담깁니다">` +
+      `<div class="body"><span class="kind ${kc}">${KIND_LABEL[e.kind] || e.kind}</span>` +
+      `<span class="act">${esc(e.action)}</span>${e.target ? `<span class="tgt">${esc(e.target)}</span>` : ""}</div>` +
       `<span class="who">${esc(e.actor || "-")}</span>` +
+      `<span class="rz ${rz}">${rzLabel}</span>` +
+      `<span class="tm">${fmtTime(e.at)}</span>` +
       `</div>`
     );
   }

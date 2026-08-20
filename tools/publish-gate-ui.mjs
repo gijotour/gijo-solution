@@ -486,12 +486,18 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     // ⚠ **압축(대화 홈)의 ▾를 먼저 눌러 본다**(2026-08-20 병렬 검토). 전체 보기를 먼저 누르면
     //   그 뒤 검사가 전부 「전체 지도」 쪽 단추를 재게 되어, 사장님이 실제로 쓰는 첫 화면 경로가
     //   한 번도 안 눌린 채 초록이 난다. 여기가 이번 라운드의 새 배선이라 반드시 재야 한다.
-    let 압축목록행 = 0, 압축전폭 = false;
-    const 압축펴기 = document.querySelector('#cePanels button[data-act="rows"]');
-    if (압축펴기) {
+    // ⚠ **첫 번째 단추만 누르면 안 된다**(2026-08-20 설계관 경고 → 실제로 밟았다): 판 순서는
+    //   「움직임 순」이라 유동적이고, 운영은 라이브 모드라 **0건이 정상인 판**(예: CTI 탐지)이
+    //   첫 자리에 올 수 있다. 그러면 제품이 멀쩡한데 게시가 막힌다.
+    //   → 단추를 차례로 눌러 **하나라도 실제 행이 나오면** 통과로 본다. 전부 0이면 그때는
+    //     진짜 문제이므로 실패시킨다(헛초록도 막는다).
+    let 압축목록행 = 0, 압축전폭 = false, 압축시도 = 0;
+    const 압축단추들 = [...document.querySelectorAll('#cePanels button[data-act="rows"]')];
+    for (const 압축펴기 of 압축단추들) {
+      압축시도++;
       압축펴기.click();
-      for (let i = 0; i < 25; i++) {
-        await new Promise((x) => setTimeout(x, 400));
+      for (let i = 0; i < 15; i++) {
+        await new Promise((x) => setTimeout(x, 300));
         압축목록행 = document.querySelectorAll("#cePanels .pv-rows .g-rows-r").length;
         if (압축목록행) break;
       }
@@ -501,6 +507,7 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
       압축전폭 = !!(cell && /1\s*\/\s*-1/.test(cell.style.gridColumn || ""));
       압축펴기.click();   // 도로 접어 다음 검사에 영향을 주지 않는다
       await new Promise((x) => setTimeout(x, 300));
+      if (압축목록행) break;   // 실제 행이 나온 판을 하나 찾았으면 충분하다
     }
     const 전체보기 = document.getElementById("pvMore");
     let 펼침 = 0;
@@ -517,12 +524,13 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     const 실패 = [...document.querySelectorAll("#cePanels .pv-fail")].length;
     // 목록을 실제로 펴서 **첫 열에 내용이 있는지**까지 본다(단추 개수만 세면 첫 열이 전부
     //   「-」인 채로 통과한다 — 필드명 오인 5번째가 그렇게 초록이었다).
-    const 펴기 = document.querySelector('#cePanels button[data-act="rows"]');
+    // ⚠ 압축과 같은 이유로 **여러 판을 차례로** 눌러 본다 — 0건이 정상인 판이 첫 자리에
+    //   오면 제품이 멀쩡한데 게시가 막힌다(2026-08-20 실제로 밟았다).
     let 목록행 = 0, 첫열있음 = false;
-    if (펴기) {
+    for (const 펴기 of [...document.querySelectorAll('#cePanels button[data-act="rows"]')]) {
       펴기.click();
-      for (let i = 0; i < 25; i++) {
-        await new Promise((x) => setTimeout(x, 400));
+      for (let i = 0; i < 15; i++) {
+        await new Promise((x) => setTimeout(x, 300));
         const rows = document.querySelectorAll("#cePanels .pv-rows .g-rows-r");
         if (rows.length) {
           목록행 = rows.length;
@@ -534,6 +542,9 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
           break;
         }
       }
+      if (목록행) break;
+      펴기.click();   // 빈 판은 도로 접는다
+      await new Promise((x) => setTimeout(x, 200));
     }
     return {
       압축: 타일.length,
