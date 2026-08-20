@@ -385,8 +385,10 @@ export function registerScreenCardRoute(app: import("express").Express): void {
     const 분기 = kind === "asset" ? "분기:자산현황" : kind === "ops" ? "분기:관제현황" : kind === "hardening" ? "분기:검증현황"
       : kind === "products" ? "product_status" : kind === "threat" ? "threats"
       : kind === "records" ? "audit_search" : kind === "sessions" ? "work_session_status"
-      : kind === "mydocs" ? "recent_documents" : kind === "aiteam" ? "adopt_adapter"
-      : "분기:내업무"; // fix·report·supervision — 내 업무 칩이 실제로 그 화면의 다음 걸음이다
+      : kind === "aiteam" ? "adapter_status" // 읽기 카드에 쓰기 도구 키(adopt_adapter) 재사용 금지(검토관 하7)
+      : "분기:내업무"; // fix·report·supervision·mydocs — 내 업무 칩이 그 화면의 다음 걸음이다
+      // (mydocs를 recent_documents로 보냈다가 되돌렸다 — 검토관 하6: 그 칩(지식 저장소·중복
+      //  문서)은 회사 지식 관리라, 「격리가 전부」인 개인 문서 카드와 영토가 어긋난다.)
     // 🗂 범위가 걸렸는데 이 카드가 범위를 모르는 종류면 제목에 밝힌다(검토관 5.41 중10 —
     //   범위를 걸어 둔 사람이 전체 숫자를 자기 자산 것으로 읽는 사고 방지). 감추지 않고 말한다.
     // 자산 범위가 **성립하는데 미적용인** 카드에만 붙인다 — mydocs(개인)·supervision·aiteam은

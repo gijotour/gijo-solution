@@ -45,12 +45,15 @@ const 시작_RE = /시나리오\s*[:：]?\s*(.+?)\s*(시작|실행|해\s*줘|할
 export function isScenarioAsk(text: string): boolean {
   const t = String(text || "").trim();
   if (!/시나리오/.test(t)) return false;
-  // ⚠ 「레드팀 시나리오」·「공격 시나리오」·「침해 시나리오」는 업무 프롬프트북이 아니라
-  //   보안 개념 질문이다(2026-08-21 설계관 실측 — 이 분기가 redteam_status 규칙보다 앞이라
-  //   그 질문들이 여기 삼켜져 엉뚱한 목록이 나갔다). 빼면 그 질문은 원래 주인
-  //   (FORCED redteam_status·LLM)이 받는다 — 빈 자리가 아니다.
+  // ⚠ **자기 시나리오 이름이 제외보다 먼저다**(2026-08-21 검토관 상1 — 처음엔 제외를 앞에
+  //   뒀다가 「위협 정보 확인」·「침해 의심 초동」 두 시나리오를 자기가 삼켰다. 목록 답이
+  //   광고한 이름을 제품이 못 받는 자리였다).
+  if (SCENARIOS.some((s) => t.includes(s.name))) return true;
+  // 「레드팀 시나리오」·「공격 시나리오」류는 업무 프롬프트북이 아니라 보안 개념 질문이다
+  // (설계관 실측 — 이 분기가 redteam_status 규칙보다 앞이라 삼키고 있었다). 빼면 그
+  // 질문은 원래 주인(FORCED redteam_status·LLM)이 받는다 — 빈 자리가 아니다.
   if (/레드팀|공격|침해|위협/.test(t)) return false;
-  return 목록_RE.test(t) || SCENARIOS.some((s) => t.includes(s.name)) || 시작_RE.test(t);
+  return 목록_RE.test(t) || 시작_RE.test(t);
 }
 
 export function scenarioAnswer(text: string): { output: string; nextChips?: string[] } {
@@ -62,7 +65,7 @@ export function scenarioAnswer(text: string): { output: string; nextChips?: stri
         `📖 시나리오 「${picked.name}」 (${picked.area}) — ${picked.steps.length}단계입니다.`,
         ...picked.steps.map((s, i) => `${i + 1}. "${s}"`),
         "",
-        "아래 칩을 차례로 누르면 됩니다 — 각 단계는 사람이 보내고, 바꾸는 일은 결재판이 섭니다.",
+        "아래 칩을 차례로 누르면 됩니다(첫 세 걸음 — 그다음은 각 답이 이어 줍니다). 각 단계는 사람이 보내고, 바꾸는 일은 결재판이 섭니다.",
       ].join("\n"),
       nextChips: picked.steps.slice(0, 3),
     };

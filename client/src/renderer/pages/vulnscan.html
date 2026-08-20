@@ -75,7 +75,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .vd-search{flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 12px;color:var(--text);font-size:12.5px;outline:none;}
 /* max-height는 공용 gijoFitList가 창 높이에 맞춰 잰다(data-gijo-fit) — 고정 520px는 1080
    모니터에서 아래 400px를 놀렸다(2026-08-21). */
-.vd-list{overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+.vd-list{max-height:60vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;} /* 60vh=폴백 — 실높이는 gijoFitList가 다시 잰다(다른 data-gijo-fit 화면과 같은 관례) */
 .vd-item{border-bottom:1px solid var(--border);padding:4px 12px;cursor:pointer;}
 .vd-item:last-child{border-bottom:none;}
 .vd-item:hover{background:rgba(255,255,255,0.03);}
@@ -405,6 +405,10 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
   function openHost(asset, keepFilters) {
     currentHostId = asset.id;
     선택알림(asset.name, "자산 " + asset.name); // 행을 골랐다 = 이 자산이 「이거」다
+    // ⚠ 목록 높이는 판이 **보일 때** 재야 한다(검토관 2026-08-21 상4) — gijoFitList는 안
+    //   보이는 요소를 건너뛰는데(offsetParent) 부팅 4회 재기는 판이 닫혀 있을 때 지나간다.
+    //   여기서 안 재면 max-height가 없어 판이 문서 끝까지 늘어난다(520px 고정보다 후퇴).
+    setTimeout(function () { if (window.gijoFitList) window.gijoFitList(document.getElementById("vdList")); }, 0);
     if (!keepFilters) {
       vdFilter = "all";
       vdSort = "sev";

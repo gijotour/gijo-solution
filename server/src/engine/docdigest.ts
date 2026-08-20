@@ -207,16 +207,18 @@ export function recentDocumentsText(days = 7): string {
     const when = r.ingestedAt.slice(5, 10).replace("-", "/");
     const who = r.uploadedBy ? ` · ${r.uploadedBy}` : "";
     let 소식 = "";
-    if (r.summary) 소식 = `\n   ${r.summary.split("\n").join("\n   ")}\n   (로컬 모델 자체 요약 — 원문 확인은 지식 화면에서)`;
+    // 「지식 화면」은 옛 이름이다(memory.html → AI 지식, aihub 패널로 흡수) — 지금 이름으로(검토관 중4).
+    if (r.summary) 소식 = `\n   ${r.summary.split("\n").join("\n   ")}\n   (로컬 모델 자체 요약 — 원문 확인은 AI 지식 화면에서)`;
     else if (r.failedReason) 소식 = `\n   요약 없음(${r.failedReason.slice(0, 60)})`;
     // 줄 맨 앞 아이콘 금지(말투 규범 — 그 자리는 상태 표식 자리다. 🔗도 사전 밖 기호다).
     if (r.matches) 소식 += `\n   우리 지식과의 접점: ${r.matches.split("\n").slice(0, 2).join(" / ")}`;
     return `- ${r.documentId} [${r.category ?? "일반"}] ${when}${who}${소식}`;
   });
-  const tail = rows.length > 10 ? `\n(외 ${rows.length - 10}건 — 지식 화면에서 전체 목록)` : "";
+  const tail = rows.length > 10 ? `\n(외 ${rows.length - 10}건)` : "";
   // 갈 곳 한 줄(2026-08-21 야간 회귀 [97] — 「숫자만 주고 갈 곳 없음」이 실결함으로 판명).
-  // 목록만 주면 「그래서 뭘 하지」가 남는다 — 이 답에서 실제로 되는 다음 걸음만 적는다
-  // (내용 질문은 대화로 되고, 전체 목록 화면은 내 문서 → 🩹 반입이 맞는 자리다).
-  const 다음 = `\n\n내용이 궁금하면 "○○ 요약해줘"라고 물으면 되고, 전체 목록은 내 문서 화면의 🩹 반입에서 봅니다.`;
+  // ⚠ 갈 곳은 **한 곳만** 말한다(검토관 중4 — 처음엔 위 tail이 「지식 화면」, 이 줄이
+  //   「내 문서」로 한 답에서 두 화면을 가리켰다). 「"요약해줘"」 안내도 뺐다(검토관 중5 —
+  //   그 지시를 받는 결정 경로가 없어 회차마다 흔들린다. 안 되는 안내는 없느니만 못하다).
+  const 다음 = `\n\n전체 목록과 원문은 내 문서 화면의 🩹 반입에서 봅니다.`;
   return `${머리}\n${lines.join("\n")}${tail}${다음}`;
 }

@@ -898,7 +898,11 @@
     //   못 찾는다」가 그대로 재발한 자리). 문구는 서버 isScenarioAsk에 결정적으로 걸리는
     //   것만(실측 ✓). ⚠ 배열 **끝**에 붙인다 — CAN[0]은 홈 인사 칩이 그대로 읽는다(설계관).
     //   screens는 화면별 칩 자리(4칸)가 남는 화면 + 칩이 ⓘ뿐이던 화면들이다.
-    { cat: "업무 시나리오", kind: "here", screens: ["products.html","maintenance.html","report.html","compliance.html","audit.html","reporting.html","hardening.html","loganalysis.html","memory.html","learnloop.html","sessions.html","records.html","mydocs.html","assets.html","handover.html","lawlookup.html"], qs: [
+    // ⚠ screens는 **셸 탭 이름**으로 적는다(검토관 상2 — 재편 흡수 화면 7개를 원 이름으로
+    //   적었다가 죽은 배선이었다). 절차 허브 5곳(discover~aihub)이 사람이 가장 오래 머무는
+    //   자리라 반드시 포함. 앞 갈래가 4칸을 먼저 채우는 화면에서는 renderChips의 시나리오
+    //   1칸 보장이 자리를 만든다.
+    { cat: "업무 시나리오", kind: "here", scenario: true, screens: ["discover.html","triage.html","fix.html","verify.html","aihub.html","reporting.html","products.html","loganalysis.html","sessions.html","records.html","mydocs.html","assets.html","handover.html","lawlookup.html"], qs: [
       { ic: "📖", q: "시나리오 목록 보여줘" },
       { ic: "🧭", q: "시나리오: 아침 브리핑 시작" },
     ]},
@@ -910,16 +914,19 @@
   // ⚠ 넣는 잣대(설계관 실측): **결정적 경로(FORCED·결정 분기)에 걸리는 문장만**. 확실하지
   //   않은 화면(intro·memory·sessions)은 일부러 비워 뒀다 — 눌렀는데 엉뚱한 답이 오는 칩은
   //   없느니만 못하다. 「이거」로 시작하는 문장만 선택 치환이 된다(「이 제품」은 안 됨).
+  // ⚠ 키는 **셸 탭의 page 값**이다(검토관 2026-08-21 상1 — 처음에 원 화면 파일명으로 적었다가
+  //   7개가 죽은 키였다: 메뉴 재편으로 analysis·threat는 discover, hardening은 verify,
+  //   learnloop·memory는 aihub, sbom·vulnscan은 triage, report·kpi·compliance는 reporting
+  //   탭 안의 **판**이라 ctx.screen이 허브 이름으로 온다. grouphub.js:117이 이미 적어 둔
+  //   사실인데 안 읽었다). 허브 키에는 그 허브의 **어느 판에서 골라도 어긋나지 않는** 문장만.
   var 일반형칩 = {
-    "analysis.html": ["최근 탐지 내역 알려줘"],
-    "threat.html": ["최근 탐지 내역 알려줘"],
-    "compliance.html": ["컴플라이언스 현황 알려줘"],
-    "hardening.html": ["검증 현황 보여줘"],
-    "learnloop.html": ["어댑터 현황 알려줘"],
-    "loganalysis.html": ["오늘 로그에서 이상 징후가 있어?"],
-    "products.html": ["이거 정기점검 잡아줘", "보안제품 현황 알려줘"],
-    "report.html": ["다음 정기 리포트 언제야?"],
-    "sbom.html": ["AI-BOM 현황 알려줘"],
+    "discover.html": ["최근 탐지 내역 알려줘"],                     // 관제·위협 판
+    "triage.html": ["AI-BOM 현황 알려줘"],                          // 일반형은 sbom 판(취약점은 취약점형)
+    "verify.html": ["검증 현황 보여줘"],                            // 하드닝 판
+    "aihub.html": ["어댑터 현황 알려줘"],                           // 학습·지식 판
+    "reporting.html": ["보안 KPI 현황 알려줘"],                     // 리포트·KPI·컴플라이언스 판 공통 상위
+    "loganalysis.html": ["오늘 로그에서 이상 징후가 있어?"],        // 독립 화면(재편 밖)
+    "products.html": ["이거 정기점검 잡아줘", "보안제품 현황 알려줘"], // 독립 화면
   };
 
   // ── 내가 등록한 지시(2026-08-02 사용자 지시 "무엇을 할 수 있나를 등록할 수 있는 메뉴") ──
@@ -1332,8 +1339,13 @@
     var 지금 = (ctx && ctx.screen) || "";
     var qs = [];
     CAN.forEach(function (c) {
-      if (c.screens && c.screens.indexOf(지금) >= 0) qs = qs.concat(fillQs(c.qs).map(function (x) { return { q: x.q, ok: c.kind === "ok" }; }));
+      if (c.screens && c.screens.indexOf(지금) >= 0) qs = qs.concat(fillQs(c.qs).map(function (x) { return { q: x.q, ok: c.kind === "ok", sc: !!c.scenario }; }));
     });
+    // 📖 시나리오 입구 1칸 보장(2026-08-21 검토관 상2) — 앞 갈래가 4칸을 먼저 채우는 화면
+    // (지금 급한 것 4칩 등)에서 시나리오 칩이 영영 안 보이면 입구를 만든 뜻이 없다.
+    if (qs.length > 4 && qs.some(function (x) { return x.sc; }) && !qs.slice(0, 4).some(function (x) { return x.sc; })) {
+      qs[3] = qs.filter(function (x) { return x.sc; })[0];
+    }
     var html = '<span class="cs-chip" data-guide="1" title="이 화면이 뭐 하는 곳인지 카드로 안내합니다">ⓘ 이 화면 안내</span>';
     qs.slice(0, 4).forEach(function (x) {
       html += '<span class="cs-chip' + (x.ok ? " ok" : "") + '" data-q="' + esc(x.q) + '"' + (x.ok ? ' title="승인 후 실행됩니다"' : "") + ">" + esc(x.q) + "</span>";

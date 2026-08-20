@@ -1268,7 +1268,12 @@
       document.head.appendChild(l);
     }
     if (document.body) document.body.classList.add("g-ui");
-    빈제목줄걷기();
+    // ⚠ 지금 바로 재면 안 된다(검토관 2026-08-21 상3) — 제목을 숨기는 CSS(gijo-ui.css)를
+    //   **방금 <link>로 주입**했으므로 이 시점엔 아직 안 붙어 「보임」으로 오판해 영영 안
+    //   숨긴다. CSS가 실제로 붙은 뒤(onload)와 지연 재시도로 잰다 — 함수는 멱등이라 안전.
+    var uiCss = document.getElementById("gijoUiCss");
+    if (uiCss) uiCss.addEventListener("load", 빈제목줄걷기);
+    [300, 1200].forEach(function (ms) { setTimeout(빈제목줄걷기, ms); });
   }
 
   /**

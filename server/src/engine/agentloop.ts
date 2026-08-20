@@ -1350,8 +1350,10 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   // ── 2026-08-21 연계성 라운드 — 다음 걸음 칩이 안내하는 말 3개를 결정화 ─────────────
   //   guidance-routing 시험이 막았다: 「제품이 안내한 말은 전부 결정적이어야 한다」.
   //   칩으로 달아 놓고 모델 판단에 맡기면 회차마다 답이 흔들린다(두더지잡기의 뿌리).
+  // 「재스캔」·「재 스캔」 다 잡는다(\s*) — 가지 하나로(검토관 하8).
+  // (주석은 re: 줄 **위**에 — 줄 끝에 붙이면 guidance-check 추출이 끊긴다. 오늘 두 번째.)
   {
-    re: /재스캔\s*(상태|현황|결과)|재\s*스캔\s*(상태|현황)/,
+    re: /재\s*스캔\s*(상태|현황|결과)/,
     tool: "scan_status",
     args: {},
   },
@@ -1363,6 +1365,15 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   {
     re: /자가\s*진단\s*(해줘|돌려|실행|해\s*봐)|self[\s-]*(check|test)\s*(해줘|실행)/i,
     tool: "system_health",
+    args: {},
+  },
+  // 「이거 검증 실행해줘」 — fix-close 시나리오 3단계이자 승인 뒤 칩(2026-08-21 검토관 상2:
+  //   verify_finding은 읽기(write:false)라 결재판이 안 서는데 결정 규칙이 없어 **사슬의
+  //   마지막 고리가 모델 운**이었다). 시킴꼴만 잡는다 — 「검증 현황」(조회)·「검증이 뭐야」
+  //   (지식)·「하드닝 점검해줘」(다른 도구)와 안 겹친다.
+  {
+    re: /(조치)?\s*검증\s*(실행|돌려)(해\s*줘|줘)?/,
+    tool: "verify_finding",
     args: {},
   },
 ];
