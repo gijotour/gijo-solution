@@ -289,6 +289,19 @@ describe("프로 확정 계약 — 메뉴는 카드가 전부(2026-08-20 사장�
     const c2 = 코드만(join(PAGES, "console.js"));
     expect(c2, "🗔가 dock 신호를 안 단다 — 카드 경로에 먹혀 화면을 영영 못 연다").toContain("gijoTabs.open(page, label, { dock: true })");
   });
+  it("문서 허브 §6 — 신고 시한 템플릿 수신 계약(발신자 가드·템플릿 id) 소스 감시", () => {
+    // 계약(승인 시안 docs-hub-v3 §6): 신고 시한 카운트다운 카드(미래)가
+    // {type:"gijo:newDocFromTemplate", templateId, prefill}를 보내면 허브가 편집기를 연다.
+    // 발신자 가드가 빠지면 아무 창이나 편집기를 열고, 템플릿 id가 바뀌면 카드 발신과 어긋난다
+    // (검토관 하11 — 필드명 원천 대조 4연발 유형의 예방 감시).
+    const s = 코드만(join(PAGES, "mydocs.html"));
+    expect(s, "수신 계약이 사라졌다").toContain("gijo:newDocFromTemplate");
+    expect(s, "발신자 가드가 없다 — 아무 창이나 편집기를 연다").toContain("ev.source !== window.parent");
+    for (const id of ["incident_report", "breach_notice"]) {
+      expect(s, `신고 템플릿 id가 바뀌면 카드 쪽 발신과 어긋난다: ${id}`).toContain(`"${id}"`);
+    }
+  });
+
   it("카드 커버리지 — 전 메뉴 확장(창 예외 제외)", () => {
     const d = 코드만(join(__dirname, "..", "src", "engine", "datacard.ts"));
     for (const p of ["sessions.html", "fix.html", "reporting.html", "products.html", "records.html", "threat.html", "aihub.html"]) {

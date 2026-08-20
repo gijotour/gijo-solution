@@ -19,24 +19,8 @@ const app = ctx.pages().find((p) => p.url().includes("app.html"));
 if (!app) { console.error("✗ 본창(app.html)이 없다 — 로그인된 앱이 필요하다"); process.exit(1); }
 
 const 창들 = [
-  {
-    이름: "문서함", 열기: "openDocbox", 파일: "docbox.html",
-    검사: async (page) => {
-      await sleep(1800);
-      const n = await page.evaluate(() => document.querySelectorAll(".doc").length);
-      if (n < 1) return `목록이 비었다(문서 ${n}건)`;
-      // 오늘 결함의 핵심 단계 — **첫 문서를 실제로 눌러 본문이 열리는지**까지 본다.
-      const r = await page.evaluate(async () => {
-        document.querySelector(".doc").click();
-        await new Promise((s) => setTimeout(s, 2500));
-        const t = (document.getElementById("view")?.textContent || "").trim();
-        return { len: t.length, err: /열지 못했습니다/.test(t) ? t.slice(0, 100) : "" };
-      });
-      if (r.err) return `본문 열기 실패: ${r.err}`;
-      if (r.len < 200) return `본문이 너무 짧다(${r.len}자) — 렌더 실패 의심`;
-      return null;
-    },
-  },
+  // (문서함 창은 2026-08-20 내 문서 허브에 흡수돼 목록에서 뺐다 — 「문서 열기까지」 검사의
+  //  의도는 publish-gate-ui ③‴(제품 안내 렌더+열람 본문)이 본창 쪽에서 승계한다.)
   {
     이름: "팀 사무실", 열기: "openTeamOffice", 파일: "office.html",
     검사: async (page) => {

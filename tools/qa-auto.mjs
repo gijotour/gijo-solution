@@ -680,14 +680,15 @@ async function runClient() {
     for (const 있어야 of ["대시보드", "팀 사무실", "문서 작성", "내 문서", "작업 내역"]) {
       if (!m.fixed.some((f) => f.includes(있어야))) throw new Error(`맨 위 고정에 '${있어야}'가 없다: ${m.fixed.join(",")}`);
     }
-    // 문서함은 왼쪽 메뉴에서 뺐으니(2026-08-02) **옮겨간 자리에 있는지**를 여기서 지킨다.
-    //   기대값만 내리고 끝내면, 나중에 📚가 통째로 사라져도 아무도 못 잡는다.
-    const 문서함 = await page.evaluate(() => {
-      const el = document.querySelector("#gijoNav .gtb-userarea [title*='문서함'], #gijoNav .gtb-userarea .gtb-doc");
+    // 제품 안내 단추 — 문서함 창은 내 문서 허브에 흡수됐지만(2026-08-20 docs-hub-v3)
+    //   **그 자리(계정 줄 끝 책 아이콘)는 유지**됐다. 자리가 통째로 사라지면 여기서 잡는다
+    //   (기대값만 내리고 끝내면 아무도 못 잡는다 — 원래 의도 유지, 대상만 갱신).
+    const 안내단추 = await page.evaluate(() => {
+      const el = document.querySelector("#gijoNav .gtb-userarea [title*='제품 안내'], #gijoNav .gtb-userarea .gtb-gear");
       const 글 = document.querySelector("#gijoNav .gtb-userarea")?.innerText || "";
-      return { 있나: !!el || /📚/.test(글), 글: 글.replace(/s+/g, " ").slice(0, 40) };
+      return { 있나: !!el, 글: 글.replace(/\s+/g, " ").slice(0, 40) };
     });
-    if (!문서함.있나) throw new Error(`문서함(📚)이 사용자 이름 옆에도 없다: ${문서함.글}`);
+    if (!안내단추.있나) throw new Error(`제품 안내(책 아이콘) 단추가 계정 줄에 없다: ${안내단추.글}`);
     if (!m.fav) throw new Error("⭐즐겨찾기 가지가 안 보인다 — 비어 있어도 보여야 한다");
     if (!(m.starOpacity > 0.15)) throw new Error(`☆가 마우스 없이는 안 보인다(opacity ${m.starOpacity}) — 즐겨찾기를 발견할 수 없다`);
     // (2026-08-09) 하한 27·「모델 합치기」·홀로 못 서는 이름·없앤 화면 검사는 위 **정확 집합**

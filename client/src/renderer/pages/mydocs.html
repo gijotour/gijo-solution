@@ -272,6 +272,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   var mineFilter = "all";
   var 선택 = null; // { 탭, id }
   var 스테이지값 = "list"; // list | edit | read | compose
+  var 기본노트 = "개인 문서는 내 질문에만 근거로 나옵니다 — 「AI 포함」과 「공유」의 차이는 ⓘ로 보세요.";
+  var 가이드히트 = null;   // 제품 안내 본문 검색 히트 {문서id: 횟수} — 문서함의 본문 검색 승계(검토관 중5)
+  var 가이드검색타이머 = null;
   // 회사 지식·반입에서 개인 문서(personal:*)는 뺀다(검토관 중3 — 서버 반입 소식도 같은 제외).
   // 개인 문서의 자리는 👤 내 것 탭이고, personal: id는 사람이 못 읽는 uuid다.
   var 회사문서만 = function () { return know.filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0; }); };
@@ -329,6 +332,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // ── 스테이지 전환 — 목록(필터·세그 포함)과 스테이지는 자리를 바꿔 쓴다 ──────
   function 스테이지(which) {
     스테이지값 = which;
+    // 요청 폼을 떠나면 paste 가로채기·초안을 한 곳에서 정리한다(검토관 중6 — 이탈 경로가
+    // 여러 갈래라 각자 치우게 두면 하나가 빠져 편집기 붙여넣기를 조용히 삼킨다).
+    if (which !== "compose") {
+      try { document.removeEventListener("paste", cx붙여넣기); } catch (e) { }
+      cx = null;
+    }
     var 목록 = which === "list";
     document.getElementById("cols").style.display = 목록 ? "grid" : "none";
     document.getElementById("q").style.display = 목록 ? "" : "none";
@@ -341,12 +350,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("composeStage").classList.toggle("on", which === "compose");
   }
 
+  // 스테이지에서 목록으로 돌아오는 유일한 문 — 스테이지값을 먼저 내려야 그리기()가 목록을 그린다.
+  function 목록으로() { 스테이지값 = "list"; 그리기(); }
+
   // ── 탭별 그리기(전부 .g-rows — 승인 시안 docs-hub-v2: 새 시각 언어 금지) ──────
   function 그리기() {
+    // ⚠ 스테이지 중에는 목록을 다시 그리지 않는다(검토관 상1) — 비동기 불러오기()가 끝나며
+    //   그리기()를 부르면 편집기·요청 폼이 **쓰는 도중에** 닫혀 글이 사라진다. §6 계약(셸이
+    //   화면을 열자마자 템플릿 메시지를 보내는 흐름)이 정확히 이 경합에 걸리는 자리다.
+    if (스테이지값 !== "list") { 탭수그리기(); return; }
     var q = (document.getElementById("q").value || "").toLowerCase().trim();
     var list = document.getElementById("list");
     var 걸림 = function (s) { return !q || String(s).toLowerCase().indexOf(q) >= 0; };
     스테이지("list");
+    document.getElementById("note").textContent = 기본노트; // 산출물 예약 안내가 눌러앉지 않게(검토관 하9)
     document.getElementById("cols").classList.toggle("full", 탭 === "learn");
     document.getElementById("rowsBox").className = "g-rows g-rows--hub-" + 탭;
 
@@ -395,8 +412,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         }).join("") : '<div class="empty">회사 지식 문서가 없습니다.</div>');
     } else if (탭 === "guide") {
       // 제품 안내 — 문서함(창) 흡수(승인 시안 v3). 읽기전용: 편집 조작이 아예 없다.
+      // 검색은 제목 + **본문 히트**(가이드히트 — docboxSearch 승계) 합집합으로 거른다.
       var byGrp = { guide: [], policy: [] };
-      guide.filter(function (d) { return 걸림(d.title); }).forEach(function (d) {
+      guide.filter(function (d) { return 걸림(d.title) || (가이드히트 && 가이드히트[d.id]); }).forEach(function (d) {
         (byGrp[d.group] || byGrp.policy).push(d);
       });
       list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 84px;gap:8px"><span>문서</span><span class="ta-r">유형</span></div>' +
@@ -407,9 +425,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           var folded = 접힘.has(gk);
           return '<div class="g-rows-gh" data-cat="' + esc(gk) + '" style="top:26px"><span class="tri">' + (folded ? "▸" : "▾") + '</span>' + GUIDE_GROUP[g].icon + " " + GUIDE_GROUP[g].label + '<span class="cnt">' + arr.length + "개</span></div>" +
             '<div class="g-rows-body' + (folded ? " folded" : "") + '">' + arr.map(function (d) {
+              var 히트 = 가이드히트 && 가이드히트[d.id];
               return '<div class="g-rows-r" data-id="' + esc(d.id) + '" style="grid-template-columns:1fr 84px;gap:8px">' +
                 '<span class="trunc" title="' + esc(d.title) + '">' + esc(d.title) + "</span>" +
-                '<span class="ta-r gm2">읽기전용</span></div>';
+                (히트 ? '<span class="ta-r gtxt-share" title="본문에서 ' + 히트 + '번 나옵니다">' + 히트 + "곳</span>" : '<span class="ta-r gm2">읽기전용</span>') + "</div>";
             }).join("") + "</div>";
         }).join("") : '<div class="empty">제품 안내 문서를 불러오지 못했거나 없습니다.</div>');
     } else if (탭 === "learn") {
@@ -502,21 +521,55 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   // ── 배선 ─────────────────────────────────────────────────────────────
-  document.getElementById("tabs").addEventListener("click", function (ev) {
+  document.getElementById("tabs").addEventListener("click", async function (ev) {
     var b = ev.target.closest("button");
     if (!b) return;
     if (b.getAttribute("data-t") === "future") {
-      // 예약 자리 — 데이터인 척하지 않는다(정직 원칙). 눌러도 예약 안내만.
+      // 예약 자리 — 데이터인 척하지 않는다(정직 원칙). 눌러도 예약 안내만(다음 그리기에서 원복).
       document.getElementById("note").textContent = "🗂 산출물 — 예약된 자리입니다(생성 리포트·공식 인수인계 기록의 읽기전용 열람을 모을 예정). 아직 동작하지 않습니다.";
       return;
     }
+    // 스테이지 중 탭 이동 — 쓰던 글이 있으면 되묻는다(검토관 상1: 확인 없는 소멸 금지)
+    if (스테이지값 === "edit") {
+      var 쓴것 = document.getElementById("editTitle").value.trim() || document.getElementById("editBody").value.trim();
+      if (쓴것) {
+        var ok = window.gijoAsk ? await window.gijoAsk("작성 중인 문서가 있습니다 — 저장하지 않고 나가면 사라집니다.\n나갈까요?") : false;
+        if (!ok) return;
+      }
+      스테이지값 = "list";
+    } else if (스테이지값 === "compose") {
+      cx담기();
+      var 적음 = cx && ((cx.title || "").trim() || (cx.tried || "").trim() || (cx.happened || "").trim() || (cx.images || []).length);
+      if (적음) {
+        var ok2 = window.gijoAsk ? await window.gijoAsk("작성 중인 요청이 있습니다 — 저장하지 않고 나가면 사라집니다.\n나갈까요?") : false;
+        if (!ok2) return;
+      }
+      스테이지값 = "list";
+    } else if (스테이지값 === "read") { 스테이지값 = "list"; }
     Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function (x) { x.classList.remove("on"); });
     b.classList.add("on");
     탭 = b.getAttribute("data-t") || "mine";
+    가이드히트 = null;
     알림(); // 탭을 바꾸면 가리키던 것도 없다
     그리기();
   });
-  document.getElementById("q").addEventListener("input", 그리기);
+  // 검색칸 — 필터 전용. 📘 제품 안내에서는 **본문까지** 찾는다(문서함의 본문 검색 승계 —
+  // 검토관 중5: 흡수하며 기능을 조용히 빼면 안내가 거짓이 된다). 히트 수는 유형 칸에 배지로.
+  document.getElementById("q").addEventListener("input", function () {
+    if (탭 !== "guide") { 그리기(); return; }
+    clearTimeout(가이드검색타이머);
+    var v = (document.getElementById("q").value || "").trim();
+    가이드검색타이머 = setTimeout(async function () {
+      if (v.length >= 2 && window.gijo && window.gijo.docboxSearch) {
+        try {
+          var r = await window.gijo.docboxSearch(v);
+          가이드히트 = {};
+          ((r && r.results) || []).forEach(function (x) { 가이드히트[x.id] = x.hits; });
+        } catch (e) { 가이드히트 = null; /* 검색 실패는 제목 필터로 계속 — 목록은 산다 */ }
+      } else { 가이드히트 = null; }
+      그리기();
+    }, 250);
+  });
   document.getElementById("mineSeg").addEventListener("click", function (ev) {
     var b = ev.target.closest("button");
     if (!b) return;
@@ -713,8 +766,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } catch (e) { if (window.gijoTell) window.gijoTell("문서를 열지 못했습니다 — " + ((e && e.message) || "오류")); }
   }
   document.getElementById("btnNew").addEventListener("click", function () { 편집열기(null, { openDrawer: true, body: "" }); });
-  document.getElementById("editBack").addEventListener("click", function () { 그리기(); });
-  document.getElementById("editCancel").addEventListener("click", function () { 그리기(); });
+  document.getElementById("editBack").addEventListener("click", 목록으로);
+  document.getElementById("editCancel").addEventListener("click", 목록으로);
   document.getElementById("editTplToggle").addEventListener("click", function () {
     var d = document.getElementById("tplDrawer");
     d.classList.toggle("on");
@@ -739,10 +792,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         ? await window.gijo.personalDocsUpdate(편집중, { title: title, body: body })
         : await window.gijo.personalDocsCreate({ title: title, body: body });
       // 비밀번호로 보이는 것이 있으면 저장 뒤에 알린다(막지는 않는다 — 오탐도 있고,
-      // 막으면 담당자는 포스트잇에 적는다). docbox saveMine과 같은 계약.
+      // 막으면 담당자는 포스트잇에 적는다). 종류·가려진 값까지 보여야 어디를 고칠지
+      // 안다(검토관 하10 — docbox saveMine이 주던 정보를 흡수하며 줄이지 않는다).
       if (saved && saved.warnings && saved.warnings.length && window.gijoTell) {
-        window.gijoTell("⚠ 비밀번호로 보이는 것이 " + saved.warnings.length + "곳 있습니다 — 장비 접속 정보는 보안제품 등록부(암호화 보관)에 두세요.");
+        window.gijoTell("⚠ 비밀번호로 보이는 것이 " + saved.warnings.length + "곳 있습니다:\n" +
+          saved.warnings.slice(0, 5).map(function (w) { return "· " + (w.kind || "?") + " — " + (w.masked || ""); }).join("\n") +
+          "\n장비 접속 정보는 보안제품 등록부(암호화 보관)에 두세요.");
       }
+      스테이지값 = "list"; // 저장이 끝났으니 목록으로 — 불러오기()의 그리기가 이제 목록을 그린다
       await 불러오기();
     } catch (e) {
       if (window.gijoTell) window.gijoTell("저장하지 못했습니다 — " + ((e && e.message) || "오류"));
@@ -768,7 +825,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           : "문서를 열지 못했습니다 — " + esc(m)) + "</div>";
     }
   }
-  document.getElementById("readBack").addEventListener("click", function () { 그리기(); });
+  document.getElementById("readBack").addEventListener("click", 목록으로);
 
   // ── 요청 만들기(문서함에서 자리 이전 — docbox.html 456-627 로직 승계, 새로 짜지 않았다) ──
   // 전달은 파일 저장뿐이다(사용자 결정 2026-07-30) — 메일 발송 기능은 없다.
@@ -832,11 +889,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         요청그리기();
       });
     });
-    document.getElementById("cxCancel").addEventListener("click", function () {
-      cx = null;
-      document.removeEventListener("paste", cx붙여넣기);
-      그리기();
-    });
+    document.getElementById("cxCancel").addEventListener("click", 목록으로); // 정리는 스테이지()가 일괄
     document.getElementById("cxPreview").addEventListener("click", function () { 요청만들기(true); });
     document.getElementById("cxSave").addEventListener("click", function () { 요청만들기(false); });
 
@@ -941,9 +994,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
       if (window.gijoTell) window.gijoTell("저장했습니다 — " + r.fileName + (r.maskedCount ? " (자격증명 " + r.maskedCount + "곳 가림)" : "") + ".\n이 파일을 개발팀에 전달해 주세요.");
-      cx = null;
-      document.removeEventListener("paste", cx붙여넣기);
-      그리기();
+      목록으로(); // cx·paste 정리는 스테이지()가 일괄
     } catch (e) {
       cx상태("만들지 못했습니다: " + ((e && e.message) || e));
     } finally {

@@ -15,7 +15,6 @@ import { URL } from "url";
 import { isDangerous } from "./terminalPolicy";
 
 let mainWindow: BrowserWindow | null = null;
-let docboxWindow: BrowserWindow | null = null; // 문서함 별도 창 — 제품 화면 셸(탭) 밖에서 돈다(사용자 결정 2026-07-30)
 let officeWindow: BrowserWindow | null = null; // "우리 AI 팀 사무실" 별도 창(시안 B) — 관제 모니터 상시용
 let smartMdWindow: BrowserWindow | null = null; // GIJO Smart MD Studio — 로그인 고객 무료 제공(2026-08-14)
 let quitConfirmed = false; // 메인 창 닫기 확인을 통과했는가 — 재시작·업데이트는 true로 건너뛴다
