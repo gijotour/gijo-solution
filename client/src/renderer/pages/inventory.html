@@ -328,7 +328,7 @@
 
     <!-- 서비스 영향도: 자산에 문제가 생기면 어느 업무 서비스가 영향받는지 자동 집계(자산 위험·CTI 위협·지연 점검). -->
     <div style="background:var(--panel);border:1px solid rgba(240,160,32,0.3);border-radius:12px;padding:16px 18px;margin-bottom:16px;">
-      <div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:2px;">🔗 서비스 영향도 <span style="font-size:12.25px;font-weight:600;color:var(--muted)">자산 → 업무 서비스 의존성</span></div>
+      <div style="font-size:14px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:2px;">🔗 서비스 영향도 <span style="font-size:12.25px;font-weight:600;color:var(--muted)">자산 → 업무 서비스 의존성</span></div>
       <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">각 자산이 지원하는 서비스별로 위험(고위험 자산·CTI 위협·지연 점검)을 모아 "지금 위험한 서비스"를 보여줍니다. 자산 등록 시 <b>지원 서비스</b>를 지정하면 집계됩니다.</div>
       <div id="serviceImpactBody" style="display:flex;flex-direction:column;gap:8px;">불러오는 중...</div>
     </div>
@@ -1395,7 +1395,7 @@
         const assetNames = 이름들.slice(0, 4).join(", ") + (이름들.length > 4 ? ` 외 ${이름들.length - 4}개` : "");
         return `<div style="display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 13px;flex-wrap:wrap;">
           <span style="font-size:11.75px;font-weight:800;padding:3px 9px;border-radius:6px;color:${im.color};background:${im.bg};white-space:nowrap;">영향도 ${im.label}</span>
-          <span style="font-size:13px;font-weight:800;color:#fff;">${s.service.replace(/</g, "&lt;")}</span>
+          <span style="font-size:13px;font-weight:800;color:var(--text-strong, #fff);">${s.service.replace(/</g, "&lt;")}</span>
           <span style="font-size:12.25px;color:var(--muted-2);">자산 ${s.assetCount} · ${assetNames}</span>
           <span style="font-size:12.5px;color:var(--muted);margin-left:auto;">${factorsStr}</span>
         </div>`;

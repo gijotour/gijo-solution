@@ -175,7 +175,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const active = SCHEDULES.filter((s) => s.enabled).length;
     const worse = derived.filter((d) => d.worsening).length;
     $("kpiRow").innerHTML =
-      `<div class="g-kpi"><div class="kv" style="color:#fff">${TARGETS.length}</div><div class="kl">등록 장비</div></div>` +
+      `<div class="g-kpi"><div class="kv" style="color:var(--text-strong, #fff)">${TARGETS.length}</div><div class="kl">등록 장비</div></div>` +
       `<div class="g-kpi"><div class="kv" style="color:var(--teal)">${active}</div><div class="kl">활성 스케줄</div></div>` +
       `<div class="g-kpi"><div class="kv" style="color:${rc(withRate.length ? avg : null)}">${withRate.length ? avg + "%" : "—"}</div><div class="kl">평균 준수율</div></div>` +
       `<div class="g-kpi" ${worse ? 'style="border-color:rgba(226,72,61,.4)"' : ""}><div class="kv" style="color:${worse ? "var(--red)" : "var(--muted)"}">${worse}</div><div class="kl">악화 경고</div></div>`;

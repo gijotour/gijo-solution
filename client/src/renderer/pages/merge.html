@@ -154,7 +154,7 @@ tr:last-child td{border-bottom:none;}
     const c = ARCH_COLOR[m.arch] || ARCH_COLOR.other, t = ARCH_TEXT[m.arch] || ARCH_TEXT.other;
     return `<div style="background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:13px 15px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-        <div style="font-weight:800;color:#fff;font-size:13px;">${esc(m.name)}${m.note ? ` <span style="font-size:11.75px;color:var(--teal);font-weight:700;">· ${esc(m.note)}</span>` : ""}</div>
+        <div style="font-weight:800;color:var(--text-strong, #fff);font-size:13px;">${esc(m.name)}${m.note ? ` <span style="font-size:11.75px;color:var(--teal);font-weight:700;">· ${esc(m.note)}</span>` : ""}</div>
         <span style="background:${c};color:${t};border-radius:5px;padding:1px 7px;font-size:11.75px;font-weight:800;white-space:nowrap;">${esc(m.arch)} · ${esc(m.size)}</span>
       </div>
       <div style="font-size:12.5px;color:var(--text);margin:5px 0;">${esc(m.focus)}</div>

@@ -609,7 +609,14 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
     const 셸 = 셸화면보정("app.html");
     console.warn(`[navigate] 없는 화면 ${file} → ${셸}로 대체`);
     target = path.join(__dirname, `../src/renderer/pages/${셸}`);
-    await mainWindow.loadFile(target);
+    // ⚠ 폴백도 셸 관례를 따른다(검토관 2026-08-20 하4) — 위 오버레이·shell=pro는 **원래 요청
+    //   파일** 기준이라, 없는 화면을 부르면 흰 셸에 검은 창틀 + 표준 모양 셸이 됐다.
+    const 폴백쿼리: Record<string, string> = {};
+    if (셸 === "app.html" && 저장된셸모드() === "pro") {
+      폴백쿼리.shell = "pro";
+      try { mainWindow.setTitleBarOverlay({ color: "#f2efe9", symbolColor: "#6b6259", height: 44 }); } catch { /* 미지원 플랫폼 */ }
+    }
+    await mainWindow.loadFile(target, Object.keys(폴백쿼리).length ? { query: 폴백쿼리 } : undefined);
     return;
   }
   // ⚠ `qs`(원래 주소에 쿼리가 있었나)가 아니라 **지금 실을 것이 있나**를 본다.

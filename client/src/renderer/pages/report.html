@@ -230,11 +230,11 @@ tr:last-child td{border-bottom:none;}
     <div style="display:flex;gap:8px;margin-bottom:12px;">
       <label style="flex:1;display:flex;gap:7px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;cursor:pointer;">
         <input type="radio" name="reportAudience" value="official" checked style="margin-top:2px;accent-color:var(--blue)">
-        <span><b style="color:#fff;font-size:12.5px">📄 보고용</b><br><span style="font-size:12px;color:var(--muted)">경영진·감사용. 격식 문어체·거버넌스 강조</span></span>
+        <span><b style="color:var(--text-strong, #fff);font-size:12.5px">📄 보고용</b><br><span style="font-size:12px;color:var(--muted)">경영진·감사용. 격식 문어체·거버넌스 강조</span></span>
       </label>
       <label style="flex:1;display:flex;gap:7px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;cursor:pointer;">
         <input type="radio" name="reportAudience" value="internal" style="margin-top:2px;accent-color:var(--blue)">
-        <span><b style="color:#fff;font-size:12.5px">🔍 내가 볼 것</b><br><span style="font-size:12px;color:var(--muted)">내부 검토용. 격식 없이 액션 중심</span></span>
+        <span><b style="color:var(--text-strong, #fff);font-size:12.5px">🔍 내가 볼 것</b><br><span style="font-size:12px;color:var(--muted)">내부 검토용. 격식 없이 액션 중심</span></span>
       </label>
     </div>
     <label for="reportFormatInput">출력 형식</label>
@@ -668,7 +668,7 @@ tr:last-child td{border-bottom:none;}
 
     detail.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <b style="color:#fff;font-size:13.5px">${isNew ? "새 스케줄" : SCHED_TYPE_LABEL[s.type] + " 리포트"}</b>
+        <b style="color:var(--text-strong, #fff);font-size:13.5px">${isNew ? "새 스케줄" : SCHED_TYPE_LABEL[s.type] + " 리포트"}</b>
         ${!isNew ? `<button class="chip-sm ${s.enabled ? "chip-on" : "chip-off"}" id="schedToggleBtn">${s.enabled ? "켜짐" : "꺼짐"}</button>` : ""}
       </div>
       <div class="sched-form">
@@ -708,7 +708,7 @@ tr:last-child td{border-bottom:none;}
       ${
         !isNew
           ? `<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px;">
-        <b style="font-size:12px;color:#fff">최근 실행 이력</b>
+        <b style="font-size:12px;color:var(--text-strong, #fff)">최근 실행 이력</b>
         <table class="sched-hist" id="schedHistTable"><tr><td style="color:var(--muted)">불러오는 중…</td></tr></table>
       </div>`
           : ""

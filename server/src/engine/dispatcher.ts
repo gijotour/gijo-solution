@@ -1043,33 +1043,42 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     }
   }
 
-  // 「내 문서」를 겨냥한 질문인데 **개인 문서 조각이 한 개도 안 잡히면** LLM에 보내지 않는다
-  // (QA 결함 1b, 2026-08-20 사장님 실측: 내 문서 내용을 물었는데 무관한 회사 문서 3건이
-  //  근거 배지로 붙고 「수정 중」이라는 상태까지 지어냈다. 0건은 재작성 금지 계열 —
-  //  회사 RAG로 흘러가 그럴듯하게 지어내는 길을 결정적으로 끊는다).
-  // ⚠ 좁게 잡는다: 「내문서/내 문서」가 명시된 입력만. 정확한 이름(「내문서」 단독)은 위
-  //   화면이름카드가 먼저 받았으므로 여기는 문장형이다. 개인 조각이 있으면 그대로 통과 —
-  //   일반 chat이 같은 질의로 그 조각을 근거 삼는다.
-  //   쓰기 지시(「내 문서에 저장/추가해줘」)는 찾기가 아니라서 제외 — 그건 내 문서 화면 몫이다.
-  if (/내\s?문서/.test(instructionText) && !/문서함/.test(instructionText)
-      && !/(저장|기록해|추가해|만들|올려|넣어|써\s?줘)/.test(instructionText)) {
-    const { queryMemoryScored } = await import("./memory.js");
-    const hits = await queryMemoryScored(instructionText, 8, undefined, screen, viewer).catch(() => []);
-    if (!hits.some((h) => h.documentId.startsWith("personal:"))) {
-      const { mydocsStatusAnswer } = await import("./datacard.js");
-      const 카드 = await mydocsStatusAnswer(String(viewer?.userId ?? "unknown"));
-      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
-      completeTask(task.id);
-      const output = [
-        // FAIL_MARKS-예외: 실패 폴백이 아니라 **의도된 부재 선언**이다 — 개인 조각 0건일 때
-        // 회사 문서로 지어내는 것(QA 결함 1b)을 끊는 정직 답. sources:[]로 배지도 함께 비운다.
-        "그 내용을 **내 문서에서 찾지 못했습니다** — 지어내지 않고 그대로 말씀드립니다.",
-
-        "내 문서가 대화에서 검색되려면 그 문서의 **AI 포함**이 켜져 있어야 합니다(내 문서 화면에서 문서별로 켭니다).",
-        "",
-        카드.output,
-      ].join("\n");
-      return { task, route: { agentId: "orchestrator", action: "chat" }, output, dataCard: 카드.dataCard, sources: [] };
+  // 「내 문서」를 겨냥한 **찾기 질문**인데 내 개인 문서 조각이 한 개도 안 잡히면 LLM에 보내지
+  // 않는다(QA 결함 1b, 2026-08-20 사장님 실측: 내 문서 내용을 물었는데 무관한 회사 문서 3건이
+  // 근거 배지로 붙고 「수정 중」이라는 상태까지 지어냈다. 0건은 재작성 금지 계열).
+  // ⚠ 좁게 잡는다(검토관 2026-08-20 상1·중1 — 넓은 가로채기가 기능을 죽인다):
+  //   · (?<![사안]) — 「사내 문서」·「안내 문서」의 꼬리에 「내 문서」가 들어 있다.
+  //     screenguide.ts:1088이 같은 함정을 먼저 밟고 막아 둔 자리다.
+  //   · 찾기 앵커 필수 — 열기·삭제·공유·저장·사용법은 이 가드의 일이 아니다(각자의 길로).
+  if (/(?<![사안])내\s?문서/.test(instructionText) && !/문서함/.test(instructionText)
+      && /(있|찾|알려|검색|내용|요약|정리|뭐|무엇|무슨)/.test(instructionText)
+      && !/(저장|기록해|추가해|만들|올려|넣어|써\s?줘|열어|열기|삭제|지워|공유|바꿔|어떻게|사용법|화면)/.test(instructionText)) {
+    // 답 경로와 같은 잣대(관련도 컷 있는 graded)로 잰다 — 컷 없는 재검색으로 재면 무관 조각
+    // 1건에 가드가 열리고 답 경로는 그 조각을 버려 원래 결함이 재현된다(검토관 중2).
+    // 검색 자체가 실패하면(임베딩 서버 다운 등) 가드를 접고 기존 길로 — 장애를 「부재 확정」으로
+    // 바꿔 말하지 않는다(검토관 중3 — 폴백=FAIL 원칙).
+    const { queryMemoryGraded } = await import("./memory.js");
+    const 검색 = await queryMemoryGraded(instructionText, 8, undefined, screen, viewer).catch(() => null);
+    if (검색) {
+      // 「내 것」 판정은 소유자 대조로 — personal:* 접두사만 보면 남이 공유한 개인 문서로
+      // 가드가 열리고 출처는 「내 문서 · …」로 나간다(검토관 중2 — 접두사≠소유).
+      const { listPersonalDocs } = await import("./personaldocs.js");
+      const 내것 = new Set(listPersonalDocs(String(viewer?.userId ?? "unknown")).map((d) => `personal:${d.id}`));
+      if (!검색.scored.some((h) => 내것.has(h.documentId))) {
+        const { mydocsStatusAnswer, 카드없는글로 } = await import("./datacard.js");
+        const 카드 = await mydocsStatusAnswer(String(viewer?.userId ?? "unknown"));
+        const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
+        completeTask(task.id);
+        const 머리 = [
+          "그 내용은 **내 문서에 없습니다** — 회사 문서로 지어내지 않고 그대로 말씀드립니다.",
+          "내 문서가 대화에서 검색되려면 그 문서의 **AI 포함**이 켜져 있어야 합니다(내 문서 화면에서 문서별로 켭니다).",
+          "",
+        ];
+        if (에디션제한중()) {
+          return { task, route: { agentId: "orchestrator", action: "chat" }, output: [...머리, 카드없는글로(카드)].join("\n"), sources: [] };
+        }
+        return { task, route: { agentId: "orchestrator", action: "chat" }, output: [...머리, 카드.output].join("\n"), dataCard: 카드.dataCard, sources: [] };
+      }
     }
   }
 
@@ -1815,7 +1824,7 @@ export function registerDispatcherRoutes(app: Express): void {
       const limitMs = qa ? QA_LONG_ANSWER_MS : 보고서꼴(text) ? REPORT_HANDOFF_MS : LONG_ANSWER_MS;
       const t0 = Date.now(); // 느린 답 원장(관측성) — 담당자를 기다리게 한 질문을 제품이 스스로 적는다
       const work = runWithProgress(progressId, user?.id ?? null, () =>
-        dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance, role: user?.role }, 선택)
+        dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id ?? user?.username, clearance: user?.clearance, role: user?.role }, 선택)
       );
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), limitMs));
@@ -1907,7 +1916,7 @@ export function registerDispatcherRoutes(app: Express): void {
       try {
         const r = await 스트림자리.run(싱크, () =>
           runWithProgress(progressId, user?.id ?? null, () =>
-            dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance, role: user?.role }, 선택)
+            dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id ?? user?.username, clearance: user?.clearance, role: user?.role }, 선택)
           )
         );
         // 출구 손질은 기존 라우트와 같은 순서·같은 함수 — 여기만 다르면 두 입이 딴말을 한다.
@@ -1953,7 +1962,7 @@ export function registerDispatcherRoutes(app: Express): void {
         //   실행자를 알게. 지식 번들 반입처럼 공급망에 닿는 쓰기는 사람 이름이 특히 중요하다
         //   (2026-08-04 자체 검토: 없으면 도구 내부 감사가 '담당자(대화창)' 일반값으로 남았다).
         const output = await runWithViewer(
-          { userId: user?.id, clearance: user?.clearance },
+          { userId: user?.id ?? user?.username, clearance: user?.clearance },
           // ⚠ 실행자 권한을 넘긴다 — 이 라우트는 authMiddleware(로그인)만 지나므로,
           //   admin 전용 도구를 막는 곳은 executeApprovedTool뿐이다(2026-08-05 검토 지적).
           () => executeApprovedTool(toolName, args, user?.role)

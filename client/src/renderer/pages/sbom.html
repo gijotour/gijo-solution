@@ -202,7 +202,7 @@ tr:last-child td{border-bottom:none;}
 
 <div class="panel" id="aibomPanel" style="display:none;margin-bottom:16px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-    <div style="font-size:14.5px;font-weight:800;color:#fff">AI-BOM 구성 명세 — <span id="aibomAssetName" style="color:var(--blue-light)"></span></div>
+    <div style="font-size:14.5px;font-weight:800;color:var(--text-strong, #fff)">AI-BOM 구성 명세 — <span id="aibomAssetName" style="color:var(--blue-light)"></span></div>
     <div style="display:flex;gap:8px">
       <button class="btn-ghost" id="aibomExportBtn" title="CycloneDX ML-BOM 표준 문서로 내보내기">📦 AI-BOM 내보내기</button>
       <button class="btn-primary" id="aibomSaveBtn">저장</button>
@@ -345,7 +345,7 @@ tr:last-child td{border-bottom:none;}
       const codes = threatsByArea[area.key] || [];
       const threatTag = codes.length ? `<div style="font-size:11.75px;color:var(--muted);margin-bottom:6px">관련 KISA 위협: ${codes.map((c) => `<span style="background:rgba(226,72,61,0.14);color:#f5928a;border-radius:4px;padding:0 5px;margin-right:2px;font-weight:700">${c}</span>`).join("")}</div>` : "";
       return `<div style="background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
-        <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:2px">${area.label}</div>
+        <div style="font-size:13px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:2px">${area.label}</div>
         <div style="font-size:12px;color:var(--amber);margin-bottom:6px">🛡 ${area.purpose}</div>
         ${threatTag}
         ${fields}
@@ -380,7 +380,7 @@ tr:last-child td{border-bottom:none;}
     const meta = rob.score == null ? "아직 점검하지 않았습니다."
       : (rob.vulnerable + "/" + rob.total + " 취약 · " + new Date(rob.ranAt).toLocaleString("ko-KR") + (rob.modelId ? " · " + rob.modelId : ""));
     card.innerHTML =
-      '<div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:2px">🛡 AI 견고성 (레드팀)</div>' +
+      '<div style="font-size:13px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:2px">🛡 AI 견고성 (레드팀)</div>' +
       '<div style="font-size:12px;color:var(--amber);margin-bottom:10px">배포 모델이 프롬프트 인젝션·탈옥에 얼마나 견고한지 실측 — 결과가 이 자산 AI-BOM에 기록됩니다</div>' +
       '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
         '<div>' + scoreHtml + '<div style="font-size:12px;font-weight:700;color:' + color + '">' + word + '</div></div>' +
@@ -478,7 +478,7 @@ tr:last-child td{border-bottom:none;}
         const areas = m.matchedAreas.map((a) => AREA[a] || a).join("·");
         const owasp = m.owasp && m.owasp[0] ? m.owasp[0].split(" ")[0] : "";
         return `<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px">
-          <span style="font-weight:800;color:#fff;width:34px;flex:0 0 auto">${m.code}</span>
+          <span style="font-weight:800;color:var(--text-strong, #fff);width:34px;flex:0 0 auto">${m.code}</span>
           <span style="flex:1;color:var(--text)">${esc(m.name)} <span style="color:var(--muted-2);font-size:12px">· ${areas}${owasp ? " · " + esc(owasp) : ""}</span></span>
           <span style="font-size:11.75px;font-weight:800;color:${sm.color};background:${sm.bg};border-radius:5px;padding:2px 8px;flex:0 0 auto">${sm.label}</span>
         </div>`;
@@ -486,7 +486,7 @@ tr:last-child td{border-bottom:none;}
       box.innerHTML =
         `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--panel-2);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:6px">
-            <div style="font-size:12.5px;font-weight:800;color:#fff">🎯 AI 위협 노출 매칭 <span style="font-size:12px;color:var(--muted-2);font-weight:600">(AI-BOM 구성 기반)</span></div>
+            <div style="font-size:12.5px;font-weight:800;color:var(--text-strong, #fff)">🎯 AI 위협 노출 매칭 <span style="font-size:12px;color:var(--muted-2);font-weight:600">(AI-BOM 구성 기반)</span></div>
             <div style="font-size:12.25px;color:var(--muted)">노출 ${S.relevant} · <span style="color:#7ee0b8">대응 ${S.covered}</span> · <span style="color:#f7c777">부분 ${S.partial}</span> · <span style="color:#f5928a">미대응 ${S.open}</span></div>
           </div>
           ${rows}
@@ -800,7 +800,7 @@ tr:last-child td{border-bottom:none;}
       document.getElementById("shadowAiList").innerHTML = r.shadow.map((s) => {
         const tag = s.severity === "high" ? '<span style="color:#f5928a;font-weight:800">⚠사용 중</span>' : '<span style="color:var(--muted-2)">배치만</span>';
         const used = s.usedByAgents && s.usedByAgents.length ? " · 사용: " + esc(s.usedByAgents.join(", ")) : "";
-        return "• " + tag + ' <b style="color:#fff">' + esc(s.modelId) + '</b> <span style="color:var(--muted-2)">(' + esc((s.sources || []).join(", ")) + used + ")</span>";
+        return "• " + tag + ' <b style="color:var(--text-strong, #fff)">' + esc(s.modelId) + '</b> <span style="color:var(--muted-2)">(' + esc((s.sources || []).join(", ")) + used + ")</span>";
       }).join("<br>");
       document.getElementById("shadowAiBanner").style.display = "block";
     } catch (e) { /* 미지원·조회 실패는 조용히 — 배너만 안 뜬다 */ }

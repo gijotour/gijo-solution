@@ -179,7 +179,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .verify-deny{background:rgba(226,72,61,.1);border:1px solid rgba(226,72,61,.4);border-radius:9px;padding:9px 12px;font-size:12.25px;color:#f5a8a1;line-height:1.7;white-space:pre-line;margin-top:8px;}
   .fchip{font-size:12.25px;padding:5px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;user-select:none;}
   .fchip b{margin-left:3px;color:var(--text);font-weight:800;}
-  .fchip.on{background:var(--blue);border-color:var(--blue);color:#fff;}.fchip.on b{color:var(--text-strong, #fff);}
+  .fchip.on{background:var(--blue);border-color:var(--blue);color:#fff;}.fchip.on b{color:#fff;} /* 부모가 채움(--blue) — 자식 b도 흰 글자 유지(검토관 중4: 스윕이 블록만 봐서 건수가 잉크로 바뀌었었다) */
   .rv-rows{max-height:640px;overflow-y:auto;}
   .rv-row{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:3px;}
   .rv-row:hover{background:var(--panel);}

@@ -372,7 +372,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
           return `<div data-sel="${esc(m.finding.target)}" title="누르면 대화창에 「이거」로 담깁니다" style="background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span class="badge ${sb.cls}">${sb.label}</span>
-              <span style="font-size:12.5px;font-weight:700;color:#fff;">${esc(m.finding.target)}</span>
+              <span style="font-size:12.5px;font-weight:700;color:var(--text-strong, #fff);">${esc(m.finding.target)}</span>
               <span style="font-size:12.25px;color:var(--muted-2);margin-left:auto;">${esc(m.finding.source)}</span>
             </div>
             <div style="font-size:12.25px;color:var(--muted);margin:6px 0 5px;">${esc(m.finding.type)}</div>

@@ -162,9 +162,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const opts = STATUS_OPTS.map((o) => `<option value="${o.v}" ${t.status === o.v ? "selected" : ""}>${o.label}</option>`).join("");
     const isOpen = expanded.has(t.code);
     return `<div class="cpl-row" style="border-bottom:1px solid var(--border);padding:12px 0;display:grid;grid-template-columns:64px 1fr 150px;gap:12px;align-items:start;">
-      <div><span data-toggle="${t.code}" style="font-weight:800;color:#fff;font-size:13px;cursor:pointer;user-select:none;">${isOpen ? "▾" : "▸"} ${t.code}</span></div>
+      <div><span data-toggle="${t.code}" style="font-weight:800;color:var(--text-strong, #fff);font-size:13px;cursor:pointer;user-select:none;">${isOpen ? "▾" : "▸"} ${t.code}</span></div>
       <div>
-        <div data-toggle="${t.code}" style="font-weight:700;color:#fff;font-size:13px;margin-bottom:4px;cursor:pointer;">${esc(t.name)} ${areas}</div>
+        <div data-toggle="${t.code}" style="font-weight:700;color:var(--text-strong, #fff);font-size:13px;margin-bottom:4px;cursor:pointer;">${esc(t.name)} ${areas}</div>
         <div style="font-size:12.25px;color:var(--muted);line-height:1.9;">
           ${t.owasp.length ? `<b style="color:var(--muted-2)">OWASP</b> ${fwBadges(t.owasp, "rgba(139,124,240,0.15)")}` : ""}
           ${t.nist.length ? `<b style="color:var(--muted-2)">NIST</b> ${fwBadges(t.nist, "rgba(30,185,128,0.13)")}` : ""}

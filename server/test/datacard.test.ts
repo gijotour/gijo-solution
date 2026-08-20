@@ -14,6 +14,17 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
+// 내 문서 정직 가드(1b)의 검색을 시험이 조종한다 — 실 LanceDB는 시험 env에서 차원 오류로
+// 던지는데, 가드는 「검색 실패=가드 접음」이라(검토관 중3) 그 상태로는 발동·통과·실패를
+// **구분해 검증할 수 없다**(검토관 중8). 기본값은 빈 결과(개인 조각 0건).
+const gradedMock = vi.hoisted(() => ({
+  impl: async () => ({ chunks: [] as string[], scored: [] as { text: string; distance: number; documentId: string }[], 약한근거만: false }),
+}));
+vi.mock("../src/engine/memory", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../src/engine/memory")>();
+  return { ...orig, queryMemoryGraded: vi.fn((...a: unknown[]) => gradedMock.impl(...(a as []))) };
+});
+
 import { isHardeningStatusAsk, hardeningStatusAnswer, isAssetStatusAsk, assetStatusAnswer } from "../src/engine/datacard";
 import {
   createTarget, createSchedule, runDueSchedules, resetHardeningForTests,
@@ -289,14 +300,54 @@ describe("화면 이름 → 현황 카드 (사장님 실측 — 「자산고르�
     expect(r.output).not.toContain("수정 중"); // 날조된 상태 문구가 아니다
   });
 
-  it("★ 내 문서 겨냥 문장 — 개인 조각 0건이면 지어내지 않고 「못 찾았다」로 (QA 결함 1b)", async () => {
+  it("★ 내 문서 겨냥 문장 — 내 조각 0건이면 지어내지 않고 「없습니다」로 (QA 결함 1b)", async () => {
     const { dispatchInstruction } = await import("../src/engine/dispatcher");
     const r = await dispatchInstruction("내 문서에 서버 실행 오류 해결법 있어?", undefined, undefined, undefined, true);
-    expect(r.output).toContain("내 문서에서 찾지 못했습니다");
+    expect(r.output).toContain("내 문서에 없습니다");
     expect(r.sources).toEqual([]); // 무관 회사 문서가 근거 배지로 붙지 않는다
-    // 쓰기 지시는 이 가드가 삼키지 않는다(찾기가 아니다)
-    const w = await dispatchInstruction("이 내용 내 문서에 저장해줘", undefined, undefined, undefined, true);
-    expect(String(w.output)).not.toContain("내 문서에서 찾지 못했습니다");
+  });
+
+  it("★ 1b 가드가 삼키면 안 되는 것들 — 쓰기·열기·사용법·「사내 문서」 (검토관 상1·중1)", async () => {
+    const { dispatchInstruction } = await import("../src/engine/dispatcher");
+    for (const 지시 of [
+      "이 내용 내 문서에 저장해줘",            // 쓰기
+      "내 문서 열어줘",                        // 열기
+      "내 문서 화면 어떻게 써?",               // 사용법
+      "사내 문서에서 개인정보 규정 찾아줘",     // 「사내 문서」 — 회사 지식 질의(상1 실사고)
+      "우리 사내 문서에 망분리 규정 있어?",
+    ]) {
+      const r = await dispatchInstruction(지시, undefined, undefined, undefined, true);
+      expect(String(r.output), 지시).not.toContain("내 문서에 없습니다");
+    }
+  });
+
+  it("★ 1b 통과 분기 — 내 소유 개인 조각이 잡히면 가드가 비켜선다 (검토관 중8)", async () => {
+    const { db } = await import("../src/db");
+    db.prepare("DELETE FROM personal_docs WHERE id = 'dc-guard-1'").run();
+    db.prepare("INSERT INTO personal_docs (id, userId, title, body, ragOptIn, createdAt, updatedAt) VALUES ('dc-guard-1','u-guard','오류 해결','본문',1,1,1)").run();
+    gradedMock.impl = async () => ({ chunks: ["조각"], scored: [{ text: "조각", distance: 0.3, documentId: "personal:dc-guard-1" }], 약한근거만: false });
+    try {
+      const { dispatchInstruction } = await import("../src/engine/dispatcher");
+      const 내것 = await dispatchInstruction("내 문서에 서버 실행 오류 해결법 있어?", undefined, undefined, undefined, true, undefined, { userId: "u-guard" });
+      expect(String(내것.output)).not.toContain("내 문서에 없습니다"); // 일반 경로로 — 그 조각이 근거가 된다
+      // 남의(다른 사람 소유) 개인 조각은 「내 것」이 아니다 — 접두사만 보면 남의 공유 문서로 열린다(중2)
+      const 남의것 = await dispatchInstruction("내 문서에 서버 실행 오류 해결법 있어?", undefined, undefined, undefined, true, undefined, { userId: "u-other" });
+      expect(String(남의것.output)).toContain("내 문서에 없습니다");
+    } finally {
+      gradedMock.impl = async () => ({ chunks: [], scored: [], 약한근거만: false });
+      db.prepare("DELETE FROM personal_docs WHERE id = 'dc-guard-1'").run();
+    }
+  });
+
+  it("★ 1b 검색 장애 ≠ 부재 — 검색이 죽으면 가드를 접고 「없습니다」를 말하지 않는다 (검토관 중3)", async () => {
+    gradedMock.impl = async () => { throw new Error("임베딩 서버 다운"); };
+    try {
+      const { dispatchInstruction } = await import("../src/engine/dispatcher");
+      const r = await dispatchInstruction("내 문서에 서버 실행 오류 해결법 있어?", undefined, undefined, undefined, true);
+      expect(String(r.output)).not.toContain("내 문서에 없습니다"); // 장애를 부재 확정으로 바꿔 말하지 않는다
+    } finally {
+      gradedMock.impl = async () => ({ chunks: [], scored: [], 약한근거만: false });
+    }
   });
 
   it("★ dispatcher 경유 — 「자산고르기」가 일반론이 아니라 자산 카드로 온다", async () => {

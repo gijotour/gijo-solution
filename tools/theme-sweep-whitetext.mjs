@@ -33,11 +33,13 @@ const WRITE = process.argv.includes("--write");
 // 로그인/설치(별도 팔레트) · 팀 사무실(canvas — ctx.fillStyle은 var()를 조용히 무시한다).
 const EXCLUDE = /^(lite-|login\.html$|setup\.html$|office\.html$)/;
 // 진한 채움 판정 — 이 배경 위 흰 글자는 옳다(두 테마 모두).
-const FILL = /background(?:-color)?\s*:\s*(var\(--(?:g-)?(?:blue|red|teal|amber|purple|green|navy)\b|#[0-9a-fA-F]{3,8}\b|linear-gradient)/;
+// rgba(0,…)도 채움이다(검은 반투명 원 — 검토관 하6: docbox .shot .x가 잉크로 바뀌어 있었다).
+const FILL = /background(?:-color)?\s*:\s*(var\(--(?:g-)?(?:blue|red|teal|amber|purple|green|navy)\b|#[0-9a-fA-F]{3,8}\b|linear-gradient|rgba\(\s*0\s*,)/;
 const WHITE = /(?<![-\w])color\s*:\s*#fff\b(?!f)/g; // color:#fff만 — border-color·#fffa 등 제외
-// CSS에 배경이 없어도 **JS가 나중에 채움을 칠하는** 선택자 — 블록 판정이 원리상 못 본다.
-// (.hm-cell = analysis 히트맵 칸, JS가 심각도색을 inline으로 칠한다 — 흰 글자가 맞다)
-const JS_FILL_SELECTOR = /\.hm-cell\b/;
+// 블록 판정이 원리상 못 보는 채움 — ① JS가 나중에 배경을 칠하는 선택자(.hm-cell = analysis
+// 히트맵, 심각도색 inline) ② **부모 규칙이 채움**인 자식 선택자(.fchip.on b — 검토관 중4:
+// 파란 칩 위 건수가 잉크로 바뀌어 안 읽혔다). 둘 다 흰 글자가 맞다.
+const JS_FILL_SELECTOR = /\.hm-cell\b|\.fchip\.on b\b/;
 
 const targets = [
   ...fs.readdirSync(pages).filter((f) => f.endsWith(".html") && !EXCLUDE.test(f)),
@@ -71,6 +73,30 @@ for (const f of targets) {
     });
     out = out.slice(0, s) + css + out.slice(e);
   }
+  // ── 인라인 패스(검토관 2026-08-20 상3) — <style> 밖(마크업 style= 속성·JS cssText 문자열)에
+  //    25곳이 남아 「잔존=보류」 초록이 거짓 안심이었다(검사 모집단=치환 모집단 함정).
+  //    판정 단위는 **그 줄**: 같은 줄에 채움이 있으면 보류(한 줄에 두 요소가 섞이면 보수적으로
+  //    남긴다), 없으면 치환. .html의 <style> 구간은 위에서 이미 처리됐으니 건너뛴다.
+  if (!f.endsWith(".css")) {
+    const styleSpans = [];
+    for (const m of out.matchAll(/<style[^>]*>[\s\S]*?<\/style>/gi)) styleSpans.push([m.index, m.index + m[0].length]);
+    const 스타일안 = (i) => styleSpans.some(([s, e]) => i >= s && i < e);
+    const lines = out.split("\n");
+    let pos = 0;
+    for (let li = 0; li < lines.length; li++) {
+      const line = lines[li];
+      if (WHITE.test(line)) {
+        WHITE.lastIndex = 0;
+        if (!스타일안(pos)) {
+          if (FILL.test(line) || JS_FILL_SELECTOR.test(line)) 보류 += (line.match(WHITE) || []).length;
+          else { n += (line.match(WHITE) || []).length; lines[li] = line.replace(WHITE, "color:var(--text-strong, #fff)"); }
+        }
+      }
+      WHITE.lastIndex = 0;
+      pos += line.length + 1;
+    }
+    out = lines.join("\n");
+  }
   if (!n && !보류) continue;
   총치환 += n; 총보류 += 보류;
   보고.push(`${f.padEnd(24)} 치환 ${String(n).padStart(3)} · 채움보류 ${보류}`);
@@ -79,24 +105,19 @@ for (const f of targets) {
 console.log(보고.join("\n"));
 console.log(`\n합계: 치환 ${총치환} · 채움 위 보류 ${총보류} ${WRITE ? "(반영됨)" : "(드라이런 — --write로 반영)"}`);
 
-// 소리 나는 검증 — 반영 후 잔존 = 보류 수와 정확히 같아야 한다(치환이 조용히 빠지면 여기서 잡힌다)
+// 소리 나는 검증 — 반영 후 잔존 = 보류 수와 정확히 같아야 한다(치환이 조용히 빠지면 여기서 잡힌다).
+// ⚠ 검사 모집단은 **파일 전체**다 — <style> 안만 다시 세면 치환 모집단과 같아져 인라인 잔존이
+//   초록 뒤에 숨는다(검토관 2026-08-20 상3이 정확히 그 함정을 잡았다).
 if (WRITE) {
   let 잔존 = 0;
   for (const f of targets) {
     const full = path.join(pages, f);
     if (!fs.existsSync(full)) continue;
-    const src = fs.readFileSync(full, "utf8");
-    const spans = [];
-    if (f.endsWith(".css")) spans.push([0, src.length]);
-    else for (const m of src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)) spans.push(m[1]);
-    for (const sp of spans) {
-      const css = typeof sp === "string" ? sp : src.slice(sp[0], sp[1]);
-      잔존 += (css.match(WHITE) || []).length;
-    }
+    잔존 += (fs.readFileSync(full, "utf8").match(WHITE) || []).length;
   }
   if (잔존 !== 총보류) {
     console.error(`✗ 검증 실패: 잔존 color:#fff ${잔존} ≠ 보류 ${총보류} — 치환이 샜다`);
     process.exit(1);
   }
-  console.log(`✓ 검증: 잔존 ${잔존} = 채움 보류 ${총보류} (전부 의도된 자리)`);
+  console.log(`✓ 검증: 잔존 ${잔존} = 채움 보류 ${총보류} (전부 의도된 자리, 파일 전체 계수)`);
 }
