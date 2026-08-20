@@ -42,6 +42,13 @@
     return Object.prototype.hasOwnProperty.call(사전, k) ? 사전[k] : (k || 없을때 || "-");
   };
 
+  // 「미배정」 판정은 **한 곳에서만** 한다(병렬 검토 중2 — 판 배지·하위 목록·실화면이 서로
+  // 다른 수를 가리키고 있었다). 원천은 서버 approvals.ts:253이고, 실화면 approvals.html:462도
+  // 같은 식이다: 완료·반려·**위험수용**은 담당자를 안 붙이는 것이 정상이라 세지 않는다.
+  var 미배정인가 = function (x) {
+    return !x.assignee && x.status !== "approved" && x.status !== "rejected" && x.status !== "accepted";
+  };
+
   var 그룹 = {
     // ① 발견·수집
     discover: [
@@ -196,10 +203,12 @@
               //   아예 없다. 처음엔 그것들을 읽어 첫 열이 전부 「-」였다: 검토관 상1, 이 저장소
               //   필드명 오인 5번째). 실화면 approvals.html:468도 finding.finding_type + assetName을 쓴다.
               // 빈 담당은 「미배정」으로 적는다 — "-"로 두면 「담당이 있는데 못 읽었다」와 구분이 안 된다.
+              // 담당 칸도 배지와 **같은 판정**을 쓴다 — 완료·반려·위험수용 건까지 「미배정」이라
+              // 적으면 위 배지(미배정 N)와 아래 목록이 다른 말을 한다(병렬 검토 중2).
               rows: rows.map(function (x) {
                 var f = x.finding || {};
                 return [String(f.finding_type || x.findingKey || "-"), String(x.assetName || x.assetId || "-"),
-                  String(x.assignee || "미배정"), 말(AP_ST_KO, x.status)];
+                  미배정인가(x) ? "미배정" : (x.assignee || "-"), 말(AP_ST_KO, x.status)];
               }),
             };
           });
@@ -208,7 +217,8 @@
         return window.gijo.listApprovals().then(function (r) {
           var rows = (r && r.reviews) || r || [];
           var 셈 = function (s) { return rows.filter(function (x) { return x.status === s; }).length; };
-          var 미배정 = rows.filter(function (x) { return !x.assignee && x.status !== "approved" && x.status !== "rejected"; }).length;
+          // 위험수용(accepted)이 빠져 있어 실화면·서버와 수가 어긋났다(병렬 검토 중2) — 헬퍼로 통일.
+          var 미배정 = rows.filter(미배정인가).length;
           return {
             badge: 미배정 ? { text: "미배정 " + n(미배정), color: A } : null,
             segments: [
@@ -262,10 +272,14 @@
       //   장비 점검 자료를 먼저 보는 역할이라 이 판의 주인이 맞다(검토관 하17 — 근거가 있는데
       //   빠뜨렸던 자리. 근거 없는 판에 다는 것만큼이나 있는 근거를 빠뜨리는 것도 들쭉날쭉이다).
       { id: "hardening", title: "🛡 보안설정 점검", page: "hardening.html", agents: ["해석"], load: function () {
+        // ⚠ 실패를 삼켜 []로 바꾸면 화면은 그려지지만 **0이 사실인 척**한다. 못 본 것은
+        //   못 봤다고 남긴다(확인못함) — 현황판이 그 표식을 보고 「값이 바뀌었다」로 오판하지
+        //   않고 기준선도 안 덮는다(병렬 검토 중1: 서버 재시작만으로 거짓 「바뀜 4」가 떴다).
+        var 못함 = [];
         return Promise.all([
-          window.gijo.hardeningTargets.list().catch(function () { return []; }),
-          window.gijo.hardeningSchedules.list().catch(function () { return []; }),
-          window.gijo.hardeningRuns(undefined, 300).catch(function () { return []; }),
+          window.gijo.hardeningTargets.list().catch(function () { 못함.push("장비 목록"); return []; }),
+          window.gijo.hardeningSchedules.list().catch(function () { 못함.push("점검 일정"); return []; }),
+          window.gijo.hardeningRuns(undefined, 300).catch(function () { 못함.push("점검 이력"); return []; }),
         ]).then(function (r) {
           // 응답은 껍데기에 담겨 온다({targets}/{schedules}/{runs}) — 배열로 벗겨 쓴다.
           var targets = (r[0] && r[0].targets) || r[0] || [], schedules = (r[1] && r[1].schedules) || r[1] || [], runs = (r[2] && r[2].runs) || r[2] || [];
@@ -283,6 +297,7 @@
               ["평균 준수율", 총 ? Math.round((합 / 총) * 100) + "%" : "-"],
             ],
             foot: vals.length ? "점검 이력 " + n(runs.length) + "회" : "아직 점검 이력이 없습니다",
+            확인못함: 못함.length ? 못함 : undefined,
           };
         });
       } },
@@ -344,9 +359,10 @@
     // 숫자는 각 화면과 같은 API. 데이터가 없어도 판 모양은 같다(0은 0으로).
     aiops: [
       { id: "team", title: "🤖 AI 팀", page: "agent.html", load: function () {
+        var 못함 = [];   // 못 본 것은 못 봤다고 남긴다(병렬 검토 중1 — 0을 사실인 척하지 않는다)
         return Promise.all([
-          window.gijo.listAgents().catch(function () { return []; }),
-          window.gijo.listAdapters().catch(function () { return { adapters: [] }; }),
+          window.gijo.listAgents().catch(function () { 못함.push("팀원 목록"); return []; }),
+          window.gijo.listAdapters().catch(function () { 못함.push("어댑터 목록"); return { adapters: [] }; }),
         ]).then(function (r) {
           var agents = r[0] || [];
           var adapters = (r[1] && r[1].adapters) || [];
@@ -362,14 +378,16 @@
               ["전문가 어댑터", 채택 + "채택 · " + 후보 + "후보"],
             ],
             foot: "모델 교체는 설정 > 서버·AI",
+            확인못함: 못함.length ? 못함 : undefined,
           };
         });
       } },
       // agents: analysis(우선) — 역할 문장이 「AI 지식·모델 관리」다(agents.ts:69).
       { id: "knowledge", title: "📚 지식", page: "memory.html", agents: ["우선"], load: function () {
+        var 못함 = [];   // 못 본 것은 못 봤다고 남긴다(병렬 검토 중1)
         return Promise.all([
-          window.gijo.listMemoryDocuments().catch(function () { return []; }),
-          window.gijo.ontologyStats().catch(function () { return null; }),
+          window.gijo.listMemoryDocuments().catch(function () { 못함.push("문서 목록"); return []; }),
+          window.gijo.ontologyStats().catch(function () { 못함.push("온톨로지 통계"); return null; }),
         ]).then(function (r) {
           var docs = r[0] || [];
           var 오늘 = new Date().toISOString().slice(0, 10);
@@ -381,6 +399,7 @@
               ["오늘 반입", String(오늘반입)],
             ],
             foot: "새 문서는 대화창 ＋로 올립니다",
+            확인못함: 못함.length ? 못함 : undefined,
           };
         });
       } },
@@ -408,11 +427,12 @@
         // ⚠ 「쓰기 결재 대기」에 조치·승인 검토 대장을 갖다 쓰면 안 된다(2026-08-09 실측 4,830):
         //   그 대장은 스캔 발견 건 전체(스캔 오류 포함)라 결재판과 전혀 다른 숫자다.
         //   여기는 **정확히 셀 수 있는 것만** 싣는다 — 팀·감독 실측·가드레일·모의 공격.
+        var 못함 = [];   // 못 본 것은 못 봤다고 남긴다(병렬 검토 중1)
         return Promise.all([
-          window.gijo.guardrailStatus().catch(function () { return null; }),
-          window.gijo.lastRedTeam().catch(function () { return null; }),
-          window.gijo.listAgents ? window.gijo.listAgents().catch(function () { return null; }) : null,
-          window.gijo.aiteamSupervision ? window.gijo.aiteamSupervision(1).catch(function () { return null; }) : null,
+          window.gijo.guardrailStatus().catch(function () { 못함.push("가드레일 상태"); return null; }),
+          window.gijo.lastRedTeam().catch(function () { 못함.push("모의 공격 결과"); return null; }),
+          window.gijo.listAgents ? window.gijo.listAgents().catch(function () { 못함.push("팀원 목록"); return null; }) : null,
+          window.gijo.aiteamSupervision ? window.gijo.aiteamSupervision(1).catch(function () { 못함.push("감독 일지"); return null; }) : null,
         ]).then(function (r) {
           var g = r[0], rt = r[1], ags = r[2], sup = r[3];
           var MODE = { off: "꺼짐", flag: "기록만", block: "차단" };
@@ -426,6 +446,7 @@
               ["가드레일(기동 후)", g ? (MODE[g.mode] || g.mode) + " · 막음 " + (g.blockedCount || 0) : "-"],
               ["모의 공격 견고성", rt && rt.robustnessScore != null ? rt.robustnessScore + "/100" : "-"],
             ],
+            확인못함: 못함.length ? 못함 : undefined,
             foot: "쓰기 지시는 항상 결재판을 거칩니다",
           };
         });
