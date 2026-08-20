@@ -225,8 +225,18 @@
   // ── 하위 리스트(엑셀형) — 판이 rows()를 가진 경우에만. 없으면 단추 자체를 안 그린다. ──
   function 목록펴기(r, box) {
     if (!r.판.rows) return;
-    if (box.getAttribute("data-open") === "1") { box.innerHTML = ""; box.removeAttribute("data-open"); return; }
+    var cell = box.closest ? box.closest(".pv-cell") : null;
+    if (box.getAttribute("data-open") === "1") {
+      box.innerHTML = ""; box.removeAttribute("data-open");
+      if (cell) cell.style.gridColumn = "";        // 다시 한 칸으로
+      return;
+    }
     box.setAttribute("data-open", "1");
+    // ⚠⚠ **펼친 동안은 줄 전체를 쓴다**(2026-08-20 병렬 검토 상2). 타일 한 칸은 214px인데
+    //   테두리·여백을 빼면 안쪽이 188px뿐이라, 고정 폭 열들(심각도·KEV 등)이 그것을 다 먹고
+    //   **1열(무엇)이 0~52px로 무너졌다** — 7판 중 6판이 55px 미만, 2판은 아예 0px였다.
+    //   열 규약의 「1열 무엇 필수」가 화면에서 사라지는 것이라, 목록에 닿아도 무엇인지 못 읽는다.
+    if (cell) cell.style.gridColumn = "1 / -1";
     box.innerHTML = '<div class="pv-empty">불러오는 중…</div>';
     Promise.resolve()
       .then(function () { return r.판.rows(); })
@@ -301,7 +311,20 @@
         return (b.movedAt || 0) - (a.movedAt || 0);
       });
       var 보일것 = opt.compact && opt.limit ? 정렬.slice(0, opt.limit) : 정렬;
+      // ⚠ 다시 그리기 전에 **펼쳐 둔 목록을 기억한다**(2026-08-20 병렬 검토). 90초 갱신이나
+      //   창 복귀가 grid를 통째로 새로 그리면, 보던 목록이 말없이 접히고 줄 전체 폭 설정도
+      //   함께 날아간다 — 읽는 도중에 화면이 스스로 닫히는 셈이다.
+      var 펴둔것 = [];
+      Array.prototype.forEach.call(grid.querySelectorAll('.pv-rows[data-open="1"]'), function (b) {
+        var id = String(b.id || "").replace(/^pvr-/, "");
+        if (id) 펴둔것.push(id);
+      });
       grid.innerHTML = 보일것.map(function (r) { return 타일(r, opt); }).join("");
+      펴둔것.forEach(function (id) {
+        var rr = 결과.find(function (x) { return x.id === id; });
+        var box = grid.querySelector("#pvr-" + id);
+        if (rr && box) 목록펴기(rr, box);   // 같은 판을 다시 펴 준다(새 값으로)
+      });
 
       var 움직인수 = 결과.filter(function (r) { return r.movedAt && (Date.now() - r.movedAt) < 86400000; }).length;
       var 실패수 = 결과.filter(function (r) { return r.실패; }).length;

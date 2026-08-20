@@ -207,6 +207,15 @@
           var r = await window.gijo.approveAgentTool(ap.tool, collect(), ap.instruction || "");
           row.className = "gcw-row bot";
           row.innerHTML = "✅ <b>실행 완료</b> — " + esc(ap.tool) + "<br>" + fmt((r && r.output) || "");
+          // 승인 뒤 「다음 걸음」 — 지휘소(console.js)에만 붙이면 **여기서만 대화가 끊긴다**
+          // (2026-08-20 병렬 검토 상2: 일반 답에는 이미 칩이 붙는데 승인 뒤만 안 붙어
+          //  「같은 위젯인데 어떤 답은 이어지고 어떤 답은 끊기는」 자리가 됐다).
+          try {
+            var P0 = window.gijoChatParts;
+            if (P0 && P0.nextChips && r && r.nextChips && r.nextChips.length) {
+              P0.nextChips(row, r.nextChips, function (q) { send(q); });
+            }
+          } catch (e) { /* 칩을 못 그려도 실행 결과는 남는다 */ }
           if (r && r.undoId) {
             var ub = document.createElement("button");
             ub.className = "gcw-undo";

@@ -1984,8 +1984,14 @@ export function registerDispatcherRoutes(app: Express): void {
         //   새 표를 만드는 것이 아니라 있는 것을 소비한다.
         //   ⚠ 승인 **전**에 칩을 안 붙이는 계약(결재판이 떠 있으면 생략)은 그대로다 — 승인 전과
         //   후는 다른 자리다(승인 전 칩은 결재를 미루게 만든다).
-        const { nextChipsFor: 칩표 } = await import("./nextguide.js");
-        const nextChips = 칩표(toolName);
+        // ⚠ 칩은 **장식**이다 — 이 계산이 실패해도 이미 끝난 쓰기가 실패로 보이면 안 된다
+        //   (2026-08-20 병렬 검토: 같은 try 안이라 여기서 예외가 나면 catch가 감사 로그에
+        //   result:"error"를 남기고 400을 돌려준다 — 실행은 됐는데 사람에겐 실패로 보인다).
+        let nextChips: string[] = [];
+        try {
+          const { nextChipsFor: 칩표 } = await import("./nextguide.js");
+          nextChips = 칩표(toolName);
+        } catch { /* 칩을 못 구해도 실행 결과는 그대로 돌려준다 */ }
         res.json({ output, undoId, task: updated.find((t) => t.id === task.id) ?? task, ...(nextChips.length ? { nextChips } : {}) });
       } catch (err) {
         resetAgentToDefault("orchestrator");

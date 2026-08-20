@@ -123,11 +123,13 @@
           var CTI_KO = { critical: "긴급", warning: "주의", info: "정보" };
           return window.gijo.listCtiFindings().then(function (fs) {
             return {
-              cols: ["대상", "심각도", "출처"],
-              grid: "1fr 58px 96px",
+              // 열 규약: 1열 무엇 · 2열 어디/누구 · 3열 등급/상태 — 처음엔 2·3열이 뒤바뀌어
+              // 넓은 폭(96px)이 3열에 가면서 1열이 눌렸다(2026-08-20 병렬 검토 중).
+              cols: ["대상", "출처", "심각도"],
+              grid: "1fr 96px 58px",
               // 서버가 이미 최신순으로 준다(cti.ts:158 ORDER BY detectedAt DESC) — 다시 정렬하지 않는다.
               rows: (fs || []).map(function (f) {
-                return [String(f.target || "-"), 말(CTI_KO, f.severity), String(f.source || "-")];
+                return [String(f.target || "-"), String(f.source || "-"), 말(CTI_KO, f.severity)];
               }),
             };
           });
@@ -323,22 +325,33 @@
         // 명령창은 "지금 몇 건"이 아니라 **최근에 무엇을 했나**가 요약이다(감사 기록 기준).
         // ⚠ 차단은 kind가 **"block"**으로 남는다(audit.ts:15) — 여기서 "cli"만 불러 놓고
         //   그 안에서 차단을 세고 있어 **영원히 0**이었다(2026-08-20 설계관 적발).
-        //   실행(cli)과 차단(block)을 각각 불러 센다.
-        return Promise.all([
-          window.gijo.listAudit("cli", 200),
-          window.gijo.listAudit("block", 200).catch(function () { return null; }),
-        ]).then(function (rr) {
-          var r = rr[0], rb = rr[1];
-          var list = (r && r.entries) || r || [];
-          var blocks = (rb && rb.entries) || rb || [];
+        //   ⚠⚠ **응답 배열을 세지 않는다**(2026-08-20 병렬 검토 상1). 처음엔 block을 따로
+        //   불러 `blocks.length`를 셌는데, 그 호출은 LIMIT 200이라 차단이 200건을 넘는 순간
+        //   **영원히 200**으로 굳는다 — 「항상 0」이 「항상 200」이 될 뿐 여전히 거짓이고,
+        //   0은 의심이라도 사지만 200은 실측값처럼 읽혀 보고서에 실린다. 저장소 자체 실측이
+        //   「하루 QA·점검만으로 차단 138건」(audit.ts:97)이고 보관은 3년이라 이틀이면 넘는다.
+        //   정답은 **같은 응답 안에 이미 있다**: /api/audit는 kind 필터와 무관하게
+        //   summary{total, byKind}(audit.ts:82-88, GROUP BY 전수)를 함께 준다. 호출도 하나로 준다.
+        return window.gijo.listAudit("cli", 200).then(function (r) {
+          var list = (r && r.entries) || [];
+          var s = r && r.summary;
+          var byKind = (s && s.byKind) || {};
           var 하루 = Date.now() - 86400000;
           var 최근 = list.filter(function (e) { return (e.at || e.createdAt || 0) >= 하루; }).length;
-          var 차단 = blocks.length;
+          var 차단 = s ? (byKind.block || 0) : null;          // 못 구하면 0이 아니라 "-"
+          var 보관 = s && s.total != null ? s.total : null;
           return {
             rows: [
-              ["최근 24시간 실행", n(최근)],
-              ["차단된 위험 명령", n(차단), 차단 ? A : ""],
-              ["기록 보관", n(list.length)],
+              // 상한(200)에 닿았으면 「+」로 상한임을 밝힌다 — 잘린 수를 정확한 수인 척하지 않는다
+              // (같은 파일 작업 기록 판이 이미 지키는 규칙: "상한을 총계처럼 말하면 거짓이다").
+              ["최근 24시간 실행", list.length >= 200 ? n(최근) + "+" : n(최근)],
+              // ⚠ 라벨을 **사실대로** 적는다(2026-08-20 병렬 검토 상3). kind:"block"은 CLI 차단만이
+              //   아니라 가드레일·에어갭·게이트웨이·업로드 정화 등 **9개 하위체계**가 함께 쓴다
+              //   (server/src/engine 전수: airgap·gateway·guardrail·knowledgebundle·memory·
+              //   pasteddata·ragsanitize·remotellm·report). 그걸 「차단된 위험 명령」이라 부르면
+              //   명령창에서 그만큼 막힌 것처럼 읽혀 거짓이 된다 — 세는 값은 그대로 두고 이름을 맞춘다.
+              ["안전장치가 막은 것(전체)", 차단 == null ? "-" : n(차단), 차단 ? A : ""],
+              ["기록 보관", 보관 == null ? "-" : n(보관)],
             ],
             foot: "허용 목록 밖 명령은 실행 전에 막습니다",
           };

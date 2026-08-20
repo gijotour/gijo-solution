@@ -99,10 +99,14 @@ describe("배선 감시 — 부품·호출 두 자리", () => {
     const 승인블록 = d.slice(ap, ap + 9000);
     expect(승인블록, "승인 응답이 nextChips를 안 싣는다 — 표에 적힌 칩이 영영 발화되지 않는다")
       .toMatch(/nextChips/);
-    const c = readFileSync(join(pages, "console.js"), "utf8");
-    const 승인후 = c.indexOf("approveAgentTool(ap.tool");
-    expect(승인후).toBeGreaterThan(0);
-    expect(c.slice(승인후, 승인후 + 1500), "대화창이 승인 응답의 nextChips를 안 그린다")
-      .toMatch(/nextChips/);
+    // ⚠ **두 곳 다** 본다(2026-08-20 병렬 검토 중: 감시가 console.js만 봐서 반쪽 수리를
+    //   계약으로 굳힐 뻔했다). 승인 창은 지휘소와 화면 안 챗 위젯 둘 다에 있다.
+    for (const f of ["console.js", "chatwidget.js"]) {
+      const c = readFileSync(join(pages, f), "utf8");
+      const 승인후 = c.indexOf("approveAgentTool(ap.tool");
+      expect(승인후, `${f}에 승인 실행 경로가 없다`).toBeGreaterThan(0);
+      expect(c.slice(승인후, 승인후 + 1500), `${f}가 승인 응답의 nextChips를 안 그린다`)
+        .toMatch(/nextChips/);
+    }
   });
 });
