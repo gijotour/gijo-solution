@@ -1415,6 +1415,19 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
   //   권한(role)은 그대로 지킨다 — admin 전용 도구가 강제 분기로 새면 안 된다.
   const available = new Set(listToolsFor(undefined, scope?.role).map((t) => t.name));
 
+  // ★ 「X가 무슨 제품이야?」 — 제품 설명 질문을 explain(사내 근거)으로 못 박는다(2026-08-20).
+  //   평가게이트 explain-product 실측: 강제 규칙이 없어 ⑨ 모델 선택으로 떨어졌고, 소형 모델이
+  //   자산 도구를 골라 「이 자산에서 발견된 1개 취약점 중 즉시 조치 없음」을 답했다(7/26 실사고
+  //   재발 — 운영 리셋 후 자산 1대 상태에서 재현). 이름을 못 뽑으면 강제하지 않는다.
+  if (available.has("explain") && /(무슨|어떤)\s*제품|뭐\s*하는\s*(제품|솔루션|도구)/.test(instruction)) {
+    const m = /^\s*(.{2,60}?)\s*(?:이|가|은|는)?\s*(?:(?:무슨|어떤)\s*제품|뭐\s*하는\s*(?:제품|솔루션|도구))/.exec(instruction);
+    const 이름 = (m?.[1] ?? "").trim();
+    // 대명사·자기 지칭은 제외 — 「이건/우리 제품」은 선택 치환·제품 즉답 등 제 길이 있다.
+    if (이름 && !/^(이|그|저|이건|그건|저건|이거|우리|본|해당)$/.test(이름)) {
+      return { tool: "explain", args: { topic: 이름 } };
+    }
+  }
+
   // 제품 소개자료 등록(추가 기능 2026-08-09) — 소개자료 화면이 "등록은 대화창에서"라고 안내한다.
   // 「제품 소개자료」 낱말 묶음은 다른 영토와 안 겹친다. 이름을 못 뽑으면 강제하지 않는다.
   if (available.has("register_product_intro") && /제품\s*소개\s*자료/.test(instruction) && /(등록|올려|추가)/.test(instruction)) {

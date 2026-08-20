@@ -243,3 +243,25 @@ describe("⑧ qa 경로도 답의 신호를 낸다", () => {
     expect(typeof a.dataHits).toBe(typeof b.dataHits);
   });
 });
+
+// ⑨ 제품 설명 질문 — 평가게이트 explain-product가 잡은 결함(2026-08-20)
+//   「Tenable …이 무슨 제품이야?」가 강제 규칙 없이 모델 선택으로 떨어져 자산 답이 나갔다.
+describe("⑨ 「X가 무슨 제품이야?」는 explain(사내 근거)으로 못 박힌다", () => {
+  it("제품명을 뽑아 explain topic으로", () => {
+    const r = forcedToolFor("Tenable Web App Scanning이 무슨 제품이야?");
+    expect(r?.tool).toBe("explain");
+    expect(r?.args.topic).toBe("Tenable Web App Scanning");
+    const r2 = forcedToolFor("SolidStep 어떤 제품인가요?");
+    expect(r2?.tool).toBe("explain");
+    expect(r2?.args.topic).toBe("SolidStep");
+    const r3 = forcedToolFor("Keyfactor Command 뭐 하는 솔루션이야?");
+    expect(r3?.tool).toBe("explain");
+    expect(r3?.args.topic).toBe("Keyfactor Command");
+  });
+
+  it("오삼킴 금지 — 대명사·우리 제품·무관 문장은 강제하지 않는다", () => {
+    expect(forcedToolFor("이건 무슨 제품이야?"), "대명사는 선택 치환의 영토").toBeNull();
+    expect(forcedToolFor("우리 제품 무슨 기능 있어?"), "「무슨 제품」 인접이 아니다").toBeNull();
+    expect(forcedToolFor("우리가 무슨 제품이야?")?.tool ?? null, "「우리」는 제외").not.toBe("explain");
+  });
+});
