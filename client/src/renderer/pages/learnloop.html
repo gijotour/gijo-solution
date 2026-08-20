@@ -59,7 +59,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .stage-chip{font-size:12.25px;font-weight:700;padding:5px 11px;border-radius:16px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted-2);}
 .stage-chip.active{background:rgba(59,130,246,0.16);border-color:var(--blue);color:var(--blue-light);animation:pulse 1.2s ease-in-out infinite;}
 .stage-chip.passed{background:rgba(30,185,128,0.12);border-color:rgba(30,185,128,0.4);color:var(--teal);}
-.stage-chip.failed{background:rgba(226,72,61,0.12);border-color:#e2483d;color:#f5928a;}
+.stage-chip.failed{background:rgba(226,72,61,0.12);border-color:var(--red);color:#f5928a;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .run-line{font-size:12px;color:var(--muted);min-height:16px;}
 .run-line.err{color:#f5928a;}
@@ -124,7 +124,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .lt-취약점{color:#f5928a;background:rgba(226,72,61,.12);}
 .lt-장비운영{color:var(--blue-light);background:rgba(59,130,246,.13);}
 .lt-사내규정{color:var(--amber);background:rgba(240,160,32,.13);}
-.lt-위협대응{color:var(--purple, #8b7cf0);background:rgba(139,124,240,.14);}
+.lt-위협대응{color:var(--purple, var(--purple));background:rgba(139,124,240,.14);}
 .lt-미분류{color:var(--muted-2);background:rgba(255,255,255,.05);}
 .lc-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:8px;}
 .lc-card.lc-dim{opacity:.75;}
@@ -150,7 +150,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .rate-btn{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--muted);margin-left:auto;}
 .rate-btn+.rate-btn{margin-left:0;}
 .rate-btn.on-up{background:rgba(30,185,128,0.18);border-color:var(--teal);color:var(--teal);}
-.rate-btn.on-down{background:rgba(226,72,61,0.16);border-color:#e2483d;color:#f5928a;}
+.rate-btn.on-down{background:rgba(226,72,61,0.16);border-color:var(--red);color:#f5928a;}
 .rate-btn.del{color:var(--muted-2);}
 
 /* 실행 이력 */
@@ -367,7 +367,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // 주제 띠(2026-08-08 시안 승인) — 클릭한 주제만 후보를 보인다. 재클릭=전체.
   let ltFilter = null;
-  const 주제색 = { 취약점: "#e2483d", 장비운영: "#3b82f6", 사내규정: "#f0a020", 위협대응: "#8b7cf0" };
+  const 주제색 = { 취약점: "var(--red)", 장비운영: "var(--blue)", 사내규정: "var(--amber)", 위협대응: "var(--purple)" };
   async function loadTopicStrip() {
     const el = document.getElementById("ltStrip");
     if (!el) return;

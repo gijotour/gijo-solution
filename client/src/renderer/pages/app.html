@@ -63,12 +63,12 @@
   /* AI 팀 로스터(승인 시안 AI팀_가시화, 2026-08-20) — 깜박임은 전부 서버 실신호(railroster.js) */
   #gijoRail .rr-item{width:38px;height:38px;/* 32px 시안은 #gijoRail button(id 특이도)에 눌려 무효였다(검토관 M1) — 기존 버튼과 38px 통일, 접근성 40px 권장에도 더 가깝다 */border-radius:9px;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:13.5px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;flex:0 0 auto;font-weight:800;}
   #gijoRail .rr-item:hover{border-color:var(--border-strong);color:#fff;}
-  #gijoRail .rr-item.watching{border-color:rgba(95,161,255,.5);color:var(--blue-l,#5fa1ff);box-shadow:inset 0 0 0 1px rgba(95,161,255,.35);/* 테두리만으론 id 규칙에 눌려 안 보였다 — inset 링 추가 */border-color:rgba(95,161,255,.5);color:var(--blue-l,#5fa1ff);}
-  #gijoRail .rr-item.working{border-color:rgba(30,185,128,.6);color:var(--teal,#1eb980);animation:rrbreath 1.6s ease-in-out infinite;}
+  #gijoRail .rr-item.watching{border-color:rgba(95,161,255,.5);color:var(--blue-l,var(--blue-light));box-shadow:inset 0 0 0 1px rgba(95,161,255,.35);/* 테두리만으론 id 규칙에 눌려 안 보였다 — inset 링 추가 */border-color:rgba(95,161,255,.5);color:var(--blue-l,var(--blue-light));}
+  #gijoRail .rr-item.working{border-color:rgba(30,185,128,.6);color:var(--teal);animation:rrbreath 1.6s ease-in-out infinite;}
   @keyframes rrbreath{0%,100%{box-shadow:0 0 0 0 rgba(30,185,128,.35);}50%{box-shadow:0 0 0 5px rgba(30,185,128,0);}}
   #gijoRail .rr-item.flash-search{animation:rrflash .9s ease-out;}
   #gijoRail .rr-item.flash-guard-ok{animation:rrflash .9s ease-out;}
-  #gijoRail .rr-item.flash-guard-warn{border-color:rgba(240,160,32,.7);color:var(--amber,#f0a020);animation:rrflash .9s ease-out;}
+  #gijoRail .rr-item.flash-guard-warn{border-color:rgba(240,160,32,.7);color:var(--amber);animation:rrflash .9s ease-out;}
   #gijoRail .rr-item.flash-guard-block{border-color:rgba(226,72,61,.7);color:#f5928a;animation:rrflashred .9s ease-out;}
   @keyframes rrflash{0%{box-shadow:0 0 0 0 rgba(95,161,255,.5);}100%{box-shadow:0 0 0 8px rgba(95,161,255,0);}}
   @keyframes rrflashred{0%{box-shadow:0 0 0 0 rgba(226,72,61,.55);}100%{box-shadow:0 0 0 8px rgba(226,72,61,0);}}
@@ -729,9 +729,9 @@
     work.style.position = "relative"; // inset:0이 .work를 덮게(grid와 공존 무해)
     el.innerHTML =
       '<div style="text-align:center;max-width:440px;padding:26px 30px;border:1px solid rgba(255,255,255,.12);' +
-      'border-radius:12px;background:var(--panel-2,#1f1e1d);pointer-events:auto;">' +
+      'border-radius:12px;background:var(--panel-2);pointer-events:auto;">' +
       '<div style="font-size:15px;font-weight:800;margin-bottom:8px">🗔 모든 화면이 별도 창에 나가 있습니다</div>' +
-      '<div style="font-size:12.5px;color:var(--muted,#b3ada4);line-height:1.6;margin-bottom:14px">' +
+      '<div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:14px">' +
       '본창은 비어 있습니다 — 아래에서 이어 가거나, 대화 창의 <b>⇤ 앱에 붙이기</b>로 대화를 되가져올 수 있습니다.</div>' +
       '<div style="display:flex;gap:8px;justify-content:center">' +
       '<button class="tb-btn" id="esgMenu">☰ 메뉴에서 화면 열기</button>' +
@@ -1207,7 +1207,7 @@
       // ⚠ align-self:start 금지 — 무대(flex 컬럼)에서 폭이 내용만큼 줄어 전폭 띠가 아니라
       //   좌상단 토막이 된다(검토관 중7). grid 시절 유물이었다.
       head.style.cssText = "display:flex;align-items:center;gap:8px;" +
-        "padding:4px 10px;font-size:12.5px;color:var(--muted,#b3ada4);background:var(--panel-2,#1f1e1d);" +
+        "padding:4px 10px;font-size:12.5px;color:var(--muted);background:var(--panel-2);" +
         "border-bottom:1px solid rgba(255,255,255,.08);position:relative;z-index:3;";
       // 🚀 무대 머리(프로 확정 2026-08-20 「대화창 자리에 화면」) — 조작은 「← 대화로」 하나뿐.
       //   ⧉ 창으로/✕는 뺐다: 팝업은 사장님 지시(「팝업 및 옆에 붙는 메뉴를 없애는」·「승인
@@ -1216,7 +1216,7 @@
       //   숨겨 두면(무대숨김) 다음 화면이 열릴 때 교체로 정리된다.
       head.innerHTML = '<button class="tb-btn" id="stageBack" ' +
         'title="화면을 내리고 대화로 돌아갑니다 — 화면은 닫히지 않아, 카드의 🗔로 되올리면 보던 그대로입니다">← 대화로</button>' +
-        '<b id="dockName" style="color:var(--text,#e9e7e2)"></b>' +
+        '<b id="dockName" style="color:var(--text)"></b>' +
         '<span style="margin-left:auto"></span>';
       var scr = document.getElementById("screens");
       if (scr && scr.parentNode) scr.parentNode.insertBefore(head, scr);

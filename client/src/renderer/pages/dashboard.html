@@ -119,7 +119,7 @@
   .kb-bar{display:flex;align-items:center;gap:10px;margin:5px 0}
   .kb-bar .lbl{flex:0 0 100px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kb-bar .track{flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;overflow:hidden}
-  .kb-bar .fill{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#1eb980);border-radius:7px;min-width:2px}
+  .kb-bar .fill{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));border-radius:7px;min-width:2px}
   .kb-bar .num{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);font-variant-numeric:tabular-nums;min-width:96px;text-align:right}
   .kb-bar .num .u{font-size:11px;opacity:.75}
   .kb-meta{font-size:11.5px;color:var(--muted-2);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
@@ -197,15 +197,15 @@
 .plan-cand .why{font-size:11px;color:var(--muted);white-space:nowrap;background:var(--panel-2);
   border:1px solid var(--border);border-radius:5px;padding:0 6px;line-height:17px;}
 .plan-cand .why.hot{color:#ffb0a8;border-color:#4a3038;}
-.plan-cand .padd{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--teal,#1eb980);
+.plan-cand .padd{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--teal,var(--teal));
   border:1px solid #244b3c;border-radius:6px;padding:0 8px;line-height:18px;background:transparent;cursor:pointer;}
-.plan-cand:hover .padd{background:var(--teal,#1eb980);color:#0d1117;}
+.plan-cand:hover .padd{background:var(--teal,var(--teal));color:#0d1117;}
 .plan-cand.added .padd{color:var(--muted-2);border-color:var(--border);cursor:default;}
 .plan-cand.added:hover .padd{background:transparent;color:var(--muted-2);}
 .plan-trow{display:flex;align-items:center;gap:8px;min-height:26px;font-size:12.5px;border-bottom:1px solid var(--border);}
 .plan-trow:last-child{border-bottom:none;}
 .plan-trow .rm{color:var(--muted-2);cursor:pointer;font-size:12px;flex:0 0 auto;}
-.plan-p0{color:#f5928a;font-weight:800;} .plan-p1{color:var(--amber,#f0a020);font-weight:800;}
+.plan-p0{color:#f5928a;font-weight:800;} .plan-p1{color:var(--amber,var(--amber));font-weight:800;}
 </style>
 <script src="viz.js"></script>
 </head>
@@ -711,7 +711,7 @@
       .sort(function (a, b) { return b.createdAt - a.createdAt; }).slice(0, 3);
     var rowHtml = function (t) {
       return '<div class="plan-trow" data-id="' + esc(t.id) + '">' +
-        '<input type="checkbox" class="pck"' + (t.done ? " checked" : "") + ' title="완료 표시" style="accent-color:var(--teal,#1eb980)">' +
+        '<input type="checkbox" class="pck"' + (t.done ? " checked" : "") + ' title="완료 표시" style="accent-color:var(--teal,var(--teal))">' +
         '<span class="ptx" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer' + (t.done ? ";color:var(--muted-2);text-decoration:line-through" : "") + '" title="누르면 대화창이 이 할 일을 가리킵니다 (📌)">' +
         (t.priority && !t.done ? '<span class="plan-' + String(t.priority).toLowerCase() + '">' + esc(t.priority) + "</span> " : "") + esc(t.text) +
         "</span>" + (t.done ? "" : '<span class="rm" title="계획에서 빼기">✕</span>') + "</div>";
@@ -803,14 +803,14 @@
           if (!entry && s.kind === "entry") entry = s;
           else if (!mid && (s.kind === "foothold" || s.kind === "lateral")) mid = s;
         });
-        var nodes = [{ 색: "#e2483d", 아이콘: "🥷", 라벨: "공격자" }];
+        var nodes = [{ 색: "var(--red)", 아이콘: "🥷", 라벨: "공격자" }];
         if (entry) nodes.push({ 색: "#f5928a", 아이콘: "🌐", 라벨: 짧게(entry.label || entry.entity, 10) });
         if (mid) nodes.push({ 색: "#f7c777", 아이콘: "⚠", 라벨: 짧게(mid.label || mid.entity, 10) });
         nodes.push({ 색: "#5fa1ff", 아이콘: "🖥", 라벨: 짧게(p.entity, 10), 밑: "도달성 " + (p.reachability || "?") });
         var xs = nodes.map(function (_, i) { return Math.round(60 + (335 * i) / Math.max(1, nodes.length - 1)); });
         var out = "";
         for (var i = 0; i < nodes.length - 1; i++) {
-          out += '<line x1="' + (xs[i] + 18) + '" y1="' + y + '" x2="' + (xs[i + 1] - 18) + '" y2="' + y + '" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow)"/>';
+          out += '<line x1="' + (xs[i] + 18) + '" y1="' + y + '" x2="' + (xs[i + 1] - 18) + '" y2="' + y + '" stroke="var(--muted)" stroke-width="1.8" marker-end="url(#pcArrow)"/>';
         }
         nodes.forEach(function (n, i) {
           out += '<g><circle cx="' + xs[i] + '" cy="' + y + '" r="15" fill="' + n.색 + '" stroke="rgba(255,255,255,.28)" stroke-width="2"/>' +
@@ -822,7 +822,7 @@
       };
       var 높이 = top.length === 2 ? 156 : 80;
       var svg = '<svg viewBox="0 0 440 ' + 높이 + '" style="display:block;max-width:440px" role="img" aria-label="공격 경로 요약 — 상위 ' + top.length + '개">' +
-        '<defs><marker id="pcArrow" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="#b3ada4"/></marker></defs>' +
+        '<defs><marker id="pcArrow" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="var(--muted)"/></marker></defs>' +
         줄그리기(top[0], 36) + (top[1] ? 줄그리기(top[1], 112) : "") + "</svg>";
       $("pcBody").innerHTML = svg;
       $("pcSub").textContent = "— 오늘 가장 위험한 연결 상위 " + top.length + "개";

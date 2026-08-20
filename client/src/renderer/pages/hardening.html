@@ -52,11 +52,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .probe-res{font-size:var(--g-t-sm);margin-top:var(--g-s2);padding:8px 11px;border-radius:var(--g-r-sm);}
 .toast{position:fixed;bottom:22px;right:22px;background:var(--panel);border:1px solid var(--border-strong);border-radius:var(--g-r);padding:11px 16px;font-size:var(--g-t-sm);color:#fff;z-index:60;max-width:420px;box-shadow:var(--g-shadow-2);display:none;}
 .toast.show{display:block;}
-.reg-guide{background:var(--panel-2,#1f1e1d);border:1px solid rgba(95,161,255,.25);border-radius:var(--g-r-sm);padding:11px 13px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.75;margin-bottom:var(--g-s3);}
-.reg-guide b{color:var(--blue-light,#5fa1ff);font-weight:700;}
-.page-guide{background:var(--panel-2,#1f1e1d);border:1px solid var(--border);border-left:3px solid var(--blue,#3b82f6);border-radius:var(--g-r-sm);padding:10px 14px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.7;margin:12px 0 16px;}
+.reg-guide{background:var(--panel-2,var(--panel-2));border:1px solid rgba(95,161,255,.25);border-radius:var(--g-r-sm);padding:11px 13px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.75;margin-bottom:var(--g-s3);}
+.reg-guide b{color:var(--blue-light,var(--blue-light));font-weight:700;}
+.page-guide{background:var(--panel-2,var(--panel-2));border:1px solid var(--border);border-left:3px solid var(--blue,var(--blue));border-radius:var(--g-r-sm);padding:10px 14px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.7;margin:12px 0 16px;}
 .page-guide b{color:#fff;font-weight:700;}
-.page-guide .std{color:var(--blue-light,#5fa1ff);font-weight:700;}
+.page-guide .std{color:var(--blue-light,var(--blue-light));font-weight:700;}
 </style>
 <script src="viz.js"></script>
 </head>
@@ -143,13 +143,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
-  const rc = (r) => (r == null ? "#b3ada4" : r >= 80 ? "#1eb980" : r >= 60 ? "#f0a020" : "#e2483d");
+  const rc = (r) => (r == null ? "var(--muted)" : r >= 80 ? "var(--teal)" : r >= 60 ? "var(--amber)" : "var(--red)");
   const authBadge = (a) => ({ key: "🔑 SSH 키", password: "🔒 비밀번호", local: "🖥 로컬" }[a] || a);
   let TARGETS = [], SCHEDULES = [], RUNS = [];
 
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3500); }
 
-  function spark(vals, w = 90, h = 26, color = "#5fa1ff") {
+  function spark(vals, w = 90, h = 26, color = "var(--blue-light)") {
     if (!vals.length) return '<span style="color:var(--muted-2);font-size:11.75px">이력 없음</span>';
     if (vals.length === 1) vals = [vals[0], vals[0]];
     const min = Math.min(...vals, 0), max = Math.max(...vals, 100);
@@ -176,9 +176,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const worse = derived.filter((d) => d.worsening).length;
     $("kpiRow").innerHTML =
       `<div class="g-kpi"><div class="kv" style="color:#fff">${TARGETS.length}</div><div class="kl">등록 장비</div></div>` +
-      `<div class="g-kpi"><div class="kv" style="color:#1eb980">${active}</div><div class="kl">활성 스케줄</div></div>` +
+      `<div class="g-kpi"><div class="kv" style="color:var(--teal)">${active}</div><div class="kl">활성 스케줄</div></div>` +
       `<div class="g-kpi"><div class="kv" style="color:${rc(withRate.length ? avg : null)}">${withRate.length ? avg + "%" : "—"}</div><div class="kl">평균 준수율</div></div>` +
-      `<div class="g-kpi" ${worse ? 'style="border-color:rgba(226,72,61,.4)"' : ""}><div class="kv" style="color:${worse ? "#e2483d" : "#b3ada4"}">${worse}</div><div class="kl">악화 경고</div></div>`;
+      `<div class="g-kpi" ${worse ? 'style="border-color:rgba(226,72,61,.4)"' : ""}><div class="kv" style="color:${worse ? "var(--red)" : "var(--muted)"}">${worse}</div><div class="kl">악화 경고</div></div>`;
   }
 
   // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
@@ -257,7 +257,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       // 예전엔 옛 성공값으로 초록을 그려, 장비가 몇 주째 안 붙어도 「92% 초록」이었다.
       const 점검실패 = d.sched && d.sched.lastResult === "fail";
       return `<div class="tcard ${d.worsening || 점검실패 ? "warn" : ""}">
-        <div class="tc-top"><span class="dot" style="background:${점검실패 ? "#e2483d" : d.sched && d.sched.enabled ? rc(rate) : "#a49d95"}"></span>
+        <div class="tc-top"><span class="dot" style="background:${점검실패 ? "var(--red)" : d.sched && d.sched.enabled ? rc(rate) : "var(--muted-2)"}"></span>
           <span class="tc-name" title="${esc(t.label)}">${esc(t.label)}</span><span class="g-badge g-b-med">${stdLabel}</span></div>
         <div class="tc-mid"><div class="tc-rate" style="color:${rc(rate)}">${rate == null ? "—" : rate + "%"}</div>
           <div style="flex:1;text-align:right">${spark(d.trend, 90, 26, rc(rate))}</div></div>
@@ -325,7 +325,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (authMethod !== "local") {
         const p = await window.gijo.hardeningTargets.probe(target.id);
         pr.style.background = p.ok ? "rgba(30,185,128,.12)" : "rgba(226,72,61,.12)";
-        pr.style.color = p.ok ? "#1eb980" : "#e2483d";
+        pr.style.color = p.ok ? "var(--teal)" : "var(--red)";
         pr.innerHTML = (p.ok ? "✅ 접속 확인 — " : "⚠ 접속 실패 — ") + esc(p.detail);
       }
       toast(`'${target.label}' 등록됨`); await loadAll();

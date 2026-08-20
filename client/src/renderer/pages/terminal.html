@@ -69,10 +69,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .report .gcount{color:var(--muted-2);font-size:12.25px;}
 .report .gbadges{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap;}
 .report .gbadge{font-size:11.5px;font-weight:800;padding:1px 7px;border-radius:5px;}
-.report .gbadge.ok{background:rgba(30,185,128,.15);color:#1eb980;}
-.report .gbadge.bad{background:rgba(226,72,61,.15);color:#e2483d;}
-.report .gbadge.warn{background:rgba(240,160,32,.15);color:#f0a020;}
-.report .gbadge.na{background:rgba(139,147,171,.15);color:#b3ada4;}
+.report .gbadge.ok{background:rgba(30,185,128,.15);color:var(--teal);}
+.report .gbadge.bad{background:rgba(226,72,61,.15);color:var(--red);}
+.report .gbadge.warn{background:rgba(240,160,32,.15);color:var(--amber);}
+.report .gbadge.na{background:rgba(139,147,171,.15);color:var(--muted);}
 .report .gid{width:52px;color:var(--muted-2);font-weight:700;}
 
 .term-wrap{background:#1a1a19;border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;}
@@ -153,7 +153,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   const MARK = { PASS: "✅ 양호", FAIL: "❌ 취약", WARN: "⚠️ 확인필요", NA: "➖ 해당없음" };
-  const MARK_COLOR = { PASS: "#1eb980", FAIL: "#e2483d", WARN: "#f0a020", NA: "#b3ada4" };
+  const MARK_COLOR = { PASS: "var(--teal)", FAIL: "var(--red)", WARN: "var(--amber)", NA: "var(--muted)" };
 
   // 빠른 점검 버튼 → 표준 기준 하드닝 점검 실행 → 리포트 렌더 (실제 동작).
   // 자연어 진입(askInput)은 2026-08-19에 뗐다 — 자연어는 대화 위젯이 맡는다.
@@ -176,14 +176,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // 시안 A — 분류(카테고리)별 섹션 그룹. 그룹 헤더에 소계 배지 + 좌측 색 바(취약 있으면 빨강).
   function renderScanReport(rep) {
     const s = rep.summary;
-    const verdictColor = s.fail === 0 ? "#1eb980" : s.fail <= 2 ? "#f0a020" : "#e2483d";
+    const verdictColor = s.fail === 0 ? "var(--teal)" : s.fail <= 2 ? "var(--amber)" : "var(--red)";
     const cats = [];
     rep.items.forEach((i) => { if (!cats.includes(i.cat)) cats.push(i.cat); });
     const groups = cats.map((cat) => {
       const items = rep.items.filter((i) => i.cat === cat);
       const c = { PASS: 0, FAIL: 0, WARN: 0, NA: 0 };
       items.forEach((i) => c[i.status]++);
-      const bar = c.FAIL > 0 ? "#e2483d" : c.WARN > 0 ? "#f0a020" : "#1eb980";
+      const bar = c.FAIL > 0 ? "var(--red)" : c.WARN > 0 ? "var(--amber)" : "var(--teal)";
       const badges =
         (c.PASS ? `<span class="gbadge ok">양호 ${c.PASS}</span>` : "") +
         (c.FAIL ? `<span class="gbadge bad">취약 ${c.FAIL}</span>` : "") +

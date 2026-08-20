@@ -94,8 +94,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .hm-0{background:rgba(255,255,255,.03);color:var(--muted);font-weight:400}
 .hm-1{background:rgba(70,167,88,.35)} .hm-2{background:rgba(240,160,32,.42)}
 .hm-3{background:rgba(242,129,29,.5)} .hm-4{background:rgba(229,72,77,.62)}
-.hm-corr{outline:2px solid #8b7cf0!important;position:relative}
-.hm-corr::after{content:"⚑";position:absolute;top:-6px;right:0;font-size:11px;color:#8b7cf0}
+.hm-corr{outline:2px solid var(--purple)!important;position:relative}
+.hm-corr::after{content:"⚑";position:absolute;top:-6px;right:0;font-size:11px;color:var(--purple)}
 .risk-row{display:flex;align-items:center;gap:11px;padding:11px 6px;border-bottom:1px solid var(--border);cursor:pointer;}
 .risk-row:hover{background:var(--panel-2);}.risk-row.sel{background:rgba(59,130,246,.07);}
 .rank{font-size:14px;font-weight:800;color:var(--muted-2);width:22px;text-align:center;flex:none;}
@@ -285,7 +285,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       { k:"product",   icon:"🧰", 이름:"운영리포트", n: s?.bySource?.product ?? 0 },
       { k:"hardening", icon:"🛡", 이름:"하드닝",   n: s?.bySource?.hardening ?? 0 },
     ];
-    const 색 = { critical:"#e2483d", high:"#e08c39", low:"#5b8dd6" };
+    const 색 = { critical:"var(--red)", high:"#e08c39", low:"#5b8dd6" };
     let out = '<defs><marker id="oah" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">'
             + '<path d="M0,0 L7,2.5 L0,5 Z" fill="#6f6a64"/></marker></defs>';
 
@@ -302,7 +302,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const h = 칸높이;
       const c = 색[v.최고] || 색.low;
       out += '<rect x="420" y="'+y+'" width="560" height="'+h+'" rx="4" fill="rgba(226,72,61,.07)" stroke="'+c+'"/>'
-           + '<text x="434" y="'+(y+h/2+4)+'" font-size="12.5" fill="#e9e7e2">'
+           + '<text x="434" y="'+(y+h/2+4)+'" font-size="12.5" fill="var(--text)">'
            + esc(이름.length>28?이름.slice(0,27)+"…":이름)
            + ' <tspan fill="'+c+'" font-weight="700">' + v.소스.size + '개 소스</tspan>'
            + ' <tspan fill="#8b93a7">· 신호 '+v.건수+'건</tspan></text>';
@@ -597,7 +597,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if(o.label) s+='<text x="'+x+'" y="'+(y+r+13)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">'+esc(trunc(o.label,18))+'</text>';
     if(o.sub) s+='<text x="'+x+'" y="'+(y+r+24)+'" text-anchor="middle" font-size="8.5" fill="#7f88a3">'+esc(trunc(o.sub,22))+'</text>';
     if(o.badge){ var w=o.badge.length*6.2+10;
-      s+='<rect x="'+(x+r-4)+'" y="'+(y-r-8)+'" rx="4" height="14" width="'+w+'" fill="#e2483d"/>'+
+      s+='<rect x="'+(x+r-4)+'" y="'+(y-r-8)+'" rx="4" height="14" width="'+w+'" fill="var(--red)"/>'+
          '<text x="'+(x+r-4+w/2)+'" y="'+(y-r+2)+'" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fff">'+esc(o.badge)+'</text>'; }
     return s+'</g>';
   }
@@ -606,7 +606,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       (dashed?' stroke-dasharray="4 3"':'')+' marker-end="url(#gah)"/>';
   }
   var GDEFS='<defs><marker id="gah" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto">'+
-            '<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#b3ada4"/></marker></defs>';
+            '<path d="M0,0 L7,3.2 L0,6.4 Z" fill="var(--muted)"/></marker></defs>';
   function findStep(p,kind){ return (p.steps||[]).find(function(s){ return s.kind===kind; }); }
   // 소스별: 중심=거점 자산, 방사형으로 관측 신호(진입/거점취약점/인접이동)
   function graphSource(p){
@@ -630,7 +630,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
                 : (s.kind==="foothold" && /KEV/i.test(p.note||"")) ? "KEV" : null;
       svg+=svgNode(x,y,{ r:16, fill:col[s.kind]||"#8fb8ff", icon:icon[s.kind]||"•", label:s.label, badge:badge });
     });
-    svg+=svgNode(cx,cy,{ r:26, fill:"#20304e", stroke:"#5fa1ff", icon:"🖥", label:p.entity, sub:"도달성 "+p.reachability+" · "+p.reachScore+"점" });
+    svg+=svgNode(cx,cy,{ r:26, fill:"#20304e", stroke:"var(--blue-light)", icon:"🖥", label:p.entity, sub:"도달성 "+p.reachability+" · "+p.reachScore+"점" });
     return svg+'</svg>';
   }
   // 전체 연관성: 공격자 → 외부노출 → 취약점 → 대상자산 (경로별 한 행)
@@ -642,12 +642,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       var y=44+ri*rowH;
       var entry=findStep(p,"entry"), foot=findStep(p,"foothold");
       var nodes=[
-        {x:xs[0],fill:"#e2483d",icon:"🥷",label:"공격자",sub:null},
+        {x:xs[0],fill:"var(--red)",icon:"🥷",label:"공격자",sub:null},
         {x:xs[1],fill:"#f5928a",icon:"🌐",label:entry?entry.label:"외부 노출",sub:null},
         {x:xs[2],fill:"#f7c777",icon:"⚠",label:foot?foot.label:"취약점",sub:null},
-        {x:xs[3],fill:"#5fa1ff",icon:"🖥",label:p.entity,sub:"도달성 "+p.reachability}
+        {x:xs[3],fill:"var(--blue-light)",icon:"🖥",label:p.entity,sub:"도달성 "+p.reachability}
       ];
-      for(var i=0;i<nodes.length-1;i++){ svg+=svgEdge(nodes[i].x+16, y, nodes[i+1].x-16, y, "#b3ada4", false); }
+      for(var i=0;i<nodes.length-1;i++){ svg+=svgEdge(nodes[i].x+16, y, nodes[i+1].x-16, y, "var(--muted)", false); }
       nodes.forEach(function(nd){ svg+=svgNode(nd.x,y,{ r:15, fill:nd.fill, icon:nd.icon, label:nd.label, sub:nd.sub }); });
     });
     return svg+'</svg>';
@@ -674,7 +674,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if(graphMode==="chain"){
       var chainPaths = selMatched ? [ap] : attackPaths.slice(0,3);
       box.innerHTML = graphChain(chainPaths);
-      legend.innerHTML = '<span class="lg"><span class="dot" style="background:#e2483d"></span>공격자</span><span class="lg"><span class="dot" style="background:#f5928a"></span>외부 노출</span><span class="lg"><span class="dot" style="background:#f7c777"></span>취약점</span><span class="lg"><span class="dot" style="background:#5fa1ff"></span>대상 자산</span> · 관측 신호 기반(침투테스트 아님)';
+      legend.innerHTML = '<span class="lg"><span class="dot" style="background:var(--red)"></span>공격자</span><span class="lg"><span class="dot" style="background:#f5928a"></span>외부 노출</span><span class="lg"><span class="dot" style="background:#f7c777"></span>취약점</span><span class="lg"><span class="dot" style="background:var(--blue-light)"></span>대상 자산</span> · 관측 신호 기반(침투테스트 아님)';
     } else {
       box.innerHTML = graphSource(ap);
       legend.innerHTML = '<span class="lg"><span class="dot" style="background:#f5928a"></span>진입</span><span class="lg"><span class="dot" style="background:#f7c777"></span>거점 취약점</span><span class="lg"><span class="dot" style="background:#8fb8ff"></span>인접 이동</span> · 중심=<b>'+esc(ap.entity)+'</b>';

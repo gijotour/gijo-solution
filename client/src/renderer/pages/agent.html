@@ -98,11 +98,11 @@ tr:last-child td{border-bottom:none;}
 .hf-result:last-child{border-bottom:none;}
 .hf-load{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:4px 10px;border-radius:6px;font-size:12.25px;font-weight:700;cursor:pointer;}
 
-.titlebar{display:flex;align-items:center;justify-content:space-between;background:#1f1e1d;padding:6px 12px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--muted);}
+.titlebar{display:flex;align-items:center;justify-content:space-between;background:var(--panel-2);padding:6px 12px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--muted);}
 .titlebar-left{display:flex;align-items:center;gap:8px;}
 .titlebar-left img{height:14px;}
 .win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
-.menubar{display:flex;gap:18px;background:#262624;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+.menubar{display:flex;gap:18px;background:var(--bg);padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
 .header-left{display:flex;align-items:center;gap:12px;}
 .header-left img{height:22px;}
@@ -126,7 +126,7 @@ tr:last-child td{border-bottom:none;}
    ⚠ 글자 11px 미만 금지(uireadability 시험). 여기 최소는 11.5px. */
 .agent-loc{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
 .agent-loc .loc-h{font-size:12px;color:var(--muted-2);margin-right:2px;}
-.loc-pill{background:var(--panel-2,#1f1e1d);border:1px solid var(--border);border-radius:999px;
+.loc-pill{background:var(--panel-2,var(--panel-2));border:1px solid var(--border);border-radius:999px;
   padding:4px 10px;color:var(--muted);font:inherit;font-size:11.5px;cursor:pointer;}
 .loc-pill:hover:not(:disabled){border-color:var(--blue);color:var(--text);}
 .loc-pill.on{border-color:var(--teal);color:var(--text);background:rgba(30,185,128,.10);}
@@ -310,7 +310,7 @@ tr:last-child td{border-bottom:none;}
     }
     const ad = a.assignedAdapterId ? adapterMap[a.assignedAdapterId] : null;
     const topic = ad && ad.topic ? ad.topic : null;
-    const 색 = { 취약점: "color:#f5928a;background:rgba(226,72,61,.12)", 장비운영: "color:var(--blue-light,#7db2f8);background:rgba(59,130,246,.13)", 사내규정: "color:var(--amber,#f0a020);background:rgba(240,160,32,.13)", 위협대응: "color:#8b7cf0;background:rgba(139,124,240,.14)" }[topic] || "color:var(--muted-2);background:rgba(255,255,255,.05)";
+    const 색 = { 취약점: "color:#f5928a;background:rgba(226,72,61,.12)", 장비운영: "color:var(--blue-light,#7db2f8);background:rgba(59,130,246,.13)", 사내규정: "color:var(--amber,var(--amber));background:rgba(240,160,32,.13)", 위협대응: "color:var(--purple);background:rgba(139,124,240,.14)" }[topic] || "color:var(--muted-2);background:rgba(255,255,255,.05)";
     return `<div class="agent-spec" style="height:20px;display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--muted)">🎓 전문 분야: ${
       a.assignedAdapterId
         ? `<span style="font-size:11.5px;font-weight:800;padding:1px 7px;border-radius:5px;${색}">${esc(topic || "미분류")}</span> <span style="color:var(--muted-2)">(${esc(a.assignedAdapterId)})</span>`
@@ -689,7 +689,7 @@ tr:last-child td{border-bottom:none;}
   function llmRowHtml(evt) {
     const f = fmtLlm(evt);
     const dim = f.phase === "start" ? "opacity:.65;" : "";
-    const color = f.phase === "error" ? "#e2483d" : (f.kind === "chat" ? "var(--blue-light)" : "var(--teal)");
+    const color = f.phase === "error" ? "var(--red)" : (f.kind === "chat" ? "var(--blue-light)" : "var(--teal)");
     // 라벨도 종류를 말한다 — search·guard를 「LLM」이라 부르면 추론이 일어난 것처럼 읽힌다(검토관 M5).
     const label = f.kind === "search" ? "검색" : f.kind === "guard" ? "가드" : "LLM";
     return `<div class="chat-row" style="${dim}"><span style="color:${color};font-weight:700">${f.icon} ${label}</span><span class="chat-msg">${f.text.replace(/</g, "&lt;")}</span></div>`;

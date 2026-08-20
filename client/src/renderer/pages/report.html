@@ -79,11 +79,11 @@ tr:last-child td{border-bottom:none;}
 .progress-fill{height:100%;border-radius:20px;}
 .content-grid{display:grid;grid-template-columns:1fr;gap:16px;}
 
-.titlebar{display:flex;align-items:center;justify-content:space-between;background:#1f1e1d;padding:6px 12px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--muted);}
+.titlebar{display:flex;align-items:center;justify-content:space-between;background:var(--panel-2);padding:6px 12px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--muted);}
 .titlebar-left{display:flex;align-items:center;gap:8px;}
 .titlebar-left img{height:14px;}
 .win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
-.menubar{display:flex;gap:18px;background:#262624;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+.menubar{display:flex;gap:18px;background:var(--bg);padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
 .header-left{display:flex;align-items:center;gap:12px;}
 .header-left img{height:22px;}
@@ -194,8 +194,8 @@ tr:last-child td{border-bottom:none;}
             <option value="90">90일 이전</option>
             <option value="180">180일 이전</option>
           </select>
-          <button id="pruneBtn" style="font-size:12.5px;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:700;">일괄 삭제</button>
-          <button id="deleteAllBtn" style="font-size:12.5px;background:rgba(226,72,61,.14);border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800;">🗑 전체 삭제</button>
+          <button id="pruneBtn" style="font-size:12.5px;background:transparent;border:1px solid var(--red);color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:700;">일괄 삭제</button>
+          <button id="deleteAllBtn" style="font-size:12.5px;background:rgba(226,72,61,.14);border:1px solid var(--red);color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800;">🗑 전체 삭제</button>
         </div>
       </div>
       <table>
@@ -484,7 +484,7 @@ tr:last-child td{border-bottom:none;}
       const viewBtn = (base) =>
         `<button class="rep-view" data-base="${base}" style="font-size:12.25px;background:var(--teal);border:1px solid var(--teal);color:#04211d;border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;font-weight:700;">👁 보기</button>`;
       const delBtn = (base) =>
-        `<button class="rep-del" data-base="${base}" title="삭제" style="font-size:12.25px;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:4px 9px;cursor:pointer;">🗑</button>`;
+        `<button class="rep-del" data-base="${base}" title="삭제" style="font-size:12.25px;background:transparent;border:1px solid var(--red);color:#f5928a;border-radius:6px;padding:4px 9px;cursor:pointer;">🗑</button>`;
       // ⚠ 예전엔 대상 자산을 **전부** 이어 붙였다. 57개면 여덟 줄이 되어 한 줄이 200px을 먹고,
       //   정작 읽히지도 않았다(2026-08-02 사용자 지적). 이 칸에서 알아야 하는 것은
       //   "어느 IP가 들어갔나"가 아니라 **"얼마나 넓게 잡았나"**다 — 개수를 앞세우고 두 개만 보인다.
@@ -701,7 +701,7 @@ tr:last-child td{border-bottom:none;}
       <div class="modal-err" id="schedErr"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
         <button class="btn-ghost" id="schedBackBtn">← 목록으로</button>
-        ${!isNew ? '<button class="btn-ghost" id="schedDeleteBtn" style="color:#f5928a;border-color:#e2483d">삭제</button>' : ""}
+        ${!isNew ? '<button class="btn-ghost" id="schedDeleteBtn" style="color:#f5928a;border-color:var(--red)">삭제</button>' : ""}
         ${!isNew ? '<button class="btn-ghost" id="schedRunNowBtn">지금 실행</button>' : ""}
         <button class="btn-primary" id="schedSaveBtn">${isNew ? "스케줄 추가" : "저장"}</button>
       </div>
