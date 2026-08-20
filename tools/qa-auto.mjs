@@ -598,7 +598,7 @@ async function runClient() {
     return `규칙 ${r.규칙수}개 · 항목 글씨 ${r.글씨}`;
   });
 
-  await scenario("QA-C05", "전체메뉴", "9그룹 — 절차 5허브 + 기반 4그룹", {
+  await scenario("QA-C05", "전체메뉴", "10그룹 — ⓪자산 + 절차 5허브 + 기반 4그룹", {
     given: "그룹 통합(2026-08-09 사용자 승인)으로 절차·등록부·AI가 허브 대표 메뉴가 된 뒤",
     when: "셸의 왼쪽 메뉴를 보면",
     then: "9그룹이 절차 순서대로 서고, 대표 그룹은 하위 줄이 없으며, 항목은 승인된 집합 그대로다",
@@ -636,13 +636,15 @@ async function runClient() {
         })(),
       };
     });
-    // 그룹 9개 — **절차 5허브 + 등록부 + AI + 추가 기능 + 설정**(2026-08-09 사용자 승인).
+    // 그룹 10개 — **⓪ 자산 + 절차 5허브 + 등록부 + AI + 추가 기능 + 설정**
+    // (2026-08-09 사용자 승인 + 2026-08-18 ⓪ 자산 신설 승인 시안 — 기대값을 2026-08-21에
+    //  따라잡았다. 낡은 기대가 멀쩡한 메뉴를 실패로 물던 자리).
     //   그룹 통합으로 절차 그룹은 각각 허브 한 화면(대표 메뉴)이 됐고, 「추가 기능」 그룹이
     //   신설됐다(보안 로그 파일 분석·제품 소개자료·업무 넘기기). AI 운영은 「AI」로 줄었다.
     // ⚠ 기대값만 바꾸지 않는다 — **순서까지** 지킨다. 절차는 위에서 아래로 한 방향이어야
     //   의미가 있고, 순서가 섞이면 개편의 뜻이 사라지는데 개수 검사로는 안 잡힌다.
-    if (m.groups.length !== 9) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
-    const 그룹순서 = ["발견", "우선순위", "조치", "검증", "보고", "등록부", "AI", "추가 기능", "설정"];
+    if (m.groups.length !== 10) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
+    const 그룹순서 = ["자산", "발견", "우선순위", "조치", "검증", "보고", "등록부", "AI", "추가 기능", "설정"]; // ⓪ 자산이 맨 앞(2026-08-18 승인 시안 — 범위 축이 절차보다 먼저)
     그룹순서.forEach((이름, i) => {
       if (!m.groups[i] || !m.groups[i].includes(이름)) {
         throw new Error(`${i + 1}번째 그룹이 '${이름}'이 아니다: ${m.groups.join(",")}`);
@@ -785,6 +787,29 @@ async function runClient() {
     }
     if (바깥.length) throw new Error(`바깥 주소 ${바깥.length}곳: ${바깥.slice(0, 3).join(" | ")}`);
     return `화면 ${files.length}개 — 바깥 주소 0곳`;
+  });
+
+  // ── 프로 셸(기준 셸) — 2026-08-21 신설(사장님 승인 묶음 7번) ──────────────────
+  // ⚠ 왜: 기준 셸이 프로(2026-08-19 로그인 기본)가 됐는데 이 계층은 표준 셸만 쟀다.
+  //   여기서는 **구조 계약만** 얕게 잰다(메뉴 숨김·레일·카드 홈) — 데이터가 필요한 깊은
+  //   검사(카드 실렌더·무대 전이)는 로그인된 실앱 관문(publish-gate-ui)이 매 게시마다 잰다.
+  await scenario("QA-C09", "프로 셸", "shell=pro로 열면 프로 구조가 선다(메뉴 숨김·레일·흰 바탕)", {
+    given: "탭 셸을 ?shell=pro로 열면",
+    when: "본문이 그려졌을 때",
+    then: "pro-shell 클래스 · #gijoNav 숨김 · #gijoRail 표시 · theme-light(흰 바탕)",
+  }, async () => {
+    await page.goto("file://" + path.join(PAGES, "app.html").replace(/\\/g, "/") + "?shell=pro");
+    await page.waitForTimeout(1500);
+    const st = await page.evaluate(() => ({
+      pro: document.body.classList.contains("pro-shell"),
+      light: document.documentElement.classList.contains("theme-light"),
+      nav: (() => { const n = document.getElementById("gijoNav"); return n ? getComputedStyle(n).display : "없음"; })(),
+      rail: (() => { const r = document.getElementById("gijoRail"); return r ? getComputedStyle(r).display : "없음"; })(),
+    }));
+    if (!st.pro) throw new Error("pro-shell 클래스가 안 붙었다");
+    if (!st.light) throw new Error("theme-light(흰 바탕)가 안 붙었다");
+    if (st.nav !== "none") throw new Error(`프로에서 사이드바가 보인다: ${st.nav}`);
+    if (st.rail === "none" || st.rail === "없음") throw new Error(`레일이 안 보인다: ${st.rail}`);
   });
 
   // ⚠ "관리자 탭에 업데이트가 펼쳐져 보이는가"는 여기(헤드리스 client 계층)에 두지 않는다.
