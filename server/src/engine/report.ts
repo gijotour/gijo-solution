@@ -15,7 +15,7 @@ import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 import { listAssets, getAsset, Asset } from "./assets";
 // ⚠ 스캔 실패(scan_error)는 취약점이 아니다. 판정은 이 함수 **한 곳**만 쓴다 —
 //   호출부마다 제 규칙을 두면 화면·리포트마다 숫자가 달라지고, 담당자는 그 숫자로 보고를 쓴다.
-import { isRealVulnerability } from "./agenttools";
+import { isRealVulnerability, isActiveVuln } from "./agenttools";
 import { listMaintenanceItems, MaintenanceItem } from "./maintenance";
 import { listTasks, TaskItem } from "./tasks";
 import { prioritizedReviews, buildTriageDraft, type PrioritizedFinding } from "./approvals";
@@ -71,8 +71,7 @@ function severityCounts(assets: Asset[]): Record<string, number> {
   for (const asset of assets) {
     // 고쳐진(fixed) finding은 현재 위험이 아니므로 제외.
     for (const finding of asset.findings) {
-      if (finding.state === "fixed") continue;
-      if (!isRealVulnerability(finding)) continue;   // 점검 실패는 심각도가 없다
+      if (!isActiveVuln(finding)) continue;   // 활성 진짜 취약점만 — 판정은 한 곳(handlers.ts)
       counts[finding.severity] = (counts[finding.severity] ?? 0) + 1;
     }
   }
@@ -102,8 +101,7 @@ export function collectVulnReportData(scopeAssets?: Asset[]): VulnReportData {
   const d = { hosts: hosts.length, active: 0, critical: 0, high: 0, medium: 0, low: 0, kev: 0, topKev: [] as { name: string; host: string }[] };
   for (const a of hosts) {
     for (const f of a.findings) {
-      if (f.state === "fixed") continue;
-      if (!isRealVulnerability(f)) continue;   // 스캔 실패를 활성 취약점으로 세지 않는다
+      if (!isActiveVuln(f)) continue;   // 활성 진짜 취약점만 — 판정은 한 곳(handlers.ts)
       d.active++;
       if (f.severity === "critical") d.critical++;
       else if (f.severity === "high") d.high++;

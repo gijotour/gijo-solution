@@ -161,6 +161,18 @@ export function isRealVulnerability(f: { finding_type?: string; severity?: strin
 }
 
 /**
+ * 활성(아직 안 고쳐진) 진짜 취약점인가 — **심각도 누산 루프의 단일 판정**(2026-08-21).
+ * 예전엔 `state !== "fixed"`와 `isRealVulnerability`를 각 집계 자리(kpi·report·assethub)가
+ * 두 줄로 나란히 반복했다 — 잣대는 이미 같았지만, 한 줄이 빠진 채 베껴지는 순간
+ * 「스캔 오류 602건을 활성 46건으로」(2026-08-01 kpi)류 사고가 되는 구조라 판정을 모았다.
+ * (⚠ 누산 **필드**는 자리마다 다르니 억지로 한 함수로 합치지 않는다 — kpi는 scanFailed·
+ *  newCount까지 세느라 continue 구조가 달라 이 헬퍼를 못 쓰고 원형을 유지한다.)
+ */
+export function isActiveVuln(f: { finding_type?: string; severity?: string; state?: string }): boolean {
+  return f.state !== "fixed" && isRealVulnerability(f);
+}
+
+/**
  * **시연용 데이터가 섞여 있으면 밝힌다.**
  *
  * 왜 필요한가(2026-08-03 실측): 운영 서버의 취약점 14건이 **전부 `demo-scan.csv`**에서 왔는데

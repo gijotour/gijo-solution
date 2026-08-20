@@ -12,7 +12,7 @@ import { authMiddleware } from "../auth/auth";
 import { listAssets, getAsset, isAiAsset, type Asset } from "./assets";
 import type { StandardFinding } from "./bridge";
 // 스캔 실패 판정은 한 곳에서만 — 규칙이 갈라지면 화면마다 숫자가 달라진다.
-import { isRealVulnerability } from "./agenttools";
+import { isRealVulnerability, isActiveVuln } from "./agenttools";
 
 export type OwaspStatus = "open" | "covered" | "na";
 
@@ -129,8 +129,7 @@ export function deriveOwaspRisks(a: Asset): OwaspRiskState[] {
 function vulnCounts(findings: StandardFinding[]): VulnCounts {
   const c = { critical: 0, high: 0, medium: 0, low: 0, kev: 0, open: 0 };
   for (const f of findings) {
-    if (f.state === "fixed") continue; // 해소된 것은 현재 노출로 세지 않는다
-    if (!isRealVulnerability(f)) continue; // 스캔 실패·미지원·조사 정보는 취약점 일감이 아니다
+    if (!isActiveVuln(f)) continue; // 활성 진짜 취약점만 — 판정은 한 곳(handlers.ts, 2026-08-21 통일)
     // ⚠ info는 위 판정에서 이미 빠진다(2026-08-04). 타입이 그걸 모르므로 한 번 더 갈라 둔다 —
     //   나중에 판정이 느슨해져도 여기서 조사 정보가 취약점 칸에 섞이지 않는다.
     if (f.severity === "info") continue;
