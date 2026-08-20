@@ -469,6 +469,43 @@ const 새세션 = await 셸.evaluate(async () => {
 ok("💬 새 세션: 확인창+저장 안내", !!새세션.문구저장, 새세션.no || "");
 ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!새세션.홈복원);
 
+// ── ⑦ 현황판 스트립(승인 시안 panels-overview §1, 2026-08-20 1단계) ────────────────
+//    ⚠ **⑥ 새 세션 뒤에 둔다.** 스트립은 대화 홈(body.chat-home)에서만 보이는데 앞 검사들이
+//      대화를 채워 홈이 아니다 — 앞에 두면 「0개」로 빨간불이 나서 제품이 아니라 검사가 틀린다
+//      (관문 헛계측 교훈의 반대 짝: 상태를 안 맞추고 재면 거짓 실패가 난다).
+//    무엇을 재나: 판이 실제로 그려지는가(0이면 부품 로드 실패 — 5.36.0 거짓 초록 계열) ·
+//    **정직 표시**(마지막 확인 시각)가 붙는가 · 「전체 보기」가 펼쳐지는가 · 입력칸 0(메뉴는 보기용).
+{
+  const r = await 셸.evaluate(async () => {
+    for (let i = 0; i < 25; i++) {
+      if (document.querySelectorAll("#cePanels .pv-tile").length) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    const 타일 = [...document.querySelectorAll("#cePanels .pv-tile")];
+    const 첫 = 타일[0] ? 타일[0].textContent || "" : "";
+    const 전체보기 = document.getElementById("pvMore");
+    let 펼침 = 0;
+    if (전체보기) {
+      전체보기.click();
+      for (let i = 0; i < 25; i++) {
+        await new Promise((x) => setTimeout(x, 400));
+        펼침 = document.querySelectorAll("#cePanels .pv-tile").length;
+        if (펼침 > 타일.length) break;
+      }
+    }
+    return {
+      압축: 타일.length,
+      확인시각: /확인 /.test(첫),          // 「조용함」과 「확인 못 함」을 가르는 정직 표시
+      입력칸: document.querySelectorAll("#cePanels input, #cePanels textarea").length,
+      펼침,
+      목록단추: document.querySelectorAll('#cePanels button[data-act="rows"]').length,
+    };
+  }).catch(() => null);
+  ok("현황판: 홈 스트립·확인시각·전체보기 펼침·입력칸 0",
+    !!r && r.압축 > 0 && r.압축 <= 6 && r.확인시각 && r.입력칸 === 0 && r.펼침 > r.압축 && r.목록단추 > 0,
+    JSON.stringify(r));
+}
+
 await browser.close().catch(() => {});
 정리();
 console.log(실패.length ? "[ui관문] ✕ 실패 " + 실패.length + "건: " + 실패.join(", ") : "[ui관문] ✓ 전부 통과");

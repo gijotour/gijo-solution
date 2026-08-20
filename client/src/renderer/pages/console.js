@@ -344,7 +344,19 @@
     renderScope();
     renderHero(); fillGreeting(); // 프로 홈 히어로(승인 시안) — chat-home일 때만 CSS가 보여준다
     // 새 대화(newSession)가 처음 화면을 되살릴 때 쓸 원본(검토관 M4) — 지금이 가장 이르고 완전하다.
-    try { var _e0 = rows() && rows().querySelector(".cs-empty"); if (_e0) 빈상태원본 = _e0.outerHTML; } catch (e) { }
+    // ⚠ 현황판 자리는 **비운 채로** 담는다(2026-08-20 관문 적발). 안 비우면 「확인하는 중…」
+    //   상태와 data-mounted 딱지가 통째로 저장돼, 새 세션이 그걸 되살린 순간 renderPanels가
+    //   「이미 그렸다」고 판단해 조기 반환한다 — 홈에 스트립이 영영 안 뜬다(실화면 실측 0개).
+    //   인사·칩도 renderHero가 다시 채우므로 빈 자리로 담는 것이 이 원본의 원래 성격에 맞다.
+    try {
+      var _e0 = rows() && rows().querySelector(".cs-empty");
+      if (_e0) {
+        var _c = _e0.cloneNode(true);
+        var _p = _c.querySelector("#cePanels");
+        if (_p) { _p.innerHTML = ""; _p.removeAttribute("data-mounted"); }
+        빈상태원본 = _c.outerHTML;
+      }
+    } catch (e) { }
     // nav.js(GROUPS 출처)가 이 스크립트보다 늦게 실릴 수 있다 — 메뉴 칩이 비면 한 번만 재시도.
     setTimeout(function () { var m = document.getElementById("ceMrow"); if (m && !m.children.length) renderHero(); }, 700);
     // 문장 줄 클릭 = 화면 맥락 토글(옛 ✕/재부착 계약을 한 자리로) — 개별 풀기는 ⋯ 메뉴.
@@ -1746,7 +1758,10 @@
     var host = document.getElementById("cePanels");
     if (!host) return;
     if (!window.gijoPanelsBoard || !window.gijoGroupPanels || !window.gijoTabs) { host.innerHTML = ""; return; }
-    if (host.getAttribute("data-mounted") === "1") return;  // 히어로 재렌더가 판을 다시 재게 하지 않는다
+    // 히어로 재렌더(부팅 재시도·새 세션)가 판을 **다시 재게 하지 않는다.** 단 딱지만 남고
+    // 내용이 비어 있으면 다시 그린다 — 「시작했다」와 「그려졌다」를 딱지 하나로 뭉뚱그리면
+    // 복원된 껍데기가 영영 안 채워진다(관문 적발).
+    if (host.getAttribute("data-mounted") === "1" && host.querySelector(".pv-tile, .pv-head")) return;
     host.setAttribute("data-mounted", "1");
     try {
       window.gijoPanelsBoard.mount(host, {
