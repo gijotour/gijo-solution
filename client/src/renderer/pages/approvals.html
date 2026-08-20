@@ -54,12 +54,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="sidebar" id="gijoNav"></div>
 
   <div class="main">
-    <div class="topbar-row">
-      <div>
-        <div class="page-title">조치·승인 — Finding 검토</div>
-      </div>
-    </div>
-
+    <!-- ⚠ 제목줄(.topbar-row)을 없앴다 — 공용 CSS(.g-ui .page-title{display:none})가 제목을
+         이미 숨기고 있어 **내용이 0인 채 margin-bottom:20px만 먹고 있었다**(2026-08-21 실측).
+         빈 div만 남기면 여백이 그대로 남는다 — 줄 자체를 없앤다(작업 기록 740e1ea6과 같은 자리). -->
     <div id="gijoChatWidget" data-prompts='["검토 대기 몇 건이야?","기한 지난 미조치 있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
     <!-- VEX 내보내기 — 지금 내보내면 어떤 상태로 나가는지 칩으로 미리 보여준다.
@@ -70,20 +67,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="btn vex-btn" id="btnVexExport">⬇ 파일 받기</button>
     </div>
 
-    <div id="scanFailNote" style="display:none;max-width:1100px;margin-bottom:12px;padding:10px 14px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.08);border-radius:10px;font-size:12.5px;color:var(--text)"></div>
+    <div id="scanFailNote" style="display:none;max-width:1100px;margin-bottom:8px;padding:5px 12px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.08);border-radius:9px;font-size:12.5px;color:var(--text)"></div>
 
-    <!-- 카드 7장 → **한 줄**(2026-08-02 사용자 지시 "상단칸 작게 우리 룰에 맞춰서").
-         공용 변환기가 [라벨][값]을 그대로 옮겨 한 줄로 만든다 — 여기선 표식만 단다. -->
-    <div data-gijo-summary style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px;max-width:1100px;">
-      <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">미검토</div><div style="font-size:20px;font-weight:800;color:var(--amber)" id="kPending">-</div></div>
-      <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">진행중</div><div style="font-size:20px;font-weight:800;color:var(--blue-light)" id="kProg">-</div></div>
-      <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">검증</div><div style="font-size:20px;font-weight:800;color:var(--purple)" id="kVerify">-</div></div>
-      <!-- 미배정 = 병목(검증은 배정된 건에만 실행 가능). 클릭하면 미배정만 걸러 본다. -->
-      <div class="panel kpi-unassigned" id="kUnassignedCard" title="담당자가 없는 건 — 클릭하면 미배정만 봅니다" style="margin:0;cursor:pointer"><div class="panel-sub" style="margin:0 0 6px">⚠ 미배정</div><div style="font-size:20px;font-weight:800;color:var(--amber)" id="kUnassigned">-</div></div>
-      <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">완료</div><div style="font-size:20px;font-weight:800;color:var(--teal)" id="kApproved">-</div></div>
-      <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">반려</div><div style="font-size:20px;font-weight:800;color:var(--muted)" id="kRejected">-</div></div>
-      <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">지연</div><div style="font-size:20px;font-weight:800;color:#f5928a" id="kOverdue">-</div></div>
-    </div>
+    <!-- ⚠ 요약 카드 7장을 걷었다(2026-08-21 밀도 라운드 — 설계관 원천 대조).
+         아래 목록의 상태 알약(#rvFilt)이 **같은 변수·같은 모집단으로 같은 숫자 7개를
+         이미 보여주고 있었다** — 미검토·진행중·검증·완료·반려는 같은 식이고, 미배정은
+         아예 같은 지역변수 하나(unassigned)를 둘이 나눠 쓰고 있었다. 같은 것을 두 곳에
+         적으면 어긋난다. 알약에만 없던 「지연」은 알약 줄로 옮겼다(요약.overdue 그대로).
+         절감 64px = 목록 2줄. -->
+
 
     <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 카드·칩은 **상태**를 말하고, 이 막대는 위 어디에도
          없던 물음 — **어느 심각도가 밀려 있나**를 말한다. 누르면 아래 목록이 그 심각도만 남는다.
@@ -108,6 +100,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <span class="fchip" data-f="approved">완료 <b id="fcApproved">0</b></span>
           <span class="fchip" data-f="pending">미검토 <b id="fcPending">0</b></span>
           <span class="fchip" data-f="unassigned">미배정 <b id="fcUnassigned">0</b></span>
+          <!-- 지연 — 옛 요약 카드 7장에서 **여기에만 없던 하나**라 옮겨 왔다(2026-08-21). -->
+          <span class="fchip" data-f="overdue" title="기한이 지났는데 아직 안 끝난 건">지연 <b id="fcOverdue">0</b></span>
         </div>
         <!-- 일괄 배정 — 선택한 건이 있을 때만 나타난다(평소엔 목록을 가리지 않는다). -->
         <div class="bulk-bar" id="bulkBar" style="display:none">
@@ -132,8 +126,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <style>
   /* ── 마스터·디테일(시안 C) ── */
   .rv-wrap{display:grid;grid-template-columns:360px 1fr;gap:14px;}
-  .rv-list-pane{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:10px;min-height:520px;}
-  .rv-filt{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px;}
+  .rv-list-pane{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:7px 10px;min-height:520px;}
+  .rv-filt{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;}
   /* 자산 좁히기 띠 — 눈에 띄어야 한다. 좁혀진 줄 모르면 "왜 이것밖에 없지?"가 된다. */
   .rv-scope{display:flex;align-items:center;gap:8px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.32);
     border-radius:9px;padding:7px 11px;margin-bottom:9px;font-size:12px;color:var(--blue-light,#8fb8ff);}
@@ -141,7 +135,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:3px 9px;}
   .rv-scope-all:hover{color:var(--text);border-color:rgba(255,255,255,.3);}
   /* VEX 내보내기 줄 — 상태 미리보기 + 파일 받기. */
-  .vex-bar{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:9px 13px;margin-bottom:14px;max-width:1100px;flex-wrap:wrap;}
+  .vex-bar{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:5px 12px;margin-bottom:8px;max-width:1100px;flex-wrap:wrap;}
   .vex-lb{font-size:12px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:5px;}
   .vex-chips{display:flex;gap:5px;flex-wrap:wrap;}
   .vex-chips .vc{font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:20px;}
@@ -149,7 +143,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .vc-aff{color:#f5928a;background:rgba(226,72,61,.15);}
   .vc-fix{color:var(--teal);background:rgba(30,185,128,.16);}
   .vc-not{color:var(--muted);background:rgba(255,255,255,.07);}
-  .vex-btn{margin-left:auto;}
+  /* ⚠ 이 단추 높이가 띠 전체 높이를 정한다(2026-08-21 실측: 36px 단추 + 여백 = 69px).
+     공용 --g-btn-h를 내리면 전 화면 단추가 같이 낮아지므로 이 띠 안에서만 낮춘다. */
+  .vex-btn{margin-left:auto;height:26px;padding:0 11px;font-size:11.75px;}
   .muted-s{font-size:12.25px;color:var(--muted-2);}
   /* 미배정 = 병목이라 다른 지표와 구분해 보이게 한다(2026-07-26 조치 검증). */
   .kpi-unassigned{border-color:rgba(240,160,32,.5) !important;background:rgba(240,160,32,.07) !important;}
@@ -182,6 +178,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .fchip.on{background:var(--blue);border-color:var(--blue);color:#fff;}.fchip.on b{color:#fff;} /* 부모가 채움(--blue) — 자식 b도 흰 글자 유지(검토관 중4: 스윕이 블록만 봐서 건수가 잉크로 바뀌었었다) */
   .rv-rows{max-height:640px;overflow-y:auto;}
   .rv-row{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:3px;}
+  /* ⚠ 아이디 특이도(1,1,0)로 적는다 — nav.js의 .gj-rows1 규칙(0,5,0)이 세로 padding을
+     5px로 덮고 있어 .rv-row에 적으면 무시된다(2026-08-21 설계관 지적: 「잘못 짚으면
+     고쳐도 안 변한다」). 줄 34 → 30px, 여백 3 → 2px. */
+  #rvList .rv-row{padding-top:3px;padding-bottom:3px;margin-bottom:2px;}
+  #rvList .rv-rt{line-height:1.5;}
   .rv-row:hover{background:var(--panel);}
   .rv-row.on{background:var(--panel);border-color:rgba(59,130,246,.4);}
   .rv-dot{width:8px;height:8px;border-radius:50%;flex:none;}
@@ -271,6 +272,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function isUnassigned(r) {
     return !r.assignee && ["pending", "in_progress", "verifying"].includes(r.status);
   }
+  // 지연 = 기한이 지났는데 아직 안 끝난 건. ⚠ **서버 approvals.ts isOverdue와 같은 잣대**를
+  // 쓴다 — 개수는 서버 요약(summary.overdue)이 주고 여기서는 「어느 줄이 그건가」만 고른다.
+  // 둘이 어긋나면 알약 숫자와 걸러진 목록 길이가 달라져 바로 티가 난다.
+  function isOverdue(r) {
+    const d = new Date();
+    const 오늘 = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    return !!r.dueDate && String(r.dueDate) < 오늘 && !["rejected", "approved", "accepted"].includes(r.status);
+  }
   // 다른 화면에서 "이 건"을 눌러 들어왔을 때 좁혀 보는 자산(2026-07-31 사용자 지적:
   // "해당 IP나 호스트를 눌렀을 때 해당 취약점만 나와야 하는데 전체가 보인다").
   // ⚠ 상태 필터(rvFilter)와 **곱해서** 건다 — 자산으로 좁힌 뒤 상태 칩도 그대로 쓸 수 있어야 한다.
@@ -290,6 +299,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       case "approved": return r.status === "approved";
       case "pending": return r.status === "pending";
       case "unassigned": return isUnassigned(r);
+      case "overdue": return isOverdue(r);
       default: return true;
     }
   }
@@ -325,13 +335,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       } else if (알림) {
         알림.style.display = "none";
       }
-      // 요약 카드
-      document.getElementById("kPending").textContent = 요약.pending;
-      document.getElementById("kProg").textContent = 요약.in_progress ?? 0;
-      document.getElementById("kVerify").textContent = 요약.verifying ?? 0;
-      document.getElementById("kApproved").textContent = 요약.approved;
-      document.getElementById("kRejected").textContent = 요약.rejected;
-      document.getElementById("kOverdue").textContent = 요약.overdue ?? 0;
+      // 요약 = 아래 상태 알약 한 줄이 전부다(2026-08-21 — 옛 카드 7장은 같은 숫자를
+      // 두 번 그리고 있었다). 「지연」만 이 줄로 옮겨 왔다.
+      document.getElementById("fcOverdue").textContent = 요약.overdue ?? 0;
       document.getElementById("fcActive").textContent = cnt((r) => ["pending", "in_progress", "verifying"].includes(r.status));
       document.getElementById("fcProg").textContent = 요약.in_progress ?? 0;
       document.getElementById("fcVerify").textContent = 요약.verifying ?? 0;
@@ -339,9 +345,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("fcAccepted").textContent = 요약.accepted ?? 0;
       document.getElementById("fcApproved").textContent = 요약.approved;
       document.getElementById("fcPending").textContent = 요약.pending;
-      const unassigned = cnt(isUnassigned);
-      document.getElementById("kUnassigned").textContent = unassigned;
-      document.getElementById("fcUnassigned").textContent = unassigned;
+      document.getElementById("fcUnassigned").textContent = cnt(isUnassigned);
       그림띠();
       renderList();
       // 상태가 바뀌면 VEX로 나갈 값도 바뀐다 — 칩을 같이 갱신한다(선언과 화면이 어긋나지 않게).
@@ -903,22 +907,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       }
     });
 
-    // 미배정 카드 클릭 = 미배정만 보기(병목을 바로 열어본다)
-    // 미배정 = 병목(검증은 배정된 건에만 가능) — 누르면 미배정만 걸러 본다.
-    // ⚠ 카드 껍데기(#kUnassignedCard)는 요약 막대로 바뀌면서 사라진다. 그래서 **옮겨지는
-    //   값 요소(#kUnassigned)에도 같이 건다** — 안 그러면 눌러도 아무 일 없는 자리가 된다.
-    const 미배정보기 = () => {
-      rvFilter = "unassigned";
-      document.querySelectorAll("#rvFilt .fchip").forEach((c) => c.classList.toggle("on", c.dataset.f === "unassigned"));
-      renderList();
-    };
-    ["kUnassignedCard", "kUnassigned"].forEach((id) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.style.cursor = "pointer";
-      el.title = "담당자가 없는 건 — 누르면 미배정만 봅니다";
-      el.addEventListener("click", 미배정보기);
-    });
+    // ⚠ 옛 「미배정 카드 클릭」 배선을 걷었다(2026-08-21) — 카드 7장이 없어졌고,
+    //   미배정 알약(#rvFilt [data-f=unassigned])이 같은 일을 이미 한다(:850 알약 배선).
+    //   껍데기만 지우고 배선을 남기면 아무 요소도 못 잡는 죽은 코드가 된다.
     // 일괄 배정 — 한 건씩 배정은 건수가 늘면 현실적이지 않다.
     document.getElementById("btnBulkClear").addEventListener("click", () => { selected.clear(); renderList(); });
     document.getElementById("btnBulkAssign").addEventListener("click", async () => {

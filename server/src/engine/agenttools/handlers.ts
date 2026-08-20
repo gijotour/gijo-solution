@@ -4,7 +4,7 @@ import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
 import { listAssets, getAsset, registerAsset, updateAssetOwnership, updateAssetMeta, setAssetRobustness, isAiAsset, Asset, 자산표시이름, 예시데이터뿐인가 } from "../assets";
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "../assetcoverage";
 import { expandOntology } from "../ontology";
-import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "../approvals";
+import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, ReviewPatch, ApprovalStatus } from "../approvals";
 import { 표식, 심각도한글, 심각도표식, 자산종류한글 } from "../tone";
 import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
@@ -1710,8 +1710,11 @@ export function runFindingStatusOverview(args: Record<string, string>): string {
   const today = dateOnlyLocal(new Date());
   for (const r of matched) {
     byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
-    if (!r.assignee) unassigned++;
-    if (r.dueDate && r.dueDate < today && r.status === "pending") overdue++;
+    // ⚠ 잣대는 approvals.ts 한 곳에서 받는다(2026-08-21). 예전 이 자리는
+    //   미배정을 !assignee만으로 세어 **끝난 건까지** 셌고, 기한 초과를 pending만 세어
+    //   **진행중·검증의 지연을 놓쳤다** — 담당자에게 「지연 없음」이라 답하던 자리다.
+    if (isUnassignedReview(r)) unassigned++;
+    if (isOverdueReview(r)) overdue++;
   }
 
   // 2026-08-04 이전에 반입한 것은 조사 정보가 취약점으로 저장돼 있다 — **섞였다고 밝힌다.**

@@ -7,7 +7,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import { todayLocal, plusDaysLocal } from "../util/date";
-import { prioritizedReviews, listFindingReviews, PrioritizedFinding, FindingReview } from "./approvals";
+import { prioritizedReviews, listFindingReviews, isUnassignedReview, PrioritizedFinding, FindingReview } from "./approvals";
 import { listAssets } from "./assets";
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
@@ -24,7 +24,9 @@ const plusDays = plusDaysLocal;
 // (수용 만료는 SLA가 아니라 재검토 부상 — acceptExpired가 맡는다. 안 빼면 「기한 초과 즉시
 //  처리」와 「기한까지 수용」이 같은 건에서 충돌한다 — 검토관 2026-08-20 중1).
 export function slaAlerts(): { overdue: FindingReview[]; dueSoon: FindingReview[] } {
-  const reviews = listFindingReviews().filter((r) => r.dueDate && r.status !== "rejected" && r.status !== "accepted");
+  // ⚠ approved(완료)도 빠져야 한다 — 안 빼면 **끝난 건이 「기한 초과 즉시 처리」로 올라온다**
+  //   (2026-08-21 설계관 적발). 잣대는 approvals.ts 한 곳에서 받는다.
+  const reviews = listFindingReviews().filter((r) => r.dueDate && r.status !== "rejected" && r.status !== "accepted" && r.status !== "approved");
   const t = today();
   const soon = plusDays(2);
   return {
@@ -81,7 +83,9 @@ export async function buildDailyBriefing(opts: { save?: boolean } = {}): Promise
   const recommendations: string[] = [];
   if (priorities[0]) recommendations.push(`최우선 조치: [${priorities[0].finding.severity}] ${priorities[0].finding.finding_type} @ ${priorities[0].assetName}${priorities[0].finding.kev ? " (KEV·실제악용)" : ""}`);
   if (overdue.length) recommendations.push(`기한 초과 ${overdue.length}건 즉시 처리 — 담당자 독촉 또는 기한 재조정`);
-  const unassigned = all.filter((r) => !r.assignee);
+  // ⚠ !assignee만 보면 **완료·반려·위험수용까지 세어** 끝난 일을 배정하라고 권한다
+  //   (2026-08-21 설계관 적발 — 화면·판·서버는 이미 통일돼 있었다).
+  const unassigned = all.filter(isUnassignedReview);
   if (unassigned.length) recommendations.push(`미배정 취약점 ${unassigned.length}건 — 상위부터 담당자 지정`);
   if (recommendations.length === 0) recommendations.push("긴급 항목 없음 — 정기 점검·자산 변경 반영을 권장");
 

@@ -46,7 +46,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .tile .v{font-size:24px;font-weight:800;margin-top:3px;}
 .tile .d{font-size:12px;color:var(--muted-2);margin-top:3px;}
 .tile.risk{background:linear-gradient(180deg,rgba(226,72,61,.1),transparent);border-color:rgba(226,72,61,.3);}
-.riskbar{background:linear-gradient(90deg,rgba(226,72,61,.1),transparent);border:1px solid rgba(226,72,61,.28);border-radius:12px;padding:10px 14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;}
+/* ⚠ 이 띠의 높이는 글자가 아니라 오른쪽 #refreshBtn(공용 --g-btn-h:36px)이 정한다
+   (2026-08-21 실측 분해: 36+20+2+16=74px). 공용 토큰은 안 건드리고 이 띠 안에서만 낮춘다. */
+.riskbar{background:linear-gradient(90deg,rgba(226,72,61,.1),transparent);border:1px solid rgba(226,72,61,.28);border-radius:11px;padding:5px 13px;margin-bottom:9px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;}
+.riskbar #refreshBtn{height:26px;min-height:0;padding:0 11px;font-size:11.75px;}
 .riskbar .rb-main{font-size:15px;font-weight:800;color:var(--text-strong, #fff);}
 .riskbar .rb-lv{font-size:17px;}
 .riskbar .rb-pri{font-size:12px;font-weight:600;color:var(--muted);margin-left:8px;}
@@ -76,7 +79,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .graph-legend .lg{display:inline-block;margin-right:10px;}
 .graph-legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:3px;}
 .task-done{background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.4);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#8fe3c0;line-height:1.5;}
-.filters{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
+.filters{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;}
 .fchip{font-size:12.5px;padding:5px 11px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;}
 .fchip.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:var(--text-strong, #fff);}
 /* 목록 높이는 **창에 맞춰 JS가 정한다**(아래 목록높이맞추기) — 여기 숫자는 계산 전 한순간의 값이다.
@@ -97,6 +100,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .hm-corr{outline:2px solid var(--purple)!important;position:relative}
 .hm-corr::after{content:"⚑";position:absolute;top:-6px;right:0;font-size:11px;color:var(--purple)}
 .risk-row{display:flex;align-items:center;gap:11px;padding:11px 6px;border-bottom:1px solid var(--border);cursor:pointer;}
+/* ⚠ 아이디 특이도(1,1,0)로 적는다 — nav.js의 .gj-rows1(0,5,0)이 세로 padding을 5px로
+   덮고 있어 .risk-row에 적으면 무시된다. 줄 35 → 30px. 배지도 함께 낮추지 않으면
+   배지(24px)가 바닥을 만들어 30px가 안 된다(2026-08-21 설계관 분해). */
+#riskList .risk-row{padding-top:3px;padding-bottom:3px;}
+#riskList .pri{padding:1px 8px;}
+#riskList .rr-name{line-height:1.5;}
 .risk-row:hover{background:var(--panel-2);}.risk-row.sel{background:rgba(59,130,246,.07);}
 .rank{font-size:14px;font-weight:800;color:var(--muted-2);width:22px;text-align:center;flex:none;}
 .src{font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:var(--g-r-pill);flex:none;}
@@ -132,11 +141,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <div class="app">
   <div class="sidebar" id="gijoNav"></div>
   <div class="main">
-    <div class="topbar-row">
-      <div>
-        <div class="page-title">🔬 보안 분석 · 통합 관제</div>
-      </div>
-    </div>
+    <!-- ⚠ 제목줄(.topbar-row)을 없앴다 — 공용 CSS(.g-ui .page-title{display:none})가 제목을
+         이미 숨기고 있어 내용이 0인 채 여백만 먹고 있었다(2026-08-21 실측 18px). -->
 
     <div id="gijoChatWidget" data-prompts='["통합 분석 현황 알려줘"]' style="max-width:640px;margin-bottom:16px;"></div>
 

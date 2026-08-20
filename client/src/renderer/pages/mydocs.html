@@ -117,7 +117,8 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
    숨기는 게 아니라 겹치는 것이라 「고른 것을 못 본다」가 생기지 않는다. */
 .v4content.narrow .v4list{flex:1 1 auto;width:auto;border-right:none;}
 .v4content.narrow .v4docpane{position:absolute;inset:0;z-index:6;background:var(--bg);display:none;}
-.v4content.narrow.showdoc .v4docpane{display:block;}
+/* ✕ 자리를 비워 둔다 — 안 비우면 편집기 첫 줄 오른쪽 끝 단추(💾 저장)가 ✕에 먹힌다. */
+.v4content.narrow.showdoc .v4docpane{display:block;padding-top:36px;}
 .v4close{display:none;position:absolute;top:8px;right:10px;z-index:7;width:24px;height:24px;padding:0;
   border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);
   font-size:12px;cursor:pointer;font-family:inherit;line-height:1;}
@@ -258,7 +259,7 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
       <button class="v4collapse" id="v4collapse" title="왼쪽 칸 접기·펴기">◧</button></div>
     <div class="v4tree" id="tabs">
       <div class="v4grouplbl">내가 쓰는 것</div>
-      <button class="v4node on" data-t="mine">📝<span class="txt">내 것</span><span class="cnt" id="nMine"></span></button>
+      <button class="v4node on" data-t="mine">👤<span class="txt">내 것</span><span class="cnt" id="nMine"></span></button>
       <div class="v4subs" id="mineSeg" style="display:none">
         <button class="v4sub on" data-f="all">전부</button>
         <button class="v4sub" data-f="personal">👤 개인만</button>
@@ -420,7 +421,9 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
       try { document.removeEventListener("paste", cx붙여넣기); } catch (e) { }
       cx = null;
     }
-    document.getElementById("mineSeg").style.display = 탭 === "mine" ? "block" : "none";
+    // ⚠ 인라인 display를 **켤 때는 빈 문자열**로 준다(검토관 중4) — "block"을 박으면
+    //   인라인이 CSS를 이겨서, 왼쪽 칸이 44px로 접혔을 때도 개인/공유 단추가 잘린 채 남는다.
+    document.getElementById("mineSeg").style.display = 탭 === "mine" ? "" : "none";
     document.getElementById("learnTop").style.display = 탭 === "learn" ? "flex" : "none";
     document.getElementById("acts").style.display = 탭 === "mine" ? "flex" : "none";
     document.getElementById("guideActs").style.display = 탭 === "guide" ? "flex" : "none";
@@ -431,8 +434,29 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
     pane.classList.toggle("staged", which !== "list");
     // 열람만은 상세를 위에 남긴다 — 무엇을 읽고 있는지가 사라지면 안 된다.
     pane.classList.toggle("read", which === "read");
+    // ⚠ 🎓 학습의 전폭(full)은 문서창을 display:none으로 만든다(검토관 중5) — 스테이지를
+    //   열 때 안 걷으면 **편집기가 열렸는데 화면에 없다**(§6 템플릿 수신이 정확히 그 경로다).
+    if (which !== "list") document.getElementById("v4content").classList.remove("full");
     문서창보임(which !== "list" || !!선택);
     폭맞추기();   // 분할 편집이 좁은 문서창에서 두 칸으로 열리지 않게(.thin)
+  }
+
+  // ── 쓰던 글 확인 — **소멸시킬 수 있는 모든 문 앞에** 세운다(검토관 상1).
+  //    v3에서는 스테이지 중 조작이 전부 숨어 있어 이 문이 하나뿐이었는데, v4는 목록·도구줄이
+  //    계속 보이므로 문이 여럿 생겼다. 한 곳이라도 빠지면 쓰던 글이 조용히 사라진다.
+  async function 쓰던글확인() {
+    if (스테이지값 === "edit") {
+      var 쓴것 = document.getElementById("editTitle").value.trim() || document.getElementById("editBody").value.trim();
+      if (!쓴것) return true;
+      return window.gijoAsk ? await window.gijoAsk("작성 중인 문서가 있습니다 — 저장하지 않고 나가면 사라집니다.\n나갈까요?") : false;
+    }
+    if (스테이지값 === "compose") {
+      cx담기();
+      var 적음 = cx && ((cx.title || "").trim() || (cx.tried || "").trim() || (cx.happened || "").trim() || (cx.images || []).length);
+      if (!적음) return true;
+      return window.gijoAsk ? await window.gijoAsk("작성 중인 요청이 있습니다 — 저장하지 않고 나가면 사라집니다.\n나갈까요?") : false;
+    }
+    return true;
   }
 
   // 문서창을 띄울지 — 넓을 때는 늘 자리에 있고, 좁을 때만 목록을 덮는다.
@@ -445,11 +469,17 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
   //    ① 1000px 미만 사이드바 자동 접기 ② 820px 미만 문서창이 목록을 덮기.
   //    세로 모니터(1080)·표준 셸(대화창 옆 380)·팝업 최소폭(700)이 전부 이 아래다.
   var 손으로접음 = false;
+  var 마지막밴드 = null;
   function 폭맞추기() {
     var root = document.getElementById("v4root");
     if (!root) return;
     var w = root.clientWidth || 0;
     if (w <= 0) return;
+    // ⚠ 손으로 정한 것은 **그 폭에서만** 존중한다(검토관 하8) — 영구 래치로 두면 넓은 창에서
+    //   펴 둔 200px이 380px 셸까지 따라와 목록이 180px가 된다. 폭 갈래가 바뀌면 다시 자동.
+    var 밴드 = w < 820 ? 0 : w < 1000 ? 1 : 2;
+    if (마지막밴드 !== null && 밴드 !== 마지막밴드) 손으로접음 = false;
+    마지막밴드 = 밴드;
     if (!손으로접음) document.getElementById("v4side").classList.toggle("collapsed", w < 1000);
     var c = document.getElementById("v4content");
     c.classList.toggle("narrow", w < 820);
@@ -460,24 +490,27 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
 
   // ── 탭별 그리기(전부 .g-rows — 승인 시안 docs-hub-v2: 새 시각 언어 금지) ──────
   function 그리기() {
-    // ⚠ 스테이지 중에는 목록을 다시 그리지 않는다(검토관 상1) — 비동기 불러오기()가 끝나며
-    //   그리기()를 부르면 편집기·요청 폼이 **쓰는 도중에** 닫혀 글이 사라진다. §6 계약(셸이
-    //   화면을 열자마자 템플릿 메시지를 보내는 흐름)이 정확히 이 경합에 걸리는 자리다.
-    if (스테이지값 !== "list") { 탭수그리기(); return; }
+    // ⚠ v4에서는 스테이지 중에도 **목록을 다시 그린다**(검토관 상2). v3에서는 스테이지가
+    //   목록·검색칸을 통째로 숨겨서 안 그려도 됐지만, v4는 둘 다 화면에 남아 있다 —
+    //   안 그리면 검색칸을 쳐도 안 걸러지고 🗂 그룹 ▾를 눌러도 안 접히는 **죽은 조작**이 된다.
+    //   ⚠ 대신 스테이지를 **닫지는 않는다**(옛 상1) — 비동기 불러오기()가 끝나며 편집기가
+    //   쓰는 도중에 닫히면 글이 사라진다. 「목록은 그린다 · 스테이지는 그대로 둔다」가 계약이다.
+    var 목록모드 = 스테이지값 === "list";
     var q = (document.getElementById("q").value || "").toLowerCase().trim();
     var list = document.getElementById("list");
     var 걸림 = function (s) { return !q || String(s).toLowerCase().indexOf(q) >= 0; };
-    스테이지("list");
-    document.getElementById("note").textContent = 기본노트; // 산출물 예약 안내가 눌러앉지 않게(검토관 하9)
+    스테이지(스테이지값);
+    if (목록모드) document.getElementById("note").textContent = 기본노트; // 산출물 예약 안내가 눌러앉지 않게(검토관 하9)
     // 🎓 학습은 조작이 없는 열람 전용이라 문서창을 아예 안 쓴다 — 목록이 전폭을 갖는다.
-    document.getElementById("v4content").classList.toggle("full", 탭 === "learn");
+    document.getElementById("v4content").classList.toggle("full", 탭 === "learn" && 목록모드);
     document.getElementById("rowsBox").className = "g-rows g-rows--hub-" + 탭;
 
     // 불러오기 실패는 「없습니다」가 아니다(검토관 상4) — 그 탭의 원천이 죽었으면 그렇게 말한다.
     var 탭오류 = 탭 === "mine" ? 오류.mine : 탭 === "learn" ? 오류.learn : 탭 === "guide" ? 오류.guide : 오류.know;
     if (탭오류) {
       list.innerHTML = '<div class="empty">불러오기 실패 — ' + esc(탭오류) + "<br>서버 연결을 확인하고 새로고침해 주세요.</div>";
-      탭수그리기(); 상세초기화();
+      탭수그리기();
+      if (목록모드) 상세초기화();   // 스테이지 중이면 쓰던 것을 건드리지 않는다
       return;
     }
 
@@ -565,7 +598,19 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
         }).join("") + "</div>" : '<div class="empty">＋로 올린 문서의 반입 기록이 여기 쌓입니다.<br><span class="gm2">스캐너 결과·보안 로그 반입은 ① 발견·수집 화면에서 봅니다.</span></div>');
     }
     탭수그리기();
+    if (!목록모드) return;   // 스테이지 중 — 목록만 새로 그리고 고른 것·문서창은 그대로 둔다
+    if (되살릴선택) { 되살리기(); return; }
     상세초기화();
+  }
+
+  // AI 포함·공유를 켠 뒤 목록이 다시 그려져도 **보던 문서에 그대로 머문다**(검토관 하7).
+  // 안 하면 좁은 자리에서 덮개가 걷혀 목록으로 튕기고, 이어서 「공유」를 누르려면 행을 다시 찾아야 한다.
+  var 되살릴선택 = null;
+  function 되살리기() {
+    var id = 되살릴선택; 되살릴선택 = null;
+    var row = document.querySelector('#list .g-rows-r[data-id="' + String(id).replace(/"/g, '\\"') + '"]');
+    if (row) { row.click(); return; }
+    상세초기화();   // 그새 사라졌으면(삭제·필터) 정직하게 목록 상태로
   }
 
   function 탭수그리기() {
@@ -639,23 +684,9 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
       document.getElementById("note").textContent = "🗂 산출물 — 예약된 자리입니다(생성 리포트·공식 인수인계 기록의 읽기전용 열람을 모을 예정). 아직 동작하지 않습니다.";
       return;
     }
-    // 스테이지 중 탭 이동 — 쓰던 글이 있으면 되묻는다(검토관 상1: 확인 없는 소멸 금지)
-    if (스테이지값 === "edit") {
-      var 쓴것 = document.getElementById("editTitle").value.trim() || document.getElementById("editBody").value.trim();
-      if (쓴것) {
-        var ok = window.gijoAsk ? await window.gijoAsk("작성 중인 문서가 있습니다 — 저장하지 않고 나가면 사라집니다.\n나갈까요?") : false;
-        if (!ok) return;
-      }
-      스테이지값 = "list";
-    } else if (스테이지값 === "compose") {
-      cx담기();
-      var 적음 = cx && ((cx.title || "").trim() || (cx.tried || "").trim() || (cx.happened || "").trim() || (cx.images || []).length);
-      if (적음) {
-        var ok2 = window.gijoAsk ? await window.gijoAsk("작성 중인 요청이 있습니다 — 저장하지 않고 나가면 사라집니다.\n나갈까요?") : false;
-        if (!ok2) return;
-      }
-      스테이지값 = "list";
-    } else if (스테이지값 === "read") { 스테이지값 = "list"; }
+    // 스테이지 중 갈래 이동 — 쓰던 글이 있으면 되묻는다(확인 없는 소멸 금지). 잣대는 한 곳.
+    if (!(await 쓰던글확인())) return;
+    스테이지값 = "list";
     Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) { x.classList.remove("on"); });
     b.classList.add("on");
     탭 = b.getAttribute("data-t") || "mine";
@@ -723,7 +754,7 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
   });
 
   // 행 클릭 — 탭별 상세(편집 조작은 내 것 탭에서만: 「위험한 관리는 전용 화면」·읽기전용 경계)
-  document.getElementById("list").addEventListener("click", function (ev) {
+  document.getElementById("list").addEventListener("click", async function (ev) {
     // 그룹 접기(검토관 중10 — ▾를 그려 놓고 배선이 없으면 죽은 조작). 회사 지식·제품 안내 공용.
     var gh = ev.target.closest(".g-rows-gh");
     if (gh) {
@@ -734,6 +765,13 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
     if (탭 === "learn") return; // 열람 전용 — 고를 것도 상세도 없다(검토관 하6)
     var row = ev.target.closest(".g-rows-r");
     if (!row) return;
+    // ⚠ v4는 편집·요청을 쓰는 중에도 목록이 살아 있다(검토관 상1-c·중6) — 행을 누르면
+    //   쓰던 글이 사라질 수 있으므로 먼저 되묻고, 이어 스테이지를 정직하게 내린다.
+    //   안 내리면 편집기는 A인데 대화창 🎯만 B로 바뀌어 「이거 요약해줘」가 딴 문서를 답한다.
+    if (스테이지값 === "edit" || 스테이지값 === "compose") {
+      if (!(await 쓰던글확인())) return;
+      스테이지("list");
+    }
     Array.prototype.forEach.call(document.querySelectorAll(".g-rows-r.sel"), function (x) { x.classList.remove("sel"); });
     row.classList.add("sel");
     var id = row.getAttribute("data-id");
@@ -797,8 +835,9 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
     try {
       // ✏ 고치기 — 본문은 목록 응답에 없어 읽기 라우트로 가져와 연다(빈 본문으로 열면 저장이 본문을 지운다)
       if (act === "edit") { 편집열기_기존(doc); return; }
-      else if (act === "rag") { await window.gijo.personalDocsRag(doc.id, !doc.ragOptIn); }
-      else if (act === "share") { await window.gijo.personalDocsShare(doc.id, !doc.shared); }
+      // 토글 뒤에도 보던 문서에 머문다(검토관 하7) — 이어서 다른 토글을 누르려면 그래야 한다.
+      else if (act === "rag") { 되살릴선택 = doc.id; await window.gijo.personalDocsRag(doc.id, !doc.ragOptIn); }
+      else if (act === "share") { 되살릴선택 = doc.id; await window.gijo.personalDocsShare(doc.id, !doc.shared); }
       else if (act === "down") {
         // 저장소 다운로드 관례(approvals·docbox와 동일 — 검토관 중9): appendChild→click→remove,
         // revoke는 8초 뒤(같은 틱이면 브라우저가 URL을 못 읽는 경합), 완료를 사람에게 알림.
@@ -879,7 +918,11 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
       편집열기(doc, { body: (full && full.body) || "" });
     } catch (e) { if (window.gijoTell) window.gijoTell("문서를 열지 못했습니다 — " + ((e && e.message) || "오류")); }
   }
-  document.getElementById("btnNew").addEventListener("click", function () { 편집열기(null, { openDrawer: true, body: "" }); });
+  // ⚠ 도구줄은 편집 중에도 보인다(v4) — 되묻지 않으면 쓰던 글이 빈 편집기로 덮인다(검토관 상1-a).
+  document.getElementById("btnNew").addEventListener("click", async function () {
+    if (!(await 쓰던글확인())) return;
+    편집열기(null, { openDrawer: true, body: "" });
+  });
   document.getElementById("editBack").addEventListener("click", 목록으로);
   document.getElementById("editCancel").addEventListener("click", 목록으로);
   document.getElementById("editTplToggle").addEventListener("click", function () {
@@ -921,17 +964,24 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
   });
 
   // ── 제품 안내 열람 스테이지 — docbox의 넓은 읽기 화면 승계(300px 상세에 본문을 욱여넣지 않는다) ──
+  // ⚠ 늦게 온 응답이 나중 선택을 덮지 않게 표를 뽑는다(검토관 중3). v4는 행을 누르면 바로
+  //   열려서 연속 클릭이 흔해졌다 — 문서 크기에 따라 완료 순서가 뒤바뀌면 **A 본문을 B로 알고
+  //   읽거나**, A의 401 오류가 정상인 B 자리를 덮어 「B가 고장」으로 보인다.
+  var 안내표 = 0;
   async function 안내열기(id) {
+    var 내표 = ++안내표;
     var body = document.getElementById("readBody");
     document.getElementById("readTitle").textContent = "";
     body.innerHTML = '<div class="empty">여는 중…</div>';
     스테이지("read");
     try {
       var doc = await window.gijo.docboxRead(id);
+      if (내표 !== 안내표) return;   // 그새 다른 문서를 눌렀다 — 늦은 응답은 버린다
       document.getElementById("readTitle").textContent = doc.title || "";
       body.innerHTML = window.gijoMd && window.gijoMd.render ? window.gijoMd.render(doc.markdown || "") : esc(doc.markdown || "");
       body.scrollTop = 0;
     } catch (e) {
+      if (내표 !== 안내표) return;   // 늦게 온 실패도 남의 자리를 덮지 않는다
       var m = String((e && e.message) || e);
       body.innerHTML = '<div class="empty">' +
         (/unauthorized|401/i.test(m)
@@ -1115,7 +1165,11 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
       if (btn) btn.disabled = false;
     }
   }
-  document.getElementById("btnRequest").addEventListener("click", 요청열기);
+  // ⚠ 되묻지 않으면 쓰던 요청(캡처 포함)이 통째로 초기화된다(검토관 상1-b).
+  document.getElementById("btnRequest").addEventListener("click", async function () {
+    if (!(await 쓰던글확인())) return;
+    요청열기();
+  });
 
   // ── 신고 시한 연계 계약(승인 시안 §6) — {type:"gijo:newDocFromTemplate", templateId, prefill} ──
   // 발신자는 부모 셸만 믿는다(발신자 검증 계약 5.37.0과 같은 잣대 — 아무 창이나 이 화면에
@@ -1164,20 +1218,7 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
   });
   // 좁은 자리에서 목록으로 돌아가는 문. 쓰던 글이 있으면 되묻는다(탭 이동과 같은 잣대).
   document.getElementById("v4close").addEventListener("click", async function () {
-    if (스테이지값 === "edit") {
-      var 쓴것 = document.getElementById("editTitle").value.trim() || document.getElementById("editBody").value.trim();
-      if (쓴것) {
-        var ok = window.gijoAsk ? await window.gijoAsk("작성 중인 문서가 있습니다 — 저장하지 않고 닫으면 사라집니다.\n닫을까요?") : false;
-        if (!ok) return;
-      }
-    } else if (스테이지값 === "compose") {
-      cx담기();
-      var 적음 = cx && ((cx.title || "").trim() || (cx.tried || "").trim() || (cx.happened || "").trim() || (cx.images || []).length);
-      if (적음) {
-        var ok2 = window.gijoAsk ? await window.gijoAsk("작성 중인 요청이 있습니다 — 저장하지 않고 닫으면 사라집니다.\n닫을까요?") : false;
-        if (!ok2) return;
-      }
-    }
+    if (!(await 쓰던글확인())) return;
     Array.prototype.forEach.call(document.querySelectorAll(".g-rows-r.sel"), function (x) { x.classList.remove("sel"); });
     목록으로();
   });

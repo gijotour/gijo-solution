@@ -267,11 +267,28 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
       const rb = document.getElementById("readBody");
       if (rb && rb.textContent && rb.textContent.length > 200 && !/여는 중/.test(rb.textContent)) { 본문 = true; break; }
     }
-    // 열람 중에도 목록은 살아 있어야 한다 — v4의 핵심(왕복 없음)
-    const 열람중목록 = document.querySelectorAll(".g-rows--hub-guide .g-rows-r").length;
-    // 📖 단추 계약은 남아 있다(자동으로 열리더라도 다시 열 수 있어야 한다)
-    const 열어보기있음 = !!document.querySelector('#detail button[data-act="read"]');
+    // ⚠ 열람 중에도 목록이 **보여야** 한다 — v4의 핵심(왕복 없음). 노드 수만 세면 v3에서도
+    //   참이고(v3는 #cols를 display:none으로 감췄을 뿐 노드는 남았다), v4 자신의 좁은 폭
+    //   (문서창이 목록을 덮는 상태)도 통과한다. **실제로 보이는지**를 재야 계약을 지킨다.
+    //   (검토관 2026-08-21 상1 — 「DOM 존재는 보임의 증거가 아니다」)
+    const 첫행 = document.querySelector(".g-rows--hub-guide .g-rows-r");
+    const 열람중목록 = 첫행 && 첫행.offsetParent !== null && 첫행.getBoundingClientRect().width > 0
+      ? document.querySelectorAll(".g-rows--hub-guide .g-rows-r").length : 0;
+    // 📖 단추가 **실제로 다시 연다**는 것까지 잰다(존재만 보면 그 갈래가 죽어도 통과한다 — 중5).
+    const 열어보기 = document.querySelector('#detail button[data-act="read"]');
+    let 재열림 = false;
+    if (열어보기) {
+      document.getElementById("readBody").innerHTML = "";
+      열어보기.click();
+      for (let i = 0; i < 15; i++) {
+        await new Promise((x) => setTimeout(x, 400));
+        const rb = document.getElementById("readBody");
+        if (rb && rb.textContent.length > 200 && !/여는 중/.test(rb.textContent)) { 재열림 = true; break; }
+      }
+    }
     document.getElementById("readBack").click();
+    // ⚠ 가드로 넘기지 않는다 — 선택자가 죽으면 여기서 조용히 건너뛰고 **뒤 판정만으로 초록**이 된다
+    //   (btnNew는 도구줄이 숨어 있어도 programmatic click이 먹는다 — 검토관 중6).
     const mineBtn = document.querySelector('#tabs .v4node[data-t="mine"]');
     if (mineBtn) mineBtn.click();
     await new Promise((x) => setTimeout(x, 300));
@@ -281,17 +298,23 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     const 편집열림 = document.getElementById("editStage").classList.contains("on");
     // 편집기가 문서창 **안에서** 열렸는가 — 전폭 스테이지로 되돌아가면 v4가 아니다
     const 편집이문서창안 = 편집열림 && 문서창.contains(document.getElementById("editStage"));
+    // 폭 계약을 **잰다**(검토관 하11) — 「40px 이상」은 접힘 44와 펼침 200을 구분하지 못해
+    // 아무것도 안 지켰다. 계약은 「1000px 미만이면 접힌다」이므로 그대로 확인한다.
+    const 루트폭 = Math.round(document.getElementById("v4root").getBoundingClientRect().width);
+    const 접힘 = 사이드.classList.contains("collapsed");
     return {
-      안내행: 행들.length, 목록시작, 본문, 열람중목록, 열어보기있음,
+      안내행: 행들.length, 목록시작, 본문, 열람중목록, 재열림,
       편집전, 편집열림, 편집이문서창안,
+      루트폭, 접힘, 폭계약: 접힘 === (루트폭 < 1000),
       사이드바폭: Math.round(사이드.getBoundingClientRect().width),
       템플릿: document.querySelectorAll("#tplDrawer .tpl-chip").length,
+      노드클릭됨: !!document.querySelector('#tabs .v4node[data-t="mine"]'),
     };
   }).catch(() => null) : null;
-  ok("문서 허브 v4: 제품 안내 렌더+행클릭 본문+열람 중 목록 유지+문서창 편집 전이+템플릿 8종(7+빈)",
-    !!r && r.안내행 > 0 && r.본문 && r.열람중목록 > 0 && r.열어보기있음
+  ok("문서 허브 v4: 제품 안내 렌더+행클릭 본문+열람 중 목록 **보임**+📖 재열기+문서창 편집 전이+폭 계약+템플릿 8종",
+    !!r && r.안내행 > 0 && r.본문 && r.열람중목록 > 0 && r.재열림 && r.노드클릭됨
       && !r.편집전 && r.편집열림 && r.편집이문서창안 && r.템플릿 === 8
-      && r.목록시작 < 140 && r.사이드바폭 >= 40,
+      && r.목록시작 < 140 && r.폭계약,
     JSON.stringify(r));
 }
 

@@ -114,6 +114,22 @@ function isOverdue(dueDate: string | null | undefined, status: ApprovalStatus): 
   return dueDate < todayLocal(); // 'YYYY-MM-DD' 로컬(KST) 달력 기준 비교
 }
 
+// ── 「지연」·「미배정」의 단일 출처 ────────────────────────────────────────────
+// ⚠ 2026-08-21 설계관이 **같은 이름으로 다른 것을 세는 곳 3군데**를 찾았다:
+//   · agenttools/handlers.ts 「기한 초과」가 status === "pending"만 세어 **진행중·검증의
+//     지연을 놓쳤다** — 담당자에게 「지연 없음」이라 답하는데 실제로는 있는 상황.
+//   · agenttools/handlers.ts·briefing.ts 「미배정」이 !assignee만 보아 **완료·반려·위험수용
+//     까지 셌다** — 끝난 일을 「담당자 지정하세요」라고 권했다.
+//   · briefing.ts slaAlerts가 approved를 안 빼서 **끝난 건이 기한 초과로 올라왔다.**
+//   화면·판·서버는 2026-08-20에 통일됐는데 이 셋만 옛 잣대로 남아 있었다.
+//   같은 것을 여러 곳에 적으면 어긋난다 — 이제 이 두 함수가 유일한 출처다.
+export function isOverdueReview(r: { dueDate?: string | null; status: ApprovalStatus }): boolean {
+  return isOverdue(r.dueDate ?? null, r.status);
+}
+export function isUnassignedReview(r: { assignee?: string | null; status: ApprovalStatus }): boolean {
+  return !r.assignee && r.status !== "approved" && r.status !== "rejected" && r.status !== "accepted";
+}
+
 function rowToReview(row: FindingApprovalRow, finding: StandardFinding, assetName: string, gone: boolean): FindingReview {
   return {
     assetId: row.assetId,
