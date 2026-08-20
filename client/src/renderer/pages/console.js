@@ -653,7 +653,16 @@
       try {
         var r = await window.gijo.approveAgentTool(ap.tool, collect(), ap.instruction || "");
         box.innerHTML = '<div class="cs-apd">✅ 실행 완료 — ' + esc(ap.label || ap.tool) + "</div>";
-        append("reply", { icon: "🧭", name: "AI 팀", message: (r && r.output) || "완료했습니다." });
+        var 실행행 = append("reply", { icon: "🧭", name: "AI 팀", message: (r && r.output) || "완료했습니다." });
+        // ★ 실행 뒤 **다음 걸음**을 붙인다(2026-08-20 사장님 「명령 후 다음 작업 연계성」).
+        //   여기가 사슬이 가장 자주 죽던 자리다 — 승인은 매일 지나는 길목인데 실행하고 나면
+        //   대화가 그냥 끝났다. 서버 표(nextguide)에 이미 적혀 있던 문장을 이제 소비한다.
+        try {
+          var P0 = window.gijoChatParts;
+          if (실행행 && P0 && P0.nextChips && r && r.nextChips && r.nextChips.length) {
+            P0.nextChips(실행행, r.nextChips, function (q) { submit(q); });
+          }
+        } catch (e) { /* 칩을 못 그려도 실행 결과는 남는다 */ }
         if (r && r.undoId && window.gijo.undoAgentTool) {
           var ub = document.createElement("button");
           ub.className = "cs-pact";

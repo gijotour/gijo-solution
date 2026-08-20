@@ -155,7 +155,8 @@ export const dispatchApi = {
   // 결재판 승인 — 사람이 값을 확인·수정하고 누른 뒤에만 호출된다.
   // instruction: 이 결재판을 만든 원 지시 — 서버가 승인된 (지시→도구)를 파인튜닝 골드로 누적(Phase 4).
   approve: (tool: string, args: Record<string, string>, instruction = "") =>
-    request<{ output: string; undoId?: string }>("/api/agent/approve", { method: "POST", body: { tool, args, instruction } }),
+    // nextChips — 승인 실행 뒤 「다음 걸음」 문장(2026-08-20). 없을 수도 있다(표에 없는 도구).
+    request<{ output: string; undoId?: string; nextChips?: string[] }>("/api/agent/approve", { method: "POST", body: { tool, args, instruction } }),
   // #7 원클릭 undo — 방금 승인 실행을 통째로 되돌린다(id 생략 시 가장 최근).
   undo: (id?: string) => request<{ ok: boolean; message: string }>("/api/agent/undo", { method: "POST", body: { id } }),
 };

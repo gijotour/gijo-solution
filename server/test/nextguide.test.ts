@@ -88,4 +88,21 @@ describe("배선 감시 — 부품·호출 두 자리", () => {
     expect(iw).toBeGreaterThan(0);
     expect(iw, "P 가드 블록 안").toBeLessThan(w.lastIndexOf("})();"));
   });
+
+  it("★ 승인 실행 뒤에도 칩이 붙는다 — 사슬이 가장 자주 죽던 자리(2026-08-20)", () => {
+    // 실측: 시나리오 177단계 중 **37단계가 결재판**인데 승인 응답에 다음 걸음 안내가 없어
+    // 매일 지나는 길목에서 대화가 끝났다. 표(nextguide)에는 쓰기 도구 4항목이 **적혀 있는데도**
+    // 읽는 쪽이 없어 한 번도 발화된 적이 없었다 — 그 소비부를 계약으로 못박는다.
+    const d = readFileSync(join(__dirname, "..", "src", "engine", "dispatcher.ts"), "utf8");
+    const ap = d.indexOf('"/api/agent/approve"');
+    expect(ap, "승인 라우트를 못 찾았다").toBeGreaterThan(0);
+    const 승인블록 = d.slice(ap, ap + 9000);
+    expect(승인블록, "승인 응답이 nextChips를 안 싣는다 — 표에 적힌 칩이 영영 발화되지 않는다")
+      .toMatch(/nextChips/);
+    const c = readFileSync(join(pages, "console.js"), "utf8");
+    const 승인후 = c.indexOf("approveAgentTool(ap.tool");
+    expect(승인후).toBeGreaterThan(0);
+    expect(c.slice(승인후, 승인후 + 1500), "대화창이 승인 응답의 nextChips를 안 그린다")
+      .toMatch(/nextChips/);
+  });
 });

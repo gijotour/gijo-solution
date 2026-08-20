@@ -1975,7 +1975,18 @@ export function registerDispatcherRoutes(app: Express): void {
         appendApprovedDecision(instruction, toolName, args);
         resetAgentToDefault("orchestrator");
         const updated = completeTask(task.id);
-        res.json({ output, undoId, task: updated.find((t) => t.id === task.id) ?? task });
+        // ★ 승인 실행 뒤에도 **다음 걸음**을 준다(2026-08-20 사장님 「대화창 명령이 후 다음
+        //   작업에 대한 연계성을 많이 고려해줘야할듯」). 여기가 사슬이 가장 자주 죽던 자리다 —
+        //   실측 177단계 중 **37단계가 결재판**인데 승인 응답에는 안내가 하나도 없어, 담당자가
+        //   가장 자주 지나는 길목에서 매번 대화가 끝났다.
+        //   ⚠ 표(nextguide)는 **이미 있다** — register_asset·assign_finding·update_finding_status·
+        //   bulk_update 네 항목이 적혀 있는데 읽는 쪽이 없어 **한 번도 발화된 적이 없었다.**
+        //   새 표를 만드는 것이 아니라 있는 것을 소비한다.
+        //   ⚠ 승인 **전**에 칩을 안 붙이는 계약(결재판이 떠 있으면 생략)은 그대로다 — 승인 전과
+        //   후는 다른 자리다(승인 전 칩은 결재를 미루게 만든다).
+        const { nextChipsFor: 칩표 } = await import("./nextguide.js");
+        const nextChips = 칩표(toolName);
+        res.json({ output, undoId, task: updated.find((t) => t.id === task.id) ?? task, ...(nextChips.length ? { nextChips } : {}) });
       } catch (err) {
         resetAgentToDefault("orchestrator");
         completeTask(task.id);
