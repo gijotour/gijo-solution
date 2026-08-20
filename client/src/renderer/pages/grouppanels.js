@@ -355,7 +355,7 @@
         // 되는 중4 부류 — 설계관 ①-B). 결과 한글은 실화면 audit와 같은 사전.
         rows: function () {
           return window.gijo.listAudit("cli", 200).then(function (r) {
-            var RES = { ok: "성공", blocked: "차단", error: "오류", pending: "대기" };
+            var RES = { ok: "완료", blocked: "차단", error: "실패", pending: "대기" }; // audit.html:189와 글자까지 동일(검토관 중4)
             var 컷 = Date.now() - 24 * 3600 * 1000;
             var list = ((r && r.entries) || r || []).filter(function (e) { return (e.at || 0) >= 컷; });
             return {
@@ -417,8 +417,8 @@
         // (설계관 ③-3-2, 서버 datacard.ts:53-62의 「등록 장비 0 · 준수율 48%」 실사고 처방).
         rows: function () {
           return Promise.all([
-            window.gijo.hardeningTargets.list().catch(function () { return []; }),
-            window.gijo.hardeningRuns(undefined, 300).catch(function () { return []; }),
+            window.gijo.hardeningTargets.list(),   // ⚠ .catch로 []를 주면 실패가 「목록이 없습니다」로
+            window.gijo.hardeningRuns(undefined, 300), // 둔갑한다(검토관 상1) — reject는 목록펴기가 정직하게 그린다
           ]).then(function (r) {
             var targets = (r[0] && r[0].targets) || r[0] || [];
             var runs = (r[1] && r[1].runs) || r[1] || [];
@@ -452,7 +452,7 @@
           var 활성 = schedules.filter(function (s) { return !!s.enabled; }).length;
           // 준수율 = 대상별 **가장 최근** 결과만(옛 결과까지 더하면 고친 것이 계속 세어진다).
           var 최근 = {};
-          runs.forEach(function (x) { if (!(x.targetId in 최근)) 최근[x.targetId] = x; });
+          runs.forEach(function (x) { if (!최근[x.targetId] || x.at > 최근[x.targetId].at) 최근[x.targetId] = x; }); // rows와 같은 산식(at 최대 — 서버 정렬에 기대지 않는다, 검토관 하11)
           var vals = Object.values(최근);
           var 합 = vals.reduce(function (a, x) { return a + (x.pass || 0); }, 0);
           var 총 = vals.reduce(function (a, x) { return a + (x.pass || 0) + (x.fail || 0); }, 0);
@@ -477,10 +477,10 @@
         // 유형 한글(report.html:286 TYPE_LABEL)·2열은 대상 한글(:505 — 영문 그대로 금지).
         rows: function () {
           return window.gijo.listReportHistory().then(function (list) {
-            var TL = { weekly: "주간 보고", quarterly: "분기 보고", ondemand: "요청 생성", incident: "사고 보고" };
+            var TL = { weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드", answer: "AI 작성 자료", ingest: "파일 처리 내역" }; // report.html:286 TYPE_LABEL과 글자까지 동일(검토관 상2 — incident는 없는 키, answer·ingest 누락이었다)
             var AU = { internal: "내부용", official: "보고용" };
             return {
-              cols: ["유형", "대상", "생성"],
+              cols: ["유형", "구분", "생성"], // 「대상」은 실화면에서 자산 이름의 자리(검토관 하9) — audience는 구분
               grid: "1fr 84px 56px",
               rows: (list || []).map(function (r) {
                 return [말(TL, r.type), 말(AU, r.audience), 날(r.createdAt)];
@@ -623,8 +623,7 @@
         // 등급 한글은 memory.html:664 GRADE_LABEL과 동일.
         // ⚠ 내 개인 문서(personal: 접두)는 뺀다(설계관 ③-3-1 — 서버는 남의 것만 거르고 내
         //   것은 포함해, 신설 「내 문서」 판과 같은 문서가 두 판에 세어진다). 실화면
-        //   mydocs.html 회사문서만()과 같은 잣대. 이 필터로 요약 수가 한 번 「바뀜」으로
-        //   서는 것은 정상(기준선 재설정).
+        //   mydocs.html 회사문서만()과 같은 잣대 — load(요약)도 같은 필터를 쓴다.
         rows: function () {
           return window.gijo.listMemoryDocuments().then(function (docs) {
             var GL = { O: "공개", S: "민감", C: "기밀" };
@@ -644,7 +643,11 @@
           window.gijo.listMemoryDocuments().catch(function () { 못함.push("문서 목록"); return []; }),
           window.gijo.ontologyStats().catch(function () { 못함.push("온톨로지 통계"); return null; }),
         ]).then(function (r) {
-          var docs = r[0] || [];
+          // rows와 같은 모집단 — 내 개인 문서(personal:) 제외(검토관 중5: 목록만 거르고
+          // 요약을 안 거르면 같은 판에서 요약과 줄 수가 어긋나고, 내 문서 판과의 이중
+          // 계수가 요약에 그대로 남는다). 이 필터로 요약 수가 줄며 한 번 「바뀜」이 서는
+          // 것은 기준선 재설정으로 정상이다.
+          var docs = (r[0] || []).filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0; });
           var 오늘 = new Date().toISOString().slice(0, 10);
           var 오늘반입 = docs.filter(function (d) { return String(d.ingestedAt || "").slice(0, 10) === 오늘; }).length;
           return {
@@ -798,7 +801,7 @@
           return window.gijo.assetHub().then(function (d) {
             var rs = (d && d.rows) || [];
             // riskBand 실제 값은 critical|high|medium|ok (assethub.ts:45 — bad·warn은 없는 값)
-            var BAND = { critical: "매우 위험", high: "위험", medium: "주의", ok: "정상" };
+            var BAND = { critical: "고위험", high: "고위험", medium: "주의", ok: "정상" }; // 선택 카드(assets.html:235)와 같은 3단계 — 같은 값 두 말 금지(검토관 하10)
             var 순위 = { critical: 0, high: 1, medium: 2, ok: 3 };
             rs = rs.slice().sort(function (a, b) { return (순위[a.riskBand] == null ? 9 : 순위[a.riskBand]) - (순위[b.riskBand] == null ? 9 : 순위[b.riskBand]); });
             return {
@@ -841,7 +844,7 @@
             (gs || []).forEach(function (g) {
               (g.products || []).forEach(function (p) {
                 var 매뉴얼 = (p.docs || []).some(function (dc) { return dc.kind === "manual"; });
-                out.push([String(p.name || "-"), String(g.categoryLabel || g.category || "-"),
+                out.push([String(p.name || "-"), String(g.label || g.category || "-") /* 원천은 label(검토관 상3 — categoryLabel은 없는 필드) */,
                   매뉴얼 ? "매뉴얼 있음" : "매뉴얼 없음", 날(p.createdAt)]);
               });
             });
@@ -902,10 +905,12 @@
             var ST = { active: "진행중", done: "완료", ignored: "무시" };
             var items = ((d && d.items) || []).filter(function (s) { return !s.qa; });
             return {
-              cols: ["제목", "누가", "상태", "갱신"],
-              grid: "1fr 76px 56px 44px",
+              // 「누가」 열은 뺐다(검토관 중6 — doneBy는 완료 경위(user|auto)지 사람이 아니고,
+              // origin:user로 걸러서 원리상 정보 0). 없는 자리는 비운다(열 규약).
+              cols: ["제목", "상태", "갱신"],
+              grid: "1fr 56px 44px",
               rows: items.map(function (s) {
-                return [String(s.title || "-"), String(s.doneBy || "-"), 말(ST, s.status || "active"), 날(s.updatedAt || s.createdAt)];
+                return [String(s.title || "-"), 말(ST, s.status || "active"), 날(s.updatedAt || s.createdAt)];
               }),
             };
           });
@@ -918,7 +923,9 @@
             var 오늘 = items.filter(function (s) { return new Date(s.updatedAt || s.createdAt) >= 오늘0시; }).length;
             return {
               rows: [
-                ["저장된 세션", items.length >= 100 ? "100+" : n(items.length)],
+                // 「최근」이라 적는다(검토관 중7) — 서버가 최근 100건을 먼저 자른 뒤 거르므로
+                // 이 수는 전체가 아니라 최근 창이다. 전부인 척하는 100+ 가드는 원리상 안 걸렸다.
+                ["최근 세션", n(items.length)],
                 ["진행중", n(진행)],
                 ["오늘 갱신", n(오늘)],
               ],

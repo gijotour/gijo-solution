@@ -42,7 +42,7 @@
       ".gjr-s .v{font-size:11.75px;color:var(--muted-2,#a49d95);margin-top:2px;}" +
       ".gjr-s .v b{font-size:15px;font-weight:900;color:var(--blue-light,#5fa1ff);}" +
       // 0인 경고는 죽여서 — 색이 흔하면 위험 신호가 안 보인다.
-      ".gjr-s .v .al{color:var(--red,#e2483d);font-weight:800;}" +
+      ".gjr-s .v .al{color:var(--rail-alert,#f5928a);font-weight:800;}" +
       ".gjr-s .v .al0{color:var(--muted-2,#a49d95);font-weight:600;}" +
       ".gjr-s .v .none{color:var(--muted-2,#a49d95);opacity:.6;}";
     document.head.appendChild(st);

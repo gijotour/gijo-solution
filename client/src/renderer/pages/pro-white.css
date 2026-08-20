@@ -95,7 +95,8 @@ html.theme-light .cx-pop { box-shadow: 0 6px 20px rgba(31, 27, 20, 0.18); }
 /* ── 흰 글자 스윕의 잉크(QA 결함 4호 — 「글자는 검정, 색은 심각도만」) ──
  * 화면들의 color:#fff가 var(--text-strong, #fff)로 치환됐다(theme-sweep-whitetext.mjs).
  * 이 토큰은 여기서만 정의 — 표준(다크)·라이트는 폴백 #fff라 무변. */
-html.theme-light { --text-strong: #1f1b14; }
+html.theme-light { --text-strong: #1f1b14;
+  --rail-alert: #b3261e; /* 절차 레일 경고 글자 — 흰 바탕 대비용(다크는 폴백 #f5928a) */ }
 /* 활성 토글·탭(옅은 파랑 배경+흰 글자였던 것) — 검정도 읽히지만 .dc-seg 선례대로 파랑 잉크 */
 html.theme-light .atab.on, html.theme-light .graph-toggle .gt.on,
 html.theme-light .fchip.active, html.theme-light .vchip.on,
