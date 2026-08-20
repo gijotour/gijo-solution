@@ -483,6 +483,25 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     }
     const 타일 = [...document.querySelectorAll("#cePanels .pv-tile")];
     const 첫 = 타일[0] ? 타일[0].textContent || "" : "";
+    // ⚠ **압축(대화 홈)의 ▾를 먼저 눌러 본다**(2026-08-20 병렬 검토). 전체 보기를 먼저 누르면
+    //   그 뒤 검사가 전부 「전체 지도」 쪽 단추를 재게 되어, 사장님이 실제로 쓰는 첫 화면 경로가
+    //   한 번도 안 눌린 채 초록이 난다. 여기가 이번 라운드의 새 배선이라 반드시 재야 한다.
+    let 압축목록행 = 0, 압축전폭 = false;
+    const 압축펴기 = document.querySelector('#cePanels button[data-act="rows"]');
+    if (압축펴기) {
+      압축펴기.click();
+      for (let i = 0; i < 25; i++) {
+        await new Promise((x) => setTimeout(x, 400));
+        압축목록행 = document.querySelectorAll("#cePanels .pv-rows .g-rows-r").length;
+        if (압축목록행) break;
+      }
+      // 펼친 목록이 **줄 전체 폭**을 쓰는지(1열이 안 무너지는지) 확인 — 타일 한 칸 안에서는
+      // 1열이 0px로 사라진다(병렬 검토 상2). 셀의 gridColumn이 넓어졌는지로 잰다.
+      const cell = 압축펴기.closest(".pv-cell");
+      압축전폭 = !!(cell && /1\s*\/\s*-1/.test(cell.style.gridColumn || ""));
+      압축펴기.click();   // 도로 접어 다음 검사에 영향을 주지 않는다
+      await new Promise((x) => setTimeout(x, 300));
+    }
     const 전체보기 = document.getElementById("pvMore");
     let 펼침 = 0;
     if (전체보기) {
@@ -520,6 +539,8 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
       압축: 타일.length,
       확인시각: /확인 /.test(첫),          // 「조용함」과 「확인 못 함」을 가르는 정직 표시
       실패,
+      압축목록행,                          // 첫 화면(사장님이 실제로 쓰는 경로)에서 잰 값
+      압축전폭,                            // 펼친 목록이 줄 전체 폭을 쓰는가(1열 보존)
       입력칸: document.querySelectorAll("#cePanels input, #cePanels textarea").length,
       펼침,
       목록단추: document.querySelectorAll('#cePanels button[data-act="rows"]').length,
@@ -527,8 +548,9 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
       첫열있음,
     };
   }).catch(() => null);
-  ok("현황판: 홈 스트립·확인시각·실패 0·전체보기·목록 첫 열 실내용·입력칸 0",
+  ok("현황판: 홈 ▾ 목록(첫 화면 경로)·줄 전체 폭·실패 0·전체보기·첫 열 실내용·입력칸 0",
     !!r && r.압축 > 0 && r.압축 <= 6 && r.확인시각 && r.실패 === 0 && r.입력칸 === 0
+      && r.압축목록행 > 0 && r.압축전폭          // 첫 화면에서 실제로 펴지고 1열이 안 무너지는가
       && r.펼침 > r.압축 && r.목록단추 > 0 && r.목록행 > 0 && r.첫열있음,
     JSON.stringify(r));
 }

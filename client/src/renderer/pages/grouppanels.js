@@ -305,11 +305,17 @@
       { id: "maintenance", title: "🛠 정기 점검", page: "maintenance.html", load: function () {
         return window.gijo.listMaintenance().then(function (r) {
           var list = (r && r.items) || r || [];
-          var 오늘 = new Date().toISOString().slice(0, 10);
-          var 지연인가 = function (m) { return String(m.scheduleDate || "") < 오늘 && m.status !== "approved"; };
+          // ⚠ **로컬 날짜**로 잡는다(2026-08-20 병렬 검토). toISOString은 UTC라 한국에서는
+          //   오전 9시 전까지 「어제」로 계산돼, 서버(util/date.ts todayLocal)와 하루가 어긋난다.
+          var d = new Date();
+          var 오늘 = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+          var 지연인가 = function (m) { return String(m.scheduleDate || "") !== "" && String(m.scheduleDate) < 오늘 && m.status !== "approved"; };
           var 기한초과 = list.filter(지연인가).length;
           var 완료 = list.filter(function (m) { return m.status === "approved"; }).length;
-          var 예정 = list.length - 완료 - 기한초과;   // 남은 것 = 전체 − 완료 − 지연(겹치지 않게)
+          // ⚠ 「예정」은 서버 카드와 **같은 잣대**(datacard.ts:520 status==="scheduled")를 쓴다.
+          //   전체−완료−지연으로 빼면 반려(rejected)·검토대기(reported) 중 기한 전인 것까지
+          //   「예정·진행」에 들어가 대화창 카드와 숫자가 갈린다(2026-08-20 병렬 검토).
+          var 예정 = list.filter(function (m) { return m.status === "scheduled" && !지연인가(m); }).length;
           return {
             badge: 기한초과 ? { text: "기한 초과 " + n(기한초과), color: R } : null,
             rows: [
@@ -409,16 +415,25 @@
           //   있고 목록 응답에는 안 실린다. 즉 `!x.qa`는 항상 참인 **죽은 필터**였고,
           //   「QA 리포트는 뺐다」는 거짓 전제를 하나 더 두는 셈이었다(2026-08-20 설계관 적발).
           //   지금은 전부 세는 것이 사실이므로 필터를 걷고 그대로 센다.
-          var 이번주 = list.filter(function (x) { return (x.createdAt || 0) >= 주; }).length;
-          var 최근 = list[0];
+          // ⚠ 다만 목록에는 **사람이 만든 보고서**가 아닌 것도 섞인다(2026-08-20 병렬 검토):
+          //   answer-*(긴 답이 자동으로 넘어간 리포트)·ingest-*(파일 반입 진행내역). 「이번 주
+          //   작성」에 그것들이 들어가면 실제보다 부풀려 읽힌다 — 종류로 갈라 꼬리에 밝힌다.
+          var 자동종류 = { answer: true, ingest: true };
+          var 사람이만든 = list.filter(function (x) { return !자동종류[String(x.type || "")]; });
+          var 자동 = list.length - 사람이만든.length;
+          var 이번주 = 사람이만든.filter(function (x) { return (x.createdAt || 0) >= 주; }).length;
+          // 「마지막 보고」도 사람이 만든 것 기준 — 자동 생성물이 끼면 보고를 안 했는데도
+          // 「어제 보고함」으로 읽힌다.
+          var 최근 = 사람이만든[0];
           var 지난날 = 최근 ? Math.floor((Date.now() - 최근.createdAt) / 86400000) : null;
           return {
             rows: [
               ["이번 주 작성", n(이번주)],
               ["마지막 보고 후", 지난날 == null ? "-" : 지난날 + "일"],
-              ["보관 중", n(list.length)],
+              ["보관 중", n(사람이만든.length)],
             ],
-            foot: "정기·수시 보고서가 여기 쌓입니다",
+            foot: 자동 ? "정기·수시 보고서가 여기 쌓입니다 · 자동 생성물 " + n(자동) + "건은 따로 셉니다"
+              : "정기·수시 보고서가 여기 쌓입니다",
           };
         });
       } },
@@ -431,7 +446,11 @@
           var BAND = { good: "양호", fair: "보통", poor: "취약" };
           var BAND_COLOR = { good: T, fair: A, poor: R };
           return {
-            badge: c.posture && BAND[c.posture.band]
+            // ⚠ 배지는 **알려야 할 때만** 단다(2026-08-20 병렬 검토). band는 언제나 셋 중
+            //   하나라 그대로 두면 「양호」 배지가 상시 붙는데, 배지는 눈길을 끄는 자리라
+            //   좋은 소식까지 달면 진짜 경고가 묻힌다(같은 파일의 「0인 경고는 죽여서 그린다」와
+            //   같은 정신). 양호는 아래 줄에 이미 있고, 배지는 보통·취약일 때만.
+            badge: c.posture && BAND[c.posture.band] && c.posture.band !== "good"
               ? { text: BAND[c.posture.band], color: BAND_COLOR[c.posture.band] || A } : null,
             rows: [
               ["종합 점수", c.posture ? c.posture.score + "/100" : "-"],
