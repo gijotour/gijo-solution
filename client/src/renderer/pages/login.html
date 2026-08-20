@@ -3,6 +3,23 @@
 <head>
 <meta charset="UTF-8" />
 <title>GIJO AS — 로그인</title>
+<script>
+// 라이트 연초록 소비자(max 회신 2026-08-20) — main.ts가 ?edition=lite를 붙여 연다.
+// 받는 쪽이 없으면 반쪽 수리다(docbox theme 전례). <style> 파싱 전에 동기로 입힌다.
+(function () {
+  if (new URLSearchParams(location.search).get("edition") === "lite") {
+    document.documentElement.classList.add("lite-edition");
+    var l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = "lite-green.css";
+    document.head.appendChild(l);
+    // 배지도 처음부터 라이트로 — 「표준」이 박혀 있다 바뀌는 깜빡임을 만들지 않는다.
+    document.addEventListener("DOMContentLoaded", function () {
+      var b = document.getElementById("modeBadge");
+      if (b && !b.textContent) b.textContent = "🪶 라이트";
+    });
+  }
+})();
+</script>
 <style>
   :root {
     --navy: #262624;

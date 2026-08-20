@@ -47,3 +47,33 @@
 .g-ui ::-webkit-scrollbar-thumb { background: rgba(24, 48, 16, 0.22); }
 .g-ui ::-webkit-scrollbar-thumb:hover { background: rgba(24, 48, 16, 0.34); }
 .g-table tbody tr:hover { background: rgba(24, 48, 16, 0.05); }
+
+/* ── 입구 두 화면(로그인·처음 설정) 덮개 — ?edition=lite 소비자 전용(2026-08-20 max 실기 회신) ──
+ * login/setup은 gijo-ui 토큰을 안 쓰는 자체 다크 팔레트(--navy·하드코딩 배경)라, 위 :root
+ * 토큰만으론 안 물든다(라이트 첫 화면이 다크로 뜬 원인). 여기서 그 팔레트를 반전하되
+ * **html.lite-edition 스코프로만** 건다 — 클래스는 두 화면의 head 소비자 스크립트가
+ * ?edition=lite일 때만 붙이므로, 같은 파일을 읽는 lite-* 화면들에는 원리상 무효다.
+ * (html.lite-edition은 0-1-1이라 두 화면의 :root(0-1-0) 변수 정의를 이긴다.) */
+html.lite-edition {
+  --navy: var(--g-bg); --text: var(--g-text); --muted: var(--g-muted); --muted2: var(--g-muted-2);
+  --border: rgba(24, 48, 16, 0.22); --blue: var(--g-blue); --panel: var(--g-surface-1);
+  --amber: var(--g-amber); --red: var(--g-red);
+}
+html.lite-edition body { background: var(--g-bg); }
+html.lite-edition .card, html.lite-edition .side-panel {
+  background: var(--g-surface-1); box-shadow: var(--g-shadow-2);
+}
+html.lite-edition input, html.lite-edition code,
+html.lite-edition .mp-btn, html.lite-edition .rc { background: var(--g-surface-2); }
+html.lite-edition .mp-btn.on { background: rgba(24, 48, 16, 0.09); }
+/* 고른 버튼의 제목 글자색 — 다크의 「밝은 파스텔」은 흰 카드에서 안 읽힌다(4.5:1 미달). 진한 잉크로 반전. */
+html.lite-edition .mp-btn[data-mode="pro"].on .mp-top, html.lite-edition .mp-btn[data-loc="remote"].on .mp-top { color: #44536B; }
+html.lite-edition .mp-btn[data-mode="lite"].on .mp-top { color: #3F6220; }
+html.lite-edition .mp-btn[data-loc="cloud"] .mp-tag, html.lite-edition .mp-btn[data-loc="cloud"].on .mp-top { color: var(--g-amber); }
+html.lite-edition .mode-badge { background: rgba(24, 48, 16, 0.06); }
+html.lite-edition .err, html.lite-edition .rc-x:hover { color: var(--g-red); }
+html.lite-edition .dup-t { color: var(--g-amber); }
+html.lite-edition .dup-no, html.lite-edition .mfa-alt { border-color: rgba(24, 48, 16, 0.30); }
+html.lite-edition .dup-no:hover, html.lite-edition .mfa-alt:hover { color: var(--g-text); }
+/* 처음 설정의 「계정 만들고 시작하기」 — 파랑이 진해졌으니(#2563EB) 글자는 흰색이어야 읽힌다. */
+html.lite-edition button.go { color: #fff; }

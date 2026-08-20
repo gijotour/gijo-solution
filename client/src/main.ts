@@ -382,8 +382,11 @@ function createMainWindow(): void {
   // 최초 화면은 로그인. 인증 성공 후 renderer/core.ts가 대시보드로 전환한다.
   // 첫 설치면 로그인 대신 **관리자 계정 만들기**부터다 — 계정이 없는데 로그인 화면을 띄우면
   // 고객은 들어갈 방법이 없다(예전엔 개발용 jyh/changeme가 그 자리를 메우고 있었다).
+  // 라이트면 첫 화면(로그인·설치)도 연초록을 입는다(max 실기 검증 회신 2026-08-20 —
+  // login/setup이 lite-green 미적재라 라이트 첫인상이 다크·배지 「표준」이었다).
   mainWindow.loadFile(
-    path.join(__dirname, `../src/renderer/pages/${첫설치인가() ? "setup.html" : "login.html"}`)
+    path.join(__dirname, `../src/renderer/pages/${첫설치인가() ? "setup.html" : "login.html"}`),
+    에디션() === "lite" ? { query: { edition: "lite" } } : undefined
   );
 
   // 대시보드(메인) 창 닫기 확인(2026-07-26 사용자 요청) — 진행 중 대화·열린 팝업이 있는 채로
@@ -584,6 +587,10 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   }
   const query: Record<string, string> = {};
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
+  // 🪶 라이트 표식도 같은 관례로 주소에 싣는다(2026-08-20 max 실기 회신 — 입구 두 화면이
+  //   lite-green.css를 못 받아 라이트 첫 화면만 다크로 떴다). 첫 로드는 창 생성부가 싣지만,
+  //   로그아웃·인증 만료가 이 통로라 여기서도 실어야 같은 결함이 재발하지 않는다.
+  if (에디션() === "lite" && (file === "login.html" || file === "setup.html")) query.edition = "lite";
   // ── 프로 셸 신호를 **주소에 실어** 보낸다(2026-08-18) ──────────────────────
   //
   // ⚠ **비동기로는 늦는다.** 프로 여부의 출처는 `shell:get`인데 그건 Promise다.
