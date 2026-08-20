@@ -50,6 +50,9 @@ const SCREENS: Record<string, ScreenContext> = {
   // ⚠ 이 줄이 없으면 `getScreenContext("assets.html")`이 undefined라 **화면 맥락도 도구
   //   좁히기도 안 걸린다** — 화면은 멀쩡히 뜨고 대화만 조용히 멍청해진다(2026-08-18 검토 지적).
   "assets.html": { label: "⓪ 자산", domain: "자산 고르기 — 범위를 정하고 ①~⑤로 간다", toolDomains: ["assets", "vuln"] },
+  // 🎯 고르기 모드(승인 시안 stage-picker) — 자산·취약점을 고르는 얇은 오버레이. 이 줄이
+  // 없으면 이 화면을 띄운 채 지시할 때 화면 맥락이 통째로 빈다(검토관 중7 — assets 전례).
+  "pick.html": { label: "🎯 고르기", domain: "자산·취약점 하나를 골라 대화로 잇는 화면", toolDomains: ["assets", "vuln"] },
   "sbom.html": { label: "AI-BOM 구성", domain: "AI-BOM/SBOM 구성요소·견고성", toolDomains: ["sbom", "assets"] },
   "vulnscan.html": { label: "취약점", domain: "취약점 스캔 결과·조치 우선순위", defaultAction: "analyze", toolDomains: ["vuln", "assets"] },
   "approvals.html": { label: "조치·승인", domain: "탐지 항목 승인·반려", toolDomains: ["vuln"] },

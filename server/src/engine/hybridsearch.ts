@@ -152,6 +152,7 @@ export type Category = (typeof CATEGORIES)[number];
 // 대시보드·기억 화면은 전 영역이 대상이라 매핑하지 않는다(부스트 없음 = 기존과 동일).
 export const SCREEN_CATEGORY: Record<string, Category> = {
   "vulnscan.html": "취약점",
+  "pick.html": "취약점", // 🎯 고르기(자산·취약점) — 취약점 계열 검색 부스트(검토관 중7)
   "analysis.html": "취약점",
   "assethub.html": "취약점",
   "inventory.html": "취약점",

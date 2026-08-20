@@ -211,6 +211,12 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
 {
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("pick.html?kind=vuln", "고르기"));
   const fr = await 프레임찾기("pick.html", 8);
+  // ⚠ 전(前) 상태를 먼저 잰다(관문 헛계측 교훈 — 부정 경로 필수): 무대가 올라가 있고,
+  //   문장에 아직 「다루는 중」이 없어야 클릭의 **전이**를 잰 것이다. 0→0이면 헛초록.
+  const 전 = await 셸.evaluate(() => ({
+    무대: document.body.classList.contains("stage-on"),
+    다루는중: /다루는 중/.test((document.getElementById("csCtx") || {}).textContent || ""),
+  }));
   let r = null;
   if (fr) {
     r = await fr.evaluate(async () => {
@@ -229,8 +235,9 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     무대내림: !document.body.classList.contains("stage-on"),
     문장: (document.getElementById("csCtx") || {}).textContent || "",
   }));
-  ok("고르기: 행 클릭 → 무대 내림+선택(다루는 중)", !!r && r.행 > 0 && 후.무대내림 && /다루는 중/.test(후.문장),
-    JSON.stringify({ 행: r && r.행, ...후, 문장: String(후.문장).slice(0, 50) }));
+  ok("고르기: 무대↑·행 클릭 → 무대 내림+선택(다루는 중, 전이 실측)",
+    전.무대 && !전.다루는중 && !!r && r.행 > 0 && 후.무대내림 && /다루는 중/.test(후.문장),
+    JSON.stringify({ 전, 행: r && r.행, 무대내림: 후.무대내림, 문장: String(후.문장).slice(0, 50) }));
 }
 
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──

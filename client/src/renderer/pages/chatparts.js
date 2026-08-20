@@ -61,6 +61,8 @@
       ".dc-card{margin-top:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:var(--panel-2,#1f1e1d);}",
       ".dc-head{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12.75px;font-weight:800;color:var(--text,#e9e7e2);}",
       ".dc-open{margin-left:auto;font-size:12px;font-weight:700;color:var(--blue-light,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:7px;padding:3px 9px;cursor:pointer;font-family:inherit;}",
+      // 단추가 둘(🎯 고르기+🗔 열기)일 때 auto가 둘로 갈려 허공에 뜨지 않게 — 첫 단추만 민다(검토관 하2)
+      ".dc-open + .dc-open{margin-left:8px;}",
       ".dc-open:hover{background:rgba(59,130,246,.18);}",
       ".dc-kpis{display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,.08);}",
       ".dc-kpi{flex:1;padding:7px 11px;border-right:1px solid rgba(255,255,255,.06);}",
@@ -359,7 +361,12 @@
     if (dc.screen && opts && typeof opts.navigate === "function") {
       // 🎯 고르기(승인 시안 stage-picker, 2026-08-20) — 고르러 갈 때는 허브 전체(첫 행까지
       // 458px·클릭 2회)가 아니라 검색+목록+상세만(110px·클릭 1회). 🗔(전체 화면)은 그대로 둔다.
-      var 고르기kind = { "assets.html": "asset", "triage.html": "vuln", "vulnscan.html": "vuln" }[dc.screen.page];
+      // ⚠ 키는 **카드가 싣는 screen.page**다(검토관 상3 — 자산 카드는 inventory.html을 싣는다.
+      //   assets.html은 리다이렉트 짝이라 함께 둔다). vulnscan은 어떤 카드도 안 실어 뺐다(하4).
+      var 고르기kind = { "inventory.html": "asset", "assets.html": "asset", "triage.html": "vuln" }[dc.screen.page];
+      // 분리창(대화창 ⧉)에는 안 그린다(검토관 중6) — 고르기는 셸 무대에 뜨는데 선택은 숨은
+      // 셸 콘솔로 가서, 분리창 사용자 눈엔 아무 일도 안 일어난 것처럼 보인다.
+      if (고르기kind && !window.gijoTabs) 고르기kind = null;
       if (고르기kind) {
         var g = document.createElement("button");
         g.className = "dc-open";
@@ -461,8 +468,10 @@
         lb.addEventListener("click", function () { lb.className = "on"; hb.className = ""; 몸통그리기("list"); });
         hb.addEventListener("click", function () { hb.className = "on"; lb.className = ""; 몸통그리기("heat"); });
         head.classList.add("hasseg"); // 🗔의 margin-left:auto를 세그먼트가 넘겨받는다
-        var 열기버튼 = head.querySelector(".dc-open");
-        if (열기버튼) head.insertBefore(seg, 열기버튼);
+        // 첫 단추(🎯 고르기가 있으면 그것) **앞**에 세그를 끼운다 — hasseg가 auto를 넘겨받는
+        // 계약 그대로다. 이름을 실제와 맞춘다(검토관 하3 — 「열기버튼」이라던 것이 이제 🎯다).
+        var 첫단추 = head.querySelector(".dc-open");
+        if (첫단추) head.insertBefore(seg, 첫단추);
         else head.appendChild(seg);
       }
       몸통그리기("list");

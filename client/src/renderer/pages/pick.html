@@ -39,7 +39,7 @@
   .pk-row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
   .pk-row .sub{flex:0 0 auto;color:var(--muted-2);font-size:12px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .tag{flex:0 0 auto;font-size:11px;font-weight:800;border-radius:4px;padding:0 5px;}
-  .tag.kev{background:rgba(226,72,61,.16);color:#ff9d9d;}
+  .tag.kev{background:var(--red);color:#fff;} /* 채움 배지(승인 시안 그대로) — 흰 바탕에서도 읽힌다(검토관 중3) */
   .tag.critical{color:var(--red);} .tag.high{color:var(--amber);} .tag.medium{color:var(--blue-light);} .tag.low{color:var(--muted);}
   .detail{border:1px solid var(--border);border-radius:9px;background:var(--panel);padding:12px 14px;position:sticky;top:12px;}
   .detail .dn{font-weight:800;font-size:13.5px;margin:4px 0;}
@@ -59,6 +59,7 @@
   </div>
 </div>
 <script src="dialog.js"></script>
+<script src="scopefilter.js"></script>
 <script src="nav.js"></script>
 <script>
 (function () {
@@ -88,7 +89,9 @@
 
   function 그리기() {
     var q = (document.getElementById("q").value || "").toLowerCase().trim();
-    var 보일 = rows.filter(function (r) { return !q || (r.이름 + " " + (r.fields.asset || "") + " " + (r.보조 || "")).toLowerCase().indexOf(q) >= 0; });
+    // 검색 재료에 증거(evidence)도 넣는다(검토관 하5) — CVE 번호는 finding_type이 아니라
+    // 증거 원문에 적히는 경우가 많다. 화면엔 안 그리고 거르기에만 쓴다.
+    var 보일 = rows.filter(function (r) { return !q || (r.이름 + " " + (r.fields.asset || "") + " " + (r.보조 || "") + " " + (r.증거 || "")).toLowerCase().indexOf(q) >= 0; });
     var CAP = 500; // 있는 것을 숨기지 않는다 — 잘랐으면 아래 메타줄에 적는다
     document.getElementById("meta").textContent =
       보일.length + "건" + (kind === "vuln" ? " · 위험도 순" : " · 이름 순") + (보일.length > CAP ? " (앞 " + CAP + "건 표시 — 검색으로 좁혀 보세요)" : "");
@@ -111,7 +114,8 @@
   async function 자산불러오기() {
     var o = await window.gijo.assetHub();
     rows = ((o && o.rows) || []).map(function (a) {
-      var 이름 = a.name || a.id;
+      // displayName 규약(검토관 중4) — 별칭이 있으면 화면은 그걸 보여준다(assets.html과 같은 잣대)
+      var 이름 = a.displayName || a.name || a.id;
       return {
         이름: 이름, 보조: a.assetType || a.type || "", sev: "", kev: false,
         label: 이름, text: "자산 " + 이름,
@@ -120,24 +124,39 @@
     }).sort(function (a, b) { return a.이름.localeCompare(b.이름, "ko"); });
   }
 
+  // 스캔 오류·조사 정보는 취약점이 아니다 — 세는 자리마다 같은 잣대(grouppanels·서버
+  // isRealVulnerability와 동일, 검토관 중2: 다르게 세면 카드 KPI와 어긋난 수가 뜬다).
+  var SCAN_NOISE = { scan_error: true, info: true };
+  function 진짜취약점(f) { return !SCAN_NOISE[f.finding_type] && !SCAN_NOISE[String(f.severity || "").toLowerCase()]; }
+
   async function 취약점불러오기() {
     var assets = await window.gijo.listAssets();
+    // 🗂 지금 범위가 걸려 있으면 그 자산 것만(검토관 중1 — 거르든지, 못 거른다고 밝히든지).
+    var 범위자산 = window.gijoScope ? window.gijoScope.assetId() : "";
     rows = [];
+    var 전체수 = 0;
     (assets || []).forEach(function (a) {
       (a.findings || []).forEach(function (f) {
-        if (f.state === "fixed") return; // 고르기의 대상은 미조치다 — 닫힌 건은 우선순위 화면 몫
-        var 이름 = f.name || f.title || f.cve || "(이름 없음)";
+        if (f.state === "fixed" || !진짜취약점(f)) return; // 고르기의 대상은 미조치 실취약점이다
+        전체수++;
+        if (범위자산 && a.id !== 범위자산) return;
+        // 이름은 finding_type이 원천이다(검토관 상1 — name·title·cve 필드는 실존하지 않는다)
+        var 이름 = f.finding_type || "(이름 없음)";
+        var 자산이름 = a.displayName || a.name || a.id;
         rows.push({
-          이름: 이름, 보조: a.name || a.id, sev: String(f.severity || "").toLowerCase(), kev: !!f.kev,
-          label: 이름.slice(0, 60), text: "자산 " + (a.name || a.id) + "의 취약점 " + 이름,
+          이름: 이름, 보조: 자산이름, sev: String(f.severity || "").toLowerCase(), kev: !!f.kev,
+          증거: String(f.evidence || "").slice(0, 300),
+          label: 이름.slice(0, 60), text: "자산 " + 자산이름 + "의 취약점 " + 이름,
           fields: {
-            asset: a.name || a.id, title: 이름, severity: String(f.severity || ""),
+            asset: 자산이름, title: 이름, severity: String(f.severity || ""),
             status: f.state || "", plain: f.plain || "", kev: f.kev ? "KEV" : "",
             assetId: a.id, findingKey: f.fkey || "",
           },
         });
       });
     });
+    // 좁혔으면 반드시 보여야 한다 — 부품 띠(🗂 …만 보는 중 · N건 표시 · 숨김 M건)
+    if (window.gijoScope) window.gijoScope.chip(rows.length, 전체수, document.querySelector(".wrap"));
     rows.sort(function (x, y) {
       if (x.kev !== y.kev) return x.kev ? -1 : 1;
       return (SEV[x.sev] ?? 9) - (SEV[y.sev] ?? 9);
@@ -152,12 +171,18 @@
     return;
   }
   document.getElementById("q").addEventListener("input", 그리기);
-  (kind === "asset" ? 자산불러오기() : 취약점불러오기())
-    .then(그리기)
-    .catch(function (e) {
-      document.getElementById("list").innerHTML = '<div class="empty">목록을 불러오지 못했습니다 — 서버 연결을 확인해 주세요.<br>' + esc((e && e.message) || "") + "</div>";
-      document.getElementById("meta").textContent = "";
-    });
+  var 실패 = function (e) {
+    document.getElementById("list").innerHTML = '<div class="empty">목록을 불러오지 못했습니다 — 서버 연결을 확인해 주세요.<br>' + esc((e && e.message) || "") + "</div>";
+    document.getElementById("meta").textContent = "";
+  };
+  if (kind === "asset") {
+    자산불러오기().then(그리기).catch(실패);
+  } else if (window.gijoScope) {
+    // 범위가 걸리거나 풀리면 다시 조회한다 — 등록 즉시 한 번 불리므로 첫 로드도 여기서 된다.
+    window.gijoScope.onChange(function () { 취약점불러오기().then(그리기).catch(실패); });
+  } else {
+    취약점불러오기().then(그리기).catch(실패);
+  }
 })();
 </script>
 </body>

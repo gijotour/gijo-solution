@@ -883,7 +883,9 @@
         });
         if (!Object.keys(f).length) f = null;
       }
-      return d.label && d.text ? { label: String(d.label), text: String(d.text), fields: f } : null;
+      // label·text에도 캡(검토관 하6) — fields만 자르고 이 둘을 안 자르면 화면이 만든 긴 글이
+      // 맥락 문장·지시문으로 그대로 흘러간다. label=문장 강조용(짧게), text=지시 재료.
+      return d.label && d.text ? { label: String(d.label).slice(0, 120), text: String(d.text).slice(0, 300), fields: f } : null;
     };
     // ⑤″ 고르기 모드 전용(승인 시안 stage-picker, 2026-08-20) — **pick.html만 보내는 좁은
     //   신호**라 자동 무대 내림이 안전하다(그 화면엔 확인창·모달이 없고 행 클릭이 유일한 동작).
