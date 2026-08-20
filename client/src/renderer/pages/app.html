@@ -869,12 +869,9 @@
       return;
     }
     // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.
-    // ⑤′ "이걸 골랐어" — 화면(iframe)이 항목을 고르면 대화창 머리에 📌칩이 붙는다(2026-08-09 2단계).
-    if (d.type === "gijo:select" && window.gijoConsole && window.gijoConsole.select) {
-      // ⚠ **값을 다시 만들어 넘긴다** — iframe이 보낸 것을 그대로 믿지 않는다(String 강제).
-      //   2026-08-18: 여기서 label·text만 골라 담느라 **fields가 조용히 사라졌다.** 보내는 쪽과
-      //   받는 쪽(console.js setSelection)만 고치면 화면은 멀쩡한데 상태 패널이 영영 안 뜬다.
-      //   fields도 같은 방어를 걸어 통과시킨다 — **아는 키만 · 문자열 강제 · 길이 캡**.
+    // 선택값 정돈 — 아는 키만 · 문자열 강제 · 길이 캡. ⑤′(일반 선택)과 ⑤″(고르기)가 **같은
+    // 함수**를 쓴다(두 벌로 두면 한쪽만 고쳐진다 — 이 저장소의 반복 함정).
+    var 선택정돈 = function (d) {
       var 허용키 = ["asset", "title", "severity", "status", "owner", "due", "plain", "kev", "assetId", "findingKey"];
       var f = null;
       if (d.fields && typeof d.fields === "object") {
@@ -886,7 +883,24 @@
         });
         if (!Object.keys(f).length) f = null;
       }
-      window.gijoConsole.select(d.label && d.text ? { label: String(d.label), text: String(d.text), fields: f } : null);
+      return d.label && d.text ? { label: String(d.label), text: String(d.text), fields: f } : null;
+    };
+    // ⑤″ 고르기 모드 전용(승인 시안 stage-picker, 2026-08-20) — **pick.html만 보내는 좁은
+    //   신호**라 자동 무대 내림이 안전하다(그 화면엔 확인창·모달이 없고 행 클릭이 유일한 동작).
+    //   ⚠ ⑤′(일반 선택 신호)에는 절대 이 내림을 붙이지 말 것 — 확인창 발신 10곳이 섞여 있다(검토관 상1).
+    if (d.type === "gijo:pickdone" && window.gijoConsole && window.gijoConsole.select) {
+      var 고른 = 선택정돈(d);
+      if (고른) {
+        window.gijoConsole.select(고른);
+        무대숨김 = true;      // stageBack(← 대화로)과 같은 상태 전이 — 새 상태를 만들지 않는다
+        대화홈갱신();
+      }
+      return;
+    }
+    // ⑤′ "이걸 골랐어" — 화면(iframe)이 항목을 고르면 맥락 문장에 실린다(2026-08-09 2단계).
+    if (d.type === "gijo:select" && window.gijoConsole && window.gijoConsole.select) {
+      // ⚠ **값을 다시 만들어 넘긴다** — iframe이 보낸 것을 그대로 믿지 않는다(위 선택정돈).
+      window.gijoConsole.select(선택정돈(d));
       // ⚠ 자동 복귀(고르면 무대 내림)는 폐지(검토관 상1) — gijo:select는 「행 클릭」 전용이
       //   아니라서, 결재 확인창(점검 승인)·모달·상세 열기 직후에도 온다(발신 18곳 중 10곳
       //   실증). 그때 무대를 내리면 방금 연 것이 통째로 숨는다 — 승인을 눌렀는데 확인창을

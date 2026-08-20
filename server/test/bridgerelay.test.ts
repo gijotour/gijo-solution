@@ -38,7 +38,11 @@ describe("팝업 릴레이 — 목록이 어긋나면 팝업에서만 조용히 
     const 제외 = new Set(["gijo:view", "gijo:explain", "gijo:ask", "gijo:prefill", "gijo:scope:set",
       // dockback — 팝업의 ⇤ 버튼이 bridgeToShell(IPC)로 **직접** 보낸다. postMessage를 안 거치므로
       // 릴레이 목록에 없어도 죽는 경로가 없다(2026-08-19 도킹 구현).
-      "gijo:dockback"]);
+      "gijo:dockback",
+      // pickdone — 고르기 모드(pick.html) 전용. 그 화면은 카드의 🎯 단추로 **무대에만** 열린다
+      // (프로 팝업 자동 폐지·창은 (창) 메뉴뿐이라 팝업 안에서 열릴 진입로가 없다). 무대 내림이
+      // 신호의 본질이라 팝업에선 애초에 뜻이 없다(승인 시안 stage-picker, 2026-08-20).
+      "gijo:pickdone"]);
     const 빠진것 = 셸이받는타입().filter((t) => !제외.has(t) && !릴레이타입().includes(t));
     expect(빠진것, "릴레이 목록에 없는 타입 — 팝업에서 이 신호가 조용히 죽는다. 넣거나, 위 제외 목록에 이유와 함께 적어라").toEqual([]);
   });

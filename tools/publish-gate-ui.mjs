@@ -206,6 +206,33 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
   ok("AI 지식 엑셀형(행·그룹·옛 목록 0)", !!r && r.행 > 0 && r.그룹 > 0 && r.옛것 === 0, JSON.stringify(r));
 }
 
+// ── ③″ 고르기 모드(승인 시안 stage-picker, 2026-08-20) — 행 클릭이 대화로 돌아오는가.
+//    pickdone 신호→선택 달림→무대 내림까지 실측(운영 취약점 190여 건이라 행 0이면 렌더 사망).
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("pick.html?kind=vuln", "고르기"));
+  const fr = await 프레임찾기("pick.html", 8);
+  let r = null;
+  if (fr) {
+    r = await fr.evaluate(async () => {
+      for (let i = 0; i < 20; i++) {
+        if (document.querySelector(".pk-row")) break;
+        await new Promise((x) => setTimeout(x, 400));
+      }
+      const row = document.querySelector(".pk-row");
+      if (!row) return { 행: 0 };
+      row.click();
+      return { 행: document.querySelectorAll(".pk-row").length };
+    }).catch(() => null);
+  }
+  await new Promise((x) => setTimeout(x, 800));
+  const 후 = await 셸.evaluate(() => ({
+    무대내림: !document.body.classList.contains("stage-on"),
+    문장: (document.getElementById("csCtx") || {}).textContent || "",
+  }));
+  ok("고르기: 행 클릭 → 무대 내림+선택(다루는 중)", !!r && r.행 > 0 && 후.무대내림 && /다루는 중/.test(후.문장),
+    JSON.stringify({ 행: r && r.행, ...후, 문장: String(후.문장).slice(0, 50) }));
+}
+
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──
 const 카드전 = await 셸.evaluate(() => document.querySelectorAll(".dc-card").length);
 await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기")); // 무dock=메뉴성 — 카드만 떠야 한다(사장님 확정 계약)

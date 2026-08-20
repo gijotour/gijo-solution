@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 고르기</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  🎯 고르기 모드 — 「고르러 갈 때는 검색+목록+상세만」 (승인 시안 mockups/stage-picker, 2026-08-20).
+
+  ■ 배경(사장님 QA): 「자산 열기를 별도 창에 띄워야 하나」·「저렇게 별도 창에서 선택하는 게
+    맞는지 고민이야」 — 허브 화면 전체(KPI·탭·필터)는 고르기에 과하다. 실측: 우선순위에서
+    첫 행까지 458px·클릭 2회 → 이 화면은 110px·클릭 1회.
+
+  ■ 계약
+    · 행 클릭 = window.top에 gijo:pickdone — **이 화면만 보내는 좁은 신호**다.
+      gijo:select(발신 18곳·확인창 10곳 포함)와 분리해, 자동 무대 내림이 안전하다(시안 §6 —
+      이 화면엔 확인창·모달이 없고 행 클릭이 유일한 동작이다). 셸이 선택을 달고 무대를 내린다.
+    · 검색칸은 **필터 전용**이다 — 지시가 아니다(「메뉴는 보기용, 지시는 대화창」).
+    · 데이터는 새 API 없이 재사용: 자산=assetHub(), 취약점=listAssets() 평탄화.
+    · fields 규격은 selectnotify 허용 키 10개 그대로 — 셸이 어차피 재검증한다.
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.09);--border-strong:rgba(255,255,255,.16);
+    --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+  .wrap{padding:12px 16px;max-width:1100px;margin:0 auto;}
+  .search{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:9px;color:var(--text);
+    font-size:13px;padding:8px 12px;outline:none;margin-bottom:8px;}
+  .search:focus{border-color:var(--blue);}
+  .meta{font-size:11.5px;color:var(--muted-2);margin-bottom:6px;}
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:12px;align-items:start;}
+  .list{border:1px solid var(--border);border-radius:9px;background:var(--panel);overflow:hidden;}
+  .pk-row{display:flex;align-items:center;gap:9px;padding:8px 10px;line-height:17px;cursor:pointer;border-bottom:1px solid var(--border);}
+  .pk-row:last-child{border-bottom:none;}
+  .pk-row:hover{background:var(--panel-2);}
+  .pk-row.on{background:rgba(59,130,246,.10);box-shadow:inset 3px 0 0 var(--blue);}
+  .pk-row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+  .pk-row .sub{flex:0 0 auto;color:var(--muted-2);font-size:12px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tag{flex:0 0 auto;font-size:11px;font-weight:800;border-radius:4px;padding:0 5px;}
+  .tag.kev{background:rgba(226,72,61,.16);color:#ff9d9d;}
+  .tag.critical{color:var(--red);} .tag.high{color:var(--amber);} .tag.medium{color:var(--blue-light);} .tag.low{color:var(--muted);}
+  .detail{border:1px solid var(--border);border-radius:9px;background:var(--panel);padding:12px 14px;position:sticky;top:12px;}
+  .detail .dn{font-weight:800;font-size:13.5px;margin:4px 0;}
+  .detail .dm{font-size:12px;color:var(--muted);line-height:1.55;}
+  .detail .dp{font-size:12.25px;color:var(--text);margin-top:8px;line-height:1.6;}
+  .detail .hint{font-size:11.5px;color:var(--muted-2);margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}
+  .empty{padding:24px;text-align:center;color:var(--muted-2);font-size:12.5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <input id="q" class="search" placeholder="이름 · CVE · 자산명으로 좁히기… (필터 전용 — 지시가 아닙니다)" aria-label="목록 좁히기">
+  <div class="meta" id="meta">불러오는 중…</div>
+  <div class="cols">
+    <div class="list" id="list"><div class="empty">불러오는 중…</div></div>
+    <div class="detail" id="detail"><div class="dm">행에 마우스를 올리면 여기서 미리 보고, <b>누르면 대화로 넘어갑니다.</b></div></div>
+  </div>
+</div>
+<script src="dialog.js"></script>
+<script src="nav.js"></script>
+<script>
+(function () {
+  "use strict";
+  var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
+  var kind = new URLSearchParams(location.search).get("kind") === "asset" ? "asset" : "vuln";
+  var rows = []; // {label,text,fields,이름,보조,sev,kev}
+  var SEV = { critical: 0, high: 1, medium: 2, low: 3 };
+
+  function 고름(r, el) {
+    document.querySelectorAll(".pk-row.on").forEach(function (x) { x.classList.remove("on"); });
+    if (el) el.classList.add("on");
+    // 좁은 전용 신호 — gijo:select가 아니다(그쪽은 확인창 발신이 섞여 자동 내림 금지).
+    try { window.top.postMessage({ type: "gijo:pickdone", label: r.label, text: r.text, fields: r.fields }, "*"); } catch (e) { }
+  }
+
+  function 상세(r) {
+    var d = document.getElementById("detail");
+    d.innerHTML =
+      (r.fields.asset ? '<div class="dm">' + esc(r.fields.asset) + "</div>" : "") +
+      '<div class="dn">' + (r.kev ? '<span class="tag kev">KEV</span> ' : "") +
+      (r.sev ? '<span class="tag ' + esc(r.sev) + '">' + esc(r.sev) + "</span> " : "") + esc(r.이름) + "</div>" +
+      (r.보조 ? '<div class="dm">' + esc(r.보조) + "</div>" : "") +
+      (r.fields.plain ? '<div class="dp">→ ' + esc(r.fields.plain) + "</div>" : "") +
+      '<div class="hint">행을 누르면 대화로 넘어갑니다 — 이어서 할 일 칩이 함께 옵니다.</div>';
+  }
+
+  function 그리기() {
+    var q = (document.getElementById("q").value || "").toLowerCase().trim();
+    var 보일 = rows.filter(function (r) { return !q || (r.이름 + " " + (r.fields.asset || "") + " " + (r.보조 || "")).toLowerCase().indexOf(q) >= 0; });
+    var CAP = 500; // 있는 것을 숨기지 않는다 — 잘랐으면 아래 메타줄에 적는다
+    document.getElementById("meta").textContent =
+      보일.length + "건" + (kind === "vuln" ? " · 위험도 순" : " · 이름 순") + (보일.length > CAP ? " (앞 " + CAP + "건 표시 — 검색으로 좁혀 보세요)" : "");
+    var list = document.getElementById("list");
+    if (!보일.length) { list.innerHTML = '<div class="empty">' + (q ? "검색과 맞는 항목이 없습니다." : "고를 항목이 없습니다.") + "</div>"; return; }
+    list.innerHTML = 보일.slice(0, CAP).map(function (r, i) {
+      return '<div class="pk-row" data-i="' + i + '">' +
+        (r.kev ? '<span class="tag kev">KEV</span>' : "") +
+        (r.sev ? '<span class="tag ' + esc(r.sev) + '">' + esc(r.sev) + "</span>" : "") +
+        '<span class="nm" title="' + esc(r.이름) + '">' + esc(r.이름) + "</span>" +
+        (r.보조 ? '<span class="sub">' + esc(r.보조) + "</span>" : "") + "</div>";
+    }).join("");
+    list.querySelectorAll(".pk-row").forEach(function (el) {
+      var r = 보일[Number(el.dataset.i)];
+      el.addEventListener("mouseenter", function () { 상세(r); });
+      el.addEventListener("click", function () { 고름(r, el); });
+    });
+  }
+
+  async function 자산불러오기() {
+    var o = await window.gijo.assetHub();
+    rows = ((o && o.rows) || []).map(function (a) {
+      var 이름 = a.name || a.id;
+      return {
+        이름: 이름, 보조: a.assetType || a.type || "", sev: "", kev: false,
+        label: 이름, text: "자산 " + 이름,
+        fields: { asset: 이름, title: 이름, assetId: a.id },
+      };
+    }).sort(function (a, b) { return a.이름.localeCompare(b.이름, "ko"); });
+  }
+
+  async function 취약점불러오기() {
+    var assets = await window.gijo.listAssets();
+    rows = [];
+    (assets || []).forEach(function (a) {
+      (a.findings || []).forEach(function (f) {
+        if (f.state === "fixed") return; // 고르기의 대상은 미조치다 — 닫힌 건은 우선순위 화면 몫
+        var 이름 = f.name || f.title || f.cve || "(이름 없음)";
+        rows.push({
+          이름: 이름, 보조: a.name || a.id, sev: String(f.severity || "").toLowerCase(), kev: !!f.kev,
+          label: 이름.slice(0, 60), text: "자산 " + (a.name || a.id) + "의 취약점 " + 이름,
+          fields: {
+            asset: a.name || a.id, title: 이름, severity: String(f.severity || ""),
+            status: f.state || "", plain: f.plain || "", kev: f.kev ? "KEV" : "",
+            assetId: a.id, findingKey: f.fkey || "",
+          },
+        });
+      });
+    });
+    rows.sort(function (x, y) {
+      if (x.kev !== y.kev) return x.kev ? -1 : 1;
+      return (SEV[x.sev] ?? 9) - (SEV[y.sev] ?? 9);
+    });
+  }
+
+  // 이 화면은 카드의 🎯 단추로 **셸 안에서만** 열린다 — 로그인이 죽어 있으면 리다이렉트
+  // 대신 그 사실을 말한다(navigateTo 단독 사용은 동결 계약 — 본창 직접 로드는 프로 셸 파괴).
+  if (!window.gijo || !window.gijo.isAuthenticated()) {
+    document.getElementById("list").innerHTML = '<div class="empty">로그인이 풀렸습니다 — 대화창으로 돌아가 다시 로그인해 주세요.</div>';
+    document.getElementById("meta").textContent = "";
+    return;
+  }
+  document.getElementById("q").addEventListener("input", 그리기);
+  (kind === "asset" ? 자산불러오기() : 취약점불러오기())
+    .then(그리기)
+    .catch(function (e) {
+      document.getElementById("list").innerHTML = '<div class="empty">목록을 불러오지 못했습니다 — 서버 연결을 확인해 주세요.<br>' + esc((e && e.message) || "") + "</div>";
+      document.getElementById("meta").textContent = "";
+    });
+})();
+</script>
+</body>
+</html>

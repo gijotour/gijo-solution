@@ -161,12 +161,16 @@ describe("조치·승인 화면이 고른 항목을 대화창에 넘긴다", () 
   it("셸이 fields를 걸러 버리지 않는다 — 아는 키만 문자열로 통과시킨다", () => {
     // ⚠ 2026-08-18에 실제로 밟은 함정: app.html이 { label, text }만 다시 만들어 넘겨
     //   fields가 조용히 사라졌다. 보내는 쪽·받는 쪽만 고치면 상태 패널이 영영 안 뜬다.
-    const i = shell.indexOf('d.type === "gijo:select"');
-    expect(i, "gijo:select 수신부를 못 찾았다 — 코드가 바뀌었으면 이 시험도 같이 볼 것").toBeGreaterThan(-1);
-    const 구간 = shell.slice(i, i + 1200);
+    // 2026-08-20 갱신: 검증이 선택정돈()으로 뽑혔다(⑤′ select와 ⑤″ pickdone이 같은 함수를
+    //   쓰게 — 두 벌이면 한쪽만 고쳐진다). 그 함수가 계약을 지고, 두 갈래가 그걸 부른다.
+    const i = shell.indexOf("var 선택정돈 = function");
+    expect(i, "선택정돈()을 못 찾았다 — 코드가 바뀌었으면 이 시험도 같이 볼 것").toBeGreaterThan(-1);
+    const 구간 = shell.slice(i, i + 900);
     expect(구간, "fields를 콘솔로 안 넘긴다").toContain("fields");
     expect(구간, "iframe 값을 그대로 믿으면 안 된다 — String 강제가 있어야 한다").toContain("String(");
     expect(구간, "아는 키만 통과시켜야 한다(허용 목록)").toMatch(/허용키|allow/);
+    expect(shell, "select 갈래가 선택정돈을 안 부른다").toContain("window.gijoConsole.select(선택정돈(d))");
+    expect(shell, "pickdone 갈래가 선택정돈을 안 부른다").toMatch(/gijo:pickdone[\s\S]{0,400}선택정돈\(d\)/);
   });
 
   // (2026-08-20 승인 시안 pro-context-strip: 🎯 상세 박스(renderSelState)는 폐지 —

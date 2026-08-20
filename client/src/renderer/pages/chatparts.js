@@ -357,6 +357,17 @@
     head.className = "dc-head";
     head.textContent = dc.title || "";
     if (dc.screen && opts && typeof opts.navigate === "function") {
+      // 🎯 고르기(승인 시안 stage-picker, 2026-08-20) — 고르러 갈 때는 허브 전체(첫 행까지
+      // 458px·클릭 2회)가 아니라 검색+목록+상세만(110px·클릭 1회). 🗔(전체 화면)은 그대로 둔다.
+      var 고르기kind = { "assets.html": "asset", "triage.html": "vuln", "vulnscan.html": "vuln" }[dc.screen.page];
+      if (고르기kind) {
+        var g = document.createElement("button");
+        g.className = "dc-open";
+        g.textContent = "🎯 고르기";
+        g.title = "검색+목록만 있는 얇은 화면에서 하나를 고릅니다 — 고르면 바로 대화로 돌아옵니다";
+        g.addEventListener("click", function () { opts.navigate("pick.html?kind=" + 고르기kind, "고르기"); });
+        head.appendChild(g);
+      }
       var b = document.createElement("button");
       b.className = "dc-open";
       b.textContent = "🗔 " + (dc.screen.label || "") + " 열기"; // 🗔 — ⧉(창으로 빼기)와 뜻이 다르다
