@@ -318,6 +318,13 @@ describe("프로 확정 계약 — 메뉴는 카드가 전부(2026-08-20 사장�
     // 무대를 오르내린 모든 길에서 대화 맥락을 다시 읽는다(상5 — syncCtx가 show/close에서만
     // 불리면 「마지막 카드=맥락」 갈래가 실사용에서 영영 안 닿는다).
     expect(s, "대화홈갱신이 syncCtx를 안 부른다(맥락 갱신 끊김 — 상5)").toMatch(/function 대화홈갱신\([\s\S]{0,3000}gijoConsoleSyncCtx/);
+    // 🎨 프로=흰 바탕(2026-08-20 배색 확정) — 셸 클래스·화면 전달·수신 세 고리가 다 있어야 한다.
+    // 한 고리만 빠지면 「셸은 흰데 무대만 다크」 같은 반쪽이 된다(배색=에디션 이름표).
+    expect(s, "프로 셸이 theme-light를 안 단다").toContain('documentElement.classList.add("theme-light")');
+    expect(s, "embedSrc가 화면에 theme=light를 안 싣는다").toMatch(/embedSrc[\s\S]{0,400}theme=light/);
+    const nv = 코드만(join(PAGES, "nav.js"));
+    expect(nv, "화면이 theme=light를 안 받는다(nav.js)").toContain("theme=light");
+    expect(nv, "pro-white.css 주입이 없다").toContain("pro-white.css");
     // 카드가 뜨면 무대를 내린다 — 무대 뒤(숨은 대화)에 카드만 붙으면 사람 눈엔 무반응이다.
     expect(s, "메뉴 카드가 무대를 안 내린다(무대 뒤 카드=무반응)").toMatch(/if \(shown\) \{[\s\S]{0,400}무대숨김 = tabs\.length > 0/);
     const c = 코드만(join(PAGES, "console.js"));

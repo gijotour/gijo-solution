@@ -260,7 +260,16 @@
   //   `embed=1`·`popout=1`과 **같은 관례**다(새 통로를 만들지 않는다).
   // ⚠ **탭 iframe에는 안 번진다** — 탭 주소는 embedSrc()가 따로 만든다(`?embed=1`).
   //   화면들은 프로인지 몰라도 되고, 알 필요도 없다(셸만 바뀐다).
-  if (/(^|[?&])shell=pro(&|$)/.test(location.search)) document.body.classList.add("pro-shell");
+  if (/(^|[?&])shell=pro(&|$)/.test(location.search)) {
+    document.body.classList.add("pro-shell");
+    // 🎨 프로=흰 바탕(2026-08-20 사장님 확정 — 배색=에디션 이름표: 라이트 연초록·표준 다크·프로 흰).
+    //   documentElement에 다는 이유: pro-white.css가 html.theme-light로 스코프되어
+    //   표준 셸(클래스 없음)에는 한 줄도 안 먹는다. 화면(iframe)은 embedSrc의 theme=light가 맡는다.
+    document.documentElement.classList.add("theme-light");
+    var 흰층 = document.createElement("link");
+    흰층.rel = "stylesheet"; 흰층.href = "pro-white.css";
+    document.head.appendChild(흰층);
+  }
 </script>
 
 <!-- 상단 조작 줄(#shellTop, 44px) — **탭은 아래에 있다**(2026-08-08 사용자 지시·시안 ㉯ 승인).
@@ -368,7 +377,11 @@
     } catch (e) {}
   }
 
-  function embedSrc(page) { return page + (page.indexOf("?") >= 0 ? "&" : "?") + "embed=1"; }
+  function embedSrc(page) {
+    // 프로면 화면에도 흰 바탕 신호를 싣는다(nav.js가 읽어 theme-light를 단다 — 2026-08-20 배색 확정).
+    var q = "embed=1" + (프로인가() ? "&theme=light" : "");
+    return page + (page.indexOf("?") >= 0 ? "&" : "?") + q;
+  }
   // 합쳐서 없어진 화면의 **옛 탭**을 새 이름·새 주소로 바로잡는다 (2026-08-02).
   //
   // ⚠ iframe 쪽 리다이렉트만으로는 부족하다. 리다이렉트는 화면 안에서 일어나고 **탭 이름은

@@ -1245,6 +1245,16 @@
   // 공용 디자인 시스템(gijo-ui.css)을 모든 페이지에 주입한다 — .g-* 컴포넌트 사용 가능 + body.g-ui로
   // 안전한 전역 베이스라인(스크롤바·포커스링·폰트 스무딩)만 통일(레이아웃은 안 건드림).
   function loadDesignSystem() {
+    // 🎨 프로 흰 바탕(2026-08-20) — 셸이 embedSrc에 실어 준 theme=light를 화면이 받아 단다.
+    //   pro-white.css는 html.theme-light 스코프라 표준(신호 없음)에는 한 줄도 안 먹는다.
+    if (/(^|[?&])theme=light(&|$)/.test(location.search)) {
+      document.documentElement.classList.add("theme-light");
+      if (!document.getElementById("proWhiteCss")) {
+        var w = document.createElement("link");
+        w.id = "proWhiteCss"; w.rel = "stylesheet"; w.href = "pro-white.css";
+        document.head.appendChild(w);
+      }
+    }
     if (!document.getElementById("gijoUiCss")) {
       var l = document.createElement("link");
       l.id = "gijoUiCss"; l.rel = "stylesheet"; l.href = "gijo-ui.css";

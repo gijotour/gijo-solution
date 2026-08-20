@@ -1,0 +1,66 @@
+/* pro-white.css — 프로 에디션 흰 바탕(2026-08-20 사장님 확정 · 승인 시안 mockups/pro-white).
+ *
+ * ■ 왜 별도 파일인가: 표준은 다크 유지가 확정이라 공용(gijo-ui.css·화면 :root)은 다크
+ *   원본 그대로 두고, **프로 셸에서만** html.theme-light 클래스로 이 층이 이긴다.
+ *   (라이트 연초록의 lite-green.css와 같은 구조 — 배색=에디션 이름표.)
+ * ■ 켜는 곳: app.html이 프로일 때 documentElement에 theme-light를 달고, 화면(iframe)은
+ *   embedSrc의 &theme=light를 nav.js가 읽어 단다. 표준 셸에는 이 클래스가 없어 한 줄도 안 먹는다.
+ * ■ 값은 전부 시안의 WCAG 계산분(치명 5.77:1·높음 5.84:1·중간 5.77:1·낮음 7.16:1·정상 5.84:1,
+ *   muted-2 4.69:1 — 다크에서 3.5:1로 미달이던 것을 여기서 바로잡음).
+ * ■ 의미색은 -ink(진한 글자용) 값으로 통일 — 다크의 「밝은 색 글자」를 흰 바탕에 그대로 쓰면
+ *   대비가 무너진다. 채움(버튼)도 같은 값을 쓰며 흰 글자와 5:1 이상.
+ */
+html.theme-light {
+  /* 화면·셸 공용(무접두) 토큰 — 1단계 스윕으로 화면 172곳이 이 토큰을 따른다 */
+  --bg: #faf8f5;
+  --panel: #ffffff;
+  --panel-2: #f2efe9;
+  --border: rgba(43, 38, 33, 0.12);
+  --border-strong: rgba(43, 38, 33, 0.22);
+  --text: #2b2621;
+  --muted: #6b6259;
+  --muted-2: #726960;
+  --blue: #1d4f91;
+  --blue-light: #1d4f91;   /* 「밝은 파랑」 역할 = 흰 바탕에선 진한 파랑(잉크 반전) */
+  --teal: #086b43;
+  --amber: #8f4d02;
+  --red: #b3241a;
+  --purple: #5b21b6;
+  --zebra: rgba(43, 38, 33, 0.035);
+  /* gijo-ui(--g-*) 토큰 — .g-* 부품이 이걸 따른다 */
+  --g-bg: #faf8f5;
+  --g-surface-1: #ffffff;
+  --g-surface-2: #f2efe9;
+  --g-surface-3: #f2efe9;
+  --g-border: rgba(43, 38, 33, 0.12);
+  --g-border-strong: rgba(43, 38, 33, 0.22);
+  --g-blue: #1d4f91;
+  --g-blue-light: #1d4f91;
+  --g-teal: #086b43;
+  --g-amber: #8f4d02;
+  --g-red: #b3241a;
+  --g-purple: #5b21b6;
+  --g-text: #2b2621;
+  --g-muted: #6b6259;
+  --g-muted-2: #726960;
+  --g-zebra: rgba(43, 38, 33, 0.035);
+  --g-shadow-1: 0 2px 8px rgba(31, 27, 20, 0.10);
+  --g-shadow-2: 0 8px 24px rgba(31, 27, 20, 0.16);
+}
+/* 심각도 배지 — 다크 공식(반투명 배경+밝은 글자)→라이트 공식(옅은 배경+진한 글자) 반전(시안 §배지) */
+html.theme-light .g-b-crit { background: #fdeceb; color: #b3241a; }
+html.theme-light .g-b-high { background: #fdf1e2; color: #8f4d02; }
+html.theme-light .g-b-med  { background: #eaf1fb; color: #1d4f91; }
+html.theme-light .g-b-low  { background: rgba(43, 38, 33, 0.06); color: #726960; }
+html.theme-light .g-b-ok   { background: #e3f6ec; color: #086b43; }
+/* 스크롤바·표 호버 — 흰 잉크 오버레이 반전 */
+html.theme-light ::-webkit-scrollbar-thumb { background: rgba(43, 38, 33, 0.20); }
+html.theme-light ::-webkit-scrollbar-thumb:hover { background: rgba(43, 38, 33, 0.32); }
+html.theme-light .g-table tbody tr:hover { background: rgba(43, 38, 33, 0.04); }
+/* 셸(app.html)의 대표 다크 하드코딩 — 토큰 밖에 남은 것들의 상쇄(2단계 범위: 눈에 띄는 표면).
+ * 잔여 rgba(255,255,255,…) 세부는 4단계 스윕 몫(작업 #33에 기록). */
+html.theme-light body { background: var(--bg); color: var(--text); }
+html.theme-light #gijoRail { background: var(--panel-2); border-color: var(--border); }
+html.theme-light #gijoRail button { color: var(--muted); }
+html.theme-light #gijoRail button:hover { background: rgba(43, 38, 33, 0.06); color: var(--text); border-color: var(--border); }
+html.theme-light #dockHead { background: var(--panel-2); border-bottom: 1px solid var(--border); color: var(--muted); }

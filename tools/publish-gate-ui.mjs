@@ -243,6 +243,17 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
   await new Promise((r) => setTimeout(r, 400));
   const 되올림 = await 셸.evaluate(() => document.body.classList.contains("stage-on"));
   ok("🗔 되올리기: 보던 화면 복귀", 되올림);
+  // 🎨 프로=흰 바탕(2026-08-20 배색 확정 — 배색=에디션 이름표) — 셸과 무대 화면 둘 다.
+  const 흰바탕 = await 셸.evaluate(() => ({
+    셸클래스: document.documentElement.classList.contains("theme-light"),
+    셸배경: getComputedStyle(document.body).backgroundColor,
+  }));
+  ok("프로 흰 바탕: 셸(theme-light·#faf8f5)", 흰바탕.셸클래스 && 흰바탕.셸배경 === "rgb(250, 248, 245)", JSON.stringify(흰바탕));
+  const 화면흰 = fr ? await fr.evaluate(() => ({
+    클래스: document.documentElement.classList.contains("theme-light"),
+    배경: getComputedStyle(document.body).backgroundColor,
+  })).catch(() => null) : null;
+  ok("프로 흰 바탕: 무대 화면(theme=light 전달)", !!화면흰 && 화면흰.클래스 && 화면흰.배경 === "rgb(250, 248, 245)", JSON.stringify(화면흰));
   // 팝업 0 — 프로에서 저절로 뜨는 창이 없다(창은 (창) 메뉴뿐 — 이 관문은 안 연다).
   const 팝업0 = ctx.pages().every((p) => {
     const u = p.url();
