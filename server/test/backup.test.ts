@@ -124,10 +124,13 @@ describe("복원 가능성 검증", () => {
     clearSnaps();
     await performBackup();
     const v = verifyBackupSnapshot();
-    // 이 시험 환경은 LanceDB가 없어 problems에 그 항목이 있다. 스키마는 지금 코드와 같으니
-    // notes는 비어 있어야 한다(같은 코드로 만든 스냅샷이므로).
+    // 이 시험 환경은 LanceDB가 없어 problems에 그 항목이 있다. 스키마는 지금 코드와 같다.
+    // ⚠ notes를 빈 배열로 못박지 않는다(2026-08-21 정정) — D 계열 수리가 「세션 아카이브
+    //   없음 — 정상」 note를 추가했는데, 그것이 정확히 이 시험의 취지(정상은 problems가
+    //   아니라 notes로)다. 잣대는 「복구를 막지 않는 항목이 problems에 없다」이다.
     expect(v.schemaMatchesNow).toBe(true);
-    expect(v.notes).toEqual([]);
     expect(Array.isArray(v.notes)).toBe(true);
+    expect(v.problems.join("\n")).not.toContain("정상입니다");
+    for (const n of v.notes) expect(n).toMatch(/정상|확인하지 못했/); // notes에는 비차단 항목만
   });
 });
