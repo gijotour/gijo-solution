@@ -209,10 +209,16 @@
     if (opt.compact) {
       조작 = p.rows ? '<div class="pv-acts"><button data-act="rows" data-id="' + esc(p.id) + '">▾ 목록</button></div>' : "";
     } else {
+      // 📖 시나리오 — 판 ↔ 업무 시나리오 대응(grouppanels scenario 필드, 2026-08-21 ⓐ안).
+      // ⚠ 대화창(gijoConsole)이 없는 자리(iframe 등)에서는 칩을 **안 그린다** — 눌러도 아무
+      //   일도 안 나는 단추는 없는 단추보다 나쁘다(없는 함수 버튼 전례).
+      var 시나리오칩 = p.scenario && window.gijoConsole && window.gijoConsole.ask
+        ? '<button data-act="scenario" data-id="' + esc(p.id) + '" title="이 업무의 단계를 대화창이 안내합니다">📖 시나리오</button>' : "";
       조작 = '<div class="pv-acts">' +
         '<button data-act="open" data-id="' + esc(p.id) + '">🗔 화면 열기</button>' +
         (p.rows ? '<button data-act="rows" data-id="' + esc(p.id) + '">▾ 목록 보기</button>' : "") +
         (p.pick ? '<button data-act="pick" data-id="' + esc(p.id) + '">🎯 고르기</button>' : "") +
+        시나리오칩 +
         "</div>";
     }
     return '<div class="pv-cell">' +
@@ -368,6 +374,10 @@
         if (act === "open") 화면열기(r.판.page, r.판.title.replace(/^[^\s]+\s/, ""));
         else if (act === "rows") 목록펴기(r, host.querySelector("#pvr-" + id));
         else if (act === "pick") 고르기(r.판.pick, r.판.title);
+        // 📖 — 「지시는 대화창에서만」: 칩은 질문을 대화창에 넣을 뿐, 화면이 직접 실행하지 않는다.
+        //   문구는 시나리오 분기(scenarios.ts isScenarioAsk)가 이름 검사로 **결정적으로** 받는다.
+        else if (act === "scenario" && r.판.scenario && window.gijoConsole && window.gijoConsole.ask)
+          window.gijoConsole.ask("시나리오: " + r.판.scenario);
       });
     }
   }

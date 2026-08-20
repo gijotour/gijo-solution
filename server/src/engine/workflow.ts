@@ -12,7 +12,7 @@
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { listAssets } from "./assets";
-import { isRealVulnerability } from "./agenttools";
+import { isRealVulnerability, isActiveVuln } from "./agenttools";
 import { listFindingReviews } from "./approvals";
 import { listTargets, listRuns } from "./hardeningtargets";
 import { reportActivity } from "./report";
@@ -71,11 +71,14 @@ export function workflowStages(): WorkflowStage[] {
   const 오늘 = new Date().toISOString().slice(0, 10);
   const 오늘신규 = assets.filter((a) => String(a.lastScannedAt ?? "").slice(0, 10) === 오늘).length;
 
-  // ② 우선순위 — **실제 취약점만** 센다. KEV는 "지금 악용 중"이라 따로 띄운다.
+  // ② 우선순위 — **활성 진짜 취약점만** 센다. KEV는 "지금 악용 중"이라 따로 띄운다.
+  // ⚠ 잣대는 판·자산 요약과 같은 isActiveVuln 하나다(2026-08-21 통일). 여기만 isReal로 세면
+  //   이미 고쳐진(fixed) 것까지 들어가 띠②와 현황판 숫자가 어긋난다 — 담당자는 그 순간
+  //   어느 쪽도 못 믿는다(같은 파일 머리의 「세는 자리를 하나로」와 같은 이유).
   let 취약 = 0, kev = 0;
   for (const a of assets) {
     for (const f of a.findings ?? []) {
-      if (!isRealVulnerability(f)) continue;
+      if (!isActiveVuln(f)) continue;
       취약++;
       if ((f as { kev?: boolean }).kev) kev++;
     }

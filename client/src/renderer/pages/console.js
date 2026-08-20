@@ -82,6 +82,8 @@
       ".cs-flow .st{border:1px solid var(--border,rgba(255,255,255,.12));border-radius:5px;padding:1px 7px;cursor:pointer;white-space:nowrap;}",
       ".cs-flow .st:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}",
       ".cs-flow .st.now{background:rgba(30,185,128,.12);border-color:rgba(30,185,128,.5);color:#5fe0aa;font-weight:800;cursor:default;}",
+      // 홈 모드의 경고 숫자(지연·KEV 등) — .cs-live b와 같은 위험색. 0이면 아예 안 그린다.
+      ".cs-flow .st b{color:#f5928a;font-weight:800;}",
       // 살아 있는 숫자 — 그 화면의 요약 1줄(절차 띠 데이터 재사용, 새 계산 없음)
       ".cs-live{margin-left:auto;font-size:11.5px;color:var(--muted,#b3ada4);white-space:nowrap;}",
       ".cs-live b{color:#f5928a;font-weight:800;}",
@@ -1368,8 +1370,29 @@
     var draw = function (stages) {
       var idx = -1;
       stages.forEach(function (s, i) { if ((s.screens || []).indexOf(screenFile) >= 0) idx = i; });
-      if (idx < 0) { el.style.display = "none"; return; } // 절차 밖 화면 — 띠를 안 그린다(빈 띠는 고장으로 읽힌다)
+      // 대화 홈(화면 맥락 없음) — 「지금 여기」가 없으니 다섯 칸을 다 보여준다(2026-08-21, 5번
+      // 「세 번째 길」). 새 렌더러가 아니라 같은 띠의 홈 모드다 — 숫자도 같은 API 그대로.
+      var home = !screenFile;
+      if (idx < 0 && !home) { el.style.display = "none"; return; } // 절차 밖 화면 — 띠를 안 그린다(빈 띠는 고장으로 읽힌다)
       var html = "";
+      if (home) {
+        stages.forEach(function (s, i) {
+          // 칸마다 숫자를 붙인다 — count는 회색 그대로, alert는 0이면 안 그린다(늘 붙는 경고는 안 보인다).
+          var 숫자 = (s.count != null ? " " + s.count : "") +
+            (s.alert ? ' <b title="' + esc(s.alertLabel || "") + '">' + s.alert + "</b>" : "");
+          html += '<span class="st" data-page="' + esc(s.page) + '" data-label="' + esc(s.label) + '" title="누르면 이 단계 화면으로">' + s.no + " " + esc(s.label) + 숫자 + "</span>";
+          if (i < stages.length - 1) html += '<span class="ar">→</span>';
+        });
+        el.innerHTML = html;
+        el.style.display = "flex";
+        el.querySelectorAll(".st").forEach(function (b) {
+          b.addEventListener("click", function () {
+            if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label);
+            else if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell(b.dataset.page, b.dataset.label);
+          });
+        });
+        return;
+      }
       stages.forEach(function (s, i) {
         if (Math.abs(i - idx) > 1) return; // 앞·지금·다음만 — 다섯 칸을 다 그리면 띠가 줄바꿈된다
         html += '<span class="st' + (i === idx ? " now" : "") + '" data-page="' + esc(s.page) + '" data-label="' + esc(s.label) + '" title="' +

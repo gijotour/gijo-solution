@@ -848,7 +848,9 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
     .filter(([, e]) => e.docx || e.pdf || e.md) // 메타만 있고 문서 없는 건 제외
     .map(([base, e]) => {
       // session-*: 작업 세션 종료 리포트(worksessions.ts) — 같은 이력에 함께 나열된다.
-      const fm = /^(?:weekly|quarterly|ondemand|session|ingest)-(\d+)$/.exec(base);
+      // answer-*: 긴 답변 자동 전환(longanswer.ts) — 여기 빠지면 ts=0으로 잡혀 **정렬 상한에서
+      //   먼저 잘리고**, 사이드카가 깨진 파일은 type이 ondemand로 위장된다(2026-08-21 설계관 덤).
+      const fm = /^(?:weekly|quarterly|ondemand|session|ingest|answer)-(\d+)$/.exec(base);
       return { base, e, ts: fm ? Number(fm[1]) : 0 };
     })
     .sort((a, b) => b.ts - a.ts)
@@ -856,7 +858,7 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
   // 2) 상한 안의 항목만 사이드카(대상 자산·독자·요약)로 보강한다.
   const out: ReportHistoryEntry[] = [];
   for (const { base, e, ts } of bases) {
-    const fm = /^(weekly|quarterly|ondemand|session|ingest)-\d+$/.exec(base);
+    const fm = /^(weekly|quarterly|ondemand|session|ingest|answer)-\d+$/.exec(base);
     const entry: ReportHistoryEntry = {
       base,
       type: fm ? fm[1] : "ondemand",

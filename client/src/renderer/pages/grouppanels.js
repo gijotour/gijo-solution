@@ -89,7 +89,10 @@
       // rows: 열린 이벤트만 + **요약이 세는 P0~P2만**(검토관 중4 — 요약은 P0/P1/P2 세 조각인데
       //   목록에 P3까지 내리면 「위는 3인데 아래는 40줄」이 된다. approvals.ts:423의 그 사고와
       //   같은 모양이다). 상태는 한글로(analysis.html:228과 같은 사전).
-      { id: "analysis", title: "🚨 통합 관제", page: "analysis.html",
+      // scenario: 판 ↔ 업무 시나리오(서버 scenarios.ts SCENARIOS) 대응 — 📖 칩이 「시나리오: <이름>」을
+      // 대화창에 넣는다(2026-08-21 ⓐ안). ⚠ 이름은 등록부와 **글자까지 같아야** 라우팅이 성립한다 —
+      // scenariochips.test.ts가 대조해 막는다. 대응이 정직하지 않은 판(억지 연결)에는 안 단다.
+      { id: "analysis", title: "🚨 통합 관제", page: "analysis.html", scenario: "아침 브리핑",
         rows: function () {
           return window.gijo.analysisEvents().then(function (d) {
             var 순위 = { P0: 0, P1: 1, P2: 2 };
@@ -126,7 +129,7 @@
       //   ⚠ 심각도 사전은 **CTI 전용**이다 — SEV_KO(매우 심각/높음/보통)를 재사용하면 요약
       //   조각(긴급·주의·정보)과 한 카드 안에서 두 말이 된다(2026-08-20 설계관 경고).
       //   ⚠ 샘플(데모)은 **빼지 않는다** — load도 세는 데서 안 뺀다. 출처 열로 드러낸다.
-      { id: "threat", title: "🌐 위협 인텔", page: "threat.html", agents: ["위협"],
+      { id: "threat", title: "🌐 위협 인텔", page: "threat.html", agents: ["위협"], scenario: "위협 정보 확인",
         rows: function () {
           var CTI_KO = { critical: "긴급", warning: "주의", info: "정보" };
           return window.gijo.listCtiFindings().then(function (fs) {
@@ -171,7 +174,7 @@
     triage: [
       // agents: analysis(우선) — ROLE_CATEGORY.analysis=["취약점"](hybridsearch.ts:235) 근거.
       // pick: 5.49.0 pick.html이 아는 kind. rows: 요약과 **같은 API·같은 잣대**(살아있는·진짜취약점).
-      { id: "vuln", title: "🔍 취약점", page: "vulnscan.html", agents: ["우선"], pick: "vuln",
+      { id: "vuln", title: "🔍 취약점", page: "vulnscan.html", agents: ["우선"], pick: "vuln", scenario: "신규 스캔 결과 처리",
         rows: function () {
           return window.gijo.listAssets().then(function (assets) {
             var out = [];
@@ -267,7 +270,7 @@
 
     // ③ 조치
     fix: [
-      { id: "approvals", title: "✅ 조치·승인", page: "approvals.html",
+      { id: "approvals", title: "✅ 조치·승인", page: "approvals.html", scenario: "조치 마감(시작→검증→확정)",
         rows: function () {
           return window.gijo.listApprovals().then(function (r) {
             var rows = (r && r.reviews) || r || [];
@@ -412,7 +415,7 @@
       // agents: scan(해석) — ROLE_CATEGORY.scan=["취약점","장비운영"](hybridsearch.ts:234) 근거.
       //   장비 점검 자료를 먼저 보는 역할이라 이 판의 주인이 맞다(검토관 하17 — 근거가 있는데
       //   빠뜨렸던 자리. 근거 없는 판에 다는 것만큼이나 있는 근거를 빠뜨리는 것도 들쭉날쭉이다).
-      { id: "hardening", title: "🛡 보안설정 점검", page: "hardening.html", agents: ["해석"],
+      { id: "hardening", title: "🛡 보안설정 점검", page: "hardening.html", agents: ["해석"], scenario: "검증 현황 점검",
         // rows: **targets에 있는 장비만** — runs만 잡으면 지워진 장비의 점수가 남는다
         // (설계관 ③-3-2, 서버 datacard.ts:53-62의 「등록 장비 0 · 준수율 48%」 실사고 처방).
         rows: function () {
@@ -472,12 +475,12 @@
     // ⑤ 보고
     reporting: [
       // agents: report(보고) — ROLE_CATEGORY.report=["사내규정"](보고 서식·규정, hybridsearch.ts:237) 근거.
-      { id: "report", title: "📄 리포트", page: "report.html", agents: ["보고"],
+      { id: "report", title: "📄 리포트", page: "report.html", agents: ["보고"], scenario: "경영 보고 준비",
         // rows: title은 원천에 **없다**(reports-admin.ts:186 — 이미 한 번 밟은 자리). 1열은
         // 유형 한글(report.html:286 TYPE_LABEL)·2열은 대상 한글(:505 — 영문 그대로 금지).
         rows: function () {
           return window.gijo.listReportHistory().then(function (list) {
-            var TL = { weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드", answer: "AI 작성 자료", ingest: "파일 처리 내역" }; // report.html:286 TYPE_LABEL과 글자까지 동일(검토관 상2 — incident는 없는 키, answer·ingest 누락이었다)
+            var TL = { weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드", answer: "AI 작성 자료", ingest: "파일 처리 내역", session: "작업 세션" }; // report.html TYPE_LABEL과 글자까지 동일(검토관 상2 — incident는 없는 키·answer·ingest 누락 / 2026-08-21 설계관 덤 — session도 없어 영문이 그대로 나갔다)
             var AU = { internal: "내부용", official: "보고용" };
             return {
               cols: ["유형", "구분", "생성"], // 「대상」은 실화면에서 자산 이름의 자리(검토관 하9) — audience는 구분
@@ -507,18 +510,22 @@
           // 「어제 보고함」으로 읽힌다.
           var 최근 = 사람이만든[0];
           var 지난날 = 최근 ? Math.floor((Date.now() - 최근.createdAt) / 86400000) : null;
+          // ⚠ 조회 상한(listReportHistory limit=100)에 걸리면 목록이 잘린 것이다 — 그때
+          //   「보관 중 87」이라 쓰면 거짓이 된다(잘리고 남은 것만 센 수). +를 붙여 밝힌다(2026-08-21 설계관 덤).
+          var 잘림 = list.length >= 100;
           return {
             rows: [
               ["이번 주 작성", n(이번주)],
               ["마지막 보고 후", 지난날 == null ? "-" : 지난날 + "일"],
-              ["보관 중", n(사람이만든.length)],
+              ["보관 중", n(사람이만든.length) + (잘림 ? "+" : "")],
             ],
             foot: 자동 ? "정기·수시 보고서가 여기 쌓입니다 · 자동 생성물 " + n(자동) + "건은 따로 셉니다"
               : "정기·수시 보고서가 여기 쌓입니다",
           };
         });
       } },
-      { id: "kpi", title: "📈 보안 KPI", page: "kpi.html", load: function () {
+      // kpi도 「경영 보고 준비」 — 시나리오 첫걸음이 「보안 KPI 현황 알려줘」라 두 판이 같은 업무의 입구다.
+      { id: "kpi", title: "📈 보안 KPI", page: "kpi.html", scenario: "경영 보고 준비", load: function () {
         return window.gijo.getSecurityKpi().then(function (k) {
           var c = (k || {}).current || {};
           // ⚠ 서버가 주는 값은 **good|fair|poor**다(kpi.ts:67·217). warn|bad는 없는 값이라
@@ -535,14 +542,16 @@
               ? { text: BAND[c.posture.band], color: BAND_COLOR[c.posture.band] || A } : null,
             rows: [
               ["종합 점수", c.posture ? c.posture.score + "/100" : "-"],
-              ["미조치 취약점", c.vulnerabilities ? n(c.vulnerabilities.active) : "-", R],
+              // 라벨은 실화면 kpi.html:280 「열린 취약점」과 동일 — 「미조치」라 쓰면 ③ 조치의
+              // 검토대장 숫자와 같은 것으로 읽힌다(잣대가 다르다: 이건 호스트 스캔 기준, 2026-08-21).
+              ["열린 취약점", c.vulnerabilities ? n(c.vulnerabilities.active) : "-", R],
               ["기한 지난 조치", c.remediation && c.remediation.overdue != null ? n(c.remediation.overdue) : "-", A],
             ],
             foot: "지표는 서버가 한 곳에서 셉니다",
           };
         });
       } },
-      { id: "compliance", title: "📋 컴플라이언스", page: "compliance.html",
+      { id: "compliance", title: "📋 컴플라이언스", page: "compliance.html", scenario: "법령·행동 대조",
         // rows: 상태 한글은 실화면 compliance.html:177과 동일 — 요약 조각 라벨도 아래에서
         // 같은 사전으로 통일했다(같은 카드 안에서 「이행/미이행」과 「대응완료/미대응」이
         // 병존하던 두 말 — 설계관 ①-B 적발).
@@ -578,7 +587,7 @@
     // AI — 내 보안 AI의 구성·지식·학습·안전장치(2026-08-09 사용자 지시 "고객 가이드 화면으로").
     // 숫자는 각 화면과 같은 API. 데이터가 없어도 판 모양은 같다(0은 0으로).
     aiops: [
-      { id: "team", title: "🤖 AI 팀", page: "agent.html",
+      { id: "team", title: "🤖 AI 팀", page: "agent.html", scenario: "AI 운영 점검",
         // rows: 상태 한글은 실화면 agent.html:287 STATUS_LABEL과 동일. 시각 필드가 없어
         // 4열은 두지 않는다(없는 값을 지어내지 않는다 — 열 규약 「없는 칸은 비운다」).
         rows: function () {
@@ -753,7 +762,8 @@
       // rows: ⚠ listLogs()는 **오래된 것이 먼저** 온다(logs.ts push 순서) — 그대로 넘기면
       //   앞 200건 상한에 걸려 **가장 오래된 200줄**만 보인다(2026-08-20 설계관 경고). 뒤집는다.
       //   레벨 한글은 이 판의 요약 라벨(오류·경고·정보)이 유일한 선례라 그 말을 쓴다.
-      { id: "syslog", title: "⚙ 시스템 로그", page: "syslog.html",
+      // 침해 의심 초동 — 시나리오 걸음(로그 이상 징후·처리 실패 내역)이 이 판의 자리다.
+      { id: "syslog", title: "⚙ 시스템 로그", page: "syslog.html", scenario: "침해 의심 초동",
         rows: function () {
           var LV_KO = { error: "오류", warn: "경고", log: "정보", info: "정보" };
           return window.gijo.listLogs().then(function (list) {
@@ -796,7 +806,7 @@
       //   판**이다(assetscope.test가 지키는 옛 id·제목 조합과 다르게 id:"asset"·🗺).
       // ⚠ 「미조치」 잣대는 취약점 판과 **같은 ㉡**(진짜취약점·미해결 — assetHub vuln.open이
       //   같은 식)이다 — 같은 현황판에 같은 이름의 다른 수가 두 개 뜨면 안 된다(설계관 ③-1).
-      { id: "asset", title: "🗺 자산", page: "assets.html", pick: "asset",
+      { id: "asset", title: "🗺 자산", page: "assets.html", pick: "asset", scenario: "자산 정리(결손 채우기)",
         rows: function () {
           return window.gijo.assetHub().then(function (d) {
             var rs = (d && d.rows) || [];
@@ -899,7 +909,7 @@
       // 🗂 작업 내역 — 반드시 축 API(origin:user)로 — 옛 통로(listWorkSessions)는 QA·시스템
       //   세션이 섞여 화면·카드와 수가 갈린다(worksessions.ts:713, 설계관 ①-A). 조회 상한이
       //   서버 SESSION_KEEP=100이라 100건이 꽉 차면 「100+」로 정직하게 말한다(③-2).
-      { id: "sessions", title: "🗂 작업 내역", page: "sessions.html",
+      { id: "sessions", title: "🗂 작업 내역", page: "sessions.html", scenario: "인수인계 점검",
         rows: function () {
           return window.gijo.listWorkSessionsWithAxes({ origin: "user" }).then(function (d) {
             var ST = { active: "진행중", done: "완료", ignored: "무시" };
