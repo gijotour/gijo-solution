@@ -191,6 +191,10 @@ describe("2차 ③ 자산 현황 카드", () => {
     expect(isAssetStatusAsk("우리 자산 상태 어때")).toBe(true);
     expect(isAssetStatusAsk("자산 목록 보여줘"), "list_assets 도구 영토").toBe(false);
     expect(isAssetStatusAsk("고위험 자산 리스트"), "list_assets 등급 갈래 영토").toBe(false);
+    // 평가게이트 no-hit-asset 실측(2026-08-20) — 특정 자산(식별자 꼴)을 물으면 전체 카드가 아니라
+    // 도구 경로(get_asset)로 가서 「없다」를 정직하게 말해야 한다.
+    expect(isAssetStatusAsk("zzz-없는서버-999 자산 상태 알려줘"), "특정 자산 식별자는 안 삼킨다").toBe(false);
+    expect(isAssetStatusAsk("srv-web-01 자산 상태 어때"), "실존 식별자도 도구 경로로").toBe(false);
     expect(isAssetStatusAsk("자산 취약점 현황"), "우선순위(findingList) 영토").toBe(false);
     expect(isAssetStatusAsk("최근 등록된 자산 현황"), "list_assets 최근 갈래 영토").toBe(false);
     expect(isAssetStatusAsk("검증 현황 보여줘"), "하드닝 카드 영토").toBe(false);

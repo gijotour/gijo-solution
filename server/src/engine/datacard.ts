@@ -122,6 +122,10 @@ export function isAssetStatusAsk(text: string): boolean {
   if (!/(현황|상태|어때)/.test(t)) return false;
   if (!/자산/.test(t)) return false;
   if (/(이|그|저|해당|선택한?|고른)자산/.test(t)) return false;
+  // 특정 자산을 콕 집은 물음(식별자 꼴 — srv-web-01·zzz-없는서버-999)은 전체 현황이 답이
+  // 아니다. 평가게이트 no-hit-asset 실측(2026-08-20): 없는 자산의 상태를 물었는데 이 카드가
+  // 삼켜 전체 요약을 답했다 — 특정 대상은 도구 경로(get_asset)로 보내 「없다」를 정직하게.
+  if (/[A-Za-z0-9][A-Za-z0-9._-]{2,}/.test(t)) return false;
   return !/취약점|스캔|목록|리스트|최근|등록|추가|삭제|검증|하드닝|점검/.test(t);
 }
 
