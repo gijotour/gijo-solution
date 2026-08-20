@@ -146,6 +146,11 @@ export interface MemoryDocument {
   hasSource: boolean;
   docClass: string | null;
   uploadedBy?: string | null; // 작업 귀속 — 누가 올렸는지
+  // ⚠ 서버(memory.ts listMemoryDocuments)와 실화면(mydocs 영역 그룹·등급 글자)은 이 둘을 쓰는데
+  //   여기 선언에만 빠져 있었다 — 세 곳 중 한 곳만 어긋난 자리다(설계관 2026-08-21 적발).
+  //   window.gijo.*가 any라 tsc도 clientglobals.test도 못 잡는 부류라 손으로 맞춰 둔다.
+  category?: string | null;   // 업무영역 — 회사 지식 목록의 🗂 그룹 머리
+  grade?: string | null;      // 열람 등급 O/S/C
 }
 
 // ── 온톨로지 (지식 그래프 / 하이브리드 지식모델의 의미 계층) ──────────────

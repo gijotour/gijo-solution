@@ -240,10 +240,12 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     JSON.stringify({ 전, 행: r && r.행, 무대내림: 후.무대내림, 문장: String(후.문장).slice(0, 50) }));
 }
 
-// ── ③‴ 문서 허브 v3(승인 시안 docs-hub-v3, 2026-08-20) — 제품 안내 탭 실렌더 + 편집 스테이지.
-//    문서함 창은 폐지됐다 — 이 탭이 제품 안내의 **유일한** 읽기 자리라, 행 0이면 제품 안내
-//    전체가 사라진 것이다(출하 문서 12건이 담겨 있어 0은 원리상 렌더 사망). 편집기는
-//    전(닫힘)→후(열림) 전이로 잰다(관문 헛계측 교훈 — 전 상태 단언 필수).
+// ── ③‴ 문서 허브 v4(승인 시안 docs-hub-v4-workspace, 2026-08-21) — 제품 안내 실렌더 +
+//    문서창 안 편집. 문서함 창은 폐지됐다 — 여기가 제품 안내의 **유일한** 읽기 자리라,
+//    행 0이면 제품 안내 전체가 사라진 것이다(출하 문서 12건이 담겨 있어 0은 원리상 렌더 사망).
+//    편집기는 전(닫힘)→후(열림) 전이로 잰다(관문 헛계측 교훈 — 전 상태 단언 필수).
+//    ⚠ v4에서 자리가 바뀐 것: 탭줄 → 사이드바(.v4node) · 전폭 스테이지 → 문서창(#v4doc) 안.
+//    📖 열어 보기는 이제 **행을 누르면 자동**이라, 단추를 눌러도 안 눌러도 본문이 와야 한다.
 {
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("mydocs.html?tab=guide", "내 문서", { dock: true }));
   const fr = await 프레임찾기("mydocs.html", 8);
@@ -254,33 +256,42 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     }
     const 행들 = document.querySelectorAll(".g-rows--hub-guide .g-rows-r");
     if (!행들.length) return { 안내행: 0 };
+    // v4 껍데기 — 목록이 위로 올라왔는지(세로 시작점)와 3단이 실제로 섰는지
+    const 목록시작 = Math.round(행들[0].getBoundingClientRect().top);
+    const 문서창 = document.getElementById("v4doc");
+    const 사이드 = document.getElementById("v4side");
     행들[0].click();
-    await new Promise((x) => setTimeout(x, 200));
-    const 열어보기 = document.querySelector('#detail button[data-act="read"]');
-    if (열어보기) 열어보기.click();
     let 본문 = false;
     for (let i = 0; i < 15; i++) {
       await new Promise((x) => setTimeout(x, 400));
       const rb = document.getElementById("readBody");
       if (rb && rb.textContent && rb.textContent.length > 200 && !/여는 중/.test(rb.textContent)) { 본문 = true; break; }
     }
+    // 열람 중에도 목록은 살아 있어야 한다 — v4의 핵심(왕복 없음)
+    const 열람중목록 = document.querySelectorAll(".g-rows--hub-guide .g-rows-r").length;
+    // 📖 단추 계약은 남아 있다(자동으로 열리더라도 다시 열 수 있어야 한다)
+    const 열어보기있음 = !!document.querySelector('#detail button[data-act="read"]');
     document.getElementById("readBack").click();
-    const mineBtn = document.querySelector('#tabs button[data-t="mine"]');
+    const mineBtn = document.querySelector('#tabs .v4node[data-t="mine"]');
     if (mineBtn) mineBtn.click();
     await new Promise((x) => setTimeout(x, 300));
     const 편집전 = document.getElementById("editStage").classList.contains("on"); // 전 상태 — false여야 전이를 잰 것
     document.getElementById("btnNew").click();
-    await new Promise((x) => setTimeout(x, 200));
+    await new Promise((x) => setTimeout(x, 250));
+    const 편집열림 = document.getElementById("editStage").classList.contains("on");
+    // 편집기가 문서창 **안에서** 열렸는가 — 전폭 스테이지로 되돌아가면 v4가 아니다
+    const 편집이문서창안 = 편집열림 && 문서창.contains(document.getElementById("editStage"));
     return {
-      안내행: 행들.length,
-      본문,
-      편집전,
-      편집열림: document.getElementById("editStage").classList.contains("on"),
+      안내행: 행들.length, 목록시작, 본문, 열람중목록, 열어보기있음,
+      편집전, 편집열림, 편집이문서창안,
+      사이드바폭: Math.round(사이드.getBoundingClientRect().width),
       템플릿: document.querySelectorAll("#tplDrawer .tpl-chip").length,
     };
   }).catch(() => null) : null;
-  ok("문서 허브: 제품 안내 렌더+열람 본문+편집 스테이지 전이+템플릿 8종(7+빈)",
-    !!r && r.안내행 > 0 && r.본문 && !r.편집전 && r.편집열림 && r.템플릿 === 8,
+  ok("문서 허브 v4: 제품 안내 렌더+행클릭 본문+열람 중 목록 유지+문서창 편집 전이+템플릿 8종(7+빈)",
+    !!r && r.안내행 > 0 && r.본문 && r.열람중목록 > 0 && r.열어보기있음
+      && !r.편집전 && r.편집열림 && r.편집이문서창안 && r.템플릿 === 8
+      && r.목록시작 < 140 && r.사이드바폭 >= 40,
     JSON.stringify(r));
 }
 

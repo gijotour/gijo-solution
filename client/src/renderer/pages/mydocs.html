@@ -24,7 +24,19 @@
       메시지를 받으면 내 것 탭·편집 스테이지를 열고 템플릿 골격을 채운다. 발신자는
       부모 셸(window.parent)만 믿는다 — 발신자 검증 계약(5.37.0)과 같은 잣대.
       (지금 발신자는 아직 없다 — 신고 시한 카운트다운 카드가 생기면 이 계약으로 들어온다.)
-  ■ 탭 5+1: 👤 내 것(personal_docs CRUD) · 🏢 회사 지식(RAG 지식창고 열람) · 📘 제품 안내
+  ■ v4 (2026-08-21 사장님 — 「문서함을 커서나 노션처럼 만들어주면 안돼?」·「지금 디자인 방식이
+    너무 화면을 많이 잡아먹고 있어」. 승인 시안: mockups/docs-hub-v4-workspace/시안.html):
+    · **작업공간 3단** — 왼쪽 사이드바(옛 제목·부제·탭줄·개인/공유 세그가 한자리로) · 가운데
+      목록 · 오른쪽 문서창. 편집·열람·요청이 **문서창 안에서** 열려 목록이 사라지지 않는다
+      (옛 전폭 스테이지의 「목록으로 돌아가기」 왕복이 없어졌다).
+    · 세로 껍데기 실측 355 → 목록이 위로 올라온다. 📘 제품 안내는 **행을 누르면 바로 본문**.
+    · ⚠ 폭 계약(설계관 지적) — 200+400 3단은 약 820px부터 성립한다. 세로 모니터(1080)·표준
+      셸(대화창 옆 380)·팝업 최소폭(700)이 전부 그 아래라, 1000px 미만이면 사이드바가 접히고
+      820px 미만이면 문서창이 목록을 덮는다. 「좁으면 깨진다」를 그냥 두지 않는다.
+    · ⚠ .g-rows-scroll의 --gr-maxh를 none으로 — gijo-ui.css:353의 540px 상한을 그대로 두면
+      껍데기를 걷어 번 자리가 빈칸이 된다.
+    · 서버·IPC 신설 0건. 게시 관문(publish-gate-ui ③‴)은 같은 커밋에서 v4 자리로 옮겼다.
+  ■ 탭 5+1(v4에서는 **사이드바 항목**): 👤 내 것(personal_docs CRUD) · 🏢 회사 지식(RAG 지식창고 열람) · 📘 제품 안내
     (출하 문서 읽기전용+요청 만들기) · 🎓 학습(수집 내역 열람 — **조작 없음**) · 🩹 반입
     (＋로 올린 문서의 기록) · 🗂 산출물(예약 자리 — 눌러도 예약 안내만, 데이터인 척 안 한다).
   ■ 격리가 이 화면의 전부다: 내 것 목록은 서버가 **내 것만** 준다(personaldocs — 남의 것은
@@ -45,35 +57,80 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
-.main{padding:20px 24px 40px;max-width:1180px;margin:0 auto;}
-.head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;}
-.page-title{font-size:19px;font-weight:800;color:var(--text-strong, #fff);}
-.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
-.acts{display:flex;gap:8px;}
+/* ── v4 작업공간 껍데기 ─────────────────────────────────────────────────
+   ⚠ nav.js:1389가 임베드에서 `.main{padding-top:16px!important}`을 주입한다. 그대로 두면
+   전폭 3단 위에 16px이 얹혀 껍데기가 도로 늘어난다 — 같은 !important를 더 센 선택자로 이긴다
+   (설계관 지적). 억지가 아니라 「이 화면은 자기 여백을 스스로 0으로 정한다」는 선언이다. */
+body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+.acts{display:flex;gap:6px;}
 .btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
-  padding:8px 14px;border-radius:8px;font-size:12.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+  padding:0 10px;height:26px;border-radius:7px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
-.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
-.tabs button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
-  padding:6px 14px;border-radius:18px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
-.tabs button.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
-.tabs button .n{font-weight:800;margin-left:4px;}
-.tabs button.future{border-style:dashed;opacity:.75;}
-.tabs button.future .soon{font-size:11px;font-weight:800;color:var(--amber);margin-left:5px;}
-.filter{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;color:var(--text);
-  font-size:12.5px;padding:7px 11px;outline:none;margin-bottom:8px;}
+.btn:hover{border-color:var(--blue);}
+.v4root{flex:1 1 auto;min-height:0;display:flex;}
+/* 왼쪽 사이드바 = 옛 탭줄·제목·부제·개인/공유 세그가 한자리로 모인 것 */
+.v4sidebar{flex:0 0 200px;width:200px;display:flex;flex-direction:column;background:var(--panel-2);
+  border-right:1px solid var(--border-strong);overflow:hidden;}
+.v4sidebar.collapsed{flex:0 0 44px;width:44px;}
+.v4sh{flex:0 0 36px;height:36px;border-bottom:1px solid var(--border);display:flex;align-items:center;
+  gap:6px;padding:0 8px;font-size:12px;font-weight:800;color:var(--text);}
+.v4sh .lbl{flex:1 1 auto;overflow:hidden;white-space:nowrap;}
+.v4sidebar.collapsed .v4sh .lbl{display:none;}
+.v4collapse{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:6px;
+  width:22px;height:22px;font-size:11px;cursor:pointer;font-family:inherit;flex:0 0 auto;line-height:1;}
+.v4collapse:hover{border-color:var(--blue);color:var(--text);}
+.v4tree{flex:1 1 auto;overflow-y:auto;padding:5px;}
+.v4node{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;border:none;background:transparent;
+  border-radius:6px;font-size:12px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;
+  white-space:nowrap;overflow:hidden;text-align:left;}
+.v4node:hover{background:rgba(255,255,255,.05);}
+.v4node.on{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.v4node .cnt{margin-left:auto;color:var(--muted-2);font-size:11px;font-weight:700;}
+.v4node.on .cnt{color:var(--blue-light);}
+.v4node.future{opacity:.6;border:1px dashed var(--border-strong);}
+.v4node.future .cnt{color:var(--amber);}
+.v4subs{padding-left:16px;}
+.v4sub{display:block;width:100%;background:transparent;border:none;text-align:left;font-family:inherit;
+  font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;padding:4px 8px;border-radius:6px;
+  white-space:nowrap;overflow:hidden;}
+.v4sub:hover{background:rgba(255,255,255,.04);color:var(--text);}
+.v4sub.on{color:var(--blue-light);background:rgba(59,130,246,.1);}
+.v4grouplbl{font-size:11px;letter-spacing:.4px;color:var(--muted-2);padding:8px 8px 2px;font-weight:800;}
+.v4sidebar.collapsed .v4subs,.v4sidebar.collapsed .v4grouplbl{display:none;}
+.v4sidebar.collapsed .v4node{justify-content:center;padding:5px 0;}
+.v4sidebar.collapsed .v4node .txt,.v4sidebar.collapsed .v4node .cnt{display:none;}
+.v4main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+.v4toolbar{flex:0 0 38px;height:38px;border-bottom:1px solid var(--border);display:flex;align-items:center;
+  gap:8px;padding:0 10px;}
+.filter{flex:1 1 auto;min-width:100px;background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;
+  color:var(--text);font-size:12px;padding:0 10px;height:26px;outline:none;font-family:inherit;}
 .filter:focus{border-color:var(--blue);}
-.cols{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start;}
-.cols.full{grid-template-columns:1fr;}
-.cols.full .detail{display:none;} /* 전폭 탭(학습)에선 상세를 숨긴다(검토관 중4 — 안 숨기면 이전 탭 문구가 목록 아래 남는다) */
+/* 목록 | 문서창 — 좁아지면 문서창이 목록을 덮는다(아래 .narrow) */
+.v4content{flex:1 1 auto;min-height:0;display:flex;position:relative;}
+.v4list{flex:0 0 400px;width:400px;display:flex;flex-direction:column;border-right:1px solid var(--border);min-height:0;}
+.v4list .g-rows{border:none;border-radius:0;flex:1 1 auto;min-height:0;}
+.v4docpane{flex:1 1 auto;min-width:0;overflow-y:auto;padding:12px 16px;position:relative;}
+.v4content.full .v4docpane{display:none;}
+.v4content.full .v4list{flex:1 1 auto;width:auto;border-right:none;}
+/* ⚠ 좁은 자리 계약(설계관 ③) — 200+400 3단은 약 820px부터 성립한다. 세로 모니터(1080)·
+   표준 셸(대화창 옆 380)·팝업 최소폭(700)이 전부 그 아래라, 그때는 문서창을 목록 위로 덮는다.
+   숨기는 게 아니라 겹치는 것이라 「고른 것을 못 본다」가 생기지 않는다. */
+.v4content.narrow .v4list{flex:1 1 auto;width:auto;border-right:none;}
+.v4content.narrow .v4docpane{position:absolute;inset:0;z-index:6;background:var(--bg);display:none;}
+.v4content.narrow.showdoc .v4docpane{display:block;}
+.v4close{display:none;position:absolute;top:8px;right:10px;z-index:7;width:24px;height:24px;padding:0;
+  border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);
+  font-size:12px;cursor:pointer;font-family:inherit;line-height:1;}
+.v4content.narrow .v4close{display:block;}
+.v4close:hover{border-color:var(--red);color:#f5928a;}
 /* 등급·보조 글자색 — .g-rows 밖(상세 패널)에서도 먹게 이 화면 범위로 정의(검토관 하2) */
 .gtxt-C{color:var(--red);font-weight:800;} .gtxt-S{color:var(--amber);font-weight:800;} .gtxt-O{color:var(--muted);font-weight:700;}
 .gm2{color:var(--muted-2);}
-.mineseg{display:flex;gap:6px;margin:0 0 8px;}
-.mineseg button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
-  padding:4px 12px;border-radius:14px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
-.mineseg button.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
-.detail{border:1px solid var(--border);border-radius:9px;background:var(--panel);padding:12px 14px;position:sticky;top:12px;font-size:12.5px;}
+.detail{font-size:12.5px;}
+/* 문서창이 스테이지(편집·열람·요청)를 품으면 상세는 비킨다 — 단 📖 열람은 위에 남는다
+   (무엇을 읽고 있는지가 사라지면 「내가 뭘 눌렀더라」가 다시 생긴다). */
+.v4docpane.staged:not(.read) .detail{display:none;}
+.v4docpane.staged.read .detail{margin-bottom:10px;}
 .detail .dn{font-weight:800;font-size:13.5px;margin-bottom:4px;word-break:break-all;}
 .detail .dm{color:var(--muted);line-height:1.6;}
 .detail .dbt{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
@@ -84,17 +141,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .go{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;
   padding:4px 10px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
 .go:hover{color:var(--text-strong, #fff);border-color:var(--blue);}
-.topics{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
-.topic{border:1px solid var(--border);border-radius:8px;background:var(--panel);padding:7px 11px;font-size:12px;}
-.topic b{font-size:14px;color:var(--text-strong, #fff);margin-left:5px;}
+.topics{display:flex;gap:7px;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid var(--border);flex:0 0 auto;}
+.topic{border:1px solid var(--border);border-radius:7px;background:var(--panel);padding:3px 9px;font-size:11.5px;}
+.topic b{font-size:12.5px;color:var(--text-strong, #fff);margin-left:5px;}
 .gtxt-rag{color:var(--teal);font-weight:700;}
 .gtxt-share{color:var(--amber);font-weight:700;}
 .gtxt-up{color:var(--teal);font-weight:700;} .gtxt-down{color:var(--red);font-weight:700;}
 .empty{padding:28px 16px;text-align:center;color:var(--muted-2);font-size:12.75px;}
-.note{font-size:11.75px;color:var(--muted-2);margin-top:10px;line-height:1.6;}
+.note{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);line-height:1.5;padding:5px 12px;
+  border-top:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-/* ── 스테이지(편집·열람·요청) — 목록과 자리를 바꿔 쓴다(시안 v3: 300px 상세에 욱여넣지 않는다) ── */
-.stage{display:none;border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px 16px;}
+/* ── 스테이지(편집·열람·요청) — v4에서는 **문서창 안에서** 열린다.
+   목록이 사라지지 않으므로 「목록으로 돌아가기」 왕복이 없다(사장님: 커서·노션처럼).
+   ⚠ 상자를 겹으로 두르지 않는다 — 문서창이 이미 바탕·여백을 갖고 있다. */
+.stage{display:none;}
 .stage.on{display:block;}
 .st-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
 .st-top .back{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;
@@ -127,15 +187,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .tpl-chip:hover{border-color:var(--blue);}
 .tpl-chip .tag{font-size:11px;font-weight:800;color:var(--teal);}
 .tpl-chip .ov{font-size:11px;font-weight:400;color:var(--muted-2);line-height:1.4;}
-.edit-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:340px;}
-.edit-split.mode-src{grid-template-columns:1fr;} .edit-split.mode-src .edit-prev{display:none;}
+/* 분할 편집 — 문서창 폭이 좁으면(≈520px 미만) 두 칸이 각 200px 밑으로 떨어져 못 쓴다.
+   그때는 자동으로 한 칸으로 눕힌다(.thin — JS가 문서창 폭을 재서 붙인다). */
+.edit-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:300px;}
+.edit-split.mode-src,.edit-split.thin{grid-template-columns:1fr;}
+.edit-split.mode-src .edit-prev,.edit-split.thin .edit-prev{display:none;}
 .edit-split.mode-prev{grid-template-columns:1fr;} .edit-split.mode-prev .edit-src{display:none;}
-.edit-src textarea{width:100%;height:100%;min-height:340px;background:var(--panel-2);border:1px solid var(--border-strong);
+.edit-split.thin.mode-prev .edit-prev{display:block;}
+.edit-src textarea{width:100%;height:100%;min-height:300px;background:var(--panel-2);border:1px solid var(--border-strong);
   border-radius:8px;color:var(--text);font:12px/1.7 Consolas,"Cascadia Mono","Malgun Gothic",monospace;
   padding:11px 13px;outline:none;resize:vertical;}
 .edit-src textarea:focus{border-color:var(--blue);}
 .edit-prev{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);padding:12px 14px;
-  overflow-y:auto;max-height:70vh;min-height:340px;}
+  overflow-y:auto;max-height:70vh;min-height:300px;}
 /* 마크다운 렌더(gijomd 출력) — docbox의 .md 규격을 축약 승계(공용 렌더러라 클래스 결이 같다) */
 .md h1{font-size:18px;margin:0 0 12px;color:var(--text-strong, #fff);line-height:1.4;}
 .md h2{font-size:14.5px;margin:18px 0 8px;color:var(--text-strong, #fff);padding-bottom:5px;border-bottom:1px solid var(--border);line-height:1.4;}
@@ -185,47 +249,60 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </style>
 </head>
 <body class="g-ui">
-<div class="main">
-  <div class="head">
-    <div>
-      <div class="page-title">내 문서</div>
-      <div class="page-sub">개인 메모 · 회사 지식 · 제품 안내 · 학습 재료 · 반입 기록 — 문서의 정문입니다. 개인 문서는 <b>내 질문에만</b> 근거로 나옵니다.</div>
-    </div>
-    <div class="acts" id="acts">
-      <button class="btn primary" id="btnNew" title="이 화면 안에서 새 문서를 씁니다 — 업무 템플릿 7종에서 고를 수 있습니다">＋ 새 문서</button>
-      <button class="btn" id="btnImport" title=".md/.txt 파일을 내 문서로 가져옵니다">📥 .md 가져오기</button>
-      <button class="btn" id="btnWrite" title="Smart MD Studio(무료·별도 창)를 엽니다 — 바깥으로 낼 문서를 정성껏 다듬을 때 좋습니다">✍ Smart MD로 쓰기</button>
-    </div>
-    <div class="acts" id="guideActs" style="display:none">
-      <button class="btn primary" id="btnRequest" title="개발팀에 보낼 요청 문서를 만듭니다 — 파일로 저장됩니다">📝 요청 만들기</button>
+<div class="main v4wrap">
+ <div class="v4root" id="v4root">
+  <!-- 왼쪽 사이드바 — 옛 제목·부제·탭줄·개인/공유 세그가 여기 한자리로 모였다.
+       세로 껍데기가 그만큼 사라지고, 어디에 있는지는 오히려 늘 보인다. -->
+  <div class="v4sidebar" id="v4side">
+    <div class="v4sh"><span class="lbl">📁 내 문서</span>
+      <button class="v4collapse" id="v4collapse" title="왼쪽 칸 접기·펴기">◧</button></div>
+    <div class="v4tree" id="tabs">
+      <div class="v4grouplbl">내가 쓰는 것</div>
+      <button class="v4node on" data-t="mine">📝<span class="txt">내 것</span><span class="cnt" id="nMine"></span></button>
+      <div class="v4subs" id="mineSeg" style="display:none">
+        <button class="v4sub on" data-f="all">전부</button>
+        <button class="v4sub" data-f="personal">👤 개인만</button>
+        <button class="v4sub" data-f="shared">🏢 공유만</button>
+      </div>
+      <div class="v4grouplbl">회사가 가진 것</div>
+      <button class="v4node" data-t="know">🏢<span class="txt">회사 지식</span><span class="cnt" id="nKnow"></span></button>
+      <button class="v4node" data-t="guide">📘<span class="txt">제품 안내</span><span class="cnt" id="nGuide"></span></button>
+      <div class="v4grouplbl">기록</div>
+      <button class="v4node" data-t="learn">🎓<span class="txt">학습</span><span class="cnt" id="nLearn"></span></button>
+      <button class="v4node" data-t="ingest">🩹<span class="txt">반입</span><span class="cnt" id="nIngest"></span></button>
+      <button class="v4node future" data-t="future" title="예약된 자리 — 리포트·공식 인수인계 열람을 모을 예정입니다(아직 동작하지 않습니다)">🗂<span class="txt">산출물</span><span class="cnt">예정</span></button>
     </div>
   </div>
-  <div class="tabs" id="tabs">
-    <button data-t="mine" class="on">👤 내 것<span class="n" id="nMine"></span></button>
-    <button data-t="know">🏢 회사 지식<span class="n" id="nKnow"></span></button>
-    <button data-t="guide">📘 제품 안내<span class="n" id="nGuide"></span></button>
-    <button data-t="learn">🎓 학습<span class="n" id="nLearn"></span></button>
-    <button data-t="ingest">🩹 반입<span class="n" id="nIngest"></span></button>
-    <button data-t="future" class="future" title="예약된 자리 — 리포트·공식 인수인계 열람을 모을 예정입니다(아직 동작하지 않습니다)">🗂 산출물<span class="soon">예정</span></button>
-  </div>
-  <input class="filter" id="q" placeholder="제목·이름으로 좁히기… (필터 전용 — 지시가 아닙니다)" aria-label="목록 좁히기">
-  <div class="mineseg" id="mineSeg" style="display:none">
-    <button data-f="all" class="on">전부</button>
-    <button data-f="personal">👤 개인만</button>
-    <button data-f="shared">🏢 공유만</button>
-  </div>
-  <div id="learnTop" class="topics" style="display:none"></div>
-  <div class="cols" id="cols">
-    <div class="g-rows" id="rowsBox">
-      <div class="g-rows-scroll" id="list" style="--gr-maxh:max(300px, calc(100vh - 320px))"><div class="empty">불러오는 중…</div></div>
+  <div class="v4main">
+    <div class="v4toolbar">
+      <input class="filter" id="q" placeholder="제목·이름으로 좁히기… (필터 전용 — 지시가 아닙니다)" aria-label="목록 좁히기">
+      <div class="acts" id="acts">
+        <button class="btn primary" id="btnNew" title="이 화면 안에서 새 문서를 씁니다 — 업무 템플릿 7종에서 고를 수 있습니다">＋ 새 문서</button>
+        <button class="btn" id="btnImport" title=".md/.txt 파일을 내 문서로 가져옵니다">📥 .md</button>
+        <button class="btn" id="btnWrite" title="Smart MD Studio(무료·별도 창)를 엽니다 — 바깥으로 낼 문서를 정성껏 다듬을 때 좋습니다">✍ Smart MD</button>
+      </div>
+      <div class="acts" id="guideActs" style="display:none">
+        <button class="btn primary" id="btnRequest" title="개발팀에 보낼 요청 문서를 만듭니다 — 파일로 저장됩니다">📝 요청 만들기</button>
+      </div>
     </div>
-    <div class="detail" id="detail"><div class="dm">행을 누르면 여기서 내용·조작을 봅니다.</div></div>
-  </div>
+    <div class="v4content" id="v4content">
+      <div class="v4list">
+        <div id="learnTop" class="topics" style="display:none"></div>
+        <div class="g-rows" id="rowsBox">
+          <!-- ⚠ --gr-maxh를 none으로 — gijo-ui.css:353의 540px 상한을 그대로 두면 목록이
+               18줄에서 잘려, 껍데기를 걷어 번 자리가 그대로 빈칸이 된다(설계관 지적). -->
+          <div class="g-rows-scroll" id="list" style="--gr-maxh:none"><div class="empty">불러오는 중…</div></div>
+        </div>
+      </div>
+      <!-- 문서창 — 상세·편집·열람·요청이 전부 여기서 열린다(화면을 통째로 갈아 끼우지 않는다) -->
+      <div class="v4docpane" id="v4doc">
+        <button class="v4close" id="v4close" title="문서창 닫기">✕</button>
+        <div class="detail" id="detail"><div class="dm">행을 누르면 여기서 내용·조작을 봅니다.</div></div>
 
-  <!-- 전폭 편집 스테이지(시안 v3 — 300px 상세에 분할 뷰를 욱여넣지 않는다) -->
+  <!-- 편집 — 문서창 안에서 연다(시안 v4) -->
   <div class="stage" id="editStage">
     <div class="st-top">
-      <button class="back" id="editBack">← 목록으로</button>
+      <button class="back" id="editBack">← 닫기</button>
       <input class="st-title-in" id="editTitle" maxlength="120" placeholder="제목을 적어 주세요">
       <button class="st-btn" id="editTplToggle">📋 업무 템플릿</button>
       <div class="viewseg" id="editViewSeg">
@@ -246,19 +323,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
   </div>
 
-  <!-- 제품 안내 열람 스테이지(문서함의 넓은 읽기 화면 승계) -->
+  <!-- 제품 안내 열람(문서함의 넓은 읽기 화면 승계) — v4에서는 행을 누르면 바로 열린다 -->
   <div class="stage" id="readStage">
     <div class="st-top">
-      <button class="back" id="readBack">← 목록으로</button>
+      <button class="back" id="readBack">✕ 본문 닫기</button>
       <span style="font-weight:800;font-size:13.5px" id="readTitle"></span>
     </div>
-    <div class="md" id="readBody" style="max-height:72vh;overflow-y:auto"></div>
+    <div class="md" id="readBody"></div>
   </div>
 
-  <!-- 요청 만들기 스테이지(문서함에서 자리 이전 — 로직은 docbox.html 456-627 승계) -->
+  <!-- 요청 만들기(문서함에서 자리 이전 — 로직은 docbox.html 456-627 승계) -->
   <div class="stage" id="composeStage"><div id="cxWrap"></div></div>
-
-  <div class="note" id="note">개인 문서는 내 질문에만 근거로 나옵니다 — 「AI 포함」과 「공유」의 차이는 ⓘ로 보세요.</div>
+      </div><!-- /v4docpane -->
+    </div><!-- /v4content -->
+    <div class="note" id="note">개인 문서는 내 질문에만 근거로 나옵니다 — 「AI 포함」과 「공유」의 차이는 ⓘ로 보세요.</div>
+  </div><!-- /v4main -->
+ </div><!-- /v4root -->
 </div>
 <!-- 공용 마크다운 렌더러 — 편집 미리보기·제품 안내 열람·요청 미리보기가 쓴다.
      ⚠ 이 줄이 빠지면 gijoMd가 undefined라 열람이 TypeError로 죽는다(문서함 5.7.2 실사고와 같은 부류). -->
@@ -329,7 +409,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   ];
   var TEMPLATE_BLANK = { id: "blank", icon: "📄", label: "빈 문서", tag: "", overlap: "", body: "" };
 
-  // ── 스테이지 전환 — 목록(필터·세그 포함)과 스테이지는 자리를 바꿔 쓴다 ──────
+  // ── 스테이지 전환 — v4에서는 목록이 **사라지지 않는다.** 편집·열람·요청은 오른쪽
+  //    문서창 안에서 열리고, 왼쪽 목록은 계속 보인다(사장님: 커서·노션처럼).
+  //    좁은 자리에서는 문서창이 목록을 덮는다(폭맞추기() 참고).
   function 스테이지(which) {
     스테이지값 = which;
     // 요청 폼을 떠나면 paste 가로채기·초안을 한 곳에서 정리한다(검토관 중6 — 이탈 경로가
@@ -338,20 +420,43 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       try { document.removeEventListener("paste", cx붙여넣기); } catch (e) { }
       cx = null;
     }
-    var 목록 = which === "list";
-    document.getElementById("cols").style.display = 목록 ? "grid" : "none";
-    document.getElementById("q").style.display = 목록 ? "" : "none";
-    document.getElementById("mineSeg").style.display = 목록 && 탭 === "mine" ? "flex" : "none";
-    document.getElementById("learnTop").style.display = 목록 && 탭 === "learn" ? "flex" : "none";
-    document.getElementById("acts").style.display = 목록 && 탭 === "mine" ? "flex" : "none";
-    document.getElementById("guideActs").style.display = 목록 && 탭 === "guide" ? "flex" : "none";
+    document.getElementById("mineSeg").style.display = 탭 === "mine" ? "block" : "none";
+    document.getElementById("learnTop").style.display = 탭 === "learn" ? "flex" : "none";
+    document.getElementById("acts").style.display = 탭 === "mine" ? "flex" : "none";
+    document.getElementById("guideActs").style.display = 탭 === "guide" ? "flex" : "none";
     document.getElementById("editStage").classList.toggle("on", which === "edit");
     document.getElementById("readStage").classList.toggle("on", which === "read");
     document.getElementById("composeStage").classList.toggle("on", which === "compose");
+    var pane = document.getElementById("v4doc");
+    pane.classList.toggle("staged", which !== "list");
+    // 열람만은 상세를 위에 남긴다 — 무엇을 읽고 있는지가 사라지면 안 된다.
+    pane.classList.toggle("read", which === "read");
+    문서창보임(which !== "list" || !!선택);
+    폭맞추기();   // 분할 편집이 좁은 문서창에서 두 칸으로 열리지 않게(.thin)
   }
 
-  // 스테이지에서 목록으로 돌아오는 유일한 문 — 스테이지값을 먼저 내려야 그리기()가 목록을 그린다.
+  // 문서창을 띄울지 — 넓을 때는 늘 자리에 있고, 좁을 때만 목록을 덮는다.
+  function 문서창보임(켬) { document.getElementById("v4content").classList.toggle("showdoc", !!켬); }
+
+  // 스테이지를 닫는 유일한 문 — 스테이지값을 먼저 내려야 그리기()가 목록을 그린다.
   function 목록으로() { 스테이지값 = "list"; 그리기(); }
+
+  // ── 폭 계약(설계관 ③) — 200+400 3단은 약 820px부터 성립한다. 그 아래에서는
+  //    ① 1000px 미만 사이드바 자동 접기 ② 820px 미만 문서창이 목록을 덮기.
+  //    세로 모니터(1080)·표준 셸(대화창 옆 380)·팝업 최소폭(700)이 전부 이 아래다.
+  var 손으로접음 = false;
+  function 폭맞추기() {
+    var root = document.getElementById("v4root");
+    if (!root) return;
+    var w = root.clientWidth || 0;
+    if (w <= 0) return;
+    if (!손으로접음) document.getElementById("v4side").classList.toggle("collapsed", w < 1000);
+    var c = document.getElementById("v4content");
+    c.classList.toggle("narrow", w < 820);
+    // 분할 편집은 문서창이 520px 아래로 내려가면 두 칸 다 못 쓴다 — 한 칸으로 눕힌다.
+    var sp = document.getElementById("editSplit");
+    if (sp) sp.classList.toggle("thin", document.getElementById("v4doc").clientWidth < 520);
+  }
 
   // ── 탭별 그리기(전부 .g-rows — 승인 시안 docs-hub-v2: 새 시각 언어 금지) ──────
   function 그리기() {
@@ -364,7 +469,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     var 걸림 = function (s) { return !q || String(s).toLowerCase().indexOf(q) >= 0; };
     스테이지("list");
     document.getElementById("note").textContent = 기본노트; // 산출물 예약 안내가 눌러앉지 않게(검토관 하9)
-    document.getElementById("cols").classList.toggle("full", 탭 === "learn");
+    // 🎓 학습은 조작이 없는 열람 전용이라 문서창을 아예 안 쓴다 — 목록이 전폭을 갖는다.
+    document.getElementById("v4content").classList.toggle("full", 탭 === "learn");
     document.getElementById("rowsBox").className = "g-rows g-rows--hub-" + 탭;
 
     // 불러오기 실패는 「없습니다」가 아니다(검토관 상4) — 그 탭의 원천이 죽었으면 그렇게 말한다.
@@ -479,10 +585,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     선택 = null;
     var d = document.getElementById("detail");
     if (탭 === "know") d.innerHTML = '<div class="dm">행을 누르면 문서 정보를 봅니다.<div class="dbt"><button class="go" data-go="memory.html" data-lb="AI 지식">🗔 AI 지식에서 관리(삭제·영역·등급)</button></div></div>';
-    else if (탭 === "guide") d.innerHTML = '<div class="dm">행을 누르면 문서 정보를 보고, 📖으로 전체를 펼쳐 읽습니다. 제품이 담아 온 읽기전용 문서라 여기서는 고치지 않습니다.</div>';
+    else if (탭 === "guide") d.innerHTML = '<div class="dm">행을 누르면 여기서 바로 본문이 열립니다. 제품이 담아 온 읽기전용 문서라 여기서는 고치지 않습니다.</div>';
     else if (탭 === "ingest") d.innerHTML = '<div class="dm">＋로 올린 문서가 어디로 갔는지의 기록입니다.<div class="dbt"><button class="go" data-go="analysis.html" data-lb="발견·수집">🗔 발견·수집(스캐너·로그 반입)</button></div></div>';
     else if (탭 === "mine") d.innerHTML = '<div class="dm">행을 누르면 여기서 내용·조작(고치기·AI 포함·공유·내려받기·삭제)을 봅니다.</div>';
     else d.innerHTML = ""; // learn — 전폭이라 숨겨져 있지만 이전 탭 문구를 남기지 않는다(중4)
+    // 고른 것이 없으면 좁은 자리의 덮개도 걷는다 — 안 걷으면 빈 문서창이 목록을 가린 채 남는다.
+    문서창보임(false);
   }
 
   function 학습띠그리기() {
@@ -522,7 +630,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // ── 배선 ─────────────────────────────────────────────────────────────
   document.getElementById("tabs").addEventListener("click", async function (ev) {
-    var b = ev.target.closest("button");
+    // ⚠ .v4node로 좁힌다 — 사이드바에는 개인/공유 하위 단추(.v4sub)도 들어 있어서,
+    //   button으로 잡으면 「개인만」을 눌러도 탭이 내 것으로 되돌아간다.
+    var b = ev.target.closest(".v4node");
     if (!b) return;
     if (b.getAttribute("data-t") === "future") {
       // 예약 자리 — 데이터인 척하지 않는다(정직 원칙). 눌러도 예약 안내만(다음 그리기에서 원복).
@@ -546,7 +656,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       }
       스테이지값 = "list";
     } else if (스테이지값 === "read") { 스테이지값 = "list"; }
-    Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function (x) { x.classList.remove("on"); });
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) { x.classList.remove("on"); });
     b.classList.add("on");
     탭 = b.getAttribute("data-t") || "mine";
     가이드히트 = null;
@@ -655,6 +765,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         '<button data-act="read">📖 열어 보기</button>' +
         '<button data-act="req">📝 요청 만들기</button>' +
         "</div>";
+      문서창보임(true);
+      안내열기(id);   // v4 — 누르면 바로 본문. 「고르고 다시 📖을 누르는」 왕복을 없앤다.
+      return;
     } else if (탭 === "know" || 탭 === "ingest") {
       var kd = know.find(function (x) { return x.documentId === id; });
       if (!kd) return;
@@ -665,6 +778,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         (kd.ingestedAt ? "<br>반입 " + new Date(kd.ingestedAt).toLocaleString("ko-KR") : "") + "</div>" +
         '<div class="dbt"><button class="go" data-go="memory.html" data-lb="AI 지식">🗔 AI 지식에서 관리</button></div>';
     }
+    문서창보임(true);   // 좁은 자리에서는 이때 문서창이 목록을 덮는다
   });
 
   // 상세 패널 조작 — 기존 계약 그대로(삭제=회수 확인·다운로드 관례·조용한 실패 금지)
@@ -1024,7 +1138,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
     // 내 것 탭으로 전환하고 편집기를 연다
     탭 = "mine";
-    Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function (x) {
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) {
       x.classList.toggle("on", x.getAttribute("data-t") === "mine");
     });
     편집열기({ id: null, title: t.label + " — " + new Date().toLocaleDateString("ko-KR") }, {
@@ -1038,10 +1152,40 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   var 첫탭 = new URLSearchParams(location.search).get("tab");
   if (첫탭 && ["mine", "know", "guide", "learn", "ingest"].indexOf(첫탭) >= 0) {
     탭 = 첫탭;
-    Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function (x) {
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) {
       x.classList.toggle("on", x.getAttribute("data-t") === 첫탭);
     });
   }
+
+  // ── v4 껍데기 배선 ────────────────────────────────────────────────────
+  document.getElementById("v4collapse").addEventListener("click", function () {
+    손으로접음 = true;   // 손으로 정한 뒤에는 폭이 바뀌어도 자동으로 되돌리지 않는다
+    document.getElementById("v4side").classList.toggle("collapsed");
+  });
+  // 좁은 자리에서 목록으로 돌아가는 문. 쓰던 글이 있으면 되묻는다(탭 이동과 같은 잣대).
+  document.getElementById("v4close").addEventListener("click", async function () {
+    if (스테이지값 === "edit") {
+      var 쓴것 = document.getElementById("editTitle").value.trim() || document.getElementById("editBody").value.trim();
+      if (쓴것) {
+        var ok = window.gijoAsk ? await window.gijoAsk("작성 중인 문서가 있습니다 — 저장하지 않고 닫으면 사라집니다.\n닫을까요?") : false;
+        if (!ok) return;
+      }
+    } else if (스테이지값 === "compose") {
+      cx담기();
+      var 적음 = cx && ((cx.title || "").trim() || (cx.tried || "").trim() || (cx.happened || "").trim() || (cx.images || []).length);
+      if (적음) {
+        var ok2 = window.gijoAsk ? await window.gijoAsk("작성 중인 요청이 있습니다 — 저장하지 않고 닫으면 사라집니다.\n닫을까요?") : false;
+        if (!ok2) return;
+      }
+    }
+    Array.prototype.forEach.call(document.querySelectorAll(".g-rows-r.sel"), function (x) { x.classList.remove("sel"); });
+    목록으로();
+  });
+  폭맞추기();
+  if (window.ResizeObserver) {
+    try { new ResizeObserver(폭맞추기).observe(document.getElementById("v4root")); } catch (e) { }
+  }
+  window.addEventListener("resize", 폭맞추기);
 
   불러오기();
 })();
