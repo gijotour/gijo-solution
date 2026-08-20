@@ -38,8 +38,12 @@
     var st = document.createElement("style");
     st.id = "gijoFoldCss";
     st.textContent =
-      ".gjf-h{display:flex;align-items:center;gap:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;" +
-      "border:1px solid var(--border,#3d3c38);border-radius:10px;background:var(--panel-2,#1f1e1d);user-select:none;}" +
+      // 높이 — 실측 53px(패딩 20 + 테두리 2 + 글줄 + 아래 여백 7)이었다. 화면마다 이 줄이
+      // **목록 위에서 한 번씩** 자리를 먹는데, 화면 이름은 도킹 머리·탭이 이미 말한다.
+      // 32px 남짓으로 줄여 그만큼을 목록에 준다(2026-08-20 밀도 라운드 — 공용 부품이라
+      // 한 곳만 고치면 전 화면이 동시에 좋아진다). 글자 크기·클릭 영역은 그대로 둔다.
+      ".gjf-h{display:flex;align-items:center;gap:9px;padding:5px 12px;margin-bottom:5px;cursor:pointer;" +
+      "border:1px solid var(--border,#3d3c38);border-radius:9px;background:var(--panel-2,#1f1e1d);user-select:none;}" +
       ".gjf-h:hover{border-color:var(--blue,#3b82f6);background:rgba(59,130,246,.05);}" +
       ".gjf-h .car{color:var(--muted-2,#a49d95);font-size:11.75px;width:11px;flex:0 0 auto;transition:transform .15s;}" +
       ".gjf-h.on .car{transform:rotate(90deg);}" +
