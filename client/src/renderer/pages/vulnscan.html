@@ -48,10 +48,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
-.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
-.kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
-.kpi-mini-label{font-size:12.25px;color:var(--muted);font-weight:600;margin-bottom:6px;}
-.kpi-mini-value{font-size:19px;font-weight:800;color:var(--text-strong, #fff);}
+/* (요약 5칸 .kpi-strip은 2026-08-21에 걷었다 — 심각도 4칸이 그림띠 막대와 같은 원천의 중복) */
 .table-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:0 18px 10px;margin-bottom:16px;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
 th{text-align:left;font-size:12px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
@@ -151,23 +148,11 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
   <div class="sidebar" id="gijoNav"></div>
 
   <div class="main">
-    <div class="topbar-row">
-      <div>
-        <div class="page-title">취약 자산관리</div>
-      </div>
-    </div>
-
+    <!-- ⚠ 제목줄은 공용 CSS가 제목을 숨겨 내용 0인 빈 줄이었다 — nav.js 빈제목줄걷기가 숨긴다.
+         ⚠ 요약 5칸은 걷었다(2026-08-21 밀도 — 설계관 원천 대조: 심각도 4칸이 아래 그림띠
+         막대와 같은 원천의 중복. 부분만 걷으면 공용 변환기 조건이 깨져 남은 칸이 옛 큰 카드
+         모양으로 되돌아가므로 전부 걷는다). 막대에 없던 「스캔 호스트」는 그림띠 제목으로. -->
     <div id="gijoChatWidget" data-prompts='["미조치 Critical 몇 건이야?","KEV 있는 거 있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
-
-    <!-- 취약점 현황 — 이 화면 전체를 대표하는 숫자다. 팝업은 여기까지만 열린다(2026-07-27).
-         "오늘의 조치" 목록보다 위에 둔다: 목록은 무엇부터 할지고, 이 줄은 지금 얼마나 남았나다. -->
-    <div class="kpi-strip" data-gijo-summary>
-      <div class="kpi-mini"><div class="kpi-mini-label">스캔 호스트</div><div class="kpi-mini-value" id="kpiHosts">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">Critical</div><div class="kpi-mini-value" id="kpiCrit" style="color:#f5928a">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">High</div><div class="kpi-mini-value" id="kpiHigh" style="color:#f7a86a">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">Medium</div><div class="kpi-mini-value" id="kpiMed" style="color:var(--amber)">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">Low/Info</div><div class="kpi-mini-value" id="kpiLow" style="color:var(--muted)">-</div></div>
-    </div>
 
     <!-- 「오늘의 조치 우선순위」 블록은 2026-08-09 사용자 지시로 제거 — 대시보드 오늘 계획 판의
          「급한 것」이 같은 목록을 같은 규칙(KEV→EPSS→VPR)으로 이미 보여 준다. 같은 목록이 두 곳이면
@@ -299,7 +284,8 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     const 좁히기 = () => { 호스트줄그리기(assets, 자산별); if (vheatOn) renderVHeat(); };
 
     window.gijoViz.mount(자리, {
-      title: "한눈에",
+      // 스캔 호스트 — 걷어낸 요약 5칸에서 막대에 없던 유일한 값. 제목 글자로 남긴다(0도 말한다).
+      title: "한눈에 — 스캔 호스트 " + (assets || []).length + "대",
       hint: "누르면 목록이 좁혀집니다",
       parts: [
         {
@@ -589,11 +575,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       const still = assets.find((a) => a.id === currentHostId);
       if (still) openHost(still, true); else closeDetail();
     }
-    document.getElementById("kpiHosts").textContent = assets.length;
-    document.getElementById("kpiCrit").textContent = totals.critical;
-    document.getElementById("kpiHigh").textContent = totals.high;
-    document.getElementById("kpiMed").textContent = totals.medium;
-    document.getElementById("kpiLow").textContent = totals.low;
+    // (요약 5칸 갱신은 2026-08-21에 걷었다 — 심각도는 그림띠가, 스캔 호스트는 그림띠 제목이 맡는다)
     if (vheatOn) renderVHeat();  // 히트맵 뷰가 켜져 있으면 함께 갱신
   }
 

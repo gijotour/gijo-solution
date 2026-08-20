@@ -512,22 +512,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       title: "한눈에",
       hint: "누르면 그 갈래로 내려갑니다",
       parts: [
-        {
-          kind: "bars",
-          segments: CATEGORIES.map((c) => ({
-            key: c.id, label: c.label, value: byCatCount(groups, c.id), color: "blue",
-          })),
-          // 기존 종류 칩(data-jump)이 이미 그 갈래로 데려간다 — 같은 일을 두 번 만들지 않고 그것을 누른다.
-          // ⚠ 이 칩이 하는 일은 **거르기가 아니라 「그 갈래 펼치고 그리로 이동」**이다.
-          //   그래서 툴팁도 그렇게 적는다 — 하지 않는 일을 약속하면 눌러 보고 속았다고 느낀다
-          //   (2026-08-05 검토 지적: 기본 문구가 "누르면 이것만 봅니다"였다).
-          누르면: "누르면 그 갈래로 내려갑니다",
-          onPick: (key) => {
-            if (!key) return;
-            const chip = document.querySelector(`.cat-chip[data-jump="${key}"]`);
-            if (chip) chip.click();
-          },
-        },
+        // ⚠ 종류 막대는 걷었다(2026-08-21 밀도 — 설계관 원천 대조). 이 화면은 다른 화면과
+        //   **반대**였다: 위 종류 칩(#catSummary)이 조작(그 갈래 펼치고 이동)을 갖고, 막대는
+        //   같은 값(g.products.length)을 그리고 칩을 대신 눌러 주는 **대리**였다. 같은 숫자
+        //   두 벌 중 대리를 걷는다 — 칩을 걷으면 막대가 조용한 버튼이 된다(반대 방향 금지).
         { kind: "donut", value: 매뉴얼있음, total: 전체, label: "매뉴얼 보유", showRatio: true },
         { kind: "donut", value: 점검함, total: 전체, label: "점검 기록 있음", showRatio: true },
         {
@@ -559,10 +547,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       ],
     });
   }
-  function byCatCount(groups, catId) {
-    const g = groups.find((x) => x.category === catId);
-    return g ? g.products.length : 0;
-  }
+  // (byCatCount는 막대와 함께 걷었다 — 같은 값을 칩 쪽 byCat이 이미 센다)
 
   async function loadProducts() {
     const root = document.getElementById("groups");
