@@ -58,6 +58,11 @@ html.lite-edition {
   --navy: var(--g-bg); --text: var(--g-text); --muted: var(--g-muted); --muted2: var(--g-muted-2);
   --border: rgba(24, 48, 16, 0.22); --blue: var(--g-blue); --panel: var(--g-surface-1);
   --amber: var(--g-amber); --red: var(--g-red);
+  /* ⚠ --orange를 빠뜨리면 **로그인 버튼만 주황으로 남는다**(2026-08-20 max 실기 눈확인:
+     연초록 화면에 주황 「로그인」 단추). login.html:146이 `background: var(--orange)`이고
+     원래 값은 #dd5a1c다. 라이트 화면 13개는 주 단추에 --blue(#2563EB)를 쓰므로 거기에 맞춘다
+     — 배색이 에디션 이름표인 이상, 입구 단추만 다른 계열이면 그 이름표가 흐려진다. */
+  --orange: var(--g-blue);
 }
 html.lite-edition body { background: var(--g-bg); }
 html.lite-edition .card, html.lite-edition .side-panel {

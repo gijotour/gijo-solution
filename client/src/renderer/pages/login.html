@@ -13,10 +13,16 @@
     l.rel = "stylesheet"; l.href = "lite-green.css";
     document.head.appendChild(l);
     // 배지도 처음부터 라이트로 — 「표준」이 박혀 있다 바뀌는 깜빡임을 만들지 않는다.
-    document.addEventListener("DOMContentLoaded", function () {
+    // ⚠ DOMContentLoaded를 기다리면 **늦는다**(2026-08-20 max 실기: 배지가 「🏢 표준」으로 떴다).
+    //   본문 스크립트(355행 블록)의 배지 초기화가 DOMContentLoaded **전에** 동기로 돌아
+    //   먼저 「표준」을 박고, 그러면 여기 `!b.textContent` 가드가 늘 거짓이 된다.
+    //   배지 자리는 h1 안에 있으니 파서가 지나간 뒤 곧바로 잡히면 된다 — 그때 바로 채우고,
+    //   아직 없으면 짧게 되돌아본다(둘 다 DOMContentLoaded보다 이르다).
+    (function 배지를라이트로() {
       var b = document.getElementById("modeBadge");
-      if (b && !b.textContent) b.textContent = "🪶 라이트";
-    });
+      if (b) { if (!b.textContent) b.textContent = "🪶 라이트"; return; }
+      if (document.readyState === "loading") { setTimeout(배지를라이트로, 0); }
+    })();
   }
 })();
 </script>
