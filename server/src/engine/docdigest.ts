@@ -214,5 +214,9 @@ export function recentDocumentsText(days = 7): string {
     return `- ${r.documentId} [${r.category ?? "일반"}] ${when}${who}${소식}`;
   });
   const tail = rows.length > 10 ? `\n(외 ${rows.length - 10}건 — 지식 화면에서 전체 목록)` : "";
-  return `${머리}\n${lines.join("\n")}${tail}`;
+  // 갈 곳 한 줄(2026-08-21 야간 회귀 [97] — 「숫자만 주고 갈 곳 없음」이 실결함으로 판명).
+  // 목록만 주면 「그래서 뭘 하지」가 남는다 — 이 답에서 실제로 되는 다음 걸음만 적는다
+  // (내용 질문은 대화로 되고, 전체 목록 화면은 내 문서 → 🩹 반입이 맞는 자리다).
+  const 다음 = `\n\n내용이 궁금하면 "○○ 요약해줘"라고 물으면 되고, 전체 목록은 내 문서 화면의 🩹 반입에서 봅니다.`;
+  return `${머리}\n${lines.join("\n")}${tail}${다음}`;
 }

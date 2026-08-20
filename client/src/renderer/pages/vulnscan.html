@@ -76,8 +76,10 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .vd-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:5px 12px;border-radius:20px;font-size:12.5px;font-weight:700;cursor:pointer;}
 .vd-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
 .vd-search{flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 12px;color:var(--text);font-size:12.5px;outline:none;}
-.vd-list{max-height:520px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
-.vd-item{border-bottom:1px solid var(--border);padding:10px 12px;cursor:pointer;}
+/* max-height는 공용 gijoFitList가 창 높이에 맞춰 잰다(data-gijo-fit) — 고정 520px는 1080
+   모니터에서 아래 400px를 놀렸다(2026-08-21). */
+.vd-list{overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+.vd-item{border-bottom:1px solid var(--border);padding:4px 12px;cursor:pointer;}
 .vd-item:last-child{border-bottom:none;}
 .vd-item:hover{background:rgba(255,255,255,0.03);}
 .vd-item-top{display:flex;align-items:center;gap:8px;font-size:12.5px;}
@@ -214,7 +216,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         <span class="vd-chip" id="vdSortBtn" title="정렬 기준 전환 — EPSS는 30일 내 실제 악용될 확률">↕ 심각도 순</span>
         <input class="vd-search" id="vdSearch" placeholder="취약점명 · CVE로 검색 (예: log4j, CVE-2021-44228, firefox)" aria-label="취약점명 · CVE로 검색">
       </div>
-      <div class="vd-list" id="vdList"></div>
+      <div class="vd-list" id="vdList" data-gijo-fit></div>
     </div>
 
     <div class="footer">
