@@ -79,10 +79,17 @@
       ".gcw-ap{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.42);border-radius:10px;padding:10px 12px;font-size:12.5px;}" +
       ".gcw-ap-head{font-weight:800;color:#f3c06a;margin-bottom:3px;}" +
       ".gcw-ap-intro{color:var(--muted,#b3ada4);font-size:12px;margin-bottom:8px;line-height:1.6;}" +
-      ".gcw-ap-f{display:flex;align-items:center;gap:6px;margin-bottom:5px;}" +
-      ".gcw-ap-k{font-size:12px;color:var(--muted,#b3ada4);width:78px;flex:0 0 auto;}" +
+      // 결재판 필드 — 지휘소(console.js)와 **같은 3열 그리드**(2026-08-20 승인 시안
+      // screen-rows-unify §3). 한쪽만 고치면 같은 창이 자리마다 다르게 보인다.
+      ".gcw-ap-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:5px 8px;margin-bottom:8px;}" +
+      ".gcw-ap-f{display:flex;align-items:center;gap:5px;min-width:0;background:var(--panel-2,#1f1e1d);" +
+        "border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:6px;padding:0 8px;height:26px;}" +
+      ".gcw-ap-f.wide{grid-column:1/-1;}" +
+      ".gcw-ap-f:focus-within{border-color:var(--blue,#3b82f6);}" +
+      ".gcw-ap-f.need{border-color:rgba(226,72,61,.6);}" +
+      ".gcw-ap-k{font-size:11px;color:var(--muted-2,#a49d95);flex:0 0 auto;white-space:nowrap;}" +
       ".gcw-ap-k .req{color:var(--red,#e2483d);margin-left:2px;}" +
-      ".gcw-ap-in{flex:1;min-width:0;background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:6px;padding:5px 8px;color:var(--text,#e9e7e2);font-size:12.25px;outline:none;}" +
+      ".gcw-ap-in{flex:1;min-width:0;background:transparent;border:none;color:var(--text,#e9e7e2);font-size:11.5px;outline:none;height:100%;font-family:inherit;}" +
       ".gcw-ap-in.need{border-color:rgba(226,72,61,.55);}" +
       ".gcw-ap-effect{background:var(--panel-2,#1f1e1d);border-radius:7px;padding:7px 9px;margin-top:7px;font-size:12px;color:var(--muted,#b3ada4);line-height:1.6;}" +
       ".gcw-ap-actions{display:flex;gap:6px;margin-top:9px;}" +
@@ -169,10 +176,15 @@
       row.innerHTML =
         '<div class="gcw-ap-head">🗂️ 실행 승인 — ' + esc(ap.label || ap.tool) + "</div>" +
         '<div class="gcw-ap-intro">지시를 아래와 같이 정리했습니다. 값을 확인·수정한 뒤 승인하면 실행합니다.</div>' +
+        '<div class="gcw-ap-grid">' +
         fields.map(function (f) {
-          return '<div class="gcw-ap-f"><span class="gcw-ap-k">' + esc(f.label || f.key) + (f.required ? '<span class="req">*</span>' : "") + "</span>" +
-            '<input class="gcw-ap-in' + (f.source === "empty" ? " need" : "") + '" data-k="' + esc(f.key) + '" value="' + esc(f.value || "") + '" placeholder="' + esc(f.hint || "") + '"></div>';
-        }).join("") +
+          // 긴 값이 들어갈 칸은 줄 전체로(3열에 끼우면 잘려서 못 고친다) — console.js와 같은 잣대.
+          var 긴칸 = /사유|메모|설명|내용|이유|비고|note|reason|detail/i.test(String(f.key) + " " + String(f.label || "")) ||
+            String(f.value || "").length > 24 || String(f.hint || "").length > 24;
+          return '<div class="gcw-ap-f' + (긴칸 ? " wide" : "") + (f.source === "empty" ? " need" : "") + '">' +
+            '<span class="gcw-ap-k">' + esc(f.label || f.key) + (f.required ? '<span class="req">*</span>' : "") + "</span>" +
+            '<input class="gcw-ap-in" data-k="' + esc(f.key) + '" value="' + esc(f.value || "") + '" placeholder="' + esc(f.hint || "") + '"></div>';
+        }).join("") + "</div>" +
         (ap.effect || ap.undo
           ? '<div class="gcw-ap-effect">' + (ap.effect ? "<b>실행되면:</b> " + esc(ap.effect) + "<br>" : "") + (ap.undo ? "<b>되돌리기:</b> " + esc(ap.undo) : "") + "</div>"
           : "") +

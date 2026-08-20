@@ -213,13 +213,27 @@
       ".cs-row .cs-pv{display:flex;gap:6px;margin-top:7px;}",
       ".cs-row .cs-pvi{flex:1;background:var(--panel-2,#1f1e1d);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 9px;color:var(--text,#e9e7e2);font-size:12px;font-family:inherit;outline:none;}",
       // 실행 승인(결재판) — 대화 안에서 값을 보고 고치고 승인한다.
-      ".cs-row .cs-ap{margin-top:8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:9px 11px;}",
+      // ⚠ `flex:1 1 auto; min-width:0`이 없으면 **결재판이 자기 내용 폭에 갇힌다**(.cs-row가
+      //   flex라 자식이 안 늘어난다) — 3열 그리드를 넣어도 폭이 좁아 1열로만 접혔다(실측 306px).
+      //   남는 폭을 쓰게 해야 넓은 화면에서 실제로 여러 열이 된다.
+      ".cs-row .cs-ap{flex:1 1 auto;min-width:0;margin-top:8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:9px 11px;}",
       ".cs-row .cs-aph{font-size:12px;font-weight:800;color:var(--amber,#f0a020);margin-bottom:3px;}",
       ".cs-row .cs-apsub{font-size:12.25px;color:var(--muted,#b3ada4);margin-bottom:8px;}",
-      ".cs-row .cs-apf{display:flex;align-items:center;gap:8px;margin-bottom:5px;}",
-      ".cs-row .cs-apk{flex:0 0 72px;font-size:12.25px;color:var(--muted-2,#a49d95);}",
-      ".cs-row .cs-apin{flex:1;min-width:0;background:var(--panel-2,#1f1e1d);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 9px;color:var(--text,#e9e7e2);font-size:12px;font-family:inherit;outline:none;}",
-      ".cs-row .cs-apin.need{border-color:rgba(226,72,61,.55);}",
+      // 결재판 필드 — **가로 3열 그리드**(2026-08-20 사장님 「결제판도 엑셀판으로 변경하더라도
+      // 많은 화면에 많은데이터가 나왔으면」, 승인 시안 screen-rows-unify §3). 세로 1열이던 것을
+      // 나란히 놓아 필드 8개 기준 405→284px(-30%). 좁으면 자동으로 2열·1열로 접힌다.
+      // ⚠ 값 수정·필수 표시(.need)·승인 잠금·「실행되면/되돌리기」는 **그대로다** — 밀도를
+      //   이유로 그 문장을 접거나 지우지 않는다(쓰기 전에 사람이 읽어야 하는 것).
+      ".cs-row .cs-apgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:5px 8px;margin-bottom:8px;}",
+      ".cs-row .cs-apf{display:flex;align-items:center;gap:5px;min-width:0;background:var(--panel-2,#1f1e1d);" +
+        "border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:0 8px;height:26px;}",
+      // 값이 긴 칸(사유·메모·설명)은 줄 전체를 쓴다 — 3열에 끼우면 글자가 잘려 못 고친다.
+      ".cs-row .cs-apf.wide{grid-column:1/-1;}",
+      ".cs-row .cs-apf:focus-within{border-color:var(--blue,#3b82f6);}",
+      ".cs-row .cs-apf.need{border-color:rgba(226,72,61,.6);}",
+      ".cs-row .cs-apk{flex:0 0 auto;font-size:11px;color:var(--muted-2,#a49d95);white-space:nowrap;}",
+      ".cs-row .cs-apin{flex:1;min-width:0;background:transparent;border:none;color:var(--text,#e9e7e2);" +
+        "font-size:11.5px;font-family:inherit;outline:none;height:100%;}",
       ".cs-row .cs-ape{font-size:12.25px;color:var(--muted,#b3ada4);margin-top:7px;line-height:1.6;}",
       ".cs-row .cs-apb{display:flex;gap:6px;margin-top:9px;}",
       ".cs-row .cs-apgo{font-size:12.5px;font-weight:800;color:#fff;background:var(--teal,#1eb980);border:none;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}",
@@ -618,11 +632,16 @@
       '<div class="cs-aph">🗂 실행 승인 — ' + esc(ap.label || ap.tool) + "</div>" +
       '<div class="cs-apsub">아래 내용대로 실행합니다. 값을 확인·수정한 뒤 승인하세요.</div>' +
       범위줄 +
+      '<div class="cs-apgrid">' +
       fields.map(function (f) {
-        return '<div class="cs-apf"><span class="cs-apk">' + esc(f.label || f.key) + (f.required ? "*" : "") + "</span>" +
-          '<input class="cs-apin' + (f.source === "empty" && f.required ? " need" : "") + '" data-k="' + esc(f.key) +
+        // 긴 값이 들어갈 칸은 줄 전체로 — 이름·지금 값·힌트 어느 쪽이든 길면 3열에서 잘린다.
+        var 긴칸 = /사유|메모|설명|내용|이유|비고|note|reason|detail/i.test(String(f.key) + " " + String(f.label || "")) ||
+          String(f.value || "").length > 24 || String(f.hint || "").length > 24;
+        return '<div class="cs-apf' + (긴칸 ? " wide" : "") + (f.source === "empty" && f.required ? " need" : "") + '">' +
+          '<span class="cs-apk">' + esc(f.label || f.key) + (f.required ? "*" : "") + "</span>" +
+          '<input class="cs-apin" data-k="' + esc(f.key) +
           '" value="' + esc(f.value || "") + '" placeholder="' + esc(f.hint || "") + '"></div>';
-      }).join("") +
+      }).join("") + "</div>" +
       (ap.effect ? '<div class="cs-ape"><b>실행되면:</b> ' + esc(ap.effect) + "</div>" : "") +
       (ap.undo ? '<div class="cs-ape"><b>되돌리기:</b> ' + esc(ap.undo) + "</div>" : "") +
       '<div class="cs-apb"><button class="cs-apgo">✓ 승인하고 실행</button><button class="cs-apno">취소</button></div>';
@@ -640,6 +659,14 @@
       var miss = required.filter(function (k) { return !args[k]; });
       go.disabled = miss.length > 0;
       go.textContent = miss.length ? "✓ 승인 (" + miss.length + "개 입력 필요)" : "✓ 승인하고 실행";
+      // 빨간 테두리는 이제 **칸(.cs-apf)**에 붙는다(3열 그리드로 바뀌며 입력칸이 테두리를
+      // 잃었다) — 채우면 그 자리에서 풀리게 매번 다시 칠한다. 안 하면 다 채워도 빨간 채로 남는다.
+      inputs.forEach(function (i) {
+        var 칸 = i.parentNode;
+        if (!칸 || !칸.classList) return;
+        var k = i.dataset.k;
+        칸.classList.toggle("need", required.indexOf(k) >= 0 && !args[k]);
+      });
     };
     inputs.forEach(function (i) { i.addEventListener("input", sync); });
     sync();
