@@ -1061,7 +1061,10 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
       completeTask(task.id);
       const output = [
+        // FAIL_MARKS-예외: 실패 폴백이 아니라 **의도된 부재 선언**이다 — 개인 조각 0건일 때
+        // 회사 문서로 지어내는 것(QA 결함 1b)을 끊는 정직 답. sources:[]로 배지도 함께 비운다.
         "그 내용을 **내 문서에서 찾지 못했습니다** — 지어내지 않고 그대로 말씀드립니다.",
+
         "내 문서가 대화에서 검색되려면 그 문서의 **AI 포함**이 켜져 있어야 합니다(내 문서 화면에서 문서별로 켭니다).",
         "",
         카드.output,
