@@ -56,6 +56,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .reg-form .grow{flex:1;min-width:180px;}
 .reg-form button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:0 18px;font-size:12.5px;font-weight:800;cursor:pointer;}
 
+/* 엑셀형 열 폭 — 한 곳 선언(.g-rows--이름 관례, gijo-ui.css:351). 머리·행이 같이 따른다. */
+.g-rows--products{max-width:1040px;} /* 같은 화면의 .notice·.cat-summary와 같은 폭(검토관 중4) */
+.g-rows--products .g-rows-head,.g-rows--products .g-rows-r{grid-template-columns:1fr 110px 84px 52px 22px;gap:8px;}
+/* ▸ 상세 손잡이(승인 시안 .row-chev 이식 — 검토관 낮7) */
+.row-chev{justify-self:end;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  border:1px solid transparent;border-radius:6px;color:var(--muted-2);cursor:pointer;font-size:11px;}
+.row-chev:hover{border-color:var(--border-strong);color:var(--text);}
+.g-rows-r.on .row-chev{color:var(--blue-light);}
+
 /* (카드·그룹 CSS는 2026-08-21 엑셀형 개편으로 걷었다 — 행·그룹 머리는 공용 .g-rows(gijo-ui.css),
    상세는 공용 .gj-detail(nav.js). .prod-note·.prod-maint·.docs·.fields-*는 상세 안에서 산다.) */
 
@@ -240,6 +249,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     );
   }
 
+  let 열린상세pid = null; // 재렌더(문서 추가·삭제) 뒤 상세를 되살리기 위한 기억(검토관 중3)
+  function 상세복원() {
+    if (!열린상세pid) return;
+    const row = document.querySelector(`.g-rows-r[data-pid="${열린상세pid}"]`);
+    const p = 제품목록.find((x) => String(x.id) === 열린상세pid);
+    if (row && p && window.gijoRowDetail) { delete fieldsState[p.id]; window.gijoRowDetail(row, prodDetailHtml(p)); }
+  }
+
   // 이 제품의 유지보수 점검 현황 — productId 연결(신규)과 제품명 스쿼시 매칭(과거 자유텍스트 등록분)
   // 둘 다 잡는다. 클릭하면 운영 가이드에서 점검을 등록/보고한다.
   let allMaints = [];
@@ -274,15 +291,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   //   일치. maintenance 화면의 B와의 병존은 이 개편 밖의 숙제로 남는다).
   function 점검요약(p) {
     const mine = allMaints.filter((m) => m.productId === p.id || squashName(m.productName) === squashName(p.name));
-    if (!mine.length) return { 글: "이력 없음", 색: "", 일자: "-" };
+    if (!mine.length) return { 글: "이력 없음", 색: "", 일자: "-", 문장: "점검 이력 없음" };
     const today = new Date().toISOString().slice(0, 10);
     const overdue = mine.filter((m) => m.status === "scheduled" && m.scheduleDate <= today).length;
     const pending = mine.filter((m) => m.status === "reported").length;
     const next = mine.filter((m) => m.status === "scheduled" && m.scheduleDate > today).sort((a, b) => a.scheduleDate.localeCompare(b.scheduleDate))[0];
-    if (overdue) return { 글: "지연 " + overdue, 색: "var(--red,#e2483d)", 일자: next ? next.scheduleDate.slice(5) : "-" };
-    if (pending) return { 글: "승인대기 " + pending, 색: "var(--amber,#f0a020)", 일자: next ? next.scheduleDate.slice(5) : "-" };
-    if (next) return { 글: "예정", 색: "", 일자: next.scheduleDate.slice(5) };
-    return { 글: "점검 완료", 색: "var(--teal,#1eb980)", 일자: "-" };
+    const 문장 = ["점검 " + mine.length + "건", overdue ? "지연 " + overdue : "", pending ? "승인대기 " + pending : "",
+      next ? "다음 " + next.scheduleDate : ""].filter(Boolean).join(" · ");
+    if (overdue) return { 글: "지연 " + overdue, 색: "var(--red,#e2483d)", 일자: next ? next.scheduleDate.slice(5) : "-", 문장: 문장 };
+    if (pending) return { 글: "승인대기 " + pending, 색: "var(--amber,#f0a020)", 일자: next ? next.scheduleDate.slice(5) : "-", 문장: 문장 };
+    if (next) return { 글: "예정", 색: "", 일자: next.scheduleDate.slice(5), 문장: 문장 };
+    return { 글: "점검 완료", 색: "var(--teal,#1eb980)", 일자: "-", 문장: 문장 };
   }
   function prodRowHtml(p, i) {
     const meta = [p.vendor, p.model].filter(Boolean).join(" · ");
@@ -290,8 +309,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const st = 점검요약(p);
     // 얼룩은 직접 준다 — 상세(.gj-detail)가 행 사이에 끼면 nth-child 홀짝이 밀린다(시안·설계관).
     return (
-      `<div class="g-rows-r" data-pid="${p.id}" data-name="${esc(p.name)}" title="누르면 대화창에 「이거」로 담깁니다 — ▸는 상세" ` +
-      `style="grid-template-columns:1fr 110px 84px 52px 22px;gap:8px;${i % 2 ? "background:rgba(255,255,255,.025);" : ""}">` +
+      // ⚠ 인라인 background 금지(검토관 상2) — hover·선택(.sel)·프로 얼룩 토큰(--g-zebra)을
+      //   전부 덮어쓴다. 얼룩은 공용 nth-child가 맡는다(상세가 끼면 한 칸 밀리는 것은 수용 —
+      //   기능(호버·선택·테마)이 줄무늬 정밀도보다 우선). 열 폭도 클래스 한 곳(낮8).
+      `<div class="g-rows-r" data-pid="${p.id}" data-name="${esc(p.name)}" title="누르면 대화창에 「이거」로 담깁니다 — ▸는 상세">` +
       `<span class="trunc">${매뉴얼 ? "📘 " : ""}${esc(p.name)}${p.assetName ? ` <span class="gm2" title="연결 자산">🔗${esc(p.assetName)}</span>` : ""}</span>` +
       `<span class="trunc gm2">${esc(meta || "-")}</span>` +
       `<span style="${st.색 ? "color:" + st.색 + ";font-weight:800" : ""}">${st.글}</span>` +
@@ -311,7 +332,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `</div>` +
       `<div class="fields-toggle" data-fields-toggle="${p.id}" data-name="${esc(p.name)}"><span>🧬 정형 정보 (온톨로지)</span><span class="car">▸</span></div>` +
       `<div class="fields-panel" id="fp-${p.id}" style="display:none"></div>` +
-      `<div class="acts"><button data-prod-del="${p.id}" data-name="${esc(p.name)}">✕ 제품 삭제</button></div>`
+      `<div class="acts"><button data-prod-del="${p.id}" data-name="${esc(p.name)}" style="border-color:var(--red,#e2483d);color:var(--red-strong,#f5928a)">✕ 제품 삭제</button></div>`
     );
   }
 
@@ -570,8 +591,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       // 엑셀형(공용 .g-rows) — 그룹 머리 28px + 행 30px. 스크롤 감싸개(data-gijo-fit)로
       // sticky 머리가 부품 설계대로 붙는다(감싸개 없이 쓰면 문서 기준 sticky — 설계관 ③).
       root.innerHTML =
-        `<div class="g-rows"><div class="g-rows-scroll" data-gijo-fit style="--gr-maxh:none">` +
-        `<div class="g-rows-head" style="grid-template-columns:1fr 110px 84px 52px 22px;gap:8px">` +
+        `<div class="g-rows g-rows--products"><div class="g-rows-scroll" data-gijo-fit>` +
+        `<div class="g-rows-head">` +
         `<span>제품</span><span>제조사 · 모델</span><span>점검</span><span class="ta-r">다음</span><span></span></div>` +
         groups.map((g) => {
           const isCol = collapsed.has(g.category);
@@ -616,7 +637,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (chev) {
       const row = chev.closest(".g-rows-r");
       const p = 제품목록.find((x) => String(x.id) === chev.dataset.detail);
-      if (row && p && window.gijoRowDetail) window.gijoRowDetail(row, prodDetailHtml(p));
+      if (row && p && window.gijoRowDetail) {
+        // 한 번에 하나(부품 계약) — 부품은 같은 그룹 안에서만 접으므로 다른 그룹 것을 먼저
+        // 접는다(검토관 중6). 자기 것은 부품의 재클릭 토글에 맡긴다.
+        const 내것 = row.nextElementSibling && row.nextElementSibling.classList.contains("gj-detail");
+        if (!내것) document.querySelectorAll("#groups .gj-detail").forEach((d) => d.remove());
+        // 정형정보 캐시를 비운다(검토관 상1) — 상세 DOM은 매번 새로 만드는데 캐시가 남아
+        // 두 번째 열람부터 🧬가 빈 상자였다.
+        delete fieldsState[p.id];
+        window.gijoRowDetail(row, prodDetailHtml(p));
+        열린상세pid = 내것 ? null : String(p.id);
+      }
       return;
     }
     const prodDel = e.target.closest("[data-prod-del]");
@@ -624,7 +655,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const docDel = e.target.closest("[data-doc-del]");
     if (docDel) {
       if (!await gijoAsk("이 문서를 삭제할까요?")) return;
-      try { await window.gijo.deleteProductDoc(docDel.dataset.docDel); await loadProducts(); }
+      try { await window.gijo.deleteProductDoc(docDel.dataset.docDel); await loadProducts(); 상세복원(); }
       catch (err) { gijoTell("삭제 실패: " + ((err && err.message) || err)); }
       return;
     }
@@ -640,6 +671,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       try {
         await window.gijo.addProductDoc(pid, { kind, title });
         await loadProducts();
+        상세복원(); // 재렌더가 상세를 지우면 「추가했는데 아무 일 없음」으로 읽힌다(검토관 중3)
+        if (window.gijoTell) gijoTell("문서를 추가했습니다 — " + title);
       } catch (err) {
         hint.textContent = "✗ " + ((err && err.message) || err);
         docAdd.disabled = false;
@@ -668,9 +701,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       선택제품id = String(p.id);
       선택표시반영(); // loadProducts 재렌더 뒤에도 같은 함수로 되살린다(audit 하이라이트반영과 같은 짝)
       const meta = [p.vendor, p.model].filter(Boolean).join(" · ");
-      // 행이 이미 그린 3·4열 글자 그대로(재계산 금지 계약 유지 — 화면과 카드가 같은 말을 한다)
-      const 셀 = zone.children;
-      const 점검줄 = ((셀[2] ? 셀[2].textContent : "") + (셀[3] && 셀[3].textContent.trim() !== "-" ? " · 다음 " + 셀[3].textContent.trim() : "")).trim();
+      // 화면이 그리는 것과 같은 함수의 전체 문장(건수·복수 상태·연도 포함 — 검토관 낮10:
+      // 행 셀만 읽으면 배타 분기라 지연·승인대기가 함께 있어도 하나만 실렸다)
+      const 점검줄 = 점검요약(p).문장 || "점검 이력 없음";
       // 전송 규격(top 한 겹·허용 키·200자 컷)은 공용 부품 selectnotify.js가 진다.
       if (window.gijoSelectNotify) window.gijoSelectNotify({
         label: p.name,

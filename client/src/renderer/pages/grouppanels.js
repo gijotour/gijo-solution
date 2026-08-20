@@ -835,7 +835,7 @@
     ],
     registry: [
       // 🧰 보안제품 — status·lastCheck는 원천에 **없다**(security-ops.ts:65-77). 3열은
-      //   「매뉴얼 있음/없음」(products.html:500과 같은 잣대)으로 적는다 — 없는 값을 지어내지
+      //   「매뉴얼 있음/없음」(products.html 매뉴얼 잣대 docs.some(kind==="manual")와 동일 — 줄번호는 개편으로 유동)으로 적는다 — 없는 값을 지어내지
       //   않는다. 「종류」 수는 datacard 잣대(제품이 있는 카테고리 수)와 통일(설계관 ③-2).
       { id: "products", title: "🧰 보안제품", page: "products.html",
         rows: function () {
