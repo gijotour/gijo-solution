@@ -7,7 +7,12 @@ Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업�
 1. **버전 bump**: client/package.json의 version을 패치 올림(예: 2.7.16→2.7.17). 게시 노트에 쓸 변경 요약을 git log에서 뽑아 정리.
 2. **빌드**: 먼저 **실행 중인 앱을 모두 종료**한다 — 개발 실행·설치본이 `client/server-dist`를
    잡고 있으면 빌드가 폴더 삭제에 실패한다(2026-07-26 실사고, exe가 안 나오는데 exit 0으로 끝남).
-   `Get-Process -Name electron,"GIJO AS" | Where-Object { $_.Path -like "D:\Connect AI\*" } | Stop-Process -Force`
+   `Get-Process -Name electron,"GIJO AS" | Where-Object { $_.Path -like "D:\Connect AI\*" -or $_.Path -like "*gijo-as*" } | Stop-Process -Force`
+   ★ **게시 때는 사장님 앱(설치본)도 묻지 않고 닫는다**(2026-08-20 사장님 허가 "게시할때 앱을
+   너가 강제로닫아도도"). 그전에는 매번 "닫아 주세요"를 요청하고 답을 기다리느라 게시가 멈췄다.
+   ⚠ 대신 **보고에 「앱을 닫고 게시했습니다」를 한 줄 적는다** — 사장님이 그 앱으로 뭘 보고
+   있었을 수 있으니 닫힌 사실을 숨기지 않는다. ⚠ 이 허가는 **게시에만** 적용된다:
+   QA·측정 중 남의 세션을 끊는 것은 여전히 금지(계정당 1세션·직렬 자원).
    그 뒤 `cd client && npm run dist` (백그라운드 권장, 수 분 소요. **NSIS exe가 실제로 생겼는지 확인** —
    빌드 로그 tail만 보고 성공으로 판단하지 말 것)
 3. **게시 전 실화면 검증**: 게시 명령이 **UI 실화면 관문을 자동으로 태운다**(2026-08-20 도입,
