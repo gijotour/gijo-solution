@@ -1364,6 +1364,11 @@
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>
+<!-- 현황판(2026-08-20 1단계) — 정의(grouppanels)와 그리기(panelsboard)를 **console.js보다 먼저**
+     싣는다. console.js의 대화 홈이 renderPanels()에서 둘을 찾는데, 없으면 조용히 비운다 —
+     즉 로드를 빠뜨리면 「스트립이 그냥 안 보이는」 거짓 초록이 된다(5.36.0 부품 로드 누락 계열). -->
+<script src="grouppanels.js"></script>
+<script src="panelsboard.js"></script>
 <script src="console.js"></script>
 <script src="railroster.js"></script>
 <script src="nav.js"></script>

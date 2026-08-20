@@ -48,6 +48,11 @@
       // 프로 홈 히어로(승인 시안 프로_홈_인사) — chat-home일 때만 히어로, 아니면 간결형. 순수 CSS 전환.
       ".ce-hero{display:none;}",
       "body.chat-home .ce-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:46vh;text-align:center;}",
+      // 현황판 스트립 — 히어로 가운데 정렬 안에서 **왼쪽 정렬 블록**으로 선다(타일 글이 가운데
+      // 정렬되면 숫자를 훑을 수 없다). 폭은 히어로 안에서 넉넉히, 창이 좁으면 자동으로 준다.
+      ".ce-panels{width:100%;max-width:880px;text-align:left;}",
+      "body.chat-home .ce-panels{display:block;}",
+      ".ce-panels:empty{display:none;}",
       "body.chat-home .ce-compact{display:none;}",
       ".ce-greet{font-size:26px;font-weight:800;color:var(--text,#e9e7e2);letter-spacing:-.3px;}",
       ".ce-honest{font-size:12.5px;color:var(--muted-2,#a49d95);max-width:560px;line-height:1.6;}",
@@ -277,6 +282,10 @@
         '<div class="ce-greet" id="ceGreet">안녕하세요</div>' +
         '<div class="ce-honest">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</div>' +
         '<div class="ce-qrow" id="ceQrow"></div>' +
+        // 현황판 스트립(2026-08-20 사장님 「초기 대시보드에 현황판 보여줘 거기서 선택해서 바로
+        // 작업 하게」 — 승인 시안 mockups/panels-overview §1). 판 정의는 grouppanels.js 한 곳,
+        // 그리기는 panelsboard.js 부품. 여기서는 **자리만** 내준다.
+        '<div class="ce-panels" id="cePanels"></div>' +
         '<div class="ce-div">또는 메뉴에서 바로 가기</div>' +
         '<div class="ce-mrow" id="ceMrow"></div>' +
       '</div></div></div>' +
@@ -1727,6 +1736,28 @@
         });
       });
     } catch (e) { mrow.innerHTML = ""; }
+    renderPanels();
+  }
+  /** 현황판 스트립 — 판 정의(grouppanels.js)와 그리기(panelsboard.js)는 부품에 있다.
+   *  여기서는 **자리와 개수만** 정한다. 부품이 안 실렸으면 조용히 비운다(죽지 않는다).
+   *  ⚠ 분리창(IS_WINDOW)에는 gijoTabs가 없어 「화면 열기」가 안 되므로 스트립을 안 그린다 —
+   *    눌러도 아무 일 없는 자리를 만들지 않는다. */
+  function renderPanels() {
+    var host = document.getElementById("cePanels");
+    if (!host) return;
+    if (!window.gijoPanelsBoard || !window.gijoGroupPanels || !window.gijoTabs) { host.innerHTML = ""; return; }
+    if (host.getAttribute("data-mounted") === "1") return;  // 히어로 재렌더가 판을 다시 재게 하지 않는다
+    host.setAttribute("data-mounted", "1");
+    try {
+      window.gijoPanelsBoard.mount(host, {
+        compact: true, limit: 6,
+        onMore: function () {
+          // 「전체 보기」 — 같은 부품을 펼침 모드로 다시 그린다(새 탭·새 창이 아니다).
+          host.removeAttribute("data-mounted");
+          window.gijoPanelsBoard.mount(host, { compact: false });
+        },
+      });
+    } catch (e) { host.innerHTML = ""; }
   }
   function fillGreeting() {
     var el = document.getElementById("ceGreet");

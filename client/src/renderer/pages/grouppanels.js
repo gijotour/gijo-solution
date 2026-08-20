@@ -9,6 +9,16 @@
 //   · 데이터가 없어도 **같은 모양**으로 그린다(0은 0으로 — 판이 사라지거나 모양이 달라지면
 //     담당자는 "고장인가?"를 먼저 의심한다. 2026-08-09 사용자 지시).
 //   · 못 구한 값은 "-"로 둔다 — 0으로 채우면 "없다"는 뜻이 되어 거짓이 된다.
+//
+// ── 선택 필드(2026-08-20 현황판 1단계 · 승인 시안 mockups/panels-overview §8) ──────────
+//   기존 판 구조는 **그대로 두고** 아래 셋만 있으면 더 쓴다(없으면 그 기능을 아예 안 그린다 —
+//   빈 껍데기를 그리면 「눌러도 아무 일 없는」 자리가 된다).
+//     · rows()  : 하위 리스트(엑셀형). → { cols:[], grid:"1fr 90px", rows:[[셀…]] }
+//                 ⚠ 요약과 **같은 API·같은 잣대**를 쓴다. 여기서 새로 세지 않는다.
+//     · pick    : 🎯 고르기 kind("vuln"|"asset"…) — pick.html이 아는 kind만(5.49.0 통일 계약).
+//     · agents  : 담당 AI 팀원 약자 — **근거가 있는 판만**. 근거는 server/src/engine/
+//                 hybridsearch.ts ROLE_CATEGORY(역할↔업무영역)와 agents.ts AGENT_DEFS(약자)다.
+//                 대응이 없는 판은 **안 적는다** — 지어내면 「AI가 그렇다더라」가 된다.
 (function () {
   "use strict";
   var R = "var(--red,#e2483d)", A = "var(--amber,#f0a020)", B = "var(--blue,#3b82f6)",
@@ -29,7 +39,23 @@
       //   (reporting: kpi→kpi.html). 두 자리에 같은 것을 두면 「어디서 보는 게 맞나」를 매번 고민한다.
       // ⚠ **화면이 사라진 것이 아니다** — `kpi.html`은 ⑤보고에서 그대로 열린다.
       //   ⓪ 자산에서 「🖥 자산」을 뺀 것과 같은 정리다(자산은 ⓪로, 지표는 ⑤로).
-      { id: "analysis", title: "🚨 통합 관제", page: "analysis.html", load: function () {
+      // rows: 열린 이벤트만(요약의 열림 잣대 그대로 — 정리된 것을 목록에 섞으면 요약과 어긋난다).
+      { id: "analysis", title: "🚨 통합 관제", page: "analysis.html",
+        rows: function () {
+          return window.gijo.analysisEvents().then(function (d) {
+            var ev = ((d && d.events) || []).filter(function (e) { return !(e.status === "done" || e.status === "ignored"); });
+            var 순위 = { P0: 0, P1: 1, P2: 2 };
+            ev.sort(function (a, b) { return (순위[a.priority] == null ? 9 : 순위[a.priority]) - (순위[b.priority] == null ? 9 : 순위[b.priority]); });
+            return {
+              cols: ["이벤트", "우선", "상태"],
+              grid: "1fr 54px 74px",
+              rows: ev.map(function (e) {
+                return [String(e.title || e.summary || e.id || "-"), String(e.priority || "-"), String(e.status || "열림")];
+              }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.analysisEvents().then(function (d) {
           var ev = (d && d.events) || [];
           var 열림 = function (e) { return !(e.status === "done" || e.status === "ignored"); };
@@ -44,7 +70,8 @@
           };
         });
       } },
-      { id: "threat", title: "🌐 위협 인텔", page: "threat.html", load: function () {
+      // agents: ti(위협) — ROLE_CATEGORY.ti=["위협대응"](hybridsearch.ts:236) 근거.
+      { id: "threat", title: "🌐 위협 인텔", page: "threat.html", agents: ["위협"], load: function () {
         return window.gijo.listCtiFindings().then(function (fs) {
           fs = fs || [];
           var 셈 = function (k) { return fs.filter(function (f) { return f.severity === k; }).length; };
@@ -71,7 +98,34 @@
 
     // ② 우선순위
     triage: [
-      { id: "vuln", title: "🔍 취약점", page: "vulnscan.html", load: function () {
+      // agents: analysis(우선) — ROLE_CATEGORY.analysis=["취약점"](hybridsearch.ts:235) 근거.
+      // pick: 5.49.0 pick.html이 아는 kind. rows: 요약과 **같은 API·같은 잣대**(살아있는·진짜취약점).
+      { id: "vuln", title: "🔍 취약점", page: "vulnscan.html", agents: ["우선"], pick: "vuln",
+        rows: function () {
+          return window.gijo.listAssets().then(function (assets) {
+            var out = [];
+            var 순위 = { critical: 0, high: 1, medium: 2, low: 3 };
+            (assets || []).forEach(function (a) {
+              (a.findings || []).forEach(function (f) {
+                if (!살아있는(f) || !진짜취약점(f)) return;
+                out.push({ 자산: a.name || a.hostname || a.id, f: f });
+              });
+            });
+            out.sort(function (x, y) {
+              var d = (순위[x.f.severity] == null ? 9 : 순위[x.f.severity]) - (순위[y.f.severity] == null ? 9 : 순위[y.f.severity]);
+              return d !== 0 ? d : (y.f.kev ? 1 : 0) - (x.f.kev ? 1 : 0);
+            });
+            return {
+              cols: ["취약점", "자산", "심각도", "KEV"],
+              grid: "1fr 130px 70px 46px",
+              rows: out.map(function (x) {
+                return [String(x.f.finding_type || x.f.id || "-"), String(x.자산 || "-"),
+                  String(x.f.severity || "-"), x.f.kev ? "KEV" : "-"];
+              }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.listAssets().then(function (assets) {
           assets = assets || [];
           var 셈 = { critical: 0, high: 0, medium: 0 }, kev = 0, 전체 = 0;
@@ -113,7 +167,22 @@
 
     // ③ 조치
     fix: [
-      { id: "approvals", title: "✅ 조치·승인", page: "approvals.html", load: function () {
+      { id: "approvals", title: "✅ 조치·승인", page: "approvals.html",
+        rows: function () {
+          return window.gijo.listApprovals().then(function (r) {
+            var rows = (r && r.reviews) || r || [];
+            return {
+              cols: ["조치 항목", "담당", "상태"],
+              grid: "1fr 90px 74px",
+              // 요약의 미배정 잣대와 같은 말(빈 담당은 「미배정」으로 적는다 — "-"로 두면
+              // 「담당이 있는데 못 읽었다」와 구분이 안 된다).
+              rows: rows.map(function (x) {
+                return [String(x.title || x.summary || x.id || "-"), String(x.assignee || "미배정"), String(x.status || "-")];
+              }),
+            };
+          });
+        },
+        load: function () {
         return window.gijo.listApprovals().then(function (r) {
           var rows = (r && r.reviews) || r || [];
           var 셈 = function (s) { return rows.filter(function (x) { return x.status === s; }).length; };
@@ -196,7 +265,8 @@
 
     // ⑤ 보고
     reporting: [
-      { id: "report", title: "📄 리포트", page: "report.html", load: function () {
+      // agents: report(보고) — ROLE_CATEGORY.report=["사내규정"](보고 서식·규정, hybridsearch.ts:237) 근거.
+      { id: "report", title: "📄 리포트", page: "report.html", agents: ["보고"], load: function () {
         return window.gijo.listReportHistory().then(function (r) {
           var list = (r && r.reports) || r || [];
           var 주 = Date.now() - 7 * 86400000;
@@ -270,7 +340,8 @@
           };
         });
       } },
-      { id: "knowledge", title: "📚 지식", page: "memory.html", load: function () {
+      // agents: analysis(우선) — 역할 문장이 「AI 지식·모델 관리」다(agents.ts:69).
+      { id: "knowledge", title: "📚 지식", page: "memory.html", agents: ["우선"], load: function () {
         return Promise.all([
           window.gijo.listMemoryDocuments().catch(function () { return []; }),
           window.gijo.ontologyStats().catch(function () { return null; }),
