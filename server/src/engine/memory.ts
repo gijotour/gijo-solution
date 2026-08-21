@@ -1401,12 +1401,22 @@ export function registerMemoryRoutes(app: Express): void {
     const row = db.prepare("SELECT uploadedBy FROM memory_documents WHERE documentId = ?").get(documentId) as { uploadedBy?: string | null } | undefined;
     return String(row?.uploadedBy ?? "") !== myId;
   };
+  // 이 요청자가 이 문서를 열람할 수 없는가 — 개인 격리 + 등급(C/S/O)을 한 곳에서 판단한다.
+  //   검색은 hiddenDocIds가 막지만, 직접-열람 라우트(목록·조각·추출본·원본)엔 등급 검사가 빠져
+  //   기밀(C) 문서가 파일 창구로 샜다(설계관 2026-08-22 적발). 잣대는 grades.ts 하나로 모은다.
+  const 열람불가 = (documentId: string, req: import("express").Request): boolean => {
+    if (남의개인문서인가(documentId, req)) return true;
+    const who = (req as import("express").Request & { user?: { clearance?: string | null } }).user;
+    const meta = getDocMetaStmt.get(documentId) as { grade?: string | null } | undefined;
+    if (!meta) return false; // 없는 문서는 각 라우트가 제 방식으로 404를 낸다
+    return blockedGrades(clearanceOf(who?.clearance)).includes(gradeOf(meta.grade));
+  };
   app.get(
     "/api/memory/documents",
     authMiddleware,
     asyncRoute(async (req, res) => {
       const docs = (await listDocuments()) as { documentId: string }[];
-      res.json(docs.filter((d) => !남의개인문서인가(d.documentId, req)));
+      res.json(docs.filter((d) => !열람불가(d.documentId, req)));
     })
   );
   // 오늘 새로 들어온 문서 수 — 사이드바 "내 문서" 배지(2026-08-21 승인 시안 menu-reorg).
@@ -1433,7 +1443,7 @@ export function registerMemoryRoutes(app: Express): void {
         return;
       }
       // ⚠ 404다, 403이 아니다 — 403은 「있긴 있다」를 흘린다(personaldocs와 같은 원칙).
-      if (남의개인문서인가(String(documentId), req)) {
+      if (열람불가(String(documentId), req)) {
         res.status(404).json({ error: "그런 문서가 없습니다" });
         return;
       }
@@ -1491,6 +1501,10 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(400).json({ error: "documentId가 필요합니다" });
         return;
       }
+      if (열람불가(String(documentId), req)) {
+        res.status(404).json({ error: "그런 문서가 없습니다" });
+        return;
+      }
       const meta = getDocMetaStmt.get(documentId) as { sourcePath?: string | null } | undefined;
       if (!meta?.sourcePath) {
         res.status(404).json({ error: "원본 파일이 보관되어 있지 않습니다 (원본 보관 기능 이전에 올린 문서)" });
@@ -1517,7 +1531,7 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(400).json({ error: "documentId가 필요합니다" });
         return;
       }
-      if (남의개인문서인가(String(documentId), req)) {
+      if (열람불가(String(documentId), req)) {
         res.status(404).json({ error: "그런 문서가 없습니다" });
         return;
       }
@@ -1540,7 +1554,7 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(400).json({ error: "documentId와 text가 필요합니다" });
         return;
       }
-      if (남의개인문서인가(String(documentId), req)) {
+      if (열람불가(String(documentId), req)) {
         res.status(404).json({ error: "그런 문서가 없습니다" });
         return;
       }
