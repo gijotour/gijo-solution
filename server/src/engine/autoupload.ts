@@ -124,7 +124,7 @@ async function tryIngest(
   category?: string,
   uploadedBy?: string,
   opts?: { keepOriginal?: boolean }
-): Promise<{ chunks: number; docClass?: string; linkedProduct?: string; docName?: string; category?: string; savedOriginal?: boolean; mdSaved?: boolean; ingested: boolean } | null> {
+): Promise<{ chunks: number; docClass?: string; linkedProduct?: string; docName?: string; category?: string; savedOriginal?: boolean; mdSaved?: boolean; ingested: boolean; 실패사유?: string } | null> {
   // ★ 보관 결과는 catch **밖**에 둔다 — 파일 보관은 검색 수집(임베딩)보다 **먼저** 끝나므로,
   //   임베딩이 죽었다고 「원본을 보관했다」는 사실까지 삼키면 화면이 거짓을 말하게 된다
   //   (0820 「삼켜진 실패」 계보의 거울상 — 이번엔 삼켜진 *성공*이다).
@@ -148,14 +148,18 @@ async function tryIngest(
       docName: r.chunks > 0 ? filename : undefined, category: r.category,
       savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: r.chunks > 0,
     };
-  } catch {
+  } catch (e) {
     // 임베딩 미기동 등 — 검색 수집만 생략, 상위 처리는 계속.
+    // ★ **사유를 들고 올라온다**(재검토관 2026-08-22). 예전엔 여기로 떨어진 것을 전부
+    //   「임베딩 미기동」이라고 단정했는데, 같은 자리에 추출기 없음·읽을 수 없는 문서도 떨어진다.
+    //   PDF 추출기가 죽은 날 담당자가 멀쩡한 임베딩 서버만 들여다보게 만드는 오진이었다.
+    const 사유 = e instanceof Error ? e.message : String(e);
     // 다만 **보관까지는 됐다면** 그 사실은 살려 보낸다(ingested:false로 「수집은 못 했다」를 구분).
     if (보관.mdSaved || 보관.originalSaved) {
       // ⚠ docName은 **주지 않는다** — 「지식으로 수집된 문서의 이름」이라는 뜻이라, 실패했는데
       //   이름을 주면 제품 매뉴얼 등록부가 그 이름을 문서로 박아 화면에 「🔍 검색가능」 배지가
       //   붙는다(검토관 2026-08-22 확정). 파일은 남았지만 검색에는 없다.
-      return { chunks: 0, savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: false };
+      return { chunks: 0, savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: false, 실패사유: 사유 };
     }
     return null;
   }
@@ -171,6 +175,18 @@ async function tryIngest(
 //   만들 뻔한 자리다.
 function 보관결과(ing: { savedOriginal?: boolean; mdSaved?: boolean; ingested?: boolean } | null): { savedOriginal?: boolean; mdSaved?: boolean; ingested?: boolean } {
   return ing ? { savedOriginal: !!ing.savedOriginal, mdSaved: !!ing.mdSaved, ingested: !!ing.ingested } : {};
+}
+
+// 왜 검색에 안 들어갔나 — **아는 만큼만** 말한다.
+//   같은 자리에 임베딩 미기동·추출기 없음·읽을 수 없는 문서가 함께 떨어지는데, 예전엔 전부
+//   「임베딩 미기동」이라 단정했다. 틀린 사유를 확신에 차서 말하는 것이 모른다고 하는 것보다 나쁘다.
+function 수집보류사유(ing: { 실패사유?: string; mdSaved?: boolean } | null): string {
+  const 사유 = ing?.실패사유 ?? "";
+  if (/추출 도구가 없습니다|추출 도구가 준비/.test(사유)) return "이 설치본에 문서 추출 도구가 없음";
+  if (/글자가 아닌 것 같습니다|읽지 못했습니다/.test(사유)) return "문서를 글자로 읽지 못함";
+  if (/fetch|ECONNREFUSED|임베딩|embedding/i.test(사유)) return "임베딩 미기동";
+  if (사유) return 사유.slice(0, 40);
+  return "사유 미상 — 서버 기록 확인";
 }
 
 // 국내 웹취약점 점검 결과보고서(PDF·DOCX 등 서술형)를 규칙 파서로 시도한다.
@@ -294,7 +310,10 @@ async function routeByType(filename: string, base64: string, type: UploadType, p
   if (!ing?.ingested) {
     return {
       filename, routedTo: "memory",
-      reason: `사용자 지정: ${유형말} · 검색수집 보류(임베딩 미기동)`,
+      // ⚠ 원인을 **지어내지 않는다** — 아는 사유가 있으면 그것을 말하고, 모르면 모른다고 한다.
+      //   예전엔 전부 「임베딩 미기동」이라 단정해, 추출기가 죽은 날에도 담당자가 멀쩡한
+      //   임베딩 서버만 들여다보게 만들었다(재검토관 2026-08-22 확정).
+      reason: `사용자 지정: ${유형말} · 검색수집 보류(${수집보류사유(ing)})`,
       memory: { chunks: 0, docClass: type === "guideline" ? "가이드라인" : undefined },
       ...보관결과(ing),
     };

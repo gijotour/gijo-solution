@@ -43,7 +43,7 @@ function dirSize(dir: string): number {
 }
 
 // 실제 백업 수행(라우트·스케줄러 공용). 스냅샷 후 보관정책으로 오래된 것 정리.
-export async function performBackup(): Promise<{ file: string; sizeBytes: number; lanceIncluded: boolean; archiveIncluded: boolean; pruned: number }> {
+export async function performBackup(): Promise<{ file: string; sizeBytes: number; lanceIncluded: boolean; archiveIncluded: boolean; docsIncluded: boolean; pruned: number }> {
   const dir = backupDir();
   fs.mkdirSync(dir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -69,8 +69,18 @@ export async function performBackup(): Promise<{ file: string; sizeBytes: number
     await fs.promises.cp(archiveSrc, path.join(dir, `gijo-as-${stamp}.session-archive`), { recursive: true });
     archiveIncluded = true;
   }
+  // 업로드 원본·추출본(2026-08-22 — 같은 계보의 세 번째 누락, 검토관 확정).
+  // DB에는 「원본 보관됨(sourcePath)」이 남는데 파일을 안 담으면, 복원한 순간 그 배지가
+  // **거짓**이 된다(「원본 열기」가 404). 추출본(.md)은 사람이 고친 글이 사는 유일한 자리라
+  // 조각만으로는 되살릴 수 없다. LanceDB·세션 아카이브와 같은 방식으로 짝 폴더에 담는다.
+  const docsSrc = path.join(process.env.GIJO_INGEST_ROOT ?? "data", "docs");
+  let docsIncluded = false;
+  if (fs.existsSync(docsSrc)) {
+    await fs.promises.cp(docsSrc, path.join(dir, `gijo-as-${stamp}.docs`), { recursive: true });
+    docsIncluded = true;
+  }
   const pruned = pruneOldBackups(dir);
-  return { file, sizeBytes: fs.statSync(dest).size, lanceIncluded, archiveIncluded, pruned };
+  return { file, sizeBytes: fs.statSync(dest).size, lanceIncluded, archiveIncluded, docsIncluded, pruned };
 }
 
 // 보관정책 — 최신 BACKUP_KEEP개만 남기고 SQLite+짝 LanceDB 폴더를 함께 삭제한다.
@@ -89,6 +99,8 @@ function pruneOldBackups(dir: string): number {
       if (fs.existsSync(lance)) fs.rmSync(lance, { recursive: true, force: true });
       const arch = path.join(dir, f.replace(/\.sqlite$/, ".session-archive"));
       if (fs.existsSync(arch)) fs.rmSync(arch, { recursive: true, force: true });
+      const docs = path.join(dir, f.replace(/\.sqlite$/, ".docs"));
+      if (fs.existsSync(docs)) fs.rmSync(docs, { recursive: true, force: true });
       pruned++;
     } catch (e) {
       console.warn(`[backup] 오래된 백업 삭제 실패(${f}): ${e instanceof Error ? e.message : String(e)}`);
@@ -136,7 +148,8 @@ const RESTORE_STEPS = [
   "② 지금 data/gijo-as.sqlite 와 data/memory.lancedb 를 **다른 이름으로 옮겨 둔다** — 지우지 말 것(복원이 잘못되면 되돌아갈 자리다)",
   "③ 스냅샷 gijo-as-<시각>.sqlite 를 data/gijo-as.sqlite 로 복사한다",
   "④ 짝 폴더 gijo-as-<같은 시각>.lancedb 를 data/memory.lancedb 로 복사한다 (빠뜨리면 지식베이스가 빈 상태로 뜬다)",
-  "⑤ 서버를 다시 켜고 자가 진단(설정 > 시스템 자가 진단)에서 지식베이스·DB 항목이 정상인지 확인한다",
+  "⑤ 짝 폴더 gijo-as-<같은 시각>.docs 를 data/docs 로 복사한다 (빠뜨리면 「원본 보관됨」 배지는 남는데 원본 열기가 404가 되고, 사람이 고친 추출본(.md)이 사라진다)",
+  "⑥ 서버를 다시 켜고 자가 진단(설정 > 시스템 자가 진단)에서 지식베이스·DB 항목이 정상인지 확인한다",
   "※ 모델 파일(models/)은 백업 대상이 아니다 — 다시 받거나 별도 이미지 백업에서 되살린다",
 ];
 

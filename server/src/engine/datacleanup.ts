@@ -129,6 +129,12 @@ const RESET_FILE_DIRS = [
   { dir: path.join("data", "reports"), label: "보고서 파일" },
   { dir: path.join("data", "exports"), label: "SBOM 내보내기" },
   { dir: path.join("data", "session-archive"), label: "세션 아카이브(대화 기록과 짝)" },
+  // ★ 업로드 원본·추출본(2026-08-22 추가, 검토관 확정).
+  //   여기 없으면 **업무 데이터를 리셋해도 고객이 올린 원본 파일이 디스크에 그대로 남는다** —
+  //   「원본은 켜야만 보관한다」는 프라이버시 기본값을 내세우는 제품이 정반대로 도는 자리였다.
+  //   추출본(.md)도 같이 옮긴다. 그것이 AI가 실제로 읽은 글이라 남으면 내용이 그대로 남는 것과 같다.
+  { dir: path.join("data", "docs", "uploads"), label: "업로드 원본 파일" },
+  { dir: path.join("data", "docs", "extracted"), label: "추출본(.md) — AI가 읽은 글" },
 ];
 function moveResetFiles(stamp: string): { label: string; moved: number }[] {
   const out: { label: string; moved: number }[] = [];
