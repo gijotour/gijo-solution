@@ -21,6 +21,10 @@ describe("지식 카드 — 실측 3문이 잡힌다", () => {
     for (const q of ["GIJO AS의 GA 판정 상태나 향후 계획이 어떻게 돼?", "제품 성숙도 어때?", "이 제품 정식 출시 됐어?", "파일럿 대상이 누구야?"]) {
       expect(faqAnswerFor(q)?.id, q).toBe("product-status");
     }
+    // ★ 2026-08-22 라이브 검증 잔여 — GA 현재형·순접 어형이 「됐나?」만으로 새던 것을 넣는다
+    for (const q of ["언제 GA 돼?", "GA 나왔어?", "GA 언제 나와?", "이거 GA 됐나요?"]) {
+      expect(faqAnswerFor(q)?.id, q).toBe("product-status");
+    }
     // ★ 검토관 [중]2·[낮]3: 제3자 SW 질문·GA 부분문자열은 영업카드가 선점하면 안 된다
     for (const q of ["Log4j 정식 버전이 뭐야?", "Struts 출시 일정 나왔어?", "VGA 상태 확인", "MEGA 상태 어때"]) {
       expect(faqAnswerFor(q), q + " 는 제품상태 아님").toBeNull();
