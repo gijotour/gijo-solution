@@ -46,7 +46,12 @@ function 서버용스크립트(): string[] {
   const 이름 = new Set<string>();
   for (const f of ts파일들(path.join(서버루트, "src"))) {
     const src = fs.readFileSync(f, "utf8");
-    if (!src.includes("serverPython()")) continue;
+    // ⚠ `serverPython()`(빈 괄호)로 찾으면 안 된다 — 2026-08-22에 용도 인자가 생겨
+    //   `serverPython("docs")`가 되면서 **dataset.ts가 필터에서 빠졌다.** 그런데도 extract_doc.py가
+    //   계속 잡힌 이유는 pythonbin.ts **주석**에 두 문자열이 우연히 함께 있어서였다 —
+    //   즉 감시가 주석에 기대고 있었고, 주석을 정리하는 순간 pypdf·OCR 의존 감시가 조용히 죽는다.
+    //   여는 괄호까지만 봐서 인자 유무와 무관하게 잡는다(설계관 2026-08-22 적발).
+    if (!src.includes("serverPython(")) continue;
     for (const m of src.matchAll(/["']([A-Za-z0-9_\-/]+\.py)["']/g)) 이름.add(path.basename(m[1]));
   }
   // 실제로 존재하는 것만(scripts/ 아래 또는 서버 루트 — modelscan_wrapper.py가 루트에 있다).
