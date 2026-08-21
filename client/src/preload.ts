@@ -407,6 +407,9 @@ const gijoApi = {
   handoverComplete: (p: { documentIds: string[]; cited: number; total: number; passRate: number; batchId?: string }) => api.handoverApi.complete(p),
   queryMemory: (question: string, topK?: number, agentId?: string) => api.memoryApi.query(question, topK, agentId),
   listMemoryDocuments: () => api.memoryApi.listDocuments(),
+  // 오늘 새로 들어온 문서 수(사이드바 배지). 이 기기의 자정(현지시각)을 ISO로 계산해 서버에 넘긴다 —
+  //   서버 ingestedAt은 UTC ISO라 문자열 비교로 맞고, "오늘"의 경계는 사람이 있는 시간대가 정한다.
+  recentDocCount: () => { const d = new Date(); d.setHours(0, 0, 0, 0); return api.memoryApi.recentDocCount(d.toISOString()); },
   memoryDocumentChunks: (documentId: string, limit?: number) => api.memoryApi.documentChunks(documentId, limit),
   setMemoryDocumentGrade: (documentId: string, grade: string) => api.memoryApi.setDocumentGrade(documentId, grade),
   deleteMemoryDocument: (documentId: string, withFile?: boolean) => api.memoryApi.deleteDocument(documentId, withFile),

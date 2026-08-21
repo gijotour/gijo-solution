@@ -133,8 +133,15 @@
     ]},
 
     // ── 기반 — 절차가 아니라 **참조하는 대장**이다. 절차 아래에 둔다. ────────────────
-    { id: "registry", icon: "drawer", label: "등록부", items: [
-      { page: "products.html", label: "보안제품" },
+    // 보안제품(옛 「등록부」, 2026-08-21 승인 시안 menu-reorg) — 「제품」이 사이드바 3곳에서
+    //   다른 뜻이던 것을 이름으로 가른다: products=우리가 운영 중인 것, intro=비교용 외부 카탈로그.
+    //   둘을 같은 그룹에 모아 「우리 것 ↔ 비교용」 대비가 이름만으로 드러난다(항목 2개 → 일반 그룹).
+    // ⚠ id(registry)는 **그대로 둔다** — workflow.test.ts가 ⑤ 보고 구간의 **끝 경계**로 그 id
+    //   문자열을 찾는다. 바꾸면 5단계 감시가 깨진다. 바꾸는 건 label과 항목뿐이다.
+    // ⚠ intro.html 항목은 이 경계 **뒤**(그룹 안)라 ⑤ 슬라이스에 안 들어간다 — 5단계 표 무영향.
+    { id: "registry", icon: "drawer", label: "보안제품", items: [
+      { page: "products.html", label: "우리 보안제품" },
+      { page: "intro.html", label: "보안제품 비교·소개" },
     ]},
     // AI 운영 — 예전 「AI」와 「데이터 플라이휠」 두 그룹을 합쳤다. 6개면 한 그룹으로 충분하고,
     // 담당자에게 둘의 차이(기능 vs 되먹임 고리)는 우리 사정이지 업무 구분이 아니었다.
@@ -151,9 +158,9 @@
     // 같은 settings.html을 ?s= 로 걸러 보여준다(파일을 쪼개면 공통 스크립트가 어긋난다).
     // ⚠ 인수인계를 여기로 옮겼다 — 「업무 관리」 그룹에 항목이 하나뿐이었다. 하나짜리는 그룹이 아니다.
     // 추가 기능(2026-08-09 사용자 지시) — 절차 5단계에 안 얹히는 부가 기능들의 자리.
-    //   지금은 업무 넘기기 하나지만 「보안 로그 파일 분석」·「제품 소개자료·비교」가 준비되면
-    //   여기로 들어온다(계획 확정 전 빈 메뉴를 미리 달지 않는다 — 정직한 구현 원칙).
-    //   alwaysGroup: 항목이 1개여도 대표 메뉴로 접지 않는다 — 곧 늘어날 그룹이다.
+    //   alwaysGroup: 항목이 1개여도 대표 메뉴로 접지 않는다.
+    // ⚠ 「제품 소개자료」는 여기 있다가 2026-08-21 승인 시안(menu-reorg)으로 **보안제품 그룹**에
+    //   「보안제품 비교·소개」란 이름으로 옮겼다 — 두 곳에 두지 않는다.
     { id: "extras", icon: "drawer", label: "추가 기능", bottom: true, alwaysGroup: true, items: [
       { page: "loganalysis.html", label: "보안 로그 파일 분석" },
       // 법령·판례(2026-08-09 사용자 지시 · mockups/법령판례_화면). 조항마다 법을 자동으로
@@ -161,7 +168,6 @@
       // ⚠ 연동이 꺼져 있어도 메뉴는 보인다. 조건부로 감추면 "왜 안 보이지"가 새 질문이 되고
       //   사이드바를 비동기로 다시 그려야 한다 — 대신 화면이 왜 안 되는지와 켜는 곳을 말한다.
       { page: "lawlookup.html", label: "법령·판례" },
-      { page: "intro.html", label: "제품 소개자료" },
       { page: "handover.html", label: "업무 넘기기" },
     ]},
     // 설정 그룹 정리(2026-08-09 사용자 지시) — 7줄에서 3줄로.
@@ -645,6 +651,17 @@
       wBadge.style.color = "#fff";
       wBadge.title = "기한이 지난 업무";
       el.appendChild(wBadge);
+    }
+    // 오늘 새로 들어온 문서 수 — "내가 올린 게 어디 쌓이나"를 눌러 보지 않아도 알린다
+    //   (2026-08-21 승인 시안 menu-reorg). 0이면 감춘다(새 게 없으면 알릴 일이 아니다).
+    // ⚠ `mydocs.html` **정확히**만 — TOP엔 숨김 항목 `mydocs.html?tab=guide`(옛 문서함)도 있어
+    //   문자열이 다르다. 그쪽엔 안 붙는다(붙으면 배지가 두 곳에 뜬다).
+    if (it.page === "mydocs.html") {
+      var dBadge = document.createElement("span");
+      dBadge.className = "gn-upbadge gn-docbadge";
+      dBadge.style.display = "none";
+      dBadge.title = "오늘 새로 들어온 문서";
+      el.appendChild(dBadge);
     }
 
     if (it.win) {
@@ -1467,6 +1484,22 @@
     }).catch(function () {});
   }
 
+  // 오늘 새로 들어온 문서 배지 — "내 문서"에 오늘 반입된 문서 수를 띄운다(2026-08-21 승인 시안
+  //   menu-reorg). 0이면 감춘다(새 게 없으면 알릴 일이 아니다). 실패해도 조용히 넘어간다.
+  //   preload가 이 기기의 자정(현지시각)을 ISO로 계산해 넘긴다 — 서버 ingestedAt(UTC ISO)과
+  //   문자열 비교로 맞고, "오늘"의 경계는 사람이 있는 시간대가 정한다(자정 경계 함정 회피).
+  function refreshDocBadge() {
+    if (!window.gijo || !window.gijo.recentDocCount) return;
+    window.gijo.recentDocCount().then(function (r) {
+      var n = (r && typeof r.count === "number") ? r.count : 0;
+      document.querySelectorAll(".gn-docbadge").forEach(function (b) {
+        b.textContent = n > 99 ? "99+" : String(n);
+        b.setAttribute("aria-label", "오늘 새로 들어온 문서 " + n + "건");
+        b.style.display = n > 0 ? "" : "none";
+      });
+    }).catch(function () {});
+  }
+
   // 분리창 — 왼쪽 메뉴를 지우고 내용이 창 폭을 다 쓰게 한다. 가장자리 토글도 두지 않는다:
   // 이 창에서 메뉴를 열 일이 없고(이동은 대시보드에서), 토글만 남으면 그게 또 하나의 조작이 된다.
   function applyPopout() {
@@ -1628,7 +1661,7 @@
     //   전이라 조회가 401로 떨어지는데, 실패를 조용히 삼키는 구조라 그대로 빈칸으로 굳었다
     //   — 기한 지난 업무가 6건인데 화면엔 아무 표시가 없었다. 두 배지가 같은 결함을 공유한다.
     //   그래서 ① 곧바로 ② 로그인이 끝날 즈음 한 번 더 ③ 그 뒤로는 주기적으로 새로 읽는다.
-    function 배지새로고침() { refreshSessionBadge(); refreshWorkBadge(); }
+    function 배지새로고침() { refreshSessionBadge(); refreshWorkBadge(); refreshDocBadge(); }
     배지새로고침();
     setTimeout(배지새로고침, 3000);
     setInterval(배지새로고침, 60000);

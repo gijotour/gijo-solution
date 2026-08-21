@@ -57,6 +57,9 @@ export const memoryApi = {
   // 올린 문서 관리(장기기억) — 목록·조각 미리보기·삭제.
   listDocuments: () =>
     request<MemoryDocument[]>("/api/memory/documents"),
+  // 오늘 새로 들어온 문서 수 — 사이드바 "내 문서" 배지(값싼 COUNT). since=현지 자정 ISO.
+  recentDocCount: (sinceIso: string) =>
+    request<{ count: number }>("/api/memory/documents/recent-count?since=" + encodeURIComponent(sinceIso)),
   documentChunks: (documentId: string, limit?: number) =>
     request<{ chunkIndex: number; text: string }[]>("/api/memory/document/chunks", { method: "POST", body: { documentId, limit } }),
   // 업무영역(취약점·장비운영·사내규정·위협대응·일반) 수정 — 승인카드의 [영역 수정]용.

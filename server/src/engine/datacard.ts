@@ -280,7 +280,9 @@ const 화면이름카드: Record<string, 화면카드종류> = {
   "작업내역": "sessions",
   "조치": "fix",
   "보고": "report", "보고서": "report", "리포트": "report",
-  "보안제품": "products",
+  // 「우리보안제품」 = 사이드바 개명(2026-08-21 menu-reorg, products.html "보안제품"→"우리 보안제품").
+  //   정확 일치·공백 제거 매칭이라 새 이름을 채팅에 치면 옛 별칭("보안제품")에 안 걸린다 — 함께 등록.
+  "보안제품": "products", "우리보안제품": "products",
   "기록": "records", "감사기록": "records",
   "위협": "threat", "위협인텔": "threat",
   "AI팀": "aiteam", "ai팀": "aiteam",

@@ -89,6 +89,15 @@ const setDocAssetsStmt = db.prepare("UPDATE memory_documents SET assetIds = ? WH
 const docsByAssetStmt = db.prepare(
   "SELECT documentId, sourcePath, assetIds FROM memory_documents WHERE assetIds IS NOT NULL AND assetIds <> ''"
 );
+// 오늘 새로 들어온 문서 수 — 사이드바 "내 문서" 배지(2026-08-21 승인 시안 menu-reorg).
+//   ⚠ listDocuments()는 LanceDB 전수 스캔이라 자주 부르는 배지엔 못 쓴다 — 값싼 SQLite COUNT로.
+//   내장 문서(origin='builtin')는 제외(반입이 아니라 제품 동봉물), **남의 개인문서도 제외**
+//   (personal:은 소유자에게만 — 격리 fail-closed: @me가 비면 uploadedBy=NULL 비교라 안 세어진다).
+const recentDocCountStmt = db.prepare(
+  "SELECT COUNT(*) AS n FROM memory_documents WHERE ingestedAt >= @since" +
+    " AND (origin IS NULL OR origin <> 'builtin')" +
+    " AND (documentId NOT LIKE 'personal:%' OR uploadedBy = @me)"
+);
 
 /** 문서에 이 자산들이 담겼다고 적는다. 빈 목록이면 아무것도 하지 않는다(빈 값으로 덮지 않는다). */
 export function linkDocumentToAssets(documentId: string, assetIds: string[]): void {
@@ -1314,6 +1323,24 @@ export function registerMemoryRoutes(app: Express): void {
     asyncRoute(async (req, res) => {
       const docs = (await listDocuments()) as { documentId: string }[];
       res.json(docs.filter((d) => !남의개인문서인가(d.documentId, req)));
+    })
+  );
+  // 오늘 새로 들어온 문서 수 — 사이드바 "내 문서" 배지(2026-08-21 승인 시안 menu-reorg).
+  //   since = 클라가 준 이 기기의 자정(현지시각을 ISO로). ingestedAt은 UTC ISO라 문자열 비교로 맞다.
+  //   값싼 COUNT(recentDocCountStmt) — 남의 개인문서는 안 센다(격리). since가 없으면 0으로 안전.
+  app.get(
+    "/api/memory/documents/recent-count",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const since = String(req.query.since ?? "").slice(0, 40);
+      if (!since) {
+        res.json({ count: 0 });
+        return;
+      }
+      const me = (req as import("express").Request & { user?: { id?: string | number; username?: string } }).user;
+      const myId = me?.id != null ? String(me.id) : (me?.username ?? "");
+      const row = recentDocCountStmt.get({ since, me: myId }) as { n?: number } | undefined;
+      res.json({ count: Number(row?.n ?? 0) });
     })
   );
   // 특정 문서 조각 미리보기(어떻게 학습됐는지 확인). Korean/특수문자 파일명 대비 body로 받는다.
