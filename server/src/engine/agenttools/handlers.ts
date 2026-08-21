@@ -20,7 +20,7 @@ import { listCompliance, setComplianceStatus } from "../compliance";
 import { generateSbom } from "../sbom";
 import type { ComplianceStatus } from "../compliance";
 import { countTriples } from "../ontology";
-import { listVisibleDocuments, queryMemory, queryMemoryRelevant, queryMemoryScored } from "../memory";
+import { listVisibleDocuments, queryMemory, queryMemoryRelevant, queryMemoryScored, 문서지목질문 } from "../memory";
 import { listFindings as listCtiFindings } from "../cti";
 import { matchCtiToAssets } from "../ctimatch";
 import { dailyBriefingText } from "../briefing";
@@ -449,8 +449,15 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   const topic = args.topic.trim();
   const out: string[] = [];
 
+  // ⚠ 문서를 콕 집은 질문(「이 영향평가 안내서에서 대상 기준…」)은 **그 문서가 권위**다 — 문서 발췌를
+  //   온톨로지보다 **앞에** 싣는다. 안 그러면 7B가 앞줄(온톨로지)을 답으로 삼아, 도메인 낱말(대상=스캔
+  //   타깃)의 온톨로지 관계 덤프가 문서 내용을 덮는다(2026-08-21 코퍼스 QA 실측). topic이 지시문 전체인
+  //   강제경로(문서지목질문 TRUE)에만 발동 — LLM이 짧게 뽑은 일반 explain(「대상이 뭐야?」)은 온톨로지 유지.
+  const 문서우선 = 문서지목질문(topic);
+  const 온톨로지: string[] = [];
   const triples = ontologyLinesFor(topic, 12);
-  if (triples.length) out.push(`사내 온톨로지 관계 — "${topic}" 관련:`, ...triples);
+  if (triples.length) 온톨로지.push(`사내 온톨로지 관계 — "${topic}" 관련:`, ...triples);
+  if (!문서우선) out.push(...온톨로지); // 일반 질문: 온톨로지 먼저(기존)
 
   // 사내 문서 **본문**을 근거로 싣는다.
   // ⚠ 2026-07-26 QA에서 잡힌 결함: 예전에는 문서 "제목과 조각 수"만 돌려줬다.
@@ -472,6 +479,8 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   } catch {
     /* 임베딩 미기동 등 — 본문 근거 없이 계속 */
   }
+
+  if (문서우선) out.push(...온톨로지); // 문서 지목: 온톨로지를 발췌 **뒤로**(발췌가 권위)
 
   // 어느 문서에서 왔는지도 함께(담당자가 원문을 찾아갈 수 있게).
   try {

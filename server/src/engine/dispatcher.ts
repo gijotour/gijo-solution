@@ -24,6 +24,7 @@ import { isNonLearningAccount } from "./learnpolicy";
 import { recordChatLog } from "./learnloop";
 import { faqAnswerFor } from "./productfaq";
 import type { Viewer } from "./memory";
+import { 문서지목질문 } from "./memory";
 import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다, 직전대상자산 } from "./agentloop";
 import { 스트림자리 } from "./streamsink";
 import { 장애질문인가, 장애초동절차, 침해사고질문인가, 침해사고초동절차 } from "./incidentsteps";
@@ -1291,7 +1292,11 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // "미조치 취약점 뭐 있어?" — 규칙으로 목록을 내고 그 자리에서 고를 수 있게 한다(2026-07-31).
   // LLM 루프에 맡기면 모델이 목록 도구를 고른 날에만 체크칸이 생긴다 — 사용자가 콕 집어 물은
   // 기능이 어떤 날은 되고 어떤 날은 안 되면 없는 것만 못하다.
-  if (isFindingListAsk(instructionText)) {
+  // ⚠ 단 **문서를 콕 집은** 질문(「이 취약점 분석평가 가이드에서 …어떤 게 있어?」)은 양보한다 —
+  //   문서명의 「취약점」이 이 빠른 길에 걸려 자산 취약점 목록이 나가던 것(2026-08-21 코퍼스 QA 실측).
+  //   문서지목질문 TRUE면 문서가 권위다(incidentsteps 장애·침해가 이미 쓰는 같은 패턴). 문서지목=FALSE인
+  //   「미조치 취약점 뭐 있어?」·「이 자산 취약점」·「고위험 목록」은 그대로 이 길(HIJACK 유지).
+  if (isFindingListAsk(instructionText) && !문서지목질문(instructionText)) {
     // 🗂 범위를 **여기에도 넘긴다** — 이 경로는 agentloop를 안 타서 도구 인자 주입이 안 온다
     // (2026-08-18 실측: 범위가 걸렸는데 전체 3,008건이 왔다).
     const { output, picklist, dataCard } = findingListAnswer(
@@ -1472,6 +1477,11 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     REMEDIATION_INTENT_RE.test(instructionText) &&
     !장애질문인가(instructionText) &&
     !침해사고질문인가(instructionText) &&
+    // ⚠ 문서를 콕 집은 질문(「이 조치 가이드에서 Log4j 조치 방법 있어?」)은 그 문서가 권위 — 플레이북에
+    //   양보한다(설계관 지적 제3 자리, 문서지목 우선 원리 일관 적용). 장애·침해질문인가는 내부에 이미
+    //   문서지목 배제가 있으나 REMEDIATION 자체엔 없어, 장애·침해가 아닌 doc-pinned 조치질문이 샜다.
+    //   AND 조건이라 순서 무관 — 소스감시가 REMEDIATION_INTENT_RE && !장애질문인가 인접을 요구해 뒤에 둔다.
+    !문서지목질문(instructionText) &&
     !/(조치|처리|수정|패치)\s*해\s*(줘|주세요|주라|다오|라|$)/.test(instructionText) &&
     // ⚠ 앞의 값싼 검사를 전부 통과했을 때만 부른다(동적 import — 이 파일의 기존 방식).
     (await import("./playbook.js")).플레이북영토인가(instructionText)

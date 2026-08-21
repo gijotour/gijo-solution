@@ -16,6 +16,16 @@ describe("지식 카드 — 실측 3문이 잡힌다", () => {
   it("★ 지어냄 식별(야간 30.8초)", () => {
     expect(faqAnswerFor("AI가 답을 지어내면 어떻게 알아?")?.id).toBe("how-to-spot-hallucination");
   });
+  it("★ 제품 상태·성숙도(2026-08-21 코퍼스 QA — GA 공식출시 환각 차단)", () => {
+    // GA·출시·성숙도·파일럿 물음은 영업 유도로 결정적 답(지어내지 않음)
+    for (const q of ["GIJO AS의 GA 판정 상태나 향후 계획이 어떻게 돼?", "제품 성숙도 어때?", "정식 출시 됐어?", "파일럿 대상이 누구야?"]) {
+      expect(faqAnswerFor(q)?.id, q).toBe("product-status");
+    }
+    // 답이 「영업 문의」로 유도하고, 거짓 GA 주장이 없어야 한다
+    const a = faqAnswerFor("GIJO AS GA 상태?")!.answer;
+    expect(/영업|도입 담당/.test(a), "영업 유도").toBe(true);
+    expect(/GA\s*상태에?\s*(있|이며)|공식\s*출시된/.test(a), "거짓 GA 주장 없어야").toBe(false);
+  });
 });
 
 describe("좁은 판별 — 딴 물음은 안 삼킨다", () => {
@@ -24,6 +34,9 @@ describe("좁은 판별 — 딴 물음은 안 삼킨다", () => {
     expect(faqAnswerFor("지금 학습 시작해줘")).toBeNull();            // 쓰기
     expect(faqAnswerFor("오늘 뭐부터 볼까?")).toBeNull();             // 무관
     expect(faqAnswerFor("미조치 취약점 알려줘")).toBeNull();          // 데이터 조회
+    expect(faqAnswerFor("GIJO AS가 뭘 해?")).toBeNull();             // 기능(제품소개 몫) — 제품상태 아님
+    expect(faqAnswerFor("에디션 뭐가 있어?")).toBeNull();             // 에디션 안내 몫
+    expect(faqAnswerFor("GAP 분석 어떻게 해?")).toBeNull();          // GA 오발 방지
   });
 });
 
