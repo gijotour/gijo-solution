@@ -285,6 +285,51 @@ function assertWithinIngestRoot(filePath: string): string {
 }
 const CHUNK_OVERLAP = 100;
 
+/** 문서 산출물 보관 — **추출본(.md)은 항상**, **원본은 옵션**(keepOriginal, 기본 꺼짐).
+ *
+ *  왜 한 곳에 모았나(2026-08-22): 같은 일을 ingest-file 라우트가 자기 안에서만 하고 있어서
+ *  **콘솔 ＋(uploadAuto)로 올린 문서는 추출본도 원본도 안 남았다** — 「내 문서」의 추출본 보기가
+ *  그 창구에서는 늘 404였다. 두 창구가 같은 잣대를 쓰게 여기로 모은다.
+ *
+ *  ⚠ documentId는 **이미 basename으로 접힌 이름**이어야 한다. 접는 일은 **각 라우트 입구**에서 한다
+ *    — 경로가 든 documentId는 .md가 basename으로만 키잉돼 등급 검사와 어긋나고, 그게 남의 기밀 .md를
+ *    읽거나 덮는 통로였다(132f19c6). 여기서 한 번 더 접는 것은 이중 방어이지 그 대체가 아니다.
+ *  ⚠ 실패를 **삼키지 않는다** — 저장 여부를 값으로 돌려준다. 삼키면 「보관했습니다」가 거짓이 된다
+ *    (0820 「삼켜진 실패가 기준선을 오염시킨다」 계보).
+ */
+export async function saveDocArtifacts(opts: {
+  documentId: string;
+  text: string;
+  contentBase64?: string;
+  keepOriginal?: boolean;
+}): Promise<{ mdSaved: boolean; originalSaved: boolean; sourcePath?: string }> {
+  const 이름 = path.basename(String(opts.documentId));
+  let mdSaved = false;
+  try {
+    const extractedDir = path.join(INGEST_ROOT, "docs", "extracted");
+    await fs.mkdir(extractedDir, { recursive: true });
+    await fs.writeFile(path.join(extractedDir, 이름 + ".md"), opts.text, "utf8");
+    mdSaved = true;
+  } catch (mdErr) {
+    console.warn(`[memory] 추출 .md 보관 실패(${이름}): ${mdErr instanceof Error ? mdErr.message : String(mdErr)}`);
+  }
+  let originalSaved = false;
+  let sourcePath: string | undefined;
+  if (opts.keepOriginal && opts.contentBase64) {
+    try {
+      const uploadsDir = path.join(INGEST_ROOT, "docs", "uploads");
+      await fs.mkdir(uploadsDir, { recursive: true });
+      const 저장경로 = path.join(uploadsDir, 이름);
+      await fs.writeFile(저장경로, Buffer.from(opts.contentBase64, "base64"));
+      sourcePath = 저장경로;
+      originalSaved = true;
+    } catch (saveErr) {
+      console.warn(`[memory] 원본 보관 실패(${이름}): ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+    }
+  }
+  return { mdSaved, originalSaved, sourcePath };
+}
+
 export interface IngestResult {
   documentId: string;
   chunks: number;
@@ -1320,25 +1365,9 @@ export function registerMemoryRoutes(app: Express): void {
         //   보고·고칠 수 있게(투명성·반입 신뢰도, built-in 코퍼스에서 검증한 PDF→.md와 같은 방식).
         //   원본 파일은 **옵션**(keepOriginal, 기본 꺼짐)이다 — 프라이버시 기본값(GDPR 제25조)·용량 절감.
         //   ⚠ 예전엔 원본을 늘 조용히 저장했다(2026-08-22 사장님 「원본만 삭제」·시안 승인으로 default-off).
-        let savedPath: string | undefined; // 원본(옵션)
-        try {
-          const extractedDir = path.join(INGEST_ROOT, "docs", "extracted");
-          await fs.mkdir(extractedDir, { recursive: true });
-          await fs.writeFile(path.join(extractedDir, path.basename(filename) + ".md"), text, "utf8");
-        } catch (mdErr) {
-          console.warn(`[memory] 추출 .md 보관 실패(${filename}): ${mdErr instanceof Error ? mdErr.message : String(mdErr)}`);
-        }
-        if (keepOriginal) {
-          try {
-            const uploadsDir = path.join(INGEST_ROOT, "docs", "uploads");
-            await fs.mkdir(uploadsDir, { recursive: true });
-            savedPath = path.join(uploadsDir, path.basename(filename));
-            await fs.writeFile(savedPath, Buffer.from(content, "base64"));
-          } catch (saveErr) {
-            console.warn(`[memory] 원본 보관 실패(${filename}): ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
-            savedPath = undefined;
-          }
-        }
+        //   ★ 보관은 saveDocArtifacts 한 곳에서 한다(2026-08-22) — 콘솔 ＋(uploadAuto) 창구와 같은 잣대.
+        const 보관 = await saveDocArtifacts({ documentId: filename, text, contentBase64: content, keepOriginal });
+        const savedPath: string | undefined = 보관.sourcePath; // 원본(옵션)
         // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함.
         const actor = (req as unknown as { user?: { displayName?: string } }).user?.displayName;
         // ★ origin='builtin'은 **관리자만** 지정할 수 있다(2026-08-12 신설).

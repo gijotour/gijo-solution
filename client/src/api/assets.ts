@@ -3,24 +3,39 @@
 import { request } from "./core";
 
 // ── 스마트 통합 업로드 — 파일 유형 자동 판별·라우팅(취약점 스캔/매뉴얼/문서 분류) ──
-export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport";
+// ⚠ 이 타입은 서버 engine/autoupload.ts의 UploadType·AutoUploadResult와 **짝**이다.
+//   2026-08-22에 네 군데가 어긋나 있던 것을 맞췄다(securitylog·opsreport·analysis·uncredentialedHosts·
+//   nextChips) — 화면(console.js)이 실제로 읽는데 타입엔 없던 필드들이라, 어긋난 채로 두면
+//   「타입은 통과하는데 화면이 못 읽는」 부류가 계속 생긴다.
+export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport" | "securitylog" | "opsreport";
 export interface AutoUploadResult {
   filename: string;
-  routedTo: "vulnscan" | "product-manual" | "memory" | "decision";
+  routedTo: "vulnscan" | "product-manual" | "memory" | "analysis" | "decision";
   reason: string;
   needsDecision?: boolean;
   guess?: UploadType;
   guessProductName?: string;
-  vulnscan?: { hosts: number; findings: number };
+  vulnscan?: { hosts: number; findings: number; uncredentialedHosts?: string[] };
   manual?: { productName: string; kind: string; createdProduct: boolean };
+  analysis?: { kind: "log" | "report"; created: number };
   memory?: { chunks: number; docClass?: string; linkedProduct?: string; category?: string };
   category?: string; // 확정된 업무영역(취약점·장비운영·사내규정·위협대응·일반) — 승인카드 표시용
+  /** 「원본도 보관」 토글의 **실제 결과** — 요청값이 아니다. 취약점 스캔으로 반영되는 갈래는
+   *  문서 인입을 안 타서 원본·추출본이 안 만들어진다. 화면은 이 값으로만 말한다(정직 원칙). */
+  savedOriginal?: boolean;
+  mdSaved?: boolean; // 추출본(.md) 실제 저장 여부 — 「내 문서」의 추출본 보기 가능 여부와 1:1
+  nextChips?: string[]; // 반입 뒤 다음 걸음 칩(서버가 붙인다)
 }
 export const uploadApi = {
-  auto: (filename: string, content: string, forceType?: UploadType, productName?: string) =>
+  auto: (filename: string, content: string, forceType?: UploadType, productName?: string, keepOriginal?: boolean) =>
     request<AutoUploadResult>("/api/upload/auto", {
       method: "POST",
-      body: { filename, content, ...(forceType ? { forceType } : {}), ...(productName ? { productName } : {}) },
+      body: {
+        filename, content,
+        ...(forceType ? { forceType } : {}),
+        ...(productName ? { productName } : {}),
+        ...(keepOriginal ? { keepOriginal: true } : {}),
+      },
     }),
 };
 

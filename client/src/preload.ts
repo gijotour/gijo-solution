@@ -332,8 +332,8 @@ const gijoApi = {
   assetHubDetail: (id: string) => api.assetHubApi.detail(id),
   shadowAi: () => api.assetHubApi.shadowAi(),
   scanAsset: (id: string) => api.assetsApi.scan(id),
-  uploadAuto: (filename: string, content: string, forceType?: import("./apiClient").UploadType, productName?: string) =>
-    api.uploadApi.auto(filename, content, forceType, productName),
+  uploadAuto: (filename: string, content: string, forceType?: import("./apiClient").UploadType, productName?: string, keepOriginal?: boolean) =>
+    api.uploadApi.auto(filename, content, forceType, productName, keepOriginal),
   deleteAsset: (id: string) => api.assetsApi.remove(id),
   assetCoverage: () => api.assetsApi.coverage(),
   updateAssetOwnership: (id: string, patch: { owner?: string; service?: string | null }) =>

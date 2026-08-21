@@ -23,10 +23,13 @@ type 격리 =
   | { how: "each"; tests: string[] } // 쓰는 시험이 스스로 임시 경로로 돌린다
   | { how: "readonly"; why: string }; // 읽기만 해서 운영 데이터가 상하지 않는다
 
-// ★ 새 GIJO_*_DIR / *_PATH 를 만들었다면 여기에 한 줄 추가해야 시험이 통과한다.
+// ★ 새 GIJO_*_DIR / *_PATH / *_ROOT 를 만들었다면 여기에 한 줄 추가해야 시험이 통과한다.
 const 표: Record<string, 격리> = {
   GIJO_DB_PATH: { how: "config" },
   GIJO_DATASETS_DIR: { how: "config" },
+  // ⚠ ROOT로 끝나 예전 정규식(DIR|PATH)에 안 걸렸다 — 감시 밖이라 **표에도 없었다**(2026-08-22 발견).
+  //   이 값이 안 걸리면 문서 인입 시험이 실제 data/docs/{extracted,uploads}에 파일을 쓴다.
+  GIJO_INGEST_ROOT: { how: "config" },
   GIJO_ORCH_GOLD_PATH: { how: "config" },
   GIJO_REPORT_DIR: { how: "config" },
   GIJO_OUTPUTS_DIR: { how: "config" }, // ④의 수리(2026-08-12)
@@ -59,7 +62,9 @@ function 소스전체(): string {
   return 조각.join("\n");
 }
 
-const 발견 = [...new Set(소스전체().match(/process\.env\.GIJO_[A-Z0-9_]*(?:DIR|PATH)/g) ?? [])].map((s) =>
+// ⚠ ROOT를 2026-08-22에 더했다 — GIJO_INGEST_ROOT(문서 원본·추출본 보관 뿌리)가 DIR|PATH로 안 끝나
+//   감시를 통째로 비켜 갔다. 경로 env를 새로 만들 때 이름 끝을 무엇으로 짓든 걸리게 한다.
+const 발견 = [...new Set(소스전체().match(/process\.env\.GIJO_[A-Z0-9_]*(?:DIR|PATH|ROOT)/g) ?? [])].map((s) =>
   s.replace("process.env.", ""),
 );
 

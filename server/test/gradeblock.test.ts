@@ -227,6 +227,13 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     // ④ 업로드가 파일명을 basename으로 접는다 — 애초에 경로 든 documentId를 못 만들게(뿌리 차단)
     const ingest = memSrc.slice(memSrc.indexOf('"/api/memory/ingest-file"'), memSrc.indexOf('"/api/memory/ingest-file"') + 800);
     expect(ingest, "ingest-file이 파일명을 basename으로 안 접는다 — 경로 든 documentId 허용").toContain("path.basename(String(rawFilename))");
+    // ⑤ **두 번째 업로드 문(門)도 같이 접는다**(2026-08-22). ingest-file만 막고 uploadAuto를 열어 두면
+    //    같은 구멍이 콘솔 ＋ 창구로 다시 열린다 — 이번에 uploadAuto도 추출본(.md)을 쓰기 시작했으므로
+    //    경로 든 documentId가 basename 키잉과 어긋나면 남의 기밀 .md를 덮을 수 있다.
+    const autoSrc = fs.readFileSync(new URL("../src/engine/autoupload.ts", import.meta.url), "utf8");
+    const auto = autoSrc.slice(autoSrc.indexOf('"/api/upload/auto"'), autoSrc.indexOf('"/api/upload/auto"') + 1400);
+    expect(auto.length, "/api/upload/auto 라우트를 못 찾았다 — 시험이 헛돈다").toBeGreaterThan(0);
+    expect(auto, "uploadAuto가 파일명을 basename으로 안 접는다 — 경로 든 documentId가 .md 키잉과 어긋난다").toContain("path.basename(String(rawFilename))");
   });
 
   it("★ 등급은 서버가 읽는다 — 요청이 주장할 수 없다", () => {

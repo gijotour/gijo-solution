@@ -251,6 +251,14 @@
       ".cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel,#30302e);color:var(--muted,#b3ada4);",
       "border:1px solid var(--border-strong,rgba(255,255,255,.16));font-size:17px;line-height:1;cursor:pointer;}",
       ".cs-plus:hover{color:#fff;border-color:var(--blue,#3b82f6);background:rgba(59,130,246,.12);}",
+      // 원본 보관 토글(승인 시안 upload-md-convert ①) — ＋·입력칸과 같은 38px 줄에 끼워 **도크 높이를 안 늘린다**(59px 유지).
+      // 기본 꺼짐: 원본이 서버에 함부로 안 쌓이게(프라이버시 기본값). 켜면 호박색으로 바뀐다.
+      ".cs-srctog{flex:0 0 auto;display:flex;align-items:center;gap:6px;height:38px;padding:0 10px;border-radius:11px;",
+      "background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));cursor:pointer;}",
+      ".cs-srctog .tl{font-size:11.5px;font-weight:700;color:var(--muted,#b3ada4);white-space:nowrap;}",
+      ".cs-srctog.on{border-color:var(--amber,#f59e0b);background:rgba(245,158,11,.12);}",
+      ".cs-srctog.on .tl{color:var(--amber,#f59e0b);}",
+      ".cs-srctog .g-toggle.g-on{background:var(--amber,#f59e0b);}",
       ".cs-updec{margin-top:6px;}",
       ".cs-updec .h{font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;}",
       ".cs-updec .f{font-size:12.25px;color:var(--muted-2,#a49d95);margin-bottom:7px;}",
@@ -308,6 +316,12 @@
       '</div></div></div>' +
       '<div class="cs-dock">' +
         '<button class="cs-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>' +
+        // 원본 보관 토글 — 켜면 다음 업로드부터 원본 파일도 서버에 함께 남는다(추출본 .md는 항상 남는다).
+        '<span class="cs-srctog" id="srcToggleChip" role="switch" aria-checked="false" tabindex="0" ' +
+          'title="켜면 다음 업로드부터 원본 파일도 서버에 함께 보관합니다 — 추출한 텍스트(.md)는 켜든 끄든 항상 남습니다">' +
+          '<span class="g-toggle" id="srcToggle"><span class="k"></span></span>' +
+          '<span class="tl" id="srcTogLbl">원본 보관 꺼짐</span>' +
+        '</span>' +
         '<input id="chatInput" placeholder="지시를 입력하세요…" aria-label="지시를 입력하세요">' +
         '<button class="cs-send" id="dockSend">전송</button>' +
       "</div>" +
@@ -1777,10 +1791,24 @@
     return "장기기억 " + r.memory.chunks + "청크 수집" + (r.memory.docClass ? " · 분류 " + r.memory.docClass : "") +
       (r.memory.linkedProduct ? " · 제품 '" + r.memory.linkedProduct + "' 연결" : "") + " (" + r.reason + ")";
   }
-  async function handleUpload(name, b64, row, forceType, productName) {
+  // 보관 결과 안내 — ★ **요청값(keep)이 아니라 실제 저장 여부(r.savedOriginal·r.mdSaved)로만 말한다.**
+  //   토글을 켜도 취약점으로 반영되는 갈래(Nessus HTML·자동 vulnscan)는 문서 저장을 안 타서 원본이
+  //   안 남는다 — 「켰는데 안 남았다」가 조용히 지나가지 않게 그 경우를 분명히 말한다(정직 원칙).
+  function 보관안내(r, keep) {
+    if (r.savedOriginal) return "\n🗄 원본도 함께 보관했습니다 — 「내 문서」에서 원본 열기·추출본(.md) 보기가 됩니다.";
+    if (r.mdSaved) {
+      return "\n📄 추출한 텍스트(.md)를 보관했습니다 — 「내 문서」에서 보고 고칠 수 있습니다." +
+        (keep ? "\n⚠ 원본은 저장하지 못했습니다(보관 실패) — 서버 기록을 확인하세요." : " 원본은 서버에 남지 않았습니다(원본 보관 꺼짐).");
+    }
+    if (keep) return "\n⚠ 이 파일은 원본 보관 대상이 아닙니다 — 취약점으로 바로 반영되는 갈래라 문서로는 저장하지 않습니다.";
+    return "";
+  }
+  // keep(원본 보관 여부)은 **업로드를 시작한 순간의 값으로 파일마다 고정**한다 —
+  // 결정 카드를 띄워 둔 채 토글을 바꿔도 그 파일은 처음 의사대로 처리된다(기준이 흔들리지 않게).
+  async function handleUpload(name, b64, row, forceType, productName, keep) {
     var cm = row.querySelector(".cm");
     cm.textContent = name + " — " + (forceType ? "처리 중…" : "유형 판별·처리 중…");
-    var r = await window.gijo.uploadAuto(name, b64, forceType, productName);
+    var r = await window.gijo.uploadAuto(name, b64, forceType, productName, keep);
     // 확신이 낮으면 담당자에게 묻는다 — 잘못 분류해 조용히 넣는 것보다 한 번 묻는 편이 낫다.
     if (r.needsDecision && !forceType) {
       var wrap = document.createElement("div");
@@ -1799,29 +1827,63 @@
           var t = b.getAttribute("data-t");
           var pin = wrap.querySelector(".pn");
           var pname = PRODUCT_NAME_TYPES[t] && pin ? (pin.value.trim() || undefined) : undefined;
-          handleUpload(name, b64, row, t, pname).catch(function (e) { cm.textContent = name + " — 실패: " + e.message; });
+          handleUpload(name, b64, row, t, pname, keep).catch(function (e) { cm.textContent = name + " — 실패: " + e.message; });
         });
       });
       return;
     }
-    cm.textContent = name + " — " + uploadResultMsg(r);
+    cm.textContent = name + " — " + uploadResultMsg(r) + 보관안내(r, keep);
     // ➡ 반입 다음 칩(2026-08-19 사장님 QA) — 반입이 끝나면 다음 걸음을 칩으로 안내한다.
     var P2 = window.gijoChatParts;
     if (r.nextChips && P2 && P2.nextChips) P2.nextChips(row, r.nextChips, function (q) { submit(q); });
   }
+  // ── 원본 보관 토글 ───────────────────────────────────────────────
+  // 기본은 **꺼짐**이다(승인 시안 upload-md-convert §3-C·프라이버시 기본값) — 켜야만 원본이 서버에 남는다.
+  // 값은 기기 localStorage에 둔다(콘솔이 초안을 두는 방식과 같은 자리). 계정이 아니라 **이 기계** 기준이다.
+  var SRC_KEEP_KEY = "gijo.upload.keepOriginal";
+  function 원본보관켜짐() {
+    try { return localStorage.getItem(SRC_KEEP_KEY) === "1"; } catch (e) { return false; }
+  }
+  function 원본보관그리기() {
+    var chip = document.getElementById("srcToggleChip");
+    var tog = document.getElementById("srcToggle");
+    var lbl = document.getElementById("srcTogLbl");
+    if (!chip || !tog || !lbl) return;
+    var on = 원본보관켜짐();
+    chip.classList.toggle("on", on);
+    chip.setAttribute("aria-checked", on ? "true" : "false");
+    tog.classList.toggle("g-on", on);
+    lbl.textContent = on ? "원본 보관 켜짐" : "원본 보관 꺼짐";
+  }
+  function 원본보관뒤집기() {
+    try { localStorage.setItem(SRC_KEEP_KEY, 원본보관켜짐() ? "0" : "1"); } catch (e) { /* 저장 못해도 화면은 돈다 */ }
+    원본보관그리기();
+  }
+  function wireSrcToggle() {
+    var chip = document.getElementById("srcToggleChip");
+    if (!chip) return;
+    chip.addEventListener("click", 원본보관뒤집기);
+    chip.addEventListener("keydown", function (e) {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); 원본보관뒤집기(); } // 조합무관: 텍스트 칸이 아니라 스위치다(role=switch) — 글자를 안 받으므로 조합 상태가 없다
+    });
+    원본보관그리기();
+  }
   function wireUpload() {
     var btn = document.getElementById("dockUpload");
     var input = document.getElementById("csUploadInput");
+    wireSrcToggle();
     if (!btn || !input) return;
     btn.addEventListener("click", function () { input.click(); });
     input.addEventListener("change", async function () {
       var files = [].slice.call(input.files);
+      // 이번 묶음 전체가 같은 기준으로 처리되게, 토글 값을 **선택한 순간에 한 번** 읽는다.
+      var keep = 원본보관켜짐();
       for (var i = 0; i < files.length; i++) {
         var file = files[i];
         var row = append("event", { icon: "📥", name: "파일 올리기", message: file.name + " — 읽는 중…" });
         try {
           var b64 = await readB64(file);
-          await handleUpload(file.name, b64, row);
+          await handleUpload(file.name, b64, row, undefined, undefined, keep);
         } catch (e) {
           row.querySelector(".cm").textContent = file.name + " — 실패: " + ((e && e.message) || e);
         }

@@ -30,6 +30,9 @@ export default defineConfig({
       // 시험을 돌리면 merge.test.ts가 만든 설정 파일이 **운영 outputs/에 생겼다 지워졌다** 한다(2026-07-17 실사고).
       // merge.ts 쪽은 그때 env를 읽도록 고쳤는데 여기서 값을 안 걸어줘 반쪽만 수리돼 있었다(2026-08-12 발견).
       GIJO_OUTPUTS_DIR: "data/test-tmp/outputs",
+      // 문서 인입 뿌리 — 업로드 원본(docs/uploads)·추출본(docs/extracted)이 여기 밑에 쌓인다.
+      // 격리 안 하면 인입 시험이 실제 data/docs에 파일을 남긴다(2026-08-22, 원본 보관 토글 작업에서 발견).
+      GIJO_INGEST_ROOT: "data/test-tmp/ingest",
     },
     testTimeout: 15000, // 실 spawn 회피해도 연결 실패 폴백까지 여유(기본 5s는 부하 시 빠듯).
   },
