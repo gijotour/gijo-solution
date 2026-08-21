@@ -790,6 +790,9 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
         '<button data-act="rag">' + (doc.ragOptIn ? "AI 제외" : "AI 포함") + "</button>" +
         '<button data-act="share">' + (doc.shared ? "공유 해제" : "🏢 공유") + "</button>" +
         '<button data-act="down">⬇ .md 내려받기</button>' +
+        // 내보내기(2026-08-21) — 다듬은 문서를 밖으로 전달할 형식. 서버 리포트 엔진 재사용.
+        '<button data-act="pdf">⬇ PDF</button>' +
+        '<button data-act="word">⬇ Word</button>' +
         '<button data-act="del" class="warn">✕ 삭제</button>' +
         "</div>";
     } else if (탭 === "guide") {
@@ -849,6 +852,22 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
         if (window.gijoTell) window.gijoTell("「" + doc.title + ".md」를 내려받습니다 — 다운로드 폴더를 확인하세요.\n다듬은 뒤 📥 가져오기로 되담으면 됩니다.");
+        return;
+      } else if (act === "pdf" || act === "word") {
+        // 내보내기(2026-08-21) — 서버 리포트 엔진이 base64로 만들어 준다. 밖으로 전달할 형식.
+        try {
+          var r = await window.gijo.personalDocsExport(doc.id, act === "pdf" ? "pdf" : "docx");
+          var bytes = Uint8Array.from(atob(r.base64), function (c) { return c.charCodeAt(0); });
+          var url2 = URL.createObjectURL(new Blob([bytes], { type: r.mime }));
+          var a2 = document.createElement("a");
+          a2.href = url2; a2.download = r.fileName;
+          document.body.appendChild(a2); a2.click(); a2.remove();
+          setTimeout(function () { URL.revokeObjectURL(url2); }, 8000);
+          if (window.gijoTell) window.gijoTell("「" + r.fileName + "」를 내려받습니다 — 다운로드 폴더를 확인하세요.");
+        } catch (e) {
+          // PDF 변환기가 없는 환경(503) 등 — 정직하게 사유를 보여 준다.
+          if (window.gijoTell) window.gijoTell("내보내기 실패 — " + ((e && (e.message || e.error)) || "잠시 후 다시 시도하거나 Word로 받아 주세요."));
+        }
         return;
       } else if (act === "del") {
         var ok = window.gijoAsk ? await window.gijoAsk("「" + doc.title + "」을 삭제할까요?\nAI 지식에 실려 있으면 함께 회수됩니다.") : false;

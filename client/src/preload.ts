@@ -39,6 +39,7 @@ const gijoApi = {
   personalDocsUpdate: (id: string, b: { title: string; body: string }) => api.personalDocsApi.update(id, b),
   personalDocsRag: (id: string, on: boolean) => api.personalDocsApi.setRag(id, on),
   personalDocsShare: (id: string, on: boolean) => api.personalDocsApi.setShared(id, on), // 위치 인자(객체면 500)
+  personalDocsExport: (id: string, fmt: "docx" | "pdf") => api.personalDocsApi.export(id, fmt), // 위치 인자
   personalDocsDelete: (id: string) => api.personalDocsApi.remove(id),
   docRequestBuild: (input: Parameters<typeof api.docRequestApi.build>[0]) => api.docRequestApi.build(input),
   docRequestList: () => api.docRequestApi.list(),

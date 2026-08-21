@@ -196,6 +196,9 @@ export const personalDocsApi = {
   setShared: (id: string, on: boolean) =>
     request<PersonalDoc>(`/api/personaldocs/${encodeURIComponent(id)}/share`, { method: "POST", body: { on } }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/personaldocs/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  // 내보내기(2026-08-21) — 서버가 base64로 문서를 만들어 준다(렌더러가 blob 저장). 문서핵심④.
+  export: (id: string, fmt: "docx" | "pdf") =>
+    request<{ fileName: string; mime: string; base64: string }>(`/api/personaldocs/${encodeURIComponent(id)}/export?fmt=${fmt}`),
 };
 
 export type GuardMode = "off" | "flag" | "block";
