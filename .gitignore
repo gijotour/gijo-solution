@@ -67,3 +67,6 @@ server/unsloth_compiled_cache/
 
 # 지식 번들 서명 개인키가 실수로라도 들어오지 않게(정상 위치는 저장소 밖 D:\GIJO-AS-signing)
 *.private.pem
+
+# 실측용 외부 자료(타사 매뉴얼 등) — 저작권상 저장소에 담지 않는다(2026-08-21)
+testdata/
