@@ -520,8 +520,11 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   return filtered;
 }
 
-/** 글자로 그냥 읽으면 안 되는(추출이 필요한) 형식 — 그대로 읽으면 압축 바이트가 지식이 된다. */
-const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx"]);
+/** 글자로 그냥 읽으면 안 되는(추출이 필요한) 형식 — 그대로 읽으면 압축 바이트가 지식이 된다.
+ *  ⚠ 이미지(스캔 문서)는 extract_doc.py가 OCR로 읽는다(2026-08-21). ⚠ 같은 목록이 docsbundle.ts:99에도
+ *   있다 — 한쪽만 고치면 번들 인입이 이미지를 바이트로 읽는다(설계관 지적, 73% 쓰레기 사고 재현). 둘 다. */
+const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx",
+  ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"]);
 
 /**
  * 위생 필터를 거치기 **전** 원문이 몇 조각짜리인지 — 인입 품질 판정의 분모.

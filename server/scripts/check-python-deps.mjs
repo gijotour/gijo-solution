@@ -46,8 +46,10 @@ function 서버파이썬() {
   return null;
 }
 
-/** requirements.txt → 모듈 이름. 배포명과 import명이 다른 것만 표로 옮긴다. */
-const IMPORT_NAME = { "opencv-python": "cv2", "pillow": "PIL", "pyyaml": "yaml" };
+/** requirements.txt → 모듈 이름. 배포명과 import명이 다른 것만 표로 옮긴다.
+ *  ⚠ 이 검사는 requirements.txt만 읽는다(OCR은 requirements-ocr.txt로 옵션이라 여기서 강제 안 함).
+ *   pymupdf→fitz 매핑은 pythondeps.test와 표를 맞추려 함께 둔다(pymupdf가 requirements.txt에 들어올 때 대비). */
+const IMPORT_NAME = { "opencv-python": "cv2", "pillow": "PIL", "pyyaml": "yaml", "pymupdf": "fitz" };
 function 요구모듈() {
   const p = path.join(서버루트, "requirements.txt");
   if (!fs.existsSync(p)) return [];

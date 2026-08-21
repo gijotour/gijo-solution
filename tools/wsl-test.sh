@@ -34,7 +34,7 @@ mkdir -p "$DST"
 rsync -a --delete \
   --include='src/***' --include='test/***' --include='scripts/***' \
   --include='package.json' --include='package-lock.json' --include='tsconfig.json' \
-  --include='vitest.config.*' --include='requirements.txt' --include='modelscan_wrapper.py' \
+  --include='vitest.config.*' --include='requirements.txt' --include='requirements-ocr.txt' --include='modelscan_wrapper.py' \
   --include='docs-manifest.json' --include='docs/***' \
   --exclude='*' \
   "$SRC/" "$DST/" || { echo "✗ server 동기화 실패"; exit 1; }

@@ -20,6 +20,70 @@ def extract_pdf(path: str) -> str:
     return "\n".join((p.extract_text() or "") for p in reader.pages)
 
 
+# ── OCR — 스캔 PDF·이미지 한국어 (옵션, 2026-08-21 사장님 「OCR 포함 끝까지」) ────────────
+#   엔진: RapidOCR(onnxruntime) + PP-OCRv5 한국어. ⚠ PP-OCRv6는 한국어 미지원이라 **v5로 핀 고정**
+#   (실측: 기본 v6는 한글 0줄). requirements-ocr.txt(옵션)로 설치 — 없으면 정직하게 거절/degrade.
+#   ⚠ RapidOCR·PyMuPDF가 stdout에 로그를 찍는다 — 추출 텍스트(stdout)가 오염되지 않게 OCR 동안엔
+#     stdout을 stderr로 돌린다(contextlib.redirect_stdout). dataset.ts는 stdout만 텍스트로 읽는다.
+import contextlib
+
+IMG_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"}
+OCR_MAX_PAGES = 30   # 스캔 PDF OCR 상한 — 수십 쪽이 요청을 오래 붙잡지 않게(execFile 타임아웃 없음)
+OCR_MIN_TEXT = 20    # pypdf 추출이 이보다 짧으면 스캔으로 보고 OCR 폴백
+_OCR = None
+
+
+def _ocr_engine():
+    global _OCR
+    if _OCR is None:
+        import logging
+        logging.getLogger("RapidOCR").setLevel(logging.ERROR)  # stderr 로그 소음 줄이기
+        from rapidocr import RapidOCR
+        from rapidocr.utils.typings import OCRVersion, LangRec, ModelType
+        _OCR = RapidOCR(params={
+            "Det.ocr_version": OCRVersion.PPOCRV5, "Det.model_type": ModelType.MOBILE,
+            "Rec.ocr_version": OCRVersion.PPOCRV5, "Rec.lang_type": LangRec.KOREAN, "Rec.model_type": ModelType.MOBILE,
+        })
+    return _OCR
+
+
+def _ocr_lines(result) -> str:
+    return "\n".join(result.txts) if result and getattr(result, "txts", None) else ""
+
+
+def ocr_image(path: str) -> str:
+    with contextlib.redirect_stdout(sys.stderr):  # 라이브러리 stdout 프린트를 텍스트에서 격리
+        return _ocr_lines(_ocr_engine()(path))
+
+
+def ocr_pdf(path: str) -> str:
+    import fitz  # pymupdf — 페이지를 이미지로 렌더(poppler 불필요)
+    import tempfile
+    import shutil
+    with contextlib.redirect_stdout(sys.stderr):
+        eng = _ocr_engine()
+        doc = fitz.open(path)
+        total = len(doc)
+        tmpdir = tempfile.mkdtemp(prefix="gijo-ocr-")
+        parts = []
+        try:
+            for i in range(min(total, OCR_MAX_PAGES)):
+                pix = doc[i].get_pixmap(dpi=300)
+                img_path = os.path.join(tmpdir, f"p{i}.png")
+                pix.save(img_path)
+                parts.append(_ocr_lines(eng(img_path)))
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+    text = "\n".join(p for p in parts if p)
+    if total > OCR_MAX_PAGES:
+        text += f"\n\n(⚠ 스캔 문서 {total}쪽 중 앞 {OCR_MAX_PAGES}쪽만 읽었습니다.)"
+    return text
+
+
+OCR_MISSING_MSG = ("이 파일은 스캔·이미지 문서라 글자를 읽으려면 OCR 구성요소가 필요합니다 — "
+                   "서버에 OCR을 설치해 주세요(server/requirements-ocr.txt). 관리자에게 문의하세요.")
+
+
 def extract_hwpx(path: str) -> str:
     # HWPX는 OWPML 포맷의 zip. Contents/section*.xml 안의 <hp:t> 텍스트를 모은다.
     z = zipfile.ZipFile(path)
@@ -100,6 +164,29 @@ def main() -> None:
     try:
         if ext == ".pdf":
             text = extract_pdf(path)
+            # 스캔(이미지-only) PDF — pypdf가 글자를 거의 못 뽑으면 OCR로 폴백.
+            # ⚠ OCR 미설치면 pypdf 결과(빈/짧음)로 degrade — PDF를 하드-실패시키지 않는다(설계관 지적:
+            #   기존 텍스트 PDF 추출을 회귀시키면 안 된다). 이미지-only만 아래에서 정직 거절한다.
+            if len(text.strip()) < OCR_MIN_TEXT:
+                try:
+                    ocr_text = ocr_pdf(path)
+                    if ocr_text.strip():
+                        text = ocr_text
+                except ImportError:
+                    pass  # OCR 미설치 — pypdf 결과 유지(빈 텍스트면 아래 ingestText가 「못 읽음」 처리)
+                except Exception as e:  # noqa
+                    print(f"WARN: OCR 폴백 실패({os.path.basename(path)}): {e}", file=sys.stderr)
+        elif ext in IMG_EXTS:
+            # 이미지 = 스캔 문서 — OCR이 유일한 길이라 미설치면 정직 거절(exit 2).
+            try:
+                text = ocr_image(path)
+            except ImportError:
+                print(f"ERROR: {OCR_MISSING_MSG}", file=sys.stderr)
+                sys.exit(2)
+            if not text.strip():
+                print(f"ERROR: 이미지에서 글자를 찾지 못했습니다: {os.path.basename(path)} "
+                      f"(글자가 없거나 너무 흐립니다)", file=sys.stderr)
+                sys.exit(2)
         elif ext == ".hwpx":
             text = extract_hwpx(path)
         elif ext == ".docx":
@@ -117,7 +204,7 @@ def main() -> None:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 text = f.read()
         else:
-            print(f"ERROR: 지원하지 않는 형식입니다: {ext} (지원: pdf, hwpx, docx, pptx, xlsx, txt, md, csv, log)", file=sys.stderr)
+            print(f"ERROR: 지원하지 않는 형식입니다: {ext} (지원: pdf, hwpx, docx, pptx, xlsx, txt, md, csv, log, 이미지 png/jpg/tiff/bmp/webp)", file=sys.stderr)
             sys.exit(2)
     except Exception as e:  # noqa
         print(f"ERROR: 추출 실패: {e}", file=sys.stderr)

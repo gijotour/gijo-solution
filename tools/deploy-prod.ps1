@@ -33,7 +33,11 @@ npm test 2>&1 | Select-Object -Last 6
 if ($LASTEXITCODE -ne 0) { throw "테스트 실패 — 배포 중단" }
 
 Step "3/5 WSL 운영 서버로 소스 동기화 + 빌드"
-wsl -d $distro -- bash -c "rsync -a --delete '/mnt/d/Connect AI/server/src/' '$wslServer/src/' && cd '$wslServer' && npx tsc -p tsconfig.json && echo BUILD_OK"
+# ⚠ src/뿐 아니라 **scripts/·requirements**도 옮긴다(2026-08-21 설계관 지적). 예전엔 src/만 옮겨
+#   scripts/extract_doc.py(파이썬 추출기·OCR)를 고쳐도 운영은 옛 스크립트로 돌았다 — 「배포는 됐는데
+#   운영은 옛 코드」의 급소. requirements-ocr.txt(옵션 OCR)도 옮기되 설치는 자동 안 함(무겁다 —
+#   OCR을 켤 때만 수동: cd server && venv/bin/pip install -r requirements-ocr.txt). copy-assets도 함께.
+wsl -d $distro -- bash -c "rsync -a --delete '/mnt/d/Connect AI/server/src/' '$wslServer/src/' && rsync -a '/mnt/d/Connect AI/server/scripts/' '$wslServer/scripts/' && cp '/mnt/d/Connect AI/server/requirements.txt' '$wslServer/' && cp '/mnt/d/Connect AI/server/requirements-ocr.txt' '$wslServer/' && cd '$wslServer' && npx tsc -p tsconfig.json && node scripts/copy-assets.mjs && echo BUILD_OK"
 if ($LASTEXITCODE -ne 0) { throw "WSL 동기화/빌드 실패 — 배포 중단 (운영은 아직 이전 코드로 구동 중)" }
 
 # ⚠ 문서도 함께 옮긴다(2026-08-08 실사고). 예전엔 소스만 옮겨서, 문서를 고쳐도 운영 AI는

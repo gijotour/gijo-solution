@@ -40,4 +40,13 @@ describe("문서 추출 — OOXML(docx·pptx·xlsx, 의존성 0)", () => {
     await expect(extractDocumentText("옛문서.doc", b64("tiny.docx"))).rejects.toThrow(/docx/);
     await expect(extractDocumentText("옛문서.hwp", b64("tiny.docx"))).rejects.toThrow(/hwpx/);
   });
+
+  // 이미지(스캔 문서)는 OCR로 간다(2026-08-21 사장님 「OCR 포함」). ⚠ 실제 한국어 OCR은 라이브로
+  //  검증했다(SolidStep 스캔 페이지→한국어 55줄, 1.6초) — 무거운 옵션 의존이라 표준 시험 환경엔
+  //  안 깔린다. 여기서는 **조용히 삼키지 않는가**만 본다: OCR 미설치면 「OCR 필요」로, 설치돼도
+  //  빈 이미지면 「글자 못 찾음」으로 **거절**한다(둘 다 이미지 바이트를 지식으로 만들지 않는다).
+  it("이미지(스캔)는 OCR 경로로 가고, 못 읽으면 정직하게 거절한다(바이트를 지식으로 안 만든다)", async () => {
+    const png1x1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    await expect(extractDocumentText("스캔.png", png1x1)).rejects.toThrow(/OCR|글자를 찾지 못/);
+  });
 });

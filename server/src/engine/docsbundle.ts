@@ -95,8 +95,10 @@ async function resolveDocPath(file: string): Promise<string | null> {
 const hashOf = (raw: string) => createHash("sha256").update(raw, "utf8").digest("hex").slice(0, 16);
 const HASH_KEY = (docId: string) => `docsbundle:hash:${docId}`;
 
-/** 글자로 그냥 읽으면 안 되는 형식 — memory.ingestDocument와 같은 목록을 본다. */
-const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx"]);
+/** 글자로 그냥 읽으면 안 되는 형식 — memory.ingestDocument와 같은 목록을 본다(이미지=OCR, 2026-08-21).
+ *  ⚠ memory.ts:524와 **같은 값**이어야 한다 — 한쪽만 고치면 번들 인입이 이미지를 바이트로 읽는다. */
+const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx",
+  ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"]);
 
 /**
  * 번들 문서 한 편을 **읽을 수 있는 글자로** 가져온다.

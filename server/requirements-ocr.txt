@@ -1,0 +1,14 @@
+# OCR — 스캔 PDF·이미지 한국어 (2026-08-21 사장님 「OCR 포함 끝까지」).
+#   ⚠ **옵션·무거움**(설치 ~480MB): 기본 requirements.txt와 분리해 옵트인으로 둔다.
+#   없으면 extract_doc.py가 이미지를 정직하게 거절하고, 스캔 PDF는 pypdf 결과로 degrade한다
+#   (기존 텍스트 PDF 추출은 회귀하지 않는다).
+#
+# 설치:  cd server && venv/bin/pip install -r requirements-ocr.txt
+#
+# ⚠ PP-OCRv6는 한국어 미지원 — extract_doc.py가 코드에서 **PP-OCRv5 한국어 모델을 핀 고정**한다.
+#   rapidocr major(4.x)가 v5를 떨구면 한국어가 깨지므로 <4로 막는다.
+# ⚠ 폐쇄망 배포: 한국어 v5 모델 3개(~19MB: ch_PP-OCRv5_det_mobile·korean_PP-OCRv5_rec_mobile·cls)를
+#   설치본 venv에 미리 담아야 런타임 다운로드 없이 돈다(운영은 배포 때 인터넷으로 1회 받는다).
+rapidocr>=3.9,<4
+onnxruntime>=1.19
+pymupdf>=1.24

@@ -73,14 +73,22 @@ function 외부모듈(py: string): string[] {
 }
 
 function 선언된것(): Set<string> {
-  const p = path.join(서버루트, "requirements.txt");
-  const 표: Record<string, string> = { "opencv-python": "cv2", pillow: "PIL", pyyaml: "yaml" };
+  // ⚠ requirements.txt(필수)와 **requirements-ocr.txt(옵션·OCR)** 둘 다 읽는다(2026-08-21 설계관 지적):
+  //   OCR 라이브러리(fitz·rapidocr)를 extract_doc.py가 import하는데, requirements.txt에 넣으면
+  //   check-python-deps가 OCR을 「강제」로 봐(옵션이 아니게) WSL·라이트에서 실패한다. 그래서 별
+  //   파일에 두되, **이 소스 감시는 두 파일을 합쳐** 봐서 「쓰는데 안 적힌 것」만 잡는다.
+  //   (check-python-deps.mjs는 requirements.txt만 읽어 OCR을 옵션으로 남긴다 — 비대칭이 핵심.)
+  const 표: Record<string, string> = { "opencv-python": "cv2", pillow: "PIL", pyyaml: "yaml", pymupdf: "fitz" };
   const s = new Set<string>();
-  for (const l of fs.readFileSync(p, "utf8").split("\n")) {
-    const pkg = l.replace(/#.*$/, "").trim().split(/[=<>!~[\s]/)[0].trim();
-    if (!pkg) continue;
-    s.add(pkg.replace(/-/g, "_"));
-    if (표[pkg.toLowerCase()]) s.add(표[pkg.toLowerCase()]);
+  for (const 파일 of ["requirements.txt", "requirements-ocr.txt"]) {
+    const p = path.join(서버루트, 파일);
+    if (!fs.existsSync(p)) continue;
+    for (const l of fs.readFileSync(p, "utf8").split("\n")) {
+      const pkg = l.replace(/#.*$/, "").trim().split(/[=<>!~[\s]/)[0].trim();
+      if (!pkg) continue;
+      s.add(pkg.replace(/-/g, "_"));
+      if (표[pkg.toLowerCase()]) s.add(표[pkg.toLowerCase()]);
+    }
   }
   return s;
 }
