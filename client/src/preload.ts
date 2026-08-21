@@ -395,7 +395,7 @@ const gijoApi = {
 
   // 장기 기억(RAG) / 파인튜닝(학습)
   ingestDocument: (path: string, scope?: string) => api.memoryApi.ingest(path, scope),
-  ingestMemoryFile: (filename: string, content: string, scope?: string) => api.memoryApi.ingestFile(filename, content, scope),
+  ingestMemoryFile: (filename: string, content: string, scope?: string, keepOriginal?: boolean) => api.memoryApi.ingestFile(filename, content, scope, keepOriginal),
   setDocCategory: (documentId: string, category: string) => api.memoryApi.setDocumentCategory(documentId, category),
   setAssetDisplayName: (id: string, displayName: string | null) => api.assetHubApi.setDisplayName(id, displayName),
   saveIngestReport: (input: Parameters<typeof api.ingestReportApi.save>[0]) => api.ingestReportApi.save(input),
@@ -424,6 +424,9 @@ const gijoApi = {
     const f = await api.memoryApi.documentFile(documentId);
     return ipcRenderer.invoke("doc:open-temp", f.filename, f.content) as Promise<{ path: string }>;
   },
+  // 추출본(.md) 보기/고치기 — 「내 문서」 상세의 .md 뷰어·편집용(문서관리 통합).
+  memoryDocumentMarkdown: (documentId: string) => api.memoryApi.documentMarkdown(documentId),
+  saveMemoryDocumentMarkdown: (documentId: string, text: string) => api.memoryApi.documentMarkdownSave(documentId, text),
 
   // 선택적 클라우드 LLM 하이브리드(Gemini/Claude/OpenAI) — 기본 OFF·admin 설정, egress 게이트 통과분만.
   cloudStatus: () => api.cloudApi.status(),

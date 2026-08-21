@@ -50,8 +50,8 @@ export const handoverApi = {
 export const memoryApi = {
   ingest: (path: string, scope?: string) =>
     request<IngestResult>("/api/memory/ingest", { method: "POST", body: { path, scope } }),
-  ingestFile: (filename: string, content: string, scope?: string) =>
-    request<IngestResult>("/api/memory/ingest-file", { method: "POST", body: { filename, content, scope } }),
+  ingestFile: (filename: string, content: string, scope?: string, keepOriginal?: boolean) =>
+    request<IngestResult>("/api/memory/ingest-file", { method: "POST", body: { filename, content, scope, keepOriginal } }),
   query: (question: string, topK?: number, agentId?: string) =>
     request<string[]>("/api/memory/query", { method: "POST", body: { question, topK, agentId } }),
   // 올린 문서 관리(장기기억) — 목록·조각 미리보기·삭제.
@@ -73,6 +73,11 @@ export const memoryApi = {
   // 서버에 보관된 업로드 원본(base64) — "원본 열기"용.
   documentFile: (documentId: string) =>
     request<{ filename: string; content: string }>("/api/memory/document/file", { method: "POST", body: { documentId } }),
+  // 추출한 텍스트(.md) 보기/고치기 — 「내 문서」에서 AI가 실제로 뽑은 내용을 확인·수정(투명성·반입 신뢰도).
+  documentMarkdown: (documentId: string) =>
+    request<{ documentId: string; text: string; source: string }>("/api/memory/document/markdown", { method: "POST", body: { documentId } }),
+  documentMarkdownSave: (documentId: string, text: string) =>
+    request<{ documentId: string; chunks: number }>("/api/memory/document/markdown/save", { method: "POST", body: { documentId, text } }),
   // 지식베이스 위생 점검(상충·중복·신선도) — 삭제는 하지 않고 리포트만.
   hygiene: () => request<KbHygieneReport>("/api/kb-hygiene"),
   hygieneScan: () => request<KbHygieneReport>("/api/kb-hygiene/scan", { method: "POST" }),
