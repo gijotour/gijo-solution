@@ -55,6 +55,38 @@ const upsertDocMetaStmt = db.prepare(
      category=COALESCE(excluded.category, memory_documents.category),
      origin=COALESCE(excluded.origin, memory_documents.origin)`
 );
+/** 남의 개인 문서(personal:*)인가 — 목록·조각·파일 창구 공용 판별.
+ *  공유된 것만 예외. 판별 불가(무기명)는 가리는 쪽 — 격리는 언제나 fail-closed. */
+export function 남의개인문서인가공용(documentId: string, req: import("express").Request): boolean {
+  if (!documentId.startsWith("personal:")) return false;
+  const 공유 = db.prepare("SELECT shared FROM personal_docs WHERE id = ?").get(documentId.slice("personal:".length)) as { shared?: number } | undefined;
+  if (공유?.shared === 1) return false;
+  const me = (req as import("express").Request & { user?: { id?: string | number; username?: string } }).user;
+  const myId = me?.id != null ? String(me.id) : (me?.username ?? null);
+  if (!myId) return true;
+  const row = db.prepare("SELECT uploadedBy FROM memory_documents WHERE documentId = ?").get(documentId) as { uploadedBy?: string | null } | undefined;
+  return String(row?.uploadedBy ?? "") !== myId;
+}
+
+/** 이 요청자가 이 문서를 열람할 수 없는가 — 개인 격리 + 등급(C/S/O)의 **단일 잣대**.
+ *
+ *  ⚠ 2026-08-22에 라우트 안 지역 함수에서 **모듈 수준으로 올렸다.** 지역에 있으니 업로드
+ *    창구(autoupload.ts)가 부를 수 없었고, 그래서 「같은 이름으로 올리면 남의 기밀 문서의
+ *    추출본·조각이 덮인다」가 열려 있었다(검토관 2026-08-22 [높음] 확정). 잣대를 새로 만들지
+ *    않고 있던 것을 올려서 쓴다 — 같은 것을 두 곳에 적으면 반드시 어긋난다.
+ */
+export function 열람불가공용(documentId: string, req: import("express").Request): boolean {
+  if (남의개인문서인가공용(documentId, req)) return true;
+  const who = (req as import("express").Request & { user?: { clearance?: string | null } }).user;
+  const meta = getDocMetaStmt.get(documentId) as { grade?: string | null } | undefined;
+  if (!meta) return false; // 없는 문서는 각 라우트가 제 방식으로 404를 낸다
+  return blockedGrades(clearanceOf(who?.clearance)).includes(gradeOf(meta.grade));
+}
+
+// ⚠ 위 upsert가 sourcePath를 COALESCE로 지키기 때문에(원본을 안 넘기는 인입 경로가 옛 원본을
+//   지우지 않게 하려는 의도) 「원본 보관 끄기」는 **명시적으로 비우는 길**이 따로 있어야 한다.
+//   saveDocArtifacts가 파일을 지울 때 함께 부른다(2026-08-22 검토관 확정 수리).
+const clearSourcePathStmt = db.prepare(`UPDATE memory_documents SET sourcePath=NULL WHERE documentId=?`);
 /** origin='builtin'인 문서 id 집합 — 검색 재정렬용. 한 번 조회해 부스트에 쓴다. */
 const builtinDocIdsStmt = db.prepare("SELECT documentId FROM memory_documents WHERE origin = 'builtin'");
 export function builtinDocumentIds(): Set<string> {
@@ -315,9 +347,9 @@ export async function saveDocArtifacts(opts: {
   }
   let originalSaved = false;
   let sourcePath: string | undefined;
+  const uploadsDir = path.join(INGEST_ROOT, "docs", "uploads");
   if (opts.keepOriginal && opts.contentBase64) {
     try {
-      const uploadsDir = path.join(INGEST_ROOT, "docs", "uploads");
       await fs.mkdir(uploadsDir, { recursive: true });
       const 저장경로 = path.join(uploadsDir, 이름);
       await fs.writeFile(저장경로, Buffer.from(opts.contentBase64, "base64"));
@@ -325,6 +357,19 @@ export async function saveDocArtifacts(opts: {
       originalSaved = true;
     } catch (saveErr) {
       console.warn(`[memory] 원본 보관 실패(${이름}): ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+    }
+  } else {
+    // ★ 「보관 안 함」을 골랐으면 **예전에 남긴 원본도 치운다**(검토관 2026-08-22 확정).
+    //   같은 이름으로 다시 올릴 때 토글을 꺼도 옛 원본이 그대로 남아 화면은 「원본은 서버에
+    //   남지 않았습니다」라고 말했다 — 프라이버시 기본값을 내세우는 기능이 정반대로 도는 자리였다.
+    //   ⚠ 파일만 지우면 안 된다. sourcePath가 남아 hasSource=true인 채 「원본 열기」가 404가 되어
+    //     거짓이 자리만 옮긴다. upsert가 COALESCE로 옛 값을 되살리므로 여기서 **명시적으로 비운다**.
+    try {
+      const 옛경로 = path.join(uploadsDir, 이름);
+      await fs.rm(옛경로, { force: true });
+      clearSourcePathStmt.run(이름);
+    } catch (rmErr) {
+      console.warn(`[memory] 옛 원본 정리 실패(${이름}): ${rmErr instanceof Error ? rmErr.message : String(rmErr)}`);
     }
   }
   return { mdSaved, originalSaved, sourcePath };
@@ -1292,6 +1337,16 @@ export async function deleteDocument(documentId: string, withFile = false): Prom
       console.warn(`[memory] 원본 파일 삭제 실패(${meta.sourcePath}): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
+  if (withFile) {
+    // ★ 추출본(.md)도 함께 지운다(2026-08-22 검토관 확정). 감사 기록이 「원본 파일까지
+    //   삭제(복구 불가)」라고 남기는데 AI가 읽은 글이 디스크에 그대로 있으면 그 기록이 거짓이다.
+    //   같은 이름으로 다시 올릴 때 **옛 추출본이 새 문서의 내용으로 보이는** 문제도 여기서 닫힌다.
+    try {
+      await fs.rm(path.join(INGEST_ROOT, "docs", "extracted", path.basename(documentId) + ".md"), { force: true });
+    } catch (err) {
+      console.warn(`[memory] 추출본 삭제 실패(${documentId}): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
   deleteDocMetaStmt.run(documentId);
   return { documentId, deletedChunks, deletedFile };
 }
@@ -1354,6 +1409,11 @@ export function registerMemoryRoutes(app: Express): void {
       //   키잉돼(전체 documentId로 보는 등급 검사와 어긋나) O등급 사용자가 남의 기밀 .md를 읽거나 덮는
       //   통로가 된다(검토관 2026-08-22 재검토 [중] 확정). documentId=basename로 못박아 .md ↔ 문서 1:1.
       const filename = path.basename(String(rawFilename));
+      // ★ 볼 수 없는 문서는 덮어쓸 수도 없다 — upload/auto 창구와 **같은 잣대**(2026-08-22 검토관).
+      if (열람불가(filename, req)) {
+        res.status(403).json({ error: "같은 이름의 문서가 이미 있고, 그 문서를 열람할 권한이 없습니다 — 다른 이름으로 올리세요" });
+        return;
+      }
       try {
         const { extractDocumentText } = await import("./dataset.js");
         const text = await extractDocumentText(filename, content);
@@ -1427,26 +1487,11 @@ export function registerMemoryRoutes(app: Express): void {
   // 남의 개인 문서(personal:*)인가 — 목록·조각 라우트 공용 판별(검토관 2026-08-20 상3:
   // 검색은 hiddenDocIds가 막는데 이 두 창구로 목록·본문 50조각이 그대로 새고 있었다).
   // 공유된 것만 예외. 판별 불가(무기명)는 가리는 쪽 — 격리는 언제나 fail-closed.
-  const 남의개인문서인가 = (documentId: string, req: import("express").Request): boolean => {
-    if (!documentId.startsWith("personal:")) return false;
-    const 공유 = db.prepare("SELECT shared FROM personal_docs WHERE id = ?").get(documentId.slice("personal:".length)) as { shared?: number } | undefined;
-    if (공유?.shared === 1) return false;
-    const me = (req as import("express").Request & { user?: { id?: string | number; username?: string } }).user;
-    const myId = me?.id != null ? String(me.id) : (me?.username ?? null);
-    if (!myId) return true;
-    const row = db.prepare("SELECT uploadedBy FROM memory_documents WHERE documentId = ?").get(documentId) as { uploadedBy?: string | null } | undefined;
-    return String(row?.uploadedBy ?? "") !== myId;
-  };
+  const 남의개인문서인가 = 남의개인문서인가공용;
   // 이 요청자가 이 문서를 열람할 수 없는가 — 개인 격리 + 등급(C/S/O)을 한 곳에서 판단한다.
   //   검색은 hiddenDocIds가 막지만, 직접-열람 라우트(목록·조각·추출본·원본)엔 등급 검사가 빠져
   //   기밀(C) 문서가 파일 창구로 샜다(설계관 2026-08-22 적발). 잣대는 grades.ts 하나로 모은다.
-  const 열람불가 = (documentId: string, req: import("express").Request): boolean => {
-    if (남의개인문서인가(documentId, req)) return true;
-    const who = (req as import("express").Request & { user?: { clearance?: string | null } }).user;
-    const meta = getDocMetaStmt.get(documentId) as { grade?: string | null } | undefined;
-    if (!meta) return false; // 없는 문서는 각 라우트가 제 방식으로 404를 낸다
-    return blockedGrades(clearanceOf(who?.clearance)).includes(gradeOf(meta.grade));
-  };
+  const 열람불가 = 열람불가공용;
   app.get(
     "/api/memory/documents",
     authMiddleware,

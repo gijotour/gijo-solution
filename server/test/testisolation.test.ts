@@ -44,6 +44,8 @@ const 표: Record<string, 격리> = {
   GIJO_DOCS_DIR: { how: "each", tests: ["docsbundle.test.ts", "packageddatapath.test.ts"] },
   GIJO_DB_KEY_PATH: { how: "each", tests: ["dbkey.test.ts", "dbencrypt.test.ts"] },
 
+  GIJO_SERVER_ROOT: { how: "readonly", why: "파이썬 스크립트 자리를 **찾기만** 한다 — 시험은 그 뿌리에 아무것도 안 쓴다(설정 안 하면 cwd)" },
+
   GIJO_TLS_CERT_PATH: { how: "readonly", why: "인증서를 읽기만 한다 — 시험은 HTTPS를 안 켠다" },
   GIJO_TLS_KEY_PATH: { how: "readonly", why: "개인키를 읽기만 한다 — 시험은 HTTPS를 안 켜서 파일을 만들지도 지우지도 않는다" },
   GIJO_LLAMA_CPP_DIR: { how: "readonly", why: "실행파일 위치만 찾는다 — 시험에서는 spawn 자체를 막아 둔다" },

@@ -12,7 +12,7 @@ import { emitCollaboration } from "./collaboration";
 import { ingestAnalysisFile, detectIngestKind } from "./analysishub";
 import { importVulnScan, parseNessusHtml } from "./vulnscan";
 import { importManual, classifyManual, listProducts, guessProductName } from "./securityproducts";
-import { ingestText, GLOBAL_SCOPE, saveDocArtifacts } from "./memory";
+import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, 열람불가공용 } from "./memory";
 
 // 사용자가 결정창에서 고를 수 있는 유형(파일명으로 애매할 때).
 //
@@ -48,8 +48,12 @@ export interface AutoUploadResult {
    *  원본도 추출본도 만들지 않는다. 화면이 「보관했습니다」를 **요청값이 아니라 이 값으로만**
    *  말하게 해서 「켰는데 안 남았다」가 조용히 지나가지 않게 한다(정직 원칙). */
   savedOriginal?: boolean;
-  /** 추출본(.md) 실제 저장 여부 — 「내 문서」의 추출본 보기가 되는지와 1:1로 대응한다. */
+  /** 추출본(.md) 실제 저장 여부 — 파일이 생겼는지만 뜻한다. */
   mdSaved?: boolean;
+  /** 검색 수집(임베딩)까지 실제로 끝났는가. **mdSaved와 다르다** — 파일은 남았는데 임베딩이
+   *  죽어 수집을 못 하면 문서 메타 행이 안 생겨 「내 문서」 목록에도 안 뜨고 추출본 보기도 404다.
+   *  화면이 「내 문서에서 보고 고칠 수 있습니다」를 말해도 되는지는 **이 값으로** 가른다. */
+  ingested?: boolean;
 }
 
 // 파일명으로 애매할 때의 추천 유형. 취약점 리포트·로그·가이드라인·매뉴얼 신호를 순서대로 본다.
@@ -124,7 +128,7 @@ async function tryIngest(
   // ★ 보관 결과는 catch **밖**에 둔다 — 파일 보관은 검색 수집(임베딩)보다 **먼저** 끝나므로,
   //   임베딩이 죽었다고 「원본을 보관했다」는 사실까지 삼키면 화면이 거짓을 말하게 된다
   //   (0820 「삼켜진 실패」 계보의 거울상 — 이번엔 삼켜진 *성공*이다).
-  let 보관 = { mdSaved: false, originalSaved: false, sourcePath: undefined as string | undefined };
+  let 보관: { mdSaved: boolean; originalSaved: boolean; sourcePath?: string } = { mdSaved: false, originalSaved: false };
   try {
     const { extractDocumentText } = await import("./dataset.js");
     const text = await extractDocumentText(filename, base64);
@@ -142,7 +146,10 @@ async function tryIngest(
     // 임베딩 미기동 등 — 검색 수집만 생략, 상위 처리는 계속.
     // 다만 **보관까지는 됐다면** 그 사실은 살려 보낸다(ingested:false로 「수집은 못 했다」를 구분).
     if (보관.mdSaved || 보관.originalSaved) {
-      return { chunks: 0, docName: filename, savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: false };
+      // ⚠ docName은 **주지 않는다** — 「지식으로 수집된 문서의 이름」이라는 뜻이라, 실패했는데
+      //   이름을 주면 제품 매뉴얼 등록부가 그 이름을 문서로 박아 화면에 「🔍 검색가능」 배지가
+      //   붙는다(검토관 2026-08-22 확정). 파일은 남았지만 검색에는 없다.
+      return { chunks: 0, savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: false };
     }
     return null;
   }
@@ -150,8 +157,14 @@ async function tryIngest(
 
 // 보관 결과를 응답에 싣는다 — **요청값이 아니라 실제 저장 여부**를 말하게 하는 자리다.
 // tryIngest를 안 타는 갈래(취약점 스캔 반영)는 ing이 null이라 아무 것도 안 실린다 = 「안 남았다」가 정직하게 드러난다.
-function 보관결과(ing: { savedOriginal?: boolean; mdSaved?: boolean } | null): { savedOriginal?: boolean; mdSaved?: boolean } {
-  return ing ? { savedOriginal: !!ing.savedOriginal, mdSaved: !!ing.mdSaved } : {};
+//
+// ⚠ ingested를 **반드시 함께 싣는다**(검토관 2026-08-22 [높음] 확정). 보관(파일)은 됐는데
+//   수집(임베딩)은 실패한 상태가 있는데, 그 구분을 응답에서 빼 놓으면 화면이 「내 문서에서
+//   보고 고칠 수 있습니다」라고 말한다 — 그 문서는 목록에 없고 열면 404다(문서 메타는
+//   ingestText 맨 끝에서 쓰이므로 실패하면 행 자체가 없다). 삼켜진 성공을 살리려다 새 거짓말을
+//   만들 뻔한 자리다.
+function 보관결과(ing: { savedOriginal?: boolean; mdSaved?: boolean; ingested?: boolean } | null): { savedOriginal?: boolean; mdSaved?: boolean; ingested?: boolean } {
+  return ing ? { savedOriginal: !!ing.savedOriginal, mdSaved: !!ing.mdSaved, ingested: !!ing.ingested } : {};
 }
 
 // 국내 웹취약점 점검 결과보고서(PDF·DOCX 등 서술형)를 규칙 파서로 시도한다.
@@ -267,10 +280,20 @@ async function routeByType(filename: string, base64: string, type: UploadType, p
   // document / guideline → 장기기억(RAG). guideline은 분류 생략(가이드로 태깅만).
   // 업무영역은 지정하지 않는다 — ingestText가 규칙(→ document는 LLM까지)으로 정한다.
   const ing = await tryIngest(filename, base64, type === "document", undefined, uploadedBy, opts);
-  if (!ing) {
-    return { filename, routedTo: "memory", reason: `사용자 지정: ${type === "guideline" ? "가이드라인" : "문서"} · 검색수집 보류(임베딩 미기동)`, memory: { chunks: 0, docClass: type === "guideline" ? "가이드라인" : undefined } };
+  const 유형말 = type === "guideline" ? "가이드라인" : "문서";
+  // ⚠ 판정 기준은 `ing`의 존재가 아니라 **`ing?.ingested`**다(검토관 2026-08-22 [높음] 회귀 수리).
+  //   보관(.md·원본)을 살려 보내면서 tryIngest가 실패해도 non-null을 돌려주게 됐는데, 여기만
+  //   `!ing`로 남아 **임베딩이 죽어도 「검색수집 보류」 경고가 안 뜨게** 됐다 — 콘솔 ＋의 주
+  //   경로라 가장 자주 밟는 자리인데, 담당자는 「0청크」라는 숫자만 보고 왜인지 알 수 없었다.
+  if (!ing?.ingested) {
+    return {
+      filename, routedTo: "memory",
+      reason: `사용자 지정: ${유형말} · 검색수집 보류(임베딩 미기동)`,
+      memory: { chunks: 0, docClass: type === "guideline" ? "가이드라인" : undefined },
+      ...보관결과(ing),
+    };
   }
-  return { filename, routedTo: "memory", reason: `사용자 지정: ${type === "guideline" ? "가이드라인" : "문서"}`, category: ing.category, memory: { chunks: ing.chunks, docClass: type === "guideline" ? "가이드라인" : ing.docClass, linkedProduct: ing.linkedProduct, category: ing.category }, ...보관결과(ing) };
+  return { filename, routedTo: "memory", reason: `사용자 지정: ${유형말}`, category: ing.category, memory: { chunks: ing.chunks, docClass: type === "guideline" ? "가이드라인" : ing.docClass, linkedProduct: ing.linkedProduct, category: ing.category }, ...보관결과(ing) };
 }
 
 export async function autoRouteUpload(
@@ -378,7 +401,21 @@ export function registerAutoUploadRoutes(app: Express): void {
       //   등급 검사와 어긋나) 남의 기밀 .md를 읽거나 덮는 통로가 된다(132f19c6). 그 창구만 막고
       //   이 창구를 열어 두면 같은 구멍이 두 번째 문으로 열린다 — 이번에 추출본 보관을 여기에도
       //   붙이므로 반드시 함께 접는다. 실사용 UI(File.name)엔 경로가 없어 화면 동작은 그대로다.
-      const filename = path.basename(String(rawFilename));
+      //   trim은 그대로 유지한다 — basename만 하면 앞뒤 공백이 documentId에 남는다(예전 동작 보존).
+      const filename = path.basename(String(rawFilename).trim());
+      if (!filename || filename === "." || filename === "..") {
+        res.status(400).json({ error: "쓸 수 있는 파일 이름이 아닙니다" });
+        return;
+      }
+      // ★ **볼 수 없는 문서는 덮어쓸 수도 없다**(검토관 2026-08-22 [높음] 확정).
+      //   인입은 같은 documentId면 옛 조각을 지우고 새로 넣으며 추출본 .md도 덮는다. 그런데
+      //   등급 칸은 그대로 남는다 — 즉 O등급 사용자가 흔한 이름(「보안점검_결과.pdf」)으로 올리면
+      //   기밀(C) 문서의 내용이 조용히 바뀌고 라벨만 C로 남는다. 읽기 창구·쓰기 창구(등급변경·
+      //   삭제·추출본 고치기)는 이미 막혀 있었는데 업로드 문만 열려 있어 통제가 우회됐다.
+      if (열람불가공용(filename, req)) {
+        res.status(403).json({ error: "같은 이름의 문서가 이미 있고, 그 문서를 열람할 권한이 없습니다 — 다른 이름으로 올리세요" });
+        return;
+      }
       // ⚠ 이 허용 목록은 **UploadType과 반드시 같이 늘려야 한다**(2026-08-01 실측 사고).
       //   유형을 새로 만들고 여기를 안 고치면 forceType이 조용히 버려져 "결정 필요"로 되돌아온다
       //   — 담당자는 골랐는데 아무 일도 안 일어나는 것으로 보인다. 타입에서 뽑아 어긋남을 막는다.

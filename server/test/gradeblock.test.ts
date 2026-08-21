@@ -179,7 +179,10 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     // 기밀(C) 문서가 그대로 샜다(document/file은 소유자 검사조차 없었다). 잣대는 한 곳(열람불가).
     const memSrc = fs.readFileSync(new URL("../src/engine/memory.ts", import.meta.url), "utf8");
     // ① 단일 잣대 열람불가가 개인격리 + 등급을 함께 본다
-    const iHelper = memSrc.indexOf("const 열람불가 =");
+    //    ⚠ 2026-08-22에 이 판정을 **모듈 수준(열람불가공용)으로 올렸다** — 라우트 안 지역 함수라
+    //      업로드 창구가 부를 수 없었고, 그래서 「같은 이름으로 덮어쓰기」가 등급을 우회했다.
+    //      감시도 새 자리를 봐야 한다(옛 자리만 보면 헛돈다).
+    const iHelper = memSrc.indexOf("export function 열람불가공용");
     expect(iHelper, "열람불가 헬퍼가 없다 — 직접-열람 등급 검사가 사라졌다").toBeGreaterThan(0);
     const 헬퍼 = memSrc.slice(iHelper, iHelper + 500);
     expect(헬퍼, "열람불가가 등급(blockedGrades)을 안 본다").toContain("blockedGrades(clearanceOf");
@@ -225,15 +228,22 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     expect(md, "markdown이 basename≠documentId를 안 거른다 — 형제 충돌 우회").toContain("path.basename(String(documentId)) !== String(documentId)");
     expect(sv, "markdown/save가 basename≠documentId를 안 거른다").toContain("path.basename(String(documentId)) !== String(documentId)");
     // ④ 업로드가 파일명을 basename으로 접는다 — 애초에 경로 든 documentId를 못 만들게(뿌리 차단)
-    const ingest = memSrc.slice(memSrc.indexOf('"/api/memory/ingest-file"'), memSrc.indexOf('"/api/memory/ingest-file"') + 800);
+    const ingest = memSrc.slice(memSrc.indexOf('"/api/memory/ingest-file"'), memSrc.indexOf('"/api/memory/ingest-file"') + 2000);
     expect(ingest, "ingest-file이 파일명을 basename으로 안 접는다 — 경로 든 documentId 허용").toContain("path.basename(String(rawFilename))");
     // ⑤ **두 번째 업로드 문(門)도 같이 접는다**(2026-08-22). ingest-file만 막고 uploadAuto를 열어 두면
     //    같은 구멍이 콘솔 ＋ 창구로 다시 열린다 — 이번에 uploadAuto도 추출본(.md)을 쓰기 시작했으므로
     //    경로 든 documentId가 basename 키잉과 어긋나면 남의 기밀 .md를 덮을 수 있다.
     const autoSrc = fs.readFileSync(new URL("../src/engine/autoupload.ts", import.meta.url), "utf8");
-    const auto = autoSrc.slice(autoSrc.indexOf('"/api/upload/auto"'), autoSrc.indexOf('"/api/upload/auto"') + 1400);
+    // ⚠ 창을 넉넉히 잡는다 — 이 라우트에는 「왜 이렇게 하는가」 주석이 길게 붙어 있어
+    //   좁게 자르면 검사 대상이 창 밖으로 밀려 **시험이 조용히 헛돈다**(2026-08-22에 실제로 밟음).
+    const auto = autoSrc.slice(autoSrc.indexOf('"/api/upload/auto"'), autoSrc.indexOf('"/api/upload/auto"') + 3000);
     expect(auto.length, "/api/upload/auto 라우트를 못 찾았다 — 시험이 헛돈다").toBeGreaterThan(0);
-    expect(auto, "uploadAuto가 파일명을 basename으로 안 접는다 — 경로 든 documentId가 .md 키잉과 어긋난다").toContain("path.basename(String(rawFilename))");
+    expect(auto, "uploadAuto가 파일명을 basename으로 안 접는다 — 경로 든 documentId가 .md 키잉과 어긋난다").toContain("path.basename(String(rawFilename)");
+    // ⑥ **볼 수 없는 문서는 덮어쓸 수도 없다**(2026-08-22 검토관 [높음]). 인입은 같은 documentId면
+    //    옛 조각을 지우고 새로 넣고 추출본 .md도 덮는데 등급 칸은 그대로 남는다 — 읽기·쓰기 창구를
+    //    다 막아 놓고 업로드 문만 열어 두면 그 통제가 통째로 우회된다. 두 업로드 창구 모두 검사한다.
+    expect(auto, "uploadAuto가 덮어쓰기 전에 등급을 안 본다 — 남의 기밀 문서를 같은 이름으로 덮을 수 있다").toContain("열람불가공용(filename, req)");
+    expect(ingest, "ingest-file이 덮어쓰기 전에 등급을 안 본다").toContain("열람불가(filename, req)");
   });
 
   it("★ 등급은 서버가 읽는다 — 요청이 주장할 수 없다", () => {

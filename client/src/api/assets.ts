@@ -23,7 +23,10 @@ export interface AutoUploadResult {
   /** 「원본도 보관」 토글의 **실제 결과** — 요청값이 아니다. 취약점 스캔으로 반영되는 갈래는
    *  문서 인입을 안 타서 원본·추출본이 안 만들어진다. 화면은 이 값으로만 말한다(정직 원칙). */
   savedOriginal?: boolean;
-  mdSaved?: boolean; // 추출본(.md) 실제 저장 여부 — 「내 문서」의 추출본 보기 가능 여부와 1:1
+  mdSaved?: boolean; // 추출본(.md) 파일이 실제로 생겼는지
+  /** 검색 수집(임베딩)까지 끝났는가 — **mdSaved와 다르다.** 파일은 남았어도 수집을 못 하면
+   *  문서 목록에 안 뜨고 추출본 보기도 404다. 「내 문서에서 볼 수 있다」는 이 값이 true일 때만 참. */
+  ingested?: boolean;
   nextChips?: string[]; // 반입 뒤 다음 걸음 칩(서버가 붙인다)
 }
 export const uploadApi = {
