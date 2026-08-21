@@ -302,6 +302,8 @@ const gijoApi = {
   sendMaintenanceNotify: (to: string[]) => api.maintenanceApi.notify(to),
 
   // 보안제품 등록부(종류별 관리 + 제품/로그 매뉴얼)
+  outboundRequestsList: (productId?: string) => api.outboundReqApi.list(productId),
+  outboundRequestSetStatus: (id: string, status: string) => api.outboundReqApi.setStatus(id, status), // 위치 인자
   listSecurityProducts: () => api.securityProductsApi.list(),
   listSecurityProductsGrouped: () => api.securityProductsApi.grouped(),
   getProductCategories: () => api.securityProductsApi.categories(),

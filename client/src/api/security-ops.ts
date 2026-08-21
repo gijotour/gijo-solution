@@ -94,6 +94,18 @@ export interface ProductFieldValue {
   value: string;
 }
 
+// 조치·수정 요청(2026-08-21) — 밖으로 나간 요청의 현황·상태 전환.
+export interface OutboundReq {
+  id: string; kind: string; targetName?: string; recipient?: string; dueDate?: string;
+  status: string; docId?: string; createdAt: number; sentAt?: number;
+}
+export const outboundReqApi = {
+  list: (productId?: string) =>
+    request<{ requests: OutboundReq[] }>(`/api/outbound-requests${productId ? `?productId=${encodeURIComponent(productId)}` : ""}`),
+  setStatus: (id: string, status: string) =>
+    request<{ ok: boolean }>(`/api/outbound-requests/${encodeURIComponent(id)}`, { method: "PATCH", body: { status } }),
+};
+
 export const securityProductsApi = {
   list: () => request<SecurityProduct[]>("/api/security-products"),
   grouped: () => request<ProductGroup[]>("/api/security-products/grouped"),

@@ -1591,6 +1591,15 @@ const TOOLS: AgentTool[] = [
       { name: "dueDate", label: "조치 기한", description: "비우면 심각도 기준 자동(가장 급한 것, SLA 표)", required: false },
       { name: "recheck", label: "재점검 조건", description: "비우면 「조치 완료 통보 후 재스캔」", required: false },
     ],
+    // 지시문의 유형 낱말을 kind로 채운다(2026-08-21 라이브 실측 — 「정책 수정 요청서」가 kind
+    // 빈 채로 와서 「취약점 조치」로 떨어졌다). handlers의 kindRaw 정규화와 같은 잣대.
+    autoFill: (_args, instruction): Record<string, string> => {
+      const t = instruction ?? "";
+      if (/패치/.test(t)) return { kind: "patch" };
+      if (/정책/.test(t)) return { kind: "policy" };
+      if (/버그/.test(t)) return { kind: "bug" };
+      return {}; // 그 외는 취약점 조치(기본) — 굳이 채우지 않는다
+    },
     effect: (args) => {
       const n = String(args.ids ?? "").split(/[\s,]+/).filter(Boolean).length;
       const k = String(args.kind ?? "").trim() || "취약점 조치";

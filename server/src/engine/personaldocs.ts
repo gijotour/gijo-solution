@@ -150,11 +150,11 @@ export function registerPersonalDocsRoutes(app: Express): void {
     const fmt = String(req.query.fmt ?? "docx").toLowerCase();
     const safe = (d.title || "문서").replace(/[^\w가-힣.-]+/g, "_").slice(0, 60);
     const { inspectionDocx, inspectionHtml } = await import("./inspectionreport.js");
+    // 클라 request 헬퍼가 토큰을 붙여 부르므로 base64 JSON으로 돌려준다(reports-admin 관례) —
+    // 렌더러가 blob으로 만들어 저장한다(브라우저 다운로드는 클라 몫).
     if (fmt === "docx") {
       const buf = await inspectionDocx(d.body);
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(safe)}.docx"`);
-      res.send(buf);
+      res.json({ fileName: `${safe}.docx`, mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", base64: buf.toString("base64") });
     } else if (fmt === "pdf") {
       const { renderPdf } = await import("./report.js");
       const os = await import("node:os"); const path = await import("node:path"); const fsp = await import("node:fs/promises");
@@ -162,9 +162,7 @@ export function registerPersonalDocsRoutes(app: Express): void {
       const ok = await renderPdf(inspectionHtml(d.body), tmp);
       if (!ok) { res.status(503).json({ error: "PDF 변환기(브라우저 엔진)가 이 환경에 없어 PDF를 못 만듭니다 — Word로 내려받아 열어 주세요." }); return; }
       const buf = await fsp.readFile(tmp); await fsp.unlink(tmp).catch(() => {});
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(safe)}.pdf"`);
-      res.send(buf);
+      res.json({ fileName: `${safe}.pdf`, mime: "application/pdf", base64: buf.toString("base64") });
     } else { res.status(400).json({ error: "fmt는 docx 또는 pdf 입니다" }); }
   }));
 
