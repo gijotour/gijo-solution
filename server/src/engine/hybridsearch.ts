@@ -224,6 +224,44 @@ export function applyOriginBoost(chunks: FusedChunk[], builtinIds: Set<string>):
     .sort((a, b) => b.rrf - a.rrf);
 }
 
+// ── 문서 스코프 부스트 — 질문이 **특정 문서를 콕 집으면** 그 문서 조각을 앞세운다 ─────────
+// 왜(2026-08-21 SolidStep 실측): "SolidStep 매뉴얼에서 X 알려줘"에 정답 조각이 늘 top16 안에
+//   있는데(1~6위) 문서명을 대도 **딴 자기문서가 1위로 새치기**해 원문 인용을 흐렸다. 조각이
+//   버려지는 게 아니라 밀리는 것이라 — candidates/topK가 아니라 **재랭킹**이 처방이다(설계관 확정).
+// ★ 이름을 콕 집은 건 가장 확실한 의도 신호라 세기를 제일 크게(ROLE 0.02 위). 그래도 **벽이
+//   아니라 올리기** — 훨씬 가까운 다른 문서(rrf 0.05+)는 못 뒤집는다. distance는 안 건드린다
+//   (근거 세기 게이트·rag-weak-evidence 보호 — rrf만 만진다).
+export const DOCSCOPE_BOOST = 0.03;
+// 파일명에서 **문서 유형어**를 빼고 구별 토큰만 남긴다 — "매뉴얼.pdf"가 "매뉴얼"만 든 질문마다
+//   걸리지 않게(오탐 방지). 2~3자 이하는 length 필터가 이미 뺀다(아래).
+const DOCSCOPE_STOP = new Set(["매뉴얼", "manual", "가이드", "guide", "규정", "문서", "doc", "docs",
+  "파일", "file", "보고서", "report", "설명서", "안내", "pdf", "docx", "xlsx", "hwp", "hwpx", "txt", "md", "png", "jpg"]);
+
+/** 질문이 콕 집은 등록 문서의 documentId 집합 — 파일명 stem(구별 토큰 ≥3자)이 질문에 들어 있으면 지목.
+ *  ⚠ 부스트(올리기)용이라 오탐이 나도 그 문서를 살짝 올릴 뿐 잃지 않는다. 그래도 좁게 잡는다:
+ *  파일명을 구분자로 쪼개 유형어(매뉴얼·pdf…)를 빼고 남은 토큰만 본다. URL 지식화 문서는 제외
+ *  (질문에 URL이 통째로 안 들어온다). 한글 파일명(취약점관리_지침.md)도 토큰이 맞으면 걸린다. */
+export function docScopeMatch(question: string, docIds: string[]): Set<string> {
+  const q = String(question || "").toLowerCase().replace(/\s+/g, "");
+  const out = new Set<string>();
+  if (q.length < 3) return out;
+  for (const id of docIds) {
+    if (/^https?:/i.test(id)) continue;
+    const base = id.replace(/^.*[\\/]/, "").replace(/\.[a-z0-9]{1,5}$/i, "").toLowerCase();
+    const tokens = base.split(/[ _\-.]+/).filter((t) => t.length >= 3 && !DOCSCOPE_STOP.has(t));
+    if (tokens.some((t) => q.includes(t))) out.add(id);
+  }
+  return out;
+}
+
+/** 지목된 문서의 조각을 위로 올린다(rrf만·재정렬). applyOriginBoost와 같은 꼴 — 벽이 아니라 올리기. */
+export function applyDocScopeBoost(chunks: FusedChunk[], scoped: Set<string>): FusedChunk[] {
+  if (scoped.size === 0) return chunks;
+  return chunks
+    .map((c) => (scoped.has(c.documentId) ? { ...c, rrf: c.rrf + DOCSCOPE_BOOST } : c))
+    .sort((a, b) => b.rrf - a.rrf);
+}
+
 // 에이전트(역할) → 그 전문가가 먼저 보는 업무영역. 화면 매핑과 별개다 —
 // 화면은 "지금 보고 있는 곳", 역할은 "누가 답하는가"다.
 // 2026-08-20 사장님 승인 ③: 「장비운영」의 주인을 지정 — 그동안 주인 없는 영역이라

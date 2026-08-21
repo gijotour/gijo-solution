@@ -10,6 +10,10 @@ import {
   isRelevant,
   applyCategoryBoost,
   categoryForScreen,
+  docScopeMatch,
+  applyDocScopeBoost,
+  DOCSCOPE_BOOST,
+  ROLE_BOOST,
   CATEGORY_BOOST,
   RRF_K,
   REWRITE_RANK_PENALTY,
@@ -265,5 +269,44 @@ describe("질의 변형 융합 — 재작성 랭킹 페널티(2026-08-17 실측 
   it("빈 입력에도 죽지 않는다", () => {
     expect(fuseVariantVectors([])).toEqual([]);
     expect(fuseVariantVectors([{ hits: [], penalty: 0 }])).toEqual([]);
+  });
+});
+
+// 문서 스코프 부스트 — 질문이 콕 집은 문서를 앞세운다(2026-08-21 SolidStep 실측으로 확정).
+describe("문서 스코프 — 지목 판별(docScopeMatch)", () => {
+  it("파일명 구별 토큰이 질문에 있으면 지목 — 영문·한글 파일명 둘 다", () => {
+    expect(docScopeMatch("SolidStep 매뉴얼에서 Windows 수동진단 알려줘", ["solidstep_manual.pdf", "other.pdf"]))
+      .toEqual(new Set(["solidstep_manual.pdf"]));
+    // 한글 파일명: 취약점관리_지침.md → 구별 토큰 "취약점관리"(지침·md는 유형어/짧음), 질문의 공백 무관
+    expect(docScopeMatch("취약점 관리 지침에서 뭐라고 해", ["취약점관리_지침.md"]))
+      .toEqual(new Set(["취약점관리_지침.md"]));
+  });
+  it("문서 유형어만으로는 안 걸린다(오탐 방지) — '매뉴얼 보여줘'가 manual.pdf를 안 집는다", () => {
+    expect(docScopeMatch("매뉴얼 보여줘", ["manual.pdf"]).size).toBe(0);
+    expect(docScopeMatch("문서 목록 알려줘", ["report.pdf", "doc.txt"]).size).toBe(0);
+  });
+  it("URL 지식화 문서·짧은 질문은 지목하지 않는다", () => {
+    expect(docScopeMatch("소만사 리포트 알려줘", ["https://www.somansa.com/x"]).size).toBe(0);
+    expect(docScopeMatch("아", ["solidstep_manual.pdf"]).size).toBe(0);
+  });
+});
+
+describe("문서 스코프 — 부스트(applyDocScopeBoost)", () => {
+  const fc = (documentId: string, rrf: number, distance = 0.5): FusedChunk =>
+    ({ text: "t-" + documentId, documentId, distance, lexicalHit: false, rrf });
+
+  it("지목 문서를 위로 올린다 — 잡음 자기문서에 밀린 조각이 1위로(실측 프로브1 재현)", () => {
+    const chunks = [fc("junk", 0.0164), fc("solid", 0.0150)]; // junk가 1위, solid 2위
+    const out = applyDocScopeBoost(chunks, new Set(["solid"]));
+    expect(out[0].documentId, "지목 문서가 1위로 올라와야 한다").toBe("solid");
+    expect(out.find((c) => c.documentId === "solid")!.distance, "distance는 안 건드린다(rrf만)").toBe(0.5);
+  });
+  it("지목이 없으면 무동작 — 순서·값 그대로(회귀 없음)", () => {
+    const chunks = [fc("a", 0.02), fc("b", 0.01)];
+    expect(applyDocScopeBoost(chunks, new Set())).toEqual(chunks);
+  });
+  it("이름을 콕 집은 신호가 가장 세다 — DOCSCOPE > ROLE > CATEGORY", () => {
+    expect(DOCSCOPE_BOOST).toBeGreaterThan(ROLE_BOOST);
+    expect(ROLE_BOOST).toBeGreaterThan(CATEGORY_BOOST);
   });
 });
