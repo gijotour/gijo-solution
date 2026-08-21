@@ -174,7 +174,9 @@
     triage: [
       // agents: analysis(우선) — ROLE_CATEGORY.analysis=["취약점"](hybridsearch.ts:235) 근거.
       // pick: 5.49.0 pick.html이 아는 kind. rows: 요약과 **같은 API·같은 잣대**(살아있는·진짜취약점).
-      { id: "vuln", title: "🔍 취약점", page: "vulnscan.html", agents: ["우선"], pick: "vuln", scenario: "신규 스캔 결과 처리",
+      // scenario를 「취약점 이해」로 교체(2026-08-21 사장님 — 처리 절차보다 쉬운 설명·공격 경로가 핵심).
+      // 신규 스캔 결과 처리는 📖 목록에서 여전히 고를 수 있다.
+      { id: "vuln", title: "🔍 취약점", page: "vulnscan.html", agents: ["우선"], pick: "vuln", scenario: "취약점 이해",
         rows: function () {
           return window.gijo.listAssets().then(function (assets) {
             var out = [];
@@ -631,7 +633,7 @@
         });
       } },
       // agents: analysis(우선) — 역할 문장이 「AI 지식·모델 관리」다(agents.ts:69).
-      { id: "knowledge", title: "📚 지식", page: "memory.html", agents: ["우선"],
+      { id: "knowledge", title: "📚 지식", page: "memory.html", agents: ["우선"], scenario: "파일 반입·활용",
         // rows: 제목 필드가 원천에 없다 — documentId가 곧 이름(실화면 memory.html:703 동일).
         // 등급 한글은 memory.html:664 GRADE_LABEL과 동일.
         // ⚠ 내 개인 문서(personal: 접두)는 뺀다(설계관 ③-3-1 — 서버는 남의 것만 거르고 내
