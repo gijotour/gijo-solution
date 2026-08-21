@@ -812,12 +812,24 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
     } else if (탭 === "know" || 탭 === "ingest") {
       var kd = know.find(function (x) { return x.documentId === id; });
       if (!kd) return;
+      선택 = { 탭: 탭, id: id };
       알림(kd.documentId, "지식 문서 " + kd.documentId + " · " + (kd.category || "일반") + " · 조각 " + (kd.chunks || 0));
       d.innerHTML = '<div class="dn">' + esc(kd.documentId) + "</div>" +
         '<div class="dm">영역 ' + esc(kd.category || "일반") + " · " + 등급글자(kd.grade) + " · 조각 " + (kd.chunks || 0) +
         (kd.uploadedBy ? "<br>올린 이 " + esc(kd.uploadedBy) : "") +
         (kd.ingestedAt ? "<br>반입 " + new Date(kd.ingestedAt).toLocaleString("ko-KR") : "") + "</div>" +
-        '<div class="dbt"><button class="go" data-go="memory.html" data-lb="AI 지식">🗔 AI 지식에서 관리</button></div>';
+        // 원본 보관 상태 — 업로드 때 「원본도 보관」을 켜면 서버에 원본이 남는다(hasSource).
+        '<div class="dm" style="border-top:1px dashed rgba(128,128,128,.3);padding-top:8px;margin-top:2px">' +
+        (kd.hasSource ? "🗄 <b>원본 보관됨</b> — 아래 「원본 열기」로 볼 수 있습니다" : "🗄 원본 미보관(추출본만) — 가볍습니다") + "</div>" +
+        // 추출본(.md) — AI가 실제로 뽑은 내용. 보고·고칠 수 있게(투명성·반입 신뢰도).
+        '<div class="dbt">' +
+        '<button data-act="mdview">📄 추출본(.md) 보기</button>' +
+        '<button data-act="mdedit">✏ 고치기</button>' +
+        '<button data-act="mddown">⬇ .md</button>' +
+        (kd.hasSource ? '<button data-act="srcopen">⬇ 원본 열기</button>' : "") +
+        '<button class="go" data-go="memory.html" data-lb="AI 지식">🗔 AI 지식</button>' +
+        "</div>" +
+        '<div id="kdMd" style="margin-top:10px"></div>';
     }
     문서창보임(true);   // 좁은 자리에서는 이때 문서창이 목록을 덮는다
   });
@@ -830,6 +842,59 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
     if (선택.탭 === "guide") {
       if (act === "read") 안내열기(선택.id);
       else if (act === "req") 요청열기();
+      return;
+    }
+    // 회사 지식·반입 문서 — 추출본(.md) 보기/고치기/내려받기 + 원본 열기(프로 기준 문서관리 통합).
+    if (선택.탭 === "know" || 선택.탭 === "ingest") {
+      var mdArea = document.getElementById("kdMd");
+      var md404 = function (m) {
+        return /404|없습니다|없음/.test(String(m))
+          ? "추출본(.md)이 아직 없습니다 — 이 문서를 다시 올리면 만들어집니다. 지금은 「AI 지식」의 조각 보기로 내용을 볼 수 있습니다."
+          : "열지 못했습니다 — " + esc(String(m));
+      };
+      var 미리 = function (t) {
+        return '<div style="border:1px solid rgba(128,128,128,.25);border-radius:8px;padding:10px 12px;max-height:300px;overflow:auto;font-size:12.5px;line-height:1.7">' +
+          (window.gijoMd && window.gijoMd.render ? window.gijoMd.render(t || "") : esc(t || "")) + "</div>";
+      };
+      try {
+        if (act === "mdview") {
+          if (mdArea) mdArea.textContent = "여는 중…";
+          var rv = await window.gijo.memoryDocumentMarkdown(선택.id);
+          if (mdArea) mdArea.innerHTML = 미리(rv.text);
+        } else if (act === "mdedit") {
+          if (mdArea) mdArea.textContent = "여는 중…";
+          var re = await window.gijo.memoryDocumentMarkdown(선택.id);
+          if (mdArea) mdArea.innerHTML =
+            '<textarea id="kdMdEdit" style="width:100%;min-height:180px;box-sizing:border-box;font:12px/1.6 Consolas,monospace;padding:9px 10px;border-radius:8px;border:1px solid rgba(128,128,128,.4);background:transparent;color:inherit;resize:vertical">' + esc(re.text || "") + "</textarea>" +
+            '<div class="dm" style="margin-top:6px">⚠ 고치면 AI가 참고하는 지식(조각)이 다시 만들어집니다.</div>' +
+            '<div class="dbt"><button data-act="mdsave">💾 저장</button><button data-act="mdcancel">취소</button></div>';
+        } else if (act === "mdsave") {
+          var ta = document.getElementById("kdMdEdit");
+          if (!ta) return;
+          b.disabled = true; b.textContent = "저장 중…";
+          var sv = await window.gijo.saveMemoryDocumentMarkdown(선택.id, ta.value);
+          if (window.gijoTell) window.gijoTell("추출본을 저장했습니다 — 조각 " + sv.chunks + "개로 지식을 다시 반입했습니다.");
+          if (mdArea) mdArea.innerHTML = 미리(ta.value);
+        } else if (act === "mdcancel") {
+          if (mdArea) mdArea.innerHTML = "";
+        } else if (act === "mddown") {
+          var rd = await window.gijo.memoryDocumentMarkdown(선택.id);
+          var blob = new Blob([rd.text || ""], { type: "text/markdown" });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement("a"); a.href = url; a.download = String(선택.id).replace(/[\\/]/g, "_") + ".md";
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
+          if (window.gijoTell) window.gijoTell("추출본(.md)을 내려받습니다 — 다운로드 폴더를 확인하세요.");
+        } else if (act === "srcopen") {
+          await window.gijo.openMemoryDocumentFile(선택.id);
+          if (window.gijoTell) window.gijoTell("원본을 기본 뷰어로 엽니다.");
+        }
+      } catch (e) {
+        if (act === "mdsave") { if (window.gijoTell) window.gijoTell("저장하지 못했습니다 — " + ((e && e.message) || "오류")); }
+        else if (mdArea) mdArea.innerHTML = '<div class="dm">' + md404((e && e.message) || e) + "</div>";
+      } finally {
+        if (act === "mdsave") { b.disabled = false; b.textContent = "💾 저장"; }
+      }
       return;
     }
     if (선택.탭 !== "mine") return;
