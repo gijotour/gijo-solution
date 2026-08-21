@@ -22,7 +22,13 @@ const SUGGEST_SCHEMA = {
   required: ["command", "explanation"],
 } as const;
 
-function buildPrompt(reqText: string): string {
+function buildPrompt(reqText: string, 근거: string[]): string {
+  const 근거절 = 근거.length
+    ? ["", "=== 사내 매뉴얼 근거(이 안에 명령·절차가 있으면 그대로 쓴다) ===", ...근거.map((c, i) => `[${i + 1}] ${c.slice(0, 600)}`),
+       "=== 근거 끝 ===",
+       "★ 위 매뉴얼에 요청에 맞는 명령·절차가 있으면 **지어내지 말고 그대로** 옮긴다(설정 파일 경로·옵션 포함).",
+       "★ 매뉴얼이 명령이 아니라 절차(예: '관리자 권한으로 Setup.bat 실행')를 말하면 command는 비우고 explanation에 그 절차를 적는다 — 억지로 PowerShell로 바꾸지 않는다."]
+    : ["", "★ 사내 매뉴얼에 관련 근거가 없다 — 일반적 점검 명령만 만들되, 확실치 않으면 command를 비우고 explanation에 '이 요청은 사내 매뉴얼에 근거가 없어 일반 명령만 제안합니다'라고 밝힌다."];
   return [
     "너는 보안 담당자의 요청을 Windows PowerShell 한 줄 명령으로 바꾸는 도우미다.",
     "규칙:",
@@ -30,17 +36,26 @@ function buildPrompt(reqText: string): string {
     "- 삭제·포맷·디스크 조작·시스템 종료 같은 파괴적 명령은 절대 만들지 않는다.",
     "- 실행은 사람이 승인 후 하므로, 너는 명령 한 줄과 짧은 설명만 낸다.",
     "- command는 한 줄. explanation은 한국어로 1문장.",
+    ...근거절,
     "",
     `요청: ${reqText}`,
   ].join("\n");
 }
 
 export async function suggestCommand(reqText: string): Promise<{ command: string; explanation: string }> {
+  // ⚠ 매뉴얼 근거를 먼저 읽는다(2026-08-21 실측 — 이 함수가 매뉴얼을 안 읽고 LLM으로 명령을
+  //   지어냈다. SolidStep 매뉴얼이 있는데도 Get-WindowsFeature를 창작). 근거가 있으면 원문
+  //   명령을 그대로, 없으면 정직하게 밝힌다. 조회 실패해도 종전대로 동작(근거 0으로).
+  let 근거: string[] = [];
+  try {
+    const { queryMemoryRelevant } = await import("./memory.js");
+    근거 = await queryMemoryRelevant(reqText, 4, "orchestrator");
+  } catch { /* RAG를 못 읽어도 명령 제안은 한다 */ }
   const raw = await chat({
     agentId: "orchestrator",
-    message: buildPrompt(reqText),
+    message: buildPrompt(reqText, 근거),
     responseSchema: SUGGEST_SCHEMA,
-    maxTokens: 200,
+    maxTokens: 240,
     // trusted — 라우트가 gateUserInput으로 이미 검사한 입력의 재진입이다 — 두 번 검사하면 이중 집계되고, 차단 모드에서는 우리 프롬프트가 걸린다.
     trusted: true,
   });

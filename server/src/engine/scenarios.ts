@@ -69,6 +69,11 @@ export function isScenarioAsk(text: string): boolean {
   // (설계관 실측 — 이 분기가 redteam_status 규칙보다 앞이라 삼키고 있었다). 빼면 그
   // 질문은 원래 주인(FORCED redteam_status·LLM)이 받는다 — 빈 자리가 아니다.
   if (/레드팀|공격|침해|위협/.test(t)) return false;
+  // ⚠ 동작 동사가 있으면 시나리오 안내가 아니라 그 동작이다(2026-08-21 실측 — 「시나리오시험
+  //   Log4Shell 배정해줘」가 자산 이름의 '시나리오'에 걸려 안내로 샜다). 자기 이름 대조는 위에서
+  //   이미 지났으므로(진짜 「시나리오: 아침 브리핑」은 여기 안 옴), 배정·조치 같은 동사가 붙으면
+  //   원 주인(agentloop assign·update)에게 비켜 준다. 시작_RE보다 **앞**에 둔다(그게 삼키는 자리).
+  if (/(배정|담당자|할당|조치|검증|오탐|기한|요청서|삭제)\s*(해\s*줘|줘|처리|시작|하기)?/.test(t)) return false;
   return 목록_RE.test(t) || 시작_RE.test(t);
 }
 
