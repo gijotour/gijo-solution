@@ -84,18 +84,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;}
 .filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
-.log-console{background:#1a1a19;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:calc(100vh - 320px);min-height:360px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:12.5px;line-height:1.65;}
+/* ⚠ 로그 상자는 테마와 무관하게 **터미널풍 어두운 배경 고정**이다. 그래서 이 안의 글자색은
+   토큰을 쓰면 안 된다 — 프로 흰 바탕(theme-light)이 토큰을 「흰 바탕용 진회색」으로 뒤집어
+   어두운 상자 안에서 글씨가 사라졌다(2026-08-21 사장님 QA). 배경이 고정이면 색도 고정으로. */
+.log-console{background:#1a1a19;color:#e9e7e2;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:calc(100vh - 320px);min-height:360px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:12.5px;line-height:1.5;} /* 1.65→1.5 — 「엑셀처럼 촘촘히」(2026-08-21 사장님) · 줄 20.6→18.8px */
 .log-line{white-space:pre-wrap;word-break:break-all;}
-.log-line.log-warn{color:var(--amber);}
+.log-line.log-warn{color:#f0a020;}
 .log-line.log-error{color:#f5928a;}
-.log-ts{color:var(--muted-2);margin-right:6px;}
-.log-src{display:inline-block;min-width:88px;margin-right:8px;padding:0 6px;border-radius:4px;font-size:11.75px;font-weight:800;text-align:center;background:rgba(255,255,255,0.06);color:var(--muted);}
-.log-src.s-console{color:var(--muted-2);}
-.log-src.s-modelscan{background:rgba(139,124,240,0.15);color:var(--purple);}
-.log-src.s-reposcan{background:rgba(59,130,246,0.15);color:var(--blue-light);}
-.log-src.s-extract-doc{background:rgba(30,185,128,0.13);color:var(--teal);}
-.log-src.s-finetune{background:rgba(240,160,32,0.15);color:var(--amber);}
-.log-src.s-hf-download{background:rgba(30,185,128,0.15);color:var(--teal);}
+.log-ts{color:#a49d95;margin-right:6px;}
+.log-src{display:inline-block;min-width:88px;margin-right:8px;padding:0 6px;border-radius:4px;font-size:11.75px;font-weight:800;text-align:center;background:rgba(255,255,255,0.06);color:#b3ada4;}
+.log-src.s-console{color:#a49d95;}
+.log-src.s-modelscan{background:rgba(139,124,240,0.15);color:#8b7cf0;}
+.log-src.s-reposcan{background:rgba(59,130,246,0.15);color:#7ab0ff;}
+.log-src.s-extract-doc{background:rgba(30,185,128,0.13);color:#1eb980;}
+.log-src.s-finetune{background:rgba(240,160,32,0.15);color:#f0a020;}
+.log-src.s-hf-download{background:rgba(30,185,128,0.15);color:#1eb980;}
     .kpi{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
   .kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 16px;}
   .kpi-mini .l{font-size:12px;color:var(--muted);}
@@ -234,7 +237,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function renderLogs() {
     그림띠();
     const shown = activeFilter === "all" ? logEntries : logEntries.filter((e) => (e.source || "console") === activeFilter);
-    logConsole.innerHTML = shown.map(lineHtml).join("") || '<div style="color:var(--muted)">표시할 로그가 없습니다.</div>';
+    logConsole.innerHTML = shown.map(lineHtml).join("") || '<div style="color:#b3ada4">표시할 로그가 없습니다.</div>'; // 고정 어두운 상자 안 — 토큰 금지(위 CSS 주석)
     logConsole.scrollTop = logConsole.scrollHeight;
     // 접힌 채로도 "지금 열어야 하나"를 알 수 있게 오류 수를 배지에 적는다.
     const 오류 = logEntries.filter((e) => /error|err|fail|실패|오류/i.test(String(e.level || "") + " " + String(e.message || ""))).length;

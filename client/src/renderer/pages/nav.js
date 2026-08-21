@@ -1243,7 +1243,14 @@
       if (box.__gijoSumWatch) return;
       box.__gijoSumWatch = true;
       new MutationObserver(function () {
-        if (box.dataset.gijoSum === "1") return;   // 이미 바꿨다 — 우리가 만든 변화다
+        // 화면이 주기 갱신 등으로 요약 칸을 통째로 다시 그리면(innerHTML) 변환된 막대는 사라지고
+        // 표식(gijoSum=1)만 남아 재변환을 스스로 막는다 — 15초 뒤 카드가 날것 세로로 풀리던 결함
+        // (2026-08-21 사장님 QA, 작업 기록). 막대(.gsum)의 실존을 본다 — 없으면 표식을 지우고 다시 바꾼다.
+        if (box.dataset.gijoSum === "1" && !box.querySelector(".gsum")) {
+          delete box.dataset.gijoSum;
+          box.classList.remove("gsum-box");
+        }
+        if (box.dataset.gijoSum === "1") return;   // 막대가 살아 있다 — 우리가 만든 변화다
         요약막대로();
       }).observe(box, { childList: true });
     });

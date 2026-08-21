@@ -280,11 +280,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function renderKpi(summary, retention) {
     const el = document.getElementById("kpiRow");
     const order = ["cli", "approval", "write", "block", "privacy", "auth"];
-    el.innerHTML = `<div class="kpi-mini"><div class="l">전체</div><div class="v" id="kpiTotal">${summary.total}</div></div>` +
-      order.map((k) => `<div class="kpi-mini"><div class="l">${KIND_LABEL[k]}</div><div class="v">${summary.byKind[k] || 0}</div></div>`).join("") +
+    const 값들 = [["전체", String(summary.total)]]
+      .concat(order.map((k) => [KIND_LABEL[k], String(summary.byKind[k] || 0)]))
       // 보관 기간을 같이 보여준다 — 감사 대응 때 "옛날 기록이 왜 없나"를 여기서 바로 답한다.
-      (retention ? `<div class="kpi-mini"><div class="l">보관 기간</div><div class="v" style="font-size:15px;">` +
-        (retention.unlimited ? "무제한" : Math.round(retention.days / 365 * 10) / 10 + "년") + "</div></div>" : "");
+      .concat(retention ? [["보관 기간", retention.unlimited ? "무제한" : Math.round(retention.days / 365 * 10) / 10 + "년"]] : []);
+    // ⚠ 15초 갱신마다 innerHTML로 통째로 다시 그리면 안 된다(2026-08-21 사장님 QA) —
+    //   공용 요약막대(nav.js data-gijo-summary)가 첫 렌더를 한 줄 막대로 바꿔 두는데,
+    //   통째로 갈면 막대가 사라지고 날것 카드가 세로로 풀린다. 시스템 로그(syslog.html
+    //   요약채우기)와 같은 패턴: 처음 한 번만 카드를 만들고, 그다음부터는 **값만** 갈아 끼운다.
+    if (!el.querySelector("[data-k]") && el.dataset.gijoSum !== "1") {
+      // ⚠ 「전체」 값의 id="kpiTotal"은 지우면 안 된다 — 접기 머리 배지(:133 data-gijo-fold-badges)가
+      //   이 id로 숫자를 읽는다(요약막대 부품도 id 붙은 쪽을 값으로 판별한다).
+      el.innerHTML = 값들.map(([l, v]) =>
+        `<div class="kpi-mini"><div class="l">${l}</div><div class="v"${l === "전체" ? ' id="kpiTotal"' : ""} data-k="${l}">${v}</div></div>`).join("");
+      return; // 처음 그렸다 — 변환기가 곧 막대로 바꾼다
+    }
+    값들.forEach(([l, v]) => {
+      const 칸 = el.querySelector(`[data-k="${l}"]`);
+      if (칸) 칸.textContent = v;
+    });
   }
 
   async function load() {
