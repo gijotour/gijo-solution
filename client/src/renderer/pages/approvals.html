@@ -357,7 +357,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       }
     } catch (e) {
       상세칸구하기(list); // ⚠ 여기서도 목록을 통째로 지운다 — 아래 renderList와 같은 파괴다
-      list.innerHTML = '<div class="rv-empty" style="color:#f5928a">불러오지 못했습니다: ' + esc(e.message) + "</div>";
+      list.innerHTML = '<div class="rv-empty" style="color:var(--red-ink, #f5928a)">불러오지 못했습니다: ' + esc(e.message) + "</div>";
       // ⚠ **여기서도 대화창의 보던 목록을 비운다**(2026-08-18 검토 지적). 위 주석이 「목록을 지우는
       //   자리가 둘」이라고 이미 적어 뒀는데 또 한 곳만 막았다. 안 비우면: 3건을 보다 서버 오류로
       //   재조회 실패 → 화면엔 "불러오지 못했습니다" → "이것들 전부 오탐" → **화면에 없는 옛 3건**에 걸린다.
@@ -673,7 +673,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } else if (r.status === "verifying") {
       stageActions = `
         <div class="verify-box"><div class="h">🔁 검증(재스캔)</div>
-          <p>${r.verifyRequestedBy ? `<b>${esc(r.verifyRequestedBy)}</b>이(가) ${fmtDate(r.verifyRequestedAt)} 조치 완료 보고. ` : ""}이 자산을 재스캔해 같은 취약점이 사라졌는지 확인합니다 — 사라지면 <b style="color:var(--teal)">완료</b>로 자동 확정, 여전히 검출되면 <b style="color:#f5928a">재조치</b>로 되돌립니다.</p></div>
+          <p>${r.verifyRequestedBy ? `<b>${esc(r.verifyRequestedBy)}</b>이(가) ${fmtDate(r.verifyRequestedAt)} 조치 완료 보고. ` : ""}이 자산을 재스캔해 같은 취약점이 사라졌는지 확인합니다 — 사라지면 <b style="color:var(--teal)">완료</b>로 자동 확정, 여전히 검출되면 <b style="color:var(--red-ink, #f5928a)">재조치</b>로 되돌립니다.</p></div>
         <div class="actions"><button class="btn verify" id="btnVerifyRun">🔍 조치 검증 실행</button><button class="btn verify" id="btnRescan">🔁 지금 재스캔</button><button class="btn done" data-set="approved">✓ 해결 확인(수동 완료)</button><button class="btn" data-set="in_progress">↩ 진행중으로</button></div>
         <div id="verifyOut"></div>`;
     } else if (r.status === "approved") {
@@ -885,7 +885,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           if (rv) rv.addEventListener("click", () => window.gijo.revealDownload(info.path));
           setTimeout(loadVexSummary, 6000); // 잠시 뒤 원래 칩으로
         } else {
-          box.innerHTML = `<span class="muted-s" style="color:#f5928a">저장 실패(${esc(info.state)})</span>`;
+          box.innerHTML = `<span class="muted-s" style="color:var(--red-ink, #f5928a)">저장 실패(${esc(info.state)})</span>`;
         }
       });
     }

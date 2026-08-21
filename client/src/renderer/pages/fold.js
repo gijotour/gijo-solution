@@ -50,7 +50,7 @@
       ".gjf-h .nm{font-size:12.5px;font-weight:700;color:var(--text-strong,#dfe6ff);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
       ".gjf-b{font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);" +
       "color:var(--muted,#b3ada4);flex:0 0 auto;}" +
-      ".gjf-b.hot{background:rgba(226,72,61,.16);color:#f5928a;}" +
+      ".gjf-b.hot{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);}" +
       ".gjf-b.warn{background:rgba(240,160,32,.16);color:var(--amber,#f0a020);}" +
       ".gjf-b.ok{background:rgba(45,212,191,.14);color:var(--teal,#2dd4bf);}";
     document.head.appendChild(st);

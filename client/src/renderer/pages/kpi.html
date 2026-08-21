@@ -455,7 +455,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           const chart = burndownChart(bd);
           const body = n === 0
             ? `<div class="trend-note">아직 스캔 이력이 없습니다. 취약점 리포트를 업로드하면 재스캔마다 번다운이 그려집니다.</div>`
-            : chart + `<div class="trend-note"><span style="color:#f5928a">●</span> 열린 취약점 &nbsp; <span style="color:#ff5a4d">●</span> 실제 악용(KEV) &nbsp;·&nbsp; ${n < 2 ? "재스캔이 쌓이면 감소 궤적이 나타납니다" : `${n}개 스캔 시점 기준 — 실제 저장된 스캔 이력에서 재구성`}</div>`;
+            : chart + `<div class="trend-note"><span style="color:var(--red-ink, #f5928a)">●</span> 열린 취약점 &nbsp; <span style="color:#ff5a4d">●</span> 실제 악용(KEV) &nbsp;·&nbsp; ${n < 2 ? "재스캔이 쌓이면 감소 궤적이 나타납니다" : `${n}개 스캔 시점 기준 — 실제 저장된 스캔 이력에서 재구성`}</div>`;
           return `<div class="cat" data-gijo-fold="📉 취약점 번다운 (실제 스캔 이력)"><div class="trend-card" style="max-width:680px"><div class="trend-head"><span class="trend-name">열린 취약점 — 재스캔마다 재구성 (줄수록 좋음)</span><span class="trend-now">${net}</span></div>${body}</div></div>`;
         })() +
 
@@ -480,7 +480,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       wireKpi();
       wireTimeSaved(timeSaved);
     } catch (e) {
-      root.innerHTML = '<div style="color:#f5928a">KPI를 불러오지 못했습니다: ' + String(e.message || e).replace(/</g, "&lt;") + "</div>";
+      root.innerHTML = '<div style="color:var(--red-ink, #f5928a)">KPI를 불러오지 못했습니다: ' + String(e.message || e).replace(/</g, "&lt;") + "</div>";
     }
   }
 

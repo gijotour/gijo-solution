@@ -217,7 +217,7 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
           <span style="color:var(--text,#cfd6ea);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">📄 ${esc(d.documentId)}</span>
           <button class="btn" style="padding:2px 9px;font-size:11.75px" data-add="${esc(d.documentId)}">담기</button></div>`).join("") || '<span style="font-size:12.25px;color:var(--muted-2)">올린 문서가 없습니다</span>';
       box.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => addDoc(b.dataset.add)));
-    } catch (e) { box.innerHTML = `<span style="font-size:12.25px;color:#f5928a">목록 실패: ${esc(e.message)}</span>`; }
+    } catch (e) { box.innerHTML = `<span style="font-size:12.25px;color:var(--red-ink, #f5928a)">목록 실패: ${esc(e.message)}</span>`; }
   }
 
   // ── 3단계: 자동 검증 ──
@@ -235,7 +235,7 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
     const body = document.getElementById("verifyBody");
     body.innerHTML = lastReport.results.map((r) => `<tr>
       <td class="doc">${esc(r.documentId)}</td>
-      <td>${r.error ? `<span style="color:#f5928a">${esc(r.error)}</span>` : esc(r.question)}</td>
+      <td>${r.error ? `<span style="color:var(--red-ink, #f5928a)">${esc(r.error)}</span>` : esc(r.question)}</td>
       <td class="src">${(r.sources || []).slice(0, 3).map((s) => esc(s) + (s === r.documentId ? " ✓" : "")).join("<br>") || "(인용 없음)"}</td>
       <td>${r.cited ? '<span class="ok">✓ 인용됨</span>' : '<span class="no">✗ 미인용</span>'}</td></tr>`).join("");
     document.getElementById("verifyTableWrap").style.display = "block";

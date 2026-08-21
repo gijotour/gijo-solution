@@ -547,7 +547,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const r = await window.gijo.analysisAnalyze(id);
       const e = data.events.find(x=>x.id===id); if(e) e.aiSummary = r.aiSummary;
       selectEvent(id); // 요약 포함해 다시 렌더
-    }catch(err){ if(box) box.innerHTML = '<div class="corr" style="color:#f5928a">AI 분석 실패: '+esc(err.message||err)+'</div>'; }
+    }catch(err){ if(box) box.innerHTML = '<div class="corr" style="color:var(--red-ink, #f5928a)">AI 분석 실패: '+esc(err.message||err)+'</div>'; }
   }
   // ⑤ 조치 생성·작업 등록 — 등록되면 대시보드 '오늘의 할일'로 가고,
   //    이 화면에는 변화가 없어 "동작 안 함"으로 보였다. → 위험을 '처리중'으로 전환해 즉시 반영 + 배너 확인.

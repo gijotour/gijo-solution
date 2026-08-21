@@ -342,7 +342,7 @@
         : 첫관측수 >= 결과.length ? " · 기준을 잡았습니다(다음부터 바뀐 것을 알려 드립니다)"
         : " · 최근 바뀐 것 없음";
       head.innerHTML = "<b>현황판</b> " + 결과.length + "개" + 가운데 +
-        (실패수 ? ' · <span style="color:#f5928a;font-weight:700">확인 못 함 ' + 실패수 + "</span>" : "") +
+        (실패수 ? ' · <span style="color:var(--red-ink, #f5928a);font-weight:700">확인 못 함 ' + 실패수 + "</span>" : "") +
         (opt.compact ? '<button class="pv-more" id="pvMore">🗺 전체 보기</button>' : "");
       var more = host.querySelector("#pvMore");
       if (more && opt.onMore) more.addEventListener("click", function (e) { e.stopPropagation(); opt.onMore(); });

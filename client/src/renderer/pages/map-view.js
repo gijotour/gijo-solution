@@ -142,7 +142,7 @@
     return (
       "<h3>" + esc(이름) + "</h3>" +
       '<div><span class="mv-rk" style="background:' + 등급[1] + ";color:" + 등급[2] + '">' + 등급[0] + "</span>" +
-      (rk.kev ? '<span class="mv-rk" style="background:rgba(229,72,77,.4);color:#ffd7d8">🔴 실제 악용 확인</span>' : "") + "</div>" +
+      (rk.kev ? '<span class="mv-rk" style="background:rgba(229,72,77,.4);color:var(--red-ink, #ffd7d8)">🔴 실제 악용 확인</span>' : "") + "</div>" +
       '<div class="mv-row"><div class="mv-lbl">미조치 취약점</div><b style="font-size:16px">' + real.length.toLocaleString() + "건</b></div>" +
       '<div class="mv-row"><div class="mv-lbl">담당</div>' +
       (a.owner ? esc(a.owner) : '<span style="color:var(--amber)">미지정 — 아래에서 바로 배정을 물을 수 있습니다</span>') + "</div>" +

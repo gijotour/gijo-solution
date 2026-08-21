@@ -179,7 +179,7 @@ tr:last-child td{border-bottom:none;}
       document.getElementById("modelA").innerHTML = opts;
       document.getElementById("modelB").innerHTML = opts;
     } catch (e) {
-      body.innerHTML = '<div style="color:#f5928a">도감을 불러오지 못했습니다: ' + e.message + "</div>";
+      body.innerHTML = '<div style="color:var(--red-ink, #f5928a)">도감을 불러오지 못했습니다: ' + e.message + "</div>";
     }
   }
 
@@ -196,7 +196,7 @@ tr:last-child td{border-bottom:none;}
         window.gijo.mergePreflight(idA, idB).catch(() => null),
       ]);
       if (!plan.ok) {
-        r.innerHTML = `<span style="color:#f5928a">✕ 합성 불가 — ${esc(plan.reason || "")}</span>`;
+        r.innerHTML = `<span style="color:var(--red-ink, #f5928a)">✕ 합성 불가 — ${esc(plan.reason || "")}</span>`;
         return;
       }
       const a = plan.modelA, b = plan.modelB;
@@ -220,7 +220,7 @@ tr:last-child td{border-bottom:none;}
         ${pfHtml}
       </div>`;
     } catch (e) {
-      r.innerHTML = '<span style="color:#f5928a">합성 계획 생성 실패: ' + esc(e.message) + '</span>';
+      r.innerHTML = '<span style="color:var(--red-ink, #f5928a)">합성 계획 생성 실패: ' + esc(e.message) + '</span>';
     }
   }
 

@@ -596,7 +596,7 @@ tr:last-child td{border-bottom:none;}
     body.textContent = rescan ? "다시 점검 중…" : "점검 중…";
     var r;
     try { r = rescan ? await window.gijo.kbHygieneScan() : await window.gijo.kbHygiene(); }
-    catch (e) { body.innerHTML = '<span style="color:#f5928a">점검 실패: ' + dmEsc(e.message || e) + "</span>"; return; }
+    catch (e) { body.innerHTML = '<span style="color:var(--red-ink, #f5928a)">점검 실패: ' + dmEsc(e.message || e) + "</span>"; return; }
     document.getElementById("hygienePanel").style.borderColor = r.clean ? "var(--border)" : "rgba(240,160,32,0.35)";
     // 배지가 읽을 숫자를 먼저 적고 접기 도우미에 알린다(접힌 채로도 "열어야 하나"를 알 수 있게).
     // ⚠ 필드 이름은 **짐작하지 않는다** — problems로 썼다가 늘 0이 나와 배지가 안 떴다
@@ -757,7 +757,7 @@ tr:last-child td{border-bottom:none;}
     const scopeShort = d.scope === "global" ? "전역" : d.scope;
     const scopeLabel = d.scope === "global" ? "전역(공유)" : d.scope + " 전용";
     const classBadge = d.docClass ? ` · 분류: <b style="color:var(--blue-light)">${dmEsc(d.docClass)}</b>` : "";
-    const whoBadge = d.uploadedBy ? ` · 올린이: <b style="color:#6fdcb5">${dmEsc(d.uploadedBy)}</b>` : ""; // 작업 귀속(2026-07-25)
+    const whoBadge = d.uploadedBy ? ` · 올린이: <b style="color:var(--teal, #6fdcb5)">${dmEsc(d.uploadedBy)}</b>` : ""; // 작업 귀속(2026-07-25)
     const cat = dmCatOf(d);
     const catBadge = ` · <span class="dm-catb c${dmEsc(cat)}">🗂 ${dmEsc(cat)}</span><button class="mem-cat-fix" id="dmCatFix">영역 수정 ▾</button>`;
     const openBtn = d.hasSource
@@ -893,7 +893,7 @@ tr:last-child td{border-bottom:none;}
     } catch (e) {
       btn.disabled = false; btn.textContent = "삭제"; btn.style.background = "";
       const box = document.querySelector("#dmDetail .dm-delbox");
-      if (box) box.insertAdjacentHTML("beforeend", '<div style="color:#f5928a;font-size:12.25px;margin-top:6px">삭제 실패: ' + dmEsc(e.message) + '</div>');
+      if (box) box.insertAdjacentHTML("beforeend", '<div style="color:var(--red-ink, #f5928a);font-size:12.25px;margin-top:6px">삭제 실패: ' + dmEsc(e.message) + '</div>');
     }
   }
 
@@ -928,7 +928,7 @@ tr:last-child td{border-bottom:none;}
         const row = document.createElement("div");
         row.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 2px;font-size:12.25px;border-bottom:1px solid var(--border)";
         const nm = document.createElement("span");
-        nm.style.cssText = "color:#cfd6ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+        nm.style.cssText = "color:var(--text, #cfd6ea);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
         nm.textContent = "📄 " + d.documentId;
         const btn = document.createElement("button");
         btn.className = "btn-ghost";

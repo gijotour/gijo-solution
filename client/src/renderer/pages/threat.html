@@ -146,7 +146,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
 <div class="kpi-strip" style="grid-template-columns:repeat(4,1fr)" data-gijo-summary>
   <div class="kpi-mini"><div class="kpi-mini-label">수집 중인 CTI 벤더</div><div class="kpi-mini-value" id="connectedFeedCount">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">탐지 내역</div><div class="kpi-mini-value" id="findingCount">-</div></div>
-  <div class="kpi-mini"><div class="kpi-mini-label">긴급 탐지</div><div class="kpi-mini-value" style="color:#f5928a" id="criticalCount">-</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">긴급 탐지</div><div class="kpi-mini-value" style="color:var(--red-ink, #f5928a)" id="criticalCount">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">영향받는 내부 자산</div><div class="kpi-mini-value" style="color:var(--amber)" id="affectedAssetCount">-</div></div>
 </div>
 
@@ -346,7 +346,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
       renderFindings(await window.gijo.listCtiFindings());
     } catch (e) {
       findingsBodyEl.innerHTML =
-        '<tr><td colspan="5" style="color:#f5928a;text-align:center;padding:28px 10px">탐지 내역을 불러오지 못했습니다. 서버 연결 상태를 확인하세요.</td></tr>';
+        '<tr><td colspan="5" style="color:var(--red-ink, #f5928a);text-align:center;padding:28px 10px">탐지 내역을 불러오지 못했습니다. 서버 연결 상태를 확인하세요.</td></tr>';
     }
   }
 
@@ -381,7 +381,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
         })
         .join("");
     } catch (e) {
-      body.innerHTML = '<div style="color:#f5928a;font-size:12px">매칭을 불러오지 못했습니다: ' + esc(e.message) + "</div>";
+      body.innerHTML = '<div style="color:var(--red-ink, #f5928a);font-size:12px">매칭을 불러오지 못했습니다: ' + esc(e.message) + "</div>";
     }
   }
   const modal = document.getElementById("apiKeyModal");

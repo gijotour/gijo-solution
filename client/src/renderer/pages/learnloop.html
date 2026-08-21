@@ -124,7 +124,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .lt-취약점{color:var(--red-ink, #f5928a);background:rgba(226,72,61,.12);}
 .lt-장비운영{color:var(--blue-light);background:rgba(59,130,246,.13);}
 .lt-사내규정{color:var(--amber);background:rgba(240,160,32,.13);}
-.lt-위협대응{color:var(--purple, var(--purple));background:rgba(139,124,240,.14);}
+.lt-위협대응{color:var(--purple, #8b7cf0);background:rgba(139,124,240,.14);}
 .lt-미분류{color:var(--muted-2);background:rgba(255,255,255,.05);}
 .lc-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:8px;}
 .lc-card.lc-dim{opacity:.75;}
@@ -419,7 +419,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           ).join("")
         : '<div style="color:var(--muted);font-size:12px">' + (ltFilter ? esc(ltFilter) + ' 주제의 후보가 지금은 없습니다 — 칩을 다시 눌러 전체를 보세요.' : '지금은 후보가 없습니다 — 대화가 더 쌓이면 코드가 다시 골라 놓습니다.') + '</div>';
     } catch (e) {
-      list.innerHTML = '<div style="color:#f5928a;font-size:12px">후보를 불러오지 못했습니다: ' + esc((e && e.message) || e) + "</div>";
+      list.innerHTML = '<div style="color:var(--red-ink, #f5928a);font-size:12px">후보를 불러오지 못했습니다: ' + esc((e && e.message) || e) + "</div>";
     }
   }
 
@@ -473,7 +473,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         ? logs.map(logRowHtml).join("")
         : '<div style="color:var(--muted-2);font-size:12px">아직 수집된 대화가 없습니다 — 에이전트 AI 화면이나 대시보드에서 대화하면 자동으로 쌓입니다.</div>';
     } catch (e) {
-      document.getElementById("logList").innerHTML = '<div style="color:#f5928a;font-size:12px">불러오지 못했습니다: ' + e.message + "</div>";
+      document.getElementById("logList").innerHTML = '<div style="color:var(--red-ink, #f5928a);font-size:12px">불러오지 못했습니다: ' + e.message + "</div>";
     }
   }
 
@@ -526,7 +526,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         : '<div style="color:var(--muted-2);font-size:12px">실행 이력이 없습니다.</div>';
       return latest;
     } catch (e) {
-      document.getElementById("runsList").innerHTML = '<div style="color:#f5928a;font-size:12px">불러오지 못했습니다: ' + e.message + "</div>";
+      document.getElementById("runsList").innerHTML = '<div style="color:var(--red-ink, #f5928a);font-size:12px">불러오지 못했습니다: ' + e.message + "</div>";
     }
   }
 

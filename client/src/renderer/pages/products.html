@@ -273,7 +273,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const pending = mine.filter((m) => m.status === "reported").length;
     const next = mine.filter((m) => m.status === "scheduled" && m.scheduleDate > today).sort((a, b) => a.scheduleDate.localeCompare(b.scheduleDate))[0];
     const parts = [
-      overdue ? `<span style="color:#f5928a;font-weight:800">지연 ${overdue}</span>` : "",
+      overdue ? `<span style="color:var(--red-ink, #f5928a);font-weight:800">지연 ${overdue}</span>` : "",
       pending ? `<span style="color:var(--amber);font-weight:800">승인대기 ${pending}</span>` : "",
       next ? `다음 점검 ${esc(next.scheduleDate)}` : "",
       !overdue && !pending && !next ? `<span style="color:var(--teal)">점검 완료</span>` : "",
@@ -384,7 +384,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         fieldsState[pid] = { fields };
         panel.innerHTML = fieldsPanelHtml(pid, fields);
       } catch (e) {
-        panel.innerHTML = `<div style="color:#f5928a;font-size:12.25px">불러오기 실패: ${esc((e && e.message) || e)}</div>`;
+        panel.innerHTML = `<div style="color:var(--red-ink, #f5928a);font-size:12.25px">불러오기 실패: ${esc((e && e.message) || e)}</div>`;
       }
     }
   }
@@ -606,7 +606,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (window.gijoFitList) window.gijoFitList(root.querySelector(".g-rows-scroll"));
       선택표시반영(); // 재렌더가 innerHTML을 갈아도 고른 카드 표시를 되살린다
     } catch (e) {
-      root.innerHTML = `<div style="color:#f5928a;font-size:12px">불러오기 실패: ${esc(e.message || e)}</div>`;
+      root.innerHTML = `<div style="color:var(--red-ink, #f5928a);font-size:12px">불러오기 실패: ${esc(e.message || e)}</div>`;
     }
   }
 

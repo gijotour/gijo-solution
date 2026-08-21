@@ -84,7 +84,7 @@
       ".cs-flow .st.now{background:rgba(30,185,128,.12);border-color:rgba(30,185,128,.5);color:var(--teal,#5fe0aa);font-weight:800;cursor:default;}",
       // 살아 있는 숫자 — 그 화면의 요약 1줄(절차 띠 데이터 재사용, 새 계산 없음)
       ".cs-live{margin-left:auto;font-size:11.5px;color:var(--muted,#b3ada4);white-space:nowrap;}",
-      ".cs-live b{color:#f5928a;font-weight:800;}",
+      ".cs-live b{color:var(--red-ink, #f5928a);font-weight:800;}",
       // 📌 선택 칩 — 화면에서 고른 항목이 「이거」가 된다(2026-08-09 2단계)
       // 맥락 한 줄(.cs-line) — 칩 3종(.cs-ctx/.cs-sel/.cs-scope)+상세 박스(.cs-state)를 사람 말
       // 한 문장으로 합친다(승인 시안 mockups/pro-context-strip, 2026-08-20 QA 「보기 너무 어렵다」).
@@ -159,7 +159,7 @@
       ".cs-cat{display:flex;align-items:center;gap:6px;padding:7px 11px 3px;font-size:11.75px;font-weight:800;color:var(--muted-2,#a49d95);}",
       ".cs-bd{font-size:11px;font-weight:800;border-radius:4px;padding:1px 5px;}",
       ".b-here{color:var(--teal,#1eb980);background:rgba(30,185,128,.16);}",
-      ".b-ok{color:#f0a020;background:rgba(240,160,32,.16);}",
+      ".b-ok{color:var(--amber, #f0a020);background:rgba(240,160,32,.16);}",
       ".b-go{color:var(--muted,#b3ada4);background:rgba(255,255,255,.07);}",
       ".cs-q{display:flex;align-items:center;gap:7px;margin:3px 11px;padding:6px 10px;border-radius:7px;",
       "  background:var(--bg,#262624);border:1px solid var(--border-strong,rgba(255,255,255,.16));",
@@ -240,7 +240,7 @@
       ".cs-row .cs-apgo:disabled{background:rgba(255,255,255,.10);color:var(--muted-2,#a49d95);cursor:default;}",
       ".cs-row .cs-apno{font-size:12.5px;font-weight:700;color:var(--muted,#b3ada4);background:none;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}",
       ".cs-row .cs-apd{font-size:12px;color:var(--muted,#b3ada4);}",
-      ".cs-row.error .cm{color:#f5928a;}",
+      ".cs-row.error .cm{color:var(--red-ink, #f5928a);}",
       ".cs-typing span{display:inline-block;width:5px;height:5px;margin-right:3px;border-radius:50%;background:var(--muted,#b3ada4);animation:csb 1s infinite;}",
       ".cs-typing span:nth-child(2){animation-delay:.15s}.cs-typing span:nth-child(3){animation-delay:.3s}",
       "@keyframes csb{0%,60%,100%{opacity:.25}30%{opacity:1}}",
@@ -528,7 +528,7 @@
     //   담당자가 가장 많이 쓰는 자리에서 "무엇을 보고 답했는지"가 안 보이고 있었다.
     if (el && Array.isArray(sources) && sources.length) {
       var badge = document.createElement("div");
-      badge.style.cssText = "margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5";
+      badge.style.cssText = "margin-top:6px;font-size:11.5px;font-weight:700;color:var(--teal, #6fdcb5)";
       badge.textContent = "📄 근거: " + sources.slice(0, 4).join(" · ");
       el.appendChild(badge);
     }
@@ -556,7 +556,7 @@
         var safe = esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         try {
           txt = txt.replace(new RegExp(safe, "g"),
-            '<mark style="background:rgba(240,160,32,.28);color:#ffd88a;padding:0 2px;border-radius:3px">$&</mark>');
+            '<mark style="background:rgba(240,160,32,.28);color:var(--amber, #ffd88a);padding:0 2px;border-radius:3px">$&</mark>');
         } catch (e) {}
       });
       box.innerHTML =

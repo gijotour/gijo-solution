@@ -548,7 +548,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     try {
       assets = (await window.gijo.listAssets()).filter((a) => a.assetType === "infra-host");
     } catch (e) {
-      hostRows.innerHTML = '<tr><td colspan="4" style="color:#f5928a">자산을 불러오지 못했습니다</td></tr>';
+      hostRows.innerHTML = '<tr><td colspan="4" style="color:var(--red-ink, #f5928a)">자산을 불러오지 못했습니다</td></tr>';
       return;
     }
     // ★ 총계는 **전체 자산**으로 먼저 낸다(2026-08-05, 전-7 ①). 막대를 눌러 목록을 좁혀도

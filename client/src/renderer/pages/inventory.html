@@ -214,7 +214,7 @@
   .mv-edge-entry{stroke:#f5928a;stroke-dasharray:4 3;}
   .mv-edge-lateral{stroke:#8fb8ff;}
   .mv-tile.mv-foothold{box-shadow:0 0 0 2px rgba(245,146,138,.8);}
-  .mv-path-toggle.on{background:rgba(245,146,138,.18);border-color:#f5928a;color:var(--red-ink, #ffd7d8);}
+  .mv-path-toggle.on{background:rgba(245,146,138,.18);border-color:var(--red-ink, #f5928a);color:var(--red-ink, #ffd7d8);}
   .mv-side{width:320px;border-left:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;}
   .mv-side h3{margin:0;font-size:13.5px;}
   .mv-rk{font-size:11.5px;padding:2px 8px;border-radius:4px;display:inline-block;margin-right:6px;}
@@ -381,7 +381,7 @@
         <!-- ③ 일괄 선택 삭제 바 — 체크박스로 하나 이상 고르면 나타난다. -->
         <div id="bulkBar" style="display:none;align-items:center;gap:12px;margin:0 0 10px;padding:8px 14px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:10px;">
           <span style="font-size:12.5px;font-weight:700;color:var(--blue-light)"><b id="bulkCount">0</b>개 선택됨</span>
-          <button id="bulkDeleteBtn" style="background:rgba(226,72,61,.16);border:1px solid rgba(226,72,61,.5);color:#f5928a;font-size:12px;font-weight:800;padding:6px 14px;border-radius:8px;cursor:pointer">🗑 선택 삭제</button>
+          <button id="bulkDeleteBtn" style="background:rgba(226,72,61,.16);border:1px solid rgba(226,72,61,.5);color:var(--red-ink, #f5928a);font-size:12px;font-weight:800;padding:6px 14px;border-radius:8px;cursor:pointer">🗑 선택 삭제</button>
           <span id="bulkClear" style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:600">선택 해제</span>
         </div>
 
@@ -1326,7 +1326,7 @@
       window.gijoMapView.overlay(zones, window.__mapShown || [], paths, mapFocus);
       const lg = document.getElementById("mapLegend");
       if (lg) lg.innerHTML = mapPathsOn
-        ? '<span style="color:#f5928a">━ ┈ 진입(어디로 들어오나)</span> · 붉은 테=거점 · <b>거점을 누르면</b> <span style="color:#8fb8ff">━ 인접 이동</span>을 펼칩니다 · 관측된 신호만'
+        ? '<span style="color:var(--red-ink, #f5928a)">━ ┈ 진입(어디로 들어오나)</span> · 붉은 테=거점 · <b>거점을 누르면</b> <span style="color:var(--blue-light, #8fb8ff)">━ 인접 이동</span>을 펼칩니다 · 관측된 신호만'
         : "색=위험 등급 · 타일 크기=미조치 취약점 수 · 구획=네트워크 대역";
     });
   }
@@ -1386,7 +1386,7 @@
         const im = IMPACT[s.impactLevel] || IMPACT.none;
         const factors = [];
         if (s.highRiskAssets) factors.push(`고위험 자산 ${s.highRiskAssets}`);
-        if (s.ctiAffectedAssets) factors.push(`<span style="color:#f5928a">CTI 위협 ${s.ctiAffectedAssets}</span>`);
+        if (s.ctiAffectedAssets) factors.push(`<span style="color:var(--red-ink, #f5928a)">CTI 위협 ${s.ctiAffectedAssets}</span>`);
         if (s.overdueInspections) factors.push(`<span style="color:var(--amber)">지연 점검 ${s.overdueInspections}</span>`);
         const factorsStr = factors.length ? factors.join(" · ") : "위험 요인 없음";
         // ⚠ 자산 이름을 **전부 늘어놓지 않는다**(2026-08-04). 「미지정」 하나에 자산 53개가
@@ -1403,7 +1403,7 @@
       }).join("") +
       (summary.unassignedAssets ? `<div style="font-size:12.25px;color:var(--muted-2);margin-top:2px;">※ 서비스 미지정 자산 ${summary.unassignedAssets}건 — 자산 등록 시 '지원 서비스'를 지정하세요.</div>` : "");
     } catch (e) {
-      body.innerHTML = '<div style="color:#f5928a;font-size:12px">서비스 영향도를 불러오지 못했습니다: ' + e.message + "</div>";
+      body.innerHTML = '<div style="color:var(--red-ink, #f5928a);font-size:12px">서비스 영향도를 불러오지 못했습니다: ' + e.message + "</div>";
     }
   }
 

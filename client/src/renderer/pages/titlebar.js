@@ -33,7 +33,7 @@
     ".gtb-sess-mi{padding:8px 10px;border-radius:7px;font-size:12px;color:#e9e7e2;cursor:pointer;font-weight:700;}",
     ".gtb-sess-mi:hover{background:rgba(59,130,246,.12);}",
     ".gtb-sess-mi .sub{font-size:11.75px;color:#a49d95;font-weight:500;margin-top:2px;}",
-    ".gtb-gear{-webkit-app-region:no-drag;width:24px;height:24px;border-radius:8px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);display:flex;align-items:center;justify-content:center;font-size:13px;color:#cfe0ff;cursor:pointer;position:relative;flex:0 0 auto;}",
+    ".gtb-gear{-webkit-app-region:no-drag;width:24px;height:24px;border-radius:8px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--blue-light, #cfe0ff);cursor:pointer;position:relative;flex:0 0 auto;}",
     // ── 사용자 영역(왼쪽 패널 하단) ──
     // 높이는 셸 하단바(.shellfoot 34px)와 **같아야 한다**(2026-08-02 사용자 지시 "세로길이도 맞춰줘").
     //   왼쪽 사용자 줄과 오른쪽 하단바가 한 띠로 이어져 보이는 자리다 — 어긋나면 계단처럼 보인다.
@@ -47,10 +47,10 @@
     ".gtb-menu-panel .mp-g{font-size:11.5px;font-weight:800;color:#a49d95;letter-spacing:1px;margin:10px 6px 4px;}",
     ".gtb-menu-panel .mp-i{padding:8px 12px;font-size:12.5px;font-weight:600;color:#b3ada4;border-radius:8px;cursor:pointer;margin-bottom:1px;}",
     ".gtb-menu-panel .mp-i:hover{background:rgba(59,130,246,.12);color:#fff;}",
-    ".gtb-userarea .ua-upd{display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:#f0a020;padding:3px 9px;border-radius:14px;font-size:12px;font-weight:800;cursor:pointer;align-self:flex-start;}",
+    ".gtb-userarea .ua-upd{display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:var(--amber, #f0a020);padding:3px 9px;border-radius:14px;font-size:12px;font-weight:800;cursor:pointer;align-self:flex-start;}",
     ".gtb-userarea .ua-row{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;}",
     ".gtb-userarea .ua-avatar{width:22px;height:22px;border-radius:50%;background:var(--blue,#3b82f6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.25px;font-weight:800;flex:0 0 auto;}",
-    ".gtb-userarea .ua-name{flex:1;font-size:12.5px;font-weight:700;color:#dfe6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+    ".gtb-userarea .ua-name{flex:1;font-size:12.5px;font-weight:700;color:var(--text-strong, #dfe6ff);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
     // ⚙ 드롭다운(공통 — 위/아래 방향은 JS가 지정)
     ".gtb-menu{position:fixed;width:268px;background:#35342f;border:1px solid rgba(255,255,255,.16);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);padding:8px;z-index:990;font-size:12.5px;-webkit-app-region:no-drag;}",
     ".gtb-menu .sec{font-size:11.75px;font-weight:800;color:#a49d95;letter-spacing:1px;padding:6px 10px 4px;}",
@@ -66,7 +66,7 @@
     ".gtb-mhead{display:flex;align-items:center;gap:8px;padding:4px 4px 8px 10px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:6px;}",
     ".gtb-mhead .t{font-size:13.5px;font-weight:800;color:#e9e7e2;flex:1;}",
     ".gtb-mx{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#a49d95;font-size:12.5px;cursor:pointer;flex:0 0 auto;}",
-    ".gtb-mx:hover{background:rgba(226,72,61,.16);color:#f5928a;}",
+    ".gtb-mx:hover{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);}",
 
     // 공용 헤더(2026-08-07) — 화면마다 두던 .header 사본 23개를 지우고 여기서 하나로 그린다.
     ".header.gtb-made{display:flex;align-items:center;justify-content:space-between;min-height:" + BAR_H + "px;",
@@ -500,7 +500,7 @@
       원격칩.style.cssText =
         "-webkit-app-region:no-drag;display:flex;align-items:center;gap:5px;padding:3px 10px;" +
         "border-radius:16px;font-size:12.25px;font-weight:800;white-space:nowrap;cursor:default;" +
-        "background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.45);color:#f0a020;";
+        "background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.45);color:var(--amber, #f0a020);";
       원격칩.title = "이 PC 대신 VPN 안의 원격 GPU가 답하고 있습니다 — 질문이 그 기계로 전송됩니다. 끄는 것은 관리자(설정 › 연동 › 원격 GPU)입니다.";
       원격칩.textContent = "🖧 원격 GPU로 전송 중";
       var clock = right.querySelector(".tb-clock, .gtb-clock");

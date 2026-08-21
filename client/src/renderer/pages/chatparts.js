@@ -69,7 +69,7 @@
       ".dc-kpi:last-child{border-right:0;}",
       ".dc-kl{font-size:11.5px;color:var(--muted-2,#a49d95);}",
       ".dc-kv{font-size:15px;font-weight:800;color:var(--text,#e9e7e2);}",
-      ".dc-kv.ok{color:var(--teal,#1eb980);} .dc-kv.warn{color:var(--amber,#f0a020);} .dc-kv.bad{color:#f5928a;} .dc-kv.muted{color:var(--muted-2,#a49d95);}",
+      ".dc-kv.ok{color:var(--teal,#1eb980);} .dc-kv.warn{color:var(--amber,#f0a020);} .dc-kv.bad{color:var(--red-ink, #f5928a);} .dc-kv.muted{color:var(--muted-2,#a49d95);}",
       ".dc-card table{width:100%;border-collapse:collapse;font-size:12.25px;}",
       ".dc-card th{text-align:left;padding:3px 10px;color:var(--muted-2,#a49d95);font-size:11.5px;border-bottom:1px solid rgba(255,255,255,.08);}",
       ".dc-card td{padding:3px 10px;line-height:1.35;border-bottom:1px solid rgba(255,255,255,.05);}",
@@ -91,7 +91,7 @@
       ".dc-tile.ok{background:rgba(30,185,128,.14);border-color:rgba(30,185,128,.45);}",
       // ⚠ 시안은 10px였으나 가독성 계약(11px 미만 금지)에 맞춰 11px로 올렸다
       ".dc-tv{font-size:11px;font-weight:800;letter-spacing:.2px;}",
-      ".dc-tv.bad{color:#f5928a;} .dc-tv.warn{color:var(--amber,#f0a020);} .dc-tv.ok{color:var(--teal,#1eb980);} .dc-tv.muted{color:var(--muted-2,#a49d95);}",
+      ".dc-tv.bad{color:var(--red-ink, #f5928a);} .dc-tv.warn{color:var(--amber,#f0a020);} .dc-tv.ok{color:var(--teal,#1eb980);} .dc-tv.muted{color:var(--muted-2,#a49d95);}",
       ".dc-tl{font-size:11.5px;font-weight:700;color:var(--text,#e9e7e2);line-height:1.3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       ".dc-ts{font-size:11px;color:var(--muted-2,#a49d95);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       // ➡ 다음 작업 칩(QA ④) — 답 꼬리의 낮은 존재감 한 줄(제안이지 재촉이 아니다)
@@ -106,7 +106,7 @@
       ".gcp-q{border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);padding:7px 10px;border-radius:0 6px 6px 0;margin-bottom:6px;}",
       ".gcp-qd{font-size:11.5px;color:var(--muted-2,#a49d95);margin-bottom:3px;}",
       ".gcp-qt{font-size:12.25px;line-height:1.75;color:#cdd4e6;}",
-      ".gcp-qt mark{background:rgba(240,160,32,.28);color:#ffd88a;padding:0 2px;border-radius:3px;}",
+      ".gcp-qt mark{background:rgba(240,160,32,.28);color:var(--amber, #ffd88a);padding:0 2px;border-radius:3px;}",
     ].join("\n");
     document.head.appendChild(st);
   }

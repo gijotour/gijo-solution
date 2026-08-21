@@ -139,7 +139,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <div style="color:var(--text);">${critList(c.good)}</div>
         </div>
         <div>
-          <div style="color:#f5928a;font-weight:800;margin-bottom:3px;">✕ 취약 판정 기준</div>
+          <div style="color:var(--red-ink, #f5928a);font-weight:800;margin-bottom:3px;">✕ 취약 판정 기준</div>
           <div style="color:var(--text);">${critList(c.weak)}</div>
         </div>
       </div>
@@ -310,7 +310,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       catalog = await window.gijo.listCompliance();
       render();
     } catch (e) {
-      document.getElementById("catalog").innerHTML = '<div style="color:#f5928a">위협 카탈로그를 불러오지 못했습니다: ' + e.message + "</div>";
+      document.getElementById("catalog").innerHTML = '<div style="color:var(--red-ink, #f5928a)">위협 카탈로그를 불러오지 못했습니다: ' + e.message + "</div>";
     }
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
