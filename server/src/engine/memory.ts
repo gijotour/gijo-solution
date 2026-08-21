@@ -1300,11 +1300,15 @@ export function registerMemoryRoutes(app: Express): void {
     "/api/memory/ingest-file",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      const { filename, content, scope, origin, keepOriginal } = req.body as { filename?: string; content?: string; scope?: string; origin?: string; keepOriginal?: boolean };
-      if (!filename || !content) {
+      const { filename: rawFilename, content, scope, origin, keepOriginal } = req.body as { filename?: string; content?: string; scope?: string; origin?: string; keepOriginal?: boolean };
+      if (!rawFilename || !content) {
         res.status(400).json({ error: "filename과 content(base64)가 필요합니다" });
         return;
       }
+      // ⚠ 파일명을 basename으로 접는다 — 경로 구분자(슬래시) 든 documentId는 .md가 basename으로만
+      //   키잉돼(전체 documentId로 보는 등급 검사와 어긋나) O등급 사용자가 남의 기밀 .md를 읽거나 덮는
+      //   통로가 된다(검토관 2026-08-22 재검토 [중] 확정). documentId=basename로 못박아 .md ↔ 문서 1:1.
+      const filename = path.basename(String(rawFilename));
       try {
         const { extractDocumentText } = await import("./dataset.js");
         const text = await extractDocumentText(filename, content);
@@ -1540,9 +1544,10 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(404).json({ error: "그런 문서가 없습니다" });
         return;
       }
-      // ⚠ 아래는 basename으로 .md를 읽는다 — 경로 조작(./기밀.pdf)이 등급 검사를 우회한다(열람불가는
-      //   전체 documentId로 grade를 보는데 그 문자열은 SQLite에 없어 통과). 실재 문서만 허용해 막는다
-      //   (exact documentId가 SQLite에 있어야 — 없으면 404). 검토관 2026-08-22 [높음].
+      // ⚠ .md는 basename으로 키잉된다 — documentId가 basename과 다르면(경로 포함·"./"·후행 슬래시)
+      //   전체 documentId로 보는 등급 검사와 어긋나 남의 기밀 .md를 가리킨다(검토관 2026-08-22 재검토 [중]).
+      //   ① 이름=basename만 허용(경로조작·형제충돌 차단) ② 실재 문서만(팬텀 차단). documentId ↔ .md 1:1.
+      if (path.basename(String(documentId)) !== String(documentId)) { res.status(400).json({ error: "잘못된 문서 이름입니다" }); return; }
       if (!getDocMetaStmt.get(String(documentId))) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
       try {
         const mdFile = assertWithinIngestRoot(path.join(INGEST_ROOT, "docs", "extracted", path.basename(String(documentId)) + ".md"));
@@ -1567,8 +1572,9 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(404).json({ error: "그런 문서가 없습니다" });
         return;
       }
-      // ⚠ 실재 문서만 — 경로 조작이 basename으로 남의 .md를 덮어쓰거나 팬텀 행(기본 grade O)을
-      //   만드는 것을 막는다(검토관 2026-08-22 [높음], markdown 읽기와 같은 뿌리).
+      // ⚠ 이름=basename만 허용 + 실재 문서만 — 경로 포함 documentId가 basename으로 남의(기밀) .md를
+      //   덮거나 팬텀 행을 만드는 것을 막는다(검토관 2026-08-22 재검토 [중], markdown 읽기와 같은 뿌리).
+      if (path.basename(String(documentId)) !== String(documentId)) { res.status(400).json({ error: "잘못된 문서 이름입니다" }); return; }
       if (!getDocMetaStmt.get(String(documentId))) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
       // 문서 본문도 LLM(임베딩)에 닿는 경로라 관문을 지난다(memory/query와 같은 이유 — 인젝션 차단).
       const gate = gateUserInput(text.slice(0, 2000), "memory-query");

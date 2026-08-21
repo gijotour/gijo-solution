@@ -221,6 +221,12 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     expect(md, "markdown이 실재검사 없이 basename을 읽는다 — ./기밀.pdf 우회").toContain("getDocMetaStmt.get(String(documentId))");
     const sv = memSrc.slice(memSrc.indexOf('"/api/memory/document/markdown/save"'), memSrc.indexOf('"/api/memory/document/markdown/save"') + 900);
     expect(sv, "markdown/save가 실재검사 없이 basename을 쓴다 — 남의 .md 덮어쓰기").toContain("getDocMetaStmt.get(String(documentId))");
+    // ③ markdown 읽기·쓰기는 이름=basename만 허용 — 형제 basename 충돌로 남의 기밀 .md를 읽거나 덮는 우회 차단(재검토 [중] 확정)
+    expect(md, "markdown이 basename≠documentId를 안 거른다 — 형제 충돌 우회").toContain("path.basename(String(documentId)) !== String(documentId)");
+    expect(sv, "markdown/save가 basename≠documentId를 안 거른다").toContain("path.basename(String(documentId)) !== String(documentId)");
+    // ④ 업로드가 파일명을 basename으로 접는다 — 애초에 경로 든 documentId를 못 만들게(뿌리 차단)
+    const ingest = memSrc.slice(memSrc.indexOf('"/api/memory/ingest-file"'), memSrc.indexOf('"/api/memory/ingest-file"') + 800);
+    expect(ingest, "ingest-file이 파일명을 basename으로 안 접는다 — 경로 든 documentId 허용").toContain("path.basename(String(rawFilename))");
   });
 
   it("★ 등급은 서버가 읽는다 — 요청이 주장할 수 없다", () => {
