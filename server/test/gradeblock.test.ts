@@ -174,6 +174,33 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     expect(toolSrc, "AI 도구가 전체 목록을 그대로 보여 준다").not.toContain("await listDocuments()");
   });
 
+  it("★ 직접-열람 창구(원본·추출본·조각·목록)도 등급으로 막는다 — 파일로 새던 구멍(2026-08-22 설계관 적발)", () => {
+    // 검색은 hiddenDocIds가 막지만, 파일을 통째로 내주는 라우트들엔 등급 검사가 없어
+    // 기밀(C) 문서가 그대로 샜다(document/file은 소유자 검사조차 없었다). 잣대는 한 곳(열람불가).
+    const memSrc = fs.readFileSync(new URL("../src/engine/memory.ts", import.meta.url), "utf8");
+    // ① 단일 잣대 열람불가가 개인격리 + 등급을 함께 본다
+    const iHelper = memSrc.indexOf("const 열람불가 =");
+    expect(iHelper, "열람불가 헬퍼가 없다 — 직접-열람 등급 검사가 사라졌다").toBeGreaterThan(0);
+    const 헬퍼 = memSrc.slice(iHelper, iHelper + 500);
+    expect(헬퍼, "열람불가가 등급(blockedGrades)을 안 본다").toContain("blockedGrades(clearanceOf");
+    expect(헬퍼, "열람불가가 개인격리(남의개인문서인가)를 안 본다").toContain("남의개인문서인가");
+    // ② 네 직접-열람 라우트가 그 잣대를 실제로 건다
+    for (const route of [
+      '"/api/memory/document/file"',
+      '"/api/memory/document/markdown"',
+      '"/api/memory/document/markdown/save"',
+      '"/api/memory/document/chunks"',
+    ]) {
+      const i = memSrc.indexOf(route);
+      expect(i, `${route} 라우트를 못 찾았다 — 시험이 헛돈다`).toBeGreaterThan(0);
+      const 라우트 = memSrc.slice(i, i + 900);
+      expect(라우트, `${route}가 열람불가로 등급을 안 막는다`).toContain("열람불가(String(documentId), req)");
+    }
+    // ③ 문서 목록도 등급으로 거른다(제목 수준 누출 차단)
+    const iList = memSrc.indexOf('"/api/memory/documents"');
+    expect(memSrc.slice(iList, iList + 300), "문서 목록이 열람불가로 안 거른다").toContain("!열람불가(d.documentId, req)");
+  });
+
   it("★ 등급은 서버가 읽는다 — 요청이 주장할 수 없다", () => {
     // 클라이언트가 clearance를 보내 올릴 수 있으면 통제 전체가 무의미하다.
     // 두 입구 모두 req.body가 아니라 **로그인 사용자**에서 읽어야 한다.
