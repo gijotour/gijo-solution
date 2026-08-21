@@ -630,8 +630,14 @@ function 다음단계붙이기(answer: string, calls: AgentToolCall[]): string {
 function isOntologyOnly(result: string): boolean {
   const 줄 = result.split("\n").map((l) => l.trim()).filter(Boolean);
   const 관계줄 = 줄.filter((l) => /—\[[^\]]+\]→/.test(l));
-  const 헤더줄 = 줄.filter((l) => /온톨로지/.test(l)); // "온톨로지 관계:" 등
-  return 관계줄.length > 0 && 관계줄.length + 헤더줄.length === 줄.length;
+  // 틀 줄 — 실데이터가 아니라 **감싸개/안내**: "온톨로지 관계:" 헤더 · `■ "대상"` 다중 대상 블록
+  //   머리(handlers.ts:874) · `"X"는 이 제품에서 "Y"…부릅니다 — 그걸로 찾은 결과입니다.` 별칭 재시도
+  //   안내(handlers.ts:861). ⚠ 이 줄들을 데이터로 세면 다중어·별칭 질문에서 정직한 부정이 다시
+  //   관계 덤프로 덮인다(2026-08-21 검토관 [중]). ⚠ 실데이터(자산·취약점·발췌)는 여기 안 걸린다 —
+  //   화살표도 없고 이 틀 문구도 아니라 「기타 줄」로 남아 sum≠total → false → 여전히 데이터로 셈.
+  const 틀줄 = 줄.filter((l) =>
+    /온톨로지/.test(l) || l.startsWith("■") || (/부릅니다/.test(l) && /찾은 결과/.test(l)));
+  return 관계줄.length > 0 && 관계줄.length + 틀줄.length === 줄.length;
 }
 
 export function guardAgainstDenial(answer: string, calls: AgentToolCall[]): string {

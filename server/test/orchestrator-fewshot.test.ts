@@ -108,6 +108,24 @@ describe("guardAgainstDenial", () => {
     expect(out, "온톨로지 관계를 근거인 양 덤프하면 안 된다").not.toContain("—[유형]→");
     expect(out).not.toContain("정리하지 못해");
   });
+
+  // ★ 검토관 [중]: 다중 대상(■ 블록)·별칭 재시도의 「틀 줄」이 화살표도 헤더도 아니라 새던 것.
+  it("★다중 대상(■ 블록)·별칭 안내로 감싸도 온톨로지-only는 부정을 안 덮는다", () => {
+    const 다중 = [{ tool: "search", args: { query: "방화벽 IDS" }, result: '■ "방화벽"\n  - 방화벽 —[유형]→ 보안제품\n■ "IDS"\n  - IDS —[유형]→ 침입탐지시스템' }];
+    const 부정 = "이 가이드에는 방화벽·IDS 설정 절차가 없습니다.";
+    expect(guardDenial(부정, 다중), "다중 대상 틀도 부정 보존").toBe(부정);
+
+    const 별칭 = [{ tool: "search", args: { query: "파이어월" }, result: '"파이어월"는 이 제품에서 "방화벽"이라고 부릅니다 — 그걸로 찾은 결과입니다.\n  - 방화벽 —[유형]→ 보안제품' }];
+    expect(guardDenial("이 가이드엔 방화벽 설정 절차가 없습니다.", 별칭), "별칭 안내 틀도 부정 보존").toBe("이 가이드엔 방화벽 설정 절차가 없습니다.");
+  });
+
+  it("★다중 대상 블록에 실데이터가 하나라도 있으면 여전히 발동한다(2026-07-25 보호 유지)", () => {
+    // ■ 블록이라도 자산·취약점 줄(화살표 없음)이 있으면 「기타 줄」→ 온톨로지-only 아님 → 덤프.
+    const 혼합 = [{ tool: "search", args: { query: "방화벽 안전대부" }, result: '■ "방화벽"\n  - 방화벽 —[유형]→ 보안제품\n■ "안전대부"\n  - vuln:certify | 안전대부 웹 서버 | finding 3건' }];
+    const out = guardDenial("관련 정보를 찾을 수 없습니다.", 혼합);
+    expect(out, "실데이터가 섞이면 부정을 되돌린다").toContain("정리하지 못해");
+    expect(out).toContain("안전대부");
+  });
 });
 
 // 헬퍼 — 테스트 가독성을 위해 인자 타입만 좁혀 감싼다.
