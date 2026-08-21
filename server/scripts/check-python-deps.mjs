@@ -39,13 +39,14 @@ function 서버파이썬() {
   const 뿌리 = process.env.GIJO_SERVER_ROOT || 서버루트;
   후보.push(venv경로(뿌리));
   if (path.resolve(뿌리) !== path.resolve(서버루트)) 후보.push(venv경로(서버루트));
-  // 설치본 동봉 파이썬 — pythonbin.ts와 **같은 자리**(venv 뒤·python3 앞).
-  후보.push(
+  // ⚠ 이 점검은 **requirements.txt 전체**(modelscan·pypdf·netmiko)를 보므로 pythonbin의
+  //   "tools" 갈래와 같은 순서를 쓴다 — 동봉본은 pypdf만 있어 여기선 맨 마지막 수단이다.
+  //   (문서 추출만 동봉본을 앞세우는 "docs" 갈래는 pythonbin.ts:63-66 참조.)
+  const 동봉본 =
     process.platform === "win32"
       ? path.join(뿌리, "python", "python.exe")
-      : path.join(뿌리, "python", "bin", "python3"),
-  );
-  후보.push("python3", "python");
+      : path.join(뿌리, "python", "bin", "python3");
+  후보.push("python3", "python", 동봉본);
   for (const c of 후보) {
     if (c.includes(path.sep) && !fs.existsSync(c)) continue;
     const r = spawnSync(c, ["--version"], { encoding: "utf-8" });

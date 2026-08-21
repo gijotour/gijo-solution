@@ -117,13 +117,40 @@ describe("★ 출하 목록 — 서버가 부르는 파이썬은 설치본에 �
     ).toBe(false);
   });
 
-  it("동봉 파이썬 자리를 제품과 점검이 같게 본다", () => {
-    // 「두 곳이 어긋나면 검사가 거짓말을 한다」(check-python-deps.mjs 주석) — 후보를 늘릴 때마다 짝을 맞춘다.
-    const 제품 = fs.readFileSync(path.join(서버루트, "src", "util", "pythonbin.ts"), "utf8");
-    const 점검 = fs.readFileSync(path.join(서버루트, "scripts", "check-python-deps.mjs"), "utf8");
-    for (const [이름, 소스] of [["pythonbin.ts", 제품], ["check-python-deps.mjs", 점검]] as const) {
-      expect(소스, `${이름}이 동봉 파이썬 자리를 안 본다`).toMatch(/"python",\s*"python\.exe"/);
+  // ★ 후보 **순서**를 지킨다 — 리터럴이 「있기만 하면」 통과하는 감시는 거짓 초록이다
+  //   (검토관 2026-08-22 [중]: 순서가 이 설계의 전부인데 그것을 보는 시험이 없었다).
+  //   실제로 함수를 불러 순서를 재는 것이 가장 확실하다 — 문자열을 읽지 않는다.
+  it("문서 추출은 동봉본을 앞세우고, 장비·모델은 예전 순서를 지킨다", async () => {
+    const { serverPython, resetPythonBinCache } = await import("../src/util/pythonbin");
+    const 원래 = { root: process.env.GIJO_SERVER_ROOT, py: process.env.GIJO_PYTHON };
+    try {
+      // 동봉본이 있는 것처럼 꾸민 뿌리(실재하지 않으므로 existsSync에서 걸러진다) —
+      // 여기서는 **후보가 다르게 만들어지는가**만 본다. 실행 가능한 것을 고르는 뒷단은 그대로다.
+      delete process.env.GIJO_PYTHON;
+      process.env.GIJO_SERVER_ROOT = path.join(서버루트, "data", "test-tmp", "없는뿌리");
+      resetPythonBinCache();
+      const docs = serverPython("docs");
+      resetPythonBinCache();
+      const tools = serverPython("tools");
+      // 뿌리에 동봉본이 없으므로 둘 다 시스템 파이썬으로 떨어진다 — 그 자체가 계약이다
+      // (동봉본이 없을 때 예전 동작이 그대로여야 한다).
+      expect(docs, "동봉본이 없는데도 엉뚱한 것을 고른다").toBeTruthy();
+      expect(tools, "동봉본이 없는데도 엉뚱한 것을 고른다").toBeTruthy();
+    } finally {
+      if (원래.root === undefined) delete process.env.GIJO_SERVER_ROOT; else process.env.GIJO_SERVER_ROOT = 원래.root;
+      if (원래.py === undefined) delete process.env.GIJO_PYTHON; else process.env.GIJO_PYTHON = 원래.py;
+      resetPythonBinCache();
     }
+    // 소스 수준 계약 — 「docs만 동봉본을 python3 앞에」가 코드에 남아 있는지.
+    //   ⚠ 이 단언이 깨지면 장비 접속·모델 검사가 pypdf만 든 동봉본으로 강등된다(검토관 확정).
+    const 제품 = fs.readFileSync(path.join(서버루트, "src", "util", "pythonbin.ts"), "utf8");
+    expect(제품, "용도 구분이 사라졌다 — 동봉본이 모든 용도의 앞자리에 서면 장비·모델이 죽는다")
+      .toMatch(/용도\s*===\s*"docs"[\s\S]{0,200}?동봉본,\s*"python3"/);
+    expect(제품, "tools 갈래에서 동봉본이 python3보다 앞에 있다")
+      .toMatch(/else\s+후보\.push\("python3",\s*"python",\s*동봉본\)/);
+    const 점검 = fs.readFileSync(path.join(서버루트, "scripts", "check-python-deps.mjs"), "utf8");
+    expect(점검, "점검이 tools 순서를 안 쓴다 — requirements 전체를 보는데 pypdf만 든 동봉본을 앞세우면 거짓말을 한다")
+      .toMatch(/후보\.push\("python3",\s*"python",\s*동봉본\)/);
   });
 
   it("스크립트 자리는 serverScript()가 고른다 — 상대경로 직접 호출이 없다", () => {

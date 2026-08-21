@@ -41,7 +41,9 @@ export async function extractDocumentText(filename: string, base64: string): Pro
         // ⚠ 맨 "python"을 부르면 안 된다 — 운영(WSL)에는 그 이름이 없어(python3만 존재)
         //   추출이 **한 번도 성공한 적 없었다**(2026-08-08 실측). 그 여파로 경로 인입이
         //   PDF를 글자로 그냥 읽어 저장소 조각의 73%가 압축 바이트였다.
-        serverPython(),
+        // "docs" — 문서 추출용 파이썬. 동봉본(pypdf 보유)을 시스템 파이썬보다 앞세우는 갈래다.
+        //   장비 접속·모델 검사는 "tools"를 써서 예전 순서를 그대로 지킨다(동봉본엔 그 부품이 없다).
+        serverPython("docs"),
         // ⚠ 스크립트 자리는 serverScript()가 고른다 — 패키징 설치본은 cwd(userData)와 스크립트가
         //   있는 자리(resources/server-dist)가 달라, 상대경로로 부르면 파일을 못 찾는다(2026-08-22).
         [serverScript("scripts/extract_doc.py"), tmp],

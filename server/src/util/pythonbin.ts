@@ -14,15 +14,27 @@ import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 
-let 캐시: string | null = null;
+const 캐시맵 = new Map<string, string>();
 
 /**
- * 서버 도구(문서 추출·모델 스캔 등)를 돌릴 파이썬.
- *   ① GIJO_PYTHON(운영자 지정) → ② 서버 venv → ③ python3 → ④ python
+ * 서버 도구를 돌릴 파이썬을 고른다.
+ *
+ * ■ 용도를 나누는 이유 (2026-08-22 검토관 [중] 수리)
+ *   이 함수는 문서 추출만 쓰는 게 아니다 — **장비 접속(netmiko)·모델 검사(modelscan)·GGUF
+ *   변환이 함께 쓰는 단 한 곳**이다. 그런데 설치본에 동봉한 파이썬에는 **pypdf만** 들어 있다.
+ *   그걸 모든 용도의 앞자리에 두면, 시스템 파이썬에 requirements를 깐 기계에서
+ *   **잘 되던 장비 접속·모델 검사가 죽는다**(No module named 'netmiko').
+ *   그래서 문서 추출만 동봉본을 앞세우고, 나머지는 예전 순서를 그대로 지킨다.
+ *
+ *   · docs  — 문서 추출: ①GIJO_PYTHON ②venv ③**동봉본** ④python3 ⑤python
+ *   · tools — 장비·모델·변환: ①GIJO_PYTHON ②venv ③python3 ④python ⑤동봉본(마지막 수단)
+ *
  * 실제로 실행되는 것만 고른다 — 존재하지 않는 이름을 돌려주면 조용한 실패로 이어진다.
  */
-export function serverPython(): string {
-  if (캐시) return 캐시;
+export function serverPython(용도: "docs" | "tools" = "tools"): string {
+  const 캐시키 = 용도;
+  const 있는것 = 캐시맵.get(캐시키);
+  if (있는것) return 있는것;
   const 후보: string[] = [];
   if (process.env.GIJO_PYTHON) 후보.push(process.env.GIJO_PYTHON);
   // venv는 **서버 뿌리** 기준으로 찾는다(2026-08-22 수리).
@@ -40,30 +52,26 @@ export function serverPython(): string {
   if (path.resolve(뿌리) !== path.resolve(process.cwd())) 후보.push(venv경로(process.cwd()));
   // 설치본에 **동봉된** 파이썬(2026-08-22, 사장님 「b」 결정) — 고객 기계에 파이썬이 없어도
   //   PDF·한글·오피스 문서를 읽을 수 있게 앱과 함께 나간다(임베더블 21.5MB + pypdf 3.5MB).
-  //   ⚠ 자리가 **venv 뒤·python3 앞**인 데는 이유가 있다:
-  //     · venv보다 뒤 — 동봉본에는 pypdf만 있다. 운영자가 만든 venv에는 netmiko·modelscan·OCR까지
-  //       들어 있을 수 있으니, 있으면 그쪽이 더 많은 일을 한다. 앞에 두면 그 환경을 가린다.
-  //     · python3보다 앞 — 시스템 파이썬은 **있어도 pypdf가 없을 수 있다**(그러면 PDF가 조용히
-  //       실패한다). 동봉본은 pypdf가 확실히 있다.
   //   ⚠ main.ts에서 GIJO_PYTHON을 대입하지 **않는다** — 그러면 운영자 지정(README 환경변수 표·
   //     배포 가이드가 안내하는 탈출구)을 덮어쓴다(설계관 2026-08-22 적발). 뿌리만 알려 주고
   //     고르는 일은 이 함수 한 곳에서 한다.
-  후보.push(
-    process.platform === "win32"
-      ? path.join(뿌리, "python", "python.exe")
-      : path.join(뿌리, "python", "bin", "python3"),
-  );
-  후보.push("python3", "python");
+  const 동봉본 = process.platform === "win32"
+    ? path.join(뿌리, "python", "python.exe")
+    : path.join(뿌리, "python", "bin", "python3");
+  // ★ 문서 추출만 동봉본을 python3 앞에 세운다 — 동봉본엔 pypdf가 확실히 있고, 시스템 파이썬은
+  //   있어도 pypdf가 없을 수 있다. 반대로 장비·모델 용도에서 앞세우면 **잘 되던 것이 죽는다**.
+  if (용도 === "docs") 후보.push(동봉본, "python3", "python");
+  else 후보.push("python3", "python", 동봉본); // 마지막 수단 — 없는 것보단 오류 문구라도 정확해진다
   for (const c of 후보) {
     if (c.includes(path.sep) && !fs.existsSync(c)) continue;
     const r = spawnSync(c, ["--version"], { encoding: "utf-8" });
     if (r.status === 0) {
-      캐시 = c;
+      캐시맵.set(캐시키, c);
       return c;
     }
   }
-  캐시 = "python3"; // 마지막 폴백 — 실패하면 호출부가 오류를 그대로 보고한다
-  return 캐시;
+  캐시맵.set(캐시키, "python3"); // 마지막 폴백 — 실패하면 호출부가 오류를 그대로 보고한다
+  return "python3";
 }
 
 /**
@@ -93,5 +101,5 @@ export function serverScript(상대: string): string {
 
 /** 시험 전용 — 환경을 바꿔 가며 확인할 때 캐시를 비운다. */
 export function resetPythonBinCache(): void {
-  캐시 = null;
+  캐시맵.clear();
 }
