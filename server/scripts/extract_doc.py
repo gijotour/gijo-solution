@@ -24,8 +24,27 @@ def extract_pdf(path: str) -> str:
 #   엔진: RapidOCR(onnxruntime) + PP-OCRv5 한국어. ⚠ PP-OCRv6는 한국어 미지원이라 **v5로 핀 고정**
 #   (실측: 기본 v6는 한글 0줄). requirements-ocr.txt(옵션)로 설치 — 없으면 정직하게 거절/degrade.
 #   ⚠ RapidOCR·PyMuPDF가 stdout에 로그를 찍는다 — 추출 텍스트(stdout)가 오염되지 않게 OCR 동안엔
-#     stdout을 stderr로 돌린다(contextlib.redirect_stdout). dataset.ts는 stdout만 텍스트로 읽는다.
+#     stdout을 stderr로 **OS fd 수준(os.dup2)** 으로 돌린다(_stdout_to_stderr — 네이티브 C 쓰기까지
+#     막는다). dataset.ts는 stdout만 텍스트로 읽는다.
 import contextlib
+
+
+@contextlib.contextmanager
+def _stdout_to_stderr():
+    """OCR 동안 stdout을 stderr로 돌린다 — **OS fd 수준(os.dup2)** 으로 돌려, onnxruntime·MuPDF
+    같은 네이티브(C) 라이브러리가 fd 1에 직접 찍어도 추출 텍스트(stdout 계약)를 오염시키지 못하게
+    한다(검토관 지적: 파이썬 contextlib.redirect_stdout는 C 쓰기를 못 막는다). 파이썬 print도
+    같은 fd를 타므로 한 번에 덮인다. 끝에서 원래 fd 1을 복구해 최종 텍스트는 진짜 stdout으로."""
+    sys.stdout.flush()
+    saved = os.dup(1)
+    try:
+        os.dup2(2, 1)   # fd 1(stdout) → fd 2(stderr)
+        yield
+    finally:
+        sys.stdout.flush()
+        os.dup2(saved, 1)
+        os.close(saved)
+
 
 IMG_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"}
 OCR_MAX_PAGES = 30   # 스캔 PDF OCR 상한 — 수십 쪽이 요청을 오래 붙잡지 않게(execFile 타임아웃 없음)
@@ -52,7 +71,7 @@ def _ocr_lines(result) -> str:
 
 
 def ocr_image(path: str) -> str:
-    with contextlib.redirect_stdout(sys.stderr):  # 라이브러리 stdout 프린트를 텍스트에서 격리
+    with _stdout_to_stderr():  # 라이브러리 stdout 프린트를 텍스트에서 격리
         return _ocr_lines(_ocr_engine()(path))
 
 
@@ -60,7 +79,7 @@ def ocr_pdf(path: str) -> str:
     import fitz  # pymupdf — 페이지를 이미지로 렌더(poppler 불필요)
     import tempfile
     import shutil
-    with contextlib.redirect_stdout(sys.stderr):
+    with _stdout_to_stderr():
         eng = _ocr_engine()
         doc = fitz.open(path)
         total = len(doc)
