@@ -130,6 +130,24 @@ describe("memory documents (올린 문서 목록·조각 미리보기·삭제)",
     expect(ids).toContain("uploaded-vendor.pdf");
     expect(ids, "내장 문서가 docScope 대상에 들면 일반 질문에 오발화한다").not.toContain("seed-topic.md");
   });
+
+  // ★ 낱말 가로채기 수리(2026-08-21 라이브): 문서를 콕 집어 그 내용/존재를 물으면 문서 RAG로,
+  //   낱말 트리거(침해사고)나 LLM 라우터의 법령 오선택으로 새면 안 된다.
+  it("문서지목질문 — 등록 문서 콕 집으면 문서로, 절차의도·미지목은 각자 몫", async () => {
+    const { 문서지목질문 } = await import("../src/engine/memory");
+    const { 침해사고질문인가 } = await import("../src/engine/incidentsteps");
+    embedDim = 3;
+    await ingestText("개인정보_안전성_확보조치_안내서.pdf", "개인정보 안전조치 내용입니다.", "global");
+    // 문서 콕 집음 + 내용 질문 → 문서(true)
+    expect(문서지목질문("개인정보 안전성 확보조치 안내서에서 암호화 대상이 뭐야?"), "지목+내용→문서").toBe(true);
+    // 문서 콕 집었어도 절차 의도(대응하려면) → 문서 아님(플레이북 몫)
+    expect(문서지목질문("이 개인정보 확보조치 안내서대로 랜섬웨어 대응하려면?"), "절차의도→플레이북").toBe(false);
+    // 미지목 일반 질문 → 문서 아님
+    expect(문서지목질문("랜섬웨어 대응 절차 알려줘"), "미지목→아님").toBe(false);
+    // ★ 침해사고질문인가: 문서 지목 존재 질문은 침해 아님(문서로), 미지목은 여전히 침해(2026-08-10 보호)
+    expect(침해사고질문인가("이 개인정보 확보조치 안내서에 랜섬웨어 대응 절차가 있어?"), "문서지목→침해 아님").toBe(false);
+    expect(침해사고질문인가("랜섬웨어 대응 절차 알려줘"), "미지목→여전히 침해").toBe(true);
+  });
 });
 
 describe("memory scope (B — 에이전트별 지식 격리)", () => {

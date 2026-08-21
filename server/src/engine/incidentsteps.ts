@@ -15,6 +15,7 @@
 // ⚠ 이건 조회(읽기)다 — 아무것도 바꾸지 않는다. 차단·재부팅 같은 행위는 사람이 한다.
 import { listProducts } from "./securityproducts";
 import { listAssets } from "./assets";
+import { 문서지목질문 } from "./memory";
 
 /** 장애·중단을 말하는 문장인가. 좁게 — 「점검·취약점·설정」 물음까지 삼키면 안 된다. */
 // ⚠ **조사(이/가/을/를/은/는)를 넣어 말한다**(2026-08-12 실측으로 고침).
@@ -35,6 +36,8 @@ export function 장애질문인가(text: string): boolean {
   const t = String(text ?? "");
   if (!장애말.test(t)) return false;
   if (장애아님.test(t)) return false;
+  // ⚠ 침해와 대칭 — 「이 장애대응 매뉴얼에 재부팅 절차 있어?」류 문서 지목 내용 질문은 문서 RAG 몫.
+  if (문서지목질문(t)) return false;
   // 대상(장비·시스템)을 가리키는 말이 있어야 한다 — 「일이 안 돼」 같은 넋두리는 아니다.
   if (/(장비|서버|방화벽|ips|ids|waf|edr|utm|스위치|라우터|시스템|호스트|장치|콘솔|웹서버|디비|db)/i.test(t)) return true;
   // ★ 우리 등록부에 있는 이름이면 낱말 종류를 안 따진다(2026-08-09 실측):
@@ -114,6 +117,10 @@ export function 침해사고질문인가(text: string): boolean {
   const t = String(text ?? "");
   if (!침해말.test(t)) return false;
   if (침해아님.test(t)) return false;
+  // ⚠ 문서를 콕 집어 그 내용/존재를 묻는 말(「이 안내서에 랜섬웨어 대응 절차 **있어?**」)은 문서
+  //   RAG(explain) 몫이다 — 침해 낱말이 있어도 초동 절차로 채 가면 안 된다(2026-08-21 실측). 「대응
+  //   하려면?」류 절차 의도는 문서지목질문이 스스로 비켜 주므로 여기 걸리지 않는다.
+  if (문서지목질문(t)) return false;
   // 「어떻게·절차·대응」처럼 **무엇을 해야 하나**를 묻는 말일 때만. 현황 조회는 다른 몫이다.
   return /(어떻게|절차|대응|해야\s*(하나|되나|할까)|뭐부터|첫\s*조치|초동)/.test(t);
 }

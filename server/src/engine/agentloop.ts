@@ -18,6 +18,7 @@ import type { AgentTool } from "./agenttools";
 import { 법령검색없음표지 } from "./lawinfo";
 import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
+import { 문서지목질문 } from "./memory";
 import { recordWork, TOOL_WORK_KIND } from "./worklog";
 import { listTasks } from "./tasks";
 import { 자산표시이름, listAssets } from "./assets";
@@ -1581,6 +1582,14 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
   //   시연 ③이 가르치는 문장이다 — 사내 규정 문서(RAG)를 근거로 답해야 한다.
   //   ⚠ 법령·법적 근거·판례를 명시하면 법제처가 맞다(비켜 준다). 「규정 대조 이력」(판정 기록
   //   조회)과 「~해도 돼?」(행동 대조)도 다른 말이다 — 이력·기록·대조를 제외한다.
+  // ★ 문서를 콕 집어 그 내용/존재를 묻는 말(「이 안내서에서 암호화 대상 뭐야」·「이 가이드에 X 있어?」)은
+  //   문서 RAG(explain)로 못박는다 — 안 그러면 ⑨ LLM 라우터가 법령 검색을 오선택하거나(2026-08-21
+  //   실측) 낱말 트리거(침해사고)가 채 간다. 신호=문서지목질문(docScope, 업로드 문서명 콕 집음 +
+  //   절차 의도 제외). 사내규정질문보다 앞에 둔다(더 구체 — 등록 문서명을 실제로 집었다).
+  if (available.has("explain") && 문서지목질문(instruction)) {
+    return { tool: "explain", args: { topic: instruction } };
+  }
+
   if (available.has("explain") && 사내규정질문(instruction)) {
     return { tool: "explain", args: { topic: instruction.replace(/\s*(알려|찾아|보여|확인)[^.\n]*$/, "").trim() || instruction } };
   }
