@@ -94,11 +94,21 @@ describe("★ 출하 목록 — 서버가 부르는 파이썬은 설치본에 �
           `extraResources는 경고만 하고 넘어가 「파이썬 없는 설치본」이 조용히 나간다`,
       ).toContain("stage-python");
     }
-    const win = pkg.build.win?.extraResources ?? [];
-    expect(
-      win.some((r) => r.from.includes("python-dist") && r.to.includes("python")),
-      "win.extraResources에 python-dist가 없다 — 꾸려도 설치본에 안 실린다",
-    ).toBe(true);
+    // ⚠ **두 빌드 설정을 다 본다.** 라이트는 electron-builder.lite.json을 쓰므로, 메인에만 넣으면
+    //   `dist:lite`가 파이썬을 꾸리고도 설치본엔 안 실린다 — 「꾸렸는데 안 나가는 반쪽」이다
+    //   (이번에 실제로 그 상태였고, 검토 전에 잡았다).
+    const 라이트 = JSON.parse(fs.readFileSync(path.join(서버루트, "..", "client", "electron-builder.lite.json"), "utf8")) as {
+      win?: { extraResources?: { from: string; to: string }[] };
+    };
+    for (const [이름, 목록] of [
+      ["client/package.json", pkg.build.win?.extraResources ?? []],
+      ["electron-builder.lite.json", 라이트.win?.extraResources ?? []],
+    ] as const) {
+      expect(
+        목록.some((r) => r.from.includes("python-dist") && r.to.includes("python")),
+        `${이름}의 win.extraResources에 python-dist가 없다 — 꾸려도 설치본에 안 실린다`,
+      ).toBe(true);
+    }
     // ⚠ mac(top-level)이 아니라 **win 아래**여야 한다 — dmg에 Windows용 파이썬이 실리면 안 된다.
     const top = (JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { build: { extraResources?: { from: string }[] } }).build.extraResources ?? [];
     expect(

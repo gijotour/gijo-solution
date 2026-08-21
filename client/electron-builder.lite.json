@@ -35,6 +35,10 @@
       {
         "from": "build/llama-cuda",
         "to": "server-dist/llama-cuda"
+      },
+      {
+        "from": "build/python-dist",
+        "to": "server-dist/python"
       }
     ]
   },
