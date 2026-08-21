@@ -123,7 +123,7 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
   border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);
   font-size:12px;cursor:pointer;font-family:inherit;line-height:1;}
 .v4content.narrow .v4close{display:block;}
-.v4close:hover{border-color:var(--red);color:#f5928a;}
+.v4close:hover{border-color:var(--red);color:var(--red, #f5928a);}
 /* 등급·보조 글자색 — .g-rows 밖(상세 패널)에서도 먹게 이 화면 범위로 정의(검토관 하2) */
 .gtxt-C{color:var(--red);font-weight:800;} .gtxt-S{color:var(--amber);font-weight:800;} .gtxt-O{color:var(--muted);font-weight:700;}
 .gm2{color:var(--muted-2);}
@@ -138,7 +138,7 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
 .detail .dbt button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);
   padding:4px 10px;border-radius:7px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
 .detail .dbt button:hover{color:var(--text-strong, #fff);border-color:var(--blue);}
-.detail .dbt button.warn:hover{color:#f5928a;border-color:var(--red);}
+.detail .dbt button.warn:hover{color:var(--red, #f5928a);border-color:var(--red);}
 .go{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;
   padding:4px 10px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
 .go:hover{color:var(--text-strong, #fff);border-color:var(--blue);}
@@ -212,7 +212,7 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
 .md th{background:var(--panel-2);color:var(--muted);text-align:left;padding:6px 9px;border:1px solid var(--border);font-weight:700;white-space:nowrap;}
 .md td{padding:6px 9px;border:1px solid var(--border);color:var(--text);}
 .md pre{background:#1a1a19;border:1px solid var(--border-strong);border-radius:8px;padding:11px;
-  overflow-x:auto;font:11.5px/1.6 Consolas,"Cascadia Mono",monospace;color:var(--muted);margin-bottom:11px;}
+  overflow-x:auto;font:11.5px/1.6 Consolas,"Cascadia Mono",monospace;color:#b3ada4;margin-bottom:11px;} /* 어두운 상자 고정 — 토큰 금지(2026-08-21) */
 .md code{background:rgba(255,255,255,.06);border-radius:4px;padding:1px 5px;font:11.5px Consolas,monospace;color:#a7d3ff;}
 .md pre code{background:none;padding:0;color:inherit;}
 .md blockquote{border-left:3px solid var(--border-strong);padding:2px 0 2px 12px;margin:0 0 11px;color:var(--muted);}

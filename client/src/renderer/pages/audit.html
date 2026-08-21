@@ -47,7 +47,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .log-box{background:#1a1a19;border:1px solid var(--border-strong);border-radius:8px;
   padding:4px 0;overflow-y:auto;min-height:360px;}
 .log-box .aud{padding:7px 14px;}
-.log-box .empty{padding:26px;text-align:center;color:var(--muted-2);font-size:12.5px;}
+.log-box .empty{padding:26px;text-align:center;color:#a49d95;font-size:12.5px;} /* 고정 어두운 상자 안 — 토큰 금지(아래 주석) */
 .filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;}
 .filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
 .search{margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--text);outline:none;width:240px;}
@@ -71,25 +71,29 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .aud:hover{background:rgba(59,130,246,.05);}
 .aud.on{background:rgba(59,130,246,.09);}
 .aud > *{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
-.aud .tm{color:var(--muted-2);font-size:12.25px;white-space:nowrap;text-align:right;}
+/* ⚠ .log-box는 테마 무관 어두운 배경 고정(#1a1a19)이다 — 이 상자 안 글자색은 토큰을 쓰면
+   안 된다(프로 흰 바탕이 토큰을 잉크색으로 뒤집어 어두운-위-어두운이 된다, 2026-08-21 사장님
+   QA·syslog/terminal과 같은 부류). 전부 다크 원값 고정색으로. 파스텔 스윕도 이 파일은 제외
+   목록에 있다(theme-sweep-pastel.mjs — 고정색을 도로 토큰으로 바꾸면 이 수리가 풀린다). */
+.aud .tm{color:#a49d95;font-size:12.25px;white-space:nowrap;text-align:right;}
 .aud .kind{font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:5px;white-space:nowrap;flex:0 0 auto;}
-.k-cli{background:rgba(30,185,128,.16);color:var(--teal);}
-.k-approval{background:rgba(240,160,32,.16);color:var(--amber);}
-.k-write{background:rgba(139,124,240,.16);color:var(--purple);}
+.k-cli{background:rgba(30,185,128,.16);color:#1eb980;}
+.k-approval{background:rgba(240,160,32,.16);color:#f0a020;}
+.k-write{background:rgba(139,124,240,.16);color:#8b7cf0;}
 .k-block{background:rgba(226,72,61,.16);color:#f5928a;}
-.k-auth{background:rgba(59,130,246,.16);color:var(--blue-light);}
-.k-config{background:rgba(255,255,255,.08);color:var(--muted);}
+.k-auth{background:rgba(59,130,246,.16);color:#5fa1ff;}
+.k-config{background:rgba(255,255,255,.08);color:#b3ada4;}
 /* 1열 = 「무엇을 했나」 — 종류 배지 + 한 일 + 대상을 한 줄에(열 규약 1열 무엇 필수) */
 .aud .body{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;}
-.aud .act{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.aud .tgt{color:var(--blue-light);font-size:12.25px;flex:0 0 auto;max-width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.aud .det{color:var(--muted-2);font-size:12.25px;margin-top:2px;white-space:pre-wrap;word-break:break-word;}
-.aud .who{color:var(--muted-2);font-size:12.25px;white-space:nowrap;flex:0 0 auto;}
+.aud .act{color:#e9e7e2;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.aud .tgt{color:#5fa1ff;font-size:12.25px;flex:0 0 auto;max-width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.aud .det{color:#a49d95;font-size:12.25px;margin-top:2px;white-space:pre-wrap;word-break:break-word;}
+.aud .who{color:#a49d95;font-size:12.25px;white-space:nowrap;flex:0 0 auto;}
 .aud .rz{font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:4px;flex:0 0 auto;}
-.rz-ok{color:var(--teal);}
+.rz-ok{color:#1eb980;}
 .rz-blocked{background:rgba(226,72,61,.16);color:#f5928a;}
 .rz-error{background:rgba(226,72,61,.16);color:#f5928a;}
-.rz-pending{color:var(--amber);}
+.rz-pending{color:#f0a020;}
 .empty{padding:30px;text-align:center;color:var(--muted-2);font-size:13px;}
 .kpi{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
 .kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 16px;}

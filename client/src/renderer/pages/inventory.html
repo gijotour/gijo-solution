@@ -129,18 +129,18 @@
   .type-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12.25px;font-weight:700;background:rgba(139,124,240,0.15);color:var(--purple);}
   .risk-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;}
   .risk-dot{width:8px;height:8px;border-radius:50%;}
-  .risk-high{color:#f5928a;}
+  .risk-high{color:var(--red, #f5928a);}
   .risk-high .risk-dot{background:var(--red);}
   .risk-mid{color:#f7c777;}
   .risk-mid .risk-dot{background:var(--amber);}
-  .risk-low{color:#6fdcb5;}
+  .risk-low{color:var(--teal, #6fdcb5);}
   .risk-low .risk-dot{background:var(--teal);}
   .sbom-ok{color:var(--teal);font-weight:700;font-size:12px;}
   .sbom-pending{color:var(--amber);font-weight:700;font-size:12px;}
   .owner{font-size:12px;color:var(--muted);}
   .row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
   .asset-del{color:var(--muted-2);font-size:12px;font-weight:700;cursor:pointer;padding:0 4px;border-radius:4px;}
-  .asset-del:hover{color:#f5928a;background:rgba(226,72,61,0.14);}
+  .asset-del:hover{color:var(--red, #f5928a);background:rgba(226,72,61,0.14);}
 
   .pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
   .page-btns{display:flex;gap:6px;}
@@ -174,7 +174,7 @@
   .modal-title{font-size:16px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:18px;}
   .modal label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
   .modal input,.modal select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;margin-bottom:14px;outline:none;}
-  .modal-err{font-size:12px;color:#f5928a;min-height:16px;margin-bottom:4px;}
+  .modal-err{font-size:12px;color:var(--red, #f5928a);min-height:16px;margin-bottom:4px;}
   .modal-actions{display:flex;gap:8px;justify-content:flex-end;}
 
   /* 커버리지 — "무엇을 모르는가" */
@@ -262,12 +262,12 @@
   .ad-row{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:12.25px;border-bottom:1px solid rgba(255,255,255,.04);}
   .ad-row .code{font-size:11.25px;font-weight:800;color:#c9b8ff;background:rgba(139,124,240,.14);padding:1px 6px;border-radius:5px;flex:0 0 auto;}
   .ad-tag{font-size:11px;font-weight:800;padding:1px 6px;border-radius:5px;flex:0 0 auto;}
-  .ad-tag.critical{background:rgba(226,72,61,.16);color:#f5928a;}
+  .ad-tag.critical{background:rgba(226,72,61,.16);color:var(--red, #f5928a);}
   .ad-tag.high{background:rgba(247,199,119,.14);color:#f7c777;}
   .ad-tag.medium{background:rgba(143,184,255,.14);color:#8fb8ff;}
   .ad-tag.low{background:var(--panel);color:var(--muted-2);}
-  .ad-tag.open{background:rgba(226,72,61,.16);color:#f5928a;}
-  .ad-tag.covered{background:rgba(30,185,128,.14);color:#6fdcb5;}
+  .ad-tag.open{background:rgba(226,72,61,.16);color:var(--red, #f5928a);}
+  .ad-tag.covered{background:rgba(30,185,128,.14);color:var(--teal, #6fdcb5);}
   .ad-tag.na{background:var(--panel);color:var(--muted-2);}
   .ad-act{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap;}
   .ad-act button{background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:4px 10px;font-size:12.25px;cursor:pointer;}

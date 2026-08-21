@@ -66,7 +66,7 @@ tr:last-child td{border-bottom:none;}
 .b-blue{background:rgba(59,130,246,0.15);color:var(--blue-light);}
 .b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
 .b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
-.b-red{background:rgba(226,72,61,0.15);color:#f5928a;}
+.b-red{background:rgba(226,72,61,0.15);color:var(--red, #f5928a);}
 .b-purple{background:rgba(139,124,240,0.15);color:var(--purple);}
 .row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
 .pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
@@ -106,7 +106,7 @@ tr:last-child td{border-bottom:none;}
 .modal select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;margin-bottom:14px;outline:none;}
 .modal-checklist{max-height:160px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;margin-bottom:14px;}
 .modal-checklist label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);font-weight:400;margin-bottom:8px;}
-.modal-err{font-size:12px;color:#f5928a;min-height:16px;margin-bottom:4px;}
+.modal-err{font-size:12px;color:var(--red, #f5928a);min-height:16px;margin-bottom:4px;}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;}
 
 .sched-item{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;}
@@ -116,7 +116,7 @@ tr:last-child td{border-bottom:none;}
 .chip-sm{font-size:11.5px;font-weight:800;padding:2px 7px;border-radius:5px;white-space:nowrap;border:none;cursor:pointer;font-family:inherit;}
 .chip-on{background:rgba(30,185,128,0.15);color:var(--teal);}
 .chip-off{background:rgba(139,147,171,0.15);color:var(--muted);}
-.chip-warn{background:rgba(226,72,61,0.15);color:#f5928a;}
+.chip-warn{background:rgba(226,72,61,0.15);color:var(--red, #f5928a);}
 .sched-form label{display:block;font-size:12px;color:var(--muted-2);font-weight:700;margin:9px 0 4px;}
 .sched-form select,.sched-form input[type=number]{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 9px;color:var(--text);font-size:12px;outline:none;}
 .sched-hist{width:100%;border-collapse:collapse;margin-top:6px;}

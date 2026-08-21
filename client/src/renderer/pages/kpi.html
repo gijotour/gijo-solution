@@ -70,7 +70,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .posture .pscore{display:flex;align-items:baseline;gap:8px;margin:6px 0 4px;}
 .posture .pv{font-size:52px;font-weight:900;line-height:1;}
 .posture .pb{font-size:13px;font-weight:800;padding:3px 10px;border-radius:20px;}
-.pb.good{background:rgba(30,185,128,.16);color:#6fdcb5;} .pb.fair{background:rgba(240,160,32,.16);color:#f7c777;} .pb.poor{background:rgba(226,72,61,.16);color:#f5928a;}
+.pb.good{background:rgba(30,185,128,.16);color:var(--teal, #6fdcb5);} .pb.fair{background:rgba(240,160,32,.16);color:#f7c777;} .pb.poor{background:rgba(226,72,61,.16);color:var(--red, #f5928a);}
 .posture .pf{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;}
 .pf-row{display:flex;align-items:center;gap:8px;font-size:12.25px;} .pf-row .l{width:120px;color:var(--muted);flex-shrink:0;}
 .pf-row .tr{flex:1;height:6px;background:var(--panel-2);border-radius:20px;overflow:hidden;} .pf-row .fl{height:100%;border-radius:20px;} .pf-row .vv{width:34px;text-align:right;font-weight:700;flex-shrink:0;}
@@ -79,7 +79,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .hcard .hl{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:5px;}
 .hcard .hv{font-size:28px;font-weight:800;margin-top:6px;line-height:1;}
 .hcard .hd{font-size:12.25px;font-weight:700;margin-top:5px;}
-.hd.up{color:#f5928a;} .hd.down{color:#6fdcb5;} .hd.flat{color:var(--muted-2);}
+.hd.up{color:var(--red, #f5928a);} .hd.down{color:var(--teal, #6fdcb5);} .hd.flat{color:var(--muted-2);}
 .hcard .hsub{font-size:11.75px;color:var(--muted-2);margin-top:3px;}
 /* 클릭 가능한 카드/타일 — 상단 KPI는 리포트 출력, AI 보안 타일은 화면 이동 */
 .hcard.clk{cursor:pointer;transition:border-color .12s,transform .12s;}

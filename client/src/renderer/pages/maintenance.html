@@ -27,7 +27,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 .ident{font-size:12.5px;color:var(--muted);margin-bottom:16px;max-width:1040px;}
 .ident b{color:var(--text);}
-.ident .warn{color:#f5928a;font-weight:700;}
+.ident .warn{color:var(--red, #f5928a);font-weight:700;}
 
 /* 요약 카드 = 필터. 다른 화면과 같은 방식이라 새로 배울 게 없다. */
 .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:1040px;margin-bottom:18px;}
@@ -57,11 +57,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .tbl td{font-size:12.5px;padding:11px 12px;border-top:1px solid var(--border);vertical-align:middle;}
 .tbl tr.late td{background:rgba(226,72,61,.06);}
 .pill{display:inline-block;font-size:12px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap;}
-.p-late{background:rgba(226,72,61,.16);color:#f5928a;}
+.p-late{background:rgba(226,72,61,.16);color:var(--red, #f5928a);}
 .p-sched{background:rgba(139,147,171,.16);color:var(--muted);}
 .p-rep{background:rgba(240,160,32,.16);color:#f7c777;}
-.p-app{background:rgba(30,185,128,.16);color:#6fdcb5;}
-.p-rej{background:rgba(226,72,61,.16);color:#f5928a;}
+.p-app{background:rgba(30,185,128,.16);color:var(--teal, #6fdcb5);}
+.p-rej{background:rgba(226,72,61,.16);color:var(--red, #f5928a);}
 .soon{color:var(--amber);font-weight:700;font-size:12.25px;}
 .dim{color:var(--muted-2);font-size:12.25px;}
 .acts{display:flex;gap:6px;justify-content:flex-end;}
@@ -95,20 +95,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .maint-badge.sched{color:var(--blue-light);background:rgba(59,130,246,0.14);}
 .maint-badge.rep{color:var(--amber);background:rgba(240,160,32,0.14);}
 .maint-badge.appr{color:var(--teal);background:rgba(30,185,128,0.14);}
-.maint-badge.rej{color:#f5928a;background:rgba(226,72,61,0.14);}
+.maint-badge.rej{color:var(--red, #f5928a);background:rgba(226,72,61,0.14);}
 .maint-title{font-size:13px;font-weight:800;color:var(--text-strong, #fff);}
 .maint-product{font-size:12.5px;color:var(--muted);}
 .maint-asset{font-size:12px;font-weight:700;color:var(--purple);background:rgba(139,124,240,0.14);padding:2px 8px;border-radius:6px;}
 .maint-date{font-size:12.5px;color:var(--muted-2);margin-left:auto;}
-.maint-date.overdue{color:#f5928a;font-weight:800;}
+.maint-date.overdue{color:var(--red, #f5928a);font-weight:800;}
 .maint-actions{display:flex;gap:6px;}
 .maint-btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 12px;font-size:12.5px;font-weight:700;cursor:pointer;}
 .maint-btn:disabled{opacity:.55;cursor:default;}
 .maint-btn.ok{background:var(--teal);border-color:var(--teal);color:var(--fill-contrast,#06281c);}
-.maint-btn.danger{background:transparent;border-color:var(--red);color:#f5928a;}
+.maint-btn.danger{background:transparent;border-color:var(--red);color:var(--red, #f5928a);}
 .maint-note{font-size:12.5px;color:var(--muted);margin-top:6px;padding-left:2px;}
 .maint-note.ok{color:var(--teal);}
-.maint-note.rej{color:#f5928a;}
+.maint-note.rej{color:var(--red, #f5928a);}
 .maint-report-form{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
 .maint-report-form textarea{flex:1;min-width:200px;min-height:50px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;font-family:inherit;resize:vertical;}
 .maint-report-form input[type=file]{font-size:12.25px;color:var(--muted);max-width:220px;}
