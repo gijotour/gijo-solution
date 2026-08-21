@@ -25,10 +25,20 @@ export function serverPython(): string {
   if (캐시) return 캐시;
   const 후보: string[] = [];
   if (process.env.GIJO_PYTHON) 후보.push(process.env.GIJO_PYTHON);
-  const venv = process.platform === "win32"
-    ? path.join(process.cwd(), "venv", "Scripts", "python.exe")
-    : path.join(process.cwd(), "venv", "bin", "python");
-  후보.push(venv, "python3", "python");
+  // venv는 **서버 뿌리** 기준으로 찾는다(2026-08-22 수리).
+  //   ⚠ 예전엔 process.cwd()만 봤는데, 패키징 설치본은 cwd가 사용자 데이터 폴더(userData)라
+  //     고객이 서버 폴더에 venv를 만들어도 **엉뚱한 자리를 봤다** — 「파이썬을 깔면 됩니다」라는
+  //     안내조차 실제로는 안 통했다. 더구나 짝인 scripts/check-python-deps.mjs는 처음부터
+  //     서버 루트 기준이라, 주석이 경고한 「두 곳이 어긋나면 검사가 거짓말을 한다」가
+  //     패키징본에서 실현돼 있었다(점검은 초록인데 제품은 못 찾는 상태).
+  //   개발·WSL 운영에서는 뿌리와 cwd가 같아 동작이 그대로다. 둘 다 후보에 두어 안전하게 넓힌다.
+  const 뿌리 = process.env.GIJO_SERVER_ROOT || process.cwd();
+  const venv경로 = (base: string) => process.platform === "win32"
+    ? path.join(base, "venv", "Scripts", "python.exe")
+    : path.join(base, "venv", "bin", "python");
+  후보.push(venv경로(뿌리));
+  if (path.resolve(뿌리) !== path.resolve(process.cwd())) 후보.push(venv경로(process.cwd()));
+  후보.push("python3", "python");
   for (const c of 후보) {
     if (c.includes(path.sep) && !fs.existsSync(c)) continue;
     const r = spawnSync(c, ["--version"], { encoding: "utf-8" });

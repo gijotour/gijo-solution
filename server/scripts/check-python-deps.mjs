@@ -25,17 +25,21 @@ import { fileURLToPath } from "node:url";
 
 const 서버루트 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** util/pythonbin.ts의 serverPython()과 **같은 순서**로 고른다. 두 곳이 어긋나면 검사가 거짓말을 한다. */
+/** util/pythonbin.ts의 serverPython()과 **같은 순서**로 고른다. 두 곳이 어긋나면 검사가 거짓말을 한다.
+ *  ⚠ 2026-08-22: 실제로 어긋나 있었다 — 여기는 서버 루트 기준인데 제품은 cwd 기준이라,
+ *    패키징 설치본(cwd=userData)에서 **점검은 초록인데 제품은 venv를 못 찾는** 상태였다.
+ *    제품 쪽을 GIJO_SERVER_ROOT || cwd 기준으로 고쳤고, 여기도 같은 뿌리를 우선 본다. */
 function 서버파이썬() {
   const 후보 = [];
   if (process.env.GIJO_PYTHON) 후보.push(process.env.GIJO_PYTHON);
-  후보.push(
+  const venv경로 = (base) =>
     process.platform === "win32"
-      ? path.join(서버루트, "venv", "Scripts", "python.exe")
-      : path.join(서버루트, "venv", "bin", "python"),
-    "python3",
-    "python",
-  );
+      ? path.join(base, "venv", "Scripts", "python.exe")
+      : path.join(base, "venv", "bin", "python");
+  const 뿌리 = process.env.GIJO_SERVER_ROOT || 서버루트;
+  후보.push(venv경로(뿌리));
+  if (path.resolve(뿌리) !== path.resolve(서버루트)) 후보.push(venv경로(서버루트));
+  후보.push("python3", "python");
   for (const c of 후보) {
     if (c.includes(path.sep) && !fs.existsSync(c)) continue;
     const r = spawnSync(c, ["--version"], { encoding: "utf-8" });

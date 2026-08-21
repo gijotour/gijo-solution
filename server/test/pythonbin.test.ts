@@ -43,6 +43,18 @@ describe("파이썬 실행 경로는 한 곳에서 고른다", () => {
     const r = spawnSync(p, ["--version"], { encoding: "utf-8" });
     expect(r.status, `${p} 실행 실패`).toBe(0);
   });
+
+  // ★ 제품과 점검 스크립트가 **같은 자리**에서 venv를 찾는다 (2026-08-22 신설)
+  //   실제로 어긋나 있었다: check-python-deps.mjs는 서버 루트 기준인데 제품(serverPython)은
+  //   cwd 기준이라, 패키징 설치본(cwd=userData)에서 **점검은 초록인데 제품은 못 찾는** 상태였다.
+  //   check-python-deps의 주석이 「두 곳이 어긋나면 검사가 거짓말을 한다」고 경고해 둔 바로 그 일이다.
+  //   문자열 비교가 아니라 **둘 다 GIJO_SERVER_ROOT를 뿌리로 쓰는가**를 본다.
+  it("제품과 점검 스크립트가 같은 뿌리에서 venv를 찾는다", () => {
+    const 제품 = fs.readFileSync(new URL("../src/util/pythonbin.ts", import.meta.url), "utf8");
+    const 점검 = fs.readFileSync(new URL("../scripts/check-python-deps.mjs", import.meta.url), "utf8");
+    expect(제품, "serverPython이 서버 뿌리를 안 본다 — 패키징본에서 cwd(userData)를 뒤진다").toContain("GIJO_SERVER_ROOT");
+    expect(점검, "check-python-deps가 서버 뿌리 env를 안 본다 — 제품과 다른 자리를 재게 된다").toContain("GIJO_SERVER_ROOT");
+  });
 });
 
 describe("추출이 필요한 형식은 글자로 그냥 읽지 않는다", () => {
