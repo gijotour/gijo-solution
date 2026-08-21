@@ -1285,6 +1285,24 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
     });
   });
 
+  // ?edition=lite — 라이트 에디션이 이 화면을 그대로 쓸 때(2026-08-22 사장님 「프로처럼」).
+  //   화면을 한 벌 더 만들면 포크가 되므로 **같은 파일이 자기 스스로 접는다.**
+  //   접는 것: 🎓 학습(어댑터 학습 전제 — 라이트엔 그 파이프라인도, 갈 화면도 없다)
+  //           🗂 산출물(아직 안 도는 예약 자리 — 라이트에서 「예정」만 보여 줄 이유가 없다)
+  //   남기는 것: 👤 내 것 · 🏢 회사 지식 · 📘 제품 안내(라이트도 같은 제품 문서를 싣는다) · 🩹 반입
+  //   ⚠ 부모 창이 자식 DOM을 손보는 방식은 쓰지 않는다 — 이 저장소에서 그게 되는지 확인된 적이 없다.
+  var 라이트판 = new URLSearchParams(location.search).get("edition") === "lite";
+  if (라이트판) {
+    document.documentElement.classList.add("edition-lite");
+    ["learn", "future"].forEach(function (t) {
+      var n = document.querySelector('#tabs .v4node[data-t="' + t + '"]');
+      if (n) n.style.display = "none";
+    });
+    var 기록라벨 = document.querySelectorAll("#tabs .v4grouplbl");
+    // 「기록」 묶음은 🩹 반입 하나만 남으므로 라벨은 그대로 둔다(빈 묶음이 아니다).
+    void 기록라벨;
+  }
+
   // ?tab= 딥링크 — 문서함(창)을 흡수하며 옛 진입로(하단 📚·설정의 가이드 링크)가
   // 「제품 안내 탭이 선택된 내 문서」로 바로 오게 한다(승인 시안 §7 대응표).
   var 첫탭 = new URLSearchParams(location.search).get("tab");

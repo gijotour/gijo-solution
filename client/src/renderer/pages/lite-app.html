@@ -84,7 +84,8 @@
 
   /* 화면 한 자리 — 탭이 없으니 자리도 하나다. */
   .lite-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
-  #liteScreen { flex: 1 1 auto; min-height: 0; }
+  /* position: relative — 「라이트에 없는 화면」 안내를 이 자리 기준으로 띄우기 위해서다(2026-08-22). */
+  #liteScreen { flex: 1 1 auto; min-height: 0; position: relative; }
   #liteScreen iframe { width: 100%; height: 100%; border: 0; display: block; }
 
   .lite-todo { padding: 44px 40px; max-width: 640px; }
@@ -332,8 +333,43 @@
     // 9개 화면뿐 아니라 **설정도** 연다 — 대시보드의 「챗 모델 등록하러 가기」가 이걸 쓴다
     //   (모델 등록이 첫 실행 관문이 됐다, 2026-08-13). 열기()는 이미 설정 id를 처리한다.
     if (화면목록.some(function (x) { return x.id === id; }) || (자료 && 자료.settings && 자료.settings.id === id)) 열기(id);
-    else console.warn("[lite-nav] 라이트에 없는 화면입니다:", page);
+    else 없는화면알림(page);
   };
+
+  // 라이트에 없는 화면을 열라는 요청 — **조용히 삼키지 않는다.**
+  // 「눌렀는데 아무 일도 안 일어난다」가 이 저장소가 반복해 겪은 최악의 결함이다.
+  // 라이트에 그 화면이 없다는 것은 사실이므로, 그 사실을 그대로 말한다.
+  function 없는화면알림(page) {
+    console.warn("[lite-nav] 라이트에 없는 화면입니다:", page);
+    var 자리 = document.getElementById("liteScreen");
+    if (!자리) return;
+    var 안내 = document.createElement("div");
+    안내.className = "lite-nohere";
+    안내.setAttribute("role", "status");
+    안내.textContent = "이 기능은 라이트 에디션에 없습니다 — 표준·프로 에디션에서 쓸 수 있습니다.";
+    안내.style.cssText = "position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:9;"
+      + "background:#3a3a37;border:1px solid rgba(255,255,255,.16);color:#e9e7e2;"
+      + "border-radius:10px;padding:9px 14px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.35)";
+    자리.appendChild(안내);
+    setTimeout(function () { if (안내.parentNode) 안내.parentNode.removeChild(안내); }, 4200);
+  }
+
+  // ── 화면이 바깥으로 보내는 신호를 받는다 (2026-08-22) ──────────────────────────
+  // 프로 화면(내 문서)을 라이트가 그대로 쓰기 시작하면서 필요해졌다. 그 화면은 다른 화면으로
+  // 갈 때 `gijo:openTab`을 **부모(top)** 로 보내는데, 라이트 셸엔 받는 곳이 없어 버튼이
+  // 조용히 죽어 있었다(설계관 2026-08-22 적발).
+  // ⚠ **발신자를 검증한다** — 같은 창 안에 든 화면(iframe)이 보낸 것만 받는다. 바깥에서 온
+  //   메시지를 그대로 실행하면 화면 전환을 남이 조종할 수 있다(프로 셸이 같은 계약을 쓴다).
+  window.addEventListener("message", function (e) {
+    var 자리 = document.getElementById("liteScreen");
+    var 안쪽 = 자리 && Array.prototype.some.call(자리.querySelectorAll("iframe"), function (f) {
+      return f.contentWindow === e.source;
+    });
+    if (!안쪽) return;
+    var d = e.data;
+    if (!d || typeof d !== "object") return;
+    if (d.type === "gijo:openTab" && d.page) window.gijoOpenScreen(String(d.page));
+  });
 
   async function 시작() {
     try {

@@ -364,10 +364,15 @@ export async function saveDocArtifacts(opts: {
     //   남지 않았습니다」라고 말했다 — 프라이버시 기본값을 내세우는 기능이 정반대로 도는 자리였다.
     //   ⚠ 파일만 지우면 안 된다. sourcePath가 남아 hasSource=true인 채 「원본 열기」가 404가 되어
     //     거짓이 자리만 옮긴다. upsert가 COALESCE로 옛 값을 되살리므로 여기서 **명시적으로 비운다**.
+    //   ⚠ **우리가 uploads/에 넣은 원본일 때만** 손댄다. built-in 코퍼스처럼 다른 자리(docs/)를
+    //     가리키는 sourcePath까지 끊으면, 같은 이름으로 문서를 하나 올렸다는 이유로 제품 기본
+    //     지식의 원본 연결이 사라진다.
     try {
       const 옛경로 = path.join(uploadsDir, 이름);
+      const 옛메타 = getDocMetaStmt.get(이름) as { sourcePath?: string | null } | undefined;
+      const 우리것 = !옛메타?.sourcePath || path.resolve(옛메타.sourcePath) === path.resolve(옛경로);
       await fs.rm(옛경로, { force: true });
-      clearSourcePathStmt.run(이름);
+      if (우리것) clearSourcePathStmt.run(이름);
     } catch (rmErr) {
       console.warn(`[memory] 옛 원본 정리 실패(${이름}): ${rmErr instanceof Error ? rmErr.message : String(rmErr)}`);
     }
