@@ -548,6 +548,14 @@ export function fixStatusAnswer(): { output: string; dataCard: DataCard } {
 export async function reportStatusAnswer(): Promise<{ output: string; dataCard: DataCard }> {
   const rp = require("./report") as typeof import("./report");
   const 이력 = await rp.listReportHistory(50);
+  // 자동 생성물(answer=긴 답 전환·ingest=반입 내역·session=작업 내역 전문)은 「만든 리포트」가
+  // 아니다 — 안 가르면 세션 몇 개 닫은 날 카드가 「만든 리포트 5건」이 된다(2026-08-21 검토관
+  // ①중6, 판·띠⑤와 같은 잣대). 숨기지는 않는다 — 건수를 따로 밝힌다.
+  const 자동종류 = new Set(["answer", "ingest", "session"]);
+  const 사람이만든 = 이력.filter((e) => !자동종류.has(String((e as { type?: string }).type ?? "")));
+  const 자동 = 이력.length - 사람이만든.length;
+  const 잘림 = 이력.length >= 50; // 조회 상한에 걸리면 정확한 수를 알 수 없다 — +로 밝힌다
+  const 만든값 = `${사람이만든.length}${잘림 ? "+" : ""}`;
   // listSchedules는 report.ts가 아니라 reportschedule.ts에 있다 — 옵셔널 체크로 감싸면
   // 영원히 0이 나오는데 예외도 안 난다(검토관 1번: 생산자 없는 값을 실측처럼 보임).
   const { listSchedules } = require("./reportschedule") as typeof import("./reportschedule");
@@ -555,18 +563,20 @@ export async function reportStatusAnswer(): Promise<{ output: string; dataCard: 
   const dataCard: DataCard = {
     title: "보고 — 리포트 현황",
     kpis: [
-      { label: "만든 리포트", value: 이력.length >= 50 ? `${이력.length}+` : String(이력.length) },
+      { label: "만든 리포트", value: 만든값 },
       { label: "정기 스케줄", value: String(스케줄.length), color: 스케줄.length ? "ok" : "muted" },
     ],
     screen: { page: "reporting.html", label: "보고" },
     pickKey: "t",
-    table: 이력.length ? {
+    // 표도 사람이 만든 것 기준 — 자동 생성물이 최신순 상위를 채우면(answer가 실시각으로 정렬되는
+    // 지금) 「최근 리포트」 6줄이 전부 AI 작성 자료가 된다. 자동 건수는 output에서 밝힌다.
+    table: 사람이만든.length ? {
       cols: [{ key: "t", label: "리포트" }, { key: "d", label: "생성" }],
       // ⚠ `title`은 ReportHistoryEntry에 **없는 필드**다(report.ts:764-777) — 항상 폴백인
       //   `base`(원시 파일명 weekly-1755…)가 나가고 있었다(2026-08-20 설계관 적발, 오늘
       //   listApprovals title 사고와 같은 계열). 실화면(report.html:286)이 쓰는 한글 이름표를
       //   같은 말로 쓴다 — 같은 것을 두 곳이 다르게 부르면 담당자가 다른 것으로 읽는다.
-      shown: 이력.slice(0, 6).map((h) => {
+      shown: 사람이만든.slice(0, 6).map((h) => {
         const e = h as { type?: string; base?: string; createdAt?: number; audience?: string };
         // ⚠ report.html:286·grouppanels.js TL과 글자까지 동일할 것 — 세 벌 중 이 사본만 키가
         //   빠져 대화 카드에 영문 "session"이 그대로 나갔다(2026-08-21 검토관 ①상2·③중1).
@@ -578,10 +588,15 @@ export async function reportStatusAnswer(): Promise<{ output: string; dataCard: 
         const 이름 = TYPE_LABEL[String(e.type ?? "")] ?? String(e.type ?? e.base ?? "리포트");
         return { t: (e.audience ? `${이름} · ${e.audience}` : 이름).slice(0, 50), d: new Date(e.createdAt ?? 0).toLocaleDateString("ko-KR") };
       }),
-      totalCount: 이력.length,
+      totalCount: 사람이만든.length,
     } : undefined,
   };
-  return { output: `보고 현황 — 만든 리포트 ${이력.length >= 50 ? `${이력.length}+` : 이력.length}건 · 정기 스케줄 ${스케줄.length}건.`, dataCard };
+  return {
+    // 자동 생성물 단서는 있을 때만 붙인다 — 늘 붙는 단서는 아무도 안 읽는다.
+    output: `보고 현황 — 만든 리포트 ${만든값}건 · 정기 스케줄 ${스케줄.length}건.` +
+      (자동 ? ` 자동 생성물 ${자동}건(AI 작성·반입 내역 등)은 따로 셉니다.` : ""),
+    dataCard,
+  };
 }
 
 export function productsStatusAnswer(): { output: string; dataCard: DataCard } {
