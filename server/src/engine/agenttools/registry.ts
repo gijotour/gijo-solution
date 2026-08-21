@@ -139,6 +139,8 @@ import {
   matchFindingsByIds,
   조건이좁히나,
   runBulkUpdate,
+  runCreateRequestDoc,
+  runRequestStatus,
   현황상한,
   runFindingStatusOverview,
   runReviewFinding,
@@ -1570,6 +1572,42 @@ const TOOLS: AgentTool[] = [
     },
     undo: "승인 화면(취약점 관리)에서 개별로 되돌릴 수 있습니다. 범위가 크면 filter를 좁혀 다시 지시하세요.",
     run: runBulkUpdate,
+  },
+  {
+    // 조치·수정 요청서(2026-08-21 시안 확정) — 승인하면 **내 문서에 md 초안**이 생기고 요청
+    // 등록부(outbound_requests)에 적힌다. 발송은 사람이 한다(문서함에서 다듬어 내보내기).
+    name: "create_request_doc",
+    label: "조치 요청서 초안",
+    domain: "cross",
+    write: true,
+    description:
+      '취약점 조치·보안패치·보안정책 수정·버그 수정 요청서 초안을 만든다 — "이것들 조치 요청서 만들어줘", ' +
+      '"방화벽 정책 수정 요청서 만들어줘". 초안은 내 문서에 md로 생겨 문서함에서 다듬은 뒤 PDF·Word로 내보낸다.',
+    params: [
+      { name: "kind", label: "요청 유형", description: "취약점 조치 / 보안패치 / 보안정책 수정 / 버그 수정 (비우면 취약점 조치)", required: false },
+      { name: "ids", label: "고른 대상", description: "대화창 목록에서 체크한 취약점들(자동으로 채워짐)", required: false },
+      { name: "recipient", label: "수신처", description: "비워 두면 문서함에서 적습니다(자동으로 채우지 않음 — 확정 ②)", required: false },
+      { name: "dueDate", label: "조치 기한", description: "비우면 심각도 기준 자동(가장 급한 것, SLA 표)", required: false },
+      { name: "recheck", label: "재점검 조건", description: "비우면 「조치 완료 통보 후 재스캔」", required: false },
+    ],
+    effect: (args) => {
+      const n = String(args.ids ?? "").split(/[\s,]+/).filter(Boolean).length;
+      const k = String(args.kind ?? "").trim() || "취약점 조치";
+      return `${k} 요청서 초안 1건을 내 문서에 만듦${n ? ` — 취약점 ${n}건 동봉` : ""}. 발송은 하지 않음(문서함에서 다듬어 내보냄)`;
+    },
+    // ⚠ 「되돌릴 수 있다」고 쓰지 않는다 — 이 쓰기는 undo 스냅샷 대상 밖이다(설계관 ②).
+    undo: "초안 문서는 내 문서에서 지울 수 있고, 요청 기록은 보안제품 화면의 요청 이력에서 정리합니다.",
+    run: runCreateRequestDoc,
+  },
+  {
+    name: "request_status",
+    label: "요청 현황",
+    domain: "cross",
+    write: false,
+    description: '밖으로 보낸 조치·수정 요청서의 현황을 본다 — "요청 현황 알려줘", "회신 없는 요청 있어?"',
+    params: [],
+    directAnswer: true,
+    run: runRequestStatus,
   },
   {
     // 전문가 어댑터 현황(재설계, 2026-08-08) — 등록부·팀원 배정·주제 재료를 한 번에.

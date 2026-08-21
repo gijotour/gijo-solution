@@ -25,6 +25,7 @@ const 예외: Record<string, string> = {
   "agenttools/handlers.ts": "판정 함수(isRealVulnerability·findingSummary)가 사는 곳 — 여기가 원본이다",
   "assets.ts": "저장·삭제 계층. 세는 것이 아니라 **보관**한다 — 스캔 실패도 기록으로 남겨야 한다",
   "kbhygiene.ts": "여기의 findings는 취약점이 아니라 **지식베이스 점검 결과**다(같은 이름 다른 뜻)",
+  "remrequest.ts": "세지 않는다 — 사람이 목록에서 고른 건을 findingKey로 **되찾는 조회**다(요청서 동봉). 고른 목록 자체가 이미 판정을 거쳐 나온 것",
   "ctimatch.ts": "취약점 문구를 CTI와 대조하는 자리 — 세지 않고 **글자만** 본다",
   "ingestreport.ts": "반입 직후 그 파일이 넣은 것을 세는 자리 — 반입 결과 보고이지 현황 집계가 아니다",
   "verifyengine.ts": "조치 검증 대상 뽑기 — 스캔 실패 자산도 재점검 대상이라 넣어야 한다",

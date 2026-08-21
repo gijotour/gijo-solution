@@ -21,6 +21,7 @@ import { registerComplianceRoutes } from "./engine/compliance";
 import { registerModelDexRoutes } from "./engine/modeldex";
 import { registerMergeRoutes } from "./engine/merge";
 import { registerDispatcherRoutes } from "./engine/dispatcher";
+import { registerRemRequestRoutes } from "./engine/remrequest";
 import { registerMemoryRoutes } from "./engine/memory";
 import { registerHandoverRoutes } from "./engine/handover";
 import { registerDataCleanupRoutes } from "./engine/datacleanup";
@@ -163,6 +164,7 @@ export function createApp(): Express {
   registerModelDexRoutes(app);
   registerMergeRoutes(app);
   registerDispatcherRoutes(app);
+  registerRemRequestRoutes(app); // 조치·수정 요청 등록부(2026-08-21)
   registerMemoryRoutes(app);
   registerModelAuthRoutes(app);
   registerHandoverRoutes(app);

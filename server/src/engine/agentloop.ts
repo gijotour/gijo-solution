@@ -1376,6 +1376,19 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "verify_finding",
     args: {},
   },
+  // 조치·수정 요청서(2026-08-21 시안 확정) — 「…요청서 만들어줘」는 유형 무관 결정 규칙으로
+  // 받는다. ⚠ REMEDIATION 계열 규칙보다 먼저 소비돼야 「정책 수정 요청서」가 조치방법 답으로
+  // 새지 않는다(설계관 경고 — FORCED가 특수경로보다 앞이라 여기 두면 안전).
+  {
+    re: /요청서\s*(만들|작성|생성|해\s*줘)/,
+    tool: "create_request_doc",
+    args: {},
+  },
+  {
+    re: /요청\s*(현황|목록|이력)|회신\s*없는\s*요청/,
+    tool: "request_status",
+    args: {},
+  },
 ];
 // 등록된 보안제품 이름을 콕 집어 "설명해줘"라고 물으면 그 제품의 사내 근거(매뉴얼·온톨로지)를
 // 모아 답한다. [2026-07-26 실사용] "Tenable Web App Scanning 주요기능 설명해줘"에 도구를 하나도

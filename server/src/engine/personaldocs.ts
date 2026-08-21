@@ -75,6 +75,21 @@ export function getPersonalDoc(id: string, userId: string): PersonalDoc | null {
   return r ? fromRow(r) : null;
 }
 
+/** 개인 문서 생성 — 라우트와 서버 내부(조치 요청서 초안 등)가 같은 규칙을 쓴다(2026-08-21 추출).
+ *  상한·길이 검사 포함 — 위반은 throw(라우트가 400으로 옮긴다). 생성은 항상 개인·비공유다. */
+export function createPersonalDocFor(userId: string, userName: string, titleRaw: string, body: string): PersonalDoc {
+  const title = titleRaw.trim();
+  if (!title) throw new Error("제목을 적어 주세요");
+  if (title.length > MAX_TITLE) throw new Error(`제목은 ${MAX_TITLE}자까지입니다`);
+  if (body.length > MAX_BODY) throw new Error(`내용은 ${MAX_BODY}자까지입니다`);
+  if (countPersonalDocs(userId) >= MAX_DOCS_PER_USER) throw new Error(`개인 문서는 ${MAX_DOCS_PER_USER}건까지입니다 — 안 쓰는 것을 지워 주세요`);
+  const now = Date.now();
+  const doc: PersonalDoc = { id: randomUUID(), title, body, ragOptIn: false, shared: false, createdAt: now, updatedAt: now };
+  insertStmt.run({ ...doc, userId, ragOptIn: 0, shared: 0 });
+  recordAudit({ kind: "config", actor: userName, action: "개인 문서 작성", target: doc.id, detail: title, result: "ok" });
+  return doc;
+}
+
 export function countPersonalDocs(userId: string): number {
   return (countStmt.get(userId) as { n: number }).n;
 }
@@ -130,19 +145,10 @@ export function registerPersonalDocsRoutes(app: Express): void {
   app.post("/api/personaldocs", authMiddleware, asyncRoute(async (req, res) => {
     const u = who(req);
     const b = req.body as { title?: string; body?: string };
-    const title = String(b.title ?? "").trim();
-    const body = String(b.body ?? "");
-    if (!title) { res.status(400).json({ error: "제목을 적어 주세요" }); return; }
-    if (title.length > MAX_TITLE) { res.status(400).json({ error: `제목은 ${MAX_TITLE}자까지입니다` }); return; }
-    if (body.length > MAX_BODY) { res.status(400).json({ error: `내용은 ${MAX_BODY}자까지입니다` }); return; }
-    if (countPersonalDocs(u.id) >= MAX_DOCS_PER_USER) {
-      res.status(400).json({ error: `개인 문서는 ${MAX_DOCS_PER_USER}건까지입니다 — 안 쓰는 것을 지워 주세요` }); return;
-    }
-    const now = Date.now();
-    const doc: PersonalDoc = { id: randomUUID(), title, body, ragOptIn: false, shared: false, createdAt: now, updatedAt: now };
-    insertStmt.run({ ...doc, userId: u.id, ragOptIn: 0, shared: 0 });
-    recordAudit({ kind: "config", actor: u.name, action: "개인 문서 작성", target: doc.id, detail: title, result: "ok" });
-    res.json({ ...doc, warnings: secretWarning(body) });
+    try {
+      const doc = createPersonalDocFor(u.id, u.name, String(b.title ?? ""), String(b.body ?? ""));
+      res.json({ ...doc, warnings: secretWarning(doc.body) });
+    } catch (e) { res.status(400).json({ error: (e as Error).message }); }
   }));
 
   app.put("/api/personaldocs/:id", authMiddleware, asyncRoute(async (req, res) => {

@@ -3353,3 +3353,50 @@ export async function runDeleteDocument(args: Record<string, string>): Promise<s
   });
   return `문서 「${id}」를 장기기억에서 지웠습니다 — 조각 ${r.deletedChunks}건 제거${r.deletedFile ? " · 원본 파일까지 삭제(복구 불가)" : " · 원본이 남아 있으면 재업로드로 복구할 수 있습니다"}. 답변에서 즉시 빠집니다.`;
 }
+
+// ── 조치·수정 요청서(2026-08-21 시안 확정 · 설계관 반영) ──────────────────────
+// 초안은 내 문서(개인·비공유)에 md로 생긴다 — 공유·AI 인입은 사람이 문서함에서 결정한다
+// (「공유 기본」은 전사 RAG 전역 인입·마스킹 부작용이 있어 절충 — 설계관 ④, 보고로 사장님 확인).
+export async function runCreateRequestDoc(args: Record<string, string>): Promise<string> {
+  const rem = await import("../remrequest.js");
+  const { createPersonalDocFor } = await import("../personaldocs.js");
+  const { currentViewer } = await import("../viewerctx.js");
+  const kindRaw = String(args.kind ?? "").trim();
+  const kind = (["vuln-fix", "patch", "policy", "bug"].includes(kindRaw) ? kindRaw
+    : /패치/.test(kindRaw) ? "patch" : /정책/.test(kindRaw) ? "policy" : /버그/.test(kindRaw) ? "bug" : "vuln-fix") as import("../remrequest.js").OutboundKind;
+  const ids = String(args.ids ?? "").split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+  const { found, missing } = rem.resolveFindings(ids);
+  if (kind === "vuln-fix" && ids.length && found.length === 0) {
+    // FAIL_MARKS-예외: 진짜 실패다 — 고른 id가 최신 목록과 안 맞아 초안을 만들 수 없는 상태를 알린다(가짜 성공 금지).
+    return "고르신 취약점을 목록에서 찾지 못했습니다 — 목록을 다시 불러 고른 뒤 시도해 주세요.";
+  }
+  const dueDate = String(args.dueDate ?? "").trim() || (found.length ? rem.defaultDueDate(found) : "");
+  const draft = rem.buildRequestDraft({
+    kind, recipient: args.recipient, dueDate, recheck: args.recheck,
+    findings: found.map((x) => ({ assetName: x.assetName, f: x.f })),
+  });
+  // ViewerTag에는 userId뿐이다(표시 이름 없음) — 감사·귀속은 userId로 정직하게 남긴다.
+  const uid = currentViewer()?.userId ?? "-";
+  const doc = createPersonalDocFor(uid, uid, draft.title, draft.body);
+  rem.createOutboundRequest({
+    kind, findingIds: ids, recipient: args.recipient, dueDate, recheck: args.recheck,
+    docId: doc.id, createdBy: uid,
+  });
+  const 빠짐 = missing ? ` ⚠ ${missing}건은 목록에서 찾지 못해 뺐습니다.` : "";
+  return `📨 조치 요청서 초안을 내 문서에 만들었습니다 — 「${draft.title}」.${빠짐}\n` +
+    `문서함(내 문서)에서 수신처를 적고 다듬은 뒤 ⬇ PDF·Word로 내보내 전달하세요. 보낸 뒤에는 보안제품 화면의 요청 이력에서 상태(보냄→회신)를 표시해 주세요.`;
+}
+
+export async function runRequestStatus(): Promise<string> {
+  const rem = await import("../remrequest.js");
+  const all = rem.listOutboundRequests();
+  if (all.length === 0) return "📨 요청 현황 — 아직 만든 요청서가 없습니다. 취약점 목록에서 고른 뒤 \"조치 요청서 만들어줘\"라고 하면 초안이 내 문서에 생깁니다.";
+  const 셈 = (s: string) => all.filter((r) => r.status === s).length;
+  const 미회신 = rem.unansweredRequests();
+  const L = [`📨 요청 현황 — 전체 ${all.length}건 · 초안 ${셈("draft")} · 보냄 ${셈("sent")} · 회신 ${셈("replied")} · 무응답 ${셈("noreply")}`];
+  if (미회신.length) {
+    L.push(`⚠ 회신 없는 요청 ${미회신.length}건 — 재촉이 필요할 수 있습니다:`);
+    for (const r of 미회신.slice(0, 5)) L.push(`- ${rem.KIND_KO[r.kind]}${r.targetName ? ` · ${r.targetName}` : ""} (보낸 날 ${new Date(r.sentAt ?? r.createdAt).toLocaleDateString("ko-KR")})`);
+  }
+  return L.join("\n");
+}
