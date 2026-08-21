@@ -721,8 +721,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (reqToggle) { toggleReqHistory(reqToggle.dataset.reqToggle); return; }
     const reqSet = e.target.closest("[data-req-set]");
     if (reqSet) {
-      // 상태 전환 = 사람이 확인하고 누른다(사장님 확정①). 확인창 한 번 — 되돌리기 어려운 표시가 아니지만 실수 방지.
+      // 상태 전환 = 사람이 확인하고 누른다(사장님 확정①). 확인창 한 번 — 실수 방지(검토관 중2).
       const id = reqSet.dataset.reqSet, to = reqSet.dataset.reqTo;
+      if (!await gijoAsk("요청 상태를 「" + (REQ_STATUS[to] || to) + "」(으)로 바꿀까요?")) return;
       const row = reqSet.closest(".g-rows-r"); const pid = row && row.closest(".fields-panel") ? row.closest(".fields-panel").id.replace("rq-", "") : null;
       try {
         await window.gijo.outboundRequestSetStatus(id, to);

@@ -11,21 +11,21 @@
 //     (타사 문서가 지식 53%를 차지해 근거가 흔들린 실사고의 재발 방지).
 //   · 유튜브는 자막이 있는 영상만 — 자막이 없으면 정직하게 못 읽는다고 말한다(STT는 실측 후).
 import { ingestText } from "./memory";
+import { isPrivateIp } from "./airgap";
 
 const 최대바이트 = 3 * 1024 * 1024;
 const 시간제한ms = 20000;
 
-/** 사설망·루프백·링크로컬 거절 — 호스트 이름 기준의 보수적 차단(이름 해석 전 단계). */
+/** 사설망·루프백·링크로컬·메타데이터 거절(SSRF 방어). ⚠ 사설 IP 판정은 **airgap.isPrivateIp**를
+ *  재사용한다 — 여기서 새로 짰다가 IPv6 대괄호([::1])·0.0.0.0·fc/fd 호스트명 오판을 다시 냈다
+ *  (2026-08-21 검토관 상1~3, 중4). URL의 hostname은 IPv6일 때 대괄호를 포함하는데 isPrivateIp가
+ *  그것을 떼고 콜론 유무로 이름/리터럴을 가른다(fcc.gov 같은 도메인 오차단도 그 함수가 안 낸다). */
 export function isPrivateTarget(url: URL): boolean {
   const h = url.hostname.toLowerCase();
   if (h === "localhost" || h.endsWith(".local") || h.endsWith(".internal")) return true;
-  // IPv4 리터럴 사설대역·루프백·링크로컬·메타데이터
-  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
-  if (m) {
-    const [a, b] = [Number(m[1]), Number(m[2])];
-    if (a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254)) return true;
-  }
-  if (h === "::1" || h.startsWith("fe80:") || h.startsWith("fd") || h.startsWith("fc")) return true;
+  // 0.0.0.0은 리눅스에서 로컬로 접속된다 — isPrivateIp의 IPv4 분기는 이걸 사설로 안 보므로 따로 막는다.
+  if (h === "0.0.0.0" || h === "[::]") return true;
+  if (isPrivateIp(url.hostname)) return true; // 대괄호·IPv6 리터럴은 이 함수가 처리
   return false;
 }
 
@@ -68,15 +68,32 @@ export async function fetchYoutubeTranscript(url: URL): Promise<{ title: string;
 }
 
 async function fetchCapped(url: string, accept: string): Promise<string> {
-  const r = await fetch(url, {
-    signal: AbortSignal.timeout(시간제한ms),
-    headers: { "user-agent": "Mozilla/5.0 (GIJO-AS knowledge ingest)", ...(accept ? { accept } : {}) },
-    redirect: "follow",
-  });
-  if (!r.ok) throw new Error(`가져오기 실패(${r.status})`);
-  const buf = Buffer.from(await r.arrayBuffer());
-  if (buf.length > 최대바이트) throw new Error(`페이지가 너무 큽니다(${Math.round(buf.length / 1024)}KB > ${최대바이트 / 1024}KB)`);
-  return buf.toString("utf8");
+  // ⚠ 리다이렉트를 **홉마다 재검사**한다(2026-08-21 검토관 상2). redirect:"follow"면 공개
+  //   도메인이 302로 169.254.169.254(클라우드 메타데이터)·내부 콘솔로 튕겨도 그대로 따라가
+  //   SSRF가 된다(에어갭 OFF가 표준 배치라 전역 fetch 관문만으론 안 막힌다). manual로 받아
+  //   Location을 isPrivateTarget으로 검사하고서만 다음 홉으로 간다.
+  let cur = url;
+  for (let hop = 0; hop < 5; hop++) {
+    const r = await fetch(cur, {
+      signal: AbortSignal.timeout(시간제한ms),
+      headers: { "user-agent": "Mozilla/5.0 (GIJO-AS knowledge ingest)", ...(accept ? { accept } : {}) },
+      redirect: "manual",
+    });
+    if (r.status >= 300 && r.status < 400) {
+      const loc = r.headers.get("location");
+      if (!loc) throw new Error(`가져오기 실패(리다이렉트에 목적지가 없음, ${r.status})`);
+      const next = new URL(loc, cur);
+      if (next.protocol !== "http:" && next.protocol !== "https:") throw new Error("리다이렉트가 http(s)가 아닙니다 — 중단합니다.");
+      if (isPrivateTarget(next)) throw new Error("리다이렉트가 내부망·사설 주소로 향합니다 — 보안상 중단합니다.");
+      cur = next.toString();
+      continue;
+    }
+    if (!r.ok) throw new Error(`가져오기 실패(${r.status})`);
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 최대바이트) throw new Error(`페이지가 너무 큽니다(${Math.round(buf.length / 1024)}KB > ${최대바이트 / 1024}KB)`);
+    return buf.toString("utf8");
+  }
+  throw new Error("리다이렉트가 너무 많습니다(5회 초과) — 중단합니다.");
 }
 
 export async function ingestUrl(rawUrl: string, actor?: string): Promise<{ documentId: string; title: string; chunks: number; youtube: boolean }> {

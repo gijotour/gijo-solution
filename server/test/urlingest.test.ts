@@ -28,12 +28,15 @@ describe("URL 지식화 — 본문 발라내기(결정적 ①층)", () => {
 
 describe("URL 지식화 — 보안 경계", () => {
   it("사설망·루프백·메타데이터 주소는 거절한다(SSRF 방어)", () => {
-    for (const u of ["http://localhost:4000/x", "http://127.0.0.1/", "http://10.8.0.1/", "http://192.168.219.66/", "http://172.16.0.9/", "http://169.254.169.254/meta", "http://server.internal/"]) {
+    for (const u of ["http://localhost:4000/x", "http://127.0.0.1/", "http://10.8.0.1/", "http://192.168.219.66/", "http://172.16.0.9/", "http://169.254.169.254/meta", "http://server.internal/",
+      // ⚠ 검토관 상1~3이 잡은 우회들 — IPv6 대괄호·0.0.0.0·IPv6 사설이 전부 막혀야 한다.
+      "http://[::1]:4000/", "http://[fd00::1]/", "http://[fe80::1]/", "http://0.0.0.0:4000/"]) {
       expect(isPrivateTarget(new URL(u)), u + " 는 막혀야 한다").toBe(true);
     }
   });
-  it("공개 주소는 통과한다", () => {
-    for (const u of ["https://www.somansa.com/ko/x", "https://youtu.be/abc", "https://www.cisa.gov/kev"]) {
+  it("공개 주소는 통과한다 — fc·fd로 시작하는 도메인도(검토관 중4 오차단 방지)", () => {
+    for (const u of ["https://www.somansa.com/ko/x", "https://youtu.be/abc", "https://www.cisa.gov/kev",
+      "https://www.fcc.gov/x", "https://www.fda.gov/x", "https://fdic.gov/x"]) {
       expect(isPrivateTarget(new URL(u)), u).toBe(false);
     }
   });

@@ -3378,9 +3378,13 @@ export async function runCreateRequestDoc(args: Record<string, string>): Promise
   // ViewerTag에는 userId뿐이다(표시 이름 없음) — 감사·귀속은 userId로 정직하게 남긴다.
   const uid = currentViewer()?.userId ?? "-";
   const doc = createPersonalDocFor(uid, uid, draft.title, draft.body);
+  // 고른 취약점의 자산에 연결된 제품을 target으로 채운다 — 안 채우면 제품 「요청 이력」 판이
+  // 영영 0건이 된다(검토관 상1). 제품이 안 걸리면 target 없이(전역 현황에서만 보인다).
+  const target = rem.resolveTargetProduct([...new Set(found.map((x) => x.assetId))]);
   rem.createOutboundRequest({
     kind, findingIds: ids, recipient: args.recipient, dueDate, recheck: args.recheck,
     docId: doc.id, createdBy: uid,
+    targetKind: target?.targetKind, targetId: target?.targetId, targetName: target?.targetName,
   });
   const 빠짐 = missing ? ` ⚠ ${missing}건은 목록에서 찾지 못해 뺐습니다.` : "";
   return `📨 조치 요청서 초안을 내 문서에 만들었습니다 — 「${draft.title}」.${빠짐}\n` +

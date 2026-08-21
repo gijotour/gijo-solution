@@ -150,6 +150,20 @@ export function createOutboundRequest(input: {
 
 export { resolveFindings };
 
+/** 고른 취약점들의 자산에 연결된 보안제품을 찾는다 — 요청서를 그 제품 이력에 걸기 위해서다
+ *  (검토관 상1 — target 미채움으로 제품 판이 영영 0건이던 것). 한 제품으로 모이면 그것을,
+ *  여러 제품이면 첫 제품을 대표로(초안은 사람이 문서함에서 정정할 수 있다). 없으면 undefined. */
+export function resolveTargetProduct(assetIds: string[]): { targetKind: "product"; targetId: string; targetName: string } | undefined {
+  if (!assetIds.length) return undefined;
+  try {
+    const { listProducts } = require("./securityproducts") as typeof import("./securityproducts");
+    const set = new Set(assetIds);
+    const hit = listProducts().find((p) => (p as { assetId?: string }).assetId && set.has((p as { assetId?: string }).assetId!));
+    if (hit) return { targetKind: "product", targetId: hit.id, targetName: hit.name };
+  } catch { /* 제품을 못 읽어도 요청서는 만든다 */ }
+  return undefined;
+}
+
 export function registerRemRequestRoutes(app: Express): void {
   app.get("/api/outbound-requests", authMiddleware, (req, res) => {
     const productId = typeof req.query.productId === "string" ? req.query.productId : undefined;
