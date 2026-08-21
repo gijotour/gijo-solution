@@ -1623,6 +1623,12 @@ const TOOLS: AgentTool[] = [
     params: [
       { name: "url", label: "주소", description: "http(s):// 로 시작하는 공개 웹 주소 또는 유튜브 링크", required: true },
     ],
+    // 지시문에 URL이 뻔히 있는데 칸이 비면 승인 실행이 인자 누락으로 죽는다(2026-08-21 라이브
+    // 실측이 잡음) — 첫 http(s) 주소를 규칙으로 뽑아 채운다(source=auto, 사람이 결재판에서 수정 가능).
+    autoFill: (_args, instruction): Record<string, string> => {
+      const m = /https?:\/\/[^\s"'<>　]+/.exec(instruction ?? "");
+      return m ? { url: m[0].replace(/[.,)\]]+$/, "") } : {};
+    },
     effect: (args) => {
       try { const u = new URL(String(args.url ?? "").trim()); return `외부 접속: ${u.hostname} — 본문을 받아 지식 저장소에 담음(사내 참고용)`; }
       catch { return "주소가 비어 있거나 형식이 아님 — 승인 전에 주소를 확인하세요"; }
