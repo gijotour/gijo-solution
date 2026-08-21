@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { chat, systemPromptFor, resetChatHistoryForTests, stripLeadingPreamble, hasEnglishDrift, hangulRatio } from "../src/engine/llm";
+import { chat, systemPromptFor, resetChatHistoryForTests, stripLeadingPreamble, hasEnglishDrift, hangulRatio, 사내특정대상질문 } from "../src/engine/llm";
 
 // 실측(2026-07-19) 재현 사례: "취약점 조치 우선순위를 정할 때 무엇을 먼저 보나요?" 에 대한 전면 영어 응답.
 const ENGLISH_DRIFT_REPLY =
@@ -397,5 +397,32 @@ describe("★ RAG 0건 정직 배너 (#8)", () => {
     expect(src2).toContain("이 PC의 사내 자료에는 이 내용이 없습니다");
     // FAIL_MARKS 전체 대조는 emptyanswer-guidance(파일 전체 감시)가 맡는다 — 여기서는 배너 문구가
     // 그 감시 대상 파일에 실제로 있는지만 본다(검토관: 항상-참 검사는 무의미했다).
+  });
+});
+
+// ★ 자료없음 + **사내 특정 대상** 질문일 때만 표적 배너(자료를 넣어 달라) — 2026-08-21 사장님
+//   「부족하면 부족하다 하고 필요한 자료를 요청」. 좁게 잡는 게 핵심이다 — 개념 질문까지 억누르면 회귀.
+describe("★ 사내 특정 대상 판별 — 자료 요청 배너의 방아쇠", () => {
+  const src3 = fsw.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
+  it("우리 문서·명령·설정을 콕 집으면 참", () => {
+    for (const q of [
+      "SolidStep 매뉴얼에서 스캔 명령어 알려줘",
+      "우리 회사 방화벽 설정 어떻게 해",
+      "이 제품 옵션 뭐 있어",
+      "사내 백업 절차 보여줘",
+      "저희 서버 접속 방법 알려줘",
+    ]) expect(사내특정대상질문(q), q).toBe(true);
+  });
+  it("일반·개념 질문은 거짓 — 자료 0건이어도 일반지식 답을 억누르지 않는다", () => {
+    for (const q of [
+      "SQL 인젝션이 뭐야",
+      "취약점 관리가 뭐야",
+      "방법 알려줘",
+      "오늘 브리핑",
+      "CVE-2021-44228 설명해줘",
+    ]) expect(사내특정대상질문(q), q).toBe(false);
+  });
+  it("배너 분기가 판별기를 실제로 쓴다(배선 감시)", () => {
+    expect(src3).toMatch(/사내특정대상질문\(args\.message\)\s*\?\s*자료요청배너\s*:\s*자료없음배너/);
   });
 });
