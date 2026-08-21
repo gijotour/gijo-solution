@@ -12,7 +12,7 @@ import { emitCollaboration } from "./collaboration";
 import { ingestAnalysisFile, detectIngestKind } from "./analysishub";
 import { importVulnScan, parseNessusHtml } from "./vulnscan";
 import { importManual, classifyManual, listProducts, guessProductName } from "./securityproducts";
-import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, 열람불가공용 } from "./memory";
+import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, cleanupOldOriginal, 열람불가공용 } from "./memory";
 
 // 사용자가 결정창에서 고를 수 있는 유형(파일명으로 애매할 때).
 //
@@ -138,9 +138,15 @@ async function tryIngest(
     //   같은 일을 하는 ingest-file 라우트와 잣대가 갈려 있었다. 이제 둘 다 saveDocArtifacts를 쓴다.
     보관 = await saveDocArtifacts({ documentId: filename, text, contentBase64: base64, keepOriginal: opts?.keepOriginal });
     const r = await ingestText(filename, text, GLOBAL_SCOPE, 보관.sourcePath, classify, uploadedBy, category);
+    // 「보관 안 함」으로 다시 올린 경우의 옛 원본 정리는 **수집이 끝난 뒤에** 한다 —
+    // 먼저 지우면 수집이 실패했을 때 옛 문서는 살아 있는데 그 원본만 사라진다.
+    if (!opts?.keepOriginal) await cleanupOldOriginal(filename);
+    // ⚠ chunks가 0이면 **문서 메타 행이 안 생긴다**(수집 함수가 그 전에 조기 반환한다).
+    //   목록에도 안 뜨고 추출본 보기도 404이므로 「수집됐다」고 말하면 안 된다(재검토관 확정).
     return {
-      chunks: r.chunks, docClass: r.docClass, linkedProduct: r.linkedProduct, docName: filename, category: r.category,
-      savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: true,
+      chunks: r.chunks, docClass: r.docClass, linkedProduct: r.linkedProduct,
+      docName: r.chunks > 0 ? filename : undefined, category: r.category,
+      savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: r.chunks > 0,
     };
   } catch {
     // 임베딩 미기동 등 — 검색 수집만 생략, 상위 처리는 계속.

@@ -6,6 +6,7 @@
 // 각 제품에 제품 매뉴얼·로그 매뉴얼을 첨부하면 텍스트를 추출해 지식베이스(RAG)에도 수집한다
 // (maintenance 점검서와 같은 패턴) — "올린 문서 검색"에서 바로 찾아지는 문서가 된다.
 
+import path from "path";
 import { 라이브모드 } from "./datacleanup";
 import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
@@ -786,13 +787,22 @@ export function registerSecurityProductRoutes(app: Express): void {
       const user = (req as Request & { user?: GijoUser }).user;
       let docName: string | undefined;
       if (filename && content) {
+        // ⚠ 이름을 basename으로 접고 **볼 수 없는 문서는 덮어쓰지 못하게** 한다 —
+        //   업로드 두 창구와 같은 잣대다(재검토관 2026-08-22: 덮어쓰기 문이 둘이 아니라 다섯이었다).
+        //   인입은 같은 documentId면 옛 조각을 지우고 새로 넣는데 등급 칸은 그대로 남는다.
+        const 문서이름 = path.basename(String(filename).trim());
+        const { 열람불가공용 } = await import("./memory.js");
+        if (!문서이름 || 문서이름 === "." || 문서이름 === ".." || 열람불가공용(문서이름, req)) {
+          res.status(403).json({ error: "같은 이름의 문서가 이미 있고, 그 문서를 열람할 권한이 없습니다 — 다른 이름으로 올리세요" });
+          return;
+        }
         const { extractDocumentText } = await import("./dataset.js");
-        const text = await extractDocumentText(filename, content);
+        const text = await extractDocumentText(문서이름, content);
         if (text.trim()) {
           const { ingestText, GLOBAL_SCOPE } = await import("./memory.js");
           // 제품 매뉴얼은 업무영역이 자명하다 — 장비운영으로 확정 인입 + 작업 귀속 기록.
-          await ingestText(filename, text, GLOBAL_SCOPE, undefined, false, user?.displayName, "장비운영");
-          docName = filename;
+          await ingestText(문서이름, text, GLOBAL_SCOPE, undefined, false, user?.displayName, "장비운영");
+          docName = 문서이름;
         }
       }
       try {
@@ -825,13 +835,20 @@ export function registerSecurityProductRoutes(app: Express): void {
       const user = (req as Request & { user?: GijoUser }).user;
       let docName: string | undefined;
       if (content) {
+        // ⚠ 업로드 창구와 같은 잣대 — basename 접기 + 「볼 수 없으면 덮어쓸 수도 없다」.
+        const 문서이름 = path.basename(String(filename).trim());
+        const { 열람불가공용 } = await import("./memory.js");
+        if (!문서이름 || 문서이름 === "." || 문서이름 === ".." || 열람불가공용(문서이름, req)) {
+          res.status(403).json({ error: "같은 이름의 문서가 이미 있고, 그 문서를 열람할 권한이 없습니다 — 다른 이름으로 올리세요" });
+          return;
+        }
         const { extractDocumentText } = await import("./dataset.js");
-        const text = await extractDocumentText(filename, content);
+        const text = await extractDocumentText(문서이름, content);
         if (text.trim()) {
           const { ingestText, GLOBAL_SCOPE } = await import("./memory.js");
           // 제품 매뉴얼은 업무영역이 자명하다 — 장비운영으로 확정 인입 + 작업 귀속 기록.
-          await ingestText(filename, text, GLOBAL_SCOPE, undefined, false, user?.displayName, "장비운영");
-          docName = filename;
+          await ingestText(문서이름, text, GLOBAL_SCOPE, undefined, false, user?.displayName, "장비운영");
+          docName = 문서이름;
         }
       }
       res.json(importManual(filename.trim(), docName, user?.displayName));

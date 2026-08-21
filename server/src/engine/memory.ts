@@ -358,26 +358,33 @@ export async function saveDocArtifacts(opts: {
     } catch (saveErr) {
       console.warn(`[memory] 원본 보관 실패(${이름}): ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
     }
-  } else {
-    // ★ 「보관 안 함」을 골랐으면 **예전에 남긴 원본도 치운다**(검토관 2026-08-22 확정).
-    //   같은 이름으로 다시 올릴 때 토글을 꺼도 옛 원본이 그대로 남아 화면은 「원본은 서버에
-    //   남지 않았습니다」라고 말했다 — 프라이버시 기본값을 내세우는 기능이 정반대로 도는 자리였다.
-    //   ⚠ 파일만 지우면 안 된다. sourcePath가 남아 hasSource=true인 채 「원본 열기」가 404가 되어
-    //     거짓이 자리만 옮긴다. upsert가 COALESCE로 옛 값을 되살리므로 여기서 **명시적으로 비운다**.
-    //   ⚠ **우리가 uploads/에 넣은 원본일 때만** 손댄다. built-in 코퍼스처럼 다른 자리(docs/)를
-    //     가리키는 sourcePath까지 끊으면, 같은 이름으로 문서를 하나 올렸다는 이유로 제품 기본
-    //     지식의 원본 연결이 사라진다.
-    try {
-      const 옛경로 = path.join(uploadsDir, 이름);
-      const 옛메타 = getDocMetaStmt.get(이름) as { sourcePath?: string | null } | undefined;
-      const 우리것 = !옛메타?.sourcePath || path.resolve(옛메타.sourcePath) === path.resolve(옛경로);
-      await fs.rm(옛경로, { force: true });
-      if (우리것) clearSourcePathStmt.run(이름);
-    } catch (rmErr) {
-      console.warn(`[memory] 옛 원본 정리 실패(${이름}): ${rmErr instanceof Error ? rmErr.message : String(rmErr)}`);
-    }
   }
   return { mdSaved, originalSaved, sourcePath };
+}
+
+/** 「원본 보관 안 함」으로 다시 올렸을 때, 예전에 남겨 둔 원본을 치운다.
+ *
+ *  ⚠ **인입(수집)이 성공한 뒤에 부른다.** 저장과 함께 하면 안 된다 — 수집이 실패하면 옛 문서가
+ *    화면·검색에 그대로 살아 있는데 그 문서의 원본 파일만 사라진다(재검토관 2026-08-22 확정).
+ *    지우는 것은 되돌릴 수 없으므로, 새 내용이 확실히 자리를 잡은 뒤에 한다.
+ *  ⚠ 파일만 지우면 안 된다 — sourcePath가 남아 hasSource=true인 채 「원본 열기」가 404가 되어
+ *    거짓이 자리만 옮긴다. upsert가 COALESCE로 옛 값을 지키므로 여기서 **명시적으로 비운다**.
+ *  ⚠ **우리가 uploads/에 넣은 원본일 때만** 손댄다. built-in 코퍼스처럼 다른 자리(docs/)를
+ *    가리키는 sourcePath까지 끊으면, 같은 이름으로 문서를 하나 올렸다는 이유로 제품 기본
+ *    지식의 원본 연결이 사라진다.
+ */
+export async function cleanupOldOriginal(documentId: string): Promise<void> {
+  const 이름 = path.basename(String(documentId));
+  try {
+    const 옛경로 = path.join(INGEST_ROOT, "docs", "uploads", 이름);
+    const 옛메타 = getDocMetaStmt.get(이름) as { sourcePath?: string | null } | undefined;
+    const 우리것 = !옛메타?.sourcePath || path.resolve(옛메타.sourcePath) === path.resolve(옛경로);
+    if (!우리것) return; // 남의 자리를 가리키는 원본은 건드리지 않는다
+    await fs.rm(옛경로, { force: true });
+    clearSourcePathStmt.run(이름);
+  } catch (rmErr) {
+    console.warn(`[memory] 옛 원본 정리 실패(${이름}): ${rmErr instanceof Error ? rmErr.message : String(rmErr)}`);
+  }
 }
 
 export interface IngestResult {
@@ -1342,12 +1349,18 @@ export async function deleteDocument(documentId: string, withFile = false): Prom
       console.warn(`[memory] 원본 파일 삭제 실패(${meta.sourcePath}): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-  if (withFile) {
-    // ★ 추출본(.md)도 함께 지운다(2026-08-22 검토관 확정). 감사 기록이 「원본 파일까지
-    //   삭제(복구 불가)」라고 남기는데 AI가 읽은 글이 디스크에 그대로 있으면 그 기록이 거짓이다.
-    //   같은 이름으로 다시 올릴 때 **옛 추출본이 새 문서의 내용으로 보이는** 문제도 여기서 닫힌다.
+  // ★ 추출본(.md)은 **조각과 같은 운명**이다 — 문서를 지우면 함께 지운다(withFile과 무관).
+  //   AI가 읽은 글이 디스크에 남아 있으면, 같은 이름으로 새 문서가 생겼을 때 그 화면이
+  //   **옛 문서의 내용**을 보여 준다(등급 게이트를 다 통과한 채로). withFile은 「원본 파일」만 가른다.
+  //
+  // ⚠ **basename으로 지우면 안 된다**(재검토관 2026-08-22 [높음]). documentId를 접어서 대상을
+  //   고르면 `기밀보고서.pdf/` 같은 값으로 **남의 추출본을 지울 수 있다** — 이 라우트엔 정규화
+  //   검사가 없고, 등급 판정은 「그런 행이 없으면 통과」라 존재하지 않는 id가 문지기를 그냥 지난다.
+  //   132f19c6이 닫은 바로 그 부류를 내가 삭제 쪽으로 다시 열 뻔했다. **실재하는 문서이고
+  //   이름이 곧 basename일 때만** 지운다.
+  if (meta && path.basename(documentId) === documentId) {
     try {
-      await fs.rm(path.join(INGEST_ROOT, "docs", "extracted", path.basename(documentId) + ".md"), { force: true });
+      await fs.rm(path.join(INGEST_ROOT, "docs", "extracted", documentId + ".md"), { force: true });
     } catch (err) {
       console.warn(`[memory] 추출본 삭제 실패(${documentId}): ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -1396,6 +1409,13 @@ export function registerMemoryRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함(classify:false로 끌 수 있음).
+      // ★ 이 경로도 documentId가 basename이라 **같은 이름이면 옛 문서를 덮는다** — 다른 업로드
+      //   창구와 같은 잣대로 막는다(재검토관 2026-08-22: 덮어쓰기 문이 다섯이었다).
+      const 대상이름 = path.basename(String(req.body?.path ?? ""));
+      if (대상이름 && 열람불가(대상이름, req)) {
+        res.status(403).json({ error: "같은 이름의 문서가 이미 있고, 그 문서를 열람할 권한이 없습니다" });
+        return;
+      }
       res.json(await ingestDocument(req.body.path, req.body.scope ?? GLOBAL_SCOPE, req.body.classify !== false, (req as unknown as { user?: { displayName?: string } }).user?.displayName));
     })
   );
@@ -1413,7 +1433,14 @@ export function registerMemoryRoutes(app: Express): void {
       // ⚠ 파일명을 basename으로 접는다 — 경로 구분자(슬래시) 든 documentId는 .md가 basename으로만
       //   키잉돼(전체 documentId로 보는 등급 검사와 어긋나) O등급 사용자가 남의 기밀 .md를 읽거나 덮는
       //   통로가 된다(검토관 2026-08-22 재검토 [중] 확정). documentId=basename로 못박아 .md ↔ 문서 1:1.
-      const filename = path.basename(String(rawFilename));
+      //   trim·빈이름 검사까지 upload/auto 창구와 **같은 모양**으로 맞춘다(재검토관 2026-08-22) —
+      //   한쪽만 접으면 같은 파일이 창구에 따라 다른 documentId(" a.pdf " vs "a.pdf")가 되어
+      //   문서가 두 벌로 쌓이고 등급 게이트도 서로 다른 키로 조회한다.
+      const filename = path.basename(String(rawFilename).trim());
+      if (!filename || filename === "." || filename === "..") {
+        res.status(400).json({ error: "쓸 수 있는 파일 이름이 아닙니다" });
+        return;
+      }
       // ★ 볼 수 없는 문서는 덮어쓸 수도 없다 — upload/auto 창구와 **같은 잣대**(2026-08-22 검토관).
       if (열람불가(filename, req)) {
         res.status(403).json({ error: "같은 이름의 문서가 이미 있고, 그 문서를 열람할 권한이 없습니다 — 다른 이름으로 올리세요" });
@@ -1449,6 +1476,8 @@ export function registerMemoryRoutes(app: Express): void {
           console.warn(`[memory] origin=builtin 요청을 무시함(관리자 아님): ${filename}`);
         }
         const ingested = await ingestText(filename, text, scope ?? GLOBAL_SCOPE, savedPath, true, actor, undefined, 요청origin);
+        // 옛 원본 정리는 **수집이 끝난 뒤**다 — 먼저 지우면 수집 실패 시 옛 문서만 원본을 잃는다.
+        if (!keepOriginal) await cleanupOldOriginal(filename);
         // 자동화 작업 원장(중-2) — 사람이 하면 읽고 요약하고 분류해 넣어야 하는 일이다.
         // 부팅 시 기본 코퍼스 인입(docsbundle)은 이 경로를 타지 않으므로 제품 자랑에 섞이지 않는다.
         const { recordWork } = await import("./worklog.js");

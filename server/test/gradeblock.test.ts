@@ -229,7 +229,11 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     expect(sv, "markdown/save가 basename≠documentId를 안 거른다").toContain("path.basename(String(documentId)) !== String(documentId)");
     // ④ 업로드가 파일명을 basename으로 접는다 — 애초에 경로 든 documentId를 못 만들게(뿌리 차단)
     const ingest = memSrc.slice(memSrc.indexOf('"/api/memory/ingest-file"'), memSrc.indexOf('"/api/memory/ingest-file"') + 2000);
-    expect(ingest, "ingest-file이 파일명을 basename으로 안 접는다 — 경로 든 documentId 허용").toContain("path.basename(String(rawFilename))");
+    // ⚠ 리터럴을 통째로 비교하지 않는다 — trim() 하나를 더했다고 감시가 빨간불이 되면
+    //   다음 사람은 **감시를 고치는 데 익숙해진다**(2026-08-22에 두 번 밟았다). 「basename으로
+    //   접는가」라는 **뜻**만 본다.
+    expect(ingest, "ingest-file이 파일명을 basename으로 안 접는다 — 경로 든 documentId 허용")
+      .toMatch(/path\.basename\(String\(rawFilename\)/);
     // ⑤ **두 번째 업로드 문(門)도 같이 접는다**(2026-08-22). ingest-file만 막고 uploadAuto를 열어 두면
     //    같은 구멍이 콘솔 ＋ 창구로 다시 열린다 — 이번에 uploadAuto도 추출본(.md)을 쓰기 시작했으므로
     //    경로 든 documentId가 basename 키잉과 어긋나면 남의 기밀 .md를 덮을 수 있다.

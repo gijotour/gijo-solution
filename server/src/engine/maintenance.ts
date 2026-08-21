@@ -4,6 +4,7 @@
 // 반려(rejected). 점검 결과에 파일을 첨부하면 dataset.ts로 텍스트를 추출해 memory.ts(RAG)에도
 // 수집한다 — 점검서 자체가 대시보드의 "올린 문서 검색"에서 바로 찾아지는 문서가 된다.
 
+import pathMod from "path";
 import { 라이브모드 } from "./datacleanup";
 import type { Express, Request } from "express";
 import { recordAudit } from "./audit";
@@ -518,13 +519,22 @@ export function registerMaintenanceRoutes(app: Express): void {
       const user = (req as Request & { user?: GijoUser }).user;
       let reportDocName: string | undefined;
       if (filename && content) {
+        // ⚠ 업로드 창구와 같은 잣대 — basename 접기 + 「볼 수 없으면 덮어쓸 수도 없다」.
+        //   인입은 같은 documentId면 옛 조각을 지우고 새로 넣는데 등급 칸은 그대로 남는다
+        //   (재검토관 2026-08-22: 덮어쓰기 문이 둘이 아니라 다섯이었다).
+        const 문서이름 = pathMod.basename(String(filename).trim());
+        const { 열람불가공용 } = await import("./memory.js");
+        if (!문서이름 || 문서이름 === "." || 문서이름 === ".." || 열람불가공용(문서이름, req)) {
+          res.status(403).json({ error: "같은 이름의 문서가 이미 있고, 그 문서를 열람할 권한이 없습니다 — 다른 이름으로 올리세요" });
+          return;
+        }
         const { extractDocumentText } = await import("./dataset.js");
-        const text = await extractDocumentText(filename, content);
+        const text = await extractDocumentText(문서이름, content);
         if (text.trim()) {
           const { ingestText, GLOBAL_SCOPE } = await import("./memory.js");
           // 유지보수 점검 리포트는 업무영역이 자명하다 — 장비운영으로 확정 인입(화면 맥락 검색용).
-          await ingestText(filename, text, GLOBAL_SCOPE, undefined, false, undefined, "장비운영");
-          reportDocName = filename;
+          await ingestText(문서이름, text, GLOBAL_SCOPE, undefined, false, undefined, "장비운영");
+          reportDocName = 문서이름;
         }
       }
       try {
