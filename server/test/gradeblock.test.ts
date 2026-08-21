@@ -201,6 +201,28 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     expect(memSrc.slice(iList, iList + 300), "문서 목록이 열람불가로 안 거른다").toContain("!열람불가(d.documentId, req)");
   });
 
+  it("★ 쓰기 창구(등급변경·삭제·영역변경)도 막고, markdown 경로조작 우회를 닫는다 (검토관 2026-08-22)", () => {
+    // 읽기만 막고 쓰기를 열어 두면 통제가 뚫린다: ① 못 보는 문서의 등급을 낮춰 우회 열람
+    //   ② 못 보는 문서를 삭제(가용성)·재분류(무결성) ③ 경로조작(./기밀.pdf)이 basename으로
+    //   등급 검사를 우회해 남의 .md를 읽거나 덮어쓴다. 세 뿌리 모두 감시로 박제한다.
+    const memSrc = fs.readFileSync(new URL("../src/engine/memory.ts", import.meta.url), "utf8");
+    // ① 쓰기 3창구에 열람불가 — 못 보는 문서는 못 바꾼다
+    for (const route of [
+      '"/api/memory/document/grade"',
+      '"/api/memory/document/category"',
+      '"/api/memory/document/delete"',
+    ]) {
+      const i = memSrc.indexOf(route);
+      expect(i, `${route} 라우트를 못 찾았다`).toBeGreaterThan(0);
+      expect(memSrc.slice(i, i + 900), `${route}가 열람불가로 안 막는다 — 못 보는 문서를 바꿀 수 있다`).toContain("열람불가(");
+    }
+    // ② markdown 읽기·쓰기는 실재검사(exact documentId)로 basename 경로조작 우회를 막는다
+    const md = memSrc.slice(memSrc.indexOf('"/api/memory/document/markdown"'), memSrc.indexOf('"/api/memory/document/markdown"') + 900);
+    expect(md, "markdown이 실재검사 없이 basename을 읽는다 — ./기밀.pdf 우회").toContain("getDocMetaStmt.get(String(documentId))");
+    const sv = memSrc.slice(memSrc.indexOf('"/api/memory/document/markdown/save"'), memSrc.indexOf('"/api/memory/document/markdown/save"') + 900);
+    expect(sv, "markdown/save가 실재검사 없이 basename을 쓴다 — 남의 .md 덮어쓰기").toContain("getDocMetaStmt.get(String(documentId))");
+  });
+
   it("★ 등급은 서버가 읽는다 — 요청이 주장할 수 없다", () => {
     // 클라이언트가 clearance를 보내 올릴 수 있으면 통제 전체가 무의미하다.
     // 두 입구 모두 req.body가 아니라 **로그인 사용자**에서 읽어야 한다.

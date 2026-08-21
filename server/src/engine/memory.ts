@@ -1268,6 +1268,9 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(400).json({ error: "등급은 O(공개)·S(민감)·C(기밀) 중 하나여야 합니다." });
         return;
       }
+      // ⚠ 열람 못 하는(기밀) 문서의 등급을 낮춰 우회 열람하는 것을 막는다 — 읽기 게이트가 신뢰하는
+      //   grade 컬럼을 아무나 바꾸면 게이트가 무의미해진다(검토관 2026-08-22 [높음]). 쓰기도 같은 잣대.
+      if (열람불가(id, req)) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
       const before = (getDocMetaStmt.get(id) as { grade?: string } | undefined)?.grade ?? null;
       const r = db.prepare("UPDATE memory_documents SET grade = ? WHERE documentId = ?").run(값, id);
       if (r.changes === 0) { res.status(404).json({ error: "그런 문서가 없습니다." }); return; }
@@ -1469,6 +1472,8 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(404).json({ error: "해당 문서를 찾을 수 없습니다" });
         return;
       }
+      // 열람 못 하는 문서의 업무영역을 변조하는 것도 막는다 — 읽기와 같은 잣대(검토관 2026-08-22).
+      if (열람불가(String(documentId), req)) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
       db.prepare("UPDATE memory_documents SET category = ? WHERE documentId = ?").run(category, documentId);
       try {
         const ldb = await lancedb.connect(DB_PATH);
@@ -1535,6 +1540,10 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(404).json({ error: "그런 문서가 없습니다" });
         return;
       }
+      // ⚠ 아래는 basename으로 .md를 읽는다 — 경로 조작(./기밀.pdf)이 등급 검사를 우회한다(열람불가는
+      //   전체 documentId로 grade를 보는데 그 문자열은 SQLite에 없어 통과). 실재 문서만 허용해 막는다
+      //   (exact documentId가 SQLite에 있어야 — 없으면 404). 검토관 2026-08-22 [높음].
+      if (!getDocMetaStmt.get(String(documentId))) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
       try {
         const mdFile = assertWithinIngestRoot(path.join(INGEST_ROOT, "docs", "extracted", path.basename(String(documentId)) + ".md"));
         const text = await fs.readFile(mdFile, "utf8");
@@ -1558,6 +1567,9 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(404).json({ error: "그런 문서가 없습니다" });
         return;
       }
+      // ⚠ 실재 문서만 — 경로 조작이 basename으로 남의 .md를 덮어쓰거나 팬텀 행(기본 grade O)을
+      //   만드는 것을 막는다(검토관 2026-08-22 [높음], markdown 읽기와 같은 뿌리).
+      if (!getDocMetaStmt.get(String(documentId))) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
       // 문서 본문도 LLM(임베딩)에 닿는 경로라 관문을 지난다(memory/query와 같은 이유 — 인젝션 차단).
       const gate = gateUserInput(text.slice(0, 2000), "memory-query");
       if (!gate.allowed) {
@@ -1589,6 +1601,8 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(400).json({ error: "documentId가 필요합니다" });
         return;
       }
+      // 열람 못 하는(기밀) 문서를 지우는(가용성 훼손·복구 불가) 것도 막는다 — 읽기와 같은 잣대(검토관 2026-08-22).
+      if (열람불가(String(documentId), req)) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
       const result = await deleteDocument(documentId, !!withFile);
       // 지식 삭제는 되돌리기 어렵다 — 무엇을 얼마나 지웠는지 반드시 남긴다.
       const { recordAudit } = await import("./audit.js");
