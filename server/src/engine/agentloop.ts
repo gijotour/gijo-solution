@@ -1389,6 +1389,12 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "request_status",
     args: {},
   },
+  // URL 지식화(2026-08-21) — 링크+반입 동사가 함께 있을 때만. 링크만 붙인 일반 질문은 안 삼킨다.
+  {
+    re: /(https?:\/\/\S+[\s\S]*(지식|반입|넣어|학습|수집))|((지식|반입|학습)[\s\S]*https?:\/\/\S+)/,
+    tool: "ingest_url",
+    args: {},
+  },
 ];
 // 등록된 보안제품 이름을 콕 집어 "설명해줘"라고 물으면 그 제품의 사내 근거(매뉴얼·온톨로지)를
 // 모아 답한다. [2026-07-26 실사용] "Tenable Web App Scanning 주요기능 설명해줘"에 도구를 하나도

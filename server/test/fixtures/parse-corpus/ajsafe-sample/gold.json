@@ -1,0 +1,19 @@
+{
+  "assets": [
+    { "host": "cert.aj-safe.co.kr", "name": "SafeKey 발급 웹 서버", "ip": "211.241.238.1" },
+    { "host": "certify.aj-safe.co.kr", "name": "안전대부 본인인증 웹 서버", "ip": "211.241.238.1" }
+  ],
+  "vulns": [
+    { "host": "cert.aj-safe.co.kr", "code": "IW-20", "name": "디렉토리 인덱싱", "risk": "low", "cve": "", "port": "" },
+    { "host": "cert.aj-safe.co.kr", "code": "IW-25", "name": "서버 정보 노출", "risk": "low", "cve": "", "port": "" },
+    { "host": "certify.aj-safe.co.kr", "code": "IW-20", "name": "디렉토리 인덱싱", "risk": "low", "cve": "", "port": "" },
+    { "host": "certify.aj-safe.co.kr", "code": "IW-27", "name": "임시/백업 파일 노출", "risk": "low", "cve": "", "port": "" },
+    { "host": "certify.aj-safe.co.kr", "code": "IW-32", "name": "데이터 평문 전송", "risk": "medium", "cve": "", "port": "" }
+  ],
+  "declaredTotal": 5,
+  "_주석": {
+    "출처": "문서 자체 총평(3.1.1) — '2 개의 대외 서비스에서 5 개의 취약점' + '총 개수 : 5 개'",
+    "위험도근거": "문서 진단항목표(2.1) — IW-20/25/27=하(low), IW-32=중(medium). IW-18(상)은 항목표에만 있고 발견 건 아님",
+    "함정": "5장(보안 대책)의 [IW-20]·[IW-25] 헤딩은 조치 가이드라 발견 건이 아니다 — 지어냄 판정 대상"
+  }
+}

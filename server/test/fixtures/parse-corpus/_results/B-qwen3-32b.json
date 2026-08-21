@@ -1,0 +1,569 @@
+{
+  "engine": "B(LLM qwen3-32b)",
+  "base": "http://127.0.0.1:18080",
+  "ranAt": "2026-08-21T05:05:48.760Z",
+  "samples": {
+    "ajsafe-sample": {
+      "ms": 175584,
+      "pred": {
+        "assets": [
+          {
+            "host": "cert.aj-safe.co.kr",
+            "name": "SafeKey 발급 웹 서버",
+            "ip": "211.241.238.1"
+          },
+          {
+            "host": "certify.aj-safe.co.kr",
+            "name": "안전대부 본인인증 웹 서버",
+            "ip": "211.241.238.1"
+          }
+        ],
+        "vulns": [
+          {
+            "host": "cert.aj-safe.co.kr",
+            "code": "IW-20",
+            "name": "디렉토리 인덱싱",
+            "risk": "하",
+            "cve": "",
+            "port": "default (80/443 등 일반 웹 포트로 추정)"
+          },
+          {
+            "host": "cert.aj-safe.co.kr",
+            "code": "IW-25",
+            "name": "서버 정보 노출",
+            "risk": "하",
+            "cve": "",
+            "port": "default"
+          },
+          {
+            "host": "certify.aj-safe.co.kr",
+            "code": "IW-20",
+            "name": "디렉토리 인덱싱",
+            "risk": "하",
+            "cve": "",
+            "port": "default"
+          },
+          {
+            "host": "certify.aj-safe.co.kr",
+            "code": "IW-27",
+            "name": "임시/백업 파일 노출",
+            "risk": "하",
+            "cve": "",
+            "port": "default"
+          },
+          {
+            "host": "certify.aj-safe.co.kr",
+            "code": "IW-32",
+            "name": "데이터 평문 전송",
+            "risk": "중",
+            "cve": "",
+            "port": "default"
+          }
+        ],
+        "declaredTotal": "5"
+      },
+      "score": {
+        "assets": [
+          {
+            "key": "cert.aj-safe.co.kr",
+            "판정": "일치"
+          },
+          {
+            "key": "certify.aj-safe.co.kr",
+            "판정": "일치"
+          }
+        ],
+        "vulns": [
+          {
+            "key": "cert.aj-safe.co.kr::IW-20",
+            "판정": "지어냄",
+            "이유": "필드 창작: port default (80/443 등 일반 웹 포트로 추정)"
+          },
+          {
+            "key": "cert.aj-safe.co.kr::IW-25",
+            "판정": "지어냄",
+            "이유": "필드 창작: port default"
+          },
+          {
+            "key": "certify.aj-safe.co.kr::IW-20",
+            "판정": "지어냄",
+            "이유": "필드 창작: port default"
+          },
+          {
+            "key": "certify.aj-safe.co.kr::IW-27",
+            "판정": "지어냄",
+            "이유": "필드 창작: port default"
+          },
+          {
+            "key": "certify.aj-safe.co.kr::IW-32",
+            "판정": "지어냄",
+            "이유": "필드 창작: port default"
+          }
+        ],
+        "declaredTotal": {
+          "pred": "5",
+          "gold": "5",
+          "ok": true
+        },
+        "요약": {
+          "자산": "2/2",
+          "취약점일치": 0,
+          "불일치": 0,
+          "누락": 0,
+          "과추출": 0,
+          "지어냄": 5,
+          "goldVulns": 5,
+          "자체합계": "✓"
+        }
+      },
+      "scoreGuarded": {
+        "assets": [
+          {
+            "key": "cert.aj-safe.co.kr",
+            "판정": "일치"
+          },
+          {
+            "key": "certify.aj-safe.co.kr",
+            "판정": "일치"
+          }
+        ],
+        "vulns": [
+          {
+            "key": "cert.aj-safe.co.kr::IW-20",
+            "판정": "일치"
+          },
+          {
+            "key": "cert.aj-safe.co.kr::IW-25",
+            "판정": "일치"
+          },
+          {
+            "key": "certify.aj-safe.co.kr::IW-20",
+            "판정": "일치"
+          },
+          {
+            "key": "certify.aj-safe.co.kr::IW-27",
+            "판정": "일치"
+          },
+          {
+            "key": "certify.aj-safe.co.kr::IW-32",
+            "판정": "일치"
+          }
+        ],
+        "declaredTotal": {
+          "pred": "5",
+          "gold": "5",
+          "ok": true
+        },
+        "요약": {
+          "자산": "2/2",
+          "취약점일치": 5,
+          "불일치": 0,
+          "누락": 0,
+          "과추출": 0,
+          "지어냄": 0,
+          "goldVulns": 5,
+          "자체합계": "✓"
+        }
+      }
+    },
+    "nurihosting": {
+      "ms": 208935,
+      "pred": {
+        "assets": [
+          {
+            "host": "testhtml5.vulnweb.com",
+            "name": "http://testhtml5.vulnweb.com",
+            "ip": ""
+          }
+        ],
+        "vulns": [
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "AngularJS client-side template injection",
+            "risk": "High",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "Cross site scripting",
+            "risk": "High",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "DOM-based cross site scripting",
+            "risk": "High",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "CVE-2014-0133",
+            "name": "nginx SPDY heap buffer overflow",
+            "risk": "High",
+            "cve": "CVE-2014-0133",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "Weak password",
+            "risk": "High",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "XML external entity injection via external file",
+            "risk": "High",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "Basic authentication over HTTP",
+            "risk": "Medium",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "HTML form without CSRF protection",
+            "risk": "Medium",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "User credentials are sent in clear text",
+            "risk": "Medium",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "Clickjacking: X-Frame-Options header missing",
+            "risk": "Low",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "Cookie(s) without HttpOnly flag set",
+            "risk": "Low",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "Login page password-guessing attack",
+            "risk": "Low",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "OPTIONS method is enabled",
+            "risk": "Low",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "Possible sensitive directories",
+            "risk": "Low",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "Possible virtual host found",
+            "risk": "Low",
+            "cve": "",
+            "port": "http"
+          },
+          {
+            "host": "testhtml5.vulnweb.com",
+            "code": "",
+            "name": "Password type input with auto-complete enabled",
+            "risk": "Informational",
+            "cve": "",
+            "port": "http"
+          }
+        ],
+        "declaredTotal": "19"
+      },
+      "score": {
+        "assets": [
+          {
+            "key": "testhtml5.vulnweb.com",
+            "판정": "일치"
+          }
+        ],
+        "vulns": [
+          {
+            "key": "testhtml5.vulnweb.com::angularjs client-side template injection",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::cross site scripting",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::dom-based cross site scripting",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::nginx spdy heap buffer overflow",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::weak password",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::xml external entity injection via external file",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::basic authentication over http",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::html form without csrf protection",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::user credentials are sent in clear text",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::clickjacking: x-frame-options header missing",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::cookie(s) without httponly flag set",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::login page password-guessing attack",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::options method is enabled",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::possible sensitive directories",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::possible virtual host found",
+            "판정": "불일치",
+            "이유": "port http≠"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::password type input with auto-complete enabled",
+            "판정": "불일치",
+            "이유": "port http≠"
+          }
+        ],
+        "declaredTotal": {
+          "pred": "19",
+          "gold": "19",
+          "ok": true
+        },
+        "요약": {
+          "자산": "1/1",
+          "취약점일치": 0,
+          "불일치": 16,
+          "누락": 0,
+          "과추출": 0,
+          "지어냄": 0,
+          "goldVulns": 16,
+          "자체합계": "✓"
+        }
+      },
+      "scoreGuarded": {
+        "assets": [
+          {
+            "key": "testhtml5.vulnweb.com",
+            "판정": "일치"
+          }
+        ],
+        "vulns": [
+          {
+            "key": "testhtml5.vulnweb.com::angularjs client-side template injection",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::cross site scripting",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::dom-based cross site scripting",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::nginx spdy heap buffer overflow",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::weak password",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::xml external entity injection via external file",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::basic authentication over http",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::html form without csrf protection",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::user credentials are sent in clear text",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::clickjacking: x-frame-options header missing",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::cookie(s) without httponly flag set",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::login page password-guessing attack",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::options method is enabled",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::possible sensitive directories",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::possible virtual host found",
+            "판정": "일치"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::password type input with auto-complete enabled",
+            "판정": "일치"
+          }
+        ],
+        "declaredTotal": {
+          "pred": "19",
+          "gold": "19",
+          "ok": true
+        },
+        "요약": {
+          "자산": "1/1",
+          "취약점일치": 16,
+          "불일치": 0,
+          "누락": 0,
+          "과추출": 0,
+          "지어냄": 0,
+          "goldVulns": 16,
+          "자체합계": "✓"
+        }
+      }
+    },
+    "twigfarm": {
+      "ms": 72444,
+      "pred": {
+        "assets": [
+          {
+            "host": "works.letr.ai",
+            "name": "트위그팜 홈페이지",
+            "ip": "works.letr.ai"
+          }
+        ],
+        "vulns": [],
+        "declaredTotal": "0"
+      },
+      "score": {
+        "assets": [
+          {
+            "key": "works.letr.ai",
+            "판정": "일치"
+          }
+        ],
+        "vulns": [],
+        "declaredTotal": {
+          "pred": "0",
+          "gold": "0",
+          "ok": true
+        },
+        "요약": {
+          "자산": "1/1",
+          "취약점일치": 0,
+          "불일치": 0,
+          "누락": 0,
+          "과추출": 0,
+          "지어냄": 0,
+          "goldVulns": 0,
+          "자체합계": "✓"
+        }
+      },
+      "scoreGuarded": {
+        "assets": [
+          {
+            "key": "works.letr.ai",
+            "판정": "일치"
+          }
+        ],
+        "vulns": [],
+        "declaredTotal": {
+          "pred": "0",
+          "gold": "0",
+          "ok": true
+        },
+        "요약": {
+          "자산": "1/1",
+          "취약점일치": 0,
+          "불일치": 0,
+          "누락": 0,
+          "과추출": 0,
+          "지어냄": 0,
+          "goldVulns": 0,
+          "자체합계": "✓"
+        }
+      }
+    }
+  }
+}

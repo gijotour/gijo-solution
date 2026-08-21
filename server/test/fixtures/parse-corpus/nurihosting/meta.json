@@ -1,0 +1,10 @@
+{
+  "sample": "nurihosting",
+  "양식": "호스팅사 제공 Acunetix 한글화 자동 스캔 리포트 — 위험도 Level·취약점 현황(Total/High/Medium/Low/Informational)·취약점별 CVSS2/CVSS3/CWE·영향받은 항목(Variation)·세부정보(요청 헤더 포함)·coverage report",
+  "벤더": "누리호스팅(웹취약점점검 서비스 결과 리포트 공개 샘플) — 스캔 도구 Acunetix, 대상 testhtml5.vulnweb.com(Acunetix 공개 테스트 사이트), 스캔일 2017-04-24",
+  "출처URL": "https://www.nurihosting.com/Resources/download/Report.pdf",
+  "공개경로": "누리호스팅 홈페이지 자료실 공개 다운로드 — 로그인 없이 접근 가능",
+  "파일": "source.pdf (229,328 bytes) · source.txt (50,127 bytes, WSL 운영 추출기 extract_doc.py/pypdf)",
+  "추출특성": "pypdf 추출 잡음이 심하다 — 굵은 글씨 이중 인쇄(같은 낱말 연속 반복), 한글 낱말 사이 공백 조각('클라이 언트'), 한 줄 1~2낱말 파편화. 규칙 파서·LLM 모두에게 실전형 시험대",
+  "확보일": "2026-08-21"
+}

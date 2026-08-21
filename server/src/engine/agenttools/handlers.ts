@@ -3400,3 +3400,14 @@ export async function runRequestStatus(): Promise<string> {
   }
   return L.join("\n");
 }
+
+// ── URL 지식화(2026-08-21 사장님 「링크를 걸면 지식화 — 일단 가능하게」) ─────────
+export async function runIngestUrl(args: Record<string, string>): Promise<string> {
+  const { ingestUrl } = await import("../urlingest.js");
+  const { currentViewer } = await import("../viewerctx.js");
+  const url = String(args.url ?? "").trim();
+  if (!url) return "지식화할 링크가 없습니다 — http(s)://로 시작하는 주소를 함께 적어 주세요.";
+  const r = await ingestUrl(url, currentViewer()?.userId ?? undefined);
+  return `🌐 링크를 지식으로 담았습니다 — 「${r.title}」${r.youtube ? " (유튜브 자막)" : ""} · 조각 ${r.chunks}건.\n` +
+    `이제 이 내용을 물어보시면 답에 씁니다. ⚠ 사내 참고용입니다 — 이 내용을 보고서로 재배포할 때는 저작권에 주의하세요. 지우려면 "문서 목록 보여줘"에서 이 주소를 지우면 됩니다.`;
+}

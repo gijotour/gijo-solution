@@ -1,0 +1,31 @@
+{
+  "assets": [
+    { "host": "testhtml5.vulnweb.com", "name": "testhtml5.vulnweb.com", "ip": "" }
+  ],
+  "vulns": [
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "AngularJS client-side template injection", "risk": "high", "cve": "", "port": "", "instances": 2 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "Cross site scripting", "risk": "high", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "DOM-based cross site scripting", "risk": "high", "cve": "", "port": "", "instances": 3 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "nginx SPDY heap buffer overflow", "risk": "high", "cve": "CVE-2014-0133", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "Weak password", "risk": "high", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "XML external entity injection via external file", "risk": "high", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "Basic authentication over HTTP", "risk": "medium", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "HTML form without CSRF protection", "risk": "medium", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "User credentials are sent in clear text", "risk": "medium", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "Clickjacking: X-Frame-Options header missing", "risk": "low", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "Cookie(s) without HttpOnly flag set", "risk": "low", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "Login page password-guessing attack", "risk": "low", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "OPTIONS method is enabled", "risk": "low", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "Possible sensitive directories", "risk": "low", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "Possible virtual host found", "risk": "low", "cve": "", "port": "", "instances": 1 },
+    { "host": "testhtml5.vulnweb.com", "code": "", "name": "Password type input with auto-complete enabled", "risk": "info", "cve": "", "port": "", "instances": 1 }
+  ],
+  "declaredTotal": 19,
+  "_주석": {
+    "출처": "문서 '취약점 현황' — Total 19 (High 9 / Medium 3 / Low 6 / Informational 1). 19는 변형(Variation) 인스턴스 합계이고 고유 취약점명은 16종",
+    "정합검증": "인스턴스 합 2+1+3+13×1=19 ✓ · 위험도별(인스턴스 가중): High 2+1+3+1+1+1=9 ✓ Medium 3 ✓ Low 6 ✓ Info 1 ✓ — 문서 자체 합계와 전부 일치",
+    "위험도근거": "각 취약점 세부정보 절의 '위험도 High/Medium/Low/Informational' 표기. Informational→info로 정규화",
+    "CVE근거": "nginx SPDY heap buffer overflow 절에만 CVE-2014-0133 명시",
+    "채점키": "이 양식엔 [XX-NN] 코드가 없다 — 키는 host::정규화(name)"
+  }
+}

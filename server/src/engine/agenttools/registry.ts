@@ -141,6 +141,7 @@ import {
   runBulkUpdate,
   runCreateRequestDoc,
   runRequestStatus,
+  runIngestUrl,
   현황상한,
   runFindingStatusOverview,
   runReviewFinding,
@@ -1608,6 +1609,26 @@ const TOOLS: AgentTool[] = [
     params: [],
     directAnswer: true,
     run: runRequestStatus,
+  },
+  {
+    // URL 지식화(2026-08-21) — 외부 접속이라 **쓰기·결재판**이다. 승인 화면에 도메인이 보인다.
+    // 에어갭 봉인이 켜지면 fetch 관문이 자동 차단한다(EGRESS_POINTS "webingest").
+    name: "ingest_url",
+    label: "링크 지식화",
+    domain: "cross",
+    write: true,
+    description:
+      '웹 페이지나 유튜브 영상(자막)을 우리 지식으로 담는다 — "이 링크 지식으로 넣어줘 https://…". ' +
+      '본문만 발라 반입하고, 유튜브는 자막이 있는 영상만 된다. 내부망·사설 주소는 거절한다.',
+    params: [
+      { name: "url", label: "주소", description: "http(s):// 로 시작하는 공개 웹 주소 또는 유튜브 링크", required: true },
+    ],
+    effect: (args) => {
+      try { const u = new URL(String(args.url ?? "").trim()); return `외부 접속: ${u.hostname} — 본문을 받아 지식 저장소에 담음(사내 참고용)`; }
+      catch { return "주소가 비어 있거나 형식이 아님 — 승인 전에 주소를 확인하세요"; }
+    },
+    undo: "담은 문서는 지식 문서 목록에서 그 주소를 지우면 답변에서 즉시 빠집니다.",
+    run: runIngestUrl,
   },
   {
     // 전문가 어댑터 현황(재설계, 2026-08-08) — 등록부·팀원 배정·주제 재료를 한 번에.

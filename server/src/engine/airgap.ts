@@ -32,6 +32,9 @@ export const EGRESS_POINTS: EgressPoint[] = [
   { id: "lawinfo", label: "법제처 법령 조회", host: "www.law.go.kr", 대체: "사내 규정 문서(RAG)" },
   { id: "hfmodels", label: "HuggingFace 모델 검색·다운로드", host: "huggingface.co", 대체: "사전 반입한 모델 파일(오프라인 이식)" },
   { id: "reposcan", label: "외부 저장소 스캔", host: "api.github.com", 대체: "사내 저장소(사설망 IP·명시 허용)" },
+  // URL 지식화(2026-08-21) — 임의 공개 웹·유튜브 자막을 지식으로 반입. 호스트가 고정이 아니라
+  //   전역 fetch 관문이 그대로 막는다(봉인 시 이 기능은 정직하게 「이 환경에선 안 됩니다」).
+  { id: "webingest", label: "URL 지식화(웹·유튜브 자막)", host: "사용자가 지정한 공개 웹 주소", 대체: "파일로 내려받아 문서 반입(11형식)" },
   // ⚠ fetch가 아닌 통로 — SMTP·SIEM은 소켓(nodemailer·dgram/net/tls)이라 fetch 관문이 못 본다.
   //   그래서 email.ts·siem.ts가 연결 직전에 assertEgressAllowed로 **호스트를 따로** 검사한다.
   //   봉인 대상 호스트는 설정값이라 고정 이름이 없다(내부망만 허용, 외부는 차단).

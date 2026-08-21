@@ -1,0 +1,513 @@
+{
+  "engine": "A(규칙 파서 webreport.ts)",
+  "ranAt": "2026-08-21T04:59:09.989Z",
+  "samples": {
+    "ajsafe-sample": {
+      "ms": 1,
+      "pred": {
+        "assets": [
+          {
+            "host": "cert.aj-safe.co.kr",
+            "name": "SafeKey 발급 웹 서버",
+            "ip": "211.241.238.1"
+          },
+          {
+            "host": "certify.aj-safe.co.kr",
+            "name": "안전대부 본인인증 웹 서버",
+            "ip": "211.241.238.1"
+          }
+        ],
+        "vulns": [
+          {
+            "host": "cert.aj-safe.co.kr",
+            "code": "IW-20",
+            "name": "[IW-20] 디렉토리 인덱싱",
+            "risk": "low",
+            "cve": "",
+            "port": ""
+          },
+          {
+            "host": "cert.aj-safe.co.kr",
+            "code": "IW-25",
+            "name": "[IW-25] 서버 정보 노출",
+            "risk": "low",
+            "cve": "",
+            "port": ""
+          },
+          {
+            "host": "certify.aj-safe.co.kr",
+            "code": "IW-20",
+            "name": "[IW-20] 디렉토리 인덱싱",
+            "risk": "low",
+            "cve": "",
+            "port": ""
+          },
+          {
+            "host": "certify.aj-safe.co.kr",
+            "code": "IW-27",
+            "name": "[IW-27] 임시/백업 파일 노출",
+            "risk": "low",
+            "cve": "",
+            "port": ""
+          },
+          {
+            "host": "certify.aj-safe.co.kr",
+            "code": "IW-32",
+            "name": "[IW-32] 데이터 평문 전송",
+            "risk": "medium",
+            "cve": "",
+            "port": ""
+          }
+        ],
+        "declaredTotal": "5"
+      },
+      "notes": [
+        "진단항목 사전 5종 인식",
+        "점검 대상 2개 자산 인식",
+        "상세 절에서 취약점 5건 추출",
+        "조치 가이드 장(5. 웹 취약점 보안 대책…) 이후는 발견 건에서 제외",
+        "✓ 문서 자체 합계(5건)와 일치 — 누락 없음"
+      ],
+      "score": {
+        "assets": [
+          {
+            "key": "cert.aj-safe.co.kr",
+            "판정": "일치"
+          },
+          {
+            "key": "certify.aj-safe.co.kr",
+            "판정": "일치"
+          }
+        ],
+        "vulns": [
+          {
+            "key": "cert.aj-safe.co.kr::IW-20",
+            "판정": "일치"
+          },
+          {
+            "key": "cert.aj-safe.co.kr::IW-25",
+            "판정": "일치"
+          },
+          {
+            "key": "certify.aj-safe.co.kr::IW-20",
+            "판정": "일치"
+          },
+          {
+            "key": "certify.aj-safe.co.kr::IW-27",
+            "판정": "일치"
+          },
+          {
+            "key": "certify.aj-safe.co.kr::IW-32",
+            "판정": "일치"
+          }
+        ],
+        "declaredTotal": {
+          "pred": "5",
+          "gold": "5",
+          "ok": true
+        },
+        "요약": {
+          "자산": "2/2",
+          "취약점일치": 5,
+          "불일치": 0,
+          "누락": 0,
+          "과추출": 0,
+          "지어냄": 0,
+          "goldVulns": 5,
+          "자체합계": "✓"
+        }
+      }
+    },
+    "nurihosting": {
+      "ms": 5,
+      "pred": {
+        "assets": [
+          {
+            "host": "testhtml5.vulnweb.com",
+            "name": "http://"
+          },
+          {
+            "host": "xss.script",
+            "name": "Scripting"
+          },
+          {
+            "host": "docs.angularjs.org",
+            "name": "(https://"
+          },
+          {
+            "host": "blog.portswigger.net",
+            "name": "(http://"
+          },
+          {
+            "host": "www.acunetix.com",
+            "name": "(http://"
+          },
+          {
+            "host": "www.cgisecurity.com",
+            "name": "(http://"
+          },
+          {
+            "host": "www.owasp.org",
+            "name": "(http://"
+          },
+          {
+            "host": "en.wikipedia.org",
+            "name": "(http://"
+          },
+          {
+            "host": "asp.net",
+            "name": "How To: Prevent Cross-Site Scripting in"
+          },
+          {
+            "host": "msdn.microsoft.com",
+            "name": "(http://"
+          },
+          {
+            "host": "window.name",
+            "name": "window.name"
+          },
+          {
+            "host": "this.myobj",
+            "name": "this.myobj"
+          },
+          {
+            "host": "www.acunetix-referrer.com",
+            "name": "http://"
+          },
+          {
+            "host": "code.jquery.com",
+            "name": "http://"
+          },
+          {
+            "host": "ajax.googleapis.com",
+            "name": "c@https://"
+          },
+          {
+            "host": "location.hash",
+            "name": "location.hash"
+          },
+          {
+            "host": "check.script",
+            "name": "Scripting (Version_"
+          },
+          {
+            "host": "mailman.nginx.org",
+            "name": "(http://"
+          },
+          {
+            "host": "cve.mitre.org",
+            "name": "(http://"
+          },
+          {
+            "host": "auth.script",
+            "name": "Scripting (Weak_Password_Basic_"
+          },
+          {
+            "host": "injection.script",
+            "name": "Scripting (XML_External_Entity_"
+          },
+          {
+            "host": "cwe.mitre.org",
+            "name": "(http://"
+          },
+          {
+            "host": "archive.cert.uni-stuttgart.de",
+            "name": "(http://"
+          },
+          {
+            "host": "hithno48aocjz.bxss.me",
+            "name": "acunetixent SYSTEM \"http://"
+          },
+          {
+            "host": "http.script",
+            "name": "Scripting (Basic_Auth_Over_"
+          },
+          {
+            "host": "options.script",
+            "name": "Scripting (Clickjacking_X_Frame_"
+          },
+          {
+            "host": "developer.mozilla.org",
+            "name": "(https://"
+          },
+          {
+            "host": "stackoverflow.com",
+            "name": "(http://"
+          },
+          {
+            "host": "audit.script",
+            "name": "Scripting (Html_Authentication_"
+          },
+          {
+            "host": "method.script",
+            "name": "Scripting (Options_Server_"
+          },
+          {
+            "host": "directories.script",
+            "name": "Scripting (Possible_Sensitive_"
+          }
+        ],
+        "vulns": [],
+        "declaredTotal": ""
+      },
+      "notes": [
+        "진단항목 사전 0종 인식",
+        "점검 대상 31개 자산 인식",
+        "상세 절에서 취약점 0건 추출",
+        "상세 장 제목을 찾지 못해 전체 텍스트에서 추출했습니다."
+      ],
+      "score": {
+        "assets": [
+          {
+            "key": "testhtml5.vulnweb.com",
+            "판정": "일치"
+          },
+          {
+            "key": "xss.script",
+            "판정": "과추출"
+          },
+          {
+            "key": "docs.angularjs.org",
+            "판정": "과추출"
+          },
+          {
+            "key": "blog.portswigger.net",
+            "판정": "과추출"
+          },
+          {
+            "key": "www.acunetix.com",
+            "판정": "과추출"
+          },
+          {
+            "key": "www.cgisecurity.com",
+            "판정": "과추출"
+          },
+          {
+            "key": "www.owasp.org",
+            "판정": "과추출"
+          },
+          {
+            "key": "en.wikipedia.org",
+            "판정": "과추출"
+          },
+          {
+            "key": "asp.net",
+            "판정": "과추출"
+          },
+          {
+            "key": "msdn.microsoft.com",
+            "판정": "과추출"
+          },
+          {
+            "key": "window.name",
+            "판정": "과추출"
+          },
+          {
+            "key": "this.myobj",
+            "판정": "과추출"
+          },
+          {
+            "key": "www.acunetix-referrer.com",
+            "판정": "과추출"
+          },
+          {
+            "key": "code.jquery.com",
+            "판정": "과추출"
+          },
+          {
+            "key": "ajax.googleapis.com",
+            "판정": "과추출"
+          },
+          {
+            "key": "location.hash",
+            "판정": "과추출"
+          },
+          {
+            "key": "check.script",
+            "판정": "과추출"
+          },
+          {
+            "key": "mailman.nginx.org",
+            "판정": "과추출"
+          },
+          {
+            "key": "cve.mitre.org",
+            "판정": "과추출"
+          },
+          {
+            "key": "auth.script",
+            "판정": "과추출"
+          },
+          {
+            "key": "injection.script",
+            "판정": "과추출"
+          },
+          {
+            "key": "cwe.mitre.org",
+            "판정": "과추출"
+          },
+          {
+            "key": "archive.cert.uni-stuttgart.de",
+            "판정": "과추출"
+          },
+          {
+            "key": "hithno48aocjz.bxss.me",
+            "판정": "과추출"
+          },
+          {
+            "key": "http.script",
+            "판정": "과추출"
+          },
+          {
+            "key": "options.script",
+            "판정": "과추출"
+          },
+          {
+            "key": "developer.mozilla.org",
+            "판정": "과추출"
+          },
+          {
+            "key": "stackoverflow.com",
+            "판정": "과추출"
+          },
+          {
+            "key": "audit.script",
+            "판정": "과추출"
+          },
+          {
+            "key": "method.script",
+            "판정": "과추출"
+          },
+          {
+            "key": "directories.script",
+            "판정": "과추출"
+          }
+        ],
+        "vulns": [
+          {
+            "key": "testhtml5.vulnweb.com::angularjs client-side template injection",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::cross site scripting",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::dom-based cross site scripting",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::nginx spdy heap buffer overflow",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::weak password",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::xml external entity injection via external file",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::basic authentication over http",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::html form without csrf protection",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::user credentials are sent in clear text",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::clickjacking: x-frame-options header missing",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::cookie(s) without httponly flag set",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::login page password-guessing attack",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::options method is enabled",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::possible sensitive directories",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::possible virtual host found",
+            "판정": "누락"
+          },
+          {
+            "key": "testhtml5.vulnweb.com::password type input with auto-complete enabled",
+            "판정": "누락"
+          }
+        ],
+        "declaredTotal": {
+          "pred": "",
+          "gold": "19",
+          "ok": false
+        },
+        "요약": {
+          "자산": "1/1",
+          "취약점일치": 0,
+          "불일치": 0,
+          "누락": 16,
+          "과추출": 30,
+          "지어냄": 0,
+          "goldVulns": 16,
+          "자체합계": "✗(없음≠19)"
+        }
+      }
+    },
+    "twigfarm": {
+      "ms": 0,
+      "pred": {
+        "assets": [
+          {
+            "host": "works.letr.ai",
+            "name": "◦ 점검 URL :"
+          }
+        ],
+        "vulns": [],
+        "declaredTotal": ""
+      },
+      "notes": [
+        "진단항목 사전 0종 인식",
+        "점검 대상 1개 자산 인식",
+        "상세 절에서 취약점 0건 추출",
+        "상세 장 제목을 찾지 못해 전체 텍스트에서 추출했습니다."
+      ],
+      "score": {
+        "assets": [
+          {
+            "key": "works.letr.ai",
+            "판정": "일치"
+          }
+        ],
+        "vulns": [],
+        "declaredTotal": {
+          "pred": "",
+          "gold": "0",
+          "ok": false
+        },
+        "요약": {
+          "자산": "1/1",
+          "취약점일치": 0,
+          "불일치": 0,
+          "누락": 0,
+          "과추출": 0,
+          "지어냄": 0,
+          "goldVulns": 0,
+          "자체합계": "✗(없음≠0)"
+        }
+      }
+    }
+  }
+}
