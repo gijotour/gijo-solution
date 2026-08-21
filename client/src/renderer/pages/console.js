@@ -244,8 +244,13 @@
       ".cs-typing span{display:inline-block;width:5px;height:5px;margin-right:3px;border-radius:50%;background:var(--muted,#b3ada4);animation:csb 1s infinite;}",
       ".cs-typing span:nth-child(2){animation-delay:.15s}.cs-typing span:nth-child(3){animation-delay:.3s}",
       "@keyframes csb{0%,60%,100%{opacity:.25}30%{opacity:1}}",
-      ".cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}",
-      ".cs-dock input{flex:1;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:11px;color:var(--text,#e9e7e2);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}",
+      // container-type — 도크 **자기 폭**을 기준으로 안쪽을 접기 위해서다(창 폭이 아니라).
+      //   콘솔은 화면 옆에 붙으면 380px까지 좁아지는데(app.html: --console-w), 그 안에서
+      //   ＋·토글·전송이 자리를 다 먹으면 입력칸이 밀려난다. 미디어쿼리로는 이 상황을 못 잰다.
+      ".cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;container-type:inline-size;}",
+      // ⚠ min-width:0 — flex 아이템의 기본값(auto)은 **입력칸이 자기 기본 크기 밑으로 안 줄게** 해서
+      //   좁은 도크에서 줄 전체를 밀어낸다(검토관 2026-08-22 [중]). 줄어들 수 있게 명시한다.
+      ".cs-dock input{flex:1;min-width:0;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:11px;color:var(--text,#e9e7e2);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}",
       ".cs-dock input:focus{border-color:var(--blue,#3b82f6);}",
       // ＋ 파일 올리기 — 인입 창구는 여기 하나다(2026-07-27 결정: "파일은 ＋ 한 곳으로").
       ".cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel,#30302e);color:var(--muted,#b3ada4);",
@@ -259,6 +264,11 @@
       ".cs-srctog.on{border-color:var(--amber,#f59e0b);background:rgba(245,158,11,.12);}",
       ".cs-srctog.on .tl{color:var(--amber,#f59e0b);}",
       ".cs-srctog .g-toggle.g-on{background:var(--amber,#f59e0b);}",
+      // 도크가 좁아지면(화면 옆 380px 등) **라벨만 접는다** — 스위치는 남으므로 상태(색·손잡이
+      // 위치)는 그대로 읽히고, 무슨 스위치인지는 툴팁과 업로드 결과 카드가 말한다.
+      // 접는 기준 440px: 도크 안쪽에서 ＋(38)+토글(141)+전송(61)+간격(24)을 빼면 입력칸이
+      // 사람이 쓸 만한 폭(≈100px) 아래로 떨어지는 지점이다.
+      "@container (max-width: 440px){.cs-srctog .tl{display:none;}.cs-srctog{padding:0 8px;}}",
       ".cs-updec{margin-top:6px;}",
       ".cs-updec .h{font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;}",
       ".cs-updec .f{font-size:12.25px;color:var(--muted-2,#a49d95);margin-bottom:7px;}",
