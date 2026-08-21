@@ -606,12 +606,14 @@ export function productsStatusAnswer(): { output: string; dataCard: DataCard } {
   const 목록 = listProducts();
   const 종류 = new Set(목록.map((p) => (p as { category?: string }).category || "기타")).size;
   const dataCard: DataCard = {
-    title: "보안제품 — 등록 현황",
+    // 표시명은 사이드바 개명(2026-08-21 menu-reorg)과 맞춘다 — 「우리 보안제품」. 어긋나면 같은
+    //   화면이 대화창 표면에서 두 이름으로 보인다(검토관 적발 — 반쪽 개명). 이동은 page로 하니 안전.
+    title: "우리 보안제품 — 등록 현황",
     kpis: [
       { label: "등록 제품", value: String(목록.length), color: 목록.length ? "ok" : "muted" },
       { label: "종류", value: String(종류) },
     ],
-    screen: { page: "products.html", label: "보안제품" },
+    screen: { page: "products.html", label: "우리 보안제품" },
     pickKey: "n",
     table: 목록.length ? {
       cols: [{ key: "n", label: "제품" }, { key: "c", label: "종류" }, { key: "v", label: "제조사" }],
@@ -619,7 +621,7 @@ export function productsStatusAnswer(): { output: string; dataCard: DataCard } {
       totalCount: 목록.length,
     } : undefined,
   };
-  return { output: 목록.length ? `보안제품 — 등록 ${목록.length}개(${종류}종류).` : "보안제품 — 아직 등록된 제품이 없습니다. 대화창에서 \"방화벽 ○○ 등록해줘\"로 등록합니다(승인 후 반영).", dataCard };
+  return { output: 목록.length ? `우리 보안제품 — 등록 ${목록.length}개(${종류}종류).` : "우리 보안제품 — 아직 등록된 제품이 없습니다. 대화창에서 \"방화벽 ○○ 등록해줘\"로 등록합니다(승인 후 반영).", dataCard };
 }
 
 export function recordsStatusAnswer(): { output: string; dataCard: DataCard } {

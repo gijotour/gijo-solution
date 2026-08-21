@@ -91,13 +91,24 @@ const docsByAssetStmt = db.prepare(
 );
 // 오늘 새로 들어온 문서 수 — 사이드바 "내 문서" 배지(2026-08-21 승인 시안 menu-reorg).
 //   ⚠ listDocuments()는 LanceDB 전수 스캔이라 자주 부르는 배지엔 못 쓴다 — 값싼 SQLite COUNT로.
-//   내장 문서(origin='builtin')는 제외(반입이 아니라 제품 동봉물), **남의 개인문서도 제외**
-//   (personal:은 소유자에게만 — 격리 fail-closed: @me가 비면 uploadedBy=NULL 비교라 안 세어진다).
+//   내장 문서(origin='builtin')는 제외(반입이 아니라 제품 동봉물).
+//   ⚠ 개인문서 격리는 **목록 라우트(남의개인문서인가)와 같은 규칙**이어야 한다(2026-08-21 검토관
+//     4갈래 적발 — 배지만 공유 예외를 빠뜨려 목록엔 뜨는데 배지엔 안 세어지는 불일치가 났다):
+//     세는 조건 = 개인문서가 아니거나 · 내 것이거나 · **공유된 것**(personal_docs.shared=1).
+//     @me가 비면 uploadedBy 비교가 안 맞아 남의 미공유 개인문서는 fail-closed로 안 세어진다.
 const recentDocCountStmt = db.prepare(
   "SELECT COUNT(*) AS n FROM memory_documents WHERE ingestedAt >= @since" +
     " AND (origin IS NULL OR origin <> 'builtin')" +
-    " AND (documentId NOT LIKE 'personal:%' OR uploadedBy = @me)"
+    " AND (documentId NOT LIKE 'personal:%' OR uploadedBy = @me" +
+    " OR documentId IN (SELECT 'personal:' || id FROM personal_docs WHERE shared = 1))"
 );
+/** 오늘(=sinceIso 이후) 새로 들어온 문서 수 — 사이드바 "내 문서" 배지. 라우트와 시험이 이 한
+ *  함수를 쓴다(두 벌로 두면 격리 규칙이 갈린다 — 검토관이 잡은 그 병). since가 비면 0(안전). */
+export function recentDocCount(sinceIso: string, userId: string): number {
+  if (!sinceIso) return 0;
+  const row = recentDocCountStmt.get({ since: sinceIso, me: userId || "" }) as { n?: number } | undefined;
+  return Number(row?.n ?? 0);
+}
 
 /** 문서에 이 자산들이 담겼다고 적는다. 빈 목록이면 아무것도 하지 않는다(빈 값으로 덮지 않는다). */
 export function linkDocumentToAssets(documentId: string, assetIds: string[]): void {
@@ -1333,14 +1344,9 @@ export function registerMemoryRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       const since = String(req.query.since ?? "").slice(0, 40);
-      if (!since) {
-        res.json({ count: 0 });
-        return;
-      }
       const me = (req as import("express").Request & { user?: { id?: string | number; username?: string } }).user;
       const myId = me?.id != null ? String(me.id) : (me?.username ?? "");
-      const row = recentDocCountStmt.get({ since, me: myId }) as { n?: number } | undefined;
-      res.json({ count: Number(row?.n ?? 0) });
+      res.json({ count: recentDocCount(since, myId) });
     })
   );
   // 특정 문서 조각 미리보기(어떻게 학습됐는지 확인). Korean/특수문자 파일명 대비 body로 받는다.

@@ -2,7 +2,7 @@
 // 하드 필터된다. RAG 오염 53% 실사고의 개인판(「내 메모가 동료 답변에 샌다」)을 원천 봉쇄.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { db } from "../src/db";
-import { hiddenDocIds } from "../src/engine/memory";
+import { hiddenDocIds, recentDocCount } from "../src/engine/memory";
 
 function 개인문서심기(id: string, userId: string, shared = false): void {
   db.prepare("INSERT OR REPLACE INTO personal_docs (id, userId, title, body, ragOptIn, shared, createdAt, updatedAt) VALUES (?, ?, '메모', '내용', 1, ?, 1, 1)")
@@ -42,6 +42,47 @@ describe("개인 문서 검색 격리 — hiddenDocIds 하드 필터", () => {
 
   it("개인 문서가 없으면 종전(등급만) 동작 그대로 — 빈 배열", () => {
     expect(hiddenDocIds(undefined)).toEqual([]);
+  });
+});
+
+// 반입 배지 COUNT(recentDocCount) — 오늘 필터 + 격리가 **목록 라우트(남의개인문서인가)와 같은
+//   규칙**인지 잠근다(2026-08-21 검토관 4갈래 적발: 배지만 공유 예외를 빠뜨려 목록엔 뜨는데 배지엔
+//   안 세어졌다). 이 시험이 있으면 다음에 누가 SQL을 손대도 격리가 조용히 갈리지 못한다.
+describe("반입 배지 COUNT — 오늘 필터 + 개인문서 격리", () => {
+  const 자정 = "2026-08-21T00:00:00.000Z";
+  const 어제 = "2026-08-20T10:00:00.000Z";
+  const 오늘 = "2026-08-21T09:00:00.000Z";
+  function 회사문서(id: string, ingestedAt: string, origin: string | null = null): void {
+    db.prepare("INSERT OR REPLACE INTO memory_documents (documentId, scope, chunks, embeddingModel, ingestedAt, uploadedBy, origin) VALUES (?, 'global', 1, 'test', ?, 'sys', ?)")
+      .run(id, ingestedAt, origin);
+  }
+  function 개인문서(id: string, userId: string, ingestedAt: string, shared: boolean): void {
+    db.prepare("INSERT OR REPLACE INTO personal_docs (id, userId, title, body, ragOptIn, shared, createdAt, updatedAt) VALUES (?, ?, 'm', 'b', 1, ?, 1, 1)")
+      .run(id, userId, shared ? 1 : 0);
+    db.prepare("INSERT OR REPLACE INTO memory_documents (documentId, scope, chunks, embeddingModel, ingestedAt, uploadedBy) VALUES (?, 'global', 1, 'test', ?, ?)")
+      .run(`personal:${id}`, ingestedAt, userId);
+  }
+  const 청소 = () => db.exec("DELETE FROM personal_docs; DELETE FROM memory_documents WHERE documentId LIKE 'personal:%' OR documentId LIKE 'badge:%'");
+  beforeEach(청소);
+  afterEach(청소);
+
+  it("오늘 반입한 회사 문서만 세고, 어제 것·내장 문서는 안 센다", () => {
+    회사문서("badge:a", 오늘);
+    회사문서("badge:old", 어제);
+    회사문서("badge:builtin", 오늘, "builtin");
+    expect(recentDocCount(자정, "userA")).toBe(1);
+  });
+
+  it("남의 미공유 개인문서는 안 세고, 공유된 것·내 것은 센다 — 목록 필터와 같은 규칙", () => {
+    개인문서("p1", "userB", 오늘, false); // 남의 미공유 → 제외
+    개인문서("p2", "userB", 오늘, true);  // 공유 → 포함
+    개인문서("p3", "userA", 오늘, false); // 내 것 → 포함
+    expect(recentDocCount(자정, "userA")).toBe(2);
+  });
+
+  it("since가 비면 0 — 배지가 켜지기 전 안전값", () => {
+    회사문서("badge:a", 오늘);
+    expect(recentDocCount("", "userA")).toBe(0);
   });
 });
 
