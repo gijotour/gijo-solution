@@ -165,6 +165,9 @@ npm start              # 빌드 후 Electron 실행
 | `GIJO_LLAMA_SERVER_PATH` | 자동 탐색 | llama-server 실행 파일 |
 | `GIJO_MAX_LOADED_MODELS` | VRAM 티어 | 동시 상주 모델 수 |
 | `GIJO_DOCS_DIR` | — | 지식 문서 폴더(운영은 여기 한 곳만 읽음) |
+| `GIJO_SERVER_ROOT` | cwd | 파이썬 스크립트(문서 추출·장비 접속·모델 스캔)를 찾을 뿌리. **패키징 앱이 넣어 준다** — 설치본은 서버 cwd(userData)와 스크립트 자리가 다르다 |
+| `GIJO_INGEST_ROOT` | `data/` | 업로드 원본(`docs/uploads`)·추출본(`docs/extracted`)을 담는 뿌리 |
+| `GIJO_PYTHON` | 자동 탐색 | 서버 도구용 파이썬(단독 모드에서 PDF·한글을 읽으려면 지정) |
 | `GIJO_AIRGAP` | 없음 | `1`이면 **폐쇄망 봉인**(기본 차단, 런타임 해제 불가) |
 | `GIJO_JWT_SECRET` | 자동 생성 | 토큰 서명 키 |
 | `GIJO_ADMIN_USER` / `GIJO_ADMIN_PASSWORD` | — | 점검 도구가 쓸 계정(**코드에 비밀번호 금지**) |
