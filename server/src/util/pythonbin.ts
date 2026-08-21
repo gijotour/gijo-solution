@@ -38,6 +38,21 @@ export function serverPython(): string {
     : path.join(base, "venv", "bin", "python");
   후보.push(venv경로(뿌리));
   if (path.resolve(뿌리) !== path.resolve(process.cwd())) 후보.push(venv경로(process.cwd()));
+  // 설치본에 **동봉된** 파이썬(2026-08-22, 사장님 「b」 결정) — 고객 기계에 파이썬이 없어도
+  //   PDF·한글·오피스 문서를 읽을 수 있게 앱과 함께 나간다(임베더블 21.5MB + pypdf 3.5MB).
+  //   ⚠ 자리가 **venv 뒤·python3 앞**인 데는 이유가 있다:
+  //     · venv보다 뒤 — 동봉본에는 pypdf만 있다. 운영자가 만든 venv에는 netmiko·modelscan·OCR까지
+  //       들어 있을 수 있으니, 있으면 그쪽이 더 많은 일을 한다. 앞에 두면 그 환경을 가린다.
+  //     · python3보다 앞 — 시스템 파이썬은 **있어도 pypdf가 없을 수 있다**(그러면 PDF가 조용히
+  //       실패한다). 동봉본은 pypdf가 확실히 있다.
+  //   ⚠ main.ts에서 GIJO_PYTHON을 대입하지 **않는다** — 그러면 운영자 지정(README 환경변수 표·
+  //     배포 가이드가 안내하는 탈출구)을 덮어쓴다(설계관 2026-08-22 적발). 뿌리만 알려 주고
+  //     고르는 일은 이 함수 한 곳에서 한다.
+  후보.push(
+    process.platform === "win32"
+      ? path.join(뿌리, "python", "python.exe")
+      : path.join(뿌리, "python", "bin", "python3"),
+  );
   후보.push("python3", "python");
   for (const c of 후보) {
     if (c.includes(path.sep) && !fs.existsSync(c)) continue;

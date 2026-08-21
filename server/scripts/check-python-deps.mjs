@@ -39,6 +39,12 @@ function 서버파이썬() {
   const 뿌리 = process.env.GIJO_SERVER_ROOT || 서버루트;
   후보.push(venv경로(뿌리));
   if (path.resolve(뿌리) !== path.resolve(서버루트)) 후보.push(venv경로(서버루트));
+  // 설치본 동봉 파이썬 — pythonbin.ts와 **같은 자리**(venv 뒤·python3 앞).
+  후보.push(
+    process.platform === "win32"
+      ? path.join(뿌리, "python", "python.exe")
+      : path.join(뿌리, "python", "bin", "python3"),
+  );
   후보.push("python3", "python");
   for (const c of 후보) {
     if (c.includes(path.sep) && !fs.existsSync(c)) continue;

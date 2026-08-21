@@ -76,6 +76,46 @@ describe("★ 출하 목록 — 서버가 부르는 파이썬은 설치본에 �
     }
   });
 
+  // ★ 동봉 파이썬(2026-08-22) — 실어 보내는 일이 **빌드 사슬에 묶여 있는가**를 지킨다.
+  //   설계관 경고: electron-builder의 extraResources는 `from`이 없어도 **경고만 찍고 계속**한다
+  //   (app-builder-lib fileMatcher.js). 즉 스테이징을 사슬에 안 묶으면 「파이썬 없는 설치본」이
+  //   조용히 나간다 — 라이트의 llama-cuda가 지금도 사람이 기억해야 하는 상태인 실제 뿌리다.
+  it("동봉 파이썬이 빌드 사슬과 출하 목록에 묶여 있다", () => {
+    const pkgPath = path.join(서버루트, "..", "client", "package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
+      scripts: Record<string, string>;
+      build: { win?: { extraResources?: { from: string; to: string }[] } };
+    };
+    expect(pkg.scripts["stage-python"], "stage-python 스크립트가 없다").toBeTruthy();
+    for (const 사슬 of ["dist", "dist:lite"]) {
+      expect(
+        pkg.scripts[사슬],
+        `${사슬} 사슬에 stage-python이 없다 — 게시할 때마다 사람이 기억해야 하고, 빠뜨리면 ` +
+          `extraResources는 경고만 하고 넘어가 「파이썬 없는 설치본」이 조용히 나간다`,
+      ).toContain("stage-python");
+    }
+    const win = pkg.build.win?.extraResources ?? [];
+    expect(
+      win.some((r) => r.from.includes("python-dist") && r.to.includes("python")),
+      "win.extraResources에 python-dist가 없다 — 꾸려도 설치본에 안 실린다",
+    ).toBe(true);
+    // ⚠ mac(top-level)이 아니라 **win 아래**여야 한다 — dmg에 Windows용 파이썬이 실리면 안 된다.
+    const top = (JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { build: { extraResources?: { from: string }[] } }).build.extraResources ?? [];
+    expect(
+      top.some((r) => r.from.includes("python-dist")),
+      "python-dist가 top-level extraResources에 있다 — mac dmg에도 Windows 파이썬이 실린다",
+    ).toBe(false);
+  });
+
+  it("동봉 파이썬 자리를 제품과 점검이 같게 본다", () => {
+    // 「두 곳이 어긋나면 검사가 거짓말을 한다」(check-python-deps.mjs 주석) — 후보를 늘릴 때마다 짝을 맞춘다.
+    const 제품 = fs.readFileSync(path.join(서버루트, "src", "util", "pythonbin.ts"), "utf8");
+    const 점검 = fs.readFileSync(path.join(서버루트, "scripts", "check-python-deps.mjs"), "utf8");
+    for (const [이름, 소스] of [["pythonbin.ts", 제품], ["check-python-deps.mjs", 점검]] as const) {
+      expect(소스, `${이름}이 동봉 파이썬 자리를 안 본다`).toMatch(/"python",\s*"python\.exe"/);
+    }
+  });
+
   it("스크립트 자리는 serverScript()가 고른다 — 상대경로 직접 호출이 없다", () => {
     // 패키징 설치본은 cwd(userData)와 스크립트가 있는 자리(resources/server-dist)가 다르다.
     // 상대경로로 부르면 파일을 못 찾아 조용히 죽는다 — 그래서 뿌리를 아는 한 곳을 거친다.

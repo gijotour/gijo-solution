@@ -56,7 +56,11 @@ export async function extractDocumentText(filename: string, base64: string): Pro
             const 원문 = (stderr.trim() || err.message || "").trim();
             const 도구없음 =
               (err as NodeJS.ErrnoException).code === "ENOENT" ||
-              /can't open file|No such file or directory|is not recognized|command not found/i.test(원문);
+              /can't open file|No such file or directory|is not recognized|command not found/i.test(원문) ||
+              // ⚠ 동봉 파이썬에는 pypdf만 들어 있다(2026-08-22) — 다른 부품이 필요한 문서를 만나면
+              //   ENOENT가 아니라 ModuleNotFoundError로 죽는다. 그 영어 원문이 그대로 화면에 나가면
+              //   담당자는 무엇을 해야 할지 알 수 없다(설계관 적발). 같은 「도구 없음」으로 묶어 안내한다.
+              /ModuleNotFoundError|No module named/i.test(원문);
             if (도구없음) {
               return reject(new Error(
                 `문서를 읽지 못했습니다(${filename}) — 이 설치본에 문서 추출 도구가 없습니다. ` +

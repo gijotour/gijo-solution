@@ -10,12 +10,13 @@
     "start": "npm run build && electron .",
     "watch": "tsc -p tsconfig.json --watch",
     "fetch-smartmd": "node scripts/fetch-smartmd.mjs --keep",
-    "dist": "npm run build && npm run fetch-smartmd && npm run build-server-dist && electron-builder",
-    "dist:lite": "npm run build && npm run fetch-smartmd && npm run build-server-dist && electron-builder --config electron-builder.lite.json",
+    "dist": "npm run build && npm run fetch-smartmd && npm run stage-python && npm run build-server-dist && electron-builder",
+    "dist:lite": "npm run build && npm run fetch-smartmd && npm run stage-python && npm run build-server-dist && electron-builder --config electron-builder.lite.json",
     "rebuild-server-native": "node scripts/rebuild-server-native.mjs",
     "build-server-dist": "node scripts/build-server-dist.mjs",
     "publish-release": "node scripts/publish-release.mjs",
-    "create-deploy-account": "node scripts/create-deploy-account.mjs"
+    "create-deploy-account": "node scripts/create-deploy-account.mjs",
+    "stage-python": "node ../tools/stage-python.mjs"
   },
   "author": "GIJO Technology",
   "license": "UNLICENSED",
@@ -50,7 +51,13 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "extraResources": [
+        {
+          "from": "build/python-dist",
+          "to": "server-dist/python"
+        }
+      ]
     },
     "mac": {
       "target": [
