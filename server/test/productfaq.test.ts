@@ -17,9 +17,13 @@ describe("지식 카드 — 실측 3문이 잡힌다", () => {
     expect(faqAnswerFor("AI가 답을 지어내면 어떻게 알아?")?.id).toBe("how-to-spot-hallucination");
   });
   it("★ 제품 상태·성숙도(2026-08-21 코퍼스 QA — GA 공식출시 환각 차단)", () => {
-    // GA·출시·성숙도·파일럿 물음은 영업 유도로 결정적 답(지어내지 않음)
-    for (const q of ["GIJO AS의 GA 판정 상태나 향후 계획이 어떻게 돼?", "제품 성숙도 어때?", "정식 출시 됐어?", "파일럿 대상이 누구야?"]) {
+    // GA·성숙도·파일럿은 우리 제품 전용 낱말이라 단독 발동, 「정식 출시」류는 제품 앵커가 있을 때만
+    for (const q of ["GIJO AS의 GA 판정 상태나 향후 계획이 어떻게 돼?", "제품 성숙도 어때?", "이 제품 정식 출시 됐어?", "파일럿 대상이 누구야?"]) {
       expect(faqAnswerFor(q)?.id, q).toBe("product-status");
+    }
+    // ★ 검토관 [중]2·[낮]3: 제3자 SW 질문·GA 부분문자열은 영업카드가 선점하면 안 된다
+    for (const q of ["Log4j 정식 버전이 뭐야?", "Struts 출시 일정 나왔어?", "VGA 상태 확인", "MEGA 상태 어때"]) {
+      expect(faqAnswerFor(q), q + " 는 제품상태 아님").toBeNull();
     }
     // 답이 「영업 문의」로 유도하고, 거짓 GA 주장이 없어야 한다
     const a = faqAnswerFor("GIJO AS GA 상태?")!.answer;

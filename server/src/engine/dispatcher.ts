@@ -1295,7 +1295,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // ⚠ 단 **문서를 콕 집은** 질문(「이 취약점 분석평가 가이드에서 …어떤 게 있어?」)은 양보한다 —
   //   문서명의 「취약점」이 이 빠른 길에 걸려 자산 취약점 목록이 나가던 것(2026-08-21 코퍼스 QA 실측).
   //   문서지목질문 TRUE면 문서가 권위다(incidentsteps 장애·침해가 이미 쓰는 같은 패턴). 문서지목=FALSE인
-  //   「미조치 취약점 뭐 있어?」·「이 자산 취약점」·「고위험 목록」은 그대로 이 길(HIJACK 유지).
+  //   「미조치 취약점 뭐 있어?」·「급한 취약점 몇 건 있어?」는 그대로 이 빠른 길(HIJACK 유지).
   if (isFindingListAsk(instructionText) && !문서지목질문(instructionText)) {
     // 🗂 범위를 **여기에도 넘긴다** — 이 경로는 agentloop를 안 타서 도구 인자 주입이 안 온다
     // (2026-08-18 실측: 범위가 걸렸는데 전체 3,008건이 왔다).
