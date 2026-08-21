@@ -44,13 +44,28 @@ fs.copyFileSync(path.join(serverDir, "package-lock.json"), path.join(outDir, "pa
 // 「꺼져 있습니다」라고 말하고 켜는 방법도 안내하는데, 그 방법(node scripts/encrypt-db.mjs)이
 // **배포본에 없어서 따를 수가 없었다.** 여기 없는 것은 고객에게 나가지 않는다 — 그래서 담는다.
 // (앱이 이 스크립트를 직접 실행한다 — main.ts의 dbcrypt:enable. 고객은 터미널을 열지 않는다)
-const 스크립트 = ["encrypt-db.mjs", "recover-db-key.mjs"];
+//
+// ★ 문서 추출기·장비 접속·모델 스캔 파이썬도 같이 담는다(2026-08-22).
+//   같은 실수의 **세 번째**다: encrypt-db(0e5ade71) → 문서 코퍼스(2d01e261) → 이번 extract_doc.py.
+//   실측: release/win-unpacked/resources/server-dist/scripts/ 에 .mjs 2개뿐이라
+//   **패키징 설치본에서는 PDF·한글(HWPX)·오피스 업로드가 전부 죽어 있었다**(라이트는 항상
+//   단독 모드라 100%, 표준·프로도 단독 모드 데모면 같이 죽는다). requirements도 함께 담아야
+//   고객이 파이썬을 깔 때 무엇을 깔아야 하는지 알 수 있다.
+//   ⚠ 이 파일만 고치면 반쪽이다 — 패키징본은 서버 cwd가 userData라 상대경로가 못 찾는다.
+//     그래서 main.ts가 GIJO_SERVER_ROOT를 넘기고 dataset.ts·netmikorunner.ts·bridge.ts가 그 기준으로 찾는다.
+const 스크립트 = ["encrypt-db.mjs", "recover-db-key.mjs", "extract_doc.py", "netmiko_runner.py"];
 const scriptsOut = path.join(outDir, "scripts");
 fs.mkdirSync(scriptsOut, { recursive: true });
 for (const f of 스크립트) {
   const src = path.join(serverDir, "scripts", f);
   if (fs.existsSync(src)) fs.copyFileSync(src, path.join(scriptsOut, f));
-  else console.warn(`[build-server-dist] ⚠ ${f} 없음 — 고객이 저장 암호화를 켤 수 없게 됩니다`);
+  else console.warn(`[build-server-dist] ⚠ ${f} 없음 — 고객 설치본에서 그 기능이 죽습니다`);
+}
+// 서버 **루트**에 있는 것들(scripts/ 밑이 아니다 — 경로가 두 갈래인 이유).
+for (const f of ["modelscan_wrapper.py", "requirements.txt", "requirements-ocr.txt"]) {
+  const src = path.join(serverDir, f);
+  if (fs.existsSync(src)) fs.copyFileSync(src, path.join(outDir, f));
+  else console.warn(`[build-server-dist] ⚠ ${f} 없음 — 고객 설치본에서 그 기능이 죽습니다`);
 }
 
 // 제품 문서 기본 코퍼스(docsbundle.ts가 첫 기동 때 지식베이스에 인입한다). 설치본에는

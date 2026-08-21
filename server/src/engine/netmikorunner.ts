@@ -13,7 +13,7 @@
 import { execFile } from "child_process";
 import * as path from "path";
 import type { RunFn, RunResult, HardeningTarget } from "./hardeningscan";
-import { serverPython } from "../util/pythonbin";
+import { serverPython, serverScript } from "../util/pythonbin";
 // ⚠ 이 통로도 `execFile(python)`이라 fetch 관문을 원리상 안 지난다 — 연결 직전에 직접 검사한다.
 //   판정기는 airgap 한 곳만 쓴다(hardeningscan의 SSH 통로와 같은 이름표 "hardening-ssh").
 import { assertEgressAllowed } from "./airgap";
@@ -31,10 +31,13 @@ export function deviceTypeOf(target: HardeningTarget): string | null {
   return null;
 }
 
-const SCRIPT = path.join(process.cwd(), "scripts", "netmiko_runner.py");
+// ⚠ **부를 때마다 읽는다** — 예전엔 모듈 로드 시점 상수였다. 상수로 굳히면 import 이후의
+//   환경변수 변경이 조용히 무시된다(docsbundle.ts:21-24가 못박아 둔 규칙 — 이 파일만 그 밖에
+//   있었다). 패키징 설치본은 cwd가 userData라 상대경로로는 스크립트를 못 찾는다(2026-08-22).
+const SCRIPT = () => serverScript(path.join("scripts", "netmiko_runner.py"));
 // ⚠ 예전엔 `?? "python"`이었다 — 운영(WSL)에 그 이름이 없어(python3만 존재) 조용히 실패한다.
 //   서버 도구용 파이썬은 한 곳에서 고른다(util/pythonbin, 2026-08-08 문서 추출 사고).
-const PYTHON = serverPython();
+const PYTHON = () => serverPython();
 const TIMEOUT_MS = Number(process.env.GIJO_NETMIKO_TIMEOUT_MS ?? 45_000);
 
 interface BridgeResponse {
@@ -68,7 +71,7 @@ export function netmikoRunner(target: HardeningTarget, deviceType: string): RunF
         commands: [cmd],
       });
 
-      const child = execFile(PYTHON, [SCRIPT], { timeout: TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 }, (err, so, se) => {
+      const child = execFile(PYTHON(), [SCRIPT()], { timeout: TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 }, (err, so, se) => {
         // 브리지가 아예 못 도는 경우(파이썬·netmiko 없음)도 "실패"로 정직하게 돌려준다.
         // 여기서 빈 성공을 주면 상위 판정이 "이상 없음"으로 오해한다.
         let parsed: BridgeResponse | null = null;

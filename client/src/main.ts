@@ -209,6 +209,12 @@ function 번들서버구성(): { entry: string; serverRoot: string; dataRoot: st
     try { fs.mkdirSync(dataRoot, { recursive: true }); } catch { /* 이미 있으면 그만 */ }
     env.GIJO_DOCS_DIR = path.join(serverRoot, "docs");
     env.GIJO_DOCS_MANIFEST = path.join(serverRoot, "docs-manifest.json");
+    // ★ 파이썬 스크립트(문서 추출기·장비 접속·모델 스캔)가 있는 자리(2026-08-22).
+    //   서버는 cwd를 dataRoot(userData)로 두고 도는데 — DB를 앱 번들 안에 쓰면 업데이트 때
+    //   지워지고 서명 봉인이 깨지기 때문이다(위 주석) — 정작 스크립트는 serverRoot에 있다.
+    //   그래서 상대경로 "scripts/extract_doc.py"가 **없는 자리**를 가리켜 패키징 설치본에서는
+    //   PDF·한글 업로드가 전부 죽어 있었다. 그 뿌리를 여기서 알려 준다.
+    env.GIJO_SERVER_ROOT = serverRoot;
   }
   return { entry: bundledServerEntry, serverRoot, dataRoot, env, 패키징본 };
 }

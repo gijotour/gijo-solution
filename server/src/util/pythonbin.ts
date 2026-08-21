@@ -41,6 +41,31 @@ export function serverPython(): string {
   return 캐시;
 }
 
+/**
+ * 파이썬 스크립트의 **실제 자리**를 고르는 단 한 곳(2026-08-22 신설).
+ *
+ * ■ 왜 생겼나 — 설치본에서 PDF·한글 업로드가 통째로 죽어 있었다
+ *   패키징된 앱은 서버를 `cwd = userData`(사용자 데이터 폴더)로 띄운다 — DB를 앱 번들 안에
+ *   쓰면 업데이트 때 지워지고 서명 봉인이 깨지기 때문이다. 그런데 스크립트는 앱 안
+ *   `resources/server-dist/`에 있다. 그래서 상대경로 `"scripts/extract_doc.py"`는
+ *   **없는 자리**를 가리켰다. 라이트는 항상 이 단독 모드라 100% 걸리고, 표준·프로도
+ *   단독 모드(데모·오프라인 시연)면 똑같이 걸린다.
+ *
+ * ⚠ **호출할 때마다 읽는다** — 모듈 로드 시점 상수로 굳히면 import 이후의 환경변수 변경이
+ *   조용히 무시된다(docsbundle.ts:21-24가 같은 이유로 못박아 둔 규칙이다).
+ * ⚠ 스크립트 **이름 문자열은 호출부에 그대로 남겨 둔다** — pythondeps 시험이 `serverPython()`이
+ *   든 파일에서 `".py"` 리터럴을 긁어 「쓰는데 requirements에 안 적힌 모듈」을 잡는다.
+ *   이름을 이 파일로 모으면 그 감시가 **아무도 모르게** 죽는다.
+ *
+ * @param 상대 서버 뿌리 기준 상대 경로. 예: "scripts/extract_doc.py", "modelscan_wrapper.py"
+ */
+export function serverScript(상대: string): string {
+  // GIJO_SERVER_ROOT는 패키징 앱(main.ts)이 넣어 준다. 개발·WSL 운영에는 없고, 그때는
+  // cwd가 곧 서버 뿌리라 예전과 똑같이 동작한다(기존 경로를 안 깨는 것이 이 폴백의 목적).
+  const 뿌리 = process.env.GIJO_SERVER_ROOT || process.cwd();
+  return path.join(뿌리, 상대);
+}
+
 /** 시험 전용 — 환경을 바꿔 가며 확인할 때 캐시를 비운다. */
 export function resetPythonBinCache(): void {
   캐시 = null;

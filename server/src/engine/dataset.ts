@@ -10,7 +10,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { chat } from "./llm";
 import { recordProcessOutput } from "./logs";
-import { serverPython } from "../util/pythonbin";
+import { serverPython, serverScript } from "../util/pythonbin";
 // 학습 데이터가 디스크에 닿는 유일한 자리라, 위생을 여기서 건다(호출부마다 붙이면 또 빠뜨린다).
 import { cleanForTraining, type 데이터종류 } from "./datasethygiene";
 
@@ -42,11 +42,29 @@ export async function extractDocumentText(filename: string, base64: string): Pro
         //   추출이 **한 번도 성공한 적 없었다**(2026-08-08 실측). 그 여파로 경로 인입이
         //   PDF를 글자로 그냥 읽어 저장소 조각의 73%가 압축 바이트였다.
         serverPython(),
-        ["scripts/extract_doc.py", tmp],
+        // ⚠ 스크립트 자리는 serverScript()가 고른다 — 패키징 설치본은 cwd(userData)와 스크립트가
+        //   있는 자리(resources/server-dist)가 달라, 상대경로로 부르면 파일을 못 찾는다(2026-08-22).
+        [serverScript("scripts/extract_doc.py"), tmp],
         { env: { ...process.env, PYTHONUTF8: "1" }, maxBuffer: 256 * 1024 * 1024 },
         (err, stdout, stderr) => {
           if (stderr) recordProcessOutput("extract-doc", "warn", stderr);
-          if (err) return reject(new Error(stderr.trim() || err.message));
+          if (err) {
+            // ★ 「추출 도구가 아예 없다」와 「이 문서를 못 읽겠다」를 가려서 말한다(2026-08-22).
+            //   설치본에 스크립트나 파이썬이 없으면 ENOENT·"can't open file" 같은 **영어 메시지가
+            //   그대로 화면에 나가** 담당자가 무엇을 해야 할지 알 수 없었다. 문구는 memory.ts의
+            //   같은 상황 안내와 **일부러 같은 표현**을 쓴다 — 잣대가 둘이 되면 서로 어긋난다.
+            const 원문 = (stderr.trim() || err.message || "").trim();
+            const 도구없음 =
+              (err as NodeJS.ErrnoException).code === "ENOENT" ||
+              /can't open file|No such file or directory|is not recognized|command not found/i.test(원문);
+            if (도구없음) {
+              return reject(new Error(
+                `문서를 읽지 못했습니다(${filename}) — 이 설치본에 문서 추출 도구가 없습니다. ` +
+                `PDF·한글(HWPX)·오피스 문서는 텍스트 추출을 거쳐야 합니다. 추출 도구가 준비돼 있는지 확인하세요.`
+              ));
+            }
+            return reject(new Error(원문 || `문서를 읽지 못했습니다(${filename})`));
+          }
           resolve(stdout);
         }
       );
