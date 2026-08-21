@@ -26,7 +26,7 @@ const 이름들 = [...new Set(
 
 describe("📖 시나리오 칩 — dispatcher 배관 실측", () => {
   it("칩 이름을 하나라도 못 뽑으면 이 시험은 빈 검사다", () => {
-    expect(이름들.length).toBeGreaterThanOrEqual(11); // 12판 · 이름 11종(경영 보고 준비 공유)
+    expect(이름들.length).toBeGreaterThanOrEqual(12); // 13판 · 이름 12종(경영 보고 준비 공유, 2026-08-21 2종 추가)
   });
 
   for (const 이름 of 이름들) {

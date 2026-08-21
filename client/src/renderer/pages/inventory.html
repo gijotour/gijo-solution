@@ -77,10 +77,11 @@
   .tb-dd.sm{padding:2px 10px;font-size:12.25px;font-weight:700;color:var(--muted);}
   .tb-menu{display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:210px;max-height:320px;overflow-y:auto;background:#35342f;border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.5);padding:6px;z-index:60;cursor:default;}
   .tb-dd.open .tb-menu{display:block;}
-  .tb-mi{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12px;color:var(--text);cursor:pointer;white-space:nowrap;}
+  /* 고정 어두운 상자(.tb-menu #35342f) 안 — 토큰 금지(2026-08-21 검토관 ②, syslog와 같은 부류) */
+  .tb-mi{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12px;color:#e9e7e2;cursor:pointer;white-space:nowrap;}
   .tb-mi:hover{background:rgba(255,255,255,.05);}
-  .tb-mi.on{background:rgba(59,130,246,.15);color:var(--text-strong, #fff);font-weight:700;}
-  .tb-mi .cn{margin-left:auto;color:var(--muted-2);font-size:12px;}
+  .tb-mi.on{background:rgba(59,130,246,.15);color:#fff;font-weight:700;}
+  .tb-mi .cn{margin-left:auto;color:#a49d95;font-size:12px;}
   .tb-active{display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:7px 11px;font-size:12.5px;}
   .tb-active.cols{background:rgba(255,255,255,.03);border-color:var(--border);}
   .tb-active .lb{color:var(--muted-2);font-weight:700;margin-right:2px;}
@@ -129,9 +130,9 @@
   .type-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12.25px;font-weight:700;background:rgba(139,124,240,0.15);color:var(--purple);}
   .risk-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;}
   .risk-dot{width:8px;height:8px;border-radius:50%;}
-  .risk-high{color:var(--red, #f5928a);}
+  .risk-high{color:var(--red-ink, #f5928a);}
   .risk-high .risk-dot{background:var(--red);}
-  .risk-mid{color:#f7c777;}
+  .risk-mid{color:var(--amber, #f7c777);}
   .risk-mid .risk-dot{background:var(--amber);}
   .risk-low{color:var(--teal, #6fdcb5);}
   .risk-low .risk-dot{background:var(--teal);}
@@ -140,7 +141,7 @@
   .owner{font-size:12px;color:var(--muted);}
   .row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
   .asset-del{color:var(--muted-2);font-size:12px;font-weight:700;cursor:pointer;padding:0 4px;border-radius:4px;}
-  .asset-del:hover{color:var(--red, #f5928a);background:rgba(226,72,61,0.14);}
+  .asset-del:hover{color:var(--red-ink, #f5928a);background:rgba(226,72,61,0.14);}
 
   .pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
   .page-btns{display:flex;gap:6px;}
@@ -174,7 +175,7 @@
   .modal-title{font-size:16px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:18px;}
   .modal label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
   .modal input,.modal select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;margin-bottom:14px;outline:none;}
-  .modal-err{font-size:12px;color:var(--red, #f5928a);min-height:16px;margin-bottom:4px;}
+  .modal-err{font-size:12px;color:var(--red-ink, #f5928a);min-height:16px;margin-bottom:4px;}
   .modal-actions{display:flex;gap:8px;justify-content:flex-end;}
 
   /* 커버리지 — "무엇을 모르는가" */
@@ -188,7 +189,7 @@
   /* ── 보안 지형도(🗺 지도 탭) — 시안 security-map-v1 ── */
   .mv-chips{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:12px;}
   .mv-chip{border:1px solid var(--border);border-radius:12px;padding:3px 11px;color:var(--muted);cursor:pointer;}
-  .mv-chip.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:#8fb8ff;}
+  .mv-chip.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:var(--blue-light, #8fb8ff);}
   .mv-legend{margin-left:auto;color:var(--muted-2);font-size:11px;}
   .mv-stage{display:flex;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel);min-height:420px;}
   .mv-map{flex:1;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;}
@@ -203,8 +204,8 @@
   .mv-nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
   .mv-ct{font-size:11px;opacity:.85;}
   .mv-kev{position:absolute;top:-6px;right:-6px;background:#e5484d;color:#fff;border-radius:8px;font-size:11px;padding:1px 5px;font-weight:800;}
-  .mv-high{background:rgba(229,72,77,.30);color:#ffd7d8;}
-  .mv-mid{background:rgba(240,160,32,.26);color:#ffe9c4;}
+  .mv-high{background:rgba(229,72,77,.30);color:var(--red-ink, #ffd7d8);}
+  .mv-mid{background:rgba(240,160,32,.26);color:var(--amber, #ffe9c4);}
   .mv-low{background:rgba(70,167,88,.22);color:#d2f2da;}
   .mv-ai{outline:1px dashed rgba(139,124,240,.55);}
   .mv-map{position:relative;} /* 오버레이 SVG 기준 */
@@ -213,7 +214,7 @@
   .mv-edge-entry{stroke:#f5928a;stroke-dasharray:4 3;}
   .mv-edge-lateral{stroke:#8fb8ff;}
   .mv-tile.mv-foothold{box-shadow:0 0 0 2px rgba(245,146,138,.8);}
-  .mv-path-toggle.on{background:rgba(245,146,138,.18);border-color:#f5928a;color:#ffd7d8;}
+  .mv-path-toggle.on{background:rgba(245,146,138,.18);border-color:#f5928a;color:var(--red-ink, #ffd7d8);}
   .mv-side{width:320px;border-left:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;}
   .mv-side h3{margin:0;font-size:13.5px;}
   .mv-rk{font-size:11.5px;padding:2px 8px;border-radius:4px;display:inline-block;margin-right:6px;}
@@ -224,7 +225,7 @@
   .mv-item:last-child{margin-bottom:0;}
   .mv-plain{font-size:12.5px;line-height:1.6;color:var(--muted);margin:4px 0 0;}
   .mv-plain b{color:var(--text);font-weight:700;}
-  .mv-ask{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.5);color:#8fb8ff;border-radius:6px;
+  .mv-ask{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.5);color:var(--blue-light, #8fb8ff);border-radius:6px;
           padding:7px 10px;cursor:pointer;font-size:12px;text-align:left;font-family:inherit;}
   .mv-ask:hover{background:rgba(59,130,246,.26);}
   .mv-hint{color:var(--muted-2);font-size:11px;margin-top:auto;}
@@ -241,8 +242,8 @@
   .gapbadge{display:inline-block;font-size:11.75px;font-weight:800;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;}
   .gapbadge.owner{color:#ff8a80;background:rgba(226,72,61,0.18);}
   .gapbadge.unscanned{color:#ff8a80;background:rgba(226,72,61,0.18);}
-  .gapbadge.service{color:#f7c777;background:rgba(240,160,32,0.16);}
-  .gapbadge.sbom{color:#f7c777;background:rgba(240,160,32,0.16);}
+  .gapbadge.service{color:var(--amber, #f7c777);background:rgba(240,160,32,0.16);}
+  .gapbadge.sbom{color:var(--amber, #f7c777);background:rgba(240,160,32,0.16);}
   .why-cell{font-size:12.5px;color:var(--muted);}
   .sortnote{font-size:12.5px;color:var(--muted-2);margin:12px 0 -4px;}
 
@@ -262,11 +263,11 @@
   .ad-row{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:12.25px;border-bottom:1px solid rgba(255,255,255,.04);}
   .ad-row .code{font-size:11.25px;font-weight:800;color:#c9b8ff;background:rgba(139,124,240,.14);padding:1px 6px;border-radius:5px;flex:0 0 auto;}
   .ad-tag{font-size:11px;font-weight:800;padding:1px 6px;border-radius:5px;flex:0 0 auto;}
-  .ad-tag.critical{background:rgba(226,72,61,.16);color:var(--red, #f5928a);}
-  .ad-tag.high{background:rgba(247,199,119,.14);color:#f7c777;}
-  .ad-tag.medium{background:rgba(143,184,255,.14);color:#8fb8ff;}
+  .ad-tag.critical{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);}
+  .ad-tag.high{background:rgba(247,199,119,.14);color:var(--amber, #f7c777);}
+  .ad-tag.medium{background:rgba(143,184,255,.14);color:var(--blue-light, #8fb8ff);}
   .ad-tag.low{background:var(--panel);color:var(--muted-2);}
-  .ad-tag.open{background:rgba(226,72,61,.16);color:var(--red, #f5928a);}
+  .ad-tag.open{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);}
   .ad-tag.covered{background:rgba(30,185,128,.14);color:var(--teal, #6fdcb5);}
   .ad-tag.na{background:var(--panel);color:var(--muted-2);}
   .ad-act{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap;}
@@ -305,9 +306,9 @@
 
     <div class="kpi-strip" data-gijo-summary>
       <div class="kpi-mini"><div class="kpi-mini-label">전체 자산</div><div class="kpi-mini-value" id="kpiTotal">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">고위험</div><div class="kpi-mini-value" id="kpiHigh" style="color:#f5928a">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">중위험</div><div class="kpi-mini-value" id="kpiMid" style="color:#f7c777">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">저위험</div><div class="kpi-mini-value" id="kpiLow" style="color:#6fdcb5">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">고위험</div><div class="kpi-mini-value" id="kpiHigh" style="color:var(--red-ink, #f5928a)">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">중위험</div><div class="kpi-mini-value" id="kpiMid" style="color:var(--amber, #f7c777)">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">저위험</div><div class="kpi-mini-value" id="kpiLow" style="color:var(--teal, #6fdcb5)">-</div></div>
       <div class="kpi-mini"><div class="kpi-mini-label">SBOM 미생성</div><div class="kpi-mini-value" id="kpiNoSbom" style="color:var(--amber)">-</div></div>
       <!-- 「자산 통합 뷰」에서 옮겨 온 3지표(2026-08-02 화면 통합). 같은 자산을 두 화면에서
            보던 것을 하나로 합쳤다 — 두 화면의 숫자가 다르면 담당자는 둘 다 못 믿는다. -->
@@ -1034,7 +1035,7 @@
     let html = mi("all", "전체", universe.length);
     [...counts.keys()].sort().forEach((c) => { html += mi(c, c, counts.get(c)); });
     if (uncategorized) html += mi("__none__", "미분류", uncategorized);
-    html += '<div style="font-size:12px;color:var(--muted-2);padding:7px 9px;border-top:1px solid var(--border);margin-top:4px;line-height:1.6">표의 <b>카테고리</b> 컬럼 ＋지정으로 그룹을 붙입니다.</div>';
+    html += '<div style="font-size:12px;color:#a49d95;padding:7px 9px;border-top:1px solid rgba(255,255,255,.12);margin-top:4px;line-height:1.6">표의 <b>카테고리</b> 컬럼 ＋지정으로 그룹을 붙입니다.</div>';
     menu.innerHTML = html;
     menu.querySelectorAll("[data-cat]").forEach((el) => el.addEventListener("click", () => {
       activeCategory = el.getAttribute("data-cat");

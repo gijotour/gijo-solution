@@ -337,7 +337,7 @@
       + ".gj-row>.rt{color:var(--muted-2,#a49d95);font-size:12px;white-space:nowrap;flex:0 0 auto;}"
       + ".gj-row>.rt b{color:#fff;font-weight:800;font-size:12.5px;}"
       + ".gj-tag{font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;white-space:nowrap;flex:0 0 auto;}"
-      + ".gj-tag.t-red{background:rgba(226,72,61,.16);color:#f5928a;}"
+      + ".gj-tag.t-red{background:rgba(226,72,61,.16);color:var(--red-ink,#f5928a);}"
       + ".gj-tag.t-amber{background:rgba(240,160,32,.16);color:var(--amber,#f0a020);}"
       + ".gj-tag.t-teal{background:rgba(30,185,128,.16);color:var(--teal,#1eb980);}"
       + ".gj-tag.t-blue{background:rgba(59,130,246,.16);color:var(--blue-light,#5fa1ff);}"
@@ -1150,6 +1150,9 @@
     [].forEach.call(상자들, function (box) {
       if (box.dataset.gijoSum === "1") return;              // 이미 바꿨다
       var 카드 = [].filter.call(box.children, function (e) { return e.nodeType === 1; });
+      // ⚠ 상한 8은 계약이다(검토관 B하3) — 작업 기록 요약이 정확히 8칸(전체+종류6+보관)이라
+      //   턱밑이다. 칸을 늘릴 일이 생기면 이 문턱과 함께 움직일 것(말없이 넘기면 변환이
+      //   조용히 멈춰 화면이 날것 카드로 돌아간다).
       if (카드.length < 2 || 카드.length > 8) return;        // 카드 줄이 아니다
       var 조각 = [];
       for (var i = 0; i < 카드.length; i++) {
@@ -1578,8 +1581,12 @@
     // ⚠ 화면이 요약 줄을 나중에 그리는 경우가 있어(목록을 받아야 카드가 생긴다) 잠깐 더 지켜본다.
     //   embed(탭 안)에서도 돌아야 한다 — 담당자가 실제로 보는 자리가 거기다.
     요약막대로();
+    // ⚠ 감시자(요약감시걸기)는 2026-08-02 도입 때부터 **아무도 안 부르는 죽은 코드**였다
+    //   (2026-08-21 검토관 B상1 — 전수 검색 호출부 0). 그래서 화면이 요약 칸을 통째로 다시
+    //   그리면 막대가 풀린 채 되살아나지 않았다(작업 기록 15초 갱신 실사고). 여기서 건다.
+    요약감시걸기();
     var 요약틱 = 0;
-    var 요약감시 = setInterval(function () { 요약막대로(); if (++요약틱 > 10) clearInterval(요약감시); }, 700);
+    var 요약감시 = setInterval(function () { 요약막대로(); 요약감시걸기(); if (++요약틱 > 10) clearInterval(요약감시); }, 700);
     // 목록 높이도 같은 이유로 첫 그림 뒤에 한 번 더 잰다.
     [300, 900, 2000, 4000].forEach(function (ms) { setTimeout(function () { window.gijoFitList && window.gijoFitList(); }, ms); });
     // 탭 안(embed)에서도 흡수는 태운다 — 열어 둔 탭이 옛 화면에 그대로 머물면 담당자는

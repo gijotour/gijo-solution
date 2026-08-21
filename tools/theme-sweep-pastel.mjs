@@ -30,7 +30,16 @@ const FILL = /background(?:-color)?\s*:\s*(var\(--(?:g-)?(?:blue|red|teal|amber|
 // 뜻 기준: 민트/초록=teal · 연파랑(버튼·링크)=blue-light · 연파랑(본문 강조)=text/text-strong ·
 // 살몬=red · 호박=amber · 보라=purple. pro-white가 각 토큰의 잉크색을 정의한다.
 const MAP = [
-  ["#f5928a", "var(--red, #f5928a)"],
+  // ⚠ 빨강 계열은 --red가 아니라 **--red-ink**다(2026-08-21 검토관 ① 게시 차단급).
+  //   화면 :root가 --red:#e2483d(테두리용)를 정의해 폴백이 무시되고, 다크 글자 66곳이
+  //   어두워졌다. --red-ink는 pro-white 한 곳만 정의 → 다크=폴백 원색, 흰 테마=잉크.
+  ["#f5928a", "var(--red-ink, #f5928a)"],
+  ["#ffd7d8", "var(--red-ink, #ffd7d8)"],
+  // 중간 등급 파스텔(검토관 ⑤ — 高·低만 잉크가 되고 中만 사라지던 반쪽). --amber·--blue-light는
+  // 다크 값(#f0a020·#5fa1ff)이 이미 전역 글자색 관례라 그대로 써도 다크 회귀가 없다.
+  ["#f7c777", "var(--amber, #f7c777)"],
+  ["#ffe9c4", "var(--amber, #ffe9c4)"],
+  ["#8fb8ff", "var(--blue-light, #8fb8ff)"],
   ["#6fdcb5", "var(--teal, #6fdcb5)"],
   ["#5fe0aa", "var(--teal, #5fe0aa)"],
   ["#7ab0ff", "var(--blue-light, #7ab0ff)"],

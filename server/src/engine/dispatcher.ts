@@ -1435,7 +1435,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const { formatAttackPaths } = await import("./analysishub.js");
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatAttackPaths(), sources: [] };
+    // nextChips — 「취약점 이해」 4걸음(배정) 사슬(검토관 B중1: 3걸음의 답이 4걸음을 이어 줘야
+    // 「그다음은 각 답이 이어 줍니다」 약속이 성립한다). 문구는 시나리오 걸음과 글자 동일.
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatAttackPaths(), sources: [], nextChips: ["이거 담당자 배정해줘", "미조치 취약점 뭐 있어?"] };
   }
 
   // "Shadow AI 점검해줘 / 미등록 AI 있어?" — 시스템 관측 신호로 미등록 모델을 결정적으로 찾는다.
@@ -1535,7 +1537,13 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   같은 병(대상 불명)이라 같은 관문에서 잡는다.
   // ★ 화면에서 항목을 골라 둔 상태(선택)면 「이거」의 대상이 있다 — 되묻지 않는다(2026-08-09 2단계).
   //   선택은 아래에서 contextText 앞머리에 실려 도구·모델이 그걸 가리키게 된다.
-  if (!선택 && (대명사뿐인가(instructionText) || 가리킬것없는대명사(instructionText, 대화열쇠))) {
+  // 📖 「이거 쉽게 설명해줘」 칩(취약점 이해 2걸음)은 기능어를 빼면 「쉽게설명」 4자가 남아 이
+  //   관문을 비켜 갔다(검토관 B중2) — 선택 없이 오면 LLM 재량으로 흘러 일반론이 나온다.
+  //   대명사류로 잡는다: 직전 대상이 있으면 짚어 확인받고, 없으면 되묻는 기존 흐름 그대로.
+  //   ⚠ 아래 관문의 앞머리(!선택 && (대명사뿐인가…)는 소스 감시 시험 2곳이 지키는 원형이다 —
+  //     새 조건은 뒤에 붙인다(assetanaphora·ops147-regress가 배선 자체를 검증한다).
+  const 설명칩인데대상없음 = /^이거\s*쉽게\s*설명해\s*줘?\s*$/.test(instructionText.trim());
+  if (!선택 && (대명사뿐인가(instructionText) || 가리킬것없는대명사(instructionText, 대화열쇠) || 설명칩인데대상없음)) {
     const 확인 = 대명사확인(대화열쇠);
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);

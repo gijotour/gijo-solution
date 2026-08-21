@@ -52,10 +52,10 @@
       ".gcp-open{display:block;margin-top:8px;font-size:12.5px;font-weight:700;color:var(--blue-light,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:28px;font-family:inherit;}",
       ".gcp-open:hover{background:rgba(59,130,246,.18);}",
       ".gcp-open:disabled{color:var(--teal,#1eb980);background:rgba(30,185,128,.10);border-color:rgba(30,185,128,.35);cursor:default;}",
-      ".gcp-src{margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5;}",
+      ".gcp-src{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--teal,#6fdcb5);}",
       // ② 찾아보긴 했으나 근거는 아님 — 초록(근거 있음)과 **눈에 띄게 달라야** 한다.
       //   호박색은 이 제품에서 「주의·확인 필요」 자리다(근거 약함 배너의 ⚠와 같은 결).
-      ".gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:#ffd88a;}",
+      ".gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--amber,#ffd88a);}",
       ".gcp-ev{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;min-width:0;}",
       // 데이터 카드(승인 시안 대화_데이터카드, 2026-08-19) — KPI+표. 밀도는 전역 규격(25px)과 같게.
       ".dc-card{margin-top:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:var(--panel-2,#1f1e1d);}",

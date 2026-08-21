@@ -47,7 +47,7 @@
       ".gjf-h:hover{border-color:var(--blue,#3b82f6);background:rgba(59,130,246,.05);}" +
       ".gjf-h .car{color:var(--muted-2,#a49d95);font-size:11.75px;width:11px;flex:0 0 auto;transition:transform .15s;}" +
       ".gjf-h.on .car{transform:rotate(90deg);}" +
-      ".gjf-h .nm{font-size:12.5px;font-weight:700;color:#dfe6ff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+      ".gjf-h .nm{font-size:12.5px;font-weight:700;color:var(--text-strong,#dfe6ff);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
       ".gjf-b{font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);" +
       "color:var(--muted,#b3ada4);flex:0 0 auto;}" +
       ".gjf-b.hot{background:rgba(226,72,61,.16);color:#f5928a;}" +

@@ -64,7 +64,7 @@
       ".pv-v b{color:var(--text,#e9e7e2);font-weight:800;}" +
       ".pv-f{margin-top:4px;font-size:11.25px;color:var(--muted-2,#a49d95);line-height:1.5;}" +
       ".pv-f .pv-when{color:var(--muted-2,#a49d95);}" +
-      ".pv-f .pv-fail{color:#f5928a;font-weight:700;}" +
+      ".pv-f .pv-fail{color:var(--red-ink,#f5928a);font-weight:700;}" +
       // wrap — 4단추 판(vuln·asset: 목록+고르기+📖)이 214px 셀을 넘으면 삐져나가지 말고 접힌다(검토관 ③중2).
       ".pv-acts{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}" +
       ".pv-acts button{background:transparent;border:1px solid var(--border-strong,rgba(255,255,255,.16));color:var(--muted,#b3ada4);" +

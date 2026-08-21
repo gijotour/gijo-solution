@@ -175,7 +175,7 @@
       // agents: analysis(우선) — ROLE_CATEGORY.analysis=["취약점"](hybridsearch.ts:235) 근거.
       // pick: 5.49.0 pick.html이 아는 kind. rows: 요약과 **같은 API·같은 잣대**(살아있는·진짜취약점).
       // scenario를 「취약점 이해」로 교체(2026-08-21 사장님 — 처리 절차보다 쉬운 설명·공격 경로가 핵심).
-      // 신규 스캔 결과 처리는 📖 목록에서 여전히 고를 수 있다.
+      // 신규 스캔 결과 처리는 목록 답에서 이름을 말하면 열린다(글머리는 칩이 아니다 — B하4 정정).
       { id: "vuln", title: "🔍 취약점", page: "vulnscan.html", agents: ["우선"], pick: "vuln", scenario: "취약점 이해",
         rows: function () {
           return window.gijo.listAssets().then(function (assets) {

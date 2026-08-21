@@ -282,8 +282,14 @@
       else if (p.kind === "spark") r.appendChild(spark(p.values, p));
       else if (p.kind === "grid") r.appendChild(grid(p.items, p));
     });
+    // ⚠ 요약막대 부품과의 공존 계약(2026-08-21 검토관 B상2): 작업 내역은 #vizStrip을 상단
+    //   버튼 병합 닻으로 쓰는데(nav.js 상단버튼줄합치기 — 원래 버튼 **노드를 옮겨** 담는다),
+    //   여기서 통째로 지우면 그 버튼(일괄 삭제 등)이 영구 소실된다(제목줄은 이미 숨겨져
+    //   되돌아올 길이 없다). 옮겨 들어온 .gsum-acts는 지우기 전에 빼 두었다가 되붙인다.
+    var 보존 = 자리.querySelectorAll ? Array.prototype.slice.call(자리.querySelectorAll(":scope > .gsum-acts")) : [];
     자리.innerHTML = "";
     자리.appendChild(d);
+    보존.forEach(function (k) { 자리.appendChild(k); });
     return d;
   }
 

@@ -207,7 +207,7 @@
       ".se-empty{padding:5px 9px 5px 12px;margin-left:14px;border-left:1px solid var(--border,rgba(255,255,255,.08));color:var(--muted-2,#a49d95);font-size:12.5px}" +
       ".se-empty.se-l2{margin-left:26px}" +
       ".se-pri{font-size:11px;font-weight:900;padding:1px 5px;border-radius:4px;flex-shrink:0}" +
-      ".se-pri.P0{color:#f5928a;background:rgba(226,72,61,.16)}.se-pri.P1{color:var(--amber,#f0a020);background:rgba(240,160,32,.14)}" +
+      ".se-pri.P0{color:var(--red-ink,#f5928a);background:rgba(226,72,61,.16)}.se-pri.P1{color:var(--amber,#f0a020);background:rgba(240,160,32,.14)}" +
       ".se-pri.P2,.se-pri.P3{color:var(--muted-2,#a49d95);background:rgba(255,255,255,.06)}";
     document.head.appendChild(st);
   }
