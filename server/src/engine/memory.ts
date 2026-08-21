@@ -1297,7 +1297,7 @@ export function registerMemoryRoutes(app: Express): void {
     "/api/memory/ingest-file",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      const { filename, content, scope, origin } = req.body as { filename?: string; content?: string; scope?: string; origin?: string };
+      const { filename, content, scope, origin, keepOriginal } = req.body as { filename?: string; content?: string; scope?: string; origin?: string; keepOriginal?: boolean };
       if (!filename || !content) {
         res.status(400).json({ error: "filename과 content(base64)가 필요합니다" });
         return;
@@ -1309,17 +1309,28 @@ export function registerMemoryRoutes(app: Express): void {
           res.status(400).json({ error: "문서에서 텍스트를 추출하지 못했습니다 (빈 문서이거나 지원하지 않는 형식)" });
           return;
         }
-        // 원본 파일을 보관한다 — 담당자가 목록에서 "원본 열기"로 PDF 등을 그대로 볼 수 있게.
-        // (예전엔 텍스트만 남기고 원본을 버려 열람이 불가능했다.) 보관 실패는 인입을 막지 않는다.
-        let savedPath: string | undefined;
+        // ★ 추출한 텍스트(.md)는 **항상** 보관한다 — 담당자가 「내 문서」에서 AI가 실제로 뭘 뽑았는지
+        //   보고·고칠 수 있게(투명성·반입 신뢰도, built-in 코퍼스에서 검증한 PDF→.md와 같은 방식).
+        //   원본 파일은 **옵션**(keepOriginal, 기본 꺼짐)이다 — 프라이버시 기본값(GDPR 제25조)·용량 절감.
+        //   ⚠ 예전엔 원본을 늘 조용히 저장했다(2026-08-22 사장님 「원본만 삭제」·시안 승인으로 default-off).
+        let savedPath: string | undefined; // 원본(옵션)
         try {
-          const uploadsDir = path.join(INGEST_ROOT, "docs", "uploads");
-          await fs.mkdir(uploadsDir, { recursive: true });
-          savedPath = path.join(uploadsDir, path.basename(filename));
-          await fs.writeFile(savedPath, Buffer.from(content, "base64"));
-        } catch (saveErr) {
-          console.warn(`[memory] 원본 보관 실패(${filename}): ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
-          savedPath = undefined;
+          const extractedDir = path.join(INGEST_ROOT, "docs", "extracted");
+          await fs.mkdir(extractedDir, { recursive: true });
+          await fs.writeFile(path.join(extractedDir, path.basename(filename) + ".md"), text, "utf8");
+        } catch (mdErr) {
+          console.warn(`[memory] 추출 .md 보관 실패(${filename}): ${mdErr instanceof Error ? mdErr.message : String(mdErr)}`);
+        }
+        if (keepOriginal) {
+          try {
+            const uploadsDir = path.join(INGEST_ROOT, "docs", "uploads");
+            await fs.mkdir(uploadsDir, { recursive: true });
+            savedPath = path.join(uploadsDir, path.basename(filename));
+            await fs.writeFile(savedPath, Buffer.from(content, "base64"));
+          } catch (saveErr) {
+            console.warn(`[memory] 원본 보관 실패(${filename}): ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+            savedPath = undefined;
+          }
         }
         // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함.
         const actor = (req as unknown as { user?: { displayName?: string } }).user?.displayName;
@@ -1491,6 +1502,65 @@ export function registerMemoryRoutes(app: Express): void {
         res.json({ filename: path.basename(resolved), content: buf.toString("base64") });
       } catch (err) {
         res.status(404).json({ error: `원본 파일을 읽을 수 없습니다: ${err instanceof Error ? err.message : String(err)}` });
+      }
+    })
+  );
+
+  // 추출한 텍스트(.md) 보기 — 「내 문서」에서 AI가 실제로 뽑은 내용을 그대로 확인(투명성).
+  //   추출이 깨졌으면 아래 save로 고쳐 지식 품질을 바로잡는다(반입 신뢰도).
+  app.post(
+    "/api/memory/document/markdown",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const { documentId } = req.body as { documentId?: string };
+      if (!documentId) {
+        res.status(400).json({ error: "documentId가 필요합니다" });
+        return;
+      }
+      if (남의개인문서인가(String(documentId), req)) {
+        res.status(404).json({ error: "그런 문서가 없습니다" });
+        return;
+      }
+      try {
+        const mdFile = assertWithinIngestRoot(path.join(INGEST_ROOT, "docs", "extracted", path.basename(String(documentId)) + ".md"));
+        const text = await fs.readFile(mdFile, "utf8");
+        res.json({ documentId, text, source: "extracted" });
+      } catch {
+        res.status(404).json({ error: "추출 텍스트(.md)가 아직 없습니다 — 추출 .md 보관 기능 이전에 올린 문서입니다. 다시 올리면 만들어지고, 지금은 「조각 보기」로 내용을 확인할 수 있습니다." });
+      }
+    })
+  );
+  // 추출 .md 고치기 — 편집본을 저장하고 조각을 다시 인입(멱등)해 지식을 바로잡는다.
+  app.post(
+    "/api/memory/document/markdown/save",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const { documentId, text } = req.body as { documentId?: string; text?: string };
+      if (!documentId || typeof text !== "string") {
+        res.status(400).json({ error: "documentId와 text가 필요합니다" });
+        return;
+      }
+      if (남의개인문서인가(String(documentId), req)) {
+        res.status(404).json({ error: "그런 문서가 없습니다" });
+        return;
+      }
+      // 문서 본문도 LLM(임베딩)에 닿는 경로라 관문을 지난다(memory/query와 같은 이유 — 인젝션 차단).
+      const gate = gateUserInput(text.slice(0, 2000), "memory-query");
+      if (!gate.allowed) {
+        res.status(400).json({ error: gate.message });
+        return;
+      }
+      try {
+        const extractedDir = path.join(INGEST_ROOT, "docs", "extracted");
+        await fs.mkdir(extractedDir, { recursive: true });
+        await fs.writeFile(path.join(extractedDir, path.basename(String(documentId)) + ".md"), text, "utf8");
+        // 조각 재인입(멱등 — 옛 조각 먼저 삭제). 원본 경로·scope는 유지.
+        const meta = getDocMetaStmt.get(documentId) as { sourcePath?: string | null; scope?: string | null } | undefined;
+        const actor = (req as unknown as { user?: { displayName?: string } }).user?.displayName;
+        const ingested = await ingestText(String(documentId), text, meta?.scope ?? GLOBAL_SCOPE, meta?.sourcePath ?? undefined, false, actor);
+        res.json({ documentId, chunks: ingested.chunks });
+      } catch (err) {
+        res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }
     })
   );
