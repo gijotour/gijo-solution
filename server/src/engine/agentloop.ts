@@ -619,9 +619,25 @@ function 다음단계붙이기(answer: string, calls: AgentToolCall[]): string {
  * 없습니다"로 답했다. 프롬프트 강화(위 지시문)로도 재발했다 — 7B 행동 교정은 프롬프트로 하지
  * 않는다는 원칙에 따라 코드로 막는다. 사람이 읽을 수 있는 원본을 그대로 주는 편이 정직하다.
  */
+/**
+ * 결과가 **온톨로지 관계만**(- X —[Y]→ Z)으로 이뤄졌는가 — 그러면 「부정을 뒤집을 데이터」가 아니다.
+ * ⚠ 2026-08-21 실측: "이 가이드에 방화벽 설정 절차 있어?"(부재 질문)에 LLM이 정직하게 "없습니다"라
+ *   답했는데, search가 「방화벽」의 온톨로지 관계(방화벽→보안제품, 질문과 무관)를 반환해 guardAgainstDenial이
+ *   그 정직한 부정을 관계 덤프로 덮었다. 온톨로지 관계는 「그 문서에 그 내용이 있다」의 근거가 아니다.
+ * ⚠ 실데이터(자산·취약점·문서 발췌)는 화살표 —[…]→ 가 없다(`|`·`[medium]` 등) — 화살표로 정확히 갈린다.
+ *   그래서 실데이터엔 여전히 발동한다(2026-07-25 「search가 취약점 줬는데 7B 오부정」 보호 유지).
+ */
+function isOntologyOnly(result: string): boolean {
+  const 줄 = result.split("\n").map((l) => l.trim()).filter(Boolean);
+  const 관계줄 = 줄.filter((l) => /—\[[^\]]+\]→/.test(l));
+  const 헤더줄 = 줄.filter((l) => /온톨로지/.test(l)); // "온톨로지 관계:" 등
+  return 관계줄.length > 0 && 관계줄.length + 헤더줄.length === 줄.length;
+}
+
 export function guardAgainstDenial(answer: string, calls: AgentToolCall[]): string {
   const hasData = calls.some(
     (c) => !INTERNAL_TOOL_ERROR_RE.test(c.result) && c.result.trim().length > 40 && !EMPTY_RESULT_RE.test(c.result)
+      && !isOntologyOnly(c.result) // 온톨로지 관계만이면 데이터로 안 센다(정직한 부정을 관계 덤프로 덮지 않는다)
   );
   // ★ 이 함수가 루프의 **마지막 관문**이다 — 두 출구(538·645) 모두 여기를 지난다.
   //   LLM이 도구 결과에서 id를 그대로 베껴 오는 일이 잦아, 되돌리지 않는 길에서도 지운다.
