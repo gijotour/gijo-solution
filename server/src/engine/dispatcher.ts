@@ -1230,7 +1230,8 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: 문장 };
   }
   if (pick) {
-    const tool = findAgentTool("bulk_update");
+    const { pickToolName } = await import("./picklist.js");
+    const tool = findAgentTool(pickToolName(pick)); // request→create_request_doc, 그 외→bulk_update
     if (tool) {
       const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
       completeTask(task.id);

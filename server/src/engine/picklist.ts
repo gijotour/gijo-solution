@@ -42,6 +42,8 @@ const PICK_ACTIONS: PickList["actions"] = [
   { key: "due", label: "기한 정하기", needs: "dueDate" },
   { key: "done", label: "조치완료로" },
   { key: "false", label: "오탐으로" },
+  // 📨 조치 요청서(2026-08-21) — 값이 필요 없다(초안 생성 후 문서함에서 수신처·기한을 적는다).
+  { key: "request", label: "📨 조치 요청서" },
 ];
 
 type Review = ReturnType<typeof prioritizedReviews>[number];
@@ -340,7 +342,7 @@ export const VIEW_MARK = "#보는목록";
 
 export interface PickCommand {
   ids: string[];
-  action: "assign" | "due" | "done" | "false";
+  action: "assign" | "due" | "done" | "false" | "request";
   value: string;
   /** 무엇을 고른 것인가 — 취약점과 할 일은 "끝냄"의 뜻이 다르다. 없으면 취약점(기존 동작). */
   kind: "finding" | "task";
@@ -361,13 +363,14 @@ export function parsePickCommand(text: string): PickCommand | null {
   const ids = idsRaw.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
   if (ids.length === 0) return null;
   const action = markLine(text, ACTION_MARK);
-  if (action !== "assign" && action !== "due" && action !== "done" && action !== "false") return null;
+  if (action !== "assign" && action !== "due" && action !== "done" && action !== "false" && action !== "request") return null;
   const value = markLine(text, VALUE_MARK);
   // 담당자·기한은 값이 있어야 뜻이 통한다. 값 없이 넘어오면 처리하지 않는다 —
   // 빈 값으로 결재판을 만들면 "담당 (없음)으로 배정"이라는 뜻 모를 승인이 뜬다.
+  // (request=조치 요청서는 값이 필요 없다 — 초안 생성 후 문서함에서 채운다.)
   if ((action === "assign" || action === "due") && !value) return null;
   const kind = markLine(text, KIND_MARK) === "task" ? "task" : "finding";
-  // 할 일에 할 수 있는 건 "끝냄" 하나다(담당자 배정·오탐·기한은 뜻이 없거나 길이 없다).
+  // 할 일에 할 수 있는 건 "끝냄" 하나다(담당자 배정·오탐·기한·요청서는 뜻이 없거나 취약점 전용).
   // 화면은 그것만 보내지만, 표식은 밖에서 오는 값이라 여기서도 막는다.
   if (kind === "task" && action !== "done") return null;
   return { ids, action, value, kind };
@@ -518,6 +521,13 @@ export function pickToolArgs(cmd: PickCommand): Record<string, string> {
   if (cmd.action === "assign") args.assignee = cmd.value;
   else if (cmd.action === "due") args.dueDate = cmd.value;
   else if (cmd.action === "done") args.status = "조치완료";
+  else if (cmd.action === "request") args.kind = "vuln-fix"; // 조치 요청서 초안(값 불요)
   else args.status = "오탐";
   return args;
+}
+
+/** 고른 것 조치가 어느 도구로 가는가 — request만 create_request_doc, 나머지는 bulk_update.
+ *  dispatcher가 도구를 하드코딩하던 것을 여기로 뺐다(설계관 ①블로커 해소). */
+export function pickToolName(cmd: PickCommand): string {
+  return cmd.action === "request" ? "create_request_doc" : "bulk_update";
 }

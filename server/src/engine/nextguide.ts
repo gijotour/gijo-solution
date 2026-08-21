@@ -34,6 +34,10 @@ const 표: Record<string, string[]> = {
   assign_finding: ["미조치 취약점 뭐 있어?", "오늘 뭐부터 할까?"],
   update_finding_status: ["재스캔 상태 알려줘", "미조치 취약점 뭐 있어?"],
   bulk_update: ["미조치 취약점 뭐 있어?", "오늘 뭐부터 할까?"],
+  // 조치 요청서(2026-08-21) — 승인 뒤 사슬: 초안이 내 문서에 생겼으니 현황·다음 요청으로 이어진다.
+  //   ⚠ 칩은 결정적으로 닿는 문구만(guidance-check) — 「내 문서 보여줘」는 결정 규칙이 없어 뺐다.
+  create_request_doc: ["요청 현황 알려줘", "미조치 취약점 뭐 있어?"],
+  request_status: ["미조치 취약점 뭐 있어?", "오늘 뭐부터 할까?"],
   scan_status: ["미조치 취약점 뭐 있어?", "오늘 브리핑"],
   run_hardening_scan: ["검증 현황 보여줘", "하드닝 점검 스케줄 알려줘"],
   hardening_schedule_list: ["검증 현황 보여줘", "하드닝 점검해줘"],

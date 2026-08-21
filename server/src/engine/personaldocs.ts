@@ -142,6 +142,32 @@ export function registerPersonalDocsRoutes(app: Express): void {
     res.json(d);
   });
 
+  // 내보내기(2026-08-21) — md를 PDF·Word로. 문서 핵심 요건④와 조치 요청서의 공용 부품이다
+  //   (요청서 전용으로 만들지 않는다 — 어떤 내 문서든 다듬어 내보낸다). 리포트 엔진 재사용.
+  app.get("/api/personaldocs/:id/export", authMiddleware, asyncRoute(async (req, res) => {
+    const d = getPersonalDoc(String(req.params.id), who(req).id);
+    if (!d) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
+    const fmt = String(req.query.fmt ?? "docx").toLowerCase();
+    const safe = (d.title || "문서").replace(/[^\w가-힣.-]+/g, "_").slice(0, 60);
+    const { inspectionDocx, inspectionHtml } = await import("./inspectionreport.js");
+    if (fmt === "docx") {
+      const buf = await inspectionDocx(d.body);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(safe)}.docx"`);
+      res.send(buf);
+    } else if (fmt === "pdf") {
+      const { renderPdf } = await import("./report.js");
+      const os = await import("node:os"); const path = await import("node:path"); const fsp = await import("node:fs/promises");
+      const tmp = path.join(os.tmpdir(), `gijo-pdoc-${Date.now()}.pdf`);
+      const ok = await renderPdf(inspectionHtml(d.body), tmp);
+      if (!ok) { res.status(503).json({ error: "PDF 변환기(브라우저 엔진)가 이 환경에 없어 PDF를 못 만듭니다 — Word로 내려받아 열어 주세요." }); return; }
+      const buf = await fsp.readFile(tmp); await fsp.unlink(tmp).catch(() => {});
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(safe)}.pdf"`);
+      res.send(buf);
+    } else { res.status(400).json({ error: "fmt는 docx 또는 pdf 입니다" }); }
+  }));
+
   app.post("/api/personaldocs", authMiddleware, asyncRoute(async (req, res) => {
     const u = who(req);
     const b = req.body as { title?: string; body?: string };

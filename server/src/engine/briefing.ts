@@ -87,6 +87,12 @@ export async function buildDailyBriefing(opts: { save?: boolean } = {}): Promise
   //   (2026-08-21 설계관 적발 — 화면·판·서버는 이미 통일돼 있었다).
   const unassigned = all.filter(isUnassignedReview);
   if (unassigned.length) recommendations.push(`미배정 취약점 ${unassigned.length}건 — 상위부터 담당자 지정`);
+  // 조치 요청서 미회신 재촉(2026-08-21 사장님 ① — 자동 재발송이 아니라 사람에게 알린다).
+  try {
+    const { unansweredRequests } = require("./remrequest") as typeof import("./remrequest");
+    const 미회신 = unansweredRequests();
+    if (미회신.length) recommendations.push(`회신 없는 조치 요청 ${미회신.length}건 — 재촉하거나 문서함에서 상태를 정리하세요 ("요청 현황 알려줘")`);
+  } catch { /* 등록부를 못 읽어도 브리핑은 나온다 */ }
   if (recommendations.length === 0) recommendations.push("긴급 항목 없음 — 정기 점검·자산 변경 반영을 권장");
 
   if (opts.save !== false) {

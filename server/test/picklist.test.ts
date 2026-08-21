@@ -134,7 +134,7 @@ describe("체크칸은 화면에 보이는 것만 만든다", () => {
     const pl = buildFindingPicks("- [critical] pick-a · 원격코드실행", ["finding_status"])!;
     expect(pl.items[0]).toHaveProperty("id");
     expect(pl.items[0].id).toContain("pick-a::");
-    expect(pl.actions.map((a) => a.key)).toEqual(["assign", "due", "done", "false"]);
+    expect(pl.actions.map((a) => a.key)).toEqual(["assign", "due", "done", "false", "request"]);
   });
 });
 
