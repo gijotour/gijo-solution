@@ -64,13 +64,15 @@ export function builtinDocumentIds(): Set<string> {
     return new Set();
   }
 }
-// 문서 스코프 부스트용 — 등록된 전체 documentId(값싼 SQLite, builtinDocIds와 같은 패턴).
-//   질문이 콕 집은 문서명을 가리려면 이름 목록이 필요하다. ⚠ listDocuments()는 LanceDB 전수
-//   스캔이라 안 쓴다. 조회 실패해도 검색은 계속(빈 목록 = 지목 없음).
-const allDocIdsStmt = db.prepare("SELECT documentId FROM memory_documents");
-export function memoryDocIds(): string[] {
+// 문서 스코프 부스트용 — **업로드 문서**의 documentId(값싼 SQLite, builtinDocIds와 같은 패턴).
+//   ⚠ 내장(builtin)은 뺀다(검토관 [중] 지적): 내장은 주제명 그대로인 게 많아(취약점관리_지침 등)
+//     일반 질문에 최강 부스트로 오발화했다. 내장은 origin 부스트가 이미 있고, docScope가 겨냥할
+//     「밀려나는 문서」는 업로드다. ⚠ listDocuments()는 LanceDB 전수 스캔이라 안 쓴다.
+//     조회 실패해도 검색은 계속(빈 목록 = 지목 없음).
+const uploadedDocIdsStmt = db.prepare("SELECT documentId FROM memory_documents WHERE origin IS NULL OR origin <> 'builtin'");
+export function uploadedDocIds(): string[] {
   try {
-    return (allDocIdsStmt.all() as { documentId: string }[]).map((r) => r.documentId);
+    return (uploadedDocIdsStmt.all() as { documentId: string }[]).map((r) => r.documentId);
   } catch {
     return [];
   }
@@ -993,7 +995,7 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //    역할·화면보다 먼저 걸어, 그 위에 역할/화면 부스트가 더해진다. 벽이 아니라 올리기만 한다.
   // ④ 문서 스코프(2026-08-21 SolidStep 실측): 질문이 등록 문서명을 콕 집으면 그 문서 조각을 올린다.
   //    벽이 아니라 올리기(rrf만) — 이름 안 대면 지목 0이라 무동작(회귀 없음).
-  const fused = applyDocScopeBoost(applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds()), docScopeMatch(question, memoryDocIds()));
+  const fused = applyDocScopeBoost(applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds()), docScopeMatch(question, uploadedDocIds()));
   // 역할 영역이 여러 개면 전부 올린다(2026-08-20 ③ 장비운영 주인 — scan은 취약점+장비운영).
   // 부스트는 벽이 아니라 올리기라, 겹쳐 걸어도 다른 영역 자료가 사라지지 않는다.
   const 역할영역들 = categoriesForRole(agentId);

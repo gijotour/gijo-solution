@@ -19,7 +19,7 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-const { ingestDocument, ingestText, queryMemory, listDocuments, getDocumentChunks, deleteDocument } = await import("../src/engine/memory");
+const { ingestDocument, ingestText, queryMemory, listDocuments, getDocumentChunks, deleteDocument, uploadedDocIds } = await import("../src/engine/memory");
 
 const DOC_A = path.join(tmpDb, "doc-a.txt");
 const DOC_B = path.join(tmpDb, "doc-b.txt");
@@ -118,6 +118,17 @@ describe("memory documents (올린 문서 목록·조각 미리보기·삭제)",
     expect((await listDocuments()).some((d) => d.documentId === "delete-me.txt")).toBe(false);
     const hits = await queryMemory("ZZTOP", 10);
     expect(hits.join(" ")).not.toContain("ZZTOP");
+  });
+
+  it("uploadedDocIds — 내장(builtin)은 빼고 업로드만 준다 (docScope 오발화 방지, 검토관 [중])", async () => {
+    // 내장은 주제명 그대로라(취약점관리_지침) 일반 질문 "취약점 관리는 어떻게"에 docScope가
+    // 최강 부스트로 오발화했다. 내장을 목록에서 빼야 그 문서명이 지목 대상이 안 된다.
+    embedDim = 3;
+    await ingestText("seed-topic.md", "내장 지침 내용입니다.", "global", undefined, false, undefined, undefined, "builtin");
+    await ingestText("uploaded-vendor.pdf", "업로드 매뉴얼 내용입니다.", "global");
+    const ids = uploadedDocIds();
+    expect(ids).toContain("uploaded-vendor.pdf");
+    expect(ids, "내장 문서가 docScope 대상에 들면 일반 질문에 오발화한다").not.toContain("seed-topic.md");
   });
 });
 

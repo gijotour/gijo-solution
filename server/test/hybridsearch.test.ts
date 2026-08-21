@@ -277,13 +277,19 @@ describe("문서 스코프 — 지목 판별(docScopeMatch)", () => {
   it("파일명 구별 토큰이 질문에 있으면 지목 — 영문·한글 파일명 둘 다", () => {
     expect(docScopeMatch("SolidStep 매뉴얼에서 Windows 수동진단 알려줘", ["solidstep_manual.pdf", "other.pdf"]))
       .toEqual(new Set(["solidstep_manual.pdf"]));
-    // 한글 파일명: 취약점관리_지침.md → 구별 토큰 "취약점관리"(지침·md는 유형어/짧음), 질문의 공백 무관
-    expect(docScopeMatch("취약점 관리 지침에서 뭐라고 해", ["취약점관리_지침.md"]))
-      .toEqual(new Set(["취약점관리_지침.md"]));
+    // 한글 파일명: 방화벽설정_절차.pdf → 구별 토큰 "방화벽설정"(절차·pdf는 유형어/짧음)
+    expect(docScopeMatch("방화벽설정 절차 알려줘", ["방화벽설정_절차.pdf"]))
+      .toEqual(new Set(["방화벽설정_절차.pdf"]));
   });
   it("문서 유형어만으로는 안 걸린다(오탐 방지) — '매뉴얼 보여줘'가 manual.pdf를 안 집는다", () => {
     expect(docScopeMatch("매뉴얼 보여줘", ["manual.pdf"]).size).toBe(0);
     expect(docScopeMatch("문서 목록 알려줘", ["report.pdf", "doc.txt"]).size).toBe(0);
+  });
+  it("★숫자만·4자 미만 토큰은 지목 안 한다 — 연도·짧은 라틴어 오발화 방지(검토관 [중])", () => {
+    // "2024"만으로 2024_보안감사를 집지 않는다(연도는 아무 질문에나 스친다)
+    expect(docScopeMatch("2024년에 무슨 일 있었어", ["2024_감사.pdf"]).size).toBe(0);
+    // 3자 라틴 공통어(log·api·web)로 집지 않는다
+    expect(docScopeMatch("api 설정 어떻게 해", ["api_log.pdf"]).size).toBe(0);
   });
   it("URL 지식화 문서·짧은 질문은 지목하지 않는다", () => {
     expect(docScopeMatch("소만사 리포트 알려줘", ["https://www.somansa.com/x"]).size).toBe(0);
@@ -305,8 +311,9 @@ describe("문서 스코프 — 부스트(applyDocScopeBoost)", () => {
     const chunks = [fc("a", 0.02), fc("b", 0.01)];
     expect(applyDocScopeBoost(chunks, new Set())).toEqual(chunks);
   });
-  it("이름을 콕 집은 신호가 가장 세다 — DOCSCOPE > ROLE > CATEGORY", () => {
-    expect(DOCSCOPE_BOOST).toBeGreaterThan(ROLE_BOOST);
+  it("이름 신호는 역할과 대등한 세기 — DOCSCOPE=ROLE > CATEGORY(검토관: 셀수록 오탐 파괴력 커 ROLE 위로 안 올림)", () => {
+    expect(DOCSCOPE_BOOST).toBeGreaterThanOrEqual(ROLE_BOOST);
+    expect(DOCSCOPE_BOOST).toBeLessThanOrEqual(ROLE_BOOST); // 대등(위로 안 올림) — 둘이 같다
     expect(ROLE_BOOST).toBeGreaterThan(CATEGORY_BOOST);
   });
 });
