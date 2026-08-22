@@ -147,7 +147,11 @@ export function 되묻기영수증지우기(id: string, filename: string, upload
   try {
     const r = 되묻기지우기.run(
       String(id),
-      String(filename),
+      // ⚠ **저장할 때와 같은 자르기를 여기서도 한다** (2026-08-22 3라운드 [낮음]).
+      //   넣을 때는 `slice(0, 300)`으로 잘라 저장하는데 지울 때는 원본 그대로 비교해서,
+      //   300자를 넘는 이름은 **영영 안 지워졌다**(물음 줄이 남아 「되묻는 중」으로 굳는다).
+      //   같은 값을 두 곳에서 다르게 다루면 반드시 어긋난다 — 자르기를 한 규칙으로 맞춘다.
+      String(filename ?? "").slice(0, 300),
       uploadedById == null ? null : String(uploadedById),
       uploadedById == null ? null : String(uploadedById)
     );

@@ -628,9 +628,17 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     var cxc = document.getElementById("cxContactsStage");
     cxc.classList.toggle("on", which === "contacts");
     var cxf = document.getElementById("cxContactsFrame");
-    //   ⚠ `theme=host`를 반드시 싣는다(2026-08-22 2라운드 검토관 [중]) — 안 실으면 그 화면의
-    //     라이트 전용 연초록 팔레트가 공용 토큰을 덮어써서 흰 프로 안에 초록 판이 뜬다.
-    if (which === "contacts") { if (!cxf.getAttribute("src")) cxf.setAttribute("src", "lite-contacts.html?embed=1&theme=host"); }
+    //   ⚠ 배색 신호를 반드시 싣는다(2026-08-22 2·3라운드 검토관 [중]) — 안 실으면 그 화면의
+    //     라이트 전용 연초록 팔레트가 흰 프로 안에 초록 판으로 뜬다.
+    //   ★ **흰 프로면 `theme=light`** — 그 화면이 nav.js와 같은 규약으로 pro-white.css를 싣는다.
+    //     `theme=host`만 보내면 다크 토큰으로 그려져 흰 바탕에서 글자가 안 보인다
+    //     (3라운드가 잡은 내 2라운드 수리의 구멍).
+    if (which === "contacts") {
+      if (!cxf.getAttribute("src")) {
+        var 흰테마 = document.documentElement.classList.contains("theme-light");
+        cxf.setAttribute("src", "lite-contacts.html?embed=1&theme=" + (흰테마 ? "light" : "host"));
+      }
+    }
     else if (cxf.getAttribute("src")) cxf.removeAttribute("src");
     var pane = document.getElementById("v4doc");
     pane.classList.toggle("staged", which !== "list");
@@ -838,16 +846,20 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       //   **일부러 지식에 안 넣으므로**(수천 줄 표가 다른 질문의 근거를 밀어낸다) 그 목록에 안 떴고,
       //   화면은 「스캐너 결과는 ① 발견·수집 화면에서 봅니다」라고 **떠넘기고 있었다.**
       //   → 이제 영수증 표(`/api/upload/receipts`)를 쓴다 — 갈래와 무관하게 **넣은 사실은 전부** 있다.
-      // ★ 「올린 이」 칸을 둔다 (2026-08-22 2라운드 검토관 [낮음]). 이 목록에는 **남의 반입도
-      //   섞여 온다**(관리자거나, 등급이 허락하는 남의 문서). 올린 사람이 안 보이면
-      //   전부 「내가 올린 것」으로 읽혀 배지 숫자와 감이 어긋난다.
-      var 칸 = "1fr 96px 84px 84px 74px 44px";
+      // ★★ **칸 예산을 지킨다** (2026-08-22 3라운드 검토관 [중] — 내 2라운드 수리가 깨뜨렸다).
+      //   목록 칸은 400px 고정이다(.v4list). 여기서 쓸 수 있는 폭은
+      //   400 − 좌우 여백 24 − 칸 사이 8×n 이다. 2라운드에 「올린 이」 칸을 더해 6칸으로
+      //   늘렸더니 **고정 칸 합만 382px**이 되어, 1fr인 「올린 파일」이 0px로 접혀
+      //   **파일명이 아예 안 보였다.** 다른 탭들이 전부 고정 170px 안팎을 쓰는 이유가 이것이다.
+      //   → 4칸으로 되돌리고(고정 196), 「올린 이」는 **남의 것일 때만** 파일명 뒤에 잇는다.
+      //     「어디로」는 줄 툴팁으로 내린다 — 갈래와 겹쳐 읽히는 값이라 잃는 것이 적다.
+      var 칸 = "1fr 76px 76px 44px";
       list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:' + 칸 + ';gap:8px">' +
           // ★ 열 이름이 「보관·수집」이면 **지금 상태**로 읽힌다. 이 표는 **그때의 기록**이다
           //   (2026-08-22 검토관 [낮음]): 같은 이름을 다시 올리면 옛 원본이 지워지고 .md도
           //   덮이는데, 옛 줄은 계속 「원본·추출본」이라 적혀 있다. 감사 대응에서 「그때
           //   원본이 있다」고 믿고 찾으면 없다. 이름을 바꿔 **시점 기록임을 드러낸다.**
-          "<span>올린 파일</span><span>갈래</span><span>어디로</span><span>그때 남긴 것</span><span>올린 이</span><span class=\"ta-r\">올린 때</span></div>" +
+          "<span>올린 파일</span><span>갈래</span><span>그때 남긴 것</span><span class=\"ta-r\">올린 때</span></div>" +
         (영수증.length ? '<div class="g-rows-flat">' + 영수증.map(function (d) {
           // 「무엇이 실제로 남았나」를 한 칸에 — 오늘 갈라 둔 세 값(원본·추출본·수집)을 그대로 쓴다.
           var 남음 = [];
@@ -869,14 +881,19 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
           //     `ingested`·`mdSaved`는 **서버가 그때 실제로 만든 것**을 적은 값이라 남의
           //     창구 상태에 안 흔들린다.
           var 지식됨 = !!(d.ingested || d.mdSaved);
+          // 줄 툴팁 — 칸에서 내린 값(어디로)과 판별 사유를 함께 담는다. 잃지 않되 자리를 안 뺏는다.
+          var 툴팁 = 어디로글(d.routedTo) + (d.detail ? " · " + d.detail : "");
+          // 남의 반입이면 **누가 올렸는지 파일명 뒤에** 잇는다(칸을 늘리지 않는다).
+          //   서버가 `내것`을 표시해 준다 — 클라는 자기 id를 모른다.
+          var 올린이꼬리 = d.내것 === false && d.uploadedBy
+            ? ' <span class="gm2">· ' + esc(d.uploadedBy) + "</span>" : "";
           return '<div class="g-rows-r' + (지식됨 ? "" : " noclick") + '"' +
             (지식됨 ? ' data-id="' + esc(d.filename) + '"' : "") +
-            ' title="' + esc(d.detail || "") + '" style="grid-template-columns:' + 칸 + ';gap:8px">' +
-            '<span class="trunc" title="' + esc(d.filename) + '">' + esc(d.filename) + "</span>" +
+            ' title="' + esc(툴팁) + '" style="grid-template-columns:' + 칸 + ';gap:8px">' +
+            '<span class="trunc" title="' + esc(d.filename) + (d.uploadedBy ? " — 올린 이 " + esc(d.uploadedBy) : "") + '">' +
+              esc(d.filename) + 올린이꼬리 + "</span>" +
             '<span class="gm2 trunc">' + esc((갈래이름 || {})[d.kind] || d.kind) + "</span>" +
-            '<span class="gm2 trunc">' + esc(어디로글(d.routedTo)) + "</span>" +
             '<span class="gm2 trunc">' + esc(남음글) + "</span>" +
-            '<span class="gm2 trunc" title="' + esc(d.uploadedBy || "") + '">' + esc(d.uploadedBy || "-") + "</span>" +
             '<span class="ta-r gm2">' + 날짜(d.uploadedAt) + "</span></div>";
         }).join("") + "</div>"
           : '<div class="empty">＋로 올린 파일의 기록이 여기 쌓입니다 — <b>문서·취약점 스캔·로그·부품표 전부</b>.<br>' +
@@ -892,7 +909,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       //   열 이름만으로는 안 드러난다(2026-08-22 검토관 [낮음]).
       '<div class="cx-note">🧾 이 목록은 <b>올린 그 순간의 기록</b>입니다 — 같은 이름을 다시 올리면 옛 원본·추출본은 새것으로 덮입니다.' +
       ' 지금 무엇이 남아 있는지는 <b>🏢 회사 지식</b>에서 그 문서를 열어 확인하세요.' +
-      ' <b>내가 올린 것</b>과, 내 열람 등급으로 볼 수 있는 것만 보입니다(관리자는 팀 반입도 봅니다) — 「올린 이」 칸으로 가릅니다.</div>';
+      ' <b>내가 올린 것</b>과, 내 열람 등급으로 볼 수 있는 것만 보입니다(관리자는 팀 반입도 봅니다) — 남이 올린 것은 파일명 뒤에 <b>· 올린 이</b>가 붙습니다.</div>';
     }
     탭수그리기();
     if (!목록모드) return;   // 스테이지 중 — 목록만 새로 그리고 고른 것·문서창은 그대로 둔다
@@ -1490,8 +1507,18 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     if (!(await 쓰던글확인())) return;
     편집열기(null, { openDrawer: true, body: "" });
   });
-  document.getElementById("editBack").addEventListener("click", 목록으로);
-  document.getElementById("editCancel").addEventListener("click", 목록으로);
+  // ★★ **편집기 자신의 두 문이 무방비였다** (2026-08-22 3라운드 검토관 [중]).
+  //   이 파일은 「소멸시킬 수 있는 **모든** 문 앞에 세운다」고 적어 두었고, 행 클릭·탭 전환·
+  //   담당자 관리에는 그 문지기를 세웠는데 **정작 편집기의 「← 닫기」·「취소」는 그냥 나갔다.**
+  //   쓰던 글이 조용히 사라지는 가장 흔한 경로가 그 두 단추다.
+  //   ⚠ 「취소」는 이름이 취소라 되묻는 게 어색해 보일 수 있는데, 되묻지 않으면
+  //     **실수로 누른 사람이 되돌릴 방법이 없다.** 되물음 한 번이 그 값보다 싸다.
+  var 편집닫기 = async function () {
+    if (!(await 쓰던글확인())) return;
+    목록으로();
+  };
+  document.getElementById("editBack").addEventListener("click", 편집닫기);
+  document.getElementById("editCancel").addEventListener("click", 편집닫기);
   document.getElementById("editTplToggle").addEventListener("click", function () {
     var d = document.getElementById("tplDrawer");
     d.classList.toggle("on");

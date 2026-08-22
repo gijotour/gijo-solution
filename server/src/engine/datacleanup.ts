@@ -144,11 +144,19 @@ export function runCleanup(targetIds: string[]): { id: string; deleted: number; 
 /** 문서 파일이 사는 뿌리 — 제품 전체가 이 한 곳을 본다(memory.ts INGEST_ROOT와 같은 규칙).
  *  ⚠ 여기서 `"data"`를 박으면 GIJO_INGEST_ROOT를 쓰는 설치에서 정리가 **헛돈다.** */
 const 문서뿌리 = process.env.GIJO_INGEST_ROOT ?? "data";
+/** ★★ **같은 결함이 같은 배열에 반쪽으로 남아 있었다** (2026-08-22 3라운드 검토관 [중]).
+ *  「환경변수를 안 봐서 엉뚱한 자리를 뒤진다」를 GIJO_INGEST_ROOT만 고치고,
+ *  **바로 두 줄 위**의 리포트·세션 아카이브는 하드코딩으로 남겼다.
+ *  제품 코드는 그 둘을 실제로 존중한다(report.ts·ingestreport.ts·inspectionreport.ts·
+ *  longanswer.ts·worksessions.ts) — 어긋나면 **0건 옮기고도 「성공」**이라 적힌다.
+ *  ⚠ 이 자리들은 **제품이 쓰는 그 식과 글자 그대로 같아야** 한다. 하나를 바꾸면 둘 다 바꾼다. */
+const 리포트뿌리 = process.env.GIJO_REPORT_DIR ?? path.join("data", "reports");
+const 세션아카이브뿌리 = process.env.GIJO_SESSION_ARCHIVE_DIR ?? path.join("data", "session-archive");
 
 const RESET_FILE_DIRS = [
-  { dir: path.join("data", "reports"), label: "보고서 파일" },
+  { dir: 리포트뿌리, label: "보고서 파일" },
   { dir: path.join("data", "exports"), label: "SBOM 내보내기" },
-  { dir: path.join("data", "session-archive"), label: "세션 아카이브(대화 기록과 짝)" },
+  { dir: 세션아카이브뿌리, label: "세션 아카이브(대화 기록과 짝)" },
   // ★ 업로드 원본·추출본(2026-08-22 추가, 검토관 확정).
   //   여기 없으면 **업무 데이터를 리셋해도 고객이 올린 원본 파일이 디스크에 그대로 남는다** —
   //   「원본은 켜야만 보관한다」는 프라이버시 기본값을 내세우는 제품이 정반대로 도는 자리였다.

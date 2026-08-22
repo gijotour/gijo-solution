@@ -9,7 +9,21 @@
      인라인 스크립트 검사(check-inline-scripts.mjs)가 막는 것은 **핸들러 속성**이지 이런
      블록이 아니다(같은 방식이 lite-manuals.html 등에 이미 있다). -->
 <script>
-  try { if (new URLSearchParams(location.search).get("theme") === "host") document.documentElement.classList.add("host-theme"); } catch (e) { }
+  try {
+    var qs = new URLSearchParams(location.search);
+    if (qs.get("theme") === "host" || qs.get("theme") === "light") {
+      document.documentElement.classList.add("host-theme");
+    }
+    // 🎨 흰 프로 셸 — nav.js loadDesignSystem과 **같은 규약**으로 흰 층을 싣는다.
+    //   ⚠ 이 화면은 nav.js를 안 싣는다(사이드바가 없는 라이트 화면이라 일부러 뺐다).
+    //     그래서 그 두 줄을 여기에 그대로 둔다. 규약이 바뀌면 두 곳을 함께 고쳐야 한다.
+    if (qs.get("theme") === "light") {
+      document.documentElement.classList.add("theme-light");
+      var w = document.createElement("link");
+      w.id = "proWhiteCss"; w.rel = "stylesheet"; w.href = "pro-white.css";
+      document.head.appendChild(w);
+    }
+  } catch (e) { }
 </script>
 <link rel="stylesheet" href="gijo-ui.css">
 <!--
@@ -32,9 +46,26 @@
      → 주소에 `theme=host`가 있으면 <html>에 `.host-theme`이 붙고, 이 블록이 안 걸린다.
      ⚠ 라이트 빌드(단독 화면)에서는 그 표시가 없으므로 지금까지와 똑같이 연초록이다. */
   :root:not(.host-theme){--bg:#EBF4EB;--panel:#FFFFFF;--panel-2:#EBF4EB;--border:rgba(24,48,16,.14);--border-strong:rgba(24,48,16,.50);--text:#16241A;--muted:#55684C;--muted-2:#5C6F52;--blue:#2563EB;--teal:#0D6B37;--red:#B3261E;--amber:#7A4E00;--purple:#6D28D9;}
+  /* ★★ **끄기만 하면 안 된다** (2026-08-22 3라운드 검토관 [중] — 내 2라운드 수리의 구멍).
+     위 블록을 끄면 이 화면이 쓰는 이름(--bg·--panel·--text …)이 **전부 미정의**가 된다:
+     gijo-ui.css는 `--g-*`라는 **다른 이름**으로만 토큰을 정의하기 때문이다.
+     끄는 게 아니라 **잇는다** — 셸 토큰에 이름만 맞춰 준다. 그러면 다크(공용 기본값)에서도
+     흰 프로(pro-white.css가 --g-*를 덮음)에서도 셸과 같은 배색이 나온다.
+     ⚠ 흰 프로에서는 `theme=light`가 함께 와야 한다 — 아래 머리 스크립트가 nav.js와
+       **같은 규약**으로 pro-white.css를 싣는다(이 화면은 nav.js를 안 싣는다). */
+  :root.host-theme{
+    --bg:var(--g-bg); --panel:var(--g-surface-1); --panel-2:var(--g-surface-2);
+    --border:var(--g-border); --border-strong:var(--g-border-strong);
+    --text:var(--g-text); --muted:var(--g-muted); --muted-2:var(--g-muted-2);
+    --blue:var(--g-blue); --teal:var(--g-teal); --red:var(--g-red);
+    --amber:var(--g-amber); --purple:var(--g-purple);
+  }
   /* 셸 안에서는 배경을 안 칠한다 — 문서창의 바탕이 그대로 비쳐야 한 화면으로 보인다. */
   :root.host-theme body{background:transparent}
   :root.host-theme .wrap{padding:12px 14px 24px}
+  /* 입력칸 바탕도 하드코딩(#EBF4EB)이라 셸 안에서는 튄다 — 셸 토큰으로 잇는다. */
+  :root.host-theme input,
+  :root.host-theme select{background:var(--g-surface-2);border-color:var(--g-border);color:var(--g-text)}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;overflow-y:auto}

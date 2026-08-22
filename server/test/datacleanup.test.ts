@@ -104,13 +104,10 @@ describe("★ 정리 대장이 새 표를 빠뜨리지 않는다", () => {
       cloud_egress_log: "⏳ 판단 대기 — 바깥으로 나간 기록. 감사 성격일 가능성이 높다",
       cloud_usage: "⏳ 판단 대기 — 사용량 집계(파생일 가능성)",
       cti_feeds: "⏳ 판단 대기 — 위협정보 구독처. 설정에 가깝다",
-      cti_sync: "⏳ 판단 대기 — 동기화 상태(파생일 가능성)",
-      finding_approvals: "⏳ 판단 대기 — 승인 이력. 감사 성격일 가능성이 높다",
       learnloop_runs: "⏳ 판단 대기 — 학습 실행 이력",
       llm_activity_daily: "⏳ 판단 대기 — AI 팀 감독의 원천(현황판이 이 값을 센다)",
       ontology_triples: "⏳ 판단 대기 — 온톨로지 시드. 제품 자산에 가깝다",
-      routine_feedback: "⏳ 판단 대기 — 예약 루틴 피드백",
-      scan_runs: "⏳ 판단 대기 — 스캔 실행 이력(assets·cti_findings와 짝인지 확인 필요)",
+      routine_feedback: "축적 자산 — 같은 결론(datacleanup.ts:24-27)",
 
       // db.ts 밖(각 엔진 모듈)에서 만드는 표들 — 같은 이유로 오늘은 판단을 미룬다.
       user_mfa: "2차 인증 등록 — 계정 딸림. 지우면 로그인이 막힌다",
@@ -122,9 +119,8 @@ describe("★ 정리 대장이 새 표를 빠뜨리지 않는다", () => {
       alert_schedules: "⏳ 판단 대기 — 알림 예약",
       report_schedules: "⏳ 판단 대기 — 리포트 예약(업무 데이터일 가능성이 높다)",
       report_schedule_runs: "⏳ 판단 대기 — 리포트 예약 실행 이력",
-      analysis_event_status: "⏳ 판단 대기 — analysis_events의 짝(함께 지워야 할 가능성이 높다)",
-      action_check_history: "⏳ 판단 대기 — 행동 대조 이력(축적 자산 후보)",
-      answer_feedback: "⏳ 판단 대기 — 답변 피드백(학습 재료)",
+      action_check_history: "축적 자산 — **일부러 안 지운다**(datacleanup.ts:24-27 결론, resetlive.test가 값으로 지킨다)",
+      answer_feedback: "축적 자산 — 담당자가 남긴 지적. 지우면 학습 재료가 사라진다(같은 결론)",
       learn_candidate_decisions: "⏳ 판단 대기 — 학습 후보 승인·반려",
       lora_adapters: "⏳ 판단 대기 — 어댑터 대장(제품 자산에 가깝다)",
       model_adoptions: "⏳ 판단 대기 — 모델 채택 이력",
@@ -132,7 +128,7 @@ describe("★ 정리 대장이 새 표를 빠뜨리지 않는다", () => {
       doc_requests: "⏳ 판단 대기 — 개발팀 요청 문서",
       handover_history: "⏳ 판단 대기 — 인수인계 기록(업무 데이터일 가능성이 높다)",
       outbound_requests: "⏳ 판단 대기 — 바깥으로 나간 요청(감사 성격일 가능성)",
-      work_events: "⏳ 판단 대기 — 작업 원장(아낀 시간 KPI의 원천)",
+      work_events: "축적 자산 — 아낀 시간 KPI의 원천. 지우면 그 숫자가 0이 된다(같은 결론)",
     };
     const 실제표 = (db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
@@ -156,5 +152,17 @@ describe("★ 정리 대장이 새 표를 빠뜨리지 않는다", () => {
     for (const [이름, 이유] of Object.entries(일부러제외)) {
       expect(이유.length, `${이름}의 제외 사유가 너무 짧다`).toBeGreaterThan(8);
     }
+
+    // ★★ **두 목록이 겹치면 안 된다** (2026-08-22 3라운드 검토관 [중] 수리).
+    //   내 2라운드 목록에는 **이미 대장에 있어 실제로 지워지는 표 4개**가 「판단 대기」로
+    //   중복 등재돼 있었다. 미분류 판정이 `!대장에있다 && !제외에있다`라, 두 곳 중 하나만
+    //   남아도 초록이다 — 누가 대장에서 그 표를 빼도(반쪽 삭제) **이 전수 감시가 못 잡는다.**
+    //   내가 고치려던 그 부류(「전수라 이름 붙였는데 안 전수」)의 사각지대를 스스로 만든 꼴이다.
+    const 겹침 = Object.keys(일부러제외).filter((t) => 대장이아는표.has(t));
+    expect(
+      겹침,
+      "정리 대장과 제외 목록에 같은 표가 둘 다 있다 — 대장에서 빠져도 이 감시가 안 빨개진다. " +
+      "실제로 지우는 표라면 제외 목록에서 뺄 것"
+    ).toEqual([]);
   });
 });

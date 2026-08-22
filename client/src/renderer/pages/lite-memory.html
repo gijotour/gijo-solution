@@ -231,7 +231,7 @@
     var h = r && r.비밀경고;
     if (!h || !h.length) return "";
     return '<div class="warn">🔑 비밀번호·API 키로 보이는 것이 ' + h.length + '곳 있습니다: ' +
-      h.slice(0, 3).map(function (x) { return (x.kind || "?") + " — " + (x.masked || ""); }).join(" · ") +
+      h.slice(0, 3).map(function (x) { return esc(x.kind || "?") + " — " + esc(x.masked || ""); }).join(" · ") +
       (h.length > 3 ? " 외 " + (h.length - 3) + "곳" : "") +
       '<br>장비 접속 정보는 <b>보안제품 등록부</b>(암호화 보관)에 두세요.</div>';
   }
