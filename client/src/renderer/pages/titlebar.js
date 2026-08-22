@@ -956,16 +956,19 @@
       navRoot.appendChild(a);
       return true;
     }
-    // 🚀 프로 셸: 사이드바가 없다 — **56px 레일 아래**에 붙인다.
+    // 🚀 프로 셸: 사이드바가 없다 — **상단바 아이콘 줄(#gijoRail) 끝**에 붙인다.
     // ⚠ 이 갈래가 없으면 계정(내 설정)·문서함·업데이트 배지·⇤대화 다시 붙이기가
     //   **통째로 사라진다**(아래 두 갈래가 다 안 걸려 return false가 된다).
     //   화면이 멀쩡히 뜨고 오류도 안 나서 아무도 모른다 — 2026-08-18 착수 전 검토가 잡은 자리.
+    // ■ 2026-08-23(셸 재구축 0-2) — 레일이 **왼쪽 56px 세로줄에서 상단바 가로줄로** 옮겨졌다.
+    //   ⚠ 찾는 방법은 한 글자도 안 바꿨다(id로 찾는다 — 위치를 안 본다). 바뀐 것은 **눕히는 방향**뿐.
     var rail = document.getElementById("gijoRail");
     if (rail && document.body.classList.contains("pro-shell")) {
       var foot = rail.querySelector(".rail-foot") || rail;
       var a3 = buildUserArea();
-      // 56px 폭에 맞춘다 — 이름 글자는 자리를 못 잡으므로 아바타·아이콘만 세로로 세운다.
-      a3.style.cssText += "flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;padding:0;";
+      // 44px 높이 상단바에 맞춘다 — 세로로 세우면 잘리므로 **가로로** 이어 붙인다.
+      // 이름 글자는 여전히 숨긴다(아래) — 상단바에서도 자리를 못 잡고 시계·세션을 밀어낸다.
+      a3.style.cssText += "flex:0 0 auto;display:flex;flex-direction:row;align-items:center;gap:6px;width:auto;padding:0;";
       // ⚠ 말로만 「아이콘만」이라 적고 실제로는 이름·긴 버튼이 그대로 붙어 레일 밖으로 잘려
       //   나왔다(2026-08-19 프로 사용자 테스트 P3: 「…포 자동화 전용」). 이름은 숨기고
       //   아바타 툴팁으로 옮기며, 되돌리기 버튼은 ⇤ 아이콘 하나로 줄인다(제목은 유지).

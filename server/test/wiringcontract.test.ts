@@ -365,6 +365,56 @@ describe("프로 확정 계약 — 메뉴는 카드가 전부(2026-08-20 사장�
     // ★ 대화창을 숨기는 규칙이 남아 있으면 나란히가 성립하지 않는다(0-1의 핵심 한 줄).
     expect(s, "stage-on이 아직 대화창을 숨긴다 — 나란히가 안 된다")
       .not.toMatch(/stage-on[^\n]*\.console\{display:none/);
+  });
+
+  // 🏠 셸 재구축 0-2(2026-08-23) — 56px 세로 레일을 **상단바 안 가로 줄**로 옮겼다.
+  //   ★ 이 시험이 지키는 것은 「예뻐졌나」가 아니라 **「지우지 않았나」**다.
+  //     railroster.js:18과 titlebar.js mountUserArea가 #gijoRail을 **id로 찾는다**(위치는 안 본다).
+  //     요소를 지우면 AI 팀 로스터 10개와 계정·문서함·업데이트 배지가 **통째로 사라지고
+  //     오류도 안 난다** — 화면은 멀쩡히 뜬다. QA도 시험도 못 잡는 부류라 여기서 막는다.
+  it("상단바 아이콘 줄 — 레일을 옮겼고 지우지 않았다(2026-08-23 셸 재구축 0-2)", () => {
+    const s = 코드만(join(PAGES, "app.html"));
+    // ① 요소가 살아 있다 — 이게 로스터·계정의 유일한 부착점이다.
+    expect(s, "#gijoRail이 사라졌다 — AI 팀 로스터와 계정·문서함이 통째로 죽는다")
+      .toMatch(/id="gijoRail"/);
+    expect(s, ".rail-foot이 사라졌다 — titlebar.js가 계정을 붙일 자리가 없다")
+      .toContain("rail-foot");
+    // ② 배지 두 자리 — 없으면 「기한 지난 업무 6건이 어디에도 안 보이던」 2026-08-01 사고 재현.
+    expect(s, ".gn-workbadge가 없다 — 기한 지난 업무 수가 어디에도 안 쓰인다").toContain("gn-workbadge");
+    expect(s, ".gn-sessbadge가 없다 — 진행중 작업 수가 어디에도 안 쓰인다").toContain("gn-sessbadge");
+    // ③ 자리가 상단바 안이다 — .topbar가 닫히기 전에 #gijoRail이 나와야 한다.
+    const 상단바 = s.indexOf('class="topbar"');
+    const 레일 = s.indexOf('id="gijoRail"');
+    const 앱 = s.indexOf('<div class="app">');
+    expect(상단바, "상단바를 못 찾았다 — 이 시험이 헛돈다").toBeGreaterThan(-1);
+    expect(앱, ".app을 못 찾았다 — 이 시험이 헛돈다").toBeGreaterThan(-1);
+    expect(레일, "레일이 아직 .app 안에 있다 — 상단바로 안 옮겨졌다")
+      .toBeGreaterThan(상단바);
+    expect(레일, "레일이 .app 뒤에 있다 — 상단바 밖이다").toBeLessThan(앱);
+    // ④ 왼쪽 56px을 돌려줬다 — 안 돌려주면 옮긴 값어치가 없다(빈 칸만 남는다).
+    expect(s, "프로 .app이 아직 56px 칸을 잡고 있다 — 레일은 옮겼는데 자리가 남았다")
+      .not.toMatch(/body\.pro-shell \.app\{grid-template-columns:56px/);
+    expect(s, "프로 .app이 한 칸이 아니다").toMatch(/body\.pro-shell \.app\{grid-template-columns:minmax\(0,\s*1fr\)/);
+    // ⑤ 가로로 눕혔다 — 세로 그대로면 44px 상단바에서 잘린다.
+    expect(s, "레일이 프로에서 가로로 안 눕는다").toMatch(/body\.pro-shell #gijoRail\{[^}]*flex-direction:row/);
+  });
+
+  it("계정·문서함이 상단바 레일에 가로로 붙는다(0-2 짝 — 한쪽만 고치면 잘린다)", () => {
+    const t = 코드만(join(PAGES, "titlebar.js"));
+    // 부착 조건(#gijoRail + pro-shell)은 그대로여야 한다 — 이게 사라지면 계정이 통째로 없어진다.
+    expect(t, "프로 갈래의 부착점(#gijoRail)이 사라졌다").toMatch(/getElementById\("gijoRail"\)/);
+    expect(t, "프로 갈래 조건(pro-shell)이 사라졌다").toMatch(/rail && document\.body\.classList\.contains\("pro-shell"\)/);
+    // ★ 방향 — 세로로 세우면 44px 상단바에서 아바타 아래가 잘린다.
+    expect(t, "계정 영역이 아직 세로다 — 상단바(44px)에서 잘린다")
+      .not.toMatch(/getElementById\("gijoRail"\)[\s\S]{0,900}flex-direction:column/);
+    expect(t, "계정 영역이 가로로 안 붙는다")
+      .toMatch(/getElementById\("gijoRail"\)[\s\S]{0,900}flex-direction:row/);
+  });
+
+  // 무대 배선의 나머지 계약(2026-08-20 검토관 상1~상5). 0-1·0-2에서 위 시험을 쪼개며
+  // 이 묶음이 갈 곳을 잃어 따로 세웠다 — 검사 내용은 한 줄도 안 바꿨다.
+  it("무대 배선 — 자동 복귀 금지·toChat·분리창(2026-08-20 검토관 상1~상5)", () => {
+    const s = 코드만(join(PAGES, "app.html"));
     // ⚠ 선택 자동 복귀는 금지 계약이다(검토관 상1) — gijo:select는 결재 확인창·모달·상세
     //   열기 직후에도 오므로(발신 18곳 중 10곳) 무대를 내리면 방금 연 것이 통째로 숨는다.
     //   허용은 표시(골랐습니다)까지다. (기호는 2026-08-20 맥락 문장 개편으로 📌→🎯)

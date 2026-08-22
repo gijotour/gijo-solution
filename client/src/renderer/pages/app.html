@@ -51,8 +51,24 @@
      ⚠ **반드시 위 `.app` 규칙 아래에 적는다.** 위에 적으면 shelllayout.test.ts가
        `.app{…}` **첫 매치**를 잡아 `grid-template-rows`·`flex:1`·`min-height:0` 검사가
        프로 규칙을 보고 실패한다. 순서가 시험의 전제다. */
-  body.pro-shell .app{grid-template-columns:56px minmax(0,1fr);}
+  /* 🏠 셸 재구축 0-2(2026-08-23) — 왼쪽 56px 레일을 **상단바로 옮겼다.**
+     그래서 .app은 이제 **한 칸**이고, 그 56px이 통째로 내 문서에 간다(1920에서 1484→1540px).
+     ⚠ #gijoRail 요소는 **지우지 않았다** — railroster.js와 titlebar.js가 id로 찾는다.
+       마크업만 .topbar 안으로 옮기고 아래에서 가로로 눕힌다. */
+  body.pro-shell .app{grid-template-columns:minmax(0,1fr);}
   body.pro-shell #gijoNav{display:none;}
+  /* 레일을 상단바 안에서 **가로 줄**로. 세로 시절 규칙(테두리·배경·세로 정렬)을 여기서 되돌린다. */
+  body.pro-shell #gijoRail{flex-direction:row;align-items:center;gap:3px;padding:0;
+    border-right:0;background:transparent;overflow:visible;flex:0 0 auto;}
+  /* 44px 상단바에 38px은 꽉 낀다 — 프로에서만 32px로 줄인다.
+     ⚠ `#gijoRail button`(id 특이도)이 38px을 박고 있어 클래스만으로는 안 눌린다
+       (2026-08-20 검토관 M1이 같은 자리에서 잡았다). body.pro-shell을 앞에 붙여 이긴다. */
+  body.pro-shell #gijoRail button,body.pro-shell #gijoRail .rr-item{width:32px;height:32px;font-size:14px;}
+  body.pro-shell #gijoRail .rr-item{font-size:12px;}
+  /* 구분선도 세로에서 가로로 — 26×1 가로줄이 아니라 1×20 세로줄이 된다. */
+  body.pro-shell #gijoRail .rr-div{width:1px;height:20px;margin:0 4px;}
+  /* 계정·문서함(rail-foot)은 「맨 아래로 밀기」가 뜻이 없어졌다 — 오른쪽으로 이어 붙인다. */
+  body.pro-shell #gijoRail .rail-foot{margin-top:0;margin-left:4px;flex-direction:row;width:auto;align-items:center;}
   /* 프로는 탭 개념이 없다(화면=별도 창, 승인 시안) — 탭줄·탭 조작 띠를 통째로 감춘다.
      2026-08-19 사용자 테스트 P2: 빈 탭바 띠와 옛 탭 2개가 남아 「대화가 주인공」을 깼다. */
   body.pro-shell .shellfoot{display:none;}
@@ -285,17 +301,19 @@
      ⚠ 창을 끄는 **유일한 손잡이**이기도 하다(예전엔 탭줄이 그 일을 했다).
      조작 단추(⚙ ▣ 🔍 ← →)와 시계·세션은 titlebar.js가 붙인다 — 여기 직접 적지 말 것(단일 소스). -->
 <div class="topbar" id="shellTop">
-  <div class="spacer"></div>
-  <!-- 시계·세션 — titlebar.js가 채운다(예전에 화면마다 있던 것을 셸 한 곳으로).
-       ⚠ 서버 연결상태 배지는 없앴다(2026-08-08 사용자 지시) — titlebar.js 정보채우기 참조. -->
-  <div id="tbInfo"></div>
-</div>
-<div class="app">
-  <div id="gijoNav"></div>
-  <!-- 🚀 프로 셸의 56px 아이콘 레일(2026-08-18 승인 시안). 표준에서는 CSS로 감춘다.
-       ⚠ 아이콘을 **넷만** 둔다. 시안은 여섯(☰🔍🕘⭐🏢⚙)이었지만 🔍와 ⚙는 상단 조작줄에
-         이미 있다 — 둘을 다 두면 「입구가 둘이면 하나만 고쳐진다」를 새로 만든다.
-       ⚠ .rail-foot에 계정·문서함이 붙는다(titlebar.js mountUserArea) — 비워 두면 안 된다. -->
+  <!-- 🚀 프로 셸의 아이콘 줄. 표준에서는 CSS로 감춘다.
+       ■ 2026-08-23(셸 재구축 0-2) — **56px 세로 레일에서 상단바 안 가로 줄로 옮겼다.**
+         사장님 지시 「내 문서 + 대화창 + 상단바 정도로 시작」. 왼쪽 56px이 비어 내 문서가
+         그만큼 넓어진다.
+       ⚠ **지우지 않고 옮겼다.** railroster.js:18과 titlebar.js mountUserArea(세 번째 갈래)가
+         `#gijoRail`을 **id로 찾는다** — 위치는 안 본다. 지우면 AI 팀 로스터 10개와
+         계정·문서함·업데이트 배지가 **통째로 사라지고 오류도 안 난다.**
+       ⚠ 클래스 이름(.gn-workbadge·.gn-sessbadge)도 **그대로**여야 한다. nav.js가 이 이름으로
+         「기한 지난 업무」·「진행중 작업」 수를 쓴다 — 없으면 2026-08-01의 「6건이 어디에도
+         안 보이던」 사고가 재현된다.
+       ⚠ .rail-foot에 계정·문서함이 붙는다(titlebar.js mountUserArea) — 비워 두면 안 된다.
+       ⚠ 상단바는 -webkit-app-region:drag다. `.topbar button`이 이미 no-drag로 되돌려 주므로
+         (139~148행) 여기 단추들은 그대로 눌린다 — 새 규칙이 필요 없다. -->
   <nav id="gijoRail" aria-label="화면 부르기">
     <!-- ⚠ 클래스 이름이 **그대로**여야 한다. nav.js가 `.gn-sessbadge`·`.gn-workbadge`를
          querySelectorAll로 찾아 「진행중 작업」·「기한 지난 업무」 수를 쓴다. 프로에서 그 자리가
@@ -308,6 +326,13 @@
     <button id="railHome" title="새 대화 시작 — 지금 대화는 작업 내역에 저장되고, 열린 화면·창을 닫고 처음 화면으로 돌아갑니다">💬</button>
     <div class="rail-foot"></div>
   </nav>
+  <div class="spacer"></div>
+  <!-- 시계·세션 — titlebar.js가 채운다(예전에 화면마다 있던 것을 셸 한 곳으로).
+       ⚠ 서버 연결상태 배지는 없앴다(2026-08-08 사용자 지시) — titlebar.js 정보채우기 참조. -->
+  <div id="tbInfo"></div>
+</div>
+<div class="app">
+  <div id="gijoNav"></div>
   <div class="work">
     <div class="screens" id="screens"><div class="blank">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다.</div></div>
     <!-- 콘솔은 console.js가 그린다 — 별도 창(console.html)과 같은 파일을 쓴다(자리만 다르다). -->
