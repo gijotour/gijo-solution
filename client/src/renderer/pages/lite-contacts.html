@@ -63,9 +63,27 @@
   /* 셸 안에서는 배경을 안 칠한다 — 문서창의 바탕이 그대로 비쳐야 한 화면으로 보인다. */
   :root.host-theme body{background:transparent}
   :root.host-theme .wrap{padding:12px 14px 24px}
-  /* 입력칸 바탕도 하드코딩(#EBF4EB)이라 셸 안에서는 튄다 — 셸 토큰으로 잇는다. */
+  /* ★★ **하드코딩 바탕은 전부 이어야 한다** (2026-08-22 4라운드 검토관 [높음]).
+     처음엔 입력칸만 이었는데 `.detail`을 빠뜨렸다 — 그 상자가 **담당자 편집 폼 전체**다.
+     다크 셸에서 --text(#e9e7e2)가 연초록(#EBF4EB) 위에 얹혀 **대비 1.07:1**,
+     즉 「+ 담당자 추가」로 여는 폼의 글자가 사실상 안 보였다.
+     ⚠ 하나를 잇고 나머지를 잊는 것이 이 부류의 전형이다 — 파일 안 하드코딩 색을
+       **전수로 훑어** 잇는다(지금 남은 것은 이 둘뿐임을 grep으로 확인). */
   :root.host-theme input,
   :root.host-theme select{background:var(--g-surface-2);border-color:var(--g-border);color:var(--g-text)}
+  :root.host-theme .detail{background:var(--g-surface-2);border-color:var(--g-border-strong)}
+  /* ★★ **채운 파랑 위 글자는 흰색이다** (2026-08-22 4라운드 검토관 [중] ×2).
+     이 화면은 `background:var(--blue); color:var(--text)`로 썼는데, 라이트 팔레트에서는
+     --text가 어두운 초록(#16241A)이라 그럭저럭 읽혔다. 그런데 셸 토큰을 타면
+     흰 프로에서 --blue와 --text가 **둘 다 어두운 값**이 되어(#1d4f91 계열)
+     선택된 칩은 글자가 **아예 사라지고**, 주 단추는 대비 1.84:1로 떨어졌다.
+     ⚠ 공용 부품이 이미 그 답을 갖고 있다 — gijo-ui.css:74 `.g-btn.g-primary{…color:#fff}`.
+       새로 정하지 않고 **그 관례를 그대로 따른다.** */
+  :root.host-theme button.go,
+  :root.host-theme .chip.on{background:var(--g-blue);border-color:var(--g-blue);color:#fff}
+  /* 카드·칩 바탕도 토큰으로 — --panel/--panel-2는 위에서 이미 이어 두었지만,
+     하드코딩이 남아 있으면 그 다리를 안 탄다. 새 하드코딩이 생기면 여기도 함께 잇는다. */
+  :root.host-theme .card{background:var(--g-surface-1);border-color:var(--g-border)}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;overflow-y:auto}

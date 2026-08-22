@@ -353,3 +353,51 @@ describe("★ 되묻기 영수증 삭제 — 안전장치 세 겹", () => {
     expect(되묻기영수증지우기(id!, 이름, "나"), "남의 영수증이 지워졌다").toBe(false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ **셸에 품는 화면은 하드코딩 색을 남기지 않는다** (2026-08-22 4라운드 검토관 [높음])
+//
+// ■ 무엇이 있었나: 담당자 관리(lite-contacts.html)를 프로/표준 문서창에 iframe으로 품으면서
+//   라이트 전용 팔레트를 셸 토큰으로 이었다. 그런데 **`.detail` 한 줄을 빠뜨렸고**,
+//   그 상자가 하필 **담당자 편집 폼 전체**였다 — 다크 셸에서 대비 1.07:1이라 안 보였다.
+//   「하나를 잇고 나머지를 잊는다」는 이 부류의 전형이고, 시험 3,400개가 원리상 못 잡는다.
+//
+// ■ 이 감시가 재는 것: 그 화면의 **하드코딩 배경색마다 host-theme 대응 규칙이 있는가.**
+//   새 하드코딩을 넣으면 여기서 걸려, 사람이 「이건 셸 안에서 어떻게 보이나」를 판단하게 된다.
+describe("★ 셸에 품는 화면(lite-contacts) — 하드코딩 색이 셸 토큰을 탄다", () => {
+  const 화면 = fs.readFileSync(
+    path.join(서버루트, "..", "client", "src", "renderer", "pages", "lite-contacts.html"), "utf8"
+  );
+  /** :root 선언(팔레트 정의) 줄은 뺀다 — 거기 하드코딩이 있는 것이 정상이다. */
+  const 스타일 = 화면.slice(화면.indexOf("<style>"), 화면.indexOf("</style>"));
+  const 팔레트빼고 = 스타일.split("\n").filter((l) => !/:root(:not\(\.host-theme\))?\s*\{/.test(l));
+
+  it("★★ 하드코딩 배경색을 쓰는 선택자마다 host-theme 대응이 있다", () => {
+    // `배경:#XXXXXX`를 쓰는 줄에서 선택자 이름을 뽑는다.
+    const 하드 = 팔레트빼고
+      .filter((l) => /background\s*:\s*#[0-9a-fA-F]{3,8}/.test(l))
+      .map((l) => l.trim().split("{")[0].trim())
+      .filter(Boolean);
+    // 감시가 헛돌지 않는지 — 실제로 하드코딩이 남아 있어야 이 검사가 뜻이 있다.
+    expect(하드.length, "하드코딩 배경이 하나도 없다 — 좋은 일이지만 이 시험은 이제 헛돈다(정규식 확인)")
+      .toBeGreaterThan(0);
+    const 안이은것 = 하드.filter((sel) => {
+      // 선택자 안의 클래스·태그 이름 하나라도 host-theme 규칙에 나오면 이은 것으로 본다.
+      const 이름들 = sel.split(",").map((s) => s.trim()).filter(Boolean);
+      return !이름들.every((n) => 스타일.includes(`:root.host-theme ${n}`));
+    });
+    expect(
+      안이은것,
+      "셸 안에서 그 상자가 라이트 연초록 그대로 뜬다 — 다크 셸에서는 글자가 안 보인다. " +
+      "`:root.host-theme <선택자>{background:var(--g-…)}` 를 함께 적을 것"
+    ).toEqual([]);
+  });
+
+  it("★ 셸 배색 신호를 받는 장치가 살아 있다 — 이게 없으면 위 검사가 헛돈다", () => {
+    expect(화면, "theme 신호를 안 읽는다").toMatch(/theme["'\]]*\s*\)\s*===\s*["']host["']/);
+    expect(화면, "host-theme 클래스를 안 단다").toMatch(/classList\.add\(["']host-theme["']\)/);
+    // 흰 프로에서는 pro-white.css까지 실어야 --g-*가 흰 값으로 바뀐다(nav.js와 같은 규약).
+    expect(화면, "흰 프로에서 pro-white.css를 안 싣는다 — 다크 토큰으로 그려진다")
+      .toMatch(/pro-white\.css/);
+  });
+});

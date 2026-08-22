@@ -186,6 +186,12 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
    이 저장소가 반복해 겪은 결함이라, 없는 조작은 **없어 보이게** 한다(2026-08-22 검토관). */
 .g-rows-r.noclick{cursor:default}
 .g-rows-r.noclick:hover{background:transparent}
+/* 반입 목록의 파일명 칸 — **파일명은 잘리고 올린 이는 안 잘린다**(2026-08-22 4라운드 [중]).
+   같은 말줄임 상자에 이어 붙이면 꼬리(올린 이)가 먼저 잘려, 남이 올린 줄이
+   「내가 올린 것」으로 읽힌다. 안쪽 그리드로 나눠 짧은 쪽을 지킨다. */
+.ing-name{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px;align-items:baseline;min-width:0}
+.ing-name .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ing-by{white-space:nowrap;flex:0 0 auto}
 /* 첨부·이력 줄 — 엑셀형 한 줄(30px). 큰 썸네일 격자로 늘어놓지 않는다(밀도 원칙). */
 .att-bar,.ver-bar{flex:0 0 auto;border-top:1px solid var(--border);padding:0 12px;font-size:11.5px;color:var(--muted-2);}
 .att-bar:empty,.ver-bar:empty{display:none;}
@@ -536,6 +542,17 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     });
   }
 
+  /** 「그때 남긴 것」을 좁은 칸에 맞게 줄인 표기 (2026-08-22 4라운드 검토관 [낮음]).
+   *
+   *  ⚠ 왜 필요한가: 대표값 「원본·추출본·AI지식」은 12.5px 기준 약 107px인데 칸은 76px다 —
+   *    **AI 지식이 됐는지**가 잘려 사라진다. 그게 이 표의 핵심 감사 정보다.
+   *  ⚠ **이름을 두 벌로 만들지 않는다** — 갈래 이름(서버 `갈래이름`)처럼 뜻이 있는 이름이
+   *    아니라, 같은 세 낱말의 **줄임 표기**일 뿐이다. 온전한 글은 그 칸의 툴팁이 그대로 준다.
+   */
+  function 남음짧게(v) {
+    return String(v || "").replace("추출본", "추출").replace("AI지식", "지식");
+  }
+
   /** 어디로 갔나 — 사람 말로. 서버의 routedTo 값을 화면 글자로 옮기는 **한 곳**. */
   function 어디로글(v) {
     return ({
@@ -848,7 +865,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       //   → 이제 영수증 표(`/api/upload/receipts`)를 쓴다 — 갈래와 무관하게 **넣은 사실은 전부** 있다.
       // ★★ **칸 예산을 지킨다** (2026-08-22 3라운드 검토관 [중] — 내 2라운드 수리가 깨뜨렸다).
       //   목록 칸은 400px 고정이다(.v4list). 여기서 쓸 수 있는 폭은
-      //   400 − 좌우 여백 24 − 칸 사이 8×n 이다. 2라운드에 「올린 이」 칸을 더해 6칸으로
+      //   400 − 오른쪽 테두리 1 − 좌우 여백 24 − 세로 스크롤바 10 − 칸 사이 8×n 이다
+      //   (⚠ 처음 이 주석에 156px이라 적었는데 **테두리와 스크롤바를 빼먹은 낙관치**였다 —
+      //     실제로는 약 145px이다. 재지 않은 숫자를 적지 않는다는 원칙에 스스로 걸렸다.)
+      //   2라운드에 「올린 이」 칸을 더해 6칸으로
       //   늘렸더니 **고정 칸 합만 382px**이 되어, 1fr인 「올린 파일」이 0px로 접혀
       //   **파일명이 아예 안 보였다.** 다른 탭들이 전부 고정 170px 안팎을 쓰는 이유가 이것이다.
       //   → 4칸으로 되돌리고(고정 196), 「올린 이」는 **남의 것일 때만** 파일명 뒤에 잇는다.
@@ -883,17 +903,27 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
           var 지식됨 = !!(d.ingested || d.mdSaved);
           // 줄 툴팁 — 칸에서 내린 값(어디로)과 판별 사유를 함께 담는다. 잃지 않되 자리를 안 뺏는다.
           var 툴팁 = 어디로글(d.routedTo) + (d.detail ? " · " + d.detail : "");
-          // 남의 반입이면 **누가 올렸는지 파일명 뒤에** 잇는다(칸을 늘리지 않는다).
-          //   서버가 `내것`을 표시해 준다 — 클라는 자기 id를 모른다.
-          var 올린이꼬리 = d.내것 === false && d.uploadedBy
-            ? ' <span class="gm2">· ' + esc(d.uploadedBy) + "</span>" : "";
+          var 갈래글 = (갈래이름 || {})[d.kind] || d.kind;
+          // ★★ 남의 반입이면 **누가 올렸는지** 보인다 — 안 보이면 전부 「내가 올린 것」으로 읽힌다.
+          //   ⚠ 4라운드 검토관 [중]: 처음엔 파일명 **뒤에 이어 붙였는데**, 같은 말줄임 상자
+          //     안이라 **꼬리가 먼저 잘려** 사실상 안 보였다(1fr이 145px뿐이다).
+          //     그러면서 아래 안내문은 「파일명 뒤에 붙습니다」라고 단언했다 — 화면이 거짓말한 것이다.
+          //   → 파일명 칸을 **안쪽 그리드**로 만든다: 파일명(minmax(0,1fr))이 잘리고
+          //     이름표(auto)는 **절대 안 잘린다.** 짧은 쪽을 지키는 것이 옳다.
+          var 남이올림 = d.내것 === false && !!d.uploadedBy;
+          var 이름칸 = 남이올림
+            ? '<span class="ing-name"><span class="trunc">' + esc(d.filename) + "</span>" +
+              '<span class="gm2 ing-by">· ' + esc(d.uploadedBy) + "</span></span>"
+            : '<span class="trunc">' + esc(d.filename) + "</span>";
           return '<div class="g-rows-r' + (지식됨 ? "" : " noclick") + '"' +
             (지식됨 ? ' data-id="' + esc(d.filename) + '"' : "") +
             ' title="' + esc(툴팁) + '" style="grid-template-columns:' + 칸 + ';gap:8px">' +
             '<span class="trunc" title="' + esc(d.filename) + (d.uploadedBy ? " — 올린 이 " + esc(d.uploadedBy) : "") + '">' +
-              esc(d.filename) + 올린이꼬리 + "</span>" +
-            '<span class="gm2 trunc">' + esc((갈래이름 || {})[d.kind] || d.kind) + "</span>" +
-            '<span class="gm2 trunc">' + esc(남음글) + "</span>" +
+              이름칸 + "</span>" +
+            // ⚠ 칸이 좁아 잘리는 값에는 **반드시 그 칸의 툴팁**을 준다(4라운드 [낮음]).
+            //   줄 툴팁은 다른 값(어디로)이라 잘린 글자를 되찾아 주지 못한다.
+            '<span class="gm2 trunc" title="' + esc(갈래글) + '">' + esc(갈래글) + "</span>" +
+            '<span class="gm2 trunc" title="' + esc(남음글) + '">' + esc(남음짧게(남음글)) + "</span>" +
             '<span class="ta-r gm2">' + 날짜(d.uploadedAt) + "</span></div>";
         }).join("") + "</div>"
           : '<div class="empty">＋로 올린 파일의 기록이 여기 쌓입니다 — <b>문서·취약점 스캔·로그·부품표 전부</b>.<br>' +
