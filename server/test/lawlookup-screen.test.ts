@@ -93,7 +93,7 @@ describe("화면이 꽂는 말이 법령 도구로 곧장 간다", () => {
 });
 
 describe("「추가 기능」 그룹 — 전부 고르는 자리다", () => {
-  for (const 화면 of ["loganalysis.html", "intro.html", "handover.html", "lawlookup.html"]) {
+  for (const 화면 of ["loganalysis.html", "handover.html", "lawlookup.html"]) {
     it(`${화면} — 자유 입력칸 0개`, () => {
       expect(자유입력(read(화면))).toHaveLength(0);
     });

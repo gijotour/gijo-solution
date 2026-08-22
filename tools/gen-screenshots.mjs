@@ -260,7 +260,7 @@ async function main() {
     { page: "aihub.html", name: "25-AI-허브" },
     { page: "records.html", name: "26-기록-허브" },
     { page: "loganalysis.html", name: "27-보안로그분석" },
-    { page: "intro.html", name: "28-제품소개자료" },
+    // intro.html — 2026-08-22 삭제(내 문서 📦 보안제품 자료로 흡수). 없는 화면을 찍으려 하면 실패한다.
     { page: "lawlookup.html", name: "29-법령판례" },
     { page: "redteam.html", name: "15-레드팀-가드레일" },
     { page: "memory.html", name: "17-기억학습-문서관리" },

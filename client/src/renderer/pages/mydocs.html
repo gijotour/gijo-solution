@@ -149,6 +149,24 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
 .gtxt-share{color:var(--amber);font-weight:700;}
 .gtxt-up{color:var(--teal);font-weight:700;} .gtxt-down{color:var(--red);font-weight:700;}
 .empty{padding:28px 16px;text-align:center;color:var(--muted-2);font-size:12.75px;}
+/* 📞 연락처 — 담당 매트릭스. 라이트 화면에서 옮겨 왔다(치수 그대로).
+   ⚠ 글자색은 **잉크 토큰**을 쓴다: 원래 값(#7fe3bf 등)은 다크 배경 전제라 프로 흰 바탕에서
+     거의 안 보인다. themecolors 감시는 denylist라 새 hex를 못 잡아 **시험은 초록인데 화면만 깨진다** —
+     그래서 --red-ink와 같은 장치로 간다(다크=폴백, 흰 테마=pro-white.css가 정의). */
+.cx-kpi{display:flex;gap:22px;padding:10px 14px 12px;flex-wrap:wrap;}
+.cx-kpi .b{font-size:18px;font-weight:800;color:var(--text);line-height:1.15;}
+.cx-kpi .b.gap{color:var(--cov-gap-ink,#e88a82);}
+.cx-kpi .l{font-size:11px;color:var(--muted-2);}
+table.mx{border-collapse:separate;border-spacing:5px;margin:2px 10px 6px;}
+table.mx th{font-size:11px;color:var(--muted);font-weight:600;padding:0 4px;text-align:center;}
+table.mx th.rowh{text-align:right;white-space:nowrap;min-width:64px;}
+table.mx td{width:74px;height:46px;border-radius:8px;text-align:center;vertical-align:middle;cursor:pointer;font-size:11px;font-weight:700;border:1px solid transparent;transition:transform .06s;}
+table.mx td:hover{transform:scale(1.04);border-color:var(--border-strong);}
+td.cov-in{background:rgba(30,185,128,.18);color:var(--cov-in-ink,#7fe3bf);border-color:rgba(30,185,128,.4);}
+td.cov-ven{background:rgba(240,160,32,.16);color:var(--cov-ven-ink,#f3c06a);border-color:rgba(240,160,32,.38);}
+td.cov-gap{background:rgba(226,72,61,.13);color:var(--cov-gap-ink,#e88a82);border-color:rgba(226,72,61,.32);}
+table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
+.cx-note{padding:8px 14px 14px;font-size:11px;color:var(--muted-2);}
 .note{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);line-height:1.5;padding:5px 12px;
   border-top:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
@@ -265,9 +283,17 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
         <button class="v4sub" data-f="personal">👤 개인만</button>
         <button class="v4sub" data-f="shared">🏢 공유만</button>
       </div>
-      <div class="v4grouplbl">회사가 가진 것</div>
+      <!-- 📞 연락처 — 「내 것」 옆에 둔다(둘 다 이 PC 전용·직접 만든다). 2026-08-22 사장님 지시. -->
+      <button class="v4node" data-t="contacts">📞<span class="txt">연락처</span><span class="cnt" id="nContacts"></span></button>
+      <!-- ⚠ 그룹 이름을 「회사 자료」로 바꿨다(2026-08-22 설계관 지적).
+           「회사가 **가진** 것」에 📦 보안제품 자료(=**아직 우리 것이 아닌** 검토용 타사 카탈로그)를
+           넣으면, 2026-08-21에 애써 가른 「우리 것 ↔ 검토용」 대비가 라벨에서 다시 뭉개진다. -->
+      <div class="v4grouplbl">회사 자료</div>
       <button class="v4node" data-t="know">🏢<span class="txt">회사 지식</span><span class="cnt" id="nKnow"></span></button>
-      <button class="v4node" data-t="guide">📘<span class="txt">제품 안내</span><span class="cnt" id="nGuide"></span></button>
+      <!-- ⚠ 「제품 안내」 → 「GIJO AS 안내」: 같은 화면 안에 타사 제품 자료가 들어오면서
+           「제품」이 두 뜻이 됐다. 우리 것임을 이름에 박는다. -->
+      <button class="v4node" data-t="guide">📘<span class="txt">GIJO AS 안내</span><span class="cnt" id="nGuide"></span></button>
+      <button class="v4node" data-t="vendor">📦<span class="txt">보안제품 자료</span><span class="cnt" id="nVendor"></span></button>
       <div class="v4grouplbl">기록</div>
       <button class="v4node" data-t="learn">🎓<span class="txt">학습</span><span class="cnt" id="nLearn"></span></button>
       <button class="v4node" data-t="ingest">🩹<span class="txt">반입</span><span class="cnt" id="nIngest"></span></button>
@@ -352,7 +378,86 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
   // ★ 반입 영수증 — 「내가 넣은 모든 파일」(2026-08-22). 문서 목록(know)과 **다른 원천**이다:
   //   취약점 스캔·SBOM은 일부러 지식에 안 넣어서 know에는 원리상 안 뜬다.
   var 영수증 = [], 갈래이름 = {};
+  // 📦 보안제품 자료 — 도입 **검토용** 타사 카탈로그. 우리가 쓰는 제품 등록부와 **다른 대장**이다.
+  var vendor = [];
   var 오류 = { mine: null, know: null, learn: null, guide: null, ingest: null }; // 불러오기 실패는 「없음」과 다르다(검토관 상4)
+
+  // ── 📞 연락처 — 담당자 테리토리×제품 매트릭스 ────────────────────────────────
+  //
+  // ■ 2026-08-22 사장님 「라이트에 있는 연락처관리 메뉴도 내문서에 넣어주고」
+  // ★ **저장은 이 PC(localStorage)에 그대로 둔다.** 서버로 옮기지 않는다:
+  //   ① 화면이 「이 PC에만 저장되고 백업·동기화되지 않습니다」라고 **약속**해 뒀다 — 옮기면 거짓이 된다
+  //   ② 전화·이메일은 개인정보다. 서버에 쌓으면 등급·격리·감사 축이 새로 열린다
+  //      (게이트웨이가 전화·이메일을 **일부러 안 가린다** — 「담당자 연락처 등록」 지시가 깨지므로)
+  //   ③ ⚠ 옮겨도 라이트↔프로는 **안 따라온다** — 라이트는 빌드가 달라 userData가 통째로 분리돼 있다
+  //      (설계관 2026-08-22: 서버 이전의 이득이 이 축에서 0이다)
+  //   ⚠ 같은 빌드 안에서는 화면이 달라도 localStorage가 공유되므로, 라이트 전용 화면에서
+  //     여기로 옮겨도 **기존 데이터는 그대로 보인다**(즐겨찾기·스코프 키가 이미 그렇게 돈다).
+  var 연락처키 = "gijo.lite.contacts";
+  var 기본테리토리 = ["본사망", "지사", "DMZ", "클라우드"];
+  var 기본제품 = ["방화벽", "EDR", "백신", "NAC"];
+
+  function 연락처읽기() {
+    try {
+      var s = JSON.parse(localStorage.getItem(연락처키) || "{}");
+      return {
+        contacts: Array.isArray(s.contacts) ? s.contacts : [],
+        territories: Array.isArray(s.territories) && s.territories.length ? s.territories : 기본테리토리.slice(),
+        products: Array.isArray(s.products) && s.products.length ? s.products : 기본제품.slice(),
+      };
+    } catch (e) { return { contacts: [], territories: 기본테리토리.slice(), products: 기본제품.slice() }; }
+  }
+
+  /** (테리토리, 제품) 칸을 덮는 담당자 — 라이트 화면의 잣대를 그대로 옮겼다(잣대를 새로 만들지 않는다). */
+  function 칸담당(st, t, p) {
+    return st.contacts.filter(function (c) {
+      return (c.territories || []).indexOf(t) >= 0 && (c.products || []).indexOf(p) >= 0;
+    });
+  }
+  function 칸색(list) {
+    if (!list.length) return "cov-gap";
+    return list.some(function (c) { return c.role === "사내"; }) ? "cov-in" : "cov-ven";
+  }
+
+  function 연락처그리기(list) {
+    var st = 연락처읽기();
+    var T = st.territories, P = st.products, 공백 = 0, 전체 = T.length * P.length;
+    var 몸 = T.map(function (t) {
+      return "<tr><th class=\"rowh\">" + esc(t) + "</th>" + P.map(function (p) {
+        var 담당 = 칸담당(st, t, p), cls = 칸색(담당);
+        if (cls === "cov-gap") 공백++;
+        var 글 = 담당.length
+          ? esc(담당[0].name) + (담당.length > 1 ? '<div class="cnt">외 ' + (담당.length - 1) + "</div>" : "")
+          : "—";
+        return '<td class="' + cls + '" data-t="' + esc(t) + '" data-p="' + esc(p) + '">' + 글 + "</td>";
+      }).join("") + "</tr>";
+    }).join("");
+    var 사내 = st.contacts.filter(function (c) { return c.role === "사내"; }).length;
+    list.innerHTML =
+      '<div class="cx-kpi">' +
+        '<div><div class="b">' + st.contacts.length + '</div><div class="l">담당자</div></div>' +
+        '<div><div class="b">' + 사내 + '</div><div class="l">사내</div></div>' +
+        '<div><div class="b">' + (st.contacts.length - 사내) + '</div><div class="l">벤더·총판</div></div>' +
+        '<div><div class="b gap">' + 공백 + " / " + 전체 + '</div><div class="l">공백 칸</div></div>' +
+      "</div>" +
+      (st.contacts.length
+        ? '<table class="mx"><tr><th class="rowh"></th>' + P.map(function (p) { return "<th>" + esc(p) + "</th>"; }).join("") + "</tr>" + 몸 + "</table>"
+        : '<div class="empty">담당자를 등록하면 <b>테리토리 × 제품</b> 표로 「누가 비었나」가 한눈에 보입니다.<br>' +
+          '<span class="gm2">대화창에 「담당자 등록해줘」라고 말하면 됩니다.</span></div>') +
+      '<div class="cx-note">🔒 전화·이메일은 <b>이 PC에만</b> 저장됩니다 — 서버로 보내지 않고 백업·동기화도 하지 않습니다.</div>';
+    // 칸을 누르면 그 담당자를 대화창에 📌 — 「고르기」이지 「지시」가 아니다(입력칸 0 원칙 유지).
+    Array.prototype.forEach.call(list.querySelectorAll("table.mx td"), function (td) {
+      td.addEventListener("click", function () {
+        var t = td.getAttribute("data-t"), p = td.getAttribute("data-p");
+        if (!t || !p) return;
+        var 담당 = 칸담당(연락처읽기(), t, p);
+        if (!담당.length) { 알림(t + " × " + p, "담당자 없음 — " + t + " " + p + " 담당이 비어 있습니다"); return; }
+        var c = 담당[0];
+        알림(c.name, "담당자 " + c.name + " (" + (c.role || "") + ") · " + t + " " + p +
+          (c.phone ? " · " + c.phone : "") + (c.email ? " · " + c.email : ""));
+      });
+    });
+  }
 
   /** 어디로 갔나 — 사람 말로. 서버의 routedTo 값을 화면 글자로 옮기는 **한 곳**. */
   function 어디로글(v) {
@@ -513,11 +618,22 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
     스테이지(스테이지값);
     if (목록모드) document.getElementById("note").textContent = 기본노트; // 산출물 예약 안내가 눌러앉지 않게(검토관 하9)
     // 🎓 학습은 조작이 없는 열람 전용이라 문서창을 아예 안 쓴다 — 목록이 전폭을 갖는다.
-    document.getElementById("v4content").classList.toggle("full", 탭 === "learn" && 목록모드);
+    // ⚠ 전폭이 필요한 탭은 「고를 것도 고칠 것도 없는 열람」이다. 📞 연락처의 담당 매트릭스도
+    //   같은 성격이라(격자를 30px 행으로 누르면 「어디가 비었나」가 안 보인다) 함께 전폭을 준다.
+    //   ⚠ 하드코드 `=== "learn"`이었다 — 새 탭을 더할 때 여기를 안 고치면 조용히 좁게 뜬다.
+    var 전폭탭 = { learn: true, contacts: true };
+    document.getElementById("v4content").classList.toggle("full", !!전폭탭[탭] && 목록모드);
     document.getElementById("rowsBox").className = "g-rows g-rows--hub-" + 탭;
 
     // 불러오기 실패는 「없습니다」가 아니다(검토관 상4) — 그 탭의 원천이 죽었으면 그렇게 말한다.
-    var 탭오류 = 탭 === "mine" ? 오류.mine : 탭 === "learn" ? 오류.learn : 탭 === "guide" ? 오류.guide : 오류.know;
+    // ⚠ **폴백이 `오류.know`였다**(설계관 2026-08-22). 새 탭에서 회사 지식 로드가 실패하면
+    //   엉뚱하게 「불러오기 실패」가 떴다 — 그 탭은 회사 지식을 쓰지도 않는데.
+    //   → 탭마다 자기 원천의 오류만 본다. 표에 없으면 오류 없음(null)이다.
+    var 탭별오류 = {
+      mine: 오류.mine, learn: 오류.learn, guide: 오류.guide, know: 오류.know,
+      ingest: 오류.ingest, vendor: 오류.vendor, contacts: null,   // 연락처는 이 PC 저장이라 로드 실패가 없다
+    };
+    var 탭오류 = Object.prototype.hasOwnProperty.call(탭별오류, 탭) ? 탭별오류[탭] : null;
     if (탭오류) {
       list.innerHTML = '<div class="empty">불러오기 실패 — ' + esc(탭오류) + "<br>서버 연결을 확인하고 새로고침해 주세요.</div>";
       탭수그리기();
@@ -596,6 +712,23 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
             '<span class="ta-r gm2">' + 날짜(g.createdAt) + "</span></div>";
         }).join("") + "</div>" + (총 > learn.length ? '<div class="empty" style="padding:10px">앞 ' + learn.length + "건 표시 — 전체 " + 총 + "건은 🗔 학습 화면에서.</div>" : "")
         : '<div class="empty">수집된 대화가 없습니다 — 대화가 쌓이면 여기 보입니다.</div>');
+    } else if (탭 === "vendor") {
+      // 📦 보안제품 자료 — 도입 **검토용** 타사 카탈로그(우리가 쓰는 제품 등록부와 다른 대장이다).
+      // ⚠ 자료를 넣는 자리는 여기가 아니다 — 대화창 ＋로 올린다(「지시는 대화창」 원칙).
+      var 칸V = "1fr 110px 120px 1fr";
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:' + 칸V + ';gap:8px">' +
+          "<span>제품</span><span>분류</span><span>공급사</span><span>한 줄 소개</span></div>" +
+        (vendor.length ? '<div class="g-rows-flat">' + vendor.map(function (p) {
+          return '<div class="g-rows-r" data-id="' + esc(p.id) + '" style="grid-template-columns:' + 칸V + ';gap:8px">' +
+            '<span class="trunc" title="' + esc(p.name) + '">' + esc(p.name) + "</span>" +
+            '<span class="gm2 trunc">' + esc(p.category || "기타") + "</span>" +
+            '<span class="gm2 trunc">' + esc(p.vendor || "-") + "</span>" +
+            '<span class="gm2 trunc" title="' + esc(p.summary || "") + '">' + esc(p.summary || "-") + "</span></div>";
+        }).join("") + "</div>"
+          : '<div class="empty">도입을 <b>검토 중인 타사 제품</b> 자료가 여기 모입니다.<br>' +
+            '<span class="gm2">대화창 ＋로 제품 소개서를 올리면 등록됩니다. 깊은 비교는 대화창에 「A와 B 비교해줘」로 물으세요.</span></div>');
+    } else if (탭 === "contacts") {
+      연락처그리기(list);
     } else { // ingest — ★ **내가 넣은 모든 파일의 영수증**
       // ⚠ 2026-08-22 사장님 「사용자가 넣는 파일 내문서에서 다 확인 가능해야 해. **취약점파일도**」
       //   그전엔 `/api/memory/documents`(지식 조각이 있는 문서)만 봤다. 그런데 취약점 스캔·SBOM은
@@ -647,6 +780,9 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
     // ⚠ 세는 원천이 바뀌었다(2026-08-22) — 문서 목록이 아니라 **영수증**이다.
     //   그전엔 지식에 든 문서만 세어, 취약점 파일을 올려도 숫자가 안 늘었다.
     document.getElementById("nIngest").textContent = 영수증.length || "";
+    document.getElementById("nVendor").textContent = vendor.length || "";
+    // 연락처는 이 PC 저장이라 불러오기가 없다 — 셀 때 바로 읽는다.
+    document.getElementById("nContacts").textContent = 연락처읽기().contacts.length || "";
   }
 
   function 상세초기화() {
@@ -705,6 +841,14 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
       갈래이름 = (j && j.갈래이름) || {};
       오류.ingest = null;
     } catch (e) { 영수증 = []; 갈래이름 = {}; 오류.ingest = (e && e.message) || "오류"; }
+    // 📦 보안제품 자료 — ⚠ 라이트에서는 **부르지 않는다**: 그 탭을 접기 때문에(아래 라이트 폴딩)
+    //   부르면 첫 그림만 늦어진다(불러오기가 순차 await라 한 번이 그대로 지연이 된다).
+    // ⚠ `라이트판` 변수에 기대지 않는다 — 그건 이 함수보다 **아래**에서 값이 정해져서,
+    //   부팅 순서가 바뀌면 조용히 undefined(=거짓)가 된다. 주소는 언제 읽어도 같다.
+    if (new URLSearchParams(location.search).get("edition") !== "lite") {
+      try { vendor = ((await window.gijo.listProductIntros()) || {}).items || []; 오류.vendor = null; }
+      catch (e) { vendor = []; 오류.vendor = (e && e.message) || "오류"; }
+    }
     학습띠그리기();
     그리기();
   }
@@ -1325,12 +1469,14 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
   //   화면을 한 벌 더 만들면 포크가 되므로 **같은 파일이 자기 스스로 접는다.**
   //   접는 것: 🎓 학습(어댑터 학습 전제 — 라이트엔 그 파이프라인도, 갈 화면도 없다)
   //           🗂 산출물(아직 안 도는 예약 자리 — 라이트에서 「예정」만 보여 줄 이유가 없다)
-  //   남기는 것: 👤 내 것 · 🏢 회사 지식 · 📘 제품 안내(라이트도 같은 제품 문서를 싣는다) · 🩹 반입
+  //           📦 보안제품 자료(타사 제품 도입 검토용 — 혼자 쓰는 담당자에겐 그 대장 자체가 없다)
+  //   남기는 것: 👤 내 것 · 📞 **연락처**(사장님 지시로 라이트에서 옮겨 온 기능이다) · 🏢 회사 지식 ·
+  //           📘 GIJO AS 안내 · 🩹 반입(라이트도 파일을 넣는다 — 그 영수증이 여기 쌓인다)
   //   ⚠ 부모 창이 자식 DOM을 손보는 방식은 쓰지 않는다 — 이 저장소에서 그게 되는지 확인된 적이 없다.
   var 라이트판 = new URLSearchParams(location.search).get("edition") === "lite";
   if (라이트판) {
     document.documentElement.classList.add("edition-lite");
-    ["learn", "future"].forEach(function (t) {
+    ["learn", "future", "vendor"].forEach(function (t) {
       var n = document.querySelector('#tabs .v4node[data-t="' + t + '"]');
       if (n) n.style.display = "none";
     });
@@ -1342,7 +1488,7 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
   // ?tab= 딥링크 — 문서함(창)을 흡수하며 옛 진입로(하단 📚·설정의 가이드 링크)가
   // 「제품 안내 탭이 선택된 내 문서」로 바로 오게 한다(승인 시안 §7 대응표).
   var 첫탭 = new URLSearchParams(location.search).get("tab");
-  if (첫탭 && ["mine", "know", "guide", "learn", "ingest"].indexOf(첫탭) >= 0) {
+  if (첫탭 && ["mine", "know", "guide", "learn", "ingest", "vendor", "contacts"].indexOf(첫탭) >= 0) {
     탭 = 첫탭;
     Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) {
       x.classList.toggle("on", x.getAttribute("data-t") === 첫탭);

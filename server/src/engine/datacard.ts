@@ -363,7 +363,6 @@ export const 카드예외: Record<string, string> = {
   "settings.html": "설정 — 조작 화면이라 현황 카드가 성립 안 함",
   "dashboard.html": "대시보드 자체가 요약판 — 카드의 카드는 중복",
   "lawlookup.html": "결과가 대화 답으로 오는 화면 — 화면 현황이 없음",
-  "intro.html": "제품 소개(읽기 전용)",
   "handover.html": "인수인계 위저드 — 행위 화면(현황은 작업내역 카드가 담당)",
 };
 

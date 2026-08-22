@@ -5,7 +5,8 @@
 //   이 대장은 "도입 검토·비교를 위한 소개자료" — 아직 우리 것이 아닌 제품도 들어온다.
 //   섞으면 담당자가 '운영 중'과 '검토 중'을 구분하지 못하게 된다.
 //
-// 등록·삭제는 대화창(결재판) 몫 — 화면(intro.html)은 보는 자리다(메뉴는 보기용 원칙).
+// 등록·삭제는 대화창(결재판) 몫 — 화면은 「내 문서 > 📦 보안제품 자료」이고 보는 자리다(메뉴는 보기용 원칙).
+//   ⚠ 2026-08-22 흡수 — 옛 intro.html은 삭제됐다.
 import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
 import { db, migrate } from "../db";

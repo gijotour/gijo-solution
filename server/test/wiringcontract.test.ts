@@ -36,7 +36,7 @@ const 선택배선대장: Record<string, "부품" | "직접" | ["제외", string
   "handover.html": ["제외", "위저드 화면 — 담기 버튼은 행위지 선택이 아니다(조사 2026-08-19 재확인)"],
   "products.html": "부품", // 행(.g-rows-r) 전체가 선택 영역(2026-08-21 엑셀형 — 조작은 ▸ 상세 안)(승인 시안 보안제품_카드선택, 2026-08-20) — 카드 안 조작 7종과 안 겹친다
   "maintenance.html": "부품",
-  "intro.html": "부품",
+  // "intro.html" — 2026-08-22 삭제(내 문서 📦 보안제품 자료로 흡수). 파일이 없으니 대장에서도 뺀다.
   "sessions.html": "부품",
   "supervision.html": "부품", // AI 팀 감독(2026-08-20 ②) — 팀원 카드 클릭=📌(일반형, label+text만)
   "mydocs.html": "부품", // 내 문서(2026-08-20 LLM 위키) — 행 클릭=📌(일반형, label+text만)

@@ -1749,7 +1749,7 @@ const TOOLS: AgentTool[] = [
     run: runAdapterImport,
   },
   {
-    // 제품 소개자료 등록(쓰기·결재판) — 보안제품 등록부와 별도 대장. 화면(intro.html)은 보기 전용.
+    // 제품 소개자료 등록(쓰기·결재판) — 보안제품 등록부와 별도 대장. 화면은 「내 문서 > 📦 보안제품 자료」이고 보기 전용(2026-08-22 흡수 — 옛 intro.html은 삭제).
     name: "register_product_intro",
     label: "제품 소개자료 등록",
     domain: "cross",
@@ -1765,8 +1765,8 @@ const TOOLS: AgentTool[] = [
       { name: "summary", label: "한 줄 소개", description: "자료에 적힌 한 줄 소개(선택)", required: false },
       { name: "doc", label: "소개서 문서명", description: "대화창 ＋로 올린 소개서 문서명(선택)", required: false },
     ],
-    effect: (args) => "제품 소개자료 대장에 \"" + args.name + "\"" + 조사(String(args.name ?? ""), "을") + " 등록합니다 — 소개자료 화면 목록·비교에 나타납니다.",
-    undo: "소개자료 화면에서 확인 후, 삭제 지시로 되돌릴 수 있습니다.",
+    effect: (args) => "제품 소개자료 대장에 \"" + args.name + "\"" + 조사(String(args.name ?? ""), "을") + " 등록합니다 — 「내 문서 > 📦 보안제품 자료」 목록·비교에 나타납니다.",
+    undo: "「내 문서 > 📦 보안제품 자료」에서 확인 후, 삭제 지시로 되돌릴 수 있습니다.",
     run: runProductIntroAdd,
   },
 ];

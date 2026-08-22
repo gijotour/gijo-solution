@@ -147,7 +147,13 @@ describe("★ 없는 화면으로 보내지 않는다", () => {
       .filter((u) => fs.existsSync(u));
     const 없음: string[] = [];
     for (const u of 서버) {
-      const src = fs.readFileSync(u, "utf8");
+      // ⚠ **주석은 걷어내고 본다**(2026-08-22). 화면을 없애면서 그 자리에 「왜 없앴나」를 적으면
+      //   그 설명 안의 파일 이름이 **살아 있는 안내로 오인**돼 실패한다 — 기록을 남긴 주석이
+      //   시험에 밀려 지워지는 건 손해다. 같은 실수를 이 파일 위쪽 시험에서도 한 번 겪었다.
+      //   ⚠ 주석 안의 참조는 **안내가 아니다** — AI가 그리로 보내지 않는다.
+      const src = fs.readFileSync(u, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, " ")   // 블록 주석
+        .replace(/(^|[^:])\/\/[^\n]*/g, "$1"); // 줄 주석(URL의 `//`는 앞에 `:`가 있어 안 지운다)
       for (const m of src.matchAll(/["']([a-z0-9_-]+\.html)["']/gi)) {
         if (!있는화면.has(m[1])) 없음.push(`${u.pathname.split("/").pop()} → ${m[1]}`);
       }
