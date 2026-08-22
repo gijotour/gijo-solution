@@ -1522,7 +1522,21 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
 
   // ── 행동 대조 (2026-07-29, 계획서 전-2) — "이거 해도 돼?"는 검색이 아니라 판정 질문이다 ──
   // 사내규정(RAG)으로만 판정하고, 법령은 원문 링크로 안내, 근거 없으면 판정하지 않는다(NA 계약).
-  if (ACTION_CHECK_RE.test(instructionText)) {
+  //
+  // ★ **지금 사고가 나 있으면 비켜 준다**(2026-08-22 운영 실측으로 신설).
+  //   실측: 「랜섬웨어 걸렸을 때 전원을 **꺼도 되나요?**」가 이 분기에 먼저 채여
+  //   「판단 불가 — 사내 규정 문서를 못 찾았습니다」가 나갔다. 그런데 **정답은 코드에 있었다**
+  //   (침해사고초동절차의 「전원을 끄지 말고 선을 뽑습니다」). 게다가 그 답변은 참고 자료 칸에
+  //   그 문장을 **인용해 놓고** 「판정 근거로 쓰지 않았습니다」라고 적었다 —
+  //   **정답을 쥐고도 모른다고 답한 것**이고, 불난 집에서는 가장 나쁜 답이다.
+  //   ⚠ 규정 대조는 **평시의 일**이다. 사고 중에는 「해도 되나」도 절차를 묻는 말이다.
+  //   ⚠ 아래 장애·침해 분기와 **같은 말을 쓴다** — 잣대를 두 벌 두지 않는다.
+  //     (`incidentsteps.route.test.ts`가 이 배제 조건이 소스에 있는지 감시한다.)
+  if (
+    ACTION_CHECK_RE.test(instructionText) &&
+    !침해사고질문인가(instructionText) &&
+    !장애질문인가(instructionText)
+  ) {
     const task = mkTask(qa, { text: instructionText, agentId: "analysis", priority: "P2" });
     const r = await runActionCheck(instructionText, qa);
     completeTask(task.id);
