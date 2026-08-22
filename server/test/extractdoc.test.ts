@@ -92,6 +92,33 @@ describe("문서 추출 — 오피스 4종은 파이썬 없이 (2026-08-22 이�
     }
   });
 
+  // ★ 이 자리는 **두 번 조용히 깨졌다**(꼬리 정규화 누락 · destroy가 없는 메서드 호출) —
+  //   둘 다 시험 3,895개를 통과했다. 「세 번째면 소스 감시」 규칙에 따라 못박는다.
+  it("고친 것이 실제로 코드에 있다 — 꼬리 정규화·문서 닫기·짧은 글 살리기 금지", () => {
+    // ⚠ 주석을 걷어내고 본다 — 「왜 그렇게 고쳤는지」를 적으면서 옛 코드를 인용하게 되는데,
+    //   그것까지 잡으면 기록을 못 남긴다(이 시험이 실제로 내 주석을 잡았다 — 오늘 두 번째다).
+    const 원문 = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "dataset.ts"), "utf8");
+    const src = 원문.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/[^\n]*/g, "$1");
+    // ① 꼬리 정규화가 **PDF까지** 걸린다(오피스만 걸고 PDF를 빠뜨렸던 자리)
+    expect(src, "PDF 갈래에 파이썬꼬리정규화가 안 걸렸다 — 같은 문서가 경로에 따라 다른 글이 된다")
+      .toMatch(/const 정리 = 파이썬꼬리정규화\(글\)/);
+    // ② 문서 닫기는 loadingTask를 거친다(doc.destroy는 **존재하지 않는다** — 조용히 통과했다)
+    expect(src, "doc.destroy를 부른다 — 그 객체엔 destroy가 없어 아무 일도 안 한다")
+      .not.toMatch(/\bdoc\s*(?:as[^)]*\))?\s*\.\s*destroy\?\.\(\)/);
+    expect(src, "loadingTask.destroy로 닫지 않는다 — 오래 도는 프로세스에서 파서가 쌓인다")
+      .toContain("doc.loadingTask?.destroy()");
+    // ③ 20자 미만을 「성공」으로 돌려주지 않는다(정직 게이트가 원리상 못 잡는 구간)
+    expect(src, "짧은 글 살리기가 되살아났다 — 쓰레기가 「반입 성공」으로 들어간다")
+      .not.toMatch(/파이썬도 못 씀 · JS가 뽑은/);
+  });
+
+  it("암호 걸린 PDF는 한글로 거절한다", async () => {
+    // 재검토 [중] — 감싸기를 지웠다가 영어(pypdf의 File has not been decrypted)가 화면에 나갔다.
+    const 암호PDF = fs.existsSync(path.join(__dirname, "fixtures", "encrypted.pdf"));
+    if (!암호PDF) return; // 픽스처가 없으면 건너뛴다(있으면 반드시 한글이어야 한다)
+    await expect(extractDocumentText("encrypted.pdf", b64("encrypted.pdf"))).rejects.toThrow(/암호/);
+  });
+
   it("손상된 zip은 사람이 읽을 말로 거절한다", async () => {
     // fixtures/broken.docx는 zip이 아닌 28바이트 쓰레기다(그동안 어떤 시험도 안 쓰던 고아 픽스처).
     await expect(extractDocumentText("broken.docx", b64("broken.docx")))

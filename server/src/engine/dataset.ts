@@ -35,16 +35,6 @@ const 스캔판정_최소글자 = 20;
  *  ⚠ unpdf는 **영어로** 던진다(InvalidPDFException·PasswordException). 그대로 두면 담당자 화면에
  *    영어가 나가므로 한글로 감싼다(「모든 사용자 대상 텍스트는 한글로」).
  */
-/** 자간을 벌려 그린 글을 되돌린다 — 「플 래 그 십」 → 「플래그십」.
- *
- *  ⚠ 왜 필요한가(2026-08-22 실측): pdf.js는 **글자 위치**를 보고 간격이 넓으면 공백을 넣는다.
- *    디자인상 자간을 벌린 제목이 그렇게 걸린다. 보기엔 맞지만 **검색에는 해롭다** — 담당자가
- *    「플래그십」을 찾으면 「플 래 그 십」은 안 걸린다. pypdf는 글리프를 순서대로 이어붙여
- *    붙은 형태로 뽑았으므로, 이 되돌리기가 없으면 옛 문서와 새 문서의 낱말이 갈린다.
- *    실측: 제안서 PDF에서 파이썬 낱말 회수율 97.4%(역량·차별·화면·플래그십 등 11개 누락).
- *  ⚠ **조각(item) 단위로만** 적용한다. 조각 하나가 통째로 「한 글자+공백」 꼴일 때만 자간으로 본다 —
- *    문장 전체에 정규식을 걸면 정상 띄어쓰기(「핵심 역량」)까지 붙여 버린다.
- */
 /* ── 자간 복원은 **일부러 하지 않는다** (2026-08-22, 세 번 시도하고 내린 결론) ────────────
  *
  * 무엇이 문제인가: pdf.js는 **글자 위치**를 보고 간격이 넓으면 공백을 넣는다. 그래서 디자인상
@@ -76,8 +66,12 @@ async function pdf추출(buf: Buffer): Promise<string> {
     // ⚠ **우리가 만든 문서 객체는 우리가 닫는다** — unpdf는 호출자가 넘긴 객체를 일부러
     //   파괴하지 않는다(수명 관리를 호출자에게 맡긴다). 안 닫으면 운영처럼 오래 도는
     //   프로세스에서 PDF를 올릴 때마다 파서 상태가 쌓인다(검토관 2026-08-22 지적).
-    //   (destroy는 pdf.js 런타임에 있지만 unpdf의 타입 선언에는 없어 캐스팅해 부른다.)
-    try { await (doc as unknown as { destroy?: () => Promise<void> }).destroy?.(); } catch { /* 이미 닫혔으면 그만 */ }
+    //   ⚠ **`doc.destroy()`가 아니라 `doc.loadingTask.destroy()`다**(2026-08-22 재검토 [높음]).
+    //     처음엔 `(doc as {destroy?}).destroy?.()`로 썼는데 그 객체엔 destroy가 아예 없어서
+    //     **아무 일도 안 하고 조용히 지나갔다** — 캐스팅+옵셔널 조합이라 tsc도 런타임도 안 잡는다.
+    //     실측으로 확인했다: doc.destroy=undefined · doc.loadingTask.destroy=function.
+    //     unpdf 자신도 내부에서 loadingTask.destroy()를 쓴다.
+    try { await doc.loadingTask?.destroy(); } catch { /* 이미 닫혔으면 그만 */ }
   }
 }
 
@@ -231,25 +225,32 @@ export async function extractDocumentText(filename: string, base64: string): Pro
     try {
       글 = await pdf추출(Buffer.from(base64, "base64"));
     } catch (e) {
-      recordProcessOutput("extract-doc", "warn", `${filename} — JS 추출 실패(${e instanceof Error ? e.message : String(e)}) · 파이썬 경로로 넘김`);
+      const 원문 = e instanceof Error ? e.message : String(e);
+      recordProcessOutput("extract-doc", "warn", `${filename} — JS 추출 실패(${원문}) · 파이썬 경로로 넘김`);
+      // ⚠ **암호 걸린 PDF는 파이썬도 못 연다** — 넘겨 봐야 영어 오류가 화면에 나간다
+      //   (pypdf의 「File has not been decrypted」가 도구없음 정규식에 안 걸려 그대로 전달된다).
+      //   여기서 한글로 끊는다(2026-08-22 재검토 [중]: 감싸기를 지웠다가 회귀했다).
+      if (/password|encrypt/i.test(원문)) {
+        throw new Error("문서를 열지 못했습니다 — 암호가 걸린 PDF입니다. 암호를 푼 뒤 다시 올려 주세요.");
+      }
     }
     if (글.trim().length >= 스캔판정_최소글자) {
-      recordProcessOutput("extract-doc", "log", `${filename} — PDF 직접 읽음(${글.length.toLocaleString()}자, 파이썬 불필요)`);
-      return 글;
+      // ⚠ PDF에도 **같은 꼬리 정규화**를 건다 — 파이썬 main()은 형식과 무관하게 이걸 거친다.
+      //   안 걸면 같은 PDF가 「JS로 읽혔을 때」와 「파이썬으로 넘어갔을 때」 다른 글이 되어,
+      //   조각 경계와 추출본(.md)이 갈린다(2026-08-22 재검토 [중] — 오피스만 고치고 PDF를 빠뜨렸다).
+      const 정리 = 파이썬꼬리정규화(글);
+      recordProcessOutput("extract-doc", "log", `${filename} — PDF 직접 읽음(${정리.length.toLocaleString()}자, 파이썬 불필요)`);
+      return 정리;
     }
     // 글자가 거의 없다 = 스캔본일 가능성 → 파이썬(OCR)에 맡긴다. 여기서 끊으면 스캔 문서가
     // 조용히 빈 결과가 된다 — 예전엔 파이썬 안에서 이 폴백이 일어났고, 그 길을 그대로 잇는다.
     recordProcessOutput("extract-doc", "log", `${filename} — 글자가 거의 없음(${글.trim().length}자) · 스캔본으로 보고 OCR 경로로 넘김`);
-    // ⚠ 파이썬마저 못 쓰는 기계(mac 설치본 등)에서는 **JS가 뽑아 둔 짧은 글이라도 살린다** —
-    //   짧은 공문·표지 PDF가 통째로 실패하는 것보다 낫다(검토관 지적).
-    if (글.trim().length > 0) {
-      try {
-        return await 파이썬추출(filename, base64, ext);
-      } catch {
-        recordProcessOutput("extract-doc", "log", `${filename} — 파이썬도 못 씀 · JS가 뽑은 ${글.trim().length}자를 그대로 씁니다`);
-        return 글;
-      }
-    }
+    // ⚠ 한때 「파이썬이 없으면 JS가 뽑은 1~19자라도 살린다」를 넣었다가 **되돌렸다**
+    //   (2026-08-22 재검토 [높음]). 그 갈래가 타는 상태는 바로 위에서 스스로 「글자가 거의 없다」고
+    //   판정한 상태이고, 정직 게이트(ingestText의 쓰레기 검사)는 원문이 3조각 이상일 때만 도는지라
+    //   19자는 **원리상 통과**한다 — 쓰레기가 「반입 성공(1조각)」으로 들어간다.
+    //   짧은 문서를 살리려면 「일부만 읽었다」를 응답에 실어야 하고, 그건 별도 설계다.
+    //   여기서는 파이썬에 맡기고, 파이썬도 없으면 **정직하게 실패**한다.
   }
   return 파이썬추출(filename, base64, ext);
 }
