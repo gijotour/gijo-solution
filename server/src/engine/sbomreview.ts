@@ -56,10 +56,19 @@ const 부품넣기 = db.prepare(
 );
 const 목록읽기 = db.prepare(`SELECT * FROM sbom_reviews ORDER BY reviewedAt DESC LIMIT ?`);
 const 하나읽기 = db.prepare(`SELECT * FROM sbom_reviews WHERE id=?`);
-const 부품읽기 = db.prepare(`SELECT * FROM sbom_review_components WHERE reviewId=? ORDER BY name`);
+// ⚠ rowid를 함께 읽는다 — 자가치유가 **그 한 줄만** 고치기 위해서다(위 등급고치기 주석 참고).
+const 부품읽기 = db.prepare(`SELECT rowid AS _rowid, * FROM sbom_review_components WHERE reviewId=? ORDER BY name`);
 const 지우기 = db.prepare(`DELETE FROM sbom_reviews WHERE id=?`);
 // 판정 규칙이 바뀌면 저장본이 낡는다 — 다시 볼 때 **제자리로 돌려놓기** 위한 것(아래 검수상세 참고).
-const 등급고치기 = db.prepare(`UPDATE sbom_review_components SET tier=@tier, needsCheck=@needsCheck WHERE reviewId=@reviewId AND name=@name AND version=@version`);
+// ⚠ **`version=''`는 NULL 행에 안 맞는다**(2026-08-22 검토관 [중]). 넣을 때는 `c.판 || null`이라
+//   판이 없는 부품이 **NULL**로 들어가는데, 읽을 때는 `String(c.version ?? "")`로 **빈 문자열**이
+//   된다. 그대로 WHERE에 넘기면 SQLite는 한 행도 안 고치고 **오류도 안 낸다** — 「고쳤다」가
+//   조용히 거짓이 된다(run().changes를 보지 않으면 영영 모른다).
+//   → `IS NOT DISTINCT FROM`에 해당하는 SQLite 표현(`IS`)을 쓴다. NULL끼리도 같다고 본다.
+//   ⚠ 그리고 **rowid로 한 줄만** 고친다 — 같은 이름·판이 두 줄이면(유일 제약이 없다)
+//     이름·판으로 고치는 UPDATE가 **두 줄을 함께 덮어** 한 줄이 남의 등급으로 오염되고,
+//     다음 조회에서 또 어긋남이 검출돼 수렴하지 않고 진동한다.
+const 등급고치기 = db.prepare(`UPDATE sbom_review_components SET tier=@tier, needsCheck=@needsCheck WHERE rowid=@rowid`);
 const 요약고치기 = db.prepare(`UPDATE sbom_reviews SET summary=@summary WHERE id=@id`);
 
 /** 한 번에 담는다 — 부품 수천 개라 낱개 INSERT는 느리다. */
@@ -71,8 +80,28 @@ const 통째로넣기 = db.transaction((행: Record<string, unknown>, 부품들:
 /** 저장된 등급을 **지금 규칙으로 다시 매긴 값**으로 되돌린다.
  *  ⚠ 읽기 중에 쓰지만 **수렴 연산**이다 — 어긋난 것이 있을 때만 돌고, 두 번 돌려도 같은 값이 된다. */
 const 낡은등급고치기 = db.transaction((id: string, 고칠것: Record<string, unknown>[], 요약: string) => {
-  for (const c of 고칠것) 등급고치기.run(c);
+  // ★ **몇 줄을 고쳤는지 센다.** 안 세면 0행 UPDATE가 조용히 성공으로 지나간다 —
+  //   이 함수가 처음 나갔을 때 실제로 그랬다(WHERE의 version이 NULL과 안 맞았다).
+  let 고쳐진수 = 0;
+  for (const c of 고칠것) 고쳐진수 += 등급고치기.run(c).changes;
+  const 옛요약 = String((하나읽기.get(id) as Record<string, unknown> | undefined)?.summary ?? "{}");
   요약고치기.run({ id, summary: 요약 });
+  // ★ **감사 기록에 남긴다**(2026-08-22 검토관 [낮음]). 검수할 때 「소스공개요구 N건」을 감사에
+  //   박아 뒀는데, 조회만으로 그 숫자가 조용히 바뀌면 **납품 심사에 낼 근거가 흔들린다** —
+  //   감사 로그의 N과 지금 보이는 N이 다른데 「누가 언제 왜」를 말할 수 없게 된다.
+  //   판정 규칙이 바뀐 것은 정당한 이유이므로 숨길 것이 아니라 **적어 둘 것**이다.
+  if (옛요약 !== 요약) {
+    recordAudit({
+      kind: "config",
+      action: "sbom-review-retier",
+      detail: `타사 SBOM 검수 등급 재산정(판정 규칙 변경 반영): ${id} · ${옛요약} → ${요약}`,
+    });
+  }
+  if (고쳐진수 !== 고칠것.length) {
+    // 던지지 않는다 — 화면은 이미 **다시 판정한 값**을 쓰므로 사람에게 틀린 것이 보이지는 않는다.
+    // 다만 저장본이 낡은 채 남았다는 사실은 알려야 한다(다음 조회에서 또 고치려 든다).
+    console.warn(`[sbom-review] 등급 되돌리기가 ${고칠것.length}줄 중 ${고쳐진수}줄만 고쳤습니다 (검수 ${id}).`);
+  }
 });
 
 function 줄로(r: Record<string, unknown>): 검수요약 {
@@ -154,8 +183,35 @@ export function sbom검수(옵션: {
   return { ok: true, 결과: 줄로(하나읽기.get(id) as Record<string, unknown>), 면책: 면책문구 };
 }
 
+/** 저장된 요약을 **지금 규칙으로 다시 센다.**
+ *
+ *  ★ 왜 목록에서도 하나(2026-08-22 검토관 [중]) — 상세만 재판정하면 「한 화면이 두 말」이
+ *    **「화면과 대화가 두 말」**로 옮겨갈 뿐이다. 목록·대화 카드·요약문은 저장된 summary를
+ *    읽으므로, 상세를 한 번도 안 연 검수본은 영영 낡은 숫자를 보인다.
+ *    담당자는 목록에서 초록을 보고 상세를 안 열 수도 있다 — 그러면 낡은 판정이 결론이 된다.
+ *  ⚠ 부품 줄을 다시 읽어야 하므로 목록이 길면 값이 든다. 그래서 **어긋난 것만** 고쳐 쓰고,
+ *    한 번 고치면 다음부터는 저장본이 맞아 다시 안 돈다(수렴한다). */
+function 요약다시세기(r: 검수요약): 검수요약 {
+  const 줄들 = 부품읽기.all(r.id) as Record<string, unknown>[];
+  if (!줄들.length) return r;
+  const 판정들 = 줄들.map((c) => 등급판정(String(c.license ?? "")));
+  const 새요약 = 등급요약(판정들).등급별;
+  const 같나 = (Object.keys(새요약) as 라이선스등급[]).every((k) => (r.summary[k] ?? 0) === (새요약[k] ?? 0));
+  if (같나) return r;
+  const 고칠것 = 줄들
+    .map((c, i) => ({ c, p: 판정들[i] }))
+    .filter(({ c, p }) => String(c.tier) !== p.등급 || (Number(c.needsCheck) === 1) !== p.확인필요)
+    .map(({ c, p }) => ({ rowid: Number(c._rowid), tier: p.등급, needsCheck: p.확인필요 ? 1 : 0 }));
+  try {
+    낡은등급고치기(r.id, 고칠것, JSON.stringify(새요약));
+  } catch {
+    // 못 고쳐도 **보여 주는 값은 새 판정**이다 — 화면이 틀리지는 않는다.
+  }
+  return { ...r, summary: 새요약 };
+}
+
 export function 검수목록(상한 = 100): 검수요약[] {
-  return (목록읽기.all(상한) as Record<string, unknown>[]).map(줄로);
+  return (목록읽기.all(상한) as Record<string, unknown>[]).map(줄로).map(요약다시세기);
 }
 
 export function 검수상세(id: string): { 요약: 검수요약; 부품: 검수부품[]; 면책: string } | null {
@@ -186,10 +242,7 @@ export function 검수상세(id: string): { 요약: 검수요약; 부품: 검수
   const 고칠것 = 줄들
     .map((c, i) => ({ c, p: 판정들[i] }))
     .filter(({ c, p }) => String(c.tier) !== p.등급 || (Number(c.needsCheck) === 1) !== p.확인필요)
-    .map(({ c, p }) => ({
-      reviewId: id, name: String(c.name), version: String(c.version ?? ""),
-      tier: p.등급, needsCheck: p.확인필요 ? 1 : 0,
-    }));
+    .map(({ c, p }) => ({ rowid: Number(c._rowid), tier: p.등급, needsCheck: p.확인필요 ? 1 : 0 }));
   let 요약줄 = 줄로(r);
   if (고칠것.length) {
     const 새요약 = 등급요약(판정들).등급별;

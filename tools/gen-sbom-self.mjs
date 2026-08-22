@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { 원장읽기 } from "./lib/vendor-manifest.mjs";
 
 const 루트 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const JSON출력 = process.argv.includes("--json");
@@ -120,6 +121,10 @@ function 파이썬꾸러미() {
  *    (「목록에 있는데 파일이 없다」로 관문이 빨개지면 아무도 안 본다).
  *  ⚠ 새 동봉물을 extraResources에 더할 때 **여기도 더할 것** — 안 그러면 고지에서 빠진다.
  */
+/** smartmd 원장을 **싣는데 못 읽은** 경우의 사유. 비어 있으면 정상.
+ *  ⚠ 이 사고의 본체가 「조용한 0」이었으므로 경고만 찍고 넘어가지 않는다 — 관문이 막는다. */
+let 동봉원장고장 = "";
+
 function 동봉바이너리() {
   const 표 = [
     { 이름: "llama.cpp (CUDA 빌드)", 라이선스: "MIT", 어디: path.join(루트, "client", "build", "llama-cuda") },
@@ -146,48 +151,23 @@ function 동봉바이너리() {
   return 모음;
 }
 
-/** smartmd vendor — 판까지 적힌 목록 파일을 읽는다(손으로 안 적는다).
+/** smartmd vendor 동봉물 — **파서는 tools/lib/vendor-manifest.mjs 한 곳**에 있다.
  *
- *  ★★ **여기가 조용히 0개를 읽고 있었다**(2026-08-22 실측).
- *    옛 정규식은 `- 이름 | 판 | 라이선스` 꼴(목록)을 기다렸는데 그 파일은 **마크다운 표**다.
+ *  ★★ 이 자리가 조용히 0개를 읽고 있었다(2026-08-22 실측).
+ *    옛 정규식은 「- 이름 | 판 | 라이선스」 꼴(목록)을 기다렸는데 그 파일은 **마크다운 표**다.
  *    한 줄도 안 걸렸고 **아무 오류도 안 났다** — 「없는 것」과 「못 읽은 것」이 구분되지 않았다.
  *    그래서 우리가 배포하는 **Font Awesome의 CC-BY-4.0(아이콘)·SIL OFL-1.1(글꼴)** 고지가
  *    통째로 빠져 있었다. 둘 다 **고지가 의무**인 라이선스다.
- *    하필 이 관문을 만든 날, 라이선스를 바로잡으면서 **다른 라이선스를 빠뜨리고 있었다.**
  *
- *  ⚠ 그래서 이제 **못 읽으면 시끄럽게 군다** — 파일은 있는데 0개면 경고를 찍는다.
- *    조용한 0은 「없다」로 읽히고, 그것이 이 사고의 본체였다.
- *  ⚠ 칸 번호를 손으로 박지 않는다 — **머리글에서 찾는다**(표에 칸이 늘어도 안 어긋난다).
+ *  ⚠ 파서를 여기 두지 않는 이유: 감시 시험이 **사본**을 재고 있어서, 시험이 초록이어도
+ *    게시에 물린 진짜 파서가 깨질 수 있었다(검토관 [중]). 이제 둘이 같은 것을 부른다.
  */
 function smartmd동봉() {
-  const vend = path.join(루트, "client", "smartmd", "vendor", "VERSIONS.md");
-  if (!fs.existsSync(vend)) return [];
-  const 줄들 = fs.readFileSync(vend, "utf8").split("\n").filter((l) => l.trim().startsWith("|"));
-  const 칸 = (l) => l.split("|").slice(1, -1).map((s) => s.trim());
-  const 모음 = [];
-  if (줄들.length >= 3) {
-    const 머리 = 칸(줄들[0]);
-    const iName = 머리.findIndex((h) => /library|name|이름/i.test(h));
-    const iVer = 머리.findIndex((h) => /version|판/i.test(h));
-    const iLic = 머리.findIndex((h) => /licen[cs]e|라이선스/i.test(h));
-    if (iName >= 0 && iLic >= 0) {
-      for (const l of 줄들.slice(2)) {          // [0]=머리글 [1]=구분선
-        const c = 칸(l);
-        if (c.length <= Math.max(iName, iLic) || !c[iName]) continue;
-        모음.push({
-          이름: `${c[iName].replace(/`/g, "")} (문서 작성 도구)`,
-          판: iVer >= 0 ? (c[iVer] || "") : "",
-          라이선스: c[iLic],
-          갈래: "동봉물",
-        });
-      }
-    }
-  }
-  if (!모음.length) {
-    console.error(`⚠ ${path.relative(루트, vend)} 를 읽었지만 **부품을 하나도 못 찾았습니다.**`);
-    console.error("   표 머리글에 Library/Version/License 칸이 있는지 보세요 — 형식이 바뀌면 고지에서 조용히 빠집니다.");
-  }
-  return 모음;
+  const r = 원장읽기(루트);
+  동봉원장고장 = r.고장;
+  return r.목록.map((c) => ({
+    이름: `${c.이름} (문서 작성 도구)`, 판: c.판, 라이선스: c.라이선스, 갈래: "동봉물",
+  }));
 }
 
 // ── 모으기 ────────────────────────────────────────────────────────────────
@@ -315,5 +295,15 @@ if (막을것.length) {
   for (const c of 막을것) console.error(`  · ${c.이름}@${c.판} [${c.갈래}] ${c.라이선스}`);
   console.error("  대체 부품을 찾거나, 이 부품을 배포물에서 빼세요.");
 }
-if (상용불가.length || 막을것.length) process.exit(1);
+// ★ **「싣는데 못 읽었다」도 막는다**(2026-08-22 검토관 [중]).
+//   그전엔 stderr 경고만 찍고 exit 0으로 통과했다 — 그러면 THIRD-PARTY-NOTICES.md가
+//   vendor 부품이 빠진 채 **덮어써지고** electron-builder가 그대로 굽는다.
+//   이 관문이 닫았다는 「조용한 0」이 게시 층에서는 그대로 열려 있었다.
+//   ⚠ 원장 형식의 결정권은 우리에게 없다(외부 저장소에서 받아온다) — 그래서 더더욱 막아야 한다.
+if (동봉원장고장) {
+  console.error(`\n★ 동봉 원장을 못 읽었습니다 — ${동봉원장고장}`);
+  console.error("  고지 목록에서 그 부품들이 통째로 빠집니다(우리가 실제로 겪은 사고입니다).");
+  console.error("  client/smartmd/vendor/VERSIONS.md 의 표 형식을 확인하세요.");
+}
+if (동봉원장고장 || 상용불가.length || 막을것.length) process.exit(1);
 if (!JSON출력) console.log("\n✓ 배포에 실을 수 없는 라이선스는 없습니다.");
