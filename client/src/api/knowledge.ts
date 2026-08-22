@@ -48,6 +48,12 @@ export const handoverApi = {
 };
 
 export const memoryApi = {
+  // 이 **서버**가 문서를 어디까지 읽는지 물어본다(2026-08-22).
+  //   ⚠ 클라이언트 OS로 판단하면 안 된다 — 분산 모드에서는 클라와 서버가 다른 기계라
+  //     mac 클라가 win 서버에 붙는 조합이 실제로 가능하고, 그때 능력을 정반대로 표시한다.
+  //     읽는 일을 하는 쪽이 답해야 화면의 약속이 참이 된다.
+  extractCapability: () =>
+    request<{ office: boolean; pdf: boolean; ocr: boolean; ocr사유: string }>("/api/extract/capability"),
   ingest: (path: string, scope?: string) =>
     request<IngestResult>("/api/memory/ingest", { method: "POST", body: { path, scope } }),
   ingestFile: (filename: string, content: string, scope?: string, keepOriginal?: boolean) =>

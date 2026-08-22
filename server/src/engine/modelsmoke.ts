@@ -12,6 +12,7 @@
 //   비었나 · 한글이 있나 · <think>가 새나 · 거절 낱말이 있나. 좁고 확실한 것만 잰다 —
 //   품질 순위는 평가 게이트(3축) 몫이고, 스모크는 "쓸 수 있는 상태인가"만 가른다.
 import { getLocalEngineStatus } from "./localengine";
+import { 말조사 } from "../util/josa";
 
 export interface SmokeDetail {
   id: string;
@@ -114,7 +115,7 @@ export async function runSmoke(modelId?: string): Promise<SmokeResult | { error:
     ? st.loaded.find((m) => m.modelId === modelId)
     : st.loaded.find((m) => m.ready) ?? st.loaded[0];
   if (!target) return { error: "로드된 채팅 모델이 없습니다 — 에이전트 AI 화면에서 모델을 먼저 시작하세요." };
-  if (!target.ready) return { error: `${target.modelId}이(가) 아직 로딩 중입니다 — 잠시 후 다시 시도하세요.` };
+  if (!target.ready) return { error: `${말조사(target.modelId, "이")} 아직 로딩 중입니다 — 잠시 후 다시 시도하세요.` };
 
   const details: SmokeDetail[] = [];
   for (const p of SMOKE_PROBES) {

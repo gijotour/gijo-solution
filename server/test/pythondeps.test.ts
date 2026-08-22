@@ -83,7 +83,11 @@ function 선언된것(): Set<string> {
   //   check-python-deps가 OCR을 「강제」로 봐(옵션이 아니게) WSL·라이트에서 실패한다. 그래서 별
   //   파일에 두되, **이 소스 감시는 두 파일을 합쳐** 봐서 「쓰는데 안 적힌 것」만 잡는다.
   //   (check-python-deps.mjs는 requirements.txt만 읽어 OCR을 옵션으로 남긴다 — 비대칭이 핵심.)
-  const 표: Record<string, string> = { "opencv-python": "cv2", pillow: "PIL", pyyaml: "yaml", pymupdf: "fitz" };
+  // ⚠ `pymupdf: "fitz"`를 **일부러 뺐다**(2026-08-22). PyMuPDF는 AGPL-3.0이라 설치본에 실을 수
+  //   없어서 pypdfium2로 갈아치웠다. 매핑을 남겨 두면 누군가 requirements에 pymupdf를 되돌려
+  //   놓아도 이 감시가 조용히 통과시킨다 — 라이선스 사고가 시험을 통과하며 재발한다.
+  //   (pypdfium2는 배포명과 import명이 같아 표에 넣을 것이 없다.)
+  const 표: Record<string, string> = { "opencv-python": "cv2", pillow: "PIL", pyyaml: "yaml" };
   const s = new Set<string>();
   for (const 파일 of ["requirements.txt", "requirements-ocr.txt"]) {
     const p = path.join(서버루트, 파일);
@@ -125,5 +129,46 @@ describe("서버가 쓰는 파이썬 모듈은 requirements.txt에 적혀 있어
     const src = fs.readFileSync(p, "utf8");
     expect(src, "requirements를 읽어야 한다").toContain("requirements.txt");
     expect(src, "0건이면 실패로 처리해야 한다").toContain("검사가 헛돌고 있습니다");
+  });
+
+  // ── 라이선스 경계 (2026-08-22 게시 전 검토관 [높음]) ──────────────────────────
+  //
+  // ■ 왜 이 시험이 생겼나
+  //   OCR을 설치본에 동봉하면서 **PyMuPDF(AGPL-3.0)를 고객에게 배포**할 뻔했다. 그전에는
+  //   「고객이 알아서 pip install 하는 옵션」이라 우리가 배포하는 물건이 아니었는데, 동봉하면서
+  //   지위가 바뀐 것을 아무도 안 봤다. 공공·금융 납품 심사나 SBOM 점검에서 잡히면
+  //   **제품 소스 공개** 또는 **상용 라이선스 구매**를 요구받는다 —
+  //   AI-BOM·SBOM을 파는 제품이 자기 SBOM에서 걸리는 모양이 된다.
+  //   사람 눈으로는 못 막는다(오늘 실제로 못 막았다). 그래서 기계로 막는다.
+  it("★★ 설치본에 동봉하는 파이썬 부품에 카피레프트(AGPL/GPL)가 없다", () => {
+    const ocr요구 = path.join(서버루트, "requirements-ocr.txt");
+    expect(fs.existsSync(ocr요구)).toBe(true);
+    const 줄들 = fs.readFileSync(ocr요구, "utf8").split("\n")
+      .map((l) => l.replace(/#.*$/, "").trim()).filter(Boolean);
+    const 이름들 = 줄들.map((l) => l.split(/[=<>!~[\s]/)[0].trim().toLowerCase());
+
+    // 금지 목록 — 「배포하면 소스 공개·상용 구매를 요구받는」 부품. 새로 알게 되면 여기에 더한다.
+    const 금지: Record<string, string> = {
+      pymupdf: "AGPL-3.0 — pypdfium2(BSD-3+Apache-2.0)를 쓸 것",
+      fitz: "PyMuPDF의 옛 이름 — 같은 이유로 금지",
+      "pymupdf-fonts": "PyMuPDF 계열",
+      unrar: "비자유 라이선스",
+      "pyqt5": "GPL-3.0(상용은 별도 구매)",
+      "pyqt6": "GPL-3.0(상용은 별도 구매)",
+    };
+    const 걸린것 = 이름들.filter((n) => 금지[n]).map((n) => `${n} — ${금지[n]}`);
+    expect(걸린것, `동봉 목록에 카피레프트 부품이 있다:\n${걸린것.join("\n")}`).toEqual([]);
+
+    // 대체재가 실제로 들어 있는지도 본다 — 빼기만 하고 안 넣으면 스캔 PDF OCR이 죽는다.
+    expect(이름들, "스캔 PDF를 그림으로 바꿀 부품이 있어야 한다").toContain("pypdfium2");
+  });
+
+  it("★★ 추출기가 fitz/pymupdf를 다시 부르지 않는다", () => {
+    // 요구 파일에서 지워도 코드가 부르면 「어쩌다 깔려 있어서 도는」 상태가 된다.
+    const p = path.join(서버루트, "scripts", "extract_doc.py");
+    const 코드줄 = fs.readFileSync(p, "utf8").split("\n")
+      .filter((l) => !l.trim().startsWith("#"));   // 주석은 이 사고의 경위를 적어 두는 자리다
+    const 되살아남 = 코드줄.filter((l) => /^\s*(import|from)\s+(fitz|pymupdf)\b/.test(l));
+    expect(되살아남, "AGPL 부품을 다시 부르고 있다 — pypdfium2를 쓸 것").toEqual([]);
   });
 });

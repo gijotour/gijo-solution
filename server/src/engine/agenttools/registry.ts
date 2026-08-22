@@ -65,6 +65,7 @@ import { findUserById } from "../../auth/users";
 
 /** 화면 파일명 → 담당자가 메뉴에서 보는 한글 이름. 못 찾으면 파일명 대신 빈 값을 쓰지 않고
  *  그대로 두되, screenguide에 제목이 있으면 그것을 쓴다(안내 문구와 메뉴 이름이 같아야 한다). */
+import { 조사, 말조사 } from "../../util/josa";
 import {
   화면이름,
   AgentToolParam,
@@ -888,7 +889,7 @@ const TOOLS: AgentTool[] = [
       { name: "model", label: "모델", description: "모델 이름(「모델 적응 상태」로 확인)", required: true },
       { name: "mode", label: "지정", description: "끔(일반 모델) 또는 켬(thinking 모델)", required: true },
     ],
-    effect: (args) => `${args.model ?? "?"}을(를) 「${/켜|켬|on/i.test(args.mode ?? "") ? "thinking 모델(생각 끄는 플래그 적용)" : "일반 모델(플래그 없음)"}」로 지정 — 다음 로드부터 적용됩니다.`,
+    effect: (args) => `${말조사(String(args.model ?? "?"), "을")} 「${/켜|켬|on/i.test(args.mode ?? "") ? "thinking 모델(생각 끄는 플래그 적용)" : "일반 모델(플래그 없음)"}」로 지정 — 다음 로드부터 적용됩니다.`,
     undo: "「모델 적응 상태」로 확인 후 반대 모드로 다시 지정하면 되돌아갑니다.",
     run: runSetModelThinking,
   },
@@ -996,7 +997,7 @@ const TOOLS: AgentTool[] = [
       { name: "model", label: "모델", description: "모델·버전 (선택)", required: false },
       { name: "asset", label: "연결 자산", description: "이 제품이 지키는 자산 이름·IP (선택)", required: false },
     ],
-    effect: (args) => `보안제품 "${(args.name ?? "").trim()}"을(를) 등록부에 추가${args.category?.trim() ? ` · 종류 ${args.category.trim()}` : ""}${args.asset?.trim() ? ` · 연결 자산 ${args.asset.trim()}` : ""}`,
+    effect: (args) => `보안제품 "${(args.name ?? "").trim()}"${조사((args.name ?? "").trim(), "을")} 등록부에 추가${args.category?.trim() ? ` · 종류 ${args.category.trim()}` : ""}${args.asset?.trim() ? ` · 연결 자산 ${args.asset.trim()}` : ""}`,
     undo: "보안제품 화면에서 제품을 삭제하면 원복됩니다.",
     run: runRegisterProduct,
   },
@@ -1299,7 +1300,7 @@ const TOOLS: AgentTool[] = [
       `자산이 서빙하는 로컬 LLM에 프롬프트 인젝션·탈옥 공격 ${PAYLOADS.length}종을 실제로 실행해 견고성을 측정한다. AI-BOM에 연결된 로컬 모델(modelRef)이 있는 AI/LLM 자산만 대상이다(인프라 호스트는 불가). "레드팀 점검해줘", "이 자산 견고성 점검", "프롬프트 인젝션 테스트해줘"에 쓴다. 예: {"assetId":"ai-secbot-01"}`,
     params: [{ name: "assetId", label: "자산 id", description: "점검할 AI/LLM 자산 id", required: true }],
     effect: (args) =>
-      `자산 ${args.assetId || "(대상 미지정)"}이(가) 쓰는 로컬 모델에 프롬프트 인젝션·탈옥 공격 ${PAYLOADS.length}종을 실제로 보내고, 그 결과로 나온 견고성 점수를 자산 기록에 남깁니다.`,
+      `자산 ${말조사(args.assetId || "(대상 미지정)", "이")} 쓰는 로컬 모델에 프롬프트 인젝션·탈옥 공격 ${PAYLOADS.length}종을 실제로 보내고, 그 결과로 나온 견고성 점수를 자산 기록에 남깁니다.`,
     undo: "보낸 공격은 되돌릴 수 없습니다(실제로 모델에 갑니다). 견고성 점수는 다음 점검 때 새 값으로 덮어씁니다.",
     run: runRunRedteam,
   },
@@ -1742,7 +1743,7 @@ const TOOLS: AgentTool[] = [
       { name: "summary", label: "한 줄 소개", description: "자료에 적힌 한 줄 소개(선택)", required: false },
       { name: "doc", label: "소개서 문서명", description: "대화창 ＋로 올린 소개서 문서명(선택)", required: false },
     ],
-    effect: (args) => "제품 소개자료 대장에 \"" + args.name + "\"을(를) 등록합니다 — 소개자료 화면 목록·비교에 나타납니다.",
+    effect: (args) => "제품 소개자료 대장에 \"" + args.name + "\"" + 조사(String(args.name ?? ""), "을") + " 등록합니다 — 소개자료 화면 목록·비교에 나타납니다.",
     undo: "소개자료 화면에서 확인 후, 삭제 지시로 되돌릴 수 있습니다.",
     run: runProductIntroAdd,
   },
@@ -1856,7 +1857,7 @@ export function validateToolArgs(tool: AgentTool, args: Record<string, unknown>)
     if (p.required && (typeof v !== "string" || v.trim() === "")) {
       return `필수 인자 누락: ${p.name} (${p.description})`;
     }
-    if (v !== undefined && typeof v !== "string") return `인자 ${p.name}은(는) 문자열이어야 합니다`;
+    if (v !== undefined && typeof v !== "string") return `인자 ${말조사(p.name, "은")} 문자열이어야 합니다`;
   }
   return null;
 }
@@ -1969,9 +1970,9 @@ export function buildApproval(
 export async function executeApprovedTool(toolName: string, args: Record<string, string>, role?: string): Promise<string> {
   const tool = findAgentTool(toolName);
   if (!tool) throw new Error(`존재하지 않는 도구: ${toolName}`);
-  if (!tool.write) throw new Error(`${toolName}은(는) 승인이 필요한 쓰기 도구가 아닙니다`);
+  if (!tool.write) throw new Error(`${말조사(toolName, "은")} 승인이 필요한 쓰기 도구가 아닙니다`);
   if (tool.requiredRole === "admin" && role !== "admin") {
-    throw new Error(`${tool.label}은(는) 관리자만 실행할 수 있습니다.`);
+    throw new Error(`${말조사(tool.label, "은")} 관리자만 실행할 수 있습니다.`);
   }
   const invalid = validateToolArgs(tool, args);
   if (invalid) throw new Error(invalid);

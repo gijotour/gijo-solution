@@ -95,10 +95,28 @@
          ② PDF도 unpdf(JS)로 직접 읽는다
          옛 주석(2026-08-13)은 「PDF 추출은 python3+pypdf인데 라이트에 파이썬이 없다」였는데
          그 전제가 통째로 없어졌다. 서버는 읽을 수 있는데 화면이 막고 있으면 **고객에게 거짓**이다.
-         ⚠ 이미지·스캔 PDF만 아직 OCR(파이썬)이 필요하다 — 그건 정직하게 남겨 둔다. -->
+         ★ 2026-08-22 게시 전 검토관 [높음] 수리 — OCR 한 줄은 **서버에게 묻고 나서** 쓴다.
+           한때 「OCR이 함께 들어 있습니다」라고 조건 없이 적었는데, 동봉은 **Windows 설치본
+           전용**이라 mac 라이트에서는 그 말이 거짓이었다. 게다가 클라 OS로 가르는 것도 틀린다 —
+           분산 모드에서는 mac 클라가 win 서버에 붙을 수 있어 능력이 정반대로 표시된다.
+           그래서 읽는 일을 하는 **서버**가 답하게 하고, 답이 오기 전에는 아무 약속도 하지 않는다. -->
   <div class="warn">📄 <b>글자 파일 · PDF · 한글(hwpx) · 워드 · 엑셀 · 파워포인트</b>를 넣을 수 있습니다.
-    <br>📷 <b>사진으로 찍거나 스캔한 문서</b>도 읽습니다 — 글자를 알아보는 기능(OCR)이 함께 들어 있습니다.
+    <span id="ocrLine"></span>
     폴더 연결은 메모(.md·.txt)만 읽습니다.</div>
+  <script>
+    (function () {
+      // 답이 오기 전에는 비워 둔다 — 「읽는다」도 「못 읽는다」도 아직 모르는 상태다.
+      var 자리 = document.getElementById("ocrLine");
+      var g = window.gijo;
+      if (!자리 || !g || !g.getExtractCapability) return;
+      g.getExtractCapability().then(function (c) {
+        if (!c) return;
+        자리.innerHTML = c.ocr
+          ? "<br>📷 <b>사진으로 찍거나 스캔한 문서</b>도 읽습니다 — 글자를 알아보는 기능(OCR)이 이 서버에 준비돼 있습니다. "
+          : "<br>📷 사진·스캔 문서는 <b>아직 못 읽습니다</b> — 이 서버에 글자를 알아보는 기능(OCR)이 없습니다. ";
+      }).catch(function () { /* 못 물어봤으면 아무 약속도 하지 않는다 */ });
+    })();
+  </script>
   </section>
 
   <section class="card">

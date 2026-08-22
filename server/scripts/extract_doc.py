@@ -63,11 +63,15 @@ def _ocr_engine():
         logging.getLogger("RapidOCR").setLevel(logging.ERROR)  # stderr 로그 소음 줄이기
         from rapidocr import RapidOCR
         from rapidocr.utils.typings import OCRVersion, LangRec, ModelType
-        # ⚠ 모델 자리를 **문자열로 못박는다**(2026-08-22, Windows 실측으로 발견).
-        #   안 주면 RapidOCR이 스스로 WindowsPath 객체를 넣는데, 그 설정 라이브러리가
-        #   「Value 'WindowsPath' is not a supported primitive type」으로 거부해 **OCR이 아예 안 뜬다.**
-        #   WSL(운영)에서는 PosixPath라 통과해서 여태 안 드러났다 — Windows 설치본에서만 나는 결함이다.
-        #   str()로 넘기면 두 환경 다 안전하다.
+        # ⚠ 모델 자리를 **문자열로 못박는다**(2026-08-22).
+        #   안 주면 RapidOCR이 스스로 Path 객체를 넣는데, 설정 라이브러리(omegaconf)가
+        #   「is not a supported primitive type」으로 거부해 **OCR이 아예 안 뜬다.**
+        #   ⚠ **뿌리는 OS가 아니라 omegaconf 판본이다**(2026-08-22 검토관이 잡아 정정).
+        #     처음엔 「WSL은 PosixPath라 통과한다 — Windows 전용 결함」이라고 적었는데 **틀렸다.**
+        #     동봉본의 omegaconf 2.0.0으로 직접 재 보니 `is_primitive_type(Path)`도
+        #     `is_primitive_type(PurePosixPath)`도 **둘 다 False**다 — OS와 무관하게 거부한다.
+        #     WSL이 멀쩡했던 것은 거기 omegaconf가 더 높은 판이라서다. 틀린 뿌리를 적어 두면
+        #     다음 사람이 「리눅스니까 괜찮겠지」로 판단한다. str()이면 어느 판에서도 안전하다.
         import os as _os
         import rapidocr as _r
         _모델방 = _os.path.join(_os.path.dirname(_r.__file__), "models")
@@ -89,22 +93,41 @@ def ocr_image(path: str) -> str:
 
 
 def ocr_pdf(path: str) -> str:
-    import fitz  # pymupdf — 페이지를 이미지로 렌더(poppler 불필요)
     import tempfile
     import shutil
+    # ⚠ **import를 격리막 안에서 한다**(2026-08-22 검토관 [높음] 수리). 밖에 두면 그 부품이
+    #   import 순간에 stdout으로 찍는 글이 **추출문 맨 앞에 붙어 그대로 지식이 된다.**
+    #   실제로 그랬다: `import fitz`가 stdout에 99자를 찍었고(실측), 그 탓에 OCR이 한 글자도
+    #   못 읽어도 stdout이 안 비어 소비자들의 `if (!text.trim())` 정직 관문을 **전부 통과**했다
+    #   — 「반입 성공(1조각)」으로 영문 경고문이 지식이 되던 자리다.
+    #   부품을 바꿔서 우연히 조용해진 게 아니라, **자리를 옮겨서** 다음 부품에도 안 새게 했다.
     with _stdout_to_stderr():
+        # pypdfium2 — 구글 PDFium 기반. **PyMuPDF(fitz)를 여기서 걷어냈다**(2026-08-22).
+        #   왜: PyMuPDF는 AGPL-3.0(또는 Artifex 상용)이라 **우리가 배포하는 설치본에 실을 수 없다** —
+        #   공공·금융 납품 심사·SBOM 점검에서 잡히면 제품 소스 공개 또는 상용 라이선스 구매를 요구받는다.
+        #   pypdfium2는 BSD-3-Clause + Apache-2.0이라 재배포에 그 의무가 없다.
+        #   ⚠ pdfium은 **dpi가 아니라 배율(scale)**을 받는다 — PDF 기본이 72dpi라 300dpi = 300/72.
+        #     실측으로 fitz와 같은 크기가 나오는 것을 확인했다(1369×311 vs 1368×310, ±2px).
+        import pypdfium2 as pdfium
         eng = _ocr_engine()
-        doc = fitz.open(path)
-        total = len(doc)
-        tmpdir = tempfile.mkdtemp(prefix="gijo-ocr-")
         parts = []
+        tmpdir = tempfile.mkdtemp(prefix="gijo-ocr-")
+        doc = pdfium.PdfDocument(path)
         try:
+            total = len(doc)
             for i in range(min(total, OCR_MAX_PAGES)):
-                pix = doc[i].get_pixmap(dpi=300)
+                # ⚠ PNG 파일을 거치는 것은 **일부러**다. RapidOCR은 넘긴 자료형에 따라 색을 다르게
+                #   다룬다 — 경로·PIL은 RGB→BGR로 바꿔 주지만 **numpy 배열은 이미 BGR로 치고 그냥 쓴다.**
+                #   배열로 바로 넘기면 적·청이 뒤바뀐 그림이 들어가는데, 흑백 스캔에서는 티가 안 나고
+                #   컬러 문서에서만 인식률이 떨어져 **눈으로는 못 잡는다**(설계관 2026-08-22).
                 img_path = os.path.join(tmpdir, f"p{i}.png")
-                pix.save(img_path)
+                doc[i].render(scale=300 / 72).to_pil().save(img_path)
                 parts.append(_ocr_lines(eng(img_path)))
         finally:
+            try:
+                doc.close()   # pdfium은 파일 핸들을 쥔다 — 임시 폴더를 지우기 전에 놓아 준다
+            except Exception:
+                pass
             shutil.rmtree(tmpdir, ignore_errors=True)
     text = "\n".join(p for p in parts if p)
     if total > OCR_MAX_PAGES:
@@ -114,6 +137,21 @@ def ocr_pdf(path: str) -> str:
 
 OCR_MISSING_MSG = ("이 파일은 스캔·이미지 문서라 글자를 읽으려면 OCR 구성요소가 필요합니다 — "
                    "서버에 OCR을 설치해 주세요(server/requirements-ocr.txt). 관리자에게 문의하세요.")
+
+# Windows 설치본에는 OCR이 **동봉돼 있다**. 그런데도 못 뜨는 경우가 있고, 그때 위 문구는
+# 「깔려 있는데 깔라고」 말하는 셈이 된다 — 고객이 따를 수 없는 안내다(2026-08-22 검토관 지적).
+# 파이썬은 DLL 적재 실패도 ImportError로 올려 주므로 **둘을 갈라서** 안내한다.
+OCR_BROKEN_MSG = ("이 파일은 스캔·이미지 문서인데, 함께 설치된 OCR 구성요소가 **뜨지 못했습니다** "
+                  "— 윈도우 실행 라이브러리(Visual C++ 재배포 패키지)나 미디어 기능이 없는 "
+                  "환경일 수 있습니다. 관리자에게 이 문구 그대로 알려 주세요.")
+
+
+def _ocr_실패문구(e: BaseException) -> str:
+    """OCR을 못 쓰는 이유를 갈라 안내한다 — 「안 깔림」과 「깔렸는데 못 뜸」은 할 일이 다르다."""
+    본문 = str(e)
+    깨짐 = ("DLL load failed" in 본문 or "specified module could not be found" in 본문.lower()
+            or "specified procedure could not be found" in 본문.lower())
+    return OCR_BROKEN_MSG if 깨짐 else OCR_MISSING_MSG
 
 
 def extract_hwpx(path: str) -> str:
@@ -212,8 +250,8 @@ def main() -> None:
             # 이미지 = 스캔 문서 — OCR이 유일한 길이라 미설치면 정직 거절(exit 2).
             try:
                 text = ocr_image(path)
-            except ImportError:
-                print(f"ERROR: {OCR_MISSING_MSG}", file=sys.stderr)
+            except ImportError as e:
+                print(f"ERROR: {_ocr_실패문구(e)}", file=sys.stderr)
                 sys.exit(2)
             if not text.strip():
                 print(f"ERROR: 이미지에서 글자를 찾지 못했습니다: {os.path.basename(path)} "

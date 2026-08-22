@@ -427,7 +427,65 @@ export function listDatasets(): { id: string; examples: number }[] {
     });
 }
 
+// ── 이 서버가 문서를 어디까지 읽을 수 있나 — **화면이 약속하기 전에 물어보는 자리** ──────────
+//
+// ■ 왜 (2026-08-22 게시 전 검토관 [높음])
+//   라이트 두 화면이 「사진·스캔 문서도 읽습니다 — OCR이 함께 들어 있습니다」라고 **조건 없이**
+//   단언했는데, OCR 동봉은 **Windows 설치본 전용**이다(mac 빌드는 스크립트가 그냥 건너뛴다).
+//   mac 라이트 사용자는 「들어 있다」는 화면을 보고 사진을 넣었다가 거절당한다 — 가짜 안내다.
+//
+// ⚠ **클라이언트 OS로 가르면 안 된다**(정찰 2026-08-22). 이 제품에는 클라와 서버가 다른 기계인
+//   **분산 모드**가 있어서(GIJO_SERVER_URL), mac 클라가 win 서버에 붙는 조합이 실제로 가능하다.
+//   그때 클라 OS로 판단하면 능력을 **정반대로** 표시한다. 읽는 일은 서버가 하니 서버가 답한다.
+//
+// ⚠ 파이썬을 띄워 보는 일이라 **캐시한다** — 화면이 열릴 때마다 프로세스를 띄우면 안 된다.
+let 추출능력캐시: { ocr: boolean; 잰때: number; 사유: string } | null = null;
+const 능력캐시수명ms = 5 * 60 * 1000;
+
+export async function 문서추출능력(): Promise<{ ocr: boolean; 사유: string }> {
+  if (추출능력캐시 && Date.now() - 추출능력캐시.잰때 < 능력캐시수명ms) {
+    return { ocr: 추출능력캐시.ocr, 사유: 추출능력캐시.사유 };
+  }
+  const 결과 = await new Promise<{ ocr: boolean; 사유: string }>((resolve) => {
+    // ⚠ **import만 보고 「된다」고 하지 않는다** — 이 제품이 실제로 데인 자리다(모델 자리를 Path로
+    //   넘겨 엔진 **생성**에서 거부당했는데 import는 멀쩡했다). 엔진을 만들어 보는 데까지 간다.
+    const 코드 = "import sys\n" +
+      "try:\n" +
+      "    sys.path.insert(0, r'" + serverScript("scripts").replace(/'/g, "") + "')\n" +
+      "    import extract_doc\n" +
+      "    extract_doc._ocr_engine()\n" +
+      "    print('OCR_OK')\n" +
+      "except Exception as e:\n" +
+      "    print('OCR_NO ' + type(e).__name__ + ': ' + str(e)[:200])\n";
+    execFile(serverPython("docs"), ["-c", 코드], { timeout: 120_000 }, (err, stdout, stderr) => {
+      const 답 = String(stdout || "").trim();
+      if (답.startsWith("OCR_OK")) return resolve({ ocr: true, 사유: "" });
+      const 원문 = 답.replace(/^OCR_NO\s*/, "") || String(stderr || err?.message || "").trim().slice(0, 200);
+      resolve({ ocr: false, 사유: 원문 || "확인하지 못했습니다" });
+    });
+  });
+  추출능력캐시 = { ...결과, 잰때: Date.now() };
+  return 결과;
+}
+
 export function registerDatasetRoutes(app: Express): void {
+  // 화면이 「무엇을 읽을 수 있다」고 말하기 전에 부르는 자리. 로그인만 있으면 된다(관리자 전용 아님) —
+  // 업로드 화면의 안내 문구가 쓰므로 담당자도 볼 수 있어야 한다.
+  app.get(
+    "/api/extract/capability",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      const c = await 문서추출능력();
+      res.json({
+        // 파이썬 없이 되는 것들 — 이건 서버 코드에 붙박이라 늘 참이다.
+        office: true,
+        pdf: true,
+        // 스캔·사진은 OCR이 있어야 한다.
+        ocr: c.ocr,
+        ocr사유: c.ocr ? "" : c.사유,
+      });
+    })
+  );
   app.post(
     "/api/dataset/convert",
     authMiddleware,

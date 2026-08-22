@@ -67,6 +67,7 @@ export function 화면이름(page: string): string {
   return g && g.title ? g.title : String(page).replace(/\.html.*$/, "");
 }
 import type { MyWorkItem } from "../mywork";
+import { 조사 } from "../../util/josa";
 
 export interface AgentToolParam {
   name: string;
@@ -353,7 +354,7 @@ export async function runGetAsset(args: Record<string, string>): Promise<string>
     const 보기 = 전체.slice(0, 8).map((a) => 자산표시이름(a.id)).join(", ") || "(없음)";
     const 더 = 전체.length > 8 ? ` … 외 ${전체.length - 8}개` : "";
     return (
-      `자산 "${args.assetId}"이(가) 검색되지 않았습니다.
+      `자산 "${args.assetId}"${조사(String(args.assetId ?? ""), "이")} 검색되지 않았습니다.
 ` +
       `등록된 자산 ${전체.length}개 중 몇 개: ${보기}${더}
 ` +
@@ -1077,7 +1078,7 @@ export async function runRunRedteam(args: Record<string, string>): Promise<strin
     const 보기 = 전체.slice(0, 8).map((a) => 자산표시이름(a.id)).join(", ") || "(없음)";
     const 더 = 전체.length > 8 ? ` … 외 ${전체.length - 8}개` : "";
     return (
-      `자산 "${args.assetId}"이(가) 검색되지 않았습니다.
+      `자산 "${args.assetId}"${조사(String(args.assetId ?? ""), "이")} 검색되지 않았습니다.
 ` +
       `등록된 자산 ${전체.length}개 중 몇 개: ${보기}${더}
 ` +
@@ -1361,7 +1362,7 @@ export function resolveFinding(assetId: string, needle: string): { ok: true; hit
   const asset = resolveAsset(assetId);
   if (!asset) {
     const ids = listAssets().map((a) => 자산표시이름(a.id)).join(", ") || "(없음)";
-    return { ok: false, error: `자산 "${assetId}"을(를) 찾을 수 없습니다. 등록된 자산 id: ${ids}` };
+    return { ok: false, error: `자산 "${assetId}"${조사(String(assetId ?? ""), "을")} 찾을 수 없습니다. 등록된 자산 id: ${ids}` };
   }
   if (asset.findings.length === 0) return { ok: false, error: `자산 ${asset.id}에는 조치할 취약점(finding)이 없습니다.` };
   const n = (needle ?? "").trim();
@@ -3286,7 +3287,7 @@ export async function runVerifyFinding(args: Record<string, string>): Promise<st
   const { targetRunner } = await import("../hardeningscan.js");
   const { netmikoRunnerFor } = await import("../netmikorunner.js");
   const asset = resolveAsset(args.assetId ?? "");
-  if (!asset) return `자산 "${args.assetId}"을(를) 찾을 수 없습니다. 자산 이름이나 id로 다시 지목해 주세요.`;
+  if (!asset) return `자산 "${args.assetId}"${조사(String(args.assetId ?? ""), "을")} 찾을 수 없습니다. 자산 이름이나 id로 다시 지목해 주세요.`;
   const v = currentViewer();
   const user = v?.userId ? findUserById(v.userId) : undefined;
   let onlyKey: string | undefined;

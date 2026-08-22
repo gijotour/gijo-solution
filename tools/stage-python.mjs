@@ -36,6 +36,125 @@ if (process.platform !== "win32") {
 }
 
 const 루트 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+// ── 어떤 MSVC 런타임을 동봉해야 하는가 — **손 목록 대신 바이너리에서 읽는다** ────────────────
+//
+// ■ 왜 (2026-08-22, 게시 전 검토관 [높음] + 설계관 실증)
+//   동봉 목록을 손으로 적었더니 **양쪽으로 다 틀렸다**: onnxruntime이 무는 `msvcp140_1.dll`이
+//   빠져 깨끗한 고객 PC에서 OCR이 통째로 죽는데, 정작 목록에 있던 `vcomp140.dll`은 이 트리에서
+//   **아무도 안 문다**. 목록이 llama-cuda 것을 물려받았는데 llama.cpp가 무는 것과 onnxruntime이
+//   무는 것이 달랐던 것이다.
+//
+// ⚠ **「빈 PATH로 검증했다」로는 이 부류를 원리상 못 잡는다.** 윈도우 DLL 탐색 순서가
+//   ①적재됨 ②API set ③**응용프로그램 디렉터리** ④**System32** ⑤현재 디렉터리 ⑥PATH라서,
+//   System32는 PATH와 무관하게 늘 검색된다. 실증: PATH를 빈 문자열로 줘도 `import onnxruntime`이
+//   성공하고, 적재 경로를 뽑으면 `C:\WINDOWS\SYSTEM32\MSVCP140_1.dll`이 조용히 채워져 있었다.
+//   개발 기계에서는 영원히 초록이고 고객 PC에서만 터진다. 그래서 **정적 분석**이 유일한 관문이다.
+//
+// ■ 어떻게 — PE 헤더의 임포트 표를 직접 읽는다(node 내장만, toolsdeps.test 계약).
+//   지연 임포트(DataDirectory[13])도 함께 본다 — 다른 표라서 빼면 안 보인다.
+const OS기본DLL = new Set([
+  // 윈도우가 늘 갖고 있는 것들 — 동봉 대상이 아니다(API set ms-win-*는 접두어로 거른다).
+  "kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll",
+  "ws2_32.dll", "crypt32.dll", "bcrypt.dll", "ntdll.dll", "rpcrt4.dll", "gdi32.dll",
+  "comdlg32.dll", "shlwapi.dll", "version.dll", "winmm.dll", "imm32.dll", "psapi.dll",
+  "userenv.dll", "secur32.dll", "iphlpapi.dll", "dbghelp.dll", "powrprof.dll", "cabinet.dll",
+  "wldap32.dll", "normaliz.dll", "setupapi.dll", "cfgmgr32.dll", "dnsapi.dll", "mswsock.dll",
+  "mf.dll", "mfplat.dll", "mfreadwrite.dll", "d3d11.dll", "dxgi.dll", "dwmapi.dll", "uxtheme.dll",
+  "opengl32.dll", "glu32.dll", "avifil32.dll", "avicap32.dll", "msvfw32.dll", "comctl32.dll",
+]);
+
+/** PE 파일 하나가 무는 DLL 이름들(정적 + 지연). 못 읽으면 빈 집합 — 판단은 부르는 쪽에서. */
+function PE임포트(파일) {
+  const 이름들 = new Set();
+  let b;
+  try { b = fs.readFileSync(파일); } catch { return 이름들; }
+  try {
+    if (b.length < 0x40 || b.readUInt16LE(0) !== 0x5a4d) return 이름들;   // "MZ"
+    const peOff = b.readUInt32LE(0x3c);
+    if (peOff + 24 > b.length || b.readUInt32LE(peOff) !== 0x00004550) return 이름들;  // "PE\0\0"
+    const 섹션수 = b.readUInt16LE(peOff + 6);
+    const opt = peOff + 24;
+    const magic = b.readUInt16LE(opt);
+    const pe32plus = magic === 0x20b;
+    // DataDirectory 시작 = optional header + (PE32는 96, PE32+는 112)
+    const dd = opt + (pe32plus ? 112 : 96);
+    const 섹션시작 = opt + b.readUInt16LE(peOff + 20);
+    const 섹션들 = [];
+    for (let i = 0; i < 섹션수; i++) {
+      const s = 섹션시작 + i * 40;
+      if (s + 40 > b.length) break;
+      섹션들.push({ va: b.readUInt32LE(s + 12), size: b.readUInt32LE(s + 16), ptr: b.readUInt32LE(s + 20) });
+    }
+    const rva에서오프셋 = (rva) => {
+      for (const s of 섹션들) if (rva >= s.va && rva < s.va + Math.max(s.size, 1)) return s.ptr + (rva - s.va);
+      return -1;
+    };
+    const 문자열 = (off) => {
+      if (off < 0 || off >= b.length) return "";
+      let e = off;
+      while (e < b.length && b[e] !== 0) e++;
+      return b.toString("latin1", off, e);
+    };
+    // [1] = 임포트 표(20바이트 항목, 이름 RVA는 +12), [13] = 지연 임포트(32바이트 항목, 이름 RVA는 +4)
+    for (const [칸, 항목크기, 이름칸] of [[1, 20, 12], [13, 32, 4]]) {
+      const rva = b.readUInt32LE(dd + 칸 * 8);
+      if (!rva) continue;
+      let p = rva에서오프셋(rva);
+      if (p < 0) continue;
+      for (let i = 0; i < 4096 && p + 항목크기 <= b.length; i++, p += 항목크기) {
+        const 조각 = b.subarray(p, p + 항목크기);
+        if (조각.every((v) => v === 0)) break;                    // 널 항목이 표의 끝
+        const 이름rva = b.readUInt32LE(p + 이름칸);
+        if (!이름rva) continue;
+        const n = 문자열(rva에서오프셋(이름rva)).toLowerCase();
+        if (n.endsWith(".dll")) 이름들.add(n);
+      }
+    }
+  } catch { /* 형식이 낯설면 조용히 비운다 — 아래에서 손 목록이 최소선을 받친다 */ }
+  return 이름들;
+}
+
+/**
+ * 꾸린 트리가 실제로 무는 것 중 **트리에도 없고 OS 기본도 아닌** MSVC 런타임 이름들.
+ * 이것이 「동봉해야 할 것」의 정답이다 — 사람이 적은 목록이 아니라.
+ */
+function 필요한MSVC(뿌리) {
+  const 검사대상 = [];
+  const 가진것 = new Set();
+  (function 훑기(d) {
+    let 목록;
+    try { 목록 = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of 목록) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { 훑기(p); continue; }
+      const 소문자 = e.name.toLowerCase();
+      if (/\.(dll|pyd|exe)$/.test(소문자)) {
+        검사대상.push(p);
+        if (소문자.endsWith(".dll")) 가진것.add(소문자);
+      }
+    }
+  })(뿌리);
+  const 모자란것 = new Set();
+  for (const f of 검사대상) {
+    for (const n of PE임포트(f)) {
+      if (가진것.has(n) || OS기본DLL.has(n) || n.startsWith("api-ms-win-") || n.startsWith("ext-ms-")) continue;
+      // 우리가 채울 수 있는 것은 System32에 있는 MSVC 런타임뿐이다. 그 밖의 결손은 아래에서 알린다.
+      모자란것.add(n);
+    }
+  }
+  const 채울수있는것 = [];
+  const 못채우는것 = [];
+  for (const n of [...모자란것].sort()) {
+    const s = path.join(process.env.SystemRoot ?? "C:/Windows", "System32", n);
+    (fs.existsSync(s) && /^(msvcp|vcruntime|vcomp|concrt)\d/.test(n) ? 채울수있는것 : 못채우는것).push(n);
+  }
+  if (못채우는것.length) {
+    // 조용히 넘기지 않는다 — cv2가 무는 Media Foundation처럼 **OS 기능**이라 동봉으로 못 푸는 것도 있다.
+    console.log(`[stage-python]   ⚠ 트리에 없고 동봉으로도 못 채우는 참조: ${못채우는것.join(", ")} (OS 기능일 수 있음)`);
+  }
+  return 채울수있는것;
+}
 const OUT = path.join(루트, "client", "build", "python-dist");
 // 판 고정 — 운영(WSL)이 3.12.3이라 같은 계열로 맞춘다. 바꿀 땐 env로 덮어쓴다.
 const 판 = process.env.GIJO_PYTHON_VERSION || "3.12.10";
@@ -49,15 +168,50 @@ const 표식 = path.join(OUT, "GIJO-PYTHON-VERSION.json");
 //   **자가 검증까지 통째로 건너뛰고** 그 폴더가 그대로 설치본에 실렸다 — 25MB를 싣고도 PDF는
 //   안 읽히는 상태가 조용히 출하된다(이 스크립트가 막으려던 바로 그 실패 모드).
 //   실제로 pypdf를 지우고 돌려 재현했다. 그래서 **꾸림의 결과물 셋을 다 확인**한다.
+// ★★ **「무엇으로 꾸렸는가」를 지문으로 남기고, 그것이 바뀌면 무조건 다시 꾸린다**(2026-08-22).
+//
+//   ⚠ 위의 「결과물 셋을 다 확인」만으로는 **부족했다.** 설계관이 실증한 실패 모드:
+//     오늘 AGPL 부품(PyMuPDF)을 걷어내려고 requirements-ocr.txt를 고치고 MSVC 목록을 고쳤는데,
+//     이미 꾸려진 폴더는 손으로 적은 확인 목록(python.exe·pypdf·모델·msvcp140·._pth)을
+//     **여전히 전부 만족**한다. 그래서 `npm run dist`를 돌려도 여기서 exit 0으로 건너뛰고
+//     **AGPL이 그대로 출하되고, 새 부품(pypdfium2)은 안 심기고, 자가검증도 안 돈다.**
+//     즉 라이선스 사고를 고쳤다고 믿는 사람과 실제 출하물이 달라진다.
+//   뿌리는 판정 조건에 **입력**(요구 파일·판·목록)이 하나도 안 들어 있던 것이다.
+//   결과물 목록은 사람이 적는 한 늘 뒤처지지만, 지문은 입력이 바뀌면 자동으로 바뀐다.
+const OCR요구파일 = path.join(루트, "server", "requirements-ocr.txt");
+function 꾸림지문() {
+  const ocr = fs.existsSync(OCR요구파일)
+    ? fs.readFileSync(OCR요구파일, "utf8").replace(/#.*$/gm, "").replace(/\s+/g, " ").trim()
+    : "";
+  return createHash("sha256").update(JSON.stringify({
+    판,
+    pypdf: process.env.GIJO_PYPDF_VERSION || "",
+    ocr,                                        // 부품 목록·판이 한 글자라도 바뀌면 다시 꾸린다
+    ocr넣나: process.env.GIJO_SKIP_OCR !== "1",   // 건너뛰기로 구운 폴더를 「온전함」으로 오인하지 않는다
+    꾸림규약: 2,                                  // 이 스크립트의 꾸리는 방식 자체가 바뀌면 손으로 올린다
+  })).digest("hex").slice(0, 16);
+}
+
 if (fs.existsSync(표식)) {
   try {
     const 있는판 = JSON.parse(fs.readFileSync(표식, "utf8"));
     const pth전 = fs.readdirSync(OUT).find((f) => /^python\d+\._pth$/.test(f));
+    if (있는판.recipe !== 꾸림지문()) {
+      console.log("[stage-python] 꾸림 재료가 바뀌었습니다(부품 목록·판·OCR 여부) — 다시 꾸립니다.");
+      throw new Error("recipe-changed");   // 아래 catch가 받아 새로 꾸리게 한다
+    }
     // ⚠ OCR까지 본다 — 안 그러면 OCR을 넣기 전에 꾸린 폴더가 「온전함」으로 통과해
     //   **OCR 없는 설치본**이 조용히 나간다(pypdf를 지우고 재현했던 것과 같은 부류).
-    const OCR확인 = process.env.GIJO_SKIP_OCR === "1" ||
-      (fs.existsSync(path.join(OUT, "site-packages", "rapidocr", "models", "korean_PP-OCRv5_rec_mobile.onnx")) &&
-       fs.existsSync(path.join(OUT, "msvcp140.dll")));
+    //   ⚠ 확인 항목이 **한 개씩만** 있었다(rec 모델 1개 + msvcp140 1개). 그러면 det 모델이나
+    //     onnxruntime이 사라진 폴더도 「온전함」으로 통과한다 — 실제로 그렇게 통과했다.
+    //     지금은 OCR이 돌기 위해 **반드시 있어야 하는 것 전부**를 본다. 건너뛰기(SKIP) 갈래는
+    //     위의 꾸림지문이 이미 갈라 주므로, 여기서는 「넣기로 했으면 다 있나」만 본다.
+    const OCR확인 = process.env.GIJO_SKIP_OCR === "1" || [
+      path.join(OUT, "site-packages", "rapidocr", "models", "ch_PP-OCRv5_det_mobile.onnx"),
+      path.join(OUT, "site-packages", "rapidocr", "models", "korean_PP-OCRv5_rec_mobile.onnx"),
+      path.join(OUT, "site-packages", "onnxruntime"),
+      path.join(OUT, "site-packages", "pypdfium2"),
+    ].every((p) => fs.existsSync(p));
     const 온전한가 =
       있는판.version === 판 &&
       fs.existsSync(path.join(OUT, "python.exe")) &&
@@ -190,6 +344,8 @@ if (!쓴pip) {
 //     웹 재구성 「130MB」 둘 다 틀렸다 — 전자는 리눅스 기준, 후자는 압축 크기였다.
 //   ⚠ 이건 오늘 잰 값이다. 판이 바뀌면 다시 재야 한다.
 const OCR넣기 = process.env.GIJO_SKIP_OCR !== "1";
+// 동봉한 MSVC 런타임 목록 — 아래 블록에서 채우고 **표식에 남긴다**(어떤 판이 나갔는지 소명용).
+let MSVC = [];
 if (OCR넣기) {
   console.log("[stage-python] 3.5/5 OCR 부품 심기(약 320MB — 시간이 걸립니다)");
   const ocr목록 = fs.readFileSync(path.join(루트, "server", "requirements-ocr.txt"), "utf8")
@@ -211,7 +367,10 @@ if (OCR넣기) {
     const p = path.join(사이트, "rapidocr", "models", f);
     if (fs.existsSync(p)) { 지운양 += fs.statSync(p).size; fs.rmSync(p, { force: true }); }
   }
+  // ⚠ 못 찾으면 **소리를 낸다**(2026-08-22 검토관). 조용히 넘어가면 rapidocr 판이 올라
+  //   파일 이름이 바뀐 날부터 「안 쓰는 모델 제거」가 아무도 모르게 사라지고 설치본이 30MB 불어난다.
   if (지운양) console.log(`[stage-python]   · 안 쓰는 v6 모델 제거: ${(지운양 / 1048576).toFixed(1)}MB(한국어 미지원)`);
+  else console.log("[stage-python]   ⚠ 지울 v6 모델을 못 찾았습니다 — rapidocr 판이 바뀌어 파일 이름이 달라졌는지 확인하세요.");
   // ★ 한국어 v5 모델을 **미리 담는다** — 안 담으면 고객 기계가 첫 실행 때 중국 CDN(modelscope.cn)으로
   //   나간다. 폐쇄망에서는 실패하고, 폐쇄망이 아니어도 **우리가 봉인한 egress를 새로 뚫는 셈**이다.
   //   ⚠ RapidOCR은 파일이 있어도 **sha256이 자기 목록과 다르면 지우고 다시 받는다** — 해시를
@@ -221,13 +380,17 @@ if (OCR넣기) {
   //   ⚠ **빈 PATH 자가검증으로는 이 누락을 원리상 못 잡는다** — System32는 PATH와 무관하게
   //     검색되므로 개발 기계에서는 늘 성공한다(설계관 2026-08-22 지적). 깨끗한 고객 PC에서만
   //     터지는 부류라, llama-cuda가 쓰는 방식 그대로 **exe 옆에 동봉**한다(MS 공식 허용 방식).
-  const MSVC = ["msvcp140.dll", "vcomp140.dll"];
+  //   ⚠ **손으로 적은 목록은 반드시 어긋난다**(2026-08-22 실증). 이 목록이 llama-cuda 것을
+  //     물려받은 탓에 실제와 두 군데 어긋나 있었다: onnxruntime이 무는 **msvcp140_1.dll이 빠졌고**
+  //     (깨끗한 고객 PC에서 OCR이 통째로 죽는다), 반대로 vcomp140.dll은 여기서 **아무도 안 문다**.
+  //     그래서 목록을 손으로 적는 대신 **꾸린 트리에서 직접 읽어** 정한다(아래 필요한MSVC).
+  MSVC = [...필요한MSVC(OUT)];
   for (const f of MSVC) {
     const s = path.join(process.env.SystemRoot ?? "C:/Windows", "System32", f);
     if (!fs.existsSync(s)) { console.error(`★ MSVC 런타임 없음: ${s}`); process.exit(1); }
     fs.copyFileSync(s, path.join(OUT, f));
   }
-  console.log(`[stage-python]   · MSVC 런타임 ${MSVC.length}개 동봉(깨끗한 고객 PC 대비)`);
+  console.log(`[stage-python]   · MSVC 런타임 ${MSVC.length}개 동봉(바이너리에서 유도): ${MSVC.join(", ")}`);
 }
 
 // ⑤ 자가 검증 — ★ **PATH를 비워 「고객 기계 모양」으로** 돌린다.
@@ -255,30 +418,66 @@ try {
     console.error(`★ 자가 검증 실패 — 동봉본이 PDF에서 한글을 못 뽑았습니다(고객 기계에서 죽는다는 뜻).\n뽑힌 글: ${JSON.stringify(글.slice(0, 200))}`);
     process.exit(1);
   }
-  // ★ OCR도 **실제로 불러 본다** — 판 불일치(cp313 wheel)·모델 누락은 여기서만 잡힌다.
-  //   설치본이 나간 뒤 고객 기계에서 드러나면 되돌릴 수 없다.
+  // ★ OCR도 **제품 경로 그대로 실제로 읽혀 본다**(2026-08-22 검토관 [중] 수리).
+  //   ⚠ 예전엔 `import rapidocr,fitz,onnxruntime` + 모델 **파일 이름 나열**이 전부였는데,
+  //     주석과 커밋 메시지는 「OCR 실제 로드」라고 적었다 — **관문의 문구가 실제 검사보다 셌다.**
+  //     그래서 바로 그날 고친 결함(모델 자리를 Path로 넘겨 엔진 생성이 거부되던 것)이 재발해도
+  //     이 관문은 초록이었다. 엔진 생성 시점의 실패는 import로는 원리상 안 잡힌다.
+  //   이제 저장소의 한글 스캔 표본을 **extract_doc.py에 물려** 한글이 나오는지까지 본다.
   if (OCR넣기) {
-    const 확인 = "import rapidocr,fitz,onnxruntime,os;" +
-      "m=os.path.join(os.path.dirname(rapidocr.__file__),'models');" +
-      "ms=sorted(f for f in os.listdir(m) if f.endswith('.onnx'));" +
-      "print('OCR', onnxruntime.__version__, len(ms), ','.join(ms))";
-    const o = String(execFileSync(path.join(OUT, "python.exe"), ["-c", 확인], {
-      env: 깨끗한env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 300_000,
-    })).trim();
-    if (!/korean_PP-OCRv5_rec/.test(o)) {
-      console.error(`★ 한국어 OCR 모델이 안 담겼습니다 — 고객 기계가 첫 실행에 CDN으로 나갑니다.\n  확인 결과: ${o}`);
+    const 표본이미지 = path.join(루트, "server", "test", "fixtures", "scan-ko.png");
+    if (!fs.existsSync(표본이미지)) {
+      console.error(`★ OCR 자가 검증 표본이 없습니다: ${표본이미지}`);
       process.exit(1);
     }
-    console.log(`[stage-python]   · OCR 자가 검증: ${o}`);
+    let 읽은글 = "";
+    try {
+      읽은글 = String(execFileSync(path.join(OUT, "python.exe"), [추출기, 표본이미지], {
+        env: 깨끗한env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 600_000,
+      }));
+    } catch (e) {
+      console.error(`★ OCR 자가 검증 실패 — 동봉본이 한글 이미지를 못 읽었습니다(고객 기계에서 죽는다는 뜻).\n${String((e && e.stderr) || (e && e.message) || e).slice(0, 500)}`);
+      process.exit(1);
+    }
+    if (!/[가-힣]/.test(읽은글)) {
+      console.error(`★ OCR 자가 검증 실패 — 한글이 한 글자도 안 나왔습니다.\n뽑힌 글: ${JSON.stringify(읽은글.slice(0, 200))}`);
+      process.exit(1);
+    }
+    console.log(`[stage-python]   · OCR 자가 검증(실제 읽기): ${JSON.stringify(읽은글.trim().slice(0, 40))}`);
   }
   const out = execFileSync(path.join(OUT, "python.exe"), ["-c", "import pypdf,sys;print(pypdf.__version__, sys.version.split()[0])"], {
     env: 깨끗한env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000,
   });
   const [심은pypdf, py판] = String(out).trim().split(/\s+/);
   // 무엇을 실었는지 남긴다 — 사후에 「그때 어떤 물건이 나갔나」를 되짚을 근거(검토관 2026-08-22).
+  //   ⚠ 예전엔 이 기록에 **OCR이 한 글자도 없었다** — 300MB가 넘는 물건을 싣고도 표식에는
+  //     python·pypdf만 있었다. 그래서 「그 게시본에 OCR이 있었나·무슨 판이었나」에 답할 근거가
+  //     없었고, 하필 라이선스 사고를 낸 부품(PyMuPDF)이 바로 그 기록 밖에 있었다.
+  //     이제 심은 OCR 부품의 **판까지** 남긴다(라이선스 소명·재현 둘 다 여기서 시작한다).
+  let OCR판 = null;
+  if (OCR넣기) {
+    try {
+      const 재기 = [
+        "import json, importlib.metadata as md",
+        "r = {}",
+        "for p in ['rapidocr','onnxruntime','pypdfium2','opencv-python','numpy','pillow','pypdf']:",
+        "    try: r[p] = md.version(p)",
+        "    except Exception: pass",
+        "print(json.dumps(r))",
+      ].join("\n");
+      OCR판 = JSON.parse(String(execFileSync(path.join(OUT, "python.exe"), ["-c", 재기], {
+        env: 깨끗한env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 120_000,
+      })).trim());
+    } catch (e) {
+      // 판을 못 읽는 것은 치명은 아니지만 **조용히 넘기지 않는다** — 기록의 목적이 사라진다.
+      console.log(`[stage-python]   ⚠ OCR 부품 판을 기록하지 못했습니다: ${String((e && e.message) || e).slice(0, 160)}`);
+    }
+  }
   fs.writeFileSync(표식, JSON.stringify({
     version: 판, python: py판, pypdf: 심은pypdf, pypdfRequested: pypdf판,
     sha256: 해시, pip: 쓴pip, source: 미리받음 ? 캐시zip : URL,
+    ocr: OCR넣기, ocrPackages: OCR판, msvc: OCR넣기 ? MSVC : [],
+    recipe: 꾸림지문(),   // ★ 이 값이 달라지면 다음 빌드가 무조건 다시 꾸린다
     stagedAt: new Date().toISOString(),
   }, null, 2) + "\n", "utf8");
   const 파일수 = 세기(OUT);

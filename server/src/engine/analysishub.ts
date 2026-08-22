@@ -22,6 +22,7 @@ import { listAssets } from "./assets";
 import { isRealVulnerability } from "./agenttools";
 import { chat } from "./llm";
 import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
+import { 말조사 } from "../util/josa";
 
 export type AnalysisSource = "vuln" | "log" | "product" | "hardening";
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
@@ -548,7 +549,7 @@ export function parseProductReport(productName: string, content: string): Report
       entity: host,
       severity: "high",
       priority: computePriority("high", signals),
-      detail: `${productName} 리포트에서 ${host}이(가) ${times}회 등장 — 잔존/재발 의심.`,
+      detail: `${productName} 리포트에서 ${말조사(host, "이")} ${times}회 등장 — 잔존/재발 의심.`,
       signals,
       aiSummary: "",
       ref: productName,
@@ -651,7 +652,7 @@ export function computeCorrelations(events: AnalysisEvent[]): Correlation[] {
       entity: 이름,
       sources,
       eventIds: evs.map((e) => e.id),
-      note: `${이름}이(가) ${sources.map(sourceLabel).join(" + ")}에 동시 출현 — 교차 위험 가능성. 함께 조사 권고.`,
+      note: `${말조사(이름, "이")} ${sources.map(sourceLabel).join(" + ")}에 동시 출현 — 교차 위험 가능성. 함께 조사 권고.`,
     });
   }
   return out;

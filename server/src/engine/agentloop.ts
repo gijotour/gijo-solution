@@ -22,6 +22,7 @@ import { 문서지목질문 } from "./memory";
 import { recordWork, TOOL_WORK_KIND } from "./worklog";
 import { listTasks } from "./tasks";
 import { 자산표시이름, listAssets } from "./assets";
+import { 말조사 } from "../util/josa";
 
 const MAX_STEPS = 5;
 
@@ -330,9 +331,9 @@ export function buildDecisionPrompt(instruction: string): string {
 function approvalMessage(approval: PendingApproval): string {
   if (approval.missing.length) {
     const labels = approval.fields.filter((f) => approval.missing.includes(f.key)).map((f) => f.label);
-    return `${approval.label}을(를) 준비했습니다. ${labels.join("·")} 값이 필요합니다 — 아래에서 채우고 승인해 주세요.`;
+    return `${말조사(approval.label, "을")} 준비했습니다. ${labels.join("·")} 값이 필요합니다 — 아래에서 채우고 승인해 주세요.`;
   }
-  return `${approval.label}을(를) 준비했습니다. 아래 값을 확인하고 승인해 주세요.`;
+  return `${말조사(approval.label, "을")} 준비했습니다. 아래 값을 확인하고 승인해 주세요.`;
 }
 
 // 최종 답변 재작성 — 도구 결과(사실)를 근거로 일반 chat 경로에서 한국어 답을 만든다.
@@ -1894,7 +1895,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     if (tool?.write) {
       reportProgress("review", `${tool.label} — 확인을 받습니다`);
       return {
-        output: `${tool.label}을(를) 진행합니다 — 아래 내용을 확인하고 승인해 주세요.`,
+        output: `${말조사(tool.label, "을")} 진행합니다 — 아래 내용을 확인하고 승인해 주세요.`,
         toolCalls: [],
         approval: buildApproval(tool, forced.args, instruction, ""),
       };
