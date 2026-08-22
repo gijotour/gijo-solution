@@ -58,11 +58,21 @@ const 목록읽기 = db.prepare(`SELECT * FROM sbom_reviews ORDER BY reviewedAt 
 const 하나읽기 = db.prepare(`SELECT * FROM sbom_reviews WHERE id=?`);
 const 부품읽기 = db.prepare(`SELECT * FROM sbom_review_components WHERE reviewId=? ORDER BY name`);
 const 지우기 = db.prepare(`DELETE FROM sbom_reviews WHERE id=?`);
+// 판정 규칙이 바뀌면 저장본이 낡는다 — 다시 볼 때 **제자리로 돌려놓기** 위한 것(아래 검수상세 참고).
+const 등급고치기 = db.prepare(`UPDATE sbom_review_components SET tier=@tier, needsCheck=@needsCheck WHERE reviewId=@reviewId AND name=@name AND version=@version`);
+const 요약고치기 = db.prepare(`UPDATE sbom_reviews SET summary=@summary WHERE id=@id`);
 
 /** 한 번에 담는다 — 부품 수천 개라 낱개 INSERT는 느리다. */
 const 통째로넣기 = db.transaction((행: Record<string, unknown>, 부품들: Record<string, unknown>[]) => {
   넣기.run(행);
   for (const c of 부품들) 부품넣기.run(c);
+});
+
+/** 저장된 등급을 **지금 규칙으로 다시 매긴 값**으로 되돌린다.
+ *  ⚠ 읽기 중에 쓰지만 **수렴 연산**이다 — 어긋난 것이 있을 때만 돌고, 두 번 돌려도 같은 값이 된다. */
+const 낡은등급고치기 = db.transaction((id: string, 고칠것: Record<string, unknown>[], 요약: string) => {
+  for (const c of 고칠것) 등급고치기.run(c);
+  요약고치기.run({ id, summary: 요약 });
 });
 
 function 줄로(r: Record<string, unknown>): 검수요약 {
@@ -151,23 +161,47 @@ export function 검수목록(상한 = 100): 검수요약[] {
 export function 검수상세(id: string): { 요약: 검수요약; 부품: 검수부품[]; 면책: string } | null {
   const r = 하나읽기.get(id) as Record<string, unknown> | undefined;
   if (!r) return null;
-  const 부품 = (부품읽기.all(id) as Record<string, unknown>[]).map((c) => {
-    // ⚠ 판정을 **다시 계산해서** 문장을 붙인다 — 등급은 저장돼 있지만 「받게 되는 요구」·「근거」는
-    //   licenserisk가 만드는 말이라 여기 복사해 두지 않는다(규칙이 바뀌면 저장본이 낡는다).
-    const p = 등급판정(String(c.license ?? ""));
-    return {
-      name: String(c.name), version: String(c.version ?? ""),
-      license: String(c.license ?? ""),
-      licenseFrom: JSON.parse(String(c.licenseFrom || "[]")),
-      tier: String(c.tier) as 라이선스등급,
-      needsCheck: Number(c.needsCheck) === 1,
-      받게되는요구: p.받게되는요구,
-      근거: p.근거,
-      purl: (c.purl as string) ?? undefined,
-      supplier: (c.supplier as string) ?? undefined,
-    };
-  });
-  return { 요약: 줄로(r), 부품, 면책: 면책문구 };
+  const 줄들 = 부품읽기.all(id) as Record<string, unknown>[];
+  // ★ **등급도 다시 계산한 것을 쓴다**(2026-08-22 수리 — 알려진 한계였던 것을 닫는다).
+  //   그전엔 「받게 되는 요구」·「근거」만 다시 계산하고 **등급은 저장본을 그대로 보여 줬다.**
+  //   그래서 판정 규칙을 고치면 한 화면 안에서 **배지와 문장이 서로 다른 말**을 했다 —
+  //   배지는 🟢 고지만인데 설명은 「전체 소스 공개를 요구받습니다」가 되는 식이다.
+  //   규칙은 실제로 바뀐다: 이 파일이 사는 동안에만 쉼표 가르기·HPND·OFL 세 번 바뀌었고,
+  //   그때마다 이미 검수해 둔 이력이 조용히 낡았다. 담당자는 낡은 배지를 보고 판단한다.
+  const 판정들 = 줄들.map((c) => 등급판정(String(c.license ?? "")));
+  const 부품 = 줄들.map((c, i) => ({
+    name: String(c.name), version: String(c.version ?? ""),
+    license: String(c.license ?? ""),
+    licenseFrom: JSON.parse(String(c.licenseFrom || "[]")),
+    tier: 판정들[i].등급,
+    needsCheck: 판정들[i].확인필요,
+    받게되는요구: 판정들[i].받게되는요구,
+    근거: 판정들[i].근거,
+    purl: (c.purl as string) ?? undefined,
+    supplier: (c.supplier as string) ?? undefined,
+  }));
+
+  // 저장본이 낡았으면 **제자리로 돌려놓는다.** 목록 화면과 KPI는 저장된 summary를 쓰므로
+  // 여기서 고쳐 두지 않으면 상세를 열 때만 맞고 목록은 계속 틀린 숫자를 보인다.
+  const 고칠것 = 줄들
+    .map((c, i) => ({ c, p: 판정들[i] }))
+    .filter(({ c, p }) => String(c.tier) !== p.등급 || (Number(c.needsCheck) === 1) !== p.확인필요)
+    .map(({ c, p }) => ({
+      reviewId: id, name: String(c.name), version: String(c.version ?? ""),
+      tier: p.등급, needsCheck: p.확인필요 ? 1 : 0,
+    }));
+  let 요약줄 = 줄로(r);
+  if (고칠것.length) {
+    const 새요약 = 등급요약(판정들).등급별;
+    try {
+      낡은등급고치기(id, 고칠것, JSON.stringify(새요약));
+      요약줄 = { ...요약줄, summary: 새요약 };
+    } catch {
+      // 고쳐 두지 못해도 **보여 주는 값은 이미 새 판정**이다 — 화면이 틀리지는 않는다.
+      요약줄 = { ...요약줄, summary: 새요약 };
+    }
+  }
+  return { 요약: 요약줄, 부품, 면책: 면책문구 };
 }
 
 export function 검수삭제(id: string, actor?: string): boolean {

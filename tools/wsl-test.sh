@@ -45,7 +45,12 @@ mkdir -p "$DST_ROOT/client"
 #   짝을 이루는지**를 본다(lite-edition-shell: extraMetadata.gijoEdition ↔ main.ts). 빠뜨리면
 #   시험 파일이 수집 단계에서 죽어 「1 failed · 테스트 0」이 된다 — 제품 결함처럼 보이는 사본 결함이다.
 # ⚠ scripts/도 가져간다(2026-08-20) — 게시 관문 감시(wiringcontract)가 publish-release.mjs를 읽는다.
-rsync -a --delete --include='src/***' --include='scripts/***' --include='package.json' --include='electron-builder*.json' \
+# ⚠ smartmd/vendor/도 가져간다(2026-08-22) — 동봉 고지 감시(vendornotice)가 VERSIONS.md를 읽는다.
+#   그 파일이 **우리가 CDN 대신 직접 싣는 JS·글꼴 4종의 라이선스 원장**이다. 안 가져가면
+#   감시가 ENOENT로 죽는데, 하필 이 감시가 막으려는 사고가 **「조용히 0개를 읽는 것」**이라
+#   사본 결함이 그 사고와 똑같은 모양으로 나타난다.
+rsync -a --delete --include='src/***' --include='scripts/***' --include='smartmd/' --include='smartmd/vendor/***' \
+  --include='package.json' --include='electron-builder*.json' \
   --exclude='*' "$SRC_ROOT/client/" "$DST_ROOT/client/" || { echo "✗ client 동기화 실패"; exit 1; }
 # 저장소 뿌리의 knowledge/·tools/·mockups/를 읽는 시험도 있다.
 for d in knowledge tools mockups; do
