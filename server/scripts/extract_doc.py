@@ -49,6 +49,10 @@ def _stdout_to_stderr():
 IMG_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"}
 OCR_MAX_PAGES = 30   # 스캔 PDF OCR 상한 — 수십 쪽이 요청을 오래 붙잡지 않게(execFile 타임아웃 없음)
 OCR_MIN_TEXT = 20    # pypdf 추출이 이보다 짧으면 스캔으로 보고 OCR 폴백
+# ⚠ **server/src/engine/dataset.ts의 `스캔판정_최소글자`와 같은 값이어야 한다**(2026-08-22).
+#   PDF 텍스트 추출이 JS(unpdf)로 옮겨가면서, 「글자가 거의 없으니 스캔본이다」를 JS가 먼저
+#   판정해 이 스크립트로 넘긴다. 두 값이 갈리면 오늘은 OCR로 가던 문서가 내일은 안 가는
+#   조용한 회귀가 난다. 상수를 나눠 가질 길이 없어 양쪽에 적고 서로를 가리킨다.
 _OCR = None
 
 

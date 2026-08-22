@@ -58,10 +58,18 @@ export function serverPython(용도: "docs" | "tools" = "tools"): string {
   const 동봉본 = process.platform === "win32"
     ? path.join(뿌리, "python", "python.exe")
     : path.join(뿌리, "python", "bin", "python3");
-  // ★ 문서 추출만 동봉본을 python3 앞에 세운다 — 동봉본엔 pypdf가 확실히 있고, 시스템 파이썬은
-  //   있어도 pypdf가 없을 수 있다. 반대로 장비·모델 용도에서 앞세우면 **잘 되던 것이 죽는다**.
-  if (용도 === "docs") 후보.push(동봉본, "python3", "python");
-  else 후보.push("python3", "python", 동봉본); // 마지막 수단 — 없는 것보단 오류 문구라도 정확해진다
+  // ★ 동봉본은 **어느 용도에서도 앞세우지 않는다**(2026-08-22, PDF를 JS로 옮기면서 개정).
+  //
+  //   ⚠ 잠깐 「문서 추출만은 앞세운다」였다 — 동봉본엔 pypdf가 확실히 있으니 PDF에 유리하다는
+  //     근거였다. 그런데 **PDF가 JS(unpdf)로 넘어가면서 그 근거가 통째로 사라졌다.**
+  //     파이썬에 남은 문서 일은 이제 **OCR(스캔 PDF·이미지)뿐인데 동봉본엔 OCR이 없다** —
+  //     앞세우면 시스템 파이썬에 OCR을 깔아 둔 기계에서 이미지를 올릴 때 동봉본이 먼저 뽑혀
+  //     ModuleNotFoundError가 나고, 그것이 「이 설치본에 문서 추출 도구가 없습니다」라는
+  //     **틀린 안내**로 나간다(설계관 2026-08-22 적발 — 이 갈래를 만든 검토관 지적의 거울상).
+  //   그래서 용도와 무관하게 **마지막 수단**이다: 시스템에 아무것도 없을 때만 쓰인다.
+  //   (용도 인자는 남긴다 — 앞으로 갈래가 갈릴 여지가 있고, 호출부가 뜻을 밝히는 값어치가 있다.)
+  void 용도;
+  후보.push("python3", "python", 동봉본);
   for (const c of 후보) {
     if (c.includes(path.sep) && !fs.existsSync(c)) continue;
     const r = spawnSync(c, ["--version"], { encoding: "utf-8" });

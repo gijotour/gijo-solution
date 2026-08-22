@@ -42,6 +42,29 @@ describe("문서 추출 — 오피스 4종은 파이썬 없이 (2026-08-22 이�
     }
   });
 
+  it("PDF도 파이썬 없이 읽힌다 — 글자가 없는 PDF만 파이썬(OCR)으로 넘긴다", async () => {
+    // 2026-08-22 — PDF 추출을 pypdf에서 unpdf(JS)로 옮겼다. 실측: 제안서 pypdf 4,507자 /
+    // unpdf 4,635자, 한글 비율 동일. 이걸로 **mac에도 파이썬을 동봉할 이유가 사라졌다.**
+    // ⚠ 스캔본(글자 없는 PDF)은 여전히 파이썬 몫이다 — OCR이 거기 있다. 그 갈림을 여기서 못박는다.
+    const 원래 = process.env.GIJO_PYTHON;
+    process.env.GIJO_PYTHON = path.join(__dirname, "fixtures", "__없는파이썬__");
+    try {
+      const { resetPythonBinCache } = await import("../src/util/pythonbin");
+      resetPythonBinCache();
+      // ① 글자가 있는 PDF — 파이썬이 막혀 있어도 읽혀야 한다.
+      const 글있는 = await extractDocumentText("has-text.pdf", b64("has-text.pdf"));
+      expect(글있는.length, "파이썬 없이 PDF가 안 읽혔다 — 이 이관의 주장 자체가 무너진다").toBeGreaterThan(20);
+      expect(글있는, "한글이 안 나온다(CJK 폰트 매핑 실패)").toMatch(/[가-힣]/);
+      // ② 글자가 없는 PDF — 스캔본으로 보고 파이썬으로 넘어가야 한다.
+      //    파이썬이 막혀 있으므로 **파이썬 쪽 오류**로 실패하는 것이 곧 「넘어갔다」는 증거다.
+      await expect(extractDocumentText("no-text.pdf", b64("no-text.pdf"))).rejects.toThrow();
+    } finally {
+      if (원래 === undefined) delete process.env.GIJO_PYTHON; else process.env.GIJO_PYTHON = 원래;
+      const { resetPythonBinCache } = await import("../src/util/pythonbin");
+      resetPythonBinCache();
+    }
+  });
+
   it("손상된 zip은 사람이 읽을 말로 거절한다", async () => {
     // fixtures/broken.docx는 zip이 아닌 28바이트 쓰레기다(그동안 어떤 시험도 안 쓰던 고아 픽스처).
     await expect(extractDocumentText("broken.docx", b64("broken.docx")))

@@ -18,6 +18,36 @@ import { cleanForTraining, type 데이터종류 } from "./datasethygiene";
 // (vitest.config.ts가 임시 디렉터리로 지정). 미설정 시 운영 경로.
 const DATASETS_DIR = process.env.GIJO_DATASETS_DIR ?? path.join("data", "datasets");
 
+/** 「글자가 거의 없다 = 스캔본이다」를 가르는 값.
+ *  ⚠ **scripts/extract_doc.py:51 `OCR_MIN_TEXT = 20`과 같은 값이어야 한다.** JS와 파이썬이
+ *    상수를 나눠 가질 길이 없어 양쪽에 적는다 — 한쪽만 고치면 「오늘은 OCR로 가던 문서가
+ *    내일은 안 가는」 조용한 회귀가 난다(같은 목록을 두 파일에 두는 memory.ts↔docsbundle.ts의
+ *    `추출필요`와 같은 방식으로, 서로를 가리키는 주석을 단다).
+ */
+const 스캔판정_최소글자 = 20;
+
+/** PDF에서 글자를 뽑는다 — unpdf(pdf.js 기반, MIT·의존성 0·2.5MB).
+ *
+ *  실측(2026-08-22): 제안서 2.0MB → pypdf 4,507자 / unpdf 4,635자, 한글 비율 47% 대 46%.
+ *  제품소개서 3.2MB → 24,286자 / 24,295자. 즉 **현행과 사실상 동등하고 한글이 정확히 나온다.**
+ *
+ *  ⚠ mergePages를 빼면 text가 배열로 온다 — 그대로 이어붙이면 타입은 통과하는데 내용이 오염된다.
+ *  ⚠ unpdf는 **영어로** 던진다(InvalidPDFException·PasswordException). 그대로 두면 담당자 화면에
+ *    영어가 나가므로 한글로 감싼다(「모든 사용자 대상 텍스트는 한글로」).
+ */
+async function pdf추출(buf: Buffer): Promise<string> {
+  try {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const doc = await getDocumentProxy(new Uint8Array(buf));
+    const { text } = await extractText(doc, { mergePages: true });
+    return typeof text === "string" ? text : String(text ?? "");
+  } catch (e) {
+    const 원문 = e instanceof Error ? e.message : String(e);
+    if (/password/i.test(원문)) throw new Error("문서를 열지 못했습니다 — 암호가 걸린 PDF입니다");
+    throw new Error(`문서를 열지 못했습니다 — PDF가 손상됐거나 형식이 올바르지 않습니다(${원문.slice(0, 60)})`);
+  }
+}
+
 /** XML 태그를 걷고 엔티티를 되돌린다 — extract_doc.py의 `_strip_tags`와 **같은 동작**.
  *
  *  ⚠ 서버에 비슷한 함수가 이미 셋 있는데(urlingest 두 곳·vulnscan) **일부러 안 쓴다.**
@@ -138,6 +168,20 @@ export async function extractDocumentText(filename: string, base64: string): Pro
     recordProcessOutput("extract-doc", "log", `${filename} — zip+xml 직접 읽음(${text.length.toLocaleString()}자, 파이썬 불필요)`);
     return text;
   }
+  // ★ PDF도 파이썬 없이 읽는다(2026-08-22) — 실측: pypdf 4,507자 vs unpdf 4,635자, 한글 비율 동일.
+  //   이걸로 **mac에도 파이썬을 동봉할 이유가 사라졌다**(원래 그게 다음 작업이었다).
+  //   ⚠ 다만 **스캔 PDF(글자가 없는 PDF)는 여전히 파이썬 몫**이다 — 거기에 OCR이 있다.
+  //     글자가 거의 안 나오면 아래 파이썬 경로로 넘긴다(그 경로가 OCR 폴백을 이미 갖고 있다).
+  if (ext === ".pdf") {
+    const 글 = await pdf추출(Buffer.from(base64, "base64"));
+    if (글.trim().length >= 스캔판정_최소글자) {
+      recordProcessOutput("extract-doc", "log", `${filename} — PDF 직접 읽음(${글.length.toLocaleString()}자, 파이썬 불필요)`);
+      return 글;
+    }
+    // 글자가 거의 없다 = 스캔본일 가능성 → 파이썬(OCR)에 맡긴다. 여기서 끊으면 스캔 문서가
+    // 조용히 빈 결과가 된다 — 예전엔 파이썬 안에서 이 폴백이 일어났고, 그 길을 그대로 잇는다.
+    recordProcessOutput("extract-doc", "log", `${filename} — 글자가 거의 없음(${글.trim().length}자) · 스캔본으로 보고 OCR 경로로 넘김`);
+  }
   const tmp = path.join(os.tmpdir(), `gijo-doc-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
   await fs.promises.writeFile(tmp, Buffer.from(base64, "base64"));
   recordProcessOutput("extract-doc", "log", `$ extract_doc.py ${filename} (${ext})`);
@@ -172,7 +216,9 @@ export async function extractDocumentText(filename: string, base64: string): Pro
             if (도구없음) {
               return reject(new Error(
                 `문서를 읽지 못했습니다(${filename}) — 이 설치본에 문서 추출 도구가 없습니다. ` +
-                `PDF·한글(HWPX)·오피스 문서는 텍스트 추출을 거쳐야 합니다. 추출 도구가 준비돼 있는지 확인하세요.`
+                // ⚠ 이제 여기로 오는 것은 **스캔 문서·이미지뿐**이다(2026-08-22) —
+                //   PDF·한글·오피스는 파이썬 없이 읽는다. 문구가 옛 범위를 말하면 거짓이 된다.
+                `스캔된 문서·이미지는 글자를 알아보는 도구(OCR)가 있어야 읽을 수 있습니다. 서버에 OCR이 준비돼 있는지 확인하세요.`
               ));
             }
             return reject(new Error(원문 || `문서를 읽지 못했습니다(${filename})`));
