@@ -403,12 +403,17 @@ describe("screenguide — 라이트는 자기 안내를 받는다", () => {
     //   그 사이로 「＋로 파일 올리기」와 「승인 창」이 새어 들어왔고 둘 다 라이트엔 없었다.
     //   (＋는 표준 콘솔 전용 부품, 승인 창은 라이트 도구가 전부 write:false라 원리상 못 뜬다.)
     //   ⇒ 이제 **약속마다 그 근거를 코드에서 직접 센다.**
-    const lite = fs.readFileSync(new URL("../../client/src/renderer/pages/lite-chat.html", import.meta.url), "utf8");
+    // ⚠ **2026-08-22: 검사 대상이 `lite-chat.html` → `console.js`로 옮겨졌다.**
+    //   사장님 지시로 라이트가 **프로 대화창을 그대로 쓴다**(lite-chat.html은 이름표가 됐다).
+    //   ★ 그 결과 이 시험의 ①번이 **이제 통과할 수 있다** — 라이트에 없던 ＋가 실제로 생겼다.
+    //     그전에는 「안내가 약속하는데 화면에 없다」가 사실이라 라이트 안내에서 ＋를 뺐어야 했다.
+    //   ⚠ 대상을 옮길 때 **약속을 낮춰서 통과시키지 않았다** — 화면이 약속을 따라온 것이다.
+    const lite = fs.readFileSync(new URL("../../client/src/renderer/pages/console.js", import.meta.url), "utf8");
     const 안내 = JSON.stringify(getScreenGuide(undefined, true));
 
-    // ① ＋ 파일 올리기 — 라이트 챗엔 그 자리가 없다
+    // ① ＋ 파일 올리기 — 라이트 대화창(=프로 console.js)에 그 자리가 있나
     if (/＋|파일을 올리|첨부/.test(안내)) {
-      expect(/type="file"|dockUpload|첨부/.test(lite), "라이트 안내가 파일 올리기를 약속하는데 lite-chat에 그 자리가 없다").toBe(true);
+      expect(/type="file"|dockUpload|첨부/.test(lite), "라이트 안내가 파일 올리기를 약속하는데 대화창에 그 자리가 없다").toBe(true);
     }
 
     // ② 승인 창 — 라이트 허용목록에 write:true 도구가 하나라도 있어야 뜰 수 있다

@@ -2,246 +2,62 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GIJO AS Lite — AI에게 물어보기</title>
-<link rel="stylesheet" href="gijo-ui.css">
+<title>AI에게 물어보기 — GIJO AS Lite</title>
 <!--
-  lite-chat.html — 라이트 「AI에게 물어보기」(자유 대화). 2026-08-13 사장님 실사용 피드백:
-  「대화창이 없다」 — 9개 화면은 각자 영역 검색(RAG)만 했고, 13개 도구를 대화로 부를 UI가 없었다.
+  lite-chat.html — **화면이 아니라 이름표다.**
 
-  ■ 여기가 그 자리다 — dispatch(g.sendInstruction)로 태운다. dispatch가 도구를 골라 쓴다
-    (search·explain·remediation·law_lookup·add_task 등 라이트 13개). 각 화면의 「물어보기」는
-    자기 영역 안 검색이고, 여기는 **무엇이든** 묻는 곳이다.
-  ■ ⚠ 쓰기 도구(작업 추가 등)는 dispatch가 결재판을 띄운다 — 라이트도 그 규칙을 탄다.
-  ■ 다리: sendInstruction(text, sessionId) → { output, toolCalls }
+  ■ 왜 바뀌었나 (2026-08-22, 사장님 「AI에게 물어보기도 우리 대화창을 그대로 이관하자」)
+    전에는 여기에 라이트 전용 대화 화면 247줄이 있었다. 프로 대화창과 **두 벌**이었고,
+    그래서 프로에 들어간 것이 라이트에 안 왔다 — 실제로 **＋(파일 넣기)가 없었다.**
+    그 상태에서 라이트 메뉴를 「대화창 + 내 문서」 둘로 줄이자(같은 날 결정)
+    **라이트에 문서를 넣을 길이 아예 없어졌다** — 내 문서에는 입력칸이 없기 때문이다
+    (「지시는 대화창에서만」 원칙). 포크의 값이 그날 청구서로 돌아온 셈이다.
+
+  ■ 왜 화면을 새로 안 짜나
+    `lite-mydocs.html`과 **같은 판단**이다. 한 벌 더 만들면 그 순간 포크가 되고,
+    프로에서 고친 것이 라이트에 안 온다. 여기서는 아무것도 그리지 않고 **본체로 넘긴다.**
+    ★ 실측(설계관 2026-08-22): `console.js` 2,155줄에 **`edition=lite` 분기가 0곳**이고,
+      라이트 전용 새 코드는 14줄이다. 이 파일이 247줄 사라지므로 **순증감 약 −183줄** —
+      기능은 늘고 코드는 줄었다.
+
+  ■ 접지 않는다 — **저절로 빈다**
+    사장님 방침이 「프로에서 쓰는 형태로 그대로 · 기능은 일부 · 라이트 전용 새 코드 최소화」다.
+    실측으로 **9가지가 감추는 코드 없이 저절로 빈다**(홈 히어로·현황판·메뉴 칩·선택 카드·
+    보는목록·화면 카드·데이터 카드·AI 팀 배지·결재판) — 라이트에 그 데이터·화면이 없어서다.
+    ★ 결재판이 좋은 예다: 라이트 도구 13개가 전부 읽기 전용이라 **지금은 안 뜨지만 코드는 살아 있다.**
+      쓰기 도구를 하나 켜는 날 **그날 바로 동작한다.** 접어 없앴으면 그날 다시 만들어야 한다.
+    없는 화면을 가리키는 경우는 라이트 셸(lite-app.html)의 메시지 리스너가 받아
+    「이 기능은 라이트 에디션에 없습니다」로 **정직하게** 답한다 — 그 합류점이 이미 있다.
+
+  ■ 왜 iframe이 아니라 location.replace 인가
+    `lite-mydocs.html`과 같은 이유다. 한 겹 더 감싸면 `window.top`이 달라져 바깥으로 보내는
+    신호(화면 열기·선택 알림)가 안 닿는다. 자리를 바꿔치기하면 부모가 그대로 라이트 셸이라
+    신호가 제대로 가고 발신자 검증도 성립한다.
+
+  ■ embed=1 이 하는 일
+    ① `console.html`이 `data-mode="embed"`로 바꾼다 — 없으면 「⇤ 앱에 붙이기」 경로를 타서
+       **눌렀는데 아무 일도 안 일어난다**(라이트 셸엔 붙일 자리가 없다).
+    ② 「⧉ 창으로」 단추가 숨는다 — 안 숨기면 별도 창이 열려 **대화창이 둘**이 된다
+       (같은 세션·같은 초안이라 서로를 덮어쓴다).
+    ③ footbar가 스스로 접힌다.
+
+  ■ ⚠ id는 `lite-chat`을 유지한다
+    라이트 셸이 화면 파일 이름을 강제 조립하고(`"lite-" + id + ".html"`),
+    `lite-edition-shell.test.ts`가 id의 `lite-` 접두사를 요구한다. 그래서 이 이름의 파일이 필요하다.
+    ⚠ `main.ts`의 「라이트에서 열 수 있나」 문지기에 `console.html`을 **넣지 말 것** —
+      그 문지기는 `lite-` 접두사로 판단하고, 이름표의 자리 바꿈은 그 길을 안 지난다.
 -->
-<style>
-  :root{--bg:#EBF4EB;--panel:#FFFFFF;--border:rgba(24,48,16,.14);--text:#16241A;--muted:#55684C;--muted-2:#5C6F52;--blue:#2563EB;--teal:#0D6B37;--red:#B3261E;--amber:#7A4E00;}
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;
-    display:flex;flex-direction:column}
-  .scr-id{font-size:12.5px;color:var(--muted);padding:14px 22px 8px}
-  .scr-id b{color:var(--text);font-weight:800}
-  #log{flex:1 1 auto;overflow-y:auto;padding:6px 22px 12px;display:flex;flex-direction:column;gap:12px}
-  .msg{max-width:760px;line-height:1.75}
-  .me{align-self:flex-end;background:var(--blue);color:var(--text);border-radius:12px 12px 3px 12px;padding:9px 13px;white-space:pre-wrap}
-  .ai{align-self:flex-start;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 12px 3px;padding:11px 14px;white-space:pre-wrap}
-  .ai .tools{font-size:11px;color:var(--muted-2);margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
-  .ai .foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
-  .ai .foot .used{flex:1;min-width:0;font-size:11px;color:var(--muted-2)}
-  .ai .foot .mini{flex:0 0 auto;background:transparent;border:1px solid var(--border);border-radius:7px;padding:3px 9px;
-    color:var(--muted-2);font:inherit;font-size:11px;cursor:pointer}
-  .ai .foot .mini:hover{border-color:var(--blue);color:var(--blue)}
-  .ai .sources{margin-top:8px;border-top:1px dashed var(--border);padding-top:8px;font-size:11.5px;color:var(--muted);line-height:1.7}
-  .ai .sources .src{padding:6px 0;border-bottom:1px solid var(--border);white-space:pre-wrap}
-  .ai .sources .src:last-child{border-bottom:0}
-  .ai .sources .src b{color:var(--text)}
-  .empty{color:var(--muted);line-height:1.85;padding:10px 2px}
-  .empty b{color:var(--text)}
-  .empty .ex{display:inline-block;margin:4px 6px 0 0;padding:5px 11px;border:1px solid var(--border);border-radius:999px;cursor:pointer;color:var(--text)}
-  .empty .ex:hover{border-color:var(--blue);color:var(--blue)}
-  .bar{flex:0 0 auto;display:flex;gap:8px;padding:10px 22px 16px;border-top:1px solid var(--border);background:var(--bg)}
-  .bar textarea{flex:1;resize:none;height:44px;max-height:140px;background:#EBF4EB;border:1px solid var(--border);border-radius:10px;
-    padding:11px 13px;color:var(--text);font:inherit;line-height:1.5}
-  .bar button{flex:0 0 auto;background:var(--blue);border:1px solid var(--blue);color:var(--text);font:inherit;font-weight:700;
-    border-radius:10px;padding:0 18px;cursor:pointer}
-  .bar button:disabled{opacity:.5;cursor:default}
-  .warn{font-size:11px;color:var(--muted-2);padding:0 22px 8px}
-</style>
 </head>
 <body>
-  <div class="scr-id"><b>AI에게 물어보기</b> — 제품자료·장비 매뉴얼·넣은 로그·나만의 기억을 두루 살펴, 검색·설명·조치·법령을 골라 답합니다.</div>
-  <div id="log"></div>
-  <!-- ⚠ 이 줄은 원격 GPU가 켜지면 **거짓이 된다**(2026-08-15 E2E가 잡음 — 원격 답변 아래에
-       「답은 이 PC 안에서 만들어집니다」가 그대로 붙어 있었다). 아래 스크립트가 상태를 읽어
-       바꾼다 — 정체성 한 줄이야말로 정확해야 한다. -->
-  <div class="warn" id="chatIdentity">⚠ 답은 이 PC 안에서 만들어집니다. 자료를 <b>바꾸는 일</b>(작업 추가 등)은 확인(결재)을 거쳐 실행됩니다.</div>
-  <div class="bar">
-    <textarea id="q" placeholder="예: 랜섬웨어 걸리면 뭐부터 해야 돼?  ·  로그 보관 며칠?  ·  프롬프트 인젝션이 뭐야?" aria-label="질문"></textarea>
-    <button class="go" id="send">보내기</button>
-  </div>
-
 <script>
-(function () {
-  "use strict";
-  var g = window.gijo || null;
-  var 세션 = "lite-chat";  // 대화 이어짐(같은 세션). ⚠ 길어지면 앱 재시작으로 초기화(이력 한계).
-  var 보내는중 = false;
-  var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
-    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
-  function 폴백복사(t) {
-    try {
-      var ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
-      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
-    } catch (e) { /* 무해 */ }
-  }
-
-  function 오류문구(e) {
-    var m = String((e && e.message) || e || "");
-    if (/401|unauthorized/i.test(m)) return "로그인이 풀렸습니다 — 다시 로그인해 주세요.";
-    if (/준비되지|모델/i.test(m)) return "AI 모델이 아직 안 올라왔습니다 — ⚙ 설정 → 모델·엔진에서 올려 주세요.";
-    if (/fetch|network|ECONN/i.test(m)) return "서버에 닿지 못했습니다.";
-    return "답을 못 만들었습니다 — " + m;
-  }
-
-  var log = document.getElementById("log");
-  function 빈화면() {
-    log.innerHTML = '<div class="empty"><b>무엇이든 물어보세요.</b> 아래를 눌러 시작해도 됩니다.<br>' +
-      '<span class="ex">랜섬웨어 걸리면 뭐부터 해야 돼?</span>' +
-      '<span class="ex">로그 보관 며칠 해야 돼?</span>' +
-      '<span class="ex">프롬프트 인젝션 막으려면?</span>' +
-      '<span class="ex">개인정보 유출되면 며칠 안에 신고?</span></div>';
-    log.querySelectorAll(".ex").forEach(function (el) {
-      el.addEventListener("click", function () { document.getElementById("q").value = el.textContent; 보내기(); });
-    });
-  }
-  function 줄(cls, html) {
-    var d = document.createElement("div"); d.className = "msg " + cls; d.innerHTML = html;
-    log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
-  }
-
-  async function 보내기() {
-    if (보내는중 || !g) return;
-    var inp = document.getElementById("q"), btn = document.getElementById("send");
-    var 글 = String(inp.value || "").trim();
-    if (!글) return;
-    // 첫 질문이면 안내 화면을 지운다
-    if (log.querySelector(".empty")) log.innerHTML = "";
-    줄("me", esc(글));
-    inp.value = ""; 보내는중 = true; btn.disabled = true;
-    var 대기 = 줄("ai", '<span style="color:var(--muted)">…생각 중</span>');
-    try {
-      // ⚡ 스트리밍 경로(max 발견#1 수리 2026-08-17, 사용자 ⓐ 선택): 비스트리밍 /api/dispatch는
-      //   30초를 넘기면 리포트로 전환했다 — 14B에서 RAG 문맥 있는 how-to가 실측 28.5초+도구·관문으로
-      //   30초를 넘겨 즉답이 리포트로 밀렸다(max 실측). 스트리밍엔 그 전환이 없어 느려도 글자가 흐른다.
-      //   표준 콘솔 챗(console 화면 1130행 부근)과 같은 다리를 라이트에도 준다.
-      //   ⚠ 위 주석에 파일명(.js)을 박지 말 것 — clientglobals 소스 감시가 '대화 부품 미탑재'로 거짓 실패한다(2026-08-17 실측).
-      var r, 흐른칸 = null;
-      var onDelta = function (t) {
-        if (!흐른칸) { 대기.innerHTML = '<div class="answer" style="white-space:pre-wrap"></div>'; 흐른칸 = 대기.querySelector(".answer"); }
-        흐른칸.textContent += t; log.scrollTop = log.scrollHeight;
-      };
-      if (g.sendInstructionStream) {
-        try {
-          r = await g.sendInstructionStream(글, 세션, undefined, undefined, undefined, onDelta);
-        } catch (se) {
-          if (흐른칸 && 흐른칸.textContent) throw se; // 흐르다 끊김 — 잘린 답을 완성인 척 안 한다
-          r = await g.sendInstruction(글, 세션);       // 아무것도 안 흘렀으면(구서버 등) 통짜 폴백, 기능 후퇴 없음
-        }
-      } else {
-        r = await g.sendInstruction(글, 세션);
-      }
-      // ⚠ 결재판(2026-08-13, win) — 위 머리 주석과 아래 ⚠경고가 「확인(결재)을 거쳐 실행」을
-      //   **약속**하는데, 그리는 코드가 없었다. 서버는 쓰기 지시에 approval을 돌려주고 실행을
-      //   멈추므로, 안 그리면 쓰기 지시가 **조용히 증발**한다(공용 감시 dispatchentrances가 잡음).
-      //   본 제품 분리창 결재판(appendApproval)의 축소판 — 다리는 공용 preload의
-      //   approveAgentTool 그대로다.
-      if (r && r.approval) { renderApproval(r.approval, 대기); return; }
-      var out = String((r && (r.output || r.reply || r.text)) || "");
-      var calls = (r && r.toolCalls) || [];
-      var tools = calls.map(function (t) { return t.tool; }).filter(function (t) { return t && t !== "사내지식"; });
-      // 근거(인용) — 도구가 실제로 찾아온 것. 있으면 [근거]로 펼쳐 원문 조각까지 보여준다(RAG 신뢰).
-      var 근거 = calls.filter(function (t) { return t && t.result && String(t.result).trim(); });
-      var srcHtml = 근거.map(function (t) {
-        var res = String(t.result).trim(); if (res.length > 600) res = res.slice(0, 600) + " …";
-        return '<div class="src"><b>' + esc(t.tool || "자료") + "</b> — " + esc(res) + "</div>";
-      }).join("");
-      대기.innerHTML =
-        '<div class="answer">' + esc(out || "(빈 답이 왔습니다)") + "</div>" +
-        '<div class="foot"><span class="used">' +
-          (tools.length ? "쓴 도구: " + esc(tools.join(" · ")) : "이 PC의 자료에서 찾았습니다") + "</span>" +
-          (srcHtml ? '<button class="mini src-btn" type="button">근거</button>' : "") +
-          '<button class="mini cp-btn" type="button">복사</button></div>' +
-        (srcHtml ? '<div class="sources" hidden>' + srcHtml + "</div>" : "");
-      // [근거] 펼치기/접기
-      var sbtn = 대기.querySelector(".src-btn"), srcBox = 대기.querySelector(".sources");
-      if (sbtn && srcBox) sbtn.addEventListener("click", function () {
-        var 접힘 = srcBox.hasAttribute("hidden");
-        if (접힘) srcBox.removeAttribute("hidden"); else srcBox.setAttribute("hidden", "");
-        sbtn.textContent = 접힘 ? "근거 접기" : "근거";
-        log.scrollTop = log.scrollHeight;
-      });
-      // [복사] 답 본문만
-      var cbtn = 대기.querySelector(".cp-btn");
-      if (cbtn) cbtn.addEventListener("click", function () {
-        var 됨 = function () { cbtn.textContent = "복사됨"; setTimeout(function () { cbtn.textContent = "복사"; }, 1500); };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(out).then(됨).catch(function () { 폴백복사(out); 됨(); });
-        } else { 폴백복사(out); 됨(); }
-      });
-    } catch (e) {
-      대기.innerHTML = '<span style="color:var(--red)">' + esc(오류문구(e)) + "</span>";
-    } finally {
-      보내는중 = false; btn.disabled = false; log.scrollTop = log.scrollHeight; inp.focus();
-    }
-  }
-
-  // 쓰기 작업 결재판 — 실행 전에 도구·인자를 보여 주고, 승인해야 실제로 실행한다.
-  // (본 제품 분리창 결재판(appendApproval)의 축소판 — 값 수정·필수값 잠금·실행 결과까지.)
-  function renderApproval(ap, 자리) { // 이름은 공용 감시(dispatchentrances) 계약 — attachApproval|appendApproval|renderApproval
-    var fields = ap.fields || [];
-    자리.innerHTML =
-      '<div style="font-weight:700">🗂️ 실행 승인 — ' + esc(ap.label || ap.tool) + "</div>" +
-      '<div style="color:var(--muted);font-size:12px;margin:4px 0 6px">지시를 아래와 같이 정리했습니다. 값을 확인한 뒤 승인하면 실행합니다.</div>' +
-      fields.map(function (f) {
-        return '<div style="margin:3px 0"><span style="color:var(--muted);font-size:12px">' + esc(f.label || f.key) + (f.required ? " *" : "") + "</span> " +
-          '<input class="ap-in" data-k="' + esc(f.key) + '" value="' + esc(f.value || "") + '" placeholder="' + esc(f.hint || "") + '" style="width:60%;background:transparent;border:1px solid rgba(24,48,16,.50);border-radius:6px;padding:3px 7px;color:inherit"></div>';
-      }).join("") +
-      '<div style="margin-top:7px"><button class="ap-go">✓ 승인하고 실행</button> <button class="ap-no">취소</button></div>';
-    var go = 자리.querySelector(".ap-go"), no = 자리.querySelector(".ap-no");
-    var inputs = Array.prototype.slice.call(자리.querySelectorAll(".ap-in"));
-    var collect = function () { var o = {}; inputs.forEach(function (i) { o[i.dataset.k] = i.value.trim(); }); return o; };
-    // 필수값이 비면 승인을 잠근다(서버도 재검증하지만 화면에서 먼저 막는다).
-    var required = fields.filter(function (f) { return f.required; }).map(function (f) { return f.key; });
-    var sync = function () {
-      var missing = required.filter(function (k) { return !collect()[k]; });
-      go.disabled = missing.length > 0;
-      go.textContent = missing.length ? "✓ 승인 (" + missing.length + "개 입력 필요)" : "✓ 승인하고 실행";
-    };
-    inputs.forEach(function (i) { i.addEventListener("input", sync); });
-    sync();
-    no.addEventListener("click", function () { 자리.innerHTML = "✕ 실행하지 않았습니다 — " + esc(ap.label || ap.tool); });
-    go.addEventListener("click", async function () {
-      go.disabled = true; go.textContent = "실행 중…";
-      try {
-        var r = await g.approveAgentTool(ap.tool, collect(), ap.instruction || "");
-        자리.innerHTML = "✅ <b>실행 완료</b> — " + esc(ap.tool) + "<br>" + esc(String((r && r.output) || ""));
-      } catch (e) {
-        go.disabled = false; go.textContent = "✓ 승인하고 실행";
-        자리.innerHTML += '<div style="color:var(--red)">실행 실패: ' + esc(오류문구(e)) + "</div>";
-      }
-      log.scrollTop = log.scrollHeight;
-    });
-    log.scrollTop = log.scrollHeight;
-  }
-
-  document.getElementById("send").addEventListener("click", 보내기);
-  document.getElementById("q").addEventListener("keydown", function (e) {
-    // Enter=보내기, Shift+Enter=줄바꿈
-    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); 보내기(); }
-  });
-  if (!g) { log.innerHTML = '<div class="empty">앱 안에서만 동작합니다.</div>'; }
-  else 빈화면();
-
-  // 정체성 한 줄을 실제 상태에 맞춘다(2026-08-15) — 원격 GPU가 켜져 있으면
-  // 「이 PC 안에서」가 거짓이다. 60초마다 다시 읽어 켜고 끔을 따라간다(제목줄 칩과 같은 결).
   (function () {
-    if (!g || typeof g.remoteLlmWhere !== "function") return;
-    var 기본 = document.getElementById("chatIdentity") ? document.getElementById("chatIdentity").innerHTML : "";
-    function 맞추기() {
-      g.remoteLlmWhere().then(function (w) {
-        var el = document.getElementById("chatIdentity");
-        if (!el) return;
-        el.innerHTML = (w && w.remote)
-          ? '⚠ 지금은 <b>VPN 안의 원격 GPU</b>가 답을 만듭니다 — 질문이 그 기계로 전송됩니다. 자료를 <b>바꾸는 일</b>(작업 추가 등)은 확인(결재)을 거쳐 실행됩니다.'
-          : 기본;
-      }).catch(function () { /* 못 읽은 회차는 그대로 둔다 */ });
-    }
-    맞추기();
-    setInterval(맞추기, 60000);
+    // 원래 붙어 온 값은 그대로 이어 준다 — 나중에 셸이 특정 상태로 바로 보내고 싶을 때
+    // 이 파일을 다시 손댈 일이 없게(lite-mydocs와 같은 규약).
+    var q = new URLSearchParams(location.search);
+    q.set("embed", "1");
+    q.set("edition", "lite");
+    location.replace("console.html?" + q.toString());
   })();
-})();
 </script>
 </body>
 </html>

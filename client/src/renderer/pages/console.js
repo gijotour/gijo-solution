@@ -14,6 +14,9 @@
   var host = document.getElementById("consoleHost");
   if (!host) return;
   var IS_WINDOW = host.dataset.mode === "window"; // console.html이 세워 둔 표시
+  // 이 화면이 **다른 셸의 iframe 안에** 들어와 있나 — 라이트가 이름표로 품을 때 그렇다.
+  // ⚠ IS_WINDOW의 반대가 아니다: 프로 도킹(app.html)도 IS_WINDOW=false지만 embed는 아니다.
+  var IS_EMBED = /(^|[?&])embed=1(&|$)/.test(location.search);
 
   var DRAFT_KEY = "gijo:console:draft";
   var SESS_KEY = "gijo:console:session";
@@ -293,11 +296,18 @@
         // 맥락 한 줄(승인 시안 mockups/pro-context-strip, 2026-08-20) — 칩 3종을 사람 말
         // 한 문장으로. 가장 구체적인 것(선택>범위>화면)이 문장을 채운다. 개별 풀기는 ⋯ 메뉴.
         // 🎯(선택)·🗂(범위) 수명 차이는 그대로다: 선택=화면 바뀌면 지워짐 · 범위=풀 때까지.
-        '<span class="cs-line" id="csCtx" title="지금 무엇을 다루는 중인지 — 누르면 화면 맥락을 뗐다 붙였다 합니다">지금 「대시보드」 화면을 보는 중</span>' +
+        // ⚠ 초기 마크업도 「대시보드」였다 — 위 1235행과 **같은 거짓말**이라 함께 고친다.
+        //   (한 곳만 고치면 첫 그림에서 잠깐 「대시보드」가 스쳤다가 바뀐다.)
+        '<span class="cs-line" id="csCtx" title="지금 무엇을 다루는 중인지 — 누르면 화면 맥락을 뗐다 붙였다 합니다">지금 「대화」 자리에 있습니다</span>' +
         '<button class="cs-more" id="csCtxMore" title="맥락 정리 — 선택 풀기·범위 풀기·화면 무관">⋯</button>' +
-        '<button class="cs-btn" id="csToggleHost" title="' +
-          (IS_WINDOW ? "이 창을 닫고 앱 아래에 다시 붙입니다" : "대화를 별도 창으로 빼냅니다 — 화면을 100%로 쓸 때") + '">' +
-          (IS_WINDOW ? "⇤ 앱에 붙이기" : "⧉ 창으로") + "</button>" +
+        // ⚠ **iframe 안에서는 창 빼기를 감춘다**(2026-08-22 설계관 적발).
+        //   이 화면을 iframe으로 품는 셸(라이트)에서 「⧉ 창으로」를 누르면 별도 창이 열리는데,
+        //   품고 있던 자리는 그대로 남아 **대화창이 둘**이 된다 — 같은 세션·같은 초안이라
+        //   두 곳에 쓰다 서로를 덮어쓴다. 프로 도킹은 app.html이라 embed가 아니어서 그대로 뜬다.
+        (IS_EMBED ? "" :
+          '<button class="cs-btn" id="csToggleHost" title="' +
+            (IS_WINDOW ? "이 창을 닫고 앱 아래에 다시 붙입니다" : "대화를 별도 창으로 빼냅니다 — 화면을 100%로 쓸 때") + '">' +
+            (IS_WINDOW ? "⇤ 앱에 붙이기" : "⧉ 창으로") + "</button>") +
       "</div>" +
       // 절차 띠 + 살아 있는 숫자(2026-08-09 시안) — 절차 화면이 아니면 통째로 숨는다
       '<div class="cs-flow" id="csFlow" style="display:none"></div>' +
@@ -1224,7 +1234,10 @@
         '<b class="sk">' + esc(sel.label) + "</b>" + 을를(sel.label) + " 다루는 중";
     } else if (범위) {
       var 건수 = 보는목록 && 보는목록.ids ? " " + 보는목록.ids.length + "건" : "";
-      var 무엇 = ctxOff ? "목록" : esc(ctx.label || "대시보드");
+      // ⚠ 기본값이 **「대시보드」였다** — 그런데 대시보드가 없는 자리(분리 창·라이트)에서도
+      //   「지금 "대시보드" 화면을 보는 중」이라고 말해 **거짓 문구**가 됐다(2026-08-22 설계관).
+      //   맥락이 없을 때 정직한 말은 **지금 있는 자리**다.
+      var 무엇 = ctxOff ? "목록" : esc(ctx.label || "대화");
       html = 무관 + "지금 " + '<b class="rk">' + esc(범위.label) + "</b>의 " + 무엇 + 건수 + (건수 ? "을" : 을를(ctxOff ? "목록" : ctx.label || "대시보드")) + " 보는 중";
     } else if (ctxOff) {
       html = "화면 무관하게 묻는 중 — 누르면 화면 맥락이 다시 붙습니다";
@@ -1416,6 +1429,11 @@
             // 프로에서 dock 없이 열면 카드만 떠서(「카드가 전부」 계약) 약속과 어긋난다(검토관 ③).
             if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label, { dock: true });
             else if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell(b.dataset.page, b.dataset.label);
+            // ⚠ **셸이 없는 자리에서는 위 둘이 다 없어 「눌러도 아무 일이 없었다」**(2026-08-22 설계관).
+            //   프로 분리 창에서도 같은 침묵이 났으니 라이트 전용 수리가 아니라 공용 수리다.
+            //   navigateTo는 embed면 preload가 postMessage로 바꿔 셸이 받는다 — 없는 화면이면
+            //   셸이 「이 기능은 라이트 에디션에 없습니다」로 **정직하게** 답한다.
+            else if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(b.dataset.page);
           });
         });
         return;
@@ -1439,6 +1457,7 @@
           // dock 명시 — 홈 모드와 같은 이유(띠 클릭=이동 의지, 카드만 뜨면 약속 위반).
           if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label, { dock: true });
           else if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell(b.dataset.page, b.dataset.label);
+          else if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(b.dataset.page);   // 셸 없는 자리 폴백(위 홈 모드 주석 참고)
         });
       });
     };

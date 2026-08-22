@@ -87,13 +87,16 @@ describe("한글 조합 중 Enter — 반 글자가 전송되지 않게", () => 
     expect(빈이유.map((x) => `${x.파일}:${x.줄}`).join(", ")).toBe("");
   });
 
-  it("주 대화창 입력칸 3곳은 반드시 가드를 갖는다", () => {
-    // ⚠ 이 셋이 2026-08-18에 실제로 뚫려 있던 자리다. 위 전수 검사와 겹치지만,
+  it("주 대화창 입력칸은 반드시 가드를 갖는다", () => {
+    // ⚠ 이 자리들이 2026-08-18에 실제로 뚫려 있던 곳이다. 위 전수 검사와 겹치지만,
     //   전수 검사가 「이유를 적으면 통과」라서 **여기만은 이유로도 못 빠져나가게** 못 박는다.
+    // ⚠ **lite-chat.html은 2026-08-22에 빠졌다** — 라이트가 프로 대화창을 그대로 쓰게 되면서
+    //   그 파일이 화면이 아니라 **이름표**가 됐다(사장님 「대화창을 그대로 이관」).
+    //   즉 라이트의 입력칸도 이제 console.js다 — **위 첫 줄이 라이트까지 함께 지킨다.**
+    //   가드가 줄어든 것이 아니라 **지킬 파일이 한 곳으로 합쳐진 것**이다.
     const 필수: [string, RegExp][] = [
       ["console.js", /input\.addEventListener\("keydown"[\s\S]{0,120}?isComposing/],
       ["chatwidget.js", /input\.addEventListener\("keydown"[\s\S]{0,120}?isComposing/],
-      ["lite-chat.html", /Enter[\s\S]{0,60}?isComposing[\s\S]{0,80}?보내기\(\)/],
     ];
     for (const [f, re] of 필수) {
       const src = fs.readFileSync(new URL(f, pagesDir), "utf8");

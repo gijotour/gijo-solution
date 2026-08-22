@@ -13,6 +13,14 @@
     document.documentElement.classList.add("theme-light");
     document.write('<link rel="stylesheet" href="pro-white.css">');
   }
+  // 🌿 라이트 에디션 연초록(2026-08-22) — 라이트가 이 화면을 이름표로 품을 때.
+  //   ⚠ 아래 :root가 다크값을 **직접 박아 두기** 때문에 그냥 두면 반쪽만 초록이 된다.
+  //     lite-green.css의 `html.lite-edition`(0-1-1)이 그 :root(0-1-0)를 이겨 덮는다.
+  //   ⚠ 「메인=다크 유지, 라이트만 연초록」이 정해진 배색이라 pro-white 재사용으로 때우지 않는다.
+  if (/(^|[?&])edition=lite(&|$)/.test(location.search)) {
+    document.documentElement.classList.add("lite-edition");
+    document.write('<link rel="stylesheet" href="lite-green.css">');
+  }
 </script>
 <style>
   :root{--bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
@@ -25,7 +33,18 @@
 <body class="g-ui">
 <!-- 콘솔 창(4.0.0) — 셸 아래 도킹과 **같은 console.js**를 쓴다. 다른 건 자리뿐이다.
      모니터가 여럿일 때 이 창을 보조 모니터에 두면 메인 창은 화면을 100%로 쓴다. -->
+<!-- ⚠ **iframe 안에서는 window 모드가 아니다**(2026-08-22 설계관 적발).
+     라이트가 이 화면을 이름표로 품으면서 iframe 안에서 열리는데, `data-mode="window"`가
+     박혀 있으면 console.js가 `IS_WINDOW=true`로 읽어 「⇤ 앱에 붙이기」 경로를 탄다 —
+     라이트 셸엔 붙일 자리가 없어 **눌렀는데 아무 일도 안 일어난다.**
+     ★ 이 저장소가 가장 싫어하는 모양이라 주소 신호로 가른다(edition 분기가 아니라 embed 분기다 —
+     프로 도킹에도 그대로 옳다). -->
 <div id="consoleHost" data-mode="window"></div>
+<script>
+  if (/(^|[?&])embed=1(&|$)/.test(location.search)) {
+    document.getElementById("consoleHost").setAttribute("data-mode", "embed");
+  }
+</script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>

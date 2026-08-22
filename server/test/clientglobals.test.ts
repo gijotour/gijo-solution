@@ -240,18 +240,27 @@ describe("★ 대화 부품은 한 벌만 있다 (2026-08-01 사용자 지적: \
   });
 
   it("부품을 쓰는 화면은 공용 파일을 먼저 읽는다", () => {
+    // ⚠ **주석에 파일 이름이 적힌 것을 「쓴다」로 세면 안 된다** — 2026-08-01에 이미 겪은 거짓 실패다.
+    //   그때 순서 검사에만 script 태그 규칙을 적용하고 **들어오는 문턱은 안 고쳤다**(반쪽 수리).
+    //   2026-08-22에 그 구멍으로 또 걸렸다: `lite-chat.html`이 이름표가 되면서 머리 주석에
+    //   「console.js 2,155줄에 분기가 0곳」이라 적었을 뿐인데 **부품 미탑재로 잡혔다.**
+    //   → 문턱도 **script 태그**로 잰다. 기록을 남긴 주석이 시험에 밀려 지워지는 일은 없어야 한다.
+    const 태그있나 = (src: string, n: string) => src.includes(`<script src="${n}"></script>`);
     const 없음: string[] = [];
     for (const [file, src] of pageSrc) {
       if (!file.endsWith(".html")) continue;
-      if (!/(chatwidget|console)\.js/.test(src)) continue;
-      if (!/chatparts\.js/.test(src)) { 없음.push(file); continue; }
+      if (!태그있나(src, "chatwidget.js") && !태그있나(src, "console.js")) continue;
+      if (!태그있나(src, "chatparts.js")) { 없음.push(file); continue; }
       // 순서도 본다 — 부품이 뒤에 오면 부를 때 아직 없다.
-      // ⚠ 주석에도 파일 이름이 적혀 있다 — **script 태그**만 센다(2026-08-01 거짓 실패).
       const 태그 = (n: string) => src.indexOf(`<script src="${n}"></script>`);
       const w = 태그("chatwidget.js");
       if (w >= 0 && 태그("chatparts.js") > w) 없음.push(file + "(순서)");
     }
     expect(없음, "부품이 없거나 늦게 읽혀 대화창이 반쪽이 된다").toEqual([]);
+    // ⚠ 감시가 헛돌지 않는지 — 실제로 검사한 화면이 있어야 한다(문턱을 좁혔으니 확인한다).
+    const 검사대상 = [...pageSrc].filter(([f, s]) =>
+      f.endsWith(".html") && (태그있나(s, "chatwidget.js") || 태그있나(s, "console.js")));
+    expect(검사대상.length, "대화 부품을 싣는 화면이 하나도 없다 — 이 감시가 헛돈다").toBeGreaterThan(0);
   });
 });
 

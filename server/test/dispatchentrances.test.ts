@@ -23,12 +23,15 @@ const pagesDir = new URL("../../client/src/renderer/pages/", import.meta.url);
 //   console.js  — 지휘소(셸 아래 도킹 + 별도 창, 같은 파일을 쓴다)
 //   chatwidget.js — 분리창 위젯(「⧉ 창으로」 뺐을 때 유일한 창구)
 // 다른 화면은 window.gijo.askConsole()로 **대화창에 넘겨야** 한다.
-// ⚠ lite-chat.html(2026-08-13, max 신설): 라이트의 유일한 대화창이다. 처음 올라온 판은
-//   결재판 없이 sendInstruction만 불러 이 감시에 걸렸다 — **감시가 옳았다**: 화면 스스로
-//   「확인(결재)을 거쳐 실행됩니다」라 약속하는데 그리는 코드가 없어 쓰기 지시가 조용히
-//   증발할 자리였다. win이 결재판(chatwidget appendApproval 축소판)을 달아 자격을 갖춘 뒤
-//   올렸다. 자격 = 결재판을 그린다 — 아래 시험이 그 조건을 함께 못박는다.
-const 자격있는자리 = new Set(["console.js", "chatwidget.js", "lite-chat.html"]);
+// ⚠ **lite-chat.html은 2026-08-22에 목록에서 빠졌다 — 자격을 잃은 것이 아니라 사라진 것이다.**
+//   그 파일은 이제 화면이 아니라 **이름표**다(console.html로 넘긴다). 사장님 지시
+//   「AI에게 물어보기도 우리 대화창을 그대로 이관하자」로 라이트가 프로 대화창을 그대로 쓴다.
+//   → 라이트의 대화창 구현체도 이제 **console.js**이므로, 자격은 그 파일이 이미 갖고 있다.
+//   ⚠ 옛 기록은 지우지 않는다(2026-08-13 max 신설분): 처음 올라온 판은 결재판 없이
+//     sendInstruction만 불러 이 감시에 걸렸고 — **감시가 옳았다.** 화면 스스로
+//     「확인(결재)을 거쳐 실행됩니다」라 약속하는데 그리는 코드가 없어 쓰기 지시가 조용히
+//     증발할 자리였다. 그 교훈이 이 파일의 존재 이유이므로 남겨 둔다.
+const 자격있는자리 = new Set(["console.js", "chatwidget.js"]);
 
 // 주석은 걷어내고 본다 — "옛 sendInstruction()은 지웠다" 같은 **설명**을 위반으로 잡으면
 // 사고를 기록한 주석을 지우게 된다. 기록이 시험에 밀려 사라지는 건 손해다.
@@ -45,12 +48,18 @@ const 페이지 = fs
   .map((f) => ({ 이름: f, 내용: 주석걷기(fs.readFileSync(new URL(f, pagesDir), "utf8")) }));
 
 describe("지시 입구 — 결재판을 그리는 곳에서만 보낸다", () => {
-  it("★ 자격의 조건 — 목록에 오른 화면은 결재판을 실제로 그린다 (2026-08-13)", () => {
+  it("★ 자격의 조건 — 목록에 오른 자리는 결재판을 **실제로** 그린다 (2026-08-13)", () => {
     // 목록만 늘리고 결재판을 안 그리면 이 감시는 구멍이 된다 — 자격 조건을 함께 못박는다.
-    const lite = 페이지.find((p) => p.이름 === "lite-chat.html");
-    expect(lite, "lite-chat.html이 없다").toBeTruthy();
-    expect(lite!.내용, "결재판을 안 그린다 — 쓰기 지시가 조용히 증발한다").toMatch(/r.approval/);
-    expect(lite!.내용, "승인 실행 다리(approveAgentTool)를 안 부른다").toMatch(/approveAgentTool/);
+    // ⚠ 이 시험이 lite-chat.html **하나만** 보고 있었다(2026-08-22까지). 그 파일이 이름표가 되면서
+    //   시험이 죽었는데, 죽은 이유가 「검사 대상이 사라져서」였다 — 자격자는 그대로 있는데.
+    //   → **목록 전체**를 돌게 고친다. 목록에 뭘 더하든 자격이 함께 검사된다(원래 뜻이 그것이다).
+    expect(자격있는자리.size, "자격자가 없으면 이 시험이 헛돈다").toBeGreaterThan(0);
+    for (const 이름 of 자격있는자리) {
+      const p = 페이지.find((x) => x.이름 === 이름);
+      expect(p, `${이름}이 없다 — 목록과 실제 파일이 어긋났다`).toBeTruthy();
+      expect(p!.내용, `${이름}: 결재판을 안 그린다 — 쓰기 지시가 조용히 증발한다`).toMatch(/approval/);
+      expect(p!.내용, `${이름}: 승인 실행 다리(approveAgentTool)를 안 부른다`).toMatch(/approveAgentTool/);
+    }
   });
 
   it("sendInstruction을 부르는 화면은 대화창 구현체뿐이다", () => {
