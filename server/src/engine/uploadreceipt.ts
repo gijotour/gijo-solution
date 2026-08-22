@@ -21,7 +21,7 @@ import { db } from "../db";
 
 export type 반입갈래 =
   | "document" | "guideline" | "vulnreport" | "securitylog" | "opsreport"
-  | "sbom" | "asset" | "log" | "unknown";
+  | "sbom" | "asset" | "log" | "productintro" | "unknown";
 
 export interface 영수증 {
   id: string;
@@ -223,6 +223,8 @@ export const 갈래이름: Record<반입갈래, string> = {
   opsreport: "운영 리포트",
   sbom: "부품표(SBOM)",
   asset: "보안제품 매뉴얼",
+  // 📦 도입 **검토 중인 타사** 제품 소개서 — asset(우리가 쓰는 제품의 매뉴얼)과 다른 대장이다.
+  productintro: "제품 소개자료",
   log: "로그 매뉴얼",
   unknown: "미정",
 };

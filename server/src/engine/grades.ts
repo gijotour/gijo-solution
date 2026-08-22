@@ -9,6 +9,10 @@
 //      사람의 열람 권한을 못 읽으면 가장 낮은 권한(공개만)으로 본다. 이 원칙은 그대로다.
 //   ② **판단은 한 곳에서.** 등급 비교를 여기저기서 하면 한 곳만 고쳐 놓고 고쳤다고 믿게 된다.
 
+// ★ 개발 모드(2026-08-23) — 등급 게이트를 **개발 기간에만** 푼다.
+//   환경변수 GIJO_DEV_MODE=1로만 켜지고 기본은 꺼짐이다(util/devmode.ts 머리주석에 이유).
+import { 개발모드 } from "../util/devmode";
+
 /** 낮을수록 공개. 숫자로 비교하므로 순서를 바꾸면 안 된다. */
 export const GRADES = ["O", "S", "C"] as const;
 export type Grade = (typeof GRADES)[number];
@@ -60,8 +64,20 @@ export function clearanceOf(value?: string | null): Grade {
   return (GRADES as readonly string[]).includes(v) ? (v as Grade) : "O";
 }
 
-/** 이 열람 등급으로 저 자료를 볼 수 있는가. */
+/** 이 열람 등급으로 저 자료를 볼 수 있는가.
+ *
+ *  ★ **개발 모드에서는 언제나 참**(2026-08-23 사장님 「개발 동안 제약사항은 다 풀고 하자 ·
+ *    등급도 개발 끝나면 지정」). 판정이 **이 한 곳**을 지나므로 여기서만 풀면 된다 —
+ *    호출부마다 예외를 두면 한 곳이 빠져 「푼 줄 알았는데 안 풀린」 자리가 생긴다.
+ *  ⚠ 환경변수로만 켜지고 기본은 꺼짐이다(util/devmode.ts). 켜져 있으면 부팅과 자가 진단이 말한다.
+ */
 export function canRead(clearance: Grade, grade: Grade): boolean {
+  if (개발모드()) return true;
+  return canReadStrict(clearance, grade);
+}
+
+/** 개발 모드를 **무시하고** 진짜 규칙만 본다 — 자가 진단·시험이 「원래 규칙」을 재는 데 쓴다. */
+export function canReadStrict(clearance: Grade, grade: Grade): boolean {
   return RANK[clearance] >= RANK[grade];
 }
 

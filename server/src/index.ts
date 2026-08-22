@@ -31,6 +31,8 @@ import { ensureKnowledgeBundle } from "./engine/knowledgebundle";
 import { bootSmtpInboundIfEnabled, stopSmtpInbound } from "./engine/smtpinbound";
 import { closeHttpServer } from "./util/gracefulClose";
 import { installAirgapGuard } from "./engine/airgap";
+// ★ 개발 모드 — 등급 게이트를 개발 기간에만 푼다(2026-08-23 사장님). 켜져 있으면 부팅에 경고.
+import { 개발모드, 개발모드경고 } from "./util/devmode";
 
 // 가능한 한 이른 시점에 설치해야 이후의 console.log/warn/error가 전부 캡처된다.
 installConsoleCapture();
@@ -65,6 +67,8 @@ attachLearnloopSocket(wss);
 const scheme = tlsEnabled ? "https" : "http";
 httpServer.listen(PORT, () => {
   console.log(`GIJO AS 서버 기동 — ${scheme}://localhost:${PORT} (WebSocket: /ws)${tlsEnabled ? " [TLS 활성]" : ""}`);
+  // ★ 개발 모드가 켜져 있으면 **크게** 말한다 — 조용히 켜져 있는 것이 가장 나쁘다(2026-08-23).
+  개발모드경고();
   console.log(`standalone 모드: 클라이언트 GIJO_SERVER_URL을 ${scheme}://localhost:${PORT} 로 설정하면 같은 머신에서 붙습니다.`);
   // 모델 파일이 있으면 채팅 LLM + 임베딩 서버를 자동 기동 — 실패해도 서버 자체는 계속 뜬다.
   // 이어서 임베딩 서버 hang 감시를 켠다 — 프로세스는 살아있어도 임베딩이 무응답이 되는 상태를

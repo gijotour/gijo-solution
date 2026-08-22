@@ -11,6 +11,8 @@ import * as path from "path";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { isDbEncrypted } from "../db";
+// ★ 개발 모드 — 켜져 있으면 등급 게이트가 꺼진다. 자가 진단이 그 사실을 말해야 한다(2026-08-23).
+import { 개발모드 } from "../util/devmode";
 import { hasKeyFile, fingerprintStrength, unsealWithMachine, rotateRecoveryKey, readKeyFile } from "../dbkey";
 import { recordAudit } from "./audit";
 
@@ -35,6 +37,15 @@ export interface DbCryptStatus {
    * 말하게 한다.
    */
   enableAvailableHere: boolean;
+  /**
+   * ★ **개발 모드가 켜져 있는가** (2026-08-23 사장님 「개발 동안 제약사항은 다 풀고 하자」).
+   *
+   * 켜져 있으면 업무정보 **등급 게이트가 통째로 꺼진다** — 기밀(C)·민감(S) 문서를 누구나 읽는다.
+   * ⚠ 이 값을 상태에 싣는 이유는 하나다: **조용히 켜져 있는 것이 가장 나쁘다.**
+   *   자가 진단이 「암호화 켜짐」이라고만 말하는데 등급이 다 열려 있으면 그 화면이 거짓이 된다.
+   *   출하 전에 이 값이 false인지 반드시 확인할 것.
+   */
+  devMode: boolean;
   /** 옆에 남아 있는 평문 DB 사본 — 이게 있으면 암호화가 무력화된다. */
   plaintextCopies: { count: number; files: string[]; totalMb: number };
 }
@@ -107,12 +118,14 @@ export function dbCryptStatus(): DbCryptStatus {
   const encrypted = isDbEncrypted();
   const kf = readKeyFile(dbPath());
   const plaintextCopies = encrypted ? findPlaintextCopies() : { count: 0, files: [], totalMb: 0 };
+  const dev = 개발모드();
   return {
     encrypted,
     keyFilePresent: hasKeyFile(dbPath()),
     keyCreatedAt: kf?.createdAt ?? null,
     plaintextCopies,
     machineBinding: fingerprintStrength(),
+    devMode: dev,
     covers: [
       "DB 파일·자동 백업본이 밖으로 나갔을 때 (열쇠 없이는 열리지 않음)",
       "서버 디스크를 폐기·반출했을 때",
@@ -120,6 +133,10 @@ export function dbCryptStatus(): DbCryptStatus {
     notCovered: [
       "서버가 살아 있는 동안의 침해 — 이 기계에서 관리자 권한을 얻으면 열 수 있습니다",
       "지식베이스(문서 원문·LanceDB)는 이 암호화 대상이 아닙니다",
+      // ★ 개발 모드가 켜져 있으면 **가장 먼저** 말한다 — 이게 지금 제일 큰 구멍이다.
+      ...(dev
+        ? ["⚠ **개발 모드(GIJO_DEV_MODE=1)가 켜져 있습니다** — 업무정보 등급(기밀·민감) 열람 제한이 **전부 꺼져** 있습니다. 개발 기간 한정 조치이며, 출하 전에 반드시 끄세요."]
+        : []),
     ],
     enableAvailableHere: 켜는스크립트있나(),
     // ⚠ 켤 수 없는 설치에 켜는 방법을 적지 않는다 — 따를 수 없는 안내는 안내가 아니다.

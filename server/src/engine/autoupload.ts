@@ -15,7 +15,9 @@ import { importVulnScan, parseNessusHtml } from "./vulnscan";
 //   운영·용량 판단용으로 uploadreceipt.ts에 남아 있고 시험이 지킨다.
 import { 영수증남기기, 영수증목록, 되묻기영수증지우기, 갈래이름, type 반입갈래 } from "./uploadreceipt";
 import { maskSecrets } from "./secretscan";
-import { importManual, classifyManual, listProducts, guessProductName } from "./securityproducts";
+import { importManual, classifyManual, listProducts, guessProductName, guessCategory } from "./securityproducts";
+// 📦 제품 소개자료 대장 — 보안제품 등록부와 **다른 대장**이다(productintro.ts 머리주석).
+import { addProductIntro } from "./productintro";
 import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, cleanupOldOriginal, 열람불가공용, 등급판정가능 } from "./memory";
 
 // 사용자가 결정창에서 고를 수 있는 유형(파일명으로 애매할 때).
@@ -28,11 +30,13 @@ import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, cleanupOldOriginal, 열람�
 // ★ securitylog·opsreport는 2026-08-01에 **되살린** 것이다. 제품 1차 목표가
 //   "취약점·보안로그·운영리포트 3소스 통합 분석"인데, 드롭존을 없애면서 뒤 두 소스의
 //   인입 경로가 통째로 끊겨 있었다(엔진은 멀쩡한데 넣을 길이 없었다).
-export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport" | "securitylog" | "opsreport" | "sbom";
+// ★ productintro(2026-08-23 사장님) — 도입 **검토 중인 타사** 제품 소개서. "asset"과 다른 대장이다:
+//   asset = 우리가 **쓰는** 제품의 매뉴얼 / productintro = 아직 **우리 것이 아닌** 제품의 소개자료.
+export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport" | "securitylog" | "opsreport" | "sbom" | "productintro";
 
 export interface AutoUploadResult {
   filename: string;
-  routedTo: "vulnscan" | "product-manual" | "memory" | "analysis" | "sbom" | "decision"; // decision = 사용자 결정 필요
+  routedTo: "vulnscan" | "product-manual" | "memory" | "analysis" | "sbom" | "productintro" | "decision"; // decision = 사용자 결정 필요
   reason: string; // 판별 근거(투명성)
   needsDecision?: boolean; // true면 프론트가 결정 카드(4유형)를 띄운다
   guess?: UploadType; // 결정 필요 시 추천 유형(미리 선택)
@@ -46,6 +50,12 @@ export interface AutoUploadResult {
   sbom?: { id: string; name: string; components: number; heavy: number; unknown: number };
   /** 통합 분석 인입 결과 — 로그/리포트 판별과 만들어진 이벤트 수(0건도 정직하게 싣는다). */
   analysis?: { kind: "log" | "report"; created: number };
+  /** 📦 제품 소개자료 등록 결과(2026-08-23) — 대장에 **실제로 들어간 것만** 싣는다. */
+  productIntro?: { id: string; name: string; category: string; vendor?: string | null };
+  /** ★ **AI가 무엇을 읽었나** — 잰 숫자와 앞부분 원문(비밀은 가려서). LLM 요약이 아니다.
+   *  사장님 지시(2026-08-23): 올린 그 자리에서 **한 번 보여 주고**, 고치기·삭제는 「내 문서」로 안내.
+   *  ⚠ 텍스트 추출을 타는 갈래에만 붙는다 — 취약점 스캔처럼 안 타는 갈래는 없는 것이 정직하다. */
+  추출?: { 글자수: number; 미리보기: string };
   memory?: { chunks: number; docClass?: string; linkedProduct?: string; category?: string };
   /** 확정된 업무영역(취약점·장비운영·사내규정·위협대응·일반) — 승인카드에 "이렇게 분류했습니다" 표시용. */
   category?: string;
@@ -68,6 +78,17 @@ export interface AutoUploadResult {
   비밀경고?: { kind: string; masked: string }[];
 }
 
+/**
+ * 타사 **제품 소개서**로 보이는가 — 우리 제품 매뉴얼과 가르는 자물쇠 (2026-08-23).
+ *
+ * ⚠ **좁게 잡는다.** 자료의 **성격**을 말하는 말만 본다 — 제품 종류(방화벽·EDR…)를 넣으면
+ *   진짜 매뉴얼까지 끌고 와 매뉴얼 자동 연결이 조용히 죽는다.
+ * ⚠ 낱말 경계(\b)를 쓰지 않는다 — 자바스크립트에서 밑줄·한글 경계가 기대대로 안 걸린다
+ *   (같은 함정을 SBOM 판별이 실측으로 겪었다 — guessType 주석 참고).
+ */
+function 제품소개서인가(filename: string): boolean {
+  return /제품\s*소개|소개\s*서|소개자료|브로슈어|brochure|datasheet|data\s*sheet|product\s*overview|제품\s*설명\s*서/i.test(filename);
+}
 // 파일명으로 애매할 때의 추천 유형. 취약점 리포트·로그·가이드라인·매뉴얼 신호를 순서대로 본다.
 function guessType(filename: string): UploadType {
   // 타사 SBOM(부품표) — **파일 이름 신호**를 먼저 본다(2026-08-22 검토관 [중]).
@@ -80,6 +101,8 @@ function guessType(filename: string): UploadType {
   //     자바스크립트에서 `_`는 낱말 문자라 `\bsbom`이 `_SBOM` 앞에서 경계를 못 찾는다.
   //     그래서 경계를 직접 적는다(문자열 시작·끝 또는 영숫자가 아닌 것).
   if (/(^|[^a-z0-9])sbom([^a-z0-9]|$)|부품표|cyclonedx|\.spdx([^a-z0-9]|$)|spdx[-_.]?json|bill\s*of\s*materials/i.test(filename)) return "sbom";
+  // 📦 제품 소개자료 — **매뉴얼보다 먼저** 본다(「방화벽 제품소개」는 소개서지 매뉴얼이 아니다).
+  if (제품소개서인가(filename)) return "productintro";
   if (/취약점|vuln(?:erabilit)?y?|스캔\s*리포트|scan\s*report/i.test(filename)) return "vulnreport";
   // 운영 리포트(주간 차단 통계 등) — 「매뉴얼」이 아니라 **운영 실적**이다. 통합 분석의 소스 ③.
   if (/(주간|월간|일일|운영|차단|탐지)\s*(리포트|report|보고)/i.test(filename)) return "opsreport";
@@ -146,7 +169,25 @@ async function tryIngest(
   category?: string,
   uploadedBy?: string,
   opts?: { keepOriginal?: boolean }
-): Promise<{ chunks: number; docClass?: string; linkedProduct?: string; docName?: string; category?: string; savedOriginal?: boolean; mdSaved?: boolean; ingested: boolean; 실패사유?: string; 비밀경고?: { kind: string; masked: string }[] } | null> {
+): Promise<{ chunks: number; docClass?: string; linkedProduct?: string; docName?: string; category?: string; savedOriginal?: boolean; mdSaved?: boolean; ingested: boolean; 실패사유?: string; 비밀경고?: { kind: string; masked: string }[]; 추출?: { 글자수: number; 미리보기: string } } | null> {
+  // ★★ **AI가 무엇을 읽었는지 한 번 보여 준다** (2026-08-23 사장님 지시
+  //   「자료를 올리면 추출한 텍스트에 대한 요약 데이터를 한번 보여주고,
+  //     수정 및 삭제는 내 문서에서 가능하다고 알려주는 게 좋을 것 같아」).
+  //
+  // ■ 왜 필요한가 — 사장님이 pptx를 올렸는데 **무엇이 읽혔는지 볼 길이 없었다.**
+  //   추출본(.md) 뷰어는 「내 문서」에 있지만, 올린 **그 순간**에는 아무 것도 안 보여 줘서
+  //   「제대로 읽혔나」를 알 수 없었다. 반입의 첫 관문이 그 물음이다.
+  //
+  // ⚠ **LLM 요약을 쓰지 않는다.** 이 저장소 원칙이 「지어내지 않는다」이고, 요약은
+  //   **틀릴 수 있는데 틀린 줄 모른다.** 여기서 보여 줄 것은 「AI가 실제로 읽은 글」이지
+  //   「그 글에 대한 해석」이 아니다. 그래서 **잰 숫자 + 앞부분 원문 그대로**만 싣는다.
+  //   (문서 세 줄 요약은 docdigest가 따로 만든다 — 그건 백그라운드라 이 시점에 없다.)
+  // ⚠ 미리보기는 **가려서** 싣는다 — 비밀정보가 앞부분에 있으면 그대로 나간다.
+  const 추출요약 = (t: string): { 글자수: number; 미리보기: string } => {
+    const 한줄 = maskSecrets(t).text.replace(/\s+/g, " ").trim();
+    return { 글자수: t.length, 미리보기: 한줄.slice(0, 300) + (한줄.length > 300 ? "…" : "") };
+  };
+
   // ★ 보관 결과는 catch **밖**에 둔다 — 파일 보관은 검색 수집(임베딩)보다 **먼저** 끝나므로,
   //   임베딩이 죽었다고 「원본을 보관했다」는 사실까지 삼키면 화면이 거짓을 말하게 된다
   //   (0820 「삼켜진 실패」 계보의 거울상 — 이번엔 삼켜진 *성공*이다).
@@ -178,6 +219,7 @@ async function tryIngest(
       docName: r.chunks > 0 ? filename : undefined, category: r.category,
       savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: r.chunks > 0,
       비밀경고: 비밀.length ? 비밀 : undefined,
+      추출: 추출요약(text),
     };
   } catch (e) {
     // 임베딩 미기동 등 — 검색 수집만 생략, 상위 처리는 계속.
@@ -214,6 +256,7 @@ function 갈래되짚기(routedTo?: string): 반입갈래 {
     case "analysis": return "securitylog";     // 로그·리포트 공통 입구 — 더 좁히려면 analysis.kind가 필요하다
     case "sbom": return "sbom";
     case "product-manual": return "asset";
+    case "productintro": return "productintro";
     case "memory": return "document";
     default: return "unknown";                 // decision(되묻는 중)만 진짜로 모른다
   }
@@ -364,6 +407,84 @@ async function routeByType(filename: string, base64: string, type: UploadType, p
       ...보관결과(ing),
     };
   }
+  // ★★ 📦 제품 소개자료 — 도입 **검토 중인 타사** 제품 (2026-08-23 사장님 지시)
+  //
+  // ■ 왜 이 갈래가 필요했나 — 결재판 유형에 이것이 없어서, 사장님이 제품 소개 pptx를 올렸을 때
+  //   「📄 일반 문서」밖에 고를 수 없었고 대장에는 0건이 남았다. 그런데 화면은
+  //   「대화창 ＋로 제품 소개서를 올리면 등록됩니다」라고 **약속하고 있었다.** 그 약속을 참으로 만든다.
+  //
+  // ⚠ `asset`과 다른 대장이다 — 섞으면 「운영 중」과 「검토 중」을 구분 못 하게 된다
+  //   (productintro.ts 머리주석이 그 이유를 적어 두었다).
+  // ★★ **지식 저장소에 넣지 않는다** (2026-08-23 사장님 결정
+  //   「소개자료는 원본보관과 제품비교용이랑 깊은학습은 아닌 것 같아」).
+  //
+  //   왜 옳은가 — 소개자료는 **남의 회사 홍보 문서**다. 통째로 지식에 넣으면
+  //   「우리 보안 정책은?」 같은 질문에 **벤더 마케팅 문구가 근거로 섞인다.**
+  //   이 저장소는 이미 그 사고를 겪었다(타사 문서 53%가 근거 배지를 흔들었다).
+  //   ⚠ 타사 SBOM이 **같은 이유로** 지식에 안 들어간다 — 그 선례를 그대로 따른다.
+  //
+  //   대신 남기는 것: **원본**(브로슈어를 그대로 다시 열 수 있게) + **추출본(.md)**
+  //   (무엇이 적혀 있는지 사람이 읽고 비교할 수 있게) + **대장 한 줄**(무엇을 검토 중인가).
+  //   ⚠ 원본 보관은 **강제로 켠다** — 프라이버시 기본값(꺼짐)의 예외다.
+  //     소개자료는 개인정보가 아니라 벤더가 배포한 자료이고, 비교의 근거가 되려면
+  //     「그때 받은 그 파일」이 남아야 한다.
+  //
+  // ⚠ 분류는 **이미 있는 잣대**를 쓴다(`guessCategory` — 보안제품 등록부와 같은 닫힌 목록).
+  //   여기서 새 분류 규칙을 만들면 같은 축에 잣대가 두 벌이 된다(설계관 지적 ③).
+  // ⚠ 제조사·요약은 **비운다** — 파일에서 확실히 얻을 길이 없다. 지어내지 않는다.
+  if (type === "productintro") {
+    const 이름 = (productName ?? "").trim() || guessProductName(filename) || filename.replace(/\.[^.]+$/, "");
+    let 보관: { mdSaved: boolean; originalSaved: boolean } = { mdSaved: false, originalSaved: false };
+    let 추출: { 글자수: number; 미리보기: string } | undefined;
+    let 비밀: { kind: string; masked: string }[] = [];
+    let 추출실패: string | undefined;
+    try {
+      const { extractDocumentText } = await import("./dataset.js");
+      const text = await extractDocumentText(filename, base64);
+      if (text.trim()) {
+        비밀 = maskSecrets(text).hits.map((h) => ({ kind: h.kind, masked: h.masked }));
+        const 한줄 = maskSecrets(text).text.replace(/\s+/g, " ").trim();
+        추출 = { 글자수: text.length, 미리보기: 한줄.slice(0, 300) + (한줄.length > 300 ? "…" : "") };
+        // ⚠ keepOriginal을 **요청값과 무관하게 true**로 준다(위 결정).
+        보관 = await saveDocArtifacts({ documentId: filename, text, contentBase64: base64, keepOriginal: true });
+      } else {
+        추출실패 = "글자를 뽑지 못했습니다(그림만 있는 자료일 수 있습니다)";
+      }
+    } catch (e) {
+      // 추출이 안 돼도 **대장 등록은 계속한다** — 「무엇을 검토 중인가」는 여전히 사실이다.
+      추출실패 = e instanceof Error ? e.message : String(e);
+    }
+    let pi: { id: string; name: string; category: string; vendor: string | null };
+    try {
+      const p = addProductIntro({
+        name: 이름,
+        category: guessCategory(filename) ?? "기타",
+        // ⚠ docName은 「지식 저장소에 올린 것」을 뜻하는 칸이다. 우리는 지식에 안 넣으므로
+        //   **비운다** — 채우면 비교가 있지도 않은 검색 근거를 찾으러 간다.
+        actor: uploadedBy ?? null,
+      });
+      pi = { id: p.id, name: p.name, category: p.category, vendor: p.vendor };
+    } catch (e) {
+      // 등록 실패를 삼키지 않는다 — 「올렸는데 대장에 없다」가 조용히 생기면 안 된다.
+      return {
+        filename, routedTo: "productintro",
+        reason: `제품 소개자료 등록에 실패했습니다 — ${e instanceof Error ? e.message : String(e)}`,
+        savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: false,
+        추출, 비밀경고: 비밀.length ? 비밀 : undefined,
+      };
+    }
+    emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 📦 제품 소개자료 '${pi.name}' 등록(원본 보관 · 지식에는 넣지 않음)` });
+    return {
+      filename, routedTo: "productintro",
+      reason: `사용자 지정: 제품 소개자료 — 「${pi.name}」을 검토 대장에 등록했습니다` +
+        (추출실패 ? ` (⚠ ${추출실패})` : "") +
+        " · **지식 저장소에는 넣지 않습니다** — 남의 홍보 문구가 답변 근거로 섞이지 않게 합니다",
+      productIntro: pi,
+      // ⚠ `ingested: false`가 사실이다 — 「AI지식」 배지가 붙으면 안 된다.
+      savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: false,
+      추출, 비밀경고: 비밀.length ? 비밀 : undefined,
+    };
+  }
   if (type === "asset" || type === "log") {
     const ing = await tryIngest(filename, base64, false, "장비운영", uploadedBy, opts);
     const m = importManual(filename, ing?.docName, undefined, type === "log" ? "logManual" : "manual", productName);
@@ -478,6 +599,30 @@ export async function autoRouteUpload(
   const webAuto = await tryWebReport(filename, base64, uploadedBy, opts);
   if (webAuto) return webAuto;
 
+  // ★★ ①′ **타사 제품 소개서는 매뉴얼 매칭보다 먼저 가른다** (2026-08-23 설계관 지적 A).
+  //
+  // ⚠ 왜 여기인가 — 아래 ②(`classifyManual`)가 **먼저 돌면** 「Fortinet_방화벽_제품소개.pdf」처럼
+  //   파일명에 제품 종류가 든 타사 브로슈어가, 그 종류의 등록 제품이 하나뿐일 때
+  //   `category-single`로 **묻지도 않고** 우리 제품의 **매뉴얼로 등록된다.**
+  //   도입 **검토 중인 남의 제품** 자료가 **우리가 운영 중인 제품의 설명서**로 둔갑하는 것이라,
+  //   두 대장을 일부러 갈라 놓은 뜻(productintro.ts 머리주석)이 통째로 무너진다.
+  //   ⚠ 이건 이번 변경이 만든 결함이 아니라 **원래 있던 길**이다 — 새 유형을 넣으며 함께 막는다.
+  //
+  // ⚠ **좁게 잡는다.** 「제품소개·소개서·브로슈어·datasheet」처럼 **자료의 성격을 말하는 말**만 본다.
+  //   넓히면 매뉴얼 자동 연결(그 자체로 값이 있는 기능)이 조용히 죽는다.
+  //   여기서 확정하지 않고 **되묻는다** — 제품명·분류를 사람에게 받아야 대장이 쓸모가 있다.
+  if (제품소개서인가(filename)) {
+    emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 타사 제품 소개자료로 보여 유형을 되묻는다` });
+    return {
+      filename,
+      routedTo: "decision",
+      needsDecision: true,
+      guess: "productintro",
+      guessProductName: guessProductName(filename),
+      reason: "파일명이 제품 소개자료를 가리킴 — 우리 제품 매뉴얼과 갈라야 해서 되묻습니다",
+    };
+  }
+
   // ② 기존 제품과 확실히 매칭되면(모델/벤더/종류 일치) 자동으로 그 제품 매뉴얼로.
   const c = classifyManual(filename, listProducts());
   if (c.reason !== "new-product") {
@@ -495,7 +640,9 @@ export async function autoRouteUpload(
     routedTo: "decision",
     needsDecision: true,
     guess,
-    guessProductName: guess === "asset" || guess === "log" ? guessProductName(filename) : undefined,
+    // ⚠ 제품명을 되묻는 유형이 늘면 **여기와 console.js의 PRODUCT_NAME_TYPES를 함께** 고쳐야 한다
+    //   (설계관 지적 B: 한쪽만 고치면 입력칸이 아예 안 뜬다).
+    guessProductName: guess === "asset" || guess === "log" || guess === "productintro" ? guessProductName(filename) : undefined,
     reason: "파일명으로 유형을 확신하기 어려움 — 사용자 결정 필요",
   };
 }
@@ -604,7 +751,7 @@ export function registerAutoUploadRoutes(app: Express): void {
       // ⚠ 이 허용 목록은 **UploadType과 반드시 같이 늘려야 한다**(2026-08-01 실측 사고).
       //   유형을 새로 만들고 여기를 안 고치면 forceType이 조용히 버려져 "결정 필요"로 되돌아온다
       //   — 담당자는 골랐는데 아무 일도 안 일어나는 것으로 보인다. 타입에서 뽑아 어긋남을 막는다.
-      const ALLOWED: UploadType[] = ["asset", "log", "document", "guideline", "vulnreport", "securitylog", "opsreport", "sbom"];
+      const ALLOWED: UploadType[] = ["asset", "log", "document", "guideline", "vulnreport", "securitylog", "opsreport", "sbom", "productintro"];
       const valid = forceType && ALLOWED.includes(forceType) ? forceType : undefined;
       // 작업 귀속 — 인입되는 문서에 "누가 올렸는지"를 함께 기록한다(2026-07-25 RAG 전면 검토).
       const uploader = (req as Request & { user?: { displayName?: string; username?: string } }).user;

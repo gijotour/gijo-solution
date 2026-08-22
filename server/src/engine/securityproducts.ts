@@ -365,7 +365,9 @@ const CATEGORY_KEYWORDS: { id: string; re: RegExp }[] = [
   { id: "NAC", re: /nac|접근제어|genian/i },
 ];
 
-function guessCategory(filename: string): string | undefined {
+/** ★ export한다(2026-08-23) — 📦 제품 소개자료도 **같은 잣대**로 분류를 정한다.
+ *  여기서 새 규칙을 만들면 같은 축(제품 종류)에 잣대가 두 벌이 된다. */
+export function guessCategory(filename: string): string | undefined {
   return CATEGORY_KEYWORDS.find((k) => k.re.test(filename))?.id;
 }
 
