@@ -150,7 +150,7 @@ const gijoApi = {
   onShellBridge: (cb: (d: unknown) => void) => { ipcRenderer.on("gijo:bridge", (_e, d) => cb(d)); },
   broadcastToWindows: (d: unknown) => ipcRenderer.send("gijo:broadcast", d),
   flashShell: () => ipcRenderer.send("shell:flash"),
-  openSmartMd: (): Promise<{ ok: boolean; error?: string; reused?: boolean }> => ipcRenderer.invoke("smartmd:open"),
+  // (openSmartMd — 2026-08-22 제거. 문서 작성이 「내 문서」 화면 안으로 들어왔다.)
   // "우리 AI 팀 사무실" 별도 창(시안 B) — 열기 + 항상 위 고정 토글
   openTeamOffice: () => ipcRenderer.invoke("office:open"),
   setOfficeAlwaysOnTop: (on: boolean) => ipcRenderer.invoke("office:setAlwaysOnTop", on),
@@ -641,6 +641,10 @@ const gijoApi = {
 
 contextBridge.exposeInMainWorld("gijo", gijoApi);
 
+// ★ 2026-08-22 — Smart MD 창을 없애면서 이 아래 판단도 **대상이 사라졌다.** 남겨 두는 이유는
+//   판단 자체가 유효하기 때문이다: **남의 저장소 코드를 창으로 실을 때 이 preload를 주지 않는다.**
+//   (아래는 그때의 기록. 새로 그런 창을 만드는 사람이 같은 실수를 하지 않게 그대로 둔다.)
+//
 // ⚠ Smart MD가 찾는 `window.gijoDesktop`은 **여기 두지 않는다**(2026-08-14 검토관 지적 H6).
 //   처음엔 「preload를 두 벌 두면 어긋난다」는 이유로 이 파일에 넣었는데, 그러면 Smart MD 창이
 //   이 preload를 쓰게 되고 — 이 preload는 로드 시점에 토큰을 복원해 **인증된 전 API**를 준다.

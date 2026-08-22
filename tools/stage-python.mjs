@@ -16,7 +16,7 @@
 //     **거짓 통과**한다. 그래서 PATH를 비우고 동봉본만으로 실제 추출을 돌려 본다.
 //     llama-cuda가 「빈 PATH 자가검증이 잡아낸 누락 1호」를 남긴 것과 같은 이유다.
 //
-// ■ 저장소에 파이썬을 커밋하지 않는다 — client/scripts/fetch-smartmd.mjs와 같은 방침이다
+// ■ 저장소에 파이썬을 커밋하지 않는다 — 옛 fetch-smartmd.mjs(2026-08-22 폐지)와 같은 방침이다
 //   (두 벌이 되면 저쪽이 올라가도 이쪽은 낡는다). 판은 env로 고정하고 받은 판을 파일로 남긴다.
 //
 // ⚠ 외부 꾸러미를 쓰지 않는다(server/test/toolsdeps.test.ts 계약) — 압축 해제는 Windows에
@@ -161,7 +161,7 @@ const 판 = process.env.GIJO_PYTHON_VERSION || "3.12.10";
 const URL = `https://www.python.org/ftp/python/${판}/python-${판}-embed-amd64.zip`;
 const 표식 = path.join(OUT, "GIJO-PYTHON-VERSION.json");
 
-// 멱등 — 이미 같은 판이 **온전히** 꾸려져 있으면 다시 받지 않는다(fetch-smartmd의 --keep과 같은 뜻).
+// 멱등 — 이미 같은 판이 **온전히** 꾸려져 있으면 다시 받지 않는다.
 //
 // ⚠ 「파일이 있다」를 증거로 삼지 않는다(검토관 2026-08-22 [중]). 예전엔 표식과 python.exe만 보고
 //   건너뛰었는데, 그러면 site-packages/pypdf가 지워지거나 ._pth가 원본으로 되돌아간 상태에서도

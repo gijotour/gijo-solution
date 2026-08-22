@@ -273,10 +273,9 @@
     <div class="free" id="freeBox" style="display:none">
       <div class="free-t">무료로 함께 드리는 것</div>
       <div class="free-row">
-        <button class="fc" id="smartMdBtn" type="button">
-          <div class="fc-h"><span>📝 Smart MD Studio</span><span class="fc-b">무료</span></div>
-          <div class="fc-d">화면 캡처를 붙여 넣어 문서를 만드는 편집기. 로그인 없이 바로 열립니다.</div>
-        </button>
+        <!-- 📝 Smart MD Studio 카드는 2026-08-22에 뺐다 — 그 기능이 「내 문서」 안으로 들어왔다
+             (캡처 붙여넣기·템플릿·버전 이력·4형식 내보내기). 사장님 「팝업은 필요없어」.
+             ⚠ freeBox 자체는 남긴다 — 라이트 다운로드 카드가 여기 살고 loginchoice.test가 그 자리를 지킨다. -->
         <button class="fc" id="liteDlBtn" type="button">
           <div class="fc-h"><span>⬇ GIJO AS 라이트</span><span class="fc-b">무료</span></div>
           <div class="fc-d">서버 없이 내 PC에서 혼자 도는 개인용 판. Windows 설치본·안내서를 받습니다(NVIDIA GPU 10GB급).</div>
@@ -714,15 +713,6 @@
       //   로그인 전이라 서버에 못 물으니, 열 때 실패하면 그때 정직하게 말한다(아래 openExternal).
     })();
 
-    document.getElementById("smartMdBtn").addEventListener("click", async () => {
-      freeMsg.textContent = "";
-      try {
-        const r = await window.gijo.openSmartMd();
-        if (r && r.ok === false) freeMsg.textContent = r.error || "Smart MD를 열지 못했습니다.";
-      } catch (err) {
-        freeMsg.textContent = "이 판에는 Smart MD가 없습니다 — 최신 버전으로 올리면 함께 들어옵니다.";
-      }
-    });
 
     // 라이트 설치본 배포처. 지금은 사장님 구글 드라이브가 통로다(임시) — 서버 배포로 옮기면
     // 이 주소 한 줄만 바뀐다. 폴더 링크라 설치본을 새 판으로 바꿔도 여기는 그대로다.

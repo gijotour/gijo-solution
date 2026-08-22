@@ -3,10 +3,9 @@
 // ■ 왜 이 감시가 생겼나
 //   `navigate:to`는 라이트에서 열 수 없는 제품 화면을 셸로 되돌린다(셸화면보정). 그런데
 //   **별도 창을 여는 IPC는 그 길을 안 지난다** — main.ts:514-515가 스스로 그 틈을 적어 뒀다.
-//   지금 그런 창이 사무실·**문서 작성(Smart MD)** 둘이다(문서함은 2026-08-20 내 문서 허브에
-//   흡수돼 창 자체가 없어졌다). 둘 다 지금은 맞다:
+//   지금 그런 창이 사무실·팝업 셸·지휘소 셋이다(문서함은 2026-08-20 내 문서 허브에,
+//   문서 작성(Smart MD)은 2026-08-22 내 문서 화면 안에 흡수돼 창 자체가 없어졌다):
 //     · office  — 라이트 셸에 그 버튼이 없어 닿지 않는다
-//     · smartmd — 전 에디션 무료 도구다(사장님 결정). 막지 않는 것이 의도다
 //   문제는 **네 번째가 제품 화면일 때 조용히 새는 것**이다. 그때 이 시험이 실패해,
 //   「새로 만든 창은 라이트에서 열려도 되는가」를 사람이 판단하게 만든다.
 //   ▶ 「세 번째면 소스 감시」(이 저장소 원칙)에 따라 셋이 된 지금 세워 둔다.
@@ -32,7 +31,7 @@ describe("별도 창을 여는 IPC — 문지기를 안 거치는 자리", () =>
   // 판단이 끝난 것만 적는다. 새 이름이 생기면 아래 시험이 실패하고, 그때 판단해서 올린다.
   const 검토됨: Record<string, string> = {
     "office:open": "팀 사무실 — 라이트 셸에 버튼이 없어 닿지 않는다",
-    "smartmd:open": "문서 작성(Smart MD) — 전 에디션 무료 도구다(2026-08-14 사장님 결정). 막지 않는 것이 의도",
+    // "smartmd:open" — 2026-08-22 제거(사장님 「팝업은 필요없어」). 그 일은 「내 문서」 화면 안으로.
     // ⚠ 아래 둘은 **임의 화면을 연다** — 재검토(B-5)로 드러났다. 라이트 셸(lite-app)에는 분리 단추가
     //   없어 지금은 닿지 않지만, 위 셋과 성격이 다르다: 화면 이름을 **렌더러가 준다.**
     //   라이트에서 이 길이 열리는 날 셸화면보정과 같은 문지기가 반드시 필요하다.
@@ -56,44 +55,34 @@ describe("별도 창을 여는 IPC — 문지기를 안 거치는 자리", () =>
     }
   });
 
-  it("★ 별도 창은 새 창 열기를 통제한다 — 문서 안 링크가 통제 밖 창을 띄우면 안 된다", () => {
-    // Smart MD는 **다른 저장소에서 받아온** 마크다운 렌더러다. 문서 안 링크가 target=_blank면
-    // Electron이 우리 통제 밖의 창을 띄운다(will-navigate는 그 길을 막지 못한다 — 다른 사건이다).
-    expect(mainSrc, "smartMd 창에 setWindowOpenHandler가 없다").toMatch(
-      /smartMdWindow\.webContents\.setWindowOpenHandler/
+  it("★ 창을 여는 자리는 남의 코드를 담지 않는다 — 그게 통제 밖 새 창의 뿌리였다", () => {
+    // ⚠ 2026-08-22까지 여기서 잰 것은 **Smart MD 창의 setWindowOpenHandler**였다.
+    //   Smart MD는 다른 저장소에서 받아온 마크다운 렌더러라, 문서 안 링크가 target=_blank면
+    //   Electron이 우리 통제 밖 창을 띄웠다(will-navigate로는 못 막는다 — 다른 사건이다).
+    //   그 창을 없애면서(문서 작성이 「내 문서」 화면 안으로 들어옴) 잴 대상이 사라졌다.
+    //   **그래서 지우는 대신 뿌리를 잰다**: 남의 렌더러를 다시 창으로 싣는 날 여기서 걸린다.
+    //   지금 남은 창(사무실·팝업 셸·지휘소)은 전부 우리 화면이라 이 위험이 없다.
+    expect(mainSrc, "smartmd 창이 되살아났다 — 남의 렌더러를 창으로 실으면 setWindowOpenHandler가 필수다").not.toMatch(
+      /smartMdWindow\s*=/
     );
   });
 });
 
 /**
- * Smart MD 봉인 — 고객 문서에 박은 약속의 **유일한 근거**를 시험으로 묶는다.
+ * (★ Smart MD 창 봉인 시험 4개 — **2026-08-22에 뗐다.**
  *
- * ⚠ 왜 (3차 검토 M-4) 라이트 안내서·사용안내서에 「만든 글은 이 PC를 벗어나지 않습니다」라고
- *   적었는데, 그 근거는 main.ts의 세 블록뿐이었다 — 누가 partition 한 줄을 지워도 시험 3,400개가
- *   전부 초록이었다. 「세 번째면 소스 감시」에 걸리는 자리다.
+ *  ■ 무엇을 지키던 것인가: 라이트 안내서·사용안내서의 「만든 글은 이 PC를 벗어나지 않습니다」의
+ *    유일한 근거였다 — partition(전용 세션) · CSP connect-src 'none' · onBeforeRequest 로컬 스킴 ·
+ *    setWindowOpenHandler deny, 이 네 겹이 main.ts에 있는지 소스로 감시했다.
+ *
+ *  ■ 왜 뗐나: 그 창 자체가 없어졌다(사장님 「내문서에서 문서작성을 할꺼니 팝업은 필요없어」).
+ *    문서 작성은 이제 **우리 화면 안**(mydocs.html ✏ 문서 편집)이고, 그 글은 우리 서버의
+ *    개인 문서 표에 들어간다 — 봉인의 대상도 방식도 달라졌다. 없는 창의 계약을 계속 재면
+ *    시험은 영원히 빨갛고, 빨간 시험은 곧 아무도 안 보는 시험이 된다.
+ *
+ *  ■ 되살리려면: git show <이 커밋>^:server/test/extra-windows.test.ts
+ *    (main.ts의 구현도 같은 커밋의 675줄 근처 주석이 어디서 꺼내는지 적어 두었다.)
+ *
+ *  ■ 대신 남긴 것: 위 describe의 「남의 렌더러를 창으로 싣지 않는다」 — 그 창이 되살아나면
+ *    걸린다. 그때 이 네 겹을 함께 되살릴 것.)
  */
-describe("Smart MD 창 봉인 — 「이 PC를 벗어나지 않습니다」의 근거", () => {
-  it("★ 전용 세션에 가둔다 — 기본 세션에 CSP를 걸면 제품 화면 전체가 그 규칙을 받는다", () => {
-    expect(mainSrc, "partition이 없다 — CSP가 기본 세션에 걸려 제품을 막는다").toMatch(
-      /partition:\s*["']persist:gijo-smartmd["']/
-    );
-  });
-
-  it("★ CSP로 바깥 연결을 막는다", () => {
-    expect(mainSrc).toMatch(/Content-Security-Policy/);
-    expect(mainSrc, "connect-src 'none'이 없다 — fetch·XHR·WebSocket이 나갈 수 있다").toMatch(/connect-src 'none'/);
-  });
-
-  it("★ 세션 층에서도 비-로컬 요청을 막는다(두 겹) — CSP는 페이지가 지키는 규칙일 뿐이다", () => {
-    expect(mainSrc).toMatch(/onBeforeRequest/);
-    expect(mainSrc, "로컬 스킴만 허용하는 검사가 없다").toMatch(/file\|devtools\|blob\|data/);
-  });
-
-  it("★ 새 창을 **바깥으로 열어 주지 않는다** — 그게 세 번째 문이었다", () => {
-    // window.open("https://…/?d=<본문>") 한 줄이면 두 겹을 우회해 글을 실어 내보낼 수 있었다.
-    const 핸들러 = mainSrc.slice(mainSrc.indexOf("smartMdWindow.webContents.setWindowOpenHandler"));
-    const 블록 = 핸들러.slice(0, 핸들러.indexOf("});") + 3);
-    expect(블록, "핸들러 안에서 openExternal로 바깥을 연다 — 봉인 밖 통로다").not.toMatch(/openExternal/);
-    expect(블록, "deny로 끝나지 않는다").toMatch(/action:\s*["']deny["']/);
-  });
-});

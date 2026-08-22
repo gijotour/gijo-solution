@@ -151,6 +151,28 @@ function 동봉바이너리() {
   return 모음;
 }
 
+/** ★ 배포 목록에 smartmd가 있나 — **폴더 유무가 아니라 빌드가 담는가**로 판정한다.
+ *
+ *  ⚠ 2026-08-22에 Smart MD 창을 없애며 `client/package.json`·`electron-builder.lite.json`의
+ *    `files`에서 `smartmd/**\/*`를 뺐다. 그런데 **개발 기계에는 옛 폴더가 남아 있다** —
+ *    폴더만 보고 판정하면 **안 싣는 것을 고지에 적는다.** 과다 고지는 법적으로 위험하진
+ *    않지만 「우리가 뭘 배포하는지 안다」는 이 관문의 값어치를 무너뜨린다.
+ *  ⚠ 반대로 다시 실으면 이 함수가 true가 되어 고지가 저절로 되살아난다.
+ */
+function smartmd배포에담나() {
+  for (const [설정, 꺼내기] of [
+    ["package.json", (j) => j.build?.files],
+    ["electron-builder.lite.json", (j) => j.files],
+  ]) {
+    const p = path.join(루트, "client", 설정);
+    if (!fs.existsSync(p)) continue;
+    let j;
+    try { j = JSON.parse(fs.readFileSync(p, "utf8")); } catch { continue; }
+    if ((꺼내기(j) ?? []).some((f) => String(f).includes("smartmd"))) return true;
+  }
+  return false;
+}
+
 /** smartmd vendor 동봉물 — **파서는 tools/lib/vendor-manifest.mjs 한 곳**에 있다.
  *
  *  ★★ 이 자리가 조용히 0개를 읽고 있었다(2026-08-22 실측).
@@ -163,6 +185,7 @@ function 동봉바이너리() {
  *    게시에 물린 진짜 파서가 깨질 수 있었다(검토관 [중]). 이제 둘이 같은 것을 부른다.
  */
 function smartmd동봉() {
+  if (!smartmd배포에담나()) return []; // 안 싣는다 — 고지에도 안 적는다(2026-08-22)
   const r = 원장읽기(루트);
   동봉원장고장 = r.고장;
   return r.목록.map((c) => ({

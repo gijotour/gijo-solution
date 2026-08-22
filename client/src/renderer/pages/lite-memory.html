@@ -522,7 +522,7 @@
     document.getElementById("upGo").addEventListener("click", 넣기);
     document.getElementById("folderPick").addEventListener("click", 폴더넣기);
     document.getElementById("smdOpen").addEventListener("click", function () {
-      if (g && g.openSmartMd) { try { g.openSmartMd(); return; } catch (e) { /* 아래 안내 */ } }
+      // (Smart MD 통로 — 2026-08-22 제거. 문서 작성은 「내 문서」 화면에서 한다.)
       gijoTell("이 판에는 문서 작성 도구(GIJO Smart MD)가 없습니다.");
     });
     목록();

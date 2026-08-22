@@ -23,13 +23,29 @@ const 저장소 = path.resolve(fileURLToPath(new URL("../..", import.meta.url)))
 const SMARTMD = path.join(저장소, "client", "smartmd");
 const VEND = path.join(SMARTMD, "vendor", "VERSIONS.md");
 
-/** ★ **이 기계가 smartmd를 싣는가.**
+/** ★ **우리가 smartmd를 배포에 싣는가.**
  *  ⚠ `client/smartmd/`는 **git이 추적하지 않고**(client/.gitignore) 게시 직전에 외부 저장소에서
  *    받아온다. 그래서 새 클론·max·gb10에는 아예 없다 — 거기서 「빨간불」을 내면
  *    **감시가 사실이 아닌 것을 말하는 것**이고, 사람은 곧 이 시험을 무시하게 된다.
  *  ⚠ 반대로 **폴더는 있는데 원장이 깨진** 경우는 반드시 잡아야 한다 — 그것이 실제 사고였다.
- *    「없다」와 「못 읽는다」를 가르는 것이 이 감시의 전부다. */
-const 싣는기계 = fs.existsSync(SMARTMD);
+ *    「없다」와 「못 읽는다」를 가르는 것이 이 감시의 전부다.
+ *
+ *  ★ 2026-08-22 — 판정 기준을 **「폴더가 있나」에서 「빌드가 담나」로** 바꿨다.
+ *    그날 Smart MD 창을 없애면서 `client/package.json`·`electron-builder.lite.json`의
+ *    `files`에서 `smartmd/**\/*`를 뺐다. 그런데 **개발 기계에는 옛 폴더가 그대로 남아 있어**
+ *    폴더만 보면 「싣는 기계」로 읽혔다 — 안 싣는 것을 고지가 있나 없나 따지는 헛감시가 된다.
+ *    지금은 **배포 목록에 들어 있을 때만** 잰다. 다시 실으면 이 감시가 저절로 되살아난다. */
+function 배포에담나(): boolean {
+  for (const 설정 of ["package.json", "electron-builder.lite.json"]) {
+    const p = path.join(저장소, "client", 설정);
+    if (!fs.existsSync(p)) continue;
+    const j = JSON.parse(fs.readFileSync(p, "utf8"));
+    const files: string[] = (설정 === "package.json" ? j.build?.files : j.files) ?? [];
+    if (files.some((f) => String(f).includes("smartmd"))) return true;
+  }
+  return false;
+}
+const 싣는기계 = 배포에담나() && fs.existsSync(SMARTMD);
 const 실을때만 = 싣는기계 ? describe : describe.skip;
 
 /** VERSIONS.md 원문. */

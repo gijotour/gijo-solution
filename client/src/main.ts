@@ -16,7 +16,7 @@ import { isDangerous } from "./terminalPolicy";
 
 let mainWindow: BrowserWindow | null = null;
 let officeWindow: BrowserWindow | null = null; // "우리 AI 팀 사무실" 별도 창(시안 B) — 관제 모니터 상시용
-let smartMdWindow: BrowserWindow | null = null; // GIJO Smart MD Studio — 로그인 고객 무료 제공(2026-08-14)
+// (smartMdWindow — 2026-08-22 제거. 그 창이 하던 일은 「내 문서」 화면 안으로 들어왔다.)
 let quitConfirmed = false; // 메인 창 닫기 확인을 통과했는가 — 재시작·업데이트는 true로 건너뛴다
 let bundledServerProcess: ChildProcess | null = null;
 /** 이 앱이 서버를 직접 띄웠을 때만 채워진다 — 저장 암호화 전환처럼 **서버를 멈춰야 하는 일**에 쓴다. */
@@ -672,120 +672,24 @@ ipcMain.handle("office:open", async () => {
 //  제품 안내 읽기·요청 만들기는 mydocs.html의 📘 제품 안내 탭이 맡는다. docbox:open IPC와
 //  창 코드는 함께 걷었다 — 옛 진입로(하단 📚·설정 가이드 링크)는 그 탭으로 재배선됐다.)
 
-// ── GIJO Smart MD Studio — 로그인한 고객에게 주는 **무료 문서 작성 도구** ────────────────
+// ── GIJO Smart MD Studio — **2026-08-22에 없앴다** ──────────────────────────────────
 //
-// ■ 사장님 결정(2026-08-14): 「클라이언트에서 로그인할 때 제공되는 무료 툴로 같이 배포하고
-//   사용할 수 있게끔」. 전 에디션 공통이다(라이트·스탠다드·프로).
+// 사장님 지시: 「내 문서에서 문서작성을 할 거니 **팝업은 필요없어**」 ·
+//   「고객 문서편집을 **여기서만** 할 수 있게, MD studio보다 더 직관적이고 사용하기 편하게」
 //
-// ■ 왜 별도 창인가 — 탭(iframe) 안에 넣지 않는다. ① Smart MD는 자기 단축키·붙여넣기 처리·
-//   전체화면 편집을 전제한 **독립 편집기**다 ② app.html의 healFrames가 탭 iframe을 되살리며
-//   다시 로드하는데, 편집 중이던 글이 그때 날아간다 ③ 문서를 옆에 띄워 두고 GIJO를 조작하는
-//   쓰임이 문서함·사무실 창과 같다. 그 셋과 같은 패턴을 쓴다.
+// 그 창이 하던 일은 전부 **「내 문서」 화면 안으로** 들어왔다 —
+//   화면 캡처 Ctrl+V 삽입 · 업무 템플릿 · **버전 이력** · md/HTML/PDF/워드 4형식 내보내기.
+//   (우리가 라이트 설치안내서·용어사전·챗봇 안내 **세 곳에 약속해 둔 목록** 그대로다.)
 //
-// ■ 없어도 GIJO가 돈다(사장님 원칙 ④ — 포함이 아니라 연동). 자산은 게시 때
-//   scripts/fetch-smartmd.mjs가 원본 저장소에서 받아 담는다. 개발 트리에 없을 수 있으므로
-//   **없으면 조용히 죽지 않고 사람이 읽을 안내**를 준다.
+// ⚠ **잃은 것을 적어 둔다** — 되살릴지 판단할 사람이 알아야 한다:
+//   · 스크린샷 주석(화살표·박스) — **어디에도 약속된 적이 없어** 옮기지 않았다
+//   · 로그인 없이 열리던 것 — 내 문서는 제품 화면이라 로그인 뒤에 쓴다
 //
-// ⚠ 라이트 문지기: 이 창은 셸화면보정을 안 거친다(navigate:to가 아니다). Smart MD는
-//   **전 에디션 공통 무료 도구**라 라이트에서 열려도 맞다 — 막지 않는 것이 의도다.
-//   (라이트에 없는 *제품* 화면을 별도 창으로 여는 길이 생기면 그때는 문지기가 필요하다.)
-function smartMdIndex(): string {
-  // 설치본에서는 asar 안(app/smartmd), 개발에서는 client/smartmd.
-  return path.join(__dirname, "../smartmd/index.html");
-}
-
-ipcMain.handle("smartmd:open", async () => {
-  const index = smartMdIndex();
-  if (!fs.existsSync(index)) {
-    return {
-      ok: false,
-      error: "Smart MD Studio가 이 설치본에 담겨 있지 않습니다. 개발 중이라면 client 폴더에서 `node scripts/fetch-smartmd.mjs`를 한 번 실행하세요.",
-    };
-  }
-  if (smartMdWindow && !smartMdWindow.isDestroyed()) {
-    smartMdWindow.focus();
-    return { ok: true, reused: true };
-  }
-  smartMdWindow = new BrowserWindow({
-    // 원본 앱의 기본 크기(1300×900)를 따르되, 작은 화면에서는 그 화면에 맞춘다.
-    width: Math.min(1300, Math.max(900, screen.getPrimaryDisplay().workAreaSize.width - 120)),
-    height: Math.min(900, Math.max(640, screen.getPrimaryDisplay().workAreaSize.height - 120)),
-    minWidth: 900,
-    minHeight: 600,
-    backgroundColor: "#262624",
-    title: "GIJO Smart MD Studio — 문서 작성(무료 제공)",
-    webPreferences: {
-      // ⚠ 제품 preload를 붙이지 않는다(검토관 지적 H6). 제품 preload는 로드 시점에 토큰을
-      //   복원해 **인증된 전 API**(터미널·파일·서버 전 라우트)를 그 창에 준다. 이 창에 실리는
-      //   코드는 **다른 저장소에서 받아온 것**이라, 저쪽 push 한 번이 그 전부를 얻게 된다.
-      //   그래서 이 창만 쓰는 최소 preload를 둔다 — gijoDesktop 두 함수뿐이다.
-      preload: path.join(__dirname, "smartmd-preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      // ⚠ **전용 세션**에 가둔다(2026-08-14). 아래 CSP를 기본 세션에 걸면 GIJO 화면 전체가
-      //   그 규칙을 받는다 — 그건 이 창 하나를 막으려다 제품을 막는 일이다.
-      //   덤으로 쿠키·저장소도 제품과 갈린다(남의 코드가 우리 세션 저장소를 못 본다).
-      partition: "persist:gijo-smartmd",
-    },
-  });
-  smartMdWindow.removeMenu();
-  // ⚠ **이 창은 바깥으로 나가지 못한다**(2026-08-14 재검토 B-6). 고객 안내서에 「만든 글은 이 PC를
-  //   벗어나지 않습니다」라고 적었는데, 그 창의 코드는 **다른 저장소에서 받아온 것**이라 코드가
-  //   그것을 보장하고 있지 않았다(문구가 코드보다 앞서 나간 자리). CSP로 못 박는다:
-  //   connect-src 'none' — fetch·XHR·WebSocket이 아예 안 나간다. 편집기는 로컬 자산만 쓴다.
-  //   (위 partition으로 이 창만의 세션이므로, 이 규칙은 GIJO 제품 화면에 영향을 주지 않는다.)
-  smartMdWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        "Content-Security-Policy": ["default-src 'self' 'unsafe-inline' data: blob:; connect-src 'none'; img-src 'self' data: blob:; font-src 'self' data:;"],
-      },
-    });
-  });
-  // 바깥으로 나가는 요청 자체를 세션 층에서도 막는다 — CSP는 페이지가 지키는 규칙이라
-  // 브라우저 밖 경로(예: 미래에 추가될 preload 기능)까지 덮지 못한다. 두 겹으로 둔다.
-  smartMdWindow.webContents.session.webRequest.onBeforeRequest((details, callback) => {
-    const 로컬 = /^(file|devtools|blob|data):/i.test(details.url);
-    if (!로컬) console.warn(`[smartmd] 바깥 요청 차단: ${details.url.slice(0, 120)}`);
-    callback({ cancel: !로컬 });
-  });
-  // ⚠ 배율(bindZoom)은 걸지 않는다 — Smart MD는 자기 확대/축소를 가진 편집기다.
-  //   GIJO 화면 배율을 강제하면 편집기 안에서 글자 크기를 조절하는 기능과 부딪힌다.
-  smartMdWindow.on("closed", () => { smartMdWindow = null; });
-  // 드롭한 파일·링크가 창을 딴 데로 끌고 가지 못하게(원본 main.js의 방어를 그대로 옮긴다).
-  smartMdWindow.webContents.on("will-navigate", (e) => e.preventDefault());
-  // ⚠ **새 창을 열지 못하게 막는다**(검토관 의심 1). Smart MD는 마크다운을 렌더링하므로
-  //   문서 안의 링크가 `target=_blank`거나 window.open을 부르면, Electron이 **우리 통제 밖의
-  //   창**을 띄운다(will-navigate는 그 길을 막지 못한다 — 다른 사건이다).
-  //   외부 주소는 기본 브라우저로 보낸다(그쪽이 샌드박스다). 그 외 스킴은 그냥 버린다.
-  smartMdWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // ⚠ **바깥으로 열어 주지 않는다**(3차 검토 M-1). 처음엔 http(s)를 기본 브라우저로 넘겼는데,
-    //   그게 위의 두 겹(CSP·세션 차단)을 **우회하는 세 번째 문**이었다:
-    //   `window.open("https://…/?d=<본문>")` 한 줄이면 편집 중인 글을 URL에 실어 내보낼 수 있다.
-    //   이 창의 위협 모델은 「저쪽 저장소 push 한 번」이고, 고객 안내서에 「이 PC를 벗어나지
-    //   않습니다」라고 적었다 — 그 약속과 이 문은 함께 설 수 없다.
-    //   ▶ 전부 거절하고 로그만 남긴다. 문서 안 링크를 열어야 할 일이 생기면, 그때 사람에게
-    //     주소를 보여 주고 확인받는 길을 따로 만든다(조용히 여는 것과 다르다).
-    console.warn(`[smartmd] 새 창 요청 거절: ${String(url).slice(0, 120)}`);
-    return { action: "deny" };
-  });
-  await smartMdWindow.loadFile(index);
-  return { ok: true };
-});
-
-// Smart MD의 PDF 내보내기 — 원본 앱이 자기 main.js에서 하던 일을 여기서 대신한다.
-// printBackground가 없으면 어두운 코드블록 배경이 빠져 흰 바탕에 흰 글씨가 된다(원본 주석).
-ipcMain.handle("smartmd:exportPdf", async (e) => {
-  const win = BrowserWindow.fromWebContents(e.sender);
-  // ⚠ **Smart MD 창에서 온 것만** 받는다(검토관 지적 L6). 자기 창을 PDF로 뜨는 것뿐이라
-  //   위험이 크지 않지만, 표면은 줄일 수 있으면 줄인다.
-  if (!win || win !== smartMdWindow) return null;
-  const buffer = await win.webContents.printToPDF({ printBackground: true });
-  return new Uint8Array(buffer); // Buffer를 구조화 복제에 태우면 판본에 따라 조용히 멎는다(원본 주석)
-});
-
-// 관제 모니터 상시용 — 항상 위 고정 토글(office.html 헤더의 📌 버튼).
+// ⚠ 그 창은 **인터넷·새 창이 다 막힌 봉인 창**이라 비밀 검사를 안 했다(나갈 데가 없었다).
+//   내 문서는 공유·AI 지식·PDF로 **나가므로** 그 전제가 사라졌다 — 그래서 공유를 켤 때
+//   「그림 속 글자는 가릴 수 없습니다」를 되묻는다(사장님 결정 B).
+//
+// ★ 되살리려면: 이 커밋 하나를 git revert 하면 된다(한 커밋으로 묶어 두었다).
 ipcMain.handle("office:setAlwaysOnTop", async (_e, on: boolean) => {
   if (officeWindow && !officeWindow.isDestroyed()) officeWindow.setAlwaysOnTop(Boolean(on));
   return { on: Boolean(on) };

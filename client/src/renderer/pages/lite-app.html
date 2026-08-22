@@ -125,7 +125,9 @@
           var chip = document.getElementById("liteRemoteChip");
           var bar = document.querySelector(".lite-titlebar");
           var btn = document.getElementById("smdBtn");
-          if (w && w.remote && !chip && bar && btn) {
+          // ⚠ 자리 기준이던 📝 단추가 사라졌다(2026-08-22) — **btn이 없어도 칩은 떠야 한다.**
+          //   있으면 그 앞에, 없으면 제목줄 끝에 붙인다. btn을 요구하면 칩이 통째로 안 뜬다.
+          if (w && w.remote && !chip && bar) {
             chip = document.createElement("span");
             chip.id = "liteRemoteChip";
             chip.style.cssText = "-webkit-app-region:no-drag;margin-left:auto;margin-right:8px;" +
@@ -133,8 +135,10 @@
               "background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.45);color:#7A4E00;";
             chip.title = "이 PC 대신 VPN 안의 원격 GPU가 답하고 있습니다 — 질문이 그 기계로 전송됩니다. ⚙ 설정 › 원격 GPU에서 끕니다.";
             chip.textContent = "🖧 원격 GPU로 전송 중";
-            bar.insertBefore(chip, btn);
-            btn.style.marginLeft = "0";                      // 칩이 auto 자리를 가져갔다
+            // ⚠ btn이 null이면 insertBefore는 **끝에 붙이는 것**으로 동작하지만,
+            //   바로 다음 줄의 `btn.style`이 TypeError로 죽어 칩이 안 뜬다. 갈라서 쓴다.
+            if (btn) { bar.insertBefore(chip, btn); btn.style.marginLeft = "0"; }
+            else bar.appendChild(chip);
           } else if ((!w || !w.remote) && chip) {
             chip.remove();                                    // 껐으면 없는 경고를 남기지 않는다
             if (btn) btn.style.marginLeft = "auto";           // auto 자리를 되돌린다
@@ -190,15 +194,7 @@
       setInterval(egRefresh, 60000);
     })();
 
-    // 없으면 조용히 지나가지 않고 이유를 말한다 — 「눌러도 아무 일 없다」를 만들지 않는다.
-    document.getElementById("smdBtn").addEventListener("click", async function () {
-      if (!window.gijo || typeof window.gijo.openSmartMd !== "function") {
-        gijoTell("이 판에는 문서 작성 도구가 없습니다 — 최신 버전으로 올리면 함께 들어옵니다.");
-        return;
-      }
-      const r = await window.gijo.openSmartMd();
-      if (r && r.ok === false) gijoTell(r.error || "문서 작성 도구를 열지 못했습니다.");
-    });
+    // 📝 문서 작성 단추는 2026-08-22에 없앴다 — 그 일이 「내 문서」 화면 안으로 들어왔다.
   </script>
   <div class="lite-body">
     <nav class="lite-side" aria-label="라이트 메뉴">

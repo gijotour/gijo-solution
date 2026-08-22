@@ -18,8 +18,9 @@
     · 👤 내 것 탭에 **전폭 편집 스테이지** — ＋ 새 문서·✏ 고치기. 업무 템플릿 7종(코드
       상수 — LLM이 짓지 않는다)·원문/분할/미리보기. 저장은 personalDocsUpdate/Create
       **이미 있던 라우트** 그대로(서버 신설 0건 — 시안 §5 대응표).
-    · Smart MD Studio 창은 **그대로 둔다**(서버 권한 0 격리 — smartmd-preload.ts 불변).
-      이 화면은 그 창을 iframe으로 품지 않는다. 「✍ Smart MD로 쓰기」는 지금처럼 별도 창.
+    · ~~Smart MD Studio 창은 그대로 둔다~~ → **2026-08-22에 그 창을 없앴다**(사장님
+      「내문서에서 문서작성을 할꺼니 팝업은 필요없어」). 문서 작성은 전부 이 화면 안이다:
+      아래 ✏ 문서 편집 스테이지가 그 일을 받았다(붙여넣기 그림·/ 명령·판 이력·첨부·내보내기).
     · 신고 시한 연계 계약(시안 §6): {type:"gijo:newDocFromTemplate", templateId, prefill}
       메시지를 받으면 내 것 탭·편집 스테이지를 열고 템플릿 골격을 채운다. 발신자는
       부모 셸(window.parent)만 믿는다 — 발신자 검증 계약(5.37.0)과 같은 잣대.
@@ -45,7 +46,8 @@
     화면, 학습 승인·실행은 학습 화면. 여기는 바로가기만 잇는다. 제품 안내는 읽기전용 —
     편집(✏·＋)은 👤 내 것 탭에서만 나온다.
   ■ 자유 텍스트 입력칸 0(지시는 대화창) — 단 **편집기·요청 만들기는 예외**다: 본문 작성
-    자리는 저작 행위이지 지시가 아니다(Smart MD와 같은 지위 — 시안 §4 자가점검). 검색칸은
+    자리는 저작 행위이지 지시가 아니다(옛 Smart MD 창이 갖던 지위를 이 화면이 받았다 —
+    시안 §4 자가점검). 검색칸은
     필터 전용.
   ■ 위키링크·백링크·그래프뷰는 만들지 않는다(확정 경계).
 -->
@@ -320,7 +322,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       <div class="acts" id="acts">
         <button class="btn primary" id="btnNew" title="이 화면 안에서 새 문서를 씁니다 — 업무 템플릿 7종에서 고를 수 있습니다">＋ 새 문서</button>
         <button class="btn" id="btnImport" title=".md/.txt 파일을 내 문서로 가져옵니다">📥 .md</button>
-        <button class="btn" id="btnWrite" title="Smart MD Studio(무료·별도 창)를 엽니다 — 바깥으로 낼 문서를 정성껏 다듬을 때 좋습니다">✍ Smart MD</button>
+        <button class="btn" id="btnWrite" title="새 문서를 씁니다 — 캡처 붙여넣기·템플릿·버전 이력이 이 안에 있습니다">✍ 문서 편집</button>
       </div>
       <div class="acts" id="guideActs" style="display:none">
         <button class="btn primary" id="btnRequest" title="개발팀에 보낼 요청 문서를 만듭니다 — 파일로 저장됩니다">📝 요청 만들기</button>
@@ -925,10 +927,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     if (g) 화면열기(g.getAttribute("data-go"), g.getAttribute("data-lb") || "");
   });
 
-  document.getElementById("btnWrite").addEventListener("click", async function () {
-    if (!(window.gijo && window.gijo.openSmartMd)) return;
-    var r = await window.gijo.openSmartMd();
-    if (r && r.ok === false && r.error && window.gijoTell) window.gijoTell(r.error);
+  // ★ 2026-08-22 — 별도 창(Smart MD)을 열던 자리다. 이제 **이 화면 안에서** 쓴다:
+  //   캡처 붙여넣기·템플릿·버전 이력·4형식 내보내기가 전부 편집 스테이지에 있다.
+  document.getElementById("btnWrite").addEventListener("click", function () {
+    탭 = "mine";
+    편집열기(null, { openDrawer: true });
   });
   document.getElementById("btnImport").addEventListener("click", function () { document.getElementById("fileIn").click(); });
   var fileIn = document.createElement("input");

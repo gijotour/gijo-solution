@@ -6,12 +6,11 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "node scripts/check-inline-scripts.mjs && tsc -p tsconfig.json && npm run bundle:preload",
-    "bundle:preload": "esbuild src/preload.ts --bundle --platform=node --target=node18 --format=cjs --external:electron --outfile=dist/preload.js && esbuild src/smartmd-preload.ts --bundle --platform=node --target=node18 --format=cjs --external:electron --outfile=dist/smartmd-preload.js",
+    "bundle:preload": "esbuild src/preload.ts --bundle --platform=node --target=node18 --format=cjs --external:electron --outfile=dist/preload.js",
     "start": "npm run build && electron .",
     "watch": "tsc -p tsconfig.json --watch",
-    "fetch-smartmd": "node scripts/fetch-smartmd.mjs --keep",
-    "dist": "npm run build && npm run fetch-smartmd && npm run stage-python && npm run build-server-dist && npm run license-gate && electron-builder",
-    "dist:lite": "npm run build && npm run fetch-smartmd && npm run stage-python && npm run build-server-dist && npm run license-gate && electron-builder --config electron-builder.lite.json",
+    "dist": "npm run build && npm run stage-python && npm run build-server-dist && npm run license-gate && electron-builder",
+    "dist:lite": "npm run build && npm run stage-python && npm run build-server-dist && npm run license-gate && electron-builder --config electron-builder.lite.json",
     "rebuild-server-native": "node scripts/rebuild-server-native.mjs",
     "build-server-dist": "node scripts/build-server-dist.mjs",
     "license-gate": "node ../tools/gen-sbom-self.mjs --write-notice",
@@ -38,8 +37,7 @@
     },
     "files": [
       "dist/**/*",
-      "src/renderer/**/*",
-      "smartmd/**/*"
+      "src/renderer/**/*"
     ],
     "extraResources": [
       {
