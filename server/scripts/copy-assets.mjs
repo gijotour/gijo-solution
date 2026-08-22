@@ -8,7 +8,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const 서버 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const 옮길것 = ["engine/examquestions.json"];
+const 옮길것 = [
+  "engine/examquestions.json",
+  // SBOM 라이선스 점검이 쓸 정본 자료(2026-08-22 반입).
+  //   · spdx-licenses.json — SPDX 정본 식별자 733종(CC0-1.0). 등급 판정의 원천.
+  //   · cyclonedx-*.schema.json — 타사 SBOM을 읽을 때 필드 이름을 대조할 정본(Apache-2.0).
+  //   ⚠ 지식 저장소(RAG)에 넣지 않는다 — 스키마 551조각이 다른 질문의 근거를 밀어낸다.
+  //     읽을 글이 아니라 **판정기가 쓸 자료**다.
+  "engine/licensedata/spdx-licenses.json",
+  "engine/licensedata/cyclonedx-1.6.schema.json",
+  "engine/licensedata/cyclonedx-1.7.schema.json",
+];
 
 for (const rel of 옮길것) {
   const from = path.join(서버, "src", rel);
