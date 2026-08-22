@@ -30,7 +30,10 @@ export interface AutoUploadResult {
   nextChips?: string[]; // 반입 뒤 다음 걸음 칩(서버가 붙인다)
 }
 export const uploadApi = {
-  auto: (filename: string, content: string, forceType?: UploadType, productName?: string, keepOriginal?: boolean) =>
+  // replacesReceiptId — 되묻기 카드가 답할 때 **그때 남은 영수증 줄의 id**를 돌려준다.
+  //   서버가 그 줄을 지우고 확정 줄만 남긴다(사람의 행위는 한 번인데 줄이 둘이면 안 된다).
+  //   ⚠ 파일명으로 짝을 찾지 않는 이유는 서버 주석에 적혀 있다(이름 키잉 금지).
+  auto: (filename: string, content: string, forceType?: UploadType, productName?: string, keepOriginal?: boolean, replacesReceiptId?: string) =>
     request<AutoUploadResult>("/api/upload/auto", {
       method: "POST",
       body: {
@@ -38,6 +41,7 @@ export const uploadApi = {
         ...(forceType ? { forceType } : {}),
         ...(productName ? { productName } : {}),
         ...(keepOriginal ? { keepOriginal: true } : {}),
+        ...(replacesReceiptId ? { replacesReceiptId } : {}),
       },
     }),
 };

@@ -77,7 +77,7 @@
     // 문서함(별도 창)은 내 문서 허브에 흡수됐다(2026-08-20 승인 시안 docs-hub-v3 — 「모든 문서는
     // 여기서」). hidden 항목을 남기는 이유는 상단 🔍 화면 찾기 — 「문서함」 옛 이름으로 찾아도
     // 새 자리(내 문서 → 📘 제품 안내 탭)에 닿아야 한다.
-    { page: "mydocs.html?tab=guide", label: "제품 안내 (옛 문서함)", icon: "book", fixed: true, hidden: true },
+    { page: "mydocs.html?tab=guide", label: "GIJO AS 안내 (옛 문서함·제품 안내)", icon: "book", fixed: true, hidden: true },
     // 흡수된 화면의 옛 이름 — 🔍 화면찾기와 옛 링크가 죽지 않게(문서함 흡수 때와 같은 방식).
     { page: "mydocs.html?tab=vendor", label: "보안제품 비교·소개 (옛 제품 소개자료)", icon: "drawer", fixed: true, hidden: true },
     { page: "mydocs.html?tab=contacts", label: "나만의 연락처", icon: "book", fixed: true, hidden: true },
@@ -230,6 +230,13 @@
     // 「자산 통합 뷰」는 자산 목록으로 합쳤다(2026-08-02) — 같은 자산을 두 화면에서
     // 보던 것을 하나로. 옛 링크·북마크·열어 둔 탭이 막다른 길이 되지 않게 돌려보낸다.
     "assethub.html": "inventory.html",
+    // 「보안제품 비교·소개」를 내 문서 📦 탭으로 흡수(2026-08-22) — **파일을 지웠다.**
+    // ⚠ 이 표는 **셸을 거쳐 여는 길**만 받는다(메뉴·🔍 화면찾기·navigateTo).
+    //   localStorage에 저장된 탭 복원은 app.html의 `옛탭` 표가 받는다 — 파일이 없으면
+    //   nav.js가 실리기 전에 로드가 실패해서, 여기 적는 것만으로는 안 막힌다.
+    //   **두 곳 다** 적어야 한다(2026-08-22 검토관 [높음]: 여기도 저기도 없었다).
+    "intro.html": "mydocs.html?tab=vendor",
+    "intro.html?embed=1": "mydocs.html?embed=1&tab=vendor",
     // 발견·수집 그룹 통합(2026-08-09) — 세 메뉴는 discover 허브가 받는다. 열어 둔 탭(?embed=1)과
     // 쿼리 없는 직접 링크 둘 다 흡수. ⚠ 허브 무대(?embed=1&hub=1)는 키가 달라 여길 안 탄다 —
     // 태우면 허브 안에서 허브를 또 여는 무한 중첩이 된다.
@@ -769,11 +776,18 @@
         saveClosed(s);
       });
       // 메뉴 정의에서 그 화면을 찾아 같은 모양으로 그린다(이름·배지를 두 곳에 적지 않는다).
+      // ★ 2026-08-22 검토관 [낮음] 수리 — **배지와 줄 수가 어긋났다.** 배지는 `favs.length`를
+      //   그대로 썼는데, 없어진 화면(흡수·삭제)은 GROUPS에서 못 찾아 `if (found)`에서 조용히
+      //   건너뛴다. 그래서 「즐겨찾기 1」인데 줄이 0개인, 오류도 안 나는 거짓 숫자가 났다.
+      //   (5.65.0에서 「보안제품 비교·소개」에 ☆를 눌러 둔 사람이 이번 삭제로 정확히 그 자리에 온다.)
+      //   → **그린 것만 센다.** 「보이는 것과 숫자가 같다」는 이 저장소의 거짓숫자 원칙 그대로.
+      var 그린수 = 0;
       favs.forEach(function (page) {
         var found = null;
         GROUPS.forEach(function (g) { g.items.forEach(function (it) { if (it.page === page) found = it; }); });
-        if (found) fkids.appendChild(makeItem(found, here, favs, container));
+        if (found) { fkids.appendChild(makeItem(found, here, favs, container)); 그린수++; }
       });
+      fcnt.textContent = 그린수;
       // 비었을 때 안내 문구는 두지 않는다(2026-07-29 사용자 결정).
       // ☆를 늘 보이게 바꾼 뒤로는 문구 없이도 알 수 있고, 좁은 메뉴 폭에서 두 줄로 접혀
       // 어설퍼 보였다. 가지 이름(⭐ 즐겨찾기)과 늘 보이는 ☆만으로 충분하다.

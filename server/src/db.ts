@@ -765,3 +765,27 @@ migrate(
    );
    CREATE INDEX IF NOT EXISTS idx_pdv_doc ON personal_doc_versions(docId, savedAt DESC);`
 );
+
+// ── 반입 영수증에 **올린 이의 id** (2026-08-22 게시 전 검토관 [높음] 수리) ────────────────
+//
+// ■ 무엇이 잘못됐나 — `/api/upload/receipts`가 **전 사용자의 반입 목록을 필터 없이** 줬다.
+//   그전에 그 탭이 쓰던 `/api/memory/documents`는 등급 필터(`!열람불가(d.documentId, req)`)를
+//   지났는데, 원천을 갈아타면서 그 잣대가 빠졌다. 즉 **내가 새로 연 구멍**이다.
+//   실패 모양: C(기밀) 「퇴사자명단_2026.xlsx」가 🏢 회사 지식 탭에는 안 보이는데
+//   같은 화면 🩹 반입 탭에는 그대로 뜬다 — 한 화면 두 탭이 서로 다른 잣대가 된다.
+//   ⚠ 제목만으로도 새는 것이 있다(gradeblock.test:169 「퇴사자명단_최종.xlsx는 열어 보지
+//     않아도 알려 준다」). 「내용이 아니라 사실만 적는다」는 내 주석이 틀렸다.
+//
+// ■ 왜 새 칸이 필요한가 — 옛 칸 `uploadedBy`는 **표시 이름**(displayName)이다.
+//   이름으로 사람을 가르면 동명이인·개명에서 어긋난다. 2026-08-22 오전에 **basename 키잉**으로
+//   기밀이 샌 바로 그 부류다. 그래서 **바뀌지 않는 id**로 가른다.
+//   ⚠ `db.exec(CREATE TABLE IF NOT EXISTS)`는 **이미 있는 표에 칸을 안 더한다** — 운영 DB에는
+//     표가 이미 있으므로 반드시 이 마이그레이션(ALTER)이어야 한다.
+//
+// ■ 옛 줄(uploadedById IS NULL)은 어떻게 되나 — 「남의 것」으로 다룬다. 즉 등급 검사를 지나야
+//   보인다. 안전한 쪽으로 기운다: 모르면 감춘다.
+migrate(
+  "upload-receipts-uploader-id-2026-08-22",
+  `ALTER TABLE upload_receipts ADD COLUMN uploadedById TEXT;
+   CREATE INDEX IF NOT EXISTS idx_upload_receipts_by ON upload_receipts(uploadedById);`
+);

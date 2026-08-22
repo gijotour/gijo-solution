@@ -87,7 +87,9 @@
     <div class="sub" style="margin-top:14px">또는 <b>폴더를 연결</b>해 그 안의 메모(.md·.txt)를 한 번에 넣습니다 — GIJO Smart MD로 쓴 문서도 이 흐름으로 지식이 됩니다.</div>
     <div class="ask">
       <button class="go" id="folderPick" type="button">📁 폴더에서 넣기</button>
-      <button id="smdOpen" type="button" title="GIJO Smart MD Studio — 무료 문서 작성 도구(별도 창)">📝 문서 작성 (창)</button>
+      <!-- (📝 문서 작성 (창) — 2026-08-22 제거. Smart MD 별도 창을 없애면서 이 단추도 뗐다.
+           ⚠ 단추만 남기고 리스너를 지우면 **눌러도 아무 일도 안 나는 죽은 단추**가 된다 —
+             그 모양이 이 저장소의 반복 결함이라 마크업째 뗀다. 문서 작성은 「내 문서」 안. -->
     </div>
     <div id="folderMsg"></div>
     <!-- ★ 2026-08-22 — 막아 두었던 이유가 사라졌다. 그날 두 가지가 바뀌었다:
@@ -521,10 +523,10 @@
     document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); 찾기(); } });
     document.getElementById("upGo").addEventListener("click", 넣기);
     document.getElementById("folderPick").addEventListener("click", 폴더넣기);
-    document.getElementById("smdOpen").addEventListener("click", function () {
-      // (Smart MD 통로 — 2026-08-22 제거. 문서 작성은 「내 문서」 화면에서 한다.)
-      gijoTell("이 판에는 문서 작성 도구(GIJO Smart MD)가 없습니다.");
-    });
+    // (Smart MD 통로 — 2026-08-22 제거. 문서 작성은 「내 문서」 화면에서 한다.
+    //  ⚠ 잠깐 남겨 두었던 안내 「이 판에는 문서 작성 도구가 없습니다」는 **거짓**이었다:
+    //    판에서 빠진 게 아니라 도구 자체가 없어졌고, 그 일은 내 문서가 받았다.
+    //    ⓘ 단추도 위 마크업에서 함께 뗐다 — 죽은 단추를 남기지 않는다.)
     목록();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);

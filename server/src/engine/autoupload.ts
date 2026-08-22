@@ -11,7 +11,9 @@ import { asyncRoute } from "../util/asyncRoute";
 import { emitCollaboration } from "./collaboration";
 import { ingestAnalysisFile, detectIngestKind } from "./analysishub";
 import { importVulnScan, parseNessusHtml } from "./vulnscan";
-import { 영수증남기기, 영수증목록, 보관총량, 갈래이름, type 반입갈래 } from "./uploadreceipt";
+// ⚠ 보관총량()은 **거르지 않은 전체**라 화면 창구에서 쓰지 않는다(2026-08-22 검토관 [높음]).
+//   운영·용량 판단용으로 uploadreceipt.ts에 남아 있고 시험이 지킨다.
+import { 영수증남기기, 영수증목록, 되묻기영수증지우기, 갈래이름, type 반입갈래 } from "./uploadreceipt";
 import { maskSecrets } from "./secretscan";
 import { importManual, classifyManual, listProducts, guessProductName } from "./securityproducts";
 import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, cleanupOldOriginal, 열람불가공용 } from "./memory";
@@ -499,15 +501,40 @@ export async function autoRouteUpload(
 }
 
 export function registerAutoUploadRoutes(app: Express): void {
-  // ★ **반입 영수증 — 「내가 넣은 모든 파일」**(2026-08-22 사장님 지시).
+  // ★ **반입 영수증**(2026-08-22 사장님 「사용자가 넣는 파일 내문서에서 다 확인 가능해야 해」).
   //   내 문서의 🩹 반입 탭이 지금은 `/api/memory/documents`를 쓰는데, 그 목록은
   //   **지식 조각이 있는 문서만** 준다. 취약점·SBOM은 일부러 지식에 안 넣으므로 거기 안 뜬다.
   //   이 창구가 그 빈자리를 메운다 — 갈래와 무관하게 **넣은 사실은 전부** 여기 있다.
-  //   ⚠ 개인 격리·등급은 걸지 않는다: 영수증은 「누가 언제 무엇을 올렸나」이지 **내용이 아니다.**
-  //     원본을 여는 것은 기존 창구(`/api/memory/document/file`)가 등급을 걸어 처리한다.
+  //
+  // ★★ 등급·소유자를 **반드시 건다** (2026-08-22 게시 전 검토관 [높음] 수리).
+  //   ⚠ 처음엔 여기에 「개인 격리·등급은 걸지 않는다: 영수증은 사실이지 내용이 아니다」라고
+  //     적어 두었다. **그 판단이 틀렸다.** 파일명 자체가 내용이다 —
+  //     `gradeblock.test:169`가 이미 그렇게 못 박아 두었다:
+  //       「★ 제목도 가린다 — "퇴사자명단_최종.xlsx"는 열어 보지 않아도 알려 준다」
+  //     게다가 이 탭은 **그전에 `/api/memory/documents`(등급 필터를 지난 목록)를 쓰고 있었다.**
+  //     원천을 갈아타면서 잣대를 떨어뜨린 것이라, 새로 연 구멍이다.
+  //
+  //   잣대 두 겹(순서대로):
+  //     ① **내가 올린 것**은 언제나 보인다 — `uploadedById`(바뀌지 않는 id)로 가른다.
+  //        ⚠ 표시 이름(uploadedBy)으로 가르지 않는다: 동명이인·개명에서 어긋난다.
+  //          같은 날 오전 basename 키잉으로 기밀이 샌 것과 같은 부류다.
+  //     ② **남의 것**(과 id가 없는 옛 줄)은 등급 검사를 지나야 보인다 —
+  //        `열람불가공용` **단일 잣대**를 그대로 부른다(사본을 만들지 않는다).
+  //        영수증의 filename이 곧 documentId다(saveDocArtifacts가 그 키로 저장한다).
   app.get("/api/upload/receipts", authMiddleware, (req, res) => {
     const 상한 = Math.min(1000, Math.max(1, Number((req.query.limit as string) ?? 300) || 300));
-    res.json({ 목록: 영수증목록(상한), 총량: 보관총량(), 갈래이름 });
+    const me = (req as Request & { user?: { id?: string | number; username?: string } }).user;
+    const 내id = me?.id != null ? String(me.id) : (me?.username ?? null);
+    const r = 영수증목록(상한, (row) => {
+      if (내id && row.uploadedById && row.uploadedById === 내id) return true; // ① 내 것
+      return !열람불가공용(row.filename, req); // ② 남의 것 — 등급이 허락할 때만
+    });
+    res.json({
+      목록: r.목록,
+      // ⚠ 「거른 뒤의」 총계를 준다. 안 그러면 못 보는 것까지 세어 숫자가 거짓이 된다.
+      총량: { 건수: r.건수, 전체바이트: r.전체바이트, 원본보관바이트: r.원본보관바이트 },
+      갈래이름,
+    });
   });
 
   app.post(
@@ -554,7 +581,9 @@ export function registerAutoUploadRoutes(app: Express): void {
       const uploader = (req as Request & { user?: { displayName?: string; username?: string } }).user;
       const result = await autoRouteUpload(filename, content, valid, productName, uploader?.displayName ?? uploader?.username, { keepOriginal: keepOriginal === true });
       const 되묻는중 = !!(result as { needsDecision?: boolean }).needsDecision;
-      const user = (req as Request & { user?: { displayName?: string } }).user;
+      // ⚠ id도 함께 읽는다 — 영수증의 「내 것인가」는 **표시 이름이 아니라 id**로 가른다
+      //   (2026-08-22 검토관 [높음]. 이름으로 가르면 동명이인·개명에서 어긋난다).
+      const user = (req as Request & { user?: { displayName?: string; id?: string | number; username?: string } }).user;
       // 유형이 확정돼 실제 반영된 업로드만 감사에 기록(needsDecision=재질문 단계는 행위가 아직 아님).
       if (!되묻는중) {
         // ★ 원본이 서버에 남는 것 자체가 감사 대상이다(2026-08-22) — **요청값이 아니라 실제 저장 여부**를 적는다.
@@ -576,10 +605,23 @@ export function registerAutoUploadRoutes(app: Express): void {
       //   ⚠ **되묻는 중에도 남긴다.** 그게 이 기능의 절반이다 —
       //     그전엔 결정 카드를 무시하면 **감사에도 아무 데도 안 남아**, 파일을 올린 사실 자체가 사라졌다.
       //     「물었는데 답을 안 했다」도 사실이므로 기록으로 남는다(routedTo="decision").
+      // ★ 되묻기 줄 정리(2026-08-22 검토관 [중]) — 답이 왔으면 **물음 줄을 지우고** 확정 줄만 남긴다.
+      //   사람의 행위는 한 번인데 영수증이 두 줄이면, 앞 줄은 영영 「되묻는 중」으로 남아
+      //   미처리 파일이 있는 것처럼 보인다.
+      //   ⚠ 파일명이 아니라 **클라가 돌려준 그 영수증의 id**로 짝을 찾는다(이름 키잉 금지).
+      //   ⚠ 지우기가 실패해도 반입은 계속한다 — 정리는 부가 가치이지 전제가 아니다.
+      const 지울영수증 = typeof (req.body as { replacesReceiptId?: unknown })?.replacesReceiptId === "string"
+        ? String((req.body as { replacesReceiptId?: string }).replacesReceiptId)
+        : undefined;
+      if (지울영수증 && !되묻는중) {
+        되묻기영수증지우기(지울영수증, user?.id != null ? String(user.id) : (user?.username ?? undefined));
+      }
+      let 영수증id: string | null = null;
       try {
-        영수증남기기({
+        영수증id = 영수증남기기({
           filename,
           uploadedBy: user?.displayName ?? undefined,
+          uploadedById: user?.id != null ? String(user.id) : (user?.username ?? undefined),
           // ⚠ 갈래를 「미정」으로 두지 않는다(2026-08-22 실측으로 잡음). 자동 판별 갈래는
           //   `valid`(사람 지정)도 `guess`(되물을 때만)도 없어서 **아는데도 「미정」**이 나왔다.
           //   어디로 갔는지는 아니까 거기서 되짚는다 — 모르는 척하는 것이 이 저장소의 반대 원칙이다.
@@ -613,7 +655,9 @@ export function registerAutoUploadRoutes(app: Express): void {
       //   방금 실패한 그 파일에 대한 답이 아니다. 실패는 실패라고만 말한다.
       const sbom실패 = routed === "sbom" && !(result as { sbom?: unknown }).sbom;
       const nextChips = routed && !sbom실패 ? 반입칩[routed] : undefined;
-      res.json(nextChips ? { ...result, nextChips } : result);
+      // ★ 영수증 id를 함께 준다 — 되묻기 카드가 답할 때 **그 줄을 지목**해 돌려주기 위해서다
+      //   (파일명으로 짝을 찾으면 같은 이름의 다른 파일을 지운다). null이면 클라가 안 보낸다.
+      res.json({ ...result, ...(nextChips ? { nextChips } : {}), ...(영수증id ? { receiptId: 영수증id } : {}) });
     })
   );
 }

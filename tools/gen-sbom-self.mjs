@@ -160,15 +160,28 @@ function 동봉바이너리() {
  *  ⚠ 반대로 다시 실으면 이 함수가 true가 되어 고지가 저절로 되살아난다.
  */
 function smartmd배포에담나() {
-  for (const [설정, 꺼내기] of [
-    ["package.json", (j) => j.build?.files],
-    ["electron-builder.lite.json", (j) => j.files],
-  ]) {
+  // ★★ **`files`만 보면 안 된다** (2026-08-22 재검토 [낮음] — 내 첫 수리의 구멍).
+  //   설치본에 폴더째 넣는 흔한 방식은 `files`가 아니라 **extraResources/extraFiles**다.
+  //   거기로 다시 동봉하면 이 함수가 false를 유지해 **동봉했는데 고지에는 안 적힌다** —
+  //   AGPL 동봉을 게시 직전에 잡아낸 이 관문의 값어치가 그 갈래에서만 0이 된다.
+  //   과다 고지(안전)에서 과소 고지(법적 위험)로 기우는 방향이라 반드시 넓힌다.
+  //   ⚠ win/mac 하위 블록의 extraResources도 본다 — 라이트가 실제로 거기 쓰고 있다.
+  const 담는곳 = (j) => {
+    const b = j.build ?? j; // package.json은 build 아래, lite json은 최상위
+    return [
+      b.files, b.extraResources, b.extraFiles,
+      b.win?.extraResources, b.win?.extraFiles,
+      b.mac?.extraResources, b.mac?.extraFiles,
+      b.linux?.extraResources, b.linux?.extraFiles,
+    ].flat().filter(Boolean);
+  };
+  for (const 설정 of ["package.json", "electron-builder.lite.json"]) {
     const p = path.join(루트, "client", 설정);
     if (!fs.existsSync(p)) continue;
     let j;
     try { j = JSON.parse(fs.readFileSync(p, "utf8")); } catch { continue; }
-    if ((꺼내기(j) ?? []).some((f) => String(f).includes("smartmd"))) return true;
+    // 항목은 문자열이거나 {from,to} 객체다 — 둘 다 훑는다.
+    if (담는곳(j).some((e) => JSON.stringify(e).includes("smartmd"))) return true;
   }
   return false;
 }

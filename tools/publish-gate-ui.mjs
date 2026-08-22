@@ -617,13 +617,19 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     "setup.html": "첫 실행 전용 — 로그인된 세션에서는 안 뜬다",
     "console.html": "지휘소 부품 — app.html이 품어서 이미 돌고 있다",
     "office.html": "팀 사무실(별도 창) — 도킹으로 못 연다",
-    "intro.html": "제품 소개(별도 진입) — 메뉴 밖",
+    // ("intro.html" — 2026-08-22 내 문서 📦 탭으로 흡수되며 **파일이 없어졌다.** 없는 파일을
+    //  제외 표에 남겨 두면 아래 「제외 N개」가 부풀어, 관문이 사실과 다른 숫자를 보고한다.)
     "pick.html": "고르기 부품 — 단독 화면이 아니라 무대 부품(위 고르기 검사가 실측)",
     "merge.html": "LLM 합성(관리 전용·메뉴 밖)",
     "handover.html": "인수인계 — 메뉴 밖 별도 진입(딥링크)",
     "lawlookup.html": "법령 — 대화창 갈래가 주 진입로",
   };
   const dir = path.join(repo, "client", "src", "renderer", "pages");
+  // ★ 제외 표가 **낡지 않게** 한다 (2026-08-22 검토관 [낮음]). 없어진 화면이 표에 남으면
+  //   「제외 N개」가 부풀고, 다음 사람은 그 화면이 아직 있는 줄 안다. 조용히 틀리느니 실패한다.
+  const 없는제외 = Object.keys(제외).filter((f) => !fs.existsSync(path.join(dir, f)));
+  ok("제외 표가 실재하는 화면만 가리킨다", 없는제외.length === 0,
+    없는제외.length ? "없는 화면이 제외 표에 남아 있다: " + 없는제외.join(", ") : Object.keys(제외).length + "개 전부 실재");
   const 후보 = fs.readdirSync(dir)
     .filter((f) => f.endsWith(".html") && !f.startsWith("lite-") && !제외[f]);
   const 죽은화면 = [];

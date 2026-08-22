@@ -37,13 +37,26 @@
     · ⚠ .g-rows-scroll의 --gr-maxh를 none으로 — gijo-ui.css:353의 540px 상한을 그대로 두면
       껍데기를 걷어 번 자리가 빈칸이 된다.
     · 서버·IPC 신설 0건. 게시 관문(publish-gate-ui ③‴)은 같은 커밋에서 v4 자리로 옮겼다.
-  ■ 탭 5+1(v4에서는 **사이드바 항목**): 👤 내 것(personal_docs CRUD) · 🏢 회사 지식(RAG 지식창고 열람) · 📘 제품 안내
-    (출하 문서 읽기전용+요청 만들기) · 🎓 학습(수집 내역 열람 — **조작 없음**) · 🩹 반입
-    (＋로 올린 문서의 기록) · 🗂 산출물(예약 자리 — 눌러도 예약 안내만, 데이터인 척 안 한다).
+  ■ v5 (2026-08-22 사장님 — 「연락처도 내 문서에」·「보안제품 비교·소개도 내 문서함에」·
+    「내문서에서 문서작성을 할꺼니 팝업은 필요없어」·「사용자가 넣는 파일 내문서에서 다
+    확인 가능해야해 취약점파일도」):
+    · **사이드바 8갈래**(5+1 → 8): 👤 내 것(personal_docs CRUD) · 🏢 회사 지식(RAG 열람) ·
+      📞 연락처(테리토리×제품 표 — **이 PC 저장**, 관리는 lite-contacts.html을 문서창에 품는다) ·
+      📘 GIJO AS 안내(출하 문서 읽기전용+요청 만들기 — 옛 이름 「제품 안내」) ·
+      📦 보안제품 자료(도입 **검토 중인 타사** 카탈로그 — intro.html 흡수) ·
+      🎓 학습(수집 내역 열람 — **조작 없음**) · 🩹 반입(＋로 올린 **모든 파일**의 영수증) ·
+      🗂 산출물(예약 자리 — 눌러도 예약 안내만, 데이터인 척 안 한다).
+    · **문서 편집이 이 화면의 일이 됐다** — Smart MD 별도 창 폐지. 캡처 붙여넣기·업무 템플릿
+      7종·판 이력 20판·그림 첨부 10장·네 형식 내보내기(.md/HTML/PDF/워드)가 편집 스테이지 안.
+    · ⚠ 🩹 반입은 **등급·소유자를 건다**(검토관 [높음] 수리) — 서버가 「내가 올린 것 + 내가
+      볼 수 있는 것」만 준다. 파일명 자체가 내용이다(퇴사자명단.xlsx).
+    · ⚠ 📞 연락처의 전화·이메일은 **대화창 선택으로 보내지 않는다**(검토관 [높음] 수리) —
+      선택 맥락은 서버 dispatch로 가므로, 바로 옆 「서버로 보내지 않습니다」 약속이 깨진다.
   ■ 격리가 이 화면의 전부다: 내 것 목록은 서버가 **내 것만** 준다(personaldocs — 남의 것은
     404). 회사 지식 목록도 서버 라우트가 남의 개인 문서를 걸러 준다(memory 라우트).
+    반입 영수증도 같은 잣대(열람불가공용)를 지난다.
   ■ 「보기·올리기는 창구, 위험한 관리는 전용 화면」 — 회사 지식의 삭제·등급 변경은 AI 지식
-    화면, 학습 승인·실행은 학습 화면. 여기는 바로가기만 잇는다. 제품 안내는 읽기전용 —
+    화면, 학습 승인·실행은 학습 화면. 여기는 바로가기만 잇는다. GIJO AS 안내는 읽기전용 —
     편집(✏·＋)은 👤 내 것 탭에서만 나온다.
   ■ 자유 텍스트 입력칸 0(지시는 대화창) — 단 **편집기·요청 만들기는 예외**다: 본문 작성
     자리는 저작 행위이지 지시가 아니다(옛 Smart MD 창이 갖던 지위를 이 화면이 받았다 —
@@ -169,6 +182,10 @@ td.cov-ven{background:rgba(240,160,32,.16);color:var(--cov-ven-ink,#f3c06a);bord
 td.cov-gap{background:rgba(226,72,61,.13);color:var(--cov-gap-ink,#e88a82);border-color:rgba(226,72,61,.32);}
 table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 .cx-note{padding:8px 14px 14px;font-size:11px;color:var(--muted-2);}
+/* 눌러도 열 것이 없는 줄 — 손가락 커서를 주지 않는다. 「눌렀는데 아무 일도 안 난다」는
+   이 저장소가 반복해 겪은 결함이라, 없는 조작은 **없어 보이게** 한다(2026-08-22 검토관). */
+.g-rows-r.noclick{cursor:default}
+.g-rows-r.noclick:hover{background:transparent}
 /* 첨부·이력 줄 — 엑셀형 한 줄(30px). 큰 썸네일 격자로 늘어놓지 않는다(밀도 원칙). */
 .att-bar,.ver-bar{flex:0 0 auto;border-top:1px solid var(--border);padding:0 12px;font-size:11.5px;color:var(--muted-2);}
 .att-bar:empty,.ver-bar:empty{display:none;}
@@ -384,6 +401,25 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 
   <!-- 요청 만들기(문서함에서 자리 이전 — 로직은 docbox.html 456-627 승계) -->
   <div class="stage" id="composeStage"><div id="cxWrap"></div></div>
+
+  <!-- 📞 담당자 관리 — **화면을 베끼지 않고 그대로 품는다**(2026-08-22 검토관 [높음] 수리).
+       ⚠ 무엇이 문제였나: 연락처 탭이 `gijo.lite.contacts`를 **읽기만** 했다. 그 값을 쓰는 화면
+         (lite-contacts.html)은 라이트 메뉴에서 내려가 어느 셸에서도 안 열려, 표가 **영영 비어
+         있었다.** 게다가 빈 상태가 「대화창에 담당자 등록해줘라고 말하면 됩니다」라고 안내했는데
+         **그런 도구가 없다**(연락처는 localStorage라 서버 도구가 원리상 못 쓴다).
+       ⚠ 왜 폼을 여기 옮겨 적지 않나: 그 화면에 이미 추가·수정·삭제·축(테리토리/제품) 편집·
+         mailto/tel 열기가 다 있다. 옮겨 적으면 **같은 것이 두 벌**이 되어 한쪽만 고쳐진다 —
+         이 저장소가 반복해 겪은 그 함정이다. 같은 빌드 안에서는 localStorage가 공유되므로
+         이 iframe이 쓴 값을 위 매트릭스가 그대로 읽는다.
+       ⚠ 닫을 때 매트릭스를 다시 그린다 — 안 그리면 「고쳤는데 안 바뀐다」로 보인다. -->
+  <div class="stage" id="cxContactsStage">
+    <div class="st-top">
+      <button class="back" id="cxContactsBack">✕ 닫기</button>
+      <span style="font-weight:800;font-size:13.5px">담당자 관리</span>
+      <span class="gm2" style="margin-left:8px">전화·이메일은 이 PC에만 저장됩니다</span>
+    </div>
+    <iframe id="cxContactsFrame" title="담당자 관리" style="width:100%;height:calc(100% - 34px);border:0;background:transparent"></iframe>
+  </div>
       </div><!-- /v4docpane -->
     </div><!-- /v4content -->
     <div class="note" id="note">개인 문서는 내 질문에만 근거로 나옵니다 — 「AI 포함」과 「공유」의 차이는 ⓘ로 보세요.</div>
@@ -398,9 +434,12 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   "use strict";
   var 탭 = "mine";
   var mine = [], know = [], learn = [], learnTopics = [], learnKpis = null, guide = [];
-  // ★ 반입 영수증 — 「내가 넣은 모든 파일」(2026-08-22). 문서 목록(know)과 **다른 원천**이다:
+  // ★ 반입 영수증 (2026-08-22). 문서 목록(know)과 **다른 원천**이다:
   //   취약점 스캔·SBOM은 일부러 지식에 안 넣어서 know에는 원리상 안 뜬다.
-  var 영수증 = [], 갈래이름 = {};
+  //   ⚠ 「내가 넣은 모든 파일」이라 부르지 않는다 — 서버가 **내 것 + 내가 볼 수 있는 것**을 준다
+  //     (2026-08-22 검토관 [높음]: 그전엔 전 사용자 것을 필터 없이 줬다).
+  //   영수증총계는 서버가 **거른 뒤에** 센 값 — 목록 길이는 조회 상한 300에 걸려 거짓이 된다.
+  var 영수증 = [], 영수증총계 = 0, 갈래이름 = {};
   // 📦 보안제품 자료 — 도입 **검토용** 타사 카탈로그. 우리가 쓰는 제품 등록부와 **다른 대장**이다.
   var vendor = [];
   var 오류 = { mine: null, know: null, learn: null, guide: null, ingest: null }; // 불러오기 실패는 「없음」과 다르다(검토관 상4)
@@ -466,8 +505,13 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       (st.contacts.length
         ? '<table class="mx"><tr><th class="rowh"></th>' + P.map(function (p) { return "<th>" + esc(p) + "</th>"; }).join("") + "</tr>" + 몸 + "</table>"
         : '<div class="empty">담당자를 등록하면 <b>테리토리 × 제품</b> 표로 「누가 비었나」가 한눈에 보입니다.<br>' +
-          '<span class="gm2">대화창에 「담당자 등록해줘」라고 말하면 됩니다.</span></div>') +
-      '<div class="cx-note">🔒 전화·이메일은 <b>이 PC에만</b> 저장됩니다 — 서버로 보내지 않고 백업·동기화도 하지 않습니다.</div>';
+          // ⚠ 「대화창에 담당자 등록해줘라고 말하면 됩니다」라고 안내하고 있었다 —
+          //   **그런 도구가 없다**(연락처는 이 PC 저장이라 서버 도구가 원리상 못 쓴다).
+          //   없는 길을 안내하면 사람은 제품이 고장 난 줄 안다(2026-08-22 검토관 [높음]).
+          '<span class="gm2">위 <b>✏ 담당자 관리</b>에서 이름·역할·담당 구역·제품·연락처를 넣으세요.</span></div>') +
+      '<div class="cx-note">🔒 전화·이메일은 <b>이 PC에만</b> 저장됩니다 — 서버로 보내지 않고 백업·동기화도 하지 않습니다.' +
+      ' <button class="go sm" id="cxManage" type="button" style="margin-left:8px">✏ 담당자 관리</button></div>';
+    document.getElementById("cxManage").addEventListener("click", function () { 스테이지("contacts"); });
     // 칸을 누르면 그 담당자를 대화창에 📌 — 「고르기」이지 「지시」가 아니다(입력칸 0 원칙 유지).
     Array.prototype.forEach.call(list.querySelectorAll("table.mx td"), function (td) {
       td.addEventListener("click", function () {
@@ -476,8 +520,14 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         var 담당 = 칸담당(연락처읽기(), t, p);
         if (!담당.length) { 알림(t + " × " + p, "담당자 없음 — " + t + " " + p + " 담당이 비어 있습니다"); return; }
         var c = 담당[0];
-        알림(c.name, "담당자 " + c.name + " (" + (c.role || "") + ") · " + t + " " + p +
-          (c.phone ? " · " + c.phone : "") + (c.email ? " · " + c.email : ""));
+        // ★★ 전화·이메일을 **여기 싣지 않는다** (2026-08-22 검토관 [높음] 수리).
+        //   이 값은 선택 맥락으로 **서버 dispatch에 실려** LLM 프롬프트까지 간다
+        //   (selectnotify → console.js 선택인자 → /api/dispatch → 선택맥락).
+        //   바로 위 줄이 「서버로 보내지 않습니다」라고 약속하는데 같은 함수가 보내고 있었다 —
+        //   약속과 코드가 정면으로 어긋난 자리다. 이름·역할·자리까지만 보낸다.
+        //   ⚠ 연락처가 필요하면 **이 화면에서** 본다(관리 창에 mailto·tel이 있다) —
+        //     대화창은 그것을 알 필요가 없다.
+        알림(c.name, "담당자 " + c.name + " (" + (c.role || "") + ") · " + t + " " + p);
       });
     });
   }
@@ -491,7 +541,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   }
   var mineFilter = "all";
   var 선택 = null; // { 탭, id }
-  var 스테이지값 = "list"; // list | edit | read | compose
+  var 스테이지값 = "list"; // list | edit | read | compose | contacts
   var 기본노트 = "개인 문서는 내 질문에만 근거로 나옵니다 — 「AI 포함」과 「공유」의 차이는 ⓘ로 보세요.";
   var 가이드히트 = null;   // 제품 안내 본문 검색 히트 {문서id: 횟수} — 문서함의 본문 검색 승계(검토관 중5)
   var 가이드검색타이머 = null;
@@ -569,6 +619,13 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     document.getElementById("editStage").classList.toggle("on", which === "edit");
     document.getElementById("readStage").classList.toggle("on", which === "read");
     document.getElementById("composeStage").classList.toggle("on", which === "compose");
+    // 📞 담당자 관리(2026-08-22) — 열 때만 src를 넣는다. 미리 물려 두면 이 화면을 열 때마다
+    //   안 쓰는 iframe이 함께 뜬다(첫 그림이 늦어진다).
+    var cxc = document.getElementById("cxContactsStage");
+    cxc.classList.toggle("on", which === "contacts");
+    var cxf = document.getElementById("cxContactsFrame");
+    if (which === "contacts") { if (!cxf.getAttribute("src")) cxf.setAttribute("src", "lite-contacts.html?embed=1"); }
+    else if (cxf.getAttribute("src")) cxf.removeAttribute("src");
     var pane = document.getElementById("v4doc");
     pane.classList.toggle("staged", which !== "list");
     // 열람만은 상세를 위에 남긴다 — 무엇을 읽고 있는지가 사라지면 안 된다.
@@ -752,7 +809,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
             '<span class="gm2">대화창 ＋로 제품 소개서를 올리면 등록됩니다. 깊은 비교는 대화창에 「A와 B 비교해줘」로 물으세요.</span></div>');
     } else if (탭 === "contacts") {
       연락처그리기(list);
-    } else { // ingest — ★ **내가 넣은 모든 파일의 영수증**
+    } else { // ingest — ★ **반입 영수증**(내 것 + 내가 볼 수 있는 것 — 등급이 걸린다)
       // ⚠ 2026-08-22 사장님 「사용자가 넣는 파일 내문서에서 다 확인 가능해야 해. **취약점파일도**」
       //   그전엔 `/api/memory/documents`(지식 조각이 있는 문서)만 봤다. 그런데 취약점 스캔·SBOM은
       //   **일부러 지식에 안 넣으므로**(수천 줄 표가 다른 질문의 근거를 밀어낸다) 그 목록에 안 떴고,
@@ -760,7 +817,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       //   → 이제 영수증 표(`/api/upload/receipts`)를 쓴다 — 갈래와 무관하게 **넣은 사실은 전부** 있다.
       var 칸 = "1fr 96px 84px 90px 44px";
       list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:' + 칸 + ';gap:8px">' +
-          "<span>올린 파일</span><span>갈래</span><span>어디로</span><span>보관·수집</span><span class=\"ta-r\">올린 때</span></div>" +
+          // ★ 열 이름이 「보관·수집」이면 **지금 상태**로 읽힌다. 이 표는 **그때의 기록**이다
+          //   (2026-08-22 검토관 [낮음]): 같은 이름을 다시 올리면 옛 원본이 지워지고 .md도
+          //   덮이는데, 옛 줄은 계속 「원본·추출본」이라 적혀 있다. 감사 대응에서 「그때
+          //   원본이 있다」고 믿고 찾으면 없다. 이름을 바꿔 **시점 기록임을 드러낸다.**
+          "<span>올린 파일</span><span>갈래</span><span>어디로</span><span>그때 남긴 것</span><span class=\"ta-r\">올린 때</span></div>" +
         (영수증.length ? '<div class="g-rows-flat">' + 영수증.map(function (d) {
           // 「무엇이 실제로 남았나」를 한 칸에 — 오늘 갈라 둔 세 값(원본·추출본·수집)을 그대로 쓴다.
           var 남음 = [];
@@ -768,7 +829,16 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
           if (d.mdSaved) 남음.push("추출본");
           if (d.ingested) 남음.push("AI지식");
           var 남음글 = 남음.length ? 남음.join("·") : (d.routedTo === "decision" ? "되묻는 중" : "기록만");
-          return '<div class="g-rows-r" title="' + esc(d.detail || "") + '" style="grid-template-columns:' + 칸 + ';gap:8px">' +
+          // ★ 2026-08-22 검토관 [중] 수리 — 원천을 문서목록(know)→영수증으로 갈아타면서
+          //   `data-id`를 안 그렸다. 클릭 소비자는 여전히 `know`를 documentId로 찾으므로
+          //   id가 null이라 **상세가 통째로 죽어 있었다**(5.65.0에 게시한 추출본 뷰어·고치기가
+          //   이 탭에서만 조용히 회귀). 영수증의 filename이 곧 documentId다.
+          //   ⚠ **지식이 된 것에만** 붙인다 — 취약점·SBOM은 지식 문서가 없어 눌러도 열 것이 없다.
+          //     없는 것에 커서를 주면 「눌렀는데 아무 일도 안 난다」가 된다.
+          var 지식됨 = !!know.find(function (x) { return x.documentId === d.filename; });
+          return '<div class="g-rows-r' + (지식됨 ? "" : " noclick") + '"' +
+            (지식됨 ? ' data-id="' + esc(d.filename) + '"' : "") +
+            ' title="' + esc(d.detail || "") + '" style="grid-template-columns:' + 칸 + ';gap:8px">' +
             '<span class="trunc" title="' + esc(d.filename) + '">' + esc(d.filename) + "</span>" +
             '<span class="gm2 trunc">' + esc((갈래이름 || {})[d.kind] || d.kind) + "</span>" +
             '<span class="gm2 trunc">' + esc(어디로글(d.routedTo)) + "</span>" +
@@ -776,7 +846,12 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
             '<span class="ta-r gm2">' + 날짜(d.uploadedAt) + "</span></div>";
         }).join("") + "</div>"
           : '<div class="empty">＋로 올린 파일의 기록이 여기 쌓입니다 — <b>문서·취약점 스캔·로그·부품표 전부</b>.<br>' +
-            '<span class="gm2">2026-08-22 이전에 올린 것은 이 기록이 없습니다 — 그때는 만들지 않았습니다.</span></div>');
+            '<span class="gm2">2026-08-22 이전에 올린 것은 이 기록이 없습니다 — 그때는 만들지 않았습니다.</span></div>') +
+      // ⚠ 「그때 남긴 것」이 무슨 뜻인지 화면이 스스로 말한다 — 사건 기록이라는 설계가
+      //   열 이름만으로는 안 드러난다(2026-08-22 검토관 [낮음]).
+      '<div class="cx-note">🧾 이 목록은 <b>올린 그 순간의 기록</b>입니다 — 같은 이름을 다시 올리면 옛 원본·추출본은 새것으로 덮입니다.' +
+      ' 지금 무엇이 남아 있는지는 <b>🏢 회사 지식</b>에서 그 문서를 열어 확인하세요.' +
+      ' 내가 올린 것과, 내 열람 등급으로 볼 수 있는 것만 보입니다.</div>';
     }
     탭수그리기();
     if (!목록모드) return;   // 스테이지 중 — 목록만 새로 그리고 고른 것·문서창은 그대로 둔다
@@ -802,7 +877,9 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     document.getElementById("nLearn").textContent = (learnKpis && learnKpis.total) || learn.length || "";
     // ⚠ 세는 원천이 바뀌었다(2026-08-22) — 문서 목록이 아니라 **영수증**이다.
     //   그전엔 지식에 든 문서만 세어, 취약점 파일을 올려도 숫자가 안 늘었다.
-    document.getElementById("nIngest").textContent = 영수증.length || "";
+    // ⚠ 서버가 준 **거른 뒤의 총계**를 쓴다 — 목록 길이(상한 300)를 총계로 말하면 거짓이다
+    //   (학습 탭이 같은 이유로 이미 고친 잣대. 2026-08-22 검토관 [중]).
+    document.getElementById("nIngest").textContent = 영수증총계 || 영수증.length || "";
     document.getElementById("nVendor").textContent = vendor.length || "";
     // 연락처는 이 PC 저장이라 불러오기가 없다 — 셀 때 바로 읽는다.
     document.getElementById("nContacts").textContent = 연락처읽기().contacts.length || "";
@@ -855,15 +932,19 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       오류.learn = null;
     } catch (e) { learn = []; learnKpis = null; 오류.learn = (e && e.message) || "오류"; }
     try { learnTopics = (await window.gijo.listLearnloopTopics()) || []; } catch (e) { learnTopics = []; }
-    // ★ 반입 영수증 — 「내가 넣은 모든 파일」(2026-08-22). 취약점·SBOM처럼 **지식에 안 들어가는**
+    // ★ 반입 영수증(2026-08-22). 취약점·SBOM처럼 **지식에 안 들어가는**
     //   갈래는 문서 목록에 원리상 안 뜨므로 별도 창구에서 온다.
-    //   ⚠ preload 다리를 새로 만들지 않는다 — 이 화면은 이미 fetch로 서버를 부르는 자리가 있다.
+    //   ⚠ 다리는 preload에 새로 냈다(listUploadReceipts) — 이 화면에는 fetch를 쓰는 자리가 없다.
+    //     (2026-08-22 검토관 [낮음]: 여기 주석이 코드와 반대로 적혀 있었다.)
+    //   ★ 서버가 **거른 뒤의 총계**(총량.건수)를 함께 준다 — 목록 길이는 조회 상한 300에
+    //     걸리므로 그것을 총계로 말하면 거짓이 된다(학습 탭이 이미 같은 이유로 고친 잣대).
     try {
       var j = await window.gijo.listUploadReceipts(300);
       영수증 = (j && j.목록) || [];
+      영수증총계 = (j && j.총량 && j.총량.건수) || 0;
       갈래이름 = (j && j.갈래이름) || {};
       오류.ingest = null;
-    } catch (e) { 영수증 = []; 갈래이름 = {}; 오류.ingest = (e && e.message) || "오류"; }
+    } catch (e) { 영수증 = []; 영수증총계 = 0; 갈래이름 = {}; 오류.ingest = (e && e.message) || "오류"; }
     // 📦 보안제품 자료 — ⚠ 라이트에서는 **부르지 않는다**: 그 탭을 접기 때문에(아래 라이트 폴딩)
     //   부르면 첫 그림만 늦어진다(불러오기가 순차 await라 한 번이 그대로 지연이 된다).
     // ⚠ `라이트판` 변수에 기대지 않는다 — 그건 이 함수보다 **아래**에서 값이 정해져서,
@@ -1035,6 +1116,20 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         '<button class="go" data-go="memory.html" data-lb="AI 지식">🗔 AI 지식</button>' +
         "</div>" +
         '<div id="kdMd" style="margin-top:10px"></div>';
+    } else if (탭 === "vendor") {
+      // ★ 2026-08-22 검토관 [낮음] 수리 — 행에 data-id를 그려 놓고 **읽는 소비자가 없었다.**
+      //   좁은 폭(800px)에서는 그 빈 문서창이 목록을 덮어, 사용자가 ✕로 되돌아와야 했다.
+      //   눌러서 아무것도 안 나오느니 **있는 것을 보여 준다** — 자료는 이미 vendor[]에 있다.
+      //   ⚠ 깊은 비교는 여전히 대화창 몫이다(「A와 B 비교해줘」) — 여기는 읽기·고르기까지.
+      var vd = vendor.find(function (x) { return String(x.id) === String(id); });
+      if (!vd) return;
+      선택 = { 탭: "vendor", id: id };
+      알림(vd.name, "보안제품 자료 「" + vd.name + "」 · " + (vd.vendor || "제조사 미상") + " · " + (vd.category || "분류 미정"));
+      d.innerHTML = '<div class="dn">' + esc(vd.name) + "</div>" +
+        '<div class="dm">📦 도입 <b>검토 중인 타사 제품</b> 자료 — 우리가 쓰는 제품은 「우리 보안제품」 화면입니다.' +
+        "<br>제조사 " + esc(vd.vendor || "-") + " · 분류 " + esc(vd.category || "-") + "</div>" +
+        (vd.summary ? '<div class="dm" style="border-top:1px dashed rgba(128,128,128,.3);padding-top:8px;margin-top:2px">' + esc(vd.summary) + "</div>" : "") +
+        '<div class="dm gm2">깊은 비교는 대화창에 「' + esc(vd.name) + '와 다른 제품 비교해줘」로 물으세요 — 고른 제품이 함께 전달됩니다.</div>';
     }
     문서창보임(true);   // 좁은 자리에서는 이때 문서창이 목록을 덮는다
   });
@@ -1150,6 +1245,9 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 
   // ── 편집 스테이지(승인 시안 v3 §1) — 저장은 이미 있던 라우트 그대로(personalDocsUpdate/Create) ──
   var 편집중 = null; // 고치는 중인 문서 id — 새 문서면 null
+  // 편집기를 열 때의 원본 {title, body} — 「저장하지 않은 변경이 있나」를 재는 기준점.
+  //   되돌리기 확인창이 이 값으로 경고 세기를 가른다(2026-08-22 검토관 [중]).
+  var 편집원본 = null;
   function 서랍그리기() {
     var box = document.getElementById("tplDrawer");
     var all = TEMPLATES.concat([TEMPLATE_BLANK]);
@@ -1198,6 +1296,9 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     편집중 = doc && doc.id ? doc.id : null;
     document.getElementById("editTitle").value = doc ? doc.title || "" : "";
     document.getElementById("editBody").value = opts.body != null ? opts.body : "";
+    // ★ 「연 그대로인가」를 재는 기준점(2026-08-22 검토관 [중]). 되돌리기 확인창이
+    //   **미저장 변경이 있을 때만** 세게 경고하려면 이 값이 있어야 한다.
+    편집원본 = { title: document.getElementById("editTitle").value, body: document.getElementById("editBody").value };
     var hook = document.getElementById("editHook");
     hook.classList.toggle("on", !!opts.hook);
     if (opts.hook) hook.textContent = opts.hook;
@@ -1365,8 +1466,21 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   document.getElementById("verBar").addEventListener("click", async function (ev) {
     var b = ev.target.closest("button"); if (!b || b.getAttribute("data-act") !== "back") return;
     var row = b.closest(".ver-row"); if (!row) return;
-    // ⚠ 되돌리기도 **되돌릴 수 있어야** 한다 — 지금 글이 판으로 남은 뒤에 바꿔치기된다(저장 때 남는다).
-    if (!(await gijoAsk("이 판의 내용으로 되돌릴까요? 지금 쓰던 글은 저장하면 이력에 남습니다."))) return;
+    // ★★ 2026-08-22 검토관 [중] 수리 — 문구가 **거짓 약속**이었다.
+    //   「지금 쓰던 글은 저장하면 이력에 남습니다」라고 안내했지만, 저장할 때 판으로 남는 것은
+    //   **DB의 마지막 저장본**이다(personaldocs.ts:201 — `cur.body`). 즉 아직 저장하지 않은
+    //   편집기 안의 글은 **어디에도 안 남고 사라진다.** 안내가 없었으면 취소했을 사람을
+    //   안내가 밀어 넣는 구조였다.
+    //   → 사실대로 말하고, **미저장 상태일 때만** 더 세게 경고한다.
+    var 미저장 = (function () {
+      var t = document.getElementById("editTitle").value;
+      var b = document.getElementById("editBody").value;
+      return !!(편집원본 && (t !== 편집원본.title || b !== 편집원본.body));
+    })();
+    var 물음 = 미저장
+      ? "⚠ 저장하지 않은 변경이 있습니다 — 되돌리면 **그 글은 사라집니다**(판 이력에도 안 남습니다).\n먼저 💾 저장하고 되돌리시겠어요? 그래도 지금 되돌릴까요?"
+      : "이 판의 내용으로 되돌릴까요? 지금 저장돼 있는 글은 판 이력에 남아 있어 다시 돌아올 수 있습니다.";
+    if (!(await gijoAsk(물음))) return;
     try {
       var v = await window.gijo.personalDocsVersionBody(Number(row.getAttribute("data-id")));
       document.getElementById("editTitle").value = v.title || "";
@@ -1453,6 +1567,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
           saved.warnings.slice(0, 5).map(function (w) { return "· " + (w.kind || "?") + " — " + (w.masked || ""); }).join("\n") +
           "\n장비 접속 정보는 보안제품 등록부(암호화 보관)에 두세요.");
       }
+      편집원본 = null;     // 저장했으니 「미저장 변경」은 없다 — 기준점을 지운다
       스테이지값 = "list"; // 저장이 끝났으니 목록으로 — 불러오기()의 그리기가 이제 목록을 그린다
       await 불러오기();
     } catch (e) {
@@ -1487,6 +1602,9 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     }
   }
   document.getElementById("readBack").addEventListener("click", 목록으로);
+  // 📞 담당자 관리를 닫으면 **매트릭스를 다시 그린다** — 안 그리면 「고쳤는데 안 바뀐다」로 보인다
+  //   (iframe이 쓴 localStorage를 이 화면이 다시 읽어야 반영된다).
+  document.getElementById("cxContactsBack").addEventListener("click", function () { 목록으로(); });
 
   // ── 요청 만들기(문서함에서 자리 이전 — docbox.html 456-627 로직 승계, 새로 짜지 않았다) ──
   // 전달은 파일 저장뿐이다(사용자 결정 2026-07-30) — 메일 발송 기능은 없다.

@@ -1376,7 +1376,10 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       //   프로엔 사이드바가 없으므로 그대로 두면 **없는 곳을 가리키는** 안내가 된다.
       output: 화면위치안내(찾는화면.screen, 찾는화면.title, 지금셸 === "pro"),
       sources: [], // 코드가 낸 안내다(4-ⓑ) — 안 실으면 배지 재검색이 무관한 문서를 붙인다
-      openScreen: { page: 찾는화면.screen, label: 찾는화면.title },
+      // ⚠ **여는 주소는 안내 열쇠와 다를 수 있다**(2026-08-22 검토관 [낮음]). 내 문서 한 화면이
+      //   여러 갈래(📦 보안제품 자료·📞 연락처·📘 안내)를 품게 되면서, 「보안제품 자료 어디
+      //   있어?」에 화면만 열면 **기본 탭(👤 내 것)**이 떠서 물은 것이 안 보인다.
+      openScreen: { page: 찾는화면.open ?? 찾는화면.screen, label: 찾는화면.title },
     };
   }
 

@@ -1889,10 +1889,13 @@
   }
   // keep(원본 보관 여부)은 **업로드를 시작한 순간의 값으로 파일마다 고정**한다 —
   // 결정 카드를 띄워 둔 채 토글을 바꿔도 그 파일은 처음 의사대로 처리된다(기준이 흔들리지 않게).
-  async function handleUpload(name, b64, row, forceType, productName, keep) {
+  // replacesReceiptId — 되묻기 카드가 답할 때 **그때 남은 영수증 줄의 id**. 서버가 그 줄을 지우고
+  //   확정 줄만 남긴다(2026-08-22 검토관 [중]: 한 번의 행위에 영수증이 두 줄 생기고, 앞 줄은
+  //   영영 「되묻는 중」으로 남아 미처리 파일이 있는 것처럼 보였다).
+  async function handleUpload(name, b64, row, forceType, productName, keep, replacesReceiptId) {
     var cm = row.querySelector(".cm");
     cm.textContent = name + " — " + (forceType ? "처리 중…" : "유형 판별·처리 중…");
-    var r = await window.gijo.uploadAuto(name, b64, forceType, productName, keep);
+    var r = await window.gijo.uploadAuto(name, b64, forceType, productName, keep, replacesReceiptId);
     // 확신이 낮으면 담당자에게 묻는다 — 잘못 분류해 조용히 넣는 것보다 한 번 묻는 편이 낫다.
     if (r.needsDecision && !forceType) {
       var wrap = document.createElement("div");
@@ -1911,7 +1914,8 @@
           var t = b.getAttribute("data-t");
           var pin = wrap.querySelector(".pn");
           var pname = PRODUCT_NAME_TYPES[t] && pin ? (pin.value.trim() || undefined) : undefined;
-          handleUpload(name, b64, row, t, pname, keep).catch(function (e) { cm.textContent = name + " — 실패: " + e.message; });
+          // r.receiptId — 되물을 때 남긴 그 영수증 줄. 서버가 지우고 확정 줄만 남긴다.
+          handleUpload(name, b64, row, t, pname, keep, r.receiptId).catch(function (e) { cm.textContent = name + " — 실패: " + e.message; });
         });
       });
       return;

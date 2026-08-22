@@ -1482,7 +1482,21 @@ export function registerMemoryRoutes(app: Express): void {
         // 부팅 시 기본 코퍼스 인입(docsbundle)은 이 경로를 타지 않으므로 제품 자랑에 섞이지 않는다.
         const { recordWork } = await import("./worklog.js");
         recordWork({ kind: "document_ingested", detail: filename, actor: actor ?? null, source: "api" });
-        res.json(ingested);
+        // ★★ 비밀정보 검사 — **잣대를 두 벌로 두지 않는다** (2026-08-22 검토관 [중] 수리).
+        //   회사 문서가 들어오는 창구는 둘이다: 콘솔 ＋(`/api/upload/auto`)와 **여기**.
+        //   앞엣것에만 검사를 붙여 놓고 커밋·화면 문구는 「회사 문서 반입엔 검사가 아예
+        //   없었다 → 고쳤다」고 전칭으로 말했다. 같은 파일을 콘솔로 올리면 경고가 뜨고
+        //   라이트 화면으로 올리면 안 뜨는, 정확히 그 「잣대가 어긋난다」였다.
+        //   ⚠ **막지 않고 알린다** — 회사 규정 문서에는 예시 키처럼 정당하게 비밀처럼 보이는
+        //     것이 있고, 지우면 원문이 훼손된다. 담당자가 보고 판단하도록 **가려진 형태로만**.
+        //   ⚠ 실패해도 인입을 막지 않는다(가드가 본체를 죽이면 안 된다).
+        let 비밀경고: { kind: string; masked: string }[] | undefined;
+        try {
+          const { maskSecrets } = await import("./secretscan.js");
+          const hits = maskSecrets(text).hits;
+          if (hits.length) 비밀경고 = hits.map((h) => ({ kind: h.kind, masked: h.masked }));
+        } catch { /* 검사 실패는 인입 실패가 아니다 */ }
+        res.json(비밀경고 ? { ...ingested, 비밀경고 } : ingested);
       } catch (err) {
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }

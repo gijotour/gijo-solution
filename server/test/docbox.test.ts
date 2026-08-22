@@ -150,16 +150,18 @@ describe("화면 이름을 부르는 말투도 안내로 간다", () => {
     for (const [q, s] of 새면안됨) expect(isHelpIntent(q, s), `화면 안내로 새면 안 된다: ${q}`).toBe(false);
   });
 
-  it("문서함을 물으면 새 자리(내 문서 📘 제품 안내)로 간다 — 흡수 뒤에도 옛 이름이 통한다", async () => {
+  it("문서함을 물으면 새 자리(내 문서 📘 GIJO AS 안내)로 간다 — 흡수 뒤에도 옛 이름이 통한다", async () => {
     // 문서함 창은 2026-08-20 내 문서 허브 v3에 흡수됐다. 담당자가 옛 이름으로 물어도
-    // 별칭이 mydocs.html로 잇고, 그 안내에 제품 안내·요청 만들기 내용이 실제로 있어야 한다.
+    // 별칭이 mydocs.html로 잇고, 그 안내에 GIJO AS 안내·요청 만들기 내용이 실제로 있어야 한다.
+    // ⚠ 2026-08-22 이름 변경: 「제품 안내」→「GIJO AS 안내」. 우리 제품 안내와 **타사 제품 자료**를
+    //   가르기 위해서다(같은 화면에 📦 보안제품 자료가 생겼다).
     const { formatScreenGuide, 이름으로화면찾기 } = await import("../src/engine/screenguide");
     const hit = 이름으로화면찾기("문서함 어디서 봐?");
     expect(hit?.screen, "별칭 「문서함」이 새 자리로 안 이어진다").toBe("mydocs.html");
     const g = formatScreenGuide("mydocs.html");
     expect(g).toBeTruthy();
     // 흡수된 내용이 실제로 들어 있어야 담당자가 이름을 넣어 되물을 수 있다
-    for (const 구역 of ["제품 안내", "요청 만들기", "업무 템플릿"]) expect(g!).toContain(구역);
+    for (const 구역 of ["GIJO AS 안내", "요청 만들기", "업무 템플릿"]) expect(g!).toContain(구역);
     // 요청 만들기가 열렸으므로 안내도 실제 절차를 말해야 한다 — "준비 중"이 남아 있으면 거짓말이 된다
     expect(g!, "준비 중 문구가 남아 있다").not.toContain("아직 준비 중");
   });

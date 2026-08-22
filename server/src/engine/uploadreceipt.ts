@@ -1,4 +1,4 @@
-// engine/uploadreceipt.ts — **내가 넣은 모든 파일의 영수증.**
+// engine/uploadreceipt.ts — **반입 영수증**(내가 넣은 것 + 내가 볼 수 있는 것).
 //
 // ■ 왜 생겼나 (2026-08-22 사장님 「사용자가 넣는 파일 내문서에서 다 확인 가능해야 해. 취약점파일도」)
 //   반입 갈래 중 **넷이 아무 흔적도 안 남겼다**(설계관 실측):
@@ -26,7 +26,11 @@ export type 반입갈래 =
 export interface 영수증 {
   id: string;
   filename: string;
+  /** 사람이 읽는 이름. ⚠ **가르는 데 쓰지 않는다** — 동명이인·개명에서 어긋난다. */
   uploadedBy?: string;
+  /** ★ 바뀌지 않는 사용자 id — 「내 것인가」는 **이것으로만** 가른다(2026-08-22 검토관 [높음]).
+   *  옛 줄에는 없다(NULL) — 그때는 「남의 것」으로 다뤄 등급 검사를 지나야 보이게 한다. */
+  uploadedById?: string;
   uploadedAt: string;
   kind: 반입갈래;
   routedTo: string;
@@ -44,15 +48,27 @@ export interface 영수증 {
 
 const 넣기 = db.prepare(
   `INSERT INTO upload_receipts
-     (id,filename,uploadedBy,uploadedAt,kind,routedTo,decidedBy,category,originalSaved,mdSaved,ingested,bytes,detail,note)
+     (id,filename,uploadedBy,uploadedById,uploadedAt,kind,routedTo,decidedBy,category,originalSaved,mdSaved,ingested,bytes,detail,note)
    VALUES
-     (@id,@filename,@uploadedBy,@uploadedAt,@kind,@routedTo,@decidedBy,@category,@originalSaved,@mdSaved,@ingested,@bytes,@detail,@note)`
+     (@id,@filename,@uploadedBy,@uploadedById,@uploadedAt,@kind,@routedTo,@decidedBy,@category,@originalSaved,@mdSaved,@ingested,@bytes,@detail,@note)`
 );
-const 목록읽기 = db.prepare(`SELECT * FROM upload_receipts ORDER BY uploadedAt DESC LIMIT ?`);
+/** ⚠ **LIMIT를 여기 걸지 않는다.** 거르기(소유자·등급)가 끝난 **뒤에** 잘라야 한다 —
+ *  먼저 300줄을 잘라 놓고 거르면 「내 것 5줄」이 남의 것 295줄에 밀려 안 보인다.
+ *  표가 아주 커지면 이 전수 조회가 부담이 되는데, 그때는 SQL에 소유자 조건을 내리는 것이
+ *  정답이다(등급은 SQL로 못 푼다 — memory_documents를 봐야 한다). 지금은 보관총량도
+ *  이미 전수를 세므로 같은 비용이다. */
+const 목록읽기 = db.prepare(`SELECT * FROM upload_receipts ORDER BY uploadedAt DESC`);
 const 총량읽기 = db.prepare(
   `SELECT COUNT(*) AS n, COALESCE(SUM(bytes),0) AS bytes,
           COALESCE(SUM(CASE WHEN originalSaved=1 THEN bytes ELSE 0 END),0) AS 보관bytes
      FROM upload_receipts`
+);
+/** ⚠ `routedTo='decision'` 조건이 이 문의 안전장치다 — 확정된 기록은 절대 안 지운다.
+ *  올린 이 조건은 「모르면(NULL) 통과」가 아니라 **넘겼을 때만 검사**하도록 썼다. */
+const 되묻기지우기 = db.prepare(
+  `DELETE FROM upload_receipts
+    WHERE id = ? AND routedTo = 'decision'
+      AND (? IS NULL OR uploadedById = ?)`
 );
 
 /** 영수증 한 장을 남긴다.
@@ -68,6 +84,7 @@ export function 영수증남기기(입력: Omit<영수증, "id" | "uploadedAt"> 
       id,
       filename: String(입력.filename ?? "").slice(0, 300),
       uploadedBy: 입력.uploadedBy ?? null,
+      uploadedById: 입력.uploadedById ? String(입력.uploadedById) : null,
       uploadedAt: 입력.uploadedAt ?? new Date().toISOString(),
       kind: 입력.kind,
       routedTo: 입력.routedTo,
@@ -92,6 +109,7 @@ function 줄로(r: Record<string, unknown>): 영수증 {
     id: String(r.id),
     filename: String(r.filename),
     uploadedBy: (r.uploadedBy as string) ?? undefined,
+    uploadedById: (r.uploadedById as string) ?? undefined,
     uploadedAt: String(r.uploadedAt),
     kind: String(r.kind) as 반입갈래,
     routedTo: String(r.routedTo),
@@ -106,12 +124,66 @@ function 줄로(r: Record<string, unknown>): 영수증 {
   };
 }
 
-export function 영수증목록(상한 = 300): 영수증[] {
-  return (목록읽기.all(상한) as Record<string, unknown>[]).map(줄로);
+/** 되묻는 중이던 영수증 한 장을 **지운다** — 답이 와서 확정 줄이 새로 생길 때.
+ *
+ *  ★ 왜 필요한가 (2026-08-22 검토관 [중]): 유형을 되물으면 영수증 A(「되묻는 중」)가 남고,
+ *    사람이 답하면 클라가 **같은 파일을 다시 올려** 영수증 B가 또 생겼다. 반입 탭에 같은
+ *    파일이 두 줄이고, A는 처리가 끝난 뒤에도 영영 「되묻는 중」이라 담당자는 미처리 파일이
+ *    있는 줄 안다. **사람의 행위는 한 번**이므로 줄도 하나여야 한다.
+ *
+ *  ⚠ 파일명으로 짝을 찾지 않는다 — 클라가 **그 영수증의 id를 그대로 돌려준다.**
+ *    이름으로 맞추면 같은 이름의 다른 파일을 지운다(basename 키잉 사고와 같은 부류).
+ *  ⚠ 안전장치: **되묻는 중(routedTo='decision')인 줄만** 지운다. 확정된 기록은 무슨 일이
+ *    있어도 안 지운다 — 감사 기록이 조용히 사라지면 이 표의 존재 이유가 없어진다.
+ *  ⚠ 남의 영수증을 지우지 못하게 올린 이도 함께 본다.
+ */
+export function 되묻기영수증지우기(id: string, uploadedById?: string): boolean {
+  try {
+    const r = 되묻기지우기.run(
+      String(id),
+      uploadedById == null ? null : String(uploadedById),
+      uploadedById == null ? null : String(uploadedById)
+    );
+    return r.changes > 0;
+  } catch (e) {
+    console.warn(`[upload-receipt] 되묻기 줄 정리 실패(반입은 계속): ${e instanceof Error ? e.message : String(e)}`);
+    return false;
+  }
 }
 
-/** 보관 총량 — **상한을 지금 정하지 않는 대신** 실제로 얼마나 쌓이는지 세어 둔다.
- *  근거 없는 숫자로 상한을 박는 것보다, 커졌을 때 이 값으로 정하는 편이 낫다(설계관 권고). */
+/** 「이 사람이 이 영수증을 볼 수 있나」를 판정하는 잣대.
+ *
+ *  ★ 왜 함수로 받나 — 이 파일이 `memory.ts`(등급 잣대가 사는 곳)를 import하면 **순환**이 된다
+ *    (memory ← autoupload ← uploadreceipt). 그래서 **부르는 쪽이 잣대를 넘긴다.**
+ *    잣대 자체는 여전히 `열람불가공용` 한 곳이다 — 사본을 만들지 않는다.
+ */
+export type 볼수있나 = (r: 영수증) => boolean;
+
+/** 반입 영수증 목록 — **거르고 나서 자른다.**
+ *
+ *  ⚠ 2026-08-22 게시 전 검토관 [높음] 수리. 그전엔 필터가 아예 없어 **남의 기밀 파일명**이
+ *    누구에게나 보였다. 순서도 중요하다: 먼저 300줄을 자르고 거르면 내 것이 밀려 사라진다.
+ *
+ *  @returns 목록(상한까지) · **거른 뒤의** 총건수·바이트. 화면이 「몇 건」이라 말할 때
+ *           쓰는 숫자가 목록 길이가 아니라 이 값이어야 한다(상한에 걸리면 거짓말이 된다).
+ */
+export function 영수증목록(
+  상한 = 300,
+  볼수있나?: 볼수있나
+): { 목록: 영수증[]; 건수: number; 전체바이트: number; 원본보관바이트: number } {
+  const 전부 = (목록읽기.all() as Record<string, unknown>[]).map(줄로);
+  const 보이는 = 볼수있나 ? 전부.filter(볼수있나) : 전부;
+  let 전체바이트 = 0;
+  let 원본보관바이트 = 0;
+  for (const r of 보이는) {
+    전체바이트 += r.bytes ?? 0;
+    if (r.originalSaved) 원본보관바이트 += r.bytes ?? 0;
+  }
+  return { 목록: 보이는.slice(0, 상한), 건수: 보이는.length, 전체바이트, 원본보관바이트 };
+}
+
+/** 보관 총량 — **거르지 않은 전체**다. 운영·용량 판단용이지 **화면에 쓰지 않는다**
+ *  (화면은 위 `영수증목록`이 돌려주는 「거른 뒤의 건수」를 쓴다 — 안 그러면 못 보는 것까지 센다). */
 export function 보관총량(): { 건수: number; 전체바이트: number; 원본보관바이트: number } {
   const r = 총량읽기.get() as Record<string, unknown>;
   return {
@@ -121,15 +193,25 @@ export function 보관총량(): { 건수: number; 전체바이트: number; 원�
   };
 }
 
-/** 사람이 읽는 갈래 이름 — 화면·대화가 **이 한 곳**을 쓴다(TYPE_LABEL 사본 3벌 함정을 만들지 않는다). */
+/** 사람이 읽는 갈래 이름 — 화면·대화가 **이 한 곳**을 쓴다(TYPE_LABEL 사본 3벌 함정을 만들지 않는다).
+ *
+ *  ★ 2026-08-22 검토관 [중] 수리 — `asset`·`log` 두 이름이 **한 행 안에서 스스로 모순**이었다.
+ *    · `asset`은 자산 목록이 아니라 **제품 매뉴얼**이다(autoupload.ts:91 「제품 매뉴얼(User Guide 등)」,
+ *      라우팅도 `product-manual`). 그런데 이름이 「자산 목록」이라
+ *      「갈래=자산 목록 · 어디로=보안제품 등록부」라는 앞뒤 안 맞는 줄이 나왔다.
+ *    · `log`는 로그 **원본**이 아니라 **로그 읽는 법 매뉴얼**이다(원본은 `securitylog`).
+ *      「로그」와 「보안 로그」가 나란히 있으면 어느 쪽이 원본인지 알 길이 없다.
+ *    ⚠ 결정 카드의 이름(console.js:1784 「🛡 보안제품 자산」)과 완전히 같지는 않다 —
+ *      사람이 **고른 것**은 그 이름이고, **된 것**은 매뉴얼이다. 영수증은 「무엇이 됐나」를 적는다.
+ */
 export const 갈래이름: Record<반입갈래, string> = {
   document: "문서",
   guideline: "지침·가이드",
   vulnreport: "취약점 리포트",
-  securitylog: "보안 로그",
+  securitylog: "보안 로그(원본)",
   opsreport: "운영 리포트",
   sbom: "부품표(SBOM)",
-  asset: "자산 목록",
-  log: "로그",
+  asset: "보안제품 매뉴얼",
+  log: "로그 매뉴얼",
   unknown: "미정",
 };

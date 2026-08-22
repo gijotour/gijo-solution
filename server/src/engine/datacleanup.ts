@@ -15,7 +15,9 @@ import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
 
 // 지원 대상 화이트리스트 — 키 이름으로만 지울 수 있다(임의 테이블명 주입 불가).
-const TARGETS: Record<string, { label: string; tables: string[] }> = {
+// ★ export한다(2026-08-22 검토관 [중]) — **표가 아니라 대장 자체를 시험이 본다.**
+//   개수만 세면 「새 표를 만들고 여기 안 넣은 것」을 못 잡는데, 그게 이번 결함의 모양이었다.
+export const TARGETS: Record<string, { label: string; tables: string[] }> = {
   cti_findings: { label: "위협 인텔 항목(CTI findings)", tables: ["cti_findings", "cti_sync"] },
   analysis_events: { label: "보안 분석 이벤트(분석허브)", tables: ["analysis_events", "analysis_event_status"] },
   // ── 실사용 전환 리셋(2026-08-19 사장님 「화면에 나오는 데이터는 삭제」) — 그룹 단위 ──
@@ -34,7 +36,15 @@ const TARGETS: Record<string, { label: string; tables: string[] }> = {
   kpi_snapshots: { label: "KPI 일일 스냅샷(파생)", tables: ["security_kpi_snapshots"] },
   product_intro: { label: "제품 소개자료 대장", tables: ["product_intro"] },
   sessions: { label: "작업 내역(대화 세션)", tables: ["work_session_turns", "work_sessions"] },
-  personal_docs: { label: "개인 문서함", tables: ["personal_docs"] },
+  // ⚠ 자식(판 이력·첨부 대장) 먼저 — **2026-08-22 검토관 [중] 수리.** 그전엔 `personal_docs`
+  //   하나뿐이라, 「개인 문서함 N건 삭제」라고 찍어 놓고 **직전 20판의 본문 전문**이
+  //   personal_doc_versions에 그대로 남았다. 문서 행이 없어 화면으로는 못 보지만
+  //   DB 백업·스냅샷에는 실려 나간다 — 「지웠다」가 거짓이 되는 자리다.
+  //   (외래키는 없지만 순서를 지킨다 — 부모를 먼저 지우면 자식이 고아가 된다.)
+  personal_docs: { label: "개인 문서함", tables: ["personal_doc_versions", "personal_doc_files", "personal_docs"] },
+  // 반입 영수증 — 「누가 언제 무엇을 올렸나」의 기록. 업무 데이터이므로 실사용 전환에서 함께 지운다
+  //   (시연 때 올린 파일 이름이 실운영 목록에 남으면 안 된다).
+  upload_receipts: { label: "반입 영수증(올린 파일 기록)", tables: ["upload_receipts"] },
   observability: { label: "브리핑 스냅샷·느린 답 원장(파생)", tables: ["briefing_snapshot", "long_answers", "slow_answers"] },
   // ⚠ 자식(부품) 먼저 — 외래키가 걸려 있어 부모를 먼저 지우면 constraint로 터진다(assets 선례).
   sbom_reviews: { label: "타사 SBOM 검수 대장", tables: ["sbom_review_components", "sbom_reviews"] },
@@ -44,6 +54,8 @@ const TARGETS: Record<string, { label: string; tables: string[] }> = {
 export const RESET_TARGETS = [
   "assets", "tasks", "cti_findings", "analysis_events", "products", "maintenance",
   "hardening", "kpi_snapshots", "product_intro", "sessions", "personal_docs", "observability",
+  // 반입 영수증(2026-08-22 검토관 [중]) — 시연 때 올린 파일 이름이 실운영 목록에 남으면 안 된다.
+  "upload_receipts",
   // 검수 이력은 **업무 데이터**다 — 시연 데이터를 지울 때 함께 지워야 남의 회사 부품표가 안 남는다.
   "sbom_reviews",
 ] as const;
@@ -139,6 +151,10 @@ const RESET_FILE_DIRS = [
   //   추출본(.md)도 같이 옮긴다. 그것이 AI가 실제로 읽은 글이라 남으면 내용이 그대로 남는 것과 같다.
   { dir: path.join("data", "docs", "uploads"), label: "업로드 원본 파일" },
   { dir: path.join("data", "docs", "extracted"), label: "추출본(.md) — AI가 읽은 글" },
+  // ★ 문서 편집기 첨부(2026-08-22 검토관 [중] 수리). 캡처 그림이 여기 쌓인다 —
+  //   빠뜨리면 개인 문서를 지워도 **그림 파일이 디스크에 영원히 남는다.**
+  //   정작 docattach.ts:113이 스스로 그렇게 경고해 두었는데 이 목록만 안 따라왔다.
+  { dir: path.join("data", "docs", "attach"), label: "문서 편집기 첨부(캡처 그림)" },
 ];
 function moveResetFiles(stamp: string): { label: string; moved: number }[] {
   const out: { label: string; moved: number }[] = [];

@@ -55,16 +55,40 @@ describe("별도 창을 여는 IPC — 문지기를 안 거치는 자리", () =>
     }
   });
 
-  it("★ 창을 여는 자리는 남의 코드를 담지 않는다 — 그게 통제 밖 새 창의 뿌리였다", () => {
+  it("★★ 창은 **우리 화면만** 싣는다 — 남의 렌더러를 창에 실은 것이 통제 밖 새 창의 뿌리였다", () => {
     // ⚠ 2026-08-22까지 여기서 잰 것은 **Smart MD 창의 setWindowOpenHandler**였다.
     //   Smart MD는 다른 저장소에서 받아온 마크다운 렌더러라, 문서 안 링크가 target=_blank면
     //   Electron이 우리 통제 밖 창을 띄웠다(will-navigate로는 못 막는다 — 다른 사건이다).
-    //   그 창을 없애면서(문서 작성이 「내 문서」 화면 안으로 들어옴) 잴 대상이 사라졌다.
-    //   **그래서 지우는 대신 뿌리를 잰다**: 남의 렌더러를 다시 창으로 싣는 날 여기서 걸린다.
-    //   지금 남은 창(사무실·팝업 셸·지휘소)은 전부 우리 화면이라 이 위험이 없다.
-    expect(mainSrc, "smartmd 창이 되살아났다 — 남의 렌더러를 창으로 실으면 setWindowOpenHandler가 필수다").not.toMatch(
-      /smartMdWindow\s*=/
-    );
+    //   그 창을 없애면서(문서 작성이 「내 문서」 화면 안으로) 잴 대상이 사라졌다.
+    //
+    // ★★ 첫 대체 시험은 **변수 이름 하나**(`smartMdWindow =`)만 봤다 — 같은 날 재검토가
+    //   그것을 잡았다: 이름을 `mdEditorWindow`로 바꿔 다시 실으면 그대로 초록이다.
+    //   4겹 봉인 감시를 뗀 대가가 이름 일치 검사여서는 안 된다. **뿌리를 잰다**:
+    //   창이 무엇을 싣는지는 `loadFile`/`loadURL`이 정하므로, **그 인자가 전부 우리
+    //   화면 폴더(src/renderer/pages) 안**이어야 한다. 남의 산출물을 실으면 여기서 걸린다.
+    // ① 원격을 싣지 않는다 — `loadURL`이 생기면 화면이 우리 디스크 밖에서 온다.
+    expect(mainSrc, "loadURL이 생겼다 — 창이 우리 디스크 밖의 것을 싣는다")
+      .not.toMatch(/\.loadURL\s*\(/);
+
+    // ② 싣는 파일 경로는 **전부 우리 화면 폴더 안**이어야 한다.
+    //    실측(2026-08-22): main.ts의 화면 경로는 모두 `path.join(__dirname, "../src/renderer/pages/…")`
+    //    꼴이고, `loadFile(target)`의 `target`도 그 꼴로만 만들어진다. 그러니 **경로 리터럴**을
+    //    전수로 보면 된다 — 다른 폴더가 끼는 순간 걸린다.
+    const 경로들 = [...mainSrc.matchAll(/path\.join\(\s*__dirname\s*,\s*([`"'])([^`"']*)\1/g)].map((m) => m[2]);
+    expect(경로들.length, "화면 경로 리터럴을 하나도 못 찾았다 — 이 시험의 정규식을 확인하라")
+      .toBeGreaterThan(0);
+    const 화면밖 = 경로들.filter((p) => p.includes(".html") && !p.startsWith("../src/renderer/pages/"));
+    expect(
+      화면밖,
+      "창에 우리 화면 폴더 밖의 화면을 싣는다 — 남의 렌더러라면 setWindowOpenHandler·CSP·전용 세션이 함께 필요하다(옛 Smart MD 봉인 4겹을 되살릴 것)"
+    ).toEqual([]);
+    // ③ 감시가 헛돌지 않는지 스스로 확인 — 실제로 우리 화면을 싣고 있어야 한다.
+    expect(
+      경로들.some((p) => p.startsWith("../src/renderer/pages/") && p.includes(".html")),
+      "우리 화면을 싣는 경로가 하나도 안 보인다 — 위 검사가 저절로 통과하고 있다"
+    ).toBe(true);
+    // ④ 옛 창이 그대로 되살아나는 경로도 함께 막는다(이름 검사는 **보조** 잣대로만 남긴다).
+    expect(mainSrc, "smartmd 창이 되살아났다").not.toMatch(/smartMdWindow\s*=/);
   });
 });
 

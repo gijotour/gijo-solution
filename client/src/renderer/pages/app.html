@@ -396,6 +396,14 @@
     "opsguide.html": { page: "maintenance.html", label: "정기 점검" },
     "ontology.html": { page: "memory.html", label: "AI 지식" },
     "mywork.html": { page: "dashboard.html", label: "대시보드" },
+    // ★ 2026-08-22 — 「보안제품 비교·소개」(intro.html)를 내 문서로 흡수하며 **파일을 지웠다.**
+    //   ⚠ 이 표에 안 적으면 그 탭을 열어 둔 담당자는 **영구 빈 탭**을 만난다:
+    //     셸이 localStorage의 탭을 그대로 복원해 iframe에 무는데 파일이 없어 ERR_FILE_NOT_FOUND.
+    //     nav.js의 TAB_REDIRECT로는 못 막는다 — 파일이 없으면 nav.js가 실리기도 전에 죽는다
+    //     (nav.js:294가 hub.html에서 겪은 그 자리를 스스로 적어 두었다).
+    //   ⚠ 이름도 함께 준다 — 못 찾으면 탭 이름이 `intro.html`로 뜬다(파일명 노출은 2026-08-18
+    //     사장님 QA로 이미 한 번 고친 결함이다).
+    "intro.html": { page: "mydocs.html?tab=vendor", label: "보안제품 비교·소개" },
   };
   function 옛탭바로잡기(o) {
     var m = 옛탭[String(o && o.page || "").split("?")[0]];

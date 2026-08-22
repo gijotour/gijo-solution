@@ -35,13 +35,27 @@ const VEND = path.join(SMARTMD, "vendor", "VERSIONS.md");
  *    `files`에서 `smartmd/**\/*`를 뺐다. 그런데 **개발 기계에는 옛 폴더가 그대로 남아 있어**
  *    폴더만 보면 「싣는 기계」로 읽혔다 — 안 싣는 것을 고지가 있나 없나 따지는 헛감시가 된다.
  *    지금은 **배포 목록에 들어 있을 때만** 잰다. 다시 실으면 이 감시가 저절로 되살아난다. */
+/** ⚠ `files`만 보면 안 된다(2026-08-22 재검토 [낮음]) — 설치본에 폴더째 넣는 흔한 방식은
+ *  **extraResources/extraFiles**다. 거기로 동봉하면 「안 싣는다」로 잘못 읽혀 고지가 빠진다.
+ *  ★ 판정 로직은 게시가 쓰는 `tools/lib/…`가 아니라 여기와 gen-sbom-self 두 곳에 있다 —
+ *    **일부러 그렇다**: 이 시험은 「관문이 판정을 제대로 하나」를 재는 쪽이 아니라
+ *    「지금 우리가 싣나」를 스스로 판단해 검사할지 말지를 정한다. 어긋나면 아래 시험이 헛돌므로
+ *    같은 넓이로 맞춰 둔다(넓히면 양쪽 다 넓힌다). */
 function 배포에담나(): boolean {
   for (const 설정 of ["package.json", "electron-builder.lite.json"]) {
     const p = path.join(저장소, "client", 설정);
     if (!fs.existsSync(p)) continue;
-    const j = JSON.parse(fs.readFileSync(p, "utf8"));
-    const files: string[] = (설정 === "package.json" ? j.build?.files : j.files) ?? [];
-    if (files.some((f) => String(f).includes("smartmd"))) return true;
+    const j = JSON.parse(fs.readFileSync(p, "utf8")) as Record<string, unknown>;
+    const b = (j.build ?? j) as Record<string, unknown>;
+    const 플랫 = (k: string) => (b[k] as unknown[]) ?? [];
+    const 하위 = (os: string, k: string) => ((b[os] as Record<string, unknown> | undefined)?.[k] as unknown[]) ?? [];
+    const 전부 = [
+      ...플랫("files"), ...플랫("extraResources"), ...플랫("extraFiles"),
+      ...하위("win", "extraResources"), ...하위("win", "extraFiles"),
+      ...하위("mac", "extraResources"), ...하위("mac", "extraFiles"),
+      ...하위("linux", "extraResources"), ...하위("linux", "extraFiles"),
+    ];
+    if (전부.some((e) => JSON.stringify(e).includes("smartmd"))) return true;
   }
   return false;
 }

@@ -49,6 +49,10 @@ mkdir -p "$DST_ROOT/client"
 #   그 파일이 **우리가 CDN 대신 직접 싣는 JS·글꼴 4종의 라이선스 원장**이다. 안 가져가면
 #   감시가 ENOENT로 죽는데, 하필 이 감시가 막으려는 사고가 **「조용히 0개를 읽는 것」**이라
 #   사본 결함이 그 사고와 똑같은 모양으로 나타난다.
+#   ★ 같은 날 밤 Smart MD를 없애 지금은 **아무 빌드도 안 싣는다** — 그 감시는 전부 skip이고
+#     이 복사는 당장은 헛일이다. **그래도 남긴다**: 언젠가 다시 동봉하는 날(extraResources
+#     갈래 포함) 이 줄이 없으면 WSL에서 파일이 없어 **조용히 skip**되고, 그게 바로
+#     「고지가 빠졌는데 초록」이다. 헛일 몇 KB가 그 위험보다 싸다.
 rsync -a --delete --include='src/***' --include='scripts/***' --include='smartmd/' --include='smartmd/vendor/***' \
   --include='package.json' --include='electron-builder*.json' \
   --exclude='*' "$SRC_ROOT/client/" "$DST_ROOT/client/" || { echo "✗ client 동기화 실패"; exit 1; }
