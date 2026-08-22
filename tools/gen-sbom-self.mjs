@@ -189,7 +189,13 @@ if (JSON출력) {
 } else {
   const 배지 = { 의무없음: "⚪", 고지만: "🟢", 고친파일공개: "🟡", 전체소스공개: "🟠", 서비스도공개: "🔴", 판정불가: "❓" };
   console.log(`\n■ GIJO AS 부품표 — ${최종.length}개 (node ${최종.filter((c) => c.갈래 === "node").length} · 파이썬 동봉 ${py.목록.length})`);
-  if (!py.표식있나) console.log("  ⚠ 동봉 파이썬이 아직 안 꾸려졌습니다 — `node tools/stage-python.mjs` 뒤에 다시 재세요.");
+  // ⚠ mac에서는 파이썬을 **일부러 안 싣는다**(stage-python이 win32가 아니면 비켜 간다).
+  //   거기서 「아직 안 꾸려졌습니다」라고 하면 무언가 잘못된 것처럼 읽혀 사람을 헤매게 한다.
+  if (!py.표식있나) {
+    console.log(process.platform === "win32"
+      ? "  ⚠ 동봉 파이썬이 아직 안 꾸려졌습니다 — `node tools/stage-python.mjs` 뒤에 다시 재세요."
+      : "  ℹ 이 기계(mac/리눅스)에는 파이썬을 동봉하지 않습니다 — 파이썬 부품은 목록에 없는 것이 정상입니다.");
+  }
   console.log("\n  등급별:");
   for (const [등급, n] of Object.entries(요약.등급별)) {
     if (n) console.log(`    ${배지[등급]} ${등급.padEnd(8)} ${String(n).padStart(4)}개`);

@@ -73,6 +73,25 @@ async function main() {
 
   const buf = fs.readFileSync(installerPath);
 
+  // ★ **크기를 먼저 잰다**(2026-08-22 게시 전 검토관). 서버 수신 한계는
+  //   `server/src/engine/clientrelease.ts`의 express.raw `limit: "500mb"` 하나뿐이다.
+  //   ⚠ 넘으면 그 미들웨어가 413을 던지는데 서버에 전역 오류 핸들러가 없어 **Express 기본 HTML**이
+  //     나가고, 아래 `.then(r => r.json())`이 「Unexpected token '<'」로 터진다 —
+  //     게시가 마지막 단계에서 죽는데 **원인이 크기라는 말이 아무 데도 안 나온다.**
+  //   OCR 동봉으로 설치본이 170MB → 300MB대가 됐으니 여유가 줄었다. 한글로 먼저 끊는다.
+  const 한계MB = 500;
+  const 크기MB = buf.length / 1024 / 1024;
+  if (크기MB > 한계MB) {
+    throw new Error(
+      `설치본이 너무 큽니다 — ${크기MB.toFixed(1)}MB (서버 수신 한계 ${한계MB}MB).\n` +
+      `  이대로 올리면 마지막 단계에서 원인 모를 오류로 죽습니다.\n` +
+      `  늘리려면 server/src/engine/clientrelease.ts의 express.raw limit을 올리고 서버를 배포하세요.`
+    );
+  }
+  if (크기MB > 한계MB * 0.85) {
+    console.log(`[publish-release] ⚠ 설치본 ${크기MB.toFixed(1)}MB — 수신 한계(${한계MB}MB)의 85%를 넘었습니다. 곧 한계에 닿습니다.`);
+  }
+
   // ★ 같은 번호로 **다른 내용**을 게시하지 못하게 막는다.
   //
   // ⚠ 2026-08-01 실사고: 4.16.1을 게시한 뒤 버튼 3곳을 더 고치고 **번호를 안 올린 채**
