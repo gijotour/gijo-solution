@@ -21,7 +21,8 @@ const 캐시맵 = new Map<string, string>();
  *
  * ■ 용도를 나누는 이유 (2026-08-22 검토관 [중] 수리)
  *   이 함수는 문서 추출만 쓰는 게 아니다 — **장비 접속(netmiko)·모델 검사(modelscan)·GGUF
- *   변환이 함께 쓰는 단 한 곳**이다. 그런데 설치본에 동봉한 파이썬에는 **pypdf만** 들어 있다.
+ *   변환이 함께 쓰는 단 한 곳**이다. 그런데 설치본에 동봉한 파이썬에는 **문서 추출에 쓰는 것만**
+ *   들어 있다(pypdf·rapidocr·onnxruntime·pypdfium2 — 2026-08-22 기준. 예전엔 pypdf뿐이었다).
  *   그걸 모든 용도의 앞자리에 두면, 시스템 파이썬에 requirements를 깐 기계에서
  *   **잘 되던 장비 접속·모델 검사가 죽는다**(No module named 'netmiko').
  *   그래서 문서 추출만 동봉본을 앞세우고, 나머지는 예전 순서를 그대로 지킨다.
@@ -51,7 +52,9 @@ export function serverPython(용도: "docs" | "tools" = "tools"): string {
   후보.push(venv경로(뿌리));
   if (path.resolve(뿌리) !== path.resolve(process.cwd())) 후보.push(venv경로(process.cwd()));
   // 설치본에 **동봉된** 파이썬(2026-08-22, 사장님 「b」 결정) — 고객 기계에 파이썬이 없어도
-  //   PDF·한글·오피스 문서를 읽을 수 있게 앱과 함께 나간다(임베더블 21.5MB + pypdf 3.5MB).
+  //   스캔 문서·이미지를 읽을 수 있게 앱과 함께 나간다(임베더블 + pypdf + 한국어 OCR 한 벌).
+  //   ⚠ 크기는 **꾸릴 때마다 달라진다** — 여기 숫자를 적어 두면 낡는다. 실제로 무엇이
+  //     얼마나 실렸는지는 설치본의 `python/GIJO-PYTHON-VERSION.json`이 판까지 기록한다.
   //   ⚠ main.ts에서 GIJO_PYTHON을 대입하지 **않는다** — 그러면 운영자 지정(README 환경변수 표·
   //     배포 가이드가 안내하는 탈출구)을 덮어쓴다(설계관 2026-08-22 적발). 뿌리만 알려 주고
   //     고르는 일은 이 함수 한 곳에서 한다.

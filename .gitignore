@@ -70,3 +70,6 @@ server/unsloth_compiled_cache/
 
 # 실측용 외부 자료(타사 매뉴얼 등) — 저작권상 저장소에 담지 않는다(2026-08-21)
 testdata/
+
+# 서드파티 고지 — 빌드 때 gen-sbom-self.mjs가 만든다(손으로 고치지 말 것, 두 벌이 된다).
+THIRD-PARTY-NOTICES.md
