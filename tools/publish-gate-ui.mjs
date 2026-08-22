@@ -165,13 +165,13 @@ if (auditFrame) {
   // 2026-08-20 B라운드: 📌 칩(.cs-sel) → 맥락 문장 한 줄(.cs-line, 「…을 다루는 중」)로 흡수.
   const 칩 = await 셸.evaluate(() => (document.querySelector(".cs-line") || {}).textContent || "");
   ok("행 클릭 → 맥락 문장(다루는 중)", /다루는 중/.test(칩), String(칩).slice(0, 60));
-  // 행 선택은 무대를 유지한다(검토관 상1 — 자동 복귀는 결재 확인창·모달을 삼켜 폐지).
-  // 맥락 문장이 「…다루는 중」으로 바뀌고, 무대 머리가 「골랐습니다」를 알린다. 내리기는 ← 대화로(사람)뿐.
+  // 행 선택은 화면을 유지한다(검토관 상1 — 자동 복귀는 결재 확인창·모달을 삼켜 폐지).
+  // 맥락 문장이 「…다루는 중」으로 바뀌고, 머리가 「골랐습니다」를 알린다. 접기는 ⊟ 화면 접기(사람)뿐.
   const 선택후 = await 셸.evaluate(() => ({
     무대유지: document.body.classList.contains("stage-on"),
-    표시: /골랐습니다|← 대화로/.test((document.getElementById("stageBack") || {}).textContent || ""),
+    표시: /골랐습니다|화면 접기/.test((document.getElementById("stageBack") || {}).textContent || ""),
   }));
-  ok("행 선택: 📌 달고 화면 유지(내리기는 ← 대화로)", 선택후.무대유지 && 선택후.표시, JSON.stringify(선택후));
+  ok("행 선택: 🎯 달고 화면 유지(접기는 ⊟ 화면 접기)", 선택후.무대유지 && 선택후.표시, JSON.stringify(선택후));
   // 허브 릴레이 — 무대→허브→셸 두 겹을 실제로 올라가는가(2026-08-20 grouphub 릴레이+가드)
   await auditFrame.evaluate(() => window.parent.postMessage({ type: "gijo:openTab", page: "kpi.html", label: "지표" }, "*"));
   const kpiFrame = await 프레임찾기("kpi.html", 8);
@@ -399,23 +399,31 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
   const has = fr ? await fr.evaluate(() => typeof window.gijoSelectNotify === "function").catch(() => false) : false;
   ok("부품 로드: assets.html", has, fr ? "" : "프레임 못 찾음");
 
-  // ── 무대(대화창 자리) 실측 — 2026-08-20 사장님 승인 「팝업·옆 도킹 없애고 대화창 자리에」 ──
-  // 방금 dock으로 열었으니 무대가 떠 있어야 한다: 화면 전폭 + 대화 숨김 + ← 대화로.
-  const 무대 = await 셸.evaluate(() => ({
-    전면: document.body.classList.contains("stage-on"),
-    대화숨김: getComputedStyle(document.querySelector(".work .console")).display === "none",
-    복귀단추: !!document.getElementById("stageBack") && document.getElementById("stageBack").offsetParent !== null,
-    옛팝업단추: !!document.getElementById("dockPop"),
-  }));
-  ok("무대: 화면 전폭·대화 숨김·← 대화로", 무대.전면 && 무대.대화숨김 && 무대.복귀단추 && !무대.옛팝업단추,
+  // ── 화면+대화 나란히 실측 — 2026-08-23 사장님 지시(셸 재구축 0-1) ────────────────
+  // ⚠ **뜻이 뒤집혔다.** 2026-08-20까지는 「화면 전폭 + 대화 숨김」이 무대였는데, 이제
+  //   「왼쪽 화면 · 오른쪽 대화」가 정상이다. 그래서 여기서 **대화가 보이는지**를 잰다 —
+  //   예전 검사(대화숨김)를 그대로 두면 나란히로 고친 코드가 게시에서 막힌다.
+  //   클래스 이름(stage-on)은 그대로다(QA·titlebar가 읽는다 — 갈면 여섯 곳이 어긋난다).
+  const 무대 = await 셸.evaluate(() => {
+    const cs = getComputedStyle(document.querySelector(".work .console"));
+    return {
+      나란히: document.body.classList.contains("stage-on"),
+      대화보임: cs.display !== "none" && document.querySelector(".work .console").offsetWidth > 0,
+      화면보임: document.querySelector(".work .screens").offsetWidth > 0,
+      접기단추: !!document.getElementById("stageBack") && document.getElementById("stageBack").offsetParent !== null,
+      옛팝업단추: !!document.getElementById("dockPop"),
+    };
+  });
+  ok("나란히: 화면 왼쪽·대화 오른쪽·⊟ 화면 접기",
+    무대.나란히 && 무대.대화보임 && 무대.화면보임 && 무대.접기단추 && !무대.옛팝업단추,
     JSON.stringify(무대));
-  // ← 대화로 — 대화가 앞으로, 화면(탭)은 산 채로 남는다(필터·스크롤 보존 계약).
+  // ⊟ 화면 접기 — 대화가 전폭이 되고, 화면(탭)은 산 채로 남는다(필터·스크롤 보존 계약).
   await 셸.evaluate(() => document.getElementById("stageBack").click());
   const 내림 = await 셸.evaluate(() => ({
-    대화앞: !document.body.classList.contains("stage-on") && document.body.classList.contains("chat-home"),
+    대화전폭: !document.body.classList.contains("stage-on") && document.body.classList.contains("chat-home"),
     탭산다: !!(window.gijoTabs && window.gijoTabs.list && window.gijoTabs.list().some((t) => String(t.page || t).includes("assets.html"))),
   }));
-  ok("← 대화로: 대화 복귀·화면 보존", 내림.대화앞 && 내림.탭산다, JSON.stringify(내림));
+  ok("⊟ 화면 접기: 대화 전폭·화면 보존", 내림.대화전폭 && 내림.탭산다, JSON.stringify(내림));
   // 🗔 되올리기 — 같은 화면 dock 열기가 숨긴 무대를 그대로 되올린다.
   await 셸.evaluate(() => window.gijoTabs.open("assets.html", "자산 고르기", { dock: true }));
   await new Promise((r) => setTimeout(r, 400));

@@ -92,20 +92,27 @@
   body.chat-home .screens{display:none;}
   /* 탭이 0개면 탭줄·「모두 닫기」가 가리킬 대상이 없다 — 자리만 차지한다. */
   body.chat-home .shellfoot{display:none;}
-  /* ── 🚀 전면 화면(stage-on) — 프로 확정 2026-08-20 「대화창 자리에 화면」 ──────────
-     chat-home(화면 숨김·대화 전폭)의 정반대 상태다: 대화(콘솔)를 숨기고 화면(#screens)이
-     .work 전체를 쓴다. iframe·탭 모델·#screens 위치는 한 글자도 안 옮긴다 — 표현만 뒤집는다
-     (옮기면 titlebar 셸 판별·허브 중첩·QA 도구의 #screens 전제가 한꺼번에 깨진다 — 정찰 §5·8).
-     ⚠ grouphub의 「무대(#ghStage)」와 다른 개념이다 — 여기는 셸 층의 전면 표시 상태.
-     ⚠ console-popped(대화 분리창)가 이기게 둔다 — 대화를 창으로 뺀 두-모니터 사용에서는
-       본창=화면 전폭이 원래 그 모양이라 이 상태를 따로 걸지 않는다. */
-  body.pro-shell.stage-on .work.console-side{display:flex;flex-direction:column;}
-  body.pro-shell.stage-on .work.console-side .console{display:none;}
-  /* 아래 10px 틈+그림자 = 「대화가 이 아래 그대로 있다」는 시각 신호(승인 시안 pro-stage —
-     검토관 중7이 코드에 빠진 것을 잡음). 밀도 셈도 이 틈을 전제로 −1.5%다. */
-  body.pro-shell.stage-on .screens{display:block;flex:1 1 auto;min-height:0;
-    margin-bottom:10px;box-shadow:0 20px 34px rgba(0,0,0,.45);}
-  /* 분리창(대화가 딴 창) 중에는 ← 대화로가 뜻이 없다 — 누르면 본창이 백지가 된다(검토관 상3). */
+  /* ── 🏠 화면 + 대화 나란히(stage-on) — 셸 재구축 0-1, 2026-08-23 사장님 지시 ─────────
+     「내 문서가 메인 화면이 되고 여기에 +대화창+상단바」.
+
+     ■ 무엇이 바뀌었나 (그전: 「전면 화면」 2026-08-20)
+       예전 stage-on은 **대화를 숨기고** 화면이 .work 전체를 먹었다. 대화와 화면이 번갈아
+       나오는 구조라, 「내 문서를 보면서 물어본다」가 안 됐다. 이제 **둘 다 선다** —
+       왼쪽 화면(#screens) · 오른쪽 대화(.console).
+     ■ 새 격자를 만들지 않는다
+       `.work.console-side`가 이미 `grid-template-columns: minmax(0,1fr) var(--console-w)`로
+       「화면 | 대화」다(231행). 예전엔 그 위에 flex 컬럼을 덮어써서 한 칸으로 만들었을 뿐이라,
+       **덮어쓰기를 걷어내면 원래 격자가 그대로 산다.** 새 상태·새 클래스를 만들지 않았다.
+     ■ 클래스 이름(stage-on)은 **그대로 둔다**
+       게시 관문·QA 도구·titlebar가 이 이름을 읽는다. 뜻만 「전면」→「화면이 왼쪽에 섰다」로
+       바뀌었다. 이름을 갈면 그 여섯 곳이 한꺼번에 어긋난다(이 저장소가 반복해 겪은 모양).
+     ⚠ grouphub의 「무대(#ghStage)」와 다른 개념이다 — 여기는 셸 층의 표시 상태.
+     ⚠ console-popped(대화 분리창)가 이기게 둔다 — 대화를 창으로 뺐으면 본창은 화면 전폭이
+       원래 그 모양이라 이 상태를 따로 걸지 않는다.
+     ⚠ 게시 관문(publish-gate-ui.mjs)의 무대 검사가 예전엔 `대화숨김`을 요구했다.
+       이 CSS와 **같은 커밋에서** 「대화보임」으로 뒤집었다 — 한쪽만 고치면 게시가 막힌다. */
+  body.pro-shell.stage-on .screens{display:block;min-height:0;}
+  /* 분리창(대화가 딴 창) 중에는 ⊟ 화면 접기가 뜻이 없다 — 누르면 본창이 백지가 된다(검토관 상3). */
   body.console-popped #stageBack{display:none;}
   #gijoNav{border-right:1px solid var(--border);background:var(--panel-2);min-height:0;display:flex;flex-direction:column;}
   .work{display:flex;flex-direction:column;min-width:0;min-height:0;}
@@ -352,7 +359,7 @@
   var KEY_TABS = "gijo:tabs:v1";
   var MAX_TABS = 8;
   var 부팅복원중 = false; // 저장 탭 되열기 중 표시 — 현황 카드를 안 띄운다(검토관 M5)
-  // 「← 대화로」가 켠다 — 화면(탭)을 닫지 않고 산 채로 숨긴다. 필터·스크롤이 보존되어
+  // 「⊟ 화면 접기」가 켠다 — 화면(탭)을 닫지 않고 산 채로 숨긴다. 필터·스크롤이 보존되어
   // 카드의 🗔로 되올리면 보던 그대로다(프로 확정 2026-08-20 「대화창 자리 무대」).
   var 무대숨김 = false;
   // 카드 조회 세대 — 서버 왕복 중 사용자가 🗔·다른 메뉴를 누르면 옛 응답이 뒤늦게 무대를
@@ -905,7 +912,7 @@
       var 고른 = 선택정돈(d);
       if (고른) {
         window.gijoConsole.select(고른);
-        무대숨김 = true;      // stageBack(← 대화로)과 같은 상태 전이 — 새 상태를 만들지 않는다
+        무대숨김 = true;      // stageBack(⊟ 화면 접기)과 같은 상태 전이 — 새 상태를 만들지 않는다
         대화홈갱신();
       }
       return;
@@ -917,14 +924,14 @@
       // ⚠ 자동 복귀(고르면 무대 내림)는 폐지(검토관 상1) — gijo:select는 「행 클릭」 전용이
       //   아니라서, 결재 확인창(점검 승인)·모달·상세 열기 직후에도 온다(발신 18곳 중 10곳
       //   실증). 그때 무대를 내리면 방금 연 것이 통째로 숨는다 — 승인을 눌렀는데 확인창을
-      //   못 본 채 「됐다」고 오인하는 최악 부류. 내리기는 사람이 ← 대화로로 한다.
+      //   못 본 채 「됐다」고 오인하는 최악 부류. 내리기는 사람이 ⊟ 화면 접기로 한다.
       //   대신 골랐음을 무대 머리에 잠깐 알린다(📌가 대화창에 붙었다는 신호).
       if (d.label && d.text && 프로인가() && document.body.classList.contains("stage-on")) {
         var sb = document.getElementById("stageBack");
         if (sb) {
-          sb.textContent = "🎯 골랐습니다 — ← 대화로"; // 📌 칩 폐지(2026-08-20 맥락 문장) — 선택 기호는 🎯 하나로
+          sb.textContent = "🎯 골랐습니다"; // 📌 칩 폐지(2026-08-20 맥락 문장) — 선택 기호는 🎯 하나로
           clearTimeout(sb._t);
-          sb._t = setTimeout(function () { try { sb.textContent = "← 대화로"; } catch (e) { } }, 2600);
+          sb._t = setTimeout(function () { try { sb.textContent = "⊟ 화면 접기"; } catch (e) { } }, 2600);
         }
       }
       return;
@@ -1213,8 +1220,18 @@
       var 활성 = (옛탭[String(st.active || "").split("?")[0]] || {}).page || st.active;
       if (활성 && find(활성)) show(활성);
       redraw();
+    } else if (프로인가()) {
+      // 🏠 프로의 홈은 **내 문서**다 (셸 재구축 0-1, 2026-08-23 사장님 지시
+      //   「내 문서가 대시보드 메인 화면이 되고 여기에 +대화창+상단바」).
+      // ⚠ 새 상태를 만들지 않는다 — 그냥 **탭 하나를 열어 고정**할 뿐이다. 그러면
+      //   tabs.length>0이라 stage-on이 걸리고, 위 CSS가 「화면 | 대화」 격자를 세운다.
+      // ⚠ pinned를 다는 이유: 「모두 닫기」가 홈을 지우면 프로에 돌아갈 자리가 없어진다.
+      //   핀은 이미 있는 장치다(복원 경로 1218행이 같은 필드를 쓴다) — 새로 만들지 않았다.
+      open("mydocs.html", "내 문서");
+      var 홈탭 = find("mydocs.html");
+      if (홈탭) 홈탭.pinned = true;
     } else {
-      open("dashboard.html", "대시보드"); // 첫 실행 — 대시보드도 여러 탭 중 하나다
+      open("dashboard.html", "대시보드"); // 표준은 예전 그대로 — 대시보드도 여러 탭 중 하나다
     }
     // 지난번에 콘솔을 창으로 빼놨으면 그대로 이어간다(모니터가 여럿인 담당자는 한 번만 빼면 된다).
     var wasPopped = "0";
@@ -1240,7 +1257,7 @@
     if (!프로인가()) return;
     if (tabs.length === 0) 무대숨김 = false; // 숨길 화면이 없으면 기억도 없앤다(다음 열기는 전면)
     // 전면(stage-on) ↔ 대화(chat-home)는 정확히 반대다 — 화면이 있고 숨기지 않았으면 전면,
-    // 그 밖(화면 없음·← 대화로)은 대화 전폭. 분리창은 CSS(console-popped)가 이긴다.
+    // 그 밖(화면 없음·⊟ 화면 접기)은 대화 전폭. 분리창은 CSS(console-popped)가 이긴다.
     document.body.classList.toggle("stage-on", tabs.length > 0 && !무대숨김);
     document.body.classList.toggle("chat-home", tabs.length === 0 || 무대숨김);
     // 🚀 도킹 패널 머리(승인 시안 §10-1) — 탭줄이 프로에서 숨겨져 있으므로(P2) 도킹된 화면의
@@ -1257,13 +1274,17 @@
       head.style.cssText = "display:flex;align-items:center;gap:8px;" +
         "padding:4px 10px;font-size:12.5px;color:var(--muted);background:var(--panel-2);" +
         "border-bottom:1px solid rgba(255,255,255,.08);position:relative;z-index:3;";
-      // 🚀 무대 머리(프로 확정 2026-08-20 「대화창 자리에 화면」) — 조작은 「← 대화로」 하나뿐.
+      // 🚀 무대 머리(프로 확정 2026-08-20 「대화창 자리에 화면」) — 조작은 「⊟ 화면 접기」 하나뿐.
       //   ⧉ 창으로/✕는 뺐다: 팝업은 사장님 지시(「팝업 및 옆에 붙는 메뉴를 없애는」·「승인
       //   추천안으로 끝까지 진행」)로 같은 날의 앞선 예외(「필요한 거 빼고」)를 대체 — 이제
       //   프로의 창은 (창) 메뉴(팀 사무실·문서함)뿐이다. ✕(진짜 닫기)도 필요 없다 — 화면은
       //   숨겨 두면(무대숨김) 다음 화면이 열릴 때 교체로 정리된다.
+      // ⚠ 문구가 예전 「대화로 돌아가기」에서 「⊟ 화면 접기」로 바뀌었다(셸 재구축 0-1, 2026-08-23).
+      //   대화창이 **늘 옆에 보이므로** 「대화로 돌아간다」는 이제 거짓말이다. 이 단추가 실제로
+      //   하는 일은 화면을 접어 대화를 전폭으로 만드는 것(무대숨김=true → chat-home)이다.
+      //   같은 커밋에서 wiringcontract.test.ts와 publish-gate-ui.mjs의 문자열도 함께 고쳤다.
       head.innerHTML = '<button class="tb-btn" id="stageBack" ' +
-        'title="화면을 내리고 대화로 돌아갑니다 — 화면은 닫히지 않아, 카드의 🗔로 되올리면 보던 그대로입니다">← 대화로</button>' +
+        'title="화면을 접고 대화를 넓게 씁니다 — 화면은 닫히지 않아, 카드의 🗔로 되올리면 보던 그대로입니다">⊟ 화면 접기</button>' +
         '<b id="dockName" style="color:var(--text)"></b>' +
         '<span style="margin-left:auto"></span>';
       var scr = document.getElementById("screens");
@@ -1274,14 +1295,14 @@
       });
     }
     var t0 = tabs[0];
-    var 전면 = !!t0 && !무대숨김; // 무대가 내려가 있으면(← 대화로) 머리도 함께 숨는다
+    var 전면 = !!t0 && !무대숨김; // 무대가 내려가 있으면(⊟ 화면 접기) 머리도 함께 숨는다
     head.style.display = 전면 ? "flex" : "none";
     // (옛 paddingTop 보정은 제거 — 그리드 시절 머리가 화면 위에 겹칠 때의 유물이다. 무대에서는
     //  머리가 흐름 안(flex 첫 자식)이라 겹치지 않고, .screen{position:absolute}은 padding을
     //  무시해 애초에 iframe엔 안 먹었다 — 검토관 하10.)
     if (전면) head.querySelector("#dockName").textContent = t0.label || "";
     // 무대를 내리고 올린 모든 길에서 대화 맥락을 다시 읽게 한다(검토관 상5 — syncCtx는
-    // show/close에서만 불려, 카드·← 대화로 경로의 「마지막 카드=맥락」 갈래가 영영 안 닿았다).
+    // show/close에서만 불려, 카드·⊟ 화면 접기 경로의 「마지막 카드=맥락」 갈래가 영영 안 닿았다).
     if (window.gijoConsoleSyncCtx) { try { window.gijoConsoleSyncCtx(); } catch (e) { } }
   }
 
