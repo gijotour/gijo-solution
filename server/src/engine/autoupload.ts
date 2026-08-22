@@ -274,7 +274,13 @@ async function routeByType(filename: string, base64: string, type: UploadType, p
     return {
       filename, routedTo: "sbom",
       reason: `사용자 지정: 타사 SBOM(${r.결과.format}) — 부품 ${r.결과.componentCount}개 검수` +
-        (무거움 ? ` · 소스 공개를 요구받을 수 있는 부품 ${무거움}건` : " · 소스 공개 요구 없음"),
+        (무거움 ? ` · 소스 공개를 요구받을 수 있는 부품 ${무거움}건` : " · 소스 공개 요구 없음") +
+        (s.판정불가 ? ` · 라이선스 모름 ${s.판정불가}건` : "") +
+        // ⚠ **못 읽은 것을 여기서도 말한다**(2026-08-22 실측으로 발견). 화면에는 적히는데
+        //   인입 답에는 안 나와서, 대화창만 보는 담당자는 「부품 1개 검수」만 보고 **다 셌다고 읽는다**
+        //   — 실제로는 그 안에 부품 2개가 더 있었다(중첩). 「다 셌다」가 사실이 아닐 때 그렇게
+        //   말하는 것이 이 기능의 값어치다.
+        (r.결과.notes.length ? ` ⚠ ${r.결과.notes[0]}` : ""),
       category: "일반",
       sbom: { id: r.결과.id, name: r.결과.name, components: r.결과.componentCount, heavy: 무거움, unknown: s.판정불가 ?? 0 },
     };
