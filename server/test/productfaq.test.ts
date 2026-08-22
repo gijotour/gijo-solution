@@ -122,3 +122,35 @@ describe("OCR — 되는 기능을 안 된다고 하지 않는다", () => {
     expect(faqAnswerFor("스캔 일정 알려줘")).toBeNull();
   });
 });
+
+// ── GPL/AGPL 경계 (2026-08-22) ────────────────────────────────────────────────
+// 지식 문서에 정확히 적혀 있는데도 모델이 **근거 절을 뒤집어** 말했다(실측):
+// 「네트워크 서비스로 제공하는 경우는 **배포로 보기 때문에** 의무가 적용되지 않습니다」
+// — 결론은 맞고 이유가 정반대다. 라이선스는 법무가 보는 칸이라 결정적으로 못 박는다.
+describe("GPL과 AGPL의 경계 — 흔들리면 안 되는 한 문장", () => {
+  it("★ 차이를 묻는 말은 카드가 받는다", () => {
+    for (const q of [
+      "GPL이랑 AGPL 차이가 뭐야?",
+      "AGPL과 GPL 구분해줘",
+      "GPL 차이점 알려줘",
+      "사내에서만 쓰면 AGPL도 괜찮아?",
+      "네트워크 서비스면 GPL 공개 의무가 있어?",
+    ]) {
+      expect(faqAnswerFor(q)?.id, q).toBe("gpl-agpl-diff");
+    }
+  });
+
+  it("★★ 근거 절이 **정방향**이다 — 「배포로 보지 않습니다」", () => {
+    const a = faqAnswerFor("GPL이랑 AGPL 차이가 뭐야?")?.answer ?? "";
+    expect(a, "GPL은 네트워크 서비스를 배포로 안 본다").toContain("배포로 보지 않습니다");
+    expect(a, "AGPL은 §13이 그 구멍을 막는다").toContain("§13");
+    expect(a, "우리 제품에 왜 중요한지 말한다").toContain("네트워크로");
+    expect(a, "법률 자문이 아니라고 밝힌다").toContain("법률 자문이 아닙니다");
+  });
+
+  it("★ 좁게 — 개념·적용 질문은 지식 문서 몫으로 넘긴다", () => {
+    expect(faqAnswerFor("GPL이 뭐야?")).toBeNull();
+    expect(faqAnswerFor("AGPL 부품을 넣으면 무슨 의무가 생겨?")).toBeNull();
+    expect(faqAnswerFor("MPL은 어디까지 공개해?")).toBeNull();
+  });
+});

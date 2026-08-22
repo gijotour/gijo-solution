@@ -1800,6 +1800,24 @@
       }
       return 종류 + "로 읽었지만 **탐지 규칙에 걸린 항목이 없어** 분석 이벤트는 만들지 않았습니다 — 원문은 저장했으니 내용은 물어보실 수 있습니다.";
     }
+    // 타사 SBOM 검수(2026-08-22) — **지식 저장소로 안 가므로 memory가 없다.**
+    // ⚠ 이 갈래가 없어서 아래 마지막 줄의 `r.memory.chunks`가 TypeError를 냈고, 검수는 이미
+    //   저장됐는데 화면엔 「실패: Cannot read properties of undefined」가 떴다.
+    //   게다가 그 예외가 nextChips 호출보다 앞이라 **반입 칩 2개가 영영 안 붙었다** —
+    //   FORCED_INTENTS[65]까지 만들어 「약속한 말」이라고 못 박은 바로 그 칩이다.
+    //   ★ 내가 「라이브 실측」이라 적은 것은 API(/api/upload/auto)만 잰 것이었다 —
+    //     **사람이 지나는 길을 안 지났다.** 게시 전 검토관이 그것까지 짚었다.
+    if (r.routedTo === "sbom") {
+      var sb = r.sbom;
+      if (!sb) return "SBOM으로 읽지 못했습니다 — " + r.reason;   // 파싱 실패 갈래(왜 못 읽었는지가 reason에 있다)
+      return "타사 부품표 검수 완료 — 부품 " + sb.components + "개" +
+        (sb.heavy ? " · **소스 공개를 요구받을 수 있는 부품 " + sb.heavy + "개**" : " · 소스 공개 요구 없음") +
+        (sb.unknown ? " · 라이선스 모름 " + sb.unknown + "개" : "") +
+        " (" + r.reason + ")";
+    }
+    // ⚠ 여기까지 온 것은 memory가 있는 갈래뿐이다 — 없으면 조용히 터지지 말고 사유를 말한다
+    //   (새 갈래를 더하고 이 줄을 안 고치는 실수가 실제로 났다).
+    if (!r.memory) return (r.reason || "인입했습니다") + " (상세 정보 없음)";
     return "장기기억 " + r.memory.chunks + "청크 수집" + (r.memory.docClass ? " · 분류 " + r.memory.docClass : "") +
       (r.memory.linkedProduct ? " · 제품 '" + r.memory.linkedProduct + "' 연결" : "") + " (" + r.reason + ")";
   }

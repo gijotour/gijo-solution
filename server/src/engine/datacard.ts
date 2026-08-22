@@ -631,7 +631,17 @@ export function productsStatusAnswer(): { output: string; dataCard: DataCard } {
  *  ⚠ 등급을 여기서 다시 세지 않는다 — 서버가 검수 때 센 값(summary)을 그대로 더한다. */
 export function supplychainStatusAnswer(): { output: string; dataCard: DataCard } {
   const { 검수목록 } = require("./sbomreview") as typeof import("./sbomreview");
-  const 것들 = 검수목록(200);
+  // ⚠ **같은 대상은 최신 것만 센다**(2026-08-22 검토관 [중]). 검수는 이력이라 같은 부품표를
+  //   다시 올리면 행이 쌓이는데(그게 대장의 목적이다), 카드가 전 건을 더하면
+  //   **부품 수와 「소스 공개 요구」가 올린 횟수만큼 부풀어** 담당자가 늘었다고 오해한다.
+  //   목록은 reviewedAt DESC라 먼저 나온 것이 최신이다.
+  const 본것 = new Set<string>();
+  const 것들 = 검수목록(200).filter((it) => {
+    const 키 = `${it.name}|${it.format}`;
+    if (본것.has(키)) return false;
+    본것.add(키);
+    return true;
+  });
   let 무거움 = 0, 서비스 = 0, 모름 = 0, 부품 = 0;
   for (const it of 것들) {
     const s = it.summary || ({} as Record<string, number>);
@@ -669,7 +679,10 @@ export function supplychainStatusAnswer(): { output: string; dataCard: DataCard 
       (무거움
         ? `**소스 공개를 요구받을 수 있는 부품 ${무거움}개**` + (서비스 ? `(그중 ${서비스}개는 네트워크로 서비스만 해도 의무가 생깁니다)` : "") + "."
         : "소스 공개를 요구받는 부품은 없습니다.") +
-      (모름 ? ` 라이선스를 알 수 없는 부품 ${모름}개는 공급사 확인이 필요합니다.` : "");
+      (모름 ? ` 라이선스를 알 수 없는 부품 ${모름}개는 공급사 확인이 필요합니다.` : "") +
+      // ⚠ **면책을 여기에도 단다**(2026-08-22 검토관 [높음]) — 이 답은 의무 판정을 말하는
+      //   출구인데 빠져 있었다. 카드 부품(chatparts)에는 꼬리를 달 자리가 없어 output에 싣는다.
+      " " + (require("./licenserisk") as typeof import("./licenserisk")).면책문구;
   return { output, dataCard };
 }
 

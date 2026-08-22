@@ -1123,6 +1123,10 @@ const 화면별칭: Record<string, string> = {
   AI팀감독: "supervision.html",
   팀감독: "supervision.html",
   안전장치: "supervision.html", // 요약·현황은 여기(실행 화면 redteam은 「레드팀」으로)
+  공급망: "supplychain.html",
+  공급망점검: "supplychain.html",
+  SBOM검수: "supplychain.html",
+  부품표: "supplychain.html",
   지식: "memory.html",
   // 문서함(별도 창)은 내 문서 허브에 흡수됐다(2026-08-20) — 옛 이름으로 물어도 새 자리로 안내.
   문서함: "mydocs.html",

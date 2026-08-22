@@ -90,6 +90,19 @@ describe("배선 계약 ⑤층 — 선택→대화창 (전수)", () => {
         //   script 태그 원문으로 검사해야 거짓 통과가 없다.
         expect(s, `${f} — 부품 선언인데 selectnotify 로드(script 태그)가 없다`).toContain('src="selectnotify.js"');
         expect(s, `${f} — 부품 선언인데 gijoSelectNotify 호출이 없다`).toContain("gijoSelectNotify(");
+        // ★ **넘기는 모양까지 본다**(2026-08-22 검토관 [높음]).
+        //   ⚠ 위 두 줄은 「부른다」만 보므로, **규격을 틀리게 불러도 초록**이다.
+        //     실제로 그랬다 — 새 화면이 `{screen, kind, label, detail}`로 불렀는데 규격은
+        //     `{label, text, fields}`이고, **text가 없으면 공용 부품이 「해제」를 보낸다**.
+        //     즉 행을 누르면 선택이 걸리는 게 아니라 **직전에 골라 둔 것까지 지워졌다.**
+        //     시험은 3,966개가 통과하는데 기능은 반대로 도는 상태였다.
+        //   객체를 넘기는 호출이 하나라도 있으면 그 안에 `text:`가 있어야 한다
+        //   (인자 없는 `gijoSelectNotify()`는 해제라 정상 — 그것만 있는 화면은 위에서 이미 걸린다).
+        const 객체호출 = /gijoSelectNotify\(\s*\{/.test(s);
+        if (객체호출) {
+          expect(s, `${f} — gijoSelectNotify에 text가 없다(규격: {label, text, fields}). text가 빠지면 「해제」로 전송돼 선택이 지워진다`)
+            .toMatch(/gijoSelectNotify\(\s*\{[\s\S]{0,600}?\btext\s*:/);
+        }
       } else {
         expect(s, `${f} — 직접 선언인데 gijo:select가 없다`).toContain("gijo:select");
       }

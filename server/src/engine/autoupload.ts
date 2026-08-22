@@ -60,6 +60,16 @@ export interface AutoUploadResult {
 
 // 파일명으로 애매할 때의 추천 유형. 취약점 리포트·로그·가이드라인·매뉴얼 신호를 순서대로 본다.
 function guessType(filename: string): UploadType {
+  // 타사 SBOM(부품표) — **파일 이름 신호**를 먼저 본다(2026-08-22 검토관 [중]).
+  //   ⚠ 이 줄이 없으면 `제품A_SBOM.json`·`bom.cyclonedx.json`·`x.spdx.json`이 전부
+  //     「일반 문서」로 추천돼, 담당자가 **매번 손으로 유형을 골라야** 한다.
+  //     추천이 틀리면 결정 카드에서 고치면 되지만, 추천이 아예 없으면 그 기능이 있는 줄도 모른다.
+  //   ⚠ 취약점보다 먼저 본다 — `SBOM_취약점_리포트.json` 같은 이름에서 부품표가 먼저다.
+  //     (진짜 취약점 스캔 결과는 아래 looksLikeVulnJson이 내용으로 다시 가른다.)
+  //   ⚠ `\b`를 쓰면 **밑줄에서 안 걸린다** — `제품A_SBOM.json`이 실측에서 「일반 문서」로 갔다.
+  //     자바스크립트에서 `_`는 낱말 문자라 `\bsbom`이 `_SBOM` 앞에서 경계를 못 찾는다.
+  //     그래서 경계를 직접 적는다(문자열 시작·끝 또는 영숫자가 아닌 것).
+  if (/(^|[^a-z0-9])sbom([^a-z0-9]|$)|부품표|cyclonedx|\.spdx([^a-z0-9]|$)|spdx[-_.]?json|bill\s*of\s*materials/i.test(filename)) return "sbom";
   if (/취약점|vuln(?:erabilit)?y?|스캔\s*리포트|scan\s*report/i.test(filename)) return "vulnreport";
   // 운영 리포트(주간 차단 통계 등) — 「매뉴얼」이 아니라 **운영 실적**이다. 통합 분석의 소스 ③.
   if (/(주간|월간|일일|운영|차단|탐지)\s*(리포트|report|보고)/i.test(filename)) return "opsreport";
@@ -514,7 +524,11 @@ export function registerAutoUploadRoutes(app: Express): void {
         // ⚠ 문구는 **실측으로 되는 것만** 적는다(이 표의 규칙) — 아래 둘은 도구·화면이 실제로 있다.
         sbom: ["SBOM 검수 결과 알려줘", "소스 공개 요구받는 부품 뭐 있어?"],
       };
-      const nextChips = routed ? 반입칩[routed] : undefined;
+      // ⚠ **못 읽은 SBOM에는 칩을 안 붙인다**(2026-08-22 검토관 [중]). 붙이면 「SBOM 검수
+      //   결과 알려줘」가 **딴 검수**(가장 최근의 다른 건)를 보여 주거나 「없습니다」라고 한다 —
+      //   방금 실패한 그 파일에 대한 답이 아니다. 실패는 실패라고만 말한다.
+      const sbom실패 = routed === "sbom" && !(result as { sbom?: unknown }).sbom;
+      const nextChips = routed && !sbom실패 ? 반입칩[routed] : undefined;
       res.json(nextChips ? { ...result, nextChips } : result);
     })
   );
