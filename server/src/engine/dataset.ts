@@ -35,16 +35,49 @@ const 스캔판정_최소글자 = 20;
  *  ⚠ unpdf는 **영어로** 던진다(InvalidPDFException·PasswordException). 그대로 두면 담당자 화면에
  *    영어가 나가므로 한글로 감싼다(「모든 사용자 대상 텍스트는 한글로」).
  */
+/** 자간을 벌려 그린 글을 되돌린다 — 「플 래 그 십」 → 「플래그십」.
+ *
+ *  ⚠ 왜 필요한가(2026-08-22 실측): pdf.js는 **글자 위치**를 보고 간격이 넓으면 공백을 넣는다.
+ *    디자인상 자간을 벌린 제목이 그렇게 걸린다. 보기엔 맞지만 **검색에는 해롭다** — 담당자가
+ *    「플래그십」을 찾으면 「플 래 그 십」은 안 걸린다. pypdf는 글리프를 순서대로 이어붙여
+ *    붙은 형태로 뽑았으므로, 이 되돌리기가 없으면 옛 문서와 새 문서의 낱말이 갈린다.
+ *    실측: 제안서 PDF에서 파이썬 낱말 회수율 97.4%(역량·차별·화면·플래그십 등 11개 누락).
+ *  ⚠ **조각(item) 단위로만** 적용한다. 조각 하나가 통째로 「한 글자+공백」 꼴일 때만 자간으로 본다 —
+ *    문장 전체에 정규식을 걸면 정상 띄어쓰기(「핵심 역량」)까지 붙여 버린다.
+ */
+/* ── 자간 복원은 **일부러 하지 않는다** (2026-08-22, 세 번 시도하고 내린 결론) ────────────
+ *
+ * 무엇이 문제인가: pdf.js는 **글자 위치**를 보고 간격이 넓으면 공백을 넣는다. 그래서 디자인상
+ * 자간을 벌린 제목이 「플 래 그 십」으로 뽑히고, 담당자가 「플래그십」을 찾으면 안 걸린다.
+ * pypdf는 글리프를 순서대로 이어붙여 붙은 형태로 뽑았다(실측 회수율 97.4%, 낱말 11개 차이).
+ *
+ * 왜 안 고치나 — 고치려던 세 방법이 **전부 더 나빴다**(전부 실측):
+ *   ① 조각(item)을 직접 이어붙이기 → 조각 사이 공백에 조사가 갈라졌다(「대신하고」→「대신 하고」).
+ *      회수율 97.4% → **96.8%**.
+ *   ② 문자열 전체에 「한 글자+공백」 정규식 → 「한 명 의 몫을」 같은 **정상 문장**을 자간으로 오인해
+ *      통째로 붙였다. 회수율 **91~95%로 급락** — 멀쩡한 낱말이 사라지는 쪽이 훨씬 나쁘다.
+ *   ③ 낱자 4연속으로 좁히기 → 실제 문서에서 **아무것도 안 잡혔다**(죽은 규칙).
+ *
+ * 그래서 **덜 잡는 쪽**을 골랐다. 지금 회수율은 5종 중 4종 99.9~100%, 1종 97.4%다.
+ * 되살릴 방법이 없는 건 아니다 — pdf.js 조각의 좌표·폭을 보고 간격을 재면 정확히 가를 수 있다.
+ * 다만 그건 별도 작업이고, 그전에 **잘못 붙이지 않는 것**이 더 중요하다.
+ * ⚠ 이 주석을 지우고 「간단히 정규식으로 붙이면 되겠다」고 다시 시도하지 말 것 — 이미 두 번 밟았다.
+ */
+
 async function pdf추출(buf: Buffer): Promise<string> {
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const doc = await getDocumentProxy(new Uint8Array(buf));
   try {
-    const { extractText, getDocumentProxy } = await import("unpdf");
-    const doc = await getDocumentProxy(new Uint8Array(buf));
     const { text } = await extractText(doc, { mergePages: true });
-    return typeof text === "string" ? text : String(text ?? "");
-  } catch (e) {
-    const 원문 = e instanceof Error ? e.message : String(e);
-    if (/password/i.test(원문)) throw new Error("문서를 열지 못했습니다 — 암호가 걸린 PDF입니다");
-    throw new Error(`문서를 열지 못했습니다 — PDF가 손상됐거나 형식이 올바르지 않습니다(${원문.slice(0, 60)})`);
+    // ⚠ mergePages:true면 문자열이다. 배열이 오면 **쉼표로 이어붙지 않게** 개행으로 잇는다
+    //   (String([...])은 페이지 경계를 쉼표로 만든다 — 검토관 2026-08-22 지적).
+    return Array.isArray(text) ? text.join("\n") : String(text ?? "");
+  } finally {
+    // ⚠ **우리가 만든 문서 객체는 우리가 닫는다** — unpdf는 호출자가 넘긴 객체를 일부러
+    //   파괴하지 않는다(수명 관리를 호출자에게 맡긴다). 안 닫으면 운영처럼 오래 도는
+    //   프로세스에서 PDF를 올릴 때마다 파서 상태가 쌓인다(검토관 2026-08-22 지적).
+    //   (destroy는 pdf.js 런타임에 있지만 unpdf의 타입 선언에는 없어 캐스팅해 부른다.)
+    try { await (doc as unknown as { destroy?: () => Promise<void> }).destroy?.(); } catch { /* 이미 닫혔으면 그만 */ }
   }
 }
 
@@ -69,17 +102,34 @@ function 태그걷기(xml: string): string {
  *    다르게 뽑으면 예전에 넣은 문서와 새로 넣는 문서의 조각이 갈려 검색 결과가 흔들린다.
  *    개선(예: docx 문단 경계 살리기)은 그 자체로 별도 판단거리다(아래 docx 주석 참조).
  */
+/** 파이썬 main()이 **모든 형식에** 마지막으로 거는 정규화 — extract_doc.py:236-238과 같은 세 줄.
+ *  ⚠ 이걸 빠뜨리면 「글자 하나까지 일치」가 성립하지 않는다(검토관 2026-08-22 확정).
+ *    재현: Word가 앞뒤 공백 있는 런에 붙이는 `xml:space="preserve"` → 파이썬 「글자 다음」,
+ *    이걸 안 걸면 「글자  다음」(공백 둘). 조각 본문·경계가 갈려 옛 문서와 어긋난다. */
+function 파이썬꼬리정규화(t: string): string {
+  return t.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
   const { default: JSZip } = await import("jszip");
   let zip;
   try {
     zip = await JSZip.loadAsync(buf);
-  } catch {
+  } catch (e) {
     // 손상된 zip·암호가 걸린 파일 — 파이썬도 같은 자리에서 죽는다. 문구는 사람이 읽을 말로.
+    //   ⚠ 암호 걸린 엔트리는 loadAsync를 통과하고 읽을 때 죽는다(jszip이 영어로 던진다) —
+    //     그래서 아래 읽기()도 같은 문구로 감싼다(검토관 2026-08-22: 영어가 화면에 나갔다).
+    void e;
     throw new Error("문서를 열지 못했습니다 — 파일이 손상됐거나 암호가 걸려 있습니다");
   }
   const 이름들 = Object.keys(zip.files);
-  const 읽기 = async (n: string) => zip.files[n].async("string");
+  const 읽기 = async (n: string) => {
+    try {
+      return await zip.files[n].async("string");
+    } catch {
+      throw new Error("문서를 열지 못했습니다 — 파일이 손상됐거나 암호가 걸려 있습니다");
+    }
+  };
   const parts: string[] = [];
 
   if (ext === ".hwpx") {
@@ -91,7 +141,7 @@ async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
     }
     let t = parts.join(" ").replace(/<[^>]+>/g, "");
     for (const [a, b] of [["&lt;", "<"], ["&gt;", ">"], ["&amp;", "&"], ["&quot;", '"']] as const) t = t.split(a).join(b);
-    return t;
+    return 파이썬꼬리정규화(t);
   }
 
   if (ext === ".docx") {
@@ -106,7 +156,7 @@ async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
       const xml = (await 읽기(n)).replace(/<\/w:p>/g, "\n");
       parts.push([...xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join(" "));
     }
-    return 태그걷기(parts.join("\n"));
+    return 파이썬꼬리정규화(태그걷기(parts.join("\n")));
   }
 
   if (ext === ".pptx") {
@@ -123,7 +173,7 @@ async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
       const texts = [...xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]);
       if (texts.length) parts.push(texts.join(" "));
     }
-    return 태그걷기(parts.join("\n\n"));
+    return 파이썬꼬리정규화(태그걷기(parts.join("\n\n")));
   }
 
   // .xlsx — 원본: 공유 문자열 + 시트 안 인라인 문자열. 숫자 격자는 **일부러 버린다**
@@ -139,7 +189,7 @@ async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
       if (inline.length) parts.push(inline.join("\n"));
     }
   }
-  return 태그걷기(parts.join("\n"));
+  return 파이썬꼬리정규화(태그걷기(parts.join("\n")));
 }
 
 // 업로드된 문서(PDF/이미지 등)에서 학습용 텍스트를 추출한다 — scripts/extract_doc.py(python) 사용.
@@ -173,7 +223,16 @@ export async function extractDocumentText(filename: string, base64: string): Pro
   //   ⚠ 다만 **스캔 PDF(글자가 없는 PDF)는 여전히 파이썬 몫**이다 — 거기에 OCR이 있다.
   //     글자가 거의 안 나오면 아래 파이썬 경로로 넘긴다(그 경로가 OCR 폴백을 이미 갖고 있다).
   if (ext === ".pdf") {
-    const 글 = await pdf추출(Buffer.from(base64, "base64"));
+    // ⚠ **JS가 실패해도 파이썬으로 넘긴다**(검토관 2026-08-22). pdf.js는 pypdf보다 까다로워서
+    //   구조가 조금 깨진 PDF를 거절하는 부류가 있다 — 여기서 던져 버리면 **예전에 잘 들어오던
+    //   문서가 이제 안 들어오고**, 안내는 「PDF가 손상됐다」며 원인을 문서 탓으로 돌린다.
+    //   실패도 「글자를 못 뽑았다」로 보고 아래 파이썬 경로에 한 번 더 기회를 준다.
+    let 글 = "";
+    try {
+      글 = await pdf추출(Buffer.from(base64, "base64"));
+    } catch (e) {
+      recordProcessOutput("extract-doc", "warn", `${filename} — JS 추출 실패(${e instanceof Error ? e.message : String(e)}) · 파이썬 경로로 넘김`);
+    }
     if (글.trim().length >= 스캔판정_최소글자) {
       recordProcessOutput("extract-doc", "log", `${filename} — PDF 직접 읽음(${글.length.toLocaleString()}자, 파이썬 불필요)`);
       return 글;
@@ -181,57 +240,18 @@ export async function extractDocumentText(filename: string, base64: string): Pro
     // 글자가 거의 없다 = 스캔본일 가능성 → 파이썬(OCR)에 맡긴다. 여기서 끊으면 스캔 문서가
     // 조용히 빈 결과가 된다 — 예전엔 파이썬 안에서 이 폴백이 일어났고, 그 길을 그대로 잇는다.
     recordProcessOutput("extract-doc", "log", `${filename} — 글자가 거의 없음(${글.trim().length}자) · 스캔본으로 보고 OCR 경로로 넘김`);
+    // ⚠ 파이썬마저 못 쓰는 기계(mac 설치본 등)에서는 **JS가 뽑아 둔 짧은 글이라도 살린다** —
+    //   짧은 공문·표지 PDF가 통째로 실패하는 것보다 낫다(검토관 지적).
+    if (글.trim().length > 0) {
+      try {
+        return await 파이썬추출(filename, base64, ext);
+      } catch {
+        recordProcessOutput("extract-doc", "log", `${filename} — 파이썬도 못 씀 · JS가 뽑은 ${글.trim().length}자를 그대로 씁니다`);
+        return 글;
+      }
+    }
   }
-  const tmp = path.join(os.tmpdir(), `gijo-doc-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-  await fs.promises.writeFile(tmp, Buffer.from(base64, "base64"));
-  recordProcessOutput("extract-doc", "log", `$ extract_doc.py ${filename} (${ext})`);
-  try {
-    const text = await new Promise<string>((resolve, reject) => {
-      execFile(
-        // ⚠ 맨 "python"을 부르면 안 된다 — 운영(WSL)에는 그 이름이 없어(python3만 존재)
-        //   추출이 **한 번도 성공한 적 없었다**(2026-08-08 실측). 그 여파로 경로 인입이
-        //   PDF를 글자로 그냥 읽어 저장소 조각의 73%가 압축 바이트였다.
-        // "docs" — 문서 추출용 파이썬. 동봉본(pypdf 보유)을 시스템 파이썬보다 앞세우는 갈래다.
-        //   장비 접속·모델 검사는 "tools"를 써서 예전 순서를 그대로 지킨다(동봉본엔 그 부품이 없다).
-        serverPython("docs"),
-        // ⚠ 스크립트 자리는 serverScript()가 고른다 — 패키징 설치본은 cwd(userData)와 스크립트가
-        //   있는 자리(resources/server-dist)가 달라, 상대경로로 부르면 파일을 못 찾는다(2026-08-22).
-        [serverScript("scripts/extract_doc.py"), tmp],
-        { env: { ...process.env, PYTHONUTF8: "1" }, maxBuffer: 256 * 1024 * 1024 },
-        (err, stdout, stderr) => {
-          if (stderr) recordProcessOutput("extract-doc", "warn", stderr);
-          if (err) {
-            // ★ 「추출 도구가 아예 없다」와 「이 문서를 못 읽겠다」를 가려서 말한다(2026-08-22).
-            //   설치본에 스크립트나 파이썬이 없으면 ENOENT·"can't open file" 같은 **영어 메시지가
-            //   그대로 화면에 나가** 담당자가 무엇을 해야 할지 알 수 없었다. 문구는 memory.ts의
-            //   같은 상황 안내와 **일부러 같은 표현**을 쓴다 — 잣대가 둘이 되면 서로 어긋난다.
-            const 원문 = (stderr.trim() || err.message || "").trim();
-            const 도구없음 =
-              (err as NodeJS.ErrnoException).code === "ENOENT" ||
-              /can't open file|No such file or directory|is not recognized|command not found/i.test(원문) ||
-              // ⚠ 동봉 파이썬에는 pypdf만 들어 있다(2026-08-22) — 다른 부품이 필요한 문서를 만나면
-              //   ENOENT가 아니라 ModuleNotFoundError로 죽는다. 그 영어 원문이 그대로 화면에 나가면
-              //   담당자는 무엇을 해야 할지 알 수 없다(설계관 적발). 같은 「도구 없음」으로 묶어 안내한다.
-              /ModuleNotFoundError|No module named/i.test(원문);
-            if (도구없음) {
-              return reject(new Error(
-                `문서를 읽지 못했습니다(${filename}) — 이 설치본에 문서 추출 도구가 없습니다. ` +
-                // ⚠ 이제 여기로 오는 것은 **스캔 문서·이미지뿐**이다(2026-08-22) —
-                //   PDF·한글·오피스는 파이썬 없이 읽는다. 문구가 옛 범위를 말하면 거짓이 된다.
-                `스캔된 문서·이미지는 글자를 알아보는 도구(OCR)가 있어야 읽을 수 있습니다. 서버에 OCR이 준비돼 있는지 확인하세요.`
-              ));
-            }
-            return reject(new Error(원문 || `문서를 읽지 못했습니다(${filename})`));
-          }
-          resolve(stdout);
-        }
-      );
-    });
-    recordProcessOutput("extract-doc", "log", `${filename} — ${text.length.toLocaleString()}자 추출`);
-    return text;
-  } finally {
-    fs.promises.unlink(tmp).catch(() => {});
-  }
+  return 파이썬추출(filename, base64, ext);
 }
 
 export interface ConversationExample {
@@ -447,4 +467,61 @@ export function registerDatasetRoutes(app: Express): void {
       }
     })
   );
+}
+
+/** 파이썬 추출기(scripts/extract_doc.py)에 맡긴다 — **스캔 문서·이미지·구형 포맷**이 여기로 온다.
+ *  ⚠ 별도 함수로 뺀 이유(2026-08-22): PDF 갈래가 「JS가 실패하거나 글자가 거의 없으면 파이썬에
+ *    한 번 더」를 하려면 이 경로를 **두 자리에서** 불러야 한다. 같은 코드를 복사하면 어긋난다.
+ */
+async function 파이썬추출(filename: string, base64: string, ext: string): Promise<string> {
+  const tmp = path.join(os.tmpdir(), `gijo-doc-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  await fs.promises.writeFile(tmp, Buffer.from(base64, "base64"));
+  recordProcessOutput("extract-doc", "log", `$ extract_doc.py ${filename} (${ext})`);
+  try {
+    const text = await new Promise<string>((resolve, reject) => {
+      execFile(
+        // ⚠ 맨 "python"을 부르면 안 된다 — 운영(WSL)에는 그 이름이 없어(python3만 존재)
+        //   추출이 **한 번도 성공한 적 없었다**(2026-08-08 실측). 그 여파로 경로 인입이
+        //   PDF를 글자로 그냥 읽어 저장소 조각의 73%가 압축 바이트였다.
+        // "docs" — 문서 추출용 파이썬. 동봉본(pypdf 보유)을 시스템 파이썬보다 앞세우는 갈래다.
+        //   장비 접속·모델 검사는 "tools"를 써서 예전 순서를 그대로 지킨다(동봉본엔 그 부품이 없다).
+        serverPython("docs"),
+        // ⚠ 스크립트 자리는 serverScript()가 고른다 — 패키징 설치본은 cwd(userData)와 스크립트가
+        //   있는 자리(resources/server-dist)가 달라, 상대경로로 부르면 파일을 못 찾는다(2026-08-22).
+        [serverScript("scripts/extract_doc.py"), tmp],
+        { env: { ...process.env, PYTHONUTF8: "1" }, maxBuffer: 256 * 1024 * 1024 },
+        (err, stdout, stderr) => {
+          if (stderr) recordProcessOutput("extract-doc", "warn", stderr);
+          if (err) {
+            // ★ 「추출 도구가 아예 없다」와 「이 문서를 못 읽겠다」를 가려서 말한다(2026-08-22).
+            //   설치본에 스크립트나 파이썬이 없으면 ENOENT·"can't open file" 같은 **영어 메시지가
+            //   그대로 화면에 나가** 담당자가 무엇을 해야 할지 알 수 없었다. 문구는 memory.ts의
+            //   같은 상황 안내와 **일부러 같은 표현**을 쓴다 — 잣대가 둘이 되면 서로 어긋난다.
+            const 원문 = (stderr.trim() || err.message || "").trim();
+            const 도구없음 =
+              (err as NodeJS.ErrnoException).code === "ENOENT" ||
+              /can't open file|No such file or directory|is not recognized|command not found/i.test(원문) ||
+              // ⚠ 동봉 파이썬에는 pypdf만 들어 있다(2026-08-22) — 다른 부품이 필요한 문서를 만나면
+              //   ENOENT가 아니라 ModuleNotFoundError로 죽는다. 그 영어 원문이 그대로 화면에 나가면
+              //   담당자는 무엇을 해야 할지 알 수 없다(설계관 적발). 같은 「도구 없음」으로 묶어 안내한다.
+              /ModuleNotFoundError|No module named/i.test(원문);
+            if (도구없음) {
+              return reject(new Error(
+                `문서를 읽지 못했습니다(${filename}) — 이 설치본에 문서 추출 도구가 없습니다. ` +
+                // ⚠ 이제 여기로 오는 것은 **스캔 문서·이미지뿐**이다(2026-08-22) —
+                //   PDF·한글·오피스는 파이썬 없이 읽는다. 문구가 옛 범위를 말하면 거짓이 된다.
+                `스캔된 문서·이미지는 글자를 알아보는 도구(OCR)가 있어야 읽을 수 있습니다. 서버에 OCR이 준비돼 있는지 확인하세요.`
+              ));
+            }
+            return reject(new Error(원문 || `문서를 읽지 못했습니다(${filename})`));
+          }
+          resolve(stdout);
+        }
+      );
+    });
+    recordProcessOutput("extract-doc", "log", `${filename} — ${text.length.toLocaleString()}자 추출`);
+    return text;
+  } finally {
+    fs.promises.unlink(tmp).catch(() => {});
+  }
 }
