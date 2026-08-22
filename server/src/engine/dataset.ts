@@ -18,8 +18,103 @@ import { cleanForTraining, type 데이터종류 } from "./datasethygiene";
 // (vitest.config.ts가 임시 디렉터리로 지정). 미설정 시 운영 경로.
 const DATASETS_DIR = process.env.GIJO_DATASETS_DIR ?? path.join("data", "datasets");
 
-// 업로드된 문서(PDF/HWPX/TXT 등)에서 학습용 텍스트를 추출한다 — scripts/extract_doc.py(python) 사용.
+/** XML 태그를 걷고 엔티티를 되돌린다 — extract_doc.py의 `_strip_tags`와 **같은 동작**.
+ *
+ *  ⚠ 서버에 비슷한 함수가 이미 셋 있는데(urlingest 두 곳·vulnscan) **일부러 안 쓴다.**
+ *    vulnscan의 것은 숫자 엔티티(`&#54620;` 같은 한글)를 **공백으로 지우는데** 파이썬은 그대로 둔다 —
+ *    재사용하면 같은 문서가 파이썬으로 넣었을 때와 다른 글이 되어, 옛 조각과 새 조각이 어긋난다.
+ *    잣대를 늘리는 게 아니라 **옮겨 온 원본과의 동치**를 지키는 쪽을 골랐다(설계관 2026-08-22).
+ */
+function 태그걷기(xml: string): string {
+  let t = xml.replace(/<[^>]+>/g, "");
+  for (const [a, b] of [["&lt;", "<"], ["&gt;", ">"], ["&amp;", "&"], ["&quot;", '"'], ["&apos;", "'"]] as const) {
+    t = t.split(a).join(b);
+  }
+  return t;
+}
+
+/** 오피스 4종(zip+xml)에서 글자를 뽑는다 — extract_doc.py의 형식별 함수를 **1:1로** 옮긴 것.
+ *
+ *  ⚠ 「더 잘 뽑기」를 하지 않았다. 범위·정규식·엔티티 목록을 원본과 똑같이 맞춘다 —
+ *    다르게 뽑으면 예전에 넣은 문서와 새로 넣는 문서의 조각이 갈려 검색 결과가 흔들린다.
+ *    개선(예: docx 문단 경계 살리기)은 그 자체로 별도 판단거리다(아래 docx 주석 참조).
+ */
+async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
+  const { default: JSZip } = await import("jszip");
+  let zip;
+  try {
+    zip = await JSZip.loadAsync(buf);
+  } catch {
+    // 손상된 zip·암호가 걸린 파일 — 파이썬도 같은 자리에서 죽는다. 문구는 사람이 읽을 말로.
+    throw new Error("문서를 열지 못했습니다 — 파일이 손상됐거나 암호가 걸려 있습니다");
+  }
+  const 이름들 = Object.keys(zip.files);
+  const 읽기 = async (n: string) => zip.files[n].async("string");
+  const parts: string[] = [];
+
+  if (ext === ".hwpx") {
+    // 원본: 이름에 "section"이 든 모든 .xml에서 <hp:t>. ⚠ 엔티티가 **4종**이다(&apos; 없음).
+    for (const n of 이름들) {
+      if (!n.toLowerCase().includes("section") || !n.endsWith(".xml")) continue;
+      const xml = await 읽기(n);
+      parts.push([...xml.matchAll(/<hp:t>([\s\S]*?)<\/hp:t>/g)].map((m) => m[1]).join(" "));
+    }
+    let t = parts.join(" ").replace(/<[^>]+>/g, "");
+    for (const [a, b] of [["&lt;", "<"], ["&gt;", ">"], ["&amp;", "&"], ["&quot;", '"']] as const) t = t.split(a).join(b);
+    return t;
+  }
+
+  if (ext === ".docx") {
+    // 원본: word/document.xml **또는** word/(header|footer)N.xml — 머리말·꼬리말을 빠뜨리면
+    //   기존 시험(「사내 대외비」가 header1.xml에 있다)이 바로 깨진다.
+    // ⚠ 원본은 </w:p>를 개행으로 바꾼 뒤 <w:t> 안쪽만 긁는다 — 그 개행은 태그 **밖**이라
+    //   결과에 안 들어간다. 즉 주석의 「문단 경계를 살린다」는 실제로 동작하지 않는다.
+    //   여기서도 **그대로 둔다**: 고치면 같은 문서가 예전과 다르게 쪼개진다(별도 판단거리).
+    for (const n of 이름들) {
+      const low = n.toLowerCase();
+      if (low !== "word/document.xml" && !/^word\/(header|footer)\d*\.xml$/.test(low)) continue;
+      const xml = (await 읽기(n)).replace(/<\/w:p>/g, "\n");
+      parts.push([...xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join(" "));
+    }
+    return 태그걷기(parts.join("\n"));
+  }
+
+  if (ext === ".pptx") {
+    // 원본: 슬라이드 먼저·노트 나중, 각각 번호순. ⚠ <a:t>는 **속성 없는 것만** 잡는다(원본과 동일).
+    const 대상 = 이름들
+      .filter((n) => /^ppt\/(slides\/slide|notesSlides\/notesSlide)\d+\.xml$/.test(n))
+      .sort((a, b) => {
+        const 갈래 = (n: string) => (n.includes("/slides/") ? 0 : 1);
+        const 번호 = (n: string) => Number((n.match(/(\d+)\.xml$/) ?? ["", "0"])[1]);
+        return 갈래(a) - 갈래(b) || 번호(a) - 번호(b);
+      });
+    for (const n of 대상) {
+      const xml = await 읽기(n);
+      const texts = [...xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]);
+      if (texts.length) parts.push(texts.join(" "));
+    }
+    return 태그걷기(parts.join("\n\n"));
+  }
+
+  // .xlsx — 원본: 공유 문자열 + 시트 안 인라인 문자열. 숫자 격자는 **일부러 버린다**
+  //   (숫자만 이어붙이면 검색을 오염시키는 무의미 조각이 된다 — PDF 바이트 사고와 같은 부류).
+  for (const n of 이름들) {
+    const low = n.toLowerCase();
+    if (low === "xl/sharedstrings.xml") {
+      const xml = await 읽기(n);
+      parts.push([...xml.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map((m) => m[1]).join("\n"));
+    } else if (/^xl\/worksheets\/sheet\d+\.xml$/.test(low)) {
+      const xml = await 읽기(n);
+      const inline = [...xml.matchAll(/<is>\s*<t(?:\s[^>]*)?>([\s\S]*?)<\/t>\s*<\/is>/g)].map((m) => m[1]);
+      if (inline.length) parts.push(inline.join("\n"));
+    }
+  }
+  return 태그걷기(parts.join("\n"));
+}
+
+// 업로드된 문서(PDF/이미지 등)에서 학습용 텍스트를 추출한다 — scripts/extract_doc.py(python) 사용.
 // 파일을 임시 폴더에 쓴 뒤 확장자를 유지해 스크립트가 형식을 판별하게 한다. PYTHONUTF8=1(한국어).
+// ⚠ 오피스 4종은 위 오피스추출()이 파이썬 없이 처리한다 — 여기로 오지 않는다.
 export async function extractDocumentText(filename: string, base64: string): Promise<string> {
   const ext = path.extname(filename).toLowerCase() || ".txt";
   // ★ 텍스트 계열은 파이썬 추출기(scripts/extract_doc.py)를 **거치지 않는다** — 이미 텍스트라 추출이
@@ -30,6 +125,17 @@ export async function extractDocumentText(filename: string, base64: string): Pro
   if (텍스트계열.has(ext)) {
     const text = Buffer.from(base64, "base64").toString("utf8");
     recordProcessOutput("extract-doc", "log", `${filename} — 텍스트 직접 읽음(${text.length.toLocaleString()}자, 파이썬 추출 생략)`);
+    return text;
+  }
+  // ★ 오피스 4종(HWPX·DOCX·XLSX·PPTX)은 **파이썬 없이** 읽는다(2026-08-22).
+  //   넷 다 zip 안의 XML이라 파이썬이 필요 없었는데(표준 라이브러리 zipfile+re만 썼다),
+  //   그 때문에 **파이썬이 없는 기계에서 함께 죽고 있었다** — 특히 mac 설치본은 파이썬 동봉 전이라
+  //   한글(HWPX) 문서가 통째로 안 읽혔다. zip 해석기(jszip)는 이미 출하본에 들어 있어 **추가 용량 0**이다.
+  //   PDF·이미지(OCR)는 그대로 파이썬이다 — 그쪽은 진짜 부품이 필요하다.
+  const 오피스 = new Set([".hwpx", ".docx", ".xlsx", ".pptx"]);
+  if (오피스.has(ext)) {
+    const text = await 오피스추출(ext, Buffer.from(base64, "base64"));
+    recordProcessOutput("extract-doc", "log", `${filename} — zip+xml 직접 읽음(${text.length.toLocaleString()}자, 파이썬 불필요)`);
     return text;
   }
   const tmp = path.join(os.tmpdir(), `gijo-doc-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);

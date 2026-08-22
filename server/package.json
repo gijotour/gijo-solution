@@ -28,6 +28,7 @@
     "docx": "^9.7.1",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.3",
+    "jszip": "^3.10.1",
     "mailparser": "^3.9.14",
     "node-fetch": "^3.3.2",
     "nodemailer": "^9.0.3",

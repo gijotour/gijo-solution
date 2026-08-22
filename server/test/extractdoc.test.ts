@@ -11,6 +11,44 @@ import * as path from "path";
 const { extractDocumentText } = await import("../src/engine/dataset");
 const b64 = (n: string) => fs.readFileSync(path.join(__dirname, "fixtures", n)).toString("base64");
 
+// ★ 2026-08-22 — 오피스 4종은 **파이썬을 안 거친다**(zip+xml을 서버가 직접 읽는다).
+//   그전에는 파이썬이 없는 기계에서 이것들이 함께 죽었다(특히 mac 설치본은 동봉 전이라 한글
+//   문서가 통째로 안 읽혔다). 옮기면서 **파이썬과 글자 하나까지 같은 결과**를 목표로 삼았고,
+//   실측으로 확인했다: 픽스처 4종 + 실제 대형 문서 3종(6,266·18,215·10,919자) 전부 완전 일치.
+//   아래 시험들은 그 이후로 「파이썬 없이 나오는 결과」를 재는 것이 된다.
+describe("문서 추출 — 오피스 4종은 파이썬 없이 (2026-08-22 이관)", () => {
+  it("파이썬을 못 쓰는 상태에서도 오피스 4종이 읽힌다", async () => {
+    // 파이썬 경로를 **일부러 막고** 돌린다 — 없는 실행파일을 가리키면 파이썬을 타는 형식은 죽는다.
+    // 오피스가 여기서 살아남으면 「파이썬 없이 된다」가 참이다(고객 기계의 실제 조건).
+    const 원래 = process.env.GIJO_PYTHON;
+    process.env.GIJO_PYTHON = path.join(__dirname, "fixtures", "__없는파이썬__");
+    try {
+      const { resetPythonBinCache } = await import("../src/util/pythonbin");
+      resetPythonBinCache();
+      for (const [이름, 있어야할말] of [
+        ["tiny.docx", "취약점 점검 결과 보고"],
+        ["tiny.pptx", "보안 교육 자료"],
+        ["tiny.xlsx", "자산명"],
+        ["tiny.hwpx", ""], // hwpx는 픽스처 내용이 짧아 존재만 본다
+      ] as const) {
+        const t = await extractDocumentText(이름, b64(이름));
+        expect(t.length, `${이름}이 파이썬 없이 안 읽혔다`).toBeGreaterThan(0);
+        if (있어야할말) expect(t, `${이름} 내용이 다르다`).toContain(있어야할말);
+      }
+    } finally {
+      if (원래 === undefined) delete process.env.GIJO_PYTHON; else process.env.GIJO_PYTHON = 원래;
+      const { resetPythonBinCache } = await import("../src/util/pythonbin");
+      resetPythonBinCache();
+    }
+  });
+
+  it("손상된 zip은 사람이 읽을 말로 거절한다", async () => {
+    // fixtures/broken.docx는 zip이 아닌 28바이트 쓰레기다(그동안 어떤 시험도 안 쓰던 고아 픽스처).
+    await expect(extractDocumentText("broken.docx", b64("broken.docx")))
+      .rejects.toThrow(/손상|암호/);
+  });
+});
+
 describe("문서 추출 — OOXML(docx·pptx·xlsx, 의존성 0)", () => {
   it("DOCX — 본문 문단과 머리말이 나오고 문단 경계가 살아 있다", async () => {
     const t = await extractDocumentText("tiny.docx", b64("tiny.docx"));
