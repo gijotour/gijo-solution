@@ -77,7 +77,9 @@
     <h2>자료 넣기</h2>
     <div class="sub">넣으면 바로 위에서 찾을 수 있습니다.</div>
     <div class="ask">
-      <input id="file" type="file" accept=".md,.txt,.log,.csv" aria-label="자료 파일">
+      <!-- ★ 2026-08-22 열림 — 오피스·PDF가 파이썬 없이 읽히게 되면서 막을 이유가 사라졌다(아래 주석).
+           목록은 서버 memory.ts의 `추출필요` 중 **파이썬 없이 되는 것**만 골라 적는다(이미지는 OCR 몫). -->
+      <input id="file" type="file" accept=".md,.txt,.log,.csv,.json,.yaml,.yml,.pdf,.hwpx,.docx,.xlsx,.pptx" aria-label="자료 파일">
       <button id="upGo">넣기</button>
     </div>
     <div id="upMsg"></div>
@@ -88,9 +90,15 @@
       <button id="smdOpen" type="button" title="GIJO Smart MD Studio — 무료 문서 작성 도구(별도 창)">📝 문서 작성 (창)</button>
     </div>
     <div id="folderMsg"></div>
-    <!-- ⚠ 2026-08-13 확인: PDF 추출은 python3+pypdf인데 라이트 동봉본에 파이썬이 없다 — lite-manuals 주석 참조. -->
-  <div class="warn">⚠ <b>글자 파일(.md · .txt · .log · .csv)</b>만 됩니다. PDF·워드는 추출기가 따로 필요해
-    라이트에는 아직 없습니다 — 지금 넣으면 <b>못 읽는 글이 지식으로 저장</b>되기 때문에 막아 두었습니다. 폴더 연결도 메모(.md·.txt)만 읽습니다.</div>
+    <!-- ★ 2026-08-22 — 막아 두었던 이유가 사라졌다. 그날 두 가지가 바뀌었다:
+         ① 오피스 4종(HWPX·DOCX·XLSX·PPTX)을 서버가 zip+xml로 **직접** 읽는다(파이썬 불필요)
+         ② PDF도 unpdf(JS)로 직접 읽는다
+         옛 주석(2026-08-13)은 「PDF 추출은 python3+pypdf인데 라이트에 파이썬이 없다」였는데
+         그 전제가 통째로 없어졌다. 서버는 읽을 수 있는데 화면이 막고 있으면 **고객에게 거짓**이다.
+         ⚠ 이미지·스캔 PDF만 아직 OCR(파이썬)이 필요하다 — 그건 정직하게 남겨 둔다. -->
+  <div class="warn">📄 <b>글자 파일 · PDF · 한글(hwpx) · 워드 · 엑셀 · 파워포인트</b>를 넣을 수 있습니다.
+    <br>⚠ <b>사진으로 찍거나 스캔한 문서</b>는 아직 못 읽습니다 — 글자를 알아보는 도구(OCR)가 따로 필요합니다.
+    폴더 연결은 메모(.md·.txt)만 읽습니다.</div>
   </section>
 
   <section class="card">

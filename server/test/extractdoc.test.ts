@@ -65,6 +65,33 @@ describe("문서 추출 — 오피스 4종은 파이썬 없이 (2026-08-22 이�
     }
   });
 
+  // ★ 서버가 읽을 수 있는 형식을 **화면이 막고 있지 않은가**(2026-08-22 신설).
+  //   실제로 그런 상태였다: 2026-08-13에 「PDF는 파이썬이 필요한데 라이트엔 없다」며 막아 두었는데,
+  //   그 전제가 오늘 사라졌는데도 화면은 그대로여서 **고객에게 거짓을 말하고 있었다**.
+  //   서버 능력과 화면 안내가 갈리는 것은 이 저장소가 반복해 겪은 결함이라 여기서 못박는다.
+  it("라이트 업로드 화면이 서버가 읽는 형식을 막고 있지 않다", () => {
+    const 화면들 = ["lite-memory.html", "lite-manuals.html"];
+    const 열려야할것 = [".pdf", ".hwpx", ".docx", ".xlsx", ".pptx"];
+    for (const 화면 of 화면들) {
+      const p = path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", 화면);
+      const src = fs.readFileSync(p, "utf8");
+      const m = src.match(/type="file"\s+accept="([^"]+)"/);
+      expect(m, `${화면}에서 업로드 input을 못 찾았다 — 시험이 헛돈다`).toBeTruthy();
+      const accept = (m as RegExpMatchArray)[1];
+      for (const 형식 of 열려야할것) {
+        expect(
+          accept.includes(형식),
+          `${화면}이 ${형식}을 막고 있다 — 서버는 파이썬 없이 읽을 수 있는데 화면이 거짓 안내를 한다`,
+        ).toBe(true);
+      }
+      // 거짓이 된 옛 문구가 **화면에 보이는 자리**에 남아 있지 않은지 본다.
+      //   ⚠ 주석은 뺀다 — 「왜 그 문구를 없앴는지」를 적으면서 그 문구를 인용하게 되는데,
+      //     그것까지 잡으면 기록을 못 남긴다(실제로 이 시험이 내 주석을 잡았다).
+      const 주석없는 = src.replace(/<!--[\s\S]*?-->/g, "");
+      expect(주석없는, `${화면}에 「추출기가 따로 필요해」라는 옛 안내가 화면에 남아 있다`).not.toContain("추출기가 따로 필요해");
+    }
+  });
+
   it("손상된 zip은 사람이 읽을 말로 거절한다", async () => {
     // fixtures/broken.docx는 zip이 아닌 28바이트 쓰레기다(그동안 어떤 시험도 안 쓰던 고아 픽스처).
     await expect(extractDocumentText("broken.docx", b64("broken.docx")))
