@@ -507,18 +507,40 @@ async function 모델담기(사이트) {
     console.error(`★ default_models.yaml을 못 찾았습니다(${yml}) — RapidOCR 구조가 바뀐 것 같습니다.`);
     process.exit(1);
   }
-  const 원문 = fs.readFileSync(yml, "utf8");
+  const 전체원문 = fs.readFileSync(yml, "utf8");
+  // ⚠ **엔진 칸을 먼저 자른다**(2026-08-22 검토관 [중]). 이 파일은 최상위에 엔진별 칸이
+  //   여럿이고(onnxruntime·openvino·mnn·paddle·torch) **같은 모델 이름이 10번쯤 나온다.**
+  //   앞에서부터 찾으면 지금은 우연히 맞을 뿐이다 — onnxruntime 칸이 맨 앞이라서.
+  //   판이 올라 순서가 바뀌면 .mnn 파일이나 디렉터리 주소를 집어 조용히 엉뚱한 것을 담는다.
+  //   우리가 쓰는 엔진은 onnxruntime 하나다(extract_doc.py의 RapidOCR 기본 엔진).
+  const 엔진칸시작 = 전체원문.search(/^onnxruntime:/m);
+  if (엔진칸시작 < 0) {
+    console.error("★ default_models.yaml에 onnxruntime 칸이 없습니다 — RapidOCR 구조가 바뀐 것 같습니다.");
+    process.exit(1);
+  }
+  const 다음칸 = 전체원문.slice(엔진칸시작 + 1).search(/^[A-Za-z_][A-Za-z0-9_]*:/m);
+  const 원문 = 다음칸 < 0 ? 전체원문.slice(엔진칸시작) : 전체원문.slice(엔진칸시작, 엔진칸시작 + 1 + 다음칸);
   // 우리가 쓰는 두 모델의 URL·sha256을 그 파일에서 뽑는다(핀은 extract_doc.py가 v5로 잡는다).
   const 필요 = ["ch_PP-OCRv5_det_mobile", "korean_PP-OCRv5_rec_mobile"];
   fs.mkdirSync(모델방, { recursive: true });
   for (const 이름 of 필요) {
     const i = 원문.indexOf(이름);
-    if (i < 0) { console.error(`★ ${이름} 항목을 default_models.yaml에서 못 찾았습니다.`); process.exit(1); }
+    if (i < 0) { console.error(`★ ${이름} 항목을 onnxruntime 칸에서 못 찾았습니다.`); process.exit(1); }
     const 조각 = 원문.slice(i, i + 600);
     const url = (조각.match(/model_dir:\s*(\S+)/) || [])[1];
     const sha = (조각.match(/SHA256:\s*(\S+)/i) || [])[1];
     if (!url || !sha) { console.error(`★ ${이름}의 주소·해시를 못 읽었습니다.`); process.exit(1); }
+    // ⚠ **뽑은 주소가 정말 그 모델인지 대조한다.** 600자 창이 다음 항목까지 넘어가면
+    //   엉뚱한 url+sha 쌍을 **짝이 맞는 채로** 집어 해시 검사까지 통과한다 — 조용한 오염이다.
+    if (!url.includes(이름)) {
+      console.error(`★ ${이름}의 주소를 잘못 읽었습니다(창이 다음 항목까지 넘어간 듯): ${url}`);
+      process.exit(1);
+    }
     const 파일명 = url.split("/").pop();
+    if (!/\.onnx$/i.test(파일명)) {
+      console.error(`★ ${이름}이 onnx 파일이 아닙니다(${파일명}) — 엔진 칸을 잘못 골랐을 수 있습니다.`);
+      process.exit(1);
+    }
     const 목적지 = path.join(모델방, 파일명);
     // 이미 맞는 파일이 있으면 그대로 쓴다(멱등).
     if (fs.existsSync(목적지) && createHash("sha256").update(fs.readFileSync(목적지)).digest("hex") === sha) continue;

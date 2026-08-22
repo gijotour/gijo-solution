@@ -243,9 +243,18 @@ def main() -> None:
                     if ocr_text.strip():
                         text = ocr_text
                 except ImportError:
-                    pass  # OCR 미설치 — pypdf 결과 유지(빈 텍스트면 아래 ingestText가 「못 읽음」 처리)
+                    pass  # OCR 미설치 — pypdf 결과 유지(아래에서 짧으면 버린다)
                 except Exception as e:  # noqa
                     print(f"WARN: OCR 폴백 실패({os.path.basename(path)}): {e}", file=sys.stderr)
+            # ⚠ **20자도 안 되는 부스러기는 성공이 아니다**(2026-08-22 검토관 [중] 수리).
+            #   JS 쪽(dataset.ts:248-253)은 「파이썬도 못 쓰면 1~19자라도 살린다」를 재검토 [높음]으로
+            #   **되돌렸다** — 정직 게이트가 원리상 못 잡기 때문이다. 그런데 파이썬 쪽은 정반대로
+            #   그 부스러기를 그대로 내보내고 있었다. 같은 제품에 잣대가 두 개였던 것이다.
+            #   여태 안 드러난 이유는 `import fitz`가 찍던 99자 경고문이 늘 붙어 20자를 넘겼기 때문이다
+            #   — 그 오염을 걷어내자 이 구멍이 드러났다.
+            #   빈 값으로 내보내면 소비자 6곳의 `if (!text.trim())`가 「못 읽음」으로 정직하게 처리한다.
+            if len(text.strip()) < OCR_MIN_TEXT:
+                text = ""
         elif ext in IMG_EXTS:
             # 이미지 = 스캔 문서 — OCR이 유일한 길이라 미설치면 정직 거절(exit 2).
             try:

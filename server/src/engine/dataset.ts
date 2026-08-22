@@ -548,7 +548,12 @@ async function 파이썬추출(filename: string, base64: string, ext: string): P
         // ⚠ 스크립트 자리는 serverScript()가 고른다 — 패키징 설치본은 cwd(userData)와 스크립트가
         //   있는 자리(resources/server-dist)가 달라, 상대경로로 부르면 파일을 못 찾는다(2026-08-22).
         [serverScript("scripts/extract_doc.py"), tmp],
-        { env: { ...process.env, PYTHONUTF8: "1" }, maxBuffer: 256 * 1024 * 1024 },
+        // ⚠ **시간 상한을 둔다**(2026-08-22 검토관 [중]). 예전엔 없었다.
+        //   OCR이 고객 기계에서 실제로 돌기 시작한 판이라, 스캔 문서 30쪽을 300dpi로 렌더해
+        //   한 장씩 읽으면 요청을 몇 분간 붙잡을 수 있다. 상한이 없으면 실패가 **「멈춤」으로 보이고**
+        //   담당자는 앱이 죽은 줄 알고 같은 문서를 여러 번 올린다(단독 모드는 그 CPU가 곧 고객 PC다).
+        //   상한에 걸리면 execFile이 프로세스를 죽이고 err로 돌아오며, 아래 분기가 한글로 안내한다.
+        { env: { ...process.env, PYTHONUTF8: "1" }, maxBuffer: 256 * 1024 * 1024, timeout: 10 * 60 * 1000 },
         (err, stdout, stderr) => {
           if (stderr) recordProcessOutput("extract-doc", "warn", stderr);
           if (err) {
@@ -557,6 +562,14 @@ async function 파이썬추출(filename: string, base64: string, ext: string): P
             //   그대로 화면에 나가** 담당자가 무엇을 해야 할지 알 수 없었다. 문구는 memory.ts의
             //   같은 상황 안내와 **일부러 같은 표현**을 쓴다 — 잣대가 둘이 되면 서로 어긋난다.
             const 원문 = (stderr.trim() || err.message || "").trim();
+            // 시간 상한에 걸린 경우 — 「실패」가 아니라 「너무 오래 걸림」이라고 말해야
+            // 담당자가 할 일을 안다(쪼개서 올리기). 영어 SIGTERM이 그대로 나가면 아무것도 못 한다.
+            if ((err as NodeJS.ErrnoException & { killed?: boolean }).killed || (err as { signal?: string }).signal === "SIGTERM") {
+              return reject(new Error(
+                `문서를 읽다가 시간이 너무 걸려 멈췄습니다(${filename}) — 스캔 문서는 쪽수가 많으면 오래 걸립니다. ` +
+                `쪽을 나눠 올리시거나, 글자가 들어 있는 PDF로 저장해 다시 올려 주세요.`
+              ));
+            }
             const 도구없음 =
               (err as NodeJS.ErrnoException).code === "ENOENT" ||
               /can't open file|No such file or directory|is not recognized|command not found/i.test(원문) ||

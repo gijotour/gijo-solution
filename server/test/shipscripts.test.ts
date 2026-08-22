@@ -119,7 +119,9 @@ describe("★ 출하 목록 — 서버가 부르는 파이썬은 설치본에 �
 
   // ★ 후보 **순서**를 지킨다 — 리터럴이 「있기만 하면」 통과하는 감시는 거짓 초록이다
   //   (검토관 2026-08-22 [중]: 순서가 이 설계의 전부인데 그것을 보는 시험이 없었다).
-  //   실제로 함수를 불러 순서를 재는 것이 가장 확실하다 — 문자열을 읽지 않는다.
+  //   실제로 함수를 불러 순서를 잰다 — **가짜 동봉본을 지어 놓고** 둘이 다른 답을 내는지 본다.
+  //   (소스 대조는 그 짝이다: 런타임은 「지금 이 기계에서 이렇게 고른다」를, 소스는 「의도가
+  //    이렇게 적혀 있다」를 지킨다. 하나만 두면 리팩터 한 번에 감시가 죽는다.)
   it("문서 추출은 동봉본을 앞세우고, 장비·모델은 예전 순서를 지킨다", async () => {
     const { serverPython, resetPythonBinCache } = await import("../src/util/pythonbin");
     const 원래 = { root: process.env.GIJO_SERVER_ROOT, py: process.env.GIJO_PYTHON };
@@ -127,15 +129,37 @@ describe("★ 출하 목록 — 서버가 부르는 파이썬은 설치본에 �
       // 동봉본이 있는 것처럼 꾸민 뿌리(실재하지 않으므로 existsSync에서 걸러진다) —
       // 여기서는 **후보가 다르게 만들어지는가**만 본다. 실행 가능한 것을 고르는 뒷단은 그대로다.
       delete process.env.GIJO_PYTHON;
-      process.env.GIJO_SERVER_ROOT = path.join(서버루트, "data", "test-tmp", "없는뿌리");
-      resetPythonBinCache();
-      const docs = serverPython("docs");
-      resetPythonBinCache();
-      const tools = serverPython("tools");
-      // 뿌리에 동봉본이 없으므로 둘 다 시스템 파이썬으로 떨어진다 — 그 자체가 계약이다
-      // (동봉본이 없을 때 예전 동작이 그대로여야 한다).
-      expect(docs, "동봉본이 없는데도 엉뚱한 것을 고른다").toBeTruthy();
-      expect(tools, "동봉본이 없는데도 엉뚱한 것을 고른다").toBeTruthy();
+      // ★ **진짜 동봉본을 하나 지어 놓고 잰다**(2026-08-22 재수리).
+      //   ⚠ 예전 몸통은 없는 뿌리를 주고 `expect(docs).toBeTruthy()`만 했다. serverPython은
+      //     어떤 경우에도 마지막에 "python3"을 돌려주므로 **구현이 어떻게 망가져도 통과**했다 —
+      //     주석은 「함수를 불러 순서를 잰다」고 적어 놓고 실제로는 아무것도 안 재는 거짓 초록이었다.
+      //     이 자리는 하루에 세 번 뒤집힌 곳이라, 안전망이 헛돌면 다음 사람이 검증받았다고 착각한다.
+      const 가짜뿌리 = path.join(서버루트, "data", "test-tmp", `pybin-${process.pid}`);
+      const 가짜동봉 = process.platform === "win32"
+        ? path.join(가짜뿌리, "python", "python.exe")
+        : path.join(가짜뿌리, "python", "bin", "python3");
+      fs.mkdirSync(path.dirname(가짜동봉), { recursive: true });
+      process.env.GIJO_SERVER_ROOT = 가짜뿌리;
+
+      if (process.platform === "win32") {
+        // 윈도우에서는 --version에 답하는 가짜 .exe를 만들 길이 없다. 그 환경에서는
+        // 아래 소스 대조가 계약을 진다(우리 정식 시험 관문은 WSL이라 실측은 거기서 돈다).
+        resetPythonBinCache();
+        expect(serverPython("docs"), "고를 것이 없으면 마지막 폴백이라도 돌려줘야 한다").toBeTruthy();
+      } else {
+        fs.writeFileSync(가짜동봉, "#!/bin/sh\necho 'Python 3.12.0'\n");
+        fs.chmodSync(가짜동봉, 0o755);
+        resetPythonBinCache();
+        const docs = serverPython("docs");
+        resetPythonBinCache();
+        const tools = serverPython("tools");
+        // 이제 **다른 답이 나와야** 한다 — 같으면 용도 구분이 죽은 것이다.
+        expect(docs, "문서 추출이 동봉본을 앞세우지 않는다 — 스캔 문서가 OCR 없는 파이썬으로 간다")
+          .toBe(가짜동봉);
+        expect(tools, "장비·모델이 동봉본을 앞세운다 — netmiko·modelscan이 없어 잘 되던 것이 죽는다")
+          .not.toBe(가짜동봉);
+      }
+      fs.rmSync(가짜뿌리, { recursive: true, force: true });
     } finally {
       if (원래.root === undefined) delete process.env.GIJO_SERVER_ROOT; else process.env.GIJO_SERVER_ROOT = 원래.root;
       if (원래.py === undefined) delete process.env.GIJO_PYTHON; else process.env.GIJO_PYTHON = 원래.py;
