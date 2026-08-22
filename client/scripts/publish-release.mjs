@@ -30,9 +30,28 @@ const password = arg("password", process.env.GIJO_PUBLISH_PASSWORD || process.en
 const notes = arg("notes", "");
 const force = process.argv.includes("--force");
 
+// ★★ 에디션 (2026-08-23) — `--edition lite`면 라이트 설치본을 라이트 채널로 올린다.
+//
+// ⚠ 왜 채널을 갈라야 하나: 그전엔 서버가 「전 에디션 통틀어 가장 높은 판」을 최신으로 줬다.
+//   라이트(1.3.0)를 그냥 올렸으면 라이트 사용자가 업데이트를 물을 때 **프로 5.70.0**이
+//   내려와 라이트 설치가 프로로 갈아치워진다. 판 번호가 안 겹친다고 안심할 수도 없다 —
+//   `release-lite/`에 `GIJO AS Lite Setup 5.17.0`이 실재한다(실제로 겹친 적이 있다).
+// ⚠ 라이트는 판 번호가 **다른 파일**에 있다: electron-builder.lite.json의 extraMetadata.version.
+//   package.json의 프로 번호를 그대로 쓰면 엉뚱한 이름으로 올라간다.
+const 에디션 = process.argv.includes("--edition")
+  ? String(process.argv[process.argv.indexOf("--edition") + 1] || "").trim()
+  : (arg("edition", "") || "pro");
+if (!["pro", "lite"].includes(에디션)) {
+  throw new Error(`--edition은 pro 또는 lite여야 합니다(받은 값: ${에디션})`);
+}
 const pkg = JSON.parse(fs.readFileSync(path.join(clientDir, "package.json"), "utf-8"));
-const version = pkg.version;
-const installerPath = path.join(clientDir, "release", `GIJO AS Setup ${version}.exe`);
+const 라이트설정 = 에디션 === "lite"
+  ? JSON.parse(fs.readFileSync(path.join(clientDir, "electron-builder.lite.json"), "utf-8"))
+  : null;
+const version = 에디션 === "lite" ? String(라이트설정.extraMetadata.version) : pkg.version;
+const installerPath = 에디션 === "lite"
+  ? path.join(clientDir, "release-lite", `GIJO AS Lite Setup ${version}.exe`)
+  : path.join(clientDir, "release", `GIJO AS Setup ${version}.exe`);
 
 async function main() {
   if (!username || !password) {
@@ -109,7 +128,8 @@ async function main() {
   })
     .then((r) => r.json())
     .catch(() => null);
-  const 이미 = (목록?.releases ?? []).find((r) => r.version === version);
+  // ⚠ 같은 에디션 안에서 찾는다 — 다른 에디션이 그 번호를 쓰고 있으면 서버가 분명히 막는다.
+  const 이미 = (목록?.releases ?? []).find((r) => r.version === version && (r.edition === "lite" ? "lite" : "pro") === 에디션);
   if (이미 && !process.argv.includes("--republish")) {
     throw new Error(
       `${version}은 **이미 게시돼 있습니다.**\n` +
@@ -124,7 +144,7 @@ async function main() {
 
   console.log(`[publish-release] 게시: ${version} (${(buf.length / 1024 / 1024).toFixed(1)}MB) ← ${installerPath}`);
   const publish = await fetch(
-    `${serverUrl}/api/client/releases?version=${encodeURIComponent(version)}&notes=${encodeURIComponent(notes)}`,
+    `${serverUrl}/api/client/releases?version=${encodeURIComponent(version)}&notes=${encodeURIComponent(notes)}&edition=${encodeURIComponent(에디션)}`,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${login.accessToken}`, "Content-Type": "application/octet-stream" },

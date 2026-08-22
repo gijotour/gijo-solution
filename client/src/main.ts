@@ -1336,7 +1336,13 @@ interface UpdateCheckResult {
 ipcMain.handle("update:check", async (): Promise<UpdateCheckResult> => {
   if (!authState.serverUrl || !authState.accessToken) return { latest: null, updateAvailable: false };
   try {
-    const res = await fetch(`${authState.serverUrl}/api/client/latest-release?current=${encodeURIComponent(app.getVersion())}`, {
+    // ★★ **자기 에디션을 반드시 실어 보낸다** (2026-08-23).
+    //   안 보내면 서버가 「전 에디션 통틀어 가장 높은 판」을 돌려준다 — 라이트(1.3.0)가
+    //   프로 5.70.0을 「새 판」으로 받아 **라이트 설치가 프로로 갈아치워진다.**
+    //   ⚠ 판 번호가 안 겹친다고 안심할 수 없다: release-lite에 `Lite Setup 5.17.0`이 실재한다.
+    const res = await fetch(
+      `${authState.serverUrl}/api/client/latest-release?current=${encodeURIComponent(app.getVersion())}` +
+      `&edition=${encodeURIComponent(에디션())}`, {
       headers: { Authorization: `Bearer ${authState.accessToken}` },
     });
     if (!res.ok) return { latest: null, updateAvailable: false };

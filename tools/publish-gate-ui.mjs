@@ -318,6 +318,50 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
       && !r.편집전 && r.편집열림 && r.편집이문서창안 && r.템플릿 === 8
       && r.목록시작 < 140 && r.폭계약,
     JSON.stringify(r));
+
+  // ── ③⁗ 2026-08-22에 새로 생긴 두 갈래 — **읽기 검토가 원리상 못 잡는 것**을 여기서 잰다.
+  //
+  // ■ 왜 관문에 더하나: 그날 검토 네 라운드가 잡은 [높음] 둘이 **렌더링 결함**이었다 —
+  //   반입 목록의 파일명 칸이 0px로 접힌 것, 담당자 편집 폼이 대비 1.07:1이 된 것.
+  //   둘 다 코드를 읽어서는 폭·대비를 손으로 계산해야 겨우 나오고, **띄워 보면 즉시 보인다.**
+  //   이 저장소 규칙 그대로다: 「새 배선은 관문에 검사를 더하는 것이 정석」.
+  if (fr) {
+    const s = await fr.evaluate(async () => {
+      const 잠깐 = (ms) => new Promise((r) => setTimeout(r, ms));
+      const 재기 = (el) => (el ? el.getBoundingClientRect().width : 0);
+      // 🩹 반입 탭으로
+      const 반입노드 = document.querySelector('#tabs .v4node[data-t="ingest"]');
+      if (반입노드) { 반입노드.click(); await 잠깐(1200); }
+      const 머리 = document.querySelector("#list .g-rows-head");
+      const 첫줄 = document.querySelector("#list .g-rows-r");
+      const 칸수 = 머리 ? (getComputedStyle(머리).gridTemplateColumns || "").trim().split(/\s+/).length : 0;
+      // ★ 파일명 칸(첫 칸)이 실제로 폭을 갖는가 — 0px로 접히면 파일명이 아예 안 보인다.
+      const 첫칸폭 = 머리 ? parseFloat((getComputedStyle(머리).gridTemplateColumns || "0").trim().split(/\s+/)[0]) : 0;
+      const 머리칸수 = 머리 ? 머리.querySelectorAll("span").length : 0;
+      const 줄칸수 = 첫줄 ? 첫줄.querySelectorAll(":scope > span").length : 0;
+
+      // 📞 연락처 → ✏ 담당자 관리 (셸 배색을 따르는지)
+      const 연락처노드 = document.querySelector('#tabs .v4node[data-t="contacts"]');
+      if (연락처노드) { 연락처노드.click(); await 잠깐(900); }
+      const 관리단추 = document.getElementById("cxManage");
+      if (관리단추) { 관리단추.click(); await 잠깐(1500); }
+      const 틀 = document.getElementById("cxContactsFrame");
+      const 틀높이 = 틀 ? 틀.getBoundingClientRect().height : 0;
+      const 틀주소 = 틀 ? String(틀.getAttribute("src") || "") : "";
+      return { 칸수, 첫칸폭, 머리칸수, 줄칸수, 줄있나: !!첫줄, 틀높이, 틀주소 };
+    }).catch(() => null);
+
+    // 줄이 없을 수도 있다(영수증 0건) — 그때는 칸 계산만 잰다. 없는 것을 실패로 만들지 않는다.
+    ok("반입 탭: 칸 수 일치 · **파일명 칸이 접히지 않음**(≥90px)",
+      !!s && s.칸수 === 4 && s.머리칸수 === 4 && s.첫칸폭 >= 90 && (!s.줄있나 || s.줄칸수 === 4),
+      JSON.stringify(s && { 칸수: s.칸수, 첫칸폭: Math.round(s.첫칸폭), 머리칸수: s.머리칸수, 줄칸수: s.줄칸수 }));
+
+    // 담당자 관리 창 — **열리고 쓸 만한 높이**이고 배색 신호를 실었는가.
+    //   (그전엔 부모에 높이가 없어 iframe이 기본 150px로 접혔다 — 「열리지만 못 쓰는」 상태였다.)
+    ok("담당자 관리: 문서창에서 열리고 높이가 산다(≥300px) + 셸 배색 신호 전달",
+      !!s && s.틀높이 >= 300 && /theme=(host|light)/.test(s.틀주소),
+      JSON.stringify(s && { 틀높이: Math.round(s.틀높이), 틀주소: s.틀주소 }));
+  }
 }
 
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──

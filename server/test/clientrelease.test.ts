@@ -151,3 +151,67 @@ describe("clientrelease — REST API", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ **에디션이 갈려 있는가** — 라이트에게 프로 설치본을 내려 주지 않는다 (2026-08-23)
+//
+// ■ 무엇이 있었나: `/api/client/latest-release`가 「전 에디션 통틀어 가장 높은 판」을 주고
+//   클라는 **자기 에디션을 안 보냈다.** 라이트(1.3.0)가 업데이트를 물으면 프로 5.70.0이
+//   「새 판」으로 나오고, 받으면 **라이트 설치가 프로로 갈아치워진다.**
+//   ⚠ 판 번호가 안 겹친다고 안심할 수 없다 — `release-lite/`에 `Lite Setup 5.17.0`이 실재한다.
+//
+// ■ 이 감시가 지키는 것: ① 에디션 안에서만 최신을 고른다 ② 에디션을 안 주면 옛 동작(pro)
+//   ③ 다른 에디션이 쓰는 판 번호를 **조용히 덮지 않는다**(PK가 version 하나라 덮으면 사라진다).
+const { 에디션of } = await import("../src/engine/clientrelease");
+const 게시 = publishClientRelease, 최신 = latestClientRelease, 비우기 = resetClientReleasesForTests;
+
+describe("★ 클라 배포 채널이 에디션으로 갈려 있다", () => {
+  it("★★ 라이트는 **라이트 판**만 최신으로 받는다 — 프로 판이 더 높아도", async () => {
+    비우기();
+    await 게시("5.70.0", "프로", Buffer.from("pro-installer"), "pro");
+    await 게시("1.3.0", "라이트", Buffer.from("lite-installer"), "lite");
+
+    const 라이트최신 = 최신("lite");
+    expect(라이트최신?.version, "라이트가 프로 판을 최신으로 받는다 — 설치가 갈아치워진다").toBe("1.3.0");
+    expect(에디션of(라이트최신!), "에디션 표시가 안 붙었다").toBe("lite");
+
+    const 프로최신 = 최신("pro");
+    expect(프로최신?.version, "프로가 라이트 판을 받는다").toBe("5.70.0");
+  });
+
+  it("★ 에디션을 안 주면 pro다 — **옛 클라의 동작이 한 톨도 안 바뀐다**", async () => {
+    비우기();
+    await 게시("5.70.0", "프로", Buffer.from("pro-installer"), "pro");
+    await 게시("9.9.9", "라이트", Buffer.from("lite-installer"), "lite"); // 더 높은 라이트 판
+    expect(최신()?.version, "에디션 미지정이 라이트 판을 집었다 — 옛 클라가 라이트를 받는다").toBe("5.70.0");
+  });
+
+  it("★★ 다른 에디션이 쓰는 판 번호는 **조용히 안 덮는다** — 덮으면 한쪽이 사라진다", async () => {
+    비우기();
+    await 게시("5.17.0", "프로", Buffer.from("pro-installer"), "pro");
+    // 실제로 있었던 상황: release-lite에 `Lite Setup 5.17.0`이 존재한다.
+    await expect(게시("5.17.0", "라이트", Buffer.from("lite-installer"), "lite"))
+      .rejects.toThrow(/이미.*설치본이 쓰고 있습니다/);
+    // 프로 것이 그대로 살아 있어야 한다.
+    expect(최신("pro")?.notes).toBe("프로");
+  });
+
+  it("★ 파일 이름으로 무엇을 받았는지 알 수 있다", async () => {
+    비우기();
+    const l = await 게시("1.3.0", "라이트", Buffer.from("x"), "lite");
+    const p = await 게시("5.70.0", "프로", Buffer.from("y"), "pro");
+    expect(l.filename, "라이트 설치본인데 이름에 표시가 없다").toMatch(/Lite/);
+    expect(p.filename, "프로 이름에 Lite가 들어갔다").not.toMatch(/Lite/);
+  });
+
+  it("★★ 클라가 **자기 에디션을 실어 보낸다** — 안 보내면 서버 갈래가 헛돈다", () => {
+    const main = fs.readFileSync(path.resolve(process.cwd(), "..", "client", "src", "main.ts"), "utf8");
+    // ⚠ 주소가 **두 조각으로 이어져** 있어도 잡아야 한다(줄 길이 때문에 나눠 썼다) —
+    //   처음엔 백틱을 안 넘는 정규식으로 써서 이 시험이 스스로 헛실패했다.
+    const 확인부 = main.slice(main.indexOf("latest-release"), main.indexOf("latest-release") + 400);
+    expect(확인부, "업데이트 확인에 edition을 안 싣는다 — 라이트가 프로 판을 받는다")
+      .toMatch(/edition=/);
+    expect(확인부, "에디션 판별 함수를 안 부른다 — 상수를 박으면 라이트 빌드에서 틀린다")
+      .toMatch(/에디션()/);
+  });
+});
