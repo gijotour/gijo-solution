@@ -53,10 +53,16 @@ if (fs.existsSync(표식)) {
   try {
     const 있는판 = JSON.parse(fs.readFileSync(표식, "utf8"));
     const pth전 = fs.readdirSync(OUT).find((f) => /^python\d+\._pth$/.test(f));
+    // ⚠ OCR까지 본다 — 안 그러면 OCR을 넣기 전에 꾸린 폴더가 「온전함」으로 통과해
+    //   **OCR 없는 설치본**이 조용히 나간다(pypdf를 지우고 재현했던 것과 같은 부류).
+    const OCR확인 = process.env.GIJO_SKIP_OCR === "1" ||
+      (fs.existsSync(path.join(OUT, "site-packages", "rapidocr", "models", "korean_PP-OCRv5_rec_mobile.onnx")) &&
+       fs.existsSync(path.join(OUT, "msvcp140.dll")));
     const 온전한가 =
       있는판.version === 판 &&
       fs.existsSync(path.join(OUT, "python.exe")) &&
       fs.existsSync(path.join(OUT, "site-packages", "pypdf")) &&
+      OCR확인 &&
       !!pth전 &&
       /^import site$/m.test(fs.readFileSync(path.join(OUT, pth전), "utf8"));
     if (온전한가) {
@@ -179,6 +185,51 @@ if (!쓴pip) {
   process.exit(1);
 }
 
+// ④-2 OCR 부품 — 스캔 문서·이미지를 읽는다(사장님 2026-08-22 「OCR 기능도 양쪽 다 넣어줘」).
+//   ⚠ 크기 실측: **322.6MB**(Windows 디스크, 3,473개 파일). requirements-ocr.txt 주석의 「~480MB」와
+//     웹 재구성 「130MB」 둘 다 틀렸다 — 전자는 리눅스 기준, 후자는 압축 크기였다.
+//   ⚠ 이건 오늘 잰 값이다. 판이 바뀌면 다시 재야 한다.
+const OCR넣기 = process.env.GIJO_SKIP_OCR !== "1";
+if (OCR넣기) {
+  console.log("[stage-python] 3.5/5 OCR 부품 심기(약 320MB — 시간이 걸립니다)");
+  const ocr목록 = fs.readFileSync(path.join(루트, "server", "requirements-ocr.txt"), "utf8")
+    .split(/\r?\n/).map((l) => l.replace(/#.*$/, "").trim()).filter(Boolean);
+  try {
+    // ⚠ `--only-binary=:all:` — 소스 빌드로 새면 빌드 머신에 컴파일러가 필요해지고, 무엇보다
+    //   **딴 판이 조용히 들어간다**. wheel만 받는다.
+    execFileSync(쓴pip, ["install", "--quiet", "--target", 사이트, "--only-binary=:all:", ...ocr목록], {
+      stdio: ["ignore", "inherit", "inherit"], timeout: 1_800_000,
+    });
+  } catch (e) {
+    console.error(`★ OCR 부품을 못 심었습니다 — 스캔 문서·이미지를 못 읽는 설치본이 됩니다.\n${String((e && e.message) || e).slice(0, 300)}`);
+    process.exit(1);
+  }
+  // ★ 안 쓰는 모델을 지운다 — RapidOCR wheel이 PP-OCRv6 모델을 싣고 오는데 **한국어를 지원하지
+  //   않아 영원히 안 쓴다**(extract_doc.py가 v5로 핀 고정). 실측 30.5MB를 그냥 버리는 셈이다.
+  let 지운양 = 0;
+  for (const f of ["PP-OCRv6_det_small.onnx", "PP-OCRv6_rec_small.onnx"]) {
+    const p = path.join(사이트, "rapidocr", "models", f);
+    if (fs.existsSync(p)) { 지운양 += fs.statSync(p).size; fs.rmSync(p, { force: true }); }
+  }
+  if (지운양) console.log(`[stage-python]   · 안 쓰는 v6 모델 제거: ${(지운양 / 1048576).toFixed(1)}MB(한국어 미지원)`);
+  // ★ 한국어 v5 모델을 **미리 담는다** — 안 담으면 고객 기계가 첫 실행 때 중국 CDN(modelscope.cn)으로
+  //   나간다. 폐쇄망에서는 실패하고, 폐쇄망이 아니어도 **우리가 봉인한 egress를 새로 뚫는 셈**이다.
+  //   ⚠ RapidOCR은 파일이 있어도 **sha256이 자기 목록과 다르면 지우고 다시 받는다** — 해시를
+  //     맞춰 담아야 진짜로 안 나간다(설계관 2026-08-22 적발).
+  await 모델담기(사이트);
+  // ★ MSVC 런타임 — onnxruntime·opencv가 msvcp140을 문다. 동봉 파이썬에는 vcruntime140만 있다.
+  //   ⚠ **빈 PATH 자가검증으로는 이 누락을 원리상 못 잡는다** — System32는 PATH와 무관하게
+  //     검색되므로 개발 기계에서는 늘 성공한다(설계관 2026-08-22 지적). 깨끗한 고객 PC에서만
+  //     터지는 부류라, llama-cuda가 쓰는 방식 그대로 **exe 옆에 동봉**한다(MS 공식 허용 방식).
+  const MSVC = ["msvcp140.dll", "vcomp140.dll"];
+  for (const f of MSVC) {
+    const s = path.join(process.env.SystemRoot ?? "C:/Windows", "System32", f);
+    if (!fs.existsSync(s)) { console.error(`★ MSVC 런타임 없음: ${s}`); process.exit(1); }
+    fs.copyFileSync(s, path.join(OUT, f));
+  }
+  console.log(`[stage-python]   · MSVC 런타임 ${MSVC.length}개 동봉(깨끗한 고객 PC 대비)`);
+}
+
 // ⑤ 자가 검증 — ★ **PATH를 비워 「고객 기계 모양」으로** 돌린다.
 //   개발 기계에는 파이썬이 있어 동봉이 잘못돼도 폴백으로 돌아 거짓 통과한다(llama-cuda 교훈).
 console.log("[stage-python] 4/4 자가 검증(빈 PATH)");
@@ -204,6 +255,22 @@ try {
     console.error(`★ 자가 검증 실패 — 동봉본이 PDF에서 한글을 못 뽑았습니다(고객 기계에서 죽는다는 뜻).\n뽑힌 글: ${JSON.stringify(글.slice(0, 200))}`);
     process.exit(1);
   }
+  // ★ OCR도 **실제로 불러 본다** — 판 불일치(cp313 wheel)·모델 누락은 여기서만 잡힌다.
+  //   설치본이 나간 뒤 고객 기계에서 드러나면 되돌릴 수 없다.
+  if (OCR넣기) {
+    const 확인 = "import rapidocr,fitz,onnxruntime,os;" +
+      "m=os.path.join(os.path.dirname(rapidocr.__file__),'models');" +
+      "ms=sorted(f for f in os.listdir(m) if f.endswith('.onnx'));" +
+      "print('OCR', onnxruntime.__version__, len(ms), ','.join(ms))";
+    const o = String(execFileSync(path.join(OUT, "python.exe"), ["-c", 확인], {
+      env: 깨끗한env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 300_000,
+    })).trim();
+    if (!/korean_PP-OCRv5_rec/.test(o)) {
+      console.error(`★ 한국어 OCR 모델이 안 담겼습니다 — 고객 기계가 첫 실행에 CDN으로 나갑니다.\n  확인 결과: ${o}`);
+      process.exit(1);
+    }
+    console.log(`[stage-python]   · OCR 자가 검증: ${o}`);
+  }
   const out = execFileSync(path.join(OUT, "python.exe"), ["-c", "import pypdf,sys;print(pypdf.__version__, sys.version.split()[0])"], {
     env: 깨끗한env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000,
   });
@@ -226,6 +293,57 @@ try {
  *  ⚠ 저장소에 표본 바이너리를 두지 않으려고 여기서 만든다(파일이 늘면 관리 대상도 는다).
  *    글자는 ToUnicode 없이도 pypdf가 뽑을 수 있게 **WinAnsi 밖 문자를 8진 이스케이프**로 넣는다 —
  *    한글이 통과하는지가 이 검증의 요점이라 ASCII만으로는 뜻이 없다. */
+/** 한국어 OCR 모델 2개를 미리 담는다 — 고객 기계가 첫 실행에 CDN으로 나가지 않게.
+ *
+ *  ⚠ 3개가 아니라 **2개**다(설계관 2026-08-22 정정) — 각도분류 모델은 wheel에 이미 실려 있다.
+ *  ⚠ RapidOCR은 **sha256이 자기 목록과 다르면 파일이 있어도 지우고 다시 받는다.** 그래서
+ *    해시를 맞춰 담아야 진짜로 안 나간다. 목록은 site-packages의 default_models.yaml에서 읽는다 —
+ *    여기 손으로 적으면 판이 바뀔 때 조용히 어긋난다(같은 것을 두 곳에 적지 않는다).
+ *  ⚠ 빌드 머신이 인터넷을 못 쓰면 GIJO_OCR_MODEL_DIR에 미리 받아 둔 파일을 둘 수 있다.
+ */
+async function 모델담기(사이트) {
+  const 모델방 = path.join(사이트, "rapidocr", "models");
+  const yml = path.join(사이트, "rapidocr", "default_models.yaml");
+  if (!fs.existsSync(yml)) {
+    console.error(`★ default_models.yaml을 못 찾았습니다(${yml}) — RapidOCR 구조가 바뀐 것 같습니다.`);
+    process.exit(1);
+  }
+  const 원문 = fs.readFileSync(yml, "utf8");
+  // 우리가 쓰는 두 모델의 URL·sha256을 그 파일에서 뽑는다(핀은 extract_doc.py가 v5로 잡는다).
+  const 필요 = ["ch_PP-OCRv5_det_mobile", "korean_PP-OCRv5_rec_mobile"];
+  fs.mkdirSync(모델방, { recursive: true });
+  for (const 이름 of 필요) {
+    const i = 원문.indexOf(이름);
+    if (i < 0) { console.error(`★ ${이름} 항목을 default_models.yaml에서 못 찾았습니다.`); process.exit(1); }
+    const 조각 = 원문.slice(i, i + 600);
+    const url = (조각.match(/model_dir:\s*(\S+)/) || [])[1];
+    const sha = (조각.match(/SHA256:\s*(\S+)/i) || [])[1];
+    if (!url || !sha) { console.error(`★ ${이름}의 주소·해시를 못 읽었습니다.`); process.exit(1); }
+    const 파일명 = url.split("/").pop();
+    const 목적지 = path.join(모델방, 파일명);
+    // 이미 맞는 파일이 있으면 그대로 쓴다(멱등).
+    if (fs.existsSync(목적지) && createHash("sha256").update(fs.readFileSync(목적지)).digest("hex") === sha) continue;
+    // 폐쇄망 빌드 머신 탈출구 — 미리 받아 둔 파일을 먼저 본다.
+    const 캐시 = process.env.GIJO_OCR_MODEL_DIR ? path.join(process.env.GIJO_OCR_MODEL_DIR, 파일명) : "";
+    if (캐시 && fs.existsSync(캐시)) {
+      fs.copyFileSync(캐시, 목적지);
+    } else {
+      try {
+        execFileSync("curl", ["-sSL", "--fail", "-o", 목적지, url], { stdio: ["ignore", "inherit", "inherit"], timeout: 600_000 });
+      } catch {
+        console.error(`★ OCR 모델을 못 받았습니다(${url})\n  인터넷이 막힌 빌드 머신이면 그 파일을 GIJO_OCR_MODEL_DIR 폴더에 두세요.`);
+        process.exit(1);
+      }
+    }
+    const 실제 = createHash("sha256").update(fs.readFileSync(목적지)).digest("hex");
+    if (실제 !== sha) {
+      console.error(`★ ${파일명}의 sha256이 다릅니다 — 고객 기계가 첫 실행에 CDN으로 나가게 됩니다.\n  기대 ${sha}\n  실제 ${실제}`);
+      process.exit(1);
+    }
+    console.log(`[stage-python]   · 모델 담음: ${파일명} (${(fs.statSync(목적지).size / 1048576).toFixed(1)}MB)`);
+  }
+}
+
 function 표본PDF() {
   // 한글을 UTF-16BE로 넣고 pypdf가 그대로 읽게 한다(Identity-H 없이도 텍스트 연산자는 보존된다).
   const 글 = "기조 AS 자가검증";

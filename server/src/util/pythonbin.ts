@@ -58,18 +58,18 @@ export function serverPython(용도: "docs" | "tools" = "tools"): string {
   const 동봉본 = process.platform === "win32"
     ? path.join(뿌리, "python", "python.exe")
     : path.join(뿌리, "python", "bin", "python3");
-  // ★ 동봉본은 **어느 용도에서도 앞세우지 않는다**(2026-08-22, PDF를 JS로 옮기면서 개정).
+  // ★ 문서 추출("docs")은 동봉본을 **앞세우고**, 장비·모델("tools")은 시스템을 먼저 본다.
   //
-  //   ⚠ 잠깐 「문서 추출만은 앞세운다」였다 — 동봉본엔 pypdf가 확실히 있으니 PDF에 유리하다는
-  //     근거였다. 그런데 **PDF가 JS(unpdf)로 넘어가면서 그 근거가 통째로 사라졌다.**
-  //     파이썬에 남은 문서 일은 이제 **OCR(스캔 PDF·이미지)뿐인데 동봉본엔 OCR이 없다** —
-  //     앞세우면 시스템 파이썬에 OCR을 깔아 둔 기계에서 이미지를 올릴 때 동봉본이 먼저 뽑혀
-  //     ModuleNotFoundError가 나고, 그것이 「이 설치본에 문서 추출 도구가 없습니다」라는
-  //     **틀린 안내**로 나간다(설계관 2026-08-22 적발 — 이 갈래를 만든 검토관 지적의 거울상).
-  //   그래서 용도와 무관하게 **마지막 수단**이다: 시스템에 아무것도 없을 때만 쓰인다.
-  //   (용도 인자는 남긴다 — 앞으로 갈래가 갈릴 여지가 있고, 호출부가 뜻을 밝히는 값어치가 있다.)
-  void 용도;
-  후보.push("python3", "python", 동봉본);
+  //   이 자리는 하루에 세 번 뒤집혔고 그때마다 **근거가 실제로 바뀌었다**(2026-08-22):
+  //     ① 처음: docs만 앞세움 — 동봉본에 pypdf가 확실히 있어서.
+  //     ② PDF가 JS로 넘어가자 그 근거가 사라져 **모든 용도에서 뒤로** 뺐다(동봉본엔 OCR이 없었다).
+  //     ③ 오늘 OCR을 동봉하면서 **다시 앞으로** — 이제 동봉본이 한국어 OCR을 가진 **유일한**
+  //        파이썬이다. 뒤에 두면 시스템 파이썬이 먼저 잡혀 스캔 문서가 안 읽힌다.
+  //   ⚠ 그래도 "tools"는 앞세우지 않는다 — 동봉본엔 netmiko·modelscan이 없어서, 앞세우면
+  //     시스템에 그것을 깔아 둔 기계에서 **잘 되던 장비 접속·모델 검사가 죽는다**(검토관이 잡았던 회귀).
+  //   ⚠ GIJO_PYTHON·venv는 여전히 맨 앞이다 — 운영자가 모든 부품을 갖춘 환경을 지정했으면 그게 낫다.
+  if (용도 === "docs") 후보.push(동봉본, "python3", "python");
+  else 후보.push("python3", "python", 동봉본);
   for (const c of 후보) {
     if (c.includes(path.sep) && !fs.existsSync(c)) continue;
     const r = spawnSync(c, ["--version"], { encoding: "utf-8" });

@@ -141,16 +141,19 @@ describe("★ 출하 목록 — 서버가 부르는 파이썬은 설치본에 �
       if (원래.py === undefined) delete process.env.GIJO_PYTHON; else process.env.GIJO_PYTHON = 원래.py;
       resetPythonBinCache();
     }
-    // 소스 수준 계약 — 동봉본은 **어느 용도에서도 앞서지 않는다**(2026-08-22 개정).
-    //   ⚠ 한때 「문서 추출만 앞세운다」였는데, PDF가 JS로 넘어가며 그 근거(pypdf 보유)가 사라졌다.
-    //     파이썬에 남은 문서 일은 OCR뿐이고 **동봉본엔 OCR이 없다** — 앞세우면 OCR을 깔아 둔
-    //     기계에서 오히려 「도구가 없습니다」라는 틀린 안내가 나간다(설계관 적발).
+    // 소스 수준 계약 — **용도에 따라 갈린다**(2026-08-22 최종).
+    //   · docs(문서 추출): 동봉본이 앞 — 한국어 OCR을 가진 **유일한** 파이썬이라서.
+    //   · tools(장비·모델): 시스템이 앞 — 동봉본엔 netmiko·modelscan이 없어, 앞세우면
+    //     그것을 깔아 둔 기계에서 **잘 되던 것이 죽는다**(검토관이 실제로 잡았던 회귀).
+    //   ⚠ 이 자리는 하루에 세 번 뒤집혔다. 뒤집을 때마다 **근거가 실제로 바뀌었는지** 먼저 볼 것.
     const 제품 = fs.readFileSync(path.join(서버루트, "src", "util", "pythonbin.ts"), "utf8");
+    expect(제품, "docs 갈래가 동봉본을 앞세우지 않는다 — 스캔 문서가 OCR 없는 파이썬으로 간다")
+      .toMatch(/용도\s*===\s*"docs"[\s\S]{0,120}?동봉본,\s*"python3"/);
+    expect(제품, "tools 갈래에서 동봉본이 시스템보다 앞에 있다 — 장비 접속·모델 검사가 죽는다")
+      .toMatch(/else\s+후보\.push\("python3",\s*"python",\s*동봉본\)/);
     const 점검 = fs.readFileSync(path.join(서버루트, "scripts", "check-python-deps.mjs"), "utf8");
-    for (const [이름, 소스] of [["pythonbin.ts", 제품], ["check-python-deps.mjs", 점검]] as const) {
-      expect(소스, `${이름}에서 동봉본이 시스템 파이썬보다 앞에 있다 — 그 기계에 깔린 부품(OCR·netmiko)을 가린다`)
-        .toMatch(/후보\.push\("python3",\s*"python",\s*동봉본\)/);
-    }
+    expect(점검, "점검이 tools 순서를 안 쓴다 — requirements 전체를 보는데 동봉본을 앞세우면 거짓말을 한다")
+      .toMatch(/후보\.push\("python3",\s*"python",\s*동봉본\)/);
   });
 
   it("스크립트 자리는 serverScript()가 고른다 — 상대경로 직접 호출이 없다", () => {

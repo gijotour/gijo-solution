@@ -63,7 +63,16 @@ def _ocr_engine():
         logging.getLogger("RapidOCR").setLevel(logging.ERROR)  # stderr 로그 소음 줄이기
         from rapidocr import RapidOCR
         from rapidocr.utils.typings import OCRVersion, LangRec, ModelType
+        # ⚠ 모델 자리를 **문자열로 못박는다**(2026-08-22, Windows 실측으로 발견).
+        #   안 주면 RapidOCR이 스스로 WindowsPath 객체를 넣는데, 그 설정 라이브러리가
+        #   「Value 'WindowsPath' is not a supported primitive type」으로 거부해 **OCR이 아예 안 뜬다.**
+        #   WSL(운영)에서는 PosixPath라 통과해서 여태 안 드러났다 — Windows 설치본에서만 나는 결함이다.
+        #   str()로 넘기면 두 환경 다 안전하다.
+        import os as _os
+        import rapidocr as _r
+        _모델방 = _os.path.join(_os.path.dirname(_r.__file__), "models")
         _OCR = RapidOCR(params={
+            "Global.model_root_dir": str(_모델방),
             "Det.ocr_version": OCRVersion.PPOCRV5, "Det.model_type": ModelType.MOBILE,
             "Rec.ocr_version": OCRVersion.PPOCRV5, "Rec.lang_type": LangRec.KOREAN, "Rec.model_type": ModelType.MOBILE,
         })
