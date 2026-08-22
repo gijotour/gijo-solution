@@ -348,7 +348,7 @@
       'fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round">' +
       '<path d="M3.4 3.2h4.2c.9 0 1.6.7 1.6 1.6v8c0-.7-.6-1.3-1.3-1.3H3.4z"/>' +
       '<path d="M12.6 3.2H9.2v10c0-.7.6-1.3 1.3-1.3h2.1z"/></svg>';
-    gear.title = "제품 안내 열기 — 내 문서의 📘 제품 안내로 갑니다";
+    gear.title = "GIJO AS 안내 열기 — 내 문서의 📘 GIJO AS 안내로 갑니다";
     row.appendChild(av); row.appendChild(nm); row.appendChild(gear);
     // 「⇤ 대화 여기로 다시 붙이기」 — 문서함 줄 **바로 위**(2026-08-08 사용자 지시·시안 승인).
     // 예전 자리는 본문 아래 가로 한 줄(38px)이라, 대화창을 뺄수록 화면이 좁아지는 모순이 있었다.

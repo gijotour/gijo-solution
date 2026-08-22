@@ -63,11 +63,17 @@ const 총량읽기 = db.prepare(
           COALESCE(SUM(CASE WHEN originalSaved=1 THEN bytes ELSE 0 END),0) AS 보관bytes
      FROM upload_receipts`
 );
-/** ⚠ `routedTo='decision'` 조건이 이 문의 안전장치다 — 확정된 기록은 절대 안 지운다.
- *  올린 이 조건은 「모르면(NULL) 통과」가 아니라 **넘겼을 때만 검사**하도록 썼다. */
+/** 안전장치 **세 겹** — 하나라도 빠지면 남의 기록·남의 파일 기록이 지워진다.
+ *  ① `routedTo='decision'` — 확정된 기록은 절대 안 지운다(감사 기록이 조용히 사라지면 안 된다).
+ *  ② `uploadedById` — 남의 영수증은 못 지운다(넘겼을 때만 검사).
+ *  ③ ★ `filename` — **같은 파일의 물음 줄만** 지운다(2026-08-22 2라운드 검토관 [중]).
+ *     그전엔 이 조건이 없어, 아무 파일이나 올리면서 남의… 아니 **내 다른 파일**의
+ *     되묻기 줄 id를 실어 보내면 그 줄이 지워졌다. 되묻는 중 반입은 감사에도 안 남으므로
+ *     그 줄이 **그 파일의 유일한 흔적**이다 — 지워지면 「올린 사실 자체가 사라진다」. */
 const 되묻기지우기 = db.prepare(
   `DELETE FROM upload_receipts
     WHERE id = ? AND routedTo = 'decision'
+      AND filename = ?
       AND (? IS NULL OR uploadedById = ?)`
 );
 
@@ -137,10 +143,11 @@ function 줄로(r: Record<string, unknown>): 영수증 {
  *    있어도 안 지운다 — 감사 기록이 조용히 사라지면 이 표의 존재 이유가 없어진다.
  *  ⚠ 남의 영수증을 지우지 못하게 올린 이도 함께 본다.
  */
-export function 되묻기영수증지우기(id: string, uploadedById?: string): boolean {
+export function 되묻기영수증지우기(id: string, filename: string, uploadedById?: string): boolean {
   try {
     const r = 되묻기지우기.run(
       String(id),
+      String(filename),
       uploadedById == null ? null : String(uploadedById),
       uploadedById == null ? null : String(uploadedById)
     );

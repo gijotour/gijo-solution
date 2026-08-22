@@ -89,17 +89,72 @@ describe("★ 정리 대장이 새 표를 빠뜨리지 않는다", () => {
       audit_log: "감사 기록 — **일부러 안 지운다**(지워지는 감사는 감사가 아니다)",
       memory_documents: "지식 문서 메타 — AI 지식 화면이 따로 관리한다",
       schema_migrations: "마이그레이션 대장 — 제품 뼈대다",
+      smtp_config: "메일 서버 설정 — 제품 구성이다",
+      cloud_llm_keys: "클라우드 열쇠 — 설정이지 업무 데이터가 아니다",
+      compliance_status: "규정 준수 상태 — 파생 계산값(원천은 다른 표들)",
+
+      // ⚠⚠ **아래는 「제외」가 아니라 「아직 판단 안 함」이다** (2026-08-22 2라운드).
+      //   전수 대조로 바꾸는 순간 미분류 표가 **29개** 드러났다 — 정리 대장이 처음부터
+      //   전수가 아니었다는 뜻이다. 여기서 한꺼번에 갈래를 정하지 **않는다**:
+      //   잘못 넣으면 실사용 전환에서 **지우면 안 될 것이 지워진다**(되돌릴 수 없다).
+      //   ★ 그래서 「오늘 아는 상태」로 못박아 둔다. 값어치는 그대로다 —
+      //     **내일 새 표를 만들면 목록에 없어서 이 시험이 빨개진다.** 그게 이 감시의 목적이다.
+      //   ▶ 남은 일: 아래 목록을 하나씩 갈래(지운다/안 지운다)로 옮기기. 옮길 때마다 한 줄 삭제.
+      chat_logs: "⏳ 판단 대기 — 대화 기록(작업 내역 sessions와 관계 확인 필요)",
+      cloud_egress_log: "⏳ 판단 대기 — 바깥으로 나간 기록. 감사 성격일 가능성이 높다",
+      cloud_usage: "⏳ 판단 대기 — 사용량 집계(파생일 가능성)",
+      cti_feeds: "⏳ 판단 대기 — 위협정보 구독처. 설정에 가깝다",
+      cti_sync: "⏳ 판단 대기 — 동기화 상태(파생일 가능성)",
+      finding_approvals: "⏳ 판단 대기 — 승인 이력. 감사 성격일 가능성이 높다",
+      learnloop_runs: "⏳ 판단 대기 — 학습 실행 이력",
+      llm_activity_daily: "⏳ 판단 대기 — AI 팀 감독의 원천(현황판이 이 값을 센다)",
+      ontology_triples: "⏳ 판단 대기 — 온톨로지 시드. 제품 자산에 가깝다",
+      routine_feedback: "⏳ 판단 대기 — 예약 루틴 피드백",
+      scan_runs: "⏳ 판단 대기 — 스캔 실행 이력(assets·cti_findings와 짝인지 확인 필요)",
+
+      // db.ts 밖(각 엔진 모듈)에서 만드는 표들 — 같은 이유로 오늘은 판단을 미룬다.
+      user_mfa: "2차 인증 등록 — 계정 딸림. 지우면 로그인이 막힌다",
+      user_mfa_recovery: "2차 인증 복구 코드 — 계정 딸림",
+      model_auth: "모델 접속 자격 — 설정이다",
+      law_config: "법제처 연동 설정 — 설정이다",
+      client_releases: "클라 배포 대장 — 제품 배포 기반이다(지우면 자동 업데이트가 끊긴다)",
+      smtp_inbound_config: "수신 메일 설정 — 설정이다",
+      alert_schedules: "⏳ 판단 대기 — 알림 예약",
+      report_schedules: "⏳ 판단 대기 — 리포트 예약(업무 데이터일 가능성이 높다)",
+      report_schedule_runs: "⏳ 판단 대기 — 리포트 예약 실행 이력",
+      analysis_event_status: "⏳ 판단 대기 — analysis_events의 짝(함께 지워야 할 가능성이 높다)",
+      action_check_history: "⏳ 판단 대기 — 행동 대조 이력(축적 자산 후보)",
+      answer_feedback: "⏳ 판단 대기 — 답변 피드백(학습 재료)",
+      learn_candidate_decisions: "⏳ 판단 대기 — 학습 후보 승인·반려",
+      lora_adapters: "⏳ 판단 대기 — 어댑터 대장(제품 자산에 가깝다)",
+      model_adoptions: "⏳ 판단 대기 — 모델 채택 이력",
+      doc_digests: "⏳ 판단 대기 — 문서 반입 소식",
+      doc_requests: "⏳ 판단 대기 — 개발팀 요청 문서",
+      handover_history: "⏳ 판단 대기 — 인수인계 기록(업무 데이터일 가능성이 높다)",
+      outbound_requests: "⏳ 판단 대기 — 바깥으로 나간 요청(감사 성격일 가능성)",
+      work_events: "⏳ 판단 대기 — 작업 원장(아낀 시간 KPI의 원천)",
     };
     const 실제표 = (db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
     ).all() as { name: string }[]).map((r) => r.name);
     // 이 시험이 헛돌지 않는지 — 표를 실제로 읽었나.
     expect(실제표.length, "DB에서 표를 하나도 못 읽었다 — 이 시험이 저절로 통과한다").toBeGreaterThan(5);
-    // 오늘 새로 만든 셋은 반드시 대장에 있어야 한다(나머지는 아직 전수 분류 전이라 이 셋만 못박는다).
-    for (const t of ["upload_receipts", "personal_doc_versions", "personal_doc_files"]) {
-      if (!실제표.includes(t)) continue; // 이 판에 아직 없는 표는 건너뛴다
-      expect(대장이아는표.has(t) || t in 일부러제외,
-        `${t}가 정리 대장 어디에도 없다 — 지워도 남거나, 지우면 안 되는데 지워진다`).toBe(true);
+
+    // ★★ **전수로 본다** (2026-08-22 2라운드 검토관 [중] 수리 — 내 첫 시험이 거짓말이었다).
+    //   처음엔 「새 표를 만들면 여기서 걸린다」고 제목을 달아 놓고 실제로는 **하드코딩한 세
+    //   이름**만 봤다. 그러면 새 표가 생겨도 원리상 절대 안 빨개진다 — 제목과 커밋이 거짓이 된다.
+    //   이제 sqlite_master 전수를 대조한다: 대장에도 없고 제외 목록에도 없으면 실패한다.
+    //   ⚠ 실패했을 때 할 일은 「제외에 밀어 넣기」가 아니라 **갈래를 판단해 적는 것**이다.
+    //     그래서 제외 목록에 **이유를 강제**한다(빈 문자열이면 아래 시험이 잡는다).
+    const 미분류 = 실제표.filter((t) => !대장이아는표.has(t) && !(t in 일부러제외));
+    expect(
+      미분류,
+      "정리 대장이 모르는 표가 있다 — 각각 「업무 데이터라 지운다(TARGETS)」인지 " +
+      "「지우면 안 된다(일부러제외에 이유와 함께)」인지 판단해 적을 것"
+    ).toEqual([]);
+    // 제외 사유가 빈칸이면 감시가 헛돈다 — 이름만 올려 두는 것을 막는다.
+    for (const [이름, 이유] of Object.entries(일부러제외)) {
+      expect(이유.length, `${이름}의 제외 사유가 너무 짧다`).toBeGreaterThan(8);
     }
   });
 });

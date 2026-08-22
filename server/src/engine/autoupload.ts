@@ -16,7 +16,7 @@ import { importVulnScan, parseNessusHtml } from "./vulnscan";
 import { 영수증남기기, 영수증목록, 되묻기영수증지우기, 갈래이름, type 반입갈래 } from "./uploadreceipt";
 import { maskSecrets } from "./secretscan";
 import { importManual, classifyManual, listProducts, guessProductName } from "./securityproducts";
-import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, cleanupOldOriginal, 열람불가공용 } from "./memory";
+import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, cleanupOldOriginal, 열람불가공용, 등급판정가능 } from "./memory";
 
 // 사용자가 결정창에서 고를 수 있는 유형(파일명으로 애매할 때).
 //
@@ -514,20 +514,36 @@ export function registerAutoUploadRoutes(app: Express): void {
   //     게다가 이 탭은 **그전에 `/api/memory/documents`(등급 필터를 지난 목록)를 쓰고 있었다.**
   //     원천을 갈아타면서 잣대를 떨어뜨린 것이라, 새로 연 구멍이다.
   //
-  //   잣대 두 겹(순서대로):
+  //   잣대 네 겹(순서대로 — 2026-08-22 2라운드 검토관 [높음]으로 ③이 더해졌다):
   //     ① **내가 올린 것**은 언제나 보인다 — `uploadedById`(바뀌지 않는 id)로 가른다.
   //        ⚠ 표시 이름(uploadedBy)으로 가르지 않는다: 동명이인·개명에서 어긋난다.
   //          같은 날 오전 basename 키잉으로 기밀이 샌 것과 같은 부류다.
-  //     ② **남의 것**(과 id가 없는 옛 줄)은 등급 검사를 지나야 보인다 —
+  //     ② **관리자**는 팀 반입을 본다(감사·운영). 등급은 그대로 건다.
+  //     ③ ★ **판정할 근거가 없으면 감춘다.** 문서 메타 행이 없는 갈래(되묻는 중·SBOM·
+  //        취약점 스캔·수집 실패)는 등급을 매길 자리 자체가 없다 — 여기서 「없으니 통과」로
+  //        두면 그게 fail-open이다.
+  //     ④ **남의 것**(과 id가 없는 옛 줄)은 등급 검사를 지나야 보인다 —
   //        `열람불가공용` **단일 잣대**를 그대로 부른다(사본을 만들지 않는다).
-  //        영수증의 filename이 곧 documentId다(saveDocArtifacts가 그 키로 저장한다).
+  //        ⚠ 「영수증의 filename이 곧 documentId다」는 **문서 갈래에만 참**이다 —
+  //          전칭으로 적었던 첫 주석이 바로 위 ③의 구멍을 못 보게 했다.
   app.get("/api/upload/receipts", authMiddleware, (req, res) => {
     const 상한 = Math.min(1000, Math.max(1, Number((req.query.limit as string) ?? 300) || 300));
-    const me = (req as Request & { user?: { id?: string | number; username?: string } }).user;
+    const me = (req as Request & { user?: { id?: string | number; username?: string; role?: string } }).user;
     const 내id = me?.id != null ? String(me.id) : (me?.username ?? null);
+    const 관리자 = me?.role === "admin";
     const r = 영수증목록(상한, (row) => {
-      if (내id && row.uploadedById && row.uploadedById === 내id) return true; // ① 내 것
-      return !열람불가공용(row.filename, req); // ② 남의 것 — 등급이 허락할 때만
+      // ① 내가 올린 것 — 언제나 보인다.
+      if (내id && row.uploadedById && row.uploadedById === 내id) return true;
+      // ② 관리자 — 팀이 무엇을 넣었는지 봐야 하는 자리다(감사·운영). 등급은 그대로 건다.
+      if (관리자) return !열람불가공용(row.filename, req);
+      // ③ ★★ **판정할 근거가 없으면 감춘다** (2026-08-22 2라운드 검토관 [높음] 수리).
+      //    `열람불가공용`은 문서 메타 행이 없으면 false(=열어 준다)를 준다 — 문서 라우트에선
+      //    옳지만 **여기서는 fail-open**이다. 되묻는 중(decision)·SBOM·취약점 스캔·수집 실패는
+      //    애초에 문서 행이 없어, 남의 「퇴사자명단_최종.xlsx」가 그대로 보였다.
+      //    ⚠ 내가 게이트를 넣고도 이 갈래를 놓쳤다. 그래서 **막힘이 아니라 판정 가능함을 먼저** 묻는다.
+      if (!등급판정가능(row.filename)) return false;
+      // ④ 판정할 수 있으면 단일 잣대에 맡긴다.
+      return !열람불가공용(row.filename, req);
     });
     res.json({
       목록: r.목록,
@@ -609,13 +625,12 @@ export function registerAutoUploadRoutes(app: Express): void {
       //   사람의 행위는 한 번인데 영수증이 두 줄이면, 앞 줄은 영영 「되묻는 중」으로 남아
       //   미처리 파일이 있는 것처럼 보인다.
       //   ⚠ 파일명이 아니라 **클라가 돌려준 그 영수증의 id**로 짝을 찾는다(이름 키잉 금지).
+      //     ★ 단, 지우는 문에는 **filename도 함께** 건다(2라운드 [중]) — id만 믿으면
+      //       무관한 업로드로 내 다른 파일의 물음 줄을 지울 수 있다.
       //   ⚠ 지우기가 실패해도 반입은 계속한다 — 정리는 부가 가치이지 전제가 아니다.
       const 지울영수증 = typeof (req.body as { replacesReceiptId?: unknown })?.replacesReceiptId === "string"
         ? String((req.body as { replacesReceiptId?: string }).replacesReceiptId)
         : undefined;
-      if (지울영수증 && !되묻는중) {
-        되묻기영수증지우기(지울영수증, user?.id != null ? String(user.id) : (user?.username ?? undefined));
-      }
       let 영수증id: string | null = null;
       try {
         영수증id = 영수증남기기({
@@ -638,6 +653,16 @@ export function registerAutoUploadRoutes(app: Express): void {
           note: 되묻는중 ? "사람이 유형을 고르면 그때 반영됩니다" : undefined,
         });
       } catch { /* 영수증은 부가 기록이다 — 실패해도 반입을 막지 않는다(uploadreceipt가 이미 삼키지만 이중 방어) */ }
+      // ★★ 물음 줄은 **새 줄이 실제로 생긴 뒤에** 지운다 (2026-08-22 2라운드 검토관 [중]).
+      //   그전엔 지우기가 넣기보다 **먼저** 돌았다. 넣기가 실패하면(디스크 가득·IO 오류)
+      //   두 실패가 모두 조용히 삼켜져 **옛 줄도 새 줄도 없는 상태**가 된다 —
+      //   이 표가 막으려던 「올린 사실 자체가 사라진다」로 정확히 되돌아간다.
+      //   트랜잭션으로 묶지 않는 이유: 영수증은 반입을 막으면 안 되는 부가 기록이라
+      //   실패해도 본체가 굴러가야 한다. 순서만 뒤집으면 **최악이 「두 줄」**이 된다 —
+      //   두 줄은 보기 싫을 뿐이고, 0줄은 기록이 사라지는 것이다. 나쁜 쪽을 고르지 않는다.
+      if (지울영수증 && !되묻는중 && 영수증id) {
+        되묻기영수증지우기(지울영수증, filename, user?.id != null ? String(user.id) : (user?.username ?? undefined));
+      }
       // ➡ 반입 다음 칩(2026-08-19 사장님 QA — 「파일 올리면 다른 가이드라인이 없는데?」):
       //   반입은 대화 지시가 아니라 nextguide 경로 표를 안 타서 칩이 영영 안 붙던 사각지대다.
       //   문장은 시나리오 실측 ✓ 확인된 것만(nextguide와 같은 원칙).

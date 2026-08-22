@@ -81,6 +81,35 @@
 - ⚠ **문서 정리가 남았다**: `GIJO_AS_Lite_설치안내서_2026-08-13.md`가 아직 Smart MD를
   「함께 드리는 무료 도구」로 안내한다. 라이트 재편(메뉴 2개)과 함께 다시 써야 한다 — 사장님 판단 대기.
 
+### ★★ 게시 전 검토관 45건 수리 (2026-08-22 밤 · 커밋 11cce495)
+
+5갈래 병렬 검토가 49건 적발 → 반증 4건 기각 → **45건 확정.** [높음] 4건이 **그날 라운드가
+새로 만든 것**이었다. 게시는 이 수리 뒤로 미뤘다.
+
+| 파일 | 무엇이 바뀌었나 |
+|---|---|
+| ⚠ `server/src/db.ts` | 마이그레이션 `upload-receipts-uploader-id-2026-08-22`(ALTER — 운영 schema 46→47) |
+| `server/src/engine/uploadreceipt.ts` | 영수증목록 반환이 **배열→객체**(`{목록,건수,전체바이트,원본보관바이트}`) · 거르개 인자 · `되묻기영수증지우기()` 신설 · `uploadedById` · 갈래 이름 2개 정정(asset=보안제품 매뉴얼·log=로그 매뉴얼) |
+| ⚠ `server/src/engine/autoupload.ts` | 영수증 창구에 **등급·소유자 게이트**(열람불가공용) · `replacesReceiptId` 수신 · 응답에 `receiptId` |
+| ⚠ `server/src/engine/memory.ts` | `ingest-file`에 **비밀 검사 추가**(창구 두 벌이던 잣대를 하나로) — 응답에 `비밀경고` 필드가 붙을 수 있다 |
+| `server/src/engine/datacleanup.ts` | `TARGETS` **export** · 개인 문서 정리에 판 이력·첨부 대장 추가 · `upload_receipts` 갈래 신설 · 첨부 폴더 리셋 목록 추가 |
+| ⚠ `server/src/engine/screenguide.ts` | `이름으로화면찾기`가 **`open`(여는 주소)을 함께 반환** · 「제품 안내」→**「GIJO AS 안내」** 이름 변경 · `/` 명령·내보내기 안내 정정 (**공용 파일**) |
+| ⚠ `server/src/engine/dispatcher.ts` | `openScreen.page = 찾는화면.open ?? 찾는화면.screen` (**공용 파일**) |
+| `server/src/engine/agenttools/handlers.ts` | 제품 소개자료 등록 완료 문구를 「내 문서 > 📦 보안제품 자료」로 |
+| ⚠ `client/src/renderer/pages/nav.js` | TAB_REDIRECT에 intro.html · 즐겨찾기 배지를 **그린 것만** 세도록 (**공용 파일**) |
+| `client/src/renderer/pages/app.html` | 「옛탭」 표에 intro.html(파일이 없으면 nav.js는 못 막는다) |
+| `client/src/renderer/pages/mydocs.html` | 담당자 관리 스테이지(lite-contacts를 iframe으로 품음) · 연락처 클릭에서 전화·이메일 제거 · 반입 data-id·총계·열 이름 · vendor 상세 · 편집원본(미저장 경고) |
+| `client/src/api/assets.ts` · `preload.ts` · `console.js` | `replacesReceiptId` 왕복 |
+| `client/src/renderer/pages/lite-memo.html` | **삭제**(고아 화면 — 어느 메뉴에도 없었고 내용이 없어진 Smart MD 전제) |
+| `client/src/renderer/pages/lite-memory.html` · `lite-screens.json` | 죽은 단추·거짓 안내 제거 · 되살리면 깨지는 배선 해제 |
+| `tools/gen-sbom-self.mjs` · `publish-gate-ui.mjs` · `qa-auto.mjs` · `wsl-test.sh` | 동봉 판정을 extraResources까지 · 제외 표 실재 검사 · QA 제목 숫자 · rsync 이유 갱신 |
+
+**새 감시 5개**(max도 이 시험을 돌리게 된다): 영수증 등급·소유자 게이트 · 거르고 자르는 순서 ·
+회사문서 창구 **둘 다** 비밀 검사 · 정리 대장이 새 표를 빠뜨리지 않음 · 흡수 별칭 5개.
+
+⚠ **max에서 주의**: `영수증목록()`의 반환 모양이 바뀌었다 — 그 함수를 부르는 코드가 있으면
+`.목록`을 붙여야 한다. 시험 4,047개로 늘었다.
+
 ### 진행 중이라 아직 인계 대상이 아닌 것
 
 - 규정 판정 요청함 — 시안·설계 검토 완료, 착수 전

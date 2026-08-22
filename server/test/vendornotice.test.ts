@@ -161,3 +161,33 @@ describe("게시 관문 배선 — 판정 함수를 부르고 **막는지**", ()
     expect(관문, "관문도 공용 파서를 써야 한다").toMatch(/vendor-manifest\.mjs/);
   });
 });
+
+// ★★ **일부러 둔 두 벌이 어긋나지 않는가** (2026-08-22 2라운드 검토관 [낮음])
+//
+// ■ `배포에담나()`는 여기와 `tools/gen-sbom-self.mjs`(smartmd배포에담나) **두 곳**에 있다.
+//   일부러 그렇다 — 관문은 「고지에 적을까」를, 시험은 「검사할까」를 정하므로 쓰임이 다르다.
+//   ⚠ 하지만 **넓이가 어긋나면** 한쪽은 「싣는다」, 다른 쪽은 「안 싣는다」로 갈려서
+//     시험은 전부 skip인데 관문은 고지를 적거나, 그 반대가 된다 — 둘 다 조용한 실패다.
+//   ■ 그래서 **같은 자리를 보는지**를 소스로 못박는다. 새 자리를 넓히면 양쪽 다 넓히게 된다.
+describe("★ 동봉 판정 두 벌이 같은 넓이를 본다", () => {
+  const 관문 = fs.readFileSync(path.join(저장소, "tools", "gen-sbom-self.mjs"), "utf8");
+  const 나 = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+
+  it("★★ 양쪽 다 files·extraResources·extraFiles를 본다", () => {
+    for (const [이름, src] of [["관문(gen-sbom-self)", 관문], ["시험(vendornotice)", 나]] as [string, string][]) {
+      for (const 자리 of ["files", "extraResources", "extraFiles"]) {
+        expect(src, `${이름}이 ${자리}를 안 본다 — 그 갈래로 동봉하면 고지가 빠진다`)
+          .toContain(자리);
+      }
+      // win/mac 하위 블록도 — 라이트가 실제로 거기 쓴다.
+      expect(src, `${이름}이 win/mac 하위 extraResources를 안 본다`).toMatch(/win|mac/);
+    }
+  });
+
+  it("★ 두 설정 파일을 **둘 다** 본다 — 한쪽만 보면 라이트/스탠다드가 갈린다", () => {
+    for (const [이름, src] of [["관문", 관문], ["시험", 나]] as [string, string][]) {
+      expect(src, `${이름}이 package.json을 안 본다`).toContain("package.json");
+      expect(src, `${이름}이 electron-builder.lite.json을 안 본다`).toContain("electron-builder.lite.json");
+    }
+  });
+});

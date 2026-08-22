@@ -158,6 +158,20 @@
 (function () {
   "use strict";
   var g = window.gijo || null;
+
+  /** ★ 비밀정보 경고를 **사람에게 보인다** (2026-08-22 2라운드 검토관 [중]).
+   *  서버는 회사 문서 반입 창구 **둘 다**에서 비밀 검사를 하는데, 이 창구의 결과는
+   *  **아무도 안 읽어** 사람이 못 봤다 — 콘솔 ＋는 경고가 뜨고 여기는 무언이었다.
+   *  ⚠ 막지 않고 알린다 · ⚠ 가려진 값(masked)만 쓴다(경고하려다 유출하면 안 된다). */
+  function 비밀안내(r) {
+    var h = r && r.비밀경고;
+    if (!h || !h.length) return "";
+    return '<div class="warn">🔑 비밀번호·API 키로 보이는 것이 ' + h.length + '곳 있습니다: ' +
+      h.slice(0, 3).map(function (x) { return (x.kind || "?") + " — " + (x.masked || ""); }).join(" · ") +
+      (h.length > 3 ? " 외 " + (h.length - 3) + "곳" : "") +
+      '<br>장비 접속 정보는 <b>보안제품 등록부</b>(암호화 보관)에 두세요.</div>';
+  }
+
   var 분류 = "장비운영";
   var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
@@ -282,7 +296,7 @@
     if (!f) { msg.innerHTML = '<div class="err">파일을 고르세요.</div>'; return; }
     btn.disabled = true; msg.innerHTML = '<div class="empty">넣는 중…</div>';
     try {
-      await g.ingestMemoryFile(f.name, await 파일을base64로(f), "global");
+      var 결과 = await g.ingestMemoryFile(f.name, await 파일을base64로(f), "global");
       // ⚠ 넣자마자 분류를 붙인다 — 안 붙이면 이 화면 목록에 안 나타난다.
       //   「넣었는데 안 보인다」가 가장 헷갈리는 실패다.
       try { await g.setDocCategory(f.name, 분류); } catch (e2) { /* 분류 실패는 아래에서 알린다 */ }
@@ -291,9 +305,10 @@
         var all = await g.listMemoryDocuments();
         붙었나 = (Array.isArray(all) ? all : all.documents || []).some(function (d) { return d.documentId === f.name && d.category === 분류; });
       } catch (e3) { /* 확인 실패는 무해 */ }
-      msg.innerHTML = 붙었나
+      msg.innerHTML = (붙었나
         ? '<div class="ok">넣었습니다 — 이제 위에서 찾을 수 있습니다.</div>'
-        : '<div class="ok">넣었습니다.</div><div class="warn">⚠ 다만 「' + esc(분류) + '」 분류가 안 붙었습니다 — 아래 목록에 안 보일 수 있습니다.</div>';
+        : '<div class="ok">넣었습니다.</div><div class="warn">⚠ 다만 「' + esc(분류) + '」 분류가 안 붙었습니다 — 아래 목록에 안 보일 수 있습니다.</div>')
+        + 비밀안내(결과);
       document.getElementById("file").value = "";
     } catch (e) { msg.innerHTML = '<div class="err">' + 오류문구(e, "매뉴얼 넣기") + "</div>"; }
     btn.disabled = false;

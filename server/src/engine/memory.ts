@@ -83,6 +83,22 @@ export function 열람불가공용(documentId: string, req: import("express").Re
   return blockedGrades(clearanceOf(who?.clearance)).includes(gradeOf(meta.grade));
 }
 
+/** ★ **등급을 매길 행이 있는가.**
+ *
+ *  왜 필요한가 (2026-08-22 2라운드 검토관 [높음]): 위 `열람불가공용`은 **문서 메타 행이
+ *  없으면 false(=열어 준다)**를 돌려준다. 문서 라우트에서는 옳다 — 없는 문서는 각자
+ *  404를 내면 되니까. 그런데 **영수증 목록처럼 「이 줄을 보여 줄까」를 묻는 자리**에서
+ *  그대로 쓰면 **fail-open**이 된다: 되묻는 중(decision)·SBOM·취약점 스캔·수집 실패는
+ *  애초에 문서 행이 없어서, 남의 「퇴사자명단.xlsx」가 전원에게 그대로 보인다.
+ *  (내가 그 게이트를 넣고도 이 갈래를 놓쳤다 — 2라운드가 잡았다.)
+ *
+ *  ⚠ 그러니 그런 자리는 **「막힘」이 아니라 「판정 가능함」을 먼저 묻고**, 판정할 근거가
+ *    없으면 감춘다. 모르면 감춘다 — 안전한 쪽으로 기운다.
+ */
+export function 등급판정가능(documentId: string): boolean {
+  return !!getDocMetaStmt.get(documentId);
+}
+
 // ⚠ 위 upsert가 sourcePath를 COALESCE로 지키기 때문에(원본을 안 넘기는 인입 경로가 옛 원본을
 //   지우지 않게 하려는 의도) 「원본 보관 끄기」는 **명시적으로 비우는 길**이 따로 있어야 한다.
 //   saveDocArtifacts가 파일을 지울 때 함께 부른다(2026-08-22 검토관 확정 수리).

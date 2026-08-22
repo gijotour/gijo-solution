@@ -418,7 +418,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       <span style="font-weight:800;font-size:13.5px">담당자 관리</span>
       <span class="gm2" style="margin-left:8px">전화·이메일은 이 PC에만 저장됩니다</span>
     </div>
-    <iframe id="cxContactsFrame" title="담당자 관리" style="width:100%;height:calc(100% - 34px);border:0;background:transparent"></iframe>
+    <!-- ⚠ **백분율 높이를 쓰지 않는다** (2026-08-22 2라운드 검토관 [중]). `.stage`에 높이가
+         없어서 `height:calc(100% - 34px)`가 auto로 떨어지고, iframe이 기본 높이(약 150px)로
+         접혔다 — 「열리지만 못 쓰는」 상태다. 형제 스테이지들이 전부 px·vh 폴백을 갖는 이유가
+         이것이다(.edit-src textarea min-height:300px 등). 여기도 같은 잣대로 vh를 쓴다. -->
+    <iframe id="cxContactsFrame" title="담당자 관리" style="width:100%;height:calc(100vh - 190px);min-height:420px;border:0;background:transparent"></iframe>
   </div>
       </div><!-- /v4docpane -->
     </div><!-- /v4content -->
@@ -624,7 +628,9 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     var cxc = document.getElementById("cxContactsStage");
     cxc.classList.toggle("on", which === "contacts");
     var cxf = document.getElementById("cxContactsFrame");
-    if (which === "contacts") { if (!cxf.getAttribute("src")) cxf.setAttribute("src", "lite-contacts.html?embed=1"); }
+    //   ⚠ `theme=host`를 반드시 싣는다(2026-08-22 2라운드 검토관 [중]) — 안 실으면 그 화면의
+    //     라이트 전용 연초록 팔레트가 공용 토큰을 덮어써서 흰 프로 안에 초록 판이 뜬다.
+    if (which === "contacts") { if (!cxf.getAttribute("src")) cxf.setAttribute("src", "lite-contacts.html?embed=1&theme=host"); }
     else if (cxf.getAttribute("src")) cxf.removeAttribute("src");
     var pane = document.getElementById("v4doc");
     pane.classList.toggle("staged", which !== "list");
@@ -642,8 +648,15 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   //    계속 보이므로 문이 여럿 생겼다. 한 곳이라도 빠지면 쓰던 글이 조용히 사라진다.
   async function 쓰던글확인() {
     if (스테이지값 === "edit") {
-      var 쓴것 = document.getElementById("editTitle").value.trim() || document.getElementById("editBody").value.trim();
-      if (!쓴것) return true;
+      // ★ 잣대를 **되돌리기 경고와 하나로** 맞춘다(2026-08-22 2라운드 검토관 [낮음]).
+      //   그전엔 「글자가 있으면 묻는다」였다 — 열어 보기만 한 문서를 닫아도 매번 물어서
+      //   사람이 경고를 흘려보게 만든다(늑대 소년). **연 뒤로 바뀐 게 있을 때만** 묻는다.
+      //   ⚠ 기준점이 없으면(옛 경로) 예전대로 「글자가 있으면 묻는다」로 떨어진다 — 안전한 쪽.
+      var 바뀜 = 편집원본
+        ? (document.getElementById("editTitle").value !== 편집원본.title ||
+           document.getElementById("editBody").value !== 편집원본.body)
+        : !!(document.getElementById("editTitle").value.trim() || document.getElementById("editBody").value.trim());
+      if (!바뀜) return true;
       return window.gijoAsk ? await window.gijoAsk("작성 중인 문서가 있습니다 — 저장하지 않고 나가면 사라집니다.\n나갈까요?") : false;
     }
     if (스테이지값 === "compose") {
@@ -651,6 +664,16 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       var 적음 = cx && ((cx.title || "").trim() || (cx.tried || "").trim() || (cx.happened || "").trim() || (cx.images || []).length);
       if (!적음) return true;
       return window.gijoAsk ? await window.gijoAsk("작성 중인 요청이 있습니다 — 저장하지 않고 나가면 사라집니다.\n나갈까요?") : false;
+    }
+    // ★ 📞 담당자 관리(2026-08-22 2라운드 검토관 [낮음]) — 이 파일이 스스로 적어 둔 계약은
+    //   「**소멸시킬 수 있는 모든 문 앞에** 세운다」다. 새로 낸 문이 그 계약을 안 지나고 있었다.
+    //   ⚠ 그 폼은 **다른 문서(iframe)** 안이라 여기서 값을 읽을 수 없다 — 읽으려 들면
+    //     같은 출처라도 배관이 하나 더 생기고, 그 배관이 어긋나면 이 문이 조용히 헛돈다.
+    //     그래서 **묻기만 한다.** 확실히 아는 것만 말하고, 모르는 것은 모른다고 하지 않는다.
+    if (스테이지값 === "contacts") {
+      return window.gijoAsk
+        ? await window.gijoAsk("담당자 관리 창을 닫습니다 — 적다 만 담당자가 있으면 사라집니다.\n(추가·수정은 그 안에서 [저장]을 눌러야 남습니다)\n닫을까요?")
+        : true;
     }
     return true;
   }
@@ -776,7 +799,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
                 '<span class="trunc" title="' + esc(d.title) + '">' + esc(d.title) + "</span>" +
                 (히트 ? '<span class="ta-r gtxt-share" title="본문에서 ' + 히트 + '번 나옵니다">' + 히트 + "곳</span>" : '<span class="ta-r gm2">읽기전용</span>') + "</div>";
             }).join("") + "</div>";
-        }).join("") : '<div class="empty">제품 안내 문서를 불러오지 못했거나 없습니다.</div>');
+        }).join("") : '<div class="empty">GIJO AS 안내 문서를 불러오지 못했거나 없습니다.</div>');
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;
@@ -815,13 +838,16 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       //   **일부러 지식에 안 넣으므로**(수천 줄 표가 다른 질문의 근거를 밀어낸다) 그 목록에 안 떴고,
       //   화면은 「스캐너 결과는 ① 발견·수집 화면에서 봅니다」라고 **떠넘기고 있었다.**
       //   → 이제 영수증 표(`/api/upload/receipts`)를 쓴다 — 갈래와 무관하게 **넣은 사실은 전부** 있다.
-      var 칸 = "1fr 96px 84px 90px 44px";
+      // ★ 「올린 이」 칸을 둔다 (2026-08-22 2라운드 검토관 [낮음]). 이 목록에는 **남의 반입도
+      //   섞여 온다**(관리자거나, 등급이 허락하는 남의 문서). 올린 사람이 안 보이면
+      //   전부 「내가 올린 것」으로 읽혀 배지 숫자와 감이 어긋난다.
+      var 칸 = "1fr 96px 84px 84px 74px 44px";
       list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:' + 칸 + ';gap:8px">' +
           // ★ 열 이름이 「보관·수집」이면 **지금 상태**로 읽힌다. 이 표는 **그때의 기록**이다
           //   (2026-08-22 검토관 [낮음]): 같은 이름을 다시 올리면 옛 원본이 지워지고 .md도
           //   덮이는데, 옛 줄은 계속 「원본·추출본」이라 적혀 있다. 감사 대응에서 「그때
           //   원본이 있다」고 믿고 찾으면 없다. 이름을 바꿔 **시점 기록임을 드러낸다.**
-          "<span>올린 파일</span><span>갈래</span><span>어디로</span><span>그때 남긴 것</span><span class=\"ta-r\">올린 때</span></div>" +
+          "<span>올린 파일</span><span>갈래</span><span>어디로</span><span>그때 남긴 것</span><span>올린 이</span><span class=\"ta-r\">올린 때</span></div>" +
         (영수증.length ? '<div class="g-rows-flat">' + 영수증.map(function (d) {
           // 「무엇이 실제로 남았나」를 한 칸에 — 오늘 갈라 둔 세 값(원본·추출본·수집)을 그대로 쓴다.
           var 남음 = [];
@@ -835,7 +861,14 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
           //   이 탭에서만 조용히 회귀). 영수증의 filename이 곧 documentId다.
           //   ⚠ **지식이 된 것에만** 붙인다 — 취약점·SBOM은 지식 문서가 없어 눌러도 열 것이 없다.
           //     없는 것에 커서를 주면 「눌렀는데 아무 일도 안 난다」가 된다.
-          var 지식됨 = !!know.find(function (x) { return x.documentId === d.filename; });
+          //   ★★ 판정을 **영수증 자신의 값**으로 한다 (2026-08-22 2라운드 검토관 [중]).
+          //     처음엔 `know`(회사 지식 목록)를 뒤져서 정했는데, 그러면 그 창구가 한 번
+          //     실패하면(401·500) know=[]가 되어 **모든 줄이 조용히 안 눌리는 줄**이 된다 —
+          //     5.65.0에서 고친 「이 탭에서만 추출본 뷰어가 죽는」 증상이 그대로 재현되고,
+          //     화면은 아무 말도 안 한다(탭별 오류 표가 know 오류를 안 보기 때문에).
+          //     `ingested`·`mdSaved`는 **서버가 그때 실제로 만든 것**을 적은 값이라 남의
+          //     창구 상태에 안 흔들린다.
+          var 지식됨 = !!(d.ingested || d.mdSaved);
           return '<div class="g-rows-r' + (지식됨 ? "" : " noclick") + '"' +
             (지식됨 ? ' data-id="' + esc(d.filename) + '"' : "") +
             ' title="' + esc(d.detail || "") + '" style="grid-template-columns:' + 칸 + ';gap:8px">' +
@@ -843,15 +876,23 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
             '<span class="gm2 trunc">' + esc((갈래이름 || {})[d.kind] || d.kind) + "</span>" +
             '<span class="gm2 trunc">' + esc(어디로글(d.routedTo)) + "</span>" +
             '<span class="gm2 trunc">' + esc(남음글) + "</span>" +
+            '<span class="gm2 trunc" title="' + esc(d.uploadedBy || "") + '">' + esc(d.uploadedBy || "-") + "</span>" +
             '<span class="ta-r gm2">' + 날짜(d.uploadedAt) + "</span></div>";
         }).join("") + "</div>"
           : '<div class="empty">＋로 올린 파일의 기록이 여기 쌓입니다 — <b>문서·취약점 스캔·로그·부품표 전부</b>.<br>' +
             '<span class="gm2">2026-08-22 이전에 올린 것은 이 기록이 없습니다 — 그때는 만들지 않았습니다.</span></div>') +
+      // ★★ **잘렸으면 잘렸다고 말한다** (2026-08-22 2라운드 검토관 [중]).
+      //   배지는 진짜 총계(서버가 거른 뒤 센 값)인데 목록은 조회 상한 300에서 끝난다.
+      //   말없이 자르면 담당자는 「내가 올린 그 파일이 기록에 없다」고 판단한다 —
+      //   감사 대응에서 정확히 위험한 오판이다. 학습 탭이 쓰는 잣대를 그대로 옮긴다.
+      ((영수증총계 && 영수증총계 > 영수증.length)
+        ? '<div class="empty">앞 ' + 영수증.length + '건만 표시했습니다 — 전체 <b>' + 영수증총계 + '건</b>입니다(최근 것부터).</div>'
+        : "") +
       // ⚠ 「그때 남긴 것」이 무슨 뜻인지 화면이 스스로 말한다 — 사건 기록이라는 설계가
       //   열 이름만으로는 안 드러난다(2026-08-22 검토관 [낮음]).
       '<div class="cx-note">🧾 이 목록은 <b>올린 그 순간의 기록</b>입니다 — 같은 이름을 다시 올리면 옛 원본·추출본은 새것으로 덮입니다.' +
       ' 지금 무엇이 남아 있는지는 <b>🏢 회사 지식</b>에서 그 문서를 열어 확인하세요.' +
-      ' 내가 올린 것과, 내 열람 등급으로 볼 수 있는 것만 보입니다.</div>';
+      ' <b>내가 올린 것</b>과, 내 열람 등급으로 볼 수 있는 것만 보입니다(관리자는 팀 반입도 봅니다) — 「올린 이」 칸으로 가릅니다.</div>';
     }
     탭수그리기();
     if (!목록모드) return;   // 스테이지 중 — 목록만 새로 그리고 고른 것·문서창은 그대로 둔다
@@ -896,7 +937,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     else if (탭 === "guide") d.innerHTML = '<div class="dm">행을 누르면 여기서 바로 본문이 열립니다. 제품이 담아 온 읽기전용 문서라 여기서는 고치지 않습니다.</div>';
     else if (탭 === "ingest") d.innerHTML = '<div class="dm">＋로 올린 문서가 어디로 갔는지의 기록입니다.<div class="dbt"><button class="go" data-go="analysis.html" data-lb="발견·수집">🗔 발견·수집(스캐너·로그 반입)</button></div></div>';
     else if (탭 === "mine") d.innerHTML = '<div class="dm">행을 누르면 여기서 내용·조작(고치기·AI 포함·공유·내려받기·삭제)을 봅니다.</div>';
-    else d.innerHTML = ""; // learn — 전폭이라 숨겨져 있지만 이전 탭 문구를 남기지 않는다(중4)
+    // ★ 📦 보안제품 자료(2026-08-22 2라운드 검토관 [낮음]) — 행을 눌러 상세가 열리게 만들었으면
+    //   **초기 안내도 있어야** 한다. 없으면 이 탭만 빈 문서창이라 「고장인가?」로 읽힌다.
+    else if (탭 === "vendor") d.innerHTML = '<div class="dm">행을 누르면 그 제품의 자료(제조사·분류·요약)를 봅니다.<br>도입을 <b>검토 중인 타사 제품</b> 카탈로그입니다 — 우리가 쓰는 제품은 「우리 보안제품」 화면입니다.<div class="dbt"><button class="go" data-go="securityproducts.html" data-lb="우리 보안제품">🗔 우리 보안제품</button></div></div>';
+    // 📞 연락처는 목록이 **전폭**이라 문서창을 안 쓴다(학습과 같은 결) — 문구를 남기지 않는다.
+    else d.innerHTML = ""; // learn · contacts — 전폭이라 숨겨져 있지만 이전 탭 문구를 남기지 않는다(중4)
     // 고른 것이 없으면 좁은 자리의 덮개도 걷는다 — 안 걷으면 빈 문서창이 목록을 가린 채 남는다.
     문서창보임(false);
   }
@@ -1053,10 +1098,18 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     // ⚠ v4는 편집·요청을 쓰는 중에도 목록이 살아 있다(검토관 상1-c·중6) — 행을 누르면
     //   쓰던 글이 사라질 수 있으므로 먼저 되묻고, 이어 스테이지를 정직하게 내린다.
     //   안 내리면 편집기는 A인데 대화창 🎯만 B로 바뀌어 「이거 요약해줘」가 딴 문서를 답한다.
-    if (스테이지값 === "edit" || 스테이지값 === "compose") {
+    // ⚠ 「contacts」도 함께 본다(2026-08-22 2라운드 검토관 [낮음]) — 담당자 관리 창을 열어 둔 채
+    //   목록의 다른 줄을 누르면 그 창이 닫힌다. 소멸시킬 수 있는 문이므로 같은 잣대를 지난다.
+    if (스테이지값 === "edit" || 스테이지값 === "compose" || 스테이지값 === "contacts") {
       if (!(await 쓰던글확인())) return;
       스테이지("list");
     }
+    // ★★ **열 것이 없는 줄이면 아무것도 건드리지 않는다** (2026-08-22 2라운드 검토관 [중]).
+    //   그전엔 선택 막대(.sel)를 먼저 옮기고 나서 id를 찾아 `if (!kd) return`으로 빠졌다.
+    //   그러면 **막대는 새 줄에 있는데 상세·대화창 🎯는 옛 문서**인 상태가 된다 —
+    //   그 자리에서 ✏ 고치기를 누르면 화면이 가리키는 것과 **다른 문서**가 바뀐다.
+    //   조작이 없는 줄은 아예 클릭을 안 받는다(커서도 안 준다 — .noclick).
+    if (row.classList.contains("noclick")) return;
     Array.prototype.forEach.call(document.querySelectorAll(".g-rows-r.sel"), function (x) { x.classList.remove("sel"); });
     row.classList.add("sel");
     var id = row.getAttribute("data-id");
@@ -1085,7 +1138,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       var gd = guide.find(function (x) { return x.id === id; });
       if (!gd) return;
       선택 = { 탭: "guide", id: id };
-      알림(gd.title, "제품 안내 「" + gd.title + "」 · " + (GUIDE_GROUP[gd.group] ? GUIDE_GROUP[gd.group].label : "업무 지침") + " · 읽기전용");
+      알림(gd.title, "GIJO AS 안내 「" + gd.title + "」 · " + (GUIDE_GROUP[gd.group] ? GUIDE_GROUP[gd.group].label : "업무 지침") + " · 읽기전용");
       d.innerHTML = '<div class="dn">' + esc(gd.title) + "</div>" +
         '<div class="dm">📘 ' + (GUIDE_GROUP[gd.group] ? GUIDE_GROUP[gd.group].label : "업무 지침") + " · 제품이 담아 온 읽기전용 문서 — 여기서는 고치지 않습니다.</div>" +
         '<div class="dbt">' +
@@ -1097,7 +1150,19 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       return;
     } else if (탭 === "know" || 탭 === "ingest") {
       var kd = know.find(function (x) { return x.documentId === id; });
-      if (!kd) return;
+      if (!kd) {
+        // ★ **조용히 빠지지 않는다** (2026-08-22 2라운드 검토관 [중]).
+        //   반입 탭은 이제 영수증 값으로 「열 수 있다」를 판정하므로, 여기까지 왔는데
+        //   지식 목록에 없다면 **그 목록을 못 불러온 것**이거나 문서가 지워진 것이다.
+        //   둘 다 사람이 알아야 한다 — 안 알리면 「눌러도 아무 일이 없는」 화면이 된다.
+        선택 = null;
+        d.innerHTML = '<div class="dn">' + esc(id || "") + "</div>" +
+          '<div class="dm">' + (오류.know
+            ? "회사 지식 목록을 못 불러왔습니다 — " + esc(String(오류.know)) + "<br>잠시 뒤 다시 열어 보세요."
+            : "이 문서가 지식 목록에 없습니다 — 지워졌거나 아직 수집이 안 끝났습니다.") + "</div>";
+        문서창보임(true);
+        return;
+      }
       선택 = { 탭: 탭, id: id };
       알림(kd.documentId, "지식 문서 " + kd.documentId + " · " + (kd.category || "일반") + " · 조각 " + (kd.chunks || 0));
       d.innerHTML = '<div class="dn">' + esc(kd.documentId) + "</div>" +
@@ -1567,7 +1632,14 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
           saved.warnings.slice(0, 5).map(function (w) { return "· " + (w.kind || "?") + " — " + (w.masked || ""); }).join("\n") +
           "\n장비 접속 정보는 보안제품 등록부(암호화 보관)에 두세요.");
       }
-      편집원본 = null;     // 저장했으니 「미저장 변경」은 없다 — 기준점을 지운다
+      // ★★ **기준점을 지우지 않고 「방금 저장한 것」으로 옮긴다** (2026-08-22 2라운드 검토관 [낮음]).
+      //   `null`은 「기준점이 없다」와 「바뀐 게 없다」 **두 뜻을 겸했다** — 저장 뒤에도 편집기가
+      //   열려 있는 경로(§6 템플릿 수신 등)에서 이어 쓰면, 바뀐 것이 있는데도 「없음」으로 읽혀
+      //   되돌리기 경고가 **약한 쪽으로** 뜬다. 뜻을 하나로 둔다: 편집원본 = **서버에 있는 지금 값**.
+      편집원본 = {
+        title: document.getElementById("editTitle").value,
+        body: document.getElementById("editBody").value,
+      };
       스테이지값 = "list"; // 저장이 끝났으니 목록으로 — 불러오기()의 그리기가 이제 목록을 그린다
       await 불러오기();
     } catch (e) {
@@ -1604,7 +1676,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   document.getElementById("readBack").addEventListener("click", 목록으로);
   // 📞 담당자 관리를 닫으면 **매트릭스를 다시 그린다** — 안 그리면 「고쳤는데 안 바뀐다」로 보인다
   //   (iframe이 쓴 localStorage를 이 화면이 다시 읽어야 반영된다).
-  document.getElementById("cxContactsBack").addEventListener("click", function () { 목록으로(); });
+  document.getElementById("cxContactsBack").addEventListener("click", async function () {
+    if (!(await 쓰던글확인())) return;   // 적다 만 담당자가 사라질 수 있다 — 계약 위반이던 자리
+    목록으로();
+  });
 
   // ── 요청 만들기(문서함에서 자리 이전 — docbox.html 456-627 로직 승계, 새로 짜지 않았다) ──
   // 전달은 파일 저장뿐이다(사용자 결정 2026-07-30) — 메일 발송 기능은 없다.

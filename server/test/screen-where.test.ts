@@ -12,6 +12,9 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { 이름으로화면찾기, 화면위치안내 } from "../src/engine/screenguide";
 
 describe("이름으로화면찾기 — 자리를 물을 때만, 우리 이름으로만", () => {
@@ -154,5 +157,35 @@ describe("★ 내 문서 흡수 별칭(보안제품 자료·연락처) — 맞�
   it("자리질문이 아니면 안 걸린다 — 「보안제품 자료 좋다」는 길찾기가 아니다", () => {
     expect(이름으로화면찾기("보안제품 자료 좋다")).toBeNull();
     expect(이름으로화면찾기("담당자 연락처 등록해줘")).toBeNull();
+  });
+});
+
+// ★★ **소비 경로까지 잰다** — 생산자만 재면 어느 쪽이 끊겨도 초록이다 (2026-08-22 2라운드 [낮음])
+//
+// ■ 위 시험들은 `이름으로화면찾기`(생산자)가 `open`을 잘 주는지만 본다. 그런데 그 값이
+//   실제로 화면을 여는 데 쓰이려면 **두 소비 경로**를 지나야 한다:
+//     ① dispatcher가 `openScreen.page`에 `open`을 싣는가
+//     ② 내 문서 화면이 `?tab=` 을 읽어 그 갈래를 펴는가
+//   어느 하나가 끊겨도 「맞는 탭으로 연다」는 약속은 깨지는데 시험은 초록이었다.
+describe("★ 흡수 별칭의 **소비 경로** — 생산자만 재면 반쪽이다", () => {
+  const 저장소 = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
+
+  it("★★ dispatcher가 `open`을 openScreen에 싣는다 — 안 실으면 기본 탭이 열린다", () => {
+    const src = fs.readFileSync(path.join(저장소, "server", "src", "engine", "dispatcher.ts"), "utf8");
+    expect(src, "찾는화면.open을 안 쓴다 — 물은 갈래가 아니라 기본 탭(👤 내 것)이 열린다")
+      .toMatch(/찾는화면\.open\s*\?\?\s*찾는화면\.screen/);
+  });
+
+  it("★★ 내 문서 화면이 `?tab=`을 읽어 그 갈래를 편다 — 안 읽으면 주소만 바뀌고 화면은 그대로다", () => {
+    const 화면 = fs.readFileSync(
+      path.join(저장소, "client", "src", "renderer", "pages", "mydocs.html"), "utf8"
+    );
+    expect(화면, "주소의 tab을 안 읽는다 — ?tab=vendor로 열어도 기본 탭이 뜬다")
+      .toMatch(/get\(["']tab["']\)/);
+    // 우리가 별칭에서 쓰는 갈래 이름이 화면에 실제로 있는가 — 없으면 조용히 기본 탭으로 떨어진다.
+    for (const t of ["vendor", "contacts", "guide"]) {
+      expect(화면, `탭 「${t}」이 화면에 없다 — 별칭이 없는 갈래를 가리킨다`)
+        .toMatch(new RegExp(`data-t="${t}"`));
+    }
   });
 });

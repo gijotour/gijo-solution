@@ -87,7 +87,17 @@ describe("별도 창을 여는 IPC — 문지기를 안 거치는 자리", () =>
       경로들.some((p) => p.startsWith("../src/renderer/pages/") && p.includes(".html")),
       "우리 화면을 싣는 경로가 하나도 안 보인다 — 위 검사가 저절로 통과하고 있다"
     ).toBe(true);
-    // ④ 옛 창이 그대로 되살아나는 경로도 함께 막는다(이름 검사는 **보조** 잣대로만 남긴다).
+    // ④ ★ **설치본 자원 경로(resourcesPath)로 화면을 싣지 않는다** (2026-08-22 2라운드 [낮음]).
+    //    ②는 `path.join(__dirname, …)` 리터럴만 훑으므로, 같은 날 SBOM 관문에서 넓힌
+    //    **extraResources 갈래**(설치본에 폴더째 넣기)로 남의 렌더러를 실으면 0 매치로 초록이다.
+    //    그 갈래가 실제로 열려 있으니(라이트가 llama·python을 그렇게 싣는다) 함께 막는다.
+    //    ⚠ resourcesPath 자체는 정당하게 쓰인다(서버 dist·모델) — **화면(.html)을 싣는 것**만 막는다.
+    const 자원화면 = [...mainSrc.matchAll(/resourcesPath[^\n]*\.html/g)].map((m) => m[0]);
+    expect(
+      자원화면,
+      "설치본 자원 폴더에서 화면을 싣는다 — 우리 화면 폴더 밖이라 ②가 못 잡는 갈래다"
+    ).toEqual([]);
+    // ⑤ 옛 창이 그대로 되살아나는 경로도 함께 막는다(이름 검사는 **보조** 잣대로만 남긴다).
     expect(mainSrc, "smartmd 창이 되살아났다").not.toMatch(/smartMdWindow\s*=/);
   });
 });

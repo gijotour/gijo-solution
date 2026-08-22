@@ -63,10 +63,13 @@ export const memoryApi = {
   // 올린 문서 관리(장기기억) — 목록·조각 미리보기·삭제.
   listDocuments: () =>
     request<MemoryDocument[]>("/api/memory/documents"),
-  /** ★ **반입 영수증** — 「내가 넣은 모든 파일」(2026-08-22 사장님 지시).
+  /** ★ **반입 영수증**(2026-08-22 사장님 「사용자가 넣는 파일 내문서에서 다 확인 가능해야 해」).
    *  ⚠ 위 `listDocuments`와 **다른 것**이다: 그쪽은 **지식 조각이 있는 문서**만 준다.
    *    취약점 스캔·SBOM은 일부러 지식에 안 넣으므로 거기 안 뜬다 —
-   *    「내가 뭘 올렸더라?」에 답하려면 갈래와 무관한 이 목록이 필요하다. */
+   *    「내가 뭘 올렸더라?」에 답하려면 갈래와 무관한 이 목록이 필요하다.
+   *  ⚠ **「내가 넣은 모든 파일」이 아니다**(2026-08-22 검토관 [높음]으로 정정) — 서버가
+   *    **내가 올린 것 + 내가 볼 수 있는 것**만 준다. 관리자는 팀 반입도 본다.
+   *    `총량.건수`는 **거른 뒤의** 총계라, 화면은 목록 길이가 아니라 이 값을 써야 한다. */
   uploadReceipts: (limit?: number) =>
     request<{ 목록: UploadReceipt[]; 총량: { 건수: number; 전체바이트: number; 원본보관바이트: number }; 갈래이름: Record<string, string> }>(
       "/api/upload/receipts" + (limit ? "?limit=" + limit : "")
@@ -157,6 +160,12 @@ export interface IngestResult {
   docClass?: string; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타)
   linkedProduct?: string; // '매뉴얼' 분류 시 자동 연결된 기존 보안제품명
   category?: string; // 업무영역 5종 — 화면 맥락 검색·승인카드 표시용
+  /** ★ **비밀정보로 보이는 것**(2026-08-22). 회사 문서 반입 창구는 둘이고
+   *  (`/api/upload/auto` · `/api/memory/ingest-file`) **둘 다** 이 검사를 지난다.
+   *  ⚠ 값이 있으면 **화면이 반드시 사람에게 보여야 한다** — 서버만 알고 사람은 모르면
+   *    「잣대 두 벌」이 표시 층에 그대로 남는다(2026-08-22 2라운드 검토관 [중]).
+   *  ⚠ 원본 값은 안 담는다(masked) — 경고하려다 유출하면 안 된다. */
+  비밀경고?: { kind: string; masked: string }[];
 }
 
 export interface MemoryDocument {

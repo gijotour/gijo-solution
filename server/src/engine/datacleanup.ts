@@ -141,6 +141,10 @@ export function runCleanup(targetIds: string[]): { id: string; deleted: number; 
 // 화면에 보이는 산출물 **파일**(보고서 pdf·SBOM 내보내기·세션 아카이브) — DB 표가 없어
 // 화이트리스트 방식으로 못 지운다(정찰 지적). 지우는 대신 **cleanup 폴더로 이동**한다 —
 // 스냅샷과 같은 결(못 남기면 안 지운다 → 이동은 그 자체가 보존이다).
+/** 문서 파일이 사는 뿌리 — 제품 전체가 이 한 곳을 본다(memory.ts INGEST_ROOT와 같은 규칙).
+ *  ⚠ 여기서 `"data"`를 박으면 GIJO_INGEST_ROOT를 쓰는 설치에서 정리가 **헛돈다.** */
+const 문서뿌리 = process.env.GIJO_INGEST_ROOT ?? "data";
+
 const RESET_FILE_DIRS = [
   { dir: path.join("data", "reports"), label: "보고서 파일" },
   { dir: path.join("data", "exports"), label: "SBOM 내보내기" },
@@ -149,12 +153,18 @@ const RESET_FILE_DIRS = [
   //   여기 없으면 **업무 데이터를 리셋해도 고객이 올린 원본 파일이 디스크에 그대로 남는다** —
   //   「원본은 켜야만 보관한다」는 프라이버시 기본값을 내세우는 제품이 정반대로 도는 자리였다.
   //   추출본(.md)도 같이 옮긴다. 그것이 AI가 실제로 읽은 글이라 남으면 내용이 그대로 남는 것과 같다.
-  { dir: path.join("data", "docs", "uploads"), label: "업로드 원본 파일" },
-  { dir: path.join("data", "docs", "extracted"), label: "추출본(.md) — AI가 읽은 글" },
+  // ★★ **`GIJO_INGEST_ROOT`를 본다** (2026-08-22 2라운드 검토관 [낮음] 수리).
+  //   문서 파일이 실제로 사는 곳은 `process.env.GIJO_INGEST_ROOT ?? "data"` 아래다
+  //   (memory.ts:326 INGEST_ROOT · docattach.ts:24 · backup.ts:76 — 셋 다 그렇다).
+  //   그런데 이 목록만 `"data"`를 박아 놓고 있었다. 그 환경변수를 쓰는 설치에서는
+  //   **엉뚱한 자리를 뒤져 0건 옮기고도 「성공」으로 보고**한다 — 지웠다는데 남는다.
+  //   ⚠ 첨부(attach)뿐 아니라 **원본·추출본도 같은 결함**이었다. 뿌리를 한 번에 고친다.
+  { dir: path.join(문서뿌리, "docs", "uploads"), label: "업로드 원본 파일" },
+  { dir: path.join(문서뿌리, "docs", "extracted"), label: "추출본(.md) — AI가 읽은 글" },
   // ★ 문서 편집기 첨부(2026-08-22 검토관 [중] 수리). 캡처 그림이 여기 쌓인다 —
   //   빠뜨리면 개인 문서를 지워도 **그림 파일이 디스크에 영원히 남는다.**
   //   정작 docattach.ts:113이 스스로 그렇게 경고해 두었는데 이 목록만 안 따라왔다.
-  { dir: path.join("data", "docs", "attach"), label: "문서 편집기 첨부(캡처 그림)" },
+  { dir: path.join(문서뿌리, "docs", "attach"), label: "문서 편집기 첨부(캡처 그림)" },
 ];
 function moveResetFiles(stamp: string): { label: string; moved: number }[] {
   const out: { label: string; moved: number }[] = [];
