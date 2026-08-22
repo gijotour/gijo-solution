@@ -11,6 +11,8 @@ import { asyncRoute } from "../util/asyncRoute";
 import { emitCollaboration } from "./collaboration";
 import { ingestAnalysisFile, detectIngestKind } from "./analysishub";
 import { importVulnScan, parseNessusHtml } from "./vulnscan";
+import { 영수증남기기, 영수증목록, 보관총량, 갈래이름, type 반입갈래 } from "./uploadreceipt";
+import { maskSecrets } from "./secretscan";
 import { importManual, classifyManual, listProducts, guessProductName } from "./securityproducts";
 import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, cleanupOldOriginal, 열람불가공용 } from "./memory";
 
@@ -56,6 +58,12 @@ export interface AutoUploadResult {
    *  죽어 수집을 못 하면 문서 메타 행이 안 생겨 「내 문서」 목록에도 안 뜨고 추출본 보기도 404다.
    *  화면이 「내 문서에서 보고 고칠 수 있습니다」를 말해도 되는지는 **이 값으로** 가른다. */
   ingested?: boolean;
+  /** ★ **비밀정보로 보이는 것**(2026-08-22 신설) — 회사 문서 반입에는 이 검사가 **아예 없었다.**
+   *  개인 문서는 공유할 때 가리는데 회사 문서는 무검사로 지식이 됐다 — API 키가 든 문서가
+   *  그대로 답변 근거로 인용될 수 있었다. 잣대가 어긋나 있던 자리다.
+   *  ⚠ **막지 않고 알린다.** 회사 규정 문서에는 예시 키처럼 정당하게 비밀처럼 보이는 것이 있고,
+   *    지우면 원문이 훼손된다. 담당자가 보고 판단하도록 **가려진 형태로만** 싣는다. */
+  비밀경고?: { kind: string; masked: string }[];
 }
 
 // 파일명으로 애매할 때의 추천 유형. 취약점 리포트·로그·가이드라인·매뉴얼 신호를 순서대로 본다.
@@ -136,7 +144,7 @@ async function tryIngest(
   category?: string,
   uploadedBy?: string,
   opts?: { keepOriginal?: boolean }
-): Promise<{ chunks: number; docClass?: string; linkedProduct?: string; docName?: string; category?: string; savedOriginal?: boolean; mdSaved?: boolean; ingested: boolean; 실패사유?: string } | null> {
+): Promise<{ chunks: number; docClass?: string; linkedProduct?: string; docName?: string; category?: string; savedOriginal?: boolean; mdSaved?: boolean; ingested: boolean; 실패사유?: string; 비밀경고?: { kind: string; masked: string }[] } | null> {
   // ★ 보관 결과는 catch **밖**에 둔다 — 파일 보관은 검색 수집(임베딩)보다 **먼저** 끝나므로,
   //   임베딩이 죽었다고 「원본을 보관했다」는 사실까지 삼키면 화면이 거짓을 말하게 된다
   //   (0820 「삼켜진 실패」 계보의 거울상 — 이번엔 삼켜진 *성공*이다).
@@ -148,6 +156,14 @@ async function tryIngest(
     // ★ 콘솔 ＋로 들어온 문서도 「내 문서」에서 추출본(.md)을 보고 고칠 수 있어야 한다(2026-08-22).
     //   예전엔 이 창구만 sourcePath=undefined로 넘겨 **추출본도 원본도 안 남았다** —
     //   같은 일을 하는 ingest-file 라우트와 잣대가 갈려 있었다. 이제 둘 다 saveDocArtifacts를 쓴다.
+    // ★★ **비밀정보 검사 — 회사 문서 반입에는 이게 아예 없었다**(2026-08-22 설계관 적발).
+    //   개인 문서는 **공유할 때** 가리는데(personaldocs.ts) 회사 문서는 아무 검사도 없이 지식이 됐다.
+    //   즉 API 키가 든 문서를 올리면 그대로 **답변 근거로 인용**된다 — 잣대가 어긋나 있었다.
+    //   ⚠ **막지 않는다.** 이 저장소 원칙은 「막지 않고 알린다」이고, 회사 규정 문서에는
+    //     예시 키처럼 **정당하게 비밀처럼 보이는 것**이 들어 있을 수 있다. 지우면 원문이 훼손된다.
+    //   ⚠ **maskSecrets를 쓴다(findSecrets가 아니다)** — 밖으로 나가는 자리에 원본 값을 실으면
+    //     경고하려다 유출하는 셈이다(2026-07-31 시험이 잡은 계보 그대로).
+    const 비밀 = maskSecrets(text).hits.map((h) => ({ kind: h.kind, masked: h.masked }));
     보관 = await saveDocArtifacts({ documentId: filename, text, contentBase64: base64, keepOriginal: opts?.keepOriginal });
     const r = await ingestText(filename, text, GLOBAL_SCOPE, 보관.sourcePath, classify, uploadedBy, category);
     // 「보관 안 함」으로 다시 올린 경우의 옛 원본 정리는 **수집이 끝난 뒤에** 한다 —
@@ -159,6 +175,7 @@ async function tryIngest(
       chunks: r.chunks, docClass: r.docClass, linkedProduct: r.linkedProduct,
       docName: r.chunks > 0 ? filename : undefined, category: r.category,
       savedOriginal: 보관.originalSaved, mdSaved: 보관.mdSaved, ingested: r.chunks > 0,
+      비밀경고: 비밀.length ? 비밀 : undefined,
     };
   } catch (e) {
     // 임베딩 미기동 등 — 검색 수집만 생략, 상위 처리는 계속.
@@ -185,8 +202,33 @@ async function tryIngest(
 //   보고 고칠 수 있습니다」라고 말한다 — 그 문서는 목록에 없고 열면 404다(문서 메타는
 //   ingestText 맨 끝에서 쓰이므로 실패하면 행 자체가 없다). 삼켜진 성공을 살리려다 새 거짓말을
 //   만들 뻔한 자리다.
-function 보관결과(ing: { savedOriginal?: boolean; mdSaved?: boolean; ingested?: boolean } | null): { savedOriginal?: boolean; mdSaved?: boolean; ingested?: boolean } {
-  return ing ? { savedOriginal: !!ing.savedOriginal, mdSaved: !!ing.mdSaved, ingested: !!ing.ingested } : {};
+/** 어디로 갔는지에서 갈래를 되짚는다 — **자동 판별 갈래에는 유형 값이 없다.**
+ *  `forceType`은 사람이 고를 때만, `guess`는 되물을 때만 채워진다. 그래서 자동으로 처리된
+ *  취약점 스캔·로그는 유형 칸이 비는데, **어디로 갔는지는 알고 있다.**
+ *  ⚠ 모르는 척하지 않는다 — 영수증에 「미정」이 뜨면 담당자는 제품이 판별에 실패한 줄 안다. */
+function 갈래되짚기(routedTo?: string): 반입갈래 {
+  switch (routedTo) {
+    case "vulnscan": return "vulnreport";
+    case "analysis": return "securitylog";     // 로그·리포트 공통 입구 — 더 좁히려면 analysis.kind가 필요하다
+    case "sbom": return "sbom";
+    case "product-manual": return "asset";
+    case "memory": return "document";
+    default: return "unknown";                 // decision(되묻는 중)만 진짜로 모른다
+  }
+}
+
+function 보관결과(ing: {
+  savedOriginal?: boolean; mdSaved?: boolean; ingested?: boolean;
+  비밀경고?: { kind: string; masked: string }[];
+} | null): { savedOriginal?: boolean; mdSaved?: boolean; ingested?: boolean; 비밀경고?: { kind: string; masked: string }[] } {
+  // ⚠ 비밀경고를 여기서 함께 나른다 — 이 함수를 지나는 갈래가 여럿이라(문서·매뉴얼·리포트)
+  //   한 곳에서 실어야 갈래마다 빠뜨리지 않는다.
+  return ing
+    ? {
+        savedOriginal: !!ing.savedOriginal, mdSaved: !!ing.mdSaved, ingested: !!ing.ingested,
+        ...(ing.비밀경고?.length ? { 비밀경고: ing.비밀경고 } : {}),
+      }
+    : {};
 }
 
 // 왜 검색에 안 들어갔나 — **아는 만큼만** 말한다.
@@ -457,6 +499,17 @@ export async function autoRouteUpload(
 }
 
 export function registerAutoUploadRoutes(app: Express): void {
+  // ★ **반입 영수증 — 「내가 넣은 모든 파일」**(2026-08-22 사장님 지시).
+  //   내 문서의 🩹 반입 탭이 지금은 `/api/memory/documents`를 쓰는데, 그 목록은
+  //   **지식 조각이 있는 문서만** 준다. 취약점·SBOM은 일부러 지식에 안 넣으므로 거기 안 뜬다.
+  //   이 창구가 그 빈자리를 메운다 — 갈래와 무관하게 **넣은 사실은 전부** 여기 있다.
+  //   ⚠ 개인 격리·등급은 걸지 않는다: 영수증은 「누가 언제 무엇을 올렸나」이지 **내용이 아니다.**
+  //     원본을 여는 것은 기존 창구(`/api/memory/document/file`)가 등급을 걸어 처리한다.
+  app.get("/api/upload/receipts", authMiddleware, (req, res) => {
+    const 상한 = Math.min(1000, Math.max(1, Number((req.query.limit as string) ?? 300) || 300));
+    res.json({ 목록: 영수증목록(상한), 총량: 보관총량(), 갈래이름 });
+  });
+
   app.post(
     "/api/upload/auto",
     authMiddleware,
@@ -500,18 +553,49 @@ export function registerAutoUploadRoutes(app: Express): void {
       // 작업 귀속 — 인입되는 문서에 "누가 올렸는지"를 함께 기록한다(2026-07-25 RAG 전면 검토).
       const uploader = (req as Request & { user?: { displayName?: string; username?: string } }).user;
       const result = await autoRouteUpload(filename, content, valid, productName, uploader?.displayName ?? uploader?.username, { keepOriginal: keepOriginal === true });
-      // 유형이 확정돼 실제 반영된 업로드만 기록(needsDecision=재질문 단계는 행위가 아직 아님).
-      if (!(result as { needsDecision?: boolean }).needsDecision) {
-        const user = (req as Request & { user?: { displayName?: string } }).user;
+      const 되묻는중 = !!(result as { needsDecision?: boolean }).needsDecision;
+      const user = (req as Request & { user?: { displayName?: string } }).user;
+      // 유형이 확정돼 실제 반영된 업로드만 감사에 기록(needsDecision=재질문 단계는 행위가 아직 아님).
+      if (!되묻는중) {
         // ★ 원본이 서버에 남는 것 자체가 감사 대상이다(2026-08-22) — **요청값이 아니라 실제 저장 여부**를 적는다.
         //   유형은 routedTo를 쓴다: 결과에 `type` 필드는 없어서 예전엔 자동 라우팅이 늘 「유형: ?」로 남았다.
+        //   ⚠ **누가 정했는지도 적는다**(2026-08-22 설계관) — 그전엔 `valid ?? routedTo`라
+        //     사람이 고른 것과 제품이 판별한 것이 **글자로만 우연히** 갈렸다.
+        //     「이 문서를 사내규정으로 분류한 것은 누구인가」에 답할 수 있어야 한다.
         recordAudit({
           kind: "write", actor: user?.displayName ?? null, action: "파일 업로드 자동 분류",
           target: filename,
-          detail: `유형: ${valid ?? result.routedTo ?? "?"}${result.savedOriginal ? " · 원본 보관" : ""}`,
+          detail: `유형: ${valid ?? result.routedTo ?? "?"}(${valid ? "사람 지정" : "자동 판별"})` +
+            `${result.category ? ` · 영역: ${result.category}` : ""}` +
+            `${result.savedOriginal ? " · 원본 보관" : ""}`,
           result: "ok",
         });
       }
+
+      // ★★ **반입 영수증** — 사장님 「사용자가 넣는 파일 내문서에서 다 확인 가능해야 해. 취약점파일도」
+      //   ⚠ **되묻는 중에도 남긴다.** 그게 이 기능의 절반이다 —
+      //     그전엔 결정 카드를 무시하면 **감사에도 아무 데도 안 남아**, 파일을 올린 사실 자체가 사라졌다.
+      //     「물었는데 답을 안 했다」도 사실이므로 기록으로 남는다(routedTo="decision").
+      try {
+        영수증남기기({
+          filename,
+          uploadedBy: user?.displayName ?? undefined,
+          // ⚠ 갈래를 「미정」으로 두지 않는다(2026-08-22 실측으로 잡음). 자동 판별 갈래는
+          //   `valid`(사람 지정)도 `guess`(되물을 때만)도 없어서 **아는데도 「미정」**이 나왔다.
+          //   어디로 갔는지는 아니까 거기서 되짚는다 — 모르는 척하는 것이 이 저장소의 반대 원칙이다.
+          kind: (valid ?? (result as { guess?: UploadType }).guess ?? 갈래되짚기(result.routedTo)) as 반입갈래,
+          routedTo: result.routedTo ?? "unknown",
+          decidedBy: valid ? "user" : "auto",
+          category: result.category,
+          originalSaved: !!result.savedOriginal,
+          mdSaved: !!result.mdSaved,
+          ingested: !!result.ingested,
+          // base64 길이에서 실제 바이트를 되짚는다(4글자 = 3바이트, 꼬리 `=`만큼 뺀다).
+          bytes: Math.max(0, Math.floor((content.length * 3) / 4) - (content.endsWith("==") ? 2 : content.endsWith("=") ? 1 : 0)),
+          detail: 되묻는중 ? "유형을 되물었습니다 — 아직 반영되지 않았습니다" : result.reason,
+          note: 되묻는중 ? "사람이 유형을 고르면 그때 반영됩니다" : undefined,
+        });
+      } catch { /* 영수증은 부가 기록이다 — 실패해도 반입을 막지 않는다(uploadreceipt가 이미 삼키지만 이중 방어) */ }
       // ➡ 반입 다음 칩(2026-08-19 사장님 QA — 「파일 올리면 다른 가이드라인이 없는데?」):
       //   반입은 대화 지시가 아니라 nextguide 경로 표를 안 타서 칩이 영영 안 붙던 사각지대다.
       //   문장은 시나리오 실측 ✓ 확인된 것만(nextguide와 같은 원칙).

@@ -682,3 +682,43 @@ migrate(
    CREATE INDEX IF NOT EXISTS idx_sbom_rc_review ON sbom_review_components(reviewId);
    CREATE INDEX IF NOT EXISTS idx_sbom_rc_tier ON sbom_review_components(tier);`
 );
+
+// ── 반입 영수증 (2026-08-22 사장님 「사용자가 넣는 파일 내문서에서 다 확인 가능해야 해. 취약점파일도」) ──
+//
+// ■ 왜 새 표인가 — `memory_documents`에 얹을 수 없다
+//   「내 문서」 목록이 뜨는 조건은 **메타 행이 아니라 LanceDB 조각 ≥1**이다
+//   (`memory.ts` listDocuments가 조각 집계를 돌면서 메타를 붙인다).
+//   그런데 취약점 스캔·SBOM은 **일부러 지식에 안 넣는다**(수천 줄 표라 다른 질문의 근거를 밀어낸다 —
+//   「스키마 551조각」 실사고). 즉 조각이 0이라 **메타 행을 만들어도 목록에 영영 안 뜬다.**
+//   억지로 뜨게 하려고 listDocuments를 고치면 「AI 지식」 화면과 지식 저장소 숫자에
+//   조각 0 문서가 섞인다 — 이 저장소가 반복해 겪은 「같은 것을 여러 곳에 적으면 어긋난다」의 재발이다.
+//
+// ■ ★ PK가 uuid인 이유 — basename이 아니다
+//   문서 쪽 계약은 「같은 이름 = 같은 문서」(basename 1:1)다. 오늘 그 계약을 못 박았다(132f19c6).
+//   하지만 **영수증은 사건 기록**이라 같은 파일을 두 번 올리면 **두 줄**이어야 한다.
+//   basename을 PK로 두면 두 팀이 `2026-08-22_스캔.csv`를 올릴 때 서로를 덮어 **기록이 사라진다.**
+//   → uuid PK + 파일명은 값. 두 계약이 서로를 안 건드린다.
+//
+// ■ 무엇을 담나
+//   「누가·언제·무엇을·어디로 보냈나」 + 원본이 남았는지. **원본을 여기 담지 않는다**(파일은 디스크).
+migrate(
+  "upload-receipts-2026-08-22",
+  `CREATE TABLE IF NOT EXISTS upload_receipts (
+     id TEXT PRIMARY KEY,             -- uuid (파일명이 아니다 — 위 주석)
+     filename TEXT NOT NULL,          -- 올린 그대로의 이름
+     uploadedBy TEXT,                 -- 누가
+     uploadedAt TEXT NOT NULL,        -- 언제 (ISO)
+     kind TEXT NOT NULL,              -- 갈래: document|vulnreport|securitylog|opsreport|sbom|asset|log|guideline|unknown
+     routedTo TEXT NOT NULL,          -- 어디로: memory|vulnscan|analysis|sbom|product-manual|decision|failed
+     decidedBy TEXT,                  -- 갈래를 누가 정했나: auto | user  ★「사람이 정한 것」을 나중에 물을 수 있게
+     category TEXT,                   -- 업무영역(정해졌으면)
+     originalSaved INTEGER NOT NULL DEFAULT 0,  -- 원본이 디스크에 남았나
+     mdSaved INTEGER NOT NULL DEFAULT 0,        -- 추출본(.md)이 생겼나
+     ingested INTEGER NOT NULL DEFAULT 0,       -- AI 지식으로 들어갔나 (0이어도 정상인 갈래가 있다)
+     bytes INTEGER,                   -- 파일 크기(보관 총량을 재는 근거)
+     detail TEXT,                     -- 사람이 읽는 한 줄(무엇이 만들어졌나)
+     note TEXT                        -- 주의·실패 사유
+   );
+   CREATE INDEX IF NOT EXISTS idx_upload_receipts_at ON upload_receipts(uploadedAt);
+   CREATE INDEX IF NOT EXISTS idx_upload_receipts_kind ON upload_receipts(kind);`
+);

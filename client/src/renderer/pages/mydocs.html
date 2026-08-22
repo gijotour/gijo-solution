@@ -349,7 +349,18 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
   "use strict";
   var 탭 = "mine";
   var mine = [], know = [], learn = [], learnTopics = [], learnKpis = null, guide = [];
-  var 오류 = { mine: null, know: null, learn: null, guide: null }; // 불러오기 실패는 「없음」과 다르다(검토관 상4)
+  // ★ 반입 영수증 — 「내가 넣은 모든 파일」(2026-08-22). 문서 목록(know)과 **다른 원천**이다:
+  //   취약점 스캔·SBOM은 일부러 지식에 안 넣어서 know에는 원리상 안 뜬다.
+  var 영수증 = [], 갈래이름 = {};
+  var 오류 = { mine: null, know: null, learn: null, guide: null, ingest: null }; // 불러오기 실패는 「없음」과 다르다(검토관 상4)
+
+  /** 어디로 갔나 — 사람 말로. 서버의 routedTo 값을 화면 글자로 옮기는 **한 곳**. */
+  function 어디로글(v) {
+    return ({
+      memory: "AI 지식", vulnscan: "취약점", analysis: "분석", sbom: "공급망 점검",
+      "product-manual": "제품 매뉴얼", decision: "되묻는 중", failed: "실패",
+    })[v] || v || "-";
+  }
   var mineFilter = "all";
   var 선택 = null; // { 탭, id }
   var 스테이지값 = "list"; // list | edit | read | compose
@@ -585,17 +596,31 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
             '<span class="ta-r gm2">' + 날짜(g.createdAt) + "</span></div>";
         }).join("") + "</div>" + (총 > learn.length ? '<div class="empty" style="padding:10px">앞 ' + learn.length + "건 표시 — 전체 " + 총 + "건은 🗔 학습 화면에서.</div>" : "")
         : '<div class="empty">수집된 대화가 없습니다 — 대화가 쌓이면 여기 보입니다.</div>');
-    } else { // ingest — ＋로 올린 문서의 반입 기록(영수증). 개인 문서 제외(중3 — 서버 반입 소식과 같은 잣대)
-      var ing = 회사문서만().filter(function (d) { return d.uploadedBy && 걸림(d.documentId); })
-        .sort(function (a, b) { return String(b.ingestedAt || "").localeCompare(String(a.ingestedAt || "")); });
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 90px 74px 44px;gap:8px"><span>올린 문서</span><span>올린 이</span><span>영역</span><span class="ta-r">반입</span></div>' +
-        (ing.length ? '<div class="g-rows-flat">' + ing.map(function (d) {
-          return '<div class="g-rows-r" data-id="' + esc(d.documentId) + '" style="grid-template-columns:1fr 90px 74px 44px;gap:8px">' +
-            '<span class="trunc" title="' + esc(d.documentId) + '">' + esc(d.documentId) + "</span>" +
-            '<span class="gm2 trunc">' + esc(d.uploadedBy) + "</span>" +
-            '<span class="gm2 trunc">' + esc(d.category || "일반") + "</span>" +
-            '<span class="ta-r gm2">' + 날짜(d.ingestedAt) + "</span></div>";
-        }).join("") + "</div>" : '<div class="empty">＋로 올린 문서의 반입 기록이 여기 쌓입니다.<br><span class="gm2">스캐너 결과·보안 로그 반입은 ① 발견·수집 화면에서 봅니다.</span></div>');
+    } else { // ingest — ★ **내가 넣은 모든 파일의 영수증**
+      // ⚠ 2026-08-22 사장님 「사용자가 넣는 파일 내문서에서 다 확인 가능해야 해. **취약점파일도**」
+      //   그전엔 `/api/memory/documents`(지식 조각이 있는 문서)만 봤다. 그런데 취약점 스캔·SBOM은
+      //   **일부러 지식에 안 넣으므로**(수천 줄 표가 다른 질문의 근거를 밀어낸다) 그 목록에 안 떴고,
+      //   화면은 「스캐너 결과는 ① 발견·수집 화면에서 봅니다」라고 **떠넘기고 있었다.**
+      //   → 이제 영수증 표(`/api/upload/receipts`)를 쓴다 — 갈래와 무관하게 **넣은 사실은 전부** 있다.
+      var 칸 = "1fr 96px 84px 90px 44px";
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:' + 칸 + ';gap:8px">' +
+          "<span>올린 파일</span><span>갈래</span><span>어디로</span><span>보관·수집</span><span class=\"ta-r\">올린 때</span></div>" +
+        (영수증.length ? '<div class="g-rows-flat">' + 영수증.map(function (d) {
+          // 「무엇이 실제로 남았나」를 한 칸에 — 오늘 갈라 둔 세 값(원본·추출본·수집)을 그대로 쓴다.
+          var 남음 = [];
+          if (d.originalSaved) 남음.push("원본");
+          if (d.mdSaved) 남음.push("추출본");
+          if (d.ingested) 남음.push("AI지식");
+          var 남음글 = 남음.length ? 남음.join("·") : (d.routedTo === "decision" ? "되묻는 중" : "기록만");
+          return '<div class="g-rows-r" title="' + esc(d.detail || "") + '" style="grid-template-columns:' + 칸 + ';gap:8px">' +
+            '<span class="trunc" title="' + esc(d.filename) + '">' + esc(d.filename) + "</span>" +
+            '<span class="gm2 trunc">' + esc((갈래이름 || {})[d.kind] || d.kind) + "</span>" +
+            '<span class="gm2 trunc">' + esc(어디로글(d.routedTo)) + "</span>" +
+            '<span class="gm2 trunc">' + esc(남음글) + "</span>" +
+            '<span class="ta-r gm2">' + 날짜(d.uploadedAt) + "</span></div>";
+        }).join("") + "</div>"
+          : '<div class="empty">＋로 올린 파일의 기록이 여기 쌓입니다 — <b>문서·취약점 스캔·로그·부품표 전부</b>.<br>' +
+            '<span class="gm2">2026-08-22 이전에 올린 것은 이 기록이 없습니다 — 그때는 만들지 않았습니다.</span></div>');
     }
     탭수그리기();
     if (!목록모드) return;   // 스테이지 중 — 목록만 새로 그리고 고른 것·문서창은 그대로 둔다
@@ -619,7 +644,9 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
     document.getElementById("nGuide").textContent = guide.length || "";
     // 학습 총계는 kpis(진짜 총계)로 — 조회 상한(100)을 총계처럼 말하면 거짓이다(중1)
     document.getElementById("nLearn").textContent = (learnKpis && learnKpis.total) || learn.length || "";
-    document.getElementById("nIngest").textContent = 회사문서만().filter(function (d) { return d.uploadedBy; }).length || "";
+    // ⚠ 세는 원천이 바뀌었다(2026-08-22) — 문서 목록이 아니라 **영수증**이다.
+    //   그전엔 지식에 든 문서만 세어, 취약점 파일을 올려도 숫자가 안 늘었다.
+    document.getElementById("nIngest").textContent = 영수증.length || "";
   }
 
   function 상세초기화() {
@@ -669,6 +696,15 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
       오류.learn = null;
     } catch (e) { learn = []; learnKpis = null; 오류.learn = (e && e.message) || "오류"; }
     try { learnTopics = (await window.gijo.listLearnloopTopics()) || []; } catch (e) { learnTopics = []; }
+    // ★ 반입 영수증 — 「내가 넣은 모든 파일」(2026-08-22). 취약점·SBOM처럼 **지식에 안 들어가는**
+    //   갈래는 문서 목록에 원리상 안 뜨므로 별도 창구에서 온다.
+    //   ⚠ preload 다리를 새로 만들지 않는다 — 이 화면은 이미 fetch로 서버를 부르는 자리가 있다.
+    try {
+      var j = await window.gijo.listUploadReceipts(300);
+      영수증 = (j && j.목록) || [];
+      갈래이름 = (j && j.갈래이름) || {};
+      오류.ingest = null;
+    } catch (e) { 영수증 = []; 갈래이름 = {}; 오류.ingest = (e && e.message) || "오류"; }
     학습띠그리기();
     그리기();
   }

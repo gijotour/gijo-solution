@@ -1843,6 +1843,26 @@
   // 보관 결과 안내 — ★ **요청값(keep)이 아니라 실제 저장 여부(r.savedOriginal·r.mdSaved)로만 말한다.**
   //   토글을 켜도 취약점으로 반영되는 갈래(Nessus HTML·자동 vulnscan)는 문서 저장을 안 타서 원본이
   //   안 남는다 — 「켰는데 안 남았다」가 조용히 지나가지 않게 그 경우를 분명히 말한다(정직 원칙).
+  /** ★ **비밀정보로 보이는 것** — 회사 문서 반입엔 이 검사가 아예 없었다(2026-08-22 설계관 적발).
+   *
+   *  개인 문서는 공유할 때 가려 주는데 회사 문서는 무검사로 지식이 됐다 —
+   *  API 키가 든 문서를 올리면 **그대로 답변 근거로 인용**될 수 있었다. 잣대가 어긋나 있었다.
+   *
+   *  ⚠ **막지 않고 알린다.** 회사 규정 문서에는 예시 키처럼 정당하게 비밀처럼 보이는 것이 있고,
+   *    자동으로 지우면 원문이 훼손된다. 사람이 보고 판단할 몫이다.
+   *  ⚠ 값은 **가려진 형태(앞 두 글자)** 로만 온다 — 경고하려다 유출하면 안 된다.
+   */
+  function 비밀안내(r) {
+    var h = r && r.비밀경고;
+    if (!h || !h.length) return "";
+    var 갈래 = {};
+    h.forEach(function (x) { 갈래[x.kind] = (갈래[x.kind] || 0) + 1; });
+    var 요약 = Object.keys(갈래).map(function (k) { return k + " " + 갈래[k] + "건"; }).join(" · ");
+    return "\n🔑 **비밀번호·토큰처럼 보이는 것이 " + h.length + "건** 있습니다 (" + 요약 + ")." +
+      "\n   이 문서는 그대로 들어갔습니다 — 지우지 않았습니다. 확인하고 필요하면 문서를 고쳐 다시 올리세요." +
+      "\n   ⚠ 장비 접속 정보는 「보안제품 등록부」에 두면 암호화되어 보관됩니다.";
+  }
+
   function 보관안내(r, keep) {
     var 보관됨 = r.savedOriginal || r.mdSaved;
     // ⚠ 「내 문서에서 볼 수 있다」는 **수집(ingested)까지 끝났을 때만** 참이다(검토관 2026-08-22).
@@ -1896,7 +1916,7 @@
       });
       return;
     }
-    cm.textContent = name + " — " + uploadResultMsg(r) + 보관안내(r, keep);
+    cm.textContent = name + " — " + uploadResultMsg(r) + 보관안내(r, keep) + 비밀안내(r);
     // ➡ 반입 다음 칩(2026-08-19 사장님 QA) — 반입이 끝나면 다음 걸음을 칩으로 안내한다.
     var P2 = window.gijoChatParts;
     if (r.nextChips && P2 && P2.nextChips) P2.nextChips(row, r.nextChips, function (q) { submit(q); });

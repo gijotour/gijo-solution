@@ -63,6 +63,14 @@ export const memoryApi = {
   // 올린 문서 관리(장기기억) — 목록·조각 미리보기·삭제.
   listDocuments: () =>
     request<MemoryDocument[]>("/api/memory/documents"),
+  /** ★ **반입 영수증** — 「내가 넣은 모든 파일」(2026-08-22 사장님 지시).
+   *  ⚠ 위 `listDocuments`와 **다른 것**이다: 그쪽은 **지식 조각이 있는 문서**만 준다.
+   *    취약점 스캔·SBOM은 일부러 지식에 안 넣으므로 거기 안 뜬다 —
+   *    「내가 뭘 올렸더라?」에 답하려면 갈래와 무관한 이 목록이 필요하다. */
+  uploadReceipts: (limit?: number) =>
+    request<{ 목록: UploadReceipt[]; 총량: { 건수: number; 전체바이트: number; 원본보관바이트: number }; 갈래이름: Record<string, string> }>(
+      "/api/upload/receipts" + (limit ? "?limit=" + limit : "")
+    ),
   // 오늘 새로 들어온 문서 수 — 사이드바 "내 문서" 배지(값싼 COUNT). since=현지 자정 ISO.
   recentDocCount: (sinceIso: string) =>
     request<{ count: number }>("/api/memory/documents/recent-count?since=" + encodeURIComponent(sinceIso)),
@@ -165,6 +173,26 @@ export interface MemoryDocument {
   //   window.gijo.*가 any라 tsc도 clientglobals.test도 못 잡는 부류라 손으로 맞춰 둔다.
   category?: string | null;   // 업무영역 — 회사 지식 목록의 🗂 그룹 머리
   grade?: string | null;      // 열람 등급 O/S/C
+}
+
+/** 반입 영수증 — **넣은 사실**의 기록. 파일 내용이 아니다.
+ *  ⚠ 서버(`uploadreceipt.ts`)의 `영수증` 인터페이스와 **짝**이다. 한쪽만 고치면 어긋난다 —
+ *    바로 위 MemoryDocument가 세 곳 중 한 곳만 어긋났던 전례가 있어 여기 적어 둔다. */
+export interface UploadReceipt {
+  id: string;
+  filename: string;
+  uploadedBy?: string;
+  uploadedAt: string;
+  kind: string;      // document|guideline|vulnreport|securitylog|opsreport|sbom|asset|log|unknown
+  routedTo: string;  // memory|vulnscan|analysis|sbom|product-manual|decision
+  decidedBy?: "auto" | "user";  // 갈래를 누가 정했나
+  category?: string;
+  originalSaved: boolean;
+  mdSaved: boolean;
+  ingested: boolean;
+  bytes?: number;
+  detail?: string;
+  note?: string;
 }
 
 // ── 온톨로지 (지식 그래프 / 하이브리드 지식모델의 의미 계층) ──────────────
