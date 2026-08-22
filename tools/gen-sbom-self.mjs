@@ -160,9 +160,18 @@ if (고지쓰기) {
   for (const c of 판정된것) {
     줄.push(`- **${c.이름}** ${c.판}${c.갈래 !== "node" ? ` (${c.갈래})` : ""} — ${c.라이선스 || "라이선스 표기 없음"}`);
   }
-  const 자리 = path.join(루트, "THIRD-PARTY-NOTICES.md");
-  fs.writeFileSync(자리, 줄.join("\n") + "\n", "utf8");
-  console.log(`\n  고지 목록: ${자리}`);
+  const 내용 = 줄.join("\n") + "\n";
+  // ⚠ **두 곳에 쓴다** — 뜻이 다르다(2026-08-22).
+  //   ① 저장소 뿌리: 개발자가 보는 것. 추적하지 않는다(빌드 산출물이라 두 벌이 되면 어긋난다).
+  //   ② client/build/: **고객 설치본에 실려 나가는 것.** MIT·Apache·BSD는 고지가 **의무**인데
+  //      그 자리가 아예 없었다 — 570개를 싣고도 고지를 안 하는 상태였다.
+  //      electron-builder의 extraResources가 이 파일을 resources/로 옮긴다.
+  const 자리들 = [path.join(루트, "THIRD-PARTY-NOTICES.md"), path.join(루트, "client", "build", "THIRD-PARTY-NOTICES.md")];
+  for (const 자리 of 자리들) {
+    fs.mkdirSync(path.dirname(자리), { recursive: true });
+    fs.writeFileSync(자리, 내용, "utf8");
+  }
+  console.log(`\n  고지 목록: ${자리들.map((p) => path.relative(루트, p)).join(" · ")}`);
 }
 
 // ── 관문 ──────────────────────────────────────────────────────────────────

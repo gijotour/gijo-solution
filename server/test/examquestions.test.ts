@@ -8,6 +8,7 @@
 //   실력을 못 재고, 그 위에 얹힌 중-4 판단이 전부 무의미해진다.
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { cleanForTraining } from "../src/engine/datasethygiene";
 
 const 목록파일 = new URL("../src/engine/examquestions.json", import.meta.url);
@@ -21,7 +22,8 @@ describe("시험 문항 목록", () => {
 
   it("시험지 원본과 어긋나지 않는다 — 늘리고 안 구우면 여기서 잡힌다", async () => {
     const { 시험문항모으기 } = await import("../scripts/gen-exam-questions.mjs");
-    const 지금 = 시험문항모으기(new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+    // ⚠ `.pathname`은 %20을 안 푼다 — 경로에 공백이 있으면 헛돈다(2026-08-22, shipscripts와 같은 계보).
+    const 지금 = 시험문항모으기(fileURLToPath(new URL("../../", import.meta.url)));
     const 구운것 = new Set((JSON.parse(fs.readFileSync(목록파일, "utf8")) as { 문항: string[] }).문항);
     const 빠진것 = 지금.filter((q: string) => !구운것.has(q));
     expect(

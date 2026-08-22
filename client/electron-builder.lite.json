@@ -27,6 +27,10 @@
     {
       "from": "../server/models/bge-m3",
       "to": "server-dist/models/bge-m3"
+    },
+    {
+      "from": "build/THIRD-PARTY-NOTICES.md",
+      "to": "THIRD-PARTY-NOTICES.md"
     }
   ],
   "win": {

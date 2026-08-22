@@ -16,9 +16,14 @@
 //     (공용 상수로 모으면 이 감시도 pythondeps 감시도 함께 죽는다).
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { describe, it, expect } from "vitest";
 
-const 서버루트 = path.resolve(new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+// ⚠ `new URL(...).pathname`은 **%20을 안 푼다** — 저장소 경로에 공백이 있으면(D:\Connect AI)
+//   Windows에서 이 시험이 통째로 헛돌았다(2026-08-22 발견). WSL 관문은 공백 없는 자리로
+//   동기화해 돌아서 여태 안 드러났다 — 「환경에 따라 안 도는 시험」의 표본이다.
+//   fileURLToPath가 정석이다(디코딩 + 드라이브 문자 처리를 함께 한다).
+const 서버루트 = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const 빌드스크립트경로 = path.join(서버루트, "..", "client", "scripts", "build-server-dist.mjs");
 
 function 소스전체(): string {

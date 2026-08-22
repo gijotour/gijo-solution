@@ -49,6 +49,10 @@
           "**/*",
           "!**/*.map"
         ]
+      },
+      {
+        "from": "build/THIRD-PARTY-NOTICES.md",
+        "to": "THIRD-PARTY-NOTICES.md"
       }
     ],
     "win": {

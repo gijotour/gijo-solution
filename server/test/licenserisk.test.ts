@@ -218,6 +218,17 @@ describe("★ 라이선스 관문이 게시 사슬에 물려 있다", () => {
     }
   });
 
+  it("★ 서드파티 고지가 **고객 설치본에 실린다** — 570개가 고지 의무인데 자리가 없었다", () => {
+    // MIT·Apache·BSD는 저작권 고지를 배포물에 함께 실어야 한다. 목록만 만들고 안 실으면
+    // 「고지 안 함」과 같다 — 라이선스를 지키려고 만든 것이 지키지 않는 모양이 된다.
+    for (const 설정 of ["package.json", "electron-builder.lite.json"]) {
+      const j = JSON.parse(fs.readFileSync(path.join(루트, "client", 설정), "utf8"));
+      const build = 설정 === "package.json" ? j.build : j;
+      const 실리나 = JSON.stringify(build.extraResources ?? []).includes("THIRD-PARTY-NOTICES");
+      expect(실리나, `${설정}: 고지 파일이 설치본에 안 실린다`).toBe(true);
+    }
+  });
+
   it("관문 도구가 판정기를 **가져다 쓴다** — 규칙을 복사해 두지 않았다", () => {
     const src = fs.readFileSync(path.join(루트, "tools", "gen-sbom-self.mjs"), "utf8");
     expect(src, "판정기를 불러 써야 한다").toMatch(/licenserisk/);
