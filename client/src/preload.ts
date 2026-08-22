@@ -39,7 +39,15 @@ const gijoApi = {
   personalDocsUpdate: (id: string, b: { title: string; body: string }) => api.personalDocsApi.update(id, b),
   personalDocsRag: (id: string, on: boolean) => api.personalDocsApi.setRag(id, on),
   personalDocsShare: (id: string, on: boolean) => api.personalDocsApi.setShared(id, on), // 위치 인자(객체면 500)
-  personalDocsExport: (id: string, fmt: "docx" | "pdf") => api.personalDocsApi.export(id, fmt), // 위치 인자
+  personalDocsExport: (id: string, fmt: "docx" | "pdf" | "html") => api.personalDocsApi.export(id, fmt), // 위치 인자
+  // 첨부(캡처) — 우리가 약속한 「화면 캡처 Ctrl+V 삽입」. 본문엔 표기만 들어가고 파일은 서버에.
+  personalDocsFiles: (id: string) => api.personalDocsApi.files(id),
+  personalDocsAddFile: (id: string, b: { name: string; mime: string; content: string }) => api.personalDocsApi.addFile(id, b),
+  personalDocsReadFile: (fileId: string) => api.personalDocsApi.readFile(fileId),
+  personalDocsRemoveFile: (fileId: string) => api.personalDocsApi.removeFile(fileId),
+  // 버전 이력 — 약속 목록의 「문서 이력」.
+  personalDocsVersions: (id: string) => api.personalDocsApi.versions(id),
+  personalDocsVersionBody: (versionId: number) => api.personalDocsApi.versionBody(versionId),
   personalDocsDelete: (id: string) => api.personalDocsApi.remove(id),
   docRequestBuild: (input: Parameters<typeof api.docRequestApi.build>[0]) => api.docRequestApi.build(input),
   docRequestList: () => api.docRequestApi.list(),

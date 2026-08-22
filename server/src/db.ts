@@ -722,3 +722,46 @@ migrate(
    CREATE INDEX IF NOT EXISTS idx_upload_receipts_at ON upload_receipts(uploadedAt);
    CREATE INDEX IF NOT EXISTS idx_upload_receipts_kind ON upload_receipts(kind);`
 );
+
+// ── 개인 문서 첨부 + 버전 이력 (2026-08-22 사장님 「내 문서가 Smart MD 기능을 충분히 했으면 해」) ──
+//
+// ■ 왜 필요한가 — Smart MD Studio를 없애려면 그 일을 여기서 해야 한다
+//   우리가 라이트 설치안내서·챗봇 안내에 **약속해 둔 목록**이 있다:
+//     화면 캡처 Ctrl+V 삽입 · md/HTML/PDF/워드 4형식 · 템플릿 · **문서 이력** · 인터넷 불필요
+//   그중 **캡처 삽입**과 **문서 이력**이 내 문서에 없었다.
+//
+// ■ ★ 왜 캡처를 본문에 안 박나 (실측)
+//   개인 문서 본문 상한이 20만 자인데 **화면 캡처 1장이 base64로 약 16만 자**다.
+//   → **1장이 한계, 2장은 원리상 불가.** 게다가 그대로 넣으면 지식 인입기가 「글자가 아니다」로
+//     거절해 **저장이 500으로 실패하는데 본문은 이미 저장된 뒤**가 된다.
+//   그래서 파일은 디스크에, 표에는 **참조만** 둔다.
+//
+// ⚠ 파일 이름은 **uuid**다(원본 이름이 아니다). basename 키잉이 같은 이름끼리 서로를 덮어
+//   기밀이 샌 사고가 2026-08-22에 있었다(커밋 132f19c6) — 그 계보를 여기서 반복하지 않는다.
+// ⚠ 저장 자리는 `data/docs/` **안**이어야 한다 — 백업(backup.ts)이 그 폴더를 통째로 복사하고
+//   데이터 정리(datacleanup.ts)도 그 아래를 안다. 밖에 두면 **백업에서 조용히 빠진다.**
+migrate(
+  "personal-doc-attach-history-2026-08-22",
+  `CREATE TABLE IF NOT EXISTS personal_doc_files (
+     id TEXT PRIMARY KEY,              -- uuid = 디스크 파일 이름이기도 하다
+     docId TEXT NOT NULL,              -- 어느 문서의 첨부인가
+     userId TEXT NOT NULL,             -- 격리 — 남의 첨부는 원리상 못 연다
+     name TEXT NOT NULL,               -- 사람이 보는 이름(원본 파일명 또는 "캡처 3")
+     mime TEXT NOT NULL,
+     bytes INTEGER NOT NULL,
+     createdAt TEXT NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS idx_pdf_doc ON personal_doc_files(docId);
+   CREATE INDEX IF NOT EXISTS idx_pdf_user ON personal_doc_files(userId);
+
+   CREATE TABLE IF NOT EXISTS personal_doc_versions (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     docId TEXT NOT NULL,
+     userId TEXT NOT NULL,
+     title TEXT NOT NULL,
+     body TEXT NOT NULL,               -- 그때의 본문 전체(첨부는 참조라 여기 안 들어온다)
+     savedAt TEXT NOT NULL,
+     savedBy TEXT
+   );
+   CREATE INDEX IF NOT EXISTS idx_pdv_doc ON personal_doc_versions(docId, savedAt DESC);`
+);

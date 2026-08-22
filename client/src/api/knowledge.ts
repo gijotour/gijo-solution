@@ -239,9 +239,39 @@ export const personalDocsApi = {
     request<PersonalDoc>(`/api/personaldocs/${encodeURIComponent(id)}/share`, { method: "POST", body: { on } }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/personaldocs/${encodeURIComponent(id)}`, { method: "DELETE" }),
   // 내보내기(2026-08-21) — 서버가 base64로 문서를 만들어 준다(렌더러가 blob 저장). 문서핵심④.
-  export: (id: string, fmt: "docx" | "pdf") =>
+  // ⚠ **html이 2026-08-22에 추가됐다** — 우리가 세 곳에 「.md/HTML/PDF/워드」로 약속해 두고
+  //   HTML만 빠져 있었다. md는 본문 그대로라 서버가 필요 없다(클라가 만든다).
+  export: (id: string, fmt: "docx" | "pdf" | "html") =>
     request<{ fileName: string; mime: string; base64: string }>(`/api/personaldocs/${encodeURIComponent(id)}/export?fmt=${fmt}`),
+
+  // ── 첨부(캡처) — 우리가 약속한 「화면 캡처 Ctrl+V 삽입」 ──────────────────────
+  // ⚠ 본문에 그림을 박지 않는다: 캡처 1장이 본문 상한의 약 71%라 2장이 원리상 불가하고,
+  //   지식 인입기가 「글자가 아니다」로 거절해 저장이 실패한다. 파일은 디스크, 본문엔 표기만.
+  files: (id: string) =>
+    request<{ files: DocFile[]; 장수상한: number }>(`/api/personaldocs/${encodeURIComponent(id)}/files`),
+  addFile: (id: string, b: { name: string; mime: string; content: string }) =>
+    request<{ ok: boolean; file: DocFile; 표기: string }>(`/api/personaldocs/${encodeURIComponent(id)}/files`, { method: "POST", body: b }),
+  /** 그림 바이트 — 렌더러의 `<img src>`에는 토큰을 못 붙이므로 받아서 data URL로 만든다. */
+  readFile: (fileId: string) =>
+    request<{ mime: string; name: string; content: string }>(`/api/personaldocs/file/${encodeURIComponent(fileId)}`),
+  removeFile: (fileId: string) =>
+    request<{ ok: boolean }>(`/api/personaldocs/file/${encodeURIComponent(fileId)}`, { method: "DELETE" }),
+
+  // ── 버전 이력 — 약속 목록의 「문서 이력」. 고치다 날린 글을 되찾는 자리 ────────
+  versions: (id: string) =>
+    request<{ versions: DocVersion[]; 보존판수: number }>(`/api/personaldocs/${encodeURIComponent(id)}/versions`),
+  versionBody: (versionId: number) =>
+    request<{ title: string; body: string; savedAt: string }>(`/api/personaldocs/version/${versionId}`),
 };
+
+/** 문서 첨부(캡처) — 서버 `docattach.ts`의 `첨부`와 짝이다. 한쪽만 고치면 어긋난다. */
+export interface DocFile {
+  id: string; docId: string; name: string; mime: string; bytes: number; createdAt: string;
+}
+/** 문서의 한 판 — 목록에는 본문을 안 싣는다(20만 자를 목록에 실을 이유가 없다). */
+export interface DocVersion {
+  id: number; docId: string; title: string; savedAt: string; savedBy?: string; 글자수: number;
+}
 
 export type GuardMode = "off" | "flag" | "block";
 export interface GuardEvent {

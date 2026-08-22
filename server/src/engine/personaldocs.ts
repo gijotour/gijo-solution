@@ -23,6 +23,10 @@ import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import { recordAudit } from "./audit";
 import { maskSecrets } from "./secretscan";
+import {
+  첨부저장, 첨부목록, 첨부읽기, 첨부삭제, 문서첨부정리, 첨부장수상한,
+  판남기기, 판목록, 판본문, 문서판정리, 이력보존판수,
+} from "./docattach";
 
 export interface PersonalDoc {
   id: string;
@@ -163,7 +167,14 @@ export function registerPersonalDocsRoutes(app: Express): void {
       if (!ok) { res.status(503).json({ error: "PDF 변환기(브라우저 엔진)가 이 환경에 없어 PDF를 못 만듭니다 — Word로 내려받아 열어 주세요." }); return; }
       const buf = await fsp.readFile(tmp); await fsp.unlink(tmp).catch(() => {});
       res.json({ fileName: `${safe}.pdf`, mime: "application/pdf", base64: buf.toString("base64") });
-    } else { res.status(400).json({ error: "fmt는 docx 또는 pdf 입니다" }); }
+    } else if (fmt === "html") {
+      // ★ **약속한 4형식 중 빠져 있던 것**(2026-08-22). 라이트 설치안내서·용어사전·챗봇 안내가
+      //   똑같이 「.md/HTML/PDF/워드로 내보냅니다」라고 적어 뒀는데 HTML만 없었다.
+      //   PDF가 쓰는 그 조립기를 그대로 돌려준다 — 새 부품을 만들지 않는다.
+      //   ⚠ PDF와 달리 **브라우저 엔진이 필요 없다** — 변환기가 없는 환경에서도 이건 된다.
+      const html = inspectionHtml(d.body);
+      res.json({ fileName: `${safe}.html`, mime: "text/html", base64: Buffer.from(html, "utf8").toString("base64") });
+    } else { res.status(400).json({ error: "fmt는 docx · pdf · html 중 하나입니다" }); }
   }));
 
   app.post("/api/personaldocs", authMiddleware, asyncRoute(async (req, res) => {
@@ -184,6 +195,12 @@ export function registerPersonalDocsRoutes(app: Express): void {
     const body = String(b.body ?? cur.body);
     if (!title) { res.status(400).json({ error: "제목을 적어 주세요" }); return; }
     if (body.length > MAX_BODY) { res.status(400).json({ error: `내용은 ${MAX_BODY}자까지입니다` }); return; }
+    // ★ **고치기 전의 판을 남긴다**(2026-08-22 — 우리가 약속한 「문서 이력」).
+    //   ⚠ 저장 **전**에 남겨야 옛 내용이 잡힌다. 뒤에 남기면 새 내용을 두 번 적는 셈이다.
+    //   ⚠ 내용이 안 바뀌었으면 안 남긴다 — 제목만 눌러도 판이 쌓이면 이력이 소음이 된다.
+    if (cur.body !== body || cur.title !== title) {
+      판남기기({ docId: cur.id, userId: u.id, title: cur.title, body: cur.body, savedBy: u.name });
+    }
     updateStmt.run({ id: cur.id, userId: u.id, title, body, updatedAt: Date.now() });
     const next = getPersonalDoc(cur.id, u.id)!;
     // 지식베이스에 실려 있던 문서면 **고친 내용으로 다시 실어야** 한다 — 안 그러면 옛 내용으로 답한다.
@@ -231,6 +248,58 @@ export function registerPersonalDocsRoutes(app: Express): void {
     res.json(next);
   }));
 
+  // ── 첨부(캡처) ─────────────────────────────────────────────────────────────
+  // ★ 우리가 약속한 「화면 캡처 Ctrl+V 삽입」의 서버 쪽. 본문에는 표기만 들어가고 파일은 디스크에.
+  // ⚠ 모든 창구가 **내 것인지**를 함께 건다 — 남의 첨부는 원리상 안 열린다.
+  app.get("/api/personaldocs/:id/files", authMiddleware, (req, res) => {
+    const u = who(req);
+    if (!getPersonalDoc(String(req.params.id), u.id)) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
+    res.json({ files: 첨부목록(String(req.params.id), u.id), 장수상한: 첨부장수상한 });
+  });
+
+  app.post("/api/personaldocs/:id/files", authMiddleware, (req, res) => {
+    const u = who(req);
+    if (!getPersonalDoc(String(req.params.id), u.id)) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
+    const b = req.body as { name?: string; mime?: string; content?: string };
+    if (!b.content) { res.status(400).json({ error: "그림 내용이 없습니다" }); return; }
+    const r = 첨부저장({
+      docId: String(req.params.id), userId: u.id,
+      name: String(b.name || "캡처"), mime: String(b.mime || "image/png"), base64: String(b.content),
+    });
+    if (!r.ok) { res.status(400).json({ error: r.사유 }); return; }
+    recordAudit({ kind: "config", actor: u.name, action: "문서 그림 첨부", target: String(req.params.id), detail: r.첨부.name, result: "ok" });
+    res.json({ ok: true, file: r.첨부, 표기: r.표기 });
+  });
+
+  // 그림 바이트 — 렌더러의 <img>가 토큰을 못 붙이므로 preload가 받아서 넘긴다.
+  app.get("/api/personaldocs/file/:fileId", authMiddleware, (req, res) => {
+    const u = who(req);
+    const r = 첨부읽기(String(req.params.fileId), u.id);
+    if (!r) { res.status(404).json({ error: "그런 그림이 없습니다" }); return; }
+    res.json({ mime: r.첨부.mime, name: r.첨부.name, content: r.buf.toString("base64") });
+  });
+
+  app.delete("/api/personaldocs/file/:fileId", authMiddleware, (req, res) => {
+    const u = who(req);
+    if (!첨부삭제(String(req.params.fileId), u.id)) { res.status(404).json({ error: "그런 그림이 없습니다" }); return; }
+    res.json({ ok: true });
+  });
+
+  // ── 버전 이력 ──────────────────────────────────────────────────────────────
+  // ★ 약속 목록의 「문서 이력」. 고치다 날린 글을 되찾는 자리다.
+  app.get("/api/personaldocs/:id/versions", authMiddleware, (req, res) => {
+    const u = who(req);
+    if (!getPersonalDoc(String(req.params.id), u.id)) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
+    res.json({ versions: 판목록(String(req.params.id), u.id), 보존판수: 이력보존판수 });
+  });
+
+  app.get("/api/personaldocs/version/:versionId", authMiddleware, (req, res) => {
+    const u = who(req);
+    const v = 판본문(Number(req.params.versionId), u.id);
+    if (!v) { res.status(404).json({ error: "그런 판이 없습니다" }); return; }
+    res.json(v);
+  });
+
   app.delete("/api/personaldocs/:id", authMiddleware, asyncRoute(async (req, res) => {
     const u = who(req);
     const cur = getPersonalDoc(String(req.params.id), u.id);
@@ -238,7 +307,14 @@ export function registerPersonalDocsRoutes(app: Express): void {
     // 지식베이스에 실려 있으면 **거기서도 지운다** — 문서만 지우면 답변에는 계속 나온다.
     if (cur.ragOptIn || cur.shared) await syncRag({ ...cur, ragOptIn: false, shared: false }, u.id);
     deleteStmt.run(cur.id, u.id);
-    recordAudit({ kind: "config", actor: u.name, action: "개인 문서 삭제", target: cur.id, detail: cur.title, result: "ok" });
+    // ⚠ **첨부와 이력도 함께 지운다.** 안 지우면 디스크에 고아 그림 파일이 영원히 남고,
+    //   지운 문서의 옛 본문이 이력 표에 계속 살아 있다(지운 줄 알았는데 안 지워진 것).
+    const 지운첨부 = 문서첨부정리(cur.id, u.id);
+    문서판정리(cur.id, u.id);
+    recordAudit({
+      kind: "config", actor: u.name, action: "개인 문서 삭제", target: cur.id,
+      detail: cur.title + (지운첨부 ? ` · 첨부 ${지운첨부}장 함께 삭제` : ""), result: "ok",
+    });
     res.json({ ok: true });
   }));
 }

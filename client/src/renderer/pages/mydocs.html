@@ -167,6 +167,20 @@ td.cov-ven{background:rgba(240,160,32,.16);color:var(--cov-ven-ink,#f3c06a);bord
 td.cov-gap{background:rgba(226,72,61,.13);color:var(--cov-gap-ink,#e88a82);border-color:rgba(226,72,61,.32);}
 table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 .cx-note{padding:8px 14px 14px;font-size:11px;color:var(--muted-2);}
+/* 첨부·이력 줄 — 엑셀형 한 줄(30px). 큰 썸네일 격자로 늘어놓지 않는다(밀도 원칙). */
+.att-bar,.ver-bar{flex:0 0 auto;border-top:1px solid var(--border);padding:0 12px;font-size:11.5px;color:var(--muted-2);}
+.att-bar:empty,.ver-bar:empty{display:none;}
+.att-row,.ver-row{display:flex;align-items:center;gap:8px;height:30px;}
+.att-row .nm,.ver-row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.att-row img{height:20px;width:28px;object-fit:cover;border-radius:3px;border:1px solid var(--border);}
+.att-row button,.ver-row button{background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted);font:inherit;font-size:11px;padding:2px 7px;cursor:pointer;}
+.att-row button:hover,.ver-row button:hover{border-color:var(--border-strong);color:var(--text);}
+/* / 명령 메뉴 — 노션 방식. 서랍을 열러 가지 않고 쓰던 자리에서 고른다. */
+.slash-menu{display:none;position:absolute;z-index:40;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 10px 26px rgba(0,0,0,.4);min-width:230px;max-height:236px;overflow:auto;}
+.slash-menu.on{display:block;}
+.slash-menu .si{padding:0 10px;height:28px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;}
+.slash-menu .si.on,.slash-menu .si:hover{background:rgba(255,255,255,.07);}
+.slash-menu .si .k{color:var(--muted-2);font-size:11px;}
 .note{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);line-height:1.5;padding:5px 12px;
   border-top:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
@@ -345,9 +359,16 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       알려 드립니다 — 장비 접속 정보는 <b>보안제품 등록부</b>(암호화 보관)에 두세요.</div>
     <div class="tpl-drawer" id="tplDrawer"></div>
     <div class="edit-split" id="editSplit">
-      <div class="edit-src"><textarea id="editBody" placeholder="본문을 적어 주세요 — ### 제목, - 목록을 쓰면 오른쪽 미리보기에 정리되어 보입니다."></textarea></div>
+      <div class="edit-src"><textarea id="editBody" placeholder="본문을 적어 주세요 — ### 제목, - 목록. 화면을 캡처해 Ctrl+V 하면 그림이 붙습니다. / 를 치면 템플릿이 뜹니다."></textarea></div>
       <div class="edit-prev md" id="editPrev"></div>
     </div>
+    <!-- 첨부·이력 — 목록은 전부 엑셀형 한 줄(사장님 「많은 데이터를 한눈에」). 없으면 줄 하나만 차지한다. -->
+    <div class="att-bar" id="attBar"></div>
+    <div class="ver-bar" id="verBar"></div>
+    <!-- / 명령 — 글을 쓰다 템플릿을 부르는 자리(노션 방식). 서랍을 열러 가지 않아도 된다.
+         ⚠ 이건 **지시가 아니라 서식 고르기**다 — 「지시는 대화창에서만」 원칙의 예외에 든다
+         (편집기 자체가 이미 그 예외다: 본문 작성은 저작 행위이지 지시가 아니다). -->
+    <div class="slash-menu" id="slashMenu"></div>
   </div>
 
   <!-- 제품 안내 열람(문서함의 넓은 읽기 화면 승계) — v4에서는 행을 누르면 바로 열린다 -->
@@ -971,6 +992,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         '<button data-act="share">' + (doc.shared ? "공유 해제" : "🏢 공유") + "</button>" +
         '<button data-act="down">⬇ .md 내려받기</button>' +
         // 내보내기(2026-08-21) — 다듬은 문서를 밖으로 전달할 형식. 서버 리포트 엔진 재사용.
+        '<button data-act="html">⬇ HTML</button>' +
         '<button data-act="pdf">⬇ PDF</button>' +
         '<button data-act="word">⬇ Word</button>' +
         '<button data-act="del" class="warn">✕ 삭제</button>' +
@@ -1098,10 +1120,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
         if (window.gijoTell) window.gijoTell("「" + doc.title + ".md」를 내려받습니다 — 다운로드 폴더를 확인하세요.\n다듬은 뒤 📥 가져오기로 되담으면 됩니다.");
         return;
-      } else if (act === "pdf" || act === "word") {
+      } else if (act === "pdf" || act === "word" || act === "html") {
         // 내보내기(2026-08-21) — 서버 리포트 엔진이 base64로 만들어 준다. 밖으로 전달할 형식.
         try {
-          var r = await window.gijo.personalDocsExport(doc.id, act === "pdf" ? "pdf" : "docx");
+          var r = await window.gijo.personalDocsExport(doc.id, act === "pdf" ? "pdf" : act === "html" ? "html" : "docx");
           var bytes = Uint8Array.from(atob(r.base64), function (c) { return c.charCodeAt(0); });
           var url2 = URL.createObjectURL(new Blob([bytes], { type: r.mime }));
           var a2 = document.createElement("a");
@@ -1157,6 +1179,16 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     var v = document.getElementById("editBody").value;
     if (window.gijoMd && window.gijoMd.render) el.innerHTML = window.gijoMd.render(v);
     else el.textContent = v;
+    // 첨부 표기를 그림으로 — 본문에는 `gijo-att:<id>`만 있다(공용 렌더러는 그 스킴을 모른다).
+    // ⚠ **공용 렌더러(gijomd)를 고치지 않는다** — 대화창도 쓰는 부품이라 손대면 전수 스윕 대상이다.
+    //   여기서 그린 뒤에 바꿔 끼우는 편이 영향이 좁다.
+    Array.prototype.forEach.call(el.querySelectorAll("img"), async function (im) {
+      var src = im.getAttribute("src") || "";
+      if (src.indexOf("gijo-att:") !== 0) return;
+      var u = await 첨부URL받기(src.slice("gijo-att:".length));
+      if (u) im.src = u;
+      else { im.replaceWith(document.createTextNode("[그림을 찾지 못했습니다 — 지워졌을 수 있습니다]")); }
+    });
   }
   function 편집열기(doc, opts) {
     opts = opts || {};
@@ -1172,8 +1204,110 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     document.getElementById("tplDrawer").classList.toggle("on", !!opts.openDrawer);
     document.getElementById("editTplToggle").classList.toggle("on", !!opts.openDrawer);
     미리보기갱신();
+    첨부그리기();
+    이력그리기();
     스테이지("edit");
     document.getElementById("editTitle").focus();
+  }
+
+  // ── 첨부(캡처) · 버전 이력 · / 명령 ──────────────────────────────────────────
+  //
+  // ★ 2026-08-22 — Smart MD Studio를 없애면서 **우리가 약속한 것**을 여기서 한다.
+  //   세 곳(라이트 설치안내서·용어사전·챗봇 안내)이 똑같이 이렇게 적어 뒀다:
+  //     화면 캡처 Ctrl+V 삽입 · md/HTML/PDF/워드 4형식 · 템플릿 · **문서 이력** · 인터넷 불필요
+  //   그 목록이 「충분히」의 선이다 — 주석(화살표·박스)은 **어디에도 약속된 적이 없어** 안 만들었다.
+  var 첨부들 = [], 판들 = [], 첨부URL = {};
+
+  /** 첨부 표기를 미리보기에서 그림으로 바꾼다 — 본문에는 `gijo-att:<id>` 표기만 있다.
+   *  ⚠ `<img src>`에 토큰을 못 붙이므로 바이트를 받아 data URL로 만든다. 한 번 받으면 캐시한다. */
+  async function 첨부URL받기(id) {
+    if (첨부URL[id]) return 첨부URL[id];
+    try {
+      var f = await window.gijo.personalDocsReadFile(id);
+      첨부URL[id] = "data:" + f.mime + ";base64," + f.content;
+      return 첨부URL[id];
+    } catch (e) { return null; }
+  }
+
+  async function 첨부그리기() {
+    var bar = document.getElementById("attBar");
+    if (!편집중) { 첨부들 = []; bar.innerHTML = ""; return; }
+    try { 첨부들 = ((await window.gijo.personalDocsFiles(편집중)) || {}).files || []; }
+    catch (e) { 첨부들 = []; }
+    if (!첨부들.length) { bar.innerHTML = ""; return; }
+    bar.innerHTML = 첨부들.map(function (f) {
+      return '<div class="att-row" data-id="' + esc(f.id) + '">' +
+        '<img data-att="' + esc(f.id) + '" alt="">' +
+        '<span class="nm" title="' + esc(f.name) + '">🖼 ' + esc(f.name) + "</span>" +
+        '<span class="gm2">' + Math.round(f.bytes / 1024) + "KB</span>" +
+        '<button data-act="ins">본문에 넣기</button>' +
+        '<button data-act="del">지우기</button></div>';
+    }).join("");
+    // 작은 미리보기 — 큰 격자로 늘어놓지 않는다(밀도 원칙).
+    Array.prototype.forEach.call(bar.querySelectorAll("img[data-att]"), async function (im) {
+      var u = await 첨부URL받기(im.getAttribute("data-att"));
+      if (u) im.src = u;
+    });
+  }
+
+  async function 이력그리기() {
+    var bar = document.getElementById("verBar");
+    if (!편집중) { 판들 = []; bar.innerHTML = ""; return; }
+    try { 판들 = ((await window.gijo.personalDocsVersions(편집중)) || {}).versions || []; }
+    catch (e) { 판들 = []; }
+    if (!판들.length) { bar.innerHTML = ""; return; }
+    // ⚠ 타임라인처럼 세로로 길게 늘어놓지 않는다 — 30px 표 한 줄씩(사장님 밀도 원칙).
+    bar.innerHTML = 판들.slice(0, 5).map(function (v) {
+      return '<div class="ver-row" data-id="' + v.id + '">' +
+        '<span class="nm">🕘 ' + esc(날짜(v.savedAt)) + " · " + esc(v.title) + "</span>" +
+        '<span class="gm2">' + v.글자수 + "자</span>" +
+        '<button data-act="back">이 판으로</button></div>';
+    }).join("") + (판들.length > 5 ? '<div class="ver-row"><span class="nm gm2">외 ' + (판들.length - 5) + "판 더 있습니다</span></div>" : "");
+  }
+
+  /** 그림을 줄여서 올린다 — Smart MD와 같은 값(긴 변 1600px · JPEG 0.85).
+   *  ⚠ 원본을 그대로 올리면 캡처 한 장이 수 MB다. 줄여도 글자는 읽힌다. */
+  function 그림줄이기(file) {
+    return new Promise(function (done) {
+      var fr = new FileReader();
+      fr.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var w = img.width, h = img.height, 최대 = 1600;
+          if (w > 최대 || h > 최대) { var r = Math.min(최대 / w, 최대 / h); w = Math.round(w * r); h = Math.round(h * r); }
+          var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          var url = cv.toDataURL("image/jpeg", 0.85);
+          done({ mime: "image/jpeg", content: url.slice(url.indexOf(",") + 1) });
+        };
+        img.onerror = function () { done(null); };
+        img.src = fr.result;
+      };
+      fr.onerror = function () { done(null); };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  async function 캡처붙이기(file) {
+    if (!편집중) { gijoTell("먼저 저장한 뒤에 그림을 붙일 수 있습니다 — 제목을 적고 💾 저장을 눌러 주세요."); return; }
+    var 줄인것 = await 그림줄이기(file);
+    if (!줄인것) { gijoTell("그 그림을 읽지 못했습니다."); return; }
+    try {
+      var r = await window.gijo.personalDocsAddFile(편집중, {
+        name: "캡처 " + (첨부들.length + 1), mime: 줄인것.mime, content: 줄인것.content,
+      });
+      본문에넣기(r.표기);
+      await 첨부그리기();
+    } catch (e) { gijoTell((e && e.message) || "그림을 붙이지 못했습니다."); }
+  }
+
+  function 본문에넣기(글) {
+    var ta = document.getElementById("editBody");
+    var s = ta.selectionStart == null ? ta.value.length : ta.selectionStart;
+    ta.value = ta.value.slice(0, s) + 글 + "\n" + ta.value.slice(s);
+    ta.selectionStart = ta.selectionEnd = s + 글.length + 1;
+    ta.focus();
+    미리보기갱신();
   }
   async function 편집열기_기존(doc) {
     // 본문은 목록 응답에 없다 — 읽기 라우트로 가져온다(빈 본문으로 열면 저장이 본문을 지운다)
@@ -1195,6 +1329,102 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     this.classList.toggle("on", d.classList.contains("on"));
   });
   document.getElementById("editBody").addEventListener("input", 미리보기갱신);
+
+  // ★ 캡처 붙여넣기 — ⚠ **`#editBody` 요소에 건다(document 아님).**
+  //   같은 화면의 「요청 만들기」가 이미 document 단위 붙여넣기를 쓰고 있어서,
+  //   여기서도 document에 걸면 **두 무대가 같은 붙여넣기를 다툰다**(설계관 2026-08-22 경고).
+  document.getElementById("editBody").addEventListener("paste", function (ev) {
+    var items = (ev.clipboardData || {}).items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type && items[i].type.indexOf("image/") === 0) {
+        var f = items[i].getAsFile();
+        if (f) { ev.preventDefault(); 캡처붙이기(f); return; }
+      }
+    }
+    // 그림이 아니면 그냥 둔다 — 글 붙여넣기는 평소대로.
+  });
+
+  // 첨부·이력 줄의 단추
+  document.getElementById("attBar").addEventListener("click", async function (ev) {
+    var b = ev.target.closest("button"); if (!b) return;
+    var row = b.closest(".att-row"); if (!row) return;
+    var id = row.getAttribute("data-id");
+    if (b.getAttribute("data-act") === "ins") {
+      var f = 첨부들.filter(function (x) { return x.id === id; })[0];
+      본문에넣기("![" + (f ? f.name : "캡처") + "](gijo-att:" + id + ")");
+    } else if (b.getAttribute("data-act") === "del") {
+      if (!(await gijoAsk("이 그림을 지울까요? 본문에 넣어 둔 자리는 그림이 안 보이게 됩니다."))) return;
+      try { await window.gijo.personalDocsRemoveFile(id); delete 첨부URL[id]; await 첨부그리기(); 미리보기갱신(); }
+      catch (e) { gijoTell((e && e.message) || "지우지 못했습니다."); }
+    }
+  });
+
+  document.getElementById("verBar").addEventListener("click", async function (ev) {
+    var b = ev.target.closest("button"); if (!b || b.getAttribute("data-act") !== "back") return;
+    var row = b.closest(".ver-row"); if (!row) return;
+    // ⚠ 되돌리기도 **되돌릴 수 있어야** 한다 — 지금 글이 판으로 남은 뒤에 바꿔치기된다(저장 때 남는다).
+    if (!(await gijoAsk("이 판의 내용으로 되돌릴까요? 지금 쓰던 글은 저장하면 이력에 남습니다."))) return;
+    try {
+      var v = await window.gijo.personalDocsVersionBody(Number(row.getAttribute("data-id")));
+      document.getElementById("editTitle").value = v.title || "";
+      document.getElementById("editBody").value = v.body || "";
+      미리보기갱신();
+      gijoTell("되돌렸습니다 — 💾 저장을 눌러야 실제로 바뀝니다.");
+    } catch (e) { gijoTell((e && e.message) || "그 판을 읽지 못했습니다."); }
+  });
+
+  // ★ `/` 명령 — 글을 쓰다 템플릿을 부른다(노션 방식). 서랍을 열러 가지 않아도 된다.
+  //   ⚠ 이건 **지시가 아니라 서식 고르기**다 — 편집기가 이미 「입력칸 0」 원칙의 예외 안에 있다.
+  (function 슬래시() {
+    var menu = document.getElementById("slashMenu"), ta = document.getElementById("editBody");
+    var 켜짐 = false, 고른 = 0, 후보 = [], 시작 = -1;
+    function 닫기() { 켜짐 = false; menu.classList.remove("on"); }
+    function 그리기() {
+      menu.innerHTML = 후보.map(function (t, i) {
+        return '<div class="si' + (i === 고른 ? " on" : "") + '" data-i="' + i + '">' +
+          "<span>" + esc(t.label) + '</span><span class="k">템플릿</span></div>';
+      }).join("");
+    }
+    function 열기() {
+      var r = ta.getBoundingClientRect();
+      menu.style.left = (r.left + 14) + "px";
+      menu.style.top = (r.top + 34) + "px";
+      menu.classList.add("on"); 켜짐 = true; 고른 = 0; 그리기();
+    }
+    function 넣기(t) {
+      var v = ta.value, s = ta.selectionStart;
+      // `/`부터 커서까지를 템플릿으로 바꿔치기한다 — 친 글자가 남으면 안 된다.
+      ta.value = v.slice(0, 시작) + t.body + v.slice(s);
+      ta.selectionStart = ta.selectionEnd = 시작 + t.body.length;
+      닫기(); ta.focus(); 미리보기갱신();
+    }
+    ta.addEventListener("keydown", function (ev) {
+      if (켜짐) {
+        if (ev.key === "ArrowDown") { ev.preventDefault(); 고른 = (고른 + 1) % 후보.length; 그리기(); return; }
+        if (ev.key === "ArrowUp") { ev.preventDefault(); 고른 = (고른 - 1 + 후보.length) % 후보.length; 그리기(); return; }
+        if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); if (후보[고른]) 넣기(후보[고른]); return; }
+        if (ev.key === "Escape") { ev.preventDefault(); 닫기(); return; }
+      }
+    });
+    ta.addEventListener("input", function () {
+      var s = ta.selectionStart, v = ta.value;
+      // 줄 맨 앞의 `/`만 본다 — 글 가운데 슬래시(경로·날짜)까지 잡으면 성가시다.
+      var 줄앞 = v.lastIndexOf("\n", s - 1) + 1;
+      var 조각 = v.slice(줄앞, s);
+      if (조각.charAt(0) !== "/") { if (켜짐) 닫기(); return; }
+      var 찾는말 = 조각.slice(1);
+      시작 = 줄앞;
+      후보 = TEMPLATES.filter(function (t) { return !찾는말 || t.label.indexOf(찾는말) >= 0; });
+      if (!후보.length) { 닫기(); return; }
+      if (!켜짐) 열기(); else 그리기();
+    });
+    ta.addEventListener("blur", function () { setTimeout(닫기, 150); });
+    menu.addEventListener("mousedown", function (ev) {
+      var it = ev.target.closest(".si"); if (!it) return;
+      ev.preventDefault();
+      넣기(후보[Number(it.getAttribute("data-i"))]);
+    });
+  })();
   document.getElementById("editViewSeg").addEventListener("click", function (ev) {
     var b = ev.target.closest("button"); if (!b) return;
     Array.prototype.forEach.call(this.querySelectorAll("button"), function (x) { x.classList.remove("on"); });
