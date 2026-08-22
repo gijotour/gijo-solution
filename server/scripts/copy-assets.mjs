@@ -11,13 +11,13 @@ const 서버 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const 옮길것 = [
   "engine/examquestions.json",
   // SBOM 라이선스 점검이 쓸 정본 자료(2026-08-22 반입).
-  //   · spdx-licenses.json — SPDX 정본 식별자 733종(CC0-1.0). 등급 판정의 원천.
-  //   · cyclonedx-*.schema.json — 타사 SBOM을 읽을 때 필드 이름을 대조할 정본(Apache-2.0).
-  //   ⚠ 지식 저장소(RAG)에 넣지 않는다 — 스키마 551조각이 다른 질문의 근거를 밀어낸다.
-  //     읽을 글이 아니라 **판정기가 쓸 자료**다.
+  //   · spdx-licenses.json — SPDX 정본 식별자 733종(CC0-1.0). licenserisk.ts가 읽는다.
+  //   ⚠ 지식 저장소(RAG)에 넣지 않는다 — 읽을 글이 아니라 **판정기가 쓸 자료**다.
+  //   ⚠ **cyclonedx 스키마 2종(420KB)은 여기 넣지 않는다**(2026-08-22 검토관).
+  //     읽는 코드가 **한 곳도 없는데** 설치본에 실려 나가고 있었다. 타사 SBOM 파서를
+  //     만들 때 필드 이름을 대조할 자료라 저장소에는 두되, **쓰는 코드가 생기면 그때** 싣는다.
+  //     「쓰지도 않는 것을 고객 기계에 넣지 않는다」 — 안 그러면 아무도 이유를 모르는 짐이 된다.
   "engine/licensedata/spdx-licenses.json",
-  "engine/licensedata/cyclonedx-1.6.schema.json",
-  "engine/licensedata/cyclonedx-1.7.schema.json",
 ];
 
 for (const rel of 옮길것) {

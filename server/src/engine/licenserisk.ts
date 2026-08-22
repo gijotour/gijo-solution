@@ -145,7 +145,12 @@ const 자유표기: Array<{ re: RegExp; id: string }> = [
   { re: /\bISC\b/i, id: "ISC" },
   { re: /blue\s*oak/i, id: "BSD-3-Clause" },      // Blue Oak 1.0.0은 허용적 — 등급이 같다
   { re: /python\s*software\s*foundation|\bPSF\b/i, id: "Python-2.0" },
-  { re: /histor|public\s*domain|\bCC0\b/i, id: "CC0-1.0" },
+  // ⚠ **HPND를 CC0로 읽지 말 것**(2026-08-22 검토관 [높음]). 예전엔 `histor`가 CC0 규칙에 있어
+  //   「Historical Permission Notice and Disclaimer」가 **의무없음**으로 떨어졌다 —
+  //   이름에 「Notice」가 들어 있듯 **고지가 의무**인 라이선스인데 정반대로 판정했다.
+  //   Pillow가 실제로 쓰는 라이선스라 우리 동봉물에 들어 있다.
+  { re: /historical\s*permission|\bHPND\b/i, id: "BSD-3-Clause" },   // 고지 의무 — 등급이 같다
+  { re: /public\s*domain|\bCC0\b/i, id: "CC0-1.0" },
   { re: /zlib/i, id: "Zlib" },
   { re: /unlicen[cs]e/i, id: "Unlicense" },
 ];
@@ -202,8 +207,17 @@ export function 등급판정(원문표기: string | null | undefined): 라이선
   // OR는 **고를 수 있다**(이중 라이선스) → 가벼운 쪽. AND는 **둘 다** → 무거운 쪽.
   //   ⚠ 괄호 중첩까지는 안 푼다. 섞여 있으면 안전하게 **무거운 쪽 + 확인필요**로 둔다.
   const OR있음 = /\sOR\s/i.test(원문);
-  const AND있음 = /\sAND\s/i.test(원문);
-  const 조각들 = 원문.split(/\s+(?:AND|OR)\s+/i).map((s) => s.replace(/\s+WITH\s+.*$/i, "").trim()).filter(Boolean);
+  // ⚠ **쉼표·슬래시·세미콜론도 갈라야 한다**(2026-08-22 게시 전 검토관 [높음]).
+  //   규칙이 접두 매칭이라(`/^BSD-[0-9]/`) 안 가르면 **첫 토큰에서 걸리고 나머지가 통째로 버려진다.**
+  //   실증: 우리가 지금 출하하는 pypdfium2의 실제 표기가
+  //   `BSD-3-Clause, Apache-2.0, dependency licenses`인데 「고지만·확인 불필요」로 초록이었다.
+  //   더 나쁜 갈래: `MIT, AGPL-3.0`이 **「고지만」으로 통과**한다 — 관문이 고지만은 안 막으니
+  //   카피레프트가 exit 0으로 나간다. 이 파일이 위에서 「뒤에 붙은 AGPL이 잘리면 판정이 조용히
+  //   뒤집힌다」고 못 박은 그 사고가, 자르기가 아니라 **접두 매칭**으로 재현된 것이다.
+  //   쉼표로 이은 목록은 「이것들이 함께 적용된다」는 뜻이라 AND로 본다(무거운 쪽).
+  const 구분자 = /\s+(?:AND|OR)\s+|\s*[,;/]\s*/i;
+  const AND있음 = /\sAND\s/i.test(원문) || /[,;/]/.test(원문);
+  const 조각들 = 원문.split(구분자).map((s) => s.replace(/\s+WITH\s+.*$/i, "").trim()).filter(Boolean);
   const 판정들 = 조각들.map(한개판정);
   if (!판정들.length) {
     return { 등급: "판정불가", 받게되는요구: 요구문장.판정불가, spdxId: "", 원문,
@@ -243,7 +257,9 @@ export function 등급판정(원문표기: string | null | undefined): 라이선
   return {
     등급: 고른것.등급,
     받게되는요구: 요구문장[고른것.등급],
-    spdxId: 조각들.length === 1 ? 조각들[0] : "",
+    // ⚠ 조각이 하나라도 **정본 식별자일 때만** spdxId로 쓴다 — 안 그러면 원문 문장이
+    //   식별자 칸에 그대로 들어간다(`dependency licenses` 같은 것이 SPDX id로 보인다).
+    spdxId: (조각들.length === 1 && 규칙.some((r) => r.re.test(조각들[0]))) ? 조각들[0] : "",
     원문,
     근거: 고른것.근거 + 셈근거 + 예외말 + 섞임말,
     확인필요: 확인,

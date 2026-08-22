@@ -440,32 +440,69 @@ export function listDatasets(): { id: string; examples: number }[] {
 //
 // ⚠ 파이썬을 띄워 보는 일이라 **캐시한다** — 화면이 열릴 때마다 프로세스를 띄우면 안 된다.
 let 추출능력캐시: { ocr: boolean; 잰때: number; 사유: string } | null = null;
+// ⚠ **도는 중인 약속을 함께 쓴다**(2026-08-22 검토관 [높음]). 캐시 대입은 프로세스가 **끝난 뒤**에만
+//   일어나므로, 그 사이에 온 요청은 전부 캐시 미스로 **각자 파이썬을 띄운다.** 이 일은 가볍지 않다 —
+//   rapidocr import + OCR 엔진 생성(모델 2개 적재)까지 간다. 화면 두 개만 동시에 열려도 곱절이 된다.
+//   이 저장소에 이미 있는 처방이다(「가드는 Promise 공유」).
+let 추출능력도는중: Promise<{ ocr: boolean; 사유: string }> | null = null;
 const 능력캐시수명ms = 5 * 60 * 1000;
 
 export async function 문서추출능력(): Promise<{ ocr: boolean; 사유: string }> {
   if (추출능력캐시 && Date.now() - 추출능력캐시.잰때 < 능력캐시수명ms) {
     return { ocr: 추출능력캐시.ocr, 사유: 추출능력캐시.사유 };
   }
-  const 결과 = await new Promise<{ ocr: boolean; 사유: string }>((resolve) => {
+  if (추출능력도는중) return 추출능력도는중;
+  추출능력도는중 = new Promise<{ ocr: boolean; 사유: string }>((resolve) => {
     // ⚠ **import만 보고 「된다」고 하지 않는다** — 이 제품이 실제로 데인 자리다(모델 자리를 Path로
     //   넘겨 엔진 **생성**에서 거부당했는데 import는 멀쩡했다). 엔진을 만들어 보는 데까지 간다.
-    const 코드 = "import sys\n" +
-      "try:\n" +
-      "    sys.path.insert(0, r'" + serverScript("scripts").replace(/'/g, "") + "')\n" +
-      "    import extract_doc\n" +
-      "    extract_doc._ocr_engine()\n" +
-      "    print('OCR_OK')\n" +
-      "except Exception as e:\n" +
-      "    print('OCR_NO ' + type(e).__name__ + ': ' + str(e)[:200])\n";
-    execFile(serverPython("docs"), ["-c", 코드], { timeout: 120_000 }, (err, stdout, stderr) => {
-      const 답 = String(stdout || "").trim();
-      if (답.startsWith("OCR_OK")) return resolve({ ocr: true, 사유: "" });
-      const 원문 = 답.replace(/^OCR_NO\s*/, "") || String(stderr || err?.message || "").trim().slice(0, 200);
-      resolve({ ocr: false, 사유: 원문 || "확인하지 못했습니다" });
-    });
+    // ⚠ 경로를 **파이썬 코드 문자열에 끼워 넣지 않는다**(검토관 [높음]). 예전엔 따옴표를
+    //   `.replace(/'/g,"")`로 **지워서** 넣었는데, 지우는 것은 이스케이프가 아니라
+    //   경로가 바뀌는 것이고 설치 경로에 따옴표가 있으면 엉뚱한 자리를 보게 된다.
+    //   이제 **환경변수로 건넨다** — 문자열 조립 자체가 없으니 주입될 자리도 없다.
+    const 코드 = [
+      "import sys, os",
+      "try:",
+      "    sys.path.insert(0, os.environ['GIJO_SCRIPTS_DIR'])",
+      "    import extract_doc",
+      "    extract_doc._ocr_engine()",
+      "    print('OCR_OK')",
+      "except Exception as e:",
+      "    print('OCR_NO ' + type(e).__name__ + ': ' + str(e)[:200])",
+    ].join("\n");
+    execFile(
+      serverPython("docs"),
+      ["-c", 코드],
+      { timeout: 120_000, env: { ...process.env, GIJO_SCRIPTS_DIR: serverScript("scripts"), PYTHONUTF8: "1" } },
+      (err, stdout, stderr) => {
+        const 답 = String(stdout || "").trim();
+        if (답.startsWith("OCR_OK")) return resolve({ ocr: true, 사유: "" });
+        const 원문 = 답.replace(/^OCR_NO\s*/, "") || String(stderr || err?.message || "").trim().slice(0, 200);
+        // 원인 원문은 **서버 기록에만** 남긴다 — 관리자가 볼 자리다. 화면에는 갈래만 나간다.
+        if (원문) recordProcessOutput("extract-capability", "warn", `OCR 사용 불가: ${원문}`);
+        resolve({ ocr: false, 사유: 원문 || "확인하지 못했습니다" });
+      }
+    );
   });
-  추출능력캐시 = { ...결과, 잰때: Date.now() };
-  return 결과;
+  try {
+    const 결과 = await 추출능력도는중;
+    추출능력캐시 = { ...결과, 잰때: Date.now() };
+    return 결과;
+  } finally {
+    추출능력도는중 = null;
+  }
+}
+
+/** OCR을 못 쓰는 이유를 **경로를 빼고** 갈래로만 말한다 — 화면에 나가는 값이다.
+ *  원인 원문은 서버 기록에만 남긴다(관리자가 본다). */
+function 능력사유요약(원문: string): string {
+  const t = String(원문 || "");
+  if (/ModuleNotFoundError|No module named/i.test(t)) return "OCR 구성요소가 설치돼 있지 않습니다.";
+  if (/DLL load failed|specified module could not be found/i.test(t)) return "OCR 구성요소는 있으나 실행 라이브러리가 없어 뜨지 못했습니다.";
+  if (/timed out|ETIMEDOUT/i.test(t)) return "OCR 구성요소를 확인하는 데 시간이 너무 걸렸습니다.";
+  if (/ENOENT|not recognized|command not found/i.test(t)) return "문서 추출용 파이썬을 찾지 못했습니다.";
+  if (!t) return "확인하지 못했습니다.";
+  // 그 밖의 원인 — **원문을 흘리지 않는다.** 자세한 것은 서버 기록에 있다.
+  return "OCR 구성요소를 쓸 수 없습니다(자세한 원인은 서버 기록에 남습니다).";
 }
 
 export function registerDatasetRoutes(app: Express): void {
@@ -482,7 +519,10 @@ export function registerDatasetRoutes(app: Express): void {
         pdf: true,
         // 스캔·사진은 OCR이 있어야 한다.
         ocr: c.ocr,
-        ocr사유: c.ocr ? "" : c.사유,
+        // ⚠ **원문을 그대로 내보내지 않는다**(2026-08-22 검토관). 파이썬 예외 원문에는
+        //   설치 절대 경로(사용자 이름이 든 자리)가 섞여 나온다. 화면이 쓰는 것은
+        //   「되나 안 되나」뿐이고 원인은 관리자가 서버 기록에서 본다.
+        ocr사유: c.ocr ? "" : 능력사유요약(c.사유),
       });
     })
   );

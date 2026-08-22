@@ -126,6 +126,31 @@ describe("라이선스 식(expression) — AND·OR·WITH", () => {
     expect(r.근거, "모르는 조각이 있다는 사실도 말해야 한다").toContain("알아보지 못한");
   });
 
+  it("★★ 쉼표·슬래시·세미콜론도 가른다 — 안 가르면 첫 토큰만 보고 나머지를 버린다", () => {
+    // 2026-08-22 게시 전 검토관 [높음]. 규칙이 접두 매칭이라 안 가르면 첫 조각에서 걸리고 끝난다.
+    // ★ 우리가 **지금 출하하는** pypdfium2의 실제 표기다(dist-info 실측).
+    const r = 등급판정("BSD-3-Clause, Apache-2.0, dependency licenses");
+    expect(r.등급).toBe("고지만");
+    expect(r.확인필요, "「dependency licenses」를 못 알아봤으니 사람이 봐야 한다").toBe(true);
+    expect(r.spdxId, "원문 문장이 식별자 칸에 들어가면 안 된다").toBe("");
+
+    // ★ 더 나쁜 갈래 — 이게 「고지만」으로 통과하면 카피레프트가 관문을 그냥 지나간다.
+    expect(등급판정("MIT, AGPL-3.0").등급).toBe("서비스도공개");
+    expect(등급판정("BSD-3-Clause/GPL-2.0").등급).toBe("전체소스공개");
+    expect(등급판정("MIT; LGPL-2.1-only").등급).toBe("고친파일공개");
+  });
+
+  it("★ HPND를 CC0로 읽지 않는다 — 고지 의무가 있는데 「의무없음」이면 정반대다", () => {
+    // Pillow가 실제로 쓰는 라이선스라 우리 동봉물에 들어 있다.
+    for (const 표기 of ["Historical Permission Notice and Disclaimer", "HPND"]) {
+      expect(등급판정(표기).등급, 표기).toBe("고지만");
+      expect(등급판정(표기).등급, "고지 의무가 있는 것을 의무없음으로 세면 안 된다").not.toBe("의무없음");
+    }
+    // 진짜 퍼블릭 도메인은 그대로 의무없음이어야 한다(수리가 반대쪽을 깨지 않았나).
+    expect(등급판정("CC0-1.0").등급).toBe("의무없음");
+    expect(등급판정("public domain").등급).toBe("의무없음");
+  });
+
   it("OR는 고를 수 있으니 **가벼운 쪽**", () => {
     const r = 등급판정("GPL-2.0-only OR MIT");
     expect(r.등급).toBe("고지만");
@@ -211,10 +236,18 @@ describe("★ 라이선스 관문이 게시 사슬에 물려 있다", () => {
     for (const 사슬 of ["dist", "dist:lite"]) {
       expect(pj.scripts[사슬], `${사슬}이 라이선스 관문을 안 부른다 — AGPL이 그대로 출하된다`)
         .toContain("license-gate");
-      // ⚠ **stage-python 뒤**여야 한다 — 동봉 파이썬까지 재야 하므로 앞에 두면 그 부분을 못 본다.
       const s = String(pj.scripts[사슬]);
-      expect(s.indexOf("license-gate"), `${사슬}: 관문이 stage-python보다 앞에 있다 — 동봉 파이썬을 못 잰다`)
+      // ⚠ **stage-python 뒤**여야 한다 — 동봉 파이썬까지 재야 한다.
+      expect(s.indexOf("license-gate"), `${사슬}: 관문이 stage-python보다 앞이면 동봉 파이썬을 못 잰다`)
         .toBeGreaterThan(s.indexOf("stage-python"));
+      // ⚠ **build-server-dist 뒤**여야 한다 — 그것이 `npm ci --omit=dev`로 **실제 배포 집합**을
+      //   만든다. 앞에 두면 개발 트리를 재게 되고, 실측상 그건 543개 중 절반이 개발 도구다
+      //   (2026-08-22 검토관 [높음]: 안 나가는 것을 「포함」이라 고지하고 나가는 것은 빠뜨렸다).
+      expect(s.indexOf("license-gate"), `${사슬}: 관문이 build-server-dist보다 앞이면 개발 트리를 잰다`)
+        .toBeGreaterThan(s.indexOf("build-server-dist"));
+      // 그리고 electron-builder **앞**이어야 막을 수 있다.
+      expect(s.indexOf("license-gate"), `${사슬}: 관문이 electron-builder 뒤면 못 막는다`)
+        .toBeLessThan(s.indexOf("electron-builder"));
     }
   });
 

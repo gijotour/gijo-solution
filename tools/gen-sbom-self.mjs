@@ -105,13 +105,66 @@ function 파이썬꾸러미() {
   return { 목록, 표식있나: true, ocr: j.ocr, python: j.python };
 }
 
+/** node 꾸러미가 아닌 **동봉물** — 있으면 센다.
+ *
+ *  ⚠ 이것들은 dist-info도 package.json도 없어 **원리상 자동으로 안 잡힌다.** 그래서 여기 적는다.
+ *    손 목록이라 낡을 수 있으므로 **파일이 실제로 있을 때만** 싣고, 없으면 그냥 뺀다
+ *    (「목록에 있는데 파일이 없다」로 관문이 빨개지면 아무도 안 본다).
+ *  ⚠ 새 동봉물을 extraResources에 더할 때 **여기도 더할 것** — 안 그러면 고지에서 빠진다.
+ */
+function 동봉바이너리() {
+  const 표 = [
+    { 이름: "llama.cpp (CUDA 빌드)", 라이선스: "MIT", 어디: path.join(루트, "client", "build", "llama-cuda") },
+    { 이름: "llama.cpp (Metal 빌드)", 라이선스: "MIT", 어디: path.join(루트, "client", "build", "llama-metal") },
+    { 이름: "CPython (임베더블 런타임)", 라이선스: "Python-2.0", 어디: path.join(루트, "client", "build", "python-dist", "python.exe") },
+    { 이름: "Microsoft Visual C++ 재배포 런타임 (msvcp140 계열)", 라이선스: "MIT", 어디: path.join(루트, "client", "build", "python-dist", "msvcp140.dll"),
+      비고: "MS 재배포 조건에 따름 — 오픈소스 아님" },
+    { 이름: "bge-m3 (임베딩 모델)", 라이선스: "MIT", 어디: path.join(루트, "server", "models", "bge-m3") },
+    { 이름: "PP-OCRv5 한국어 모델", 라이선스: "Apache-2.0", 어디: path.join(루트, "client", "build", "python-dist", "site-packages", "rapidocr", "models") },
+  ];
+  const 모음 = [];
+  for (const t of 표) {
+    if (!fs.existsSync(t.어디)) continue;
+    모음.push({ 이름: t.이름, 판: "", 라이선스: t.라이선스, 갈래: "동봉물", 비고: t.비고 });
+  }
+  // smartmd vendor — 판까지 적힌 목록 파일이 있으면 그것을 읽는다(손으로 안 적는다).
+  const vend = path.join(루트, "client", "smartmd", "vendor", "VERSIONS.md");
+  if (fs.existsSync(vend)) {
+    for (const 줄 of fs.readFileSync(vend, "utf8").split("\n")) {
+      // `- 이름 판 — 라이선스` 꼴을 느슨하게 읽는다. 못 읽으면 건너뛴다(억지로 넣지 않는다).
+      const m = 줄.match(/^[-*]\s*\*{0,2}([^*|]+?)\*{0,2}\s*[|—-]\s*([^|—]+?)\s*[|—-]\s*(.+)$/);
+      if (m) 모음.push({ 이름: `${m[1].trim()} (문서 작성 도구)`, 판: m[2].trim(), 라이선스: m[3].trim(), 갈래: "동봉물" });
+    }
+  }
+  return 모음;
+}
+
 // ── 모으기 ────────────────────────────────────────────────────────────────
-const 부품 = [
-  ...node꾸러미(path.join(루트, "server")),
-  ...node꾸러미(path.join(루트, "client")),
-];
+//
+// ⚠ **모집단이 「실제로 배포하는 것」이어야 한다**(2026-08-22 검토관 [높음]).
+//   처음엔 server·client의 node_modules를 통째로 훑었는데, 그러면 두 방향으로 다 틀린다:
+//     ① 개발 도구(vitest·electron-builder·typescript…)를 「제품에 포함돼 있습니다」라고 고지한다 —
+//        client는 dependencies가 아예 없어 **전부** 개발 도구다. 거짓 고지다.
+//     ② 반대로 **정말 나가는 것**을 빠뜨린다 — llama.cpp 바이너리·bge-m3 모델·
+//        임베더블 CPython 자체·MSVC 재배포 DLL·smartmd vendor(JS 4종).
+//   이 관문의 존재 이유가 「우리가 배포하는 물건이 된 순간을 아무도 못 봤다」인데
+//   모집단이 배포물과 다르면 같은 사고가 다시 난다.
+//   ★ 그래서 **추측하지 않고 실제 배포 집합을 잰다** — build-server-dist가
+//     `npm ci --omit=dev`로 만든 `client/server-dist/node_modules`가 고객에게 나가는 그것이다.
+//     실측 2026-08-22: 개발 트리 543개 vs **실제 배포 265개**. 절반이 개발 도구였다.
+//     (devDeps 이름만 걸러 내는 방식은 **그 하위 의존이 그대로 남아** 10개밖에 못 걸렀다.)
+//   ⚠ 이 폴더는 build-server-dist가 만든다 — 그래서 관문이 **그 뒤**에 돈다(client/package.json).
+const 배포집합 = path.join(루트, "client", "server-dist");
+if (!fs.existsSync(path.join(배포집합, "node_modules"))) {
+  console.error(`★ 실제 배포 집합이 없습니다: ${배포집합}/node_modules`);
+  console.error("  이 관문은 build-server-dist **뒤에** 돌아야 합니다(개발 트리를 재면 절반이 개발 도구다).");
+  console.error("  만들려면:  cd client && npm run build-server-dist");
+  process.exit(2);
+}
+const 부품 = node꾸러미(배포집합);
 const py = 파이썬꾸러미();
 부품.push(...py.목록);
+부품.push(...동봉바이너리());
 
 // 같은 이름·판이 두 곳에 있으면 한 번만 센다.
 const 중복제거 = new Map();
