@@ -382,6 +382,11 @@ const gijoApi = {
   // SBOM
   generateSbom: (assetId: string) => api.sbomApi.generate(assetId),
   exportSbom: (assetId: string, format: "cyclonedx" | "spdx") => api.sbomApi.export(assetId, format),
+  // 공급망 점검(타사 SBOM 검수) — 보기 전용. 넣기는 대화창 ＋의 「📦 타사 SBOM」 유형이 진다.
+  listSbomReviews: () => api.sbomReviewApi.list(),
+  getSbomReview: (id: string) => api.sbomReviewApi.get(id),
+  deleteSbomReview: (id: string) => api.sbomReviewApi.remove(id),
+  setSbomReviewMeta: (id: string, body: { vendor?: string; assetId?: string }) => api.sbomReviewApi.setMeta(id, body),
   exportAiBom: (assetId: string) => api.sbomApi.aibomExport(assetId),
   aibomThreats: (assetId: string) => api.sbomApi.aibomThreats(assetId),
 

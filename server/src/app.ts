@@ -34,6 +34,7 @@ import { registerActivityAudit } from "./engine/activityaudit";
 import { registerBridgeRoutes } from "./engine/bridge";
 import { registerCollaborationRoutes } from "./engine/collaboration";
 import { registerDatasetRoutes } from "./engine/dataset";
+import { registerSbomReviewRoutes } from "./engine/sbomreview";
 import { registerOrchestratorDatasetRoutes } from "./engine/orchestrator-dataset";
 import { registerBriefingRoutes } from "./engine/briefing";
 import { registerUndoRoutes } from "./engine/undo";
@@ -177,6 +178,7 @@ export function createApp(): Express {
   registerBridgeRoutes(app);
   registerCollaborationRoutes(app);
   registerDatasetRoutes(app);
+  registerSbomReviewRoutes(app);
   registerOrchestratorDatasetRoutes(app);
   registerBriefingRoutes(app);
   registerUndoRoutes(app);

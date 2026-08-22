@@ -53,6 +53,9 @@ const SCREENS: Record<string, ScreenContext> = {
   // 🎯 고르기 모드(승인 시안 stage-picker) — 자산·취약점을 고르는 얇은 오버레이. 이 줄이
   // 없으면 이 화면을 띄운 채 지시할 때 화면 맥락이 통째로 빈다(검토관 중7 — assets 전례).
   "pick.html": { label: "🎯 고르기", domain: "자산·취약점 하나를 골라 대화로 잇는 화면", toolDomains: ["assets", "vuln"] },
+  // 공급망 점검(2026-08-22) — 타사 부품표 검수. ⚠ 이 줄이 없으면 이 화면을 띄운 채 지시할 때
+  //   화면 맥락도 도구 좁히기도 안 걸린다(assets.html 전례 — 화면은 뜨는데 대화만 멍청해진다).
+  "supplychain.html": { label: "📦 공급망 점검", domain: "납품받을 제품의 부품표(SBOM) 라이선스 의무 검수", toolDomains: ["sbom", "assets"] },
   "sbom.html": { label: "AI-BOM 구성", domain: "AI-BOM/SBOM 구성요소·견고성", toolDomains: ["sbom", "assets"] },
   "vulnscan.html": { label: "취약점", domain: "취약점 스캔 결과·조치 우선순위", defaultAction: "analyze", toolDomains: ["vuln", "assets"] },
   "approvals.html": { label: "조치·승인", domain: "탐지 항목 승인·반려", toolDomains: ["vuln"] },

@@ -27,6 +27,7 @@ const 선택배선대장: Record<string, "부품" | "직접" | ["제외", string
   "analysis.html": "부품",
   "loganalysis.html": "부품",
   "sbom.html": "부품",
+  "supplychain.html": "부품", // 공급망 점검(2026-08-22) — 부품 행 클릭 = 📌 선택(등급·받게되는요구)
   "threat.html": "부품", // fields(title·plain: 유형·소스·탐지시각)도 보강(2026-08-20)
   "records.html": ["제외", "허브 껍데기 — 무대는 audit(배선됨)·syslog. 행 렌더가 이 파일에 없다(grouphub가 iframe으로 끼움)"],
   "audit.html": "부품", // records의 실제 무대 — 행 클릭=📌 선택(2026-08-20). 1단계: label+text만(감사 행은 자산이 아니라 fields를 실으면 선택카드가 「담당 미배정」 거짓 줄을 그린다)

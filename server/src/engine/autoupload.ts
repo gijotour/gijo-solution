@@ -24,11 +24,11 @@ import { ingestText, GLOBAL_SCOPE, saveDocArtifacts, cleanupOldOriginal, 열람�
 // ★ securitylog·opsreport는 2026-08-01에 **되살린** 것이다. 제품 1차 목표가
 //   "취약점·보안로그·운영리포트 3소스 통합 분석"인데, 드롭존을 없애면서 뒤 두 소스의
 //   인입 경로가 통째로 끊겨 있었다(엔진은 멀쩡한데 넣을 길이 없었다).
-export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport" | "securitylog" | "opsreport";
+export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport" | "securitylog" | "opsreport" | "sbom";
 
 export interface AutoUploadResult {
   filename: string;
-  routedTo: "vulnscan" | "product-manual" | "memory" | "analysis" | "decision"; // decision = 사용자 결정 필요
+  routedTo: "vulnscan" | "product-manual" | "memory" | "analysis" | "sbom" | "decision"; // decision = 사용자 결정 필요
   reason: string; // 판별 근거(투명성)
   needsDecision?: boolean; // true면 프론트가 결정 카드(4유형)를 띄운다
   guess?: UploadType; // 결정 필요 시 추천 유형(미리 선택)
@@ -38,6 +38,8 @@ export interface AutoUploadResult {
    *  ＋로 모으면서(2026-07-27) 이 경고까지 사라지면 안 되므로 결과에 함께 싣는다. */
   vulnscan?: { hosts: number; findings: number; uncredentialedHosts?: string[] };
   manual?: { productName: string; kind: string; createdProduct: boolean };
+  /** 타사 SBOM 검수 결과 — 카드가 「무엇을 요구받나」를 바로 보여 줄 수 있게 숫자를 함께 싣는다. */
+  sbom?: { id: string; name: string; components: number; heavy: number; unknown: number };
   /** 통합 분석 인입 결과 — 로그/리포트 판별과 만들어진 이벤트 수(0건도 정직하게 싣는다). */
   analysis?: { kind: "log" | "report"; created: number };
   memory?: { chunks: number; docClass?: string; linkedProduct?: string; category?: string };
@@ -244,6 +246,39 @@ async function tryWebReport(filename: string, base64: string, uploadedBy?: strin
 // 라우팅 경로가 업무영역(category)을 이미 아는 경우 그 값을 인입에 그대로 전달한다 —
 // 제품 매뉴얼=장비운영, 취약점 리포트=취약점. LLM 분류보다 정확하고 결정적이다.
 async function routeByType(filename: string, base64: string, type: UploadType, productName?: string, uploadedBy?: string, opts?: { keepOriginal?: boolean }): Promise<AutoUploadResult> {
+  // ── 타사 SBOM(부품표) 검수 — 2026-08-22, 계획서 중-7 확장 ─────────────────────
+  //
+  // ⚠ **tryIngest를 부르지 않는다.** SBOM은 수천 줄 JSON이라 조각내 지식 저장소에 넣으면
+  //   다른 질문의 근거를 밀어낸다(스키마 551조각으로 실제로 겪었다). 읽을 글이 아니라
+  //   **점검할 자료**다 — 취약점 자동 반영 갈래가 이미 같은 모양으로 되어 있다.
+  if (type === "sbom") {
+    const { sbom검수 } = await import("./sbomreview.js");
+    const 내용 = Buffer.from(base64, "base64").toString("utf-8");
+    const r = sbom검수({ 파일이름: filename, 내용, 검수자: uploadedBy });
+    if (!r.ok) {
+      // 못 읽었으면 **왜 못 읽었는지** 그대로 말한다 — 「실패」 한 마디로 끝내지 않는다.
+      return {
+        filename, routedTo: "sbom",
+        reason: `사용자 지정: 타사 SBOM — ${r.사유}${r.알림.length ? " (" + r.알림[0] + ")" : ""}`,
+        category: "일반",
+      };
+    }
+    const s = r.결과.summary;
+    const 무거움 = (s.서비스도공개 ?? 0) + (s.전체소스공개 ?? 0);
+    emitCollaboration({
+      from: "scan", to: "orchestrator",
+      message: `${filename} → 타사 SBOM 검수 — 부품 ${r.결과.componentCount}개 · ` +
+        (무거움 ? `**소스 공개 요구 ${무거움}건**` : "소스 공개 요구 없음") +
+        (s.판정불가 ? ` · 라이선스 모름 ${s.판정불가}건` : ""),
+    });
+    return {
+      filename, routedTo: "sbom",
+      reason: `사용자 지정: 타사 SBOM(${r.결과.format}) — 부품 ${r.결과.componentCount}개 검수` +
+        (무거움 ? ` · 소스 공개를 요구받을 수 있는 부품 ${무거움}건` : " · 소스 공개 요구 없음"),
+      category: "일반",
+      sbom: { id: r.결과.id, name: r.결과.name, components: r.결과.componentCount, heavy: 무거움, unknown: s.판정불가 ?? 0 },
+    };
+  }
   // 보안로그 원본·운영 리포트 → **통합 분석 이벤트**. 제품 1차 목표의 소스 ②③이다.
   // ⚠ 파싱만 하고 끝내지 않는다 — 이벤트로 저장돼야 관제 목록·상관분석에 올라온다.
   if (type === "securitylog" || type === "opsreport") {
@@ -444,7 +479,7 @@ export function registerAutoUploadRoutes(app: Express): void {
       // ⚠ 이 허용 목록은 **UploadType과 반드시 같이 늘려야 한다**(2026-08-01 실측 사고).
       //   유형을 새로 만들고 여기를 안 고치면 forceType이 조용히 버려져 "결정 필요"로 되돌아온다
       //   — 담당자는 골랐는데 아무 일도 안 일어나는 것으로 보인다. 타입에서 뽑아 어긋남을 막는다.
-      const ALLOWED: UploadType[] = ["asset", "log", "document", "guideline", "vulnreport", "securitylog", "opsreport"];
+      const ALLOWED: UploadType[] = ["asset", "log", "document", "guideline", "vulnreport", "securitylog", "opsreport", "sbom"];
       const valid = forceType && ALLOWED.includes(forceType) ? forceType : undefined;
       // 작업 귀속 — 인입되는 문서에 "누가 올렸는지"를 함께 기록한다(2026-07-25 RAG 전면 검토).
       const uploader = (req as Request & { user?: { displayName?: string; username?: string } }).user;
@@ -470,6 +505,8 @@ export function registerAutoUploadRoutes(app: Express): void {
         analysis: ["통합 분석 현황 알려줘", "지금 손댈 일 뭐야?"],
         "product-manual": ["보안제품 현황 알려줘", "점검 일정 현황 알려줘"],
         memory: ["새로 들어온 문서 알려줘", "지식 저장소 상태 알려줘"],
+        // ⚠ 문구는 **실측으로 되는 것만** 적는다(이 표의 규칙) — 아래 둘은 도구·화면이 실제로 있다.
+        sbom: ["SBOM 검수 결과 알려줘", "소스 공개 요구받는 부품 뭐 있어?"],
       };
       const nextChips = routed ? 반입칩[routed] : undefined;
       res.json(nextChips ? { ...result, nextChips } : result);

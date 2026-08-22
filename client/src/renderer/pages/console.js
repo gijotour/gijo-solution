@@ -1766,6 +1766,8 @@
     { t: "log", label: "📊 로그 매뉴얼" },
     { t: "document", label: "📄 일반 문서" },
     { t: "guideline", label: "📘 가이드라인" },
+    // 타사 SBOM(부품표) — 지식 저장소로 안 간다. 라이선스 의무를 점검하는 자리로 간다(2026-08-22).
+    { t: "sbom", label: "📦 타사 SBOM(부품표)" },
   ];
   // 신규 제품으로 등록되는 유형에서만 제품명을 묻는다(추천값을 채워 두고 고칠 수 있게).
   var PRODUCT_NAME_TYPES = { asset: 1, log: 1 };

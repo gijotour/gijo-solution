@@ -283,6 +283,7 @@ const 화면이름카드: Record<string, 화면카드종류> = {
   // 「우리보안제품」 = 사이드바 개명(2026-08-21 menu-reorg, products.html "보안제품"→"우리 보안제품").
   //   정확 일치·공백 제거 매칭이라 새 이름을 채팅에 치면 옛 별칭("보안제품")에 안 걸린다 — 함께 등록.
   "보안제품": "products", "우리보안제품": "products",
+  "공급망": "supplychain", "공급망점검": "supplychain", "SBOM검수": "supplychain",
   "기록": "records", "감사기록": "records",
   "위협": "threat", "위협인텔": "threat",
   "AI팀": "aiteam", "ai팀": "aiteam",
@@ -301,6 +302,7 @@ export async function 카드답변(kind: Exclude<화면카드종류, "finding">,
     : kind === "fix" ? fixStatusAnswer()
     : kind === "report" ? await reportStatusAnswer()
     : kind === "products" ? productsStatusAnswer()
+    : kind === "supplychain" ? supplychainStatusAnswer()
     : kind === "records" ? recordsStatusAnswer()
     : kind === "threat" ? threatStatusAnswer()
     : aiteamStatusAnswer();
@@ -332,7 +334,7 @@ export function 카드없는글로(answer: { output: string; dataCard: DataCard 
 // 메뉴·팔레트로 화면을 열면 셸(app.html open)이 이 라우트를 불러, 그 화면의 현황 카드를
 // 대화창에 자동으로 띄운다. 지시가 아니라 **조회**다 — 대화 기록에 가짜 사용자 발화를 남기지
 // 않으려고 dispatch를 거치지 않는다. 카드가 없는 화면은 none — 지어내지 않는다.
-type 화면카드종류 = "asset" | "ops" | "hardening" | "finding" | "sessions" | "fix" | "report" | "products" | "records" | "threat" | "aiteam" | "supervision" | "mydocs";
+type 화면카드종류 = "asset" | "ops" | "hardening" | "finding" | "sessions" | "fix" | "report" | "products" | "records" | "threat" | "aiteam" | "supervision" | "mydocs" | "supplychain";
 const 화면파일카드: Record<string, 화면카드종류> = {
   "assets.html": "asset",
   "discover.html": "ops", "analysis.html": "ops", "loganalysis.html": "ops",
@@ -350,6 +352,7 @@ const 화면파일카드: Record<string, 화면카드종류> = {
   "aihub.html": "aiteam", "agent.html": "aiteam",
   "supervision.html": "supervision", // AI 팀 감독(2026-08-20 ② — 사장님 「에이전트 감독도 필요」)
   "mydocs.html": "mydocs", // 내 문서(2026-08-20 LLM 위키 — 개인 문서·정리본·공유)
+  "supplychain.html": "supplychain", // 공급망 점검(2026-08-22 — 타사 SBOM 라이선스 검수)
 };
 
 // 카드 없이 남는 메뉴 화면 — 「맵에 없음」이 암묵 예외였던 것을 이유와 함께 명시(검토관 5.41
@@ -622,6 +625,52 @@ export function productsStatusAnswer(): { output: string; dataCard: DataCard } {
     } : undefined,
   };
   return { output: 목록.length ? `우리 보안제품 — 등록 ${목록.length}개(${종류}종류).` : "우리 보안제품 — 아직 등록된 제품이 없습니다. 대화창에서 \"방화벽 ○○ 등록해줘\"로 등록합니다(승인 후 반영).", dataCard };
+}
+
+/** 공급망 점검 카드 — **「무엇을 요구받나」를 숫자로** 먼저 보인다(2026-08-22, 계획서 중-7 확장).
+ *  ⚠ 등급을 여기서 다시 세지 않는다 — 서버가 검수 때 센 값(summary)을 그대로 더한다. */
+export function supplychainStatusAnswer(): { output: string; dataCard: DataCard } {
+  const { 검수목록 } = require("./sbomreview") as typeof import("./sbomreview");
+  const 것들 = 검수목록(200);
+  let 무거움 = 0, 서비스 = 0, 모름 = 0, 부품 = 0;
+  for (const it of 것들) {
+    const s = it.summary || ({} as Record<string, number>);
+    서비스 += s.서비스도공개 ?? 0;
+    무거움 += (s.서비스도공개 ?? 0) + (s.전체소스공개 ?? 0);
+    모름 += s.판정불가 ?? 0;
+    부품 += it.componentCount;
+  }
+  const dataCard: DataCard = {
+    title: "공급망 점검 — 타사 부품표 검수",
+    kpis: [
+      { label: "검수한 부품표", value: String(것들.length), color: 것들.length ? "ok" : "muted" },
+      { label: "부품", value: String(부품) },
+      // 「소스 공개 요구」가 이 카드의 핵심 숫자다 — 0이면 초록, 있으면 빨강.
+      { label: "소스 공개 요구", value: String(무거움), color: 무거움 ? "bad" : "ok" },
+      { label: "라이선스 모름", value: String(모름), color: 모름 ? "warn" : "muted" },
+    ],
+    screen: { page: "supplychain.html", label: "공급망 점검" },
+    pickKey: "n",
+    table: 것들.length ? {
+      cols: [{ key: "n", label: "무엇" }, { key: "f", label: "형식" }, { key: "c", label: "부품" }, { key: "r", label: "소스공개요구" }],
+      shown: 것들.slice(0, 8).map((it) => {
+        const s = it.summary || ({} as Record<string, number>);
+        return {
+          n: it.name, f: it.format, c: String(it.componentCount),
+          r: String((s.서비스도공개 ?? 0) + (s.전체소스공개 ?? 0)),
+        };
+      }),
+      totalCount: 것들.length,
+    } : undefined,
+  };
+  const output = !것들.length
+    ? "공급망 점검 — 아직 검수한 부품표가 없습니다. 대화창의 ＋로 SBOM 파일을 올리고 유형에서 「📦 타사 SBOM(부품표)」을 고르세요."
+    : `공급망 점검 — 부품표 ${것들.length}건 · 부품 ${부품}개. ` +
+      (무거움
+        ? `**소스 공개를 요구받을 수 있는 부품 ${무거움}개**` + (서비스 ? `(그중 ${서비스}개는 네트워크로 서비스만 해도 의무가 생깁니다)` : "") + "."
+        : "소스 공개를 요구받는 부품은 없습니다.") +
+      (모름 ? ` 라이선스를 알 수 없는 부품 ${모름}개는 공급사 확인이 필요합니다.` : "");
+  return { output, dataCard };
 }
 
 export function recordsStatusAnswer(): { output: string; dataCard: DataCard } {

@@ -640,3 +640,45 @@ migrate(
   `ALTER TABLE memory_documents ADD COLUMN assetIds TEXT;`
 );
 
+
+// ── 타사 SBOM 검수 대장 (2026-08-22, 계획서 중-7 확장) ────────────────────────
+//
+// ■ 왜 **자산의 components에 붙이지 않고** 따로 두나(사장님 「우리 자산 정확도 + 타사 것 검수」)
+//   검수 대상이 「우리가 운영 중인 자산」이 아니라 **「납품받을 후보 제품」**일 수 있다.
+//   그것을 자산 등록부에 넣으면 자산 수가 부풀고 취약점·조치 흐름에 끼어든다(AssetOrigin에도
+//   그런 갈래가 없다: sample/scanner/registered). 또 SBOM 하나가 부품 수백~수천이라
+//   자산 하나에 합치면 SBOM 화면 표·판(200행 상한)이 그것에 잠긴다.
+//   대신 **자산과 잇고 싶으면 assetId로 가리킨다**(선택) — 우리 자산의 부품표 정확도를 올리는
+//   쪽(중-7 본체)은 기존 components가 그대로 맡는다.
+// ⚠ 새 표를 만들면 datacleanup.ts의 TARGETS·RESET_TARGETS에도 넣어야 한다 —
+//   안 넣으면 「실사용 전환 리셋」 뒤에도 검수 데이터가 남는다(시험이 신규 표를 강제하지는 않는다).
+migrate(
+  "sbom-review-2026-08-22",
+  `CREATE TABLE IF NOT EXISTS sbom_reviews (
+     id TEXT PRIMARY KEY,
+     name TEXT NOT NULL,              -- 무엇을 검수했나(파일 이름 또는 문서가 말하는 대상)
+     vendor TEXT,                     -- 공급사·납품 업체(사람이 적는다)
+     assetId TEXT,                    -- 우리 자산과 잇고 싶을 때만(선택)
+     format TEXT NOT NULL,            -- CycloneDX | SPDX
+     formatVersion TEXT,
+     componentCount INTEGER NOT NULL,
+     summary TEXT NOT NULL,           -- 등급별 집계 JSON(licenserisk 등급요약 결과)
+     notes TEXT,                      -- 못 읽은 것·주의 사항(파서 알림) JSON 배열
+     reviewedBy TEXT,
+     reviewedAt TEXT NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS sbom_review_components (
+     reviewId TEXT NOT NULL,
+     name TEXT NOT NULL,
+     version TEXT,
+     license TEXT,                    -- **원문 그대로**(자르지 않는다 — 뒤에 붙은 AGPL이 잘리면 판정이 뒤집힌다)
+     licenseFrom TEXT,                -- 어느 자리에서 읽었나(근거)
+     tier TEXT NOT NULL,              -- licenserisk 등급(한글)
+     needsCheck INTEGER NOT NULL,     -- 사람이 봐야 하나
+     purl TEXT,
+     supplier TEXT,
+     FOREIGN KEY (reviewId) REFERENCES sbom_reviews(id) ON DELETE CASCADE
+   );
+   CREATE INDEX IF NOT EXISTS idx_sbom_rc_review ON sbom_review_components(reviewId);
+   CREATE INDEX IF NOT EXISTS idx_sbom_rc_tier ON sbom_review_components(tier);`
+);

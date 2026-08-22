@@ -7,10 +7,10 @@ import { request } from "./core";
 //   2026-08-22에 네 군데가 어긋나 있던 것을 맞췄다(securitylog·opsreport·analysis·uncredentialedHosts·
 //   nextChips) — 화면(console.js)이 실제로 읽는데 타입엔 없던 필드들이라, 어긋난 채로 두면
 //   「타입은 통과하는데 화면이 못 읽는」 부류가 계속 생긴다.
-export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport" | "securitylog" | "opsreport";
+export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport" | "securitylog" | "opsreport" | "sbom";
 export interface AutoUploadResult {
   filename: string;
-  routedTo: "vulnscan" | "product-manual" | "memory" | "analysis" | "decision";
+  routedTo: "vulnscan" | "product-manual" | "memory" | "analysis" | "sbom" | "decision";
   reason: string;
   needsDecision?: boolean;
   guess?: UploadType;

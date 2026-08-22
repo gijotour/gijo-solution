@@ -1131,6 +1131,28 @@ const TOOLS: AgentTool[] = [
     run: runAibomStatus,
   },
   {
+    // ★ **타사 SBOM 검수**(2026-08-22, 계획서 중-7 확장). aibom_status와 방향이 반대다 —
+    //   저쪽은 **우리 자산**의 구성요소를 보고, 이쪽은 **남이 준 부품표**의 라이선스 의무를 본다.
+    //   ⚠ 실측으로 확인한 것: 이 도구가 없을 때 「SBOM 검수 결과 알려줘」가 **aibom_status로 새서**
+    //     「등록된 AI/모델 자산이 없습니다」라고 엉뚱하게 답했다 — 우리가 반입 칩에 약속한 바로 그 문구였다.
+    //     같은 축(sbom)의 도구 셋이 서로를 밀어내도록 설명에 **대문자로 경계**를 적는다(위 둘의 관례).
+    name: "sbom_review_status",
+    label: "타사 SBOM 검수 결과",
+    domain: "sbom",
+    write: false,
+    description:
+      '**납품받은/타사 제품의 부품표(SBOM)를 검수한 결과**를 조회한다 — 어떤 라이선스 의무를 지게 되는지(소스 공개 요구·상용 라이선스 구매 요구·고지만). ' +
+      '"SBOM 검수 결과", "소스 공개 요구받는 부품", "협력사 부품표 점검 결과", "공급망 점검"에 쓴다. ' +
+      '**우리 자산의 AI-BOM 구성 현황은 aibom_status를 쓴다(이건 남이 준 부품표 전용).** **새로 만드는 것은 generate_sbom이다(이건 조회 전용).** 예: {}',
+    params: [],
+    // 출력이 이미 한국어 완성문이다 — 재작성하면 라이선스 문장이 흔들린다(법무가 보는 칸).
+    directAnswer: true,
+    run: async () => {
+      const { 검수요약문 } = await import("../sbomreview.js");
+      return 검수요약문();
+    },
+  },
+  {
     name: "finding_status",
     label: "취약점 현황 조회",
     domain: "vuln",

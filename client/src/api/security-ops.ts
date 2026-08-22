@@ -291,6 +291,32 @@ export const sbomApi = {
   aibomThreats: (assetId: string) => request<AiBomThreatReport>(`/api/assets/${assetId}/aibom/threats`),
 };
 
+// ── 타사 SBOM 검수(공급망 점검) — 2026-08-22, 계획서 중-7 확장 ──────────────────
+// ⚠ **여기에 업로드가 없는 것이 의도다.** 파일 인입 창구는 대화창 ＋ 한 곳이고(2026-07-27 결정),
+//   거기에 「📦 타사 SBOM」 유형을 더해 두었다. 화면은 **보기만** 한다.
+export interface SbomReviewSummary {
+  id: string; name: string; vendor?: string; assetId?: string;
+  format: string; formatVersion?: string; componentCount: number;
+  /** 등급별 개수 — 서버(licenserisk)가 센 값 그대로. 화면이 다시 세지 않는다. */
+  summary: Record<string, number>;
+  notes: string[]; reviewedBy?: string; reviewedAt: string;
+}
+export interface SbomReviewComponent {
+  name: string; version: string; license: string; licenseFrom: string[];
+  tier: string; needsCheck: boolean;
+  /** 「실제로 받게 되는 요구」 — 서버가 완성한 문장이다(화면이 규칙표를 갖지 않는다). */
+  받게되는요구: string; 근거: string;
+  purl?: string; supplier?: string;
+}
+export const sbomReviewApi = {
+  list: () => request<{ items: SbomReviewSummary[]; 면책: string }>("/api/sbom-review/list"),
+  get: (id: string) =>
+    request<{ 요약: SbomReviewSummary; 부품: SbomReviewComponent[]; 면책: string }>(`/api/sbom-review/${encodeURIComponent(id)}`),
+  remove: (id: string) => request<{ ok: boolean }>(`/api/sbom-review/${encodeURIComponent(id)}/delete`, { method: "POST" }),
+  setMeta: (id: string, body: { vendor?: string; assetId?: string }) =>
+    request<{ ok: boolean }>(`/api/sbom-review/${encodeURIComponent(id)}/meta`, { method: "POST", body }),
+};
+
 export interface AiBomThreatMatch {
   code: string;
   name: string;

@@ -288,6 +288,7 @@ async function main() {
     { page: "report.html", name: "29-리포트" },
     { page: "mydocs.html", name: "36-내문서-허브" },          // 2026-08-20 문서 허브 v3(문서함 흡수)
     { page: "supervision.html", name: "37-AI팀감독-안전" },   // 2026-08-20 AI 허브 4탭 통합
+    { page: "supplychain.html", name: "38-공급망점검" },      // 2026-08-22 타사 SBOM 라이선스 검수
 
   ];
 
