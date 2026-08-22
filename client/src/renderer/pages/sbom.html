@@ -585,9 +585,15 @@ tr:last-child td{border-bottom:none;}
   let 라이선스필터 = null;
   const 미상 = "미상";
   // "-" · 빈칸 · 없는 필드는 전부 「미상」 하나로 묶는다(표기만 다른 같은 상태다).
+  // ⚠ **서버(licenserisk.ts 라이선스모름)와 같은 목록이어야 한다**(2026-08-22 검토관).
+  //   예전엔 서버가 `!== "-"`만 봐서 NOASSERTION을 「안다」로 세고, 여기서는 「미상」으로 접었다.
+  //   지금은 rpm/deb 수집이 NOASSERTION을 안 만들어 안 터지지만, 타사 SBOM 반입이 붙으면
+  //   그 값이 거의 반드시 들어온다 — 그날 대화창과 화면이 다른 숫자를 말하게 된다.
+  //   ⚠ 목록을 고칠 일이 생기면 **양쪽을 함께** 고칠 것(값 자체를 나눠 가질 길이 없어 두 곳에 적는다).
+  const 모름표기 = ["", "-", "noassertion", "none", "unknown", "n/a", "na", "미상", "확인필요"];
   const 라이선스이름 = (v) => {
     const s = String(v == null ? "" : v).trim();
-    return (!s || s === "-" || s === "NOASSERTION" || s === "unknown") ? 미상 : s;
+    return 모름표기.includes(s.toLowerCase()) ? 미상 : s;
   };
 
   function 그림띠() {

@@ -21,6 +21,12 @@
 //   ④ **못 읽으면 못 읽었다고 말한다.** 빈 목록을 "부품 없음"으로 기록하지 않는다.
 import type { RunFn } from "./hardeningscan";
 import type { AssetComponent } from "./assets";
+// ⚠ 「라이선스를 아는가」 잣대는 **licenserisk 한 곳**을 쓴다(2026-08-22 검토관).
+//   여기서는 `c.license !== "-"`로, 화면(sbom.html)에서는 NOASSERTION·unknown까지 미상으로 세어
+//   **두 잣대가 서로 달랐다.** 지금은 rpm/deb 수집이 NOASSERTION을 안 만들어 안 터지지만,
+//   타사 SBOM 반입이 붙으면 그 값이 거의 반드시 들어온다 — 그날 대화창은 「512개 안다」,
+//   화면은 「미상 400」이라고 서로 다른 말을 하고 담당자는 둘 다 못 믿게 된다.
+import { 라이선스모름 } from "./licenserisk";
 
 /** 장비 종류 — 어떤 명령으로 읽을지 가른다. */
 export type 장비종류 = "rpm" | "deb" | "windows";
@@ -118,7 +124,7 @@ export function 데비안라이선스파싱(out: string): Record<string, string>
  */
 export function 라이선스채우기(부품: AssetComponent[], 표: Record<string, string>): AssetComponent[] {
   return (부품 ?? []).map((c) => {
-    if (c.license && c.license !== "-") return c;
+    if (!라이선스모름(c.license)) return c;
     const v = 표[c.name];
     return v ? { ...c, license: v } : c;
   });
@@ -265,12 +271,12 @@ export async function 패키지수집(run: RunFn, 윈도우 = false): Promise<�
     try {
       const lr = await run(데비안라이선스명령);
       const 표 = 데비안라이선스파싱(lr.out);
-      const 전 = 부품.filter((c) => c.license && c.license !== "-").length;
+      const 전 = 부품.filter((c) => !라이선스모름(c.license)).length;
       부품 = 라이선스채우기(부품, 표);
-      라이선스보탬 = 부품.filter((c) => c.license && c.license !== "-").length - 전;
+      라이선스보탬 = 부품.filter((c) => !라이선스모름(c.license)).length - 전;
     } catch (e) { /* 못 읽어도 목록은 살린다 */ }
   }
-  const 라이선스없음 = 부품.filter((c) => c.license === "-").length;
+  const 라이선스없음 = 부품.filter((c) => 라이선스모름(c.license)).length;
   return {
     ok: true, 종류, 부품,
     말:
@@ -304,7 +310,7 @@ export function 덮는범위글(components: AssetComponent[]): string {
   if (총 === 0) return "구성요소가 아직 없습니다 — 패키지 수집을 돌리면 채워집니다.";
   const 실제 = components.filter((c) => c.from === "package").length;
   const 추정 = components.filter((c) => c.from !== "package").length;
-  const 라이선스 = components.filter((c) => c.license && c.license !== "-").length;
+  const 라이선스 = components.filter((c) => !라이선스모름(c.license)).length;
   return (
     `구성요소 ${총}개 — 장비에서 **직접 읽은 것 ${실제}개** · 스캐너가 준 것 ${추정}개. ` +
     `라이선스를 아는 것은 ${라이선스}개입니다.` +

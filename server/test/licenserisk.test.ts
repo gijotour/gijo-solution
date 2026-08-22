@@ -272,6 +272,38 @@ describe("★ 라이선스 관문이 게시 사슬에 물려 있다", () => {
   });
 });
 
+// ── 「모른다」 잣대가 서버·화면에서 같은가 ────────────────────────────────────
+//
+// ⚠ 이 값은 **나눠 가질 길이 없어** 두 곳에 적혀 있다(서버 licenserisk.ts · 화면 sbom.html).
+//   그래서 시험이 대조한다 — 이 저장소가 반복해 겪은 「같은 것을 여러 곳에 적으면 어긋난다」의
+//   실제 사례가 바로 이 잣대였다(서버는 NOASSERTION을 「안다」로, 화면은 「미상」으로 셌다).
+describe("★ 「모른다」 목록이 서버·화면에서 같다", () => {
+  it("sbom.html의 모름표기가 licenserisk와 어긋나지 않는다", () => {
+    const 루트 = path.resolve(__dirname, "..", "..");
+    const html = fs.readFileSync(path.join(루트, "client", "src", "renderer", "pages", "sbom.html"), "utf8");
+    const m = html.match(/const\s+모름표기\s*=\s*\[([^\]]*)\]/);
+    expect(m, "sbom.html에서 모름표기 목록을 못 찾았다 — 이름이 바뀌었으면 이 시험도 고칠 것").toBeTruthy();
+    const 화면목록 = (m?.[1] ?? "").split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter((s) => s !== "");
+    // 서버가 「모른다」로 보는 값은 화면도 모두 「미상」으로 봐야 한다.
+    for (const v of ["", "-", "noassertion", "none", "unknown", "n/a", "na", "미상", "확인필요"]) {
+      expect(라이선스모름(v), `서버가 "${v}"를 모름으로 안 본다`).toBe(true);
+      if (v !== "") expect(화면목록, `화면이 "${v}"를 미상으로 안 본다 — 두 숫자가 갈린다`).toContain(v);
+    }
+    // 반대로 화면이 모름으로 보는 것을 서버가 안다고 하면 안 된다.
+    for (const v of 화면목록) {
+      expect(라이선스모름(v), `화면은 "${v}"를 미상으로 보는데 서버는 안다고 한다`).toBe(true);
+    }
+  });
+
+  it("packagescan이 「-」 직접 비교를 안 쓴다 — 잣대를 한 곳으로 모았다", () => {
+    const 루트 = path.resolve(__dirname, "..", "..");
+    const src = fs.readFileSync(path.join(루트, "server", "src", "engine", "packagescan.ts"), "utf8");
+    const 코드 = src.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+    const 남은것 = 코드.match(/license\s*(!==|===)\s*"-"/g) ?? [];
+    expect(남은것, `옛 잣대가 남아 있다(${남은것.length}곳) — 라이선스모름()을 쓸 것`).toEqual([]);
+  });
+});
+
 describe("면책 — 빼면 안 되는 것", () => {
   it("법률 자문이 아니라고 분명히 말한다", () => {
     expect(면책문구).toContain("법률 자문이 아닙니다");
