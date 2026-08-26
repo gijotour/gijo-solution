@@ -1,0 +1,22 @@
+[
+  { "file": "server/src/engine/grades.ts", "question": "개발 모드일 때 등급 열람 판정이 우회되는 곳은 어디인가?", "anchor": "if (개발모드()) return true" },
+  { "file": "server/src/util/devmode.ts", "question": "개발 모드가 켜지는 유일한 조건은 무엇인가?", "anchor": "GIJO_DEV_MODE" },
+  { "file": "server/src/engine/memory.ts", "question": "추출 텍스트에서 반복되는 짧은 줄을 지우는 정리 함수는 어디에 정의되나?", "anchor": "function cleanExtractedText" },
+  { "file": "server/src/engine/localengine.ts", "question": "에이전트에 할당된 모델을 풀에 보장하고 base URL을 돌려주는 함수는?", "anchor": "export async function ensureAgentModel" },
+  { "file": "server/src/engine/agents.ts", "question": "배치되지 않은 모델을 배정하려 하면 어디서 막히나?", "anchor": "배치되지 않은 모델입니다" },
+  { "file": "server/src/engine/audit.ts", "question": "감사 기록을 남기는 함수의 정의는 어디인가?", "anchor": "export function recordAudit" },
+  { "file": "server/src/auth/users.ts", "question": "사용자 비밀번호 변경 API 라우트는 어디서 등록되나?", "anchor": "/api/users/:id/password" },
+  { "file": "server/src/engine/approvals.ts", "question": "취약점 항목의 고유 키(해시)를 만드는 함수 정의는 어디인가?", "anchor": "export function findingKey" },
+  { "file": "server/src/engine/learnloop.ts", "question": "dataset 모듈을 정적이 아니라 동적으로 import하는 이유가 적힌 곳은?", "anchor": "llm→learnloop→dataset→llm" },
+  { "file": "server/src/engine/securityproducts.ts", "question": "지식베이스 문서를 지울 때 memory 모듈을 불러오는 자리는?", "anchor": "await import(\"./memory.js\")" },
+  { "file": "server/src/engine/autoupload.ts", "question": "파일명으로 제품 소개자료인지 판별하는 함수는 어디인가?", "anchor": "function 제품소개서인가" },
+  { "file": "server/src/engine/dbcrypt.ts", "question": "암호화를 무력화하는 평문 DB 사본을 찾아내는 함수는?", "anchor": "function findPlaintextCopies" },
+  { "file": "server/src/index.ts", "question": "부팅 시 개발 모드 경고를 출력하는 자리는 어디인가?", "anchor": "개발모드경고()" },
+  { "file": "server/src/engine/dispatcher.ts", "question": "범위 걸기 명령(scopecmd)을 동적으로 불러오는 자리는?", "anchor": "scopecmd.js" },
+  { "file": "server/src/engine/agentloop.ts", "question": "강제 라우팅 규칙 배열(FORCED_INTENTS)의 정의가 시작되는 곳은?", "anchor": "const FORCED_INTENTS" },
+  { "file": "client/src/renderer/pages/nav.js", "question": "옛 화면 주소를 새 자리로 보내는 갈아타기 표의 정의는 어디인가?", "anchor": "var TAB_REDIRECT" },
+  { "file": "client/src/renderer/pages/console.js", "question": "consoleHost 요소가 없으면 대화창이 조용히 종료되는 자리는?", "anchor": "getElementById(\"consoleHost\")" },
+  { "file": "client/src/main.ts", "question": "프로 셸에서 본창이 화면 파일로 교체되는 것을 막는 조건은 어디인가?", "anchor": "getURL().includes(\"app.html\")" },
+  { "file": "tools/publish-gate-ui.mjs", "question": "게시 전에 앱 프로세스가 떠 있으면 중단시키는 검사는 어디인가?", "anchor": "원인③" },
+  { "file": "server/src/engine/clientrelease.ts", "question": "릴리스가 프로인지 라이트인지 판정하는 함수는?", "anchor": "에디션of" }
+]
