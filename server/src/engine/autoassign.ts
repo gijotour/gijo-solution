@@ -8,25 +8,21 @@
 //  · 자산에 기본 담당자가 지정돼 있을 때만 배정한다. 없으면 아무 일도 하지 않는다(미배정 유지).
 //  · **이미 담당자가 있는 건은 절대 건드리지 않는다** — 사람이 정한 배정을 기계가 덮으면 안 된다.
 //  · 상태도 바꾸지 않는다. 배정은 "누가 볼 것인가"이지 "검토했다"가 아니다(미검토는 그대로).
-
-import { db } from "../db";
+//
+// ★ 층 정리 (2026-08-28, 화살 #7)
+//   이 파일은 이제 **결재 층 물건만** 남았다 — 자산 컬럼 접근자(getDefaultAssignee 등)는
+//   잎 모듈 assetassignee.ts로 내려갔고, 여기서 재수출해 옛 호출부는 한 줄도 안 바뀐다.
+//   그리고 assets가 이 파일을 **부르지 않는다** — 아래 registerFindingsRecorded로
+//   자기를 등록한다(app.ts가 배선). 그래서 assets→autoassign→approvals→assets 순환이 끊긴다.
 import type { StandardFinding } from "./bridge";
-import { findingKey, updateFindingReview } from "./approvals";
+import { findingKey } from "./findingkey"; // 잎(화살 #2) — approvals 전체를 물지 않는다
+import { updateFindingReview } from "./approvals";
+import { db } from "../db";
+import { getDefaultAssignee } from "./assetassignee";
+import { onFindingsRecorded } from "./assets";
 
-// 자산별 기본 담당자 — assets에 컬럼 하나로 둔다(nullable, 없으면 자동 배정 안 함).
-try { db.exec("ALTER TABLE assets ADD COLUMN defaultAssignee TEXT"); } catch { /* 이미 있으면 무시 */ }
-
-export function getDefaultAssignee(assetId: string): string | null {
-  const r = db.prepare("SELECT defaultAssignee FROM assets WHERE id = ?").get(assetId) as { defaultAssignee: string | null } | undefined;
-  const v = (r?.defaultAssignee ?? "").trim();
-  return v || null;
-}
-
-export function setDefaultAssignee(assetId: string, assignee: string | null): string | null {
-  const v = (assignee ?? "").trim();
-  db.prepare("UPDATE assets SET defaultAssignee = ? WHERE id = ?").run(v || null, assetId);
-  return v || null;
-}
+// 자산 컬럼 접근자는 잎으로 이사 — 재수출(옛 호출부·시험 무변경).
+export { getDefaultAssignee, setDefaultAssignee } from "./assetassignee";
 
 /** 현재 담당자가 비어 있는지 — 이미 배정된 건을 덮지 않기 위한 확인. */
 function hasAssignee(assetId: string, key: string): boolean {
@@ -60,4 +56,21 @@ export function autoAssignFindings(assetId: string, findings: StandardFinding[])
     } catch { /* 상태 전이 제약 등으로 실패하면 그 건만 건너뛴다 */ }
   }
   return { assignee, assigned };
+}
+
+/**
+ * ★ 자산 층에 자기를 꽂는다 — app.ts가 부팅 때 한 번 호출한다(배선).
+ *
+ * ⚠ **등록이 안 걸리면 자동 배정이 소리 없이 죽는다.** 옛 구조는 assets.ts가 직접
+ *   부르고 그 자리가 `catch {}`라 실패도 안 보였다 — 훅으로 바꾸면서 그 위험이
+ *   「등록을 잊는 것」으로 옮겨 갔다(반증 검토 2026-08-23 경고). 그래서:
+ *     · autoassign.test가 「등록 0건이면 실패」를 못 박는다
+ *     · assets.ts는 청취자가 없으면 아무 일도 안 하지만, 있으면 **동기로** 부른다
+ *       (호출 순서 계약: findings 저장 뒤 · broadcast 앞 — 화면이 미배정을 먼저 받고
+ *        나중에 배정되는 깜빡임을 막는다)
+ */
+export function 자동배정_배선(): void {
+  onFindingsRecorded((assetId, findings) => {
+    autoAssignFindings(assetId, findings);
+  });
 }

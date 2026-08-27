@@ -2,7 +2,10 @@
 // 가장 중요한 계약: **사람이 정한 배정을 기계가 덮지 않는다.**
 import { describe, it, expect, beforeEach } from "vitest";
 import { getDefaultAssignee, setDefaultAssignee, autoAssignFindings } from "../src/engine/autoassign";
-import { registerAsset, recordFindings } from "../src/engine/assets";
+import { registerAsset, recordFindings, findingsRecordedListenerCount } from "../src/engine/assets";
+import { 자동배정_배선 } from "../src/engine/autoassign";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { resetApprovalsForTests, listFindingReviews, updateFindingReview, findingKey } from "../src/engine/approvals";
 import type { StandardFinding } from "../src/engine/bridge";
 
@@ -10,6 +13,13 @@ const A = "auto-web-01";
 const F1: StandardFinding = { finding_type: "OpenSSH < 9.6", severity: "high", evidence: "", source_tool: "t", key: "f1", state: "active" };
 const F2: StandardFinding = { finding_type: "Log4j RCE", severity: "critical", evidence: "", source_tool: "t", key: "f2", state: "new" };
 const FIXED: StandardFinding = { finding_type: "이미 해결", severity: "low", evidence: "", source_tool: "t", key: "f3", state: "fixed" };
+
+// ★ 2026-08-28(화살 #7) — 자동 배정은 이제 **등록된 훅**으로 돈다(assets가 결재 층을
+//   직접 안 부른다). 운영에서는 app.ts가 부팅에 한 번 배선하고, 시험에서는 여기서 한다.
+//   ⚠ 이 한 줄이 없으면 아래 「스캔에서 자동으로 돈다」 시험이 **실제로 실패한다** —
+//     그게 이 구조의 안전망이다(배선을 잊으면 조용히 죽는 대신 시험이 운다).
+//   중복 등록을 피해 파일 최초 1회만(청취자는 배열이라 매번 부르면 쌓인다).
+자동배정_배선();
 
 beforeEach(() => {
   resetApprovalsForTests();
@@ -74,5 +84,35 @@ describe("autoAssignFindings", () => {
     recordFindings(A, [F1, F2]);
     const assigned = listFindingReviews().filter((x) => x.assetId === A && x.assignee === "박담당");
     expect(assigned).toHaveLength(2);
+  });
+});
+
+// ── ★ 등록 계약 (2026-08-28 화살 #7 — 두 인격 분리의 대가를 막는 그물) ────────────────
+//
+// 훅으로 바꾸면서 위험이 「직접 호출을 빠뜨림」에서 **「등록을 잊음」**으로 옮겨 갔다.
+// 등록이 없으면 자동 배정이 **소리 없이** 죽는다(assets의 청취자 루프가 그냥 0회 돈다) —
+// 화면도 오류도 멀쩡하고 미배정만 다시 쌓인다. 반증 검토(2026-08-23)가 정확히 경고한 자리다.
+describe("★ 자동 배정 배선 — 등록이 없으면 소리 없이 죽는다", () => {
+  it("app.ts가 자동배정_배선을 부른다 — 이 줄이 빠지면 자동 배정 전체가 죽는다", () => {
+    const app = readFileSync(join(__dirname, "..", "src", "app.ts"), "utf-8");
+    expect(app, "app.ts에서 자동배정_배선() 호출이 사라졌다 — 스캔이 들어와도 아무도 안 배정한다")
+      .toContain("자동배정_배선()");
+  });
+
+  it("배선하면 청취자가 실제로 늘고, recordFindings가 그것을 부른다", () => {
+    // 파일 최상단에서 이미 배선했다 — 청취자가 최소 1명 있어야 한다(0이면 조용히 죽는 상태).
+    expect(findingsRecordedListenerCount(), "청취자 0 — 자동 배정이 소리 없이 죽는 상태").toBeGreaterThan(0);
+    // 실동작: 기본 담당자가 있는 자산에 스캔이 들어오면 배정된다(직접 호출 없이)
+    registerAsset({ id: "hook-web", name: "훅 검증", path: "" });
+    setDefaultAssignee("hook-web", "김담당");
+    recordFindings("hook-web", [F1]);
+    const 배정 = listFindingReviews("hook-web").filter((r) => (r.assignee ?? "").trim());
+    expect(배정.length, "훅을 걸었는데 배정이 안 됐다 — 배선이 헛돈다").toBeGreaterThan(0);
+  });
+
+  it("자산 층은 결재 층을 모른다 — assets.ts가 autoassign을 직접 import하지 않는다", () => {
+    const a = readFileSync(join(__dirname, "..", "src", "engine", "assets.ts"), "utf-8");
+    expect(a, "assets가 autoassign을 다시 문다 — 3자 순환이 부활한다")
+      .not.toContain('from "./autoassign"');
   });
 });

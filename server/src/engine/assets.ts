@@ -29,7 +29,7 @@ import { setAgentStatus, resetAgentToDefault } from "./agents";
 // 스캔 결과가 들어오면 자산 기본 담당자에게 자동 배정한다(미배정 적체 재발 방지).
 // approvals를 거쳐 다시 assets로 돌아오는 순환 참조가 있으나, 호출이 모듈 로드가 아닌
 // 런타임이라 안전하다.
-import { autoAssignFindings, setDefaultAssignee } from "./autoassign";
+import { setDefaultAssignee } from "./assetassignee"; // 잎(화살 #7) — 결재 층을 안 문다
 import { computeAssetCoverage } from "./assetcoverage";
 
 export interface AssetComponent {
@@ -403,6 +403,24 @@ function 실패로덮어쓰지않기(assetId: string, 들어온: StandardFinding
   return [...진짜, ...들어온];
 }
 
+/**
+ * 스캔 결과가 저장된 직후에 불린다 — 결재 층(자동 배정) 같은 **위층 소비자가 자기를 등록**한다.
+ *
+ * ★ 왜 훅인가(2026-08-28 화살 #7): 자산(낮은 층)이 결재(높은 층)를 직접 부르면
+ *   assets→autoassign→approvals→assets 순환이 닫힌다. audit.ts의 onAudit과 같은 방식이다.
+ * ⚠ 등록하는 쪽(autoassign.자동배정_배선)이 app.ts 배선에서 빠지면 **자동 배정이 소리 없이
+ *   죽는다** — 그래서 autoassign.test가 「등록 0건이면 실패」를 못 박는다.
+ */
+export type FindingsRecordedListener = (assetId: string, findings: StandardFinding[]) => void;
+const findingsRecordedListeners: FindingsRecordedListener[] = [];
+export function onFindingsRecorded(l: FindingsRecordedListener): void {
+  findingsRecordedListeners.push(l);
+}
+/** 시험·자가진단용 — 등록된 청취자 수(0이면 자동 배정이 안 돈다는 뜻). */
+export function findingsRecordedListenerCount(): number {
+  return findingsRecordedListeners.length;
+}
+
 export function recordFindings(assetId: string, findings: StandardFinding[]): Asset | undefined {
   const existing = getAssetRowStmt.get(assetId) as AssetRow | undefined;
   if (!existing) return undefined;
@@ -419,12 +437,15 @@ export function recordFindings(assetId: string, findings: StandardFinding[]): As
   touchAsset(assetId); // ④ 스캔 결과 반영도 최종수정으로 본다
 
   // 자산에 기본 담당자가 지정돼 있으면 새 취약점을 바로 배정한다(미배정 적체 재발 방지).
-  // 이미 배정된 건은 건드리지 않으며, 실패해도 스캔 결과 저장에는 영향을 주지 않는다.
-  // (autoassign → approvals → assets 순환 참조가 있지만 호출이 런타임이라 안전하다.
-  //  ⚠ 여기서 require()를 쓰면 ESM에서 조용히 실패한다 — 실제로 그렇게 한 번 놓쳤다.)
-  try {
-    autoAssignFindings(assetId, findings);
-  } catch { /* 자동 배정 실패가 스캔을 막지는 않는다 */ }
+  // ★ 2026-08-28(화살 #7) — 여기서 autoassign을 **직접 부르지 않는다.** 청취자가 자기를
+  //   등록한다(onFindingsRecorded). 그래야 assets가 결재 층을 모르고, 옛
+  //   assets→autoassign→approvals→assets 3자 순환이 끊긴다.
+  // ⚠ 호출 자리는 그대로다: findings 저장·touchAsset **뒤**, broadcastAssetUpdated **앞**.
+  //   뒤로 옮기면 화면이 「미배정」을 먼저 받고 나중에 배정되는 깜빡임이 생긴다.
+  // ⚠ 동기로 부른다 — 시험이 recordFindings() 직후 배정을 세는 계약이 있다.
+  for (const 청취자 of findingsRecordedListeners) {
+    try { 청취자(assetId, findings); } catch { /* 청취자 실패가 스캔을 막지는 않는다 */ }
+  }
 
   const asset = getAsset(assetId)!;
   broadcastAssetUpdated(asset);

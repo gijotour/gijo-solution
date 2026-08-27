@@ -13,6 +13,7 @@ import { registerAgentsRoutes } from "./engine/agents";
 import { registerTeamViewRoutes } from "./engine/teamview";
 import { registerAdapterRoutes } from "./engine/adapters";
 import { registerAssetsRoutes } from "./engine/assets";
+import { 자동배정_배선 } from "./engine/autoassign"; // 화살 #7 — 자산 층에 결재 층을 꽂는다(등록 없으면 자동배정이 죽는다)
 import { registerAssetImportRoutes } from "./engine/assetimport";
 import { registerRepoScanRoutes } from "./engine/reposcan";
 import { registerVulnScanRoutes } from "./engine/vulnscan";
@@ -157,6 +158,7 @@ export function createApp(): Express {
   registerAgentsRoutes(app);
   registerTeamViewRoutes(app); // AI팀 구성 한눈에(2026-08-09) — 설정·팀 사무실이 같은 그림을 본다
   registerAdapterRoutes(app);
+  자동배정_배선(); // ⚠ 라우트 등록보다 먼저 — 부팅 중 들어온 스캔도 배정되게
   registerAssetsRoutes(app);
   registerAssetImportRoutes(app);
   registerRepoScanRoutes(app);
