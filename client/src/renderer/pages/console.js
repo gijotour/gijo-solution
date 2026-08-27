@@ -1788,9 +1788,16 @@
     { t: "guideline", label: "📘 가이드라인" },
     // 타사 SBOM(부품표) — 지식 저장소로 안 간다. 라이선스 의무를 점검하는 자리로 간다(2026-08-22).
     { t: "sbom", label: "📦 타사 SBOM(부품표)" },
+    // 제품 소개자료 — 원본 보관 + 제품 비교용. **깊은 학습(RAG)엔 안 간다**(2026-08-23 사장님
+    // 「소개자료는 원본보관과 제품비교용, 깊은 학습은 아니다」 — 남의 홍보 문구가 근거로 섞인다).
+    // ⚠ 서버는 8월 23일부터 guess:"productintro"를 보냈는데 이 버튼이 없어 **고를 수 없었다**
+    //   (SafeBreach pptx 실사고 — 사장님이 소개자료로 분류하려 했는데 갈 곳이 없었다).
+    //   서버 유형↔이 목록의 어긋남은 이제 uploadtypes 대조 시험이 지킨다.
+    { t: "productintro", label: "🗂 제품 소개자료" },
   ];
-  // 신규 제품으로 등록되는 유형에서만 제품명을 묻는다(추천값을 채워 두고 고칠 수 있게).
-  var PRODUCT_NAME_TYPES = { asset: 1, log: 1 };
+  // 제품명을 묻는 유형(추천값을 채워 두고 고칠 수 있게) — 소개자료도 제품 이름이 필요하다
+  // (어느 제품의 소개인지 — 서버가 guessProductName으로 추천값을 보낸다).
+  var PRODUCT_NAME_TYPES = { asset: 1, log: 1, productintro: 1 };
 
   function readB64(file) {
     return new Promise(function (resolve, reject) {
@@ -1913,7 +1920,7 @@
       var wrap = document.createElement("div");
       wrap.className = "cs-updec";
       var pn = r.guessProductName
-        ? '<input class="pn" type="text" value="' + esc(r.guessProductName) + '" placeholder="제품명(보안제품 자산·로그 매뉴얼일 때 씁니다)">' : "";
+        ? '<input class="pn" type="text" value="' + esc(r.guessProductName) + '" placeholder="제품명(보안제품 자산·로그 매뉴얼·제품 소개자료일 때 씁니다)">' : "";
       wrap.innerHTML = '<div class="h">🤔 이 파일, 어떻게 처리할까요?</div>' +
         '<div class="f">📄 ' + esc(name) + " — 파일명만으론 유형을 확신하기 어렵습니다</div>" + pn +
         '<div class="btns">' + UPLOAD_TYPES.map(function (x) {
