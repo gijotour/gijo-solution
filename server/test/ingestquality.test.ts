@@ -7,6 +7,9 @@
 // 20%도 안 남았다면 그 문서는 글자가 아니다 — 성공한 척하지 말고 오류로 알린다.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// ⚠ 2026-08-28(화살 #12): embed가 잎 모듈 engine/embedding.ts로 내려갔다 — memory는 그쪽을
+//   문다. llm만 목하면 **진짜 embed가 돌아** 임베딩 서버(8081)를 찾다 실패한다(실측).
+vi.mock("../src/engine/embedding", () => ({ embed: vi.fn(async (t: string[]) => t.map(() => [0.1, 0.2, 0.3])) }));
 vi.mock("../src/engine/llm", () => ({ chat: vi.fn(async () => "기타"), embed: vi.fn(async () => [new Array(1024).fill(0.01)]) }));
 
 import { ingestText } from "../src/engine/memory";

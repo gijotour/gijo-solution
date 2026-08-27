@@ -21,7 +21,7 @@ import { syncDocTriples, manualTriples } from "./docgraph";
 //   실측(의존 지도 v2)으로 둘 다 아니었다: 이 방향(보안제품→지식)은 층을 따르는 정방향이고,
 //   memory.ts 로딩 비용은 핸들 열기가 아니라 첫 질의에서 난다. 동적 5곳은 순환을 가린
 //   습관이었고, 가리면 컴파일러가 조용해져 진짜 순환이 자랄 자리가 된다.
-import { deleteDocument, ingestText, GLOBAL_SCOPE, 열람불가공용 } from "./memory";
+import { deleteDocument, ingestText, GLOBAL_SCOPE, 열람불가공용, onManualClassified } from "./memory";
 
 // 카탈로그 상수(종류·자료 갈래)는 잎 모듈로 내려갔다(2026-08-27 화살 #5 — 온톨로지 씨앗이
 // 상수 하나 때문에 이 큰 모듈을 통째로 물었다). 재수출이라 기존 호출부는 무변경.
@@ -839,4 +839,19 @@ export function registerSecurityProductRoutes(app: Express): void {
       res.json(importManual(filename.trim(), docName, user?.displayName));
     })
   );
+}
+
+/**
+ * ★ 지식 층(memory)에 자기를 꽂는다 — app.ts가 부팅 때 한 번 호출한다(2026-08-28 화살 #13).
+ *
+ * 그전에는 memory.ts가 `await import("./securityproducts.js")`로 **위층을 직접** 불렀다
+ * (memory ⇄ securityproducts 순환). 방향을 뒤집으면 지식 층은 「매뉴얼로 분류됐다」만
+ * 알리고, 그것으로 무엇을 할지는 업무 층인 여기가 정한다.
+ * ⚠ 등록이 빠지면 매뉴얼 자동 연결이 소리 없이 안 된다 — 짝 시험이 못 박는다.
+ */
+export function 매뉴얼연결_배선(): void {
+  onManualClassified((documentId) => {
+    const linked = attachManualToExistingProduct(documentId, documentId, "문서·분석 자동 연결");
+    return linked ? { productName: linked.productName, kind: linked.kind } : undefined;
+  });
 }

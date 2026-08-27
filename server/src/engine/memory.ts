@@ -10,7 +10,8 @@ import * as lancedb from "@lancedb/lancedb";
 import { rewriteForSearch } from "./searchrewrite";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { embed, chat } from "./llm";
+import { embed } from "./embedding"; // 잎(화살 #12) — llm 전체를 물지 않는다
+import { chat } from "./llm";
 import { isBinaryLikeChunk } from "./ragsanitize";
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
@@ -563,12 +564,30 @@ async function classifyDocument(documentId: string, text: string): Promise<strin
   return docClass;
 }
 
+/**
+ * '매뉴얼'로 분류된 문서를 다룰 **위층 소비자**가 자기를 등록한다(2026-08-28 화살 #13).
+ *
+ * ★ 왜 훅인가: 지식 층(이 파일)이 보안제품 등록부(securityproducts — 업무 층)를 알면
+ *   층이 거꾸로다. 동적 import로 가려 뒀지만 그래도 순환이었다(memory ⇄ securityproducts).
+ *   audit.onAudit·assets.onFindingsRecorded와 같은 방식으로 뒤집는다.
+ * ⚠ 등록이 없으면 매뉴얼 자동 연결이 **소리 없이** 안 된다 — memoryhooks.test가 못 박는다.
+ */
+export type ManualClassifiedListener = (documentId: string) => { productName: string; kind: string } | undefined;
+const manualListeners: ManualClassifiedListener[] = [];
+export function onManualClassified(l: ManualClassifiedListener): void {
+  manualListeners.push(l);
+}
+/** 시험·자가진단용 — 0이면 매뉴얼 자동 연결이 안 도는 상태. */
+export function manualClassifiedListenerCount(): number {
+  return manualListeners.length;
+}
+
 // '매뉴얼'로 분류된 문서를 기존 보안제품에 자동 연결한다(새 제품 생성 없음 — 등록부 오염 방지).
 // 연결되면 제품 화면·탐색기의 매뉴얼 배지에 바로 반영되고, 협업 피드로 알린다.
 async function linkManualToProduct(documentId: string): Promise<string | undefined> {
   try {
-    const { attachManualToExistingProduct } = await import("./securityproducts.js");
-    const linked = attachManualToExistingProduct(documentId, documentId, "문서·분석 자동 연결");
+    const linked = manualListeners.reduce<{ productName: string; kind: string } | undefined>(
+      (acc, l) => acc ?? l(documentId), undefined);
     if (linked) {
       emitCollaboration({
         from: "analysis",

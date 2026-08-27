@@ -75,7 +75,7 @@ import { registerMyWorkRoutes } from "./engine/mywork";
 import { registerPersonalDocsRoutes } from "./engine/personaldocs";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
 import { registerTodayRoutes } from "./engine/today";
-import { registerSecurityProductRoutes } from "./engine/securityproducts";
+import { registerSecurityProductRoutes, 매뉴얼연결_배선 } from "./engine/securityproducts"; // 화살 #13 — 지식 층에 업무 층을 꽂는다
 import { registerEmailRoutes } from "./engine/email";
 import { registerSmtpInboundRoutes } from "./engine/smtpinbound";
 import { registerCloudLlmRoutes } from "./engine/cloudllm";
@@ -158,7 +158,8 @@ export function createApp(): Express {
   registerAgentsRoutes(app);
   registerTeamViewRoutes(app); // AI팀 구성 한눈에(2026-08-09) — 설정·팀 사무실이 같은 그림을 본다
   registerAdapterRoutes(app);
-  자동배정_배선(); // ⚠ 라우트 등록보다 먼저 — 부팅 중 들어온 스캔도 배정되게
+  자동배정_배선();
+  매뉴얼연결_배선(); // ⚠ 등록 없으면 매뉴얼 자동 연결이 소리 없이 안 된다 // ⚠ 라우트 등록보다 먼저 — 부팅 중 들어온 스캔도 배정되게
   registerAssetsRoutes(app);
   registerAssetImportRoutes(app);
   registerRepoScanRoutes(app);

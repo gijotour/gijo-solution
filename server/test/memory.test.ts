@@ -12,7 +12,13 @@ process.env.GIJO_MEMORY_DB_PATH = tmpDb;
 process.env.GIJO_INGEST_ROOT = tmpDb;
 
 // 임베딩 차원을 테스트마다 바꿀 수 있는 mock — 임베딩 모델 교체 시나리오 재현용
+// ⚠ 2026-08-28(화살 #12): embed가 잎 모듈 engine/embedding.ts로 내려갔다. memory는 이제
+//   그쪽을 문다 — **목도 실제 import 경로를 따라가야 한다.** llm만 목하면 진짜 embed가
+//   돌아 임베딩 서버(8081)를 찾다가 실패한다(이 시험 3개가 그것을 실증했다).
 let embedDim = 3;
+vi.mock("../src/engine/embedding", () => ({
+  embed: vi.fn(async (texts: string[]) => texts.map(() => Array.from({ length: embedDim }, (_, i) => (i + 1) / embedDim))),
+}));
 vi.mock("../src/engine/llm", () => ({
   embed: vi.fn(async (texts: string[]) => texts.map(() => Array.from({ length: embedDim }, (_, i) => (i + 1) / embedDim))),
   chat: vi.fn(),

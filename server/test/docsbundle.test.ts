@@ -14,6 +14,9 @@ const DOCS_DIR = path.join(tmp, "docs");
 process.env.GIJO_DOCS_MANIFEST = MANIFEST;
 process.env.GIJO_DOCS_DIR = DOCS_DIR;
 
+// ⚠ 2026-08-28(화살 #12): embed가 잎 모듈 engine/embedding.ts로 내려갔다 — memory는 그쪽을
+//   문다. llm만 목하면 **진짜 embed가 돌아** 임베딩 서버(8081)를 찾다 실패한다(실측).
+vi.mock("../src/engine/embedding", () => ({ embed: vi.fn(async (t: string[]) => t.map(() => [0.1, 0.2, 0.3])) }));
 vi.mock("../src/engine/llm", () => ({
   embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
   chat: vi.fn(),
