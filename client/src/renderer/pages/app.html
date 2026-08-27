@@ -231,8 +231,10 @@
   /* 콘솔 — 셸에 있으므로 탭을 옮겨도 대화가 끊기지 않는다. 겉모습은 console.js가 넣는다.
      높이는 **대화 4줄이 보이는 만큼으로 고정**한다(2026-07-28 사용자 결정).
        맥락 줄 34 + 대화 4줄(22px×4=88) + 입력 52 + 여백 16 ≒ 190px
-     끌어서 늘리는 손잡이는 없앴다 — 끄는 동안 아래 iframe이 매번 다시 그려져 버벅였다.
-     더 넓게 보려면 「⧉ 창으로」로 빼면 된다. */
+     끌어서 늘리는 **높이** 손잡이는 없앴다 — 끄는 동안 아래 iframe이 매번 다시 그려져 버벅였다.
+     더 넓게 보려면 「⧉ 창으로」로 빼면 된다.
+     (2026-08-27 — **가로** 끌개(#conResize)는 되살렸다. 같은 함정을 유령선 방식으로 회피한다:
+      끄는 동안 크기 변경 0회, 놓을 때 한 번. 위 폐지 사유는 「드래그 중 실시간 반영」에만 적용된다.) */
   .console{flex:0 0 auto;display:flex;flex-direction:column;height:190px;min-height:190px;
     background:var(--panel-2);border-top:1px solid var(--border);}
 
@@ -257,6 +259,26 @@
     border-top:0;border-left:1px solid var(--border);}
   .work.console-side .screens{grid-column:1;grid-row:1;}
   .work.console-side .shellfoot{grid-column:1 / -1;grid-row:2;}
+  /* ── 대화창 폭 끌개 (셸 재구축 0-4, 2026-08-27 사장님 「대화창은 크기조정 기능」) ──────
+     ■ 왜 이제야 끌개인가 — 2026-07-28에 **높이** 손잡이를 만들었다 걷어낸 이력이 있다
+       (mousemove마다 크기를 바꾸면 아래 iframe이 통째로 재레이아웃되어 버벅였다 — 818행).
+       이번 가로 끌개는 그 폐지 사유를 정면으로 회피한다: **끄는 동안에는 유령선만 긋고**
+       (#conGhost — 크기 변경 0회), **놓는 순간 한 번만** --console-w를 바꾼다.
+       그래서 드래그 중 iframe 재레이아웃이 원리상 없다.
+     ■ 끌개는 .console의 **형제**로 같은 격자 칸(2,1)에 겹친다 — .console 안에 넣으면
+       console.js가 그리는 DOM에 간섭하고, position:relative를 주면 내부 absolute 기준이
+       바뀔 수 있다. 형제 겹침은 둘 다 피한다.
+     ■ stage-on에서만 보인다 — chat-home(대화 전폭)·console-popped(대화 없음)에는
+       끌 대상이 없다(설계 검토 2026-08-27 [높음]). */
+  #conResize{display:none;grid-column:2;grid-row:1;justify-self:start;align-self:stretch;
+    width:9px;margin-left:-5px;cursor:col-resize;z-index:5;}
+  #conResize:hover,#conResize.drag{background:rgba(95,161,255,.28);}
+  body.pro-shell.stage-on .work.console-side #conResize{display:block;}
+  /* 유령선 — 드래그 중 「여기까지 온다」만 보여 준다. 실제 폭은 mouseup에서 한 번. */
+  #conGhost{position:fixed;top:0;bottom:0;width:2px;background:var(--blue,#3b82f6);z-index:99;display:none;pointer-events:none;}
+  /* 드래그 중 iframe이 마우스 이벤트를 삼키면 유령선이 멈춘다 — 잠깐 입력을 끈다. */
+  body.con-resizing .screens{pointer-events:none;}
+  body.con-resizing{cursor:col-resize;}
   /* ⚠ 대화창을 **창으로 빼 두면** 도킹 콘솔은 숨겨진다(.console{display:none}). 그때도 옆 자리를
      비워 두면 **본문만 380px 줄고 그 자리가 텅 빈다**(실측: 1196 → 816). 없는 것을 위해
      자리를 남기지 않는다 — 분리 상태에서는 한 칸으로 되돌린다. */
@@ -815,11 +837,13 @@
   window.gijoConsoleHidden = setPopped; // console.js가 '창으로' 눌렀을 때 셸에 알린다
 
   // ── 화면/대화 비율 ────────────────────────────────────────────────────
-  // 콘솔 높이는 **고정**이다(2026-07-28 사용자 결정). 예전엔 손잡이를 끌어 비율을 바꿨는데
+  // 콘솔 **높이**는 고정이다(2026-07-28 사용자 결정). 예전엔 손잡이를 끌어 비율을 바꿨는데
   // 움직임이 매끄럽지 않았다 — mousemove마다 높이를 바꾸면 그 아래 iframe이 통째로 다시
   // 레이아웃되기 때문이다(무거운 화면일수록 끊긴다). 끌면서 계속 버벅이는 조작은 없느니만 못하다.
-  // 대신 넓게 보고 싶으면 「⧉ 창으로」가 있다 — 그쪽이 본래 그 용도다.
   // 옛 저장값(gijo:console:height)은 더 쓰지 않는다 — 남아 있어도 무시된다.
+  // ★ **가로 폭**은 2026-08-27(셸 재구축 0-4)부터 끌 수 있다(#conResize · gijo:console:w).
+  //   위 폐지 사유와 모순이 아니다 — 가로 끌개는 드래그 중 유령선만 긋고 놓을 때 한 번만
+  //   반영해서, 「mousemove마다 재레이아웃」이라는 병 자체가 없다.
 
   // ── 공개 API ──────────────────────────────────────────────────────────
   // nav.js가 메뉴 클릭 때 이걸 보고 "이동" 대신 "탭 열기"를 한다.
@@ -1231,6 +1255,7 @@
       if (wasPopped0 === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
       로그인선택_못한것알리기();
       프로레일();
+      끌개설치(); 대화폭복원(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
       return;
     }
     var st = null;
@@ -1264,6 +1289,7 @@
     if (wasPopped === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
     로그인선택_못한것알리기();
     프로레일();
+    끌개설치(); 대화폭복원(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
   }
 
   // ── 🚀 프로 셸 — 레일과 「대화 홈」(2026-08-18 승인 시안) ────────────────────
@@ -1286,10 +1312,10 @@
     document.body.classList.toggle("stage-on", tabs.length > 0 && !무대숨김);
     document.body.classList.toggle("chat-home", tabs.length === 0 || 무대숨김);
     // 🚀 도킹 패널 머리(승인 시안 §10-1) — 탭줄이 프로에서 숨겨져 있으므로(P2) 도킹된 화면의
-    //   이름과 ⧉/✕가 설 자리를 여기 만든다. 대화 폭 700 고정도 프로 전용 값이라 여기서 준다.
-    // (옛 대화 폭 클램프(--console-w)는 제거 — 무대 전환으로 프로에서 화면·대화가 폭을
-    //  나누는 조합이 없어졌다: 탭0=chat-home·무대=stage-on·내림=chat-home·분리=console-popped
-    //  전부 flex 한 칸이다. 죽은 값을 계약으로 지키면 감시가 형해화된다 — 검토관 중9①.)
+    //   이름과 ⧉/✕가 설 자리를 여기 만든다.
+    // (--console-w 이력: 무대 전환기에 죽은 값이 됐다가 — 0-1이 나란히 격자를 되살리고
+    //  0-4가 끌개(대화폭적용)를 만들면서 **생산자-소비자 짝이 다시 생겼다**. 계약도 부활:
+    //  wiringcontract 「대화창 폭 끌개」 시험이 생산자·클램프·저장키를 지킨다.)
     var head = document.getElementById("dockHead");
     if (!head) {
       head = document.createElement("div");
@@ -1387,6 +1413,74 @@
       });
     });
     대화홈갱신();
+  }
+
+  // ── 대화창 폭 끌개 (셸 재구축 0-4, 2026-08-27) ─────────────────────────────
+  //
+  // ■ --console-w의 **첫 생산자**다. 이 변수는 0-1 직후까지 「소비자 1곳(위 격자)·생산자 0」인
+  //   죽은 값이었고 그렇게 기록돼 있었다 — 이 블록이 그 전제를 뒤집는다(기록도 같은 커밋에서 갱신).
+  // ■ 버벅임 회피 계약: **mousemove에서는 절대 --console-w를 바꾸지 않는다.** 유령선(#conGhost)만
+  //   움직이고, mouseup에서 대화폭적용()을 한 번 부른다. 2026-07-28 높이 손잡이 폐지 사유
+  //   (mousemove마다 iframe 재레이아웃)를 원리로 회피하는 것이 이 분리의 전부다.
+  // ■ 클램프: 대화 최소 360(분리 대화창 minWidth와 같은 실증 바닥 — main.ts, 그 밑은 결재판
+  //   150px 칸이 먼저 넘친다) · 화면 판 최소 420 보장 · 더블클릭 = 기본 380 복귀.
+  // ■ 저장: gijo:console:w (콘솔 상태 가족 — gijo:console:popped·side와 같은 관례).
+  //   복원값도 반드시 클램프를 지난다 — 관문 앱이 userData를 실사용과 공유하므로
+  //   0 근처 폭이 저장되면 다음 게시 관문(대화보임 offsetWidth>0)이 죽는다(설계 검토 [높음]).
+  var CONSOLE_W_KEY = "gijo:console:w";
+  var CONSOLE_W_DEFAULT = 380;
+  function 대화폭클램프(px) {
+    var work = document.querySelector(".work");
+    var 최대 = Math.max(360, (work ? work.clientWidth : 1920) - 420); // 화면 판 최소 420 보장
+    return Math.max(360, Math.min(최대, Math.round(px)));
+  }
+  function 대화폭적용(px, 저장) {
+    var v = 대화폭클램프(px);
+    var work = document.querySelector(".work");
+    if (work) work.style.setProperty("--console-w", v + "px");
+    if (저장) { try { localStorage.setItem(CONSOLE_W_KEY, String(v)); } catch (e) { } }
+    return v;
+  }
+  function 대화폭복원() {
+    var v = null;
+    try { v = parseInt(localStorage.getItem(CONSOLE_W_KEY) || "", 10); } catch (e) { }
+    if (v && isFinite(v)) 대화폭적용(v, false); // 저장은 안 한다 — 복원이 값을 재작성하면 안 된다
+  }
+  function 끌개설치() {
+    if (!프로인가() || document.getElementById("conResize")) return;
+    var work = document.querySelector(".work.console-side");
+    if (!work) return;
+    var 끌개 = document.createElement("div");
+    끌개.id = "conResize";
+    끌개.title = "끌어서 대화창 폭 조절 — 더블클릭하면 기본(380px)으로";
+    var 유령 = document.createElement("div");
+    유령.id = "conGhost";
+    work.appendChild(끌개);
+    document.body.appendChild(유령);
+    끌개.addEventListener("dblclick", function () {
+      try { localStorage.removeItem(CONSOLE_W_KEY); } catch (e) { }
+      대화폭적용(CONSOLE_W_DEFAULT, false);
+    });
+    끌개.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      끌개.classList.add("drag");
+      document.body.classList.add("con-resizing"); // iframe pointer-events 차단 — 안 하면 유령선이 iframe 위에서 멈춘다
+      유령.style.display = "block";
+      유령.style.left = e.clientX + "px";
+      var 이동 = function (ev) { 유령.style.left = ev.clientX + "px"; }; // ⚠ 여기서 폭을 바꾸지 않는다(버벅임 계약)
+      var 놓음 = function (ev) {
+        document.removeEventListener("mousemove", 이동);
+        document.removeEventListener("mouseup", 놓음);
+        끌개.classList.remove("drag");
+        document.body.classList.remove("con-resizing");
+        유령.style.display = "none";
+        var work2 = document.querySelector(".work");
+        var 오른끝 = work2 ? work2.getBoundingClientRect().right : window.innerWidth;
+        대화폭적용(오른끝 - ev.clientX, true);
+      };
+      document.addEventListener("mousemove", 이동);
+      document.addEventListener("mouseup", 놓음);
+    });
   }
 
   // 로그인 화면에서 고른 구동 모드·AI 위치가 **적용되지 않았으면** 여기서 알린다.

@@ -240,8 +240,36 @@ describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님
       .not.toContain("openShellPopout(t.page, t.label || undefined)");
     // 도킹 진입 전 그 화면의 팝업을 닫는다(검토관 S2 — 안 닫으면 메뉴 재선택 시 두 벌)
     expect(s, "메뉴 선택 시 기존 팝업 닫기(두 벌 방지)가 없다").toContain("closeShellPopout(page)");
-    // (옛 대화 폭 클램프 계약은 폐지 — 무대 전환으로 프로에서 화면·대화가 폭을 나누는 조합이
-    //  없어져 --console-w가 죽은 값이 됐다. 죽은 값을 지키는 계약은 감시를 형해화한다 — 중9①.)
+    // (--console-w 계약 이력: 무대 전환기에 죽은 값이 되어 폐지했었다(중9①) —
+    //  0-4 끌개가 생산자를 만들면서 아래 「대화창 폭 끌개」 시험으로 **부활**했다.)
+  });
+
+  // 🖱 대화창 폭 끌개(셸 재구축 0-4, 2026-08-27 사장님 「대화창은 크기조정 기능」).
+  //   ★ 이 시험이 지키는 것 셋:
+  //   ① 생산자-소비자 짝 — --console-w는 「소비자 1곳·생산자 0」인 죽은 값이었던 이력이 있다.
+  //     끌개(생산자)가 사라지면 다시 죽은 값이 되는데 화면은 멀쩡해 보인다(기본 380 폴백).
+  //   ② 버벅임 계약 — 2026-07-28에 높이 손잡이를 「mousemove마다 iframe 재레이아웃」으로
+  //     걷어냈다. 가로 끌개는 유령선 방식(드래그 중 반영 0회)이라서만 허용된 것이다 —
+  //     mousemove 핸들러가 --console-w를 직접 바꾸기 시작하면 같은 병이 재발한다.
+  //   ③ 저장·클램프 — 관문 앱이 userData(localStorage)를 실사용과 공유하므로, 클램프 없이
+  //     0 근처 폭이 저장되면 다음 게시 관문(대화보임 offsetWidth>0)이 죽는다.
+  it("대화창 폭 끌개 — 생산자·유령선(버벅임 계약)·클램프·저장(0-4)", () => {
+    const s = 코드만(join(PAGES, "app.html"));
+    // ① 생산자와 소비자가 짝으로 존재한다
+    expect(s, "--console-w 소비자(격자)가 없다").toContain("var(--console-w");
+    expect(s, "--console-w 생산자(끌개)가 없다 — 죽은 값으로 회귀").toContain('setProperty("--console-w"');
+    // ② 버벅임 계약 — 드래그 이동 핸들러는 유령선만 옮긴다. 폭 반영은 mouseup(놓음)에서만.
+    const 이동부 = s.match(/var 이동 = function[\s\S]{0,300}/);
+    expect(이동부, "끌개의 이동 핸들러(이동)가 없다").toBeTruthy();
+    expect(이동부![0], "드래그 중 폭을 실시간 반영한다 — 2026-07-28 버벅임 병 재발")
+      .not.toContain("--console-w");
+    // ③ 클램프 바닥 360(분리창 minWidth와 같은 실증값) + 저장키(콘솔 상태 가족)
+    expect(s, "클램프 바닥(360)이 없다 — 0폭 저장이 게시 관문을 죽인다").toMatch(/Math\.max\(360,/);
+    expect(s, "저장키(gijo:console:w)가 없다").toContain('"gijo:console:w"');
+    // 복원 경로도 클램프를 지난다 — 대화폭적용이 클램프를 품으므로 복원이 그 함수를 부르면 된다.
+    expect(s, "복원(대화폭복원)이 없다 — 폭이 세션을 못 넘긴다").toMatch(/function 대화폭복원[\s\S]{0,200}대화폭적용/);
+    // stage-on 한정 — chat-home(대화 전폭)·분리창에는 끌 대상이 없다(설계 검토 [높음]).
+    expect(s, "끌개가 stage-on 한정이 아니다").toMatch(/body\.pro-shell\.stage-on [^\n]*#conResize\{display:block/);
   });
   it("💬 대화 홈 = 새 세션 확인(작업 내역 저장 안내) 후 대화·선택·범위 초기화", () => {
     const s = 코드만(join(PAGES, "app.html"));

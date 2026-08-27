@@ -248,7 +248,8 @@
       ".cs-typing span:nth-child(2){animation-delay:.15s}.cs-typing span:nth-child(3){animation-delay:.3s}",
       "@keyframes csb{0%,60%,100%{opacity:.25}30%{opacity:1}}",
       // container-type — 도크 **자기 폭**을 기준으로 안쪽을 접기 위해서다(창 폭이 아니라).
-      //   콘솔은 화면 옆에 붙으면 380px까지 좁아지는데(app.html: --console-w), 그 안에서
+      //   콘솔은 화면 옆에 붙으면 기본 380px이고 끌개로 360까지 좁아질 수 있는데(app.html:
+      //   --console-w, 0-4 끌개 — 바닥 360은 분리창 minWidth와 같은 실증값), 그 안에서
       //   ＋·토글·전송이 자리를 다 먹으면 입력칸이 밀려난다. 미디어쿼리로는 이 상황을 못 잰다.
       ".cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;container-type:inline-size;}",
       // ⚠ min-width:0 — flex 아이템의 기본값(auto)은 **입력칸이 자기 기본 크기 밑으로 안 줄게** 해서
