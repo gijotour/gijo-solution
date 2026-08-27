@@ -271,6 +271,44 @@ describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님
     // stage-on 한정 — chat-home(대화 전폭)·분리창에는 끌 대상이 없다(설계 검토 [높음]).
     expect(s, "끌개가 stage-on 한정이 아니다").toMatch(/body\.pro-shell\.stage-on [^\n]*#conResize\{display:block/);
   });
+
+  // 🗂 화면 메뉴 판(셸 재구축 0-3, 2026-08-27 사장님 「1+3」 — 화면 메뉴 + 접기).
+  //   ★ 이 시험이 지키는 것:
+  //   ① 두 줄 원자성 — 「두 칸 격자」와 「#gijoNav 표시」는 함께 산다. display:none만 남으면
+  //     빈 200px 칸이 생기고, 격자만 한 칸으로 돌아가면 #gijoNav가 1행을 먹어 .work가
+  //     암묵 2행으로 떨어진다(화면 전체가 아래로 밀리는 즉사형 — 설계 검토 [BLOCKER]).
+  //   ② 한 원천 — 판 내용은 nav.js gijoRenderMenu 재사용이다. 셸이 메뉴를 따로 그리기
+  //     시작하면 「같은 것을 두 곳에 적으면 어긋난다」가 메뉴에서 재발한다.
+  //   ③ 계정 이사 방지 — 컨테이너가 .gn-mid면 titlebar.js mountUserArea 첫 갈래가 계정을
+  //     판 하단으로 옮긴다(판을 접으면 계정·업데이트 배지가 사라진다 — 2026-08-01 계보).
+  //   ④ 접기 키 격리 — 표준 LEFT_KEY를 같이 쓰면 프로에서 접은 것이 표준 사이드바를 접는다.
+  it("화면 메뉴 판 — 두 칸 원자성·gijoRenderMenu 한 원천·계정 자리·접기 키(0-3)", () => {
+    const s = 코드만(join(PAGES, "app.html"));
+    // ① 두 칸 격자 + display:none 부재가 짝이다
+    expect(s, "프로 #gijoNav가 아직 display:none이다 — 두 칸 격자에 빈 칸만 남는다")
+      .not.toMatch(/body\.pro-shell #gijoNav\{display:none/);
+    expect(s, "프로 #gijoNav 표시 복원이 없다").toMatch(/body\.pro-shell #gijoNav\{display:flex/);
+    // nav.js가 주입하는 sticky·100vh(단독 화면용)를 프로에서 되돌렸나 — 안 하면 44px 상단바 밑에서 넘친다
+    expect(s, "프로 #gijoNav의 sticky·100vh 되돌림이 없다").toMatch(/body\.pro-shell #gijoNav\{[^}]*position:static/);
+    // ② 한 원천 — gijoRenderMenu 재사용
+    expect(s, "판 내용이 gijoRenderMenu 재사용이 아니다").toContain("window.gijoRenderMenu(box)");
+    // ③ 계정 이사 방지 — 판 컨테이너는 .pro-menu이고 gn-mid가 아니다
+    const 설치부 = s.match(/function 메뉴판설치[\s\S]{0,700}/);
+    expect(설치부, "메뉴판설치가 없다").toBeTruthy();
+    expect(설치부![0], "판 컨테이너가 gn-mid다 — 계정·문서함이 판 하단으로 이사해 접으면 사라진다")
+      .not.toMatch(/className = "[^"]*gn-mid/);
+    // ④ 접기 — 새 키 + 표준 키 미사용 + 복원·토글·단추 배선
+    expect(s, "접기 키(gijo:proMenu:collapsed)가 없다").toContain('"gijo:proMenu:collapsed"');
+    // ⚠ 문자열 전체가 아니라 **localStorage 사용만** 본다 — 주석은 「이 키를 쓰지 말라」를
+    //   이유와 함께 적을 수 있어야 한다(0-1 「← 대화로」 시험과 같은 교훈).
+    expect(s, "표준 접기 키(leftPanel)를 프로가 같이 쓴다 — 프로에서 접으면 표준도 접힌다")
+      .not.toMatch(/localStorage\.[gs]etItem\("gijo:leftPanel/);
+    expect(s, "접기 CSS(--menu-w:0)가 없다").toMatch(/pro-menu-closed\{--menu-w:0px/);
+    expect(s, "‖ 단추(railPane) 배선이 없다").toMatch(/눌러\("railPane", 메뉴판토글\)/);
+    // 설치 시점 — 부팅 인라인 시점엔 nav.js가 아직 안 실렸다(DOMContentLoaded 계약)
+    expect(s, "메뉴판설치가 DOMContentLoaded에 안 걸려 있다 — gijoRenderMenu가 undefined인 시점에 돈다")
+      .toMatch(/DOMContentLoaded",\s*메뉴판설치/);
+  });
   it("💬 대화 홈 = 새 세션 확인(작업 내역 저장 안내) 후 대화·선택·범위 초기화", () => {
     const s = 코드만(join(PAGES, "app.html"));
     expect(s, "확인창에 「작업 내역에 저장」 안내가 없다 — 없으면 누르길 겁낸다").toContain("「작업 내역」에 저장");
@@ -419,10 +457,12 @@ describe("프로 확정 계약 — 메뉴는 카드가 전부(2026-08-20 사장�
     expect(레일, "레일이 아직 .app 안에 있다 — 상단바로 안 옮겨졌다")
       .toBeGreaterThan(상단바);
     expect(레일, "레일이 .app 뒤에 있다 — 상단바 밖이다").toBeLessThan(앱);
-    // ④ 왼쪽 56px을 돌려줬다 — 안 돌려주면 옮긴 값어치가 없다(빈 칸만 남는다).
+    // ④ 왼쪽 56px 레일 칸은 돌려줬다(0-2) — 이후 0-3이 그 자리에 **메뉴 판 칸**을 세웠다.
+    //   빈 칸(56px 레일 잔해)은 여전히 금지지만, 격자의 첫 칸은 이제 var(--menu-w)다.
     expect(s, "프로 .app이 아직 56px 칸을 잡고 있다 — 레일은 옮겼는데 자리가 남았다")
       .not.toMatch(/body\.pro-shell \.app\{grid-template-columns:56px/);
-    expect(s, "프로 .app이 한 칸이 아니다").toMatch(/body\.pro-shell \.app\{grid-template-columns:minmax\(0,\s*1fr\)/);
+    expect(s, "프로 .app 첫 칸이 메뉴 판(var(--menu-w))이 아니다 — 0-3 두 칸 격자가 깨졌다")
+      .toMatch(/body\.pro-shell \.app\{grid-template-columns:var\(--menu-w/);
     // ⑤ 가로로 눕혔다 — 세로 그대로면 44px 상단바에서 잘린다.
     expect(s, "레일이 프로에서 가로로 안 눕는다").toMatch(/body\.pro-shell #gijoRail\{[^}]*flex-direction:row/);
   });

@@ -118,3 +118,12 @@ html.theme-light .tab.on, html.theme-light .chip.on, html.theme-light .lt-chip.o
 html.theme-light summary { color: var(--text); }
 /* 취약점 스캔 타일 선택 테두리 — border-color:#fff는 흰 바탕에서 투명인간 */
 html.theme-light .mv-tile.mv-sel { border-color: #1d4f91; box-shadow: 0 0 0 1px rgba(29, 79, 145, 0.35); }
+
+/* ── 🗂 프로 메뉴 판(셸 재구축 0-3) — nav.js gn-* 중 흰 알파 하드코딩 보정 ──────────
+   gn-* 스타일 대부분은 var() 토큰이라 흰 바탕을 자동으로 따라가지만, 셋이 흰색 알파를
+   박아 두어 흰 바탕에서 투명인간이 된다(설계 검토 2026-08-27 [낮음] — hover 무반응은
+   디자인이 아니라 기능성 문제): hover 배경·상단 고정줄 구분선·스크롤바 썸. */
+html.theme-light .gn-item:hover { background: rgba(0, 0, 0, 0.05); }
+html.theme-light .gn-top-fixed { border-bottom-color: rgba(0, 0, 0, 0.08); }
+html.theme-light .pro-menu::-webkit-scrollbar-thumb,
+html.theme-light .gn-mid::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.16); }

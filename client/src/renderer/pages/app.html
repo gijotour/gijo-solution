@@ -52,11 +52,25 @@
        `.app{…}` **첫 매치**를 잡아 `grid-template-rows`·`flex:1`·`min-height:0` 검사가
        프로 규칙을 보고 실패한다. 순서가 시험의 전제다. */
   /* 🏠 셸 재구축 0-2(2026-08-23) — 왼쪽 56px 레일을 **상단바로 옮겼다.**
-     그래서 .app은 이제 **한 칸**이고, 그 56px이 통째로 내 문서에 간다(1920에서 1484→1540px).
      ⚠ #gijoRail 요소는 **지우지 않았다** — railroster.js와 titlebar.js가 id로 찾는다.
-       마크업만 .topbar 안으로 옮기고 아래에서 가로로 눕힌다. */
-  body.pro-shell .app{grid-template-columns:minmax(0,1fr);}
-  body.pro-shell #gijoNav{display:none;}
+       마크업만 .topbar 안으로 옮기고 아래에서 가로로 눕힌다.
+     🗂 셸 재구축 0-3(2026-08-27, 사장님 「1+3」) — 왼쪽에 **접는 화면 메뉴 판**이 선다.
+     ■ 두 줄이 원자다(설계 검토 [BLOCKER]): 아래 「두 칸 격자」와 「#gijoNav 표시」는
+       반드시 함께 산다 — display:none만 걷으면 grid 자동 배치가 #gijoNav를 1행에 넣고
+       .work가 암묵 2행으로 떨어져 화면 전체가 아래로 밀리는 즉사형이다.
+     ■ 판의 내용은 셸이 nav.js의 gijoRenderMenu를 **재사용**해 그린다(아래 메뉴판설치) —
+       그룹 접기·즐겨찾기·배지·클릭(gijoTabs.open)이 표준과 한 원천이다. 새로 그리지 않는다.
+     ■ 접기(1+3의 「3」)는 **새 키**(gijo:proMenu:collapsed)다 — 표준의
+       gijo:leftPanel:collapsed(LEFT_KEY)를 같이 쓰면 프로에서 접은 것이 표준 사이드바를
+       접는다(설계 검토 [높음]). body 클래스가 --menu-w를 0으로 만들 뿐, 격자 규칙은 하나다. */
+  body.pro-shell .app{grid-template-columns:var(--menu-w, 200px) minmax(0,1fr);}
+  /* nav.js injectCss가 #gijoNav에 sticky·100vh를 주입한다(단독 화면용) — 프로 격자는
+     44px 상단바 아래라 100vh가 넘친다. !important 아닌 선언이라 특이도로 이긴다. */
+  body.pro-shell #gijoNav{display:flex;position:static;height:auto;align-self:stretch;
+    min-width:0;overflow-y:auto;overflow-x:hidden;}
+  body.pro-shell.pro-menu-closed{--menu-w:0px;}
+  /* 0px 칸에서 테두리 1px가 실선으로 남는다 — 접힘엔 선도 지운다(injectCss가 !important라 여기도). */
+  body.pro-shell.pro-menu-closed #gijoNav{border-right:0 !important;}
   /* 레일을 상단바 안에서 **가로 줄**로. 세로 시절 규칙(테두리·배경·세로 정렬)을 여기서 되돌린다. */
   body.pro-shell #gijoRail{flex-direction:row;align-items:center;gap:3px;padding:0;
     border-right:0;background:transparent;overflow:visible;flex:0 0 auto;}
@@ -341,6 +355,8 @@
          querySelectorAll로 찾아 「진행중 작업」·「기한 지난 업무」 수를 쓴다. 프로에서 그 자리가
          없으면 조용히 아무 데도 안 써서, **기한 지난 업무 6건이 어디에도 안 보이던
          2026-08-01 사고와 같은 결과**가 된다. 이름만 맞춰 두면 갱신 코드는 한 줄도 안 고쳐도 산다. -->
+    <!-- 🗂 0-3: 메뉴 판 접기/펴기(1+3의 「3」). ☰(찾기 오버레이)와 다르다 — 이건 상설 판. -->
+    <button id="railPane" title="화면 메뉴 판 접기/펴기">‖</button>
     <button id="railMenu" title="전체 메뉴 (Ctrl+K)">☰<span class="gn-workbadge"></span></button>
     <button id="railWork" title="작업 내역">🕘<span class="gn-sessbadge"></span></button>
     <button id="railFav" title="즐겨찾기">⭐</button>
@@ -1366,6 +1382,7 @@
     // ☰ 전체 메뉴 — **기존 화면찾기를 그대로 부른다.** 새 오버레이를 만들지 않는다:
     //   titlebar.js의 화면찾기가 이미 검색·아이콘·구역·↑↓Enter·**한글 조합 보호**까지 갖췄고,
     //   따로 만들면 아이콘이 갈라져 죽었던 사고(titlebar.js 주석)가 두 번째로 생긴다.
+    눌러("railPane", 메뉴판토글); // 🗂 0-3 — 메뉴 판 접기/펴기(저장은 함수 안에서)
     눌러("railMenu", function () {
       if (window.gijoOpenFinder) window.gijoOpenFinder();
       else gijoTell("화면 찾기를 열지 못했습니다 — 상단 🔍를 눌러 주세요.");
@@ -1427,6 +1444,39 @@
   // ■ 저장: gijo:console:w (콘솔 상태 가족 — gijo:console:popped·side와 같은 관례).
   //   복원값도 반드시 클램프를 지난다 — 관문 앱이 userData를 실사용과 공유하므로
   //   0 근처 폭이 저장되면 다음 게시 관문(대화보임 offsetWidth>0)이 죽는다(설계 검토 [높음]).
+  // ── 화면 메뉴 판 (셸 재구축 0-3, 2026-08-27 사장님 「1+3」) ────────────────────
+  //
+  // ■ 내용은 nav.js의 gijoRenderMenu(buildMenu) **재사용** — titlebar.js가 대시보드
+  //   「전체메뉴」 판에 이미 재사용한 전례 그대로다. 그룹 접기(gijo:menu:closed)·
+  //   즐겨찾기·배지 3종(gn-*badge — 갱신이 querySelectorAll이라 레일과 판에 동시 반영)·
+  //   클릭(셸 안이면 gijoTabs.open → stage-on 격자에 뜸)이 전부 한 원천에서 온다.
+  // ■ ⚠ 컨테이너에 .gn-mid 클래스를 **쓰지 않는다** — titlebar.js mountUserArea의 첫
+  //   갈래가 #gijoNav 안 .gn-mid를 보고 계정·문서함을 판 하단으로 이사시킨다. 계정은
+  //   상단바(레일 rail-foot)에 남는다 — 판을 접어도 계정·업데이트 배지가 보여야 한다
+  //   (「기한 지난 업무 6건이 안 보이던」 2026-08-01 사고 계보).
+  // ■ 설치 시점은 DOMContentLoaded — 부팅 인라인이 돌 때 nav.js(뒤 스크립트)가 아직
+  //   안 실려 gijoRenderMenu가 없다. DOMContentLoaded면 일반 스크립트 전부 실행 완료.
+  var PRO_MENU_KEY = "gijo:proMenu:collapsed"; // ⚠ 표준 LEFT_KEY(gijo:leftPanel:collapsed) 재사용 금지
+  function 메뉴판설치() {
+    if (!프로인가()) return;
+    var nav = document.getElementById("gijoNav");
+    if (!nav || nav.querySelector(".pro-menu")) return;
+    var box = document.createElement("div");
+    box.className = "pro-menu"; // gn-mid 금지(위 주석)
+    nav.appendChild(box);
+    if (window.gijoRenderMenu) window.gijoRenderMenu(box);
+    else box.textContent = "메뉴 로딩 중…"; // titlebar.js와 같은 폴백
+    var 접힘 = "0";
+    try { 접힘 = localStorage.getItem(PRO_MENU_KEY) || "0"; } catch (e) { }
+    document.body.classList.toggle("pro-menu-closed", 접힘 === "1");
+  }
+  function 메뉴판토글() {
+    var 닫힘 = document.body.classList.toggle("pro-menu-closed");
+    try { localStorage.setItem(PRO_MENU_KEY, 닫힘 ? "1" : "0"); } catch (e) { }
+  }
+  // nav.js가 이 인라인보다 **뒤에** 실리므로 여기서 바로 부르면 gijoRenderMenu가 없다.
+  document.addEventListener("DOMContentLoaded", 메뉴판설치);
+
   var CONSOLE_W_KEY = "gijo:console:w";
   var CONSOLE_W_DEFAULT = 380;
   function 대화폭클램프(px) {
