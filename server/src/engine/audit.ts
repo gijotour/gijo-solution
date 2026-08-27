@@ -2,12 +2,13 @@
 // 남긴다. 흩어진 이벤트(협업·LLM활동·egress·가드레일)와 달리, 이건 "누가 무엇을 했나"의 단일 원천이다.
 // CLI 실행(①)·챗봇 명령 승인/차단이 여기에 강제로 기록되며, 끌 수 없다(감사 무결성).
 
-import type { Express, Request } from "express";
+// ⚠ 여기에 express·authMiddleware·asyncRoute를 **다시 import하지 말 것**(2026-08-27 화살 #3).
+//   라우트는 auditroutes.ts에 산다 — 이 파일이 auth를 무는 순간 auth⇄users⇄audit 3자 순환이
+//   경고 없이 부활한다(59개 모듈이 무는 바닥이라 그 순환은 전 서버를 묶는다).
+//   실사고: 함수만 옮기고 이 import들을 안 지워 검토관 3갈래가 전부 「반쪽 수리」로 잡았다 —
+//   tsc는 미사용 import를 emit에서 지워(런타임 무사) 시험 4,089개가 원리상 못 잡는 부류였다.
 import { randomUUID } from "crypto";
-import { authMiddleware } from "../auth/auth";
-import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
-import type { GijoUser } from "../auth/users";
 
 // privacy — 개인정보 가림(2026-08-09 신설). 차단(block)과 다르다: 요청은 그대로 진행되고
 //   민감한 숫자만 가려서 LLM에 전달됐다는 **사실의 기록**이다. 담당자가 "내 입력이 어디까지

@@ -647,15 +647,19 @@ function fkey붙임<T extends { id: string; findings: Asset["findings"] }>(a: T)
 }
 
 export function registerAssetsRoutes(app: Express): void {
-  app.get("/api/assets", authMiddleware, (_req, res) =>
-    res.json(listAssets().map(목록용).map(fkey붙임)));
+  // ⚠ 본문은 동기가 됐지만 asyncRoute는 **일부러 남긴다**(검토관 2026-08-27 [낮음]):
+  //   이 앱엔 커스텀 에러 미들웨어가 없어서, 동기 핸들러가 던지면 Express 기본 HTML이
+  //   나간다(개발 모드에선 스택까지 노출·클라 JSON 파싱은 실패). asyncRoute가 예외를
+  //   500 + {"error": …} JSON으로 잡아 주던 옛 응답 계약을 그대로 지킨다.
+  app.get("/api/assets", authMiddleware, asyncRoute(async (_req, res) =>
+    res.json(listAssets().map(목록용).map(fkey붙임))));
   // :id 라우트보다 먼저 — 뒤에 두면 "coverage"가 자산 id로 잡힌다.
   app.get("/api/assets/coverage", authMiddleware, (_req, res) => res.json(computeAssetCoverage(listAssets())));
-  app.get("/api/assets/:id", authMiddleware, (req, res) => {
+  app.get("/api/assets/:id", authMiddleware, asyncRoute(async (req, res) => {
     const asset = getAsset(String(req.params.id));
     if (!asset) return res.status(404).json({ error: "asset not found" });
     res.json(fkey붙임(asset));
-  });
+  }));
   // 자산 기본 담당자 — 새 취약점이 이 사람에게 자동 배정된다(미배정 적체 재발 방지).
   app.post("/api/assets/:id/default-assignee", authMiddleware, (req, res) => {
     const id = String(req.params.id);

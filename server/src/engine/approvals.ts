@@ -6,7 +6,6 @@
 // 반려(오탐)로 처리된 finding은 SBOM 취약점 반영에서 제외된다(sbom.ts가 isFindingRejected를 참조).
 
 import type { Express, Request } from "express";
-import * as crypto from "crypto";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { todayLocal } from "../util/date";
