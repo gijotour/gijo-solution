@@ -71,14 +71,11 @@ export interface FindingReview {
   gone?: boolean; // 최신 스캔에 더는 없음(재스캔에서 사라짐) — 검증/완료 표시에 씀
 }
 
-// finding 내용으로 안정적인 키를 만든다 — 같은 finding이면 재스캔 후에도 검토 상태가 유지된다.
-export function findingKey(assetId: string, f: StandardFinding): string {
-  return crypto
-    .createHash("sha1")
-    .update(`${assetId}\0${f.finding_type}\0${f.severity}\0${f.evidence}\0${f.source_tool}`)
-    .digest("hex")
-    .slice(0, 16);
-}
+// finding 내용의 안정 키 — 본체는 잎 모듈 findingkey.ts로 내려갔다(2026-08-27 화살 #2:
+// 순수 해시 하나 때문에 네 모듈이 결재 엔진 전체를 물고 들어왔다). 여기서 **재수출**해
+// 기존 호출부(src 4곳 + 시험 8곳)는 한 줄도 안 바뀐다. 해시 조립은 그 파일의 ⚠⚠ 참조.
+export { findingKey } from "./findingkey";
+import { findingKey } from "./findingkey";
 
 const getStmt = db.prepare("SELECT * FROM finding_approvals WHERE assetId = ? AND findingKey = ?");
 const allRowsStmt = db.prepare("SELECT * FROM finding_approvals");

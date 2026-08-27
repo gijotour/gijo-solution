@@ -8,7 +8,7 @@
 // "탈옥"에서 2홉이면 같은 LLM01을 공유하는 "에이전트 하이재킹"까지 닿는다(하이브리드 확장의 실효).
 
 import { THREAT_CATALOG, CATEGORY_LABEL, type AiBomArea } from "./compliance";
-import { PRODUCT_CATEGORIES } from "./securityproducts";
+import { PRODUCT_CATEGORIES } from "./securityproducts-catalog"; // 잎만 문다(화살 #5)
 import { addTriples, deleteTriplesBySource, type TripleInput } from "./ontology";
 import { atlasTriples, ATLAS_SOURCE } from "./atlas-seed";
 import { owaspLlmTriples, OWASP_SOURCE } from "./owasp-llm-seed";
@@ -145,4 +145,21 @@ export function seedOntologyFromCatalog(): { inserted: number; sources: string[]
     ...attackTriples(), // MITRE ATT&CK Enterprise(취약점 악용 전술·기법·완화통제) — 인프라 취약점 그라운딩
   ]);
   return { inserted: rows.length, sources: [SEED_SOURCE, MITIGATION_SOURCE, PRODUCT_SOURCE, VULN_SOURCE, ATLAS_SOURCE, OWASP_SOURCE, NIST_SOURCE, CWE_SOURCE, ATTACK_SOURCE] };
+}
+
+// ── 라우트 (2026-08-27 화살 #4 — ontology.ts에서 이사) ─────────────────────────
+//   씨앗 적재 버튼의 창구. 여기 있어야 저장고(ontology.ts)가 씨앗을 모른 채로 남는다.
+import type { Express } from "express";
+import { authMiddleware } from "../auth/auth";
+import { asyncRoute } from "../util/asyncRoute";
+
+export function registerOntologySeedRoutes(app: Express): void {
+  // 샘플 지식 적재 — KISA AI 보안 위협 카탈로그를 트리플로 변환해 넣는다(멱등). 화면 버튼용.
+  app.post(
+    "/api/ontology/seed",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      res.json(seedOntologyFromCatalog());
+    })
+  );
 }

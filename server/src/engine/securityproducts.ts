@@ -17,29 +17,18 @@ import { chat } from "./llm";
 import { recordAudit } from "./audit";
 import { addTriple, listTriples, deleteTriple } from "./ontology";
 import { syncDocTriples, manualTriples } from "./docgraph";
+// ★ 정적 import (2026-08-27 화살 #6) — 옛 주석은 「무거운 모듈이라·순환이라 동적」이라 적었지만
+//   실측(의존 지도 v2)으로 둘 다 아니었다: 이 방향(보안제품→지식)은 층을 따르는 정방향이고,
+//   memory.ts 로딩 비용은 핸들 열기가 아니라 첫 질의에서 난다. 동적 5곳은 순환을 가린
+//   습관이었고, 가리면 컴파일러가 조용해져 진짜 순환이 자랄 자리가 된다.
+import { deleteDocument, ingestText, GLOBAL_SCOPE, 열람불가공용 } from "./memory";
 
-// 보안제품 종류 카탈로그 — 대시보드/등록 폼에서 공용으로 쓴다. 한국 중소기업 보안팀이 흔히
-// 운영하는 제품군 위주(과한 세분화 지양). "기타"로 흡수 가능.
-export const PRODUCT_CATEGORIES = [
-  { id: "방화벽", label: "방화벽", icon: "🧱" },
-  { id: "EDR", label: "EDR (단말탐지대응)", icon: "🖥" },
-  { id: "DLP", label: "DLP (정보유출방지)", icon: "🔒" },
-  { id: "WAF", label: "WAF (웹방화벽)", icon: "🌐" },
-  { id: "VPN", label: "VPN", icon: "🔑" },
-  { id: "IPS", label: "IPS/IDS (침입방지)", icon: "🛡" },
-  { id: "SIEM", label: "SIEM (통합로그관리)", icon: "📊" },
-  { id: "백신", label: "백신 (안티바이러스)", icon: "🦠" },
-  { id: "NAC", label: "NAC (접근제어)", icon: "🚪" },
-  { id: "기타", label: "기타", icon: "📦" },
-] as const;
+// 카탈로그 상수(종류·자료 갈래)는 잎 모듈로 내려갔다(2026-08-27 화살 #5 — 온톨로지 씨앗이
+// 상수 하나 때문에 이 큰 모듈을 통째로 물었다). 재수출이라 기존 호출부는 무변경.
+// 내용 수정은 securityproducts-catalog.ts에서.
+export { PRODUCT_CATEGORIES, DOC_KINDS } from "./securityproducts-catalog";
+import { PRODUCT_CATEGORIES, DOC_KINDS } from "./securityproducts-catalog";
 const CATEGORY_IDS = new Set<string>(PRODUCT_CATEGORIES.map((c) => c.id));
-
-// 제품 문서 종류 — 제품 매뉴얼 / 로그(분석) 매뉴얼 / 기타.
-export const DOC_KINDS = [
-  { id: "manual", label: "제품 매뉴얼" },
-  { id: "logManual", label: "로그 매뉴얼" },
-  { id: "etc", label: "기타 문서" },
-] as const;
 const DOC_KIND_IDS = new Set<string>(DOC_KINDS.map((k) => k.id));
 
 // 제품 "정형 정보" 항목 — 매뉴얼 업로드가 지금까지 RAG(자유 텍스트 검색)로만 가고 온톨로지(구조화
@@ -331,8 +320,6 @@ export async function cleanupProductManuals(
   const keptShared = plan.filter((p) => p.sharedWith.length > 0).map((p) => ({ docName: p.docName, sharedWith: p.sharedWith }));
   if (mode === "keep") return { removed: [], keptShared };
   const removed: string[] = [];
-  // 동적 import — memory는 무거운 모듈(LanceDB)이고, 정적으로 물면 순환 참조가 된다.
-  const { deleteDocument } = await import("./memory.js");
   for (const p of plan) {
     if (p.sharedWith.length > 0) continue;
     try {
@@ -793,7 +780,6 @@ export function registerSecurityProductRoutes(app: Express): void {
         //   업로드 두 창구와 같은 잣대다(재검토관 2026-08-22: 덮어쓰기 문이 둘이 아니라 다섯이었다).
         //   인입은 같은 documentId면 옛 조각을 지우고 새로 넣는데 등급 칸은 그대로 남는다.
         const 문서이름 = path.basename(String(filename).trim());
-        const { 열람불가공용 } = await import("./memory.js");
         if (!문서이름 || 문서이름 === "." || 문서이름 === ".." || 열람불가공용(문서이름, req)) {
           res.status(403).json({ error: "같은 이름의 문서가 이미 있고, 그 문서를 열람할 권한이 없습니다 — 다른 이름으로 올리세요" });
           return;
@@ -801,7 +787,6 @@ export function registerSecurityProductRoutes(app: Express): void {
         const { extractDocumentText } = await import("./dataset.js");
         const text = await extractDocumentText(문서이름, content);
         if (text.trim()) {
-          const { ingestText, GLOBAL_SCOPE } = await import("./memory.js");
           // 제품 매뉴얼은 업무영역이 자명하다 — 장비운영으로 확정 인입 + 작업 귀속 기록.
           await ingestText(문서이름, text, GLOBAL_SCOPE, undefined, false, user?.displayName, "장비운영");
           docName = 문서이름;
@@ -839,7 +824,6 @@ export function registerSecurityProductRoutes(app: Express): void {
       if (content) {
         // ⚠ 업로드 창구와 같은 잣대 — basename 접기 + 「볼 수 없으면 덮어쓸 수도 없다」.
         const 문서이름 = path.basename(String(filename).trim());
-        const { 열람불가공용 } = await import("./memory.js");
         if (!문서이름 || 문서이름 === "." || 문서이름 === ".." || 열람불가공용(문서이름, req)) {
           res.status(403).json({ error: "같은 이름의 문서가 이미 있고, 그 문서를 열람할 권한이 없습니다 — 다른 이름으로 올리세요" });
           return;
@@ -847,7 +831,6 @@ export function registerSecurityProductRoutes(app: Express): void {
         const { extractDocumentText } = await import("./dataset.js");
         const text = await extractDocumentText(문서이름, content);
         if (text.trim()) {
-          const { ingestText, GLOBAL_SCOPE } = await import("./memory.js");
           // 제품 매뉴얼은 업무영역이 자명하다 — 장비운영으로 확정 인입 + 작업 귀속 기록.
           await ingestText(문서이름, text, GLOBAL_SCOPE, undefined, false, user?.displayName, "장비운영");
           docName = 문서이름;

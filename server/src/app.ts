@@ -20,7 +20,7 @@ import { registerAutoUploadRoutes } from "./engine/autoupload";
 import { registerComplianceRoutes } from "./engine/compliance";
 import { registerModelDexRoutes } from "./engine/modeldex";
 import { registerMergeRoutes } from "./engine/merge";
-import { registerDispatcherRoutes } from "./engine/dispatcher";
+import { registerDispatcherRoutes, dispatchInstruction } from "./engine/dispatcher";
 import { registerRemRequestRoutes } from "./engine/remrequest";
 import { registerMemoryRoutes } from "./engine/memory";
 import { registerHandoverRoutes } from "./engine/handover";
@@ -88,7 +88,7 @@ import { registerReportRoutes } from "./engine/report";
 import { registerKpiRoutes } from "./engine/kpi";
 import { registerUsageRoutes, usageLoggingMiddleware } from "./engine/usage";
 import { registerLogsRoutes } from "./engine/logs";
-import { registerAuditRoutes } from "./engine/audit";
+import { registerAuditRoutes } from "./engine/auditroutes"; // 화살 #3 — audit.ts는 잎이 됐다
 import { registerCmdSuggestRoutes } from "./engine/cmdsuggest";
 import { registerHardeningRoutes } from "./engine/hardeningscan";
 import { registerHardeningTargetRoutes } from "./engine/hardeningtargets";
@@ -105,6 +105,7 @@ import { registerShadowAiRoutes } from "./engine/shadowai";
 import { registerSiemRoutes } from "./engine/siem";
 import { registerKbHygieneRoutes } from "./engine/kbhygiene";
 import { registerOntologyRoutes } from "./engine/ontology";
+import { registerOntologySeedRoutes } from "./engine/ontology-seed"; // 화살 #4 — 씨앗 라우트는 씨앗 곁에
 import { registerWorkSessionRoutes } from "./engine/worksessions";
 import { registerSessionPatternRoutes } from "./engine/sessionpatterns";
 
@@ -182,7 +183,9 @@ export function createApp(): Express {
   registerOrchestratorDatasetRoutes(app);
   registerBriefingRoutes(app);
   registerUndoRoutes(app);
-  registerRedteamRoutes(app);
+  // ★ dispatch 주입(화살 #1) — 레드팀이 dispatcher를 직접 물면 61개 순환 덩어리의 목줄이 된다.
+  //   조립 층인 여기가 넣어 준다(redteam.ts 머리주석). qa 플래그까지의 인자만 쓴다.
+  registerRedteamRoutes(app, { dispatch: (text, sessionId, screen, agent, qa) => dispatchInstruction(text, sessionId, screen, agent, qa) });
   registerInspectionRoutes(app);  // 고객사 AI 보안 점검 결과보고서(점검 상품화 4단계)
   registerGuardrailRoutes(app);
   registerWorkflowRoutes(app);   // 업무 절차 5단계 현황(절차 띠가 읽는다)
@@ -249,6 +252,7 @@ export function createApp(): Express {
   registerSiemRoutes(app);
   registerKbHygieneRoutes(app);
   registerOntologyRoutes(app);
+  registerOntologySeedRoutes(app);
   registerWorkSessionRoutes(app);
   registerSessionPatternRoutes(app);
 

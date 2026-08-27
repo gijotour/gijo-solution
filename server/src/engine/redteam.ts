@@ -687,16 +687,29 @@ export function effectiveReportText(r: EffectiveReport, rawScore?: number | null
   return lines.join("\n");
 }
 
-export function registerRedteamRoutes(app: Express): void {
+/**
+ * ★ 의존 방향 수리(2026-08-27, 화살 #1 — 되먹임 12개 중 효과 1위: 61개 덩어리 → 15).
+ *
+ * 그전: 여기서 `await import("./dispatcher.js")` — 레드팀(공격 시늉)이 대화 처리기를
+ * **직접** 물었다. 동적이라 컴파일러는 조용했지만 런타임 의존 고리(redteam→dispatcher→
+ * …→redteam)를 만들어 61개 모듈이 한 덩어리로 묶였다.
+ *
+ * 지금: **조립하는 쪽(app.ts)이 dispatch를 넣어 준다.** 레드팀은 「지시를 받아 답을
+ * 돌려주는 함수」 하나만 알면 되고, 그게 dispatcher인지는 조립 층의 사정이다.
+ * app.ts는 이미 dispatcher를 정적으로 아는 꼭대기 층이라 새 의존이 생기지 않는다.
+ */
+export function registerRedteamRoutes(
+  app: Express,
+  deps: { dispatch: (text: string, sessionId: string, screen: string | undefined, agent: string, qa: boolean) => Promise<{ output?: unknown }> }
+): void {
   // 제품 경로 실효 견고성 — 담당자가 "레드팀 29점인데 우리 위험한가?"에 답할 숫자.
   app.post(
     "/api/redteam/effective",
     authMiddleware,
     asyncRoute(async (_req, res) => {
-      const { dispatchInstruction } = await import("./dispatcher.js");
       const report = await runEffectiveRedTeam(async (text) => {
         // qa:true — 이 점검이 세션·학습 데이터를 오염시키지 않게(평가 게이트와 같은 원칙).
-        const r = await dispatchInstruction(text, "", undefined, "redteam-effective", true);
+        const r = await deps.dispatch(text, "", undefined, "redteam-effective", true);
         return String(r.output ?? "");
       });
       recordAudit({

@@ -21,6 +21,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { runAdapter } from "./bridge";
 import type { StandardFinding } from "./bridge";
 import { 한줄풀이찾기 } from "./findingplain";
+import { findingKey } from "./findingkey"; // 잎 모듈 — approvals를 물지 않는다(화살 #2)
 import { db, assertTestDb } from "../db";
 import { emitCollaboration } from "./collaboration";
 import { recordAudit } from "./audit";
@@ -638,22 +639,23 @@ function 목록용(a: Asset): Omit<Asset, "scanHistory"> & { scanCount: number }
 // ⚠ **목록·상세 두 라우트가 같은 이 함수를 탄다** — 검토관(2026-08-19 심각1)이 잡았다:
 //   처음엔 상세에만 붙여서, 목록(hostCache)으로 그리는 취약점 화면이 키를 영영 못 받아
 //   수리가 무효였다. 생산자를 나누면 이 사고가 재발한다.
-// ⚠ 지연 import — approvals.ts가 이 파일을 import하고 있어(정적이면 순환) 여기서 푼다.
-async function fkey붙임<T extends { id: string; findings: Asset["findings"] }>(a: T): Promise<T> {
-  const { findingKey } = await import("./approvals.js");
+// (2026-08-27 화살 #2 — 옛 지연 import를 걷었다: findingKey가 잎 모듈(findingkey.ts)로
+//  내려가 approvals를 물 일이 없어졌고, 이 함수도 **동기**로 돌아왔다. 취약점 N건마다
+//  도는 순수 해시가 이유 없이 비동기였던 것도 그 지연 import의 대가였다.)
+function fkey붙임<T extends { id: string; findings: Asset["findings"] }>(a: T): T {
   return { ...a, findings: a.findings.map((f) => ({ ...f, fkey: findingKey(a.id, f) })) };
 }
 
 export function registerAssetsRoutes(app: Express): void {
-  app.get("/api/assets", authMiddleware, asyncRoute(async (_req, res) =>
-    res.json(await Promise.all(listAssets().map(목록용).map(fkey붙임)))));
+  app.get("/api/assets", authMiddleware, (_req, res) =>
+    res.json(listAssets().map(목록용).map(fkey붙임)));
   // :id 라우트보다 먼저 — 뒤에 두면 "coverage"가 자산 id로 잡힌다.
   app.get("/api/assets/coverage", authMiddleware, (_req, res) => res.json(computeAssetCoverage(listAssets())));
-  app.get("/api/assets/:id", authMiddleware, asyncRoute(async (req, res) => {
+  app.get("/api/assets/:id", authMiddleware, (req, res) => {
     const asset = getAsset(String(req.params.id));
     if (!asset) return res.status(404).json({ error: "asset not found" });
-    res.json(await fkey붙임(asset));
-  }));
+    res.json(fkey붙임(asset));
+  });
   // 자산 기본 담당자 — 새 취약점이 이 사람에게 자동 배정된다(미배정 적체 재발 방지).
   app.post("/api/assets/:id/default-assignee", authMiddleware, (req, res) => {
     const id = String(req.params.id);

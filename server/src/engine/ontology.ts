@@ -339,13 +339,8 @@ export function registerOntologyRoutes(app: Express): void {
       res.json({ count: countTriples() });
     })
   );
-  // 샘플 지식 적재 — KISA AI 보안 위협 카탈로그를 트리플로 변환해 넣는다(멱등). 화면 버튼용.
-  app.post(
-    "/api/ontology/seed",
-    authMiddleware,
-    asyncRoute(async (_req, res) => {
-      const { seedOntologyFromCatalog } = await import("./ontology-seed.js");
-      res.json(seedOntologyFromCatalog());
-    })
-  );
+  // (POST /api/ontology/seed 는 ontology-seed.ts의 registerOntologySeedRoutes로 이사했다 —
+  //  2026-08-27 화살 #4. 저장고(이 파일)가 씨앗을 동적으로 물면 「저장고→씨앗→저장고」
+  //  고리가 되고, 61개 덩어리의 한 변이었다. 씨앗이 자기 라우트를 갖는 게 방향이 맞다:
+  //  씨앗은 저장고를 아는 게 자연(addTriples를 쓴다), 그 역은 아니다.)
 }
