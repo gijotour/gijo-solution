@@ -200,6 +200,8 @@ import {
   runAdapterAssign,
   runAdapterImport,
   runProductIntroAdd,
+  runProductCompare,
+  runSetIntroField,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -1768,6 +1770,40 @@ const TOOLS: AgentTool[] = [
     effect: (args) => "제품 소개자료 대장에 \"" + args.name + "\"" + 조사(String(args.name ?? ""), "을") + " 등록합니다 — 「내 문서 > 📦 보안제품 자료」 목록·비교에 나타납니다.",
     undo: "「내 문서 > 📦 보안제품 자료」에서 확인 후, 삭제 지시로 되돌릴 수 있습니다.",
     run: runProductIntroAdd,
+  },
+  {
+    // ⚖ 제품 비교(2026-08-28) — 내 문서 📦 안내(「대화창에 A와 B 비교해줘」)의 **받는 곳**.
+    //   이 도구가 생기기 전 그 안내는 거짓 약속이었다(2026-08-23 적발). 값은 담당자가
+    //   확정한 항목만 나오고, 빈 항목은 「―」다 — 소개자료 원문에서 지어 채우지 않는다.
+    name: "product_compare",
+    label: "제품 소개자료 비교",
+    domain: "knowledge",
+    write: false,
+    description:
+      '등록된 제품 소개자료 두 개를 항목별 표로 비교한다(도입 형태·라이선스·주요 기능·차별점·대상 규모·연동·경쟁 제품). 예: {"a":"SafeBreach","b":"Cymulate"}',
+    params: [
+      { name: "a", label: "제품 A", description: "소개자료 대장에 등록된 제품 이름(부분 일치 가능)", required: true },
+      { name: "b", label: "제품 B", description: "비교할 다른 제품 이름", required: true },
+    ],
+    run: runProductCompare,
+  },
+  {
+    // 비교표의 빈 칸(―)을 채우는 짝 — 「SafeBreach 도입 형태를 온프레미스로 기록해줘」.
+    name: "set_intro_field",
+    label: "제품 소개 항목 기록",
+    domain: "knowledge",
+    write: true,
+    description:
+      '제품 소개자료의 비교 항목 값을 기록한다. key는 deployType(도입 형태)·license(라이선스·과금)·mainFeatures(주요 기능)·differentiator(차별점)·targetSize(대상 규모)·integration(연동)·competitors(경쟁 제품). 예: {"name":"SafeBreach","key":"deployType","value":"온프레미스(SaaS 지원)"}',
+    params: [
+      { name: "name", label: "제품", description: "소개자료 대장의 제품 이름", required: true },
+      { name: "key", label: "항목", description: "deployType·license·mainFeatures·differentiator·targetSize·integration·competitors 또는 한글 항목명", required: true },
+      { name: "value", label: "값", description: "확정할 값(비우면 그 항목 삭제)", required: true },
+      { name: "quote", label: "근거 인용", description: "소개자료 원문 인용(선택 — 값의 출처)", required: false },
+    ],
+    effect: (args) => `${args.name}의 소개 항목(${args.key})을 「${args.value}」로 기록합니다 — 비교표와 지식 관계(온톨로지)에 반영.`,
+    undo: "같은 항목에 빈 값을 기록하면 지워집니다.",
+    run: runSetIntroField,
   },
 ];
 

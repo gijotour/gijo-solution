@@ -3,6 +3,9 @@
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
 import { listAssets, getAsset, registerAsset, updateAssetOwnership, updateAssetMeta, setAssetRobustness, isAiAsset, Asset, 자산표시이름, 예시데이터뿐인가 } from "../assets";
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "../assetcoverage";
+// 비교 도구(2026-08-28) — **정적** import: 화살 #6에서 걷은 「동적 습관」을 새로 만들지 않는다
+// (handlers는 꼭대기 층이라 순환 없음 · require는 vitest에서 .ts를 못 찾아 시험이 실증했다).
+import { listProductIntros, listIntroFields, setIntroField, INTRO_FIELD_SCHEMA } from "../productintro";
 import { expandOntology } from "../ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, ReviewPatch, ApprovalStatus } from "../approvals";
 import { 표식, 심각도한글, 심각도표식, 자산종류한글 } from "../tone";
@@ -3428,4 +3431,72 @@ export async function runIngestUrl(args: Record<string, string>): Promise<string
   const r = await ingestUrl(url, currentViewer()?.userId ?? undefined);
   return `🌐 링크를 지식으로 담았습니다 — 「${r.title}」${r.youtube ? " (유튜브 자막)" : ""} · 조각 ${r.chunks}건.\n` +
     `이제 이 내용을 물어보시면 답에 씁니다. ⚠ 사내 참고용입니다 — 이 내용을 보고서로 재배포할 때는 저작권에 주의하세요. 지우려면 "문서 목록 보여줘"에서 이 주소를 지우면 됩니다.`;
+}
+
+// ── 제품 비교 (2026-08-28, 승인 설계 2026-08-23 「DB 한 벌 + 트리플 파생」) ───────────────
+//
+// ★ 이 도구가 생기기 전, 내 문서 📦 안내가 「깊은 비교는 대화창에 A와 B 비교해줘」라고
+//   말했는데 **받는 도구가 없었다**(거짓 약속 — 2026-08-23 워크플로 적발). 이제 받는다.
+// ■ 정직 규칙: 값은 product_intro_field에 **담당자가 확정한 것만** 나온다. 비면 「―」다 —
+//   소개자료 원문에서 지어 채우지 않는다(자동 추출은 인용까지만·값 단정 금지 실측).
+export function runProductCompare(args: Record<string, string>): string {
+  const items = listProductIntros();
+  if (items.length === 0) {
+    return "등록된 제품 소개자료가 없습니다. — 파일을 올려 결재판에서 「🗂 제품 소개자료」를 고르면 등록됩니다.";
+  }
+  const 찾기 = (q: string) => {
+    const s = (q ?? "").trim().toLowerCase();
+    if (!s) return undefined;
+    return items.find((it) => it.name.toLowerCase() === s) ?? items.find((it) => it.name.toLowerCase().includes(s));
+  };
+  const a = 찾기(args.a ?? "");
+  const b = 찾기(args.b ?? "");
+  const 목록 = () => `등록된 소개자료: ${items.map((i) => i.name).join(" · ")}`;
+  if (!a || !b) {
+    const 없는것 = [!a ? args.a : null, !b ? args.b : null].filter(Boolean).join("·");
+    // 「찾지 못했습니다」 금지 — 서랍 점검 실패 문구와 겹쳐 정직한 「없다」에 실패 딱지가 붙는다(emptyanswer 감시).
+    return `「${없는것}」 소개자료가 대장에 없습니다.\n${목록()}`;
+  }
+  if (a.id === b.id) return `같은 제품입니다(${a.name}). 서로 다른 두 제품 이름을 주세요.\n${목록()}`;
+
+  const fa = new Map(listIntroFields(a.id).map((f) => [f.key, f]));
+  const fb = new Map(listIntroFields(b.id).map((f) => [f.key, f]));
+  const L: string[] = [`⚖ **${a.name} vs ${b.name}** — 소개자료 대장 기준`];
+  L.push("", `| 항목 | ${a.name} | ${b.name} |`, "|---|---|---|");
+  L.push(`| 분류 | ${a.category} | ${b.category} |`);
+  L.push(`| 공급사 | ${a.vendor ?? "―"} | ${b.vendor ?? "―"} |`);
+  let 빈칸 = 0;
+  for (const s of INTRO_FIELD_SCHEMA) {
+    const va = fa.get(s.key)?.value; const vb = fb.get(s.key)?.value;
+    if (!va) 빈칸++; if (!vb) 빈칸++;
+    L.push(`| ${s.label} | ${va ?? "―"} | ${vb ?? "―"} |`);
+  }
+  // 근거 인용(있으면) — 값의 출처를 사람이 검증할 수 있게. 없는 값을 지어내는 것과 반대 방향.
+  const 인용 = [...fa.values(), ...fb.values()].filter((f) => f.quote).slice(0, 4);
+  if (인용.length) {
+    L.push("", "근거 인용(원문 그대로):");
+    for (const f of 인용) L.push(`- ${f.quote}`);
+  }
+  if (빈칸 > 0) {
+    L.push("", `⚠ 「―」 ${빈칸}칸은 **아직 담당자가 확정하지 않은 항목**입니다 — 소개자료에서 지어 채우지 않습니다.`,
+      `채우기: 「${a.name} 도입 형태를 온프레미스로 기록해줘」처럼 말하면 됩니다.`);
+  }
+  const 근거 = [a, b].filter((x) => x.docName).map((x) => `${x.name}: ${x.docName}`);
+  if (근거.length) L.push("", `원본 소개자료 — ${근거.join(" · ")} (내 문서 > 보안제품 비교·소개)`);
+  return L.join("\n");
+}
+
+/** 항목 값 기록(쓰기) — 「SafeBreach 도입 형태를 온프레미스로 기록해줘」의 받는 곳. */
+export function runSetIntroField(args: Record<string, string>): string {
+  const items = listProductIntros();
+  const q = (args.name ?? "").trim().toLowerCase();
+  const it = items.find((x) => x.name.toLowerCase() === q) ?? items.find((x) => x.name.toLowerCase().includes(q));
+  if (!it) return `「${args.name}」 소개자료가 대장에 없습니다. 등록된 것: ${items.map((i) => i.name).join(" · ") || "없음"}`;
+  const 항목 = INTRO_FIELD_SCHEMA.find((s) => s.key === (args.key ?? "").trim() || s.label === (args.key ?? "").trim());
+  if (!항목) return `모르는 항목입니다: ${args.key}. 항목: ${INTRO_FIELD_SCHEMA.map((s) => `${s.label}(${s.key})`).join(" · ")}`;
+  setIntroField(it.id, 항목.key, args.value ?? "", { quote: args.quote ?? null, actor: args.actor ?? null });
+  const v = (args.value ?? "").trim();
+  return v
+    ? `${it.name}의 ${항목.label}${조사(항목.label, "을")} 「${v}」로 기록했습니다 — 비교표와 지식 관계(온톨로지)에 바로 반영됩니다.`
+    : `${it.name}의 ${항목.label} 값을 지웠습니다.`;
 }

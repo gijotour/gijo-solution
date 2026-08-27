@@ -34,7 +34,7 @@ export const TARGETS: Record<string, { label: string; tables: string[] }> = {
   maintenance: { label: "유지보수 일정·이력", tables: ["maintenance_events", "maintenance_items"] },
   hardening: { label: "검증(하드닝) 대상·스케줄·이력", tables: ["hardening_targets", "hardening_schedules", "hardening_runs"] },
   kpi_snapshots: { label: "KPI 일일 스냅샷(파생)", tables: ["security_kpi_snapshots"] },
-  product_intro: { label: "제품 소개자료 대장", tables: ["product_intro"] },
+  product_intro: { label: "제품 소개자료 대장", tables: ["product_intro", "product_intro_field"] }, // field=비교 항목(2026-08-28) — 대장과 함께 산다
   sessions: { label: "작업 내역(대화 세션)", tables: ["work_session_turns", "work_sessions"] },
   // ⚠ 자식(판 이력·첨부 대장) 먼저 — **2026-08-22 검토관 [중] 수리.** 그전엔 `personal_docs`
   //   하나뿐이라, 「개인 문서함 N건 삭제」라고 찍어 놓고 **직전 20판의 본문 전문**이
