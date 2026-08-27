@@ -122,8 +122,13 @@ const REVIEW_SCHEMA = {
 };
 
 function 리뷰(커밋) {
+  // --wip = 아직 커밋 안 한 변경(working tree vs HEAD) — 커밋 전에 1차 선별을 돌리라고 있다.
+  //   (만든 날 실측: git show 기반이라 미커밋을 못 봤다 — 커밋 후에야 선별이 가능했던 한계.)
   const ref = 커밋 || "HEAD";
-  const diff = execFileSync("git", ["show", "--no-color", ref], { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  const diff = ref === "--wip"
+    ? execFileSync("git", ["diff", "--no-color", "HEAD"], { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })
+    : execFileSync("git", ["show", "--no-color", ref], { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  if (!diff.trim()) { console.log(`# ${ref} — 변경 없음`); return; }
   const 조각크기 = 60000; // 문자 기준 — ctx 여유
   const all = [];
   for (let i = 0; i < diff.length; i += 조각크기) {

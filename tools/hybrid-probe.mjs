@@ -13,6 +13,12 @@
 //   30%를 넘으면 표시한다 — 통과 불가능한 시험만큼 통과 무의미한 시험도 가짜다.
 //
 // 실행(gb10): . ~/gijo-env.sh && node tools/hybrid-probe.mjs --extract --url http://localhost:8082
+//
+// ⚠ 서버는 --parallel 1로 띄울 것 (2026-08-27 실측): --parallel 2면 ctx가 슬롯당 반으로
+//   갈라져(65536→32768) 2,000줄급 파일 6개(36K~59K tok)가 전부 400으로 죽었다 —
+//   모델 오답이 아니라 판정 환경 문제였다(14/20이 그렇게 나왔고, 답한 14문항은 14/14 정답).
+//   이건 측정 잡음이 아니라 **파이프라인 요건**이다: local-digest 구현 때
+//   「파일 토큰 > 슬롯 ctx면 겹침 분할 후 범위 병합」이 필수라는 실측 근거.
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
