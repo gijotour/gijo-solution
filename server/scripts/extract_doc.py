@@ -207,17 +207,54 @@ def extract_docx(path: str) -> str:
 
 def extract_pptx(path: str) -> str:
     # PPTX = zip. 슬라이드(ppt/slides/slideN.xml)와 노트의 <a:t> 텍스트를 슬라이드 순서대로.
+    #
+    # ★ 2026-08-29 확장 (사장님 「데이터 파일 파싱을 잘해야 하는 게 핵심, 문서함에 주제별로」)
+    #   ① **도해·차트 글자를 회수한다.** 그전엔 ppt/slides·notesSlides만 읽어 SmartArt
+    #      (ppt/diagrams/data*.xml)와 차트(ppt/charts/chart*.xml) 안 글자를 통째로 놓쳤다 —
+    #      도해가 많은 벤더 덱은 본문이 거의 비었다(2026-08-23 SafeBreach 실측으로 확인한 공백).
+    #      슬라이드와 도해를 잇는 관계 파일(slideN.xml.rels)로 **어느 슬라이드의 도해인지**를
+    #      알아내 그 슬라이드 자리에 끼운다 — 순서가 흐트러지면 주제 분해가 무의미해진다.
+    #   ② **슬라이드 경계를 남긴다.** 「[슬라이드 N]」 표시가 있어야 뒤에서 목차·「N.」 소속
+    #      표시를 근거로 주제별로 자를 수 있다. 사람이 읽어도 어디 슬라이드인지 보인다.
     z = zipfile.ZipFile(path)
-    names = sorted(
-        (n for n in z.namelist() if re.match(r"ppt/(slides/slide|notesSlides/notesSlide)\d+\.xml$", n)),
-        key=lambda n: (0 if "/slides/" in n else 1, int(re.search(r"(\d+)\.xml$", n).group(1))),
+    있는파일 = set(z.namelist())
+
+    def 글자(name: str) -> list:
+        try:
+            xml = z.read(name).decode("utf-8", "ignore")
+        except KeyError:
+            return []
+        # <a:t>는 슬라이드·도해 공통, <c:v>는 차트 축·계열 이름
+        return [t for t in re.findall(r"<a:t>(.*?)</a:t>|<c:v>(.*?)</c:v>", xml, re.S) for t in t if t]
+
+    # 슬라이드 → 딸린 도해·차트 파일 목록 (관계 파일에서 뽑는다)
+    def 딸린것(slide_no: int) -> list:
+        rel = "ppt/slides/_rels/slide%d.xml.rels" % slide_no
+        if rel not in 있는파일:
+            return []
+        xml = z.read(rel).decode("utf-8", "ignore")
+        out = []
+        for target in re.findall(r'Target="([^"]+)"', xml):
+            t = target.replace("../", "ppt/")
+            if re.match(r"ppt/(diagrams/data|charts/chart)\d+\.xml$", t) and t in 있는파일:
+                out.append(t)
+        return out
+
+    슬라이드번호 = sorted(
+        int(re.search(r"slide(\d+)\.xml$", n).group(1))
+        for n in 있는파일 if re.match(r"ppt/slides/slide\d+\.xml$", n)
     )
     parts = []
-    for name in names:
-        xml = z.read(name).decode("utf-8", "ignore")
-        texts = re.findall(r"<a:t>(.*?)</a:t>", xml, re.S)
-        if texts:
-            parts.append(" ".join(texts))
+    for no in 슬라이드번호:
+        조각 = 글자("ppt/slides/slide%d.xml" % no)
+        for 딸림 in 딸린것(no):
+            조각 += 글자(딸림)  # 도해·차트 글자를 그 슬라이드 자리에
+        노트 = 글자("ppt/notesSlides/notesSlide%d.xml" % no)
+        if 조각 or 노트:
+            본문 = " ".join(조각)
+            if 노트:
+                본문 += "\n(노트) " + " ".join(노트)
+            parts.append("[슬라이드 %d] %s" % (no, 본문))
     return _strip_tags("\n\n".join(parts))
 
 

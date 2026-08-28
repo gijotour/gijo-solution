@@ -26,7 +26,12 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
      **제품이 도는 환경이 아니다.** 그래서 이 확인은 반드시 WSL 안에서 한다.
    - 없으면: `venv/bin/pip install -r requirements.txt` (venv가 없으면 `python3 -m venv venv` 먼저)
 4. WSL 동기화+빌드:
-   `wsl -d Ubuntu-24.04 -- bash -c "rsync -a --delete '/mnt/d/Connect AI/server/src/' /home/gijo/gijo-as/server/src/ && cd /home/gijo/gijo-as/server && npx tsc -p tsconfig.json && node scripts/copy-assets.mjs && echo BUILD_OK"`
+   `wsl -d Ubuntu-24.04 -- bash -c "rsync -a --delete '/mnt/d/Connect AI/server/src/' /home/gijo/gijo-as/server/src/ && rsync -a '/mnt/d/Connect AI/server/scripts/' /home/gijo/gijo-as/server/scripts/ && cd /home/gijo/gijo-as/server && npx tsc -p tsconfig.json && node scripts/copy-assets.mjs && echo BUILD_OK"`
+   - ⚠ **`scripts/`도 함께 옮긴다**(2026-08-29 실사고). 그전에는 `src/`만 옮겨서
+     `scripts/`의 파이썬 추출기(extract_doc.py)·장비 접속기(netmiko_runner.py)가 **영영 안 갔다.**
+     실측: pptx 추출기를 고치고 배포했는데 운영은 옛 코드였고, 세 스크립트 모두 89줄씩 어긋나
+     있었다. TS만 배포하는 절차라 **파이썬 쪽 수리는 배포한 적이 없던 셈**이다.
+     ⚠ `--delete`는 안 붙인다 — 운영에서만 만들어지는 파일(venv 등)을 지울 위험이 있다.
    - ⚠ **`copy-assets.mjs`를 빼지 말 것**(2026-08-13에 빠져 있던 것을 찾음). `tsc`만 돌리면
      `import`로 읽지 않는 자료 파일(`engine/examquestions.json` 등)이 dist에 안 들어간다.
      `npm run build`는 이 둘을 함께 돌리는데 **배포 절차만 앞의 하나를 부르고 있었다** —
