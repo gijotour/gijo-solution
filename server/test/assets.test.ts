@@ -4,6 +4,9 @@ import request from "supertest";
 // 스캔 dispatch가 findings 상태를 어떻게 다루는지만 검증한다. 실제 로컬 LLM/모델 로딩에
 // 의존하지 않도록 llm을 목킹한다(라우팅·분석 요약용 chat 호출이 실제 모델을 띄우지 않게).
 vi.mock("../src/engine/llm", () => ({
+  // 2026-08-29 화살 #14·#15 — llm이 RAG·수집 훅을 내보낸다. 목도 표면을 따라가야 한다
+  // (안 주면 그 모듈을 import하는 파일이 통째로 죽는다 — verifyroutes 6개가 실증).
+  setRagProvider: vi.fn(), hasRagProvider: vi.fn(() => false), onChatRecorded: vi.fn(), chatLogListenerCount: vi.fn(() => 0),
   chat: vi.fn(async () => "요약: 스캔 결과 정리."),
   embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
   registerLlmRoutes: vi.fn(),

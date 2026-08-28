@@ -3,6 +3,9 @@ import request from "supertest";
 
 // 라우트 스택만 검증하므로 임베딩/LLM은 목킹(실제 모델 불필요).
 vi.mock("../src/engine/llm", () => ({
+  // 2026-08-29 화살 #14·#15 — llm이 RAG·수집 훅을 내보낸다. 목도 표면을 따라가야 한다
+  // (안 주면 그 모듈을 import하는 파일이 통째로 죽는다 — verifyroutes 6개가 실증).
+  setRagProvider: vi.fn(), hasRagProvider: vi.fn(() => false), onChatRecorded: vi.fn(), chatLogListenerCount: vi.fn(() => 0),
   chat: vi.fn(async () => "ok"),
   embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
   registerLlmRoutes: vi.fn(),

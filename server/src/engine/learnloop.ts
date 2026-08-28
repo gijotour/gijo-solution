@@ -24,6 +24,7 @@ import { authMiddleware } from "../auth/auth";
 import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
+import { onChatRecorded } from "./llm"; // 화살 #15 — 수집기가 추론 층에 자기를 등록한다
 import { llamaBinPath } from "../util/llamabin";
 import { db, assertTestDb, migrate } from "../db";
 import { startFinetune, isFinetuneRunning } from "./finetune";
@@ -870,4 +871,16 @@ export function registerLearnloopRoutes(app: Express): void {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }
   });
+}
+
+/**
+ * ★ 추론 층(llm)에 대화 수집기를 꽂는다 — app.ts가 부팅 때 한 번 호출한다(2026-08-29 화살 #15).
+ *
+ * 그전에는 llm.ts가 recordChatLog를 **직접** 물었다. 그런데 이 파일은 학습 쪽에서 dataset을
+ * 부르고 dataset은 llm을 물어 **llm → learnloop → dataset → llm** 고리가 됐다.
+ * 방향을 뒤집으면 추론 층은 「누가 모으는지」를 모른다 — 수집기가 지켜보는 쪽이다.
+ * ⚠ 등록이 빠지면 대화 수집이 **조용히 멈춘다**(학습 후보가 안 쌓임) — 짝 시험이 못 박는다.
+ */
+export function 대화수집_배선(): void {
+  onChatRecorded((agentId, question, answer) => recordChatLog(agentId, question, answer));
 }

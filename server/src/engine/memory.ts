@@ -11,7 +11,7 @@ import { rewriteForSearch } from "./searchrewrite";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { embed } from "./embedding"; // 잎(화살 #12) — llm 전체를 물지 않는다
-import { chat } from "./llm";
+import { chat, setRagProvider } from "./llm";
 import { isBinaryLikeChunk } from "./ragsanitize";
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
@@ -1779,4 +1779,16 @@ export function registerMemoryRoutes(app: Express): void {
       res.json(result);
     })
   );
+}
+
+/**
+ * ★ 추론 층(llm)에 지식 검색을 꽂는다 — app.ts가 부팅 때 한 번 호출한다(2026-08-29 화살 #14).
+ *
+ * 그전에는 llm.ts가 `await import("./memory.js")`로 **위층을 거슬러** 지식을 가져갔다
+ * (llm ⇄ memory 순환). 방향을 뒤집으면 추론 층은 「누가 근거를 주는지」를 모르고,
+ * 지식 층이 자기를 제공자로 등록한다.
+ * ⚠ 등록이 빠지면 RAG가 **조용히 꺼진다**(근거 없는 답 · 오류 없음) — 짝 시험이 못 박는다.
+ */
+export function 지식제공_배선(): void {
+  setRagProvider((message, k, agentId, screen, viewer) => queryMemoryGraded(message, k, agentId, screen, viewer));
 }

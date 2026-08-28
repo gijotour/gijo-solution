@@ -9,15 +9,15 @@ describe("GIJO Agent 엄격 그라운딩", () => {
     vi.doUnmock("../src/engine/memory.js");
   });
 
-  function mockMemory(relevant: string[]) {
-    vi.doMock("../src/engine/memory.js", () => ({
-      queryMemoryGraded: async () => ({ chunks: relevant, 약한근거만: false }),
-      queryMemory: async () => relevant,
-    }));
+  // 2026-08-29 화살 #14 — llm이 memory를 물지 않고 **제공자를 등록받는다.**
+  //   모듈을 갈아끼우는 대신 제공자를 꽂는다(짧고, 실제 배선과 같은 통로다).
+  async function mockMemory(relevant: string[]) {
+    const { setRagProvider } = await import("../src/engine/llm");
+    setRagProvider(async () => ({ chunks: relevant, 약한근거만: false }));
   }
 
   it("관련 자료가 없으면 LLM을 부르지 않고 '자료 없음'을 답한다", async () => {
-    mockMemory([]);
+    await mockMemory([]);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
@@ -29,7 +29,7 @@ describe("GIJO Agent 엄격 그라운딩", () => {
   });
 
   it("관련 자료가 있으면 평소대로 LLM에 묻는다", async () => {
-    mockMemory(["AI-BOM은 AI 시스템의 구성요소 명세다..."]);
+    await mockMemory(["AI-BOM은 AI 시스템의 구성요소 명세다..."]);
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ choices: [{ message: { content: "AI-BOM은 ..." } }] }),
@@ -44,7 +44,7 @@ describe("GIJO Agent 엄격 그라운딩", () => {
   });
 
   it("다른 에이전트는 이 제한을 받지 않는다", async () => {
-    mockMemory([]);
+    await mockMemory([]);
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ choices: [{ message: { content: "일반 답변" } }] }),
@@ -58,10 +58,8 @@ describe("GIJO Agent 엄격 그라운딩", () => {
   });
 
   it("검색 자체가 실패하면 막지 않는다 — 임베딩 서버 장애가 채팅을 죽이면 안 된다", async () => {
-    vi.doMock("../src/engine/memory.js", () => ({
-      queryMemoryGraded: async () => { throw new Error("임베딩 서버 없음"); },
-      queryMemory: async () => { throw new Error("임베딩 서버 없음"); },
-    }));
+    const { setRagProvider } = await import("../src/engine/llm");
+    setRagProvider(async () => { throw new Error("임베딩 서버 없음"); });
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ choices: [{ message: { content: "답변" } }] }),

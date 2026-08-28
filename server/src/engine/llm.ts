@@ -11,7 +11,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { getAgentById } from "./agents";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
-import { recordChatLog } from "./learnloop";
+// (recordChatLog 직접 import 제거 — 2026-08-29 화살 #15: 수집기가 onChatRecorded로 등록한다.)
 import type { GijoUser } from "../auth/users";
 // ⚠ "어떤 계정을 학습에서 뺄까"는 LLM의 관심사가 아니라 정책이다. 여기 두었다가 시험 4개가
 //   깨졌다 — 이 파일을 vi.mock으로 통째로 바꿔치기하는 시험이 많아, export를 더할 때마다
@@ -136,9 +136,40 @@ export function 사내특정대상질문(text: string): boolean {
 // 임베딩 서버가 없거나 지식 베이스가 비어 있으면 조용히 생략한다 — RAG가 안 된다고
 // 채팅 자체가 죽으면 안 된다. (memory.ts가 llm.ts의 embed를 쓰므로 순환 참조를 피해
 // 호출 시점에 동적 import.)
+/**
+ * ── 지식 조회·대화 수집을 **밖에서 꽂는다** (2026-08-29, 의존 수리 화살 #14·#15) ──────────
+ *
+ * ★ 왜: llm.ts는 **추론 인프라**(아래층)인데 RAG를 쓰려고 memory(지식 층)를, 대화를 남기려고
+ *   learnloop(수집 층)를 **위로 거슬러** 물었다. 그래서 llm ⇄ memory와
+ *   llm → learnloop → dataset → llm 두 고리가 생겨 마지막 4개 덩어리를 이뤘다.
+ *   방향을 뒤집는다 — 위층이 자기를 등록하고, llm은 「누가 답해 주는지」를 모른다.
+ *
+ * ★ 왜 chat()을 쪼개지 않았나(대안 기각): memory·dataset이 부르는 chat에서 추론만 잎으로
+ *   빼면 그 둘이 **단일 관문(gateUserInput)을 건너뛴다.** 지금은 trusted:true로 의도적으로
+ *   지나가지만, 잊었을 때 관문이 잡아 주는 안전망이 사라진다 — 순환을 풀자고 보안 경계를
+ *   무르게 하지 않는다.
+ *
+ * ⚠ 등록이 없으면 **RAG가 조용히 꺼진다**(근거 없는 답이 되고 오류는 안 난다) —
+ *   llmhooks.test가 app.ts 배선·청취자 수·역참조 부재를 못 박는다.
+ */
+// ⚠ chunks는 **문자열 배열**이다(queryMemoryGraded 실제 반환형 — 내가 객체로 넘겨짚었다가
+//   tsc가 잡았다. 「그 API가 주는 필드가 뭔가」를 원천에서 확인하는 계보).
+export type RagProvider = (
+  message: string, k: number, agentId: string, screen?: string, viewer?: Viewer
+) => Promise<{ chunks: string[]; 약한근거만: boolean }>;
+let ragProvider: RagProvider | null = null;
+export function setRagProvider(p: RagProvider): void { ragProvider = p; }
+export function hasRagProvider(): boolean { return ragProvider !== null; }
+
+export type ChatLogListener = (agentId: string, question: string, answer: string) => void;
+const chatLogListeners: ChatLogListener[] = [];
+export function onChatRecorded(l: ChatLogListener): void { chatLogListeners.push(l); }
+export function chatLogListenerCount(): number { return chatLogListeners.length; }
+
 async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean; 자료없음: boolean }> {
   try {
-    const { queryMemoryGraded } = await import("./memory.js");
+    if (!ragProvider) return { context: null, 약한근거만: false, 자료없음: false };
+    const queryMemoryGraded = ragProvider;
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
     // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
     // 근거인 양 답한다(memory.ts의 RAG_RELEVANCE_MAX_DISTANCE 주석 참고).
@@ -672,10 +703,20 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 지켜지지 않았다(2026-07-19 실측: "2026년 프로야구 우승팀"에 "롯데 지자체입니다"라고
   // 없는 사실을 단정했다). 관련 자료가 없으면 애초에 LLM에 묻지 않는 것이 유일한 보장이다.
   if (args.agentId === "normaltic" && !args.responseSchema) {
-    // ⚠ 위 ragContextFor와 **같은 함수**를 쓴다 — 두 벌로 두면 한쪽만 고쳐져 어긋난다
+    // ⚠ 위 ragContextFor와 **같은 제공자**를 쓴다 — 두 벌로 두면 한쪽만 고쳐져 어긋난다
     //   (2026-08-03 예고 판정에서 이미 겪었다).
-    const { queryMemoryGraded } = await import("./memory.js");
-    const relevant = await queryMemoryGraded(args.message, 4, args.agentId, undefined, args.viewer)
+    // ⚠⚠ **「제공자 없음」과 「검색 실패」를 가른다.**
+    //   · 검색 실패(임베딩 서버 다운 등) = 일시적 → null → 막지 않고 진행한다(채팅 생존).
+    //   · 제공자 미등록 = **설정 오류** → 이 에이전트의 존재 이유(사내 자료에 없으면 없다고
+    //     밝힌다)가 통째로 꺼진 상태다. 조용히 지나가면 근거 없는 답이 그대로 나간다 —
+    //     이 저장소가 가장 경계하는 조용한 고장이다. 그래서 **크게 막는다.**
+    //   (2026-08-29 화살 #14 구현 중 grounding 시험이 이 구멍을 드러냈다.)
+    if (!ragProvider) {
+      // FAIL_MARKS-예외: 이건 정직한 「없다」가 아니라 **진짜 설정 오류**다(배선 누락) —
+      //   점검 도구가 실패로 세는 것이 옳다. 정상 「자료 없음」 답과 문구를 일부러 다르게 둔다.
+      return "지식 검색이 준비되지 않아 사내 자료를 확인할 수 없습니다 — 서버 설정(지식 제공자 배선)을 확인해 주세요. 확인 전에는 근거 없는 답을 드리지 않습니다.";
+    }
+    const relevant = await ragProvider(args.message, 4, args.agentId, undefined, args.viewer)
       .then((r) => r.chunks)
       .catch(() => null);
     // null = 검색 자체가 실패(임베딩 서버 다운 등) — 이때는 막지 않고 평소대로 진행한다.
@@ -1021,7 +1062,12 @@ export async function chat(args: ChatArgs): Promise<string> {
     // 기록에는 맥락을 뺀 **사람이 한 질문**만 남긴다(logQuestion). 위 ChatArgs 주석 참고.
     // ⚠ noLearn은 **여기에만** 건다 — 대화 이력(위 histories)은 그대로 둬야 배포 계정으로
     //   검증할 때도 사람이 쓰는 것과 똑같이 동작한다(학습에만 안 들어간다).
-    if (!args.noLearn) recordChatLog(args.agentId, args.logQuestion?.trim() || args.message, reply);
+    // 대화 수집 — 등록된 수집기에게 알린다(화살 #15). llm은 누가 모으는지 모른다.
+    if (!args.noLearn) {
+      for (const 수집 of chatLogListeners) {
+        try { 수집(args.agentId, args.logQuestion?.trim() || args.message, reply); } catch { /* 수집 실패가 답을 막지 않는다 */ }
+      }
+    }
   }
   // 사람이 읽는 답변(explain)에만 어려운 용어 쉬운 풀이를 붙인다. 히스토리·학습로그는 위에서 이미
   // 원문으로 저장됐다 — 맥락 오염·중복 방지.

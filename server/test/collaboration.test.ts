@@ -4,6 +4,9 @@ import request from "supertest";
 // 이 테스트는 dispatch가 협업 이벤트 2개를 내는지(오케스트레이션)만 검증한다. 실제 로컬 LLM/
 // 모델 로딩에 의존하지 않도록 llm을 목킹한다(다른 dispatch 테스트와 동일한 격리).
 vi.mock("../src/engine/llm", () => ({
+  // 2026-08-29 화살 #14·#15 — llm이 RAG·수집 훅을 내보낸다. 목도 표면을 따라가야 한다
+  // (안 주면 그 모듈을 import하는 파일이 통째로 죽는다 — verifyroutes 6개가 실증).
+  setRagProvider: vi.fn(), hasRagProvider: vi.fn(() => false), onChatRecorded: vi.fn(), chatLogListenerCount: vi.fn(() => 0),
   chat: vi.fn(async () => "상태 양호합니다."),
   embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
   registerLlmRoutes: vi.fn(),

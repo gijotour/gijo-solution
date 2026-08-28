@@ -186,7 +186,11 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
   // 그대로 타되 학습 수집(chat_logs)과 대화 이력에 남으면 안 된다. 기존 regress 11문항이
   // 실제로 학습 후보함에 새고 있었다(2026-07-29 발견) — 그 구멍을 막았음을 고정한다.
   it("qa:true — 답변은 정상, chat_logs·대화 이력에는 남지 않는다 (게이트 오염 차단)", async () => {
-    vi.doMock("../src/engine/memory", () => ({ queryMemory: vi.fn().mockResolvedValue([]) }));
+    // 2026-08-29 화살 #15 — 대화 수집은 이제 **등록된 수집기**가 한다(llm이 learnloop를
+    //   직접 안 문다). 아래 「대조: qa 없으면 수집된다」가 성립하려면 여기서 배선해야 한다.
+    //   ⚠ 이 줄이 없으면 chat_logs가 늘 0이라 **대조가 헛통과**한다(감시가 형해화).
+    const { 대화수집_배선 } = await import("../src/engine/learnloop");
+    대화수집_배선();
     const { db } = await import("../src/db");
     const count = () => (db.prepare("SELECT COUNT(*) AS n FROM chat_logs").get() as { n: number }).n;
 
@@ -231,11 +235,10 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
   });
 
   it("injects RAG context into the single system prompt (장기 기억 — Mistral 템플릿은 system 2개를 거부)", async () => {
-    // ragContextFor는 거리 임계값을 적용한 queryMemoryRelevant를 쓴다(무관한 청크 주입 방지).
-    vi.doMock("../src/engine/memory", () => ({
-      queryMemoryGraded: vi.fn().mockResolvedValue({ chunks: ["사내 규정: pickle 파일은 반드시 스캔 후 반입한다."], 약한근거만: false }),
-      queryMemory: vi.fn().mockResolvedValue(["사내 규정: pickle 파일은 반드시 스캔 후 반입한다."]),
-    }));
+    // 2026-08-29 화살 #14 — llm이 memory를 물지 않고 **제공자를 등록받는다.**
+    //   그래서 시험도 모듈을 갈아끼우지 않고 제공자를 직접 꽂는다(더 정직하고 짧다).
+    const { setRagProvider } = await import("../src/engine/llm");
+    setRagProvider(async () => ({ chunks: ["사내 규정: pickle 파일은 반드시 스캔 후 반입한다."], 약한근거만: false }));
     const fetchMock = stubLlm();
 
     await chat({ agentId: "orchestrator", message: "pickle 파일 반입 규정 알려줘", remember: true });
@@ -250,10 +253,9 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
   });
 
   it("chat still works when the embedding server / knowledge base is unavailable", async () => {
-    vi.doMock("../src/engine/memory", () => ({
-      queryMemoryGraded: vi.fn().mockRejectedValue(new Error("임베딩 서버에 연결할 수 없습니다")),
-      queryMemory: vi.fn().mockRejectedValue(new Error("임베딩 서버에 연결할 수 없습니다")),
-    }));
+    // 화살 #14 — 제공자가 던지는 상황(임베딩 서버 다운)을 그대로 재현한다.
+    const { setRagProvider: setP } = await import("../src/engine/llm");
+    setP(async () => { throw new Error("임베딩 서버에 연결할 수 없습니다"); });
     const fetchMock = stubLlm("RAG 없이 답변");
 
     const reply = await chat({ agentId: "orchestrator", message: "질문", remember: true });

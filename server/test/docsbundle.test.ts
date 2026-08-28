@@ -18,6 +18,9 @@ process.env.GIJO_DOCS_DIR = DOCS_DIR;
 //   문다. llm만 목하면 **진짜 embed가 돌아** 임베딩 서버(8081)를 찾다 실패한다(실측).
 vi.mock("../src/engine/embedding", () => ({ embed: vi.fn(async (t: string[]) => t.map(() => [0.1, 0.2, 0.3])) }));
 vi.mock("../src/engine/llm", () => ({
+  // 2026-08-29 화살 #14·#15 — llm이 RAG·수집 훅을 내보낸다. 목도 표면을 따라가야 한다
+  // (안 주면 그 모듈을 import하는 파일이 통째로 죽는다 — verifyroutes 6개가 실증).
+  setRagProvider: vi.fn(), hasRagProvider: vi.fn(() => false), onChatRecorded: vi.fn(), chatLogListenerCount: vi.fn(() => 0),
   embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
   chat: vi.fn(),
   registerLlmRoutes: vi.fn(),

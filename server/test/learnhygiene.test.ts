@@ -10,13 +10,16 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 
+// ⚠ 2026-08-29(화살 #15): llm이 recordChatLog를 직접 부르지 않는다 — 등록된 수집기에게
+//   알린다(수집(agentId, …)). 아래 감시들의 **앵커만** 그 호출로 바꿨고, 지키는 계약
+//   세 가지(logQuestion 사용 · noLearn 게이트 · qa 조건 안쪽)는 한 글자도 안 바뀌었다.
 const llmSrc = fs.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
 const dispSrc = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
 
 describe("★ 학습 기록에는 사람이 한 질문만 남는다", () => {
   it("chat()이 맥락 덩어리(message) 대신 logQuestion을 기록한다", () => {
-    // recordChatLog(args.message, …)로 되돌아가면 맥락이 다시 질문 자리에 저장된다.
-    const call = llmSrc.slice(llmSrc.indexOf("recordChatLog(args."), llmSrc.indexOf("recordChatLog(args.") + 90);
+    // 수집(args.message, …)로 되돌아가면(옛 recordChatLog 직접 호출 시절과 같은 병) 맥락이 다시 질문 자리에 저장된다.
+    const call = llmSrc.slice(llmSrc.indexOf("수집(args."), llmSrc.indexOf("수집(args.") + 90);
     expect(call, "맥락이 붙은 message를 그대로 기록하면 안 된다").toContain("logQuestion");
   });
 
@@ -55,7 +58,7 @@ describe("★ 배포·시험 계정의 문답은 학습에 안 들어간다", ()
     // (실제로 처음엔 바깥 if에 걸어 이력까지 껐다 — 주석과 코드가 어긋났다).
     const cond = llmSrc.slice(llmSrc.indexOf("if (args.remember"), llmSrc.indexOf("if (args.remember") + 60);
     expect(cond, "이력 갱신 조건에 noLearn이 끼면 안 된다").not.toContain("noLearn");
-    const rec = llmSrc.indexOf("recordChatLog(args.");
+    const rec = llmSrc.indexOf("수집(args.");
     expect(llmSrc.slice(rec - 80, rec), "학습 수집에는 noLearn이 걸려야 한다").toContain("!args.noLearn");
   });
 
@@ -85,7 +88,7 @@ describe("QA·게이트 호출은 학습에 들어가지 않는다", () => {
     // 실측으로 게이트 문항 99개 중 후보와 겹치는 것은 0건이었다 — 이 조건이 지키고 있다.
     const 조건 = "if (args.remember && !args.qa && reply)";
     const g = llmSrc.indexOf(조건);
-    const r = llmSrc.indexOf("recordChatLog(args.");
+    const r = llmSrc.indexOf("수집(args.");
     expect(g, "qa를 거르는 조건문이 사라졌다 — 게이트 문답이 학습에 섞인다").toBeGreaterThan(0);
     expect(r, "학습 수집 호출을 못 찾았다 — 시험이 헛돌고 있다").toBeGreaterThan(0);
     expect(r, "학습 수집이 qa 조건 밖으로 나가면 게이트가 무의미해진다").toBeGreaterThan(g);

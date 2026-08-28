@@ -23,7 +23,7 @@ import { registerModelDexRoutes } from "./engine/modeldex";
 import { registerMergeRoutes } from "./engine/merge";
 import { registerDispatcherRoutes, dispatchInstruction } from "./engine/dispatcher";
 import { registerRemRequestRoutes } from "./engine/remrequest";
-import { registerMemoryRoutes } from "./engine/memory";
+import { registerMemoryRoutes, 지식제공_배선 } from "./engine/memory"; // 화살 #14
 import { registerHandoverRoutes } from "./engine/handover";
 import { registerDataCleanupRoutes } from "./engine/datacleanup";
 import { registerIngestReportRoutes } from "./engine/ingestreport";
@@ -60,7 +60,7 @@ import { registerIntentRoutes } from "./engine/intent";
 import { registerLlmRoutes } from "./engine/llm";
 import { registerLocalEngineRoutes } from "./engine/localengine";
 import { registerFinetuneRoutes } from "./engine/finetune";
-import { registerLearnloopRoutes } from "./engine/learnloop";
+import { registerLearnloopRoutes, 대화수집_배선 } from "./engine/learnloop"; // 화살 #15
 import { registerLearnCandidateRoutes } from "./engine/learncandidates";
 import { registerKnowledgeBundleRoutes } from "./engine/knowledgebundle";
 import { registerWorkLogRoutes } from "./engine/worklog";
@@ -159,7 +159,9 @@ export function createApp(): Express {
   registerTeamViewRoutes(app); // AI팀 구성 한눈에(2026-08-09) — 설정·팀 사무실이 같은 그림을 본다
   registerAdapterRoutes(app);
   자동배정_배선();
-  매뉴얼연결_배선(); // ⚠ 등록 없으면 매뉴얼 자동 연결이 소리 없이 안 된다 // ⚠ 라우트 등록보다 먼저 — 부팅 중 들어온 스캔도 배정되게
+  매뉴얼연결_배선(); // ⚠ 등록 없으면 매뉴얼 자동 연결이 소리 없이 안 된다
+  지식제공_배선();   // ⚠ 등록 없으면 RAG가 조용히 꺼진다(근거 없는 답)
+  대화수집_배선();   // ⚠ 등록 없으면 학습 후보가 안 쌓인다 // ⚠ 등록 없으면 매뉴얼 자동 연결이 소리 없이 안 된다 // ⚠ 라우트 등록보다 먼저 — 부팅 중 들어온 스캔도 배정되게
   registerAssetsRoutes(app);
   registerAssetImportRoutes(app);
   registerRepoScanRoutes(app);
