@@ -566,8 +566,18 @@ export function attachSessionText(sessionId: string, maxChars = 1200): string {
   const lines = recent.map(
     (t) => `${t.role === "user" ? "사용자" : "AI"}: ${t.content.replace(/\s+/g, " ").trim().slice(0, 300)}`
   );
-  const body = lines.join("\n").slice(0, maxChars);
-  return [`[첨부한 지난 작업 — "${s.title}"] 담당자가 참고하라고 붙인 다른 세션의 기록입니다:`, body].join("\n");
+  // ⚠ 예산은 **최신부터** 지킨다(검토관 적발 — slice(0, maxChars)는 앞자르기라 「최근 6턴」에서
+  //   정작 결론인 최신 턴이 통째로 빠졌다. 첨부의 존재 이유가 「아까 그 작업 이어서」인데
+  //   서두만 붙는 것). 뒤에서부터 통줄 단위로 채우고, 안 들어가는 오래된 줄을 버린다.
+  const 담김: string[] = [];
+  let 남은 = maxChars;
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (lines[i].length + 1 > 남은) break;
+    남은 -= lines[i].length + 1;
+    담김.unshift(lines[i]);
+  }
+  if (!담김.length) 담김.push(lines[lines.length - 1].slice(0, maxChars)); // 한 줄조차 크면 최신 줄 머리라도
+  return [`[첨부한 지난 작업 — "${s.title}"] 담당자가 참고하라고 붙인 다른 세션의 기록입니다:`, ...담김].join("\n");
 }
 
 // ── 모든 행위 → 작업 세션 자동 기록(사용자 요청 2026-07-20) ────────────

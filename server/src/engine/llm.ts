@@ -814,7 +814,10 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   ⚠ 개수 상한(HISTORY_LIMIT)은 그대로 둔다 — 이건 크기 상한이고 그건 개수 상한이다.
   {
     const ctx = 원격 ? 32768 : ((await import("./localengine.js").then((m) => m.currentTierSettings().ctxSize).catch(() => 32768)) || 32768);
-    const 이력예산자 = Math.floor((ctx / 2) * 1.2);
+    // 📎 첨부는 systemContent에 실리는데 이 예산은 이력만 잰다 — 첨부 몫(최대 ≈4,000자)을
+    // 이력에서 미리 덜어내지 않으면 라이트(8K)에서 「긴 요청만 0초에 400」이 재발한다
+    // (검토관 적발 — 2026-08-13 max가 사흘 걸려 규명한 그 실패 모양의 새 통로).
+    const 이력예산자 = Math.max(1000, Math.floor((ctx / 2) * 1.2) - (첨부 ? 첨부.length : 0));
     let 합 = 0;
     let 시작 = history.length;
     for (let i = history.length - 1; i >= 0; i--) {

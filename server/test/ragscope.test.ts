@@ -117,10 +117,20 @@ describe("attachSessionText — 📎 첨부 압축", () => {
     expect(attachSessionText(s.id)).toBe("");
   });
 
-  it("예산 상한 — 긴 세션도 maxChars에서 잘린다(라이트 ctx 8K 보호)", () => {
+  it("★ 예산 상한 + **최신 턴 보존** — 앞자르기면 결론이 빠진다(검토관 적발)", () => {
+    // 옛 구현이 slice(0, maxChars)라 「최근 6턴」에서 정작 최신 턴이 통째로 빠졌다 —
+    // 첨부의 존재 이유(아까 그 작업 이어서)가 죽는다. 길이만 재던 시험도 그걸 통과시켰다.
     const s = createSession("긴 세션");
     for (let i = 0; i < 6; i += 1) appendTurn(s.id, "user", `지시 ${i} ` + "가".repeat(400));
     const t = attachSessionText(s.id, 1200);
     expect(t.length).toBeLessThan(1200 + 120); // 본문 1200 + 머리말
+    expect(t, "가장 최신 턴(지시 5)이 잘려 나갔다 — 예산은 최신부터 지켜야 한다").toContain("지시 5");
+    expect(t, "잘렸으면 오래된 쪽이 빠져야 한다").not.toContain("지시 0");
+  });
+
+  it("dispatcher — 첨부 조립은 두 입구가 한 함수(첨부글만들기)·빈 세션은 사실을 싣는다", () => {
+    expect((DISPATCHER_SRC.match(/첨부글만들기\(req\.body\?\.attachSessions\)/g) || []).length,
+      "두 입구가 같은 조립기를 안 쓴다").toBe(2);
+    expect(DISPATCHER_SRC, "빈 세션을 조용히 버린다 — 「첨부한 척」").toContain("내용을 싣지 못했습니다");
   });
 });

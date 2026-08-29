@@ -2240,6 +2240,12 @@
     try { localStorage.removeItem(SESS_KEY); } catch (e) { }
     setSelection(null);
     setScope(null);
+    // ☑ 근거 지정·📎 첨부도 푼다(검토관 — 맥락 운반체 5종 중 3종만 지우는 비대칭이었다).
+    // 새 세션의 약속이 「처음 화면으로」인데 옛 지정·첨부가 프롬프트에 계속 실리면 거짓이 된다.
+    setDocScope([]);
+    첨부세션 = [];
+    근거띠그리기();
+    try { if (window.gijoDocScopeCleared) window.gijoDocScopeCleared(); } catch (err) { }
     // 화면들도 범위 해제를 알아야 목록이 되돌아온다 — 셸을 거쳐 모든 틀에(기존 풀기 경로와 동일).
     try { window.parent.postMessage({ type: "gijo:scope", scope: null }, "*"); } catch (err) { }
     화면카드직전 = null;

@@ -1813,6 +1813,20 @@ function picksFor(output: string, toolCalls?: AgentToolCall[], approval?: Pendin
   return picks ? { picklist: picks } : {};
 }
 
+// 📎 첨부 조립(노트북형) — 두 입구(통짜·스트림)가 같은 함수를 쓴다(두 벌이면 어긋난다).
+// 삭제·아카이브로 빈 세션은 **조용히 버리지 않는다**(검토관 — 칩은 남았는데 첨부는 무동작이면
+// 「첨부한 척」이 된다. 제품 1원칙: 가짜 UI·조용한 무동작 금지). 빠진 사실을 맥락에 그대로 싣어
+// 모델이 「그 작업 내용은 받지 못했다」를 알고 답하게 한다.
+function 첨부글만들기(raw: unknown): string | undefined {
+  const ids = sanitizeAttachIds(raw);
+  if (!ids.length) return undefined;
+  const texts = ids.map((id) => attachSessionText(id));
+  const 빠짐 = texts.filter((t) => !t).length;
+  const parts = texts.filter(Boolean);
+  if (빠짐) parts.push(`(담당자가 첨부한 지난 작업 ${빠짐}건은 삭제되었거나 보관함으로 넘어가 내용을 싣지 못했습니다 — 그 내용을 아는 척하지 말 것)`);
+  return parts.join("\n\n") || undefined;
+}
+
 export function registerDispatcherRoutes(app: Express): void {
   registerProgressRoutes(app); // 진행 조회(GET /api/dispatch/progress) — 지시 처리 중 0.7초 폴링
   app.post(
@@ -1844,8 +1858,7 @@ export function registerDispatcherRoutes(app: Express): void {
       // ☑ 근거 지정·📎 지난 작업 첨부(노트북형 2026-08-30) — 요청 동안만 사는 ALS 꼬리표로
       // 나른다(ragscope.ts). 검색(하드 필터)·배지·도구·normaltic이 **한 기계**로 같은 범위를 본다.
       const 지정문서 = sanitizeDocIds(req.body?.docIds);
-      const 첨부글 = sanitizeAttachIds(req.body?.attachSessions)
-        .map((id) => attachSessionText(id)).filter(Boolean).join("\n\n") || undefined;
+      const 첨부글 = 첨부글만들기(req.body?.attachSessions); // 빈 세션은 조용히 안 버린다(위 헬퍼)
       // progressId — 클라가 만든 UUID. 있으면 처리 중 단계를 기록해 두고 클라가 폴링으로 본다
       // (2026-07-30 사용자 요청 "진행사항을 %나 진행 바로"). 없으면(구버전·QA) 완전 무동작.
       const progressId = isValidProgressId(req.body?.progressId) ? (req.body.progressId as string) : null;
@@ -1950,8 +1963,7 @@ export function registerDispatcherRoutes(app: Express): void {
       const 선택 = 선택정리(req.body?.selection);
       // ☑·📎 — 통짜 라우트와 같은 처리(두 입구가 같은 계약 — 한 곳만 하면 스트림에서 샌다).
       const 지정문서 = sanitizeDocIds(req.body?.docIds);
-      const 첨부글 = sanitizeAttachIds(req.body?.attachSessions)
-        .map((id) => attachSessionText(id)).filter(Boolean).join("\n\n") || undefined;
+      const 첨부글 = 첨부글만들기(req.body?.attachSessions); // 빈 세션은 조용히 안 버린다(위 헬퍼)
 
       res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
       res.setHeader("Cache-Control", "no-cache");

@@ -79,10 +79,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
 .acts{display:flex;gap:6px;}
 .btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
-/* 📎 첨부(노트북형) — 30px 행 안에 드는 압축 단추. 11px = uireadability 하한 */
+  padding:0 10px;height:26px;border-radius:7px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+/* 📎 첨부(노트북형) — 30px 행 안에 드는 압축 단추. 11px = uireadability 하한.
+   ⚠ .btn 블록 **밖**에 둔다 — 블록 안에 넣었다가 CSS 중첩 해석으로 .btn 선언 절반과 이 규칙이
+   통째로 죽었다(검토관 4갈래 동시 적발 — 규칙을 넣을 땐 블록 경계부터 본다). */
 .wattach{height:20px;padding:0 7px;font-size:11px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);border-radius:6px;cursor:pointer;white-space:nowrap}
 .wattach:hover{border-color:var(--ok,#3fa66a);color:var(--ok,#3fa66a)}
-  padding:0 10px;height:26px;border-radius:7px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
 .btn:hover{border-color:var(--blue);}
 .v4root{flex:1 1 auto;min-height:0;display:flex;}
@@ -627,6 +629,18 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     var 목록 = Object.keys(근거체크).map(function (k) { return { id: k, label: 근거체크[k] }; });
     try { window.top.postMessage({ type: "gijo:docscope", docIds: 목록 }, "*"); } catch (e) { }
   }
+  // ★ 이 화면이 정본이다(검토관 [높음] — 재수화 계약) — 목록을 불러올 때마다 ①지식에서
+  //   빠진 문서(AI 제외·삭제)를 지정에서 걷어내고 ②지금 상태 전체를 셸에 다시 보낸다.
+  //   그래서 (a)탭을 닫았다 열면 체크 0 = 칩 0(옛 칩이 몰래 남지 않는다) (b)체크한 문서를
+  //   AI 제외하면 지정도 풀린다 — 유령 지정으로 「지정 범위에서 검색되지 않았습니다」만
+  //   반복되는 잠금이 원리상 안 생긴다.
+  function 근거정리후알림() {
+    var 살아있다 = {};
+    mine.forEach(function (d) { if (d.ragOptIn || d.shared) 살아있다["personal:" + d.id] = 1; });
+    know.forEach(function (d) { if (d.documentId) 살아있다[d.documentId] = 1; });
+    Object.keys(근거체크).forEach(function (k) { if (!살아있다[k]) delete 근거체크[k]; });
+    근거알림();
+  }
   function 화면열기(page, label) {
     try { window.top.postMessage({ type: "gijo:openTab", page: page, label: label }, "*"); } catch (e) { }
   }
@@ -1104,7 +1118,14 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     try { learnTopics = (await window.gijo.listLearnloopTopics()) || []; } catch (e) { learnTopics = []; }
     // 📎 지난 작업(노트북형) — 최근 100건 롤링이 서버 원천의 전부다(그 밖은 아카이브 JSONL —
     //   첨부 대상에서 제외, 시안 「포기」란에 명시). 다리는 기존 listWorkSessions 재사용.
-    try { work = (await window.gijo.listWorkSessions()) || []; 오류.work = null; }
+    try {
+      // ⚠ 옛 통로 listWorkSessions()는 감사 자동기록·QA 세션이 섞인다(grouppanels.js가 명시
+      //   경고하는 그 함정 — 검토관 적발). 「작업 내역」 화면과 같은 axes 창구(기본 origin=user·
+      //   qa 숨김)를 쓴다 — 두 화면의 모집단이 갈리면 배지 숫자부터 딴말을 한다.
+      var wr_ = await window.gijo.listWorkSessionsWithAxes({});
+      work = (wr_ && wr_.items) || [];
+      오류.work = null;
+    }
     catch (e) { work = []; 오류.work = (e && e.message) || "오류"; }
     // ★ 반입 영수증(2026-08-22). 취약점·SBOM처럼 **지식에 안 들어가는**
     //   갈래는 문서 목록에 원리상 안 뜨므로 별도 창구에서 온다.
@@ -1119,6 +1140,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       갈래이름 = (j && j.갈래이름) || {};
       오류.ingest = null;
     } catch (e) { 영수증 = []; 영수증총계 = 0; 갈래이름 = {}; 오류.ingest = (e && e.message) || "오류"; }
+    근거정리후알림(); // ☑ 재수화 — 이 화면이 정본(함수 주석 참조). 불러올 때마다 유령 지정을 걷어낸다.
     // 📦 보안제품 자료 — ⚠ 라이트에서는 **부르지 않는다**: 그 탭을 접기 때문에(아래 라이트 폴딩)
     //   부르면 첫 그림만 늦어진다(불러오기가 순차 await라 한 번이 그대로 지연이 된다).
     // ⚠ `라이트판` 변수에 기대지 않는다 — 그건 이 함수보다 **아래**에서 값이 정해져서,
@@ -1224,11 +1246,26 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     if (!k || !k.classList || !k.classList.contains("dchk")) return;
     var id = k.getAttribute("data-doc") || "";
     if (!id) return;
-    if (k.checked) 근거체크[id] = k.getAttribute("data-label") || id;
-    else delete 근거체크[id];
+    if (k.checked) {
+      // 상한 50(서버 소독과 같은 수) — 51개째를 조용히 버리면 「체크 60 = 칩 50」 거짓이 된다.
+      if (Object.keys(근거체크).length >= 50) {
+        k.checked = false;
+        try { document.getElementById("note").textContent = "근거 지정은 50개까지입니다 — 더 좁혀 고르거나, 지정을 풀고 전체 검색을 쓰세요."; } catch (e2) { }
+        return;
+      }
+      근거체크[id] = k.getAttribute("data-label") || id;
+    } else delete 근거체크[id];
     근거알림();
   });
   document.getElementById("list").addEventListener("click", async function (ev) {
+    // ☑ 체크 클릭은 행 처리로 흘리지 않는다(검토관 [높음] 3갈래 동시 적발) — 안 막으면
+    //   ①좁은 폭에서 문서창이 목록을 덮어 두 번째 문서를 못 고르고 ②편집 중이면 「쓰던 글
+    //   사라집니다」 확인창이 떠 초안을 날릴 수 있고 ③🎯 선택 맥락이 체크마다 바뀐다.
+    //   상태 반영은 change 델리게이트 몫 — 여기는 체크의 click만 삼킨다.
+    if (ev.target && ev.target.classList && ev.target.classList.contains("dchk")) return;
+    // 📎 지난 작업 행은 행 클릭 처리 자체가 없다 — 선택 막대만 옮겨가는 죽은 조작을 막는다
+    //   (열람·이어가기는 「작업 내역」 화면 몫, 여기는 📎 단추가 전부다).
+    if (탭 === "work" && !(ev.target && ev.target.classList && ev.target.classList.contains("wattach"))) return;
     // 📎 첨부(노트북형) — 지난 작업을 지금 대화의 맥락으로. 행 클릭과 섞이지 않게 먼저 잡는다.
     if (ev.target && ev.target.classList && ev.target.classList.contains("wattach")) {
       ev.stopPropagation();

@@ -636,6 +636,11 @@
     tabs.forEach(function (t) {
       try { t.frame.contentWindow.postMessage({ type: "gijo:docscope:clear" }, "*"); } catch (e) { }
     });
+    // 분리창(팝업)으로 뺀 내 문서에도 — 탭만 돌면 팝업의 체크가 남아, 거기서 하나 더 체크하는
+    // 순간 「전체 목록」 발신이 해제했던 지정을 통째로 되살린다(검토관 5갈래 중 4갈래 적발).
+    if (window.gijo && window.gijo.broadcastToWindows) {
+      try { window.gijo.broadcastToWindows({ type: "gijo:docscope:clear" }); } catch (e) { }
+    }
   };
 
   function open(page, label, opts) {

@@ -10,7 +10,8 @@
 // 폴백 계약: 이 루프는 실패하거나 할 일이 없으면 null을 돌려주고, 호출자(dispatcher)가 기존
 // 채팅 경로로 폴백한다. 즉 루프 도입으로 기존 동작이 나빠지는 회귀가 없다.
 
-import { chat, 자료없음배너, 자료없음중복가드 } from "./llm";
+import { chat, 자료없음배너, 자료없음중복가드, 지정범위배너 } from "./llm";
+import { currentDocIds } from "./ragscope";
 import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 지식근거없음표지 } from "./agenttools";
@@ -451,6 +452,10 @@ export function 지식없음을밝힌다(reply: string, calls: AgentToolCall[]):
   const useful = calls.filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result));
   if (!useful.length || !useful.every((c) => 지식근거없음표지.test(c.result))) return reply;
   if (자료없음중복가드.test(reply.slice(0, 60))) return reply;
+  // ☑ 지정 범위가 걸린 0건은 별개 사실(검토관 [높음] — 「이 문서에서 …」 말투는 도구 경로로
+  // 오는데 여기가 옛 배너를 붙이면, 커밋이 「거짓말」이라 지목한 바로 그 문장이 가장 흔한
+  // 말투에서 나간다). llm.ts chat 경로와 같은 분기 — 두 출구가 같은 사실을 말해야 한다.
+  if (currentDocIds().length) return `${지정범위배너}\n\n${reply}`;
   return `${자료없음배너}\n\n${reply}`;
 }
 

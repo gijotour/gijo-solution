@@ -7,6 +7,7 @@ import { computeAssetCoverage, coverageSummaryText, type GapKind } from "../asse
 // (handlers는 꼭대기 층이라 순환 없음 · require는 vitest에서 .ts를 못 찾아 시험이 실증했다).
 import { listProductIntros, listIntroFields, setIntroField, INTRO_FIELD_SCHEMA } from "../productintro";
 import { expandOntology } from "../ontology";
+import { currentDocIds } from "../ragscope";
 import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, ReviewPatch, ApprovalStatus } from "../approvals";
 import { 표식, 심각도한글, 심각도표식, 자산종류한글 } from "../tone";
 import { buildHub, sourceFileOf } from "../assethub";
@@ -447,7 +448,10 @@ export function ontologyLinesFor(text: string, limit: number): string[] {
 // ★ #8 배너(도구 경로)의 표지 — explain·remediation이 사내 근거 0건일 때 내는 문장이다.
 //   agentloop의 지식없음을밝힌다가 이 표지를 보고 「일반 지식 기준」 배너를 붙인다(코드가 붙인다 —
 //   모델에게 맡기지 않는다). 아래 두 반환 문장을 고치면 이 정규식·explain-banner.test 를 함께 볼 것.
-export const 지식근거없음표지 = /(등록부에서 찾은 근거가 없습니다|매뉴얼 근거가 검색되지 않았습니다)/;
+// ☑ 세 번째 갈래(노트북형 2026-08-30): 지정 범위 0-근거 문장도 표지에 잡힌다 — 그래야
+// agentloop 지식없음을밝힌다가 (지정이면) 지정범위배너를 코드로 보장한다. 모델이 도구 문장을
+// 바꿔 말해도 배너는 남는다(이 기계의 존재 이유). explain-banner.test 소스 감시가 짝을 지킨다.
+export const 지식근거없음표지 = /(등록부에서 찾은 근거가 없습니다|매뉴얼 근거가 검색되지 않았습니다|지정하신 문서 범위.*찾은 근거가 없습니다)/;
 
 export async function runExplain(args: Record<string, string>): Promise<string> {
   const topic = args.topic.trim();
@@ -461,7 +465,11 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   const 온톨로지: string[] = [];
   const triples = ontologyLinesFor(topic, 12);
   if (triples.length) 온톨로지.push(`사내 온톨로지 관계 — "${topic}" 관련:`, ...triples);
-  if (!문서우선) out.push(...온톨로지); // 일반 질문: 온톨로지 먼저(기존)
+  // ☑ 지정 범위가 걸리면 문서 밖 원천(온톨로지·제품 등록부)은 싣지 않는다(검토관 —
+  //   「그 문서들 안에서만」이라 약속해 놓고 범위 밖 근거로 답을 조립하면 근거 배지 신뢰가
+  //   무너진다. 8/10 「배지가 답과 다른 문서」 계보). 지정이 없으면 기존 그대로.
+  const 지정범위 = currentDocIds();
+  if (!문서우선 && !지정범위.length) out.push(...온톨로지); // 일반 질문: 온톨로지 먼저(기존)
 
   // 사내 문서 **본문**을 근거로 싣는다.
   // ⚠ 2026-07-26 QA에서 잡힌 결함: 예전에는 문서 "제목과 조각 수"만 돌려줬다.
@@ -484,11 +492,12 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
     /* 임베딩 미기동 등 — 본문 근거 없이 계속 */
   }
 
-  if (문서우선) out.push(...온톨로지); // 문서 지목: 온톨로지를 발췌 **뒤로**(발췌가 권위)
+  if (문서우선 && !지정범위.length) out.push(...온톨로지); // 문서 지목: 온톨로지를 발췌 **뒤로**(발췌가 권위)
 
   // 어느 문서에서 왔는지도 함께(담당자가 원문을 찾아갈 수 있게).
   try {
-    const docs = (await listVisibleDocuments()).filter((d) => matches(d.documentId, topic));
+    const docs = (await listVisibleDocuments()).filter((d) => matches(d.documentId, topic))
+      .filter((d) => !지정범위.length || 지정범위.includes(d.documentId)); // ☑ 지정 밖 문서명을 「관련 문서」로 싣지 않는다
     if (docs.length) {
       out.push(
         `관련 사내 문서 ${docs.length}건:`,
@@ -500,7 +509,7 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   }
 
   // 보유 보안제품 중 관련된 것(대응 수단 제시).
-  const products = listProducts().filter((p) => matches(`${p.name} ${p.category} ${p.vendor ?? ""}`, topic));
+  const products = 지정범위.length ? [] : listProducts().filter((p) => matches(`${p.name} ${p.category} ${p.vendor ?? ""}`, topic));
   if (products.length) {
     out.push(
       `보유 보안제품 ${products.length}건:`,
@@ -509,6 +518,12 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   }
 
   if (out.length === 0) {
+    // ☑ 지정 범위가 걸린 0건은 「전체에 없다」가 아니다(검토관 [높음]) — 「업로드하라」는 권고도
+    // 틀린 말이 된다(체크 안 한 문서에 답이 있을 수 있다). 표지 문장이 달라져 agentloop의
+    // 자료없음배너도 안 붙는다 — 이 문장 자체가 정직한 최종 답이다.
+    if (currentDocIds().length) {
+      return `"${topic}"에 대해 지정하신 문서 범위(☑ ${currentDocIds().length}개)에서 찾은 근거가 없습니다. 문서 지정을 풀면 전체 사내 자료에서 다시 찾습니다.`;
+    }
     return `"${topic}"에 대해 사내 온톨로지·문서·보안제품 등록부에서 찾은 근거가 없습니다. 일반 지식으로만 답하거나, 관련 문서를 업로드하면 근거가 쌓입니다.`;
   }
   return out.join("\n").slice(0, 3500); // 본문 발췌가 들어가 상한을 늘렸다(2500이면 근거가 잘렸다)

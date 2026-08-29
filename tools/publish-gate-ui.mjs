@@ -461,19 +461,24 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
   //    전체 대시보드에 적용」) — 배선이 body 수준이라 이미 전역인데, 그 사실을 여기 못박는다.
   //    앞 검사들이 mydocs 아닌 탭(assets 등)을 여러 개 연 **지금 상태**에서 재야 뜻이 있다.
   {
+    // ⚠ 1차본이 헛계측이었다(검토관 — 없는 API `gijoTabs.active()`를 불러 늘 ""이었고, 그 값을
+    //   판정에 쓰지도 않았다). 고침: **mydocs 아닌 화면을 실제로 활성으로 만들고**(assets 도킹),
+    //   실제 API activeScreen()으로 그 사실까지 판정식에 넣는다 — 부정 경로가 있는 검사만 검사다.
+    await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산", { dock: true }));
+    await new Promise((r) => setTimeout(r, 1200));
     const 전역 = await 셸.evaluate(() => {
       const nav = document.getElementById("gijoNav");
       const rsz = document.getElementById("conResize");
-      const 활성탭 = (window.gijoTabs && window.gijoTabs.active && window.gijoTabs.active()) || "";
+      const 활성 = (window.gijoTabs && window.gijoTabs.activeScreen && window.gijoTabs.activeScreen()) || "";
       return {
         메뉴판: !!nav && nav.offsetWidth > 0,
         끌개: !!rsz && rsz.offsetParent !== null,
-        비mydocs탭: !/mydocs/.test(String(활성탭)),
+        활성: String(활성),
+        비mydocs활성: !!활성 && !/mydocs/.test(String(활성)),
       };
     }).catch(() => null);
-    // 활성 탭 API가 없으면(구셸) 탭 판정만 건너뛴다 — 메뉴판·끌개는 어느 화면에서든 있어야 한다.
-    ok("셸 전역: 메뉴 판·대화폭 끌개가 mydocs 아닌 화면에서도 산다(전체 대시보드 계약)",
-      !!전역 && 전역.메뉴판 && 전역.끌개, JSON.stringify(전역));
+    ok("셸 전역: 메뉴 판·대화폭 끌개가 mydocs 아닌 **활성** 화면에서도 산다(전체 대시보드 계약)",
+      !!전역 && 전역.메뉴판 && 전역.끌개 && 전역.비mydocs활성, JSON.stringify(전역));
   }
   // ⊟ 화면 접기 — 대화가 전폭이 되고, 화면(탭)은 산 채로 남는다(필터·스크롤 보존 계약).
   await 셸.evaluate(() => document.getElementById("stageBack").click());

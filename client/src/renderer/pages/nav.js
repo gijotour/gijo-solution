@@ -1587,6 +1587,9 @@
     if (window.gijo && window.gijo.onShellBridge) {
       window.gijo.onShellBridge(function (d) {
         if (d && d.type === "gijo:scope:set") window.postMessage(d, "*");
+        // ☑ 전체 해제(노트북형 역방향) — 셸 근거띠의 ×가 팝업 내 문서의 체크도 되돌린다.
+        // 정방향(gijo:docscope 중계)만 넣고 이걸 빠뜨리면 「화면-칩 딴말」이 팝업에만 남는다.
+        if (d && d.type === "gijo:docscope:clear") window.postMessage(d, "*");
       });
     }
 
