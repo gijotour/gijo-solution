@@ -452,6 +452,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   var 영수증 = [], 영수증총계 = 0, 갈래이름 = {};
   // 📦 보안제품 자료 — 도입 **검토용** 타사 카탈로그. 우리가 쓰는 제품 등록부와 **다른 대장**이다.
   var vendor = [];
+  var introSchema = []; // 비교 항목 스키마 — 서버가 준다(화면이 항목 이름을 베껴 적지 않는다)
   var 오류 = { mine: null, know: null, learn: null, guide: null, ingest: null }; // 불러오기 실패는 「없음」과 다르다(검토관 상4)
 
   // ── 📞 연락처 — 담당자 테리토리×제품 매트릭스 ────────────────────────────────
@@ -489,6 +490,30 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   function 칸색(list) {
     if (!list.length) return "cov-gap";
     return list.some(function (c) { return c.role === "사내"; }) ? "cov-in" : "cov-ven";
+  }
+
+  // 📊 비교 항목 표(2026-08-29) — 상세 패널에서 「이 제품에 대해 무엇이 확정됐나」를 보인다.
+  //
+  // 정직 규칙 셋(서버 product_compare와 같은 규칙 — 두 곳이 다르게 말하면 안 된다):
+  //   ① 값은 담당자가 **확정한 것만**. 비면 「―」다 — 소개자료에서 지어 채우지 않는다.
+  //   ② 근거 인용(quote)이 있으면 원문 그대로 붙인다 — 값의 출처를 사람이 검증할 수 있게.
+  //   ③ 항목 이름·순서는 **서버 schema**를 그대로 쓴다. 화면이 베껴 적으면 항목이 늘 때 어긋난다.
+  function 비교항목표(vd) {
+    if (!introSchema.length) return ""; // 스키마를 못 받았으면 아무것도 지어내지 않는다
+    var 값 = {};
+    (vd.fields || []).forEach(function (f) { 값[f.key] = f; });
+    var 채움 = (vd.fields || []).length;
+    var 줄 = introSchema.map(function (s) {
+      var f = 값[s.key];
+      return '<div style="display:grid;grid-template-columns:96px 1fr;gap:6px;padding:2px 0;border-bottom:1px solid rgba(128,128,128,.14)">' +
+        '<span class="gm2" style="font-size:11px">' + esc(s.label) + "</span>" +
+        '<span style="font-size:12px' + (f ? "" : ";color:var(--muted-2)") + '">' + (f ? esc(f.value) : "―") +
+        (f && f.quote ? '<br><span class="gm2" style="font-size:11px">근거: ' + esc(f.quote) + "</span>" : "") +
+        "</span></div>";
+    }).join("");
+    return '<div class="dm" style="border-top:1px dashed rgba(128,128,128,.3);padding-top:8px;margin-top:4px">' +
+      '<div style="font-size:11px;font-weight:700;margin-bottom:4px" class="gm2">비교 항목 ' + 채움 + "/" + introSchema.length + "</div>" +
+      줄 + "</div>";
   }
 
   function 연락처그리기(list) {
@@ -843,18 +868,24 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     } else if (탭 === "vendor") {
       // 📦 보안제품 자료 — 도입 **검토용** 타사 카탈로그(우리가 쓰는 제품 등록부와 다른 대장이다).
       // ⚠ 자료를 넣는 자리는 여기가 아니다 — 대화창 ＋로 올린다(「지시는 대화창」 원칙).
-      var 칸V = "1fr 110px 120px 1fr";
+      // 📊 비교 항목 채움 — 「몇/전체」를 보여 준다(2026-08-29). 비교표의 「―」가 몇 칸인지
+      //   목록에서 바로 보이면, 무엇을 더 채워야 비교가 쓸 만해지는지 알 수 있다.
+      //   ⚠ 숫자는 서버가 준 fields·schema에서만 온다 — 화면이 항목 이름을 따로 적지 않는다.
+      var 칸V = "1fr 100px 110px 64px 1fr";
       list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:' + 칸V + ';gap:8px">' +
-          "<span>제품</span><span>분류</span><span>공급사</span><span>한 줄 소개</span></div>" +
+          "<span>제품</span><span>분류</span><span>공급사</span><span>항목</span><span>한 줄 소개</span></div>" +
         (vendor.length ? '<div class="g-rows-flat">' + vendor.map(function (p) {
+          var 채움 = (p.fields || []).length, 전체 = (introSchema || []).length;
           return '<div class="g-rows-r" data-id="' + esc(p.id) + '" style="grid-template-columns:' + 칸V + ';gap:8px">' +
             '<span class="trunc" title="' + esc(p.name) + '">' + esc(p.name) + "</span>" +
             '<span class="gm2 trunc">' + esc(p.category || "기타") + "</span>" +
             '<span class="gm2 trunc">' + esc(p.vendor || "-") + "</span>" +
+            '<span class="gm2" title="비교 항목 채움">' + (전체 ? 채움 + "/" + 전체 : "-") + "</span>" +
             '<span class="gm2 trunc" title="' + esc(p.summary || "") + '">' + esc(p.summary || "-") + "</span></div>";
         }).join("") + "</div>"
           : '<div class="empty">도입을 <b>검토 중인 타사 제품</b> 자료가 여기 모입니다.<br>' +
-            '<span class="gm2">대화창 ＋로 제품 소개서를 올리면 등록됩니다. 깊은 비교는 대화창에 「A와 B 비교해줘」로 물으세요.</span></div>');
+            '<span class="gm2">대화창 ＋로 제품 소개서를 올려 「🗂 제품 소개자료」를 고르면 등록됩니다.<br>' +
+            '등록 뒤에는 대화창에서 「A와 B 비교해줘」로 항목별 표를 보고, 「A 도입 형태를 온프레미스로 기록해줘」로 빈 칸을 채웁니다.</span></div>');
     } else if (탭 === "contacts") {
       연락처그리기(list);
     } else { // ingest — ★ **반입 영수증**(내 것 + 내가 볼 수 있는 것 — 등급이 걸린다)
@@ -1042,7 +1073,12 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     // ⚠ `라이트판` 변수에 기대지 않는다 — 그건 이 함수보다 **아래**에서 값이 정해져서,
     //   부팅 순서가 바뀌면 조용히 undefined(=거짓)가 된다. 주소는 언제 읽어도 같다.
     if (new URLSearchParams(location.search).get("edition") !== "lite") {
-      try { vendor = ((await window.gijo.listProductIntros()) || {}).items || []; 오류.vendor = null; }
+      // 📊 schema도 함께 받는다(2026-08-29) — 비교 항목 이름·순서의 **단일 출처는 서버**다.
+      //   화면이 항목표를 베껴 적으면 서버가 항목을 늘렸을 때 조용히 어긋난다.
+      try {
+        var _pi = (await window.gijo.listProductIntros()) || {};
+        vendor = _pi.items || []; introSchema = _pi.schema || []; 오류.vendor = null;
+      }
       catch (e) { vendor = []; 오류.vendor = (e && e.message) || "오류"; }
     }
     학습띠그리기();
@@ -1241,7 +1277,13 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         '<div class="dm">📦 도입 <b>검토 중인 타사 제품</b> 자료 — 우리가 쓰는 제품은 「우리 보안제품」 화면입니다.' +
         "<br>제조사 " + esc(vd.vendor || "-") + " · 분류 " + esc(vd.category || "-") + "</div>" +
         (vd.summary ? '<div class="dm" style="border-top:1px dashed rgba(128,128,128,.3);padding-top:8px;margin-top:2px">' + esc(vd.summary) + "</div>" : "") +
-        '<div class="dm gm2">깊은 비교는 대화창에 「' + esc(vd.name) + '와 다른 제품 비교해줘」로 물으세요 — 고른 제품이 함께 전달됩니다.</div>';
+        // 📊 비교 항목 — 담당자가 **확정한 값만** 보인다. 안 채운 칸은 「―」이고, 소개자료
+        //   원문에서 지어 채우지 않는다(자동 추출은 값이 아니라 인용까지 — 2026-08-23 실측).
+        //   ⚠ 항목 이름·순서는 서버 schema 그대로다(화면이 따로 적으면 어긋난다).
+        //   ⚠ 여기는 **보는 자리**다 — 값을 고치는 입력칸을 두지 않는다(「지시는 대화창」 원칙).
+        비교항목표(vd) +
+        '<div class="dm gm2">깊은 비교는 대화창에 「' + esc(vd.name) + '와 다른 제품 비교해줘」로 물으세요 — 고른 제품이 함께 전달됩니다.' +
+        '<br>빈 항목은 「' + esc(vd.name) + ' 도입 형태를 온프레미스로 기록해줘」처럼 채웁니다.</div>';
     }
     문서창보임(true);   // 좁은 자리에서는 이때 문서창이 목록을 덮는다
   });
