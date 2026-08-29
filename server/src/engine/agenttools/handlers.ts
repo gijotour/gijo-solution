@@ -3452,6 +3452,25 @@ export function runProductCompare(args: Record<string, string>): string {
   const a = 찾기(args.a ?? "");
   const b = 찾기(args.b ?? "");
   const 목록 = () => `등록된 소개자료: ${items.map((i) => i.name).join(" · ")}`;
+  // ★ 한 제품만 지목된 경우 — 그 제품 카드를 보여 준다(2026-08-29 라이브 실측 수리).
+  //   모델이 「SafeBreach 도입 형태가 뭐야?」에 이 도구를 골라 b가 비면, 그전에는
+  //   「비교 대상이 누락됐다」는 **엉뚱한 답**이 나갔다. 잘못 골랐다고 아무것도 못 주는 것이
+  //   가장 나쁘다 — 아는 것을 주고, 비교하려면 무엇이 더 필요한지 말한다.
+  const 하나 = (a && !b) ? a : (b && !a) ? b : null;
+  if (하나 && !(args.a && args.b)) {
+    const f = listIntroFields(하나.id);
+    const L = [`📦 **${하나.name}** — 소개자료 대장 기준`,
+      `분류 ${하나.category}${하나.vendor ? ` · 공급사 ${하나.vendor}` : ""}`, ""];
+    for (const s of INTRO_FIELD_SCHEMA) {
+      const v = f.find((x) => x.key === s.key);
+      L.push(`- ${s.label}: ${v ? v.value : "―"}`);
+    }
+    const 다른 = items.filter((x) => x.id !== 하나.id).map((x) => x.name);
+    L.push("", 다른.length
+      ? `비교하려면 상대를 함께 말해 주세요 — 예: 「${하나.name}와 ${다른[0]} 비교해줘」`
+      : "비교하려면 소개자료가 하나 더 필요합니다.");
+    return L.join("\n");
+  }
   if (!a || !b) {
     const 없는것 = [!a ? args.a : null, !b ? args.b : null].filter(Boolean).join("·");
     // 「찾지 못했습니다」 금지 — 서랍 점검 실패 문구와 겹쳐 정직한 「없다」에 실패 딱지가 붙는다(emptyanswer 감시).

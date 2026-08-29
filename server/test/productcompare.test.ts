@@ -88,6 +88,20 @@ describe("product_compare 도구 (거짓 약속의 받는 곳)", () => {
     for (const s of INTRO_FIELD_SCHEMA) expect(out).toContain(s.label);
   });
 
+  it("★ 한 제품만 지목되면 그 제품 카드를 준다 — 잘못 골라도 쓸모 있게(2026-08-29 라이브 수리)", () => {
+    // 모델이 「SafeBreach 도입 형태가 뭐야?」에 이 도구를 골라 b가 비는 일이 실제로 있었다.
+    // 그전에는 「비교 대상이 누락됐다」는 엉뚱한 답이 나갔다 — 아무것도 못 주는 것이 가장 나쁘다.
+    const a = addProductIntro({ name: "SafeBreach", category: "BAS" });
+    addProductIntro({ name: "Cymulate", category: "BAS" });
+    setIntroField(a.id, "deployType", "온프레미스");
+    const out = runProductCompare({ a: "SafeBreach", b: "" });
+    expect(out, "한 제품 카드를 안 준다").toContain("SafeBreach");
+    expect(out, "확정 값을 안 보인다").toContain("온프레미스");
+    expect(out, "미확정 항목을 「―」로 안 보인다").toContain("―");
+    expect(out, "비교하는 법을 안 알려 준다 — 막다른 답").toMatch(/비교하려면/);
+    expect(out, "상대 후보를 제시하지 않는다").toContain("Cymulate");
+  });
+
   it("못 찾으면 등록 목록을 보여 준다 — 막다른 답 금지", () => {
     addProductIntro({ name: "SafeBreach", category: "BAS" });
     const out = runProductCompare({ a: "SafeBreach", b: "없는제품" });
