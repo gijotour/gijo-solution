@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>시안 — 내 문서 노트북형(근거 선택) + 작업내역 첨부</title>
+<style>
+  /* 프로 셸 확정 배색(흰 바탕 #faf8f5 — 게시 관문이 검사하는 값) */
+  :root{
+    --bg:#faf8f5; --card:#fff; --line:rgba(43,38,33,.12); --tx:#2b2621; --mut:#6b6259;
+    --acc:#1a7f4e; --accbg:#e8f5ee; --blue:#2563eb; --bluebg:#eaf1fe; --amber:#b45309;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+  body{background:var(--bg);color:var(--tx);font-size:12px}
+  .note{max-width:1460px;margin:10px auto 6px;padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:8px;line-height:1.55}
+  .note b{color:var(--acc)}
+  .shell{max-width:1460px;margin:0 auto 14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+  /* ── 상단바(기존 그대로) ── */
+  .top{height:38px;display:flex;align-items:center;gap:10px;padding:0 12px;background:#fff;border-bottom:1px solid var(--line)}
+  .top .logo{font-weight:700}
+  .top .tag{font-size:11px;color:var(--mut)}
+  /* ── 본체: 메뉴 | 내문서 | ‖ | 대화 (전 화면 공통 격자 — app.html 전역) ── */
+  .work{display:grid;grid-template-columns:180px minmax(0,1fr) 6px 430px;height:640px}
+  .menu{background:#fff;border-right:1px solid var(--line);padding:8px 0;overflow:auto}
+  .menu .g{padding:6px 12px 2px;font-size:11px;color:var(--mut);font-weight:700}
+  .menu .m{padding:5px 12px;cursor:pointer;line-height:1.3}
+  .menu .m:hover{background:var(--accbg)}
+  .menu .m.on{background:var(--accbg);color:var(--acc);font-weight:700}
+  .rsz{background:var(--line);cursor:col-resize;position:relative}
+  .rsz::after{content:"‖";position:absolute;top:50%;left:-3px;color:var(--mut);font-size:10px}
+  /* ── 내 문서(v4 3단 유지: 사이드탭 | 목록 | 문서창) ── */
+  .docs{display:grid;grid-template-columns:128px 330px minmax(0,1fr);min-width:0;background:var(--bg)}
+  .dtabs{border-right:1px solid var(--line);background:#fff;padding-top:6px}
+  .dtabs .t{padding:6px 10px;cursor:pointer;color:var(--mut)}
+  .dtabs .t.on{color:var(--acc);font-weight:700;background:var(--accbg)}
+  .dtabs .t .n{float:right;font-size:10px;color:var(--mut)}
+  .list{border-right:1px solid var(--line);background:#fff;overflow:auto;min-width:0}
+  .lhead{display:flex;align-items:center;gap:6px;height:30px;padding:0 8px;border-bottom:1px solid var(--line);font-size:11px;color:var(--mut)}
+  .lhead .all{margin-right:2px}
+  .row{display:flex;align-items:center;gap:6px;height:30px;padding:0 8px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap}
+  .row:hover{background:#f7f3ec}
+  .row.sel{background:var(--accbg)}
+  .row input{flex:0 0 auto}
+  .row .nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .row .mt{margin-left:auto;color:var(--mut);font-size:10px;flex:0 0 auto}
+  .row .pin{flex:0 0 auto;border:1px solid var(--line);border-radius:4px;background:#fff;font-size:10px;padding:1px 5px;cursor:pointer;color:var(--mut)}
+  .row .pin:hover{border-color:var(--blue);color:var(--blue)}
+  .viewer{padding:10px 12px;overflow:auto;min-width:0}
+  .viewer h3{font-size:13px;margin-bottom:6px}
+  .viewer .meta{color:var(--mut);font-size:11px;margin-bottom:8px}
+  .viewer .body{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;line-height:1.6}
+  mark{background:#fde68a;padding:0 2px}
+  /* ── 대화창 ── */
+  .chat{display:flex;flex-direction:column;background:#fff;border-left:1px solid var(--line);min-width:0}
+  .chead{height:30px;display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid var(--line);font-size:11px;color:var(--mut)}
+  .cbody{flex:1;overflow:auto;padding:10px}
+  .msg{margin-bottom:10px;max-width:96%}
+  .msg .who{font-size:10px;color:var(--mut);margin-bottom:2px}
+  .msg .bub{border:1px solid var(--line);border-radius:8px;padding:7px 9px;line-height:1.55;background:#fff}
+  .msg.user .bub{background:var(--accbg)}
+  .att{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:#f7f3ec;border-radius:12px;padding:1px 8px;font-size:10px;color:var(--mut);margin:2px 4px 2px 0}
+  .srcbadge{margin-top:6px;font-size:11px;color:var(--acc)}
+  .cite{display:inline-block;background:var(--bluebg);color:var(--blue);border-radius:8px;padding:0 5px;font-size:10px;cursor:pointer;margin:0 1px}
+  .ev{margin-top:5px;border:1px dashed var(--line);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--mut)}
+  .honest{margin-top:6px;font-size:11px;color:var(--amber)}
+  /* 근거띠 — 입력창 위(칩이 있을 때만 나타남 · 없으면 높이 0) */
+  .ground{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 10px;border-top:1px solid var(--line);background:#fdfbf7;min-height:28px}
+  .chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:2px 9px;font-size:11px}
+  .chip.doc{border-color:var(--acc);color:var(--acc);background:var(--accbg)}
+  .chip.ses{border-color:var(--blue);color:var(--blue);background:var(--bluebg)}
+  .chip .x{cursor:pointer;font-weight:700;opacity:.6}
+  .chip .x:hover{opacity:1}
+  .ground .hint{font-size:10px;color:var(--mut)}
+  .cinput{display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid var(--line)}
+  .cinput .plus{width:26px;height:26px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer}
+  .cinput input{flex:1;height:28px;border:1px solid var(--line);border-radius:6px;padding:0 9px;font-size:12px}
+  .cinput .send{height:28px;border:none;border-radius:6px;background:var(--acc);color:#fff;padding:0 14px;cursor:pointer}
+  .foot{max-width:1460px;margin:0 auto 24px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .foot .c{background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;line-height:1.6}
+  .foot h4{font-size:12px;margin-bottom:4px;color:var(--acc)}
+  .foot td{padding:1px 8px 1px 0;vertical-align:top}
+</style></head><body>
+
+<div class="note">
+  <b>시안 — 내 문서 노트북형 + 작업내역 첨부</b> (사장님 지시 2026-08-29 「내문서는 구글 llm notebook처럼 · 작업내역은 첨부파일처럼 · 메뉴판/접기/폭조절 전체 대시보드 적용」)
+  · 아래는 실제 크기 비율의 조작 가능한 목업입니다 — <b>☑를 체크</b>하고 <b>📎를 눌러</b> 보세요. 입력창 위 근거띠가 실제 동작대로 반응합니다.
+</div>
+
+<div class="shell">
+  <div class="top"><span class="logo">GIJO AS</span><span class="tag">프로 · 상단바(기존 그대로)</span>
+    <span class="tag" style="margin-left:auto">메뉴 ▤ · ‖ 접기 · 폭 끌기 = <b>전 화면 공통</b>(app.html 셸 전역 — 이미 그렇게 배선돼 있고, 이번에 관문 검사로 못박음)</span></div>
+  <div class="work">
+    <div class="menu">
+      <div class="g">🧠 내 지식</div>
+      <div class="m on">내 문서</div><div class="m">지식 창고</div><div class="m">법령·판례</div>
+      <div class="g">업무</div>
+      <div class="m">현황판</div><div class="m">취약점</div><div class="m">자산</div><div class="m">결재판</div>
+      <div class="g" style="margin-top:8px;color:#b45309">▤ 메뉴 판 — 어느 화면에서든 이 자리(접으면 0px)</div>
+    </div>
+
+    <div class="docs">
+      <div class="dtabs">
+        <div class="t on" data-dt="mine">내 것 <span class="n">12</span></div>
+        <div class="t" data-dt="know">회사 지식 <span class="n">115</span></div>
+        <div class="t" data-dt="work">📎 작업내역 <span class="n">37</span></div>
+        <div class="t">보안제품 자료 <span class="n">2</span></div>
+        <div class="t">GIJO AS 안내</div>
+        <div class="t">반입</div>
+      </div>
+
+      <!-- 목록: 내 것/회사 지식 탭 — ☑ = 대화 근거로 지정(NotebookLM 소스 체크) -->
+      <div class="list" id="docList">
+        <div class="lhead"><input type="checkbox" class="all" id="allChk" title="전체 지정/해제"><span>문서 (☑ = 대화 근거로 지정 · 안 고르면 전체에서 검색)</span></div>
+        <div class="row"><input type="checkbox" class="dck" data-doc="취약점관리_지침.md"><span class="nm">취약점관리_지침.md</span><span class="mt">지침 · 8/12</span></div>
+        <div class="row sel"><input type="checkbox" class="dck" data-doc="202506_SafeBreach_제품소개.pptx" checked><span class="nm">202506_SafeBreach_제품소개.pptx</span><span class="mt">제품 · 8/28</span></div>
+        <div class="row"><input type="checkbox" class="dck" data-doc="개인정보_유출신고_안내서.pdf"><span class="nm">개인정보_유출신고_안내서.pdf</span><span class="mt">법령 · 8/20</span></div>
+        <div class="row"><input type="checkbox" class="dck" data-doc="침해사고_대응절차.md"><span class="nm">침해사고_대응절차.md</span><span class="mt">절차 · 8/18</span></div>
+        <div class="row"><input type="checkbox" class="dck" data-doc="ISMS-P_인증기준.pdf"><span class="nm">ISMS-P_인증기준.pdf</span><span class="mt">기준 · 8/15</span></div>
+        <div style="padding:6px 8px;font-size:10px;color:var(--mut)">… 행 30px — 기존 전 화면 공용값 그대로(증감 0)</div>
+      </div>
+
+      <!-- 목록: 작업내역 탭 — 지난 세션, 📎로 대화에 첨부 -->
+      <div class="list" id="workList" style="display:none">
+        <div class="lhead"><span>지난 작업 (📎 = 지금 대화에 맥락으로 첨부)</span></div>
+        <div class="row"><span class="nm">SafeBreach·Cymulate 비교 정리</span><span class="mt">8/29 · 14턴</span><button class="pin" data-ses="s-0829a">📎 첨부</button></div>
+        <div class="row"><span class="nm">웹서버 취약점 조치 요청서 작성</span><span class="mt">8/28 · 9턴</span><button class="pin" data-ses="s-0828b">📎 첨부</button></div>
+        <div class="row"><span class="nm">개인정보 유출신고 시한 확인</span><span class="mt">8/27 · 6턴</span><button class="pin" data-ses="s-0827c">📎 첨부</button></div>
+        <div class="row"><span class="nm">자산 담당자 일괄 지정</span><span class="mt">8/26 · 11턴</span><button class="pin" data-ses="s-0826d">📎 첨부</button></div>
+        <div style="padding:6px 8px;font-size:10px;color:var(--mut)">행 클릭 = 읽기 전용으로 열람(기존 작업 내역 화면과 동일) · 📎 = 첨부만</div>
+      </div>
+
+      <div class="viewer">
+        <h3>202506_SafeBreach_제품소개.pptx</h3>
+        <div class="meta">제품 소개자료 · 36슬라이드 · 조각 69개 · <span style="color:var(--acc)">☑ 대화 근거로 지정됨</span></div>
+        <div class="body">
+          <b>[슬라이드 12]</b> 도입 형태 — <mark>SaaS 기반(On-Prem 지원 가능)</mark>. 고객 보안 정책에 따라
+          내부망 단독 구성을 지원하며… <br><br>
+          <span style="color:var(--mut);font-size:11px">↑ 대화 인용 <span class="cite">1</span>을 누르면 이 위치로 점프·형광펜(NotebookLM 인용→소스 이동과 동일). 문서창은 기존 열람 스테이지 재사용.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rsz" title="대화창 폭 끌기 — 전 화면 공통(기존 0-4 그대로)"></div>
+
+    <div class="chat">
+      <div class="chead">💬 대화 · <span>근거 범위: <b id="scopeLabel" style="color:var(--acc)">지정 문서 1개</b></span><span style="margin-left:auto">⊟ 접기(기존)</span></div>
+      <div class="cbody">
+        <div class="msg user"><div class="who">나</div><div class="bub">SafeBreach 도입 형태가 뭐야?
+          <div><span class="att">📚 근거: 지정 문서 1</span></div></div></div>
+        <div class="msg"><div class="who">GIJO</div><div class="bub">
+          지정하신 소개서 기준, SafeBreach는 <b>SaaS 기반이며 On-Prem(내부망 단독) 구성을 지원</b>합니다 <span class="cite" title="클릭 → 왼쪽 문서창 해당 위치로">1</span>.
+          <div class="srcbadge">📄 근거: 202506_SafeBreach_제품소개.pptx</div>
+          <div class="ev">▸ 근거 원문(기존 접이식 그대로) — 인용 번호 클릭 시 <b>왼쪽 문서창이 그 위치를 형광펜으로 연다</b>(신규)</div>
+        </div></div>
+        <div class="msg"><div class="who">GIJO</div><div class="bub" style="border-color:#f3d9b0">
+          <div class="honest">⚠ 정직 규칙(신규): 문서를 지정했는데 그 안에서 근거를 못 찾으면 —<br>
+          「지정하신 문서 1개에서는 근거를 찾지 못했습니다. 전체 문서에서 다시 찾으려면 지정을 풀어 주세요.」<br>
+          <b>몰래 전체로 넓혀 답하지 않습니다.</b></div>
+        </div></div>
+      </div>
+      <div class="ground" id="ground">
+        <span class="hint">근거띠(칩 있을 때만 +28px):</span>
+        <!-- 칩은 JS가 채움 -->
+      </div>
+      <div class="cinput">
+        <button class="plus">＋</button>
+        <input placeholder="지시하거나 물어보세요 — 근거 범위는 위 칩이 말해 줍니다">
+        <button class="send">전송</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="foot">
+  <div class="c"><h4>왜 이 안인가 (다른 길을 왜 안 골랐나)</h4>
+    ① <b>새 화면을 만들지 않았다</b> — NotebookLM의 소스판·채팅판이 우리 「내 문서 + 대화창 나란히」와 이미 같은 뼈대다. 체크 열(0px 추가 높이)·작업내역 탭·근거띠(조건부 28px)만 얹는다. 별도 「노트북 화면」 신설안은 화면 26종+1이 되고 「메뉴는 보기용·지시는 대화창」과 충돌해 버렸다.<br>
+    ② <b>체크 = NotebookLM과 같은 뜻(지정하면 그 문서들만)</b> — 단 기본은 전체(아무것도 안 고르면 지금과 완전 동일). 「우선순위만 올리는」 절충안은 담당자가 결과를 예측 못 해(올라갔는지 안 올라갔는지 안 보임) 버렸다. 대신 못 찾으면 정직하게 말하고 몰래 넓히지 않는다.<br>
+    ③ <b>작업내역 첨부는 AI 요약이 아니라 결정적 압축</b> — 서버에 이미 있는 같은-세션 압축기(최근 6턴 + 이전 지시 다이제스트)를 재사용한다. 이 저장소의 「7B 요약은 지어냄이 섞인다」 원칙 그대로.</div>
+  <div class="c"><h4>밀도 · 포기한 것 · 자가점검</h4>
+    <table>
+    <tr><td><b>밀도</b></td><td>목록 행 30px <b>증감 0</b>(전역 공용값 유지) · 체크 열 가로 +18px · 근거띠 = 칩 있을 때만 +28px(평소 0) · 작업내역 행 30px · 세로 총합 변화 <b>0~28px</b></td></tr>
+    <tr><td><b>포기</b></td><td>NotebookLM 스튜디오판(마인드맵·오디오) — 이번 범위 아님 · 문단 단위 정밀 점프는 1차에선 「문서 열기+조각 형광펜」까지(pptx 페이지 좌표가 없음) · 100건 넘은 옛 세션(아카이브 JSONL)은 첨부 목록에서 제외(별도 리더 필요)</td></tr>
+    <tr><td><b>자가점검</b></td><td>지시는 대화창(체크·📎는 <b>선택이지 입력이 아님</b>·입력칸 신설 0) ✓ · 화면 설명은 screenguide+ⓘ로 ✓ · 정직(지정-미발견은 그대로 알림·몰래 확장 금지) ✓ · 등급 게이트는 기존 창구 그대로(새 열람 경로 없음 — 문서 열람은 기존 스테이지 재사용) ✓</td></tr>
+    </table></div>
+</div>
+
+<script>
+  // 목업 상호작용 — 실제 배선과 같은 흐름만 흉내(체크→근거띠 칩, 📎→세션 칩, 탭 전환)
+  var 문서칩 = {}, 세션칩 = {};
+  function 근거띠그리기(){
+    var g = document.getElementById("ground");
+    g.querySelectorAll(".chip").forEach(function(c){ c.remove(); });
+    var docs = Object.keys(문서칩), ses = Object.keys(세션칩);
+    if (docs.length){
+      var c = document.createElement("span"); c.className = "chip doc";
+      c.innerHTML = "📚 근거: 문서 " + docs.length + " <span class='x' title='전체 해제'>×</span>";
+      c.title = docs.join("\n");
+      c.querySelector(".x").onclick = function(){ 문서칩 = {}; document.querySelectorAll(".dck").forEach(function(k){k.checked=false;}); 근거띠그리기(); };
+      g.appendChild(c);
+    }
+    ses.forEach(function(id){
+      var c = document.createElement("span"); c.className = "chip ses";
+      c.innerHTML = "📎 " + 세션칩[id] + " <span class='x'>×</span>";
+      c.querySelector(".x").onclick = function(){ delete 세션칩[id]; 근거띠그리기(); };
+      g.appendChild(c);
+    });
+    document.getElementById("scopeLabel").textContent = docs.length ? ("지정 문서 " + docs.length + "개") : "전체 문서";
+    document.getElementById("scopeLabel").style.color = docs.length ? "var(--acc)" : "var(--mut)";
+  }
+  document.querySelectorAll(".dck").forEach(function(k){
+    k.addEventListener("change", function(){ if (k.checked) 문서칩[k.dataset.doc]=1; else delete 문서칩[k.dataset.doc]; 근거띠그리기(); });
+    if (k.checked) 문서칩[k.dataset.doc]=1;
+  });
+  document.getElementById("allChk").addEventListener("change", function(){
+    var on = this.checked;
+    document.querySelectorAll(".dck").forEach(function(k){ k.checked = on; if (on) 문서칩[k.dataset.doc]=1; });
+    if (!on) 문서칩 = {};
+    근거띠그리기();
+  });
+  document.querySelectorAll(".pin").forEach(function(b){
+    b.addEventListener("click", function(e){ e.stopPropagation();
+      세션칩[b.dataset.ses] = b.parentElement.querySelector(".nm").textContent.slice(0,14) + "…"; 근거띠그리기(); });
+  });
+  document.querySelectorAll(".dtabs .t[data-dt]").forEach(function(t){
+    t.addEventListener("click", function(){
+      document.querySelectorAll(".dtabs .t").forEach(function(x){x.classList.remove("on");});
+      t.classList.add("on");
+      var work = t.dataset.dt === "work";
+      document.getElementById("docList").style.display = work ? "none" : "";
+      document.getElementById("workList").style.display = work ? "" : "none";
+    });
+  });
+  근거띠그리기();
+</script>
+</body></html>

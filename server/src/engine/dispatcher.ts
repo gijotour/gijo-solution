@@ -45,7 +45,8 @@ import { generateReport } from "./report";
 import { listFindingReviews } from "./approvals";
 import { listMaintenanceItems } from "./maintenance";
 import { ACTION_CHECK_RE, runActionCheck } from "./actioncheck";
-import { appendTurn, recentTurnsText, getSession, createSession, markSession } from "./worksessions";
+import { appendTurn, recentTurnsText, getSession, createSession, markSession, attachSessionText } from "./worksessions";
+import { runWithRagScope, sanitizeDocIds, sanitizeAttachIds } from "./ragscope";
 import type { SessionMarks, SessionFold } from "./worksessions";
 import { LONG_ANSWER_MS, QA_LONG_ANSWER_MS, REPORT_HANDOFF_MS, 보고서꼴, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
 import { runWithProgress, isValidProgressId, reportProgress, reportBigStep, registerProgressRoutes } from "./progress";
@@ -1831,7 +1832,8 @@ export function registerDispatcherRoutes(app: Express): void {
       if (!text.trim()) {
         res.status(400).json({
           error: "지시 내용이 비어 있습니다 — 본문에 text를 담아 보내세요.",
-          expected: { text: "string(필수)", sessionId: "string?", screen: "string?", selection: "string?" },
+          // ⚠ 실제로 읽는 필드 전부를 적는다 — qa·progressId가 빠져 있던 것도 고침(설계관 지적).
+          expected: { text: "string(필수)", sessionId: "string?", screen: "string?", selection: "string?", qa: "boolean?", progressId: "string?", docIds: "string[]?", attachSessions: "string[]?" },
         });
         return;
       }
@@ -1839,6 +1841,11 @@ export function registerDispatcherRoutes(app: Express): void {
       // qa=true — 평가 게이트/QA 호출 표시(중-3). 세션·학습 수집을 건너뛴다(오염 방지).
       // 판단 경로는 동일하므로 이 플래그로 점수가 후해지는 일은 없다.
       const qa = req.body?.qa === true;
+      // ☑ 근거 지정·📎 지난 작업 첨부(노트북형 2026-08-30) — 요청 동안만 사는 ALS 꼬리표로
+      // 나른다(ragscope.ts). 검색(하드 필터)·배지·도구·normaltic이 **한 기계**로 같은 범위를 본다.
+      const 지정문서 = sanitizeDocIds(req.body?.docIds);
+      const 첨부글 = sanitizeAttachIds(req.body?.attachSessions)
+        .map((id) => attachSessionText(id)).filter(Boolean).join("\n\n") || undefined;
       // progressId — 클라가 만든 UUID. 있으면 처리 중 단계를 기록해 두고 클라가 폴링으로 본다
       // (2026-07-30 사용자 요청 "진행사항을 %나 진행 바로"). 없으면(구버전·QA) 완전 무동작.
       const progressId = isValidProgressId(req.body?.progressId) ? (req.body.progressId as string) : null;
@@ -1859,8 +1866,10 @@ export function registerDispatcherRoutes(app: Express): void {
       // 리포트 저장+알림이 답을 깎는 게 아니다. 그 밖은 기존 30초 그대로.
       const limitMs = qa ? QA_LONG_ANSWER_MS : 보고서꼴(text) ? REPORT_HANDOFF_MS : LONG_ANSWER_MS;
       const t0 = Date.now(); // 느린 답 원장(관측성) — 담당자를 기다리게 한 질문을 제품이 스스로 적는다
-      const work = runWithProgress(progressId, user?.id ?? null, () =>
-        dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id ?? user?.username, clearance: user?.clearance, role: user?.role }, 선택)
+      const work = runWithRagScope({ docIds: 지정문서, attachText: 첨부글 }, () =>
+        runWithProgress(progressId, user?.id ?? null, () =>
+          dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id ?? user?.username, clearance: user?.clearance, role: user?.role }, 선택)
+        )
       );
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), limitMs));
@@ -1931,7 +1940,7 @@ export function registerDispatcherRoutes(app: Express): void {
       if (!text.trim()) {
         res.status(400).json({
           error: "지시 내용이 비어 있습니다 — 본문에 text를 담아 보내세요.",
-          expected: { text: "string(필수)", sessionId: "string?", screen: "string?", selection: "string?" },
+          expected: { text: "string(필수)", sessionId: "string?", screen: "string?", selection: "string?", qa: "boolean?", progressId: "string?", docIds: "string[]?", attachSessions: "string[]?" },
         });
         return;
       }
@@ -1939,6 +1948,10 @@ export function registerDispatcherRoutes(app: Express): void {
       const qa = req.body?.qa === true;
       const progressId = isValidProgressId(req.body?.progressId) ? (req.body.progressId as string) : null;
       const 선택 = 선택정리(req.body?.selection);
+      // ☑·📎 — 통짜 라우트와 같은 처리(두 입구가 같은 계약 — 한 곳만 하면 스트림에서 샌다).
+      const 지정문서 = sanitizeDocIds(req.body?.docIds);
+      const 첨부글 = sanitizeAttachIds(req.body?.attachSessions)
+        .map((id) => attachSessionText(id)).filter(Boolean).join("\n\n") || undefined;
 
       res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
       res.setHeader("Cache-Control", "no-cache");
@@ -1950,9 +1963,11 @@ export function registerDispatcherRoutes(app: Express): void {
 
       const t0 = Date.now();
       try {
-        const r = await 스트림자리.run(싱크, () =>
-          runWithProgress(progressId, user?.id ?? null, () =>
-            dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id ?? user?.username, clearance: user?.clearance, role: user?.role }, 선택)
+        const r = await runWithRagScope({ docIds: 지정문서, attachText: 첨부글 }, () =>
+          스트림자리.run(싱크, () =>
+            runWithProgress(progressId, user?.id ?? null, () =>
+              dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id ?? user?.username, clearance: user?.clearance, role: user?.role }, 선택)
+            )
           )
         );
         // 출구 손질은 기존 라우트와 같은 순서·같은 함수 — 여기만 다르면 두 입이 딴말을 한다.

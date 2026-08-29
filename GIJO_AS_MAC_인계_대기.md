@@ -167,6 +167,16 @@
 
 ⚠ 한계만 올리면 **1.6GB를 클라·서버 양쪽 메모리에 통째로** 올린다(Node Buffer 상한 부근) — 권하지 않는다.
 
+### 2026-08-30 — 내 문서 노트북형(☑ 근거 지정·📎 지난 작업 첨부)
+
+- **공용 파일 변경**: `preload.ts`(sendInstruction/Stream에 docIds·attachSessions 위치 인자 추가) ·
+  `console.js`(근거띠 #csGround·gijoConsole.docScope/attachWork) · `app.html`(gijo:docscope/attach 수신 분기·
+  gijoDocScopeCleared 훅) · `nav.js`(팝업 릴레이 목록 2종 추가) · `mydocs.html`(☑ 열·📎 지난 작업 탭) ·
+  `dispatcher.ts`(본문 필드 2개·ALS 랩) · `llm.ts`(지정범위배너·첨부 블록) · `memory.ts`(where AND 필터) ·
+  `worksessions.ts`(attachSessionText) · `screenguide.ts` · 신규 `ragscope.ts`·`ragscope.test.ts`
+- **max 실기 검증거리**: 라이트 dmg에서 mydocs 「📎 지난 작업」 탭이 뜨는지(라이트에 work-sessions
+  라우트가 있는지 — 없으면 「불러오기 실패」가 뜬다. edition-lite에서 탭을 숨길지 win이 후속 판단)
+
 ### 진행 중이라 아직 인계 대상이 아닌 것
 
 - 규정 판정 요청함 — 시안·설계 검토 완료, 착수 전

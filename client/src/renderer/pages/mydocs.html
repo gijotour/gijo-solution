@@ -79,6 +79,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
 .acts{display:flex;gap:6px;}
 .btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+/* 📎 첨부(노트북형) — 30px 행 안에 드는 압축 단추. 11px = uireadability 하한 */
+.wattach{height:20px;padding:0 7px;font-size:11px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);border-radius:6px;cursor:pointer;white-space:nowrap}
+.wattach:hover{border-color:var(--ok,#3fa66a);color:var(--ok,#3fa66a)}
   padding:0 10px;height:26px;border-radius:7px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
 .btn:hover{border-color:var(--blue);}
@@ -334,6 +337,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       <button class="v4node" data-t="guide">📘<span class="txt">GIJO AS 안내</span><span class="cnt" id="nGuide"></span></button>
       <button class="v4node" data-t="vendor">📦<span class="txt">보안제품 자료</span><span class="cnt" id="nVendor"></span></button>
       <div class="v4grouplbl">기록</div>
+      <!-- 📎 지난 작업(노트북형 2026-08-30, 시안 mydocs-notebook) — 지난 대화 세션을 골라
+           현재 대화에 맥락으로 첨부한다. ⚠ 이름을 「작업내역」이라 하지 않는다 — sessions.html의
+           화면 이름이 이미 「작업 내역」이라 별칭·길찾기가 두 곳을 가리키게 된다(설계관 지적). -->
+      <button class="v4node" data-t="work">📎<span class="txt">지난 작업</span><span class="cnt" id="nWork"></span></button>
       <button class="v4node" data-t="learn">🎓<span class="txt">학습</span><span class="cnt" id="nLearn"></span></button>
       <button class="v4node" data-t="ingest">🩹<span class="txt">반입</span><span class="cnt" id="nIngest"></span></button>
       <button class="v4node future" data-t="future" title="예약된 자리 — 리포트·공식 인수인계 열람을 모을 예정입니다(아직 동작하지 않습니다)">🗂<span class="txt">산출물</span><span class="cnt">예정</span></button>
@@ -444,6 +451,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   "use strict";
   var 탭 = "mine";
   var mine = [], know = [], learn = [], learnTopics = [], learnKpis = null, guide = [];
+  var work = []; // 📎 지난 작업(노트북형) — 지난 대화 세션 목록(listWorkSessions)
+  // ☑ 근거 지정 상태 — docId(검색 세계 키) → 표시 이름. ⚠ 개인 문서의 검색 키는
+  //   "personal:<uuid>"다(server personaldocs.ts ragDocumentId — id 그대로 보내면 무동작).
+  var 근거체크 = {};
   // ★ 반입 영수증 (2026-08-22). 문서 목록(know)과 **다른 원천**이다:
   //   취약점 스캔·SBOM은 일부러 지식에 안 넣어서 know에는 원리상 안 뜬다.
   //   ⚠ 「내가 넣은 모든 파일」이라 부르지 않는다 — 서버가 **내 것 + 내가 볼 수 있는 것**을 준다
@@ -453,7 +464,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   // 📦 보안제품 자료 — 도입 **검토용** 타사 카탈로그. 우리가 쓰는 제품 등록부와 **다른 대장**이다.
   var vendor = [];
   var introSchema = []; // 비교 항목 스키마 — 서버가 준다(화면이 항목 이름을 베껴 적지 않는다)
-  var 오류 = { mine: null, know: null, learn: null, guide: null, ingest: null }; // 불러오기 실패는 「없음」과 다르다(검토관 상4)
+  var 오류 = { mine: null, know: null, learn: null, guide: null, ingest: null, work: null }; // 불러오기 실패는 「없음」과 다르다(검토관 상4)
 
   // ── 📞 연락처 — 담당자 테리토리×제품 매트릭스 ────────────────────────────────
   //
@@ -608,6 +619,13 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   function 알림(라벨, 글) {
     if (!window.gijoSelectNotify) return;
     window.gijoSelectNotify(라벨 ? { label: String(라벨).slice(0, 40), text: 글 } : undefined);
+  }
+  // ☑ 근거 지정 발신(노트북형 2026-08-30) — 체크 상태의 **전체 목록**을 셸(app.html)에 보낸다.
+  // 부분 갱신이 아니라 전체를 보내는 이유: 칩(대화창)과 체크(이 화면)가 어긋날 여지를 없앤다.
+  // 수신부는 app.html의 gijo:docscope 분기 — 값은 거기서 다시 정돈된다(iframe 값 불신 관례).
+  function 근거알림() {
+    var 목록 = Object.keys(근거체크).map(function (k) { return { id: k, label: 근거체크[k] }; });
+    try { window.top.postMessage({ type: "gijo:docscope", docIds: 목록 }, "*"); } catch (e) { }
   }
   function 화면열기(page, label) {
     try { window.top.postMessage({ type: "gijo:openTab", page: page, label: label }, "*"); } catch (e) { }
@@ -774,7 +792,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     // ⚠ 전폭이 필요한 탭은 「고를 것도 고칠 것도 없는 열람」이다. 📞 연락처의 담당 매트릭스도
     //   같은 성격이라(격자를 30px 행으로 누르면 「어디가 비었나」가 안 보인다) 함께 전폭을 준다.
     //   ⚠ 하드코드 `=== "learn"`이었다 — 새 탭을 더할 때 여기를 안 고치면 조용히 좁게 뜬다.
-    var 전폭탭 = { learn: true, contacts: true };
+    var 전폭탭 = { learn: true, contacts: true, work: true }; // 📎 지난 작업도 열람 전용 — 문서창 없음
     document.getElementById("v4content").classList.toggle("full", !!전폭탭[탭] && 목록모드);
     document.getElementById("rowsBox").className = "g-rows g-rows--hub-" + 탭;
 
@@ -783,7 +801,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     //   엉뚱하게 「불러오기 실패」가 떴다 — 그 탭은 회사 지식을 쓰지도 않는데.
     //   → 탭마다 자기 원천의 오류만 본다. 표에 없으면 오류 없음(null)이다.
     var 탭별오류 = {
-      mine: 오류.mine, learn: 오류.learn, guide: 오류.guide, know: 오류.know,
+      mine: 오류.mine, learn: 오류.learn, guide: 오류.guide, know: 오류.know, work: 오류.work,
       ingest: 오류.ingest, vendor: 오류.vendor, contacts: null,   // 연락처는 이 PC 저장이라 로드 실패가 없다
     };
     var 탭오류 = Object.prototype.hasOwnProperty.call(탭별오류, 탭) ? 탭별오류[탭] : null;
@@ -800,9 +818,17 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         if (mineFilter === "personal" && d.shared) return false;
         return 걸림(d.title);
       });
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 64px 64px 44px;gap:8px"><span>제목</span><span>AI</span><span>공유</span><span class="ta-r">수정</span></div>' +
+      // ☑ 첫 칸 = 대화 근거 지정(노트북형). AI 포함이 꺼진 개인 전용 문서는 지식에 아예 없어
+      // (인입본문 null) 체크해도 조각 0이 된다 — 체크를 막고 이유를 말한다(「근거 없음」과
+      // 「AI 포함 꺼짐」은 다른 사실 — 설계관 지적).
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 64px 64px 44px;gap:8px"><span title="☑ = 대화 근거로 지정">☑</span><span>제목</span><span>AI</span><span>공유</span><span class="ta-r">수정</span></div>' +
         (rows.length ? '<div class="g-rows-flat">' + rows.map(function (d) {
-          return '<div class="g-rows-r" data-id="' + esc(d.id) + '" style="grid-template-columns:1fr 64px 64px 44px;gap:8px">' +
+          var 키 = "personal:" + d.id;
+          var 가능 = !!(d.ragOptIn || d.shared);
+          return '<div class="g-rows-r" data-id="' + esc(d.id) + '" style="grid-template-columns:20px 1fr 64px 64px 44px;gap:8px">' +
+            '<span>' + (가능
+              ? '<input type="checkbox" class="dchk" data-doc="' + esc(키) + '" data-label="' + esc(d.title) + '"' + (근거체크[키] ? " checked" : "") + ' title="대화 근거로 지정 — 체크한 문서들 안에서만 검색합니다">'
+              : '<span class="gm2" title="AI 포함이 꺼진 개인 문서 — 지식에 없어 근거로 쓸 수 없습니다. 문서를 열어 AI 포함을 켜면 지정할 수 있습니다">–</span>') + "</span>" +
             '<span class="trunc" title="' + esc(d.title) + '">' + esc(d.title) + "</span>" +
             '<span>' + (d.ragOptIn ? '<span class="gtxt-rag">AI 포함</span>' : '<span class="gm2">—</span>') + "</span>" +
             '<span>' + (d.shared ? '<span class="gtxt-share">🏢 공유</span>' : '<span class="gm2">개인</span>') + "</span>" +
@@ -817,12 +843,15 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         (byCat[c] = byCat[c] || []).push(d);
       });
       var cats = Object.keys(byCat).sort();
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 74px 52px 44px;gap:8px"><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>' +
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px"><span title="☑ = 대화 근거로 지정">☑</span><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>' +
         (cats.length ? cats.map(function (c) {
           var folded = 접힘.has(c);
           return '<div class="g-rows-gh" data-cat="' + esc(c) + '" style="top:26px"><span class="tri">' + (folded ? "▸" : "▾") + '</span>🗂 ' + esc(c) + '<span class="cnt">' + byCat[c].length + "개</span></div>" +
             '<div class="g-rows-body' + (folded ? " folded" : "") + '">' + byCat[c].map(function (d) {
-              return '<div class="g-rows-r" data-id="' + esc(d.documentId) + '" style="grid-template-columns:1fr 74px 52px 44px;gap:8px">' +
+              // ☑ 회사 지식은 목록에 있으면 곧 지식에 있는 문서다(이 목록의 원천이 지식 등록부).
+              // 등급 차단은 서버 검색이 한 번 더 거른다 — 화면 체크는 범위 지정일 뿐이다.
+              return '<div class="g-rows-r" data-id="' + esc(d.documentId) + '" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px">' +
+                '<span><input type="checkbox" class="dchk" data-doc="' + esc(d.documentId) + '" data-label="' + esc(d.documentId) + '"' + (근거체크[d.documentId] ? " checked" : "") + ' title="대화 근거로 지정 — 체크한 문서들 안에서만 검색합니다"></span>' +
                 '<span class="trunc" title="' + esc(d.documentId) + '">' + esc(d.documentId) + "</span>" +
                 등급글자(d.grade) +
                 '<span class="ta-r gm">' + (d.chunks || 0) + "</span>" +
@@ -850,6 +879,23 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
                 (히트 ? '<span class="ta-r gtxt-share" title="본문에서 ' + 히트 + '번 나옵니다">' + 히트 + "곳</span>" : '<span class="ta-r gm2">읽기전용</span>') + "</div>";
             }).join("") + "</div>";
         }).join("") : '<div class="empty">GIJO AS 안내 문서를 불러오지 못했거나 없습니다.</div>');
+    } else if (탭 === "work") {
+      // 📎 지난 작업(노트북형 2026-08-30) — 지난 대화 세션을 현재 대화에 맥락으로 첨부한다.
+      // ⚠ 원천 정직: 서버는 최근 100건 롤링만 준다(그 밖은 아카이브 — 여기 안 뜬다).
+      // ⚠ 세션 열람·이어가기는 「작업 내역」 화면 몫 — 여기는 첨부만 한다(갈아타기와 별개 기능).
+      var wr = work.filter(function (s) { return 걸림(s.title || ""); });
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 56px 70px 52px 64px;gap:8px"><span>지난 작업(최근 100건 — 📎로 지금 대화에 첨부)</span><span>턴</span><span>상태</span><span class="ta-r">시각</span><span></span></div>' +
+        (wr.length ? '<div class="g-rows-flat">' + wr.map(function (s) {
+          return '<div class="g-rows-r" data-id="' + esc(s.id) + '" style="grid-template-columns:1fr 56px 70px 52px 64px;gap:8px">' +
+            '<span class="trunc" title="' + esc(s.title || "") + (s.lastPreview ? " — " + esc(s.lastPreview) : "") + '">' + esc(s.title || "(제목 없음)") + "</span>" +
+            '<span class="gm">' + (s.turnCount || 0) + "</span>" +
+            '<span class="gm2">' + (s.status === "active" ? "진행 중" : s.status === "done" ? "완료" : "무시") + "</span>" +
+            '<span class="ta-r gm2">' + 날짜(s.updatedAt) + "</span>" +
+            '<span class="ta-r">' + ((s.turnCount || 0) > 0
+              ? '<button class="wattach" data-ses="' + esc(s.id) + '" data-title="' + esc(s.title || "") + '" title="이 작업의 대화(최근 6턴 압축)를 지금 대화에 맥락으로 첨부합니다 — 최대 3개">📎 첨부</button>'
+              : '<span class="gm2" title="대화 턴이 없는 세션 — 첨부할 내용이 없습니다">—</span>') + "</span></div>";
+        }).join("") + "</div>"
+        : '<div class="empty">' + (work.length ? "검색과 맞는 작업이 없습니다." : "지난 작업이 없습니다 — 대화창에서 일하면 자동으로 쌓입니다.") + "</div>");
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;
@@ -994,6 +1040,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     document.getElementById("nGuide").textContent = guide.length || "";
     // 학습 총계는 kpis(진짜 총계)로 — 조회 상한(100)을 총계처럼 말하면 거짓이다(중1)
     document.getElementById("nLearn").textContent = (learnKpis && learnKpis.total) || learn.length || "";
+    document.getElementById("nWork").textContent = work.length || "";
     // ⚠ 세는 원천이 바뀌었다(2026-08-22) — 문서 목록이 아니라 **영수증**이다.
     //   그전엔 지식에 든 문서만 세어, 취약점 파일을 올려도 숫자가 안 늘었다.
     // ⚠ 서버가 준 **거른 뒤의 총계**를 쓴다 — 목록 길이(상한 300)를 총계로 말하면 거짓이다
@@ -1055,6 +1102,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       오류.learn = null;
     } catch (e) { learn = []; learnKpis = null; 오류.learn = (e && e.message) || "오류"; }
     try { learnTopics = (await window.gijo.listLearnloopTopics()) || []; } catch (e) { learnTopics = []; }
+    // 📎 지난 작업(노트북형) — 최근 100건 롤링이 서버 원천의 전부다(그 밖은 아카이브 JSONL —
+    //   첨부 대상에서 제외, 시안 「포기」란에 명시). 다리는 기존 listWorkSessions 재사용.
+    try { work = (await window.gijo.listWorkSessions()) || []; 오류.work = null; }
+    catch (e) { work = []; 오류.work = (e && e.message) || "오류"; }
     // ★ 반입 영수증(2026-08-22). 취약점·SBOM처럼 **지식에 안 들어가는**
     //   갈래는 문서 목록에 원리상 안 뜨므로 별도 창구에서 온다.
     //   ⚠ 다리는 preload에 새로 냈다(listUploadReceipts) — 이 화면에는 fetch를 쓰는 자리가 없다.
@@ -1167,7 +1218,29 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   });
 
   // 행 클릭 — 탭별 상세(편집 조작은 내 것 탭에서만: 「위험한 관리는 전용 화면」·읽기전용 경계)
+  // ☑ 체크 변경 → 근거 지정 발신(노트북형). change 델리게이트라 행 클릭(상세 열기)과 안 싸운다.
+  document.getElementById("list").addEventListener("change", function (ev) {
+    var k = ev.target;
+    if (!k || !k.classList || !k.classList.contains("dchk")) return;
+    var id = k.getAttribute("data-doc") || "";
+    if (!id) return;
+    if (k.checked) 근거체크[id] = k.getAttribute("data-label") || id;
+    else delete 근거체크[id];
+    근거알림();
+  });
   document.getElementById("list").addEventListener("click", async function (ev) {
+    // 📎 첨부(노트북형) — 지난 작업을 지금 대화의 맥락으로. 행 클릭과 섞이지 않게 먼저 잡는다.
+    if (ev.target && ev.target.classList && ev.target.classList.contains("wattach")) {
+      ev.stopPropagation();
+      try {
+        window.top.postMessage({
+          type: "gijo:attach",
+          sessionId: ev.target.getAttribute("data-ses") || "",
+          title: ev.target.getAttribute("data-title") || "",
+        }, "*");
+      } catch (e) { }
+      return;
+    }
     // 그룹 접기(검토관 중10 — ▾를 그려 놓고 배선이 없으면 죽은 조작). 회사 지식·제품 안내 공용.
     var gh = ev.target.closest(".g-rows-gh");
     if (gh) {
@@ -1967,7 +2040,14 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   window.addEventListener("message", function (ev) {
     if (ev.source !== window.parent && ev.source !== window.top) return;
     var d = ev.data;
-    if (!d || d.type !== "gijo:newDocFromTemplate") return;
+    if (!d) return;
+    // ☑ 전체 해제(노트북형) — 대화창 근거띠의 ×를 눌렀을 때. 체크만 남으면 화면이 거짓말한다.
+    if (d.type === "gijo:docscope:clear") {
+      근거체크 = {};
+      Array.prototype.forEach.call(document.querySelectorAll("#list .dchk"), function (k) { k.checked = false; });
+      return;
+    }
+    if (d.type !== "gijo:newDocFromTemplate") return;
     var t = TEMPLATES.find(function (x) { return x.id === d.templateId; });
     if (!t) return; // 모르는 템플릿이면 열지 않는다 — 빈 편집기를 여는 것보다 안 여는 쪽이 정직하다
     var body = t.body;
@@ -2013,7 +2093,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   // ?tab= 딥링크 — 문서함(창)을 흡수하며 옛 진입로(하단 📚·설정의 가이드 링크)가
   // 「제품 안내 탭이 선택된 내 문서」로 바로 오게 한다(승인 시안 §7 대응표).
   var 첫탭 = new URLSearchParams(location.search).get("tab");
-  if (첫탭 && ["mine", "know", "guide", "learn", "ingest", "vendor", "contacts"].indexOf(첫탭) >= 0) {
+  if (첫탭 && ["mine", "know", "guide", "learn", "ingest", "vendor", "contacts", "work"].indexOf(첫탭) >= 0) {
     탭 = 첫탭;
     Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) {
       x.classList.toggle("on", x.getAttribute("data-t") === 첫탭);

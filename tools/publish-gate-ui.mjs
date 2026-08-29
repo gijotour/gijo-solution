@@ -361,6 +361,45 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     ok("담당자 관리: 문서창에서 열리고 높이가 산다(≥300px) + 셸 배색 신호 전달",
       !!s && s.틀높이 >= 300 && /theme=(host|light)/.test(s.틀주소),
       JSON.stringify(s && { 틀높이: Math.round(s.틀높이), 틀주소: s.틀주소 }));
+
+    // ── ③⁙ 노트북형(시안 mydocs-notebook, 2026-08-30) — ☑ 근거 지정·📎 지난 작업.
+    //   읽기 검토가 못 잡는 것: 체크→postMessage→셸 재조립→근거띠 칩까지 **네 단계 릴레이**라
+    //   한 단계만 끊겨도 화면은 멀쩡해 보인다(칩이 안 뜰 뿐). 띄워서 끝까지 잰다.
+    const nb = await fr.evaluate(async () => {
+      const 잠깐 = (ms) => new Promise((r) => setTimeout(r, ms));
+      // 📎 지난 작업 탭이 그려지는가(빈 목록이어도 머리·빈 안내는 떠야 한다)
+      const 작업노드 = document.querySelector('#tabs .v4node[data-t="work"]');
+      if (작업노드) { 작업노드.click(); await 잠깐(1200); }
+      const 작업머리 = !!document.querySelector("#list .g-rows-head") || !!document.querySelector("#list .empty");
+      // 회사 지식 탭에서 첫 ☑ 체크 → gijo:docscope 발신
+      const 지식노드 = document.querySelector('#tabs .v4node[data-t="know"]');
+      if (지식노드) { 지식노드.click(); await 잠깐(1200); }
+      const 첫체크 = document.querySelector("#list .dchk");
+      if (첫체크) { 첫체크.click(); await 잠깐(600); }
+      return { 작업노드: !!작업노드, 작업머리, 체크있나: !!첫체크, 체크됨: !!(첫체크 && 첫체크.checked) };
+    }).catch(() => null);
+    // 셸(대화창)에 근거띠 칩이 실제로 떴는가 — 릴레이 종점 실측
+    const 칩 = await 셸.evaluate(() => {
+      const g = document.getElementById("csGround");
+      const c = g && g.querySelector(".cs-gchip.gdoc");
+      return { 띠있나: !!g, 칩글: c ? c.textContent.trim().slice(0, 30) : "" };
+    }).catch(() => null);
+    ok("노트북형: 📎 지난 작업 탭 렌더 + ☑ 체크 → 근거띠 칩(4단계 릴레이 실측)",
+      !!nb && nb.작업노드 && nb.작업머리 && nb.체크있나 && nb.체크됨
+        && !!칩 && 칩.띠있나 && /근거: 문서 1/.test(칩.칩글),
+      JSON.stringify({ nb, 칩 }));
+    // 칩 ×(전체 해제) → mydocs 체크도 풀리는가 — 역방향 릴레이(화면-칩 딴말 방지)
+    await 셸.evaluate(() => {
+      const x = document.querySelector("#csGround .cs-gchip.gdoc .gx");
+      if (x) x.click();
+    }).catch(() => null);
+    await new Promise((r) => setTimeout(r, 600));
+    const 해제 = await fr.evaluate(() =>
+      ![...document.querySelectorAll("#list .dchk")].some((k) => k.checked)
+    ).catch(() => null);
+    const 칩후 = await 셸.evaluate(() => !document.querySelector("#csGround .cs-gchip.gdoc")).catch(() => null);
+    ok("노트북형: 칩 × → 칩 사라짐 + 화면 체크 해제(역방향 릴레이)", 해제 === true && 칩후 === true,
+      JSON.stringify({ 해제, 칩사라짐: 칩후 }));
   }
 }
 
@@ -417,6 +456,25 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
   ok("나란히: 화면 왼쪽·대화 오른쪽·⊟ 화면 접기",
     무대.나란히 && 무대.대화보임 && 무대.화면보임 && 무대.접기단추 && !무대.옛팝업단추,
     JSON.stringify(무대));
+
+  // ── 셸 배치는 **전 화면 공통**(사장님 2026-08-29 「메뉴 판·‖ 접기·대화창 폭 조절
+  //    전체 대시보드에 적용」) — 배선이 body 수준이라 이미 전역인데, 그 사실을 여기 못박는다.
+  //    앞 검사들이 mydocs 아닌 탭(assets 등)을 여러 개 연 **지금 상태**에서 재야 뜻이 있다.
+  {
+    const 전역 = await 셸.evaluate(() => {
+      const nav = document.getElementById("gijoNav");
+      const rsz = document.getElementById("conResize");
+      const 활성탭 = (window.gijoTabs && window.gijoTabs.active && window.gijoTabs.active()) || "";
+      return {
+        메뉴판: !!nav && nav.offsetWidth > 0,
+        끌개: !!rsz && rsz.offsetParent !== null,
+        비mydocs탭: !/mydocs/.test(String(활성탭)),
+      };
+    }).catch(() => null);
+    // 활성 탭 API가 없으면(구셸) 탭 판정만 건너뛴다 — 메뉴판·끌개는 어느 화면에서든 있어야 한다.
+    ok("셸 전역: 메뉴 판·대화폭 끌개가 mydocs 아닌 화면에서도 산다(전체 대시보드 계약)",
+      !!전역 && 전역.메뉴판 && 전역.끌개, JSON.stringify(전역));
+  }
   // ⊟ 화면 접기 — 대화가 전폭이 되고, 화면(탭)은 산 채로 남는다(필터·스크롤 보존 계약).
   await 셸.evaluate(() => document.getElementById("stageBack").click());
   const 내림 = await 셸.evaluate(() => ({

@@ -252,6 +252,14 @@
       //   --console-w, 0-4 끌개 — 바닥 360은 분리창 minWidth와 같은 실증값), 그 안에서
       //   ＋·토글·전송이 자리를 다 먹으면 입력칸이 밀려난다. 미디어쿼리로는 이 상황을 못 잰다.
       ".cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;container-type:inline-size;}",
+      // ☑ 근거띠(노트북형 2026-08-30) — 칩 없으면 :empty로 0px(평소 세로 증감 0). 글자 11px(uireadability 하한).
+      ".cs-ground{flex:0 0 auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 14px 0;}",
+      ".cs-ground:empty{display:none;}",
+      ".cs-gchip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line,#3a4350);border-radius:12px;padding:1px 9px;font-size:11px;cursor:default;max-width:100%;}",
+      ".cs-gchip .gx{cursor:pointer;font-weight:700;opacity:.65;}",
+      ".cs-gchip .gx:hover{opacity:1;}",
+      ".cs-gchip.gdoc{color:#5fb98a;border-color:#5fb98a55;}",
+      ".cs-gchip.gses{color:#7ea6e8;border-color:#7ea6e855;}",
       // ⚠ min-width:0 — flex 아이템의 기본값(auto)은 **입력칸이 자기 기본 크기 밑으로 안 줄게** 해서
       //   좁은 도크에서 줄 전체를 밀어낸다(검토관 2026-08-22 [중]). 줄어들 수 있게 명시한다.
       ".cs-dock input{flex:1;min-width:0;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:11px;color:var(--text,#e9e7e2);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}",
@@ -335,6 +343,9 @@
         '<div class="ce-div">또는 메뉴에서 바로 가기</div>' +
         '<div class="ce-mrow" id="ceMrow"></div>' +
       '</div></div></div>' +
+      // ☑ 근거띠(노트북형 2026-08-30) — 「내 문서」에서 ☑한 문서·📎한 지난 작업이 칩으로 뜬다.
+      // 칩이 없으면 CSS(:empty)로 자리 자체가 0px — 평소 세로 증감 0.
+      '<div class="cs-ground" id="csGround"></div>' +
       '<div class="cs-dock">' +
         '<button class="cs-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>' +
         // 원본 보관 토글 — 켜면 다음 업로드부터 원본 파일도 서버에 함께 남는다(추출본 .md는 항상 남는다).
@@ -1248,6 +1259,58 @@
     line.innerHTML = html;
   }
 
+  // ── ☑ 근거 지정·📎 지난 작업 첨부(노트북형 2026-08-30, 시안 mydocs-notebook) ──────
+  // 「내 문서」의 ☑ 체크가 gijo:docscope로, 📎가 gijo:attach로 들어온다(app.html 수신부 경유).
+  // 상태는 여기 한 곳 — 전송 시 docIds/attachSessions 인자로 실린다. 칩이 곧 상태 표시라
+  // 화면(mydocs 체크)과 어긋나지 않게, 칩 ×로 지울 때는 셸 훅으로 mydocs에도 되알린다.
+  var 근거문서 = [];   // [{id, label}] — mydocs가 체크 전체 목록을 보낸다(부분 갱신 아님)
+  var 첨부세션 = [];   // [{id, title}] — 최대 3개(서버 상한과 동일)
+  function 근거띠그리기() {
+    var g = document.getElementById("csGround");
+    if (!g) return;
+    g.textContent = "";
+    if (근거문서.length) {
+      var c = document.createElement("span");
+      c.className = "cs-gchip gdoc";
+      c.title = 근거문서.map(function (d) { return d.label || d.id; }).join("\n");
+      c.appendChild(document.createTextNode("📚 근거: 문서 " + 근거문서.length + " "));
+      var x = document.createElement("span");
+      x.className = "gx"; x.textContent = "×"; x.title = "지정 전체 해제 — 전체 문서에서 검색";
+      x.addEventListener("click", function () { setDocScope([]); if (window.gijoDocScopeCleared) { try { window.gijoDocScopeCleared(); } catch (e) {} } });
+      c.appendChild(x);
+      g.appendChild(c);
+    }
+    첨부세션.forEach(function (s) {
+      var c = document.createElement("span");
+      c.className = "cs-gchip gses";
+      c.title = s.title || s.id;
+      c.appendChild(document.createTextNode("📎 " + String(s.title || s.id).slice(0, 18) + " "));
+      var x = document.createElement("span");
+      x.className = "gx"; x.textContent = "×"; x.title = "첨부 빼기";
+      x.addEventListener("click", function () {
+        첨부세션 = 첨부세션.filter(function (t) { return t.id !== s.id; });
+        근거띠그리기();
+      });
+      c.appendChild(x);
+      g.appendChild(c);
+    });
+  }
+  function setDocScope(list) {
+    // 값 정돈은 여기서도 한다(셸이 한 번 하지만 부품은 부품대로 — 다른 셸에 실려도 안전).
+    근거문서 = (Array.isArray(list) ? list : []).slice(0, 50).map(function (d) {
+      return { id: String(d && d.id || "").slice(0, 200), label: String(d && d.label || "").slice(0, 120) };
+    }).filter(function (d) { return d.id; });
+    근거띠그리기();
+  }
+  function attachWork(item) {
+    var id = String(item && item.id || "").slice(0, 80);
+    if (!id) return;
+    if (첨부세션.some(function (t) { return t.id === id; })) return; // 중복 첨부 무시
+    if (첨부세션.length >= 3) 첨부세션.shift(); // 상한 3 — 오래된 것부터 밀어낸다(서버 상한과 동일)
+    첨부세션.push({ id: id, title: String(item && item.title || "").slice(0, 120) });
+    근거띠그리기();
+  }
+
   // ── 메뉴 연동 재설계(2026-08-09 시안 승인 + 외부사례 B·C) ────────────────
   var prevScreen = null;
   var ctxOff = false; // C. 맥락 떼기 — 켜지면 지시에 화면을 안 싣는다
@@ -1636,18 +1699,21 @@
         var b = rows();
         if (b) b.scrollTop = b.scrollHeight;
       };
+      // ☑·📎 — 근거띠 상태를 전송에 싣는다(노트북형). 비면 undefined — 기존 요청과 동일.
+      var 지정문서인자 = 근거문서.length ? 근거문서.map(function (d) { return d.id; }) : undefined;
+      var 첨부인자 = 첨부세션.length ? 첨부세션.map(function (s) { return s.id; }) : undefined;
       var r;
       if (window.gijo.sendInstructionStream) {
         try {
-          r = await window.gijo.sendInstructionStream(보낼글, session ? session.id : undefined, 화면인자, pid, 선택인자, onDelta, onStart);
+          r = await window.gijo.sendInstructionStream(보낼글, session ? session.id : undefined, 화면인자, pid, 선택인자, onDelta, onStart, 지정문서인자, 첨부인자);
         } catch (se) {
           // 흐르다 끊겼으면(글자가 이미 보였으면) 끊겼다고 알린다 — 잘린 답을 완성인 척 안 한다.
           // 아무것도 안 흘렀으면(구서버 404·연결 실패) 통짜 경로로 한 번 더 — 기능 후퇴는 없다.
           if (live && live.textContent) throw se;
-          r = await window.gijo.sendInstruction(보낼글, session ? session.id : undefined, 화면인자, pid, 선택인자);
+          r = await window.gijo.sendInstruction(보낼글, session ? session.id : undefined, 화면인자, pid, 선택인자, 지정문서인자, 첨부인자);
         }
       } else {
-        r = await window.gijo.sendInstruction(보낼글, session ? session.id : undefined, 화면인자, pid, 선택인자);
+        r = await window.gijo.sendInstruction(보낼글, session ? session.id : undefined, 화면인자, pid, 선택인자, 지정문서인자, 첨부인자);
       }
       if (pc) pc.stop();
       if (r && r.sessionId) {
@@ -2193,7 +2259,7 @@
     // 비워 놓고 다시 안 그리면 띠가 직전 화면의 「지금 여기」를 계속 가리킨다).
     try { readCtxFromShell(); } catch (e) { }
   }
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; }, screenCard: screenCard, newSession: newSession };
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; }, screenCard: screenCard, newSession: newSession, docScope: setDocScope, attachWork: attachWork };
 
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.

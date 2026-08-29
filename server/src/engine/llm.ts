@@ -20,6 +20,7 @@ import { isNonLearningAccount } from "./learnpolicy";
 import type { Viewer } from "./memory";
 import { explainHardTerms, glossaryGroundingFor } from "./glossary";
 import { gateUserInput } from "./gateway";
+import { currentDocIds, currentAttachText } from "./ragscope";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -106,6 +107,11 @@ export function resetChatHistoryForTests(): void {
 //   지식없음을밝힌다)가 **같은 문장**을 쓴다. 두 곳에 따로 적으면 어긋난다(이 저장소 반복 유형).
 //   문구는 FAIL_MARKS와 대조됨(emptyanswer-guidance 파일 전체 감시) — 「찾지 못했」 금지.
 export const 자료없음배너 = `${표식.주의} **이 PC의 사내 자료에는 이 내용이 없습니다** — 아래는 **일반 지식 기준**의 답이니, 회사 규정·내부 데이터가 걸린 판단에는 그대로 쓰지 마세요.`;
+// ☑ 지정 범위 배너(노트북형 2026-08-30) — 문서를 지정했는데 **그 범위에서** 0건일 때.
+//   전체 자료에 없다는 뜻이 아니므로 자료없음배너를 재사용하면 거짓말이 된다(설계관 지적 —
+//   범위를 좁힌 것뿐인데 「이 PC의 사내 자료에는 없습니다」라 말하게 된다).
+//   ⚠ FAIL_MARKS 대조 — 「찾지 못했」 금지. 「검색되지 않았습니다」는 목록에 없다.
+export const 지정범위배너 = `${표식.주의} **지정하신 문서 범위에서는 관련 내용이 검색되지 않았습니다** — 문서 지정(☑)을 풀면 전체 사내 자료에서 다시 찾습니다. 아래는 일반 지식 기준의 답이니 그대로 쓰지 마세요.`;
 // 답 머리가 이미 사실을 말하고 있으면 배너를 겹쳐 붙이지 않는다(머리 60자 검사).
 export const 자료없음중복가드 = /자료에는 없|없습니다|근거 약함|자료를 넣어/;
 // **사내 특정 대상**을 콕 집어 물었는데 근거 0일 때의 표적 배너 — 일반지식 답을 「우리 답인 척」
@@ -721,6 +727,10 @@ export async function chat(args: ChatArgs): Promise<string> {
       .catch(() => null);
     // null = 검색 자체가 실패(임베딩 서버 다운 등) — 이때는 막지 않고 평소대로 진행한다.
     if (relevant && relevant.length === 0) {
+      // ☑ 지정 범위가 걸린 0건은 별개 사실이다 — 전체에 없다고 말하면 거짓(노트북형 2026-08-30).
+      if (currentDocIds().length) {
+        return "지정하신 문서 범위에는 관련 내용이 없습니다. 문서 지정(☑)을 풀면 전체 사내 자료에서 다시 확인합니다.";
+      }
       return "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요.";
     }
   }
@@ -750,9 +760,14 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 실제로 전 호출에 걸었더니 그 내부 경로들이 느려져 라우트 테스트가 15초 제한을 넘겼다 —
   // 세션 초반 explainHardTerms를 chat() 전체에 걸어 내부 호출을 오염시킨 것과 같은 실수였다.
   const grounding = args.responseSchema || !args.explain ? null : glossaryGroundingFor(args.message);
+  // 📎 첨부한 지난 작업(노트북형 2026-08-30) — ALS 꼬리표로만 나른다(ragscope.ts 머리 주석).
+  //   message/contextText에 섞지 않는 이유: buildRagQuery가 그 둘로 답·배지 공용 검색 질의를
+  //   만든다 — 섞으면 질의가 3,600자에 희석돼 배지가 엉뚱한 문서를 가리킨다(8/10 사고 계보).
+  //   결정 호출(responseSchema)에는 싣지 않는다 — 페르소나와 같은 이유로 JSON 출력을 흔든다.
+  const 첨부 = args.responseSchema ? null : currentAttachText();
   const systemContent = args.responseSchema
     ? "너는 지시를 읽고 도구를 고르는 분류기다. 설명·인사 없이 요청된 JSON 객체 하나만 출력한다."
-    : [systemPromptFor(args.agentId), grounding, rag].filter(Boolean).join("\n\n");
+    : [systemPromptFor(args.agentId), grounding, rag, 첨부].filter(Boolean).join("\n\n");
   // 원격 LLM 여부는 **예산 계산보다 먼저** 알아야 한다(검토관 확인 지적) — 원격이 켜졌는데
   // 로컬 티어(라이트 8K)로 예산을 재면, 원격 32B에 붙여도 이력이 4,915자로 잘려
   // 「기계 교체 없이 더 크게」가 반쪽이 된다. 원격이면 표준 32K 예산을 쓴다.
@@ -1032,7 +1047,11 @@ export async function chat(args: ChatArgs): Promise<string> {
   //     질문은 종전대로 일반지식 배너 — 좁게 잡지 않으면 「SQL 인젝션이 뭐야」까지 억눌러 회귀한다.
   //     답 자체는 두 경우 다 남긴다(먼 자료도 실마리 — rag-weak-evidence 원칙과 무충돌).
   if (ragResult?.자료없음 && reply && !자료없음중복가드.test(reply.slice(0, 60))) {
-    const 배너 = 사내특정대상질문(args.message) ? 자료요청배너 : 자료없음배너;
+    // ☑ 지정 범위가 걸려 있으면 그 사실을 먼저 말한다 — 「전체에 없다」와 「지정 범위에 없다」는
+    //   다른 사실이고, 뭉개면 담당자가 전체를 뒤졌다고 오해한다(노트북형 2026-08-30).
+    const 배너 = currentDocIds().length
+      ? 지정범위배너
+      : 사내특정대상질문(args.message) ? 자료요청배너 : 자료없음배너;
     reply = `${배너}\n\n${reply}`;
   }
 

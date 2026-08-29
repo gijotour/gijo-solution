@@ -1575,7 +1575,11 @@
     window.addEventListener("message", function (ev) {
       var d = ev.data;
       if (!d) return;
-      if (d.type !== "gijo:select" && d.type !== "gijo:scope" && d.type !== "gijo:openTab") return;
+      // ☑ 근거 지정·📎 첨부(노트북형 2026-08-30)도 중계한다 — 내 문서를 (창)으로 빼 쓰는
+      // 사람의 체크·첨부가 셸 대화창(근거띠)에 닿아야 한다. 안 넣으면 팝업에서만 조용히 죽는다
+      // (bridgerelay.test가 이 목록과 셸 수신부의 일치를 못박는다).
+      if (d.type !== "gijo:select" && d.type !== "gijo:scope" && d.type !== "gijo:openTab"
+        && d.type !== "gijo:docscope" && d.type !== "gijo:attach") return;
       if (!ev.source || !팝업발신자인가(ev.source)) return;
       if (window.gijo && window.gijo.bridgeToShell) window.gijo.bridgeToShell(d);
     });

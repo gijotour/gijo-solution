@@ -111,7 +111,9 @@ export const dispatchApi = {
   // progressId: 클라가 만든 UUID. 주면 서버가 처리 단계를 기록하고, progress()로 0.7초마다
   // 조회해 진행 카드를 그린다(2026-07-30 — "처리 중…" 침묵 구간 해소).
   // selection: 화면에서 골라 둔 항목(2026-08-09 2단계) — 「이거」의 대상. 서버가 맥락 앞머리에 싣는다.
-  send: (text: string, sessionId?: string, screen?: string, progressId?: string, selection?: string) =>
+  // docIds: ☑로 지정한 근거 문서(노트북형 2026-08-30) — 있으면 서버가 그 문서들만 검색한다.
+  // attachSessions: 📎로 첨부한 지난 작업 세션 id — 서버가 결정적 압축으로 맥락에 싣는다.
+  send: (text: string, sessionId?: string, screen?: string, progressId?: string, selection?: string, docIds?: string[], attachSessions?: string[]) =>
     request<DispatchResult>("/api/dispatch", {
       method: "POST",
       body: {
@@ -119,6 +121,8 @@ export const dispatchApi = {
         ...(sessionId ? { sessionId } : {}),
         ...(progressId ? { progressId } : {}),
         ...(selection ? { selection } : {}),
+        ...(docIds && docIds.length ? { docIds } : {}),
+        ...(attachSessions && attachSessions.length ? { attachSessions } : {}),
         screen: screen ?? currentScreen(),
       },
     }),
@@ -130,7 +134,9 @@ export const dispatchApi = {
     screen: string | undefined,
     progressId: string | undefined,
     selection: string | undefined,
-    on: { start?: () => void; delta?: (text: string) => void }
+    on: { start?: () => void; delta?: (text: string) => void },
+    docIds?: string[],
+    attachSessions?: string[]
   ) =>
     requestStream<DispatchResult>(
       "/api/dispatch/stream",
@@ -139,6 +145,8 @@ export const dispatchApi = {
         ...(sessionId ? { sessionId } : {}),
         ...(progressId ? { progressId } : {}),
         ...(selection ? { selection } : {}),
+        ...(docIds && docIds.length ? { docIds } : {}),
+        ...(attachSessions && attachSessions.length ? { attachSessions } : {}),
         screen: screen ?? currentScreen(),
       },
       on

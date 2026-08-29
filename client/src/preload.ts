@@ -231,8 +231,10 @@ const gijoApi = {
   listModels: () => api.localEngineApi.models(),
   // screen: 지시가 들어온 화면 맥락 — 팝업 셸에서는 "지금 보고 있는 팝업"이 맥락이 된다(없으면 현재 문서).
   // selection: 화면에서 골라 둔 항목 — 「이거」의 대상(2026-08-09 2단계).
-  sendInstruction: (text: string, sessionId?: string, screen?: string, progressId?: string, selection?: string) =>
-    api.dispatchApi.send(text, sessionId, screen, progressId, selection),
+  // docIds: ☑ 근거 지정 · attachSessions: 📎 지난 작업 첨부(노트북형 2026-08-30) — 위치 인자로
+  // 뒤에 더한다(preload API는 위치 인자 관례 — 객체로 바꾸면 기존 호출부가 조용히 깨진다).
+  sendInstruction: (text: string, sessionId?: string, screen?: string, progressId?: string, selection?: string, docIds?: string[], attachSessions?: string[]) =>
+    api.dispatchApi.send(text, sessionId, screen, progressId, selection, docIds, attachSessions),
   // 답 스트리밍(전-7) — 산문이 생성되는 대로 onDelta(토막)·onStart(새 산문 시작)가 불린다.
   // contextBridge는 인자로 넘긴 함수를 프록시로 감싸 렌더러로 되돌려 부른다.
   // 반환값은 출구 관문을 지난 최종 결과 — 화면은 흐르던 글자를 반드시 이것으로 갈아 끼운다.
@@ -243,8 +245,10 @@ const gijoApi = {
     progressId: string | undefined,
     selection: string | undefined,
     onDelta: (t: string) => void,
-    onStart?: () => void
-  ) => api.dispatchApi.sendStream(text, sessionId, screen, progressId, selection, { delta: onDelta, start: onStart }),
+    onStart?: () => void,
+    docIds?: string[],
+    attachSessions?: string[]
+  ) => api.dispatchApi.sendStream(text, sessionId, screen, progressId, selection, { delta: onDelta, start: onStart }, docIds, attachSessions),
   dispatchProgress: (progressId: string) => api.dispatchApi.progress(progressId),
   // 화면 열기 → 현황 카드(2026-08-20) — 셸이 메뉴 열기 때 부른다(조회 전용).
   screenCard: (page: string, scope?: string) => api.dispatchApi.screenCard(page, scope),

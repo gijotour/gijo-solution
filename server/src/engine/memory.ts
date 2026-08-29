@@ -16,6 +16,7 @@ import { isBinaryLikeChunk } from "./ragsanitize";
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
 import { currentViewer } from "./viewerctx";
+import { currentDocIds } from "./ragscope";
 import { emitCollaboration } from "./collaboration";
 import { gateUserInput } from "./gateway";
 import {
@@ -1111,9 +1112,17 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //   viewer를 명시로 안 받았으면 **요청에 달린 꼬리표**를 집는다. AI 도구(search·explain)는
   //   run(args) 한 모양으로 등록돼 사람을 넘길 자리가 없어, 이 덧문이 없으면 도구로 우회된다.
   const 가림 = hiddenDocIds(viewer ?? currentViewer());
+  // ☑ 지정 범위(노트북형, 2026-08-30) — 담당자가 「내 문서」에서 체크한 문서만 후보로.
+  //   ⚠ 소프트부스트 docScope(추론 지목)와 다르다 — 이건 **사람이 명시로 고른 것**이라
+  //     하드 필터가 옳다(하드 게이트 금지 계약은 추론 신호에 대한 것 — 아래 148행 참조).
+  //   ⚠ 가림(NOT IN)에 AND로 **겹친다** — 지정이 등급 차단을 푸는 일은 원리상 없다.
+  //     기밀 documentId를 지정해도 NOT IN이 먼저라 후보에 못 든다(ragscope.test가 못박음).
+  //   ⚠ 벡터·어휘 두 갈래가 같은 whereClause를 쓴다 — 한쪽만 좁히면 샌다.
+  const 지정문서 = currentDocIds();
   const whereClause =
     `scope IN (${scopes.map((s) => `'${s}'`).join(", ")})` +
-    (가림.length ? ` AND documentId NOT IN (${가림.map((d) => `'${escapeLiteral(d)}'`).join(", ")})` : "");
+    (가림.length ? ` AND documentId NOT IN (${가림.map((d) => `'${escapeLiteral(d)}'`).join(", ")})` : "") +
+    (지정문서.length ? ` AND documentId IN (${지정문서.map((d) => `'${escapeLiteral(d)}'`).join(", ")})` : "");
   // 융합 전에는 각 검색이 넉넉히 후보를 내야 한다 — 한쪽에서 밀린 정답을 다른 쪽이 살린다.
   // ⚠ 2026-08-10 실측(Mac): topK=4면 후보 10칸을 **청크 많은 타사 PDF 하나**가 채워, 정작
   //   우리 문서(청크 30개)가 후보에 못 들어왔다 — origin 부스트(①ⓑ)를 걸 대상 자체가 없던 것이다.

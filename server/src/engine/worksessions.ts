@@ -552,6 +552,24 @@ export function recentTurnsText(sessionId: string, maxTurns = 6): string {
   return ["이전 대화 맥락(같은 세션):", ...lines].join("\n");
 }
 
+// 📎 첨부용 압축(노트북형 2026-08-30) — 지난 세션을 **다른** 세션의 대화에 맥락으로 붙일 때.
+// ⚠ recentTurnsText를 재사용하지 않는 이유: 머리말 「같은 세션」이 문자열에 박혀 있어
+//   다른 세션에 실으면 거짓 문장이 프롬프트에 들어간다(설계관 지적). 압축 원칙은 동일 —
+//   LLM 요약 금지(지어냄이 이후 모든 턴에 주입됨), 기록된 값의 결정적 압축만.
+// ⚠ 예산: 세션당 maxChars(기본 1,200자) — recentTurnsText의 실측 상한 ≈2,900자를 그대로
+//   3개 실으면 ≈8,700자로 라이트(ctx 8K)가 죽는다. 첨부는 요지가 목적이라 더 짧게 자른다.
+export function attachSessionText(sessionId: string, maxChars = 1200): string {
+  const s = getSession(sessionId);
+  if (!s) return ""; // 없는 세션(삭제·아카이브 롤링) — 조용히 건너뛴다, 호출부가 빈 것을 거른다
+  const { recent } = getContextTurns(sessionId, 6, 0);
+  if (!recent.length) return "";
+  const lines = recent.map(
+    (t) => `${t.role === "user" ? "사용자" : "AI"}: ${t.content.replace(/\s+/g, " ").trim().slice(0, 300)}`
+  );
+  const body = lines.join("\n").slice(0, maxChars);
+  return [`[첨부한 지난 작업 — "${s.title}"] 담당자가 참고하라고 붙인 다른 세션의 기록입니다:`, body].join("\n");
+}
+
 // ── 모든 행위 → 작업 세션 자동 기록(사용자 요청 2026-07-20) ────────────
 // 감사 로그에 남는 행위(하드닝 점검·승인 실행·CLI·설정 변경 등)를 작업 세션 목록에도 1건씩 남긴다.
 // auth(로그인/로그아웃)는 제외 — 세션 목록이 접속 기록으로 도배되는 것을 막는다(접속은 사무실 창 presence·감사에서).

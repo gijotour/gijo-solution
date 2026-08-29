@@ -630,6 +630,13 @@
   function 지금범위() {
     try { return JSON.parse(localStorage.getItem("gijo:scope:asset") || "null"); } catch (e) { return null; }
   }
+  // ☑ 근거띠 칩 ×(전체 해제)가 눌리면 화면(내 문서) 체크도 되돌린다(노트북형 2026-08-30).
+  // 안 되알리면 칩은 없는데 체크는 남아 「화면과 칩이 딴말」이 된다 — 약속-코드 불일치 부류.
+  window.gijoDocScopeCleared = function () {
+    tabs.forEach(function (t) {
+      try { t.frame.contentWindow.postMessage({ type: "gijo:docscope:clear" }, "*"); } catch (e) { }
+    });
+  };
 
   function open(page, label, opts) {
     if (!page) return;
@@ -970,6 +977,22 @@
       // 맥락 문장·지시문으로 그대로 흘러간다. label=문장 강조용(짧게), text=지시 재료.
       return d.label && d.text ? { label: String(d.label).slice(0, 120), text: String(d.text).slice(0, 300), fields: f } : null;
     };
+    // ☑ 근거 지정(노트북형 2026-08-30, 시안 mydocs-notebook) — 「내 문서」가 체크 상태의
+    //   **전체 목록**을 보낸다(부분 갱신 아님 — 화면과 칩이 어긋날 여지를 없앤다).
+    //   값 재조립 — iframe 값을 그대로 믿지 않는다. 문서명(documentId)에 공백·한글이 흔하므로
+    //   gijo:view의 `[,\s]` 금지 검사를 베끼면 안 된다(설계관 지적) — 길이·개수 캡만.
+    if (d.type === "gijo:docscope" && window.gijoConsole && window.gijoConsole.docScope) {
+      var 문서들 = Array.isArray(d.docIds) ? d.docIds.slice(0, 50).map(function (x) {
+        return { id: String(x && x.id || "").slice(0, 200), label: String(x && x.label || "").slice(0, 120) };
+      }).filter(function (x) { return x.id; }) : [];
+      window.gijoConsole.docScope(문서들);
+      return;
+    }
+    // 📎 지난 작업 첨부(노트북형) — 세션 id·제목만 나른다. 압축·예산은 서버 몫(attachSessionText).
+    if (d.type === "gijo:attach" && window.gijoConsole && window.gijoConsole.attachWork) {
+      window.gijoConsole.attachWork({ id: String(d.sessionId || "").slice(0, 80), title: String(d.title || "").slice(0, 120) });
+      return;
+    }
     // ⑤″ 고르기 모드 전용(승인 시안 stage-picker, 2026-08-20) — **pick.html만 보내는 좁은
     //   신호**라 자동 무대 내림이 안전하다(그 화면엔 확인창·모달이 없고 행 클릭이 유일한 동작).
     //   ⚠ ⑤′(일반 선택 신호)에는 절대 이 내림을 붙이지 말 것 — 확인창 발신 10곳이 섞여 있다(검토관 상1).
