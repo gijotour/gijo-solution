@@ -142,11 +142,34 @@ describe("노트북형 ③(123진행) — 인용→문서·전체 지정·분리
   const CONSOLE = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "console.js"), "utf-8");
   const NAV = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "nav.js"), "utf-8");
 
-  it("인용→문서 사슬 3단이 전부 실재한다 — 한 단만 빠지면 눌러도 조용히 무동작", () => {
-    expect(CHATPARTS, "발신(배지 문서명)이 없다").toContain('type: "gijo:opendoc"');
+  it("인용→문서 사슬이 실재한다 — 발신은 한 함수·분리 대화창은 IPC 다리(③라운드 수리)", () => {
+    // ⚠ 1차 시험이 nav.js 문자열만 보고 초록을 줬는데, 분리 대화창(console.html)은 nav.js를
+    //   싣지 않아 거짓 초록이었다(검토관 [높음]). 실경로를 박는다: chatparts가 창 종류를 갈라
+    //   bridgeToShell로 나르고, 인라인 발신이 남아 있지 않아야 한다(한 함수 원칙).
+    expect(CHATPARTS, "발신 함수가 없다").toContain("function 문서열기신호");
+    expect(CHATPARTS, "분리 대화창 갈래(bridgeToShell)가 없다 — 죽은 조작 재발")
+      .toMatch(/console\\?\.html[\s\S]{0,200}bridgeToShell\(msg\)/); // 원문은 정규식 리터럴이라 \.가 끼어 있다
+    expect((CHATPARTS.match(/window\.top\.postMessage\(\{ type: "gijo:opendoc"/g) || []).length,
+      "헬퍼 밖 인라인 발신이 남아 있다").toBe(0);
     expect(APP, "셸 분기가 없다").toContain('d.type === "gijo:opendoc"');
     expect(MYDOCS, "내 문서 수신이 없다").toContain('"gijo:opendoc"');
-    expect(NAV, "분리창 대화의 인용 클릭이 셸로 안 나른다").toContain('"gijo:opendoc"');
+  });
+
+  it("인용→문서는 핸드셰이크다 — 「보냈다=닿았다」 도박 금지(③라운드 [높음])", () => {
+    // 방금 만든 iframe도 contentWindow가 늘 있어 1차본의 재시도가 도달 불능이었다.
+    expect(APP, "셸이 ack까지 재전송하지 않는다").toContain('d.type === "gijo:opendoc:ack"');
+    expect(APP, "재전송 고리가 없다").toContain("열문서타이머 = setInterval(재전송, 600)");
+    expect(MYDOCS, "수신 즉시 ack를 안 보낸다").toContain('type: "gijo:opendoc:ack"');
+    // 목록 로드 전 도착은 미룬다 — 700ms 타이머 도박 금지
+    expect(MYDOCS, "로드 전 대기(대기인용)가 없다").toContain("대기인용 = 열id");
+    expect(MYDOCS, "존재를 데이터로 판정하지 않는다(거짓 「반입 확인」 재발)").toContain("동료의 개인 문서");
+  });
+
+  it("⧉ 분리 대화창 상태 동기 — 뜰 때 물려받고(ground:req)·📎×는 되돌아온다(detach)", () => {
+    expect(CONSOLE).toContain('bridgeToShell({ type: "gijo:ground:req" })');
+    expect(APP).toContain('d.type === "gijo:ground:req"');
+    expect(CONSOLE, "분리창 📎× 되보냄이 없다 — 도킹 복귀 때 되살아난다").toContain('"gijo:detach"');
+    expect(APP).toContain('d.type === "gijo:detach"');
   });
 
   it("전체 지정은 50 상한에서 **막고 이유를 말한다** — 조용히 자르면 「체크 120=칩 50」 거짓", () => {

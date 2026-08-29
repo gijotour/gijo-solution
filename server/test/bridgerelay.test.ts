@@ -42,7 +42,13 @@ describe("팝업 릴레이 — 목록이 어긋나면 팝업에서만 조용히 
       // pickdone — 고르기 모드(pick.html) 전용. 그 화면은 카드의 🎯 단추로 **무대에만** 열린다
       // (프로 팝업 자동 폐지·창은 (창) 메뉴뿐이라 팝업 안에서 열릴 진입로가 없다). 무대 내림이
       // 신호의 본질이라 팝업에선 애초에 뜻이 없다(승인 시안 stage-picker, 2026-08-20).
-      "gijo:pickdone"]);
+      "gijo:pickdone",
+      // opendoc:ack — 도킹 홈 탭(mydocs iframe)만 보낸다(핸드셰이크 응답). 셸이 팝업으로
+      // opendoc을 보내지 않으므로 팝업發 ack 경로 자체가 없다(2026-08-30 ③라운드).
+      "gijo:opendoc:ack",
+      // ground:req·detach — 분리 대화창(console.html)이 bridgeToShell(IPC)로 직접 보낸다.
+      // postMessage를 안 거치므로 릴레이 목록에 없어도 죽는 경로가 없다(dockback과 같은 부류).
+      "gijo:ground:req", "gijo:detach"]);
     const 빠진것 = 셸이받는타입().filter((t) => !제외.has(t) && !릴레이타입().includes(t));
     expect(빠진것, "릴레이 목록에 없는 타입 — 팝업에서 이 신호가 조용히 죽는다. 넣거나, 위 제외 목록에 이유와 함께 적어라").toEqual([]);
   });

@@ -944,6 +944,7 @@
   }
 
   // 탭 안 화면이 셸에 부탁하는 것들.
+  var 열문서대기 = null, 열문서타이머 = null; // 📄 인용→문서 핸드셰이크 상태(아래 opendoc 분기)
   window.addEventListener("message", function (ev) {
     var d = ev && ev.data;
     if (!d) return;
@@ -1008,21 +1009,53 @@
       }
       return;
     }
-    // 📄 인용 → 원문 열기(「123진행」 ③-C — 시안의 「인용 클릭 → 문서로」) — 대화의 근거 배지·
-    // 인용 원문에서 문서명을 누르면 내 문서에서 그 문서를 연다. 새 탭을 늘리지 않고
-    // 홈 탭(mydocs.html)을 활성으로 만든 뒤 프레임에 위임한다(문서 찾기·펼치기는 mydocs 몫).
+    // 📄 인용 → 원문 열기(「123진행」 ③-C · ③라운드 검토관 [높음] 반영 — **핸드셰이크**).
+    // ⚠ 1차본의 「보내고 return」은 도달 불능 재시도였다 — 방금 만든 iframe도 contentWindow가
+    //   늘 있어서(about:blank) 첫 발송이 「성공」으로 보이고, 수신부가 아직 없으면 통째로
+    //   유실됐다. 고침: 수신부(mydocs)가 ack를 되보낼 때까지 재전송, 상한 20회×600ms.
     if (d.type === "gijo:opendoc" && typeof d.documentId === "string" && d.documentId.trim()) {
       var 열문서 = d.documentId.trim().slice(0, 200);
       open("mydocs.html", "내 문서", { dock: true }); // 이미 있으면 활성으로만
-      var 시도 = 0;
-      var 보내기 = function () {
+      if (열문서타이머) clearInterval(열문서타이머);
+      열문서대기 = 열문서;
+      var 남은재전송 = 20;
+      var 재전송 = function () {
+        if (!열문서대기 || 남은재전송-- <= 0) { clearInterval(열문서타이머); 열문서타이머 = null; 열문서대기 = null; return; }
         var t = find("mydocs.html");
         if (t && t.frame && t.frame.contentWindow) {
-          try { t.frame.contentWindow.postMessage({ type: "gijo:opendoc", documentId: 열문서 }, "*"); return; } catch (e) { }
+          try { t.frame.contentWindow.postMessage({ type: "gijo:opendoc", documentId: 열문서대기 }, "*"); } catch (e) { }
         }
-        if (시도++ < 8) setTimeout(보내기, 500); // 방금 연 탭이면 프레임 로드를 기다린다
       };
-      setTimeout(보내기, 250);
+      열문서타이머 = setInterval(재전송, 600);
+      재전송();
+      return;
+    }
+    // 수신부의 「받았다」 — 재전송을 멈춘다(처리 결과와 무관, 유실 방지 전용).
+    if (d.type === "gijo:opendoc:ack") {
+      열문서대기 = null;
+      if (열문서타이머) { clearInterval(열문서타이머); 열문서타이머 = null; }
+      return;
+    }
+    // ⧉ 분리 대화창이 뜰 때 지금 근거 상태를 요청한다(③라운드 #14 — 빼는 순간 ☑·📎가 빈 창).
+    if (d.type === "gijo:ground:req") {
+      if (window.gijoConsole && window.gijoConsole.getGroundState && window.gijo && window.gijo.broadcastToWindows) {
+        try {
+          var 상태 = window.gijoConsole.getGroundState();
+          window.gijo.broadcastToWindows({ type: "gijo:docscope", docIds: 상태.docs || [] });
+          (상태.attaches || []).forEach(function (a) {
+            window.gijo.broadcastToWindows({ type: "gijo:attach", sessionId: a.id, title: a.title });
+          });
+        } catch (e) { }
+      }
+      return;
+    }
+    // 📎 빼기 — 분리창 칩 ×가 도킹 인스턴스에도 반영돼야 도킹 복귀 때 되살아나지 않는다(#16).
+    if (d.type === "gijo:detach") {
+      var 뺄세션 = String(d.sessionId || "").slice(0, 80);
+      if (window.gijoConsole && window.gijoConsole.detachWork) window.gijoConsole.detachWork(뺄세션);
+      if (window.gijo && window.gijo.broadcastToWindows) {
+        try { window.gijo.broadcastToWindows({ type: "gijo:detach", sessionId: 뺄세션 }); } catch (e) { }
+      }
       return;
     }
     // ⑤″ 고르기 모드 전용(승인 시안 stage-picker, 2026-08-20) — **pick.html만 보내는 좁은

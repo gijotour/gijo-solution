@@ -1304,6 +1304,11 @@
       x.addEventListener("click", function () {
         첨부세션 = 첨부세션.filter(function (t) { return t.id !== s.id; });
         근거띠그리기();
+        // 분리창(console.html) 인스턴스면 도킹 쪽에도 알린다 — 도킹 복귀 때 뺀 첨부가
+        // 되살아나는 비대칭 방지(③라운드 #16). 도킹 인스턴스에서는 셸이 이미 자기 상태다.
+        if (/console\.html/i.test(location.pathname) && window.gijo && window.gijo.bridgeToShell) {
+          try { window.gijo.bridgeToShell({ type: "gijo:detach", sessionId: s.id }); } catch (e) { }
+        }
       });
       c.appendChild(x);
       g.appendChild(c);
@@ -1315,6 +1320,13 @@
       return { id: String(d && d.id || "").slice(0, 200), label: String(d && d.label || "").slice(0, 120) };
     }).filter(function (d) { return d.id; });
     근거띠그리기();
+  }
+  function detachWork(id) {
+    첨부세션 = 첨부세션.filter(function (t) { return t.id !== id; });
+    근거띠그리기();
+  }
+  function getGroundState() { // ⧉ 분리창이 뜰 때 지금 상태를 그대로 물려주기 위한 스냅샷
+    return { docs: 근거문서.slice(), attaches: 첨부세션.slice() };
   }
   function attachWork(item) {
     var id = String(item && item.id || "").slice(0, 80);
@@ -2294,7 +2306,7 @@
     // 비워 놓고 다시 안 그리면 띠가 직전 화면의 「지금 여기」를 계속 가리킨다).
     try { readCtxFromShell(); } catch (e) { }
   }
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; }, screenCard: screenCard, newSession: newSession, docScope: setDocScope, attachWork: attachWork };
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; }, screenCard: screenCard, newSession: newSession, docScope: setDocScope, attachWork: attachWork, detachWork: detachWork, getGroundState: getGroundState };
 
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.
@@ -2306,8 +2318,14 @@
       if (!d) return;
       if (d.type === "gijo:docscope") setDocScope(Array.isArray(d.docIds) ? d.docIds : []);
       else if (d.type === "gijo:attach") attachWork({ id: d.sessionId, title: d.title });
+      else if (d.type === "gijo:detach") detachWork(String(d.sessionId || ""));
       else if (d.type === "gijo:docscope:clear") setDocScope([]);
     });
+  }
+  // ⧉ 분리창으로 뜬 인스턴스는 빈 상태로 시작한다 — 셸에 지금 근거 상태를 요청해 물려받는다
+  // (③라운드 #14: 빼는 순간 이미 걸려 있던 ☑·📎가 새 창에 없어 전체 검색으로 새던 구멍).
+  if (/console\.html/i.test(location.pathname) && window.gijo && window.gijo.bridgeToShell) {
+    try { window.gijo.bridgeToShell({ type: "gijo:ground:req" }); } catch (e) { }
   }
   if (window.gijo && window.gijo.onConsoleAsk) {
     window.gijo.onConsoleAsk(function (text, sessionId) {

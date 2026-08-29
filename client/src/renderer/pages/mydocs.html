@@ -457,6 +457,8 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   // ☑ 근거 지정 상태 — docId(검색 세계 키) → 표시 이름. ⚠ 개인 문서의 검색 키는
   //   "personal:<uuid>"다(server personaldocs.ts ragDocumentId — id 그대로 보내면 무동작).
   var 근거체크 = {};
+  var 데이터로드됨 = false; // 인용→문서 열기가 목록 로딩과 도박하지 않게(③라운드 [높음])
+  var 대기인용 = null;      // 목록이 오기 전에 도착한 인용 열기 요청 — 로드 후 처리
   // ★ 반입 영수증 (2026-08-22). 문서 목록(know)과 **다른 원천**이다:
   //   취약점 스캔·SBOM은 일부러 지식에 안 넣어서 know에는 원리상 안 뜬다.
   //   ⚠ 「내가 넣은 모든 파일」이라 부르지 않는다 — 서버가 **내 것 + 내가 볼 수 있는 것**을 준다
@@ -622,6 +624,66 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     if (!window.gijoSelectNotify) return;
     window.gijoSelectNotify(라벨 ? { label: String(라벨).slice(0, 40), text: 글 } : undefined);
   }
+  // 📄 인용 → 원문 열기(③라운드 재설계 — 검토관 [높음]: 700ms 도박·재시도 도달불능·거짓 안내·
+  //   모달 갈아치움·검색어 무단 삭제 다섯을 한꺼번에 잡는다).
+  //   원칙: ①받은 즉시 ack(셸이 재전송을 멈춘다 — 처리 결과와 무관한 「받았다」 신호)
+  //        ②목록 로드 전이면 미룬다(불러오기 끝에서 처리 — 타이머 도박 폐지)
+  //        ③존재는 DOM이 아니라 **데이터로** 판정(mine·know 배열 — 거짓 「반입 확인」 금지)
+  //        ④쓰던글확인은 **한 번, 우리가 직접** 묻고 취소를 존중한다(타이머가 모달을 안 덮는다)
+  //        ⑤필터는 행이 가려졌을 때만 풀고, 풀었으면 **다시 그린다**(값만 지우는 반쪽 금지)
+  function 행찾기(행키) {
+    // 선택자 문자열을 만들지 않는다 — CSS.escape 폴백이 주입 자리였다(검토관 [낮음])
+    var rows = document.querySelectorAll("#list .g-rows-r");
+    for (var i = 0; i < rows.length; i++) if (rows[i].getAttribute("data-id") === 행키) return rows[i];
+    return null;
+  }
+  async function 인용문서열기(열id) {
+    try { (window.parent || window).postMessage({ type: "gijo:opendoc:ack", documentId: 열id }, "*"); } catch (e) { }
+    if (!데이터로드됨) { 대기인용 = 열id; return; }
+    var 개인 = 열id.indexOf("personal:") === 0;
+    var 행키 = 개인 ? 열id.slice(9) : 열id;
+    var note = document.getElementById("note");
+    if (개인 && !mine.some(function (d) { return d.id === 행키; })) {
+      // 동료의 개인 문서(🏢 공유) — 내 목록에는 원리상 없다. 「반입 확인」 거짓 안내·uuid 노출 금지.
+      if (note) note.textContent = "인용된 문서는 동료의 개인 문서(🏢 공유)입니다 — 내 문서 목록에는 안 보이고, 내용은 대화의 「근거 원문」으로 확인하세요.";
+      return;
+    }
+    if (!개인 && !know.some(function (d) { return d.documentId === 행키; })) {
+      if (note) note.textContent = "인용한 문서(" + 행키.slice(0, 60) + ")가 회사 지식 목록에 없습니다 — 반입 상태를 확인해 주세요.";
+      return;
+    }
+    var 열탭 = 개인 ? "mine" : "know";
+    if (탭 !== 열탭 || 스테이지값 !== "list") {
+      if (!(await 쓰던글확인())) {
+        if (note) note.textContent = "작성 중인 문서를 지키려고 인용 문서 열기를 멈췄습니다 — 저장하거나 닫은 뒤 다시 눌러 주세요.";
+        return; // 사람의 취소를 존중 — 검색어·필터·목록 무엇도 건드리지 않았다
+      }
+      탭전환(열탭);
+    }
+    var 행 = 행찾기(행키);
+    if (!행) {
+      var 검색칸 = document.getElementById("q");
+      var 풀었다 = false;
+      if (검색칸 && 검색칸.value) { 검색칸.value = ""; 풀었다 = true; }
+      if (개인 && mineFilter !== "all") {
+        mineFilter = "all";
+        Array.prototype.forEach.call(document.querySelectorAll("#mineSeg button"), function (x) {
+          x.classList.toggle("on", x.getAttribute("data-f") === "all");
+        });
+        풀었다 = true;
+      }
+      if (풀었다) { 그리기(); 행 = 행찾기(행키); }
+    }
+    if (!행) {
+      if (note) note.textContent = "문서를 목록에 그리지 못했습니다 — 새로고침 후 다시 시도해 주세요.";
+      return;
+    }
+    var 접힌 = 행.closest(".g-rows-body.folded");
+    if (접힌 && 접힌.previousElementSibling) 접힌.previousElementSibling.click();
+    행.click(); // 스테이지값이 이미 list라 목록 클릭의 쓰던글확인은 즉시 통과 — 모달 중복 없음
+    try { 행.scrollIntoView({ block: "center" }); } catch (e) { }
+  }
+
   // ☑ 근거 지정 발신(노트북형 2026-08-30) — 체크 상태의 **전체 목록**을 셸(app.html)에 보낸다.
   // 부분 갱신이 아니라 전체를 보내는 이유: 칩(대화창)과 체크(이 화면)가 어긋날 여지를 없앤다.
   // 수신부는 app.html의 gijo:docscope 분기 — 값은 거기서 다시 정돈된다(iframe 값 불신 관례).
@@ -835,7 +897,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       // ☑ 첫 칸 = 대화 근거 지정(노트북형). AI 포함이 꺼진 개인 전용 문서는 지식에 아예 없어
       // (인입본문 null) 체크해도 조각 0이 된다 — 체크를 막고 이유를 말한다(「근거 없음」과
       // 「AI 포함 꺼짐」은 다른 사실 — 설계관 지적).
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 64px 64px 44px;gap:8px"><span><input type="checkbox" class="dchkall" title="이 목록 전체를 근거로 지정/해제 — 검색으로 거른 상태면 거른 것만"></span><span>제목</span><span>AI</span><span>공유</span><span class="ta-r">수정</span></div>' +
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 64px 64px 44px;gap:8px"><span><input type="checkbox" class="dchkall" title="이 목록 전체를 근거로 지정/해제 — 검색·탭으로 좁힌 지금 목록 기준(접힌 그룹 포함, 상한 50)"></span><span>제목</span><span>AI</span><span>공유</span><span class="ta-r">수정</span></div>' +
         (rows.length ? '<div class="g-rows-flat">' + rows.map(function (d) {
           var 키 = "personal:" + d.id;
           var 가능 = !!(d.ragOptIn || d.shared);
@@ -857,7 +919,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         (byCat[c] = byCat[c] || []).push(d);
       });
       var cats = Object.keys(byCat).sort();
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px"><span><input type="checkbox" class="dchkall" title="이 목록 전체를 근거로 지정/해제 — 검색으로 거른 상태면 거른 것만"></span><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>' +
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px"><span><input type="checkbox" class="dchkall" title="이 목록 전체를 근거로 지정/해제 — 검색·탭으로 좁힌 지금 목록 기준(접힌 그룹 포함, 상한 50)"></span><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>' +
         (cats.length ? cats.map(function (c) {
           var folded = 접힘.has(c);
           return '<div class="g-rows-gh" data-cat="' + esc(c) + '" style="top:26px"><span class="tri">' + (folded ? "▸" : "▾") + '</span>🗂 ' + esc(c) + '<span class="cnt">' + byCat[c].length + "개</span></div>" +
@@ -1032,6 +1094,16 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       ' 지금 무엇이 남아 있는지는 <b>🏢 회사 지식</b>에서 그 문서를 열어 확인하세요.' +
       ' <b>내가 올린 것</b>과, 내 열람 등급으로 볼 수 있는 것만 보입니다(관리자는 팀 반입도 봅니다) — 남이 올린 것은 파일명 뒤에 <b>· 올린 이</b>가 붙습니다.</div>';
     }
+    // ☑ 전체 지정 머리 체크를 실제 상태와 맞춘다 — 다시 그릴 때마다(검토관 ③ [낮음]:
+    //   머리만 해제로 되돌아가면 「전부 지정돼 있는데 머리는 빈」 딴말이 된다).
+    (function () {
+      var 전체칸 = document.querySelector("#list .dchkall");
+      if (!전체칸) return;
+      var 칸들 = document.querySelectorAll("#list .dchk");
+      var 전부 = 칸들.length > 0;
+      for (var ci = 0; ci < 칸들.length; ci++) if (!칸들[ci].checked) { 전부 = false; break; }
+      전체칸.checked = 전부;
+    })();
     탭수그리기();
     if (!목록모드) return;   // 스테이지 중 — 목록만 새로 그리고 고른 것·문서창은 그대로 둔다
     if (되살릴선택) { 되살리기(); return; }
@@ -1141,6 +1213,8 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       오류.ingest = null;
     } catch (e) { 영수증 = []; 영수증총계 = 0; 갈래이름 = {}; 오류.ingest = (e && e.message) || "오류"; }
     근거정리후알림(); // ☑ 재수화 — 이 화면이 정본(함수 주석 참조). 불러올 때마다 유령 지정을 걷어낸다.
+    데이터로드됨 = true;
+    if (대기인용) { var 미룬 = 대기인용; 대기인용 = null; 인용문서열기(미룬); }
     // 📦 보안제품 자료 — ⚠ 라이트에서는 **부르지 않는다**: 그 탭을 접기 때문에(아래 라이트 폴딩)
     //   부르면 첫 그림만 늦어진다(불러오기가 순차 await라 한 번이 그대로 지연이 된다).
     // ⚠ `라이트판` 변수에 기대지 않는다 — 그건 이 함수보다 **아래**에서 값이 정해져서,
@@ -1171,14 +1245,20 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     }
     // 스테이지 중 갈래 이동 — 쓰던 글이 있으면 되묻는다(확인 없는 소멸 금지). 잣대는 한 곳.
     if (!(await 쓰던글확인())) return;
+    탭전환(b.getAttribute("data-t") || "mine");
+  });
+  // 탭 전환의 몸통 — 클릭 핸들러와 인용문서열기(③라운드)가 같은 것을 쓴다(두 벌 금지).
+  // ⚠ 쓰던글확인은 **호출자 몫** — 여기 넣으면 이미 물은 호출자가 두 번 묻게 된다.
+  function 탭전환(이름) {
     스테이지값 = "list";
-    Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) { x.classList.remove("on"); });
-    b.classList.add("on");
-    탭 = b.getAttribute("data-t") || "mine";
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) {
+      x.classList.toggle("on", x.getAttribute("data-t") === 이름);
+    });
+    탭 = 이름 || "mine";
     가이드히트 = null;
     알림(); // 탭을 바꾸면 가리키던 것도 없다
     그리기();
-  });
+  }
   // 검색칸 — 필터 전용. 📘 제품 안내에서는 **본문까지** 찾는다(문서함의 본문 검색 승계 —
   // 검토관 중5: 흡수하며 기능을 조용히 빼면 안내가 거짓이 된다). 히트 수는 유형 칸에 배지로.
   document.getElementById("q").addEventListener("input", function () {
@@ -2097,29 +2177,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     var d = ev.data;
     if (!d) return;
     // ☑ 전체 해제(노트북형) — 대화창 근거띠의 ×를 눌렀을 때. 체크만 남으면 화면이 거짓말한다.
-    // 📄 인용 → 원문(「123진행」 ③-C). 발신은 대화의 근거 배지·인용 원문(chatparts) — 셸 경유.
+    // 📄 인용 → 원문(「123진행」 ③-C, ③라운드 검토관 [높음] 3건 반영해 재설계).
+    // 발신은 대화의 근거 배지·인용 원문(chatparts) — 셸 경유. 타이머 도박 없이:
+    // 받자마자 ack(셸 재전송 중지) → 목록 로드 전이면 로드 뒤로 미룸 → 존재는 데이터로 판정.
     if (d.type === "gijo:opendoc" && typeof d.documentId === "string") {
-      var 열id = d.documentId.trim().slice(0, 200);
-      var 개인 = 열id.indexOf("personal:") === 0;
-      var 열탭 = 개인 ? "mine" : "know";
-      var 행키 = 개인 ? 열id.slice(9) : 열id;
-      var 열노드 = document.querySelector('#tabs .v4node[data-t="' + 열탭 + '"]');
-      var 검색칸 = document.getElementById("q");
-      if (검색칸 && 검색칸.value) 검색칸.value = ""; // 필터에 가려 못 찾는 것 방지
-      if (열노드) 열노드.click(); // 쓰던글확인을 그대로 지난다(편집 중 소멸 방지 계약 유지)
-      setTimeout(function () {
-        var 행 = null;
-        try { 행 = document.querySelector('#list .g-rows-r[data-id="' + (window.CSS && CSS.escape ? CSS.escape(행키) : 행키) + '"]'); } catch (e) { }
-        if (행) {
-          // 접힌 그룹 안이면 펼친다 — 숨은 행을 클릭해도 상세는 뜨지만 사람이 못 본다
-          var 접힌 = 행.closest(".g-rows-body.folded");
-          if (접힌 && 접힌.previousElementSibling) 접힌.previousElementSibling.click();
-          행.click();
-          try { 행.scrollIntoView({ block: "center" }); } catch (e) { }
-        } else {
-          try { document.getElementById("note").textContent = "인용한 문서(" + 행키.slice(0, 60) + ")가 이 목록에 없습니다 — 반입 상태를 확인해 주세요."; } catch (e) { }
-        }
-      }, 700);
+      인용문서열기(d.documentId.trim().slice(0, 200));
       return;
     }
     if (d.type === "gijo:docscope:clear") {

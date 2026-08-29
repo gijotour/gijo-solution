@@ -158,6 +158,20 @@
    * ⚠ 문구에 「찾지 못했습니다」를 쓰지 않는다 — drawer-audit의 실패 문구 목록에 있어
    *   좋은 답에 실패 딱지가 붙는다(2026-08-13 actioncheck에서 겪은 그 함정).
    */
+  // 📄 인용→문서 발신 — 실린 곳에 따라 길이 다르다(③라운드 검토관 [높음]: 분리 대화창은
+  //   최상위 창이라 window.top이 자기 자신 — postMessage가 제자리에 떨어져 죽은 조작이 됐다).
+  //   도킹(app.html 안): top으로 postMessage → 셸 수신부. 분리창(console.html): bridgeToShell(IPC).
+  function 문서열기신호(id) {
+    var msg = { type: "gijo:opendoc", documentId: String(id || "") };
+    if (!msg.documentId) return;
+    try {
+      if (/console\.html/i.test(location.pathname) && window.gijo && window.gijo.bridgeToShell) {
+        window.gijo.bridgeToShell(msg);
+        return;
+      }
+      window.top.postMessage(msg, "*");
+    } catch (e) { }
+  }
   function quotes(el, list, answer, sources, 근거세기) {
     el = 붙일자리(el);
     if (!el) return;
@@ -167,7 +181,7 @@
       var badge = document.createElement("div");
       badge.className = 약함 ? "gcp-src2" : "gcp-src";
       // 문서명 클릭 → 내 문서에서 원문 열기(「123진행」 ③-C — 시안 「인용→소스 점프」의 1차분).
-      // 셸의 gijo:opendoc 분기가 받는다. 분리창 대화에서는 nav.js 팝업 릴레이가 셸로 나른다.
+      // 발신은 문서열기신호 한 곳 — 도킹은 postMessage, 분리 대화창은 IPC 다리(위 함수 주석).
       badge.appendChild(document.createTextNode(약함 ? "📄 찾아본 자료 — 근거 아님: " : "📄 근거: "));
       sources.slice(0, 4).forEach(function (nm, i) {
         if (i) badge.appendChild(document.createTextNode(" · "));
@@ -175,9 +189,7 @@
         a.className = "gcp-doclink";
         a.textContent = nm;
         a.title = "내 문서에서 이 문서 열기";
-        a.addEventListener("click", function () {
-          try { window.top.postMessage({ type: "gijo:opendoc", documentId: String(nm) }, "*"); } catch (e) { }
-        });
+        a.addEventListener("click", function () { 문서열기신호(nm); });
         badge.appendChild(a);
       });
       el.appendChild(badge);
@@ -209,9 +221,7 @@
         try { txt = txt.replace(new RegExp(safe, "g"), "<mark>$&</mark>"); } catch (e) {}
       });
       box.innerHTML = '<div class="gcp-qd gcp-doclink" title="내 문서에서 이 문서 열기">' + esc(q.documentId || "") + '</div><div class="gcp-qt">' + txt + "</div>";
-      box.querySelector(".gcp-qd").addEventListener("click", function () {
-        try { window.top.postMessage({ type: "gijo:opendoc", documentId: String(q.documentId || "") }, "*"); } catch (e) { }
-      });
+      box.querySelector(".gcp-qd").addEventListener("click", function () { 문서열기신호(q.documentId); });
       body.appendChild(box);
     });
 
