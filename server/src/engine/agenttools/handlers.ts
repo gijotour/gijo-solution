@@ -3205,7 +3205,9 @@ export async function runProductIntroAdd(args: Record<string, string>): Promise<
       actor: (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)",
     });
     return (
-      `제품 소개자료를 등록했습니다: ${it.name} (분류: ${it.category}${it.vendor ? ` · 벤더: ${it.vendor}` : ""})\n` +
+      // ⚠ 「등록했다」와 「갱신했다」를 뭉개지 않는다 — 같은 이름을 다시 올리면 새 행이 생기던 것을
+      //   갱신으로 바꿨다(2026-08-29 라이브: 같은 제품이 3벌). 담당자에게도 사실대로 말한다.
+      `제품 소개자료를 ${it.갱신됨 ? "갱신" : "등록"}했습니다: ${it.name} (분류: ${it.category}${it.vendor ? ` · 벤더: ${it.vendor}` : ""})\n` +
       // ⚠ 2026-08-22 검토관 [중] 수리 — **없어진 자리를 안내하고 있었다.**
       //   그날 「제품 소개자료」 화면(intro.html)을 내 문서로 흡수하며 지웠는데,
       //   결재판 문구(registry.ts effect·undo)만 고치고 **실행 결과 문구인 이곳**을 안 고쳤다.

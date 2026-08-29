@@ -44,6 +44,21 @@ const insertStmt = db.prepare(
 const listStmt = db.prepare("SELECT * FROM product_intro ORDER BY category, name");
 const getStmt = db.prepare("SELECT * FROM product_intro WHERE id = ?");
 const delStmt = db.prepare("DELETE FROM product_intro WHERE id = ?");
+// ⚠ 같은 제품을 두 번 등록하면 **행이 늘어난다** — 라이브 실측(2026-08-29)에서 같은 이름이
+//   3벌 쌓였고, 그러자 항목 기록은 A행에 붙고 비교는 B행을 읽어 「채움 0/7」이 나왔다.
+//   자동 업로드(autoupload)는 같은 소개서를 다시 올리기만 해도 이 길을 또 지난다.
+//   그래서 **이름이 유일 열쇠**다 — 대소문자·앞뒤 공백은 같은 것으로 본다.
+const byNameStmt = db.prepare(
+  "SELECT * FROM product_intro WHERE lower(trim(name)) = lower(trim(?)) ORDER BY createdAt LIMIT 1"
+);
+const updStmt = db.prepare(
+  "UPDATE product_intro SET category = @category, vendor = @vendor, summary = @summary, docName = @docName WHERE id = @id"
+);
+
+/** 이름으로 소개자료 찾기 — 없으면 undefined. 중복 방지와 「이미 있나」 확인의 단일 출처. */
+export function findProductIntroByName(name: string): ProductIntro | undefined {
+  return byNameStmt.get((name ?? "").trim()) as ProductIntro | undefined;
+}
 
 // ── 비교 항목(필드) — 사실이 사는 **유일한 곳** (2026-08-28, 승인 설계 2026-08-23) ─────────
 //
@@ -146,10 +161,26 @@ export function listProductIntros(): ProductIntro[] {
 
 export function addProductIntro(args: {
   name: string; category: string; vendor?: string | null; summary?: string | null; docName?: string | null; actor?: string | null;
-}): ProductIntro {
+}): ProductIntro & { 갱신됨: boolean } {
   const name = (args.name ?? "").trim();
   const category = (args.category ?? "").trim() || "기타";
   if (!name) throw new Error("제품 이름이 비었습니다");
+  const 있던것 = findProductIntroByName(name);
+  if (있던것) {
+    // 덮어쓰기가 아니라 **채우기** — 새로 준 값만 반영하고 빈 값으로 기존 사실을 지우지 않는다.
+    // (자동 업로드가 분류만 들고 다시 들어와도 벤더·요약이 날아가면 안 된다.)
+    updStmt.run({
+      id: 있던것.id,
+      category: (args.category ?? "").trim() || 있던것.category,
+      vendor: (args.vendor ?? "")?.trim() || 있던것.vendor,
+      summary: (args.summary ?? "")?.trim() || 있던것.summary,
+      docName: (args.docName ?? "")?.trim() || 있던것.docName,
+    });
+    recordAudit({ kind: "write", actor: args.actor ?? null, action: "제품 소개자료 갱신", target: name, detail: category, result: "ok" });
+    const 갱신 = getStmt.get(있던것.id) as ProductIntro;
+    syncIntroTriples(갱신); // 분류·공급사가 바뀌었으면 트리플도 따라간다
+    return { ...갱신, 갱신됨: true };
+  }
   const id = `pi-${name.toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40)}-${Date.now().toString(36)}`;
   insertStmt.run({
     id, name, category,
@@ -161,7 +192,7 @@ export function addProductIntro(args: {
   recordAudit({ kind: "write", actor: args.actor ?? null, action: "제품 소개자료 등록", target: name, detail: category, result: "ok" });
   const made = getStmt.get(id) as ProductIntro;
   syncIntroTriples(made); // 등록 즉시 기본 트리플(분류·공급사) — 항목은 담당자가 채우며 늘어난다
-  return made;
+  return { ...made, 갱신됨: false };
 }
 
 export function removeProductIntro(id: string, actor?: string | null): boolean {
