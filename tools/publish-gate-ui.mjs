@@ -367,13 +367,26 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     //   한 단계만 끊겨도 화면은 멀쩡해 보인다(칩이 안 뜰 뿐). 띄워서 끝까지 잰다.
     const nb = await fr.evaluate(async () => {
       const 잠깐 = (ms) => new Promise((r) => setTimeout(r, ms));
+      // ⚠ 직전 검사(연락처 관리)가 문서창 스테이지를 열어 둔 채다 — 그 상태로 탭을 누르면
+      //   쓰던글확인()이 **gijoAsk 모달**(#gijoDlg)을 띄우고 답을 기다려 전환이 영영 멈추고,
+      //   이 검사는 직전 탭의 잔상을 재게 된다(1·2차 실행 실측 — 단독 실행은 ☑ 120개 정상).
+      //   스테이지를 닫고, 되묻는 모달이 뜨면 「확인(.ok)」으로 답해 준다(사람이 하는 그대로).
+      const 모달확인 = async () => {
+        const ok = document.querySelector("#gijoDlg .ok");
+        if (ok) { ok.click(); await 잠깐(400); }
+      };
+      const 닫기 = document.getElementById("v4close");
+      if (닫기 && 닫기.offsetParent !== null) { 닫기.click(); await 잠깐(500); await 모달확인(); }
+      await 모달확인(); // 탭 전환이 이미 모달에 걸려 있던 경우까지
       // 📎 지난 작업 탭이 그려지는가(빈 목록이어도 머리·빈 안내는 떠야 한다)
       const 작업노드 = document.querySelector('#tabs .v4node[data-t="work"]');
-      if (작업노드) { 작업노드.click(); await 잠깐(1200); }
-      const 작업머리 = !!document.querySelector("#list .g-rows-head") || !!document.querySelector("#list .empty");
+      if (작업노드) { 작업노드.click(); await 잠깐(700); await 모달확인(); await 잠깐(700); }
+      // ★ 잔상 방지 — 「지난 작업」 탭이 진짜 활성인지까지 본다(직전 탭 머리를 재면 헛계측)
+      const 작업활성 = !!document.querySelector('#tabs .v4node.on[data-t="work"]');
+      const 작업머리 = 작업활성 && (!!document.querySelector("#list .g-rows-head") || !!document.querySelector("#list .empty"));
       // 회사 지식 탭에서 첫 ☑ 체크 → gijo:docscope 발신
       const 지식노드 = document.querySelector('#tabs .v4node[data-t="know"]');
-      if (지식노드) { 지식노드.click(); await 잠깐(1200); }
+      if (지식노드) { 지식노드.click(); await 잠깐(700); await 모달확인(); await 잠깐(700); }
       const 첫체크 = document.querySelector("#list .dchk");
       if (첫체크) { 첫체크.click(); await 잠깐(600); }
       return { 작업노드: !!작업노드, 작업머리, 체크있나: !!첫체크, 체크됨: !!(첫체크 && 첫체크.checked) };
