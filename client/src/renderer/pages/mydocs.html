@@ -835,7 +835,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       // ☑ 첫 칸 = 대화 근거 지정(노트북형). AI 포함이 꺼진 개인 전용 문서는 지식에 아예 없어
       // (인입본문 null) 체크해도 조각 0이 된다 — 체크를 막고 이유를 말한다(「근거 없음」과
       // 「AI 포함 꺼짐」은 다른 사실 — 설계관 지적).
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 64px 64px 44px;gap:8px"><span title="☑ = 대화 근거로 지정">☑</span><span>제목</span><span>AI</span><span>공유</span><span class="ta-r">수정</span></div>' +
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 64px 64px 44px;gap:8px"><span><input type="checkbox" class="dchkall" title="이 목록 전체를 근거로 지정/해제 — 검색으로 거른 상태면 거른 것만"></span><span>제목</span><span>AI</span><span>공유</span><span class="ta-r">수정</span></div>' +
         (rows.length ? '<div class="g-rows-flat">' + rows.map(function (d) {
           var 키 = "personal:" + d.id;
           var 가능 = !!(d.ragOptIn || d.shared);
@@ -857,7 +857,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         (byCat[c] = byCat[c] || []).push(d);
       });
       var cats = Object.keys(byCat).sort();
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px"><span title="☑ = 대화 근거로 지정">☑</span><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>' +
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px"><span><input type="checkbox" class="dchkall" title="이 목록 전체를 근거로 지정/해제 — 검색으로 거른 상태면 거른 것만"></span><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>' +
         (cats.length ? cats.map(function (c) {
           var folded = 접힘.has(c);
           return '<div class="g-rows-gh" data-cat="' + esc(c) + '" style="top:26px"><span class="tri">' + (folded ? "▸" : "▾") + '</span>🗂 ' + esc(c) + '<span class="cnt">' + byCat[c].length + "개</span></div>" +
@@ -1243,6 +1243,24 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   // ☑ 체크 변경 → 근거 지정 발신(노트북형). change 델리게이트라 행 클릭(상세 열기)과 안 싸운다.
   document.getElementById("list").addEventListener("change", function (ev) {
     var k = ev.target;
+    // 전체 지정(시안의 「전체」 체크 — 「123진행」 ③-B). 대상 = 지금 그려진 체크박스들(검색 필터 반영).
+    if (k && k.classList && k.classList.contains("dchkall")) {
+      var 칸들 = Array.prototype.slice.call(document.querySelectorAll("#list .dchk"));
+      if (k.checked) {
+        // 상한 50 — 넘치면 조용히 자르지 않고 막고 이유를 말한다(51개째 침묵 금지와 같은 잣대).
+        var 합칠 = 칸들.filter(function (c) { return !근거체크[c.getAttribute("data-doc")]; }).length;
+        if (Object.keys(근거체크).length + 합칠 > 50) {
+          k.checked = false;
+          try { document.getElementById("note").textContent = "근거 지정은 50개까지입니다 — 검색으로 좁힌 뒤 전체 지정을 쓰세요."; } catch (e2) { }
+          return;
+        }
+        칸들.forEach(function (c) { c.checked = true; 근거체크[c.getAttribute("data-doc")] = c.getAttribute("data-label") || c.getAttribute("data-doc"); });
+      } else {
+        칸들.forEach(function (c) { c.checked = false; delete 근거체크[c.getAttribute("data-doc")]; });
+      }
+      근거알림();
+      return;
+    }
     if (!k || !k.classList || !k.classList.contains("dchk")) return;
     var id = k.getAttribute("data-doc") || "";
     if (!id) return;
@@ -2079,6 +2097,31 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     var d = ev.data;
     if (!d) return;
     // ☑ 전체 해제(노트북형) — 대화창 근거띠의 ×를 눌렀을 때. 체크만 남으면 화면이 거짓말한다.
+    // 📄 인용 → 원문(「123진행」 ③-C). 발신은 대화의 근거 배지·인용 원문(chatparts) — 셸 경유.
+    if (d.type === "gijo:opendoc" && typeof d.documentId === "string") {
+      var 열id = d.documentId.trim().slice(0, 200);
+      var 개인 = 열id.indexOf("personal:") === 0;
+      var 열탭 = 개인 ? "mine" : "know";
+      var 행키 = 개인 ? 열id.slice(9) : 열id;
+      var 열노드 = document.querySelector('#tabs .v4node[data-t="' + 열탭 + '"]');
+      var 검색칸 = document.getElementById("q");
+      if (검색칸 && 검색칸.value) 검색칸.value = ""; // 필터에 가려 못 찾는 것 방지
+      if (열노드) 열노드.click(); // 쓰던글확인을 그대로 지난다(편집 중 소멸 방지 계약 유지)
+      setTimeout(function () {
+        var 행 = null;
+        try { 행 = document.querySelector('#list .g-rows-r[data-id="' + (window.CSS && CSS.escape ? CSS.escape(행키) : 행키) + '"]'); } catch (e) { }
+        if (행) {
+          // 접힌 그룹 안이면 펼친다 — 숨은 행을 클릭해도 상세는 뜨지만 사람이 못 본다
+          var 접힌 = 행.closest(".g-rows-body.folded");
+          if (접힌 && 접힌.previousElementSibling) 접힌.previousElementSibling.click();
+          행.click();
+          try { 행.scrollIntoView({ block: "center" }); } catch (e) { }
+        } else {
+          try { document.getElementById("note").textContent = "인용한 문서(" + 행키.slice(0, 60) + ")가 이 목록에 없습니다 — 반입 상태를 확인해 주세요."; } catch (e) { }
+        }
+      }, 700);
+      return;
+    }
     if (d.type === "gijo:docscope:clear") {
       근거체크 = {};
       Array.prototype.forEach.call(document.querySelectorAll("#list .dchk"), function (k) { k.checked = false; });

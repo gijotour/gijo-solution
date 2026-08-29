@@ -1579,7 +1579,7 @@
       // 사람의 체크·첨부가 셸 대화창(근거띠)에 닿아야 한다. 안 넣으면 팝업에서만 조용히 죽는다
       // (bridgerelay.test가 이 목록과 셸 수신부의 일치를 못박는다).
       if (d.type !== "gijo:select" && d.type !== "gijo:scope" && d.type !== "gijo:openTab"
-        && d.type !== "gijo:docscope" && d.type !== "gijo:attach") return;
+        && d.type !== "gijo:docscope" && d.type !== "gijo:attach" && d.type !== "gijo:opendoc") return;
       if (!ev.source || !팝업발신자인가(ev.source)) return;
       if (window.gijo && window.gijo.bridgeToShell) window.gijo.bridgeToShell(d);
     });

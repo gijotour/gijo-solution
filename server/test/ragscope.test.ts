@@ -134,3 +134,37 @@ describe("attachSessionText — 📎 첨부 압축", () => {
     expect(DISPATCHER_SRC, "빈 세션을 조용히 버린다 — 「첨부한 척」").toContain("내용을 싣지 못했습니다");
   });
 });
+
+describe("노트북형 ③(123진행) — 인용→문서·전체 지정·분리창 릴레이 배선 계약", () => {
+  const CHATPARTS = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "chatparts.js"), "utf-8");
+  const APP = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "app.html"), "utf-8");
+  const MYDOCS = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "mydocs.html"), "utf-8");
+  const CONSOLE = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "console.js"), "utf-8");
+  const NAV = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "nav.js"), "utf-8");
+
+  it("인용→문서 사슬 3단이 전부 실재한다 — 한 단만 빠지면 눌러도 조용히 무동작", () => {
+    expect(CHATPARTS, "발신(배지 문서명)이 없다").toContain('type: "gijo:opendoc"');
+    expect(APP, "셸 분기가 없다").toContain('d.type === "gijo:opendoc"');
+    expect(MYDOCS, "내 문서 수신이 없다").toContain('"gijo:opendoc"');
+    expect(NAV, "분리창 대화의 인용 클릭이 셸로 안 나른다").toContain('"gijo:opendoc"');
+  });
+
+  it("전체 지정은 50 상한에서 **막고 이유를 말한다** — 조용히 자르면 「체크 120=칩 50」 거짓", () => {
+    expect(MYDOCS).toContain("dchkall");
+    expect(MYDOCS, "상한 안내가 없다").toContain("검색으로 좁힌 뒤 전체 지정");
+  });
+
+  it("분리창 대화창 동기화 — 셸이 두 신호를 broadcast하고, console이 bridge로 받는다", () => {
+    expect((APP.match(/broadcastToWindows\(\{ type: "gijo:docscope"/g) || []).length, "docscope 중계 없음").toBeGreaterThanOrEqual(1);
+    expect((APP.match(/broadcastToWindows\(\{ type: "gijo:attach"/g) || []).length, "attach 중계 없음").toBeGreaterThanOrEqual(1);
+    expect(CONSOLE, "분리창 인스턴스 수신(onShellBridge)이 없다").toMatch(/onShellBridge[\s\S]{0,400}gijo:docscope/);
+    // 분리창 칩 × → 셸로 되보내 화면 체크까지 되돌린다(비대칭 재발 방지)
+    expect(CONSOLE).toContain('bridgeToShell({ type: "gijo:docscope", docIds: [] })');
+    expect(APP, "빈 목록 신호가 화면 해제(gijoDocScopeCleared)로 안 이어진다").toMatch(/!문서들\.length && window\.gijoDocScopeCleared/);
+  });
+
+  it("말풍선 근거 표시·범위 라벨 — 보낸 그때의 사실을 남긴다(시안 약속)", () => {
+    expect(CONSOLE).toContain("cs-scopeline");
+    expect(CONSOLE).toContain("cs-glabel");
+  });
+});

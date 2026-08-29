@@ -991,11 +991,38 @@
         return { id: String(x && x.id || "").slice(0, 200), label: String(x && x.label || "").slice(0, 120) };
       }).filter(function (x) { return x.id; }) : [];
       window.gijoConsole.docScope(문서들);
+      // 분리창 대화창 인스턴스에도 같은 상태를(③-A — broadcast는 본창 제외라 이중 수신 없음).
+      if (window.gijo && window.gijo.broadcastToWindows) {
+        try { window.gijo.broadcastToWindows({ type: "gijo:docscope", docIds: 문서들 }); } catch (e) { }
+      }
+      // 빈 목록 = 전체 해제 신호(분리창 칩 ×의 되보냄 포함) — 화면(내 문서) 체크까지 되돌린다.
+      if (!문서들.length && window.gijoDocScopeCleared) { try { window.gijoDocScopeCleared(); } catch (e) { } }
       return;
     }
     // 📎 지난 작업 첨부(노트북형) — 세션 id·제목만 나른다. 압축·예산은 서버 몫(attachSessionText).
     if (d.type === "gijo:attach" && window.gijoConsole && window.gijoConsole.attachWork) {
-      window.gijoConsole.attachWork({ id: String(d.sessionId || "").slice(0, 80), title: String(d.title || "").slice(0, 120) });
+      var 첨부값 = { id: String(d.sessionId || "").slice(0, 80), title: String(d.title || "").slice(0, 120) };
+      window.gijoConsole.attachWork(첨부값);
+      if (window.gijo && window.gijo.broadcastToWindows) {
+        try { window.gijo.broadcastToWindows({ type: "gijo:attach", sessionId: 첨부값.id, title: 첨부값.title }); } catch (e) { }
+      }
+      return;
+    }
+    // 📄 인용 → 원문 열기(「123진행」 ③-C — 시안의 「인용 클릭 → 문서로」) — 대화의 근거 배지·
+    // 인용 원문에서 문서명을 누르면 내 문서에서 그 문서를 연다. 새 탭을 늘리지 않고
+    // 홈 탭(mydocs.html)을 활성으로 만든 뒤 프레임에 위임한다(문서 찾기·펼치기는 mydocs 몫).
+    if (d.type === "gijo:opendoc" && typeof d.documentId === "string" && d.documentId.trim()) {
+      var 열문서 = d.documentId.trim().slice(0, 200);
+      open("mydocs.html", "내 문서", { dock: true }); // 이미 있으면 활성으로만
+      var 시도 = 0;
+      var 보내기 = function () {
+        var t = find("mydocs.html");
+        if (t && t.frame && t.frame.contentWindow) {
+          try { t.frame.contentWindow.postMessage({ type: "gijo:opendoc", documentId: 열문서 }, "*"); return; } catch (e) { }
+        }
+        if (시도++ < 8) setTimeout(보내기, 500); // 방금 연 탭이면 프레임 로드를 기다린다
+      };
+      setTimeout(보내기, 250);
       return;
     }
     // ⑤″ 고르기 모드 전용(승인 시안 stage-picker, 2026-08-20) — **pick.html만 보내는 좁은

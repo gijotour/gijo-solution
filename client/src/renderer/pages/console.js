@@ -260,6 +260,8 @@
       ".cs-gchip .gx:hover{opacity:1;}",
       ".cs-gchip.gdoc{color:#5fb98a;border-color:#5fb98a55;}",
       ".cs-gchip.gses{color:#7ea6e8;border-color:#7ea6e855;}",
+      ".cs-glabel{font-size:11px;color:var(--mut,#8a93a0);}",
+      ".cs-scopeline{margin-top:3px;font-size:11px;color:var(--mut,#8a93a0);}",
       // ⚠ min-width:0 — flex 아이템의 기본값(auto)은 **입력칸이 자기 기본 크기 밑으로 안 줄게** 해서
       //   좁은 도크에서 줄 전체를 밀어낸다(검토관 2026-08-22 [중]). 줄어들 수 있게 명시한다.
       ".cs-dock input{flex:1;min-width:0;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:11px;color:var(--text,#e9e7e2);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}",
@@ -1269,6 +1271,13 @@
     var g = document.getElementById("csGround");
     if (!g) return;
     g.textContent = "";
+    // 근거 범위 라벨(시안 mydocs-notebook — 「123진행」 ③) — 칩이 있을 때만. 없으면 띠 자체가 0px.
+    if (근거문서.length || 첨부세션.length) {
+      var lb = document.createElement("span");
+      lb.className = "cs-glabel";
+      lb.textContent = "근거 범위:";
+      g.appendChild(lb);
+    }
     if (근거문서.length) {
       var c = document.createElement("span");
       c.className = "cs-gchip gdoc";
@@ -1276,7 +1285,12 @@
       c.appendChild(document.createTextNode("📚 근거: 문서 " + 근거문서.length + " "));
       var x = document.createElement("span");
       x.className = "gx"; x.textContent = "×"; x.title = "지정 전체 해제 — 전체 문서에서 검색";
-      x.addEventListener("click", function () { setDocScope([]); if (window.gijoDocScopeCleared) { try { window.gijoDocScopeCleared(); } catch (e) {} } });
+      x.addEventListener("click", function () {
+        setDocScope([]);
+        if (window.gijoDocScopeCleared) { try { window.gijoDocScopeCleared(); } catch (e) {} }
+        // 분리창 인스턴스에는 셸 훅이 없다 — 셸로 되보내 화면(내 문서) 체크까지 되돌린다(③-A)
+        else if (window.gijo && window.gijo.bridgeToShell) { try { window.gijo.bridgeToShell({ type: "gijo:docscope", docIds: [] }); } catch (e) {} }
+      });
       c.appendChild(x);
       g.appendChild(c);
     }
@@ -1630,6 +1644,21 @@
     sending = true;
     document.getElementById("dockSend").disabled = true;
     append("instr", { icon: "나", name: "나 → AI 팀", message: showText == null ? text : showText });
+    // ☑·📎가 걸린 채 보낸 지시임을 말풍선에 남긴다 — 칩은 지금 상태고, 이 줄은 그때 사실이다.
+    if (근거문서.length || 첨부세션.length) {
+      try {
+        var 지시행 = rows() && rows().lastElementChild;
+        var 지시칸 = 지시행 && 지시행.querySelector(".cb");
+        if (지시칸) {
+          var sl = document.createElement("div");
+          sl.className = "cs-scopeline";
+          sl.textContent = (근거문서.length ? "📚 지정 문서 " + 근거문서.length : "") +
+            (근거문서.length && 첨부세션.length ? " · " : "") +
+            (첨부세션.length ? "📎 첨부 " + 첨부세션.length : "");
+          지시칸.appendChild(sl);
+        }
+      } catch (e) { /* 표시는 덤 — 실패해도 전송은 그대로 */ }
+    }
     var typing = append("typing", { icon: "🧭", name: "오케스트레이터" });
     // 진행 카드 — 점 세 개 대신 서버가 실제로 지나는 단계를 보여준다(2026-07-30 시안 승인).
     // 카드는 typing 행의 .cm 자리에 그린다. progresscard.js가 없으면 기존 점 애니메이션 그대로.
@@ -2270,6 +2299,16 @@
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.
   //   커서만 놓아 주는 것이 맞고, 빈 지시를 던지면 AI가 엉뚱한 답을 만든다.
+  // ☑·📎 분리창 릴레이(「123진행」 ③-A) — 셸의 중계(gijo:bridge)를 이 인스턴스 상태에 반영.
+  // 본창(도킹)은 app.html이 gijoConsole을 직접 부르고, broadcast는 본창을 제외하므로 이중 수신 없음.
+  if (window.gijo && window.gijo.onShellBridge) {
+    window.gijo.onShellBridge(function (d) {
+      if (!d) return;
+      if (d.type === "gijo:docscope") setDocScope(Array.isArray(d.docIds) ? d.docIds : []);
+      else if (d.type === "gijo:attach") attachWork({ id: d.sessionId, title: d.title });
+      else if (d.type === "gijo:docscope:clear") setDocScope([]);
+    });
+  }
   if (window.gijo && window.gijo.onConsoleAsk) {
     window.gijo.onConsoleAsk(function (text, sessionId) {
       // 세션을 함께 받으면 **그 작업으로 갈아탄다** — 「작업 내역에서 이어서 지시」가 그 작업에

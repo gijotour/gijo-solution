@@ -55,7 +55,7 @@
       ".gcp-src{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--teal,#6fdcb5);}",
       // ② 찾아보긴 했으나 근거는 아님 — 초록(근거 있음)과 **눈에 띄게 달라야** 한다.
       //   호박색은 이 제품에서 「주의·확인 필요」 자리다(근거 약함 배너의 ⚠와 같은 결).
-      ".gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--amber,#ffd88a);}",
+      ".gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--amber,#ffd88a);}.gcp-doclink{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}.gcp-doclink:hover{opacity:.8;}",
       ".gcp-ev{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;min-width:0;}",
       // 데이터 카드(승인 시안 대화_데이터카드, 2026-08-19) — KPI+표. 밀도는 전역 규격(25px)과 같게.
       ".dc-card{margin-top:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:var(--panel-2,#1f1e1d);}",
@@ -166,7 +166,20 @@
       var 약함 = 근거세기 === "약함";
       var badge = document.createElement("div");
       badge.className = 약함 ? "gcp-src2" : "gcp-src";
-      badge.textContent = (약함 ? "📄 찾아본 자료 — 근거 아님: " : "📄 근거: ") + sources.slice(0, 4).join(" · ");
+      // 문서명 클릭 → 내 문서에서 원문 열기(「123진행」 ③-C — 시안 「인용→소스 점프」의 1차분).
+      // 셸의 gijo:opendoc 분기가 받는다. 분리창 대화에서는 nav.js 팝업 릴레이가 셸로 나른다.
+      badge.appendChild(document.createTextNode(약함 ? "📄 찾아본 자료 — 근거 아님: " : "📄 근거: "));
+      sources.slice(0, 4).forEach(function (nm, i) {
+        if (i) badge.appendChild(document.createTextNode(" · "));
+        var a = document.createElement("span");
+        a.className = "gcp-doclink";
+        a.textContent = nm;
+        a.title = "내 문서에서 이 문서 열기";
+        a.addEventListener("click", function () {
+          try { window.top.postMessage({ type: "gijo:opendoc", documentId: String(nm) }, "*"); } catch (e) { }
+        });
+        badge.appendChild(a);
+      });
       el.appendChild(badge);
     }
     if (!Array.isArray(list) || !list.length) return;
@@ -195,7 +208,10 @@
         var safe = esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         try { txt = txt.replace(new RegExp(safe, "g"), "<mark>$&</mark>"); } catch (e) {}
       });
-      box.innerHTML = '<div class="gcp-qd">' + esc(q.documentId || "") + '</div><div class="gcp-qt">' + txt + "</div>";
+      box.innerHTML = '<div class="gcp-qd gcp-doclink" title="내 문서에서 이 문서 열기">' + esc(q.documentId || "") + '</div><div class="gcp-qt">' + txt + "</div>";
+      box.querySelector(".gcp-qd").addEventListener("click", function () {
+        try { window.top.postMessage({ type: "gijo:opendoc", documentId: String(q.documentId || "") }, "*"); } catch (e) { }
+      });
       body.appendChild(box);
     });
 
