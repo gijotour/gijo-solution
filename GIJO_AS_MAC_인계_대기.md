@@ -190,6 +190,17 @@
   `broadcastToWindows`는 본창 뺀 BrowserWindow 전수 발송이고, ⇤ 붙이기 → ⧉ 다시 빼기에서
   `ground:req` 물려받기가 mac에서도 같은 순서로 도는지)
 
+### 2026-08-30 — 메뉴 호출·배선 통일(전 화면 통일감 검토 라운드)
+
+- **공용 파일 변경**: `nav.js`(팝업 릴레이 목록에 gijo:prefill 추가·새버전 배지 부착점 s=my·주석 교정) ·
+  `app.html`(openTab 라벨 폴백 page 제거·옛탭 표 3건 최종 도착지·⭐ railFav 제거·prefill broadcast) ·
+  `console.js`(onShellBridge prefill 수신) · `railroster.js`(E/R 라벨 「지식 창고」) ·
+  `map-view.js`(선택을 selectnotify 부품으로) · 시험 5파일(대장·전수 스캔·top 고정·배지 실존)
+- **라벨 정본 사슬 확정**: ① 메뉴 라벨(GROUPS) ② 여는 곳 관례(railroster·assets) ③ 판 제목.
+  라이트가 화면·탭 라벨을 만질 때 같은 사슬을 따를 것.
+- **max 실기 검증거리**: mac에서 화면 팝업(창) 상태의 대시보드 「적어 넣기」(prefill 릴레이 신설 경로) ·
+  hardening 카드 클릭 🎯(win 운영에 점검 대상 0건이라 실측 못 함 — mac 개발 서버에 대상 있으면 확인)
+
 ### 진행 중이라 아직 인계 대상이 아닌 것
 
 - 규정 판정 요청함 — 시안·설계 검토 완료, 착수 전
