@@ -75,8 +75,8 @@
     //   picklist 결정적 목록 + add_task·complete_task·work_steps·step_done·step_undo·routine_tasks.
     //   화면을 되살릴 일이 있으면 그 도구들과 겹치지 않게 먼저 정리할 것.
     // 문서함(별도 창)은 내 문서 허브에 흡수됐다(2026-08-20 승인 시안 docs-hub-v3 — 「모든 문서는
-    // 여기서」). hidden 항목을 남기는 이유는 상단 🔍 화면 찾기 — 「문서함」 옛 이름으로 찾아도
-    // 새 자리(내 문서 → 📘 제품 안내 탭)에 닿아야 한다.
+    // 여기서」). ⚠ hidden 항목(🔍 찾기 전용) 규약은 살아 있지만 **지금 TOP에 hidden 항목은
+    // 0개**다 — 마지막 하나(연락처)가 2026-08-31 재편으로 📓 보이는 항목이 됐다(아래 주석).
     // (「GIJO AS 안내」·「보안제품 비교·소개」는 TOP 숨김에서 **🧠 내 지식 그룹으로 이사**했다 —
     //  2026-08-28 사장님 「우리 제품은 내 지식이 강조되어야 해」. 숨김은 검색으로만 닿았는데,
     //  제품의 차별점(축적되는 지식)이 메뉴에서 안 보이는 게 문제였다. 입구는 하나다 — 복제 아님.)
@@ -142,7 +142,12 @@
       // 업무 넘기기 — 「추가 기능」 그룹이 사라지며 사장님 정의(「내 문서 … 업무넘기기 포함」)
       //   그대로 이리로. 파일(handover.html)은 그대로다 — 자리 이동이지 흡수가 아니다.
       { page: "handover.html", label: "업무 넘기기" },
-      { page: "sessions.html", label: "작업 내역" }, // TOP 고정과 같은 화면 — 시안이 양쪽 다 그렸다
+      // 작업 내역 — TOP 고정과 같은 화면(시안이 양쪽에 다 그렸다 — 이중 등재는 승인된 의도).
+      //   ⚠ 부작용 3종은 이렇게 막는다(검토관 2026-08-31): ① fixed:true로 ☆를 억제(즐겨찾기에
+      //   꽂으면 세 번째 줄이 생긴다) ② 🔍 화면찾기 중복은 gijoScreenList가 걸러낸다(아래)
+      //   ③ 진행중 배지는 **두 줄 다 붙는 게 맞다** — 두 줄이 같은 화면의 같은 입구라,
+      //   mydocs 배지 규칙(딴 탭 변형엔 안 붙임)과 달리 여기선 어느 쪽을 봐도 같은 사실이다.
+      { page: "sessions.html", label: "작업 내역", fixed: true },
     ]},
     // ③ 🩹 취약점 업무 — 「취약점 분석 파일·보안로그 분석 → 담당자 지정·관리·보고」(사장님
     //   원문). ⓪ 자산(범위 축)과 절차 ①~⑤ 허브 전부 + 보안 로그 파일 분석(옛 추가 기능).
@@ -154,17 +159,23 @@
       { page: "triage.html", label: "② 우선순위", id: "s2-triage" },
       { page: "fix.html", label: "③ 조치", id: "s3-fix" },
       { page: "verify.html", label: "④ 검증", id: "s4-verify" },
+      // ⑤ 보고 — 시안의 「(KPI·컴플라이언스)」 꼬리는 뗐다(공개 결정 2026-08-31 검토관):
+      //   단계 이름은 서버 workflow.ts와 글자 일치가 정본이다(2026-08-05 실사고 — 이름이
+      //   갈리자 챗봇이 「사이드바에 없는 단계」로 안내). KPI·컴플라이언스는 그 화면 안의 판이다.
       { page: "reporting.html", label: "⑤ 보고", id: "s5-report" },
       { page: "loganalysis.html", label: "보안 로그 파일 분석" },
     ]},
     // ④ 🧰 보안제품 관리 — 「등록된 자산 및 보안제품 체크리스트, 필요시 스크립트 만들어 직접
     //   스캔하고 보고」(사장님 원문). 옛 「보안제품」+「공급망」 그룹 + 자산 관리·점검 판.
     //   ⚠ id(registry)는 그대로 둔다 — 접힘 기억 열쇠이고 옛 「보안제품」 그룹의 계보다.
-    //   ⚠ 자산 관리는 반드시 `inventory.html?hub=1` — hub=1이 없으면 갈아타기 표(TAB_REDIRECT
-    //     inventory→assets)가 **오류 없이 ⓪ 자산 고르기를 띄운다**(hub=1이 유일한 예외 통로).
+    //   ⚠ 자산 관리는 반드시 `inventory.html?full=1` — 예외 표시(full=1·hub=1)가 없으면
+    //     갈아타기 표(TAB_REDIRECT inventory→assets)가 **오류 없이 ⓪ 자산 고르기를 띄운다**.
+    //     hub=1이 아니라 full=1인 이유(검토관 2026-08-31): hub=1은 「허브 무대 안」 표시
+    //     계약이라 화면의 「한눈에」 그림띠(#vizStrip)까지 숨긴다 — 메뉴로 연 전체 화면은
+    //     허브가 위에 없으므로 띠가 보여야 한다. full=1은 갈아타기 예외만 태운다.
     { id: "registry", icon: "drawer", label: "④ 🧰 보안제품 관리", items: [
       { page: "products.html", label: "우리 보안제품" },
-      { page: "inventory.html?hub=1", label: "자산 관리 (전체)" },
+      { page: "inventory.html?full=1", label: "자산 관리 (전체)" },
       { page: "verify.html?panel=hardening", label: "보안설정 점검 (하드닝)" },
       { page: "fix.html?panel=maintenance", label: "정기 점검" },
       { page: "supplychain.html", label: "공급망 점검" },
@@ -262,7 +273,7 @@
     "threat.html": "discover.html?panel=threat",
     "threat.html?embed=1": "discover.html?embed=1&panel=threat",
     // ⓪ 자산이 생기면서 자산의 **첫 자리**가 바뀌었다(2026-08-18 승인 시안).
-    // ⚠ **`hub=1`이 붙은 주소는 여기 안 걸린다**(아래 갈아타기 적용부의 예외). 그게 자산
+    // ⚠ **`hub=1`(또는 `full=1`)이 붙은 주소는 여기 안 걸린다**(아래 갈아타기 적용부의 예외). 그게 자산
     //   관리(inventory)로 가는 **유일한 탈출구**다 — assets.html의 「전체 관리 열기」가
     //   `inventory.html?hub=1`로 여는 이유다. 그 한 글자가 없으면 관리 화면을 열려고 눌러도
     //   이 표가 ⓪로 되돌려 **영영 못 간다**(오류도 안 난다 — 그냥 같은 화면이 다시 뜬다).
@@ -668,10 +679,10 @@
     }
     // 오늘 새로 들어온 문서 수 — "내가 올린 게 어디 쌓이나"를 눌러 보지 않아도 알린다
     //   (2026-08-21 승인 시안 menu-reorg). 0이면 감춘다(새 게 없으면 알릴 일이 아니다).
-    // ⚠ `mydocs.html` **정확히**만 — TOP엔 숨김 항목 `mydocs.html?tab=contacts`(옛 연락처)가,
-    //   🧠 내 지식 그룹엔 `mydocs.html?tab=guide`·`?tab=vendor`가 있어 문자열이 다르다.
-    //   그쪽엔 안 붙는다(붙으면 배지가 여러 곳에 뜬다). (2026-08-30 — 옛 주석이 guide를
-    //   TOP 숨김이라 적었는데 guide는 2026-08-28 내 지식 그룹으로 이사했다. 사실대로 고침.)
+    // ⚠ `mydocs.html` **정확히**만 — 📓 내 문서 그룹의 `?tab=ingest`·`?tab=mine`·
+    //   `?tab=contacts`와 🧠 내 지식 그룹의 `?tab=guide`·`?tab=vendor`는 문자열이 달라
+    //   안 붙는다(붙으면 배지가 여러 곳에 뜬다). (2026-08-31 — 연락처가 TOP 숨김에서 📓
+    //   보이는 항목으로 이사해 사실대로 고침. 2026-08-30에도 같은 부류를 한 번 고친 자리다.)
     if (it.page === "mydocs.html") {
       var dBadge = document.createElement("span");
       dBadge.className = "gn-upbadge gn-docbadge";
@@ -883,12 +894,22 @@
     }).catch(function () { /* 다리 자체가 없는 옛 판 — 위 typeof 검사에서 이미 걸렀다 */ });
   };
 
-  /** 찾기용 납작한 목록 — {page|win, label, group}. 자료는 위 TOP/GROUPS 하나에서만 온다. */
+  /** 찾기용 납작한 목록 — {page|win, label, group}. 자료는 위 TOP/GROUPS 하나에서만 온다.
+   *  ⚠ 같은 주소+같은 이름은 **한 번만** 낸다(2026-08-31 검토관) — 작업 내역이 TOP과 📓에
+   *  이중 등재라(승인된 의도) 안 거르면 🔍 화면찾기에 같은 줄이 두 번 나온다. TOP이 먼저
+   *  돌므로 남는 쪽은 TOP 것이다. */
   window.gijoScreenList = function () {
     var out = [];
-    TOP.forEach(function (t) { out.push({ page: t.page, win: t.win, label: t.label, icon: t.icon, group: "" }); });
+    var 본것 = {};
+    function 넣기(entry) {
+      var k = (entry.page || entry.win || "") + "|" + (entry.label || "");
+      if (본것[k]) return;
+      본것[k] = true;
+      out.push(entry);
+    }
+    TOP.forEach(function (t) { 넣기({ page: t.page, win: t.win, label: t.label, icon: t.icon, group: "" }); });
     GROUPS.forEach(function (g) {
-      g.items.forEach(function (i) { out.push({ page: i.page, win: i.win, label: i.label, icon: g.icon, group: g.label }); });
+      g.items.forEach(function (i) { 넣기({ page: i.page, win: i.win, label: i.label, icon: g.icon, group: g.label }); });
     });
     return out;
   };
@@ -1663,7 +1684,9 @@
     // ⚠ 허브 무대(&hub=1)는 흡수 대상이 아니다 — 태우면 허브 안에서 허브를 여는 무한 중첩.
     //    이 자리에서는 navigateTo(새 탭 열기)가 아니라 **그 자리 교체**(replace)여야 한다.
     if (IS_EMBED) {
-      if (!/[?&]hub=1/.test(location.search)) {
+      // ⚠ full=1도 예외다(2026-08-31 5그룹 재편) — 메뉴의 「자산 관리 (전체)」가 갈아타기만
+      //   피하고 허브 무대 표시 계약(hub=1의 #vizStrip 숨김)은 안 물려받게 만든 통로.
+      if (!/[?&](?:hub|full)=1/.test(location.search)) {
         // 흡수 키는 주소 정확 일치인데, 프로가 표시용 theme=light를 붙이면 키가 안 맞아
         // 폐지 화면 23종이 허브로 못 넘어간다(검토관 배색 중5 — 프로에서만 재발하는 부류).
         // 표시용 파라미터는 키에서 떼고, 흡수 주소에는 도로 붙인다.

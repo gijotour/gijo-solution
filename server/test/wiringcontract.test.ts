@@ -389,6 +389,28 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
     // 그룹 id(g.id)로 거르면 칩이 **조용히 0개**가 된다(설계관 적발, 시험 없던 자리).
     expect(c2, "홈 히어로 절차 칩이 항목 id(it.id)를 안 본다 — 칩 0개 부류").toMatch(/STAGE[\s\S]{0,400}it\.id/);
   });
+  it("5그룹 재편 연쇄 감시 — TOP 다리·깊은 주소·화면찾기 중복(2026-08-31 검토관)", () => {
+    const nv = 코드만(join(PAGES, "nav.js"));
+    const s = 코드만(join(PAGES, "app.html"));
+    // ① 셸 이름찾기의 TOP 다리 — 끊기면 오류 없이 옛 결함(mydocs 탭 이름 오인)으로 회귀한다.
+    expect(nv, "nav.js가 gijoNavTop을 안 내준다").toContain("window.gijoNavTop = TOP");
+    expect(s, "셸 화면이름찾기가 gijoNavTop을 안 읽는다").toContain("window.gijoNavTop");
+    // ② 깊은 주소 메뉴 — 쿼리 값이 어긋나면 **오류 없이** 딴 화면·딴 판이 열린다.
+    //    판 주소는 갈아타기 표(TAB_REDIRECT)의 도착 주소와 같은 문자열이어야 한다(단일 출처 대조).
+    for (const [흡수원, 도착] of [["hardening.html", "verify.html?panel=hardening"], ["maintenance.html", "fix.html?panel=maintenance"]]) {
+      expect(nv, `메뉴 깊은 주소가 사라졌다: ${도착}`).toContain(`page: "${도착}"`);
+      expect(nv, `갈아타기 도착 주소와 어긋났다: ${흡수원}→${도착}`).toContain(`"${흡수원}": "${도착}"`);
+    }
+    expect(nv, "자산 관리 메뉴가 full=1 예외 없이 걸렸다 — 조용히 ⓪로 갈아탄다").toContain('page: "inventory.html?full=1"');
+    const md = 코드만(join(PAGES, "mydocs.html"));
+    for (const tab of ["ingest", "mine", "contacts"]) {
+      expect(nv, `내 문서 탭 메뉴가 사라졌다: ${tab}`).toContain(`mydocs.html?tab=${tab}`);
+      expect(md, `내 문서에 ${tab} 탭이 없다 — 메뉴가 유령 탭을 가리킨다`).toContain(`"${tab}"`);
+    }
+    // ③ 🔍 화면찾기 중복 거름 — 작업 내역 이중 등재(TOP+📓, 승인 의도)가 목록에 두 줄로
+    //    새지 않게 gijoScreenList가 같은 주소+이름을 거른다.
+    expect(nv, "gijoScreenList가 중복을 안 거른다(작업 내역 두 줄)").toContain("본것[k]");
+  });
   it("문서 허브 §6 — 신고 시한 템플릿 수신 계약(발신자 가드·템플릿 id) 소스 감시", () => {
     // 계약(승인 시안 docs-hub-v3 §6): 신고 시한 카운트다운 카드(미래)가
     // {type:"gijo:newDocFromTemplate", templateId, prefill}를 보내면 허브가 편집기를 연다.

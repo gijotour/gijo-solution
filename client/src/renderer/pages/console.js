@@ -1564,7 +1564,8 @@
       el.style.display = "flex";
       el.querySelectorAll(".st:not(.now)").forEach(function (b) {
         b.addEventListener("click", function () {
-          // dock 명시 — 홈 모드와 같은 이유(띠 클릭=이동 의지, 카드만 뜨면 약속 위반).
+          // dock 명시 — 홈 모드와 같은 이유(띠 클릭=이동 의지 신호. 2026-08-31 개정으로
+          // dock 없이도 화면이 열리지만, 명시 의도 신호는 그대로 단다 — 홈 모드 주석 참조).
           if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label, { dock: true });
           else if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell(b.dataset.page, b.dataset.label);
           else if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(b.dataset.page);   // 셸 없는 자리 폴백(위 홈 모드 주석 참고)

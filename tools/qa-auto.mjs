@@ -450,7 +450,7 @@ async function runClient() {
   // 사이드바에서 누르는 것은 허브이고, 탭 이름도 허브 이름이다.
   await scenario("QA-C01", "탭 셸", "메뉴를 누르면 화면이 탭으로 열린다(이동 아님)", {
     given: "탭 셸(app.html)에서",
-    when: "왼쪽 메뉴의 대표 그룹 '② 우선순위'를 누르면",
+    when: "왼쪽 메뉴 🩹 취약점 업무 그룹의 항목 '② 우선순위'를 누르면(5그룹 재편 2026-08-31 — 대표 그룹은 소멸)",
     then: "주소는 셸 그대로이고 탭이 하나 생기며, 탭 안은 triage.html 허브를 **직접** 품는다",
   }, async () => {
     await open("app.html");
@@ -509,27 +509,28 @@ async function runClient() {
   });
 
   // 설정 그룹 정리(2026-08-09 사용자 지시) — 5구역은 사이드바 나열이 아니라 settings.html
-  // **안의 구역 탭줄**이 됐다. 사이드바에는 「설정·기록」 두 줄만 남는다. 화면 안 탭줄과
+  // **안의 구역 탭줄**이 됐다. 2026-08-31 5그룹 재편으로 ⑤ ⚙ 설정 그룹은 「설정·AI·기록」
+  // 3줄이다(옛 독립 AI 그룹이 항목으로 내려옴). 화면 안 탭줄과
   // 관리자 게이트는 실앱으로 도는 shell 계층이 지킨다(파일 하네스는 로그인이 없어 못 본다).
-  await scenario("QA-C03", "메뉴 C안", "설정 그룹 2줄 + 업데이트 배지", {
+  await scenario("QA-C03", "메뉴 C안", "⚙ 설정 그룹 3줄(설정·AI·기록) + 업데이트 배지", {
     given: "새 버전이 있다고 서버가 알려줄 때",
-    when: "셸(app.html)의 사이드바 설정 그룹을 보면",
-    then: "「설정」·「기록」 두 줄이 있고(5구역 나열은 화면 안 탭줄로 이관), 업데이트 배지가 표시된다",
+    when: "셸(app.html)의 사이드바 ⚙ 설정 그룹을 보면",
+    then: "「설정」·「AI」·「기록」 세 줄이 있고(5구역 나열은 화면 안 탭줄로 이관), 업데이트 배지가 표시된다",
   }, async () => {
     await open("app.html");
     await page.waitForTimeout(1500);
     const r = await page.evaluate(() => {
       const labels = [...document.querySelectorAll("#gijoNav .gn-item .gn-label")].map((e) => e.textContent);
       return {
-        설정그룹: labels.filter((l) => ["설정", "기록"].includes(l)),
+        설정그룹: labels.filter((l) => ["설정", "AI", "기록"].includes(l)),
         옛나열: labels.filter((l) => ["내 설정", "서버·AI", "연동", "관리자", "기록 보기"].includes(l)),
         배지: !!document.querySelector(".gn-upbadge"),
       };
     });
-    if (r.설정그룹.length !== 2) throw new Error(`설정 그룹 ${r.설정그룹.length}줄: ${r.설정그룹.join(",")}`);
+    if (r.설정그룹.length !== 3) throw new Error(`설정 그룹 ${r.설정그룹.length}줄: ${r.설정그룹.join(",")}`);
     if (r.옛나열.length) throw new Error(`이관한 5구역 나열이 사이드바에 되살아남: ${r.옛나열.join(",")}`);
     if (!r.배지) throw new Error("업데이트 배지 없음");
-    return `설정 그룹 [${r.설정그룹.join("·")}] + 업데이트 배지 표시`;
+    return `⚙ 설정 그룹 [${r.설정그룹.join("·")}] + 업데이트 배지 표시`;
   });
 
   // 4.0.0 기대값 현행화: 오른쪽 숨은 팝업(commandpanel.js)을 통째로 삭제했다.

@@ -21,7 +21,8 @@ const navSrc = fs.readFileSync(
 
 /** nav.js의 절차 항목(id: "s1-find" … "s5-report")에서 화면 목록을 뽑는다.
  *  2026-08-31 5그룹 재편: 단계 id는 그룹이 아니라 🩹 취약점 업무 그룹의 **항목 한 줄**에
- *  산다(`{ page: "discover.html", id: "s1-find", label: "① 발견·수집" }`). 그래서 id가 있는
+ *  산다(`{ page: "discover.html", label: "① 발견·수집", id: "s1-find" }` — 필드 순서는
+ *  page→label→id가 계약이다: howto·screenguide가 「page 바로 뒤 label」 무늬를 본다). id가 있는
  *  **그 줄만** 읽는다 — 옛 파서의 경계 개념(다음 그룹·registry)이 사라져 배치가 자유롭고,
  *  ⑤와 registry 사이에 다른 항목(loganalysis 등)이 끼어도 오인하지 않는다(설계관 지뢰 해소). */
 function 사이드바단계(): Record<number, string[]> {

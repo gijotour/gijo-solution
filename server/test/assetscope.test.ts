@@ -123,11 +123,14 @@ describe("★ 갈아타기 — 「전체 관리 열기」가 영영 되돌지 �
     expect(nav).toMatch(/"inventory\.html\?embed=1": "assets\.html\?embed=1"/);
   });
 
-  it("★★ 탈출구(hub=1)가 실제로 있고, 화면이 그것을 쓴다", () => {
+  it("★★ 탈출구(hub=1·full=1)가 실제로 있고, 두 통로가 그것을 쓴다", () => {
     // 이게 없으면 「전체 관리 열기」→ inventory.html?embed=1 → 표가 assets로 되돌림 →
     // 담당자는 영영 관리 화면을 못 본다. **오류도 안 난다** — 같은 화면이 다시 뜰 뿐이다.
-    expect(nav, "갈아타기 예외(hub=1)가 사라졌다").toMatch(/if \(!\/\[\?&\]hub=1\/\.test\(location\.search\)\)/);
+    // 2026-08-31 5그룹 재편: 메뉴의 「자산 관리 (전체)」는 full=1을 쓴다 — hub=1을 쓰면
+    // 허브 무대 표시 계약(#vizStrip 숨김)까지 물려받아 메뉴로 연 전체 화면에서 띠가 사라진다.
+    expect(nav, "갈아타기 예외(hub=1·full=1)가 사라졌다").toMatch(/if \(!\/\[\?&\]\(\?:hub\|full\)=1\/\.test\(location\.search\)\)/);
     expect(화면, "전체 관리 열기가 hub=1 없이 연다 — 영영 못 간다").toContain('page: "inventory.html?hub=1"');
+    expect(nav, "메뉴의 자산 관리가 full=1 없이 걸렸다 — 조용히 ⓪ 자산 고르기로 갈아탄다").toContain('page: "inventory.html?full=1"');
   });
 
   it("⓪ 자산이 사이드바 **맨 위**에 있다 — ① 앞이다", () => {
