@@ -60,14 +60,18 @@ const upsertDocMetaStmt = db.prepare(
 /** 남의 개인 문서(personal:*)인가 — 목록·조각·파일 창구 공용 판별.
  *  공유된 것만 예외. 판별 불가(무기명)는 가리는 쪽 — 격리는 언제나 fail-closed. */
 export function 남의개인문서인가공용(documentId: string, req: import("express").Request): boolean {
+  const me = (req as import("express").Request & { user?: { id?: string | number; username?: string } }).user;
+  return 남의개인문서인가핵심(documentId, me?.id != null ? String(me.id) : (me?.username ?? null));
+}
+/** req 없는 핵심 꼴(2026-08-31 설계관) — 폴링 데몬(watchfolder)처럼 express 요청이 없는 자리가
+ *  **같은 잣대**를 쓰기 위한 분리다. 위 req 꼴은 이 핵심에 위임한다(두 벌 금지 — 잣대는 하나). */
+export function 남의개인문서인가핵심(documentId: string, viewerId: string | null): boolean {
   if (!documentId.startsWith("personal:")) return false;
   const 공유 = db.prepare("SELECT shared FROM personal_docs WHERE id = ?").get(documentId.slice("personal:".length)) as { shared?: number } | undefined;
   if (공유?.shared === 1) return false;
-  const me = (req as import("express").Request & { user?: { id?: string | number; username?: string } }).user;
-  const myId = me?.id != null ? String(me.id) : (me?.username ?? null);
-  if (!myId) return true;
+  if (!viewerId) return true;
   const row = db.prepare("SELECT uploadedBy FROM memory_documents WHERE documentId = ?").get(documentId) as { uploadedBy?: string | null } | undefined;
-  return String(row?.uploadedBy ?? "") !== myId;
+  return String(row?.uploadedBy ?? "") !== viewerId;
 }
 
 /** 이 요청자가 이 문서를 열람할 수 없는가 — 개인 격리 + 등급(C/S/O)의 **단일 잣대**.
@@ -78,11 +82,19 @@ export function 남의개인문서인가공용(documentId: string, req: import("
  *    않고 있던 것을 올려서 쓴다 — 같은 것을 두 곳에 적으면 반드시 어긋난다.
  */
 export function 열람불가공용(documentId: string, req: import("express").Request): boolean {
-  if (남의개인문서인가공용(documentId, req)) return true;
-  const who = (req as import("express").Request & { user?: { clearance?: string | null } }).user;
+  const who = (req as import("express").Request & { user?: { id?: string | number; username?: string; clearance?: string | null } }).user;
+  return 열람불가핵심(documentId, {
+    viewerId: who?.id != null ? String(who.id) : (who?.username ?? null),
+    clearance: who?.clearance ?? null,
+  });
+}
+/** req 없는 핵심 꼴(2026-08-31 설계관) — 감시 폴더 폴링이 **폴더 등록자**의 눈으로 같은
+ *  잣대를 적용하기 위한 분리다. req 꼴은 여기에 위임한다(단일 잣대 — 두 벌 금지 주석 계보). */
+export function 열람불가핵심(documentId: string, viewer: { viewerId: string | null; clearance?: string | null }): boolean {
+  if (남의개인문서인가핵심(documentId, viewer.viewerId)) return true;
   const meta = getDocMetaStmt.get(documentId) as { grade?: string | null } | undefined;
-  if (!meta) return false; // 없는 문서는 각 라우트가 제 방식으로 404를 낸다
-  return blockedGrades(clearanceOf(who?.clearance)).includes(gradeOf(meta.grade));
+  if (!meta) return false; // 없는 문서는 각 창구가 제 방식으로 처리한다(라우트는 404)
+  return blockedGrades(clearanceOf(viewer.clearance)).includes(gradeOf(meta.grade));
 }
 
 /** ★ **등급을 매길 행이 있는가.**
@@ -701,9 +713,11 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
 }
 
 /** 글자로 그냥 읽으면 안 되는(추출이 필요한) 형식 — 그대로 읽으면 압축 바이트가 지식이 된다.
- *  ⚠ 이미지(스캔 문서)는 extract_doc.py가 OCR로 읽는다(2026-08-21). ⚠ 같은 목록이 docsbundle.ts:99에도
- *   있다 — 한쪽만 고치면 번들 인입이 이미지를 바이트로 읽는다(설계관 지적, 73% 쓰레기 사고 재현). 둘 다. */
-const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx",
+ *  ⚠ 이미지(스캔 문서)는 extract_doc.py가 OCR로 읽는다(2026-08-21).
+ *  ★ 2026-08-31 일원화(설계관): 여기가 **유일한 정본**이다(export) — docsbundle·watchfolder가
+ *    이걸 import한다. 그전엔 docsbundle에 사본이 있어 「한쪽만 고치면 어긋난다」 계약
+ *    주석으로 버텼다 — 세 번째 소비자가 생기는 김에 한 벌로 모았다. */
+export const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx",
   ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"]);
 
 /**

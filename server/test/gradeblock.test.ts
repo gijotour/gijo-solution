@@ -184,9 +184,16 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     //      감시도 새 자리를 봐야 한다(옛 자리만 보면 헛돈다).
     const iHelper = memSrc.indexOf("export function 열람불가공용");
     expect(iHelper, "열람불가 헬퍼가 없다 — 직접-열람 등급 검사가 사라졌다").toBeGreaterThan(0);
+    // ★ 2026-08-31(설계관): req 꼴은 **핵심 꼴(열람불가핵심)에 위임**한다 — 감시 폴더 폴링
+    //   (express req 없음)이 같은 잣대를 쓰기 위한 분리다. 감시도 위임 사슬을 따라간다:
+    //   req 꼴이 핵심을 부르는지 + 핵심이 등급·개인격리를 실제로 보는지, 둘 다.
     const 헬퍼 = memSrc.slice(iHelper, iHelper + 500);
-    expect(헬퍼, "열람불가가 등급(blockedGrades)을 안 본다").toContain("blockedGrades(clearanceOf");
-    expect(헬퍼, "열람불가가 개인격리(남의개인문서인가)를 안 본다").toContain("남의개인문서인가");
+    expect(헬퍼, "req 꼴이 핵심(열람불가핵심)에 위임하지 않는다 — 잣대가 두 벌이 된다").toContain("열람불가핵심(");
+    const iCore = memSrc.indexOf("export function 열람불가핵심");
+    expect(iCore, "핵심 꼴(열람불가핵심)이 없다 — 폴링 창구가 잣대 없이 돈다").toBeGreaterThan(0);
+    const 핵심 = memSrc.slice(iCore, iCore + 600);
+    expect(핵심, "열람불가가 등급(blockedGrades)을 안 본다").toContain("blockedGrades(clearanceOf");
+    expect(핵심, "열람불가가 개인격리(남의개인문서인가)를 안 본다").toContain("남의개인문서인가");
     // ② 네 직접-열람 라우트가 그 잣대를 실제로 건다
     for (const route of [
       '"/api/memory/document/file"',

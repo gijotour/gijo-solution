@@ -16,7 +16,7 @@ import * as path from "path";
 import { createHash } from "crypto";
 
 import { db } from "../db";
-import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument, markDocumentsBuiltin } from "./memory";
+import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument, markDocumentsBuiltin, 추출필요 } from "./memory";
 
 // 프로젝트 관례(localengine의 MODELS_DIR, memory의 DB_PATH)대로 cwd 기준 상대경로 + 환경변수
 // 오버라이드. 다만 저 둘과 달리 모듈 로드 시점에 상수로 굳히지 않고 호출할 때마다 읽는다 —
@@ -95,10 +95,8 @@ async function resolveDocPath(file: string): Promise<string | null> {
 const hashOf = (raw: string) => createHash("sha256").update(raw, "utf8").digest("hex").slice(0, 16);
 const HASH_KEY = (docId: string) => `docsbundle:hash:${docId}`;
 
-/** 글자로 그냥 읽으면 안 되는 형식 — memory.ingestDocument와 같은 목록을 본다(이미지=OCR, 2026-08-21).
- *  ⚠ memory.ts:524와 **같은 값**이어야 한다 — 한쪽만 고치면 번들 인입이 이미지를 바이트로 읽는다. */
-const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx",
-  ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"]);
+// 추출필요(추출이 필요한 형식) — 2026-08-31 일원화(설계관): memory.ts의 정본을 import해 쓴다.
+// 사본 시절 「한쪽만 고치면 번들 인입이 이미지를 바이트로 읽는다」 계약 주석이 있던 자리다.
 
 /**
  * 번들 문서 한 편을 **읽을 수 있는 글자로** 가져온다.
