@@ -22,6 +22,7 @@ import { startReportScheduler, stopReportScheduler } from "./engine/reportschedu
 import { startBackupScheduler, stopBackupScheduler } from "./engine/backup";
 import { startAuditPruneScheduler, stopAuditPruneScheduler } from "./engine/audit";
 import { startAlertScheduler, stopAlertScheduler } from "./engine/alertschedule";
+import { startWatchFolderScheduler, stopWatchFolderScheduler } from "./engine/watchfolder";
 import { startEventLifecycleScheduler, stopEventLifecycleScheduler } from "./engine/analysishub";
 import { startSiemForwarding } from "./engine/siem";
 import { startKbHygieneScheduler } from "./engine/kbhygiene";
@@ -88,6 +89,7 @@ httpServer.listen(PORT, () => {
   startAuditPruneScheduler(); // 감사 로그 보관 정리(기본 3년) — 무한히 쌓여 디스크를 채우지 않게
   startSiemForwarding(); // SIEM 아웃바운드 — 감사 이벤트를 고객 SIEM으로 전달(설정 켜진 경우만)
   startKbHygieneScheduler(); // 지식베이스 위생 — 주 1회 상충·중복 점검(삭제 없이 리포트만)
+  startWatchFolderScheduler(); // 📂 지켜보는 폴더 — 지정 폴더의 새/바뀐 문서 주기 반입(2026-08-31)
   // CISA KEV 목록을 백그라운드로 최신화(공개 피드 다운로드 — 실패해도 캐시로 동작).
   void refreshKev()
     .then((s) => console.log(`[kev] KEV 목록 ${s.count}건 (${s.source})`))
@@ -127,6 +129,7 @@ async function shutdown(signal: string): Promise<void> {
     stopAlertScheduler();
     stopBackupScheduler();
     stopAuditPruneScheduler();
+    stopWatchFolderScheduler();
     await Promise.all([stopLocalEngine(), stopEmbeddingEngine(), stopSmtpInbound()]);
   } catch (err) {
     // 엔진 정리에 실패해도 종료는 계속한다 — 안 끝나는 것보다 낫다.
