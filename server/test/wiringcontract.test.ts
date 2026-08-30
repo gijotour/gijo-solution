@@ -411,6 +411,17 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
     //    새지 않게 gijoScreenList가 같은 주소+이름을 거른다.
     expect(nv, "gijoScreenList가 중복을 안 거른다(작업 내역 두 줄)").toContain("본것[k]");
   });
+  it("💬 대화창 온디맨드(2026-08-31 사장님 「필요할 때만 불러서 보고」) — 접힘 축·손잡이·강제 오픈", () => {
+    const s = 코드만(join(PAGES, "app.html"));
+    expect(s, "접힘 축(console-folded)이 없다").toContain("console-folded");
+    expect(s, "💬 손잡이가 없다 — 접으면 되부를 길이 없다").toContain('b.id = "conSummon"');
+    // 기본값=접힘은 소스로 못박는다(게시 관문은 프로필 기억이 섞여 비결정적 — 동작만 잰다).
+    expect(s, "기본값이 접힘이 아니다(사장님 「필요할 때만」)").toContain('기억 === null ? true');
+    expect(s, "toChat이 접힘을 강제로 안 푼다 — ⓘ·질문 얹기가 숨은 대화에 쓰는 무반응 부류").toMatch(/toChat:[\s\S]{0,200}대화접힘적용\(false/);
+    const c4 = 코드만(join(PAGES, "console.js"));
+    expect(c4, "도착 신호 훅(gijoConsoleActivity)이 없다 — 접힌 동안 소식이 조용히 사라진다").toContain("gijoConsoleActivity");
+    expect(c4, "⊮ 접기 단추가 없다 — 부른 대화를 되접을 길이 없다").toContain('id="csFold"');
+  });
   it("문서 허브 §6 — 신고 시한 템플릿 수신 계약(발신자 가드·템플릿 id) 소스 감시", () => {
     // 계약(승인 시안 docs-hub-v3 §6): 신고 시한 카운트다운 카드(미래)가
     // {type:"gijo:newDocFromTemplate", templateId, prefill}를 보내면 허브가 편집기를 연다.
@@ -466,8 +477,10 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
     expect(s, "프로 첫 실행이 내 문서를 열지 않는다").toMatch(/프로인가\(\)[\s\S]{0,600}open\("mydocs\.html"/);
     expect(s, "홈 탭에 핀이 없다 — 「모두 닫기」로 홈이 사라진다").toMatch(/홈탭[\s\S]{0,80}pinned = true/);
     // ★ 대화창을 숨기는 규칙이 남아 있으면 나란히가 성립하지 않는다(0-1의 핵심 한 줄).
-    expect(s, "stage-on이 아직 대화창을 숨긴다 — 나란히가 안 된다")
-      .not.toMatch(/stage-on[^\n]*\.console\{display:none/);
+    // 2026-08-31 개정: **접힘 축(console-folded)이 붙은 숨김만** 허용 — 「필요할 때만
+    // 불러서」(온디맨드)의 접힘이다. 무조건 숨김이 되살아나면 여전히 여기서 잡힌다.
+    expect(s, "stage-on이 접힘 축 없이 대화창을 숨긴다 — 나란히가 안 된다")
+      .not.toMatch(/stage-on(?![^\n]*console-folded)[^\n]*\.console\{display:none/);
   });
 
   // 🏠 셸 재구축 0-2(2026-08-23) — 56px 세로 레일을 **상단바 안 가로 줄**로 옮겼다.

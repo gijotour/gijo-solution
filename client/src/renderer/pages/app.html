@@ -288,6 +288,27 @@
     width:9px;margin-left:-5px;cursor:col-resize;z-index:5;}
   #conResize:hover,#conResize.drag{background:rgba(95,161,255,.28);}
   body.pro-shell.stage-on .work.console-side #conResize{display:block;}
+  /* ── 💬 대화창 온디맨드(2026-08-31 사장님 「대화창은 필요할 때만 불러서 보고」) ─────────
+     승인 시안 shell-chat-ondemand: stage-on 위에 「대화접힘」 **독립 축** 하나만 얹는다 —
+     stage-on/chat-home 전이·클래스 계약은 한 글자도 안 바꾼다(오늘 개정분과 무충돌).
+     · 접힘: 화면이 전폭을 얻고(약 +340px), 오른쪽 40px 세로 손잡이만 남는다.
+       접힌 동안 도착한 카드·답은 **배지로만** 쌓인다(자동 펼침 기각 — 작업 중 화면을
+       밀어내는 방해. 시안 「설계 긴장」 절·PatternFly Notification Drawer 관례).
+     · chat-home(대화 전폭)·console-popped(분리창)에는 손잡이도 접힘도 없다 — 접힘은
+       「화면 옆 대화」가 성립하는 상태(stage-on)에만 뜻이 있다.
+     · ⓘ·질문 얹기 등 **입력을 요구하는 길(toChat)은 접힘을 강제로 푼다** — 카드 도착
+       (신호)과 입력 요구(강제 오픈)는 다른 급이다(시안 명시 계약). */
+  body.pro-shell.stage-on.console-folded:not(.console-popped) .work.console-side{grid-template-columns:minmax(0,1fr) 40px;}
+  body.pro-shell.stage-on.console-folded:not(.console-popped) .work.console-side .console{display:none;}
+  body.pro-shell.stage-on.console-folded .work.console-side #conResize{display:none !important;}
+  #conSummon{display:none;grid-column:2;grid-row:1;flex-direction:column;align-items:center;gap:8px;
+    padding:12px 0 0;border:0;border-left:1px solid var(--border);background:var(--panel,#30302e);
+    color:var(--muted);cursor:pointer;font-size:15px;font-family:inherit;}
+  #conSummon:hover{background:var(--panel-2,#1f1e1d);color:var(--text);}
+  #conSummon .cs-vt{writing-mode:vertical-rl;font-size:11.5px;letter-spacing:2px;color:var(--muted-2);}
+  #conSummon .cs-n{display:none;min-width:18px;height:18px;border-radius:9px;background:var(--red,#e2483d);color:#fff;font-size:11px;font-weight:800;line-height:18px;text-align:center;padding:0 4px;}
+  #conSummon.has .cs-n{display:block;}
+  body.pro-shell.stage-on.console-folded:not(.console-popped) #conSummon{display:flex;}
   /* 유령선 — 드래그 중 「여기까지 온다」만 보여 준다. 실제 폭은 mouseup에서 한 번. */
   #conGhost{position:fixed;top:0;bottom:0;width:2px;background:var(--blue,#3b82f6);z-index:99;display:none;pointer-events:none;}
   /* 드래그 중 iframe이 마우스 이벤트를 삼키면 유령선이 멈춘다 — 잠깐 입력을 끈다. */
@@ -899,10 +920,12 @@
     // 대화를 앞으로(무대 내림) — 대화창에 무언가를 보여 줘야 하는 부품(질문 얹기·ⓘ 안내 등)이
     // 부른다. 무대 뒤(숨은 대화)에 쓰면 사람 눈엔 무반응이다(검토관 상4 — 적어 넣기·이어서
     // 지시하기·물어보기 3종 실증).
-    toChat: function () { if (프로인가()) { 무대숨김 = tabs.length > 0; 대화홈갱신(); } },
+    toChat: function () { if (프로인가()) { if (대화접힘상태()) 대화접힘적용(false, true); 무대숨김 = tabs.length > 0; 대화홈갱신(); } }, // 입력 요구 길은 접힘을 강제로 푼다(온디맨드 계약)
     // 외부(팝업) 맥락이 있으면 그것이 「보고 있는 화면」이다 — 콘솔 칩·지시 screen 인자의 원천.
     activeScreen: function () { return 외부맥락 ? 외부맥락.page : (active ? active.page : null); },
     activeLabel: function () { return 외부맥락 ? 외부맥락.label : (active ? active.label : null); },
+    foldConsole: function () { 대화접기(); },      // 💬 온디맨드(2026-08-31) — 대화창 머리 ⊮ 접기
+    summonConsole: function () { 대화부르기(); },  // 손잡이·관문이 부른다
   };
   // (옛 이름 window.gijoShell 별칭은 두지 않는다 — 팝업 셸을 지운 뒤 부르는 곳이 없다.
   //  이름을 남겨 두면 "아직 팝업이 있나" 하고 헷갈릴 뿐이다.)
@@ -1401,7 +1424,7 @@
       if (wasPopped0 === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
       로그인선택_못한것알리기();
       프로레일();
-      끌개설치(); 대화폭복원(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
+      끌개설치(); 대화폭복원(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
       return;
     }
     var st = null;
@@ -1435,7 +1458,7 @@
     if (wasPopped === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
     로그인선택_못한것알리기();
     프로레일();
-    끌개설치(); 대화폭복원(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
+    끌개설치(); 대화폭복원(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
   }
 
   // ── 🚀 프로 셸 — 레일과 「대화 홈」(2026-08-18 승인 시안) ────────────────────
@@ -1659,6 +1682,54 @@
       document.addEventListener("mousemove", 이동);
       document.addEventListener("mouseup", 놓음);
     });
+  }
+
+  // ── 💬 대화창 온디맨드(2026-08-31 사장님 「대화창은 필요할 때만 불러서 보고」) ─────────
+  //   승인 시안 shell-chat-ondemand — 규칙은 위 CSS 주석에. 여기는 상태와 배선만.
+  //   ⚠ 프로 전용(표준 셸은 대화가 하단 고정이라 접을 대상이 다르다 — 이번 범위 아님).
+  var CONSOLE_FOLD_KEY = "gijo:console:folded";
+  var 미확인대화 = 0; // 접힌 동안 도착한 카드·답 수 — 손잡이 배지
+  function 대화접힘상태() { return document.body.classList.contains("console-folded"); }
+  function 손잡이배지그리기() {
+    var b = $("conSummon"); if (!b) return;
+    b.classList.toggle("has", 미확인대화 > 0);
+    var n = b.querySelector(".cs-n"); if (n) n.textContent = String(Math.min(99, 미확인대화));
+    b.title = 미확인대화 > 0 ? "대화창 부르기 — 안 본 소식 " + 미확인대화 + "건" : "대화창 부르기";
+  }
+  function 대화접힘적용(접힘, 저장) {
+    if (!프로인가()) 접힘 = false;
+    document.body.classList.toggle("console-folded", !!접힘);
+    if (!접힘) { 미확인대화 = 0; 손잡이배지그리기(); }
+    if (저장) { try { localStorage.setItem(CONSOLE_FOLD_KEY, 접힘 ? "1" : "0"); } catch (e) { } }
+  }
+  function 대화부르기() {
+    if (!대화접힘상태()) return;
+    대화접힘적용(false, true);
+    // 접힌 동안 온 것을 바로 보인다 — 최신(맨 아래)으로(시안: 열면 그 자리로 스크롤).
+    setTimeout(function () {
+      try { var m = document.querySelector(".console .cs-rows, .console .cs-body"); if (m) m.scrollTop = m.scrollHeight; } catch (e) { }
+    }, 60);
+  }
+  function 대화접기() { if (프로인가()) 대화접힘적용(true, true); }
+  // 접힌 동안의 도착 신호 — console.js append가 부른다(사용자 자신의 발화는 세지 않는다).
+  window.gijoConsoleActivity = function () {
+    if (프로인가() && 대화접힘상태() && document.body.classList.contains("stage-on")) {
+      미확인대화++; 손잡이배지그리기();
+    }
+  };
+  function 대화온디맨드설치() {
+    if (!프로인가() || document.getElementById("conSummon")) return;
+    var work = document.querySelector(".work.console-side");
+    if (!work) return;
+    var b = document.createElement("button");
+    b.id = "conSummon";
+    b.innerHTML = '<span aria-hidden="true">💬</span><span class="cs-n">0</span><span class="cs-vt">대화창</span>';
+    b.addEventListener("click", 대화부르기);
+    work.appendChild(b);
+    // 기본값 = 접힘(사장님 「필요할 때만」) — 담당자가 펴 두면 그 기억이 이긴다.
+    var 기억 = null; try { 기억 = localStorage.getItem(CONSOLE_FOLD_KEY); } catch (e) { }
+    대화접힘적용(기억 === null ? true : 기억 === "1", false);
+    손잡이배지그리기();
   }
 
   // 로그인 화면에서 고른 구동 모드·AI 위치가 **적용되지 않았으면** 여기서 알린다.

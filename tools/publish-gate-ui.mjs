@@ -454,24 +454,44 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
   const has = fr ? await fr.evaluate(() => typeof window.gijoSelectNotify === "function").catch(() => false) : false;
   ok("부품 로드: assets.html", has, fr ? "" : "프레임 못 찾음");
 
-  // ── 화면+대화 나란히 실측 — 2026-08-23 사장님 지시(셸 재구축 0-1) ────────────────
-  // ⚠ **뜻이 뒤집혔다.** 2026-08-20까지는 「화면 전폭 + 대화 숨김」이 무대였는데, 이제
-  //   「왼쪽 화면 · 오른쪽 대화」가 정상이다. 그래서 여기서 **대화가 보이는지**를 잰다 —
-  //   예전 검사(대화숨김)를 그대로 두면 나란히로 고친 코드가 게시에서 막힌다.
+  // ── 💬 대화창 온디맨드 실측 — 2026-08-31 사장님 「대화창은 필요할 때만 불러서 보고」 ──
+  // ⚠ 계약 두 번째 개정: 2026-08-23 「나란히 상시」를 같은 사장님이 개정하셨다(시안
+  //   shell-chat-ondemand). 화면이 열리면 기본=접힘(화면 전폭+오른쪽 💬 손잡이), 부르면
+  //   나란히, ⊮로 다시 접고, ⓘ·질문 얹기(toChat)는 접힘을 강제로 푼다. 접힌 동안 도착분은
+  //   배지. **기본값 자체는 소스 감시(wiringcontract) 몫** — 여기는 동작을 잰다(설치본
+  //   프로필의 저장된 접힘 기억이 켜켜이 달라 기본값 실측은 비결정적이다).
   //   클래스 이름(stage-on)은 그대로다(QA·titlebar가 읽는다 — 갈면 여섯 곳이 어긋난다).
-  const 무대 = await 셸.evaluate(() => {
-    const cs = getComputedStyle(document.querySelector(".work .console"));
+  const 상태읽기 = () => 셸.evaluate(() => {
+    const con = document.querySelector(".work .console");
+    const cs = getComputedStyle(con);
+    const sm = document.getElementById("conSummon");
     return {
-      나란히: document.body.classList.contains("stage-on"),
-      대화보임: cs.display !== "none" && document.querySelector(".work .console").offsetWidth > 0,
+      무대: document.body.classList.contains("stage-on"),
+      접힘: document.body.classList.contains("console-folded"),
+      대화보임: cs.display !== "none" && con.offsetWidth > 0,
       화면보임: document.querySelector(".work .screens").offsetWidth > 0,
+      손잡이보임: !!sm && getComputedStyle(sm).display !== "none",
       접기단추: !!document.getElementById("stageBack") && document.getElementById("stageBack").offsetParent !== null,
       옛팝업단추: !!document.getElementById("dockPop"),
+      머리접기단추: !!document.getElementById("csFold"),
     };
   });
-  ok("나란히: 화면 왼쪽·대화 오른쪽·⊟ 화면 접기",
-    무대.나란히 && 무대.대화보임 && 무대.화면보임 && 무대.접기단추 && !무대.옛팝업단추,
+  await 셸.evaluate(() => window.gijoTabs.foldConsole());
+  await new Promise((r) => setTimeout(r, 500));
+  const 접힘상 = await 상태읽기();
+  ok("온디맨드①: 접기 → 화면 전폭 + 💬 손잡이",
+    접힘상.무대 && 접힘상.접힘 && !접힘상.대화보임 && 접힘상.화면보임 && 접힘상.손잡이보임,
+    JSON.stringify(접힘상));
+  await 셸.evaluate(() => window.gijoTabs.summonConsole());
+  await new Promise((r) => setTimeout(r, 500));
+  const 무대 = await 상태읽기();
+  ok("온디맨드②: 부르기 → 화면 왼쪽·대화 오른쪽 나란히(⊟·⊮ 단추)",
+    무대.무대 && !무대.접힘 && 무대.대화보임 && 무대.화면보임 && 무대.접기단추 && 무대.머리접기단추 && !무대.옛팝업단추,
     JSON.stringify(무대));
+  await 셸.evaluate(() => { window.gijoTabs.foldConsole(); window.gijoTabs.toChat(); });
+  await new Promise((r) => setTimeout(r, 500));
+  const 강제 = await 상태읽기();
+  ok("온디맨드③: toChat(ⓘ 경로)가 접힘을 강제로 푼다", !강제.접힘, JSON.stringify({ 접힘: 강제.접힘 }));
 
   // ── 셸 배치는 **전 화면 공통**(사장님 2026-08-29 「메뉴 판·‖ 접기·대화창 폭 조절
   //    전체 대시보드에 적용」) — 배선이 body 수준이라 이미 전역인데, 그 사실을 여기 못박는다.

@@ -319,6 +319,10 @@
           '<button class="cs-btn" id="csToggleHost" title="' +
             (IS_WINDOW ? "이 창을 닫고 앱 아래에 다시 붙입니다" : "대화를 별도 창으로 빼냅니다 — 화면을 100%로 쓸 때") + '">' +
             (IS_WINDOW ? "⇤ 앱에 붙이기" : "⧉ 창으로") + "</button>") +
+        // 💬 온디맨드 접기(2026-08-31 사장님 「필요할 때만 불러서」) — 프로 도킹에서만 보인다
+        //   (아래 바인딩이 판정). 접으면 화면이 전폭, 오른쪽 💬 손잡이로 다시 부른다.
+        (IS_EMBED || IS_WINDOW ? "" :
+          '<button class="cs-btn" id="csFold" title="대화창 접기 — 화면을 전폭으로 씁니다. 오른쪽 💬 손잡이로 다시 부릅니다">⊮ 접기</button>') +
       "</div>" +
       // 절차 띠 + 살아 있는 숫자(2026-08-09 시안) — 절차 화면이 아니면 통째로 숨는다
       '<div class="cs-flow" id="csFlow" style="display:none"></div>' +
@@ -463,6 +467,15 @@
       }
     });
 
+    // 💬 온디맨드 접기 — 프로 셸 도킹에서만(표준 셸은 하단 고정 대화라 접을 대상이 다르다).
+    var foldBtn = document.getElementById("csFold");
+    if (foldBtn) {
+      if (!document.body.classList.contains("pro-shell") || !(window.gijoTabs && window.gijoTabs.foldConsole)) {
+        foldBtn.style.display = "none";
+      } else {
+        foldBtn.addEventListener("click", function () { window.gijoTabs.foldConsole(); });
+      }
+    }
     document.getElementById("csToggleHost").addEventListener("click", function () {
       if (!window.gijo) return;
       if (IS_WINDOW) window.gijo.dockConsoleWindow();
@@ -1192,6 +1205,9 @@
     body.appendChild(el);
     while (body.childElementCount > CL_MAX) body.removeChild(body.firstChild);
     body.scrollTop = body.scrollHeight;
+    // 💬 온디맨드(2026-08-31) — 접힌 대화창에 도착한 소식(카드·답·이벤트)은 셸 손잡이
+    //   배지로 알린다. 지시(instr)는 사람 자신의 발화라 세지 않는다.
+    if (kind !== "instr" && window.gijoConsoleActivity) { try { window.gijoConsoleActivity(); } catch (e) { } }
     return el;
   }
   function replaceTyping(el, kind, o) {
