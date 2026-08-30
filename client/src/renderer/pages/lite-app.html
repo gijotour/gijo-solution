@@ -61,8 +61,8 @@
     border-right: 1px solid var(--g-border, #262a33); background: var(--g-panel, #141821);
   }
   #liteNav { padding: 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
-  /* 설정은 번호 매긴 업무 메뉴와 성격이 달라 아래에 따로 둔다. */
-  #liteNavFoot { margin-top: auto; padding: 8px; border-top: 1px solid var(--g-border, #262a33); }
+  /* 설정은 2026-08-31부터 상단바 ⚙ — 사이드바 밑(#liteNavFoot) 자리는 걷었다
+     (사장님 「왼쪽 메뉴에 내지식·내문서만」). */
 
   .lite-nav-item {
     display: flex; align-items: center; gap: 8px; width: 100%;
@@ -101,6 +101,9 @@
     <span class="e">Lite — 담당자 PC 1인용</span>
     <!-- 무료로 함께 드리는 문서 작성 도구(Smart MD Studio). 별도 창으로 열린다. -->
     <button class="smd" id="smdBtn" type="button" title="GIJO Smart MD Studio — 무료 문서 작성 도구(별도 창)">📝 문서 작성</button>
+    <!-- ⚙ 설정 — 2026-08-31 사장님 「왼쪽 메뉴에 내지식·내문서만」으로 사이드바 밑에서 여기로.
+         프로의 상단바 ⚙(titlebar.js)과 같은 자리 감각이다. 그리기는 설정그리기()가 한다. -->
+    <span id="liteTopSettings"></span>
   </div>
   <!-- ⚠⚠ **dialog.js를 반드시 싣는다**(2026-08-18 회귀 수리). 이 셸은 gijoTell을 3곳에서 부르는데
      (185·189·258행) 스크립트를 하나도 안 실어 **gijoTell이 undefined**였다 — 버튼을 눌러도
@@ -199,7 +202,6 @@
   <div class="lite-body">
     <nav class="lite-side" aria-label="라이트 메뉴">
       <div id="liteNav" role="list"></div>
-      <div id="liteNavFoot"></div>
     </nav>
     <main class="lite-main">
       <div id="liteScreen"></div>
@@ -310,14 +312,16 @@
   // ⚠ 설정은 **화면목록에 안 섞는다.** 섞으면 번호가 10이 되고, 그러면 사장님이 정하신
   //   「메뉴 9개」와 어긋난다. 목록은 업무 화면만이고 설정은 아래 자리에 따로 그린다.
   function 설정그리기() {
+    // ⚙는 **상단바**에 그린다(2026-08-31 사장님 「왼쪽 메뉴에 내지식·내문서만」) —
+    // 사이드바 밑(#liteNavFoot)에 두던 것을 옮겼다. 프로의 상단바 ⚙과 같은 자리 감각.
     var 설정 = 자료 && 자료.settings;
-    var box = document.getElementById("liteNavFoot");
+    var box = document.getElementById("liteTopSettings");
     if (!설정 || !box) return;
     var a = document.createElement("button");
-    a.className = "lite-nav-item" + (지금 === 설정.id ? " on" : "") + (설정.구현됨 ? "" : " todo");
+    a.className = "smd" + (지금 === 설정.id ? " on" : "");
     a.type = "button"; a.dataset.id = 설정.id;
-    a.innerHTML = '<span class="n">⚙</span><span class="t">' + esc(설정.이름) + "</span>" +
-      (설정.구현됨 ? "" : '<span class="badge">준비 중</span>');
+    a.title = "설정 — 서버·모델·바깥 연결";
+    a.textContent = "⚙ " + 설정.이름;
     a.addEventListener("click", function () { 열기(설정.id); });
     box.innerHTML = ""; box.appendChild(a);
   }
