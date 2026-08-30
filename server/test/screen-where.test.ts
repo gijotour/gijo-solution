@@ -208,7 +208,9 @@ describe("★ 흡수된 화면의 자리 안내 — 없는 메뉴를 가리키�
 
   /** nav.js TAB_REDIRECT를 읽어 **전이를 끝까지 따라간** 흡수 지도를 만든다. */
   function 흡수지도(): Record<string, string> {
-    const i = nav.indexOf("TAB_REDIRECT");
+    // ⚠ **정의를 찾는다**(게시 관문 [낮음]) — 그냥 "TAB_REDIRECT"로 찾으면 105줄 앞 **주석**에
+    //   먼저 걸려 GROUPS 배열 후반부까지 구간에 들어온다.
+    const i = nav.indexOf("TAB_REDIRECT = {");
     const 구간 = nav.slice(i, nav.indexOf("};", i));
     const 표: Record<string, string> = {};
     for (const m of 구간.matchAll(/"([\w.-]+\.html)":\s*"([^"]+)"/g)) if (!m[1].includes("?")) 표[m[1]] = m[2];

@@ -373,7 +373,7 @@ body.g-ui { line-height: 1.7; }
      (로드 순서가 두 적용 지점에서 보장되지 않아서다 — 이 파일의 .kpi-strip 3중과 같은 수법). */
 .g-ui.g-ui table td, .g-ui.g-ui table th { padding: 3px 10px; line-height: 1.35; }
 /* ⚠ **표 밀도는 여기 한 곳이다.** 화면마다 td{padding:…}을 두어도 위 특이도(0,2,2)에
-   져서 죽은 코드가 된다 — 2026-08-30에 그런 사본 11곳을 걷었다(실측: 지역 13px를 두고도
+   져서 죽은 코드가 된다 — 2026-08-30에 그런 사본 10곳을 걷었다(실측: 지역 13px를 두고도
    화면에 3px가 먹고 있었다). 밀도를 바꿀 일이 생기면 이 줄을 고치고, 화면에 다시 적지 말 것. */
 .g-ui.g-ui table tbody tr:nth-child(even) { background: var(--g-zebra, rgba(255,255,255,.025)); }
 .g-ui.g-ui table thead th {

@@ -23,7 +23,10 @@ const WRITE = process.argv.includes("--write");
 
 // audit·agent도 제외(2026-08-21 색 지도) — 고정 어두운 상자(.log-box·.terminal) 안을 고정색으로
 // 수리했는데, 그 고정색(#f5928a·#5fa1ff 등)이 MAP에 있어 재실행하면 도로 토큰이 되어 수리가 풀린다.
-const EXCLUDE = /^(lite-|login\.html$|setup\.html$|office\.html$|syslog\.html$|terminal\.html$|audit\.html$|agent\.html$)/;
+// ⚠ agent.html 제외는 2026-08-30에 풀었다 — 감시(themecolors.test)가 그 파일을 보는데 도구가
+//   안 보면, 시험이 안내하는 수리 명령(이 도구)이 그 파일을 **못 고치는 통과 불가능한 관문**이
+//   된다(게시 관문 [낮음]). 그 파일의 진짜 상자(.terminal)는 아래 FILL·상자줄 규칙이 보류시킨다.
+const EXCLUDE = /^(lite-|login\.html$|setup\.html$|office\.html$|syslog\.html$|terminal\.html$|audit\.html$)/;
 const FILL = /background(?:-color)?\s*:\s*(var\(--(?:g-)?(?:blue|red|teal|amber|purple|green|navy)\b|#[0-9a-fA-F]{3,8}\b|linear-gradient|rgba\(\s*0\s*,)/;
 
 // 색 → 토큰 사전. 값(폴백)은 **원래 색 그대로** — 다크 화면은 변하지 않는다.

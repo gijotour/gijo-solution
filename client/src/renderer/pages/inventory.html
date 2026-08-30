@@ -80,7 +80,7 @@
   /* 고정 어두운 상자(.tb-menu #35342f) 안 — 토큰 금지(2026-08-21 검토관 ②, syslog와 같은 부류) */
   .tb-mi{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12px;color:#e9e7e2;cursor:pointer;white-space:nowrap;}
   .tb-mi:hover{background:rgba(255,255,255,.05);}
-  .tb-mi.on{background:rgba(59,130,246,.15);color:var(--text-strong, #fff);font-weight:700;}
+  .tb-mi.on{background:rgba(59,130,246,.15);color:#fff;font-weight:700;}
   .tb-mi .cn{margin-left:auto;color:#a49d95;font-size:12px;}
   .tb-active{display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:7px 11px;font-size:12.5px;}
   .tb-active.cols{background:rgba(255,255,255,.03);border-color:var(--border);}
@@ -327,7 +327,7 @@
          남아 있었다. fold.js가 기본접힘(data-gijo-fold-closed)·배지·상태 저장을 이미 한다.
          ⚠ 지연 로딩은 fold.js가 쏘는 gijo:fold 이벤트로 잇는다(아래 JS) — 접기와 데이터 로딩이
          한 함수에 묶여 있던 것을 부품 계약으로 갈랐다. -->
-    <div id="extraPanels" data-gijo-fold="서비스 영향도" data-gijo-fold-closed data-gijo-fold-badges="extraBadge:영향:warn">
+    <div id="extraPanels" style="display:none" data-gijo-fold="서비스 영향도" data-gijo-fold-closed data-gijo-fold-badges="extraBadge:영향:warn">
       <!-- 배지 값을 담는 자리 — fold.js는 「그 요소의 글자」를 읽어 머리줄에 얹는다(부품 계약).
            숨겨 두는 이유: 본문에 같은 숫자를 두 번 보이면 접기 머리와 본문이 겹쳐 읽힌다. -->
       <span id="extraBadge" style="display:none"></span>
@@ -1373,7 +1373,9 @@
     try {
       const { services } = await window.gijo.getServiceImpact();
       const 위험 = services.filter((s) => s.impactLevel && s.impactLevel !== "none").length;
-      el.textContent = 위험 ? `— 위험한 서비스 ${위험}개 (눌러서 펼치기)` : `— 위험한 서비스 없음 (눌러서 펼치기)`;
+          // 접기 배지는 fold.js가 **이 요소의 글자를 그대로** 알약에 넣는다 — 문장을 넣으면 머리줄을
+    // 다 먹고, 숫자가 아니면 0건일 때도 안 감춰져 위험이 없는데 경고 알약이 상시로 뜬다(게시 관문 [중]).
+    el.textContent = 위험 ? String(위험) : "";
       if (위험) el.style.color = "var(--amber)";
     } catch {
       el.textContent = "— 세지 못했습니다 (눌러서 펼치기)";

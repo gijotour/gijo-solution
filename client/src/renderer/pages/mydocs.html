@@ -298,7 +298,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 .shot{width:104px;height:68px;border:1px solid var(--border-strong);border-radius:7px;position:relative;
   overflow:hidden;background:var(--panel-2);}
 .shot img{width:100%;height:100%;object-fit:cover;}
-.shot .x{position:absolute;top:2px;right:5px;color:var(--text-strong, #fff);background:rgba(0,0,0,.6);border-radius:50%;
+.shot .x{position:absolute;top:2px;right:5px;color:#fff;background:rgba(0,0,0,.6);border-radius:50%;
   width:16px;height:16px;line-height:16px;text-align:center;font-size:12.25px;cursor:pointer;}
 .drop{border:1px dashed var(--border-strong);border-radius:8px;padding:12px;text-align:center;
   font-size:12.5px;color:var(--muted-2);}
@@ -446,6 +446,13 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
          때마다 note.textContent를 덮어써 **자식 노드를 전부 지운다**. 안에 두면 첫 렌더에서
          위젯이 문서에서 떨어져(chatwidget은 host를 body로 옮기지 않는다) 눌러도 아무것도 안 뜬다.
          assets.html이 정적 컨테이너에 두는 것도 같은 이유다. -->
+    <!-- ⚠ **여는 자리를 함께 둔다**(2026-08-30 게시 관문 [높음]) — 위젯은 늘 닫힌 채 시작하고
+         옛 진입로(좌측 메뉴 🤖)는 사라져, 호스트만 붙이면 **여는 방법이 제품 어디에도 없다.**
+         노트가 「차이는 ⓘ로 보세요」라고 안내하므로 그 ⓘ를 실제 단추로 만든다.
+         ⚠ #note 밖에 둔다 — 이 화면은 목록을 그릴 때마다 note.textContent를 덮어쓴다. -->
+    <button id="noteInfo" title="이 화면 안내 — 「AI 포함」과 「공유」의 차이 등"
+      style="background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;
+             color:var(--blue-light);font-size:12px;font-weight:700;padding:3px 9px;cursor:pointer;margin-top:6px;">ⓘ 이 화면 안내</button>
     <div id="gijoChatWidget" data-prompts='["개인 문서와 공유 문서 차이가 뭐야?","내 문서에서 뭘 할 수 있어?"]'></div>
   </div><!-- /v4main -->
  </div><!-- /v4root -->
@@ -2272,9 +2279,17 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 <!-- ⓘ 화면 안내 위젯(2026-08-30 검토관 [중]) — 이 화면 노트가 「차이는 ⓘ로 보세요」라고
      안내하는데 위젯이 없었다. 탭에서는 셸 대화창의 ⓘ 칩이 대신 답해 참이지만, **⧉ 창으로
      빼면** 셸 콘솔이 없어 ⓘ도 답변 창구도 전무해 안내가 막다른 길이 됐다(본체 화면 중 미탑재는
-     여기와 pick·supervision 셋뿐이고 그 둘은 단독 분리 경로가 없다).
+     여기 말고도 몇 곳 더 있다(supplychain 등 — 그쪽은 별건으로 남긴다).
      ⚠ chatparts.js가 chatwidget.js **앞**이어야 한다 — 뒤면 위젯이 부를 때 부품이 없어
      대화가 반쪽이 된다(clientglobals.test.ts가 순서까지 본다). assets.html이 본보기. -->
+<script>
+// ⓘ 단추 → 화면 안내 위젯 열기(2026-08-30 게시 관문 [높음] — 여는 통로가 없어 무동작이었다).
+// chatwidget.js가 window.gijoOpenChat을 내준다. 위젯이 없는 배치에서도 조용히 넘어간다.
+document.addEventListener("DOMContentLoaded", function () {
+  var b = document.getElementById("noteInfo");
+  if (b) b.addEventListener("click", function () { if (window.gijoOpenChat) window.gijoOpenChat(); });
+});
+</script>
 <script src="chatparts.js"></script>
 <script src="chatwidget.js"></script>
 </body>

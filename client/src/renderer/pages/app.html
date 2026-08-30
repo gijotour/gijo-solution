@@ -536,6 +536,12 @@
         var d = f.contentDocument;
         if (!d || d.readyState !== "complete") return;
         var n = Number(f.dataset.healTries || 0);
+        // ⚠ **아직 주소를 안 받은 틀은 건드리지 않는다**(2026-08-30 게시 관문 조사에서 드러남).
+        //   틀을 만든 뒤 src는 다음 그림 프레임(requestAnimationFrame)에 붙이는데, 창이 화면에
+        //   없으면 그 프레임이 안 돌아 src가 빈 채로 남는다. 그때 아래 `f.src = f.src`가
+        //   **빈 값을 문서 자신의 주소로 해석해 탭 안에 셸을 통째로 싣는다**(실측: 탭에
+        //   app.html?shell=pro가 들어갔다). 화면은 영영 안 뜨고 오류도 안 난다.
+        if (!f.getAttribute("src")) return;
         if (!f.contentWindow.gijo) {
           if (n >= HEAL_MAX) return;
           f.dataset.healTries = String(n + 1);
@@ -739,8 +745,13 @@
       f.className = "screen";
       f.title = label || 읽을이름(page);
       $("screens").appendChild(f);
-      // 문서 파싱 중에 src를 붙이면 서브프레임 preload 주입이 간헐적으로 빠진다(실측) — 다음 프레임에.
-      (function (frame, p) { requestAnimationFrame(function () { frame.src = embedSrc(p); }); })(f, page);
+      // 문서 파싱 중에 src를 붙이면 서브프레임 preload 주입이 간헐적으로 빠진다(실측) — 한 박자 뒤에.
+      // ⚠ **requestAnimationFrame을 쓰지 않는다**(2026-08-30 실측): 창이 화면에 없으면(최소화·
+      //   백그라운드 시작·다른 창에 완전히 가림) rAF는 **영영 안 돈다.** 그러면 src가 빈 채
+      //   남아 화면이 통째로 안 뜨고, healFrames가 그 빈 값을 문서 자신의 주소로 되살려
+      //   **탭 안에 셸이 실린다**(실측으로 재현). setTimeout은 창이 숨어도 돌아 같은 목적을
+      //   달성하면서 이 함정이 없다.
+      (function (frame, p) { setTimeout(function () { frame.src = embedSrc(p); }, 0); })(f, page);
       // 🗂 범위가 걸려 있으면 **새로 여는 화면에도** 먹인다 — 안 그러면 새 탭만 전체를
       //   보여 주고, 담당자는 어느 쪽이 맞는지 모른다(2026-08-18 시안).
       (function (frame) {

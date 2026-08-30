@@ -48,8 +48,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .ai-draft-btn:disabled{opacity:0.6;cursor:default;}
   /* 요약 막대 — 규제 대응 현황이라 파랑 계열(위험 경고가 아니다). */
   /* 위험 갈래 접기 — 2026-08-30 공용 fold.js로 이관했다(자체 .cat-head 규칙 6줄 제거).
-     머리줄·화살표·배지·상태 저장은 전부 부품이 그린다. 「미대응이 있으면 접힌 구역도 펼친다」는
-     공용 안전 원칙이 이 화면에만 없던 것이 이관의 이유다. */
+     머리줄·화살표·배지·상태 저장은 전부 부품이 그린다.
+     ⚠ 배지 종류는 **warn**이다(hot 아님) — hot은 담당자가 접어 둔 것도 자동으로 다시 펴는데,
+       이 화면은 미대응이 늘 있어 그러면 접기가 눌러도 반응 없는 자리가 된다(게시 관문 [중]). */
 </style>
 <script src="viz.js"></script>
 </head>
@@ -244,10 +245,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       // 공용 접기(fold.js)로 통일 — 2026-08-30 검토관. 자체 구현에는 「위험(hot) 신호면 접힌
       // 구역도 펼친다」는 공용 안전 원칙이 없어, 미대응이 있어도 접힌 채 남았다(배지만 보였다).
       // ⚠ 배지 값은 fold.js가 **그 요소의 글자를 읽는다**(id 필수) — 숨은 span에 담는다.
+      // ⚠ 종류는 **warn**이다(hot 아님, 게시 관문 [중]) — hot은 담당자가 접어 둔 것도 1초마다
+      //   다시 펴므로(fold.js watch), 미대응이 늘 있는 이 화면에서는 접기가 눌러도 반응 없는 자리가 된다.
+      // ⚠ 접기 **이름에 건수를 넣지 않는다** — 상태 필터를 바꿀 때마다 이름이 달라져 저장 열쇠가
+      //   갈리고(접어 둔 기억 증발) 죽은 키가 조합마다 쌓인다. 건수는 배지가 말한다.
       //   0·빈값이면 fold.js가 배지를 감추므로 미대응 0인 갈래는 자동으로 조용해진다.
       return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px;"
-        data-gijo-fold="${items[0].categoryLabel} (${items.length})" ${접힘 ? "data-gijo-fold-closed" : ""}
-        data-gijo-fold-badges="cplOpen-${cat}:미대응:hot">
+        data-gijo-fold="${items[0].categoryLabel}" ${접힘 ? "data-gijo-fold-closed" : ""}
+        data-gijo-fold-badges="cplOpen-${cat}:미대응:warn">
         <span id="cplOpen-${cat}" style="display:none">${미대응 || ""}</span>
         ${items.map(threatRow).join("")}
       </div>`;

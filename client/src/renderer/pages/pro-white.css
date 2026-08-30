@@ -136,6 +136,13 @@ html.theme-light { --amber-box-ink: #fdf1e2; --amber-boxbd-ink: #e8d3a8; }
 /* KEV 배지 — 흰 글자 + 밝은 빨강 채움(#e5484d)은 11px에서 3.91:1로 AA에 못 미친다(실화면 실측
  * tools/contrast-probe.mjs). 채움을 잉크 빨강으로 낮추면 흰 글자가 6.6:1이 된다. */
 html.theme-light .mv-kev { background: #b3241a; }
+/* --white — 화면 27곳이 :root에 #ffffff로 정의해 두고 **글자색으로만** 쓴다(배경·테두리 용도 0곳,
+ * 전수 확인). 여기서 안 뒤집으면 흰 바탕에 흰 글자가 남는다 — 실제로 취약점 히트맵 구획 머리
+ * 숫자가 그랬다(1:1, 2026-08-30 게시 관문 [높음]). `:root`(0,1,0)보다 `html.theme-light`(0,1,1)가
+ * 세서 화면 정의를 이긴다 — 폴백 함정(--red 계열)과는 다른 자리다.
+ * ⚠ 앞으로 --white를 **배경·테두리로 쓰면 이 반전이 그것까지 검게 만든다.** 그런 용도가
+ *   생기면 이 줄이 아니라 그 화면이 다른 토큰을 써야 한다. */
+html.theme-light { --white: #1f1b14; }
 html.theme-light { --text-strong: #1f1b14;
   --rail-alert: #b3261e; /* 절차 레일 경고 글자 — 흰 바탕 대비용(다크는 폴백 #f5928a) */ }
 /* 활성 토글·탭(옅은 파랑 배경+흰 글자였던 것) — 검정도 읽히지만 .dc-seg 선례대로 파랑 잉크 */

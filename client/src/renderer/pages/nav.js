@@ -522,7 +522,7 @@
         "body.gn-left-collapsed .body-grid.no-right{grid-template-columns:1fr !important;}") +
       ".gn-seg{display:flex;background:#1f1e1d;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}" +
       ".gn-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:12.25px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}" +
-      ".gn-seg span.on{background:rgba(59,130,246,.22);color:var(--text-strong, #fff);border-color:rgba(59,130,246,.5);}" +
+      ".gn-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}" +
       ".gn-pin{flex:0 0 auto;padding:8px 6px 0;}" +
       ".gn-mid{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 6px 8px;}"
       + "#gijoNav .gtb-userarea{flex:0 0 auto;position:sticky;bottom:0;background:var(--panel-2,#1f1e1d);}" +

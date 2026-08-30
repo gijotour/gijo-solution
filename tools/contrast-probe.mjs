@@ -86,29 +86,89 @@ const 재기 = `(() => {
   return { 잰것, 나쁜수: 나쁜것.length, 나쁜것: 나쁜것.sort((a, b) => a.대비 - b.대비).slice(0, 15) };
 })()`;
 
+/** 잴 창 고르기 — 셸 안에서 도는 코드(평가 문자열에 끼워 넣는다).
+ *  ⚠ 「속틀이 있으면 무조건 속틀」이 아니다(2026-08-30 실측): 내 문서는 담당자 관리용 **빈**
+ *    iframe을 하나 품고 있어서, 그것을 고르면 글자가 없어 「못 쟀다」가 된다. 허브 화면은
+ *    반대로 속틀에 진짜 내용이 있다. ⇒ **글자가 가장 많은 창**을 고른다 — 사람이 보는 것이 그것이다. */
+const 잴창정의 = `
+  function 잴창(f) {
+    var 후보 = [];
+    try { 후보.push(f.contentWindow); } catch (e) {}
+    try {
+      [...f.contentDocument.querySelectorAll('iframe')].forEach(function (x) { try { 후보.push(x.contentWindow); } catch (e) {} });
+    } catch (e) {}
+    var 최고 = null, 최다 = 30; // 30자 미만이면 아직 안 뜬 것으로 본다
+    후보.forEach(function (w) {
+      try {
+        if (!w || w.document.readyState !== 'complete') return;
+        var n = (w.document.body.innerText || '').trim().length;
+        if (n > 최다) { 최다 = n; 최고 = w; }
+      } catch (e) {}
+    });
+    return 최고;
+  }
+`;
+
 const 기본 = ["inventory.html?hub=1|자산 관리", "memory.html|AI 지식", "settings.html|설정",
   "supplychain.html|공급망", "products.html|보안제품", "dashboard.html|대시보드"];
 const 화면들 = process.argv.slice(2).length ? process.argv.slice(2) : 기본;
 
 const t = await 붙기("app.html");
 if (!t) { console.error(`✗ CDP(${PORT})에서 app.html을 못 찾았습니다 — 앱을 띄우고 로그인해 주세요.`); process.exit(2); }
+// ⚠ **창을 앞으로 꺼낸다** — 셸이 탭 화면 주소를 requestAnimationFrame에 붙이는데, 창이 화면에
+//   없으면 그 프레임이 안 돌아 화면이 영영 안 뜬다(2026-08-30 실측). 재기 전에 보이게 만든다.
+try { await fetch(`http://127.0.0.1:${PORT}/json/activate/${t.id}`); } catch { /* 못 해도 계속 — 아래 도착 확인이 막는다 */ }
 let 총위반 = 0;
+let 못잰것 = 0;
 for (const 항목 of 화면들) {
   const [page, label] = 항목.split("|");
+  const 파일 = page.split("?")[0];
   await 평가(t, `window.gijoTabs.open(${JSON.stringify(page)}, ${JSON.stringify(label || page)}, {dock:true})`);
-  await 잠깐(4500);
-  const 결과 = await 평가(t, `(() => {
+  // ★ **도착을 확인하고 잰다**(2026-08-30 게시 관문 [중]) — 종전엔 4.5초 자고 바로 쟀는데,
+  //   셸이 탭 틀을 만들어 두고 화면을 아직 안 물린 상태(src="" → about:blank)면 그 틀의
+  //   contentWindow가 **셸 자신**을 가리킨다. 그러면 6화면을 「쟀다」면서 셸을 6번 재고
+  //   전부 초록으로 끝난다 — 실제로 그랬다. 주소가 그 화면이 될 때까지 기다린다.
+  let 도착 = false;
+  for (let i = 0; i < 40 && !도착; i++) { // 20초 — 큰 화면(내 지식 2,000요소)은 느리다
+    await 잠깐(500);
+    도착 = await 평가(t, `(() => {${잴창정의}
+      const f = [...document.querySelectorAll('iframe')].find(x => x.classList.contains('on'));
+      if (!f) return false;
+      try {
+        // ⚠ **바깥 틀의 주소**로 도착을 판정한다 — 허브 화면(triage?panel=vuln 등)은 속에 다른
+        //   화면(vulnscan)을 물기 때문에, 속 주소로 대조하면 제대로 떠 있어도 「못 쟀다」가 된다.
+        //   잴 때는 그 속(가장 안쪽)을 재는 것이 맞다 — 사람이 보는 것이 그것이라서.
+        // ⚠ **갈아타기를 인정한다**(2026-08-30) — 흡수된 화면(memory→aihub?panel=knowledge)은
+        //   요청한 주소로 안 남는다. 그건 제품이 옳게 도는 것이지 「못 잰 것」이 아니다.
+        //   그래서 바깥이든 속이든 **어느 창이든** 그 파일이 있으면 도착으로 본다.
+        const 창들 = [f.contentWindow].concat(
+          [...f.contentDocument.querySelectorAll('iframe')].map(function (x) { try { return x.contentWindow; } catch (e) { return null; } }).filter(Boolean));
+        const 맞음 = 창들.some(function (w) { try { return w.location.href.includes(${JSON.stringify(파일)}); } catch (e) { return false; } });
+        // 갈아탄 경우(요청 파일이 어디에도 없음)도 속틀에 진짜 내용이 있으면 도착으로 본다.
+        const 잴것 = 잴창(f);
+        if (!잴것) return false;
+        if (!맞음 && 잴것 === f.contentWindow) return false; // 셸이 그 자리에 있는 경우를 막는 최소 방어
+        return true;
+      } catch (e) { return false; }
+    })()`).catch(() => false);
+  }
+  if (!도착) {
+    못잰것++;
+    console.log(`■ ${page} — ★ 못 쟀다(화면이 안 떴거나 셸이 그 자리에 있다). **초록으로 치지 않는다.**`);
+    continue;
+  }
+  const 결과 = await 평가(t, `(() => {${잴창정의}
     const f = [...document.querySelectorAll('iframe')].find(x => x.classList.contains('on'));
-    if (!f) return { 오류: '틀 없음' };
-    const 안 = [...f.contentDocument.querySelectorAll('iframe')].map(x => { try { return x.contentWindow; } catch (e) { return null; } }).filter(Boolean);
-    const w = 안.length ? 안[0] : f.contentWindow;
+    const w = 잴창(f);
+    if (!w) return { 오류: '잴 창을 못 찾았다' };
     if (!w.document.documentElement.classList.contains('theme-light')) return { 오류: '이 틀이 라이트 테마가 아니다(프로 셸에서 재야 한다)' };
-    return w.eval(${JSON.stringify(재기)});
+    return Object.assign({ url: w.location.href.split('/').pop().slice(0, 40) }, w.eval(${JSON.stringify(재기)}));
   })()`).catch((e) => ({ 오류: String(e).slice(0, 100) }));
-  if (결과.오류) { console.log(`■ ${page} — ⚠ ${결과.오류}`); continue; }
+  if (결과.오류) { 못잰것++; console.log(`■ ${page} — ★ ${결과.오류}`); continue; }
   총위반 += 결과.나쁜수;
-  console.log(`■ ${page} — 잰 요소 ${결과.잰것}개 · 4.5:1 미만 ${결과.나쁜수}개`);
+  console.log(`■ ${page} [${결과.url}] — 잰 요소 ${결과.잰것}개 · 4.5:1 미만 ${결과.나쁜수}개`);
   (결과.나쁜것 || []).forEach((x) => console.log(`   ${String(x.대비).padStart(5)}:1  ${x.크기.padStart(7)}  "${x.글}"  ${x.색} / ${x.배경}  [${x.클래스}]`));
 }
-console.log(`\n합계 위반 ${총위반}곳`);
-process.exit(총위반 ? 1 : 0);
+console.log(`\n합계 위반 ${총위반}곳 · 못 잰 화면 ${못잰것}개`);
+// ★ fail-closed — 못 잰 것이 있으면 초록이 아니다(「0건」과 「안 쟀다」는 다른 말이다).
+process.exit(총위반 || 못잰것 ? 1 : 0);

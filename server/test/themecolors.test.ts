@@ -30,7 +30,18 @@ import * as path from "path";
 const PAGES = path.join(__dirname, "..", "..", "client", "src", "renderer", "pages");
 const 제외파일 = /^(lite-|login\.html$|setup\.html$|office\.html$|pro-white\.css$|gijo-ui\.css$|lite-green\.css$)/;
 const 상자파일 = new Set(["syslog.html", "terminal.html", "audit.html"]);
-const 상자선택자 = /\.terminal\b|\.log-|\.k-block|한 번만 보입니다/;
+/** 「테마 무관 고정 어두운 상자」의 선택자 — 그 안은 **다크가 정답**이라 잉크로 바꾸면 글자가
+ *  사라진다(2026-08-30 게시 관문이 [높음] 3건으로 잡은 부류). 예외마다 **이유를 적는다**:
+ *   · .terminal / .log- / .k-block — 로그·터미널 고정 상자(2026-08-21 손수리로 확정)
+ *   · .tb-menu   — 자산 목록 필터 드롭다운(background:#35342f). 그 파일 주석이 「토큰 금지」를 못박음
+ *   · .gn-seg    — 메뉴 판 구분 토글(background:#1f1e1d)
+ *   · .gtb-menu / .gtb-seg / .gtb-fr — 상단바 ⚙ 설정 패널(background:#35342f)과 그 안 조각
+ *   · .shot .x   — 캡처 썸네일 위 ✕(같은 줄 background:rgba(0,0,0,.6))
+ *   · 한 번만 보입니다 — 설정의 DB 복구 열쇠 상자(background:#000). 그 값은 다시 못 본다.
+ */
+// ⚠ `.log-`를 통째로 빼면 안 된다(2026-08-30 게시 관문 [중]) — learnloop의 학습 로그 **목록**
+//   (.log-list·.log-item·.log-q…) 9줄이 상자도 아닌데 감시 밖으로 빠졌다. 진짜 상자만 적는다.
+const 상자선택자 = /\.terminal\b|\.log-console|\.log-box\b|\.k-block|\.tb-menu|\.tb-mi\b|\.gn-seg|\.gtb-menu|\.gtb-seg|\.gtb-fr|\.shot\s+\.x|한 번만 보입니다/;
 const 상자줄 = /background:\s*#(000|0[0-9a-f]|1[0-9a-f]|2[0-9a-f]|3[0-9a-f])/i;
 // 채움(진한 배경) 위 글자 — 두 테마 모두 밝은 글자가 옳다(pro-white --fill-contrast 관례)
 const 채움 = /background(?:-color)?\s*:\s*(var\(--(?:g-)?(?:blue|red|teal|amber|purple|green|navy)\b|#[0-9a-fA-F]{3,6}\b|linear-gradient)/;
@@ -70,13 +81,22 @@ function 덮개목록(): Set<string> {
   return out;
 }
 
+// 헛돌이 계측(2026-08-30 게시 관문 [중]) — 실제로 대비를 **판정한 색의 수**.
+// 위 검사들은 잣대(대비 함수·덮개 목록)만 봤지 스캐너가 무엇을 읽었는지는 한 줄도 안 봤다.
+// 제외 규칙이 넓어져 모집단이 0이 되면 「위반 0」이 거짓 초록이 된다.
+let 판정수 = 0;
 function 위반들(): string[] {
   const 덮개 = 덮개목록();
+  판정수 = 0;
   const out: string[] = [];
   for (const f of fs.readdirSync(PAGES)) {
     if (!/\.(html|js)$/.test(f) || 제외파일.test(f) || 상자파일.has(f)) continue;
-    fs.readFileSync(path.join(PAGES, f), "utf-8").split(/\r?\n/).forEach((l, i) => {
+    const 줄들 = fs.readFileSync(path.join(PAGES, f), "utf-8").split(/\r?\n/);
+    줄들.forEach((l, i) => {
       if (상자줄.test(l) || 채움.test(l) || 상자선택자.test(l)) return;
+      // 바로 앞 3줄에 고정 어두운 배경이 있으면 **같은 상자를 그리는 이웃 줄**이다(설정의 DB
+      // 복구 열쇠처럼 배경과 글자가 다른 줄에 나뉜 자리). 선택자 목록만으로는 그 부류를 못 가른다.
+      if (줄들.slice(Math.max(0, i - 3), i).some((p) => 상자줄.test(p))) return;
       const b = l.indexOf("{");
       if (b > 0) {
         const 선택자들 = 정규(l.slice(0, b).replace(/^[^.#a-zA-Z*:]*/, "")).split(",").map(정규);
@@ -87,6 +107,7 @@ function 위반들(): string[] {
         const hex = raw.toLowerCase() === "#fff" ? "#ffffff" : raw.toLowerCase();
         if (구조색.has(hex) || hex.length !== 7) continue;
         if (new RegExp("var\\(--[\\w-]+,\\s*" + raw + "\\)", "i").test(l)) continue; // 장치를 지났다
+        판정수++;
         const r = 대비(hex);
         if (r >= 4.5) continue;
         out.push(`${f}:${i + 1} ${raw} (흰 바탕 ${r}:1)`);
@@ -121,11 +142,38 @@ describe("배색 감시 — 밝은 글자색은 잉크 토큰으로(대비 계�
       "파일 주석 규칙을 따르라:\n  " + v.join("\n  ")).toEqual([]);
   });
 
+  // ★★ 반대 방향(2026-08-30 게시 관문이 [높음] 3건으로 잡은 부류) ─────────────────
+  //
+  // 위 검사는 「밝은 리터럴이 흰 테마에서 사라지는 것」만 본다. 그런데 스윕이 **고정 어두운
+  // 상자 안**까지 토큰으로 바꾸면 정반대 사고가 난다 — 라이트에서 잉크(거의 검정)로 뒤집혀
+  // 검은 상자 위에서 글자가 사라진다. 실제로 났다:
+  //   · settings DB 복구 열쇠(background:#000 상자) 8.2:1 → 3.2:1 — 그 값은 **한 번만 보이고
+  //     어디에도 저장되지 않는다.** 잘못 옮겨 적으면 기계 교체 때 DB를 못 연다.
+  //   · inventory 필터 드롭다운(.tb-menu #35342f) 선택 항목 1.4:1 — 지금 무슨 필터인지 안 보인다.
+  // 위 검사는 `var(토큰, 폴백)` 꼴이면 **무조건 통과**시키므로 이 부류를 원리상 못 본다.
+  it("★★ 고정 어두운 상자 안에서는 잉크 토큰을 쓰지 않는다 — 라이트에서 글자가 사라진다", () => {
+    const 어두운배경 = /background(?:-color)?\s*:\s*#(000|0[0-9a-f]|1[0-9a-f]|2[0-9a-f]|3[0-9a-f])[0-9a-f]{0,4}\b/i;
+    const 잉크토큰 = /var\(--(text-strong|red-ink|teal-ink|amber-ink|blue-ink|purple-ink|muted-ink)\s*,/;
+    const 위반: string[] = [];
+    for (const f of fs.readdirSync(PAGES)) {
+      if (!/\.(html|js)$/.test(f) || 제외파일.test(f)) continue;
+      fs.readFileSync(path.join(PAGES, f), "utf-8").split(/\r?\n/).forEach((l, i) => {
+        // 같은 줄에 고정 어두운 배경과 잉크 토큰이 함께 있으면 그 자리는 라이트에서 무너진다.
+        if (어두운배경.test(l) && 잉크토큰.test(l)) 위반.push(`${f}:${i + 1}`);
+      });
+    }
+    expect(위반, "고정 어두운 배경 위에 잉크 토큰을 얹었다 — 라이트 테마에서 검은 상자 위 검은 글자가 된다. " +
+      "그 상자 안은 **다크가 정답**이므로 리터럴(#fff·#1eb980 등)로 두어라:\n  " + 위반.join("\n  ")).toEqual([]);
+  });
+
   it("감시가 헛돌지 않는다 — 잣대가 실제로 무언가를 판정하고 있다", () => {
     // 통과가 「검사가 0건을 읽어서」인지 「진짜 0건이라서」인지 가른다(이 저장소의 거짓 초록 계보).
     expect(대비("#f5928a"), "밝은 살몬은 흰 바탕에서 4.5 미만이어야 한다").toBeLessThan(4.5);
     expect(대비("#b3241a"), "잉크 빨강은 통과해야 한다").toBeGreaterThanOrEqual(4.5);
     expect(덮개목록().size, "pro-white 덮개 선택자를 못 뽑았다 — 계약 ④가 헛돈다").toBeGreaterThanOrEqual(20);
+    // ★ **모집단을 잰다** — 잣대만 보면 「스캐너가 아무것도 안 읽어서 0건」인 경우를 못 가른다.
+    위반들();
+    expect(판정수, "대비를 실제로 판정한 색이 없다 — 제외 규칙이 모집단을 통째로 지웠다(거짓 초록)").toBeGreaterThanOrEqual(3);
   });
 
   it("잉크 토큰은 pro-white 한 곳에서만 정의된다 — 화면이 정의하면 다크 폴백이 죽는다", () => {

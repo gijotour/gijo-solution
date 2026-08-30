@@ -41,12 +41,12 @@
     // 세그먼트 [🏠 대시보드 | ☰ 전체메뉴] — Claude.ai 홈/Code 전환 패턴
     ".gtb-seg{display:flex;background:#1f1e1d;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:9px;padding:3px;gap:3px;}",
     ".gtb-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:12.25px;font-weight:800;color:var(--muted,#b3ada4);cursor:pointer;border:1px solid transparent;}",
-    ".gtb-seg span.on{background:rgba(59,130,246,.22);color:var(--text-strong, #fff);border-color:rgba(59,130,246,.5);}",
+    ".gtb-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}",
     // 대시보드 '전체메뉴' 모드 패널
     ".gtb-menu-panel{padding:10px 8px;overflow-y:auto;}",
     ".gtb-menu-panel .mp-g{font-size:11.5px;font-weight:800;color:#a49d95;letter-spacing:1px;margin:10px 6px 4px;}",
     ".gtb-menu-panel .mp-i{padding:8px 12px;font-size:12.5px;font-weight:600;color:#b3ada4;border-radius:8px;cursor:pointer;margin-bottom:1px;}",
-    ".gtb-menu-panel .mp-i:hover{background:rgba(59,130,246,.12);color:var(--text-strong, #fff);}",
+    ".gtb-menu-panel .mp-i:hover{background:rgba(59,130,246,.12);color:#fff;}" /* .gtb-menu-panel 고정 어두운 판 안 */,
     ".gtb-userarea .ua-upd{display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:var(--amber, #f0a020);padding:3px 9px;border-radius:14px;font-size:12px;font-weight:800;cursor:pointer;align-self:flex-start;}",
     ".gtb-userarea .ua-row{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;}",
     ".gtb-userarea .ua-avatar{width:22px;height:22px;border-radius:50%;background:var(--blue,#3b82f6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.25px;font-weight:800;flex:0 0 auto;}",
@@ -61,7 +61,7 @@
     ".gtb-menu .sep{height:1px;background:rgba(255,255,255,.08);margin:6px 4px;}",
     ".gtb-menu .zrow{display:flex;gap:5px;padding:4px 10px 8px;}",
     ".gtb-menu .z{flex:1;text-align:center;font-size:12px;font-weight:700;padding:6px 0;border-radius:7px;background:#1f1e1d;border:1px solid rgba(255,255,255,.08);color:#b3ada4;cursor:pointer;}",
-    ".gtb-menu .z.on{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.6);color:var(--text-strong, #fff);}",
+    ".gtb-menu .z.on{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.6);color:#fff;}" /* 고정 어두운 판(.gtb-menu #35342f) 안 — 토큰 금지 */,
     ".gtb-menu .foot{padding:8px 10px 4px;font-size:12px;color:#a49d95;}",
     ".gtb-mhead{display:flex;align-items:center;gap:8px;padding:4px 4px 8px 10px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:6px;}",
     ".gtb-mhead .t{font-size:13.5px;font-weight:800;color:#e9e7e2;flex:1;}",
@@ -98,7 +98,7 @@
     ".gtb-fpal input{width:100%;background:none;border:none;border-bottom:1px solid var(--border,rgba(255,255,255,.10));padding:13px 15px;color:var(--text,#e9e7e2);font-size:14.5px;outline:none;font-family:inherit;}",
     ".gtb-fpal .fl{overflow-y:auto;padding:5px;}",
     ".gtb-fr{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;font-size:13.5px;color:var(--muted,#b3ada4);cursor:pointer;}",
-    ".gtb-fr.on{background:rgba(59,130,246,.18);color:var(--text-strong, #fff);}",
+    ".gtb-fr.on{background:rgba(59,130,246,.18);color:#fff;}" /* 같은 판 안 */,
     ".gtb-fr .fg{margin-left:auto;font-size:12px;color:var(--muted-2,#a49d95);flex:0 0 auto;}",
     // 찾기 결과의 아이콘 — 왼쪽 메뉴와 같은 단선 SVG(2026-08-05).
     ".gtb-fi{flex:0 0 auto;width:15px;height:15px;display:flex;align-items:center;justify-content:center;}",
