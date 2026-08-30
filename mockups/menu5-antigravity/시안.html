@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 시안: 메뉴 5그룹 통합 · 안티그래비티(화면 왼쪽 도킹 + 대화 오른쪽 상시) — 추천안 1개</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  시안: mockups/menu5-antigravity/시안.html   (추천 시안 1개 — mockup 규칙)
+  근거: 사장님 지시(2026-08-31, 실화면 캡처 3장) — 상세는 본문 하단 "왜 이 안인지" 참고.
+  이 파일은 mockups/ 밖의 제품 코드를 한 글자도 바꾸지 않는다. 순수 그림(정적 HTML)이며
+  버튼·탭은 시각 시연용이다 — 실제 라우팅·서버 호출은 없다(정직한 구현 원칙, 목업에도 적용).
+
+  ── 설계 전 조사(근거) ──────────────────────────────────────────────────────
+  1) 메뉴 5그룹 통합의 근거 — Miller's Law(단기기억 7±2)와 IA 청킹 관행:
+     "설계자는 전역 내비게이션 항목을 보통 5~9개로 제한한다. 예: Spotify는 내비 항목을
+     Home/Browse/Library/Search/Premium 5개로 제한한다." / "12개를 그대로 보여주는 대신
+     5~6개 상위 범주로 묶는다." (2026-08-30 웹 조사, 출처는 파일 하단 표기)
+     → 우리 사이드바는 현재 그룹 12개(항목 18개)다. 5개로 묶는 이번 안은 이 권고와 정확히 맞는다.
+  2) 화면=왼쪽 도킹 + 대화=오른쪽 상시 패널 구조 — **이미 우리 코드에 있다.**
+     client/src/renderer/pages/app.html:270 `.work.console-side{grid-template-columns:
+     minmax(0,1fr) var(--console-w,380px)}` (2026-08-23 "셸 재구축 0-1" 승인 시안, 2026-08-27
+     "0-4" 대화폭 끌개까지 게시 완료). 그 도입 주석이 스스로 표준을 인용한다:
+     "VS Code Copilot·Cursor·JetBrains AI가 고른 방식" + "Material Design 3 Extra-large(1600~)
+     등급이 다분할 배치를 권한다." → 이번 시안은 **새 레이아웃을 발명하지 않고** 이미 검증된
+     이 격자를 그대로 쓴다. 바뀌는 것은 "메뉴를 누르면 카드가 아니라 이 도킹이 바로 뜬다"는
+     **클릭 동작**과 **사이드바 그룹 수**뿐이다.
+  3) 「내 문서」 3분할(사이드바 44px 접힘·목록 400px·문서창)도 기존 구현 그대로
+     (mydocs.html v4, 2026-08-20~22 승인 시안 docs-hub-v3/v4/v5). 목록 행 30px은
+     gijo-ui.css:359 `.g-rows-r{height:30px}` — 새로 만들지 않고 기존 "엑셀형" 그대로 쓴다.
+  ════════════════════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  /* pro-white 팔레트 — client/src/renderer/pages/pro-white.css의 html.theme-light 값을
+     그대로 옮겼다(제품과 같은 색, 시안에서 새로 지어내지 않음). */
+  --bg:#faf8f5; --panel:#ffffff; --panel-2:#f2efe9;
+  --border:rgba(43,38,33,.12); --border-strong:rgba(43,38,33,.22);
+  --text:#2b2621; --text-strong:#1f1b14; --muted:#6b6259; --muted-2:#726960;
+  --blue:#1d4f91; --blue-light:#1d4f91; --teal:#086b43; --amber:#8f4d02; --red:#b3241a; --purple:#5b21b6;
+  --zebra:rgba(43,38,33,.035);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#e7e2d8;color:var(--text);
+  font-size:13px;padding:22px;}
+.wrap{max-width:1720px;margin:0 auto;}
+h1{font-size:19px;margin-bottom:4px;color:var(--text-strong);}
+.sub{color:var(--muted);font-size:12.5px;margin-bottom:16px;}
+.pill{display:inline-block;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:20px;
+  padding:2px 10px;font-size:11.25px;font-weight:700;color:var(--muted);margin-right:6px;}
+.pill.on{background:rgba(29,79,145,.1);color:var(--blue);border-color:var(--blue);}
+.note-static{background:#fff8e6;border:1px solid #e8d3a8;color:#6b4c02;border-radius:8px;padding:8px 12px;
+  font-size:12px;font-weight:700;margin:10px 0 18px;}
+
+/* ── 섹션 공통 ─────────────────────────────────────────────────────────── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:18px;}
+.card h2{font-size:14px;margin-bottom:10px;color:var(--text-strong);display:flex;align-items:center;gap:8px;}
+.card h2 .n{background:var(--blue);color:#fff;border-radius:6px;width:20px;height:20px;display:inline-flex;
+  align-items:center;justify-content:center;font-size:11px;font-weight:800;}
+
+/* ── 대비표 ────────────────────────────────────────────────────────────── */
+table.cmp{width:100%;border-collapse:collapse;font-size:12px;}
+table.cmp th{background:var(--panel-2);text-align:left;padding:6px 10px;font-size:11.5px;color:var(--muted);
+  border-bottom:1px solid var(--border-strong);}
+table.cmp td{padding:5px 10px;border-bottom:1px solid var(--border);vertical-align:top;height:30px;}
+table.cmp tr:nth-child(even) td{background:var(--zebra);}
+table.cmp .g{font-weight:800;color:var(--text-strong);}
+table.cmp .arrow{color:var(--blue);font-weight:800;text-align:center;width:26px;}
+table.cmp .new{color:var(--teal);font-weight:800;font-size:10.5px;background:#e3f6ec;border-radius:4px;
+  padding:1px 5px;margin-left:5px;}
+table.cmp .same{color:var(--muted-2);font-size:10.5px;}
+
+/* ── 목업 창(실제 셸을 흉내낸 정적 그림) ─────────────────────────────────── */
+.shell{background:var(--bg);border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;
+  box-shadow:0 10px 32px rgba(31,27,20,.14);height:820px;display:flex;flex-direction:column;}
+.titlebar{height:34px;flex:0 0 34px;background:var(--panel-2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 12px;gap:8px;font-size:11.5px;color:var(--muted);}
+.dots{display:flex;gap:5px;}
+.dots i{width:9px;height:9px;border-radius:50%;background:var(--border-strong);display:block;}
+.titlebar b{color:var(--text);font-weight:800;font-size:12px;}
+.topbar{height:44px;flex:0 0 44px;background:var(--panel);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 10px;gap:5px;}
+.rail-ic{width:32px;height:32px;border-radius:8px;border:1px solid transparent;display:flex;align-items:center;
+  justify-content:center;font-size:14px;color:var(--muted);}
+.rail-ic.on{border-color:rgba(29,79,145,.35);background:rgba(29,79,145,.08);color:var(--blue);}
+.rail-div{width:1px;height:20px;background:var(--border-strong);margin:0 4px;}
+
+.body-row{flex:1 1 auto;display:flex;min-height:0;}
+
+/* 1) 왼쪽 5그룹 사이드바 — 새 설계 대상 */
+.gnav{flex:0 0 214px;width:214px;background:var(--panel-2);border-right:1px solid var(--border-strong);
+  overflow-y:auto;padding:8px 0;}
+.gnav .top-fixed{padding:0 8px 6px;border-bottom:1px solid var(--border);margin-bottom:6px;}
+.gnav .tf-item{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;border-radius:6px;
+  font-size:12.25px;font-weight:700;color:var(--text);cursor:default;}
+.gnav .tf-item.on{background:rgba(29,79,145,.12);color:var(--blue);}
+.gnav .tf-item .ic{width:15px;text-align:center;flex:0 0 auto;font-size:12.5px;}
+.gnav .grp{margin:2px 0;}
+.gnav .gh{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;font-size:12px;font-weight:800;
+  color:var(--text-strong);cursor:default;}
+.gnav .gh .no{width:15px;height:15px;border-radius:4px;background:var(--border-strong);color:var(--panel);
+  font-size:9.5px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.gnav .gh .no{background:var(--blue);color:#fff;}
+.gnav .gh .cnt{margin-left:auto;color:var(--muted-2);font-size:10.5px;font-weight:700;}
+.gnav .items{padding-left:6px;}
+.gnav .gi{display:flex;align-items:center;gap:7px;height:26px;padding:0 8px 0 27px;border-radius:6px;
+  font-size:11.75px;color:var(--muted);cursor:default;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gnav .gi:hover{background:rgba(43,38,33,.05);color:var(--text);}
+.gnav .gi.hot{background:rgba(29,79,145,.09);color:var(--blue);font-weight:700;}
+.gnav .gi .tagnew{margin-left:auto;flex:0 0 auto;background:#e3f6ec;color:var(--teal);font-size:9.5px;
+  font-weight:800;border-radius:4px;padding:0 4px;}
+
+/* 2) 내 문서 — 3분할(v4 워크스페이스 그대로) */
+.stage{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+.dockhead{height:30px;flex:0 0 30px;background:var(--panel-2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;padding:0 10px;font-size:11.5px;color:var(--muted);}
+.dockhead b{color:var(--text);font-weight:800;font-size:12px;}
+.docwrap{flex:1 1 auto;min-height:0;display:flex;}
+
+.mdside{flex:0 0 44px;width:44px;background:var(--panel-2);border-right:1px solid var(--border-strong);
+  display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;}
+.mdside .nd{width:32px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:var(--muted);position:relative;}
+.mdside .nd.on{background:rgba(29,79,145,.14);color:var(--blue);}
+.mdside .nd.newf{box-shadow:inset 0 0 0 1px var(--teal);}
+.mdside .nd .b{position:absolute;top:-3px;right:-4px;background:var(--teal);color:#fff;font-size:7.5px;
+  font-weight:900;border-radius:5px;padding:0 3px;line-height:1.3;}
+.mdside .div{width:22px;height:1px;background:var(--border-strong);margin:4px 0;}
+
+.mdlist{flex:0 0 380px;width:380px;border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+.mdlist .lh{flex:0 0 34px;height:34px;display:flex;align-items:center;gap:6px;padding:0 10px;
+  border-bottom:1px solid var(--border);font-size:11.75px;font-weight:800;color:var(--text-strong);}
+.mdlist .lh .cnt{color:var(--muted-2);font-weight:600;}
+.filterbar{flex:0 0 28px;height:28px;display:flex;align-items:center;padding:0 8px;gap:6px;}
+.filterbar .fk{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:2px 8px;
+  font-size:10.75px;color:var(--muted-2);}
+.rows{flex:1 1 auto;overflow-y:auto;}
+.row{display:grid;grid-template-columns:74px 1fr 92px;align-items:center;height:30px;padding:0 10px;
+  font-size:11.75px;border-bottom:1px solid var(--border);cursor:default;}
+.row:nth-child(even){background:var(--zebra);}
+.row.sel{background:rgba(29,79,145,.1);}
+.row .k{color:var(--muted-2);font-size:10.75px;white-space:nowrap;}
+.row .bd{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.row .bd b{font-weight:700;color:var(--text);}
+.row .bd .s{color:var(--muted-2);margin-left:5px;}
+.row .rt{text-align:right;color:var(--muted-2);font-size:10.5px;white-space:nowrap;}
+.row .rt b{color:var(--text);font-weight:800;}
+.chip{display:inline-block;font-size:9.5px;font-weight:800;border-radius:4px;padding:1px 5px;margin-right:5px;}
+.chip.watch{background:#e3f6ec;color:var(--teal);}
+.chip.pause{background:var(--panel-2);color:var(--muted-2);}
+.chip.new{background:#eaf1fb;color:var(--blue);}
+
+.mddoc{flex:1 1 auto;min-width:0;padding:14px 16px;overflow-y:auto;}
+.mddoc h3{font-size:14px;margin-bottom:6px;color:var(--text-strong);word-break:break-all;}
+.mddoc .path{font-family:Consolas,monospace;font-size:11.5px;background:var(--panel-2);border:1px solid var(--border);
+  border-radius:6px;padding:6px 9px;color:var(--text);margin-bottom:10px;}
+.kv{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;}
+.kv .b{font-size:16px;font-weight:800;color:var(--text-strong);}
+.kv .l{font-size:10.5px;color:var(--muted-2);}
+.callout{background:#eaf1fb;border:1px solid rgba(29,79,145,.28);border-radius:9px;padding:12px 14px;margin-top:6px;}
+.callout b{color:var(--blue);}
+.callout .say{margin-top:8px;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;
+  padding:8px 10px;font-size:12px;color:var(--text);font-style:italic;}
+.noinput{margin-top:10px;font-size:11px;color:var(--muted-2);display:flex;align-items:center;gap:6px;}
+.noinput .x{color:var(--red);font-weight:900;}
+
+/* 3) 오른쪽 대화창 — 380px 고정 도킹 계약 그대로 */
+.chatdock{flex:0 0 380px;width:380px;border-left:1px solid var(--border);display:flex;flex-direction:column;
+  background:var(--panel);}
+.chatdock .ch{flex:0 0 34px;height:34px;display:flex;align-items:center;padding:0 10px;font-size:11.75px;
+  font-weight:800;color:var(--text-strong);border-bottom:1px solid var(--border);background:var(--panel-2);}
+.chatlog{flex:1 1 auto;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;}
+.msg{max-width:88%;border-radius:10px;padding:7px 10px;font-size:12px;line-height:1.5;}
+.msg.me{align-self:flex-end;background:rgba(29,79,145,.1);color:var(--text);}
+.msg.ai{align-self:flex-start;background:var(--panel-2);color:var(--text);border:1px solid var(--border);}
+.chatin{flex:0 0 44px;border-top:1px solid var(--border);display:flex;align-items:center;padding:0 8px;gap:6px;}
+.chatin .box{flex:1 1 auto;height:28px;border:1px solid var(--border-strong);border-radius:8px;background:var(--panel-2);
+  display:flex;align-items:center;padding:0 10px;font-size:11.75px;color:var(--muted-2);}
+
+/* ── 클릭 동작 범례 ────────────────────────────────────────────────────── */
+.legend{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+.leg{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 11px;font-size:11.5px;}
+.leg .h{display:flex;align-items:center;gap:6px;font-weight:800;color:var(--text-strong);margin-bottom:5px;}
+.leg .h .no{background:var(--blue);color:#fff;width:16px;height:16px;border-radius:4px;font-size:9.5px;
+  display:inline-flex;align-items:center;justify-content:center;font-weight:900;}
+.leg .body{color:var(--muted);line-height:1.6;}
+.leg code{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:0 3px;font-size:10.5px;}
+
+/* ── 밀도 숫자 표 ──────────────────────────────────────────────────────── */
+table.dense{width:100%;border-collapse:collapse;font-size:12px;}
+table.dense th{background:var(--panel-2);padding:6px 9px;text-align:left;font-size:11px;color:var(--muted);}
+table.dense td{padding:6px 9px;border-bottom:1px solid var(--border);}
+table.dense .up{color:var(--red);font-weight:800;}
+table.dense .down{color:var(--teal);font-weight:800;}
+table.dense .flat{color:var(--muted-2);font-weight:700;}
+
+ul.plain{padding-left:18px;line-height:1.85;font-size:12.5px;color:var(--text);}
+ul.plain li b{color:var(--text-strong);}
+.selfcheck{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.sc{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.sc .t{font-weight:800;font-size:12.25px;margin-bottom:5px;color:var(--text-strong);}
+.sc .ok{color:var(--teal);font-weight:800;}
+.src{font-size:11px;color:var(--muted-2);line-height:1.8;margin-top:6px;}
+.src a{color:var(--blue);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>메뉴 5그룹 통합 + 안티그래비티(화면 왼쪽 도킹 · 대화 오른쪽 상시) — 추천 시안 1개</h1>
+  <div class="sub">
+    <span class="pill on">추천안 1개</span>
+    <span class="pill">자체완결 HTML(외부 CDN 없음)</span>
+    <span class="pill">프로 흰 바탕(pro-white 팔레트)</span>
+    <span class="pill">밀도: 목록 행 30px(엑셀형)</span>
+    2026-08-31 사장님 지시(실화면 캡처 3장) 기반 — mockups/menu5-antigravity/시안.html
+  </div>
+  <div class="note-static">⚠ 이 문서는 정적 그림입니다. 아래 목업 안의 버튼·행·탭은 눌러도 동작하지 않습니다(가짜 상호작용 금지 원칙) — 실제 배선은 승인 후 구현 단계에서 합니다.</div>
+
+  <!-- ══ 1. 사이드바 대비표 ══════════════════════════════════════════════ -->
+  <div class="card">
+    <h2><span class="n">1</span>사이드바 대비표 — 현행 12그룹(nav.js GROUPS) → 신규 5그룹</h2>
+    <table class="cmp">
+      <tr><th style="width:26%">현행(client/src/renderer/pages/nav.js)</th><th style="width:4%"></th>
+          <th style="width:26%">신규 5그룹</th><th>그 안의 화면(실제 파일 그대로, 새 화면 0개)</th></tr>
+
+      <tr><td class="g">🧠 내 지식<br><span class="same">(지식창고·법령판례·GIJO AS안내·보안제품비교소개)</span></td>
+          <td class="arrow">→</td>
+          <td class="g" rowspan="1">🧠 내 지식</td>
+          <td>지식 창고(aihub.html?panel=knowledge) · 법령·판례(lawlookup.html) · GIJO AS 안내(mydocs.html?tab=guide) · 보안제품 비교·소개(mydocs.html?tab=vendor) — <span class="same">항목 그대로 이동</span></td></tr>
+
+      <tr><td class="g">📓 내 문서<br><span class="same">(TOP 고정 1항목뿐 — 하위 8갈래는 화면 안에 숨어 사이드바엔 안 보였다)</span></td>
+          <td class="arrow">→</td>
+          <td class="g">📓 내 문서</td>
+          <td>업로드·반입(mydocs.html?tab=ingest) · 문서 편집(?tab=mine) · 조치요청서(업무템플릿 7종+요청 만들기) · 연락처(?tab=contacts) · 업무 넘기기(handover.html) · 작업 내역(sessions.html, TOP 고정과 동일 화면) · <b>📂 지켜보는 폴더</b><span class="new">신규</span></td></tr>
+
+      <tr><td class="g">⓪ 자산 / ①발견·수집 / ②우선순위 / ③조치 / ④검증 / ⑤보고<br><span class="same">(6개 그룹, 각 1항목)</span></td>
+          <td class="arrow">→</td>
+          <td class="g">🩹 취약점 업무</td>
+          <td>⓪ 자산 고르기(assets.html) · ① 발견·수집(discover.html) · ② 우선순위(triage.html) · ③ 조치(fix.html) · ④ 검증(verify.html) · ⑤ 보고 · KPI · 컴플라이언스(reporting.html) · 보안 로그 파일 분석(loganalysis.html, 「추가 기능」에서 이관)</td></tr>
+
+      <tr><td class="g">보안제품 / 공급망<br><span class="same">(2개 그룹)</span></td>
+          <td class="arrow">→</td>
+          <td class="g">🧰 보안제품 관리</td>
+          <td>우리 보안제품(products.html) · 자산 관리 전체(inventory.html) · 보안설정 점검·하드닝(verify.html?panel=hardening) · 정기 점검(fix.html?panel=maintenance) · 공급망 점검(supplychain.html)</td></tr>
+
+      <tr><td class="g">AI / 설정<br><span class="same">(2개 그룹)</span></td>
+          <td class="arrow">→</td>
+          <td class="g">⚙ 설정</td>
+          <td>설정(settings.html?s=my) · AI(aihub.html, AI 팀·지식·학습·안전장치 통합) · 기록(records.html)</td></tr>
+
+      <tr><td class="g" style="color:var(--muted-2)">「추가 기능」 그룹 자체<br><span class="same">(로그분석·업무넘기기 담아 두던 잡동사니 자리)</span></td>
+          <td class="arrow">→</td>
+          <td colspan="2" style="color:var(--muted-2)">그룹 자체를 없앤다 — 로그분석은 🩹 취약점 업무로, 업무넘기기는 📓 내 문서로 각각 뜻이 맞는 곳으로 흡수(위 두 줄에 반영)</td></tr>
+    </table>
+  </div>
+
+  <!-- ══ 2. 목업 본문 ══════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2><span class="n">2</span>본문 목업 — 「내 문서」가 열린 상태(안티그래비티: 왼쪽 화면 도킹 + 오른쪽 대화 상시)</h2>
+    <div class="shell">
+      <div class="titlebar">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <b>GIJO AS</b> — 프로 셸
+      </div>
+      <div class="topbar">
+        <div class="rail-ic" title="화면 메뉴 판 접기/펴기">‖</div>
+        <div class="rail-ic" title="🔍 전체 화면 찾기">🔍</div>
+        <div class="rail-div"></div>
+        <div class="rail-ic on" title="지금 도킹된 화면: 내 문서">📓</div>
+        <div class="rail-ic" title="🗔 열린 창 목록">🗔</div>
+        <div class="rail-div"></div>
+        <div class="rail-ic" title="💬 새 대화(세션)">💬</div>
+      </div>
+
+      <div class="body-row">
+        <!-- ① 왼쪽 5그룹 사이드바 -->
+        <nav class="gnav">
+          <div class="top-fixed">
+            <div class="tf-item"><span class="ic">🏠</span>대시보드</div>
+            <div class="tf-item"><span class="ic">🏢</span>팀 사무실(창)</div>
+            <div class="tf-item on"><span class="ic">📓</span>내 문서</div>
+            <div class="tf-item"><span class="ic">💬</span>작업 내역</div>
+          </div>
+
+          <div class="grp">
+            <div class="gh"><span class="no">①</span>🧠 내 지식<span class="cnt">4</span></div>
+            <div class="items">
+              <div class="gi">지식 창고</div>
+              <div class="gi">법령·판례</div>
+              <div class="gi">GIJO AS 안내</div>
+              <div class="gi">보안제품 비교·소개</div>
+            </div>
+          </div>
+
+          <div class="grp">
+            <div class="gh"><span class="no">②</span>📓 내 문서<span class="cnt">7</span></div>
+            <div class="items">
+              <div class="gi hot">업로드·반입</div>
+              <div class="gi">문서 편집(내 것)</div>
+              <div class="gi">조치요청서</div>
+              <div class="gi">연락처</div>
+              <div class="gi">업무 넘기기</div>
+              <div class="gi">작업 내역</div>
+              <div class="gi">📂 지켜보는 폴더<span class="tagnew">신규</span></div>
+            </div>
+          </div>
+
+          <div class="grp">
+            <div class="gh"><span class="no">③</span>🩹 취약점 업무<span class="cnt">7</span></div>
+            <div class="items">
+              <div class="gi">⓪ 자산 고르기</div>
+              <div class="gi">① 발견·수집</div>
+              <div class="gi">② 우선순위</div>
+              <div class="gi">③ 조치</div>
+              <div class="gi">④ 검증</div>
+              <div class="gi">⑤ 보고(KPI·컴플라이언스)</div>
+              <div class="gi">보안 로그 파일 분석</div>
+            </div>
+          </div>
+
+          <div class="grp">
+            <div class="gh"><span class="no">④</span>🧰 보안제품 관리<span class="cnt">5</span></div>
+            <div class="items">
+              <div class="gi">우리 보안제품</div>
+              <div class="gi">자산 관리(전체)</div>
+              <div class="gi">보안설정 점검(하드닝)</div>
+              <div class="gi">정기 점검</div>
+              <div class="gi">공급망 점검</div>
+            </div>
+          </div>
+
+          <div class="grp">
+            <div class="gh"><span class="no">⑤</span>⚙ 설정<span class="cnt">3</span></div>
+            <div class="items">
+              <div class="gi">설정</div>
+              <div class="gi">AI</div>
+              <div class="gi">기록</div>
+            </div>
+          </div>
+        </nav>
+
+        <!-- ② 가운데: 화면이 왼쪽에 바로 도킹된 모습(내 문서, 3분할) -->
+        <div class="stage">
+          <div class="dockhead">⊟ 화면 접기　<b>내 문서</b>　— 📂 지켜보는 폴더 (신규)</div>
+          <div class="docwrap">
+            <!-- 문서 사이드(44px 접힘, mydocs.html v4 그대로) -->
+            <div class="mdside">
+              <div class="nd" title="👤 내 것">👤</div>
+              <div class="nd" title="🏢 회사 지식">🏢</div>
+              <div class="nd" title="📞 연락처">📞</div>
+              <div class="nd" title="📘 GIJO AS 안내">📘</div>
+              <div class="nd" title="📦 보안제품 자료">📦</div>
+              <div class="div"></div>
+              <div class="nd" title="📎 지난 작업">📎</div>
+              <div class="nd" title="🎓 학습">🎓</div>
+              <div class="nd" title="🩹 반입">🩹</div>
+              <div class="nd newf on" title="📂 지켜보는 폴더 — 신규">📂<span class="b">N</span></div>
+              <div class="nd" title="🗂 산출물(예약)" style="opacity:.5">🗂</div>
+            </div>
+
+            <!-- 목록(엑셀형, 행 30px) -->
+            <div class="mdlist">
+              <div class="lh">📂 지켜보는 폴더 <span class="cnt">· 3개</span></div>
+              <div class="filterbar">
+                <span class="fk">전체</span><span class="fk">감시중</span><span class="fk">일시중지</span>
+              </div>
+              <div class="rows">
+                <div class="row sel"><span class="k">08-30</span>
+                  <span class="bd"><span class="chip watch">감시중</span><b>D:\보안팀\취약점_스캔결과</b><span class="s">· .xlsx/.pdf</span></span>
+                  <span class="rt">새 문서 <b>3</b></span></div>
+                <div class="row"><span class="k">08-28</span>
+                  <span class="bd"><span class="chip watch">감시중</span><b>\\NAS\보안\월간점검</b><span class="s">· .docx</span></span>
+                  <span class="rt">새 문서 <b>0</b></span></div>
+                <div class="row"><span class="k">08-14</span>
+                  <span class="bd"><span class="chip pause">일시중지</span><b>D:\감사자료\2026_ISMS</b><span class="s">· 전체</span></span>
+                  <span class="rt">마지막 <b>08-14</b></span></div>
+              </div>
+            </div>
+
+            <!-- 문서창: 선택한 지켜보는 폴더 상세 + 신규 지정 안내 -->
+            <div class="mddoc">
+              <h3>📂 D:\보안팀\취약점_스캔결과</h3>
+              <div class="path">감시중 · 확장자 .xlsx, .pdf · 하위 폴더 포함</div>
+              <div class="kv">
+                <div><div class="b">3</div><div class="l">새로 들어온 문서(24h)</div></div>
+                <div><div class="b">128</div><div class="l">누적 반입 건수</div></div>
+                <div><div class="b">08-30 14:20</div><div class="l">마지막 확인</div></div>
+              </div>
+              <div class="callout">
+                <b>지정은 대화창에서만 합니다</b> — 이 화면에 새 폴더를 추가하는 입력칸이 없습니다
+                (「메뉴는 보기용·지시는 대화창」 원칙). 오른쪽 대화창에 지켜볼 경로를 말하면
+                이 목록에 새 줄로 나타납니다.
+                <div class="say">"내 문서에서 D:\보안팀\침해사고_로그 폴더를 계속 지켜봐 줘. 새 파일이 들어오면 자동으로 반입해 줘."</div>
+                <div class="noinput"><span class="x">✕</span> 이 화면엔 자유 입력칸이 없습니다 — 검색칸도 필터 전용입니다.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ③ 오른쪽: 대화창 상시 도킹(380px 고정 계약, 기존 그대로) -->
+        <div class="chatdock">
+          <div class="ch">💬 대화 (380px 도킹 · 끌어서 조절 가능)</div>
+          <div class="chatlog">
+            <div class="msg me">지켜보는 폴더에 뭐 새로 들어온 거 있어?</div>
+            <div class="msg ai">📂 지켜보는 폴더 중 <b>D:\보안팀\취약점_스캔결과</b>에 오늘 새 문서 3건이 들어왔습니다. 왼쪽 「내 문서」 화면에 목록을 띄워 드렸습니다 — 필요하면 열어서 확인하세요.</div>
+            <div class="msg me">D:\보안팀\침해사고_로그 폴더도 새로 지켜봐 줘</div>
+            <div class="msg ai">등록했습니다. 지금부터 그 폴더에 파일이 추가되면 자동으로 반입 영수증을 남기고 알려 드리겠습니다.</div>
+          </div>
+          <div class="chatin"><div class="box">메시지를 입력하세요…</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 3. 5대 메뉴 클릭 동작 ══════════════════════════════════════════ -->
+  <div class="card">
+    <h2><span class="n">3</span>5대 메뉴 클릭 동작 — 카드가 아니라 즉시 도킹</h2>
+    <div class="legend">
+      <div class="leg"><div class="h"><span class="no">①</span>🧠 내 지식</div>
+        <div class="body">클릭 즉시 왼쪽에 그 화면이 도킹. 예: 「법령·판례」 → <code>lawlookup.html</code>이 바로 왼쪽에 뜨고, 오른쪽 대화는 그대로 있어 "이 조항 뜻이 뭐야"를 바로 물을 수 있다.</div></div>
+      <div class="leg"><div class="h"><span class="no">②</span>📓 내 문서</div>
+        <div class="body">클릭하면 <code>mydocs.html</code>이 도킹(이번 목업의 기본 상태). 하위 7항목은 각각 그 안의 탭(예: 조치요청서 → 👤 내 것 탭의 업무템플릿)으로 바로 진입.</div></div>
+      <div class="leg"><div class="h"><span class="no">③</span>🩹 취약점 업무</div>
+        <div class="body">⓪~⑤ 절차 화면이 순서대로 도킹. 「자산 고르기」에서 범위를 좁히면 ①~⑤가 그 자산으로 좁혀지는 기존 계약(2026-08-18) 그대로 유지.</div></div>
+      <div class="leg"><div class="h"><span class="no">④</span>🧰 보안제품 관리</div>
+        <div class="body">우리가 <b>운영 중인</b> 제품·자산·설정점검이 모인 자리. 취약점 업무가 참조하는 "대장"이라 절차 아래 둔다(기존 설계 그대로).</div></div>
+      <div class="leg"><div class="h"><span class="no">⑤</span>⚙ 설정</div>
+        <div class="body">설정 5구역은 이미 한 화면(탭)이라 「설정」 한 줄. AI 허브·기록 허브도 각각 한 화면 — 그룹 자체가 3줄로 끝난다.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ 4. 밀도 숫자 ══════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2><span class="n">4</span>밀도 숫자(실측 기준값 — gijo-ui.css / nav.js 코드 그대로 인용)</h2>
+    <table class="dense">
+      <tr><th>항목</th><th>현행</th><th>신규</th><th>증감</th></tr>
+      <tr><td>사이드바 그룹 헤더 수</td><td>12개 (24px × 12 = 288px)</td><td>5개 (24px × 5 = 120px)</td><td class="down">−168px / −58%</td></tr>
+      <tr><td>사이드바 평소 상태 총 높이<br><span style="color:var(--muted-2);font-size:10.5px">(TOP 4행 + 그룹헤더 전부 + 평균 1그룹만 펼침)</span></td>
+          <td>120 + 288 + (1.5×30≈45) = <b>453px</b></td>
+          <td>120 + 120 + (5.4×30≈162) = <b>402px</b></td><td class="down">−51px / −11%</td></tr>
+      <tr><td>사이드바 전부 펼쳤을 때 총 높이<br><span style="color:var(--muted-2);font-size:10.5px">(항목 30px × 개수, gn-item 실측값)</span></td>
+          <td>120 + 288 + (18×30=540) = <b>948px</b></td>
+          <td>120 + 120 + (27×30=810) = <b>1050px</b></td><td class="up">+102px / +11%</td></tr>
+      <tr><td>내 문서 목록 행 높이</td><td colspan="2">30px (gijo-ui.css:359 .g-rows-r, <b>변경 없음</b> — 이미 엑셀형)</td><td class="flat">그대로</td></tr>
+      <tr><td>오른쪽 대화창 도킹 폭</td><td colspan="2">380px 기본 · 끌기 최소 360 · 화면판 최소 420 보장(app.html:270, <b>변경 없음</b>)</td><td class="flat">그대로</td></tr>
+    </table>
+  </div>
+
+  <!-- ══ 5. 결정 근거 ══════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>왜 이 안인지 · 무엇을 포기했는지 · 제품 원칙 자가점검</h2>
+    <ul class="plain">
+      <li><b>왜 이 안(다른 길을 왜 안 골랐나):</b> 화면-왼쪽·대화-오른쪽 도킹 격자(<code>.work.console-side</code>)는
+        2026-08-23~27에 이미 만들어 게시된 것이다 — 새 CSS를 발명하는 대신 그걸 그대로 쓰는 것이
+        구현 리스크가 가장 낮다. ① "현행 12그룹 유지 + 카드만 다듬기"는 캡처 1번(카드만 뜨는 지금 화면)을
+        사장님이 이미 "정답 아니다"로 지목했으므로 기각. ② "사이드바를 아예 없애고 전부 대화로"는
+        캡처 3번이 요구한 "화면을 직접 보고 싶다"와 정면충돌해 기각.</li>
+      <li><b>무엇을 포기했나:</b> 사이드바를 <u>전부 펼치면</u> 오히려 11% 길어진다(내 문서 하위 7갈래가
+        처음으로 전역 메뉴에 노출되기 때문 — 전엔 화면 안에 숨어 사이드바가 짧아 보였을 뿐이다).
+        「메뉴=카드」 계약(5.41.0, 2026-08-20)도 되돌린다 — 카드가 사라지는 게 아니라, 메뉴 클릭의
+        기본 동작이 카드→도킹으로 바뀐다는 뜻이며 이 전환의 부작용 범위는 구현 전 설계관 검토가 필요하다.</li>
+      <li><b>제품 원칙 자가점검:</b>
+        <div class="selfcheck">
+          <div class="sc"><div class="t">메뉴는 보기용</div>사이드바 항목은 전부 "화면 이동"만 한다. 새로 만든 항목(📂 지켜보는 폴더)도 클릭하면 화면만 뜬다. <span class="ok">지킴</span></div>
+          <div class="sc"><div class="t">지시는 대화창</div>지켜보는 폴더 "지정"에 입력칸을 두지 않았다 — 대화창 문장으로만 등록한다는 안내와 예시 문장을 화면 안에 넣었다. <span class="ok">지킴</span></div>
+          <div class="sc"><div class="t">화면엔 정체성 한 줄</div>도크 머리에 "내 문서" 한 줄만 두고, 사용법·주의사항은 이 시안에 담지 않았다(실제 구현 시 screenguide+ⓘ로 간다). <span class="ok">지킴</span></div>
+        </div>
+      </li>
+    </ul>
+    <div class="src">
+      참고한 표준·근거:
+      <a href="https://www.geeksforgeeks.org/millers-law-in-ux-design/">Miller's Law in UX Design — GeeksforGeeks</a> ·
+      <a href="https://blog.logrocket.com/ux-design/millers-law-ux-design/">How can Miller's law make UX better? — LogRocket</a>
+      (전역 내비게이션 5~9개 권고, 12개 → 5~6개 청킹 사례) ·
+      코드 내부 근거: <code>client/src/renderer/pages/app.html:255-270</code>(도킹 격자·380px 계약, Material Design 3 Extra-large 1600px 인용) ·
+      <code>client/src/renderer/pages/nav.js:99-218</code>(현행 GROUPS 12개) ·
+      <code>client/src/renderer/pages/gijo-ui.css:359</code>(목록 행 30px) ·
+      <code>client/src/renderer/pages/mydocs.html:43-48</code>(내 문서 8갈래 사이드바)
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

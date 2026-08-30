@@ -418,7 +418,7 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
 
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──
 const 카드전 = await 셸.evaluate(() => document.querySelectorAll(".dc-card").length);
-await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기")); // 무dock=메뉴성 — 카드만 떠야 한다(사장님 확정 계약)
+await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기")); // 무dock=메뉴성 — 화면+카드가 나란히 떠야 한다(2026-08-31 개정)
 let 자동카드 = false;
 for (let i = 0; i < 10 && !자동카드; i++) {
   await new Promise((r) => setTimeout(r, 1000));
@@ -429,10 +429,12 @@ for (let i = 0; i < 10 && !자동카드; i++) {
 }
 ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
 {
-  // ★ 확정 계약(2026-08-20 사장님 ×3): 메뉴성 열기는 화면을 열지 않는다 — 카드가 전부.
-  // ⚠ assets는 앞선 검사(행 클릭 등)가 이미 열어 iframe이 잔존하고, 셸은 iframe을
-  //   재사용하므로 assets로는 「안 열림」을 못 잰다(수 비교도 재사용이면 거짓 통과).
-  //   이 관문에서 한 번도 안 연 sessions.html(신설 작업내역 카드)로 0→0을 확인한다.
+  // ★ 계약 개정(2026-08-31 사장님 — 실화면 캡처 3장 「안티그래비티처럼, 3번 그림처럼」):
+  //   메뉴성 열기도 **화면을 연다**(왼쪽 도킹) + 카드도 온다(5.38 계약 존속). 종전
+  //   「카드가 전부」(2026-08-20 ×3)의 0→0 검사를 0→1로 뒤집었다 — 그대로 두면
+  //   나란히로 고친 코드가 이 관문에서 막힌다(관문도 계약과 함께 개정).
+  // ⚠ assets는 앞선 검사가 이미 열어 iframe이 잔존하므로, 이 관문에서 한 번도 안 연
+  //   sessions.html(신설 작업내역 카드)로 0→1을 확인한다.
   const 프레임수 = (nm) => ctx.pages().reduce((n, p) => n + p.frames().filter((f) => f.url().includes(nm)).length, 0);
   const 전 = 프레임수("sessions.html");
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("sessions.html", "작업 내역"));
@@ -442,9 +444,10 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
     세션카드 = await 셸.evaluate(() => [...document.querySelectorAll(".dc-card")].some((c) => (c.textContent || "").includes("작업 내역 — 대화 세션")));
   }
   const 후 = 프레임수("sessions.html");
-  ok("메뉴 열기는 화면을 열지 않는다(카드가 전부)", 세션카드 && 전 === 0 && 후 === 0, "신설카드 " + 세션카드 + " · 프레임 " + 전 + "→" + 후);
+  ok("메뉴 열기 → 화면이 열리고(0→1) 카드도 온다(2026-08-31 개정)", 세션카드 && 전 === 0 && 후 === 1, "신설카드 " + 세션카드 + " · 프레임 " + 전 + "→" + 후);
 }
-// assets 부품 확인 — 방금 ④′가 assets를 열었으니 프레임이 살아 있다(순서 계약).
+// assets 부품 확인 — 위 sessions 열기가 도킹을 교체해 assets 프레임은 닫혔다(2026-08-31
+// 개정 후 메뉴 열기=도킹 교체). dock 명시로 다시 열어 부품을 확인한다.
 {
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기", { dock: true })); // 부품 확인은 진짜 열어서
   const fr = await 프레임찾기("assets.html", 6);
