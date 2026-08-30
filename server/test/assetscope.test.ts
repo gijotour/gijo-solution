@@ -207,8 +207,12 @@ describe("★ 판을 뺐으면 빈칸이 남지 않는다", () => {
 });
 
 describe("★ 범위 배관 5고리 — 하나만 끊겨도 조용히 죽는다", () => {
-  it("① 화면이 셸에 알린다", () => {
-    expect(화면).toMatch(/postMessage\(\{ type: "gijo:scope", scope: sc \}/);
+  it("① 화면이 셸에 알린다 — 반드시 top으로", () => {
+    // top 고정(2026-08-30 검토관 2차) — parent로 되돌아가면 허브 무대(그룹 판)에 실렸을 때
+    // parent=grouphub가 gijo:scope를 릴레이하지 않아 범위 걸기가 조용히 죽는다(그날 고친 실결함).
+    expect(화면).toMatch(/window\.top\.postMessage\(\{ type: "gijo:scope", scope: sc \}/);
+    expect(화면, "parent 발신이 되살아나면 허브 안 범위 걸기가 다시 죽는다")
+      .not.toMatch(/window\.parent\.postMessage\(\{ type: "gijo:scope", scope: sc \}/);
   });
   it("② 셸이 받는다", () => {
     expect(셸).toMatch(/d\.type === "gijo:scope"/);

@@ -295,6 +295,23 @@ describe("★ 탭 이름 — 파일명을 사람에게 보이지 않는다", () 
       .replace(/\/\*[\s\S]*?\*\//g, "")     // 블록 주석
       .split("\n").filter((l) => !/^\s*(\/\/|\*)/.test(l)).join("\n"); // 줄 주석·JSDoc 이어지는 줄
     expect(/label\s*\|\|\s*page(?![a-zA-Z])/.test(코드만), "아직 `label || page`로 파일명이 샌다").toBe(false);
+    // 2026-08-30 — openTab 수신부의 `d.label || known || page` 폴백이 위 정규식을 피해
+    // 같은 결함(탭 머리에 파일명·쿼리)을 이 경로로 되살렸다(검토관 적발). 폴백에 page 금지.
+    expect(/d\.label\s*\|\|\s*known\s*\|\|\s*page/.test(코드만), "openTab 폴백에 page가 남아 파일명이 샌다").toBe(false);
+    // 금지(위)만으론 변형(`known || page` 등)이 빠져나간다(검토관 2차) — **정답 모양을 양성으로**
+    // 못박는다: openTab은 라벨을 못 찾으면 undefined로 넘겨 open() 안의 두 겹 폴백에 맡긴다.
+    expect(코드만, "openTab의 정답 폴백(d.label || known || undefined)이 사라졌다 — 바꿨다면 파일명이 안 새는지 실측하고 이 검사를 갱신할 것")
+      .toMatch(/open\(page,\s*d\.label\s*\|\|\s*known\s*\|\|\s*undefined,/);
+  });
+
+  it("새 버전 배지의 부착점은 메뉴에 실존한다 — 아니면 배지는 유령이 된다(2026-08-30)", () => {
+    // 2026-08-09 설정 그룹 정리로 부착점(settings.html?s=admin)이 사라져 배지가 어디에도 못
+    // 그려지는 죽은 코드로 3주를 지냈다(생산자 checkUpdateBadge는 살아 있었다). 메뉴가 또
+    // 재편되면 같은 유령이 재발하므로, 부착 조건의 주소가 메뉴 정의에 있는지 값으로 대조한다.
+    const m = nav.match(/it\.page === "([^"]+)" && updateAvailable/);
+    expect(m, "배지 부착 조건을 못 찾았다 — 코드가 바뀌었으면 이 시험도 같이 볼 것").toBeTruthy();
+    const 부착점 = m![1];
+    expect(nav.includes(`{ page: "${부착점}"`), `배지 부착점 ${부착점}이 메뉴 정의에 없다 — 배지가 어디에도 안 그려진다`).toBe(true);
   });
 
   it("리다이렉트가 넘기는 화면은 전부 사이드바에 이름이 있다", () => {

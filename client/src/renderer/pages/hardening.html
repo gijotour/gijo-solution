@@ -256,7 +256,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       // 지난 정기점검이 실패했으면 점·경고줄이 그것을 말해야 한다(2026-08-19 검토 지적).
       // 예전엔 옛 성공값으로 초록을 그려, 장비가 몇 주째 안 붙어도 「92% 초록」이었다.
       const 점검실패 = d.sched && d.sched.lastResult === "fail";
-      return `<div class="tcard ${d.worsening || 점검실패 ? "warn" : ""}">
+      return `<div class="tcard ${d.worsening || 점검실패 ? "warn" : ""}" data-tid="${esc(t.id)}">
         <div class="tc-top"><span class="dot" style="background:${점검실패 ? "var(--red)" : d.sched && d.sched.enabled ? rc(rate) : "var(--muted-2)"}"></span>
           <span class="tc-name" title="${esc(t.label)}">${esc(t.label)}</span><span class="g-badge g-b-med">${stdLabel}</span></div>
         <div class="tc-mid"><div class="tc-rate" style="color:${rc(rate)}">${rate == null ? "—" : rate + "%"}</div>
@@ -276,6 +276,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => removeTarget(b.dataset.del)));
     document.querySelectorAll("[data-sched]").forEach((b) => b.addEventListener("click", () => openSched(b.dataset.sched)));
     document.querySelectorAll("[data-toggle]").forEach((el) => el.addEventListener("click", () => toggleSched(el.dataset.toggle, el.dataset.on !== "1")));
+    // 카드 클릭 = 🎯 선택(2026-08-30 — 목록형 화면들과 반응 통일: 종전엔 카드 몸통을 눌러도
+    // 아무 일도 없었다). 조작 4종(토글·스케줄·점검·삭제)과 분리 — products의 「행=선택,
+    // 조작은 단추」 관례. 전송 규격은 공용 부품 selectnotify.js가 진다.
+    document.querySelectorAll(".tcard[data-tid]").forEach((c) => c.addEventListener("click", (e) => {
+      if (e.target.closest("button,[data-toggle],.g-toggle")) return; // 조작 클릭은 선택이 아니다
+      const t = TARGETS.find((x) => x.id === c.dataset.tid); if (!t) return;
+      if (window.gijoSelectNotify) window.gijoSelectNotify({ label: t.label, text: "점검 대상 " + t.label, fields: { asset: t.label } });
+    }));
     // ⚠ 목록은 30초마다 다시 그려진다 — 그때마다 잠금을 다시 걸지 않으면 **풀린 채로 보인다.**
     if (typeof isAdmin !== "undefined" && !isAdmin) {
       document.querySelectorAll("[data-scan],[data-del],[data-sched],[data-toggle]").forEach((b) => { b.disabled = true; b.title = "관리자만 할 수 있습니다"; });

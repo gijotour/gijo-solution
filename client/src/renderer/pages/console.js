@@ -2344,6 +2344,8 @@
       // (화면 전환·「선택 풀기」가 그 길로 온다). 여기서 한 번 더 문자열로 굳혀 받는다.
       else if (d.type === "gijo:select") setSelection(d.label && d.text
         ? { label: String(d.label), text: String(d.text), fields: d.fields || undefined } : null);
+      // ④ 문장 얹기(설계관 B1-ⓑ) — 대시보드 「적어 넣기」가 분리창에서도 살아 있게. 보내지 않는다.
+      else if (d.type === "gijo:prefill" && d.text) prefill(String(d.text).slice(0, 500));
     });
   }
   // ⧉ 분리창으로 뜬 인스턴스는 빈 상태로 시작한다 — 셸에 지금 근거 상태를 요청해 물려받는다

@@ -668,7 +668,12 @@
       el.appendChild(star);
     }
 
-    if (it.page === "settings.html?s=admin" && updateAvailable) {
+    // ⚠ 붙는 항목은 **메뉴에 실존하는 주소**여야 한다(2026-08-30 검토관) — 종전 조건이
+    //   settings.html?s=admin이었는데 2026-08-09 설정 그룹 정리로 그 항목이 사라져,
+    //   이 배지는 어디에도 그려질 수 없는 죽은 코드였다(생산자 checkUpdateBadge는 살아 있었다).
+    if (it.page === "settings.html?s=my" && updateAvailable) {
+      // 툴팁에 「관리자 탭」을 안내하지 않는다(검토관 2차) — 배지는 역할 무관하게 뜨는데
+      // 그 탭은 담당자에겐 없어 거짓 안내가 된다.
       var upBadge = document.createElement("span"); upBadge.className = "gn-upbadge"; upBadge.textContent = "1"; upBadge.title = "새 버전 있음"; el.appendChild(upBadge);
     }
     // 진행중인 작업 세션 개수 — "몇 건 돌고 있나"는 눌러 보지 않아도 알아야 하는 값이다.
@@ -695,8 +700,10 @@
     }
     // 오늘 새로 들어온 문서 수 — "내가 올린 게 어디 쌓이나"를 눌러 보지 않아도 알린다
     //   (2026-08-21 승인 시안 menu-reorg). 0이면 감춘다(새 게 없으면 알릴 일이 아니다).
-    // ⚠ `mydocs.html` **정확히**만 — TOP엔 숨김 항목 `mydocs.html?tab=guide`(옛 문서함)도 있어
-    //   문자열이 다르다. 그쪽엔 안 붙는다(붙으면 배지가 두 곳에 뜬다).
+    // ⚠ `mydocs.html` **정확히**만 — TOP엔 숨김 항목 `mydocs.html?tab=contacts`(옛 연락처)가,
+    //   🧠 내 지식 그룹엔 `mydocs.html?tab=guide`·`?tab=vendor`가 있어 문자열이 다르다.
+    //   그쪽엔 안 붙는다(붙으면 배지가 여러 곳에 뜬다). (2026-08-30 — 옛 주석이 guide를
+    //   TOP 숨김이라 적었는데 guide는 2026-08-28 내 지식 그룹으로 이사했다. 사실대로 고침.)
     if (it.page === "mydocs.html") {
       var dBadge = document.createElement("span");
       dBadge.className = "gn-upbadge gn-docbadge";
@@ -1578,8 +1585,12 @@
       // ☑ 근거 지정·📎 첨부(노트북형 2026-08-30)도 중계한다 — 내 문서를 (창)으로 빼 쓰는
       // 사람의 체크·첨부가 셸 대화창(근거띠)에 닿아야 한다. 안 넣으면 팝업에서만 조용히 죽는다
       // (bridgerelay.test가 이 목록과 셸 수신부의 일치를 못박는다).
+      // gijo:prefill(2026-08-30 검토관 2차) — 화면을 창으로 빼 쓰는 사람의 「적어 넣기」가
+      // 셸 대화창에 닿아야 한다. 종전 제외 사유(「팝업엔 자기 chatwidget이 있다」)는 prefill엔
+      // 거짓이었다 — chatwidget에 prefill 수신이 0건이라 팝업 대시보드에서 조용히 죽고 있었다.
       if (d.type !== "gijo:select" && d.type !== "gijo:scope" && d.type !== "gijo:openTab"
-        && d.type !== "gijo:docscope" && d.type !== "gijo:attach" && d.type !== "gijo:opendoc") return;
+        && d.type !== "gijo:docscope" && d.type !== "gijo:attach" && d.type !== "gijo:opendoc"
+        && d.type !== "gijo:prefill") return;
       if (!ev.source || !팝업발신자인가(ev.source)) return;
       if (window.gijo && window.gijo.bridgeToShell) window.gijo.bridgeToShell(d);
     });

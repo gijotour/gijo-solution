@@ -112,11 +112,25 @@ describe("직전 대상 이어 붙이기 (2026-08-09 ③ — 같은 병의 마�
 
 describe("클라 배선 (소스 계약)", () => {
   it("선택 알림은 클릭 한 곳에서만 — 자동 열림은 선택이 아니다", () => {
+    // 2026-08-30 부품 이관: 전송 규격(top·길이 컷)은 selectnotify.js 한 곳이 진다.
+    // 호스트 3곳(analysis·inventory·vulnscan)이 부품을 싣는 것은 아래 별도 검사로 못박는다.
     const mv = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "map-view.js"), "utf8");
-    expect((mv.match(/gijo:select/g) ?? []).length, "선택 알림이 여러 곳이면 자동 열림까지 잡는다").toBe(1);
-    // 2026-08-09 실측 결함: parent로 보내면 허브 화면(discover 등) 안의 한 겹 때문에
-    // 셸에 못 닿는다 — 셸은 항상 최상위 창이므로 top으로 보낸다.
-    expect(mv, "선택 알림은 top으로 — parent는 허브 한 겹에 막힌다").toContain("window.top.postMessage");
+    expect((mv.match(/gijoSelectNotify\(\{/g) ?? []).length, "선택 알림(부품 호출)이 여러 곳이면 자동 열림까지 잡는다").toBe(1);
+    expect(mv, "직접 발신이 되살아나면 부품 규격(60자 컷·해제)이 안 걸린다").not.toContain("window.top.postMessage");
+    expect(mv, "단독 팝업 예외(top!==window)는 부품 계약이 금지한 패턴이다").not.toContain("window.top !== window");
+  });
+
+  it("map-view를 싣는 호스트는 부품(selectnotify)도 싣는다 — 안 실으면 클릭이 조용히 죽는다", () => {
+    // 전수 스캔(검토관 2차) — 고정 목록이면 네 번째 호스트가 감시 밖이라, 이 시험이 막으려는
+    // 결함(부품 로드 누락=클릭 무증상 사망, 5.36.0 거짓 초록 부류)이 새 호스트에서 재발한다.
+    const 방 = path.join(__dirname, "..", "..", "client", "src", "renderer", "pages");
+    const 호스트들 = fs.readdirSync(방).filter((f) => f.endsWith(".html"))
+      .filter((f) => fs.readFileSync(path.join(방, f), "utf8").includes('src="map-view.js"'));
+    expect(호스트들.length, "map-view 호스트가 0 — 스캔이 헛돈다(파일명·로드 방식이 바뀌었나)").toBeGreaterThanOrEqual(3);
+    for (const f of 호스트들) {
+      const s = fs.readFileSync(path.join(방, f), "utf8");
+      expect(s, `${f} — map-view는 싣는데 selectnotify가 없다(지도 클릭 선택이 조용히 죽는다)`).toContain('src="selectnotify.js"');
+    }
   });
 
   it("화면이 바뀌면 선택을 푼다 — 옆 화면 항목을 계속 가리키면 「이거」가 거짓말이 된다", () => {
@@ -163,6 +177,10 @@ describe("클라 배선 (소스 계약)", () => {
     // ⑤ 빼는 순간 물려받기(③라운드 #14와 같은 부류 — 이미 걸린 🎯가 새 창엔 없던 구멍).
     expect(콘솔, "물려주기 스냅샷에 sel이 없다").toMatch(/function getGroundState[\s\S]{0,320}sel: sel \?/);
     expect(셸, "ground:req 응답이 sel을 안 보낸다").toMatch(/상태\.sel[\s\S]{0,200}type: "gijo:select"/);
+    // ⑥ gijo:prefill도 같은 무늬(2026-08-30 설계관 B1-ⓑ) — 대시보드 「적어 넣기」가 분리창
+    //   상태에서 숨은 콘솔 입력칸에 얹혀 무반응이던 것. 정돈 값(얹을글)만 나른다.
+    expect(셸, "prefill을 분리창에 중계하지 않는다").toMatch(/broadcastToWindows\(\{ type: "gijo:prefill", text: 얹을글 \}\)/);
+    expect(콘솔, "분리창 수신에 prefill 갈래가 없다").toMatch(/onShellBridge[\s\S]{0,1600}d\.type === "gijo:prefill"/);
   });
 
   it("3단계 확장 화면도 top으로 보낸다 — 취약점 목록(호스트·항목)·할 일 줄", () => {
@@ -176,8 +194,11 @@ describe("클라 배선 (소스 계약)", () => {
     expect((sn.match(/window\.top\.postMessage/g) ?? []).length, "부품의 전송은 한 곳이어야 규격이 산다").toBe(1);
     expect(sn, "단독 팝업 예외(top!==window)가 되살아나면 프로 팝업 선택이 다시 죽는다").not.toContain("window.top !== window");
     const db = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "dashboard.html"), "utf8");
-    expect(db, "할 일 줄에 선택 배선").toContain("gijo:select");
-    expect(db, "셸은 최상위 창").toContain("window.top.postMessage");
+    // 2026-08-30 부품 이관 — 종전 직접 발신(gijo:select + top)은 선택배선대장의 「직접 0」
+    // 선언과 어긋나 있었다. 이제 부품 호출·로드를 검사한다(vulnscan과 같은 관례).
+    expect(db, "할 일 줄에 선택 배선(부품)").toContain("gijoSelectNotify");
+    expect(db, "부품 로드가 없으면 호출이 조용히 죽는다").toContain('src="selectnotify.js"');
+    expect(db, "직접 발신이 되살아나면 대장과 다시 어긋난다").not.toContain('window.top.postMessage({ type: "gijo:select"');
   });
 });
 

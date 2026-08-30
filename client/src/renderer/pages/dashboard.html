@@ -364,7 +364,12 @@
     });
   }
   // 화면 열기 — 셸이 있으면 새 탭, 없으면(분리창) 그 자리 이동. 다리는 nav.js가 놓는다.
-  function go(page) { if (window.gijoOpenScreen) window.gijoOpenScreen(page); else location.href = page; }
+  // label(선택) — ?panel= 딥링크는 메뉴에 없어 셸 폴백이 오라벨하므로(설계관 2026-08-30)
+  // 발신부가 이름을 명시한다. gijoOpenScreen은 {page,label} 객체를 받는다(nav.js).
+  function go(page, label) {
+    if (window.gijoOpenScreen) window.gijoOpenScreen(label ? { page: page, label: label } : page);
+    else location.href = page;
+  }
 
   // today 항목 id 접두사 → 실제로 조치하는 화면. 급한 것 목록이 이 규칙을 쓴다
   // (브리핑 버튼도 같이 쓰던 것은 2026-08-06 대화창 이동으로 없어졌다).
@@ -478,15 +483,21 @@
       box.innerHTML = '<span class="team-load">AI 팀 상태를 불러오지 못했습니다</span>';
     }
   }
-  $("teamRow").addEventListener("click", function () { go("agent.html"); });
+  // agent.html은 aihub로 흡수(TAB_REDIRECT) — 도착지 직행+라벨(아래 부품정의와 같은 규칙, 검토관 2차).
+  $("teamRow").addEventListener("click", function () { go("aihub.html?panel=team", "AI 팀"); });
 
   // ── AI 팀 카드 줄 + 기반 부품(승인 시안 AI팀_가시화) — 전부 실데이터·실신호 ──────────
   var 부품el = {}; // 동적 생성 id 참조 맵 — IIFE 최상위(검토관 S1: 지역 스코프면 learnloop 콜백이 ReferenceError)
+  // label — 셸이 이름을 못 찾는 딥링크는 발신부가 명시한다(설계관 2026-08-30). 라벨 정본 사슬:
+  // ① 메뉴 라벨(nav.js GROUPS — knowledge는 「지식 창고」로 실존한다) ② 이미 여는 곳의 관례
+  // (railroster.js — 안전장치·AI 팀) ③ 그도 없으면 판 제목(grouppanels.js, 이모지 뗀 것).
+  // ⚠ 1차 주석은 「판 제목이 정본」이라 적었는데 거짓이었다(검토관 2차 — 실제 값은 ①·②에서 왔다).
   var 부품정의 = [
-    { id: "embed", lt: "E", nm: "임베딩", tip: "임베딩 엔진(bge-m3) — 문서·질문을 숫자로", page: "aihub.html?panel=knowledge" },
-    { id: "search", lt: "R", nm: "RAG 검색", tip: "사내 지식에서 근거 찾기", page: "aihub.html?panel=knowledge" },
-    { id: "guard", lt: "G", nm: "가드레일", tip: "들어오는 지시 입구 검사", page: "redteam.html" },
-    { id: "lora", lt: "L", nm: "LoRA", tip: "전문가 어댑터", page: "aihub.html?panel=team" },
+    { id: "embed", lt: "E", nm: "임베딩", tip: "임베딩 엔진(bge-m3) — 문서·질문을 숫자로", page: "aihub.html?panel=knowledge", label: "지식 창고" },
+    { id: "search", lt: "R", nm: "RAG 검색", tip: "사내 지식에서 근거 찾기", page: "aihub.html?panel=knowledge", label: "지식 창고" },
+    // 가드레일 — redteam.html은 aihub로 흡수(TAB_REDIRECT). 도착지로 직접(railroster.js L8과 동일).
+    { id: "guard", lt: "G", nm: "가드레일", tip: "들어오는 지시 입구 검사", page: "aihub.html?panel=safety", label: "안전장치" },
+    { id: "lora", lt: "L", nm: "LoRA", tip: "전문가 어댑터", page: "aihub.html?panel=team", label: "AI 팀" },
   ];
   async function loadTeamCards() {
     var row = $("aiteamRow");
@@ -503,7 +514,7 @@
           '<span style="color:var(--muted-2);font-size:11.5px">' + esc(a.role || "") + '</span></span>';
       }).join("");
       row.querySelectorAll(".aiteam-chip").forEach(function (c) {
-        c.addEventListener("click", function () { go("aihub.html?panel=team"); });
+        c.addEventListener("click", function () { go("aihub.html?panel=team", "AI 팀"); });
       });
     } catch (e) { row.innerHTML = '<span style="font-size:12px;color:var(--muted-2)">AI 팀 상태를 불러오지 못했습니다</span>'; }
     var parts = $("aiteamParts");
@@ -511,11 +522,14 @@
     parts.innerHTML = 부품정의.map(function (p) {
       return '<span class="part" id="pt-' + p.id + '" title="' + esc(p.tip) + '"><span class="lt">' + p.lt + '</span><span>' + esc(p.nm) + '</span></span>';
     }).join("");
-    var 부품el = {};
+    // ⚠ `var`를 붙이지 않는다(2026-08-30 설계관 적발) — 여기 var가 있으면 IIFE 최상위의 부품el
+    //   선언(검토관 S1 수리분 — 행 번호는 안 적는다, 편집마다 낡아서 이미 한 번 틀렸다)을
+    //   **가려서** learnloop 콜백이 영원히 빈 맵을 읽는다(같은 결함 반쪽 부활).
+    부품el = {};
     부품정의.forEach(function (p) {
       var el = document.getElementById("pt-" + p.id);
       부품el[p.id] = el;
-      if (el) el.addEventListener("click", function () { go(p.page); });
+      if (el) el.addEventListener("click", function () { go(p.page, p.label); });
     });
     // 사실 값으로 툴팁 보강 — 가드레일 모드·차단/표시 수, 어댑터 등록/채택(채택 0=준비 중)
     try {
@@ -754,13 +768,15 @@
       return;
     }
     // 할 일 글자 클릭 = 선택(2026-08-09 3단계) — 「이거 완료 처리해줘」의 「이거」가 이 할 일이 된다.
-    // ⚠ 체크박스(완료)·✕(빼기)와 분리 — 글자 부분만. 셸은 항상 최상위 창이라 top으로 보낸다.
+    // ⚠ 체크박스(완료)·✕(빼기)와 분리 — 글자 부분만.
+    // 전송 규격(top·길이 컷·해제 규칙)은 공용 부품 selectnotify.js 한 곳이 진다(2026-08-30 이관 —
+    // 종전 직접 발신은 선택배선대장의 「직접 0」 선언과 어긋나 있었다).
     var ptx = e.target.closest(".plan-trow .ptx");
     if (ptx) {
       var id = ptx.closest(".plan-trow").dataset.id;
       var task = planTasks.find(function (t) { return t.id === id; });
-      if (task && task.text) {
-        try { window.top.postMessage({ type: "gijo:select", label: task.text.slice(0, 40), text: "할 일 " + task.text }, "*"); } catch (err) {}
+      if (task && task.text && window.gijoSelectNotify) {
+        window.gijoSelectNotify({ label: task.text.slice(0, 40), text: "할 일 " + task.text });
       }
       return;
     }
@@ -855,6 +871,8 @@
 </script>
 
 <script src="fold.js"></script>
+<!-- 선택 알림 공용 부품(2026-08-30 부품 이관) — 로드를 빠뜨리면 호출이 조용히 죽는다(5.36.0 부류) -->
+<script src="selectnotify.js"></script>
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>
 <script src="progresscard.js"></script>

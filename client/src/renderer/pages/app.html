@@ -359,7 +359,9 @@
     <button id="railPane" title="화면 메뉴 판 접기/펴기">‖</button>
     <button id="railMenu" title="전체 메뉴 (Ctrl+K)">☰<span class="gn-workbadge"></span></button>
     <button id="railWork" title="작업 내역">🕘<span class="gn-sessbadge"></span></button>
-    <button id="railFav" title="즐겨찾기">⭐</button>
+    <!-- ⭐ railFav는 2026-08-30 검토로 제거 — ☰과 똑같이 화면찾기를 열 뿐이라 라벨(즐겨찾기)과
+         동작이 달랐다. 즐겨찾기는 메뉴 판(★)·화면찾기 안에 그대로 있다. 마크업과 핸들러(프로레일)를
+         **함께** 지웠다 — deadelements 감시는 눌러() 헬퍼 인자를 못 보므로 한쪽만 지우면 조용히 남는다. -->
     <button id="railWins" title="열려 있는 창 목록 — 누르면 그 창이 앞으로">🗔</button>
     <button id="railHome" title="새 대화 시작 — 지금 대화는 작업 내역에 저장되고, 열린 화면·창을 닫고 처음 화면으로 돌아갑니다">💬</button>
     <div class="rail-foot"></div>
@@ -460,11 +462,18 @@
   // ⚠ iframe 쪽 리다이렉트만으로는 부족하다. 리다이렉트는 화면 안에서 일어나고 **탭 이름은
   //   셸이 따로 저장**하므로, 그냥 두면 「자산 통합 뷰」라는 이름 안에 자산 목록이 뜬다 —
   //   이름과 내용이 다르면 담당자는 잘못 눌렀다고 생각한다(실측 2026-08-02).
-  // ⚠ 새 이름은 사이드바(nav.js GROUPS)에 적힌 것과 **같아야** 한다.
+  // ⚠ 새 이름의 정본 사슬(2026-08-30 갱신 — 종전 「사이드바와 같아야」는 도착지가 딥링크가
+  //   되며 낡았다): ① 메뉴 라벨(nav.js GROUPS에 그 주소가 있으면) ② 이미 여는 곳의 관례
+  //   (assets.html 「전체 관리 열기」=자산 관리 등) ③ 그도 없으면 판 제목(grouppanels.js).
   var 옛탭 = {
-    "assethub.html": { page: "inventory.html", label: "자산 목록" },
-    "opsguide.html": { page: "maintenance.html", label: "정기 점검" },
-    "ontology.html": { page: "memory.html", label: "AI 지식" },
+    // ⚠ 도착지는 **최종** 자리로 적는다(2026-08-30 검토관·설계관) — 종전 셋(inventory·
+    //   maintenance·memory)은 그 자체가 다시 흡수된 화면이라, 복원 라벨(자산 목록·정기 점검·
+    //   AI 지식)과 실제 도착 화면 이름이 어긋났다(이 표 바로 위 규칙을 표 스스로 어겼다).
+    // assethub(옛 자산 통합 뷰)는 목록·관리를 쓰던 사람의 탭이라 ⓪ 자산 고르기가 아니라
+    //   관리 화면으로 — hub=1이 갈아타기 표(inventory→assets)의 유일한 예외 통로다(assets.html 관례).
+    "assethub.html": { page: "inventory.html?hub=1", label: "자산 관리" },
+    "opsguide.html": { page: "fix.html?panel=maintenance", label: "정기 점검" },
+    "ontology.html": { page: "aihub.html?panel=knowledge", label: "지식 창고" },
     "mywork.html": { page: "dashboard.html", label: "대시보드" },
     // ★ 2026-08-22 — 「보안제품 비교·소개」(intro.html)를 내 문서로 흡수하며 **파일을 지웠다.**
     //   ⚠ 이 표에 안 적으면 그 탭을 열어 둔 담당자는 **영구 빈 탭**을 만난다:
@@ -961,7 +970,10 @@
       // 그 화면을 보겠다고 누른 것이라 메뉴성이 아니다(확정 계약의 dock 경로 5곳 중 하나인데
       // 이 자리만 빠져 있었다 — 종전엔 screenCard 결함이 무조건 도킹시켜 가려졌고, 관문
       // 「허브 릴레이」가 잡았다).
-      open(page, d.label || known || page, { dock: true });
+      // ⚠ 마지막 폴백에 page를 넣지 않는다(2026-08-30 설계관) — 메뉴에 없는 화면의 탭 머리에
+      //   파일명(쿼리 포함)이 그대로 떴다(2026-08-18 사장님 QA로 옛탭 표에서 한 번 고친 그 부류).
+      //   open() 안에 이미 두 겹 폴백(화면이름찾기→읽을이름 「화면」)이 있으니 그 사슬에 맡긴다.
+      open(page, d.label || known || undefined, { dock: true });
       return;
     }
     // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.
@@ -1207,7 +1219,14 @@
     // ④ "문장만 얹어 줘" — ③과 달리 **보내지 않는다**. 뒷말을 담당자가 채워야 하는 자리에 쓴다
     //    (대시보드 「적어 넣기」 → "할 일 추가: "). 빈 칸만 보면 무슨 말을 할지 몰라 멈춘다.
     if (d.type === "gijo:prefill" && d.text && window.gijoConsole && window.gijoConsole.prefill) {
-      window.gijoConsole.prefill(String(d.text));
+      var 얹을글 = String(d.text).slice(0, 500);
+      window.gijoConsole.prefill(얹을글);
+      // 분리 대화창에도(2026-08-30 설계관 B1-ⓑ — 🎯 select 중계와 같은 무늬). 위 prefill은
+      // 대화를 ⧉로 빼면 **숨은 도킹 인스턴스**의 입력칸에 얹혀 사람 눈엔 무반응이었다.
+      // 원본 d가 아니라 정돈 값만 나른다(값 재조립 관례).
+      if (window.gijo && window.gijo.broadcastToWindows) {
+        try { window.gijo.broadcastToWindows({ type: "gijo:prefill", text: 얹을글 }); } catch (e) { }
+      }
     }
   });
 
@@ -1516,9 +1535,7 @@
       if (pop.classList.contains("on")) pop.classList.remove("on");
       else if (window.gijoOpenWinPop) window.gijoOpenWinPop();
     });
-    눌러("railFav", function () {
-      if (window.gijoOpenFinder) window.gijoOpenFinder();
-    });
+    // (railFav ⭐는 마크업과 함께 제거 — 2026-08-30. 이유는 마크업 자리 주석에.)
     // 💬 대화 홈 = 새 대화(세션) 시작(2026-08-20 사장님 — 「새로운 세션을 열겠습니까 알림
     // 주고 물어보는 거야」). 열린 화면을 닫고(감추지 않는다 — 감추면 active가 남아 맥락이
     // 「닫은 화면」을 가리킨다) 대화·📌 선택·🗂 범위를 초기화한다.

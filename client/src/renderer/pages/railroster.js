@@ -26,8 +26,8 @@
       { id: "report", 기호: "▣" }, { id: "ti", 기호: "🛰" }, { id: "normaltic", 기호: "📚" },
     ];
     var 부품 = [
-      { id: "embed", 기호: "E", title: "임베딩 엔진(bge-m3) — 문서·질문을 숫자로", page: "aihub.html?panel=knowledge", label: "지식" },
-      { id: "search", 기호: "R", title: "RAG 검색 — 사내 지식에서 근거 찾기", page: "aihub.html?panel=knowledge", label: "지식" },
+      { id: "embed", 기호: "E", title: "임베딩 엔진(bge-m3) — 문서·질문을 숫자로", page: "aihub.html?panel=knowledge", label: "지식 창고" },
+      { id: "search", 기호: "R", title: "RAG 검색 — 사내 지식에서 근거 찾기", page: "aihub.html?panel=knowledge", label: "지식 창고" },
       { id: "guard", 기호: "G", title: "가드레일 — 들어오는 지시 입구 검사", page: "aihub.html?panel=safety", label: "안전장치" } /* redteam.html은 aihub로 흡수(TAB_REDIRECT) — 도착지로 직접(검토관 L8) */,
       { id: "lora", 기호: "L", title: "LoRA 전문가 어댑터", page: "aihub.html?panel=team", label: "AI 팀" },
     ];

@@ -138,7 +138,11 @@
   //   대화창(console.js)이 한다 — 여기서 localStorage를 직접 쓰지 않는다.
   //   두 곳이 같은 값을 각자 쓰면 반드시 어긋난다(이 저장소가 반복해 겪은 것).
   function 범위알리기(sc) {
-    try { window.parent.postMessage({ type: "gijo:scope", scope: sc }, "*"); } catch (e) { }
+    // ⚠ parent가 아니라 **top**이다(2026-08-30 설계관 확정 결함) — 이 화면은 그룹 판
+    //   (grouppanels)의 허브 무대에도 실리는데, 그때 parent=허브(grouphub)이고 허브는
+    //   openTab·scope:set만 릴레이하고 gijo:scope는 안 나른다 → 허브 안에서 범위를 걸면
+    //   조용히 죽었다. 셸은 항상 최상위 창이다(「parent는 허브 한 겹에 막힌다」 규칙 그대로).
+    try { window.top.postMessage({ type: "gijo:scope", scope: sc }, "*"); } catch (e) { }
   }
   function 범위그리기(sc) {
     var bar = $("scopeBar");

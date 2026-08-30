@@ -309,10 +309,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return (
       '<div class="cat"><div class="cat-title">🤖 AI 보안 (OWASP LLM Top 10)</div>' +
       '<div class="tiles">' +
-      aiTile("AI 자산", a.aiAssets, "#c9b8ff", "LLM·모델 자산", "inventory.html") +
-      aiTile("OWASP LLM 미대응", a.owaspOpen, a.owaspOpen ? "#f5928a" : "var(--teal)", top, "inventory.html") +
-      aiTile("AI-BOM 생성률", bomRate + "%", bomRate >= 80 ? "var(--teal)" : bomRate >= 40 ? "var(--amber)" : "#f5928a", a.aibomComplete + "/" + a.aiAssets + " 자산", "sbom.html") +
-      aiTile("레드팀 견고성", robust, robustCol, a.redteamTested + "/" + a.aiAssets + " 점검됨", "redteam.html") +
+      aiTile("AI 자산", a.aiAssets, "#c9b8ff", "LLM·모델 자산", "inventory.html?hub=1") +
+      aiTile("OWASP LLM 미대응", a.owaspOpen, a.owaspOpen ? "#f5928a" : "var(--teal)", top, "inventory.html?hub=1") +
+      aiTile("AI-BOM 생성률", bomRate + "%", bomRate >= 80 ? "var(--teal)" : bomRate >= 40 ? "var(--amber)" : "#f5928a", a.aibomComplete + "/" + a.aiAssets + " 자산", "triage.html?panel=sbom") +
+      aiTile("레드팀 견고성", robust, robustCol, a.redteamTested + "/" + a.aiAssets + " 점검됨", "aihub.html?panel=safety") +
       "</div></div>"
     );
   }
@@ -486,6 +486,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // 렌더 후 상호작용 배선 — ① 상세 지표 아코디언(기본 펼침) ② 상단 KPI 카드 → 리포트 출력
   // ③ AI 보안 타일 → 관련 화면 이동. (data-page 배선은 kpiRoot가 async로 채워지므로 여기서 다시 건다.)
+  // 화면 열기 한 곳 — ?hub=1 딥링크는 메뉴에 없어 셸이 이름을 못 찾으므로(설계관 2026-08-30)
+  // 발신부가 이름을 명시한다. gijoOpenScreen은 {page,label} 객체를 받는다(nav.js).
+  // ⚠ 최상위 함수 선언이어야 한다 — wireKpi()와 init() 두 스코프가 같이 부른다.
+  var KPI_LABEL = {
+    "inventory.html?hub=1": "자산 관리",
+    // data-page 타일(aiTile)이 라벨을 못 나르므로 흡수 주소는 여기서 이름을 받는다(검토관 2026-08-30 2차).
+    "triage.html?panel=sbom": "AI-BOM · 구성",
+    "aihub.html?panel=safety": "안전장치",
+  };
+  function 열기(page, label) {
+    label = label || KPI_LABEL[page];
+    if (window.gijoOpenScreen) window.gijoOpenScreen(label ? { page: page, label: label } : page);
+    else window.gijo.navigateTo(page);
+  }
+
   function wireKpi() {
     const root = document.getElementById("kpiRoot");
     // 상단 임원 KPI 카드 — 클릭하면 리포트 출력 여부를 묻는다.
@@ -506,15 +521,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // 상세 지표 각 섹션 → 관련 화면 연결(타일·추세카드·제목 링크 모두 이동).
     // 제목의 고유 토큰으로 대상 화면을 판별한다(개별 tile 호출을 건드리지 않는 방식).
     const SECTION_PAGE = [
-      { key: "자산 위험도", page: "inventory.html" },   // 🖥 → 자산 허브
-      { key: "취약점 승인", page: "approvals.html" },   // 🔎 → 조치·승인
+      // ⚠ hub=1 필수(2026-08-30 검토관) — 없으면 갈아타기 표(inventory→assets)가 ⓪ 자산
+      //   고르기로 되돌려 자산 관리 화면에 영영 못 간다(assets.html 「전체 관리 열기」와 같은 통로).
+      //   label도 함께 — 이 주소는 메뉴에 없어 셸이 이름을 못 찾는다(assets.html:174 관례).
+      { key: "자산 위험도", page: "inventory.html?hub=1", label: "자산 관리" },   // 🖥 → 자산 관리
+      { key: "취약점 승인", page: "fix.html?panel=approvals", label: "조치·승인" },
       { key: "유지보수", page: "products.html" },       // 🔧 → 보안제품 등록부
-      { key: "CTI", page: "threat.html" },              // 🎯 → 위협 인텔
-      { key: "조치 현황", page: "vulnscan.html" },      // 🛡 → 취약점
-      { key: "조치 항목", page: "approvals.html" },     // 📋 → 조치·승인
-      { key: "컴플라이언스", page: "compliance.html" }, // ✓ → 컴플라이언스
-      { key: "취약점 번다운", page: "vulnscan.html" },  // 📉 → 취약점
-      { key: "추세", page: "vulnscan.html" },           // 📈 → 취약점
+      { key: "CTI", page: "discover.html?panel=threat", label: "위협 인텔" },
+      { key: "조치 현황", page: "triage.html?panel=vuln", label: "취약점" },
+      { key: "조치 항목", page: "fix.html?panel=approvals", label: "조치·승인" },
+      { key: "컴플라이언스", page: "reporting.html?panel=compliance", label: "컴플라이언스" },
+      { key: "취약점 번다운", page: "triage.html?panel=vuln", label: "취약점" },
+      { key: "추세", page: "triage.html?panel=vuln", label: "취약점" },
     ];
     panel && panel.querySelectorAll(".cat").forEach((cat) => {
       const title = cat.querySelector(".cat-title");
@@ -523,17 +541,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (!m) return;
       cat.querySelectorAll(".tile, .trend-card, .kv").forEach((el) => {
         el.classList.add("clk");
-        el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(m.page) : window.gijo.navigateTo(m.page)));
+        el.addEventListener("click", () => 열기(m.page, m.label));
       });
       const link = document.createElement("span");
       link.className = "cat-link";
       link.textContent = "→ 화면 열기";
-      link.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(m.page) : window.gijo.navigateTo(m.page)));
+      link.addEventListener("click", () => 열기(m.page, m.label));
       title.appendChild(link);
     });
     // AI 보안 타일 등 data-page 요소 → 해당 화면으로 이동.
     root.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
+      el.addEventListener("click", () => 열기(el.dataset.page));
     });
   }
 
@@ -571,7 +589,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function init() {
     load();
     document.querySelectorAll("[data-page]").forEach((el) => {
-      el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
+      el.addEventListener("click", () => 열기(el.dataset.page));
     });
   }
 
