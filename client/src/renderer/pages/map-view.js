@@ -133,9 +133,9 @@
   function detailHtml(a, ctx) {
     const real = (ctx.activeFindings(a) || []).filter(진짜취약);
     const rk = ctx.riskOf(a);
-    const 등급 = rk.level === "high" ? ["고위험", "rgba(229,72,77,.3)", "#ffd7d8"]
-      : rk.level === "mid" ? ["중위험", "rgba(240,160,32,.26)", "#ffe9c4"]
-      : ["저위험", "rgba(70,167,88,.22)", "#d2f2da"];
+    const 등급 = rk.level === "high" ? ["고위험", "rgba(229,72,77,.3)", "var(--red-ink, #ffd7d8)"]
+      : rk.level === "mid" ? ["중위험", "rgba(240,160,32,.26)", "var(--amber-ink, #ffe9c4)"]
+      : ["저위험", "rgba(70,167,88,.22)", "var(--teal-ink, #d2f2da)"];
     // 심각한 순 상위 3 — 전부 나열하면 목록 화면과 다를 게 없다.
     const RANK = { critical: 4, high: 3, medium: 2, low: 1 };
     const top = [...real].sort((x, y) => (RANK[y.severity] || 0) - (RANK[x.severity] || 0)).slice(0, 3);

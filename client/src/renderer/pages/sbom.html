@@ -409,7 +409,7 @@ tr:last-child td{border-bottom:none;}
     const btn = document.getElementById("robRunBtn");
     const status = document.getElementById("robStatus");
     const modelId = document.getElementById("robModelSel").value;
-    if (!modelId) { status.textContent = "먼저 연결 로컬 모델을 선택하세요."; status.style.color = "#f5928a"; return; }
+    if (!modelId) { status.textContent = "먼저 연결 로컬 모델을 선택하세요."; status.style.color = "var(--red-ink, #f5928a)"; return; }
     btn.disabled = true; const orig = btn.textContent; btn.textContent = "점검 중… (~1분)";
     status.textContent = "표준 인젝션 공격 전량으로 실측 중…"; status.style.color = "var(--muted)";
     try {
@@ -418,7 +418,7 @@ tr:last-child td{border-bottom:none;}
       renderAiBom(updated); // 새 점수로 다시 그림
     } catch (e) {
       status.textContent = "✗ 점검 실패: " + (e.message || e);
-      status.style.color = "#f5928a";
+      status.style.color = "var(--red-ink, #f5928a)";
       btn.disabled = false; btn.textContent = orig;
     }
   }
@@ -447,7 +447,7 @@ tr:last-child td{border-bottom:none;}
         status.style.color = "var(--teal)";
       } catch (e) {
         status.textContent = "✗ " + e.message;
-        status.style.color = "#f5928a";
+        status.style.color = "var(--red-ink, #f5928a)";
       } finally {
         btn.disabled = false; btn.textContent = "⚙ SHA-256 자동 계산";
       }
@@ -468,10 +468,10 @@ tr:last-child td{border-bottom:none;}
       }
       const S = rep.summary;
       const SM = {
-        open: { label: "미대응", color: "#f5928a", bg: "rgba(226,72,61,0.16)" },
-        partial: { label: "부분대응", color: "#f7c777", bg: "rgba(240,160,32,0.16)" },
+        open: { label: "미대응", color: "var(--red-ink, #f5928a)", bg: "rgba(226,72,61,0.16)" },
+        partial: { label: "부분대응", color: "var(--amber-ink, #f7c777)", bg: "rgba(240,160,32,0.16)" },
         na: { label: "해당없음", color: "var(--muted-2)", bg: "rgba(255,255,255,0.05)" },
-        covered: { label: "대응완료", color: "#7ee0b8", bg: "rgba(30,185,128,0.16)" },
+        covered: { label: "대응완료", color: "var(--teal-ink, #7ee0b8)", bg: "rgba(30,185,128,0.16)" },
       };
       const AREA = { model: "모델", dataset: "데이터", prompt: "프롬프트", agentTool: "도구", infrastructure: "인프라" };
       const rows = rep.matches.map((m) => {
@@ -488,7 +488,7 @@ tr:last-child td{border-bottom:none;}
         `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--panel-2);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:6px">
             <div style="font-size:12.5px;font-weight:800;color:var(--text-strong, #fff)">🎯 AI 위협 노출 매칭 <span style="font-size:12px;color:var(--muted-2);font-weight:600">(AI-BOM 구성 기반)</span></div>
-            <div style="font-size:12.25px;color:var(--muted)">노출 ${S.relevant} · <span style="color:#7ee0b8">대응 ${S.covered}</span> · <span style="color:var(--amber, #f7c777)">부분 ${S.partial}</span> · <span style="color:var(--red-ink, #f5928a)">미대응 ${S.open}</span></div>
+            <div style="font-size:12.25px;color:var(--muted)">노출 ${S.relevant} · <span style="color:var(--teal-ink, #7ee0b8)">대응 ${S.covered}</span> · <span style="color:var(--amber, #f7c777)">부분 ${S.partial}</span> · <span style="color:var(--red-ink, #f5928a)">미대응 ${S.open}</span></div>
           </div>
           ${rows}
         </div>
@@ -519,7 +519,7 @@ tr:last-child td{border-bottom:none;}
       await refresh();
     } catch (e) {
       status.textContent = "✗ 저장 실패: " + e.message;
-      status.style.color = "#f5928a";
+      status.style.color = "var(--red-ink, #f5928a)";
     }
   }
 
@@ -546,7 +546,7 @@ tr:last-child td{border-bottom:none;}
       logExport("AI-BOM 내보내기", aibomAssetId, "CycloneDX ML-BOM: " + res.filename);
     } catch (e) {
       status.textContent = "✗ 내보내기 실패: " + e.message;
-      status.style.color = "#f5928a";
+      status.style.color = "var(--red-ink, #f5928a)";
     }
   }
 
@@ -782,7 +782,7 @@ tr:last-child td{border-bottom:none;}
   async function runRepoScan() {
     const btn = document.getElementById("repoScanBtn"), status = document.getElementById("repoScanStatus");
     const owner = document.getElementById("repoOwnerInput").value.trim();
-    if (!owner) { status.textContent = "조직 또는 사용자명을 입력하세요."; status.style.color = "#f5928a"; return; }
+    if (!owner) { status.textContent = "조직 또는 사용자명을 입력하세요."; status.style.color = "var(--red-ink, #f5928a)"; return; }
     const token = document.getElementById("repoTokenInput").value.trim() || undefined;
     const baseUrl = document.getElementById("repoBaseUrlInput").value.trim() || undefined;
     btn.disabled = true; status.style.color = "var(--muted)"; status.textContent = "저장소를 훑는 중… (조직 규모에 따라 수십 초)";
@@ -792,7 +792,7 @@ tr:last-child td{border-bottom:none;}
       status.textContent = `✓ 스캔 완료 — 저장소 ${r.scanned}개 중 ${r.registered}개를 AI 자산으로 등록했습니다.`;
       await refresh(); // SBOM 표 + AI 자산 목록 동시 갱신
     } catch (e) {
-      status.style.color = "#f5928a";
+      status.style.color = "var(--red-ink, #f5928a)";
       status.textContent = "✗ 스캔 실패: " + (e && e.message ? e.message : e);
     }
     btn.disabled = false;

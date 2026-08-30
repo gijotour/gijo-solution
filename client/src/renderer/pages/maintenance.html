@@ -601,7 +601,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         ? results.map((r) => `<div class="chunk">${esc(r)}</div>`).join("")
         : '<div style="color:var(--muted);font-size:12px">관련 문서가 없습니다 — 위에서 문서를 올리거나 샘플 문서를 추가해보세요.</div>';
     } catch (e) {
-      box.innerHTML = '<div style="color:#f87171;font-size:12px">검색 실패: ' + e.message + "</div>";
+      box.innerHTML = '<div style="color:var(--red-ink, #f87171);font-size:12px">검색 실패: ' + e.message + "</div>";
     }
   }
 

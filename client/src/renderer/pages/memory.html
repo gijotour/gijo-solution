@@ -49,7 +49,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .dm-catb.c일반{border-color:var(--border-strong);color:var(--muted);}
 /* 업무정보 등급 배지 — 색이 먼저 읽히게. 기밀은 눈에 띄어야 하고 공개는 조용해야 한다. */
 .dm-grade{border-radius:5px;padding:0 6px;font-size:11.75px;font-weight:800;white-space:nowrap;letter-spacing:.2px;}
-.dm-grade.gg-C{background:rgba(226,72,61,.18);color:#ff8a80;border:1px solid rgba(226,72,61,.5);}
+.dm-grade.gg-C{background:rgba(226,72,61,.18);color:var(--red-ink, #ff8a80);border:1px solid rgba(226,72,61,.5);}
 .dm-grade.gg-S{background:rgba(240,160,32,.16);color:var(--amber);border:1px solid rgba(240,160,32,.42);}
 .dm-grade.gg-O{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid rgba(255,255,255,.14);}
 /* 미지정은 "공개처럼 보이면 안 된다" — 물음표로 눈에 띄게 남긴다. */
@@ -59,11 +59,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .dm-gbtn{flex:1;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;
   background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
 .dm-gbtn:hover{color:var(--text);border-color:rgba(255,255,255,.32);}
-.dm-gbtn.on.gg-C{background:rgba(226,72,61,.18);color:#ff8a80;border-color:rgba(226,72,61,.55);}
+.dm-gbtn.on.gg-C{background:rgba(226,72,61,.18);color:var(--red-ink, #ff8a80);border-color:rgba(226,72,61,.55);}
 .dm-gbtn.on.gg-S{background:rgba(240,160,32,.16);color:var(--amber);border-color:rgba(240,160,32,.5);}
 .dm-gbtn.on.gg-O{background:rgba(255,255,255,.08);color:var(--text);border-color:rgba(255,255,255,.28);}
-.dm-catb.c위협대응{border-color:rgba(248,81,73,.45);color:#ff9d97;}
-.dm-catb.c사내규정{border-color:rgba(188,140,255,.45);color:#bc8cff;}
+.dm-catb.c위협대응{border-color:rgba(248,81,73,.45);color:var(--red-ink, #ff9d97);}
+.dm-catb.c사내규정{border-color:rgba(188,140,255,.45);color:var(--purple-ink, #bc8cff);}
 .dm-catb.c취약점{border-color:rgba(251,191,36,.45);color:var(--amber);}
 .dm-rel{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:3px 0;flex-wrap:wrap;}
 .dm-rel b{color:var(--text);font-weight:600;}
@@ -74,7 +74,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .mem-cat-row{margin-top:7px;font-size:12px;color:var(--muted);}
 .mem-cat-file{color:var(--text);font-weight:600;}
 .mem-cat-badge{display:inline-block;border:1px solid rgba(45,212,191,.45);color:var(--teal);border-radius:20px;padding:0 9px;font-size:12.5px;margin-left:6px;}
-.mem-cat-badge.low{border-color:rgba(251,191,36,.5);color:#fbbf24;}
+.mem-cat-badge.low{border-color:rgba(251,191,36,.5);color:var(--amber-ink, #fbbf24);}
 .mem-cat-fix{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12.5px;padding:1px 8px;margin-left:6px;cursor:pointer;}
 .mem-cat-fix:hover{border-color:var(--border-strong);color:var(--text);}
 .mem-cat-q{font-size:12px;margin-top:6px;color:var(--text);}
@@ -616,7 +616,7 @@ tr:last-child td{border-bottom:none;}
       demo_overlap: "데모문서 겹침",
     };
     var 종류이름 = function (t) { return label[t] || String(t || "확인필요"); };
-    var color = { high: "#f5928a", medium: "#f7c777", low: "var(--muted)" };
+    var color = { high: "var(--red-ink, #f5928a)", medium: "var(--amber-ink, #f7c777)", low: "var(--muted)" };
     body.innerHTML = r.findings.map(function (f) {
       var docs = f.documents.map(function (id) { return '<span class="hy-doc" data-hy="' + dmEsc(id) + '" style="color:var(--blue-light);cursor:pointer;text-decoration:underline">' + dmEsc(id) + "</span>"; }).join(", ");
       return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">' +

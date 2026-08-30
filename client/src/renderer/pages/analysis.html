@@ -78,7 +78,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .graph-legend{font-size:11.75px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
 .graph-legend .lg{display:inline-block;margin-right:10px;}
 .graph-legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:3px;}
-.task-done{background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.4);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#8fe3c0;line-height:1.5;}
+.task-done{background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.4);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--teal-ink, #8fe3c0);line-height:1.5;}
 .filters{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;}
 .fchip{font-size:12.5px;padding:5px 11px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;}
 .fchip.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:var(--text-strong, #fff);}
@@ -92,7 +92,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .hm-ch{font-size:11px;color:var(--muted);text-align:center;padding-bottom:2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hm-rh{font-size:11.5px;color:var(--muted);display:flex;align-items:center;padding-right:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .hm-rh:hover{color:var(--text)}
-.hm-cell{border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;cursor:pointer;color:#fff}
+.hm-cell{border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;cursor:pointer;color:var(--text-strong, #fff)}
 .hm-cell:hover{outline:1px solid rgba(255,255,255,.5)}
 .hm-0{background:rgba(255,255,255,.03);color:var(--muted);font-weight:400}
 .hm-1{background:rgba(70,167,88,.35)} .hm-2{background:rgba(240,160,32,.42)}
@@ -123,10 +123,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .p3{color:var(--muted-2);background:rgba(255,255,255,.05);}
 
 .ana .arow{font-size:12.5px;color:var(--muted);line-height:1.8;}.ana .arow b{color:var(--text);}
-.ana pre{background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:12.5px;color:#cdd7e0;white-space:pre-wrap;font-family:inherit;margin:8px 0;}
+.ana pre{background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:12.5px;color:var(--text-strong, #cdd7e0);white-space:pre-wrap;font-family:inherit;margin:8px 0;}
 .sigs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
 .sig{font-size:12px;padding:2px 8px;border-radius:5px;background:rgba(226,72,61,.12);color:var(--red);}
-.corr{background:rgba(139,124,240,.08);border:1px solid rgba(139,124,240,.25);border-radius:8px;padding:10px;font-size:12.5px;color:#b9aef5;line-height:1.6;margin-bottom:8px;}
+.corr{background:rgba(139,124,240,.08);border:1px solid rgba(139,124,240,.25);border-radius:8px;padding:10px;font-size:12.5px;color:var(--purple-ink, #b9aef5);line-height:1.6;margin-bottom:8px;}
 .empty{color:var(--muted-2);font-size:12.5px;padding:24px;text-align:center;}
 .footer{display:flex;align-items:center;gap:10px;margin-top:28px;color:var(--muted-2);font-size:12.25px;}
 .footer img{height:16px;opacity:.6;}
@@ -464,7 +464,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }));
     const 상관수 = hd.rows.filter(r=>r.corr).length;
     document.getElementById("heatNote").innerHTML =
-      `가로=소스 · 세로=자산(위험 큰 순 ${hd.rows.length}${hd.전체행수>hd.rows.length?'/'+hd.전체행수:''}) · 색=최고 심각도 · <span style="color:#a99cf5">⚑=두 소스 이상 동시 = 상관 ${상관수}건</span> · 칸을 누르면 대화창에 묻습니다`;
+      `가로=소스 · 세로=자산(위험 큰 순 ${hd.rows.length}${hd.전체행수>hd.rows.length?'/'+hd.전체행수:''}) · 색=최고 심각도 · <span style="color:var(--purple-ink, #a99cf5)">⚑=두 소스 이상 동시 = 상관 ${상관수}건</span> · 칸을 누르면 대화창에 묻습니다`;
   }
   function setView(v){
     view = v;
@@ -511,7 +511,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       '<pre>'+esc(e.detail||"(상세 없음)")+'</pre>'+
       (corr ? '<div class="corr">🔗 <b>상관:</b> '+esc(corr.note)+'</div>' : "")+
       '<div id="aiBox" style="margin:8px 0">'+
-        (e.aiSummary ? '<div class="corr" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.25);color:#bcd3ff">🤖 <b>AI 분석</b><br>'+esc(e.aiSummary).replace(/\n/g,"<br>")+'</div>'
+        (e.aiSummary ? '<div class="corr" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.25);color:var(--blue-ink, #bcd3ff)">🤖 <b>AI 분석</b><br>'+esc(e.aiSummary).replace(/\n/g,"<br>")+'</div>'
                      : '<button class="btn-ghost" id="aiBtn" style="font-size:12px">🤖 AI 분석 (무슨 일·왜 위험·권고)</button>')+
       '</div>'+
       '<button class="btn-primary" id="mkTask">▶ 조치 생성 · 작업 등록</button>'+
@@ -542,7 +542,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const PRI_TASK = { P0:"P0", P1:"P1", P2:"P2", P3:"P3" };
   async function runAnalyze(id){
     const box = document.getElementById("aiBox");
-    if(box) box.innerHTML = '<div class="corr" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.25);color:#bcd3ff">🤖 AI가 분석 중… (로컬 LLM)</div>';
+    if(box) box.innerHTML = '<div class="corr" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.25);color:var(--blue-ink, #bcd3ff)">🤖 AI가 분석 중… (로컬 LLM)</div>';
     try{
       const r = await window.gijo.analysisAnalyze(id);
       const e = data.events.find(x=>x.id===id); if(e) e.aiSummary = r.aiSummary;

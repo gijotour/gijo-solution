@@ -185,8 +185,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .mtx-wrap{overflow-x:auto;}
 .mtx{border-collapse:collapse;font-size:12.5px;min-width:520px;}
 .mtx th,.mtx td{border:1px solid var(--border);padding:6px 10px;text-align:center;color:var(--muted);}
-.mtx th{color:#dfe8f7;font-weight:700;background:var(--panel-2);}
-.mtx td.tool-c{text-align:left;color:#dfe8f7;font-family:Consolas,monospace;}
+.mtx th{color:var(--text-strong, #dfe8f7);font-weight:700;background:var(--panel-2);}
+.mtx td.tool-c{text-align:left;color:var(--text-strong, #dfe8f7);font-family:Consolas,monospace;}
 .mtx .y{color:var(--teal);font-weight:800;}.mtx .n{color:var(--muted-2);}
 .audit{background:var(--g-surface-1);border:1px solid var(--border);border-radius:12px;padding:8px 6px;}
 .au-row{font-size:12.5px;color:var(--muted);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);display:flex;gap:10px;}
@@ -466,7 +466,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <button class="btn-ghost" id="saveHfProxyBtn">저장</button>
         </div>
       </div>
-      <div style="font-size:11.5px;color:#fbbf24;background:#251b06;border:1px solid #4a3a10;border-radius:7px;padding:7px 9px;margin-top:6px">
+      <div style="font-size:11.5px;color:var(--amber-ink, #fbbf24);background:var(--amber-box-ink, #251b06);border:1px solid var(--amber-boxbd-ink, #4a3a10);border-radius:7px;padding:7px 9px;margin-top:6px">
         ⚠ 프록시는 <b>모델 받기(다운로드)에만</b> 적용됩니다 — 모델 <b>검색</b>과 아래 <b>연결 시험</b>은 거치지 않습니다.
         사내망이라면 검색이 안 되어도 받기는 될 수 있습니다.
       </div>
@@ -485,7 +485,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="panel-title">모델 받기</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:9px">권장 모델을 눌러 바로 받습니다 — 이름을 검색해 고를 필요가 없습니다.</div>
       <div id="hfRecommended" style="font-size:12px;color:var(--muted-2)">불러오는 중…</div>
-      <div style="font-size:11.5px;color:#fbbf24;background:#251b06;border:1px solid #4a3a10;border-radius:7px;padding:7px 9px;margin-top:8px">
+      <div style="font-size:11.5px;color:var(--amber-ink, #fbbf24);background:var(--amber-box-ink, #251b06);border:1px solid var(--amber-boxbd-ink, #4a3a10);border-radius:7px;padding:7px 9px;margin-top:8px">
         ⚠ 권장 목록은 <b>조직명까지 고정</b>돼 있습니다. 이름만으로 검색하면 안전장치가 제거된 개조본이 먼저 나옵니다 — 보안 제품에는 쓰면 안 됩니다.
       </div>
       <!-- 고급 — 직접 검색. BYOM은 이 제품의 차별점이라 없애지 않고 접어서 남긴다. -->
@@ -494,7 +494,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="model-search"><input id="hfSearchInput" placeholder="예: Qwen/Qwen3-14B-GGUF — 조직명까지 정확히"><button id="hfSearchBtn">검색</button></div>
         <div id="hfResults" style="font-size:12px;color:var(--muted-2)">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
         <div style="font-size:11.5px;color:var(--muted-2);margin-top:6px">
-          ⚠ 검색 결과에는 <b style="color:#fca5a5">Uncensored · abliterated · Heretic</b> 같은 개조본이 섞입니다. 받기 전에 한 번 더 확인을 받습니다.
+          ⚠ 검색 결과에는 <b style="color:var(--red-ink, #fca5a5)">Uncensored · abliterated · Heretic</b> 같은 개조본이 섞입니다. 받기 전에 한 번 더 확인을 받습니다.
         </div>
       </details>
       <div id="hfJobs" style="font-size:12px;margin-top:8px"></div>
@@ -1255,7 +1255,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
             "afterbegin",
             '<div style="margin-bottom:12px;padding:14px;border:1px solid #1eb980;border-radius:10px;background:#000">' +
               '<div style="font-size:12.5px;color:#f0a020;font-weight:700;margin-bottom:8px">⚠ 지금 한 번만 보입니다 — 종이에 적어 금고에 보관하세요</div>' +
-              '<div style="font:700 16px/1.5 Consolas,monospace;letter-spacing:2px;color:#1eb980;text-align:center;user-select:all">' +
+              '<div style="font:700 16px/1.5 Consolas,monospace;letter-spacing:2px;color:var(--teal-ink, #1eb980);text-align:center;user-select:all">' +
               esc(r.recoveryKey) + "</div>" +
               '<div style="font-size:12.25px;color:#b3ada4;margin-top:8px">서버 기계를 교체·재설치하면 이 열쇠로만 DB를 엽니다. 이전 열쇠는 이제 쓸 수 없습니다.</div></div>'
           );
@@ -1561,7 +1561,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         box.textContent = "등록된 어댑터가 없습니다 — 학습 루프가 어댑터를 구우면 여기 등록됩니다(채택 전에는 실서비스에 실리지 않습니다).";
         return;
       }
-      const 색 = { 취약점: "color:var(--red-ink, #f5928a);background:rgba(226,72,61,.12)", 장비운영: "color:#7db2f8;background:rgba(59,130,246,.13)", 사내규정: "color:var(--amber);background:rgba(240,160,32,.13)", 위협대응: "color:var(--purple);background:rgba(139,124,240,.14)" };
+      const 색 = { 취약점: "color:var(--red-ink, #f5928a);background:rgba(226,72,61,.12)", 장비운영: "color:var(--blue-ink, #7db2f8);background:rgba(59,130,246,.13)", 사내규정: "color:var(--amber);background:rgba(240,160,32,.13)", 위협대응: "color:var(--purple);background:rgba(139,124,240,.14)" };
       const esc2 = (s) => String(s ?? "").replace(/</g, "&lt;");
       box.innerHTML =
         '<table style="border-collapse:collapse;width:100%"><tr>' +
@@ -1986,7 +1986,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     let 상태 = "", 단추 = "", 보조 = "";
     if (m.이미받음) {
       상태 = '<span class="badge b-green">받음</span>';
-      단추 = '<button class="hf-load" disabled style="color:#4ade80;border-color:#14532d;cursor:default">✓ 사용 중</button>';
+      단추 = '<button class="hf-load" disabled style="color:var(--teal-ink, #4ade80);border-color:#14532d;cursor:default">✓ 사용 중</button>';
     } else if (job && (job.status === "queued" || job.status === "downloading")) {
       상태 = '<span class="badge b-amber">받는 중</span>';
       단추 = '<button class="hf-load" disabled>받는 중…</button>';
@@ -1995,14 +1995,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       상태 = '<span class="badge b-red">받기 실패</span>';
       단추 = `<button class="hf-load" data-load="${esc(m.repo)}">다시 받기</button>`;
       // ⚠ 왜 실패했는지 그대로 보여준다 — 서버는 알고 있는데 화면만 모르던 자리다.
-      보조 = `<div style="color:#fca5a5;font-size:11.5px;margin-top:3px">${esc(job.error || "받기 실패")}</div>`;
+      보조 = `<div style="color:var(--red-ink, #fca5a5);font-size:11.5px;margin-top:3px">${esc(job.error || "받기 실패")}</div>`;
     } else {
       상태 = m.기준 ? '<span class="badge b-teal">기준</span>' : '<span class="badge">선택</span>';
       단추 = `<button class="hf-load" data-load="${esc(m.repo)}">받기</button>`;
     }
     // 저장소를 못 봤다는 것과 없다는 것은 다르다 — 사내망에서는 조회가 막혀도 받기는 될 수 있다.
     const 확인 = m.저장소확인 === "없음"
-      ? '<span style="color:#fca5a5"> · ⚠ 저장소를 찾지 못했습니다(확인 필요)</span>'
+      ? '<span style="color:var(--red-ink, #fca5a5)"> · ⚠ 저장소를 찾지 못했습니다(확인 필요)</span>'
       : m.저장소확인 === "확인못함"
         ? '<span style="color:var(--muted-2)"> · 저장소 확인 못 함(사내망이면 정상)</span>'
         : "";
@@ -2010,7 +2010,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <span style="flex:1;min-width:0">
         <b>${esc(m.용도)}</b> ${상태}
         <div class="hf-sub">${esc(m.repo)} · ${esc(m.대략크기)} · ${esc(m.권장장비)}${확인}</div>
-        ${m.주의 ? `<div class="hf-sub" style="color:#fbbf24">${esc(m.주의)}</div>` : ""}
+        ${m.주의 ? `<div class="hf-sub" style="color:var(--amber-ink, #fbbf24)">${esc(m.주의)}</div>` : ""}
         ${보조}
       </span>${단추}</div>`;
   }
@@ -2022,9 +2022,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       // ⚠ 0건이면 「없다」가 아니라 **뭔가 잘못된 것**이다. 빈 화면으로 두지 않는다.
       el.innerHTML = 권장캐시.length
         ? 권장캐시.map(권장줄).join("")
-        : '<div style="color:#fca5a5">권장 목록을 받지 못했습니다 — 서버가 최신인지 확인해 주세요.</div>';
+        : '<div style="color:var(--red-ink, #fca5a5)">권장 목록을 받지 못했습니다 — 서버가 최신인지 확인해 주세요.</div>';
     } catch (e) {
-      el.innerHTML = `<div style="color:#fca5a5">권장 목록을 불러오지 못했습니다: ${esc((e && e.message) || String(e))}</div>`;
+      el.innerHTML = `<div style="color:var(--red-ink, #fca5a5)">권장 목록을 불러오지 못했습니다: ${esc((e && e.message) || String(e))}</div>`;
     }
   }
 

@@ -108,6 +108,34 @@ html.theme-light { --red-ink: #b3241a; }
  * --red-ink와 **같은 장치**다: 다크=폴백(원래 색 유지) · 흰 테마=여기서 잉크.
  * ⚠ 화면 :root에 이 토큰들을 정의하면 장치가 통째로 깨진다(위 --red-ink 경고와 같은 이유). */
 html.theme-light { --cov-in-ink: #0f6b4f; --cov-ven-ink: #8a5a08; --cov-gap-ink: #b3241a; }
+/* ── 잉크 토큰 전면 확장(2026-08-30 검토관 배색 12건 + 전수 스캔 68곳) ─────────────
+ * --red-ink와 **똑같은 장치**다: 여기 한 곳만 정의 → 다크는 폴백(원색 그대로), 흰 테마만 잉크.
+ * ⚠ 왜 --teal·--amber·--purple·--blue-light를 그냥 못 쓰나: 그 넷은 **화면 :root가 정의**한다
+ *   (51개 화면이 --muted-2를, 전 화면이 --teal/--amber/--purple을). 토큰이 정의돼 있으면
+ *   var(--teal, #8fe3c0)의 폴백은 **무시**되고 다크 글자색이 조용히 딴 색으로 바뀐다 —
+ *   2026-08-21 검토관 A①(게시 차단급, 살몬 66곳이 진빨강으로 어두워짐)과 같은 조건이다.
+ * ⚠ 화면 :root에 이 토큰들을 정의하면 장치가 통째로 깨진다(themecolors.test가 막는다).
+ * 값 대비(흰 #ffffff / 패널2 #f2efe9): teal 6.57/5.73 · amber 6.50/5.66 · blue 8.14/7.09 ·
+ * purple 8.98/7.83 · muted 5.97/5.20 — 전부 AA(4.5:1) 통과. */
+html.theme-light {
+  --teal-ink: #086b43;
+  --amber-ink: #8f4d02;
+  --blue-ink: #1d4f91;
+  --purple-ink: #5b21b6;
+  --muted-ink: #6b6259;
+}
+/* 불투명 다크 배지 2종 — 색만 바꿔서는 안 되는 자리(어두운 배경이 흰 바탕에 그대로 남는다).
+ * .g-b-* 반전 공식(옅은 배경+잉크 글자)을 따른다. ⚠ 선택자를 좁게 — 맨 `.lv`는 office.html에도
+ * 있다(그쪽은 theme-light를 안 달지만, 이름이 겹치는 채로 두면 다음 사람이 밟는다). */
+html.theme-light .plan-cand .lv.p0 { background: #fdeceb; color: #b3241a; }
+html.theme-light .plan-cand .lv.p1 { background: #fdf1e2; color: #8f4d02; }
+/* 인라인 style=로 그린 다크 주의 상자(설정의 개조본 경고 2곳) — 인라인은 이 층이 규칙으로는
+ * 못 이긴다(!important 없이는). 그래서 **값**을 토큰으로 받게 했다: 다크=폴백 원색, 라이트=옅은 판.
+ * .g-b-high 반전 공식과 같은 계열 값. */
+html.theme-light { --amber-box-ink: #fdf1e2; --amber-boxbd-ink: #e8d3a8; }
+/* KEV 배지 — 흰 글자 + 밝은 빨강 채움(#e5484d)은 11px에서 3.91:1로 AA에 못 미친다(실화면 실측
+ * tools/contrast-probe.mjs). 채움을 잉크 빨강으로 낮추면 흰 글자가 6.6:1이 된다. */
+html.theme-light .mv-kev { background: #b3241a; }
 html.theme-light { --text-strong: #1f1b14;
   --rail-alert: #b3261e; /* 절차 레일 경고 글자 — 흰 바탕 대비용(다크는 폴백 #f5928a) */ }
 /* 활성 토글·탭(옅은 파랑 배경+흰 글자였던 것) — 검정도 읽히지만 .dc-seg 선례대로 파랑 잉크 */

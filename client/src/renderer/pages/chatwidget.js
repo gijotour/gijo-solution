@@ -56,10 +56,10 @@
       // 닫힌 상태는 완전히 숨긴다 — 예전엔 우하단 "🤖 챗봇" 알약이 떠 있었으나,
       // 여는 입구를 좌측 메뉴의 🤖 아이콘 하나로 일원화했다(2026-07-24).
       ".gcw.collapsed{display:none;}" +
-      ".gcw-head{font-size:13.5px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;}" +
+      ".gcw-head{font-size:13.5px;font-weight:800;color:var(--text-strong, #fff);display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;}" +
       ".gcw-head .gcw-title{display:flex;align-items:center;gap:6px;}" +
       ".gcw-toggle{cursor:pointer;font-size:12.25px;color:var(--muted,#b3ada4);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:20px;padding:3px 10px;flex-shrink:0;}" +
-      ".gcw-toggle:hover{color:#fff;border-color:var(--blue,#3b82f6);}" +
+      ".gcw-toggle:hover{color:var(--text-strong, #fff);border-color:var(--blue,#3b82f6);}" +
       ".gcw-body{display:flex;flex-direction:column;flex:1;min-height:0;}" +
       ".gcw-sub{font-size:12px;color:var(--muted-2,#a49d95);margin-bottom:10px;}" +
       ".gcw-guide{background:var(--panel-2,#1f1e1d);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12.25px;color:var(--muted,#b3ada4);line-height:1.7;flex-shrink:0;}" +
@@ -77,7 +77,7 @@
       // 확인 후 실행 — 쓰기 작업은 답만 하고 끝내지 않고, 무엇을 어떤 값으로 실행할지 카드로
       // 보여 준 뒤 승인해야 실행한다(대시보드 지휘 콘솔의 결재판과 같은 규약).
       ".gcw-ap{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.42);border-radius:10px;padding:10px 12px;font-size:12.5px;}" +
-      ".gcw-ap-head{font-weight:800;color:#f3c06a;margin-bottom:3px;}" +
+      ".gcw-ap-head{font-weight:800;color:var(--amber-ink, #f3c06a);margin-bottom:3px;}" +
       ".gcw-ap-intro{color:var(--muted,#b3ada4);font-size:12px;margin-bottom:8px;line-height:1.6;}" +
       // 결재판 필드 — 지휘소(console.js)와 **같은 3열 그리드**(2026-08-20 승인 시안
       // screen-rows-unify §3). 한쪽만 고치면 같은 창이 자리마다 다르게 보인다.

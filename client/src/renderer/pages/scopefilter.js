@@ -93,7 +93,7 @@
       var 감춘 = Math.max(0, (전체 || 0) - (보임 || 0));
       el.style.display = "flex";
       el.innerHTML =
-        '<span>🗂 <b style="color:#bcd7ff">' + esc(범위.label) + "</b>만 보는 중</span>" +
+        '<span>🗂 <b style="color:var(--blue-ink, #bcd7ff)">' + esc(범위.label) + "</b>만 보는 중</span>" +
         '<span style="color:var(--muted-2,#a49d95)">' + 보임 + "건 표시" +
         (감춘 ? " · 다른 자산 " + 감춘 + "건 숨김" : "") + "</span>" +
         '<button type="button" id="gijoScopeAll" style="margin-left:auto;background:var(--panel-2,#1f1e1d);' +
@@ -118,7 +118,7 @@
       el.style.background = "rgba(240,160,32,.08)";
       el.style.borderColor = "rgba(240,160,32,.4)";
       el.innerHTML =
-        '<span>🗂 <b style="color:#f0c060">' + esc(범위.label) + "</b> 범위가 걸려 있지만 " +
+        '<span>🗂 <b style="color:var(--amber-ink, #f0c060)">' + esc(범위.label) + "</b> 범위가 걸려 있지만 " +
         '<b>이 화면은 전체를 보여 줍니다</b></span>' +
         '<span style="color:var(--muted-2,#a49d95)">' + esc(이유 || "자산별로 나눌 수 없는 자료입니다") + "</span>";
     },

@@ -37,7 +37,7 @@
       ".gijo-ln .a{display:flex;gap:6px;}" +
       ".gijo-ln button{border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;" +
       "border:1px solid var(--border-strong,rgba(255,255,255,.16));background:var(--panel-2,#1f1e1d);color:var(--text,#e9e7e2);}" +
-      ".gijo-ln button.go{background:rgba(30,185,128,.16);border-color:#1eb980;color:#6ee7a0;}";
+      ".gijo-ln button.go{background:rgba(30,185,128,.16);border-color:#1eb980;color:var(--teal-ink, #6ee7a0);}";
     document.head.appendChild(s);
   }
 

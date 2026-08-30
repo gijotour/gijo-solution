@@ -80,14 +80,14 @@
   /* 고정 어두운 상자(.tb-menu #35342f) 안 — 토큰 금지(2026-08-21 검토관 ②, syslog와 같은 부류) */
   .tb-mi{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12px;color:#e9e7e2;cursor:pointer;white-space:nowrap;}
   .tb-mi:hover{background:rgba(255,255,255,.05);}
-  .tb-mi.on{background:rgba(59,130,246,.15);color:#fff;font-weight:700;}
+  .tb-mi.on{background:rgba(59,130,246,.15);color:var(--text-strong, #fff);font-weight:700;}
   .tb-mi .cn{margin-left:auto;color:#a49d95;font-size:12px;}
   .tb-active{display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:7px 11px;font-size:12.5px;}
   .tb-active.cols{background:rgba(255,255,255,.03);border-color:var(--border);}
   .tb-active .lb{color:var(--muted-2);font-weight:700;margin-right:2px;}
-  .tb-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.45);border-radius:20px;padding:3px 6px 3px 11px;color:#dfe9ff;font-weight:600;margin-right:6px;}
+  .tb-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.45);border-radius:20px;padding:3px 6px 3px 11px;color:var(--text-strong, #dfe9ff);font-weight:600;margin-right:6px;}
   .tb-chip .x{color:var(--blue-light);font-size:12px;cursor:pointer;padding:0 3px;}
-  .tb-chip.warn{background:rgba(226,72,61,.14);border-color:rgba(226,72,61,.45);color:#ffb3ac;}
+  .tb-chip.warn{background:rgba(226,72,61,.14);border-color:rgba(226,72,61,.45);color:var(--red-ink, #ffb3ac);}
   .tb-chip.col{background:rgba(255,255,255,.06);border-color:var(--border-strong);color:var(--text);}
   .tb-chip.col .x{color:var(--muted-2);}
   .tb-clear{margin-left:auto;color:var(--muted);cursor:pointer;font-weight:600;}
@@ -185,7 +185,7 @@
   .cov-tab.on{color:var(--blue-light);border-bottom-color:var(--blue);}
   .cov-tab .cnt{font-size:12px;font-weight:800;background:rgba(255,255,255,0.09);color:var(--muted);padding:1px 7px;border-radius:20px;}
   .cov-tab.on .cnt{background:rgba(59,130,246,0.18);color:var(--blue-light);}
-  .cov-tab .cnt.warn{background:rgba(226,72,61,0.18);color:#ff8a80;}
+  .cov-tab .cnt.warn{background:rgba(226,72,61,0.18);color:var(--red-ink, #ff8a80);}
   /* ── 보안 지형도(🗺 지도 탭) — 시안 security-map-v1 ── */
   .mv-chips{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:12px;}
   .mv-chip{border:1px solid var(--border);border-radius:12px;padding:3px 11px;color:var(--muted);cursor:pointer;}
@@ -206,7 +206,7 @@
   .mv-kev{position:absolute;top:-6px;right:-6px;background:#e5484d;color:#fff;border-radius:8px;font-size:11px;padding:1px 5px;font-weight:800;}
   .mv-high{background:rgba(229,72,77,.30);color:var(--red-ink, #ffd7d8);}
   .mv-mid{background:rgba(240,160,32,.26);color:var(--amber, #ffe9c4);}
-  .mv-low{background:rgba(70,167,88,.22);color:#d2f2da;}
+  .mv-low{background:rgba(70,167,88,.22);color:var(--teal-ink, #d2f2da);}
   .mv-ai{outline:1px dashed rgba(139,124,240,.55);}
   .mv-map{position:relative;} /* 오버레이 SVG 기준 */
   .mv-overlay{position:absolute;inset:0;pointer-events:none;z-index:5;}
@@ -240,8 +240,8 @@
 
   /* 결손 배지 — 목록 행에 붙는다 */
   .gapbadge{display:inline-block;font-size:11.75px;font-weight:800;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;}
-  .gapbadge.owner{color:#ff8a80;background:rgba(226,72,61,0.18);}
-  .gapbadge.unscanned{color:#ff8a80;background:rgba(226,72,61,0.18);}
+  .gapbadge.owner{color:var(--red-ink, #ff8a80);background:rgba(226,72,61,0.18);}
+  .gapbadge.unscanned{color:var(--red-ink, #ff8a80);background:rgba(226,72,61,0.18);}
   .gapbadge.service{color:var(--amber, #f7c777);background:rgba(240,160,32,0.16);}
   .gapbadge.sbom{color:var(--amber, #f7c777);background:rgba(240,160,32,0.16);}
   .why-cell{font-size:12.5px;color:var(--muted);}
@@ -261,7 +261,7 @@
   .ad-cell .l{font-size:11.5px;color:var(--muted-2);} .ad-cell .v{font-size:12.75px;font-weight:700;margin-top:1px;}
   .ad-sec{margin-top:7px;} .ad-sec .h{font-size:11.75px;color:var(--muted);font-weight:700;margin-bottom:4px;}
   .ad-row{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:12.25px;border-bottom:1px solid rgba(255,255,255,.04);}
-  .ad-row .code{font-size:11.25px;font-weight:800;color:#c9b8ff;background:rgba(139,124,240,.14);padding:1px 6px;border-radius:5px;flex:0 0 auto;}
+  .ad-row .code{font-size:11.25px;font-weight:800;color:var(--purple-ink, #c9b8ff);background:rgba(139,124,240,.14);padding:1px 6px;border-radius:5px;flex:0 0 auto;}
   .ad-tag{font-size:11px;font-weight:800;padding:1px 6px;border-radius:5px;flex:0 0 auto;}
   .ad-tag.critical{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);}
   .ad-tag.high{background:rgba(247,199,119,.14);color:var(--amber, #f7c777);}
@@ -313,7 +313,7 @@
       <!-- 「자산 통합 뷰」에서 옮겨 온 3지표(2026-08-02 화면 통합). 같은 자산을 두 화면에서
            보던 것을 하나로 합쳤다 — 두 화면의 숫자가 다르면 담당자는 둘 다 못 믿는다. -->
       <div class="kpi-mini"><div class="kpi-mini-label">종합 노출도</div><div class="kpi-mini-value" id="kpiExposure">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">AI 위험(미대응)</div><div class="kpi-mini-value" id="kpiOwasp" style="color:#c9b8ff">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">AI 위험(미대응)</div><div class="kpi-mini-value" id="kpiOwasp" style="color:var(--purple-ink, #c9b8ff)">-</div></div>
       <div class="kpi-mini"><div class="kpi-mini-label">미조치 취약점</div><div class="kpi-mini-value" id="kpiOpenVuln">-</div></div>
     </div>
 
@@ -773,7 +773,7 @@
       maintBadge: maintByAsset[a.id]
         ? ` <span data-open-ops="${esc(a.name)}" title="이 자산의 유지보수 점검 — 운영 가이드로 이동" style="cursor:pointer;font-size:12px;font-weight:700;color:${maintByAsset[a.id].overdue ? "#f5928a" : "var(--blue-light)"};background:rgba(59,130,246,0.14);padding:1px 7px;border-radius:6px;">🔧 점검 ${maintByAsset[a.id].total}${maintByAsset[a.id].overdue ? ` · 지연 ${maintByAsset[a.id].overdue}` : ""}</span>`
         : "",
-      kevBadge: risk.kev ? ` <span title="실제 악용이 확인된 취약점(CISA KEV) 포함 — 최우선" style="font-size:12px;font-weight:800;color:#ff8a80;background:rgba(226,72,61,0.2);border:1px solid rgba(226,72,61,0.5);padding:1px 7px;border-radius:6px;">🔴 KEV</span>` : "",
+      kevBadge: risk.kev ? ` <span title="실제 악용이 확인된 취약점(CISA KEV) 포함 — 최우선" style="font-size:12px;font-weight:800;color:var(--red-ink, #ff8a80);background:rgba(226,72,61,0.2);border:1px solid rgba(226,72,61,0.5);padding:1px 7px;border-radius:6px;">🔴 KEV</span>` : "",
       os: a.components && a.components.length ? a.components[0].name : (isHost ? "—" : a.path),
       action: isHost
         // ⚠ 툴팁이 "이 호스트의 취약점"이라고 약속하므로 **그 호스트 id를 실어 보낸다**.
@@ -800,7 +800,7 @@
         ? `<span class="dfa-set" data-dfa="${esc(a.id)}" title="눌러서 변경">${esc(a.defaultAssignee)}</span>`
         : `<span class="dfa-none" data-dfa="${esc(a.id)}" title="눌러서 지정 — 새 취약점이 이 사람에게 자동 배정됩니다">＋ 지정</span>`;
       case "category": return a.category
-        ? `<span class="type-badge" style="cursor:pointer;background:rgba(139,124,240,.16);color:#b9aef5" data-set-cat="${a.id}" title="카테고리 변경">${esc(a.category)}</span>`
+        ? `<span class="type-badge" style="cursor:pointer;background:rgba(139,124,240,.16);color:var(--purple-ink, #b9aef5)" data-set-cat="${a.id}" title="카테고리 변경">${esc(a.category)}</span>`
         : `<span class="sbom-pending" style="cursor:pointer" data-set-cat="${a.id}" title="카테고리 지정">＋지정</span>`;
       case "risk": return `<span class="risk-badge risk-${ctx.risk.level === "none" ? "low" : ctx.risk.level}"><span class="risk-dot"></span>${ctx.risk.label}</span>`;
       case "why": return ctx.whyCell;
@@ -928,14 +928,14 @@
       const ex = document.getElementById("kpiExposure");
       if (ex) {
         ex.textContent = s2.overallExposure;
-        ex.style.color = s2.overallExposure >= 45 ? "#f5928a" : s2.overallExposure >= 18 ? "#8fb8ff" : "#6fdcb5";
+        ex.style.color = s2.overallExposure >= 45 ? "var(--red-ink, #f5928a)" : s2.overallExposure >= 18 ? "var(--blue-ink, #8fb8ff)" : "var(--teal-ink, #6fdcb5)";
       }
       const ow = document.getElementById("kpiOwasp");
       if (ow) ow.textContent = (s2.owaspOpenByCode || []).reduce((a, x) => a + (x.count || 0), 0);
       const ov = document.getElementById("kpiOpenVuln");
       if (ov) {
         ov.textContent = s2.vuln.open;
-        ov.style.color = s2.vuln.critical > 0 ? "#f5928a" : s2.vuln.open > 0 ? "#f7c777" : "#6fdcb5";
+        ov.style.color = s2.vuln.critical > 0 ? "var(--red-ink, #f5928a)" : s2.vuln.open > 0 ? "var(--amber-ink, #f7c777)" : "var(--teal-ink, #6fdcb5)";
       }
     } catch (e) { /* 못 받으면 "-" 그대로 둔다 */ }
   }
@@ -1351,7 +1351,7 @@
   }
 
   const IMPACT = {
-    high: { label: "높음", color: "#f5928a", bg: "rgba(226,72,61,0.14)" },
+    high: { label: "높음", color: "var(--red-ink, #f5928a)", bg: "rgba(226,72,61,0.14)" },
     mid: { label: "중간", color: "var(--amber)", bg: "rgba(240,160,32,0.14)" },
     low: { label: "낮음", color: "var(--blue-light)", bg: "rgba(59,130,246,0.14)" },
     none: { label: "정상", color: "var(--teal)", bg: "rgba(30,185,128,0.14)" },

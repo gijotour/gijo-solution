@@ -40,7 +40,7 @@
       ".cs-head{position:relative;}", // ⋯ 팝업(.cx-pop)의 기준 좌표
       ".cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}",
       ".cs-btn{flex:0 0 auto;font-size:12.25px;font-weight:700;color:var(--muted,#b3ada4);background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap;}",
-      ".cs-btn:hover{color:#fff;border-color:var(--blue,#3b82f6);}",
+      ".cs-btn:hover{color:var(--text-strong, #fff);border-color:var(--blue,#3b82f6);}",
       // 대화는 **아래에 붙인다**(2026-08-02 사용자 지적 "대화창 아래 빈칸?").
       // 대화가 짧으면 아래가 238px 비어 있었고, 새 답변이 입력칸에서 멀리 떨어져 나왔다.
       // ⚠ justify-content:flex-end로 밀면 대화가 길어졌을 때 **위가 잘려 못 올라간다**(크롬 알려진 문제).
@@ -68,7 +68,7 @@
       ".ce-div{font-size:11.5px;color:var(--muted-2,#a49d95);margin-top:4px;}",
       ".ce-mrow{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;max-width:640px;}",
       ".ce-mrow .mchip{background:transparent;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:9px;padding:6px 12px;font-size:12.25px;color:var(--muted,#b3ada4);cursor:pointer;}",
-      ".ce-mrow .mchip:hover{color:#fff;border-color:var(--blue,#3b82f6);}",
+      ".ce-mrow .mchip:hover{color:var(--text-strong, #fff);border-color:var(--blue,#3b82f6);}",
       ".cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);}",
       ".cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:12.25px;}",
       ".cs-row.instr .ci{background:rgba(30,185,128,.16);}",
@@ -140,7 +140,7 @@
       ".cs-addbox input{flex:1 1 200px;min-width:0;background:var(--bg,#262624);border:1px solid var(--border-strong,rgba(255,255,255,.18));",
       "border-radius:8px;padding:7px 10px;color:var(--text,#e9e7e2);font-size:12.5px;outline:none;font-family:inherit;}",
       ".cs-addbox button{font-size:12px;font-weight:800;border-radius:8px;padding:7px 12px;cursor:pointer;border:1px solid rgba(59,130,246,.5);",
-      "background:rgba(59,130,246,.18);color:#fff;font-family:inherit;flex:0 0 auto;}",
+      "background:rgba(59,130,246,.18);color:var(--text-strong, #fff);font-family:inherit;flex:0 0 auto;}",
       ".cs-addbox button.ghost{background:transparent;border-color:var(--border-strong,rgba(255,255,255,.18));color:var(--muted,#b3ada4);}",
       ".cs-addbox .hint{flex:1 1 100%;font-size:11.75px;color:var(--muted-2,#a49d95);}",
       ".cs-del{margin-left:auto;font-size:12px;opacity:.55;flex:0 0 auto;}",
@@ -258,8 +258,8 @@
       ".cs-gchip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line,#3a4350);border-radius:12px;padding:1px 9px;font-size:11px;cursor:default;max-width:100%;}",
       ".cs-gchip .gx{cursor:pointer;font-weight:700;opacity:.65;}",
       ".cs-gchip .gx:hover{opacity:1;}",
-      ".cs-gchip.gdoc{color:#5fb98a;border-color:#5fb98a55;}",
-      ".cs-gchip.gses{color:#7ea6e8;border-color:#7ea6e855;}",
+      ".cs-gchip.gdoc{color:var(--teal-ink, #5fb98a);border-color:#5fb98a55;}",
+      ".cs-gchip.gses{color:var(--blue-ink, #7ea6e8);border-color:#7ea6e855;}",
       ".cs-glabel{font-size:11px;color:var(--mut,#8a93a0);}",
       ".cs-scopeline{margin-top:3px;font-size:11px;color:var(--mut,#8a93a0);}",
       // ⚠ min-width:0 — flex 아이템의 기본값(auto)은 **입력칸이 자기 기본 크기 밑으로 안 줄게** 해서
@@ -558,7 +558,7 @@
         append("event", { icon: "📝", name: "지적 접수", message: "접수했습니다. 사람이 검토 후 검사 문항으로 씁니다(자동 반영 아님)." });
       } catch (e) {
         hint.textContent = "보내지 못했습니다: " + ((e && e.message) || e);
-        hint.style.color = "#f5928a";
+        hint.style.color = "var(--red-ink, #f5928a)";
       }
     };
   }
@@ -617,7 +617,7 @@
       });
       box.innerHTML =
         '<div style="font-size:11.5px;color:var(--muted-2,#a49d95);margin-bottom:3px">' + esc(q.documentId || "") + "</div>" +
-        '<div style="font-size:12.25px;line-height:1.75;color:#cdd4e6">' + txt + "</div>";
+        '<div style="font-size:12.25px;line-height:1.75;color:var(--text-strong, #cdd4e6)">' + txt + "</div>";
       body.appendChild(box);
     });
 

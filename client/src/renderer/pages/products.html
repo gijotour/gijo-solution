@@ -142,8 +142,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .del-doc:last-child{border-bottom:none;}
 .del-doc .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .del-tag{font-size:12px;border-radius:5px;padding:2px 7px;white-space:nowrap;font-weight:700;flex:none;}
-.del-tag.del{background:rgba(226,72,61,.15);color:#ff8b80;border:1px solid rgba(226,72,61,.35);}
-.del-tag.keep{background:rgba(30,185,128,.13);color:#4fd6a4;border:1px solid rgba(30,185,128,.3);}
+.del-tag.del{background:rgba(226,72,61,.15);color:var(--red-ink, #ff8b80);border:1px solid rgba(226,72,61,.35);}
+.del-tag.keep{background:rgba(30,185,128,.13);color:var(--teal-ink, #4fd6a4);border:1px solid rgba(30,185,128,.3);}
 .del-shared{font-size:12.25px;color:var(--muted-2);padding:3px 0 0 12px;}
 .del-opts{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;}
 .del-opt{display:flex;gap:9px;align-items:flex-start;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 11px;cursor:pointer;}
@@ -154,7 +154,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .del-opt.danger.on .rd{border-color:var(--red);box-shadow:inset 0 0 0 3px var(--red);}
 .del-opt .ot{font-size:12.5px;font-weight:700;}
 .del-opt .od{font-size:12.5px;color:var(--muted);margin-top:1px;line-height:1.5;}
-.del-warn{display:flex;gap:8px;background:rgba(240,160,32,.1);border:1px solid rgba(240,160,32,.3);border-radius:9px;padding:9px 11px;font-size:12.5px;color:#f5c877;}
+.del-warn{display:flex;gap:8px;background:rgba(240,160,32,.1);border:1px solid rgba(240,160,32,.3);border-radius:9px;padding:9px 11px;font-size:12.5px;color:var(--amber-ink, #f5c877);}
 </style>
 <script src="viz.js"></script>
 </head>
@@ -443,7 +443,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const hint = panel.querySelector(`[data-fdraft-hint="${pid}"]`);
     const btn = panel.querySelector(`[data-fdraft-run="${pid}"]`);
     const file = fileInput.files[0];
-    if (!file) { hint.style.color = "#f5928a"; hint.textContent = "먼저 매뉴얼 파일을 선택하세요."; return; }
+    if (!file) { hint.style.color = "var(--red-ink, #f5928a)"; hint.textContent = "먼저 매뉴얼 파일을 선택하세요."; return; }
     btn.disabled = true; hint.style.color = "var(--muted-2)"; hint.textContent = "AI가 매뉴얼에서 항목을 뽑는 중...";
     try {
       const content = await fileToBase64(file);
@@ -456,7 +456,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       hint.style.color = "var(--teal)";
       hint.textContent = "✓ 초안을 채웠습니다 — 확인 후 저장하세요.";
     } catch (e) {
-      hint.style.color = "#f5928a";
+      hint.style.color = "var(--red-ink, #f5928a)";
       hint.textContent = "✗ 초안 생성 실패: " + ((e && e.message) || e);
     } finally {
       btn.disabled = false;
@@ -941,8 +941,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <div><div class="ot">지식베이스에 남기기</div>
                <div class="od">제품 등록부에서만 뺍니다. 매뉴얼은 그대로 두고 나중에 다른 제품에 붙일 때 고릅니다.</div></div></div>
         <div class="del-opt danger" data-mode="file"><span class="rd"></span>
-          <div><div class="ot" style="color:#ff8b80">원본 파일까지 완전 삭제</div>
-               <div class="od">서버 디스크의 원본 문서까지 지웁니다. <b style="color:#ff8b80">되돌릴 수 없습니다.</b> 퇴역 장비 자료를 흔적 없이 없앨 때만 쓰세요.</div></div></div>
+          <div><div class="ot" style="color:var(--red-ink, #ff8b80)">원본 파일까지 완전 삭제</div>
+               <div class="od">서버 디스크의 원본 문서까지 지웁니다. <b style="color:var(--red-ink, #ff8b80)">되돌릴 수 없습니다.</b> 퇴역 장비 자료를 흔적 없이 없앨 때만 쓰세요.</div></div></div>
       </div>
       <div class="del-warn">⚠ <span>업로드로 올린 문서는 서버에 원본이 없어, <b>지식베이스에서 지우면 그게 곧 완전 삭제</b>입니다. 원본 파일을 갖고 계신지 확인하세요.</span></div>
     </div>

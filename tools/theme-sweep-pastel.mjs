@@ -50,6 +50,63 @@ const MAP = [
   ["#cfe8d6", "var(--text, #cfe8d6)"],
   ["#f0a020", "var(--amber, #f0a020)"],
   ["#8b7cf0", "var(--purple, #8b7cf0)"],
+
+  // ── 2026-08-30 확장(검토관 배색 12건 + 밝기 계산 전수 스캔 68곳) ─────────────────
+  // ⚠ 여기부터는 **-ink 토큰만** 쓴다. 위 옛 항목들이 쓴 --teal·--amber·--blue-light·--purple은
+  //   화면 :root가 정의하는 토큰이라 폴백이 무시되고 **다크 색이 조용히 바뀐다**(2026-08-21 A①
+  //   계보 — agent.html:314가 실제로 그렇게 #7db2f8에서 #5fa1ff로 드리프트해 있었다).
+  //   -ink 토큰은 pro-white 한 곳만 정의 → 다크=폴백 원색 유지.
+  // 빨강·살몬(경고·심각·오류)
+  ["#ff8a80", "var(--red-ink, #ff8a80)"],
+  ["#ff8b80", "var(--red-ink, #ff8b80)"],
+  ["#fca5a5", "var(--red-ink, #fca5a5)"],
+  ["#f5a8a1", "var(--red-ink, #f5a8a1)"],
+  ["#ffb3ac", "var(--red-ink, #ffb3ac)"],
+  ["#ffb0a8", "var(--red-ink, #ffb0a8)"],
+  ["#ff9d97", "var(--red-ink, #ff9d97)"],
+  ["#f87171", "var(--red-ink, #f87171)"],
+  ["#ff5a4d", "var(--red-ink, #ff5a4d)"],
+  // 초록·민트(정상·완료·대응)
+  ["#4ade80", "var(--teal-ink, #4ade80)"],
+  ["#6ee7a0", "var(--teal-ink, #6ee7a0)"],
+  ["#8fe3c0", "var(--teal-ink, #8fe3c0)"],
+  ["#5fd4a6", "var(--teal-ink, #5fd4a6)"],
+  ["#4fd6a4", "var(--teal-ink, #4fd6a4)"],
+  ["#7ee0b8", "var(--teal-ink, #7ee0b8)"],
+  ["#d2f2da", "var(--teal-ink, #d2f2da)"],
+  ["#5fb98a", "var(--teal-ink, #5fb98a)"],
+  ["#1eb980", "var(--teal-ink, #1eb980)"],
+  // 호박·주황(주의·중간 등급)
+  ["#fbbf24", "var(--amber-ink, #fbbf24)"],
+  ["#f0c060", "var(--amber-ink, #f0c060)"],
+  ["#f3c06a", "var(--amber-ink, #f3c06a)"],
+  ["#c9a227", "var(--amber-ink, #c9a227)"],
+  ["#f4b350", "var(--amber-ink, #f4b350)"],
+  ["#f5b942", "var(--amber-ink, #f5b942)"],
+  ["#f5bb55", "var(--amber-ink, #f5bb55)"],
+  ["#f5c877", "var(--amber-ink, #f5c877)"],
+  ["#f7a86a", "var(--amber-ink, #f7a86a)"],
+  ["#e8823c", "var(--amber-ink, #e8823c)"],
+  // 보라(분류·태그)
+  ["#b9aef5", "var(--purple-ink, #b9aef5)"],
+  ["#c9b8ff", "var(--purple-ink, #c9b8ff)"],
+  ["#a99cf5", "var(--purple-ink, #a99cf5)"],
+  ["#b3a7ee", "var(--purple-ink, #b3a7ee)"],
+  ["#b0a4ff", "var(--purple-ink, #b0a4ff)"],
+  ["#bc8cff", "var(--purple-ink, #bc8cff)"],
+  // 파랑 강조
+  ["#bcd3ff", "var(--blue-ink, #bcd3ff)"],
+  ["#bcd7ff", "var(--blue-ink, #bcd7ff)"],
+  ["#7db2f8", "var(--blue-ink, #7db2f8)"],
+  ["#7ea6e8", "var(--blue-ink, #7ea6e8)"],
+  // 근백색 본문(다크 전제 밝은 글자)
+  ["#dfe8f7", "var(--text-strong, #dfe8f7)"],
+  ["#dfe9ff", "var(--text-strong, #dfe9ff)"],
+  ["#cdd4e6", "var(--text-strong, #cdd4e6)"],
+  ["#cdd7e0", "var(--text-strong, #cdd7e0)"],
+  // 회청 보조(가장 흐린 글자)
+  ["#c3cad9", "var(--muted-ink, #c3cad9)"],
+  ["#aab2c6", "var(--muted-ink, #aab2c6)"],
 ];
 
 const targets = [

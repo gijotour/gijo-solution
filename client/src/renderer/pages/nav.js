@@ -382,7 +382,7 @@
       + ".gj-row>.bd .t{color:var(--text,#e9e7e2);font-weight:600;}"
       + ".gj-row>.bd .s{color:var(--muted-2,#a49d95);font-size:12px;margin-left:7px;}"
       + ".gj-row>.rt{color:var(--muted-2,#a49d95);font-size:12px;white-space:nowrap;flex:0 0 auto;}"
-      + ".gj-row>.rt b{color:#fff;font-weight:800;font-size:12.5px;}"
+      + ".gj-row>.rt b{color:var(--text-strong, #fff);font-weight:800;font-size:12.5px;}"
       + ".gj-tag{font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;white-space:nowrap;flex:0 0 auto;}"
       + ".gj-tag.t-red{background:rgba(226,72,61,.16);color:var(--red-ink,#f5928a);}"
       + ".gj-tag.t-amber{background:rgba(240,160,32,.16);color:var(--amber,#f0a020);}"
@@ -458,7 +458,7 @@
       + "display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;"
       + "background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);"
       + "color:var(--muted-2,#a49d95);font-size:12px;line-height:1;}"
-      + ".gj-detail-x:hover{background:rgba(226,72,61,.3);color:#fff;border-color:rgba(226,72,61,.6);}"
+      + ".gj-detail-x:hover{background:rgba(226,72,61,.3);color:var(--text-strong, #fff);border-color:rgba(226,72,61,.6);}"
       + ".gj-detail .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;}"
       + ".gj-detail .acts button,.gj-detail .acts a{background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));" +
         "color:var(--blue-light,#5fa1ff);border-radius:7px;padding:4px 11px;font-size:11.75px;font-weight:700;" +
@@ -522,7 +522,7 @@
         "body.gn-left-collapsed .body-grid.no-right{grid-template-columns:1fr !important;}") +
       ".gn-seg{display:flex;background:#1f1e1d;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}" +
       ".gn-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:12.25px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}" +
-      ".gn-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}" +
+      ".gn-seg span.on{background:rgba(59,130,246,.22);color:var(--text-strong, #fff);border-color:rgba(59,130,246,.5);}" +
       ".gn-pin{flex:0 0 auto;padding:8px 6px 0;}" +
       ".gn-mid{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 6px 8px;}"
       + "#gijoNav .gtb-userarea{flex:0 0 auto;position:sticky;bottom:0;background:var(--panel-2,#1f1e1d);}" +
@@ -577,9 +577,9 @@
       ".gn-item:hover .gn-ic{opacity:.95;}" +
       ".gn-item.active .gn-ic{opacity:1;color:var(--blue-light,#5fa1ff);}" +
       ".gn-g .gn-ic{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.5;opacity:.6;flex:0 0 auto;}" +
-      ".gn-item:hover{color:#fff;background:rgba(255,255,255,.04);}" +
+      ".gn-item:hover{color:var(--text-strong, #fff);background:rgba(255,255,255,.04);}" +
       // 지금 있는 곳 — 배경을 옅게 두고 **왼쪽 얇은 막대 하나**로 말한다(파란 판을 깔면 그 줄만 튄다).
-      ".gn-item.active{color:#fff;background:rgba(255,255,255,.055);font-weight:600;cursor:default;}" +
+      ".gn-item.active{color:var(--text-strong, #fff);background:rgba(255,255,255,.055);font-weight:600;cursor:default;}" +
       ".gn-item.active::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--blue-light,#5fa1ff);}" +
       ".gn-item .gn-label{flex:1;overflow:hidden;text-overflow:ellipsis;}" +
       // 그 화면의 챗봇을 여는 버튼 — 모든 항목에서 같은 자리(우측).
@@ -593,7 +593,7 @@
       // 2026-08-05: 혼자 파란 테두리 상자였다 — 맨 위 자리 자체가 이미 "집"을 말하므로
       // 상자를 걷고 글자색만 살짝 밝게 둔다(다른 줄과 같은 모양이어야 눈이 쉰다).
       ".gn-item.gn-home{color:var(--text,#e9e7e2);}" +
-      ".gn-item.gn-home:hover{background:rgba(255,255,255,.05);color:#fff;}" +
+      ".gn-item.gn-home:hover{background:rgba(255,255,255,.05);color:var(--text-strong, #fff);}" +
       // 팝업이 떠 있으면 대시보드는 "돌아갈 곳"이라 누를 수 있어야 한다(아래 클릭 처리).
       ".gn-item.gn-home.active{cursor:pointer;}" +
 
@@ -1208,8 +1208,8 @@
       "padding:0 !important;display:inline !important;}" +
       // 첫 짝은 **이름처럼 굵게** 읽혀야 한다 — 컴플라이언스 막대(「KISA 위협 21건 | …」)와
       // 같은 맛(2026-08-02 사용자가 그 화면을 가리키며 "이렇게").
-      ".gsum-pair.first .gsum-l{font-size:14.5px;color:#fff;font-weight:800;}" +
-      ".gsum-pair.first .gsum-v{font-size:17px !important;color:#fff;}" +
+      ".gsum-pair.first .gsum-l{font-size:14.5px;color:var(--text-strong, #fff);font-weight:800;}" +
+      ".gsum-pair.first .gsum-v{font-size:17px !important;color:var(--text-strong, #fff);}" +
       // 이름 뒤에 얇은 칸막이 — 제목과 곁가지가 눈으로 갈린다.
       ".gsum-pair.first{padding-right:11px;margin-right:2px;border-right:1px solid var(--border,rgba(255,255,255,.14));}" +
       ".gsum-dot{color:var(--muted-2,#a49d95);}";
@@ -1618,7 +1618,7 @@
       // 세로(피벗) 모니터를 쓰는 관제실이 있어 남겨 둔다.
       ".gijo-orient{position:fixed;top:10px;right:14px;z-index:950;background:var(--panel-2,#1f1e1d);color:var(--muted,#b3ada4);" +
       "border:1px solid var(--border,#3d3c38);border-radius:8px;font-size:12.25px;font-weight:800;padding:5px 10px;cursor:pointer;}" +
-      ".gijo-orient:hover{color:#fff;border-color:var(--blue,#3b82f6);}";
+      ".gijo-orient:hover{color:var(--text-strong, #fff);border-color:var(--blue,#3b82f6);}";
     document.head.appendChild(st);
     if (!window.gijo || !window.gijo.setPopoutOrientation) return;
     var orient = /[?&]orient=portrait(&|$)/.test(location.search) ? "portrait" : "landscape";

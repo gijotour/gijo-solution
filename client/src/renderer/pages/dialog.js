@@ -35,7 +35,7 @@
     "#gijoDlg button{font-size:12.5px;font-weight:700;border-radius:9px;padding:8px 15px;cursor:pointer;" +
     "font-family:inherit;border:1px solid transparent;}" +
     "#gijoDlg .no{background:transparent;color:var(--muted,#b3ada4);border-color:rgba(255,255,255,.16);}" +
-    "#gijoDlg .no:hover{color:#fff;}" +
+    "#gijoDlg .no:hover{color:var(--text-strong, #fff);}" +
     "#gijoDlg .ok{background:var(--blue,#3b82f6);color:#fff;}" +
     "#gijoDlg .ok:hover{filter:brightness(1.1);}" +
     "#gijoDlg .ok.danger{background:var(--red,#e2483d);}" +
