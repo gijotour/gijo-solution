@@ -1,6 +1,7 @@
 // engine/agenttools/registry.ts — TOOLS 등록표 + 공개 API(find/validate/buildApproval…)
 // (2026-08-06 agenttools.ts 분리) 핸들러 본문은 handlers.ts — 여기는 이름↔스키마 매핑과 관문만.
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
+import { watchFolderText, addWatchFolder, removeWatchFolder, watchFolderDocCount } from "../watchfolder";
 // ⚠ 레드팀 공격 개수는 **세어서** 쓴다(2026-08-18). 손으로 「14종」이라 적어 뒀는데 실제는 30종이었다 —
 //   그 문구 하나가 **살아 있는 모델에 공격을 발사하기 전 받는 동의 문구**였다.
 import { PAYLOADS } from "../redteam";
@@ -488,6 +489,77 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [],
     run: () => alertScheduleText(),
+  },
+  {
+    // 📂 지켜보는 폴더 현황(2026-08-31 사장님 「위키처럼 특정 디렉토리 지정해서 계속 확인」).
+    // 결정적 목록(alertScheduleText 관례) — 경로·건수·마지막 확인을 값 그대로, 지어낼 자리 없음.
+    name: "watch_folder_list",
+    label: "지켜보는 폴더 현황",
+    domain: "knowledge",
+    write: false,
+    description:
+      '지켜보는 폴더 목록과 최근 스캔 결과(새로 들어온 문서·건너뜀·충돌·오류)를 보여준다. "지켜보는 폴더 뭐 있어?", "폴더 감시 현황 알려줘"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: () => watchFolderText(),
+  },
+  {
+    // 📂 지켜보는 폴더 등록. ⚠ admin만(설계관 ④-1): 로그인한 누구나 **서버 파일시스템의
+    //   임의 경로**를 지식으로 퍼올리는 통로가 된다 — INGEST_ROOT가 생긴 이유가 정확히
+    //   이 구멍이었다(2026-07-19 임의 절대경로 인입 사고). knowledge_bundle_import와 같은
+    //   논리(한 사람이 전체 지식을 바꾼다). 파일럿 뒤 완화는 별도 결정.
+    name: "watch_folder_add",
+    label: "지켜보는 폴더 등록",
+    domain: "knowledge",
+    write: true,
+    requiredRole: "admin",
+    description:
+      '서버 기계의 폴더를 지정해 두면 주기적으로(기본 5분) 들여다보고 새/바뀐 문서를 지식으로 자동 반입한다. ' +
+      '"D:\\보안팀\\스캔결과 폴더 지켜봐 줘"에 쓴다. ⚠ 경로는 **서버**의 폴더다 — 분산 설치에서는 내 PC 경로가 아니다. ' +
+      '취약점 스캔 파일(CSV·XML 등)은 자동 등록하지 않고 발견만 알린다(원장은 사람 확인으로만). 예: {"path":"D:\\\\보안팀\\\\스캔결과"}',
+    params: [
+      { name: "path", label: "폴더 경로", description: "서버 기계 기준 폴더 경로(win 운영은 D:\\… 를 서버가 /mnt/…로 자동 변환)", required: true },
+      { name: "label", label: "이름표", description: "목록에 보일 이름 — 비우면 경로 그대로", required: false },
+    ],
+    // 지시문에서 경로를 뽑아 결재판에 채운다(빈 결재판 방지 — 어댑터 지시 관례).
+    autoFill: (args, instruction): Record<string, string> => {
+      if ((args.path ?? "").trim()) return {};
+      const m = String(instruction ?? "").match(/([A-Za-z]:[\\/][^\s"'「」]+|\/(?:mnt|home|srv|media|Volumes)\/[^\s"'「」]+)/);
+      return m ? { path: m[1].replace(/[.,)\]」]+$/, "") } : {};
+    },
+    run: (args) => {
+      const viewer = currentViewer();
+      const uid = viewer?.userId != null ? String(viewer.userId) : "";
+      if (!uid) return "등록한 사람을 확인하지 못해 등록하지 않았습니다 — 다시 로그인한 뒤 시도해 주세요.";
+      const 사람 = findUserById(uid);
+      const r = addWatchFolder({ path: String(args.path ?? ""), label: (args.label ?? "").trim() || undefined, userId: uid, userName: 사람?.displayName });
+      if (!r.ok) return `등록하지 못했습니다 — ${r.error}`;
+      return [
+        `📂 지켜보는 폴더로 등록했습니다 — ${r.folder.label ?? r.folder.path}`,
+        `서버 경로: ${r.folder.path}`,
+        "이제 주기적으로(기본 5분) 확인해 새/바뀐 문서를 지식으로 자동 반입합니다. 반입되면 「새로 들어온 문서 알려줘」와 내 문서 배지에 잡힙니다.",
+        "⚠ 취약점 스캔 파일(CSV·XML)은 자동 등록하지 않습니다 — 발견하면 알려 드리니 확인 후 ＋로 올려 주세요.",
+      ].join("\n");
+    },
+  },
+  {
+    // 📂 지켜보는 폴더 해제 — 등록과 같은 급(admin·결재판). 인입된 문서는 지우지 않는다.
+    name: "watch_folder_remove",
+    label: "지켜보는 폴더 해제",
+    domain: "knowledge",
+    write: true,
+    requiredRole: "admin",
+    description:
+      '지켜보는 폴더를 감시에서 뺀다(이미 반입된 문서는 지식에 그대로 남는다). "스캔결과 폴더 그만 지켜봐"에 쓴다. 번호나 경로로 지목한다 — 목록은 「지켜보는 폴더 현황」. 예: {"target":"1"}',
+    params: [
+      { name: "target", label: "폴더(번호 또는 경로)", description: "「지켜보는 폴더 현황」의 [번호] 또는 경로", required: true },
+    ],
+    run: (args) => {
+      const r = removeWatchFolder(String(args.target ?? ""));
+      // FAIL_MARKS-예외: 지목한 폴더가 등록부에 없다는 **진짜 실패 사유**다 — 다음 걸음(현황으로 번호 확인)을 함께 준다.
+      if (!r) return "그 폴더를 찾지 못했습니다 — 「지켜보는 폴더 현황」으로 번호를 확인해 주세요.";
+      return `📂 감시에서 뺐습니다 — ${r.label ?? r.path}\n이미 반입된 문서 ${watchFolderDocCount(r.id)}건은 지식에 그대로 남아 있습니다(지우려면 내 문서에서).`;
+    },
   },
   {
     // ★ 등록하는 길이 아예 없었다(2026-08-01 실측). 서버·챗봇 조회·발송은 다 만들어 뒀는데

@@ -12,6 +12,14 @@ import path from "node:path";
 vi.mock("../src/engine/autoupload", () => ({
   autoRouteUpload: vi.fn(async (filename: string) => ({ filename, routedTo: "memory", reason: "시험 모킹" })),
 }));
+// 라우팅 시험용 — 강제 경로면 LLM 호출 자체가 없어야 한다(forced-write-approval 관례).
+const mockChat = vi.fn();
+vi.mock("../src/engine/llm", () => ({
+  setRagProvider: vi.fn(), hasRagProvider: vi.fn(() => false), onChatRecorded: vi.fn(), chatLogListenerCount: vi.fn(() => 0),
+  chat: (...args: unknown[]) => mockChat(...args),
+  embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
+  registerLlmRoutes: vi.fn(),
+}));
 
 import { autoRouteUpload } from "../src/engine/autoupload";
 import { db } from "../src/db";
@@ -162,6 +170,43 @@ describe("스캔 — 2단 스킵 멱등·충돌 skip·남의 문서 보호·스�
     if (!r.ok) throw new Error("등록 실패");
     await scanWatchFolder(r.folder);
     expect(watchFolderDocCount(r.folder.id)).toBe(1);
+  });
+});
+
+describe("라우팅 — 「지정은 대화창에서」 약속을 결정적으로(dispatch 수준·설계관 ②)", () => {
+  // ⚠ forcedToolFor 단위만 재면 앞 층이 안 보여 「시험은 통과하는데 안 닿는다」(routes.ts §51
+  //   실사고) — 그래서 runAgentLoop(dispatch 수준)으로 잰다. 강제 경로면 LLM 호출이 0이어야 한다.
+  it("경로에 침해·로그 낱말이 들어도 폴더 등록 결재판으로 간다(admin 쓰기) — 초동절차가 안 가로챈다", async () => {
+    mockChat.mockReset();
+    const { runAgentLoop, resetContextForTests } = await import("../src/engine/agentloop");
+    resetContextForTests();
+    // admin 범위 — 이 도구는 admin 전용이라 role 없이는 강제 분기가 **설계대로** 비켜간다
+    // (「admin 전용 도구가 강제 분기로 새면 안 된다」 — forcedToolFor 규약).
+    const r = await runAgentLoop("내 문서에서 D:\\보안팀\\침해사고_로그 폴더를 계속 지켜봐 줘", "", { role: "admin" });
+    expect(r, "루프가 아무것도 안 돌려줬다 — LLM으로 샌다").not.toBeNull();
+    expect(r!.approval?.tool, "결재판이 안 뜬다(쓰기·admin)").toBe("watch_folder_add");
+    const 경로칸 = r!.approval!.fields.find((f) => f.key === "path");
+    expect(경로칸?.value ?? "", "autoFill이 지시문의 경로를 못 뽑았다(빈 결재판)").toContain("침해사고_로그");
+    expect(mockChat, "LLM을 불렀다 — 강제 경로가 안 먹었다").not.toHaveBeenCalled();
+  });
+  it("「지켜보는 폴더 뭐 있어?」는 결재판 없이 결정적 목록으로 답한다", async () => {
+    mockChat.mockReset();
+    const { runAgentLoop, resetContextForTests } = await import("../src/engine/agentloop");
+    resetContextForTests();
+    const r = await runAgentLoop("지켜보는 폴더 뭐 있어?");
+    expect(r).not.toBeNull();
+    expect(r!.approval, "조회가 결재판으로 샜다").toBeUndefined();
+    expect(r!.output).toContain("지켜보는 폴더");
+    expect(mockChat).not.toHaveBeenCalled();
+  });
+  it("「방화벽 로그 감시해줘」(관제 문장)는 폴더 도구를 안 삼킨다 — 홑낱말 가로채기 금지", async () => {
+    mockChat.mockReset();
+    const { runAgentLoop, resetContextForTests } = await import("../src/engine/agentloop");
+    resetContextForTests();
+    mockChat.mockResolvedValue(""); // 모델 선택으로 떨어지는 것이 정답 — LLM 목은 무해값(형식 불가→채팅 폴백)
+    const r = await runAgentLoop("방화벽 로그 감시해줘", "", { role: "admin" });
+    if (r?.approval) expect(r.approval.tool, "관제 지시가 폴더 등록 결재판으로 샜다").not.toContain("watch_folder");
+    if (r?.output) expect(r.output).not.toContain("지켜보는 폴더로 등록");
   });
 });
 
