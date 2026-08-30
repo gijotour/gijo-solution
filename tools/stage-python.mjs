@@ -407,14 +407,25 @@ try {
   //   「고객 기계에서 한글 PDF가 읽힌다」를 주장하는 것이었다 — 다른 명제다.
   //   여기서는 extract_doc.py에 진짜 PDF를 물려 **한글이 나오는지**까지 본다
   //   (stdout 격리·인코딩·zip 경로가 전부 이 한 번에 걸린다).
-  const 표본 = path.join(OUT, "_selfcheck.pdf");
-  fs.writeFileSync(표본, 표본PDF());
+  // ⚠ **표본은 진짜 한글 PDF를 쓴다**(2026-08-30 게시 중 정정). 종전엔 손으로 만든 최소 PDF를
+  //   써 왔는데, pypdf 6.x에서 그 표본이 **0자**를 돌려주기 시작해 관문이 게시를 막았다 —
+  //   그런데 같은 동봉본으로 저장소의 실제 문서는 11,751자(한글 3,654자)를 멀쩡히 뽑았다.
+  //   즉 제품이 아니라 **표본이 낡은 것**이었다. 실제 문서로 재면 그 함정이 없고 검사도 더 세다.
+  //   실제 문서가 없으면(배포물만 있는 환경) 옛 합성 표본으로 물러선다 — 그때는 0자여도
+  //   「못 쟀다」로 알리고 막지는 않는다(없는 파일 때문에 게시를 세우지 않는다).
+  const 실표본 = path.join(루트, "GIJO_AS_배포_가이드.pdf");
+  const 실표본있나 = fs.existsSync(실표본);
+  const 표본 = 실표본있나 ? 실표본 : path.join(OUT, "_selfcheck.pdf");
+  if (!실표본있나) fs.writeFileSync(표본, 표본PDF());
   const 추출기 = path.join(루트, "server", "scripts", "extract_doc.py");
   const 글 = String(execFileSync(path.join(OUT, "python.exe"), [추출기, 표본], {
-    env: 깨끗한env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 120_000,
+    env: 깨끗한env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 120_000, maxBuffer: 64 * 1024 * 1024,
   }));
-  fs.rmSync(표본, { force: true });
-  if (!/기조/.test(글)) {
+  if (!실표본있나) fs.rmSync(표본, { force: true });
+  // 합성 표본은 「기조」, 실제 문서는 한글이 넉넉히 나오는지로 본다(문서가 바뀌어도 안 깨지게).
+  const 통과 = 실표본있나 ? (글.match(/[가-힣]/g) || []).length >= 100 : /기조/.test(글);
+  if (!실표본있나) console.log("[stage-python]   ⚠ 실제 한글 PDF가 없어 합성 표본으로 쟀습니다(검사가 약합니다).");
+  if (!통과) {
     console.error(`★ 자가 검증 실패 — 동봉본이 PDF에서 한글을 못 뽑았습니다(고객 기계에서 죽는다는 뜻).\n뽑힌 글: ${JSON.stringify(글.slice(0, 200))}`);
     process.exit(1);
   }
@@ -518,8 +529,13 @@ async function 모델담기(사이트) {
     console.error("★ default_models.yaml에 onnxruntime 칸이 없습니다 — RapidOCR 구조가 바뀐 것 같습니다.");
     process.exit(1);
   }
-  const 다음칸 = 전체원문.slice(엔진칸시작 + 1).search(/^[A-Za-z_][A-Za-z0-9_]*:/m);
-  const 원문 = 다음칸 < 0 ? 전체원문.slice(엔진칸시작) : 전체원문.slice(엔진칸시작, 엔진칸시작 + 1 + 다음칸);
+  // ⚠ **`^`(/m)으로 다음 칸을 찾으면 안 된다**(2026-08-30 게시 중 발각): slice(+1)한 문자열의
+  //   **맨 앞**에도 `^`가 걸린다. 그래서 "onnxruntime:"에서 한 글자 자른 "nnxruntime:"이 스스로
+  //   다음 칸으로 잡혀 **칸이 1글자("o")로 잘렸고**, 모델을 못 찾아 빌드가 멈췄다.
+  //   줄바꿈을 명시해 그 함정을 피한다.
+  const 뒤 = 전체원문.slice(엔진칸시작);
+  const 다음칸 = 뒤.slice(1).search(/\n[A-Za-z_][A-Za-z0-9_]*:/);
+  const 원문 = 다음칸 < 0 ? 뒤 : 뒤.slice(0, 1 + 다음칸);
   // 우리가 쓰는 두 모델의 URL·sha256을 그 파일에서 뽑는다(핀은 extract_doc.py가 v5로 잡는다).
   const 필요 = ["ch_PP-OCRv5_det_mobile", "korean_PP-OCRv5_rec_mobile"];
   fs.mkdirSync(모델방, { recursive: true });
