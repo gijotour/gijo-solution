@@ -89,24 +89,18 @@ const clickMenu = async (label) => {
   }, label);
   await page.waitForTimeout(3200);
 };
-// 대표 그룹(그룹 줄=메뉴, 2026-08-09 그룹 통합) — 절차 허브는 .gn-item이 아니라 .gn-g를 누른다.
-const clickHub = async (name) => {
-  await page.evaluate((n) => {
-    const gh = [...document.querySelectorAll("#gijoNav .gn-g")].find((e) => e.querySelector(".gn-gname")?.textContent === n);
-    gh?.click();
-  }, name);
-  await page.waitForTimeout(3200);
-};
+// (clickHub — 대표 그룹 클릭 — 은 2026-08-31 5그룹 재편으로 걷었다: 절차 허브가 🩹 그룹의
+//  **항목**이 되어 clickMenu가 그대로 받는다. 대표 그룹 자체가 0개다 — nav.js 주석 참조.)
 
 // 2) 첫 실행 — 대시보드 탭 하나
 const s0 = await snap();
 ok("첫 실행에 대시보드 탭이 열려 있다", s0.탭.includes("대시보드"), s0.탭.join(" | "));
 
 // 3) 메뉴를 눌러도 셸을 떠나지 않고 탭이 늘어난다
-//    '취약점'·'조치·승인'은 허브로 흡수됐다(2026-08-09) — 대표 그룹을 눌러 허브 탭을 연다.
+//    '취약점'·'조치·승인'은 허브로 흡수됐다(2026-08-09) — 허브 항목(🩹 그룹)을 눌러 탭을 연다.
 const urlBefore = page.url();
-await clickHub("우선순위");
-await clickHub("조치");
+await clickMenu("② 우선순위");
+await clickMenu("③ 조치");
 const s1 = await snap();
 ok("메뉴 클릭이 탭으로 열린다(화면 이동 아님)", page.url() === urlBefore && s1.탭.length === 3, s1.탭.join(" | "));
 ok("보이는 프레임은 하나, 나머지는 살아서 숨는다", s1.프레임 === 3 && s1.보이는프레임 === 1, `프레임 ${s1.프레임} / 보임 ${s1.보이는프레임}`);

@@ -385,6 +385,9 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
     expect(s2, "명시 열기(dock) 신호가 없다").toContain("{ dock: true }");
     const c2 = 코드만(join(PAGES, "console.js"));
     expect(c2, "🗔가 dock 신호를 안 단다").toContain("gijoTabs.open(page, label, { dock: true })");
+    // 홈 히어로 절차 칩 — 5그룹 재편(2026-08-31)으로 단계 id가 그룹→항목으로 내려갔다.
+    // 그룹 id(g.id)로 거르면 칩이 **조용히 0개**가 된다(설계관 적발, 시험 없던 자리).
+    expect(c2, "홈 히어로 절차 칩이 항목 id(it.id)를 안 본다 — 칩 0개 부류").toMatch(/STAGE[\s\S]{0,400}it\.id/);
   });
   it("문서 허브 §6 — 신고 시한 템플릿 수신 계약(발신자 가드·템플릿 id) 소스 감시", () => {
     // 계약(승인 시안 docs-hub-v3 §6): 신고 시한 카운트다운 카드(미래)가

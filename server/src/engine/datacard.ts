@@ -337,6 +337,7 @@ export function 카드없는글로(answer: { output: string; dataCard: DataCard 
 type 화면카드종류 = "asset" | "ops" | "hardening" | "finding" | "sessions" | "fix" | "report" | "products" | "records" | "threat" | "aiteam" | "supervision" | "mydocs" | "supplychain";
 const 화면파일카드: Record<string, 화면카드종류> = {
   "assets.html": "asset",
+  "inventory.html": "asset", // 자산 관리 전체(2026-08-31 5그룹 재편 — 🧰 보안제품 관리의 독립 메뉴로 승격, 현황은 자산 카드와 동일)
   "discover.html": "ops", "analysis.html": "ops", "loganalysis.html": "ops",
   "verify.html": "hardening", "hardening.html": "hardening",
   "triage.html": "finding", "vulnscan.html": "finding",

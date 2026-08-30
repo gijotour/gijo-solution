@@ -504,17 +504,21 @@
     var 파일 = 주소.split("?")[0];
     var G = window.gijoNavGroups;
     if (!G || !G.length) return "";
+    // 후보를 한 줄로 편다: TOP(고정 4자리)이 **맨 앞** — mydocs.html·sessions.html처럼
+    // TOP에만 정확 일치가 있는 주소가 그룹의 ?tab= 변형에 밀리지 않게(2026-08-31 재편).
+    var 목록 = [];
+    var T = window.gijoNavTop || [];
+    for (var t = 0; t < T.length; t++) if (T[t] && T[t].page) 목록.push({ it: T[t], g: null });
     for (var i = 0; i < G.length; i++) {
       var items = G[i].items || [];
-      for (var j = 0; j < items.length; j++) {
-        var it = items[j];
-        if (!it || !it.page) continue;
-        // 주소 전체가 같으면 가장 좋고(패널까지 일치), 아니면 파일명으로 맞춘다.
-        if (it.page === 주소) return it.label || G[i].label || "";
-        if (String(it.page).split("?")[0] === 파일) return it.label || G[i].label || "";
-      }
-      if (G[i].page && String(G[i].page).split("?")[0] === 파일) return G[i].label || "";
+      for (var j = 0; j < items.length; j++) if (items[j] && items[j].page) 목록.push({ it: items[j], g: G[i] });
+      if (G[i].page) 목록.push({ it: G[i], g: null });
     }
+    // ⚠ **두 번 돈다** — 1차는 주소 전체 일치(패널·탭까지), 2차만 파일명 일치(2026-08-31).
+    //   한 번에 섞어 재면 verify.html?panel=hardening(🧰 보안설정 점검)을 열었는데 앞 그룹
+    //   🩹의 verify.html이 파일명으로 먼저 걸려 탭 이름이 「④ 검증」이 되는 부류가 난다.
+    for (var a = 0; a < 목록.length; a++) if (목록[a].it.page === 주소) return 목록[a].it.label || (목록[a].g && 목록[a].g.label) || "";
+    for (var b = 0; b < 목록.length; b++) if (String(목록[b].it.page).split("?")[0] === 파일) return 목록[b].it.label || (목록[b].g && 목록[b].g.label) || "";
     return "";
   }
 

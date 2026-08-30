@@ -19,16 +19,19 @@ const navSrc = fs.readFileSync(
   "utf8"
 );
 
-/** nav.js의 절차 그룹(s1-find … s5-report)에서 화면 목록을 뽑는다. */
+/** nav.js의 절차 항목(id: "s1-find" … "s5-report")에서 화면 목록을 뽑는다.
+ *  2026-08-31 5그룹 재편: 단계 id는 그룹이 아니라 🩹 취약점 업무 그룹의 **항목 한 줄**에
+ *  산다(`{ page: "discover.html", id: "s1-find", label: "① 발견·수집" }`). 그래서 id가 있는
+ *  **그 줄만** 읽는다 — 옛 파서의 경계 개념(다음 그룹·registry)이 사라져 배치가 자유롭고,
+ *  ⑤와 registry 사이에 다른 항목(loganalysis 등)이 끼어도 오인하지 않는다(설계관 지뢰 해소). */
 function 사이드바단계(): Record<number, string[]> {
   const out: Record<number, string[]> = {};
   for (let no = 1; no <= 5; no++) {
     const i = navSrc.indexOf(`id: "s${no}-`);
     if (i < 0) continue;
-    // 다음 그룹(또는 배열 끝)까지가 이 그룹의 몫이다.
-    const 다음 = navSrc.indexOf(`id: "s${no + 1}-`, i);
-    const 끝 = 다음 > i ? 다음 : navSrc.indexOf('id: "registry"', i);
-    const 덩이 = navSrc.slice(i, 끝 > i ? 끝 : i + 900);
+    const 줄시작 = navSrc.lastIndexOf("\n", i) + 1;
+    const 줄끝 = navSrc.indexOf("\n", i);
+    const 덩이 = navSrc.slice(줄시작, 줄끝 > 0 ? 줄끝 : navSrc.length);
     out[no] = [...덩이.matchAll(/page:\s*"([a-z]+\.html)"/g)].map((m) => m[1]);
   }
   return out;

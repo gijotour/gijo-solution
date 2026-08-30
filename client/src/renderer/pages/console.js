@@ -1536,7 +1536,7 @@
         el.querySelectorAll(".st").forEach(function (b) {
           b.addEventListener("click", function () {
             // dock 명시 — 띠 클릭은 「그 단계 화면으로 가겠다」는 뜻이다(title이 그렇게 약속한다).
-            // 프로에서 dock 없이 열면 카드만 떠서(「카드가 전부」 계약) 약속과 어긋난다(검토관 ③).
+            // (2026-08-31 개정으로 dock 없이도 화면이 열리지만, 명시 의도 신호는 그대로 단다.)
             if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label, { dock: true });
             else if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell(b.dataset.page, b.dataset.label);
             // ⚠ **셸이 없는 자리에서는 위 둘이 다 없어 「눌러도 아무 일이 없었다」**(2026-08-22 설계관).
@@ -2144,9 +2144,17 @@
     } catch (e) { qrow.innerHTML = ""; }
     try {
       var STAGE = ["assets0", "s1-find", "s2-triage", "s3-fix", "s4-verify", "s5-report"];
-      var groups = (window.gijoNavGroups || []).filter(function (g) { return STAGE.indexOf(g.id) >= 0 && g.items && g.items[0]; });
-      mrow.innerHTML = groups.map(function (g) {
-        return '<span class="mchip" data-page="' + esc(g.items[0].page) + '" data-label="' + esc(g.items[0].label) + '">' + esc(g.label) + "</span>";
+      // 5그룹 재편(2026-08-31): 단계 id는 그룹이 아니라 🩹 취약점 업무 그룹의 **항목**에
+      // 산다 — 그룹 id로 거르면 칩이 조용히 0개가 된다(설계관 적발, 시험 없던 자리 —
+      // wiringcontract가 이제 it.id 무늬를 감시한다).
+      var 단계항목 = [];
+      (window.gijoNavGroups || []).forEach(function (g) {
+        (g.items || []).forEach(function (it) {
+          if (it && it.id && it.page && STAGE.indexOf(it.id) >= 0) 단계항목.push(it);
+        });
+      });
+      mrow.innerHTML = 단계항목.map(function (it) {
+        return '<span class="mchip" data-page="' + esc(it.page) + '" data-label="' + esc(it.label) + '">' + esc(it.label) + "</span>";
       }).join("");
       Array.prototype.forEach.call(mrow.querySelectorAll(".mchip"), function (b) {
         b.addEventListener("click", function () {
@@ -2236,8 +2244,9 @@
   var 화면카드행 = null;   // 직전 카드의 행(DOM) — 같은 메뉴 재클릭 때 다시 그리는 대신 비춰 준다
   var 카드조회중 = null;   // 서버 왕복 중인 화면 — 연타로 카드가 2장 쌓이는 것을 막는다
   var 빈상태원본 = null; // 대화 홈(.cs-empty) 원본 — build가 저장, newSession이 되살린다
-  // 반환: Promise<boolean> — 카드를 띄웠으면 true(셸 open()이 「화면을 열지 않는다」 판단에 쓴다,
-  // 2026-08-20 사장님 확정 「화면 내용은 대화창에」). 같은 화면 연속도 true(카드는 이미 떠 있다).
+  // 반환: Promise<boolean> — 카드를 띄웠으면 true. 같은 화면 연속도 true(카드는 이미 떠 있다).
+  // ⚠ 셸 쪽 소비자는 2026-08-31 계약 개정(메뉴 클릭=화면+카드 나란히)으로 사라졌다 —
+  //   반환값은 이제 정보용이다(관문·시험이 카드 등장 자체를 잰다).
   function screenCard(page, label) {
     var p = String(page || "").split("?")[0];
     if (!p) return Promise.resolve(false);
@@ -2285,8 +2294,8 @@
         },
       });
       if (P.nextChips) P.nextChips(row, r.nextChips, function (q) { submit(q); });
-      return true; // 카드가 전부 — 셸은 화면을 열지 않는다(then 끝의 암묵 undefined가 도킹 폴백을
-      // 태워 카드+화면이 둘 다 열렸던 실결함, 2026-08-20 관문 「프레임 0→1」이 잡았다)
+      return true; // 카드를 띄웠다 — 2026-08-31 개정 후 셸은 이 값과 무관하게 화면을 연다
+      // (화면+카드 나란히). 옛 「카드가 전부」 시절의 암묵 undefined 실결함 계보는 커밋 이력에.
     }).catch(function () { return false; /* 조회 실패는 조용히 — 셸이 화면을 연다 */ })
       .finally(function () { 카드조회중 = null; });
     카드조회중 = { p: p, promise: 조회 };

@@ -50,7 +50,10 @@ const 채움 = /background(?:-color)?\s*:\s*(var\(--(?:g-)?(?:blue|red|teal|ambe
 const 구조색 = new Set(["#e9e7e2", "#b3ada4", "#a49d95"]);
 /** JS 대입 예외 — **이유를 반드시 적는다**(이유 없는 예외는 미룸이지 결정이 아니다). */
 const JS예외 = new Map([
-  ["nav.js:697", "기한 지난 업무 배지 — 바로 위에서 같은 요소에 background=var(--red,#e2483d)를 깔아 흰 글자가 옳다(채움)"],
+  // ⚠ 열쇠가 줄 번호라 nav.js 윗부분을 고치면 밀린다(2026-08-31 5그룹 재편에서 697→665로
+  //   실제로 밀렸다). 실패 메시지의 줄 번호를 보고 여기만 따라 옮기면 된다 — 예외 대상
+  //   자체(wBadge 흰 글자)는 그대로다.
+  ["nav.js:665", "기한 지난 업무 배지 — 바로 위에서 같은 요소에 background=var(--red,#e2483d)를 깔아 흰 글자가 옳다(채움)"],
 ]);
 
 function 광도(hex: string): number {
