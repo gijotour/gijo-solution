@@ -416,6 +416,30 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
   }
 }
 
+// ── 📂 지켜보는 폴더 판(2026-08-31 2단계 — 「새 배선은 관문에 검사 추가」 정석) ──────────
+// 딥링크 ?tab=watch로 열려 판이 실제로 그려지는지 — 서버 조회(watchFolders)가 죽으면
+// 목록도 빈 상태 안내도 없이 하얗다(그게 이 검사가 잡는 부류다).
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("mydocs.html?tab=watch", "지켜보는 폴더", { dock: true }));
+  const fr = await 프레임찾기("mydocs.html", 8);
+  const r = fr ? await fr.evaluate(async () => {
+    for (let i = 0; i < 15; i++) {
+      const t = (document.getElementById("list")?.innerText || "");
+      if (t.includes("지켜보는 폴더")) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    const node = document.querySelector('#tabs .v4node[data-t="watch"]');
+    return {
+      탭있음: !!node,
+      탭활성: !!(node && node.classList.contains("on")),
+      판글: (document.getElementById("list")?.innerText || "").slice(0, 60),
+    };
+  }).catch(() => null) : null;
+  ok("📂 지켜보는 폴더 판: 딥링크로 열리고 목록/빈 상태가 그려진다",
+    !!r && r.탭있음 && r.탭활성 && r.판글.includes("지켜보는 폴더"),
+    r ? JSON.stringify(r) : "프레임 못 찾음");
+}
+
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──
 const 카드전 = await 셸.evaluate(() => document.querySelectorAll(".dc-card").length);
 await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기")); // 무dock=메뉴성 — 화면+카드가 나란히 떠야 한다(2026-08-31 개정)

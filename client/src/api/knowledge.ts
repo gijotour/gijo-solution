@@ -74,6 +74,11 @@ export const memoryApi = {
     request<{ 목록: UploadReceipt[]; 총량: { 건수: number; 전체바이트: number; 원본보관바이트: number }; 갈래이름: Record<string, string> }>(
       "/api/upload/receipts" + (limit ? "?limit=" + limit : "")
     ),
+  // 📂 지켜보는 폴더(2026-08-31) — 목록·최근 스캔 결과. 읽기 전용(등록·해제는 대화창 결재판).
+  watchFolders: () =>
+    request<{ folders: { id: number; path: string; label: string | null; active: boolean; createdByName: string | null; createdAt: string; lastScanAt: string | null; lastResult: { ranAt: string; 새로: number; 갱신: number; 건너뜀: number; 충돌: string[]; 등급막힘: string[]; 스캔후보: string[]; 오류: string[]; 잘림: string | null } | null; docCount: number }[]; tickSeconds: number }>(
+      "/api/watch-folders"
+    ),
   // 오늘 새로 들어온 문서 수 — 사이드바 "내 문서" 배지(값싼 COUNT). since=현지 자정 ISO.
   recentDocCount: (sinceIso: string) =>
     request<{ count: number }>("/api/memory/documents/recent-count?since=" + encodeURIComponent(sinceIso)),

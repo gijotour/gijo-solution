@@ -30,7 +30,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import type { Express } from "express";
 import { db, migrate } from "../db";
+import { authMiddleware } from "../auth/auth";
 import { autoRouteUpload } from "./autoupload";
 import { 추출필요, 열람불가핵심 } from "./memory";
 import { 영수증남기기 } from "./uploadreceipt";
@@ -259,6 +261,23 @@ export function stopWatchFolderScheduler(): void {
 export function resetWatchFoldersForTests(): void {
   db.exec("DELETE FROM watch_folders");
   상태지우기like.run("watchfolder:%");
+}
+
+/** 내 문서 📂 판이 읽는 조회 창구 — 목록+최근 결과(JSON 풀어서)+들어온 문서 수.
+ *  읽기 전용(등록·해제는 대화창 결재판만 — 「메뉴는 보기용·지시는 대화창」). */
+export function registerWatchFolderRoutes(app: Express): void {
+  app.get("/api/watch-folders", authMiddleware, (_req, res) => {
+    const folders = listWatchFolders().map((f) => {
+      let last: unknown = null;
+      try { last = f.last_result ? JSON.parse(f.last_result) : null; } catch { last = null; }
+      return {
+        id: f.id, path: f.path, label: f.label, active: !!f.active,
+        createdByName: f.created_by_name, createdAt: f.created_at,
+        lastScanAt: f.last_scan_at, lastResult: last, docCount: watchFolderDocCount(f.id),
+      };
+    });
+    res.json({ folders, tickSeconds: Math.round(TICK_MS / 1000) });
+  });
 }
 
 /** 결정적 목록 글 — 도구(watch_folder_list)가 그대로 낸다(alertScheduleText 관례: 숫자·경로·

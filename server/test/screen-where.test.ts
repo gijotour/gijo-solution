@@ -186,7 +186,7 @@ describe("★ 흡수 별칭의 **소비 경로** — 생산자만 재면 반쪽�
     expect(화면, "주소의 tab을 안 읽는다 — ?tab=vendor로 열어도 기본 탭이 뜬다")
       .toMatch(/get\(["']tab["']\)/);
     // 우리가 별칭에서 쓰는 갈래 이름이 화면에 실제로 있는가 — 없으면 조용히 기본 탭으로 떨어진다.
-    for (const t of ["vendor", "contacts", "guide"]) {
+    for (const t of ["vendor", "contacts", "guide", "watch"]) { // watch: 📂 지켜보는 폴더(2026-08-31)
       expect(화면, `탭 「${t}」이 화면에 없다 — 별칭이 없는 갈래를 가리킨다`)
         .toMatch(new RegExp(`data-t="${t}"`));
     }

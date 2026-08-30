@@ -345,6 +345,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       <button class="v4node" data-t="work">📎<span class="txt">지난 작업</span><span class="cnt" id="nWork"></span></button>
       <button class="v4node" data-t="learn">🎓<span class="txt">학습</span><span class="cnt" id="nLearn"></span></button>
       <button class="v4node" data-t="ingest">🩹<span class="txt">반입</span><span class="cnt" id="nIngest"></span></button>
+      <!-- 📂 지켜보는 폴더(2026-08-31 사장님 「위키처럼 특정 디렉토리 지정해서 계속 확인」) —
+           서버가 주기적으로 들여다보고 새/바뀐 문서를 자동 반입하는 폴더들. 지정·해제는
+           대화창(admin 결재판)만 — 이 판은 보기 전용이다(「메뉴는 보기용·지시는 대화창」). -->
+      <button class="v4node" data-t="watch">📂<span class="txt">지켜보는 폴더</span><span class="cnt" id="nWatch"></span></button>
       <button class="v4node future" data-t="future" title="예약된 자리 — 리포트·공식 인수인계 열람을 모을 예정입니다(아직 동작하지 않습니다)">🗂<span class="txt">산출물</span><span class="cnt">예정</span></button>
     </div>
   </div>
@@ -465,6 +469,8 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   "use strict";
   var 탭 = "mine";
   var mine = [], know = [], learn = [], learnTopics = [], learnKpis = null, guide = [];
+  var 감시폴더 = []; // 📂 지켜보는 폴더(2026-08-31) — 조회 전용(등록·해제는 대화창 결재판)
+  var 감시틱초 = 300;
   var work = []; // 📎 지난 작업(노트북형) — 지난 대화 세션 목록(listWorkSessions)
   // ☑ 근거 지정 상태 — docId(검색 세계 키) → 표시 이름. ⚠ 개인 문서의 검색 키는
   //   "personal:<uuid>"다(server personaldocs.ts ragDocumentId — id 그대로 보내면 무동작).
@@ -984,6 +990,25 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
               : '<span class="gm2" title="대화 턴이 없는 세션 — 첨부할 내용이 없습니다">—</span>') + "</span></div>";
         }).join("") + "</div>"
         : '<div class="empty">' + (work.length ? "검색과 맞는 작업이 없습니다." : "지난 작업이 없습니다 — 대화창에서 일하면 자동으로 쌓입니다.") + "</div>");
+    } else if (탭 === "watch") {
+      // 📂 지켜보는 폴더(2026-08-31) — 보기 전용. 지정·해제는 대화창(admin 결재판)이 유일한 길.
+      // 원천 정직: 숫자는 전부 서버 계산(스캔 결과 JSON) — 화면이 지어내지 않는다.
+      var wf = 감시폴더.filter(function (f) { return 걸림((f.label || "") + " " + (f.path || "")); });
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 92px 64px 92px;gap:8px"><span>지켜보는 폴더(약 ' + Math.round(감시틱초 / 60) + '분마다 확인 — 행을 누르면 최근 결과)</span><span>최근 확인</span><span class="ta-r">문서</span><span class="ta-r">상태</span></div>' +
+        (wf.length ? '<div class="g-rows-flat">' + wf.map(function (f) {
+          var lr2 = f.lastResult;
+          var 상태 = !f.active ? '<span class="gm2">중지</span>'
+            : lr2 && (lr2.오류 || []).length ? '<span class="gtxt-down">오류 ' + lr2.오류.length + "</span>"
+            : lr2 && ((lr2.충돌 || []).length + (lr2.등급막힘 || []).length) ? '<span class="gtxt-share">건너뜀 있음</span>'
+            : '<span class="gtxt-up">감시중</span>';
+          return '<div class="g-rows-r" data-wid="' + f.id + '" style="grid-template-columns:1fr 92px 64px 92px;gap:8px">' +
+            '<span class="trunc" title="' + esc(f.path) + '">' + esc(f.label || f.path) + "</span>" +
+            '<span class="gm2">' + (f.lastScanAt ? 날짜(f.lastScanAt) : "대기") + "</span>" +
+            '<span class="ta-r">' + (f.docCount || 0) + "</span>" +
+            '<span class="ta-r">' + 상태 + "</span></div>";
+        }).join("") + "</div>"
+        : '<div class="empty">' + (감시폴더.length ? "검색과 맞는 폴더가 없습니다."
+          : "지켜보는 폴더가 없습니다.<br><br>대화창에서 <b>「D:\\보안팀\\스캔결과 폴더 지켜봐 줘」</b>처럼 말하면 등록됩니다(관리자).<br>등록된 목록은 <b>「지켜보는 폴더 알려줘」</b>로도 봅니다.<br><br>⚠ 경로는 <b>서버 기계</b>의 폴더입니다 — 분산 설치에서는 내 PC 경로가 아닙니다.") + "</div>");
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;
@@ -1139,6 +1164,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     // 학습 총계는 kpis(진짜 총계)로 — 조회 상한(100)을 총계처럼 말하면 거짓이다(중1)
     document.getElementById("nLearn").textContent = (learnKpis && learnKpis.total) || learn.length || "";
     document.getElementById("nWork").textContent = work.length || "";
+    document.getElementById("nWatch").textContent = 감시폴더.length || "";
     // ⚠ 세는 원천이 바뀌었다(2026-08-22) — 문서 목록이 아니라 **영수증**이다.
     //   그전엔 지식에 든 문서만 세어, 취약점 파일을 올려도 숫자가 안 늘었다.
     // ⚠ 서버가 준 **거른 뒤의 총계**를 쓴다 — 목록 길이(상한 300)를 총계로 말하면 거짓이다
@@ -1163,6 +1189,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     // ★ 📦 보안제품 자료(2026-08-22 2라운드 검토관 [낮음]) — 행을 눌러 상세가 열리게 만들었으면
     //   **초기 안내도 있어야** 한다. 없으면 이 탭만 빈 문서창이라 「고장인가?」로 읽힌다.
     else if (탭 === "vendor") d.innerHTML = '<div class="dm">행을 누르면 그 제품의 자료(제조사·분류·요약)를 봅니다.<br>도입을 <b>검토 중인 타사 제품</b> 카탈로그입니다 — 우리가 쓰는 제품은 「우리 보안제품」 화면입니다.<div class="dbt"><button class="go" data-go="securityproducts.html" data-lb="우리 보안제품">🗔 우리 보안제품</button></div></div>';
+    else if (탭 === "watch") d.innerHTML = '<div class="dm">행을 누르면 그 폴더의 최근 확인 결과(새로 들어온 문서·건너뜀·충돌)를 봅니다.<br><br>지정·해제는 <b>대화창</b>에서 합니다 — 「D:\\경로 폴더 지켜봐 줘」(관리자).</div>';
     // 📞 연락처는 목록이 **전폭**이라 문서창을 안 쓴다(학습과 같은 결) — 문구를 남기지 않는다.
     else d.innerHTML = ""; // learn · contacts — 전폭이라 숨겨져 있지만 이전 탭 문구를 남기지 않는다(중4)
     // 고른 것이 없으면 좁은 자리의 덮개도 걷는다 — 안 걷으면 빈 문서창이 목록을 가린 채 남는다.
@@ -1211,6 +1238,13 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       오류.work = null;
     }
     catch (e) { work = []; 오류.work = (e && e.message) || "오류"; }
+    // 📂 지켜보는 폴더(2026-08-31) — 조회 전용 다리(preload watchFolders). 없거나 실패면 빈 목록.
+    try {
+      var wf_ = await window.gijo.watchFolders();
+      감시폴더 = (wf_ && wf_.folders) || [];
+      감시틱초 = (wf_ && wf_.tickSeconds) || 300;
+      오류.watch = null;
+    } catch (e) { 감시폴더 = []; 오류.watch = (e && e.message) || "오류"; }
     // ★ 반입 영수증(2026-08-22). 취약점·SBOM처럼 **지식에 안 들어가는**
     //   갈래는 문서 목록에 원리상 안 뜨므로 별도 창구에서 온다.
     //   ⚠ 다리는 preload에 새로 냈다(listUploadReceipts) — 이 화면에는 fetch를 쓰는 자리가 없다.
@@ -1396,6 +1430,32 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       return;
     }
     if (탭 === "learn") return; // 열람 전용 — 고를 것도 상세도 없다(검토관 하6)
+    // 📂 지켜보는 폴더 행 — 최근 스캔 결과 상세를 문서창에 그린다(보기 전용·서버 값 그대로).
+    if (탭 === "watch") {
+      var wrow = ev.target.closest(".g-rows-r");
+      if (!wrow) return;
+      var wid = Number(wrow.getAttribute("data-wid"));
+      var wfd = null;
+      for (var wi = 0; wi < 감시폴더.length; wi++) if (감시폴더[wi].id === wid) wfd = 감시폴더[wi];
+      if (!wfd) return;
+      var lr3 = wfd.lastResult;
+      var 줄 = function (제목, arr) {
+        return (arr && arr.length) ? "<div style=\"margin-top:8px\"><b>" + 제목 + " " + arr.length + "건</b><br>" + arr.map(function (x) { return "· " + esc(x); }).join("<br>") + "</div>" : "";
+      };
+      document.getElementById("detail").innerHTML = '<div class="dm">' +
+        "<b>📂 " + esc(wfd.label || wfd.path) + "</b><br>" +
+        '<span class="gm2">서버 경로: ' + esc(wfd.path) + "</span><br>" +
+        '<span class="gm2">등록: ' + esc(wfd.createdByName || "-") + " · " + 날짜(wfd.createdAt) + " · 들어온 문서 " + (wfd.docCount || 0) + "건</span>" +
+        (lr3 ? "<div style=\"margin-top:8px\">최근 확인 " + 날짜(lr3.ranAt) + " — 새로 " + lr3.새로 + " · 갱신 " + lr3.갱신 + " · 건너뜀 " + lr3.건너뜀 + "</div>" +
+          줄("이름 충돌(건너뜀)", lr3.충돌) + 줄("등급 막힘(안 덮음)", lr3.등급막힘) +
+          줄("스캔파일 후보(자동 등록 안 함 — 확인 후 ＋로)", lr3.스캔후보) + 줄("오류", lr3.오류) +
+          (lr3.잘림 ? '<div style="margin-top:8px">⚠ ' + esc(lr3.잘림) + "</div>" : "")
+          : "<div style=\"margin-top:8px\">아직 첫 확인 전입니다 — 약 " + Math.round(감시틱초 / 60) + "분 안에 돕니다.</div>") +
+        '<div style="margin-top:10px" class="gm2">해제는 대화창에서 「지켜보는 폴더 ' + wfd.id + '번 그만 지켜봐」(관리자).</div>' +
+        "</div>";
+      문서창보임(true);
+      return;
+    }
     var row = ev.target.closest(".g-rows-r");
     if (!row) return;
     // ⚠ v4는 편집·요청을 쓰는 중에도 목록이 살아 있다(검토관 상1-c·중6) — 행을 누르면
@@ -2235,7 +2295,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   var 라이트판 = new URLSearchParams(location.search).get("edition") === "lite";
   if (라이트판) {
     document.documentElement.classList.add("edition-lite");
-    ["learn", "future", "vendor"].forEach(function (t) {
+    ["learn", "future", "vendor", "watch"].forEach(function (t) { // watch: 지정 도구가 라이트 화이트리스트 밖 — 죽은 판 금지(v1 접힘, 라이트 반영 라운드에서 재판단)
       var n = document.querySelector('#tabs .v4node[data-t="' + t + '"]');
       if (n) n.style.display = "none";
     });
@@ -2247,7 +2307,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   // ?tab= 딥링크 — 문서함(창)을 흡수하며 옛 진입로(하단 📚·설정의 가이드 링크)가
   // 「제품 안내 탭이 선택된 내 문서」로 바로 오게 한다(승인 시안 §7 대응표).
   var 첫탭 = new URLSearchParams(location.search).get("tab");
-  if (첫탭 && ["mine", "know", "guide", "learn", "ingest", "vendor", "contacts", "work"].indexOf(첫탭) >= 0) {
+  if (첫탭 && ["mine", "know", "guide", "learn", "ingest", "vendor", "contacts", "work", "watch"].indexOf(첫탭) >= 0) {
     탭 = 첫탭;
     Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) {
       x.classList.toggle("on", x.getAttribute("data-t") === 첫탭);

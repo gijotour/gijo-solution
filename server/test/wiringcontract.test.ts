@@ -403,7 +403,7 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
     }
     expect(nv, "자산 관리 메뉴가 full=1 예외 없이 걸렸다 — 조용히 ⓪로 갈아탄다").toContain('page: "inventory.html?full=1"');
     const md = 코드만(join(PAGES, "mydocs.html"));
-    for (const tab of ["ingest", "mine", "contacts"]) {
+    for (const tab of ["ingest", "mine", "contacts", "watch"]) { // watch: 📂 지켜보는 폴더(2026-08-31 2단계)
       expect(nv, `내 문서 탭 메뉴가 사라졌다: ${tab}`).toContain(`mydocs.html?tab=${tab}`);
       expect(md, `내 문서에 ${tab} 탭이 없다 — 메뉴가 유령 탭을 가리킨다`).toContain(`"${tab}"`);
     }

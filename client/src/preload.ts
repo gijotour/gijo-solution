@@ -426,6 +426,8 @@ const gijoApi = {
   listMemoryDocuments: () => api.memoryApi.listDocuments(),
   // ★ 반입 영수증 — 「내가 넣은 모든 파일」. listMemoryDocuments와 **다른 것**이다(지식에 안 든 것도 온다).
   listUploadReceipts: (limit?: number) => api.memoryApi.uploadReceipts(limit),
+  // 📂 지켜보는 폴더(2026-08-31) — 내 문서 판 조회 전용(위치 인자 관례).
+  watchFolders: () => api.memoryApi.watchFolders(),
   // 오늘 새로 들어온 문서 수(사이드바 배지). 이 기기의 자정(현지시각)을 ISO로 계산해 서버에 넘긴다 —
   //   서버 ingestedAt은 UTC ISO라 문자열 비교로 맞고, "오늘"의 경계는 사람이 있는 시간대가 정한다.
   recentDocCount: () => { const d = new Date(); d.setHours(0, 0, 0, 0); return api.memoryApi.recentDocCount(d.toISOString()); },

@@ -69,6 +69,7 @@ import { registerAnswerFeedbackRoutes } from "./engine/answerfeedback";
 import { registerModelAdoptionRoutes } from "./engine/modeladoption";
 import { registerObservabilityRoutes } from "./engine/observability";
 import { registerAlertScheduleRoutes } from "./engine/alertschedule";
+import { registerWatchFolderRoutes } from "./engine/watchfolder";
 import { registerToolsRoutes } from "./engine/tools";
 import { registerTasksRoutes } from "./engine/tasks";
 import { registerMyWorkRoutes } from "./engine/mywork";
@@ -220,6 +221,7 @@ export function createApp(): Express {
   registerModelAdoptionRoutes(app); // 모델 채택 원장 — 게이트 통과분만 배포(중-4)
   registerObservabilityRoutes(app); // 자가 진단(후-1 관측성)
   registerAlertScheduleRoutes(app); // 정기 알림(후-1 알림 스케줄)
+  registerWatchFolderRoutes(app); // 📂 지켜보는 폴더 조회(내 문서 판) — 등록·해제는 대화창 결재판만(2026-08-31)
   registerToolsRoutes(app);
   registerTasksRoutes(app);
   registerMyWorkRoutes(app);
