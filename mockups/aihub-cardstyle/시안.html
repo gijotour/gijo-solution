@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 시안: 지식 창고 카드 언어 재구성 (aihub-cardstyle)</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  시안 — 지식 창고(aihub.html?panel=knowledge) 를 대화창 현황 카드(dc-card) 언어로 재구성
+  경로: mockups/aihub-cardstyle/시안.html · 자체완결(외부 CDN·웹폰트·원격 이미지 0개, 더블클릭으로 열림)
+  추천 시안 1개 원칙(2026-08-09 사용자 결정) — 대안은 §5 "왜 이 안"에 기각 사유와 함께만 남긴다.
+  ════════════════════════════════════════════════════════════════════════
+
+  ▣ 배경 — 사장님 실화면 캡처 3장(2026-08-31)
+    1번 이미지(바꿀 대상) = 지식 창고: 위 요약 카드 4장이 다닥다닥 붙어 글자가 잘림
+      ("베이스 모…"·"전문가 어…"), 아래는 옛날식 폼 덩어리(둥근 회색 입력칸+파란 버튼,
+      장애노트/매뉴얼 보강 입력칸이 테두리 얇은 상자로 빽빽). 상자 안 상자, 잘린 라벨, 여백 불통일.
+    2번 이미지(목표) = 대화창 현황 카드(dc-card): 헤더(제목 + 목록|히트맵 칩 + 🗔 열기) →
+      지표 3개(라벨 위/값 아래) → 표(얇은 행 구분선·줄무늬). 잘리는 글자 없음.
+    이어 사장님 추가 지시 3건(같은 날, 실화면 캡처 동봉) — 전부 이 시안에 반영:
+      A) "대화창 최대일 때 글씨가 안 깨지게 — 엑셀처럼, 모든 메뉴도 동일하게" → §3 좁은 폭(420px) 장면.
+      B) "히트맵은 있었으면 좋겠어" → §2 문서 목록 카드에 목록|히트맵 토글(실제 작동), §4 히트맵 정지 장면.
+      C) "히트맵·지도 있는 데는 반응형으로" (자산 관리 지도 탭 캡처 동봉) → §6 적용 규칙 (e) 표 vs 시각 판.
+
+  ▣ 이 시안이 다루는 실물 코드(전부 읽고 그대로 인용 — 숫자만 예시)
+    · client/src/renderer/pages/aihub.html:16-41 — .gh-strip(4열 강제) · .gh-card{height:138px;
+      overflow:hidden}(고정+하드클립의 원천) · .gh-row{display:flex;justify-content:space-between}
+      (줄바꿈·말줄임 CSS 0개 — grep 확인, 라벨 잘림의 뿌리).
+    · client/src/renderer/pages/grouphub.js:65-94 — panelHtml/summaryHtml, "h += '&lt;div class="gh-row"&gt;'"
+      가 라벨:값을 그대로 한 줄에 꽂는다(줄바꿈 방지 CSS 없음).
+    · client/src/renderer/pages/grouppanels.js:619-634(team)·642-678(knowledge)·679-695(learning)·
+      699-726(safety) — 4장의 실제 rows/foot 문구·원천 API(verbatim, 아래 카드에 그대로 인용).
+    · client/src/renderer/pages/memory.html:8-156(:root 다크 토큰·.panel/.field/.dm-* 원본 CSS),
+      178-262(수집 폼+보강 인입, data-gijo-fold), 278-291(문서 목록 .g-rows), 243·256(class="btn" —
+      ⚠ 실측: 이 파일 전체에 <code>.btn{</code> 규칙이 **0개**다. .btn-primary만 있다. 스타일 없는
+      버튼이 좁아지면 문단처럼 줄바꿈한다 — "장애노트 저장" 버튼 꺾임의 진짜 원인).
+    · client/src/renderer/pages/chatparts.js:60-96(.dc-card/.dc-head/.dc-kpis/.dc-kv 카드 언어 정의),
+      444-502(히트맵: .dc-tiles·색사전[치명/높음/정상]·타일색()·"표가 2행 이상일 때만" 토글 노출 규칙 —
+      이 시안의 히트맵도 같은 규칙·같은 색사전을 그대로 쓴다).
+    · client/src/renderer/pages/pro-white.css:13-49,74-83,111-126 — 흰 바탕 토큰(--g-*) 재정의·
+      대비 계산값(주석에 실측 대비율 있음, §8에 그대로 인용).
+    · client/src/renderer/pages/gijo-ui.css:72-81(.g-btn, white-space:nowrap 포함! — .btn 버그의
+      기성 해법), 86-124(.g-card/.g-kpis/.g-table 이미 있는 화면용 카드 부품), 347-369(.g-rows 엑셀형
+      — 이미 이 화면 문서 목록에 쓰이고 있고 목표 디자인과 결이 같다).
+    · client/src/renderer/pages/app.html:1571,1608-1614 — 대화폭클램프(): "화면 판 최소 420 보장"
+      (Math.max(360, work.clientWidth-420)) — §3의 420px 폭 기준 원천.
+    · client/src/renderer/pages/nav.js:497-501,929-949 — gn-left-collapsed(사이드바 축소 계약,
+      LEFT_KEY로 기억) — §3 사이드바 축소의 선례(폭 자동판정은 이 시안이 새로 제안, 아래 §5 명시).
+
+  ▣ 설계 전 조사(2026-08-31)
+    1) KPI 카드 구조 — "라벨은 값 위/아래에, 값은 큰 굵은 글자로" 배치가 표준형. 상단 한 줄에
+       4~6장 이내 권장(과밀은 재사식별 부담↑). appdeck.com "Executive Dashboard Design Best
+       Practices"(2026), 5of10.com "Dashboard Design Best Practices"(2026).
+       https://appdeck.com/blog/executive-dashboard-design-best-practices
+       https://5of10.com/articles/dashboard-design-best-practices/
+    2) WCAG 1.4.12(Text Spacing) 취지 — 라벨·버튼은 좁아지면 "잘라내기"가 아니라 "더 넓은 자리를
+       수용"하는 쪽이어야 한다. 말줄임(…)으로 자르는 것도 원문 접근 수단(title·펼치기) 없이 쓰면
+       비접근이다. sitelint.com "Truncating text and making it accessible".
+       https://www.sitelint.com/blog/truncating-text-and-making-it-accessible
+       → 이 시안의 결론: 라벨은 "줄바꿈 허용(카드 높이 가변)"이 1차 처방, 정말 좁아져 줄바꿈도
+         못 버틸 때만 nowrap+ellipsis+title(원문 보존)을 쓴다 — 자르기만 하고 원문을 안 남기지 않는다.
+    3) CSS 컨테이너 쿼리(@container) — Chromium 105(2022-08-30)부터 정식 지원, 이 제품의 Electron은
+       그보다 훨씬 최신이라 안전하게 쓸 수 있다. chrome.dev "Container Queries", Chrome for
+       Developers 블로그.
+       https://chrome.dev/container-queries/
+       https://developer.chrome.com/blog/cq-polyfill
+       → 창(뷰포트) 전체가 아니라 "이 카드 격자가 실제로 받은 폭"에 반응해야 하므로 @media보다
+         @container가 맞는 도구다(카드가 나중에 다른 폭의 자리에 재사용될 수 있다 — 예: 대시보드 슬롯).
+    → 다크 색 토큰·11px 하한·행 30px 엑셀형(.g-rows)은 이 저장소가 이미 조사·승인한 표준
+      (gijo-ui.css 주석, mockups/knowledge-rows 2026-08-20 승인)이라 재조사하지 않고 재사용했다.
+
+  ▣ 핵심 결정 3줄
+    1. 새 색·새 부품을 발명하지 않는다 — chatparts.js의 dc-card 언어(헤더+KPI 스택+표+히트맵 토글)를
+       "화면(page)용 카드"로 옮기고, gijo-ui.css에 이미 있는 .g-card/.g-kpis/.g-rows/.g-btn 위에 얹는다.
+       --g-* 토큰만 쓰므로 pro-white.css는 **한 줄도 안 건드려도** 흰 바탕에서 옳은 색이 된다(§8).
+    2. 잘림의 뿌리는 "가로 배치(라벨:값 한 줄)+고정 높이+강제 열 수"다. 라벨을 값 위로 올리고
+       (dc-kpi 패턴), 카드 높이를 고정→최소값으로 풀고, 격자를 auto-fit/@container로 풀면
+       잘림이 구조적으로 사라진다 — 특정 문구만 고치는 대증요법을 쓰지 않는다.
+    3. 좁은 폭(420px, 대화폭클램프)과 히트맵 반응형은 "같은 계약"의 두 조각이다: 표=말줄임(정보는
+       스크롤로 살아있음), 시각 판(히트맵·지도)=리플로우(정보는 축소로 살아있음) — 이 둘을 섞으면
+       (표를 리플로우시키거나 히트맵을 말줄임시키면) 둘 다 망가진다(§6 표로 대비).
+-->
+<style>
+  /* 실제 화면 다크 토큰 그대로 복사 — aihub.html:16 + memory.html:8-11 (border-strong·purple 등 보강분) */
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.09);
+    --border-strong:rgba(255,255,255,.16);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
+    --blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;--red-ink:#f5928a;
+    --amber:#f0a020;--amber-ink:#fbbf24;--purple:#8b7cf0;--g-zebra:rgba(255,255,255,.025);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;}
+  .wrap{max-width:1360px;margin:0 auto;padding:20px 22px 90px;}
+  h1{font-size:19px;margin:0 0 4px;}
+  h2{font-size:15px;margin:0 0 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding-bottom:8px;}
+  h3{font-size:12.75px;margin:0 0 6px;color:var(--muted);}
+  section{margin:0 0 34px;}
+  .sub{font-size:12px;color:var(--muted-2);line-height:1.65;margin:0 0 12px;}
+  code{background:rgba(255,255,255,.06);border-radius:4px;padding:0 4px;font-size:11.5px;}
+  a{color:var(--blue-light);}
+  .note{font-size:11.5px;color:var(--muted-2);line-height:1.6;}
+  .warn{color:var(--red-ink);}
+  .ok{color:var(--teal);}
+  table.reftbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
+  table.reftbl th{text-align:left;color:var(--muted-2);font-weight:800;font-size:11px;padding:6px 9px;border-bottom:1px solid var(--border-strong);white-space:nowrap;}
+  table.reftbl td{padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:top;}
+  table.reftbl tr:nth-child(even) td{background:var(--g-zebra);}
+  table.reftbl .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+  /* ── 시치 경고 배너(정직 구현) ─────────────────────────────────────────── */
+  .disclaimer{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.35);border-radius:10px;
+    padding:10px 14px;font-size:12.25px;color:var(--amber);margin-bottom:22px;line-height:1.6;}
+  .disclaimer b{color:var(--text);}
+
+  /* ══════════════════════ 카드 언어(dc-card → 화면용) ══════════════════════ */
+  /* 실물 대응: chatparts.js .dc-card/.dc-head/.dc-kpis/.dc-kv 값을 화면 카드 크기로 확대(13px 헤더,
+     16px 값 — 채팅 인라인보다 크게, 이 화면은 카드가 "주역"이라서). gijo-ui.css 승격 제안명은 .g-scard*. */
+  .ac-shell{container-type:inline-size;container-name:acshell;} /* 이 안의 모든 카드가 "자기가 받은 폭"에 반응 */
+  .ac-app{display:grid;grid-template-columns:212px 1fr;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--bg);}
+  .ac-sidebar{background:var(--panel-2);border-right:1px solid var(--border);padding:14px 10px;font-size:12px;}
+  .ac-nav-sec{font-size:11px;font-weight:800;color:var(--muted-2);letter-spacing:.6px;margin:14px 6px 6px;}
+  .ac-nav-sec:first-child{margin-top:0;}
+  .ac-nav-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;color:var(--muted);cursor:default;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ac-nav-item.on{background:rgba(59,130,246,.14);color:var(--text);box-shadow:inset 3px 0 0 var(--blue);}
+  .ac-nav-item .ic{width:16px;text-align:center;flex:0 0 auto;}
+  .ac-nav-item .lb{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  .ac-nav-rail{display:none;} /* 좁은 폭에서만 보임(§3) */
+  .ac-main{padding:16px 18px;min-width:0;}
+  .ac-scrid{font-size:12.25px;color:var(--muted);margin-bottom:12px;}
+  .ac-scrid b{color:var(--text);font-weight:800;}
+
+  /* 요약 카드 4장 — auto-fit/minmax라 컨테이너 폭이 줄면 스스로 열이 준다(@container 없이도 1차 방어) */
+  .ac-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:16px;}
+  .ac-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .12s;}
+  .ac-card:hover{border-color:rgba(59,130,246,.5);}
+  .ac-card.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+  .ac-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:800;color:var(--text);flex-wrap:wrap;}
+  .ac-head .t{flex:1 1 auto;min-width:0;}
+  .ac-cnt{flex:0 0 auto;white-space:nowrap;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700;color:var(--muted-2);}
+  /* KPI 스택 — dc-kpis 그대로: 라벨 위(작고 흐림) / 값 아래(굵게). 잘림 대신 "줄바꿈 허용"이 기본. */
+  .ac-kpis{display:grid;grid-template-columns:repeat(3,1fr);}
+  .ac-kpi{padding:10px 12px;border-right:1px solid var(--border);min-width:0;}
+  .ac-kpi:last-child{border-right:0;}
+  .ac-kl{font-size:11px;color:var(--muted-2);line-height:1.35;}
+  .ac-kv{font-size:16px;font-weight:800;color:var(--text);margin-top:3px;line-height:1.3;overflow-wrap:anywhere;}
+  .ac-foot{padding:8px 14px;border-top:1px dashed var(--border);font-size:11px;color:var(--muted-2);line-height:1.5;}
+  /* 학습 카드 — 4주제 진행률(막대), 값 위/이름 아래는 그대로 유지(다른 성격의 시각화라 KPI로 안 우겨넣음) */
+  .ac-bars{display:flex;gap:10px;align-items:flex-end;padding:12px 14px 8px;}
+  .ac-bcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;}
+  .ac-bv{font-size:11px;color:var(--muted);white-space:nowrap;}
+  .ac-bar{width:100%;max-width:34px;border-radius:4px 4px 0 0;background:var(--blue);min-height:5px;}
+  .ac-bl{font-size:11px;color:var(--muted-2);white-space:nowrap;}
+
+  /* ── 배너(카드 상단 얇은 줄) — 「기본 지식 번들 적용됨」 ─────────────────── */
+  .ac-banner{padding:7px 14px;font-size:11.5px;background:rgba(30,185,128,.08);border-bottom:1px solid rgba(30,185,128,.25);color:var(--teal);display:flex;align-items:center;gap:6px;}
+  .ac-banner b{color:var(--text);}
+
+  /* ── 수집 폼 카드: 헤더(제목+버튼 우측) + 본문(입력칸 1줄) ─────────────────── */
+  .ac-body{padding:12px 14px 14px;}
+  .ac-row1{display:flex;gap:10px;flex-wrap:wrap;}
+  .ac-field{flex:1;min-width:150px;}
+  .ac-field label{display:block;font-size:11px;color:var(--muted-2);margin-bottom:4px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ac-input,.ac-select{width:100%;height:34px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 10px;color:var(--text);font-size:12.5px;font-family:inherit;}
+  /* .g-btn.g-primary(gijo-ui.css:72-75) 값 그대로 — white-space:nowrap이 핵심(장애노트 버튼 꺾임 처방) */
+  .ac-btn{height:34px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 15px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;border:1px solid transparent;white-space:nowrap;flex:0 0 auto;font-family:inherit;}
+  .ac-btn.primary{background:var(--blue);color:#fff;}
+  .ac-btn.ghost{background:transparent;border-color:var(--border-strong);color:var(--muted);}
+  .ac-btn:disabled{opacity:.55;cursor:default;}
+
+  /* ── 보강 인입 2카드: 표처럼(라벨 좌·칸 우) ─────────────────────────────── */
+  .ac-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .ac-frow{display:grid;grid-template-columns:92px 1fr;gap:10px;align-items:center;padding:6px 14px;border-bottom:1px solid var(--border);}
+  .ac-frow:last-child{border-bottom:0;}
+  .ac-frow.top{align-items:flex-start;padding-top:8px;}
+  .ac-flabel{font-size:11px;color:var(--muted-2);font-weight:700;padding-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ac-frow textarea{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12.5px;font-family:inherit;resize:vertical;}
+  .ac-badge{font-size:10.75px;font-weight:800;color:var(--amber);border:1px solid rgba(240,160,32,.4);border-radius:20px;padding:1px 8px;white-space:nowrap;}
+
+  /* ── 문서 목록 카드: g-rows(엑셀형, 이미 실물) + 목록|히트맵 토글(dc-seg 이식) ──── */
+  .ac-seg{display:inline-flex;background:rgba(255,255,255,.05);border:1px solid var(--border-strong);border-radius:7px;padding:2px;gap:2px;flex:0 0 auto;}
+  .ac-seg span{padding:3px 9px;border-radius:5px;font-size:11px;font-weight:800;color:var(--muted-2);cursor:pointer;white-space:nowrap;}
+  .ac-seg span.on{background:rgba(59,130,246,.22);color:#fff;}
+  .g-rows{border:1px solid var(--border);border-top:0;border-radius:0;overflow:hidden;background:var(--panel);}
+  .g-rows-scroll{max-height:260px;overflow-y:auto;}
+  .g-rows-head{display:grid;grid-template-columns:1fr 90px 64px 64px;align-items:center;height:26px;padding:0 14px;font-size:11px;font-weight:800;color:var(--muted-2);background:var(--panel-2);border-bottom:1px solid var(--border-strong);position:sticky;top:0;}
+  .g-rows-r{display:grid;grid-template-columns:1fr 90px 64px 64px;align-items:center;height:30px;padding:0 14px;font-size:12.25px;}
+  .g-rows-r:nth-child(even){background:var(--g-zebra);}
+  .g-rows-r:hover{background:rgba(59,130,246,.07);}
+  .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dm-grade{border-radius:5px;padding:0 6px;font-size:11px;font-weight:800;white-space:nowrap;}
+  .dm-grade.gC{background:rgba(226,72,61,.18);color:var(--red-ink);border:1px solid rgba(226,72,61,.5);}
+  .dm-grade.gS{background:rgba(240,160,32,.16);color:var(--amber);border:1px solid rgba(240,160,32,.42);}
+  .dm-grade.gO{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid rgba(255,255,255,.14);}
+  .dm-grade.gQ{background:rgba(139,124,240,.14);color:var(--purple);border:1px dashed rgba(139,124,240,.5);}
+  /* 히트맵(타일) — chatparts.js .dc-tiles/.dc-tile 그대로: 절대배치 0개(전부 문서 흐름 stacking),
+     그래서 겹침 실패가 구조적으로 안 난다. auto-fill/minmax라 좁아지면 "열 수가 준다"(반응형). */
+  .ac-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;padding:10px;}
+  .ac-tile{border:1px solid var(--border-strong);border-radius:7px;padding:7px 9px;background:rgba(255,255,255,.03);min-width:0;}
+  .ac-tile.bad{background:rgba(245,146,138,.14);border-color:rgba(245,146,138,.45);}
+  .ac-tile.warn{background:rgba(240,160,32,.14);border-color:rgba(240,160,32,.45);}
+  .ac-tile.ok{background:rgba(30,185,128,.14);border-color:rgba(30,185,128,.45);}
+  .ac-tile.purp{background:rgba(139,124,240,.14);border-color:rgba(139,124,240,.45);}
+  .ac-tv{font-size:11px;font-weight:800;} /* 11px 하한 계약 — chatparts.js 주석과 동일 이유 */
+  .ac-tv.bad{color:var(--red-ink);}.ac-tv.warn{color:var(--amber);}.ac-tv.ok{color:var(--teal);}.ac-tv.purp{color:var(--purple);}
+  .ac-tl{font-size:11.5px;font-weight:700;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ac-ts{font-size:11px;color:var(--muted-2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  /* ══════════════════════ 좁은 폭 계약(@container, §3) ══════════════════════ */
+  @container acshell (max-width: 480px) {
+    .ac-app{grid-template-columns:44px 1fr;}
+    .ac-sidebar{display:none;}
+    .ac-nav-rail{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0;background:var(--panel-2);border-right:1px solid var(--border);}
+    .ac-nav-rail .ri{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--muted);border:1px solid var(--border);}
+    .ac-nav-rail .ri.on{color:var(--blue-light);border-color:rgba(59,130,246,.5);background:rgba(59,130,246,.14);}
+    .ac-main{padding:10px 10px;}
+    .ac-strip{grid-template-columns:1fr;} /* 4장이 세로 1열 — auto-fit이 이미 하지만 명시(계약 문서화) */
+    /* 규칙(a): 한 줄 의도 요소 — 라벨/헤더제목/배지/버튼은 nowrap+ellipsis, 원문은 title 속성 */
+    .ac-kl,.ac-flabel,.ac-nav-item .lb{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .ac-head .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .ac-2col{grid-template-columns:1fr;} /* 보강 인입 2카드 → 세로 적층 */
+    .ac-frow{grid-template-columns:70px 1fr;padding:6px 10px;}
+    /* 규칙(c): 표는 컨테이너 자체가 가로 스크롤 — 셀 폭은 안 줄이고 통째로 옆으로 민다 */
+    .doclist-scroll{overflow-x:auto;}
+    .g-rows-head,.g-rows-r{grid-template-columns:180px 90px 64px 64px;width:max-content;min-width:100%;}
+    /* 규칙(e): 히트맵 타일은 말줄임이 아니라 "더 촘촘히" — 최소폭을 좁혀 열 수를 스스로 줄인다 */
+    .ac-tiles{grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:5px;padding:8px;}
+  }
+  /* 실제 rendering 증거를 위해 420px 데모 박스에도 같은 이름의 컨테이너를 건다(§3) */
+  .narrowbox{width:420px;border:2px dashed var(--amber);border-radius:14px;overflow:hidden;background:var(--bg);}
+  .narrowcap{font-size:11.5px;color:var(--amber);margin:0 0 8px;font-weight:800;}
+
+  /* ══════════════════════ Before 재현(§1) — 실물 CSS 그대로 스코프만 바꿈 ══════════════════════ */
+  .old-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;} /* aihub.html:25 그대로 */
+  .old-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 12px;height:138px;overflow:hidden;position:relative;} /* aihub.html:26 그대로 */
+  .old-headr{font-size:11.75px;font-weight:800;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;gap:6px;}
+  .old-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;} /* aihub.html:31 그대로 — nowrap/ellipsis 없음 */
+  .old-row b{color:var(--text);}
+  .old-foot{font-size:11.5px;color:var(--muted-2);margin-top:4px;}
+  .old-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;} /* memory.html:30 .panel 그대로 */
+  .old-2col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .old-box{border:1px solid var(--border);border-radius:10px;padding:12px;}
+  .old-box input{width:100%;margin-bottom:6px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);font-size:13px;padding:6px 8px;border-radius:6px;font-family:inherit;}
+  .old-titlerow{font-size:14.5px;font-weight:800;color:#fff;} /* .panel-title 그대로 — span 카운트가 같은 줄에 흐름 */
+  .old-titlerow span{font-size:12.25px;font-weight:600;color:var(--muted-2);margin-left:6px;}
+  /* class="btn" — memory.html에 .btn{} 규칙이 없다(grep 확인). 아무 스타일도 안 먹는 네이티브 버튼. */
+  .old-btn{cursor:pointer;}
+  .beforeafter{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+  .baframe{border:1px solid var(--border);border-radius:12px;padding:14px;background:#221f1b;}
+  .baframe.b{border-color:rgba(226,72,61,.4);}
+  .baframe.a{border-color:rgba(30,185,128,.4);}
+  .balabel{font-size:11.5px;font-weight:800;margin-bottom:8px;}
+  .balabel.b{color:var(--red-ink);}
+  .balabel.a{color:var(--teal);}
+
+  /* ── 기타 공용 ─────────────────────────────────────────────────────────── */
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .checkline{display:flex;align-items:flex-start;gap:8px;padding:6px 0;font-size:12.5px;line-height:1.6;}
+  .checkline .ic{flex:0 0 auto;}
+  footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-2);line-height:1.8;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>지식 창고(aihub.html?panel=knowledge) — 카드 언어 재구성</h1>
+  <p class="sub">추천 시안 1개 · client/·server/ 무변경(mockups/ 전용) · 아래 §1~§4가 새 화면, §5~§9가 근거·규칙·자가점검.</p>
+
+  <div class="disclaimer">🔒 이 페이지는 <b>정지 화면(목업)</b>입니다. 버튼·입력칸·문서 클릭은 실제로 서버에
+  닿지 않습니다 — 예외적으로 <b>「목록|히트맵」 토글만</b> 실제로 눌립니다(순수 CSS/DOM 전환이라
+  가짜 데이터 통신이 없어 안전하게 살려 뒀습니다). 값(문서 120건·팀원 6명 등)은 전부 예시 숫자입니다.</div>
+
+  <!-- ═══════════════════ §0 Before — 실물 CSS 그대로 재현한 잘림 ═══════════════════ -->
+  <section id="before">
+    <h2>§0. Before — 왜 잘렸나(실물 CSS를 그대로 옮겨 재현, 창작 아님)</h2>
+    <p class="sub">아래 3장은 <code>.old-*</code> 접두로 <b>aihub.html·memory.html의 실제 CSS 값을 그대로</b>
+    옮긴 것이다(클래스 이름만 충돌 방지로 바꿨다). 지어낸 잘림이 아니라 소스가 그렇게 되어 있어 재현된다.</p>
+
+    <h3>① 요약 카드 — 700px 폭(흔한 창 크기)에서도 잘림. 420px로 좁힐 필요조차 없다.</h3>
+    <div class="old-panel" style="width:700px;">
+      <div class="old-strip">
+        <div class="old-card">
+          <div class="old-headr">🧑‍💻 AI 팀</div>
+          <div class="old-row"><span>베이스 모델</span><b>qwen2.5-14b-instruct-q4</b></div>
+          <div class="old-row"><span>팀원</span><b>6명</b></div>
+          <div class="old-row"><span>전문가 어댑터</span><b>2채택 · 5후보</b></div>
+          <div class="old-foot">모델 교체는 설정 &gt; 서버·AI</div>
+        </div>
+        <div class="old-card">
+          <div class="old-headr">📚 지식</div>
+          <div class="old-row"><span>올린 문서</span><b>1,842</b></div>
+          <div class="old-row"><span>표준 관계망(온톨로지)</span><b>12,406</b></div>
+          <div class="old-row"><span>오늘 반입</span><b>7</b></div>
+          <div class="old-foot">새 문서는 대화창 ＋로 올립니다</div>
+        </div>
+        <div class="old-card">
+          <div class="old-headr">🎓 학습</div>
+          <div class="old-row"><span>취약점</span><b>42</b></div>
+          <div class="old-row"><span>장비운영</span><b>18</b></div>
+          <div class="old-row"><span>사내규정</span><b>9</b></div>
+        </div>
+        <div class="old-card">
+          <div class="old-headr">🛡 팀 감독·안전</div>
+          <div class="old-row"><span>팀·감독(오늘)</span><b>6명·호출214</b></div>
+          <div class="old-row"><span>가드레일(기동 후)</span><b>차단·막음11</b></div>
+          <div class="old-row"><span>모의 공격 견고성</span><b>88/100</b></div>
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:8px;"><span class="warn">▲ 실제로 잘려 보이는 이유</span> —
+    <code>.gh-row{display:flex;justify-content:space-between}</code>에 <code>white-space:nowrap</code>도
+    <code>text-overflow:ellipsis</code>도 없다(aihub.html:31, grep 확인). 좁은 칸에서 라벨과 값이 한 줄
+    다툼을 하다 카드의 <code>overflow:hidden</code>(26행)에 물리적으로 잘려 나간다 — "말줄임"조차 아니고
+    그냥 하드 클립이다.</p>
+
+    <h3 style="margin-top:18px;">② 「올린 문서 120」 두 줄 꺾임 · ③ 「장애노트 저장」 버튼 꺾임 · ④ placeholder 잘림 — 420px에서(§3과 동일 폭)</h3>
+    <div class="beforeafter">
+      <div class="baframe b">
+        <div class="balabel b">Before(실물 재현, 420px)</div>
+        <div class="old-panel" style="width:380px;padding:14px;">
+          <div class="old-titlerow">📚 올린 문서 확인 · 관리<span>(120건)</span></div>
+          <div class="old-2col" style="margin-top:12px;gap:10px;">
+            <div class="old-box">
+              <div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">🩹 장애노트 작성</div>
+              <input placeholder="제품/대상 (예: Tenable Security Center)">
+              <button class="old-btn" id="mSaveOld">💾 장애노트 저장</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="baframe a">
+        <div class="balabel a">After(이 시안, 420px)</div>
+        <div class="ac-shell" style="width:380px;">
+        <div class="card" style="padding:0;">
+          <div class="ac-head"><span class="t">📚 올린 문서</span><span class="ac-cnt">120건</span></div>
+          <div class="ac-frow"><span class="ac-flabel" title="제품/대상">제품/대상</span>
+            <input class="ac-input" placeholder="예: Tenable Security Center"></div>
+          <div class="ac-body" style="padding-top:8px;">
+            <button class="ac-btn primary">💾 장애노트 저장</button>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <table class="reftbl" style="margin-top:10px;">
+      <tr><th>증상</th><th>진짜 원인(소스 확인)</th><th>처방</th></tr>
+      <tr><td>「올린 문서 120」 두 줄 꺾임</td><td>제목 문장과 숫자가 같은 인라인 텍스트 흐름(memory.html:279
+        <code>.panel-title</code> 안 <code>&lt;span&gt;</code>) — 줄바꿈 자체는 정상 동작이지만 숫자 중간에서
+        끊겨 보기 흉하다.</td><td>숫자를 별도 배지(<code>.ac-cnt</code>, <code>white-space:nowrap</code>)로 분리
+        — 꺾이면 배지 통째로 다음 줄, "올린 문서"와 "120" 사이에서 끊기지 않는다.</td></tr>
+      <tr><td>「장애노트 저장」 버튼 꺾임</td><td><span class="warn">memory.html 전체에 <code>.btn{}</code> 규칙이
+        0개다</span>(grep 확인, <code>.btn-primary</code>만 있음). 스타일 없는 버튼은 좁아지면 문단처럼
+        줄바꿈한다.</td><td><code>.g-btn</code>(gijo-ui.css:72, <code>white-space:nowrap</code> 포함 — 이미
+        있는 실물 부품)으로 교체. 이 시안의 <code>.ac-btn</code>이 그 값을 그대로 복사.</td></tr>
+      <tr><td>입력칸 안내문 잘림("제품/대상 (예: Te")</td><td>placeholder만 있고 상시 라벨이 없다 — 잘리면
+        그 칸이 뭘 위한 것인지 아예 알 길이 없어진다.</td><td>"라벨 좌·칸 우" 표 형태(§2)로 상시 라벨을
+        둔다 — placeholder가 잘려도(그건 예시 힌트일 뿐) 라벨이 뜻을 지킨다. 라벨 자체도 규칙(a)로
+        nowrap+ellipsis+title.</td></tr>
+    </table>
+  </section>
+
+  <!-- ═══════════════════ §1~§2 새 화면 — 정상 폭 ═══════════════════ -->
+  <section id="after-wide">
+    <h2>§1~§2. After — 정상 폭(약 960px 가정)</h2>
+    <div class="ac-shell">
+    <div class="ac-app">
+      <aside class="ac-sidebar">
+        <div class="ac-nav-sec">① 🧠 내 지식</div>
+        <div class="ac-nav-item on"><span class="ic">📚</span><span class="lb">지식 창고</span></div>
+        <div class="ac-nav-item"><span class="ic">🔗</span><span class="lb">지식 관계도</span></div>
+        <div class="ac-nav-sec">② 발견·수집</div>
+        <div class="ac-nav-item"><span class="ic">🖥</span><span class="lb">자산</span></div>
+        <div class="ac-nav-item"><span class="ic">🩹</span><span class="lb">취약점 분석</span></div>
+      </aside>
+      <div class="ac-nav-rail">
+        <div class="ri on" title="지식 창고">📚</div>
+        <div class="ri" title="자산">🖥</div>
+        <div class="ri" title="취약점 분석">🩹</div>
+      </div>
+      <main class="ac-main">
+        <div class="ac-scrid"><b>AI</b> — 내 보안 AI가 어떻게 구성되고, 무엇을 알고, 어떻게 배우는지 봅니다.</div>
+
+        <!-- 요약 카드 4장 — 클릭하면 아래 무대(판) 전환(grouphub.js 기존 동작 유지, 이 목업은 정지) -->
+        <div class="ac-strip">
+          <div class="ac-card">
+            <div class="ac-head"><span class="t">🧑‍💻 AI 팀</span></div>
+            <div class="ac-kpis">
+              <div class="ac-kpi"><div class="ac-kl">베이스 모델</div><div class="ac-kv">qwen2.5-14b-instruct-q4</div></div>
+              <div class="ac-kpi"><div class="ac-kl">팀원</div><div class="ac-kv">6명</div></div>
+              <div class="ac-kpi"><div class="ac-kl">전문가 어댑터</div><div class="ac-kv">2채택 · 5후보</div></div>
+            </div>
+            <div class="ac-foot">모델 교체는 설정 &gt; 서버·AI</div>
+          </div>
+          <div class="ac-card on">
+            <div class="ac-head"><span class="t">📚 지식</span></div>
+            <div class="ac-kpis">
+              <div class="ac-kpi"><div class="ac-kl">올린 문서</div><div class="ac-kv">1,842</div></div>
+              <div class="ac-kpi"><div class="ac-kl">표준 관계망(온톨로지)</div><div class="ac-kv">12,406</div></div>
+              <div class="ac-kpi"><div class="ac-kl">오늘 반입</div><div class="ac-kv">7</div></div>
+            </div>
+            <div class="ac-foot">새 문서는 대화창 ＋로 올립니다</div>
+          </div>
+          <div class="ac-card">
+            <div class="ac-head"><span class="t">🎓 학습</span></div>
+            <div class="ac-bars">
+              <div class="ac-bcol"><div class="ac-bv">42</div><div class="ac-bar" style="height:26px;"></div><div class="ac-bl">취약점</div></div>
+              <div class="ac-bcol"><div class="ac-bv">18</div><div class="ac-bar" style="height:14px;"></div><div class="ac-bl">장비</div></div>
+              <div class="ac-bcol"><div class="ac-bv">9</div><div class="ac-bar" style="height:8px;"></div><div class="ac-bl">규정</div></div>
+              <div class="ac-bcol"><div class="ac-bv">3</div><div class="ac-bar" style="height:5px;"></div><div class="ac-bl">위협</div></div>
+            </div>
+            <div class="ac-foot">300이 차면 전문가 어댑터를 학습할 수 있습니다</div>
+          </div>
+          <div class="ac-card">
+            <div class="ac-head"><span class="t">🛡 팀 감독·안전</span></div>
+            <div class="ac-kpis">
+              <div class="ac-kpi"><div class="ac-kl">팀·감독(오늘)</div><div class="ac-kv">6명 · 호출 214 · 오류 3</div></div>
+              <div class="ac-kpi"><div class="ac-kl">가드레일(기동 후)</div><div class="ac-kv">차단 · 막음 11</div></div>
+              <div class="ac-kpi"><div class="ac-kl">모의 공격 견고성</div><div class="ac-kv">88/100</div></div>
+            </div>
+            <div class="ac-foot">쓰기 지시는 항상 결재판을 거칩니다</div>
+          </div>
+        </div>
+
+        <!-- 수집 폼 카드 — 배너(상단 얇은 줄) + 헤더(제목+버튼 우측) + 본문(1줄) -->
+        <div class="card" style="padding:0;margin-bottom:12px;">
+          <div class="ac-banner">📦 기본 지식 번들 <b>v2026.7</b> 적용됨(8월 3일) — 표준 관계 12,406개 · 기본 문서 41종</div>
+          <div class="ac-head"><span class="t">📥 서버 파일 경로로 수집</span>
+            <button class="ac-btn primary">수집</button></div>
+          <div class="ac-body">
+            <div class="ac-row1">
+              <div class="ac-field"><label>대상 에이전트</label>
+                <select class="ac-select"><option>전체 공유(모든 에이전트)</option></select></div>
+              <div class="ac-field" style="flex:2;"><label>문서 경로</label>
+                <input class="ac-input" placeholder="예: data/docs/incident-policy.txt"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 보강 인입 2카드 — 표처럼(라벨 좌·칸 우) -->
+        <div class="ac-2col" style="margin-bottom:12px;">
+          <div class="card" style="padding:0;">
+            <div class="ac-head"><span class="t">🩹 장애노트 작성</span><span class="ac-badge">AI 미사용 · 즉시 저장</span></div>
+            <div class="ac-frow"><span class="ac-flabel" title="제품/대상">제품/대상</span><input class="ac-input" placeholder="예: Tenable Security Center"></div>
+            <div class="ac-frow"><span class="ac-flabel" title="제목">제목</span><input class="ac-input" placeholder="예: 예약 스캔 진행 중 멈춤"></div>
+            <div class="ac-frow"><span class="ac-flabel" title="증상">증상</span><input class="ac-input" placeholder="무엇이 잘못됐나"></div>
+            <div class="ac-frow"><span class="ac-flabel" title="원인(선택)">원인(선택)</span><input class="ac-input"></div>
+            <div class="ac-frow top"><span class="ac-flabel" title="해결 방법">해결 방법</span><textarea rows="3" placeholder="명령어·경로는 원문 그대로"></textarea></div>
+            <div class="ac-body" style="padding-top:8px;"><button class="ac-btn primary">💾 장애노트 저장</button></div>
+          </div>
+          <div class="card" style="padding:0;">
+            <div class="ac-head"><span class="t">📄 매뉴얼 보강(AI 번역·구조화)</span></div>
+            <div class="ac-frow"><span class="ac-flabel" title="제품/대상">제품/대상</span><input class="ac-input"></div>
+            <div class="ac-frow"><span class="ac-flabel" title="섹션 이름">섹션 이름</span><input class="ac-input" placeholder="예: 진단 파일 로그 옵션"></div>
+            <div class="ac-frow top"><span class="ac-flabel" title="매뉴얼 텍스트">매뉴얼 텍스트</span><textarea rows="3" placeholder="한 번에 ~6,000자"></textarea></div>
+            <div class="ac-frow"><span class="ac-flabel" title="모드">모드</span>
+              <select class="ac-select"><option>⚙ 자동</option><option>☁ 클라우드</option><option>💻 로컬</option></select></div>
+            <div class="ac-body" style="padding-top:8px;"><button class="ac-btn primary">▶ 보강해서 저장</button></div>
+          </div>
+        </div>
+
+        <!-- 문서 목록 카드 — 표(엑셀형, g-rows 실물 재사용) + 목록|히트맵 토글(실제 작동) -->
+        <div class="card" style="padding:0;">
+          <div class="ac-head">
+            <span class="t">📚 올린 문서 확인 · 관리</span>
+            <span class="ac-cnt">120건</span>
+            <span class="ac-seg" id="docSeg">
+              <span class="on" data-v="list">목록</span><span data-v="heat">히트맵</span>
+            </span>
+          </div>
+          <div id="docListWrap" class="g-rows doclist-scroll">
+            <div class="g-rows-scroll">
+              <div class="g-rows-head"><span>문서</span><span>영역</span><span>등급</span><span>반입</span></div>
+              <div id="docListRows"></div>
+            </div>
+          </div>
+          <div id="docTilesWrap" style="display:none;" class="doclist-scroll"><div class="ac-tiles" id="docTiles"></div></div>
+        </div>
+      </main>
+    </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ §3 좁은 폭(420px) ═══════════════════ -->
+  <section id="narrow">
+    <h2>§3. 좁은 폭 — 420px(app.html 대화폭클램프 실측치)</h2>
+    <p class="sub">근거: <code>app.html:1612</code> <code>대화폭클램프()</code> — 대화창을 최대로 키우면
+    <code>Math.max(360, work.clientWidth-420)</code>로 계산되어 <b>화면 판이 420px까지 좁아진다</b>(주석
+    "화면 판 최소 420 보장"). 아래는 <b>§1~§2와 완전히 같은 HTML/CSS</b>를 폭 420px 상자(<code>@container</code>,
+    Chromium 105+ 지원, §7 근거)에 넣은 것 — 다른 코드를 안 쓴다. 그리드(auto-fit)·표(가로 스크롤)·
+    카드(폭 반응)가 스스로 접힌다.</p>
+    <div class="narrowbox">
+      <div class="narrowcap" style="padding:8px 10px 0;">▣ 420px 실측 — 잘리는 글자 0개(아래 표에서 확인)</div>
+      <div class="ac-shell">
+      <div class="ac-app">
+        <aside class="ac-sidebar"><div class="ac-nav-item on"><span class="ic">📚</span><span class="lb">지식 창고</span></div></aside>
+        <div class="ac-nav-rail">
+          <div class="ri on" title="지식 창고">📚</div>
+          <div class="ri" title="자산">🖥</div>
+          <div class="ri" title="취약점 분석">🩹</div>
+        </div>
+        <main class="ac-main">
+          <div class="ac-scrid" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="AI — 내 보안 AI가 어떻게 구성되고, 무엇을 알고, 어떻게 배우는지 봅니다.">
+            <b>AI</b> — 내 보안 AI가 어떻게 구성되고…</div>
+          <div class="ac-strip">
+            <div class="ac-card">
+              <div class="ac-head"><span class="t" title="AI 팀">🧑‍💻 AI 팀</span></div>
+              <div class="ac-kpis">
+                <div class="ac-kpi"><div class="ac-kl" title="베이스 모델">베이스 모델</div><div class="ac-kv">qwen2.5-14b…</div></div>
+                <div class="ac-kpi"><div class="ac-kl">팀원</div><div class="ac-kv">6명</div></div>
+                <div class="ac-kpi"><div class="ac-kl" title="전문가 어댑터">전문가 어댑터</div><div class="ac-kv">2채택·5후보</div></div>
+              </div>
+              <div class="ac-foot">모델 교체는 설정 &gt; 서버·AI</div>
+            </div>
+            <div class="ac-card on">
+              <div class="ac-head"><span class="t">📚 지식</span></div>
+              <div class="ac-kpis">
+                <div class="ac-kpi"><div class="ac-kl">올린 문서</div><div class="ac-kv">1,842</div></div>
+                <div class="ac-kpi"><div class="ac-kl" title="표준 관계망(온톨로지)">표준 관계망</div><div class="ac-kv">12,406</div></div>
+                <div class="ac-kpi"><div class="ac-kl">오늘 반입</div><div class="ac-kv">7</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="card" style="padding:0;margin-bottom:10px;">
+            <div class="ac-head"><span class="t">📥 경로로 수집</span><button class="ac-btn primary">수집</button></div>
+            <div class="ac-body"><div class="ac-row1">
+              <div class="ac-field" style="min-width:0;"><label title="문서 경로">문서 경로</label><input class="ac-input" placeholder="예: data/docs/…"></div>
+            </div></div>
+          </div>
+          <div class="ac-2col">
+            <div class="card" style="padding:0;">
+              <div class="ac-head"><span class="t" title="장애노트 작성">🩹 장애노트</span></div>
+              <div class="ac-frow"><span class="ac-flabel" title="제품/대상">제품/대상</span><input class="ac-input" placeholder="예: Tenable…"></div>
+              <div class="ac-body" style="padding-top:8px;"><button class="ac-btn primary">💾 장애노트 저장</button></div>
+            </div>
+            <div class="card" style="padding:0;">
+              <div class="ac-head"><span class="t" title="매뉴얼 보강">📄 매뉴얼</span></div>
+              <div class="ac-frow"><span class="ac-flabel" title="섹션 이름">섹션</span><input class="ac-input"></div>
+              <div class="ac-body" style="padding-top:8px;"><button class="ac-btn primary">▶ 저장</button></div>
+            </div>
+          </div>
+          <div class="card" style="padding:0;margin-top:10px;">
+            <div class="ac-head"><span class="t">📚 문서</span><span class="ac-cnt">120건</span></div>
+            <div class="doclist-scroll">
+              <div class="g-rows-head"><span>문서</span><span>영역</span><span>등급</span><span>반입</span></div>
+              <div class="g-rows-r"><span class="trunc" title="ISMS-P_인증기준_해설서_v3.pdf">ISMS-P_인증기준_해설서_v3.pdf</span><span class="trunc">일반</span><span><span class="dm-grade gO">공개</span></span><span class="trunc">08-30</span></div>
+              <div class="g-rows-r"><span class="trunc" title="Tenable_SC_운영매뉴얼_보안팀전용.docx">Tenable_SC_운영매뉴얼_보안팀전용.docx</span><span class="trunc">취약점</span><span><span class="dm-grade gS">민감</span></span><span class="trunc">08-29</span></div>
+            </div>
+          </div>
+          <div class="narrowcap" style="margin-top:10px;">▣ 히트맵 보기가 420px에서 접히는 모습(§4·§6-e)</div>
+          <div class="ac-tiles" style="border:1px solid var(--border);border-radius:10px;">
+            <div class="ac-tile gO"><div class="ac-tv ok">공개</div><div class="ac-tl" title="ISMS-P_인증기준_해설서_v3.pdf">ISMS-P_인증…</div><div class="ac-ts">일반</div></div>
+            <div class="ac-tile"><div class="ac-tv warn">민감</div><div class="ac-tl" title="Tenable_SC_운영매뉴얼_보안팀전용.docx">Tenable_SC_…</div><div class="ac-ts">취약점</div></div>
+            <div class="ac-tile"><div class="ac-tv bad">기밀</div><div class="ac-tl" title="망분리_예외승인_대장.xlsx">망분리_예외…</div><div class="ac-ts">사내규정</div></div>
+          </div>
+        </main>
+      </div>
+      </div>
+    </div>
+    <table class="reftbl" style="margin-top:12px;">
+      <tr><th>요소</th><th>420px에서</th><th>잘리는 글자</th></tr>
+      <tr><td>화면 정체성 한 줄</td><td>nowrap+ellipsis+title(마우스오버 시 전문)</td><td class="ok">0</td></tr>
+      <tr><td>KPI 라벨("전문가 어댑터" 등)</td><td>줄바꿈 우선, 정 안 되면 ellipsis+title</td><td class="ok">0</td></tr>
+      <tr><td>버튼("장애노트 저장" 등)</td><td>.ac-btn = nowrap 고정(내용 폭만큼 항상 한 줄)</td><td class="ok">0</td></tr>
+      <tr><td>문서 표 셀</td><td>표 전체가 가로 스크롤(overflow-x:auto), 셀 안에서는 ellipsis+title</td><td class="ok">0</td></tr>
+      <tr><td>히트맵 타일</td><td>말줄임 아님 — 열 수만 자동으로 줆(auto-fill/minmax)</td><td class="ok">0</td></tr>
+    </table>
+  </section>
+
+  <!-- ═══════════════════ §4 히트맵 정지 장면 ═══════════════════ -->
+  <section id="heatstill">
+    <h2>§4. 히트맵 보기 — 정지 장면(위 §2 토글을 눌러도 같은 결과가 라이브로 뜬다)</h2>
+    <p class="sub">색·규칙은 chatparts.js <code>색사전</code>(444-470행)을 그대로 재사용 — 새 색 발명 없음:
+    치명/높음/정상 정규식 매칭. 이 화면은 "등급"(공개/민감/기밀)이 판정열 역할을 하며, 색은 이미 존재하는
+    <code>memory.html</code>의 <code>.dm-grade</code> 배지 색과 같다(기밀=빨강·민감=호박·공개=무채색).</p>
+    <div class="card" style="max-width:640px;">
+      <div class="ac-head"><span class="t">📚 올린 문서 확인 · 관리</span><span class="ac-cnt">120건</span>
+        <span class="ac-seg"><span data-v="list">목록</span><span class="on" data-v="heat">히트맵</span></span></div>
+      <div class="ac-tiles">
+        <div class="ac-tile"><div class="ac-tv ok">공개</div><div class="ac-tl">ISMS-P_인증기준_해설서_v3.pdf</div><div class="ac-ts">일반 · 08-30</div></div>
+        <div class="ac-tile"><div class="ac-tv warn">민감</div><div class="ac-tl">Tenable_SC_운영매뉴얼.docx</div><div class="ac-ts">취약점 · 08-29</div></div>
+        <div class="ac-tile"><div class="ac-tv bad">기밀</div><div class="ac-tl">망분리_예외승인_대장.xlsx</div><div class="ac-ts">사내규정 · 08-27</div></div>
+        <div class="ac-tile"><div class="ac-tv ok">공개</div><div class="ac-tl">CVE-2026-보안공지_모음.pdf</div><div class="ac-ts">취약점 · 08-25</div></div>
+        <div class="ac-tile"><div class="ac-tv purp">미지정</div><div class="ac-tl">현장_장애노트_2026Q3.md</div><div class="ac-ts">위협대응 · 08-24</div></div>
+        <div class="ac-tile"><div class="ac-tv warn">민감</div><div class="ac-tl">접근제어_지침_v5.pdf</div><div class="ac-ts">사내규정 · 08-20</div></div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:8px;">⚠ 색사전에 "미지정"(purp)은 없다 — dm-grade의 gg-\? 배지(보라·점선)를
+    본떠 <b>이 화면 전용으로 4번째 색을 제안</b>한다(§5에 기각하지 않고 채택한 이유 기록).</p>
+  </section>
+
+  <!-- ═══════════════════ §5 왜 이 안 ═══════════════════ -->
+  <section id="why">
+    <h2>§5. 왜 이 안 — 기각한 대안</h2>
+    <table class="reftbl">
+      <tr><th>대안</th><th>기각 이유</th></tr>
+      <tr><td>A. dc-card(chatparts.js)를 화면에 그대로 이식(JS 재사용)</td>
+        <td>dc-card는 "말풍선 안에 붙는 답변 부속품" 계약 위에 있다(<code>붙일자리()</code>가 <code>.cs-row</code>
+        전제). 독립 페이지 최상위 레이아웃에 그대로 꽂으면 안 쓰는 채팅 계약을 억지로 끌고 온다 — 그래서
+        <b>시각 언어(CSS)만</b> 옮기고 JS는 새로 짰다.</td></tr>
+      <tr><td>B. 전 화면(176곳) CSS 일괄 스윕 자동화</td>
+        <td>이 저장소의 전수 스윕 사고 계보(테마 감시가 denylist라 새 hex를 못 잡음·"하루에 8화면에서
+        같은 병") — 검증 없이 한 번에 176곳을 바꾸면 게시 후에야 깨진 자리를 발견한다. 이번엔
+        <b>지식 창고 1개 화면만</b> 먼저 하고, 승인·실사용 확인 후 §9에서 확산 순서를 제안한다.</td></tr>
+      <tr><td>C. 요약 카드 4장만 고치고 폼은 그대로 둔다</td>
+        <td>사장님이 지적한 "폼 덩어리"가 스샷의 절반이다. 카드만 고치면 위(카드)·아래(옛 폼)의 톤이
+        갈라져 더 어색해진다 — 그래서 <b>배너·수집·보강 2·문서 목록까지 화면 전체</b>를 통일했다.</td></tr>
+      <tr><td>D. 카드마다 「🗔 열기」 버튼 추가(2번째 이미지 그대로)</td>
+        <td>지식 창고의 요약 카드는 이미 <b>카드 전체가 클릭 가능한 판 전환 스위치</b>다(grouphub.js:132-135,
+        기존 동작 유지). 버튼을 얹으면 "카드를 눌러도 되고 버튼을 눌러도 되는" 두 클릭 표적이 생겨
+        오히려 헷갈린다 — 표(문서 목록)가 있는 카드에만 필요한 목록|히트맵 토글을 얹었다.</td></tr>
+      <tr><td>E. 좁은 폭 대응을 @media(뷰포트 전체)로</td>
+        <td>이 화면은 iframe 안에 있어 @media도 사실 동작은 한다(iframe 자체 뷰포트를 따름). 그러나
+        카드가 "이 화면 전용"이 아니라 나중에 다른 폭의 자리(예: 대시보드 슬롯)에 재사용될 수 있어
+        <b>컴포넌트가 자기 폭에 반응</b>하는 @container가 더 맞는 도구다(§7 근거).</td></tr>
+      <tr><td>F. 사이드바 축소를 자동 폭 판정 없이 수동 토글로만 유지</td>
+        <td>기존 <code>gn-left-collapsed</code>(nav.js:929-949)는 사용자가 직접 누르는 기억형 토글이다.
+        420px처럼 스스로 좁아지는 상황엔 사용자가 매번 누르게 하는 것이 더 나쁘다 — <b>폭 자동판정으로
+        같은 시각 언어(아이콘 레일)를 트리거</b>하는 것을 이 시안이 새로 제안한다(기존 로직 재사용
+        아님, 명시).</td></tr>
+    </table>
+  </section>
+
+  <!-- ═══════════════════ §6 무엇을 포기했는지 ═══════════════════ -->
+  <section id="giveup">
+    <h2>§6. 무엇을 포기했는지 · 표 vs 시각 판 반응형 대비</h2>
+    <div class="checkline"><span class="ic">⏸</span><span><b>지식 관계도(그래프)·학습 데이터셋 만들기·
+    파인튜닝·정리 점검</b> 접기 구역은 이번 범위 밖이다 — 사장님 스크린샷에 없었고, 그래프처럼 이질적인
+    시각화는 카드 틀을 씌우면 오히려 좁아질 위험이 있어 별도 라운드로 미룬다.</span></div>
+    <div class="checkline"><span class="ic">⏸</span><span><b>자산 관리 「지도」 탭</b>(추가 지시 C에서
+    캡처로 언급)은 <u>다른 화면</u>이다 — 이 목업은 만들지 않는다. 다만 <b>규칙(e)는 그 화면에도 그대로
+    적용되도록 일반화</b>해 아래 표에 남긴다(메인 에이전트가 그 화면에도 같은 규칙으로 반영할 근거).</span></div>
+    <div class="checkline"><span class="ic">⏸</span><span>카드 헤더 버튼은 2번째 이미지처럼 모든 카드에
+    넣지 않았다(§5-D) — 표가 있는 카드에만.</span></div>
+    <table class="reftbl" style="margin-top:10px;">
+      <tr><th></th><th>표(엑셀형 · .g-rows)</th><th>시각 판(히트맵 · 지도)</th></tr>
+      <tr><td>정보 보존 원칙</td><td>말줄임 + title(원문) — 셀 하나가 진실의 단위</td>
+        <td><b>반응형(리플로우)</b> — 축소·재배치. 말줄임 대상이 아니다(숫자·색은 잘려도 뜻을 모른다).</td></tr>
+      <tr><td>좁을 때 동작</td><td>컨테이너 <code>overflow-x:auto</code>로 통째로 옆으로(표는 안 접는다)</td>
+        <td><code>auto-fill/minmax</code>로 열 수 자체가 준다(§3 실측 — 6열→3열)</td></tr>
+      <tr><td>겹침 레이어</td><td>해당 없음(표는 원래 겹칠 요소가 없다)</td>
+        <td>절대배치(<code>position:absolute</code>) 금지 — dc-tile은 전부 문서 흐름(stacking) 배치라
+        구조적으로 안 겹친다(chatparts.js 실측, 이 시안도 그대로 유지)</td></tr>
+      <tr><td>실패 판정</td><td>잘리는 글자(title 없이) &gt; 0</td>
+        <td>절대배치 글자가 다른 글자 위에 얹힘, 또는 타일이 카드 폭을 벗어나 가로 스크롤 생김
+        (히트맵은 스크롤이 아니라 <u>재배치</u>가 정답)</td></tr>
+    </table>
+  </section>
+
+  <!-- ═══════════════════ §7 적용 규칙 ═══════════════════ -->
+  <section id="rules">
+    <h2>§7. 적용 규칙 — 공용 부품화 + 좁은 폭 계약</h2>
+    <h3>공용 부품화(단계적, 일괄 스윕 아님 — §5-B)</h3>
+    <div class="checkline"><span class="ic">1</span><span>이 시안 승인 시 <code>gijo-ui.css</code>에
+    <code>.g-scard*</code>(화면용 카드) 계열을 추가한다 — 값은 이 시안의 <code>.ac-*</code>를 그대로
+    옮긴다(다크 토큰만 사용, 새 hex 0개).</span></div>
+    <div class="checkline"><span class="ic">2</span><span><code>pro-white.css</code>는 <b>무변경</b> —
+    <code>.g-scard*</code>가 <code>--g-surface/--g-text/--g-muted*</code> 토큰만 쓰므로 흰 바탕은 이미
+    올바른 색으로 뒤집힌다(§8에서 대비값 확인).</span></div>
+    <div class="checkline"><span class="ic">3</span><span><code>aihub.html</code> 요약 띠부터 적용 →
+    <code>memory.html</code> 폼 → 승인 검증 후 다른 화면(discover 등)에 <b>화면 단위로</b> 확산(한
+    커밋에 여러 화면 금지).</span></div>
+    <h3 style="margin-top:14px;">좁은 폭 계약(420px 기준, 모든 메뉴 공통 적용 대상)</h3>
+    <table class="reftbl">
+      <tr><th>규칙</th><th>내용</th><th>이 시안의 구현</th></tr>
+      <tr><td>(a)</td><td>한 줄 의도 요소(라벨·버튼·행 셀)는 <code>white-space:nowrap</code> +
+        <code>text-overflow:ellipsis</code> + <code>title</code>(원문)</td>
+        <td><code>.ac-kl</code>·<code>.ac-flabel</code>·<code>.trunc</code>·모든 헤더 제목</td></tr>
+      <tr><td>(b)</td><td>카드 격자는 컨테이너 폭 기준으로 열 수를 줄인다</td>
+        <td><code>auto-fit/minmax</code>(그리드 기본기) + <code>@container acshell(max-width:480px)</code>
+        (사이드바·2열 폼 등 개별 컴포넌트 재배치)</td></tr>
+      <tr><td>(c)</td><td>표는 컨테이너에 <code>overflow-x:auto</code></td>
+        <td><code>.doclist-scroll</code> — 셀은 안 줄이고 표 전체를 옆으로</td></tr>
+      <tr><td>(d)</td><td>최소폭 420px에서 잘리는 글자 0이 합격선</td><td>§3 표로 실측 확인(전부 0)</td></tr>
+      <tr><td>(e)</td><td><b>히트맵·지도 같은 "시각 판"은 말줄임 대상이 아니다</b> — 좁은 폭에서 타일이
+        리플로우(열 수 감소)·축소되고, 겹침 레이어(배지·라벨)는 세로 적층으로 풀린다. 절대배치 글자가
+        다른 글자 위에 얹히면 실패.</td><td><code>.ac-tiles</code>(auto-fill/minmax, 문서 흐름 배치만) —
+        §3·§4·§6 표 참고</td></tr>
+    </table>
+  </section>
+
+  <!-- ═══════════════════ §8 밀도 숫자 ═══════════════════ -->
+  <section id="density">
+    <h2>§8. 밀도 숫자</h2>
+    <p class="sub">방법: 이 시안이 <b>직접 선언한 CSS 값의 합</b>(위 &lt;style&gt;)과, 실물 소스에 있는
+    <b>리터럴 상수</b>(파일:줄 인용)를 대조한다. 브라우저 실제 렌더는 폰트 메트릭 차이로 ±2~4px 오차가
+    있을 수 있다 — 라이브 픽셀 실측이 아니라 <b>소스 계산값</b>임을 명시한다(실측 없이 "줄었다"고
+    단정하지 않는다는 원칙에 따라 방법을 먼저 밝힌다).</p>
+    <table class="reftbl">
+      <tr><th>항목</th><th class="num">기존</th><th class="num">이 시안</th><th class="num">증감</th><th>근거</th></tr>
+      <tr><td>요약 카드 1장 높이</td><td class="num">138px(고정, aihub.html:26)</td>
+        <td class="num">≈130px(1줄 기준, 가변)</td><td class="num ok">-8px(-6%), 단 <b>고정→최소값</b></td>
+        <td>헤더38(패딩10×2+텍스트17+테두리1) + KPI행59(패딩20+라벨15+간격3+값21) + 꼬리33(패딩16+텍스트17)</td></tr>
+      <tr><td>수집 폼 카드</td><td class="num">≈279px(memory.html .panel20×2+배너26+select필드73+
+        fold헤더45+입력행69+상태26)</td><td class="num">≈146px(헤더38+배너30+본문78)</td>
+        <td class="num ok">-133px(-48%)</td><td>fold 래퍼(접기 제목 줄) 제거 + 배너·헤더·본문 3단만 남김</td></tr>
+      <tr><td>보강 인입 2카드</td><td class="num">구조적 비교만(원본 <code>&lt;input&gt;</code>이
+        <code>.field</code> 클래스 밖이라 브라우저 기본값에 의존 — 정확한 픽셀 계산 근거 부족)</td>
+        <td class="num">행 5개×평균 43px+헤더38</td>
+        <td class="num">—</td><td>핵심은 높이가 아니라 <b>라벨 상시 노출</b>(placeholder 의존 제거,
+        §0-④)</td></tr>
+      <tr><td>문서 목록 행</td><td class="num">30px(.g-rows-r, gijo-ui.css:359 — 실물 그대로)</td>
+        <td class="num">30px</td><td class="num ok">0%(부품 재사용, 새 CSS 0줄)</td>
+        <td>이미 목표 디자인과 결이 같아 유지</td></tr>
+      <tr><td>420px에서 잘리는 글자 수</td><td class="num">추정 다수(§0 재현 참고)</td>
+        <td class="num">0</td><td class="num ok">— (합격선 (d))</td><td>§3 실측표</td></tr>
+    </table>
+  </section>
+
+  <!-- ═══════════════════ §9 제품 원칙 자가점검 ═══════════════════ -->
+  <section id="selfcheck">
+    <h2>§9. 제품 원칙 자가점검</h2>
+    <div class="card">
+      <div class="checkline"><span class="ic">⚠</span><span><b>메뉴는 보기용 · 지시는 대화창</b> — 이
+      화면은 <b>기존 예외</b>다(원본 memory.html이 이미 입력 폼 화면). 수집 경로·장애노트·매뉴얼 보강은
+      파일시스템 경로·자유서술 구조화 입력이라 대화형 지시로 대체하기 어렵고, 이번 시안은 그 예외를
+      <b>그대로 유지</b>한 채 껍데기(카드 언어)만 바꿨다 — 새로 입력칸을 늘리지 않았고 폼 개수도 원본과
+      동일(수집1 + 장애노트1 + 매뉴얼1). 대화 이관은 이번 범위 밖.</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>자체완결 HTML</b> — 외부 CDN·웹폰트·원격
+      이미지 0개. 더블클릭으로 열린다(이모지·순수 CSS만 사용).</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>다크톤 기본</b> — aihub.html·memory.html의
+      실제 <code>:root</code> 값을 그대로 복사(색 하나도 새로 정의 안 함).</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>11px 하한</b> — 본문·배지·타일 라벨 전부
+      ≥11px(<code>.ac-tv</code> 11px가 최소, chatparts.js와 같은 이유로 10→11px 유지).</span></div>
+      <div class="checkline"><span class="ic">⚠</span><span><b>정직한 구현</b> — 문서 목록·요약 숫자는
+      전부 예시값이다(실제 API 연결 없음). <b>목록|히트맵 토글만 실제로 작동</b>(§2·§4, 순수 DOM 전환,
+      서버 호출 없음) — 나머지 버튼·입력칸은 눌러도 반응하지 않는다(상단 배너에 명시).</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>흰 바탕 대비(프로 라이트 대응)</b> — 이
+      시안은 <code>--g-*</code> 토큰만 쓰므로 <code>pro-white.css</code>가 이미 계산해 둔 대비값을
+      그대로 물려받는다(주석 111-119행 실측 인용): teal-ink 6.57:1(흰) / 5.73:1(패널2) · amber-ink
+      6.50:1/5.66:1 · blue-ink 8.14:1/7.09:1 · purple-ink 8.98:1/7.83:1 · muted-ink 5.97:1/5.20:1 —
+      전부 WCAG AA(4.5:1) 통과. 새 hex를 하나도 안 써서 <code>themecolors</code> 감시(denylist 함정)에
+      걸릴 여지도 없다.</span></div>
+      <div class="checkline"><span class="ic">✅</span><span><b>같은 것을 한 곳에만</b> — 히트맵 색사전·
+      타일 배치·11px 규칙은 chatparts.js를 그대로 인용(재정의 없음). 등급 색(공개/민감/기밀)은
+      memory.html의 <code>.dm-grade</code>를 그대로 인용.</span></div>
+      <div class="checkline"><span class="ic">⚠</span><span><b>@container 신규 의존</b> — 이 저장소에서
+      처음 쓰는 CSS 기법이다(§7 근거는 있으나 실물 코드에 전례 없음). 실제 반영 전 <code>gijo-architect</code>
+      검토에서 "Electron 번들 Chromium 버전이 105+ 확실한가"를 확인받을 것을 제안한다(이 목업은 조사
+      근거만 남기고 확정은 사장님·설계관 몫).</span></div>
+    </div>
+  </section>
+
+  <footer>
+    산출물: <code>mockups/aihub-cardstyle/시안.html</code> · 작성 2026-08-31 · gijo-mockup 서브에이전트<br>
+    참고 표준: appdeck.com "Executive Dashboard Design Best Practices"(2026) ·
+    5of10.com "Dashboard Design Best Practices"(2026) ·
+    sitelint.com "Truncating text and making it accessible" ·
+    chrome.dev "Container Queries" · developer.chrome.com "cq-polyfill" 블로그(Chromium 105 지원 시점)<br>
+    내부 근거: aihub.html·grouphub.js·grouppanels.js·memory.html·chatparts.js·pro-white.css·gijo-ui.css·
+    app.html(대화폭클램프)·nav.js(gn-left-collapsed) — 전부 파일:줄 인용(§ 머리말)
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // 목록|히트맵 토글 — 순수 DOM 전환(서버 호출 없음, 정직 구현 원칙). 문서 목록 카드 예시 6행.
+  var DOCS = [
+    { name: "ISMS-P_인증기준_해설서_v3.pdf", area: "일반", grade: "O", gl: "공개", date: "08-30" },
+    { name: "Tenable_SC_운영매뉴얼_보안팀전용.docx", area: "취약점", grade: "S", gl: "민감", date: "08-29" },
+    { name: "망분리_예외승인_대장.xlsx", area: "사내규정", grade: "C", gl: "기밀", date: "08-27" },
+    { name: "CVE-2026-보안공지_모음.pdf", area: "취약점", grade: "O", gl: "공개", date: "08-25" },
+    { name: "현장_장애노트_2026Q3.md", area: "위협대응", grade: "Q", gl: "미지정", date: "08-24" },
+    { name: "접근제어_지침_v5.pdf", area: "사내규정", grade: "S", gl: "민감", date: "08-20" },
+  ];
+  var TCLS = { O: "ok", S: "warn", C: "bad", Q: "purp" };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  var rowsEl = document.getElementById("docListRows");
+  if (rowsEl) {
+    rowsEl.innerHTML = DOCS.map(function (d) {
+      return '<div class="g-rows-r"><span class="trunc" title="' + esc(d.name) + '">' + esc(d.name) + '</span>' +
+        '<span class="trunc">' + esc(d.area) + '</span>' +
+        '<span><span class="dm-grade g' + d.grade + '">' + esc(d.gl) + '</span></span>' +
+        '<span class="trunc">' + esc(d.date) + '</span></div>';
+    }).join("");
+  }
+  var tilesEl = document.getElementById("docTiles");
+  if (tilesEl) {
+    tilesEl.innerHTML = DOCS.map(function (d) {
+      var c = TCLS[d.grade] || "muted";
+      return '<div class="ac-tile ' + (d.grade === "O" ? "" : d.grade === "S" ? "warn" : d.grade === "C" ? "bad" : "purp") + '">' +
+        '<div class="ac-tv ' + c + '">' + esc(d.gl) + '</div>' +
+        '<div class="ac-tl" title="' + esc(d.name) + '">' + esc(d.name) + '</div>' +
+        '<div class="ac-ts">' + esc(d.area) + ' · ' + esc(d.date) + '</div></div>';
+    }).join("");
+  }
+  var seg = document.getElementById("docSeg");
+  if (seg) {
+    seg.addEventListener("click", function (e) {
+      var s = e.target.closest("span[data-v]");
+      if (!s) return;
+      seg.querySelectorAll("span").forEach(function (x) { x.classList.remove("on"); });
+      s.classList.add("on");
+      var wrapList = document.getElementById("docListWrap");
+      var wrapHeat = document.getElementById("docTilesWrap");
+      var heat = s.getAttribute("data-v") === "heat";
+      if (wrapList) wrapList.style.display = heat ? "none" : "";
+      if (wrapHeat) wrapHeat.style.display = heat ? "" : "none";
+    });
+  }
+})();
+</script>
+</body>
+</html>

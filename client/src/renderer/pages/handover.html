@@ -74,6 +74,14 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
 .btn.go{background:var(--teal);border-color:var(--teal);color:var(--fill-contrast,#04281c);font-weight:800;}
 .btn:disabled{opacity:.5;cursor:default;}
 .btn:hover:not(:disabled){filter:brightness(1.15);}
+/* 좁은 폭 계약(2026-08-31) — 대화창 최대(판 420px)에서 단계 표시 4칸·요약 4칸이 세로로
+   뭉개졌다(실측). 엑셀 방식: 격자는 폭 따라 접히고, 단계 글자는 말줄임. */
+.step{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+@media (max-width: 720px){
+  .steps{display:grid;grid-template-columns:repeat(2,1fr);}
+  .sum{grid-template-columns:repeat(2,1fr);}
+  .chk{grid-template-columns:1fr;} /* 점검표 문장이 109px 기둥에 뭉개지던 것 — 전폭이면 두 줄 안팎 */
+}
 </style>
 </head>
 <body>
@@ -122,7 +130,7 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
     <!-- 3단계 -->
     <div class="panel">
       <div class="p-title">3. AI 자동 검증 — 후임자가 물어보면 진짜 답이 나올까?</div>
-      <div class="acts"><button class="btn primary" id="verifyBtn">▶ 검증 시작 (문서마다 AI가 질문을 만들어 실제로 물어봅니다)</button><button class="btn" id="verifyFailBtn" style="display:none">미인용 문서만 재검증</button></div>
+      <div class="acts"><button class="btn primary wrap-ok" id="verifyBtn">▶ 검증 시작 (문서마다 AI가 질문을 만들어 실제로 물어봅니다)</button><button class="btn" id="verifyFailBtn" style="display:none">미인용 문서만 재검증</button></div>
       <div id="verifyStatus" class="hint"></div>
       <div id="verifyTableWrap" style="display:none;margin-top:10px">
         <table>

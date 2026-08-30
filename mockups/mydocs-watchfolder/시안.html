@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 시안: 내 문서 「📂 지켜보는 폴더」 — 추천안 1개</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  시안: mockups/mydocs-watchfolder/시안.html   (추천 시안 1개 — mockup 규칙)
+  근거: 사장님 원문(2026-08-31) 「내문서 — 모든 데이터 업로드 확인 + 위키처럼 특정 디렉토리
+  지정해서 계속 확인도 가능하게 + 업무넘기기 포함」. 승인 시안 menu5-antigravity/시안.html §2가
+  그린 모습(감시중 칩·새 파일 알림·경로 지정은 대화창)을 이 화면(mydocs.html) 단위로 구체화한다.
+  이 파일은 mockups/ 밖의 제품 코드를 한 글자도 바꾸지 않는다. 순수 그림(정적 HTML)이며
+  버튼·행·탭은 시각 시연용이다 — 실제 라우팅·서버 호출은 없다(정직한 구현 원칙, 목업에도 적용).
+
+  ── 설계 전 조사(근거, 2026-08-31 웹 조사) ──────────────────────────────────
+  1) "지켜보는 폴더(watched folder)" UI의 표준 필드 — Adobe LiveCycle/AEM Forms "Watched
+     Folder"와 Febooti Automation Workshop "File/Folder Watcher"를 확인. 둘 다 폴더 단위로
+     ①상태(활성/일시중지) ②마지막 확인·갱신 시각 ③폴링 주기(초 단위)를 표준 필드로 다룬다 —
+     "실시간 감시"가 아니라 "주기 확인"이 이 부류 소프트웨어의 일반적 동작 방식이라는 뜻이다.
+     이 시안의 "마지막 확인 08-30 14:20" 문구·상태 칩(감시중/일시중지/경로 없음)은 그 관행을
+     그대로 따른다 — 동시에 이 제품의 구현 초안(watchfolder.ts, 주기 폴링 — WSL /mnt에서
+     fs.watch가 신뢰성 문제가 있어 배제)과도 정확히 맞는다. "감시 중·즉시 반영" 같은 실시간을
+     암시하는 문구는 쓰지 않았다(정직한 구현 원칙 — 화면 문구가 구현 방식을 속이지 않는다).
+     출처: help.adobe.com Watched Folder(AEM Forms) · febooti.com File/Folder Watcher.
+  2) 빈 상태(empty state) 설계 — NN/g "Designing Empty States in Complex Applications"는
+     빈 화면에 맥락 안내 + "다음 행동"을 담되 보통 화면 안 버튼·링크로 유도하라고 권한다.
+     ⚠ 이 권고와 우리 제품 원칙("메뉴는 보기용·지시는 대화창", 2026-07-25~ 확립)이 정면으로
+     부딪힌다 — 이 시안은 **우리 원칙을 따른다**: 빈 상태에 "+ 폴더 추가" 버튼을 두지 않고,
+     대신 대화창에 말할 "예시 문장"을 눈에 띄게(굵게·인용상자) 두어 "어디로 가면 되는지"만
+     명확히 한다. 일반 모범사례를 그대로 베끼지 않은 이유를 여기 남긴다.
+     출처: nngroup.com/articles/empty-state-interface-design.
+  3) 화면 구조·밀도·배색은 **전부 기존 코드값 재사용**(새로 발명한 치수 0개):
+     client/src/renderer/pages/mydocs.html(v4) — 사이드바 접힘 44px(.v4sidebar.collapsed,
+     L94) · 목록 칸 400px(.v4list, L130) · 반입 영수증 그리드(파일명/갈래/남긴것/시각,
+     L1025-1062, 파일명은 잘리고 올린이는 안 잘리는 ing-name 그리드 L197-199) · 등급 배지
+     gtxt-C/S/O(L148, L721-727). 행 높이 30px는 gijo-ui.css:359 .g-rows-r(제품 전역 "엑셀형"
+     표준). 배색은 client/src/renderer/pages/pro-white.css의 html.theme-light 토큰을 그대로
+     옮겼다(승인 시안 mockups/menu5-antigravity/시안.html이 이미 같은 방식으로 옮긴 값과 동일).
+  ════════════════════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  /* pro-white 팔레트 — client/src/renderer/pages/pro-white.css의 html.theme-light 값을
+     그대로 옮겼다(제품과 같은 색, 시안에서 새로 지어내지 않음). */
+  --bg:#faf8f5; --panel:#ffffff; --panel-2:#f2efe9;
+  --border:rgba(43,38,33,.12); --border-strong:rgba(43,38,33,.22);
+  --text:#2b2621; --text-strong:#1f1b14; --muted:#6b6259; --muted-2:#726960;
+  --blue:#1d4f91; --blue-light:#1d4f91; --teal:#086b43; --amber:#8f4d02; --red:#b3241a; --purple:#5b21b6;
+  --zebra:rgba(43,38,33,.035);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#e7e2d8;color:var(--text);
+  font-size:13px;padding:22px;}
+.wrap{max-width:1560px;margin:0 auto;}
+h1{font-size:19px;margin-bottom:4px;color:var(--text-strong);}
+.sub{color:var(--muted);font-size:12.5px;margin-bottom:16px;}
+.pill{display:inline-block;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:20px;
+  padding:2px 10px;font-size:11.25px;font-weight:700;color:var(--muted);margin-right:6px;}
+.pill.on{background:rgba(29,79,145,.1);color:var(--blue);border-color:var(--blue);}
+.note-static{background:#fff8e6;border:1px solid #e8d3a8;color:#6b4c02;border-radius:8px;padding:8px 12px;
+  font-size:12px;font-weight:700;margin:10px 0 18px;}
+
+/* ── 섹션 공통 ─────────────────────────────────────────────────────────── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:18px;}
+.card h2{font-size:14px;margin-bottom:10px;color:var(--text-strong);display:flex;align-items:center;gap:8px;}
+.card h2 .n{background:var(--blue);color:#fff;border-radius:6px;width:20px;height:20px;display:inline-flex;
+  align-items:center;justify-content:center;font-size:11px;font-weight:800;}
+.card .capt{font-size:11.5px;color:var(--muted-2);margin:-4px 0 12px;}
+
+/* ── 목업 창(실제 셸을 흉내낸 정적 그림) ─────────────────────────────────── */
+.shell{background:var(--bg);border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;
+  box-shadow:0 10px 32px rgba(31,27,20,.14);height:700px;display:flex;flex-direction:column;}
+.shell.small{height:420px;}
+.dockhead{height:30px;flex:0 0 30px;background:var(--panel-2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;padding:0 10px;font-size:11.5px;color:var(--muted);}
+.dockhead b{color:var(--text);font-weight:800;font-size:12px;}
+.dockhead .sp{flex:1 1 auto;}
+.dockhead .ib{background:var(--panel);border:1px solid var(--border-strong);color:var(--blue);border-radius:6px;
+  font-size:10.75px;font-weight:800;padding:2px 8px;}
+.docwrap{flex:1 1 auto;min-height:0;display:flex;}
+
+/* 문서 사이드(44px 접힘, mydocs.html v4 그대로 — .v4sidebar.collapsed) */
+.mdside{flex:0 0 44px;width:44px;background:var(--panel-2);border-right:1px solid var(--border-strong);
+  display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;}
+.mdside .nd{width:32px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:var(--muted);position:relative;}
+.mdside .nd.on{background:rgba(29,79,145,.14);color:var(--blue);}
+.mdside .nd.newf{box-shadow:inset 0 0 0 1px var(--teal);}
+.mdside .nd .b{position:absolute;top:-3px;right:-4px;background:var(--teal);color:#fff;font-size:7.5px;
+  font-weight:900;border-radius:5px;padding:0 3px;line-height:1.3;}
+.mdside .div{width:22px;height:1px;background:var(--border-strong);margin:4px 0;}
+
+/* 목록(엑셀형, 행 30px — 기존 .v4list 400px 그대로) */
+.mdlist{flex:0 0 400px;width:400px;border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+.mdlist .lh{flex:0 0 34px;height:34px;display:flex;align-items:center;gap:6px;padding:0 10px;
+  border-bottom:1px solid var(--border);font-size:11.75px;font-weight:800;color:var(--text-strong);}
+.mdlist .lh .cnt{color:var(--muted-2);font-weight:600;}
+.filterbar{flex:0 0 28px;height:28px;display:flex;align-items:center;padding:0 8px;gap:6px;}
+.filterbar .fk{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:2px 8px;
+  font-size:10.75px;color:var(--muted-2);}
+.filterbar .fk.on{color:var(--blue);border-color:var(--blue);background:rgba(29,79,145,.08);font-weight:700;}
+.rows{flex:1 1 auto;overflow-y:auto;}
+.wf-row{display:grid;grid-template-columns:78px 1fr 60px 78px;align-items:center;gap:6px;height:30px;
+  padding:0 10px;font-size:11.5px;border-bottom:1px solid var(--border);cursor:pointer;}
+.wf-row:nth-child(even){background:var(--zebra);}
+.wf-row.sel{background:rgba(29,79,145,.1);}
+.wf-row .p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.wf-row .p b{font-weight:700;color:var(--text);}
+.wf-row .p .ext{color:var(--muted-2);margin-left:4px;font-size:10.5px;}
+.wf-row .n{text-align:right;font-weight:800;color:var(--text);}
+.wf-row .n.z{color:var(--muted-2);font-weight:600;}
+.wf-row .t{text-align:right;color:var(--muted-2);font-size:10.5px;white-space:nowrap;}
+.chip{display:inline-block;font-size:9.5px;font-weight:800;border-radius:4px;padding:2px 6px;white-space:nowrap;}
+.chip.watch{background:#e3f6ec;color:var(--teal);}
+.chip.pause{background:var(--panel-2);color:var(--muted-2);}
+.chip.missing{background:#fdeceb;color:var(--red);} /* g-b-crit 반전 공식(pro-white.css:51) 재사용 */
+
+.mddoc{flex:1 1 auto;min-width:0;padding:14px 16px;overflow-y:auto;}
+.mddoc h3{font-size:14px;margin-bottom:4px;color:var(--text-strong);word-break:break-all;}
+.mddoc .meta{font-family:Consolas,monospace;font-size:11px;background:var(--panel-2);border:1px solid var(--border);
+  border-radius:6px;padding:6px 9px;color:var(--text);margin-bottom:4px;}
+.mddoc .honest{font-size:10.75px;color:var(--muted-2);margin-bottom:10px;}
+.kv{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;}
+.kv .b{font-size:16px;font-weight:800;color:var(--text-strong);}
+.kv .l{font-size:10.5px;color:var(--muted-2);}
+.sub-h{font-size:11.5px;font-weight:800;color:var(--text-strong);margin:12px 0 4px;display:flex;align-items:center;gap:6px;}
+.sub-h .cnt{color:var(--muted-2);font-weight:600;font-size:10.5px;}
+.ing-list{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.ing-row{display:grid;grid-template-columns:1fr 70px 78px 68px;align-items:center;gap:6px;height:30px;
+  padding:0 10px;font-size:11.25px;border-bottom:1px solid var(--border);}
+.ing-row:last-child{border-bottom:none;}
+.ing-row:nth-child(even){background:var(--zebra);}
+.ing-name{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px;align-items:baseline;min-width:0}
+.ing-name .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.gtxt-C{color:var(--red);font-weight:800;} .gtxt-S{color:var(--amber);font-weight:800;} .gtxt-O{color:var(--muted-2);font-weight:700;}
+.ing-t{text-align:right;color:var(--muted-2);font-size:10.5px;}
+.ing-auto{text-align:right;color:var(--teal);font-size:10px;font-weight:800;}
+.ing-more{padding:6px 10px;font-size:11px;color:var(--muted-2);border-top:1px dashed var(--border);}
+.ing-more b{color:var(--blue);font-weight:700;cursor:default;}
+
+.callout{background:#eaf1fb;border:1px solid rgba(29,79,145,.28);border-radius:9px;padding:12px 14px;margin-top:12px;}
+.callout b{color:var(--blue);}
+.callout .say{margin-top:8px;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;
+  padding:8px 10px;font-size:12px;color:var(--text);font-style:italic;}
+.noinput{margin-top:10px;font-size:11px;color:var(--muted-2);display:flex;align-items:center;gap:6px;}
+.noinput .x{color:var(--red);font-weight:900;}
+
+.empty{padding:26px 18px;text-align:center;color:var(--muted-2);font-size:12px;}
+.empty .big{font-size:26px;margin-bottom:6px;}
+.empty .t1{font-weight:800;color:var(--text);font-size:13px;margin-bottom:3px;}
+
+/* 오른쪽 대화창 — 380px 고정 도킹 계약 그대로(app.html:270) */
+.chatdock{flex:0 0 380px;width:380px;border-left:1px solid var(--border);display:flex;flex-direction:column;
+  background:var(--panel);}
+.chatdock .ch{flex:0 0 34px;height:34px;display:flex;align-items:center;padding:0 10px;font-size:11.75px;
+  font-weight:800;color:var(--text-strong);border-bottom:1px solid var(--border);background:var(--panel-2);}
+.chatlog{flex:1 1 auto;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;}
+.msg{max-width:88%;border-radius:10px;padding:7px 10px;font-size:12px;line-height:1.5;}
+.msg.me{align-self:flex-end;background:rgba(29,79,145,.1);color:var(--text);}
+.msg.ai{align-self:flex-start;background:var(--panel-2);color:var(--text);border:1px solid var(--border);}
+.timegap{align-self:center;color:var(--muted-2);font-size:10.5px;display:flex;align-items:center;gap:8px;width:100%;margin:2px 0;}
+.timegap::before,.timegap::after{content:"";flex:1 1 auto;height:1px;background:var(--border);}
+.chatin{flex:0 0 44px;border-top:1px solid var(--border);display:flex;align-items:center;padding:0 8px;gap:6px;}
+.chatin .box{flex:1 1 auto;height:28px;border:1px solid var(--border-strong);border-radius:8px;background:var(--panel-2);
+  display:flex;align-items:center;padding:0 10px;font-size:11.75px;color:var(--muted-2);}
+
+/* 새 파일 알림 카드 — 대화 속 일반 말풍선과 구분되는 「카드」(dc-card 공식: 흰 배경+테두리+그림자) */
+.filecard{align-self:flex-start;max-width:94%;background:var(--panel);border:1px solid var(--border);
+  border-radius:10px;box-shadow:0 1px 4px rgba(31,27,20,.06);overflow:hidden;}
+.filecard .fh{display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--panel-2);
+  border-bottom:1px solid var(--border);font-size:11.25px;font-weight:800;color:var(--text-strong);}
+.filecard .fh .ts{margin-left:auto;color:var(--muted-2);font-weight:600;font-size:10.25px;}
+.filecard .fb{padding:9px 10px;}
+.filecard .lead{font-size:12px;color:var(--text);margin-bottom:6px;}
+.filecard .lead b{color:var(--blue);}
+.filecard .flist{display:flex;flex-direction:column;gap:3px;margin-bottom:6px;}
+.filecard .fitem{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;}
+.filecard .fitem .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.filecard .foot{font-size:10.75px;color:var(--muted-2);border-top:1px dashed var(--border);padding-top:6px;}
+
+/* ── 클릭 동작 범례(단계) ──────────────────────────────────────────────── */
+.legend{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.leg{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 11px;font-size:11.5px;}
+.leg .h{display:flex;align-items:center;gap:6px;font-weight:800;color:var(--text-strong);margin-bottom:5px;}
+.leg .h .no{background:var(--blue);color:#fff;width:16px;height:16px;border-radius:4px;font-size:9.5px;
+  display:inline-flex;align-items:center;justify-content:center;font-weight:900;}
+.leg .body{color:var(--muted);line-height:1.6;}
+.leg code{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:0 3px;font-size:10.5px;}
+
+/* ── 밀도 숫자 표 ──────────────────────────────────────────────────────── */
+table.dense{width:100%;border-collapse:collapse;font-size:12px;}
+table.dense th{background:var(--panel-2);padding:6px 9px;text-align:left;font-size:11px;color:var(--muted);}
+table.dense td{padding:6px 9px;border-bottom:1px solid var(--border);}
+table.dense .up{color:var(--red);font-weight:800;}
+table.dense .down{color:var(--teal);font-weight:800;}
+table.dense .flat{color:var(--muted-2);font-weight:700;}
+
+ul.plain{padding-left:18px;line-height:1.85;font-size:12.5px;color:var(--text);}
+ul.plain li b{color:var(--text-strong);}
+.selfcheck{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.sc{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.sc .t{font-weight:800;font-size:12.25px;margin-bottom:5px;color:var(--text-strong);}
+.sc .ok{color:var(--teal);font-weight:800;}
+.src{font-size:11px;color:var(--muted-2);line-height:1.8;margin-top:6px;}
+.src a{color:var(--blue);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>내 문서 — 📂 지켜보는 폴더 (신규 탭) — 추천 시안 1개</h1>
+  <div class="sub">
+    <span class="pill on">추천안 1개</span>
+    <span class="pill">자체완결 HTML(외부 CDN 없음)</span>
+    <span class="pill">프로 흰 바탕(pro-white 팔레트)</span>
+    <span class="pill">밀도: 행 30px(엑셀형, 기존 그대로)</span>
+    2026-08-31 사장님 지시("위키처럼 디렉토리 지정해 계속 확인") 기반 — mockups/mydocs-watchfolder/시안.html
+  </div>
+  <div class="note-static">⚠ 이 문서는 정적 그림입니다. 아래 목업 안의 버튼·행·탭·대화 메시지는 눌러도 동작하지 않습니다(가짜 상호작용 금지 원칙) — 실제 배선은 승인 후 구현 단계(watchfolder.ts·대화 도구 3종)에서 합니다.</div>
+
+  <!-- ══ 1. 목업 본문 — 폴더가 있는 상태 ══════════════════════════════════ -->
+  <div class="card">
+    <h2><span class="n">1</span>목업 본문 A — 폴더 3개 감시 중(1개는 「경로 없음」) + 상세 선택 + 오른쪽 대화창</h2>
+    <div class="capt">기존 mydocs.html v4 구조(사이드 44px·목록 400px·문서창) 그대로. 새로 만든 것은 이 안의 「지켜보는 폴더」 그리드 배치뿐이다.</div>
+    <div class="shell">
+      <div class="dockhead">📁 <b>내 문서</b>　—　📂 지켜보는 폴더 <span class="pill" style="margin:0">신규</span>
+        <span class="sp"></span><span class="ib" title="사용법·주의사항은 이 배지를 누르면 챗봇(screenguide)이 설명합니다 — 화면엔 이름만 둡니다">ⓘ 이 화면 안내</span></div>
+      <div class="docwrap">
+        <!-- 문서 사이드(44px, 📂 강조) -->
+        <div class="mdside">
+          <div class="nd" title="👤 내 것">👤</div>
+          <div class="nd" title="🏢 회사 지식">🏢</div>
+          <div class="nd" title="📞 연락처">📞</div>
+          <div class="nd" title="📘 GIJO AS 안내">📘</div>
+          <div class="nd" title="📦 보안제품 자료">📦</div>
+          <div class="div"></div>
+          <div class="nd" title="📎 지난 작업">📎</div>
+          <div class="nd" title="🎓 학습">🎓</div>
+          <div class="nd" title="🩹 반입">🩹</div>
+          <div class="nd newf on" title="📂 지켜보는 폴더 — 신규">📂<span class="b">N</span></div>
+          <div class="nd" title="🗂 산출물(예약)" style="opacity:.5">🗂</div>
+        </div>
+
+        <!-- 목록(엑셀형, 행 30px) -->
+        <div class="mdlist">
+          <div class="lh">📂 지켜보는 폴더 <span class="cnt">· 4개</span></div>
+          <div class="filterbar">
+            <span class="fk on">전체</span><span class="fk">감시중</span><span class="fk">일시중지</span><span class="fk">경로 없음</span>
+          </div>
+          <div class="rows">
+            <div class="wf-row sel">
+              <span class="chip watch">감시중</span>
+              <span class="p"><b>D:\보안팀\취약점_스캔결과</b><span class="ext">.xlsx/.pdf</span></span>
+              <span class="n">3</span><span class="t">14:20</span></div>
+            <div class="wf-row">
+              <span class="chip watch">감시중</span>
+              <span class="p"><b>\\NAS\보안\월간점검</b><span class="ext">.docx</span></span>
+              <span class="n z">0</span><span class="t">09:00</span></div>
+            <div class="wf-row">
+              <span class="chip pause">일시중지</span>
+              <span class="p"><b>D:\감사자료\2026_ISMS</b><span class="ext">전체</span></span>
+              <span class="n z">―</span><span class="t">08-14</span></div>
+            <div class="wf-row">
+              <span class="chip missing">경로 없음</span>
+              <span class="p"><b>\\NAS-철수\월간백업</b><span class="ext">전체</span></span>
+              <span class="n z">―</span><span class="t">08-10</span></div>
+          </div>
+        </div>
+
+        <!-- 문서창: 선택한 지켜보는 폴더 상세 -->
+        <div class="mddoc">
+          <h3>📂 D:\보안팀\취약점_스캔결과</h3>
+          <div class="meta">감시중 · 확장자 .xlsx, .pdf · 하위 폴더 포함 · 5분마다 확인</div>
+          <div class="honest">※ 실시간 감시가 아니라 <b>주기 확인</b>입니다 — 「마지막 확인」 시각이 그 증거입니다(폴더 변화를 즉시 아는 것이 아니라 정해진 간격으로 살펴봅니다).</div>
+          <div class="kv">
+            <div><div class="b">3</div><div class="l">새로 들어온 문서(24h)</div></div>
+            <div><div class="b">128</div><div class="l">누적 반입 건수</div></div>
+            <div><div class="b">08-30 14:20</div><div class="l">마지막 확인</div></div>
+          </div>
+
+          <div class="sub-h">이 폴더에서 반입된 문서 <span class="cnt">· 최근 3건(전체 128건은 🩹 반입에서)</span></div>
+          <div class="ing-list">
+            <div class="ing-row">
+              <span class="ing-name"><span class="trunc">2026년_3분기_인프라_취약점_스캔결과.xlsx</span></span>
+              <span class="gtxt-O">O 공개</span><span class="ing-t">지식·기록</span><span class="ing-auto">자동</span></div>
+            <div class="ing-row">
+              <span class="ing-name"><span class="trunc">웹서버_스캔_리포트.pdf</span></span>
+              <span class="gtxt-S">S 민감</span><span class="ing-t">기록만</span><span class="ing-auto">자동</span></div>
+            <div class="ing-row">
+              <span class="ing-name"><span class="trunc">DB서버_점검표.xlsx</span></span>
+              <span class="gtxt-O">O 공개</span><span class="ing-t">지식·기록</span><span class="ing-auto">자동</span></div>
+            <div class="ing-more">등급·격리 검사는 <b>기존 반입 절차 그대로</b> 지납니다 — 이 창구가 새로 봐주는 것은 없습니다.</div>
+          </div>
+
+          <div class="callout">
+            <b>지정·해제·일시중지는 대화창에서만 합니다</b> — 이 화면에 폴더를 추가·삭제하는 입력칸이나
+            단추가 없습니다(「메뉴는 보기용·지시는 대화창」 원칙). 오른쪽 대화창에 지켜볼 경로를
+            말하면 이 목록에 새 줄로 나타납니다.
+            <div class="say">"내 문서에서 D:\보안팀\침해사고_로그 폴더를 계속 지켜봐 줘. 새 파일이 들어오면 자동으로 반입해 줘."</div>
+            <div class="noinput"><span class="x">✕</span> 이 화면엔 자유 입력칸이 없습니다 — 위 필터 칩도 좁히기 전용입니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 2. 목업 본문 — 폴더 0개(빈 상태) ══════════════════════════════════ -->
+  <div class="card">
+    <h2><span class="n">2</span>목업 본문 B — 폴더 0개(빈 상태)</h2>
+    <div class="capt">빈 상태에도 "+ 추가" 버튼을 두지 않는다(§근거 2). 오른쪽 대화창은 위 1과 계약이 같아 생략한다.</div>
+    <div class="shell small">
+      <div class="dockhead">📁 <b>내 문서</b>　—　📂 지켜보는 폴더 <span class="pill" style="margin:0">신규</span></div>
+      <div class="docwrap">
+        <div class="mdside">
+          <div class="nd" title="👤 내 것">👤</div><div class="nd" title="🏢 회사 지식">🏢</div>
+          <div class="nd" title="📞 연락처">📞</div><div class="nd" title="📘 GIJO AS 안내">📘</div>
+          <div class="nd" title="📦 보안제품 자료">📦</div><div class="div"></div>
+          <div class="nd" title="📎 지난 작업">📎</div><div class="nd" title="🎓 학습">🎓</div>
+          <div class="nd" title="🩹 반입">🩹</div><div class="nd on" title="📂 지켜보는 폴더">📂</div>
+          <div class="nd" title="🗂 산출물(예약)" style="opacity:.5">🗂</div>
+        </div>
+        <div class="mdlist">
+          <div class="lh">📂 지켜보는 폴더 <span class="cnt">· 0개</span></div>
+          <div class="rows">
+            <div class="empty"><div class="big">📂</div><div class="t1">아직 지켜보는 폴더가 없습니다</div>오른쪽 문서창에서 지정 방법을 확인하세요.</div>
+          </div>
+        </div>
+        <div class="mddoc">
+          <div class="callout" style="margin-top:24px">
+            <b>지정은 대화창에서 합니다</b> — 위키처럼 특정 디렉토리를 계속 확인하게 하려면
+            대화창에 경로와 함께 말해 주세요. 등록되면 이 화면에 폴더 행이 생기고,
+            새 파일이 들어올 때마다 기존 반입 절차(등급 검사 포함)를 그대로 거쳐 알려 드립니다.
+            <div class="say">"D:\보안팀\침해사고_로그 폴더를 계속 지켜봐 줘"</div>
+            <div class="noinput"><span class="x">✕</span> 이 화면엔 폴더를 추가하는 입력칸·버튼이 없습니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 3. 대화창 흐름 + 새 파일 알림 카드 ═══════════════════════════════ -->
+  <div class="card">
+    <h2><span class="n">3</span>대화창 쪽 흐름 — 지정 발화 → 확인 답 → (시간 경과) → 새 파일 알림 카드</h2>
+    <div class="legend" style="margin-bottom:12px">
+      <div class="leg"><div class="h"><span class="no">①</span>지정 발화</div>
+        <div class="body">사람이 경로를 <b>문장으로</b> 말한다. 확장자·하위 폴더 포함 여부도 문장 안에서 밝힐 수 있다(별도 옵션 화면 없음).</div></div>
+      <div class="leg"><div class="h"><span class="no">②</span>확인 답</div>
+        <div class="body">AI가 등록 사실과 <b>폴링 방식임</b>을 함께 답한다("5분마다 확인" — 실시간이라 말하지 않는다).</div></div>
+      <div class="leg"><div class="h"><span class="no">③</span>시간 경과</div>
+        <div class="body">폴더 확인은 사람이 보고 있지 않을 때도 돈다 — 대화 로그에 <code>timegap</code> 구분선으로 그 사이를 표시.</div></div>
+      <div class="leg"><div class="h"><span class="no">④</span>알림 카드</div>
+        <div class="body">일반 말풍선과 다른 <b>카드</b>로 온다 — 폴더 경로·새 문서 수·파일명·"왼쪽 목록에 반영했다"는 안내가 한 장에.</div></div>
+    </div>
+    <div class="shell" style="height:420px">
+      <div class="docwrap">
+        <div class="chatdock" style="flex:1 1 auto;width:auto;border-left:none">
+          <div class="ch">💬 대화 (380px 도킹 · 끌어서 조절 가능)</div>
+          <div class="chatlog">
+            <div class="msg me">D:\보안팀\침해사고_로그 폴더도 계속 지켜봐 줘. 확장자는 상관없어.</div>
+            <div class="msg ai">등록했습니다. 지금부터 5분마다 그 폴더를 확인하고, 새 파일이 들어오면 기존 반입 절차(등급 검사 포함)를 그대로 거쳐 지식에 반영한 뒤 알려 드리겠습니다.</div>
+            <div class="timegap">— 3시간 후 —</div>
+            <div class="filecard">
+              <div class="fh">📂 지켜보는 폴더 알림 <span class="ts">08-30 14:20</span></div>
+              <div class="fb">
+                <div class="lead"><b>D:\보안팀\취약점_스캔결과</b>에 새 문서 3건이 들어왔습니다.</div>
+                <div class="flist">
+                  <div class="fitem">📄 <span class="trunc">2026년_3분기_인프라_취약점_스캔결과.xlsx</span></div>
+                  <div class="fitem">📄 <span class="trunc">웹서버_스캔_리포트.pdf</span></div>
+                  <div class="fitem">📄 <span class="trunc">DB서버_점검표.xlsx</span></div>
+                </div>
+                <div class="foot">왼쪽 「내 문서 › 📂 지켜보는 폴더」 목록에 반영했습니다 — 열어서 확인하세요.</div>
+              </div>
+            </div>
+            <div class="msg me">고마워</div>
+          </div>
+          <div class="chatin"><div class="box">메시지를 입력하세요… (목업 — 비활성)</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 4. 밀도 숫자 ══════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2><span class="n">4</span>밀도 숫자 — 새로 발명한 치수는 0개(전부 기존 코드값 재사용)</h2>
+    <table class="dense">
+      <tr><th>항목</th><th>값</th><th>근거·기존 대비</th></tr>
+      <tr><td>사이드 아이콘 줄 폭</td><td>44px</td><td class="flat">기존 그대로 — mydocs.html:94 <code>.v4sidebar.collapsed</code></td></tr>
+      <tr><td>목록 칸 폭</td><td>400px</td><td class="flat">기존 그대로 — mydocs.html:130 <code>.v4list</code></td></tr>
+      <tr><td>지켜보는 폴더 행 높이</td><td>30px</td><td class="flat">기존 그대로 — gijo-ui.css:359 <code>.g-rows-r</code>(제품 전역 "엑셀형" 표준). 새로 만든 것은 그리드 컬럼 배치(78+1fr+60+78)뿐.</td></tr>
+      <tr><td>목록 세로 총합(폴더 4개, 카드1 기준)<br><span style="color:var(--muted-2);font-size:10.5px">(머리 34 + 필터바 28 + 행 4×30=120)</span></td>
+          <td><b>182px</b></td>
+          <td>대안(포기)인 카드형(폴더당 카드 1장, 여백 12px+내용 약 76px≈88px, 4장 사이 간격 8px×3)일 때 <b>376px</b> → <span class="down">−194px / −52%</span></td></tr>
+      <tr><td>폴더 상세 「반입된 문서」 행 높이</td><td>30px</td><td class="flat">기존 반입 탭 그리드와 동일 — mydocs.html:1025-1062 재사용(새 컬럼 폭만 조정)</td></tr>
+      <tr><td>오른쪽 대화창 도킹 폭</td><td>380px</td><td class="flat">기존 그대로 — app.html:270 <code>.work.console-side</code> 기본값</td></tr>
+    </table>
+  </div>
+
+  <!-- ══ 5. 결정 근거 ══════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>왜 이 안인지 · 무엇을 포기했는지 · 제품 원칙 자가점검</h2>
+    <ul class="plain">
+      <li><b>왜 이 안(다른 길을 왜 안 골랐나):</b> 이 시안이 새로 지어낸 치수는 <b>0개</b>다 —
+        사이드 44px·목록 400px·행 30px·대화창 380px 전부 기존 mydocs.html·gijo-ui.css·app.html의
+        값 그대로다. 「지켜보는 폴더」 행에 필요한 4개 정보(경로·상태·새 문서 수·마지막 확인)는
+        기존 30px 행 그리드 안에 컬럼만 새로 짜 넣었을 뿐이라, 구현 시 새 CSS 레이아웃을
+        발명할 필요가 없다 — 이미 이 화면 안에서 8갈래(내 것~산출물)가 같은 3분할을 쓰고 있고
+        「지켜보는 폴더」가 9번째로 들어가는 것뿐이다.</li>
+      <li><b>무엇을 포기했나:</b> ① 카드형 그리드(폴더당 카드 1장) — 밀도표(§4)에서 52% 더
+        길어져 기각, 대신 엑셀형 채택(2026-08-20 "엑셀처럼 촘촘하게" 원칙 계승). ② 화면 안
+        "+ 폴더 추가" 버튼·입력창 — 「메뉴는 보기용」 원칙 위반이라 기각, 대화창 지정만 남김.
+        ③ "감시 중 · 즉시 반영" 같은 실시간 표현 — 실제 구현이 주기 폴링이라 정직하지 않아 기각,
+        "마지막 확인 HH:MM" 문구로 대체. ④ 폴더별 전체 반입 이력 표를 새로 만드는 것 — 이미 있는
+        🩹 반입 탭과 같은 것을 두 벌 만들면 한쪽만 고쳐지는 결함이 반복되므로, 최근 3건만 보이고
+        전체는 기존 반입 탭으로 안내한다.</li>
+      <li><b>제품 원칙 자가점검:</b>
+        <div class="selfcheck">
+          <div class="sc"><div class="t">메뉴는 보기용</div>📂 아이콘·행·필터 칩은 전부 "보기·좁히기"만 한다. 폴더 추가·삭제·일시중지는 이 화면 어디에도 조작이 없다 — 전부 대화창 문장으로만 이뤄진다. <span class="ok">지킴</span></div>
+          <div class="sc"><div class="t">정직 구현</div>"마지막 확인" 문구·5분 폴링 표기로 실시간 감시가 아님을 화면이 스스로 밝힌다. 경로가 사라진 폴더는 "경로 없음"으로 숨기지 않고 보여준다(빨간 칩). 정적 목업임을 상단 배너로 명시. <span class="ok">지킴</span></div>
+          <div class="sc"><div class="t">등급 게이트</div>지켜보는 폴더로 들어온 문서도 상세 패널의 반입 목록에서 등급 배지(O/S/C)를 그대로 보인다 — 새 창구라고 등급·격리 검사를 건너뛰지 않는다는 것을 화면에 새겨 뒀다("등급·격리 검사는 기존 반입 절차 그대로"). <span class="ok">지킴</span></div>
+        </div>
+      </li>
+    </ul>
+    <div class="src">
+      참고한 표준·근거:
+      <a href="https://help.adobe.com/en_US/livecycle/10.0/AdminHelp/WS92d06802c76abadb-5145d5d12905ce07e7-7ebc.html">Watched Folder service settings — Adobe LiveCycle/AEM Forms</a> ·
+      <a href="https://www.febooti.com/products/automation-workshop/online-help/triggers/file-folder-watcher/">File/Folder Watcher — Febooti Automation Workshop</a>
+      (폴더 감시류 소프트웨어의 표준 필드: 상태·마지막 확인·폴링 주기) ·
+      <a href="https://www.nngroup.com/articles/empty-state-interface-design/">Designing Empty States in Complex Applications — NN/g</a>
+      (빈 상태 CTA 권고 — 이 시안은 「메뉴는 보기용」 원칙 때문에 화면 안 버튼 대신 대화창 예시 문장으로 대체) ·
+      코드 내부 근거: <code>client/src/renderer/pages/mydocs.html:94-130</code>(사이드 44px·목록 400px) ·
+      <code>client/src/renderer/pages/mydocs.html:1025-1062</code>(반입 영수증 그리드·등급 배지) ·
+      <code>client/src/renderer/pages/mydocs.html:197-199</code>(파일명 트렁케이션 그리드, 2026-08-22 4라운드 수리) ·
+      <code>client/src/renderer/pages/gijo-ui.css:359</code>(행 30px 표준) ·
+      <code>client/src/renderer/pages/pro-white.css:13-55</code>(흰 바탕 토큰·g-b-crit 칩 반전 공식) ·
+      <code>client/src/renderer/pages/app.html:270</code>(대화창 380px 도킹 계약) ·
+      승인 시안 <code>mockups/menu5-antigravity/시안.html §2</code>(같은 얼개의 첫 초안).
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

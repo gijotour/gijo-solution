@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS 프로 셸 — 「대화창 온디맨드(부를 때만)」 시안 (추천 1개)
+  경로: mockups/shell-chat-ondemand/시안.html · 제품 코드(client/·server/)는 한 글자도 고치지 않았다(읽기만 했다).
+
+  ══════════════════════════════════════════════════════════════════════════════
+  ── 배경 ────────────────────────────────────────────────────────────────────
+  2026-08-31 사장님, 실화면을 보시며: 「대화창은 필요할 때만 불러서 보게 하고 싶다」.
+  같은 날 앞서 「메뉴성 열기도 화면을 연다 — 화면이 왼쪽에 바로 서고 대화창은 오른쪽 상시」
+  (app.html:673, 실화면 캡처 3장 「안티그래비티처럼」)가 이미 구현·게시됐다 — 대화창이
+  탭이 1개라도 있으면(stage-on) **늘** 오른쪽 380px를 차지한다. 사장님은 그 직후 같은 자리
+  에서 "평소엔 화면이 전폭을 쓰고, 대화창은 부를 때만"이라 방향을 다시 주셨다. 함께 주신
+  참고: 화면 데이터는 "엑셀처럼" — 대화창 현황 카드(dc-card)의 표 스타일이 밀도 기준이다.
+
+  이 시안은 **오늘 게시된 "화면+대화 상시 나란히" 계약을 뒤집지 않는다.** stage-on·
+  chat-home 클래스와 그 조건식(app.html:1449-1459)은 그대로 두고, stage-on이 참일 때만
+  뜻이 있는 **새 축 하나**(대화창을 접었는가)를 얹는다 — 기존 계약 위에 원자 하나만 더한다.
+
+  ── 설계 전 조사 ────────────────────────────────────────────────────────────
+  [1] PatternFly(레드햇 오픈소스 디자인 시스템) 「Notification drawer」 설계 지침 — 배지는
+      마스트헤드(상단 고정 자리)에 두고, 배지를 누르면 서랍이 열리고 닫힌다. 배지는 개수·
+      안 읽음·긴급 여부를 표시한다.
+      https://www.patternfly.org/components/notification-drawer/design-guidelines/
+      → 근거: 「소환 손잡이 + 배지(새 카드 N)」 조합을 그대로 썼다 — 새 패턴을 발명하지
+        않고 이미 검증된 "배지=닫힌 서랍의 신호" 관례를 가져왔다.
+  [2] Setproduct 「Notifications UI design」 — "단순한 앱 아이콘 배지는 사용자가 준비됐을 때
+      탐색하도록 새 것이 있다는 신호만 줄 뿐, 지금 하는 일을 방해하지 않는다"는 것이
+      알림 설계의 핵심 원칙 중 하나로 꼽힌다.
+      https://www.setproduct.com/blog/notifications-ui-design
+      → 근거: "카드 도착 시 자동으로 대화창이 펴진다"를 기각한 직접적 근거다. 자동 펼침은
+        방금 화면을 넓혀 놓고 일하던 담당자를 그 순간 다시 밀어낸다 — 배지만 남기고
+        펼침은 사람이 정하게 한다.
+  [3] uxpatterns.dev 「Accordion / Expandable」 모범사례 — 확장형 패널은 **기본이 접힘
+      상태**이며, 자동으로 펴지게 하지 말고 사용자가 직접 펴게 해야 한다. 배지 색으로
+      "펼쳐 볼 만한 것이 있다"만 알려준다.
+      https://uxpatterns.dev/patterns/content-management/accordion
+      → 근거: 기본 상태=접힘, 자동펼침 대신 배지라는 이 시안의 두 축을 그대로 뒷받침한다.
+  [4] 제품 내부 근거(2026-08-31 확인) — app.html:672-711의 도킹 우선순위 규칙과
+      1449-1459의 stage-on/chat-home 판정식, 1608-1626의 --console-w 클램프(기본
+      380px·최소 360px), console.js:306-322의 cs-head 마크업(⋯·⧉ 버튼 자리), nav.js:552-568
+      의 gn-item·gn-upbadge(배지 관례), chatparts.js:60-78의 dc-card(밀도 25px 규격),
+      pro-white.css 전체(프로 흰 바탕 토큰) — 전부 직접 읽고 그대로 재사용했다(아래 정찰
+      확정 사실).
+
+  ── 정찰 확정 사실(이 밖은 지어내지 않았다) ──────────────────────────────────
+  · 오늘 게시본의 화면 폭은 1920 기준 1920-200(메뉴 판)-380(대화창)=1340px다
+    (app.html:66 var(--menu-w,200px)·270행 var(--console-w,380px)).
+  · 대화창 폭은 사용자가 끌면(#conResize) 360~(창폭-420) 사이로 바뀌고 localStorage
+    (gijo:console:w)에 저장된다(app.html:1608-1626) — 이 시안은 그 값을 건드리지 않는다.
+  · 배지 관례(amber 알약)는 nav.js:568 .gn-upbadge 하나뿐이고 새 버전·세션 수·업무 수
+    셋이 이미 재사용 중이다(656·661·673행) — 이 시안의 "새 카드 N"도 같은 부품이다.
+  · toChat()(app.html:902)은 이미 존재하는 "대화창을 앞으로" API다 — ⓘ 안내·질문 얹기 등이
+    이미 이걸 부른다(무대숨김=false로 되돌림). 이 시안은 이 API의 **역할을 하나 더 늘린다**
+    (아래 "설계 긴장" 절) — 새 통로를 만들지 않는다.
+  · 색 토큰은 client/src/renderer/pages/pro-white.css(html.theme-light 전체)와
+    app.html :root(다크, 시안 UI 크롬에만 사용) 그대로 복사(2026-08-31 확인). 프로 셸은
+    흰 바탕이 확정(2026-08-20)이라 화면 내부 재현은 전부 pro-white 값을 썼다.
+
+  ── 이 파일에 실제로 있는 것 ─────────────────────────────────────────────────
+  · 위: 시안 조작 바(제품 UI 아님) — 장면 전환 버튼 3개, 배율.
+  · 가운데: 실제 셸 구조 재현(1920×1080 실치수, 0.6배 축소 표시) — 장면① 기본(접힘)·
+    장면② 불러온 상태·장면③ 다시 접기. 장면 전환 버튼만 동작하고, 그 안의 단추·입력칸은
+    전부 "(목업) 동작하지 않음"이라 표기했다(정직한 목업 원칙).
+  · 아래: 결정 문서 — 왜 이 안·설계 긴장(카드 배지 vs 자동펼침)·무엇을 포기했는지·
+    밀도 숫자·제품 원칙 자가점검.
+  ══════════════════════════════════════════════════════════════════════════════
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 대화창 온디맨드 시안</title>
+<style>
+  /* 시안 UI 크롬(조작 바·문서 패널) 색 — client/src/renderer/pages/app.html :root 다크값 그대로 */
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;
+    --mk-page:#161615;--mk-accent:#5fa1ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--mk-page);color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+
+  /* ── 시안 조작 바(제품 UI 아님) ─────────────────────────────────────────── */
+  .mk-bar{position:sticky;top:0;z-index:50;background:#101012;border-bottom:1px dashed rgba(95,161,255,.4);
+    padding:10px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .mk-badge{font-size:10.5px;font-weight:800;letter-spacing:.04em;color:#0b0b0c;background:var(--mk-accent);
+    border-radius:5px;padding:2px 7px;flex:0 0 auto;}
+  .mk-title{font-size:13.5px;font-weight:800;color:#fff;flex:0 0 auto;}
+  .mk-scenes{display:flex;gap:6px;flex:0 0 auto;}
+  .mk-scenebtn{font-size:12px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border-strong);
+    border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;}
+  .mk-scenebtn:hover{color:#fff;border-color:var(--mk-accent);}
+  .mk-scenebtn.on{color:#0b0b0c;background:var(--mk-accent);border-color:var(--mk-accent);}
+  .mk-scale{display:flex;gap:4px;flex:0 0 auto;margin-left:auto;align-items:center;}
+  .mk-scale button{font-size:11px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border);
+    border-radius:6px;padding:4px 8px;cursor:pointer;font-family:inherit;}
+  .mk-scale button.on{color:#fff;border-color:var(--mk-accent);}
+  .mk-docLink{font-size:12px;color:var(--mk-accent);text-decoration:none;flex:0 0 auto;}
+  .mk-docLink:hover{text-decoration:underline;}
+  .mk-caption{width:100%;font-size:12.25px;color:var(--muted);line-height:1.6;padding-top:2px;}
+  .mk-caption b{color:#fff;}
+
+  .stagewrap{display:flex;justify-content:center;padding:28px 16px 10px;}
+  .device-frame{overflow:hidden;border-radius:14px;box-shadow:0 30px 70px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);
+    width:1152px;height:648px;flex:0 0 auto;}
+  /* 실치수 1920×1080을 그대로 그리고 0.6배로 축소 표시 — 안의 모든 px 값은 실제 산출물 숫자다. */
+  .device{width:1920px;height:1080px;transform:scale(.6);transform-origin:top left;
+    overflow:hidden;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+
+  /* ══════════════ 여기부터 「제품 화면」 재현 — 프로=흰 바탕(pro-white.css 값 그대로) ══════════════ */
+  .pf{
+    --bg:#faf8f5;--panel:#ffffff;--panel-2:#f2efe9;--border:rgba(43,38,33,.12);--border-strong:rgba(43,38,33,.22);
+    --text:#2b2621;--muted:#6b6259;--muted-2:#726960;--blue:#1d4f91;--blue-light:#1d4f91;
+    --teal:#086b43;--amber:#8f4d02;--red:#b3241a;--zebra:rgba(43,38,33,.035);
+    --amber-soft:#fdf1e2; --blue-soft:rgba(29,79,145,.10);
+    background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100%;position:relative;
+  }
+  .pf *{box-sizing:border-box;}
+
+  /* 상단바 44px — 레일 아이콘은 셸 재구축 0-2(2026-08-23)로 상단바 안 가로줄이 됐다(세로 레일 아님). */
+  .pf-top{flex:0 0 auto;height:44px;display:flex;align-items:center;gap:3px;padding:0 10px;
+    border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .pf-top button{width:32px;height:32px;border-radius:9px;background:transparent;border:1px solid var(--border);
+    color:var(--muted);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:default;
+    font-family:inherit;flex:0 0 auto;}
+  .pf-top .sep{width:1px;height:20px;background:var(--border-strong);margin:0 4px;flex:0 0 auto;}
+  .pf-top .spacer{flex:1;}
+  .pf-clock{font-size:12.25px;color:var(--muted);white-space:nowrap;}
+  .pf-status{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--teal);
+    background:#e3f6ec;border:1px solid rgba(8,107,67,.35);padding:3px 10px;border-radius:16px;white-space:nowrap;margin-left:8px;}
+  .pf-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  /* 두 칸: 메뉴 판(200px, 실치수) + 본문 */
+  .pf-grid{flex:1 1 auto;display:flex;min-height:0;}
+  .pf-menu{width:200px;flex:0 0 auto;border-right:1px solid var(--border);background:var(--panel-2);
+    padding:8px 6px;overflow:hidden;}
+  .gn-item{display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:6px;
+    font-size:12.5px;font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;position:relative;}
+  .gn-item .ic{flex:0 0 auto;font-size:13px;}
+  .gn-item .lb{flex:1;overflow:hidden;text-overflow:ellipsis;}
+  .gn-item.active{color:var(--text);background:rgba(43,38,33,.06);font-weight:700;}
+  .gn-item.active::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--blue-light);}
+
+  .pf-work{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0;position:relative;}
+
+  /* 화면 접기 머리(dockHead, 기존 그대로 — app.html:1465-1500) */
+  .pf-dockhead{flex:0 0 auto;height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;
+    font-size:12.5px;color:var(--muted);background:var(--panel-2);border-bottom:1px solid var(--border);}
+  .pf-dockhead .stageback{font-size:11.75px;font-weight:700;color:var(--muted);background:transparent;
+    border:1px solid var(--border-strong);border-radius:7px;padding:3px 8px;cursor:default;white-space:nowrap;}
+  .pf-dockhead b{color:var(--text);font-weight:800;}
+
+  /* 화면+오른쪽 열(핸들 또는 대화창) 두 칸 — .work.console-side 재현(app.html:270-274) */
+  .pf-body{flex:1 1 auto;min-height:0;display:grid;grid-template-rows:minmax(0,1fr);}
+  .pf-body.folded{grid-template-columns:minmax(0,1fr) 40px;}   /* ⚠ 접힘은 --console-w를 안 쓴다 — 고정 40px */
+  .pf-body.open{grid-template-columns:minmax(0,1fr) 380px;}     /* 열림은 기존 var(--console-w,380px) 그대로 */
+
+  /* 화면 콘텐츠 — "엑셀처럼" 밀도(행 25px, chatparts.js:60 규격과 동일) */
+  .pf-screen{grid-column:1;min-width:0;overflow:hidden;background:var(--panel);position:relative;}
+  .pf-table{width:100%;border-collapse:collapse;font-size:12.25px;table-layout:fixed;}
+  .pf-table th{text-align:left;padding:5px 10px;font-size:11.5px;font-weight:700;color:var(--muted-2);
+    background:var(--panel-2);border-bottom:1px solid var(--border-strong);position:sticky;top:0;}
+  .pf-table td{height:25px;padding:0 10px;border-bottom:1px solid var(--border);color:var(--text);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pf-table tbody tr:nth-child(even){background:var(--zebra);}
+  .pf-sev{font-size:10.75px;font-weight:800;border-radius:9px;padding:1px 7px;white-space:nowrap;}
+  .pf-sev.crit{background:#fdeceb;color:#b3241a;}
+  .pf-sev.high{background:#fdf1e2;color:#8f4d02;}
+  .pf-sev.med{background:#eaf1fb;color:#1d4f91;}
+  .pf-sev.low{background:rgba(43,38,33,.06);color:#726960;}
+  .pf-screen-title{position:absolute;top:8px;right:14px;font-size:11px;color:var(--muted-2);
+    background:rgba(255,255,255,.85);border:1px solid var(--border);border-radius:6px;padding:2px 8px;}
+
+  /* ── ① 소환 손잡이(신규 제안 — 지금 코드에 없다) ────────────────────────── */
+  .pf-handle{grid-column:2;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;background:var(--panel-2);border-left:1px solid var(--border-strong);cursor:default;position:relative;}
+  .pf-handle .hi{font-size:20px;color:var(--muted);}
+  .pf-handle .hlabel{writing-mode:vertical-rl;font-size:11.5px;font-weight:700;color:var(--muted-2);letter-spacing:.06em;}
+  .pf-handle .hbadge{background:var(--amber-soft);color:#8f4d02;font-size:11px;font-weight:900;
+    border-radius:20px;padding:2px 7px;min-width:16px;text-align:center;}
+  .pf-handle .hbadge.zero{display:none;}
+  .pf-handle .hchevron{position:absolute;left:-9px;top:50%;transform:translateY(-50%);width:18px;height:28px;
+    background:var(--panel-2);border:1px solid var(--border-strong);border-right:0;border-radius:6px 0 0 6px;
+    display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted-2);}
+
+  /* ── ② 대화창(열림 — 오늘 게시본과 동일 폭·부품, console.js·chatparts.js 그대로) ───────── */
+  .pf-console{grid-column:2;display:flex;flex-direction:column;min-width:0;min-height:0;
+    background:var(--panel-2);border-left:1px solid var(--border);position:relative;}
+  .pf-resize{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:default;}
+  .pf-resize::after{content:'';position:absolute;left:3px;top:0;bottom:0;width:2px;background:var(--border-strong);}
+  .cs-head{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:7px 10px;font-size:12px;
+    color:var(--muted);border-bottom:1px solid var(--border);}
+  .cs-line{flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .cs-more,.cs-fold,.cs-btn{font-size:11.5px;font-weight:700;color:var(--muted);background:transparent;
+    border:1px solid var(--border);border-radius:7px;padding:3px 7px;cursor:default;white-space:nowrap;flex:0 0 auto;}
+  .cs-fold{color:#1d4f91;border-color:rgba(29,79,145,.35);background:var(--blue-soft);}
+  .cs-fold.new-tag::after{content:'신규';font-size:9px;font-weight:900;color:#fff;background:#1d4f91;
+    border-radius:4px;padding:0 3px;margin-left:5px;vertical-align:1px;}
+  .cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:10px 12px;}
+  .dc-card{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel);
+    box-shadow:0 1px 4px rgba(31,27,20,.06);margin-bottom:10px;}
+  .dc-head{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--border);
+    font-size:12px;font-weight:800;color:var(--text);}
+  .dc-open{margin-left:auto;font-size:11px;font-weight:700;color:#1d4f91;background:var(--blue-soft);
+    border:1px solid rgba(29,79,145,.35);border-radius:7px;padding:3px 8px;cursor:default;font-family:inherit;white-space:nowrap;}
+  .dc-kpis{display:flex;border-bottom:1px solid var(--border);}
+  .dc-kpi{flex:1;padding:6px 10px;border-right:1px solid var(--border);}
+  .dc-kpi:last-child{border-right:0;}
+  .dc-kl{font-size:10.75px;color:var(--muted-2);}
+  .dc-kv{font-size:14px;font-weight:800;color:var(--text);}
+  .dc-kv.bad{color:#b3241a;}.dc-kv.warn{color:#8f4d02;}
+  .dc-card table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  .dc-card th{text-align:left;padding:3px 9px;color:var(--muted-2);font-size:10.75px;border-bottom:1px solid var(--border);}
+  .dc-card td{padding:3px 9px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap;}
+  .dc-card tbody tr:nth-child(even){background:var(--zebra);}
+  .dc-peek{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:7px 10px;
+    font-size:11.5px;font-weight:800;color:var(--text);position:relative;height:34px;overflow:hidden;}
+  .dc-peek::after{content:'⌄ 스크롤하면 더 있음';position:absolute;left:0;right:0;bottom:0;text-align:center;
+    font-size:10.5px;font-weight:600;color:var(--muted-2);background:linear-gradient(rgba(255,255,255,0),var(--panel) 65%);
+    padding:12px 0 3px;}
+  .cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid var(--border);}
+  .cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:9px;
+    color:var(--text);font-size:12px;padding:8px 10px;outline:none;font-family:inherit;}
+  .cs-send{background:#1d4f91;color:#fff;border:none;border-radius:9px;font-size:11.75px;font-weight:800;
+    padding:8px 13px;cursor:default;white-space:nowrap;}
+
+  /* 시안 안 주석(annotation) — 장치 위에 겹치는 손 그림, 제품 요소 아님 */
+  .callout{position:absolute;background:#1d4f91;color:#fff;font-size:14px;font-weight:700;line-height:1.5;
+    padding:9px 13px;border-radius:9px;box-shadow:0 8px 20px rgba(0,0,0,.35);max-width:290px;z-index:5;}
+  .callout::before{content:'';position:absolute;width:0;height:0;border:8px solid transparent;}
+  .callout.left::before{left:-15px;top:20px;border-right-color:#1d4f91;}
+  .callout.right::before{right:-15px;top:20px;border-left-color:#1d4f91;}
+  .callout.top::before{top:-15px;left:24px;border-bottom-color:#1d4f91;}
+  .callout .num{display:inline-flex;width:19px;height:19px;border-radius:50%;background:#fff;color:#1d4f91;
+    align-items:center;justify-content:center;font-size:11px;font-weight:900;margin-right:6px;}
+
+  /* ⚠ height:100%는 필수다 — .device가 고정 1080px인데 .scene이 auto 높이면 안의 .pf(height:100%)가
+     퍼센트를 못 받아 flex 체인 전체가 내용 높이로 쪼그라든다(표 몇 줄만 남고 아래가 빈 여백). */
+  .device{position:relative;}
+  .scene{display:none;height:100%;}
+  .scene.on{display:block;}
+
+  /* ── 문서(설명) 패널 ─────────────────────────────────────────────────────── */
+  .doc{max-width:900px;margin:0 auto;padding:46px 22px 90px;}
+  .doc h1{font-size:19px;color:#fff;margin:0 0 6px;}
+  .doc .lead{font-size:13px;color:var(--muted);margin-bottom:26px;line-height:1.7;}
+  .tldr{border:1px solid var(--border-strong);background:var(--panel-2);border-radius:12px;padding:16px 20px;margin-bottom:30px;}
+  .tldr .h{font-size:12px;font-weight:800;color:var(--mk-accent);margin-bottom:8px;letter-spacing:.02em;}
+  .tldr li{font-size:13px;line-height:1.75;color:var(--text);}
+  .doc section{margin-bottom:32px;padding-left:16px;border-left:3px solid var(--border-strong);}
+  .doc section.why{border-left-color:var(--blue);}
+  .doc section.tension{border-left-color:#8b7cf0;}
+  .doc section.give{border-left-color:#f5928a;}
+  .doc section.density{border-left-color:var(--teal);}
+  .doc section.check{border-left-color:#f0a020;}
+  .doc h2{font-size:14.5px;color:#fff;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .doc p{font-size:13px;line-height:1.75;color:var(--muted);margin:0 0 10px;}
+  .doc ul{margin:0 0 10px;padding-left:20px;}
+  .doc li{font-size:13px;line-height:1.75;color:var(--muted);margin-bottom:4px;}
+  .doc li b{color:var(--text);}
+  .doc code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:0 5px;
+    color:var(--blue-light);font-size:12.25px;}
+  .num-table{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:12.75px;}
+  .num-table th{text-align:left;padding:7px 10px;color:var(--muted-2);font-size:11.75px;border-bottom:1px solid var(--border-strong);}
+  .num-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);}
+  .num-table tr.sum td{font-weight:800;color:#fff;background:rgba(59,130,246,.06);}
+  .checklist{list-style:none;margin:0;padding:0;}
+  .checklist li{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.65;color:var(--text);margin-bottom:9px;}
+  .checklist .ok{color:var(--teal);flex:0 0 auto;font-weight:800;}
+  .checklist .warn{color:var(--amber);flex:0 0 auto;font-weight:800;}
+  .rejected{margin-top:12px;padding:12px 14px;background:rgba(255,255,255,.03);border-radius:8px;}
+  .rejected .h{font-size:11.75px;font-weight:800;color:var(--muted-2);margin-bottom:6px;}
+  .src{font-size:11.5px;color:var(--muted-2);margin-top:2px;}
+  .src a{color:var(--blue-light);}
+  footer.doc-foot{max-width:900px;margin:0 auto;padding:0 22px 60px;font-size:11.5px;color:var(--muted-2);line-height:1.7;}
+</style>
+</head>
+<body>
+
+  <!-- ── 시안 조작 바(제품 UI 아님) ─────────────────────────────────────────── -->
+  <div class="mk-bar">
+    <span class="mk-badge">시안 · MOCKUP</span>
+    <span class="mk-title">대화창 온디맨드 — 프로 셸</span>
+    <div class="mk-scenes">
+      <button class="mk-scenebtn on" data-scene="A">① 기본 · 접힘</button>
+      <button class="mk-scenebtn" data-scene="B">② 불러온 상태</button>
+      <button class="mk-scenebtn" data-scene="C">③ 다시 접기</button>
+    </div>
+    <a class="mk-docLink" href="#doc">↓ 설명(왜·설계 긴장·포기·숫자·자가점검) 보기</a>
+    <div class="mk-scale">
+      <button data-scale="0.6" class="on">60%</button>
+      <button data-scale="0.85">85%</button>
+    </div>
+    <div class="mk-caption" id="mkCaption"></div>
+  </div>
+
+  <!-- ── 장치 프레임 — 1920×1080 실치수를 그대로 그리고 축소 표시 ─────────────────── -->
+  <div class="stagewrap">
+    <div class="device-frame" id="deviceFrame">
+      <div class="device" id="device">
+
+        <!-- ══ 장면① — 기본(접힘): 화면 전폭 + 소환 손잡이 ══ -->
+        <div class="scene sceneA on" id="sceneA">
+          <div class="pf">
+            <div class="pf-top">
+              <button title="(목업) 메뉴 판 접기/펴기">‖</button>
+              <button title="(목업) 전체 메뉴">☰</button>
+              <button title="(목업) 작업 내역">🕘</button>
+              <button title="(목업) 열린 창 목록">🗔</button>
+              <button title="(목업) 새 대화 시작">💬</button>
+              <div class="sep"></div>
+              <div class="spacer"></div>
+              <span class="pf-clock">14:32</span>
+              <span class="pf-status"><span class="dot"></span>연결됨</span>
+            </div>
+            <div class="pf-grid">
+              <nav class="pf-menu">
+                <div class="gn-item"><span class="ic">🏠</span><span class="lb">대시보드</span></div>
+                <div class="gn-item"><span class="ic">🗄</span><span class="lb">자산 관리</span></div>
+                <div class="gn-item active"><span class="ic">🛡</span><span class="lb">취약점 관리</span></div>
+                <div class="gn-item"><span class="ic">📄</span><span class="lb">내 문서</span></div>
+                <div class="gn-item"><span class="ic">📊</span><span class="lb">리포트</span></div>
+                <div class="gn-item"><span class="ic">🧰</span><span class="lb">보안설정 점검</span></div>
+                <div class="gn-item"><span class="ic">⚙</span><span class="lb">설정</span></div>
+              </nav>
+              <div class="pf-work">
+                <div class="pf-dockhead">
+                  <button class="stageback" title="(목업) 화면을 접고 대화를 전폭으로">⊟ 화면 접기</button>
+                  <b>취약점 관리</b>
+                </div>
+                <div class="pf-body folded">
+                  <div class="pf-screen" id="tableHostA"><span class="pf-screen-title">예시 데이터</span></div>
+                  <div class="pf-handle" title="(목업) 눌러서 대화창 열기 — 새 카드 3개 도착">
+                    <div class="hchevron">‹</div>
+                    <div class="hi">🗨</div>
+                    <div class="hbadge">3</div>
+                    <div class="hlabel">대화 열기</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="callout right" style="right:56px;top:230px;max-width:250px;">
+              <span class="num">①</span>화면이 전폭(1680px)을 씁니다. 대화 중 도착한 카드는
+              배지(3)로만 쌓이고, 화면은 안 밀립니다. → 오른쪽 40px 손잡이를 가리킵니다.
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ 장면② — 불러온 상태: 기존 나란히 배치(오늘 게시본과 동일) ══ -->
+        <div class="scene sceneB" id="sceneB">
+          <div class="pf">
+            <div class="pf-top">
+              <button title="(목업)">‖</button><button title="(목업)">☰</button>
+              <button title="(목업)">🕘</button><button title="(목업)">🗔</button>
+              <button title="(목업)">💬</button>
+              <div class="sep"></div><div class="spacer"></div>
+              <span class="pf-clock">14:33</span>
+              <span class="pf-status"><span class="dot"></span>연결됨</span>
+            </div>
+            <div class="pf-grid">
+              <nav class="pf-menu">
+                <div class="gn-item"><span class="ic">🏠</span><span class="lb">대시보드</span></div>
+                <div class="gn-item"><span class="ic">🗄</span><span class="lb">자산 관리</span></div>
+                <div class="gn-item active"><span class="ic">🛡</span><span class="lb">취약점 관리</span></div>
+                <div class="gn-item"><span class="ic">📄</span><span class="lb">내 문서</span></div>
+                <div class="gn-item"><span class="ic">📊</span><span class="lb">리포트</span></div>
+                <div class="gn-item"><span class="ic">🧰</span><span class="lb">보안설정 점검</span></div>
+                <div class="gn-item"><span class="ic">⚙</span><span class="lb">설정</span></div>
+              </nav>
+              <div class="pf-work">
+                <div class="pf-dockhead">
+                  <button class="stageback" title="(목업)">⊟ 화면 접기</button>
+                  <b>취약점 관리</b>
+                </div>
+                <div class="pf-body open">
+                  <div class="pf-screen" id="tableHostB"><span class="pf-screen-title">예시 데이터</span></div>
+                  <div class="pf-console">
+                    <div class="pf-resize" title="(목업) 끌어서 폭 조절 — 기존 ‖ 그대로, 기본 380px"></div>
+                    <div class="cs-head">
+                      <span class="cs-line">지금 「취약점 관리」 화면을 보는 중입니다</span>
+                      <button class="cs-more" title="(목업) ⋯ 맥락 정리">⋯</button>
+                      <button class="cs-fold new-tag" title="(목업) 대화를 접고 화면을 전폭으로 — 이 시안의 신규 제안">⊟ 대화 접기</button>
+                      <button class="cs-btn" title="(목업) 별도 창으로">⧉ 창으로</button>
+                    </div>
+                    <div class="cs-body">
+                      <div class="dc-card">
+                        <div class="dc-head">취약점 현황 — 취약점 관리<button class="dc-open">🗔 열기</button></div>
+                        <div class="dc-kpis">
+                          <div class="dc-kpi"><div class="dc-kl">총 취약점</div><div class="dc-kv">47</div></div>
+                          <div class="dc-kpi"><div class="dc-kl">치명</div><div class="dc-kv bad">3</div></div>
+                          <div class="dc-kpi"><div class="dc-kl">조치 대기</div><div class="dc-kv warn">12</div></div>
+                        </div>
+                        <table>
+                          <thead><tr><th>CVE</th><th>심각도</th><th>상태</th></tr></thead>
+                          <tbody>
+                            <tr><td>CVE-2026-3311</td><td>치명</td><td>조치 대기</td></tr>
+                            <tr><td>CVE-2026-3298</td><td>높음</td><td>진행 중</td></tr>
+                            <tr><td>CVE-2026-3277</td><td>높음</td><td>조치 대기</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div class="dc-peek">최근 스캔 결과 — web-prod-02 외 2건</div>
+                    </div>
+                    <div class="cs-dock">
+                      <input readonly placeholder="무엇을 도와드릴까요?" title="(목업) 입력되지 않습니다">
+                      <button class="cs-send" title="(목업)">전송</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="callout top" style="left:1180px;top:56px;">
+              <span class="num">②</span>🗨 손잡이를 누르면 기존 폭(380px)의 대화창이
+              그대로 열립니다(오른쪽) — 폭 끌개(‖)·⧉ 창으로 전부 오늘과 동일.
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ 장면③ — 다시 접기: ⊟ 대화 접기를 누른 직후 ══ -->
+        <div class="scene sceneC" id="sceneC">
+          <div class="pf">
+            <div class="pf-top">
+              <button title="(목업)">‖</button><button title="(목업)">☰</button>
+              <button title="(목업)">🕘</button><button title="(목업)">🗔</button>
+              <button title="(목업)">💬</button>
+              <div class="sep"></div><div class="spacer"></div>
+              <span class="pf-clock">14:41</span>
+              <span class="pf-status"><span class="dot"></span>연결됨</span>
+            </div>
+            <div class="pf-grid">
+              <nav class="pf-menu">
+                <div class="gn-item"><span class="ic">🏠</span><span class="lb">대시보드</span></div>
+                <div class="gn-item"><span class="ic">🗄</span><span class="lb">자산 관리</span></div>
+                <div class="gn-item active"><span class="ic">🛡</span><span class="lb">취약점 관리</span></div>
+                <div class="gn-item"><span class="ic">📄</span><span class="lb">내 문서</span></div>
+                <div class="gn-item"><span class="ic">📊</span><span class="lb">리포트</span></div>
+                <div class="gn-item"><span class="ic">🧰</span><span class="lb">보안설정 점검</span></div>
+                <div class="gn-item"><span class="ic">⚙</span><span class="lb">설정</span></div>
+              </nav>
+              <div class="pf-work">
+                <div class="pf-dockhead">
+                  <button class="stageback" title="(목업)">⊟ 화면 접기</button>
+                  <b>취약점 관리</b>
+                </div>
+                <div class="pf-body folded">
+                  <div class="pf-screen" id="tableHostC"><span class="pf-screen-title">예시 데이터</span></div>
+                  <div class="pf-handle" title="(목업) 방금 접었습니다">
+                    <div class="hchevron">‹</div>
+                    <div class="hi">🗨</div>
+                    <div class="hbadge zero">0</div>
+                    <div class="hlabel">대화 열기</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="callout right" style="right:56px;top:230px;max-width:270px;">
+              <span class="num">③</span>⊟ 대화 접기 → 화면이 즉시 +340px 넓어집니다.
+              배지는 0부터 다시 쌓입니다(방금 직접 접었으니 밀린 카드가 없다는 뜻).
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 설명 문서 ─────────────────────────────────────────────────────────────── -->
+  <div class="doc" id="doc">
+    <h1>대화창 온디맨드(프로 셸) — 시안 설명</h1>
+    <p class="lead">
+      추천 시안 1개(2026-07-25 결정에 따라 복수 시안 아님). 위 장면 전환 버튼(①②③)으로
+      직접 넘겨 볼 수 있다. 장면 안의 단추·입력칸은 전부 "(목업)"이라 표기했고 실제로는
+      동작하지 않는다 — 이 페이지가 결정하는 것은 <b>배치와 상태 전이 규칙</b>이지 구현이 아니다.
+    </p>
+
+    <div class="tldr">
+      <div class="h">한눈에</div>
+      <ol style="margin:0;padding-left:18px;">
+        <li>오늘 게시된 "화면+대화 상시 나란히"(stage-on) 계약은 <b>그대로 둔다</b> — 그 위에
+          "대화창을 접었는가"라는 축 하나만 얹는다. 대화창이 접히면 화면이 전폭(1680px)이
+          되고, 오른쪽엔 40px 손잡이(배지 포함)만 남는다.</li>
+        <li>손잡이를 누르면 <b>오늘과 똑같은 380px 대화창</b>이 열린다 — 새 폭·새 부품을
+          만들지 않고 기존 --console-w·#conResize·cs-head·dc-card를 그대로 재사용한다.</li>
+        <li>카드는 접힌 동안에도 <b>배지로 쌓인다</b>(자동으로 펴지지 않는다) — 왜 자동 펼침을
+          기각했는지는 아래 "설계 긴장" 절에 정직하게 적었다.</li>
+      </ol>
+    </div>
+
+    <section class="why">
+      <h2>왜 이 안인지</h2>
+      <ul>
+        <li><b>기존 계약을 뒤집지 않는다.</b> stage-on·chat-home 클래스와 그 판정식
+          (app.html:1449-1459)은 한 글자도 안 바꾼다. "대화창 접힘"은 stage-on이 참일 때만
+          뜻이 있는 독립 축이라, 곱집합으로만 더해진다 — 기존 갈래(카드 자동 도착·⊟ 화면
+          접기·분리창)를 재검토할 필요가 없다.</li>
+        <li><b>손잡이는 세로 띠로 골랐다(상단바 💬 단추 대신).</b> 상단바에는 이미 💬(새 대화
+          시작)가 있다 — 같은 그림을 다른 동작에 또 쓰면 헷갈린다(정직한 구현 원칙: 같은
+          아이콘이 다른 일을 하면 안 된다). 세로 띠는 항상 같은 자리에 떠 있어 "부를 때만"의
+          존재감을 더 분명히 신호한다.</li>
+        <li><b>배지는 이미 있는 부품이다.</b> nav.js의 .gn-upbadge(새 버전·세션 수·업무 수에
+          이미 재사용 중)를 그대로 쓴다 — 새 색·새 모양을 발명하지 않았다.</li>
+        <li><b>열림 폭은 새로 정하지 않았다.</b> 오늘 게시본의 380px·최소 360px·끌개(#conResize)
+          를 그대로 재사용한다 — 새 숫자를 하나 더 만들면 검증해야 할 상태가 하나 늘어난다
+          (이 저장소가 반복해 겪은 "같은 것을 여러 곳에 적으면 어긋난다").</li>
+      </ul>
+      <div class="rejected">
+        <div class="h">기각한 대안</div>
+        <ul style="margin:0;">
+          <li><b>카드 도착 시 자동 펼침.</b> 아래 "설계 긴장" 절에서 자세히 다룬다 — 요지는
+            "방해 없이 신호만"<span class="src">(조사 [2][3])</span>.</li>
+          <li><b>상단바 💬 버튼을 손잡이로 겸용.</b> 기존 💬(새 대화 시작)와 뜻이 부딪힌다
+            — 위 "왜 이 안" 둘째 항목.</li>
+          <li><b>열림 폭을 화면 크기에 비례하게 새로 계산.</b> 오늘 이미 반응형 클램프
+            (360~창폭-420, app.html:1610-1613)가 있다 — 다시 만들 이유가 없다.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="tension">
+      <h2>설계 긴장 — 카드 배지 vs 자동 펼침</h2>
+      <p><b>긴장:</b> 오늘 확정된 계약은 "메뉴 클릭 = 화면+카드 나란히"(app.html:673-678,
+        「안티그래비티처럼」)다. 그런데 대화창이 접혀 있으면 카드가 뜨는 자리 자체가 없다
+        — 메뉴를 눌러도 카드가 안 보인다면, "메뉴 클릭=카드"라는 오늘의 약속이 깨진 것처럼
+        보일 수 있다.</p>
+      <p><b>이 시안의 답:</b> 접힘 중 도착한 카드는 <b>손잡이의 배지 숫자로 쌓이고</b>, 대화창을
+        열면 <b>그 카드가 있던 자리로 스크롤</b>한다(console.js가 이미 재클릭 시 쓰는
+        scrollIntoView 관례를 재사용 — 새 스크롤 로직을 만들지 않는다). 카드는 사라지지
+        않는다, 다만 지금 화면을 넓혀 쓰고 있는 사람 앞에 억지로 끼어들지 않을 뿐이다.</p>
+      <p><b>왜 자동 펼침을 안 골랐나:</b> 취약점 47건짜리 표를 넓게 펴 놓고 우선순위를
+        가려내는 중에, 메뉴에서 카드가 하나 도착했다고 대화창이 340px를 갑자기 가져가면
+        방금 하던 작업이 밀린다. "닫힌 서랍의 배지는 신호만 주고 펼치는 시점은 사람이
+        고른다"가 알림 설계의 공통된 결론이다<span class="src">(조사 [2][3])</span> — 이
+        시안은 이 원칙을 그대로 따랐다.</p>
+      <p><b>대화창을 접어도 막히지 않는 순간(지시가 필요한 순간)은 따로 있다</b> — 아래
+        "제품 원칙 자가점검"의 첫 항목에 정리했다.</p>
+    </section>
+
+    <section class="give">
+      <h2>무엇을 포기했는지</h2>
+      <ul>
+        <li><b>"메뉴를 누르면 카드가 항상 즉시 보인다"는 보장.</b> 접힘 상태에서는 카드가
+          바로 안 보인다 — 배지로 대신한다. 오늘 계약의 "즉시성"을 살짝 낮추는 대신 화면
+          밀림을 막는 쪽을 택했다.</li>
+        <li><b>완화 — 첫 로그인(대화 홈)은 그대로 대화창이 전면이다.</b> 접힘·손잡이는
+          tabs.length&gt;0(화면이 열려 있을 때)에서만 뜻이 있다. 화면이 하나도 없는 chat-home
+          에서는 오늘처럼 대화가 입구다 — 대화가 제품 정체성이라는 원칙은 안 건드렸다.</li>
+        <li><b>배지 숫자의 정확한 상한 표기.</b> 카드가 10개 넘게 쌓이는 실사용은 드물지만,
+          혹시를 대비해 9+ 로 캡하는 규칙까지는 이 시안에서 정하지 않았다(구현 단계 세부
+          — gn-upbadge의 기존 세션·업무 배지도 지금 캡이 없어 같은 결정을 그때 함께 내리는
+          편이 낫다).</li>
+        <li><b>새로운 "닫힌 채 몇 개 쌓였는지" 통계 화면.</b> 배지 숫자 하나면 충분하다고
+          보고 별도 이력 화면은 만들지 않았다 — 필요해지면 별도 요청으로 판단한다.</li>
+      </ul>
+    </section>
+
+    <section class="density">
+      <h2>밀도 숫자</h2>
+      <p>1920px 기준. "오늘"은 2026-08-31 게시된 상시 나란히 배치(화면 항상 1340px)다.</p>
+      <table class="num-table">
+        <thead><tr><th>구성</th><th>오늘(상시 나란히)</th><th>이 시안 · 기본(접힘)</th><th>이 시안 · 열림</th></tr></thead>
+        <tbody>
+          <tr><td>메뉴 판</td><td>200px</td><td>200px</td><td>200px</td></tr>
+          <tr><td>오른쪽 열(손잡이/대화창)</td><td>380px(항상 존재)</td><td>40px(손잡이)</td><td>380px(오늘과 동일)</td></tr>
+          <tr><td>화면(screens) 가로</td><td>1340px</td><td>1680px</td><td>1340px</td></tr>
+          <tr class="sum"><td>화면이 오늘 대비 얻는 폭</td><td>—</td><td>+340px(+25.4%)</td><td>±0px(무변화)</td></tr>
+          <tr><td>손잡이가 새로 먹는 세로</td><td>—</td><td>0px(work 영역을 그대로 채움, 가로만 소비)</td><td>—</td></tr>
+          <tr><td>대화창 머리(cs-head)에 ⊟ 버튼 추가로 늘어나는 세로</td><td>—</td><td>—</td><td>0px(기존 36px 줄에 버튼만 추가)</td></tr>
+        </tbody>
+      </table>
+      <p><b>정직하게 말하면:</b> "열림" 상태는 오늘 게시본과 화면 치수가 완전히 같다(회귀
+        없음) — 이 시안이 실제로 바꾸는 것은 "기본값이 접힘이냐 열림이냐" 하나다. 접힘의
+        폭 이득(+340px)은 손잡이(40px)가 오늘 대화창 자리(380px)의 10.5%만 남기고 89.5%를
+        화면에 돌려주기 때문이다. 접힘 열의 폭은 사용자가 끌어 둔 --console-w 값과
+        <b>무관하게 고정 40px</b>다 — 끌어 둔 값(예: 420px)은 저장된 채로 있다가, 다시
+        열 때 그 값으로 복귀한다(새 상태를 만들지 않고 기존 저장 값을 그대로 재사용).</p>
+    </section>
+
+    <section class="check">
+      <h2>제품 원칙 자가점검</h2>
+      <ul class="checklist">
+        <li><span class="ok">✅</span><span><b>지시는 대화창 — 접혀 있어도 입력이 필요한
+          순간엔 자동으로 편다.</b> ⓘ 안내·질문 얹기·guideAsk 등은 이미
+          <code>gijoTabs.toChat()</code>(app.html:902)을 불러 대화창을 앞으로 낸다. 이
+          시안은 그 함수의 역할을 하나 늘린다 — <b>무대숨김뿐 아니라 이 시안의 "접힘" 상태도
+          함께 지운다.</b> 안 지우면 ⓘ를 눌러도 대화창이 안 열리는 새 결함이 생긴다(구현
+          단계에서 반드시 지킬 계약으로 명시해 둔다). 즉 "부를 때만"은 <b>사람이 손잡이를
+          누를 때</b>와 <b>제품이 입력을 요구할 때</b> 둘 다를 "부름"으로 본다 — 후자를
+          "카드 도착"과 혼동하지 않는다(카드=신호만, 입력요구=강제 오픈, 서로 다른 급이다).</span></li>
+        <li><span class="ok">✅</span><span><b>프로 흰 바탕 대비.</b> 손잡이·배지·⊟ 버튼
+          전부 pro-white.css의 잉크 토큰(예: amber-ink #8f4d02 on #fdf1e2, blue-ink #1d4f91)을
+          그대로 썼다 — 새 색을 하나도 안 만들었다(위 CSS의 .pf 블록이 pro-white.css 값의
+          복사본).</span></li>
+        <li><span class="ok">✅</span><span><b>기존 계약 불변.</b> stage-on·chat-home 클래스
+          이름과 조건식은 그대로다. 새 축("접힘")은 stage-on이 참일 때만 뜻이 있는 곱집합이고,
+          chat-home이 되는 순간(화면 0개 또는 ⊟ 화면 접기) "접힘" 기억은 무시된다 — 이미
+          있는 "console-popped가 이기게 둔다"(app.html:140-141) 우선순위 선례와 같은 방식
+          이다: 우선순위는 <b>chat-home &gt; console-popped(분리창) &gt; 이 시안의 접힘</b>.</span></li>
+        <li><span class="ok">✅</span><span><b>정직한 목업.</b> 위 장면들의 단추·입력칸은
+          전부 "(목업)"이라 표기했고 실제로 반응하지 않는다. 장면 전환 버튼(①②③)만 동작한다
+          — 이것도 제품 기능이 아니라 이 문서 안의 탐색 보조일 뿐이다.</span></li>
+      </ul>
+    </section>
+  </div>
+
+  <footer class="doc-foot">
+    mockups/shell-chat-ondemand/시안.html · 제품 코드(client/·server/) 미수정 · 외부 리소스 없음(폐쇄망에서 더블클릭으로 열림) ·
+    표 속 CVE·수치는 예시입니다.
+  </footer>
+
+<script>
+(function(){
+  // ── 장면 전환(제품 기능 아님 — 이 문서 안 탐색 보조) ──────────────────────
+  var scenes = { A: "sceneA", B: "sceneB", C: "sceneC" };
+  var captions = {
+    A: "① 기본 상태 — 화면 전폭(1680px). 대화 중 도착한 카드는 손잡이 배지(3)로만 쌓이고 화면은 안 밀립니다.",
+    B: "② 🗨 손잡이를 눌러 열린 상태 — 오늘 게시본과 완전히 같은 배치(화면 1340px + 대화 380px). 폭 끌개(‖)·⧉ 창으로 전부 그대로 동작.",
+    C: "③ ⊟ 대화 접기를 누른 직후 — 화면이 즉시 +340px 넓어지고 배지는 0부터 다시 쌓입니다."
+  };
+  var btns = document.querySelectorAll(".mk-scenebtn");
+  function setScene(key){
+    Object.keys(scenes).forEach(function(k){
+      document.getElementById(scenes[k]).classList.toggle("on", k === key);
+    });
+    btns.forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-scene") === key); });
+    document.getElementById("mkCaption").textContent = captions[key] || "";
+  }
+  btns.forEach(function(b){
+    b.addEventListener("click", function(){ setScene(b.getAttribute("data-scene")); });
+  });
+  setScene("A");
+
+  // ── 배율(제품 기능 아님) ──────────────────────────────────────────────────
+  var scaleBtns = document.querySelectorAll(".mk-scale button");
+  var device = document.getElementById("device");
+  var frame = document.getElementById("deviceFrame");
+  scaleBtns.forEach(function(b){
+    b.addEventListener("click", function(){
+      var s = parseFloat(b.getAttribute("data-scale"));
+      device.style.transform = "scale(" + s + ")";
+      frame.style.width = Math.round(1920 * s) + "px";
+      frame.style.height = Math.round(1080 * s) + "px";
+      scaleBtns.forEach(function(x){ x.classList.toggle("on", x === b); });
+    });
+  });
+
+  // ── "엑셀처럼" 표 — 세 장면 화면 자리에 같은 더미 표를 채운다(장면 간 비교용) ──────
+  var COLS = ["자산명","CVE","심각도","상태","담당","최근 스캔"];
+  var SEV = ["crit","high","high","med","med","low","low","low","med","high","low","med","crit","low"];
+  var rows = [];
+  for (var i = 0; i < 14; i++) {
+    var s = SEV[i], label = s === "crit" ? "치명" : s === "high" ? "높음" : s === "med" ? "중간" : "낮음";
+    rows.push({
+      asset: "web-prod-0" + ((i % 9) + 1),
+      cve: "CVE-2026-3" + (300 + i),
+      sev: s, sevLabel: label,
+      status: (i % 3 === 0) ? "조치 대기" : (i % 3 === 1) ? "진행 중" : "완료",
+      owner: ["김보안","이담당","박운영"][i % 3],
+      scanned: "08-" + (20 + (i % 9)) + " 09:1" + (i % 6)
+    });
+  }
+  function buildTable(){
+    var t = document.createElement("table");
+    t.className = "pf-table";
+    var thead = document.createElement("thead");
+    var tr = document.createElement("tr");
+    COLS.forEach(function(c){ var th = document.createElement("th"); th.textContent = c; tr.appendChild(th); });
+    thead.appendChild(tr); t.appendChild(thead);
+    var tbody = document.createElement("tbody");
+    rows.forEach(function(r){
+      var tr2 = document.createElement("tr");
+      var tds = [r.asset, null, null, r.status, r.owner, r.scanned];
+      tds.forEach(function(v, idx){
+        var td = document.createElement("td");
+        if (idx === 1) td.textContent = r.cve;
+        else if (idx === 2) { var sp = document.createElement("span"); sp.className = "pf-sev " + r.sev; sp.textContent = r.sevLabel; td.appendChild(sp); }
+        else td.textContent = v;
+        tr2.appendChild(td);
+      });
+      tbody.appendChild(tr2);
+    });
+    t.appendChild(tbody);
+    return t;
+  }
+  ["tableHostA","tableHostB","tableHostC"].forEach(function(id){
+    var host = document.getElementById(id);
+    if (host) host.appendChild(buildTable());
+  });
+})();
+</script>
+</body>
+</html>

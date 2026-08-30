@@ -396,3 +396,23 @@ body[data-screen="loganalysis"] .frow, .g-ui .erow { line-height: 1.45; }
 .g-ui .srow:nth-child(even):not(:hover):not(.on),
 .g-ui .aud:nth-child(even) { background: var(--g-zebra, rgba(255,255,255,.025)); }
 :root { --g-zebra: rgba(255,255,255,.025); }
+
+/* ══ 좁은 폭 계약 — 대화창 최대일 때 글씨가 안 깨진다 (2026-08-31 사장님) ══════════════
+ *
+ * 대화창을 최대로 키우면 화면 판이 하한 420px까지 좁아진다(app.html 대화폭클램프).
+ * 사장님 실화면 캡처: 「올린 문서 120」이 두 줄로 꺾이고, 「장애노트 저장」 버튼 글자가
+ * 중간에서 깨지고, 지도 탭은 글자가 세로로 뭉개졌다. 지시: 「내용들이 대화창 최대일 때
+ * 글씨가 안 깨지게 — 그래서 엑셀처럼이고, 모든 메뉴도 동일하게 변경 희망」.
+ *
+ * 규칙(실측기 tools/narrow-probe.mjs — 판폭 420px 깨짐 0이 합격선):
+ * ① 한글은 **낱말 중간에서 꺾이지 않는다** — 한글은 낱말 경계 없이 아무 데서나 접혀
+ *    「저장」이 「저/장」이 된다. keep-all로 어절 단위만 허용, 한 어절이 칸보다 길면
+ *    그때만 부순다(overflow-wrap) — 삐져나가는 것(넘침)보다는 낫다.
+ * ② 단추 글자는 한 줄 — 단추가 두 줄로 접히면 깨져 보인다. 대신 단추 **줄**이 접힌다
+ *    (컨테이너 flex-wrap은 화면별). 문장형 칩(질문 제안 등 일부러 긴 것)은 .wrap-ok로 예외.
+ * ③ 표·행은 엑셀처럼: nowrap+말줄임(기존 밀도 절)이거나 가로 스크롤로 도망.
+ * ④ 히트맵·지도 같은 **시각 판은 말줄임이 아니라 반응형** — 좁으면 적층·리플로우
+ *    (각 화면의 미디어쿼리 몫 — 화면은 iframe이라 뷰포트=판 폭이다. inventory 🗺가 본보기). */
+body.g-ui { word-break: keep-all; overflow-wrap: break-word; }
+.g-ui button, .g-ui .btn { white-space: nowrap; }
+.g-ui button.wrap-ok, .g-ui .btn.wrap-ok { white-space: normal; word-break: keep-all; text-align: left; }
