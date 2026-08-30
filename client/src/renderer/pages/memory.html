@@ -103,7 +103,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
 th{text-align:left;font-size:12px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
-td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;line-height:1.5;}
+td{border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;line-height:1.5;}
 tr:last-child td{border-bottom:none;}
 
 /* ── 지식 관계도(옛 온톨로지 화면) — 2026-08-02 통합 ─────────────────────────
@@ -172,17 +172,8 @@ tr:last-child td{border-bottom:none;}
 
     <div id="gijoChatWidget" data-prompts='["지식베이스에 뭐 들어있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
-      <div data-gijo-fold="기술 상세" style="max-width:1100px;margin-bottom:16px;">
-      <div class="panel" style="margin-top:8px;">
-        <table>
-          <thead><tr><th style="width:15%">구분</th><th style="width:28%">단기 기억</th><th style="width:28%">장기 기억</th><th style="width:29%">학습</th></tr></thead>
-          <tbody>
-            <tr><td style="font-weight:700">기술</td><td>서버 인메모리 대화 이력 (에이전트별 최근 10턴, 채팅 시 자동 주입)</td><td><code>LanceDB</code> 로컬 벡터 DB (RAG)</td><td>QLoRA 파인튜닝 (모델 가중치 업데이트)</td></tr>
-            <tr><td style="font-weight:700">지속성</td><td style="color:var(--muted)">서버 재시작 시 휘발</td><td style="color:var(--teal)">파일 추가 시 즉시 반영</td><td style="color:var(--amber)">데이터셋 구축 후 재학습 필요</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <!-- 「기술 상세」 비교표는 2026-08-30 screenguide로 이관했다(검토관 [중] — 화면엔 정체성
+         한 줄과 ⚠경고만, 사용법·용어 풀이는 안내로). 「단기 기억이 뭐야?」로 물으면 답한다. -->
 
     <div class="panel">
       <!-- 기본 지식 번들 상태(전-4) — 실데이터 한 줄. 설명·용어는 screenguide "기본 지식 번들" 패널로. -->
@@ -299,19 +290,11 @@ tr:last-child td{border-bottom:none;}
       </div>
     </div>
 
-    <div class="panel" data-gijo-fold="RAG로 쓸까 학습으로 쓸까 — 활용 가이드">
-      <div data-gijo-fold="RAG로 쓸까 학습으로 쓸까" style="margin-bottom:14px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
-        <div style="font-size:12px;color:var(--text);line-height:1.8;margin-top:10px;">
-          <div style="margin-bottom:8px;"><b style="color:var(--teal);">📚 그냥 참고만 하면 됨 → 장기 기억(RAG)이 더 쉬움</b><br>최신 위협 전망·침해사고 사례처럼 "찾아보게만" 하면 되는 자료는 위 <b>문서 올리기</b>에 넣으세요. 재학습 없이 즉시 반영되고, 문서가 바뀌면 다시 올리면 끝입니다.</div>
-          <div style="margin-bottom:8px;"><b style="color:var(--amber);">🎓 AI가 체화하게 하려면 → 학습(파인튜닝)</b><br>한국식 사고대응 문체, 보고서 서식, 판단 방식 자체를 AI에 각인시키려면 아래 학습을 쓰세요. GPU와 시간이 필요합니다.</div>
-          <div style="border-top:1px solid var(--border);padding-top:8px;">
-            <b style="color:var(--text-strong, #fff);">문서별 추천 대상 에이전트</b> (학습 후 → 모델 내보내기 → 에이전트 AI 화면에서 그 에이전트에 할당)<br>
-            · 해킹진단 사례·침해사고 분석 → <b>침투테스트·분석</b> 에이전트<br>
-            · 사이버 위협 전망·동향 보고서 → <b>CTI·분석</b> 에이전트<br>
-            · 침해사고 대응 보고서 → <b>리포트</b> 에이전트 (보고서 문체 학습)
-          </div>
-        </div>
-      </div>
+    <!-- ⚠ 접기 이름은 **안에 실제로 든 것**을 가리켜야 한다 — 안내 문단을 이관한 뒤에도 옛 이름을
+         두면 「활용 가이드」라는 머리가 입력 폼을 감싼다(설계관 지적). -->
+    <div class="panel" data-gijo-fold="학습 — 데이터셋 만들기">
+      <!-- 활용 가이드 3문단(RAG vs 학습·문서별 추천 에이전트)은 2026-08-30 screenguide로 이관.
+           「RAG로 쓸까 학습으로 쓸까?」로 물으면 답한다. -->
 
       <div class="panel-title">🎓 학습 · ① 데이터셋 만들기</div><div class="field">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">

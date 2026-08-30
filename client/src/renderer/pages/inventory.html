@@ -123,7 +123,7 @@
   .table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
   th{text-align:left;font-size:12px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
-  td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+  td{border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
   tr:last-child td{border-bottom:none;}
   .asset-name{font-weight:700;color:var(--text-strong, #fff);}
   .asset-sub{font-size:12.25px;color:var(--muted-2);margin-top:2px;}
@@ -323,8 +323,14 @@
          스크롤을 내려야 자산 한 줄을 봤다. 접으면 178px에서 표가 시작한다.
          ⚠ 접되 **배지로 안에 무엇이 있는지 숫자를 남긴다** — 배지 없이 접으면 담당자는
            그런 것이 있는 줄도 모른다(2026-08-02 접기 규범). -->
-    <div id="extraToggle" style="font-size:13px;font-weight:700;color:var(--blue-light);cursor:pointer;margin-bottom:12px;user-select:none;">▸ 서비스 영향도 <span id="extraBadge" style="font-weight:600;color:var(--muted)">— 세는 중…</span></div>
-    <div id="extraPanels" style="display:none;">
+    <!-- 공용 접기로 통일(2026-08-30 검토관) — 여기만 세 번째 무늬(자체 텍스트 토글·상태 저장 없음)로
+         남아 있었다. fold.js가 기본접힘(data-gijo-fold-closed)·배지·상태 저장을 이미 한다.
+         ⚠ 지연 로딩은 fold.js가 쏘는 gijo:fold 이벤트로 잇는다(아래 JS) — 접기와 데이터 로딩이
+         한 함수에 묶여 있던 것을 부품 계약으로 갈랐다. -->
+    <div id="extraPanels" data-gijo-fold="서비스 영향도" data-gijo-fold-closed data-gijo-fold-badges="extraBadge:영향:warn">
+      <!-- 배지 값을 담는 자리 — fold.js는 「그 요소의 글자」를 읽어 머리줄에 얹는다(부품 계약).
+           숨겨 두는 이유: 본문에 같은 숫자를 두 번 보이면 접기 머리와 본문이 겹쳐 읽힌다. -->
+      <span id="extraBadge" style="display:none"></span>
     <!-- 코드 저장소 스캔은 AI-BOM 화면으로 이동(2026-07-26) — AI 자산을 찾아 등록하는 기능이라 Shadow AI와 한 흐름 -->
 
     <!-- 서비스 영향도: 자산에 문제가 생기면 어느 업무 서비스가 영향받는지 자동 집계(자산 위험·CTI 위협·지연 점검). -->
@@ -1632,18 +1638,10 @@
     searchInput.addEventListener("input", () => { render(); renderActiveChips(); });
     initToolbarDropdowns();
 
-    document.getElementById("extraToggle").addEventListener("click", () => {
-      const pane = document.getElementById("extraPanels");
-      const badge = document.getElementById("extraBadge");
-      const open = pane.style.display === "none";
-      pane.style.display = open ? "" : "none";
-      // ⚠ 라벨을 통째로 갈아 끼우면 배지가 사라진다(예전 코드가 그랬다 — textContent로 덮었다).
-      //   화살표만 바꾸고 배지는 그대로 둔다. 접힘 문구도 HTML 초기값과 **같은 말**을 쓴다
-      //   (예전엔 HTML은 「서비스 영향도」, JS는 「위험 요약 · 서비스 영향도」로 어긋나 있었다).
-      document.getElementById("extraToggle").firstChild.textContent = (open ? "▾ " : "▸ ") + "서비스 영향도 ";
-      if (badge) badge.textContent = open ? "(눌러서 접기)" : "— 세는 중…";
-      if (open) loadServiceImpact();
-      else loadImpactBadge();
+    // 지연 로딩만 남긴다 — 펼치기·화살표·상태 저장은 공용 fold.js 몫(2026-08-30 통일).
+    var 영향도불렀나 = false;
+    document.getElementById("extraPanels").addEventListener("gijo:fold", (e) => {
+      if (e.detail && e.detail.open && !영향도불렀나) { 영향도불렀나 = true; loadServiceImpact(); }
     });
 
     document.getElementById("covTabs").addEventListener("click", (e) => {

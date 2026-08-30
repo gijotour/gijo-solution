@@ -47,14 +47,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .ai-draft-btn:hover{border-color:var(--blue);}
 .ai-draft-btn:disabled{opacity:0.6;cursor:default;}
   /* 요약 막대 — 규제 대응 현황이라 파랑 계열(위험 경고가 아니다). */
-  /* 위험 갈래 접기 — 제목 줄만 남기고 접는다. 접혀도 미대응 건수는 보인다. */
-  .cat-head{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;margin-bottom:6px;}
-  .cat-head .car{font-size:11px;color:var(--muted-2);width:11px;flex:0 0 auto;}
-  .cat-head .nm{font-size:13.5px;font-weight:800;color:var(--text-strong, #fff);}
-  .cat-head .cnt{font-size:12.25px;font-weight:600;color:var(--muted-2);}
-  .cat-head .hot{font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;
-    background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);margin-left:auto;}
-  .cat-head:hover .nm{color:var(--blue-light);}
+  /* 위험 갈래 접기 — 2026-08-30 공용 fold.js로 이관했다(자체 .cat-head 규칙 6줄 제거).
+     머리줄·화살표·배지·상태 저장은 전부 부품이 그린다. 「미대응이 있으면 접힌 구역도 펼친다」는
+     공용 안전 원칙이 이 화면에만 없던 것이 이관의 이유다. */
 </style>
 <script src="viz.js"></script>
 </head>
@@ -109,10 +104,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   let catalog = [];
   // 접은 갈래만 기억한다 — **기본은 펼침**(2026-08-02 원칙). 이 PC에만 저장한다.
+  // 옛 자체 접기 상태 — **한 번만 읽어 첫 기본값으로 쓰고 지운다**(2026-08-30 공용 fold 이관).
+  //   저장 형식이 다르다: 옛 키는 갈래 **키** 배열, fold.js는 「gijo:fold:화면:한글이름」에
+  //   "0"/"1"을 쓴다. 자동 변환은 라벨 대조가 필요해 값이 어긋날 위험이 크므로, 첫 화면만
+  //   물려주고 그 뒤로는 공용 부품이 기억한다(담당자가 한 번 접었다 펴면 그대로 이어진다).
   const 접기키 = "gijo:compliance:closed";
   let 접힌갈래 = new Set();
-  try { 접힌갈래 = new Set(JSON.parse(localStorage.getItem(접기키) || "[]")); } catch (e) {}
-  const 접기저장 = () => { try { localStorage.setItem(접기키, JSON.stringify([...접힌갈래])); } catch (e) {} };
+  try {
+    접힌갈래 = new Set(JSON.parse(localStorage.getItem(접기키) || "[]"));
+    localStorage.removeItem(접기키);
+  } catch (e) {}
 
   function esc(s) { return String(s == null ? "" : s).replace(/</g, "&lt;"); }
 
@@ -240,26 +241,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       //   「대응완료」만 보는 순간 빨간 배지가 전부 사라져 미대응이 없는 것처럼 보인다.
       const 접힘 = 접힌갈래.has(cat);
       const 미대응 = 갈래전체.filter((t) => t.status === "open").length;
-      return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px;">
-        <div class="cat-head" data-cat="${cat}" role="button" tabindex="0">
-          <span class="car">${접힘 ? "▶" : "▼"}</span>
-          <span class="nm">${items[0].categoryLabel}</span>
-          <span class="cnt">(${items.length})</span>
-          ${미대응 ? `<span class="hot">미대응 ${미대응}</span>` : ""}
-        </div>
-        ${접힘 ? "" : items.map(threatRow).join("")}
+      // 공용 접기(fold.js)로 통일 — 2026-08-30 검토관. 자체 구현에는 「위험(hot) 신호면 접힌
+      // 구역도 펼친다」는 공용 안전 원칙이 없어, 미대응이 있어도 접힌 채 남았다(배지만 보였다).
+      // ⚠ 배지 값은 fold.js가 **그 요소의 글자를 읽는다**(id 필수) — 숨은 span에 담는다.
+      //   0·빈값이면 fold.js가 배지를 감추므로 미대응 0인 갈래는 자동으로 조용해진다.
+      return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px;"
+        data-gijo-fold="${items[0].categoryLabel} (${items.length})" ${접힘 ? "data-gijo-fold-closed" : ""}
+        data-gijo-fold-badges="cplOpen-${cat}:미대응:hot">
+        <span id="cplOpen-${cat}" style="display:none">${미대응 || ""}</span>
+        ${items.map(threatRow).join("")}
       </div>`;
     }).join("");
 
-    // 갈래 접기/펴기 — 제목 줄 전체가 누르는 자리다.
-    cats.querySelectorAll(".cat-head").forEach((el) => {
-      el.addEventListener("click", () => {
-        const c = el.dataset.cat;
-        if (접힌갈래.has(c)) 접힌갈래.delete(c); else 접힌갈래.add(c);
-        접기저장();
-        render();
-      });
-    });
+    // 접기/펴기·상태 저장·배지는 공용 fold.js 몫이다(2026-08-30 통일) — 자체 배선을 걷었다.
+    // ⚠ innerHTML로 다시 그렸으므로 **그린 뒤 한 번 더 훑게** 한다(kpi.html과 같은 관례).
+    //   fold.js의 scan()은 멱등이고, 떨어져 나간 옛 구역은 그 안에서 함께 걷힌다.
+    if (window.gijoFold) window.gijoFold.scan();
 
     cats.querySelectorAll("[data-toggle]").forEach((el) => {
       el.addEventListener("click", () => {

@@ -489,14 +489,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         ⚠ 권장 목록은 <b>조직명까지 고정</b>돼 있습니다. 이름만으로 검색하면 안전장치가 제거된 개조본이 먼저 나옵니다 — 보안 제품에는 쓰면 안 됩니다.
       </div>
       <!-- 고급 — 직접 검색. BYOM은 이 제품의 차별점이라 없애지 않고 접어서 남긴다. -->
-      <details style="margin-top:9px">
-        <summary style="cursor:pointer;font-size:12px;color:var(--muted)">고급 — 직접 검색해서 받기 (권장하지 않음)</summary>
+      <!-- 공용 접기로 통일(2026-08-30 검토관) — details는 상태 저장·배지·머리줄 무늬가 없어
+           같은 화면 안에서 두 무늬가 섞여 있었다(이 파일은 data-gijo-fold를 이미 여럿 쓴다). -->
+      <div style="margin-top:9px" data-gijo-fold="고급 — 직접 검색해서 받기 (권장하지 않음)" data-gijo-fold-closed>
         <div class="model-search"><input id="hfSearchInput" placeholder="예: Qwen/Qwen3-14B-GGUF — 조직명까지 정확히"><button id="hfSearchBtn">검색</button></div>
         <div id="hfResults" style="font-size:12px;color:var(--muted-2)">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
         <div style="font-size:11.5px;color:var(--muted-2);margin-top:6px">
           ⚠ 검색 결과에는 <b style="color:var(--red-ink, #fca5a5)">Uncensored · abliterated · Heretic</b> 같은 개조본이 섞입니다. 받기 전에 한 번 더 확인을 받습니다.
         </div>
-      </details>
+      </div>
       <div id="hfJobs" style="font-size:12px;margin-top:8px"></div>
     </div>
 
@@ -526,11 +527,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div id="teamCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px"></div>
       <div id="teamShared" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
       <!-- 고급 — 팀원별 예외 배정(기존 기능 보존). 32GB+ 티어·실험용 탈출구다. -->
-      <details style="margin-top:10px">
-        <summary style="cursor:pointer;font-size:12px;color:var(--muted)">고급 — 팀원별 예외 모델 배정 (기본은 전원 자동)</summary>
+      <div style="margin-top:10px" data-gijo-fold="고급 — 팀원별 예외 모델 배정 (기본은 전원 자동)" data-gijo-fold-closed>
         <div style="font-size:11.5px;color:var(--muted-2);margin:6px 0 4px">⚠ 단일 GPU에서는 팀원마다 다른 큰 모델을 두면 교체 대기(수십 초)가 생깁니다 — 전문성은 어댑터·지식으로 내는 것이 이 제품의 방식입니다.</div>
         <div id="agentModelRows" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
-      </details>
+      </div>
       <div class="status-line" id="agentModelStatusLine"></div>
     </div>
 

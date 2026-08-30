@@ -187,6 +187,16 @@
 
   function scan() {
     injectCss();
+    // ⚠ **문서에서 떨어져 나간 구역을 먼저 걷는다**(2026-08-30 설계관 적발).
+    //   화면이 innerHTML로 목록을 다시 그리면 접기 머리(.gjf-h)와 __gijoFolded 플래그가 함께
+    //   사라지므로 scan()이 새 entry를 또 만든다 — 그런데 entries에는 **비우는 코드가 없어**
+    //   재렌더 횟수만큼 죽은 entry가 쌓였다. refresh()가 그 전부를 순회하고, open()은 떨어져
+    //   나간 요소를 찾아 `found=true`를 돌려줄 수 있다(「폈다」고 답하고 화면은 그대로).
+    //   지금까지 안 드러난 이유는 재렌더 화면(kpi)이 scan을 한 번만 불렀기 때문이다 —
+    //   compliance가 렌더마다 부르게 되면서 실제 문제가 된다.
+    for (var i = entries.length - 1; i >= 0; i--) {
+      if (!document.contains(entries[i].target)) entries.splice(i, 1);
+    }
     document.querySelectorAll("[data-gijo-fold]").forEach(function (t) {
       if (t.__gijoFolded) return;
       t.__gijoFolded = true;
