@@ -87,7 +87,7 @@ export function registerVerifyRoutes(app: Express): void {
         res.status(400).json({
           error:
             `이 자산(${asset.name})에 연결된 점검 대상이 등록돼 있지 않습니다.\n` +
-            `→ 점검 콘솔 › 원격 정기점검에서 대상(호스트·계정)을 먼저 등록해 주세요.`,
+            `→ ④ 검증 → 보안설정 점검(하드닝)의 [＋ 대상 등록]에서 대상(호스트·계정)을 먼저 등록해 주세요.`,
         });
         return;
       }

@@ -18,7 +18,7 @@ vi.mock("../src/engine/llm", () => ({
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { 이름으로화면찾기, 화면위치안내 } from "../src/engine/screenguide";
+import { 이름으로화면찾기, 화면위치안내, getScreenGuide } from "../src/engine/screenguide";
 
 describe("이름으로화면찾기 — 자리를 물을 때만, 우리 이름으로만", () => {
   it("★ 「설정은 어디서 해?」가 우리 설정 화면을 찾는다", () => {
@@ -190,5 +190,123 @@ describe("★ 흡수 별칭의 **소비 경로** — 생산자만 재면 반쪽�
       expect(화면, `탭 「${t}」이 화면에 없다 — 별칭이 없는 갈래를 가리킨다`)
         .toMatch(new RegExp(`data-t="${t}"`));
     }
+  });
+});
+
+// ── 흡수 화면의 자리 안내 — 「사이드바에서 찾으세요」가 거짓이 되는 자리 (2026-08-30) ──────
+//
+// ★ 왜: 허브 통합(2026-08-09~20)으로 화면 19종이 사이드바에서 빠졌는데, 자리 안내는 폴백
+//   「사이드바 메뉴에서 찾을 수 있습니다」를 그대로 냈다 — 메뉴를 아무리 봐도 없는 화면을
+//   보라고 한 것이다. 검토관이 [높음]으로 잡았고, 그것을 막으려 만든 흡수자리 표에는
+//   supervision 한 줄뿐이었다(장치는 있고 채워지지 않은 부류).
+// ⚠ 이 표는 클라 nav.js TAB_REDIRECT와 **손으로** 맞춘다(서버는 화면 파일을 배포물에
+//   안 갖는다). 그래서 **시험 시각에 두 표를 대조**한다 — clientglobals·screen-where가
+//   이미 쓰는 방식이다. 어긋나면 여기서 빨간불이 난다.
+describe("★ 흡수된 화면의 자리 안내 — 없는 메뉴를 가리키지 않는다", () => {
+  const PAGES = path.join(__dirname, "..", "..", "client", "src", "renderer", "pages");
+  const nav = fs.readFileSync(path.join(PAGES, "nav.js"), "utf-8");
+
+  /** nav.js TAB_REDIRECT를 읽어 **전이를 끝까지 따라간** 흡수 지도를 만든다. */
+  function 흡수지도(): Record<string, string> {
+    const i = nav.indexOf("TAB_REDIRECT");
+    const 구간 = nav.slice(i, nav.indexOf("};", i));
+    const 표: Record<string, string> = {};
+    for (const m of 구간.matchAll(/"([\w.-]+\.html)":\s*"([^"]+)"/g)) if (!m[1].includes("?")) 표[m[1]] = m[2];
+    const 최종 = (p: string) => {
+      let cur = p;
+      for (let n = 0; n < 5; n++) {
+        const nx = 표[cur.split("?")[0]];
+        if (!nx || nx.split("?")[0] === cur.split("?")[0]) break;
+        cur = nx;
+      }
+      return cur;
+    };
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(표)) {
+      const f = 최종(v);
+      if (f.split("?")[0] === k) continue; // settings.html→?s=ai 같은 자기 정규화는 흡수가 아니다
+      out[k] = f;
+    }
+    return out;
+  }
+
+  it("추출이 헛돌지 않는다 — TAB_REDIRECT를 실제로 읽는다", () => {
+    expect(Object.keys(흡수지도()).length, "흡수 지도를 못 뽑았다 — 이 시험이 통째로 헛돈다").toBeGreaterThanOrEqual(20);
+  });
+
+  it("★★ 흡수된 화면의 안내에 「사이드바/왼쪽 메뉴에서 찾으세요」가 안 나온다", () => {
+    const 샌것: string[] = [];
+    let 잰것 = 0; // 헛돌이 방지(검토관 [중]) — GUIDES 필터가 모집단을 0으로 줄여도 통과하면 안 된다
+    for (const 화면 of Object.keys(흡수지도())) {
+      // GUIDES에 항목이 **있는** 화면만 본다 — 없는 화면(reference·mcp·assethub 등 옛 이름)은
+      // 안내가 개요로 떨어지고, 그쪽은 「그런 화면이 없다」가 참이라 자리 안내가 뜻이 없다.
+      // ⚠ 개요 폴백을 값으로 가른다: 같은 개요를 받으면 그 화면 전용 안내가 없다는 뜻이다.
+      if (getScreenGuide(화면).title === getScreenGuide("__없는화면__.html").title) continue;
+      const 글 = 화면위치안내(화면, "아무개");
+      if (!글 || 글.length < 40) continue;
+      잰것++;
+      if (/사이드바|왼쪽 메뉴/.test(글)) 샌것.push(화면);
+    }
+    expect(잰것, "실제로 잰 흡수 화면이 0이다 — 필터가 모집단을 통째로 지웠다(거짓 초록)").toBeGreaterThanOrEqual(15);
+    expect(샌것, "허브로 흡수돼 메뉴에 없는 화면인데 「메뉴에서 찾으세요」라고 답한다 — " +
+      "screenguide.ts의 흡수자리 표에 실제 가는 길을 적어라:\n  " + 샌것.join("\n  ")).toEqual([]);
+  });
+
+  it("흡수 안내는 셸 중립이다 — 프로 담당자에게 표준 셸 말이 나가면 안 된다", () => {
+    // 흡수 갈래는 pro 인자를 안 타므로, 문구 자체가 셸에 안 매여 있어야 한다.
+    for (const 화면 of ["vulnscan.html", "approvals.html", "kpi.html"]) {
+      const 글 = 화면위치안내(화면, "아무개");
+      expect(글, `${화면} 흡수 안내가 셸에 매인 말을 쓴다`).not.toMatch(/사이드바|왼쪽 메뉴/);
+    }
+  });
+});
+
+// ── 새 별칭은 **걸리는가 + 삼키는가**를 함께 본다 (2026-08-30) ─────────────────────
+//
+// ★ 왜 이 짝이 필요한가: 허브 별칭을 넣으면서 홑낱말 「조치」·「보고」·「검증」을 넣었다가
+//   검토관에게 [높음] 3건으로 잡혔다 — 이 낱말들은 **업무 낱말**이라 자리 질문이 아닌 문장까지
+//   삼킨다. dispatcher에서 이름으로화면찾기가 침해사고 초동절차·법령 조회보다 **앞**이라
+//   즉시 return으로 그 길을 막는다:
+//     「랜섬웨어 감염됐는데 조치 절차 어디서 봐?」 → 초동절차 대신 화면 안내
+//   같은 파일이 「마크다운」·「기록」에서 이미 두 번 성문화한 규칙인데 또 밟았다.
+//   ⇒ 별칭을 더할 때는 **반드시 이 두 짝**을 같이 쓴다.
+describe("★ 허브 별칭 — 맞는 화면으로 가고, 남의 질문은 안 삼킨다", () => {
+  it("허브를 부르는 말로 물으면 그 허브를 찾는다", () => {
+    const 짝: [string, string][] = [
+      ["우선순위화면 어디야?", "triage.html"],
+      ["조치화면 어디 있어?", "fix.html"],
+      ["검증허브 어디로 가?", "verify.html"],
+      ["보고화면 어디서 봐?", "reporting.html"],
+      ["기록화면 어디야?", "records.html"],
+      ["AI허브 어디 있어?", "aihub.html"],
+      ["보안분석 어디서 봐?", "analysis.html"],
+    ];
+    for (const [q, 기대] of 짝) {
+      const r = 이름으로화면찾기(q);
+      expect(r, `「${q}」를 못 찾는다 — 허브 제목의 「(통합)」 접미사 때문에 원리상 안 걸리던 자리다`).not.toBeNull();
+      expect(r!.screen, `「${q}」`).toBe(기대);
+    }
+  });
+
+  it("★★ 업무 낱말이 든 문장은 삼키지 않는다 — 초동절차·법령·플레이북의 길을 막지 않게", () => {
+    // 이 문장들은 화면 안내가 아니라 **다른 엔진**이 답해야 한다(침해 초동절차·법령 조회·조치 절차).
+    const 삼키면안됨 = [
+      "랜섬웨어 감염됐는데 조치 절차 어디서 봐?",
+      "개인정보 유출 시 어디에 보고해야 하나요?",
+      "해킹당하면 어디에 신고해야 하나요?",
+      "백업 복원 검증은 어떻게 하나요?",
+      "이 취약점 조치 방법 알려줘",
+      "유출 신고 의무는 어디에 보고해?",
+    ];
+    for (const q of 삼키면안됨) {
+      const r = 이름으로화면찾기(q);
+      expect(r, `「${q}」를 화면 안내가 가로챈다(→ ${r?.screen}) — 홑낱말 별칭을 넣지 마라. ` +
+        "이름으로화면찾기는 dispatcher에서 침해사고·법령보다 앞이라 즉시 return으로 그 길을 막는다").toBeNull();
+    }
+  });
+
+  it("헛돌이 방지 — 위 두 시험이 같은 잣대를 쓰는지(별칭표가 실제로 살아 있나)", () => {
+    // 「전부 null」로 통과하는 거짓 초록을 막는다: 걸려야 할 것은 걸리는지 한 번 더 못박는다.
+    expect(이름으로화면찾기("조치화면 어디야?"), "별칭표가 죽었다 — 위 삼킴 시험이 저절로 통과한다").not.toBeNull();
   });
 });

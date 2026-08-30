@@ -201,6 +201,19 @@
 - **max 실기 검증거리**: mac에서 화면 팝업(창) 상태의 대시보드 「적어 넣기」(prefill 릴레이 신설 경로) ·
   hardening 카드 클릭 🎯(win 운영에 점검 대상 0건이라 실측 못 함 — mac 개발 서버에 대상 있으면 확인)
 
+### 2026-08-30 — 라이트(프로 흰 바탕) 대비 수리 121곳 + 배색 감시 교체
+
+- **공용 파일 변경**: `pro-white.css`(**잉크 토큰 5종 신설** `--teal-ink`·`--amber-ink`·`--blue-ink`·
+  `--purple-ink`·`--muted-ink` + 배지 반전 3종) · `nav.js`·`titlebar.js`·`console.js`·`chatparts.js`·
+  `chatwidget.js`·`dialog.js`·`scopefilter.js`·`session-explorer.js`·`longnotice.js`·`map-view.js`
+  (밝은 글자 → 토큰 장치) · `tools/theme-sweep-pastel.mjs` MAP 45색 확장 · `server/test/themecolors.test.ts`
+  **명단 → 대비 계산**으로 교체 · 신설 `tools/contrast-probe.mjs`(실화면 대비 측정기)
+- ⚠ **라이트 에디션 작업 시 반드시 알 것**: 새 색을 넣을 때 `--teal`·`--amber`·`--purple`·`--blue-light`에
+  폴백을 달면 **다크가 조용히 바뀐다**(화면 :root가 그 토큰들을 정의한다). 반드시 `-ink` 토큰을 쓸 것.
+  잉크 토큰은 `pro-white.css` 한 곳에서만 정의한다 — 화면이 정의하면 장치가 깨지고 시험이 막는다.
+- **max 실기 검증거리**: mac에서 프로 흰 바탕 화면들의 글자 대비 — `node tools/contrast-probe.mjs`
+  (앱을 CDP 9223으로 띄우고 로그인 후 실행, 위반 0이어야 한다). mac 폰트 렌더링이 달라 눈으로도 한 번.
+
 ### 진행 중이라 아직 인계 대상이 아닌 것
 
 - 규정 판정 요청함 — 시안·설계 검토 완료, 착수 전

@@ -442,6 +442,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       </div><!-- /v4docpane -->
     </div><!-- /v4content -->
     <div class="note" id="note">개인 문서는 내 질문에만 근거로 나옵니다 — 「AI 포함」과 「공유」의 차이는 ⓘ로 보세요.</div>
+    <!-- ⚠ 위젯 호스트는 #note **밖**이어야 한다(2026-08-30 검토관 [높음]) — 이 화면은 목록을 그릴
+         때마다 note.textContent를 덮어써 **자식 노드를 전부 지운다**. 안에 두면 첫 렌더에서
+         위젯이 문서에서 떨어져(chatwidget은 host를 body로 옮기지 않는다) 눌러도 아무것도 안 뜬다.
+         assets.html이 정적 컨테이너에 두는 것도 같은 이유다. -->
+    <div id="gijoChatWidget" data-prompts='["개인 문서와 공유 문서 차이가 뭐야?","내 문서에서 뭘 할 수 있어?"]'></div>
   </div><!-- /v4main -->
  </div><!-- /v4root -->
 </div>
@@ -2264,5 +2269,13 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 </script>
 <script src="nav.js"></script>
 <script src="selectnotify.js"></script>
+<!-- ⓘ 화면 안내 위젯(2026-08-30 검토관 [중]) — 이 화면 노트가 「차이는 ⓘ로 보세요」라고
+     안내하는데 위젯이 없었다. 탭에서는 셸 대화창의 ⓘ 칩이 대신 답해 참이지만, **⧉ 창으로
+     빼면** 셸 콘솔이 없어 ⓘ도 답변 창구도 전무해 안내가 막다른 길이 됐다(본체 화면 중 미탑재는
+     여기와 pick·supervision 셋뿐이고 그 둘은 단독 분리 경로가 없다).
+     ⚠ chatparts.js가 chatwidget.js **앞**이어야 한다 — 뒤면 위젯이 부를 때 부품이 없어
+     대화가 반쪽이 된다(clientglobals.test.ts가 순서까지 본다). assets.html이 본보기. -->
+<script src="chatparts.js"></script>
+<script src="chatwidget.js"></script>
 </body>
 </html>

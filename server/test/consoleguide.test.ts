@@ -58,7 +58,9 @@ describe("알아두기(팁 줄)에도 실린다 — 어느 화면에서나 눈�
   it("새 조작 3종이 규칙 줄에 있다", () => {
     const { rules } = screenTips("vulnscan.html");
     const 전부 = rules.join("\n");
-    expect(전부).toContain("📌");
+    // 2026-08-30: 선택 기호는 📌 → 🎯로 바뀌었다(맥락 문장 개편). 감시를 내린 게 아니라
+    // **현행 기호로 옮긴 것** — PRODUCT_RULES가 폐지된 기호를 안내하던 것이 결함이었다.
+    expect(전부).toContain("🎯");
     expect(전부).toContain("🧭");
     expect(전부).toMatch(/흐르|흘러/);
   });
