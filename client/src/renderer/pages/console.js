@@ -385,7 +385,15 @@
       var pop = document.createElement("div");
       pop.className = "cx-pop"; pop.id = "cxPop";
       var 단추들 = [];
-      if (sel) 단추들.push(["🎯 선택 풀기", function () { setSelection(null); }]);
+      if (sel) 단추들.push(["🎯 선택 풀기", function () {
+        setSelection(null);
+        // 분리창에서 푼 것은 셸에도 닿아야 한다(📎× gijo:detach와 같은 부류) — 안 보내면 숨은
+        // 도킹 인스턴스에 선택이 남아, ⇤ 붙이기로 돌아간 순간 **유령 🎯**가 되살아난다.
+        // ⚠ 되보냄은 이 단추에서만 — setSelection 안에 넣으면 셸의 되쏘기와 맞물려 고리가 된다.
+        if (IS_WINDOW && window.gijo && window.gijo.bridgeToShell) {
+          try { window.gijo.bridgeToShell({ type: "gijo:select" }); } catch (err) { }
+        }
+      }]);
       if (범위) 단추들.push(["🗂 범위 풀기 — 전체를 다시 봅니다", function () {
         setScope(null);
         // 화면들도 알아야 목록이 되돌아온다 — 셸을 거쳐 모든 틀에 알린다.
@@ -1213,6 +1221,17 @@
       }
       ctxOff = false; // 새 화면에 왔으면 맥락은 다시 붙는다(뗀 것은 그 화면에서의 선택이었다)
       setSelection(null); // 선택도 푼다 — 옆 화면 항목을 계속 가리키면 「이거」가 거짓말이 된다
+      // 분리창 인스턴스에도 같은 해제를(2026-08-30 ④). ⚠ 화면 전환 판정은 **이 한 곳**에만
+      // 둔다 — 위 readCtxFromShell의 규칙(pick.html 제외·무대 내림 때 화면카드 치환)을 셸에
+      // 베끼면 두 벌이 되어 어긋난다.
+      // ⚠ **탭 전환에서는 이 중계가 유일한 통로가 아니다** — 분리창도 IPC로 맥락을 받아
+      //   (preload onConsoleContext → applyCtx) 스스로 같은 자리를 지난다. 그래도 남기는 이유:
+      //   셸이 **syncCtx만 부르고 IPC는 안 보내는 경로**가 있다(app.html의 무대 오르내림 —
+      //   sendConsoleContext는 setCtx에만 붙어 있다). 그 길로 도킹만 풀리면 두 인스턴스의 🎯가
+      //   갈라진다. 겹쳐도 결과가 같은(멱등) 중계라 겹침의 대가는 없다.
+      if (!IS_WINDOW && window.gijo && window.gijo.broadcastToWindows) {
+        try { window.gijo.broadcastToWindows({ type: "gijo:select" }); } catch (e) { }
+      }
     }
     prevScreen = ctx.screen || prevScreen;
     renderCtxLine(); // 문장 한 줄이 칩 3종을 대신한다(보이게+뗄 수 있게 계약은 문장+⋯로)
@@ -1326,7 +1345,8 @@
     근거띠그리기();
   }
   function getGroundState() { // ⧉ 분리창이 뜰 때 지금 상태를 그대로 물려주기 위한 스냅샷
-    return { docs: 근거문서.slice(), attaches: 첨부세션.slice() };
+    // sel도 함께 — 🎯가 걸린 채로 창을 빼면 새 창만 모르는 상태가 된다(2026-08-30 ④).
+    return { docs: 근거문서.slice(), attaches: 첨부세션.slice(), sel: sel ? { label: sel.label, text: sel.text, fields: sel.fields } : null };
   }
   function attachWork(item) {
     var id = String(item && item.id || "").slice(0, 80);
@@ -2320,6 +2340,10 @@
       else if (d.type === "gijo:attach") attachWork({ id: d.sessionId, title: d.title });
       else if (d.type === "gijo:detach") detachWork(String(d.sessionId || ""));
       else if (d.type === "gijo:docscope:clear") setDocScope([]);
+      // 🎯 선택(2026-08-30 ④) — 셸이 **정돈을 지난 값만** 보낸다. label·text가 없으면 해제다
+      // (화면 전환·「선택 풀기」가 그 길로 온다). 여기서 한 번 더 문자열로 굳혀 받는다.
+      else if (d.type === "gijo:select") setSelection(d.label && d.text
+        ? { label: String(d.label), text: String(d.text), fields: d.fields || undefined } : null);
     });
   }
   // ⧉ 분리창으로 뜬 인스턴스는 빈 상태로 시작한다 — 셸에 지금 근거 상태를 요청해 물려받는다

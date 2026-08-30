@@ -125,6 +125,46 @@ describe("클라 배선 (소스 계약)", () => {
     expect(cs).toContain("select: setSelection");
   });
 
+  // ⧉ 분리 대화창까지 — 2026-08-30 ④.
+  //
+  // ■ 왜 감시하나
+  //   대화를 창으로 빼면 셸 안의 gijoConsole은 **숨은 도킹 인스턴스**가 된다. 화면의 🎯가
+  //   거기로만 가면 사람이 보는 창엔 아무 일도 안 일어나고 오류도 안 난다 — 이 저장소가
+  //   반복해 겪은 「설계는 다 됐고 쓰인 적 없다」 그대로다(☑ 근거 지정·📎 첨부가 같은 무늬로
+  //   b7f3c6af에서 닫혔고, 🎯만 남아 있었다).
+  //   ★ 정방향만 넣으면 **반대 방향이 새로 샌다**: 분리창에서 푼 선택이 셸에 안 닿으면
+  //     ⇤ 붙이기로 돌아간 순간 유령 🎯가 되살아나고, 화면 전환 해제가 안 닿으면 분리창의
+  //     🎯가 옆 화면 항목을 계속 가리킨다. 네 방향을 한 시험에 묶어 둔다.
+  it("★★ 🎯 선택은 분리 대화창에도 닿는다 — 네 방향 전부(2026-08-30 ④)", () => {
+    const 셸 = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "app.html"), "utf8");
+    const 콘솔 = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "console.js"), "utf8");
+    // ① 셸 → 분리창. **정돈을 지난 값만** 나른다(원본 d 재전송은 값 재조립 관례 위반).
+    expect(셸, "셸이 select를 분리창에 중계하지 않는다 — ⧉ 상태에서 🎯가 영영 안 뜬다")
+      .toMatch(/broadcastToWindows\(고른값[\s\S]{0,240}type: "gijo:select"/);
+    expect(셸, "정돈 전 원본을 그대로 퍼뜨린다 — 화면이 만든 값이 검사 없이 창으로 간다")
+      .not.toMatch(/broadcastToWindows\(d[,)\s]/);
+    // ② 분리창이 받는다(수신부가 없으면 중계는 허공에 간다).
+    expect(콘솔, "분리창 인스턴스 수신(onShellBridge)에 select 갈래가 없다")
+      .toMatch(/onShellBridge[\s\S]{0,900}d\.type === "gijo:select"/);
+    // ③ 분리창 「선택 풀기」 → 셸(유령 🎯 부활 방지). 되보냄은 단추에서만 — setSelection 안에
+    //    넣으면 셸의 되쏘기와 맞물려 고리가 된다.
+    expect(콘솔, "분리창 선택 풀기 되보냄이 없다 — ⇤ 붙이기 때 유령 🎯가 되살아난다")
+      .toMatch(/🎯 선택 풀기[\s\S]{0,500}bridgeToShell\(\{ type: "gijo:select" \}\)/);
+    expect(콘솔, "setSelection 자체가 되보내면 셸↔창 고리가 된다")
+      .not.toMatch(/function setSelection\([\s\S]{0,300}bridgeToShell/);
+    // ④ 화면 전환 해제도 중계 — 판정은 console.js 한 곳에만 두고 셸에 복제하지 않는다.
+    //   ⚠ 탭 전환에서는 분리창 자체 경로(onConsoleContext→applyCtx)와 겹친다(실측 2026-08-30:
+    //     둘 중 무엇이 풀었는지 못 가른다 — contextBridge가 동결이라 중계만 끊는 실험이 안 된다).
+    //     그래도 감시하는 이유는 **IPC가 안 붙은 경로**(셸의 무대 오르내림은 syncCtx만 부른다)
+    //     에서 이 중계가 유일한 통로이기 때문이다.
+    expect(콘솔, "화면 전환 해제가 분리창에 안 닿는다 — 🎯가 옆 화면 항목을 계속 가리킨다")
+      //   (창 800자는 그 사이의 「왜 남기나」 주석 몫이다 — 갈래 자체는 세 줄이다.)
+      .toMatch(/setSelection\(null\); \/\/ 선택도 푼다[\s\S]{0,800}broadcastToWindows\(\{ type: "gijo:select" \}\)/);
+    // ⑤ 빼는 순간 물려받기(③라운드 #14와 같은 부류 — 이미 걸린 🎯가 새 창엔 없던 구멍).
+    expect(콘솔, "물려주기 스냅샷에 sel이 없다").toMatch(/function getGroundState[\s\S]{0,320}sel: sel \?/);
+    expect(셸, "ground:req 응답이 sel을 안 보낸다").toMatch(/상태\.sel[\s\S]{0,200}type: "gijo:select"/);
+  });
+
   it("3단계 확장 화면도 top으로 보낸다 — 취약점 목록(호스트·항목)·할 일 줄", () => {
     // 2026-08-20 계약 갱신: vulnscan은 공용 부품(selectnotify.js)으로 이관됐다 —
     // 「top 전송·팝업 예외 금지」 계약은 부품 한 곳이 지고, 화면은 부품 호출만 감시한다.
@@ -169,7 +209,10 @@ describe("조치·승인 화면이 고른 항목을 대화창에 넘긴다", () 
     expect(구간, "fields를 콘솔로 안 넘긴다").toContain("fields");
     expect(구간, "iframe 값을 그대로 믿으면 안 된다 — String 강제가 있어야 한다").toContain("String(");
     expect(구간, "아는 키만 통과시켜야 한다(허용 목록)").toMatch(/허용키|allow/);
-    expect(shell, "select 갈래가 선택정돈을 안 부른다").toContain("window.gijoConsole.select(선택정돈(d))");
+    // 2026-08-30 ④ 갱신: select 갈래가 정돈 결과를 **분리창에도 중계**하느라 값을 변수로 받는다.
+    //   계약의 뜻은 한 줄도 안 바뀐다 — 「iframe이 보낸 것이 아니라 선택정돈을 지난 값이 콘솔로 간다」.
+    expect(shell, "select 갈래가 선택정돈을 안 부른다")
+      .toMatch(/d\.type === "gijo:select"[\s\S]{0,300}var 고른값 = 선택정돈\(d\);[\s\S]{0,120}window\.gijoConsole\.select\(고른값\)/);
     expect(shell, "pickdone 갈래가 선택정돈을 안 부른다").toMatch(/gijo:pickdone[\s\S]{0,400}선택정돈\(d\)/);
   });
 

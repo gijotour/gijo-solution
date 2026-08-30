@@ -1036,19 +1036,6 @@
       if (열문서타이머) { clearInterval(열문서타이머); 열문서타이머 = null; }
       return;
     }
-    // ⧉ 분리 대화창이 뜰 때 지금 근거 상태를 요청한다(③라운드 #14 — 빼는 순간 ☑·📎가 빈 창).
-    if (d.type === "gijo:ground:req") {
-      if (window.gijoConsole && window.gijoConsole.getGroundState && window.gijo && window.gijo.broadcastToWindows) {
-        try {
-          var 상태 = window.gijoConsole.getGroundState();
-          window.gijo.broadcastToWindows({ type: "gijo:docscope", docIds: 상태.docs || [] });
-          (상태.attaches || []).forEach(function (a) {
-            window.gijo.broadcastToWindows({ type: "gijo:attach", sessionId: a.id, title: a.title });
-          });
-        } catch (e) { }
-      }
-      return;
-    }
     // 📎 빼기 — 분리창 칩 ×가 도킹 인스턴스에도 반영돼야 도킹 복귀 때 되살아나지 않는다(#16).
     if (d.type === "gijo:detach") {
       var 뺄세션 = String(d.sessionId || "").slice(0, 80);
@@ -1073,7 +1060,21 @@
     // ⑤′ "이걸 골랐어" — 화면(iframe)이 항목을 고르면 맥락 문장에 실린다(2026-08-09 2단계).
     if (d.type === "gijo:select" && window.gijoConsole && window.gijoConsole.select) {
       // ⚠ **값을 다시 만들어 넘긴다** — iframe이 보낸 것을 그대로 믿지 않는다(위 선택정돈).
-      window.gijoConsole.select(선택정돈(d));
+      var 고른값 = 선택정돈(d);
+      window.gijoConsole.select(고른값);
+      // 분리창 대화창 인스턴스에도 같은 선택을(2026-08-30 ④ — ☑·📎와 같은 무늬).
+      // ⚠ 위 gijoConsole은 대화를 ⧉로 빼면 **숨은 도킹 인스턴스**다. 중계가 없으면 사람이
+      //   보고 있는 창에는 🎯가 영영 안 뜨고, 다음 전송의 선택 인자도 안 실린다(기존 한계).
+      // ⚠ 원본 d를 되쏘지 않는다 — **정돈을 지난 값만** 나른다(값 재조립 관례).
+      //   정돈이 null이면 라벨 없이 보낸다 = 해제 신호(선택정돈이 label·text 없는 알림을
+      //   null로 만드는 그 뜻 그대로 — 도킹과 분리창의 상태가 갈라지지 않게).
+      if (window.gijo && window.gijo.broadcastToWindows) {
+        try {
+          window.gijo.broadcastToWindows(고른값
+            ? { type: "gijo:select", label: 고른값.label, text: 고른값.text, fields: 고른값.fields }
+            : { type: "gijo:select" });
+        } catch (e) { }
+      }
       // ⚠ 자동 복귀(고르면 무대 내림)는 폐지(검토관 상1) — gijo:select는 「행 클릭」 전용이
       //   아니라서, 결재 확인창(점검 승인)·모달·상세 열기 직후에도 온다(발신 18곳 중 10곳
       //   실증). 그때 무대를 내리면 방금 연 것이 통째로 숨는다 — 승인을 눌렀는데 확인창을
@@ -1086,6 +1087,30 @@
           clearTimeout(sb._t);
           sb._t = setTimeout(function () { try { sb.textContent = "⊟ 화면 접기"; } catch (e) { } }, 2600);
         }
+      }
+      return;
+    }
+    // ⧉ 분리 대화창이 뜰 때 지금 근거 상태를 요청한다(③라운드 #14 — 빼는 순간 ☑·📎가 빈 창).
+    //
+    // ⚠ **자리를 위(opendoc 뒤)에서 여기로 옮겼다**(2026-08-30 ④). 이 분기가 🎯까지 물려주게
+    //   되면서 `gijo:select` 글자가 ⑤″ 고르기 분기의 `무대숨김 = true`보다 **앞**에 놓였고,
+    //   상1 금지 감시(wiringcontract 「선택 자동 복귀」)가 2000자 창으로 그 둘을 붙여 읽어
+    //   오탐으로 걸렸다. 감시를 느슨하게 하는 대신 **선택 관련 배선을 ⑤′ 뒤로 모았다** —
+    //   감시가 지키는 것(고르면 무대가 숨는 사고)은 그대로 두는 쪽이 싸다.
+    if (d.type === "gijo:ground:req") {
+      if (window.gijoConsole && window.gijoConsole.getGroundState && window.gijo && window.gijo.broadcastToWindows) {
+        try {
+          var 상태 = window.gijoConsole.getGroundState();
+          window.gijo.broadcastToWindows({ type: "gijo:docscope", docIds: 상태.docs || [] });
+          (상태.attaches || []).forEach(function (a) {
+            window.gijo.broadcastToWindows({ type: "gijo:attach", sessionId: a.id, title: a.title });
+          });
+          // 🎯도 물려준다(#14와 같은 부류). 빼는 순간 걸려 있던 선택이 새 창에 없으면,
+          // 사람은 「이거」가 살아 있다고 믿는데 창은 모르는 상태가 된다.
+          if (상태.sel) {
+            window.gijo.broadcastToWindows({ type: "gijo:select", label: 상태.sel.label, text: 상태.sel.text, fields: 상태.sel.fields });
+          }
+        } catch (e) { }
       }
       return;
     }

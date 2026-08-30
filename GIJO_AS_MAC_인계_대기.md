@@ -177,6 +177,19 @@
 - **max 실기 검증거리**: 라이트 dmg에서 mydocs 「📎 지난 작업」 탭이 뜨는지(라이트에 work-sessions
   라우트가 있는지 — 없으면 「불러오기 실패」가 뜬다. edition-lite에서 탭을 숨길지 win이 후속 판단)
 
+### 2026-08-30 — 🎯 선택이 ⧉ 분리 대화창까지 닿는다(④)
+
+- **공용 파일 변경**: `app.html`(⑤′ `gijo:select` 분기가 **선택정돈을 지난 값만** `broadcastToWindows`로
+  중계 · `ground:req`가 `sel`까지 물려줌 · ⚠ **`ground:req` 분기 자리를 ⑤′ 뒤로 옮겼다** — 그 앞에 두면
+  `wiringcontract`의 상1 감시(「선택 자동 복귀 금지」)가 2000자 창으로 ⑤″의 `무대숨김`과 붙여 읽어 오탐) ·
+  `console.js`(`onShellBridge`에 select 수신 · 「🎯 선택 풀기」가 `bridgeToShell`로 되보냄 · 화면 전환 해제
+  중계 · `getGroundState`에 `sel` 추가)
+- **감시**: `selectioncontext.test.ts`에 네 방향 계약 추가. 기존 「select 갈래가 선택정돈을 부른다」 검사를
+  새 모양(`var 고른값 = 선택정돈(d)`)에 맞춰 갱신 — 계약의 뜻은 그대로.
+- **max 실기 검증거리**: mac에서 ⧉ 분리창 상태의 🎯(창 파괴·재생성 타이밍이 OS마다 다르다 —
+  `broadcastToWindows`는 본창 뺀 BrowserWindow 전수 발송이고, ⇤ 붙이기 → ⧉ 다시 빼기에서
+  `ground:req` 물려받기가 mac에서도 같은 순서로 도는지)
+
 ### 진행 중이라 아직 인계 대상이 아닌 것
 
 - 규정 판정 요청함 — 시안·설계 검토 완료, 착수 전
