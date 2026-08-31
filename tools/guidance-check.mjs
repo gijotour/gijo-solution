@@ -50,11 +50,20 @@ function 안내명령들() {
   const 본것 = new Set();
   const 결과 = [];
   let 설명안 = false;
+  let can안 = false;
   for (const 줄 of 줄들) {
     // ⚠ **도구 설명(description) 안의 예시는 세지 않는다**(2026-08-04 스스로 정정).
     //   그건 담당자에게 주는 약속이 아니라 **LLM 라우터에게 주는 예시**다 — 모델이
     //   고르라고 적어 둔 것을 "모델 판단이라 문제"라고 세면 숫자가 부풀려진다.
     //   처음 돌렸을 때 29개가 나왔는데, 그중 상당수가 이것이었다.
+    // 🔎 can: [...] 구간을 따로 안다(2026-08-31). 여기가 제품이 담당자에게 **「이렇게 치세요」**
+    //   라고 내놓는 자리다. 그런데 수확 조건이 「해줘·알려줘류로 끝나는 문장」뿐이라
+    //   **물음꼴 안내는 한 번도 재어진 적이 없었다** — guidance-check가 「읽기 안내 전부
+    //   결정적」이라는 초록을 내면서 그 물음들을 아예 안 세고 있었다.
+    //   ⚠ 물음표 하나로 넓히면 **과포착**이다(실측: 66 → 287개, FAQ 물음까지 딸려 온다).
+    //   그래서 **can: 안에서만** 물음꼴을 받는다 — 제품이 약속한 자리만 잰다.
+    if (/^\s*can:\s*\[/.test(줄)) can안 = true;
+    else if (can안 && /^\s*\]/.test(줄)) can안 = false;
     if (/^\s*description:/.test(줄)) 설명안 = true;
     else if (/^\s*(name|label|domain|write|params|run|effect|undo|directAnswer|autoFill|\}|\{)/.test(줄)) 설명안 = false;
     if (설명안) continue;
@@ -72,7 +81,7 @@ function 안내명령들() {
     ];
     for (const m of 후보) {
       let s = m[1].trim();
-      if (!끝맺음.test(s)) continue;
+      if (!끝맺음.test(s) && !(can안 && /\?$/.test(s))) continue;
       if (s.includes("${") || s.includes("<")) continue;  // 코드 조각·자리표시자는 그대로 못 친다
       if (/^[a-z_]+$/i.test(s)) continue;           // 도구 이름
       // ⚠ 조각으로 시작하는 것은 안내가 아니다 — 화면이 앞에 대상 이름을 붙여 완성한다

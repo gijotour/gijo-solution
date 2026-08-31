@@ -148,7 +148,12 @@ tr:last-child td{border-bottom:none;}
         <div class="page-title">내부 리포트</div>
       </div>
       <div style="display:flex;gap:8px;">
-        <button class="btn-ghost" id="templateBtn">템플릿 관리</button><button class="btn-primary" id="genReportBtn">+ 리포트 생성</button>
+        <!-- ⚠ [템플릿 관리] 단추를 걷었다(2026-08-31). 누르면 「아직 구현되지 않았습니다」만
+             뜨는 **죽은 입구**였고, 서버에 템플릿 체계 자체가 없다 — 리포트 모양은 유형
+             (주간·분기·수시)과 대상(내부·공식)으로 정해진다. 없는 기능의 단추를 남겨 두면
+             시연·파일럿에서 담당자가 반드시 한 번 누른다(가짜 UI 금지). 그 사실은 ⓘ 안내로
+             옮겼다(screenguide "리포트 모양은 어떻게 정해지나"). -->
+        <button class="btn-primary" id="genReportBtn">+ 리포트 생성</button>
       </div>
     </div>
 
@@ -855,9 +860,8 @@ tr:last-child td{border-bottom:none;}
     viewModal.addEventListener("click", (e) => { if (e.target === viewModal) closeViewer(); });
     document.getElementById("pruneBtn").addEventListener("click", pruneOld);
     document.getElementById("deleteAllBtn").addEventListener("click", deleteAllReports);
-    document.getElementById("templateBtn").addEventListener("click", () => {
-      gijoTell("템플릿 관리 기능은 아직 구현되지 않았습니다.");
-    });
+    // (templateBtn 배선은 단추와 함께 제거 — 2026-08-31. 남겨 두면 없는 id에 addEventListener를
+    //  걸어 **그 뒤 줄이 통째로 안 도는** TypeError가 난다: 「없는 함수 버튼」 계보.)
     document.getElementById("schedAddBtn").addEventListener("click", renderNewScheduleForm);
   }
 

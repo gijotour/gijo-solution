@@ -1935,7 +1935,11 @@ export function runAibomStatus(args: Record<string, string>): string {
 export function runProductStatus(args: Record<string, string>): string {
   const q = (args.query ?? "").trim().toLowerCase();
   const all = listProducts();
-  if (all.length === 0) return "등록된 보안제품이 없습니다. — 아직 등록 전이라는 뜻입니다. 보안제품 화면에서 방화벽·IPS·EDR 등을 추가하면 매뉴얼·점검 이력이 함께 쌓입니다.";
+  // ⚠ **없는 곳으로 보내고 있었다**(2026-08-31). 「보안제품 화면에서 추가하면」이라고 안내하는데,
+  //   그 등록 폼은 2026-08-02 사용자 지시로 걷어냈다(products.html:649 「제품 등록은 **대화창**에서
+  //   한다」). 파일럿 첫날 담당자가 처음 던지는 물음이라 그대로 시연에 노출된다.
+  //   → 실제로 되는 길(대화창)로 안내한다. 「지시는 대화창에서만」 원칙과도 이쪽이 맞다.
+  if (all.length === 0) return "등록된 보안제품이 없습니다 — 아직 등록 전이라는 뜻입니다. 여기 대화창에 \"보안제품 등록해줘\"라고 말씀하시면 방화벽·IPS·EDR 등을 담을 수 있습니다(확인 판이 뜹니다). 등록하면 매뉴얼·점검 이력이 함께 쌓입니다.";
 
   const matched = q
     ? all.filter((p) => 필터에맞나(`${p.name} ${p.category} ${p.vendor ?? ""} ${p.model ?? ""} ${p.note ?? ""}`, q))
