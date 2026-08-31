@@ -110,12 +110,19 @@ const REVIEW_SCHEMA = {
       type: "array", maxItems: 8,
       items: {
         type: "object",
-        required: ["file", "quote", "why"],
+        // ⚠ **defect(참/거짓)를 필수로 둔다**(2026-08-31). 문구로 거르려 했더니 모델이
+        //   말만 바꿔 빠져나갔다(「결함이 없으며」→「따라서 …」). 이 저장소의 오래된 교훈
+        //   그대로다 — **모델을 프롬프트로 교정하지 말고 코드로 해결한다.** boolean은 못 돌린다.
+        required: ["file", "quote", "why", "defect"],
         properties: {
           file: { type: "string" },
-          quote: { type: "string", description: "diff에서 그대로 복사한 한 줄(재서술 금지)" },
-          why: { type: "string", description: "왜 의심되나 한 문장(한국어)" },
+          // ⚠ **길이를 스키마로 묶는다**(2026-08-31). 산문이 길어 출력이 예산을 넘으면 JSON이
+          //   잘려 조각 전체가 날아간다 — 실측으로 두 번 겪었다. 「짧게 써 달라」는 부탁이
+          //   아니라 **maxLength로 못 박는 것**이 코드로 해결하는 방식이다.
+          quote: { type: "string", maxLength: 160, description: "diff에서 그대로 복사한 한 줄(재서술 금지)" },
+          why: { type: "string", maxLength: 140, description: "왜 의심되나 **한 문장**(한국어, 140자 안)" },
           kind: { type: "string", enum: ["logic", "leftover", "mismatch", "contract", "type", "other"] },
+          defect: { type: "boolean", description: "정말 결함이라고 보는가. 아니면 false — false는 버려진다." },
         },
       },
     },
@@ -134,6 +141,7 @@ function 리뷰(커밋) {
   const 조각크기 = 60000; // 문자 기준 — ctx 여유
   const all = [];
   let 실패조각 = 0;
+  let 버린수 = 0; // 스스로 「결함 없다」고 적은 후보 — 숫자를 정직하게 밝힌다
   for (let i = 0; i < diff.length; i += 조각크기) {
     const 부분 = diff.slice(i, i + 조각크기);
     const prompt =
@@ -146,7 +154,13 @@ function 리뷰(커밋) {
     for (const [스키마, 예산] of [[REVIEW_SCHEMA, 3072], [좁은스키마(3), 1536]]) {
       try {
         const out = JSON.parse(gb10Chat(prompt, 스키마, 예산));
-        all.push(...(out.findings || []));
+        // ⚠ **스스로 부정하는 후보를 버린다**(2026-08-31 실측). 30B 모델이 「이 줄은 …
+        //   결함이 없으며」라고 적으면서도 후보로 올린다 — 그대로 두면 Claude 검토관이
+        //   읽을 양이 안 줄고, 「후보 8건」이라는 숫자가 뜻을 잃는다(실측: 8건 전부 그랬다).
+        //   판정은 여전히 사람/Claude 몫이지만, **자기가 아니라고 표시한 것**은 여기서 뺀다.
+        const 걸러낸 = (out.findings || []).filter((f) => f.defect === true);
+        버린수 += (out.findings || []).length - 걸러낸.length;
+        all.push(...걸러낸);
         담았나 = true;
         break;
       } catch (e2) {
@@ -160,7 +174,7 @@ function 리뷰(커밋) {
   console.log(
     실패조각
       ? `# ${ref} 1차 선별 — ⚠ **선별 실패 ${실패조각}조각** · 읽어낸 후보 ${all.length}건 (gb10 30B-A3B)`
-      : `# ${ref} 1차 선별 — 후보 ${all.length}건 (gb10 30B-A3B)`,
+      : `# ${ref} 1차 선별 — 후보 ${all.length}건${버린수 ? ` (스스로 「결함 없다」고 적은 ${버린수}건은 버림)` : ""} (gb10 30B-A3B)`,
   );
   console.log(`# ⚠ **후보이지 판정이 아니다.** 각 지점은 Claude/사람이 직접 열어 확정할 것 —`);
   console.log(`#    이 선별은 검토관을 대체하지 않고 읽을 양을 줄인다(CLAUDE.md 검토관 원칙 유효).`);
