@@ -203,3 +203,50 @@ describe("배색 감시 — 밝은 글자색은 잉크 토큰으로(대비 계�
     expect(agent, "agent의 진짜 상자(.terminal)가 사라졌다 — 줄 단위 예외의 근거가 없어진다").toContain(".terminal{");
   });
 });
+
+// ══ 좁은 폭 계약 감시 (2026-08-31 사장님 「대화창 최대일 때 글씨가 안 깨지게」) ══════════
+//
+// 왜 여기인가: 이 파일은 이미 **화면 CSS를 줄 단위로 읽는** 감시다(배색). 좁은 폭 계약도
+// 같은 종류(전 화면 공용 CSS 규칙 + 화면별 반응형)라 잣대를 한 곳에 둔다.
+//
+// ⚠ 실측기(tools/narrow-probe.mjs)는 **앱을 띄워야** 도는 수동 도구라 게시마다 26화면을
+//   돌리면 무겁다. 그래서 기계로 남기는 것은 두 겹이다:
+//     ① 여기(소스) — 공용 계약 3줄과 수리한 화면의 반응형이 사라지지 않았는가
+//     ② 게시 관문 — 실제 판폭에서 대표 화면이 안 깨지는가(publish-gate-ui 「좁은 폭」 검사)
+//   기준(판폭 420px 깨짐 0건/26화면, 2026-08-31 실측)이 문서가 아니라 기계로 남게.
+describe("좁은 폭 계약 — 대화창 최대(판 420px)에서 글씨가 안 깨진다", () => {
+  it("공용 계약 3줄이 gijo-ui.css에 살아 있다 — 이 파일이 전 화면에 주입된다", () => {
+    const css = fs.readFileSync(path.join(PAGES, "gijo-ui.css"), "utf-8");
+    expect(css, "한글 어절 중간 꺾임 금지(keep-all)가 사라졌다 — 「저/장」 부류가 돌아온다")
+      .toMatch(/body\.g-ui\s*\{[^}]*word-break:\s*keep-all/);
+    expect(css, "단추 한 줄 계약(nowrap)이 사라졌다").toMatch(/\.g-ui button[^{]*\{[^}]*white-space:\s*nowrap/);
+    expect(css, "문장형 칩 예외(.wrap-ok)가 사라졌다 — 예외가 없으면 긴 안내 단추가 잘린다")
+      .toMatch(/\.wrap-ok[^{]*\{[^}]*white-space:\s*normal/);
+    const nav = fs.readFileSync(path.join(PAGES, "nav.js"), "utf-8");
+    expect(nav, "공용 CSS 주입이 끊겼다 — 계약이 어느 화면에도 안 닿는다").toContain("gijo-ui.css");
+  });
+
+  it("좁은 폭에서 접히는 화면 4곳의 반응형이 남아 있다(2026-08-31 수리분)", () => {
+    // 화면은 iframe이라 뷰포트=판 폭 — 미디어쿼리가 곧 판 폭 반응이다.
+    const 대상: [string, RegExp, string][] = [
+      ["inventory.html", /@media\s*\(max-width:\s*720px\)[\s\S]{0,400}\.mv-stage\{[^}]*flex-direction:\s*column/, "🗺 지도: 사이드 320px 고정이 지도를 28px로 눌러 글자가 세로로 뭉갰다"],
+      ["aihub.html", /@media\s*\(max-width:\s*720px\)[\s\S]{0,300}\.gh-strip\{grid-template-columns:repeat\(2,1fr\)/, "요약 띠 4열 고정이 카드당 ~95px가 돼 「올린 문서 120」이 꺾였다"],
+      ["records.html", /@media\s*\(max-width:\s*720px\)[\s\S]{0,300}\.gh-strip\{grid-template-columns:repeat\(2,1fr\)/, "aihub와 같은 4열 띠 — 같은 수리"],
+      ["handover.html", /@media\s*\(max-width:\s*720px\)[\s\S]{0,300}\.chk\{grid-template-columns:1fr/, "점검표 2열이 109px 기둥이 돼 문장이 세로로 뭉갰다"],
+    ];
+    for (const [파일, re, 왜] of 대상) {
+      const s = fs.readFileSync(path.join(PAGES, 파일), "utf-8");
+      expect(s, `${파일} — 좁은 폭 반응형이 사라졌다: ${왜}`).toMatch(re);
+    }
+  });
+
+  it("실측기가 저장소에 있고 합격선을 말한다 — 수동 도구라도 사라지면 기준이 사라진다", () => {
+    const probe = fs.readFileSync(path.join(PAGES, "..", "..", "..", "..", "tools", "narrow-probe.mjs"), "utf-8");
+    expect(probe, "판폭 기본값(420)이 사라졌다").toMatch(/옵션\("width", "420"\)/);
+    // 판정 5종이 다 있는지 — 순서는 코드마다 다를 수 있어 **낱개로** 본다(순서 강제는 헛됨).
+    for (const 종류 of ["넘침", "버튼꺾임", "화면밖", "겹침", "세로뭉개짐"]) {
+      expect(probe, `실측기 판정 「${종류}」가 사라졌다 — 기준 5종이 줄면 「깨짐 0」의 뜻이 얕아진다`)
+        .toContain(`종류: "${종류}"`);
+    }
+  });
+});

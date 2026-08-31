@@ -76,7 +76,7 @@ export const memoryApi = {
     ),
   // 📂 지켜보는 폴더(2026-08-31) — 목록·최근 스캔 결과. 읽기 전용(등록·해제는 대화창 결재판).
   watchFolders: () =>
-    request<{ folders: { id: number; path: string; label: string | null; active: boolean; createdByName: string | null; createdAt: string; lastScanAt: string | null; lastResult: { ranAt: string; 새로: number; 갱신: number; 건너뜀: number; 충돌: string[]; 등급막힘: string[]; 스캔후보: string[]; 오류: string[]; 잘림: string | null } | null; docCount: number }[]; tickSeconds: number }>(
+    request<{ folders: { id: number; path: string; label: string | null; active: boolean; createdByName: string | null; createdAt: string; lastScanAt: string | null; lastResult: { ranAt: string; 새로: number; 갱신: number; 건너뜀: number; 충돌: string[]; 등급막힘: string[]; 스캔후보: string[]; 비밀경고: string[]; 오류: string[]; 잘림: string | null } | null; docCount: number }[]; tickSeconds: number }>(
       "/api/watch-folders"
     ),
   // 오늘 새로 들어온 문서 수 — 사이드바 "내 문서" 배지(값싼 COUNT). since=현지 자정 ISO.

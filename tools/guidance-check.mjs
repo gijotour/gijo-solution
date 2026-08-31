@@ -45,7 +45,8 @@ function 안내명령들() {
   const 줄들 = ["agenttools.ts", "agenttools/handlers.ts", "agenttools/registry.ts", "agentloop.ts", "dispatcher.ts", "screenguide.ts", "workflow.ts", "nextguide.ts", "scenarios.ts", "docdigest.ts"]
     .flatMap((f) => { try { return 엔진(f).split("\n"); } catch { return []; } })
     .concat(화면줄들());
-  const 끝맺음 = /(해줘|알려줘|보여줘|만들어줘|읽어줘|배정해줘|정리해줘|확인해줘|추천해줘|복구해줘|찾아줘)$/;
+  // 2026-08-31: 「지켜봐 줘」(띄어쓰기 포함) 추가 — 📂 지켜보는 폴더 안내가 이 말을 약속한다.
+  const 끝맺음 = /(해줘|알려줘|보여줘|만들어줘|읽어줘|배정해줘|정리해줘|확인해줘|추천해줘|복구해줘|찾아줘|지켜봐\s*줘)$/;
   const 본것 = new Set();
   const 결과 = [];
   let 설명안 = false;

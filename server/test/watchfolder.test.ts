@@ -9,8 +9,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+// ⚠ 모킹은 **원천 계약을 그대로** 흉내 낸다 — 처음엔 {routedTo:"memory"}만 돌려줬는데,
+//   실제 autoRouteUpload는 인입에 실패해도 routedTo:"memory"를 주고 ingested:false를 함께
+//   싣는다. 그 차이를 모킹이 지워 「실패를 성공으로 기록」 결함을 시험이 원리상 못 봤다
+//   (2026-08-31 검토관 [높음]). 이제 성공은 ingested:true, 실패 갈래는 아래 시험이 직접 준다.
 vi.mock("../src/engine/autoupload", () => ({
-  autoRouteUpload: vi.fn(async (filename: string) => ({ filename, routedTo: "memory", reason: "시험 모킹" })),
+  autoRouteUpload: vi.fn(async (filename: string) => ({
+    filename, routedTo: "memory", reason: "시험 모킹",
+    savedOriginal: false, mdSaved: true, ingested: true,
+  })),
 }));
 // 라우팅 시험용 — 강제 경로면 LLM 호출 자체가 없어야 한다(forced-write-approval 관례).
 const mockChat = vi.fn();
@@ -162,6 +169,41 @@ describe("스캔 — 2단 스킵 멱등·충돌 skip·남의 문서 보호·스�
     const s = await scanWatchFolder(r.folder);
     expect(부른횟수()).toBe(0);
     expect(s.스캔후보.length).toBe(1);
+  });
+  it("★ 인입이 실패하면(ingested:false) 기록하지 않고 다음 확인에 다시 시도한다 — 실패를 성공으로 적지 않는다", async () => {
+    // 2026-08-31 검토관 [높음]: routedTo만 보면 임베딩 미기동·추출 실패가 「새로 1」이 되고
+    // stat·hash가 박혀 **파일이 바뀌기 전까지 영영 재시도가 없다**(머리 주석의 계약 위반).
+    const 모킹 = autoRouteUpload as ReturnType<typeof vi.fn>;
+    모킹.mockResolvedValueOnce({ filename: "watchtest-f.txt", routedTo: "memory", reason: "검색수집 보류(임베딩 미기동)", savedOriginal: false, mdSaved: true, ingested: false });
+    const dir = 임시폴더();
+    fs.writeFileSync(path.join(dir, "watchtest-f.txt"), "임베딩이 죽은 동안 들어온 문서입니다.");
+    const r = addWatchFolder({ path: dir, userId: "u-1" });
+    if (!r.ok) throw new Error("등록 실패");
+    const s1 = await scanWatchFolder(r.folder);
+    expect(s1.새로, "실패를 성공으로 셌다").toBe(0);
+    expect(s1.오류.some((e) => e.includes("보류")), "왜 안 들어왔는지 말하지 않는다").toBe(true);
+    // 다음 틱: 파일이 안 바뀌어도 **다시 시도**해야 한다(stat·hash를 안 썼으므로).
+    const 전 = 부른횟수();
+    const s2 = await scanWatchFolder(listWatchFolders()[0]);
+    expect(부른횟수(), "재시도하지 않았다 — 실패가 성공처럼 기록됐다").toBe(전 + 1);
+    expect(s2.새로, "이번엔 성공해야 한다(모킹 기본값=ingested:true)").toBe(1);
+  });
+  it("★ 감시 폴더가 제품 폴더(data·서버 뿌리)를 **품고 있어도** 거부한다 — 추출본 .md 증식 루프", () => {
+    // 하위만 막던 것이 [높음]으로 잡혔다(조상 방향은 통과 → 걷기가 깊이 4에서 extracted에 닿음).
+    const 조상 = path.resolve(".", "..");
+    const r = 경로검증(조상);
+    expect(r.ok, "제품 폴더를 품은 상위 폴더가 통과했다 — .md.md 증식 루프가 열린다").toBe(false);
+    if (!r.ok) expect(r.error).toContain("순환");
+  });
+  it("★ 「personal:」로 시작하는 파일명은 반입하지 않는다 — 개인 문서 네임스페이스 오염", async () => {
+    const dir = 임시폴더();
+    fs.writeFileSync(path.join(dir, "personal:유령메모.txt"), "개인 문서 자리를 차지하는 이름입니다.");
+    const r = addWatchFolder({ path: dir, userId: "u-1" });
+    if (!r.ok) throw new Error("등록 실패");
+    const 전 = 부른횟수();
+    const s = await scanWatchFolder(r.folder);
+    expect(부른횟수(), "예약 접두 파일을 인입했다 — 아무에게도 안 보이는 유령 문서가 된다").toBe(전);
+    expect(s.오류.some((e) => e.includes("personal:")), "왜 건너뛰었는지 말하지 않는다").toBe(true);
   });
   it("인입 문서 수는 doc 지도에서 센다(표를 안 늘린다)", async () => {
     const dir = 임시폴더();

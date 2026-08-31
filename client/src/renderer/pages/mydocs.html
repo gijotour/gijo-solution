@@ -469,6 +469,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   "use strict";
   var 탭 = "mine";
   var mine = [], know = [], learn = [], learnTopics = [], learnKpis = null, guide = [];
+  // 📂 안내가 약속하는 말 — **짧은 홑 문자열**로 둔다. guidance-check는 4~44자 리터럴만
+  //   수확하므로, 긴 안내문 안에 묻어 두면 「제품이 약속한 말이 실제로 걸리는가」 검사에서
+  //   원리상 빠진다(2026-08-31 검토관 적발 — 커밋이 「검사 가능 어미」라 적었는데 실측 0건이었다).
+  var 감시지정예시 = "스캔결과 폴더 지켜봐 줘";
+  var 감시조회예시 = "지켜보는 폴더 알려줘";
   var 감시폴더 = []; // 📂 지켜보는 폴더(2026-08-31) — 조회 전용(등록·해제는 대화창 결재판)
   var 감시틱초 = 300;
   var work = []; // 📎 지난 작업(노트북형) — 지난 대화 세션 목록(listWorkSessions)
@@ -896,7 +901,9 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     //   → 탭마다 자기 원천의 오류만 본다. 표에 없으면 오류 없음(null)이다.
     var 탭별오류 = {
       mine: 오류.mine, learn: 오류.learn, guide: 오류.guide, know: 오류.know, work: 오류.work,
-      ingest: 오류.ingest, vendor: 오류.vendor, contacts: null,   // 연락처는 이 PC 저장이라 로드 실패가 없다
+      ingest: 오류.ingest, vendor: 오류.vendor, watch: 오류.watch, contacts: null,   // 연락처는 이 PC 저장이라 로드 실패가 없다
+      // ⚠ watch(📂 지켜보는 폴더)는 2026-08-31 검토관이 잡은 누락 — 조회 창구가 죽어도 「폴더가
+      //   없습니다」로 보여 **장애를 부재로** 말했다(정직 가드 「장애≠부재」 계보).
     };
     var 탭오류 = Object.prototype.hasOwnProperty.call(탭별오류, 탭) ? 탭별오류[탭] : null;
     if (탭오류) {
@@ -999,6 +1006,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
           var lr2 = f.lastResult;
           var 상태 = !f.active ? '<span class="gm2">중지</span>'
             : lr2 && (lr2.오류 || []).length ? '<span class="gtxt-down">오류 ' + lr2.오류.length + "</span>"
+            : lr2 && (lr2.비밀경고 || []).length ? '<span class="gtxt-share">🔐 비밀정보 ' + lr2.비밀경고.length + "</span>"
             : lr2 && ((lr2.충돌 || []).length + (lr2.등급막힘 || []).length) ? '<span class="gtxt-share">건너뜀 있음</span>'
             : '<span class="gtxt-up">감시중</span>';
           return '<div class="g-rows-r" data-wid="' + f.id + '" style="grid-template-columns:1fr 92px 64px 92px;gap:8px">' +
@@ -1008,7 +1016,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
             '<span class="ta-r">' + 상태 + "</span></div>";
         }).join("") + "</div>"
         : '<div class="empty">' + (감시폴더.length ? "검색과 맞는 폴더가 없습니다."
-          : "지켜보는 폴더가 없습니다.<br><br>대화창에서 <b>「D:\\보안팀\\스캔결과 폴더 지켜봐 줘」</b>처럼 말하면 등록됩니다(관리자).<br>등록된 목록은 <b>「지켜보는 폴더 알려줘」</b>로도 봅니다.<br><br>⚠ 경로는 <b>서버 기계</b>의 폴더입니다 — 분산 설치에서는 내 PC 경로가 아닙니다.") + "</div>");
+          : "지켜보는 폴더가 없습니다.<br><br>대화창에서 <b>「D:\\보안팀\\" + 감시지정예시 + "」</b>처럼 말하면 등록됩니다(관리자).<br>등록된 목록은 <b>「" + 감시조회예시 + "」</b>로도 봅니다.<br><br>⚠ 경로는 <b>서버 기계</b>의 폴더입니다 — 분산 설치에서는 내 PC 경로가 아닙니다.") + "</div>");
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;
@@ -1448,7 +1456,8 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         '<span class="gm2">등록: ' + esc(wfd.createdByName || "-") + " · " + 날짜(wfd.createdAt) + " · 들어온 문서 " + (wfd.docCount || 0) + "건</span>" +
         (lr3 ? "<div style=\"margin-top:8px\">최근 확인 " + 날짜(lr3.ranAt) + " — 새로 " + lr3.새로 + " · 갱신 " + lr3.갱신 + " · 건너뜀 " + lr3.건너뜀 + "</div>" +
           줄("이름 충돌(건너뜀)", lr3.충돌) + 줄("등급 막힘(안 덮음)", lr3.등급막힘) +
-          줄("스캔파일 후보(자동 등록 안 함 — 확인 후 ＋로)", lr3.스캔후보) + 줄("오류", lr3.오류) +
+          줄("스캔파일 후보(자동 등록 안 함 — 확인 후 ＋로)", lr3.스캔후보) +
+          줄("🔐 비밀정보 경고(가려서 담았습니다 — 원본 확인 필요)", lr3.비밀경고) + 줄("오류", lr3.오류) +
           (lr3.잘림 ? '<div style="margin-top:8px">⚠ ' + esc(lr3.잘림) + "</div>" : "")
           : "<div style=\"margin-top:8px\">아직 첫 확인 전입니다 — 약 " + Math.round(감시틱초 / 60) + "분 안에 돕니다.</div>") +
         '<div style="margin-top:10px" class="gm2">해제는 대화창에서 「지켜보는 폴더 ' + wfd.id + '번 그만 지켜봐」(관리자).</div>' +
