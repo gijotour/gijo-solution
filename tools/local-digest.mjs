@@ -105,7 +105,9 @@ const REVIEW_SCHEMA = {
   type: "object",
   properties: {
     findings: {
-      type: "array", maxItems: 15,
+      // ⚠ 8건 — 예산(max_tokens)과 **함께** 정해야 하는 값이다. 15건일 때 1024토큰으로는
+      //   출력이 잘려 JSON이 깨졌고, 그래서 이 모드는 **한 번도 성공한 적이 없었다**(2026-08-31).
+      type: "array", maxItems: 8,
       items: {
         type: "object",
         required: ["file", "quote", "why"],
@@ -131,22 +133,53 @@ function 리뷰(커밋) {
   if (!diff.trim()) { console.log(`# ${ref} — 변경 없음`); return; }
   const 조각크기 = 60000; // 문자 기준 — ctx 여유
   const all = [];
+  let 실패조각 = 0;
   for (let i = 0; i < diff.length; i += 조각크기) {
     const 부분 = diff.slice(i, i + 조각크기);
     const prompt =
       `아래는 git 커밋 diff의 일부다. **결함 후보**를 골라라 — 로직 오류, 옮기다 남긴 것(leftover), ` +
       `약속(주석·메시지)과 코드의 불일치, 반쪽 수리. 스타일 지적 금지. 확실하지 않으면 빼라(적은 게 낫다).\n` +
       `quote는 diff에서 **그대로 복사**한 줄이어야 한다.\n\n${부분}`;
-    try {
-      const out = JSON.parse(gb10Chat(prompt, REVIEW_SCHEMA, 1024));
-      all.push(...(out.findings || []));
-    } catch (e2) { console.error(`⚠ diff 조각 ${i} 실패: ${e2.message}`); }
+    // 잘림에 강하게: 넉넉히 주고(3072), 그래도 깨지면 **더 좁은 스키마로 한 번 더** 묻는다.
+    //   두 번 다 실패하면 조용히 넘기지 않고 **실패로 센다**(아래 머리글이 그 수를 말한다).
+    let 담았나 = false;
+    for (const [스키마, 예산] of [[REVIEW_SCHEMA, 3072], [좁은스키마(3), 1536]]) {
+      try {
+        const out = JSON.parse(gb10Chat(prompt, 스키마, 예산));
+        all.push(...(out.findings || []));
+        담았나 = true;
+        break;
+      } catch (e2) {
+        console.error(`⚠ diff 조각 ${i} 실패(예산 ${예산}): ${e2.message}`);
+      }
+    }
+    if (!담았나) 실패조각++;
   }
-  console.log(`# ${ref} 1차 선별 — 후보 ${all.length}건 (gb10 30B-A3B)`);
+  // ⚠ **실패를 0건으로 포장하지 않는다.** 전부 실패해도 「후보 0건」이라 적으면 깨끗하다는
+  //   뜻으로 읽힌다 — 이 저장소가 이미 겪은 거짓 초록이다.
+  console.log(
+    실패조각
+      ? `# ${ref} 1차 선별 — ⚠ **선별 실패 ${실패조각}조각** · 읽어낸 후보 ${all.length}건 (gb10 30B-A3B)`
+      : `# ${ref} 1차 선별 — 후보 ${all.length}건 (gb10 30B-A3B)`,
+  );
   console.log(`# ⚠ **후보이지 판정이 아니다.** 각 지점은 Claude/사람이 직접 열어 확정할 것 —`);
   console.log(`#    이 선별은 검토관을 대체하지 않고 읽을 양을 줄인다(CLAUDE.md 검토관 원칙 유효).`);
   for (const f of all) console.log(`\n[후보·${f.kind || "other"}] ${f.file}\n  인용: ${f.quote}\n  왜: ${f.why}`);
-  if (!all.length) console.log("(후보 없음 — 로컬 선별이 못 보는 부류일 수 있다. 게시 전엔 정식 검토관을 태울 것)");
+  if (!all.length && !실패조각) console.log("(후보 없음 — 로컬 선별이 못 보는 부류일 수 있다. 게시 전엔 정식 검토관을 태울 것)");
+  if (실패조각) {
+    console.log(`\n✗ ${실패조각}조각을 못 읽었다 — 이 결과를 「깨끗하다」로 읽지 말 것.`);
+    process.exitCode = 1;
+  }
+}
+
+/** 잘림이 났을 때 쓰는 더 좁은 스키마 — 건수를 줄여 출력이 예산 안에 들어오게 한다. */
+function 좁은스키마(최대) {
+  return {
+    ...REVIEW_SCHEMA,
+    properties: {
+      findings: { ...REVIEW_SCHEMA.properties.findings, maxItems: 최대 },
+    },
+  };
 }
 
 // ── 실행 ────────────────────────────────────────────────────────────────────
