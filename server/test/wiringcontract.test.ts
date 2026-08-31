@@ -580,3 +580,19 @@ describe("배선 계약 ⑤층 — 반입 다음 칩", () => {
     expect(c).toMatch(/r\.nextChips && P2 && P2\.nextChips/);
   });
 });
+
+describe("지식 창고 잣대 통일 — 「올린 문서」 수는 한 가지로(2026-08-31 설계관)", () => {
+  // 왜: 같은 화면에서 위 요약 카드(grouppanels)와 아래 목록 제목(memory.html)이 **다른 숫자**를
+  //   말했다 — 카드는 개인 문서(personal:)를 빼고 세는데 목록은 포함해서. 카드 언어로 묶으면
+  //   두 숫자가 나란히 서서 바로 눈에 띈다. 세 소비자(요약 카드·목록·내 문서 배지)가 같은
+  //   규칙을 쓰는지 값으로 지킨다(「같은 것을 여러 곳에 적으면 어긋난다」의 계보).
+  it("요약 카드·지식 창고 목록·내 문서 배지가 모두 personal:을 뺀다", () => {
+    const gp = 코드만(join(PAGES, "grouppanels.js"));
+    expect(gp, "요약 카드가 개인 문서를 안 뺀다").toMatch(/documentId\)\.indexOf\("personal:"\) !== 0/);
+    const mem = 코드만(join(PAGES, "memory.html"));
+    expect(mem, "지식 창고 목록이 개인 문서를 포함해 센다 — 카드와 딴말을 한다")
+      .toMatch(/listMemoryDocuments\(\)[\s\S]{0,200}indexOf\("personal:"\) !== 0/);
+    const md = 코드만(join(PAGES, "mydocs.html"));
+    expect(md, "내 문서 배지의 회사문서만 잣대가 사라졌다").toContain("회사문서만");
+  });
+});

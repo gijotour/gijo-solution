@@ -162,3 +162,19 @@ html.theme-light .gn-item:hover { background: rgba(0, 0, 0, 0.05); }
 html.theme-light .gn-top-fixed { border-bottom-color: rgba(0, 0, 0, 0.08); }
 html.theme-light .pro-menu::-webkit-scrollbar-thumb,
 html.theme-light .gn-mid::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.16); }
+
+/* ── 화면 카드 골격(.g-scard, 2026-08-31) 흰 테마 덮개 ──────────────────────────────
+ * 골격 자체는 --g-* 토큰만 써서 자동으로 뒤집힌다(위 :root 재정의). 여기서 덮는 것은
+ * **토큰으로 표현할 수 없는 두 가지**뿐이다:
+ *   ① 히트맵 타일의 반투명 배경 — 어두운 바탕 기준 알파라 흰 바탕에서 색이 옅어 안 읽힌다.
+ *   ② 지표 강조색 — 잉크(진한 색)로 뒤집어야 흰 바탕에서 대비가 선다(dc-kv와 같은 값). */
+html.theme-light .g-ui .g-scard { box-shadow: 0 1px 4px rgba(31, 27, 20, 0.06); }
+html.theme-light .g-ui .g-scard-kv.bad { color: #b3241a; }
+html.theme-light .g-ui .g-scard-kv.warn { color: #8f4d02; }
+html.theme-light .g-ui .g-scard-kv.ok { color: #086b43; }
+html.theme-light .g-ui .g-tile.bad { background: rgba(179, 36, 26, 0.12); }
+html.theme-light .g-ui .g-tile.warn { background: rgba(143, 77, 2, 0.12); }
+html.theme-light .g-ui .g-tile.ok { background: rgba(8, 107, 67, 0.12); }
+html.theme-light .g-ui .g-tile .tv.bad { color: #b3241a; }
+html.theme-light .g-ui .g-tile .tv.warn { color: #8f4d02; }
+html.theme-light .g-ui .g-tile .tv.ok { color: #086b43; }

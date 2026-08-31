@@ -27,9 +27,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
 .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:1100px;} /* 720→1100: 다른 화면보다 유난히 좁아 보이던 문제(2026-07-26) */
-.panel-title{font-size:14.5px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:4px;}
-.panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
+/* 카드 언어(2026-08-31 사장님 「2번째 이미지로」) — 공용 골격 .g-scard와 **같은 값**을 쓴다.
+   ⚠ 판(.panel)을 카드로 바꾸되 **헤더를 새로 달지 않는다**: 이 화면은 접기 부품(fold.js)이
+   이미 제목 줄(.gjf-h)을 그리므로, 카드 헤더를 더하면 제목이 두 겹이 된다(설계관 ④).
+   대신 접기 헤더를 **카드 머리로 승격**한다(아래 .gjf-h 규칙) — 부품은 안 건드리고
+   이 화면에서만 붙여 세운다(공용 부품 변경은 7화면 동시 위험이라 다음 라운드). */
+.panel{background:var(--g-surface-1,var(--panel));border:1px solid var(--g-border,var(--border));border-radius:var(--g-r,12px);
+  padding:14px 16px;margin-bottom:12px;max-width:1100px;} /* 720→1100(2026-07-26) · 20→14/16(카드 밀도) */
+.panel-title{font-size:12.75px;font-weight:800;color:var(--g-text,var(--text));margin:-14px -16px 10px;padding:7px 12px;
+  border-bottom:1px solid var(--g-border,var(--border));} /* 카드 머리 — 제목 줄이 카드 위 칸을 차지한다 */
+.panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+/* ⚠ 접기 헤더(.gjf-h)는 **카드 머리로 승격하지 않는다**(2026-08-31 실측으로 정정).
+   설계관은 「카드 헤더 + 접기 헤더 = 제목 두 겹」을 경고했는데, 실제 DOM을 열어 보니
+   이 화면의 접기 헤더는 판의 첫 자식이 아니라 **판 중간의 구역 제목**이다(앞 형제가
+   .field-row인 자리도 있다). 즉 카드 머리(.panel-title)와 층이 달라 겹치지 않는다 —
+   승격 규칙을 넣었다가 선택자가 안 맞아 아무 일도 안 했고, 그 사실을 확인하고 걷었다.
+   (추측으로 규칙을 남겨 두면 다음 사람이 「이건 왜 안 먹지」로 헤맨다.) */
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 .field input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
@@ -277,6 +290,9 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel">
       <div class="panel-title">📚 올린 문서 확인 · 관리 <span id="dmSummary" style="font-size:12.25px;font-weight:600;color:var(--muted-2);margin-left:6px"></span></div>
+      <!-- 지표 줄(카드 언어, 2026-08-31) — 라벨 위/값 아래. 숫자는 목록과 **같은 원천**을
+           쓴다(dmDocs) — 새로 세지 않는다(잣대 두 벌 금지). 좁아지면 열이 접힌다. -->
+      <div class="g-scard-k" id="dmKpis" style="margin:0 -16px 10px;border-top:0"></div>
       <div class="dm-seg" id="dmSeg"></div>
       <div class="dm-wrap">
         <!-- 엑셀형 행 목록(승인 시안 mockups/knowledge-rows, 2026-08-20) — 카드·알약 없이
@@ -713,13 +729,38 @@ tr:last-child td{border-bottom:none;}
     const list = document.getElementById("dmList");
     if (!list) return;
     try {
-      dmDocs = await window.gijo.listMemoryDocuments();
+      // ★ 개인 문서(personal:)는 뺀다 — **잣대 통일**(2026-08-31 설계관 적발).
+      //   같은 화면 위 요약 카드(grouppanels 「올린 문서」)와 내 문서 배지(nKnow)는 이미
+      //   빼고 세는데 여기만 포함해, 카드와 그 아래 목록 제목이 **다른 숫자**를 말했다.
+      //   여기는 회사 지식 창고다 — 개인 메모는 「내 문서」의 영토이고 검색에서도 격리된다.
+      //   ⚠ 표시 수가 한 번 줄지만 그건 기준이 맞춰진 것이다(요약 카드와 같은 계보).
+      dmDocs = (await window.gijo.listMemoryDocuments()).filter(
+        (d) => String(d.documentId || "").indexOf("personal:") !== 0
+      );
     } catch (e) {
       list.innerHTML = '<div class="dm-empty">불러오지 못했습니다: ' + dmEsc(e.message) + '</div>';
       return;
     }
     const totalChunks = dmDocs.reduce((s, d) => s + (d.chunks || 0), 0);
     document.getElementById("dmSummary").textContent = `· ${dmDocs.length}개 문서 · ${totalChunks}조각 · bge-m3`;
+    // 지표 줄(카드 언어) — 값은 전부 **위 목록과 같은 dmDocs**에서 센다(새 원천 없음).
+    // 등급이 비어 있는 문서가 있으므로 「등급 지정」은 값이 있는 것만 센다(지어내지 않는다).
+    {
+      const k = document.getElementById("dmKpis");
+      if (k) {
+        const 오늘 = new Date().toISOString().slice(0, 10);
+        const 오늘반입 = dmDocs.filter((d) => String(d.ingestedAt || "").slice(0, 10) === 오늘).length;
+        const 등급매김 = dmDocs.filter((d) => d.grade).length;
+        k.innerHTML = [
+          ["문서", dmDocs.length.toLocaleString(), ""],
+          ["조각", totalChunks.toLocaleString(), ""],
+          ["오늘 반입", 오늘반입.toLocaleString(), 오늘반입 ? "ok" : "muted"],
+          ["열람 등급 지정", `${등급매김.toLocaleString()} / ${dmDocs.length.toLocaleString()}`, 등급매김 < dmDocs.length ? "warn" : "ok"],
+        ].map(([l, v, c]) =>
+          `<div><div class="g-scard-kl">${dmEsc(l)}</div><div class="g-scard-kv ${c}">${dmEsc(String(v))}</div></div>`
+        ).join("");
+      }
+    }
     if (!dmDocs.length) {
       list.innerHTML = '<div class="dm-empty">아직 올린 문서가 없습니다. 위에서 파일을 올려보세요.</div>';
       document.getElementById("dmDetail").innerHTML = '<div class="dm-empty">올린 문서가 여기에 표시됩니다.</div>';

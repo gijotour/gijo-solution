@@ -416,3 +416,57 @@ body[data-screen="loganalysis"] .frow, .g-ui .erow { line-height: 1.45; }
 body.g-ui { word-break: keep-all; overflow-wrap: break-word; }
 .g-ui button, .g-ui .btn { white-space: nowrap; }
 .g-ui button.wrap-ok, .g-ui .btn.wrap-ok { white-space: normal; word-break: keep-all; text-align: left; }
+
+/* ══ 화면 카드 골격 .g-scard — 「대화창 카드 언어를 화면으로」 (2026-08-31 사장님) ═══════
+ *
+ * 사장님 지시: 실화면 캡처 두 장을 대비해 「이런 디자인들 다 **2번째 이미지**로 변경 가능할까?」
+ *   — 2번째가 대화창 현황 카드(chatparts.js .dc-card)다: 흰 카드 한 장 · 헤더 줄(제목+우측 조작칩)
+ *   · 라벨 위/값 아래 지표 · 얇은 행선 표. 1번째(지식 창고)는 잘린 라벨과 상자 안 상자였다.
+ *   이어서 「엑셀처럼」·「모든 메뉴도 동일하게」·「히트맵은 있었으면」.
+ *
+ * ■ 왜 새 이름(.g-scard)인가 — **.g-card를 확장하지 않는다**(설계관 ⑤-6):
+ *   .g-card는 padding 24px 단일 상자라 확장하면 그걸 쓰는 기존 화면의 여백이 통째로 바뀐다.
+ *   카드 언어는 padding:0 + 3단(헤더/지표/본문) 구조다 — 다른 부품이다.
+ * ■ 왜 dc-card를 그대로 안 쓰나 — dc-*는 **대화창 안**을 전제로 rgba 리터럴을 쓰고
+ *   흰 테마는 pro-white가 선택자로 하나씩 덮어 성립한다. 화면에 그대로 옮기면 그 덮개가
+ *   안 따라온다. 여기서는 처음부터 **--g-* 토큰만** 쓴다(3테마가 이 이름으로 뒤집힌다).
+ * ■ 밀도는 이미 있는 것을 쓴다 — 표 셀 padding은 아래 「목록 밀도」 절이 정본이고,
+ *   행 30px·머리 26px도 .g-rows-*가 정본이다. 여기서 다시 정하지 않는다.
+ * ■ 좁은 폭(판 420px) 계약을 그대로 탄다 — 지표는 auto-fit으로 접히고 라벨은 말줄임.
+ * ⚠ 11px 하한(uireadability) — 이 절의 최소 글자는 11px다. 더 줄이지 말 것. */
+.g-ui .g-scard { background: var(--g-surface-1); border: 1px solid var(--g-border); border-radius: var(--g-r);
+  overflow: hidden; margin-bottom: var(--g-s3); }
+.g-ui .g-scard-h { display: flex; align-items: center; gap: var(--g-s2); padding: 7px 12px;
+  border-bottom: 1px solid var(--g-border); font-size: 12.75px; font-weight: 800; color: var(--g-text); }
+.g-ui .g-scard-h .g-scard-t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 헤더 우측 조작 자리 — 「목록|히트맵」 토글·열기 단추가 여기 선다(왼쪽 제목과 안 겹친다). */
+.g-ui .g-scard-h .g-scard-a { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+/* 지표 줄 — 라벨 위 / 값 아래. 좁아지면 열 수가 준다(고정 4열 금지 — 잘림의 뿌리였다). */
+.g-ui .g-scard-k { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  border-bottom: 1px solid var(--g-border); }
+.g-ui .g-scard-k > div { padding: 7px 12px; border-right: 1px solid var(--g-border); min-width: 0; }
+.g-ui .g-scard-k > div:last-child { border-right: 0; }
+.g-ui .g-scard-kl { font-size: 11.5px; color: var(--g-muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-ui .g-scard-kv { font-size: 15px; font-weight: 800; color: var(--g-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-ui .g-scard-kv.bad { color: var(--g-red); } .g-ui .g-scard-kv.warn { color: var(--g-amber); }
+.g-ui .g-scard-kv.ok { color: var(--g-teal); } .g-ui .g-scard-kv.muted { color: var(--g-muted-2); }
+/* 본문 — 표(.g-rows*)나 폼이 그대로 들어온다. 표는 자기 밀도를 유지한다. */
+.g-ui .g-scard-b { padding: 0; }
+.g-ui .g-scard-b.pad { padding: var(--g-s3); }
+/* 카드 안 표는 가로로 도망간다(엑셀 방식) — 좁은 폭에서 셀이 삐져나오지 않게. */
+.g-ui .g-scard-b > .g-rows, .g-ui .g-scard-b > table { max-width: 100%; }
+.g-ui .g-scard-b { overflow-x: auto; }
+/* 보기 전환 칩(목록|히트맵) — dc-seg와 같은 결이되 토큰으로. */
+.g-ui .g-seg { display: inline-flex; background: var(--g-surface-2); border: 1px solid var(--g-border-strong);
+  border-radius: 7px; padding: 2px; }
+.g-ui .g-seg span { font-size: 11px; font-weight: 800; color: var(--g-muted); padding: 2px 8px;
+  border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.g-ui .g-seg span.on { background: var(--g-blue); color: #fff; }
+/* 히트맵 타일 — 좁아지면 열이 준다(시각 판은 말줄임이 아니라 반응형). */
+.g-ui .g-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; padding: 8px 10px; }
+.g-ui .g-tile { border: 1px solid var(--g-border-strong); border-radius: 8px; padding: 6px 8px; min-width: 0; }
+.g-ui .g-tile .tv { font-size: 11px; font-weight: 800; }
+.g-ui .g-tile .tl { font-size: 11.5px; color: var(--g-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-ui .g-tile .ts { font-size: 11px; color: var(--g-muted-2); }
+.g-ui .g-tile.bad { background: rgba(226, 72, 61, 0.18); } .g-ui .g-tile.warn { background: rgba(240, 160, 32, 0.16); }
+.g-ui .g-tile.ok { background: rgba(30, 185, 128, 0.14); } .g-ui .g-tile.muted { background: var(--g-surface-2); }
