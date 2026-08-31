@@ -209,6 +209,7 @@ import {
   runDeleteReportSchedule,
   runSetEventStatus,
   runDeleteProduct,
+  runVexStatus,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -2030,6 +2031,23 @@ const TOOLS: AgentTool[] = [
     effect: (args) => `보안제품 「${args.name ?? ""}」을 등록부에서 삭제 · **그 제품의 매뉴얼·점검 문서도 함께 삭제**`,
     undo: "되돌릴 수 없습니다 — 필요하면 대화창에서 다시 등록해야 하고, 문서도 다시 올려야 합니다.",
     run: runDeleteProduct,
+  },
+  {
+    // 📄 VEX 현황 — 「VEX 파일 내보내줘」(대장 §4 끊김 2 · 계획서 중-7 SBOM 갈래).
+    //   ⚠ **읽기 도구다.** 대화창은 파일을 건네지 못하므로 「지금 내보내면 어떤 상태로 나가는지」를
+    //     숫자로 보여 주고 파일 받는 자리를 알려 준다. 「내보냈습니다」라고 말하지 않는다 —
+    //     실제로 파일을 안 만들었는데 만들었다고 하면 「하지 않은 일을 했다고 말함」이 된다.
+    name: "vex_status",
+    label: "VEX 현황",
+    domain: "sbom",
+    write: false,
+    description:
+      'VEX(취약점 대응 상태 문서)로 내보내면 어떤 상태가 몇 건 나가는지 본다. "VEX 파일 내보내줘"·"VEX로 나가면 어떤 상태야?"에 쓴다. 파일 자체는 결재판 화면에서 받는다.',
+    params: [
+      { name: "asset", label: "자산", description: "특정 자산만 볼 때 (선택, 비우면 전체)", required: false },
+    ],
+    directAnswer: true,
+    run: runVexStatus,
   },
 ];
 

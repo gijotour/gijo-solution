@@ -3815,3 +3815,77 @@ export async function runDeleteProduct(args: Record<string, string>): Promise<st
   if (!지움) return `제품을 지우지 못했습니다 — 「${고름.name}」(그새 지워졌을 수 있습니다).`;
   return `보안제품을 등록부에서 지웠습니다 — 「${고름.name}」.\n⚠ 그 제품에 매달려 있던 **매뉴얼·점검 문서도 함께** 지워집니다. 점검 일정은 남으니 필요 없으면 따로 정리하세요.`;
 }
+
+// ── VEX 내보내기 — 대화로 (2026-09-01 · 대장 §4 끊김 2 · 계획서 중-7 SBOM 갈래) ────────
+//
+// ■ 왜 (계획서 관계)
+//   중-7의 「SBOM 패키지 수집」 갈래다. 새 기능이 아니라 **이미 있는 엔진에 대화 길을 내는 것**
+//   이다 — vexexport.ts에 buildVexDocument·요약 창구가 온전히 있고, 결재판 화면에는 [파일 받기]
+//   단추까지 있다. 빠진 것은 대화 도구뿐이라 대장이 「안됨 — 받아줄 도구 없음」으로 적었다.
+//
+// ■ 대화에서는 **파일을 주지 않는다**
+//   대화창은 파일을 내려받는 자리가 아니다(화면 단추가 그 일을 한다). 여기서는 **지금 내보내면
+//   어떤 상태로 나가는지**를 숫자로 보여 주고, 파일이 필요하면 어디서 받는지 알려 준다.
+//   ⚠ 「내보냈습니다」라고 말하지 않는다 — 실제로 파일을 만들지 않았는데 만들었다고 하면
+//     「하지 않은 일을 했다고 말함」 계보가 된다.
+
+/** VEX 상태 우리말.
+ *  ⚠ 열쇠는 **vexexport.ts의 toVexAnalysis가 실제로 내보내는 값**이다(그 파일 머리 6~10행이 원천).
+ *    CycloneDX 표준에는 이보다 많은 값이 있지만 우리 승인 흐름이 쓰는 것은 이 넷뿐이다 —
+ *    표준 목록을 보고 넷 밖의 값을 여기에 적으면 **영원히 안 맞는 열쇠**가 된다(2026-09-01 실제로 그랬다). */
+const VEX상태글: Record<string, string> = {
+  under_investigation: "조사 중(아직 판정 안 함)",
+  affected: "영향 있음(조치 중)",
+  fixed: "조치 완료",
+  not_affected: "영향 없음(사유 있음)",
+};
+
+/** VEX 현황 — 「VEX 파일 내보내줘」·「VEX로 나가면 어떤 상태야?」. */
+export async function runVexStatus(args: Record<string, string>): Promise<string> {
+  const { buildVexDocument } = await import("../vexexport.js");
+  const { listFindingReviews } = await import("../approvals.js");
+  const 대상글 = (args.asset ?? args.target ?? "").trim();
+  const 전부 = listFindingReviews();
+  let 볼것 = 전부;
+  let 범위글 = "전체 자산";
+  if (대상글) {
+    const hit = resolveAsset(대상글);
+    if (!hit) {
+      const 예 = listAssets().map((a) => a.name).slice(0, 6).join(", ") || "(없음)";
+      return `"${대상글}"에 맞는 자산을 못 찾았습니다. 등록된 자산: ${예}`;
+    }
+    볼것 = 전부.filter((r) => r.assetId === hit.id);
+    범위글 = hit.name;
+  }
+  if (!볼것.length) {
+    // ⚠ listFindingReviews()는 미검토(pending)까지 **전부** 돌려준다 — 여기가 비었다는 것은
+    //   「판정을 안 했다」가 아니라 **취약점 자체가 없다**는 뜻이다. 말을 헷갈리게 적으면
+    //   담당자가 「판정하면 나오겠지」 하고 없는 것을 기다린다.
+    return `${범위글}에는 등록된 취약점이 없어 VEX로 내보낼 것이 없습니다 — 스캔 결과가 들어오면 미검토도 「조사 중」 상태로 실립니다.`;
+  }
+  const doc = buildVexDocument(볼것);
+  if (!doc.vulnerabilities.length) {
+    return (
+      `${범위글} — 판정한 취약점은 ${볼것.length}건인데 **VEX에 실릴 것은 0건**입니다.\n` +
+      `VEX는 CVE 번호가 있는 것만 싣습니다(표준이 CVE를 열쇠로 씁니다). 스캐너가 CVE를 안 준 항목은 빠집니다.`
+    );
+  }
+  const 셈: Record<string, number> = {};
+  for (const v of doc.vulnerabilities) {
+    const st = ((v.analysis as { state?: string }) || {}).state ?? "?";
+    셈[st] = (셈[st] ?? 0) + 1;
+  }
+  const 줄 = Object.entries(셈)
+    .sort((a, b) => b[1] - a[1])
+    .map(([st, n]) => `- ${VEX상태글[st] ?? st} ${n}건`)
+    .join("\n");
+  // ⚠ 「전체 − 실린 줄 수」로 세면 안 된다 — 한 항목이 CVE를 둘 이상 달면 줄이 늘어 **음수**가 된다.
+  //   빠지는 것의 정의는 「CVE 번호가 하나도 없는 항목」이므로 그것을 그대로 센다.
+  const { cvesOf } = await import("../vexexport.js");
+  const CVE없음 = 볼것.filter((r) => cvesOf(r).length === 0).length;
+  return (
+    `📄 VEX 현황 — ${범위글} · 실릴 취약점 **${doc.vulnerabilities.length}건**\n${줄}\n` +
+    (CVE없음 > 0 ? `\n⚠ 판정한 것 중 **${CVE없음}건은 CVE 번호가 없어 VEX에 안 실립니다**(표준이 CVE를 열쇠로 씁니다).\n` : "\n") +
+    `\n파일로 받으시려면 **③ 조치 › 결재판** 화면의 [VEX 내보내기]에서 받으세요 — 대화창은 파일을 건네지 못합니다.`
+  );
+}

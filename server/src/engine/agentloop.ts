@@ -1519,6 +1519,14 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "delete_product",
     args: {},
   },
+  {
+    // 📄 VEX 현황 — 「VEX 파일 내보내줘」가 받아 줄 곳이 없어 모델 판단으로 새던 자리
+    //   (대장 §4 끊김 2). ⚠ 「VEX」는 이 제품에서 뜻이 하나뿐인 낱말이라 가로채기 위험이 적다.
+    //   ⚠ 다만 **SBOM 내보내기와는 다르다** — SBOM은 부품표, VEX는 그 부품의 대응 상태다.
+    re: /VEX|vex\s*(문서|파일|내보내|현황)/,
+    tool: "vex_status",
+    args: {},
+  },
 ];
 // 등록된 보안제품 이름을 콕 집어 "설명해줘"라고 물으면 그 제품의 사내 근거(매뉴얼·온톨로지)를
 // 모아 답한다. [2026-07-26 실사용] "Tenable Web App Scanning 주요기능 설명해줘"에 도구를 하나도
