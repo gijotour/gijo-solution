@@ -105,7 +105,33 @@ export function sbom읽기(원문: string): 반입결과 {
   // ── CycloneDX ─────────────────────────────────────────────────────────
   if (doc.bomFormat === "CycloneDX" || Array.isArray(doc.components)) {
     const 부품: 반입부품[] = [];
-    const comps = Array.isArray(doc.components) ? doc.components : [];
+    // ⚠ **중첩을 편다**(2026-09-01). 전에는 맨 위 단계만 셌다 — 「겉만 셌습니다」라고 정직하게
+    //   알리기는 했지만, 부품 안에 든 부품도 **똑같이 라이선스 의무를 지운다.** GPL 라이브러리가
+    //   한 겹 안에 들어 있다고 의무가 사라지지 않는다. 겉만 세면 검수 결과가 **실제보다 안전해
+    //   보인다** — 이것이 이 화면에서 가장 위험한 종류의 틀림이다.
+    // ⚠ 깊이 상한을 둔다. 상한에 닿으면 **몇 개를 못 봤는지 말한다** — 조용히 자르면
+    //   「전부 봤다」로 읽힌다(말없는 잘라내기 금지).
+    const 최대깊이 = 8;
+    let 깊이초과 = 0;
+    let 중첩에서온것 = 0;
+    const 펴기 = (목록: unknown[], 깊이: number): Record<string, unknown>[] => {
+      const 결과: Record<string, unknown>[] = [];
+      for (const c of 목록) {
+        if (!c || typeof c !== "object") continue;
+        const o = c as Record<string, unknown>;
+        결과.push(o);
+        const 안 = o.components;
+        if (Array.isArray(안) && 안.length) {
+          if (깊이 >= 최대깊이) { 깊이초과 += 안.length; continue; }
+          const 안쪽 = 펴기(안, 깊이 + 1);
+          중첩에서온것 += 안쪽.length;
+          결과.push(...안쪽);
+        }
+      }
+      return 결과;
+    };
+    const 맨위 = Array.isArray(doc.components) ? doc.components : [];
+    const comps = 펴기(맨위, 1);
     for (const c of comps) {
       if (!c || typeof c !== "object") continue;
       const o = c as Record<string, unknown>;
@@ -124,9 +150,14 @@ export function sbom읽기(원문: string): 반입결과 {
     const 이름없음 = comps.length - 부품.length;
     if (이름없음 > 0) 알림.push(`이름이 없는 항목 ${이름없음}개는 세지 못했습니다.`);
     if (!comps.length) 알림.push("부품 목록(components)이 비어 있습니다.");
-    // ⚠ 중첩 부품(components 안의 components)은 아직 안 편다 — **안 편다고 말한다.**
-    const 중첩 = comps.filter((c) => Array.isArray((c as Record<string, unknown>)?.components)).length;
-    if (중첩) 알림.push(`부품 안에 부품이 든 항목 ${중첩}개가 있습니다 — 그 안쪽은 아직 안 읽습니다(겉만 셌습니다).`);
+    // ⚠ 숫자가 왜 겉보다 많은지 밝힌다 — 안 밝히면 「목록엔 12개인데 왜 47개라 하나」가 된다.
+    if (중첩에서온것 > 0) {
+      알림.push(`부품 안에 든 부품 ${중첩에서온것}개까지 펴서 셌습니다(맨 위 ${맨위.length}개 + 안쪽 ${중첩에서온것}개). 안쪽 부품도 똑같이 라이선스 의무를 지웁니다.`);
+    }
+    // ⚠ **말없는 잘라내기 금지.** 상한에 걸린 것이 있으면 몇 개인지 말한다.
+    if (깊이초과 > 0) {
+      알림.push(`부품이 ${최대깊이}겹보다 깊게 들어 있어 ${깊이초과}개는 못 읽었습니다 — 이 결과는 그만큼 덜 센 값입니다.`);
+    }
     return {
       형식: "CycloneDX",
       형식판: typeof doc.specVersion === "string" ? doc.specVersion : undefined,
