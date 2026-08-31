@@ -14,7 +14,6 @@ import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
 import { runInspectionReport } from "../inspectionreport";
 import { 한줄풀이글, 섞임고지 } from "../findingplain";
-import { eol찾기, eol한줄 } from "../eol-seed";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "../packagescan";
 import { targetRunner, runnerFor } from "../hardeningscan";
 import { listTargets } from "../hardeningtargets";
@@ -262,8 +261,12 @@ const TOOLS: AgentTool[] = [
   },
   {
     // ⏳ 지원 종료(EOL) 점검 — 「지원 끝난 부품 있어?」(계획서 중-7 + 전-4).
-    //   ⚠ eol-seed.ts의 표를 **처음으로 부르는 곳**이다 — 2026-08-04에 만들어 놓고
-    //     소비자가 없어 아무도 못 보던 값이었다.
+    //   ⚠ **정정(2026-09-01 검토관 [중])**: 처음엔 「eol-seed의 창구는 소비자가 0이었다」고
+    //     적었는데 **사실이 아니다.** eol찾기·eol한줄은 sbom_coverage가 이미 쓰고 있었다
+    //     (자산 하나를 콕 집었을 때만). 내 grep이 engine/*.ts만 봐서 agenttools/ 하위를
+    //     놓친 것이다 — **얕은 글로브가 만든 거짓 사실**을 커밋·표·시험에 그대로 옮겨 적었다.
+    //   이 도구가 실제로 더하는 것: ① 자산을 안 집어도 **전체**를 본다 ② eol표상태를 처음 쓴다
+    //     ③ 「없다 ≠ 괜찮다」를 말한다.
     //   ⚠ 급소는 「0건」의 뜻이다 — 표가 9줄뿐이라 **없다 ≠ 괜찮다**. 답이 그 사실을
     //     반드시 함께 말한다(eolcheck.test.ts가 지킨다).
     name: "eol_check",
@@ -1294,7 +1297,9 @@ const TOOLS: AgentTool[] = [
     },
     effect: (args) =>
       `자산 "${(args.asset ?? "").trim()}"의 AI-BOM **${(args.field ?? "").trim()}** 칸에 기록 · 이미 값이 있으면 **덮어씀**(답에 이전 값을 밝힙니다)`,
-    undo: "이전 값은 답에 남습니다 — 되돌리려면 그 값으로 다시 적으시면 됩니다.",
+    // ⚠ 답은 긴 값을 60자에서 줄인다 — 「답에 남는다」고만 하면 **긴 값을 잃는다**(검토관 [중]).
+    //   지키지 못할 약속을 하느니 어디에 온전히 남는지를 말한다.
+    undo: "이전 값의 앞 60자는 답에 남고, 온전한 값은 📦 AI-BOM 화면에 그대로 있습니다 — 적기 전에 그 화면에서 확인하세요.",
     run: runSetAiBomField,
   },
   {

@@ -1,7 +1,10 @@
 // 지원 종료(EOL) 점검 — 대화로 (2026-09-01 · 계획서 중-7 + 전-4)
 //
-// 왜: eol-seed.ts의 표는 2026-08-04 파트너 지적으로 만들어졌는데
-// **부르는 곳이 한 군데도 없었다** — 생산자만 있고 소비자가 없는 값이었다.
+// ⚠ **정정(2026-09-01 검토관 [중])**: 처음 이 시험을 쓸 때 「부르는 곳이 한 군데도 없었다」고
+// 적었는데 **사실이 아니었다.** eol찾기·eol한줄은 sbom_coverage가 이미 쓰고 있었다(자산 하나를
+// 집었을 때만). 내 grep이 engine/*.ts만 봐서 agenttools/ 하위를 놓쳤다 —
+// **얕은 글로브가 만든 거짓 사실**이다. 소비자가 정말 0이던 것은 eol표상태 하나였다.
+// 이 도구가 더하는 것: 자산을 안 집어도 전체를 보고, 「없다 ≠ 괜찮다」를 말한다.
 //
 // ★★ 이 도구의 급소는 「0건」의 뜻이다.
 //    표는 9줄뿐이라 걸리는 게 없다는 건 **「모른다」이지 「지원 중」이 아니다.**
@@ -10,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runEolCheck } from "../src/engine/agenttools/handlers";
-import { EOL_SEED, eol찾기, eol한줄, eol표상태 } from "../src/engine/eol-seed";
+import { EOL_SEED, eol찾기, eol한줄, eol표상태, 이름이정확한가, eol한줄확실도 } from "../src/engine/eol-seed";
 
 describe("★★ 「없다」를 「괜찮다」로 말하지 않는다", () => {
   it("답이 **덮는 범위(표 줄 수)**를 반드시 밝힌다", async () => {
@@ -66,7 +69,7 @@ describe("찾기 — 못 찾으면 null(모른다)", () => {
 });
 
 describe("★ 표가 실제로 닿는다 — 부르는 곳이 있다", () => {
-  it("등록부에 eol_check가 있다(2026-08-04~09-01 소비자 0이던 표)", () => {
+  it("등록부에 eol_check가 있다", () => {
     const 등록 = readFileSync(join(__dirname, "..", "src", "engine", "agenttools", "registry.ts"), "utf8");
     expect(등록).toContain('name: "eol_check"');
   });
@@ -94,4 +97,41 @@ describe("낱말 가로채기 — 「지원」 홑낱말을 안 삼킨다", () =
   for (const t of ["기술 지원 받을 수 있어?", "지원해줘", "이 제품 버전 뭐야", "자산 목록 보여줘", "취약점 알려줘", "계약 종료일 알려줘"]) {
     it(`"${t}" — 안 삼킨다`, () => expect(규칙.test(t), `EOL 규칙이 "${t}"을 가로챘다`).toBe(false));
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-09-01 검토관 [중] — eol찾기의 느슨한 부분일치를 **전 부품에** 돌리면서,
+// 이름만 겹치는 라이브러리를 「지원이 끝난 버전」이라 단정했다.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("★★ 이름이 겹치기만 한 부품을 「지원 종료」로 단정하지 않는다", () => {
+  const 남의것 = [
+    ["python-dateutil", "2.7.5"],   // Python 2.7이 아니다 — 전혀 다른 꾸러미다
+    ["python3-requests", "2.7.0"],
+    ["libcentos-shim", "7.1"],
+    ["ubuntu-advantage-tools", "20.04.1"],
+    ["my-python-tool", "2.7"],
+  ];
+  for (const [이름, 판] of 남의것) {
+    it(`"${이름} ${판}" — 단정하지 않고 확인을 청한다`, () => {
+      const row = eol찾기(이름, 판);
+      expect(row, "표에 걸리기는 한다(느슨한 맞춤)").not.toBeNull();
+      expect(이름이정확한가(이름, row), `${이름}을 ${row.제품}과 같은 제품으로 봤다`).toBe(false);
+      const 글 = eol한줄확실도(이름, row);
+      expect(글, "이름이 겹칠 뿐인데 단정했다").toContain("이름이 겹칩니다");
+      expect(글, "무엇을 하라는지 안 말한다").toContain("확인해 주세요");
+    });
+  }
+
+  it("★ 이름이 똑같으면 그대로 단정한다 — 참인 경보를 잃지 않는다", () => {
+    const row = eol찾기("centos", "7.9");
+    expect(이름이정확한가("centos", row)).toBe(true);
+    expect(eol한줄확실도("centos", row), "맞는 것까지 흐려 놓으면 경보가 죽는다")
+      .not.toContain("이름이 겹칩니다");
+  });
+
+  it("확인 청하는 글에도 **원래 사실**이 함께 남는다", () => {
+    const row = eol찾기("python-dateutil", "2.7.5");
+    expect(eol한줄확실도("python-dateutil", row), "같은 것이었을 때의 뜻을 안 알려 준다")
+      .toMatch(/같은 것이라면/);
+  });
 });

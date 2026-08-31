@@ -104,6 +104,19 @@ export function sbom읽기(원문: string): 반입결과 {
 
   // ── CycloneDX ─────────────────────────────────────────────────────────
   if (doc.bomFormat === "CycloneDX" || Array.isArray(doc.components)) {
+    // 상한에 걸려 **안 읽은 것이 몇 개인지** 센다 — 직계 자식이 아니라 **그 아래 전부**다.
+    // ⚠ 여기도 깊이를 막는다. 부품이 자기 자신을 품는 망가진 문서가 오면 세다가 스택이 터진다.
+    const 안읽은수 = (목록: unknown[], 남은겹 = 64): number => {
+      if (남은겹 <= 0) return 목록.length; // 더 못 들어가면 있는 만큼만 — 0으로 두면 없는 척이 된다
+      let n = 0;
+      for (const c of 목록) {
+        if (!c || typeof c !== "object") continue;
+        n++;
+        const 안 = (c as Record<string, unknown>).components;
+        if (Array.isArray(안) && 안.length) n += 안읽은수(안, 남은겹 - 1);
+      }
+      return n;
+    };
     const 부품: 반입부품[] = [];
     // ⚠ **중첩을 편다**(2026-09-01). 전에는 맨 위 단계만 셌다 — 「겉만 셌습니다」라고 정직하게
     //   알리기는 했지만, 부품 안에 든 부품도 **똑같이 라이선스 의무를 지운다.** GPL 라이브러리가
@@ -113,7 +126,6 @@ export function sbom읽기(원문: string): 반입결과 {
     //   「전부 봤다」로 읽힌다(말없는 잘라내기 금지).
     const 최대깊이 = 8;
     let 깊이초과 = 0;
-    let 중첩에서온것 = 0;
     const 펴기 = (목록: unknown[], 깊이: number): Record<string, unknown>[] => {
       const 결과: Record<string, unknown>[] = [];
       for (const c of 목록) {
@@ -122,16 +134,27 @@ export function sbom읽기(원문: string): 반입결과 {
         결과.push(o);
         const 안 = o.components;
         if (Array.isArray(안) && 안.length) {
-          if (깊이 >= 최대깊이) { 깊이초과 += 안.length; continue; }
-          const 안쪽 = 펴기(안, 깊이 + 1);
-          중첩에서온것 += 안쪽.length;
-          결과.push(...안쪽);
+          if (깊이 >= 최대깊이) {
+            // ⚠ **못 읽은 것은 서브트리 전체다.** 직계 자식만 세면 그 아래 손자·증손자가
+            //   빠져 「N개 못 읽었습니다」가 실제보다 **적게** 나온다 — 덜 센 정도를 과소
+            //   보고하면 검수 결과가 실제보다 안전해 보인다(2026-09-01 검토관 [중]).
+            깊이초과 += 안읽은수(안);
+            continue;
+          }
+          결과.push(...펴기(안, 깊이 + 1));
         }
       }
       return 결과;
     };
     const 맨위 = Array.isArray(doc.components) ? doc.components : [];
     const comps = 펴기(맨위, 1);
+    // ★ 안쪽에서 온 것의 수는 **평탄화 결과에서 맨 위 개수를 빼서** 구한다.
+    //   재귀 안에서 `중첩에서온것 += 안쪽.length`로 누적하면 **깊이마다 자손이 다시 더해져**
+    //   3겹부터 실제 부품 수를 넘는다(실측: a>b>c 3개인데 「맨 위 1 + 안쪽 3」=4,
+    //   10겹은 읽은 것 8개인데 「1 + 28」=29). 이 커밋의 목적이 「숫자가 왜 겉보다 많은지
+    //   밝힌다」였는데 밝히려던 그 숫자가 틀렸던 것이다(2026-09-01 검토관 [상]).
+    //   빼기 한 번이면 정의상 절대 안 어긋난다 — 셈을 두 곳에서 하지 않는다.
+    const 중첩에서온것 = comps.length - 맨위.filter((c) => c && typeof c === "object").length;
     for (const c of comps) {
       if (!c || typeof c !== "object") continue;
       const o = c as Record<string, unknown>;
@@ -152,7 +175,8 @@ export function sbom읽기(원문: string): 반입결과 {
     if (!comps.length) 알림.push("부품 목록(components)이 비어 있습니다.");
     // ⚠ 숫자가 왜 겉보다 많은지 밝힌다 — 안 밝히면 「목록엔 12개인데 왜 47개라 하나」가 된다.
     if (중첩에서온것 > 0) {
-      알림.push(`부품 안에 든 부품 ${중첩에서온것}개까지 펴서 셌습니다(맨 위 ${맨위.length}개 + 안쪽 ${중첩에서온것}개). 안쪽 부품도 똑같이 라이선스 의무를 지웁니다.`);
+      const 맨위수 = 맨위.filter((c) => c && typeof c === "object").length;
+      알림.push(`부품 안에 든 부품 ${중첩에서온것}개까지 펴서 셌습니다(맨 위 ${맨위수}개 + 안쪽 ${중첩에서온것}개 = ${comps.length}개). 안쪽 부품도 똑같이 라이선스 의무를 지웁니다.`);
     }
     // ⚠ **말없는 잘라내기 금지.** 상한에 걸린 것이 있으면 몇 개인지 말한다.
     if (깊이초과 > 0) {

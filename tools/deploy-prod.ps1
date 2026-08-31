@@ -44,6 +44,22 @@ if ($LASTEXITCODE -ne 0) { throw "WSL 동기화/빌드 실패 — 배포 중단 
 #   **옛 문서를 근거로 계속 답했다**(8월 7일판이 쓰이고 있었다). 사람이 기억해야만 맞는 구조였다.
 #   ⚠ 운영이 읽는 곳은 **env가 가리키는 한 곳뿐**이다(gijo-as.env의 GIJO_DOCS_DIR).
 #      다른 폴더에 복사하면 조용히 옛 문서가 계속 쓰인다 — 그래서 env를 읽어 그 자리에 넣는다.
+# 🔓 개발 모드 표지 — **배포할 때마다 눈에 띄게 말한다**(2026-09-01 완결성 비평 [중]).
+#   자가 진단에 항목을 만들어 뒀지만 그건 **사람이 그 화면을 열어야** 보인다. 되돌리는 걸 잊는
+#   사고는 「아무도 안 봐서」 나므로, 사람이 반드시 지나가는 **배포 순간**에 말한다.
+#   ⚠ 여기서 배포를 막지는 않는다 — 개발 기간에는 일부러 켜 둔 값이라 막으면 매번 걸린다.
+#     끄는 시점은 사장님 결정이고, 이 표지는 **잊지 말라는 알림**이다.
+$devMode = (wsl -d $distro -- bash -c "grep -m1 ^GIJO_DEV_MODE= /home/gijo/gijo-as/gijo-as.env | cut -d= -f2").Trim()
+if ($devMode -eq "1") {
+  Write-Output ""
+  Write-Output "  ⚠⚠  개발 모드가 켜져 있습니다(GIJO_DEV_MODE=1) — 업무정보 등급(기밀·민감)"
+  Write-Output "       열람 제한이 **꺼진 채** 운영이 돕니다. 개발 기간 조치라면 그대로 두시고,"
+  Write-Output "       출하·파일럿 전에는 gijo-as.env에서 그 줄을 지우고 재시작하세요."
+  Write-Output ""
+} else {
+  Write-Output "개발 모드: 꺼짐 (등급 열람 제한 정상)"
+}
+
 Step "3.5/5 제품 문서 동기화 (docs-manifest 열거분)"
 $docsDir = (wsl -d $distro -- bash -c "grep -m1 '^GIJO_DOCS_DIR=' /home/gijo/gijo-as/gijo-as.env | cut -d= -f2").Trim()
 if (-not $docsDir) { $docsDir = "$wslServer/docs" }

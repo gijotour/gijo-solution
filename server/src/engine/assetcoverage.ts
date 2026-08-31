@@ -58,7 +58,15 @@ function openFindingsOf(a: Asset) {
 // 으로 세면 커버리지가 거짓 결손을 만든다(실측 2026-07-19: 방화벽까지 SBOM 결손으로 집계).
 // assets.isAiAsset과 목적은 같으나 순환 임포트 회피를 위해 여기서 자체 판별한다.
 const NON_SOFTWARE_TYPES = new Set(["infra-host"]);
-function sbomApplies(a: Asset): boolean {
+/**
+ * SBOM 결손을 세는 **단 하나의 잣대**다(2026-09-01 내보냄).
+ *
+ * ⚠ 밖으로 낸 이유: 대화창이 「SBOM 없는 자산 알려줘」에 **AI 자산만 세는 도구**로 답해
+ *   IT·일반 소프트웨어 자산이 통째로 빠졌다(검토관 [상]). 화면(sbom.html)은 또 전체 자산을
+ *   세고 있어 **같은 물음에 잣대가 세 벌**이었다. 세는 곳이 늘 때마다 여기를 쓴다 —
+ *   각자 세면 화면과 대화창이 다른 숫자를 말한다.
+ */
+export function sbomApplies(a: Asset): boolean {
   if (a.id.startsWith("vuln:")) return false; // 스캐너가 들여온 IP 호스트
   return !NON_SOFTWARE_TYPES.has(a.assetType);
 }

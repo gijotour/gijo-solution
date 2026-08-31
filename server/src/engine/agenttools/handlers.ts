@@ -2,7 +2,7 @@
 // 본문은 원문 그대로다. 레지스트리(등록표)는 registry.ts, 겉문은 ../agenttools.ts(배럴).
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
 import { listAssets, getAsset, registerAsset, updateAssetOwnership, updateAssetMeta, setAssetRobustness, isAiAsset, Asset, 자산표시이름, 예시데이터뿐인가 } from "../assets";
-import { computeAssetCoverage, coverageSummaryText, type GapKind } from "../assetcoverage";
+import { computeAssetCoverage, coverageSummaryText, sbomApplies, type GapKind } from "../assetcoverage";
 // 비교 도구(2026-08-28) — **정적** import: 화살 #6에서 걷은 「동적 습관」을 새로 만들지 않는다
 // (handlers는 꼭대기 층이라 순환 없음 · require는 vitest에서 .ts를 못 찾아 시험이 실증했다).
 import { listProductIntros, listIntroFields, setIntroField, INTRO_FIELD_SCHEMA } from "../productintro";
@@ -13,7 +13,7 @@ import { 표식, 심각도한글, 심각도표식, 자산종류한글 } from "..
 import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
 import { 한줄풀이글, 섞임고지 } from "../findingplain";
-import { eol찾기, eol한줄 } from "../eol-seed";
+import { eol찾기, eol한줄확실도 } from "../eol-seed";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "../packagescan";
 import { targetRunner, runnerFor } from "../hardeningscan";
 import { listTargets } from "../hardeningtargets";
@@ -2245,7 +2245,7 @@ export function runSbomCoverage(assetId?: string): string {
     const 끝난것: string[] = [];
     for (const c of a.components ?? []) {
       const row = eol찾기(c.name, c.version);
-      if (row) 끝난것.push(`  · ${c.name} ${c.version !== "-" ? c.version : ""} — ${eol한줄(row)}`);
+      if (row) 끝난것.push(`  · ${c.name} ${c.version !== "-" ? c.version : ""} — ${eol한줄확실도(c.name, row)}`);
     }
     return [
       자산표시이름(a.id),
@@ -2262,8 +2262,20 @@ export function runSbomCoverage(assetId?: string): string {
     실제 += 직접;
     if (직접 === 0) 비어있음.push(자산표시이름(a.id));
   }
+  // ★ SBOM이 **아예 없는** 자산을 여기서 함께 말한다(2026-09-01 검토관 [상]).
+  //   전에는 「SBOM 없는 자산 알려줘」를 aibom_status로 보냈는데 그 도구는 **AI 자산만** 센다 —
+  //   IT·일반 소프트웨어 자산이 통째로 빠졌고, 등록 자산이 전부 IT면 「등록된 AI/모델 자산이
+  //   없습니다」라고 답했다(SBOM 없는 자산이 12건 있는데 없다고 말하는 셈).
+  //   ⚠ 잣대는 **assetcoverage.sbomApplies 하나**를 쓴다 — 화면·현황 카드와 같은 수를 말해야 한다.
+  const 대상들 = (자산들 as NonNullable<ReturnType<typeof getAsset>>[]).filter(sbomApplies);
+  const SBOM없음 = 대상들.filter((a) => !a.sbomGeneratedAt);
+  const 제외수 = 자산들.length - 대상들.length;
   return [
     `자산 ${자산들.length}개 · 구성요소 **${총}개** — 장비에서 직접 읽은 것 **${실제}개**`,
+    SBOM없음.length
+      ? `${표식.주의} **SBOM이 아예 없는 자산 ${SBOM없음.length}건**${제외수 ? ` (스캐너로 들여온 IP 호스트·인프라 장비 ${제외수}건은 SBOM 대상이 아니라 제외)` : ""}
+  · ${SBOM없음.slice(0, 8).map((a) => 자산표시이름(a.id)).join(", ")}${SBOM없음.length > 8 ? ` 외 ${SBOM없음.length - 8}건` : ""}`
+      : `SBOM은 대상 자산 ${대상들.length}건 모두에 있습니다.`,
     실제 === 0
       ? `${표식.주의} 아직 **직접 읽은 부품이 하나도 없습니다.** 지금 SBOM은 스캐너가 준 제품 이름(CPE) 수준이라 패키지·라이브러리가 비어 있습니다.`
       : `${표식.주의} 직접 읽지 않은 자산 ${비어있음.length}개는 아직 제품(CPE) 수준입니다.`,
@@ -3868,7 +3880,7 @@ export async function runVexStatus(args: Record<string, string>): Promise<string
   const doc = buildVexDocument(볼것);
   if (!doc.vulnerabilities.length) {
     return (
-      `${범위글} — 판정한 취약점은 ${볼것.length}건인데 **VEX에 실릴 것은 0건**입니다.\n` +
+      `${범위글} — 대상 취약점 ${볼것.length}건(미검토 포함)인데 **VEX에 실릴 것은 0건**입니다.\n` +
       `VEX는 CVE 번호가 있는 것만 싣습니다(표준이 CVE를 열쇠로 씁니다). 스캐너가 CVE를 안 준 항목은 빠집니다.`
     );
   }
@@ -3887,8 +3899,8 @@ export async function runVexStatus(args: Record<string, string>): Promise<string
   const CVE없음 = 볼것.filter((r) => cvesOf(r).length === 0).length;
   return (
     `📄 VEX 현황 — ${범위글} · 실릴 취약점 **${doc.vulnerabilities.length}건**\n${줄}\n` +
-    (CVE없음 > 0 ? `\n⚠ 판정한 것 중 **${CVE없음}건은 CVE 번호가 없어 VEX에 안 실립니다**(표준이 CVE를 열쇠로 씁니다).\n` : "\n") +
-    `\n파일로 받으시려면 **③ 조치 › 결재판** 화면의 [VEX 내보내기]에서 받으세요 — 대화창은 파일을 건네지 못합니다.`
+    (CVE없음 > 0 ? `\n⚠ 대상 중 **${CVE없음}건은 CVE 번호가 없어 VEX에 안 실립니다**(표준이 CVE를 열쇠로 씁니다).\n` : "\n") +
+    `\n파일로 받으시려면 **③ 조치 › ✅ 조치·승인** 화면의 [VEX 내보내기]에서 받으세요 — 대화창은 파일을 건네지 못합니다.`
   );
 }
 
@@ -4006,7 +4018,7 @@ export async function runSetAiBomField(args: Record<string, string>): Promise<st
 
 /** 지원 종료 점검 — 「지원 끝난 부품 있어?」. */
 export async function runEolCheck(args: Record<string, string>): Promise<string> {
-  const { EOL_SEED, eol찾기, eol한줄, eol표상태 } = await import("../eol-seed.js");
+  const { EOL_SEED, eol찾기, eol한줄확실도, 이름이정확한가, eol표상태 } = await import("../eol-seed.js");
   const 대상글 = (args.asset ?? args.assetId ?? "").trim();
 
   let 자산들 = listAssets();
@@ -4030,7 +4042,10 @@ export async function runEolCheck(args: Record<string, string>): Promise<string>
       const row = eol찾기(c.name, c.version);
       if (!row) continue;
       const 지남 = Boolean(row.종료일 && new Date(row.종료일 + "T00:00:00").getTime() < 오늘.getTime());
-      걸린.push({ 자산: a.name, 부품: c.name, 버전: c.version, 줄: eol한줄(row, 오늘), 지남 });
+      // ⚠ 이름이 겹치기만 한 것은 **지원 종료로 단정하지 않는다**(python-dateutil 2.7.5가
+      //   「Python 2.7 종료」로 찍히던 자리 — 검토관 [중]). 확실한 것만 ⛔ 칸으로 올린다.
+      const 확실 = 이름이정확한가(c.name, row);
+      걸린.push({ 자산: a.name, 부품: c.name, 버전: c.version, 줄: eol한줄확실도(c.name, row, 오늘), 지남: 지남 && 확실 });
     }
   }
 

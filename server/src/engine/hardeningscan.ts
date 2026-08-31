@@ -589,10 +589,21 @@ export function defaultRunnerFor(standard: StandardId): RunFn {
   return STANDARDS[standard].shell === "windows" ? winHostRunner : hostRunner;
 }
 
+/**
+ * 이 대상을 **정말 원격으로** 점검하는가 — 러너 선택과 리포트 문구가 **같은 답**을 쓰게 하는 원천.
+ *
+ * ⚠ 왜 함수로 뺐나(2026-09-01 검토관 [상]): 리포트가 「러너를 받았는가」로 원격을 판정했는데,
+ *   authMethod="local" 대상도 runnerFor가 **로컬 러너를 돌려주어** opts.run이 채워진다.
+ *   그래서 접속조차 안 한 점검이 「장비 CLI 원격 점검(등록 장비에 붙어 실 명령 실행·실측)」으로
+ *   기록됐다 — 하루 전 커밋이 없애려던 바로 그 거짓이 반쪽만 지워져 있었다.
+ */
+export function 원격점검인가(t: HardeningTarget): boolean {
+  return !(t.authMethod === "local" || t.host === "local");
+}
+
 // 대상×표준에 맞는 러너 — 원격(ssh)이면 SSH, 로컬이면 표준별 기본 러너.
 export function runnerFor(t: HardeningTarget, standard: StandardId): RunFn {
-  if (t.authMethod === "local" || t.host === "local") return defaultRunnerFor(standard);
-  return targetRunner(t);
+  return 원격점검인가(t) ? targetRunner(t) : defaultRunnerFor(standard);
 }
 
 export function listChecklists() {
@@ -608,11 +619,26 @@ function verdictOf(fail: number): string {
   return fail === 0 ? "🟢 양호" : fail <= 2 ? "🟡 보통(취약 항목 조치 필요)" : "🔴 미흡(다수 취약)";
 }
 
-export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn; skipWorkLog?: boolean }): Promise<ScanReport> {
+/**
+ * 감사 기록·작업 원장에 적을 **대상 이름** — 리포트 본문과 **같은 사실**을 말하게 하는 원천.
+ *
+ * ⚠ 왜 함수인가(2026-09-01 완결성 비평 [상]): 리포트 본문만 「이 서버 자신을 점검」으로 고치고
+ *   **감사 기록은 여전히 사람이 적은 장비 이름을 그대로** 남겼다. 증적은 리포트보다 오래 남고
+ *   감사 때 그것부터 본다 — 본문과 증적이 다른 말을 하면 증적 쪽이 이긴다.
+ *   붙지도 않은 장비를 「대상」으로 적어 두는 것은 이 제품에서 가장 나쁜 종류의 기록이다.
+ */
+export function 감사대상글(r: Pick<ScanReport, "target" | "ranOn">): string {
+  return r.ranOn === "remote" ? r.target : `이 서버 자신(적힌 이름표: ${r.target})`;
+}
+
+export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn; ranOn?: "self" | "remote"; skipWorkLog?: boolean }): Promise<ScanReport> {
   const std = STANDARDS[opts.standard];
-  // ⚠ **러너를 받았는지가 유일한 근거다.** target은 사람이 적은 글자일 뿐이라
-  //   그것으로 「원격인가」를 판정하면 거짓이 된다(2026-09-01 수리의 요점).
-  const ranOn: "self" | "remote" = opts.run ? "remote" : "self";
+  // ⚠⚠ **「러너를 받았는가」로는 못 가린다**(2026-09-01 검토관 [상]이 잡은 반쪽 수정).
+  //   runnerFor는 authMethod="local" 대상에도 **로컬 러너**를 돌려주므로 opts.run이 채워진다.
+  //   그러면 접속도 안 한 점검이 「원격 점검」으로 기록됐다.
+  //   → 아는 쪽(부르는 곳)이 말한다. **안 말하면 self다** — 모호할 때 「장비에 붙어 실측했다」고
+  //     말하는 것이 이 리포트에서 가장 나쁜 거짓이라, 모르면 **덜 주장하는 쪽**으로 떨어뜨린다.
+  const ranOn: "self" | "remote" = opts.ranOn ?? "self";
   const run = opts.run ?? defaultRunnerFor(opts.standard);
   const target = opts.target || "localhost (this-appliance)";
   const t0 = Date.now();
@@ -638,7 +664,7 @@ export async function runHardeningScan(opts: { standard: StandardId; target?: st
   // 챗봇 경로는 agentloop이 이미 원장에 남긴다(TOOL_WORK_KIND) — 여기서 또 남기면 1회 점검이
   // 2건으로 잡혀 절감 시간이 2배가 된다(검토 지적 2026-07-29). 그래서 도구 경로는 skipWorkLog로 끈다.
   // 스케줄러·화면 실행은 agentloop을 안 타므로 여기서 남겨야 한다.
-  if (!opts.skipWorkLog) recordWork({ kind: "hardening_scanned", detail: `${opts.standard}/${target}`, source: "schedule" });
+  if (!opts.skipWorkLog) recordWork({ kind: "hardening_scanned", detail: `${opts.standard}/${ranOn === "remote" ? target : `self(${target})`}`, source: "schedule" });
   return {
     standard: opts.standard,
     standardLabel: std.label,
@@ -737,7 +763,7 @@ export function registerHardeningRoutes(app: Express): void {
         kind: "cli",
         actor,
         action: `하드닝 점검 실행 (${standard.toUpperCase()})`,
-        target: report.target,
+        target: 감사대상글(report),
         detail: `준수율 ${report.summary.rate}% · 취약 ${report.summary.fail} · 확인필요 ${report.summary.warn}`,
         result: "ok",
       });

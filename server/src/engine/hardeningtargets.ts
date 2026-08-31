@@ -23,6 +23,8 @@ import { projectHardeningEvents } from "./analysishub";
 import {
   runHardeningScan,
   runnerFor,
+  원격점검인가,
+  감사대상글,
   probeTarget,
   scanSummaryText,
   isStandard,
@@ -130,7 +132,14 @@ function lastRunFail(targetId: string, standard: string): number | null {
 // run: 테스트에서 실 셸 대신 결정적 러너를 주입할 때 쓴다(미지정 시 대상에 맞는 실제 러너).
 export async function runScanForTarget(target: HardeningTarget, standard: StandardId, source: Source, actor = "system", run?: RunFn) {
   const prevFail = lastRunFail(target.id, standard); // 알림 판단용(이력 저장 전 값)
-  const report = await runHardeningScan({ standard, target: target.label, run: run ?? runnerFor(target, standard) });
+  // ⚠ 러너와 리포트 문구가 **같은 원천**(원격점검인가)을 쓴다 — 갈리면 안 붙은 장비를
+  //   「붙어서 실측했다」고 적는다. run을 밖에서 넣어 준 경우(시험 등)는 그 뜻을 존중한다.
+  const report = await runHardeningScan({
+    standard,
+    target: target.label,
+    run: run ?? runnerFor(target, standard),
+    ranOn: 원격점검인가(target) ? "remote" : "self",
+  });
   const s = report.summary;
   db.prepare(
     `INSERT INTO hardening_runs (id, targetId, targetLabel, standard, at, rate, pass, fail, warn, na, source, summary)
@@ -142,7 +151,9 @@ export async function runScanForTarget(target: HardeningTarget, standard: Standa
   recordAudit({
     kind: "cli", actor,
     action: `하드닝 정기점검 (${standard.toUpperCase()}·${source})`,
-    target: target.label,
+    // ⚠ 감사 기록은 리포트 본문과 **같은 사실**을 말해야 한다 — 로컬로 등록된 대상은
+    //   장비에 붙지 않았는데 장비 이름만 남기면 「그 장비를 점검했다」는 증적이 된다.
+    target: 감사대상글(report),
     detail: `준수율 ${s.rate}% · 취약 ${s.fail} · 확인필요 ${s.warn}`,
     result: "ok",
   });
@@ -153,7 +164,7 @@ export async function runScanForTarget(target: HardeningTarget, standard: Standa
     recordAudit({
       kind: "config", actor: "scheduler",
       action: `⚠ 하드닝 준수율 악화 감지 (${standard.toUpperCase()})`,
-      target: target.label,
+      target: 감사대상글(report),
       detail: `취약 ${prevFail} → ${s.fail}건 (준수율 ${s.rate}%)`,
       result: "error",
     });

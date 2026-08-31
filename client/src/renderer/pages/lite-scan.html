@@ -181,11 +181,17 @@
       return;
     }
     btn.disabled = true; res.textContent = "";
-    msg.innerHTML = '<div class="empty">점검 중입니다 — 장비에 붙어 실제로 확인하므로 <b>수십 초</b> 걸릴 수 있습니다.</div>';
+    msg.innerHTML = '<div class="empty">점검 중입니다 — <b>이 PC의 설정을 하나씩 실제로 읽으므로</b> 수십 초 걸릴 수 있습니다.</div>';
     try {
       var r = await g.hardeningScan(std, target || undefined);
-      마지막 = { std: std, target: target || "이 PC", at: new Date(), markdown: r.markdown || "", summary: r.summary || "" };
       var rep = r.report || {};
+      // ⚠ 붙지도 않은 장비를 「대상」으로 적어 두면 그것이 증적이 된다.
+      마지막 = {
+        std: std,
+        이름표: target || "",
+        원격: rep.ranOn === "remote",
+        at: new Date(), markdown: r.markdown || "", summary: r.summary || "",
+      };
       msg.innerHTML = '<div class="ok">끝났습니다 — ' + esc(r.summary || "") + "</div>" +
         '<div class="row" style="padding-top:4px">' +
           '<span class="pill on">양호 ' + esc(rep.pass ?? "?") + "</span> " +
@@ -219,7 +225,14 @@
     btn.disabled = true;
     try {
       var 이름 = "점검결과_" + 마지막.std + "_" + 마지막.at.toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".md";
-      var 본문 = "# 보안 설정 점검 결과\n\n- 기준: " + 마지막.std + "\n- 대상: " + 마지막.target +
+      // ⚠ 점검한 곳과 사람이 적은 이름표를 **가른다** — 화면 문구만 고치고 저장본을 안 고치면
+      //   반쪽 수리다. 문서는 화면보다 오래 남고 감사 때 그것부터 본다(2026-09-01 검토관 [상]).
+      var 대상글 = 마지막.원격
+        ? 마지막.이름표
+        : "이 PC" + (마지막.이름표 ? " (적은 이름표: " + 마지막.이름표 + ")" : "");
+      var 본문 = "# 보안 설정 점검 결과\n\n- 기준: " + 마지막.std +
+                 "\n- 대상: " + 대상글 +
+                 "\n- 점검 방식: " + (마지막.원격 ? "장비에 접속해 실 명령 실행" : "이 PC의 설정을 읽어 점검") +
                  "\n- 시각: " + 마지막.at.toLocaleString("ko-KR") + "\n\n" + 마지막.markdown;
       var 결과 = await g.ingestMemoryFile(이름, 글을base64로(본문), "global");
       try { await g.setDocCategory(이름, "장비운영"); } catch (e2) { /* 분류 실패는 아래에서 알린다 */ }

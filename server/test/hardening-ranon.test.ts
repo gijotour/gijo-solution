@@ -20,13 +20,19 @@ describe("어디서 돌았나를 값으로 갖는다", () => {
     expect(소스, "ranOn 선언이 없다").toMatch(/ranOn:\s*"self"\s*\|\s*"remote"/);
   });
 
-  it("★★ 판정 근거는 **러너를 받았는가**다 — 라벨이 아니다", () => {
-    // ⚠ **그 한 줄만** 본다 — 창을 넓게 잡으면 다음 줄(target 기본값)까지 읽어
-    //   「라벨로 가른다」고 잘못 잡는다(이 시험을 처음 쓸 때 실제로 그랬다).
+  // ⚠⚠ **이 시험이 결함을 못 박고 있었다**(2026-09-01 검토관 [상]).
+  //   「러너를 받았는가(opts.run)」를 근거로 삼으라고 시험이 요구했는데, runnerFor는
+  //   authMethod="local" 대상에도 **로컬 러너**를 돌려주므로 opts.run이 채워진다.
+  //   그래서 접속조차 안 한 점검이 「원격 점검」으로 기록됐다 — 시험이 그것을 지키고 있었다.
+  //   ★ 소스 문자열만 보는 시험의 한계다. 이제 **부르는 쪽이 말한다**로 바꾸고,
+  //     아래에서 **실제 실행 경로**를 태워 확인한다(문자열 감시로는 원리상 못 잡는다).
+  it("★★ 판정 근거는 **부르는 쪽이 말한 ranOn**이다 — 러너를 받았는지가 아니다", () => {
     const i = 소스.indexOf("const ranOn");
     expect(i, "ranOn을 만드는 자리가 없다").toBeGreaterThan(-1);
     const 한줄 = 소스.slice(i, 소스.indexOf(String.fromCharCode(10), i));
-    expect(한줄, "opts.run으로 안 가른다").toContain("opts.run");
+    expect(한줄, "opts.run으로 가르면 로컬 대상이 원격으로 찍힌다").not.toContain("opts.run");
+    expect(한줄, "부르는 쪽의 말을 안 쓴다").toContain("opts.ranOn");
+    expect(한줄, "모를 때 remote로 기울면 안 된다 — 덜 주장하는 쪽이 안전하다").toContain(String.fromCharCode(34) + "self" + String.fromCharCode(34));
     expect(한줄, "target(라벨)으로 가르면 거짓이 된다").not.toContain("target");
   });
 
@@ -61,5 +67,58 @@ describe("거짓을 적던 자리가 ranOn만 읽는다", () => {
     const i = 소스.indexOf("본 리포트는");
     expect(i, "꼬리말이 없다").toBeGreaterThan(-1);
     expect(소스.slice(i, i + 300), "꼬리말이 늘 「대상 장비 CLI에서」라고 적는다").toContain("ranOn");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ 2026-09-01 검토관 [상] — 위 시험들은 **전부 소스 문자열 grep**이라
+//    실제 실행 경로를 한 번도 안 태웠다. 그래서 authMethod="local" 대상이
+//    로컬 러너를 받고도 「원격 점검」으로 기록되던 것을 **원리상 못 잡았다.**
+//    문자열 감시는 「적혀 있는가」를 볼 뿐 「도는가」를 못 본다.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("★★ 실제로 돌려서 확인한다 (문자열 감시가 못 보는 자리)", () => {
+  it("원격점검인가 — local로 등록한 대상은 원격이 아니다", async () => {
+    const { 원격점검인가 } = await import("../src/engine/hardeningscan");
+    const 기본 = { id: "t1", label: "방화벽-01", standard: "kisa" } as never;
+    expect(원격점검인가({ ...(기본 as object), authMethod: "local", host: "10.0.0.9" } as never),
+      "authMethod=local인데 원격이라 한다").toBe(false);
+    expect(원격점검인가({ ...(기본 as object), authMethod: "key", host: "local" } as never),
+      "host=local인데 원격이라 한다").toBe(false);
+    expect(원격점검인가({ ...(기본 as object), authMethod: "key", host: "10.0.0.9" } as never),
+      "진짜 원격을 로컬이라 한다").toBe(true);
+  });
+
+  it("★★ ranOn을 안 주면 **self**다 — 모르면 덜 주장한다", async () => {
+    const { runHardeningScan } = await import("../src/engine/hardeningscan");
+    // 러너를 주되 ranOn은 말하지 않는다. 예전 로직이면 이것만으로 remote가 됐다.
+    const r = await runHardeningScan({
+      standard: "kisa",
+      target: "방화벽-01",
+      run: async () => ({ code: 0, stdout: "", stderr: "" }),
+      skipWorkLog: true,
+    });
+    expect(r.ranOn, "러너를 받았다는 이유로 원격이라 단정했다 — 접속조차 안 했을 수 있다").toBe("self");
+  });
+
+  it("ranOn: remote를 명시하면 그대로 원격이다", async () => {
+    const { runHardeningScan } = await import("../src/engine/hardeningscan");
+    const r = await runHardeningScan({
+      standard: "kisa",
+      target: "방화벽-01",
+      run: async () => ({ code: 0, stdout: "", stderr: "" }),
+      ranOn: "remote",
+      skipWorkLog: true,
+    });
+    expect(r.ranOn).toBe("remote");
+  });
+
+  it("★ 감사 기록에 적을 대상 — self면 **장비 이름만 남기지 않는다**", async () => {
+    const { 감사대상글 } = await import("../src/engine/hardeningscan");
+    const self글 = 감사대상글({ target: "방화벽-01", ranOn: "self" });
+    expect(self글, "붙지도 않은 장비 이름만 남으면 그것이 증적이 된다").not.toBe("방화벽-01");
+    expect(self글, "이 서버를 점검했다는 사실이 없다").toContain("이 서버 자신");
+    expect(self글, "사람이 적은 이름표를 잃으면 어느 점검인지 못 찾는다").toContain("방화벽-01");
+    expect(감사대상글({ target: "방화벽-01", ranOn: "remote" }), "진짜 원격은 그대로 장비 이름")
+      .toBe("방화벽-01");
   });
 });

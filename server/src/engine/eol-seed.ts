@@ -89,3 +89,31 @@ export function eol표상태(): string {
     ". 폐쇄망이라 온라인 조회를 쓰지 않고 번들로 실어 나릅니다 — 갱신은 번들 갱신으로 합니다."
   );
 }
+
+/**
+ * 표에 걸린 것이 **정말 같은 제품인가** — 이름이 겹치기만 한 것인지 가른다 (2026-09-01).
+ *
+ * ⚠⚠ 왜 필요한가(검토관 [중]): eol찾기는 `이름.includes(제품)`으로 느슨하게 맞춘다.
+ *   그래서 **`python-dateutil 2.7.5`가 「Python 2.7 지원 종료」로 찍힌다** — 전혀 다른
+ *   꾸러미다. 같은 함정: `libcentos-shim 7.1` · `ubuntu-advantage-tools 20.04.1` ·
+ *   `my-python-tool 2.7`. 지원이 안 끝난 것을 「끝났다」고 단정하면 담당자는 멀쩡한 부품을
+ *   교체하러 나선다.
+ *
+ * ⚠ 그렇다고 느슨한 맞춤을 버릴 수는 없다 — `openssl-libs 1.0.2k`는 **진짜 openssl**이다.
+ *   이름만으로는 둘을 못 가른다. 그래서 **버리지 않고 말투를 낮춘다**:
+ *   이름이 똑같을 때만 단정하고, 겹치기만 하면 「같은 제품인지 확인해 달라」고 한다.
+ */
+export function 이름이정확한가(부품이름: string, row: EolRow): boolean {
+  const n = String(부품이름 ?? "").trim().toLowerCase();
+  return n === row.제품;
+}
+
+/** 담당자에게 그대로 나가는 한 줄 — **이름이 겹치기만 하면 단정하지 않는다.** */
+export function eol한줄확실도(부품이름: string, row: EolRow, 오늘 = new Date()): string {
+  const 본문 = eol한줄(row, 오늘);
+  if (이름이정확한가(부품이름, row)) return 본문;
+  return (
+    `표의 「${row.제품}${row.버전 ? " " + row.버전 : ""}」과 **이름이 겹칩니다** — 같은 제품인지 확인해 주세요. ` +
+    `(같은 것이라면: ${본문})`
+  );
+}

@@ -90,3 +90,69 @@ describe("망가진 입력에 안 죽는다", () => {
     expect(r.알림.join(" ")).toContain("이름이 없는 항목");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-09-01 검토관 [상][중] — 위 시험이 **2겹 픽스처만** 써서 우연히 맞는 구간만 봤다.
+// 3겹부터 숫자가 틀렸는데 시험이 통과했다. **숫자를 직접 검사한다.**
+// ─────────────────────────────────────────────────────────────────────────────
+describe("★★ 안내 숫자가 실제 부품 수와 맞는다 (3겹 이상)", () => {
+  const 안쪽수 = (알림: string[]) => {
+    const m = 알림.join(" ").match(/안쪽 (\d+)개 = (\d+)개/);
+    return m ? { 안쪽: Number(m[1]), 합: Number(m[2]) } : null;
+  };
+
+  it("3겹 a>b>c — 「맨 위 1 + 안쪽 2 = 3」이어야 한다(예전엔 4라고 했다)", () => {
+    const r = sbom읽기(감싸기([{ name: "a", components: [{ name: "b", components: [{ name: "c" }] }] }]));
+    expect(r.부품).toHaveLength(3);
+    const n = 안쪽수(r.알림);
+    expect(n, "안내 문장을 못 찾았다").not.toBeNull();
+    expect(n.안쪽, "겹마다 자손을 다시 더해 부풀었다").toBe(2);
+    expect(n.합, "안내가 말한 합이 실제 부품 수와 다르다").toBe(r.부품.length);
+  });
+
+  it("★ 어떤 모양이든 **안내한 합 === 실제 부품 수**", () => {
+    const 모양들 = [
+      [{ name: "a", components: [{ name: "b" }] }],
+      [{ name: "a", components: [{ name: "b", components: [{ name: "c" }] }] }],
+      [{ name: "a", components: [{ name: "b", components: [{ name: "c", components: [{ name: "d" }] }] }] }],
+      [{ name: "a", components: [{ name: "b" }, { name: "c", components: [{ name: "d" }, { name: "e" }] }] }],
+      [{ name: "x" }, { name: "a", components: [{ name: "b", components: [{ name: "c" }] }] }],
+    ];
+    for (const 모양 of 모양들) {
+      const r = sbom읽기(감싸기(모양));
+      const n = 안쪽수(r.알림);
+      if (!n) continue; // 중첩 없는 모양은 안내가 없다
+      expect(n.합, `모양 ${JSON.stringify(모양).slice(0, 40)}…: 안내 합 ${n.합} ≠ 실제 ${r.부품.length}`)
+        .toBe(r.부품.length);
+    }
+  });
+});
+
+describe("★★ 못 읽은 부품 수는 **서브트리 전체**다 (직계 자식만 세면 과소 보고)", () => {
+  it("10겹 — d9·d10 두 개를 못 읽으므로 「2개」여야 한다(예전엔 1개라고 했다)", () => {
+    let 안 = { name: "d10" };
+    for (let i = 9; i >= 1; i--) 안 = { name: `d${i}`, components: [안] };
+    const r = sbom읽기(감싸기([안]));
+    expect(r.부품, "8겹까지 읽어야 한다").toHaveLength(8);
+    const m = r.알림.join(" ").match(/(\d+)개는 못 읽었습니다/);
+    expect(m, "못 읽었다는 말이 없다").not.toBeNull();
+    expect(Number(m[1]), "직계 자식만 세어 실제보다 적게 보고한다").toBe(2);
+  });
+
+  it("★ 상한 아래에 자손이 여럿이면 그것을 다 센다", () => {
+    // 9겹 자리에 2개, 각각 10겹에 3개씩 → 못 읽는 것은 2 + 6 = 8개
+    const 손자 = () => ({ name: "손", components: [{ name: "증1" }, { name: "증2" }, { name: "증3" }] });
+    let 안 = { name: "d8", components: [손자(), 손자()] };
+    for (let i = 7; i >= 1; i--) 안 = { name: `d${i}`, components: [안] };
+    const r = sbom읽기(감싸기([안]));
+    const m = r.알림.join(" ").match(/(\d+)개는 못 읽었습니다/);
+    expect(Number(m[1]), "그 아래 서브트리를 안 셌다").toBe(8);
+  });
+
+  it("망가진 문서(자기 자신을 품는 부품)에도 안 죽는다", () => {
+    // JSON에는 순환이 없지만, 아주 깊은 문서가 스택을 터뜨리지 않는지 본다.
+    let 안 = { name: "깊음" };
+    for (let i = 0; i < 300; i++) 안 = { name: "d" + i, components: [안] };
+    expect(() => sbom읽기(감싸기([안])), "깊은 문서에 죽는다").not.toThrow();
+  });
+});

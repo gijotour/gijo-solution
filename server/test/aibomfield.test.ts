@@ -133,34 +133,16 @@ describe("계약 — 쓰기 도구다", () => {
 });
 
 describe("「SBOM 없는 자산 알려줘」 — 전용 분기 (대장 §3-4 항목 2)", () => {
-  const 규칙2 = (() => {
-    const i = 셸.indexOf('tool: "aibom_status"', 셸.indexOf('tool: "set_aibom_field"'));
-    const j = 셸.lastIndexOf("re: /", i);
-    return new RegExp(셸.slice(j + 5, 셸.indexOf("/,", j)));
-  })();
-
-  for (const t of ["SBOM 없는 자산 알려줘", "SBOM 미생성 자산 보여줘", "부품표 없는 자산 뭐야", "SBOM 안 만든 자산 알려줘", "SBOM 누락 자산 목록"]) {
-    it(`"${t}" — 잡는다`, () => expect(규칙2.test(t)).toBe(true));
-  }
-
-  // ★★ 생성 요청을 조회로 돌리는 것이 **가장 나쁜 오라우팅**이다 —
-  //    담당자는 만든 줄 알고 넘어가는데 아무것도 안 만들어진다.
-  for (const t of [
-    "fraud-detect-llm SBOM 생성해줘",
-    "SBOM 만들어줘",
-    "SBOM 없는 자산 SBOM 만들어줘",
-    "SBOM 미생성 자산 SBOM 생성해줘",
-    "AI-BOM 현황 알려줘",
-    "SBOM 얼마나 채워졌어?",
-    "자산 목록 보여줘",
-    "가드레일 기재해줘",
-  ]) {
-    it(`"${t}" — 안 삼킨다`, () => expect(규칙2.test(t), `조회 규칙이 "${t}"을 가로챘다`).toBe(false));
-  }
-
+  // ⚠ 규칙을 손수 떼어 내 홀로 test하던 것을 걷어냈다(2026-09-01 검토관 [상]).
+  //   그 방식은 **자기가 만든 정규식을 자기가 확인하는** 꼴이라, 앞 규칙이 이미 삼키고
+  //   있어도 초록이었다. 도착지 자체가 옳은지는 routing-order.test.ts가 실제 순서로 본다.
+  //   여기서는 규칙 **글자**에만 남은 함정 하나를 지킨다.
   it("★ 「미생성」이 「생성」을 품는 함정 — (?<!미)가 살아 있다", () => {
     // 이 한 글자가 빠지면 「SBOM 미생성 자산 보여줘」가 스스로 배제돼 규칙이 통째로 헛돈다.
     // 헛도는 규칙은 시험 없이는 안 보인다 — 아무 일도 안 일어나는 것처럼 보이기 때문이다.
-    expect(규칙2.source, "(?<!미) 예외가 사라졌다").toContain("(?<!미)");
+    const i = 셸.indexOf("📦 SBOM 없는 자산 —");
+    expect(i, "규칙을 못 찾았다 — 이 시험이 낡았다").toBeGreaterThan(-1);
+    const 둘레 = 셸.slice(i, i + 1400);
+    expect(둘레, "(?<!미) 예외가 사라졌다").toContain("(?<!미)");
   });
 });
