@@ -53,3 +53,24 @@ describe("📨 조치 요청서 라벨은 서버 원천 하나에서 온다", ()
     expect(화면.slice(Math.max(0, i - 200), i), "req 줄에 .noclick이 없다").toContain("noclick");
   });
 });
+
+describe("📨 판은 서버가 좁혀 줬다고 말했을 때만 그린다(fail-closed)", () => {
+  // 클라 게시가 서버 배포를 앞지르면, mine=1을 모르는 옛 서버가 **전원 목록**으로 답한다.
+  // 화면이 그것을 「내 것」이라 믿고 그리면 그 순간 누출이다 — 서버 배포 순서에만 기대지
+  // 않고 화면 쪽에서도 막는다(2026-08-31). 창구와 화면 양쪽에 표식이 살아 있는지 본다.
+  it("창구가 scope를 함께 준다", () => {
+    const src = readFileSync(join(__dirname, "..", "src", "engine", "remrequest.ts"), "utf8");
+    const i = src.indexOf("/api/outbound-requests");
+    expect(i, "목록 창구가 없다").toBeGreaterThan(-1);
+    const 창구 = src.slice(i, i + 1400);
+    expect(창구, "응답에 scope가 없다 — 화면이 옛 서버를 구별할 수 없다").toContain("scope");
+  });
+  it("화면이 scope !== mine이면 아무것도 안 그린다", () => {
+    expect(화면, "scope 판정이 없다").toContain("오래된서버");
+    // 선언(var 오래된서버 = false)이 아니라 **판정하는 자리**를 본다.
+    const i = 화면.indexOf("오래된서버 = !!(");
+    expect(i, "scope로 판정하는 자리가 없다").toBeGreaterThan(-1);
+    expect(화면.slice(i, i + 160), "scope를 안 보고 판정한다").toContain("scope");
+    expect(화면, "옛 서버일 때 목록을 비우지 않는다").toContain("오래된서버 ? [] :");
+  });
+});

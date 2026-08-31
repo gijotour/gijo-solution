@@ -177,8 +177,12 @@ export function registerRemRequestRoutes(app: Express): void {
     const me = (req as typeof req & { user?: { id?: string | number; username?: string } }).user;
     const uid = me?.id != null ? String(me.id) : (me?.username ?? "");
     const mine = String(req.query.mine ?? "") === "1";
-    if (mine && !uid) { res.json({ requests: [] }); return; } // 주인을 모르면 안 준다
-    res.json({ requests: listOutboundRequests(mine ? { createdBy: uid } : { productId }) });
+    if (mine && !uid) { res.json({ requests: [], scope: "mine" }); return; } // 주인을 모르면 안 준다
+    // ★ scope를 함께 준다 — 화면이 **이 서버가 좁혀 줄 줄 아는지** 알 수 있어야 한다.
+    //   안 주면 mine=1을 모르는 옛 서버가 조용히 **전원 목록**으로 답하고, 새 화면은 그것을
+    //   「내 것」이라 믿고 그린다(클라 게시가 서버 배포를 앞지르면 실제로 그렇게 된다 —
+    //   기준서 「의존 시 서버 먼저 배포」가 지켜지지 않는 순간 곧바로 누출이다).
+    res.json({ requests: listOutboundRequests(mine ? { createdBy: uid } : { productId }), scope: mine ? "mine" : "all" });
   });
   // 상태 전환 — 사람이 화면에서 확인하고 누른다(사장님 확정 ①). 전환은 전부 감사에 남는다.
   app.patch("/api/outbound-requests/:id", authMiddleware, (req, res) => {
