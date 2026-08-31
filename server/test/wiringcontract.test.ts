@@ -608,7 +608,9 @@ describe("카드 언어 — 지식 창고 보기 전환(2026-08-31 사장님 「
     // 공용 부품을 쓴다(화면 전용 타일 CSS를 새로 만들지 않았는지)
     expect(m, "히트맵이 공용 타일 부품을 안 쓴다").toContain("g-tiles");
     const css = 코드만(join(PAGES, "gijo-ui.css"));
-    for (const 부품 of [".g-scard", ".g-scard-k", ".g-seg", ".g-tiles", ".g-tile"]) {
+    // ⚠ 목록은 **쓰이는 것만**(2026-08-31 검토관): 안 쓰는 겉껍데기(.g-scard-h 등)를 계약에
+    //   넣으면 죽은 CSS가 감시로 굳는다. 실제 소비자가 있는 셋만 지킨다.
+    for (const 부품 of [".g-scard-k", ".g-seg", ".g-tiles", ".g-tile"]) {
       expect(css, `공용 카드 골격 ${부품}가 사라졌다`).toContain(부품);
     }
   });

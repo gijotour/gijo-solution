@@ -43,6 +43,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
    .field-row인 자리도 있다). 즉 카드 머리(.panel-title)와 층이 달라 겹치지 않는다 —
    승격 규칙을 넣었다가 선택자가 안 맞아 아무 일도 안 했고, 그 사실을 확인하고 걷었다.
    (추측으로 규칙을 남겨 두면 다음 사람이 「이건 왜 안 먹지」로 헤맨다.) */
+/* ★ 접기 판에서는 카드 머리를 **걷는다**(2026-08-31 검토관 [높음] — 내 앞 판단이 틀렸다).
+   앞 주석은 「접기 헤더는 판 중간 구역 제목이라 층이 다르다」였는데, 실측하니 data-gijo-fold가
+   **.panel 자신**에 붙은 판 5곳(위생점검·데이터셋·파인튜닝·규칙주입·관계추가)에서는 fold.js가
+   판 **바로 위**에 제목 막대를 세우고 카드 첫 줄에 .panel-title 막대가 또 서서 **제목이 두 겹**이었다.
+   (첫 판 하나만 열어 보고 「층이 다르다」고 단정한 것이 오판이었다 — 5곳 전수로 확인했다.)
+   ⇒ 접기 판(.panel[data-gijo-fold])의 .panel-title은 카드 머리 꾸밈을 걷고 본문 제목으로 둔다. */
+.panel[data-gijo-fold] > .panel-title{margin:0 0 8px;padding:0;border-bottom:0;font-size:13px;}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 .field input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
@@ -584,6 +591,7 @@ tr:last-child td{border-bottom:none;}
 
   // ── 올린 문서 확인·관리(장기기억) — 목록 + 상세 + 삭제 2옵션(장기기억만 / 원본까지) ──
   let dmDocs = [];
+  let dmAllDocs = []; // 개인 문서까지 **원본** — 위생 점검이 지목한 문서를 선택으로 열 수 있게(검토관)
   let dmView = "list"; // 📋 목록 | 🔥 히트맵(2026-08-31) — 기본은 목록(게시 관문 계약)
   let dmSelected = null;
   let dmConfirmId = null;
@@ -670,22 +678,61 @@ tr:last-child td{border-bottom:none;}
     return `<span class="dm-grade gg-${k}" title="열람 등급: ${이름}${k === "?" ? " — 아직 정하지 않았습니다" : ""}">${k === "?" ? "?" : k} ${이름}</span>`;
   }
 
+  // 📊 카드 지표 — **한 곳에서** 그린다(2026-08-31 검토관: 등급을 바꿔도 안 바뀌던 것과
+  //   불러오기 실패 때 옛 숫자가 남던 것을 여기로 모아 해결).
+  // ⚠ 「오늘 반입」은 직접 세지 않는다 — 제품 정본(recentDocCount: 현지 자정 기준·내장 문서
+  //   제외)을 쓴다. 처음엔 ingestedAt을 UTC로 잘라 세어 바로 아래 목록의 반입 열(현지 시각)과
+  //   어긋났고 내장 문서까지 셌다. 같은 숫자를 두 잣대로 세지 않는다.
+  function renderDmKpis(실패) {
+    const k = document.getElementById("dmKpis");
+    if (!k) return;
+    if (실패) {
+      k.innerHTML = '<div><div class="g-scard-kl">지표</div><div class="g-scard-kv muted">불러오지 못했습니다</div></div>';
+      return;
+    }
+    const totalChunks = dmDocs.reduce((sum, d) => sum + (d.chunks || 0), 0);
+    const 등급매김 = dmDocs.filter((d) => d.grade).length;
+    const 칸 = (l, v, c) =>
+      '<div><div class="g-scard-kl">' + dmEsc(l) + '</div><div class="g-scard-kv ' + (c || "") + '">' + dmEsc(String(v)) + "</div></div>";
+    k.innerHTML =
+      칸("문서", dmDocs.length.toLocaleString()) +
+      칸("조각", totalChunks.toLocaleString()) +
+      '<div><div class="g-scard-kl">오늘 반입</div><div class="g-scard-kv muted" id="dmKpiToday">…</div></div>' +
+      칸("열람 등급 지정", 등급매김.toLocaleString() + " / " + dmDocs.length.toLocaleString(),
+        등급매김 < dmDocs.length ? "warn" : "ok");
+    const 오늘칸 = () => document.getElementById("dmKpiToday");
+    if (window.gijo && window.gijo.recentDocCount) {
+      window.gijo.recentDocCount().then((r) => {
+        const el = 오늘칸();
+        if (!el) return;
+        const n = (r && r.count) || 0;
+        el.textContent = n.toLocaleString();
+        el.className = "g-scard-kv " + (n ? "ok" : "muted");
+      }).catch(() => { const el = 오늘칸(); if (el) el.textContent = "—"; });
+    } else { const el = 오늘칸(); if (el) el.textContent = "—"; }
+  }
+
+  // 🔥 보기 전환 칩(목록|히트맵) 배선 — **부팅 때 한 번**(2026-08-31 검토관 [중]).
+  //   처음엔 renderDmList 안에서 붙였는데, 문서 0건이거나 목록 로드가 실패하면 그 함수가
+  //   먼저 return해서 칩이 **영영 배선되지 않았다**(눌러도 무반응 — 죽은 조작).
+  function bindDmViewSeg() {
+    const seg = document.getElementById("dmViewSeg");
+    if (!seg || seg.dataset.bound) return;
+    seg.dataset.bound = "1";
+    seg.addEventListener("click", (ev) => {
+      const b = ev.target.closest("span[data-v]");
+      if (!b || b.dataset.v === dmView) return;
+      dmView = b.dataset.v;
+      seg.querySelectorAll("span").forEach((x) => x.classList.toggle("on", x === b));
+      renderDmList(true);
+    });
+  }
+
   function renderDmList(keepSel) {
     renderDmSeg();
+    renderDmKpis(); // 등급을 바꾸거나 보기를 전환해도 지표가 따라온다(검토관)
     const list = document.getElementById("dmList");
     if (!list) return;
-    // 🔥 보기 전환 칩(목록|히트맵) 배선 — 그릴 때마다 붙이지 않고 한 번만(중복 리스너 금지).
-    const seg = document.getElementById("dmViewSeg");
-    if (seg && !seg.dataset.bound) {
-      seg.dataset.bound = "1";
-      seg.addEventListener("click", (ev) => {
-        const b = ev.target.closest("span[data-v]");
-        if (!b || b.dataset.v === dmView) return;
-        dmView = b.dataset.v;
-        seg.querySelectorAll("span").forEach((x) => x.classList.toggle("on", x === b));
-        renderDmList(true);
-      });
-    }
     const groups = DM_GROUPS.filter((g) => dmSegSel === "전체" || g.c === dmSegSel)
       .map((g) => ({ ...g, docs: dmDocs.filter((d) => dmCatOf(d) === g.c) }))
       .filter((g) => g.docs.length > 0);
@@ -706,27 +753,44 @@ tr:last-child td{border-bottom:none;}
       const d = new Date(t);
       return String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
     };
-    // 🔥 히트맵 보기(2026-08-31 사장님 「히트맵은 있었으면」) — 목록과 **같은 dmDocs**를
-    //   타일로 편다. 부품은 공용 .g-tiles/.g-tile(카드 골격과 한 벌).
-    // ⚠ 색은 대화창 카드의 색 사전(치명/높음/정상 — **심각도**)을 쓰지 않는다: 여기 데이터는
-    //   심각도가 아니라 **지식화 상태**라 그 사전이 원리상 안 걸린다(설계관 ①이 지적한 자리).
-    //   두 벌이 아니라 **다른 축**이므로 이 화면에서 판단한다 — 규칙은 셋뿐이고 값 그대로다:
-    //     조각 0 = 못 읽은 문서(bad) · 열람 등급 미지정 = 관리 필요(warn) · 그 외 정상(ok).
-    // ⚠ 기본 보기는 **목록**이다(게시 관문이 .g-rows-r > 0을 요구 — 설계관 ⑤-9).
+    // 🔥 히트맵 보기(2026-08-31 사장님 「히트맵은 있었으면」) — 목록과 **같은 부분집합**을 편다.
+    // ⚠ 2026-08-31 검토관 [높음] 3건 수리:
+    //   ① **영역 필터(dmSegSel)를 그대로 탄다** — 처음엔 원본 dmDocs를 통째로 그려, 칩은
+    //      「취약점 12」인데 타일은 420개였다(칩이 고장 난 것처럼 보였다). 승인 시안도
+    //      「히트맵도 목록과 같은 것만」을 못박는다.
+    //   ② **선택을 대화창에 알린다**(gijoSelectNotify) — 목록 행과 같은 계약. 안 부르면
+    //      화면 상세는 B인데 대화창 선택은 앞 문서 A로 남아 「이 문서 지워줘」가 A를 지운다.
+    //   ③ **「조각 0 = 못 읽음」 규칙을 걷었다** — 원천(listDocuments)이 조각이 있는 문서만
+    //      주므로 그 분기는 **원리상 발화하지 않는 죽은 규칙**이었다(그런데 커밋은 규칙 3개를
+    //      약속했다 — 거짓 약속). 지금 규칙은 둘: 열람 등급 미지정=관리 필요(warn) · 지정=ok.
+    //      「못 읽은 문서」는 반입 영수증(ingested:false)이 원천이라 이 화면 몫이 아니다.
     if (dmView === "heat") {
-      const 타일 = dmDocs.map((d) => {
-        const cls = !d.chunks ? "bad" : !d.grade ? "warn" : "ok";
-        const 뜻 = !d.chunks ? "못 읽음" : !d.grade ? "등급 미지정" : "정상";
+      const 대상 = groups.flatMap((g) => g.docs); // ← 필터를 지난 것만(①)
+      const 타일 = 대상.map((d) => {
+        const cls = d.grade ? "ok" : "warn";
+        const 뜻 = d.grade ? "정상" : "등급 미지정";
         return `<div class="g-tile ${cls}" data-id="${dmEsc(d.documentId)}" title="${dmEsc(d.documentId)} — ${뜻} · 조각 ${d.chunks}">` +
           `<div class="tv ${cls}">${d.chunks}</div>` +
           `<div class="tl">${dmEsc(d.documentId)}</div>` +
           `<div class="ts">${뜻}</div></div>`;
       }).join("");
-      list.innerHTML = dmDocs.length
+      list.innerHTML = 대상.length
         ? `<div class="g-tiles">${타일}</div>`
-        : '<div class="dm-empty">문서가 없습니다.</div>';
+        : '<div class="dm-empty">이 영역에 문서가 없습니다.</div>';
       list.querySelectorAll(".g-tile").forEach((el) =>
-        el.addEventListener("click", () => selectDoc(el.getAttribute("data-id"))));
+        el.addEventListener("click", () => {
+          const id = el.getAttribute("data-id");
+          selectDoc(id);
+          list.querySelectorAll(".g-tile").forEach((x) => x.classList.toggle("sel", x === el)); // 고른 타일 표시
+          // 🎯 고른 문서를 대화창에(B16 계약 — 목록 행과 같은 값·같은 모양)(②)
+          if (window.gijoSelectNotify) window.gijoSelectNotify({ label: id, text: "올린 문서 " + id, fields: { title: id } });
+        }));
+      // 선택이 있었으면 유지 — 조기 return이 아래 「선택 유지」 블록을 건너뛰므로 여기서 한다.
+      if (keepSel && dmSelected) {
+        const 살아있나 = 대상.some((d) => d.documentId === dmSelected);
+        if (!살아있나) { dmSelected = null; const dt = document.getElementById("dmDetail"); if (dt) dt.innerHTML = '<div class="dm-empty">왼쪽에서 문서를 선택하세요.</div>'; }
+        else list.querySelectorAll(".g-tile").forEach((x) => x.classList.toggle("sel", x.getAttribute("data-id") === dmSelected));
+      }
       return;
     }
     // 열 머리를 스크롤 안 첫 요소로(검토관 중5 — 밖에 두면 스크롤바 폭만큼 어긋난다)
@@ -771,33 +835,25 @@ tr:last-child td{border-bottom:none;}
       //   빼고 세는데 여기만 포함해, 카드와 그 아래 목록 제목이 **다른 숫자**를 말했다.
       //   여기는 회사 지식 창고다 — 개인 메모는 「내 문서」의 영토이고 검색에서도 격리된다.
       //   ⚠ 표시 수가 한 번 줄지만 그건 기준이 맞춰진 것이다(요약 카드와 같은 계보).
-      dmDocs = (await window.gijo.listMemoryDocuments()).filter(
-        (d) => String(d.documentId || "").indexOf("personal:") !== 0
-      );
+      // ★ 원본은 **따로 들고 있는다**(2026-08-31 검토관 [중]): 위생 점검(kb-hygiene)은 개인
+      //   문서를 안 걸러 목록에 내는데, 그 문서명을 누르면 selectDoc이 dmDocs에서 못 찾아
+      //   **조용히 아무 일도 안 일어났다**(화면은 「눌러 보라」고 안내한다). 선택 조회는
+      //   원본을 보게 하고, **목록·지표만** 회사 문서로 좁힌다.
+      dmAllDocs = await window.gijo.listMemoryDocuments();
+      dmDocs = dmAllDocs.filter((d) => String(d.documentId || "").indexOf("personal:") !== 0);
     } catch (e) {
       list.innerHTML = '<div class="dm-empty">불러오지 못했습니다: ' + dmEsc(e.message) + '</div>';
+      renderDmKpis(true); // 지표도 사실대로 — 옛 숫자가 남으면 「실패」 옆에 거짓이 선다
       return;
     }
     const totalChunks = dmDocs.reduce((s, d) => s + (d.chunks || 0), 0);
     document.getElementById("dmSummary").textContent = `· ${dmDocs.length}개 문서 · ${totalChunks}조각 · bge-m3`;
-    // 지표 줄(카드 언어) — 값은 전부 **위 목록과 같은 dmDocs**에서 센다(새 원천 없음).
-    // 등급이 비어 있는 문서가 있으므로 「등급 지정」은 값이 있는 것만 센다(지어내지 않는다).
-    {
-      const k = document.getElementById("dmKpis");
-      if (k) {
-        const 오늘 = new Date().toISOString().slice(0, 10);
-        const 오늘반입 = dmDocs.filter((d) => String(d.ingestedAt || "").slice(0, 10) === 오늘).length;
-        const 등급매김 = dmDocs.filter((d) => d.grade).length;
-        k.innerHTML = [
-          ["문서", dmDocs.length.toLocaleString(), ""],
-          ["조각", totalChunks.toLocaleString(), ""],
-          ["오늘 반입", 오늘반입.toLocaleString(), 오늘반입 ? "ok" : "muted"],
-          ["열람 등급 지정", `${등급매김.toLocaleString()} / ${dmDocs.length.toLocaleString()}`, 등급매김 < dmDocs.length ? "warn" : "ok"],
-        ].map(([l, v, c]) =>
-          `<div><div class="g-scard-kl">${dmEsc(l)}</div><div class="g-scard-kv ${c}">${dmEsc(String(v))}</div></div>`
-        ).join("");
-      }
-    }
+    // 지표 줄(카드 언어) — 그리기는 renderDmKpis 하나가 맡는다(등급을 바꿔도 다시 그리게).
+    // ⚠ 「오늘 반입」은 **직접 세지 않는다**(2026-08-31 검토관 [높음]): 처음엔 ingestedAt을
+    //   UTC로 잘라 세어, 같은 화면 아래 목록의 반입 열(현지 시각)과 어긋나고 내장 문서까지
+    //   셌다. 제품엔 이미 정본이 있다 — recentDocCount(현지 자정 기준·builtin 제외).
+    //   같은 숫자를 두 잣대로 세지 않는다.
+    renderDmKpis();
     if (!dmDocs.length) {
       list.innerHTML = '<div class="dm-empty">아직 올린 문서가 없습니다. 위에서 파일을 올려보세요.</div>';
       document.getElementById("dmDetail").innerHTML = '<div class="dm-empty">올린 문서가 여기에 표시됩니다.</div>';
@@ -1113,6 +1169,7 @@ tr:last-child td{border-bottom:none;}
     await loadAgentScopes();
     loadBundleStatus(); // 실패해도 화면 로드는 계속 — await 안 한다
 
+    bindDmViewSeg(); // 🔥 보기 전환 칩 — **문서를 못 불러와도** 눌리게(검토관 [중]: 죽은 조작 금지)
     await loadDocuments();
     loadHygiene();
     // ★ 2026-08-05 발견: 온톨로지(「등록된 관계」)를 **화면 진입 시 아예 안 불렀다**.
