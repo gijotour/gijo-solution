@@ -102,6 +102,8 @@ export interface OutboundReq {
 export const outboundReqApi = {
   list: (productId?: string) =>
     request<{ requests: OutboundReq[] }>(`/api/outbound-requests${productId ? `?productId=${encodeURIComponent(productId)}` : ""}`),
+  // 📨 내 문서 판 — **내가 만든 것만**(2026-08-31). 전역 목록을 소유로 좁히는 창구다.
+  listMine: () => request<{ requests: OutboundReq[] }>("/api/outbound-requests?mine=1"),
   setStatus: (id: string, status: string) =>
     request<{ ok: boolean }>(`/api/outbound-requests/${encodeURIComponent(id)}`, { method: "PATCH", body: { status } }),
 };

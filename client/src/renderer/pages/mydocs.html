@@ -349,6 +349,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
            서버가 주기적으로 들여다보고 새/바뀐 문서를 자동 반입하는 폴더들. 지정·해제는
            대화창(admin 결재판)만 — 이 판은 보기 전용이다(「메뉴는 보기용·지시는 대화창」). -->
       <button class="v4node" data-t="watch">📂<span class="txt">지켜보는 폴더</span><span class="cnt" id="nWatch"></span></button>
+      <!-- 📨 조치 요청서(2026-08-31) — 대화창에서 만든 요청서를 **되찾는 자리**. 지금까지는
+           만들 수는 있는데 화면에서 볼 곳이 없어(제품별 접기에만 떴다) 기능이 없는 것과 같았다.
+           판은 보기 전용 — 만들기·상태 변경은 대화창(📂 지켜보는 폴더와 같은 계약). -->
+      <button class="v4node" data-t="req">📨<span class="txt">조치 요청서</span><span class="cnt" id="nReq"></span></button>
       <button class="v4node future" data-t="future" title="예약된 자리 — 리포트·공식 인수인계 열람을 모을 예정입니다(아직 동작하지 않습니다)">🗂<span class="txt">산출물</span><span class="cnt">예정</span></button>
     </div>
   </div>
@@ -474,6 +478,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   //   원리상 빠진다(2026-08-31 검토관 적발 — 커밋이 「검사 가능 어미」라 적었는데 실측 0건이었다).
   var 감시지정예시 = "스캔결과 폴더 지켜봐 줘";
   var 감시조회예시 = "지켜보는 폴더 알려줘";
+  var 요청서 = []; // 📨 조치 요청서(2026-08-31) — 내가 만든 것만(서버가 소유로 좁혀 준다)
   var 감시폴더 = []; // 📂 지켜보는 폴더(2026-08-31) — 조회 전용(등록·해제는 대화창 결재판)
   var 감시틱초 = 300;
   var work = []; // 📎 지난 작업(노트북형) — 지난 대화 세션 목록(listWorkSessions)
@@ -901,7 +906,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     //   → 탭마다 자기 원천의 오류만 본다. 표에 없으면 오류 없음(null)이다.
     var 탭별오류 = {
       mine: 오류.mine, learn: 오류.learn, guide: 오류.guide, know: 오류.know, work: 오류.work,
-      ingest: 오류.ingest, vendor: 오류.vendor, watch: 오류.watch, contacts: null,   // 연락처는 이 PC 저장이라 로드 실패가 없다
+      ingest: 오류.ingest, vendor: 오류.vendor, watch: 오류.watch, req: 오류.req, contacts: null,   // 연락처는 이 PC 저장이라 로드 실패가 없다
       // ⚠ watch(📂 지켜보는 폴더)는 2026-08-31 검토관이 잡은 누락 — 조회 창구가 죽어도 「폴더가
       //   없습니다」로 보여 **장애를 부재로** 말했다(정직 가드 「장애≠부재」 계보).
     };
@@ -1017,6 +1022,29 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         }).join("") + "</div>"
         : '<div class="empty">' + (감시폴더.length ? "검색과 맞는 폴더가 없습니다."
           : "지켜보는 폴더가 없습니다.<br><br>대화창에서 <b>「D:\\보안팀\\" + 감시지정예시 + "」</b>처럼 말하면 등록됩니다(관리자).<br>등록된 목록은 <b>「" + 감시조회예시 + "」</b>로도 봅니다.<br><br>⚠ 경로는 <b>서버 기계</b>의 폴더입니다 — 분산 설치에서는 내 PC 경로가 아닙니다.") + "</div>");
+    } else if (탭 === "req") {
+      // 📨 조치 요청서(2026-08-31) — 대화창에서 만든 요청서를 **되찾는 자리**(보기 전용).
+      //   지금까지는 만들 수는 있는데 화면에서 볼 곳이 없어(제품별 접기에만 떴다) 기능이
+      //   없는 것과 같았다. 만들기·상태 변경은 대화창 — 📂 지켜보는 폴더와 같은 계약.
+      // ⚠ 서버가 **내가 만든 것만** 준다(mine=1) — 전역 목록이 전원의 요청서를 펼치지
+      //   않게 창구에서 좁혔다(「직접-열람 등급 누출」 계보).
+      // ⚠ 라벨은 **서버 원천과 같은 값**이다(remrequest.ts KIND_KO·STATUS_KO). 화면이 새로
+      //   짓지 않는다 — 어긋나면 같은 것을 두 이름으로 부르게 된다.
+      var 상태글 = { draft: "초안", sent: "보냄", replied: "회신 옴", noreply: "미회신" };
+      var 종류글 = { "vuln-fix": "취약점 조치", patch: "보안패치", policy: "보안정책 수정", bug: "버그 수정" };
+      var rq = 요청서.filter(function (r) { return 걸림((r.targetName || "") + " " + (종류글[r.kind] || r.kind || "") + " " + (r.recipient || "")); });
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 108px 80px 64px;gap:8px"><span class="trunc" title="대화창에서 만든 조치 요청서입니다. 상태 변경도 대화창에서 합니다.">조치 요청서</span><span>받는 곳</span><span>상태</span><span class="ta-r">만든 날</span></div>' +
+        (rq.length ? '<div class="g-rows-flat">' + rq.map(function (r) {
+          var st = 상태글[r.status] || r.status || "-";
+          var 색 = r.status === "replied" ? "gtxt-up" : r.status === "noreply" ? "gtxt-down" : "gm2";
+          return '<div class="g-rows-r" data-req="' + esc(r.id) + '" style="grid-template-columns:1fr 108px 80px 64px;gap:8px">' +
+            '<span class="trunc" title="' + esc((종류글[r.kind] || r.kind || "") + (r.dueDate ? " · 기한 " + r.dueDate : "")) + '">' + esc(종류글[r.kind] || r.kind || "(종류 없음)") + "</span>" +
+            '<span class="gm2 trunc">' + esc(r.recipient || r.targetName || "-") + "</span>" +
+            '<span class="' + 색 + '">' + esc(st) + "</span>" +
+            '<span class="ta-r gm2">' + 날짜(r.createdAt) + "</span></div>";
+        }).join("") + "</div>"
+        : '<div class="empty">' + (요청서.length ? "검색과 맞는 요청서가 없습니다."
+          : "만든 조치 요청서가 없습니다.<br><br>대화창에서 <b>「이 취약점 조치 요청서 만들어줘」</b>처럼 말하면 초안이 만들어지고, 그 초안은 <b>👤 내 것</b>에 문서로 들어옵니다.<br>여기서는 만든 요청서의 상태(초안·보냄·회신)를 봅니다.") + "</div>");
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;
@@ -1173,6 +1201,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     document.getElementById("nLearn").textContent = (learnKpis && learnKpis.total) || learn.length || "";
     document.getElementById("nWork").textContent = work.length || "";
     document.getElementById("nWatch").textContent = 감시폴더.length || "";
+    document.getElementById("nReq").textContent = 요청서.length || "";
     // ⚠ 세는 원천이 바뀌었다(2026-08-22) — 문서 목록이 아니라 **영수증**이다.
     //   그전엔 지식에 든 문서만 세어, 취약점 파일을 올려도 숫자가 안 늘었다.
     // ⚠ 서버가 준 **거른 뒤의 총계**를 쓴다 — 목록 길이(상한 300)를 총계로 말하면 거짓이다
@@ -1197,6 +1226,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     // ★ 📦 보안제품 자료(2026-08-22 2라운드 검토관 [낮음]) — 행을 눌러 상세가 열리게 만들었으면
     //   **초기 안내도 있어야** 한다. 없으면 이 탭만 빈 문서창이라 「고장인가?」로 읽힌다.
     else if (탭 === "vendor") d.innerHTML = '<div class="dm">행을 누르면 그 제품의 자료(제조사·분류·요약)를 봅니다.<br>도입을 <b>검토 중인 타사 제품</b> 카탈로그입니다 — 우리가 쓰는 제품은 「우리 보안제품」 화면입니다.<div class="dbt"><button class="go" data-go="securityproducts.html" data-lb="우리 보안제품">🗔 우리 보안제품</button></div></div>';
+    else if (탭 === "req") d.innerHTML = '<div class="dm">대화창에서 만든 조치 요청서 목록입니다. 상태(초안·보냄·회신)를 여기서 봅니다.<br><br>만들기·상태 변경은 <b>대화창</b>에서 합니다 — 「…조치 요청서 만들어줘」.</div>';
     else if (탭 === "watch") d.innerHTML = '<div class="dm">행을 누르면 그 폴더의 최근 확인 결과(새로 들어온 문서·건너뜀·충돌)를 봅니다.<br><br>지정·해제는 <b>대화창</b>에서 합니다 — 「D:\\경로 폴더 지켜봐 줘」(관리자).</div>';
     // 📞 연락처는 목록이 **전폭**이라 문서창을 안 쓴다(학습과 같은 결) — 문구를 남기지 않는다.
     else d.innerHTML = ""; // learn · contacts — 전폭이라 숨겨져 있지만 이전 탭 문구를 남기지 않는다(중4)
@@ -1253,6 +1283,12 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       감시틱초 = (wf_ && wf_.tickSeconds) || 300;
       오류.watch = null;
     } catch (e) { 감시폴더 = []; 오류.watch = (e && e.message) || "오류"; }
+    // 📨 조치 요청서(2026-08-31) — **내가 만든 것만**(서버가 mine=1로 좁힌다).
+    try {
+      var rq_ = await window.gijo.outboundRequestsMine();
+      요청서 = (rq_ && rq_.requests) || [];
+      오류.req = null;
+    } catch (e) { 요청서 = []; 오류.req = (e && e.message) || "오류"; }
     // ★ 반입 영수증(2026-08-22). 취약점·SBOM처럼 **지식에 안 들어가는**
     //   갈래는 문서 목록에 원리상 안 뜨므로 별도 창구에서 온다.
     //   ⚠ 다리는 preload에 새로 냈다(listUploadReceipts) — 이 화면에는 fetch를 쓰는 자리가 없다.
@@ -2318,7 +2354,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   // ?tab= 딥링크 — 문서함(창)을 흡수하며 옛 진입로(하단 📚·설정의 가이드 링크)가
   // 「제품 안내 탭이 선택된 내 문서」로 바로 오게 한다(승인 시안 §7 대응표).
   var 첫탭 = new URLSearchParams(location.search).get("tab");
-  if (첫탭 && ["mine", "know", "guide", "learn", "ingest", "vendor", "contacts", "work", "watch"].indexOf(첫탭) >= 0) {
+  if (첫탭 && ["mine", "know", "guide", "learn", "ingest", "vendor", "contacts", "work", "watch", "req"].indexOf(첫탭) >= 0) {
     탭 = 첫탭;
     Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) {
       x.classList.toggle("on", x.getAttribute("data-t") === 첫탭);

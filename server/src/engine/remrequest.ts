@@ -59,10 +59,14 @@ function rowToReq(r: Record<string, unknown>): OutboundRequest {
   return { ...(r as unknown as OutboundRequest), findingKeys: JSON.parse(String(r.findingKeys ?? "[]")) };
 }
 
-export function listOutboundRequests(filter?: { productId?: string; status?: OutboundStatus }): OutboundRequest[] {
+export function listOutboundRequests(filter?: { productId?: string; status?: OutboundStatus; createdBy?: string }): OutboundRequest[] {
   let sql = "SELECT * FROM outbound_requests"; const args: unknown[] = []; const w: string[] = [];
   if (filter?.productId) { w.push("targetKind='product' AND targetId=?"); args.push(filter.productId); }
   if (filter?.status) { w.push("status=?"); args.push(filter.status); }
+  // ★ 소유 잣대(2026-08-31 조사 지적) — 제품별 접기에서는 티가 안 났지만 **전역 목록**을
+  //   만들면 전원의 요청이 보인다(「직접-열람 등급 누출」 계보). 창구가 사람을 넘기면
+  //   그 사람 것만 준다. 주인을 모르는 옛 줄(createdBy NULL)은 **안 준다**(fail-closed).
+  if (filter?.createdBy) { w.push("createdBy=?"); args.push(filter.createdBy); }
   if (w.length) sql += " WHERE " + w.join(" AND ");
   sql += " ORDER BY createdAt DESC";
   return (db.prepare(sql).all(...args) as Record<string, unknown>[]).map(rowToReq);
@@ -167,7 +171,14 @@ export function resolveTargetProduct(assetIds: string[]): { targetKind: "product
 export function registerRemRequestRoutes(app: Express): void {
   app.get("/api/outbound-requests", authMiddleware, (req, res) => {
     const productId = typeof req.query.productId === "string" ? req.query.productId : undefined;
-    res.json({ requests: listOutboundRequests({ productId }) });
+    // ★ mine=1 — **내가 만든 것만**(2026-08-31). 내 문서 📨 판이 이 꼴로 부른다.
+    //   제품별 조회(productId)는 팀이 함께 보는 자리라 종전대로 두고, **전역 목록**만
+    //   소유로 좁힌다 — 좁히지 않으면 화면 하나가 전원의 요청서를 펼치는 창구가 된다.
+    const me = (req as typeof req & { user?: { id?: string | number; username?: string } }).user;
+    const uid = me?.id != null ? String(me.id) : (me?.username ?? "");
+    const mine = String(req.query.mine ?? "") === "1";
+    if (mine && !uid) { res.json({ requests: [] }); return; } // 주인을 모르면 안 준다
+    res.json({ requests: listOutboundRequests(mine ? { createdBy: uid } : { productId }) });
   });
   // 상태 전환 — 사람이 화면에서 확인하고 누른다(사장님 확정 ①). 전환은 전부 감사에 남는다.
   app.patch("/api/outbound-requests/:id", authMiddleware, (req, res) => {
