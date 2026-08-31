@@ -144,18 +144,22 @@ export function addWatchFolder(args: { path: string; label?: string; userId: str
   return { ok: true, folder: row };
 }
 
-export function removeWatchFolder(idOrPath: string): WatchFolderRow | null {
-  const n = Number(idOrPath);
+/** 해제. ⚠ 반환에 docCount를 함께 싣는다 — 지운 **뒤에** watchFolderDocCount(id)를 부르면
+ *  경로를 못 찾아 늘 0이 된다(2026-08-31 라이브 검증이 「0건」으로 잡은 자리). 지우기 전에 센다. */
+export function removeWatchFolder(idOrPath: string): (WatchFolderRow & { docCount: number }) | null {
+  const 입력 = String(idOrPath ?? "").trim();
+  const n = Number(입력.replace(/번$/, "")); // 「1번」도 받는다(안내가 그렇게 말한다)
   const row = (Number.isInteger(n) && n > 0
     ? db.prepare("SELECT * FROM watch_folders WHERE id = ?").get(n)
-    : db.prepare("SELECT * FROM watch_folders WHERE path = ?").get(서버경로로(idOrPath))) as WatchFolderRow | undefined;
+    : db.prepare("SELECT * FROM watch_folders WHERE path = ?").get(서버경로로(입력))) as WatchFolderRow | undefined;
   if (!row) return null;
+  const docCount = watchFolderDocCount(row.id); // ★ 지우기 전에
   db.prepare("DELETE FROM watch_folders WHERE id = ?").run(row.id);
   // 스캔 기억(stat·hash)은 함께 지운다 — 다시 등록하면 처음부터. doc 지도는 남긴다
   // (인입된 문서는 살아 있으므로, 남겨야 「남의 문서 보호」 판정이 유지된다).
   상태지우기like.run(`watchfolder:stat:${row.id}:%`);
   상태지우기like.run(`watchfolder:hash:${row.id}:%`);
-  return row;
+  return { ...row, docCount };
 }
 
 export function listWatchFolders(): WatchFolderRow[] {

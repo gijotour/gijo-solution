@@ -554,11 +554,21 @@ const TOOLS: AgentTool[] = [
     params: [
       { name: "target", label: "폴더(번호 또는 경로)", description: "「지켜보는 폴더 현황」의 [번호] 또는 경로", required: true },
     ],
+    // 지시문에서 번호·경로를 뽑는다 — 안내가 「1번 그만 지켜봐」라고 약속하는데 autoFill이
+    // 없어 결재판이 빈 칸으로 떴다(2026-08-31 라이브 검증 적발 — 약속-코드 불일치).
+    autoFill: (args, instruction): Record<string, string> => {
+      if ((args.target ?? "").trim()) return {};
+      const t = String(instruction ?? "");
+      const 경로 = t.match(/([A-Za-z]:[\\/][^\s"'「」]+|\/(?:mnt|home|srv|media|Volumes)\/[^\s"'「」]+)/);
+      if (경로) return { target: 경로[1].replace(/[.,)\]」]+$/, "") };
+      const 번호 = t.match(/(?:^|[\s「[(])(\d{1,4})\s*번/) ?? t.match(/폴더\s*(\d{1,4})\b/);
+      return 번호 ? { target: 번호[1] } : {};
+    },
     run: (args) => {
       const r = removeWatchFolder(String(args.target ?? ""));
       // FAIL_MARKS-예외: 지목한 폴더가 등록부에 없다는 **진짜 실패 사유**다 — 다음 걸음(현황으로 번호 확인)을 함께 준다.
       if (!r) return "그 폴더를 찾지 못했습니다 — 「지켜보는 폴더 현황」으로 번호를 확인해 주세요.";
-      return `📂 감시에서 뺐습니다 — ${r.label ?? r.path}\n이미 반입된 문서 ${watchFolderDocCount(r.id)}건은 지식에 그대로 남아 있습니다(지우려면 내 문서에서).`;
+      return `📂 감시에서 뺐습니다 — ${r.label ?? r.path}\n이미 반입된 문서 ${r.docCount}건은 지식에 그대로 남아 있습니다(지우려면 내 문서에서).`;
     },
   },
   {

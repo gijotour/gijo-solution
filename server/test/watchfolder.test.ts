@@ -259,3 +259,25 @@ describe("배선 짝 — 스케줄러가 index.ts에서 켜지고 꺼진다(소�
     expect(src, "stop 짝이 없다(kb-hygiene류 미등록을 답습하지 말 것 — 설계관 ③)").toContain("stopWatchFolderScheduler()");
   });
 });
+
+describe("라이브 검증이 잡은 것(2026-08-31) — 안내가 약속한 말이 실제로 통한다", () => {
+  it("해제 결재판이 「1번」에서 번호를 뽑는다 — 안내가 그렇게 말한다", async () => {
+    mockChat.mockReset();
+    const { runAgentLoop, resetContextForTests } = await import("../src/engine/agentloop");
+    resetContextForTests();
+    const r = await runAgentLoop("지켜보는 폴더 1번 그만 지켜봐", "", { role: "admin" });
+    expect(r!.approval?.tool).toBe("watch_folder_remove");
+    expect(r!.approval!.fields.find((f) => f.key === "target")?.value, "「1번」에서 번호를 못 뽑아 빈 결재판이 뜬다").toBe("1");
+    expect(r!.approval!.missing, "빠진 칸이 있다고 말한다 — 사람이 다시 채워야 한다").toEqual([]);
+  });
+  it("해제 답이 반입 문서 수를 사실대로 말한다 — 지운 뒤에 세면 늘 0이다", async () => {
+    const dir = 임시폴더();
+    fs.writeFileSync(path.join(dir, "watchtest-g.txt"), "해제 메시지 검증용 문서 본문입니다.");
+    const a = addWatchFolder({ path: dir, userId: "u-1" });
+    if (!a.ok) throw new Error("등록 실패");
+    await scanWatchFolder(a.folder);
+    expect(watchFolderDocCount(a.folder.id)).toBe(1);
+    const r = removeWatchFolder(String(a.folder.id));
+    expect(r?.docCount, "해제 결과가 문서 0건이라 말한다 — 실제로는 1건이 남아 있다").toBe(1);
+  });
+});
