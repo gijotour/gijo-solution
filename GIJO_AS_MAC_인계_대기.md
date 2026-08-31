@@ -253,6 +253,25 @@
   화면이 왼쪽에 바로 열리고 대화창이 오른쪽에 남는지(옛 「카드만」이 아니라) ③ 자산 관리
   (전체)가 ⓪ 자산 고르기로 갈아타지 않는지 ④ 새 대화 홈의 절차 칩 6개.
 
+### 2026-08-31 (2) — 좁은 폭 계약 · 대화창 온디맨드 · 📂 지켜보는 폴더 (사장님 지시 4건)
+
+- **클라 공용 파일**: `gijo-ui.css`(**좁은 폭 계약** — 한글 keep-all·단추 nowrap·.wrap-ok 예외.
+  전 화면에 주입되므로 mac에서도 그대로 적용) · `app.html`(💬 **대화창 온디맨드** — 접힘 축·
+  40px 손잡이·배지·toChat 강제 해제) · `console.js`(⊮ 접기 단추·도착 훅) · `mydocs.html`
+  (📂 지켜보는 폴더 판·탭별오류) · `nav.js`(📓에 항목) · 화면 4곳 반응형(inventory 🗺 지도
+  적층·aihub/records 요약 띠 접힘·handover 점검표).
+- **서버 공용 파일**: `watchfolder.ts`(신규 — 주기 폴링·경로 검증·등급/충돌 보호) ·
+  `memory.ts`(추출필요 export 일원화·열람불가핵심 분리) · `docsbundle.ts`(사본 제거) ·
+  `autoupload` 계약 소비 · `registry/agentloop/routes/falseclaim/screenguide` · `app.ts` 라우트 ·
+  `index.ts` 스케줄러 start/stop.
+- **새 도구/기계**: `tools/narrow-probe.mjs`(좁은 폭 실측기 — 앱 CDP 필요) ·
+  themecolors에 좁은 폭 소스 감시 · publish-gate에 온디맨드 3검사·📂 판 검사.
+- **max 실기 검증거리**: ① 좁은 폭(대화창 최대)에서 mac 폰트로도 글자 안 깨지는지 —
+  `node tools/narrow-probe.mjs --port <CDP>`로 26화면 0건 재확인 ② 💬 손잡이·배지가 mac
+  신호등/트래픽 라이트와 겹치지 않는지 ③ 📂 지켜보는 폴더: **mac 경로**(`/Users/...`)로
+  등록·스캔·해제가 되는지(WSL 변환은 리눅스 전용이라 mac은 그대로 통과해야 한다) ·
+  data/ 조상 폴더 거부가 mac 경로에서도 서는지.
+
 ### 진행 중이라 아직 인계 대상이 아닌 것
 
 - 규정 판정 요청함 — 시안·설계 검토 완료, 착수 전
