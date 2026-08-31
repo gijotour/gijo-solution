@@ -1001,7 +1001,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       // 📂 지켜보는 폴더(2026-08-31) — 보기 전용. 지정·해제는 대화창(admin 결재판)이 유일한 길.
       // 원천 정직: 숫자는 전부 서버 계산(스캔 결과 JSON) — 화면이 지어내지 않는다.
       var wf = 감시폴더.filter(function (f) { return 걸림((f.label || "") + " " + (f.path || "")); });
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 92px 64px 92px;gap:8px"><span>지켜보는 폴더(약 ' + Math.round(감시틱초 / 60) + '분마다 확인 — 행을 누르면 최근 결과)</span><span>최근 확인</span><span class="ta-r">문서</span><span class="ta-r">상태</span></div>' +
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 92px 64px 92px;gap:8px"><span class="trunc" title="약 ' + Math.round(감시틱초 / 60) + '분마다 확인합니다. 행을 누르면 최근 결과를 봅니다.">지켜보는 폴더</span><span>최근 확인</span><span class="ta-r">문서</span><span class="ta-r">상태</span></div>' +
         (wf.length ? '<div class="g-rows-flat">' + wf.map(function (f) {
           var lr2 = f.lastResult;
           var 상태 = !f.active ? '<span class="gm2">중지</span>'

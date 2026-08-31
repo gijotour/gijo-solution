@@ -56,8 +56,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
 .filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
 .table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
-.panel-title{font-size:14.5px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+/* 카드 언어(2026-08-31 사장님 「2번째 이미지로」) — 공용 골격 .g-scard와 같은 값.
+   판을 카드로: 여백 20 → 14/16, 제목 줄을 카드 머리(위 칸을 채우고 아래를 선으로 가름). */
+.panel{background:var(--g-surface-1,var(--panel));border:1px solid var(--g-border,var(--border));border-radius:var(--g-r,12px);padding:14px 16px;margin-bottom:12px;}
+.panel-title{font-size:12.75px;font-weight:800;color:var(--g-text,var(--text-strong,#fff));margin:-14px -16px 10px;padding:7px 12px;border-bottom:1px solid var(--g-border,var(--border));display:flex;justify-content:space-between;align-items:center;}
 /* 2026-08-21 밀도 — 줄 75→32px대: 여백 축소 + 이름·부제 가로 나란히(적층 해제) */
 .ai-card{display:flex;align-items:center;gap:10px;padding:3px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);margin-bottom:3px;cursor:pointer;}
 .ai-card:hover{border-color:var(--blue);}

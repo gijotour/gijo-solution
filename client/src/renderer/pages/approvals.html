@@ -25,8 +25,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:var(--text-strong, #fff);}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
-.panel-title{font-size:14.5px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+/* 카드 언어(2026-08-31 사장님 「2번째 이미지로」) — 공용 골격 .g-scard와 같은 값.
+   판을 카드로: 여백 20 → 14/16, 제목 줄을 카드 머리(위 칸을 채우고 아래를 선으로 가름). */
+.panel{background:var(--g-surface-1,var(--panel));border:1px solid var(--g-border,var(--border));border-radius:var(--g-r,12px);padding:14px 16px;margin-bottom:12px;}
+.panel-title{font-size:12.75px;font-weight:800;color:var(--g-text,var(--text-strong,#fff));margin:-14px -16px 10px;padding:7px 12px;border-bottom:1px solid var(--g-border,var(--border));display:flex;justify-content:space-between;align-items:center;}
 .panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:14px;}
 .badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12.25px;font-weight:700;}
 .b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
