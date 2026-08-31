@@ -43,7 +43,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
 .beta-tag{background:var(--teal);color:var(--fill-contrast,#06281c);font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
-.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--g-blue-fill, var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 </style>
 <script src="viz.js"></script>
@@ -177,7 +177,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .verify-deny{background:rgba(226,72,61,.1);border:1px solid rgba(226,72,61,.4);border-radius:9px;padding:9px 12px;font-size:12.25px;color:var(--red-ink, #f5a8a1);line-height:1.7;white-space:pre-line;margin-top:8px;}
   .fchip{font-size:12.25px;padding:5px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;user-select:none;}
   .fchip b{margin-left:3px;color:var(--text);font-weight:800;}
-  .fchip.on{background:var(--blue);border-color:var(--blue);color:#fff;}.fchip.on b{color:#fff;} /* 부모가 채움(--blue) — 자식 b도 흰 글자 유지(검토관 중4: 스윕이 블록만 봐서 건수가 잉크로 바뀌었었다) */
+  .fchip.on{background:var(--g-blue-fill, var(--blue));border-color:var(--blue);color:#fff;}.fchip.on b{color:#fff;} /* 부모가 채움(--blue) — 자식 b도 흰 글자 유지(검토관 중4: 스윕이 블록만 봐서 건수가 잉크로 바뀌었었다) */
   .rv-rows{max-height:640px;overflow-y:auto;}
   .rv-row{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:3px;}
   /* ⚠ 아이디 특이도(1,1,0)로 적는다 — nav.js의 .gj-rows1 규칙(0,5,0)이 세로 padding을
@@ -231,7 +231,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .btn{font-size:12px;font-weight:700;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
   .btn:hover{border-color:var(--blue);}
   .btn:disabled{opacity:.5;cursor:default;}
-  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .btn.primary{background:var(--g-blue-fill, var(--blue));border-color:var(--blue);color:#fff;}
   .btn.mail{border-color:rgba(59,130,246,.4);color:var(--blue-light);}
   .btn.verify{background:rgba(139,124,240,.14);border-color:rgba(139,124,240,.45);color:var(--purple);}
   .btn.done{background:var(--teal);border-color:var(--teal);color:var(--fill-contrast,#06281c);}

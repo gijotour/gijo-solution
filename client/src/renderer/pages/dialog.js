@@ -36,9 +36,15 @@
     "font-family:inherit;border:1px solid transparent;}" +
     "#gijoDlg .no{background:transparent;color:var(--muted,#b3ada4);border-color:rgba(255,255,255,.16);}" +
     "#gijoDlg .no:hover{color:var(--text-strong, #fff);}" +
-    "#gijoDlg .ok{background:var(--blue,#3b82f6);color:#fff;}" +
-    "#gijoDlg .ok:hover{filter:brightness(1.1);}" +
+    "#gijoDlg .ok{background:var(--g-blue-fill, var(--blue,#3b82f6));color:#fff;}" +
+    // ⚠ brightness(1.1)은 **밝히는** 필터라 흰 글씨 대비를 깎았다(#3b82f6→#418fff, 3.18:1).
+    //   채움 위 흰 글씨에서 hover는 진해지는 쪽이 맞다 — 값 대신 토큰으로 간다.
+    "#gijoDlg .ok:hover{background:var(--g-blue-fill-hover, var(--blue,#3b82f6));}" +
     "#gijoDlg .ok.danger{background:var(--red,#e2483d);}" +
+    // ⚠ 빨강은 위 .ok:hover(파랑)를 같은 특이도로 **뒤에서 덮는다** — 그래서 danger는 hover
+    //   표시를 통째로 잃는다. 예전 filter가 danger에도 걸려 있었으므로 그 자리를 그대로 살린다.
+    //   (빨강 채움 대비는 이번 파랑 작업의 범위 밖이라 값은 손대지 않는다.)
+    "#gijoDlg .ok.danger:hover{filter:brightness(1.1);}" +
     "#gijoDlg .in{width:100%;margin-top:12px;background:var(--panel-2,#1f1e1d);color:var(--text,#e9e7e2);" +
     "border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:9px;padding:9px 11px;" +
     "font-size:13px;font-family:inherit;outline:none;}" +

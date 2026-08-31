@@ -64,16 +64,16 @@
       ".gcw-sub{font-size:12px;color:var(--muted-2,#a49d95);margin-bottom:10px;}" +
       ".gcw-guide{background:var(--panel-2,#1f1e1d);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12.25px;color:var(--muted,#b3ada4);line-height:1.7;flex-shrink:0;}" +
       ".gcw-chip{display:inline-block;background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));color:var(--blue-light,#5fa1ff);font-size:12px;padding:4px 10px;border-radius:20px;margin:3px 4px 0 0;cursor:pointer;}" +
-      ".gcw-chip:hover{background:var(--blue,#3b82f6);color:#fff;border-color:var(--blue,#3b82f6);}" +
+      ".gcw-chip:hover{background:var(--g-blue-fill, var(--blue,#3b82f6));color:#fff;border-color:var(--blue,#3b82f6);}" +
       ".gcw-msgs{flex:1;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:9px;min-height:0;}" +
       ".gcw-empty{font-size:12.25px;color:var(--muted-2,#a49d95);}" +
       ".gcw-row{border-radius:9px;padding:9px 11px;font-size:12.5px;line-height:1.6;max-width:92%;word-break:break-word;}" +
-      ".gcw-row.user{background:var(--blue,#3b82f6);color:#fff;margin-left:auto;}" +
+      ".gcw-row.user{background:var(--g-blue-fill, var(--blue,#3b82f6));color:#fff;margin-left:auto;}" +
       ".gcw-row.bot{background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));}" +
       ".gcw-row.error{background:rgba(226,72,61,.12);border:1px solid rgba(226,72,61,.4);color:var(--red-ink, #f5928a);}" +
       ".gcw-dock{display:flex;gap:6px;margin-top:8px;flex-shrink:0;}" +
       ".gcw-dock input{flex:1;background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:8px;padding:9px 11px;color:var(--text,#e9e7e2);font-size:12.5px;outline:none;}" +
-      ".gcw-dock button{background:var(--blue,#3b82f6);color:#fff;border:0;border-radius:8px;padding:0 14px;font-size:12.5px;font-weight:700;cursor:pointer;}" +
+      ".gcw-dock button{background:var(--g-blue-fill, var(--blue,#3b82f6));color:#fff;border:0;border-radius:8px;padding:0 14px;font-size:12.5px;font-weight:700;cursor:pointer;}" +
       // 확인 후 실행 — 쓰기 작업은 답만 하고 끝내지 않고, 무엇을 어떤 값으로 실행할지 카드로
       // 보여 준 뒤 승인해야 실행한다(대시보드 지휘 콘솔의 결재판과 같은 규약).
       ".gcw-ap{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.42);border-radius:10px;padding:10px 12px;font-size:12.5px;}" +
