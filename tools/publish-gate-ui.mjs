@@ -647,8 +647,12 @@ ok("로스터 약자(등록부 단일 출처) 반영", 가시화.약자적용 ==
   const r = df ? await df.evaluate(() => {
     const 카드 = document.getElementById("aiteamRow");
     const 칩 = 카드 ? 카드.querySelectorAll(".aiteam-chip").length : 0;
-    // 지식창고는 기본 접힘 — 「접기는 접은 채로, 검증 땐 펴서 잰다」: 펴서 KPI가 그려졌는지
-    const head = document.querySelector("[data-gijo-fold] , .gjf-h");
+    // 「접기는 접은 채로, 검증 땐 펴서 잰다」 — 접혀 있으면 **실제로 펴서** KPI를 본다.
+    // ⚠ 2026-08-31 정정: 여기는 접기 머리를 잡아 놓고 **누르지 않았다**(죽은 변수) —
+    //   주석이 약속한 「펴서」가 코드에 없었다. 접힌 채로 재면 kbKpi가 비어 보여
+    //   「렌더 실패」로 오판하거나, 반대로 접힌 채 통과해 아무것도 안 보게 된다.
+    const head = document.querySelector(".gjf-h");
+    if (head && !head.classList.contains("on")) head.click();
     const kb = document.getElementById("kbKpi");
     return { 칩, kb있음: !!kb, kb내용: kb ? (kb.textContent || "").length : 0 };
   }).catch(() => null) : null;
