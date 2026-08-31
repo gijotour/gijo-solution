@@ -216,7 +216,17 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 
 
 
+  // ⚠ **선언만 있고 아무도 안 채우던 값이었다**(2026-08-31). [＋ 조치 등록]이 이 값을
+  //   assignee로 넣는데 늘 빈 문자열이라, 담당자는 등록했다고 믿는데 **담당 칸이 빈 채로**
+  //   들어갔다. 「소비자만 있고 생산자 없는 값」 계보 — 이 저장소가 여러 번 겪은 부류다.
+  //   원천은 window.gijo.me() 하나다(dashboard·hardening·maintenance가 이미 그렇게 쓴다).
   let currentUser = "";
+  (async () => {
+    try {
+      const u = await window.gijo.me();
+      currentUser = (u && (u.displayName || u.username)) || "";
+    } catch (e) { /* 이름을 못 읽어도 등록은 되게 둔다 — 빈 담당자는 화면에서 보인다 */ }
+  })();
 
   // 취약점 → 조치 항목: 심각도·KEV로 우선순위와 SLA(기한)를 자동 산정한다.
   // KEV(실제 악용)는 7일, Critical 14, High 30, Medium 60, Low 90일.

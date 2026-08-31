@@ -17,7 +17,7 @@ import { listAssets } from "./assets";
 // ⚠ 심각도 우리말은 **한 곳에서만** 만든다(tone.ts). 실측(2026-08-03): 영문 심각도가 담당자
 //   화면에 나가는 자리가 여덟 곳이었고, 자리마다 따로 만들면 어떤 화면은 "critical",
 //   어떤 화면은 "매우 심각"이 되어 같은 것이 둘로 보인다.
-import { 심각도한글 } from "./tone";
+import { 물음속심각도, 심각도한글 } from "./tone";
 
 export interface PickItem {
   id: string; // "assetId::findingKey" — 조치할 때 그대로 돌려보낸다
@@ -185,7 +185,20 @@ export function findingListAnswer(text = "", 걸린범위?: string | null): { ou
   }
   // ⚠ 상한을 걸고 그 수를 "총 N건"이라 말하면 거짓이 된다(실측: 상한 200에 걸려 늘 "200건"이었다).
   //   담당자는 그 수를 보고 일의 크기를 가늠하므로, 총계는 상한 없이 센다.
-  const rows = prioritizedReviews(100000, 범위.ids ?? undefined);
+  const 전부 = prioritizedReviews(100000, 범위.ids ?? undefined);
+  // 🎚 물음에 심각도가 적혀 있으면 **그 등급만** 본다(2026-08-31). 옛 판은 좁히기가 자산
+  //   이름만 봐서, 「critical 취약점 목록 보여줘」에 전체 건수를 답했다 — 담당자는 그 수를
+  //   critical 수로 읽는다. 판정은 tone.ts 한 곳(물음속심각도)에서만 하고 라벨도 거기 표를
+  //   쓴다(사본 금지 — 「매우 심각」과 「critical」이 갈리던 2026-08-03 사고의 계보).
+  const 등급 = 물음속심각도(text);
+  const rows = 등급 ? 전부.filter((r) => r.finding.severity === 등급) : 전부;
+  if (등급 && rows.length === 0) {
+    // ⚠ 좁혔는데 0건이면 **전체를 쏟지 않는다**(대상 못 찾음과 같은 원칙).
+    return {
+      output: `${범위.이름 ? `${범위.이름}에 ` : ""}[${심각도한글(등급)}] 등급으로 조치할 취약점이 없습니다. (전체는 ${전부.length}건 — "조치할 취약점 목록 보여줘"라고 하시면 다 보여드립니다.)`,
+      picklist: null,
+    };
+  }
   if (rows.length === 0) {
     return {
       output: 범위.이름
@@ -203,9 +216,13 @@ export function findingListAnswer(text = "", 걸린범위?: string | null): { ou
     return `- **[${심각도한글(r.finding.severity)}]** ${r.finding.finding_type} @ ${r.assetName} — ${who} · ${due}`;
   });
   // 좁혔으면 **무엇으로 좁혔는지 머리줄에 적는다** — 안 적으면 전체인 줄 안다.
+  // 좁혔으면 **무엇으로 좁혔는지 전부 적는다** — 자산도, 등급도. 안 적으면 전체인 줄 안다.
   const 머리 =
     (범위.이름 ? `${범위.이름} — ` : "") +
-    `조치할 취약점 **${rows.length}건** — 담당자 미배정 ${미배정}건 · 기한 초과 ${초과}건`;
+    (등급 ? `[${심각도한글(등급)}] ` : "") +
+    `조치할 취약점 **${rows.length}건**` +
+    (등급 ? ` (전체 ${전부.length}건 중)` : "") +
+    ` — 담당자 미배정 ${미배정}건 · 기한 초과 ${초과}건`;
   const 꼬리 = rows.length > 보여줄.length ? `\n\n(급한 순으로 ${보여줄.length}건만 보여드립니다)` : "";
   const output = `${머리}\n\n${lines.join("\n")}${꼬리}`;
   // 데이터 카드(2차, 2026-08-19) — **KPI만, 표는 없다.** 목록은 이미 두 벌이다:

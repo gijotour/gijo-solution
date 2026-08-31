@@ -81,6 +81,25 @@ export const 허용표식 = new Set<string>(Object.values(표식));
  * ⚠ 모르는 값은 **그대로 돌려준다** — 지어내지 않는다.
  */
 const 심각도표: Record<string, string> = { critical: "매우 심각", high: "높음", medium: "보통", low: "낮음", info: "참고" };
+/**
+ * 물음에 **심각도가 적혀 있으면** 그 값을 돌려준다(없으면 null).
+ *
+ * ⚠ 표는 위 `심각도표` 하나를 쓴다 — 우리말 라벨을 여기서 새로 짓지 않는다.
+ *   자리마다 지으면 「매우 심각」과 「critical」이 갈리는 그 사고가 다시 난다(2026-08-03).
+ * ⚠ **좁게** — 「위험도 높은」처럼 정도를 말하는 어형은 안 받는다. 목록을 그 등급으로
+ *   좁히겠다는 뜻이 분명할 때만이다(critical/심각/높음 … + 취약점·목록·건).
+ */
+export function 물음속심각도(text: string): string | null {
+  const t = String(text ?? "").toLowerCase();
+  for (const [영문, 우리말] of Object.entries(심각도표)) {
+    if (t.includes(영문)) return 영문;
+    if (String(text ?? "").includes(우리말)) return 영문;
+  }
+  // 담당자가 자주 쓰는 갈래 — 표에 없는 말이라 여기서만 잇는다(값은 표의 것 그대로).
+  if (/치명적|긴급/.test(String(text ?? ""))) return "critical";
+  return null;
+}
+
 export function 심각도한글(severity: string): string {
   return 심각도표[String(severity ?? "").toLowerCase()] ?? String(severity ?? "");
 }
