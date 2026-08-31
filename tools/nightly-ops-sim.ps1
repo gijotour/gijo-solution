@@ -19,6 +19,10 @@ if (-not $env:QA_PASS) {
 }
 $log = ".tmp-reports\ops-sim-nightly-$(Get-Date -Format yyyyMMdd).log"
 "시작 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File $log -Encoding utf8
+# 🌙 **결석을 다음 회차가 알린다**(2026-08-31). 결석은 아무 일도 안 일어나는 것이라 스스로
+#   못 알린다 — 그래서 **돌아온 회차가 지난 공백을 로그 머리에 적는다.** 실제로 08-25·26
+#   두 밤을 건너뛰고도 아무도 몰랐고, 그 전에도 08-12에 같은 일이 있었다(이 파일 머리 주석).
+node tools/nightly-gap.mjs 2>&1 | Out-File $log -Append -Encoding utf8
 node tools/ops-sim.mjs 2>&1 | Out-File $log -Append -Encoding utf8
 "끝 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') · 종료코드 $LASTEXITCODE" | Out-File $log -Append -Encoding utf8
 exit $LASTEXITCODE

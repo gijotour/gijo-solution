@@ -73,6 +73,21 @@ try {
   if (r.ok) { console.error("[ui관문] exit 3 원인④: 포트 " + PORT + "에 이미 CDP가 떠 있습니다 — 게시 중단."); process.exit(3); }
 } catch { /* 닫혀 있음 — 정상 */ }
 
+// 🌙 **오래된 초록은 초록이 아니다**(2026-08-31). 야간 회귀(152상황)가 며칠째 안 돌았는데
+//   게시하면, 「매일 도는 감시가 지킨다」는 전제 위에서 근거 없이 내보내는 것이 된다.
+//   실제로 08-25·26 두 밤이 결석했고 아무도 몰랐다(그 전 08-12에도 같은 일이 있었다).
+//   ⚠ 하루는 흔하다(기계 꺼짐·시차) — **사흘 넘게** 비면 멈춘다. 원인 ⑤로 센다.
+{
+  const { 결석현황 } = await import("./nightly-gap.mjs");
+  const 결석 = 결석현황(repo);
+  console.log("[ui관문] 🌙 " + 결석.문장);
+  if (결석.빈날 > 2) {
+    console.error("[ui관문] exit 3 원인⑤: 야간 회귀가 " + 결석.빈날 + "일째 안 돌았습니다 — 게시 중단.");
+    console.error("  회귀 증거 없이 내보내지 않습니다. `node tools/ops-sim.mjs`로 한 회차를 돌리고 다시 게시하세요.");
+    process.exit(3);
+  }
+}
+
 // ── 앱 기동(전용 포트) ────────────────────────────────────────────────────
 const app = spawn(EXE, ["--remote-debugging-port=" + PORT], { stdio: "ignore" });
 const 정리 = () => { try { execFileSync("taskkill", ["/PID", String(app.pid), "/T", "/F"], { stdio: "ignore" }); } catch { /* 이미 종료 */ } };

@@ -64,6 +64,13 @@ done
 #   「매니페스트에 적힌 파일이 실제로 있는가」를 본다. 없으면 **감시가 헛돌지 않는지 보는
 #   시험**까지 빨간불이 난다(그게 이 사본에서 처음 6건이 실패한 이유였다).
 rsync -a --include='*.md' --exclude='*/' --exclude='*' "$SRC_ROOT/" "$DST_ROOT/" 2>/dev/null
+# ⚠ **실전 답 기록(.tmp-reports/ops-sim.json)도 옮긴다**(2026-08-31).
+#   말투 규범 감시(tone-realanswers)와 프롬프트 복창 누출 감시(promptleak-retry)는 「내가 고른
+#   표본이 아니라 **실전 답 전체**로 오탐 0을 증명한다」가 존재 이유인데, 이 사본에 기록이 안
+#   가서 **둘 다 늘 건너뛰고 있었다.** 시험이 조용히 건너뛰면 초록이 뜨지만 아무것도 증명하지
+#   않는다 — 이 저장소가 반복해 겪은 「헛도는 시험」이다. 없으면 종전대로 건너뛴다(선택).
+mkdir -p "$DST_ROOT/.tmp-reports"
+[ -f "$SRC_ROOT/.tmp-reports/ops-sim.json" ] && cp "$SRC_ROOT/.tmp-reports/ops-sim.json" "$DST_ROOT/.tmp-reports/" 2>/dev/null
 [ -f "$SRC_ROOT/.gitignore" ] && cp "$SRC_ROOT/.gitignore" "$DST_ROOT/" 2>/dev/null
 echo "  서버 소스 $(find "$DST/src" -name '*.ts' 2>/dev/null | wc -l)개 · 시험 $(find "$DST/test" -name '*.test.ts' 2>/dev/null | wc -l)개 · 클라 화면 $(find "$DST_ROOT/client/src" -name '*.html' 2>/dev/null | wc -l)개"
 
