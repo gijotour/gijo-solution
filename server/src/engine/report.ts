@@ -2,6 +2,8 @@
 // 데이터 소스는 6.4의 자산 레지스트리(assets.ts)를 그대로 재사용 — 별도 수집 로직 없음.
 
 import type { Express, Request } from "express";
+// 심각도 우리말은 원천 한 곳(tone.ts)에서만 만든다 — 자리마다 만들면 같은 것이 둘로 보인다.
+import { 심각도한글 } from "./tone";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { createRequire } from "module";
@@ -59,10 +61,14 @@ function collectAssets(req: ReportRequest): Asset[] {
 }
 
 /** 심각도 건수를 **우리말 한 줄**로. LLM 프롬프트에 영문 키를 넣으면 답변에 그대로 나온다. */
-const 심각도이름: Record<string, string> = { critical: "매우 심각", high: "높음", medium: "보통", low: "낮음" };
-function 심각도한글(counts: Record<string, number>): string {
+// ⚠ 여기 있던 `심각도이름` 사본 표를 지웠다(2026-08-31) — 심각도 우리말의 **세 번째 사본**이었다.
+//   원천은 tone.ts 하나다(2026-08-03에 「한 곳에만 둔다」로 정한 그 표).
+// ⚠ 이름을 바꿨다 — 이 함수는 **개수 요약**이지 심각도 한 개의 우리말이 아니다.
+//   tone.ts의 심각도한글(severity)과 **같은 이름 다른 뜻**이라 임포트가 충돌했고, 그 충돌이
+//   드러나기 전까지 두 뜻이 한 이름으로 살아 있었다(2026-08-31 발견).
+function 심각도별건수요약(counts: Record<string, number>): string {
   return ["critical", "high", "medium", "low"]
-    .map((k) => `${심각도이름[k]} ${counts[k] ?? 0}건`)
+    .map((k) => `${심각도한글(k)} ${counts[k] ?? 0}건`)
     .join(" · ");
 }
 
@@ -443,7 +449,7 @@ async function buildDocx(
                       //   심각도 대괄호를 달면 읽는 사람이 취약점으로 센다.
                       children: [new TextRun(
                         isRealVulnerability(f)
-                          ? `[${f.severity}] ${f.finding_type} — ${f.evidence} (${f.source_tool})`
+                          ? `[${심각도한글(f.severity)}] ${f.finding_type} — ${f.evidence} (${f.source_tool})`
                           : `[점검 실패 · 취약점 아님] ${f.evidence} (${f.source_tool}) — 재스캔 필요`
                       )],
                     })
@@ -568,7 +574,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
       // ⚠ 영문 키를 그대로 넣으면 모델이 그대로 복창한다 — 실측(2026-08-03 실전 147상황):
       //   보고서 요약에 `"low" 2개, "medium" 3개, "high" 5개, "critical" 4개`가 그대로 나갔다.
       //   한글 제품에서 영문 상태값은 담당자가 못 읽는다(말투 규범 금지 항목). **넣을 때부터 우리말로.**
-      `심각도별 발견 건수: ${심각도한글(counts)}. ` +
+      `심각도별 발견 건수: ${심각도별건수요약(counts)}. ` +
       `취약점 조치: 스캔 호스트 ${vuln.hosts}대, 열린 취약점 ${vuln.active}건(Critical ${vuln.critical}·High ${vuln.high}), ` +
       `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%, 기한 초과 ${vuln.remediation.overdue}건. ` +
       `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건.${caseHint} ` +

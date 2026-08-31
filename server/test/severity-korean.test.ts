@@ -13,7 +13,27 @@ import path from "node:path";
 import { 심각도한글, 심각도표식, 표식 } from "../src/engine/tone";
 import { agenttoolsSource } from "./util/toolsrc";
 
-const 소스 = agenttoolsSource();
+// ⚠ **감시 범위를 engine 전수로 넓혔다**(2026-08-31). agenttools 3파일만 보던 탓에
+//   picklist.ts가 체크칸 라벨에 「[critical]」을 그대로 내보내는 것을 **아무도 못 잡았다**
+//   (라이브 실측으로 확인 — 담당자 화면에 영문이 그대로 떴다). 부재 단정("…이 없다")은
+//   **안 보는 곳이 있으면 지키는 게 아니라 안 보는 것**이다(toolsrc.ts 머리 주석과 같은 교훈).
+//   넓히자 5곳이 더 걸렸고(결재판·브리핑 3·리포트) 전부 같은 결함이라 함께 고쳤다.
+const 엔진뿌리 = path.join(__dirname, "..", "src", "engine");
+function 엔진소스전수(): string {
+  const 모음: string[] = [];
+  const 훑 = (d: string) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) 훑(p);
+      else if (e.name.endsWith(".ts")) 모음.push(fs.readFileSync(p, "utf8"));
+    }
+  };
+  훑(엔진뿌리);
+  return 모음.join("\n");
+}
+const 소스 = 엔진소스전수();
+// agenttoolsSource는 「헛돌지 않는지」 검사가 계속 쓰는 하한 잣대다(아래).
+const 도구소스 = agenttoolsSource();
 
 describe("심각도 우리말 변환기", () => {
   it("네 등급을 우리말로 준다", () => {
@@ -49,7 +69,8 @@ describe("★ 소스 감시 — 화면에 나가는 글자에 영문 심각도�
 
   it("이 감시가 헛돌고 있지 않다", () => {
     // 소스를 못 읽었거나 정규식이 죽었으면 위 시험은 조용히 통과한다.
-    expect(소스.length, "agenttools.ts를 못 읽었다").toBeGreaterThan(50000);
+    expect(도구소스.length, "agenttools를 못 읽었다").toBeGreaterThan(50000);
+    expect(소스.length, "engine 전수를 못 읽었다 — 넓힌 감시가 헛돈다").toBeGreaterThan(도구소스.length);
     expect(소스, "변환기를 아무도 안 쓴다 — 그럼 위 감시는 의미가 없다").toContain("심각도한글(");
     // 감시가 실제로 잡는지 — 일부러 만든 나쁜 예를 넣어 본다.
     const 나쁜예 = "const x = `  - [${f.severity}] ${f.finding_type}`;";

@@ -3,6 +3,8 @@
 // 데이터는 전부 기존 엔진(우선순위·검토대장·CTI)에서 조립한다. "어제 대비 신규"는 일일 스냅샷 비교.
 
 import type { Express } from "express";
+// 심각도 우리말은 원천 한 곳(tone.ts)에서만 만든다 — 자리마다 만들면 같은 것이 둘로 보인다.
+import { 심각도한글 } from "./tone";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
@@ -81,7 +83,7 @@ export async function buildDailyBriefing(opts: { save?: boolean } = {}): Promise
 
   // 오늘 추천 3 (규칙): 최우선 취약점 조치 · 기한 초과 처리 · 미배정 상위 배정
   const recommendations: string[] = [];
-  if (priorities[0]) recommendations.push(`최우선 조치: [${priorities[0].finding.severity}] ${priorities[0].finding.finding_type} @ ${priorities[0].assetName}${priorities[0].finding.kev ? " (KEV·실제악용)" : ""}`);
+  if (priorities[0]) recommendations.push(`최우선 조치: [${심각도한글(priorities[0].finding.severity)}] ${priorities[0].finding.finding_type} @ ${priorities[0].assetName}${priorities[0].finding.kev ? " (KEV·실제악용)" : ""}`);
   if (overdue.length) recommendations.push(`기한 초과 ${overdue.length}건 즉시 처리 — 담당자 독촉 또는 기한 재조정`);
   // ⚠ !assignee만 보면 **완료·반려·위험수용까지 세어** 끝난 일을 배정하라고 권한다
   //   (2026-08-21 설계관 적발 — 화면·판·서버는 이미 통일돼 있었다).
@@ -109,12 +111,12 @@ export async function dailyBriefingText(opts: { save?: boolean } = {}): Promise<
   const lines: string[] = [`📋 ${b.date} 보안 브리핑`];
   lines.push(
     `- 오늘의 조치 상위 ${b.priorities.length}건: ` +
-      b.priorities.map((p) => `[${p.finding.severity}] ${p.finding.finding_type} @ ${p.assetName}${p.finding.kev ? "·KEV" : ""}`).join(" / ")
+      b.priorities.map((p) => `[${심각도한글(p.finding.severity)}] ${p.finding.finding_type} @ ${p.assetName}${p.finding.kev ? "·KEV" : ""}`).join(" / ")
   );
   if (b.newFindings.length) lines.push(`- 지난 브리핑 이후 신규 ${b.newFindings.length}건: ` + b.newFindings.slice(0, 5).map((r) => `${r.finding.finding_type}@${r.assetName}`).join(" / "));
   if (b.overdue.length) lines.push(`- ⚠ 기한 초과 ${b.overdue.length}건: ` + b.overdue.slice(0, 5).map((r) => `${r.finding.finding_type}(기한 ${r.dueDate}, 담당 ${r.assignee || "미지정"})`).join(" / "));
   if (b.dueSoon.length) lines.push(`- 기한 임박(D-2) ${b.dueSoon.length}건: ` + b.dueSoon.slice(0, 5).map((r) => `${r.finding.finding_type}(기한 ${r.dueDate})`).join(" / "));
-  if (b.threats.length) lines.push(`- 우리 자산 관련 위협 ${b.threats.length}건: ` + b.threats.map((t) => `[${t.severity}] ${t.type}→${t.assets.join(",")}`).join(" / "));
+  if (b.threats.length) lines.push(`- 우리 자산 관련 위협 ${b.threats.length}건: ` + b.threats.map((t) => `[${심각도한글(t.severity)}] ${t.type}→${t.assets.join(",")}`).join(" / "));
   lines.push(`- 오늘 추천: ` + b.recommendations.map((r, i) => `${i + 1}) ${r}`).join(" "));
   return lines.join("\n").slice(0, 2500);
 }

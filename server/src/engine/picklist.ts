@@ -14,6 +14,10 @@
 
 import { prioritizedReviews } from "./approvals";
 import { listAssets } from "./assets";
+// ⚠ 심각도 우리말은 **한 곳에서만** 만든다(tone.ts). 실측(2026-08-03): 영문 심각도가 담당자
+//   화면에 나가는 자리가 여덟 곳이었고, 자리마다 따로 만들면 어떤 화면은 "critical",
+//   어떤 화면은 "매우 심각"이 되어 같은 것이 둘로 보인다.
+import { 심각도한글 } from "./tone";
 
 export interface PickItem {
   id: string; // "assetId::findingKey" — 조치할 때 그대로 돌려보낸다
@@ -51,7 +55,10 @@ type Review = ReturnType<typeof prioritizedReviews>[number];
 function toPickItem(r: Review): PickItem {
   return {
     id: `${r.assetId}::${r.findingKey}`,
-    label: `[${r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName}`,
+    // ⚠ **영문 심각도를 그대로 내보내고 있었다**(2026-08-31 설계 검토에서 발견). 라이브 실측:
+    //   체크칸 라벨이 「[critical] Apache Log4j…」였다. severity-korean 감시가 agenttools
+    //   소스만 읽어서(toolsrc) 이 파일은 감시 밖이었다 — 그래서 아무도 못 잡았다.
+    label: `[${심각도한글(r.finding.severity)}] ${r.finding.finding_type} @ ${r.assetName}`,
     severity: r.finding.severity,
     ...(r.assignee ? { assignee: r.assignee } : {}),
     ...(r.dueDate ? { dueDate: r.dueDate } : {}),
@@ -193,7 +200,7 @@ export function findingListAnswer(text = "", 걸린범위?: string | null): { ou
   const lines = 보여줄.map((r) => {
     const who = r.assignee ? `담당 ${r.assignee}` : "담당 미배정";
     const due = r.dueDate ? `기한 ${r.dueDate}` : "기한 없음";
-    return `- **[${r.finding.severity}]** ${r.finding.finding_type} @ ${r.assetName} — ${who} · ${due}`;
+    return `- **[${심각도한글(r.finding.severity)}]** ${r.finding.finding_type} @ ${r.assetName} — ${who} · ${due}`;
   });
   // 좁혔으면 **무엇으로 좁혔는지 머리줄에 적는다** — 안 적으면 전체인 줄 안다.
   const 머리 =
