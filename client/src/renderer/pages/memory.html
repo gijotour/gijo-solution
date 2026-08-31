@@ -290,6 +290,7 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel">
       <div class="panel-title">📚 올린 문서 확인 · 관리 <span id="dmSummary" style="font-size:12.25px;font-weight:600;color:var(--muted-2);margin-left:6px"></span></div>
+      <div class="g-seg" id="dmViewSeg" style="margin:-4px 0 8px"><span class="on" data-v="list">목록</span><span data-v="heat">히트맵</span></div>
       <!-- 지표 줄(카드 언어, 2026-08-31) — 라벨 위/값 아래. 숫자는 목록과 **같은 원천**을
            쓴다(dmDocs) — 새로 세지 않는다(잣대 두 벌 금지). 좁아지면 열이 접힌다. -->
       <div class="g-scard-k" id="dmKpis" style="margin:0 -16px 10px;border-top:0"></div>
@@ -583,6 +584,7 @@ tr:last-child td{border-bottom:none;}
 
   // ── 올린 문서 확인·관리(장기기억) — 목록 + 상세 + 삭제 2옵션(장기기억만 / 원본까지) ──
   let dmDocs = [];
+  let dmView = "list"; // 📋 목록 | 🔥 히트맵(2026-08-31) — 기본은 목록(게시 관문 계약)
   let dmSelected = null;
   let dmConfirmId = null;
   const DM_ICON = (name) => /\.pdf$/i.test(name) ? "📕" : /\.hwpx?$/i.test(name) ? "📘" : /\.md$/i.test(name) ? "📝" : "📄";
@@ -672,6 +674,18 @@ tr:last-child td{border-bottom:none;}
     renderDmSeg();
     const list = document.getElementById("dmList");
     if (!list) return;
+    // 🔥 보기 전환 칩(목록|히트맵) 배선 — 그릴 때마다 붙이지 않고 한 번만(중복 리스너 금지).
+    const seg = document.getElementById("dmViewSeg");
+    if (seg && !seg.dataset.bound) {
+      seg.dataset.bound = "1";
+      seg.addEventListener("click", (ev) => {
+        const b = ev.target.closest("span[data-v]");
+        if (!b || b.dataset.v === dmView) return;
+        dmView = b.dataset.v;
+        seg.querySelectorAll("span").forEach((x) => x.classList.toggle("on", x === b));
+        renderDmList(true);
+      });
+    }
     const groups = DM_GROUPS.filter((g) => dmSegSel === "전체" || g.c === dmSegSel)
       .map((g) => ({ ...g, docs: dmDocs.filter((d) => dmCatOf(d) === g.c) }))
       .filter((g) => g.docs.length > 0);
@@ -692,6 +706,29 @@ tr:last-child td{border-bottom:none;}
       const d = new Date(t);
       return String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
     };
+    // 🔥 히트맵 보기(2026-08-31 사장님 「히트맵은 있었으면」) — 목록과 **같은 dmDocs**를
+    //   타일로 편다. 부품은 공용 .g-tiles/.g-tile(카드 골격과 한 벌).
+    // ⚠ 색은 대화창 카드의 색 사전(치명/높음/정상 — **심각도**)을 쓰지 않는다: 여기 데이터는
+    //   심각도가 아니라 **지식화 상태**라 그 사전이 원리상 안 걸린다(설계관 ①이 지적한 자리).
+    //   두 벌이 아니라 **다른 축**이므로 이 화면에서 판단한다 — 규칙은 셋뿐이고 값 그대로다:
+    //     조각 0 = 못 읽은 문서(bad) · 열람 등급 미지정 = 관리 필요(warn) · 그 외 정상(ok).
+    // ⚠ 기본 보기는 **목록**이다(게시 관문이 .g-rows-r > 0을 요구 — 설계관 ⑤-9).
+    if (dmView === "heat") {
+      const 타일 = dmDocs.map((d) => {
+        const cls = !d.chunks ? "bad" : !d.grade ? "warn" : "ok";
+        const 뜻 = !d.chunks ? "못 읽음" : !d.grade ? "등급 미지정" : "정상";
+        return `<div class="g-tile ${cls}" data-id="${dmEsc(d.documentId)}" title="${dmEsc(d.documentId)} — ${뜻} · 조각 ${d.chunks}">` +
+          `<div class="tv ${cls}">${d.chunks}</div>` +
+          `<div class="tl">${dmEsc(d.documentId)}</div>` +
+          `<div class="ts">${뜻}</div></div>`;
+      }).join("");
+      list.innerHTML = dmDocs.length
+        ? `<div class="g-tiles">${타일}</div>`
+        : '<div class="dm-empty">문서가 없습니다.</div>';
+      list.querySelectorAll(".g-tile").forEach((el) =>
+        el.addEventListener("click", () => selectDoc(el.getAttribute("data-id"))));
+      return;
+    }
     // 열 머리를 스크롤 안 첫 요소로(검토관 중5 — 밖에 두면 스크롤바 폭만큼 어긋난다)
     const 머리 = '<div class="g-rows-head"><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>';
     list.innerHTML = 머리 + groups.map((g) => {

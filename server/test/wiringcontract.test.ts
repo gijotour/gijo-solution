@@ -596,3 +596,20 @@ describe("지식 창고 잣대 통일 — 「올린 문서」 수는 한 가지�
     expect(md, "내 문서 배지의 회사문서만 잣대가 사라졌다").toContain("회사문서만");
   });
 });
+
+describe("카드 언어 — 지식 창고 보기 전환(2026-08-31 사장님 「히트맵은 있었으면」)", () => {
+  it("히트맵은 있고 **기본은 목록**이다 — 기본이 뒤집히면 게시 관문이 막힌다", () => {
+    const m = 코드만(join(PAGES, "memory.html"));
+    expect(m, "보기 전환 칩이 없다").toContain('id="dmViewSeg"');
+    expect(m, "히트맵 보기가 없다").toContain('dmView === "heat"');
+    // ⚠ 기본값 계약: publish-gate ③′가 `.g-rows--docs .g-rows-r > 0`을 요구한다 —
+    //   기본이 히트맵이 되면 행이 0이라 게시가 막힌다(설계관 ⑤-9가 미리 짚은 자리).
+    expect(m, "기본 보기가 목록이 아니다 — 게시 관문(.g-rows-r>0)이 막힌다").toMatch(/dmView\s*=\s*"list"/);
+    // 공용 부품을 쓴다(화면 전용 타일 CSS를 새로 만들지 않았는지)
+    expect(m, "히트맵이 공용 타일 부품을 안 쓴다").toContain("g-tiles");
+    const css = 코드만(join(PAGES, "gijo-ui.css"));
+    for (const 부품 of [".g-scard", ".g-scard-k", ".g-seg", ".g-tiles", ".g-tile"]) {
+      expect(css, `공용 카드 골격 ${부품}가 사라졌다`).toContain(부품);
+    }
+  });
+});
