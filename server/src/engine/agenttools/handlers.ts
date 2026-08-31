@@ -3731,3 +3731,87 @@ export async function runDeleteReportSchedule(args: Record<string, string>): Pro
   deleteSchedule(고름.id);
   return `정기 리포트 일정을 지웠습니다 — ${SCHEDULE_TYPE_LABEL[고름.type]} (${고름.hour}시). 자동 생성이 멈춥니다.\n이미 만들어진 리포트는 그대로 남아 있습니다.`;
 }
+
+// ── 관제 이벤트 상태 바꾸기 · 보안제품 지우기 (2026-08-31) ────────────────────
+//
+// ■ 왜 (대장 §2 끊김 4 · §7 끊김 3)
+//   둘 다 **엔진은 있는데 대화 도구가 없어** 화면 버튼으로만 되던 자리다.
+//   · 이벤트 상태: analysishub.ts `setEventStatus`가 있는데 화면 API만 그것을 썼다.
+//     (update_finding_status는 **취약점 전용**이라 관제 이벤트는 받지 못했다.)
+//   · 제품 삭제: securityproducts.ts `deleteProduct`가 자식 문서까지 지우는데 대화 길이 없었다.
+//
+// ⚠ 상태 이름은 **엔진의 EventStatus 그대로**다(open·ack·inprogress·done·ignored).
+//   화면에 보일 우리말은 여기 한 곳에서만 만든다 — 자리마다 지으면 같은 상태가 둘로 보인다.
+
+const 이벤트상태글: Record<string, string> = {
+  open: "열림", ack: "확인함", inprogress: "처리 중", done: "완료", ignored: "무시",
+};
+/** 사람 말 → EventStatus. 못 읽으면 null(지어내지 않는다). */
+function 이벤트상태해석(값: string | undefined): "open" | "ack" | "inprogress" | "done" | "ignored" | null {
+  const t = (값 ?? "").trim();
+  if (!t) return null;
+  if (/^(open|ack|inprogress|done|ignored)$/.test(t)) return t as "open";
+  if (/확인|접수|봤/.test(t)) return "ack";
+  if (/처리\s*중|진행/.test(t)) return "inprogress";
+  if (/완료|끝|해결/.test(t)) return "done";
+  if (/무시|보류|해당\s*없/.test(t)) return "ignored";
+  if (/열림|미처리|다시\s*열/.test(t)) return "open";
+  return null;
+}
+
+/** 관제 이벤트 상태 바꾸기 — 「이 이벤트 확인 처리로 바꿔줘」(대장 §2 끊김 4). */
+export async function runSetEventStatus(args: Record<string, string>): Promise<string> {
+  const { listAnalysisEvents, setEventStatus } = await import("../analysishub.js");
+  const 상태 = 이벤트상태해석(args.status ?? args.decision ?? "");
+  if (!상태) {
+    return `어떤 상태로 바꿀지 알려 주세요 — 확인함 · 처리 중 · 완료 · 무시 중에서 (받은 값: "${args.status ?? ""}").`;
+  }
+  const 전부 = listAnalysisEvents();
+  if (!전부.length) return "관제 이벤트가 없습니다 — 로그·리포트를 반입하면 여기 쌓입니다.";
+  const q = (args.event ?? args.title ?? args.entity ?? "").trim();
+  // 가장 긴 일치를 고른다 — 다른 도구들과 같은 규칙(새 잣대를 만들지 않는다).
+  const 걸린 = q
+    ? 전부
+        .filter((e) => e.title.includes(q) || q.includes(e.title) || e.entity.includes(q) || e.id === q)
+        .sort((a, b) => b.title.length - a.title.length)
+    : 전부;
+  if (!걸린.length) {
+    const 예 = 전부.slice(0, 5).map((e) => `${e.title} (${e.entity})`).join(", ");
+    return `"${q}"에 맞는 이벤트를 못 찾았습니다. 최근 이벤트: ${예}`;
+  }
+  if (!q && 걸린.length > 1) {
+    const 목록 = 걸린.slice(0, 8).map((e) => `- ${e.title} (${e.entity} · ${이벤트상태글[e.status ?? "open"]})`).join("\n");
+    return `어느 이벤트인지 말씀해 주세요:\n${목록}`;
+  }
+  const 고름 = 걸린[0];
+  setEventStatus(고름.id, 상태, (args.note ?? "").trim(), 행위자());
+  return `관제 이벤트 상태를 바꿨습니다 — 「${고름.title}」(${고름.entity}) · ${이벤트상태글[고름.status ?? "open"]} → **${이벤트상태글[상태]}**`;
+}
+
+/** 보안제품 지우기 — 「FW-01 등록부에서 삭제해줘」(대장 §7 끊김 3). */
+export async function runDeleteProduct(args: Record<string, string>): Promise<string> {
+  const { listProducts, deleteProduct } = await import("../securityproducts.js");
+  const q = (args.name ?? args.product ?? "").trim();
+  const 전부 = listProducts();
+  if (!전부.length) return "등록된 보안제품이 없습니다.";
+  if (!q) {
+    const 예 = 전부.slice(0, 8).map((p) => p.name).join(", ");
+    return `어느 제품을 지울지 알려 주세요 — 등록된 것: ${예}`;
+  }
+  const 걸린 = 전부
+    .filter((p) => p.name === q || p.name.includes(q) || q.includes(p.name))
+    .sort((a, b) => b.name.length - a.name.length);
+  if (!걸린.length) {
+    const 예 = 전부.slice(0, 8).map((p) => p.name).join(", ");
+    return `"${q}"에 맞는 제품을 못 찾았습니다. 등록된 것: ${예}`;
+  }
+  if (걸린.length > 1 && !걸린.some((p) => p.name === q)) {
+    return `여러 개가 걸립니다 — 정확한 이름으로 말씀해 주세요: ${걸린.slice(0, 6).map((p) => p.name).join(", ")}`;
+  }
+  const 고름 = 걸린.find((p) => p.name === q) ?? 걸린[0];
+  const 지움 = deleteProduct(고름.id);
+  // FAIL_MARKS-예외: **진짜 실패의 오류문**이다 — 고른 뒤 지우기 사이에 남이 먼저 지운 경우다
+  //   (0건이라는 정직한 사실이 아니라 처리가 안 된 것).
+  if (!지움) return `제품을 지우지 못했습니다 — 「${고름.name}」(그새 지워졌을 수 있습니다).`;
+  return `보안제품을 등록부에서 지웠습니다 — 「${고름.name}」.\n⚠ 그 제품에 매달려 있던 **매뉴얼·점검 문서도 함께** 지워집니다. 점검 일정은 남으니 필요 없으면 따로 정리하세요.`;
+}

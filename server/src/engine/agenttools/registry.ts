@@ -207,6 +207,8 @@ import {
   runReviewMaintenance,
   runUpdateReportSchedule,
   runDeleteReportSchedule,
+  runSetEventStatus,
+  runDeleteProduct,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -1991,6 +1993,43 @@ const TOOLS: AgentTool[] = [
     effect: (args) => `${args.name}의 소개 항목(${args.key})을 「${args.value}」로 기록합니다 — 비교표와 지식 관계(온톨로지)에 반영.`,
     undo: "같은 항목에 빈 값을 기록하면 지워집니다.",
     run: runSetIntroField,
+  },
+  {
+    // 🖥 관제 이벤트 상태 바꾸기 — 「이 이벤트 확인 처리로 바꿔줘」(대장 §2 끊김 4).
+    //   ⚠ update_finding_status는 **취약점 전용**이라 관제 이벤트를 못 받았다. 엔진
+    //     (analysishub setEventStatus)은 있는데 화면 API만 그것을 썼다.
+    name: "set_event_status",
+    label: "관제 이벤트 상태 바꾸기",
+    // ⚠ domain은 정해진 아홉 값 + cross다(TOOL_DOMAINS). "analysis"는 **없는 값**이라 tsc가
+    //   잡았다 — 관제 이벤트는 로그·취약점·리포트를 가로지르므로 cross가 맞다.
+    domain: "cross",
+    write: true,
+    description:
+      '관제(분석 허브) 이벤트의 처리 상태를 바꾼다 — 확인함·처리 중·완료·무시. "이 이벤트 확인 처리로 바꿔줘"에 쓴다. 취약점 상태는 update_finding_status가 맡는다.',
+    params: [
+      { name: "event", label: "이벤트", description: "이벤트 제목이나 대상(호스트·IP)", required: true },
+      { name: "status", label: "상태", description: "확인함 / 처리 중 / 완료 / 무시", required: true },
+      { name: "note", label: "메모", description: "왜 그렇게 정했는지 (선택)", required: false },
+    ],
+    effect: (args) => `관제 이벤트 「${args.event ?? ""}」의 상태를 "${args.status ?? ""}"로 기록`,
+    undo: "다시 다른 상태로 바꾸면 됩니다(이력은 남습니다).",
+    run: runSetEventStatus,
+  },
+  {
+    // 🧰 보안제품 지우기 — 「FW-01 등록부에서 삭제해줘」(대장 §7 끊김 3).
+    //   ⚠ 자식 문서(매뉴얼·점검 문서)가 **함께 지워진다** — 결재판 문구에서 그 사실을 먼저 말한다.
+    //     되돌릴 수 없는 삭제라 되돌리기 안내도 「다시 등록」이라고 정직하게 적는다.
+    name: "delete_product",
+    label: "보안제품 지우기",
+    domain: "products", // ⚠ 단수 "product"가 아니다(TOOL_DOMAINS) — tsc가 잡아 줬다.
+    write: true,
+    description: '보안제품을 등록부에서 지운다(매뉴얼·점검 문서도 함께 지워진다). "FW-01 등록부에서 삭제해줘"에 쓴다.',
+    params: [
+      { name: "name", label: "제품명", description: "지울 보안제품 이름", required: true },
+    ],
+    effect: (args) => `보안제품 「${args.name ?? ""}」을 등록부에서 삭제 · **그 제품의 매뉴얼·점검 문서도 함께 삭제**`,
+    undo: "되돌릴 수 없습니다 — 필요하면 대화창에서 다시 등록해야 하고, 문서도 다시 올려야 합니다.",
+    run: runDeleteProduct,
   },
 ];
 
