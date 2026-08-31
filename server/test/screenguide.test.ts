@@ -462,6 +462,18 @@ describe("screenguide — 라이트는 자기 안내를 받는다", () => {
       const i = reg.indexOf('name: "' + n + '"');
       return i >= 0 && /write:\s*true/.test(reg.slice(i, i + 500));
     });
-    expect(쓰기, "라이트에 쓰기 도구가 생겼다 — LITE_OVERVIEW에 승인 창 안내를 되살릴 때다").toEqual([]);
+    // ★ 2026-08-31: 라이트에 **첫 쓰기 도구**가 생겼다(📂 지켜보는 폴더 등록·해제).
+    //   이 시험의 설계대로 「기대를 고치면서 안내를 손봤다」 — LITE_OVERVIEW의 tip에 승인 창
+    //   설명을, can에 두 예시 문장을 되살렸다. 그래서 이제 **안내와 도구가 함께** 지켜진다:
+    //   쓰기 도구가 여기 목록과 다르면 실패하고, 있으면 안내에 승인 창 문구가 있어야 한다.
+    expect(쓰기.sort(), "라이트 쓰기 도구 목록이 바뀌었다 — LITE_OVERVIEW의 승인 창 안내도 함께 손볼 것")
+      .toEqual(["watch_folder_add", "watch_folder_remove"]);
+    if (쓰기.length) {
+      const guide = fs.readFileSync(new URL("../src/engine/screenguide.ts", import.meta.url), "utf8");
+      const i = guide.indexOf("const LITE_OVERVIEW");
+      const 블록 = guide.slice(i, guide.indexOf("};", i));
+      expect(블록, "라이트에 쓰기 도구가 있는데 안내가 승인 창을 말하지 않는다(2026-08-18 검토관 계보)")
+        .toMatch(/승인 창|승인\]/);
+    }
   });
 });

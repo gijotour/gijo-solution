@@ -2304,7 +2304,9 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   var 라이트판 = new URLSearchParams(location.search).get("edition") === "lite";
   if (라이트판) {
     document.documentElement.classList.add("edition-lite");
-    ["learn", "future", "vendor", "watch"].forEach(function (t) { // watch: 지정 도구가 라이트 화이트리스트 밖 — 죽은 판 금지(v1 접힘, 라이트 반영 라운드에서 재판단)
+    // 📂 watch는 2026-08-31에 **폈다** — 지정 도구 3종을 라이트 허용목록에 넣었다(lite-tools.json).
+    //   라이트는 서버=내 PC라 「경로는 서버 기계의 폴더」 마찰이 없어 오히려 값어치가 크다(조사 결론).
+    ["learn", "future", "vendor"].forEach(function (t) {
       var n = document.querySelector('#tabs .v4node[data-t="' + t + '"]');
       if (n) n.style.display = "none";
     });

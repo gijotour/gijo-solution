@@ -176,6 +176,14 @@ export function watchFolderDocCount(folderId: number): number {
   return r.n;
 }
 
+/** 목록형 결과의 상한 — 충돌·등급막힘·스캔후보는 처음부터 5로 잘랐는데 **오류만 무상한**
+ *  이었다(2026-08-31 조사 지적). 500개가 전부 실패하면 last_result가 통째로 부풀어
+ *  DB·판·도구 답을 짓누른다. 잘랐으면 **잘랐다고 말한다**(조용한 절단 금지 — 아래 잘림). */
+function 오류담기(r: { 오류: string[]; 잘림: string | null }, 글: string): void {
+  if (r.오류.length < 5) { r.오류.push(글); return; }
+  r.잘림 = (r.잘림 ? r.잘림 + " · " : "") + "오류가 5건을 넘어 그 뒤는 줄였습니다";
+}
+
 interface 스캔결과 {
   ranAt: string; 새로: number; 갱신: number; 건너뜀: number;
   충돌: string[]; 등급막힘: string[]; 스캔후보: string[]; 비밀경고: string[]; 오류: string[]; 잘림: string | null;
@@ -210,7 +218,7 @@ export async function scanWatchFolder(folder: WatchFolderRow): Promise<스캔결
   //   저장값과 realpath가 다르거나 금지에 걸리면 **읽지 않고 보고**한다.
   const 재검 = 경로검증(folder.path);
   if (!재검.ok || 재검.real !== folder.path) {
-    r.오류.push(`경로가 등록 때와 다릅니다 — ${재검.ok ? `지금은 ${재검.real}를 가리킵니다` : 재검.error} · 안전을 위해 이번 확인을 건너뜁니다`);
+    오류담기(r, `경로가 등록 때와 다릅니다 — ${재검.ok ? `지금은 ${재검.real}를 가리킵니다` : 재검.error} · 안전을 위해 이번 확인을 건너뜁니다`);
     db.prepare("UPDATE watch_folders SET last_scan_at = ?, last_result = ? WHERE id = ?").run(r.ranAt, JSON.stringify(r), folder.id);
     return r;
   }
@@ -227,8 +235,8 @@ export async function scanWatchFolder(folder: WatchFolderRow): Promise<스캔결
     // ★ 예약 접두 거부(2026-08-31 검토관) — documentId=basename이라 「personal:…」 이름 파일이
     //   개인 문서 네임스페이스를 차지한다. personal_docs에 짝 행이 없어 **등록자 포함 전원에게
     //   숨는 유령 문서**가 되고 지우기도 어렵다. 리눅스 파일명엔 콜론이 허용돼 실제로 가능하다.
-    if (/^personal:/i.test(이름)) { r.오류.push(`${f.rel} — 「personal:」로 시작하는 이름은 개인 문서 자리라 반입하지 않습니다(이름을 바꿔 주세요)`); continue; }
-    if (f.size > 크기한도) { r.오류.push(`${f.rel} — ${Math.round(f.size / 1048576)}MB(상한 32MB)`); continue; }
+    if (/^personal:/i.test(이름)) { 오류담기(r, `${f.rel} — 「personal:」로 시작하는 이름은 개인 문서 자리라 반입하지 않습니다(이름을 바꿔 주세요)`); continue; }
+    if (f.size > 크기한도) { 오류담기(r, `${f.rel} — ${Math.round(f.size / 1048576)}MB(상한 32MB)`); continue; }
     const statKey = K_STAT(folder.id, f.rel);
     const statVal = `${Math.round(f.mtimeMs)}:${f.size}`;
     if ((상태읽기.get(statKey) as { value?: string } | undefined)?.value === statVal) { r.건너뜀++; continue; }
@@ -252,14 +260,14 @@ export async function scanWatchFolder(folder: WatchFolderRow): Promise<스캔결
         if (r.등급막힘.length < 5) r.등급막힘.push(이름); continue;
       }
       const 결과 = await autoRouteUpload(docId, bytes.toString("base64"), "document", undefined, folder.created_by_name ?? undefined, { keepOriginal: false });
-      if (결과.routedTo !== "memory") { r.오류.push(`${f.rel} — 인입 갈래가 예상 밖(${결과.routedTo})`); continue; }
+      if (결과.routedTo !== "memory") { 오류담기(r, `${f.rel} — 인입 갈래가 예상 밖(${결과.routedTo})`); continue; }
       // ★ **routedTo만 보면 실패가 성공이 된다**(2026-08-31 검토관 [높음]) — 문서 갈래는
       //   임베딩 미기동·추출 실패에도 routedTo:"memory"를 돌려주고 ingested:false를 함께 싣는다
       //   (autoupload 보관결과). 그때 stat·hash를 기록하면 **파일이 다시 바뀌기 전까지 영영
       //   재시도가 없고**, 영수증은 「반입 완료」라는 거짓을 남긴다(머리 주석의 「성공 후에만
       //   기록한다」 계약이 바로 이 자리다).
       if (!결과.ingested) {
-        r.오류.push(`${f.rel} — 지식 수집 보류(${결과.reason || "사유 미상"}) · 다음 확인 때 다시 시도합니다`);
+        오류담기(r, `${f.rel} — 지식 수집 보류(${결과.reason || "사유 미상"}) · 다음 확인 때 다시 시도합니다`);
         continue; // 기록하지 않는다 = 다음 틱 자연 재시도
       }
       상태쓰기.run(statKey, statVal);
@@ -281,7 +289,7 @@ export async function scanWatchFolder(folder: WatchFolderRow): Promise<스캔결
         detail: `📂 지켜보는 폴더 「${folder.label ?? folder.path}」 ${기존 ? "갱신" : "자동 반입"}: ${f.rel}`,
       });
     } catch (e) {
-      r.오류.push(`${f.rel} — ${e instanceof Error ? e.message.slice(0, 120) : String(e).slice(0, 120)}`);
+      오류담기(r, `${f.rel} — ${e instanceof Error ? e.message.slice(0, 120) : String(e).slice(0, 120)}`);
     }
   }
   db.prepare("UPDATE watch_folders SET last_scan_at = ?, last_result = ? WHERE id = ?")
