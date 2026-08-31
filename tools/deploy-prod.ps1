@@ -1,4 +1,4 @@
-# tools/deploy-prod.ps1 — 운영(WSL) 원클릭 배포. Mac에서 SSH로 원격 실행하는 용도.
+﻿# tools/deploy-prod.ps1 — 운영(WSL) 원클릭 배포. Mac에서 SSH로 원격 실행하는 용도.
 #   ssh user@10.8.0.1 "powershell -NoProfile -ExecutionPolicy Bypass -File 'd:/Connect AI/tools/deploy-prod.ps1'"
 #
 # 절차: hub pull(ff-only) → 서버 테스트 전체(실패 시 배포 중단) → WSL 동기화+빌드 → kill 재시작

@@ -64,15 +64,36 @@ const RANGE_SCHEMA = {
 };
 
 // 큰 파일은 겹침 분할(프로브 실사고: 2,000줄급이 슬롯 ctx를 넘으면 400) — 조각마다 묻고 범위 병합.
-const 조각줄수 = 1500, 겹침 = 150;
+//
+// ⚠⚠ **줄이 아니라 글자로 자른다**(2026-09-01 실측으로 고침).
+//   1,500줄 고정이었는데 **한글이 많은 파일에서 ctx를 넘겼다** — screenguide.ts의 1,500줄이
+//   66,597토큰이라 65,536을 초과해 **조각 하나가 통째로 날아갔다.** 줄 수는 토큰 수를 못 재는
+//   자다: 같은 1,500줄이 screenguide 102,719자 / handlers 68,261자로 **1.5배 차이**가 난다
+//   (한글 비율 45% vs 21%). 줄로 자르면 한글 많은 파일만 조용히 실패한다.
+//   실측 비율 1.54자/토큰 기준, 안전 예산 50,000토큰 ≈ 77,000자로 잡는다(ctx 65,536의 76%).
+const 조각글자수 = 70000, 겹침줄 = 150;
 
 function 발췌(경로, 물음) {
   const abs = path.isAbsolute(경로) ? 경로 : path.join(ROOT, 경로);
   const src = fs.readFileSync(abs, "utf8");
   const lines = src.split("\n");
+  // ⚠ **못 본 조각을 세어 둔다.** 예전에는 실패를 stderr 경고로만 흘리고 종료코드 0을 냈다.
+  //   그러면 이 발췌를 받아 쓰는 쪽(digest-pack·워크플로)은 **다 봤다고 믿는다** —
+  //   실제로는 파일의 일부를 아예 안 본 발췌인데도. 2026-09-01 screenguide.ts에서 그랬고,
+  //   꾸러미가 「실패 0」이라고 적었다. 조용한 폴백 금지가 이 파일의 첫 원칙인데 어겼다.
+  const 못본조각 = [];
   const 전체범위 = [];
-  for (let s = 0; s < lines.length; s += 조각줄수 - 겹침) {
-    const e = Math.min(lines.length, s + 조각줄수);
+  // 글자 예산에 맞춰 조각의 **끝 줄**을 정한다(겹침은 줄 단위 그대로).
+  const 조각끝 = (시작) => {
+    let 글자 = 0;
+    for (let i = 시작; i < lines.length; i++) {
+      글자 += lines[i].length + 1;
+      if (글자 > 조각글자수) return Math.max(시작 + 1, i); // 최소 한 줄은 담는다
+    }
+    return lines.length;
+  };
+  for (let s = 0; s < lines.length; ) {
+    const e = 조각끝(s);
     const 번호원문 = lines.slice(s, e).map((l, i) => `${s + i + 1}\t${l}`).join("\n");
     const prompt =
       `아래는 줄번호가 붙은 파일 일부다(${s + 1}~${e}줄/총 ${lines.length}줄). 질문에 답하는 데 필요한 부분의 **줄 범위**만 골라라.\n` +
@@ -80,8 +101,12 @@ function 발췌(경로, 물음) {
     try {
       const out = JSON.parse(gb10Chat(prompt, RANGE_SCHEMA, 256));
       for (const [a, b] of out.ranges || []) if (a >= s + 1 && b <= e) 전체범위.push([a, b]);
-    } catch (e2) { console.error(`⚠ 조각 ${s + 1}~${e} 실패: ${e2.message}`); }
+    } catch (e2) {
+      못본조각.push([s + 1, e]);
+      console.error(`⚠ 조각 ${s + 1}~${e} 실패: ${e2.message}`);
+    }
     if (e >= lines.length) break;
+    s = Math.max(s + 1, e - 겹침줄); // 겹쳐서 다음 조각 — 경계에 걸친 함수를 놓치지 않는다
   }
   // 병합·출력 — 본문은 **기계가 원문을 자른다**
   전체범위.sort((x, y) => x[0] - y[0]);
@@ -92,12 +117,24 @@ function 발췌(경로, 물음) {
     else 병합.push([...r]);
   }
   const 총 = 병합.reduce((a, [x, y]) => a + (y - x + 1), 0);
-  console.log(`# ${경로} — ${lines.length}줄 중 ${총}줄 발췌 (${병합.length}구간 · gb10 30B-A3B · 원문 그대로)`);
+  // ⚠ 못 본 구간을 **머리글에 적는다** — 받는 쪽이 읽는 첫 줄이라 여기 없으면 못 본 것이 된다.
+  const 못본줄 = 못본조각.reduce((a, [x, y]) => a + (y - x + 1), 0);
+  console.log(
+    `# ${경로} — ${lines.length}줄 중 ${총}줄 발췌 (${병합.length}구간 · gb10 30B-A3B · 원문 그대로)` +
+      (못본조각.length
+        ? `
+# ⚠⚠ **못 본 구간이 있다** — ${못본조각.length}조각 ${못본줄}줄(${못본조각.map(([x, y]) => `${x}~${y}`).join(", ")})을 gb10이 못 읽었다.
+` +
+          "# 이 발췌는 **파일 전체를 본 것이 아니다** — 그 구간이 중요하면 원문을 직접 읽어라."
+        : ""),
+  );
   for (const [a, b] of 병합) {
     console.log(`\n── ${a}~${b}줄 ──`);
     console.log(lines.slice(a - 1, b).map((l, i) => `${a + i}\t${l}`).join("\n"));
   }
   if (!병합.length) console.log("(관련 구간 없음 — 질문을 좁히거나 원문을 직접 읽어라)");
+  // ⚠ **실패는 종료코드로도 말한다.** 글로만 적으면 자동으로 엮는 쪽(digest-pack)이 못 알아챈다.
+  if (못본조각.length) process.exitCode = 1;
 }
 
 // ── review: diff 1차 선별 ────────────────────────────────────────────────────
@@ -138,16 +175,30 @@ function 리뷰(커밋) {
     ? execFileSync("git", ["diff", "--no-color", "HEAD"], { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })
     : execFileSync("git", ["show", "--no-color", ref], { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
   if (!diff.trim()) { console.log(`# ${ref} — 변경 없음`); return; }
+  // ⚠⚠ **지워진 줄을 아예 안 보여 준다**(2026-09-01 실측으로 고침).
+  //   diff를 통째로 주면 모델이 `-` 줄(방금 고친 **옛 결함**)을 읽고 그것을 결함으로 올린다.
+  //   수리 커밋에서 특히 심하다 — ea8dc515 선별에서 후보 8건이 **전부** 「고쳤지만 이전에는
+  //   문제가 있었다」였다. 커밋 메시지를 되풀이한 것이지 결함을 찾은 게 아니다.
+  //   「옛 코드는 보지 마라」고 **부탁하면 안 지킨다** — 이 저장소의 오래된 교훈대로
+  //   **코드로 해결한다**: 지워진 줄을 물리적으로 빼서 볼 수가 없게 만든다.
+  //   (남는 것은 새 코드 `+`와 둘레 문맥 — 「지금 코드에 남아 있는 결함」만 볼 수 있다.)
+  const 줄바꿈 = String.fromCharCode(10);
+  const 새코드만 = diff
+    .split(줄바꿈)
+    .filter((l) => !(l.startsWith("-") && !l.startsWith("---")))
+    .join(줄바꿈);
   const 조각크기 = 60000; // 문자 기준 — ctx 여유
   const all = [];
   let 실패조각 = 0;
   let 버린수 = 0; // 스스로 「결함 없다」고 적은 후보 — 숫자를 정직하게 밝힌다
-  for (let i = 0; i < diff.length; i += 조각크기) {
-    const 부분 = diff.slice(i, i + 조각크기);
+  for (let i = 0; i < 새코드만.length; i += 조각크기) {
+    const 부분 = 새코드만.slice(i, i + 조각크기);
     const prompt =
-      `아래는 git 커밋 diff의 일부다. **결함 후보**를 골라라 — 로직 오류, 옮기다 남긴 것(leftover), ` +
-      `약속(주석·메시지)과 코드의 불일치, 반쪽 수리. 스타일 지적 금지. 확실하지 않으면 빼라(적은 게 낫다).\n` +
-      `quote는 diff에서 **그대로 복사**한 줄이어야 한다.\n\n${부분}`;
+      `아래는 git 커밋의 **바뀐 뒤 코드**다(지워진 줄은 빼 놓았다 — 옛 코드는 볼 수 없다).\n` +
+      `**지금 이 코드에 남아 있는 결함 후보**를 골라라 — 로직 오류, 옮기다 남긴 것(leftover), ` +
+      `약속(주석·메시지)과 코드의 불일치, 반쪽 수리. 스타일 지적 금지.\n` +
+      `⚠ 「전에는 …였는데 고쳤다」는 결함이 아니다 — 그건 이 커밋이 한 일이다. 그런 것은 올리지 마라.\n` +
+      `⚠ 확실하지 않으면 빼라(적은 게 낫다). quote는 아래에서 **그대로 복사**한 줄이어야 한다.\n\n${부분}`;
     // 잘림에 강하게: 넉넉히 주고(3072), 그래도 깨지면 **더 좁은 스키마로 한 번 더** 묻는다.
     //   두 번 다 실패하면 조용히 넘기지 않고 **실패로 센다**(아래 머리글이 그 수를 말한다).
     let 담았나 = false;

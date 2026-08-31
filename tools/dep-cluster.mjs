@@ -25,10 +25,36 @@ const 뿌리 = "server/src";
 const B = String.fromCharCode(92);
 const NL = String.fromCharCode(10);
 
-const 블록주석 = new RegExp(B + "/" + B + "*[" + B + "s" + B + "S]*?" + B + "*" + B + "/", "g");
-const 줄주석 = new RegExp("(^|[^:])" + B + "/" + B + "/.*$");
-const 주석빼기 = (원문) =>
-  원문.replace(블록주석, "").split(NL).map((l) => l.replace(줄주석, "$1")).join(NL);
+/**
+ * 주석만 걷어낸다 — **따옴표 안은 건드리지 않는다.**
+ *
+ * ⚠⚠ 처음엔 정규식으로 대충 지웠다(`(^|[^:])//.*$`). URL의 `://`만 피하면 될 줄 알았는데,
+ *   `"a//b"` 같은 **문자열 속 //**부터 뒤를 통째로 잘라 먹었다. 실측(2026-09-01):
+ *   그 방식은 서버 200개 파일에서 화살 **21개**를 놓쳤다 — knowledgebundle.ts는 17개 전부.
+ *   재는 도구가 틀리면 고칠 것을 잘못 고른다. 그래서 **글자를 하나씩 따라가며** 판정한다.
+ *   (같은 파일 안에서 이 병을 두 번 겪었다 — 처음엔 주석 속 옛 코드를 세어 이미 끊은
+ *    화살을 「살아있음」이라 했고, 두 번째가 이것이다.)
+ */
+const 주석빼기 = (원문) => {
+  let out = "", i = 0;
+  const n = 원문.length;
+  let 따옴 = null, 블록 = false, 줄 = false;
+  while (i < n) {
+    const c = 원문[i], d = 원문[i + 1];
+    if (블록) { if (c === "*" && d === "/") { 블록 = false; i += 2; continue; } if (c === NL) out += c; i++; continue; }
+    if (줄) { if (c === NL) { 줄 = false; out += c; } i++; continue; }
+    if (따옴) {
+      if (c === B) { out += c + (원문[i + 1] ?? ""); i += 2; continue; } // 이스케이프는 통째로 넘긴다
+      if (c === 따옴) 따옴 = null;
+      out += c; i++; continue;
+    }
+    if (c === '"' || c === "'" || c === "`") { 따옴 = c; out += c; i++; continue; }
+    if (c === "/" && d === "*") { 블록 = true; i += 2; continue; }
+    if (c === "/" && d === "/") { 줄 = true; i += 2; continue; }
+    out += c; i++;
+  }
+  return out;
+};
 
 // from "..." / await import("...") / require("...") — 값과 동적만. `import type`은 뺀다.
 const 값RE = new RegExp("^" + B + "s*import" + B + "s+(?!type[" + B + "s{])[" + B + "s" + B + "S]*?from" + B + "s*[\"']([^\"']+)[\"']", "gm");
