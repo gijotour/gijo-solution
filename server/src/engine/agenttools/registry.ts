@@ -203,6 +203,8 @@ import {
   runProductIntroAdd,
   runProductCompare,
   runSetIntroField,
+  runSubmitMaintenanceReport,
+  runReviewMaintenance,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -1135,6 +1137,52 @@ const TOOLS: AgentTool[] = [
     effect: (args) => `점검 일정 등록 — ${(args.productName ?? "").trim()} · ${(args.scheduleDate ?? "").trim()} · 알림/승인 흐름과 연동`,
     undo: "운영 가이드(점검) 화면에서 일정을 삭제하면 원복됩니다.",
     run: runScheduleMaintenance,
+  },
+  {
+    // 📋 점검서 올리기 — schedule_maintenance(등록)·maintenance_status(조회)의 **마지막 짝**.
+    //   ⚠ 이 도구가 없어서, 정기 점검 화면의 [점검서 올리기] 단추가 대화창에 넣어 주는
+    //     「「○○」 점검서를 올릴게」가 **받아 줄 곳이 없었다**(2026-08-31 대장 §4 끊김 3).
+    //     제품이 시킨 대로 쳤는데 아무 일도 안 일어나는 자리는 없어야 한다.
+    name: "submit_maintenance_report",
+    label: "점검서 올리기",
+    domain: "maintenance",
+    write: true,
+    description:
+      '끝낸 정기 점검의 결과를 적어 낸다(상태 → 승인 대기). item(어느 점검)과 note(점검 결과)가 필요하다. 예: {"item":"방화벽 정책 점검","note":"이상 없음"}',
+    params: [
+      { name: "item", label: "점검", description: "점검명 또는 제품명", required: true },
+      { name: "note", label: "점검 결과", description: "무엇을 확인했고 어땠는지", required: true },
+      { name: "reportDocName", label: "첨부 점검서", description: "지식베이스에 올린 점검서 문서명 (선택)", required: false },
+    ],
+    // ⚠ effect는 **함수**다(args를 받아 결재판에 보일 한 줄을 만든다) — 문자열이 아니다.
+    effect: (args) => `「${args.item ?? "점검"}」의 점검서를 올려 상태를 **승인 대기**로 바꿉니다 · 결과: ${(args.note ?? "").slice(0, 40) || "(비어 있음)"}`,
+    undo: "관리자가 반려하면 다시 점검서를 올릴 수 있습니다.",
+    run: runSubmitMaintenanceReport,
+  },
+  {
+    // 📋 점검 승인·반려 — **admin만**. 화면에서도 서버가 막고 있던 것을 대화에도 같은 급으로 둔다.
+    //   ⚠ 반려는 **이유가 필수**다(엔진 rejectItem이 reason을 받는다) — 이유 없는 반려는
+    //     담당자가 무엇을 다시 해야 할지 모른다.
+    name: "review_maintenance",
+    label: "점검 승인·반려",
+    domain: "maintenance",
+    write: true,
+    requiredRole: "admin",
+    description:
+      '승인 대기 중인 정기 점검을 승인하거나 반려한다(관리자). decision에 "승인" 또는 "반려"를, 반려면 reason도 준다. 예: {"item":"방화벽 정책 점검","decision":"승인"}',
+    params: [
+      { name: "item", label: "점검", description: "점검명 또는 제품명 (승인 대기 중인 것)", required: true },
+      { name: "decision", label: "승인/반려", description: '"승인" 또는 "반려"', required: true },
+      { name: "reason", label: "반려 이유", description: "반려할 때만 — 무엇을 보완해야 하는지", required: false },
+    ],
+    effect: (args) => {
+      const 반려 = /반려|거절|돌려/.test(args.decision ?? "");
+      return 반려
+        ? `「${args.item ?? "점검"}」을 **반려**합니다 · 이유: ${(args.reason ?? "").slice(0, 40) || "(비어 있음 — 반려하려면 필요합니다)"}`
+        : `「${args.item ?? "점검"}」을 **승인**해 완료로 닫습니다(반복 점검이면 다음 회차가 자동 생성).`;
+    },
+    undo: "되돌리려면 담당자가 점검서를 다시 올려야 합니다.",
+    run: runReviewMaintenance,
   },
   {
     name: "asset_coverage",

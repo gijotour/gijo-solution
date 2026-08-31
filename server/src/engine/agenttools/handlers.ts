@@ -19,7 +19,7 @@ import { targetRunner, runnerFor } from "../hardeningscan";
 import { listTargets } from "../hardeningtargets";
 import { 잃은취약점찾기, 잃은취약점현황글, 되살리기 } from "../findingsrestore";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "../securityproducts";
-import { listMaintenanceItems, createMaintenanceItem } from "../maintenance";
+import { listMaintenanceItems, createMaintenanceItem, submitReport, approveItem, rejectItem, type MaintenanceItem } from "../maintenance";
 import { listCompliance, setComplianceStatus } from "../compliance";
 import { generateSbom } from "../sbom";
 import type { ComplianceStatus } from "../compliance";
@@ -3545,4 +3545,98 @@ export function runSetIntroField(args: Record<string, string>): string {
   return v
     ? `${it.name}의 ${항목.label}${조사(항목.label, "을")} 「${v}」로 기록했습니다 — 비교표와 지식 관계(온톨로지)에 바로 반영됩니다.`
     : `${it.name}의 ${항목.label} 값을 지웠습니다.`;
+}
+
+// ── 정기 점검 닫기 — 점검서 올리기 · 승인/반려 (2026-08-31) ───────────────────
+//
+// ■ 왜 (대장 §4 끊김 3·4 · §5 끊김 3)
+//   엔진은 **처음부터 다 있었다**(maintenance.ts submitReport·approveItem·rejectItem).
+//   빠진 것은 대화 도구뿐이라, 정기 점검을 **화면 버튼으로만** 닫을 수 있었다.
+//   더 나쁜 것은 화면이 담당자에게 **말을 시켜 놓고 받지 못했다**는 점이다 —
+//   [점검서 올리기] 단추가 대화창에 「「○○」 점검서를 올릴게」라는 문장을 직접 넣어 주는데,
+//   그 말을 받는 분기도 도구도 없었다(route-explain: 걸리는 규칙 없음).
+//   제품이 시킨 대로 쳤는데 아무 일도 안 일어나는 자리다.
+//
+// ■ 무엇을 안 하나
+//   점검 항목 **생성**은 이미 schedule_maintenance가 한다 — 여기서 또 만들지 않는다.
+//   상태 전이 규칙(reported만 승인 가능 등)도 maintenance.ts가 정본이다. 여기서 다시 판정하지
+//   않고 엔진이 던지는 말을 그대로 사람에게 전한다(잣대가 두 벌이 되면 어긋난다).
+
+/** 지금 지시한 사람 — 감사·이력에 남는 이름(runKnowledgeBundleImport와 같은 방식). */
+function 행위자(): string {
+  const v = currentViewer();
+  return (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)";
+}
+
+/** 점검 이름·제품명으로 점검 항목 하나를 고른다. 여러 개면 고르라고 말한다(지어내지 않는다). */
+function 점검찾기(말: string, 상태?: MaintenanceItem["status"]): MaintenanceItem | string {
+  const q = (말 ?? "").trim();
+  const 전부 = listMaintenanceItems().filter((x) => (상태 ? x.status === 상태 : true));
+  if (!전부.length) {
+    return 상태 === "reported"
+      ? "승인 대기 중인 점검이 없습니다 — 점검서가 올라온 것이 있어야 승인할 수 있습니다."
+      : "등록된 정기 점검이 없습니다. 대화창에 \"○○ 정기점검 잡아줘\"라고 하시면 일정을 등록합니다.";
+  }
+  if (!q) {
+    if (전부.length === 1) return 전부[0];
+    const 목록 = 전부.slice(0, 8).map((x) => `- ${x.title} (${x.productName} · ${x.scheduleDate})`).join("\n");
+    return `어느 점검인지 말씀해 주세요:\n${목록}`;
+  }
+  // 가장 긴 일치를 고른다 — 「FOCS」와 「FOCS 메뉴얼 ver1 2」가 다 걸리면 긴 쪽이 맞다
+  // (schedule_maintenance의 제품명 대조와 같은 규칙 — 잣대를 새로 만들지 않는다).
+  const 걸린 = 전부
+    .filter((x) => q.includes(x.title) || q.includes(x.productName) || x.title.includes(q))
+    .sort((a, b) => b.title.length - a.title.length);
+  if (!걸린.length) {
+    const 예 = 전부.slice(0, 6).map((x) => x.title).join(", ");
+    return `"${q}"에 맞는 점검을 못 찾았습니다. 등록된 점검: ${예}`;
+  }
+  return 걸린[0];
+}
+
+/** 점검서 올리기 — 담당자가 점검을 마치고 결과를 적어 낸다(상태: 예정/기한초과 → 승인 대기). */
+export function runSubmitMaintenanceReport(
+  args: Record<string, string>,
+): string {
+  const 고름 = 점검찾기(args.item ?? args.title ?? args.productName ?? "");
+  if (typeof 고름 === "string") return 고름;
+  const note = (args.note ?? args.result ?? "").trim();
+  if (!note) {
+    return `「${고름.title}」 점검서에 **점검 결과**를 함께 적어 주세요 — 예: "${고름.title} 점검서 올릴게, 이상 없음".`;
+  }
+  try {
+    const 결과 = submitReport(고름.id, { note, reportDocName: args.reportDocName?.trim() || undefined }, 행위자());
+    return `점검서를 올렸습니다 — ${결과.title} (${결과.productName}) · 상태 **승인 대기**.\n관리자가 대화창에서 "「${결과.title}」 점검 승인해줘"라고 하면 닫힙니다.`;
+  } catch (e) {
+    // 엔진이 상태 전이를 판정한다 — 여기서 다시 판정하지 않고 그 말을 그대로 전한다.
+    return `점검서를 올리지 못했습니다 — ${(e as Error).message}`;
+  }
+}
+
+/** 점검 승인·반려(관리자). 반려는 이유를 반드시 받는다 — 이유 없는 반려는 다시 할 수가 없다. */
+export function runReviewMaintenance(
+  args: Record<string, string>,
+): string {
+  const 반려인가 = /반려|거절|돌려/.test((args.decision ?? "").trim());
+  const 고름 = 점검찾기(args.item ?? args.title ?? args.productName ?? "", "reported");
+  if (typeof 고름 === "string") return 고름;
+  try {
+    if (반려인가) {
+      const 이유 = (args.reason ?? "").trim();
+      if (!이유) return `반려하려면 **이유**를 함께 적어 주세요 — 이유가 없으면 담당자가 무엇을 다시 해야 할지 모릅니다.`;
+      const r = rejectItem(고름.id, 행위자(), 이유);
+      return `점검을 반려했습니다 — ${r.title} (${r.productName}) · 이유: ${이유}\n담당자가 보완해서 점검서를 다시 올리면 승인 대기로 돌아옵니다.`;
+    }
+    const r = approveItem(고름.id, 행위자());
+    // 반복 점검이면 엔진이 승인하면서 **다음 회차를 자동 생성**한다(maintenance.ts approveItem).
+    //   ⚠ 날짜를 여기서 다시 계산하지 않는다 — 잣대가 두 벌이 되면 어긋난다.
+    //   ⚠ 1차 초안은 `r.nextScheduleDate`를 읽었는데 **없는 필드였다**(MaintenanceItem에 그런
+    //     칸이 없다) — 원천을 안 열고 이름을 지어낸 것이다. 이 저장소의 단골 함정.
+    const 다음 = r.intervalDays
+      ? `\n반복 점검이라 다음 회차(${r.intervalDays}일 뒤)를 자동으로 잡아 두었습니다.`
+      : "";
+    return `점검을 승인했습니다 — ${r.title} (${r.productName}) · 상태 **완료**.${다음}`;
+  } catch (e) {
+    return `처리하지 못했습니다 — ${(e as Error).message}`;
+  }
 }
