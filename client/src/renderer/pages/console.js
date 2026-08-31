@@ -293,8 +293,9 @@
       ".cs-updec button.reco{border-color:var(--teal,#1eb980);color:var(--teal,#bff3de);}",
       ".cs-updec input.pn{width:100%;margin-bottom:7px;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));",
       "border-radius:8px;color:var(--text,#e9e7e2);font-size:12px;padding:7px 9px;outline:none;font-family:inherit;}",
-      ".cs-send{background:var(--blue,#3b82f6);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;}",
-      ".cs-send:hover{background:#2f6fd0;}",
+      ".cs-send{background:var(--g-blue-fill, var(--blue,#3b82f6));color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;}",
+      // 박혀 있던 #2f6fd0(4.88:1)은 새 기본(5.17:1)보다 밝아 hover가 되레 흐려졌다 — 토큰으로.
+      ".cs-send:hover{background:var(--g-blue-fill-hover, var(--blue,#3b82f6));}",
       ".cs-send[disabled]{opacity:.5;cursor:default;}",
     ].join("");
     document.head.appendChild(st);
@@ -520,7 +521,7 @@
       '<div style="font-size:11.5px;color:var(--muted-2,#a49d95);margin:5px 0 10px">적어 주시면 앞으로 이 질문을 검사 문항으로 씁니다.</div>' +
       '<div style="display:flex;justify-content:flex-end;gap:7px">' +
       '<button id="fbCancel" style="background:none;border:1px solid var(--border,#3a3936);border-radius:7px;padding:5px 12px;color:var(--muted,#b3ada4);font-size:12.5px;cursor:pointer">취소</button>' +
-      '<button id="fbSend" style="background:var(--blue,#3b82f6);border:none;border-radius:7px;padding:5px 14px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer">전송</button></div>';
+      '<button id="fbSend" style="background:var(--g-blue-fill, var(--blue,#3b82f6));border:none;border-radius:7px;padding:5px 14px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer">전송</button></div>';
     document.body.appendChild(c);
     flagCard = c;
 

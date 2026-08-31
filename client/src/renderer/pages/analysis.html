@@ -20,7 +20,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .status-pill{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.25);border-radius:20px;padding:5px 12px;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
 .beta-tag{font-size:11.25px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;}
-.avatar-btn{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;}
+.avatar-btn{width:30px;height:30px;border-radius:50%;background:var(--g-blue-fill, var(--blue));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;}
 .icon-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;}
 .app{display:grid;grid-template-columns:220px 1fr;}
 .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
@@ -36,8 +36,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:820px;line-height:1.6;}
 .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border-strong);padding:0 15px;height:var(--g-btn-h);border-radius:var(--g-r);font-size:12.5px;font-weight:700;cursor:pointer;transition:.12s;}
 .btn-ghost:hover{color:var(--text-strong, #fff);border-color:var(--blue);}
-.btn-primary{background:var(--blue);color:#fff;border:none;padding:0 17px;height:var(--g-btn-h);border-radius:var(--g-r);font-size:12.5px;font-weight:700;cursor:pointer;}
-.btn-primary:hover{background:#3576e0;}
+.btn-primary{background:var(--g-blue-fill, var(--blue));color:#fff;border:none;padding:0 17px;height:var(--g-btn-h);border-radius:var(--g-r);font-size:12.5px;font-weight:700;cursor:pointer;}
+/* hover는 **더 진해야** 한다 — 박혀 있던 #3576e0은 흰 글씨 대비 4.36:1로 AA 미달인 데다
+   기본(5.17:1)보다 밝아, 손을 얹으면 오히려 안 보였다(2026-08-31 실측). */
+.btn-primary:hover{background:var(--g-blue-fill-hover, var(--blue));}
 
 
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}

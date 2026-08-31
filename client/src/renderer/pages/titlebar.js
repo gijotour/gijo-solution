@@ -49,7 +49,7 @@
     ".gtb-menu-panel .mp-i:hover{background:rgba(59,130,246,.12);color:#fff;}" /* .gtb-menu-panel 고정 어두운 판 안 */,
     ".gtb-userarea .ua-upd{display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:var(--amber, #f0a020);padding:3px 9px;border-radius:14px;font-size:12px;font-weight:800;cursor:pointer;align-self:flex-start;}",
     ".gtb-userarea .ua-row{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;}",
-    ".gtb-userarea .ua-avatar{width:22px;height:22px;border-radius:50%;background:var(--blue,#3b82f6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.25px;font-weight:800;flex:0 0 auto;}",
+    ".gtb-userarea .ua-avatar{width:22px;height:22px;border-radius:50%;background:var(--g-blue-fill, var(--blue,#3b82f6));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.25px;font-weight:800;flex:0 0 auto;}",
     ".gtb-userarea .ua-name{flex:1;font-size:12.5px;font-weight:700;color:var(--text-strong, #dfe6ff);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
     // ⚙ 드롭다운(공통 — 위/아래 방향은 JS가 지정)
     ".gtb-menu{position:fixed;width:268px;background:#35342f;border:1px solid rgba(255,255,255,.16);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);padding:8px;z-index:990;font-size:12.5px;-webkit-app-region:no-drag;}",

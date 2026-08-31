@@ -27,7 +27,7 @@
   .icon-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
   .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;transition:background .12s,border-color .12s,color .12s;}
   .icon-btn:hover,.icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
-  .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+  .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--g-blue-fill, var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
   .page-head{padding:16px 22px 4px;}
   .page-title{font-size:20px;font-weight:800;color:var(--text-strong, #fff);}
@@ -36,8 +36,9 @@
   .body-grid{display:grid;grid-template-columns:210px 260px 1fr;gap:12px;padding:14px 22px 22px;min-height:calc(100vh - 120px);}
   .col{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
   .colhead{padding:11px 14px;font-size:12.5px;font-weight:800;color:var(--text-strong, #fff);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
-  .newbtn{background:var(--blue);color:#fff;border:0;border-radius:7px;font-size:12.5px;font-weight:700;padding:5px 11px;cursor:pointer;}
-  .newbtn:hover{background:#2f6fd0;}
+  .newbtn{background:var(--g-blue-fill, var(--blue));color:#fff;border:0;border-radius:7px;font-size:12.5px;font-weight:700;padding:5px 11px;cursor:pointer;}
+  /* 박혀 있던 #2f6fd0(4.88:1)은 새 기본(5.17:1)보다 밝아 hover가 되레 흐려졌다 — 토큰으로. */
+  .newbtn:hover{background:var(--g-blue-fill-hover, var(--blue));}
 
   /* 탐색기 — 4구획(접기) */
   .tree{padding:6px 6px 10px;overflow-y:auto;font-size:12.5px;}
@@ -109,7 +110,7 @@
   .cin{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;}
   .cin input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:9px;padding:11px 14px;color:var(--text);font-size:13px;outline:none;}
   .cin input:disabled{opacity:.5;}
-  .cin button{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:0 20px;font-weight:800;font-size:13px;cursor:pointer;}
+  .cin button{background:var(--g-blue-fill, var(--blue));color:#fff;border:0;border-radius:9px;padding:0 20px;font-weight:800;font-size:13px;cursor:pointer;}
   .cin button:disabled{opacity:.5;cursor:default;}
 
   /* ── 시안 A(보안 분석 판박이) 레이아웃 ── */
@@ -125,7 +126,7 @@
   .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;gap:16px;}
   .page-sub{max-width:720px;line-height:1.6;}
   .v3-tools{display:flex;gap:8px;align-items:center;flex:none;}
-  .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 15px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+  .btn-primary{background:var(--g-blue-fill, var(--blue));color:#fff;border:none;padding:9px 15px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
   .btn-ghost{background:var(--panel);color:var(--text);border:1px solid var(--border-strong);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;outline:none;}
   .btn-danger{background:rgba(226,72,61,.14);color:var(--red-ink, #f5928a);border:1px solid var(--red);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;}
   .two{display:grid;grid-template-columns:1.15fr 1.4fr;gap:16px;align-items:start;}
@@ -259,7 +260,7 @@
       <div id="pickBar" style="display:none;align-items:center;gap:8px;background:rgba(59,130,246,.10);border:1px solid var(--blue);border-radius:8px;padding:6px 10px;margin:6px 0;font-size:12px">
         <span id="pickCnt" style="font-weight:700">0건 선택</span>
         <span style="color:var(--muted-2)">— 리포트에 실을 진행사항을 목록에서 체크하세요</span>
-        <button id="pickGo" style="margin-left:auto;background:var(--blue);border:none;border-radius:7px;padding:4px 10px;color:#fff;font-size:11.75px;font-weight:700;cursor:pointer">리포트 만들기</button>
+        <button id="pickGo" style="margin-left:auto;background:var(--g-blue-fill, var(--blue));border:none;border-radius:7px;padding:4px 10px;color:#fff;font-size:11.75px;font-weight:700;cursor:pointer">리포트 만들기</button>
         <button id="pickCancel" style="background:none;border:none;color:var(--muted-2);font-size:12px;cursor:pointer">취소</button>
       </div>
       <div class="search">🔎<input id="sessionSearch" placeholder="내역 검색…" aria-label="작업 내역 검색"></div>
