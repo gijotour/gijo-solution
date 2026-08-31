@@ -272,6 +272,19 @@
   등록·스캔·해제가 되는지(WSL 변환은 리눅스 전용이라 mac은 그대로 통과해야 한다) ·
   data/ 조상 폴더 거부가 mac 경로에서도 서는지.
 
+### 2026-08-31 (3) — 카드 언어 전환 17화면 (사장님 「2번째 이미지로·모든 메뉴도 동일하게」)
+
+- **클라 공용 파일**: `gijo-ui.css`(지표 줄 .g-scard-k* · 보기 전환 칩 .g-seg · 히트맵 타일
+  .g-tiles/.g-tile — **--g-* 토큰만** 써서 3테마 자동) · `pro-white.css`·`lite-green.css` 덮개.
+- **화면 17곳**: memory(지표·히트맵·카드 밀도) · aihub/records/discover/fix/reporting/triage/
+  verify(요약 띠 카드 꼴·고정 높이 제거·라벨 위/값 아래 스택) · settings/agent/approvals/
+  compliance/report/sbom/threat/redteam/merge(판 카드 밀도).
+  ⚠ grouphub.js(마크업)는 **안 건드렸다** — 7화면 공용이라 화면별 CSS 사본만 고쳤다.
+- **max 실기 검증거리**: ① mac 폰트로도 요약 카드 라벨이 안 잘리는지(넓은 폭·좁은 폭 둘 다,
+  `node tools/narrow-probe.mjs`) ② 지식 창고 「목록|히트맵」 전환·타일 클릭 선택이 mac에서도
+  대화창에 실리는지 ③ 라이트(연초록)에서 새 부품 색이 프로 색으로 새지 않는지 — 라이트는
+  아직 이 부품을 쓰는 화면이 없어 **내지식·내문서 라이트 반영 라운드에서 함께** 봐야 한다.
+
 ### 진행 중이라 아직 인계 대상이 아닌 것
 
 - 규정 판정 요청함 — 시안·설계 검토 완료, 착수 전
