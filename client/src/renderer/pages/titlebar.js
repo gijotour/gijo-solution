@@ -707,8 +707,18 @@
     var 걸린것 = [], 고른것 = 0;
     function 그리기() {
       var q = inp.value.trim().toLowerCase();
-      걸린것 = q ? 목록.filter(function (i) { return (i.label || "").toLowerCase().indexOf(q) >= 0 || (i.group || "").toLowerCase().indexOf(q) >= 0; })
-                 : 목록.slice(0, 12);
+      // 🧭 친 말이 **묶음 이름과 꼭 같으면 그 묶음만** 본다(2026-08-31 검토관 [낮음]).
+      //   칩을 누르면 그 묶음 이름이 그대로 들어가므로, 「누르면 그 묶음만 남는다」는 약속이
+      //   이 갈래로 참이 된다. 옛 판은 낱말 겹침으로 딴 묶음 화면이 섞였다(「설정」을 누르면
+      //   ③의 「보안설정 점검」이 함께 남아, 칩이 묶음이 아니라 검색어처럼 굴었다).
+      var 묶음이름 = (window.gijoNavGroups || []).map(function (g) {
+        return String(g.label || "").replace(/^[①②③④⑤]\s*/, "").replace(/^[^가-힣A-Za-z0-9]+/, "").trim().toLowerCase();
+      });
+      var 묶음골랐나 = q && 묶음이름.indexOf(q) >= 0;
+      걸린것 = !q ? 목록.slice(0, 12)
+        : 묶음골랐나
+          ? 목록.filter(function (i) { return (i.group || "").toLowerCase().indexOf(q) >= 0; })
+          : 목록.filter(function (i) { return (i.label || "").toLowerCase().indexOf(q) >= 0 || (i.group || "").toLowerCase().indexOf(q) >= 0; });
       고른것 = 0;
       list.innerHTML = "";
       // 최근 지시 5(승인 시안 도킹 묶음, 프로 전용) — 빈 검색일 때만 맨 위에. 화면 항목과
@@ -791,8 +801,13 @@
     function 고르기(d) {
       if (!걸린것.length) return;
       고른것 = Math.min(걸린것.length - 1, Math.max(0, 고른것 + d));
-      [].forEach.call(list.children, function (el, n) { el.classList.toggle("on", n === 고른것); });
-      var on = list.children[고른것];
+      // ⚠ **list.children이 아니라 결과 줄(.gtb-fr)만 센다**(2026-08-31 검토관 [높음] 3갈래 동시).
+      //   목록에는 결과가 아닌 블록이 섞인다 — 「🕘 최근 지시」(옛날부터)와 「묶음」 칩(오늘).
+      //   children 번호로 세면 **강조된 줄과 Enter가 여는 화면이 어긋난다**(최근 지시가 있는
+      //   프로 셸에서는 오늘 이전에도 이미 어긋나 있었다 — 칩이 그걸 상시화했을 뿐이다).
+      var 줄 = list.querySelectorAll(".gtb-fr");
+      [].forEach.call(줄, function (el, n) { el.classList.toggle("on", n === 고른것); });
+      var on = 줄[고른것];
       if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
     }
     // ⚠ 한글은 ㅎ→하→한처럼 **조합 중**에도 input이 뜬다. 목록만 다시 그리고 입력칸은
@@ -805,7 +820,11 @@
         if (e.isComposing) return; // 한글 조합 확정용 Enter를 '열기'로 삼으면 엉뚱한 화면이 열린다
         e.preventDefault();
         var it = 걸린것[고른것];
-        if (it) { closeFinder(); window.gijoOpenScreen(it); }
+        if (it) { closeFinder(); window.gijoOpenScreen(it); return; }
+        // 결과가 없으면 **Enter가 탈출로를 탄다**(2026-08-31 검토관) — 마우스로만 되면
+        // 이름을 치고 Enter를 누르는 사람에겐 여전히 「아무 반응 없음」이다.
+        var 탈출 = list.querySelector(".gtb-fask");
+        if (탈출) 탈출.click();
       } else if (e.key === "Escape") { e.preventDefault(); closeFinder(); }
     });
     finderEl.addEventListener("click", function (e) { if (e.target === finderEl) closeFinder(); });

@@ -440,6 +440,36 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     r ? JSON.stringify(r) : "프레임 못 찾음");
 }
 
+// ── 📨 조치 요청서 판(2026-08-31) — 📂와 **같은 계약**이라 적었으면 등록도 같아야 한다
+//    (검토관 [중간]: 커밋이 같은 계약이라 해 놓고 관문 등록만 빠졌다). 여기는 새 서버
+//    창구(mine=1)까지 지나는 자리라, 창구가 죽으면 판이 빈손인 채 조용히 뜬다 —
+//    「보기 전용 판」은 **눌러도 아무 일이 없는 것이 정상**이라 사람 눈으로는 구별이 안 된다.
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("mydocs.html?tab=req", "조치 요청서", { dock: true }));
+  const fr = await 프레임찾기("mydocs.html", 8);
+  const r = fr ? await fr.evaluate(async () => {
+    for (let i = 0; i < 15; i++) {
+      const t = (document.getElementById("list")?.innerText || "");
+      if (t.includes("조치 요청서")) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    const node = document.querySelector('#tabs .v4node[data-t="req"]');
+    const 줄 = document.querySelector('#list .g-rows-r[data-req]');
+    return {
+      탭있음: !!node,
+      탭활성: !!(node && node.classList.contains("on")),
+      판글: (document.getElementById("list")?.innerText || "").slice(0, 60),
+      // 보기 전용 계약: 줄이 있으면 반드시 .noclick — 없으면 클릭이 일반 처리기로 흘러
+      //   좁은 폭에서 **빈 문서창이 목록을 덮는다**(2026-08-22 vendor 탭 전례의 재발).
+      줄있음: !!줄,
+      보기전용: !줄 || 줄.classList.contains("noclick"),
+    };
+  }).catch(() => null) : null;
+  ok("📨 조치 요청서 판: 딥링크로 열리고, 줄은 보기 전용(.noclick)이다",
+    !!r && r.탭있음 && r.탭활성 && r.판글.includes("조치 요청서") && r.보기전용,
+    r ? JSON.stringify(r) : "프레임 못 찾음");
+}
+
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──
 const 카드전 = await 셸.evaluate(() => document.querySelectorAll(".dc-card").length);
 await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기")); // 무dock=메뉴성 — 화면+카드가 나란히 떠야 한다(2026-08-31 개정)

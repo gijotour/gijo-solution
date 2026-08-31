@@ -1198,6 +1198,14 @@ const 화면별칭: Record<string, string> = {
   보안제품비교: "mydocs.html",
   나만의연락처: "mydocs.html",
   담당자연락처: "mydocs.html",
+  // ⚠ **여기에도 적어야 산다.** 아래 별명열기탭은 「여는 주소」만 담는 곁표이고, 별칭을
+  //   실제로 도는 것은 이 표다(같은 파일 「for (const [별명, screen] of Object.entries(화면별칭))」).
+  //   곁표에만 적으면 **아무도 안 읽는 죽은 줄**이 된다 — 📂(2026-08-31 2단계)와 📨이 그렇게
+  //   등록돼 「별칭 반영」이라 적어 놓고 실제로는 안 걸렸다(2026-08-31 검토관 [중간]).
+  //   짝은 server/test/aliaspair.test.ts가 지킨다.
+  지켜보는폴더: "mydocs.html",
+  폴더감시: "mydocs.html",
+  조치요청서: "mydocs.html",
   대시보드: "dashboard.html",
   // 별도 창이라 화면 파일이 없다 — 담당자가 부르는 이름으로 찾히게 둔다(2026-08-14).
   // ⚠ 「마크다운」은 **넣지 않는다**(검토관 지적 M11로 재고). 이 표는 dispatcher에서
@@ -1224,8 +1232,10 @@ const 별명열기탭: Record<string, string> = {
   나만의연락처: "mydocs.html?tab=contacts",
   담당자연락처: "mydocs.html?tab=contacts",
   제품안내: "mydocs.html?tab=guide",
+  // 📂 서버가 주기 확인해 자동 반입하는 폴더 판(2026-08-31 2단계).
   지켜보는폴더: "mydocs.html?tab=watch",
-  조치요청서: "mydocs.html?tab=req", // 📨(2026-08-31) — 복합어만(「요청」 홑낱말 금지: 가로채기 계보) // 📂(2026-08-31) — 복합어만(「감시」·「폴더」 홑낱말 금지 — 가로채기 계보)
+  // 📨(2026-08-31) — 복합어만(「요청」 홑낱말 금지: 가로채기 계보).
+  조치요청서: "mydocs.html?tab=req",
   폴더감시: "mydocs.html?tab=watch",
   문서함: "mydocs.html?tab=guide",
 };

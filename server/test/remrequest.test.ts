@@ -65,3 +65,25 @@ describe("조치 요청서 — 픽 배관(설계관 ①블로커 해소)", () =>
     expect(pickToolName(cmd!)).toBe("bulk_update");
   });
 });
+
+
+// ★ 소유 잣대(2026-08-31) — 📨 판이 쓰는 mine=1의 알맹이. 전역 목록을 화면에 그대로 펼치면
+//   **전원의 요청서**가 보인다(「직접-열람 등급 누출」 계보). 창구에서 좁히는 것이 잣대이고,
+//   그 잣대에 시험이 0건이었다(검토관 [낮음] — 보안 경계인데 대상 파일이 이미 있는데도).
+describe("조치 요청서 — 소유 잣대(mine)", () => {
+  it("createdBy로 좁히면 그 사람 것만 나온다", () => {
+    createOutboundRequest({ kind: "patch", targetName: "방화벽 A", createdBy: "u1" });
+    createOutboundRequest({ kind: "bug", targetName: "웹서버 B", createdBy: "u2" });
+    expect(listOutboundRequests().length, "전역은 둘 다 준다(팀 자리)").toBe(2);
+    const 내것 = listOutboundRequests({ createdBy: "u1" });
+    expect(내것.length).toBe(1);
+    expect(내것[0].kind).toBe("patch");
+  });
+  it("주인을 모르는 옛 줄(createdBy 없음)은 **안 준다**(fail-closed)", () => {
+    // 소유 열이 생기기 전에 만들어진 줄이 남아 있어도, 좁힌 조회에는 섞이지 않아야 한다.
+    const { req } = createOutboundRequest({ kind: "policy", targetName: "정책 C", createdBy: "u1" });
+    db.prepare("UPDATE outbound_requests SET createdBy=NULL WHERE id=?").run(req.id);
+    expect(listOutboundRequests({ createdBy: "u1" }).length, "주인 없는 줄이 새어 나왔다").toBe(0);
+    expect(listOutboundRequests().length, "전역 조회에서는 여전히 보인다").toBe(1);
+  });
+});

@@ -34,7 +34,7 @@
     · ⚠ 폭 계약(설계관 지적) — 200+400 3단은 약 820px부터 성립한다. 세로 모니터(1080)·표준
       셸(대화창 옆 380)·팝업 최소폭(700)이 전부 그 아래라, 1000px 미만이면 사이드바가 접히고
       820px 미만이면 문서창이 목록을 덮는다. 「좁으면 깨진다」를 그냥 두지 않는다.
-    · ⚠ .g-rows-scroll의 --gr-maxh를 none으로 — gijo-ui.css:353의 540px 상한을 그대로 두면
+    · ⚠ .g-rows-scroll의 --gr-maxh를 none으로 — gijo-ui.css `.g-rows-scroll`의 540px 상한을 그대로 두면
       껍데기를 걷어 번 자리가 빈칸이 된다.
     · 서버·IPC 신설 0건. 게시 관문(publish-gate-ui ③‴)은 같은 커밋에서 v4 자리로 옮겼다.
   ■ v5 (2026-08-22 사장님 — 「연락처도 내 문서에」·「보안제품 비교·소개도 내 문서함에」·
@@ -372,7 +372,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       <div class="v4list">
         <div id="learnTop" class="topics" style="display:none"></div>
         <div class="g-rows" id="rowsBox">
-          <!-- ⚠ --gr-maxh를 none으로 — gijo-ui.css:353의 540px 상한을 그대로 두면 목록이
+          <!-- ⚠ --gr-maxh를 none으로 — gijo-ui.css `.g-rows-scroll`의 540px 상한을 그대로 두면 목록이
                18줄에서 잘려, 껍데기를 걷어 번 자리가 그대로 빈칸이 된다(설계관 지적). -->
           <div class="g-rows-scroll" id="list" style="--gr-maxh:none"><div class="empty">불러오는 중…</div></div>
         </div>
@@ -477,6 +477,8 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   //   수확하므로, 긴 안내문 안에 묻어 두면 「제품이 약속한 말이 실제로 걸리는가」 검사에서
   //   원리상 빠진다(2026-08-31 검토관 적발 — 커밋이 「검사 가능 어미」라 적었는데 실측 0건이었다).
   var 감시지정예시 = "스캔결과 폴더 지켜봐 줘";
+  var 요청생성예시 = "이 취약점 조치 요청서 만들어줘";
+  var 요청현황예시 = "요청 현황 알려줘";
   var 감시조회예시 = "지켜보는 폴더 알려줘";
   var 요청서 = []; // 📨 조치 요청서(2026-08-31) — 내가 만든 것만(서버가 소유로 좁혀 준다)
   var 감시폴더 = []; // 📂 지켜보는 폴더(2026-08-31) — 조회 전용(등록·해제는 대화창 결재판)
@@ -1030,21 +1032,33 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       //   않게 창구에서 좁혔다(「직접-열람 등급 누출」 계보).
       // ⚠ 라벨은 **서버 원천과 같은 값**이다(remrequest.ts KIND_KO·STATUS_KO). 화면이 새로
       //   짓지 않는다 — 어긋나면 같은 것을 두 이름으로 부르게 된다.
-      var 상태글 = { draft: "초안", sent: "보냄", replied: "회신 옴", noreply: "미회신" };
+      // ⚠ **글자까지 서버 원천과 같아야 한다**(remrequest.ts STATUS_KO·KIND_KO). 1차본은
+      //   「회신 옴」·「미회신」으로 적어 놓고 주석엔 「같은 값」이라 써 두었다 — 대화창은
+      //   「회신·무응답」이라 하고 화면은 딴 말을 하는, 이 저장소가 반복해 겪은 사본 어긋남이다
+      //   (2026-08-31 검토관 2갈래 동시 적발). 어긋나면 server/test/reqlabels.test.ts가 잡는다.
+      var 상태글 = { draft: "초안", sent: "보냄", replied: "회신", noreply: "무응답" };
       var 종류글 = { "vuln-fix": "취약점 조치", patch: "보안패치", policy: "보안정책 수정", bug: "버그 수정" };
       var rq = 요청서.filter(function (r) { return 걸림((r.targetName || "") + " " + (종류글[r.kind] || r.kind || "") + " " + (r.recipient || "")); });
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 108px 80px 64px;gap:8px"><span class="trunc" title="내가 만든 조치 요청서만 보입니다. 팀 전체 현황은 대화창에 「요청 현황 알려줘」라고 물으세요. 만들기·상태 변경도 대화창에서 합니다.">조치 요청서</span><span>받는 곳</span><span>상태</span><span class="ta-r">만든 날</span></div>' +
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 108px 80px 64px;gap:8px"><span class="trunc" title="내가 만든 조치 요청서만 보입니다. 팀 전체 현황은 대화창에 「요청 현황 알려줘」라고 물으세요. 만들기·상태 변경도 대화창에서 합니다.">조치 요청서</span><span title="수신처를 적었으면 그 이름, 안 적었으면 요청 대상 보안제품입니다.">받는 곳·대상</span><span>상태</span><span class="ta-r">만든 날</span></div>' +
         (rq.length ? '<div class="g-rows-flat">' + rq.map(function (r) {
           var st = 상태글[r.status] || r.status || "-";
           var 색 = r.status === "replied" ? "gtxt-up" : r.status === "noreply" ? "gtxt-down" : "gm2";
-          return '<div class="g-rows-r" data-req="' + esc(r.id) + '" style="grid-template-columns:1fr 108px 80px 64px;gap:8px">' +
+          // ⚠ **.noclick** — 이 판은 보기 전용이라 줄을 눌러 열 것이 없다. 안 붙이면 클릭이
+          //   일반 행 처리기로 흘러 **빈 문서창**이 뜬다(2026-08-31 검토관 3갈래 — 같은 파일이
+          //   2026-08-22 vendor 탭에서 이미 한 번 고친 결함이다). data-req는 나중에 상태 전환
+          //   진입이 생길 때 쓸 자리라 남긴다.
+          return '<div class="g-rows-r noclick" data-req="' + esc(r.id) + '" style="grid-template-columns:1fr 108px 80px 64px;gap:8px">' +
             '<span class="trunc" title="' + esc((종류글[r.kind] || r.kind || "") + (r.dueDate ? " · 기한 " + r.dueDate : "")) + '">' + esc(종류글[r.kind] || r.kind || "(종류 없음)") + "</span>" +
-            '<span class="gm2 trunc">' + esc(r.recipient || r.targetName || "-") + "</span>" +
+            // 수신처(recipient)는 사람이 적었을 때만 있다. 없으면 요청 **대상 제품**을 보여
+            //   주되 그것이 수신처인 척하지 않는다 — 머리 이름이 「받는 곳·대상」인 이유다
+            //   (2026-08-31 검토관: targetName은 받는 곳이 아니라 대상이다).
+            '<span class="gm2 trunc"' + (r.recipient ? "" : ' title="수신처가 아직 없습니다 — 요청 대상 제품입니다."') + ">" +
+              esc(r.recipient || r.targetName || "-") + "</span>" +
             '<span class="' + 색 + '">' + esc(st) + "</span>" +
             '<span class="ta-r gm2">' + 날짜(r.createdAt) + "</span></div>";
         }).join("") + "</div>"
         : '<div class="empty">' + (요청서.length ? "검색과 맞는 요청서가 없습니다."
-          : "<b>내가</b> 만든 조치 요청서가 없습니다.<br><br>대화창에서 <b>「이 취약점 조치 요청서 만들어줘」</b>처럼 말하면 초안이 만들어지고, 그 초안은 <b>👤 내 것</b>에 문서로 들어옵니다.<br>여기서는 <b>내가 만든</b> 요청서의 상태(초안·보냄·회신)를 봅니다 — 팀 전체 현황은 대화창에 「요청 현황 알려줘」라고 물으세요.") + "</div>");
+          : "<b>내가</b> 만든 조치 요청서가 없습니다.<br><br>대화창에서 <b>「" + 요청생성예시 + "」</b>처럼 말하면 초안이 만들어지고, 그 초안은 <b>👤 내 것</b>에 문서로 들어옵니다.<br>여기서는 <b>내가 만든</b> 요청서의 상태(초안·보냄·회신)를 봅니다 — 팀 전체 현황은 대화창에 「" + 요청현황예시 + "」라고 물으세요.") + "</div>");
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;
