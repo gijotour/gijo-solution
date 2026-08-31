@@ -3990,3 +3990,74 @@ export async function runSetAiBomField(args: Record<string, string>): Promise<st
   const 바뀜 = 이전 ? `이전 값이 있어 **덮어썼습니다** — 전: ${짧게(이전)}` : "(비어 있던 칸입니다)";
   return `✅ "${asset.name}"의 AI-BOM **${칸.이름}**에 적었습니다.\n  · 후: ${짧게(값)}\n  · ${바뀜}${경고}\n\n전체 현황은 「AI-BOM 현황 알려줘」로 보실 수 있습니다.`;
 }
+
+// ── 지원 종료(EOL) 점검 — 대화로 (2026-09-01 · 계획서 중-7 + 전-4) ─────────────────────
+//
+// ■ 왜: 표는 있는데 **아무도 부르지 않았다**
+//   eol-seed.ts는 2026-08-04 파트너 지적으로 만들어졌는데(「EOS 정보도 같이 제공될 거라
+//   생각된다」), eol찾기·eol한줄·eol표상태 셋 다 **부르는 곳이 한 군데도 없었다.**
+//   생산자만 있고 소비자가 없는 값 — 있으나 마나였다.
+//
+// ■ 이 답이 만드는 함정 하나 (여기가 이 도구의 급소다)
+//   표는 **9줄뿐**이다. 「3건이 지원 종료」라고만 말하면 담당자는 **나머지는 지원 중**이라고
+//   읽는다. 그건 이 표가 말할 수 있는 것이 아니다 — 표에 없는 것은 「모른다」이지
+//   「괜찮다」가 아니다. 그래서 **덮는 범위를 숫자로 먼저 밝힌다.**
+//   ⚠ 이 문장을 지우면 이 도구는 없느니만 못해진다(틀린 안심을 준다).
+
+/** 지원 종료 점검 — 「지원 끝난 부품 있어?」. */
+export async function runEolCheck(args: Record<string, string>): Promise<string> {
+  const { EOL_SEED, eol찾기, eol한줄, eol표상태 } = await import("../eol-seed.js");
+  const 대상글 = (args.asset ?? args.assetId ?? "").trim();
+
+  let 자산들 = listAssets();
+  let 범위글 = "전체 자산";
+  if (대상글) {
+    const hit = resolveAsset(대상글);
+    if (!hit) {
+      const 예 = 자산들.map((a) => a.name).slice(0, 6).join(", ") || "(없음)";
+      return `"${대상글}"에 맞는 자산을 못 찾았습니다. 등록된 자산: ${예}`;
+    }
+    자산들 = 자산들.filter((a) => a.id === hit.id);
+    범위글 = hit.name;
+  }
+
+  const 오늘 = new Date();
+  const 걸린: { 자산: string; 부품: string; 버전: string; 줄: string; 지남: boolean }[] = [];
+  let 부품수 = 0;
+  for (const a of 자산들) {
+    for (const c of a.components ?? []) {
+      부품수++;
+      const row = eol찾기(c.name, c.version);
+      if (!row) continue;
+      const 지남 = Boolean(row.종료일 && new Date(row.종료일 + "T00:00:00").getTime() < 오늘.getTime());
+      걸린.push({ 자산: a.name, 부품: c.name, 버전: c.version, 줄: eol한줄(row, 오늘), 지남 });
+    }
+  }
+
+  // ⚠ **덮는 범위를 먼저 말한다.** 이 표는 9줄짜리다 — 「0건」이 「전부 괜찮다」로 읽히면
+  //   이 도구는 틀린 안심을 주는 물건이 된다.
+  const 범위줄 = `📋 ${범위글} 부품 ${부품수}개를 지원종료 표(${EOL_SEED.length}줄)와 맞춰 봤습니다.`;
+
+  if (!부품수) {
+    return `${범위줄}\n\n부품 목록이 비어 있습니다 — 먼저 "SBOM 만들어줘" 또는 "패키지 목록 읽어줘"로 부품을 채우셔야 합니다.`;
+  }
+  if (!걸린.length) {
+    return (
+      `${범위줄}\n\n표에 걸리는 부품이 **없습니다.**\n` +
+      `⚠ 다만 이 표는 널리 알려진 ${EOL_SEED.length}줄만 담고 있습니다 — **표에 없다는 것은 「모른다」이지 「지원 중」이 아닙니다.**\n\n${eol표상태()}`
+    );
+  }
+
+  const 지난것 = 걸린.filter((x) => x.지남);
+  const 예정 = 걸린.filter((x) => !x.지남);
+  const 그리기 = (xs: typeof 걸린) =>
+    xs.slice(0, 12).map((x) => `- ${x.자산} · **${x.부품} ${x.버전}** — ${x.줄}`).join("\n") +
+    (xs.length > 12 ? `\n… 외 ${xs.length - 12}건` : "");
+
+  return (
+    `${범위줄}\n\n` +
+    (지난것.length ? `⛔ **지원이 이미 끝난 부품 ${지난것.length}건**\n${그리기(지난것)}\n\n` : "") +
+    (예정.length ? `⏳ 지원 종료가 예정된 부품 ${예정.length}건\n${그리기(예정)}\n\n` : "") +
+    `⚠ 표에 걸리지 않은 나머지 ${부품수 - 걸린.length}개는 **「지원 중」이 아니라 「모른다」**입니다 — 표가 ${EOL_SEED.length}줄뿐입니다.\n\n${eol표상태()}`
+  );
+}

@@ -211,6 +211,7 @@ import {
   runDeleteProduct,
   runVexStatus,
   runSetAiBomField,
+  runEolCheck,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -258,6 +259,22 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [{ name: "assetId", label: "자산", description: "특정 자산만 볼 때 (비우면 전체)", required: false }],
     run: async (args: Record<string, string>) => runSbomCoverage(args.assetId),
+  },
+  {
+    // ⏳ 지원 종료(EOL) 점검 — 「지원 끝난 부품 있어?」(계획서 중-7 + 전-4).
+    //   ⚠ eol-seed.ts의 표를 **처음으로 부르는 곳**이다 — 2026-08-04에 만들어 놓고
+    //     소비자가 없어 아무도 못 보던 값이었다.
+    //   ⚠ 급소는 「0건」의 뜻이다 — 표가 9줄뿐이라 **없다 ≠ 괜찮다**. 답이 그 사실을
+    //     반드시 함께 말한다(eolcheck.test.ts가 지킨다).
+    name: "eol_check",
+    label: "지원 종료 점검",
+    domain: "assets",
+    write: false,
+    description:
+      '자산의 부품 중 **지원(보안 패치)이 끝난 것**이 있는지 본다. "지원 끝난 부품 있어?", "EOL 확인해줘", "단종된 소프트웨어 알려줘"에 쓴다. 지원이 끝나면 취약점이 나와도 고칠 패치가 없다. 자산 하나만 보려면 asset을 준다. 예: {} 또는 {"asset":"web-01"}',
+    directAnswer: true,
+    params: [{ name: "asset", label: "자산", description: "특정 자산만 볼 때 (비우면 전체)", required: false }],
+    run: runEolCheck,
   },
   {
     // ⚠ **쓰기다.** 고객 장비에 원격 접속해 명령을 돌린다 — 결재판을 반드시 거친다.
