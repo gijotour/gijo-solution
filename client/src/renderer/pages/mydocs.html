@@ -1033,7 +1033,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       var 상태글 = { draft: "초안", sent: "보냄", replied: "회신 옴", noreply: "미회신" };
       var 종류글 = { "vuln-fix": "취약점 조치", patch: "보안패치", policy: "보안정책 수정", bug: "버그 수정" };
       var rq = 요청서.filter(function (r) { return 걸림((r.targetName || "") + " " + (종류글[r.kind] || r.kind || "") + " " + (r.recipient || "")); });
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 108px 80px 64px;gap:8px"><span class="trunc" title="대화창에서 만든 조치 요청서입니다. 상태 변경도 대화창에서 합니다.">조치 요청서</span><span>받는 곳</span><span>상태</span><span class="ta-r">만든 날</span></div>' +
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 108px 80px 64px;gap:8px"><span class="trunc" title="내가 만든 조치 요청서만 보입니다. 팀 전체 현황은 대화창에 「요청 현황 알려줘」라고 물으세요. 만들기·상태 변경도 대화창에서 합니다.">조치 요청서</span><span>받는 곳</span><span>상태</span><span class="ta-r">만든 날</span></div>' +
         (rq.length ? '<div class="g-rows-flat">' + rq.map(function (r) {
           var st = 상태글[r.status] || r.status || "-";
           var 색 = r.status === "replied" ? "gtxt-up" : r.status === "noreply" ? "gtxt-down" : "gm2";
@@ -1044,7 +1044,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
             '<span class="ta-r gm2">' + 날짜(r.createdAt) + "</span></div>";
         }).join("") + "</div>"
         : '<div class="empty">' + (요청서.length ? "검색과 맞는 요청서가 없습니다."
-          : "만든 조치 요청서가 없습니다.<br><br>대화창에서 <b>「이 취약점 조치 요청서 만들어줘」</b>처럼 말하면 초안이 만들어지고, 그 초안은 <b>👤 내 것</b>에 문서로 들어옵니다.<br>여기서는 만든 요청서의 상태(초안·보냄·회신)를 봅니다.") + "</div>");
+          : "<b>내가</b> 만든 조치 요청서가 없습니다.<br><br>대화창에서 <b>「이 취약점 조치 요청서 만들어줘」</b>처럼 말하면 초안이 만들어지고, 그 초안은 <b>👤 내 것</b>에 문서로 들어옵니다.<br>여기서는 <b>내가 만든</b> 요청서의 상태(초안·보냄·회신)를 봅니다 — 팀 전체 현황은 대화창에 「요청 현황 알려줘」라고 물으세요.") + "</div>");
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;

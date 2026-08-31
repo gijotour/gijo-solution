@@ -3425,17 +3425,23 @@ export async function runCreateRequestDoc(args: Record<string, string>): Promise
     `문서함(내 문서)에서 수신처를 적고 다듬은 뒤 ⬇ PDF·Word로 내보내 전달하세요. 보낸 뒤에는 보안제품 화면의 요청 이력에서 상태(보냄→회신)를 표시해 주세요.`;
 }
 
+// ⚠ 이 도구는 **팀 전체**를 센다(만든 사람으로 안 좁힌다). 조치 요청서는 밖(협력사·벤더)으로
+//   나가는 것이라 「회신 없는 요청」은 팀이 함께 봐야 하는 사실이고, 제품별 조회를 팀 자리로
+//   둔 것과 같은 결이다. 대신 **그렇다고 말한다** — 2026-08-31에 내 문서 📨 판(내가 만든 것만)이
+//   생기면서 같은 것을 두 자리가 다르게 세게 됐는데, 어느 쪽도 자기 범위를 안 밝히고 있었다.
+//   (범위를 좁혀야 한다는 결정이 나오면 listOutboundRequests({ createdBy })가 이미 있다.)
 export async function runRequestStatus(): Promise<string> {
   const rem = await import("../remrequest.js");
   const all = rem.listOutboundRequests();
   if (all.length === 0) return "📨 요청 현황 — 아직 만든 요청서가 없습니다. 취약점 목록에서 고른 뒤 \"조치 요청서 만들어줘\"라고 하면 초안이 내 문서에 생깁니다.";
   const 셈 = (s: string) => all.filter((r) => r.status === s).length;
   const 미회신 = rem.unansweredRequests();
-  const L = [`📨 요청 현황 — 전체 ${all.length}건 · 초안 ${셈("draft")} · 보냄 ${셈("sent")} · 회신 ${셈("replied")} · 무응답 ${셈("noreply")}`];
+  const L = [`📨 요청 현황(팀 전체) — ${all.length}건 · 초안 ${셈("draft")} · 보냄 ${셈("sent")} · 회신 ${셈("replied")} · 무응답 ${셈("noreply")}`];
   if (미회신.length) {
     L.push(`⚠ 회신 없는 요청 ${미회신.length}건 — 재촉이 필요할 수 있습니다:`);
     for (const r of 미회신.slice(0, 5)) L.push(`- ${rem.KIND_KO[r.kind]}${r.targetName ? ` · ${r.targetName}` : ""} (보낸 날 ${new Date(r.sentAt ?? r.createdAt).toLocaleDateString("ko-KR")})`);
   }
+  L.push("내가 만든 것만 보려면 내 문서 → 📨 조치 요청서를 여세요.");
   return L.join("\n");
 }
 
