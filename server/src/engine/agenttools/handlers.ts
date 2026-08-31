@@ -1916,15 +1916,17 @@ export function runAibomStatus(args: Record<string, string>): string {
     `AI 자산 ${rows.length}건${itNote} — AI-BOM 미완성 ${incomplete.length}건, SBOM 미생성 ${noSbom.length}건, 견고성 미점검 ${noRobustness.length}건`;
   const lines = rows
     .slice(0, 10)
-    .map((r) => `- ${자산표시이름(r.a.id)}: ${r.filled}/${r.total} 기재${r.missing.length ? ` (미기재 ${r.missing.length}개)` : " ✓"}`);
+    .map((r) => `- ${자산표시이름(r.a.id)}: ${r.filled}/${r.total} 기재${r.missing.length ? ` (미기재 ${r.missing.length}개)` : " ✓"}${r.a.sbomGeneratedAt ? "" : " · SBOM 없음"}`);
   const more = rows.length > 10 ? `\n… 외 ${rows.length - 10}건` : "";
   // ⚠ 숫자만 주고 끝내면 "그래서 뭘 하지"가 남는다(2026-08-03 18건 실측 규범).
-  // ⚠⚠ **있는 명령만 적는다.** AI-BOM 항목을 채우는 대화창 도구는 아직 없다 —
-  //    없는 것을 안내하면 담당자가 그 말을 따라가다 막다른 길에 선다(2026-08-04 확인).
+  // ⚠⚠ **있는 명령만 적는다** — 없는 것을 안내하면 담당자가 그 말을 따라가다 막다른 길에 선다.
+  //    (2026-09-01) 그 이유로 오래 비워 뒀던 「채우는 길」이 생겼다 — set_aibom_field.
+  //    ⚠ 이 안내를 고칠 때는 **도구가 실제로 있는지 먼저 확인**할 것. 여기 적힌 말이
+  //      곧 담당자가 따라 칠 명령이다.
   const 다음 = noSbom.length
     ? `\n\n${표식.다음} SBOM이 없는 자산은 "○○ SBOM 만들어줘"라고 하면 만듭니다.`
     : incomplete.length
-      ? `\n\n${표식.다음} 어느 항목이 비었는지 보려면 "○○ AI-BOM 보여줘"라고 하세요.`
+      ? `\n\n${표식.다음} 비어 있는 칸은 "○○ 가드레일 기재해줘"처럼 **대화로 바로 적으실 수 있습니다**(칸 이름은 "○○ AI-BOM 보여줘"로 확인).`
       : "";
   return `${head}\n${lines.join("\n")}${more}${다음}`;
 }

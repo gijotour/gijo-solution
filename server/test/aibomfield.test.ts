@@ -131,3 +131,36 @@ describe("계약 — 쓰기 도구다", () => {
     expect(등록.slice(i, i + 1800), "덮어쓴다는 걸 결재 전에 안 알린다").toContain("덮어씀");
   });
 });
+
+describe("「SBOM 없는 자산 알려줘」 — 전용 분기 (대장 §3-4 항목 2)", () => {
+  const 규칙2 = (() => {
+    const i = 셸.indexOf('tool: "aibom_status"', 셸.indexOf('tool: "set_aibom_field"'));
+    const j = 셸.lastIndexOf("re: /", i);
+    return new RegExp(셸.slice(j + 5, 셸.indexOf("/,", j)));
+  })();
+
+  for (const t of ["SBOM 없는 자산 알려줘", "SBOM 미생성 자산 보여줘", "부품표 없는 자산 뭐야", "SBOM 안 만든 자산 알려줘", "SBOM 누락 자산 목록"]) {
+    it(`"${t}" — 잡는다`, () => expect(규칙2.test(t)).toBe(true));
+  }
+
+  // ★★ 생성 요청을 조회로 돌리는 것이 **가장 나쁜 오라우팅**이다 —
+  //    담당자는 만든 줄 알고 넘어가는데 아무것도 안 만들어진다.
+  for (const t of [
+    "fraud-detect-llm SBOM 생성해줘",
+    "SBOM 만들어줘",
+    "SBOM 없는 자산 SBOM 만들어줘",
+    "SBOM 미생성 자산 SBOM 생성해줘",
+    "AI-BOM 현황 알려줘",
+    "SBOM 얼마나 채워졌어?",
+    "자산 목록 보여줘",
+    "가드레일 기재해줘",
+  ]) {
+    it(`"${t}" — 안 삼킨다`, () => expect(규칙2.test(t), `조회 규칙이 "${t}"을 가로챘다`).toBe(false));
+  }
+
+  it("★ 「미생성」이 「생성」을 품는 함정 — (?<!미)가 살아 있다", () => {
+    // 이 한 글자가 빠지면 「SBOM 미생성 자산 보여줘」가 스스로 배제돼 규칙이 통째로 헛돈다.
+    // 헛도는 규칙은 시험 없이는 안 보인다 — 아무 일도 안 일어나는 것처럼 보이기 때문이다.
+    expect(규칙2.source, "(?<!미) 예외가 사라졌다").toContain("(?<!미)");
+  });
+});
