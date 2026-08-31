@@ -709,7 +709,9 @@ tr:last-child td{border-bottom:none;}
     //   실측: 도장 기준 4 → 전체 기준 844. 840개를 아는데 모른다고 적고 있었다.
     document.getElementById("kpiComponents").textContent =
       allAssets.reduce((sum, a) => sum + (a.components || []).length, 0).toLocaleString();
-    document.getElementById("kpiMissing").textContent = allAssets.filter((a) => !a.sbomGeneratedAt).length;
+    // ⚠ 공용 잣대로 센다 — 대화창(sbom_coverage)·현황 카드와 **같은 수**를 말해야 한다.
+    //   전에는 스캐너 IP 호스트·인프라 장비까지 세어 대화창이 12건이라 할 때 화면은 4,812를 찍었다.
+    document.getElementById("kpiMissing").textContent = window.gijoSbomMissingCount(allAssets);
     // 라이선스 종수도 「미상」을 세지 않는다 — 아는 것이 몇 종인지가 이 칸의 뜻이다.
     const licenses = new Set();
     allAssets.forEach((a) => (a.components || []).forEach((c) => {
@@ -879,6 +881,7 @@ tr:last-child td{border-bottom:none;}
 
 
 
+<script src="assetrules.js"></script>
 <script src="nav.js"></script>
 <script src="selectnotify.js"></script>
 <script src="scopefilter.js"></script>

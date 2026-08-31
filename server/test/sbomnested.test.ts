@@ -156,3 +156,23 @@ describe("★★ 못 읽은 부품 수는 **서브트리 전체**다 (직계 자
     expect(() => sbom읽기(감싸기([안])), "깊은 문서에 죽는다").not.toThrow();
   });
 });
+
+describe("★ 세는 것마저 상한에 걸리면 **그 사실도 말한다** (재검토 [하])", () => {
+  it("64겹보다 깊으면 「못 읽은 수조차 다 세지 못했다」고 밝힌다", () => {
+    // 8겹까지 읽고, 그 아래로 100겹을 더 쌓는다 → 세는 재귀(상한 64)도 끝까지 못 간다.
+    let 안: Record<string, unknown> = { name: "맨아래" };
+    for (let i = 0; i < 100; i++) 안 = { name: `d${i}`, components: [안] };
+    const r = sbom읽기(감싸기([안]));
+    const 알림 = r.알림.join(" ");
+    expect(알림, "못 읽었다는 말이 없다").toMatch(/못 읽었습니다/);
+    expect(알림, "그 수마저 하한이라는 걸 안 밝힌다 — 「딱 N개」로 읽힌다")
+      .toContain("다 세지 못했습니다");
+  });
+
+  it("상한 안쪽이면 그 말을 붙이지 않는다 — 겁주지 않는다", () => {
+    let 안: Record<string, unknown> = { name: "d10" };
+    for (let i = 9; i >= 1; i--) 안 = { name: `d${i}`, components: [안] };
+    const r = sbom읽기(감싸기([안]));
+    expect(r.알림.join(" ")).not.toContain("다 세지 못했습니다");
+  });
+});

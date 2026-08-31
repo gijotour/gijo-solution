@@ -2275,7 +2275,11 @@ export function runSbomCoverage(assetId?: string): string {
     SBOM없음.length
       ? `${표식.주의} **SBOM이 아예 없는 자산 ${SBOM없음.length}건**${제외수 ? ` (스캐너로 들여온 IP 호스트·인프라 장비 ${제외수}건은 SBOM 대상이 아니라 제외)` : ""}
   · ${SBOM없음.slice(0, 8).map((a) => 자산표시이름(a.id)).join(", ")}${SBOM없음.length > 8 ? ` 외 ${SBOM없음.length - 8}건` : ""}`
-      : `SBOM은 대상 자산 ${대상들.length}건 모두에 있습니다.`,
+      : 대상들.length
+        // ⚠ **없음과 다 됐음을 가른다**(재검토 [하]). 0건이면 「0건 모두에 있습니다」가 되어
+        //   아직 아무것도 시작 안 한 현장에 「끝났다」고 안심시킨다 — 정직 가드 위반이다.
+        ? `SBOM은 대상 자산 ${대상들.length}건 모두에 있습니다.`
+        : `SBOM을 만들 수 있는 자산이 **없습니다** — 등록된 것이 전부 스캐너로 들여온 IP 호스트·인프라 장비입니다(SBOM 대상이 아닙니다). 소프트웨어·AI 자산을 등록하면 그때부터 셉니다.`,
     실제 === 0
       ? `${표식.주의} 아직 **직접 읽은 부품이 하나도 없습니다.** 지금 SBOM은 스캐너가 준 제품 이름(CPE) 수준이라 패키지·라이브러리가 비어 있습니다.`
       : `${표식.주의} 직접 읽지 않은 자산 ${비어있음.length}개는 아직 제품(CPE) 수준입니다.`,
@@ -4006,9 +4010,11 @@ export async function runSetAiBomField(args: Record<string, string>): Promise<st
 // ── 지원 종료(EOL) 점검 — 대화로 (2026-09-01 · 계획서 중-7 + 전-4) ─────────────────────
 //
 // ■ 왜: 표는 있는데 **아무도 부르지 않았다**
-//   eol-seed.ts는 2026-08-04 파트너 지적으로 만들어졌는데(「EOS 정보도 같이 제공될 거라
-//   생각된다」), eol찾기·eol한줄·eol표상태 셋 다 **부르는 곳이 한 군데도 없었다.**
-//   생산자만 있고 소비자가 없는 값 — 있으나 마나였다.
+// ■ 왜: 표는 있는데 **전체를 보는 길**이 없었다
+//   eol-seed.ts는 2026-08-04 파트너 지적으로 만들어졌다. eol찾기·eol한줄은 sbom_coverage가
+//   이미 쓰고 있었지만 **자산을 하나 콕 집었을 때만**이었고, eol표상태는 **소비자가 0**이었다.
+//   ⚠ 처음 이 주석에 「셋 다 부르는 곳이 한 군데도 없었다」고 적었는데 **사실이 아니다** —
+//     내 grep이 engine/*.ts만 봐서 agenttools/ 하위를 놓쳤다(얕은 글로브가 만든 거짓 사실).
 //
 // ■ 이 답이 만드는 함정 하나 (여기가 이 도구의 급소다)
 //   표는 **9줄뿐**이다. 「3건이 지원 종료」라고만 말하면 담당자는 **나머지는 지원 중**이라고
@@ -4034,18 +4040,24 @@ export async function runEolCheck(args: Record<string, string>): Promise<string>
   }
 
   const 오늘 = new Date();
-  const 걸린: { 자산: string; 부품: string; 버전: string; 줄: string; 지남: boolean }[] = [];
+  const 걸린: { 자산: string; 부품: string; 버전: string; 줄: string; 지남: boolean; 확실: boolean }[] = [];
   let 부품수 = 0;
   for (const a of 자산들) {
     for (const c of a.components ?? []) {
       부품수++;
       const row = eol찾기(c.name, c.version);
       if (!row) continue;
+      // ⚠⚠ **두 사실을 곱하면 안 된다**(2026-09-01 재검토 [상]이 잡았다).
+      //   `지남`은 「종료일이 오늘보다 과거인가」라는 **날짜 사실**,
+      //   `확실`은 「이 부품이 표의 그 제품이 맞나」라는 **이름 사실** — 서로 다른 물음이다.
+      //   처음엔 `지남 && 확실`로 곱했는데, 그러면 **이름이 덜 확실한 진짜 만료품이
+      //   「⏳ 종료 예정」으로 강등**된다. 하필 내가 「참인 경보를 잃지 않겠다」며 근거로 든
+      //   `openssl-libs 1.0.2k`(2019년 만료)가 바로 그렇게 미래형 칸으로 내려갔다 —
+      //   담당자는 「아직 안 끝났다」로 읽고 우선순위를 내린다. 고치려던 것보다 나쁜 결과다.
+      //   → 곱하지 말고 **칸을 셋으로 나눈다**: 확실히 끝남 / 끝났는데 이름 확인 필요 / 예정.
       const 지남 = Boolean(row.종료일 && new Date(row.종료일 + "T00:00:00").getTime() < 오늘.getTime());
-      // ⚠ 이름이 겹치기만 한 것은 **지원 종료로 단정하지 않는다**(python-dateutil 2.7.5가
-      //   「Python 2.7 종료」로 찍히던 자리 — 검토관 [중]). 확실한 것만 ⛔ 칸으로 올린다.
       const 확실 = 이름이정확한가(c.name, row);
-      걸린.push({ 자산: a.name, 부품: c.name, 버전: c.version, 줄: eol한줄확실도(c.name, row, 오늘), 지남: 지남 && 확실 });
+      걸린.push({ 자산: a.name, 부품: c.name, 버전: c.version, 줄: eol한줄확실도(c.name, row, 오늘), 지남, 확실 });
     }
   }
 
@@ -4063,7 +4075,10 @@ export async function runEolCheck(args: Record<string, string>): Promise<string>
     );
   }
 
-  const 지난것 = 걸린.filter((x) => x.지남);
+  // ★ 칸이 셋이다 — 「끝났나(날짜)」와 「그 제품이 맞나(이름)」는 다른 물음이라 섞지 않는다.
+  //   둘을 곱해 두 칸으로 만들면 **진짜 만료품이 「예정」으로 내려간다**(위 주석의 사고).
+  const 지난것 = 걸린.filter((x) => x.지남 && x.확실);
+  const 이름확인 = 걸린.filter((x) => x.지남 && !x.확실);
   const 예정 = 걸린.filter((x) => !x.지남);
   const 그리기 = (xs: typeof 걸린) =>
     xs.slice(0, 12).map((x) => `- ${x.자산} · **${x.부품} ${x.버전}** — ${x.줄}`).join("\n") +
@@ -4072,6 +4087,11 @@ export async function runEolCheck(args: Record<string, string>): Promise<string>
   return (
     `${범위줄}\n\n` +
     (지난것.length ? `⛔ **지원이 이미 끝난 부품 ${지난것.length}건**\n${그리기(지난것)}\n\n` : "") +
+    // ⚠ 이 칸을 「예정」에 섞으면 안 된다 — **날짜상 이미 끝난 것들**이라 급한 쪽이다.
+    //   다만 이름이 겹치기만 한 것일 수 있어 단정하지 않고 확인을 청한다.
+    (이름확인.length
+      ? `⚠ **종료일이 이미 지났지만 같은 제품인지 확인이 필요한 부품 ${이름확인.length}건** (이름이 표와 겹치기만 할 수 있습니다)\n${그리기(이름확인)}\n\n`
+      : "") +
     (예정.length ? `⏳ 지원 종료가 예정된 부품 ${예정.length}건\n${그리기(예정)}\n\n` : "") +
     `⚠ 표에 걸리지 않은 나머지 ${부품수 - 걸린.length}개는 **「지원 중」이 아니라 「모른다」**입니다 — 표가 ${EOL_SEED.length}줄뿐입니다.\n\n${eol표상태()}`
   );

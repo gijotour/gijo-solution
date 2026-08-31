@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { 강제규칙들, 실제도착, 가로챈규칙 } from "./helpers/routing";
 
-const 규칙 = 강제규칙들();
+const 규칙 = 강제규칙들(); // 진단용(어느 규칙이 가로챘나) — 판정은 실제도착()이 제품 함수로 한다
 
 describe("★★ 쓰기 요청이 읽기 도구로 새지 않는다", () => {
   const 기입해야함 = [
@@ -24,7 +24,7 @@ describe("★★ 쓰기 요청이 읽기 도구로 새지 않는다", () => {
   ];
   for (const 문장 of 기입해야함) {
     it(`"${문장}" → set_aibom_field`, () => {
-      const 도착 = 실제도착(문장, 규칙);
+      const 도착 = 실제도착(문장);
       const 도둑 = 가로챈규칙(문장, "set_aibom_field", 규칙);
       expect(도착, 도둑 ? `앞 규칙 [${도둑.차례}] ${도둑.도구}가 가로챘다` : "아무 규칙에도 안 걸린다")
         .toBe("set_aibom_field");
@@ -33,9 +33,9 @@ describe("★★ 쓰기 요청이 읽기 도구로 새지 않는다", () => {
 
   it("★ 물음꼴은 그대로 조회로 간다 — 시킴말만 비켜 준 것이다", () => {
     // 「뭘 기재해야 해?」는 무엇을 적을지 **묻는** 말이라 조회(미기재 목록)가 맞다.
-    expect(실제도착("AI-BOM 뭘 기재해야 해?", 규칙)).toBe("aibom_status");
-    expect(실제도착("AI-BOM 현황 알려줘", 규칙)).toBe("aibom_status");
-    expect(실제도착("AI-BOM 보여줘", 규칙)).toBe("aibom_status");
+    expect(실제도착("AI-BOM 뭘 기재해야 해?")).toBe("aibom_status");
+    expect(실제도착("AI-BOM 현황 알려줘")).toBe("aibom_status");
+    expect(실제도착("AI-BOM 보여줘")).toBe("aibom_status");
   });
 });
 
@@ -45,34 +45,69 @@ describe("★ SBOM 없는 자산 — AI 자산만 세는 도구로 보내지 않
   // 답한다 — SBOM 없는 자산이 12건 있는데 없다고 말하는 셈이다(검토관 [상]).
   for (const 문장 of ["SBOM 없는 자산 알려줘", "SBOM 미생성 자산 보여줘", "부품표 없는 자산 뭐야", "SBOM 누락 자산 목록"]) {
     it(`"${문장}" → sbom_coverage`, () => {
-      expect(실제도착(문장, 규칙), "AI 자산만 세는 도구로 가면 IT 자산이 빠진다").toBe("sbom_coverage");
+      expect(실제도착(문장), "AI 자산만 세는 도구로 가면 IT 자산이 빠진다").toBe("sbom_coverage");
     });
   }
 
-  it("★★ 생성 요청은 여전히 generate_sbom으로 — 조회로 돌리면 안 만들고 만든 줄 안다", () => {
-    for (const 문장 of ["fraud-detect-llm SBOM 생성해줘", "SBOM 만들어줘"]) {
-      expect(실제도착(문장, 규칙), `"${문장}"이 조회로 샜다`).not.toBe("sbom_coverage");
+  // ⚠ 시험 이름이 「generate_sbom으로 간다」고 약속했는데 검사는 「sbom_coverage가 아니다」만
+  //   봤다 — 실제 도착지는 null(강제 규칙 없음 → LLM 판단)이다. **확인하지 않는 것을 이름으로
+  //   약속하면 안 된다**(2026-09-01 재검토 [하]). 이름을 사실대로 고치고, 진짜 위험(조회로 새는
+  //   것)만 못 박는다. 생성 요청이 어디로 가는지는 LLM 루프의 몫이라 여기서 정할 수 없다.
+  it("★★ 생성 요청이 **조회 도구로 새지 않는다** — 새면 안 만들고 만든 줄 안다", () => {
+    for (const 문장 of [
+      "fraud-detect-llm SBOM 생성해줘",
+      "SBOM 만들어줘",
+      // ↓ 원래 aibomfield 시험이 지키던 문장들 — 옮기면서 빠뜨렸던 것을 되살린다
+      "SBOM 없는 자산 SBOM 만들어줘",
+      "SBOM 미생성 자산 SBOM 생성해줘",
+    ]) {
+      expect(실제도착(문장), `"${문장}"이 조회(sbom_coverage)로 샜다 — 아무것도 안 만들어진다`)
+        .not.toBe("sbom_coverage");
+      expect(실제도착(문장), `"${문장}"이 AI-BOM 조회로 샜다`).not.toBe("aibom_status");
     }
+  });
+
+  // ⚠ aibomfield.test.ts에서 지운 부정 문장 중 **옮겨지지 않은 것**을 여기 되살린다
+  //   (2026-09-01 재검토 [중]: 13문장 중 5문장이 사라졌고, 그중 둘은 원 커밋이
+  //    「가장 나쁜 오라우팅」이라 부른 바로 그 문장이었다).
+  it("★ 엉뚱한 물음을 SBOM 결손 조회가 삼키지 않는다", () => {
+    // ⚠ 「SBOM 얼마나 채워졌어?」는 뺐다 — 그건 **원래 sbom_coverage가 답하는 물음**이다
+    //   (도구 설명에 그대로 적혀 있다). 옛 시험이 그것을 부정에 넣은 건 「그 규칙이 잡으면
+    //   안 된다」는 뜻이었지 「그 도구에 가면 안 된다」가 아니었다 — 규칙 단위 시험을 도착지
+    //   시험으로 옮길 때 뜻이 뒤집히는 자리다.
+    for (const 문장 of ["AI-BOM 현황 알려줘", "자산 목록 보여줘", "가드레일 기재해줘", "MCP 서버 목록 보여줘"]) {
+      expect(실제도착(문장), `"${문장}"을 sbom_coverage가 가로챘다`).not.toBe("sbom_coverage");
+    }
+    // 「SBOM 얼마나 채워졌어?」는 sbom_coverage가 맞다 — 그것도 못 박아 둔다.
+    expect(실제도착("SBOM 얼마나 채워졌어?")).toBe("sbom_coverage");
   });
 });
 
 describe("★ VEX — 개념 물음을 건수표로 답하지 않는다", () => {
   for (const 문장 of ["VEX 파일 내보내줘", "VEX 현황 알려줘", "VEX로 나가면 어떤 상태야?"]) {
-    it(`"${문장}" → vex_status`, () => expect(실제도착(문장, 규칙)).toBe("vex_status"));
+    it(`"${문장}" → vex_status`, () => expect(실제도착(문장)).toBe("vex_status"));
   }
-  for (const 문장 of ["VEX가 뭐야?", "VEX 표준 설명해줘", "VEX란 무엇인가?", "VEX 어떻게 쓰는 거야?"]) {
+  // ⚠ 배제를 넓게 잡으면 **평범한 조회까지 죽어** 아무 도구에도 안 닿는다(재검토 [중]).
+  //   그러면 이 창구를 만든 이유(모델 판단으로 새던 자리)가 그대로 돌아온다.
+  it("★★ 조회 문장에 설명·왜·방법이 섞여도 vex_status에 닿는다", () => {
+    for (const 문장 of ["VEX 현황 설명해줘", "VEX 대상이 왜 0건이야?", "VEX 파일 받는 방법", "VEX 내보낼 절차 알려줘"]) {
+      expect(실제도착(문장), `"${문장}"이 아무 도구에도 안 닿는다 — 모델이 지어낸다`).toBe("vex_status");
+    }
+  });
+
+  for (const 문장 of ["VEX가 뭐야?", "VEX 표준 설명해줘", "VEX란 무엇인가?"]) {
     it(`"${문장}" — 건수표로 답하지 않는다`, () => {
-      expect(실제도착(문장, 규칙), "무엇인지 물었는데 「실릴 취약점 312건」이 나온다").not.toBe("vex_status");
+      expect(실제도착(문장), "무엇인지 물었는데 「실릴 취약점 312건」이 나온다").not.toBe("vex_status");
     });
   }
 });
 
 describe("★ EOL — 「지원해줘」를 삼키지 않는다(실제 순서로)", () => {
   for (const 문장 of ["지원 끝난 부품 있어?", "EOL 확인해줘", "단종된 소프트웨어 알려줘"]) {
-    it(`"${문장}" → eol_check`, () => expect(실제도착(문장, 규칙)).toBe("eol_check"));
+    it(`"${문장}" → eol_check`, () => expect(실제도착(문장)).toBe("eol_check"));
   }
   for (const 문장 of ["기술 지원 받을 수 있어?", "지원해줘"]) {
-    it(`"${문장}" — eol_check로 안 간다`, () => expect(실제도착(문장, 규칙)).not.toBe("eol_check"));
+    it(`"${문장}" — eol_check로 안 간다`, () => expect(실제도착(문장)).not.toBe("eol_check"));
   }
 });
 

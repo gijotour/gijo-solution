@@ -158,7 +158,13 @@ export async function runScanForTarget(target: HardeningTarget, standard: Standa
     result: "ok",
   });
   // 취약·확인필요 항목을 통합 관제(보안 분석) 4번째 소스로 투영 — 장비명으로 취약점·로그와 상관·조치 흐름 연결.
-  projectHardeningEvents(target.id, target.label, standard, report.items);
+  // ⚠⚠ **여기도 「점검한 곳」을 사실대로 적는다**(2026-09-01 재검토 [상]).
+  //   리포트·요약·감사 기록·악화 알림·작업 원장 다섯 곳을 감사대상글()로 통일하면서
+  //   **바로 그 사이에 낀 이 여섯 번째만 빠뜨렸다.** 여기가 가장 나쁜 자리다 —
+  //   통합관제 목록·히트맵·상관분석·▶조치로 흘러가 **실제로 사람을 움직이게** 하기 때문이다.
+  //   로컬 대상을 장비 이름으로 올리면 담당자는 멀쩡한 방화벽을 고치러 가고, 정작 취약한
+  //   이 서버는 아무도 안 본다.
+  projectHardeningEvents(target.id, 감사대상글(report), standard, report.items);
   // 악화 알림 — 직전 대비 취약 건수가 늘면 별도 감사 항목으로 눈에 띄게 남긴다.
   if (prevFail !== null && s.fail > prevFail) {
     recordAudit({

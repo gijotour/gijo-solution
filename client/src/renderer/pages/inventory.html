@@ -1015,7 +1015,8 @@
     document.getElementById("kpiHigh").textContent = allAssets.filter((a) => riskOf(a).level === "high").length;
     document.getElementById("kpiMid").textContent = allAssets.filter((a) => riskOf(a).level === "mid").length;
     document.getElementById("kpiLow").textContent = allAssets.filter((a) => ["low", "none"].includes(riskOf(a).level)).length;
-    document.getElementById("kpiNoSbom").textContent = allAssets.filter((a) => !a.sbomGeneratedAt).length;
+    // ⚠ 공용 잣대로 센다(assetrules.js) — 화면마다 각자 세면 같은 물음에 다른 수가 나온다.
+    document.getElementById("kpiNoSbom").textContent = window.gijoSbomMissingCount(allAssets);
     // 지도 탭이 열려 있으면 함께 갱신 — 필터·검색·실시간 갱신 모든 경로가 render()를 거치므로
     // 여기 한 곳만 걸면 지도가 표와 어긋나지 않는다.
     if (activeTab === "map" && window.gijoMapView) renderMap();
@@ -1840,6 +1841,7 @@
 
 
 
+<script src="assetrules.js"></script>
 <script src="nav.js"></script>
 <script src="selectnotify.js"></script>
 <script src="workflowrail.js"></script>

@@ -60,6 +60,11 @@ const 주석빼기 = (원문) => {
 const 값RE = new RegExp("^" + B + "s*import" + B + "s+(?!type[" + B + "s{])[" + B + "s" + B + "S]*?from" + B + "s*[\"']([^\"']+)[\"']", "gm");
 const 부작용RE = new RegExp("^" + B + "s*import" + B + "s*[\"']([^\"']+)[\"']", "gm");
 const 동적RE = new RegExp("(?:await" + B + "s+import|require)" + B + "s*" + B + "(" + B + "s*[\"']([^\"']+)[\"']", "g");
+// ⚠ **배럴 재수출(`export … from "./x"`)도 화살이다**(2026-09-01 완결성 비평 [상]).
+//   `export { a } from "./b"`는 런타임에 b를 **실제로 불러온다** — import와 똑같은 의존이다.
+//   빠뜨리면 그 파일이 아무것도 안 무는 것처럼 보여 **덩어리가 실제보다 작게 나온다.**
+//   ⚠ `export type { … } from`은 뺀다 — 타입은 컴파일하면 사라진다(값/타입 가르기 원칙 그대로).
+const 재수출RE = new RegExp("^" + B + "s*export" + B + "s+(?!type[" + B + "s{])[" + B + "s" + B + "S]*?from" + B + "s*[\"']([^\"']+)[\"']", "gm");
 
 function 파일들(d, 모음 = []) {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -83,7 +88,7 @@ const 화살 = new Map(); // 파일 -> Set(파일)
 for (const f of 목록) {
   const s = 주석빼기(fs.readFileSync(f, "utf8"));
   const 밖 = new Set();
-  for (const re of [값RE, 부작용RE, 동적RE]) {
+  for (const re of [값RE, 부작용RE, 동적RE, 재수출RE]) {
     re.lastIndex = 0;
     let m;
     while ((m = re.exec(s))) {

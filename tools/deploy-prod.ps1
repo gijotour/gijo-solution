@@ -49,7 +49,17 @@ if ($LASTEXITCODE -ne 0) { throw "WSL 동기화/빌드 실패 — 배포 중단 
 #   사고는 「아무도 안 봐서」 나므로, 사람이 반드시 지나가는 **배포 순간**에 말한다.
 #   ⚠ 여기서 배포를 막지는 않는다 — 개발 기간에는 일부러 켜 둔 값이라 막으면 매번 걸린다.
 #     끄는 시점은 사장님 결정이고, 이 표지는 **잊지 말라는 알림**이다.
-$devMode = (wsl -d $distro -- bash -c "grep -m1 ^GIJO_DEV_MODE= /home/gijo/gijo-as/gijo-as.env | cut -d= -f2").Trim()
+# ⚠⚠ **줄이 없을 때 죽지 않게** 한다(2026-09-01 재검토 [상]).
+#   이 스크립트는 위에서 $ErrorActionPreference="Stop"을 건다. GIJO_DEV_MODE 줄이 env에 없으면
+#   grep이 아무것도 안 뱉고, PowerShell 5.1에서 출력 0줄인 네이티브 명령의 결과는 $null이다.
+#   $null.Trim()은 던지고, Stop이라 배포가 **거기서 멈춘다** — 문서 동기화·서버 재시작·health가
+#   전부 안 돈다. 하필 이 표지가 스스로 권하는 「그 줄을 지우고 재시작하세요」를 따르는 순간
+#   배포가 깨진다. **끄라고 해 놓고 끄면 벌주는** 꼴이었다.
+$devMode = ""
+try {
+  $raw = wsl -d $distro -- bash -c "grep -m1 ^GIJO_DEV_MODE= /home/gijo/gijo-as/gijo-as.env | cut -d= -f2"
+  if ($null -ne $raw) { $devMode = ([string]$raw).Trim() }
+} catch { $devMode = "" }   # env를 못 읽어도 배포는 계속한다 — 이건 표지이지 관문이 아니다
 if ($devMode -eq "1") {
   Write-Output ""
   Write-Output "  ⚠⚠  개발 모드가 켜져 있습니다(GIJO_DEV_MODE=1) — 업무정보 등급(기밀·민감)"
