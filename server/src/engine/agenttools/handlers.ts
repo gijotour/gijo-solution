@@ -3350,16 +3350,13 @@ export async function runVerifyFinding(args: Record<string, string>): Promise<st
 /** 정기 리포트 스케줄 걸기 — "주간 리포트 매주 금요일 17시로 걸어줘"(⑤보고의 쓰기 짝). */
 export async function runAddReportSchedule(args: Record<string, string>): Promise<string> {
   const { createSchedule, SCHEDULE_TYPE_LABEL } = await import("../reportschedule.js");
-  const typeMap: Record<string, "daily" | "weekly" | "monthly" | "quarterly"> = {
-    "일일": "daily", "매일": "daily", "주간": "weekly", "매주": "weekly",
-    "월간": "monthly", "매월": "monthly", "분기": "quarterly",
-  };
-  const type = typeMap[(args.type ?? "").trim()] ?? (["daily", "weekly", "monthly", "quarterly"].includes(args.type) ? (args.type as "daily") : null);
+  // ⚠ 주기 해석은 **한 곳에서만**(주기해석) — 바꾸기 도구가 생기면서 사본이 둘이 될 뻔했다.
+  //   따로 적으면 「주간」을 한쪽은 weekly로, 다른 쪽은 다르게 읽는 날이 온다(2026-08-31).
+  const type = 주기해석(args.type);
   if (!type) return `주기를 해석하지 못했습니다 (받은 값: "${args.type}") — 일일/주간/매월/분기 중 하나로 말씀해 주세요.`;
   const hour = Number(args.hour);
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) return `시각(hour)은 0~23 사이여야 합니다 (받은 값: "${args.hour}").`;
-  const WEEKDAY: Record<string, number> = { "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6 };
-  const dayOfWeek = type === "weekly" ? (WEEKDAY[(args.dayOfWeek ?? "").trim().replace(/요일$/, "")] ?? 1) : null;
+  const dayOfWeek = type === "weekly" ? (요일해석(args.dayOfWeek) ?? 1) : null;
   const sch = createSchedule({ type, format: "pdf", audience: "internal", dayOfWeek, hour, minute: 0 });
   return `${SCHEDULE_TYPE_LABEL[sch.type]} 리포트 스케줄을 걸었습니다 — 다음 실행 ${새시각(sch.nextRunAt)} (pdf · 내부용). 끄거나 지우는 것은 보고 화면 › 정기 리포트에서.`;
 }
@@ -3639,4 +3636,98 @@ export function runReviewMaintenance(
   } catch (e) {
     return `처리하지 못했습니다 — ${(e as Error).message}`;
   }
+}
+
+// ── 정기 리포트 일정 바꾸기·지우기 (2026-08-31) ─────────────────────────────
+//
+// ■ 왜 (대장 §6 끊김 2)
+//   조회(report_schedule_list)와 등록(report_schedule_add)은 있는데 **바꾸기·지우기가 없어서**
+//   「주간 리포트를 매주 금요일 5시로 바꿔줘」가 안 됐다. 엔진에는 updateSchedule·deleteSchedule이
+//   처음부터 있었고 화면 IPC만 그것을 썼다 — 대화창에는 길이 없었다.
+//
+// ■ 사본을 만들지 않는다
+//   주기(일일/주간/매월/분기)와 요일 해석은 runAddReportSchedule 안에 있던 것을 **뽑아 함께
+//   쓴다.** 새로 적으면 「주간」을 한쪽은 weekly로, 다른 쪽은 다르게 읽는 날이 온다.
+
+const 주기표: Record<string, "daily" | "weekly" | "monthly" | "quarterly"> = {
+  "일일": "daily", "매일": "daily", "주간": "weekly", "매주": "weekly",
+  "월간": "monthly", "매월": "monthly", "분기": "quarterly",
+};
+const 요일표: Record<string, number> = { "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6 };
+
+/** "주간"·"매주"·"weekly" → weekly. 못 읽으면 null(지어내지 않는다). */
+export function 주기해석(값: string | undefined): "daily" | "weekly" | "monthly" | "quarterly" | null {
+  const t = (값 ?? "").trim();
+  if (!t) return null;
+  if (주기표[t]) return 주기표[t];
+  return (["daily", "weekly", "monthly", "quarterly"] as const).includes(t as never)
+    ? (t as "daily" | "weekly" | "monthly" | "quarterly")
+    : null;
+}
+
+/** "금요일"·"금" → 5. 못 읽으면 null. */
+export function 요일해석(값: string | undefined): number | null {
+  const d = (값 ?? "").trim().replace(/요일$/, "");
+  return d in 요일표 ? 요일표[d] : null;
+}
+
+/** 일정 한 줄에서 **이 도구가 쓰는 칸만** 적는다 — reportschedule을 동적 import하므로
+ *  타입을 끌어오지 않고 모양으로 받는다(필드 이름은 원천과 같아야 한다). */
+// ⚠ type은 **다섯 값**이다 — ondemand가 더 있다(reportschedule.ts ScheduleType).
+//   네 값으로 적었다가 tsc가 잡았다. 원천을 안 열고 가정하면 이렇게 걸린다.
+type 일정칸 = { id: string; type: "ondemand" | "daily" | "weekly" | "monthly" | "quarterly"; hour: number; dayOfWeek?: number | null };
+
+/** 어느 일정인가 — 하나면 그것, 여럿이면 고르라고 한다(아무거나 안 집는다). */
+function 일정찾기(말: string, 목록: 일정칸[], 라벨: Record<string, string>): 일정칸 | string {
+  if (!목록.length) {
+    return "등록된 정기 리포트 일정이 없습니다. 대화창에 \"주간 리포트 매주 금요일 5시로 걸어줘\"라고 하시면 새로 겁니다.";
+  }
+  const q = (말 ?? "").trim();
+  const 주기 = 주기해석(q) ?? (q ? 주기해석(q.replace(/\s*리포트.*$/, "")) : null);
+  const 걸린 = 주기 ? 목록.filter((s) => s.type === 주기) : 목록;
+  if (걸린.length === 1) return 걸린[0];
+  if (!걸린.length) {
+    const 있는것 = 목록.map((s) => 라벨[s.type]).join(", ");
+    return `"${q}"에 맞는 일정을 못 찾았습니다. 등록된 것: ${있는것}`;
+  }
+  const 목록글 = 걸린.map((s) => `- ${라벨[s.type]} (${s.hour}시)`).join("\n");
+  return `어느 일정인지 말씀해 주세요:\n${목록글}`;
+}
+
+/** 정기 리포트 일정 바꾸기 — 주기·요일·시각을 고친다(안 준 것은 그대로 둔다). */
+export async function runUpdateReportSchedule(args: Record<string, string>): Promise<string> {
+  const { listSchedules, updateSchedule, SCHEDULE_TYPE_LABEL } = await import("../reportschedule.js");
+  const 고름 = 일정찾기(args.target ?? args.type ?? "", listSchedules(), SCHEDULE_TYPE_LABEL);
+  if (typeof 고름 === "string") return 고름;
+
+  const patch: { type?: "daily" | "weekly" | "monthly" | "quarterly"; dayOfWeek?: number | null; hour?: number } = {};
+  const 새주기 = 주기해석(args.newType ?? args.type ?? "");
+  // ⚠ target으로 고른 주기와 같으면 「바꾼 것」이 아니다 — newType이 따로 있을 때만 주기를 옮긴다.
+  if (args.newType && 새주기) patch.type = 새주기;
+  const 새요일 = 요일해석(args.dayOfWeek ?? "");
+  if (새요일 !== null) patch.dayOfWeek = 새요일;
+  if (args.hour !== undefined && args.hour !== "") {
+    const h = Number(args.hour);
+    if (!Number.isInteger(h) || h < 0 || h > 23) return `시각(hour)은 0~23 사이여야 합니다 (받은 값: "${args.hour}").`;
+    patch.hour = h;
+  }
+  if (!Object.keys(patch).length) {
+    return `무엇을 바꿀지 알려 주세요 — 주기(일일/주간/매월/분기)·요일·시각 중에서. 예: "주간 리포트 금요일 17시로 바꿔줘".`;
+  }
+  const 바뀐 = updateSchedule(고름.id, patch);
+  // FAIL_MARKS-예외: **진짜 실패의 오류문**이다 — 고른 뒤 바꾸기 사이에 남이 지운 경우다
+  //   (0건이라는 정직한 사실이 아니라 처리가 안 된 것). 「없습니다」로 적으면 실패를 정상으로
+  //   포장하게 된다. 감시가 이 줄을 잡아 준 덕에 이유를 적는다.
+  if (!바뀐) return "일정을 찾지 못했습니다(그새 지워졌을 수 있습니다).";
+  const 요일글 = 바뀐.type === "weekly" ? ` ${["일", "월", "화", "수", "목", "금", "토"][바뀐.dayOfWeek ?? 1]}요일` : "";
+  return `정기 리포트 일정을 바꿨습니다 — ${SCHEDULE_TYPE_LABEL[바뀐.type]}${요일글} ${바뀐.hour}시 · 다음 실행 ${새시각(바뀐.nextRunAt)}`;
+}
+
+/** 정기 리포트 일정 지우기 — 자동 생성이 멈춘다(이미 만든 리포트는 그대로 남는다). */
+export async function runDeleteReportSchedule(args: Record<string, string>): Promise<string> {
+  const { listSchedules, deleteSchedule, SCHEDULE_TYPE_LABEL } = await import("../reportschedule.js");
+  const 고름 = 일정찾기(args.target ?? args.type ?? "", listSchedules(), SCHEDULE_TYPE_LABEL);
+  if (typeof 고름 === "string") return 고름;
+  deleteSchedule(고름.id);
+  return `정기 리포트 일정을 지웠습니다 — ${SCHEDULE_TYPE_LABEL[고름.type]} (${고름.hour}시). 자동 생성이 멈춥니다.\n이미 만들어진 리포트는 그대로 남아 있습니다.`;
 }

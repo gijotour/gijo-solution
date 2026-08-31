@@ -205,6 +205,8 @@ import {
   runSetIntroField,
   runSubmitMaintenanceReport,
   runReviewMaintenance,
+  runUpdateReportSchedule,
+  runDeleteReportSchedule,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -1678,6 +1680,54 @@ const TOOLS: AgentTool[] = [
     effect: (args) => `${args.type ?? "정기"} 리포트가 자동 생성되도록 스케줄 등록 (pdf · 내부용)`,
     undo: "보고 화면 › 정기 리포트에서 끄거나 지울 수 있습니다.",
     run: runAddReportSchedule,
+  },
+  {
+    // 📄 정기 리포트 일정 **바꾸기** — 조회·등록은 있는데 이것만 없어서
+    //   「주간 리포트를 매주 금요일 5시로 바꿔줘」가 안 됐다(2026-08-31 대장 §6 끊김 2).
+    //   엔진(updateSchedule)은 처음부터 있었고 화면 IPC만 그것을 썼다.
+    name: "report_schedule_update",
+    label: "정기 리포트 일정 바꾸기",
+    domain: "report",
+    write: true,
+    description:
+      '이미 걸어 둔 정기 리포트 일정의 주기·요일·시각을 바꾼다. "주간 리포트 금요일 17시로 바꿔줘"에 쓴다. 안 준 값은 그대로 둔다.',
+    params: [
+      { name: "target", label: "어느 일정", description: "주간/일일/매월/분기 (하나뿐이면 비워도 됨)", required: false },
+      { name: "hour", label: "시각(0~23)", description: "몇 시로 바꿀지", required: false },
+      { name: "dayOfWeek", label: "요일", description: "주간일 때 — 월~일", required: false },
+      { name: "newType", label: "새 주기", description: "주기 자체를 바꿀 때만", required: false },
+    ],
+    // report_schedule_add와 **같은 규칙**으로 지시문에서 시각·요일을 정정한다(사람이 다시 안 적게).
+    autoFill: (args, instruction) => {
+      const filled: Record<string, string> = {};
+      const h = /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시/.exec(instruction);
+      if (h) {
+        let 시 = Number(h[2]);
+        if ((h[1] === "오후" || h[1] === "저녁" || h[1] === "밤") && 시 < 12) 시 += 12;
+        if (String(시) !== args.hour) filled.hour = String(시);
+      }
+      const d = /(월|화|수|목|금|토|일)요일/.exec(instruction);
+      if (d && !args.dayOfWeek) filled.dayOfWeek = d[1];
+      return filled;
+    },
+    effect: (args) =>
+      `정기 리포트 일정을 바꿉니다 — ${[args.newType && `주기 ${args.newType}`, args.dayOfWeek && `${args.dayOfWeek}요일`, args.hour && `${args.hour}시`].filter(Boolean).join(" · ") || "(바꿀 값이 비어 있음)"}`,
+    undo: "다시 바꾸거나, 보고 화면 › 정기 리포트에서 고칠 수 있습니다.",
+    run: runUpdateReportSchedule,
+  },
+  {
+    // 📄 정기 리포트 일정 **지우기** — 자동 생성이 멈춘다. 만든 리포트는 그대로 남는다.
+    name: "report_schedule_delete",
+    label: "정기 리포트 일정 지우기",
+    domain: "report",
+    write: true,
+    description: '걸어 둔 정기 리포트 일정을 지운다(자동 생성 중지). "주간 리포트 자동 생성 그만해줘"에 쓴다.',
+    params: [
+      { name: "target", label: "어느 일정", description: "주간/일일/매월/분기 (하나뿐이면 비워도 됨)", required: false },
+    ],
+    effect: (args) => `${args.target || "정기"} 리포트 자동 생성을 멈춥니다(이미 만든 리포트는 남습니다)`,
+    undo: "다시 걸려면 \"주간 리포트 금요일 17시로 걸어줘\"라고 하시면 됩니다.",
+    run: runDeleteReportSchedule,
   },
   {
     name: "bulk_update",
