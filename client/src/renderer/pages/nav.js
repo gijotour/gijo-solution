@@ -136,7 +136,13 @@
     //    📂 지켜보는 폴더는 2026-08-31 2단계 구현으로 항목이 생겼다 — 아래.)
     { id: "mydocs", icon: "book", label: "② 📓 내 문서", items: [
       { page: "mydocs.html?tab=ingest", label: "업로드·반입" },
-      { page: "mydocs.html?tab=mine", label: "문서 편집 (내 것)" },
+      // 📝 문서작성(2026-09-01 사장님 지시) — 「직접 작성해야 하는 것」을 한 자리로.
+      //   ⚠ 「문서 편집 (내 것)」을 **대체**한다. 새로 더하면 같은 화면이 두 줄이 되고
+      //     🔍 화면찾기에도 두 번 나온다(gijoScreenList가 주소+이름으로 거른다).
+      //   ⚠ 「문서작성」은 2026-08-22에 **창(Smart MD Studio)으로는 없앤** 이름이다
+      //     — 이번 지시는 그 결정을 뒤집는 게 아니라 **창이 아니라 메뉴로** 세우는 것이다.
+      { page: "mydocs.html?tab=write", label: "문서작성" },
+      { page: "mydocs.html?tab=mine", label: "내 문서 목록" },
       // 나만의 연락처 — TOP 숨김(🔍 찾기 전용이던 자리)에서 보이는 항목으로 승격(같은 주소·이름).
       { page: "mydocs.html?tab=contacts", label: "나만의 연락처" },
       // 업무 넘기기 — 「추가 기능」 그룹이 사라지며 사장님 정의(「내 문서 … 업무넘기기 포함」)

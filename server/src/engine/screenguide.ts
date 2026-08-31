@@ -1235,7 +1235,11 @@ const 화면별칭: Record<string, string> = {
   //   화면 이름에 가까운 말만 둔다. (라우팅 회귀를 못 돌리는 상황이라 더 좁게 잡았다.)
   // 「문서 작성」은 2026-08-22부터 내 문서 화면 안이다(옛 Smart MD 별도 창 폐지).
   // 옛 이름으로 묻는 사람이 있어 별칭은 남기되 가리키는 곳만 바꿨다.
+  // 📝 2026-09-01 — 「문서작성」이 **탭 하나**가 됐다(직접 쓰는 자리 모음). 통짜 주소로
+  //   보내면 문서 목록이 떠서, 물어본 사람이 쓰는 자리를 다시 찾아야 했다.
   문서작성: "mydocs.html",
+  장애노트: "mydocs.html",
+  매뉴얼보강: "mydocs.html",
   스마트MD: "mydocs.html",
 };
 
@@ -1254,6 +1258,9 @@ const 별명열기탭: Record<string, string> = {
   담당자연락처: "mydocs.html?tab=contacts",
   제품안내: "mydocs.html?tab=guide",
   // 📂 서버가 주기 확인해 자동 반입하는 폴더 판(2026-08-31 2단계).
+  문서작성: "mydocs.html?tab=write",
+  장애노트: "mydocs.html?tab=write",
+  매뉴얼보강: "mydocs.html?tab=write",
   지켜보는폴더: "mydocs.html?tab=watch",
   // 📨(2026-08-31) — 복합어만(「요청」 홑낱말 금지: 가로채기 계보).
   조치요청서: "mydocs.html?tab=req",

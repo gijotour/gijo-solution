@@ -248,38 +248,10 @@ tr:last-child td{border-bottom:none;}
     .dm-delbtn{background:var(--red);color:#fff;border:none;border-radius:9px;padding:0 18px;font-weight:800;font-size:12px;cursor:pointer;}
     .dm-delbtn:disabled{opacity:.5;cursor:not-allowed;}
     </style>
-    <!-- 문서 보강 인입 — docenrich.html에서 병합(메뉴 정리 2026-07-25). 장애노트(수동)와
-         매뉴얼 보강(AI 번역·구조화). 기본 펼침(2026-08-02 사용자 지시). -->
-    <div class="panel">
-      <div data-gijo-fold="문서 보강 인입">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;">
-          <div style="border:1px solid var(--border);border-radius:10px;padding:12px;">
-            <div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">🩹 장애노트 작성 <span style="font-size:11.75px;color:var(--amber);border:1px solid rgba(240,160,32,.4);border-radius:20px;padding:0 7px;">AI 미사용 · 즉시 저장</span></div>
-            <input id="mProduct" placeholder="제품/대상 (예: Tenable Security Center)" style="width:100%;margin-bottom:6px;">
-            <input id="mTitle" placeholder="제목 (예: 예약 스캔 진행 중 멈춤)" style="width:100%;margin-bottom:6px;">
-            <input id="mSymptom" placeholder="증상 — 무엇이 잘못됐나" style="width:100%;margin-bottom:6px;">
-            <input id="mCause" placeholder="원인 (선택)" style="width:100%;margin-bottom:6px;">
-            <textarea id="mFix" rows="3" placeholder="해결 방법 — 명령어·경로는 원문 그대로" style="width:100%;margin-bottom:8px;"></textarea>
-            <button class="g-btn" id="mSave">💾 장애노트 저장</button>
-            <div class="status-line" id="mStatus"></div>
-          </div>
-          <div style="border:1px solid var(--border);border-radius:10px;padding:12px;">
-            <div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">📄 매뉴얼 보강 (AI 번역·구조화)</div>
-            <input id="dProduct" placeholder="제품/대상" style="width:100%;margin-bottom:6px;">
-            <input id="dSection" placeholder="섹션 이름 (예: 진단 파일 로그 옵션)" style="width:100%;margin-bottom:6px;">
-            <textarea id="dText" rows="5" placeholder="매뉴얼 한 섹션 붙여넣기 (한 번에 ~6,000자)" style="width:100%;margin-bottom:6px;"></textarea>
-            <select id="dMode" style="width:100%;margin-bottom:8px;">
-              <option value="auto">⚙ 자동 — 클라우드 되면 쓰고, 내부정보·비활성이면 로컬</option>
-              <option value="cloud">☁ 클라우드 — 품질↑ (벤더 공개자료만)</option>
-              <option value="local">💻 로컬 — 무료·폐쇄망 (온프렘 7B)</option>
-            </select>
-            <button class="g-btn g-primary" id="dRun">▶ 보강해서 저장</button>
-            <div class="status-line" id="dStatus"></div>
-          </div>
-        </div>
-        <div id="enrichResList" style="font-size:12.5px;color:var(--muted);margin-top:8px;"></div>
-      </div>
-    </div>
+    <!-- 🩹 장애노트 · 📄 매뉴얼 보강은 **📝 문서작성으로 옮겼다**(2026-09-01 사장님 지시 ②).
+         「직접 작성해야 하는 것」을 한 자리에 모으라는 지시다. 여기 남겨 두면 같은 것이 둘이
+         되고 고칠 때 한쪽만 고쳐진다 — 옮긴 것이지 복제가 아니다.
+         가는 길: 내 문서 › 📝 문서작성 (관리자만 그 칸이 보인다 — 서버가 admin으로 막는다). -->
 
     <!-- 접기(2026-08-01) — 정리 점검은 매일 보는 것이 아니다. 다만 **겹친 문서 수를 배지로**
          남긴다: 숫자 없이 접으면 "안에 뭐가 있는지 모르는 서랍"이 된다. -->
@@ -455,51 +427,9 @@ tr:last-child td{border-bottom:none;}
   // 문서 파일 인입은 대시보드 ＋로 통일(2026-07-27) — 분류 승인카드도 그쪽에서 뜬다.
   // 서버에 이미 있는 파일을 경로로 수집하는 길(ingest)은 여기 남는다(파일 탐색기가 아니라 경로 입력).
 
-  // ── 문서 보강 인입(docenrich에서 병합, 메뉴 정리 2026-07-25) — 장애노트·매뉴얼 보강 ──
-  (function initEnrich() {
-    const enrichResults = [];
-    function addEnrichResult(r) {
-      enrichResults.unshift(r);
-      document.getElementById("enrichResList").innerHTML = "이번 세션 인입: " + enrichResults.map((x) =>
-        `${x.documentId} (${x.via} · ${x.chunks}청크${x.triples ? " · 관계 " + x.triples : ""})`).join(" · ");
-    }
-    document.getElementById("mSave")?.addEventListener("click", async () => {
-      const btn = document.getElementById("mSave"), st = document.getElementById("mStatus");
-      const v = (id) => document.getElementById(id).value.trim();
-      const product = v("mProduct"), title = v("mTitle"), symptom = v("mSymptom"), cause = v("mCause"), fix = v("mFix");
-      if (!product || !title || !symptom || !fix) { st.textContent = "제품·제목·증상·해결은 필수입니다."; st.className = "status-line status-err"; return; }
-      const korean = ["증상: " + symptom, cause ? "원인: " + cause : "", "해결: " + fix].filter(Boolean).join("\n");
-      const triples = [];
-      if (cause) triples.push({ subject: title, predicate: "원인", object: cause });
-      triples.push({ subject: title, predicate: "해결", object: fix });
-      btn.disabled = true; st.textContent = "저장 중…"; st.className = "status-line";
-      try {
-        const r = await window.gijo.enrichIngest({ productName: product, sourceDoc: "현장 장애노트", section: title, mode: "manual", korean, triples });
-        st.textContent = `✓ 저장됨 — ${r.chunks}청크 · 관계 ${r.triples}개. 이제 검색됩니다.`; st.className = "status-line status-ok";
-        addEnrichResult(r);
-        ["mTitle", "mSymptom", "mCause", "mFix"].forEach((id) => document.getElementById(id).value = "");
-        loadDocuments();
-      } catch (e) { st.textContent = "✗ 실패: " + e.message; st.className = "status-line status-err"; }
-      btn.disabled = false;
-    });
-    document.getElementById("dRun")?.addEventListener("click", async () => {
-      const btn = document.getElementById("dRun"), st = document.getElementById("dStatus");
-      const v = (id) => document.getElementById(id).value.trim();
-      const productName = v("dProduct"), section = v("dSection"), text = v("dText");
-      const mode = document.getElementById("dMode").value;
-      if (!productName || !section || !text) { st.textContent = "제품·섹션·원본 텍스트는 필수입니다."; st.className = "status-line status-err"; return; }
-      btn.disabled = true; st.textContent = (mode === "local" ? "로컬 7B로 " : "") + "번역·구조화 중… (수십 초 걸릴 수 있어요)"; st.className = "status-line";
-      try {
-        const r = await window.gijo.enrichIngest({ text, productName, sourceDoc: productName + " 매뉴얼", section, mode });
-        const via = r.via === "cloud" ? "클라우드" : r.via === "local" ? "로컬" : r.via === "manual" ? "수동" : "원문";
-        st.textContent = `✓ 저장됨(${via}) — ${r.chunks}청크${r.triples ? " · 관계 " + r.triples + "개" : ""}${r.translated ? "" : " · 번역 실패로 원문 저장"}`; st.className = "status-line status-ok";
-        addEnrichResult(r);
-        document.getElementById("dText").value = "";
-        loadDocuments();
-      } catch (e) { st.textContent = "✗ 실패: " + e.message; st.className = "status-line status-err"; }
-      btn.disabled = false;
-    });
-  })();
+  // ── 🩹📄 장애노트·매뉴얼 보강 배선은 **📝 문서작성으로 옮겼다**(2026-09-01).
+  //   마크업만 옮기고 배선을 남기면 없는 노드에 addEventListener를 걸어 **그 뒤 줄이 통째로**
+  //   **안 돈다**(「없는 함수 버튼」 계보). 짝을 함께 옮긴다 — 로직은 한 글자도 안 바꿨다.
 
   // ── 승인카드(시안 승인 2026-07-25) — 업로드된 문서의 업무영역을 확인·수정한다.
   // 확실(≠일반)=청록 배지+[수정▾], 확신 낮음(일반)=호박 배지+되물음. 문서는 이미 저장돼 있어
