@@ -210,6 +210,7 @@ import {
   runSetEventStatus,
   runDeleteProduct,
   runVexStatus,
+  runSetAiBomField,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -1252,6 +1253,32 @@ const TOOLS: AgentTool[] = [
     effect: (args) => `자산 "${(args.assetId ?? "").trim()}"의 SBOM(구성요소 목록)을 생성·저장 · 스캔 결과는 바뀌지 않음`,
     undo: "SBOM은 재생성으로 갱신됩니다(별도 되돌리기 없음).",
     run: runGenerateSbom,
+  },
+  {
+    // 📦 AI-BOM 칸 기입 — 「이 자산의 가드레일 기재해줘」(대장 §3-4 항목 5 · 계획서 중-7).
+    //   ⚠ 화면(sbom.html)의 입력칸 13개를 대체하려고 낸 길이다 —
+    //     「메뉴는 보기용 · 새 화면에 입력칸 금지」 원칙을 그 화면이 어기고 있었다.
+    //   ⚠ 가중치 해시·서빙 모델 연결은 **일부러 뺐다**(계산값·목록 선택이라 자유 글이면 망가진다).
+    name: "set_aibom_field",
+    label: "AI-BOM 기입",
+    domain: "sbom",
+    write: true,
+    description:
+      'AI-BOM 5영역의 칸 하나에 내용을 **적는다**("가드레일 기재해줘", "시스템 프롬프트 적어줘"). 조회는 aibom_status를 쓴다(이건 기입 전용). 칸 이름: 기초 모델·아키텍처·파인튜닝 이력·용도·한계·데이터셋 출처·벡터 DB 위치·시스템 프롬프트·가드레일·API 목록·MCP 서버·서빙 환경·호스팅 공급업체. 예: {"asset":"fraud-detect-llm","field":"가드레일","value":"프롬프트 인젝션 차단 필터 v2"}',
+    params: [
+      { name: "asset", label: "자산", description: "대상 자산 이름 또는 id", required: true },
+      { name: "field", label: "칸", description: "적을 칸 이름 (예: 가드레일)", required: true },
+      { name: "value", label: "내용", description: "그 칸에 적을 내용", required: true },
+    ],
+    autoFill: (args): Record<string, string> => {
+      const raw = (args.asset ?? args.assetId ?? "").trim();
+      const a = resolveAsset(raw);
+      return a && a.name !== raw ? { asset: a.name } : {};
+    },
+    effect: (args) =>
+      `자산 "${(args.asset ?? "").trim()}"의 AI-BOM **${(args.field ?? "").trim()}** 칸에 기록 · 이미 값이 있으면 **덮어씀**(답에 이전 값을 밝힙니다)`,
+    undo: "이전 값은 답에 남습니다 — 되돌리려면 그 값으로 다시 적으시면 됩니다.",
+    run: runSetAiBomField,
   },
   {
     name: "aibom_status",

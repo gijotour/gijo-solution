@@ -3889,3 +3889,102 @@ export async function runVexStatus(args: Record<string, string>): Promise<string
     `\n파일로 받으시려면 **③ 조치 › 결재판** 화면의 [VEX 내보내기]에서 받으세요 — 대화창은 파일을 건네지 못합니다.`
   );
 }
+
+// ── AI-BOM 5영역 기입 — 대화로 (2026-09-01 · 대장 §3-4 항목 5 · 계획서 중-7) ────────────
+//
+// ■ 왜 (계획서 관계 · 원칙 관계)
+//   대장이 「안됨 — 화면(sbom.html textarea+저장)으로만 가능, 대화창 쓰기 도구 없음」으로 적었다.
+//   더 큰 문제는 **원칙 위반**이다 — 「메뉴는 보기용 · 새 화면에 입력칸 금지」인데 이 화면에는
+//   입력칸 13개가 살아 있다. 대화로 넣는 길을 내야 그 입력칸을 걷어낼 수 있다.
+//
+// ■ 손대지 않는 두 칸 (막는 이유가 서로 다르다)
+//   · modelRef    — 로컬 모델 **목록에서 고르는** 칸이다. 아무 글이나 넣으면 레드팀 점검 대상
+//                   연결이 **끊긴다**.
+//   · weightsHash — 모델 파일에서 **계산하는** 값이다. 손으로 적으면 「검증했다」는 **거짓 증거**가
+//                   남는다.
+
+/** 자유 글로 적는 AI-BOM 칸의 영역 이름 — AiBom의 5영역 중 robustness(기계가 채움)를 뺀 다섯. */
+type AiBom영역 = "model" | "dataset" | "prompt" | "agentTool" | "infrastructure";
+
+/** AI-BOM 칸 이름(우리말) → 저장 자리.
+ *  ⚠ 우리말 이름의 **원천은 화면(sbom.html)의 label**이다 — 여기서 새로 짓지 않는다.
+ *    이름이 갈리면 담당자가 화면에서 본 이름을 대화창에 대도 안 먹는다.
+ *    aibomfield.test.ts가 화면의 칸 목록과 여기를 대조한다(한쪽만 늘면 걸린다). */
+const AIBOM칸: Record<string, { 영역: AiBom영역; 키: string; 이름: string }> = {
+  "기초 모델": { 영역: "model", 키: "foundationModel", 이름: "기초 모델 (Foundation Model)" },
+  "아키텍처": { 영역: "model", 키: "architecture", 이름: "아키텍처 정보" },
+  "파인튜닝 이력": { 영역: "model", 키: "finetuneHistory", 이름: "파인튜닝 이력" },
+  "용도": { 영역: "model", 키: "intendedUse", 이름: "용도·사용 범위 (Intended Use — 모델 카드)" },
+  "한계": { 영역: "model", 키: "limitations", 이름: "한계·주의사항 (Limitations — 모델 카드)" },
+  "데이터셋 출처": { 영역: "dataset", 키: "sources", 이름: "학습/파인튜닝 데이터셋 출처" },
+  "벡터 DB 위치": { 영역: "dataset", 키: "vectorDbLocation", 이름: "RAG가 참조하는 Vector DB 위치" },
+  "시스템 프롬프트": { 영역: "prompt", 키: "systemPrompt", 이름: "시스템 프롬프트 및 안전 템플릿" },
+  "가드레일": { 영역: "prompt", 키: "guardrails", 이름: "가드레일(Guardrail) 규칙" },
+  "API 목록": { 영역: "agentTool", 키: "apis", 이름: "호출 가능 API 및 권한 목록" },
+  "MCP 서버": { 영역: "agentTool", 키: "mcpServers", 이름: "MCP 연동 서버" },
+  "서빙 환경": { 영역: "infrastructure", 키: "compute", 이름: "GPU/CPU 서빙 환경 사양" },
+  "호스팅 공급업체": { 영역: "infrastructure", 키: "hostingProvider", 이름: "호스팅 공급업체 (AWS/OpenAI/Azure 등)" },
+};
+
+/** 사람이 댄 칸 이름을 찾는다 — 짧은 이름·화면의 긴 이름·영문 키 셋 다 받는다. */
+export function AIBOM칸찾기(글: string): { 영역: AiBom영역; 키: string; 이름: string } | null {
+  const 납작 = (x: string) => x.toLowerCase().replace(/\s+/g, "");
+  const t = 납작(글.trim());
+  if (!t) return null;
+  for (const [열쇠, v] of Object.entries(AIBOM칸)) {
+    if ([열쇠, v.이름, v.키].some((c) => 납작(c) === t)) return v;
+  }
+  // 부분 일치는 **하나로 좁혀질 때만** 받는다 — 둘 이상 걸리면 아무거나 고르지 않고 되묻는다.
+  const 걸린 = Object.entries(AIBOM칸).filter(([열쇠, v]) => [열쇠, v.이름].some((c) => 납작(c).includes(t)));
+  return 걸린.length === 1 ? 걸린[0][1] : null;
+}
+
+/** AI-BOM 칸 기입 — 「이 자산의 가드레일 기재해줘」. */
+export async function runSetAiBomField(args: Record<string, string>): Promise<string> {
+  const { getAsset, updateAiBom, isAiAsset } = await import("../assets.js");
+  const 대상글 = (args.asset ?? args.assetId ?? "").trim();
+  const 칸글 = (args.field ?? "").trim();
+  const 값 = (args.value ?? "").trim();
+
+  // ⚠ 순서가 뜻을 바꾼다 — 자산 찾기보다 **먼저** 막는다.
+  //   「가중치 해시 적어줘」는 자산이 뭐든 대화로는 안 되는 일이라, 자산부터 찾으면 못 찾았을 때
+  //   「자산을 못 찾았습니다」라는 **엉뚱한 이유**를 대게 된다(2026-09-01 시험이 잡았다).
+  // ⛔ 손대지 않는 칸을 **먼저** 거른다 — 이름을 대충 대도 걸리게 한다.
+  if (/가중치|해시|weightshash/i.test(칸글)) {
+    return "⛔ 가중치 해시는 대화로 적지 않습니다.\n모델 파일에서 **계산하는 값**이라 손으로 적으면 「검증했다」는 거짓 증거가 남습니다. 📦 AI-BOM 화면의 [가중치 해시 계산]으로 뽑으세요.";
+  }
+  if (/서빙\s*모델|모델\s*연결|modelref/i.test(칸글)) {
+    return "⛔ 서빙 모델 연결은 대화로 적지 않습니다.\n설치된 모델 **목록에서 고르는 칸**이라 아무 글이나 넣으면 레드팀 점검 대상 연결이 끊깁니다. 📦 AI-BOM 화면의 모델 드롭다운에서 고르세요.";
+  }
+
+  const hit = 대상글 ? resolveAsset(대상글) : null;
+  if (!hit) {
+    const 예 = listAssets().filter(isAiAsset).map((a) => a.name).slice(0, 6).join(", ") || "(AI 자산 없음)";
+    return `"${대상글 || "(빈칸)"}"에 맞는 자산을 못 찾았습니다. AI 자산: ${예}`;
+  }
+  const asset = getAsset(hit.id);
+  if (!asset) return `"${hit.name}" 자산을 읽지 못했습니다.`;
+
+  const 칸 = AIBOM칸찾기(칸글);
+  if (!칸) {
+    return `"${칸글 || "(빈칸)"}"이 어느 칸인지 모르겠습니다. 적을 수 있는 칸:\n${Object.keys(AIBOM칸).join(" · ")}`;
+  }
+  if (!값) return `"${칸.이름}"에 적을 내용이 비었습니다. 무엇을 적을지 함께 말씀해 주세요.`;
+
+  // ⚠ AI 자산이 아니면 **막지는 않되 알린다.** 방화벽·DB에 AI-BOM을 채우면 거버넌스 숫자가
+  //   거짓으로 채워지지만, 판별이 「AI처럼 보이면 True」인 추정이라 단정해 막으면 오히려 막힌다.
+  const 경고 = isAiAsset(asset)
+    ? ""
+    : `\n⚠ "${asset.name}"${조사(asset.name, "은")} AI 자산으로 안 보입니다(유형: ${asset.assetType}). AI-BOM은 모델·데이터가 있는 자산의 명세라 여기 적으면 거버넌스 현황이 실제와 달라집니다.`;
+
+  const 짧게 = (x: string) => (x.length > 60 ? x.slice(0, 60) + "…" : x);
+  const 영역값 = { ...(asset.aibom as unknown as Record<string, Record<string, string>>)[칸.영역] };
+  const 이전 = (영역값[칸.키] ?? "").trim();
+  영역값[칸.키] = 값;
+  const 결과 = updateAiBom(asset.id, { ...asset.aibom, [칸.영역]: 영역값 } as typeof asset.aibom);
+  if (!결과) return `"${asset.name}"의 AI-BOM 저장에 실패했습니다.`;
+
+  // ⚠ 덮어쓴 사실을 **반드시 밝힌다** — 조용히 지우면 남이 적어 둔 명세가 사라진 걸 아무도 모른다.
+  const 바뀜 = 이전 ? `이전 값이 있어 **덮어썼습니다** — 전: ${짧게(이전)}` : "(비어 있던 칸입니다)";
+  return `✅ "${asset.name}"의 AI-BOM **${칸.이름}**에 적었습니다.\n  · 후: ${짧게(값)}\n  · ${바뀜}${경고}\n\n전체 현황은 「AI-BOM 현황 알려줘」로 보실 수 있습니다.`;
+}
