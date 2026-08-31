@@ -512,10 +512,51 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
   ok("온디맨드②: 부르기 → 화면 왼쪽·대화 오른쪽 나란히(⊟·⊮ 단추)",
     무대.무대 && !무대.접힘 && 무대.대화보임 && 무대.화면보임 && 무대.접기단추 && 무대.머리접기단추 && !무대.옛팝업단추,
     JSON.stringify(무대));
-  await 셸.evaluate(() => { window.gijoTabs.foldConsole(); window.gijoTabs.toChat(); });
-  await new Promise((r) => setTimeout(r, 500));
+  // ⚠ 1차본은 gijoTabs.toChat()을 **직접** 불렀다 — 사람은 그 길로 가지 않는다(ⓘ·「이어서
+  //   지시」는 console.js의 ask를 거친다). 직접 부르면 ask 안의 분기(무대가 켜졌으면 접힘만
+  //   푼다)를 **건너뛰어**, 화면을 지우는 옛 행동이 돌아와도 관문이 통과시킨다. 사람이 가는
+  //   길(gijoConsole.ask)로 재고, **접힘이 풀리는 것과 화면이 남는 것을 함께** 본다
+  //   (2026-08-31 실측: 옛 판은 stage-on이 꺼지고 대화창이 폭을 다 먹었다).
+  await 셸.evaluate(() => { window.gijoTabs.foldConsole(); });
+  await new Promise((r) => setTimeout(r, 400));
+  //   ⚠ ask가 아니라 prefill을 쓴다 — **같은 갈래(대화앞으로)를 지나면서 아무것도 보내지**
+  //   **않는다.** ask로 재면 게시할 때마다 운영 대화에 QA 질문이 실입력으로 남는다(2026-08-19
+  //   운영 리셋 이후 운영 데이터는 전부 실입력이라는 약속을 관문이 깨뜨리게 된다).
+  await 셸.evaluate(() => window.gijoConsole && window.gijoConsole.prefill("이 화면에서 뭐 할 수 있어?"));
+  await new Promise((r) => setTimeout(r, 900));
   const 강제 = await 상태읽기();
-  ok("온디맨드③: toChat(ⓘ 경로)가 접힘을 강제로 푼다", !강제.접힘, JSON.stringify({ 접힘: 강제.접힘 }));
+  ok("온디맨드③: ⓘ(사람 길)가 접힘을 풀되 **화면을 안 지운다**",
+    !강제.접힘 && 강제.무대 && 강제.화면보임 && 강제.대화보임,
+    JSON.stringify({ 접힘: 강제.접힘, 무대: 강제.무대, 화면: 강제.화면보임, 대화: 강제.대화보임 }));
+
+  // ── 🧭 길찾기(0-5) — ☰는 길 잃은 사람이 오는 자리다. 묶음을 가르치고, 못 찾으면
+  //    대화창으로 넘긴다. 셋 다 **문구**라 소스 감시로는 「있다」밖에 못 본다 — 실제로
+  //    떠서 눌리는지는 여기서만 잡힌다.
+  {
+    await 셸.evaluate(() => window.gijoOpenFinder && window.gijoOpenFinder());
+    await new Promise((r) => setTimeout(r, 700));
+    const 길 = await 셸.evaluate(() => {
+      const f = document.querySelector(".gtb-fmask");
+      if (!f) return { 열림: false };
+      const inp = f.querySelector("input");
+      const chips = [].map.call(f.querySelectorAll(".gtb-fgb"), (e) => e.textContent);
+      return { 열림: true, 문구: inp ? inp.placeholder : "", 칩수: chips.length, 칩: chips,
+               순번남음: chips.some((t) => /^[①②③④⑤]/.test(t)) };
+    });
+    ok("길찾기①: ☰에 5묶음 칩이 뜨고 순번(①)은 안 보인다",
+      길.열림 && 길.칩수 === 5 && !길.순번남음 && /묶음/.test(길.문구 || ""), JSON.stringify(길));
+    const 막 = await 셸.evaluate(async () => {
+      const i = document.querySelector(".gtb-fmask input");
+      if (!i) return { 없음: "(입력칸 없음)" };
+      i.value = "냉장고"; i.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 250));
+      const n = document.querySelector(".gtb-fnone"), k = document.querySelector(".gtb-fask");
+      return { 없음: n ? n.textContent : "", 대화길: k ? k.textContent : "" };
+    });
+    ok("길찾기②: 못 찾으면 대화창으로 넘기는 길이 있다(막다른 골목 아님)",
+      /없습니다/.test(막.없음 || "") && /대화창에/.test(막.대화길 || ""), JSON.stringify(막));
+    await 셸.evaluate(() => { const el = document.querySelector(".gtb-fmask"); if (el) el.remove(); });
+  }
 
   // ── 셸 배치는 **전 화면 공통**(사장님 2026-08-29 「메뉴 판·‖ 접기·대화창 폭 조절
   //    전체 대시보드에 적용」) — 배선이 body 수준이라 이미 전역인데, 그 사실을 여기 못박는다.
