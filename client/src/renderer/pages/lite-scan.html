@@ -68,7 +68,11 @@
     <div class="sub">기준을 고르고 눌러 주세요. 읽기만 하고 아무것도 바꾸지 않습니다.</div>
     <div class="row"><span class="k">기준</span><select id="std" style="flex:1"></select></div>
     <div class="row"><span class="k">대상</span>
-      <input id="target" type="text" placeholder="비우면 이 PC — 다른 장비면 주소 하나만 적으세요">
+      <!-- ⚠ **원격 점검을 약속하지 않는다**(2026-09-01). 옛 문구는 「다른 장비면 주소 하나만
+           적으세요」였는데, 서버는 등록 장비가 아니면 **그 주소를 버리고 이 서버를 점검한다**.
+           그 결과가 문서로 저장돼 증적으로 굳으므로 거짓이 오래 남는다. 이제 서버가 「점검한
+           곳」을 정직하게 적으니(hardeningscan ranOn), 여기서도 이름표라는 사실을 밝힌다. -->
+      <input id="target" type="text" placeholder="이 PC를 점검합니다 — 적으신 이름은 보고서 이름표로만 씁니다">
       <button class="go" id="go">점검 시작</button>
     </div>
     <div id="msg"></div>

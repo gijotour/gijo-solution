@@ -50,6 +50,12 @@ export interface ScanReport {
   standard: StandardId;
   standardLabel: string;
   target: string;
+  /** **어디서 돌았나** — 라벨(target)이 아니라 실제로 명령을 실행한 곳이다.
+   *  "self" = 이 서버 자신 · "remote" = 등록 장비에 붙어서.
+   *  ⚠ 이 칸이 생기기 전에는 표기가 target을 보고 「원격 점검」이라 **단정**했다 —
+   *    라벨만 받고 러너는 로컬인 경로에서 **점검하지 않은 장비를 점검했다고** 적었다
+   *    (2026-09-01). 증적으로 저장되는 글이라 거짓이 굳는다. */
+  ranOn: "self" | "remote";
   startedAt: string;
   durationMs: number;
   items: CheckResult[];
@@ -604,6 +610,9 @@ function verdictOf(fail: number): string {
 
 export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn; skipWorkLog?: boolean }): Promise<ScanReport> {
   const std = STANDARDS[opts.standard];
+  // ⚠ **러너를 받았는지가 유일한 근거다.** target은 사람이 적은 글자일 뿐이라
+  //   그것으로 「원격인가」를 판정하면 거짓이 된다(2026-09-01 수리의 요점).
+  const ranOn: "self" | "remote" = opts.run ? "remote" : "self";
   const run = opts.run ?? defaultRunnerFor(opts.standard);
   const target = opts.target || "localhost (this-appliance)";
   const t0 = Date.now();
@@ -634,6 +643,7 @@ export async function runHardeningScan(opts: { standard: StandardId; target?: st
     standard: opts.standard,
     standardLabel: std.label,
     target,
+    ranOn,
     startedAt,
     durationMs: Date.now() - t0,
     items,
@@ -647,10 +657,21 @@ export function formatHardeningReport(r: ScanReport): string {
   const L: string[] = [];
   L.push(`# 보안장비 하드닝 점검 리포트`);
   L.push("");
-  L.push(`- 대상 장비: ${r.target}`);
+  // ⚠ **자기 자신을 점검했으면 그렇게 적는다**(2026-09-01). 옛 판은 사람이 적은 라벨을
+  //   「대상 장비」라 부르고 원격 점검이라 단정했다 — 준수율 증적으로 쓰이는 글이라
+  //   점검하지 않은 장비를 점검했다고 보고하게 된다.
+  L.push(
+    r.ranOn === "remote"
+      ? `- 대상 장비: ${r.target}`
+      : `- 점검한 곳: **이 서버 자신**${r.target && !/localhost|this-appliance/.test(r.target) ? ` (적어 주신 「${r.target}」은 **점검하지 않았습니다** — 이름표로만 남습니다)` : ""}`,
+  );
   L.push(`- 점검 기준: ${r.standardLabel}`);
   L.push(`- 점검 일시: ${koDateTimeString(new Date(r.startedAt).getTime())} (${(r.durationMs / 1000).toFixed(1)}초 소요)`);
-  L.push(`- 점검 방식: 장비 CLI 원격 점검(실 명령 실행·실측)`);
+  L.push(
+    r.ranOn === "remote"
+      ? `- 점검 방식: 장비 CLI **원격 점검**(등록 장비에 붙어 실 명령 실행·실측)`
+      : `- 점검 방식: **이 서버에서 실행**(실 명령 실행·실측). 다른 장비를 점검하려면 그 장비를 **등록**해야 합니다 — 등록 전에는 이 서버만 점검합니다.`,
+  );
   L.push("");
   L.push(`## 요약`);
   L.push("");
@@ -671,7 +692,7 @@ export function formatHardeningReport(r: ScanReport): string {
     for (const i of acts) L.push(`- **[${i.id}] ${i.title}** — ${i.evidence}\n  → 조치: ${i.remediation}`);
   }
   L.push("");
-  L.push(`> 본 리포트는 대상 장비 CLI에서 ${r.standardLabel.split(" —")[0]} 기준 점검 명령을 실제 실행해 얻은 실측 결과입니다.`);
+  L.push(`> 본 리포트는 ${r.ranOn === "remote" ? "대상 장비 CLI에서" : "**이 서버에서**"} ${r.standardLabel.split(" —")[0]} 기준 점검 명령을 실제 실행해 얻은 실측 결과입니다.`);
   return L.join("\n");
 }
 
@@ -679,7 +700,10 @@ export function formatHardeningReport(r: ScanReport): string {
 export function scanSummaryText(r: ScanReport): string {
   const fails = r.items.filter((i) => i.status === "FAIL");
   const L: string[] = [];
-  L.push(`${r.standardLabel.split(" —")[0]} 기준 하드닝 점검 완료 — 대상 ${r.target}`);
+  L.push(
+    `${r.standardLabel.split(" —")[0]} 기준 하드닝 점검 완료 — ` +
+      (r.ranOn === "remote" ? `대상 ${r.target}` : "점검한 곳 **이 서버 자신**"),
+  );
   L.push(`준수율 ${r.summary.rate}% (양호 ${r.summary.pass}/${r.summary.scored}) · ${r.summary.verdict}`);
   L.push(`✓ 양호 ${r.summary.pass} · ✗ 취약 ${r.summary.fail} · ⚠ 확인필요 ${r.summary.warn} · — 해당없음 ${r.summary.na}`);
   if (fails.length) {
