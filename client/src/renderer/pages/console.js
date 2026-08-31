@@ -1608,7 +1608,7 @@
   var guideBusy = false;
   function guideAsk() {
     // ⓘ 안내도 대화에 그린다 — 무대 뒤면 앞으로(검토관 상4와 같은 부류, 2026-08-01 전례).
-    if (window.gijoTabs && window.gijoTabs.toChat) { try { window.gijoTabs.toChat(); } catch (e) { } }
+    대화앞으로();
     var body = document.getElementById("csBody");
     if (!body || guideBusy || !window.gijo || !window.gijo.sendInstruction) return;
     var card = document.getElementById("csGuide");
@@ -2231,10 +2231,24 @@
     }).catch(function () { /* 이름을 못 읽어도 인사말은 남는다 */ });
   }
 
+  /** 답·입력칸이 **보이는 자리**에 오게 한다(2026-08-01 상4 「숨은 콘솔에 쓰면 무반응」).
+   *  ⚠ 화면이 열려 있을 때는 **화면을 덮지 않는다**(2026-08-31 실측). 온디맨드에서 화면이
+   *  주인이고 대화창은 부르는 것이라(사장님 「대화창은 필요할 때만 불러서」), 접어 두고 보던
+   *  화면의 ⓘ를 눌렀더니 그 화면이 사라지는 것은 앞뒤가 안 맞았다 — 실측에서 stage-on이
+   *  꺼지고 대화창이 폭을 다 먹었다. 무대가 켜져 있으면 접힘만 풀어 **나란히** 둔다.
+   *  분리 대화창(IS_WINDOW)·표준 판에는 gijoTabs가 없어 그냥 지나간다. */
+  function 대화앞으로() {
+    var t = window.gijoTabs;
+    if (!t) return;
+    try {
+      if (t.summonConsole && document.body.classList.contains("stage-on")) t.summonConsole();
+      else if (t.toChat) t.toChat();
+    } catch (e) { }
+  }
   function ask(text) {
     // 무대 뒤(숨은 대화)에 쓰면 무반응으로 보인다 — 대화를 앞으로(검토관 상4:
-    // 「이어서 지시하기」·「물어보기」가 숨은 콘솔에 쌓였다). 분리창(IS_WINDOW)엔 gijoTabs가 없다.
-    if (window.gijoTabs && window.gijoTabs.toChat) { try { window.gijoTabs.toChat(); } catch (e) { } }
+    // 「이어서 지시하기」·「물어보기」가 숨은 콘솔에 쌓였다). 규칙은 대화앞으로() 한 곳에.
+    대화앞으로();
     var input = document.getElementById("chatInput");
     if (!input) return;
     input.value = text;
@@ -2245,7 +2259,7 @@
   // 무슨 말을 해야 할지 몰라 그 자리에서 멈춘다 — 첫 몇 글자가 그걸 막는다.
   function prefill(text) {
     // 무대 뒤 입력칸에 얹으면 「적어 넣기」가 무반응으로 보인다 — 대화를 앞으로(검토관 상4).
-    if (window.gijoTabs && window.gijoTabs.toChat) { try { window.gijoTabs.toChat(); } catch (e) { } }
+    대화앞으로();
     var input = document.getElementById("chatInput");
     if (!input) return;
     input.value = text;

@@ -29,6 +29,11 @@
   --g-border: rgba(255, 255, 255, 0.08);
   --g-border-strong: rgba(255, 255, 255, 0.16);
   --g-blue: #3b82f6;
+  /* 흰 글씨를 얹는 **채움**용 파랑. --g-blue(#3b82f6)는 테두리·글자색으로는 좋지만 흰 글씨를
+     얹으면 대비가 3.68:1로 WCAG AA(보통 글씨 4.5:1)에 못 미친다 — 라이트(밝은 판)에서 특히
+     읽기 힘들었다. 채움 자리만 갈라 5.17:1로 올린다(테두리·글자색 쓰임새는 안 건드린다). */
+  --g-blue-fill: #2563eb;       /* 흰 글씨 대비 5.17:1 */
+  --g-blue-fill-hover: #1d4ed8; /* 흰 글씨 대비 6.70:1 */
   --g-blue-light: #5fa1ff;
   --g-teal: #1eb980;
   --g-amber: #f0a020;
@@ -71,8 +76,8 @@
 /* ── 버튼 ── */
 .g-btn { height: var(--g-btn-h); display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 var(--g-s4); border-radius: var(--g-r); font-size: var(--g-t-sm); font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: background .12s, border-color .12s, color .12s, transform .12s; white-space: nowrap; }
 .g-btn:active { transform: translateY(1px); }
-.g-btn.g-primary { background: var(--g-blue); color: #fff; }
-.g-btn.g-primary:hover { background: #3576e0; }
+.g-btn.g-primary { background: var(--g-blue-fill); color: #fff; }
+.g-btn.g-primary:hover { background: var(--g-blue-fill-hover); }
 .g-btn.g-ghost { background: transparent; border-color: var(--g-border-strong); color: var(--g-muted); }
 .g-btn.g-ghost:hover { color:var(--text-strong, #fff); border-color: var(--g-blue); }
 .g-btn.g-danger { background: rgba(226, 72, 61, 0.14); border-color: var(--g-red); color: var(--red-ink, #f5928a); }
@@ -450,7 +455,7 @@ body.g-ui { word-break: keep-all; overflow-wrap: break-word; }
   border-radius: 7px; padding: 2px; }
 .g-ui .g-seg span { font-size: 11px; font-weight: 800; color: var(--g-muted); padding: 2px 8px;
   border-radius: 5px; cursor: pointer; white-space: nowrap; }
-.g-ui .g-seg span.on { background: var(--g-blue); color: #fff; }
+.g-ui .g-seg span.on { background: var(--g-blue-fill); color: #fff; }
 /* 히트맵 타일 — 좁아지면 열이 준다(시각 판은 말줄임이 아니라 반응형). */
 .g-ui .g-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; padding: 8px 10px; }
 .g-ui .g-tile { border: 1px solid var(--g-border-strong); border-radius: 8px; padding: 6px 8px; min-width: 0; }

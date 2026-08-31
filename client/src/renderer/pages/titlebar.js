@@ -103,6 +103,12 @@
     // 찾기 결과의 아이콘 — 왼쪽 메뉴와 같은 단선 SVG(2026-08-05).
     ".gtb-fi{flex:0 0 auto;width:15px;height:15px;display:flex;align-items:center;justify-content:center;}",
     ".gtb-fi svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.7;}",
+    ".gtb-fgroups{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:4px 8px 8px;border-bottom:1px solid var(--border,rgba(255,255,255,.10));margin-bottom:4px;}",
+    ".gtb-fgl{font-size:11.5px;color:var(--muted-2,#a49d95);margin-right:2px;}",
+    ".gtb-fgb{font:inherit;font-size:12px;line-height:1.2;white-space:nowrap;padding:4px 9px;border-radius:999px;cursor:pointer;background:var(--panel-2,rgba(255,255,255,.06));color:var(--text,#e9e7e2);border:1px solid var(--border,rgba(255,255,255,.12));}",
+    ".gtb-fgb:hover{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.42);}",
+    ".gtb-fask{padding:9px 12px;margin:2px 6px 6px;border-radius:8px;font-size:12.5px;cursor:pointer;color:var(--text,#e9e7e2);background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.34);}",
+    ".gtb-fask:hover{background:rgba(59,130,246,.24);}",
     ".gtb-fnone{padding:16px;font-size:13px;color:var(--muted-2,#a49d95);text-align:center;}",
     ".gtb-fhint{padding:7px 12px;border-top:1px solid var(--border,rgba(255,255,255,.10));font-size:12px;color:var(--muted-2,#a49d95);display:flex;gap:14px;}",
   ].join("");
@@ -684,7 +690,10 @@
     pal.className = "gtb-fpal";
     var inp = document.createElement("input");
     inp.type = "text";
-    inp.placeholder = "화면 이름을 적으세요 — 예: 취약점, 자산, 기록";
+    // 🧭 0-5 길찾기 문구(2026-08-31) — 옛 문구는 「화면 이름을 적으세요」라 **사용자가 모르는
+    //   것을 요구했다**(이름을 알면 애초에 안 헤맨다). 묶음 이름으로도 찾힌다는 사실이
+    //   이미 코드에 있는데(아래 filter가 i.group도 본다) 어디에도 안 적혀 있었다.
+    inp.placeholder = "찾을 화면 · 묶음 이름 (예: 취약점, 내 문서, 설정)";
     inp.setAttribute("aria-label", "화면 찾기");
     inp.autocomplete = "off"; inp.spellcheck = false;
     var list = document.createElement("div"); list.className = "fl";
@@ -727,11 +736,45 @@
           }
         } catch (e) { /* 최근 목록이 깨져도 팔레트는 돈다 */ }
       }
+      // 🧭 빈 검색 = 「무엇이 있는지 모르겠다」는 뜻. 묶음 다섯을 **누를 수 있게** 보여
+      //   준다(치면 그 묶음만 남는다 — 위 filter의 i.group 경로 그대로).
+      if (!q && window.gijoNavGroups) {
+        var gb = document.createElement("div");
+        gb.className = "gtb-fgroups";
+        gb.innerHTML = '<span class="gtb-fgl">묶음</span>';
+        window.gijoNavGroups.forEach(function (g) {
+          var 이름 = String(g.label || "").replace(/^[①②③④⑤]\s*/, "");
+          var b = document.createElement("button");
+          b.type = "button"; b.className = "gtb-fgb"; b.textContent = 이름;
+          b.addEventListener("click", function () {
+            inp.value = 이름.replace(/^[^가-힣A-Za-z0-9]+/, "").trim();
+            그리기(); inp.focus();
+          });
+          gb.appendChild(b);
+        });
+        list.appendChild(gb);
+      }
       if (!걸린것.length) {
         var none = document.createElement("div");
         none.className = "gtb-fnone";
-        none.textContent = "'" + inp.value.trim() + "'에 맞는 화면이 없습니다.";
+        var 물음 = inp.value.trim();
+        none.textContent = "'" + 물음 + "'에 맞는 화면이 없습니다.";
         list.appendChild(none);
+        // 🧭 옛 판은 여기서 **막다른 골목**이었다 — 화면이 없다는 말만 하고 끝났다. 이 제품에서
+        //   답은 화면에만 있지 않으니, 친 말을 그대로 대화창에 넘기는 길을 낸다(위 「최근 지시」와
+        //   같은 통로 gijoConsole.ask). 대화창이 없는 판(표준)에서는 안 붙인다 — 없는 곳으로
+        //   보내겠다고 말하는 것이 안 되는 것보다 나쁘다.
+        if (물음 && document.body.classList.contains("pro-shell") &&
+            window.gijoConsole && window.gijoConsole.ask) {
+          var toc = document.createElement("div");
+          toc.className = "gtb-fask";
+          toc.textContent = "💬 대화창에 「" + 물음 + "」 물어보기";
+          toc.addEventListener("click", function () {
+            closeFinder();
+            window.gijoConsole.ask(물음);
+          });
+          list.appendChild(toc);
+        }
         return;
       }
       걸린것.forEach(function (it, n) {
@@ -740,7 +783,7 @@
         // 아이콘은 nav.js의 ICON 표 하나에서 온다(2026-08-05) — 여기서 따로 그리면 갈라진다.
         var 아이콘 = (window.gijoIconMarkup && it.icon) ? window.gijoIconMarkup(it.icon) : "";
         r.innerHTML = '<span class="gtb-fi">' + (아이콘 || "▪") + "</span><span>" + it.label + "</span>" +
-                      (it.group ? '<span class="fg">' + it.group + "</span>" : "");
+                      (it.group ? '<span class="fg">' + String(it.group).replace(/^[①②③④⑤]\s*/, "") + "</span>" : "");
         r.addEventListener("click", function () { closeFinder(); window.gijoOpenScreen(it); });
         list.appendChild(r);
       });

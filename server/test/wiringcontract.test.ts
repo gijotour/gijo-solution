@@ -542,11 +542,23 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
     // 대화에 쓰는 부품(질문 얹기·ⓘ)은 무대를 내린다 — 숨은 콘솔에 쓰면 무반응(상4).
     expect(s, "toChat(대화 앞으로) 노출이 없다").toContain("toChat:");
     const c3 = 코드만(join(PAGES, "console.js"));
+    // 세 길 모두 **한 규칙**(대화앞으로)을 거친다. 옛 판은 세 곳이 각자 toChat을 불렀는데,
+    // 2026-08-31 온디맨드가 들어오며 규칙이 「앞으로」에서 「덮지 말고 나란히」로 바뀌었다 —
+    // 규칙이 세 벌이면 하나만 고쳐 놓고 고쳤다고 하게 된다(이 저장소가 반복해 겪은 사본 함정).
     for (const fn of ["function ask(", "function prefill(", "function guideAsk("]) {
       const i = c3.indexOf(fn);
       expect(i, fn + "가 없다").toBeGreaterThan(-1);
-      expect(c3.slice(i, i + 400), fn + "가 무대를 안 내린다(숨은 콘솔에 쓰면 무반응 — 상4)").toContain("toChat");
+      expect(c3.slice(i, i + 400), fn + "가 대화를 앞으로 안 낸다(숨은 콘솔에 쓰면 무반응 — 상4)").toContain("대화앞으로()");
     }
+    // 그 한 규칙이 두 갈래를 다 갖췄는가: 화면이 열렸으면 접힘만 풀고(summonConsole),
+    // 아니면 무대를 대화로 돌린다(toChat). 한 갈래가 빠지면 ⓘ가 화면을 지우거나(옛 결함)
+    // 숨은 콘솔에 쓰거나(상4) 둘 중 하나로 돌아간다.
+    const fi = c3.indexOf("function 대화앞으로(");
+    expect(fi, "대화앞으로()가 없다").toBeGreaterThan(-1);
+    const 규칙 = c3.slice(fi, fi + 420);
+    expect(규칙, "화면이 열렸을 때 접힘만 푸는 갈래가 없다").toContain("summonConsole");
+    expect(규칙, "무대 판정(stage-on)이 없다").toContain("stage-on");
+    expect(규칙, "화면이 없을 때 무대를 대화로 돌리는 갈래가 없다").toContain("toChat");
     // 분리창 되붙이기·빼기는 무대 상태를 다시 계산한다(상2·상3 — 안 하면 대화가 어디에도 없다).
     expect(s, "setPopped가 무대 상태를 안 다룬다").toMatch(/function setPopped\([\s\S]{0,900}무대숨김 = popped \? false : tabs\.length > 0/);
     // 무대를 오르내린 모든 길에서 대화 맥락을 다시 읽는다(상5 — syncCtx가 show/close에서만
