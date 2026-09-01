@@ -204,6 +204,45 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
   ok("부품 로드: " + pg, has, fr ? "" : "프레임 못 찾음");
 }
 
+// ── ③‴ AI 팀 로스터 · 🌐 외부지원 명패(승인 시안 agent-external-member, 2026-09-02) ─────────
+//   ⚠ **무엇을 재는지 정직하게 적는다.** 이 관문 환경은 원격 GPU가 꺼져 있어 명패가 하나도
+//     안 붙는 것이 **정상**이다(외부지원인가()가 전원 false). 그러니 「명패가 보인다」로는 못 잰다.
+//   그래서 이 셋을 잰다:
+//    ① **카드 > 0** — `extTagHtml(a)`는 카드 템플릿 **안**에서 불린다. 그것이 던지면
+//       `agentGrid.innerHTML` 대입 자체가 실패해 **카드가 0이 된다.** 즉 카드 수가 곧
+//       명패 함수의 생존 증거다(가장 무서운 실패 모드 — 화면이 하얘지는 것 — 를 잡는다).
+//    ② **#extStrip 존재** — 새 자리가 실제로 실렸는가(파일이 안 갔거나 되돌려졌으면 없다).
+//    ③ **낡은 숫자 0** — 「32B 약 37초 · 72B 약 90초」가 화면 글에 다시 나타나면 실패.
+//       원격이 Qwen3.8(125B)로 바뀐 뒤에도 그대로였던 **틀린 안내**가 되살아나는 것을 막는다.
+//   ⚠ `renderExtStrip()`이 던지는 경우는 이 셋으로 못 잡는다(카드 뒤에 불린다) — 알고 남긴다.
+//     원격이 켜진 환경에서 관문을 돌릴 수 있게 되면 그때 「명패 > 0」을 더한다.
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("agent.html", "AI 팀", { dock: true }));
+  const fr = await 프레임찾기("agent.html", 8);
+  const r = fr
+    ? await fr
+        .evaluate(async () => {
+          for (let i = 0; i < 20; i++) {
+            if (document.querySelector(".agent-card")) break;
+            await new Promise((x) => setTimeout(x, 400));
+          }
+          const 글 = document.body.innerText || "";
+          return {
+            카드: document.querySelectorAll(".agent-card").length,
+            띠자리: !!document.getElementById("extStrip"),
+            명패: document.querySelectorAll(".ext-tag").length, // 원격 꺼짐이면 0이 정상
+            낡은숫자: /32B\s*약?\s*\d+\s*초|72B\s*약?\s*\d+\s*초/.test(글),
+          };
+        })
+        .catch(() => null)
+    : null;
+  ok(
+    "AI 팀 로스터(카드>0 = 명패 함수 생존 · 띠자리 · 낡은숫자 0)",
+    !!r && r.카드 > 0 && r.띠자리 && !r.낡은숫자,
+    JSON.stringify(r)
+  );
+}
+
 // ── ③′ AI 지식 엑셀형(승인 시안 knowledge-rows, 2026-08-20) — 행 목록이 실데이터로 그려지는가.
 //    운영에 문서 90여 건이 있으므로 행 0이면 렌더가 죽은 것이다(옛 .dm-li로 되돌아간 것도 실패).
 {
