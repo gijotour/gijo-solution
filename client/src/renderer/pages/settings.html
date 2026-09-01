@@ -834,6 +834,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <label for="cloudBaseUrlInput">서버 주소 (OpenAI 호환 /v1)</label>
         <input id="cloudBaseUrlInput" placeholder="예: http://10.8.0.12:8000/v1  ·  https://내서버/v1">
       </div>
+      <!-- ⚠ 화면엔 **경고 한 줄**만 둔다 — 제공자별 약관·보관 기간·등급 확인법은 screenguide
+           「클라우드 LLM」이 말한다(2026-07-25 지시: 설명은 챗봇으로). 여기 다 적으면 아무도 안 읽는다.
+           ⚠ 이 한 줄을 지우지 말 것 — 키를 넣는 **바로 그 자리**에서 봐야 하는 경고다. -->
+      <div style="font-size:12.25px;line-height:1.6;color:var(--muted);background:rgba(224,164,74,.08);
+        border:1px solid rgba(224,164,74,.35);border-radius:8px;padding:8px 11px;margin:0 0 10px">
+        ⚠ 켜면 <b>질문 본문이 선택한 제공자 서버로 전송됩니다</b>(사내 문서·자산·담당자는 나가지 않습니다).
+        전송된 내용을 제공자가 <b>학습에 쓰는지는 제공자와 요금제에 따라 다릅니다</b> —
+        특히 <b>제미나이 무료 등급 키는 학습에 쓰이고 사람이 읽을 수 있습니다</b>.
+        자세한 것은 ⓘ 를 눌러 확인하세요.
+      </div>
       <div class="field-row">
         <div class="field">
           <label for="cloudModelInput">모델</label>
