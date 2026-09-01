@@ -278,3 +278,23 @@
 - 📂 지켜보는 폴더(위키 폴더 감시) — 2단계 신기능, 화면·서버 워처 미착수
 
 ---
+
+## 2026-09-01 — 분할 GGUF(조각으로 나뉜 대용량 모델) 지원
+
+**공용 파일**: `server/src/engine/localengine.ts` · `server/src/engine/hfmodels.ts` · `tools/wsl-test.sh`
+
+- `modelFilePath()`가 `<id>/<id>.gguf`가 없으면 **분할 GGUF의 1번 조각**을 돌려준다.
+  `modelFileSizeMb()`는 **전 조각의 합**을 잰다.
+  → 84GB짜리 Qwen3.8-Flash-Next(3조각) 같은 모델이 이제 모델 목록·에이전트 배정에 뜬다.
+- ⚠ **이름을 바꾸거나 심링크를 만들면 안 된다.** llama.cpp가 경로 끝의 `-00001-of-00003.gguf`를
+  파싱해 형제 조각을 찾는다(`llama_split_prefix`) — 이름이 다르면 `invalid split file name`으로 죽는다.
+  `hfmodels.ts`의 받기 창구가 분할을 계속 막는 까닭이 이것이다(받은 파일을 `<dir>.gguf`로 이름을 바꾸기 때문).
+  문구는 「이 모델은 못 쓴다」 → 「이 창구로는 못 받는다(직접 넣으면 목록에 뜬다)」로 고쳤다.
+- 시험: `server/test/modelsplit.test.ts` 7개. 분할 지원을 끄면 **4개가 실패**하는 것까지 확인했다(거짓 초록 아님).
+- `tools/wsl-test.sh`에 `GIJO_SRC_ROOT`/`GIJO_DST_ROOT` 덮어쓰기를 넣었다 —
+  전엔 메인 저장소로 고정이라 **워크트리에서 편집하면 내 변경이 아니라 메인 옛 코드를 시험**했다.
+
+- **max 실기 검증거리**: mac에서도 분할 GGUF 폴더가 모델 목록에 뜨는지(경로 구분자 차이).
+  mac에는 아직 분할 모델이 없으니, 빈 파일 3개를 `-00001-of-00003.gguf` 이름으로 놓아 목록에만 뜨는지 보면 된다.
+
+---

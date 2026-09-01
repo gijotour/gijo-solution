@@ -22,8 +22,13 @@
 #   전체:      (인자 없이)
 #   일부:      test/lawfallback.test.ts test/modelcatalog.test.ts
 set -u
-SRC_ROOT="/mnt/d/Connect AI"
-DST_ROOT="/home/gijo/gijo-as-test"
+# ⚠ 워크트리(.claude/worktrees/*)에서 편집할 때는 **여기가 메인을 가리키면 안 된다** —
+#   내 변경이 아니라 메인의 옛 코드를 시험하게 되고, 그건 「초록인데 안 고쳐진」 상태다.
+#   GIJO_SRC_ROOT로 덮어쓴다. DST도 같이 갈라야 두 곳을 번갈아 돌려도 안 섞인다.
+#   예)  GIJO_SRC_ROOT="/mnt/d/Connect AI/.claude/worktrees/foo" GIJO_DST_ROOT=/home/gijo/gijo-as-test-foo \
+#          wsl -d Ubuntu-24.04 -- bash ".../tools/wsl-test.sh" test/modelsplit.test.ts
+SRC_ROOT="${GIJO_SRC_ROOT:-/mnt/d/Connect AI}"
+DST_ROOT="${GIJO_DST_ROOT:-/home/gijo/gijo-as-test}"
 SRC="$SRC_ROOT/server"
 DST="$DST_ROOT/server"
 

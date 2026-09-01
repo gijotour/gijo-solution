@@ -146,8 +146,17 @@ async function runHfDownload(modelId: string, onProgress: (pct: number) => void)
   if (!chosen) {
     throw new Error("이 저장소에서 받을 .gguf 파일을 찾지 못했습니다. GGUF 형식 저장소인지 확인하세요.");
   }
+  // ⚠ 막는 것은 **받기**뿐이다 — 엔진은 분할 GGUF를 돌린다(localengine.modelFilePath가
+  //   `<id>/*-00001-of-*.gguf`를 첫 조각으로 넘긴다, 2026-09-01). 여기서 막는 까닭은 아래
+  //   배치 단계가 받은 파일을 `<dir>/<dir>.gguf`로 **이름을 바꾸기** 때문이다. 조각의 이름을
+  //   바꾸면 llama.cpp가 형제 조각을 못 찾아(`invalid split file name`) 되레 못 쓰게 된다.
+  //   그러니 문구도 「이 모델은 못 쓴다」가 아니라 「이 창구로는 못 받는다」여야 한다.
   if (SHARD_RE.test(chosen)) {
-    throw new Error(`이 모델은 여러 조각으로 분할된 대용량 GGUF뿐입니다(${chosen}). 단일 파일 양자화본이 있는 더 작은 모델을 선택하세요.`);
+    throw new Error(
+      `이 모델은 여러 조각으로 나뉜 대용량 GGUF뿐이라 이 화면에서는 받을 수 없습니다(${chosen}). ` +
+        `엔진 자체는 분할 모델을 돌릴 수 있으니, 조각 파일을 이름 그대로 models/<모델이름>/ 폴더에 ` +
+        `직접 넣으면 목록에 나타납니다. 간편하게 받으시려면 단일 파일 양자화본이 있는 모델을 고르세요.`
+    );
   }
 
   const cli = resolveHfCli();

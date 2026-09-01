@@ -252,19 +252,65 @@ export function getLocalEngineStatus(): LocalEngineStatus {
   };
 }
 
-function modelFilePath(modelId: string): string {
-  return path.join(MODELS_DIR, modelId, `${modelId}.gguf`);
+/** 분할 GGUF 조각 이름 — `…-00002-of-00003.gguf` */
+const 분할조각 = /-(\d{5})-of-(\d{5})\.gguf$/;
+
+/**
+ * `models/<id>/` 안의 분할 GGUF 조각들 — 이름 오름차순(= 조각 번호 순).
+ * 분할이 아니면 빈 배열.
+ */
+function 분할조각들(modelId: string): string[] {
+  try {
+    return fs
+      .readdirSync(path.join(MODELS_DIR, modelId))
+      .filter((n) => 분할조각.test(n))
+      .sort()
+      .map((n) => path.join(MODELS_DIR, modelId, n));
+  } catch {
+    return [];
+  }
 }
 
-function modelFileSizeMb(modelId: string): number {
+/**
+ * 모델 파일 경로 — 원칙은 `<id>/<id>.gguf`, 없으면 **분할 GGUF의 첫 조각**.
+ *
+ * ⚠ **반드시 1번 조각이다.** llama.cpp 로더는 `split.no != 0`이면
+ *   `illegal split file idx … model must be loaded with the first split`으로 던진다
+ *   (llama-model-loader.cpp). 나머지 조각은 로더가 파일명 규칙으로 알아서 찾으므로
+ *   우리가 넘길 것은 첫 조각 하나뿐이다.
+ * ⚠ **이름을 바꾸거나 심링크로 `<id>.gguf`를 만들면 안 된다.** llama.cpp는 경로 끝의
+ *   `-00001-of-00003.gguf`를 파싱해 형제를 찾는다(`llama_split_prefix`) — 이름이 다르면
+ *   `invalid split file name`으로 죽는다. 그래서 **조각 파일명을 그대로** 넘긴다.
+ *   (2026-09-01 Qwen3.8-Flash-Next 84GB 3조각 편입에서 확인)
+ */
+export function modelFilePath(modelId: string): string {
+  const 단일 = path.join(MODELS_DIR, modelId, `${modelId}.gguf`);
+  if (fs.existsSync(단일)) return 단일;
+  const 첫 = 분할조각들(modelId).find((p) => {
+    const m = 분할조각.exec(path.basename(p));
+    return m ? Number(m[1]) === 1 : false;
+  });
+  // 없으면 원래 경로를 돌려준다 — 호출자의 existsSync가 false로 걸러 준다(계약 유지).
+  return 첫 ?? 단일;
+}
+
+export function modelFileSizeMb(modelId: string): number {
   try {
-    return fs.statSync(modelFilePath(modelId)).size / (1024 * 1024);
+    const 단일 = path.join(MODELS_DIR, modelId, `${modelId}.gguf`);
+    if (fs.existsSync(단일)) return fs.statSync(단일).size / (1024 * 1024);
+    // ⚠ 분할이면 **전 조각의 합**이다. 첫 조각만 재면 안 된다 — 1번 조각은 텐서가 0개인
+    //   메타데이터 조각이라 10MB 남짓이고, 그 값으로는 VRAM 확보가 그냥 통과해
+    //   **조용히 OOM**으로 간다(84GB 모델이 10MB로 읽힌다).
+    const 조각 = 분할조각들(modelId);
+    if (!조각.length) return 0;
+    return 조각.reduce((합, p) => 합 + fs.statSync(p).size, 0) / (1024 * 1024);
   } catch {
     return 0;
   }
 }
 
-// models/ 아래 실제로 배치된 채팅 모델 목록 (models/<id>/<id>.gguf 패턴). 임베딩 모델은 제외.
+// models/ 아래 실제로 배치된 채팅 모델 목록 (`<id>/<id>.gguf`, 또는 분할 GGUF 조각들).
+// 임베딩 모델은 제외.
 // running = 지금 풀에 상주 중인지.
 export function listAvailableModels(): { id: string; running: boolean }[] {
   if (!fs.existsSync(MODELS_DIR)) return [];
