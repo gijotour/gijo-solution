@@ -433,7 +433,9 @@ async function 사람에게내보낸다(
   if (!direct) reportProgress("write", "조회 결과로 답을 쓰고 있습니다");
   const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
   reportProgress("review", "답변을 검수하고 있습니다");
-  return 다음단계붙이기(지식없음을밝힌다(법령한계를밝힌다(guardAgainstDenial(composed, calls), calls), calls), calls);
+  // ⚠ **조문근거를보탠다는 법령한계를밝힌다보다 안쪽**에 둔다 — 한계 문구(「원문 미확인」)와
+  //   법제처 원문이 붙기 **전**에 조문을 답 본문 뒤에 붙여야, 조문이 원문 뒤로 밀려나지 않는다.
+  return 다음단계붙이기(지식없음을밝힌다(법령한계를밝힌다(조문근거를보탠다(guardAgainstDenial(composed, calls), calls), calls), calls), calls);
 }
 
 /**
@@ -476,6 +478,61 @@ export async function 사내지식으로보강(instruction: string, calls: Agent
     args: { question: instruction },
     result: chunks.join("\n\n---\n\n").slice(0, 3000),
   });
+}
+
+/** 사내 근거에 적힌 **조문 표기**를 그대로 뽑는다 — 짓지 않고 **복사**만 한다. */
+// ⚠ **법령 이름이 붙은 조문만** 잡는다 — 맨 「제30조」는 안 잡는다(어느 법인지 모르는 번호는
+//   근거가 못 된다). 처음엔 법령 이름을 손으로 나열했는데 「전자금융감독규정 제15조」가
+//   빠져 금융 망분리 근거를 못 붙였다 — 이름을 열거하지 말고 **꼴로** 잡는다.
+const 조문표기 =
+  /((?:[가-힣][가-힣\s]{0,24}(?:법률|법|시행령|시행규칙|규정|기준|고시|지침)|법|고시|시행령)\s*제\s*\d+조(?:의\s*\d+)?)/g;
+
+/**
+ * **근거를 물었는데 답에 조문 번호가 없으면**, 우리가 실제로 읽은 사내 근거에서 조문을 뽑아 붙인다.
+ *
+ * ■ 왜 이렇게 하나 (2026-09-01 실측)
+ *   「접속기록은 몇 년 보관하고 근거 법령은?」에 답이 1년/2년은 맞히면서 **조문 번호를 안 댔다**.
+ *   문맥에는 「개인정보 보호법 시행령 제30조」가 **2조각이나 들어 있었는데** 모델이 다른 조각
+ *   (해설 89·63)을 골라 쓴 것이다. 담당자가 원한 건 **조문 번호**다 — 근거를 물었으니까.
+ *
+ * ⚠ **모델에게 「조문을 대라」고 시키지 않는다.** 7B/14B에 프롬프트 규칙을 더해 행동을
+ *   고치려던 시도는 이 저장소에서 반복해 실패했다(CLAUDE.md). 바로 위 법령한계를밝힌다와
+ *   같은 방식 — **코드가 붙인다.**
+ * ⚠ **짓지 않는다.** 우리가 읽은 조각에 **글자 그대로 있는 표기**만 복사한다.
+ *   조각에 없으면 아무것도 안 붙인다(없는 조문을 만들면 이 기능은 없느니만 못하다).
+ * ⚠ 답에 이미 그 조문이 있으면 안 붙인다(같은 말을 두 번 하지 않는다).
+ */
+export function 조문근거를보탠다(answer: string, calls: AgentToolCall[]): string {
+  if (!answer.trim()) return answer;
+  const 사내 = calls.find((c) => c.tool === 사내지식꼬리표);
+  if (!사내) return answer; // 사내 근거를 안 읽었으면 보탤 것이 없다
+  // ⚠⚠ **「자주 나는 오해」로 적힌 조문을 베끼면 안 된다**(2026-09-01 실측으로 즉시 드러났다).
+  //   이 저장소의 근거 문서들은 **틀린 답을 일부러 적어 둔다** — 「⚠ 자주 나는 오해:
+  //   「정보통신망법 제12조」가 근거라고 답하면 틀리다」처럼. 문맥을 안 보고 조문만 긁으면
+  //   **그 틀린 답을 근거로 붙인다.** 첫 판이 정확히 그랬고 fin-mangbunri 회귀가 바로 깨졌다.
+  //   → 조문이 **부정·정정 문장 안**에 있으면 건너뛴다.
+  const 부정말 = /오해|틀리|아니|잘못|혼동|착각|해당\s*없|근거가\s*아니/;
+  const 원문 = String(사내.result ?? "");
+  const 문장들 = 원문.split(/(?<=[.!?。])\s+|\n+/);
+  const 있는것: string[] = [];
+  for (const 문장 of 문장들) {
+    if (부정말.test(문장)) continue; // 틀린 답으로 적힌 조문이다 — 베끼지 않는다
+    조문표기.lastIndex = 0;
+    for (const m of 문장.matchAll(조문표기)) 있는것.push(m[1].replace(/\s+/g, " ").trim());
+  }
+  if (!있는것.length) return answer;
+  // 답에 이미 있는 조문 번호는 뺀다 — 번호로 견준다(표기가 조금 달라도 중복을 막는다).
+  const 답번호 = new Set([...answer.matchAll(/제\s*(\d+)\s*조/g)].map((m) => m[1]));
+  const 보탤것: { n: string; t: string }[] = [];
+  for (const t of 있는것) {
+    const n = /제\s*(\d+)\s*조/.exec(t)?.[1];
+    if (!n || 답번호.has(n)) continue;
+    if (보탤것.some((x) => x.n === n)) continue;
+    보탤것.push({ n, t });
+  }
+  if (!보탤것.length) return answer;
+  const 목록 = 보탤것.slice(0, 4).map((x) => x.t).join(" · ");
+  return `${answer.trim()}\n\n▸ **사내 자료에 적힌 근거 조문**: ${목록}`;
 }
 
 /**
