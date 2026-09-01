@@ -403,9 +403,12 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
     }
     expect(nv, "자산 관리 메뉴가 full=1 예외 없이 걸렸다 — 조용히 ⓪로 갈아탄다").toContain('page: "inventory.html?full=1"');
     const md = 코드만(join(PAGES, "mydocs.html"));
-    for (const tab of ["ingest", "mine", "contacts", "watch"]) { // watch: 📂 지켜보는 폴더(2026-08-31 2단계)
+    for (const tab of ["ingest", "mine", "contacts", "watch", "req", "write"]) { // watch: 📂(08-31) · write: 📝 문서작성(09-01)
       expect(nv, `내 문서 탭 메뉴가 사라졌다: ${tab}`).toContain(`mydocs.html?tab=${tab}`);
-      expect(md, `내 문서에 ${tab} 탭이 없다 — 메뉴가 유령 탭을 가리킨다`).toContain(`"${tab}"`);
+      // ⚠ 옛 판은 `"${tab}"`만 찾았다 — 「req」·「mine」 같은 낱말은 상태 키·오류 표에도
+      //   널려 있어 **탭이 하나도 없어도 통과**했다(2026-08-31 검토관 [낮음]: 부정 경로가
+      //   없는 검사는 검사가 아니다). 실제 탭 단추의 표식(data-t)으로 못 박는다.
+      expect(md, `내 문서에 ${tab} 탭 단추가 없다 — 메뉴가 유령 탭을 가리킨다`).toContain(`data-t="${tab}"`);
     }
     // ③ 🔍 화면찾기 중복 거름 — 작업 내역 이중 등재(TOP+📓, 승인 의도)가 목록에 두 줄로
     //    새지 않게 gijoScreenList가 같은 주소+이름을 거른다.
@@ -531,7 +534,10 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
 
   // 무대 배선의 나머지 계약(2026-08-20 검토관 상1~상5). 0-1·0-2에서 위 시험을 쪼개며
   // 이 묶음이 갈 곳을 잃어 따로 세웠다 — 검사 내용은 한 줄도 안 바꿨다.
-  it("무대 배선 — 자동 복귀 금지·toChat·분리창(2026-08-20 검토관 상1~상5)", () => {
+  // ⚠ 제목의 「toChat」은 2026-08-20 당시 이름이다 — 2026-08-31에 그 규칙이 대화앞으로()로
+  //   모이면서 「앞으로 낸다」에서 「덮지 말고 나란히」로 바뀌었다. 제목을 그대로 둔 채 아래만
+  //   고치면 시험이 자기 이름과 어긋난다.
+  it("무대 배선 — 자동 복귀 금지·대화앞으로()·분리창(2026-08-20 상1~상5 · 2026-08-31 개정)", () => {
     const s = 코드만(join(PAGES, "app.html"));
     // ⚠ 선택 자동 복귀는 금지 계약이다(검토관 상1) — gijo:select는 결재 확인창·모달·상세
     //   열기 직후에도 오므로(발신 18곳 중 10곳) 무대를 내리면 방금 연 것이 통째로 숨는다.
@@ -542,11 +548,23 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
     // 대화에 쓰는 부품(질문 얹기·ⓘ)은 무대를 내린다 — 숨은 콘솔에 쓰면 무반응(상4).
     expect(s, "toChat(대화 앞으로) 노출이 없다").toContain("toChat:");
     const c3 = 코드만(join(PAGES, "console.js"));
+    // 세 길 모두 **한 규칙**(대화앞으로)을 거친다. 옛 판은 세 곳이 각자 toChat을 불렀는데,
+    // 2026-08-31 온디맨드가 들어오며 규칙이 「앞으로」에서 「덮지 말고 나란히」로 바뀌었다 —
+    // 규칙이 세 벌이면 하나만 고쳐 놓고 고쳤다고 하게 된다(이 저장소가 반복해 겪은 사본 함정).
     for (const fn of ["function ask(", "function prefill(", "function guideAsk("]) {
       const i = c3.indexOf(fn);
       expect(i, fn + "가 없다").toBeGreaterThan(-1);
-      expect(c3.slice(i, i + 400), fn + "가 무대를 안 내린다(숨은 콘솔에 쓰면 무반응 — 상4)").toContain("toChat");
+      expect(c3.slice(i, i + 400), fn + "가 대화를 앞으로 안 낸다(숨은 콘솔에 쓰면 무반응 — 상4)").toContain("대화앞으로()");
     }
+    // 그 한 규칙이 두 갈래를 다 갖췄는가: 화면이 열렸으면 접힘만 풀고(summonConsole),
+    // 아니면 무대를 대화로 돌린다(toChat). 한 갈래가 빠지면 ⓘ가 화면을 지우거나(옛 결함)
+    // 숨은 콘솔에 쓰거나(상4) 둘 중 하나로 돌아간다.
+    const fi = c3.indexOf("function 대화앞으로(");
+    expect(fi, "대화앞으로()가 없다").toBeGreaterThan(-1);
+    const 규칙 = c3.slice(fi, fi + 420);
+    expect(규칙, "화면이 열렸을 때 접힘만 푸는 갈래가 없다").toContain("summonConsole");
+    expect(규칙, "무대 판정(stage-on)이 없다").toContain("stage-on");
+    expect(규칙, "화면이 없을 때 무대를 대화로 돌리는 갈래가 없다").toContain("toChat");
     // 분리창 되붙이기·빼기는 무대 상태를 다시 계산한다(상2·상3 — 안 하면 대화가 어디에도 없다).
     expect(s, "setPopped가 무대 상태를 안 다룬다").toMatch(/function setPopped\([\s\S]{0,900}무대숨김 = popped \? false : tabs\.length > 0/);
     // 무대를 오르내린 모든 길에서 대화 맥락을 다시 읽는다(상5 — syncCtx가 show/close에서만
@@ -578,5 +596,40 @@ describe("배선 계약 ⑤층 — 반입 다음 칩", () => {
     expect(up).toContain("vulnscan:");
     const c = readFileSync(join(PAGES, "console.js"), "utf8");
     expect(c).toMatch(/r\.nextChips && P2 && P2\.nextChips/);
+  });
+});
+
+describe("지식 창고 잣대 통일 — 「올린 문서」 수는 한 가지로(2026-08-31 설계관)", () => {
+  // 왜: 같은 화면에서 위 요약 카드(grouppanels)와 아래 목록 제목(memory.html)이 **다른 숫자**를
+  //   말했다 — 카드는 개인 문서(personal:)를 빼고 세는데 목록은 포함해서. 카드 언어로 묶으면
+  //   두 숫자가 나란히 서서 바로 눈에 띈다. 세 소비자(요약 카드·목록·내 문서 배지)가 같은
+  //   규칙을 쓰는지 값으로 지킨다(「같은 것을 여러 곳에 적으면 어긋난다」의 계보).
+  it("요약 카드·지식 창고 목록·내 문서 배지가 모두 personal:을 뺀다", () => {
+    const gp = 코드만(join(PAGES, "grouppanels.js"));
+    expect(gp, "요약 카드가 개인 문서를 안 뺀다").toMatch(/documentId\)\.indexOf\("personal:"\) !== 0/);
+    const mem = 코드만(join(PAGES, "memory.html"));
+    expect(mem, "지식 창고 목록이 개인 문서를 포함해 센다 — 카드와 딴말을 한다")
+      .toMatch(/listMemoryDocuments\(\)[\s\S]{0,200}indexOf\("personal:"\) !== 0/);
+    const md = 코드만(join(PAGES, "mydocs.html"));
+    expect(md, "내 문서 배지의 회사문서만 잣대가 사라졌다").toContain("회사문서만");
+  });
+});
+
+describe("카드 언어 — 지식 창고 보기 전환(2026-08-31 사장님 「히트맵은 있었으면」)", () => {
+  it("히트맵은 있고 **기본은 목록**이다 — 기본이 뒤집히면 게시 관문이 막힌다", () => {
+    const m = 코드만(join(PAGES, "memory.html"));
+    expect(m, "보기 전환 칩이 없다").toContain('id="dmViewSeg"');
+    expect(m, "히트맵 보기가 없다").toContain('dmView === "heat"');
+    // ⚠ 기본값 계약: publish-gate ③′가 `.g-rows--docs .g-rows-r > 0`을 요구한다 —
+    //   기본이 히트맵이 되면 행이 0이라 게시가 막힌다(설계관 ⑤-9가 미리 짚은 자리).
+    expect(m, "기본 보기가 목록이 아니다 — 게시 관문(.g-rows-r>0)이 막힌다").toMatch(/dmView\s*=\s*"list"/);
+    // 공용 부품을 쓴다(화면 전용 타일 CSS를 새로 만들지 않았는지)
+    expect(m, "히트맵이 공용 타일 부품을 안 쓴다").toContain("g-tiles");
+    const css = 코드만(join(PAGES, "gijo-ui.css"));
+    // ⚠ 목록은 **쓰이는 것만**(2026-08-31 검토관): 안 쓰는 겉껍데기(.g-scard-h 등)를 계약에
+    //   넣으면 죽은 CSS가 감시로 굳는다. 실제 소비자가 있는 셋만 지킨다.
+    for (const 부품 of [".g-scard-k", ".g-seg", ".g-tiles", ".g-tile"]) {
+      expect(css, `공용 카드 골격 ${부품}가 사라졌다`).toContain(부품);
+    }
   });
 });

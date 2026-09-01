@@ -6,6 +6,8 @@
 // 반려(오탐)로 처리된 finding은 SBOM 취약점 반영에서 제외된다(sbom.ts가 isFindingRejected를 참조).
 
 import type { Express, Request } from "express";
+// 심각도 우리말은 원천 한 곳(tone.ts)에서만 만든다 — 자리마다 만들면 같은 것이 둘로 보인다.
+import { 심각도한글 } from "./tone";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { todayLocal } from "../util/date";
@@ -276,7 +278,7 @@ export function buildTriagePrompt(top: PrioritizedFinding[], ontologyContext: st
     const f = r.finding;
     const flags = [f.kev ? "CISA KEV(실제 악용)" : "", f.epss != null ? `EPSS ${Math.round(f.epss * 100)}%` : "", f.vpr != null ? `VPR ${f.vpr}` : ""]
       .filter(Boolean).join(", ");
-    return `${i + 1}. [${f.severity}] ${f.finding_type} — 자산 ${r.assetName}${flags ? ` (${flags})` : ""}`;
+    return `${i + 1}. [${심각도한글(f.severity)}] ${f.finding_type} — 자산 ${r.assetName}${flags ? ` (${flags})` : ""}`;
   });
   return [
     "당신은 보안담당자의 조치 결정을 돕는 보안 AI입니다. 아래 '우선순위 상위 취약점'에 대해 '오늘의 조치 브리핑'을 작성하세요.",

@@ -377,7 +377,17 @@ async function routeByType(filename: string, base64: string, type: UploadType, p
         //   인입 답에는 안 나와서, 대화창만 보는 담당자는 「부품 1개 검수」만 보고 **다 셌다고 읽는다**
         //   — 실제로는 그 안에 부품 2개가 더 있었다(중첩). 「다 셌다」가 사실이 아닐 때 그렇게
         //   말하는 것이 이 기능의 값어치다.
-        (r.결과.notes.length ? ` ⚠ ${r.결과.notes[0]}` : ""),
+        // ⚠⚠ **notes[0]만 보이면 안 된다**(2026-09-01 재검토 [중]). 중첩 안내(「펴서 셌습니다」)가
+        //   먼저 들어가면서 **「못 읽었습니다」 경고를 밀어냈다** — 하필 그게 「다 안 셌다」를
+        //   알리는 유일한 문장이었다. 알림 하나만 보여 주는 구조 자체가 이 사고를 만든다.
+        //   → **못 읽은 것을 먼저** 보여 주고, 나머지는 뒤에 붙인다(있으면 몇 개 더 있다고 말한다).
+        (() => {
+          const ns = r.결과.notes ?? [];
+          if (!ns.length) return "";
+          const 급한것 = ns.filter((x) => /못 읽었|세지 못|비어 있|안 셌/.test(x));
+          const 순서 = [...급한것, ...ns.filter((x) => !급한것.includes(x))];
+          return ` ⚠ ${순서[0]}` + (순서.length > 1 ? ` (알림 ${순서.length - 1}건 더 — 검수 화면에서 봅니다)` : "");
+        })(),
       category: "일반",
       sbom: { id: r.결과.id, name: r.결과.name, components: r.결과.componentCount, heavy: 무거움, unknown: s.판정불가 ?? 0 },
     };

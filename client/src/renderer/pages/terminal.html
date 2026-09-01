@@ -33,7 +33,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
 .beta-tag{background:var(--teal);color:var(--fill-contrast,#06281c);font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
-.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--g-blue-fill, var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 
 .warn{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.35);border-radius:9px;padding:9px 13px;font-size:12.5px;color:var(--amber);margin-bottom:12px;line-height:1.55;}
@@ -205,7 +205,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="report">` +
       `<button class="close" onclick="this.closest('.report').remove()">닫기</button>` +
       `<h4>🛡 보안장비 하드닝 점검 리포트</h4>` +
-      `<div class="meta">대상: ${esc(rep.target)} · 기준: ${esc(rep.standardLabel)}<br>점검 방식: 장비 CLI 실 명령 실행·실측 · ${(rep.durationMs / 1000).toFixed(1)}초 소요</div>` +
+      // ⚠ ranOn을 보고 적는다(2026-09-01). 전에는 조건 없이 「장비 CLI 실 명령 실행」이라 적어,
+      //   이 서버 자신을 점검하고도 **장비에 붙어 실측했다**고 화면이 말했다(검토관 [중]).
+      `<div class="meta">대상: ${esc(rep.ranOn === "remote" ? rep.target : "이 서버 자신")}${rep.ranOn === "remote" ? "" : " (적힌 이름표: " + esc(rep.target) + ")"} · 기준: ${esc(rep.standardLabel)}<br>점검 방식: ${rep.ranOn === "remote" ? "장비 CLI 실 명령 실행·실측" : "이 서버 자신의 설정을 읽어 점검"} · ${(rep.durationMs / 1000).toFixed(1)}초 소요</div>` +
       `<div class="sumline"><span class="score" style="color:${verdictColor}">${s.rate}%</span>` +
       `<span style="color:${verdictColor};font-weight:800">${esc(s.verdict)}</span>` +
       `<span style="color:var(--muted)">✅ ${s.pass} · ❌ ${s.fail} · ⚠️ ${s.warn} · ➖ ${s.na} (총 ${s.total})</span></div>` +

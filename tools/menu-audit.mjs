@@ -8,13 +8,19 @@
 // (3) 그 중 쓰기 성격(생성/실행/삭제)만 추려 오케스트레이션 후보로 본다.
 import { readFileSync, readdirSync } from "fs";
 
-const DIR = "D:/Connect AI/client/src/renderer/pages";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+// ⚠ 절대경로를 박지 않는다(2026-08-31) — 워크트리·max·gb10에서 파일을 못 찾아 조용히 0개가 됐다.
+const DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "client", "src", "renderer", "pages");
 const nav = readFileSync(`${DIR}/nav.js`, "utf-8");
 
 // 메뉴 구조 파싱 (그룹 → 페이지)
 const groups = [];
 let cur = null;
-for (const m of nav.matchAll(/ic:\s*"([^"]*)",\s*label:\s*"([^"]*)"|page:\s*"([^"]*)",\s*label:\s*"([^"]*)"/g)) {
+// ⚠ 필드 이름은 `icon:`이다(2026-08-31 정정) — 이 도구만 옛 이름 `ic:`를 보고 있어 그룹이
+//   0개로 잡혔고, 그래서 「총 0개 화면」이라는 **거짓 초록**을 몇 달 찍었다.
+//   그룹 줄은 `{ id: "...", icon: "...", label: "..." }` 꼴이다.
+for (const m of nav.matchAll(/icon:\s*"([^"]*)",\s*label:\s*"([^"]*)"|page:\s*"([^"]*)",\s*label:\s*"([^"]*)"/g)) {
   if (m[1] !== undefined) { cur = { icon: m[1], label: m[2], pages: [] }; groups.push(cur); }
   else if (cur) cur.pages.push({ page: m[3], label: m[4] });
 }
@@ -44,7 +50,9 @@ const rows = [];
 
 for (const g of groups) {
   for (const p of g.pages) {
-    const a = audit(p.page);
+    // ⚠ 쿼리를 뗀 **파일명**으로 연다(2026-08-31) — 메뉴 주소는 `mydocs.html?tab=guide`처럼
+    //   판·탭을 가리키는 깊은 주소가 많아, 그대로 열면 실재하는 화면을 「파일 없음」이라 했다.
+    const a = audit(String(p.page).split("?")[0]);
     if (!a) { console.log(`- (파일 없음) ${p.page}`); continue; }
     totalPages++; totalWrites += a.writes.length;
     rows.push({ 그룹: g.label, 화면: p.label, 파일: p.page, 쓰기작업: a.writes.length, 조회: a.reads, 줄수: a.lines });

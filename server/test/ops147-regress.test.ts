@@ -5,6 +5,7 @@
 //
 // ⚠ 이 시험은 **소스를 읽는다.** 동작만 보면 「고쳤다고 주석에 적어 놓고 코드가 안 지키는 것」을
 //   못 잡는다(2026-07-29 17건 실측). 그리고 감시가 헛돌고 있지 않은지도 함께 잰다.
+import { 실제도착 } from "./helpers/routing";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -51,8 +52,12 @@ describe("② 「자산 중에 AI-BOM 비어 있는 거 뭐야?」가 27자 — 
   const loop = 읽기("engine/agentloop.ts");
   const tools = agenttoolsSource();
 
-  it("★ AI-BOM 창구가 있다", () => {
-    expect(loop).toMatch(/re:\s*\/ai\[-\\s_\]\?bom\/i,\s*\n\s*tool:\s*"aibom_status"/);
+  // ⚠ 정규식 **글자**를 못 박으면 규칙을 못 고친다(2026-09-01: 기입 시킴말을 비켜 주는
+  //   조건을 더하자 이 시험이 깨졌다 — 고친 쪽이 옳았는데 시험이 막았다).
+  //   그래서 **행동**을 본다: 이 문장이 실제 순서로 aibom_status에 닿는가.
+  it("★ AI-BOM 창구가 있다 — 실제 순서로 닿는다", () => {
+    expect(실제도착("자산 중에 AI-BOM 비어 있는 거 뭐야?")).toBe("aibom_status");
+    expect(실제도착("AI-BOM 현황 알려줘")).toBe("aibom_status");
   });
 
   it("★★ SBOM은 AI-BOM 규칙에 걸리지 않는다 — 「SBOM」 안에 「ai」가 없다", () => {

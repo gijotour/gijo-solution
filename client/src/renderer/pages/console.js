@@ -293,8 +293,9 @@
       ".cs-updec button.reco{border-color:var(--teal,#1eb980);color:var(--teal,#bff3de);}",
       ".cs-updec input.pn{width:100%;margin-bottom:7px;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));",
       "border-radius:8px;color:var(--text,#e9e7e2);font-size:12px;padding:7px 9px;outline:none;font-family:inherit;}",
-      ".cs-send{background:var(--blue,#3b82f6);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;}",
-      ".cs-send:hover{background:#2f6fd0;}",
+      ".cs-send{background:var(--g-blue-fill, var(--blue,#3b82f6));color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;}",
+      // 박혀 있던 #2f6fd0(4.88:1)은 새 기본(5.17:1)보다 밝아 hover가 되레 흐려졌다 — 토큰으로.
+      ".cs-send:hover{background:var(--g-blue-fill-hover, var(--blue,#3b82f6));}",
       ".cs-send[disabled]{opacity:.5;cursor:default;}",
     ].join("");
     document.head.appendChild(st);
@@ -520,7 +521,7 @@
       '<div style="font-size:11.5px;color:var(--muted-2,#a49d95);margin:5px 0 10px">적어 주시면 앞으로 이 질문을 검사 문항으로 씁니다.</div>' +
       '<div style="display:flex;justify-content:flex-end;gap:7px">' +
       '<button id="fbCancel" style="background:none;border:1px solid var(--border,#3a3936);border-radius:7px;padding:5px 12px;color:var(--muted,#b3ada4);font-size:12.5px;cursor:pointer">취소</button>' +
-      '<button id="fbSend" style="background:var(--blue,#3b82f6);border:none;border-radius:7px;padding:5px 14px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer">전송</button></div>';
+      '<button id="fbSend" style="background:var(--g-blue-fill, var(--blue,#3b82f6));border:none;border-radius:7px;padding:5px 14px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer">전송</button></div>';
     document.body.appendChild(c);
     flagCard = c;
 
@@ -1608,7 +1609,7 @@
   var guideBusy = false;
   function guideAsk() {
     // ⓘ 안내도 대화에 그린다 — 무대 뒤면 앞으로(검토관 상4와 같은 부류, 2026-08-01 전례).
-    if (window.gijoTabs && window.gijoTabs.toChat) { try { window.gijoTabs.toChat(); } catch (e) { } }
+    대화앞으로();
     var body = document.getElementById("csBody");
     if (!body || guideBusy || !window.gijo || !window.gijo.sendInstruction) return;
     var card = document.getElementById("csGuide");
@@ -1975,7 +1976,9 @@
     // ⚠ 이 갈래가 없어서 아래 마지막 줄의 `r.memory.chunks`가 TypeError를 냈고, 검수는 이미
     //   저장됐는데 화면엔 「실패: Cannot read properties of undefined」가 떴다.
     //   게다가 그 예외가 nextChips 호출보다 앞이라 **반입 칩 2개가 영영 안 붙었다** —
-    //   FORCED_INTENTS[65]까지 만들어 「약속한 말」이라고 못 박은 바로 그 칩이다.
+    //   강제 규칙을 줄줄이 만들어 「약속한 말」이라고 못 박은 바로 그 칩이다.
+    //   ⚠ 여기 규칙 **번호**를 적지 않는다 — 배열에 규칙이 끼면 번호가 밀려 뜻이 틀려진다
+    //     (2026-09-01 실제로 아홉 곳이 한 칸씩 밀렸다).
     //   ★ 내가 「라이브 실측」이라 적은 것은 API(/api/upload/auto)만 잰 것이었다 —
     //     **사람이 지나는 길을 안 지났다.** 게시 전 검토관이 그것까지 짚었다.
     if (r.routedTo === "sbom") {
@@ -2231,10 +2234,24 @@
     }).catch(function () { /* 이름을 못 읽어도 인사말은 남는다 */ });
   }
 
+  /** 답·입력칸이 **보이는 자리**에 오게 한다(2026-08-01 상4 「숨은 콘솔에 쓰면 무반응」).
+   *  ⚠ 화면이 열려 있을 때는 **화면을 덮지 않는다**(2026-08-31 실측). 온디맨드에서 화면이
+   *  주인이고 대화창은 부르는 것이라(사장님 「대화창은 필요할 때만 불러서」), 접어 두고 보던
+   *  화면의 ⓘ를 눌렀더니 그 화면이 사라지는 것은 앞뒤가 안 맞았다 — 실측에서 stage-on이
+   *  꺼지고 대화창이 폭을 다 먹었다. 무대가 켜져 있으면 접힘만 풀어 **나란히** 둔다.
+   *  분리 대화창(IS_WINDOW)·표준 판에는 gijoTabs가 없어 그냥 지나간다. */
+  function 대화앞으로() {
+    var t = window.gijoTabs;
+    if (!t) return;
+    try {
+      if (t.summonConsole && document.body.classList.contains("stage-on")) t.summonConsole();
+      else if (t.toChat) t.toChat();
+    } catch (e) { }
+  }
   function ask(text) {
     // 무대 뒤(숨은 대화)에 쓰면 무반응으로 보인다 — 대화를 앞으로(검토관 상4:
-    // 「이어서 지시하기」·「물어보기」가 숨은 콘솔에 쌓였다). 분리창(IS_WINDOW)엔 gijoTabs가 없다.
-    if (window.gijoTabs && window.gijoTabs.toChat) { try { window.gijoTabs.toChat(); } catch (e) { } }
+    // 「이어서 지시하기」·「물어보기」가 숨은 콘솔에 쌓였다). 규칙은 대화앞으로() 한 곳에.
+    대화앞으로();
     var input = document.getElementById("chatInput");
     if (!input) return;
     input.value = text;
@@ -2245,7 +2262,7 @@
   // 무슨 말을 해야 할지 몰라 그 자리에서 멈춘다 — 첫 몇 글자가 그걸 막는다.
   function prefill(text) {
     // 무대 뒤 입력칸에 얹으면 「적어 넣기」가 무반응으로 보인다 — 대화를 앞으로(검토관 상4).
-    if (window.gijoTabs && window.gijoTabs.toChat) { try { window.gijoTabs.toChat(); } catch (e) { } }
+    대화앞으로();
     var input = document.getElementById("chatInput");
     if (!input) return;
     input.value = text;

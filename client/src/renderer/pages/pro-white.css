@@ -35,6 +35,12 @@ html.theme-light {
   --g-border: rgba(43, 38, 33, 0.12);
   --g-border-strong: rgba(43, 38, 33, 0.22);
   --g-blue: #1d4f91;
+  /* 흰 글씨 채움용(gijo-ui.css의 --g-blue-fill과 같은 이름). **이 줄이 없으면 다크 기본값**
+     **(#2563eb)이 새어 들어와** 이 셸의 8.14:1을 5.17:1로 떨어뜨린다 — 고치려다 나빠지는
+     자리다(2026-08-31, 두 세션이 각자 실측해 같은 값에 닿았다). 흰 테마는 잉크 파랑이
+     원칙이라 채움도 같은 #1d4f91이 옳다. */
+  --g-blue-fill: #1d4f91;       /* 흰 글씨 대비 8.14:1 */
+  --g-blue-fill-hover: #143a6b; /* 흰 글씨 대비 11.37:1 */
   --g-blue-light: #1d4f91;
   --g-teal: #086b43;
   --g-amber: #8f4d02;
@@ -162,3 +168,18 @@ html.theme-light .gn-item:hover { background: rgba(0, 0, 0, 0.05); }
 html.theme-light .gn-top-fixed { border-bottom-color: rgba(0, 0, 0, 0.08); }
 html.theme-light .pro-menu::-webkit-scrollbar-thumb,
 html.theme-light .gn-mid::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.16); }
+
+/* ── 화면 카드 지표·타일(2026-08-31) 흰 테마 덮개 ──────────────────────────────────
+ * 골격 자체는 --g-* 토큰만 써서 자동으로 뒤집힌다(위 :root 재정의). 여기서 덮는 것은
+ * **토큰으로 표현할 수 없는 두 가지**뿐이다:
+ *   ① 히트맵 타일의 반투명 배경 — 어두운 바탕 기준 알파라 흰 바탕에서 색이 옅어 안 읽힌다.
+ *   ② 지표 강조색 — 잉크(진한 색)로 뒤집어야 흰 바탕에서 대비가 선다(dc-kv와 같은 값). */
+html.theme-light .g-ui .g-scard-kv.bad { color: #b3241a; }
+html.theme-light .g-ui .g-scard-kv.warn { color: #8f4d02; }
+html.theme-light .g-ui .g-scard-kv.ok { color: #086b43; }
+html.theme-light .g-ui .g-tile.bad { background: rgba(179, 36, 26, 0.12); }
+html.theme-light .g-ui .g-tile.warn { background: rgba(143, 77, 2, 0.12); }
+html.theme-light .g-ui .g-tile.ok { background: rgba(8, 107, 67, 0.12); }
+html.theme-light .g-ui .g-tile .tv.bad { color: #b3241a; }
+html.theme-light .g-ui .g-tile .tv.warn { color: #8f4d02; }
+html.theme-light .g-ui .g-tile .tv.ok { color: #086b43; }

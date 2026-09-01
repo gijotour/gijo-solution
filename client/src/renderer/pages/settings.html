@@ -25,7 +25,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:var(--text-strong, #fff);}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
-.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-primary{background:var(--g-blue-fill, var(--blue));color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
 .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
 .btn-danger{background:transparent;border:1px solid rgba(226,72,61,0.5);color:var(--red-ink, #f5928a);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
@@ -33,8 +33,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .sec-tab{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;}
 .sec-tab:hover{border-color:var(--blue);color:var(--text-strong, #fff);}
 .sec-tab.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:var(--text-strong, #fff);}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:640px;}
-.panel-title{font-size:14.5px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:4px;}
+/* 카드 언어(2026-08-31 사장님 「2번째 이미지로」) — 공용 골격 .g-scard와 같은 값.
+   판을 카드로: 여백 20 → 14/16, 제목 줄을 카드 머리(위 칸을 채우고 아래를 선으로 가름). */
+.panel{background:var(--g-surface-1,var(--panel));border:1px solid var(--g-border,var(--border));border-radius:var(--g-r,12px);padding:14px 16px;margin-bottom:12px;max-width:640px;}
+.panel-title{font-size:12.75px;font-weight:800;color:var(--g-text,var(--text-strong,#fff));margin:-14px -16px 10px;padding:7px 12px;border-bottom:1px solid var(--g-border,var(--border));}
 .panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
@@ -95,13 +97,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
 .beta-tag{background:var(--teal);color:var(--fill-contrast,#06281c);font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
-.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--g-blue-fill, var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 
 /* 모델 검색·받기 — agent.html에서 이관(2026-07-28) */
 .model-search{display:flex;gap:8px;margin-bottom:12px;}
 .model-search input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 12px;height:34px;color:var(--text);font-size:12px;outline:none;}
-.model-search button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:12px;font-weight:700;cursor:pointer;}
+.model-search button{background:var(--g-blue-fill, var(--blue));color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:12px;font-weight:700;cursor:pointer;}
 .hf-result{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;}
 .hf-result:last-child{border-bottom:none;}
 .hf-load{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:4px 10px;border-radius:6px;font-size:12.25px;font-weight:700;cursor:pointer;}
@@ -121,7 +123,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .mc-id{font-size:12px;color:var(--muted-2);font-family:'Consolas','Menlo',monospace;word-break:break-all;}
 .mc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;}
 .mc-gb{font-size:12.25px;color:var(--muted);}
-.mc-dl{background:var(--blue);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;}
+.mc-dl{background:var(--g-blue-fill, var(--blue));color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;}
 .mc-dl:disabled{opacity:.55;cursor:default;}
 .mc-installed{font-size:12.5px;font-weight:800;color:var(--teal);}
 .mc-agents{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:2px;}
@@ -204,7 +206,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .seg label:has(input:checked){border-color:var(--blue);background:rgba(59,130,246,.14);}
 .m-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
 .btn{font-size:12.5px;font-weight:800;border-radius:9px;padding:9px 16px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
-.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff;}
+.btn.pri{background:var(--g-blue-fill, var(--blue));border-color:var(--blue);color:#fff;}
 .err{color:var(--red);font-size:12.5px;min-height:14px;margin-top:2px;}
 .usage-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
 .usage-kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}

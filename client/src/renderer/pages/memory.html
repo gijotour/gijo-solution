@@ -25,11 +25,31 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:var(--text-strong, #fff);}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
-.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-primary{background:var(--g-blue-fill, var(--blue));color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:1100px;} /* 720→1100: 다른 화면보다 유난히 좁아 보이던 문제(2026-07-26) */
-.panel-title{font-size:14.5px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:4px;}
-.panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
+/* 카드 언어(2026-08-31 사장님 「2번째 이미지로」) — 공용 골격 .g-scard와 **같은 값**을 쓴다.
+   ⚠ 판(.panel)을 카드로 바꾸되 **헤더를 새로 달지 않는다**: 이 화면은 접기 부품(fold.js)이
+   이미 제목 줄(.gjf-h)을 그리므로, 카드 헤더를 더하면 제목이 두 겹이 된다(설계관 ④).
+   대신 접기 헤더를 **카드 머리로 승격**한다(아래 .gjf-h 규칙) — 부품은 안 건드리고
+   이 화면에서만 붙여 세운다(공용 부품 변경은 7화면 동시 위험이라 다음 라운드). */
+.panel{background:var(--g-surface-1,var(--panel));border:1px solid var(--g-border,var(--border));border-radius:var(--g-r,12px);
+  padding:14px 16px;margin-bottom:12px;max-width:1100px;} /* 720→1100(2026-07-26) · 20→14/16(카드 밀도) */
+.panel-title{font-size:12.75px;font-weight:800;color:var(--g-text,var(--text));margin:-14px -16px 10px;padding:7px 12px;
+  border-bottom:1px solid var(--g-border,var(--border));} /* 카드 머리 — 제목 줄이 카드 위 칸을 차지한다 */
+.panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+/* ⚠ 접기 헤더(.gjf-h)는 **카드 머리로 승격하지 않는다**(2026-08-31 실측으로 정정).
+   설계관은 「카드 헤더 + 접기 헤더 = 제목 두 겹」을 경고했는데, 실제 DOM을 열어 보니
+   이 화면의 접기 헤더는 판의 첫 자식이 아니라 **판 중간의 구역 제목**이다(앞 형제가
+   .field-row인 자리도 있다). 즉 카드 머리(.panel-title)와 층이 달라 겹치지 않는다 —
+   승격 규칙을 넣었다가 선택자가 안 맞아 아무 일도 안 했고, 그 사실을 확인하고 걷었다.
+   (추측으로 규칙을 남겨 두면 다음 사람이 「이건 왜 안 먹지」로 헤맨다.) */
+/* ★ 접기 판에서는 카드 머리를 **걷는다**(2026-08-31 검토관 [높음] — 내 앞 판단이 틀렸다).
+   앞 주석은 「접기 헤더는 판 중간 구역 제목이라 층이 다르다」였는데, 실측하니 data-gijo-fold가
+   **.panel 자신**에 붙은 판 5곳(위생점검·데이터셋·파인튜닝·규칙주입·관계추가)에서는 fold.js가
+   판 **바로 위**에 제목 막대를 세우고 카드 첫 줄에 .panel-title 막대가 또 서서 **제목이 두 겹**이었다.
+   (첫 판 하나만 열어 보고 「층이 다르다」고 단정한 것이 오판이었다 — 5곳 전수로 확인했다.)
+   ⇒ 접기 판(.panel[data-gijo-fold])의 .panel-title은 카드 머리 꾸밈을 걷고 본문 제목으로 둔다. */
+.panel[data-gijo-fold] > .panel-title{margin:0 0 8px;padding:0;border-bottom:0;font-size:13px;}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 .field input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
@@ -99,7 +119,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
 .beta-tag{background:var(--teal);color:var(--fill-contrast,#06281c);font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
-.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--g-blue-fill, var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
 th{text-align:left;font-size:12px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
@@ -143,7 +163,7 @@ tr:last-child td{border-bottom:none;}
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
 .beta-tag{background:var(--teal);color:var(--fill-contrast,#06281c);font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
-.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--g-blue-fill, var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 .result-box{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;color:var(--text);}
 .result-chunk{padding:7px 0;border-bottom:1px solid var(--border);line-height:1.6;}
@@ -228,38 +248,10 @@ tr:last-child td{border-bottom:none;}
     .dm-delbtn{background:var(--red);color:#fff;border:none;border-radius:9px;padding:0 18px;font-weight:800;font-size:12px;cursor:pointer;}
     .dm-delbtn:disabled{opacity:.5;cursor:not-allowed;}
     </style>
-    <!-- 문서 보강 인입 — docenrich.html에서 병합(메뉴 정리 2026-07-25). 장애노트(수동)와
-         매뉴얼 보강(AI 번역·구조화). 기본 펼침(2026-08-02 사용자 지시). -->
-    <div class="panel">
-      <div data-gijo-fold="문서 보강 인입">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;">
-          <div style="border:1px solid var(--border);border-radius:10px;padding:12px;">
-            <div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">🩹 장애노트 작성 <span style="font-size:11.75px;color:var(--amber);border:1px solid rgba(240,160,32,.4);border-radius:20px;padding:0 7px;">AI 미사용 · 즉시 저장</span></div>
-            <input id="mProduct" placeholder="제품/대상 (예: Tenable Security Center)" style="width:100%;margin-bottom:6px;">
-            <input id="mTitle" placeholder="제목 (예: 예약 스캔 진행 중 멈춤)" style="width:100%;margin-bottom:6px;">
-            <input id="mSymptom" placeholder="증상 — 무엇이 잘못됐나" style="width:100%;margin-bottom:6px;">
-            <input id="mCause" placeholder="원인 (선택)" style="width:100%;margin-bottom:6px;">
-            <textarea id="mFix" rows="3" placeholder="해결 방법 — 명령어·경로는 원문 그대로" style="width:100%;margin-bottom:8px;"></textarea>
-            <button class="g-btn" id="mSave">💾 장애노트 저장</button>
-            <div class="status-line" id="mStatus"></div>
-          </div>
-          <div style="border:1px solid var(--border);border-radius:10px;padding:12px;">
-            <div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">📄 매뉴얼 보강 (AI 번역·구조화)</div>
-            <input id="dProduct" placeholder="제품/대상" style="width:100%;margin-bottom:6px;">
-            <input id="dSection" placeholder="섹션 이름 (예: 진단 파일 로그 옵션)" style="width:100%;margin-bottom:6px;">
-            <textarea id="dText" rows="5" placeholder="매뉴얼 한 섹션 붙여넣기 (한 번에 ~6,000자)" style="width:100%;margin-bottom:6px;"></textarea>
-            <select id="dMode" style="width:100%;margin-bottom:8px;">
-              <option value="auto">⚙ 자동 — 클라우드 되면 쓰고, 내부정보·비활성이면 로컬</option>
-              <option value="cloud">☁ 클라우드 — 품질↑ (벤더 공개자료만)</option>
-              <option value="local">💻 로컬 — 무료·폐쇄망 (온프렘 7B)</option>
-            </select>
-            <button class="g-btn g-primary" id="dRun">▶ 보강해서 저장</button>
-            <div class="status-line" id="dStatus"></div>
-          </div>
-        </div>
-        <div id="enrichResList" style="font-size:12.5px;color:var(--muted);margin-top:8px;"></div>
-      </div>
-    </div>
+    <!-- 🩹 장애노트 · 📄 매뉴얼 보강은 **📝 문서작성으로 옮겼다**(2026-09-01 사장님 지시 ②).
+         「직접 작성해야 하는 것」을 한 자리에 모으라는 지시다. 여기 남겨 두면 같은 것이 둘이
+         되고 고칠 때 한쪽만 고쳐진다 — 옮긴 것이지 복제가 아니다.
+         가는 길: 내 문서 › 📝 문서작성 (관리자만 그 칸이 보인다 — 서버가 admin으로 막는다). -->
 
     <!-- 접기(2026-08-01) — 정리 점검은 매일 보는 것이 아니다. 다만 **겹친 문서 수를 배지로**
          남긴다: 숫자 없이 접으면 "안에 뭐가 있는지 모르는 서랍"이 된다. -->
@@ -277,6 +269,10 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel">
       <div class="panel-title">📚 올린 문서 확인 · 관리 <span id="dmSummary" style="font-size:12.25px;font-weight:600;color:var(--muted-2);margin-left:6px"></span></div>
+      <div class="g-seg" id="dmViewSeg" style="margin:-4px 0 8px"><span class="on" data-v="list">목록</span><span data-v="heat">히트맵</span></div>
+      <!-- 지표 줄(카드 언어, 2026-08-31) — 라벨 위/값 아래. 숫자는 목록과 **같은 원천**을
+           쓴다(dmDocs) — 새로 세지 않는다(잣대 두 벌 금지). 좁아지면 열이 접힌다. -->
+      <div class="g-scard-k" id="dmKpis" style="margin:0 -16px 10px;border-top:0"></div>
       <div class="dm-seg" id="dmSeg"></div>
       <div class="dm-wrap">
         <!-- 엑셀형 행 목록(승인 시안 mockups/knowledge-rows, 2026-08-20) — 카드·알약 없이
@@ -431,51 +427,9 @@ tr:last-child td{border-bottom:none;}
   // 문서 파일 인입은 대시보드 ＋로 통일(2026-07-27) — 분류 승인카드도 그쪽에서 뜬다.
   // 서버에 이미 있는 파일을 경로로 수집하는 길(ingest)은 여기 남는다(파일 탐색기가 아니라 경로 입력).
 
-  // ── 문서 보강 인입(docenrich에서 병합, 메뉴 정리 2026-07-25) — 장애노트·매뉴얼 보강 ──
-  (function initEnrich() {
-    const enrichResults = [];
-    function addEnrichResult(r) {
-      enrichResults.unshift(r);
-      document.getElementById("enrichResList").innerHTML = "이번 세션 인입: " + enrichResults.map((x) =>
-        `${x.documentId} (${x.via} · ${x.chunks}청크${x.triples ? " · 관계 " + x.triples : ""})`).join(" · ");
-    }
-    document.getElementById("mSave")?.addEventListener("click", async () => {
-      const btn = document.getElementById("mSave"), st = document.getElementById("mStatus");
-      const v = (id) => document.getElementById(id).value.trim();
-      const product = v("mProduct"), title = v("mTitle"), symptom = v("mSymptom"), cause = v("mCause"), fix = v("mFix");
-      if (!product || !title || !symptom || !fix) { st.textContent = "제품·제목·증상·해결은 필수입니다."; st.className = "status-line status-err"; return; }
-      const korean = ["증상: " + symptom, cause ? "원인: " + cause : "", "해결: " + fix].filter(Boolean).join("\n");
-      const triples = [];
-      if (cause) triples.push({ subject: title, predicate: "원인", object: cause });
-      triples.push({ subject: title, predicate: "해결", object: fix });
-      btn.disabled = true; st.textContent = "저장 중…"; st.className = "status-line";
-      try {
-        const r = await window.gijo.enrichIngest({ productName: product, sourceDoc: "현장 장애노트", section: title, mode: "manual", korean, triples });
-        st.textContent = `✓ 저장됨 — ${r.chunks}청크 · 관계 ${r.triples}개. 이제 검색됩니다.`; st.className = "status-line status-ok";
-        addEnrichResult(r);
-        ["mTitle", "mSymptom", "mCause", "mFix"].forEach((id) => document.getElementById(id).value = "");
-        loadDocuments();
-      } catch (e) { st.textContent = "✗ 실패: " + e.message; st.className = "status-line status-err"; }
-      btn.disabled = false;
-    });
-    document.getElementById("dRun")?.addEventListener("click", async () => {
-      const btn = document.getElementById("dRun"), st = document.getElementById("dStatus");
-      const v = (id) => document.getElementById(id).value.trim();
-      const productName = v("dProduct"), section = v("dSection"), text = v("dText");
-      const mode = document.getElementById("dMode").value;
-      if (!productName || !section || !text) { st.textContent = "제품·섹션·원본 텍스트는 필수입니다."; st.className = "status-line status-err"; return; }
-      btn.disabled = true; st.textContent = (mode === "local" ? "로컬 7B로 " : "") + "번역·구조화 중… (수십 초 걸릴 수 있어요)"; st.className = "status-line";
-      try {
-        const r = await window.gijo.enrichIngest({ text, productName, sourceDoc: productName + " 매뉴얼", section, mode });
-        const via = r.via === "cloud" ? "클라우드" : r.via === "local" ? "로컬" : r.via === "manual" ? "수동" : "원문";
-        st.textContent = `✓ 저장됨(${via}) — ${r.chunks}청크${r.triples ? " · 관계 " + r.triples + "개" : ""}${r.translated ? "" : " · 번역 실패로 원문 저장"}`; st.className = "status-line status-ok";
-        addEnrichResult(r);
-        document.getElementById("dText").value = "";
-        loadDocuments();
-      } catch (e) { st.textContent = "✗ 실패: " + e.message; st.className = "status-line status-err"; }
-      btn.disabled = false;
-    });
-  })();
+  // ── 🩹📄 장애노트·매뉴얼 보강 배선은 **📝 문서작성으로 옮겼다**(2026-09-01).
+  //   마크업만 옮기고 배선을 남기면 없는 노드에 addEventListener를 걸어 **그 뒤 줄이 통째로**
+  //   **안 돈다**(「없는 함수 버튼」 계보). 짝을 함께 옮긴다 — 로직은 한 글자도 안 바꿨다.
 
   // ── 승인카드(시안 승인 2026-07-25) — 업로드된 문서의 업무영역을 확인·수정한다.
   // 확실(≠일반)=청록 배지+[수정▾], 확신 낮음(일반)=호박 배지+되물음. 문서는 이미 저장돼 있어
@@ -567,6 +521,8 @@ tr:last-child td{border-bottom:none;}
 
   // ── 올린 문서 확인·관리(장기기억) — 목록 + 상세 + 삭제 2옵션(장기기억만 / 원본까지) ──
   let dmDocs = [];
+  let dmAllDocs = []; // 개인 문서까지 **원본** — 위생 점검이 지목한 문서를 선택으로 열 수 있게(검토관)
+  let dmView = "list"; // 📋 목록 | 🔥 히트맵(2026-08-31) — 기본은 목록(게시 관문 계약)
   let dmSelected = null;
   let dmConfirmId = null;
   const DM_ICON = (name) => /\.pdf$/i.test(name) ? "📕" : /\.hwpx?$/i.test(name) ? "📘" : /\.md$/i.test(name) ? "📝" : "📄";
@@ -652,8 +608,59 @@ tr:last-child td{border-bottom:none;}
     return `<span class="dm-grade gg-${k}" title="열람 등급: ${이름}${k === "?" ? " — 아직 정하지 않았습니다" : ""}">${k === "?" ? "?" : k} ${이름}</span>`;
   }
 
+  // 📊 카드 지표 — **한 곳에서** 그린다(2026-08-31 검토관: 등급을 바꿔도 안 바뀌던 것과
+  //   불러오기 실패 때 옛 숫자가 남던 것을 여기로 모아 해결).
+  // ⚠ 「오늘 반입」은 직접 세지 않는다 — 제품 정본(recentDocCount: 현지 자정 기준·내장 문서
+  //   제외)을 쓴다. 처음엔 ingestedAt을 UTC로 잘라 세어 바로 아래 목록의 반입 열(현지 시각)과
+  //   어긋났고 내장 문서까지 셌다. 같은 숫자를 두 잣대로 세지 않는다.
+  function renderDmKpis(실패) {
+    const k = document.getElementById("dmKpis");
+    if (!k) return;
+    if (실패) {
+      k.innerHTML = '<div><div class="g-scard-kl">지표</div><div class="g-scard-kv muted">불러오지 못했습니다</div></div>';
+      return;
+    }
+    const totalChunks = dmDocs.reduce((sum, d) => sum + (d.chunks || 0), 0);
+    const 등급매김 = dmDocs.filter((d) => d.grade).length;
+    const 칸 = (l, v, c) =>
+      '<div><div class="g-scard-kl">' + dmEsc(l) + '</div><div class="g-scard-kv ' + (c || "") + '">' + dmEsc(String(v)) + "</div></div>";
+    k.innerHTML =
+      칸("문서", dmDocs.length.toLocaleString()) +
+      칸("조각", totalChunks.toLocaleString()) +
+      '<div><div class="g-scard-kl">오늘 반입</div><div class="g-scard-kv muted" id="dmKpiToday">…</div></div>' +
+      칸("열람 등급 지정", 등급매김.toLocaleString() + " / " + dmDocs.length.toLocaleString(),
+        등급매김 < dmDocs.length ? "warn" : "ok");
+    const 오늘칸 = () => document.getElementById("dmKpiToday");
+    if (window.gijo && window.gijo.recentDocCount) {
+      window.gijo.recentDocCount().then((r) => {
+        const el = 오늘칸();
+        if (!el) return;
+        const n = (r && r.count) || 0;
+        el.textContent = n.toLocaleString();
+        el.className = "g-scard-kv " + (n ? "ok" : "muted");
+      }).catch(() => { const el = 오늘칸(); if (el) el.textContent = "—"; });
+    } else { const el = 오늘칸(); if (el) el.textContent = "—"; }
+  }
+
+  // 🔥 보기 전환 칩(목록|히트맵) 배선 — **부팅 때 한 번**(2026-08-31 검토관 [중]).
+  //   처음엔 renderDmList 안에서 붙였는데, 문서 0건이거나 목록 로드가 실패하면 그 함수가
+  //   먼저 return해서 칩이 **영영 배선되지 않았다**(눌러도 무반응 — 죽은 조작).
+  function bindDmViewSeg() {
+    const seg = document.getElementById("dmViewSeg");
+    if (!seg || seg.dataset.bound) return;
+    seg.dataset.bound = "1";
+    seg.addEventListener("click", (ev) => {
+      const b = ev.target.closest("span[data-v]");
+      if (!b || b.dataset.v === dmView) return;
+      dmView = b.dataset.v;
+      seg.querySelectorAll("span").forEach((x) => x.classList.toggle("on", x === b));
+      renderDmList(true);
+    });
+  }
+
   function renderDmList(keepSel) {
     renderDmSeg();
+    renderDmKpis(); // 등급을 바꾸거나 보기를 전환해도 지표가 따라온다(검토관)
     const list = document.getElementById("dmList");
     if (!list) return;
     const groups = DM_GROUPS.filter((g) => dmSegSel === "전체" || g.c === dmSegSel)
@@ -676,6 +683,46 @@ tr:last-child td{border-bottom:none;}
       const d = new Date(t);
       return String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
     };
+    // 🔥 히트맵 보기(2026-08-31 사장님 「히트맵은 있었으면」) — 목록과 **같은 부분집합**을 편다.
+    // ⚠ 2026-08-31 검토관 [높음] 3건 수리:
+    //   ① **영역 필터(dmSegSel)를 그대로 탄다** — 처음엔 원본 dmDocs를 통째로 그려, 칩은
+    //      「취약점 12」인데 타일은 420개였다(칩이 고장 난 것처럼 보였다). 승인 시안도
+    //      「히트맵도 목록과 같은 것만」을 못박는다.
+    //   ② **선택을 대화창에 알린다**(gijoSelectNotify) — 목록 행과 같은 계약. 안 부르면
+    //      화면 상세는 B인데 대화창 선택은 앞 문서 A로 남아 「이 문서 지워줘」가 A를 지운다.
+    //   ③ **「조각 0 = 못 읽음」 규칙을 걷었다** — 원천(listDocuments)이 조각이 있는 문서만
+    //      주므로 그 분기는 **원리상 발화하지 않는 죽은 규칙**이었다(그런데 커밋은 규칙 3개를
+    //      약속했다 — 거짓 약속). 지금 규칙은 둘: 열람 등급 미지정=관리 필요(warn) · 지정=ok.
+    //      「못 읽은 문서」는 반입 영수증(ingested:false)이 원천이라 이 화면 몫이 아니다.
+    if (dmView === "heat") {
+      const 대상 = groups.flatMap((g) => g.docs); // ← 필터를 지난 것만(①)
+      const 타일 = 대상.map((d) => {
+        const cls = d.grade ? "ok" : "warn";
+        const 뜻 = d.grade ? "정상" : "등급 미지정";
+        return `<div class="g-tile ${cls}" data-id="${dmEsc(d.documentId)}" title="${dmEsc(d.documentId)} — ${뜻} · 조각 ${d.chunks}">` +
+          `<div class="tv ${cls}">${d.chunks}</div>` +
+          `<div class="tl">${dmEsc(d.documentId)}</div>` +
+          `<div class="ts">${뜻}</div></div>`;
+      }).join("");
+      list.innerHTML = 대상.length
+        ? `<div class="g-tiles">${타일}</div>`
+        : '<div class="dm-empty">이 영역에 문서가 없습니다.</div>';
+      list.querySelectorAll(".g-tile").forEach((el) =>
+        el.addEventListener("click", () => {
+          const id = el.getAttribute("data-id");
+          selectDoc(id);
+          list.querySelectorAll(".g-tile").forEach((x) => x.classList.toggle("sel", x === el)); // 고른 타일 표시
+          // 🎯 고른 문서를 대화창에(B16 계약 — 목록 행과 같은 값·같은 모양)(②)
+          if (window.gijoSelectNotify) window.gijoSelectNotify({ label: id, text: "올린 문서 " + id, fields: { title: id } });
+        }));
+      // 선택이 있었으면 유지 — 조기 return이 아래 「선택 유지」 블록을 건너뛰므로 여기서 한다.
+      if (keepSel && dmSelected) {
+        const 살아있나 = 대상.some((d) => d.documentId === dmSelected);
+        if (!살아있나) { dmSelected = null; const dt = document.getElementById("dmDetail"); if (dt) dt.innerHTML = '<div class="dm-empty">왼쪽에서 문서를 선택하세요.</div>'; }
+        else list.querySelectorAll(".g-tile").forEach((x) => x.classList.toggle("sel", x.getAttribute("data-id") === dmSelected));
+      }
+      return;
+    }
     // 열 머리를 스크롤 안 첫 요소로(검토관 중5 — 밖에 두면 스크롤바 폭만큼 어긋난다)
     const 머리 = '<div class="g-rows-head"><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>';
     list.innerHTML = 머리 + groups.map((g) => {
@@ -713,13 +760,30 @@ tr:last-child td{border-bottom:none;}
     const list = document.getElementById("dmList");
     if (!list) return;
     try {
-      dmDocs = await window.gijo.listMemoryDocuments();
+      // ★ 개인 문서(personal:)는 뺀다 — **잣대 통일**(2026-08-31 설계관 적발).
+      //   같은 화면 위 요약 카드(grouppanels 「올린 문서」)와 내 문서 배지(nKnow)는 이미
+      //   빼고 세는데 여기만 포함해, 카드와 그 아래 목록 제목이 **다른 숫자**를 말했다.
+      //   여기는 회사 지식 창고다 — 개인 메모는 「내 문서」의 영토이고 검색에서도 격리된다.
+      //   ⚠ 표시 수가 한 번 줄지만 그건 기준이 맞춰진 것이다(요약 카드와 같은 계보).
+      // ★ 원본은 **따로 들고 있는다**(2026-08-31 검토관 [중]): 위생 점검(kb-hygiene)은 개인
+      //   문서를 안 걸러 목록에 내는데, 그 문서명을 누르면 selectDoc이 dmDocs에서 못 찾아
+      //   **조용히 아무 일도 안 일어났다**(화면은 「눌러 보라」고 안내한다). 선택 조회는
+      //   원본을 보게 하고, **목록·지표만** 회사 문서로 좁힌다.
+      dmAllDocs = await window.gijo.listMemoryDocuments();
+      dmDocs = dmAllDocs.filter((d) => String(d.documentId || "").indexOf("personal:") !== 0);
     } catch (e) {
       list.innerHTML = '<div class="dm-empty">불러오지 못했습니다: ' + dmEsc(e.message) + '</div>';
+      renderDmKpis(true); // 지표도 사실대로 — 옛 숫자가 남으면 「실패」 옆에 거짓이 선다
       return;
     }
     const totalChunks = dmDocs.reduce((s, d) => s + (d.chunks || 0), 0);
     document.getElementById("dmSummary").textContent = `· ${dmDocs.length}개 문서 · ${totalChunks}조각 · bge-m3`;
+    // 지표 줄(카드 언어) — 그리기는 renderDmKpis 하나가 맡는다(등급을 바꿔도 다시 그리게).
+    // ⚠ 「오늘 반입」은 **직접 세지 않는다**(2026-08-31 검토관 [높음]): 처음엔 ingestedAt을
+    //   UTC로 잘라 세어, 같은 화면 아래 목록의 반입 열(현지 시각)과 어긋나고 내장 문서까지
+    //   셌다. 제품엔 이미 정본이 있다 — recentDocCount(현지 자정 기준·builtin 제외).
+    //   같은 숫자를 두 잣대로 세지 않는다.
+    renderDmKpis();
     if (!dmDocs.length) {
       list.innerHTML = '<div class="dm-empty">아직 올린 문서가 없습니다. 위에서 파일을 올려보세요.</div>';
       document.getElementById("dmDetail").innerHTML = '<div class="dm-empty">올린 문서가 여기에 표시됩니다.</div>';
@@ -1035,6 +1099,7 @@ tr:last-child td{border-bottom:none;}
     await loadAgentScopes();
     loadBundleStatus(); // 실패해도 화면 로드는 계속 — await 안 한다
 
+    bindDmViewSeg(); // 🔥 보기 전환 칩 — **문서를 못 불러와도** 눌리게(검토관 [중]: 죽은 조작 금지)
     await loadDocuments();
     loadHygiene();
     // ★ 2026-08-05 발견: 온톨로지(「등록된 관계」)를 **화면 진입 시 아예 안 불렀다**.

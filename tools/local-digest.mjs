@@ -93,15 +93,36 @@ const RANGE_SCHEMA = {
 };
 
 // 큰 파일은 겹침 분할(프로브 실사고: 2,000줄급이 슬롯 ctx를 넘으면 400) — 조각마다 묻고 범위 병합.
-const 조각줄수 = 1500, 겹침 = 150;
+//
+// ⚠⚠ **줄이 아니라 글자로 자른다**(2026-09-01 실측으로 고침).
+//   1,500줄 고정이었는데 **한글이 많은 파일에서 ctx를 넘겼다** — screenguide.ts의 1,500줄이
+//   66,597토큰이라 65,536을 초과해 **조각 하나가 통째로 날아갔다.** 줄 수는 토큰 수를 못 재는
+//   자다: 같은 1,500줄이 screenguide 102,719자 / handlers 68,261자로 **1.5배 차이**가 난다
+//   (한글 비율 45% vs 21%). 줄로 자르면 한글 많은 파일만 조용히 실패한다.
+//   실측 비율 1.54자/토큰 기준, 안전 예산 50,000토큰 ≈ 77,000자로 잡는다(ctx 65,536의 76%).
+const 조각글자수 = 70000, 겹침줄 = 150;
 
 function 발췌(경로, 물음) {
   const abs = path.isAbsolute(경로) ? 경로 : path.join(ROOT, 경로);
   const src = fs.readFileSync(abs, "utf8");
   const lines = src.split("\n");
+  // ⚠ **못 본 조각을 세어 둔다.** 예전에는 실패를 stderr 경고로만 흘리고 종료코드 0을 냈다.
+  //   그러면 이 발췌를 받아 쓰는 쪽(digest-pack·워크플로)은 **다 봤다고 믿는다** —
+  //   실제로는 파일의 일부를 아예 안 본 발췌인데도. 2026-09-01 screenguide.ts에서 그랬고,
+  //   꾸러미가 「실패 0」이라고 적었다. 조용한 폴백 금지가 이 파일의 첫 원칙인데 어겼다.
+  const 못본조각 = [];
   const 전체범위 = [];
-  for (let s = 0; s < lines.length; s += 조각줄수 - 겹침) {
-    const e = Math.min(lines.length, s + 조각줄수);
+  // 글자 예산에 맞춰 조각의 **끝 줄**을 정한다(겹침은 줄 단위 그대로).
+  const 조각끝 = (시작) => {
+    let 글자 = 0;
+    for (let i = 시작; i < lines.length; i++) {
+      글자 += lines[i].length + 1;
+      if (글자 > 조각글자수) return Math.max(시작 + 1, i); // 최소 한 줄은 담는다
+    }
+    return lines.length;
+  };
+  for (let s = 0; s < lines.length; ) {
+    const e = 조각끝(s);
     const 번호원문 = lines.slice(s, e).map((l, i) => `${s + i + 1}\t${l}`).join("\n");
     const prompt =
       `아래는 줄번호가 붙은 파일 일부다(${s + 1}~${e}줄/총 ${lines.length}줄). 질문에 답하는 데 필요한 부분의 **줄 범위**만 골라라.\n` +
@@ -109,8 +130,12 @@ function 발췌(경로, 물음) {
     try {
       const out = JSON.parse(gb10Chat(prompt, RANGE_SCHEMA, 256));
       for (const [a, b] of out.ranges || []) if (a >= s + 1 && b <= e) 전체범위.push([a, b]);
-    } catch (e2) { console.error(`⚠ 조각 ${s + 1}~${e} 실패: ${e2.message}`); }
+    } catch (e2) {
+      못본조각.push([s + 1, e]);
+      console.error(`⚠ 조각 ${s + 1}~${e} 실패: ${e2.message}`);
+    }
     if (e >= lines.length) break;
+    s = Math.max(s + 1, e - 겹침줄); // 겹쳐서 다음 조각 — 경계에 걸친 함수를 놓치지 않는다
   }
   // 병합·출력 — 본문은 **기계가 원문을 자른다**
   전체범위.sort((x, y) => x[0] - y[0]);
@@ -121,12 +146,24 @@ function 발췌(경로, 물음) {
     else 병합.push([...r]);
   }
   const 총 = 병합.reduce((a, [x, y]) => a + (y - x + 1), 0);
-  console.log(`# ${경로} — ${lines.length}줄 중 ${총}줄 발췌 (${병합.length}구간 · gb10 ${두뇌.이름} · 원문 그대로)`);
+  // ⚠ 못 본 구간을 **머리글에 적는다** — 받는 쪽이 읽는 첫 줄이라 여기 없으면 못 본 것이 된다.
+  const 못본줄 = 못본조각.reduce((a, [x, y]) => a + (y - x + 1), 0);
+  console.log(
+    `# ${경로} — ${lines.length}줄 중 ${총}줄 발췌 (${병합.length}구간 · gb10 ${두뇌.이름} · 원문 그대로)` +
+      (못본조각.length
+        ? `
+# ⚠⚠ **못 본 구간이 있다** — ${못본조각.length}조각 ${못본줄}줄(${못본조각.map(([x, y]) => `${x}~${y}`).join(", ")})을 gb10이 못 읽었다.
+` +
+          "# 이 발췌는 **파일 전체를 본 것이 아니다** — 그 구간이 중요하면 원문을 직접 읽어라."
+        : ""),
+  );
   for (const [a, b] of 병합) {
     console.log(`\n── ${a}~${b}줄 ──`);
     console.log(lines.slice(a - 1, b).map((l, i) => `${a + i}\t${l}`).join("\n"));
   }
   if (!병합.length) console.log("(관련 구간 없음 — 질문을 좁히거나 원문을 직접 읽어라)");
+  // ⚠ **실패는 종료코드로도 말한다.** 글로만 적으면 자동으로 엮는 쪽(digest-pack)이 못 알아챈다.
+  if (못본조각.length) process.exitCode = 1;
 }
 
 // ── review: diff 1차 선별 ────────────────────────────────────────────────────
@@ -134,15 +171,24 @@ const REVIEW_SCHEMA = {
   type: "object",
   properties: {
     findings: {
-      type: "array", maxItems: 15,
+      // ⚠ 8건 — 예산(max_tokens)과 **함께** 정해야 하는 값이다. 15건일 때 1024토큰으로는
+      //   출력이 잘려 JSON이 깨졌고, 그래서 이 모드는 **한 번도 성공한 적이 없었다**(2026-08-31).
+      type: "array", maxItems: 8,
       items: {
         type: "object",
-        required: ["file", "quote", "why"],
+        // ⚠ **defect(참/거짓)를 필수로 둔다**(2026-08-31). 문구로 거르려 했더니 모델이
+        //   말만 바꿔 빠져나갔다(「결함이 없으며」→「따라서 …」). 이 저장소의 오래된 교훈
+        //   그대로다 — **모델을 프롬프트로 교정하지 말고 코드로 해결한다.** boolean은 못 돌린다.
+        required: ["file", "quote", "why", "defect"],
         properties: {
           file: { type: "string" },
-          quote: { type: "string", description: "diff에서 그대로 복사한 한 줄(재서술 금지)" },
-          why: { type: "string", description: "왜 의심되나 한 문장(한국어)" },
+          // ⚠ **길이를 스키마로 묶는다**(2026-08-31). 산문이 길어 출력이 예산을 넘으면 JSON이
+          //   잘려 조각 전체가 날아간다 — 실측으로 두 번 겪었다. 「짧게 써 달라」는 부탁이
+          //   아니라 **maxLength로 못 박는 것**이 코드로 해결하는 방식이다.
+          quote: { type: "string", maxLength: 160, description: "diff에서 그대로 복사한 한 줄(재서술 금지)" },
+          why: { type: "string", maxLength: 140, description: "왜 의심되나 **한 문장**(한국어, 140자 안)" },
           kind: { type: "string", enum: ["logic", "leftover", "mismatch", "contract", "type", "other"] },
+          defect: { type: "boolean", description: "정말 결함이라고 보는가. 아니면 false — false는 버려진다." },
         },
       },
     },
@@ -158,24 +204,76 @@ function 리뷰(커밋) {
     ? execFileSync("git", ["diff", "--no-color", "HEAD"], { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })
     : execFileSync("git", ["show", "--no-color", ref], { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
   if (!diff.trim()) { console.log(`# ${ref} — 변경 없음`); return; }
+  // ⚠⚠ **지워진 줄을 아예 안 보여 준다**(2026-09-01 실측으로 고침).
+  //   diff를 통째로 주면 모델이 `-` 줄(방금 고친 **옛 결함**)을 읽고 그것을 결함으로 올린다.
+  //   수리 커밋에서 특히 심하다 — ea8dc515 선별에서 후보 8건이 **전부** 「고쳤지만 이전에는
+  //   문제가 있었다」였다. 커밋 메시지를 되풀이한 것이지 결함을 찾은 게 아니다.
+  //   「옛 코드는 보지 마라」고 **부탁하면 안 지킨다** — 이 저장소의 오래된 교훈대로
+  //   **코드로 해결한다**: 지워진 줄을 물리적으로 빼서 볼 수가 없게 만든다.
+  //   (남는 것은 새 코드 `+`와 둘레 문맥 — 「지금 코드에 남아 있는 결함」만 볼 수 있다.)
+  const 줄바꿈 = String.fromCharCode(10);
+  const 새코드만 = diff
+    .split(줄바꿈)
+    .filter((l) => !(l.startsWith("-") && !l.startsWith("---")))
+    .join(줄바꿈);
   const 조각크기 = 60000; // 문자 기준 — ctx 여유
   const all = [];
-  for (let i = 0; i < diff.length; i += 조각크기) {
-    const 부분 = diff.slice(i, i + 조각크기);
+  let 실패조각 = 0;
+  let 버린수 = 0; // 스스로 「결함 없다」고 적은 후보 — 숫자를 정직하게 밝힌다
+  for (let i = 0; i < 새코드만.length; i += 조각크기) {
+    const 부분 = 새코드만.slice(i, i + 조각크기);
     const prompt =
-      `아래는 git 커밋 diff의 일부다. **결함 후보**를 골라라 — 로직 오류, 옮기다 남긴 것(leftover), ` +
-      `약속(주석·메시지)과 코드의 불일치, 반쪽 수리. 스타일 지적 금지. 확실하지 않으면 빼라(적은 게 낫다).\n` +
-      `quote는 diff에서 **그대로 복사**한 줄이어야 한다.\n\n${부분}`;
-    try {
-      const out = JSON.parse(gb10Chat(prompt, REVIEW_SCHEMA, 1024));
-      all.push(...(out.findings || []));
-    } catch (e2) { console.error(`⚠ diff 조각 ${i} 실패: ${e2.message}`); }
+      `아래는 git 커밋의 **바뀐 뒤 코드**다(지워진 줄은 빼 놓았다 — 옛 코드는 볼 수 없다).\n` +
+      `**지금 이 코드에 남아 있는 결함 후보**를 골라라 — 로직 오류, 옮기다 남긴 것(leftover), ` +
+      `약속(주석·메시지)과 코드의 불일치, 반쪽 수리. 스타일 지적 금지.\n` +
+      `⚠ 「전에는 …였는데 고쳤다」는 결함이 아니다 — 그건 이 커밋이 한 일이다. 그런 것은 올리지 마라.\n` +
+      `⚠ 확실하지 않으면 빼라(적은 게 낫다). quote는 아래에서 **그대로 복사**한 줄이어야 한다.\n\n${부분}`;
+    // 잘림에 강하게: 넉넉히 주고(3072), 그래도 깨지면 **더 좁은 스키마로 한 번 더** 묻는다.
+    //   두 번 다 실패하면 조용히 넘기지 않고 **실패로 센다**(아래 머리글이 그 수를 말한다).
+    let 담았나 = false;
+    for (const [스키마, 예산] of [[REVIEW_SCHEMA, 3072], [좁은스키마(3), 1536]]) {
+      try {
+        const out = JSON.parse(gb10Chat(prompt, 스키마, 예산));
+        // ⚠ **스스로 부정하는 후보를 버린다**(2026-08-31 실측). 30B 모델이 「이 줄은 …
+        //   결함이 없으며」라고 적으면서도 후보로 올린다 — 그대로 두면 Claude 검토관이
+        //   읽을 양이 안 줄고, 「후보 8건」이라는 숫자가 뜻을 잃는다(실측: 8건 전부 그랬다).
+        //   판정은 여전히 사람/Claude 몫이지만, **자기가 아니라고 표시한 것**은 여기서 뺀다.
+        const 걸러낸 = (out.findings || []).filter((f) => f.defect === true);
+        버린수 += (out.findings || []).length - 걸러낸.length;
+        all.push(...걸러낸);
+        담았나 = true;
+        break;
+      } catch (e2) {
+        console.error(`⚠ diff 조각 ${i} 실패(예산 ${예산}): ${e2.message}`);
+      }
+    }
+    if (!담았나) 실패조각++;
   }
-  console.log(`# ${ref} 1차 선별 — 후보 ${all.length}건 (gb10 ${두뇌.이름})`);
+  // ⚠ **실패를 0건으로 포장하지 않는다.** 전부 실패해도 「후보 0건」이라 적으면 깨끗하다는
+  //   뜻으로 읽힌다 — 이 저장소가 이미 겪은 거짓 초록이다.
+  console.log(
+    실패조각
+      ? `# ${ref} 1차 선별 — ⚠ **선별 실패 ${실패조각}조각** · 읽어낸 후보 ${all.length}건 (gb10 ${두뇌.이름})`
+      : `# ${ref} 1차 선별 — 후보 ${all.length}건${버린수 ? ` (스스로 「결함 없다」고 적은 ${버린수}건은 버림)` : ""} (gb10 ${두뇌.이름})`,
+  );
   console.log(`# ⚠ **후보이지 판정이 아니다.** 각 지점은 Claude/사람이 직접 열어 확정할 것 —`);
   console.log(`#    이 선별은 검토관을 대체하지 않고 읽을 양을 줄인다(CLAUDE.md 검토관 원칙 유효).`);
   for (const f of all) console.log(`\n[후보·${f.kind || "other"}] ${f.file}\n  인용: ${f.quote}\n  왜: ${f.why}`);
-  if (!all.length) console.log("(후보 없음 — 로컬 선별이 못 보는 부류일 수 있다. 게시 전엔 정식 검토관을 태울 것)");
+  if (!all.length && !실패조각) console.log("(후보 없음 — 로컬 선별이 못 보는 부류일 수 있다. 게시 전엔 정식 검토관을 태울 것)");
+  if (실패조각) {
+    console.log(`\n✗ ${실패조각}조각을 못 읽었다 — 이 결과를 「깨끗하다」로 읽지 말 것.`);
+    process.exitCode = 1;
+  }
+}
+
+/** 잘림이 났을 때 쓰는 더 좁은 스키마 — 건수를 줄여 출력이 예산 안에 들어오게 한다. */
+function 좁은스키마(최대) {
+  return {
+    ...REVIEW_SCHEMA,
+    properties: {
+      findings: { ...REVIEW_SCHEMA.properties.findings, maxItems: 최대 },
+    },
+  };
 }
 
 // ── 실행 ────────────────────────────────────────────────────────────────────

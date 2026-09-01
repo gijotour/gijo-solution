@@ -68,16 +68,21 @@ describe("못 읽으면 못 읽었다고 — 「실패」 한 마디로 끝내�
     expect(검수목록().length).toBe(0);
   });
 
-  it("★ 중첩 부품을 안 폈다는 사실이 **저장된다** — 다 센 척하지 않는다", () => {
+  // 2026-09-01: 겉만 세던 것을 편다. **안쪽에 든 GPL도 소스 공개 의무를 지운다** —
+  // 한 겹 안에 있다고 의무가 사라지지 않는다. 겉만 세면 검수 결과가 실제보다 안전해 보인다.
+  it("★★ 안쪽 부품까지 검수에 들어간다 — 한 겹 안의 GPL이 숨지 않는다", () => {
     const 내용 = JSON.stringify({
       bomFormat: "CycloneDX",
-      components: [{ name: "겉", licenses: [{ license: { id: "MIT" } }], components: [{ name: "속" }] }],
+      components: [{
+        name: "겉", licenses: [{ license: { id: "MIT" } }],
+        components: [{ name: "속", licenses: [{ license: { id: "GPL-3.0-only" } }] }],
+      }],
     });
     const r = sbom검수({ 파일이름: "중첩.json", 내용 });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.결과.componentCount, "겉만 셌다").toBe(1);
-    expect(r.결과.notes.join(" "), "안 폈다는 것을 적어 둔다").toContain("안쪽은 아직 안 읽습니다");
+    expect(r.결과.componentCount, "안쪽을 안 셌다").toBe(2);
+    expect(r.결과.notes.join(" "), "숫자가 왜 겉보다 많은지 안 밝힌다").toContain("펴서 셌습니다");
   });
 });
 

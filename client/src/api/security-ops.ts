@@ -99,9 +99,13 @@ export interface OutboundReq {
   id: string; kind: string; targetName?: string; recipient?: string; dueDate?: string;
   status: string; docId?: string; createdAt: number; sentAt?: number;
 }
+/** 서버가 **좁혀 줬는지**. 없으면 mine=1을 모르는 옛 서버다 — 화면은 그때 아무것도 안 그린다. */
+export type ReqScope = "mine" | "all" | undefined;
 export const outboundReqApi = {
   list: (productId?: string) =>
     request<{ requests: OutboundReq[] }>(`/api/outbound-requests${productId ? `?productId=${encodeURIComponent(productId)}` : ""}`),
+  // 📨 내 문서 판 — **내가 만든 것만**(2026-08-31). 전역 목록을 소유로 좁히는 창구다.
+  listMine: () => request<{ requests: OutboundReq[]; scope?: ReqScope }>("/api/outbound-requests?mine=1"),
   setStatus: (id: string, status: string) =>
     request<{ ok: boolean }>(`/api/outbound-requests/${encodeURIComponent(id)}`, { method: "PATCH", body: { status } }),
 };

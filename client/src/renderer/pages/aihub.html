@@ -23,13 +23,27 @@
   .scr-id b{color:var(--text);font-weight:800;}
   /* 한눈에 띠 — 판 132px, 늘 보임 */
   .gh-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:0 0 auto;}
-  .gh-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 12px;height:138px;cursor:pointer;position:relative;overflow:hidden;}
+  /* 카드 언어(2026-08-31 사장님 「2번째 이미지로」) — 마크업(grouphub.js)은 7화면 공용이라
+     건드리지 않고 **이 화면의 CSS 사본만** 카드 꼴로 바꾼다(설계관 ④: 공용 부품을 고치면
+     7화면이 동시에 흔들린다). 값은 공용 골격 .g-scard와 같은 값을 쓴다.
+     ⚠ height 고정을 걷는다 — 138px+overflow:hidden이 넓은 폭에서 라벨을 잘라 먹던 뿌리다
+     (좁은 폭은 2026-08-31 미디어쿼리로 이미 풀렸고, 넓은 폭에만 남아 있었다). */
+  .gh-card{background:var(--g-surface-1,var(--panel));border:1px solid var(--g-border,var(--border));border-radius:var(--g-r,12px);
+    padding:0;min-height:132px;cursor:pointer;position:relative;overflow:hidden;display:flex;flex-direction:column;}
   .gh-card:hover{border-color:rgba(59,130,246,.5);}
   .gh-card.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
-  .gh-head{font-size:11.75px;font-weight:800;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;gap:6px;}
+  /* 머리 줄 — 제목 왼쪽, 배지 오른쪽. 카드 위 칸을 꽉 채우고 아래를 선으로 가른다. */
+  .gh-head{font-size:12.75px;font-weight:800;color:var(--g-text,var(--text));padding:7px 12px;margin:0;
+    border-bottom:1px solid var(--g-border,var(--border));display:flex;justify-content:space-between;gap:6px;align-items:center;}
+  .gh-body{padding:7px 12px;min-width:0;}
   .gh-badge{font-weight:800;font-size:11.5px;}
-  .gh-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;}
-  .gh-row b{color:var(--text);}
+  /* ★ 라벨 잘림의 **진짜 뿌리**(2026-08-31 검토관 [높음]으로 정정): 「베이스 모…」를 만드는 것은
+     고정 높이가 아니라 **라벨↔값 가로 배치**다. 카드 폭의 절반만 라벨에 주니 긴 이름이 말줄임
+     된다(2호 커밋의 「뿌리 제거」는 오진이었다 — 세로 클리핑은 「…」을 만들지 못한다).
+     ⇒ 대화창 카드(dc-kpi)와 같은 **라벨 위 / 값 아래** 스택으로 바꾼다 — 라벨이 카드 폭을
+     통째로 쓰므로 같은 글자가 잘리지 않는다. 좁은 폭에서만 접는 게 아니라 항상 그렇다. */
+  .gh-row{display:flex;flex-direction:column;gap:1px;font-size:12px;color:var(--muted);padding:3px 0;min-width:0;}
+  .gh-row b{color:var(--text);font-size:14px;font-weight:800;}
   .gh-bars{display:flex;align-items:flex-end;gap:10px;height:46px;margin:2px 2px 4px;overflow:hidden;}
   .gh-bcol{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:34px;}
   .gh-bv{font-size:11.5px;color:var(--muted);}
@@ -68,6 +82,7 @@
 <script src="dialog.js"></script>
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
+<script src="assetrules.js"></script>
 <script src="grouppanels.js"></script>
 <script src="grouphub.js"></script>
 <script src="gijomd.js"></script>

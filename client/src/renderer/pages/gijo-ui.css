@@ -29,6 +29,21 @@
   --g-border: rgba(255, 255, 255, 0.08);
   --g-border-strong: rgba(255, 255, 255, 0.16);
   --g-blue: #3b82f6;
+  /* 흰 글씨를 얹는 **채움**용 파랑. --g-blue(#3b82f6)는 테두리·글자색으로는 좋지만 흰 글씨를
+     얹으면 대비가 3.68:1로 WCAG AA(보통 글씨 4.5:1)에 못 미친다. 채움 자리만 갈라 5.17:1로
+     올린다(테두리·글자색 쓰임새는 안 건드린다).
+     ⚠ 못 미친 것은 **이 다크 기본값 하나**다. 1차본 주석은 「라이트에서 특히 읽기 힘들었다」고
+       적었는데 사실과 반대였다(2026-08-31 검토관 [높음]) — 실측: 프로 흰 셸 #1d4f91 = 8.14:1,
+       라이트 연초록 #2563EB = 5.17:1로 둘 다 이미 통과였다. 그래서 **테마 층에도 같은 이름으로
+       제 값을 둔다**(pro-white.css·lite-green.css) — 안 두면 이 다크 값이 밝은 테마의 고른
+       색을 덮어써, 고치려다 8.14:1을 5.17:1로 **떨어뜨린다.**
+     ★ 화면 파일(무접두 --blue 계열)도 **채움은 이 토큰을 쓴다** — 같은 색에 이름을 둘로 두면
+       세 파일에 정의가 여섯 벌이 되어 어긋난다(「같은 것을 여러 곳에 적으면 어긋난다」).
+       화면 쪽 표기는 `var(--g-blue-fill, var(--blue))`다 — gijo-ui.css를 nav.js가 **나중에**
+       주입하는 화면이 있어, 주입 전 한 순간 배경이 transparent(= 흰 글씨가 사라짐)가 되지
+       않도록 폴백을 둔다. */
+  --g-blue-fill: #2563eb;       /* 흰 글씨 대비 5.17:1 */
+  --g-blue-fill-hover: #1d4ed8; /* 흰 글씨 대비 6.70:1 */
   --g-blue-light: #5fa1ff;
   --g-teal: #1eb980;
   --g-amber: #f0a020;
@@ -71,8 +86,8 @@
 /* ── 버튼 ── */
 .g-btn { height: var(--g-btn-h); display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 var(--g-s4); border-radius: var(--g-r); font-size: var(--g-t-sm); font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: background .12s, border-color .12s, color .12s, transform .12s; white-space: nowrap; }
 .g-btn:active { transform: translateY(1px); }
-.g-btn.g-primary { background: var(--g-blue); color: #fff; }
-.g-btn.g-primary:hover { background: #3576e0; }
+.g-btn.g-primary { background: var(--g-blue-fill); color: #fff; }
+.g-btn.g-primary:hover { background: var(--g-blue-fill-hover); }
 .g-btn.g-ghost { background: transparent; border-color: var(--g-border-strong); color: var(--g-muted); }
 .g-btn.g-ghost:hover { color:var(--text-strong, #fff); border-color: var(--g-blue); }
 .g-btn.g-danger { background: rgba(226, 72, 61, 0.14); border-color: var(--g-red); color: var(--red-ink, #f5928a); }
@@ -416,3 +431,48 @@ body[data-screen="loganalysis"] .frow, .g-ui .erow { line-height: 1.45; }
 body.g-ui { word-break: keep-all; overflow-wrap: break-word; }
 .g-ui button, .g-ui .btn { white-space: nowrap; }
 .g-ui button.wrap-ok, .g-ui .btn.wrap-ok { white-space: normal; word-break: keep-all; text-align: left; }
+
+/* ══ 화면 카드 지표·보기 부품 (2026-08-31 사장님 「2번째 이미지로」) ═════════════════
+ *
+ * 사장님 지시: 실화면 캡처 두 장을 대비해 「이런 디자인들 다 **2번째 이미지**로 변경 가능할까?」
+ *   — 2번째가 대화창 현황 카드(chatparts.js .dc-card)다: 흰 카드 한 장 · 헤더 줄(제목+우측 조작칩)
+ *   · 라벨 위/값 아래 지표 · 얇은 행선 표. 1번째(지식 창고)는 잘린 라벨과 상자 안 상자였다.
+ *   이어서 「엑셀처럼」·「모든 메뉴도 동일하게」·「히트맵은 있었으면」.
+ *
+ * ■ 여기 있는 것은 **지표 줄·보기 전환 칩·히트맵 타일** 셋뿐이다(2026-08-31 검토관으로 축소):
+ *   처음엔 카드 겉껍데기(.g-scard/-h/-t/-a/-b)도 함께 넣었는데 **쓰는 화면이 0개**였다 —
+ *   화면들은 자기 .panel/.gh-card CSS를 카드 값으로 고쳐 쓰고 있었다(값 복제). 죽은 CSS를
+ *   남기면 다음 사람이 「이 부품을 쓰는 줄」 알고 헤매므로 걷었다. 겉껍데기가 정말 필요해지면
+ *   그때 **쓰는 화면과 함께** 다시 넣는다(부품만 먼저 만들지 않는다).
+ * ■ 왜 dc-card를 그대로 안 쓰나 — dc-*는 **대화창 안**을 전제로 rgba 리터럴을 쓰고
+ *   흰 테마는 pro-white가 선택자로 하나씩 덮어 성립한다. 화면에 그대로 옮기면 그 덮개가
+ *   안 따라온다. 여기서는 처음부터 **--g-* 토큰만** 쓴다(3테마가 이 이름으로 뒤집힌다).
+ * ■ 밀도는 이미 있는 것을 쓴다 — 표 셀 padding은 아래 「목록 밀도」 절이 정본이고,
+ *   행 30px·머리 26px도 .g-rows-*가 정본이다. 여기서 다시 정하지 않는다.
+ * ■ 좁은 폭(판 420px) 계약을 그대로 탄다 — 지표는 auto-fit으로 접히고 라벨은 말줄임.
+ * ⚠ 11px 하한(uireadability) — 이 절의 최소 글자는 11px다. 더 줄이지 말 것. */
+/* 지표 줄 — 라벨 위 / 값 아래. 좁아지면 열 수가 준다(고정 4열 금지 — 잘림의 뿌리였다). */
+.g-ui .g-scard-k { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  border-bottom: 1px solid var(--g-border); }
+.g-ui .g-scard-k > div { padding: 7px 12px; border-right: 1px solid var(--g-border); min-width: 0; }
+.g-ui .g-scard-k > div:last-child { border-right: 0; }
+.g-ui .g-scard-kl { font-size: 11.5px; color: var(--g-muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-ui .g-scard-kv { font-size: 15px; font-weight: 800; color: var(--g-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-ui .g-scard-kv.bad { color: var(--g-red); } .g-ui .g-scard-kv.warn { color: var(--g-amber); }
+.g-ui .g-scard-kv.ok { color: var(--g-teal); } .g-ui .g-scard-kv.muted { color: var(--g-muted-2); }
+/* 보기 전환 칩(목록|히트맵) — dc-seg와 같은 결이되 토큰으로. */
+.g-ui .g-seg { display: inline-flex; background: var(--g-surface-2); border: 1px solid var(--g-border-strong);
+  border-radius: 7px; padding: 2px; }
+.g-ui .g-seg span { font-size: 11px; font-weight: 800; color: var(--g-muted); padding: 2px 8px;
+  border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.g-ui .g-seg span.on { background: var(--g-blue-fill); color: #fff; }
+/* 히트맵 타일 — 좁아지면 열이 준다(시각 판은 말줄임이 아니라 반응형). */
+.g-ui .g-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; padding: 8px 10px; }
+.g-ui .g-tile { border: 1px solid var(--g-border-strong); border-radius: 8px; padding: 6px 8px; min-width: 0; }
+.g-ui .g-tile .tv { font-size: 11px; font-weight: 800; }
+.g-ui .g-tile .tl { font-size: 11.5px; color: var(--g-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-ui .g-tile .ts { font-size: 11px; color: var(--g-muted-2); }
+.g-ui .g-tile.bad { background: rgba(226, 72, 61, 0.18); } .g-ui .g-tile.warn { background: rgba(240, 160, 32, 0.16); }
+.g-ui .g-tile.ok { background: rgba(30, 185, 128, 0.14); } .g-ui .g-tile.muted { background: var(--g-surface-2); }
+/* 고른 타일 — 목록 행의 .sel과 같은 뜻(2026-08-31 검토관: 히트맵에선 어느 것을 골랐는지 안 보였다) */
+.g-ui .g-tile.sel { outline: 2px solid var(--g-blue); outline-offset: -2px; }

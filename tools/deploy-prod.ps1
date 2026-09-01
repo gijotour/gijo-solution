@@ -1,4 +1,4 @@
-# tools/deploy-prod.ps1 — 운영(WSL) 원클릭 배포. Mac에서 SSH로 원격 실행하는 용도.
+﻿# tools/deploy-prod.ps1 — 운영(WSL) 원클릭 배포. Mac에서 SSH로 원격 실행하는 용도.
 #   ssh user@10.8.0.1 "powershell -NoProfile -ExecutionPolicy Bypass -File 'd:/Connect AI/tools/deploy-prod.ps1'"
 #
 # 절차: hub pull(ff-only) → 서버 테스트 전체(실패 시 배포 중단) → WSL 동기화+빌드 → kill 재시작
@@ -9,6 +9,32 @@
 $ErrorActionPreference = "Stop"
 $repo = "D:\Connect AI"
 $distro = "Ubuntu-24.04"
+
+# ⚠⚠ **WSL 출력 읽기는 반드시 이 함수로.**
+#   PowerShell 5.1에서 출력이 0줄인 네이티브 명령의 결과는 문자열이 아니라 $null이고,
+#   이 스크립트는 위에서 $ErrorActionPreference="Stop"을 걸었다. 그래서 `(wsl …).Trim()`은
+#   **줄이 없을 때 그 자리에서 배포를 죽인다.**
+#   2026-09-01에 개발모드 표지 한 곳에서 이걸 겪었는데(끄라고 안내해 놓고 끄면 죽는 꼴),
+#   검토관이 **같은 함정이 다섯 곳 더** 있다고 짚었다 — 서비스 PID·프로세스 시작시각·
+#   dist 시각·문서 경로가 전부 「값이 없을 수 있는」 자리다.
+#   ⇒ 자리마다 try/catch를 흩뿌리지 않고 **읽는 길을 하나로** 만든다.
+function Read-WslLine {
+  param([Parameter(Mandatory)][string]$Command, [string]$Default = "")
+  try {
+    $raw = wsl -d $distro -- bash -c $Command
+    if ($null -eq $raw) { return $Default }
+    return ([string]$raw).Trim()
+  } catch { return $Default }
+}
+function Read-WslRaw {
+  param([Parameter(Mandatory)][string[]]$Args, [string]$Default = "")
+  try {
+    $raw = & wsl -d $distro -- @Args
+    if ($null -eq $raw) { return $Default }
+    return ([string]$raw).Trim()
+  } catch { return $Default }
+}
+
 $wslServer = "/home/gijo/gijo-as/server"
 
 function Step($name) { Write-Output ""; Write-Output "━━ $name ━━" }
@@ -44,8 +70,30 @@ if ($LASTEXITCODE -ne 0) { throw "WSL 동기화/빌드 실패 — 배포 중단 
 #   **옛 문서를 근거로 계속 답했다**(8월 7일판이 쓰이고 있었다). 사람이 기억해야만 맞는 구조였다.
 #   ⚠ 운영이 읽는 곳은 **env가 가리키는 한 곳뿐**이다(gijo-as.env의 GIJO_DOCS_DIR).
 #      다른 폴더에 복사하면 조용히 옛 문서가 계속 쓰인다 — 그래서 env를 읽어 그 자리에 넣는다.
+# 🔓 개발 모드 표지 — **배포할 때마다 눈에 띄게 말한다**(2026-09-01 완결성 비평 [중]).
+#   자가 진단에 항목을 만들어 뒀지만 그건 **사람이 그 화면을 열어야** 보인다. 되돌리는 걸 잊는
+#   사고는 「아무도 안 봐서」 나므로, 사람이 반드시 지나가는 **배포 순간**에 말한다.
+#   ⚠ 여기서 배포를 막지는 않는다 — 개발 기간에는 일부러 켜 둔 값이라 막으면 매번 걸린다.
+#     끄는 시점은 사장님 결정이고, 이 표지는 **잊지 말라는 알림**이다.
+# ⚠⚠ **줄이 없을 때 죽지 않게** 한다(2026-09-01 재검토 [상]).
+#   이 스크립트는 위에서 $ErrorActionPreference="Stop"을 건다. GIJO_DEV_MODE 줄이 env에 없으면
+#   grep이 아무것도 안 뱉고, PowerShell 5.1에서 출력 0줄인 네이티브 명령의 결과는 $null이다.
+#   $null.Trim()은 던지고, Stop이라 배포가 **거기서 멈춘다** — 문서 동기화·서버 재시작·health가
+#   전부 안 돈다. 하필 이 표지가 스스로 권하는 「그 줄을 지우고 재시작하세요」를 따르는 순간
+#   배포가 깨진다. **끄라고 해 놓고 끄면 벌주는** 꼴이었다.
+$devMode = Read-WslLine "grep -m1 '^GIJO_DEV_MODE=' /home/gijo/gijo-as/gijo-as.env | cut -d= -f2"
+if ($devMode -eq "1") {
+  Write-Output ""
+  Write-Output "  ⚠⚠  개발 모드가 켜져 있습니다(GIJO_DEV_MODE=1) — 업무정보 등급(기밀·민감)"
+  Write-Output "       열람 제한이 **꺼진 채** 운영이 돕니다. 개발 기간 조치라면 그대로 두시고,"
+  Write-Output "       출하·파일럿 전에는 gijo-as.env에서 그 줄을 지우고 재시작하세요."
+  Write-Output ""
+} else {
+  Write-Output "개발 모드: 꺼짐 (등급 열람 제한 정상)"
+}
+
 Step "3.5/5 제품 문서 동기화 (docs-manifest 열거분)"
-$docsDir = (wsl -d $distro -- bash -c "grep -m1 '^GIJO_DOCS_DIR=' /home/gijo/gijo-as/gijo-as.env | cut -d= -f2").Trim()
+$docsDir = Read-WslLine "grep -m1 '^GIJO_DOCS_DIR=' /home/gijo/gijo-as/gijo-as.env | cut -d= -f2"
 if (-not $docsDir) { $docsDir = "$wslServer/docs" }
 Write-Output "운영 문서 위치: $docsDir"
 # ⚠ 매니페스트도 함께 옮긴다 — 새 문서를 목록에 더해도 운영 매니페스트가 옛것이면
@@ -75,7 +123,7 @@ if ($문서없음.Count -gt 0) { Write-Warning "리포지토리에 없는 문서
 
 Step "4/5 운영 프로세스 재시작 (systemd Restart=always)"
 # grep/awk 파이프는 셸 경유 인용 문제로 빈 결과가 나는 함정(2026-07-24 실측) — systemd MainPID 직접 조회.
-$pid = (wsl -d $distro -- systemctl show gijo-as.service -p MainPID --value).Trim()
+$pid = Read-WslRaw @("systemctl","show","gijo-as.service","-p","MainPID","--value")
 if ($pid -and $pid -ne "0") {
   wsl -d $distro -- kill $pid
   Write-Output "killed $pid"
@@ -102,13 +150,13 @@ foreach ($i in 1..12) {
 }
 if (-not $ok) { throw "health 실패 — 운영 서버가 60초 내에 응답하지 않음. WSL 로그 확인 필요." }
 
-$after_pid = (wsl -d $distro -- systemctl show gijo-as.service -p MainPID --value).Trim()
+$after_pid = Read-WslRaw @("systemctl","show","gijo-as.service","-p","MainPID","--value")
 if (-not $after_pid -or $after_pid -eq "0") { throw "재시작 확인 실패 — MainPID가 비어 있다(서비스가 안 떴다). health 200은 다른 프로세스가 답했을 수 있다." }
 if ($before -and $before -ne "0" -and $after_pid -eq $before) {
   throw "재시작 확인 실패 — PID가 $before 그대로다. **옛 프로세스가 health에 답하고 있다.** 새 코드가 안 올라갔다."
 }
-$started = (wsl -d $distro -- bash -c "ps -o lstart= -p $after_pid").Trim()
-$built = (wsl -d $distro -- bash -c "stat -c '%y' /home/gijo/gijo-as/server/dist/index.js").Trim()
+$started = Read-WslLine "ps -o lstart= -p $after_pid"
+$built = Read-WslLine "stat -c '%y' /home/gijo/gijo-as/server/dist/index.js"
 Write-Output "PID $before → $after_pid"
 Write-Output "  프로세스 기동: $started"
 Write-Output "  dist 빌드    : $built   ← 기동이 빌드보다 뒤여야 새 코드다"

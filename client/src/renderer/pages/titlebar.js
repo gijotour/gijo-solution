@@ -49,7 +49,7 @@
     ".gtb-menu-panel .mp-i:hover{background:rgba(59,130,246,.12);color:#fff;}" /* .gtb-menu-panel 고정 어두운 판 안 */,
     ".gtb-userarea .ua-upd{display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:var(--amber, #f0a020);padding:3px 9px;border-radius:14px;font-size:12px;font-weight:800;cursor:pointer;align-self:flex-start;}",
     ".gtb-userarea .ua-row{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;}",
-    ".gtb-userarea .ua-avatar{width:22px;height:22px;border-radius:50%;background:var(--blue,#3b82f6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.25px;font-weight:800;flex:0 0 auto;}",
+    ".gtb-userarea .ua-avatar{width:22px;height:22px;border-radius:50%;background:var(--g-blue-fill, var(--blue,#3b82f6));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.25px;font-weight:800;flex:0 0 auto;}",
     ".gtb-userarea .ua-name{flex:1;font-size:12.5px;font-weight:700;color:var(--text-strong, #dfe6ff);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
     // ⚙ 드롭다운(공통 — 위/아래 방향은 JS가 지정)
     ".gtb-menu{position:fixed;width:268px;background:#35342f;border:1px solid rgba(255,255,255,.16);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);padding:8px;z-index:990;font-size:12.5px;-webkit-app-region:no-drag;}",
@@ -103,6 +103,12 @@
     // 찾기 결과의 아이콘 — 왼쪽 메뉴와 같은 단선 SVG(2026-08-05).
     ".gtb-fi{flex:0 0 auto;width:15px;height:15px;display:flex;align-items:center;justify-content:center;}",
     ".gtb-fi svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.7;}",
+    ".gtb-fgroups{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:4px 8px 8px;border-bottom:1px solid var(--border,rgba(255,255,255,.10));margin-bottom:4px;}",
+    ".gtb-fgl{font-size:11.5px;color:var(--muted-2,#a49d95);margin-right:2px;}",
+    ".gtb-fgb{font:inherit;font-size:12px;line-height:1.2;white-space:nowrap;padding:4px 9px;border-radius:999px;cursor:pointer;background:var(--panel-2,rgba(255,255,255,.06));color:var(--text,#e9e7e2);border:1px solid var(--border,rgba(255,255,255,.12));}",
+    ".gtb-fgb:hover{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.42);}",
+    ".gtb-fask{padding:9px 12px;margin:2px 6px 6px;border-radius:8px;font-size:12.5px;cursor:pointer;color:var(--text,#e9e7e2);background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.34);}",
+    ".gtb-fask:hover{background:rgba(59,130,246,.24);}",
     ".gtb-fnone{padding:16px;font-size:13px;color:var(--muted-2,#a49d95);text-align:center;}",
     ".gtb-fhint{padding:7px 12px;border-top:1px solid var(--border,rgba(255,255,255,.10));font-size:12px;color:var(--muted-2,#a49d95);display:flex;gap:14px;}",
   ].join("");
@@ -684,7 +690,10 @@
     pal.className = "gtb-fpal";
     var inp = document.createElement("input");
     inp.type = "text";
-    inp.placeholder = "화면 이름을 적으세요 — 예: 취약점, 자산, 기록";
+    // 🧭 0-5 길찾기 문구(2026-08-31) — 옛 문구는 「화면 이름을 적으세요」라 **사용자가 모르는
+    //   것을 요구했다**(이름을 알면 애초에 안 헤맨다). 묶음 이름으로도 찾힌다는 사실이
+    //   이미 코드에 있는데(아래 filter가 i.group도 본다) 어디에도 안 적혀 있었다.
+    inp.placeholder = "찾을 화면 · 묶음 이름 (예: 취약점, 내 문서, 설정)";
     inp.setAttribute("aria-label", "화면 찾기");
     inp.autocomplete = "off"; inp.spellcheck = false;
     var list = document.createElement("div"); list.className = "fl";
@@ -698,8 +707,18 @@
     var 걸린것 = [], 고른것 = 0;
     function 그리기() {
       var q = inp.value.trim().toLowerCase();
-      걸린것 = q ? 목록.filter(function (i) { return (i.label || "").toLowerCase().indexOf(q) >= 0 || (i.group || "").toLowerCase().indexOf(q) >= 0; })
-                 : 목록.slice(0, 12);
+      // 🧭 친 말이 **묶음 이름과 꼭 같으면 그 묶음만** 본다(2026-08-31 검토관 [낮음]).
+      //   칩을 누르면 그 묶음 이름이 그대로 들어가므로, 「누르면 그 묶음만 남는다」는 약속이
+      //   이 갈래로 참이 된다. 옛 판은 낱말 겹침으로 딴 묶음 화면이 섞였다(「설정」을 누르면
+      //   ③의 「보안설정 점검」이 함께 남아, 칩이 묶음이 아니라 검색어처럼 굴었다).
+      var 묶음이름 = (window.gijoNavGroups || []).map(function (g) {
+        return String(g.label || "").replace(/^[①②③④⑤]\s*/, "").replace(/^[^가-힣A-Za-z0-9]+/, "").trim().toLowerCase();
+      });
+      var 묶음골랐나 = q && 묶음이름.indexOf(q) >= 0;
+      걸린것 = !q ? 목록.slice(0, 12)
+        : 묶음골랐나
+          ? 목록.filter(function (i) { return (i.group || "").toLowerCase().indexOf(q) >= 0; })
+          : 목록.filter(function (i) { return (i.label || "").toLowerCase().indexOf(q) >= 0 || (i.group || "").toLowerCase().indexOf(q) >= 0; });
       고른것 = 0;
       list.innerHTML = "";
       // 최근 지시 5(승인 시안 도킹 묶음, 프로 전용) — 빈 검색일 때만 맨 위에. 화면 항목과
@@ -727,11 +746,45 @@
           }
         } catch (e) { /* 최근 목록이 깨져도 팔레트는 돈다 */ }
       }
+      // 🧭 빈 검색 = 「무엇이 있는지 모르겠다」는 뜻. 묶음 다섯을 **누를 수 있게** 보여
+      //   준다(치면 그 묶음만 남는다 — 위 filter의 i.group 경로 그대로).
+      if (!q && window.gijoNavGroups) {
+        var gb = document.createElement("div");
+        gb.className = "gtb-fgroups";
+        gb.innerHTML = '<span class="gtb-fgl">묶음</span>';
+        window.gijoNavGroups.forEach(function (g) {
+          var 이름 = String(g.label || "").replace(/^[①②③④⑤]\s*/, "");
+          var b = document.createElement("button");
+          b.type = "button"; b.className = "gtb-fgb"; b.textContent = 이름;
+          b.addEventListener("click", function () {
+            inp.value = 이름.replace(/^[^가-힣A-Za-z0-9]+/, "").trim();
+            그리기(); inp.focus();
+          });
+          gb.appendChild(b);
+        });
+        list.appendChild(gb);
+      }
       if (!걸린것.length) {
         var none = document.createElement("div");
         none.className = "gtb-fnone";
-        none.textContent = "'" + inp.value.trim() + "'에 맞는 화면이 없습니다.";
+        var 물음 = inp.value.trim();
+        none.textContent = "'" + 물음 + "'에 맞는 화면이 없습니다.";
         list.appendChild(none);
+        // 🧭 옛 판은 여기서 **막다른 골목**이었다 — 화면이 없다는 말만 하고 끝났다. 이 제품에서
+        //   답은 화면에만 있지 않으니, 친 말을 그대로 대화창에 넘기는 길을 낸다(위 「최근 지시」와
+        //   같은 통로 gijoConsole.ask). 대화창이 없는 판(표준)에서는 안 붙인다 — 없는 곳으로
+        //   보내겠다고 말하는 것이 안 되는 것보다 나쁘다.
+        if (물음 && document.body.classList.contains("pro-shell") &&
+            window.gijoConsole && window.gijoConsole.ask) {
+          var toc = document.createElement("div");
+          toc.className = "gtb-fask";
+          toc.textContent = "💬 대화창에 「" + 물음 + "」 물어보기";
+          toc.addEventListener("click", function () {
+            closeFinder();
+            window.gijoConsole.ask(물음);
+          });
+          list.appendChild(toc);
+        }
         return;
       }
       걸린것.forEach(function (it, n) {
@@ -740,7 +793,7 @@
         // 아이콘은 nav.js의 ICON 표 하나에서 온다(2026-08-05) — 여기서 따로 그리면 갈라진다.
         var 아이콘 = (window.gijoIconMarkup && it.icon) ? window.gijoIconMarkup(it.icon) : "";
         r.innerHTML = '<span class="gtb-fi">' + (아이콘 || "▪") + "</span><span>" + it.label + "</span>" +
-                      (it.group ? '<span class="fg">' + it.group + "</span>" : "");
+                      (it.group ? '<span class="fg">' + String(it.group).replace(/^[①②③④⑤]\s*/, "") + "</span>" : "");
         r.addEventListener("click", function () { closeFinder(); window.gijoOpenScreen(it); });
         list.appendChild(r);
       });
@@ -748,8 +801,13 @@
     function 고르기(d) {
       if (!걸린것.length) return;
       고른것 = Math.min(걸린것.length - 1, Math.max(0, 고른것 + d));
-      [].forEach.call(list.children, function (el, n) { el.classList.toggle("on", n === 고른것); });
-      var on = list.children[고른것];
+      // ⚠ **list.children이 아니라 결과 줄(.gtb-fr)만 센다**(2026-08-31 검토관 [높음] 3갈래 동시).
+      //   목록에는 결과가 아닌 블록이 섞인다 — 「🕘 최근 지시」(옛날부터)와 「묶음」 칩(오늘).
+      //   children 번호로 세면 **강조된 줄과 Enter가 여는 화면이 어긋난다**(최근 지시가 있는
+      //   프로 셸에서는 오늘 이전에도 이미 어긋나 있었다 — 칩이 그걸 상시화했을 뿐이다).
+      var 줄 = list.querySelectorAll(".gtb-fr");
+      [].forEach.call(줄, function (el, n) { el.classList.toggle("on", n === 고른것); });
+      var on = 줄[고른것];
       if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
     }
     // ⚠ 한글은 ㅎ→하→한처럼 **조합 중**에도 input이 뜬다. 목록만 다시 그리고 입력칸은
@@ -762,7 +820,11 @@
         if (e.isComposing) return; // 한글 조합 확정용 Enter를 '열기'로 삼으면 엉뚱한 화면이 열린다
         e.preventDefault();
         var it = 걸린것[고른것];
-        if (it) { closeFinder(); window.gijoOpenScreen(it); }
+        if (it) { closeFinder(); window.gijoOpenScreen(it); return; }
+        // 결과가 없으면 **Enter가 탈출로를 탄다**(2026-08-31 검토관) — 마우스로만 되면
+        // 이름을 치고 Enter를 누르는 사람에겐 여전히 「아무 반응 없음」이다.
+        var 탈출 = list.querySelector(".gtb-fask");
+        if (탈출) 탈출.click();
       } else if (e.key === "Escape") { e.preventDefault(); closeFinder(); }
     });
     finderEl.addEventListener("click", function (e) { if (e.target === finderEl) closeFinder(); });

@@ -10,6 +10,9 @@ import { llamaBinPath } from "../util/llamabin";
 import { gpuMemoryReport } from "../util/unifiedmem";
 import { usingDefaultCredential } from "../auth/users";
 import { dbCryptStatus } from "./dbcrypt";
+// 개발 모드 판정은 **원천 한 곳**에서만 읽는다(util/devmode) — 자리마다 env를 직접 읽으면
+// 어느 곳은 켜졌다고, 어느 곳은 꺼졌다고 말하는 날이 온다.
+import { 개발모드 } from "../util/devmode";
 
 export interface PreflightCheck {
   name: string;
@@ -106,6 +109,24 @@ export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready:
     });
   } catch (e) {
     checks.push({ name: "저장 암호화", status: "warn", detail: "상태 확인 실패: " + (e as Error).message });
+  }
+
+  // 🔓 개발 모드 — **출하 전에 반드시 되돌릴 것**을 잊지 않게 하는 항목(2026-09-01 신설).
+  //   GIJO_DEV_MODE=1이면 업무정보 등급(기밀·민감) 열람 제한이 통째로 꺼진다(grades.ts).
+  //   ⚠ **fail로 둔다.** 저장 암호화(warn)는 「안 켰다」는 선택이지만, 개발 모드는 **제품이
+  //     스스로 규칙을 끈 상태**라 그대로 출하되면 통제 없는 제품이 나간다.
+  //   ⚠ 끄는 것은 사장님 결정이다 — 이 항목은 **끄라는 명령이 아니라 잊지 말라는 표지**다.
+  try {
+    const 개발 = 개발모드();
+    checks.push({
+      name: "개발 모드",
+      status: 개발 ? "fail" : "pass",
+      detail: 개발
+        ? "켜짐 — **업무정보 등급(기밀·민감) 열람 제한이 꺼져 있습니다.** 개발 동안 일부러 푼 것이라면 그대로 두시고, **출하 전에는 반드시** gijo-as.env의 GIJO_DEV_MODE 줄을 지우고 재시작하세요."
+        : "꺼짐 — 등급 열람 제한이 정상 작동합니다",
+    });
+  } catch (e) {
+    checks.push({ name: "개발 모드", status: "fail", detail: "상태 확인 실패(모호하면 막는다): " + (e as Error).message });
   }
 
   // 데이터 디렉토리 쓰기 가능

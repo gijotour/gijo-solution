@@ -23,6 +23,8 @@ import { projectHardeningEvents } from "./analysishub";
 import {
   runHardeningScan,
   runnerFor,
+  원격점검인가,
+  감사대상글,
   probeTarget,
   scanSummaryText,
   isStandard,
@@ -130,7 +132,14 @@ function lastRunFail(targetId: string, standard: string): number | null {
 // run: 테스트에서 실 셸 대신 결정적 러너를 주입할 때 쓴다(미지정 시 대상에 맞는 실제 러너).
 export async function runScanForTarget(target: HardeningTarget, standard: StandardId, source: Source, actor = "system", run?: RunFn) {
   const prevFail = lastRunFail(target.id, standard); // 알림 판단용(이력 저장 전 값)
-  const report = await runHardeningScan({ standard, target: target.label, run: run ?? runnerFor(target, standard) });
+  // ⚠ 러너와 리포트 문구가 **같은 원천**(원격점검인가)을 쓴다 — 갈리면 안 붙은 장비를
+  //   「붙어서 실측했다」고 적는다. run을 밖에서 넣어 준 경우(시험 등)는 그 뜻을 존중한다.
+  const report = await runHardeningScan({
+    standard,
+    target: target.label,
+    run: run ?? runnerFor(target, standard),
+    ranOn: 원격점검인가(target) ? "remote" : "self",
+  });
   const s = report.summary;
   db.prepare(
     `INSERT INTO hardening_runs (id, targetId, targetLabel, standard, at, rate, pass, fail, warn, na, source, summary)
@@ -142,18 +151,32 @@ export async function runScanForTarget(target: HardeningTarget, standard: Standa
   recordAudit({
     kind: "cli", actor,
     action: `하드닝 정기점검 (${standard.toUpperCase()}·${source})`,
-    target: target.label,
+    // ⚠ 감사 기록은 리포트 본문과 **같은 사실**을 말해야 한다 — 로컬로 등록된 대상은
+    //   장비에 붙지 않았는데 장비 이름만 남기면 「그 장비를 점검했다」는 증적이 된다.
+    target: 감사대상글(report),
     detail: `준수율 ${s.rate}% · 취약 ${s.fail} · 확인필요 ${s.warn}`,
     result: "ok",
   });
-  // 취약·확인필요 항목을 통합 관제(보안 분석) 4번째 소스로 투영 — 장비명으로 취약점·로그와 상관·조치 흐름 연결.
-  projectHardeningEvents(target.id, target.label, standard, report.items);
+  // 취약·확인필요 항목을 통합 관제(보안 분석) 4번째 소스로 투영.
+  // ⚠⚠ **entity는 상관분석 키다 — 문장을 넣으면 안 된다**(2026-09-01 3차 검토 [중]).
+  //   「점검한 곳을 사실대로」를 고치면서 여기에 감사대상글()을 넣었는데, 그건 사람이 읽는
+  //   **문장**이라 「같은 entity가 두 소스에 나타나면 상관」이라는 이 표의 뼈대를 깨뜨린다
+  //   (analysishub.ts:38·71). 고치려다 로컬 대상을 상관·공격경로에서 통째로 떨어뜨릴 뻔했다.
+  //   → 키는 **안정된 짧은 이름**으로 두되, 로컬은 장비 이름을 **쓰지 않는다** —
+  //     붙지도 않은 장비 이름을 키로 두면 그 장비의 취약점·로그와 잘못 묶인다.
+  //     사람이 볼 이름표는 리포트·감사 기록이 이미 정직하게 담고 있다.
+  projectHardeningEvents(
+    target.id,
+    원격점검인가(target) ? target.label : "이 서버(자체 점검)",
+    standard,
+    report.items,
+  );
   // 악화 알림 — 직전 대비 취약 건수가 늘면 별도 감사 항목으로 눈에 띄게 남긴다.
   if (prevFail !== null && s.fail > prevFail) {
     recordAudit({
       kind: "config", actor: "scheduler",
       action: `⚠ 하드닝 준수율 악화 감지 (${standard.toUpperCase()})`,
-      target: target.label,
+      target: 감사대상글(report),
       detail: `취약 ${prevFail} → ${s.fail}건 (준수율 ${s.rate}%)`,
       result: "error",
     });
@@ -174,9 +197,16 @@ export interface ScheduleRow {
   lastRunAt: number | null; nextRunAt: number; lastRate: number | null; lastFail: number | null;
   lastResult: string | null; lastError: string | null; createdAt: number;
 }
-export function listSchedules(): (ScheduleRow & { targetLabel: string })[] {
+export function listSchedules(): (ScheduleRow & { targetLabel: string; 원격: boolean })[] {
   const rows = db.prepare("SELECT * FROM hardening_schedules ORDER BY createdAt").all() as ScheduleRow[];
-  return rows.map((r) => ({ ...r, targetLabel: getTarget(r.targetId)?.label ?? "(삭제된 대상)" }));
+  // ⚠ **원격인지 여기서 함께 준다**(2026-09-01 3차 검토 [중]). 「점검한 곳」을 사실대로 적는
+  //   수리를 여섯 곳에 했는데 **일곱 번째**인 스케줄 조회가 남아, 로컬로 등록한 대상의
+  //   스케줄도 「원격 정기점검」이라 말하고 장비 이름만 보여 줬다.
+  //   소비자가 각자 짐작하게 두면 또 갈린다 — 원천(원격점검인가)을 여기서 한 번 태운다.
+  return rows.map((r) => {
+    const t = getTarget(r.targetId);
+    return { ...r, targetLabel: t?.label ?? "(삭제된 대상)", 원격: t ? 원격점검인가(t) : false };
+  });
 }
 export function createSchedule(targetId: string, standard: StandardId, intervalHours: number): ScheduleRow {
   const id = `sch-${randomUUID().slice(0, 8)}`;

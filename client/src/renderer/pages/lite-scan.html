@@ -68,12 +68,16 @@
     <div class="sub">기준을 고르고 눌러 주세요. 읽기만 하고 아무것도 바꾸지 않습니다.</div>
     <div class="row"><span class="k">기준</span><select id="std" style="flex:1"></select></div>
     <div class="row"><span class="k">대상</span>
-      <input id="target" type="text" placeholder="비우면 이 PC — 다른 장비면 주소 하나만 적으세요">
+      <!-- ⚠ **원격 점검을 약속하지 않는다**(2026-09-01). 옛 문구는 「다른 장비면 주소 하나만
+           적으세요」였는데, 서버는 등록 장비가 아니면 **그 주소를 버리고 이 서버를 점검한다**.
+           그 결과가 문서로 저장돼 증적으로 굳으므로 거짓이 오래 남는다. 이제 서버가 「점검한
+           곳」을 정직하게 적으니(hardeningscan ranOn), 여기서도 이름표라는 사실을 밝힌다. -->
+      <input id="target" type="text" placeholder="이 PC를 점검합니다 — 적으신 이름은 보고서 이름표로만 씁니다">
       <button class="go" id="go">점검 시작</button>
     </div>
     <div id="msg"></div>
     <div class="res" id="res"></div>
-    <div class="guard">⚠ <b>대역 스캔은 없습니다.</b> 이 화면은 <b>이 PC</b>나 <b>내가 직접 적은 대상 하나</b>만 점검합니다 —
+    <div class="guard">⚠ <b>대역 스캔은 없습니다.</b> 이 화면은 <b>이 PC</b>만 점검합니다 — 적으신 이름은 보고서 이름표로만 씁니다.
       「10.0.0.0/24」처럼 범위를 적는 칸을 일부러 두지 않았습니다.
       <b>허가 없는 사내망 스캔은 사고입니다</b>(사장님 결정 2026-08-12).</div>
   </section>
@@ -148,9 +152,17 @@
 
   // ⚠ 범위처럼 보이는 입력은 **받지 않는다.** 화면에 칸이 없다는 것만으로는 부족하다 —
   //   손으로 「10.0.0.0/24」를 적어 넣을 수 있기 때문이다. 여기서 한 번 더 막는다.
+  // ⚠⚠ **띄어쓰기·붙임표는 더 이상 막지 않는다**(2026-09-01 3차 검토 [중]).
+  //   이 칸이 점검 대상이던 시절엔 공백이 「여러 대상」을 뜻할 수 있어 막았는데, 지금은
+  //   **보고서 이름표**일 뿐이라 「서버실 1번」·「회계팀 PC」·「web-01」 같은 평범한 이름이
+  //   「대역 스캔」으로 거절당했다. 막아야 할 것은 **범위 꼴**이지 이름 속 공백이 아니다.
   function 대역인가(t) {
     var s = String(t || "").trim();
-    return /\/\d{1,2}\s*$/.test(s) || /[-,]/.test(s) || /\*/.test(s) || /\s/.test(s);
+    if (/\/\d{1,2}\s*$/.test(s)) return true;            // 10.0.0.0/24
+    if (/\*/.test(s)) return true;                        // 10.0.0.*
+    if (/\d+\s*[-~]\s*\d+\s*$/.test(s)) return true;      // 10.0.0.1-50
+    if (/\d+\.\d+[^,]*,\s*\d+\.\d+/.test(s)) return true; // 여러 IP를 쉼표로
+    return false;
   }
 
   async function 기준목록() {
@@ -177,11 +189,17 @@
       return;
     }
     btn.disabled = true; res.textContent = "";
-    msg.innerHTML = '<div class="empty">점검 중입니다 — 장비에 붙어 실제로 확인하므로 <b>수십 초</b> 걸릴 수 있습니다.</div>';
+    msg.innerHTML = '<div class="empty">점검 중입니다 — <b>이 PC의 설정을 하나씩 실제로 읽으므로</b> 수십 초 걸릴 수 있습니다.</div>';
     try {
       var r = await g.hardeningScan(std, target || undefined);
-      마지막 = { std: std, target: target || "이 PC", at: new Date(), markdown: r.markdown || "", summary: r.summary || "" };
       var rep = r.report || {};
+      // ⚠ 붙지도 않은 장비를 「대상」으로 적어 두면 그것이 증적이 된다.
+      마지막 = {
+        std: std,
+        이름표: target || "",
+        원격: rep.ranOn === "remote",
+        at: new Date(), markdown: r.markdown || "", summary: r.summary || "",
+      };
       msg.innerHTML = '<div class="ok">끝났습니다 — ' + esc(r.summary || "") + "</div>" +
         '<div class="row" style="padding-top:4px">' +
           '<span class="pill on">양호 ' + esc(rep.pass ?? "?") + "</span> " +
@@ -193,7 +211,7 @@
       // ⚠ 「점검 실패」로 뭉뚱그리지 않는다 — 라이트에서 가장 흔한 원인은 **기준과 기계가 다른 것**이다.
       msg.innerHTML = '<div class="err">' + 오류문구(e, "점검") + "</div>" +
         '<div class="empty">기준이 이 기계와 안 맞으면 붙지 못합니다 — Windows PC 기준을 macOS·리눅스에 돌리면 그렇습니다. ' +
-        "기준을 바꿔 보시거나, 다른 장비 주소를 적어 보세요.</div>";
+        "기준을 바꿔 보시거나, 잠시 뒤 다시 해 보세요.</div>";  // ⚠ 「다른 장비 주소를 적어 보세요」였다 — 이 화면은 이 PC만 점검한다(2026-09-01 3차 검토)
     }
     btn.disabled = false;
     이력();
@@ -215,7 +233,14 @@
     btn.disabled = true;
     try {
       var 이름 = "점검결과_" + 마지막.std + "_" + 마지막.at.toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".md";
-      var 본문 = "# 보안 설정 점검 결과\n\n- 기준: " + 마지막.std + "\n- 대상: " + 마지막.target +
+      // ⚠ 점검한 곳과 사람이 적은 이름표를 **가른다** — 화면 문구만 고치고 저장본을 안 고치면
+      //   반쪽 수리다. 문서는 화면보다 오래 남고 감사 때 그것부터 본다(2026-09-01 검토관 [상]).
+      var 대상글 = 마지막.원격
+        ? 마지막.이름표
+        : "이 PC" + (마지막.이름표 ? " (적은 이름표: " + 마지막.이름표 + ")" : "");
+      var 본문 = "# 보안 설정 점검 결과\n\n- 기준: " + 마지막.std +
+                 "\n- 대상: " + 대상글 +
+                 "\n- 점검 방식: " + (마지막.원격 ? "장비에 접속해 실 명령 실행" : "이 PC의 설정을 읽어 점검") +
                  "\n- 시각: " + 마지막.at.toLocaleString("ko-KR") + "\n\n" + 마지막.markdown;
       var 결과 = await g.ingestMemoryFile(이름, 글을base64로(본문), "global");
       try { await g.setDocCategory(이름, "장비운영"); } catch (e2) { /* 분류 실패는 아래에서 알린다 */ }

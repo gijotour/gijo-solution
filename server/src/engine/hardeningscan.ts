@@ -50,6 +50,12 @@ export interface ScanReport {
   standard: StandardId;
   standardLabel: string;
   target: string;
+  /** **어디서 돌았나** — 라벨(target)이 아니라 실제로 명령을 실행한 곳이다.
+   *  "self" = 이 서버 자신 · "remote" = 등록 장비에 붙어서.
+   *  ⚠ 이 칸이 생기기 전에는 표기가 target을 보고 「원격 점검」이라 **단정**했다 —
+   *    라벨만 받고 러너는 로컬인 경로에서 **점검하지 않은 장비를 점검했다고** 적었다
+   *    (2026-09-01). 증적으로 저장되는 글이라 거짓이 굳는다. */
+  ranOn: "self" | "remote";
   startedAt: string;
   durationMs: number;
   items: CheckResult[];
@@ -583,10 +589,21 @@ export function defaultRunnerFor(standard: StandardId): RunFn {
   return STANDARDS[standard].shell === "windows" ? winHostRunner : hostRunner;
 }
 
+/**
+ * 이 대상을 **정말 원격으로** 점검하는가 — 러너 선택과 리포트 문구가 **같은 답**을 쓰게 하는 원천.
+ *
+ * ⚠ 왜 함수로 뺐나(2026-09-01 검토관 [상]): 리포트가 「러너를 받았는가」로 원격을 판정했는데,
+ *   authMethod="local" 대상도 runnerFor가 **로컬 러너를 돌려주어** opts.run이 채워진다.
+ *   그래서 접속조차 안 한 점검이 「장비 CLI 원격 점검(등록 장비에 붙어 실 명령 실행·실측)」으로
+ *   기록됐다 — 하루 전 커밋이 없애려던 바로 그 거짓이 반쪽만 지워져 있었다.
+ */
+export function 원격점검인가(t: HardeningTarget): boolean {
+  return !(t.authMethod === "local" || t.host === "local");
+}
+
 // 대상×표준에 맞는 러너 — 원격(ssh)이면 SSH, 로컬이면 표준별 기본 러너.
 export function runnerFor(t: HardeningTarget, standard: StandardId): RunFn {
-  if (t.authMethod === "local" || t.host === "local") return defaultRunnerFor(standard);
-  return targetRunner(t);
+  return 원격점검인가(t) ? targetRunner(t) : defaultRunnerFor(standard);
 }
 
 export function listChecklists() {
@@ -602,8 +619,26 @@ function verdictOf(fail: number): string {
   return fail === 0 ? "🟢 양호" : fail <= 2 ? "🟡 보통(취약 항목 조치 필요)" : "🔴 미흡(다수 취약)";
 }
 
-export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn; skipWorkLog?: boolean }): Promise<ScanReport> {
+/**
+ * 감사 기록·작업 원장에 적을 **대상 이름** — 리포트 본문과 **같은 사실**을 말하게 하는 원천.
+ *
+ * ⚠ 왜 함수인가(2026-09-01 완결성 비평 [상]): 리포트 본문만 「이 서버 자신을 점검」으로 고치고
+ *   **감사 기록은 여전히 사람이 적은 장비 이름을 그대로** 남겼다. 증적은 리포트보다 오래 남고
+ *   감사 때 그것부터 본다 — 본문과 증적이 다른 말을 하면 증적 쪽이 이긴다.
+ *   붙지도 않은 장비를 「대상」으로 적어 두는 것은 이 제품에서 가장 나쁜 종류의 기록이다.
+ */
+export function 감사대상글(r: Pick<ScanReport, "target" | "ranOn">): string {
+  return r.ranOn === "remote" ? r.target : `이 서버 자신(적힌 이름표: ${r.target})`;
+}
+
+export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn; ranOn?: "self" | "remote"; skipWorkLog?: boolean }): Promise<ScanReport> {
   const std = STANDARDS[opts.standard];
+  // ⚠⚠ **「러너를 받았는가」로는 못 가린다**(2026-09-01 검토관 [상]이 잡은 반쪽 수정).
+  //   runnerFor는 authMethod="local" 대상에도 **로컬 러너**를 돌려주므로 opts.run이 채워진다.
+  //   그러면 접속도 안 한 점검이 「원격 점검」으로 기록됐다.
+  //   → 아는 쪽(부르는 곳)이 말한다. **안 말하면 self다** — 모호할 때 「장비에 붙어 실측했다」고
+  //     말하는 것이 이 리포트에서 가장 나쁜 거짓이라, 모르면 **덜 주장하는 쪽**으로 떨어뜨린다.
+  const ranOn: "self" | "remote" = opts.ranOn ?? "self";
   const run = opts.run ?? defaultRunnerFor(opts.standard);
   const target = opts.target || "localhost (this-appliance)";
   const t0 = Date.now();
@@ -629,11 +664,12 @@ export async function runHardeningScan(opts: { standard: StandardId; target?: st
   // 챗봇 경로는 agentloop이 이미 원장에 남긴다(TOOL_WORK_KIND) — 여기서 또 남기면 1회 점검이
   // 2건으로 잡혀 절감 시간이 2배가 된다(검토 지적 2026-07-29). 그래서 도구 경로는 skipWorkLog로 끈다.
   // 스케줄러·화면 실행은 agentloop을 안 타므로 여기서 남겨야 한다.
-  if (!opts.skipWorkLog) recordWork({ kind: "hardening_scanned", detail: `${opts.standard}/${target}`, source: "schedule" });
+  if (!opts.skipWorkLog) recordWork({ kind: "hardening_scanned", detail: `${opts.standard}/${ranOn === "remote" ? target : `self(${target})`}`, source: "schedule" });
   return {
     standard: opts.standard,
     standardLabel: std.label,
     target,
+    ranOn,
     startedAt,
     durationMs: Date.now() - t0,
     items,
@@ -647,10 +683,21 @@ export function formatHardeningReport(r: ScanReport): string {
   const L: string[] = [];
   L.push(`# 보안장비 하드닝 점검 리포트`);
   L.push("");
-  L.push(`- 대상 장비: ${r.target}`);
+  // ⚠ **자기 자신을 점검했으면 그렇게 적는다**(2026-09-01). 옛 판은 사람이 적은 라벨을
+  //   「대상 장비」라 부르고 원격 점검이라 단정했다 — 준수율 증적으로 쓰이는 글이라
+  //   점검하지 않은 장비를 점검했다고 보고하게 된다.
+  L.push(
+    r.ranOn === "remote"
+      ? `- 대상 장비: ${r.target}`
+      : `- 점검한 곳: **이 서버 자신**${r.target && !/localhost|this-appliance/.test(r.target) ? ` (적어 주신 「${r.target}」은 **점검하지 않았습니다** — 이름표로만 남습니다)` : ""}`,
+  );
   L.push(`- 점검 기준: ${r.standardLabel}`);
   L.push(`- 점검 일시: ${koDateTimeString(new Date(r.startedAt).getTime())} (${(r.durationMs / 1000).toFixed(1)}초 소요)`);
-  L.push(`- 점검 방식: 장비 CLI 원격 점검(실 명령 실행·실측)`);
+  L.push(
+    r.ranOn === "remote"
+      ? `- 점검 방식: 장비 CLI **원격 점검**(등록 장비에 붙어 실 명령 실행·실측)`
+      : `- 점검 방식: **이 서버에서 실행**(실 명령 실행·실측). 다른 장비를 점검하려면 그 장비를 **등록**해야 합니다 — 등록 전에는 이 서버만 점검합니다.`,
+  );
   L.push("");
   L.push(`## 요약`);
   L.push("");
@@ -671,7 +718,7 @@ export function formatHardeningReport(r: ScanReport): string {
     for (const i of acts) L.push(`- **[${i.id}] ${i.title}** — ${i.evidence}\n  → 조치: ${i.remediation}`);
   }
   L.push("");
-  L.push(`> 본 리포트는 대상 장비 CLI에서 ${r.standardLabel.split(" —")[0]} 기준 점검 명령을 실제 실행해 얻은 실측 결과입니다.`);
+  L.push(`> 본 리포트는 ${r.ranOn === "remote" ? "대상 장비 CLI에서" : "**이 서버에서**"} ${r.standardLabel.split(" —")[0]} 기준 점검 명령을 실제 실행해 얻은 실측 결과입니다.`);
   return L.join("\n");
 }
 
@@ -679,7 +726,10 @@ export function formatHardeningReport(r: ScanReport): string {
 export function scanSummaryText(r: ScanReport): string {
   const fails = r.items.filter((i) => i.status === "FAIL");
   const L: string[] = [];
-  L.push(`${r.standardLabel.split(" —")[0]} 기준 하드닝 점검 완료 — 대상 ${r.target}`);
+  L.push(
+    `${r.standardLabel.split(" —")[0]} 기준 하드닝 점검 완료 — ` +
+      (r.ranOn === "remote" ? `대상 ${r.target}` : "점검한 곳 **이 서버 자신**"),
+  );
   L.push(`준수율 ${r.summary.rate}% (양호 ${r.summary.pass}/${r.summary.scored}) · ${r.summary.verdict}`);
   L.push(`✓ 양호 ${r.summary.pass} · ✗ 취약 ${r.summary.fail} · ⚠ 확인필요 ${r.summary.warn} · — 해당없음 ${r.summary.na}`);
   if (fails.length) {
@@ -713,7 +763,7 @@ export function registerHardeningRoutes(app: Express): void {
         kind: "cli",
         actor,
         action: `하드닝 점검 실행 (${standard.toUpperCase()})`,
-        target: report.target,
+        target: 감사대상글(report),
         detail: `준수율 ${report.summary.rate}% · 취약 ${report.summary.fail} · 확인필요 ${report.summary.warn}`,
         result: "ok",
       });

@@ -11,6 +11,7 @@
 //   만드는 대신, 여기서만 세 값을 같은 원천(hardeningtargets)에서 함께 읽어 틈을 안 늘린다.
 
 import { listTargets, listSchedules, listRuns } from "./hardeningtargets";
+import { 원격점검인가 } from "./hardeningscan";
 import { todayLocal } from "../util/date";
 import { listAssets, getAsset } from "./assets";
 import { authMiddleware } from "../auth/auth";
@@ -72,7 +73,10 @@ export function hardeningStatusAnswer(): { output: string; dataCard: DataCard } 
       : !최근 ? "미점검"
       : sch && sch.enabled === 1 ? "정상" : "수동만";
     return {
-      장비: t.label,
+      // ⚠ **로컬로 등록한 대상은 장비에 붙지 않는다**(2026-09-01 4차 검토 [중]).
+      //   「점검한 곳을 사실대로」를 일곱 곳에 고쳤는데 **여덟 번째**인 이 카드가 남았다 —
+      //   프로 셸에서 가장 자주 보는 창구라 담당자가 그대로 보고에 옮긴다.
+      장비: 원격점검인가(t) ? t.label : `이 서버(이름표: ${t.label})`,
       기준: (sch?.standard ?? t.standard ?? "kisa").toUpperCase(),
       준수율: 최근 ? String(최근.rate) : "—",
       최근점검: 최근 ? new Date(최근.at).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "—",

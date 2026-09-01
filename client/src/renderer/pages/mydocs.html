@@ -34,7 +34,7 @@
     · ⚠ 폭 계약(설계관 지적) — 200+400 3단은 약 820px부터 성립한다. 세로 모니터(1080)·표준
       셸(대화창 옆 380)·팝업 최소폭(700)이 전부 그 아래라, 1000px 미만이면 사이드바가 접히고
       820px 미만이면 문서창이 목록을 덮는다. 「좁으면 깨진다」를 그냥 두지 않는다.
-    · ⚠ .g-rows-scroll의 --gr-maxh를 none으로 — gijo-ui.css:353의 540px 상한을 그대로 두면
+    · ⚠ .g-rows-scroll의 --gr-maxh를 none으로 — gijo-ui.css `.g-rows-scroll`의 540px 상한을 그대로 두면
       껍데기를 걷어 번 자리가 빈칸이 된다.
     · 서버·IPC 신설 0건. 게시 관문(publish-gate-ui ③‴)은 같은 커밋에서 v4 자리로 옮겼다.
   ■ v5 (2026-08-22 사장님 — 「연락처도 내 문서에」·「보안제품 비교·소개도 내 문서함에」·
@@ -85,7 +85,7 @@ body.g-ui .main.v4wrap{padding:0 !important;max-width:none;margin:0;height:100vh
    통째로 죽었다(검토관 4갈래 동시 적발 — 규칙을 넣을 땐 블록 경계부터 본다). */
 .wattach{height:20px;padding:0 7px;font-size:11px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);border-radius:6px;cursor:pointer;white-space:nowrap}
 .wattach:hover{border-color:var(--ok,#3fa66a);color:var(--ok,#3fa66a)}
-.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+.btn.primary{background:var(--g-blue-fill, var(--blue));border-color:var(--blue);color:#fff;}
 .btn:hover{border-color:var(--blue);}
 .v4root{flex:1 1 auto;min-height:0;display:flex;}
 /* 왼쪽 사이드바 = 옛 탭줄·제목·부제·개인/공유 세그가 한자리로 모인 것 */
@@ -228,7 +228,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 .st-title-in:focus{border-color:var(--blue);}
 .st-btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;
   padding:7px 13px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
-.st-btn.save{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:800;}
+.st-btn.save{background:var(--g-blue-fill, var(--blue));border-color:var(--blue);color:#fff;font-weight:800;}
 .st-btn.on{border-color:var(--blue);color:var(--blue-light);}
 .viewseg{display:flex;gap:0;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
 .viewseg button{background:var(--panel-2);border:none;color:var(--muted);padding:7px 11px;font-size:12px;
@@ -328,6 +328,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         <button class="v4sub" data-f="shared">🏢 공유만</button>
       </div>
       <!-- 📞 연락처 — 「내 것」 옆에 둔다(둘 다 이 PC 전용·직접 만든다). 2026-08-22 사장님 지시. -->
+      <!-- 📝 문서작성(2026-09-01 사장님 지시) — 「직접 작성해야 하는 것」을 한 자리에.
+           개인 문서 작성(편집기)과 회사 지식 작성(장애노트·매뉴얼 보강)이 함께 있되,
+           **저장되는 곳이 다르다**는 사실을 판에서 밝히고 회사 지식 쪽은 관리자에게만 보인다. -->
+      <button class="v4node" data-t="write">📝<span class="txt">문서작성</span></button>
       <button class="v4node" data-t="contacts">📞<span class="txt">연락처</span><span class="cnt" id="nContacts"></span></button>
       <!-- ⚠ 그룹 이름을 「회사 자료」로 바꿨다(2026-08-22 설계관 지적).
            「회사가 **가진** 것」에 📦 보안제품 자료(=**아직 우리 것이 아닌** 검토용 타사 카탈로그)를
@@ -349,6 +353,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
            서버가 주기적으로 들여다보고 새/바뀐 문서를 자동 반입하는 폴더들. 지정·해제는
            대화창(admin 결재판)만 — 이 판은 보기 전용이다(「메뉴는 보기용·지시는 대화창」). -->
       <button class="v4node" data-t="watch">📂<span class="txt">지켜보는 폴더</span><span class="cnt" id="nWatch"></span></button>
+      <!-- 📨 조치 요청서(2026-08-31) — 대화창에서 만든 요청서를 **되찾는 자리**. 지금까지는
+           만들 수는 있는데 화면에서 볼 곳이 없어(제품별 접기에만 떴다) 기능이 없는 것과 같았다.
+           판은 보기 전용 — 만들기·상태 변경은 대화창(📂 지켜보는 폴더와 같은 계약). -->
+      <button class="v4node" data-t="req">📨<span class="txt">조치 요청서</span><span class="cnt" id="nReq"></span></button>
       <button class="v4node future" data-t="future" title="예약된 자리 — 리포트·공식 인수인계 열람을 모을 예정입니다(아직 동작하지 않습니다)">🗂<span class="txt">산출물</span><span class="cnt">예정</span></button>
     </div>
   </div>
@@ -368,13 +376,50 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       <div class="v4list">
         <div id="learnTop" class="topics" style="display:none"></div>
         <div class="g-rows" id="rowsBox">
-          <!-- ⚠ --gr-maxh를 none으로 — gijo-ui.css:353의 540px 상한을 그대로 두면 목록이
+          <!-- ⚠ --gr-maxh를 none으로 — gijo-ui.css `.g-rows-scroll`의 540px 상한을 그대로 두면 목록이
                18줄에서 잘려, 껍데기를 걷어 번 자리가 그대로 빈칸이 된다(설계관 지적). -->
           <div class="g-rows-scroll" id="list" style="--gr-maxh:none"><div class="empty">불러오는 중…</div></div>
         </div>
       </div>
       <!-- 문서창 — 상세·편집·열람·요청이 전부 여기서 열린다(화면을 통째로 갈아 끼우지 않는다) -->
       <div class="v4docpane" id="v4doc">
+        <!-- 🩹📄 회사 지식에 직접 쓰는 자리 — memory.html에서 **옮겨 왔다**(2026-09-01 사장님 지시 ②).
+             ⚠ **관리자에게만 연다**(서버 docenrich가 adminMiddleware로 막는다 — 안 가리면 눌러도
+               실패하는 죽은 입구가 된다). 여는 곳은 📝 문서작성 판의 [쓰기] 단추 두 개다.
+             ⚠ 여기 쓴 것은 **회사 지식(모두가 검색)**으로 간다 — 개인 문서와 저장소가 다르다.
+               그 사실을 판과 안내 양쪽에서 밝힌다. -->
+        <div id="enrichStage" style="display:none">
+        <div class="panel">
+          <div data-gijo-fold="문서 보강 인입">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;">
+              <div style="border:1px solid var(--border);border-radius:10px;padding:12px;">
+                <div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">🩹 장애노트 작성 <span style="font-size:11.75px;color:var(--amber);border:1px solid rgba(240,160,32,.4);border-radius:20px;padding:0 7px;">AI 미사용 · 즉시 저장</span></div>
+                <input id="mProduct" placeholder="제품/대상 (예: Tenable Security Center)" style="width:100%;margin-bottom:6px;">
+                <input id="mTitle" placeholder="제목 (예: 예약 스캔 진행 중 멈춤)" style="width:100%;margin-bottom:6px;">
+                <input id="mSymptom" placeholder="증상 — 무엇이 잘못됐나" style="width:100%;margin-bottom:6px;">
+                <input id="mCause" placeholder="원인 (선택)" style="width:100%;margin-bottom:6px;">
+                <textarea id="mFix" rows="3" placeholder="해결 방법 — 명령어·경로는 원문 그대로" style="width:100%;margin-bottom:8px;"></textarea>
+                <button class="g-btn" id="mSave">💾 장애노트 저장</button>
+                <div class="status-line" id="mStatus"></div>
+              </div>
+              <div style="border:1px solid var(--border);border-radius:10px;padding:12px;">
+                <div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">📄 매뉴얼 보강 (AI 번역·구조화)</div>
+                <input id="dProduct" placeholder="제품/대상" style="width:100%;margin-bottom:6px;">
+                <input id="dSection" placeholder="섹션 이름 (예: 진단 파일 로그 옵션)" style="width:100%;margin-bottom:6px;">
+                <textarea id="dText" rows="5" placeholder="매뉴얼 한 섹션 붙여넣기 (한 번에 ~6,000자)" style="width:100%;margin-bottom:6px;"></textarea>
+                <select id="dMode" style="width:100%;margin-bottom:8px;">
+                  <option value="auto">⚙ 자동 — 클라우드 되면 쓰고, 내부정보·비활성이면 로컬</option>
+                  <option value="cloud">☁ 클라우드 — 품질↑ (벤더 공개자료만)</option>
+                  <option value="local">💻 로컬 — 무료·폐쇄망 (온프렘 7B)</option>
+                </select>
+                <button class="g-btn g-primary" id="dRun">▶ 보강해서 저장</button>
+                <div class="status-line" id="dStatus"></div>
+              </div>
+            </div>
+            <div id="enrichResList" style="font-size:12.5px;color:var(--muted);margin-top:8px;"></div>
+          </div>
+        </div>
+        </div>
         <button class="v4close" id="v4close" title="문서창 닫기">✕</button>
         <div class="detail" id="detail"><div class="dm">행을 누르면 여기서 내용·조작을 봅니다.</div></div>
 
@@ -473,7 +518,18 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   //   수확하므로, 긴 안내문 안에 묻어 두면 「제품이 약속한 말이 실제로 걸리는가」 검사에서
   //   원리상 빠진다(2026-08-31 검토관 적발 — 커밋이 「검사 가능 어미」라 적었는데 실측 0건이었다).
   var 감시지정예시 = "스캔결과 폴더 지켜봐 줘";
+  var 요청생성예시 = "이 취약점 조치 요청서 만들어줘";
+  var 요청현황예시 = "요청 현황 알려줘";
   var 감시조회예시 = "지켜보는 폴더 알려줘";
+  var 요청서 = [];
+  // 📝 문서작성 — 회사 지식에 쓰는 칸은 **관리자에게만 보인다**(서버가 adminMiddleware로
+  //   막으므로, 안 가리면 눌러도 실패하는 죽은 입구가 된다). 판정은 원천 하나에서:
+  //   window.gijo.me().role — hardening.html이 이미 그 꼴로 쓴다.
+  var 관리자인가 = false;
+  (async () => {
+    try { 관리자인가 = (await window.gijo.me()).role === "admin"; } catch (e) { 관리자인가 = false; }
+  })();
+  var 오래된서버 = false; // 서버가 mine=1을 모르면 참 — 판은 아무것도 안 그린다(fail-closed) // 📨 조치 요청서(2026-08-31) — 내가 만든 것만(서버가 소유로 좁혀 준다)
   var 감시폴더 = []; // 📂 지켜보는 폴더(2026-08-31) — 조회 전용(등록·해제는 대화창 결재판)
   var 감시틱초 = 300;
   var work = []; // 📎 지난 작업(노트북형) — 지난 대화 세션 목록(listWorkSessions)
@@ -901,7 +957,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     //   → 탭마다 자기 원천의 오류만 본다. 표에 없으면 오류 없음(null)이다.
     var 탭별오류 = {
       mine: 오류.mine, learn: 오류.learn, guide: 오류.guide, know: 오류.know, work: 오류.work,
-      ingest: 오류.ingest, vendor: 오류.vendor, watch: 오류.watch, contacts: null,   // 연락처는 이 PC 저장이라 로드 실패가 없다
+      ingest: 오류.ingest, vendor: 오류.vendor, watch: 오류.watch, req: 오류.req, contacts: null,   // 연락처는 이 PC 저장이라 로드 실패가 없다
       // ⚠ watch(📂 지켜보는 폴더)는 2026-08-31 검토관이 잡은 누락 — 조회 창구가 죽어도 「폴더가
       //   없습니다」로 보여 **장애를 부재로** 말했다(정직 가드 「장애≠부재」 계보).
     };
@@ -1001,7 +1057,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       // 📂 지켜보는 폴더(2026-08-31) — 보기 전용. 지정·해제는 대화창(admin 결재판)이 유일한 길.
       // 원천 정직: 숫자는 전부 서버 계산(스캔 결과 JSON) — 화면이 지어내지 않는다.
       var wf = 감시폴더.filter(function (f) { return 걸림((f.label || "") + " " + (f.path || "")); });
-      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 92px 64px 92px;gap:8px"><span>지켜보는 폴더(약 ' + Math.round(감시틱초 / 60) + '분마다 확인 — 행을 누르면 최근 결과)</span><span>최근 확인</span><span class="ta-r">문서</span><span class="ta-r">상태</span></div>' +
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 92px 64px 92px;gap:8px"><span class="trunc" title="약 ' + Math.round(감시틱초 / 60) + '분마다 확인합니다. 행을 누르면 최근 결과를 봅니다.">지켜보는 폴더</span><span>최근 확인</span><span class="ta-r">문서</span><span class="ta-r">상태</span></div>' +
         (wf.length ? '<div class="g-rows-flat">' + wf.map(function (f) {
           var lr2 = f.lastResult;
           var 상태 = !f.active ? '<span class="gm2">중지</span>'
@@ -1017,6 +1073,91 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         }).join("") + "</div>"
         : '<div class="empty">' + (감시폴더.length ? "검색과 맞는 폴더가 없습니다."
           : "지켜보는 폴더가 없습니다.<br><br>대화창에서 <b>「D:\\보안팀\\" + 감시지정예시 + "」</b>처럼 말하면 등록됩니다(관리자).<br>등록된 목록은 <b>「" + 감시조회예시 + "」</b>로도 봅니다.<br><br>⚠ 경로는 <b>서버 기계</b>의 폴더입니다 — 분산 설치에서는 내 PC 경로가 아닙니다.") + "</div>");
+    } else if (탭 === "write") {
+      // 📝 문서작성 — **작성 자리 모음**. 목록이 아니라 「어디서 무엇을 쓰나」를 보여 준다.
+      //   ⚠ 템플릿 칩은 여기서 다시 그리지 않는다 — 편집기 서랍(#tplDrawer)이 정본이고
+      //     게시 관문이 그 안을 8개로 **정확히** 센다. 복제하면 그 수가 깨진다.
+      // ⚠ **표 줄(.g-rows-r)을 쓰지 않는다**(2026-09-01 실측). 그 클래스는 height:30px **고정**인
+      //   표용이라(gijo-ui.css) 두 줄짜리 카드가 그 안에서 넘쳐 좁은 폭에서 글자끼리 겹친다.
+      //   1차 수리로 flex만 얹었더니 높이 고정이 남아 겹침이 5 → 7건으로 **되레 늘었다** —
+      //   덧대지 말고 뿌리(높이 고정)를 피하는 것이 답이었다. 제 높이를 갖는 블록으로 짠다.
+      var 줄 = function (아이콘, 제목, 설명, 단추, 표식) {
+        return '<div style="display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid var(--border)">' +
+          '<span style="font-size:16px;flex:0 0 auto;line-height:1.5">' + 아이콘 + "</span>" +
+          '<span style="flex:1 1 200px;min-width:0"><b style="font-size:12.5px">' + esc(제목) + "</b>" + (표식 ? ' <span class="gm2" style="font-size:11.5px">' + esc(표식) + "</span>" : "") +
+          '<div class="gm2 wrap-ok" style="font-size:12px;line-height:1.6;margin-top:3px">' + 설명 + "</div></span>" +
+          (단추 ? '<span style="flex:0 0 auto;align-self:center">' + 단추 + "</span>" : "") + "</div>";
+      };
+      var 관리자칸 = 관리자인가
+        ? '<div class="g-rows-head" style="grid-template-columns:1fr;margin-top:14px">회사 지식으로 들어가는 작성 <span class="gm2" style="font-weight:400">— 모두가 검색해서 보게 됩니다</span></div>' +
+          '<div class="g-rows-flat">' +
+          줄("🩹", "장애노트 작성", "제품이 멈췄던 일과 해결 방법을 적습니다. AI를 안 쓰고 <b>적은 그대로</b> 저장합니다.",
+             '<button class="btn" id="goEnrichFix">쓰기</button>', "관리자 · 회사 지식") +
+          줄("📄", "매뉴얼 보강", "매뉴얼 한 섹션을 붙여넣으면 AI가 번역·구조화해서 지식으로 넣습니다.",
+             '<button class="btn" id="goEnrichDoc">쓰기</button>', "관리자 · 회사 지식") +
+          "</div>"
+        : '<div class="gm2" style="font-size:12px;margin-top:14px">※ 회사 지식에 직접 쓰는 자리(장애노트·매뉴얼 보강)는 <b>관리자만</b> 쓸 수 있어 여기 보이지 않습니다.</div>';
+      // 단추 배선은 그린 **직후**에 건다 — 이 판은 다시 그려질 때마다 노드가 새로 난다.
+      setTimeout(function () {
+        var 새문서 = document.getElementById("goNewDoc");
+        if (새문서) 새문서.addEventListener("click", function () {
+          회사지식쓰기닫기();
+          편집열기(null, { openDrawer: true });
+        });
+        var f = document.getElementById("goEnrichFix");
+        if (f) f.addEventListener("click", function () { 회사지식쓰기열기("fix"); });
+        var d2 = document.getElementById("goEnrichDoc");
+        if (d2) d2.addEventListener("click", function () { 회사지식쓰기열기("doc"); });
+      }, 0);
+      list.innerHTML =
+        '<div class="g-rows-head" style="grid-template-columns:1fr">내 문서로 들어가는 작성 <span class="gm2" style="font-weight:400">— 나만 봅니다</span></div>' +
+        '<div class="g-rows-flat">' +
+        줄("📝", "새 문서 쓰기", "업무 템플릿 8종(침해사고 1차 보고·유출 신고서·주간 보고·인수인계 메모·조치 계획·위험수용 신청·장비 점검·빈 문서)이 있습니다. 화면을 캡처해 Ctrl+V로 붙일 수 있고, 고친 이력이 남습니다.",
+           '<button class="btn primary" id="goNewDoc">＋ 새 문서</button>') +
+        "</div>" +
+        관리자칸 +
+        '<div class="g-rows-head" style="grid-template-columns:1fr;margin-top:14px">자산에 딸린 작성</div>' +
+        '<div class="g-rows-flat">' +
+        줄("🤖", "AI-BOM 기입", "AI 자산의 시스템 프롬프트·가드레일 등을 적습니다. <b>자산을 먼저 고른 뒤</b> 쓰는 자리라 여기서 바로 열지 않습니다 — 「③ 취약점 업무 › ② 우선순위」의 📦 AI-BOM 판에서 자산을 고르세요.",
+           "") +
+        "</div>";
+    } else if (탭 === "req") {
+      // 📨 조치 요청서(2026-08-31) — 대화창에서 만든 요청서를 **되찾는 자리**(보기 전용).
+      //   지금까지는 만들 수는 있는데 화면에서 볼 곳이 없어(제품별 접기에만 떴다) 기능이
+      //   없는 것과 같았다. 만들기·상태 변경은 대화창 — 📂 지켜보는 폴더와 같은 계약.
+      // ⚠ 서버가 **내가 만든 것만** 준다(mine=1) — 전역 목록이 전원의 요청서를 펼치지
+      //   않게 창구에서 좁혔다(「직접-열람 등급 누출」 계보).
+      // ⚠ 라벨은 **서버 원천과 같은 값**이다(remrequest.ts KIND_KO·STATUS_KO). 화면이 새로
+      //   짓지 않는다 — 어긋나면 같은 것을 두 이름으로 부르게 된다.
+      // ⚠ **글자까지 서버 원천과 같아야 한다**(remrequest.ts STATUS_KO·KIND_KO). 1차본은
+      //   「회신 옴」·「미회신」으로 적어 놓고 주석엔 「같은 값」이라 써 두었다 — 대화창은
+      //   「회신·무응답」이라 하고 화면은 딴 말을 하는, 이 저장소가 반복해 겪은 사본 어긋남이다
+      //   (2026-08-31 검토관 2갈래 동시 적발). 어긋나면 server/test/reqlabels.test.ts가 잡는다.
+      var 상태글 = { draft: "초안", sent: "보냄", replied: "회신", noreply: "무응답" };
+      var 종류글 = { "vuln-fix": "취약점 조치", patch: "보안패치", policy: "보안정책 수정", bug: "버그 수정" };
+      var rq = 요청서.filter(function (r) { return 걸림((r.targetName || "") + " " + (종류글[r.kind] || r.kind || "") + " " + (r.recipient || "")); });
+      list.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr 108px 80px 64px;gap:8px"><span class="trunc" title="내가 만든 조치 요청서만 보입니다. 팀 전체 현황은 대화창에 「요청 현황 알려줘」라고 물으세요. 만들기·상태 변경도 대화창에서 합니다.">조치 요청서</span><span title="수신처를 적었으면 그 이름, 안 적었으면 요청 대상 보안제품입니다.">받는 곳·대상</span><span>상태</span><span class="ta-r">만든 날</span></div>' +
+        (rq.length ? '<div class="g-rows-flat">' + rq.map(function (r) {
+          var st = 상태글[r.status] || r.status || "-";
+          var 색 = r.status === "replied" ? "gtxt-up" : r.status === "noreply" ? "gtxt-down" : "gm2";
+          // ⚠ **.noclick** — 이 판은 보기 전용이라 줄을 눌러 열 것이 없다. 안 붙이면 클릭이
+          //   일반 행 처리기로 흘러 **빈 문서창**이 뜬다(2026-08-31 검토관 3갈래 — 같은 파일이
+          //   2026-08-22 vendor 탭에서 이미 한 번 고친 결함이다). data-req는 나중에 상태 전환
+          //   진입이 생길 때 쓸 자리라 남긴다.
+          return '<div class="g-rows-r noclick" data-req="' + esc(r.id) + '" style="grid-template-columns:1fr 108px 80px 64px;gap:8px">' +
+            '<span class="trunc" title="' + esc((종류글[r.kind] || r.kind || "") + (r.dueDate ? " · 기한 " + r.dueDate : "")) + '">' + esc(종류글[r.kind] || r.kind || "(종류 없음)") + "</span>" +
+            // 수신처(recipient)는 사람이 적었을 때만 있다. 없으면 요청 **대상 제품**을 보여
+            //   주되 그것이 수신처인 척하지 않는다 — 머리 이름이 「받는 곳·대상」인 이유다
+            //   (2026-08-31 검토관: targetName은 받는 곳이 아니라 대상이다).
+            '<span class="gm2 trunc"' + (r.recipient ? "" : ' title="수신처가 아직 없습니다 — 요청 대상 제품입니다."') + ">" +
+              esc(r.recipient || r.targetName || "-") + "</span>" +
+            '<span class="' + 색 + '">' + esc(st) + "</span>" +
+            '<span class="ta-r gm2">' + 날짜(r.createdAt) + "</span></div>";
+        }).join("") + "</div>"
+        : '<div class="empty">' + (오래된서버
+          ? "이 서버는 아직 <b>내 것만 골라 주는 기능</b>이 없습니다.<br><br>남의 요청서까지 보일 수 있어 <b>아무것도 표시하지 않았습니다.</b><br>서버를 최신으로 올린 뒤 다시 열어 주세요 — 그때까지 팀 전체 현황은 대화창에 「" + 요청현황예시 + "」라고 물으시면 됩니다."
+          : 요청서.length ? "검색과 맞는 요청서가 없습니다."
+          : "<b>내가</b> 만든 조치 요청서가 없습니다.<br><br>대화창에서 <b>「" + 요청생성예시 + "」</b>처럼 말하면 초안이 만들어지고, 그 초안은 <b>👤 내 것</b>에 문서로 들어옵니다.<br>여기서는 <b>내가 만든</b> 요청서의 상태(초안·보냄·회신)를 봅니다 — 팀 전체 현황은 대화창에 「" + 요청현황예시 + "」라고 물으세요.") + "</div>");
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;
@@ -1173,6 +1314,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     document.getElementById("nLearn").textContent = (learnKpis && learnKpis.total) || learn.length || "";
     document.getElementById("nWork").textContent = work.length || "";
     document.getElementById("nWatch").textContent = 감시폴더.length || "";
+    document.getElementById("nReq").textContent = 요청서.length || "";
     // ⚠ 세는 원천이 바뀌었다(2026-08-22) — 문서 목록이 아니라 **영수증**이다.
     //   그전엔 지식에 든 문서만 세어, 취약점 파일을 올려도 숫자가 안 늘었다.
     // ⚠ 서버가 준 **거른 뒤의 총계**를 쓴다 — 목록 길이(상한 300)를 총계로 말하면 거짓이다
@@ -1197,6 +1339,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     // ★ 📦 보안제품 자료(2026-08-22 2라운드 검토관 [낮음]) — 행을 눌러 상세가 열리게 만들었으면
     //   **초기 안내도 있어야** 한다. 없으면 이 탭만 빈 문서창이라 「고장인가?」로 읽힌다.
     else if (탭 === "vendor") d.innerHTML = '<div class="dm">행을 누르면 그 제품의 자료(제조사·분류·요약)를 봅니다.<br>도입을 <b>검토 중인 타사 제품</b> 카탈로그입니다 — 우리가 쓰는 제품은 「우리 보안제품」 화면입니다.<div class="dbt"><button class="go" data-go="securityproducts.html" data-lb="우리 보안제품">🗔 우리 보안제품</button></div></div>';
+    else if (탭 === "write") d.innerHTML = '<div class="dm"><b>직접 쓰는 자리를 모았습니다.</b><br><br>' +
+      '⚠ <b>저장되는 곳이 다릅니다.</b> 「새 문서」는 <b>나만 보는 내 문서</b>에 들어가고, 「장애노트·매뉴얼 보강」은 <b>모두가 검색하는 회사 지식</b>에 들어갑니다. 회사 지식 쪽은 관리자만 쓸 수 있습니다.<br><br>' +
+      '조치 요청서처럼 <b>대화창이 만들어 주는 문서</b>는 여기가 아니라 📨 탭에서 봅니다.</div>';
+    else if (탭 === "req") d.innerHTML = '<div class="dm">대화창에서 만든 조치 요청서 목록입니다. 상태(초안·보냄·회신)를 여기서 봅니다.<br><br>만들기·상태 변경은 <b>대화창</b>에서 합니다 — 「…조치 요청서 만들어줘」.</div>';
     else if (탭 === "watch") d.innerHTML = '<div class="dm">행을 누르면 그 폴더의 최근 확인 결과(새로 들어온 문서·건너뜀·충돌)를 봅니다.<br><br>지정·해제는 <b>대화창</b>에서 합니다 — 「D:\\경로 폴더 지켜봐 줘」(관리자).</div>';
     // 📞 연락처는 목록이 **전폭**이라 문서창을 안 쓴다(학습과 같은 결) — 문구를 남기지 않는다.
     else d.innerHTML = ""; // learn · contacts — 전폭이라 숨겨져 있지만 이전 탭 문구를 남기지 않는다(중4)
@@ -1253,6 +1399,17 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       감시틱초 = (wf_ && wf_.tickSeconds) || 300;
       오류.watch = null;
     } catch (e) { 감시폴더 = []; 오류.watch = (e && e.message) || "오류"; }
+    // 📨 조치 요청서(2026-08-31) — **내가 만든 것만**(서버가 mine=1로 좁힌다).
+    try {
+      var rq_ = await window.gijo.outboundRequestsMine();
+      // ★ **서버가 좁혀 줬다고 말했을 때만 그린다**(fail-closed). mine=1을 모르는 옛 서버는
+      //   그 물음을 무시하고 **전원 목록**으로 답하는데, 그것을 「내 것」이라 믿고 그리면
+      //   화면 하나가 전원의 요청서를 펼치는 창구가 된다. 클라 게시가 서버 배포를 앞지르는
+      //   순간이 실제로 그 순간이라(기준서 「의존 시 서버 먼저 배포」), 화면 쪽에서도 막는다.
+      오래된서버 = !!(rq_ && rq_.scope !== "mine");
+      요청서 = 오래된서버 ? [] : ((rq_ && rq_.requests) || []);
+      오류.req = null;
+    } catch (e) { 요청서 = []; 오류.req = (e && e.message) || "오류"; }
     // ★ 반입 영수증(2026-08-22). 취약점·SBOM처럼 **지식에 안 들어가는**
     //   갈래는 문서 목록에 원리상 안 뜨므로 별도 창구에서 온다.
     //   ⚠ 다리는 preload에 새로 냈다(listUploadReceipts) — 이 화면에는 fetch를 쓰는 자리가 없다.
@@ -1734,6 +1891,70 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       else { im.replaceWith(document.createTextNode("[그림을 찾지 못했습니다 — 지워졌을 수 있습니다]")); }
     });
   }
+  // ── 🩹📄 회사 지식 작성(장애노트·매뉴얼 보강) — memory.html에서 옮겨 온 배선 ──────
+  //   ⚠ 로직은 **한 글자도 안 바꿨다**. 옮기면서 고치면 「옮긴 탓인지 고친 탓인지」를
+  //     나중에 못 가른다. 창구(enrichIngest)·필드(chunks·triples·via·translated)도 그대로다.
+  function 회사지식쓰기열기(어느것) {
+    var st = document.getElementById("enrichStage");
+    if (!st) return;
+    문서창보임(true);
+    var 편집 = document.getElementById("editStage");
+    if (편집) 편집.classList.remove("on");
+    st.style.display = "";
+    var 첫칸 = document.getElementById(어느것 === "doc" ? "dProduct" : "mProduct");
+    if (첫칸 && 첫칸.focus) 첫칸.focus();
+  }
+  function 회사지식쓰기닫기() {
+    var st = document.getElementById("enrichStage");
+    if (st) st.style.display = "none";
+  }
+    // ── 문서 보강 인입(docenrich에서 병합, 메뉴 정리 2026-07-25) — 장애노트·매뉴얼 보강 ──
+    (function initEnrich() {
+      const enrichResults = [];
+      function addEnrichResult(r) {
+        enrichResults.unshift(r);
+        document.getElementById("enrichResList").innerHTML = "이번 세션 인입: " + enrichResults.map((x) =>
+          `${x.documentId} (${x.via} · ${x.chunks}청크${x.triples ? " · 관계 " + x.triples : ""})`).join(" · ");
+      }
+      document.getElementById("mSave")?.addEventListener("click", async () => {
+        const btn = document.getElementById("mSave"), st = document.getElementById("mStatus");
+        const v = (id) => document.getElementById(id).value.trim();
+        const product = v("mProduct"), title = v("mTitle"), symptom = v("mSymptom"), cause = v("mCause"), fix = v("mFix");
+        if (!product || !title || !symptom || !fix) { st.textContent = "제품·제목·증상·해결은 필수입니다."; st.className = "status-line status-err"; return; }
+        const korean = ["증상: " + symptom, cause ? "원인: " + cause : "", "해결: " + fix].filter(Boolean).join("\n");
+        const triples = [];
+        if (cause) triples.push({ subject: title, predicate: "원인", object: cause });
+        triples.push({ subject: title, predicate: "해결", object: fix });
+        btn.disabled = true; st.textContent = "저장 중…"; st.className = "status-line";
+        try {
+          const r = await window.gijo.enrichIngest({ productName: product, sourceDoc: "현장 장애노트", section: title, mode: "manual", korean, triples });
+          st.textContent = `✓ 저장됨 — ${r.chunks}청크 · 관계 ${r.triples}개. 이제 검색됩니다.`; st.className = "status-line status-ok";
+          addEnrichResult(r);
+          ["mTitle", "mSymptom", "mCause", "mFix"].forEach((id) => document.getElementById(id).value = "");
+          loadDocuments();
+        } catch (e) { st.textContent = "✗ 실패: " + e.message; st.className = "status-line status-err"; }
+        btn.disabled = false;
+      });
+      document.getElementById("dRun")?.addEventListener("click", async () => {
+        const btn = document.getElementById("dRun"), st = document.getElementById("dStatus");
+        const v = (id) => document.getElementById(id).value.trim();
+        const productName = v("dProduct"), section = v("dSection"), text = v("dText");
+        const mode = document.getElementById("dMode").value;
+        if (!productName || !section || !text) { st.textContent = "제품·섹션·원본 텍스트는 필수입니다."; st.className = "status-line status-err"; return; }
+        btn.disabled = true; st.textContent = (mode === "local" ? "로컬 7B로 " : "") + "번역·구조화 중… (수십 초 걸릴 수 있어요)"; st.className = "status-line";
+        try {
+          const r = await window.gijo.enrichIngest({ text, productName, sourceDoc: productName + " 매뉴얼", section, mode });
+          const via = r.via === "cloud" ? "클라우드" : r.via === "local" ? "로컬" : r.via === "manual" ? "수동" : "원문";
+          st.textContent = `✓ 저장됨(${via}) — ${r.chunks}청크${r.triples ? " · 관계 " + r.triples + "개" : ""}${r.translated ? "" : " · 번역 실패로 원문 저장"}`; st.className = "status-line status-ok";
+          addEnrichResult(r);
+          document.getElementById("dText").value = "";
+          loadDocuments();
+        } catch (e) { st.textContent = "✗ 실패: " + e.message; st.className = "status-line status-err"; }
+        btn.disabled = false;
+      });
+    })();
+
+
   function 편집열기(doc, opts) {
     opts = opts || {};
     편집중 = doc && doc.id ? doc.id : null;
@@ -2304,7 +2525,9 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   var 라이트판 = new URLSearchParams(location.search).get("edition") === "lite";
   if (라이트판) {
     document.documentElement.classList.add("edition-lite");
-    ["learn", "future", "vendor", "watch"].forEach(function (t) { // watch: 지정 도구가 라이트 화이트리스트 밖 — 죽은 판 금지(v1 접힘, 라이트 반영 라운드에서 재판단)
+    // 📂 watch는 2026-08-31에 **폈다** — 지정 도구 3종을 라이트 허용목록에 넣었다(lite-tools.json).
+    //   라이트는 서버=내 PC라 「경로는 서버 기계의 폴더」 마찰이 없어 오히려 값어치가 크다(조사 결론).
+    ["learn", "future", "vendor"].forEach(function (t) {
       var n = document.querySelector('#tabs .v4node[data-t="' + t + '"]');
       if (n) n.style.display = "none";
     });
@@ -2316,7 +2539,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   // ?tab= 딥링크 — 문서함(창)을 흡수하며 옛 진입로(하단 📚·설정의 가이드 링크)가
   // 「제품 안내 탭이 선택된 내 문서」로 바로 오게 한다(승인 시안 §7 대응표).
   var 첫탭 = new URLSearchParams(location.search).get("tab");
-  if (첫탭 && ["mine", "know", "guide", "learn", "ingest", "vendor", "contacts", "work", "watch"].indexOf(첫탭) >= 0) {
+  if (첫탭 && ["mine", "write", "know", "guide", "learn", "ingest", "vendor", "contacts", "work", "watch", "req"].indexOf(첫탭) >= 0) {
     탭 = 첫탭;
     Array.prototype.forEach.call(document.querySelectorAll("#tabs .v4node"), function (x) {
       x.classList.toggle("on", x.getAttribute("data-t") === 첫탭);

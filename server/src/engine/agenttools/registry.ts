@@ -14,7 +14,6 @@ import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
 import { runInspectionReport } from "../inspectionreport";
 import { 한줄풀이글, 섞임고지 } from "../findingplain";
-import { eol찾기, eol한줄 } from "../eol-seed";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "../packagescan";
 import { targetRunner, runnerFor } from "../hardeningscan";
 import { listTargets } from "../hardeningtargets";
@@ -203,6 +202,15 @@ import {
   runProductIntroAdd,
   runProductCompare,
   runSetIntroField,
+  runSubmitMaintenanceReport,
+  runReviewMaintenance,
+  runUpdateReportSchedule,
+  runDeleteReportSchedule,
+  runSetEventStatus,
+  runDeleteProduct,
+  runVexStatus,
+  runSetAiBomField,
+  runEolCheck,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -250,6 +258,26 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [{ name: "assetId", label: "자산", description: "특정 자산만 볼 때 (비우면 전체)", required: false }],
     run: async (args: Record<string, string>) => runSbomCoverage(args.assetId),
+  },
+  {
+    // ⏳ 지원 종료(EOL) 점검 — 「지원 끝난 부품 있어?」(계획서 중-7 + 전-4).
+    //   ⚠ **정정(2026-09-01 검토관 [중])**: 처음엔 「eol-seed의 창구는 소비자가 0이었다」고
+    //     적었는데 **사실이 아니다.** eol찾기·eol한줄은 sbom_coverage가 이미 쓰고 있었다
+    //     (자산 하나를 콕 집었을 때만). 내 grep이 engine/*.ts만 봐서 agenttools/ 하위를
+    //     놓친 것이다 — **얕은 글로브가 만든 거짓 사실**을 커밋·표·시험에 그대로 옮겨 적었다.
+    //   이 도구가 실제로 더하는 것: ① 자산을 안 집어도 **전체**를 본다 ② eol표상태를 처음 쓴다
+    //     ③ 「없다 ≠ 괜찮다」를 말한다.
+    //   ⚠ 급소는 「0건」의 뜻이다 — 표가 9줄뿐이라 **없다 ≠ 괜찮다**. 답이 그 사실을
+    //     반드시 함께 말한다(eolcheck.test.ts가 지킨다).
+    name: "eol_check",
+    label: "지원 종료 점검",
+    domain: "assets",
+    write: false,
+    description:
+      '자산의 부품 중 **지원(보안 패치)이 끝난 것**이 있는지 본다. "지원 끝난 부품 있어?", "EOL 확인해줘", "단종된 소프트웨어 알려줘"에 쓴다. 지원이 끝나면 취약점이 나와도 고칠 패치가 없다. 자산 하나만 보려면 asset을 준다. 예: {} 또는 {"asset":"web-01"}',
+    directAnswer: true,
+    params: [{ name: "asset", label: "자산", description: "특정 자산만 볼 때 (비우면 전체)", required: false }],
+    run: runEolCheck,
   },
   {
     // ⚠ **쓰기다.** 고객 장비에 원격 접속해 명령을 돌린다 — 결재판을 반드시 거친다.
@@ -1137,6 +1165,52 @@ const TOOLS: AgentTool[] = [
     run: runScheduleMaintenance,
   },
   {
+    // 📋 점검서 올리기 — schedule_maintenance(등록)·maintenance_status(조회)의 **마지막 짝**.
+    //   ⚠ 이 도구가 없어서, 정기 점검 화면의 [점검서 올리기] 단추가 대화창에 넣어 주는
+    //     「「○○」 점검서를 올릴게」가 **받아 줄 곳이 없었다**(2026-08-31 대장 §4 끊김 3).
+    //     제품이 시킨 대로 쳤는데 아무 일도 안 일어나는 자리는 없어야 한다.
+    name: "submit_maintenance_report",
+    label: "점검서 올리기",
+    domain: "maintenance",
+    write: true,
+    description:
+      '끝낸 정기 점검의 결과를 적어 낸다(상태 → 승인 대기). item(어느 점검)과 note(점검 결과)가 필요하다. 예: {"item":"방화벽 정책 점검","note":"이상 없음"}',
+    params: [
+      { name: "item", label: "점검", description: "점검명 또는 제품명", required: true },
+      { name: "note", label: "점검 결과", description: "무엇을 확인했고 어땠는지", required: true },
+      { name: "reportDocName", label: "첨부 점검서", description: "지식베이스에 올린 점검서 문서명 (선택)", required: false },
+    ],
+    // ⚠ effect는 **함수**다(args를 받아 결재판에 보일 한 줄을 만든다) — 문자열이 아니다.
+    effect: (args) => `「${args.item ?? "점검"}」의 점검서를 올려 상태를 **승인 대기**로 바꿉니다 · 결과: ${(args.note ?? "").slice(0, 40) || "(비어 있음)"}`,
+    undo: "관리자가 반려하면 다시 점검서를 올릴 수 있습니다.",
+    run: runSubmitMaintenanceReport,
+  },
+  {
+    // 📋 점검 승인·반려 — **admin만**. 화면에서도 서버가 막고 있던 것을 대화에도 같은 급으로 둔다.
+    //   ⚠ 반려는 **이유가 필수**다(엔진 rejectItem이 reason을 받는다) — 이유 없는 반려는
+    //     담당자가 무엇을 다시 해야 할지 모른다.
+    name: "review_maintenance",
+    label: "점검 승인·반려",
+    domain: "maintenance",
+    write: true,
+    requiredRole: "admin",
+    description:
+      '승인 대기 중인 정기 점검을 승인하거나 반려한다(관리자). decision에 "승인" 또는 "반려"를, 반려면 reason도 준다. 예: {"item":"방화벽 정책 점검","decision":"승인"}',
+    params: [
+      { name: "item", label: "점검", description: "점검명 또는 제품명 (승인 대기 중인 것)", required: true },
+      { name: "decision", label: "승인/반려", description: '"승인" 또는 "반려"', required: true },
+      { name: "reason", label: "반려 이유", description: "반려할 때만 — 무엇을 보완해야 하는지", required: false },
+    ],
+    effect: (args) => {
+      const 반려 = /반려|거절|돌려/.test(args.decision ?? "");
+      return 반려
+        ? `「${args.item ?? "점검"}」을 **반려**합니다 · 이유: ${(args.reason ?? "").slice(0, 40) || "(비어 있음 — 반려하려면 필요합니다)"}`
+        : `「${args.item ?? "점검"}」을 **승인**해 완료로 닫습니다(반복 점검이면 다음 회차가 자동 생성).`;
+    },
+    undo: "되돌리려면 담당자가 점검서를 다시 올려야 합니다.",
+    run: runReviewMaintenance,
+  },
+  {
     name: "asset_coverage",
     label: "자산 정보 결손 현황",
     domain: "assets",
@@ -1199,6 +1273,34 @@ const TOOLS: AgentTool[] = [
     effect: (args) => `자산 "${(args.assetId ?? "").trim()}"의 SBOM(구성요소 목록)을 생성·저장 · 스캔 결과는 바뀌지 않음`,
     undo: "SBOM은 재생성으로 갱신됩니다(별도 되돌리기 없음).",
     run: runGenerateSbom,
+  },
+  {
+    // 📦 AI-BOM 칸 기입 — 「이 자산의 가드레일 기재해줘」(대장 §3-4 항목 5 · 계획서 중-7).
+    //   ⚠ 화면(sbom.html)의 입력칸 13개를 대체하려고 낸 길이다 —
+    //     「메뉴는 보기용 · 새 화면에 입력칸 금지」 원칙을 그 화면이 어기고 있었다.
+    //   ⚠ 가중치 해시·서빙 모델 연결은 **일부러 뺐다**(계산값·목록 선택이라 자유 글이면 망가진다).
+    name: "set_aibom_field",
+    label: "AI-BOM 기입",
+    domain: "sbom",
+    write: true,
+    description:
+      'AI-BOM 5영역의 칸 하나에 내용을 **적는다**("가드레일 기재해줘", "시스템 프롬프트 적어줘"). 조회는 aibom_status를 쓴다(이건 기입 전용). 칸 이름: 기초 모델·아키텍처·파인튜닝 이력·용도·한계·데이터셋 출처·벡터 DB 위치·시스템 프롬프트·가드레일·API 목록·MCP 서버·서빙 환경·호스팅 공급업체. 예: {"asset":"fraud-detect-llm","field":"가드레일","value":"프롬프트 인젝션 차단 필터 v2"}',
+    params: [
+      { name: "asset", label: "자산", description: "대상 자산 이름 또는 id", required: true },
+      { name: "field", label: "칸", description: "적을 칸 이름 (예: 가드레일)", required: true },
+      { name: "value", label: "내용", description: "그 칸에 적을 내용", required: true },
+    ],
+    autoFill: (args): Record<string, string> => {
+      const raw = (args.asset ?? args.assetId ?? "").trim();
+      const a = resolveAsset(raw);
+      return a && a.name !== raw ? { asset: a.name } : {};
+    },
+    effect: (args) =>
+      `자산 "${(args.asset ?? "").trim()}"의 AI-BOM **${(args.field ?? "").trim()}** 칸에 기록 · 이미 값이 있으면 **덮어씀**(답에 이전 값을 밝힙니다)`,
+    // ⚠ 답은 긴 값을 60자에서 줄인다 — 「답에 남는다」고만 하면 **긴 값을 잃는다**(검토관 [중]).
+    //   지키지 못할 약속을 하느니 어디에 온전히 남는지를 말한다.
+    undo: "이전 값의 앞 60자는 답에 남고, 온전한 값은 📦 AI-BOM 화면에 그대로 있습니다 — 적기 전에 그 화면에서 확인하세요.",
+    run: runSetAiBomField,
   },
   {
     name: "aibom_status",
@@ -1632,6 +1734,54 @@ const TOOLS: AgentTool[] = [
     run: runAddReportSchedule,
   },
   {
+    // 📄 정기 리포트 일정 **바꾸기** — 조회·등록은 있는데 이것만 없어서
+    //   「주간 리포트를 매주 금요일 5시로 바꿔줘」가 안 됐다(2026-08-31 대장 §6 끊김 2).
+    //   엔진(updateSchedule)은 처음부터 있었고 화면 IPC만 그것을 썼다.
+    name: "report_schedule_update",
+    label: "정기 리포트 일정 바꾸기",
+    domain: "report",
+    write: true,
+    description:
+      '이미 걸어 둔 정기 리포트 일정의 주기·요일·시각을 바꾼다. "주간 리포트 금요일 17시로 바꿔줘"에 쓴다. 안 준 값은 그대로 둔다.',
+    params: [
+      { name: "target", label: "어느 일정", description: "주간/일일/매월/분기 (하나뿐이면 비워도 됨)", required: false },
+      { name: "hour", label: "시각(0~23)", description: "몇 시로 바꿀지", required: false },
+      { name: "dayOfWeek", label: "요일", description: "주간일 때 — 월~일", required: false },
+      { name: "newType", label: "새 주기", description: "주기 자체를 바꿀 때만", required: false },
+    ],
+    // report_schedule_add와 **같은 규칙**으로 지시문에서 시각·요일을 정정한다(사람이 다시 안 적게).
+    autoFill: (args, instruction) => {
+      const filled: Record<string, string> = {};
+      const h = /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시/.exec(instruction);
+      if (h) {
+        let 시 = Number(h[2]);
+        if ((h[1] === "오후" || h[1] === "저녁" || h[1] === "밤") && 시 < 12) 시 += 12;
+        if (String(시) !== args.hour) filled.hour = String(시);
+      }
+      const d = /(월|화|수|목|금|토|일)요일/.exec(instruction);
+      if (d && !args.dayOfWeek) filled.dayOfWeek = d[1];
+      return filled;
+    },
+    effect: (args) =>
+      `정기 리포트 일정을 바꿉니다 — ${[args.newType && `주기 ${args.newType}`, args.dayOfWeek && `${args.dayOfWeek}요일`, args.hour && `${args.hour}시`].filter(Boolean).join(" · ") || "(바꿀 값이 비어 있음)"}`,
+    undo: "다시 바꾸거나, 보고 화면 › 정기 리포트에서 고칠 수 있습니다.",
+    run: runUpdateReportSchedule,
+  },
+  {
+    // 📄 정기 리포트 일정 **지우기** — 자동 생성이 멈춘다. 만든 리포트는 그대로 남는다.
+    name: "report_schedule_delete",
+    label: "정기 리포트 일정 지우기",
+    domain: "report",
+    write: true,
+    description: '걸어 둔 정기 리포트 일정을 지운다(자동 생성 중지). "주간 리포트 자동 생성 그만해줘"에 쓴다.',
+    params: [
+      { name: "target", label: "어느 일정", description: "주간/일일/매월/분기 (하나뿐이면 비워도 됨)", required: false },
+    ],
+    effect: (args) => `${args.target || "정기"} 리포트 자동 생성을 멈춥니다(이미 만든 리포트는 남습니다)`,
+    undo: "다시 걸려면 \"주간 리포트 금요일 17시로 걸어줘\"라고 하시면 됩니다.",
+    run: runDeleteReportSchedule,
+  },
+  {
     name: "bulk_update",
     label: "취약점 일괄 조치",
     domain: "cross", // 전 자산을 가로질러 조건으로 다건 처리
@@ -1893,6 +2043,60 @@ const TOOLS: AgentTool[] = [
     effect: (args) => `${args.name}의 소개 항목(${args.key})을 「${args.value}」로 기록합니다 — 비교표와 지식 관계(온톨로지)에 반영.`,
     undo: "같은 항목에 빈 값을 기록하면 지워집니다.",
     run: runSetIntroField,
+  },
+  {
+    // 🖥 관제 이벤트 상태 바꾸기 — 「이 이벤트 확인 처리로 바꿔줘」(대장 §2 끊김 4).
+    //   ⚠ update_finding_status는 **취약점 전용**이라 관제 이벤트를 못 받았다. 엔진
+    //     (analysishub setEventStatus)은 있는데 화면 API만 그것을 썼다.
+    name: "set_event_status",
+    label: "관제 이벤트 상태 바꾸기",
+    // ⚠ domain은 정해진 아홉 값 + cross다(TOOL_DOMAINS). "analysis"는 **없는 값**이라 tsc가
+    //   잡았다 — 관제 이벤트는 로그·취약점·리포트를 가로지르므로 cross가 맞다.
+    domain: "cross",
+    write: true,
+    description:
+      '관제(분석 허브) 이벤트의 처리 상태를 바꾼다 — 확인함·처리 중·완료·무시. "이 이벤트 확인 처리로 바꿔줘"에 쓴다. 취약점 상태는 update_finding_status가 맡는다.',
+    params: [
+      { name: "event", label: "이벤트", description: "이벤트 제목이나 대상(호스트·IP)", required: true },
+      { name: "status", label: "상태", description: "확인함 / 처리 중 / 완료 / 무시", required: true },
+      { name: "note", label: "메모", description: "왜 그렇게 정했는지 (선택)", required: false },
+    ],
+    effect: (args) => `관제 이벤트 「${args.event ?? ""}」의 상태를 "${args.status ?? ""}"로 기록`,
+    undo: "다시 다른 상태로 바꾸면 됩니다(이력은 남습니다).",
+    run: runSetEventStatus,
+  },
+  {
+    // 🧰 보안제품 지우기 — 「FW-01 등록부에서 삭제해줘」(대장 §7 끊김 3).
+    //   ⚠ 자식 문서(매뉴얼·점검 문서)가 **함께 지워진다** — 결재판 문구에서 그 사실을 먼저 말한다.
+    //     되돌릴 수 없는 삭제라 되돌리기 안내도 「다시 등록」이라고 정직하게 적는다.
+    name: "delete_product",
+    label: "보안제품 지우기",
+    domain: "products", // ⚠ 단수 "product"가 아니다(TOOL_DOMAINS) — tsc가 잡아 줬다.
+    write: true,
+    description: '보안제품을 등록부에서 지운다(매뉴얼·점검 문서도 함께 지워진다). "FW-01 등록부에서 삭제해줘"에 쓴다.',
+    params: [
+      { name: "name", label: "제품명", description: "지울 보안제품 이름", required: true },
+    ],
+    effect: (args) => `보안제품 「${args.name ?? ""}」을 등록부에서 삭제 · **그 제품의 매뉴얼·점검 문서도 함께 삭제**`,
+    undo: "되돌릴 수 없습니다 — 필요하면 대화창에서 다시 등록해야 하고, 문서도 다시 올려야 합니다.",
+    run: runDeleteProduct,
+  },
+  {
+    // 📄 VEX 현황 — 「VEX 파일 내보내줘」(대장 §4 끊김 2 · 계획서 중-7 SBOM 갈래).
+    //   ⚠ **읽기 도구다.** 대화창은 파일을 건네지 못하므로 「지금 내보내면 어떤 상태로 나가는지」를
+    //     숫자로 보여 주고 파일 받는 자리를 알려 준다. 「내보냈습니다」라고 말하지 않는다 —
+    //     실제로 파일을 안 만들었는데 만들었다고 하면 「하지 않은 일을 했다고 말함」이 된다.
+    name: "vex_status",
+    label: "VEX 현황",
+    domain: "sbom",
+    write: false,
+    description:
+      'VEX(취약점 대응 상태 문서)로 내보내면 어떤 상태가 몇 건 나가는지 본다. "VEX 파일 내보내줘"·"VEX로 나가면 어떤 상태야?"에 쓴다. 파일 자체는 ③ 조치 › ✅ 조치·승인 화면에서 받는다.',
+    params: [
+      { name: "asset", label: "자산", description: "특정 자산만 볼 때 (선택, 비우면 전체)", required: false },
+    ],
+    directAnswer: true,
+    run: runVexStatus,
   },
 ];
 

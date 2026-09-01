@@ -1091,6 +1091,46 @@ async function refreshFtsIndex(table: lancedb.Table): Promise<void> {
  * 관련성 게이트(0.95 임계값)를 그대로 유지할 수 있기 때문이다. 순위 점수만 남으면
  * "무관한 질문에 잡음 조각 주입" 사고가 다시 열린다.
  */
+/**
+ * 상위 결과가 **한 문서에 독점되지 않게** 자른다 (2026-09-01).
+ *
+ * ■ 무슨 일이 있었나 — 실측
+ *   「개인정보처리시스템 접속기록은 최소 몇 년 보관해야 하고 근거 법령은?」에
+ *   상위 **8건이 전부 같은 PDF 한 편**이었다(개인정보_안전성_확보조치_기준_안내서_2024.pdf).
+ *   사내 근거 문서(`보안규제_법적근거_모음.md` — 시행령 제30조·고시 제8조가 한 줄로 적혀 있다)는
+ *   **후보에 아예 못 들었다.** 그래서 답이 조문 번호를 못 대고 「해설 89에 근거한다」로 끝났다.
+ *   ⚠ 더 나쁜 것: 그 PDF의 2위 조각은 「최소 3년간 보관」인데 그건 **접근 권한 부여 내역**
+ *     이야기다. 한 문서만 보이면 **옆 조각을 접속기록 답으로 잘못 읽을 위험**까지 생긴다.
+ *
+ * ■ 왜 이 방식인가
+ *   순위를 흔들지 않는다 — 순서대로 담되 **한 문서가 몫을 다 쓰면 그 뒤 조각은 뒤로 미룬다.**
+ *   자리가 남으면 미뤄 둔 것으로 **끝까지 채운다.** 그래서 **돌려주는 개수는 전과 같다** —
+ *   다양성만 늘고 잃는 것이 없다. (덜 주면 「고치려다 근거를 줄인」 꼴이 된다.)
+ *
+ * ⚠ 한 문서로만 답할 수 있는 물음도 있다 — 그래서 몫을 넉넉히(기본 3) 둔다.
+ *   1로 조이면 이어지는 문맥(같은 절의 앞뒤 조각)이 끊겨 답이 되레 나빠진다.
+ */
+function 문서를섞어자르기<T extends { documentId?: string }>(목록: T[], topK: number, 문서당 = 3): T[] {
+  if (목록.length <= topK) return 목록.slice(0, topK);
+  const 셈 = new Map<string, number>();
+  const 담김: T[] = [];
+  const 미룸: T[] = [];
+  for (const c of 목록) {
+    if (담김.length >= topK) break;
+    const d = c.documentId ?? "";
+    const n = 셈.get(d) ?? 0;
+    if (n >= 문서당) { 미룸.push(c); continue; }
+    셈.set(d, n + 1);
+    담김.push(c);
+  }
+  // 자리가 남으면 미뤄 둔 것으로 채운다 — **개수는 전과 같아야 한다.**
+  for (const c of 미룸) {
+    if (담김.length >= topK) break;
+    담김.push(c);
+  }
+  return 담김;
+}
+
 async function hybridSearch(question: string, topK: number, agentId?: string, screen?: string, viewer?: Viewer): Promise<FusedChunk[]> {
   const db = await lancedb.connect(DB_PATH);
   const names = await db.tableNames();
@@ -1208,9 +1248,9 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   if (역할영역들.length) {
     let boosted = fused;
     for (const 영역 of 역할영역들) boosted = applyCategoryBoost(boosted, 영역, true);
-    결과 = boosted.slice(0, topK);
+    결과 = 문서를섞어자르기(boosted, topK);
   } else {
-    결과 = applyCategoryBoost(fused, categoryForScreen(screen)).slice(0, topK);
+    결과 = 문서를섞어자르기(applyCategoryBoost(fused, categoryForScreen(screen)), topK);
   }
   // RAG 실동작 신호(2026-08-20 AI 팀 가시화) — 검색 4경로(queryMemory·Scored·Relevant·Graded)가
   // 전부 이 함수를 지나므로 여기 한 곳이 전 경로를 커버한다. 레일 R 아이콘이 이 신호로 반짝인다.

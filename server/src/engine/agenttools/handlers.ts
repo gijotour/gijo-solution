@@ -2,7 +2,7 @@
 // 본문은 원문 그대로다. 레지스트리(등록표)는 registry.ts, 겉문은 ../agenttools.ts(배럴).
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
 import { listAssets, getAsset, registerAsset, updateAssetOwnership, updateAssetMeta, setAssetRobustness, isAiAsset, Asset, 자산표시이름, 예시데이터뿐인가 } from "../assets";
-import { computeAssetCoverage, coverageSummaryText, type GapKind } from "../assetcoverage";
+import { computeAssetCoverage, coverageSummaryText, sbomApplies, type GapKind } from "../assetcoverage";
 // 비교 도구(2026-08-28) — **정적** import: 화살 #6에서 걷은 「동적 습관」을 새로 만들지 않는다
 // (handlers는 꼭대기 층이라 순환 없음 · require는 vitest에서 .ts를 못 찾아 시험이 실증했다).
 import { listProductIntros, listIntroFields, setIntroField, INTRO_FIELD_SCHEMA } from "../productintro";
@@ -13,13 +13,13 @@ import { 표식, 심각도한글, 심각도표식, 자산종류한글 } from "..
 import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
 import { 한줄풀이글, 섞임고지 } from "../findingplain";
-import { eol찾기, eol한줄 } from "../eol-seed";
+import { eol찾기, eol한줄확실도 } from "../eol-seed";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "../packagescan";
 import { targetRunner, runnerFor } from "../hardeningscan";
 import { listTargets } from "../hardeningtargets";
 import { 잃은취약점찾기, 잃은취약점현황글, 되살리기 } from "../findingsrestore";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "../securityproducts";
-import { listMaintenanceItems, createMaintenanceItem } from "../maintenance";
+import { listMaintenanceItems, createMaintenanceItem, submitReport, approveItem, rejectItem, type MaintenanceItem } from "../maintenance";
 import { listCompliance, setComplianceStatus } from "../compliance";
 import { generateSbom } from "../sbom";
 import type { ComplianceStatus } from "../compliance";
@@ -1916,15 +1916,17 @@ export function runAibomStatus(args: Record<string, string>): string {
     `AI 자산 ${rows.length}건${itNote} — AI-BOM 미완성 ${incomplete.length}건, SBOM 미생성 ${noSbom.length}건, 견고성 미점검 ${noRobustness.length}건`;
   const lines = rows
     .slice(0, 10)
-    .map((r) => `- ${자산표시이름(r.a.id)}: ${r.filled}/${r.total} 기재${r.missing.length ? ` (미기재 ${r.missing.length}개)` : " ✓"}`);
+    .map((r) => `- ${자산표시이름(r.a.id)}: ${r.filled}/${r.total} 기재${r.missing.length ? ` (미기재 ${r.missing.length}개)` : " ✓"}${r.a.sbomGeneratedAt ? "" : " · SBOM 없음"}`);
   const more = rows.length > 10 ? `\n… 외 ${rows.length - 10}건` : "";
   // ⚠ 숫자만 주고 끝내면 "그래서 뭘 하지"가 남는다(2026-08-03 18건 실측 규범).
-  // ⚠⚠ **있는 명령만 적는다.** AI-BOM 항목을 채우는 대화창 도구는 아직 없다 —
-  //    없는 것을 안내하면 담당자가 그 말을 따라가다 막다른 길에 선다(2026-08-04 확인).
+  // ⚠⚠ **있는 명령만 적는다** — 없는 것을 안내하면 담당자가 그 말을 따라가다 막다른 길에 선다.
+  //    (2026-09-01) 그 이유로 오래 비워 뒀던 「채우는 길」이 생겼다 — set_aibom_field.
+  //    ⚠ 이 안내를 고칠 때는 **도구가 실제로 있는지 먼저 확인**할 것. 여기 적힌 말이
+  //      곧 담당자가 따라 칠 명령이다.
   const 다음 = noSbom.length
     ? `\n\n${표식.다음} SBOM이 없는 자산은 "○○ SBOM 만들어줘"라고 하면 만듭니다.`
     : incomplete.length
-      ? `\n\n${표식.다음} 어느 항목이 비었는지 보려면 "○○ AI-BOM 보여줘"라고 하세요.`
+      ? `\n\n${표식.다음} 비어 있는 칸은 "○○ 가드레일 기재해줘"처럼 **대화로 바로 적으실 수 있습니다**(칸 이름은 "○○ AI-BOM 보여줘"로 확인).`
       : "";
   return `${head}\n${lines.join("\n")}${more}${다음}`;
 }
@@ -1935,7 +1937,11 @@ export function runAibomStatus(args: Record<string, string>): string {
 export function runProductStatus(args: Record<string, string>): string {
   const q = (args.query ?? "").trim().toLowerCase();
   const all = listProducts();
-  if (all.length === 0) return "등록된 보안제품이 없습니다. — 아직 등록 전이라는 뜻입니다. 보안제품 화면에서 방화벽·IPS·EDR 등을 추가하면 매뉴얼·점검 이력이 함께 쌓입니다.";
+  // ⚠ **없는 곳으로 보내고 있었다**(2026-08-31). 「보안제품 화면에서 추가하면」이라고 안내하는데,
+  //   그 등록 폼은 2026-08-02 사용자 지시로 걷어냈다(products.html:649 「제품 등록은 **대화창**에서
+  //   한다」). 파일럿 첫날 담당자가 처음 던지는 물음이라 그대로 시연에 노출된다.
+  //   → 실제로 되는 길(대화창)로 안내한다. 「지시는 대화창에서만」 원칙과도 이쪽이 맞다.
+  if (all.length === 0) return "등록된 보안제품이 없습니다 — 아직 등록 전이라는 뜻입니다. 여기 대화창에 \"보안제품 등록해줘\"라고 말씀하시면 방화벽·IPS·EDR 등을 담을 수 있습니다(확인 판이 뜹니다). 등록하면 매뉴얼·점검 이력이 함께 쌓입니다.";
 
   const matched = q
     ? all.filter((p) => 필터에맞나(`${p.name} ${p.category} ${p.vendor ?? ""} ${p.model ?? ""} ${p.note ?? ""}`, q))
@@ -2239,7 +2245,7 @@ export function runSbomCoverage(assetId?: string): string {
     const 끝난것: string[] = [];
     for (const c of a.components ?? []) {
       const row = eol찾기(c.name, c.version);
-      if (row) 끝난것.push(`  · ${c.name} ${c.version !== "-" ? c.version : ""} — ${eol한줄(row)}`);
+      if (row) 끝난것.push(`  · ${c.name} ${c.version !== "-" ? c.version : ""} — ${eol한줄확실도(c.name, row)}`);
     }
     return [
       자산표시이름(a.id),
@@ -2256,8 +2262,24 @@ export function runSbomCoverage(assetId?: string): string {
     실제 += 직접;
     if (직접 === 0) 비어있음.push(자산표시이름(a.id));
   }
+  // ★ SBOM이 **아예 없는** 자산을 여기서 함께 말한다(2026-09-01 검토관 [상]).
+  //   전에는 「SBOM 없는 자산 알려줘」를 aibom_status로 보냈는데 그 도구는 **AI 자산만** 센다 —
+  //   IT·일반 소프트웨어 자산이 통째로 빠졌고, 등록 자산이 전부 IT면 「등록된 AI/모델 자산이
+  //   없습니다」라고 답했다(SBOM 없는 자산이 12건 있는데 없다고 말하는 셈).
+  //   ⚠ 잣대는 **assetcoverage.sbomApplies 하나**를 쓴다 — 화면·현황 카드와 같은 수를 말해야 한다.
+  const 대상들 = (자산들 as NonNullable<ReturnType<typeof getAsset>>[]).filter(sbomApplies);
+  const SBOM없음 = 대상들.filter((a) => !a.sbomGeneratedAt);
+  const 제외수 = 자산들.length - 대상들.length;
   return [
     `자산 ${자산들.length}개 · 구성요소 **${총}개** — 장비에서 직접 읽은 것 **${실제}개**`,
+    SBOM없음.length
+      ? `${표식.주의} **SBOM이 아예 없는 자산 ${SBOM없음.length}건**${제외수 ? ` (스캐너로 들여온 IP 호스트·인프라 장비 ${제외수}건은 SBOM 대상이 아니라 제외)` : ""}
+  · ${SBOM없음.slice(0, 8).map((a) => 자산표시이름(a.id)).join(", ")}${SBOM없음.length > 8 ? ` 외 ${SBOM없음.length - 8}건` : ""}`
+      : 대상들.length
+        // ⚠ **없음과 다 됐음을 가른다**(재검토 [하]). 0건이면 「0건 모두에 있습니다」가 되어
+        //   아직 아무것도 시작 안 한 현장에 「끝났다」고 안심시킨다 — 정직 가드 위반이다.
+        ? `SBOM은 대상 자산 ${대상들.length}건 모두에 있습니다.`
+        : `SBOM을 만들 수 있는 자산이 **없습니다** — 등록된 것이 전부 스캐너로 들여온 IP 호스트·인프라 장비입니다(SBOM 대상이 아닙니다). 소프트웨어·AI 자산을 등록하면 그때부터 셉니다.`,
     실제 === 0
       ? `${표식.주의} 아직 **직접 읽은 부품이 하나도 없습니다.** 지금 SBOM은 스캐너가 준 제품 이름(CPE) 수준이라 패키지·라이브러리가 비어 있습니다.`
       : `${표식.주의} 직접 읽지 않은 자산 ${비어있음.length}개는 아직 제품(CPE) 수준입니다.`,
@@ -2344,7 +2366,10 @@ export function runHardeningScheduleList(): string {
     const last = r.lastResult === "fail"
       ? `최근 ${fmt(r.lastRunAt)} ✕ 실패(${r.lastError || "원인 미상"}) — 표시 준수율은 그전 성공값`
       : r.lastRunAt ? `최근 ${fmt(r.lastRunAt)} · 준수율 ${r.lastRate ?? "-"}%${r.lastFail ? ` · 취약 ${r.lastFail}건` : ""}` : "아직 실행 전";
-    return `- ${r.targetLabel} — ${r.standard.toUpperCase()} 기준 · ${r.intervalHours}시간마다 · ${state} · 다음 ${fmt(r.nextRunAt)} (${last})`;
+    // ⚠ 로컬로 등록한 대상은 **장비에 붙지 않는다** — 장비 이름만 적으면 「그 장비를
+    //   정기 점검 중」으로 읽힌다(2026-09-01 3차 검토 [중]).
+    const 어디 = r.원격 ? r.targetLabel : `이 서버 자신(이름표: ${r.targetLabel})`;
+    return `- ${어디} — ${r.standard.toUpperCase()} 기준 · ${r.intervalHours}시간마다 · ${state} · 다음 ${fmt(r.nextRunAt)} (${last})`;
   });
   const on = rows.filter((r) => r.enabled).length;
   return [`원격 정기점검 스케줄 ${rows.length}건(가동 ${on} · 중지 ${rows.length - on})`, ...lines].join("\n");
@@ -3346,16 +3371,13 @@ export async function runVerifyFinding(args: Record<string, string>): Promise<st
 /** 정기 리포트 스케줄 걸기 — "주간 리포트 매주 금요일 17시로 걸어줘"(⑤보고의 쓰기 짝). */
 export async function runAddReportSchedule(args: Record<string, string>): Promise<string> {
   const { createSchedule, SCHEDULE_TYPE_LABEL } = await import("../reportschedule.js");
-  const typeMap: Record<string, "daily" | "weekly" | "monthly" | "quarterly"> = {
-    "일일": "daily", "매일": "daily", "주간": "weekly", "매주": "weekly",
-    "월간": "monthly", "매월": "monthly", "분기": "quarterly",
-  };
-  const type = typeMap[(args.type ?? "").trim()] ?? (["daily", "weekly", "monthly", "quarterly"].includes(args.type) ? (args.type as "daily") : null);
+  // ⚠ 주기 해석은 **한 곳에서만**(주기해석) — 바꾸기 도구가 생기면서 사본이 둘이 될 뻔했다.
+  //   따로 적으면 「주간」을 한쪽은 weekly로, 다른 쪽은 다르게 읽는 날이 온다(2026-08-31).
+  const type = 주기해석(args.type);
   if (!type) return `주기를 해석하지 못했습니다 (받은 값: "${args.type}") — 일일/주간/매월/분기 중 하나로 말씀해 주세요.`;
   const hour = Number(args.hour);
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) return `시각(hour)은 0~23 사이여야 합니다 (받은 값: "${args.hour}").`;
-  const WEEKDAY: Record<string, number> = { "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6 };
-  const dayOfWeek = type === "weekly" ? (WEEKDAY[(args.dayOfWeek ?? "").trim().replace(/요일$/, "")] ?? 1) : null;
+  const dayOfWeek = type === "weekly" ? (요일해석(args.dayOfWeek) ?? 1) : null;
   const sch = createSchedule({ type, format: "pdf", audience: "internal", dayOfWeek, hour, minute: 0 });
   return `${SCHEDULE_TYPE_LABEL[sch.type]} 리포트 스케줄을 걸었습니다 — 다음 실행 ${새시각(sch.nextRunAt)} (pdf · 내부용). 끄거나 지우는 것은 보고 화면 › 정기 리포트에서.`;
 }
@@ -3425,17 +3447,23 @@ export async function runCreateRequestDoc(args: Record<string, string>): Promise
     `문서함(내 문서)에서 수신처를 적고 다듬은 뒤 ⬇ PDF·Word로 내보내 전달하세요. 보낸 뒤에는 보안제품 화면의 요청 이력에서 상태(보냄→회신)를 표시해 주세요.`;
 }
 
+// ⚠ 이 도구는 **팀 전체**를 센다(만든 사람으로 안 좁힌다). 조치 요청서는 밖(협력사·벤더)으로
+//   나가는 것이라 「회신 없는 요청」은 팀이 함께 봐야 하는 사실이고, 제품별 조회를 팀 자리로
+//   둔 것과 같은 결이다. 대신 **그렇다고 말한다** — 2026-08-31에 내 문서 📨 판(내가 만든 것만)이
+//   생기면서 같은 것을 두 자리가 다르게 세게 됐는데, 어느 쪽도 자기 범위를 안 밝히고 있었다.
+//   (범위를 좁혀야 한다는 결정이 나오면 listOutboundRequests({ createdBy })가 이미 있다.)
 export async function runRequestStatus(): Promise<string> {
   const rem = await import("../remrequest.js");
   const all = rem.listOutboundRequests();
   if (all.length === 0) return "📨 요청 현황 — 아직 만든 요청서가 없습니다. 취약점 목록에서 고른 뒤 \"조치 요청서 만들어줘\"라고 하면 초안이 내 문서에 생깁니다.";
   const 셈 = (s: string) => all.filter((r) => r.status === s).length;
   const 미회신 = rem.unansweredRequests();
-  const L = [`📨 요청 현황 — 전체 ${all.length}건 · 초안 ${셈("draft")} · 보냄 ${셈("sent")} · 회신 ${셈("replied")} · 무응답 ${셈("noreply")}`];
+  const L = [`📨 요청 현황(팀 전체) — ${all.length}건 · 초안 ${셈("draft")} · 보냄 ${셈("sent")} · 회신 ${셈("replied")} · 무응답 ${셈("noreply")}`];
   if (미회신.length) {
     L.push(`⚠ 회신 없는 요청 ${미회신.length}건 — 재촉이 필요할 수 있습니다:`);
     for (const r of 미회신.slice(0, 5)) L.push(`- ${rem.KIND_KO[r.kind]}${r.targetName ? ` · ${r.targetName}` : ""} (보낸 날 ${new Date(r.sentAt ?? r.createdAt).toLocaleDateString("ko-KR")})`);
   }
+  L.push("내가 만든 것만 보려면 내 문서 → 📨 조치 요청서를 여세요.");
   return L.join("\n");
 }
 
@@ -3535,4 +3563,539 @@ export function runSetIntroField(args: Record<string, string>): string {
   return v
     ? `${it.name}의 ${항목.label}${조사(항목.label, "을")} 「${v}」로 기록했습니다 — 비교표와 지식 관계(온톨로지)에 바로 반영됩니다.`
     : `${it.name}의 ${항목.label} 값을 지웠습니다.`;
+}
+
+// ── 정기 점검 닫기 — 점검서 올리기 · 승인/반려 (2026-08-31) ───────────────────
+//
+// ■ 왜 (대장 §4 끊김 3·4 · §5 끊김 3)
+//   엔진은 **처음부터 다 있었다**(maintenance.ts submitReport·approveItem·rejectItem).
+//   빠진 것은 대화 도구뿐이라, 정기 점검을 **화면 버튼으로만** 닫을 수 있었다.
+//   더 나쁜 것은 화면이 담당자에게 **말을 시켜 놓고 받지 못했다**는 점이다 —
+//   [점검서 올리기] 단추가 대화창에 「「○○」 점검서를 올릴게」라는 문장을 직접 넣어 주는데,
+//   그 말을 받는 분기도 도구도 없었다(route-explain: 걸리는 규칙 없음).
+//   제품이 시킨 대로 쳤는데 아무 일도 안 일어나는 자리다.
+//
+// ■ 무엇을 안 하나
+//   점검 항목 **생성**은 이미 schedule_maintenance가 한다 — 여기서 또 만들지 않는다.
+//   상태 전이 규칙(reported만 승인 가능 등)도 maintenance.ts가 정본이다. 여기서 다시 판정하지
+//   않고 엔진이 던지는 말을 그대로 사람에게 전한다(잣대가 두 벌이 되면 어긋난다).
+
+/** 지금 지시한 사람 — 감사·이력에 남는 이름(runKnowledgeBundleImport와 같은 방식). */
+function 행위자(): string {
+  const v = currentViewer();
+  return (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)";
+}
+
+/** 점검 이름·제품명으로 점검 항목 하나를 고른다. 여러 개면 고르라고 말한다(지어내지 않는다). */
+function 점검찾기(말: string, 상태?: MaintenanceItem["status"]): MaintenanceItem | string {
+  const q = (말 ?? "").trim();
+  const 전부 = listMaintenanceItems().filter((x) => (상태 ? x.status === 상태 : true));
+  if (!전부.length) {
+    return 상태 === "reported"
+      ? "승인 대기 중인 점검이 없습니다 — 점검서가 올라온 것이 있어야 승인할 수 있습니다."
+      : "등록된 정기 점검이 없습니다. 대화창에 \"○○ 정기점검 잡아줘\"라고 하시면 일정을 등록합니다.";
+  }
+  if (!q) {
+    if (전부.length === 1) return 전부[0];
+    const 목록 = 전부.slice(0, 8).map((x) => `- ${x.title} (${x.productName} · ${x.scheduleDate})`).join("\n");
+    return `어느 점검인지 말씀해 주세요:\n${목록}`;
+  }
+  // 가장 긴 일치를 고른다 — 「FOCS」와 「FOCS 메뉴얼 ver1 2」가 다 걸리면 긴 쪽이 맞다
+  // (schedule_maintenance의 제품명 대조와 같은 규칙 — 잣대를 새로 만들지 않는다).
+  const 걸린 = 전부
+    .filter((x) => q.includes(x.title) || q.includes(x.productName) || x.title.includes(q))
+    .sort((a, b) => b.title.length - a.title.length);
+  if (!걸린.length) {
+    const 예 = 전부.slice(0, 6).map((x) => x.title).join(", ");
+    return `"${q}"에 맞는 점검을 못 찾았습니다. 등록된 점검: ${예}`;
+  }
+  return 걸린[0];
+}
+
+/** 점검서 올리기 — 담당자가 점검을 마치고 결과를 적어 낸다(상태: 예정/기한초과 → 승인 대기). */
+export function runSubmitMaintenanceReport(
+  args: Record<string, string>,
+): string {
+  const 고름 = 점검찾기(args.item ?? args.title ?? args.productName ?? "");
+  if (typeof 고름 === "string") return 고름;
+  const note = (args.note ?? args.result ?? "").trim();
+  if (!note) {
+    return `「${고름.title}」 점검서에 **점검 결과**를 함께 적어 주세요 — 예: "${고름.title} 점검서 올릴게, 이상 없음".`;
+  }
+  try {
+    const 결과 = submitReport(고름.id, { note, reportDocName: args.reportDocName?.trim() || undefined }, 행위자());
+    return `점검서를 올렸습니다 — ${결과.title} (${결과.productName}) · 상태 **승인 대기**.\n관리자가 대화창에서 "「${결과.title}」 점검 승인해줘"라고 하면 닫힙니다.`;
+  } catch (e) {
+    // 엔진이 상태 전이를 판정한다 — 여기서 다시 판정하지 않고 그 말을 그대로 전한다.
+    return `점검서를 올리지 못했습니다 — ${(e as Error).message}`;
+  }
+}
+
+/** 점검 승인·반려(관리자). 반려는 이유를 반드시 받는다 — 이유 없는 반려는 다시 할 수가 없다. */
+export function runReviewMaintenance(
+  args: Record<string, string>,
+): string {
+  const 반려인가 = /반려|거절|돌려/.test((args.decision ?? "").trim());
+  const 고름 = 점검찾기(args.item ?? args.title ?? args.productName ?? "", "reported");
+  if (typeof 고름 === "string") return 고름;
+  try {
+    if (반려인가) {
+      const 이유 = (args.reason ?? "").trim();
+      if (!이유) return `반려하려면 **이유**를 함께 적어 주세요 — 이유가 없으면 담당자가 무엇을 다시 해야 할지 모릅니다.`;
+      const r = rejectItem(고름.id, 행위자(), 이유);
+      return `점검을 반려했습니다 — ${r.title} (${r.productName}) · 이유: ${이유}\n담당자가 보완해서 점검서를 다시 올리면 승인 대기로 돌아옵니다.`;
+    }
+    const r = approveItem(고름.id, 행위자());
+    // 반복 점검이면 엔진이 승인하면서 **다음 회차를 자동 생성**한다(maintenance.ts approveItem).
+    //   ⚠ 날짜를 여기서 다시 계산하지 않는다 — 잣대가 두 벌이 되면 어긋난다.
+    //   ⚠ 1차 초안은 `r.nextScheduleDate`를 읽었는데 **없는 필드였다**(MaintenanceItem에 그런
+    //     칸이 없다) — 원천을 안 열고 이름을 지어낸 것이다. 이 저장소의 단골 함정.
+    const 다음 = r.intervalDays
+      ? `\n반복 점검이라 다음 회차(${r.intervalDays}일 뒤)를 자동으로 잡아 두었습니다.`
+      : "";
+    return `점검을 승인했습니다 — ${r.title} (${r.productName}) · 상태 **완료**.${다음}`;
+  } catch (e) {
+    return `처리하지 못했습니다 — ${(e as Error).message}`;
+  }
+}
+
+// ── 정기 리포트 일정 바꾸기·지우기 (2026-08-31) ─────────────────────────────
+//
+// ■ 왜 (대장 §6 끊김 2)
+//   조회(report_schedule_list)와 등록(report_schedule_add)은 있는데 **바꾸기·지우기가 없어서**
+//   「주간 리포트를 매주 금요일 5시로 바꿔줘」가 안 됐다. 엔진에는 updateSchedule·deleteSchedule이
+//   처음부터 있었고 화면 IPC만 그것을 썼다 — 대화창에는 길이 없었다.
+//
+// ■ 사본을 만들지 않는다
+//   주기(일일/주간/매월/분기)와 요일 해석은 runAddReportSchedule 안에 있던 것을 **뽑아 함께
+//   쓴다.** 새로 적으면 「주간」을 한쪽은 weekly로, 다른 쪽은 다르게 읽는 날이 온다.
+
+const 주기표: Record<string, "daily" | "weekly" | "monthly" | "quarterly"> = {
+  "일일": "daily", "매일": "daily", "주간": "weekly", "매주": "weekly",
+  "월간": "monthly", "매월": "monthly", "분기": "quarterly",
+};
+const 요일표: Record<string, number> = { "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6 };
+
+/** "주간"·"매주"·"weekly" → weekly. 못 읽으면 null(지어내지 않는다). */
+export function 주기해석(값: string | undefined): "daily" | "weekly" | "monthly" | "quarterly" | null {
+  const t = (값 ?? "").trim();
+  if (!t) return null;
+  if (주기표[t]) return 주기표[t];
+  return (["daily", "weekly", "monthly", "quarterly"] as const).includes(t as never)
+    ? (t as "daily" | "weekly" | "monthly" | "quarterly")
+    : null;
+}
+
+/** "금요일"·"금" → 5. 못 읽으면 null. */
+export function 요일해석(값: string | undefined): number | null {
+  const d = (값 ?? "").trim().replace(/요일$/, "");
+  return d in 요일표 ? 요일표[d] : null;
+}
+
+/** 일정 한 줄에서 **이 도구가 쓰는 칸만** 적는다 — reportschedule을 동적 import하므로
+ *  타입을 끌어오지 않고 모양으로 받는다(필드 이름은 원천과 같아야 한다). */
+// ⚠ type은 **다섯 값**이다 — ondemand가 더 있다(reportschedule.ts ScheduleType).
+//   네 값으로 적었다가 tsc가 잡았다. 원천을 안 열고 가정하면 이렇게 걸린다.
+type 일정칸 = { id: string; type: "ondemand" | "daily" | "weekly" | "monthly" | "quarterly"; hour: number; dayOfWeek?: number | null };
+
+/** 어느 일정인가 — 하나면 그것, 여럿이면 고르라고 한다(아무거나 안 집는다). */
+function 일정찾기(말: string, 목록: 일정칸[], 라벨: Record<string, string>): 일정칸 | string {
+  if (!목록.length) {
+    return "등록된 정기 리포트 일정이 없습니다. 대화창에 \"주간 리포트 매주 금요일 5시로 걸어줘\"라고 하시면 새로 겁니다.";
+  }
+  const q = (말 ?? "").trim();
+  const 주기 = 주기해석(q) ?? (q ? 주기해석(q.replace(/\s*리포트.*$/, "")) : null);
+  const 걸린 = 주기 ? 목록.filter((s) => s.type === 주기) : 목록;
+  if (걸린.length === 1) return 걸린[0];
+  if (!걸린.length) {
+    const 있는것 = 목록.map((s) => 라벨[s.type]).join(", ");
+    return `"${q}"에 맞는 일정을 못 찾았습니다. 등록된 것: ${있는것}`;
+  }
+  const 목록글 = 걸린.map((s) => `- ${라벨[s.type]} (${s.hour}시)`).join("\n");
+  return `어느 일정인지 말씀해 주세요:\n${목록글}`;
+}
+
+/** 정기 리포트 일정 바꾸기 — 주기·요일·시각을 고친다(안 준 것은 그대로 둔다). */
+export async function runUpdateReportSchedule(args: Record<string, string>): Promise<string> {
+  const { listSchedules, updateSchedule, SCHEDULE_TYPE_LABEL } = await import("../reportschedule.js");
+  const 고름 = 일정찾기(args.target ?? args.type ?? "", listSchedules(), SCHEDULE_TYPE_LABEL);
+  if (typeof 고름 === "string") return 고름;
+
+  const patch: { type?: "daily" | "weekly" | "monthly" | "quarterly"; dayOfWeek?: number | null; hour?: number } = {};
+  const 새주기 = 주기해석(args.newType ?? args.type ?? "");
+  // ⚠ target으로 고른 주기와 같으면 「바꾼 것」이 아니다 — newType이 따로 있을 때만 주기를 옮긴다.
+  if (args.newType && 새주기) patch.type = 새주기;
+  const 새요일 = 요일해석(args.dayOfWeek ?? "");
+  if (새요일 !== null) patch.dayOfWeek = 새요일;
+  if (args.hour !== undefined && args.hour !== "") {
+    const h = Number(args.hour);
+    if (!Number.isInteger(h) || h < 0 || h > 23) return `시각(hour)은 0~23 사이여야 합니다 (받은 값: "${args.hour}").`;
+    patch.hour = h;
+  }
+  if (!Object.keys(patch).length) {
+    return `무엇을 바꿀지 알려 주세요 — 주기(일일/주간/매월/분기)·요일·시각 중에서. 예: "주간 리포트 금요일 17시로 바꿔줘".`;
+  }
+  const 바뀐 = updateSchedule(고름.id, patch);
+  // FAIL_MARKS-예외: **진짜 실패의 오류문**이다 — 고른 뒤 바꾸기 사이에 남이 지운 경우다
+  //   (0건이라는 정직한 사실이 아니라 처리가 안 된 것). 「없습니다」로 적으면 실패를 정상으로
+  //   포장하게 된다. 감시가 이 줄을 잡아 준 덕에 이유를 적는다.
+  if (!바뀐) return "일정을 찾지 못했습니다(그새 지워졌을 수 있습니다).";
+  const 요일글 = 바뀐.type === "weekly" ? ` ${["일", "월", "화", "수", "목", "금", "토"][바뀐.dayOfWeek ?? 1]}요일` : "";
+  return `정기 리포트 일정을 바꿨습니다 — ${SCHEDULE_TYPE_LABEL[바뀐.type]}${요일글} ${바뀐.hour}시 · 다음 실행 ${새시각(바뀐.nextRunAt)}`;
+}
+
+/** 정기 리포트 일정 지우기 — 자동 생성이 멈춘다(이미 만든 리포트는 그대로 남는다). */
+export async function runDeleteReportSchedule(args: Record<string, string>): Promise<string> {
+  const { listSchedules, deleteSchedule, SCHEDULE_TYPE_LABEL } = await import("../reportschedule.js");
+  const 고름 = 일정찾기(args.target ?? args.type ?? "", listSchedules(), SCHEDULE_TYPE_LABEL);
+  if (typeof 고름 === "string") return 고름;
+  deleteSchedule(고름.id);
+  return `정기 리포트 일정을 지웠습니다 — ${SCHEDULE_TYPE_LABEL[고름.type]} (${고름.hour}시). 자동 생성이 멈춥니다.\n이미 만들어진 리포트는 그대로 남아 있습니다.`;
+}
+
+// ── 관제 이벤트 상태 바꾸기 · 보안제품 지우기 (2026-08-31) ────────────────────
+//
+// ■ 왜 (대장 §2 끊김 4 · §7 끊김 3)
+//   둘 다 **엔진은 있는데 대화 도구가 없어** 화면 버튼으로만 되던 자리다.
+//   · 이벤트 상태: analysishub.ts `setEventStatus`가 있는데 화면 API만 그것을 썼다.
+//     (update_finding_status는 **취약점 전용**이라 관제 이벤트는 받지 못했다.)
+//   · 제품 삭제: securityproducts.ts `deleteProduct`가 자식 문서까지 지우는데 대화 길이 없었다.
+//
+// ⚠ 상태 이름은 **엔진의 EventStatus 그대로**다(open·ack·inprogress·done·ignored).
+//   화면에 보일 우리말은 여기 한 곳에서만 만든다 — 자리마다 지으면 같은 상태가 둘로 보인다.
+
+const 이벤트상태글: Record<string, string> = {
+  open: "열림", ack: "확인함", inprogress: "처리 중", done: "완료", ignored: "무시",
+};
+/** 사람 말 → EventStatus. 못 읽으면 null(지어내지 않는다). */
+function 이벤트상태해석(값: string | undefined): "open" | "ack" | "inprogress" | "done" | "ignored" | null {
+  const t = (값 ?? "").trim();
+  if (!t) return null;
+  if (/^(open|ack|inprogress|done|ignored)$/.test(t)) return t as "open";
+  if (/확인|접수|봤/.test(t)) return "ack";
+  if (/처리\s*중|진행/.test(t)) return "inprogress";
+  if (/완료|끝|해결/.test(t)) return "done";
+  if (/무시|보류|해당\s*없/.test(t)) return "ignored";
+  if (/열림|미처리|다시\s*열/.test(t)) return "open";
+  return null;
+}
+
+/** 관제 이벤트 상태 바꾸기 — 「이 이벤트 확인 처리로 바꿔줘」(대장 §2 끊김 4). */
+export async function runSetEventStatus(args: Record<string, string>): Promise<string> {
+  const { listAnalysisEvents, setEventStatus } = await import("../analysishub.js");
+  const 상태 = 이벤트상태해석(args.status ?? args.decision ?? "");
+  if (!상태) {
+    return `어떤 상태로 바꿀지 알려 주세요 — 확인함 · 처리 중 · 완료 · 무시 중에서 (받은 값: "${args.status ?? ""}").`;
+  }
+  const 전부 = listAnalysisEvents();
+  if (!전부.length) return "관제 이벤트가 없습니다 — 로그·리포트를 반입하면 여기 쌓입니다.";
+  const q = (args.event ?? args.title ?? args.entity ?? "").trim();
+  // 가장 긴 일치를 고른다 — 다른 도구들과 같은 규칙(새 잣대를 만들지 않는다).
+  const 걸린 = q
+    ? 전부
+        .filter((e) => e.title.includes(q) || q.includes(e.title) || e.entity.includes(q) || e.id === q)
+        .sort((a, b) => b.title.length - a.title.length)
+    : 전부;
+  if (!걸린.length) {
+    const 예 = 전부.slice(0, 5).map((e) => `${e.title} (${e.entity})`).join(", ");
+    return `"${q}"에 맞는 이벤트를 못 찾았습니다. 최근 이벤트: ${예}`;
+  }
+  if (!q && 걸린.length > 1) {
+    const 목록 = 걸린.slice(0, 8).map((e) => `- ${e.title} (${e.entity} · ${이벤트상태글[e.status ?? "open"]})`).join("\n");
+    return `어느 이벤트인지 말씀해 주세요:\n${목록}`;
+  }
+  const 고름 = 걸린[0];
+  setEventStatus(고름.id, 상태, (args.note ?? "").trim(), 행위자());
+  return `관제 이벤트 상태를 바꿨습니다 — 「${고름.title}」(${고름.entity}) · ${이벤트상태글[고름.status ?? "open"]} → **${이벤트상태글[상태]}**`;
+}
+
+/** 보안제품 지우기 — 「FW-01 등록부에서 삭제해줘」(대장 §7 끊김 3). */
+export async function runDeleteProduct(args: Record<string, string>): Promise<string> {
+  const { listProducts, deleteProduct } = await import("../securityproducts.js");
+  const q = (args.name ?? args.product ?? "").trim();
+  const 전부 = listProducts();
+  if (!전부.length) return "등록된 보안제품이 없습니다.";
+  if (!q) {
+    const 예 = 전부.slice(0, 8).map((p) => p.name).join(", ");
+    return `어느 제품을 지울지 알려 주세요 — 등록된 것: ${예}`;
+  }
+  const 걸린 = 전부
+    .filter((p) => p.name === q || p.name.includes(q) || q.includes(p.name))
+    .sort((a, b) => b.name.length - a.name.length);
+  if (!걸린.length) {
+    const 예 = 전부.slice(0, 8).map((p) => p.name).join(", ");
+    return `"${q}"에 맞는 제품을 못 찾았습니다. 등록된 것: ${예}`;
+  }
+  if (걸린.length > 1 && !걸린.some((p) => p.name === q)) {
+    return `여러 개가 걸립니다 — 정확한 이름으로 말씀해 주세요: ${걸린.slice(0, 6).map((p) => p.name).join(", ")}`;
+  }
+  const 고름 = 걸린.find((p) => p.name === q) ?? 걸린[0];
+  const 지움 = deleteProduct(고름.id);
+  // FAIL_MARKS-예외: **진짜 실패의 오류문**이다 — 고른 뒤 지우기 사이에 남이 먼저 지운 경우다
+  //   (0건이라는 정직한 사실이 아니라 처리가 안 된 것).
+  if (!지움) return `제품을 지우지 못했습니다 — 「${고름.name}」(그새 지워졌을 수 있습니다).`;
+  return `보안제품을 등록부에서 지웠습니다 — 「${고름.name}」.\n⚠ 그 제품에 매달려 있던 **매뉴얼·점검 문서도 함께** 지워집니다. 점검 일정은 남으니 필요 없으면 따로 정리하세요.`;
+}
+
+// ── VEX 내보내기 — 대화로 (2026-09-01 · 대장 §4 끊김 2 · 계획서 중-7 SBOM 갈래) ────────
+//
+// ■ 왜 (계획서 관계)
+//   중-7의 「SBOM 패키지 수집」 갈래다. 새 기능이 아니라 **이미 있는 엔진에 대화 길을 내는 것**
+//   이다 — vexexport.ts에 buildVexDocument·요약 창구가 온전히 있고, 결재판 화면에는 [파일 받기]
+//   단추까지 있다. 빠진 것은 대화 도구뿐이라 대장이 「안됨 — 받아줄 도구 없음」으로 적었다.
+//
+// ■ 대화에서는 **파일을 주지 않는다**
+//   대화창은 파일을 내려받는 자리가 아니다(화면 단추가 그 일을 한다). 여기서는 **지금 내보내면
+//   어떤 상태로 나가는지**를 숫자로 보여 주고, 파일이 필요하면 어디서 받는지 알려 준다.
+//   ⚠ 「내보냈습니다」라고 말하지 않는다 — 실제로 파일을 만들지 않았는데 만들었다고 하면
+//     「하지 않은 일을 했다고 말함」 계보가 된다.
+
+/** VEX 상태 우리말.
+ *  ⚠ 열쇠는 **vexexport.ts의 toVexAnalysis가 실제로 내보내는 값**이다(그 파일 머리 6~10행이 원천).
+ *    CycloneDX 표준에는 이보다 많은 값이 있지만 우리 승인 흐름이 쓰는 것은 이 넷뿐이다 —
+ *    표준 목록을 보고 넷 밖의 값을 여기에 적으면 **영원히 안 맞는 열쇠**가 된다(2026-09-01 실제로 그랬다). */
+const VEX상태글: Record<string, string> = {
+  under_investigation: "조사 중(아직 판정 안 함)",
+  affected: "영향 있음(조치 중)",
+  fixed: "조치 완료",
+  not_affected: "영향 없음(사유 있음)",
+};
+
+/** VEX 현황 — 「VEX 파일 내보내줘」·「VEX로 나가면 어떤 상태야?」. */
+export async function runVexStatus(args: Record<string, string>): Promise<string> {
+  const { buildVexDocument } = await import("../vexexport.js");
+  const { listFindingReviews } = await import("../approvals.js");
+  const 대상글 = (args.asset ?? args.target ?? "").trim();
+  const 전부 = listFindingReviews();
+  let 볼것 = 전부;
+  let 범위글 = "전체 자산";
+  if (대상글) {
+    const hit = resolveAsset(대상글);
+    if (!hit) {
+      const 예 = listAssets().map((a) => a.name).slice(0, 6).join(", ") || "(없음)";
+      return `"${대상글}"에 맞는 자산을 못 찾았습니다. 등록된 자산: ${예}`;
+    }
+    볼것 = 전부.filter((r) => r.assetId === hit.id);
+    범위글 = hit.name;
+  }
+  if (!볼것.length) {
+    // ⚠ listFindingReviews()는 미검토(pending)까지 **전부** 돌려준다 — 여기가 비었다는 것은
+    //   「판정을 안 했다」가 아니라 **취약점 자체가 없다**는 뜻이다. 말을 헷갈리게 적으면
+    //   담당자가 「판정하면 나오겠지」 하고 없는 것을 기다린다.
+    return `${범위글}에는 등록된 취약점이 없어 VEX로 내보낼 것이 없습니다 — 스캔 결과가 들어오면 미검토도 「조사 중」 상태로 실립니다.`;
+  }
+  const doc = buildVexDocument(볼것);
+  if (!doc.vulnerabilities.length) {
+    return (
+      `${범위글} — 대상 취약점 ${볼것.length}건(미검토 포함)인데 **VEX에 실릴 것은 0건**입니다.\n` +
+      `VEX는 CVE 번호가 있는 것만 싣습니다(표준이 CVE를 열쇠로 씁니다). 스캐너가 CVE를 안 준 항목은 빠집니다.`
+    );
+  }
+  const 셈: Record<string, number> = {};
+  for (const v of doc.vulnerabilities) {
+    const st = ((v.analysis as { state?: string }) || {}).state ?? "?";
+    셈[st] = (셈[st] ?? 0) + 1;
+  }
+  const 줄 = Object.entries(셈)
+    .sort((a, b) => b[1] - a[1])
+    .map(([st, n]) => `- ${VEX상태글[st] ?? st} ${n}건`)
+    .join("\n");
+  // ⚠ 「전체 − 실린 줄 수」로 세면 안 된다 — 한 항목이 CVE를 둘 이상 달면 줄이 늘어 **음수**가 된다.
+  //   빠지는 것의 정의는 「CVE 번호가 하나도 없는 항목」이므로 그것을 그대로 센다.
+  const { cvesOf } = await import("../vexexport.js");
+  const CVE없음 = 볼것.filter((r) => cvesOf(r).length === 0).length;
+  return (
+    `📄 VEX 현황 — ${범위글} · 실릴 취약점 **${doc.vulnerabilities.length}건**\n${줄}\n` +
+    (CVE없음 > 0 ? `\n⚠ 대상 중 **${CVE없음}건은 CVE 번호가 없어 VEX에 안 실립니다**(표준이 CVE를 열쇠로 씁니다).\n` : "\n") +
+    `\n파일로 받으시려면 **③ 조치 › ✅ 조치·승인** 화면의 [VEX 내보내기]에서 받으세요 — 대화창은 파일을 건네지 못합니다.`
+  );
+}
+
+// ── AI-BOM 5영역 기입 — 대화로 (2026-09-01 · 대장 §3-4 항목 5 · 계획서 중-7) ────────────
+//
+// ■ 왜 (계획서 관계 · 원칙 관계)
+//   대장이 「안됨 — 화면(sbom.html textarea+저장)으로만 가능, 대화창 쓰기 도구 없음」으로 적었다.
+//   더 큰 문제는 **원칙 위반**이다 — 「메뉴는 보기용 · 새 화면에 입력칸 금지」인데 이 화면에는
+//   입력칸 13개가 살아 있다. 대화로 넣는 길을 내야 그 입력칸을 걷어낼 수 있다.
+//
+// ■ 손대지 않는 두 칸 (막는 이유가 서로 다르다)
+//   · modelRef    — 로컬 모델 **목록에서 고르는** 칸이다. 아무 글이나 넣으면 레드팀 점검 대상
+//                   연결이 **끊긴다**.
+//   · weightsHash — 모델 파일에서 **계산하는** 값이다. 손으로 적으면 「검증했다」는 **거짓 증거**가
+//                   남는다.
+
+/** 자유 글로 적는 AI-BOM 칸의 영역 이름 — AiBom의 5영역 중 robustness(기계가 채움)를 뺀 다섯. */
+type AiBom영역 = "model" | "dataset" | "prompt" | "agentTool" | "infrastructure";
+
+/** AI-BOM 칸 이름(우리말) → 저장 자리.
+ *  ⚠ 우리말 이름의 **원천은 화면(sbom.html)의 label**이다 — 여기서 새로 짓지 않는다.
+ *    이름이 갈리면 담당자가 화면에서 본 이름을 대화창에 대도 안 먹는다.
+ *    aibomfield.test.ts가 화면의 칸 목록과 여기를 대조한다(한쪽만 늘면 걸린다). */
+const AIBOM칸: Record<string, { 영역: AiBom영역; 키: string; 이름: string }> = {
+  "기초 모델": { 영역: "model", 키: "foundationModel", 이름: "기초 모델 (Foundation Model)" },
+  "아키텍처": { 영역: "model", 키: "architecture", 이름: "아키텍처 정보" },
+  "파인튜닝 이력": { 영역: "model", 키: "finetuneHistory", 이름: "파인튜닝 이력" },
+  "용도": { 영역: "model", 키: "intendedUse", 이름: "용도·사용 범위 (Intended Use — 모델 카드)" },
+  "한계": { 영역: "model", 키: "limitations", 이름: "한계·주의사항 (Limitations — 모델 카드)" },
+  "데이터셋 출처": { 영역: "dataset", 키: "sources", 이름: "학습/파인튜닝 데이터셋 출처" },
+  "벡터 DB 위치": { 영역: "dataset", 키: "vectorDbLocation", 이름: "RAG가 참조하는 Vector DB 위치" },
+  "시스템 프롬프트": { 영역: "prompt", 키: "systemPrompt", 이름: "시스템 프롬프트 및 안전 템플릿" },
+  "가드레일": { 영역: "prompt", 키: "guardrails", 이름: "가드레일(Guardrail) 규칙" },
+  "API 목록": { 영역: "agentTool", 키: "apis", 이름: "호출 가능 API 및 권한 목록" },
+  "MCP 서버": { 영역: "agentTool", 키: "mcpServers", 이름: "MCP 연동 서버" },
+  "서빙 환경": { 영역: "infrastructure", 키: "compute", 이름: "GPU/CPU 서빙 환경 사양" },
+  "호스팅 공급업체": { 영역: "infrastructure", 키: "hostingProvider", 이름: "호스팅 공급업체 (AWS/OpenAI/Azure 등)" },
+};
+
+/** 사람이 댄 칸 이름을 찾는다 — 짧은 이름·화면의 긴 이름·영문 키 셋 다 받는다. */
+export function AIBOM칸찾기(글: string): { 영역: AiBom영역; 키: string; 이름: string } | null {
+  const 납작 = (x: string) => x.toLowerCase().replace(/\s+/g, "");
+  const t = 납작(글.trim());
+  if (!t) return null;
+  for (const [열쇠, v] of Object.entries(AIBOM칸)) {
+    if ([열쇠, v.이름, v.키].some((c) => 납작(c) === t)) return v;
+  }
+  // 부분 일치는 **하나로 좁혀질 때만** 받는다 — 둘 이상 걸리면 아무거나 고르지 않고 되묻는다.
+  const 걸린 = Object.entries(AIBOM칸).filter(([열쇠, v]) => [열쇠, v.이름].some((c) => 납작(c).includes(t)));
+  return 걸린.length === 1 ? 걸린[0][1] : null;
+}
+
+/** AI-BOM 칸 기입 — 「이 자산의 가드레일 기재해줘」. */
+export async function runSetAiBomField(args: Record<string, string>): Promise<string> {
+  const { getAsset, updateAiBom, isAiAsset } = await import("../assets.js");
+  const 대상글 = (args.asset ?? args.assetId ?? "").trim();
+  const 칸글 = (args.field ?? "").trim();
+  const 값 = (args.value ?? "").trim();
+
+  // ⚠ 순서가 뜻을 바꾼다 — 자산 찾기보다 **먼저** 막는다.
+  //   「가중치 해시 적어줘」는 자산이 뭐든 대화로는 안 되는 일이라, 자산부터 찾으면 못 찾았을 때
+  //   「자산을 못 찾았습니다」라는 **엉뚱한 이유**를 대게 된다(2026-09-01 시험이 잡았다).
+  // ⛔ 손대지 않는 칸을 **먼저** 거른다 — 이름을 대충 대도 걸리게 한다.
+  if (/가중치|해시|weightshash/i.test(칸글)) {
+    return "⛔ 가중치 해시는 대화로 적지 않습니다.\n모델 파일에서 **계산하는 값**이라 손으로 적으면 「검증했다」는 거짓 증거가 남습니다. 📦 AI-BOM 화면의 [가중치 해시 계산]으로 뽑으세요.";
+  }
+  if (/서빙\s*모델|모델\s*연결|modelref/i.test(칸글)) {
+    return "⛔ 서빙 모델 연결은 대화로 적지 않습니다.\n설치된 모델 **목록에서 고르는 칸**이라 아무 글이나 넣으면 레드팀 점검 대상 연결이 끊깁니다. 📦 AI-BOM 화면의 모델 드롭다운에서 고르세요.";
+  }
+
+  const hit = 대상글 ? resolveAsset(대상글) : null;
+  if (!hit) {
+    const 예 = listAssets().filter(isAiAsset).map((a) => a.name).slice(0, 6).join(", ") || "(AI 자산 없음)";
+    return `"${대상글 || "(빈칸)"}"에 맞는 자산을 못 찾았습니다. AI 자산: ${예}`;
+  }
+  const asset = getAsset(hit.id);
+  if (!asset) return `"${hit.name}" 자산을 읽지 못했습니다.`;
+
+  const 칸 = AIBOM칸찾기(칸글);
+  if (!칸) {
+    return `"${칸글 || "(빈칸)"}"이 어느 칸인지 모르겠습니다. 적을 수 있는 칸:\n${Object.keys(AIBOM칸).join(" · ")}`;
+  }
+  if (!값) return `"${칸.이름}"에 적을 내용이 비었습니다. 무엇을 적을지 함께 말씀해 주세요.`;
+
+  // ⚠ AI 자산이 아니면 **막지는 않되 알린다.** 방화벽·DB에 AI-BOM을 채우면 거버넌스 숫자가
+  //   거짓으로 채워지지만, 판별이 「AI처럼 보이면 True」인 추정이라 단정해 막으면 오히려 막힌다.
+  const 경고 = isAiAsset(asset)
+    ? ""
+    : `\n⚠ "${asset.name}"${조사(asset.name, "은")} AI 자산으로 안 보입니다(유형: ${asset.assetType}). AI-BOM은 모델·데이터가 있는 자산의 명세라 여기 적으면 거버넌스 현황이 실제와 달라집니다.`;
+
+  const 짧게 = (x: string) => (x.length > 60 ? x.slice(0, 60) + "…" : x);
+  const 영역값 = { ...(asset.aibom as unknown as Record<string, Record<string, string>>)[칸.영역] };
+  const 이전 = (영역값[칸.키] ?? "").trim();
+  영역값[칸.키] = 값;
+  const 결과 = updateAiBom(asset.id, { ...asset.aibom, [칸.영역]: 영역값 } as typeof asset.aibom);
+  if (!결과) return `"${asset.name}"의 AI-BOM 저장에 실패했습니다.`;
+
+  // ⚠ 덮어쓴 사실을 **반드시 밝힌다** — 조용히 지우면 남이 적어 둔 명세가 사라진 걸 아무도 모른다.
+  const 바뀜 = 이전 ? `이전 값이 있어 **덮어썼습니다** — 전: ${짧게(이전)}` : "(비어 있던 칸입니다)";
+  return `✅ "${asset.name}"의 AI-BOM **${칸.이름}**에 적었습니다.\n  · 후: ${짧게(값)}\n  · ${바뀜}${경고}\n\n전체 현황은 「AI-BOM 현황 알려줘」로 보실 수 있습니다.`;
+}
+
+// ── 지원 종료(EOL) 점검 — 대화로 (2026-09-01 · 계획서 중-7 + 전-4) ─────────────────────
+//
+// ■ 왜: 표는 있는데 **아무도 부르지 않았다**
+// ■ 왜: 표는 있는데 **전체를 보는 길**이 없었다
+//   eol-seed.ts는 2026-08-04 파트너 지적으로 만들어졌다. eol찾기·eol한줄은 sbom_coverage가
+//   이미 쓰고 있었지만 **자산을 하나 콕 집었을 때만**이었고, eol표상태는 **소비자가 0**이었다.
+//   ⚠ 처음 이 주석에 「셋 다 부르는 곳이 한 군데도 없었다」고 적었는데 **사실이 아니다** —
+//     내 grep이 engine/*.ts만 봐서 agenttools/ 하위를 놓쳤다(얕은 글로브가 만든 거짓 사실).
+//
+// ■ 이 답이 만드는 함정 하나 (여기가 이 도구의 급소다)
+//   표는 **9줄뿐**이다. 「3건이 지원 종료」라고만 말하면 담당자는 **나머지는 지원 중**이라고
+//   읽는다. 그건 이 표가 말할 수 있는 것이 아니다 — 표에 없는 것은 「모른다」이지
+//   「괜찮다」가 아니다. 그래서 **덮는 범위를 숫자로 먼저 밝힌다.**
+//   ⚠ 이 문장을 지우면 이 도구는 없느니만 못해진다(틀린 안심을 준다).
+
+/** 지원 종료 점검 — 「지원 끝난 부품 있어?」. */
+export async function runEolCheck(args: Record<string, string>): Promise<string> {
+  const { EOL_SEED, eol찾기, eol한줄확실도, 이름이정확한가, eol표상태 } = await import("../eol-seed.js");
+  const 대상글 = (args.asset ?? args.assetId ?? "").trim();
+
+  let 자산들 = listAssets();
+  let 범위글 = "전체 자산";
+  if (대상글) {
+    const hit = resolveAsset(대상글);
+    if (!hit) {
+      const 예 = 자산들.map((a) => a.name).slice(0, 6).join(", ") || "(없음)";
+      return `"${대상글}"에 맞는 자산을 못 찾았습니다. 등록된 자산: ${예}`;
+    }
+    자산들 = 자산들.filter((a) => a.id === hit.id);
+    범위글 = hit.name;
+  }
+
+  const 오늘 = new Date();
+  const 걸린: { 자산: string; 부품: string; 버전: string; 줄: string; 지남: boolean; 확실: boolean }[] = [];
+  let 부품수 = 0;
+  for (const a of 자산들) {
+    for (const c of a.components ?? []) {
+      부품수++;
+      const row = eol찾기(c.name, c.version);
+      if (!row) continue;
+      // ⚠⚠ **두 사실을 곱하면 안 된다**(2026-09-01 재검토 [상]이 잡았다).
+      //   `지남`은 「종료일이 오늘보다 과거인가」라는 **날짜 사실**,
+      //   `확실`은 「이 부품이 표의 그 제품이 맞나」라는 **이름 사실** — 서로 다른 물음이다.
+      //   처음엔 `지남 && 확실`로 곱했는데, 그러면 **이름이 덜 확실한 진짜 만료품이
+      //   「⏳ 종료 예정」으로 강등**된다. 하필 내가 「참인 경보를 잃지 않겠다」며 근거로 든
+      //   `openssl-libs 1.0.2k`(2019년 만료)가 바로 그렇게 미래형 칸으로 내려갔다 —
+      //   담당자는 「아직 안 끝났다」로 읽고 우선순위를 내린다. 고치려던 것보다 나쁜 결과다.
+      //   → 곱하지 말고 **칸을 셋으로 나눈다**: 확실히 끝남 / 끝났는데 이름 확인 필요 / 예정.
+      const 지남 = Boolean(row.종료일 && new Date(row.종료일 + "T00:00:00").getTime() < 오늘.getTime());
+      const 확실 = 이름이정확한가(c.name, row);
+      걸린.push({ 자산: a.name, 부품: c.name, 버전: c.version, 줄: eol한줄확실도(c.name, row, 오늘), 지남, 확실 });
+    }
+  }
+
+  // ⚠ **덮는 범위를 먼저 말한다.** 이 표는 9줄짜리다 — 「0건」이 「전부 괜찮다」로 읽히면
+  //   이 도구는 틀린 안심을 주는 물건이 된다.
+  const 범위줄 = `📋 ${범위글} 부품 ${부품수}개를 지원종료 표(${EOL_SEED.length}줄)와 맞춰 봤습니다.`;
+
+  if (!부품수) {
+    return `${범위줄}\n\n부품 목록이 비어 있습니다 — 먼저 "SBOM 만들어줘" 또는 "패키지 목록 읽어줘"로 부품을 채우셔야 합니다.`;
+  }
+  if (!걸린.length) {
+    return (
+      `${범위줄}\n\n표에 걸리는 부품이 **없습니다.**\n` +
+      `⚠ 다만 이 표는 널리 알려진 ${EOL_SEED.length}줄만 담고 있습니다 — **표에 없다는 것은 「모른다」이지 「지원 중」이 아닙니다.**\n\n${eol표상태()}`
+    );
+  }
+
+  // ★ 칸이 셋이다 — 「끝났나(날짜)」와 「그 제품이 맞나(이름)」는 다른 물음이라 섞지 않는다.
+  //   둘을 곱해 두 칸으로 만들면 **진짜 만료품이 「예정」으로 내려간다**(위 주석의 사고).
+  const 지난것 = 걸린.filter((x) => x.지남 && x.확실);
+  const 이름확인 = 걸린.filter((x) => x.지남 && !x.확실);
+  const 예정 = 걸린.filter((x) => !x.지남);
+  const 그리기 = (xs: typeof 걸린) =>
+    xs.slice(0, 12).map((x) => `- ${x.자산} · **${x.부품} ${x.버전}** — ${x.줄}`).join("\n") +
+    (xs.length > 12 ? `\n… 외 ${xs.length - 12}건` : "");
+
+  return (
+    `${범위줄}\n\n` +
+    (지난것.length ? `⛔ **지원이 이미 끝난 부품 ${지난것.length}건**\n${그리기(지난것)}\n\n` : "") +
+    // ⚠ 이 칸을 「예정」에 섞으면 안 된다 — **날짜상 이미 끝난 것들**이라 급한 쪽이다.
+    //   다만 이름이 겹치기만 한 것일 수 있어 단정하지 않고 확인을 청한다.
+    (이름확인.length
+      ? `⚠ **종료일이 이미 지났지만 같은 제품인지 확인이 필요한 부품 ${이름확인.length}건** (이름이 표와 겹치기만 할 수 있습니다)\n${그리기(이름확인)}\n\n`
+      : "") +
+    (예정.length ? `⏳ 지원 종료가 예정된 부품 ${예정.length}건\n${그리기(예정)}\n\n` : "") +
+    `⚠ 표에 걸리지 않은 나머지 ${부품수 - 걸린.length}개는 **「지원 중」이 아니라 「모른다」**입니다 — 표가 ${EOL_SEED.length}줄뿐입니다.\n\n${eol표상태()}`
+  );
 }

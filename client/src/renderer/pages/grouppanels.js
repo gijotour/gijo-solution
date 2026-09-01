@@ -232,7 +232,12 @@
       { id: "sbom", title: "📦 AI-BOM · 구성", page: "sbom.html",
         rows: function () {
           return window.gijo.listAssets().then(function (assets) {
-            var list = (assets || []).slice();
+            // ⚠⚠ **목록도 카드와 같은 모수**를 쓴다(2026-09-01 4차 검토 [상]).
+            //   같은 판의 load()는 공용 잣대로 고쳤는데 **바로 위 이 목록만 전 자산**이었다 —
+            //   카드는 「아직 없음 12」인데 판을 펴면 스캐너 IP 호스트 수천 행이 전부 「미생성」으로
+            //   나왔다. 이 파일 머리글이 스스로 못 박은 「요약과 **같은 잣대**를 쓴다」 위반이고,
+            //   sbom.html에서 고쳤다고 적은 그 결함의 형제가 **수리한 파일 자신에** 남아 있었다.
+            var list = window.gijoSbomTargets(assets || []);
             // 미생성 먼저 — 이 판의 유일한 주황 신호이고, 200행 상한에서 볼 값어치가 큰 쪽이다.
             list.sort(function (a, b) { return (a.sbomGeneratedAt ? 1 : 0) - (b.sbomGeneratedAt ? 1 : 0); });
             return {
@@ -248,7 +253,16 @@
         load: function () {
         return window.gijo.listAssets().then(function (assets) {
           assets = assets || [];
-          var 있음 = assets.filter(function (a) { return a.sbomGeneratedAt; }).length;
+          // ⚠⚠ **프로 셸 현황 카드도 같은 잣대**(2026-09-01 3차 검토 [상]).
+          //   여기가 네 번째로 각자 세던 자리였다 — 프로가 기준 모델이라 사용자가 가장
+          //   자주 보는 숫자가 안 고쳐진 쪽이었다. 대화창은 12라는데 카드는 4,888을 찍었다.
+          // ⚠ **조용한 폴백을 두지 않는다.** 처음엔 `window.gijoSbomTargets ? … : assets`로
+          //   썼는데, 이 부품을 싣는 화면 8개가 **아무도 assetrules.js를 안 읽고 있어서**
+          //   그 폴백이 통째로 옛 동작(전 자산 세기)으로 되돌렸다 — 고쳤다고 믿는데 안 고쳐진
+          //   상태가 조용히 유지된다. 이제 화면이 잣대를 안 읽으면 **눈에 띄게 죽는다**
+          //   (시험이 화면 8개에 assetrules.js를 강제한다).
+          var 있음 = window.gijoSbomGeneratedCount(assets);
+          var 대상수 = window.gijoSbomTargets(assets).length;
           // ⚠ `llm-service`·`ml-model`은 **저장소에 존재하지 않는 값**이라 이 줄이 항상 0이었다
           //   (2026-08-20 설계관 적발). 원천은 서버 assets.ts:100-106 isAiAsset — 자산 종류가
           //   「LLM 서비스·분류 모델·이상탐지 모델」이거나 AI-BOM에 모델 참조가 채워진 것.
@@ -261,7 +275,7 @@
           return {
             rows: [
               ["구성 명세(SBOM) 있음", n(있음)],
-              ["아직 없음", n(assets.length - 있음), A],
+              ["아직 없음", n(대상수 - 있음), A],
               ["AI 자산", n(ai)],
             ],
             foot: "전체 자산 " + n(assets.length),

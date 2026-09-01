@@ -23,7 +23,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .topnav a{color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;padding:6px 2px;border-bottom:2px solid transparent;}
 .topnav a.active{color:var(--white);border-bottom-color:var(--blue);}
 .user-chip{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
-.avatar{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--g-blue-fill, var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .app{display:grid;grid-template-columns:220px 1fr;}
 .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
 .nav-section{font-size:12px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
@@ -37,7 +37,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:var(--text-strong, #fff);}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
-.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-primary{background:var(--g-blue-fill, var(--blue));color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
 .kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
 .kpi-strip.c5{grid-template-columns:repeat(5,1fr);}
@@ -52,8 +52,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
 .filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
 .table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
-.panel-title{font-size:14.5px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+/* 카드 언어(2026-08-31 사장님 「2번째 이미지로」) — 공용 골격 .g-scard와 같은 값.
+   판을 카드로: 여백 20 → 14/16, 제목 줄을 카드 머리(위 칸을 채우고 아래를 선으로 가름). */
+.panel{background:var(--g-surface-1,var(--panel));border:1px solid var(--g-border,var(--border));border-radius:var(--g-r,12px);padding:14px 16px;margin-bottom:12px;}
+.panel-title{font-size:12.75px;font-weight:800;color:var(--g-text,var(--text-strong,#fff));margin:-14px -16px 10px;padding:7px 12px;border-bottom:1px solid var(--g-border,var(--border));display:flex;justify-content:space-between;align-items:center;}
 .panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:14px;}
 .panel-link{font-size:12px;color:var(--blue-light);font-weight:700;cursor:pointer;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -72,7 +74,7 @@ tr:last-child td{border-bottom:none;}
 .pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
 .page-btns{display:flex;gap:6px;}
 .page-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}
-.page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+.page-btn.active{background:var(--g-blue-fill, var(--blue));border-color:var(--blue);color:#fff;}
 .footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);}
 .footer img{height:16px;opacity:0.6;}
 .progress-track{height:7px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:8px;}
@@ -94,7 +96,7 @@ tr:last-child td{border-bottom:none;}
 .terminal .out{color:#b3ada4;}
 .model-search{display:flex;gap:8px;margin-bottom:12px;}
 .model-search input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 12px;height:34px;color:var(--text);font-size:12px;outline:none;}
-.model-search button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:12px;font-weight:700;cursor:pointer;}
+.model-search button{background:var(--g-blue-fill, var(--blue));color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:12px;font-weight:700;cursor:pointer;}
 .hf-result{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;}
 .hf-result:last-child{border-bottom:none;}
 .hf-load{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:4px 10px;border-radius:6px;font-size:12.25px;font-weight:700;cursor:pointer;}
@@ -116,7 +118,7 @@ tr:last-child td{border-bottom:none;}
 .icon-row{display:flex;gap:6px;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
-.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--g-blue-fill, var(--blue));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
 .task-bar{display:flex;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;}
 .task-bar input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 16px;color:var(--text);font-size:13.5px;outline:none;}
