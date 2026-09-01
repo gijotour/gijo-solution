@@ -321,3 +321,58 @@
   화이트리스트를 함께 손봐야 한다. 위 (4) 참고)
 
 ---
+
+### 2026-09-01 — 클라 5.82.0 게시 · 새 도구 3종 · 화면 잣대 통일 · 검토 4라운드
+
+> ⚠ **이 항목은 사장님이 「max 프로버전 올려 보게」 하셔서 인계 보류를 잠시 연 것**이다.
+> 나머지 보류는 그대로 — 제품 완성 후 한 번에 전달한다(2026-08-22 지시).
+
+**hub·gb10에 밀어 뒀다**(`356ebc18`). max는 `/GIJOAS동기화`로 당기면 된다.
+
+#### ⚠ 공용 파일 변경 (mac에서 겹칠 자리 — 먼저 본다)
+- **`client/src/renderer/pages/assetrules.js` — 새 파일이다.** SBOM 대상 판정을 화면들이
+  **한 곳에서** 쓰게 만든 공용 부품. `<script src="assetrules.js">`를 **화면 10곳**에 실었고
+  (`app.html`·`sbom.html`·`inventory.html`·`aihub.html`·`discover.html`·`fix.html`·
+  `records.html`·`reporting.html`·`triage.html`·`verify.html`),
+  ⚠ **grouppanels.js보다 먼저** 실려야 한다. 폴백을 일부러 없앴으므로 순서가 틀리면
+  그 화면 카드가 **TypeError로 죽는다**(옛날엔 조용히 옛 값을 냈다 — 죽는 편이 낫다).
+  `server/test/sbomapplies-pair.test.ts`가 순서까지 못 박는다.
+- **`grouppanels.js`** — 📦 AI-BOM 판의 요약·목록이 둘 다 공용 잣대를 지난다.
+- **`console.js`** — 규칙 번호 주석에서 번호를 뺐다(밀리면 뜻이 틀려져서).
+- **`agentloop.ts`** — 강제 규칙 **79개**. `set_aibom_field`를 **23번 자리로 옮겼다**
+  (뒤에 두면 조회 규칙이 먼저 삼켜 「기재해줘」가 영영 안 걸렸다). routes.ts 표도 함께 밀렸다.
+- **`routes.ts`** — 표 79줄. ⚠ 규칙을 중간에 끼우면 표가 통째로 밀린다 —
+  `node tools/routes-renumber.mjs`로 확인하고, **routes.ts 밖의 번호 참조**도 밀린다
+  (새 감시 `server/test/rulerefs.test.ts`가 .ts·.js·.md를 전부 훑어 잡는다).
+- **`screenguide.ts`** — 공급망 점검 안내가 「중첩은 겉만 셉니다」 → 「8겹까지 펴서 읽습니다」.
+- **`CLAUDE.md`** — 작업 규칙에 **「모든 작업 보고에 gb10 이용 내역을 적는다」** 추가.
+
+#### 새로 생긴 것
+- **대화 도구 3종** — `vex_status`(VEX 현황·읽기) · `set_aibom_field`(AI-BOM 5영역 기입·쓰기)
+  · `eol_check`(지원 종료 점검). 「SBOM 없는 자산」 전용 분기도(→ `sbom_coverage`).
+- **도구**: `tools/dep-cluster.mjs`(의존 덩어리 재기) · `tools/digest-pack.mjs`(gb10 발췌 꾸러미)
+- **시험**: `sbomapplies-pair`·`rulerefs`·`routing-order`·`clausecite`·`eolcheck`·`vextool`·
+  `aibomfield`·`sbomnested` + helper `server/test/helpers/routing.ts`
+
+#### ★ mac에서 특히 볼 것 (win에서 원리상 못 보는 것)
+1. **화면 10곳이 실제로 뜨는지** — `assetrules.js` 로드 순서가 맞아야 한다.
+   프로 셸 대화 홈의 **📦 AI-BOM·구성 카드**가 뜨면 통과, 안 뜨면 순서 문제다.
+2. **같은 숫자를 말하는지** — 대화창 「SBOM 없는 자산 알려줘」의 건수와
+   📦 화면 배지 「미생성」·현황 카드 「아직 없음」이 **셋 다 같아야** 한다.
+   (전에는 대화창 12 vs 화면 4,812로 갈렸다.)
+3. **📦 화면에서 [전체 재생성]** — SBOM 대상이 아닌 자산(스캐너 IP 호스트·방화벽)이
+   목록에 안 나오고, 일괄 생성 대상에도 안 들어가는지.
+4. **하드닝** — 인증 방식을 「로컬(서버 자신)」로 등록해 점검한 뒤,
+   리포트·감사 기록·통합관제·오늘 할 일·대화 카드가 **전부** 「이 서버 자신(이름표: …)」이라
+   적는지. 장비 이름만 적히면 그 자리가 안 고쳐진 것이다(9곳을 고쳤다).
+5. **라이트 점검 화면**(`lite-scan.html`) — 이름표 칸에 「회의실 3-1」을 넣어도 안 막히는지,
+   보증 상자 문장이 깨지지 않았는지(`</b>` 짝).
+
+#### max 기계별 주의 (기존 그대로)
+- 관리자 계정 **`jyh`**(win은 `claude-deploy`) · 키체인 `-a gijo-qa` · `GIJO_QA_USER=max_claude-qa`
+- ⚠ **QA는 admin 계정으로 돌린다**(2026-09-01 확인) — QA 전용 계정은 소속 팀이 없어
+  검증 계층 9건이 통째로 막힌다. 권한을 올리지 말고 계정을 바꾼다(`tools/qa-account.mjs` 머리글).
+
+#### 운영 서버는 win에 있다
+서버는 이미 win의 WSL에 배포됐다(PID 784323). max는 **자기 개발 서버**로 띄워 보는 것이고,
+운영 데이터는 win에만 있다 — 숫자가 다른 건 정상이다.
