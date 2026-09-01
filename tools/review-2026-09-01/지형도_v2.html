@@ -1,0 +1,591 @@
+<title>GIJO AS — 개발 환경·제품 전체 지도</title>
+<style>
+  :root{
+    --ground:#eef1f7; --surface:#ffffff; --surface-2:#f5f7fb; --inset:#eef2f9;
+    --ink:#141c2b; --ink-soft:#33405a; --muted:#5b6879; --border:#d5dbe7;
+    --grid:rgba(30,55,100,.045);
+    --win:#2f6fd6; --mac:#6f52c9; --gb:#2f9455; --cloud:#697488;
+    --accent:#0f8f86; --git:#b3771a; --good:#2f9455; --warn:#b3771a; --client:#b5497a; --bad:#c23b3b;
+    --shadow:0 1px 2px rgba(20,35,70,.06),0 8px 24px rgba(20,35,70,.06);
+    --mono:"SF Mono","Cascadia Code","JetBrains Mono","D2Coding",ui-monospace,monospace;
+    --sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#070a11; --surface:#101622; --surface-2:#0c111b; --inset:#080c14;
+      --ink:#e4eaf4; --ink-soft:#c0c9da; --muted:#8593a9; --border:#222c3d;
+      --grid:rgba(120,165,230,.05);
+      --win:#5a95f4; --mac:#a893e8; --gb:#5cba7c; --cloud:#818da1;
+      --accent:#2ec4b9; --git:#e2a745; --good:#5cba7c; --warn:#e2a745; --client:#e07aa8; --bad:#ef6b6b;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"]{
+    --ground:#eef1f7; --surface:#ffffff; --surface-2:#f5f7fb; --inset:#eef2f9;
+    --ink:#141c2b; --ink-soft:#33405a; --muted:#5b6879; --border:#d5dbe7;
+    --grid:rgba(30,55,100,.045);
+    --win:#2f6fd6; --mac:#6f52c9; --gb:#2f9455; --cloud:#697488;
+    --accent:#0f8f86; --git:#b3771a; --good:#2f9455; --warn:#b3771a; --client:#b5497a; --bad:#c23b3b;
+    --shadow:0 1px 2px rgba(20,35,70,.06),0 8px 24px rgba(20,35,70,.06);
+  }
+  :root[data-theme="dark"]{
+    --ground:#070a11; --surface:#101622; --surface-2:#0c111b; --inset:#080c14;
+    --ink:#e4eaf4; --ink-soft:#c0c9da; --muted:#8593a9; --border:#222c3d;
+    --grid:rgba(120,165,230,.05);
+    --win:#5a95f4; --mac:#a893e8; --gb:#5cba7c; --cloud:#818da1;
+    --accent:#2ec4b9; --git:#e2a745; --good:#5cba7c; --warn:#e2a745; --client:#e07aa8; --bad:#ef6b6b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{
+    font-family:var(--sans); color:var(--ink);
+    background:
+      linear-gradient(var(--grid) 1px,transparent 1px) 0 0/28px 28px,
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/28px 28px,
+      var(--ground);
+    min-height:100vh; padding:clamp(20px,4vw,56px) clamp(16px,4vw,40px);
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:1120px; margin:0 auto}
+  .eyebrow{font-family:var(--mono); font-size:.72rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin:0 0 .5rem}
+  h1{font-size:clamp(1.8rem,3.6vw,2.7rem); font-weight:750; letter-spacing:-.02em; line-height:1.12; margin:0 0 .6rem; text-wrap:balance}
+  .lede{color:var(--ink-soft); font-size:1.02rem; max-width:64ch; margin:0}
+  .lede b{color:var(--ink); font-weight:650}
+
+  .legend{display:flex; flex-wrap:wrap; gap:14px 22px; margin:22px 0 6px; font-size:.82rem; color:var(--muted)}
+  .legend span{display:inline-flex; align-items:center; gap:8px}
+  .lg-line{width:26px; height:0; border-top:3px solid var(--accent); border-radius:2px}
+  .lg-line.git{border-top-style:dashed; border-color:var(--git)}
+  .lg-dot{width:11px; height:11px; border-radius:3px}
+
+  section{margin-top:clamp(34px,5vw,58px)}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin:0 0 18px; flex-wrap:wrap}
+  h2{font-size:1.3rem; font-weight:700; letter-spacing:-.01em; margin:0}
+  .sec-head .num{font-family:var(--mono); font-size:.8rem; color:var(--accent); font-weight:600}
+  .sec-head .sub{font-size:.86rem; color:var(--muted); margin-left:auto}
+
+  .diagram-scroll{overflow-x:auto; border:1px solid var(--border); border-radius:16px; background:var(--surface); box-shadow:var(--shadow)}
+  svg.topo{display:block; min-width:900px; width:100%; height:auto; font-family:var(--sans)}
+  .t-eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:1.4px; font-weight:600}
+  .t-host{font-family:var(--mono); font-size:16.5px; font-weight:600}
+  .t-meta{font-family:var(--mono); font-size:12.5px}
+  .t-role{font-size:13.5px; font-weight:600}
+  .t-note{font-size:12.5px}
+  .t-lbl{font-family:var(--mono); font-size:11.5px; font-weight:600; letter-spacing:.4px}
+
+  /* Claude Code directory band */
+  .dir{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-top:4px}
+  .node{border:1px solid var(--border); border-radius:14px; background:var(--surface); padding:15px 16px; box-shadow:var(--shadow); position:relative}
+  .node .tag{font-family:var(--mono); font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+  .node .name{font-family:var(--mono); font-weight:650; font-size:.95rem; margin:3px 0 6px}
+  .node .desc{font-size:.82rem; color:var(--ink-soft)}
+  .node.dash{border-style:dashed}
+  .node::before{content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px; border-radius:3px; background:var(--c,var(--accent))}
+  .node{padding-left:20px}
+  .dir-note{margin-top:14px; font-size:.86rem; color:var(--muted); display:flex; gap:10px; align-items:flex-start}
+  .dir-note b{color:var(--ink)}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:760px){.grid2{grid-template-columns:1fr}}
+  .card{border:1px solid var(--border); border-radius:14px; background:var(--surface); padding:20px 22px; box-shadow:var(--shadow)}
+  .card h3{margin:0 0 12px; font-size:1rem; font-weight:700; display:flex; align-items:center; gap:9px}
+  .card h3 .k{width:10px; height:10px; border-radius:3px; background:var(--c,var(--accent))}
+  .stack{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px}
+  .stack li{display:grid; grid-template-columns:112px 1fr; gap:12px; font-size:.88rem; align-items:baseline}
+  .stack .lk{font-family:var(--mono); font-size:.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em}
+  .stack code{font-family:var(--mono); font-size:.82em; background:var(--inset); padding:.05em .4em; border-radius:5px}
+
+  table{width:100%; border-collapse:collapse; font-size:.88rem}
+  .tbl-scroll{overflow-x:auto; border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow)}
+  th,td{text-align:left; padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:top}
+  thead th{background:var(--surface-2); font-family:var(--mono); font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600}
+  tbody tr:last-child td{border-bottom:none}
+  td:first-child{font-weight:650; white-space:nowrap}
+  td code{font-family:var(--mono); font-size:.82em; background:var(--inset); padding:.05em .4em; border-radius:5px}
+  .where{font-family:var(--mono); font-size:.82em; font-weight:650}
+
+  /* roadmap */
+  .road{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+  @media (max-width:760px){.road{grid-template-columns:1fr}}
+  .phase{border:1px solid var(--border); border-radius:14px; background:var(--surface); padding:18px 20px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+  .phase .ph{font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600}
+  .phase h4{margin:6px 0 10px; font-size:1.05rem; font-weight:700}
+  .phase ul{margin:0; padding-left:1.05em; font-size:.85rem; color:var(--ink-soft); display:flex; flex-direction:column; gap:6px}
+  .phase ul li::marker{color:var(--muted)}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:2px}
+  .chip{font-size:.76rem; font-family:var(--mono); padding:4px 9px; border-radius:999px; border:1px solid var(--border); color:var(--ink-soft); background:var(--surface-2)}
+  .chip.a{border-color:var(--accent); color:var(--accent)}
+
+  .foot{margin-top:46px; padding-top:18px; border-top:1px solid var(--border); font-size:.8rem; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+  .foot code{font-family:var(--mono)}
+
+  @media (prefers-reduced-motion:no-preference){
+    .page>section,.page>header{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+    .page>section:nth-child(2){animation-delay:.05s}
+    .page>section:nth-child(3){animation-delay:.1s}
+    @keyframes rise{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
+  }
+  /* ── 05 고객사 배치 · 06 담당자 여정 · 07 GB10 검토 · 08 문서 통합 (2026-09-01 추가) ── */
+  .jr{display:grid; grid-template-columns:repeat(6,1fr); gap:10px}
+  @media (max-width:900px){.jr{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:560px){.jr{grid-template-columns:1fr 1fr}}
+  .stg{border:1px solid var(--border); border-radius:12px; background:var(--surface); padding:12px 13px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:6px; min-width:0}
+  .stg .st-n{font-family:var(--mono); font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--client); font-weight:600}
+  .stg .st-t{font-size:.92rem; font-weight:700; line-height:1.25}
+  .stg .st-p{display:flex; gap:5px; flex-wrap:wrap}
+  .pill{font-family:var(--mono); font-size:.7rem; font-weight:650; padding:2px 7px; border-radius:999px; border:1px solid var(--border); color:var(--muted); background:var(--surface-2); font-variant-numeric:tabular-nums}
+  .pill.p0{border-color:var(--bad); color:var(--bad)}
+  .pill.p1{border-color:var(--warn); color:var(--warn)}
+  .pill.p2{border-color:var(--border); color:var(--muted)}
+  .pill.ok{border-color:var(--good); color:var(--good)}
+  .stg .st-d{font-size:.8rem; color:var(--ink-soft); line-height:1.45}
+  .sev{font-family:var(--mono); font-size:.72rem; font-weight:650}
+  .sev.p0{color:var(--bad)} .sev.p1{color:var(--warn)} .sev.p2{color:var(--muted)}
+  .note{border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:10px; background:var(--surface-2); padding:13px 15px; font-size:.85rem; color:var(--ink-soft); line-height:1.6}
+  .note.warn{border-left-color:var(--warn)} .note.bad{border-left-color:var(--bad)} .note.client{border-left-color:var(--client)}
+  .note b{color:var(--ink)}
+  .chk{margin:0; padding-left:1.3em; font-size:.86rem; color:var(--ink-soft); display:flex; flex-direction:column; gap:6px}
+  .chk li::marker{font-family:var(--mono); color:var(--gb); font-weight:600}
+  .facts{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; font-size:.85rem}
+  .facts li{display:grid; grid-template-columns:118px 1fr; gap:10px; align-items:baseline}
+  .facts .fk{font-family:var(--mono); font-size:.74rem; color:var(--muted); letter-spacing:.04em}
+  .facts a{color:var(--accent); text-decoration:none; border-bottom:1px dotted var(--accent)}
+  .kpi{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
+  @media (max-width:760px){.kpi{grid-template-columns:1fr 1fr}}
+  .kpi .k{border:1px solid var(--border); border-radius:12px; background:var(--surface); padding:12px 14px; box-shadow:var(--shadow)}
+  .kpi .kv{font-family:var(--mono); font-size:1.35rem; font-weight:650; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+  .kpi .kl{font-size:.76rem; color:var(--muted); margin-top:2px}
+  .link{color:var(--accent); text-decoration:none; border-bottom:1px dotted var(--accent)}
+  @media print{
+    .wrap,.wrap *{ -webkit-print-color-adjust:exact; print-color-adjust:exact }
+    .wrap{ background:#fff; padding:10px 14px }
+    svg.topo{ min-width:0; width:100% }
+    .diagram-scroll{ overflow:visible }
+    .card,.phase,.node,.tbl-scroll,.diagram-scroll,.road,table{ break-inside:avoid }
+    .page>section,.page>header{ animation:none !important }
+  }
+</style>
+
+<div class="wrap">
+<div class="page">
+
+  <header>
+    <p class="eyebrow">GIJO AS · 개발 환경 + 제품 서비스 전체 지도</p>
+    <h1>한 장으로 보는 우리 지형도</h1>
+    <p class="lede">한국형 <b>온프렘 AI 보안관리 플랫폼</b>을 만드는 <b>3+1 실행 환경</b> — 편집·게시하는 Windows, 그 안에서 제품이 실제로 도는 <b>WSL</b>, Metal을 재는 Mac, ARM CUDA를 재는 GB10, 그리고 폰까지 이어주는 클라우드 세션 디렉터리 — 여기에 <b>고객사 담당자 PC</b>가 설치본으로 붙는다. <b>무엇을 어디서 만들고 어디서 재는가</b>, 그리고 <b>담당자가 설치부터 로그인·업무 화면까지 무엇을 겪는가</b>(2026-09-01 점검)를 그렸다.</p>
+    <div class="legend">
+      <span><span class="lg-dot" style="background:var(--win)"></span>Windows · WSL</span>
+      <span><span class="lg-dot" style="background:var(--mac)"></span>Mac (M1 Max)</span>
+      <span><span class="lg-dot" style="background:var(--gb)"></span>GB10 (DGX Spark)</span>
+      <span><span class="lg-dot" style="background:var(--client)"></span>담당자 PC (설치본)</span>
+      <span><span class="lg-line"></span>WireGuard 터널 (10.8.0.x)</span>
+      <span><span class="lg-line git"></span>git 흐름</span>
+    </div>
+  </header>
+
+  <!-- ========== 1. 머신 지형도 ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">01</span><h2>머신 지형도 · 네트워크와 git</h2>
+      <span class="sub">WireGuard로 묶고, Windows가 git 허브</span>
+    </div>
+    <div class="diagram-scroll">
+      <svg class="topo" viewBox="0 0 1060 560" role="img" aria-label="Windows·WSL·Mac·GB10 네트워크 및 git 지형도">
+        <defs>
+          <marker id="arrGit" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 Z" fill="var(--git)"/>
+          </marker>
+        </defs>
+
+        <!-- WireGuard tunnels (teal) : hub = Windows -->
+        <g stroke="var(--accent)" stroke-width="2.6" fill="none" opacity=".9">
+          <path d="M460,300 C560,290 560,168 648,168"/>
+          <path d="M460,372 C560,382 560,452 648,452"/>
+        </g>
+        <g fill="var(--accent)" class="t-lbl" text-anchor="middle">
+          <rect x="500" y="218" width="86" height="19" rx="9" fill="var(--surface)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="543" y="231">WireGuard</text>
+          <rect x="500" y="399" width="86" height="19" rx="9" fill="var(--surface)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="543" y="412">WireGuard</text>
+        </g>
+
+        <!-- git flow (amber, dashed) -->
+        <g stroke="var(--git)" stroke-width="2" fill="none" stroke-dasharray="6 5" marker-end="url(#arrGit)">
+          <path d="M470,230 C580,150 590,120 648,120"/>
+          <path d="M470,415 C590,500 600,505 648,505"/>
+        </g>
+        <g fill="var(--git)" class="t-lbl">
+          <text x="512" y="150">pull ⟶ Mac</text>
+          <text x="500" y="527">Windows push ⟶ GB10</text>
+        </g>
+
+        <!-- WINDOWS host (contains WSL) -->
+        <g>
+          <rect x="40" y="150" width="420" height="330" rx="16" fill="var(--surface)" stroke="var(--win)" stroke-width="1.6"/>
+          <rect x="40" y="150" width="420" height="34" rx="16" fill="var(--win)" opacity=".12"/>
+          <text class="t-eyebrow" fill="var(--win)" x="62" y="172">WINDOWS · x86_64 · 주개발</text>
+          <text class="t-host" fill="var(--ink)" x="62" y="212">DESKTOP-4QPLVNC</text>
+          <text class="t-meta" fill="var(--muted)" x="62" y="233">WG 10.8.0.1 · 계정 user · git 허브 · 게시 · 운영 호스트</text>
+
+          <!-- WSL nested -->
+          <rect x="62" y="252" width="376" height="208" rx="12" fill="var(--inset)" stroke="var(--accent)" stroke-width="1.4"/>
+          <rect x="62" y="252" width="6" height="208" rx="3" fill="var(--accent)"/>
+          <text class="t-eyebrow" fill="var(--accent)" x="82" y="276">WSL2 · Ubuntu (systemd) · 계정 gijo</text>
+          <text class="t-meta" fill="var(--ink-soft)" x="82" y="300">gijo-as.service · 포트 :4000</text>
+          <text class="t-role" fill="var(--ink)" x="82" y="326">■ 제품(서버)이 실제로 도는 곳</text>
+          <text class="t-note" fill="var(--muted)" x="97" y="346">— 서버 시험도 여기서 (27초 / 2,979개)</text>
+          <line x1="82" y1="362" x2="418" y2="362" stroke="var(--border)" stroke-width="1"/>
+          <text class="t-note" fill="var(--ink-soft)" x="82" y="386">LLM  ·  llama.cpp + CUDA (WSL GPU)</text>
+          <text class="t-note" fill="var(--ink-soft)" x="82" y="408">DB  ·  SQLite   |   RAG  ·  LanceDB + bge-m3</text>
+          <text class="t-note" fill="var(--muted)" x="82" y="430">models/&lt;id&gt;/&lt;id&gt;.gguf · 임베딩 :8081 상주</text>
+          <text class="t-note" fill="var(--muted)" x="82" y="450">bash tools/wsl-test.sh · kill 재시작(watcher 없음)</text>
+        </g>
+
+        <!-- MAC -->
+        <g>
+          <rect x="648" y="70" width="372" height="188" rx="16" fill="var(--surface)" stroke="var(--mac)" stroke-width="1.6"/>
+          <rect x="648" y="70" width="372" height="34" rx="16" fill="var(--mac)" opacity=".12"/>
+          <text class="t-eyebrow" fill="var(--mac)" x="670" y="92">MAC · arm64 · Phase 2</text>
+          <text class="t-host" fill="var(--ink)" x="670" y="132">GIJOHN_MAC</text>
+          <text class="t-meta" fill="var(--muted)" x="670" y="153">M1 Max 32GB · WireGuard 10.8.0.11</text>
+          <text class="t-role" fill="var(--ink)" x="670" y="180">mac 올인원 (서버 + LLM) · 검증</text>
+          <text class="t-note" fill="var(--ink-soft)" x="670" y="204">LLM · llama.cpp + Metal (-DGGML_METAL=ON)</text>
+          <text class="t-note" fill="var(--muted)" x="670" y="226">dmg 빌드(arm64) · 협업자(제임스)는 별도 M4</text>
+        </g>
+
+        <!-- GB10 -->
+        <g>
+          <rect x="648" y="360" width="372" height="188" rx="16" fill="var(--surface)" stroke="var(--gb)" stroke-width="1.6"/>
+          <rect x="648" y="360" width="372" height="34" rx="16" fill="var(--gb)" opacity=".12"/>
+          <text class="t-eyebrow" fill="var(--gb)" x="670" y="382">GB10 · aarch64 · Pro/올인원 타깃</text>
+          <text class="t-host" fill="var(--ink)" x="670" y="422">promaxgb10-1d0a</text>
+          <text class="t-meta" fill="var(--muted)" x="670" y="443">DGX Spark · WG 10.8.0.12 · 계정 gijohn_llm · CUDA 13.0</text>
+          <text class="t-role" fill="var(--ink)" x="670" y="470">■ ARM CUDA 실측 (맨바닥에서)</text>
+          <text class="t-note" fill="var(--ink-soft)" x="670" y="494">LLM · llama.cpp + ARM CUDA (sm_121a)</text>
+          <text class="t-note" fill="var(--muted)" x="670" y="516">통합메모리 — nvidia-smi N/A → unifiedmem.ts</text>
+        </g>
+      </svg>
+    </div>
+    <div class="dir-note" style="margin-top:14px">
+      <span>↳</span>
+      <div><b>git 방향이 머신마다 다르다.</b> Mac은 허브에서 <b>당겨가고</b>(pull), GB10엔 Windows가 <b>밀어넣는다</b>(push · <code style="font-family:var(--mono)">git push gb10 main</code>). GitHub(origin)는 사용자 요청 시에만.</div>
+    </div>
+
+    <div style="margin-top:22px">
+      <p class="eyebrow" style="margin-bottom:10px">검증됨 · 2026-08-13 · 라이브 조회 (Windows·WSL·GB10 직접 확인 / Mac 설정 기준)</p>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>머신</th><th>호스트명 (OS)</th><th>아키</th><th>WireGuard IP</th><th>계정</th><th>검증</th></tr></thead>
+          <tbody>
+            <tr><td>Windows</td><td><code>DESKTOP-4QPLVNC</code></td><td>x86_64</td><td><code>10.8.0.1</code></td><td>user · claude-deploy <span style="color:var(--muted)">(게시)</span></td><td style="color:var(--good)">✓ 라이브</td></tr>
+            <tr><td>└ WSL2</td><td><span style="color:var(--muted)">동일 호스트</span></td><td>x86_64</td><td><span style="color:var(--muted)">호스트 경유</span></td><td>gijo</td><td style="color:var(--good)">✓ :4000 active</td></tr>
+            <tr><td>Mac</td><td><code>GIJOHN_MAC</code></td><td>arm64</td><td><code>10.8.0.11</code></td><td><span style="color:var(--muted)">미확인</span></td><td style="color:var(--warn)">△ 설정 기준</td></tr>
+            <tr><td>GB10</td><td><code>promaxgb10-1d0a</code></td><td>aarch64</td><td><code>10.8.0.12</code></td><td>gijohn_llm</td><td style="color:var(--good)">✓ 라이브 (ssh)</td></tr>
+            <tr><td>vm cloud</td><td><span style="color:var(--muted)">—</span></td><td>—</td><td><span style="color:var(--muted)">WG 밖</span></td><td>Claude 계정</td><td>디렉터리 멤버 · <span style="color:var(--good)">✓ 2026-09-01 여정 점검 · GB10 코드 검토 · 문서 통독 (origin/main f1bfd98 기준)</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px; border:1px solid var(--border); border-left:3px solid var(--warn); border-radius:10px; background:var(--surface-2); padding:14px 16px; font-size:.85rem; color:var(--ink-soft)">
+        <b style="color:var(--warn)">운영 노트 · 2026-08-12</b> — 05:16 Windows 업데이트가 <b>자동 재부팅</b>(2회, 세션 전부 끊김). 원인 = 활성 시간 11:00–04:00의 <b>04–11시 재부팅 창</b>. 서버는 자동 복구됨(:4000 정상, NRestarts=0). <b>통제안</b>: <code style="font-family:var(--mono)">AUOptions=3</code>(자동 다운로드 · 설치·재부팅 수동)로 예고 없는 재부팅 차단 — <b>관리자 실행 대기</b>.
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 2. Claude Code 세션 디렉터리 + 폰 ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">02</span><h2>Claude Code 세션 디렉터리 · 폰 접근</h2>
+      <span class="sub">계정으로 묶인 members — 클라우드 평면</span>
+    </div>
+    <div class="dir">
+      <div class="node" style="--c:var(--win)"><div class="tag">member</div><div class="name">DESKTOP-4QPLVNC</div><div class="desc">Windows — 상시 켜짐(허브 후보)</div></div>
+      <div class="node" style="--c:var(--mac)"><div class="tag">member</div><div class="name">GIJOHN_MAC</div><div class="desc">Mac M1 Max</div></div>
+      <div class="node" style="--c:var(--gb)"><div class="tag">member</div><div class="name">promaxgb10</div><div class="desc">GB10 DGX Spark</div></div>
+      <div class="node dash" style="--c:var(--cloud)"><div class="tag">cloud</div><div class="name">vm cloud</div><div class="desc">WireGuard 망에는 없음</div></div>
+      <div class="node" style="--c:var(--accent)"><div class="tag">device</div><div class="name">📱 Phone</div><div class="desc">claude.ai/code 로그인</div></div>
+    </div>
+    <div class="dir-note">
+      <span>↳</span>
+      <div><b>이 평면은 "보기·찌르기"다 — "조종"이 아니다.</b> 폰이 로그인하면 members의 <b>살아있는 세션</b>을 읽고(진행상황) 메시지로 방향을 바꿀 수 있다. 단 상대 머신에 <b>사람이 붙은 세션</b>이 켜져 있어야 하고, 명령·배포까지 하려면 허브(권장: Windows PC)를 통해 WireGuard로 들어가야 한다.</div>
+    </div>
+  </section>
+
+  <!-- ========== 3. 무엇을 어디서 재나 ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">03</span><h2>무엇을 어디서 만들고 · 어디서 재나</h2>
+      <span class="sub">제품이 도는 환경에서 잰다</span>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>무엇</th><th>어디서</th><th>왜</th></tr></thead>
+        <tbody>
+          <tr><td>서버 시험</td><td><span class="where" style="color:var(--accent)">WSL</span> · <code>bash tools/wsl-test.sh</code></td><td>제품이 WSL에서 돈다. 실측 27초/2,979개 vs Windows 14분/파일. Windows에서 재면 <b>딴 환경</b>을 검증한다.</td></tr>
+          <tr><td>클라 빌드·게시·실화면</td><td><span class="where" style="color:var(--win)">Windows</span>(exe) / <span class="where" style="color:var(--mac)">Mac</span>(dmg)</td><td>electron-builder·CDP가 거기 묶여 있다. 게시는 <b>Windows 전용</b>.</td></tr>
+          <tr><td>ARM CUDA 실측</td><td><span class="where" style="color:var(--gb)">GB10</span> · <code>ssh gb10</code></td><td>Pro/올인원이 실제로 돌 맨바닥. x86 CUDA·Metal에서는 원리상 못 잰다.</td></tr>
+          <tr><td>git ls-files·이미지 시험</td><td><span class="where" style="color:var(--win)">Windows</span> 호스트</td><td>WSL 사본은 git 저장소가 아니고 이미지를 안 가져간다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ========== 4. 제품 구조 + 서비스 방향 ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">04</span><h2>제품 구조 · 서비스 방향</h2>
+      <span class="sub">온프렘 · 오프라인 · 로컬 LLM</span>
+    </div>
+    <div class="grid2">
+      <div class="card" style="--c:var(--win)">
+        <h3><span class="k"></span>제품 구조</h3>
+        <ul class="stack">
+          <li><span class="lk">클라이언트</span><span>Electron (<code>client/</code>) · <code>app.html</code> 탭 셸 + <code>nav.js</code> 사이드바 · <code>npm run dist</code></span></li>
+          <li><span class="lk">서버</span><span>Express + TypeScript (<code>server/</code>) · 엔진 <code>src/engine/*.ts</code></span></li>
+          <li><span class="lk">데이터</span><span>SQLite <code>gijo-as.sqlite</code> · RAG = LanceDB + <code>bge-m3</code> 임베딩</span></li>
+          <li><span class="lk">모델</span><span>llama.cpp · GGUF · <code>localengine.ts</code> 프로세스 풀(VRAM 예산·LRU 스왑)</span></li>
+          <li><span class="lk">LLM 백엔드</span><span>WSL <b>CUDA</b> · Mac <b>Metal</b> · GB10 <b>ARM CUDA</b> — 한 코드, 세 백엔드</span></li>
+        </ul>
+      </div>
+      <div class="card" style="--c:var(--accent)">
+        <h3><span class="k"></span>서비스 방향</h3>
+        <ul class="stack">
+          <li><span class="lk">정체성</span><span>한국형 <b>온프렘</b> AI 보안관리 플랫폼 <span style="color:var(--muted)">(데이터가 고객 밖으로 안 나감)</span></span></li>
+          <li><span class="lk">1차 목표</span><span>분석 허브 — 취약점 스캐너 로그 · 보안로그 · 보안제품 리포트 <b>3소스 통합 분석·관제</b></span></li>
+          <li><span class="lk">차별점</span><span>AI-BOM · 온톨로지(6대 표준) · 레드팀/가드레일</span></li>
+          <li><span class="lk">지금 추진</span><span><b>점검 상품화</b>(매출 우선) — 결함 수리 → 원격 대상 → 한국어 공격 페이로드 팩 + 실측 도구</span></li>
+        </ul>
+        <div class="chips" style="margin-top:14px">
+          <span class="chip a">라이트 · WSL 이미지</span>
+          <span class="chip a">Pro/올인원 · GB10</span>
+          <span class="chip a">Mac 올인원 · Metal</span>
+          <span class="chip a">에어갭 · GIJO_AIRGAP=1</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="road" style="margin-top:16px">
+      <div class="phase">
+        <div class="ph">전 · before</div>
+        <h4>팔 수 있게</h4>
+        <ul>
+          <li>4시나리오 시연 통과</li>
+          <li>하드웨어 갈래 — GB10 편입(전-7)</li>
+          <li>보안 지형도·자산 지도</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="ph">중 · during</div>
+        <h4>믿을 수 있게</h4>
+        <ul>
+          <li>평가 게이트 3축 100~200문항</li>
+          <li>RAG 오염 차단 · 게이트 상충 감지</li>
+          <li>아낀 시간 KPI · 작업 원장</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="ph">후 · after</div>
+        <h4>넓힐 수 있게</h4>
+        <ul>
+          <li>에어갭 에디션(완전 폐쇄망)</li>
+          <li>지식 번들 구독화</li>
+          <li>Mac/ARM 올인원 확장</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 5. 고객사 배치 · 담당자 PC ↔ 서버 (2026-09-01 추가) ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">05</span><h2>고객사 배치 · 담당자 PC와 서버</h2>
+      <span class="sub">설치본은 서버가 나눠 주고, 서버는 한 대만 있으면 된다</span>
+    </div>
+    <div class="diagram-scroll">
+      <svg class="topo" viewBox="0 0 1060 340" role="img" aria-label="담당자 PC(설치본·로그인·탭 셸)와 사내 GPU 서버(WSL·GB10·Mac) 배치도">
+        <defs>
+          <marker id="arrNet" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 Z" fill="var(--accent)"/>
+          </marker>
+          <marker id="arrRel" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 Z" fill="var(--git)"/>
+          </marker>
+        </defs>
+
+        <!-- 담당자 PC -->
+        <g>
+          <rect x="40" y="36" width="410" height="270" rx="16" fill="var(--surface)" stroke="var(--client)" stroke-width="1.6"/>
+          <rect x="40" y="36" width="410" height="34" rx="16" fill="var(--client)" opacity=".12"/>
+          <text class="t-eyebrow" fill="var(--client)" x="62" y="58">담당자 PC · WINDOWS 10/11 · ×N대 · 관리자 권한 불필요</text>
+          <text class="t-host" fill="var(--ink)" x="62" y="98">GIJO AS 클라이언트 5.14.0</text>
+          <text class="t-meta" fill="var(--muted)" x="62" y="119">Electron · 계정당 로그인 세션 1개 · 상태는 전부 서버에</text>
+
+          <g font-family="var(--sans)">
+            <circle cx="74" cy="150" r="9" fill="var(--client)" opacity=".18"/><text x="74" y="154" text-anchor="middle" fill="var(--client)" font-size="11" font-weight="700">1</text>
+            <text class="t-role" fill="var(--ink)" x="92" y="154">설치본 — GIJO AS Setup 5.14.0.exe</text>
+            <text class="t-note" fill="var(--muted)" x="92" y="172">NSIS 마법사 · 사용자 단위 설치 · 서명 없음(EDR 예외 필요)</text>
+
+            <circle cx="74" cy="199" r="9" fill="var(--client)" opacity=".18"/><text x="74" y="203" text-anchor="middle" fill="var(--client)" font-size="11" font-weight="700">2</text>
+            <text class="t-role" fill="var(--ink)" x="92" y="203">첫 실행 → 로그인</text>
+            <text class="t-note" fill="var(--muted)" x="92" y="221">서버 주소 · 아이디 · 비밀번호 · 2차 인증(선택) · 중복 로그인 확인</text>
+
+            <circle cx="74" cy="248" r="9" fill="var(--client)" opacity=".18"/><text x="74" y="252" text-anchor="middle" fill="var(--client)" font-size="11" font-weight="700">3</text>
+            <text class="t-role" fill="var(--ink)" x="92" y="252">탭 셸(app.html) — 메뉴 · 탭 · 대화창</text>
+            <text class="t-note" fill="var(--muted)" x="92" y="270">① 발견·수집 → ⑤ 보고 절차 메뉴 · 지시는 대화창에서</text>
+          </g>
+          <line x1="62" y1="284" x2="428" y2="284" stroke="var(--border)" stroke-width="1"/>
+          <text class="t-note" fill="var(--muted)" x="62" y="300">단일 데스크톱 모드: 동봉 서버(server-dist)를 localhost:4000에 자동 기동 · 모델은 별도 배치</text>
+        </g>
+
+        <!-- 사내망 연결 -->
+        <g stroke="var(--accent)" stroke-width="2.6" fill="none" marker-end="url(#arrNet)">
+          <path d="M452,150 C520,150 560,150 636,150"/>
+        </g>
+        <g fill="var(--accent)" class="t-lbl" text-anchor="middle">
+          <rect x="478" y="118" width="134" height="19" rx="9" fill="var(--surface)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="545" y="131">사내망 · :4000 · HTTP/WS</text>
+        </g>
+        <g stroke="var(--git)" stroke-width="2" fill="none" stroke-dasharray="6 5" marker-end="url(#arrRel)">
+          <path d="M636,206 C560,206 520,206 452,206"/>
+        </g>
+        <g fill="var(--git)" class="t-lbl" text-anchor="middle">
+          <text x="545" y="232">설치본 게시 · 인앱 업데이트</text>
+          <text x="545" y="248">(/api/client/*)</text>
+        </g>
+
+        <!-- 서버 -->
+        <g>
+          <rect x="640" y="36" width="380" height="270" rx="16" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+          <rect x="640" y="36" width="380" height="34" rx="16" fill="var(--accent)" opacity=".12"/>
+          <text class="t-eyebrow" fill="var(--accent)" x="662" y="58">서버 · GPU 머신 1대 · 배포처는 서버 자신</text>
+          <text class="t-host" fill="var(--ink)" x="662" y="98">gijo-as-server :4000</text>
+          <text class="t-meta" fill="var(--muted)" x="662" y="119">Qwen3-14B Q4 + 전문가 어댑터 · bge-m3 임베딩 :8081 · SQLite · LanceDB</text>
+
+          <rect x="662" y="136" width="336" height="44" rx="10" fill="var(--inset)" stroke="var(--accent)" stroke-width="1.2"/>
+          <text class="t-lbl" fill="var(--accent)" x="676" y="154">지금 · 운영</text>
+          <text class="t-note" fill="var(--ink)" x="676" y="171">WSL2 · RTX 3090 24GB · Standard 티어(14B · 32K)</text>
+
+          <rect x="662" y="188" width="336" height="44" rx="10" fill="var(--inset)" stroke="var(--gb)" stroke-width="1.2"/>
+          <text class="t-lbl" fill="var(--gb)" x="676" y="206">후보 · 코드 검토 2026-09-01</text>
+          <text class="t-note" fill="var(--ink)" x="676" y="223">{{GB10_ONE_LINE}}</text>
+
+          <rect x="662" y="240" width="336" height="44" rx="10" fill="var(--inset)" stroke="var(--mac)" stroke-width="1.2"/>
+          <text class="t-lbl" fill="var(--mac)" x="676" y="258">1인 · 올인원</text>
+          <text class="t-note" fill="var(--ink)" x="676" y="275">Mac · Metal · M4 24GB(단일 LLM) / M1 Max 32GB</text>
+        </g>
+      </svg>
+    </div>
+    <div class="dir-note" style="margin-top:14px">
+      <span>↳</span>
+      <div><b>분산 모드가 표준이다.</b> 서버 한 대가 모델·데이터·설치본 게시를 전부 맡고, 담당자 PC는 설치본만 받아 서버 주소로 붙는다. 서버 자리를 WSL(RTX 3090)에서 GB10으로 바꿔도 담당자 PC 쪽은 <b>서버 주소 한 줄</b> 말고 바뀌는 것이 없다 — 07절이 그 전제로 코드를 봤다.</div>
+    </div>
+  </section>
+
+  <!-- ========== 6. 담당자 여정 점검 (2026-09-01) ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">06</span><h2>담당자 여정 점검 · 설치 → 로그인 → 제품 UI</h2>
+      <span class="sub">8갈래 점검 → 반박 검증 통과분만 · 코드는 안 고쳤다</span>
+    </div>
+    <div class="kpi" style="margin-bottom:14px">
+      {{JOURNEY_KPI}}
+    </div>
+    <div class="jr">
+      {{JOURNEY_STAGES}}
+    </div>
+    <div style="margin-top:16px" class="tbl-scroll">
+      <table>
+        <thead><tr><th>변경안</th><th>우선</th><th>무엇을 바꾸나</th><th>계획서</th><th>크기</th><th>시안</th></tr></thead>
+        <tbody>
+          {{JOURNEY_TOP}}
+        </tbody>
+      </table>
+    </div>
+    <div class="note client" style="margin-top:14px">
+      {{JOURNEY_SUMMARY}}
+    </div>
+  </section>
+
+  <!-- ========== 7. GB10 코드 병행 검토 (2026-09-01) ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">07</span><h2>GB10(DGX Spark) 코드 병행 검토</h2>
+      <span class="sub">서버를 GB10에 올린다는 전제 · origin/main f1bfd98 기준</span>
+    </div>
+    <div class="grid2">
+      <div class="card" style="--c:var(--gb)">
+        <h3><span class="k"></span>판정</h3>
+        <div style="font-size:.88rem; color:var(--ink-soft); line-height:1.6">{{GB10_VERDICT}}</div>
+      </div>
+      <div class="card" style="--c:var(--accent)">
+        <h3><span class="k"></span>확정한 사실 — 출처 있는 것만</h3>
+        <ul class="facts">
+          {{GB10_FACTS}}
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top:16px" class="tbl-scroll">
+      <table>
+        <thead><tr><th>변경안</th><th>우선</th><th>무엇을 바꾸나</th><th>계획서</th><th>크기</th></tr></thead>
+        <tbody>
+          {{GB10_ROWS}}
+        </tbody>
+      </table>
+    </div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="card" style="--c:var(--gb)">
+        <h3><span class="k"></span>GB10 실장비 실측 체크리스트 — 이 순서대로</h3>
+        <ol class="chk">
+          {{GB10_CHECKLIST}}
+        </ol>
+      </div>
+      <div class="card" style="--c:var(--warn)">
+        <h3><span class="k"></span>정직하게 밝힐 한계</h3>
+        <ul class="facts" style="gap:6px">
+          {{GB10_CAVEATS}}
+        </ul>
+      </div>
+    </div>
+    <div class="note bad" style="margin-top:14px">
+      <b>origin(GitHub)이 허브보다 뒤에 있다.</b> 이 검토는 origin/main <code style="font-family:var(--mono)">f1bfd98</code>(2026-08-09) 코드를 봤다. 이 지도의 08-13 판에 적힌 <code style="font-family:var(--mono)">unifiedmem.ts</code>·<code style="font-family:var(--mono)">tools/wsl-test.sh</code>·시험 2,979개는 origin에 없다 — 허브(Windows)에서 <code style="font-family:var(--mono)">git push origin main</code>을 한 번 해 주면 다음 클라우드 검토가 현재 코드를 본다. 아래 nvidia-smi 관련 항목은 허브의 unifiedmem.ts가 이미 풀었을 수 있다.
+    </div>
+  </section>
+
+  <!-- ========== 8. 문서 통독·통합 (2026-09-01) ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">08</span><h2>md 문서 81개 · 날짜순 통독과 통합</h2>
+      <span class="sub">본문 날짜로 연대기 · 원본은 지우지 않았다</span>
+    </div>
+    <div class="kpi" style="margin-bottom:14px">
+      {{DOCS_KPI}}
+    </div>
+    <div class="grid2">
+      <div class="card" style="--c:var(--git)">
+        <h3><span class="k"></span>시대 구분 — 문서에 적힌 날짜로</h3>
+        <ul class="facts">
+          {{DOC_ERAS}}
+        </ul>
+      </div>
+      <div class="card" style="--c:var(--accent)">
+        <h3><span class="k"></span>통합 뒤 남길 대표 문서</h3>
+        <ul class="facts">
+          {{DOC_TARGETS}}
+        </ul>
+      </div>
+    </div>
+    <div class="note warn" style="margin-top:14px">
+      {{DOCS_NOTE}}
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>기준 문서 · <code>GIJO_AS_시장경쟁력_전중후_계획서.md</code> · <code>CLAUDE.md</code></span>
+    <span>3+1 환경 · Windows(x86_64) · WSL · Mac(arm64) · GB10(aarch64) · 담당자 PC(설치본) · 검증 2026-08-13 · 여정·GB10·문서 점검 2026-09-01</span>
+  </div>
+
+</div>
+</div>
+
+</body></html>
