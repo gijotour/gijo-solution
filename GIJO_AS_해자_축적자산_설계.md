@@ -90,7 +90,7 @@ id · askedAt · question(원문) · verdict(○/△/×) · basisRefs(인용 문
 **슬라이스 1 완료**(같은 커밋): `action_check_history`(askedAt·question·normQuestion·verdict·
 basisRefs·verdictText·qa) + 판정 직후 저장. 재질문 병기는 **정규화 완전 일치 + 같은
 basisRefs**일 때만, 판정이 갈리면 ⚠. 조회 도구 `action_check_history`(즉답) +
-`FORCED_INTENTS[47]`. qa 행은 저장하되 조회·집계에서 제외.
+`FORCED_INTENTS[48]`. qa 행은 저장하되 조회·집계에서 제외.
 
 설계와 달라진 것 1건: 조회 답에 「다음 걸음」을 붙였다가 **감시 시험이 잡아 뺐다** —
 현황 조회는 다음 행동이 사람마다 다르다는 기존 원칙(exposed_assets 전례) 준수.

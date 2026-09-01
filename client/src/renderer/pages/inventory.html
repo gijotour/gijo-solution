@@ -645,7 +645,8 @@
       const risk = riskOf(a).level;
       if (activeFilter === "kev" && !riskOf(a).kev) return false;
       if (activeFilter === "high" && risk !== "high") return false;
-      if (activeFilter === "nosbom" && a.sbomGeneratedAt) return false;
+      // ⚠ 목록도 KPI·드롭다운과 같은 모수를 쓴다(2026-09-01 3차 검토 [상]).
+      if (activeFilter === "nosbom" && !(window.gijoSbomApplies(a) && !a.sbomGeneratedAt)) return false;
       if (activeFilter === "unscanned" && a.lastScannedAt) return false;
       if (activeFilter === "recent" && Date.now() - a.registeredAt > 7 * 24 * 3600 * 1000) return false;
       // 그림 띠에서 고른 자산 종류(전-7 ①, 2026-08-05) — 기존 조건들과 **곱해서** 건다.
@@ -1091,7 +1092,8 @@
         const r = riskOf(a);
         if (k === "kev") return r.kev;
         if (k === "high") return riskOf(a).level === "high";
-        if (k === "nosbom") return !a.sbomGeneratedAt;
+        // ⚠ 드롭다운 건수도 같은 모수 — 30픽셀 옆 KPI와 다른 수를 말하면 안 된다.
+        if (k === "nosbom") return window.gijoSbomApplies(a) && !a.sbomGeneratedAt;
         if (k === "unscanned") return !a.lastScannedAt;
         if (k === "recent") return Date.now() - a.registeredAt <= 7 * 24 * 3600 * 1000;
         return true;

@@ -134,6 +134,53 @@ let 실패 = [];
 let 원본줄합 = 0;
 let 발췌줄합 = 0;
 
+/** 이 커밋이 그 파일에서 **실제로 바꾼 줄 번호들**(바뀐 뒤 기준). */
+function 바뀐줄번호(ref, file) {
+  let diff = "";
+  try {
+    diff = execFileSync("git", ["show", "--no-color", "-U0", ref, "--", file], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  } catch { return []; }
+  const 줄 = [];
+  let 현재 = 0;
+  for (const l of diff.split("\n")) {
+    const h = l.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
+    if (h) { 현재 = Number(h[1]); continue; }
+    if (l.startsWith("+") && !l.startsWith("+++")) { 줄.push(현재); 현재++; }
+    else if (!l.startsWith("-") && !l.startsWith("\\")) 현재++;
+  }
+  return 줄;
+}
+
+/**
+ * 발췌를 꾸러미에 담는다 — **바뀐 줄이 하나도 안 담겼으면 크게 알린다.**
+ *
+ * ⚠⚠ 발췌가 나왔다는 것과 **검토에 쓸 만하다**는 것은 다르다(2026-09-01 완결성 비평 [상]).
+ *   이름은 diff에서 뽑았는데 그 이름의 **정의부만** 담기고 이 커밋이 바꾼 줄이 빠지면,
+ *   검토관은 「봤다」고 믿으면서 정작 커밋이 한 일을 못 본다 — 안 보는 것보다 나쁘다.
+ */
+function 담기(j, 원줄수, out, 머리말) {
+  const 발췌줄 = out.split("\n").length;
+  발췌줄합 += 발췌줄;
+  let 경고 = 머리말;
+  if (커밋) {
+    const 담긴 = new Set();
+    for (const m of out.matchAll(/^(\d+)\t/gm)) 담긴.add(Number(m[1]));
+    const 바뀐 = 바뀐줄번호(커밋, j.file);
+    const 겹침 = 바뀐.filter((x) => 담긴.has(x)).length;
+    if (바뀐.length && 겹침 === 0) {
+      경고 = `⚠⚠ **이 발췌에는 이 커밋이 바꾼 줄이 하나도 없다**(바뀐 줄 ${바뀐.length}개) — 질문이 빗나갔다. 원문을 직접 읽어라.\n${경고}`;
+      실패.push(`${j.file}: 발췌에 바뀐 줄이 0개 — 원문을 직접 읽어라`);
+    } else if (바뀐.length) {
+      경고 = `(이 커밋이 바꾼 ${바뀐.length}줄 중 ${겹침}줄이 발췌에 담겼다)\n${경고}`;
+    }
+  }
+  조각.push(
+    `## ${j.file} (원문 ${원줄수}줄 → 발췌 ${발췌줄}줄)\n\n물음: ${j.q}\n${경고 ? 경고 + "\n" : ""}\n\`\`\`\n${out.trim()}\n\`\`\``,
+  );
+  성공++;
+  process.stderr.write(`${발췌줄}줄\n`);
+}
+
 for (const j of 일감) {
   const n = j.줄 ?? 줄수(j.file);
   원본줄합 += n;
@@ -152,16 +199,24 @@ for (const j of 일감) {
       maxBuffer: 32 * 1024 * 1024,
       timeout: 300000,
     });
-    const 발췌줄 = out.split("\n").length;
-    발췌줄합 += 발췌줄;
-    조각.push(`## ${j.file} (원문 ${n}줄 → 발췌 ${발췌줄}줄)\n\n물음: ${j.q}\n\n\`\`\`\n${out.trim()}\n\`\`\``);
-    성공++;
-    process.stderr.write(`${발췌줄}줄\n`);
+    담기(j, n, out, "");
   } catch (e) {
-    // ⚠ **조용한 폴백 금지.** 실패는 실패라고 적고, 그 파일은 원문을 읽으라고 말한다.
-    실패.push(`${j.file}: ${String(e.message ?? e).slice(0, 120)}`);
-    조각.push(`## ${j.file} (원문 ${n}줄)\n\n⚠ **gb10 발췌 실패** — 이 파일은 원문을 직접 읽어라.\n오류: ${String(e.message ?? e).slice(0, 200)}`);
-    process.stderr.write(`실패\n`);
+    // ⚠⚠ **일부만 못 본 발췌를 통째로 버리지 않는다**(2026-09-01 완결성 비평 [중]).
+    //   앞 커밋에서 local-digest가 「조각 하나를 못 읽었다」를 알리려고 **종료코드 1**을 내게
+    //   했는데, execFileSync는 그걸 예외로 던지므로 여기서 **쓸 만한 발췌가 통째로 날아갔다** —
+    //   정직하게 알리려고 만든 장치가 그 정보를 버리게 만든 셈이다.
+    //   → 표준출력에 내용이 있으면 **살려 쓰되 「일부만 봤다」고 크게 적는다.**
+    const 살릴것 = String(e.stdout ?? "").trim();
+    if (살릴것) {
+      담기(j, n, 살릴것, "⚠ **이 발췌는 파일의 일부만 본 것이다**(gb10이 일부 구간을 못 읽었다). 아래 머리글의 「못 본 구간」을 보고, 중요하면 원문을 열어라.");
+      실패.push(`${j.file}: 일부 구간을 못 읽음(발췌는 살려 담았다)`);
+      process.stderr.write(`일부만\n`);
+    } else {
+      // ⚠ **조용한 폴백 금지.** 살릴 것이 없으면 실패라고 적고, 원문을 읽으라고 말한다.
+      실패.push(`${j.file}: ${String(e.message ?? e).slice(0, 120)}`);
+      조각.push(`## ${j.file} (원문 ${n}줄)\n\n⚠ **gb10 발췌 실패** — 이 파일은 원문을 직접 읽어라.\n오류: ${String(e.message ?? e).slice(0, 200)}`);
+      process.stderr.write(`실패\n`);
+    }
   }
 }
 

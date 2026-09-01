@@ -273,8 +273,10 @@ tr:last-child td{border-bottom:none;}
     return assets.filter((a) => {
       if (범위자산 && a.id !== 범위자산) return false;
       if (q && !a.name.toLowerCase().includes(q)) return false;
-      if (activeFilter === "generated" && !a.sbomGeneratedAt) return false;
-      if (activeFilter === "missing" && a.sbomGeneratedAt) return false;
+      // ⚠ 목록도 **KPI와 같은 모수**를 쓴다(2026-09-01 3차 검토 [상]) — 배지는 「미생성 12」인데
+      //   판을 펴면 4,888행이 나오던 자리다. 「같은 물음에 두 숫자」를 화면 안으로 옮긴 셈이었다.
+      if (activeFilter === "generated" && !(window.gijoSbomApplies(a) && a.sbomGeneratedAt)) return false;
+      if (activeFilter === "missing" && !(window.gijoSbomApplies(a) && !a.sbomGeneratedAt)) return false;
       // 그림 띠에서 라이선스를 골랐으면 그 라이선스를 쓰는 자산만(전-7 ①, 2026-08-05)
       if (라이선스필터 && !(a.components || []).some((c) => 라이선스이름(c.license) === 라이선스필터)) return false;
       return true;
@@ -601,7 +603,7 @@ tr:last-child td{border-bottom:none;}
   function 그림띠() {
     const 자리 = document.getElementById("vizStrip");
     if (!자리 || !window.gijoViz) return;
-    const 생성됨 = allAssets.filter((a) => a.sbomGeneratedAt).length;
+    const 생성됨 = window.gijoSbomGeneratedCount(allAssets);
     // ⚠ 실측(2026-08-05): 운영 데이터 844개 컴포넌트의 라이선스가 **전부 문자 "-"** 였다.
     //   빈 값을 조용히 버리면 "라이선스 정보 없음"이라는 사실 자체가 화면에서 사라진다 —
     //   버리지 말고 「미상」이라 이름 붙여 그린다. 그래야 채워 넣을 일이 있다는 게 보인다.
@@ -701,7 +703,9 @@ tr:last-child td{border-bottom:none;}
         .join("");
     }
     paginationLabel.textContent = `전체 ${allAssets.length}건 중 ${filtered.length}건 표시`;
-    document.getElementById("kpiGenerated").textContent = allAssets.filter((a) => a.sbomGeneratedAt).length;
+    // ⚠ 「생성」과 「미생성」은 **같은 모수**에서 — 한쪽만 고치면 나란히 놓인 두 수의 합이
+    //   전체와 안 맞는다(이 파일 704줄 주석이 옛날에 못 박아 둔 그 사고).
+    document.getElementById("kpiGenerated").textContent = window.gijoSbomGeneratedCount(allAssets);
     // ★ 2026-08-05 기준 통일. 여기 있던 「컴포넌트」는 **SBOM 도장을 찍은 자산만** 세어 4였고,
     //   바로 옆 「라이선스 N종」은 **전 자산**을 세고 있었다 — 나란히 있는 두 숫자의 모수가
     //   달랐다. 부품은 SBOM 문서를 만들었든 아니든 **우리가 이미 아는 것**이므로 전체로 센다
@@ -818,7 +822,10 @@ tr:last-child td{border-bottom:none;}
   }
 
   async function bulkGenerate() {
-    const targets = allAssets.filter((a) => !a.sbomGeneratedAt);
+    // ⚠⚠ **일괄 생성은 대상 자산만.** 옛 잣대로 두면 스캐너가 들여온 IP 호스트·방화벽
+    //   수천 건에 대해 generateSbom을 순차로 부른다 — 숫자만 틀리는 게 아니라 **실제로
+    //   엉뚱한 일을 한다**(2026-09-01 3차 검토 [상]).
+    const targets = window.gijoSbomMissing(allAssets);
     for (const a of targets) {
       await window.gijo.generateSbom(a.id);
       logExport("일괄 생성", a.id, "SBOM 생성 완료");

@@ -32,13 +32,49 @@
     return a.assetType !== "infra-host";
   }
 
-  /** SBOM이 아직 없는 **대상** 자산 수 — 화면 KPI는 이것만 쓴다. */
+  /**
+   * SBOM 잣대가 **적용되는 자산들** — 세는 것도, 목록도, 일괄 작업도 전부 여기서 시작한다.
+   *
+   * ⚠⚠ 왜 목록까지 여기서 주나(2026-09-01 3차 검토 [상]): KPI 한 칸만 공용 잣대로 바꾸고
+   *   같은 화면의 **필터 칩·드롭다운 건수·일괄 생성**을 옛 잣대로 두었더니, 배지는 12를
+   *   말하는데 목록을 펴면 4,888행이 나왔다 — 「같은 물음에 두 숫자」를 화면 밖에서 안으로
+   *   옮겼을 뿐이다. **모수를 만드는 함수 하나**를 쓰게 해야 갈릴 수가 없다.
+   */
+  function gijoSbomTargets(assets) {
+    return (assets || []).filter(gijoSbomApplies);
+  }
+
+  /** SBOM이 아직 없는 **대상** 자산들 — 목록·일괄 작업이 쓴다. */
+  function gijoSbomMissing(assets) {
+    return gijoSbomTargets(assets).filter(function (a) {
+      return !a.sbomGeneratedAt;
+    });
+  }
+
+  /** SBOM이 이미 있는 **대상** 자산들. */
+  function gijoSbomGenerated(assets) {
+    return gijoSbomTargets(assets).filter(function (a) {
+      return a.sbomGeneratedAt;
+    });
+  }
+
+  /**
+   * 화면 KPI용 건수.
+   * ⚠ 「생성」과 「미생성」은 **같은 모수**에서 나와야 한다 — 한쪽만 고치면 나란히 놓인 두
+   *   숫자의 합이 전체와 안 맞아 담당자가 「나머지는 어디 갔나」를 묻게 된다
+   *   (sbom.html이 옛날에 겪고 주석으로 못 박아 둔 그 사고를, 2026-09-01에 내가 재발시켰다).
+   */
   function gijoSbomMissingCount(assets) {
-    return (assets || []).filter(function (a) {
-      return gijoSbomApplies(a) && !a.sbomGeneratedAt;
-    }).length;
+    return gijoSbomMissing(assets).length;
+  }
+  function gijoSbomGeneratedCount(assets) {
+    return gijoSbomGenerated(assets).length;
   }
 
   window.gijoSbomApplies = gijoSbomApplies;
+  window.gijoSbomTargets = gijoSbomTargets;
+  window.gijoSbomMissing = gijoSbomMissing;
+  window.gijoSbomGenerated = gijoSbomGenerated;
   window.gijoSbomMissingCount = gijoSbomMissingCount;
+  window.gijoSbomGeneratedCount = gijoSbomGeneratedCount;
 })();

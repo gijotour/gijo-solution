@@ -2366,7 +2366,10 @@ export function runHardeningScheduleList(): string {
     const last = r.lastResult === "fail"
       ? `최근 ${fmt(r.lastRunAt)} ✕ 실패(${r.lastError || "원인 미상"}) — 표시 준수율은 그전 성공값`
       : r.lastRunAt ? `최근 ${fmt(r.lastRunAt)} · 준수율 ${r.lastRate ?? "-"}%${r.lastFail ? ` · 취약 ${r.lastFail}건` : ""}` : "아직 실행 전";
-    return `- ${r.targetLabel} — ${r.standard.toUpperCase()} 기준 · ${r.intervalHours}시간마다 · ${state} · 다음 ${fmt(r.nextRunAt)} (${last})`;
+    // ⚠ 로컬로 등록한 대상은 **장비에 붙지 않는다** — 장비 이름만 적으면 「그 장비를
+    //   정기 점검 중」으로 읽힌다(2026-09-01 3차 검토 [중]).
+    const 어디 = r.원격 ? r.targetLabel : `이 서버 자신(이름표: ${r.targetLabel})`;
+    return `- ${어디} — ${r.standard.toUpperCase()} 기준 · ${r.intervalHours}시간마다 · ${state} · 다음 ${fmt(r.nextRunAt)} (${last})`;
   });
   const on = rows.filter((r) => r.enabled).length;
   return [`원격 정기점검 스케줄 ${rows.length}건(가동 ${on} · 중지 ${rows.length - on})`, ...lines].join("\n");

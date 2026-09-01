@@ -248,7 +248,16 @@
         load: function () {
         return window.gijo.listAssets().then(function (assets) {
           assets = assets || [];
-          var 있음 = assets.filter(function (a) { return a.sbomGeneratedAt; }).length;
+          // ⚠⚠ **프로 셸 현황 카드도 같은 잣대**(2026-09-01 3차 검토 [상]).
+          //   여기가 네 번째로 각자 세던 자리였다 — 프로가 기준 모델이라 사용자가 가장
+          //   자주 보는 숫자가 안 고쳐진 쪽이었다. 대화창은 12라는데 카드는 4,888을 찍었다.
+          // ⚠ **조용한 폴백을 두지 않는다.** 처음엔 `window.gijoSbomTargets ? … : assets`로
+          //   썼는데, 이 부품을 싣는 화면 8개가 **아무도 assetrules.js를 안 읽고 있어서**
+          //   그 폴백이 통째로 옛 동작(전 자산 세기)으로 되돌렸다 — 고쳤다고 믿는데 안 고쳐진
+          //   상태가 조용히 유지된다. 이제 화면이 잣대를 안 읽으면 **눈에 띄게 죽는다**
+          //   (시험이 화면 8개에 assetrules.js를 강제한다).
+          var 있음 = window.gijoSbomGeneratedCount(assets);
+          var 대상수 = window.gijoSbomTargets(assets).length;
           // ⚠ `llm-service`·`ml-model`은 **저장소에 존재하지 않는 값**이라 이 줄이 항상 0이었다
           //   (2026-08-20 설계관 적발). 원천은 서버 assets.ts:100-106 isAiAsset — 자산 종류가
           //   「LLM 서비스·분류 모델·이상탐지 모델」이거나 AI-BOM에 모델 참조가 채워진 것.
@@ -261,7 +270,7 @@
           return {
             rows: [
               ["구성 명세(SBOM) 있음", n(있음)],
-              ["아직 없음", n(assets.length - 있음), A],
+              ["아직 없음", n(대상수 - 있음), A],
               ["AI 자산", n(ai)],
             ],
             foot: "전체 자산 " + n(assets.length),
