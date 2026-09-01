@@ -685,7 +685,10 @@ async function runClient() {
       // ① 🧠 내 지식
       "지식 창고", "법령·판례", "GIJO AS 안내 (옛 문서함·제품 안내)", "보안제품 비교·소개 (옛 제품 소개자료)",
       // ② 📓 내 문서
-      "업로드·반입", "문서 편집 (내 것)", "나만의 연락처", "업무 넘기기", "지켜보는 폴더", "조치 요청서",
+      // ⚠ 「문서 편집 (내 것)」 → **「문서작성」+「내 문서 목록」**으로 갈렸다
+      //   (2026-08-30 사장님 지시 「직접 작성해야 하는 부분들을 문서작성 메뉴로」).
+      //   낡은 기대값이 실결함처럼 보이던 자리다 — 승인된 변경이면 여기를 같이 고쳐야 한다.
+      "업로드·반입", "문서작성", "내 문서 목록", "나만의 연락처", "업무 넘기기", "지켜보는 폴더", "조치 요청서",
       // ③ 🩹 취약점 업무
       "⓪ 자산 고르기", "① 발견·수집", "② 우선순위", "③ 조치", "④ 검증", "⑤ 보고", "보안 로그 파일 분석",
       // ④ 🧰 보안제품 관리
@@ -825,7 +828,7 @@ async function runClient() {
   await scenario("QA-C09", "프로 셸", "shell=pro로 열면 프로 구조가 선다(메뉴 숨김·레일·흰 바탕)", {
     given: "탭 셸을 ?shell=pro로 열면",
     when: "본문이 그려졌을 때",
-    then: "pro-shell 클래스 · #gijoNav 숨김 · #gijoRail 표시 · theme-light(흰 바탕)",
+    then: "pro-shell 클래스 · #gijoNav는 **접는 판**으로 살아 있음 · #gijoRail 표시 · theme-light(흰 바탕)",
   }, async () => {
     await page.goto("file://" + path.join(PAGES, "app.html").replace(/\\/g, "/") + "?shell=pro");
     await page.waitForTimeout(1500);
@@ -837,7 +840,11 @@ async function runClient() {
     }));
     if (!st.pro) throw new Error("pro-shell 클래스가 안 붙었다");
     if (!st.light) throw new Error("theme-light(흰 바탕)가 안 붙었다");
-    if (st.nav !== "none") throw new Error(`프로에서 사이드바가 보인다: ${st.nav}`);
+    // ⚠ **프로 셸은 이제 사이드바를 숨기지 않는다**(2026-08-27 「셸 재구축 0-3: 접는 화면 메뉴 판」
+    //   784545a0). app.html이 `body.pro-shell #gijoNav{display:flex}`로 **일부러** 살려 두고,
+    //   `.pro-menu-closed`로 폭을 0으로 접는다. 옛 기대(숨김)를 그대로 두니 설계 변경이
+    //   실결함처럼 보였다 — 접히는지를 본다.
+    if (st.nav === "none") throw new Error("프로에서 메뉴 판이 통째로 사라졌다 — 접는 판이어야 한다");
     if (st.rail === "none" || st.rail === "없음") throw new Error(`레일이 안 보인다: ${st.rail}`);
   });
 

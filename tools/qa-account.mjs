@@ -11,6 +11,17 @@
  * @param {string} [why] 이 도구가 왜 로그인하는지 — 안내 문구에 그대로 쓴다.
  * @returns {{ user: string, pass: string }}
  */
+/**
+ * ⚠⚠ **QA 전용 계정(win_claude-qa)만으로는 QA가 반쪽이 된다**(2026-09-01 실측).
+ *   그 계정은 security_officer이고 **소속 팀이 없어**, 검증 계층 9건이 통째로
+ *   「이 자산은 보안관제팀 소관입니다 — 권한이 없습니다」로 실패한다.
+ *   admin 전용 창구(/api/localengine/model-licenses)도 403이 난다.
+ *   ⚠ 그렇다고 **QA 계정의 권한을 올리지 않는다** — 운영 서버에 admin 계정을 하나 더 두는
+ *     것은 보안 결정이지 편의가 아니다. 대신 **이미 문서화된 테스트용 admin 계정**
+ *     (CLAUDE.md: win = claude-deploy)을 쓴다.
+ *   ⚠ 그 계정으로 로그인하면 **계정당 1세션**이라 같은 계정의 앱 세션이 끊긴다.
+ *     사장님 계정과는 다른 계정이라 사장님 세션에는 영향이 없다.
+ */
 export function account(why = "점검") {
   const user = process.env.GIJO_ADMIN_USER || process.env.GIJO_QA_USER || "";
   const pass = process.env.GIJO_ADMIN_PASSWORD || process.env.GIJO_QA_PASS || "";
