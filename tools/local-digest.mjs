@@ -1,4 +1,5 @@
-// tools/local-digest.mjs — gb10 로컬 LLM(Qwen3-Coder-30B-A3B)으로 **Claude 입력을 줄이는** 창구.
+// tools/local-digest.mjs — gb10 로컬 LLM으로 **Claude 입력을 줄이는** 창구.
+// 어느 모델인지는 아래 `두뇌들`이 단일 출처다(GIJO_DIGEST_BRAIN으로 고름) — 여기에 이름을 박지 말 것.
 // (하이브리드 설계서 §6-⑴ · 1주차 게이트 통과 실측: 발췌 20/20 · 생성 69.8 tok/s · 압축 ~45×)
 //
 // ■ 무엇을 아끼나 (2026-08-27 사장님 「gb10으로 토큰 줄일 수 있는 거 있으면 해줘 — 검토관·소스관리·검사 등」)
@@ -14,7 +15,7 @@
 //     그대로 유효하고, 이 도구는 검토관을 **대체하지 않고 읽을 양을 줄인다.**
 //   · gb10이 죽어 있으면 **크고 시끄럽게** 실패한다(조용한 폴백 금지) — 그때는 그냥 원문을 읽는다.
 //
-// ■ 전송: win → ssh gb10 → localhost:8082 (llama-server는 루프백만 열려 있다 — WireGuard에
+// ■ 전송: win → ssh gb10 → localhost:$GIJO_DIGEST_PORT (llama-server는 루프백만 열려 있다 — WireGuard에
 //   포트를 더 열지 않는다). 요청 JSON은 stdin 파이프라 한글·따옴표 안전.
 //   ⚠ 서버는 --parallel 1로 떠 있어야 한다(2가 되면 ctx 반토막 — hybrid-probe.mjs 머리주석 실사고).
 //
@@ -31,6 +32,34 @@ import { fileURLToPath } from "url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const [mode, 대상, 질문] = process.argv.slice(2);
 
+// ── 어느 두뇌를 쓰나 ─────────────────────────────────────────────────────────
+// 포트와 「그 포트를 띄우는 명령」은 **짝이다.** 전엔 포트만 바꿔 놓고 기동 명령은
+// 옛것을 그대로 둬서, `up` 한 번이면 조용히 딴 모델이 딴 포트에 떴다(반쪽 수리).
+// 그래서 여기서 둘을 함께 정한다. GIJO_DIGEST_BRAIN 으로 고른다.
+const 두뇌들 = {
+  // 2026-09-01부터 기본. 125B MoE(6B 활성) — 24.5 tok/s로 coder-30b(67)보다 느리지만
+  // 답이 2.2배 상세하고, 무엇보다 coder-30b와 **동시에 못 올린다**(둘 다 올리면 여유 7GiB).
+  // ⚠ 생각하는 모델이라 --reasoning off 가 없으면 토큰을 전부 생각에 쓰고 답이 0자로 나온다.
+  "qwen38": {
+    port: 8100,
+    이름: "Qwen3.8-Flash-Next 125B-A6B",
+    기동: "cd ~/gijo-as/server && mkdir -p ~/logs && nohup llama.cpp-next/build/bin/llama-server" +
+      " -m models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf" +
+      " -a qwen38-flash-next --port 8100 -c 32768 --jinja --reasoning off --reasoning-budget 0" +
+      " >> ~/logs/q38.log 2>&1 & sleep 1",
+  },
+  // 예전 기본. 3배 빠르니 「빨리 훑기」가 필요하면 GIJO_DIGEST_BRAIN=coder30 로 쓴다.
+  "coder30": {
+    port: 8082,
+    이름: "Qwen3-Coder-30B-A3B",
+    기동: "cd ~/gijo-as/server && nohup llama.cpp/build/bin/llama-server" +
+      " -m models/qwen3-coder-30b-a3b/qwen3-coder-30b-a3b.gguf -ngl -1 --ctx-size 65536" +
+      " --parallel 1 --port 8082 --jinja >> /tmp/qwen3coder2.log 2>&1 & sleep 1",
+  },
+};
+const 두뇌 = 두뇌들[process.env.GIJO_DIGEST_BRAIN ?? "qwen38"] ?? 두뇌들.qwen38;
+const DIGEST_PORT = 두뇌.port;
+
 // ── gb10 창구 ────────────────────────────────────────────────────────────────
 function gb10Chat(prompt, schema, nPredict) {
   const body = {
@@ -40,7 +69,7 @@ function gb10Chat(prompt, schema, nPredict) {
     max_tokens: nPredict ?? 512,
   };
   if (schema) body.response_format = { type: "json_schema", json_schema: { name: "out", strict: true, schema } };
-  const r = spawnSync("ssh", ["gb10", "curl -s --max-time 300 -X POST http://localhost:8082/v1/chat/completions -H 'content-type: application/json' --data-binary @-"],
+  const r = spawnSync("ssh", ["gb10", `curl -s --max-time 300 -X POST http://localhost:${DIGEST_PORT}/v1/chat/completions -H 'content-type: application/json' --data-binary @-`],
     { input: JSON.stringify(body), encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (r.status !== 0) throw new Error("ssh 실패: " + (r.stderr || "").slice(0, 200));
   let j;
@@ -50,7 +79,7 @@ function gb10Chat(prompt, schema, nPredict) {
 }
 
 function 서버확인() {
-  const r = spawnSync("ssh", ["gb10", "curl -s --max-time 5 http://localhost:8082/health"], { encoding: "utf8" });
+  const r = spawnSync("ssh", ["gb10", `curl -s --max-time 5 http://localhost:${DIGEST_PORT}/health`], { encoding: "utf8" });
   return /ok/.test(r.stdout || "");
 }
 
@@ -92,7 +121,7 @@ function 발췌(경로, 물음) {
     else 병합.push([...r]);
   }
   const 총 = 병합.reduce((a, [x, y]) => a + (y - x + 1), 0);
-  console.log(`# ${경로} — ${lines.length}줄 중 ${총}줄 발췌 (${병합.length}구간 · gb10 30B-A3B · 원문 그대로)`);
+  console.log(`# ${경로} — ${lines.length}줄 중 ${총}줄 발췌 (${병합.length}구간 · gb10 ${두뇌.이름} · 원문 그대로)`);
   for (const [a, b] of 병합) {
     console.log(`\n── ${a}~${b}줄 ──`);
     console.log(lines.slice(a - 1, b).map((l, i) => `${a + i}\t${l}`).join("\n"));
@@ -142,7 +171,7 @@ function 리뷰(커밋) {
       all.push(...(out.findings || []));
     } catch (e2) { console.error(`⚠ diff 조각 ${i} 실패: ${e2.message}`); }
   }
-  console.log(`# ${ref} 1차 선별 — 후보 ${all.length}건 (gb10 30B-A3B)`);
+  console.log(`# ${ref} 1차 선별 — 후보 ${all.length}건 (gb10 ${두뇌.이름})`);
   console.log(`# ⚠ **후보이지 판정이 아니다.** 각 지점은 Claude/사람이 직접 열어 확정할 것 —`);
   console.log(`#    이 선별은 검토관을 대체하지 않고 읽을 양을 줄인다(CLAUDE.md 검토관 원칙 유효).`);
   for (const f of all) console.log(`\n[후보·${f.kind || "other"}] ${f.file}\n  인용: ${f.quote}\n  왜: ${f.why}`);
@@ -151,7 +180,7 @@ function 리뷰(커밋) {
 
 // ── 실행 ────────────────────────────────────────────────────────────────────
 if (!서버확인() && mode !== "up") {
-  console.error("✗ gb10:8082가 응답하지 않는다 — 조용한 폴백은 하지 않는다.");
+  console.error(`✗ gb10:${DIGEST_PORT}가 응답하지 않는다 — 조용한 폴백은 하지 않는다.`);
   console.error("  기동:  node tools/local-digest.mjs up");
   process.exit(2);
 }
@@ -159,8 +188,8 @@ if (mode === "file" || mode === "log") 발췌(대상, 질문 || "핵심 내용")
 else if (mode === "review") 리뷰(대상);
 else if (mode === "up") {
   if (서버확인()) { console.log("이미 떠 있음 ✅"); process.exit(0); }
-  spawnSync("ssh", ["gb10", "cd ~/gijo-as/server && nohup llama.cpp/build/bin/llama-server -m models/qwen3-coder-30b-a3b/qwen3-coder-30b-a3b.gguf -ngl -1 --ctx-size 65536 --parallel 1 --port 8082 --jinja > /tmp/qwen3coder.log 2>&1 & sleep 1"], { encoding: "utf8", timeout: 20000 });
-  console.log("기동 명령 보냄 — 로드 30~60초 뒤 다시 확인");
+  spawnSync("ssh", ["gb10", `. ~/gijo-env.sh 2>/dev/null; ${두뇌.기동}`], { encoding: "utf8", timeout: 20000 });
+  console.log(`기동 명령 보냄 (${두뇌.이름} · 포트 ${DIGEST_PORT}) — 적재 45~60초 뒤 다시 확인`);
 } else {
   console.log("사용: node tools/local-digest.mjs file <경로> \"<질문>\" | review [커밋] | log <경로> \"<질문>\" | up");
 }
