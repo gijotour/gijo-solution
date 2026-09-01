@@ -12,7 +12,7 @@
 //   Claude 입력 절감이라는 목적이 죽는다. 통과 판정과 별개로 발췌 폭을 기록해
 //   30%를 넘으면 표시한다 — 통과 불가능한 시험만큼 통과 무의미한 시험도 가짜다.
 //
-// 실행(gb10): . ~/gijo-env.sh && node tools/hybrid-probe.mjs --extract --url http://localhost:8100
+// 실행(gb10): . ~/gijo-env.sh && node tools/hybrid-probe.mjs --extract --url http://localhost:8080
 //
 // ⚠ 서버는 --parallel 1로 띄울 것 (2026-08-27 실측): --parallel 2면 ctx가 슬롯당 반으로
 //   갈라져(65536→32768) 2,000줄급 파일 6개(36K~59K tok)가 전부 400으로 죽었다 —
@@ -25,7 +25,7 @@ import { fileURLToPath } from "url";
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 && args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : d; };
-const URL_ = opt("--url", "http://localhost:8100");
+const URL_ = opt("--url", "http://localhost:8080");
 // ⚠ new URL().pathname은 공백을 %20으로 남긴다(「D:\Connect AI」가 실제로 밟았다) — fileURLToPath가 정석.
 const ROOT = opt("--root", path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
 const QFILE = path.join(ROOT, "tools", "hybrid-probe-questions.json");
@@ -150,4 +150,4 @@ const 문항들 = JSON.parse(fs.readFileSync(QFILE, "utf8"));
 if (args.includes("--check")) 앵커검증(문항들);
 else if (args.includes("--speed")) await 속도();
 else if (args.includes("--extract")) { await 속도(); console.log(""); await 발췌(문항들); }
-else console.log("사용: node tools/hybrid-probe.mjs --check | --speed | --extract [--url http://localhost:8100]");
+else console.log("사용: node tools/hybrid-probe.mjs --check | --speed | --extract [--url http://localhost:8080]");

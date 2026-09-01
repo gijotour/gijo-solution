@@ -40,13 +40,15 @@ const 두뇌들 = {
   // 2026-09-01부터 기본. 125B MoE(6B 활성) — 24.5 tok/s로 coder-30b(67)보다 느리지만
   // 답이 2.2배 상세하고, 무엇보다 coder-30b와 **동시에 못 올린다**(둘 다 올리면 여유 7GiB).
   // ⚠ 생각하는 모델이라 --reasoning off 가 없으면 토큰을 전부 생각에 쓰고 답이 0자로 나온다.
+  // 2026-09-01부터 기본. 125B MoE(6B 활성) — 24.5 tok/s로 coder-30b(67)보다 느리지만 답이 2.2배 상세하다.
+  // ★ **제품(node dist/index.js)이 8080에서 직접 관리한다** — 손으로 띄우지 마라.
+  //   app_state.defaultModelId = qwen38-flash-next 라 node가 뜨면 자동으로 올라온다.
+  //   ⚠ 여기 기동 명령은 **node가 죽어 있을 때의 비상용**이다. node가 살아 있는데 이걸 쓰면
+  //     8080이 이미 잡혀 있어 실패하고, node를 재기동하면 reapOrphanEngines가 죽인다.
   "qwen38": {
-    port: 8100,
+    port: 8080,
     이름: "Qwen3.8-Flash-Next 125B-A6B",
-    기동: "cd ~/gijo-as/server && mkdir -p ~/logs && nohup llama.cpp-next/build/bin/llama-server" +
-      " -m models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf" +
-      " -a qwen38-flash-next --port 8100 -c 32768 --jinja --reasoning off --reasoning-budget 0" +
-      " >> ~/logs/q38.log 2>&1 & sleep 1",
+    기동: "cd ~/gijo-as/server && nohup node dist/index.js >> /tmp/gijo-server.log 2>&1 & sleep 1",
   },
   // 예전 기본. 3배 빠르니 「빨리 훑기」가 필요하면 GIJO_DIGEST_BRAIN=coder30 로 쓴다.
   "coder30": {
