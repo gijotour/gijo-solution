@@ -48,12 +48,16 @@ const 두뇌들 = {
   "qwen38": {
     port: 8080,
     이름: "Qwen3.8-Flash-Next 125B-A6B",
+    // ⚠ **슬롯당** 문맥이다(전체 아님). 제품이 --parallel 2로 띄우므로 32768÷2 = 16384다.
+    //   전체 ctx를 적으면 조각이 두 배로 커져 400이 난다(2026-09-02에 실제로 밟았다).
+    슬롯문맥: 16384,
     기동: "cd ~/gijo-as/server && nohup node dist/index.js >> /tmp/gijo-server.log 2>&1 & sleep 1",
   },
   // 예전 기본. 3배 빠르니 「빨리 훑기」가 필요하면 GIJO_DIGEST_BRAIN=coder30 로 쓴다.
   "coder30": {
     port: 8082,
     이름: "Qwen3-Coder-30B-A3B",
+    슬롯문맥: 65536, // --parallel 1이라 전체가 곧 슬롯이다
     기동: "cd ~/gijo-as/server && nohup llama.cpp/build/bin/llama-server" +
       " -m models/qwen3-coder-30b-a3b/qwen3-coder-30b-a3b.gguf -ngl -1 --ctx-size 65536" +
       " --parallel 1 --port 8082 --jinja >> /tmp/qwen3coder2.log 2>&1 & sleep 1",
@@ -102,7 +106,18 @@ const RANGE_SCHEMA = {
 //   자다: 같은 1,500줄이 screenguide 102,719자 / handlers 68,261자로 **1.5배 차이**가 난다
 //   (한글 비율 45% vs 21%). 줄로 자르면 한글 많은 파일만 조용히 실패한다.
 //   실측 비율 1.54자/토큰 기준, 안전 예산 50,000토큰 ≈ 77,000자로 잡는다(ctx 65,536의 76%).
-const 조각글자수 = 70000, 겹침줄 = 150;
+//
+// ⚠⚠ **두뇌에서 계산한다**(2026-09-02에 또 밟고 고침). 상수 70,000을 박아 두었더니
+//   두뇌를 coder-30b(ctx 65,536) → Qwen3.8(슬롯 16,384)로 바꾸는 순간 조각이 ctx의 4배가 되어
+//   **파일 하나가 통째로 실패**했다. 「모델을 바꾸면 같이 움직여야 하는 값」을 상수로 두면
+//   바꾸는 사람이 반드시 잊는다 — 그래서 두뇌 정의에서 끌어온다.
+// ⚠ **자/토큰 비율은 1.54를 쓴다**(가장 나쁜 경우). 같은 70,000자가 한글 많은 파일에선
+//   45,000토큰, ASCII 많은 파일에선 19,600토큰이었다 — 2.3배 차이다. 넉넉한 쪽으로 잡으면
+//   조각이 많아질 뿐이지만, 모자라게 잡으면 **조용히 통째로 날아간다.**
+const 자당토큰 = 1.54;   // 한글 많은 파일 실측(가장 나쁜 경우)
+const 입력몫 = 0.70;      // 나머지는 답·프롬프트 몫
+const 조각글자수 = Math.floor(두뇌.슬롯문맥 * 입력몫 * 자당토큰);
+const 겹침줄 = 150;
 
 function 발췌(경로, 물음) {
   const abs = path.isAbsolute(경로) ? 경로 : path.join(ROOT, 경로);
