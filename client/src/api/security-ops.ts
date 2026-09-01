@@ -570,12 +570,13 @@ export const docRequestApi = {
 
 // ── 원격 LLM(BridgeAI 1단계 · VPN 전용) — 서버 remotellm.ts 라우트의 소비자 ──────────
 export const remoteLlmApi = {
-  get: () => request<{ enabled: boolean; url: string; lastCheck: number | null; airgap: boolean }>("/api/llm/remote"),
-  test: (url: string) => request<{ ok: boolean; models?: number | null; error?: string }>("/api/llm/remote/test", { method: "POST", body: { url } }),
+  get: () => request<{ enabled: boolean; url: string; lastCheck: number | null; lastModel: string | null; airgap: boolean }>("/api/llm/remote"),
+  test: (url: string) => request<{ ok: boolean; models?: number | null; model?: string | null; error?: string }>("/api/llm/remote/test", { method: "POST", body: { url } }),
   set: (enabled: boolean, url: string) => request<{ enabled: boolean; url: string; airgap: boolean }>("/api/llm/remote", { method: "POST", body: { enabled, url } }),
   // 「내 질문이 바깥으로 나가나」 — 로그인한 누구나(담당자 포함). 주소는 안 준다.
   // 위 get()은 admin 전용이라, 담당자 화면이 그걸 쓰면 원격이 켜져 있어도 로컬로 보였다.
-  where: () => request<{ remote: boolean; airgap: boolean }>("/api/llm/remote/where"),
+  // model·checkedAt은 **주소가 아니다** — 담당자도 「어느 두뇌가 답하나」는 알아야 한다(2026-09-02).
+  where: () => request<{ remote: boolean; airgap: boolean; model: string | null; checkedAt: number | null }>("/api/llm/remote/where"),
 };
 
 // ── 이 PC를 원격 GPU로 **내주기**(2026-08-14) — 서버 llmserve.ts의 소비자 ────────────

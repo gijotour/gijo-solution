@@ -43,20 +43,34 @@ export interface RemoteLlmConfig {
   enabled: boolean;
   url: string;            // 예: http://10.8.0.12:8080/v1
   lastCheck: number | null; // 마지막 연결 테스트 성공 시각(ms) — 화면 표시용
+  lastModel: string | null; // 그때 원격이 내놓은 모델 id — 「어느 두뇌가 답하나」를 화면이 말하게
 }
+
+// ⚠ **주소가 바뀌면 지난 확인은 무효다.** 그래서 「어느 주소를 쟀는지」를 함께 적고,
+//   지금 주소와 다르면 lastCheck·lastModel을 null로 돌려준다.
+//   안 그러면 주소를 바꾼 뒤에도 **옛 기계의 모델 이름**이 화면에 남는다 — 그게 거짓 표시다.
+interface 저장모양 extends RemoteLlmConfig { lastCheckedUrl?: string | null }
 
 export function remoteLlmConfig(): RemoteLlmConfig {
   try {
     const row = getStateStmt.get(STATE_KEY) as { value: string } | undefined;
-    if (!row) return { enabled: false, url: "", lastCheck: null };
-    const v = JSON.parse(row.value) as Partial<RemoteLlmConfig>;
-    return { enabled: v.enabled === true, url: String(v.url ?? ""), lastCheck: typeof v.lastCheck === "number" ? v.lastCheck : null };
+    if (!row) return { enabled: false, url: "", lastCheck: null, lastModel: null };
+    const v = JSON.parse(row.value) as Partial<저장모양>;
+    const url = String(v.url ?? "");
+    // 잰 주소와 지금 주소가 다르면 「모른다」로 답한다(위 주석).
+    const 유효 = !v.lastCheckedUrl || v.lastCheckedUrl === url;
+    return {
+      enabled: v.enabled === true,
+      url,
+      lastCheck: 유효 && typeof v.lastCheck === "number" ? v.lastCheck : null,
+      lastModel: 유효 && typeof v.lastModel === "string" && v.lastModel ? v.lastModel : null,
+    };
   } catch {
-    return { enabled: false, url: "", lastCheck: null };
+    return { enabled: false, url: "", lastCheck: null, lastModel: null };
   }
 }
 
-function saveConfig(c: RemoteLlmConfig): void {
+function saveConfig(c: 저장모양): void {
   setStateStmt.run(STATE_KEY, JSON.stringify(c));
 }
 
@@ -155,7 +169,17 @@ export function registerRemoteLlmRoutes(app: Express): void {
   app.get("/api/llm/remote/where", authMiddleware, (_req, res) => {
     // 게터와 같은 계산을 쓴다(2026-08-19) — 사용 시점 재검증으로 차단된 상태인데
     // 여기만 「원격중」이라 답하면 화면이 거짓을 보증하게 된다.
-    res.json({ remote: remoteLlmBaseUrl() !== null, airgap: isAirgapOn() });
+    // ⚠ **주소는 여전히 안 알려준다**(위 주석의 결정 그대로). 대신 **모델 이름**은 연다 —
+    //   담당자가 「어느 두뇌가 내 질문에 답하나」를 아는 것은 정직성이고, 모델 이름은
+    //   망 구조를 알려주지 않는다. 주소를 아는 것과는 다른 이야기다.
+    const c = remoteLlmConfig();
+    const 켜짐 = remoteLlmBaseUrl() !== null;
+    res.json({
+      remote: 켜짐,
+      airgap: isAirgapOn(),
+      model: 켜짐 ? c.lastModel : null,
+      checkedAt: 켜짐 ? c.lastCheck : null,
+    });
   });
 
   // 연결 테스트 — 저장 전에 도달을 확인한다. OpenAI 호환 /models를 찌른다.
@@ -186,8 +210,16 @@ export function registerRemoteLlmRoutes(app: Express): void {
         // redirect 금지(검토관) — 테스트 대상이 3xx로 공인 호스트를 가리켜도 따라가지 않는다.
         const r = await fetch(`${찌를url}/models`, { headers: 헤더, signal: AbortSignal.timeout(5000), redirect: "error" });
         if (!r.ok) { res.json({ ok: false, error: `원격이 답했지만 거절했습니다(HTTP ${r.status}) — /v1 주소인지 확인하세요.` }); return; }
-        const j = (await r.json().catch(() => null)) as { data?: unknown[] } | null;
-        res.json({ ok: true, models: Array.isArray(j?.data) ? j.data.length : null });
+        const j = (await r.json().catch(() => null)) as { data?: { id?: unknown }[] } | null;
+        const 개수 = Array.isArray(j?.data) ? j.data.length : null;
+        // ★ **여기가 lastCheck의 생산자다**(2026-09-02). 그전까지 lastCheck는 타입에 있고
+        //   화면이 읽는데 **아무도 값을 넣지 않아 늘 null**이었다 — 소비자만 있고 생산자가
+        //   없는 값(이 저장소가 반복해 겪은 유형). 모델 이름도 여기서만 알 수 있다:
+        //   /models를 이미 찌르고 있었는데 **개수만 쓰고 버렸다.**
+        const 모델 = Array.isArray(j?.data) && typeof j.data[0]?.id === "string" ? String(j.data[0].id) : null;
+        const prev = remoteLlmConfig();
+        saveConfig({ ...prev, lastCheck: Date.now(), lastModel: 모델, lastCheckedUrl: url });
+        res.json({ ok: true, models: 개수, model: 모델 });
       } catch (e) {
         res.json({ ok: false, error: `원격에 닿지 못했습니다 — ${e instanceof Error ? e.message : String(e)}. VPN 연결과 주소를 확인하세요.` });
       }
@@ -220,7 +252,7 @@ export function registerRemoteLlmRoutes(app: Express): void {
       } else if (url && remoteUrlProblem(url)) {
         저장url = prev.url; // 규칙 밖 새 주소는 안 받는다 — 끄기만 통과
       }
-      saveConfig({ enabled, url: 저장url, lastCheck: prev.lastCheck });
+      saveConfig({ enabled, url: 저장url, lastCheck: prev.lastCheck, lastModel: prev.lastModel, lastCheckedUrl: 저장url });
       차단기록한주소.clear(); // 주소가 바뀌었으니 다음 차단은 다시 한 번 기록한다
       // 채팅이 어디로 가는지를 바꾸는 admin 설정 — 작업 기록에 남긴다(2026-08-19 검토 지적:
       // 이 파일에 감사가 한 줄도 없었다). ⚠ URL 전체를 적지 않는다 — ?token=이 평문으로 딸려 온다.
