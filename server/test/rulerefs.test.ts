@@ -33,13 +33,17 @@ function 볼파일들(): string[] {
       if (건너뛸.has(e.name)) continue;
       const p = join(d, e.name);
       if (e.isDirectory()) 훑기(p, 깊이 + 1);
-      else if (/\.(ts|js)$/.test(e.name) && statSync(p).size < 2_000_000) 결과.push(p);
+      else if (/\.(ts|js|md)$/.test(e.name) && statSync(p).size < 2_000_000) 결과.push(p);
     }
   };
   훑기(join(뿌리, "server", "src"));
   훑기(join(뿌리, "server", "test"));
   훑기(join(뿌리, "client", "src"));
   훑기(join(뿌리, "tools"));
+  // 저장소 뿌리의 기획 문서(.md) — 규칙 번호가 실제로 밀렸던 곳이다.
+  for (const e of readdirSync(뿌리, { withFileTypes: true })) {
+    if (e.isFile() && e.name.endsWith(".md")) 결과.push(join(뿌리, e.name));
+  }
   return 결과;
 }
 

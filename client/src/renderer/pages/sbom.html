@@ -242,6 +242,7 @@ tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
+<script src="assetrules.js"></script>
 <script>
   const sbomRows = document.getElementById("sbomRows");
   const searchInput = document.getElementById("searchInput");
@@ -271,12 +272,18 @@ tr:last-child td{border-bottom:none;}
     //   그 차이는 아래 띠가 밝힌다. 안 밝히면 「자산 1개인데 부품이 왜 이렇게 많지」가 된다.
     const 범위자산 = window.gijoScope ? window.gijoScope.assetId() : "";
     return assets.filter((a) => {
+      // ⚠⚠ **이 화면의 목록 자체가 SBOM 대상만**이다(2026-09-01 4차 검토 [중]).
+      //   필터를 안 걸었을 때 전 자산이 나오면서, 스캐너가 들여온 IP 호스트·방화벽에까지
+      //   「미생성」 주황 배지와 **[지금 생성 →] 단추**가 붙었다 — 누르면 SBOM 대상이 아닌
+      //   자산에 generateSbom을 부른다. 숫자만 틀린 게 아니라 **엉뚱한 일을 시킨다.**
+      //   ⚠ 몇 건을 뺐는지는 KPI·「한눈에」 띠가 밝힌다(말없이 자르지 않는다).
+      if (!window.gijoSbomApplies(a)) return false;
       if (범위자산 && a.id !== 범위자산) return false;
       if (q && !a.name.toLowerCase().includes(q)) return false;
       // ⚠ 목록도 **KPI와 같은 모수**를 쓴다(2026-09-01 3차 검토 [상]) — 배지는 「미생성 12」인데
-      //   판을 펴면 4,888행이 나오던 자리다. 「같은 물음에 두 숫자」를 화면 안으로 옮긴 셈이었다.
-      if (activeFilter === "generated" && !(window.gijoSbomApplies(a) && a.sbomGeneratedAt)) return false;
-      if (activeFilter === "missing" && !(window.gijoSbomApplies(a) && !a.sbomGeneratedAt)) return false;
+      //   판을 펴면 4,888행이 나오던 자리다. 위에서 이미 대상만 남겼으므로 여기선 상태만 본다.
+      if (activeFilter === "generated" && !a.sbomGeneratedAt) return false;
+      if (activeFilter === "missing" && a.sbomGeneratedAt) return false;
       // 그림 띠에서 라이선스를 골랐으면 그 라이선스를 쓰는 자산만(전-7 ①, 2026-08-05)
       if (라이선스필터 && !(a.components || []).some((c) => 라이선스이름(c.license) === 라이선스필터)) return false;
       return true;
@@ -636,7 +643,10 @@ tr:last-child td{border-bottom:none;}
           + ` · 자산 ${부품있는자산}개 · 부품 ${총부품.toLocaleString()}개`
           + `(직접 읽음 ${직접읽음.toLocaleString()} · 스캐너 ${스캐너.toLocaleString()})`,
       parts: [
-        { kind: "donut", value: 생성됨, total: allAssets.length, label: "SBOM 생성", showRatio: true },
+        // ⚠ **분자와 분모가 같은 모수여야 한다**(2026-09-01 4차 검토 [상]). 분자만 대상 기준으로
+        //   바꾸고 분모를 전 자산으로 두어 「4/4,911」이 됐다 — 30픽셀 옆 KPI는 「생성 4·미생성 8」인데
+        //   도넛은 0%를 빨강으로 그렸다. 같은 화면에서 이행률을 25%로도 0%로도 읽게 된다.
+        { kind: "donut", value: 생성됨, total: window.gijoSbomTargets(allAssets).length, label: "SBOM 생성", showRatio: true },
         {
           kind: "bars",
           segments: 상위.map((L) => ({
@@ -888,7 +898,6 @@ tr:last-child td{border-bottom:none;}
 
 
 
-<script src="assetrules.js"></script>
 <script src="nav.js"></script>
 <script src="selectnotify.js"></script>
 <script src="scopefilter.js"></script>

@@ -37,6 +37,20 @@ function 화면파일들(): string[] {
 }
 const 이름만 = (p: string) => p.split(/[\\/]/).pop() as string;
 
+/**
+ * 그 화면이 이 파일을 **실제로 싣는가** — 주석에 이름만 적힌 것은 안 친다.
+ *
+ * ⚠⚠ 이 저장소가 두 번 밟은 함정이다. clientglobals.test.ts가 「「있다고 적힌 것」이 아니라
+ *   **「실제로 싣는 태그」**를 봐야 한다」고 명문화해 뒀는데(lite-app.html이 주석 속
+ *   「lite-nav.js」로 통과한 사고), 이 시험을 처음 쓸 때 또 `src.includes(…)`로 적었다.
+ *   같은 파일 안에서 부품 이름은 태그꼴로 보면서 assetrules만 원문 문자열이라 비대칭이기도 했다.
+ */
+function 실제로싣나(원문: string, 파일: string): boolean {
+  const 코드 = 원문.replace(/<!--[\s\S]*?-->/g, ""); // HTML 주석을 먼저 걷어낸다
+  const 이스케이프 = 파일.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`<script[^>]*\\ssrc\\s*=\\s*[\"'][^\"']*${이스케이프}[\"']`, "i").test(코드);
+}
+
 describe("서버와 화면이 같은 잣대를 쓴다", () => {
   const 화면코드 = 주석빼기(화면규칙);
 
@@ -88,22 +102,57 @@ describe("서버와 화면이 같은 잣대를 쓴다", () => {
 });
 
 describe("★★ 화면 어디에서도 각자 세지 않는다 (자리를 손으로 적지 않는다)", () => {
-  it("sbomGeneratedAt으로 **인구를 세거나 거르는** 자리가 전부 공용 잣대를 지난다", () => {
-    // 인구를 다루는 꼴만 본다. 한 줄 표시(a.sbomGeneratedAt ? "완료" : "…")는 잣대가 필요 없다.
-    const 위반: string[] = [];
+  // ★★ **기본 거부 + 이유 있는 예외**로 뒤집었다 (2026-09-01 4차 검토 [상]).
+  //
+  //   3차에서 「인구를 세는 꼴」을 정규식 셋으로 맞히려 했는데 **그물에 구멍이 뚫렸다** —
+  //   `list.sort((a,b) => (a.sbomGeneratedAt ? 1 : 0) - ...)`와 `list.map(...)` 꼴이
+  //   그냥 통과했고, 그 자리가 바로 프로 셸 SBOM 판 목록이었다(카드 12 vs 목록 4,888).
+  //   **세는 꼴은 무한하다** — 맞히려 들면 진다.
+  //
+  //   → 뒤집는다: `sbomGeneratedAt`을 만지는 **모든 줄이 기본 거부**이고,
+  //     ① 같은 줄에서 공용 잣대를 지나거나
+  //     ② 아래 예외 목록에 **이유와 함께** 적혀 있어야 통과한다.
+  //   예외는 「한 줄을 표시만 하는 자리」(배지·날짜·칸 내용)뿐이다 — 인구를 만들지 않는다.
+  //   ⚠ 예외를 **줄 번호가 아니라 코드 조각**으로 적는다. 그 줄이 바뀌면 예외가 안 맞아
+  //     시험이 깨지고, 사람이 다시 들여다보게 된다.
+  const 표시전용예외: { 조각: string; 왜: string }[] = [
+    { 조각: 'sbomCell: a.sbomGeneratedAt ?', 왜: "자산 목록의 한 칸 — 그 행 하나의 상태만 그린다" },
+    { 조각: "relativeTime(a.lastScannedAt), a.sbomGeneratedAt", 왜: "CSV 내보내기의 한 칸" },
+    { 조각: "if (!asset.sbomGeneratedAt) {", 왜: "자산 하나를 골랐을 때의 안내 — 인구가 아니다" },
+    { 조각: "const statusCell = a.sbomGeneratedAt", 왜: "표의 한 칸(생성됨/미생성 배지)" },
+    { 조각: "const actionCell = a.sbomGeneratedAt", 왜: "표의 한 칸(내려받기/생성 단추)" },
+    { 조각: "a.sbomGeneratedAt ? '<span class=\"badge b-blue\">CycloneDX", 왜: "표의 한 칸(형식 배지)" },
+    { 조각: "${fmtDate(a.sbomGeneratedAt)}", 왜: "표의 한 칸(생성 날짜)" },
+    { 조각: "full && full.sbomGeneratedAt", 왜: "AI 자산 칩 하나의 표시" },
+    { 조각: "a.sbomGeneratedAt ? 1 : 0", 왜: "정렬 기준 — 위에서 gijoSbomTargets로 모수를 이미 좁혔다" },
+    { 조각: 'a.sbomGeneratedAt ? "생성됨" : "미생성"', 왜: "판 목록의 한 칸 — 모수는 위에서 좁혔다" },
+    { 조각: 'activeFilter === "generated" && !a.sbomGeneratedAt', 왜: "모수는 같은 함수 위에서 gijoSbomApplies로 이미 좁혔다 — 여기선 상태만 본다" },
+    { 조각: 'activeFilter === "missing" && a.sbomGeneratedAt', 왜: "모수는 같은 함수 위에서 gijoSbomApplies로 이미 좁혔다 — 여기선 상태만 본다" },
+  ];
+
+  it("★★ sbomGeneratedAt을 만지는 줄은 **공용 잣대를 지나거나 이유 있는 예외**여야 한다", () => {
+    const 걸린: string[] = [];
+    const 쓰인예외 = new Set<string>();
     for (const p of 화면파일들()) {
       const 코드 = 주석빼기(readFileSync(p, "utf8"));
       코드.split("\n").forEach((줄, i) => {
         if (!줄.includes("sbomGeneratedAt")) return;
-        if (/gijoSbom(Applies|Targets|Missing|Generated)/.test(줄)) return; // 공용 잣대를 지났다
-        const 인구꼴 =
-          /\.filter\([^\n]*sbomGeneratedAt/.test(줄) ||
-          /return\s+!?\s*[a-z]\.sbomGeneratedAt\s*;/.test(줄) ||
-          /(activeFilter|k)\s*===\s*"(nosbom|missing|generated)"[^\n]*sbomGeneratedAt/.test(줄);
-        if (인구꼴) 위반.push(`${이름만(p)}:${i + 1}  ${줄.trim().slice(0, 90)}`);
+        if (/gijoSbom(Applies|Targets|Missing|Generated)/.test(줄)) return; // ① 잣대를 지났다
+        const 예외 = 표시전용예외.find((x) => 줄.includes(x.조각));
+        if (예외) { 쓰인예외.add(예외.조각); return; }                      // ② 이유 있는 예외
+        걸린.push(`${이름만(p)}:${i + 1}  ${줄.trim().slice(0, 100)}`);
       });
     }
-    expect(위반, `공용 잣대를 안 지나고 스스로 세는 자리:\n  ${위반.join("\n  ")}`).toEqual([]);
+    expect(
+      걸린,
+      `공용 잣대를 안 지나고 예외 목록에도 없는 자리 — 인구를 세는 자리면 잣대를 지나게 하고,\n` +
+        `표시만 하는 자리면 **왜 그런지 적어** 예외에 넣어라:\n  ${걸린.join("\n  ")}`,
+    ).toEqual([]);
+
+    // ⚠ **낡은 예외도 걸린다.** 코드가 바뀌어 예외가 안 쓰이면 그 예외는 뜻을 잃은 것이다 —
+    //   남겨 두면 다음에 같은 조각이 다시 나타났을 때 검사 없이 통과한다.
+    const 안쓰인 = 표시전용예외.filter((x) => !쓰인예외.has(x.조각)).map((x) => x.조각);
+    expect(안쓰인, `이제 없는 코드에 예외가 남아 있다 — 지워라:\n  ${안쓰인.join("\n  ")}`).toEqual([]);
   });
 
   it("★ 공용 잣대를 쓰는 화면은 assetrules.js를 **읽어 들인다** — 안 읽으면 런타임에 죽는다", () => {
@@ -112,7 +161,10 @@ describe("★★ 화면 어디에서도 각자 세지 않는다 (자리를 손�
       if (!p.endsWith(".html")) continue;
       const src = readFileSync(p, "utf8");
       if (!/gijoSbom(Applies|Targets|Missing|Generated)/.test(주석빼기(src))) continue;
-      if (!src.includes("assetrules.js")) 빠진.push(이름만(p));
+      // ⚠ **주석의 낱말이 아니라 실제 태그**를 본다. 이 저장소는 같은 함정을 두 번 밟았고
+      //   clientglobals.test.ts가 「「있다고 적힌 것」이 아니라 「실제로 싣는 태그」를 봐야
+      //   한다」고 못 박아 뒀다(lite-app.html이 주석의 「lite-nav.js」로 통과한 사고).
+      if (!실제로싣나(src, "assetrules.js")) 빠진.push(이름만(p));
     }
     expect(빠진, `공용 잣대를 쓰는데 assetrules.js를 안 읽는 화면: ${빠진.join(", ")}`).toEqual([]);
   });
@@ -130,11 +182,47 @@ describe("★★ 화면 어디에서도 각자 세지 않는다 (자리를 손�
       for (const p of 화면파일들()) {
         if (!p.endsWith(".html")) continue;
         const src = readFileSync(p, "utf8");
-        if (src.includes(`src="${부품이름}"`) && !src.includes("assetrules.js")) {
+        if (실제로싣나(src, 부품이름) && !실제로싣나(src, "assetrules.js")) {
           빠진.push(`${이름만(p)} — ${부품이름}을 싣는데 assetrules.js는 안 읽는다`);
         }
       }
     }
     expect(빠진, `부품이 쓰는 잣대가 없는 화면:\n  ${빠진.join("\n  ")}`).toEqual([]);
+  });
+});
+
+describe("★★ 잣대가 **쓰이기 전에** 읽힌다 (폴백을 없앴으므로 순서가 급소다)", () => {
+  it("assetrules.js가 그것을 쓰는 코드보다 **먼저** 실린다", () => {
+    // ⚠ 왜 시험까지 두나(2026-09-01 4차 준비): 조용한 폴백을 없애서 이제 잣대가 없으면
+    //   화면이 **TypeError로 죽는다.** 옛날엔 폴백이 조용히 옛 값을 냈다 — 죽는 편이 낫지만,
+    //   그러려면 순서가 확실해야 한다. sbom.html은 실제로 `<script src>`가 최상위 init()
+    //   **뒤에** 있었고, refresh()의 첫 await 덕에 **우연히** 돌고 있었다.
+    const 어긋남: string[] = [];
+    for (const p of 화면파일들()) {
+      if (!p.endsWith(".html")) continue;
+      const src = readFileSync(p, "utf8");
+      if (!실제로싣나(src, "assetrules.js")) continue;
+      const 줄 = src.split("\n");
+      const 실림 = 줄.findIndex((l) => /<script[^>]*src\s*=\s*["'][^"']*assetrules\.js/.test(l));
+      // ⚠ 태그가 있다는데 줄을 못 찾으면 **검사가 헛도는 것**이다 — 조용히 넘기지 않는다.
+      expect(실림, `${이름만(p)}: assetrules.js 태그 줄을 못 찾았다 — 이 검사가 헛돈다`).toBeGreaterThanOrEqual(0);
+      const 첫쓰임 = 줄.findIndex((l) => /gijoSbom(Applies|Targets|Missing|Generated)/.test(l));
+      if (첫쓰임 >= 0 && 실림 > 첫쓰임) {
+        어긋남.push(`${이름만(p)}: assetrules.js는 ${실림 + 1}줄인데 첫 쓰임이 ${첫쓰임 + 1}줄`);
+      }
+    }
+    expect(어긋남, `잣대를 쓰는 코드가 먼저 온다 — 그 화면은 죽는다:\n  ${어긋남.join("\n  ")}`).toEqual([]);
+  });
+
+  it("★ 부품(grouppanels.js)보다도 먼저 실린다", () => {
+    const 어긋남: string[] = [];
+    for (const p of 화면파일들()) {
+      if (!p.endsWith(".html")) continue;
+      const 줄 = readFileSync(p, "utf8").split("\n");
+      const a = 줄.findIndex((l) => /<script[^>]*src\s*=\s*["'][^"']*assetrules\.js/.test(l));
+      const g = 줄.findIndex((l) => /<script[^>]*src\s*=\s*["'][^"']*grouppanels\.js/.test(l));
+      if (a >= 0 && g >= 0 && a > g) 어긋남.push(`${이름만(p)}: assetrules ${a + 1}줄 > grouppanels ${g + 1}줄`);
+    }
+    expect(어긋남, `부품이 먼저 실려 잣대를 못 찾는다:\n  ${어긋남.join("\n  ")}`).toEqual([]);
   });
 });

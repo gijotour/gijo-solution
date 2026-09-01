@@ -222,7 +222,9 @@ function deviceItems(now: number): TodayItem[] {
       id: `hardening:${s.id}`,
       axis: "device",
       urgency: "today",
-      title: `${s.targetLabel} 하드닝 점검`,
+      // ⚠ 로컬 대상은 장비 이름을 단독으로 쓰지 않는다(2026-09-01 4차 검토 [중]) —
+      //   「웹서버-01 하드닝 점검」이라 적으면 그 장비에 붙는 일로 읽힌다.
+      title: `${s.원격 ? s.targetLabel : `이 서버(이름표: ${s.targetLabel})`} 하드닝 점검`,
       subtitle: `${s.standard.toUpperCase()} 기준 · ${lastLabel}`,
       why: overdueDays > 0 ? `점검 주기 ${overdueDays}일 초과` : "점검 주기 도래",
       action: "지금 점검을 실행하면 결과가 리포트에 남습니다",

@@ -103,7 +103,10 @@ describe("카드 내용 — 전부 DB에서 결정적으로", () => {
     expect(dataCard.kpis[2].value).toMatch(/%$/); // 평균 준수율 — 측정값이 있어야 한다
     expect(dataCard.kpis[3].value).toBe("0"); // 점검 실패
     const row = dataCard.table.shown[0];
-    expect(row.장비).toBe("웹서버-카드");
+    // ⚠ 이 픽스처는 host/authMethod가 "local"이다 — **장비에 붙지 않는다.**
+    //   장비 이름만 적으면 「그 장비를 점검했다」는 거짓이 되므로 이름표로 밝힌다
+    //   (2026-09-01 4차 검토 [중] — 「점검한 곳」 여덟 번째 소비자).
+    expect(row.장비).toBe("이 서버(이름표: 웹서버-카드)");
     expect(row.기준).toBe("KISA");
     expect(row.상태).toBe("정상");
     expect(row.준수율).not.toBe("—");
@@ -403,7 +406,8 @@ describe("dispatcher 경유 — 카드가 응답에 실린다", () => {
     const { dispatchInstruction } = await import("../src/engine/dispatcher");
     const r = await dispatchInstruction("검증 현황 보여줘", undefined, undefined, undefined, true);
     expect(r.dataCard, "카드가 응답에 실려야 한다").toBeTruthy();
-    expect(r.dataCard!.table!.shown[0].장비).toBe("경유-장비");
+    // ⚠ 이 픽스처도 host/authMethod가 "local"이다 — 로컬 대상은 장비 이름을 단독으로 쓰지 않는다.
+    expect(r.dataCard!.table!.shown[0].장비).toBe("이 서버(이름표: 경유-장비)");
     expect(r.output).toContain("검증(보안설정 점검) 현황"); // 옛 클라 호환 글 답도 함께
   });
 

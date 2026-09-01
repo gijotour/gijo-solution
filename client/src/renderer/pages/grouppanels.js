@@ -232,7 +232,12 @@
       { id: "sbom", title: "📦 AI-BOM · 구성", page: "sbom.html",
         rows: function () {
           return window.gijo.listAssets().then(function (assets) {
-            var list = (assets || []).slice();
+            // ⚠⚠ **목록도 카드와 같은 모수**를 쓴다(2026-09-01 4차 검토 [상]).
+            //   같은 판의 load()는 공용 잣대로 고쳤는데 **바로 위 이 목록만 전 자산**이었다 —
+            //   카드는 「아직 없음 12」인데 판을 펴면 스캐너 IP 호스트 수천 행이 전부 「미생성」으로
+            //   나왔다. 이 파일 머리글이 스스로 못 박은 「요약과 **같은 잣대**를 쓴다」 위반이고,
+            //   sbom.html에서 고쳤다고 적은 그 결함의 형제가 **수리한 파일 자신에** 남아 있었다.
+            var list = window.gijoSbomTargets(assets || []);
             // 미생성 먼저 — 이 판의 유일한 주황 신호이고, 200행 상한에서 볼 값어치가 큰 쪽이다.
             list.sort(function (a, b) { return (a.sbomGeneratedAt ? 1 : 0) - (b.sbomGeneratedAt ? 1 : 0); });
             return {
