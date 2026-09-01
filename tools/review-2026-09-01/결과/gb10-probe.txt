@@ -1,0 +1,131 @@
+
+=== 머신 ===
+Linux promaxgb10-1d0a 6.17.0-1029-nvidia #29-Ubuntu SMP PREEMPT_DYNAMIC Wed Jul  1 00:13:52 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.4 LTS (Noble Numbat)"
+CPU: 20 cores
+
+=== 메모리(free -g) ===
+               총계         사용        여분      공유    버퍼/캐시    가용
+메모리:          121          96           1           1          25          25
+스  왑:           15           7           8
+
+=== /proc/meminfo ===
+MemTotal:       127535300 kB
+MemFree:         1838720 kB
+MemAvailable:   26303632 kB
+
+=== nvidia-smi 기본 ===
+Wed Sep  2 05:36:20 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.173.02             Driver Version: 580.173.02     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GB10                    On  |   0000000F:01:00.0 Off |                  N/A |
+| N/A   40C    P0             10W /  N/A  | Not Supported          |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A            3730      G   /usr/lib/xorg/Xorg                      116MiB |
+|    0   N/A  N/A            4075      G   /usr/bin/gnome-shell                     80MiB |
+|    0   N/A  N/A           77455      G   .../8735/usr/lib/firefox/firefox        266MiB |
+|    0   N/A  N/A          390957      G   /usr/bin/gnome-control-center            29MiB |
+|    0   N/A  N/A         3294142      C   ...p-next/build/bin/llama-server       1086MiB |
+|    0   N/A  N/A         3294191      C   ...p-next/build/bin/llama-server      59601MiB |
+|    0   N/A  N/A         3541022      C   ...p-next/build/bin/llama-server      20958MiB |
+
+=== nvidia-smi 쿼리 — preflight.ts gpuAvailable()과 같은 인자 ===
+NVIDIA GB10, [N/A]
+
+=== nvidia-smi 쿼리 — localengine.ts getFreeVramMb()와 같은 인자 ===
+[N/A]
+
+=== nvidia-smi 쿼리 — localengine.ts getGpuUsage()와 같은 인자 ===
+0, [N/A], [N/A]
+
+=== nvidia-smi -q 메모리 절 ===
+    FB Memory Usage
+        Total                                          : N/A
+        Reserved                                       : N/A
+        Used                                           : N/A
+        Free                                           : N/A
+
+=== CUDA ===
+/usr/local/cuda
+/usr/local/cuda-13
+/usr/local/cuda-13.0
+
+=== Node ===
+node 없음
+
+=== Python ===
+Python 3.12.3
+python(2자 명령) 없음 — pythonbin.ts가 python3로 폴백한다
+
+=== llama.cpp 바이너리 ===
+PATH에 llama-server 없음
+
+=== 네이티브 모듈 로드 — server/node_modules가 있을 때 ===
+server/node_modules 없음 — 저장소 server/ 에서 npm ci 뒤 다시 돌린다
+
+=== /api/health — 서버가 떠 있을 때(한글 깨짐 방지로 curl 대신 Node fetch) ===
+
+=== 끝 ===
+=== node via login shell
+/home/gijohn_llm/.local/bin/node
+v24.19.0
+=== gijo repo
+/home/gijohn_llm/gijo-as
+/home/gijohn_llm/gijo-as/server
+915a71fd 제품이 Qwen3.8을 관리한다 — 도구도 8080(제품 포트)으로
+## claude/hungry-blackwell-cd58b7
+node_modules:있음
+=== llama-server
+=== listening ports
+LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*                                              
+LISTEN 0      512        127.0.0.1:8081       0.0.0.0:*    users:(("llama-server",pid=3294142,fd=32))
+LISTEN 0      512        127.0.0.1:8080       0.0.0.0:*    users:(("llama-server",pid=3294191,fd=32))
+LISTEN 0      511                *:4000             *:*    users:(("MainThread",pid=3294106,fd=30))  
+LISTEN 0      4096            [::]:22            [::]:*                                              
+=== running llama-server cmdlines
+3294142 /home/gijohn_llm/gijo-as/server/llama.cpp-next/build/bin/llama-server -m models/bge-m3/bge-m3.gguf --embedding -ngl -1 --ctx-size 8192 --batch-size 8192 --ubatch-size 8192 --port 8081
+3294191 /home/gijohn_llm/gijo-as/server/llama.cpp-next/build/bin/llama-server -m models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf -ngl -1 --ctx-size 32768 --parallel 2 --port 8080 --reasoning of
+3541022 ./llama.cpp-next/build/bin/llama-server -m models/qwen3-coder-30b-a3b/qwen3-coder-30b-a3b.gguf --alias qwen3-coder-30b-a3b -ngl -1 --ctx-size 32768 --parallel 1 --host 127.0.0.1 --port 8090 --jinja
+3638844 bash -lc  echo === node via login shell; command -v node && node --version; ls -d ~/.nvm 2>/dev/null; ls ~/.nvm/versions/node 2>/dev/null echo === gijo repo; ls -d ~/gijo-as ~/AS-Private ~/*/server 2>/dev/null; f
+=== disk
+/dev/nvme0n1p2  1.9T  265G  1.5T   15% /
+/dev/nvme0n1p2  1.9T  265G  1.5T   15% /
+=== docker
+/usr/bin/docker
+=== /api/health 로그인셸
+{"ok":true,"service":"gijo-as-server","schema":{"count":50,"latest":"client-releases-edition-2026-08-23"},"serverTime":1788295045766,"airgap":{"on":false,"egressPoints":12}}
+=== 8080 모델
+{"models":[{"name":"models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf","model":"models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf","modified_at":"","size":"","digest":"","type":"model","description":"","tags":[""],"capabilities":["completion"],"param
+=== 네이티브 모듈
+OK   better-sqlite3
+OK   better-sqlite3-multiple-ciphers
+OK   @lancedb/lancedb
+OK   onnxruntime-node
+=== llama-server 버전
+version: 0.3.0-dev (build 1, commit 0eadefe)
+built with GNU 13.3.0 for Linux aarch64
+=== 서버 프로세스
+    PID     ELAPSED COMMAND
+3294106    11:32:22 node dist/index.js
+=== repo 최근 커밋
+915a71fd 제품이 Qwen3.8을 관리한다 — 도구도 8080(제품 포트)으로
+07a7fe17 Merge remote-tracking branch 'hub/main' into claude/hungry-blackwell-cd58b7
+710802e0 절감 도구를 Qwen3.8로 — 포트와 기동 명령을 짝으로 묶는다
+  claude/gb10-remote-session-oikism
+* claude/hungry-blackwell-cd58b7
+  main
