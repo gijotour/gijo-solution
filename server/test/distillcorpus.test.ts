@@ -5,7 +5,7 @@
 //   ④ 바이너리꼴 조각 ⑤ 너무 짧은 조각 은 **절대** 나가지 않는다. ref 꼬리는 본문 sha12 — 편입 검증과 같은 규칙.
 import { describe, it, expect } from "vitest";
 import crypto from "crypto";
-import { buildDistillCorpus } from "../src/engine/learncandidates";
+import { buildDistillCorpus, 구조데이터꼴 } from "../src/engine/learncandidates";
 import type { MemoryDocument } from "../src/engine/memory";
 
 const doc = (documentId: string, over: Partial<MemoryDocument> = {}): MemoryDocument => ({
@@ -42,6 +42,15 @@ describe("증류 근거 코퍼스 — 무엇이 나가고 무엇이 절대 안 �
     // 민감(S)은 명시로 열 수 있지만 기밀(C)은 무엇을 줘도 안 나간다
     const r2 = await buildDistillCorpus({ category: "취약점", allowedGrades: ["O", "S", "C"] }, mem(docs, chunks));
     expect(r2.chunks.map((c) => c.documentId).sort()).toEqual(["남의문서.md", "민감.md", "지침.md"]);
+  });
+
+  it("JSON·CSV 덤프꼴 조각은 안 나간다 — 교사가 키 이름을 소리 나는 대로 읽어 문답을 만든다(첫 운영 증류 실측)", async () => {
+    const 덤프 = '{"cve":["CVE-2015-9251"],"cwe":["693"],"cvss2_base_score":2.6,"cvss2_temporal_score":1.9,"exploited_by_malware":false,"epss_score":0.00553}'.repeat(2);
+    expect(구조데이터꼴(덤프)).toBe(true);
+    expect(구조데이터꼴(긴("글"))).toBe(false);
+    const r = await buildDistillCorpus({}, mem([doc("a.md")], { "a.md": [덤프, 긴("본문")] }));
+    expect(r.chunks.length).toBe(1);
+    expect(r.skipped["구조 데이터꼴"]).toBe(1);
   });
 
   it("업무영역·출처로 거른다 — 다른 영역·다른 출처는 안 나간다", async () => {
@@ -85,5 +94,8 @@ describe("증류 근거 코퍼스 — 무엇이 나가고 무엇이 절대 안 �
     expect(tool).toContain('force: has("--force-login")');
     // 같은 서버면 코퍼스 로그인 세션을 편입에 재사용 — 같은 계정 두 번 로그인은 중복로그인 방지(409)에 걸린다
     expect(tool).toContain("코퍼스auth && CORPUS_SERVER === SERVER ? 코퍼스auth : await login()");
+    // 접속 토큰 만료(긴 증류) → 편입 401은 다시 로그인해 한 번 더, 그래도 못 넣은 문답은 보고서에 남긴다
+    expect(tool).toMatch(/편입 401[\s\S]*auth = await login\(\)/);
+    expect(tool).toContain("report.failedItems ??= []");
   });
 });

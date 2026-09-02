@@ -84,9 +84,11 @@ export interface LearnCandidate {
   signals: { cite: boolean; tool: boolean; accepted: boolean; lengthOk: boolean };
   topic: string | null; // 주제 딱지 — 후보함 배지·주제별 진척(2026-08-08 시안 승인)
   score: number; // cite 3 + tool 2 + accepted 1 + lengthOk 1
+  teacher?: string | null; // 증류 행만 — 교사 모델 id(후보함 칩)
+  cites?: { ref: string; text: string }[]; // 증류 행만 — 근거 조각(승인 전에 사람이 본다)
 }
 
-interface ChatLogRow { id: string; agentId: string; question: string; answer: string; rating: number | null; usedInDataset: number; createdAt: number; topic?: string | null; origin?: string | null; cites?: string | null }
+interface ChatLogRow { id: string; agentId: string; question: string; answer: string; rating: number | null; usedInDataset: number; createdAt: number; topic?: string | null; origin?: string | null; cites?: string | null; teacher?: string | null }
 interface TurnRow { id: string; sessionId: string; role: "user" | "assistant"; content: string; tool: string | null; at: number; createdBy: string | null }
 
 // 대화 로그 창은 실대화만(증류 제외) — 증류 500건이 들어오면 실사용 미평가 대화가 이 창(LIMIT 500)
@@ -204,7 +206,9 @@ export function listLearnCandidates(days = 30, limit = 60): {
     const fp = fingerprint(r.question, r.answer);
     if (out.some((c) => fingerprint(c.question, c.answer) === fp) || distillOut.some((c) => fingerprint(c.question, c.answer) === fp)) { drop("중복"); continue; }
     const signals = { cite: Boolean(r.cites && r.cites !== "[]"), tool: false, accepted: false, lengthOk: r.answer.length >= 80 && r.answer.length <= 1200 };
-    distillOut.push({ id: `cl:${r.id}`, source: "distill", question: r.question, answer: r.answer, createdAt: r.createdAt, signals, score: 0, topic: r.topic ?? 질문주제(r.question) });
+    let cites: { ref: string; text: string }[] = [];
+    try { cites = r.cites ? (JSON.parse(r.cites) as { ref: string; text: string }[]) : []; } catch { cites = []; }
+    distillOut.push({ id: `cl:${r.id}`, source: "distill", question: r.question, answer: r.answer, createdAt: r.createdAt, signals, score: 0, topic: r.topic ?? 질문주제(r.question), teacher: r.teacher ?? null, cites });
   }
 
   // ── 출처 B: 작업내역 user→assistant 짝 ──────────────────────────────
@@ -395,6 +399,16 @@ type CorpusMemory = { listDocuments(): Promise<MemoryDocument[]>; getDocumentChu
  * ref = store:<documentId>#<sha12(text)> — intakeDistilledCandidates의 「ref 꼬리 = 본문 해시」 검증과 같은 규칙.
  * 상한을 넘겨 못 나간 조각은 skipped에 센다 — 조용히 잘리면 「다 봤다」로 읽힌다.
  */
+/** JSON·CSV 덤프꼴 조각 — 키:값 쌍이 줄줄이거나 괄호·따옴표가 글의 2%를 넘으면 읽을 글이 아니라 자료다. */
+export function 구조데이터꼴(text: string): boolean {
+  const t = String(text ?? "");
+  if (t.length < 40) return false;
+  const 키값 = (t.match(/"[A-Za-z_][A-Za-z0-9_]*"\s*:/g) ?? []).length;
+  if (키값 >= 3) return true;
+  const 기호 = (t.match(/[{}\[\]]/g) ?? []).length;
+  return 기호 / t.length > 0.02;
+}
+
 export async function buildDistillCorpus(b: DistillCorpusOptions, mem: CorpusMemory): Promise<DistillCorpusResult> {
   const category = String(b.category ?? b.topic ?? "").trim();
   const origins = Array.isArray(b.origins) ? b.origins.map(String) : null;
@@ -404,7 +418,7 @@ export async function buildDistillCorpus(b: DistillCorpusOptions, mem: CorpusMem
   // 등급은 grades.ts 한 곳의 잣대로 — 문자열 비교를 새로 적으면 깨진 값·소문자가 새고 민감(S)이 그대로 나간다(검토관 2026-09-03).
   const allowed: string[] = (Array.isArray(b.allowedGrades) && b.allowedGrades.length ? b.allowedGrades : ["O"]).map((g) => gradeOf(g)).filter((g) => g !== "C");
   const docs = (await mem.listDocuments()).filter((d) => d.scope === "global");
-  const skipped: Record<string, number> = { "승인 문답": 0, "개인 문서": 0, "등급 제외": 0, "열람 불가": 0, "출처 제외": 0, "업무영역 다름": 0, "바이너리꼴": 0, "너무 짧음": 0, "문서당 상한": 0, "전체 상한(문서)": 0, "전체 상한(조각)": 0 };
+  const skipped: Record<string, number> = { "승인 문답": 0, "개인 문서": 0, "등급 제외": 0, "열람 불가": 0, "출처 제외": 0, "업무영역 다름": 0, "바이너리꼴": 0, "구조 데이터꼴": 0, "너무 짧음": 0, "문서당 상한": 0, "전체 상한(문서)": 0, "전체 상한(조각)": 0 };
   const out: DistillCorpusChunk[] = [];
   let docsUsed = 0;
   for (const d of docs) {
@@ -422,6 +436,8 @@ export async function buildDistillCorpus(b: DistillCorpusOptions, mem: CorpusMem
       const text = String(c.text ?? "").trim();
       if (text.length < minChars) { skipped["너무 짧음"] += 1; continue; }
       if (isBinaryLikeChunk(text)) { skipped["바이너리꼴"] += 1; continue; }
+      // JSON/CSV 덤프꼴(취약점 내보내기 파일 등) — 교사가 키 이름을 소리 나는 대로 읽어 「시비 에이씨이 점수」 같은 문답을 만든다(2026-09-03 첫 운영 증류 실측).
+      if (구조데이터꼴(text)) { skipped["구조 데이터꼴"] += 1; continue; }
       if (took >= maxPerDoc) { skipped["문서당 상한"] += 1; continue; }
       if (out.length >= maxChunks) { skipped["전체 상한(조각)"] += 1; break; }
       out.push({ ref: `store:${d.documentId}#${crypto.createHash("sha1").update(text).digest("hex").slice(0, 12)}`, documentId: d.documentId, chunkIndex: c.chunkIndex, category: d.category, text });

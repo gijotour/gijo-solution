@@ -186,7 +186,7 @@ if (DRY) { for (const p of picked.slice(0, 3)) console.log("--", p.ref, "\n", p.
 const report = { topic: TOPIC, endpoint: ENDPOINT, startedAt: new Date().toISOString(), files: SOURCE === "store" ? 0 : files.length, source: SOURCE, corpusDocs: 코퍼스문서, chunks: picked.length, generated: 0, preRejected: {}, preChecked: 0, accepted: 0, rejected: {}, teacher: null, tokens: { prompt: 0, completion: 0 }, teacherMs: 0, errors: [] };
 // --no-intake: 편입 없이 교사 수율만 잰다(교사·프롬프트 비교용) — 서버 로그인도 안 한다.
 const NO_INTAKE = has("--no-intake");
-const auth = NO_INTAKE ? null : (코퍼스auth && CORPUS_SERVER === SERVER ? 코퍼스auth : await login()); // 세션 하나 재사용(서버가 다를 때만 새 로그인)
+let auth = NO_INTAKE ? null : (코퍼스auth && CORPUS_SERVER === SERVER ? 코퍼스auth : await login()); // 세션 하나 재사용(서버가 다를 때만 새 로그인) · 401이면 flush가 다시 로그인한다
 const queue = [...picked]; let teacherId = null; const batch = []; const flushEvery = 40;
 async function flush(force = false) {
   if (!batch.length || (!force && batch.length < flushEvery)) return;
@@ -194,11 +194,24 @@ async function flush(force = false) {
   report.preChecked += items.length;
   if (NO_INTAKE) { console.log(`[distill] (편입 생략) 사전검사 통과 ${items.length}건`); return; }
   try {
-    const r = await intake(auth, teacherId || "unknown", items);
+    let r;
+    try {
+      r = await intake(auth, teacherId || "unknown", items);
+    } catch (e) {
+      // 접속 토큰은 짧게 만료된다 — 긴 증류(30분+)에서 뒤쪽 묶음이 401로 통째로 버려졌다(2026-09-03 실측: 223건 중 141건).
+      if (!/편입 401/.test(String(e.message))) throw e;
+      console.warn("[distill] 편입 401 — 다시 로그인해 한 번 더");
+      auth = await login();
+      r = await intake(auth, teacherId || "unknown", items);
+    }
     report.accepted += r.accepted;
     for (const [k, v] of Object.entries(r.byReason || {})) report.rejected[k] = (report.rejected[k] ?? 0) + v;
     console.log(`[distill] 편입 ${r.accepted}/${items.length} · 거절 ${JSON.stringify(r.byReason)}`);
-  } catch (e) { report.errors.push(String(e.message)); console.warn("[distill] 편입 실패:", e.message); }
+  } catch (e) {
+    report.errors.push(String(e.message)); console.warn("[distill] 편입 실패:", e.message);
+    // 편입 못 한 문답은 보고서에 남긴다 — 교사 시간이 사라지지 않게(다음 실행이 --reintake로 넣을 수 있다)
+    (report.failedItems ??= []).push(...items);
+  }
 }
 async function worker(n) {
   while (queue.length) {
