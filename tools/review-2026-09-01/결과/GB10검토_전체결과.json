@@ -1,0 +1,1507 @@
+{
+  "summary": "NVIDIA GB10(DGX Spark) 서버 플랫폼을 전제로 GIJO AS 코드를 병행 검토한다 — 사실 조사 → 3갈래 점검 → 반박 검증 → 종합",
+  "agentCount": 8,
+  "logs": [
+    "조사 완료: facts 22건",
+    "[검증:G2] failed: You've hit your session limit · resets 3:30pm (Asia/Seoul)",
+    "[검증:G3] Note: claude-sonnet-5[1m] (the safety classifier) was unavailable (rate-limited) when reviewing this subagent's work. Please carefully verify the subagent's actions and output before acting on them.",
+    "GB10: 확정 19 · 기각 11",
+    "[GB10 변경안 종합] failed: You've hit your session limit · resets 3:30pm (Asia/Seoul)"
+  ],
+  "result": {
+    "synth": null,
+    "plan": {
+      "memory_model": "■ 출발점(프로브 2026-09-02 실측): MemTotal 127,535,300kB = **121.6GiB**(os.totalmem이 보는 값 · localengine.ts:463). 이 기계에는 GPU 전용 VRAM이 없으므로 「LLM 가용량」= 통합메모리에서 LLM이 아닌 것을 뺀 나머지다.\n\n■ 산정식(GIJO_AS_VRAM_티어_구동_가이드라인.md:63~69 그대로): 모델 1개 점유 ≈ GGUF 파일 + KV캐시(ctx) + 런타임 1~2GB. KV캐시(f16)/토큰 = 2 × 층수 × KV헤드수 × 헤드차원 × 2바이트. 검산: qwen3-14b CUDA 실측(GIJO_AS_모델_메모리_실측_2026-08-10.md:19) 파일 8.38 → @32K 13.20GB, 오버헤드 4.9GB = 코드 상수 5000MB(localengine.ts:52)와 일치.\n\n■ 빼야 할 것(가정을 밝힘):\n ① 코드 여유계수 5% = 121.6×0.05 ≈ **6.1GB**(localengine.ts:197·207 — 「판단」이지 실측 아님).\n ② OS·데스크톱(Xorg·gnome·firefox — 프로브 39~42행에 GPU 점유 0.5GB)·GIJO node 서버(dist/index.js)·SQLite·LanceDB: **직접 실측 없음**. 프로브를 역산하면 121.6 − 모델 3개 GPU 귀속 79.8GiB(1,086+59,601+20,958MiB) − MemAvailable 25.1GiB = **약 16.7GiB**가 「모델도 아니고 가용도 아닌」 상주분이고, 별도로 **스왑 7GB**가 밀려나 있다. 어느 프로세스 몫인지는 확인 필요. 헤드리스로 돌리고 스왑 0을 전제하면 **10~14GB**로 잡는 것이 보수적.\n ③ bge-m3 임베딩(ctx/batch 8192 상주): CUDA 실측 **2.5GB**(실측 문서 :26 · EMBED_COST.cuda) — GB10 nvidia-smi 프로세스 표는 1,086MiB(프로브 :43)라 2.5는 과대 예비지만 그대로 둔다(안전 쪽).\n ④ 스왑은 **가용량에 넣지 않는다**(facts: UMA에서 스왑으로 밀리면 성능이 무너지고 GPU OOM은 시스템 정지로 나타남).\n\n■ 결과: 121.6 − 6.1 − (10~14) − 2.5 ≈ **99~103GB → 「LLM 예산 약 100GB(안전값 95GB)」**. 이 안에서 채팅 모델 + 배치용 모델 + A/B 후보를 합해 쓴다. 단, 이 숫자는 「들어간다」이지 「빨리 돈다」가 아니다 — 속도는 대역폭 273GB/s가 정한다(candidates 참조).\n\n■ 참고(현 GB10 상태): 제품 기본값(qwen3-14b)이 아닌 Qwen3.8-Flash-Next Q3_K_XL(59.6GB, 8080) + qwen3-coder-30b-a3b(21GB, 8090·제품 풀 밖 수동 기동) + bge가 상주해 이미 96GB 사용·스왑 7GB — 예산(≈100GB)을 넘긴 상태다(프로브 :12~13, :101~103).",
+      "candidates": [
+        {
+          "model": "Qwen3-14B Q4_K_M (현 운영 기본 — localengine.ts:41 DEFAULT_MODEL_ID)",
+          "params_b": 14.8,
+          "quant": "Q4_K_M",
+          "file_gb": 8.38,
+          "ctx": 32768,
+          "est_tok_s": "24~30 (RTX 3090 추정 70~85 — 직접 실측 없음, 확인 필요)",
+          "fits": true,
+          "basis": "점유 13.2GB = CUDA 실측(모델_메모리_실측 :19). 속도: GB10 Qwen3-14B 실측이 외부에 없어 Ministral 14B Q4_K_M 26.4 t/s(DandinPower)로 대체 + 내부 7.6B 실측 비율(38.3 vs 118.5 = 3.1배)을 3090 값에 적용. 3090 14B 수치는 7B 160·27B 40 사이 보간(확인 필요)."
+        },
+        {
+          "model": "Qwen3-14B Q4_K_M ×2 인스턴스 (현 Pro 티어 모양 · maxLoadedModels 2)",
+          "params_b": 14.8,
+          "quant": "Q4_K_M",
+          "file_gb": 16.76,
+          "ctx": 32768,
+          "est_tok_s": "인스턴스당 24~30이나 동시 요청 시 각각 그 이하 — GPU가 하나라 계산은 차례로 돈다(모델_선택_가이드 :24). 집계 처리량 실측 없음(확인 필요)",
+          "fits": true,
+          "basis": "점유 2×13.2+2.5 = 28.9GB(localengine.ts:107). 121GB에서 메모리는 남지만 대역폭이 하나라 인스턴스를 늘려도 속도 총량이 비례로 늘지 않는다 — 한 인스턴스의 --parallel 칸(1014~1018행)이 같은 효과를 더 싸게 낸다."
+        },
+        {
+          "model": "Qwen3-32B Q4_K_M (dense)",
+          "params_b": 32.8,
+          "quant": "Q4_K_M",
+          "file_gb": 19.8,
+          "ctx": 32768,
+          "est_tok_s": "9~12",
+          "fits": true,
+          "basis": "파일 19.8GB는 공개 GGUF 통상값(확인 필요). KV: 64층×8KV헤드×128×2×2B ≈ 262KB/토큰 → 32K 8.6GB, 런타임 1.5 → 총 ≈30GB. 속도: DandinPower GB10 실측 Qwen3 32B dense Q4_K_M 10.7 t/s. 사람 타이핑보다 느린 체감(facts)."
+        },
+        {
+          "model": "Qwen3-30B-A3B Q4_K_M (MoE · 활성 3.3B)",
+          "params_b": 30.5,
+          "quant": "Q4_K_M",
+          "file_gb": 18.6,
+          "ctx": 32768,
+          "est_tok_s": "60~90",
+          "fits": true,
+          "basis": "파일 18.6GB 공개 통상값(확인 필요). KV: 48층×4KV헤드×128×2×2B ≈ 98KB/토큰 → 32K 3.2GB → 총 ≈23GB. 속도: GB10 실측 Q4_K_M 89.3 t/s(DandinPower) · Q8_0 61.1@d0/40.2@d16K(ggml-org 공식 벤치). MoE는 활성 파라미터만 읽어 대역폭 한계를 비켜간다 — GB10에서 14B dense보다 2~3배 빠른 유일한 「더 큰」 후보."
+        },
+        {
+          "model": "gpt-oss-120b MXFP4 (MoE · 활성 5.1B)",
+          "params_b": 117,
+          "quant": "MXFP4",
+          "file_gb": 63,
+          "ctx": 32768,
+          "est_tok_s": "45~58",
+          "fits": true,
+          "basis": "파일 63GB 공개 통상값(확인 필요). KV: 36층×8KV헤드×64×2×2B ≈ 74KB/토큰 → 32K 2.4GB(슬라이딩 윈도우로 더 작음) → 총 ≈67GB. 속도: ggml-org 공식 벤치 dgx-spark 58.7@d0 / 49.5@d16384. 라이선스 Apache-2.0(번들_LLM_후보 :28). 한국어 평가 게이트 통과 여부는 미지수."
+        },
+        {
+          "model": "Llama-3.3-70B Q4_K_M (dense)",
+          "params_b": 70.6,
+          "quant": "Q4_K_M",
+          "file_gb": 42.5,
+          "ctx": 32768,
+          "est_tok_s": "4~6 (추정)",
+          "fits": true,
+          "basis": "파일 42.5GB 공개 통상값(확인 필요). KV: 80층×8KV헤드×128×2×2B ≈ 327KB/토큰 → 32K 10.7GB → 총 ≈55GB. 속도: GB10 실측 없음 — 32B dense 10.7 t/s를 파라미터 비례로 나눈 값이며 대역폭 상한(273GB/s ÷ 42.5GB ≈ 6.4 t/s)과 부합. 대화용으로는 쓸 수 없는 속도."
+        },
+        {
+          "model": "Qwen2.5-72B Q4_K_M (dense · GB10에 이미 배치됨 — CLAUDE.md:146)",
+          "params_b": 72.7,
+          "quant": "Q4_K_M",
+          "file_gb": 47,
+          "ctx": 32768,
+          "est_tok_s": "4~6 (추정)",
+          "fits": true,
+          "basis": "파일 47GB 공개 통상값(CLAUDE.md:146 「qwen2.5-72b 포함 56GB」 — 확인 필요). KV: 80층×8KV헤드×128 → 32K 10.7GB → 총 ≈59GB. 속도: Llama-70B와 같은 근거(32B 실측 비례·대역폭 상한). 메모리는 넉넉히 들어가지만 4~6 t/s는 야간 배치(레드팀·회귀)에만 쓸 수 있는 속도."
+        }
+      ],
+      "tier_proposal": "■ 지금 코드가 GB10을 어떻게 판정하나(읽은 대로): `/api/localengine/status`가 `recommendTier(gpu.memTotalMb, \"cuda\")`를 부른다(localengine.ts:1231 — IS_MAC이 아니면 무조건 \"cuda\"). 121.6GB에서 max는 planned라 건너뛰고(215행), pro는 minVramGb 48 ≤ 121(204행)·필요 2×13.2+2.5=28.9GB ≤ 121.6×0.95(206~207행) → **「Pro · 48GB급」으로 판정된다.** tierReason은 「NVIDIA GB10 · 통합메모리 121.6GB(CPU와 공유) — 32K — ⚠ 지금은 스탠다드와 엔진 동작이 같습니다…」(1191행)라고 정직하게 말한다.\n\n■ Pro로 두면 무엇이 낭비되나: ① Pro는 Standard와 **엔진 동작이 같다**(135~136행: ctxSize 32768·overheadMb 5000 동일, maxLoadedModels는 nvidia-smi 실패 갈래에서만 쓰임) → 121GB 중 채팅 13.2+임베딩 2.5 = 15.7GB만 쓰고 **약 85GB가 놀고, 문맥은 32K에 묶인다**. ② 스폰 인자로 가는 티어 변수는 ctxSize 하나뿐(1263행)이고 `--parallel 2`는 칸당 12,288 규칙(1014~1018행)에서 고정 → 121GB로도 동시 칸이 2개다(모델 native 40,960이 상한이라 3칸이 물리 한계, 141행). ③ 「48GB급」 표기가 기계와 안 맞아 화면이 어색하다.\n\n■ 새 티어를 만들어야 하나: **고객용 「대용량 통합메모리」 티어는 만들지 않는다.** 근거: 계획서 77~79행이 「큰 모델·큰 기계 = Pro」 길을 닫았고(7.6B 3.1배 느림), candidates에서 보듯 GB10에서 14B는 3090의 약 1/3 속도라 「Pro=더 좋다」가 성립하지 않는다. 새 등급명을 달면 고객이 「비싼 기계=빠른 제품」으로 읽는다.\n\n■ 대신 할 것(근거 붙인 제안): \n (1) **이미 표에 있는 planned 「Max(관제용)」(143~144행)의 사양을 GB10에서 실측해 채운다** — Max의 뼈대는 「배치 전용 두뇌를 따로 두어 야간 회귀·자동 스캔·리포트를 담당자 대화와 분리」인데, 이것이 계획서 80행 「운영을 멈추지 않고 A/B·레드팀을 돌리는 검증 기계」와 같은 그림이다. 예산 ≈100GB 안에 채팅 14B@32K 13.2 + 배치 두뇌(Qwen3-30B-A3B ≈23 또는 14B 둘째 13.2) + 임베딩 2.5 + A/B 후보 1개(32B ≈30) ≈ 69~70GB가 들어간다. 즉 GB10은 「Max 사양을 정하는 기계」이고, 고객 서버 후보로는 14B 속도 실측·게이트 통과 뒤에 판단한다.\n (2) 통합메모리 갈래의 **티어 표시·판정 보정**(코드 수준): tierFits에 unified일 때 절대 예비(예: 총량−12GB)를 두고, GijoTierSpec에 `unifiedLabel`(예: 「통합메모리 64GB급+」)을 추가해 vramLabel 대신 보이게 한다 — 등급은 그대로 Pro, 이름표만 사실대로.\n (3) unified·ctx: GB10처럼 예산이 크면 ctxSize를 티어값이 아니라 **모델 native(40,960)로 올리고 칸 3개**를 쓰는 옵션(env `GIJO_LOCAL_LLM_CTX_SIZE`는 이미 있음, 27행)을 실측해 Max 사양에 적는다. 동시 담당자 처리량은 인스턴스 2개보다 한 인스턴스의 칸 수가 싸다(대역폭 하나를 나누는 건 어느 쪽이나 같고, 칸은 모델 가중치를 한 번만 읽는다).",
+      "honest_caveats": [
+        "속도: GB10은 메모리 대역폭 273GB/s로 RTX 3090(936GB/s)의 약 29%다. 토큰 생성은 대역폭에 비례해 내부 실측 7.6B Q5@16K에서 38.3 vs 118.5 t/s(3.1배 느림, 계획서 77~78행). 운영 기본 Qwen3-14B Q4는 GB10에서 약 24~30 t/s로 추정(직접 실측 없음 — Ministral 14B 26.4 대체값). 3090에서 4.8초 걸리던 설명 답변(VRAM 가이드라인 :18)이 GB10에선 13~15초로 늘 수 있다.",
+        "「큰 기계 = 더 빠른 제품」이 아니다. GB10의 값어치는 용량(약 100GB LLM 예산)·동시 상주·전력(140W)이며, 32B·70B dense는 들어가지만 4~12 t/s로 대화용이 아니다(야간 배치·A/B·레드팀 용도).",
+        "nvidia-smi가 GPU 메모리를 보고하지 않는다([N/A] — NVIDIA 공식 「예상된 동작」). 제품은 MemAvailable로 대신 세지만(unifiedmem.ts), 이 숫자는 스왑을 반영하지 않으며 통합메모리에서 메모리 부족은 깨끗한 오류가 아니라 시스템 전체 정지(SSH 무응답·하드 리부트)로 나타날 수 있다. 운영 시 스왑 정책(swapoff 또는 earlyoom)을 정해야 한다.",
+        "ARM64 + CUDA 13 생태계: llama.cpp는 CUDA 13 nvcc로 sm_121 네이티브 빌드가 필수(구 툴킷 불가, 120으로 빌드하면 'no kernel image'). Node 네이티브 4종은 프로브에서 로드 OK지만 pip 휠·onnxruntime-node(Linux arm64는 CPU만)·playwright Chrome 채널(arm64 미지원) 등 「대부분 CI가 시험하지 않는 조합」이라 갱신마다 깨질 수 있다.",
+        "가격·공급: Founders Edition $3,999 → 2026-02 $4,699(+18%, LPDDR5x 공급난). 한국 정가·국내 유통 파트너(ASUS GX10 1TB 등) 가격은 확인 필요. 파트너 모델은 SSD 1TB로 작다.",
+        "드라이버·OS 채널: DGX OS 7(Ubuntu 24.04 기반) + 580 계열 open kernel module 필수. 프로브 기계 드라이버(580.173.02)가 최신 릴리스 노트(580.159.03)보다 새 빌드라 어느 갱신 채널을 따르는지 확인 필요 — 고객 배치 시 판본 고정 정책이 필요하다.",
+        "발열·폼팩터: TDP 140W·240W 어댑터·150×150×50.5mm 소형 데스크톱이다. 팬 소음·지속 부하 온도는 조사 범위에 실측이 없어 확인 필요(프로브 유휴 40°C·10W만 확인).",
+        "모델 교체는 평가 게이트(중-3: 라우팅 66/66·안전 9/9·한국어 24/24) 통과 뒤에만 채택한다 — 메모리에 들어간다는 것과 제품 답이 좋아진다는 것은 다른 명제다."
+      ]
+    },
+    "confirmed": [
+      {
+        "id": "G1-01",
+        "title": "통합메모리 여유 판정이 스왑을 보지 않는다 — 「모자라면 llama가 실패」 가정이 GB10에선 「기계가 멈춤」",
+        "area": "GPU감지·엔진",
+        "severity": "P1",
+        "impact": "GB10은 지금 이미 스왑 15GB 중 7GB를 쓰고 있다(모델 3개 상주). makeRoomFor는 MemAvailable(26GB)만 보고 「자리 있다」고 판단해 새 모델을 더 올릴 수 있고, 더 내릴 모델이 없으면 그냥 스폰한다. 통합메모리에서는 GPU OOM이 깨끗한 오류가 아니라 SSH도 안 되는 시스템 전체 정지로 나타나므로(조사 사실), 그 순간 4000 서버·DB·임베딩이 한꺼번에 죽고 하드 리부트가 필요하다. 스왑에 밀린 상태는 이미 성능이 무너진 상태인데 화면(getGpuUsage)은 사용 96/121GB만 보여 주고 스왑은 안 보인다.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 537,
+            "quote": "const free = await getFreeVramMb();"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 551,
+            "quote": "if (!victim) break; // 더 내릴 게 없음 — 그냥 시도(정말 부족하면 llama가 실패)"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 464,
+            "quote": "const usedMb = Math.max(0, totalMb - unifiedAvailableMb());"
+          },
+          {
+            "file": "server/src/util/unifiedmem.ts",
+            "line": 102,
+            "quote": "const m = /^MemAvailable:\\s+(\\d+)\\s*kB/m.exec(String(meminfo));"
+          },
+          {
+            "file": "tools/review-2026-09-01/결과/gb10-probe.txt",
+            "line": 13,
+            "quote": "스  왑:           15           7           8"
+          }
+        ],
+        "proposal": "① util/unifiedmem.ts의 parseMemAvailableMb를 parseMeminfo(meminfo) → { availableMb, memFreeMb, swapTotalMb, swapUsedMb } 순수 함수로 넓히고(기존 함수는 감싸서 유지, 시험 추가), linuxAvailableMb 옆에 linuxSwapUsedMb()를 둔다. ② localengine.ts makeRoomFor의 unified 갈래: swapUsedMb > GIJO_UNIFIED_SWAP_LIMIT_MB(기본 1024)이면 여유가 있어 보여도 LRU 축출을 먼저 하고, 축출 뒤에도 needMb > availableMb면 551행처럼 스폰하지 않고 emitLlmActivity(kind:\"load\", phase:\"error\", detail:\"통합메모리 여유 부족 — 스폰하면 시스템이 멈출 수 있어 중단\")로 끝낸다(통합메모리에서만; RTX 갈래는 그대로). ③ GpuUsage에 swapUsedMb?를 추가해 getGpuUsage unified 갈래와 /api/localengine/tier 응답에 싣고, tierReason에 「스왑 N GB 사용 중 — 모델을 내리세요」 경고 한 줄. 운영 정책(swapoff/earlyoom)은 배포 갈래(G2)에서 결정.",
+        "plan_item": "전-7 (하드웨어 갈래 — GB10 편입·통합메모리 티어)",
+        "effort": "M",
+        "confidence": 0.8,
+        "fact_basis": "3. 스왑과 OOM — 통합메모리 운영 함정 · 현재 GB10 상태(프로브 2026-09-02)",
+        "verify_reason": "인용 전부 실물과 일치 — localengine.ts:537 getFreeVramMb→419행 unified 갈래는 unifiedmem.ts:101~105의 MemAvailable만 돌려주고, 551행은 축출 후보가 없으면 스폰을 강행하며, GpuUsage(432~438)에 스왑 필드가 없다. 프로브 13행 스왑 7/15GB·facts「스왑과 OOM」과 맞는 지적이다. 단 GB10 풀에는 8080 한 모델만 있어(8090·8082는 pool 밖) LRU 축출이 실제로 내릴 것은 거의 없다 — 그래서 「스폰 중단」 갈래(②)가 핵심이다.",
+        "corrected_proposal": "제안 ①~③ 유지. 덧붙여 ②의 「스폰하지 않고 중단」이 ensureModelLoaded(601행) 호출자에게 어떻게 전달되는지(throw vs ready:false 반환)를 정하고, 폴백 문구가 아니라 명시 오류로 채팅 경로에 닿게 해야 한다(CLAUDE.md 「폴백 문구=FAIL」)."
+      },
+      {
+        "id": "G1-02",
+        "title": "MemAvailable은 회수 가능한 페이지캐시를 여유로 세는데 CUDA 할당은 그 캐시 때문에 실패할 수 있다 — 실패하면 「대기 시간 초과」로 오표기",
+        "area": "GPU감지·엔진",
+        "severity": "P1",
+        "impact": "프로브에서 MemFree 1.8GB · MemAvailable 26GB — 여유의 거의 전부가 페이지캐시다. NVIDIA 포팅 가이드는 cudaMemGetInfo가 회수 가능 메모리를 계산에 넣지 않는다고 하고, llama.cpp 트러블슈팅은 「용량 안인데도 메모리 오류가 나면 페이지캐시 때문이니 drop_caches 후 재시작」이라고 적는다. 우리 판정은 26GB를 여유로 봐 14B(약 14GB 필요)를 스폰하고, cudaMalloc이 실패하면 llama-server가 종료 → waitForReady가 pool 교체를 보고 false → 활동 로그·화면엔 「모델 준비 대기 시간 초과」가 뜬다. 담당자는 시간 문제로 오해해 다시 기다리고, 원인(캐시)도 처방(drop_caches)도 안 보인다. 어느 쪽 함정(과소/과대)이 실제인지는 GB10 실측 대조가 남아 있다(open_questions 3번).",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 536,
+            "quote": "const needMb = modelFileSizeMb(modelId) + tier.overheadMb;"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 566,
+            "quote": "if (pool.get(model.modelId) !== model) return false; // 죽었거나 교체됨"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 669,
+            "quote": "detail: ready ? `모델 준비 완료 (포트 ${port})` : \"모델 준비 대기 시간 초과\","
+          },
+          {
+            "file": "server/src/util/unifiedmem.ts",
+            "line": 97,
+            "quote": "⚠ MemFree로 세지 말 것. 리눅스는 남는 RAM을 페이지 캐시로 채우므로 MemFree는 실제로 더 쓸 수"
+          },
+          {
+            "file": "tools/review-2026-09-01/결과/gb10-probe.txt",
+            "line": 17,
+            "quote": "MemFree:         1838720 kB"
+          }
+        ],
+        "proposal": "① 먼저 실측: GB10에서 MemFree≈2GB·MemAvailable≈26GB 상태로 14B GGUF를 llama-server -ngl -1로 띄워 성공/실패와 dmesg를 기록(open_questions 3번을 닫는 것). ② 코드: waitForReady가 false를 돌려준 이유를 갈라 detail을 「프로세스 종료(code N) — 마지막 출력: …」과 「N초 안에 준비 안 됨」으로 분리한다(drainProcessOutput의 tail 반환값을 ensureModelLoaded에서 받아 쓰면 된다 — 지금은 버려진다). tail에 'out of memory'·'cudaMalloc'이 있고 gpuMemoryReport().kind===\"unified\"면 「페이지캐시가 높을 때 생기는 실패 — sync; echo 3 > /proc/sys/vm/drop_caches 후 재시도」 안내를 붙인다. ③ 실측이 「실패한다」로 나오면 unified 갈래의 needMb 비교를 min(MemAvailable, MemFree + α·캐시)로 보수화하거나, 스폰 전에 모델 파일에 posix_fadvise(DONTNEED) 대신 서비스 계정 권한 없이 가능한 방법을 배포 갈래와 함께 정한다.",
+        "plan_item": "전-7 (하드웨어 갈래 — GB10 편입·통합메모리 티어)",
+        "effort": "M",
+        "confidence": 0.6,
+        "fact_basis": "3. 대안 조회 방법 — free / MemAvailable / cudaMemGetInfo / NVML · 4. llama.cpp — 통합메모리에서 -ngl 동작·알려진 문제",
+        "verify_reason": "코드 경로는 확인된다 — spawned.on(\"exit\")(653~655)이 pool에서 지우면 waitForReady 566행이 false를 주고 669행은 원인 불문 「모델 준비 대기 시간 초과」를 찍는다(drainProcessOutput 597행의 tail 반환값은 639행에서 버려진다). 이 오표기는 GB10과 무관하게 모든 스폰 실패에 해당하는 실제 결함이다. 반면 「페이지캐시 때문에 cudaMalloc이 실패한다」는 전제는 facts에 상반된 서술이 공존하고 점검자도 open_questions 3번으로 남겨 두었다 — 단정하지 않았으므로 fact_ok.",
+        "corrected_proposal": "실측(①)과 무관하게 ②는 지금 바로 할 것: drainProcessOutput의 tail 함수를 ensureModelLoaded에서 받아 두고, waitForReady가 false일 때 `pool.get(modelId)!==model`(프로세스 사망)과 시간 초과를 갈라 detail을 「프로세스 종료 — 마지막 출력: …」/「N초 안에 준비 안 됨」으로 나눈다. 캐시 안내 문구(drop_caches)는 실측 ①이 「실패한다」로 나올 때만 붙인다 — 확인 안 된 처방을 화면에 쓰면 안 된다."
+      },
+      {
+        "id": "G1-03",
+        "title": "모델 준비 대기 120초 고정 — GB10의 존재 이유인 큰 모델(84GB 3조각)에서 넘기면 ready=false로 영구 고정되고 감시에서 빠진다",
+        "area": "GPU감지·엔진",
+        "severity": "P1",
+        "impact": "GB10은 「용량이 값어치」인 기계라 84GB Qwen3.8 같은 큰 모델을 제품이 관리한다(프로브 101~102행). 로드가 120초를 넘기면(외부 사례: 커널 옵션 전 로드 104초, 페이지캐시 압박·스왑 상태에선 더 길어질 수 있음) waitForReady가 false → model.ready=false가 한 번만 대입되고 다시 true가 될 길이 없다. 프로세스는 살아서 나중에 8080을 서빙하므로 채팅은 되지만, ① 채팅 hang 감시(1041행 filter m.ready)에서 영원히 빠져 자가치유 대상이 아니고, ② 대시보드(dashboard.html 422행 filter ready)와 status는 계속 「준비 안 됨」으로 보이며, ③ 활동 로그엔 「대기 시간 초과」 오류가 남는다. 화면은 죽었다 하고 실제는 살아 있는, 이 저장소가 경계하는 「두 화면 모순」이다.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 49,
+            "quote": "const READY_TIMEOUT_MS = Number(process.env.GIJO_MODEL_READY_TIMEOUT_MS ?? 120000);"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 663,
+            "quote": "model.ready = ready;"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 1041,
+            "quote": "const models = [...pool.values()].filter((m) => m.ready);"
+          },
+          {
+            "file": "tools/review-2026-09-01/결과/gb10-probe.txt",
+            "line": 102,
+            "quote": "llama-server -m models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf -ngl -1 --ctx-size 32768 --parallel 2 --port 8080"
+          }
+        ],
+        "proposal": "localengine.ts waitForReady·ensureModelLoaded: ① 상한을 파일 크기에 비례시킨다 — timeoutMs = Math.max(READY_TIMEOUT_MS, Math.ceil(modelFileSizeMb(modelId)/1024) * GIJO_MODEL_READY_SEC_PER_GB(기본 5)*1000) — 84GB면 420초. ② 상한을 넘겨도 프로세스가 살아 있으면(pool.get(modelId)===model) ready=false로 두되 백그라운드 setInterval로 /health를 계속 찔러 200이 오면 model.ready=true·emitLlmActivity(\"load\",\"done\")을 뒤늦게 낸다(죽음과 지연을 구분). ③ 669행 detail을 「N초 안에 준비 안 됨 — 계속 기다립니다(큰 모델은 수 분)」로 바꾼다. 시험: localengine 풀 시험에 fake health 서버로 「지연 뒤 준비」 경로를 추가.",
+        "plan_item": "전-7 (하드웨어 갈래 — GB10 편입·통합메모리 티어)",
+        "effort": "S",
+        "confidence": 0.7,
+        "fact_basis": "4. llama.cpp — 통합메모리에서 -ngl 동작·알려진 문제 · 현재 GB10 상태(프로브 2026-09-02)",
+        "verify_reason": "49행 120초 고정·663행 단회 대입·1041행 ready 필터 모두 실물과 일치하고, `.ready` 대입은 663행 한 곳뿐이라 「다시 true가 될 길이 없다」도 맞다(grep 확인). 84GB는 localengine.ts:284·modelsplit.test.ts:4에 근거가 있다. 단 impact ②(대시보드 「준비 안 됨」)는 절반만 맞다 — /api/localengine/status 1205~1213행이 ready 모델이 없을 때 PORT(8080)를 두드려 ready:true 항목을 덧붙이므로 첫 모델(8080)은 실제로 뜨면 「1개 로드」로 보이고, 대신 같은 모델이 loaded에 두 번 실린다. 120초를 실제로 넘기는지는 미실측.",
+        "corrected_proposal": "제안 ①~③ 유지하되 ②(뒤늦은 ready 승격)를 넣을 때 1205행 포트 폴백과 겹쳐 loaded에 같은 모델이 두 번 실리지 않도록 modelId/port로 중복을 걸러야 한다. 착수 전 GB10에서 `systemctl restart` 직후 활동 로그의 load latencyMs를 한 번 읽어 120초를 실제로 넘기는지 확인(넘기지 않으면 effort S 그대로, ③ 문구만 우선)."
+      },
+      {
+        "id": "G1-04",
+        "title": "티어 표에 통합메모리 갈래가 없다 — 121GB GB10에 「Pro(48GB급)」를 권하는데 계획서는 「큰 기계=Pro 길을 닫았다」",
+        "area": "GPU감지·엔진",
+        "severity": "P2",
+        "impact": "EnginePlatform이 \"cuda\"|\"metal\" 둘뿐이라 GB10은 cuda 상수로 계산된다. 프로브 MemTotal 127,535,300kB → os.totalmem 124,546MB → recommendTier는 pro를 낸다(수식 재현: Pro 필요 29,594MB ≤ 118,319MB). 화면 근거 한 줄은 「NVIDIA GB10 · 통합메모리 121.6GB(CPU와 공유) — 32K — ⚠ 지금은 스탠다드와 엔진 동작이 같습니다…」이고 vramLabel은 「48GB급」이다. 계획서 77~79행은 실측(7.6B Q5 GB10 38.3 vs 3090 118.5 tok/s)으로 「큰 모델·큰 기계=Pro 길은 닫는다 — 값어치는 용량」이라 적었는데, 제품 화면은 GB10에 가장 높은 등급을 권하고 속도 경고는 한 마디도 없다. 담당자는 「Pro 기계니 빠르겠다」로 읽는다. 동작 자체는 스탠다드와 같아 사고는 아니지만 판정 문구가 거짓 인상을 준다. 또 EMBED_COST cuda 2.5GB는 GB10 프로브 bge-m3 1,086MiB와 다르나, CLAUDE.md 148행대로 GB10의 nvidia-smi 프로세스 표는 「틀린 자」라 이 숫자로 표를 고치면 안 된다.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 170,
+            "quote": "export type EnginePlatform = \"cuda\" | \"metal\";"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 136,
+            "quote": "{ id: \"pro\", label: \"Pro\", vramLabel: \"48GB급\", minVramGb: 48, maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000,"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 1231,
+            "quote": "const recommended = gpu.available ? recommendTier(gpu.memTotalMb, IS_MAC ? \"metal\" : \"cuda\") : null;"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 1191,
+            "quote": "if (보고.kind === \"unified\") return `${보고.name} · 통합메모리 ${gb}GB(CPU와 공유) — ${desc}`;"
+          },
+          {
+            "file": "GIJO_AS_시장경쟁력_전중후_계획서.md",
+            "line": 78,
+            "quote": "∴ **「큰 모델·큰 기계 = Pro」 길은 닫는다.** GB10의 값어치는 속도가 아니라 **용량**(121GB)이며,"
+          }
+        ],
+        "proposal": "① EnginePlatform에 \"unified\"를 추가하고 TIER_COST·EMBED_COST에 unified 열을 둔다(값은 GB10 실측 전까지 cuda 복사 + 주석 「미실측」). 1231행 플랫폼 선택을 IS_MAC ? \"metal\" : gpuMemoryReport().kind===\"unified\" ? \"unified\" : \"cuda\"로. ② tierReason unified 갈래에 「토큰 생성 속도는 메모리 대역폭에 묶여 RTX 3090의 약 1/3(실측 2026-08-11) — 등급은 용량 기준이며 속도를 뜻하지 않습니다」 한 줄을 붙인다. ③ /api/localengine/tier 응답에 platform 필드를 실어 화면이 vramLabel 대신 「메모리 121GB(CPU와 공유)」로 그리게 한다. ④ server/test/localengine-tier.test.ts에 recommendTier(124546, \"unified\") 경계와 tierReason 문구 시험 추가.",
+        "plan_item": "전-7 (하드웨어 갈래 — GB10 편입·통합메모리 티어) · CLAUDE.md GB10 절 「티어표 재검토 때 121GB 티어 실측」",
+        "effort": "S",
+        "confidence": 0.85,
+        "fact_basis": "8. RTX 3090 비교 — 정직한 결론 · 1. 하드웨어 사양 — 메모리 · 현재 GB10 상태",
+        "verify_reason": "EnginePlatform(170)·pro 사양(136)·1231행 플랫폼 선택·1191행 tierReason 모두 일치하고, 계산도 재현된다(Pro 필요 2×13.2+2.5=28.9GB=29,594MB ≤ 124,546×0.95=118,319MB → pro). 클라 settings.html:1635가 vramLabel(48GB급)을 그대로 찍는다. 계획서 인용은 78행이 아니라 79행이다(문구는 정확). desc에 「스탠다드와 동작이 같다」는 이미 적혀 있어 사고는 아니지만 속도 경고가 없다는 지적은 맞다.",
+        "corrected_proposal": ""
+      },
+      {
+        "id": "G1-05",
+        "title": "tools/model-benchmark.mjs 티어 판정이 제품과 다르다 — GB10에서 「Pro(30GB+급) LLM 3개」를 찍고, localengine.ts 주석은 「동일 기준」이라 거짓",
+        "area": "GPU감지·엔진",
+        "severity": "P2",
+        "impact": "GB10에서 tok/s 실측에 쓰는 도구가 통합메모리 121GB를 받아 「🟪 AS Pro (30GB+급) · 보안 LLM 3개 · GIJO_MAX_LOADED_MODELS=3」과 「티어 표는 32GB급까지만 정의돼 있다」를 출력한다. 제품(recommendTier)은 Pro=48GB급·2개·「스탠다드와 동작 같음」이다. 같은 기계에서 도구와 제품이 다른 등급·다른 모델 수를 말하고, 도구가 권하는 환경변수(3개)는 2026-08-12에 「32GB에서 터진다」고 폐기된 값이다. localengine.ts 210행 주석은 「tools/model-benchmark.mjs 판정과 동일 기준」이라 적어 다음 사람이 믿게 만든다. unifiedmem.test.ts 149행의 소스 감시는 [N/A] 처리만 보고 문턱 파리티는 안 본다.",
+        "evidence": [
+          {
+            "file": "tools/model-benchmark.mjs",
+            "line": 154,
+            "quote": "if (totalGb < 28) {"
+          },
+          {
+            "file": "tools/model-benchmark.mjs",
+            "line": 163,
+            "quote": "env: [\"GIJO_MAX_LOADED_MODELS=3\", \"GIJO_LOCAL_LLM_CTX_SIZE=32768\"],"
+          },
+          {
+            "file": "tools/model-benchmark.mjs",
+            "line": 182,
+            "quote": "⚠ 티어 표는 **32GB급까지만** 정의돼 있다"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 210,
+            "quote": "// VRAM 총량 기준 권장 티어 — tools/model-benchmark.mjs 판정과 동일 기준."
+          },
+          {
+            "file": "server/test/unifiedmem.test.ts",
+            "line": 149,
+            "quote": "it(\"tools/model-benchmark.mjs도 [N/A]를 다룬다 — .mjs라 모듈을 못 써 같은 판정을 적어 둔 곳\", () => {"
+          }
+        ],
+        "proposal": "GIJO_TIERS·TIER_COST·EMBED_COST·tierFits·recommendTier를 db 의존이 없는 순수 모듈 server/src/engine/tiers.ts로 떼고(localengine.ts는 re-export), tools/model-benchmark.mjs의 tierJudgment를 지우고 `await import(\"../server/dist/engine/tiers.js\")`로 같은 함수를 부른다(dist 없으면 「npm run build 먼저」 안내). 210행 주석 삭제. unifiedmem.test.ts 감시에 「benchmark가 tiers.js를 import한다」 한 줄 추가.",
+        "plan_item": "전-7 (하드웨어 갈래 — GB10 실측 도구)",
+        "effort": "S",
+        "confidence": 0.9,
+        "fact_basis": "코드",
+        "verify_reason": "model-benchmark.mjs:46~59 gpu()가 통합메모리면 os.totalmem()(121GB)을 total로 주고 tierJudgment(144~166)는 ≥28GB를 「Pro(30GB+급)·LLM 3개·GIJO_MAX_LOADED_MODELS=3」으로 찍는 반면 제품 recommendTier(211~220)는 Pro=48GB급·2개다 — 불일치 확인. 210행 「동일 기준」 주석과 unifiedmem.test.ts:149~157(파리티 미검사)도 인용대로다. 도구 43~45행 주석이 「같은 판정을 한 번 더 적는다」고 스스로 인정하는 자리다.",
+        "corrected_proposal": ""
+      },
+      {
+        "id": "G1-06",
+        "title": "고아 정리가 GB10에서 손으로 띄운 llama-server(8090 · local-digest 도구의 모델)를 서버 재시작마다 SIGKILL — 포트 배정도 실제 리스너를 안 본다",
+        "area": "GPU감지·엔진",
+        "severity": "P2",
+        "impact": "reapOrphanEngines는 형제 node가 없으면 「--embedding 아닌 llama-server 전부」를 고아로 보고 죽인다. GB10은 계획서·CLAUDE.md가 정한 대로 「운영 안 멈추고 A/B·레드팀·코드 발췌(local-digest, 8090 Qwen3-Coder-30B-A3B)를 돌리는 검증 기계」라 제품 밖 llama-server가 상주하는 것이 정상인데(프로브 103행), 제품 서버를 재시작(systemd Restart·배포)하면 그 모델이 소리 없이 사라져 CLAUDE.md 96행의 도구 흐름이 끊긴다. 또 PORT_RANGE_END=8092라 8090이 풀 범위 안이고 allocPort는 풀 내부 기록만 보고 배정하므로, 제품이 모델을 여럿 올리면 살아 있는 8090과 충돌해 스폰이 「포트 사용 중」으로 죽을 수 있다.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 750,
+            "quote": ".filter((l) => l.includes(\"llama-server\") && !l.includes(\"--embedding\") && !l.includes(\"pgrep\"))"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 56,
+            "quote": "const PORT_RANGE_END = PORT + 12;"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 515,
+            "quote": "function allocPort(): number {"
+          },
+          {
+            "file": "tools/review-2026-09-01/결과/gb10-probe.txt",
+            "line": 103,
+            "quote": "./llama.cpp-next/build/bin/llama-server -m models/qwen3-coder-30b-a3b/qwen3-coder-30b-a3b.gguf --alias qwen3-coder-30b-a3b -ngl -1 --ctx-size 32768 --parallel 1 --host 127.0.0.1 --port 8090 --jinja"
+          },
+          {
+            "file": "CLAUDE.md",
+            "line": 96,
+            "quote": "`node tools/local-digest.mjs file <경로> \"<질문>\"`(gb10 Qwen3-Coder-30B-A3B · 실측 1,416줄→92줄"
+          }
+        ],
+        "proposal": "① ensureModelLoaded에서 스폰한 PID를 app_state(\"llamaPids\", JSON 배열)에 적고 unload·exit에서 지운다; reapOrphanEngines는 그 목록에 있고 아직 살아 있는 PID만 죽인다(목록이 비면 옛 방식으로 물러나되 cmdline에 `--port 80[8-9]\\d` 와 MODELS_DIR 경로가 함께 있는 것만). ② allocPort에서 후보 포트를 net.createServer().listen으로 한 번 잡아 보고(즉시 close) 실패하면 다음 포트로. ③ GB10 운용 관행(8090 수동 모델)을 CLAUDE.md GB10 절에 「제품 재시작이 8090을 죽이지 않음」으로 확인 후 적는다.",
+        "plan_item": "전-7 (하드웨어 갈래 — GB10 검증 기계 운용) · CLAUDE.md gb10 이용 규칙",
+        "effort": "S",
+        "confidence": 0.85,
+        "fact_basis": "현재 GB10 상태(프로브 2026-09-02) · 코드",
+        "verify_reason": "750행 필터·56행 PORT_RANGE_END·515행 allocPort는 인용대로이고 pgrep 기반 정리(747~758)가 pool 밖 llama-server를 죽이는 동작도 확인된다. 그러나 impact의 핵심 근거가 낡았다 — tools/local-digest.mjs:44~67은 기본 두뇌를 **제품이 관리하는 8080**(재시작 시 자동 재기동)으로, coder 두뇌는 **8082**로 옮겼고 47행에 「node를 재기동하면 reapOrphanEngines가 죽인다」를 이미 알고 적어 두었다. 프로브의 8090은 옛 판본 잔재라 「도구 흐름이 끊긴다」는 과장이다. 8082는 allocPort가 두 번째로 내주는 포트라 충돌 위험은 오히려 8090보다 현실적이다.",
+        "corrected_proposal": "impact를 「local-digest coder 두뇌(8082, tools/local-digest.mjs:58~63)가 제품 재시작에 죽고, 살아 있으면 allocPort 2번째 포트와 충돌」로 고쳐 쓴다. 코드 제안 ①(스폰 PID를 app_state에 기록해 그것만 정리)·②(listen 시도로 포트 점유 확인)는 유지. ③ CLAUDE.md 96행의 「gb10 Qwen3-Coder-30B-A3B」 서술도 도구 실제(기본 Qwen3.8@8080)와 어긋나므로 같이 바로잡는다."
+      },
+      {
+        "id": "G1-07",
+        "title": "gpuMemoryReport가 일시 실패(nvidia-smi 비정상 종료·5초 타임아웃)를 「GPU 없음」으로 프로세스 생애 동안 캐시한다",
+        "area": "GPU감지·엔진",
+        "severity": "P2",
+        "impact": "부팅 직후 드라이버·persistenced가 아직 준비 전이거나 nvidia-smi가 5초를 넘기면 캐시가 {kind:\"none\"}으로 굳는다. 그 뒤 GB10은 재시작 전까지 ① getFreeVramMb가 null → makeRoomFor 개수상한(2개) 폴백, ② getGpuUsage available:false → 티어 화면 「NVIDIA GPU를 찾지 못했습니다(nvidia-smi 없음)」, ③ preflight warn — 2026-08-11에 고친 바로 그 거짓 문구가 다른 경로로 돌아온다. systemd 기동 순서에서 실제로 생기는지는 GB10 실측이 없어 확인 필요(facts에 없음). RTX WSL도 같은 위험이지만 GB10은 nvidia-smi 자체가 이미 「반쯤만 답하는」 환경이라 재시도 여지를 두는 편이 안전하다.",
+        "evidence": [
+          {
+            "file": "server/src/util/unifiedmem.ts",
+            "line": 82,
+            "quote": "캐시 = r.status === 0 && r.stdout ? parseGpuMemoryReport(r.stdout) : { kind: \"none\" };"
+          },
+          {
+            "file": "server/src/util/unifiedmem.ts",
+            "line": 80,
+            "quote": "timeout: 5000,"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 1187,
+            "quote": "if (!gpu.available) return \"NVIDIA GPU를 찾지 못했습니다(nvidia-smi 없음) — 로컬 LLM 구동 미지원 환경입니다.\";"
+          }
+        ],
+        "proposal": "unifiedmem.ts gpuMemoryReport: reported·unified 결과만 영구 캐시하고, none은 캐시 시각을 기록해 60초 뒤 재시도(또는 최대 3회까지 재시도 후 굳힘). r.error(타임아웃)와 status≠0을 로그로 남겨 「없음」과 「못 물었음」을 구분. 시험: resetGpuMemoryReportCache 뒤 spawnSync를 모킹해 none→unified 전환을 확인. GB10에서 `systemctl restart gijo-as` 직후 /api/localengine/tier의 reason을 실측해 부팅 경합이 실제인지 닫는다.",
+        "plan_item": "전-7 (하드웨어 갈래 — GB10 편입)",
+        "effort": "S",
+        "confidence": 0.6,
+        "fact_basis": "3. nvidia-smi 메모리 보고 — 실제 동작 · 코드",
+        "verify_reason": "unifiedmem.ts:78~83이 status≠0·타임아웃(status null)을 모두 {kind:\"none\"}으로 영구 캐시하는 것은 인용대로다(1187행 인용은 실제 1185행 — 문구는 정확). GB10에선 그 뒤 getFreeVramMb 420행·getGpuUsage 478행이 직접 nvidia-smi를 읽어 [N/A]→null/available:false로 떨어지므로 impact 연쇄도 코드상 맞다. 부팅 경합이 실제로 생기는지는 facts에 없고 점검자도 「확인 필요」로 적었다 — 사실을 지어내지 않았으므로 fact_ok, 트리거 미확인이라 P2.",
+        "corrected_proposal": ""
+      },
+      {
+        "id": "G1-08",
+        "title": "hang 진단 스냅샷·감시 로그가 WSL2/RTX 전제 — GB10 hang의 실제 원인(스왑·페이지캐시)을 가를 정보가 없다",
+        "area": "GPU감지·엔진",
+        "severity": "P2",
+        "impact": "captureHangDiagnostics는 여유메모리를 os.freemem()/os.totalmem()으로 적는다 — unifiedmem.ts가 「libuv 구현이라 판본에 따라 MemFree로 돌아갈 수 있어 MemAvailable을 직접 읽는다」고 못박은 이유와 어긋나고, 스왑 사용량은 아예 없다. 임베딩·채팅 감시는 지연을 「일시 지연(WSL2 GPU 추정)」이라 적는데 GB10 로그에도 그대로 찍혀 원인 추정을 오도한다. 통합메모리에서 무응답의 첫 용의자는 스왑 진입(조사 사실: 스왑이 늘면 이미 성능은 무너짐, MoE는 특히 예측 불가 정지)인데 스냅샷에 그 숫자가 없어 다음 재현 때도 못 가른다.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 507,
+            "quote": "const memFreePct = Math.round((os.freemem() / os.totalmem()) * 100);"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 944,
+            "quote": "임베딩 서버 일시 지연(WSL2 GPU 추정) — 재확인 응답 정상, 재기동 취소"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 1060,
+            "quote": "채팅 모델 일시 지연(WSL2 GPU 추정) — 재확인 응답 정상, 재기동 취소"
+          },
+          {
+            "file": "server/src/util/unifiedmem.ts",
+            "line": 25,
+            "quote": "① os.freemem()이 무엇을 세는지는 Node 문서의 약속이 아니라 libuv 구현이다 — 판본에 따라"
+          }
+        ],
+        "proposal": "captureHangDiagnostics: gpuMemoryReport().kind===\"unified\"(또는 linux)면 G1-01의 parseMeminfo로 `MemAvailable N MB · MemFree N MB · Swap N/N MB`를 적고, 기존 memFreePct는 유지. 감시 문구는 플랫폼 라벨을 변수로(IS_MAC→\"Metal\", unified→\"통합메모리(스왑·캐시 압박 추정)\", 그 외 \"WSL2 GPU 추정\"). opslog-watch.mjs가 이 줄을 findings로 잡으므로 형식 변경 시 그 파서도 같이 본다.",
+        "plan_item": "전-7 (하드웨어 갈래 — GB10 편입) · 중-1 운영 피드백 루프(장애 진단)",
+        "effort": "S",
+        "confidence": 0.8,
+        "fact_basis": "3. 스왑과 OOM — 통합메모리 운영 함정 · 코드",
+        "verify_reason": "507행 os.freemem() 비율·944행·1060행 「WSL2 GPU 추정」 문구·unifiedmem.ts:25 주석 모두 실물과 일치한다. captureHangDiagnostics가 unifiedmem의 값(MemAvailable)이 아니라 os.freemem()을 쓰는 자기모순과 스왑 부재는 확인된다. 스왑 진입이 첫 용의자라는 근거는 facts「스왑과 OOM」에 있다. G1-01의 parseMeminfo 확장에 얹히는 후속이지만 판단(makeRoomFor)과 진단(스냅샷)은 다른 자리라 중복은 아니다.",
+        "corrected_proposal": ""
+      },
+      {
+        "id": "G3-01",
+        "title": "통합메모리 갈래의 여유 판정이 스왑을 모른다 — 스왑 7GB 밀린 상태에서도 「26GB 남았다」로 새 모델을 들인다",
+        "area": "성능·용량",
+        "severity": "P1",
+        "impact": "GB10에서 makeRoomFor는 MemAvailable만 본다. 프로브 상태(사용 96GB·스왑 7GB 사용·MemAvailable 26GB)에서 14B(8.4+5GB) 적재 요청이 오면 13.4 < 26이라 통과하고, 실제로는 더 깊이 스왑으로 밀린다. facts: UMA에서 과할당은 깨끗한 OOM 대신 시스템 정지(SSH 무응답·하드 리부트)로 나타나고, 스왑 사용이 늘면 이미 성능은 무너진 상태다. 여유계수 5%(6GB)도 121GB 기계에선 OS·서버·데스크톱 상주 약 17GB(프로브 역산)를 덮지 못한다.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 419,
+            "quote": "if (gpuMemoryReport().kind === \"unified\") return Promise.resolve(unifiedAvailableMb());"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 549,
+            "quote": "while (freeMb < needMb) { ... if (!victim) break; // 더 내릴 게 없음 — 그냥 시도(정말 부족하면 llama가 실패)"
+          },
+          {
+            "file": "server/src/util/unifiedmem.ts",
+            "line": 102,
+            "quote": "const m = /^MemAvailable:\\s+(\\d+)\\s*kB/m.exec(String(meminfo));"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 197,
+            "quote": "const 여유계수 = 0.95;"
+          },
+          {
+            "file": "tools/review-2026-09-01/결과/gb10-probe.txt",
+            "line": 13,
+            "quote": "스  왑:           15           7           8"
+          }
+        ],
+        "proposal": "① unifiedmem.ts에 `parseSwapUsedMb(meminfo)`(SwapTotal−SwapFree) 순수 함수 추가 + `linuxSwapUsedMb()`. ② localengine.ts `getFreeVramMb()` unified 갈래: `MemAvailable − SwapUsed − 절대예비(env GIJO_UNIFIED_RESERVE_MB 기본 8192)`; SwapUsed가 예비의 절반을 넘으면 적재 거부(축출로 못 푸는 상황이면 「그냥 시도」 대신 명시 실패 + emitLlmActivity). ③ `tierFits`에 platform이 unified일 때 `min(총량×0.95, 총량−12GB)` 적용(EnginePlatform에 unified 추가 또는 tierFits 3번째 인자). ④ status 응답에 swapUsedMb를 실어 화면이 「스왑 중」을 보이게. ⑤ 운영 정책 결정(사용자): `swapoff -a`(기계 대신 작업이 죽음) vs earlyoom — CLAUDE.md GB10 절에 기록. 시험: server/test/unifiedmem.test.ts에 스왑 있는 meminfo 케이스 추가.",
+        "plan_item": "전-7(하드웨어 갈래 — 계획서 60·77~82행)",
+        "effort": "M",
+        "confidence": 0.8,
+        "fact_basis": "facts §3 스왑과 OOM(PyTorch #174358·NVIDIA 포럼 2026-03-08·Denneman) + 프로브 실측(:12~13·:18) + 코드 인용",
+        "verify_reason": "인용 전부 실제와 일치(localengine.ts:419 unified 갈래→unifiedAvailableMb, :549~551 「그냥 시도」, unifiedmem.ts:102 MemAvailable만 읽음, :197 여유계수). unifiedmem.ts·localengine.ts 어디에도 SwapTotal/SwapFree를 읽는 코드가 없음을 grep으로 확인(「swap」은 축출 이벤트 이름뿐). 스왑·OOM 사실은 facts §3(PyTorch #174358·포럼 2026-03-08·Denneman)과 프로브 :13(스왑 15/7)에 있어 fact_ok. 단 여유계수 5%는 tierFits(권장 판정)에만 걸리고 makeRoomFor엔 안 쓰이므로 「17GB를 덮지 못한다」 대목은 논점이 약함 — 핵심은 절대예비·스왑 미고려·UMA에서의 「그냥 시도」다. ②의 「명시 실패」는 G3-08 ①과 겹치니 한 곳에서 구현.",
+        "corrected_proposal": "제안 ①②④⑤ 유지. ③(tierFits에 unified 갈래)은 121GB에선 Pro가 어차피 넉넉히 들어가므로 우선순위를 낮추고, 대신 makeRoomFor의 needMb 비교에 절대예비(GIJO_UNIFIED_RESERVE_MB)를 넣는 것을 먼저 한다. 「그냥 시도→명시 실패」는 G3-08 ①과 합쳐 한 번만 구현."
+      },
+      {
+        "id": "G3-02",
+        "title": "모델을 키우기 전에 평가 게이트(중-3) 통과가 먼저다 — GB10 서버를 대상으로 게이트를 돌릴 통로는 이미 있다",
+        "area": "성능·용량",
+        "severity": "P2",
+        "impact": "GB10은 32B·30B-A3B·gpt-oss-120b·72B가 메모리에 다 들어가 「올려 보자」는 유혹이 크다. 그러나 채택 기준은 라우팅 66/66·안전 9/9·한국어 24/24(안전 축은 카나리 0-실패)다. 14B 기준선은 3090 운영 서버에서 확정됐고, GB10에서는 어떤 모델도 게이트를 통과한 기록이 없다(프로브의 Qwen3.8-Flash-Next 포함). 게이트 없이 모델을 바꾸면 계획서 위험표(125행 「7B 모델 한계」)가 그대로 재현된다.",
+        "evidence": [
+          {
+            "file": ".claude/commands/평가게이트.md",
+            "line": 3,
+            "quote": "모델을 바꾸거나(교체·합성·파인튜닝) 프롬프트·라우팅을 손댄 뒤 **채택 여부를 판정**한다."
+          },
+          {
+            "file": ".claude/commands/평가게이트.md",
+            "line": 34,
+            "quote": "안전 축은 카나리(0-실패)다. 1건만 뚫려도 보류 — 평균으로 가리지 않는다."
+          },
+          {
+            "file": "tools/evalgate/run.mjs",
+            "line": 38,
+            "quote": "const base = (process.env.GIJO_SERVER_URL || \"http://localhost:4000\").replace(/\\/+$/, \"\");"
+          },
+          {
+            "file": "GIJO_AS_VRAM_티어_구동_가이드라인.md",
+            "line": 16,
+            "quote": "평가 게이트 판정: **통과** — routing 66/66 · safety 9/9 · korean 24/24"
+          }
+        ],
+        "proposal": "① 규칙 명문화: GB10에서 후보 모델을 채팅 기본으로 올리기 전 `GIJO_SERVER_URL=http://<gb10>:4000 node tools/evalgate/run.mjs`(3축 전체)를 돌리고 리포트를 `.tmp-reports/evalgate-<모델>-gb10.md`로 보관 — 기준선(--accept-baseline)은 모델별·기계별로 따로 확정(문항 지문이 같아도 모델이 다르면 비교는 참고용). ② 순서 제안: Qwen3-14B(기준선 재현) → Qwen3-30B-A3B → gpt-oss-120b → 32B(속도 때문에 마지막). ③ 게이트 리포트에 「응답 지연 참고치」(즉답·설명 p50/p95) 열을 추가해 속도 하락도 채택 판단 자료로 남긴다(축은 아니고 참고). ④ GB10 4000 서버는 `FETCH_TIMEOUT_MS`(run.mjs:187, 240s)를 넘길 수 있는 72B는 게이트 대상에서 제외.",
+        "plan_item": "중-3(평가 게이트) + 전-7(하드웨어 갈래)",
+        "effort": "M",
+        "confidence": 0.85,
+        "fact_basis": "코드·명령 문서 인용 + 계획서 92·125행",
+        "verify_reason": "인용 정확(평가게이트.md:3·:34, run.mjs:38 GIJO_SERVER_URL, 가이드라인:16). 그러나 「모델을 바꾸면 게이트를 돈다」 규칙은 평가게이트.md:3에 이미 있고 GIJO_SERVER_URL로 GB10을 겨누는 통로도 이미 있어, 남는 신규분은 기계별 기준선 보관 규약·지연 참고 열·72B 제외 정도다. run.mjs:270은 문항별 ms를 이미 기록하므로 ③은 리포트 집계 추가만이다. 규칙·문서 성격이라 P1이 아니라 P2.",
+        "corrected_proposal": ""
+      },
+      {
+        "id": "G3-03",
+        "title": "GB10은 자동 판정으로 「Pro · 48GB급」이 되지만 Pro는 Standard와 엔진 동작이 같다 — 121GB 중 약 85GB가 놀고 문맥은 32K에 묶인다",
+        "area": "성능·용량",
+        "severity": "P2",
+        "impact": "recommendTier(121.6GB,\"cuda\")는 planned max를 건너뛰고 pro를 고른다. Pro의 ctxSize·overheadMb는 Standard와 같고 maxLoadedModels는 실제로 쓰이지 않는다(코드 주석이 자백). 결과: 채팅 13.2+임베딩 2.5=15.7GB만 쓰고 나머지는 빈 채로 「48GB급」이라 표시된다. 계획서는 「큰 기계=Pro」를 닫았으므로 새 고객 티어가 아니라 planned Max(관제용·배치 두뇌 분리)를 GB10 실측으로 채우는 것이 맞다.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 1231,
+            "quote": "const recommended = gpu.available ? recommendTier(gpu.memTotalMb, IS_MAC ? \"metal\" : \"cuda\") : null;"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 135,
+            "quote": "⇒ 지금 프로는 스탠다드와 **엔진 동작이 같다**(ctxSize·overheadMb 동일). 그렇게 적는다."
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 143,
+            "quote": "{ id: \"max\", label: \"Max (관제용 · 예정)\", vramLabel: \"대용량 GPU (사양 확정 전)\", maxLoadedModels: 3, ctxSize: 32768, overheadMb: 5000, planned: true,"
+          },
+          {
+            "file": "GIJO_AS_시장경쟁력_전중후_계획서.md",
+            "line": 79,
+            "quote": "∴ **「큰 모델·큰 기계 = Pro」 길은 닫는다.** GB10의 값어치는 속도가 아니라 **용량**(121GB)이며,"
+          },
+          {
+            "file": "CLAUDE.md",
+            "line": 146,
+            "quote": "**티어표 재검토 때** — **72B·통합메모리 121GB 티어 실측**(모델은 이미 가 있다: qwen2.5-72b 포함 56GB)."
+          }
+        ],
+        "proposal": "① Max 사양 실측(GB10): 채팅 qwen3-14b@32K + 배치 두뇌(후보 Qwen3-30B-A3B 또는 14B 둘째) + bge-m3 동시 상주 → ΔMemAvailable·스왑 0 확인·동시 요청(담당자 대화 1 + 배치 1) 시 각 tok/s. 결과로 GIJO_TIERS.max의 vramLabel·TIER_COST.max·desc를 채우고 planned를 유지하거나 해제(사용자 결정). ② 통합메모리 표시 보정: GijoTierSpec에 선택 필드 `unifiedLabel`을 두고 tierReason(1191행)에서 unified면 「통합메모리 64GB급+(용량형)」처럼 보이게 — 등급은 Pro 그대로. ③ 고객용 「대용량 통합메모리」 등급 신설은 하지 않는다(속도 근거 없음). ④ 문서 정합은 요청 시(G3-11).",
+        "plan_item": "전-7(하드웨어 갈래) + Max 티어 사양 확정(계획서 반영 필요 — 코드에만 planned로 존재)",
+        "effort": "M",
+        "confidence": 0.75,
+        "fact_basis": "코드 인용·계획서 79행·CLAUDE.md 146행; 「85GB가 논다」는 121.6−15.7−예비 계산",
+        "verify_reason": "인용 정확(localengine.ts:1231 recommendTier 호출, :135 「엔진 동작이 같다」, :143 max planned, 계획서:79, CLAUDE.md:146). recommendTier(211~220행)가 planned를 건너뛰고 tierFits(pro, 124,518MB, cuda)=참이라 GB10이 Pro로 판정되는 것은 계산상 맞다. 다만 이것은 코드가 의도한 정직 표기(Pro desc가 「스탠다드와 같다·남은 VRAM이 정한다」를 이미 말함)이고, tierReason(1191행)도 「통합메모리 121GB(CPU와 공유)」를 이미 붙이며, Max 실측은 CLAUDE.md:146에 예정 작업으로 이미 적혀 있다. 「85GB가 논다」는 온디맨드 풀에서 빈 메모리를 낭비라 부르는 것이라 과장. 틀린 판정이 아니라 예정 작업 재확인이므로 P2.",
+        "corrected_proposal": "① Max 사양 GB10 실측은 유지(CLAUDE.md:146의 예정 항목을 실행하는 일). ② 표시 보정은 GijoTierSpec 필드 추가 대신 tierReason(1191행)의 unified 문장에 「등급은 전용 VRAM 기준 — 통합메모리는 용량형」 한 구절만 덧붙이는 S 작업으로 축소."
+      },
+      {
+        "id": "G3-04",
+        "title": "needMb의 고정 오버헤드 5000MB는 14B 기준이다 — GB10에서 32B·70B급을 올리면 KV캐시만 8.6~10.7GB라 4~6GB를 덜 잡는다",
+        "area": "성능·용량",
+        "severity": "P1",
+        "impact": "makeRoomFor의 필요량 = 파일 + tier.overheadMb(5000). 14B@32K CUDA는 실측 오버헤드 4.9GB로 맞았지만(실측 문서가 확인), 32B(64층)·70B(80층)는 KV캐시가 32K에서 8.6·10.7GB(산정식)라 5000MB는 과소다. 전용 VRAM 기계에서는 llama가 깨끗하게 실패하지만 통합메모리에서는 과할당이 시스템 정지로 이어질 수 있다(facts). 기존 실측 문서도 「상수를 버리고 (모델, ctx, 플랫폼)으로 재서 기억」을 권했으나 미반영.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 536,
+            "quote": "const needMb = modelFileSizeMb(modelId) + tier.overheadMb;"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 52,
+            "quote": "const MODEL_VRAM_OVERHEAD_MB = Number(process.env.GIJO_MODEL_VRAM_OVERHEAD_MB ?? 5000);"
+          },
+          {
+            "file": "GIJO_AS_모델_메모리_실측_2026-08-10.md",
+            "line": 70,
+            "quote": "→ 상수를 버리고 **첫 적재 때 재서 `(모델, ctx, 플랫폼)`으로 기억**하는 쪽이 맞다."
+          },
+          {
+            "file": "server/src/engine/modelquirks.ts",
+            "line": 89,
+            "quote": "if (key.endsWith(\".context_length\") && (type === 4 || type === 10)) {"
+          }
+        ],
+        "proposal": "modelquirks.ts의 GGUF 메타 파서가 이미 `<arch>.context_length`를 읽으므로 `block_count`·`attention.head_count`·`attention.head_count_kv`·`embedding_length`를 함께 읽어 `kvMb(ctx) = 2 × L × Hkv × (emb/H) × 2B × ctx / 2^20`을 계산하고, makeRoomFor의 needMb를 `파일 + kvMb(fittedCtx) + 런타임 1,500MB`로 바꾼다(CUDA 14B@32K 검산 8.38+5.0+1.5 ≈ 14.9 vs 실측 13.2 — 보수적). 축출량(552행 reclaimed)도 같은 식으로. 실측이 있으면 app_state에 (모델, ctx, 플랫폼)→점유를 기억해 우선 사용. 시험: 14B·32B·72B 메타로 kvMb 단위 시험.",
+        "plan_item": "전-7(하드웨어 갈래) — 실측 문서 §3ⓐ의 미반영 결함",
+        "effort": "M",
+        "confidence": 0.8,
+        "fact_basis": "코드 인용 + 실측 문서 §3ⓐ + KV 산정식(가이드라인 §2); 층수·KV헤드수는 공개 모델 카드값(확인 필요)",
+        "verify_reason": "인용 정확(localengine.ts:536 needMb=파일+overheadMb, :52 5000 기본, 실측문서:70 「상수를 버리고 (모델,ctx,플랫폼)으로 기억」, modelquirks.ts:89 context_length 파서). 실측문서:68이 「CUDA 32K는 4.9GB라 5000이 원래 맞았다」고 하므로 운영 14B엔 문제 없고, 32B·70B의 KV 8.6·10.7GB는 facts에 없는 모델 카드값(층수·KV헤드)에서 나온 산식이라 finding 스스로 「확인 필요」로 표시했다 — 단정이 아니어서 fact_ok는 유지. UMA에서 과소 산정→축출 없이 적재→정지 위험(facts §3)이라 대형 모델 실측(CLAUDE.md:146 72B)에 앞서 고칠 가치가 있어 P1 유지.",
+        "corrected_proposal": "GGUF 메타에서 block_count·head_count_kv·embedding_length·head_count를 읽어 kvMb를 계산하는 안은 유지하되, 먼저 GB10에서 qwen3-14b·qwen2.5-72b를 실제로 올려 ΔMemAvailable을 재고(G3-09 규약) 산식과 대조한 뒤 코드에 넣는다 — 산식만으로 바꾸면 실측문서가 경고한 「멀쩡한 적재를 막는」 반대 사고가 난다."
+      },
+      {
+        "id": "G3-05",
+        "title": "14B 속도 비교가 추정에 머물러 있다 — GB10 ≈ 24~30 vs 3090 ≈ 70~85 t/s(둘 다 직접 실측 없음), 같은 GGUF로 양쪽을 재야 한다",
+        "area": "성능·용량",
+        "severity": "P2",
+        "impact": "내부 실측은 7.6B Q5@16K(38.3 vs 118.5)뿐이고 운영 기본 Qwen3-14B의 수치는 어느 기계에도 없다. GB10을 고객 서버 후보로 논하려면 「설명 답변 4.8초(3090)」가 GB10에서 몇 초가 되는지 숫자가 필요하다. 대역폭 비례(3.1~3.4배)로 13~15초를 예상하지만 추정이다. 영업 문서에 추정치를 적으면 전-6(과장 금지)에 걸린다.",
+        "evidence": [
+          {
+            "file": "GIJO_AS_시장경쟁력_전중후_계획서.md",
+            "line": 77,
+            "quote": "7.6B Q5 @16K에서 **GB10 38.3 tok/s vs 운영 RTX 3090 118.5 tok/s — 3.1배 느리다.**"
+          },
+          {
+            "file": "GIJO_AS_VRAM_티어_구동_가이드라인.md",
+            "line": 18,
+            "quote": "응답: 즉답 0.6초 · 설명(CVE) 4.8초(7B 3.4초 대비 +1.4초)."
+          },
+          {
+            "file": "GIJO_AS_VRAM_티어_구동_가이드라인.md",
+            "line": 205,
+            "quote": "| gijo-main-orchestrator (7.6B Q5) | 16K | 3.1s | **6.0GB** | 49ms | 118.5 tok/s |"
+          },
+          {
+            "file": "CLAUDE.md",
+            "line": 153,
+            "quote": "Windows와 **같은 판본**으로 맞춰야 실측을 비교할 수 있다."
+          }
+        ],
+        "proposal": "양쪽에 같은 `models/qwen3-14b/qwen3-14b.gguf`·같은 llama.cpp 판본으로 ① `llama-bench -m <gguf> -ngl 99 -p 512 -n 128 -d 0,16384`(pp·tg @d0/@d16K) ② 제품 경로 `node tools/model-benchmark.mjs --ctx 32768`(로드시간·첫토큰·tok/s 표) ③ 게이트 시연 문장 9개의 응답 시간(전-1 대본)을 재서 `GIJO_AS_모델_메모리_실측_…`에 GB10 열을 추가. 3090 측은 운영 서버를 밀어내지 않도록 model-benchmark의 「여유 VRAM 부족 시 스킵」을 그대로 쓴다. 결과가 나오기 전엔 문서에 「추정」 표기를 유지.",
+        "plan_item": "전-7(하드웨어 갈래) + 전-6(과장 금지)",
+        "effort": "S",
+        "confidence": 0.7,
+        "fact_basis": "계획서·가이드라인 실측 인용 + facts §8(대역폭 비례·Ministral 14B 26.4)",
+        "verify_reason": "인용 정확(계획서:77, 가이드라인:18·:205, CLAUDE.md:153). tools/model-benchmark.mjs가 존재하고 :4·:122에 「여유 VRAM 부족 시 스킵」이 있음을 확인. 3090 14B 70~85 t/s는 보간 추정으로 finding이 「확인 필요」로 표시했고 GB10 26.4는 facts §4 Ministral 14B 값이라 fact_ok. 그러나 이것은 코드 결함이 아니라 실측 공백이며 제품 동작에 틀린 판정을 만들지 않으므로 P2. 전-6(과장 금지)와의 연결은 타당.",
+        "corrected_proposal": ""
+      },
+      {
+        "id": "G3-06",
+        "title": "동시 사용자 대응이 「인스턴스 2개(Pro)」 모양인데 GB10에선 한 인스턴스의 칸(--parallel)이 같은 일을 더 싸게 한다 — 칸은 2개에 고정돼 있다",
+        "area": "성능·용량",
+        "severity": "P2",
+        "impact": "GPU가 하나면 인스턴스를 늘려도 계산은 차례로 돌고(모델 선택 가이드 24행), 대역폭 273GB/s를 나눠 쓰는 것은 인스턴스든 칸이든 같다. 칸은 가중치를 한 번만 읽어 집계 처리량이 낫다(facts: Spark 10 스트림 집계 195~210 t/s). 그런데 칸 수는 `확인용칸`이 ctx/2 ≥ 12,288이면 무조건 2로 고정하고, 121GB라도 ctxSize는 티어값 32K라 3칸(native 40,960 상한)을 못 쓴다.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 1016,
+            "quote": "const 칸당 = Math.floor(fittedCtx / 2); if (칸당 < 칸당_최소문맥) return []; return [\"--parallel\", \"2\"];"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 141,
+            "quote": "지금 구조는 칸당 12,288토큰이 필요하고 모델 native 40,960이 상한이라 **3칸이 물리적 한계**다."
+          },
+          {
+            "file": "GIJO_AS_모델_선택_가이드.md",
+            "line": 24,
+            "quote": "1. **GPU가 하나면 병렬이 아니다.** 모델을 여러 개 올려도 계산은 차례로 돕니다."
+          }
+        ],
+        "proposal": "① `확인용칸(fittedCtx)`을 `Math.min(3, Math.floor(fittedCtx / 칸당_최소문맥))`으로 일반화(2칸 하한 유지). ② unified이고 예산이 크면 ctxSize를 티어값 대신 모델 native(modelquirks nativeCtx 40,960)까지 올리는 옵션(`GIJO_LOCAL_LLM_CTX_SIZE=40960` env로 즉시 실험 가능, 27행) → 3칸. ③ GB10에서 동시 요청 1·2·3개로 각 스트림 tok/s와 집계 tok/s를 재서 Max 사양(G3-03)에 적는다. ④ 4명 이상은 코드 주석대로 VRAM이 아니라 프롬프트 축소(도구 카탈로그 13,674자)가 선결 — GB10이 그 문제를 풀어 주지 않음을 문서에 명시.",
+        "plan_item": "전-7(하드웨어 갈래) + Max 티어(계획서 반영 필요)",
+        "effort": "S",
+        "confidence": 0.65,
+        "fact_basis": "코드 인용 + facts §8(동시 스트림 집계 처리량) — 집계 수치의 모델·조건은 원문에 불명확(확인 필요)",
+        "verify_reason": "인용은 1016행 quote가 1016~1018행을 한 줄로 합친 것이지만 내용은 정확(확인용칸이 2 고정), :141·모델선택가이드:24 정확. 집계 처리량 수치는 facts §8에 있음. 단 제안 ②의 「GIJO_LOCAL_LLM_CTX_SIZE=40960 env로 즉시 실험」은 틀렸다 — DEFAULT_CTX_SIZE(27행)는 currentTierSettings(157행)에서 app_state gijoTier가 없을 때만 쓰이고, 티어가 저장돼 있으면 티어 ctxSize(32768)가 이긴다. 또 계획서:79는 GB10을 「검증 기계」로 두었으므로 다인 동시성 최적화는 틀린 판정이 아니라 다듬기 → P2.",
+        "corrected_proposal": "② 실험 경로 수정: app_state gijoTier를 지우거나(또는 시험용으로 max 티어를 잠시 planned 해제) 한 뒤 GIJO_LOCAL_LLM_CTX_SIZE=40960을 주어야 fittedCtx가 40960이 된다. ① 확인용칸 일반화는 Math.min(3, floor(fittedCtx/12288))로 유지."
+      },
+      {
+        "id": "G3-07",
+        "title": "모델 준비 대기 120초가 GB10의 60GB급 모델에 짧을 수 있다 — 지금 GB10에 59.6GB 모델이 실제로 떠 있다",
+        "area": "성능·용량",
+        "severity": "P1",
+        "impact": "waitForReady는 READY_TIMEOUT_MS(기본 120,000ms) 안에 /health가 200이 안 되면 실패로 본다. 3090에서 14B 예열이 ~98초(코드 주석)였고, GB10은 NVMe에서 47~63GB 파일을 읽어 올려야 한다(facts: 커널 옵션에 따라 로드 104s→22s 사례 — 모델 크기 불명). 실패로 판정되면 풀에서 빠지는데 프로세스는 계속 메모리를 먹어(G3-08과 결합) 예산이 조용히 새 나간다. 로드 시간 실측이 없어 확률은 「확인 필요」.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 49,
+            "quote": "const READY_TIMEOUT_MS = Number(process.env.GIJO_MODEL_READY_TIMEOUT_MS ?? 120000);"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 774,
+            "quote": "임베딩은 566M이라 몇 초면 뜬다. 채팅 모델(14B 예열 ~98초) 앞에 두는 대가가 작다."
+          },
+          {
+            "file": "tools/review-2026-09-01/결과/gb10-probe.txt",
+            "line": 44,
+            "quote": "|    0   N/A  N/A         3294191      C   ...p-next/build/bin/llama-server      59601MiB |"
+          }
+        ],
+        "proposal": "① GB10에서 qwen3-14b·qwen2.5-72b(이미 배치됨) 각각 스폰→/health 200까지의 시간을 재서 기록. ② READY_TIMEOUT을 파일 크기에 비례시키는 식으로 바꾼다: `max(120s, 60s + 3s × fileGB)`(72B 47GB → 201s; 실측으로 계수 조정). ③ 타임아웃 시 프로세스를 반드시 종료(unloadModel 경로)해 「풀 밖 상주」를 남기지 않는다 — waitForReady false 뒤 처리(571행 이후) 확인 필요.",
+        "plan_item": "전-7(하드웨어 갈래)",
+        "effort": "S",
+        "confidence": 0.55,
+        "fact_basis": "코드 인용 + 프로브 + facts §4(로드 시간 사례) — GB10 로드 시간 직접 실측 없음",
+        "verify_reason": "인용 정확(localengine.ts:49 120s, :774 「14B 예열 ~98초」, 프로브:44 59,601MiB). 다만 impact의 「실패로 판정되면 풀에서 빠지는데」는 코드와 다르다 — 660~664행에서 waitForReady가 false여도 pool.delete를 하지 않고 model.ready=false로 풀에 남으며, 프로세스도 죽이지 않는다. ready는 그 뒤 다시 갱신되지 않으므로(663행 한 번뿐) 130초에 뜬 모델도 영영 ready=false로 남아 1041행 필터에서 빠져 메모리만 먹는다(LRU 축출 대상이긴 함). 결과는 finding이 말한 「조용히 새는 예산」과 같아 P1 유지. GB10 로드 시간 자체는 실측 없음(finding도 확인 필요로 표시).",
+        "corrected_proposal": "③을 이렇게 바꾼다: waitForReady false 시 (a) unloadModel(modelId)로 프로세스를 종료하고 풀에서 제거하거나, (b) 풀에 남기되 배경 재폴링으로 ready를 뒤늦게 true로 올리는 둘 중 하나를 택한다(지금은 둘 다 아니어서 「살아 있는데 안 쓰는」 상태가 남는다). ①②(GB10 로드 시간 실측 → 파일 크기 비례 타임아웃)는 유지."
+      },
+      {
+        "id": "G3-08",
+        "title": "제품 풀 밖에서 도는 llama-server(8090·21GB)가 예산에 안 잡히고, 반대로 제품 재시작은 그것을 SIGKILL한다 — GB10 공동 사용의 두 방향 사고",
+        "area": "성능·용량",
+        "severity": "P1",
+        "impact": "프로브: 8090의 qwen3-coder-30b-a3b는 `./llama.cpp-next/...`로 수동 기동된 절감 도구용이며 제품 pool에 없다. ① makeRoomFor는 pool 안 모델만 축출할 수 있어 이 21GB는 못 회수하고 「더 내릴 게 없음 → 그냥 시도」로 간다(UMA에서는 정지 위험). ② 제품 서버가 재시작되면 reapOrphanEngines가 `--embedding`이 아닌 모든 llama-server를 죽인다 — 도구용 llama가 조용히 사라진다. 현 상태(96GB 사용·스왑 7GB)는 이미 이 공동 사용이 예산을 넘긴 증거다.",
+        "evidence": [
+          {
+            "file": "tools/review-2026-09-01/결과/gb10-probe.txt",
+            "line": 103,
+            "quote": "3541022 ./llama.cpp-next/build/bin/llama-server -m models/qwen3-coder-30b-a3b/qwen3-coder-30b-a3b.gguf --alias qwen3-coder-30b-a3b -ngl -1 --ctx-size 32768 --parallel 1 --host 127.0.0.1 --port 8090 --jinja"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 750,
+            "quote": ".filter((l) => l.includes(\"llama-server\") && !l.includes(\"--embedding\") && !l.includes(\"pgrep\"))"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 755,
+            "quote": "process.kill(pid, \"SIGKILL\");"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 551,
+            "quote": "if (!victim) break; // 더 내릴 게 없음 — 그냥 시도(정말 부족하면 llama가 실패)"
+          }
+        ],
+        "proposal": "① 예산: unified 갈래에서 `nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits`(GB10에서 프로세스별 값은 나온다 — 프로브 43~45행)로 pool 밖 llama 점유를 합산해 status에 「외부 점유 N GB」로 보이고, makeRoomFor가 축출로 못 푸는 경우 「그냥 시도」 대신 명시 실패(emitLlmActivity guard) — unifiedmem.ts 소스 감시 시험(unifiedmem.test.ts:119)이 있으니 읽기는 unifiedmem.ts에 둔다. ② 고아 정리: env `GIJO_PRESERVE_LLAMA_PORTS=8090` 또는 cmdline에 `--alias`가 있는 프로세스는 「우리가 띄운 것이 아니다」로 보고 건너뛴다(제품 스폰 인자에는 --alias가 없다, 636행). ③ 운영 규칙(CLAUDE.md GB10 절): 제품 4000이 떠 있는 동안 도구용 llama는 예산(≈100GB−제품 점유) 안에서만 띄우고, 스왑이 0이 아니면 띄우지 않는다.",
+        "plan_item": "전-7(하드웨어 갈래) — 절감 도구(915a71fd 「제품이 Qwen3.8을 관리한다」)와의 공존 규칙",
+        "effort": "S",
+        "confidence": 0.7,
+        "fact_basis": "프로브 실측(:43~45·:101~103) + 코드 인용; 8090 프로세스가 도구용이라는 해석은 커밋 메시지 710802e0·915a71fd(프로브 :126·:128)에 근거",
+        "verify_reason": "인용 정확(프로브:103 8090 --alias 수동 기동, localengine.ts:750 --embedding 아닌 llama-server 전부, :755 SIGKILL, :551 그냥 시도). server/src에 --alias가 0건임을 grep으로 확인 → 「--alias면 우리가 띄운 것이 아니다」 판별은 성립. 단 제목의 「예산에 안 잡히고」는 틀렸다 — unified 갈래의 getFreeVramMb는 MemAvailable(시스템 전체)이라 8090의 21GB는 이미 여유에서 빠져 있다. 남는 진짜 문제 둘: 풀 밖 프로세스는 축출로 못 푸는데 「그냥 시도」로 간다(UMA에서 위험), 제품 재시작 시 reapOrphanEngines가 도구용 llama를 SIGKILL한다(운영 도구 불가) → P1 유지.",
+        "corrected_proposal": "① 「외부 점유」 합산은 예산 계산이 아니라 화면 표시용으로만 둔다(예산은 MemAvailable이 이미 맞다). 「그냥 시도→명시 실패」는 G3-01 ②와 합쳐 한 번만 구현. ②(--alias 또는 GIJO_PRESERVE_LLAMA_PORTS로 고아 정리 제외) ③(운영 규칙) 유지."
+      },
+      {
+        "id": "G3-09",
+        "title": "통합메모리에서 점유를 재는 「자」가 문서마다 다르다 — TIER_COST.cuda는 gb10 nvidia-smi 프로세스 MiB인데 CLAUDE.md는 그 자가 틀렸다고 적는다",
+        "area": "성능·용량",
+        "severity": "P2",
+        "impact": "TIER_COST.lite.cuda 5.9는 「gb10 실측 5,912MiB」(nvidia-smi 프로세스 표)에서 왔다. 반면 CLAUDE.md는 「통합메모리라 RSS·nvidia-smi 둘 다 틀린 자다(5.4GB 모델이 RSS 0.73GiB)」라 적고 라이트 측정을 3090으로 돌렸다. 두 서술이 충돌하면 GB10에서 잰 Max 사양(G3-03)도 신뢰를 잃는다. 판정에 쓰는 값은 MemAvailable이므로 측정도 같은 자(ΔMemAvailable)여야 화면·판단·문서가 일치한다.",
+        "evidence": [
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 172,
+            "quote": "cuda 값은 **gb10 실측**(2026-08-12): gijo-main-orchestrator(8B급 Q4, 5.07GB) @ ctx 8192 → 적재 직후 6,011 MiB · **예열 3회 후 5,912 MiB(5.77GB)**"
+          },
+          {
+            "file": "CLAUDE.md",
+            "line": 148,
+            "quote": "통합메모리라 RSS·nvidia-smi 둘 다 틀린 자다(2026-08-13 실측: 5.4GB 모델이 RSS 0.73GiB). 그 측정은 3090(win)이 맡는다."
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 191,
+            "quote": "export const EMBED_COST: Record<EnginePlatform, number> = { cuda: 2.5, metal: 1.55 }; // bge-m3 상주"
+          },
+          {
+            "file": "tools/review-2026-09-01/결과/gb10-probe.txt",
+            "line": 43,
+            "quote": "|    0   N/A  N/A         3294142      C   ...p-next/build/bin/llama-server       1086MiB |"
+          }
+        ],
+        "proposal": "GB10 측정 규약을 하나로 정한다: 「적재 전 MemAvailable − 적재·예열 후 MemAvailable」(makeRoomFor가 쓰는 값과 동일)을 기본 자로, nvidia-smi 프로세스 MiB와 llama.cpp `--list-devices`/CUDA 런타임 값을 보조 열로 함께 기록. `tools/light-cuda-measure.sh`에 GB10 모드(ΔMemAvailable)를 추가하고 qwen3-14b@32K·bge-m3@8192를 다시 재서 TIER_COST.standard.cuda(13.2)·EMBED_COST.cuda(2.5)가 GB10에서도 맞는지 확인. 결과를 실측 문서에 GB10 열로 추가(문서 갱신은 요청 시).",
+        "plan_item": "전-7(하드웨어 갈래)",
+        "effort": "S",
+        "confidence": 0.7,
+        "fact_basis": "코드·CLAUDE.md 인용 + facts §3(cudaMemGetInfo·MemAvailable 각각의 함정 — NVIDIA 포팅 가이드·Denneman)",
+        "verify_reason": "인용 정확(localengine.ts:172 「gb10 실측 5,912MiB」 nvidia-smi 프로세스 표, CLAUDE.md:148 「RSS·nvidia-smi 둘 다 틀린 자다 … 3090이 맡는다」, :191 EMBED_COST, 프로브:43). 2026-08-12 코드 상수가 2026-08-13 CLAUDE.md가 부정한 자로 잰 값이라는 충돌은 실제다. facts §3(cudaMemGetInfo·MemAvailable 각각의 한계)과 어긋남 없음. 제품 판정이 틀리는 것은 아니고 측정 규약 정리라 P2 유지.",
+        "corrected_proposal": ""
+      },
+      {
+        "id": "G3-10",
+        "title": "GB10에서 14B dense보다 빠른 「더 큰」 후보는 MoE(Qwen3-30B-A3B·gpt-oss-120b)뿐인데 번들 후보 문서에 GB10 관점이 없다",
+        "area": "성능·용량",
+        "severity": "P2",
+        "impact": "대역폭 273GB/s에서 dense는 파라미터가 커질수록 정비례로 느려진다(32B 10.7·70B 추정 4~6 t/s). MoE는 활성 파라미터만 읽어 30B-A3B 89.3·gpt-oss-120b 58.7 t/s로 14B dense(≈26)보다 빠르다. 번들 후보 문서는 12~32GB 티어 기준이라 gpt-oss-20b·Phi-4까지만 다루고, 모델 선택 가이드는 「32B 단일도 가능하나 가장 느립니다」에서 멈춘다. GB10을 Max/검증 기계로 쓰려면 후보표에 「용량형 기계」 열이 필요하다.",
+        "evidence": [
+          {
+            "file": "GIJO_AS_번들_LLM_후보.md",
+            "line": 5,
+            "quote": "② 우리 티어(12~32GB)에 GGUF로 탑재 가능한 크기"
+          },
+          {
+            "file": "GIJO_AS_번들_LLM_후보.md",
+            "line": 28,
+            "quote": "| **gpt-oss-20b** (OpenAI) | 20B MoE | Apache-2.0 | 추론·도구호출 강력, ~16GB로 Pro 탑재 가능 | 24GB 단독은 빠듯 — 32GB 권장 |"
+          },
+          {
+            "file": "GIJO_AS_모델_선택_가이드.md",
+            "line": 16,
+            "quote": "| Pro | 32GB급 이상 (A6000/L40/다중 GPU) | 14B 한 개 + 어댑터 여러 장 · 대문맥 | 32B 단일도 가능하나 문맥이 짧아지고 가장 느립니다 |"
+          }
+        ],
+        "proposal": "① G3-02 순서대로 GB10에서 Qwen3-30B-A3B Q4_K_M(Apache-2.0)·gpt-oss-120b MXFP4(Apache-2.0)를 평가 게이트 3축에 올린다 — 한국어 축 24/24와 라우팅(JSON 결정) 66/66이 관건. ② 통과하면 「배치 두뇌」(Max) 후보로, 14B 대화 두뇌는 그대로 둔다(모델을 섞으면 답 성격이 흔들린다는 가이드라인 20~21행 원칙 유지 — 배치와 대화는 역할이 갈리므로 예외 가능, 사용자 결정). ③ modellicense.ts 규칙에 gpt-oss·Qwen3-30B 패턴이 permissive로 분류되는지 확인(번들 후보 문서 81행 미완 항목). ④ 문서 열 추가는 요청 시.",
+        "plan_item": "중-3(평가 게이트) + 전-7(하드웨어 갈래)",
+        "effort": "M",
+        "confidence": 0.6,
+        "fact_basis": "facts §4 실측 속도(ggml-org 공식 벤치·DandinPower) + 문서 인용; 한국어 품질은 미검증",
+        "verify_reason": "인용 정확(번들후보:5 「우리 티어(12~32GB)」, :28 gpt-oss-20b, 모델선택가이드:16). 속도 수치는 facts §4(ggml-org 공식 벤치 gpt-oss-120b 58.7 · DandinPower 30B-A3B 89.3)와 일치. 제안 ③ 라이선스 패턴은 modellicense.ts:39에 qwen3-30b가 이미 permissive로 있고 gpt-oss 패턴은 없음을 확인 — 번들후보:81의 「추가」 항목이 미완인 것은 맞다. 한국어 품질 미검증을 스스로 표시했고 문서·후보 성격이라 P2 유지.",
+        "corrected_proposal": "③을 구체화: modellicense.ts:39 규칙에 /gpt-oss/i permissive(Apache-2.0) 패턴만 추가하면 된다(qwen3-30b는 이미 있음)."
+      },
+      {
+        "id": "G3-11",
+        "title": "Pro 등급의 VRAM 숫자가 세 문서·코드에서 다르고(32GB / 32GB+ / 48GB), 통합메모리 갈래 행이 어디에도 없다",
+        "area": "성능·용량",
+        "severity": "P2",
+        "impact": "모델 선택 가이드 「Pro 32GB급 이상」, VRAM 가이드라인 「Pro 32GB급+」, 코드 「Pro 48GB급 · minVramGb 48」. GB10(121GB 통합)이 화면에서 Pro로 나오면 담당자가 어느 문서를 봐도 자기 기계 행을 못 찾는다. 계획서(60행)는 「타깃 하드웨어를 실측으로 정하는 일」을 전-7에 두었으니 표의 단일 출처가 필요하다.",
+        "evidence": [
+          {
+            "file": "GIJO_AS_모델_선택_가이드.md",
+            "line": 16,
+            "quote": "| Pro | 32GB급 이상 (A6000/L40/다중 GPU) |"
+          },
+          {
+            "file": "GIJO_AS_VRAM_티어_구동_가이드라인.md",
+            "line": 27,
+            "quote": "| Pro | 32GB급+ | 14B **2인스턴스** · 32K | 여러 담당자가 동시에 물어도 안 밀림 |"
+          },
+          {
+            "file": "server/src/engine/localengine.ts",
+            "line": 136,
+            "quote": "{ id: \"pro\", label: \"Pro\", vramLabel: \"48GB급\", minVramGb: 48, maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000,"
+          }
+        ],
+        "proposal": "단일 출처는 코드(GIJO_TIERS)다. `tools/tiers-table.mjs`(신규·S)로 GIJO_TIERS·TIER_COST·EMBED_COST에서 마크다운 표를 생성해 두 문서의 표를 그것으로 바꾸고, 표 아래 「통합메모리(GB10·Apple Silicon): 판정은 총 메모리로 하되 값어치는 속도가 아니라 용량」 한 줄을 추가. tierhonesty.test.ts에 문서 표↔코드 불일치를 잡는 시험을 붙일 수 있는지 검토. 문서 갱신 자체는 사용자 요청 시.",
+        "plan_item": "전-7(하드웨어 갈래) — 문서 정합(요청 시 수행)",
+        "effort": "S",
+        "confidence": 0.9,
+        "fact_basis": "세 파일 직접 인용",
+        "verify_reason": "세 인용 모두 정확(모델선택가이드:16 「32GB급 이상」, 가이드라인:27 「32GB급+」, localengine.ts:136 「48GB급 · minVramGb 48」). 가이드라인:27은 2026-08-07 개정 블록 안의 현행 표이고(1~13행 머리말이 옛 구성이라고 못박은 것은 32행 이하 「7B 2개 시절」 본문이다), 코드 48GB는 2026-08-12 이후 값이라 문서가 낡은 것이 사실. 사용자 대면 문서 정합이라 P2 유지, 갱신은 요청 시.",
+        "corrected_proposal": ""
+      }
+    ],
+    "rejected": [
+      {
+        "id": "G2-01",
+        "title": "GB10에 배포 도구·절차가 없다 — deploy.sh는 WSL 경로·systemd 전제, deploy-prod.ps1은 WSL 전용, 슬래시 명령은 win/max 갈래만",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-02",
+        "title": "GB10 상주(systemd) 정의가 없고, 가이드의 유닛 예시는 WSL 전용 값(/usr/bin/node·/usr/lib/wsl/lib·User=gijo)이라 그대로 못 쓴다",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-03",
+        "title": "고아 정리(reapOrphanEngines)가 GB10의 「제품 것 아닌」 동시 상주 llama-server를 재시작마다 SIGKILL — GB10의 값어치(용량·동시 상주)와 정면 충돌",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-04",
+        "title": "통합메모리 판정·자가진단이 스왑을 전혀 안 본다 — 스왑 7/15GB를 쓰는 지금 상태에서도 preflight pass·「그냥 시도」로 로드",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-05",
+        "title": "파이썬 `python` 하드코딩 잔재 2곳(trainenv 폴백·merge 안내 명령) — GB10엔 `python` 명령이 없다",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-06",
+        "title": "학습·합성 스택이 x86 CUDA 12 pip 관행 전제 — aarch64+CUDA 13에선 호스트 venv가 아니라 NGC 컨테이너가 검증된 길",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-07",
+        "title": "설치·반입 문서가 x86/Windows 전제 — GB10용 llama.cpp 빌드(121a-real·CUDA 13)·arm64 에어갭 반입 절차와 꾸림 도구가 없다",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-08",
+        "title": "Linux arm64 클라이언트 경로 부재 — 빌드 타깃(win/mac만)·게시(.exe)·자동갱신(.exe) 전부 x86/mac 전제(올인원은 부차 검토)",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-09",
+        "title": "데이터 이식 도구가 mac 전용 표기(`mac:` 목적지 하드코딩) — GB10 이식 안내가 틀린 호스트를 찍고, 암호화 DB는 아키텍처 변경으로 반드시 복구 절차가 필요한데 GB10 절차서가 없다",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-10",
+        "title": "리포트 PDF 렌더(Playwright Chromium) 설치가 배포 절차·자가진단에 없다 — arm64 Linux는 Chrome/Edge 채널이 없어 번들 Chromium만 가능",
+        "reason": "검증 결과 없음"
+      },
+      {
+        "id": "G2-11",
+        "title": "CLAUDE.md GB10 절이 실태와 어긋난다 — 「push 수신만·풀스택 상주 불필요」라 적혔지만 제품 서버(4000)·모델 3개가 11시간 상주 중",
+        "reason": "검증 결과 없음"
+      }
+    ],
+    "notes": [
+      "[G1 GPU 감지·엔진·티어] [전제] GB10 = DGX Spark(ARM64 Linux·통합메모리 121GiB)를 RTX 3090 WSL 대신 「서버(GPU 머신)」로 쓰는 분산 모드로 보고 검토했다. P0는 없다 — 프로브가 보여 주듯 제품 서버(4000)가 11시간 넘게 떠 있고 llama-server 3개·네이티브 모듈 4종이 정상이다.\n\n[그대로 되는 것 — 이식 부담 없음]\n- GPU 감지: util/unifiedmem.ts parseGpuMemoryReport가 「NVIDIA GB10, [N/A]」를 kind:\"unified\"로 가르고(66행), localengine.ts getFreeVramMb(419행)·getGpuUsage(462행)·tierReason(1191행)·preflight.ts gpuAvailable(34행)이 그 판정을 쓴다. NaN이 어느 분기로 가는지 추적: memory.total 「[N/A]」 → Number.parseInt → NaN → !Number.isFinite → unified(이름이 있으니 GPU 있음). utilization.gpu는 「0」으로 정상 파싱된다(프로브 54행). 2026-08-11 사고(「GPU를 찾지 못했습니다」)는 닫혀 있다.\n- 스폰 인자: `-ngl -1 --ctx-size 32768 --parallel 2`(GB10에서 실제로 그렇게 떠 있음, 프로브 102행), 임베딩 `--ctx-size/--batch-size/--ubatch-size 8192`(101행) — 통합메모리에서 전 레이어 GPU 오프로드가 표준이라 그대로 맞다. GGML_CUDA_ENABLE_UNIFIED_MEMORY 빌드 옵션은 필요 없어 보인다(59.6GB 모델이 기본 빌드로 떠 있음) — 단 facts가 「확인 필요」로 둔 항목.\n- util/llamabin.ts linux 갈래(`build/bin/<name>`)는 aarch64에도 그대로 맞는다. 단 GB10의 실제 바이너리는 `llama.cpp-next/build/bin/`(프로브 101행)이라 기본 경로(`llama.cpp/build/bin`)와 다르다 — GIJO_LLAMA_SERVER_PATH가 ~/gijo-env.sh에 잡혀 있어야 preflight(55행)도 pass다. 이건 배포 갈래(G2) 확인 사항.\n- 티어 산술: 124,546MB → Pro. 계산은 일관되고 Pro=스탠다드 동작이라 사고는 아니다(G1-04는 문구·표의 문제).\n- 라이트 CUDA 상수(TIER_COST.lite.cuda 5.9)는 이미 gb10 실측값이다.\n\n[확인 필요 — facts에 없어 단언 안 함]\n1. G1-02의 핵심: MemFree 2GB·MemAvailable 26GB 상태에서 실제로 14B가 뜨는가(페이지캐시 회수가 cudaMalloc에 제때 되는가). NVIDIA 문서와 커뮤니티 서술이 갈린다. GB10에서 한 번 재면 끝나는 일.\n2. modelFileSizeMb는 Qwen3.8 3조각 합(약 84GB)을 needMb로 쓰는데 nvidia-smi 프로세스 표는 59,601MiB다. CLAUDE.md 148행이 「GB10의 nvidia-smi·RSS는 틀린 자」라 했으니 어느 쪽이 실점유인지 모른다 — llama.cpp `--list-devices`(CUDA 런타임 API)로 재라고 같은 절이 적어 뒀다. 과대면 불필요한 축출, 과소면 OOM이라 방향이 중요하다.\n3. killProcessOnPort(879행)가 lsof를 쓴다 — DGX OS 기본 설치에 lsof가 있는지 프로브가 안 봤다(없으면 조용히 실패, 비치명적).\n4. gpuMemoryReport 부팅 경합(G1-07)이 systemd 기동 순서에서 실제로 나는지.\n5. Qwen3-14B Q4의 GB10 tok/s 직접 실측 없음(open_questions 1번) — 티어 문구에 「약 1/3」을 적을 때 2026-08-11 내부 실측(7.6B 38.3 vs 118.5)을 근거로 쓰고 14B는 재측정 후 갱신.\n6. 스왑을 끌지(swapoff) earlyoom을 둘지는 운영 정책 결정 — 코드(G1-01)는 어느 쪽이든 스왑 사용량을 보고 물러나게 하는 것이 맞다.\n\n[못 본 것] 클라이언트 티어 화면(설정 페이지)이 platform/vramLabel을 어떻게 그리는지는 G3(클라이언트) 갈래에 맡겼다. hfmodels·modelauth에는 VRAM 판정 코드가 없었다(grep 0건, modeldex의 approxGb 문구만). 학습 루프(finetune·learnloop의 pauseInferenceEngines)가 GB10 통합메모리에서 PyTorch와 자리를 나누는 문제는 G2(빌드·네이티브·python) 범위라 보지 않았다. 실행 검증은 recommendTier 수식을 node로 재현한 것까지이고, 운영 서버·CDP·로그인 세션은 건드리지 않았다.",
+      "[G2 빌드·배포·네이티브·운영 도구] ■ 검토 전제: GB10=DGX Spark(ARM64 Linux, 통합메모리 121GiB)를 RTX 3090 WSL 대신 「서버(GPU 기계)」로 쓰는 분산 모드가 주 대상, 올인원(Linux arm64 Electron)은 부차. P0는 없다 — 프로브가 제품 서버(4000, 11시간)·llama-server 3개·네이티브 모듈 4종 로드 OK를 실측했으므로 「GB10에서 서버가 안 뜬다」는 성립하지 않는다. 남은 것은 운영 도구·상주·문서의 틈(P1 4건)과 다듬기(P2 7건)다.\n\n■ 문제 없이 그대로 되는 것(이식 부담 없음, 근거 파일:줄):\n- 네이티브 의존: better-sqlite3·better-sqlite3-multiple-ciphers `^12.11.1`(server/package.json:25-26)은 Node 24 ABI 137 linux-arm64 프리빌드가 있고 프로브에서 로드 OK(사실 5). @lancedb/lancedb `^0.31.0`(package.json:17)은 `-linux-arm64-gnu` 패키지로 로드 OK. `sharp`는 server/package.json에 없다 — package-lock에만 있고 `@lancedb/lancedb → @huggingface/transformers(optional) → onnxruntime-node/sharp` 경로로 딸려온다(package-lock.json:141-151). server/src에서 onnxruntime을 쓰는 코드는 0건(reposcan.ts:18은 문자열 목록, pythonbin.ts:25는 주석)이라 「Linux arm64 onnxruntime-node는 CPU만」(사실 5)은 우리 제품에 영향이 없다. ⚠ `npm ci --omit=optional`로 줄이려 하지 말 것 — lancedb 플랫폼 바이너리도 optionalDependencies라 함께 빠진다.\n- 경로·플랫폼 분기: util/llamabin.ts:11(win32 아니면 `build/bin/<name>`) · util/pythonbin.ts:74-75(python3 폴백, 프로브 73행이 확인) · hardeningscan.ts:69-71(리눅스면 `bash -lc` — GB10 자기 점검 가능) · dbkey.ts:52-53(/etc/machine-id, /var/lib/dbus/machine-id로 지문 4개 이상) · unifiedmem.ts + localengine.ts:419/462 + preflight.ts:34-40(통합메모리 갈래, 계획서 80행 수리 29bc62b) · backup.ts:21/32(cwd 상대 경로 — systemd WorkingDirectory만 맞으면 그대로) · airgap.ts(플랫폼 무관).\n- build-server-dist.mjs:115-122의 linux 갈래는 darwin/win32만 지우고 linux/x64·arm64를 둘 다 남긴다 — 안전(용량만 조금 큼). Electron ^31 linux-arm64 better-sqlite3 프리빌드도 존재(사실 5).\n\n■ 확인 필요(사실 조사에 없어 단언하지 않은 것):\n1) GB10에 systemd 유닛이 있는가 — 프로브가 systemctl을 안 봤다(nohup 추정은 local-digest.mjs:52 기동 문자열에서). 2) GB10 서버가 llama-server를 어떻게 가리키나 — 프로브 cmdline은 `llama.cpp-next/build/bin`이라 GIJO_LLAMA_SERVER_PATH env로 보인다(gijo-env.sh 확인). 3) Playwright Chromium 설치 여부(`~/.cache/ms-playwright`). 4) bitsandbytes aarch64+CUDA13 휠 존재 — 사실에 없음. 5) MemAvailable(26GB, 스왑 7GB 사용 상태)이 실제 로드 가능량인가 — cudaMemGetInfo와 대조 실측(open question). 6) 프로브의 8090 llama-server(qwen3-coder)와 local-digest.mjs coder30의 8082 포트가 다르다 — 손으로 띄운 것으로 보이며 어느 쪽이 정본인지 확인. 7) llama.cpp GGML_CUDA_ENABLE_UNIFIED_MEMORY 필요 여부 — 59.6GB 모델이 기본 빌드로 떠 있어 불필요해 보이지만 미확인. 8) GB10 스왑 정책(swapoff vs earlyoom) — 사장님 결정 사항.\n\n■ Docker/NGC 컨테이너 vs 네이티브 systemd(우리 관행):\n- 네이티브 systemd(추천, 제품 배포): 「제품이 도는 환경에서 잰다」 원칙·CLAUDE.md:155 판단과 일치, 라이트/WSL 배포와 같은 운영 모양, nvidia-smi [N/A]는 컨테이너 안에서도 같아 도커가 해결해 주는 것이 없다(unifiedmem.ts:9-10). 단점: node tarball·llama.cpp 빌드·Chromium·파이썬 venv를 호스트에 직접 관리(G2-01·02·07·10이 그 비용).\n- NGC 컨테이너(학습·합성 도구에 한정 추천): aarch64+CUDA 13에서 pip 휠이 자주 깨지는 문제를 NVIDIA가 컨테이너로 흡수(사실 7). 제품 서버까지 컨테이너로 가면 cgroup 메모리 한도와 MemAvailable이 갈리는 문제(unifiedmem.ts:29)·GPU CDI 장치 전달·systemd 재시작 의미 변화가 따라와 우리 운영 도구를 다시 짜야 한다. ⇒ 서버는 systemd, 학습 도구만 컨테이너 래퍼(G2-06).\n\n■ 못 본 것·한계: 읽기 검토만 했고 npm test·node 스크립트 실행 검증은 하지 않았다(운영 4000·CDP·로그인 세션 불가침 원칙, 그리고 이번 갈래의 결함이 실행으로 드러나는 종류가 아니어서). hardeningtargets.ts는 grep(wsl·bash·platform·powershell) 0건이라 내용을 읽지 않았다. Electron arm64 실빌드·GB10 Chromium 실행·학습 스크립트 실행은 실측 없이 사실 자료에만 의존했다. 계획서 3~5절 전체가 아니라 55~85행(GB10 편입·실측 결론)과 96·109·112·114행(중-7·후-1·후-4·후-6)만 읽었다.",
+      "[G3 성능·용량·모델 계획] ■ 검토 전제: GB10을 RTX 3090 WSL 대신 「서버(GPU 머신)」로 두는 분산 모드를 주 배치로 보았다. 단 계획서 77~80행·CLAUDE.md 143~147행이 이미 GB10의 자리를 「운영을 멈추지 않고 A/B·레드팀을 돌리는 검증 기계 · Max 티어 실측 기계」로 정했으므로, 이 갈래의 결론도 「고객 서버 후보는 14B 속도 실측·게이트 통과 뒤 판단, 지금은 Max 사양을 정하는 기계」다.\n\n■ 숫자의 신뢰도 구분: 실측=qwen3-14b CUDA 13.2GB/8.38GB(실측 문서), bge 2.5GB, 7.6B 38.3 vs 118.5 t/s, 프로브 메모리/스왑/프로세스 표. 외부 실측=Ministral 14B 26.4·Qwen3 32B 10.7·30B-A3B 89.3·gpt-oss-120b 58.7/49.5(facts). 추정=Qwen3-14B GB10 24~30·3090 70~85, 70B/72B 4~6, 32B/70B/gpt-oss 파일 크기(공개 GGUF 통상값)와 층수·KV헤드수(공개 모델 카드) — 전부 「확인 필요」로 표기했다.\n\n■ 현재 GB10 상태 주의: 제품 기본 모델이 아닌 Qwen3.8-Flash-Next Q3_K_XL(59.6GB)이 8080에 떠 있고(커밋 915a71fd「제품이 Qwen3.8을 관리한다」), 8090엔 도구용 qwen3-coder-30b가 수동 기동 중이라 이미 스왑 7GB — 검토한 코드(makeRoomFor·reapOrphanEngines)는 이 상태를 감지도, 보호도 못 한다(G3-01·G3-08). 이 모델의 tok/s 실측은 없어 후보표에 넣지 않았다.\n\n■ 미해결(open_questions 승계): llama.cpp GGML_CUDA_ENABLE_UNIFIED_MEMORY 필요 여부(프로브상 59.6GB 모델이 기본 빌드로 뜨고 있어 불필요해 보임), cudaMemGetInfo vs MemAvailable 어느 쪽이 실제 로드 가능량에 가까운지(스왑 7GB 상태에서 실측 대조 필요), 스왑 정책(swapoff vs earlyoom — 사용자 결정), 모델 로드 시간(G3-07).\n\n■ 실행 검증은 하지 않았다: 운영 서버(4000)·GB10 부하를 건드리지 않는 읽기 전용 검토 원칙에 따라 코드·문서·프로브 결과만 읽었다. server/test/unifiedmem.test.ts가 통합메모리 파싱을 덮고 있음은 확인(스왑 케이스는 없음)."
+    ],
+    "facts": [
+      {
+        "topic": "1. 하드웨어 사양 — CPU",
+        "claim": "GB10의 CPU는 20코어 Arm(Cortex-X925 10개 + Cortex-A725 10개). MediaTek이 공동 설계. GPU와는 NVLink-C2C로 연결(PCIe Gen5의 5배 대역폭이라고 NVIDIA가 주장). GB10 프로브 실측에서도 uname aarch64 · 20코어 확인.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://www.nvidia.com/en-us/products/workstations/dgx-spark/",
+            "title": "Personal AI Supercomputer Powered by Blackwell | NVIDIA DGX Spark",
+            "date": "2026 접속"
+          },
+          {
+            "url": "https://www.mediatek.com/press-room/newly-launched-nvidia-dgx-spark-features-gb10-superchip-co-designed-by-mediatek",
+            "title": "Newly-Launched NVIDIA DGX Spark Features GB10 Superchip Co-Designed by MediaTek",
+            "date": "2025-10"
+          }
+        ]
+      },
+      {
+        "topic": "1. 하드웨어 사양 — GPU",
+        "claim": "Blackwell GPU, 48 SM · 6,144 CUDA 코어(RTX 5070과 같은 수), 5세대 텐서코어(FP4 지원), 4세대 RT 코어, 최대 클록 2.42GHz, 'up to 1 PFLOP FP4(sparse)'. 컴퓨트 능력 12.1(sm_121) — 데이터센터 B200(sm_100)·RTX 50(sm_120)과 다른 별도 타깃이며 HBM·NVLink·TMEM·tcgen05 없음.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://blog.kubesimplify.com/day-3-the-dgx-spark-unpacked-gb10-unified-memory-sm-121-and-the-one-reason-this-hardware-exists",
+            "title": "Day 3: DGX Spark Unpacked. GB10, Unified Memory, sm_121, and NVFP4 | Kubesimplify",
+            "date": "2026-06-05"
+          },
+          {
+            "url": "https://www.backend.ai/blog/2026-02-is-dgx-spark-actually-a-blackwell",
+            "title": "Inside NVIDIA DGX Spark: Is DGX Spark Actually Blackwell?",
+            "date": "2026-02-19"
+          },
+          {
+            "url": "https://videocardz.com/newz/nvidia-dgx-spark-features-6144-cuda-cores-just-as-many-as-rtx-5070",
+            "title": "NVIDIA DGX Spark features 6144 CUDA cores, just as many as RTX 5070 - VideoCardz.com"
+          }
+        ]
+      },
+      {
+        "topic": "1. 하드웨어 사양 — 메모리(속도를 결정하는 숫자)",
+        "claim": "128GB LPDDR5x, 256-bit 인터페이스, 대역폭 273 GB/s, CPU·GPU가 한 풀을 쓰는 코히런트 통합메모리. OS가 보는 총량은 약 121GiB(프로브 MemTotal 127,535,300kB). RTX 3090(GDDR6X 936 GB/s)의 약 29%에 해당 — 토큰 생성(디코드)은 대역폭에 비례하므로 이 차이가 곧 속도 차이다.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://www.nvidia.com/en-us/products/workstations/dgx-spark/",
+            "title": "Personal AI Supercomputer Powered by Blackwell | NVIDIA DGX Spark"
+          },
+          {
+            "url": "https://www.storagereview.com/ko/review/nvidia-dgx-spark-review-the-ai-appliance-bringing-datacenter-capabilities-to-desktops",
+            "title": "NVIDIA DGX Spark 리뷰: 데스크톱에 데이터센터 기능을 제공하는 AI 어플라이언스 - StorageReview.com"
+          },
+          {
+            "url": "https://www.servethehome.com/nvidia-dgx-spark-review-the-gb10-machine-is-so-freaking-cool/2/",
+            "title": "NVIDIA DGX Spark Review The GB10 Machine is so Freaking Cool - Page 2 - ServeTheHome"
+          }
+        ]
+      },
+      {
+        "topic": "1. 하드웨어 사양 — 저장장치·네트워크·전력·폼팩터",
+        "claim": "Founders Edition: 4TB NVMe M.2(자체 암호화), ConnectX-7 200Gbps(STH 실측은 PCIe x4 링크라 포트당 ~100Gbps·iperf3 96Gbps), 10GbE RJ-45, WiFi 7. 전원 어댑터 240W, GB10 TDP 140W. 크기 150×150×50.5mm, 1.2kg. GPU L2 24MB. 파트너 모델(ASUS Ascent GX10 등)은 SSD가 1TB로 작다. 프로브 기계는 루트 1.9TB 중 265GB 사용.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://www.nvidia.com/en-us/products/workstations/dgx-spark/",
+            "title": "Personal AI Supercomputer Powered by Blackwell | NVIDIA DGX Spark"
+          },
+          {
+            "url": "https://www.servethehome.com/nvidia-dgx-spark-review-the-gb10-machine-is-so-freaking-cool/2/",
+            "title": "NVIDIA DGX Spark Review The GB10 Machine is so Freaking Cool - Page 2 - ServeTheHome"
+          }
+        ]
+      },
+      {
+        "topic": "1. 하드웨어 사양 — 출시·가격",
+        "claim": "2025-03-18 GTC에서 'Project DIGITS'로 발표, 2025-10-15 판매 시작(원래 5월 예정에서 지연). Founders Edition $3,999 → 2026-02-23 LPDDR5x 공급난을 이유로 $4,699(+18%)로 인상. ASUS Ascent GX10(1TB)은 약 $3,266 수준. 한국 정가는 확인 필요.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://www.tomshardware.com/desktops/mini-pcs/nvidia-dgx-spark-gets-18-percent-price-increase-as-memory-shortages-bite-founders-edition-now-usd4-699-up-from-usd3-999",
+            "title": "Nvidia DGX Spark gets $700 price hike as memory shortages bite — Founders Edition price jumps 18% to $4,699 | Tom's Hardware",
+            "date": "2026-02"
+          },
+          {
+            "url": "https://www.tomshardware.com/desktops/mini-pcs/nvidias-dgx-spark-ai-mini-pc-goes-up-for-sale-october-15-1-petaflop-developer-platform-was-originally-slated-for-may",
+            "title": "Nvidia's DGX Spark AI mini-PC goes up for sale October 15 | Tom's Hardware",
+            "date": "2025-10"
+          },
+          {
+            "url": "https://intuitionlabs.ai/articles/nvidia-dgx-spark-review",
+            "title": "NVIDIA DGX Spark Review: $4,699 Price & Benchmarks | IntuitionLabs"
+          }
+        ]
+      },
+      {
+        "topic": "2. DGX OS — 기반·버전",
+        "claim": "DGX OS 7은 Ubuntu 24.04 LTS 기반(문서상 기본 커널 6.8, ARM64 DGX엔 NVIDIA 최적화 커널). DGX Spark 릴리스 노트 최신(2026-07): DGX OS 7.5.0 · GPU 드라이버 580.159.03 · CUDA Toolkit 13.0.2 · 커널 6.17 · UEFI 1.110.13. 2025-11 릴리스에서 HWE 6.14 커널 도입과 함께 '통합메모리 메모리 보고 차이 문제를 CUDA 지침에 맞게 수정'했다고 적혀 있다. 프로브 실측: Ubuntu 24.04.4, 커널 6.17.0-1029-nvidia, 드라이버 580.173.02(문서보다 새 빌드), CUDA 13.0(/usr/local/cuda-13.0). 580 계열 open kernel module이 필수.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://docs.nvidia.com/dgx/dgx-spark/release-notes.html",
+            "title": "DGX Spark Release Notes — NVIDIA",
+            "date": "2026-07"
+          },
+          {
+            "url": "https://docs.nvidia.com/dgx/dgx-os-7-user-guide/introduction.html",
+            "title": "About DGX OS 7 — NVIDIA DGX OS 7 User Guide"
+          },
+          {
+            "url": "https://github.com/natolambert/dgx-spark-setup",
+            "title": "GitHub - natolambert/dgx-spark-setup: Setup guide for ML training on NVIDIA DGX Spark (GB10 Blackwell, CUDA 13, aarch64)"
+          }
+        ]
+      },
+      {
+        "topic": "2. DGX OS — aarch64·Docker·NGC·관행",
+        "claim": "완전한 aarch64(ARM64/SBSA) 리눅스. CUDA·cuDNN·TensorRT·Docker·NVIDIA Container Runtime(container-toolkit)이 사전 설치·구성되어 NGC 컨테이너를 바로 pull해 쓰는 것이 NVIDIA 권장 관행(build.nvidia.com/spark 플레이북 대부분이 컨테이너 기반). systemd 사용(일반 Ubuntu와 동일 — `systemctl enable --now ssh` 등), DGX Dashboard(https://localhost:11000) 웹 모니터링 포함. 프로브에서 /usr/bin/docker 존재 확인. 주의: 'ARM + CUDA 13' 조합은 대부분 CI가 시험하지 않는 희귀 조합이라 pip 휠 등이 자주 깨진다.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://thenewstack.io/nvidia-dgx-spark-the-new-stack-developers-guide/",
+            "title": "Nvidia DGX Spark: The New Stack Developer's Guide - The New Stack"
+          },
+          {
+            "url": "https://docs.nvidia.com/dgx/dgx-spark/nvidia-container-runtime-for-docker.html",
+            "title": "NVIDIA Container Runtime for Docker — DGX Spark User Guide"
+          },
+          {
+            "url": "https://docs.nvidia.com/dgx/dgx-spark/system-overview.html",
+            "title": "System Overview — DGX Spark User Guide"
+          }
+        ]
+      },
+      {
+        "topic": "3. nvidia-smi 메모리 보고 — 실제 동작",
+        "claim": "DGX Spark에서 nvidia-smi는 GPU 메모리를 보고하지 않는다. 기본 표에 Memory-Usage 'Not Supported', `--query-gpu=memory.total/used/free`는 모두 `[N/A]`, `nvidia-smi -q`의 FB Memory Usage Total/Reserved/Used/Free 전부 N/A. 프로세스 목록의 'GPU Memory Usage'(예: llama-server 59,601MiB)와 utilization.gpu(0%)는 나온다. NVIDIA 직원(NVES, 2026-04-25) 공식 답변: '통합메모리라 nvidia-smi가 보고할 전용 VRAM이 없다 — 예상된 동작. top/htop/free 또는 DGX Dashboard를 쓰라'. 프로브(2026-09-02)가 이 세 쿼리 모두 [N/A]임을 실측으로 재확인.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://forums.developer.nvidia.com/t/dear-nvidia-nvidia-smi-is-broken-on-the-dgx-spark/367765",
+            "title": "Dear @nvidia — nvidia-smi is broken on the DGX Spark - NVIDIA Developer Forums",
+            "date": "2026-04-24~25"
+          },
+          {
+            "url": "https://forums.developer.nvidia.com/t/dgx-spark-memory-dashboard-live-gib-occupancy-map-can-i-load-next/381279",
+            "title": "DGX Spark Memory Dashboard — live GiB occupancy map + “can I load next?” - NVIDIA Developer Forums",
+            "date": "2026-08-26"
+          },
+          {
+            "url": "https://blog.kubesimplify.com/day-3-the-dgx-spark-unpacked-gb10-unified-memory-sm-121-and-the-one-reason-this-hardware-exists",
+            "title": "Day 3: DGX Spark Unpacked | Kubesimplify",
+            "date": "2026-06-05"
+          }
+        ]
+      },
+      {
+        "topic": "3. 대안 조회 방법 — free / MemAvailable / cudaMemGetInfo / NVML",
+        "claim": "(a) `free -h`의 available 열(=/proc/meminfo MemAvailable)이 실제 여유분이며 free 열은 페이지캐시 때문에 오해를 준다(Denneman: 94GB 모델 로드 후 free 861MB·available 27GB). (b) NVML: pynvml 메모리 질의는 NVML_ERROR_NOT_SUPPORTED — 커뮤니티가 CUDA Runtime API+/proc/meminfo로 만든 nvml-unified-shim(16개 함수)이 있다(비공식). (c) cudaMemGetInfo는 NVIDIA 포팅 가이드가 명시한 한계가 있다: '회수 가능한(스왑·페이지캐시) 메모리를 계산에 넣지 않아 실제 할당 가능량보다 작게 보고'하며, 반대로 UMA에선 '물리적으로 free'와 'CUDA가 쓸 수 있음'이 달라 과할당 실패도 생긴다. NVIDIA는 '스왑 없이 할당 가능한 최대치'와 '스왑 포함 최대치' 두 값을 계산하는 참조 C 코드를 제공하고, 디버깅 시 `sync; echo 3 > /proc/sys/vm/drop_caches`를 권한다. (d) 프로세스별 GPU 점유는 nvidia-smi 프로세스 표에서 읽을 수 있다(프로브에서 값 확인).",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://docs.nvidia.com/dgx/dgx-spark-porting-guide/optimization.html",
+            "title": "Optimization for DGX Spark — NVIDIA DGX Spark Porting Guide"
+          },
+          {
+            "url": "https://frankdenneman.ai/posts/2026-03-23-understanding-unified-memory-dgx-spark-nemoclaw-nemotron/",
+            "title": "Understanding Unified Memory on DGX Spark Running NemoClaw and Nemotron | Frank Denneman",
+            "date": "2026-03-23"
+          },
+          {
+            "url": "https://forums.developer.nvidia.com/t/nvml-support-for-dgx-spark-grace-blackwell-unified-memory-community-solution/358869",
+            "title": "NVML Support for DGX Spark Grace Blackwell Unified Memory - Community Solution - NVIDIA Developer Forums",
+            "date": "2026-01-28"
+          }
+        ]
+      },
+      {
+        "topic": "3. 스왑과 OOM — 통합메모리 운영 함정",
+        "claim": "기본 스왑 15GB(프로브: 15GB 중 7GB 사용 중). 통합메모리에선 'GPU OOM'이 깨끗한 오류 대신 시스템 전체 멈춤(SSH 응답 없음, 하드 리부트)으로 나타나는 사례가 다수 보고됨(PyTorch 이슈 #174358: 400GB 할당 시 시스템 행). 커뮤니티·natolambert 가이드는 `swapoff -a`로 '기계가 죽는 것'을 '작업이 죽는 것'으로 바꾸라 권하고, NVIDIA 포럼(2026-03-08)의 earlyoom(RAM<3%·swap<10%에서 개입)+경량 SSH(dropbear) 해법은 NVIDIA 직원이 sparkrun v0.1.9에 채택. Denneman: '스왑 사용량이 늘면 이미 성능은 무너진 상태'. 프로브가 이미 스왑 7GB를 쓰고 있는 것은 모델 3개(bge-m3 1GB + Qwen3.8 59.6GB + qwen3-coder-30b 21GB) 상주로 인한 압박 신호.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://github.com/pytorch/pytorch/issues/174358",
+            "title": "[Memory] Unbounded allocation on NVIDIA DGX (Unified Memory) causes system hang instead of OOM · Issue #174358 · pytorch/pytorch",
+            "date": "2026-02-05"
+          },
+          {
+            "url": "https://forums.developer.nvidia.com/t/mitigating-oom-system-freezes-on-uma-based-single-board-computers/362769",
+            "title": "Mitigating OOM System Freezes on UMA-Based Single-Board Computers - NVIDIA Developer Forums",
+            "date": "2026-03-08"
+          },
+          {
+            "url": "https://github.com/natolambert/dgx-spark-setup",
+            "title": "GitHub - natolambert/dgx-spark-setup"
+          }
+        ]
+      },
+      {
+        "topic": "4. llama.cpp CUDA 빌드 — 플래그",
+        "claim": "CUDA 13.x nvcc 필수(구 툴킷은 sm_121을 모름). NVIDIA 플레이북 공식 명령: `cmake -B build -DGGML_NATIVE=ON -DGGML_CUDA=ON -DGGML_CURL=ON -DGGML_RPC=ON -DCMAKE_CUDA_ARCHITECTURES=121a-real` → `cmake --build build --config Release --target llama-server -j`(5~10분). Arm 학습경로는 `-DCMAKE_CUDA_ARCHITECTURES=121 -DGGML_CUDA_F16=ON`. llama.cpp 관리자(0cc4m, 2026-03-11): 값을 비워도 설치된 GPU 아키텍처를 자동 감지하며, `121a`는 네이티브 FP4용, `121a-real`이 GB10 포럼 권장. 120(RTX 50)으로 빌드하면 'no kernel image is available' 오류. GGML_CUDA_FA_ALL_QUANTS는 하드웨어와 무관(KV 캐시 특수 양자화용, 빌드 시간·바이너리만 커짐). 프로브: 제품 llama-server는 'built with GNU 13.3.0 for Linux aarch64'로 이미 네이티브 빌드되어 8080/8081/8090에서 가동 중.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://github.com/NVIDIA/dgx-spark-playbooks/tree/main/nvidia/llama-cpp",
+            "title": "dgx-spark-playbooks/nvidia/llama-cpp at main · NVIDIA/dgx-spark-playbooks"
+          },
+          {
+            "url": "https://github.com/ggml-org/llama.cpp/discussions/20405",
+            "title": "DGX Spark (GB10) llama.cpp build question · ggml-org/llama.cpp · Discussion #20405",
+            "date": "2026-03-11"
+          },
+          {
+            "url": "https://learn.arm.com/learning-paths/laptops-and-desktops/dgx_spark_llamacpp/2_gb10_llamacpp_gpu/",
+            "title": "Unlock quantized LLM performance on Arm-based NVIDIA DGX Spark: Build the GPU version of llama.cpp on GB10"
+          }
+        ]
+      },
+      {
+        "topic": "4. llama.cpp — 통합메모리에서 -ngl 동작·알려진 문제",
+        "claim": "GGUF는 '시스템 메모리에 들어가는 한' 어떤 크기든 로드 가능(-ngl 999/-1로 전 레이어 GPU 오프로드가 표준). NVIDIA 트러블슈팅: 용량 안인데도 메모리 오류가 나면 페이지캐시 때문이며 `drop_caches` 후 재시작. Fedora 사용자 보고: 커널 NO_PAGE_MAPCOUNT 옵션으로 모델 로드 104s→22s. 여러 모델 동시 상주가 가능한 것이 장점이지만 스왑으로 밀리면 MoE에서 특히 예측 불가한 정지(Denneman). llama.cpp의 GGML_CUDA_ENABLE_UNIFIED_MEMORY 플래그 필요 여부는 조사 범위에서 확인되지 않음 — 확인 필요.",
+        "confidence": "medium",
+        "sources": [
+          {
+            "url": "https://build.nvidia.com/spark/llama-cpp/troubleshooting",
+            "title": "Run models with llama.cpp on DGX Spark — Troubleshooting"
+          },
+          {
+            "url": "https://github.com/ggml-org/llama.cpp/discussions/16578",
+            "title": "Performance of llama.cpp on NVIDIA DGX Spark · ggml-org/llama.cpp · Discussion #16578"
+          }
+        ]
+      },
+      {
+        "topic": "4. llama.cpp 실측 속도 — 공식 벤치(ggml-org benches/dgx-spark, 2026-02-05, CUDA 13.0 · 드라이버 580.95.05)",
+        "claim": "tg(토큰 생성) @d0 / @d16384: Qwen2.5-Coder 7B Q8_0 29.4 / 25.7 t/s · Gemma3 4B Q4_0 81.1 / 70.9 · gpt-oss-20b MXFP4 83.4 / 70.4 · Qwen3-Coder 30B-A3B Q8_0 61.1 / 40.2 · gpt-oss-120b MXFP4 58.7 / 49.5 · GLM-4.7-Flash 48.7 / 38.7. pp(프롬프트 처리)는 2,000~6,000 t/s대로 강하다. 초기 b6767(2025-10-31) 빌드 대비 gpt-oss-120b tg 52.9→58.7로 개선됨.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/benches/dgx-spark/dgx-spark.md",
+            "title": "llama.cpp benches/dgx-spark/dgx-spark.md",
+            "date": "2026-02-05"
+          },
+          {
+            "url": "https://jetsonhacks.com/wp-content/uploads/2025/10/spark-llamacpp-bench.html",
+            "title": "llama.cpp on NVIDIA DGX Spark — Benchmarks (JetsonHacks)",
+            "date": "2025-10-31"
+          }
+        ]
+      },
+      {
+        "topic": "4. llama.cpp 실측 속도 — 밀집(dense) 모델 Q4_K_M(커뮤니티)",
+        "claim": "DandinPower 벤치(Q4_K_M, GB10): Qwen3 1.7B tg 161.4 · Qwen3 8B 43.7 · Ministral 14B 26.4 · Qwen3 32B dense 10.7 · Qwen3 30B-A3B MoE 89.3 t/s. Llama 3.1 8B Q4_K_M 38.0 t/s(aimultiple). Qwen3.8-27B dense: llama.cpp 기본 12.2 t/s(4k) → MTP/DSpark로 27~29, SGLang+NVFP4로 34~38. 결론: 14B Q4 dense는 GB10에서 약 25~30 t/s 구간이며, 32B dense는 10 t/s대로 '사람 타이핑보다 느린' 체감(한국어 리뷰도 동일 지적). Qwen3-14B 자체의 GB10 수치는 못 찾음 — Ministral 14B로 대체.",
+        "confidence": "medium",
+        "sources": [
+          {
+            "url": "https://github.com/DandinPower/llama.cpp_bench/blob/main/dgx_spark/report.md",
+            "title": "llama.cpp_bench/dgx_spark/report.md · DandinPower/llama.cpp_bench"
+          },
+          {
+            "url": "https://www.contextstudios.ai/blog/qwen-3-8-27b-hardware-guide",
+            "title": "Qwen 3.8 27B Hardware Guide: From the RTX 3090 to the DGX Spark | Context Studios Blog",
+            "date": "2026-08-19"
+          },
+          {
+            "url": "https://medical.vizensoft.com/insight/read?no=772",
+            "title": "DGX Spark 128GB 실사용 성능과 한계 | 비젠메디컬"
+          }
+        ]
+      },
+      {
+        "topic": "5. Node 네이티브 모듈 — better-sqlite3 / better-sqlite3-multiple-ciphers",
+        "claim": "두 패키지 모두 v12.11.1 릴리스에 `…-node-v137-linux-arm64.tar.gz`(Node 24 ABI 137)와 electron v121~v146 linux-arm64 프리빌드가 있다(glibc). 최신은 v13.0.3(Node 22+, Electron 35+ 프리빌드). 우리 server/package.json은 `^12.11.1`로 정확히 그 버전. 프로브에서 GB10(Node v24.19.0)에서 두 모듈 로드 OK 실측. 단 Node 24 초기엔 musl-arm64 프리빌드가 늦었던 이력이 있어 버전 고정이 안전.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://github.com/WiseLibs/better-sqlite3/releases/expanded_assets/v12.11.1",
+            "title": "better-sqlite3 v12.11.1 release assets"
+          },
+          {
+            "url": "https://github.com/m4heshd/better-sqlite3-multiple-ciphers/releases/expanded_assets/v12.11.1",
+            "title": "better-sqlite3-multiple-ciphers v12.11.1 release assets"
+          },
+          {
+            "url": "https://github.com/WiseLibs/better-sqlite3/issues/1384",
+            "title": "Missing prebuild-install release binaries for Node 24/N-API 137 · Issue #1384 · WiseLibs/better-sqlite3"
+          }
+        ]
+      },
+      {
+        "topic": "5. Node 네이티브 모듈 — @lancedb/lancedb",
+        "claim": "npm에 `@lancedb/lancedb-linux-arm64-gnu`(aarch64-unknown-linux-gnu, os linux/cpu arm64/libc glibc) 패키지가 존재하며 최신 0.38.0. 우리 의존은 `^0.31.0`. 프로브에서 GB10 로드 OK. 소스 빌드(Rust) 불필요.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://registry.npmjs.org/@lancedb/lancedb-linux-arm64-gnu",
+            "title": "@lancedb/lancedb-linux-arm64-gnu — npm registry"
+          }
+        ]
+      },
+      {
+        "topic": "5. Node 네이티브 모듈 — onnxruntime-node",
+        "claim": "onnxruntime-node(최신 1.29.0)는 postinstall 스크립트로 바이너리를 받으며 공식 표에서 Linux arm64는 **CPU만** 지원(WebGPU 미제공, CUDA EP는 Linux x64 전용 v12). GB10에서 ONNX 추론은 CPU 실행 — GPU를 쓰려면 소스 빌드(js/node) 필요. 프로브에서 CPU 로드 OK. 우리 용도(경량 ONNX)엔 CPU로 충분한지 검토 필요.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/main/js/node/README.md",
+            "title": "onnxruntime/js/node/README.md — Supported Platforms"
+          },
+          {
+            "url": "https://github.com/microsoft/onnxruntime/issues/27005",
+            "title": "[Feature Request] Support aarch64 for onnxruntime-gpu · Issue #27005 · microsoft/onnxruntime"
+          }
+        ]
+      },
+      {
+        "topic": "5. Node 네이티브 모듈 — playwright-core Chromium(Ubuntu arm64)",
+        "claim": "Playwright 공식 시스템 요구사항: Linux는 Debian 12/13·Ubuntu 22.04/24.04/26.04, **x86-64와 arm64 모두 지원**, Node 22/24/26. arm64 Linux에서 Chromium은 계속 제공되지만 'Chrome(stable 채널) 설치는 Linux arm64 미지원' — 우리 코드가 `channel: 'chrome'`을 쓰면 실패하므로 번들 Chromium 또는 시스템 chromium 경로 사용 필요(확인 필요: 코드가 어떤 채널을 쓰는지). server ^1.47.0 / client ^1.61.1로 버전이 갈려 있음.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://playwright.dev/docs/intro",
+            "title": "Installation | Playwright — System requirements"
+          },
+          {
+            "url": "https://github.com/microsoft/playwright-mcp/issues/1515",
+            "title": "Playwright MCP setup is blocked on Linux Arm64 due to Chrome-only install path · Issue #1515"
+          }
+        ]
+      },
+      {
+        "topic": "6. Electron / electron-builder — Linux arm64",
+        "claim": "Electron 공식 배포는 Linux x64·arm64 바이너리 제공(ia32·armv7l은 중단), 프리빌드는 Ubuntu에서 빌드. electron-builder는 `--linux --arm64`(targets arch: arm64) 지원. 실무 제약: AppImage는 arm64에서 바로 되지만 deb/rpm은 builder가 x86 fpm을 내려받아 실패 → `USE_SYSTEM_FPM=true`(ruby gem fpm 설치) 필요, snap은 ARM에서 사실상 깨짐; 크로스컴파일 시 arm64 타깃에 x64 바이너리가 들어가는 이슈(#7608)가 있어 **ARM 기계(GB10 자체)에서 네이티브 빌드**가 권장. 우리 client/package.json은 현재 win(nsis)·mac(dmg/zip)만 정의 — linux 타깃 없음. 사용 중 electron ^31 / electron-builder ^24.13.3.",
+        "confidence": "medium",
+        "sources": [
+          {
+            "url": "https://raw.githubusercontent.com/electron/electron/main/README.md",
+            "title": "electron/electron README — Platform support"
+          },
+          {
+            "url": "https://www.beekeeperstudio.io/blog/electron-apps-for-arm-and-raspberry-pi",
+            "title": "Quick Guide to Building Electon Apps For ARM Linux and the Raspberry Pi | Beekeeper Studio",
+            "date": "2020-09-14"
+          },
+          {
+            "url": "https://github.com/electron-userland/electron-builder/issues/7608",
+            "title": "electron-builder: Linux deb ,rpm arch cross-complile wont work. arm64 target contains x64 binaries · Issue #7608"
+          }
+        ]
+      },
+      {
+        "topic": "7. PyTorch CUDA(aarch64) · unsloth · mergekit",
+        "claim": "PyTorch는 cu130 인덱스(`pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130`)에 aarch64 휠이 있고 PyTorch 2.9+에서 sm_121 동작(sm_120과 바이너리 호환, 경고 무시 가능). 함정: 대부분 pip ML 패키지가 cu12x로 빌드되어 `libcudart.so.12` 없음 오류 — flash-attn은 건너뛰고 SDPA 사용, Triton은 `TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas` 필요. Unsloth: NVIDIA 공식 플레이북이 `nvcr.io/nvidia/pytorch:25.09-py3`(문서) / `25.11-py3`(DeepWiki 요약) 기반 Dockerfile로 Triton·xformers(TORCH_CUDA_ARCH_LIST=12.1)를 소스 빌드해 사용, gpt-oss-120b QLoRA가 약 68GB 통합메모리로 돌아 '최대 200B 파라미터' 파인튜닝을 주장. mergekit: 'CPU만으로도 전부 실행 가능, --cuda 선택'이라 aarch64에서 torch만 있으면 동작할 것으로 보이나 GB10 실측 보고는 없음(확인 필요).",
+        "confidence": "medium",
+        "sources": [
+          {
+            "url": "https://unsloth.ai/docs/blog/fine-tuning-llms-with-nvidia-dgx-spark-and-unsloth",
+            "title": "Fine-tuning LLMs with NVIDIA DGX Spark and Unsloth | Unsloth Documentation"
+          },
+          {
+            "url": "https://github.com/natolambert/dgx-spark-setup",
+            "title": "GitHub - natolambert/dgx-spark-setup"
+          },
+          {
+            "url": "https://github.com/arcee-ai/mergekit",
+            "title": "GitHub - arcee-ai/mergekit"
+          },
+          {
+            "url": "https://github.com/thekozugroup/unsloth-dgxspark",
+            "title": "GitHub - thekozugroup/unsloth-dgxspark"
+          }
+        ]
+      },
+      {
+        "topic": "8. RTX 3090 비교 — 정직한 결론",
+        "claim": "토큰 생성은 대역폭 비례: 936 vs 273 GB/s ≈ 3.4배. 외부 실측: (a) Qwen3.8-27B Q4 4k 컨텍스트 3090 40.3 t/s vs Spark 12.2 t/s(3.3배); (b) Llama-2 7B Q4_0 3090 tg128 158~162 t/s(공식 CUDA 스코어보드) vs Spark 7B급 30~38 t/s; (c) Qwen3.6-27B Q4_K_M 3090 단일 39.9 t/s. 내부 실측(계획서 2026-08-11): 7.6B Q5 @16K GB10 38.3 vs 3090 118.5 t/s(3.1배). **14B Q4_K_M 추정**: Spark 약 26 t/s(Ministral 14B 실측) vs 3090 약 70~85 t/s(7B 160·27B 40 사이 보간 — 직접 실측 없음, 확인 필요). 반대로 GB10이 이기는 곳: (1) 용량 — 121GB에 27B·30B·bge-m3 동시 상주(3090은 24GB 한계), (2) 프롬프트 처리는 FP4/텐서코어 덕에 3×3090과 비슷(gpt-oss-120b pp 1,723 vs 1,642), (3) 동시 요청 집계 처리량(Spark 10 스트림 195~210 t/s), (4) 전력 140W vs 350W. 따라서 '큰 기계=Pro(더 빠름)'는 성립하지 않고 GB10의 값어치는 속도가 아니라 용량·동시성·전력이다.",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "https://www.contextstudios.ai/blog/qwen-3-8-27b-hardware-guide",
+            "title": "Qwen 3.8 27B Hardware Guide: From the RTX 3090 to the DGX Spark | Context Studios Blog",
+            "date": "2026-08-19"
+          },
+          {
+            "url": "https://github.com/ggml-org/llama.cpp/discussions/15013",
+            "title": "Performance of llama.cpp on Nvidia CUDA · ggml-org/llama.cpp · Discussion #15013"
+          },
+          {
+            "url": "https://aimultiple.com/dgx-spark-alternatives",
+            "title": "DGX Spark vs Mac Studio & Halo: Benchmarks & Alternatives",
+            "date": "2026-04-13"
+          },
+          {
+            "url": "https://ahelpme.com/ai/llamacpp-ai/llama-bench-the-qwen3-6-27b-and-nvidia-rtx-3090/",
+            "title": "llama-bench the Qwen3.6 27B and NVIDIA RTX 3090",
+            "date": "2026-06-10"
+          }
+        ]
+      },
+      {
+        "topic": "현재 GB10 상태(프로브 2026-09-02 05:36) — 코드 검토의 출발점",
+        "claim": "호스트 promaxgb10-1d0a, Ubuntu 24.04.4, 커널 6.17.0-1029-nvidia, 드라이버 580.173.02/CUDA 13.0. 메모리 총 121GiB 중 사용 96·가용 25(MemAvailable 26,303,632kB), 스왑 15GB 중 7GB 사용. llama-server 3개 상주(bge-m3 8081 1,086MiB · Qwen3.8-Flash-Next Q3_K_XL 8080 59,601MiB · qwen3-coder-30b-a3b 8090 20,958MiB). 제품 서버 `node dist/index.js` 4000 포트 11시간+ 가동, /api/health ok(schema 50). 비로그인 셸엔 node·llama-server가 PATH에 없음(node는 ~/.local/bin v24.19.0, 로그인 셸에서만). python 명령 없음(python3 3.12.3만). 네이티브 모듈 4종 로드 OK. 저장소 브랜치 claude/hungry-blackwell-cd58b7(915a71fd).",
+        "confidence": "high",
+        "sources": [
+          {
+            "url": "file:///D:/orca/AS-Private/gijo-as/tools/review-2026-09-01/결과/gb10-probe.txt",
+            "title": "gb10-probe.txt (내부 실측 결과)",
+            "date": "2026-09-02"
+          },
+          {
+            "url": "file:///D:/orca/AS-Private/gijo-as/GIJO_AS_시장경쟁력_전중후_계획서.md",
+            "title": "GIJO_AS_시장경쟁력_전중후_계획서.md 62·70·77~79행",
+            "date": "2026-08-11~14"
+          }
+        ]
+      }
+    ],
+    "open_questions": [
+      "Qwen3-14B(또는 운영 Qwen3-14B Q4) 자체의 GB10 llama.cpp tg 실측이 외부에 없다 — Ministral 14B Q4_K_M 26.4 t/s로 대체했으므로 GB10에서 `llama-bench -m <Qwen3-14B Q4> -ngl 99`로 직접 재야 한다(RTX 3090 쪽도 같은 GGUF로).",
+      "llama.cpp가 GB10에서 GGML_CUDA_ENABLE_UNIFIED_MEMORY 빌드 옵션을 필요로 하는지(기본 cudaMalloc 경로로도 121GB를 다 쓰는지) — 플레이북·논의 어디에도 명시가 없다. 프로브상 59.6GB 모델이 기본 빌드로 뜨고 있어 필요 없어 보이지만 확인 필요.",
+      "cudaMemGetInfo가 '회수 가능한 페이지캐시·스왑을 빼고' 보고한다는 NVIDIA 포팅 가이드 서술과, 반대로 '과할당을 허용해 실패한다'는 커뮤니티 서술이 공존한다 — 우리 unifiedmem.ts가 MemAvailable을 쓰는 것이 어느 쪽 함정을 더 잘 피하는지 실측 대조 필요(스왑 7GB 사용 상태에서 MemAvailable 26GB가 실제 로드 가능량인지).",
+      "DGX Spark 릴리스 노트 최신(2026-07)은 드라이버 580.159.03인데 프로브 기계는 580.173.02다 — apt 자동 갱신이거나 문서 지연; 어느 채널을 따르는지 확인 필요.",
+      "DGX Spark 한국 정식 판매가(달러 $4,699 인상 이후)와 국내 유통 파트너 모델 가격은 확인 못 함.",
+      "onnxruntime-node가 Linux arm64에서 CPU만 지원한다 — 우리 서버가 ONNX를 어떤 용도(리랭커? 분류기?)로 얼마나 무겁게 쓰는지에 따라 GB10에서 병목이 될 수 있다. 코드 확인 필요.",
+      "playwright-core가 `channel: 'chrome'`을 쓰는지 여부 — Linux arm64에선 Chrome stable 설치가 미지원이라 번들 Chromium으로만 가능. 코드 확인 필요.",
+      "mergekit의 aarch64+CUDA 13 실측 보고가 없다(CPU 모드는 문서상 가능). 학습 루프(unsloth)는 NVIDIA 컨테이너 기반이 사실상 유일한 검증 경로라, 우리 pythonbin.ts가 호스트 python3를 직접 부르는 구조와 맞는지 검토 필요.",
+      "electron-builder 공식 docs(electron.build/linux)를 직접 읽지 못했다(빈 응답·404) — 지원 아키텍처 목록은 CLI 문서·이슈·2020년 실무 글에 의존. Linux arm64 클라이언트는 어차피 부차 검토라 우선순위 낮음.",
+      "GB10에서 스왑을 끌지(natolambert·포럼 권고) 아니면 earlyoom을 둘지 — 운영 정책 결정 사항. 현재 스왑 7GB가 이미 쓰이고 있어 어느 프로세스가 밀려났는지 확인 필요."
+    ],
+    "searches": [
+      "NVIDIA DGX Spark GB10 specifications memory bandwidth 273 GB/s LPDDR5x CPU cores Blackwell CUDA cores",
+      "DGX Spark DGX OS Ubuntu version CUDA driver version aarch64",
+      "DGX Spark nvidia-smi memory.total N/A unified memory",
+      "llama.cpp DGX Spark build CMAKE_CUDA_ARCHITECTURES 121 GGML_CUDA benchmark tok/s",
+      "better-sqlite3 prebuilt linux arm64 binaries node 24",
+      "electron-builder linux arm64 AppImage deb support",
+      "DGX Spark PyTorch unsloth fine-tuning container arm64 sbsa",
+      "DGX Spark vs RTX 3090 llama.cpp tokens per second comparison 14B Q4",
+      "onnxruntime-node linux arm64 prebuilt npm CUDA support aarch64",
+      "playwright chromium Ubuntu 24.04 arm64 aarch64 supported \"linux arm64\"",
+      "better-sqlite3-multiple-ciphers prebuilt linux-arm64 releases",
+      "DGX Spark 스펙 GB10 128GB 273GB/s 가격 출시 리뷰",
+      "DGX Spark llama.cpp 토큰 속도 실측 Qwen3 14B 벤치마크",
+      "DGX OS 7 Ubuntu 24.04 kernel 6.11 nvidia driver 580 DGX Spark release notes",
+      "RTX 3090 llama.cpp Qwen3 14B Q4_K_M tokens per second tg128 llama-bench",
+      "mergekit DGX Spark arm64 aarch64 pip install torch cu130 wheel",
+      "DGX Spark unified memory GPU memory usage llama.cpp -ngl 999 cudaMemGetInfo free memory swap zram",
+      "mergekit arm64 aarch64 CPU merge works \"mergekit\" Grace ARM",
+      "DGX Spark nvidia-smi 메모리 N/A 통합메모리 확인 free -h",
+      "Electron official prebuilt linux-arm64 releases supported platforms arm64 Linux",
+      "DGX Spark GB10 6144 CUDA cores 48 SMs compute capability 12.1 sm_121",
+      "DGX Spark llama.cpp Qwen3 14B Q4_K_M tg tok/s dense \"14B\" spark benchmark GB10",
+      "DGX Spark ships with NGC containers docker nvidia-container-toolkit preinstalled DGX Dashboard systemd",
+      "DGX Spark 리뷰 토큰 속도 RTX 3090 비교 대역폭 273GB/s 느리다",
+      "DGX Spark launch date October 15 2025 price $3,999 Founders Edition $2,999 partner Asus Ascent GX10",
+      "llama.cpp CUDA \"sm_121\" OR \"121a\" DGX Spark build issue GGML_CUDA_FA_ALL_QUANTS CMAKE_CUDA_ARCHITECTURES=121 known problems",
+      "DGX Spark swap zram default 15GB swapfile unified memory OOM freeze recommendation swapoff",
+      "\"RTX 3090\" llama-bench Qwen2.5 14B OR Qwen3 14B Q4_K_M \"t/s\" tg128 generation speed",
+      "ggml-org llama.cpp discussion \"Performance of llama.cpp with CUDA\" RTX 3090 tg128 t/s Llama 8B Q4_0",
+      "DGX Spark Qwen3 14B Q4 tok/s ollama llama.cpp reddit LocalLLaMA GB10 \"14B\"",
+      "(WebFetch) nvidia.com DGX Spark 제품 페이지 · docs.nvidia.com DGX Spark release-notes / DGX OS 7 introduction / porting-guide optimization·cuda / system-overview · NVIDIA 포럼 nvidia-smi broken · NVML community solution · OOM freeze · memory dashboard · ggml-org benches/dgx-spark.md · discussions #16578 #20405 #15013 · NVIDIA dgx-spark-playbooks llama-cpp · learn.arm.com GB10 llama.cpp · Kubesimplify Day 3 · backend.ai sm_121 · frankdenneman UMA · natolambert setup · unsloth docs · deepwiki unsloth/memory · pytorch issue #174358 · registry.npmjs.org @lancedb/lancedb-linux-arm64-gnu · onnxruntime-node latest · onnxruntime js/node README · better-sqlite3(-multiple-ciphers) v12.11.1 expanded_assets · electron README · beekeeperstudio ARM electron · contextstudios Qwen3.8 27B guide · aimultiple · intuitionlabs · ahelpme 3090 bench · tokenstead · howtospark · STH review p2 · Tom's Hardware 가격 인상",
+      "(로컬) tools/review-2026-09-01/결과/gb10-probe.txt · server/package.json · client/package.json · server/src/util/unifiedmem.ts · GIJO_AS_시장경쟁력_전중후_계획서.md 58~82행 · GIJO_AS_VRAM_티어_구동_가이드라인.md 실측표"
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "조사"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "점검"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 3,
+      "title": "검증"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 4,
+      "title": "종합"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "조사: DGX Spark 사실",
+      "phaseIndex": 1,
+      "phaseTitle": "조사",
+      "agentId": "ab136ae7b010ac9fc",
+      "model": "claude-fable-5-1",
+      "state": "done",
+      "startedAt": 1788314841761,
+      "queuedAt": 1788314840213,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "[제품] GIJO AS — 한국형 온프렘 AI 보안관리 플랫폼. Electron 클라이언트(client/) + Node/TS 서버(server/) + 로컬 LLM(llama.cpp llama-server 프로세스 풀). 저장소 D:/Connect AI. **읽기 전용** — 파일 수정 금지. 이 머신에는 node_modules가 있어 읽기 검증에 더해 실행 검증(npm test·node 스크립트)도 가능하다 — 단 운영 서버(4000)·CDP(9223)·로그인 세션은 건드리지 않는다. 오늘 2026-09-01. 클라 5.14.0.\n[지금 운영 환경] Windows PC(RTX 3090 24GB)의 WSL2 Ubuntu에서 systemd 서비스(gijo-as.service, /home/gijo/gijo-as/…",
+      "lastProgressAt": 1788315420279,
+      "tokens": 137806,
+      "toolCalls": 93,
+      "durationMs": 578517,
+      "resultPreview": "{\"facts\":[{\"topic\":\"1. 하드웨어 사양 — CPU\",\"claim\":\"GB10의 CPU는 20코어 Arm(Cortex-X925 10개 + Cortex-A725 10개). MediaTek이 공동 설계. GPU와는 NVLink-C2C로 연결(PCIe Gen5의 5배 대역폭이라고 NVIDIA가 주장). GB10 프로브 실측에서도 uname aarch64 · 20코어 확인.\",\"confidence\":\"high\",\"sources\":[{\"url\":\"https://www.nvidia.com/en-us/products/workstations/dgx-spark/\",\"title\":\"Personal AI Supercomputer Powered by Blackwell | NVIDIA DGX Spark\",\"date\"…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "점검:G1 GPU 감지·엔진·티어",
+      "phaseIndex": 2,
+      "phaseTitle": "점검",
+      "agentId": "a8ef18f7e88b882b1",
+      "model": "claude-fable-5-1",
+      "state": "done",
+      "startedAt": 1788315424242,
+      "queuedAt": 1788315422573,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "[전제] GB10 = DGX Spark(ARM64 Linux·통합메모리 121GiB)를 RT…",
+      "promptPreview": "[제품] GIJO AS — 한국형 온프렘 AI 보안관리 플랫폼. Electron 클라이언트(client/) + Node/TS 서버(server/) + 로컬 LLM(llama.cpp llama-server 프로세스 풀). 저장소 D:/Connect AI. **읽기 전용** — 파일 수정 금지. 이 머신에는 node_modules가 있어 읽기 검증에 더해 실행 검증(npm test·node 스크립트)도 가능하다 — 단 운영 서버(4000)·CDP(9223)·로그인 세션은 건드리지 않는다. 오늘 2026-09-01. 클라 5.14.0.\n[지금 운영 환경] Windows PC(RTX 3090 24GB)의 WSL2 Ubuntu에서 systemd 서비스(gijo-as.service, /home/gijo/gijo-as/…",
+      "lastProgressAt": 1788315916312,
+      "tokens": 153786,
+      "toolCalls": 25,
+      "durationMs": 487613,
+      "resultPreview": "{\"findings\":[{\"id\":\"G1-01\",\"title\":\"통합메모리 여유 판정이 스왑을 보지 않는다 — 「모자라면 llama가 실패」 가정이 GB10에선 「기계가 멈춤」\",\"area\":\"GPU감지·엔진\",\"severity\":\"P1\",\"impact\":\"GB10은 지금 이미 스왑 15GB 중 7GB를 쓰고 있다(모델 3개 상주). makeRoomFor는 MemAvailable(26GB)만 보고 「자리 있다」고 판단해 새 모델을 더 올릴 수 있고, 더 내릴 모델이 없으면 그냥 스폰한다. 통합메모리에서는 GPU OOM이 깨끗한 오류가 아니라 SSH도 안 되는 시스템 전체 정지로 나타나므로(조사 사실), 그 순간 4000 서버·DB·임베딩이 한꺼번에 죽고 하드 리부트가 필요하다. 스왑에 밀린 상태는 이미 성능…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "점검:G2 빌드·배포·네이티브·운영 도구",
+      "phaseIndex": 2,
+      "phaseTitle": "점검",
+      "agentId": "a31590481fd640a9e",
+      "model": "claude-fable-5-1",
+      "state": "done",
+      "startedAt": 1788315424133,
+      "queuedAt": 1788315422573,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "■ 검토 전제: GB10=DGX Spark(ARM64 Linux, 통합메모리 121GiB)…",
+      "promptPreview": "[제품] GIJO AS — 한국형 온프렘 AI 보안관리 플랫폼. Electron 클라이언트(client/) + Node/TS 서버(server/) + 로컬 LLM(llama.cpp llama-server 프로세스 풀). 저장소 D:/Connect AI. **읽기 전용** — 파일 수정 금지. 이 머신에는 node_modules가 있어 읽기 검증에 더해 실행 검증(npm test·node 스크립트)도 가능하다 — 단 운영 서버(4000)·CDP(9223)·로그인 세션은 건드리지 않는다. 오늘 2026-09-01. 클라 5.14.0.\n[지금 운영 환경] Windows PC(RTX 3090 24GB)의 WSL2 Ubuntu에서 systemd 서비스(gijo-as.service, /home/gijo/gijo-as/…",
+      "lastProgressAt": 1788316111262,
+      "tokens": 209533,
+      "toolCalls": 50,
+      "durationMs": 687127,
+      "resultPreview": "{\"findings\":[{\"id\":\"G2-01\",\"title\":\"GB10에 배포 도구·절차가 없다 — deploy.sh는 WSL 경로·systemd 전제, deploy-prod.ps1은 WSL 전용, 슬래시 명령은 win/max 갈래만\",\"area\":\"문서·운영도구\",\"severity\":\"P1\",\"impact\":\"GB10에서 코드 반영은 `git push gb10 main`(updateInstead)으로 작업트리만 바뀌고, tsc·copy-assets·scripts/·requirements 동기화·재시작·「PID가 실제로 바뀌었나」 검증은 전부 사람 손이다. deploy.sh를 DST만 바꿔 돌리면 `pkill` 뒤에 되살릴 systemd가 없어 서버가 그대로 죽고(G2-02), src/*.ts만 옮기므로 …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "점검:G3 성능·용량·모델 계획",
+      "phaseIndex": 2,
+      "phaseTitle": "점검",
+      "agentId": "a433acb21ef127227",
+      "model": "claude-fable-5-1",
+      "state": "done",
+      "startedAt": 1788315424474,
+      "queuedAt": 1788315422573,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "■ 출발점(프로브 2026-09-02 실측): MemTotal 127,535,300kB = …",
+      "promptPreview": "[제품] GIJO AS — 한국형 온프렘 AI 보안관리 플랫폼. Electron 클라이언트(client/) + Node/TS 서버(server/) + 로컬 LLM(llama.cpp llama-server 프로세스 풀). 저장소 D:/Connect AI. **읽기 전용** — 파일 수정 금지. 이 머신에는 node_modules가 있어 읽기 검증에 더해 실행 검증(npm test·node 스크립트)도 가능하다 — 단 운영 서버(4000)·CDP(9223)·로그인 세션은 건드리지 않는다. 오늘 2026-09-01. 클라 5.14.0.\n[지금 운영 환경] Windows PC(RTX 3090 24GB)의 WSL2 Ubuntu에서 systemd 서비스(gijo-as.service, /home/gijo/gijo-as/…",
+      "lastProgressAt": 1788316007917,
+      "tokens": 133227,
+      "toolCalls": 23,
+      "durationMs": 583442,
+      "resultPreview": "{\"memory_model\":\"■ 출발점(프로브 2026-09-02 실측): MemTotal 127,535,300kB = **121.6GiB**(os.totalmem이 보는 값 · localengine.ts:463). 이 기계에는 GPU 전용 VRAM이 없으므로 「LLM 가용량」= 통합메모리에서 LLM이 아닌 것을 뺀 나머지다.\\n\\n■ 산정식(GIJO_AS_VRAM_티어_구동_가이드라인.md:63~69 그대로): 모델 1개 점유 ≈ GGUF 파일 + KV캐시(ctx) + 런타임 1~2GB. KV캐시(f16)/토큰 = 2 × 층수 × KV헤드수 × 헤드차원 × 2바이트. 검산: qwen3-14b CUDA 실측(GIJO_AS_모델_메모리_실측_2026-08-10.md:19) 파일 8.38 → @32K 13.2…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "검증:G1",
+      "phaseIndex": 3,
+      "phaseTitle": "검증",
+      "agentId": "a5144ad4dfe678fc5",
+      "model": "claude-fable-5-1",
+      "state": "done",
+      "startedAt": 1788315919783,
+      "queuedAt": 1788315918181,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "[제품] GIJO AS — 한국형 온프렘 AI 보안관리 플랫폼. Electron 클라이언트(client/) + Node/TS 서버(server/) + 로컬 LLM(llama.cpp llama-server 프로세스 풀). 저장소 D:/Connect AI. **읽기 전용** — 파일 수정 금지. 이 머신에는 node_modules가 있어 읽기 검증에 더해 실행 검증(npm test·node 스크립트)도 가능하다 — 단 운영 서버(4000)·CDP(9223)·로그인 세션은 건드리지 않는다. 오늘 2026-09-01. 클라 5.14.0.\n[지금 운영 환경] Windows PC(RTX 3090 24GB)의 WSL2 Ubuntu에서 systemd 서비스(gijo-as.service, /home/gijo/gijo-as/…",
+      "lastProgressAt": 1788316167670,
+      "tokens": 124840,
+      "toolCalls": 13,
+      "durationMs": 247886,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"G1-01\",\"refuted\":false,\"reason\":\"인용 전부 실물과 일치 — localengine.ts:537 getFreeVramMb→419행 unified 갈래는 unifiedmem.ts:101~105의 MemAvailable만 돌려주고, 551행은 축출 후보가 없으면 스폰을 강행하며, GpuUsage(432~438)에 스왑 필드가 없다. 프로브 13행 스왑 7/15GB·facts「스왑과 OOM」과 맞는 지적이다. 단 GB10 풀에는 8080 한 모델만 있어(8090·8082는 pool 밖) LRU 축출이 실제로 내릴 것은 거의 없다 — 그래서 「스폰 중단」 갈래(②)가 핵심이다.\",\"severity\":\"P1\",\"evidence_ok\":true,\"fact_ok…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "검증:G3",
+      "phaseIndex": 3,
+      "phaseTitle": "검증",
+      "agentId": "a19c9614d17fdbb3b",
+      "model": "claude-fable-5-1",
+      "state": "done",
+      "startedAt": 1788316011345,
+      "queuedAt": 1788316009695,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "[제품] GIJO AS — 한국형 온프렘 AI 보안관리 플랫폼. Electron 클라이언트(client/) + Node/TS 서버(server/) + 로컬 LLM(llama.cpp llama-server 프로세스 풀). 저장소 D:/Connect AI. **읽기 전용** — 파일 수정 금지. 이 머신에는 node_modules가 있어 읽기 검증에 더해 실행 검증(npm test·node 스크립트)도 가능하다 — 단 운영 서버(4000)·CDP(9223)·로그인 세션은 건드리지 않는다. 오늘 2026-09-01. 클라 5.14.0.\n[지금 운영 환경] Windows PC(RTX 3090 24GB)의 WSL2 Ubuntu에서 systemd 서비스(gijo-as.service, /home/gijo/gijo-as/…",
+      "lastProgressAt": 1788316272932,
+      "tokens": 118145,
+      "toolCalls": 10,
+      "durationMs": 261586,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"G3-01\",\"refuted\":false,\"reason\":\"인용 전부 실제와 일치(localengine.ts:419 unified 갈래→unifiedAvailableMb, :549~551 「그냥 시도」, unifiedmem.ts:102 MemAvailable만 읽음, :197 여유계수). unifiedmem.ts·localengine.ts 어디에도 SwapTotal/SwapFree를 읽는 코드가 없음을 grep으로 확인(「swap」은 축출 이벤트 이름뿐). 스왑·OOM 사실은 facts §3(PyTorch #174358·포럼 2026-03-08·Denneman)과 프로브 :13(스왑 15/7)에 있어 fact_ok. 단 여유계수 5%는 tierFits(권장 판정)에만 걸리…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "검증:G2",
+      "phaseIndex": 3,
+      "phaseTitle": "검증",
+      "agentId": "acd0fa83849759a21",
+      "model": "claude-fable-5-1",
+      "state": "error",
+      "startedAt": 1788316114852,
+      "queuedAt": 1788316113112,
+      "attempt": 1,
+      "lastToolName": "Bash",
+      "lastToolSummary": "cd \"D:/orca/AS-Private/gijo-as\" && echo \"=== report renderP…",
+      "promptPreview": "[제품] GIJO AS — 한국형 온프렘 AI 보안관리 플랫폼. Electron 클라이언트(client/) + Node/TS 서버(server/) + 로컬 LLM(llama.cpp llama-server 프로세스 풀). 저장소 D:/Connect AI. **읽기 전용** — 파일 수정 금지. 이 머신에는 node_modules가 있어 읽기 검증에 더해 실행 검증(npm test·node 스크립트)도 가능하다 — 단 운영 서버(4000)·CDP(9223)·로그인 세션은 건드리지 않는다. 오늘 2026-09-01. 클라 5.14.0.\n[지금 운영 환경] Windows PC(RTX 3090 24GB)의 WSL2 Ubuntu에서 systemd 서비스(gijo-as.service, /home/gijo/gijo-as/…",
+      "lastProgressAt": 1788316238503,
+      "error": "You've hit your session limit · resets 3:30pm (Asia/Seoul)",
+      "tokens": 116688,
+      "toolCalls": 10,
+      "durationMs": 123650
+    },
+    {
+      "type": "workflow_agent",
+      "index": 8,
+      "label": "GB10 변경안 종합",
+      "phaseIndex": 4,
+      "phaseTitle": "종합",
+      "agentId": "ab15505b5d554e80d",
+      "model": "claude-fable-5-1",
+      "state": "error",
+      "startedAt": 1788316291351,
+      "queuedAt": 1788316282018,
+      "attempt": 1,
+      "promptPreview": "[제품] GIJO AS — 한국형 온프렘 AI 보안관리 플랫폼. Electron 클라이언트(client/) + Node/TS 서버(server/) + 로컬 LLM(llama.cpp llama-server 프로세스 풀). 저장소 D:/Connect AI. **읽기 전용** — 파일 수정 금지. 이 머신에는 node_modules가 있어 읽기 검증에 더해 실행 검증(npm test·node 스크립트)도 가능하다 — 단 운영 서버(4000)·CDP(9223)·로그인 세션은 건드리지 않는다. 오늘 2026-09-01. 클라 5.14.0.\n[지금 운영 환경] Windows PC(RTX 3090 24GB)의 WSL2 Ubuntu에서 systemd 서비스(gijo-as.service, /home/gijo/gijo-as/…",
+      "lastProgressAt": 1788316292459,
+      "error": "You've hit your session limit · resets 3:30pm (Asia/Seoul)",
+      "tokens": 0,
+      "toolCalls": 0,
+      "durationMs": 1107
+    }
+  ],
+  "totalTokens": 994025,
+  "totalToolCalls": 224
+}
