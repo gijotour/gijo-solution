@@ -104,6 +104,27 @@
   @keyframes rrflashred{0%{box-shadow:0 0 0 0 rgba(226,72,61,.55);}100%{box-shadow:0 0 0 8px rgba(226,72,61,0);}}
   #gijoRail .rr-item.training{border-color:rgba(139,124,240,.65);color:var(--purple,#8b7cf0);animation:rrtrain 1.5s ease-in-out infinite;}
   @keyframes rrtrain{0%,100%{box-shadow:0 0 0 0 rgba(139,124,240,.4);}50%{box-shadow:0 0 0 5px rgba(139,124,240,0);}}
+  /* ══ 상단바 정리 — 숨김(2026-09-02 사장님 지시 「삭제하자 … 지우지는 말고 숨겨줘」) ══
+     ⚠ **지우지 않고 숨긴다.** 지우면 걸리는 것이 많아서다 —
+       · 게시 관문(tools/publish-gate-ui.mjs:759)이 「#gijoRail .rr-item이 10개」를 센다.
+         숨김(display:none)은 DOM에 그대로 남으므로 관문이 계속 통과한다.
+       · wiringcontract 시험이 railroster.js 로드와 팀6+부품4 구성을 못박는다.
+       · railWork의 .gn-sessbadge는 nav.js가 「진행중 작업」 수를 써 넣는 자리다.
+     되살리려면 이 블록만 지우면 된다 — 코드는 한 줄도 안 없앴다.
+
+     ⚠ 숨김의 대가(정직하게): railWork을 숨기면 프로에서 **「진행중 작업」 수가 보이는 자리가 없다.**
+       배지 갱신 코드는 살아 있으나 사람 눈에 안 띈다. 2026-08-01에 「기한 지난 업무 6건이 어디에도
+       안 보이던」 사고가 있었으므로, 그 수를 어디서 보일지는 따로 정해야 한다(작업 내역 화면은
+       ☰ 전체 메뉴로 그대로 갈 수 있다). */
+  /* 🤖 AI 팀 로스터(팀6 🧭◣◎▣🛰📚 + 부품4 E·R·G·L) — 도는 것을 깜박임으로 보이려던 자리.
+     아이콘·약자만 있어 무엇인지 읽히지 않았다(이름 없는 조작). */
+  #gijoRail .rr-item,#gijoRail .rr-div{display:none!important;}
+  /* 🕘 작업 내역 — ☰ 전체 메뉴로도 갈 수 있어 상단바 자리를 따로 쓰지 않는다. */
+  #railWork{display:none!important;}
+  /* 🔍 화면 찾기 — 프로에서만 숨긴다. ☰(railMenu)이 **같은 겹판**을 열어 둘이 겹쳤다.
+     ⚠ 표준 셸에는 ☰가 없다 — 거기서는 이것이 유일한 찾기 단추라 그대로 둔다. */
+  body.pro-shell #gtbFind{display:none!important;}
+
   .rr-div{width:26px;height:1px;background:var(--border-strong);margin:7px 0;flex:0 0 auto;}
   body.pro-shell #gijoRail{display:flex;}
   #gijoRail button{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid transparent;

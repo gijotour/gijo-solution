@@ -917,9 +917,15 @@
       acts.appendChild(topSideBtn);
     }
 
-    acts.appendChild(아이콘단추("화면 찾기 (Ctrl+K)", '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>', function () {
+    // 🔍 화면 찾기 — **표준 셸에서는 이것이 유일한 찾기 단추다**(프로의 ☰는 프로 전용).
+    //   프로에서는 ☰(railMenu)이 같은 겹판을 열어 둘이 겹치므로 CSS로 숨긴다(app.html).
+    //   ⚠ 그래서 여기서 지우지 않는다 — 지우면 표준이 Ctrl+K 말고 찾을 길을 잃는다.
+    //   숨기려면 가리킬 자리가 필요해서 id를 붙였다(2026-09-02 사장님 「🔍를 없애고 ☰만 남긴다」).
+    var 찾기단추 = 아이콘단추("화면 찾기 (Ctrl+K)", '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>', function () {
       window.gijoOpenFinder();
-    }));
+    });
+    찾기단추.id = "gtbFind";
+    acts.appendChild(찾기단추);
 
     var vr = document.createElement("div"); vr.className = "gtb-vr"; acts.appendChild(vr);
     topBackBtn = 아이콘단추("뒤로 (Alt+←)", '<path d="M19 12H5M11 6l-6 6 6 6"/>', function () { 이력이동(-1); });
