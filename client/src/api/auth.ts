@@ -10,6 +10,13 @@ import { getServerUrl, setAuthTokens, getRefreshToken } from "./core";
 export interface LoginResult {
   ok: boolean;
   code?: "already_logged_in" | "invalid_credentials" | "locked" | "error" | "mfa_required";
+  /**
+   * 중복 로그인일 때 **이미 붙어 있는 자리**(2026-09-02 F2-07 승인 시안).
+   * 예전엔 「이미 다른 곳에서 로그인 중입니다」만 있어서, 담당자는 그것이 **자기가 아까 쓰던
+   * 자리인지 남인지** 알 수 없었다 — 보안 제품에서 그 구분이 「밀고 들어갈까」의 근거다.
+   * ⚠ 서버가 새로 세는 값이 아니다. 세션 기록에 이미 있던 것을 실어 보낼 뿐이다.
+   */
+  기존접속?: { ip: string | null; since: number | null; lastSeenAt: number | null };
   message?: string;
   user?: { id: string; displayName: string; role: string };
   // 2차 인증이 켜진 계정 — 이 값을 들고 loginMfa()로 6자리(또는 복구 코드)를 보낸다.
@@ -42,6 +49,7 @@ interface LoginBody {
 
 function loginFailure(status: number, data: LoginBody): LoginResult {
   const code =
+    // ⚠ 아래 코드 판정은 그대로 두고, 본문의 기존접속만 그대로 넘긴다(모양이 다르면 화면이 안 그린다).
     status === 409 && data.error === "already_logged_in" ? "already_logged_in"
     : status === 429 ? "locked"
     : "invalid_credentials";

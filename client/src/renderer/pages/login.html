@@ -99,6 +99,17 @@
      처음 보는 담당자에게 6개가 한 덩어리로 읽혔다 — 고르라고 해 놓고 **무엇을 두 번 고르는지**
      안 알려 준 셈이다. 테두리+배경으로 감싸면 여백만 두는 것보다 묶음 신호가 강하다(NN/g 공통 영역).
      ⚠ 새 부품을 만들지 않는다 — gijo-ui.css의 .g-nested(103행)·.g-section-label(148행)을 그대로 쓴다. */
+  /* 연결 확인(2026-09-02 F2-03) — 얇은 한 줄. 새 색을 만들지 않는다(기존 토큰만). */
+  .srv-check { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
+  .srv-btn { font: inherit; font-size: 11.5px; font-weight: 700; padding: 4px 10px;
+    border-radius: var(--g-r-pill); border: 1px solid var(--g-border-strong);
+    background: transparent; color: var(--g-muted); cursor: pointer; flex: 0 0 auto; }
+  .srv-btn:hover { color: var(--g-text); border-color: var(--g-blue); }
+  .srv-btn[disabled] { opacity: .55; cursor: default; }
+  .srv-state { font-size: 11.5px; font-weight: 700; color: var(--g-muted-2); min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srv-state.ok { color: var(--g-teal); }
+  .srv-state.bad { color: #ff8080; }   /* 오류 글자는 로그인 화면의 기존 값과 같은 것을 쓴다(대비 6.86:1) */
   .mp-group + .mp-group { margin-top: var(--g-s4); }
   .mp-glabel { font-size: 11px; font-weight: 800; color: var(--g-muted-2); letter-spacing: .4px; margin-bottom: 8px; }
 
@@ -206,6 +217,7 @@
   .dup-d { margin-top: 5px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
   .dup-a { display: flex; gap: 8px; margin-top: 10px; }
   .dup-ok, .dup-no { font-size: 12px; font-weight: 700; border-radius: 8px; padding: 7px 13px; cursor: pointer; }
+  .dup-w { font-size: 11.75px; font-weight: 700; color: var(--g-amber); margin: 2px 0 6px; }
   .dup-ok { background: var(--g-amber); color: #21160a; border: 0; }
   .dup-no { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,.16); }
   .dup-no:hover { color: #fff; }
@@ -399,7 +411,17 @@
       <!-- ⚠ 예전엔 「/ aria-label=」처럼 슬래시가 속성 사이에 끼어 있었다(2026-09-02 정리).
            HTML 파서가 홀로 선 「/」를 무시해 동작에는 영향이 없었지만, 읽는 사람이 오타를
            따라 쓰게 되고 검사 도구가 걸고 넘어진다. -->
-      <input id="serverUrl" placeholder="서버 주소 (이 PC에 동봉된 서버면 비워 두세요)" aria-label="서버 주소" />
+      <!-- ⚠ 2026-09-02(F2-01·F8-02 승인 시안): 안내가 **자기 자신과 모순**이었다.
+           「동봉된 서버면 비워 두세요」라고 적어 놓고, 앱은 뜰 때마다 이 칸을 **자동으로 채운다**
+           (main이 auth:getState로 주소를 넣어 준다) — **비어 있는 일이 없다.**
+           지킬 수 없는 안내라 지웠다. 대신 아래에 **확인 단추**를 둔다: 이 주소가 진짜 GIJO 서버인지
+           로그인 **전에** 알 수 있어야 한다(틀린 주소로 아이디·비밀번호를 넣어 보는 일이 없게).
+           ⚠ 새 장치를 만들지 않았다 — 설정 화면이 이미 쓰는 연결 확인을 그대로 쓴다. -->
+      <input id="serverUrl" placeholder="서버 주소" aria-label="서버 주소" />
+      <div class="srv-check">
+        <button type="button" id="srvCheck" class="srv-btn">연결 확인</button>
+        <span id="srvState" class="srv-state" aria-live="polite"></span>
+      </div>
     </div>
 
     <label for="username">아이디</label>
@@ -427,6 +449,10 @@
          못 하던 진짜 이유였다. 화면 안에서 물으면 앱과 어울리고 검사도 통과한다. -->
     <div class="dup" id="dupBox" style="display:none">
       <div class="dup-t">이미 다른 곳에서 로그인 중입니다</div>
+      <!-- ⚠ 2026-09-02(F2-07): **어디서·언제**를 적는다. 예전엔 「이미 다른 곳」만 있어서
+           자기가 아까 쓰던 자리인지 남인지 알 수 없었다 — 그 구분이 「밀고 들어갈까」의 근거다.
+           값이 없으면 이 줄을 안 그린다(빈칸을 지어내지 않는다). -->
+      <div class="dup-w" id="dupWhere" style="display:none"></div>
       <div class="dup-d">강제로 로그인하면 그 세션은 로그아웃됩니다. 계속할까요?</div>
       <div class="dup-a">
         <button id="dupForce" class="dup-ok">강제 로그인</button>
@@ -557,6 +583,67 @@
     loadRecent();
 
     const dupBox = document.getElementById("dupBox");
+
+    // ── 연결 확인(2026-09-02 F2-03 승인 시안) ─────────────────────────────
+    //   왜: 로그인 화면에는 이 주소가 **진짜 GIJO 서버인지 알 길이 없었다.** 틀린 주소면
+    //   아이디·비밀번호를 넣어 본 뒤에야 「연결 실패」로 알게 된다 — 그 전에 알 수 있어야 한다.
+    //   ⚠ 새 장치를 만들지 않는다 — 설정 화면이 이미 쓰는 연결 확인(checkServerHealth)을 그대로 쓴다.
+    //   ⚠ 자동으로 부르지 않는다 — 화면이 뜰 때마다 서버를 두드리면 꺼져 있는 서버에
+    //     쓸데없이 붙고, 담당자는 누른 적 없는 오류를 본다. **누를 때만** 확인한다.
+    const srvBtn = document.getElementById("srvCheck");
+    const srvState = document.getElementById("srvState");
+    function 상태쓰기(글, 종류) {
+      if (!srvState) return;
+      srvState.textContent = 글 || "";
+      srvState.className = "srv-state" + (종류 ? " " + 종류 : "");
+    }
+    if (srvBtn) {
+      srvBtn.addEventListener("click", async () => {
+        const 주소 = (serverInput.value || "").trim();
+        if (!주소) { 상태쓰기("주소를 먼저 넣어 주세요", "bad"); return; }
+        srvBtn.disabled = true;
+        상태쓰기("확인 중…", "");
+        try {
+          // 주소 칸의 값으로 확인해야 한다 — 지금 저장된 주소가 아니라 **담당자가 넣은 그 주소**다.
+          if (window.gijo && window.gijo.setServerUrl) await window.gijo.setServerUrl(주소);
+          const r = await window.gijo.checkServerHealth();
+          // ⚠ 붙었다고 다 GIJO는 아니다 — 아무 웹서버나 200을 준다. 응답 모양까지 본다.
+          if (r && (r.ok === true || r.status === "ok" || r.name || r.version)) {
+            상태쓰기("GIJO 서버 확인됨", "ok");
+          } else {
+            상태쓰기("응답은 왔지만 GIJO 서버가 아닙니다 — 주소를 확인해 주세요", "bad");
+          }
+        } catch (e) {
+          // 사유를 그대로 보여 준다(「오류」 한 마디로 뭉개면 담당자가 고칠 수가 없다).
+          상태쓰기("응답이 없습니다 — " + ((e && e.message) || "연결 실패"), "bad");
+        } finally {
+          srvBtn.disabled = false;
+        }
+      });
+      // 주소를 고치면 이전 확인 결과를 지운다 — 옛 결과가 새 주소를 보증하면 안 된다.
+      serverInput.addEventListener("input", () => 상태쓰기("", ""));
+    }
+
+    // ── 중복 로그인: 어디서·언제(2026-09-02 F2-07) ────────────────────────
+    const dupWhere = document.getElementById("dupWhere");
+    function 상대시각(ms) {
+      if (!ms) return "";
+      const 초 = Math.max(0, Math.round((Date.now() - ms) / 1000));
+      if (초 < 60) return "방금";
+      if (초 < 3600) return Math.floor(초 / 60) + "분 전";
+      if (초 < 86400) return Math.floor(초 / 3600) + "시간 전";
+      return Math.floor(초 / 86400) + "일 전";
+    }
+    function 중복표시(정보) {
+      if (!dupWhere) return;
+      // ⚠ 값이 없으면 **줄을 안 그린다.** 빈칸이나 「알 수 없음」을 지어내지 않는다.
+      const 조각 = [];
+      if (정보 && 정보.ip) 조각.push("접속 위치 " + 정보.ip);
+      if (정보 && 정보.since) 조각.push("시작 " + 상대시각(정보.since));
+      if (정보 && 정보.lastSeenAt) 조각.push("마지막 활동 " + 상대시각(정보.lastSeenAt));
+      dupWhere.textContent = 조각.join(" · ");
+      dupWhere.style.display = 조각.length ? "block" : "none";
+    }
     document.getElementById("dupForce").addEventListener("click", () => { dupBox.style.display = "none"; doLogin(true); });
     document.getElementById("dupCancel").addEventListener("click", () => { dupBox.style.display = "none"; });
 
@@ -653,6 +740,7 @@
         if (r.code === "already_logged_in") {
           // 코드를 넣는 동안 다른 곳에서 로그인됐다 — 처음부터 강제 로그인으로 다시 한다.
           setMfaStep(false);
+          중복표시(r.기존접속);
           dupBox.style.display = "block";
           return;
         }
@@ -717,6 +805,7 @@
           //   통째로 멈춘다. 사람이 직접 누르기 전까지 아무것도 못 하고, 자동화는 닫지도
           //   못한다(2026-07-29 실측: Playwright가 "No dialog is showing"으로 실패).
           //   화면 안에서 물으면 앱과 어울리고 검사도 통과한다.
+          중복표시(result.기존접속);
           dupBox.style.display = "block";
           btn.disabled = false;
           btn.textContent = "로그인";

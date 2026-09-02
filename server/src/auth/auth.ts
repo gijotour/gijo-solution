@@ -304,8 +304,25 @@ export function registerAuthRoutes(app: Express): void {
       return;
     }
     // 중복로그인 방지: 이미 다른 곳에서 로그인 중이면 강제 확인 없이는 새 세션을 내주지 않는다.
-    if (findActiveSession(user.id) && !force) {
-      res.status(409).json({ error: "already_logged_in", message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?" });
+    // ⚠ findActiveSession은 **토큰 문자열**을 돌려준다(기록이 아니다) — 기록은 한 번 더 꺼낸다.
+    //   처음에 이 반환값을 기록으로 착각했다가 적용 전에 잡았다(이 저장소의 「필드명 오인」 부류).
+    const 살아있는토큰 = findActiveSession(user.id);
+    const 살아있는세션 = 살아있는토큰 ? refreshTokens.get(살아있는토큰) : undefined;
+    if (살아있는세션 && !force) {
+      // ⚠ 2026-09-02(F2-07 승인 시안): **어디서·언제**를 함께 준다. 예전엔 「이미 다른 곳에서
+      //   로그인 중입니다」만 보내서, 담당자는 그것이 **자기가 아까 쓰던 자리인지 남인지** 알 수 없었다.
+      //   보안 제품에서 그 구분은 「강제로 밀고 들어갈까」를 정하는 근거다.
+      //   ⚠ **새 컬럼을 만들지 않았다** — 세션 기록이 이미 ip·since·lastSeenAt을 들고 있고,
+      //     팀 사무실 창이 같은 값을 이미 사람에게 보여 준다(같은 것을 두 번 세지 않는다).
+      res.status(409).json({
+        error: "already_logged_in",
+        message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?",
+        기존접속: {
+          ip: 살아있는세션.ip ?? null,
+          since: 살아있는세션.since ?? null,
+          lastSeenAt: 살아있는세션.lastSeenAt ?? null,
+        },
+      });
       return;
     }
     // ── 2차 인증 ─────────────────────────────────────────────────────────────
@@ -405,8 +422,25 @@ export function registerAuthRoutes(app: Express): void {
 
     // 비밀번호 단계와 코드 단계 사이에 다른 곳에서 로그인했을 수 있다 — 다시 확인한다.
     const force = payload.force === true;
-    if (findActiveSession(user.id) && !force) {
-      res.status(409).json({ error: "already_logged_in", message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?" });
+    // ⚠ findActiveSession은 **토큰 문자열**을 돌려준다(기록이 아니다) — 기록은 한 번 더 꺼낸다.
+    //   처음에 이 반환값을 기록으로 착각했다가 적용 전에 잡았다(이 저장소의 「필드명 오인」 부류).
+    const 살아있는토큰 = findActiveSession(user.id);
+    const 살아있는세션 = 살아있는토큰 ? refreshTokens.get(살아있는토큰) : undefined;
+    if (살아있는세션 && !force) {
+      // ⚠ 2026-09-02(F2-07 승인 시안): **어디서·언제**를 함께 준다. 예전엔 「이미 다른 곳에서
+      //   로그인 중입니다」만 보내서, 담당자는 그것이 **자기가 아까 쓰던 자리인지 남인지** 알 수 없었다.
+      //   보안 제품에서 그 구분은 「강제로 밀고 들어갈까」를 정하는 근거다.
+      //   ⚠ **새 컬럼을 만들지 않았다** — 세션 기록이 이미 ip·since·lastSeenAt을 들고 있고,
+      //     팀 사무실 창이 같은 값을 이미 사람에게 보여 준다(같은 것을 두 번 세지 않는다).
+      res.status(409).json({
+        error: "already_logged_in",
+        message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?",
+        기존접속: {
+          ip: 살아있는세션.ip ?? null,
+          since: 살아있는세션.since ?? null,
+          lastSeenAt: 살아있는세션.lastSeenAt ?? null,
+        },
+      });
       return;
     }
     const tokens = issueTokenPair(user.id, { ip: req.ip ?? undefined });

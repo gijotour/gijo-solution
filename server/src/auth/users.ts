@@ -49,6 +49,11 @@ interface UserRow {
 // ⚠ assets.owner가 자유 문자열이라 오타 한 글자면 매칭이 조용히 실패한다 —
 //   그래서 값은 화면에서 선택 목록으로만 고르게 하고(자유 입력 금지), 서버도 저장 전 다듬는다.
 try { db.exec("ALTER TABLE users ADD COLUMN team TEXT"); } catch { /* 이미 있으면 무시 */ }
+// ⚠ 2026-09-02(F8-04 승인 시안): 비밀번호를 **마지막으로 바꾼 시각**. 관리자가 만들어 준 임시
+//   비밀번호를 그대로 쓰고 있는 계정을 알아보는 근거다(NIST SP 800-63B — 관리자가 정한 임시
+//   비밀번호는 교체를 요구해야 한다). 값이 **없으면 「한 번도 안 바꿨다」**로 읽는다.
+//   ⚠ 강제로 막지 않는다 — 로그인 뒤 **건너뛸 수 있는 권유**로만 쓴다(막는 문은 범위가 훨씬 커진다).
+try { db.exec("ALTER TABLE users ADD COLUMN passwordChangedAt INTEGER"); } catch { /* 이미 있으면 무시 */ }
 
 const insertStmt = db.prepare(
   "INSERT INTO users (id, username, passwordHash, displayName, role, createdAt) VALUES (@id, @username, @passwordHash, @displayName, @role, @createdAt)"
