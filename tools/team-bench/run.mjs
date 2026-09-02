@@ -36,9 +36,15 @@ async function health() {
   try { const r = await fetch(`http://127.0.0.1:${PORT}/health`, { signal: AbortSignal.timeout(3000) }); return r.status === 200; } catch { return false; }
 }
 
+async function servedModel() {
+  try { const j = await (await fetch(`http://127.0.0.1:${PORT}/v1/models`, { signal: AbortSignal.timeout(3000) })).json(); return String(j.data?.[0]?.id ?? ""); } catch { return ""; }
+}
+
 async function startServer(m) {
   const file = m.path.replace(/^~\//, (process.env.HOME || "") + "/");
   if (!fs.existsSync(file)) return { ok: false, why: `파일 없음 ${file}` };
+  // ★ 포트가 이미 잡혀 있으면 **남의 모델을 재게 된다**(2026-09-03 실측: 「적재 0s」로 드러남). 절대 진행하지 않는다.
+  if (await health()) return { ok: false, why: `포트 ${PORT} 이미 사용 중(서빙 중: ${await servedModel() || "?"}) — 다른 --port를 쓰거나 그 서버를 내려라` };
   const a = ["-m", file, "-ngl", "-1", "--ctx-size", String(m.ctx || CTX), "--parallel", "1", "--port", String(PORT), "--jinja", ...(m.thinking ? ["--reasoning", "off", "--reasoning-budget", "0"] : []), ...(m.extra || [])];
   const logPath = path.join(OUT, `${m.id}.server.log`);
   const outFd = fs.openSync(logPath, "w");
@@ -46,7 +52,13 @@ async function startServer(m) {
   const t0 = Date.now();
   while (Date.now() - t0 < READY_MS) {
     if (child.exitCode !== null) return { ok: false, why: `서버 종료 code=${child.exitCode} (로그 ${logPath})`, child };
-    if (await health()) return { ok: true, child, loadMs: Date.now() - t0 };
+    if (await health()) {
+      // 뜬 서버가 **이 모델**인지 확인한다 — 파일 이름이 /v1/models의 id에 들어 있어야 한다.
+      const served = await servedModel();
+      const base = path.basename(file);
+      if (!served.includes(base)) return { ok: false, why: `서빙 모델 불일치: 기대 ${base} · 실제 ${served || "?"}`, child };
+      return { ok: true, child, loadMs: Date.now() - t0 };
+    }
     await sleep(2000);
   }
   return { ok: false, why: "준비 시간 초과", child };
