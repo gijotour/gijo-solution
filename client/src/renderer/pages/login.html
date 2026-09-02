@@ -315,7 +315,11 @@
     <label for="password">비밀번호</label>
     <input id="password" type="password" placeholder="비밀번호" autocomplete="current-password" />
 
-    <label class="savepw" id="savePwRow"><input type="checkbox" id="savePw" checked /> 이 PC에 로그인 정보 저장(서버·아이디·비밀번호)</label>
+    <!-- ⚠ 문구가 동작과 같아야 한다(F2-04). 이 체크는 **비밀번호에만** 걸린다 — 체크를 풀어도
+         서버·아이디는 「최근 로그인」에 남는다(main.ts creds:save는 savePw=false면 비밀번호만
+         비워 저장한다). 예전 문구는 「로그인 정보 저장(서버·아이디·비밀번호)」이라, 공용 PC에서
+         체크를 푼 담당자의 아이디가 다음 사람 화면에 그대로 보였다. 목록의 ✕로 지울 수 있다. -->
+    <label class="savepw" id="savePwRow"><input type="checkbox" id="savePw" checked /> 이 PC에 비밀번호도 저장(서버·아이디는 최근 목록에 남습니다)</label>
 
     <button id="loginBtn">로그인</button>
     <div class="err" id="errMsg"></div>
@@ -367,6 +371,14 @@
     const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
     serverInput.value = window.gijo.getServerUrl();
+
+    // 왜 로그인 화면으로 돌아왔는지 말한다(F8-06·F3-06). 예전엔 아무 말 없이 튕겨,
+    //   담당자는 자기가 뭘 잘못 눌렀는지 몰랐다. 사유 문장은 **서버가 만든 것**을
+    //   core.ts→메인이 그대로 실어 보낸다 — 여기서 새로 짓지 않는다.
+    (function () {
+      const 끊긴사유 = new URLSearchParams(location.search).get("reason");
+      if (끊긴사유) errMsg.textContent = 끊긴사유;
+    })();
 
     // 지금 적용된(설치된) 클라이언트 버전 표시.
     (async () => {
@@ -526,7 +538,21 @@
       btn.disabled = true;
       btn.textContent = "연결 중...";
       try {
-        if (serverInput.value.trim()) window.gijo.setServerUrl(serverInput.value.trim());
+        // 주소 형식이 틀리면 **여기서 멈춘다**(F2-02, 2026-09-02). 예전에는 스킴 없는
+        // 「10.8.0.1:4000」이 그대로 fetch로 가 터졌고, 아래 catch가 「아이디/비밀번호…」라고
+        // 엉뚱한 안내를 했다 — 담당자는 맞는 비밀번호를 계속 고쳐 넣었다.
+        if (serverInput.value.trim()) {
+          try {
+            window.gijo.setServerUrl(serverInput.value.trim());
+            // 고쳐진 주소(http:// 가 붙은 꼴)를 칸에 되비춘다 — 다음부터 바른 형식을 배운다.
+            serverInput.value = window.gijo.getServerUrl();
+          } catch (e) {
+            errMsg.textContent = (e && e.message) || "서버 주소 형식이 올바르지 않습니다 — 「http://」로 시작하는 주소를 넣어 주세요.";
+            resetBtn();
+            serverInput.focus();
+            return;
+          }
+        }
         const result = await window.gijo.login(userInput.value.trim(), passInput.value, force);
         if (result.ok) {
           await finishLogin();
@@ -551,8 +577,11 @@
           btn.textContent = "로그인";
           return;
         }
-        errMsg.textContent = result.code === "locked"
-          ? result.message
+        // 「서버에 못 닿음」과 「자격 틀림」을 가른다(F2-06, 2026-09-02). 예전에는 code:"error"
+        // (연결 실패·시간 초과)의 사유를 **버리고** 「아이디/비밀번호…」라고만 말해, 담당자가
+        // 맞는 비밀번호를 계속 고쳐 넣었다. 서버·연결이 보내 준 사유는 그대로 앞세운다.
+        errMsg.textContent = (result.code === "locked" || result.code === "error")
+          ? (result.message || "로그인 실패: 서버에 연결하지 못했습니다.")
           : "로그인 실패: 아이디/비밀번호 또는 서버 주소를 확인하세요.";
         btn.disabled = false;
         btn.textContent = "로그인";

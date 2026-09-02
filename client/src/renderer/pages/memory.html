@@ -1117,6 +1117,19 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("dsConvertBtn").addEventListener("click", convertDataset);
     document.getElementById("dsPickDocBtn").addEventListener("click", toggleDsPick);
     document.getElementById("dsSaveBtn").addEventListener("click", saveDataset);
+    // ⚠ 파인튜닝 시작은 **관리자만**이다(2026-09-01 여정 점검 F5-07). 서버 /api/finetune/start를
+    //   관리자 전용으로 막았으니 화면도 함께 잠근다 — 서버만 막으면 눌렀다가 오류를 보는 경험이 되고,
+    //   화면만 막으면 라우트로 샌다(hardening.html:379 원칙). 판정 원천은 window.gijo.me() 하나다.
+    //   데이터셋 만들기·저장까지는 담당자도 그대로 한다 — GPU를 쓰지 않는 준비 작업이다.
+    //   ⚠ 못 읽으면 **잠그는 쪽**으로 둔다.
+    let 학습관리자 = false;
+    try { 학습관리자 = (await window.gijo.me()).role === "admin"; } catch (e) { 학습관리자 = false; }
+    if (!학습관리자) {
+      const ftBtn = document.getElementById("ftStartBtn");
+      if (ftBtn) { ftBtn.disabled = true; ftBtn.title = "관리자만 파인튜닝을 시작할 수 있습니다"; }
+      const ftLine = document.getElementById("ftStatusLine");
+      if (ftLine) ftLine.textContent = "학습 시작은 관리자만 할 수 있습니다 — 학습 중에는 모두의 채팅·문서검색이 멈추기 때문입니다. 데이터셋 준비까지는 여기서 하시면 됩니다.";
+    }
     document.getElementById("ftStartBtn").addEventListener("click", startFinetune);
 
     if (window.gijoRealtime) window.gijoRealtime.connect();

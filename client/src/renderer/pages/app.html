@@ -174,8 +174,19 @@
     -webkit-app-region:drag;}
   .topbar .spacer{flex:1 1 auto;}
   /* 창을 끄는 손잡이는 이제 이 줄뿐이다 — 그 안의 누르는 것들만 되돌린다
-     (안 되돌리면 단추가 안 눌리고 창만 끌린다). */
-  .topbar button,.topbar .gtb-acts,.topbar .gtb-sess,.topbar input,.topbar select{-webkit-app-region:no-drag;}
+     (안 되돌리면 단추가 안 눌리고 창만 끌린다).
+     ⚠ .gtb-userarea를 2026-09-02(여정 점검 F3-03)에 더했다. 프로 셸에서 계정 줄(.ua-row →
+       내 설정)과 ⬆ 업데이트 칩(.ua-upd)은 **div라서** 위 목록에 안 걸렸고, 상단바 drag 영역
+       안에 그대로 놓여 **눌러도 클릭이 아니라 창 끌기로 먹혔다** — 담당자 눈에는 「눌러도
+       아무 일 없는 자리」였다. 붙이는 곳은 titlebar.js mountUserArea 세 번째 갈래(.rail-foot).
+     ⚠ -webkit-app-region은 **상속되는 속성이 아니다** — 자식의 계산값은 none으로 남는다.
+       Chromium/Electron은 drag 사각형을 합치고 no-drag 사각형을 **빼서** 손잡이 영역을
+       만든다. 그래서 바깥 상자 하나만 no-drag로 선언해도 그 안에 든 .ua-row·.ua-upd가
+       통째로 손잡이에서 빠진다 — 자식마다 선언할 필요가 없는 이유가 이것이다.
+       ⚠ 그러므로 「자식의 getComputedStyle(...).webkitAppRegion이 no-drag인가」로 검증하면
+         안 된다(none이 나와 거짓 빨간불이 된다). .gtb-userarea **자신의** 계산값과
+         실제 클릭 동작으로 잰다. */
+  .topbar button,.topbar .gtb-acts,.topbar .gtb-sess,.topbar .gtb-userarea,.topbar input,.topbar select{-webkit-app-region:no-drag;}
   /* 조작 단추(⚙ ▣ 🔍 ← →)는 titlebar.js가 여기 맨 앞에 붙인다 */
   .topbar .gtb-acts{padding-bottom:0;}
 
@@ -457,6 +468,14 @@
   var tabs = [];             // {page, label, el, frame, pinned}
   var active = null;
   var 외부맥락 = null; // 팝업 포커스 맥락 {page,label} — 「보고 있는 것이 맥락」(activeScreen이 우선 사용)
+  // 🗔 허브 무대 맥락 — 탭 주소별 {page,label} (F4-02, 2026-09-02).
+  //   허브(fix.html 등)는 탭 **하나**인데 그 안 무대는 판마다 다른 실화면(approvals.html…)이다.
+  //   셸이 탭 이름만 들고 있으면 ⓘ가 「허브 공통 안내」만 받아 승인·취약점 화면 전용 안내에는
+  //   영영 못 닿았다(screenguide.ts:400 공통문 vs 613 승인 전용문).
+  //   ⚠ 탭 주소를 열쇠로 둔다 — 다른 탭으로 옮기면 그 탭 것이 아니므로 저절로 안 쓰이게 된다.
+  //   ⚠ 탭 자체의 page는 **안 바꾼다**: 탭 저장·되짚기·nav.js TAB_REDIRECT가 그 값에 걸려 있다.
+  var 무대맥락 = {};
+  function 무대화면() { return active ? 무대맥락[active.page] : null; }
 
   function save() {
     // 🚀 프로는 저장하지 않는다(검토관 #1, 2026-08-19) — 도킹 경로가 표준 탭 저장(gijo:tabs:v1)을
@@ -805,6 +824,7 @@
     var idx = tabs.indexOf(t);
     t.frame.remove();
     tabs.splice(idx, 1);
+    delete 무대맥락[t.page]; // 닫은 탭의 무대 기억도 함께 버린다 — 같은 주소로 다시 열 때 옛 판이 맥락이 되면 안 된다(F4-02)
     if (active === t) {
       active = tabs[Math.min(idx, tabs.length - 1)] || null;
       if (active) active.frame.classList.add("on");
@@ -924,6 +944,12 @@
     // 외부(팝업) 맥락이 있으면 그것이 「보고 있는 화면」이다 — 콘솔 칩·지시 screen 인자의 원천.
     activeScreen: function () { return 외부맥락 ? 외부맥락.page : (active ? active.page : null); },
     activeLabel: function () { return 외부맥락 ? 외부맥락.label : (active ? active.label : null); },
+    // 🗔 허브 무대 화면 — **ⓘ 화면 안내 전용**이다(F4-02, 2026-09-02).
+    //   ⚠ activeScreen()을 갈아끼우지 않는다: 그 값은 「지금 어느 탭이냐」라는 **탭 정체성**이고
+    //     ① 절차 띠(console.js renderFlow가 서버 STAGE_SCREENS로 단계를 찾는다 — 허브 5개뿐이라
+    //        approvals.html이면 띠가 통째로 사라진다) ② 서버 stageOfScreen ③ tools/menu-sweep.mjs의
+    //        「누른 그 화면이 열렸나」 판정까지 함께 쓴다. 안내만 무대 화면을 보게 한다.
+    activeStage: function () { var st = 무대화면(); return st ? { page: st.page, label: st.label } : null; },
     foldConsole: function () { 대화접기(); },      // 💬 온디맨드(2026-08-31) — 대화창 머리 ⊮ 접기
     summonConsole: function () { 대화부르기(); },  // 손잡이·관문이 부른다
   };
@@ -995,6 +1021,25 @@
       //   파일명(쿼리 포함)이 그대로 떴다(2026-08-18 사장님 QA로 옛탭 표에서 한 번 고친 그 부류).
       //   open() 안에 이미 두 겹 폴백(화면이름찾기→읽을이름 「화면」)이 있으니 그 사슬에 맡긴다.
       open(page, d.label || known || undefined, { dock: true });
+      return;
+    }
+    // ①′ "허브 무대가 이 화면으로 바뀌었다"(F4-02, 2026-09-02).
+    //   허브가 판을 갈아 끼울 때마다 알려 온다 — 셸은 그 탭의 「지금 무대 화면」으로 기억만 하고,
+    //   탭 자체(page·label·저장값)는 건드리지 않는다.
+    //   ⚠ 값 재조립 — iframe이 보낸 문자열을 그대로 믿지 않는다(위 openTab과 **같은 잣대**).
+    //   ⚠ 어느 탭이 보냈는지 사슬을 걸어 찾는다: 안 보이는 탭의 허브도 살아 있어서, 그것을
+    //     활성 탭 것으로 도장 찍으면 안 보고 있는 화면이 지시 대상이 된다(활성탭안인가의 그 사고).
+    if (d.type === "gijo:hubStage") {
+      var 무대 = String(d.page || "");
+      if (!/^[\w.-]+\.html(\?[^\s"'<>`\\]*)?$/.test(무대)) return;
+      var 주인 = null;
+      for (var ti = 0; ti < tabs.length; ti++) {
+        if (tabs[ti].frame && 활성탭안인가(ev.source, tabs[ti].frame)) { 주인 = tabs[ti]; break; }
+      }
+      if (!주인) return;
+      무대맥락[주인.page] = { page: 무대, label: String(d.label || "").slice(0, 60) || null };
+      // 보고 있는 탭이면 대화창 맥락(ⓘ·지시의 screen 인자)에 곧바로 반영한다.
+      if (주인 === active && window.gijoConsoleSyncCtx) window.gijoConsoleSyncCtx();
       return;
     }
     // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.

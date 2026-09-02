@@ -52,6 +52,17 @@
     return d.getFullYear() === new Date().getFullYear() ? mmdd : String(d.getFullYear() % 100).padStart(2, "0") + "-" + mmdd;
   };
 
+  // 「오늘」 판정은 **로컬(KST) 날짜**로, 그리고 **여기 한 곳**에서만 만든다(F4-10, 2026-09-02).
+  //   toISOString()은 UTC라 한국에서는 오전 9시 전까지 「어제」로 계산돼, 서버(util/date.ts
+  //   todayLocal)와 하루가 어긋난다. 판마다 따로 적어 두면 한 곳만 고쳐져 다시 갈린다 —
+  //   실제로 정기 점검 판은 2026-08-20에 고쳤는데 지식 판은 UTC인 채로 남아 있었다.
+  //   인자를 주면 그 시각(밀리초 숫자·ISO 문자열 모두)의 로컬 날짜를, 안 주면 오늘을 준다.
+  var 오늘날짜 = function (t) {
+    var d = t == null ? new Date() : new Date(t);
+    if (isNaN(d)) return "";
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  };
+
   // 스캔 오류는 취약점이 아니다(서버 isRealVulnerability와 같은 잣대) — 세는 자리마다 지킨다.
   // ⚠ 서버 목록과 **같아야** 한다 — `scan_not_supported`가 빠져 있어 서버(handlers.ts:198)와
   //   취약점 수가 갈렸다(2026-08-20 설계관 적발). info는 severity 쪽 잣대라 함께 둔다.
@@ -166,8 +177,9 @@
       //   두 자리에 남겨 두면 담당자가 「어디서 고르는 게 맞나」를 매번 고민한다 —
       //   이 저장소가 「같은 일 하는 자리가 둘이면 조작 개념만 늘어난다」로 이미 정리한 것이다.
       //   자산 관리(등록·수정·CSV)는 inventory.html 그대로다 — ⓪ 화면의 「전체 관리 열기」로 간다.
-      // ⚠ 「📊 보안 태세」(posture)는 **손대지 않았다.** 시안이 그것도 뺄지 물었지만
-      //   사장님 확인이 필요한 자리라 남긴다 — 승인 없이 화면을 지우지 않는다.
+      // (「📊 보안 태세」는 2026-08-18에는 사장님 확인 전이라 일부러 남겨 뒀다가, 2026-08-19 승인으로
+      //  뺐다 — 위 83행 주석이 그 결말이다. 「손대지 않았다」고 적힌 옛 주석은 83행과 정면으로
+      //  모순이라 지웠다(F4-01, 2026-09-02). 주석이 코드와 다른 말을 하면 다음 사람이 그 말을 믿는다.)
     ],
 
     // ② 우선순위
@@ -347,10 +359,9 @@
         load: function () {
         return window.gijo.listMaintenance().then(function (r) {
           var list = (r && r.items) || r || [];
-          // ⚠ **로컬 날짜**로 잡는다(2026-08-20 병렬 검토). toISOString은 UTC라 한국에서는
-          //   오전 9시 전까지 「어제」로 계산돼, 서버(util/date.ts todayLocal)와 하루가 어긋난다.
-          var d = new Date();
-          var 오늘 = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+          // ⚠ **로컬 날짜**로 잡는다(2026-08-20 병렬 검토) — 이유는 위 오늘날짜() 주석에 한 번만 적는다.
+          //   같은 셈을 판마다 베껴 두면 한 곳만 고쳐진다(F4-10, 2026-09-02에 실제로 그랬다).
+          var 오늘 = 오늘날짜();
           var 지연인가 = function (m) { return String(m.scheduleDate || "") !== "" && String(m.scheduleDate) < 오늘 && m.status !== "approved"; };
           var 기한초과 = list.filter(지연인가).length;
           var 완료 = list.filter(function (m) { return m.status === "approved"; }).length;

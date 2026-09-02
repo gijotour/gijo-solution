@@ -11,6 +11,7 @@ import * as fs from "fs";
 import * as http from "http";
 import * as https from "https";
 import * as net from "net";
+import * as crypto from "crypto"; // 업데이트 설치본 sha256 대조용(2026-09-02 F6-02)
 import { URL } from "url";
 import { isDangerous } from "./terminalPolicy";
 
@@ -565,7 +566,13 @@ function 셸화면보정(file: string): string {
   return file;
 }
 
-ipcMain.handle("navigate:to", async (_e, page: string) => {
+// ⚠ 화면 이동의 **본체를 함수로 두고** IPC는 그것을 부르기만 한다(2026-09-02 F8-06·F3-06).
+//   팝업·대화·사무실 창 닫기, 라이트 표식, 프로 셸 승격 예외가 전부 이 안에 있다.
+//   인증 만료로 로그인에 돌려보낼 때도 **같은 길**을 타야 규칙이 한 곳에만 남는다
+//   (아래 auth:expired가 이 함수를 부른다 — 새 통로를 내지 않는다).
+ipcMain.handle("navigate:to", async (_e, page: string) => 화면이동(String(page)));
+
+const 화면이동 = (async (page: string): Promise<void> => {
   if (!mainWindow) return;
   // 파일 경로와 쿼리를 분리해 loadFile에 넘긴다(settings.html?s=ai 같은 구역 딥링크 지원).
   const [요청파일, qs] = String(page).split("?");
@@ -636,6 +643,24 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   //   **원래 쿼리가 없을 때 통째로 버려진다** — `navigateTo("app.html")`이 바로 그 경우다.
   //   실측(2026-08-18): 프로로 바꿔도 주소에 안 실려 셸이 표준 그대로 떴다.
   await mainWindow.loadFile(target, Object.keys(query).length ? { query } : undefined);
+});
+
+// 인증이 끊겼다(유휴 30분 만료·다른 곳 로그인·토큰 폐기) — core.ts가 **사유를 담아** 보낸다.
+//   ⚠ core.ts는 창·프레임마다 실행되므로 같은 신호가 여러 번 온다. 여기서 **한 번만** 처리한다.
+//   ⚠ 사유 문장은 서버가 만든 것을 그대로 싣는다 — 여기서 새로 짓지 않는다(단일 출처).
+//   ⚠ 조용히 로그인 화면만 띄우지 않는다. **왜 끊겼는지 말한다**(F8-06·F3-06).
+let 만료복귀중 = false;
+ipcMain.on("auth:expired", (_e, info: { reason?: string } | undefined) => {
+  if (만료복귀중 || !mainWindow || mainWindow.isDestroyed()) return;
+  // 이미 로그인 화면이면 다시 싣지 않는다 — 입력 중이던 아이디와 사유 문구가 지워진다.
+  if (mainWindow.webContents.getURL().includes("login.html")) return;
+  만료복귀중 = true;
+  authState = { accessToken: null, refreshToken: null, serverUrl: authState.serverUrl };
+  const 사유 = info && typeof info.reason === "string" && info.reason.trim()
+    ? info.reason.trim()
+    : "세션이 끝났습니다. 다시 로그인해 주세요.";
+  // 팝업·대화·사무실 창 정리는 화면이동 안에 이미 있다 — 같은 길을 그대로 탄다.
+  void 화면이동("login.html?reason=" + encodeURIComponent(사유)).finally(() => { 만료복귀중 = false; });
 });
 
 // "우리 AI 팀 사무실" 별도 창 — 이미 열려 있으면 앞으로만 가져온다(중복 창 방지).
@@ -1074,9 +1099,31 @@ function bindZoom(win: BrowserWindow): void {
   //   말과 코드가 어긋난 자리라 여기서 실제로 건다. bindZoom은 모든 창이 거치므로
   //   대시보드·사무실·문서함·분리 창 어디서 눌러도 같게 동작한다.
   win.webContents.on("before-input-event", (e, input) => {
-    if (input.type !== "keyDown" || input.alt || !(input.control || input.meta)) return;
+    if (input.type !== "keyDown") return;
     const k = String(input.key);
-    if (k === "+" || k === "=") {
+    // 🔑 셸 단축키(2026-09-02 여정 점검 F3-04) — 화면(iframe)에 포커스가 있으면 렌더러
+    //   keydown은 **그 iframe 문서에서만** 터져 셸의 처리기에 닿지 않는다(titlebar.js:10이
+    //   iframe에서 즉시 return하므로 안쪽에도 처리기가 없다). before-input-event는 모든
+    //   프레임의 키가 거치는 유일한 길이라, 확대·축소가 이미 쓰는 이 통로로 모은다.
+    //   ⚠ 보내는 곳은 mainWindow가 아니라 **키를 누른 그 창(win)**이다 — 분리창에서 누른
+    //     Ctrl+K가 본창의 화면 찾기를 열면 「엉뚱한 창이 반응한다」가 된다.
+    //   ⚠ preventDefault를 부르므로 페이지에는 keydown이 가지 않는다 = 중복 실행이 없다.
+    //     그래서 렌더러 쪽(nav.js·titlebar.js) 처리는 남기지 않고 지웠다(확대·축소 전례와 같다).
+    if (input.alt && !input.control && !input.meta) {
+      if (k === "ArrowLeft" || k === "ArrowRight") {
+        e.preventDefault();
+        win.webContents.send("shell:hotkey", k === "ArrowLeft" ? "back" : "forward");
+      }
+      return;
+    }
+    if (input.alt || !(input.control || input.meta)) return;
+    if (k === "k" || k === "K") {
+      e.preventDefault();
+      win.webContents.send("shell:hotkey", "finder");
+    } else if (k === "b" || k === "B") {
+      e.preventDefault();
+      win.webContents.send("shell:hotkey", "leftpane");
+    } else if (k === "+" || k === "=") {
       e.preventDefault();
       화면크기한칸(1);
     } else if (k === "-" || k === "_") {
@@ -1122,8 +1169,15 @@ ipcMain.handle("ui:toggleFullscreen", () => {
   return next;
 });
 // 앱 재시작 — 업데이트 적용·화면 이상 시 원클릭 복구.
-ipcMain.handle("app:restart", () => {
+ipcMain.handle("app:restart", async () => {
   quitConfirmed = true; // 의도된 재시작 — 닫기 확인을 띄우지 않는다
+  // ⚠ app.exit()는 before-quit을 내지 않는다 — 그래서 여기서 바로 나가면 종료 로그아웃
+  //   (logoutOnQuit)을 **건너뛴다.** 서버에는 내 세션이 살아 있어, 다시 켜면 「이미 다른 곳에서
+  //   로그인 중」이 뜨고 담당자가 **자기 자신을** 강제로 밀어내야 했다(감사에도 「강제 로그인」으로
+  //   남았다). 창 닫기 종료는 before-quit으로 이미 정리하고 있었는데 재시작만 새는 자리였다(F6-06).
+  //   logoutOnQuit은 3초 타임아웃이 있어 서버가 죽어 있어도 여기서 멈추지 않는다.
+  //   동봉 서버도 함께 내려가지만, 재기동한 앱이 maybeStartBundledServer로 다시 띄운다.
+  await logoutOnQuit();
   app.relaunch();
   app.exit(0);
 });
@@ -1332,9 +1386,17 @@ ipcMain.handle("terminal:kill", async () => {
 interface UpdateCheckResult {
   latest: { version: string; notes: string | null; size: number; publishedAt: number; sha256: string } | null;
   updateAvailable: boolean;
+  /** 확인 **자체가 실패한** 이유(2026-09-02, 여정 점검 F6-03).
+   *  ⚠ 예전에는 서버가 꺼졌거나 세션이 풀려도 `{ latest:null, updateAvailable:false }` 하나로
+   *    접어 돌려줬고, 화면은 그걸 초록 「최신 버전입니다」로 그렸다 — **확인이 안 된 것을
+   *    확인했다고 말하는** 자리였다. 실패는 실패라고 말할 수 있게 이유를 함께 돌려준다.
+   *  - unauthorized: 로그인이 안 됐거나 풀렸다(토큰 없음·401·403)
+   *  - unreachable : 서버에 닿지 못했다(주소 오류·서버 꺼짐·망 끊김)
+   *  - server      : 서버가 오류를 돌려줬다(그 밖의 4xx·5xx) */
+  error?: "unauthorized" | "unreachable" | "server";
 }
 ipcMain.handle("update:check", async (): Promise<UpdateCheckResult> => {
-  if (!authState.serverUrl || !authState.accessToken) return { latest: null, updateAvailable: false };
+  if (!authState.serverUrl || !authState.accessToken) return { latest: null, updateAvailable: false, error: "unauthorized" };
   try {
     // ★★ **자기 에디션을 반드시 실어 보낸다** (2026-08-23).
     //   안 보내면 서버가 「전 에디션 통틀어 가장 높은 판」을 돌려준다 — 라이트(1.3.0)가
@@ -1345,16 +1407,24 @@ ipcMain.handle("update:check", async (): Promise<UpdateCheckResult> => {
       `&edition=${encodeURIComponent(에디션())}`, {
       headers: { Authorization: `Bearer ${authState.accessToken}` },
     });
-    if (!res.ok) return { latest: null, updateAvailable: false };
+    // 서버가 거절했다 — 세션이 풀린 것(401·403)과 서버 쪽 오류를 갈라 말해야
+    // 담당자가 「다시 로그인」인지 「잠시 뒤 다시」인지 안다(2026-09-02 F6-03).
+    if (!res.ok) return { latest: null, updateAvailable: false, error: (res.status === 401 || res.status === 403) ? "unauthorized" : "server" };
     return (await res.json()) as UpdateCheckResult;
   } catch {
-    return { latest: null, updateAvailable: false };
+    // 서버가 꺼졌거나 주소가 틀렸거나 망이 끊겼다 — 담당자가 할 일은 같으니 하나로 묶는다.
+    return { latest: null, updateAvailable: false, error: "unreachable" };
   }
 });
 ipcMain.handle("update:currentVersion", () => app.getVersion());
 
 // url을 destPath로 스트리밍 다운로드(전체를 메모리에 안 올림) — 진행률은 progress 콜백으로.
-function downloadToFile(urlStr: string, headers: Record<string, string>, destPath: string, onProgress: (pct: number) => void): Promise<void> {
+// expectedSha256을 주면 **받으면서 함께 해시를 계산해** 끝에 대조한다(2026-09-02 F6-02).
+//   ⚠ 왜 여기서 하나: 설치본이 250MB다. 다 받은 뒤 파일을 다시 읽어 해시를 뜨면 디스크를
+//     두 번 읽는다. 스트림에 물려 두면 한 번에 끝난다.
+//   ⚠ 왜 필요한가: 예전에는 서버가 준 sha256을 **받기만 하고 대조하지 않으면서** 화면은
+//     「무결성 검증 완료」라고 말했다 — 하지 않은 일을 했다고 말한 자리다.
+function downloadToFile(urlStr: string, headers: Record<string, string>, destPath: string, onProgress: (pct: number) => void, expectedSha256: string | null): Promise<void> {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr);
     const mod = u.protocol === "https:" ? https : http;
@@ -1366,13 +1436,24 @@ function downloadToFile(urlStr: string, headers: Record<string, string>, destPat
       }
       const total = Number(res.headers["content-length"] || 0);
       let received = 0;
+      // 서버가 게시 때 계산해 둔 값(clientrelease.ts:126)과 대조할 준비 — 기대값이 없으면 계산도 안 한다.
+      const 기대해시 = expectedSha256 ? expectedSha256.toLowerCase() : null;
+      const 해시 = 기대해시 ? crypto.createHash("sha256") : null;
       const file = fs.createWriteStream(destPath);
       res.on("data", (chunk: Buffer) => {
         received += chunk.length;
+        if (해시) 해시.update(chunk);
         if (total) onProgress(Math.round((received / total) * 100));
       });
       res.pipe(file);
-      file.on("finish", () => file.close(() => resolve()));
+      file.on("finish", () => file.close(() => {
+        if (!해시 || !기대해시) { resolve(); return; }
+        const 받은해시 = 해시.digest("hex").toLowerCase();
+        if (받은해시 === 기대해시) { resolve(); return; }
+        // 다르면 **실행하지 않는다** — 전송 중 깨졌거나 바꿔 낀 파일일 수 있다. 흔적도 지운다.
+        try { fs.unlinkSync(destPath); } catch { /* 이미 없거나 잠김 — 임시 폴더라 무해 */ }
+        reject(new Error("받은 설치 파일이 서버에 게시된 파일과 다릅니다(전송 중 손상됐을 수 있습니다) — 안전을 위해 실행하지 않았습니다. 잠시 뒤 다시 시도해 주세요."));
+      }));
       // 시스템 오류 코드(EBUSY·ENOSPC 등)가 그대로 화면에 나가면 담당자가 뭘 해야 할지 모른다.
       // 무엇이 막혔고 어떻게 풀지를 한국어로 알려 준다.
       file.on("error", (err: NodeJS.ErrnoException) => {
@@ -1395,16 +1476,18 @@ function downloadToFile(urlStr: string, headers: Record<string, string>, destPat
  *    연결이 리셋되는데, 영문 오류(read ECONNRESET)가 그대로 화면에 나갔고 담당자는
  *    다시 누르면 되는 일인지 알 수 없었다. 한 번은 기계가 다시 해 보고, 그래도 안 되면
  *    한국어로 「다시 시도」를 알려 준다. 재시도는 새 파일로 처음부터(이어받기 없음 — 단순 우선). */
-async function downloadToFileRetry(urlStr: string, headers: Record<string, string>, destPath: string, onProgress: (pct: number) => void): Promise<void> {
+async function downloadToFileRetry(urlStr: string, headers: Record<string, string>, destPath: string, onProgress: (pct: number) => void, expectedSha256: string | null): Promise<void> {
   const 순단인가 = (e: unknown) => /ECONNRESET|ECONNREFUSED|socket hang up|ETIMEDOUT|EPIPE/i.test(String((e as Error)?.message ?? e));
+  // ⚠ sha256 불일치는 「순단」이 아니다 — 다시 받아도 같은 파일이면 또 어긋난다.
+  //   그래서 재시도하지 않고 그대로 던져, 담당자에게 한국어로 알린다(2026-09-02 F6-02).
   try {
-    await downloadToFile(urlStr, headers, destPath, onProgress);
+    await downloadToFile(urlStr, headers, destPath, onProgress, expectedSha256);
   } catch (e) {
     if (!순단인가(e)) throw e;
     try { fs.unlinkSync(destPath); } catch { /* 없거나 잠김 — 새 이름이라 무해 */ }
     await new Promise((r) => setTimeout(r, 1500));
     try {
-      await downloadToFile(urlStr, headers, destPath, onProgress);
+      await downloadToFile(urlStr, headers, destPath, onProgress, expectedSha256);
     } catch (e2) {
       if (순단인가(e2)) throw new Error("서버와의 연결이 도중에 끊겼습니다 — 서버가 재시작 중일 수 있습니다. 잠시 뒤 업데이트를 다시 눌러 주세요.");
       throw e2;
@@ -1448,11 +1531,29 @@ ipcMain.handle("update:install", async (event, version: string) => {
     } catch { /* 프레임이 이미 사라졌으면 아래 폴백 */ }
     try { event.sender.send("update:progress", pct); } catch { /* 창이 닫혔다 — 무시 */ }
   };
+  // 서버가 게시할 때 계산해 둔 sha256을 받아 온다 — 받은 파일을 이 값과 대조한다(2026-09-02 F6-02).
+  //   ⚠ latest-release는 「그 에디션의 가장 최신 판」만 준다. 확인한 뒤 새 판이 게시되면
+  //     지금 받는 version과 어긋날 수 있는데, 그때 남의 해시로 막으면 멀쩡한 설치를 막는다.
+  //     그래서 **버전이 같을 때만** 기대값으로 쓰고, 아니면 대조를 못 했다고 사실대로 알린다
+  //     (verified:false → 화면이 「무결성 대조는 건너뛰었습니다」로 말한다).
+  let 기대sha: string | null = null;
+  try {
+    const 확인 = await fetch(
+      `${authState.serverUrl}/api/client/latest-release?current=${encodeURIComponent(app.getVersion())}` +
+      `&edition=${encodeURIComponent(에디션())}`, {
+      headers: { Authorization: `Bearer ${authState.accessToken}` },
+    });
+    if (확인.ok) {
+      const j = (await 확인.json()) as UpdateCheckResult;
+      if (j.latest && j.latest.version === version && j.latest.sha256) 기대sha = j.latest.sha256;
+    }
+  } catch { /* 못 받아도 다운로드는 진행하되, 아래에서 verified:false로 사실대로 말한다 */ }
   await downloadToFileRetry(
     `${authState.serverUrl}/api/client/download/${encodeURIComponent(version)}`,
     { Authorization: `Bearer ${authState.accessToken}` },
     dest,
-    sendProgress
+    sendProgress,
+    기대sha
   );
   // ⚠ 예전엔 "/S"(무음)로 돌렸다. 설치는 되지만 **화면에 아무것도 안 나온다** —
   //   앱이 갑자기 꺼지고, 한참 뒤에야 새 앱이 뜬다. 그 사이 담당자는 설치가 되는 중인지
@@ -1466,7 +1567,9 @@ ipcMain.handle("update:install", async (event, version: string) => {
   // 설치 창이 화면에 뜬 것을 담당자가 본 뒤에 우리 창이 사라져야 한다. 먼저 꺼지면
   // "앱이 그냥 죽었다"로 보인다. 1.2초면 설치 첫 화면이 그려진다(실측).
   setTimeout(() => app.quit(), 1200);
-  return { ok: true };
+  // 무결성 대조를 **실제로 했는지**를 화면에 그대로 넘긴다 — 안 한 검증을 했다고 말하지
+  // 않기 위해서다(2026-09-02 F6-02).
+  return { ok: true, verified: 기대sha !== null };
 });
 
 // 파일 내려받기 — Electron은 브라우저와 다르다. will-download를 처리하지 않으면 저장 경로가

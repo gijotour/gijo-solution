@@ -994,18 +994,31 @@
   }
 
   // 단축키 — 안내한 것은 반드시 걸려 있어야 한다(안내만 하고 안 걸어 둔 전례가 있다).
-  document.addEventListener("keydown", function (e) {
-    if (e.altKey && !e.ctrlKey && !e.metaKey) {
-      if (e.key === "ArrowLeft") { e.preventDefault(); 이력이동(-1); return; }
-      if (e.key === "ArrowRight") { e.preventDefault(); 이력이동(1); return; }
+  //
+  // ⚠ 2026-09-02(여정 점검 F3-04) — **document keydown만으로는 대부분의 시점에 안 걸렸다.**
+  //   담당자가 표를 한 번 클릭하면 포커스가 화면 iframe으로 넘어가고, 그 뒤의 키는 iframe
+  //   문서에서만 터져 이 처리기에 닿지 않는다(이 파일은 10행에서 iframe이면 즉시 return하므로
+  //   안쪽에도 처리기가 없다). 그래서 「단축키가 되다 안 되다 한다」가 됐다.
+  //   → 키를 잡는 자리를 **메인 프로세스 한 곳**으로 옮겼다(main.ts bindZoom의
+  //     before-input-event → preload onShellHotkey → 여기). 확대·축소가 이미 쓰는 길이다.
+  //   ⚠ 렌더러에도 같은 처리를 남기지 않는다 — 한 일을 두 곳에서 하다 `setUiZoom(0)`이
+  //     배율을 최소값으로 떨어뜨린 전례가 있다(nav.js가 그 사고를 적어 두었다).
+  //   ⚠ 처리 함수(이력이동·gijoOpenFinder·gijoLeftCollapse)는 한 글자도 안 바꿨다 —
+  //     바뀐 것은 **부르는 사람**뿐이다.
+  function 셸단축키(kind) {
+    if (kind === "back") { 이력이동(-1); return; }
+    if (kind === "forward") { 이력이동(1); return; }
+    if (kind === "finder") {
+      if (typeof window.gijoOpenFinder === "function") window.gijoOpenFinder();
+      return;
     }
-    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B")) {
-      if (typeof window.gijoLeftCollapse === "function") {
-        e.preventDefault();
+    if (kind === "leftpane") {
+      if (typeof window.gijoLeftCollapse === "function" && typeof window.gijoLeftCollapsed === "function") {
         window.gijoLeftCollapse(!window.gijoLeftCollapsed());
       }
     }
-  });
+  }
+  if (window.gijo && window.gijo.onShellHotkey) window.gijo.onShellHotkey(셸단축키);
 
   // ── 마운트 — 화면 유형별 왼쪽 패널 ─────────────────────────────────────
   function mountUserArea() {

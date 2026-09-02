@@ -104,6 +104,13 @@
       current = id;
       var p = cfg.panels.find(function (x) { return x.id === id; });
       if (!p) return;
+      // 🗔 셸에 **지금 무대에 올린 실화면**을 알린다(F4-02, 2026-09-02).
+      //   아래 117행 주석이 인정한 그 자리다 — 셸이 보는 탭 이름은 허브 하나로 고정이라(fix.html)
+      //   판을 바꿔도 안 바뀌고, 그래서 ⓘ가 허브 공통 안내만 받아 왔다(승인 화면 전용 안내는
+      //   screenguide.ts:613에 있는데 닿을 길이 없었다).
+      //   ⚠ src를 갈아 끼우기 **전에** 보낸다. 뒤에 보내면 새 판이 방금 알린 「보던 목록」을
+      //     셸의 화면전환 판정이 도로 지운다(아래 gijo:view 비우기와 같은 순서 문제다).
+      try { window.top.postMessage({ type: "gijo:hubStage", page: p.page, label: p.title }, "*"); } catch (e) { /* 셸 밖(팝업 단독)이면 없던 일로 */ }
       host.querySelectorAll(".gh-card").forEach(function (el) { el.classList.toggle("on", el.dataset.panel === id); });
       // 같은 화면 재클릭이면 다시 로드하지 않는다(끼움 창 초기화 비용).
       // hub=1: 허브 무대 표식 — nav.js의 탭 흡수(TAB_REDIRECT)가 이 창을 다시 허브로

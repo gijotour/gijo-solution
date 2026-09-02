@@ -274,4 +274,28 @@ describe("learnloop (헤르메스 폐쇄형 학습 루프)", () => {
     expect((await request(app).post("/api/learnloop/run")).status).toBe(401);
     expect((await request(app).get("/api/learnloop/config")).status).toBe(401);
   });
+
+  // 여정 점검 F5-07(계획서 중-4) — 담당자(security_officer)는 GPU 학습을 열 수 없다.
+  //   루프 실행·파인튜닝은 pauseInferenceEngines로 GPU를 독점해 **접속한 전원의** 채팅·문서검색이
+  //   멈춘다. 화면을 숨기는 것으로는 라우트로 새므로, **서버가 실제로 거절하는지**를 여기서 잰다.
+  //   동시에 「너무 좁히지 않았는가」도 잰다 — 후보 로그 읽기는 담당자도 계속 돼야 한다.
+  it("담당자는 학습을 시작하거나 루프 설정을 바꿀 수 없다(403) — 읽기는 그대로", async () => {
+    const { createUser, findUserByUsername, deleteUser } = await import("../src/auth/users");
+    const uname = "learnloop-officer";
+    if (findUserByUsername(uname)) deleteUser(findUserByUsername(uname)!.id);
+    createUser({ username: uname, password: "officerPw12345", displayName: "학습시험 담당자", role: "security_officer" });
+    const res = await request(app).post("/api/auth/login").send({ username: uname, password: "officerPw12345", force: true });
+    const officer = { Authorization: `Bearer ${res.body.accessToken as string}` };
+
+    expect((await request(app).post("/api/learnloop/run").set(officer).send({})).status).toBe(403);
+    expect((await request(app).put("/api/learnloop/config").set(officer).send({ modelPrefix: "sec-x" })).status).toBe(403);
+    expect((await request(app).post("/api/finetune/start").set(officer).send({ agentId: "analysis", datasetId: "ds-x" })).status).toBe(403);
+    // 「막았다」고 말만 하는 시험이 되지 않게 — 실제로 아무것도 안 돌았는지 상태로 확인한다.
+    expect(getLearnloopStatus().running).toBe(false);
+    // 읽기·평가는 담당자 몫으로 남아 있어야 한다(권한을 필요 이상으로 좁히면 그것도 결함이다).
+    expect((await request(app).get("/api/learnloop/logs").set(officer)).status).toBe(200);
+    expect((await request(app).get("/api/learnloop/config").set(officer)).status).toBe(200);
+
+    deleteUser(findUserByUsername(uname)!.id);
+  });
 });

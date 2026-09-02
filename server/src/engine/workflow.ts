@@ -16,6 +16,9 @@ import { isRealVulnerability, isActiveVuln } from "./agenttools";
 import { listFindingReviews } from "./approvals";
 import { listTargets, listRuns } from "./hardeningtargets";
 import { reportActivity } from "./report";
+// 「오늘」은 **여기 한 곳**에서 만든다(util/date.ts) — toISOString()은 UTC라 한국에서는
+// 오전 9시 전까지 「어제」로 잡혀 다른 엔진(approvals·kpi·briefing…)과 하루가 어긋난다.
+import { todayLocal, dateOnlyLocal } from "../util/date";
 
 /**
  * 화면 → 절차 단계. **여기가 단 하나의 출처다.**
@@ -67,9 +70,19 @@ export interface WorkflowStage {
 export function workflowStages(): WorkflowStage[] {
   const assets = listAssets();
 
-  // ① 발견 — 우리가 아는 자산과 오늘 새로 들어온 것.
-  const 오늘 = new Date().toISOString().slice(0, 10);
-  const 오늘신규 = assets.filter((a) => String(a.lastScannedAt ?? "").slice(0, 10) === 오늘).length;
+  // ① 발견 — 우리가 아는 자산과 오늘 스캔에 잡힌 것.
+  //
+  // ⚠ **상시 거짓 0이었다**(F4-10, 2026-09-02 수정). lastScannedAt은 epoch **밀리초 숫자**다
+  //   (assets.ts:154 · recordFindings가 Date.now()로 넣는다). 옛 코드는 그것을 문자열로 바꿔
+  //   앞 10글자를 날짜와 견줬는데, 그 앞 10글자는 "1788315755" 같은 숫자라 **어떤 날짜와도
+  //   같아질 수 없다** — 시각과 무관하게 늘 0이 나갔다. 이 파일 머리의 「0으로 채우면 없다는
+  //   뜻이 되어 거짓이다」를 정작 이 줄이 어기고 있었다.
+  // ⚠ 라벨을 「오늘 신규」에서 **「오늘 스캔」**으로 바꾼 이유(아래 128행): ① 이 숫자는 새로
+  //   등록된 자산이 아니라 **오늘 스캔에 잡힌 자산**이다(오래된 자산도 오늘 스캔되면 들어온다).
+  //   ② datacard.ts:250에 **이름이 똑같은 「오늘 신규」**가 따로 있고 그쪽은 자산이 아니라
+  //   **이벤트**를 센다 — 같은 이름이 한 화면에서 다른 숫자를 가리키면 담당자는 둘 다 못 믿는다.
+  const 오늘 = todayLocal();
+  const 오늘신규 = assets.filter((a) => a.lastScannedAt != null && dateOnlyLocal(new Date(a.lastScannedAt)) === 오늘).length;
 
   // ② 우선순위 — **활성 진짜 취약점만** 센다. KEV는 "지금 악용 중"이라 따로 띄운다.
   // ⚠ 잣대는 판·자산 요약과 같은 isActiveVuln 하나다(2026-08-21 통일). 여기만 isReal로 세면

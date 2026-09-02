@@ -192,6 +192,14 @@ const gijoApi = {
     ipcRenderer.removeAllListeners("console:closed");
     ipcRenderer.on("console:closed", () => cb());
   },
+  // 🔑 셸 단축키(2026-09-02 여정 점검 F3-04) — Ctrl/Cmd+K(화면 찾기)·Alt+←/→(뒤로·앞으로)·Ctrl+B(왼쪽 판).
+  // 화면(iframe)에 포커스가 있으면 렌더러 keydown은 그 iframe 문서에서만 터져 셸에 닿지 않는다.
+  // 메인 프로세스의 before-input-event만이 **모든 프레임의 키**를 본다 — 거기서 잡아 이 다리로 넘긴다.
+  // ⚠ 받는 쪽은 키를 누른 그 창이다(main.ts가 mainWindow가 아니라 win에 보낸다).
+  onShellHotkey: (cb: (kind: "finder" | "back" | "forward" | "leftpane") => void) => {
+    ipcRenderer.removeAllListeners("shell:hotkey");
+    ipcRenderer.on("shell:hotkey", (_e, kind: string) => cb(kind as "finder" | "back" | "forward" | "leftpane"));
+  },
 
   // 대시보드가 분리창의 포커스·탭·닫힘을 받아 명령 맥락에 반영한다.
   onPopoutContext: (cb: (kind: "focus" | "tab" | "closed", info: Record<string, unknown>) => void) => {
@@ -607,7 +615,8 @@ const gijoApi = {
   update: {
     checkForUpdate: () => ipcRenderer.invoke("update:check") as Promise<api.ClientUpdateCheckResult>,
     currentVersion: () => ipcRenderer.invoke("update:currentVersion") as Promise<string>,
-    install: (version: string) => ipcRenderer.invoke("update:install", version) as Promise<{ ok: boolean }>,
+    // verified — sha256 대조를 실제로 했는가(2026-09-02 F6-02). 화면 문구가 이 값을 따라간다.
+    install: (version: string) => ipcRenderer.invoke("update:install", version) as Promise<{ ok: boolean; verified: boolean }>,
     onProgress: (cb: (pct: number) => void) => ipcRenderer.on("update:progress", (_e, pct: number) => cb(pct)),
     listReleases: () => api.clientReleaseApi.listAll(),
     downloadLog: () => api.clientReleaseApi.downloadLog(),

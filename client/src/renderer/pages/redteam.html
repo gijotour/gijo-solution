@@ -78,6 +78,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
 .seg button{background:transparent;border:none;color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;}
 .seg button.active{background:var(--g-blue-fill, var(--blue));color:#fff;cursor:default;}
+/* 잠긴 단추는 눈으로도 잠겨 보여야 한다 — 안 그러면 「눌리는데 안 눌린다」로 읽힌다(F5-03). */
+.seg button:disabled{opacity:.45;cursor:not-allowed;}
 .guard-counts{margin-left:auto;font-size:12px;color:var(--muted);}
 .guard-counts b{color:var(--text);}
 .glog{margin-top:14px;max-height:150px;overflow-y:auto;}
@@ -218,6 +220,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <button data-mode="block">차단</button>
         </div>
         <div class="guard-counts">누적 탐지 <b id="gFlagged">0</b> · 차단 <b id="gBlocked">0</b></div>
+        <!-- ⚠ 권한·실패 사유를 적는 자리(2026-09-01 F5-03). 평소엔 비어 있고, 담당자이거나
+             모드 변경이 거절됐을 때만 한 줄이 뜬다 — 조용히 실패하지 않기 위한 최소 자리다. -->
+        <span id="guardNote" style="font-size:12.25px;color:var(--muted-2)"></span>
       </div>
       <div class="glog" id="guardLog"></div>
     </div>
@@ -286,7 +291,31 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         '<span class="gbk '+(e.blocked?"b":"f")+'">'+(e.blocked?"차단":"기록")+'</span></div>';
     }).join("");
   }
+  // ⚠ 가드레일 모드 변경은 **관리자만**이다 — 서버 guardrail.ts:110이 adminMiddleware로 막는다
+  //   (「방어를 끈 사람을 알 수 없다」는 이유로 정한 **의도된 설계**다 — 서버를 풀지 않는다).
+  //   그런데 이 화면엔 권한 판별이 0줄이라, 담당자가 [차단]을 눌러도 403이 catch(e){}에 삼켜져
+  //   **아무 일도 일어나지 않았다**(2026-09-01 여정 점검 F5-03). 죽은 조작 금지 원칙대로 둘 다 한다:
+  //     ① 미리 잠근다(눌러 보고 실패하지 않게) ② 그래도 실패하면 **이유를 말한다**(조용한 폴백 금지).
+  //   ⚠ 역할을 못 읽으면 **잠그는 쪽**으로 둔다 — 덜 약속하는 편이 낫다(hardening.html:381 선례).
+  let 가드관리자 = false;
+  function 가드안내(문구){ const n = document.getElementById("guardNote"); if(n) n.textContent = 문구; }
+  // 서버가 답한 실패는 core.ts가 **한글 사유를 첫 줄**에 세워 준다(403이면 「관리자만 접근할 수
+  //   있습니다」) — 그 줄만 쓴다. 다만 **서버에 닿지도 못한** 경우엔 fetch가 영문을 던지므로
+  //   한국어로 바꿔 말한다(lite-records.html:129 선례 — 영문 날것을 담당자에게 보이지 않는다).
+  function 가드사유(e){
+    const m = String((e && e.message) || e).split("\n")[0];
+    return /fetch|network|ECONN/i.test(m) ? "서버에 닿지 못했습니다 — 서버가 켜져 있는지 확인해 주세요." : m;
+  }
+  async function 가드권한읽기(){
+    try{ 가드관리자 = (await window.gijo.me()).role === "admin"; }catch(e){ 가드관리자 = false; }
+    document.querySelectorAll("#guardSeg button").forEach(b => {
+      b.disabled = !가드관리자;
+      b.title = 가드관리자 ? "" : "관리자만 바꿀 수 있습니다 — 방어를 끄고 켜는 일이라 기록에 남습니다";
+    });
+    if(!가드관리자) 가드안내("모드 변경은 관리자만 — 바꾸려면 관리자에게 요청하세요.");
+  }
   async function loadGuard(){
+    await 가드권한읽기(); // 값보다 잠금이 먼저 — 값을 기다리는 동안 눌리면 다시 403을 삼킨다
     try{
       const [status, log] = await Promise.all([window.gijo.guardrailStatus(), window.gijo.guardrailLog(30)]);
       renderGuard(status); renderGuardLog(log);
@@ -294,7 +323,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
   document.getElementById("guardSeg").addEventListener("click", async (ev) => {
     const btn = ev.target.closest("button"); if(!btn) return;
-    try{ const status = await window.gijo.setGuardrailMode(btn.dataset.mode); renderGuard(status); }catch(e){}
+    try{ const status = await window.gijo.setGuardrailMode(btn.dataset.mode); renderGuard(status); 가드안내(""); }
+    catch(e){
+      const 사유 = 가드사유(e);
+      // ⚠ 여기서 loadGuard()를 부르면 **안 된다** — 그 안의 가드권한읽기가 아래 ✗ 줄을
+      //   「모드 변경은 관리자만…」으로 덮어써 실패 사유가 사라진다(고치려던 조용한 실패로 되돌아간다).
+      //   배지만 서버의 실제 값으로 되돌리고, 안내는 **그 뒤에** 세운다.
+      try{ renderGuard(await window.gijo.guardrailStatus()); }catch(_){}
+      가드안내("✗ 모드를 바꾸지 못했습니다 — " + 사유);
+      if(window.gijoTell) window.gijoTell("가드레일 모드를 바꾸지 못했습니다.\n" + 사유);
+    }
   });
 
   // ── 레드팀 ──

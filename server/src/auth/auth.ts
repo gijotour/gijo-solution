@@ -8,7 +8,7 @@ import type { Request, Response, NextFunction, Express } from "express";
 import * as crypto from "crypto";
 import * as jwt from "jsonwebtoken";
 import * as bcrypt from "bcryptjs";
-import { findUserByUsername, findUserById, GijoUser } from "./users";
+import { findUserByUsername, findUserById, GijoUser, MIN_PASSWORD_LEN } from "./users";
 import { recordAudit } from "../engine/audit";
 import { isMfaEnabled, verifyLoginCode, consumeRecoveryCode, mfaRequiredForAdmin } from "./mfa";
 
@@ -405,12 +405,15 @@ export function registerAuthRoutes(app: Express): void {
     const { refreshToken } = req.body as { refreshToken?: string };
     const record = refreshToken ? refreshTokens.get(refreshToken) : undefined;
     if (!refreshToken || !record) {
-      res.status(401).json({ error: "invalid refresh token" });
+      // ⚠ 사유 문장은 **서버가 만든다**(2026-09-02 F8-06·F3-06). message가 없으면 클라이언트가
+      //   error 코드를 그대로 앞세워 담당자 화면에 「invalid refresh token」이 찍힌다.
+      res.status(401).json({ error: "invalid refresh token", message: "로그인 정보가 더 이상 유효하지 않습니다. 다시 로그인해 주세요." });
       return;
     }
     if (record.expiresAt < Date.now()) {
       refreshTokens.delete(refreshToken);
-      res.status(401).json({ error: "refresh token expired" });
+      // ⚠ 위와 같은 이유 — 코드만 보내면 담당자가 영문을 읽게 된다(F8-06·F3-06).
+      res.status(401).json({ error: "refresh token expired", message: "로그인 유효 시간이 지났습니다. 다시 로그인해 주세요." });
       return;
     }
     // 유휴 타임아웃 — 마지막 활동 후 오래 방치된 세션은 갱신을 거부한다(재로그인 유도).
@@ -449,7 +452,10 @@ export function registerAuthRoutes(app: Express): void {
     if (!u) { res.status(401).json({ error: "unauthorized" }); return; }
     // clearance(열람 등급)는 화면이 "내가 어디까지 볼 수 있나"를 보여주는 데 쓴다.
     //   ⚠ 이 값을 화면이 바꿔 보내도 서버는 안 믿는다 — 검색 차단은 서버가 DB에서 직접 읽는다.
-    res.json({ id: u.id, username: u.username, displayName: u.displayName, role: u.role, team: u.team ?? null, clearance: u.clearance ?? null });
+    // minPasswordLen — 비밀번호 규칙의 **단일 출처는 서버**다(users.ts MIN_PASSWORD_LEN).
+    //   화면이 숫자를 스스로 적으면 정책을 바꿀 때 화면만 낡는다(「4자라더니 8자」 · F8-03·F6-08).
+    //   ⚠ 비밀이 아니다 — 길이 규칙은 어차피 거절 메시지로 드러난다. 해시는 절대 안 나간다(위 주석).
+    res.json({ id: u.id, username: u.username, displayName: u.displayName, role: u.role, team: u.team ?? null, clearance: u.clearance ?? null, minPasswordLen: MIN_PASSWORD_LEN });
   });
 
   // 접속 중 클라이언트(외부 콘솔) 목록 — 팀 사무실 창의 presence 표시용.

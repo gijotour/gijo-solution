@@ -44,14 +44,33 @@ function loginFailure(status: number, data: LoginBody): LoginResult {
   return { ok: false, code, message: data.message ?? data.error ?? "로그인에 실패했습니다." };
 }
 
+// 로그인 요청 시간제한 — 응답 없는 주소(방화벽 drop·엉뚱한 IP)를 넣으면 Windows TCP가
+// 20초 넘게 매달려 「연결 중...」 버튼이 굳은 채 손쓸 길이 없었다(F2-06, 2026-09-02).
+// ⚠ 이 값의 단일 출처는 여기 한 곳이다 — 아래 문구도 이 상수에서 초를 만들어 쓴다.
+const 로그인제한밀리초 = 8000;
+
+// 연결 자체가 안 된 경우의 한국어 사유 — **시간 초과**와 **그 밖의 연결 실패**를 가른다.
+// 둘을 뭉뚱그리면 담당자가 「주소를 고칠지 더 기다릴지」를 판단할 수 없다.
+function 연결실패문구(e: unknown): string {
+  const 이름 = (e as { name?: string } | null)?.name;
+  return 이름 === "TimeoutError" || 이름 === "AbortError"
+    ? `서버가 ${Math.round(로그인제한밀리초 / 1000)}초 안에 응답하지 않았습니다 — 서버 주소와 사내망(VPN) 연결을 확인하세요.`
+    : "서버에 연결할 수 없습니다 — 서버 주소와 사내망(VPN) 연결을 확인하세요.";
+}
+
 export const authApi = {
   login: async (username: string, password: string, force = false): Promise<LoginResult> => {
+    // ⚠ 시간제한을 준다(F2-06) — 없으면 응답 없는 주소에서 버튼이 수십 초 굳는다.
+    //   그리고 **왜 실패했는지**를 담아 돌려준다: 예전엔 사유가 한 문장으로 뭉개져
+    //   화면이 「아이디/비밀번호를 확인하세요」로 엉뚱한 곳을 가리켰다.
+    let 실패사유 = 연결실패문구(null);
     const res = await fetch(`${getServerUrl()}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password, ...(force ? { force: true } : {}) }),
-    }).catch(() => null);
-    if (!res) return { ok: false, code: "error", message: "서버에 연결할 수 없습니다." };
+      signal: AbortSignal.timeout(로그인제한밀리초),
+    }).catch((e: unknown) => { 실패사유 = 연결실패문구(e); return null; });
+    if (!res) return { ok: false, code: "error", message: 실패사유 };
     const data = (await res.json().catch(() => ({}))) as LoginBody;
     if (!res.ok) return loginFailure(res.status, data);
     // 2차 인증이 켜진 계정 — 아직 로그인이 끝나지 않았다. 토큰을 저장하지 않는다.
@@ -64,12 +83,15 @@ export const authApi = {
 
   // 로그인 2단계 — 인증앱의 6자리 또는 복구 코드 하나.
   loginMfa: async (mfaToken: string, code: string, isRecovery = false): Promise<LoginResult> => {
+    // 2단계도 같은 제한을 쓴다(F2-06) — 1단계만 고치면 6자리를 넣은 뒤에 똑같이 굳는다.
+    let 실패사유 = 연결실패문구(null);
     const res = await fetch(`${getServerUrl()}/api/auth/login/mfa`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mfaToken, ...(isRecovery ? { recoveryCode: code } : { code }) }),
-    }).catch(() => null);
-    if (!res) return { ok: false, code: "error", message: "서버에 연결할 수 없습니다." };
+      signal: AbortSignal.timeout(로그인제한밀리초),
+    }).catch((e: unknown) => { 실패사유 = 연결실패문구(e); return null; });
+    if (!res) return { ok: false, code: "error", message: 실패사유 };
     const data = (await res.json().catch(() => ({}))) as LoginBody;
     if (!res.ok) return loginFailure(res.status, data);
     setAuthTokens({ accessToken: data.accessToken!, refreshToken: data.refreshToken! });

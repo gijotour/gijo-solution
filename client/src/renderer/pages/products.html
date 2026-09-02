@@ -621,7 +621,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       제품목록 = groups.reduce((a, g) => a.concat(g.products || []), []);
       renderSummary(groups);
       if (!groups.length) {
-        root.innerHTML = `<div class="empty-all">아직 등록된 보안제품이 없습니다. 위에서 종류를 골라 제품을 등록하세요.</div>`;
+        // ⚠ 「위에서 종류를 골라 등록」은 **없는 칸**을 가리키고 있었다(2026-09-01 여정 점검 F5-01).
+        //   등록 폼은 2026-08-02에 걷어냈고(아래 649행 주석), 화면 위 칩은 거르기·점프 전용이다.
+        //   처음 온 담당자는 화면 위를 아무리 찾아도 등록 칸이 없어 막혔다.
+        //   문구는 screenguide.ts 「제품 등록」 판과 같은 말로 맞춘다 — 등록은 대화창, 결재판을 거친다.
+        root.innerHTML = `<div class="empty-all">아직 등록된 보안제품이 없습니다 — 아래 대화창에 "경계 방화벽 FW-01 등록해줘"처럼 말하면 결재판 승인 뒤 등록됩니다.</div>`;
         return;
       }
       // 엑셀형(공용 .g-rows) — 그룹 머리 28px + 행 30px. 스크롤 감싸개(data-gijo-fit)로

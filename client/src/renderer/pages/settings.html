@@ -264,7 +264,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="field inline">
         <label for="myPasswordInput">비밀번호 변경</label>
         <div class="field-row">
-          <input id="myPasswordInput" type="password" placeholder="새 비밀번호 (4자 이상)">
+          <!-- 자릿수는 화면이 적지 않는다 — 서버 정책(minPasswordLen)을 받아 loadUser가 채운다(F8-03·F6-08). -->
+          <input id="myPasswordInput" type="password" placeholder="새 비밀번호">
           <button class="btn-ghost" id="changeMyPasswordBtn">변경</button>
         </div>
       </div>
@@ -329,7 +330,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="field-row">
         <div class="field">
           <label for="newPasswordInput">초기 비밀번호</label>
-          <input id="newPasswordInput" type="password" placeholder="4자 이상">
+          <!-- 자릿수는 화면이 적지 않는다 — 서버 정책(minPasswordLen)을 받아 loadUser가 채운다(F8-03·F6-08). -->
+          <input id="newPasswordInput" type="password" placeholder="초기 비밀번호">
         </div>
         <div class="field" style="max-width:160px">
           <label for="newRoleInput">역할</label>
@@ -882,11 +884,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
   let currentUser = null;
+  // 비밀번호 최소 길이 — **서버가 진실**이다(auth/users.ts MIN_PASSWORD_LEN → /api/auth/me).
+  //   화면에 숫자를 박아 두면 정책이 바뀔 때 화면만 낡는다(F8-03·F6-08).
+  //   아직 못 받았으면(옛 서버·통신 실패) **숫자를 지어내지 않고** 서버 판정에 맡긴다.
+  let 최소비번길이 = null;
 
   async function loadUser() {
     try {
       const user = await window.gijo.me();
       currentUser = user;
+      // 서버가 알려 준 최소 길이를 화면 문구·검사에 그대로 흘린다(단일 출처 · F8-03·F6-08).
+      //   ⚠ 칸이 없으면 그냥 지나간다 — loadUser는 통째로 try{}catch{}라 여기서 터지면
+      //     아래 계정 정보와 관리자 판이 **조용히 안 그려진다.**
+      if (Number(user.minPasswordLen) > 0) {
+        최소비번길이 = Number(user.minPasswordLen);
+        const 내비번 = document.getElementById("myPasswordInput");
+        if (내비번) 내비번.placeholder = `새 비밀번호 (${최소비번길이}자 이상)`;
+        const 새계정비번 = document.getElementById("newPasswordInput");
+        if (새계정비번) 새계정비번.placeholder = `${최소비번길이}자 이상`;
+      }
 
       document.getElementById("accountUsername").textContent = user.username || "-";
       document.getElementById("accountDisplayName").textContent = user.displayName || "-";
@@ -937,8 +953,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const line = document.getElementById("myPasswordStatusLine");
     const password = document.getElementById("myPasswordInput").value;
     if (!currentUser) return;
-    if (password.length < 4) {
-      line.textContent = "비밀번호는 4자 이상이어야 합니다.";
+    if (!password || (최소비번길이 !== null && password.length < 최소비번길이)) {
+      // 숫자를 문장에 박지 않는다 — 서버가 알려 준 값으로 말한다(F8-03·F6-08).
+      line.textContent = 최소비번길이 !== null ? `비밀번호는 ${최소비번길이}자 이상이어야 합니다.` : "새 비밀번호를 넣으세요.";
       line.className = "status-line status-err";
       return;
     }
@@ -1449,7 +1466,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   async function resetUserPw(id) {
     const line = document.getElementById("userManagementStatusLine");
     // prompt()도 렌더러를 멈추는 네이티브 모달(2026-07-29 검토) — 화면 안 입력으로. 비밀번호라 가림 입력.
-    const pw = await gijoPrompt("새 비밀번호(8자 이상) — 초기화하면 해당 사용자의 세션이 끊깁니다", { password: true, ok: "초기화", danger: true });
+    // 여기만 8을 손으로 적어 두어 「같은 화면이 두 규칙을 말한다」의 반쪽이었다 — 여기도 서버 값으로(F6-08).
+    const pw = await gijoPrompt(
+      최소비번길이 !== null
+        ? `새 비밀번호(${최소비번길이}자 이상) — 초기화하면 해당 사용자의 세션이 끊깁니다`
+        : "새 비밀번호 — 초기화하면 해당 사용자의 세션이 끊깁니다",
+      { password: true, ok: "초기화", danger: true });
     if (!pw) return;
     try { await window.gijo.changeUserPassword(id, pw); await loadUserList(); line.textContent = "✓ 비밀번호를 초기화했습니다(세션 종료됨)."; line.className = "status-line status-ok"; }
     catch (e) { line.textContent = "✗ 초기화 실패: " + e.message; line.className = "status-line status-err"; }
@@ -1467,8 +1489,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const displayName = document.getElementById("newDisplayNameInput").value.trim();
     const password = document.getElementById("newPasswordInput").value;
     const role = document.getElementById("newRoleInput").value;
-    if (!username || !displayName || password.length < 4) {
-      line.textContent = "아이디·이름을 입력하고 비밀번호는 4자 이상으로 설정하세요.";
+    if (!username || !displayName || !password || (최소비번길이 !== null && password.length < 최소비번길이)) {
+      // 숫자를 문장에 박지 않는다 — 서버가 알려 준 값으로 말한다(F8-03·F6-08).
+      line.textContent = 최소비번길이 !== null
+        ? `아이디·이름을 입력하고 비밀번호는 ${최소비번길이}자 이상으로 설정하세요.`
+        : "아이디·이름·초기 비밀번호를 모두 입력하세요.";
       line.className = "status-line status-err";
       return;
     }
@@ -1505,7 +1530,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       serverStatusLine.textContent = "✓ 서버에 정상적으로 연결됩니다.";
       serverStatusLine.className = "status-line status-ok";
     } catch (e) {
-      serverStatusLine.textContent = "✗ 서버에 연결할 수 없습니다: " + e.message;
+      // core.ts가 이미 한국어 사유를 지어 던진다(F8-05, 2026-09-02) — 앞에 같은 말을 또 붙이면
+      // 「서버에 연결할 수 없습니다: 서버에 연결할 수 없습니다 …」가 된다.
+      serverStatusLine.textContent = "✗ " + ((e && e.message) || "서버에 연결할 수 없습니다.");
       serverStatusLine.className = "status-line status-err";
     }
   }
@@ -1519,7 +1546,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       serverUrlInput.focus();
       return;
     }
-    window.gijo.setServerUrl(url);
+    // 주소 형식이 틀리면 setServerUrl이 던진다(core.ts 서버주소정규화 — F2-02, 2026-09-02).
+    // 잡지 않으면 아무 말 없이 저장이 안 된 것처럼 보인다(바로 위 「조용히 돌아가던 자리」와 같은 결).
+    try {
+      window.gijo.setServerUrl(url);
+    } catch (e) {
+      serverStatusLine.textContent = "✗ " + ((e && e.message) || "서버 주소 형식이 올바르지 않습니다.");
+      serverStatusLine.className = "status-line status-err";
+      serverUrlInput.focus();
+      return;
+    }
     testConnection();
   }
 
@@ -2271,6 +2307,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         document.getElementById("latestPublished").textContent = new Date(r.latest.publishedAt).toLocaleString("ko-KR");
         document.getElementById("latestSize").textContent = fmtBytes(r.latest.size);
         document.getElementById("latestNotes").textContent = r.latest.notes || "(릴리스 노트 없음)";
+      } else if (r.error) {
+        // ⚠ 확인이 **안 된 것**을 「최신 버전입니다」라고 말하지 않는다(2026-09-02 F6-03).
+        //   담당자가 지금 무엇을 해야 하는지 알도록 이유를 한국어로 나눠 적는다.
+        //   (영문 코드는 화면에 내보내지 않는다 — unauthorized·Failed to fetch 같은 날것 금지)
+        const 왜 = r.error === "unauthorized"
+          ? "로그인이 풀렸습니다 — 다시 로그인한 뒤 확인해 주세요."
+          : r.error === "unreachable"
+            ? "서버에 닿지 못했습니다 — 서버 주소와 서버가 켜져 있는지 확인해 주세요."
+            : "서버가 오류를 돌려줬습니다 — 잠시 뒤 다시 확인해 주세요.";
+        badge.innerHTML = '<span class="badge b-muted">확인하지 못했습니다</span>'
+          + ' <span style="color:var(--muted);font-size:12px">' + esc(왜) + '</span>';
+        document.getElementById("updatePanel").style.display = "none";
       } else {
         badge.innerHTML = '<span class="badge b-teal">최신 버전입니다</span>';
         document.getElementById("updatePanel").style.display = "none";
@@ -2305,13 +2353,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       label.textContent = "다운로드 중… " + pct + "%";
     });
     try {
-      await window.gijo.update.install(latestRelease.version);
+      const 결과 = await window.gijo.update.install(latestRelease.version);
       btn.textContent = "설치 창 열림";
       label.textContent = "설치 창이 열립니다 — 안내를 따라 진행해 주세요.";
       line.className = "status-line status-ok";
       // 예전엔 무음 설치라 아무 화면도 안 나와 "그냥 앱이 죽었다"로 보였다(2026-07-29 신고).
       // 이제 설치 창이 뜨므로, 무엇을 보게 될지 미리 말해 준다.
-      line.textContent = "다운로드·무결성 검증 완료 — 잠시 뒤 설치 창이 뜨고 이 앱은 닫힙니다. 설치가 끝나면 새 버전이 자동으로 열립니다.";
+      // ⚠ 「무결성 검증 완료」는 **실제로 sha256을 대조했을 때만** 말한다(2026-09-02 F6-02).
+      //   예전에는 대조를 하지도 않고 검증했다고 말했다 — 제품이 거짓을 말한 자리였다.
+      line.textContent = (결과 && 결과.verified
+        ? "다운로드·무결성 검증(sha256) 완료 — "
+        : "다운로드 완료(서버에서 sha256을 받지 못해 무결성 대조는 하지 못했습니다) — ")
+        + "잠시 뒤 설치 창이 뜨고 이 앱은 닫힙니다. 설치가 끝나면 새 버전이 자동으로 열립니다.";
     } catch (e) {
       line.className = "status-line status-err";
       line.textContent = "업데이트 실패: " + ((e && e.message) || e);

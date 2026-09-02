@@ -69,7 +69,17 @@ function newId(): string {
 }
 
 // 비밀번호 정책 — 길이 우선(기본 8자, GIJO_MIN_PASSWORD_LEN으로 조정). 보안 제품이라 최소한을 강제한다.
-const MIN_PASSWORD_LEN = Number(process.env.GIJO_MIN_PASSWORD_LEN ?? 8);
+// ⚠ 비밀번호 최소 길이의 **단일 출처는 auth/passwordpolicy.ts**다(2026-09-02 F8-03·F6-08 수리).
+//   예전엔 화면(settings.html)이 「4자 이상」이라 하고 서버가 8자를 요구해, 담당자가 안내대로
+//   6자를 넣으면 서버가 거절했다 — 한 제품이 두 규칙을 말했다.
+//   이제 화면은 /api/auth/me의 minPasswordLen으로, 챗봇 안내(engine/howto.ts)는 정책 파일을 직접 읽는다.
+//   ⚠ 숫자를 이 파일(users.ts)에 두면 안 된다 — 여기는 db·auth·audit을 끌고 와서,
+//     순수 표인 howto.ts가 import하는 순간 DB가 열린다(tools/learn-candidate-review.mjs가
+//     server/dist/engine/howto.js를 서버 밖에서 부른다 — 그때 저장소 루트에 data/ DB가 생긴다).
+//   ⚠ 아직 손으로 적힌 자리가 남아 있다(로그인 전이라 /api/auth/me를 못 부르는 곳):
+//     client/src/main.ts:319 · setup.html:112·173. 정책을 바꾸면 여기도 함께 본다.
+import { MIN_PASSWORD_LEN } from "./passwordpolicy";
+export { MIN_PASSWORD_LEN };
 export function validatePassword(password: string): void {
   if (!password || password.length < MIN_PASSWORD_LEN) {
     throw new Error(`비밀번호는 ${MIN_PASSWORD_LEN}자 이상이어야 합니다`);
