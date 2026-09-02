@@ -85,7 +85,7 @@ export interface LearnCandidate {
   topic: string | null; // 주제 딱지 — 후보함 배지·주제별 진척(2026-08-08 시안 승인)
   score: number; // cite 3 + tool 2 + accepted 1 + lengthOk 1
   teacher?: string | null; // 증류 행만 — 교사 모델 id(후보함 칩)
-  cites?: { ref: string; text: string }[]; // 증류 행만 — 근거 조각(승인 전에 사람이 본다)
+  cites?: string[]; // 증류 행만 — 근거 ref 목록(chat_logs.cites는 ref 문자열 배열 — learnloop.ChatLog.cites와 같은 모양). 본문은 승인 화면이 ref로 찾는다.
 }
 
 interface ChatLogRow { id: string; agentId: string; question: string; answer: string; rating: number | null; usedInDataset: number; createdAt: number; topic?: string | null; origin?: string | null; cites?: string | null; teacher?: string | null }
@@ -206,8 +206,8 @@ export function listLearnCandidates(days = 30, limit = 60): {
     const fp = fingerprint(r.question, r.answer);
     if (out.some((c) => fingerprint(c.question, c.answer) === fp) || distillOut.some((c) => fingerprint(c.question, c.answer) === fp)) { drop("중복"); continue; }
     const signals = { cite: Boolean(r.cites && r.cites !== "[]"), tool: false, accepted: false, lengthOk: r.answer.length >= 80 && r.answer.length <= 1200 };
-    let cites: { ref: string; text: string }[] = [];
-    try { cites = r.cites ? (JSON.parse(r.cites) as { ref: string; text: string }[]) : []; } catch { cites = []; }
+    let cites: string[] = [];
+    try { const raw = r.cites ? (JSON.parse(r.cites) as unknown[]) : []; cites = raw.map((c) => (typeof c === "string" ? c : String((c as { ref?: string })?.ref ?? ""))).filter(Boolean); } catch { cites = []; }
     distillOut.push({ id: `cl:${r.id}`, source: "distill", question: r.question, answer: r.answer, createdAt: r.createdAt, signals, score: 0, topic: r.topic ?? 질문주제(r.question), teacher: r.teacher ?? null, cites });
   }
 
