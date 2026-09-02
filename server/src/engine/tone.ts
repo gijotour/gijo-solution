@@ -103,6 +103,17 @@ export function 물음속심각도(text: string): string | null {
 export function 심각도한글(severity: string): string {
   return 심각도표[String(severity ?? "").toLowerCase()] ?? String(severity ?? "");
 }
+
+/**
+ * CTI(위협 인텔) 심각도는 취약점과 다른 세 단계(info·warning·critical)다 — 위 표에 섞으면 물음속심각도가
+ * 취약점 도메인에 없는 등급을 뱉는다. 그래서 표를 따로 두되 **여기 한 곳**에서만 짓는다(2026-09-03 검토관:
+ * handlers 지역 라벨·scandrafts 프롬프트가 같은 값을 「심각」·「매우 심각」·「warning」 세 말로 갈랐다).
+ */
+const CTI심각도표: Record<string, string> = { critical: "심각", warning: "경고", info: "참고" };
+export function cti심각도한글(severity: string): string {
+  return CTI심각도표[String(severity ?? "").toLowerCase()] ?? "참고";
+}
+
 /**
  * 자산 종류를 사람 말로 — `infra-host` → 「인프라 서버」.
  *

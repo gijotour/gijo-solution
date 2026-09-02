@@ -50,6 +50,30 @@ describe("스캔 해석 초안 — 근거 검증", () => {
     expect(validateDraft("이건 JSON이 아니다", vulns)).toBeNull();
   });
 
+  it("같은 코드가 여러 자산에 걸리면 모델이 말한 자산을 지목한다(코드가 먼저 이겨 다른 자산을 지목하던 결함)", () => {
+    const 둘 = [{ code: "IW-20", name: "디렉토리 인덱싱", risk: "하", host: "cert.example.co.kr" }, { code: "IW-20", name: "디렉토리 인덱싱", risk: "하", host: "certify.example.co.kr" }];
+    const v = validateDraft(JSON.stringify({ summary: "두 서버 모두 디렉토리 인덱싱이 열려 있어 먼저 닫아야 합니다.", priorities: [
+      { code: "IW-20", name: "디렉토리 인덱싱", host: "cert.example.co.kr", why: "인증서 발급 서버라 먼저" },
+      { code: "IW-20", name: "디렉토리 인덱싱", host: "certify.example.co.kr", why: "본인인증 서버" },
+      { code: "IW-20", name: "디렉토리 인덱싱", host: "없는서버", why: "자산을 지어냄 → 코드로 교정" },
+    ], caveats: [] }), 둘)!;
+    expect(v.draft.priorities.map((p) => p.host)).toEqual(["cert.example.co.kr", "certify.example.co.kr"]); // 세 번째는 코드 교정 뒤 중복
+    expect(v.draft.priorities[0].why).toBe("인증서 발급 서버라 먼저");
+  });
+
+  it("한자·중국어가 섞인 줄은 사람에게 내보내지 않는다 — 요약이면 초안 자체를 버린다", () => {
+    expect(validateDraft(JSON.stringify({ summary: "平文传输 위험이 큽니다 즉시 조치가 필요합니다", priorities: [{ code: "IW-25", name: "평문 전송", host: "cert.example.co.kr", why: "" }], caveats: [] }), vulns)).toBeNull();
+    const v = validateDraft(JSON.stringify({ summary: "평문 전송이 인증 구간에 있어 가장 급합니다.", priorities: [{ code: "IW-25", name: "평문 전송", host: "cert.example.co.kr", why: "认证信息泄露" }], caveats: ["확인 필요", "需要确认"] }), vulns)!;
+    expect(v.draft.priorities[0].why).toBe("");
+    expect(v.draft.caveats).toEqual(["확인 필요"]);
+  });
+
+  it("파서 name에 [코드]가 이미 붙어 있어도 코드를 두 번 찍지 않는다(프롬프트·화면·할 일 제목)", () => {
+    const p = buildScanDraftPrompt({ ...input, vulns: [{ code: "IW-20", name: "[IW-20] 디렉토리 인덱싱", risk: "하", host: "h" }] });
+    expect(p).toContain("[IW-20] 디렉토리 인덱싱 · 위험 하");
+    expect(p).not.toContain("[IW-20] [IW-20]");
+  });
+
   it("프롬프트는 항목을 40건까지만 싣고 나머지는 생략 수를 적는다", () => {
     const many = { ...input, vulns: Array.from({ length: 45 }, (_, i) => ({ code: `V-${i}`, name: `취약점 ${i}`, risk: "하", host: "h" })) };
     const p = buildScanDraftPrompt(many);
@@ -79,6 +103,8 @@ describe("스캔 해석 초안 — 부르는 문 왕복(chat 주입)", () => {
     const before = listTasks().length;
     const reg = registerScanDraft(rows[0].id.slice(0, 8), "jyh");
     expect(reg.taskIds.length).toBe(1);
+    expect(reg.신규).toBe(1); // 새로 생긴 것만 「등록」으로 센다(createTask 중복 억제 때문에 taskIds.length가 곧 등록 수는 아니다)
+    expect(reg.기존).toBe(0);
     expect(listTasks().length).toBe(before + 1);
     expect(listTasks().find((t) => t.id === reg.taskIds[0])!.text).toContain("[스캔 해석] cert.example.co.kr [IW-25] 평문 전송");
     expect(getScanDraft(rows[0].id)!.status).toBe("registered");
@@ -103,12 +129,20 @@ describe("TI 해석 — 규칙 매칭이 있을 때만, 목록에 있는 자산�
   it("해석은 붙고 우선 자산은 목록 안의 것만 남는다", async () => {
     const prev = process.env.GIJO_TI_INTERPRET; process.env.GIJO_TI_INTERPRET = "1";
     try {
-      const s = await interpretThreats(items, { chat: async (a) => { expect(a.agentId).toBe("ti"); return JSON.stringify({ 해석: "유출된 자격증명이 web-01 로그인에 재사용될 수 있어 지금 문제입니다.", 우선: ["web-01", "없는자산", "db-01"] }); } });
-      expect(s).toContain("🛰 TI 해석:");
+      const s = await interpretThreats(items, { chat: async (a) => { expect(a.agentId).toBe("ti"); expect(a.message).toContain("[심각]"); return JSON.stringify({ interpretation: "유출된 자격증명이 web-01 로그인에 재사용될 수 있어 지금 문제입니다.", first_assets: ["web-01", "없는자산", "db-01"] }); } });
+      expect(s).toContain("🤖 TI 해석:"); // 표식 사전(tone.ts)의 안내 기호 — 말투 감시가 아는 기호만
       expect(s).toContain("먼저 볼 자산: web-01, db-01");
       expect(await interpretThreats([], { chat: async () => "x" })).toBe("");
       expect(await interpretThreats(items, { chat: async () => { throw new Error("x"); } })).toBe("");
       expect(await interpretThreats(items, { chat: async () => "JSON 아님" })).toBe("");
+      // 한자·중국어가 섞인 해석은 사람에게 내보내지 않는다(json_schema 경로는 한자 차단이 꺼져 있다)
+      expect(await interpretThreats(items, { chat: async () => JSON.stringify({ interpretation: "凭证泄露 web-01 로그인 위험이 있습니다 지금 확인하세요", first_assets: [] }) })).toBe("");
+      // 시간 예산 — threats는 즉답 도구다. 모델이 늦으면 규칙 답만 즉시 나간다
+      const prevMs = process.env.GIJO_TI_INTERPRET_MS; process.env.GIJO_TI_INTERPRET_MS = "500";
+      try {
+        const 늦음 = await interpretThreats(items, { chat: () => new Promise((r) => setTimeout(() => r(JSON.stringify({ interpretation: "늦게 온 해석입니다 열 글자 넘게", first_assets: [] })), 1500)) });
+        expect(늦음).toBe("");
+      } finally { if (prevMs === undefined) delete process.env.GIJO_TI_INTERPRET_MS; else process.env.GIJO_TI_INTERPRET_MS = prevMs; }
     } finally { if (prev === undefined) delete process.env.GIJO_TI_INTERPRET; else process.env.GIJO_TI_INTERPRET = prev; }
   });
   it("GIJO_TI_INTERPRET=0 이면 모델을 부르지 않는다(시험 환경 기본)", async () => {
@@ -132,10 +166,21 @@ describe("배선 — 문이 실제로 이어져 있다(소스 감시)", () => {
     const t = h.slice(h.indexOf("export async function runThreats("), h.indexOf("export async function runRemediation("));
     expect(t).toContain("await interpretThreats(");
   });
-  it("대화창 도구 scan_drafts·register_scan_draft가 등록돼 있고, 채택은 결재판(write)이다", () => {
+  it("대화창 도구 scan_drafts·register_scan_draft가 등록돼 있고, 채택은 결재판(write)이며 실행자를 싣는다", () => {
     const reg = fs.readFileSync(path.join(E, "agenttools", "registry.ts"), "utf8");
     expect(reg).toMatch(/name: "scan_drafts",[\s\S]{0,200}write: false/);
     expect(reg).toMatch(/name: "register_scan_draft",[\s\S]{0,200}write: true/);
+    // 채택자 = 결재판을 승인한 사람(viewerctx) — null 고정이면 화면이 「채택됨(?)」이고 감사 actor가 빈다(검토관 2026-09-03)
+    const block = reg.slice(reg.indexOf('name: "register_scan_draft"'), reg.indexOf('name: "threats"'));
+    expect(block).toMatch(/currentViewer\(\)/);
+    expect(block).toMatch(/registerScanDraft\(String\(args\.id \?\? ""\), \(v\?\.userId \? findUserById/);
+    // 결재판이 「무엇을」 승인하는지 보인다 — effect가 초안 이름을 쓴다
+    expect(block).toMatch(/effect: \(args\) => \{[\s\S]*getScanDraft\(String\(args\.id/);
+    // threats 즉답 도구의 TI 해석은 시간 예산 안에서만 — 안내 줄은 잘림 밖
+    const h = fs.readFileSync(path.join(E, "agenttools", "handlers.ts"), "utf8");
+    const t = h.slice(h.indexOf("export async function runThreats("), h.indexOf("export async function runRemediation("));
+    expect(t).toContain("const 심각도말 = cti심각도한글;");
+    expect(t).toMatch(/const 본문 = \[[\s\S]*\]\.join\("\\n"\)\.slice\(0, 2400\);\s*return `\$\{본문\}\\n\\n\$\{표식\.다음\}/);
   });
   it("scan_drafts는 업무 데이터다 — 정리 대장과 실사용 전환 리셋에 들어 있다", () => {
     expect(TARGETS.scan_drafts?.tables).toEqual(["scan_drafts"]);

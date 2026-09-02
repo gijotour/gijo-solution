@@ -10,7 +10,7 @@ import { listProductIntros, listIntroFields, setIntroField, INTRO_FIELD_SCHEMA }
 import { expandOntology } from "../ontology";
 import { currentDocIds } from "../ragscope";
 import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, ReviewPatch, ApprovalStatus } from "../approvals";
-import { 표식, 심각도한글, 심각도표식, 자산종류한글 } from "../tone";
+import { 표식, 심각도한글, 심각도표식, 자산종류한글, cti심각도한글 } from "../tone";
 import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
 import { 한줄풀이글, 섞임고지 } from "../findingplain";
@@ -997,7 +997,7 @@ export async function runThreats(args: Record<string, string>): Promise<string> 
   //   그 답이 **담당자 화면에 그대로 나갔다**(2026-08-03 실전 147상황 실측: 30.5초 + 영문 상태값).
   //   내부 식별자와 영문 상태값은 사람이 읽는 글자가 아니다 — 말투 규범이 금지하는 둘이다.
   //   **사람이 읽을 답으로 만들고 즉답으로 돌린다**(재작성 20~30초를 안 쓴다).
-  const 심각도말 = (s: string) => (s === "critical" ? "심각" : s === "warning" ? "경고" : "참고");
+  const 심각도말 = cti심각도한글; // CTI 세 단계 라벨의 단일 출처(tone.ts) — scandrafts의 TI 프롬프트와 같은 말
   const 표 = (s: string) => (s === "critical" ? 표식.위험 : s === "warning" ? 표식.주의 : "·");
   const lines = top.map((m) => {
     // 걸린 자산이 수십 대면 나열이 답을 2,000자 밖으로 밀어낸다(150상황 선제 회차 실측:
@@ -1008,15 +1008,17 @@ export async function runThreats(args: Record<string, string>): Promise<string> 
   });
   const 잘림 =
     matches.length > top.length ? ` · 아래는 심각한 순 ${top.length}건입니다` : "";
-  // TI 팀원의 부르는 문(2026-09-03, 계획서 §7 2단계) — 매칭(규칙)은 그대로, 걸린 것이 있을 때만 해석 3줄. 실패하면 빈 문자열.
+  // TI 팀원의 부르는 문(2026-09-03, 계획서 §7 2단계) — 매칭(규칙)은 그대로, 걸린 것이 있을 때만 해석 3줄.
+  //   ⚠ 이 도구는 즉답(directAnswer)이다 — 해석은 **시간 예산 안(interpretThreats, 기본 5초)**에서만 붙고 넘으면 규칙 답만 즉시 나간다.
+  //   실패·초과는 빈 문자열(활동 신호에는 남는다). 「이어서」 안내 줄은 본문 잘림(2,400자) 밖에 둔다.
   const 해석 = await interpretThreats(top.map((m) => ({ type: m.finding.type, target: m.finding.target, severity: m.finding.severity, assets: m.matchedAssets.map((a) => a.assetName) })));
-  return [
+  const 본문 = [
     `최신 위협 ${summary.totalFindings}건 중 우리 자산에 걸리는 것 ${summary.matchedFindings}건` +
       ` (영향 자산 ${summary.affectedAssets}개 · 심각·경고 ${summary.criticalMatches}건)${잘림}`,
     ...lines,
     ...(해석 ? [해석] : []),
-    `\n${표식.다음} 이어서 — 자산 하나를 파고들려면 "○○ 자산 취약점 알려줘"`,
-  ].join("\n").slice(0, 2500);
+  ].join("\n").slice(0, 2400);
+  return `${본문}\n\n${표식.다음} 이어서 — 자산 하나를 파고들려면 "○○ 자산 취약점 알려줘"`;
 }
 
 // #5 조치 절차 — "이거 어떻게 조치해?"에 완화통제·보안제품·매뉴얼 근거로 답한다.

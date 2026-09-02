@@ -17,7 +17,8 @@ import { emitCollaboration } from "./collaboration";
 import { setAgentStatus, resetAgentToDefault } from "./agents";
 import { createTask } from "./tasks";
 import { recordAudit } from "./audit";
-import { 심각도한글 } from "./tone"; // 모델에게 주는 목록도 화면과 같은 우리말 심각도(영문이 답에 되돌아온다)
+import { 표식, cti심각도한글 } from "./tone"; // CTI 심각도 라벨의 단일 출처·🤖 표식 — 지역에서 새로 짓지 않는다(검토관 2026-09-03)
+import { listTasks } from "./tasks";
 
 migrate(
   "scan-drafts-2026-09-03",
@@ -61,7 +62,7 @@ export const SCAN_DRAFT_SCHEMA = {
 const MAX_VULNS_IN_PROMPT = 40;
 
 export function buildScanDraftPrompt(input: ScanDraftInput): string {
-  const lines = input.vulns.slice(0, MAX_VULNS_IN_PROMPT).map((v) => `[${v.code || "-"}] ${v.name} · 위험 ${v.risk || "-"} · 자산 ${v.host || "-"}`);
+  const lines = input.vulns.slice(0, MAX_VULNS_IN_PROMPT).map((v) => `${이름표(v.code, v.name)} · 위험 ${v.risk || "-"} · 자산 ${v.host || "-"}`);
   const 더 = input.vulns.length > MAX_VULNS_IN_PROMPT ? `\n(외 ${input.vulns.length - MAX_VULNS_IN_PROMPT}건 생략)` : "";
   return [
     "다음은 방금 자산·취약점으로 등록된 웹취약점 점검 보고서의 항목이다. 보안담당자에게 줄 해석 초안을 JSON으로만 써라.",
@@ -75,6 +76,10 @@ export function buildScanDraftPrompt(input: ScanDraftInput): string {
 }
 
 const norm = (s: unknown) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, "");
+/** json_schema 경로는 한자 차단(GBNF)·중국어 재생성 후처리가 둘 다 꺼져 있다 — 사람이 읽는 줄은 여기서 거른다(actioncheck.ts와 같은 잣대). */
+export const 우리말 = (s: string) => /[가-힣]/.test(s) && !/[一-鿿]/.test(s);
+/** 파서의 name에 [코드]가 이미 붙어 있을 수 있다(webreport) — 두 번 찍지 않는다. */
+export const 이름표 = (code: string, name: string) => (code && !name.includes(`[${code}]`) ? `[${code}] ${name}` : name || `[${code || "-"}]`);
 
 /** 모델 출력이 보고서 사실 안에 있는지 검증한다 — 우선 조치는 실제 항목과 code(또는 name+host)가 맞아야 남는다. */
 export function validateDraft(raw: unknown, vulns: ScanDraftVuln[]): { draft: ScanDraft; dropped: number } | null {
@@ -85,7 +90,7 @@ export function validateDraft(raw: unknown, vulns: ScanDraftVuln[]): { draft: Sc
   if (!o || typeof o !== "object") return null;
   const r = o as { summary?: unknown; priorities?: unknown; caveats?: unknown };
   const summary = String(r.summary ?? "").trim();
-  if (summary.length < 10) return null;
+  if (summary.length < 10 || !우리말(summary)) return null;
   const byCode = new Map(vulns.filter((v) => v.code).map((v) => [norm(v.code), v]));
   const out: ScanDraftPriority[] = [];
   let dropped = 0;
@@ -93,15 +98,20 @@ export function validateDraft(raw: unknown, vulns: ScanDraftVuln[]): { draft: Sc
     if (!p || typeof p !== "object") { dropped += 1; continue; }
     const q = p as Record<string, unknown>;
     const code = norm(q.code);
-    let hit = code ? byCode.get(code) : undefined;
-    if (!hit) hit = vulns.find((v) => norm(v.name) && norm(v.name) === norm(q.name) && (!q.host || norm(v.host) === norm(q.host)));
+    const host = norm(q.host);
+    // 같은 코드가 여러 자산에 걸리는 것이 보고서의 보통 모양이다(host::code) — code+host가 함께 맞는 항목을 먼저 찾고,
+    // 자산을 지어냈거나 비웠을 때만 코드로 교정한다(검토관 2026-09-03: 예전엔 코드가 먼저 이겨 다른 자산을 지목했다).
+    let hit = code ? vulns.find((v) => norm(v.code) === code && (!host || norm(v.host) === host)) : undefined;
+    if (!hit && code) hit = byCode.get(code);
+    if (!hit) hit = vulns.find((v) => norm(v.name) && norm(v.name) === norm(q.name) && (!host || norm(v.host) === host));
     if (!hit) { dropped += 1; continue; }
     if (out.some((x) => x.code === hit!.code && x.host === hit!.host)) continue; // 같은 것을 두 번
-    out.push({ code: hit.code, name: hit.name, host: hit.host, why: String(q.why ?? "").trim().slice(0, 200) });
+    const why = String(q.why ?? "").trim().slice(0, 200);
+    out.push({ code: hit.code, name: hit.name, host: hit.host, why: 우리말(why) ? why : "" });
     if (out.length >= 3) break;
   }
   if (out.length === 0) return null; // 근거 있는 우선 조치가 하나도 없으면 초안이 아니다
-  const caveats = (Array.isArray(r.caveats) ? r.caveats : []).map((c) => String(c ?? "").trim()).filter(Boolean).slice(0, 3).map((c) => c.slice(0, 200));
+  const caveats = (Array.isArray(r.caveats) ? r.caveats : []).map((c) => String(c ?? "").trim()).filter((c) => c && 우리말(c)).slice(0, 3).map((c) => c.slice(0, 200));
   return { draft: { summary: summary.slice(0, 600), priorities: out, caveats }, dropped };
 }
 
@@ -163,18 +173,22 @@ export function getScanDraft(idOrPrefix: string): ScanDraftRow | undefined {
 }
 
 /** 사람이 초안을 채택한다 — 우선 조치가 할 일(스캔 팀원 귀속)이 된다. 두 번 채택은 거부. */
-export function registerScanDraft(idOrPrefix: string, by?: string | null): { row: ScanDraftRow; taskIds: string[] } {
+export function registerScanDraft(idOrPrefix: string, by?: string | null): { row: ScanDraftRow; taskIds: string[]; 신규: number; 기존: number } {
   const row = getScanDraft(idOrPrefix);
   if (!row) throw new Error(`초안을 찾지 못했습니다: ${idOrPrefix || "(최근 없음)"}`);
   if (row.status === "registered") throw new Error(`이미 채택된 초안입니다(${row.registeredBy ?? "?"} · 할 일 ${row.taskIds.length}건)`);
+  // createTask는 같은 글의 할 일이 이미 있으면 그 행을 돌려준다(중복 억제) — 「N건 등록」이 거짓이 되지 않게 새로 생긴 것만 센다.
+  const 전에 = new Set(listTasks({ includeAgentRuns: true }).map((t) => t.id));
   const taskIds = row.draft.priorities.map((p) =>
     // ⚠ agentId를 붙이지 않는다 — tasks.listTasks는 agentId가 있는 행을 「에이전트 실행 기록」으로 보고 기본 목록에서 숨긴다.
     //   이 할 일은 사람이 채택한 사람의 일이다. 출처는 origin "ai"(AI가 제안), 근거는 ref로 초안에 잇는다. P1 = 높음(tasks.ts 잣대 P0~P3).
-    createTask({ text: `[스캔 해석] ${p.host} ${p.code ? `[${p.code}] ` : ""}${p.name} — ${p.why || "우선 조치"}`, priority: "P1", origin: "ai", ref: `scan_draft:${row.id}` }).id,
+    createTask({ text: `[스캔 해석] ${p.host} ${이름표(p.code, p.name)} — ${p.why || "우선 조치"}`, priority: "P1", origin: "ai", ref: `scan_draft:${row.id}` }).id,
   );
+  const 신규 = taskIds.filter((id) => !전에.has(id)).length;
+  const 기존 = taskIds.length - 신규;
   db.prepare("UPDATE scan_drafts SET status = 'registered', registeredBy = ?, registeredAt = ?, taskIds = ? WHERE id = ?").run(by ?? null, Date.now(), JSON.stringify(taskIds), row.id);
-  recordAudit({ kind: "write", actor: by ?? null, action: "스캔 해석 초안 채택", target: row.source, detail: `초안 ${row.id.slice(0, 8)} · 할 일 ${taskIds.length}건`, result: "ok" });
-  return { row: getScanDraft(row.id)!, taskIds };
+  recordAudit({ kind: "write", actor: by ?? null, action: "스캔 해석 초안 채택", target: row.source, detail: `초안 ${row.id.slice(0, 8)} · 할 일 새로 ${신규}건${기존 ? ` · 이미 있던 ${기존}건` : ""}`, result: "ok" });
+  return { row: getScanDraft(row.id)!, taskIds, 신규, 기존 };
 }
 
 export function formatScanDrafts(rows: ScanDraftRow[]): string {
@@ -182,9 +196,11 @@ export function formatScanDrafts(rows: ScanDraftRow[]): string {
   return rows
     .map((r) => {
       const 머리 = `■ ${r.source} — 자산 ${r.hosts}·취약점 ${r.findings}건 · ${new Date(r.createdAt).toLocaleString("ko-KR")} · ${r.status === "registered" ? `채택됨(${r.registeredBy ?? "?"}, 할 일 ${r.taskIds.length}건)` : `초안 #${r.id.slice(0, 8)}`}`;
-      const 우선 = r.draft.priorities.map((p, i) => `  ${i + 1}. [${p.code || "-"}] ${p.name} @ ${p.host} — ${p.why}`);
-      const 주의 = r.draft.caveats.map((c) => `  ⚠ ${c}`);
-      return [머리, `  ${r.draft.summary}`, ...우선, ...주의, r.dropped ? `  (근거 없는 항목 ${r.dropped}건은 버렸습니다)` : ""].filter(Boolean).join("\n");
+      // 보고서와 대조한 것은 우선 조치의 코드·자산뿐이다 — 요약·이유·확인할 점은 AI가 쓴 글이라 🤖(안내) 표식을 붙이고 경계를 말한다.
+      const 우선 = r.draft.priorities.map((p, i) => `  ${i + 1}. ${이름표(p.code, p.name)} @ ${p.host}${p.why ? ` — ${표식.안내} ${p.why}` : ""}`);
+      const 주의 = r.draft.caveats.map((c) => `  ${표식.안내} 확인할 점: ${c}`);
+      return [머리, `  ${표식.안내} ${r.draft.summary}`, ...우선, ...주의, r.dropped ? `  (근거 없는 항목 ${r.dropped}건은 버렸습니다)` : "",
+        `  ${표식.안내} 요약·이유·확인할 점은 AI가 쓴 글이라 사실 확인이 필요합니다 — 보고서와 대조한 것은 우선 조치의 코드·자산뿐입니다`].filter(Boolean).join("\n");
     })
     .join("\n\n")
     .slice(0, 2500);
@@ -194,9 +210,12 @@ export function formatScanDrafts(rows: ScanDraftRow[]): string {
 export interface ThreatMatchLite { type: string; target: string; severity: string; assets: string[] }
 export const TI_INTERPRET_SCHEMA = {
   type: "object",
-  properties: { 해석: { type: "string" }, 우선: { type: "array", items: { type: "string" } } },
-  required: ["해석", "우선"],
+  // 키는 영문(스키마 강제 디코딩 관례 — 한글 키는 실모델로 통과시킨 근거가 없다). 라벨·설명은 한글.
+  properties: { interpretation: { type: "string" }, first_assets: { type: "array", items: { type: "string" } } },
+  required: ["interpretation", "first_assets"],
 } as const;
+/** TI 해석 시간 예산 — threats는 즉답 도구다. 넘으면 규칙 답만 즉시 나간다(GIJO_TI_INTERPRET_MS, 기본 5초). */
+const TI_INTERPRET_MS = () => Math.max(500, Number(process.env.GIJO_TI_INTERPRET_MS ?? 5000));
 
 /**
  * CTI 매칭 결과(규칙)가 있을 때만 해석 3줄을 만든다. 실패하면 빈 문자열 — 요약(규칙)은 그대로 값이 있다.
@@ -207,18 +226,23 @@ export async function interpretThreats(items: ThreatMatchLite[], deps?: { chat?:
   setAgentStatus("ti", "working");
   try {
     const chat: ChatFn = deps?.chat ?? ((await import("./llm.js")).chat as unknown as ChatFn);
-    const 목록 = items.slice(0, 8).map((m) => `- [${심각도한글(m.severity)}] ${m.type} — ${m.target} → 우리 자산: ${m.assets.slice(0, 3).join(", ")}`).join("\n");
-    const out = await chat({
-      agentId: "ti", trusted: true, responseSchema: TI_INTERPRET_SCHEMA, maxTokens: 350,
-      message: `아래는 규칙 엔진이 위협 인텔을 우리 자산과 대조해 걸러낸 결과다(이미 확정된 사실). JSON으로만 답하라.\n해석: 담당자에게 왜 지금 이것이 문제인지 2~3문장(한국어, 250자 이내). 우선: 먼저 볼 자산 최대 3개(목록에 있는 자산 이름 그대로).\n목록에 없는 자산·위협·숫자를 지어내지 마라.\n\n${목록}`,
-    });
-    let o: { 해석?: unknown; 우선?: unknown } = {};
+    const 목록 = items.slice(0, 8).map((m) => `- [${cti심각도한글(m.severity)}] ${m.type} — ${m.target} → 우리 자산: ${m.assets.slice(0, 3).join(", ")}`).join("\n");
+    const 예산 = new Promise<string>((resolve) => setTimeout(() => resolve(""), TI_INTERPRET_MS()).unref?.());
+    const out = await Promise.race([
+      chat({
+        agentId: "ti", trusted: true, responseSchema: TI_INTERPRET_SCHEMA, maxTokens: 350,
+        message: `아래는 규칙 엔진이 위협 인텔을 우리 자산과 대조해 걸러낸 결과다(이미 확정된 사실). JSON으로만 답하라.\ninterpretation: 담당자에게 왜 지금 이것이 문제인지 2~3문장(한국어, 250자 이내). first_assets: 먼저 볼 자산 최대 3개(목록에 있는 자산 이름 그대로).\n목록에 없는 자산·위협·숫자를 지어내지 마라.\n\n${목록}`,
+      }),
+      예산,
+    ]);
+    if (!out) return ""; // 시간 예산 초과 — 규칙 답만 즉시(활동 신호에는 남는다)
+    let o: { interpretation?: unknown; first_assets?: unknown } = {};
     try { o = JSON.parse(String(out).replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { return ""; }
-    const 해석 = String(o.해석 ?? "").trim().slice(0, 300);
-    if (해석.length < 10) return "";
+    const 해석 = String(o.interpretation ?? "").trim().slice(0, 300);
+    if (해석.length < 10 || !우리말(해석)) return "";
     const 자산전부 = new Set(items.flatMap((m) => m.assets.map(norm)));
-    const 우선 = (Array.isArray(o.우선) ? o.우선 : []).map((s) => String(s ?? "").trim()).filter((s) => s && 자산전부.has(norm(s))).slice(0, 3);
-    return `🛰 TI 해석: ${해석}${우선.length ? `\n  먼저 볼 자산: ${우선.join(", ")}` : ""}`;
+    const 우선 = (Array.isArray(o.first_assets) ? o.first_assets : []).map((s) => String(s ?? "").trim()).filter((s) => s && 자산전부.has(norm(s))).slice(0, 3);
+    return `${표식.안내} TI 해석: ${해석}${우선.length ? `\n  먼저 볼 자산: ${우선.join(", ")}` : ""}`;
   } catch {
     return "";
   } finally {

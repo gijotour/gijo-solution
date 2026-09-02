@@ -28,6 +28,8 @@ import { 학습재료가못되나 } from "./datasethygiene";
 import "./worksessions";
 import { recordAudit } from "./audit";
 import { isBinaryLikeChunk } from "./ragsanitize";
+import { gradeOf } from "./grades";
+
 import type { GijoUser } from "../auth/users";
 import type { MemoryDocument } from "./memory"; // 타입만 — 런타임 화살 없음
 
@@ -374,7 +376,13 @@ export function intakeDistilledCandidates(teacher: string, items: DistillItem[])
   return { accepted, rejected, byReason };
 }
 
-export interface DistillCorpusOptions { category?: string; topic?: string; origins?: string[]; maxPerDoc?: number; maxChunks?: number; minChars?: number }
+export interface DistillCorpusOptions {
+  category?: string; topic?: string; origins?: string[]; maxPerDoc?: number; maxChunks?: number; minChars?: number;
+  /** 내보낼 등급(grades.ts 잣대). 기본 공개(O)만 — 출하 베이스 재료에 민감(S)이 섞이면 안 된다. C(기밀)는 무엇을 줘도 안 나간다. */
+  allowedGrades?: string[];
+  /** 요청자 눈으로 한 번 더 거른다(라우트가 열람불가공용으로 주입) — 등급 게이트를 창구가 우회하지 않게. */
+  열람가능?: (documentId: string) => boolean;
+}
 export interface DistillCorpusChunk { ref: string; documentId: string; chunkIndex: number; category: string | null; text: string }
 export interface DistillCorpusResult { chunks: DistillCorpusChunk[]; docs: number; skipped: Record<string, number>; filter: { category: string; origins: string[] | null } }
 type CorpusMemory = { listDocuments(): Promise<MemoryDocument[]>; getDocumentChunks(id: string, limit?: number): Promise<{ chunkIndex: number; text: string }[]> };
@@ -393,16 +401,21 @@ export async function buildDistillCorpus(b: DistillCorpusOptions, mem: CorpusMem
   const maxPerDoc = Math.max(1, Math.min(2000, Number(b.maxPerDoc) || 400));
   const maxChunks = Math.max(1, Math.min(20000, Number(b.maxChunks) || 4000));
   const minChars = Math.max(0, Number(b.minChars) || 80);
+  // 등급은 grades.ts 한 곳의 잣대로 — 문자열 비교를 새로 적으면 깨진 값·소문자가 새고 민감(S)이 그대로 나간다(검토관 2026-09-03).
+  const allowed: string[] = (Array.isArray(b.allowedGrades) && b.allowedGrades.length ? b.allowedGrades : ["O"]).map((g) => gradeOf(g)).filter((g) => g !== "C");
   const docs = (await mem.listDocuments()).filter((d) => d.scope === "global");
-  const skipped: Record<string, number> = { "승인 문답": 0, "기밀 C": 0, "출처 제외": 0, "업무영역 다름": 0, "바이너리꼴": 0, "너무 짧음": 0, "문서당 상한": 0, "전체 상한": 0 };
+  const skipped: Record<string, number> = { "승인 문답": 0, "개인 문서": 0, "등급 제외": 0, "열람 불가": 0, "출처 제외": 0, "업무영역 다름": 0, "바이너리꼴": 0, "너무 짧음": 0, "문서당 상한": 0, "전체 상한(문서)": 0, "전체 상한(조각)": 0 };
   const out: DistillCorpusChunk[] = [];
   let docsUsed = 0;
   for (const d of docs) {
     if (d.origin === "approved-qa") { skipped["승인 문답"] += 1; continue; }
-    if (d.grade === "C") { skipped["기밀 C"] += 1; continue; }
+    // 개인 문서(내 문서)는 scope가 global이어도 문서 id 접두(personal:)로 갈린다 — scope만 보면 그대로 샌다(검토관 2026-09-03).
+    if (d.documentId.startsWith("personal:")) { skipped["개인 문서"] += 1; continue; }
+    if (!allowed.includes(gradeOf(d.grade))) { skipped["등급 제외"] += 1; continue; }
+    if (b.열람가능 && !b.열람가능(d.documentId)) { skipped["열람 불가"] += 1; continue; }
     if (origins && !origins.includes(d.origin ?? "")) { skipped["출처 제외"] += 1; continue; }
     if (category && (d.category ?? "") !== category) { skipped["업무영역 다름"] += 1; continue; }
-    if (out.length >= maxChunks) { skipped["전체 상한"] += 1; continue; }
+    if (out.length >= maxChunks) { skipped["전체 상한(문서)"] += 1; continue; }
     const chunks = await mem.getDocumentChunks(d.documentId, 1_000_000);
     let took = 0;
     for (const c of chunks) {
@@ -410,7 +423,7 @@ export async function buildDistillCorpus(b: DistillCorpusOptions, mem: CorpusMem
       if (text.length < minChars) { skipped["너무 짧음"] += 1; continue; }
       if (isBinaryLikeChunk(text)) { skipped["바이너리꼴"] += 1; continue; }
       if (took >= maxPerDoc) { skipped["문서당 상한"] += 1; continue; }
-      if (out.length >= maxChunks) { skipped["전체 상한"] += 1; break; }
+      if (out.length >= maxChunks) { skipped["전체 상한(조각)"] += 1; break; }
       out.push({ ref: `store:${d.documentId}#${crypto.createHash("sha1").update(text).digest("hex").slice(0, 12)}`, documentId: d.documentId, chunkIndex: c.chunkIndex, category: d.category, text });
       took += 1;
     }
@@ -529,7 +542,8 @@ export function registerLearnCandidateRoutes(app: Express): void {
     try {
       // 동적 import — memory(지식 층)로 가는 정적 화살을 새로 긋지 않는다(의존 수리 2026-08-28 원칙).
       const mem = await import("./memory.js");
-      const r = await buildDistillCorpus(b, mem);
+      // 요청자 눈으로 한 번 더 — 창구가 등급 게이트(열람불가공용)를 우회하지 않는다.
+      const r = await buildDistillCorpus({ ...b, 열람가능: (id) => !mem.열람불가공용(id, req) }, mem);
       recordAudit({
         // "write"가 아니라 반출이지만 AuditKind에 열람 종류가 없다 — 증류 편입(write)과 같은 흐름의 짝으로 둔다.
         kind: "write", actor: actorOf(req), action: "증류 근거 코퍼스 내줌",

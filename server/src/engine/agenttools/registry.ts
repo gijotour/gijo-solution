@@ -1,7 +1,7 @@
 // engine/agenttools/registry.ts — TOOLS 등록표 + 공개 API(find/validate/buildApproval…)
 // (2026-08-06 agenttools.ts 분리) 핸들러 본문은 handlers.ts — 여기는 이름↔스키마 매핑과 관문만.
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
-import { listScanDrafts, formatScanDrafts, registerScanDraft } from "../scandrafts";
+import { listScanDrafts, formatScanDrafts, registerScanDraft, getScanDraft } from "../scandrafts";
 import { watchFolderText, addWatchFolder, removeWatchFolder, watchFolderDocCount } from "../watchfolder";
 // ⚠ 레드팀 공격 개수는 **세어서** 쓴다(2026-08-18). 손으로 「14종」이라 적어 뒀는데 실제는 30종이었다 —
 //   그 문구 하나가 **살아 있는 모델에 공격을 발사하기 전 받는 동의 문구**였다.
@@ -1471,11 +1471,19 @@ const TOOLS: AgentTool[] = [
       '스캔 해석 초안의 우선 조치를 할 일(조치 항목)로 등록한다 — "해석 초안 채택해줘", "초안 3a1f 조치로 등록"처럼 말할 때. ' +
       '초안 번호를 비우면 가장 최근 초안이다.',
     params: [{ name: "id", label: "초안 번호", description: "초안 id(앞 8자리로도 됨) — 비우면 가장 최근 초안", required: false }],
-    effect: () => "초안의 우선 조치가 할 일 목록에 등록됩니다(스캔 팀원 귀속 · 우선순위 높음)",
+    // 결재판에 「무엇을」 승인하는지 보인다 — id를 비우면 가장 최근 초안이 조용히 골라지므로 그 이름을 여기서 드러낸다(검토관 2026-09-03).
+    effect: (args) => {
+      const d = getScanDraft(String(args.id ?? ""));
+      return d
+        ? `${d.source} 초안 #${d.id.slice(0, 8)}의 우선 조치 ${d.draft.priorities.length}건(${d.draft.priorities.map((p) => p.host).join(" · ")})이 할 일로 등록됩니다(우선순위 높음 · 출처 AI)`
+        : "채택할 초안이 없습니다 — 웹취약점 보고서를 올리면 스캔 팀원이 초안을 남깁니다";
+    },
     undo: "할 일 화면에서 그 항목을 삭제하면 됩니다(초안은 채택됨 표시로 남습니다)",
     run: (args) => {
-      const r = registerScanDraft(String(args.id ?? ""), null);
-      return `초안 채택 — ${r.row.source}: 할 일 ${r.taskIds.length}건 등록(${r.row.draft.priorities.map((p) => `[${p.code}] ${p.host}`).join(" · ")})`;
+      // 실행자 = 결재판을 승인한 사람(viewerctx) — 같은 파일 watch_folder_add와 같은 방식. 못 집으면 채택은 막지 않고 「담당자(대화창)」로 남긴다.
+      const v = currentViewer();
+      const r = registerScanDraft(String(args.id ?? ""), (v?.userId ? findUserById(String(v.userId))?.displayName : null) ?? "담당자(대화창)");
+      return `초안 채택 — ${r.row.source}: 할 일 ${r.신규}건 새로 등록${r.기존 ? `(이미 있던 ${r.기존}건은 그대로)` : ""} — ${r.row.draft.priorities.map((p) => `[${p.code}] ${p.host}`).join(" · ")}`;
     },
   },
   {

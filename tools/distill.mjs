@@ -157,9 +157,11 @@ for (const f of (SOURCE === "store" ? [] : files)) {
 }
 // 같은 조각이 매번 같은 순서면 상위 조각만 닳는다 — 결정적으로 섞는다(주제+날짜 시드).
 let 코퍼스문서 = 0;
+let 코퍼스auth = null; // 같은 서버면 편입에도 이 세션을 쓴다 — 같은 계정 두 번 로그인은 중복로그인 방지(409)에 걸린다(검토관 2026-09-03)
 if (SOURCE === "store") {
   // 지식 저장소 조각 — admin 로그인 필요(코퍼스 창구는 admin). 같은 창구로 편입도 하므로 계정 하나면 된다.
-  const auth = await login(CORPUS_SERVER);
+  코퍼스auth = await login(CORPUS_SERVER);
+  const auth = 코퍼스auth;
   const r = await fetch(CORPUS_SERVER + "/api/learnloop/distill/corpus", { method: "POST", headers: auth, body: JSON.stringify({ category: TOPIC, maxChunks: 20000 }), redirect: "error" });
   const j = await r.json();
   if (!r.ok) throw new Error("코퍼스 창구 실패: " + JSON.stringify(j).slice(0, 200));
@@ -173,13 +175,18 @@ pool.sort((a, b) => (sha12(a.ref + seed) < sha12(b.ref + seed) ? -1 : 1));
 const need = Math.ceil(LIMIT / PER_CHUNK);
 const picked = pool.slice(0, need);
 console.log(`[distill] 주제 ${TOPIC} · 파일 ${files.length} · 주제 조각 ${pool.length} · 쓸 조각 ${picked.length} (조각당 ${PER_CHUNK}문답, 목표 ${LIMIT}) · 교사 ${ENDPOINT}${DRY ? " · DRY-RUN" : ""}`);
-if (!pool.length) { console.error("주제에 맞는 조각이 없습니다 — --files 로 문서를 더 주세요"); process.exit(2); }
+if (!pool.length) {
+  console.error(SOURCE === "store"
+    ? `저장소에 '${TOPIC}' 업무영역의 공개(global) 문서 조각이 없거나 거름(위 줄의 skipped)에 전부 걸렸습니다 — 문서의 업무영역 분류·등급을 확인하세요`
+    : "주제에 맞는 조각이 없습니다 — --files 로 문서를 더 주세요");
+  process.exit(2);
+}
 if (DRY) { for (const p of picked.slice(0, 3)) console.log("--", p.ref, "\n", p.text.slice(0, 200).replace(/\n/g, " ")); process.exit(0); }
 
 const report = { topic: TOPIC, endpoint: ENDPOINT, startedAt: new Date().toISOString(), files: SOURCE === "store" ? 0 : files.length, source: SOURCE, corpusDocs: 코퍼스문서, chunks: picked.length, generated: 0, preRejected: {}, preChecked: 0, accepted: 0, rejected: {}, teacher: null, tokens: { prompt: 0, completion: 0 }, teacherMs: 0, errors: [] };
 // --no-intake: 편입 없이 교사 수율만 잰다(교사·프롬프트 비교용) — 서버 로그인도 안 한다.
 const NO_INTAKE = has("--no-intake");
-const auth = NO_INTAKE ? null : await login();
+const auth = NO_INTAKE ? null : (코퍼스auth && CORPUS_SERVER === SERVER ? 코퍼스auth : await login()); // 세션 하나 재사용(서버가 다를 때만 새 로그인)
 const queue = [...picked]; let teacherId = null; const batch = []; const flushEvery = 40;
 async function flush(force = false) {
   if (!batch.length || (!force && batch.length < flushEvery)) return;

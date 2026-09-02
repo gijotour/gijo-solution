@@ -321,7 +321,8 @@ async function tryWebReport(filename: string, base64: string, uploadedBy?: strin
     //   ⚠ 이 경로(웹취약점 보고서)에서만 부른다 — 자동 갈래는 보고서라는 신호가 없어 초안을 만들 근거가 없다(설계관).
     void draftScanInterpretation({
       source: filename, hosts: r.hosts, findings: r.findings,
-      vulns: parsed.vulns.map((v) => ({ code: v.pluginId, name: v.name, risk: v.risk, host: v.host })),
+      // 파서의 name에는 [IW-20] 같은 코드가 이미 앞에 붙어 있다 — 떼서 넘긴다(초안·할 일 제목에 코드가 두 번 찍힌다, 검토관 2026-09-03).
+      vulns: parsed.vulns.map((v) => ({ code: v.pluginId, name: v.name.replace(/^\[[^\]]+\]\s*/, ""), risk: v.risk, host: v.host })),
     });
     emitCollaboration({
       from: "scan",
