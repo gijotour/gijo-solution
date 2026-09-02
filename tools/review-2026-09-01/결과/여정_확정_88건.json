@@ -1,0 +1,3264 @@
+[
+ {
+  "id": "F2-01",
+  "area": "로그인",
+  "severity": "P1",
+  "title": "서버 주소 칸이 「비워 두세요」라고 안내하면서 실제로는 localhost:7446이 회색 글자로 늘 채워져 있다 — 분산 모드 첫 로그인에서 잘못 읽힌다",
+  "user_impact": "사내 GPU 서버(표준 4000)에 붙어야 하는 담당자가 회색으로 미리 채워진 「http://localhost:7446」을 힌트(placeholder)로 착각해 아이디·비밀번호만 넣고 로그인을 누르면 실패하고, 안내대로 칸을 비우면 주소는 바뀌지 않고 그 로그인은 「최근 로그인」에도 저장되지 않는다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 309,
+    "quote": "<input id=\"serverUrl\" placeholder=\"서버 주소 (이 PC에 동봉된 서버면 비워 두세요)\""
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 369,
+    "quote": "serverInput.value = window.gijo.getServerUrl();"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 143,
+    "quote": ".server-row input { margin-bottom: 0; font-size: 12px; color: var(--muted); }"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 65,
+    "quote": "if (!authState.serverUrl) authState.serverUrl = 기본서버주소();"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 53,
+    "quote": "return 에디션() === \"lite\" ? 7445 : 7446;"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 529,
+    "quote": "if (serverInput.value.trim()) window.gijo.setServerUrl(serverInput.value.trim());"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 98,
+    "quote": "if (!serverUrl || !username) return;"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 353,
+    "quote": "단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 <b>비워 두세요</b> — 앱이 알아서 맞춥니다."
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 838,
+    "quote": "\"서버 연결\": \"단일 데스크톱 모드는 기본 주소(localhost:4000) 그대로"
+   },
+   {
+    "file": "server/src/index.ts",
+    "line": 45,
+    "quote": "const PORT = Number(process.env.GIJO_SERVER_PORT ?? 4000);"
+   }
+  ],
+  "proposal": "main.ts가 seed한 기본값은 값이 아니라 **placeholder**로 보이게 하고(칸은 비워 두고 placeholder=\"예: http://10.8.0.1:4000 — 이 PC에 동봉된 서버면 비워 두세요\"), 값이 들어 있을 때는 본문색(var(--text))으로 그려 「입력된 주소」임을 분명히 한다. doLogin에서 칸이 비어 있으면 setServerUrl(기본서버주소)로 **되돌리고**, creds.save에도 실제 쓰인 주소를 넘긴다. 힌트 두 줄은 표준 배치인 분산 모드를 첫 줄로 올리고, screenguide 838행의 「localhost:4000」은 포트를 박지 말고 「앱이 정한 기본 주소」로 고친다(에디션 포트 단일 출처 원칙, main.ts 2026-08-13 결정과 정합).",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": true,
+  "verify_reason": "인용 모두 일치(login.html:309·369·143, main.ts:53·65·98, login.html:529). 값이 seed되는 것은 2026-08-13 결정(login.html:304-308 주석)이지만 finding이 그 결정을 알고 「값과 placeholder가 같은 회색(--muted #b3ada4 ≈ 기본 placeholder 색)으로 보인다」·「비우면 주소가 안 되돌아가고(529행 조건) creds.save가 빈 주소로 조기 반환(main.ts:98)」을 짚었으니 살린다. 다만 실패 문구가 「서버 주소를 확인하세요」를 포함하고(560행) 주소가 칸에 보이므로 담당자가 완전히 막히지는 않는다 — 「비워 두세요 — 앱이 알아서 맞춥니다」(353행)가 한 번 원격 주소를 저장한 뒤엔 거짓이 되는 정직 위반이 핵심이라 P1."
+ },
+ {
+  "id": "F2-02",
+  "area": "로그인",
+  "severity": "P1",
+  "title": "「10.8.0.1:4000」처럼 http:// 없이 주소를 넣으면 fetch가 ERR_INVALID_URL로 터지는데 화면은 「아이디/비밀번호 확인」이라고 말한다 — 설치 첫 화면(setup.html)이 바로 그 형식을 예시로 든다",
+  "user_impact": "첫 설치 화면의 예시대로 「10.8.0.1:4000」을 서버 주소에 넣은 담당자는 어떤 아이디·비밀번호를 넣어도 100% 실패하고, 화면은 자격증명을 의심하라고 하니 비밀번호를 여러 번 바꿔 넣다 잠금(429)까지 갈 수 있다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/setup.html",
+    "line": 138,
+    "quote": "서버 주소(예: <code>10.8.0.1:4000</code>)를 입력하는 로그인 화면으로 갑니다."
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 33,
+    "quote": "serverUrl = url.replace(/\\/+$/, \"\");"
+   },
+   {
+    "file": "client/src/api/auth.ts",
+    "line": 49,
+    "quote": "const res = await fetch(`${getServerUrl()}/api/auth/login`, {"
+   },
+   {
+    "file": "client/src/api/auth.ts",
+    "line": 53,
+    "quote": "}).catch(() => null);"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 560,
+    "quote": "errMsg.textContent = \"로그인 실패: 아이디/비밀번호 또는 서버 주소를 확인하세요.\";"
+   }
+  ],
+  "proposal": "core.ts setServerUrl에서 스킴이 없으면 `http://`를 붙이고 `new URL()`로 검증해 잘못된 주소면 즉시 「주소 형식이 틀렸습니다(예: http://10.8.0.1:4000)」를 login.html errMsg에 띄운다(fetch 전에). setup.html 138행 예시는 `http://10.8.0.1:4000`으로 고쳐 매뉴얼 §0.2와 같은 형식으로 맞춘다. 실행 검증: node로 `new URL(\"10.8.0.1:4000/api/auth/login\")` → ERR_INVALID_URL 확인(2026-09-02).",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "setup.html:138 예시가 스킴 없는 「10.8.0.1:4000」, core.ts:33 setServerUrl은 스킴을 보정하지 않고, client/src에 정규화 코드 0건(main.ts의 new URL은 다른 용도) — node로 new URL(\"10.8.0.1:4000/...\") → ERR_INVALID_URL 재확인. 단 과장 두 곳: 화면 문구(560행)는 「아이디/비밀번호 **또는 서버 주소**를 확인하세요」라 서버 주소도 언급하고, fetch가 서버에 닿지 않으니 실패가 서버 카운터(auth.ts:280)에 쌓이지 않아 429 잠금은 일어나지 않는다. 담당자가 잘못 판단할 여지는 있으나 완전히 막히진 않아 P1."
+ },
+ {
+  "id": "F2-03",
+  "area": "로그인",
+  "severity": "P1",
+  "title": "로그인 전에 서버가 살아 있는지 확인할 수단이 없다 — 매뉴얼은 「상단 서버 연결 점」을 보라 하지만 로그인 화면엔 ⚙ 하나뿐이고, GIJO가 아닌 서버(404)도 자격증명 오류로 뭉개진다",
+  "user_impact": "주소를 잘못 넣었는지, 서버가 꺼졌는지, 방화벽인지, 비밀번호가 틀렸는지를 담당자가 로그인 버튼을 눌러 보는 것 말고는 가릴 방법이 없고, 매뉴얼 문제해결 항목이 가리키는 연결 표시는 이 화면에 존재하지 않는다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 425,
+    "quote": "**로그인이 안 돼요.** 상단 서버 연결 점이 초록인지 확인 → 서버 주소가 맞는지 확인"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 1089,
+    "quote": "// 왼콽 패널이 없는 화면(login) — 우상단 스트립의 ⚙만(예외)"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 465,
+    "quote": "const h = await window.gijo.checkServerHealth();"
+   },
+   {
+    "file": "client/src/api/auth.ts",
+    "line": 43,
+    "quote": ": \"invalid_credentials\";"
+   },
+   {
+    "file": "server/src/app.ts",
+    "line": 271,
+    "quote": "res.json({ ok: true, service: \"gijo-as-server\", schema: schemaVersion(), serverTime: Date.now(), airgap:"
+   }
+  ],
+  "proposal": "서버 주소 칸 아래에 한 줄 상태를 둔다: 입력이 멎으면(500ms) 무인증 `/api/health`를 불러 `service===\"gijo-as-server\"`면 「● 서버 연결됨 · 봉인 켜짐/꺼짐」, 아니면 「○ 이 주소에서 GIJO 서버를 찾지 못했습니다」를 보인다(showClockHint가 이미 쓰는 checkServerHealth 재사용). auth.ts loginFailure는 401/409/429가 아닌 상태(404·5xx·HTML 응답)를 `code:\"error\"`로 갈라 「GIJO 서버가 아닌 것 같습니다」로 보낸다. 매뉴얼 425행은 이 표시를 가리키도록 고친다(요청 시).",
+  "plan_item": "전-7",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "매뉴얼:425의 「상단 서버 연결 점」은 titlebar.js:965 「서버 연결상태 배지는 없앴다(2026-08-08 사용자 지시)」로 앱 전체에서 사라졌고 로그인 화면은 원래 ⚙만(titlebar.js:1089) — 매뉴얼이 낡았다는 지적은 맞다. checkServerHealth는 2차 인증 단계(465행)에서만 쓰이고, loginFailure(auth.ts:40-43)는 404·5xx를 invalid_credentials로 뭉갠다 — 확인됨. 2026-08-08 결정은 「늘 초록인 칩이 자리만 먹는다」는 앱 안 이야기이고, 로그인 전은 연결 여부가 곧 질문이라 상충하지 않는다. 이 사실을 시안에 명시해야 한다."
+ },
+ {
+  "id": "F2-04",
+  "area": "로그인",
+  "severity": "P1",
+  "title": "「이 PC에 로그인 정보 저장(서버·아이디·비밀번호)」를 해제해도 서버·아이디는 저장돼 최근 목록에 뜬다 — 문구가 거짓이고, 보안 제품인데 비밀번호 저장이 기본 체크다",
+  "user_impact": "공용 관제 PC에서 체크를 풀고 로그인한 담당자의 아이디와 서버 주소가 다음 사람 로그인 화면 「최근 로그인」에 그대로 보이고, 기본값을 그대로 둔 담당자는 자기 비밀번호가 이 PC에 저장된다는 사실을 의식하지 못한 채 넘어간다(제품이 동봉한 KISA 가이드가 「비밀번호 저장을 통한 자동 로그인」을 과다 신뢰관계로 분류한다).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 318,
+    "quote": "<input type=\"checkbox\" id=\"savePw\" checked /> 이 PC에 로그인 정보 저장(서버·아이디·비밀번호)"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 104,
+    "quote": "list.unshift({ serverUrl, username, encPw, savedAt: Date.now() });"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 101,
+    "quote": "if (savePw && password && pwEncAvailable()) {"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 383,
+    "quote": "checked disabled style=\"opacity:.4\"> 이 PC에 서버·아이디 저장(비밀번호는 이 OS에서 안전 저장 미지원)"
+   },
+   {
+    "file": "knowledge/KISA_취약점_분석평가_상세가이드.md",
+    "line": 1659,
+    "quote": "비밀번호 저장을 통한 자동 로그인 등 역시 과다한 신뢰 관계에 해당함"
+   }
+  ],
+  "proposal": "두 가지 중 하나로 문구와 동작을 맞춘다. (권장) 체크박스를 「이 PC에 비밀번호도 저장」으로 바꾸고 **기본 해제**, 서버·아이디 저장은 항상 한다고 별도 한 줄로 밝힌다(「서버·아이디는 빠른 선택용으로 남습니다 — 목록의 ✕로 지울 수 있습니다」). 또는 해제 시 creds.save 자체를 건너뛰어 문구 그대로 동작하게 한다(main.ts creds:save에 savePw=false면 엔트리 미저장 분기). 기본 체크는 2026-07-22 커밋 ee98a084의 구현 선택이고 사용자 결정 기록은 없다 — 기본값은 사용자 결정 사항으로 올린다.",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "login.html:318 문구 「로그인 정보 저장(서버·아이디·비밀번호)」와 main.ts:97-106 동작(savePw=false여도 서버·ID 엔트리 저장, 주석 「savePw=false면 비밀번호는 저장하지 않는다」) 불일치 확인. 미지원 분기(383행)는 이미 「서버·아이디 저장」이라고 정직하게 쓰고 있어 지원 분기만 거짓. git show ee98a084(2026-07-22)에 「체크박스(기본 on)」만 있고 사용자 결정 기록 없음 — finding 서술과 일치. KISA 인용(1659행)도 실재."
+ },
+ {
+  "id": "F2-05",
+  "area": "로그인",
+  "severity": "P1",
+  "title": "세션이 끊겨 로그인 화면으로 튕길 때 사유(유휴 만료·다른 곳 로그인·서버 재시작)가 사라진다 — 서버는 그 사유 문장을 만들어 두었는데 클라이언트가 응답 본문을 읽지 않는다",
+  "user_impact": "일하다 갑자기 로그인 화면이 뜬 담당자는 자기 실수인지, 누가 자기 계정으로 들어온 것인지(보안 사고 신호), 30분 유휴 만료인지 구분할 길이 없고, 빈 오류칸만 본 채 다시 로그인한다.",
+  "evidence": [
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 49,
+    "quote": "그래야 옛 기기가 다음 refresh를 시도할 때 \"다른 곳에서 로그인되어 세션이 종료됐다\"는"
+   },
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 425,
+    "quote": "res.status(409).json({ error: \"session_superseded\", message: \"다른 곳에서 로그인되어 이 세션은 종료되었습니다.\" });"
+   },
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 419,
+    "quote": "res.status(401).json({ error: \"session_idle_expired\", message: \"오래 사용하지 않아 세션이 만료되었습니다. 다시 로그인하세요.\" });"
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 98,
+    "quote": "if (!res || !res.ok) {"
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 102,
+    "quote": "if (after.refreshToken === usedRefresh) setAuthTokens(null);"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1413,
+    "quote": "if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(\"login.html\");"
+   }
+  ],
+  "proposal": "core.ts tryRefresh 실패 분기에서 응답 본문의 `error`/`message`를 읽어 메인 프로세스 authState에 `lastLogoutReason`으로 남기고(auth:setState 확장), login.html이 첫 로드 때 그 값을 errMsg 위 안내 상자로 한 번 보여 준 뒤 지운다: 「다른 곳에서 로그인되어 이 세션은 종료되었습니다 — 본인이 아니라면 관리자에게 알리세요」 / 「30분간 사용하지 않아 자동 로그아웃됐습니다」. grep 결과 `session_superseded`·`session_idle_expired`를 읽는 클라이언트 코드는 0건이다.",
+  "plan_item": "후-1",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "서버는 session_idle_expired(auth.ts:419)·session_superseded(auth.ts:425) 사유를 내리지만 core.ts:98-104 tryRefresh 실패 분기는 본문을 읽지 않고 토큰만 지우며, client/src 전체에 두 코드 문자열을 읽는 곳 0건(grep 재확인). app.html:1412-1413은 미인증이면 login.html로 보내기만 하고 login.html 첫 로드에 사유 표시 없음. 세션 칩(titlebar.js:427-460)은 만료 전 남은 시간만 보이고 튕긴 뒤 사유는 없다. 대체 로그인(보안 신호)을 못 알아채는 점에서 P1 유지."
+ },
+ {
+  "id": "F2-06",
+  "area": "로그인",
+  "severity": "P1",
+  "title": "로그인 요청에 시간제한이 없어 응답 없는 주소(방화벽 drop·엉뚱한 IP)를 넣으면 「연결 중...」이 수십 초 멈춘 채 취소도 못 한다",
+  "user_impact": "주소 한 자리를 잘못 친 담당자는 버튼이 회색으로 굳은 채 아무 안내 없이 기다리게 되고, 멈춘 줄 알고 앱을 강제 종료하기 쉽다.",
+  "evidence": [
+   {
+    "file": "client/src/api/auth.ts",
+    "line": 49,
+    "quote": "const res = await fetch(`${getServerUrl()}/api/auth/login`, {"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 526,
+    "quote": "btn.disabled = true;"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 527,
+    "quote": "btn.textContent = \"연결 중...\";"
+   }
+  ],
+  "proposal": "authApi.login/loginMfa의 fetch에 `signal: AbortSignal.timeout(8000)`을 주고, 시간 초과는 `code:\"error\"`·message 「8초 안에 서버가 응답하지 않았습니다 — 주소·네트워크를 확인하세요」로 돌려준다. login.html은 「연결 중...」 3초 뒤 버튼 옆에 「취소」를 보여 AbortController로 끊을 수 있게 한다. grep 결과 client/src/api/auth.ts·core.ts에 AbortSignal·timeout이 0건이다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "client/src/api/auth.ts:49·66 fetch에 signal 없음, api/·core.ts에 AbortSignal·AbortController 0건(grep 재확인; main.ts의 timeout은 net:probe·로그아웃용). login.html:526-527이 버튼을 굳히고 취소 수단이 없다. 응답 없는 IP는 Windows TCP 연결 실패까지 20초 남짓 걸려 「죽은 조작」 원칙 위반 — P1 타당."
+ },
+ {
+  "id": "F2-07",
+  "area": "로그인",
+  "severity": "P2",
+  "title": "중복 로그인(409) 안내가 「이미 다른 곳에서 로그인 중」만 말하고 어디서·언제인지 없다 — 서버는 IP·마지막 활동 시각을 갖고 있다",
+  "user_impact": "어제 로그아웃 없이 앱이 죽은 자기 세션인지, 지금 누가 자기 계정을 쓰고 있는지 모른 채 「강제 로그인」을 눌러야 하고, 후자라면 보안 사고를 그 자리에서 놓친다.",
+  "evidence": [
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 286,
+    "quote": "res.status(409).json({ error: \"already_logged_in\", message: \"이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?\" });"
+   },
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 39,
+    "quote": "lastSeenAt: number; // 마지막 인증 요청 시각 — presence 판정 기준"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 328,
+    "quote": "<div class=\"dup-t\">이미 다른 곳에서 로그인 중입니다</div>"
+   }
+  ],
+  "proposal": "409 응답에 `since`·`lastSeenAt`·마스킹한 `ip`(예: 10.8.0.*)를 실어 보내고, dupBox 본문을 「10.8.0.* 에서 09:12부터 · 마지막 활동 3분 전. 본인이 아니라면 강제 로그인 대신 관리자에게 알리세요」로 채운다. 비밀번호가 맞은 뒤에만 내려가는 정보라 계정 열람 위험은 늘지 않는다.",
+  "plan_item": "중-1",
+  "effort": "S",
+  "needs_mockup": true,
+  "verify_reason": "auth.ts:286·386의 409 응답은 error·message만 실고, RefreshRecord(auth.ts:33-42)에 ip·since·lastSeenAt이 있으며 login.html:328 dupBox는 고정 문구 — 모두 일치. 비밀번호 검증 뒤(auth.ts:279-286)에만 내려가는 정보라는 서술도 맞다. P2 적정."
+ },
+ {
+  "id": "F2-08",
+  "area": "로그인",
+  "severity": "P2",
+  "title": "관리자가 발급한 임시 비밀번호로 첫 로그인해도 비밀번호 변경을 유도하는 장치가 없다 — 매뉴얼은 「권장」만 적어 둔다",
+  "user_impact": "관리자가 정해 알려준 비밀번호를 담당자가 그대로 계속 쓰게 되어 관리자가 담당자 계정으로 들어갈 수 있는 상태가 무기한 남고, 감사에서 「누가 했나」가 흔들린다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 35,
+    "quote": "4. 최초 로그인 후 **설정 → 내 설정 → 비밀번호 변경**을 권장합니다."
+   },
+   {
+    "file": "server/src/auth/users.ts",
+    "line": 13,
+    "quote": "export interface GijoUser {"
+   },
+   {
+    "file": "server/src/auth/users.ts",
+    "line": 119,
+    "quote": "export function changePassword(id: string, newPassword: string): void {"
+   },
+   {
+    "file": "client/src/api/auth.ts",
+    "line": 62,
+    "quote": "return { ok: true, user: data.user, enrollRequired: data.enrollRequired };"
+   }
+  ],
+  "proposal": "users 테이블에 `mustChangePassword`(관리자가 만들거나 재설정하면 1, 본인이 바꾸면 0)를 두고 로그인 응답에 실어, login.html finishLogin이 값이 있으면 app.html 첫 탭을 「설정 › 내 계정 › 비밀번호 변경」으로 열고 한 줄 안내(「관리자가 정한 비밀번호입니다 — 본인만 아는 것으로 바꿔 주세요」)를 gijoTell로 띄운다. 강제 차단은 두지 않는다(enrollRequired와 달리 업무를 막을 만큼의 근거가 없다).",
+  "plan_item": "후-1",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "server/src·client/src에 mustChange·임시 비밀번호 류 필드 0건, GijoUser(users.ts:13-24)에 해당 필드 없음, changePassword(users.ts:119)는 플래그 없이 해시만 갱신, 매뉴얼:35는 「권장」만. 관리자 초기화 경로(settings.html:1454)가 실재하므로 시나리오도 실제. P2 적정."
+ },
+ {
+  "id": "F2-09",
+  "area": "로그인",
+  "severity": "P2",
+  "title": "키보드·접근성 — 아이디·서버 칸에서 Enter가 무반응(form 없음), 최근 로그인 항목은 div 클릭 전용, 2차 인증 이름줄은 이스케이프 없이 innerHTML",
+  "user_impact": "아이디를 치고 Enter를 눌러도 아무 일이 없어 마우스로 비밀번호 칸을 찍어야 하고, 키보드만 쓰는 담당자는 「최근 로그인」을 고를 수 없다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 567,
+    "quote": "passInput.addEventListener(\"keydown\", (e) => { if (e.key === \"Enter\" && !e.isComposing) doLogin(false); });"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 401,
+    "quote": "'<div class=\"rc\" data-i=\"' + i + '\"><div class=\"rc-main\"><div class=\"rc-id\">' + esc(e.username) + \"</div>\" +"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 450,
+    "quote": "else if (who) document.getElementById(\"mfaWho\").innerHTML = \"<b>\" + who + \"</b> 계정의 2차 인증\";"
+   }
+  ],
+  "proposal": "자격증명 칸을 `<form id=\"loginForm\">`로 감싸 submit에서 doLogin을 부르고(아이디·서버 칸 Enter도 통하게, 조합 중 Enter 가드는 유지), 최근 로그인 항목은 `<button type=\"button\" class=\"rc\">`로 바꿔 Tab·Enter로 고를 수 있게 하며 ✕도 button으로. mfaWho는 이미 있는 `esc()`를 거치게 한다(450행).",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "login.html에 <form> 없음, keydown은 passInput(567)·mfaCode(516)·mfaReco(518)만 — 아이디·서버 칸 Enter 무반응 확인. 최근 항목은 div.rc(401행)에 click만 걸려 있고, mfaWho(450행)는 who(서버 displayName 또는 본인 입력)를 esc() 없이 innerHTML에 넣는다 — 위험은 낮지만 같은 파일의 esc()를 안 쓴 불일치. P2 적정."
+ },
+ {
+  "id": "F2-10",
+  "area": "로그인",
+  "severity": "P2",
+  "title": "복구 코드로 로그인하면 남은 개수를 localStorage에 적기만 하고 아무 화면도 읽지 않는다 — 「남은 개수를 알려야 한다」는 주석과 달리 담당자는 알림을 못 받는다",
+  "user_impact": "휴대폰을 잃어 복구 코드로 들어온 담당자는 코드가 몇 개 남았는지 모른 채 넘어가고, 마지막 코드를 쓰고도 알림이 없어 다음 로그인에서 관리자 해제 없이는 못 들어오게 된다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 495,
+    "quote": "// 복구 코드를 썼다면 남은 개수를 알려야 한다 — 다 쓰면 관리자 해제밖에 남지 않는다."
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 496,
+    "quote": "try { window.localStorage.setItem(\"gijo:recoveryRemaining\", String(r.recoveryRemaining ?? \"\")); } catch (e) {}"
+   },
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 399,
+    "quote": "recoveryRemaining: usedRecovery ? remaining : undefined,"
+   }
+  ],
+  "proposal": "app.html의 `로그인선택_못한것알리기`와 같은 자리에서 `gijo:recoveryRemaining`을 읽어 gijoTell로 「복구 코드로 로그인했습니다 — 남은 코드 N개. 설정 › 내 계정에서 2차 인증을 다시 등록하거나 코드를 다시 만들어 두세요」를 한 번 띄우고 지운다(0개면 ⚠로 강조). grep 결과 이 키를 읽는 코드는 client/src 전체에서 0건이다.",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "login.html:495-496이 gijo:recoveryRemaining을 쓰지만 client/src에서 이 키를 읽는 곳 0건(grep 재확인; settings.html:980·985의 recoveryRemaining은 서버 API 값이라 별개). app.html:1739 로그인선택_못한것알리기는 gijo:loginChoiceFailed만 읽는다. 단 설정 › 내 계정이 남은 개수를 보여 주고(settings.html:985) 로그인 화면 문구(344행)가 「다 썼으면 관리자에게」를 이미 적어 완전 공백은 아니라 P2 유지."
+ },
+ {
+  "id": "F8-01",
+  "area": "여정전반",
+  "severity": "P1",
+  "title": "분산 모드 담당자는 앱을 켤 때마다 「처음 설정」 화면부터 — 선택이 기억되지 않는다",
+  "user_impact": "김대리(사내 서버 접속)는 매일 아침 「처음 설정 — 어떻게 시작하시겠어요?」를 보고 「이미 GIJO 서버가 있어요 → 로그인 화면으로」를 두 번 눌러야 로그인 화면에 닿고, 한 번이라도 「관리자 계정 만들기」를 잘못 누르면 자기 PC에 로컬 DB가 생겨 이후 매 실행마다 동봉 서버가 localhost:7446으로 떠오른다(박주임은 10대에서 같은 안내를 반복해야 한다).",
+  "evidence": [
+   {
+    "file": "client/src/main.ts",
+    "line": 1548,
+    "quote": "첫설치 = !!서버구성 && 서버구성.패키징본 && !fs.existsSync(DB경로(서버구성));"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 393,
+    "quote": "`../src/renderer/pages/${첫설치인가() ? \"setup.html\" : \"login.html\"}`"
+   },
+   {
+    "file": "client/src/renderer/pages/setup.html",
+    "line": 199,
+    "quote": "location.href = \"login.html\" + location.search;  (「로그인 화면으로」 — 선택을 어디에도 남기지 않음)"
+   },
+   {
+    "file": "client/package.json",
+    "line": 48,
+    "quote": "\"extraResources\": [ { \"from\": \"server-dist\", \"to\": \"server-dist\" … (표준 설치본에 서버가 동봉되므로 DB 없음 = 매번 첫 설치로 판정)"
+   }
+  ],
+  "proposal": "setup.html의 「로그인 화면으로」를 누르면 userData에 `gijo-connect-mode.txt`=`remote` 같은 표식을 쓰고(IPC 하나 추가), main.ts 1548의 첫설치 판정에 「표식이 remote면 첫설치 아님·동봉 서버도 띄우지 않음」 갈래를 더한다. 되돌리는 길은 설정 › 서버에 「이 PC에 서버 새로 설치」 한 줄로 둔다.",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "인용 모두 실물과 일치(main.ts:1548 첫설치 판정, :393 setup/login 분기, setup.html:198~200 toLogin은 location.href만, package.json:42~50 server-dist 동봉). 5.15.1 게시 커밋(57212f17)은 「main.ts 안 건드림 — location.href만」이라 적은 빠른 우회이지 매번 띄우기로 한 결정 기록은 없다. 단 GIJO_SERVER_URL 환경변수를 주면 번들서버구성()이 null을 돌려 첫설치=false로 이미 우회되므로(main.ts:149) 막힘은 아니고 「매일 두 번 클릭」 불편이라 P0→P1."
+ },
+ {
+  "id": "F8-02",
+  "area": "여정전반",
+  "severity": "P1",
+  "title": "서버 주소 칸이 「비워 두세요」라 안내하면서 localhost:7446을 미리 채우고, http:// 없는 주소는 연결 실패로만 보인다",
+  "user_impact": "김대리는 메모(10.20.30.40:4000)를 들고 왔는데 칸에는 이미 `http://localhost:7446`이 들어 있어 지우고 쳐야 하고, 처음 설정 화면이 가르쳐 준 대로 `10.20.30.40:4000`처럼 http:// 없이 넣으면 URL 자체가 무효라 「아이디/비밀번호 또는 서버 주소를 확인하세요」만 보고 무엇이 틀렸는지 모른다 — 헬프데스크 전화 1순위 자리.",
+  "evidence": [
+   {
+    "file": "client/src/main.ts",
+    "line": 58,
+    "quote": "return process.env.GIJO_SERVER_URL ?? `http://localhost:${서버포트()}`;"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 355,
+    "quote": "serverInput.value = window.gijo.getServerUrl();"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 309,
+    "quote": "placeholder=\"서버 주소 (이 PC에 동봉된 서버면 비워 두세요)\""
+   },
+   {
+    "file": "client/src/renderer/pages/setup.html",
+    "line": 138,
+    "quote": "서버 주소(예: <code>10.8.0.1:4000</code>)를 입력하는 로그인 화면으로 갑니다."
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 33,
+    "quote": "serverUrl = url.replace(/\\/+$/, \"\");  (스킴 보정 없음 — node 실측 `new URL(\"10.20.30.40:4000/api/auth/login\")` → Invalid URL)"
+   }
+  ],
+  "proposal": "core.ts setServerUrl에서 스킴이 없으면 `http://`를 붙이고, login.html 서버 칸 blur 시 `checkServerHealth()`로 「✓ 서버 연결됨 (v…)」/「✗ 연결 안 됨 — 주소·포트·서버 상태 확인」 한 줄을 칸 아래에 보인다. 분산 모드 안내 예시는 `http://10.20.30.40:4000` 꼴로 통일하고(setup.html 138), 미리 채우는 값은 저장된 로그인이 없을 때는 비워 두고 placeholder로만 안내한다.",
+  "plan_item": "전-7",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "main.ts:58 기본서버주소, login.html:309 placeholder, login.html:369(인용 355 — 내용은 그대로, 14줄 어긋남) 미리 채움, setup.html:138 스킴 없는 예시, core.ts:33 스킴 보정 없음 — 모두 확인. authApi.login(api/auth.ts:54)은 fetch 실패 시 「서버에 연결할 수 없습니다」를 돌려주지만 login.html doLogin(:548~550)이 code==='locked'가 아니면 일괄 「아이디/비밀번호 또는 서버 주소를 확인하세요」로 덮어 버려 사유가 버려진다. 2026-08-13 주석(:304~308)은 포트 숫자를 안내문에 안 적는 결정이고 미리 채움·스킴 문제를 의도한 기록은 아니다."
+ },
+ {
+  "id": "F8-05",
+  "area": "여정전반",
+  "severity": "P1",
+  "title": "서버가 꺼지거나 망이 끊기면 대화창에 「Failed to fetch」 영문 날것 오류가 뜨고, 그 밖엔 알려 주는 곳이 없다",
+  "user_impact": "김대리가 질문을 보냈는데 서버가 재시작 중이면 ⚠ 오류 「Failed to fetch」만 보고 자기 PC 문제인지 서버 문제인지 몰라 헬프데스크에 전화한다(연결 배지는 2026-08-08 사용자 지시로 없앤 상태라 다른 신호가 없다).",
+  "evidence": [
+   {
+    "file": "client/src/api/core.ts",
+    "line": 168,
+    "quote": "const res = await fetch(`${serverUrl}${path}`, {  (네트워크 예외를 잡지 않아 TypeError 「Failed to fetch」가 그대로 화면으로 감)"
+   },
+   {
+    "file": "client/src/renderer/pages/console.js",
+    "line": 1875,
+    "quote": "replaceTyping(typing, \"error\", { icon: \"⚠\", name: \"오류\", message: (e && e.message) || String(e) });"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 967,
+    "quote": "⚠ 서버가 죽었을 때 알 길이 함께 사라진 것은 사실이다 — 그때는 화면이 값을 못 채워 드러나고"
+   }
+  ],
+  "proposal": "배지를 되살리자는 것이 아니다(2026-08-08 결정 인지). core.ts request()/requestStream()의 fetch를 try/catch로 감싸 「서버에 연결할 수 없습니다 — 사내 GIJO 서버(주소)가 꺼졌거나 네트워크가 끊겼습니다. 잠시 뒤 다시 시도하거나 ⚙ › 서버 변경에서 주소를 확인하세요」 한국어 오류로 바꿔 던진다. 콘솔은 그 문구를 그대로 보이면 된다.",
+  "plan_item": "중-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "core.ts:168 request()와 :128 requestStream()의 fetch는 try/catch가 없어 TypeError 「Failed to fetch」가 그대로 던져지고, console.js:1875가 e.message를 그대로 보인다. 표준 화면엔 매핑이 없고 라이트 화면(lite-settings.html:304 등)만 「서버에 닿지 못했습니다」로 바꾼다 — 같은 제품 안에서 표준만 날것이다. titlebar.js:966~969 주석은 배지 제거(2026-08-08 지시)가 알 길을 없앤 사실을 인정할 뿐 날것 오류를 두기로 한 결정은 아니다. 제안도 배지 부활이 아니라 문구 변환이라 결정과 충돌하지 않는다."
+ },
+ {
+  "id": "F8-06",
+  "area": "여정전반",
+  "severity": "P1",
+  "title": "유휴 30분 만료 뒤 아무 안내 없이 모든 동작이 「unauthorized (서버 오류 401 …)」로 실패한다",
+  "user_impact": "점심 먹고 온 김대리는 세션 칩이 0:00이 된 채 화면은 그대로 남아 있고, 무엇을 눌러도 영문 401 오류가 뜬다 — 서버의 한국어 사유(「오래 사용하지 않아 세션이 만료되었습니다」)는 버려지고 로그인 화면으로 데려가지도 않아 앱을 껐다 켜는 방법을 스스로 알아내야 한다.",
+  "evidence": [
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 419,
+    "quote": "res.status(401).json({ error: \"session_idle_expired\", message: \"오래 사용하지 않아 세션이 만료되었습니다. 다시 로그인하세요.\" });"
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 102,
+    "quote": "if (after.refreshToken === usedRefresh) setAuthTokens(null);  (서버 메시지를 읽지 않고 토큰만 지움)"
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 200,
+    "quote": ": `GIJO AS 서버 오류 ${res.status} ${path} ${detail}`  (이후 요청은 「unauthorized (서버 오류 401 · /api/…)」로 표시)"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1412,
+    "quote": "if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) {  (로드 시점 1회 가드만 — 만료 후 자동 이동 없음)"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 444,
+    "quote": "? Math.max(0, info.remainingMs) : null;  (0:00까지 세고 멈춤)"
+   }
+  ],
+  "proposal": "core.ts tryRefresh가 401/409로 실패하면 서버 message를 담아 IPC 이벤트(`auth:expired`)를 메인에 보내고, main.ts가 본창에 알림 한 줄(「오래 사용하지 않아 세션이 만료되었습니다 — 다시 로그인합니다」)을 띄운 뒤 `navigate:to login.html`로 보낸다(이미 있는 팝업·콘솔 창 정리 경로 576~580행을 그대로 탄다). 세션 칩이 0:00에 닿으면 같은 흐름을 탄다.",
+  "plan_item": "중-1",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "auth.ts:419 한국어 사유, core.ts:102 tryRefresh는 res.ok가 아니면 본문을 읽지 않고 토큰만 지움, 이후 요청은 서버 {error:'unauthorized'}(auth.ts:219)를 core.ts:199 형식으로 「unauthorized\\n(서버 오류 401 · …)」로 던짐, app.html:1412 boot 1회 가드만, titlebar.js:443~444 0까지 세고 멈춤 — 모두 확인. preload.ts:706 주석은 「만료는 다음 API 호출의 가드가 처리」라 하지만 그런 가드(로그인 화면 이동)는 어디에도 없다. 로그아웃 메뉴(titlebar.js:234)로 빠져나갈 수는 있어 P0는 아니고 P1 유지."
+ },
+ {
+  "id": "F8-03",
+  "area": "여정전반",
+  "severity": "P1",
+  "title": "비밀번호 변경·계정 추가 화면은 「4자 이상」이라 하고 서버는 8자를 요구한다",
+  "user_impact": "김대리가 온보딩 체크리스트대로 설정 › 계정에서 초기 비밀번호를 6자로 바꾸면 화면은 통과시키고 서버가 400을 돌려 「✗ 변경 실패: 비밀번호는 8자 이상이어야 합니다 (서버 오류 400 · /api/users/…)」가 뜬다 — 같은 화면이 두 가지 규칙을 말한다(박주임이 계정 추가할 때도 동일).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 267,
+    "quote": "<input id=\"myPasswordInput\" type=\"password\" placeholder=\"새 비밀번호 (4자 이상)\">"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 941,
+    "quote": "line.textContent = \"비밀번호는 4자 이상이어야 합니다.\";"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 1471,
+    "quote": "line.textContent = \"아이디·이름을 입력하고 비밀번호는 4자 이상으로 설정하세요.\";"
+   },
+   {
+    "file": "server/src/auth/users.ts",
+    "line": 72,
+    "quote": "const MIN_PASSWORD_LEN = Number(process.env.GIJO_MIN_PASSWORD_LEN ?? 8);"
+   },
+   {
+    "file": "client/src/renderer/pages/setup.html",
+    "line": 112,
+    "quote": "8자 이상(제품 최소). <b>12자 이상을 권합니다</b>"
+   }
+  ],
+  "proposal": "settings.html 세 곳(267·941·1471)을 「8자 이상」으로 고치고 setup.html처럼 「12자 이상 권장」을 덧붙인다. 서버 정책값(GIJO_MIN_PASSWORD_LEN)이 바뀔 수 있으니 /api/auth/me 응답에 `minPasswordLen`을 실어 화면이 그 숫자를 읽게 하면 다시 어긋나지 않는다.",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "settings.html:267·941·1471 「4자」, users.ts:72 MIN_PASSWORD_LEN 기본 8, setup.html:112 「8자 이상」 — 모두 확인. 같은 settings.html 안에서도 :332 placeholder는 「4자 이상」, :1452 비번 초기화 프롬프트는 「8자 이상」이라 한 화면이 두 규칙을 말한다. 의도된 설계 기록 없음."
+ },
+ {
+  "id": "F8-04",
+  "area": "여정전반",
+  "severity": "P1",
+  "title": "「초기 비밀번호 변경」은 문서로만 시키고 제품은 한 번도 권하지 않는다",
+  "user_impact": "김대리는 헬프데스크 메모에 적힌 초기 비밀번호로 몇 달을 그대로 쓴다 — 배포 가이드·온보딩 체크리스트가 「즉시 교체」를 말하지만 첫 로그인 뒤 화면 어디에도 알림·유도가 없고, 관리자가 「비번↺」로 초기화해 준 뒤에도 같다(메모지 비밀번호가 곧 영구 비밀번호가 된다).",
+  "evidence": [
+   {
+    "file": "GIJO_AS_보안담당자_온보딩_체크리스트.md",
+    "line": 14,
+    "quote": "- [ ] 로그인 후 **비밀번호 변경**(설정 → 계정) — 기본 비밀번호는 즉시 교체"
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 146,
+    "quote": "발급 계정으로 로그인 성공 → **초기 비밀번호 변경** 안내"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 331,
+    "quote": "<label for=\"newPasswordInput\">초기 비밀번호</label>"
+   },
+   {
+    "file": "server/src/auth/users.ts",
+    "line": 36,
+    "quote": "interface UserRow { id; username; passwordHash; displayName; role; team; clearance; createdAt }  (변경 필요 표식·변경 시각 칼럼 없음 — mustChange/passwordChangedAt grep 0건)"
+   }
+  ],
+  "proposal": "users 표에 `must_change_password`(관리자가 만들거나 초기화하면 1, 본인이 바꾸면 0)를 두고 로그인 응답에 `passwordChangeRequired`를 싣는다. app.html이 그 값을 보면 상단에 한 줄 띠 「관리자가 준 초기 비밀번호를 쓰고 있습니다 — 지금 바꾸기」를 보이고 누르면 settings.html?s=my 계정 판으로 간다(강제 차단은 하지 않는다).",
+  "plan_item": "후-1",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "온보딩 체크리스트:14·배포 가이드:146은 문서로만 「즉시 교체」를 지시하고, settings.html:331 「초기 비밀번호」 라벨만 있으며 server/src·client/src에 must_change/passwordChangedAt/passwordChangeRequired가 0건임을 grep으로 확인. UserRow(users.ts:36~44)에 관련 칼럼 없음. 보안 제품이 초기 비밀번호 교체를 한 번도 권하지 않는 것은 정직·보안 원칙 훼손이라 P1 유지."
+ },
+ {
+  "id": "F8-12",
+  "area": "여정전반",
+  "severity": "P1",
+  "title": "「이 PC에 비밀번호 저장」이 기본 켜짐 — 헬프데스크가 시험 로그인한 관리자 비밀번호가 10대 PC에 남는다",
+  "user_impact": "박주임이 설치 확인용으로 자기 admin 계정으로 한 번 로그인하면 그 PC의 「최근 로그인」에 🔑 표시로 남아, 이후 그 PC를 쓰는 누구든 한 번 클릭으로 관리자 비밀번호가 자동 채워진다(같은 Windows 계정이면 DPAPI로도 풀린다). 저장을 끄는 체크는 있지만 기본이 켜짐이라 바쁜 배포 중에는 늘 남는다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 318,
+    "quote": "<input type=\"checkbox\" id=\"savePw\" checked /> 이 PC에 로그인 정보 저장(서버·아이디·비밀번호)"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 434,
+    "quote": "passInput.value = e.hasPw ? (await window.gijo.creds.getPassword(e.serverUrl, e.username)) : \"\";"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 101,
+    "quote": "if (savePw && password && pwEncAvailable()) { … encPw = safeStorage.encryptString(password)"
+   }
+  ],
+  "proposal": "비밀번호 저장은 기본 꺼짐으로 바꾸고(서버·아이디 저장은 기본 유지) 문구를 「비밀번호도 저장(여러 사람이 쓰는 PC에서는 끄세요)」로 한다. 로그인 응답 role이 admin이면 비밀번호는 저장하지 않는다(finishLogin에서 `result.user.role` 확인 후 savePw=false로 넘김).",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "login.html:318 기본 checked, :434 최근 로그인 클릭 시 비밀번호 자동 채움, main.ts:101 safeStorage 저장 — 모두 확인. 도입 커밋 ee98a084는 「체크박스(기본 on)」이라 적었을 뿐 사용자 결정 기록은 아니다. 관리자 비밀번호가 배포 PC마다 DPAPI 저장으로 남는 것은 보안 제품의 신뢰 문제라 P1 유지."
+ },
+ {
+  "id": "F8-07",
+  "area": "여정전반",
+  "severity": "P2",
+  "title": "박주임의 「서버 주소 고정」 수단이 환경변수 하나뿐이고, 10대에 어떻게 넣는지 문서에 명령이 없다",
+  "user_impact": "배포 가이드는 「환경변수 GIJO_SERVER_URL을 지정하면」이라고만 적어 박주임은 setx인지 시스템 변수인지 GPO인지 스스로 알아내야 하고, 설치본(/S)에는 주소를 넘길 인자도, 앱이 읽는 설정 파일도 없어 10대마다 사람이 로그인 화면에서 주소를 손으로 친다(F8-01·F8-02와 겹쳐 대당 실수 확률이 커진다).",
+  "evidence": [
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 64,
+    "quote": "실행 환경변수 `GIJO_SERVER_URL=http://<서버IP>:4000` 를 지정하면 매번 주소를 입력하지 않고 그 서버에 붙습니다."
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 149,
+    "quote": "if (process.env.GIJO_SERVER_URL) return null; // 원격 서버를 명시적으로 지정한 경우 번들 서버 기동 안 함"
+   },
+   {
+    "file": "client/build/installer.nsh",
+    "line": 26,
+    "quote": "!macro customWelcomePage  (서버 주소를 받는 설치 인자·설정 파일 생성 없음 — 파일 전체 37줄)"
+   }
+  ],
+  "proposal": "main.ts 기본서버주소()의 두 번째 출처로 `%APPDATA%\\GIJO AS\\gijo-server.json`({\"serverUrl\":…})을 읽게 하고(env가 있으면 env 우선), 배포 가이드 §5.1에 10대용 한 블록 — `GIJO-AS-Setup-x.y.z.exe /S` + `setx GIJO_SERVER_URL http://10.20.30.40:4000`(또는 그 json 파일 복사) — 을 그대로 복사해 쓸 수 있게 적는다. 이 파일이 있으면 F8-01의 첫 설치 판정도 「분산 모드」로 확정한다.",
+  "plan_item": "후-1",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "배포 가이드:64 환경변수 한 줄, main.ts:149 env 분기, installer.nsh 37줄에 인자·설정파일 없음 — 확인. 저장소 문서 전체에서 GIJO_SERVER_URL을 setx·시스템 변수로 넣는 명령은 없다(setx는 2머신 가이드의 GIJO_ADMIN_PASSWORD만). 다만 환경변수 경로 자체는 동작하고 IT 담당자가 PC당 한 번 겪는 일이라 담당자 일상 불편(P1)보다는 배포 다듬기(P2)다."
+ },
+ {
+  "id": "F8-08",
+  "area": "여정전반",
+  "severity": "P2",
+  "title": "manual-update.ps1은 클라이언트 소스가 있는 PC에서만 돌고, 설치된 버전이 아니라 소스 버전을 읽는다",
+  "user_impact": "박주임이 10대를 일괄 업데이트하려고 가이드 §6.3을 따르면 「cd <client 소스 경로>」에서 막힌다 — 헬프데스크 PC에는 설치본 exe만 있고 소스가 없다. 소스를 받아 돌려도 「현재 버전」은 그 소스의 package.json 값이라 담당자 PC에 실제 깔린 판과 다를 수 있어 「이미 최신」이 거짓이 될 수 있고, 기본 서버가 localhost:4000이라 -ServerUrl을 빼먹으면 조용히 엉뚱한 곳을 본다.",
+  "evidence": [
+   {
+    "file": "client/scripts/manual-update.ps1",
+    "line": 27,
+    "quote": "$pkgPath = Join-Path $PSScriptRoot \"..\\package.json\"  /  $currentVersion = (Get-Content $pkgPath -Raw | ConvertFrom-Json).version"
+   },
+   {
+    "file": "client/scripts/manual-update.ps1",
+    "line": 18,
+    "quote": "[string]$ServerUrl = \"http://localhost:4000\","
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 108,
+    "quote": "cd <client 소스 경로>  /  .\\scripts\\manual-update.ps1 -User <아이디> -Password <비밀번호> -ServerUrl http://<서버IP>:4000"
+   }
+  ],
+  "proposal": "스크립트를 설치본 resources에 동봉하고(package.json extraResources에 scripts/manual-update.ps1 추가), 설치 버전은 NSIS가 남기는 레지스트리 `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\<appId>\\DisplayVersion`에서 읽는다. -ServerUrl은 필수 인자로 바꾸고, 가이드 §6.3을 「설치 폴더의 스크립트를 원격 PowerShell로 실행」 예시로 다시 쓴다(기존#5 oneClick 문구 수정과 함께).",
+  "plan_item": "후-1",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "manual-update.ps1:18 기본 localhost:4000, :26~28 소스 package.json에서 버전 읽음, 머리말 :3~4 「oneClick이라 조용히 설치」는 main.ts:1457~1461(oneClick:false·마법사 표시, 2026-07-29)과 어긋남, 가이드:108 「cd <client 소스 경로>」 — 모두 확인. 다만 인앱 ⚙ 업데이트가 주 경로고 이 스크립트는 관리자 보조 경로라 P1→P2."
+ },
+ {
+  "id": "F8-09",
+  "area": "여정전반",
+  "severity": "P2",
+  "title": "비밀번호를 다섯 번 틀려도 「몇 번 남았는지·잠기면 몇 분인지·잊으면 누구에게」를 화면이 말하지 않는다",
+  "user_impact": "김대리가 메모지 비밀번호를 잘못 읽어 다섯 번 틀리면 다섯 번 똑같은 문구만 보고, 열 번째에 갑자기 「15분 후 다시 시도하세요」로 잠긴다 — 로그인 화면 어디에도 「잊으면 관리자에게 초기화 요청」이 없어 결국 전화한다.",
+  "evidence": [
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 56,
+    "quote": "const LOGIN_MAX_FAILS = Number(process.env.GIJO_LOGIN_MAX_FAILS ?? 10);"
+   },
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 281,
+    "quote": "res.status(401).json({ error: \"invalid credentials\" });  (남은 횟수 없음)"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 365,
+    "quote": "단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 <b>비워 두세요</b> … 분산 모드: 사내망 GPU 서버 주소를 입력하세요.  (비밀번호 분실 안내 없음)"
+   }
+  ],
+  "proposal": "auth.ts 401 응답에 `remaining: LOGIN_MAX_FAILS - fails`를 싣고, login.html은 remaining ≤ 5일 때 「N회 더 틀리면 15분 동안 잠깁니다」를 오류 아래 한 줄로 덧붙인다. 힌트 영역(365~368행)에 「비밀번호를 잊었으면 관리자에게 초기화를 요청하세요(설정 › 계정 관리 › 비번↺)」 한 줄을 더한다. 기존#3의 문구 분기와 같은 자리에서 함께 고친다.",
+  "plan_item": "중-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "auth.ts:56 LOGIN_MAX_FAILS 기본 10, :281 401 본문에 남은 횟수 없음, login.html:365~368 힌트에 분실 안내 없음 — 확인. 잠긴 뒤 429 메시지(:275)는 client가 code 'locked'로 그대로 보이므로 「열 번째에 갑자기 N분」 묘사도 맞다. P2 적정."
+ },
+ {
+  "id": "F8-10",
+  "area": "여정전반",
+  "severity": "P2",
+  "title": "로그인 화면의 구동 모드·AI 위치 선택을 담당자(비관리자)가 누르면 로그인 직후 「서버 오류 403 · /api/…」가 섞인 알림을 받는다",
+  "user_impact": "김대리가 궁금해서 「🚀 프로」「🖧 원격 GPU」를 눌러 보면 로그인 뒤 「고른 것 중 2가지가 적용되지 않았습니다 · 구동 모드(pro): 관리자만 접근할 수 있습니다 (서버 오류 403 · /api/llm/tier)」처럼 HTTP 상태와 경로가 담긴 알림을 본다 — 첫날 첫 화면에서 「오류」라는 말을 만난다(선택을 로그인 전에 보이게 둔 ⓒ안 결정 2026-08-18은 그대로 두자는 전제).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 665,
+    "quote": "못한것.push(\"구동 모드(\" + 고른모드.값 + \"): \" + (e && e.message ? e.message : \"권한이 없거나 서버가 거절했습니다\"));"
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 199,
+    "quote": "? `${사유}\\n(서버 오류 ${res.status} · ${path.split(\"?\")[0]})`"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1751,
+    "quote": "gijoTell(\"로그인 화면에서 고른 것 중 \" + 못한것.length + \"가지가 적용되지 않았습니다.\\n\\n\" +"
+   }
+  ],
+  "proposal": "login.html 고른것적용()에서 e.message의 첫 줄만 쓰고(`split(\"\\n\")[0]`), 403이면 「관리자만 바꿀 수 있는 설정입니다 — 관리자에게 요청하세요」로 바꿔 담는다. 알림 제목도 「적용되지 않았습니다」 대신 「일부 선택은 관리자 권한이 필요합니다」로 낮춘다. 시안 필요 없음(문구만).",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "login.html:651(인용 665 — 내용 동일, 14줄 어긋남) e.message 그대로 담음, core.ts:199 「\\n(서버 오류 403 · 경로)」 형식, app.html:1748 gijoTell — 확인. 서버 403 본문은 auth.ts:263 「관리자만 접근할 수 있습니다」. ⓒ안(2026-08-18, login.html:569~576)은 finding이 인지하고 존중하며 문구만 다듬자는 것이라 결정과 충돌 없음."
+ },
+ {
+  "id": "F8-11",
+  "area": "여정전반",
+  "severity": "P2",
+  "title": "인앱 업데이트가 띄우는 설치 마법사가 「GIJO AS 설치를 시작합니다 … 설치 후 서버 주소로 로그인하면」이라 새 설치처럼 읽힌다",
+  "user_impact": "김대리가 ⚙ 배지에서 「지금 업데이트」를 누르면 앱이 꺼지고 「GIJO AS 설치를 시작합니다 — 사내에서만 도는 AI 보안관제 플랫폼입니다 … 설치 후 사내 GIJO 서버 주소로 로그인하면」 환영 페이지와 완료 페이지의 WireGuard 링크를 본다 — 업데이트인지 재설치인지, 설정이 지워지는지 헷갈려 [다음]을 망설인다(마법사를 보이게 둔 2026-07-29 결정은 유지).",
+  "evidence": [
+   {
+    "file": "client/build/installer.nsh",
+    "line": 27,
+    "quote": "!define MUI_WELCOMEPAGE_TITLE \"GIJO AS 설치를 시작합니다\""
+   },
+   {
+    "file": "client/build/installer.nsh",
+    "line": 30,
+    "quote": "설치 후 사내 GIJO 서버 주소로 로그인하면$\\r$\\n바로 쓸 수 있습니다."
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1463,
+    "quote": "const child = spawn(dest, [\"--force-run\"], { detached: true, stdio: \"ignore\" });  (/S 없음 — 마법사가 보인다)"
+   }
+  ],
+  "proposal": "installer.nsh customWelcomePage에서 electron-builder가 주는 `${isUpdated}` 조건으로 갈라, 업데이트면 제목 「GIJO AS 업데이트 ${VERSION}」·본문 「설정·로그인 정보는 그대로 유지됩니다. 완료되면 앱이 다시 켜집니다」로 바꾸고 완료 페이지 VPN 링크는 새 설치일 때만 보인다.",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "installer.nsh:27·30 환영 문구, :36 완료 페이지 VPN 링크, main.ts:1463 `--force-run`만 넘겨 마법사가 보임(2026-07-29 결정, finding이 인지) — 확인. 덧붙여 installer.nsh:8 주석 「자동 업데이트는 /S로 돌므로 수동 설치에만 보인다」는 그 결정 이후 낡은 상태라 finding을 뒷받침한다."
+ },
+ {
+  "id": "F4-01",
+  "area": "절차허브",
+  "severity": "P1",
+  "title": "첫 화면·챗봇 안내가 「보안 태세·자산 요약은 ① 발견·수집에서」라고 말하지만, 그 판 둘은 이미 허브에서 빠졌다",
+  "user_impact": "대시보드 위 한 줄(「보안 태세·위협 인텔·자산 요약은 발견·수집에서 봅니다」)이나 챗봇 「한눈에」 안내를 믿고 ① 발견·수집에 들어간 담당자는 통합 관제·위협 인텔 두 판만 보고 「점수·자산이 어디 갔지」를 찾다 포기한다 — 허브 정체성 한 줄도 「관제·위협·자산」이라 같은 거짓을 반복한다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/dashboard.html",
+    "line": 309,
+    "quote": "보안 태세·위협 인텔·자산 요약은 <b>발견·수집</b>에서 봅니다"
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 285,
+    "quote": "\"한눈에\": \"보안 태세 점수(도넛)는 **이 화면이 아니라 「① 발견·수집」 화면**에 있습니다(2026-08-09에 옮겼습니다)."
+   },
+   {
+    "file": "client/src/renderer/pages/discover.html",
+    "line": 59,
+    "quote": "<b>발견·수집</b> — 관제·위협·자산의 한눈에를 한 줄로 보고"
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 369,
+    "quote": "what: \"관제·위협·자산의 「한눈에」를 위 한 줄에 모아 두고"
+   },
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 83,
+    "quote": "// ⚠ 「📊 보안 태세」 판을 **뺐다**(사장님 승인 2026-08-19 … 종합 점수·컴플라이언스는 … ⑤보고의 몫"
+   },
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 164,
+    "quote": "// ⚠ 「🖥 자산」 판을 **뺐다**(승인 시안 mockups/자산_0단계, 2026-08-18)."
+   },
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 169,
+    "quote": "// ⚠ 「📊 보안 태세」(posture)는 **손대지 않았다.** … 사장님 확인이 필요한 자리라 남긴다"
+   }
+  ],
+  "proposal": "세 문구를 현재 판 구성에 맞춘다 — dashboard.html:309는 「관제·위협 인텔은 ① 발견·수집, 보안 점수는 ⑤ 보고(KPI), 자산은 ⓪ 자산 고르기에서」로, screenguide.ts:285(dashboard 「한눈에」)는 「보안 태세 점수는 ⑤ 보고 > 보안 KPI 판」으로, discover.html:59·screenguide.ts:369는 「관제·위협」만 말하게 고친다. grouppanels.js:169-170의 「손대지 않았다」 주석은 83행과 모순이므로 지운다(2026-08-19 승인으로 뺀 사실을 알고 있다).",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "인용 전부 실제와 일치 — dashboard.html:309 폴백 한 줄(공격 경로 0건·오류 시 노출, 신규 설치에서 흔함)·screenguide.ts:285·discover.html:59·screenguide.ts:369가 「보안 태세·자산」이 ①에 있다고 말하지만 grouppanels.js:83·164에서 두 판은 2026-08-19·08-18 승인으로 빠졌고, grouppanels.js:169 「posture 손대지 않았다」 주석은 83행과 모순되는 낡은 주석이다. 다만 ① 허브에는 관제·위협 외에 「🔍 취약점」 판(grouppanels.js:179)도 있어 「두 판만」은 틀렸고, 점수는 ⑤ 보고 메뉴로 갈 수 있어 「막힘」까지는 아니다 → P1."
+ },
+ {
+  "id": "F4-02",
+  "area": "절차허브",
+  "severity": "P1",
+  "title": "허브 안에서 ⓘ를 누르면 그 판 화면(승인·취약점·하드닝…)의 안내가 아니라 허브 공통 문장만 나온다",
+  "user_impact": "③ 조치 허브에서 승인 화면을 보며 「이 화면에서 뭐 할 수 있어?」(ⓘ)를 누르면 「화면 맨 위 한 줄에 요약이 나란히… 판을 누르면 무대가 바뀝니다」라는 허브 설명만 받는다 — 승인 화면 전용 안내(조치 검증·미배정·반려 등)는 서버에 있지만 개별 화면이 전부 허브로 흡수돼 ⓘ로는 영영 닿지 않는다. 원칙 ②(사용법은 ⓘ로)가 절차 5단계 안쪽 화면 11개에서 비어 있는 셈이다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/console.js",
+    "line": 1627,
+    "quote": "window.gijo.sendInstruction(\"이 화면에서 뭐 할 수 있어?\", session ? session.id : undefined, ctx.screen || undefined)"
+   },
+   {
+    "file": "client/src/renderer/pages/console.js",
+    "line": 1642,
+    "quote": "var s = window.gijoTabs.activeScreen(), l = window.gijoTabs.activeLabel();"
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 1120,
+    "quote": "const key = (screen.split(/[\\\\/]/).pop() ?? screen).split(\"?\")[0];"
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 400,
+    "quote": "\"한눈에\": \"화면 맨 위 한 줄에 이 그룹 메뉴들의 요약이 나란히 있습니다. 판을 누르면 **아래 무대**가 그 메뉴로 바뀌고"
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 613,
+    "quote": "\"approvals.html\": {"
+   },
+   {
+    "file": "client/src/renderer/pages/grouphub.js",
+    "line": 103,
+    "quote": "function show(id) { current = id; … stage.setAttribute(\"src\", want);"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 270,
+    "quote": "\"approvals.html?embed=1\": \"fix.html?embed=1&panel=approvals\","
+   }
+  ],
+  "proposal": "두 층을 잇는다 — ① grouphub.js show()가 판을 바꿀 때 window.top에 「지금 무대 화면」(예: {type:\"gijo:hubStage\", page:\"approvals.html\"})을 알리고 셸이 활성 탭의 무대 화면으로 기억, ② console.js ⓘ·맥락 전송은 무대 화면이 있으면 그것을 screen으로 보낸다. 서버 쪽 대안으로 screenguide.getScreenGuide가 `?panel=` 값을 grouppanels 대응표(discover/analysis→analysis.html 등)로 풀어 해당 화면 안내를 먼저 주고, 허브 안내는 「위 한 줄」 구역으로 덧붙이는 방식도 가능(단 이 방법은 판을 눌러 바꾼 뒤엔 여전히 초기 판만 맞는다).",
+  "plan_item": "전-7",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "console.js:1627이 ctx.screen(허브 탭 주소 fix.html?panel=approvals)을 보내고 screenguide.ts:1120이 쿼리를 떼 「fix.html」 안내(400행 허브 공통문)만 돌려준다 — approvals.html 전용 안내(613행)는 ⓘ로 닿을 길이 없다. grouphub.js:117-121 주석이 「셸이 보는 탭 이름은 허브 하나로 고정」이라 인정하고 보는목록만 비우는 회피를 했을 뿐, 이 상태를 유지하기로 한 사용자 결정은 없다. 서버 쪽 panel= 해석도 없음(grep 확인)."
+ },
+ {
+  "id": "F4-03",
+  "area": "절차허브",
+  "severity": "P1",
+  "title": "절차 띠의 큰 숫자에 이름이 없다 — 승인 시안은 「57 자산 · 18 미분류 · 3 진행 · 5 대기」였는데 구현은 숫자만 찍는다",
+  "user_impact": "담당자는 「④ 검증 40 · 미점검 대상 2」를 보고 40이 무엇인지(실패 점검항목 합계) 알 길이 없고, 그 40은 ④ 허브의 어느 판에도 다시 나오지 않는다(판은 등록 장비·활성 스케줄·평균 준수율만 보임). ①의 57(자산 수)도 허브 판(P0/P1/P2·긴급/주의/정보)과 맞춰 볼 수 없어 「숫자를 못 믿는」 상태가 된다 — 절차 띠 설계 취지(workflowrail.js 머리글)와 정반대다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/workflowrail.js",
+    "line": 61,
+    "quote": "var 값 = s.count == null ? '<span class=\"none\">—</span>' : \"<b>\" + s.count + \"</b>\";"
+   },
+   {
+    "file": "client/src/renderer/pages/workflowrail.js",
+    "line": 71,
+    "quote": "'<div class=\"v\">' + 값 + 경고 + \"</div>\";"
+   },
+   {
+    "file": "mockups/menu-workflow/시안.html",
+    "line": 181,
+    "quote": "<span class=\"rn\">57</span> 자산 · 오늘 신규 <b>3</b>"
+   },
+   {
+    "file": "mockups/menu-workflow/시안.html",
+    "line": 184,
+    "quote": "<div class=\"rt\">④ 검증</div><div class=\"rv\"><span class=\"rn\">5</span> 대기 · 재발 <b>0</b>"
+   },
+   {
+    "file": "server/src/engine/workflow.ts",
+    "line": 131,
+    "quote": "{ no: 4, key: \"verify\", label: \"검증\", count: 실패항목, alert: 미확인, alertLabel: \"미점검 대상\""
+   },
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 479,
+    "quote": "rows: [ [\"등록 장비\", n(targets.length)], [\"활성 스케줄\", n(활성)], [\"평균 준수율\", …] ],"
+   }
+  ],
+  "proposal": "서버 WorkflowStage에 `countLabel`(예: ①「자산」 ②「미조치」 ③「진행」 ④「실패 항목」 ⑤「이번 주 보고」)을 한 곳(workflow.ts)에서 정해 내려주고, workflowrail.js:61이 `<b>N</b> 자산` 꼴로 그린다(승인 시안 181-185행 복원). 아울러 ④ 허브 하드닝 판(grouppanels.js:479)에 「실패 항목」·「미점검 대상」 두 줄을 rail과 같은 잣대로 넣어 띠 숫자가 판에서 확인되게 한다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": true,
+  "verify_reason": "workflowrail.js:61·71이 count를 이름 없이 <b>N</b>만 그리고, 승인 시안 mockups/menu-workflow/시안.html:181-185는 「57 자산·5 대기」처럼 이름을 붙였다. workflow.ts:131 ④ count=실패항목 합계는 허브 판(grouppanels.js:479-483 등록 장비·활성 스케줄·평균 준수율)에 다시 나오지 않아 대조 불가. 이름을 뺀 결정 기록 없음. 띠는 모든 절차 화면 상단에 상시 노출되므로 P1 유지."
+ },
+ {
+  "id": "F4-04",
+  "area": "절차허브",
+  "severity": "P1",
+  "title": "허브 판이 「일부를 못 봤다」(확인못함)고 알려도 grouphub.js가 그 표식을 버려 0이 사실처럼 보인다",
+  "user_impact": "④ 검증 허브에서 장비 목록 API만 실패하면 판은 「등록 장비 0 · 활성 스케줄 3 · 평균 준수율 -」로 멀쩡히 그려진다 — 담당자는 장비가 하나도 없다고 읽고 보고서에 쓴다. 같은 판 정의를 쓰는 현황판(panelsboard.js)은 「일부를 불러오지 못했습니다 — 장비 목록」을 띄우는데 허브만 조용히 삼킨다(원칙 ③ 위반).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 463,
+    "quote": "window.gijo.hardeningTargets.list().catch(function () { 못함.push(\"장비 목록\"); return []; }),"
+   },
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 485,
+    "quote": "확인못함: 못함.length ? 못함 : undefined,"
+   },
+   {
+    "file": "client/src/renderer/pages/grouphub.js",
+    "line": 75,
+    "quote": "function summaryHtml(d) { if (!d) return '<span class=\"gh-empty\">불러오지 못했습니다</span>'; … if (d.foot) …"
+   },
+   {
+    "file": "client/src/renderer/pages/panelsboard.js",
+    "line": 141,
+    "quote": "if ((d && d.확인못함 && d.확인못함.length) || !fp) {"
+   },
+   {
+    "file": "client/src/renderer/pages/panelsboard.js",
+    "line": 143,
+    "quote": "실패: d && d.확인못함 && d.확인못함.length ? \"일부를 불러오지 못했습니다 — \" + d.확인못함.join(\"·\") : \"값을 읽지 못했습니다\","
+   }
+  ],
+  "proposal": "grouphub.js summaryHtml에 `if (d.확인못함 && d.확인못함.length) h += '<div class=\"gh-foot\" style=\"color:var(--amber)\">⚠ 일부를 불러오지 못했습니다 — ' + esc(d.확인못함.join('·')) + '</div>'`를 foot 앞에 넣고, 못 본 항목의 숫자 줄은 0 대신 「-」로 바꾼다(hardening 판이면 「등록 장비 -」). 문구는 panelsboard.js:143과 글자까지 같게 한다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "grouppanels.js:463-485가 실패를 확인못함에 남기지만 grouphub.js:75-96 summaryHtml은 segments·rows·foot만 그리고 확인못함을 읽지 않는다(grep: grouphub.js에 확인못함 0건). panelsboard.js:141-143은 같은 표식으로 「일부를 불러오지 못했습니다 — …」를 띄운다. grouppanels.js:457-460 주석도 이 표식을 「현황판이 본다」로만 설계했다 — 허브 쪽은 빠진 자리이며 0이 거짓으로 보이는 실제 결함. 같은 꼴 판이 645·689·736행에도 있어 영향 범위는 ④만이 아니다."
+ },
+ {
+  "id": "F4-05",
+  "area": "절차허브",
+  "severity": "P1",
+  "title": "④ 검증 허브는 「고친 것이 닫혔는지 확인하는 자리」라 쓰여 있지만 실제 조치 검증(재스캔·조치 검증 실행·검증 대기)은 전부 ③ 조치의 승인 화면에 있다",
+  "user_impact": "조치를 끝낸 담당자가 절차대로 ④ 검증에 가면 보안설정(하드닝) 점검 판 하나만 있고, 「검증 대기」로 올린 취약점을 재스캔·검증하는 단추는 ③ 조치 > 조치·승인 안에 있다 — 다섯 단계 이름을 따라 움직이면 정작 검증 단계에서 검증할 곳이 없어 되돌아가야 한다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/verify.html",
+    "line": 59,
+    "quote": "<b>검증</b> — 고친 것이 실제로 닫혔는지 확인하는 자리입니다."
+   },
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 434,
+    "quote": "{ id: \"hardening\", title: \"🛡 보안설정 점검\", page: \"hardening.html\", agents: [\"해석\"], scenario: \"검증 현황 점검\","
+   },
+   {
+    "file": "client/src/renderer/pages/approvals.html",
+    "line": 673,
+    "quote": "<button class=\"btn verify\" data-set=\"verifying\">🔁 조치 완료 → 검증 요청</button><button class=\"btn verify\" id=\"btnVerifyRun\">🔍 조치 검증 실행</button>"
+   },
+   {
+    "file": "client/src/renderer/pages/approvals.html",
+    "line": 679,
+    "quote": "<button class=\"btn verify\" id=\"btnVerifyRun\">🔍 조치 검증 실행</button><button class=\"btn verify\" id=\"btnRescan\">🔁 지금 재스캔</button>"
+   },
+   {
+    "file": "client/src/renderer/pages/approvals.html",
+    "line": 262,
+    "quote": "verifying: \"검증 대기\""
+   },
+   {
+    "file": "server/src/engine/workflow.ts",
+    "line": 105,
+    "quote": "// ⚠ 처음엔 여기에 **점검서 승인 대기(유지보수)** 숫자를 넣었다. … 단계의 숫자는 **그 단계의 화면에서 나온 것**이어야 한다. 그래서 보안설정 점검에서 센다."
+   },
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 289,
+    "quote": "{ id: \"approvals\", title: \"✅ 조치·승인\", page: \"approvals.html\", scenario: \"조치 마감(시작→검증→확정)\","
+   }
+  ],
+  "proposal": "2026-08-02의 「④ 숫자는 하드닝에서」 결정을 알고 내는 의견이다 — 둘 중 하나로 정합시킨다. (가) ④ 허브에 「🔁 조치 검증 대기」 판을 추가해 approvals.html을 `?status=verifying` 필터로 무대에 열고(approvals.html이 `?finding=` 쿼리는 이미 읽는다:821행), 서버 ④ count도 검증 대기 건수로 바꿔 시나리오 「조치 마감(시작→검증→확정)」이 ③→④로 흐르게 한다. (나) 그게 아니면 verify.html:59와 screenguide.ts:405 문구를 「보안장비 설정이 기준대로 유지되는지 점검하는 자리 — 취약점 조치 검증은 ③ 조치·승인 안 🔍 조치 검증에서」로 바꿔 거짓 약속을 없앤다.",
+  "plan_item": "전-1",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "verify.html:59·screenguide.ts:405 「고친 것이 닫혔는지 확인」 vs ④ 허브 판은 hardening 하나(grouppanels.js:434), 재스캔·조치 검증 실행 단추는 approvals.html:673·679(③ 조치)에 있음 — 인용 일치. workflow.ts:105의 2026-08-02 결정은 「띠 숫자의 출처」에 관한 것이고 finding도 이를 알고 낸다. 문서끼리도 어긋난다: GIJO_AS_사용자_매뉴얼.md:446은 ④=「조치 검증(재스캔)」, GIJO_AS_용어사전.md:648은 ④=「보안설정 점검」 — 사용자 결정이 필요한 정합 문제로 P1 타당."
+ },
+ {
+  "id": "F4-06",
+  "area": "절차허브",
+  "severity": "P1",
+  "title": "③ 조치·② 우선순위 무대의 빈 상태 문구가 영어 「finding」을 쓰고, 다음 행동(스캔 결과 올리기)을 없는 자리로 안내한다",
+  "user_impact": "승인 목록이 비면 「검토할 finding이 없습니다 — 자산 스캔을 먼저 실행하세요」, 상세칸은 「왼읽에서 finding을 선택하세요」가 뜬다 — 담당자는 finding이 뭔지 모르고, 「자산 스캔 실행」을 어디서 하는지도 없다. 취약점 화면은 「위에서 Nessus 등의 결과 파일을 올려주세요」라 하지만 화면에 올리는 곳이 없다(스캔 파일 인입은 대화창 ＋로 통일됨).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/approvals.html",
+    "line": 445,
+    "quote": "(!allReviews.length ? \"검토할 finding이 없습니다 — 자산 스캔을 먼저 실행하세요.\""
+   },
+   {
+    "file": "client/src/renderer/pages/approvals.html",
+    "line": 447,
+    "quote": ": \"이 상태의 finding이 없습니다.\") + \"</div>\";"
+   },
+   {
+    "file": "client/src/renderer/pages/approvals.html",
+    "line": 118,
+    "quote": "<div class=\"rv-empty\">왼쪽에서 finding을 선택하세요.</div>"
+   },
+   {
+    "file": "client/src/renderer/pages/vulnscan.html",
+    "line": 532,
+    "quote": "업로드된 취약점 스캔 결과가 없습니다. 위에서 Nessus 등의 결과 파일을 올려주세요."
+   },
+   {
+    "file": "client/src/renderer/pages/vulnscan.html",
+    "line": 604,
+    "quote": "// 스캔 파일 인입은 대시보드 ＋로 통일(2026-07-27)."
+   }
+  ],
+  "proposal": "approvals.html:118·445·447·504의 「finding」을 「취약점」으로, 「자산 스캔을 먼저 실행하세요」를 「아직 검토할 취약점이 없습니다 — 아래 대화창 ＋로 스캔 결과 파일(Nessus 등)을 올리면 여기 쌓입니다」로 바꾼다. vulnscan.html:532·364도 「위에서」를 「아래 대화창 ＋로」로 고친다(원칙 ⑥·⑦: 다음 행동을 실제 있는 자리로).",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "approvals.html:118·445·447·504의 영어 「finding」과 「자산 스캔을 먼저 실행하세요」(실행 자리 없음), vulnscan.html:532 「위에서 … 올려주세요」 vs 604행 주석 「인입은 대시보드 ＋로 통일(2026-07-27)」 — 인용 일치, 다음 행동이 없는 자리를 가리키는 빈 화면이다. 한글 원칙·「막막한 빈 화면 금지」 위반이고 신규 설치에서 첫 화면급으로 자주 보인다."
+ },
+ {
+  "id": "F4-07",
+  "area": "절차허브",
+  "severity": "P2",
+  "title": "③ 조치 판 「🛠 정기 점검」을 누르면 무대는 「🔧 유지보수 점검」이라 하고, ④의 하드닝은 스스로를 「원격 정기점검 관제」라 부른다 — 같은 말이 두 화면을 가리킨다",
+  "user_impact": "판 이름(정기 점검)과 그 아래 화면 정체성(유지보수 점검)이 달라 「잘못 눌렀나」 하게 되고, 「정기점검」이라는 말이 ③(유지보수)과 ④(하드닝 제목·products 칩 「이거 정기점검 잡아줘」)에 걸쳐 있어 담당자가 대화창에 「정기점검 현황」을 물으면 어느 쪽이 답인지 흔들린다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 332,
+    "quote": "{ id: \"maintenance\", title: \"🛠 정기 점검\", page: \"maintenance.html\","
+   },
+   {
+    "file": "client/src/renderer/pages/maintenance.html",
+    "line": 128,
+    "quote": "🔧 <b>유지보수 점검</b> — 보안장비·AI 자산의 정기 점검을 <b>기한 순으로</b> 챙기는 곳입니다."
+   },
+   {
+    "file": "client/src/renderer/pages/hardening.html",
+    "line": 72,
+    "quote": "<div class=\"page-title\">🛡 원격 정기점검 관제</div>"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 191,
+    "quote": "{ page: \"verify.html?panel=hardening\", label: \"보안설정 점검 (하드닝)\" },"
+   },
+   {
+    "file": "client/src/renderer/pages/console.js",
+    "line": 999,
+    "quote": "\"products.html\": [\"이거 정기점검 잡아줘\", \"보안제품 현황 알려줘\"],"
+   }
+  ],
+  "proposal": "이름을 한 벌로 통일한다 — 유지보수는 판·메뉴·정체성 줄 모두 「정기 점검」(maintenance.html:128 「🔧 정기 점검 — …」), 하드닝은 모두 「보안설정 점검」(hardening.html:72 제목·screenguide title). 「정기점검」이라는 낱말은 유지보수에만 쓰고 하드닝 쪽 문구에서 걷는다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "grouppanels.js:332 판 「🛠 정기 점검」 ↔ maintenance.html:128 정체성 「🔧 유지보수 점검」, hardening.html:6·72 「원격 정기점검 관제」 ↔ screenguide.ts:916 title 「보안설정 점검 (하드닝)」·nav.js:191 — 어긋남은 실제. 단 console.js:999 products 칩 「이거 정기점검 잡아줘」는 agentloop.ts:1315에서 schedule_maintenance(유지보수)로 가므로 하드닝 쪽 증거가 아니다 — 그 인용은 틀렸다. 다듬기 수준이라 P2."
+ },
+ {
+  "id": "F4-08",
+  "area": "절차허브",
+  "severity": "P2",
+  "title": "허브 안에서 판을 바꿔도 셸은 모른다 — 탭 이름·주소·대화 맥락이 처음 연 판에 머문다",
+  "user_impact": "보안제품 관리 > 「정기 점검」으로 ③ 허브를 열고 판을 「조치·승인」으로 바꾸면 탭 이름은 여전히 「정기 점검」이고, 앱을 다시 열면 저장된 탭이 다시 정기 점검 판으로 돌아간다. 대화창 맥락(ctx.screen)도 `fix.html?panel=maintenance`에 고정돼 지금 보는 판과 어긋난다(console.js가 이미 이 어긋남을 회피 코드로 다루고 있다).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/grouphub.js",
+    "line": 114,
+    "quote": "var want = p.page + (p.page.indexOf(\"?\") >= 0 ? \"&\" : \"?\") + \"embed=1&hub=1\" + 테마;"
+   },
+   {
+    "file": "client/src/renderer/pages/grouphub.js",
+    "line": 121,
+    "quote": "try { window.top.postMessage({ type: \"gijo:view\" }, \"*\"); } catch (e) { /* 셸 밖이면 없던 일로 */ }"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 541,
+    "quote": "for (var a = 0; a < 목록.length; a++) if (목록[a].it.page === 주소) return 목록[a].it.label"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 192,
+    "quote": "{ page: \"fix.html?panel=maintenance\", label: \"정기 점검\" },"
+   },
+   {
+    "file": "client/src/renderer/pages/console.js",
+    "line": 1651,
+    "quote": "// ⚠ 같은 화면이면 탭 값(쿼리 포함)을 그대로 둔다 — 직전은 쿼리를 뗀 파일명이라 fix.html vs fix.html?panel=…이 「화면 전환」으로 오인되어"
+   }
+  ],
+  "proposal": "grouphub.js show()에서 판이 바뀔 때 `history.replaceState`로 자기 주소의 `panel=`을 갱신하고 window.top에 {type:\"gijo:hubStage\", panel, page, label}을 보낸다; 셸(app.html)은 활성 탭의 page를 새 `?panel=`로 바꿔 저장(gijo:tabs:v1)하고 탭 이름을 판 제목으로 갈아 준다. F4-02와 같은 배관으로 한 번에 처리한다.",
+  "plan_item": "신규",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "grouphub.js:103-125 show()는 iframe src만 바꾸고 주소·셸에 판을 알리지 않으며(replaceState·hubStage 검색 0건), app.html:541은 탭 라벨을 저장된 page로만 찾고, console.js:1651-1656은 이 고정 때문에 생긴 오인을 회피 코드로 다룬다 — 인용 일치. 알려진 한계지 사용자 결정은 아니다. F4-02와 뿌리(셸이 무대 판을 모름)는 같지만 증상(탭 이름·복원·맥락)이 달라 중복으로 보지 않는다; 구현은 한 배관으로."
+ },
+ {
+  "id": "F4-09",
+  "area": "절차허브",
+  "severity": "P2",
+  "title": "⑤ 보고(KPI)·⓪ 자산에서 「자산 관리」로 나가는 링크가 `hub=1`이라, 새로 열린 전체 탭에서 자산 화면의 「한눈에」 그림띠가 숨겨진다",
+  "user_impact": "KPI 타일(AI 자산·자산 위험도)이나 ⓪의 「전체 관리 열기」를 눌러 자산 관리 탭에 들어가면, 메뉴로 연 같은 화면과 달리 위쪽 요약 그림이 없다 — 「어디가 고장인가」로 읽힌다. nav.js는 이 문제 때문에 2026-08-31 `full=1`을 따로 만들었는데 링크 두 곳이 아직 옛 표식을 쓴다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/kpi.html",
+    "line": 312,
+    "quote": "aiTile(\"AI 자산\", a.aiAssets, \"#c9b8ff\", \"LLM·모델 자산\", \"inventory.html?hub=1\") +"
+   },
+   {
+    "file": "client/src/renderer/pages/kpi.html",
+    "line": 527,
+    "quote": "{ key: \"자산 위험도\", page: \"inventory.html?hub=1\", label: \"자산 관리\" },"
+   },
+   {
+    "file": "client/src/renderer/pages/assets.html",
+    "line": 178,
+    "quote": "window.parent.postMessage({ type: \"gijo:openTab\", page: \"inventory.html?hub=1\", label: \"자산 관리\" }, \"*\");"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 185,
+    "quote": "hub=1이 아니라 full=1인 이유(검토관 2026-08-31): hub=1은 「허브 무대 안」 표시 계약이라 화면의 「한눈에」 그림띠(#vizStrip)까지 숨긴다"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 1509,
+    "quote": "(/[?&]hub=1/.test(location.search) ? \"#vizStrip{display:none !important;}\" : \"\") +"
+   }
+  ],
+  "proposal": "kpi.html:312·313·493·527과 assets.html:178의 `inventory.html?hub=1`을 `inventory.html?full=1`로 바꾸고, nav.js:288-291 주석(「assets.html이 hub=1로 여는 이유」)도 full=1로 고친다. 같은 주소가 되면 탭 이름도 메뉴 라벨 「자산 관리 (전체)」로 저절로 맞는다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "kpi.html:312·313·493·527, assets.html:178이 inventory.html?hub=1로 열고, nav.js:1509(applyEmbed — 탭 iframe은 embed=1이라 적용됨)가 hub=1이면 #vizStrip을 숨긴다. nav.js:183-187이 2026-08-31 검토관 지적으로 메뉴만 full=1로 바꿨고(1699행에 full=1 예외 확인), 두 링크와 nav.js:288-291 주석은 옛 표식 그대로 — 인용·영향 모두 실제. 그림띠 하나 빠지는 수준이라 P2."
+ },
+ {
+  "id": "F4-10",
+  "area": "절차허브",
+  "severity": "P1",
+  "title": "절차 띠 ①의 「오늘 신규」가 UTC 날짜로 계산돼 한국 시간 오전 9시 전에는 어제 스캔이 「오늘」로 잡힌다",
+  "user_impact": "아침 브리핑 시나리오에서 담당자가 8시에 ① 발견·수집 띠를 보면 「오늘 신규 3」이 뜨지만 9시가 지나면 0으로 바뀐다 — 같은 날 숫자가 저절로 바뀌어 띠를 못 믿게 된다. 같은 파일 ③ 판은 이 함정을 이미 한 번 고쳤다(grouppanels.js 「로컬 날짜로 잡는다」).",
+  "evidence": [
+   {
+    "file": "server/src/engine/workflow.ts",
+    "line": 71,
+    "quote": "const 오늘 = new Date().toISOString().slice(0, 10);"
+   },
+   {
+    "file": "server/src/engine/workflow.ts",
+    "line": 72,
+    "quote": "const 오늘신규 = assets.filter((a) => String(a.lastScannedAt ?? \"\").slice(0, 10) === 오늘).length;"
+   },
+   {
+    "file": "client/src/renderer/pages/grouppanels.js",
+    "line": 350,
+    "quote": "// ⚠ **로컬 날짜**로 잡는다(2026-08-20 병렬 검토). toISOString은 UTC라 한국에서는 오전 9시 전까지 「어제」로 계산돼, 서버(util/date.ts todayLocal)와 하루가 어긋난다."
+   }
+  ],
+  "proposal": "workflow.ts:71을 `util/date.ts todayLocal()`로 바꾸고 lastScannedAt도 로컬 날짜로 잘라 비교한다(maintenance 판·datacard와 같은 잣대). grouppanels.js:680(지식 판 「오늘 반입」)도 같은 꼴이니 함께 고친다.",
+  "plan_item": "전-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "workflow.ts:71-72 인용은 맞지만 진단이 틀렸다 — lastScannedAt은 epoch ms 숫자다(assets.ts:154, recordFindings scannedAt=Date.now() :429·436). String(1788315755xxx).slice(0,10)=\"1788315755\"는 어떤 날짜 문자열과도 같을 수 없어 「오늘 신규」는 시각과 무관하게 **항상 0**이다(node로 실측 false). 따라서 「8시엔 3, 9시엔 0」 영향은 실제가 아니고, 실제 결함은 더 나쁘다: 띠 머리글 규칙(0으로 채우면 거짓) 위반인 상시 거짓 0. grouppanels.js:680의 ingestedAt은 ISO 문자열(memory.ts:921)이라 그쪽은 finding대로 UTC 어긋남이 맞다."
+ },
+ {
+  "id": "F4-11",
+  "area": "절차허브",
+  "severity": "P2",
+  "title": "무대 빈 상태 문구가 보이지 않는 자리를 가리킨다 — AI-BOM은 「위 Shadow AI에서 등록」(발견 없으면 숨김), 위협 인텔은 「연동된 피드가 없거나」로 끝난다",
+  "user_impact": "② 우선순위 > AI-BOM에서 AI 자산이 없으면 「위 Shadow AI에서 발견된 모델을 등록하거나」라 하는데 그 배너는 발견이 있을 때만 보이므로 담당자는 위를 아무리 봐도 찾지 못한다. ① 위협 인텔 빈 상태는 원인만 나열하고 무엇을 하면 되는지(피드 연결은 어디서) 말하지 않는다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/sbom.html",
+    "line": 759,
+    "quote": "등록된 AI 자산이 없습니다. 위 Shadow AI에서 발견된 모델을 등록하거나, 자산 목록에서 AI 유형으로 등록하세요."
+   },
+   {
+    "file": "client/src/renderer/pages/sbom.html",
+    "line": 155,
+    "quote": "<div id=\"shadowAiBanner\" style=\"display:none;margin-bottom:14px;"
+   },
+   {
+    "file": "client/src/renderer/pages/threat.html",
+    "line": 299,
+    "quote": "탐지 내역이 없습니다. 연동된 CTI 피드가 없거나 아직 탐지된 항목이 없습니다."
+   },
+   {
+    "file": "client/src/renderer/pages/threat.html",
+    "line": 140,
+    "quote": "<button class=\"btn-primary\" data-page=\"settings.html?s=link\" title=\"AI 에이전트를 외부 CTI·보안도구에 MCP로 연결\" …>🔌 MCP 연동</button>"
+   }
+  ],
+  "proposal": "sbom.html:759는 Shadow AI 배너가 보일 때만 그 문장을 붙이고, 아니면 「등록된 AI 자산이 없습니다 — ⓪ 자산 고르기 > 자산 관리(전체)에서 종류를 LLM 서비스·분류 모델로 등록하면 여기 나옵니다」로. threat.html:299는 「… 피드 연결은 위 🔌 MCP 연동(설정 > 연동)에서 합니다」를 덧붙인다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "sbom.html:759 「위 Shadow AI에서 …」 vs 배너는 155행 display:none이고 830행 발견 시에만 block — 인용 일치, 빈 상태가 보이지 않는 자리를 가리킨다. threat.html:299는 원인만 말하고 다음 행동 없음, 140행 「🔌 MCP 연동」 단추가 실제 있음. 두 곳 모두 빈 화면 원칙 다듬기라 P2 적정."
+ },
+ {
+  "id": "F5-01",
+  "area": "설정·기록·부가",
+  "severity": "P1",
+  "title": "보안제품 빈 상태 안내가 없어진 등록 폼을 가리킨다",
+  "user_impact": "제품을 처음 등록하려는 담당자가 「위에서 종류를 골라 등록하세요」를 읽고 화면 위를 아무리 찾아도 등록 칸이 없어 막힌다(등록은 2026-08-02부터 대화창 전용).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/products.html",
+    "line": 624,
+    "quote": "root.innerHTML = `<div class=\"empty-all\">아직 등록된 보안제품이 없습니다. 위에서 종류를 골라 제품을 등록하세요.</div>`;"
+   },
+   {
+    "file": "client/src/renderer/pages/products.html",
+    "line": 649,
+    "quote": "// 제품 등록은 **대화창**에서 한다(2026-08-02 사용자 지시). 화면 폼과 그 처리를 걷어냈다."
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 673,
+    "quote": "\"제품 등록\": \"제품 등록은 **대화창에서** 합니다(2026-08-02부터 — 화면의 등록 칸은 없앴습니다.\""
+   }
+  ],
+  "proposal": "products.html:624 문구를 「아직 등록된 보안제품이 없습니다 — 아래 대화창에 \"경계 방화벽 ○○ 등록해줘\"처럼 말하면 승인 후 등록됩니다」로 바꾸고, 같은 문장을 screenguide 「제품 등록」 판과 맞춘다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "products.html:624 빈 상태 문구가 「위에서 종류를 골라 등록」을 가리키지만, 위 칩(renderSummary, :542)은 거르기·점프 전용이고 등록 폼은 :649 주석대로 2026-08-02 걷어냈다(대화창 register_product만). screenguide.ts:691도 「화면의 등록 칸은 없앴습니다」라 화면 문구만 낡았다. 단, 대화창 ＋·ⓘ가 늘 보여 완전히 막히는 건 아니므로 P1로 내린다."
+ },
+ {
+  "id": "F5-02",
+  "area": "설정·기록·부가",
+  "severity": "P1",
+  "title": "법령·판례가 꺼져 있을 때 담당자를 「설정 › 연동」으로 보내지만 그 판은 관리자 전용",
+  "user_impact": "담당자가 「설정 › 연동에서 켜기 ›」를 눌러 연동 탭에 가면 법령 판이 없어(admin 전용·숨김) 무엇을 해야 하는지 모른 채 막힌다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/lawlookup.html",
+    "line": 215,
+    "quote": "'<span class=\"go\" id=\"goSet\">설정 › 연동에서 켜기 ›</span>';"
+   },
+   {
+    "file": "client/src/renderer/pages/lawlookup.html",
+    "line": 219,
+    "quote": "if (window.gijoOpenScreen) window.gijoOpenScreen(\"settings.html?s=link\", \"설정\");"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 768,
+    "quote": "<div data-sec=\"link\" class=\"panel\" id=\"lawPanel\" style=\"display:none\">"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 906,
+    "quote": "document.getElementById(\"lawPanel\").style.display = \"\";  (admin 분기 안에서만)"
+   }
+  ],
+  "proposal": "lawlookup.html 그리기상태()에서 window.gijo.me()로 역할을 확인해, 담당자에게는 「⚠ 꺼져 있습니다 — 관리자가 설정 › 연동에서 법제처 인증키·도메인을 넣어야 합니다(관리자에게 요청하세요)」로 바꾸고 goSet 링크는 관리자에게만 붙인다.",
+  "plan_item": "전-2",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "lawlookup.html:213-219가 역할 무관하게 settings.html?s=link로 보내고, settings.html:768 lawPanel은 :906 admin 분기에서만 열린다. nav.js에는 역할 필터가 없어 담당자도 법령 화면에 들어오며, 연동 탭에는 MCP 판만 남는다. 다만 담당자는 원래 켤 수 없는 기능(서버 POST /api/law/config도 admin, lawinfo.ts:569-571)이라 「관리자에게 요청」 안내 문제이지 업무 차단은 아니다 → P1."
+ },
+ {
+  "id": "F5-03",
+  "area": "설정·기록·부가",
+  "severity": "P1",
+  "title": "가드레일 끔/탐지/차단 단추가 담당자에게는 눌러도 아무 일이 없다(403을 삼킴)",
+  "user_impact": "담당자가 레드팀 화면에서 「차단」을 눌러도 서버가 관리자 전용으로 거부하는데 화면은 아무 반응이 없어 고장으로 읽거나, 켠 줄 알고 넘어간다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/redteam.html",
+    "line": 297,
+    "quote": "try{ const status = await window.gijo.setGuardrailMode(btn.dataset.mode); renderGuard(status); }catch(e){}"
+   },
+   {
+    "file": "server/src/engine/guardrail.ts",
+    "line": 111,
+    "quote": "app.post(\"/api/guardrail/mode\", authMiddleware, adminMiddleware, (req, res) => {"
+   }
+  ],
+  "proposal": "redteam.html에서 역할을 읽어 담당자에게는 세그먼트를 disabled로 두고 옆에 「관리자만 바꿀 수 있습니다」를 적으며, catch에서는 gijoTell(\"바꾸지 못했습니다 — 관리자 권한이 필요합니다\")로 이유를 말한다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "redteam.html:297 catch(e){}가 오류를 삼키고, guardrail.ts:111은 adminMiddleware로 막는다(주석: 모드 변경은 관리자만 — 의도된 서버 설계). 클라 request()는 !res.ok면 throw(core.ts)하므로 담당자에겐 반응 없는 죽은 조작이 된다. redteam은 aihub 안전 판으로 모두에게 보이고(grouppanels.js에 역할 게이팅 없음), redteam.html에 role 확인도 없다. screenguide.ts:823이 「관리자만」을 적어 두긴 했으나 화면 자체는 원칙(죽은 조작 금지) 위반."
+ },
+ {
+  "id": "F5-04",
+  "area": "설정·기록·부가",
+  "severity": "P2",
+  "title": "유지보수 화면의 「샘플 문서 추가」가 확인 없이 가짜 문서를 전사 지식베이스에 넣는다",
+  "user_impact": "처음 화면을 연 담당자가 감을 잡으려고 단추를 누르면 「샘플_IPS_오탐_대응_사례.txt」 같은 지어낸 사례가 전체 공유(global) 지식이 되어 이후 AI 답변의 근거로 인용되고, 되돌리려면 지식 화면에서 직접 찾아 지워야 한다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/maintenance.html",
+    "line": 154,
+    "quote": "<button id=\"kbSampleBtn\" class=\"ops-btn-secondary\">샘플 문서 추가</button>"
+   },
+   {
+    "file": "client/src/renderer/pages/maintenance.html",
+    "line": 581,
+    "quote": "await window.gijo.ingestMemoryFile(doc.name, utf8ToBase64(doc.text), \"global\");"
+   },
+   {
+    "file": "client/src/renderer/pages/maintenance.html",
+    "line": 602,
+    "quote": "관련 문서가 없습니다 — 위에서 문서를 올리거나 샘플 문서를 추가해보세요.  (이 화면엔 올리는 칸이 없다)"
+   }
+  ],
+  "proposal": "샘플 문서 단추·SAMPLE_DOCS를 걷고(시연용이면 QA 시드 스크립트로 이동), 151행 소개와 602행 빈 상태를 「대화창 ＋로 매뉴얼·케이스·에러로그를 올리면 여기서 검색됩니다」로 바꾼다.",
+  "plan_item": "전-6",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "maintenance.html:154·581(scope \"global\", 확인창 없음)·602 인용 정확. GIJO_AS_RAG_아키텍처_LLM연동.md:267은 이 샘플 문서가 실제 문서를 밀어내 1순위 근거로 잡히는 것을 「알고 있으나 안 고친 것」으로 적고, 「담당자가 남겨두라고 하셔서 두었습니다」라 이미 들어간 문서 보존은 사용자 결정이다(단추 존치는 결정 아님). 서버 kb-hygiene가 경고 중이고 승인 없이 전사 지식이 되는 건 사실이나, 사용자가 시연용으로 남긴 맥락이 있어 P2로 내린다."
+ },
+ {
+  "id": "F5-05",
+  "area": "설정·기록·부가",
+  "severity": "P2",
+  "title": "「파일은 대시보드 ＋로」 안내가 4곳에 남아 있지만 대시보드에 ＋ 업로드가 없다",
+  "user_impact": "문서를 올리려는 담당자가 대시보드로 가서 ＋를 찾다 실패한다 — 실제 인입 창구는 대화창 ＋(console.js) 하나다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/products.html",
+    "line": 244,
+    "quote": "`<input type=\"text\" placeholder=\"문서 제목 — 파일은 대시보드 ＋로\" aria-label=\"문서 제목\">`"
+   },
+   {
+    "file": "client/src/renderer/pages/products.html",
+    "line": 705,
+    "quote": "hint.textContent = \"문서 제목을 입력하세요 (파일은 대시보드 ＋로 올립니다).\";"
+   },
+   {
+    "file": "client/src/renderer/pages/memory.html",
+    "line": 969,
+    "quote": "box.textContent = \"올린 문서가 없습니다 — 대시보드 ＋로 먼저 올리세요\";"
+   },
+   {
+    "file": "client/src/renderer/pages/memory.html",
+    "line": 302,
+    "quote": "placeholder=\"여기에 문서를 붙여넣거나, 위 '올린 문서에서 불러오기'로 대시보드 ＋로 올려 둔 문서를 가져오세요\""
+   },
+   {
+    "file": "client/src/renderer/pages/console.js",
+    "line": 269,
+    "quote": "// ＋ 파일 올리기 — 인입 창구는 여기 하나다(2026-07-27 결정: \"파일은 ＋ 한 곳으로\")."
+   }
+  ],
+  "proposal": "네 곳의 「대시보드 ＋」를 「대화창 ＋」로 고친다(screenguide는 이미 「아래 대화 콘솔의 ＋」로 맞다).",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "products.html:244·705, memory.html:302·969 네 곳 인용 정확. 「＋ 한 곳」은 2026-07-27 사용자 결정(console.js:269)이나 그때 대시보드에 있던 콘솔이 지금은 셸(app.html:399, 모든 탭에 상주)로 옮겨졌고 dashboard.html에는 별도 ＋가 없다. 결정 자체가 아니라 위치 이름만 낡은 것. 단, 대시보드 탭에서도 셸 콘솔 ＋가 보이므로 담당자가 실제로 실패하진 않는다 → P2(문구 다듬기)."
+ },
+ {
+  "id": "F5-06",
+  "area": "설정·기록·부가",
+  "severity": "P2",
+  "title": "온톨로지 관계 0건 빈 상태가 존재하지 않는 「샘플 지식 불러오기」 단추를 가리킨다",
+  "user_impact": "관계망이 비어 있는 새 설치에서 담당자가 안내대로 「위 샘플 지식 불러오기」를 찾지만 그런 단추가 화면에 없어 다음 걸음을 잃는다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/memory.html",
+    "line": 1237,
+    "quote": "등록된 관계가 없습니다. 위 \"샘플 지식 불러오기\"로 시작하거나…  (파일 전체에서 「샘플 지식」은 이 한 줄뿐 — 단추 없음)"
+   }
+  ],
+  "proposal": "문구를 「등록된 관계가 없습니다 — 문서를 올리면 관계가 자동으로 생기고, 기본 지식 번들이 적용되면 표준 관계가 들어옵니다. 아래 「관계 추가」로 직접 넣을 수도 있습니다」로 바꾼다.",
+  "plan_item": "전-4",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "memory.html:1237 문구가 「샘플 지식 불러오기」를 가리키나 파일·screenguide 어디에도 그 단추가 없다(grep 유일 1건). 「관계 추가」 접기(memory.html:365)는 실재한다. 다만 screenguide.ts memory 판이 밝히듯 기본 지식 번들이 6대 표준 온톨로지 약 2,000 관계를 서버 기동 시 채우므로 0건 빈 상태는 번들 미적용 설치에서만 보인다 → P2."
+ },
+ {
+  "id": "F5-07",
+  "area": "설정·기록·부가",
+  "severity": "P1",
+  "title": "담당자도 GPU 학습(루프 실행·파인튜닝)을 시작할 수 있어 전 사용자의 채팅이 멈춘다",
+  "user_impact": "담당자가 AI › 학습 판에서 「루프 실행」이나 「파인튜닝 시작」을 누르면 서버가 역할을 보지 않고 학습을 시작해, 다른 담당자·관리자의 채팅·문서검색이 끝날 때까지 멈춘다(에이전트 구성은 관리자만인 것과 어긋남).",
+  "evidence": [
+   {
+    "file": "server/src/engine/learnloop.ts",
+    "line": 838,
+    "quote": "\"/api/learnloop/run\",\n    authMiddleware,  (adminMiddleware 없음)"
+   },
+   {
+    "file": "server/src/engine/finetune.ts",
+    "line": 158,
+    "quote": "app.post(\"/api/finetune/start\", authMiddleware, (req, res) => {"
+   },
+   {
+    "file": "client/src/renderer/pages/learnloop.html",
+    "line": 552,
+    "quote": "if (!await gijoAsk(\"학습 루프를 실행합니다.\\n진행 중에는 채팅·문서검색이 일시 중지됩니다 (완료 후 자동 재개).\\n계속할까요?\")) return;"
+   },
+   {
+    "file": "client/src/renderer/pages/agent.html",
+    "line": 869,
+    "quote": "// 에이전트 구성(이름·모델)은 관리자만 — 담당자(security_officer)는 정의된 팀을 그대로 쓴다."
+   }
+  ],
+  "proposal": "서버 /api/learnloop/run·PUT /api/learnloop/config·/api/finetune/start에 adminMiddleware를 붙이고, learnloop.html·memory.html은 역할을 읽어 담당자에게는 실행 단추 대신 「학습 시작은 관리자만 — 후보 승인(👍)은 여기서 하세요」를 보인다(후보함 승인은 담당자 유지).",
+  "plan_item": "중-4",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "learnloop.ts:837-839 /api/learnloop/run, :867 PUT /config, finetune.ts:158 /start 모두 authMiddleware만(adminMiddleware 없음, import도 없음). 실행 시 pauseInferenceEngines(learnloop.ts:568, finetune.ts:77)로 전 사용자 추론이 멈추는 것도 사실이고 learnloop.html:552 확인창도 그렇게 말한다. 담당자 허용을 「사용자 결정」으로 적은 주석·문서는 없다(agent.html:869는 구성만 관리자). 학습 판은 aihub에 역할 게이팅 없이 모두에게 열린다."
+ },
+ {
+  "id": "F5-08",
+  "area": "설정·기록·부가",
+  "severity": "P1",
+  "title": "에이전트 AI 화면에 제목만 있고 내용이 없는 「모델 받기」 빈 판이 남아 있다",
+  "user_impact": "AI › AI 팀 판을 연 담당자가 「모델 받기」 상자를 보고 눌러 보지만 안에 아무것도 없어 고장으로 읽는다(주석은 「가는 길만 남긴다」인데 길도 없다).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/agent.html",
+    "line": 258,
+    "quote": "<div class=\"panel\">\n      <div class=\"panel-title\">모델 받기</div>\n          </div>"
+   },
+   {
+    "file": "client/src/renderer/pages/agent.html",
+    "line": 256,
+    "quote": "<!-- 모델 검색·받기는 설정 > 서버·AI로 옮겼습니다(2026-07-28) … 여기엔 가는 길만 남깁니다. -->"
+   }
+  ],
+  "proposal": "판을 지우거나, 안에 「설정 › 서버·AI에서 받습니다 →」 단추 하나(data-page=\"settings.html?s=ai\")를 넣는다. 담당자에게는 모델 받기가 admin 전용이므로 지우는 쪽을 권한다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "agent.html:256-260 주석은 「가는 길만 남깁니다」인데 판 안에는 제목 「모델 받기」만 있고 링크·단추가 없다(:empty 숨김 CSS도 없음, applyAdminGating :872-880도 이 판을 안 건드림). AI 허브 초기 판이 team(=agent.html)이라 AI를 여는 누구나 본다. 2026-08-01 상황점검 ④의 빈 화면 4건에는 포함되지 않아 미해결."
+ },
+ {
+  "id": "F5-09",
+  "area": "설정·기록·부가",
+  "severity": "P2",
+  "title": "학습 설정·파인튜닝 칸이 개발자 용어(HF repo·QLoRA·GGUF·에이전트 ID)로 담당자에게 노출된다",
+  "user_impact": "담당자가 「베이스 모델은 HuggingFace 원본 repo id(HF transformers)이며 GGUF id가 아닙니다」·「Unsloth QLoRA」·「에이전트 ID 예: analysis」를 읽고 무엇을 넣어야 할지 몰라 포기하거나 잘못 넣는다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/learnloop.html",
+    "line": 218,
+    "quote": "⚠ 모델·대상은 신중히 바꾸세요. 베이스 모델은 HuggingFace 원본 repo id(HF transformers)이며, GGUF id가 아닙니다."
+   },
+   {
+    "file": "client/src/renderer/pages/learnloop.html",
+    "line": 221,
+    "quote": "<label>학습 베이스 모델 (HF repo)</label><input id=\"cfgBaseModel\" class=\"wide\" placeholder=\"Qwen/Qwen3-14B\">"
+   },
+   {
+    "file": "client/src/renderer/pages/memory.html",
+    "line": 321,
+    "quote": "🎓 학습 · ② 파인튜닝<span class=\"badge b-amber\">GPU 필요 · Unsloth QLoRA</span>"
+   },
+   {
+    "file": "client/src/renderer/pages/memory.html",
+    "line": 324,
+    "quote": "<label for=\"ftAgentInput\">에이전트 ID</label>\n          <input id=\"ftAgentInput\" placeholder=\"예: analysis\">"
+   }
+  ],
+  "proposal": "루프 설정·파인튜닝 칸을 설정 › 관리자(또는 서버·AI admin 판)로 옮기고, 담당자 화면에는 「지금 학습 두뇌: Qwen3-14B · 산출 이름: sec-expert」 읽기 전용 한 줄만 남긴다. 에이전트 ID 입력은 팀원 이름 select로, 용어 풀이는 screenguide 「학습 루프 4단계」 판에 둔다.",
+  "plan_item": "중-4",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "learnloop.html:218·221, memory.html:321·324 인용 정확. :216 주석의 「설명은 ⓘ로, ⚠ 한 줄만 남긴다(2026-08-21)」는 밀도 결정이지 HF repo·QLoRA 용어 노출을 정한 것은 아니다. 역할 게이팅도 없어 담당자에게 그대로 보인다. 옮기기 제안은 F5-07(관리자 전용화)과 맞물리므로 함께 다루는 것이 맞다."
+ },
+ {
+  "id": "F5-10",
+  "area": "설정·기록·부가",
+  "severity": "P2",
+  "title": "「서버 파일 경로로 수집」 자유 입력칸 — 분산 모드 담당자에겐 없는 경로",
+  "user_impact": "담당자가 자기 PC 파일 경로를 넣고 「수집」을 누르면 서버(사내 GPU 서버) 디스크 기준으로 찾다 실패하고, 왜 안 되는지 알 수 없다. 화면 자유 입력으로 자료를 바꾸는 자리라 「지시는 대화창」 원칙과도 어긋난다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/memory.html",
+    "line": 212,
+    "quote": "<div data-gijo-fold=\"서버 파일 경로로 수집\" style=\"margin-top:12px;\">"
+   },
+   {
+    "file": "client/src/renderer/pages/memory.html",
+    "line": 216,
+    "quote": "<input id=\"ingestPathInput\" placeholder=\"예: data/docs/incident-policy.txt\">"
+   },
+   {
+    "file": "server/src/engine/memory.ts",
+    "line": 336,
+    "quote": "// 경로 기반 인입(/api/memory/ingest)은 memory.html의 \"서버에 이미 있는 파일 경로로 직접 수집\" 기능용"
+   }
+  ],
+  "proposal": "이 접기 구역을 관리자에게만 보이게 하고(서버 디스크를 아는 사람), 담당자에게는 「문서는 대화창 ＋로 올립니다」 한 줄만 남긴다. 접기 제목에 「(서버 디스크 경로 · 관리자용)」을 붙인다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "memory.html:212-218, memory.ts:336-338 인용 정확 — 서버 data/ 안 경로 전용, 로그인만 필요. 다만 「왜 안 되는지 알 수 없다」는 과장이다: memory.html:517 catch가 「✗ 수집 실패: 허용된 경로(…) 밖의 파일은 인입할 수 없습니다」를 그대로 보여준다. 남는 문제는 담당자에게 무의미한 서버 디스크 경로 자유 입력칸과 「지시는 대화창」 원칙 어긋남 → P2 유지."
+ },
+ {
+  "id": "F5-11",
+  "area": "설정·기록·부가",
+  "severity": "P2",
+  "title": "업무 넘기기 2단계 제목이 「문서 올리기」인데 올리는 칸이 없고, 진행 상태가 PC별 localStorage에만 남는다",
+  "user_impact": "떠나는 담당자가 2단계에서 올릴 곳을 찾다 대화창으로 가야 함을 늦게 알고, 다른 PC에서 이어 하면 체크리스트·담은 문서가 사라지며 공용 PC에서는 다른 사람의 진행 상태가 그대로 보인다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/handover.html",
+    "line": 124,
+    "quote": "<div class=\"p-title\">2. 문서 올리기 <span class=\"p-badge\" id=\"docBadge\">0개</span></div>"
+   },
+   {
+    "file": "client/src/renderer/pages/handover.html",
+    "line": 126,
+    "quote": "<button class=\"btn\" id=\"pickExistingBtn\">🗂 이미 올린 문서에서 고르기</button>"
+   },
+   {
+    "file": "client/src/renderer/pages/handover.html",
+    "line": 171,
+    "quote": "const CHK_KEY = \"gijo:handover:checklist\";\n  const DOCS_KEY = \"gijo:handover:docs\";"
+   }
+  ],
+  "proposal": "제목을 「2. 문서 담기 — 파일은 대화창 ＋로 올린 뒤 여기서 고릅니다」로 바꾸고, 체크리스트·담은 문서를 서버의 사용자별 상태(app_state 또는 handover 테이블)로 옮겨 계정을 따라다니게 한다.",
+  "plan_item": "전-1",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "handover.html:124 제목 「2. 문서 올리기」, :126 고르기 단추만, :171-172 localStorage 키 인용 정확. screenguide.ts:746은 이미 「② 문서 담기(파일은 아래 대화 콘솔의 ＋로…)」라 화면 제목만 어긋난다. 서버 handover.ts는 verify·complete·history(:187·204·232)만 두어 체크리스트·담은 문서의 계정 추적 저장은 없다. 공용 PC에서 남의 진행 상태가 보이는 것도 사실."
+ },
+ {
+  "id": "F5-12",
+  "area": "설정·기록·부가",
+  "severity": "P2",
+  "title": "시스템 로그 줄마다 영문 갈래 식별자(finetune·hf-download·modelscan)가 그대로 찍힌다",
+  "user_impact": "칩에는 「파인튜닝·모델 다운로드」로 적혀 있는데 로그 본문에는 finetune·hf-download가 찍혀 담당자가 같은 것인지 대조해야 한다(한글 우선 원칙 위반).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/syslog.html",
+    "line": 171,
+    "quote": "return `<div class=\"${cls}\"><span class=\"log-ts\">${time}</span><span class=\"${srcClass}\">${src}</span>${String(entry.message)…"
+   },
+   {
+    "file": "client/src/renderer/pages/syslog.html",
+    "line": 178,
+    "quote": "function 갈래이름(src) {  (칩 라벨을 읽는 한글 변환기가 이미 있으나 lineHtml에서 안 쓴다)"
+   }
+  ],
+  "proposal": "lineHtml에서 `${src}` 대신 `${갈래이름(src)}`를 쓴다(색 클래스는 그대로 영문 키 사용).",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "syslog.html:169 lineHtml이 `${src}` 원문을 찍고, :178 갈래이름()은 그림띠에서만 쓴다(2026-08-05 검토 지적을 막대에만 반영). 칩(:140-145)에 한글 라벨이 이미 있으므로 제안대로 한 줄 바꾸면 되고 색 클래스(s-키)는 그대로다."
+ },
+ {
+  "id": "F1-01",
+  "area": "설치",
+  "severity": "P1",
+  "title": "표준 설치본 첫 실행이 매번 「처음 설정(관리자 계정 만들기)」 화면 — 분산 모드 담당자는 빠져나올 길이 없고, 설치 마법사 약속과도 어긋난다",
+  "user_impact": "사내 서버에 붙기만 하면 되는 담당자가 설치 직후(그리고 앱을 켤 때마다) 「관리자 계정 만들기 / 이 PC에 GIJO를 처음 설치합니다」가 첫 갈래로 열린 화면을 보고, 잘못 누르면 자기 PC에 빈 로컬 서버와 가짜 관리자 계정을 만든 채 「데이터가 없다」고 판단한다.",
+  "evidence": [
+   {
+    "file": "client/src/main.ts",
+    "line": 1548,
+    "quote": "첫설치 = !!서버구성 && 서버구성.패키징본 && !fs.existsSync(DB경로(서버구성));"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 393,
+    "quote": "path.join(__dirname, `../src/renderer/pages/${첫설치인가() ? \"setup.html\" : \"login.html\"}`)"
+   },
+   {
+    "file": "client/src/renderer/pages/setup.html",
+    "line": 101,
+    "quote": "<span class=\"choice-title\">관리자 계정 만들기<small>이 PC에 GIJO를 처음 설치합니다</small></span>"
+   },
+   {
+    "file": "client/src/renderer/pages/setup.html",
+    "line": 200,
+    "quote": "location.href = \"login.html\" + location.search;"
+   },
+   {
+    "file": "client/src/renderer/pages/setup.html",
+    "line": 138,
+    "quote": "서버 주소(예: <code>10.8.0.1:4000</code>)를 입력하는 로그인 화면으로 갑니다."
+   },
+   {
+    "file": "client/build/installer.nsh",
+    "line": 30,
+    "quote": "설치 후 사내 GIJO 서버 주소로 로그인하면$\\r$\\n바로 쓸 수 있습니다."
+   }
+  ],
+  "proposal": "(2026-08-09 「고객이 관리자 비번을 정한다」·08-11 「아코디언 우회」 결정은 유지하되) ① setup.html의 「로그인 화면으로」 선택을 userData에 파일(예: gijo-setup-choice.txt)로 남기고 main.ts 1548행이 그 파일도 보게 해 다음 실행부터 login.html로 바로 가게 한다 ② 표준 배포본은 갈래 순서를 「이미 GIJO 서버가 있어요」 먼저로 바꾸고 예시 주소 `10.8.0.1:4000`(개발 VPN IP)을 `http://<서버IP>:4000` 꼴로 ③ 헬프데스크가 설치 때 서버 주소를 심을 길을 하나 만든다 — installer.nsh customInstall에서 `/SERVER=` 인자를 받아 `%APPDATA%\\GIJO AS\\server-url.txt`에 쓰고 main.ts 기본서버주소()가 GIJO_SERVER_URL 다음으로 그 파일을 읽는다.",
+  "plan_item": "전-7",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "main.ts:1548은 패키징본에서 DB 부재만 보므로 「로그인 화면으로」(setup.html:200)를 고른 분산 모드 담당자는 DB가 영영 생기지 않아 매 실행 setup.html로 간다(main.ts:393) — 로그인 정보는 creds 파일(main.ts:97)에 저장되나 첫설치 판정이 그것을 보지 않는다. 2026-08-09·08-11 결정(setup.html:18-29)은 화면 신설·우회 추가이고 「매번 다시 뜬다」는 기록된 결정이 아니며 finding도 두 결정을 알고 있다. 단 두 번 클릭으로 빠져나올 수 있어 「막힘」은 아니므로 P0→P1."
+ },
+ {
+  "id": "F1-02",
+  "area": "설치",
+  "severity": "P1",
+  "title": "표준 설치본의 단일 데스크톱 모드는 AI가 절대 뜨지 않는데(llama-server·모델 미동봉) 화면 문구 3곳은 「동봉」·「내려받아 로드하면 된다」고 말한다",
+  "user_impact": "서버 없이 표준 exe를 깐 담당자가 관리자 계정을 만들고 들어가 채팅을 치면 「모델 검색·받기에서 모델을 내려받아 로드」하라는 안내를 받고 수 GB를 받았는데도 AI가 영영 안 뜬다 — 실행부(llama-server.exe)가 이 설치본 어디에도 없고 찾는 자리는 %APPDATA% 밑 상대경로라서다.",
+  "evidence": [
+   {
+    "file": "client/package.json",
+    "line": 58,
+    "quote": "\"win\": { \"target\": \"nsis\", \"extraResources\": [ { \"from\": \"build/python-dist\", \"to\": \"server-dist/python\" } ] }"
+   },
+   {
+    "file": "server/src/engine/localengine.ts",
+    "line": 24,
+    "quote": "const LLAMA_SERVER_PATH = process.env.GIJO_LLAMA_SERVER_PATH ?? llamaBinPath(\"llama-server\");"
+   },
+   {
+    "file": "server/src/util/llamabin.ts",
+    "line": 11,
+    "quote": "return process.platform === \"win32\" ? path.join(base, \"Release\", `${binName}.exe`) : path.join(base, binName);"
+   },
+   {
+    "file": "server/src/lite/env.ts",
+    "line": 39,
+    "quote": "? path.join(뿌리, \"llama-cuda\", \"llama-server.exe\")"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 353,
+    "quote": "단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 <b>비워 두세요</b> — 앱이 알아서 맞춥니다."
+   },
+   {
+    "file": "server/src/engine/llm.ts",
+    "line": 907,
+    "quote": "⚠ AI 모델이 아직 준비되지 않았습니다. 다음 중 하나로 해결하세요 — ① 설정 > 서버·AI > 모델 검색·받기에서 모델을 내려받아 로드"
+   }
+  ],
+  "proposal": "실물 확인: 이 PC의 %LOCALAPPDATA%\\Programs\\gijo-as-client\\resources\\server-dist에 llama-cuda·models·llama.cpp 폴더가 없다(5.82.0 설치본). ① 표준 설치본이 실행부를 안 실을 거면 setup.html 갈래 1과 login.html 힌트에 「⚠ 이 설치본에는 AI 실행부·모델이 없습니다 — 사내 GPU 서버 연결을 권합니다」를 넣고 llm.ts 907행 안내를 `fs.existsSync(LLAMA_SERVER_PATH)`로 분기해 실행부가 없을 땐 ②(사내 서버 연결)만 말한다 ② 또는 라이트가 쓰는 lite/env.ts의 server-dist/llama-cuda 해석을 표준 진입점에도 적용하고 package.json win.extraResources에 build/llama-cuda를 더한다(설치본 +1.3GB — 500MB 게시 한계와 충돌하므로 F1-03과 함께 결정).",
+  "plan_item": "전-7",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "표준 빌드는 win.extraResources에 python-dist만 있고(package.json:56-63) llama-cuda는 라이트 설정(electron-builder.lite.json win.extraResources)에만 있다 — 이 PC 설치본 resources/server-dist에 llama-cuda·models 없음을 실측 확인. 표준 진입점 dist/index.js는 lite/env.ts:39-43의 실행부 해석을 거치지 않아 localengine.ts:24가 cwd(userData) 상대 `llama.cpp/build/bin/Release/llama-server.exe`를 찾고 실패하며, llm.ts:907은 실행부 유무를 보지 않고 「모델을 내려받아 로드」만 안내한다. 표준에 실행부를 안 싣는 것 자체는 500MB 한계·라이트 분리로 의도된 상태지만 안내문이 막다른 길을 가리키는 것은 기록된 결정이 아니다. preflight.ts:55가 설정 화면에서 「경로에 파일 없음」을 fail로 보여 주는 진단 경로가 있고 표준의 주 경로는 사내 서버 연결이라 P0→P1."
+ },
+ {
+  "id": "F1-03",
+  "area": "설치",
+  "severity": "P1",
+  "title": "라이트 설치본(1,616MB)은 서버 게시 한계(500MB)를 넘어 08-23에 만든 라이트 채널로 올릴 수 없다 — 그래서 로그인 화면의 라이트 내려받기가 구글 드라이브 외부 링크로 남아 있다",
+  "user_impact": "라이트 설치본을 받으려는 담당자는 폐쇄망 안의 GIJO 서버가 아니라 개인 구글 드라이브 링크로 보내지고(인터넷이 막힌 기계면 「브라우저를 열지 못했습니다」), 이미 라이트를 깐 사람은 인앱 업데이트를 영영 받지 못한다.",
+  "evidence": [
+   {
+    "file": "server/src/engine/clientrelease.ts",
+    "line": 212,
+    "quote": "express.raw({ type: \"application/octet-stream\", limit: \"500mb\" }),"
+   },
+   {
+    "file": "client/scripts/publish-release.mjs",
+    "line": 101,
+    "quote": "const 한계MB = 500;"
+   },
+   {
+    "file": "client/scripts/publish-release.mjs",
+    "line": 105,
+    "quote": "`설치본이 너무 큽니다 — ${크기MB.toFixed(1)}MB (서버 수신 한계 ${한계MB}MB).\\n` +"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 719,
+    "quote": "const LITE_DL = \"https://drive.google.com/drive/folders/1IYGXSz7aLzXP6LgGwI03fh0J8p48e4aX\";"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 717,
+    "quote": "// 라이트 설치본 배포처. 지금은 사장님 구글 드라이브가 통로다(임시) — 서버 배포로 옮기면"
+   }
+  ],
+  "proposal": "실측: D:\\Connect AI\\client\\release-lite\\GIJO AS Lite Setup 1.4.0.exe = 1,616.3MB. (2026-08-14 「임시 통로」 결정을 알고 있다 — 그 전제였던 「서버 배포」가 지금은 크기 때문에 막혀 있다.) ① clientrelease.ts 업로드를 express.raw 메모리 버퍼 대신 요청 스트림을 파일로 흘려 쓰는 방식(pipeline → fs.createWriteStream, sha256은 스트림 해시)으로 바꿔 한계를 없애고 publish-release의 500 상수도 함께 정리 ② 로그인 화면 라이트 카드는 로그인 전이라 인증 API를 못 쓰니 사내망 전용 비인증 경로(예: GET /api/client/lite-installer, 라이트 채널 최신 파일을 res.download)를 하나 열어 LITE_DL을 서버 주소 기준으로 바꾼다.",
+  "plan_item": "전-7",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "clientrelease.ts:212 express.raw limit 500mb, publish-release.mjs:101 한계MB=500, release-lite/GIJO AS Lite Setup 1.4.0.exe = 1,694,761,091바이트(1,616MB) 실측 일치. 라이트 클라는 main.ts:1344-1345에서 edition=lite로 묻고 서버는 clientrelease.ts:156에서 그 에디션만 돌려주므로 라이트가 게시되지 못하는 동안 인앱 업데이트는 항상 없음 — 실제 영향. login.html:717의 「임시 통로」 결정은 finding이 알고 있고 그 전제(서버 배포)가 크기 때문에 막힌 점을 더 강한 근거로 댄다."
+ },
+ {
+  "id": "F1-04",
+  "area": "설치",
+  "severity": "P2",
+  "title": "설치 완료 페이지의 WireGuard 인터넷 링크 — 폐쇄망 담당자에겐 열리지 않는 브라우저 창",
+  "user_impact": "폐쇄망 PC에서 설치를 마친 담당자가 완료 페이지의 파란 링크를 누르면 브라우저가 열리고 「사이트에 연결할 수 없음」만 본다 — 제품 첫 접점에서 외부 인터넷 주소를 권하는 셈이다.",
+  "evidence": [
+   {
+    "file": "client/build/installer.nsh",
+    "line": 36,
+    "quote": "!define MUI_FINISHPAGE_LINK \"원격 접속(VPN)이 필요하면: WireGuard 공식 다운로드 — 설정 파일은 관리자에게 받으세요\""
+   },
+   {
+    "file": "client/build/installer.nsh",
+    "line": 37,
+    "quote": "!define MUI_FINISHPAGE_LINK_LOCATION \"https://www.wireguard.com/install/\""
+   },
+   {
+    "file": "client/build/installer.nsh",
+    "line": 5,
+    "quote": "WireGuard는 동봉하지 않는다 — 상표 정책상 상용 동봉은 서면 허가가 필요해(정책 확인 2026-07-25)"
+   }
+  ],
+  "proposal": "2026-07-25 결정은 「동봉하지 않는다」(상표)이고 인터넷 링크를 두라는 결정은 아니다. MUI_FINISHPAGE_LINK/LOCATION 두 줄을 지우고 완료 페이지 본문(MUI_FINISHPAGE_TEXT)에 「원격 접속(VPN)이 필요하면 관리자에게 WireGuard 설치 파일과 설정 파일을 받으세요」 한 줄만 서술로 남긴다 — 온프렘·오프라인 원칙(④)과 상표 서술적 사용 둘 다 지켜진다.",
+  "plan_item": "후-4",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "installer.nsh:36-37 인용 정확, electron-builder가 installer.nsh를 assistedInstaller.nsh(MUI_PAGE_FINISH) 앞에 include하므로 링크가 실제 완료 페이지에 뜬다. 커밋 046be04d는 「WireGuard 동봉 안 함(사용자 결정)」 뒤에 「완료 페이지에 공식 다운로드 링크만」을 설계로 적었으니 링크 자체도 의도된 설계이나, finding이 이를 알고 오프라인 원칙을 더 강한 근거로 댄다. 영향은 수동 설치 완료 페이지 1곳·문구가 이미 「설정 파일은 관리자에게」라 P1→P2."
+ },
+ {
+  "id": "F1-05",
+  "area": "설치",
+  "severity": "P1",
+  "title": "설치 문서의 숫자·경로가 5.83.0 실물과 다르다 — 설치본 247MB(문서 155~160MB)·설치 후 0.9GB(문서 「1GB 여유」)·경로 gijo-as-client(설치 가이드는 gijo-as)·동봉 서버 포트 7446(문서는 4000)",
+  "user_impact": "헬프데스크가 문서대로 「1GB 여유」 PC에 배포하면 설치 중 디스크가 차고, 문제 해결 때 문서의 설치 경로(`Programs\\gijo-as`)를 열면 폴더가 없고, 단독 모드 주소를 문서대로 `localhost:4000`으로 치면 연결이 안 된다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 22,
+    "quote": "`GIJO AS Setup 2.5.0.exe` (약 160MB)"
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 37,
+    "quote": "| 디스크 | 1GB 여유 | 2GB+ 여유 |"
+   },
+   {
+    "file": "GIJO_AS_설치_가이드_v2.1.0.md",
+    "line": 54,
+    "quote": "설치 경로 확인(기본: `%LOCALAPPDATA%\\Programs\\gijo-as`)."
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 67,
+    "quote": "번들 서버가 자동 기동**되어 `http://localhost:4000`에 붙습니다."
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 56,
+    "quote": "return 에디션() === \"lite\" ? 7445 : 7446;"
+   },
+   {
+    "file": "GIJO_AS_배포_가이드.md",
+    "line": 249,
+    "quote": "`client/release/GIJO AS Setup 2.3.0.exe`** (NSIS 설치본, 약 158MB)."
+   }
+  ],
+  "proposal": "실측(이 PC): release/GIJO AS Setup 5.83.0.exe 247.2MB · 설치 폴더 %LOCALAPPDATA%\\Programs\\gijo-as-client 889MB · 설치본+설치 폴더+임시 추출을 더하면 1.2GB 이상. 기존#7(문서 낡음)의 하위 항목이지만 숫자가 틀린 건 따로 위험하다 — 배포 가이드 §2·§3·§6.4·§5.2를 「247MB · 설치 후 약 0.9GB · 최소 여유 2GB · 경로 gijo-as-client · 동봉 서버는 주소를 비워 둔다(포트를 적지 않는다)」로 고치고, 설치 가이드 v2.1.0은 폐기 표시하거나 5.x로 다시 쓴다(문서 갱신은 요청 시 — 사용자 결정 필요).",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "클라이언트_배포_가이드.md:22(160MB)·37(1GB 여유)·67(localhost:4000), 설치_가이드_v2.1.0.md:54(Programs\\gijo-as), 배포_가이드.md:249 인용 정확. 실측: release/GIJO AS Setup 5.83.0.exe 259,250,803바이트(247MB), 설치 폴더 %LOCALAPPDATA%\\Programs\\gijo-as-client 912MB, 표준 동봉 서버 포트는 main.ts:56에서 7446(사장님 결정 2026-08-13 주석). 문서 갱신은 요청 시라는 규칙을 finding이 명시했고 사용자 결정 필요로 적었다."
+ },
+ {
+  "id": "F1-07",
+  "area": "설치",
+  "severity": "P1",
+  "title": "manual-update.ps1이 「설치된 버전」을 대상 PC가 아니라 클라 소스 package.json에서 읽는다 — 헬프데스크 PC에서 돌리면 「이미 최신」으로 오판하고, 에디션도 안 보낸다",
+  "user_impact": "IT 담당자가 문서대로 `cd <client 소스 경로>`에서 스크립트를 돌리면 소스가 최신(5.83.0)이라 담당자 PC에 5.70이 깔려 있어도 「이미 최신 버전입니다」로 끝나고, 라이트 PC에서 돌리면 프로 설치본을 내려받아 라이트 설치를 덮는다.",
+  "evidence": [
+   {
+    "file": "client/scripts/manual-update.ps1",
+    "line": 26,
+    "quote": "# 설치된 버전은 package.json에서 읽는다(빌드된 앱이 실행 중이 아니어도 동작)."
+   },
+   {
+    "file": "client/scripts/manual-update.ps1",
+    "line": 28,
+    "quote": "$currentVersion = (Get-Content $pkgPath -Raw | ConvertFrom-Json).version"
+   },
+   {
+    "file": "client/scripts/manual-update.ps1",
+    "line": 47,
+    "quote": "$check = Invoke-RestMethod -Uri \"$ServerUrl/api/client/latest-release?current=$currentVersion\" -Headers $headers"
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 108,
+    "quote": "cd <client 소스 경로>"
+   }
+  ],
+  "proposal": "현재 버전을 설치 실물에서 읽는다 — `(Get-Item \"$env:LOCALAPPDATA\\Programs\\gijo-as-client\\GIJO AS.exe\").VersionInfo.ProductVersion`(이 PC 실측 5.82.0.0) 또는 HKCU Uninstall 키의 DisplayVersion; 없으면 「설치본이 없습니다」로 끊는다. `-Edition pro|lite` 인자를 받아 `&edition=`을 붙이고, 80~82행의 「oneClick 조용히 설치」 문구는 기존#5대로 고친다. 소스 없이 단독 배포되는 .ps1 하나로 만들면 문서의 「client 소스 경로」 요구도 사라진다.",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "manual-update.ps1:26-28이 소스 package.json 버전을 현재 버전으로 쓰고 :47에 edition을 붙이지 않음을 확인. 서버는 edition 없으면 pro로 처리(clientrelease.ts:156)하고 현재=5.83.0이면 updateAvailable=false라 「이미 최신」 오판이 실제로 난다. :4·:82의 oneClick 문구도 nsis oneClick:false(package.json:89)와 어긋난다. 「라이트 설치를 덮는다」는 appId가 달라(ai.gijo.as vs ai.gijo.as.lite) 나란히 설치될 가능성이 크지만 main.ts:1340 주석도 「갈아치워진다」로 보고 있어 큰 틀은 유지."
+ },
+ {
+  "id": "F1-08",
+  "area": "설치",
+  "severity": "P2",
+  "title": "설치 마법사가 설치 소요 시간·용량·두 운영 모드를 한 마디도 말하지 않는다",
+  "user_impact": "247MB 설치본을 처음 실행한 담당자는 얼마나 걸리는지, 어디에 깔리는지(경로 변경 불가), 이 설치본으로 서버 없이 쓸 수 있는지 여부를 마법사 어디에서도 못 보고 「다음」을 누른다.",
+  "evidence": [
+   {
+    "file": "client/build/installer.nsh",
+    "line": 27,
+    "quote": "!define MUI_WELCOMEPAGE_TITLE \"GIJO AS 설치를 시작합니다\""
+   },
+   {
+    "file": "client/build/installer.nsh",
+    "line": 30,
+    "quote": "·  AI-BOM · 레드팀으로 AI 자산까지 보호$\\r$\\n$\\r$\\n설치 후 사내 GIJO 서버 주소로 로그인하면"
+   },
+   {
+    "file": "client/package.json",
+    "line": 91,
+    "quote": "\"allowToChangeInstallationDirectory\": false,"
+   }
+  ],
+  "proposal": "환영 페이지 마지막 두 줄을 「설치 위치: 내 문서 옆(사용자 폴더) · 약 0.9GB · 1~2분 / 설치 후 관리자에게 받은 서버 주소·계정으로 로그인합니다」로 바꾸고(fix-welcome-text.mjs LINES 배열 수정), 단독 모드를 표준 설치본에서 지원하지 않기로 하면(F1-02) 그 사실도 한 줄 넣는다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "installer.nsh:27·30 환영 문구에 소요 시간·용량·설치 위치·두 모드 언급이 없음을 확인, package.json:91 경로 변경 불가 정확. 단 installer.nsh:28-29에 「길면 페이지 높이를 넘어 잘린다(실측)」 제약이 기록돼 있어 줄 수를 늘리지 않는 교체만 가능하다. 다듬기 수준 P2 유지."
+ },
+ {
+  "id": "F1-기존#6",
+  "area": "설치",
+  "severity": "P2",
+  "title": "서버 게시 저장소가 .exe 두 이름만 받는다 — mac dmg·arm64는 인앱 업데이트 경로 없음(publish-release도 release/*.exe만 찾음)",
+  "user_impact": "mac 담당자는 새 판이 나와도 업데이트 배지를 못 받는다.",
+  "evidence": [
+   {
+    "file": "server/src/engine/clientrelease.ts",
+    "line": 124,
+    "quote": "const filename = 에디션 === \"lite\" ? `GIJO-AS-Lite-Setup-${version}.exe` : `GIJO-AS-Setup-${version}.exe`;"
+   },
+   {
+    "file": "client/scripts/publish-release.mjs",
+    "line": 54,
+    "quote": ": path.join(clientDir, \"release\", `GIJO AS Setup ${version}.exe`);"
+   }
+  ],
+  "proposal": "기존#6 그대로 — 변경안 보고서 §3 P3 항목 유지(Mac 인계 보류 중).",
+  "plan_item": "신규",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "clientrelease.ts:124가 .exe 두 이름만 만들고 publish-release.mjs:52-54가 release(-lite)/*.exe만 찾음을 확인, mac 타깃(package.json mac dmg/zip arm64)은 게시·인앱 업데이트 경로가 없다. Mac 인계 보류 상태(GIJO_AS_MAC_인계_대기.md)라 P2 유지."
+ },
+ {
+  "id": "F1-기존#10",
+  "area": "설치",
+  "severity": "P2",
+  "title": "Windows 설치본 코드 서명 없음(이 PC 설치 실물 Get-AuthenticodeSignature = NotSigned) — SmartScreen 「추가 정보 → 실행」 절차를 안내하는 문서도 없다",
+  "user_impact": "담당자가 파란 SmartScreen 창에서 「실행 안 함」만 보고 설치를 포기한다.",
+  "evidence": [
+   {
+    "file": "client/package.json",
+    "line": 95,
+    "quote": "\"afterSign\": \"build/mac-adhoc-sign.cjs\""
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 138,
+    "quote": "| **설치가 막힘/차단됨** | 백신·EDR이 미서명 실행을 막을 수 있음 — 보안팀에 예외 등록 요청 |"
+   }
+  ],
+  "proposal": "기존#10 그대로 — 서명 도입 검토와 별개로, 배포 가이드 §4에 SmartScreen 화면의 「추가 정보 → 실행」 두 단계와 sha256 대조 방법을 한 줄 넣는 것은 지금 바로 할 수 있다.",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "package.json:95 afterSign은 mac-adhoc-sign만이고 win 서명 설정(certificateFile 등)이 없음을 확인. 이 PC 설치 실물 GIJO AS.exe와 release/GIJO AS Setup 5.83.0.exe 모두 Get-AuthenticodeSignature = NotSigned 실측. 저장소 md 문서에 SmartScreen 「추가 정보 → 실행」 안내가 없고 배포 가이드:138은 백신·EDR만 언급한다."
+ },
+ {
+  "id": "F6-01",
+  "area": "업데이트·세션",
+  "severity": "P1",
+  "title": "세션이 밀리거나(중복 로그인) 만료·서버 재시작으로 끊겨도 화면은 그대로 — 사유는 버려지고 「서버 오류 401」만 남는다",
+  "user_impact": "다른 PC에서 같은 계정으로 강제 로그인되거나 30분 유휴·운영 서버 재시작으로 세션이 끊긴 담당자는 화면이 멀쩡히 남아 있는 채로 무엇을 눌러도 「GIJO AS 서버 오류 401 … {\"error\":\"unauthorized\"}」만 보고, 왜 그런지(밀렸는지·만료됐는지)도 로그인 화면으로 가는 길도 안내받지 못한다.",
+  "evidence": [
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 48,
+    "quote": "강제 로그인 시엔 옛 refresh token을 즉시 지우지 않고 … \"다른 곳에서 로그인되어 세션이 종료됐다\"는 구체적인 사유를 줄 수 있다"
+   },
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 425,
+    "quote": "res.status(409).json({ error: \"session_superseded\", message: \"다른 곳에서 로그인되어 이 세션은 종료되었습니다.\" });"
+   },
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 419,
+    "quote": "error: \"session_idle_expired\", message: \"오래 사용하지 않아 세션이 만료되었습니다. 다시 로그인하세요.\""
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 98,
+    "quote": "if (!res || !res.ok) { … if (after.refreshToken === usedRefresh) setAuthTokens(null); return false; }"
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 200,
+    "quote": ": `GIJO AS 서버 오류 ${res.status} ${path} ${detail}`"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1412,
+    "quote": "if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) { … navigateTo(\"login.html\"); — boot() 한 번만"
+   },
+   {
+    "file": "client/src/preload.ts",
+    "line": 707,
+    "quote": "api.authApi.me().catch(() => { /* 만료/네트워크 오류는 다음 API 호출의 가드가 처리 */ });"
+   },
+   {
+    "file": "client/src/renderer/pages/lite-records.html",
+    "line": 129,
+    "quote": "if (/401|unauthorized/i.test(m)) return \"로그인이 풀렸습니다 — 다시 로그인해 주세요.\"; — 라이트 화면 한 곳만 번역"
+   }
+  ],
+  "proposal": "core.ts tryRefresh가 refresh 실패 응답의 error 코드(session_superseded·session_idle_expired·invalid refresh token)를 읽어 메인 프로세스에 「끊긴 사유」로 남기고, 최상위 프레임(app.html)이 그 신호를 받아 곧바로 `login.html?reason=superseded|idle|restart`로 보낸다. login.html은 reason별로 한 줄(「다른 곳에서 로그인되어 이 세션이 끊겼습니다」「오래 사용하지 않아 만료되었습니다」「서버가 재시작되어 다시 로그인해야 합니다」)을 보이고, 5분 ping(preload 707)이 실패했을 때도 같은 길을 탄다. 서버는 이미 사유를 만들어 보내므로 서버 변경은 없다.",
+  "plan_item": "중-1",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "auth.ts 403~427이 사유(session_idle_expired·session_superseded)를 보내고 core.ts 98~103은 그것을 읽지 않고 토큰만 지운다. core.ts 62~63 주석은 「각 페이지의 isAuthenticated() 가드가 로그인으로 돌려보낸다」를 전제하지만 그 가드는 로드 시 1회(settings.html 2961, app.html 1412)라 탭 셸(iframe 재로드 없음)에서는 작동하지 않는다 — 의도된 설계가 아니라 셸 전환으로 깨진 전제다. 다만 ⚙ 메뉴의 로그아웃(titlebar.js 234~239)으로 로그인 화면에 갈 길은 있어 「완전히 막힘」은 아니므로 P1. 실제 문구는 core.ts 190~200에 따라 「unauthorized\\n(서버 오류 401 · /api/…)」 형태이고 401 번역은 라이트 9화면+pick.html에 있다(인용의 「한 곳」은 부정확하나 요지는 맞다)."
+ },
+ {
+  "id": "F6-02",
+  "area": "업데이트·세션",
+  "severity": "P1",
+  "title": "「다운로드·무결성 검증 완료」라고 말하지만 클라이언트는 sha256을 대조하지 않는다",
+  "user_impact": "담당자는 설치 파일이 검증됐다고 믿고 실행하지만 실제로는 받은 파일을 그대로 실행한다 — 전송 중 깨진 파일이나 바꿔 낀 파일도 걸러지지 않으며, 문서(§6.3)와 수동 스크립트만 진짜 검증을 한다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 2313,
+    "quote": "line.textContent = \"다운로드·무결성 검증 완료 — 잠시 뒤 설치 창이 뜨고 이 앱은 닫힙니다. …\";"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1333,
+    "quote": "latest: { version: string; notes: string | null; size: number; publishedAt: number; sha256: string } | null; — sha256을 받기만 하고 main.ts 전체에 createHash·sha256 대조 0건"
+   },
+   {
+    "file": "client/scripts/manual-update.ps1",
+    "line": 74,
+    "quote": "$actualHash = (Get-FileHash -Path $dest -Algorithm SHA256).Hash.ToLower() — 스크립트만 대조한다"
+   },
+   {
+    "file": "server/src/engine/clientrelease.ts",
+    "line": 126,
+    "quote": "const sha256 = crypto.createHash(\"sha256\").update(buffer).digest(\"hex\");"
+   }
+  ],
+  "proposal": "main.ts downloadToFile에서 스트림에 crypto.createHash(\"sha256\")를 함께 물려 받은 뒤 latest-release의 sha256과 비교하고, 다르면 파일을 지우고 「받은 파일이 서버 게시본과 다릅니다(손상 가능) — 다시 시도하세요」로 실패시킨다. update:install 인자에 기대 sha256을 함께 넘기거나 설치 직전 latest-release를 한 번 더 조회한다. 대조가 들어가기 전까지는 settings.html 2313의 「무결성 검증 완료」 문구를 「다운로드 완료」로 고친다.",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "main.ts 1333은 sha256을 타입으로만 받고 파일 전체에 createHash·대조가 없다(grep 0건, downloadToFile 1357~1391도 크기·해시 검증 없음). settings.html 2313의 「다운로드·무결성 검증 완료」는 하지 않은 일을 했다고 말하는 문구라 정직 원칙 위반이며, 진짜 대조는 manual-update.ps1 74~78과 서버 게시(clientrelease.ts 126)에만 있다. 의도된 설계 기록 없음."
+ },
+ {
+  "id": "F6-03",
+  "area": "업데이트·세션",
+  "severity": "P1",
+  "title": "업데이트 확인이 실패하면(서버 다운·401·500) 「최신 버전입니다」로 표시된다",
+  "user_impact": "서버가 재시작 중이거나 세션이 끊긴 상태에서 「지금 확인」을 누른 담당자는 초록 「최신 버전입니다」를 보고 업데이트가 없다고 잘못 판단한다 — 실제로는 확인 자체가 안 된 것이다.",
+  "evidence": [
+   {
+    "file": "client/src/main.ts",
+    "line": 1348,
+    "quote": "if (!res.ok) return { latest: null, updateAvailable: false };"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1351,
+    "quote": "} catch { return { latest: null, updateAvailable: false }; }"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 2273,
+    "quote": "} else { badge.innerHTML = '<span class=\"badge b-teal\">최신 버전입니다</span>';"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 2280,
+    "quote": "badge.innerHTML = '<span class=\"badge b-muted\">확인 실패: ' … — 이 갈래는 IPC가 예외를 삼켜 사실상 도달하지 않는다"
+   }
+  ],
+  "proposal": "update:check가 실패 종류를 돌려주게 한다(`{ latest:null, updateAvailable:false, error:\"unreachable\"|\"unauthorized\"|\"server\" }`). settings.html checkUpdate는 error가 있으면 「확인하지 못했습니다 — 서버에 닿지 않습니다/로그인이 풀렸습니다」(회색)로 그리고, `latest===null && !error`일 때만 「게시된 배포판이 없습니다」, 실제 비교가 된 경우에만 「최신 버전입니다」를 쓴다. titlebar.js·nav.js 배지는 그대로 조용히.",
+  "plan_item": "중-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "main.ts 1348·1351이 !res.ok와 예외를 모두 { latest:null, updateAvailable:false }로 접어 돌려주고, settings.html 2273 else 갈래가 이를 「최신 버전입니다」(초록)로 그린다 — 2280의 「확인 실패」는 IPC가 예외를 삼켜 도달하지 않는다. 확인이 안 된 것을 「최신」으로 보이는 것은 잘못된 판단을 유도한다. 단 「게시본 없음 → 최신 버전입니다」는 배포 가이드 100행에 문서화된 동작이므로 그 부분까지 바꾸자는 제안은 과하다."
+ },
+ {
+  "id": "F6-04",
+  "area": "업데이트·세션",
+  "severity": "P2",
+  "title": "업데이트 설치 흐름의 문구·주석이 실제 동작(/S 없는 마법사 실행)과 세 갈래로 어긋난다 — 완료 페이지엔 외부 링크까지 뜬다",
+  "user_impact": "담당자는 「설치가 끝나면 새 버전이 자동으로 열립니다」를 믿고 기다리지만 실제로는 제품 소개 환영 페이지부터 시작하는 설치 마법사를 [다음]→[마침]까지 직접 눌러야 하고, 마침 페이지에서 WireGuard 외부 사이트 링크(완전 오프라인 원칙 ④ 위반)를 만난다. 코드 주석 자신이 「/S와 --force-run 둘 다 있어야 자동 실행」이라 적어 두고 /S를 뺐다.",
+  "evidence": [
+   {
+    "file": "client/src/main.ts",
+    "line": 1419,
+    "quote": "즉 **/S(무인)와 --force-run을 둘 다** 줘야 설치 후 앱이 다시 켜진다."
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1463,
+    "quote": "const child = spawn(dest, [\"--force-run\"], { detached: true, stdio: \"ignore\" }); — 2026-07-29 사용자 신고로 /S를 뺀 결정(1456~1462행 주석)"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 2313,
+    "quote": "설치가 끝나면 새 버전이 자동으로 열립니다."
+   },
+   {
+    "file": "client/build/installer.nsh",
+    "line": 8,
+    "quote": ";  · 자동 업데이트는 /S(무인)로 돌므로 이 페이지들은 수동 설치에만 보인다."
+   },
+   {
+    "file": "client/build/installer.nsh",
+    "line": 37,
+    "quote": "!define MUI_FINISHPAGE_LINK_LOCATION \"https://www.wireguard.com/install/\""
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 99,
+    "quote": "완료되면 **자동으로 설치가 진행되며 앱이 재기동**됩니다 — 클릭 한 번으로 끝입니다."
+   }
+  ],
+  "proposal": "「설치 창을 보이게 한다」는 2026-07-29 사용자 결정은 그대로 두고, 그 결정에 맞춰 나머지를 정직하게 맞춘다: ① settings.html 2310~2313 문구를 「설치 창에서 [다음]→[설치]→[마침]을 누르면 새 버전이 열립니다(약 1분)」로, gijoAsk 문구(2288)도 동일하게 ② main.ts 1416~1420 주석을 「/S를 빼서 마법사가 보인다 — 자동 재기동은 마침 페이지의 체크박스가 담당」으로 갱신 ③ installer.nsh 8행 주석 정정, 완료 페이지의 외부 https 링크는 `${isUpdated}`(업데이트 실행)일 때 숨기거나 「관리자에게 VPN 설정 파일을 받으세요」 문장으로 대체. 자동 재기동을 정말 원하면 /S 재도입은 사용자 결정 사안으로 따로 묻는다.",
+  "plan_item": "중-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "인용 전부 실제와 일치: main.ts 1416~1420 주석은 「/S와 --force-run 둘 다」라 하고 1456~1463은 2026-07-29 사용자 신고로 /S를 뺐다(의도된 결정이고 finding도 알고 있다). settings.html 2313·배포 가이드 99행·installer.nsh 8행은 여전히 「자동 진행·자동 재기동」을 말해 세 곳이 어긋난다. WireGuard 링크는 nsh 3~8행에 2026-07-25 정책 확인(상표·동봉 불가)으로 기록된 결정이라 링크 자체를 없애자는 것은 안 되지만, 업데이트 실행 때만 숨기자는 제안은 그 결정과 충돌하지 않는다. 마법사가 화면에 보이므로 담당자가 오래 헤매지는 않아 P2로 낮춘다."
+ },
+ {
+  "id": "F6-05",
+  "area": "업데이트·세션",
+  "severity": "P2",
+  "title": "설치 프로그램 실행(spawn)이 실패해도 잡지 않고 1.2초 뒤 앱을 끈다",
+  "user_impact": "서명 없는 설치 파일이 SmartScreen·EDR에 막히거나 실행 권한이 없어 spawn이 실패하면(기존#10과 맞닿음) 화면에는 「설치 창 열림」이 남은 채 앱이 조용히 종료되고, 담당자는 설치 창도 새 버전도 없이 바탕화면만 본다 — 메인 프로세스에는 처리되지 않은 'error' 이벤트로 영문 예외 대화상자가 뜰 수 있다.",
+  "evidence": [
+   {
+    "file": "client/src/main.ts",
+    "line": 1463,
+    "quote": "const child = spawn(dest, [\"--force-run\"], { detached: true, stdio: \"ignore\" });\n  child.unref(); — child.on(\"error\") 없음"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1468,
+    "quote": "setTimeout(() => app.quit(), 1200);"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 2310,
+    "quote": "btn.textContent = \"설치 창 열림\";"
+   }
+  ],
+  "proposal": "spawn 뒤 `child.once(\"spawn\")`을 기다려 성공했을 때만 quitConfirmed·app.quit()으로 넘어가고, `child.once(\"error\", …)`에서는 한국어로 「설치 프로그램을 실행하지 못했습니다(Windows 보안 프로그램이 막았을 수 있습니다). 받은 파일 위치: …」를 renderer에 던져 installUpdate의 catch가 보이게 한다(파일은 지우지 않고 경로를 알려 수동 실행 길을 남긴다).",
+  "plan_item": "후-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "main.ts 1463~1468: spawn 뒤 child.on(\"error\")가 없고 main.ts에 process.on(\"uncaughtException\") 처리도 없어(grep 0건) 비동기 spawn 오류는 Electron 기본 영문 오류 대화상자로 새고, 1.2초 뒤 app.quit()은 그대로 실행된다. 단 Node http로 내려받은 파일엔 MotW가 붙지 않아 SmartScreen은 거의 관여하지 않으며 EDR·권한(EACCES) 실패만 현실적이라 발생 빈도는 낮다 — P2."
+ },
+ {
+  "id": "F6-06",
+  "area": "업데이트·세션",
+  "severity": "P1",
+  "title": "⚙ 「앱 재시작」은 app.exit(0)로 나가 로그아웃을 건너뛴다 — 다시 켜면 자기 유령 세션에 「이미 다른 곳에서 로그인 중」으로 막힌다",
+  "user_impact": "화면 이상을 고치려 「앱 재시작」을 누른 담당자는 재기동 후 로그인에서 「이미 다른 곳에서 로그인 중입니다 — 강제 로그인」 상자를 만나 자기 자신을 강제로 밀어내야 하고, 감사 기록에는 「강제 로그인」으로 남는다.",
+  "evidence": [
+   {
+    "file": "client/src/main.ts",
+    "line": 1126,
+    "quote": "quitConfirmed = true; // 의도된 재시작 — 닫기 확인을 띄우지 않는다\n  app.relaunch();\n  app.exit(0);"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1596,
+    "quote": "app.on(\"before-quit\", (e) => { … logoutOnQuit().finally(() => app.quit()); — app.exit()는 before-quit을 내지 않아 이 길을 타지 않는다"
+   },
+   {
+    "file": "server/src/auth/auth.ts",
+    "line": 286,
+    "quote": "res.status(409).json({ error: \"already_logged_in\", message: \"이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?\" });"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 283,
+    "quote": "menuEl.appendChild(item(\"♻️\", \"앱 재시작\", \"\", function () { window.gijo.restartApp(); }));"
+   }
+  ],
+  "proposal": "app:restart 핸들러를 `await logoutOnQuit(); app.relaunch(); app.exit(0);`으로 바꾼다(logoutOnQuit은 3초 타임아웃이 있어 서버가 죽어 있어도 멈추지 않는다). 동봉 서버 모드에서는 logoutOnQuit이 번들 서버까지 죽이므로 재시작 뒤 maybeStartBundledServer가 다시 띄우는지 함께 확인한다.",
+  "plan_item": "중-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "main.ts 1125~1129 app:restart는 app.exit(0)를 부르고, Electron은 app.exit에서 before-quit을 내지 않아 1596의 logoutOnQuit이 실행되지 않는다. authState는 메인 프로세스 메모리(main.ts 32)에만 있어 재기동 후 반드시 재로그인해야 하고, 서버 findActiveSession(auth.ts 165~173)은 유휴 전이면 세션을 살아있다고 봐 286의 409 already_logged_in을 돌려준다 → login.html dupBox(331) 「강제 로그인」, 감사엔 auth.ts 313의 「강제 로그인」으로 남는다. 인용·영향 모두 확인."
+ },
+ {
+  "id": "F6-07",
+  "area": "업데이트·세션",
+  "severity": "P1",
+  "title": "서버 재시작·네트워크 단절 때 표준/프로 화면은 영문 「Failed to fetch」를 그대로 보인다",
+  "user_impact": "운영 서버가 재시작되는 1~2분 동안 담당자가 무엇을 누르면 화면마다 「TypeError: Failed to fetch」 같은 영문 시스템 오류가 뜨고(원칙 ⑦), 서버가 고장난 건지 내 네트워크가 끊긴 건지 알 수 없다 — 라이트 화면 두 곳만 이를 한국어로 바꾼다.",
+  "evidence": [
+   {
+    "file": "client/src/api/core.ts",
+    "line": 168,
+    "quote": "const res = await fetch(`${serverUrl}${path}`, { … }); — try/catch 없음, 네트워크 예외가 그대로 화면으로"
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 128,
+    "quote": "const res = await fetch(`${serverUrl}${path}`, { method: \"POST\", headers, body: JSON.stringify(body) }); — requestStream도 동일"
+   },
+   {
+    "file": "client/src/renderer/pages/lite-records.html",
+    "line": 129,
+    "quote": "if (/fetch|network|ECONN|Failed to fetch/i.test(m)) return \"서버에 닿지 못했습니다 — 서버가 켜져 있는지 확인해 주세요.\";"
+   },
+   {
+    "file": "client/src/renderer/pages/lite-settings.html",
+    "line": 304,
+    "quote": "if (/fetch|network|ECONN|Failed to fetch/i.test(m)) return \"서버에 닿지 못했습니다 — …\";"
+   }
+  ],
+  "proposal": "core.ts request()·requestStream()의 fetch를 감싸 네트워크 예외를 한 곳에서 「서버에 닿지 못했습니다 — 서버가 재시작 중이거나 네트워크가 끊겼을 수 있습니다. 잠시 뒤 다시 시도해 주세요.」로 바꿔 던진다(기술 정보는 괄호 뒤에). 이렇게 하면 화면 39개를 고치지 않고 라이트 두 곳의 번역기도 불필요해진다.",
+  "plan_item": "중-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "core.ts 168(request)·128(requestStream)의 fetch에 try/catch가 없어 네트워크 예외(TypeError: Failed to fetch)가 그대로 화면 catch로 간다. 공용 번역기는 없고(grep 0건) 번역은 라이트 9화면(lite-*.html 오류문구, 인용의 「두 곳」은 실제 9곳)에만 있으며 표준/프로 화면은 날것 영문을 보인다(원칙 ⑦). 의도된 설계 기록 없음."
+ },
+ {
+  "id": "F6-08",
+  "area": "업데이트·세션",
+  "severity": "P1",
+  "title": "비밀번호 규칙이 화면(4자 이상)과 서버(8자 이상)로 어긋난다",
+  "user_impact": "담당자가 「새 비밀번호 (4자 이상)」 안내대로 6자를 넣으면 화면 검사는 통과하고 서버가 「✗ 변경 실패: 비밀번호는 8자 이상이어야 합니다 (서버 오류 400 · /api/users/…/password)」로 거절한다 — 같은 화면의 관리자 초기화는 「8자 이상」이라 적혀 있어 제품이 규칙을 모른다는 인상을 준다. 계정 생성(4자)도 같다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 267,
+    "quote": "<input id=\"myPasswordInput\" type=\"password\" placeholder=\"새 비밀번호 (4자 이상)\">"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 941,
+    "quote": "line.textContent = \"비밀번호는 4자 이상이어야 합니다.\";"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 1452,
+    "quote": "gijoPrompt(\"새 비밀번호(8자 이상) — 초기화하면 해당 사용자의 세션이 끊깁니다\", …)"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 1471,
+    "quote": "line.textContent = \"아이디·이름을 입력하고 비밀번호는 4자 이상으로 설정하세요.\";"
+   },
+   {
+    "file": "server/src/auth/users.ts",
+    "line": 72,
+    "quote": "const MIN_PASSWORD_LEN = Number(process.env.GIJO_MIN_PASSWORD_LEN ?? 8);"
+   }
+  ],
+  "proposal": "서버가 최소 길이를 `/api/auth/me` 또는 별도 `/api/users/password-policy`로 내려 주고, settings.html의 placeholder(267)·검사 문구(941·1471)·초기화 안내(1452)가 그 값을 쓴다. 서버 변경이 부담이면 우선 세 곳을 「8자 이상」으로 통일한다.",
+  "plan_item": "중-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "settings.html 267·941·1471은 「4자 이상」, 1452는 「8자 이상」, 서버 users.ts 72는 기본 8(배포 가이드 111행도 기본 8)로 어긋남이 실제다. 오류는 core.ts 190~200에 따라 「비밀번호는 8자 이상이어야 합니다\\n(서버 오류 400 · /api/users/…/password)」로 보인다. 사용자 결정 기록 없음."
+ },
+ {
+  "id": "F6-09",
+  "area": "업데이트·세션",
+  "severity": "P2",
+  "title": "비밀번호를 바꿔도 「최근 로그인」에 저장된 옛 비밀번호는 그대로 — 다음 로그인이 실패로 시작한다(UX피드백 5절 「셀프 잠김」의 현재 모습)",
+  "user_impact": "비밀번호를 바꾼 담당자가 다음 날 로그인 화면에서 「최근 로그인 — 눌러서 빠르게 채우기」(🔑 저장됨)를 누르면 옛 비밀번호가 채워져 「아이디/비밀번호 또는 서버 주소를 확인하세요」를 만나고, 실패가 10회/15분 잠금 카운터에 쌓인다. 변경 직후 「저장된 비밀번호도 바꿀까요/지울까요」 같은 안내가 없다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 946,
+    "quote": "await window.gijo.changeUserPassword(currentUser.id, password); … line.textContent = \"✓ 비밀번호가 변경되었습니다.\"; — creds.save/remove 호출 없음(settings.html에 creds 0건)"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 416,
+    "quote": "passInput.value = e.hasPw ? (await window.gijo.creds.getPassword(e.serverUrl, e.username)) : \"\";"
+   },
+   {
+    "file": "server/src/auth/users.ts",
+    "line": 288,
+    "quote": "if (requester?.id !== targetId) { revokeUserSession(targetId); — 본인 변경은 세션을 끊지 않는다(잠김은 안 남)"
+   },
+   {
+    "file": "GIJO_AS_실사용_UX피드백.md",
+    "line": 46,
+    "quote": "비밀번호 변경 API는 되지만, 변경 후 재로그인/세션 안내 흐름 미흡(테스트 중 셀프 잠김 재현)"
+   }
+  ],
+  "proposal": "changeMyPassword 성공 직후 `window.gijo.creds.list()`에서 현재 서버·아이디 항목이 hasPw면 `creds.save(serverUrl, username, 새비번, true)`로 갱신하고, 상태 줄에 「✓ 비밀번호가 변경되었습니다. 이 PC에 저장된 로그인 정보도 새 비밀번호로 바꿨습니다.」를 적는다. 서버측 「셀프 잠김」(본인 세션 끊김)은 현재 코드에서 재현되지 않으므로 UX피드백 5절은 「저장 비밀번호 갱신」으로 갱신 대상.",
+  "plan_item": "중-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "settings.html 936~950 changeMyPassword에 creds 호출이 없고(settings.html에 creds 0건) login.html 416은 저장된 옛 비밀번호를 그대로 채운다. 서버 users.ts 288은 본인 변경 시 세션을 끊지 않으므로 UX피드백 46행의 「셀프 잠김」은 지금 코드에선 재현되지 않고, 남는 것은 저장 비밀번호 불일치로 실패 1회가 쌓이는 정도라 P2가 맞다. login.html 478에서 재로그인 성공 시 creds.save가 갱신하므로 두 번째 시도부터는 해소된다."
+ },
+ {
+  "id": "F6-10",
+  "area": "업데이트·세션",
+  "severity": "P2",
+  "title": "업데이트 판은 「관리자」 구역에 있지만 담당자도 배지를 눌러 들어가 받을 수 있다 — 탭줄에 없는 구역에 떨어진다",
+  "user_impact": "security_officer 담당자가 ⬆ 배지나 ⚙ 「새 버전 설치 가능」을 누르면 settings.html?s=admin으로 가는데 「관리자」 탭은 숨겨져 있어 탭줄 어디에도 현재 위치 표시가 없고, 판 주석은 「버전을 올리는 건 관리자의 일」이라 하지만 서버는 누구에게나 내려 준다 — 정책과 자리가 서로 다르다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 126,
+    "quote": "var TAB_UPDATE = \"settings.html?s=admin\"; // 업데이트 패널은 관리자 구역에 있다"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 247,
+    "quote": "if (authed) { if (updateInfo) { var up = item(\"⬆\", \"새 버전 설치 가능\", … — 역할 무관"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 370,
+    "quote": "'버전을 올린다'는 관리자의 일이라 계정 관리와 같은 탭에 둔다."
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 897,
+    "quote": "document.getElementById(\"secAdminTab\").style.display = \"\"; — admin에게만 탭을 보인다"
+   },
+   {
+    "file": "server/src/engine/clientrelease.ts",
+    "line": 171,
+    "quote": "app.get(\"/api/client/download/:version\", authMiddleware, (req, res) => { — adminMiddleware 없음"
+   }
+  ],
+  "proposal": "정책을 하나로 정한다. (권장) 「업데이트는 누구나」 — 업데이트 판을 data-sec=\"my\"(내 설정)로 옮기고 TAB_UPDATE를 settings.html?s=my로, 「게시된 배포판·누가 받았나」만 admin 구역에 남긴다. 반대로 「관리자만」이면 서버 download에 adminMiddleware를 붙이고 담당자에게는 배지 대신 「관리자에게 업데이트를 요청하세요」를 보인다.",
+  "plan_item": "중-1",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "titlebar.js 126·247~256은 역할 무관하게 배지·메뉴를 settings.html?s=admin으로 보내고, settings.html 373 업데이트 판은 data-sec=admin(display:none 아님)이라 담당자에게도 보이지만 secAdminTab(237·897)은 admin에게만 보여 탭줄에 현재 위치가 없다. 서버 download(clientrelease.ts 171)엔 adminMiddleware가 없다. 용어사전 164행은 「관리자 — 관리자만 보이는 것 — 계정 관리·업데이트」로 문서화돼 있어 정책은 관리자 전용인데 구현이 어긋난다 — 불일치는 실제다."
+ },
+ {
+  "id": "F6-11",
+  "area": "업데이트·세션",
+  "severity": "P2",
+  "title": "WebSocket이 끊기면 5초마다 조용히 재접속만 한다 — 실시간 패널이 멈춘 걸 담당자는 모른다",
+  "user_impact": "운영 서버 재시작이나 VPN 끊김 뒤 로그·협업·학습 진행률 같은 실시간 채널이 멈춰도 화면에는 아무 표시가 없어, 담당자는 「이벤트가 없다」와 「연결이 끊겼다」를 구분할 수 없다(원칙 ③ 못 받은 값은 못 받았다고 보인다).",
+  "evidence": [
+   {
+    "file": "client/src/wsClient.ts",
+    "line": 32,
+    "quote": "socket.addEventListener(\"close\", () => { // 서버 재시작/네트워크 단절 대비 재접속 (5초 간격, 단순 스캐폴드 수준)"
+   },
+   {
+    "file": "client/src/wsClient.ts",
+    "line": 38,
+    "quote": "socket.addEventListener(\"error\", () => { socket?.close(); }); — 상태를 밖으로 알리는 콜백 없음"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 558,
+    "quote": "예전에는 연결상태 배지를 찾아 그 **뒤에** 끼워 넣고 … 그 배지를 없앤 지금은 기준 자체가 사라져"
+   }
+  ],
+  "proposal": "wsClient에 `onState(cb)`(connected/reconnecting)를 더하고, 재접속이 3회(15초) 이상 이어질 때만 titlebar.js 세션 칩 옆에 「⚡ 실시간 연결 끊김 — 다시 연결 중」 작은 회색 칩을 띄우고 복구되면 사라지게 한다(연결상태 배지를 없앤 결정을 알고 있어 상시 표시가 아닌 「끊겼을 때만」으로 제한).",
+  "plan_item": "중-1",
+  "effort": "M",
+  "needs_mockup": true,
+  "verify_reason": "wsClient.ts 32~40은 close 시 5초 재접속만 하고 상태 콜백이 없으며, preload.ts 661~663의 gijoRealtime.connect 외에 상태를 밖으로 내는 통로가 없다. titlebar.js 557~560 주석대로 연결상태 배지는 없어졌고(2026-08-08 사용자 신고는 배지 위치 문제) finding이 이를 알고 「끊겼을 때만」으로 제한했다. 실시간 채널이 보조 정보라 P2."
+ },
+ {
+  "id": "F6-12",
+  "area": "업데이트·세션",
+  "severity": "P2",
+  "title": "수동 업데이트 스크립트가 에디션을 보내지 않아 라이트 PC에 프로 설치본을 받고, 기본 포트도 옛 4000이다",
+  "user_impact": "IT 담당자가 라이트가 깔린 PC에서 manual-update.ps1을 돌리면 서버가 에디션 없는 요청을 「pro」로 보고 프로 설치본을 내려 주며(클라 main.ts가 2026-08-23에 막은 사고가 이 경로에는 남아 있다), -ServerUrl을 생략하면 이제 쓰지 않는 4000 포트로 붙어 로그인 실패부터 만난다. (기존#5 oneClick 문구와는 별개의 기능 문제)",
+  "evidence": [
+   {
+    "file": "client/scripts/manual-update.ps1",
+    "line": 47,
+    "quote": "$check = Invoke-RestMethod -Uri \"$ServerUrl/api/client/latest-release?current=$currentVersion\" -Headers $headers — edition 없음"
+   },
+   {
+    "file": "client/scripts/manual-update.ps1",
+    "line": 18,
+    "quote": "[string]$ServerUrl = \"http://localhost:4000\","
+   },
+   {
+    "file": "server/src/engine/clientrelease.ts",
+    "line": 156,
+    "quote": "const 에디션 = req.query.edition === \"lite\" ? \"lite\" : \"pro\";"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1338,
+    "quote": "★★ **자기 에디션을 반드시 실어 보낸다** (2026-08-23). 안 보내면 … **라이트 설치가 프로로 갈아치워진다.**"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 48,
+    "quote": "return 에디션() === \"lite\" ? 7445 : 7446;"
+   }
+  ],
+  "proposal": "manual-update.ps1에 `-Edition pro|lite` 매개변수(기본은 설치 폴더의 에디션 표지 또는 package.json name으로 판정)를 넣어 `&edition=`을 붙이고, 기본 ServerUrl을 7446(라이트면 7445)으로 바꾸며, 받는 파일 이름도 서버가 준 filename을 쓴다. 배포 가이드 §6.3 예시의 `:4000`도 함께 갱신.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "manual-update.ps1 18행 기본 4000, 47행 edition 없음, 3~4·82행은 「oneClick 조용히 설치」라 적혀 있어 현재 마법사형(package.json 89)과도 어긋난다. 서버 clientrelease.ts 156은 edition 없으면 pro로 보고, main.ts 1338~1341이 2026-08-23에 막은 사고 경로가 스크립트엔 그대로 남아 있다. 배포 가이드 109행 예시도 :4000. 관리자용 보조 도구라 P2."
+ },
+ {
+  "id": "F3-01",
+  "area": "셸·첫화면",
+  "severity": "P1",
+  "title": "프로 첫 화면 「내 문서 + 대화창 나란히」 코드가 도달 불능 — 실제 첫 화면은 빈 대화 홈, 시험은 글자 대조라 거짓 초록",
+  "user_impact": "기본 셸(프로)로 로그인하면 사장님 지시(2026-08-23 「내 문서가 메인 화면 + 대화창 + 상단바」)와 달리 화면 없는 대화 홈만 뜨고, 담당자는 「내 문서」를 매번 메뉴에서 직접 열어야 한다 — 그런데 주석·시험·커밋 메시지는 전부 「내 문서가 열린다」고 말한다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1420,
+    "quote": "if (프로인가()) { 대화홈갱신(); redraw(); … 로그인선택_못한것알리기(); 프로레일(); … return; }"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1442,
+    "quote": "} else if (프로인가()) { // 🏠 프로의 홈은 **내 문서**다 (셸 재구축 0-1, 2026-08-23 사장님 지시 … open(\"mydocs.html\", \"내 문서\");"
+   },
+   {
+    "file": "server/test/wiringcontract.test.ts",
+    "line": 480,
+    "quote": "expect(s, \"프로 첫 실행이 내 문서를 열지 않는다\").toMatch(/프로인가\\(\\)[\\s\\S]{0,600}open\\(\"mydocs\\.html\"/);"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 505,
+    "quote": "} catch { return \"pro\"; } // 기본=프로(사장님 2026-08-19 「표준은 프로」"
+   }
+  ],
+  "proposal": "사용자 결정을 먼저 받는다 — (a) 08-23 지시대로 살리려면 app.html:1420 프로 분기 안에서 `open(\"mydocs.html\",\"내 문서\")`+핀을 실행하고 1442 분기를 지운다, (b) 지금의 대화 홈을 확정하려면 1442~1451과 주석을 지우고 wiringcontract.test.ts:479~481을 「대화 홈」 검사로 바꾼다. 어느 쪽이든 시험은 정규식 글자 대조가 아니라 실제 boot 경로(도달 가능성)를 재는 방식으로 고친다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "app.html:1420 프로 분기가 return하므로 1442 `else if (프로인가())`의 open(\"mydocs.html\")은 도달 불능이고(blame: 1420은 08-19, 1442는 08-23 커밋), wiringcontract.test.ts:480은 정규식 글자 대조라 통과한다 — 확인됨. 단 2026-08-31 승인 시안 mockups/shell-chat-ondemand/시안.html:544가 「첫 로그인(대화 홈)은 그대로 대화창이 전면」을 전제로 승인됐으므로 08-23 지시가 조용히 뒤집힌 것이 아니라 08-31에 사실상 대화 홈이 수용된 상태로 보인다. 그래도 죽은 코드·거짓 초록 시험·「내 문서가 열린다」 주석은 정직 원칙 위반이라 P1 유지."
+ },
+ {
+  "id": "F3-02",
+  "area": "셸·첫화면",
+  "severity": "P1",
+  "title": "챗봇 근거 문서(사용자 매뉴얼·이렇게 쓰면 됩니다)가 옛 셸·옛 메뉴를 설명 — 첫 5분 「화면 안내 보여줘」에 틀린 길을 안내",
+  "user_impact": "신규 담당자가 대화창에 「인수인계 어떻게 해?」「화면 구성 알려줘」라고 물으면 RAG 근거(docs-manifest 등록 문서)가 「설정 > 업무 넘기기」「AI 운영 > AI 지식」「메뉴를 고르면 현황 카드가 뜨고 ← 대화로」「문서 작성(창)」처럼 지금 메뉴(① 내 지식·② 내 문서·③ 취약점 업무·④ 보안제품 관리·⑤ 설정)와 다른 안내를 하고, 담당자는 없는 메뉴를 찾다 막힌다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 39,
+    "quote": "좌측 메뉴는 **업무 절차 5단계 + 기반 4그룹**입니다 … | **① 발견·수집** … | **등록부** | **AI** | **추가 기능** | **설정** |"
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 63,
+    "quote": "메뉴 맨 위에는 **대시보드 · 팀 사무실(창) · 작업 내역 · 내 문서 · 문서 작성(창)** 이 늘 고정돼 있습니다."
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 410,
+    "quote": "**메뉴를 고르면 화면이 아니라 「현황 카드」가 대화창에 뜹니다.** … 머리의 **「← 대화로」** 를 누르면 대화로 돌아오고"
+   },
+   {
+    "file": "GIJO_AS_이렇게_쓰면_됩니다.md",
+    "line": 23,
+    "quote": "1. 화면에서: **설정 > 업무 넘기기** … 2. 화면에서: **AI 운영 > AI 지식**"
+   },
+   {
+    "file": "server/docs-manifest.json",
+    "line": 29,
+    "quote": "\"file\": \"GIJO_AS_사용자_매뉴얼.md\", … \"file\": \"GIJO_AS_이렇게_쓰면_됩니다.md\""
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 122,
+    "quote": "{ id: \"knowledge\", icon: \"book\", label: \"① 🧠 내 지식\", … { id: \"mydocs\", … label: \"② 📓 내 문서\" … { page: \"handover.html\", label: \"업무 넘기기\" }"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1502,
+    "quote": "문구가 예전 「대화로 돌아가기」에서 「⊟ 화면 접기」로 바뀌었다(셸 재구축 0-1, 2026-08-23). 대화창이 **늘 옆에 보이므로** 「대화로 돌아간다」는 이제 거짓말이다."
+   }
+  ],
+  "proposal": "문서 갱신은 「요청 시」 규칙이라 먼저 사용자에게 알린다. 승인되면 매뉴얼 §0.3 표를 5그룹으로, §6 「프로 화면구성」을 「메뉴 = 화면 왼쪽 + 대화 오른쪽(⊟ 화면 접기·💬 손잡이)」로, 이렇게_쓰면의 메뉴 경로 5곳(16·23·24·36·44행)을 현 nav.js 라벨로 고친다. 그때까지는 임시로 docs-manifest에서 두 문서를 빼거나 「기준일 2026-08-08, 메뉴가 바뀌었을 수 있음」 머리말을 넣어 챗봇이 옛 경로를 확정적으로 말하지 않게 한다.",
+  "plan_item": "전-7",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "GIJO_AS_사용자_매뉴얼.md:39(9그룹 표)·:59(「대시보드·팀 사무실(창)…문서 작성(창)」 고정 메뉴)·:411(「← 대화로」)과 이렇게_쓰면_됩니다.md:23~24(설정 > 업무 넘기기 · AI 운영 > AI 지식)는 현 nav.js 5그룹(nav.js:122~)과 어긋나며 docs-manifest.json:29~35에 RAG 코퍼스로 등록돼 있다 — 확인됨. 다만 「화면 안내 보여줘」·「~어떻게 해?」는 RAG가 아니라 서버 screenguide(dispatcher.ts:1387, screenguide.ts)가 코드로 답하므로 제목의 예시는 틀렸다. 반면 이 두 문서는 docbox.ts(내 문서 › GIJO AS 안내)로 담당자가 직접 읽는 문서이기도 해 영향은 실제다. 막힘이 아니라 신뢰 훼손이라 P0→P1."
+ },
+ {
+  "id": "F3-03",
+  "area": "셸·첫화면",
+  "severity": "P1",
+  "title": "프로 상단바의 사용자 영역(아바타→내 설정·⬆ 업데이트 칩)이 창 끌기 영역 안에 있어 눌러도 창만 끌린다",
+  "user_impact": "프로 셸에서 담당자가 자기 이름표(아바타)를 눌러 「내 설정」으로 가거나 ⬆ 업데이트 칩을 눌러도 아무 화면도 열리지 않고 창이 끌리기만 한다 — 「눌러도 아무 일 없는 자리」이자 사용자 영역 발견 가능성의 마지막 고리가 끊긴다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 174,
+    "quote": ".topbar{… -webkit-app-region:drag;}"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 178,
+    "quote": ".topbar button,.topbar .gtb-acts,.topbar .gtb-sess,.topbar input,.topbar select{-webkit-app-region:no-drag;}"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 388,
+    "quote": "<div class=\"rail-foot\"></div>   (#gijoRail은 .topbar 안 — 374행 <nav id=\"gijoRail\">)"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 51,
+    "quote": ".gtb-userarea .ua-row{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;}  (app-region 선언 없음)"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 387,
+    "quote": "row.addEventListener(\"click\", … var 갈곳 = { page: \"settings.html?s=my\", label: \"내 설정\" };"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 1028,
+    "quote": "if (rail && document.body.classList.contains(\"pro-shell\")) { var foot = rail.querySelector(\".rail-foot\") || rail; var a3 = buildUserArea(); … foot.appendChild(a3);"
+   }
+  ],
+  "proposal": "app.html 178행 no-drag 목록에 `.topbar .gtb-userarea` 를 더한다(또는 titlebar.js 40행 .gtb-userarea 규칙에 `-webkit-app-region:no-drag` 추가). 실앱에서 프로 셸 아바타 클릭→내 설정 탭이 열리는지, 상단 빈 자리 끌기는 여전히 되는지 두 가지를 확인한다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "app.html:359 `<div class=\"topbar\">` 안에 #gijoRail(:374)·.rail-foot(:388)이 있고 .topbar는 drag(:174), no-drag 되돌림은 button·.gtb-acts·.gtb-sess·input·select만(:178). titlebar.js:337~ buildUserArea의 .ua-row(div)·.ua-upd(div)는 no-drag 선언이 없어 프로 셸(titlebar.js:1028 rail-foot에 부착)에서 끌기 영역에 잠긴다 — 확인됨. 단 .gtb-gear(📘 안내)는 titlebar.js:36에 no-drag가 있어 눌리므로 죽는 것은 아바타→내 설정과 ⬆ 업데이트 칩 둘이다. 죽은 조작은 원칙 위반이라 P1 유지(실앱 확인 필요)."
+ },
+ {
+  "id": "F3-04",
+  "area": "셸·첫화면",
+  "severity": "P1",
+  "title": "안내된 단축키(Ctrl+K 화면 찾기 · Alt+←/→ · Ctrl+B)가 화면(iframe)에 포커스가 있으면 동작하지 않는다",
+  "user_impact": "담당자가 표나 목록을 한 번 클릭한 뒤(포커스가 화면 iframe으로 감) 툴팁이 가르쳐 준 Ctrl+K를 눌러도 화면 찾기가 열리지 않고, 뒤로/앞으로 단축키도 죽어 「단축키가 되다 안 되다 한다」로 느낀다 — 하루에 수십 번 겪는 자리다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 1665,
+    "quote": "window.addEventListener(\"keydown\", function (e) { … (e.key === \"k\" || e.key === \"K\")) { if (typeof window.gijoOpenFinder === \"function\") { … window.gijoOpenFinder(); return; }"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 10,
+    "quote": "if (window.top !== window) return; // embed iframe — 타이틀바/사용자 영역은 상위 문서 몫   (→ 탭 안에는 gijoOpenFinder가 정의되지 않는다)"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 997,
+    "quote": "document.addEventListener(\"keydown\", function (e) { if (e.altKey && … e.key === \"ArrowLeft\") { … 이력이동(-1); … (e.key === \"b\" || e.key === \"B\")) {"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 381,
+    "quote": "<button id=\"railMenu\" title=\"화면 찾기 · 전체 메뉴 (Ctrl+K)\">"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1079,
+    "quote": "win.webContents.on(\"before-input-event\", (e, input) => { … if (k === \"+\" || k === \"=\") … (확대·축소만 메인에서 잡는다)"
+   }
+  ],
+  "proposal": "main.ts bindZoom의 before-input-event(모든 프레임의 키가 거친다)에서 Ctrl/Cmd+K·Alt+←/→·Ctrl+B를 잡아 `mainWindow.webContents.send(\"shell:hotkey\", …)`로 셸에 넘기고, app.html이 gijoOpenFinder/이력이동/gijoLeftCollapse를 부른다 — 확대·축소가 이미 쓰는 길이라 새 통로가 아니다. nav.js 1667행·titlebar.js 997행의 렌더러 처리는 남겨 두되 중복 실행을 막는다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "nav.js:1665~1669는 iframe에서도 실리지만 gijoOpenFinder는 titlebar.js:10이 iframe에서 즉시 return해 정의되지 않고, Alt+←/→·Ctrl+B 처리(titlebar.js:997~1008)도 최상위 문서에만 있다. iframe→셸로 키를 중계하는 통로(postMessage·IPC)는 grep 결과 없고 main.ts:1076 before-input-event는 확대·축소 키만 잡는다 — 확인됨. 화면을 한 번 클릭하면 포커스가 iframe으로 가므로 사실상 대부분의 시점에 단축키가 죽는다. P1 타당."
+ },
+ {
+  "id": "F3-05",
+  "area": "셸·첫화면",
+  "severity": "P1",
+  "title": "대시보드 「사용법 3단계」가 현 셸과 다르다 — 「아래 대화창」(기본은 오른쪽)·「탭으로 열립니다」(프로엔 탭줄이 없음)",
+  "user_impact": "첫 화면에서 유일하게 「지시는 대화창에서」를 가르치는 문장이 「아래 대화창」을 가리키는데 대화창은 오른쫜(프로는 접혀 있으면 오른쪽 💬 손잡이)에 있고, 「탭으로 열립니다」는 기본 셸(프로)에서 보이지 않는 개념이라 신규 담당자가 아래와 탭을 찾다 안내를 못 믿게 된다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/dashboard.html",
+    "line": 251,
+    "quote": "<span class=\"step\"><span class=\"n\">1</span>왼쪽 메뉴에서 화면을 고르면 <b>탭</b>으로 열립니다 … <span class=\"n\">2</span>일은 <b>아래 대화창</b>에 시킵니다"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1257,
+    "quote": "// 사용자 결정(2026-08-09): \"아래는 쓰지 말자 — 대화 쓸 공간이 없다. 오른쪽에 붙는 걸 기본으로.\""
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 86,
+    "quote": "/* 프로는 탭 개념이 없다(화면=별도 창, 승인 시안) — 탭줄·탭 조작 띠를 통째로 감춘다. … */ body.pro-shell .shellfoot{display:none;}"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1729,
+    "quote": "// 기본값 = 접힘(사장님 「필요할 때만」) — 담당자가 펴 두면 그 기억이 이긴다."
+   }
+  ],
+  "proposal": "dashboard.html 251~253행 문구를 셸 무관하게 참인 말로 바꾼다 — ① 「왼쪽 메뉴에서 화면을 고르면 왼쪽에 열립니다(보던 화면은 그대로)」 ② 「일은 <b>대화창</b>(오른쪽, 접혀 있으면 💬 손잡이)에 시킵니다 — 지금 보는 화면이 곧 지시의 대상입니다」. 표준·프로 두 셸에서 같은 문장이 참인지 실화면으로 확인.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "dashboard.html:251~252 「탭으로 열립니다」·「아래 대화창」 확인. 대화창 기본은 오른쪽(app.html:1257 사용자 결정 2026-08-09), 프로는 탭줄 숨김(app.html:86~88), 대시보드는 두 셸 모두 고정 메뉴(nav.js:66)라 프로에서도 도달한다. 두 문장 모두 지금 셸에서 거짓이라 잘못된 안내=신뢰 훼손. 단 기본 셸(프로)의 첫 화면은 대시보드가 아니므로 「첫 화면에서 유일하게」는 표준 셸에만 해당한다."
+ },
+ {
+  "id": "F3-06",
+  "area": "셸·첫화면",
+  "severity": "P1",
+  "title": "유휴 만료(30분) 뒤 셸이 로그인으로 돌아가지 않고 대화창에 날것 「GIJO AS 서버 오류 401 /api/…」가 뜬다",
+  "user_impact": "점심 뒤 돌아온 담당자가 지시를 보내면 세션 칩은 0:00(빨강)만 보이고 답 자리에 「GIJO AS 서버 오류 401 /api/console/…」가 찍힌다 — 왜 안 되는지·무엇을 해야 하는지(다시 로그인) 아무도 말해 주지 않고, 셸 안에는 401→로그인 복귀 처리가 없다.",
+  "evidence": [
+   {
+    "file": "client/src/preload.ts",
+    "line": 14,
+    "quote": "const keepalive = { lastActivity: Date.now(), idleTimeoutMs: 30 * 60 * 1000 };"
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 61,
+    "quote": "// refresh도 실패하면(만료/폐기) 토큰을 지워서 다음 API 호출들이 즉시 401로 실패 -> 각 페이지의 isAuthenticated() 가드가 로그인 화면으로 돌려보낸다."
+   },
+   {
+    "file": "client/src/api/core.ts",
+    "line": 200,
+    "quote": ": `GIJO AS 서버 오류 ${res.status} ${path} ${detail}`"
+   },
+   {
+    "file": "client/src/renderer/pages/console.js",
+    "line": 1875,
+    "quote": "replaceTyping(typing, \"error\", { icon: \"⚠\", name: \"오류\", message: (e && e.message) || String(e) });"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 452,
+    "quote": "var rgb = ms > 300000 ? \"30,185,128\" : ms > 120000 ? \"240,160,32\" : \"226,72,61\";  (0:00에 도달해도 색만 바뀐다)"
+   }
+  ],
+  "proposal": "core.ts에서 refresh까지 실패해 토큰을 지운 순간 `auth:lost` 신호를 메인으로 보내고 main.ts가 navigate:to(\"login.html\")로 통째 복귀시키며(별도 창 닫기 규칙은 568~576행에 이미 있다), login.html 상단에 「자리를 비워 세션이 끝났습니다 — 다시 로그인해 주세요」 한 줄을 띄운다. 만료 2분 전(칩이 빨강이 되는 시점) 대화창에 「2분 뒤 세션이 끝납니다 — 마우스를 움직이면 연장」 한 줄을 한 번만 알린다.",
+  "plan_item": "중-1",
+  "effort": "M",
+  "needs_mockup": false,
+  "verify_reason": "core.ts:83~112 tryRefresh 실패 시 setAuthTokens(null)→persist만 하고 main.ts:68 auth:setState는 저장만 한다; 셸 안 isAuthenticated 가드(app.html:1412·console.js:1897 등)는 부팅 시에만 돌아 만료 뒤 로그인 복귀가 없다 — 확인됨. 실제 첫 줄은 서버가 {error:\"unauthorized\"}(auth.ts:219)만 보내고 core.ts:193 `message ?? error`가 그걸 앞세워 「unauthorized\\n(서버 오류 401 · /api/console/…)」이 되므로(인용된 :200 템플릿은 body 없을 때의 폴백) finding의 문구는 다르지만 「날것 영문 코드」라는 결함은 같다. console.js:1875가 그대로 대화창에 찍는다."
+ },
+ {
+  "id": "F3-07",
+  "area": "셸·첫화면",
+  "severity": "P2",
+  "title": "프로 상단바에 「☰ 전체 메뉴」와 「🔍 화면 찾기」가 나란히 있는데 둘 다 같은 검색 겹판을 연다",
+  "user_impact": "첫 방문자는 ☰을 「메뉴 목록」으로 기대해 누르지만 검색창이 뜨고, 옆 🔍도 같은 것이 떠 「둘이 뭐가 다르지」로 헤맨다 — 08-30에 ⭐를 같은 이유(라벨과 동작 불일치·☰과 중복)로 없앤 규칙이 ☰·🔍 쌍에는 안 적용됐다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 381,
+    "quote": "<button id=\"railMenu\" title=\"화면 찾기 · 전체 메뉴 (Ctrl+K)\">☰"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1539,
+    "quote": "눌러(\"railMenu\", function () { if (window.gijoOpenFinder) window.gijoOpenFinder(); else gijoTell(\"화면 찾기를 열지 못했습니다 — 상단 🔍를 눌러 주세요.\"); });"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 920,
+    "quote": "acts.appendChild(아이콘단추(\"화면 찾기 (Ctrl+K)\", … function () { window.gijoOpenFinder(); }));"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 383,
+    "quote": "⭐ railFav는 2026-08-30 검토로 제거 — ☰과 똑같이 화면찾기를 열 뿐이라 라벨(즐겨찾기)과 동작이 달랐다."
+   }
+  ],
+  "proposal": "둘 중 하나로 줄인다 — 프로엔 이미 왼콃 상설 메뉴 판(‖로 접기)이 있으므로 ☰을 없애고 🔍 하나만 남기거나, ☰을 「메뉴 판 펴기(‖와 통합)」로 뜻을 바꾼다. 시안 1개로 상단바 단추 구성을 확정한 뒤 반영.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": true,
+  "verify_reason": "app.html:381 ☰(railMenu)→:1539 gijoOpenFinder, titlebar.js:920 🔍→gijoOpenFinder이고 🔍는 셸 종류를 가리지 않고 붙는다(pro-shell 숨김 CSS 없음) — 중복은 확인됨. 단 ☰=화면찾기는 의도된 설계다: 셸재구축 계획서 0-5(커밋 ca21f4a7, 2026-08-31)가 ☰를 「길 잃은 사람이 오는 자리」로 정해 빈 검색에 5묶음 칩을 보이게 했으므로 「☰이 메뉴 목록이 아니다」는 지적은 이미 해소됐다. 남는 결함은 프로 상단바의 🔍 중복 하나라 P2 유지."
+ },
+ {
+  "id": "F3-09",
+  "area": "셸·첫화면",
+  "severity": "P2",
+  "title": "셸 부팅 시 gijoTell이 아직 없다 — 로그인 선택 실패 알림이 ReferenceError로 프로 레일·끌개·온디맨드 설치를 통째로 막을 수 있다",
+  "user_impact": "로그인 화면에서 고른 것(구동 모드·AI 위치)이 적용되지 않은 회차에 담당자는 알림 대신 아무것도 못 보고, 그 뒤 상단 ☰·🕘·🗔·💬·‖가 눌러도 반응하지 않는 셸을 만난다(오류는 콘솔에만 남는다).",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1748,
+    "quote": "gijoTell(\"로그인 화면에서 고른 것 중 \" + 못한것.length + \"가지가 적용되지 않았습니다.\\n\\n\" +"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1425,
+    "quote": "로그인선택_못한것알리기(); 프로레일(); 끌개설치(); 대화폭복원(); 대화온디맨드설치();"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1760,
+    "quote": "if (document.readyState === \"loading\") document.addEventListener(\"DOMContentLoaded\", boot);  (dialog.js는 <script> 목록 1764~1776행에 없다)"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 1421,
+    "quote": "function loadDialog() { if (window.gijoAsk || document.getElementById(\"gijoDlgScript\")) return; var s = document.createElement(\"script\"); … s.src = \"dialog.js\";"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 1743,
+    "quote": "if (document.readyState === \"loading\") document.addEventListener(\"DOMContentLoaded\", boot);  (셸 boot가 먼저 등록돼 먼저 돈다 → loadDialog 이전)"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 678,
+    "quote": "if (못한것.length) window.localStorage.setItem(\"gijo:loginChoiceFailed\", JSON.stringify(못한것));"
+   }
+  ],
+  "proposal": "app.html 스크립트 목록에 `<script src=\"dialog.js\">`를 console.js 앞에 정적으로 싣고(1764행 부근), 1748·744·1541행의 gijoTell 호출은 `window.gijoTell ? gijoTell(…) : console.warn(…)`로 감싼다. 시험: 셸 boot 순서에서 dialog.js가 정적 로드되는지 wiringcontract에 한 줄 추가.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "gijoTell은 dialog.js:144에만 정의되고 app.html 스크립트 목록(:1764~1776)에 dialog.js가 없다. nav.js:1421 loadDialog는 nav.js boot(DOMContentLoaded, :1743)에서 동적 삽입하는데 app.html 인라인 boot(:1760)가 먼저 등록돼 먼저 돈다. 그 boot 안 로그인선택_못한것알리기(:1425)가 gijoTell(:1748)을 무방비로 부르므로 gijo:loginChoiceFailed(login.html:678)가 있는 회차에 ReferenceError로 뒤의 프로레일()·끌개설치()·대화폭복원()·대화온디맨드설치()가 건너뛰어진다 — 확인됨. 발생 조건이 드문 갈래라 P2 타당."
+ },
+ {
+  "id": "F3-10",
+  "area": "셸·첫화면",
+  "severity": "P2",
+  "title": "프로 첫 화면(대화 홈 히어로)에 핵심 규칙 「보는 일은 화면, 시키는 일은 대화창」 한 줄이 없고, 첫 메뉴 클릭 뒤 대화창이 40px 손잡이로 접히는 것을 아무도 예고하지 않는다",
+  "user_impact": "신규 담당자는 인사·정직 문장·질문 칩만 보고 「그래서 화면은 어디서 보나」를 모르고, 메뉴를 처음 누르면 대화창이 사라지고 오른쪽 세로 「💬 1」만 남아 「대화가 어디 갔지」를 겪는다 — 표준 셸의 대시보드 3단계 안내는 프로에서는 첫 화면이 아니라 못 본다.",
+  "evidence": [
+   {
+    "file": "client/src/renderer/pages/console.js",
+    "line": 342,
+    "quote": "'<div class=\"ce-hero\" id=\"ceHero\">' + '<div class=\"ce-greet\" id=\"ceGreet\">안녕하세요</div>' + '<div class=\"ce-honest\">이 AI는 사내 자료로만 답합니다 — …</div>' + '<div class=\"ce-qrow\" …' + '<div class=\"ce-div\">또는 메뉴에서 바로 가기</div>'"
+   },
+   {
+    "file": "GIJO_AS_이렇게_쓰면_됩니다.md",
+    "line": 7,
+    "quote": "기본 규칙은 하나입니다 — **보는 일은 화면에서, 시키는 일은 대화창에서.**"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1726,
+    "quote": "b.innerHTML = '<span aria-hidden=\"true\">💬</span><span class=\"cs-n\">0</span><span class=\"cs-vt\">대화창</span>'; … 대화접힘적용(기억 === null ? true : 기억 === \"1\", false);"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 505,
+    "quote": "} catch { return \"pro\"; } // 기본=프로"
+   }
+  ],
+  "proposal": "2026-08-31 온디맨드 결정(기본 접힘)은 그대로 두고, 히어로 ce-honest 아래에 한 줄 「보는 일은 왼쪽 화면에서, 시키는 일은 이 대화창에서 — 화면을 열면 대화창은 오른쪽 💬로 접히고 다시 누르면 돌아옵니다」를 넣는다(첫 로그인 1회만 보이게 localStorage 표식). 문구·위치는 시안 1개로 승인.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": true,
+  "verify_reason": "console.js:342~348 히어로에 「보는 일은 화면·시키는 일은 대화창」 규칙 문장이 없고(이렇게_쓰면_됩니다.md:7에만 있다), app.html:1728 온디맨드 기본 접힘이 확인된다. 2026-08-31 승인 시안(shell-chat-ondemand/시안.html:540~546)은 접힘의 완화책으로 「배지」만 택하고 첫 로그인 안내는 정하지 않았으므로 결정을 뒤집는 제안이 아니라 빈자리 채우기다. 대시보드 3단계는 프로 첫 화면이 아니라는 점도 맞다. 다듬기 수준이라 P2."
+ },
+ {
+  "id": "F3-11",
+  "area": "셸·첫화면",
+  "severity": "P2",
+  "title": "좁은 창·세로 모니터에서 프로 격자가 하한을 못 지킨다 — 최소 창 900px에서 화면 판이 약 340px, 세로 모니터(1080폭)에서도 약 460px",
+  "user_impact": "세로 모니터나 절반 크기 창을 쓰는 담당자는 메뉴 판 200 + 대화창 360이 먼저 자리를 먹어 표 화면이 3~4열만 보이는 좁은 띠가 되고, 코드가 약속한 「화면 판 최소 420 보장」·「스퀴즈 하한 644+380」이 실제로는 성립하지 않는다.",
+  "evidence": [
+   {
+    "file": "client/src/main.ts",
+    "line": 348,
+    "quote": "minWidth: Math.min(900, Math.max(600, wa.width - 40)),"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 1635,
+    "quote": "var 최대 = Math.max(360, (work ? work.clientWidth : 1920) - 420); // 화면 판 최소 420 보장  (work 700이면 최대=360 → 화면 340)"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 66,
+    "quote": "body.pro-shell .app{grid-template-columns:var(--menu-w, 200px) minmax(0,1fr);}"
+   },
+   {
+    "file": "client/src/renderer/pages/app.html",
+    "line": 727,
+    "quote": "좁은 창(폭<1400)에서 자동으로 팝업을 띄우던 갈래를 없앴다 … 좁아도 도킹으로 연다(스퀴즈 하한 644+380 실측)."
+   }
+  ],
+  "proposal": "2026-08-20 「프로 팝업 자동 생성 폐지」 결정은 유지하고, 폭이 좁을 때(work 폭 < 644+360)만 ① 대화창을 접힘(console-folded) 기본으로 열고 ② 메뉴 판을 자동 접기(pro-menu-closed, 저장 안 함)로 두는 규칙을 대화폭클램프 옆에 더한다. 세로 모니터(1080×1920) 실측 스크린샷을 시안에 붙여 승인.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": true,
+  "verify_reason": "main.ts:348 minWidth 900, app.html:66 메뉴 판 200px, :1635 대화폭클램프 최대=max(360, work−420)이라 work 700이면 대화 360·화면 340으로 「화면 판 최소 420 보장」 주석과 :727 「스퀴즈 하한 644+380」 주장이 성립하지 않는다 — 산술로 확인됨. 단 영향은 finding보다 작다: 온디맨드(app.html:1728)로 stage-on의 대화창은 기본 접힘(40px 손잡이)이라 담당자가 한 번 펴 두었을 때만 겹친다. 그래서 P2가 맞다."
+ },
+ {
+  "id": "F7-01",
+  "area": "문서",
+  "severity": "P1",
+  "title": "사용자 매뉴얼의 메뉴 지도(§0.3·§8)가 2026-08-31 「5대 메뉴」 재편 이전 구조를 설명한다 — 챗봇 RAG 1차 근거가 낡음",
+  "user_impact": "담당자가 챗봇에 「등록부 어디예요」「추가 기능 메뉴 열어줘」라고 물으면 이미 사라진 그룹(등록부·AI·추가 기능)을 안내받아 사이드바에서 찾다 못 찾고, 실제 5그룹(내 지식·내 문서·취약점 업무·보안제품 관리·설정)은 어느 문서에도 없다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 50,
+    "quote": "| **등록부** | 우리가 운영 중인 보안제품 대장 |"
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 52,
+    "quote": "| **추가 기능** | 보안 로그 파일 분석 · 제품 소개자료 · 업무 넘기기 |"
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 448,
+    "quote": "| **등록부** | 보안제품 | 운영 중인 제품과 매뉴얼 대장 |"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 99,
+    "quote": "// ══ 5대 메뉴 (2026-08-31 사장님 — 실화면 캡처 3장 「안티그래비티처럼」 + 「모든 메뉴를 크게 5가지로 통합 및 그룹핑」"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 122,
+    "quote": "{ id: \"knowledge\", icon: \"book\", label: \"① 🧠 내 지식\", items: ["
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 188,
+    "quote": "{ id: \"registry\", icon: \"drawer\", label: \"④ 🧰 보안제품 관리\", items: ["
+   },
+   {
+    "file": "server/docs-manifest.json",
+    "line": 29,
+    "quote": "\"file\": \"GIJO_AS_사용자_매뉴얼.md\", \"why\": \"로그인·화면 구성·권한부터 일일 루틴까지 — '이 화면 뭐예요' 질문의 1차 근거\""
+   }
+  ],
+  "proposal": "§0.3 표와 §8 부록 표를 nav.js GROUPS 그대로(① 내 지식: 지식 창고·법령·판례·GIJO AS 안내·보안제품 비교 / ② 내 문서: 업로드·반입·문서작성·내 문서 목록·나만의 연락처·업무 넘기기·작업 내역·지켜보는 폴더·조치 요청서 / ③ 취약점 업무: ⓪ 자산 고르기·①~⑤ 절차·보안 로그 파일 분석 / ④ 보안제품 관리 / ⑤ 설정: 설정·AI·기록)로 다시 쓰고, 「절차 5단계는 ③ 취약점 업무 안의 항목」임을 명시한다. 문서 기준일도 갱신한다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "GIJO_AS_사용자_매뉴얼.md:50-53·448-451이 등록부·AI·추가 기능 그룹을 현행처럼 적고, nav.js:99-205는 2026-08-31 5그룹(내 지식·내 문서·취약점 업무·보안제품 관리·설정)이다. server/docs-manifest.json:29가 이 문서를 RAG 1차 근거로 지정하므로 낡음이 챗봇 답에 그대로 실린다. 다만 사이드바·🔍 화면찾기·screenguide.ts:1395-1413 흡수자리 표가 보조하므로 「막힘」보다 「틀린 안내·신뢰 훼손」이라 P1로 낮춘다."
+ },
+ {
+  "id": "F7-02",
+  "area": "문서",
+  "severity": "P1",
+  "title": "실무매뉴얼 §0에 서로 다른 메뉴 지도가 두 개 있고 둘 다 낡음(07월 IA·08-02 IA) — 고객 RAG 문서",
+  "user_impact": "챗봇이 「가장 많이 쓰는 화면은 관제·모니터링 › 보안 분석」「🛠 시스템 › 터미널」처럼 지금 사이드바에 없는 경로를 안내해, 담당자가 존재하지 않는 그룹을 찾게 된다(2026-08-05 「사이드바에 없는 단계」 실사고와 같은 유형).",
+  "evidence": [
+   {
+    "file": "GIJO_AS_보안담당자_실무매뉴얼.md",
+    "line": 21,
+    "quote": "**메뉴 구조**: **⓪ 자산 + 업무 절차 5단계(① 발견·수집 → ⑤ 보고) + 등록부 + AI + 추가 기능 + 설정·기록**"
+   },
+   {
+    "file": "GIJO_AS_보안담당자_실무매뉴얼.md",
+    "line": 22,
+    "quote": "3. 가장 많이 쓰는 화면은 **관제·모니터링 › 보안 분석 (통합 관제)**입니다."
+   },
+   {
+    "file": "GIJO_AS_보안담당자_실무매뉴얼.md",
+    "line": 28,
+    "quote": "| **🖥 관제·모니터링** | 대시보드 / 보안 KPI | 자연어 한 줄 지시 콘솔 + 통합 위험 지표 모니터링 |"
+   },
+   {
+    "file": "GIJO_AS_보안담당자_실무매뉴얼.md",
+    "line": 39,
+    "quote": "| **🛠 시스템** | 로그 / **작업 기록(감사)** | 서버 로그 및 전 작업 내역 감사 타임라인 추적 |"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 175,
+    "quote": "단계 이름은 서버 workflow.ts와 글자 일치가 정본이다(2026-08-05 실사고 — 이름이 갈리자 챗봇이 「사이드바에 없는 단계」로 안내)"
+   },
+   {
+    "file": "server/docs-manifest.json",
+    "line": 37,
+    "quote": "\"file\": \"GIJO_AS_보안담당자_실무매뉴얼.md\""
+   }
+  ],
+  "proposal": "§0-1 표를 삭제하고 §0 2항을 nav.js 5그룹으로 바꾸거나, 메뉴 지도는 사용자 매뉴얼 §8 한 곳만 정본으로 두고 실무매뉴얼은 「메뉴 지도는 사용자 매뉴얼 §8」로 넘긴다(두 문서가 각자 지도를 들고 있으면 한쪽은 반드시 낡는다).",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "GIJO_AS_보안담당자_실무매뉴얼.md:21은 08-02 IA(등록부·AI·추가 기능), :22·:28-40의 0-1 표는 07월 IA(관제·모니터링·🛠 시스템·터미널)로 서로 다른 두 지도가 모두 낡았고, docs-manifest.json:37로 RAG에 나간다. nav.js:175-176 주석의 2026-08-05 실사고와 같은 유형이 맞다. 그러나 사이드바가 눈앞에 있고 screenguide 흡수자리 표가 옛 화면 이름을 현행 자리로 안내하므로 P0가 아니라 P1."
+ },
+ {
+  "id": "F7-03",
+  "area": "문서",
+  "severity": "P1",
+  "title": "「이렇게 쓰면 됩니다」의 화면 경로 4곳이 낡음 — 챗봇이 이 문서로 직접 안내한다",
+  "user_impact": "챗봇 「뭐부터 해요」 답의 근거인 이 문서를 따라 「설정 > 업무 넘기기」「AI 운영 > AI 지식」을 찾으면 설정 그룹에는 업무 넘기기가 없고 「AI 운영」 그룹은 존재하지 않아 첫 사용 동선이 첫 단계에서 끊긴다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_이렇게_쓰면_됩니다.md",
+    "line": 23,
+    "quote": "1. 화면에서: **설정 > 업무 넘기기** — 4단계 마법사를 따라갑니다."
+   },
+   {
+    "file": "GIJO_AS_이렇게_쓰면_됩니다.md",
+    "line": 24,
+    "quote": "2. 화면에서: **AI 운영 > AI 지식** — 사내 문서를 올립니다"
+   },
+   {
+    "file": "GIJO_AS_이렇게_쓰면_됩니다.md",
+    "line": 8,
+    "quote": "왼쪽 메뉴에서 화면을 고르면 탭으로 열리고, 지시는 아래 대화창에 적습니다."
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 150,
+    "quote": "{ page: \"handover.html\", label: \"업무 넘기기\" },"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 124,
+    "quote": "{ page: \"aihub.html?panel=knowledge\", label: \"지식 창고\" },"
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 410,
+    "quote": "**메뉴를 고르면 화면이 아니라 「현황 카드」가 대화창에 뜹니다.**"
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 266,
+    "quote": "\"이렇게 쓰면 됩니다\": \"처음 쓰는 분을 위한 4가지 상황 안내(…)는 **내 문서 → 📘 GIJO AS 안내**의 「이렇게 쓰면 됩니다」 문서에 있습니다"
+   }
+  ],
+  "proposal": "경로를 「② 내 문서 > 업무 넘기기」「① 내 지식 > 지식 창고(또는 대화창 ＋로 올리기)」「③ 취약점 업무 > ③ 조치」「③ 취약점 업무 > ⑤ 보고」로 고치고, 8행은 「프로 화면구성(기본)은 현황 카드가 대화창에, 표준은 탭으로」로 바꾼다.",
+  "plan_item": "전-1",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "GIJO_AS_이렇게_쓰면_됩니다.md:23-24의 「설정 > 업무 넘기기」「AI 운영 > AI 지식」은 nav.js:150(② 내 문서 › 업무 넘기기)·:124(① 내 지식 › 지식 창고)와 어긋나고, :8 「탭으로 열리고」는 main.ts:504-505 기본 셸=프로(현황 카드)와 다르다. docs-manifest.json:33이 「뭐부터 해요」 근거로 지정한 문서라 첫 사용 동선에 직접 영향, P1 유지. 문서 끝(:49)의 「낡았다고 느껴지면 화면 안내 보여줘」는 회피문이지 해결이 아니다."
+ },
+ {
+  "id": "F7-04",
+  "area": "문서",
+  "severity": "P1",
+  "title": "단일 데스크톱 모드 기본 주소가 문서·챗봇 안내 전부 「localhost:4000」인데 코드는 7446(라이트 7445) — 따라 치면 연결 실패",
+  "user_impact": "동봉 서버로 쓰는 담당자가 챗봇(설정 › 서버 연결 ⓘ)이나 README·배포 가이드대로 localhost:4000을 넣으면 서버가 그 포트에 없어 「연결 실패」가 나고, 원인이 자기 오타인지 서버 고장인지 알 수 없다.",
+  "evidence": [
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 838,
+    "quote": "\"서버 연결\": \"단일 데스크톱 모드는 기본 주소(localhost:4000) 그대로, 사내망 GPU 서버를 쓰는 분산 모드는 그 서버 주소로 변경합니다."
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 35,
+    "quote": "* 에디션이 정하는 **기본 포트** — 라이트 7445 · 스탠다드/프로 7446 (사장님 지시 2026-08-13)."
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 58,
+    "quote": "return process.env.GIJO_SERVER_URL ?? `http://localhost:${서버포트()}`;"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 248,
+    "quote": "<input id=\"serverUrlInput\" placeholder=\"http://localhost:4000\">"
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 67,
+    "quote": "설치본에 포함된 **번들 서버가 자동 기동**되어 `http://localhost:4000`에 붙습니다."
+   },
+   {
+    "file": "client/README.md",
+    "line": 33,
+    "quote": "main.ts가 앱 시작 시 서버를 자동으로 `localhost:4000`에 기동합니다."
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 306,
+    "quote": "스탠다드/프로 7446) 단일 출처는 main.ts의 서버포트()다. 안내문에 숫자를 박아 두면"
+   }
+  ],
+  "proposal": "screenguide.ts 838행을 「동봉 서버는 주소를 비워 두면 앱이 알아서 맞춘다(포트는 에디션이 정한다) · 분산 모드는 사내 서버 주소(:4000 기본)」로 바꾸고, settings.html 248행 placeholder도 login.html처럼 숫자 없는 문구로 바꾼다(login.html 306행의 「숫자를 박지 않는다」 규약과 맞춘다). 배포 가이드·client/README도 같은 문장으로.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "인용 전부 일치 — main.ts:35·50-58(라이트 7445·스탠다드/프로 7446, 2026-08-13 사장님 지시), screenguide.ts:838·settings.html:248·배포가이드:67·client/README:33은 localhost:4000. 다만 분산 모드의 「사내 서버 :4000」은 server/src/index.ts:45 기본 포트가 4000이라 맞는 안내이고, 동봉 서버 안내만 틀렸다. 또 settings.html:2782가 실제 주소를 값으로 채워 placeholder는 거의 안 보이며, 비워 두면 앱이 맞춘다(login.html:353). 기본 흐름은 동작하므로 P0가 아니라 P1."
+ },
+ {
+  "id": "F7-05",
+  "area": "문서",
+  "severity": "P1",
+  "title": "screenguide 「계정」 판 설명이 관리자 계정 관리를 서술하고, 실제 admin 「계정 관리」 판은 안내가 없다",
+  "user_impact": "담당자가 내 설정의 「계정」 판(내 아이디·비밀번호 변경·로그아웃)에서 ⓘ를 누르면 「보안팀 계정을 추가·삭제합니다」라고 나와 자기 화면에 없는 기능을 찾게 되고, 관리자가 「계정 관리」 판을 물으면 근거가 없다.",
+  "evidence": [
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 839,
+    "quote": "\"계정\": \"보안팀 계정을 추가·삭제합니다. 역할은 admin(관리자)과 security_officer(담당자) 둘입니다. 계정당 로그인 세션은 1개만 허용됩니다.\""
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 256,
+    "quote": "<div data-sec=\"my\" class=\"panel\" data-gijo-fold=\"계정\">"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 267,
+    "quote": "<label for=\"myPasswordInput\">비밀번호 변경</label>"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 310,
+    "quote": "<div class=\"panel-title\">계정 관리<span class=\"badge b-teal\" style=\"margin-left:8px\">admin 전용</span>"
+   }
+  ],
+  "proposal": "screenguide.ts settings.html panels에 「계정」은 「내 아이디·이름·역할 확인, 비밀번호 변경(4자 이상), 로그아웃」으로 다시 쓰고, 「계정 관리」 항목을 새로 추가해 지금의 추가·삭제·역할·세션 1개 서술을 옮긴다(별명 표에 「계정 발급」「사용자 추가」도 건다).",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "screenguide.ts:839 「계정」은 계정 추가·삭제(관리자 일)를 서술하는데 settings.html:256-274의 data-gijo-fold=\"계정\" 판은 내 아이디·비밀번호 변경·로그아웃이고, admin 「계정 관리」 판(:310)은 screenguide 항목이 없다(grep 결과 :829 what 문장에만 낱말 등장). 서버는 질문 문장 안의 판 이름으로 매칭하므로(screenguide.ts:185) 「계정」을 물으면 틀린 답이 나간다. 의도된 설계 주석 없음. P1 타당."
+ },
+ {
+  "id": "F7-06",
+  "area": "문서",
+  "severity": "P2",
+  "title": "사용자 매뉴얼 §5 설정 표가 실제 탭·판 배치와 어긋남 — 「5개 탭」·화면 크기·사용량 위치·2차 인증 누락",
+  "user_impact": "담당자가 매뉴얼대로 「내 설정 → 화면 크기」를 찾거나 「서버·AI → 사용량·비용」을 열면 없고(각각 상단 ⚙·내 설정으로 이동), 로그인에 새로 붙은 2차 인증을 켜고 끄는 자리는 매뉴얼 어디에도 없어 챗봇이 문서 근거로는 답하지 못한다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 322,
+    "quote": "화면을 옮겨 다니지 않도록, **\"누가 결정하는가\"** 기준으로 5개 탭에 나눠 담았습니다."
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 326,
+    "quote": "| **내 설정** | 화면 크기, 계정(비밀번호 변경) — 나만 바꾸는 것 |"
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 327,
+    "quote": "| **서버·AI** | 서버 연결, GIJO 구동 티어, … 이메일(SMTP) 설정, 사용량·비용 — 서버·AI 운영 전반 |"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 234,
+    "quote": "<button class=\"sec-tab\" data-s=\"my\">내 설정</button>"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 240,
+    "quote": "<!-- 「화면 크기」 구역은 제거(2026-08-09 사용자 지시) — 상단 바 ⚙ 설정 팝오버(배율 6단·확대/축소·단축키)가"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 283,
+    "quote": "<div data-sec=\"my\" class=\"panel\" data-gijo-fold=\"사용량 · 비용\""
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 303,
+    "quote": "<div data-sec=\"my\" class=\"panel\" data-gijo-fold=\"2차 인증\" data-gijo-fold-badges=\"mfaBadge\">"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 348,
+    "quote": "<div data-sec=\"admin\" class=\"panel\" id=\"mfaAdminPanel\" style=\"display:none\" data-gijo-fold=\"계정별 2차 인증\""
+   }
+  ],
+  "proposal": "§5 표를 「4개 탭(내 설정·서버·AI·연동·관리자) + 별도 화면 기록」으로 고치고, 내 설정=계정·사용량·비용·2차 인증, 관리자=계정 관리·계정별 2차 인증·저장 암호화·업데이트·게시된 배포판·누가 받았나·에디션으로 settings.html data-sec 기준으로 다시 적는다. 화면 크기는 「상단 ⚙ 팝오버」로 안내한다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "사용자_매뉴얼.md:322-329는 「5개 탭」·내 설정=화면 크기·서버·AI=사용량·비용이라 적었고, settings.html:234-237은 탭 4개, :240-241 화면 크기 제거(2026-08-09 사용자 지시), :283 사용량·비용은 내 설정(2026-08-02 지시), :303·:348 2차 인증 판은 매뉴얼에 없다 — 문서 낡음은 사실. 그러나 screenguide.ts:829(「화면 크기는 상단 바 ⚙」)·:840(2차 인증)이 이미 현행이라 「챗봇이 답하지 못한다」는 과장이다. 매뉴얼만 낡은 다듬기 수준이라 P2."
+ },
+ {
+  "id": "F7-07",
+  "area": "문서",
+  "severity": "P2",
+  "title": "사용자 매뉴얼 §0.1·§0.2 로그인 절차가 5.83.0 로그인 화면(구동 모드 3택·AI 위치 3택·2차 인증 2단계)을 반영하지 않음",
+  "user_impact": "「서버 주소 → 아이디/비번」 두 단계만 배운 담당자가 첫 화면에서 표준/프로/라이트·이 PC/원격 GPU/클라우드를 골라야 하는 상황에 막히고, 2차 인증이 켜진 계정은 문서에 없는 6자리 입력 단계를 만나며, 「서버 1대」 서술은 라이트(서버 없이 내 PC만)와 모순된다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 27,
+    "quote": "- **서버 1대**(GPU 머신, 폐쇄망 내부 상주)가 모든 데이터·AI를 보유합니다."
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 33,
+    "quote": "2. 처음이라면 **서버 주소**(예: `http://<서버IP>:4000`)를 입력합니다."
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 252,
+    "quote": "<span class=\"mp-top\">🪶 라이트</span><span class=\"mp-tag\">혼자 쓰는 판<br>서버 없이 내 PC만</span>"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 265,
+    "quote": "<span class=\"mp-top\">☁ 클라우드</span><span class=\"mp-tag\">일반 질문만 · 사외</span>"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 339,
+    "quote": "<div class=\"mfa-t\">인증앱의 6자리 숫자</div>"
+   },
+   {
+    "file": "client/src/renderer/pages/login.html",
+    "line": 353,
+    "quote": "단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 <b>비워 두세요</b> — 앱이 알아서 맞춥니다."
+   }
+  ],
+  "proposal": "§0.2를 「① 구동 모드(표준/프로/라이트) ② AI 위치(이 PC/원격 GPU/클라우드) ③ 서버 주소(동봉이면 비움, 분산이면 사내 서버) ④ 아이디/비밀번호 ⑤ (켜져 있으면) 인증앱 6자리 또는 복구 코드 ⑥ 이미 다른 곳에 로그인 중이면 확인 후 전환」으로 다시 쓰고, §0.1에 라이트는 서버 없이 한 PC에서 돈다는 문장을 더한다. 용어사전의 2차 인증 항목과 연결한다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "사용자_매뉴얼.md:27·33은 서버 주소→아이디만 적고, login.html:238-266(구동 모드 3택·AI 위치 3택, 항상 표시)·:337-350(2차 인증 6자리·복구 코드)이 문서에 없다 — 인용 일치. 다만 로그인 화면 자체가 mp-note·hint(:353-354)로 선택지를 설명하고 2차 인증도 화면이 안내하므로 담당자가 막히지는 않는다. 「서버 1대」는 표준·프로 기준으로는 맞고 라이트는 별도 에디션이라 한 줄 보충으로 족하다. P2."
+ },
+ {
+  "id": "F7-08",
+  "area": "문서",
+  "severity": "P1",
+  "title": "대시보드 서술이 코드와 어긋남 — 「한눈에 보기」·「네트워크 그래프」는 없고, 「오늘 할 일은 읽기용」은 매뉴얼·screenguide 모두 코드(완료 체크·즉시 저장)와 반대",
+  "user_impact": "담당자가 매뉴얼의 「한눈에 보기」「중앙 네트워크 그래프」를 첫 화면에서 찾다 못 찾고, 「오늘 할 일」 판에 있는 체크박스를 두고도 챗봇·매뉴얼이 「읽기용이니 대화창에서 하라」고 말해 화면을 못 믿게 된다. AI 팀·공격 경로·내 지식창고 카드는 매뉴얼에 없다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 73,
+    "quote": "이 카드는 **읽기용 요약**입니다. 담고·끝내고·순서를 밟는 것은 아래 **대화창**에서 합니다."
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 96,
+    "quote": "- **한눈에 보기:** 자산·점검·위협·컴플라이언스의 핵심 수치를 요약합니다."
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 97,
+    "quote": "- 중앙 네트워크 그래프는 시스템이 활동 중일 때 반응합니다"
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 277,
+    "quote": "\"오늘 할 일\": \"…체크하면 완료로 남습니다. ⚠ 이 자리는 **읽기용 요약**입니다 — 담고·끝내고·순서를 밟는 것은 아래 대화창에서 합니다.\""
+   },
+   {
+    "file": "client/src/renderer/pages/dashboard.html",
+    "line": 337,
+    "quote": "담기·빼기·완료는 즉시 저장됩니다 — 팀 사무실 창과 절차 띠가 같은 목록을 봅니다."
+   },
+   {
+    "file": "client/src/renderer/pages/dashboard.html",
+    "line": 744,
+    "quote": "// 완료 체크(오늘 내 계획) — 기존 오늘 할 일 카드의 토글 흡수."
+   },
+   {
+    "file": "client/src/renderer/pages/dashboard.html",
+    "line": 347,
+    "quote": "<!-- 「한눈에」 카드는 2026-08-09 사용자 지시로 **위 한 줄 안내**로 올라갔다(#glanceGo)."
+   },
+   {
+    "file": "client/src/renderer/pages/dashboard.html",
+    "line": 291,
+    "quote": "🧑‍🤝‍🧑 AI 팀 <span id=\"aiteamCnt\""
+   }
+  ],
+  "proposal": "매뉴얼 §1을 dashboard.html 실제 순서(AI 팀 카드 → 내 지식창고(접힘) → 🧭 공격 경로 → ☑ 오늘 할 일—계획 짜기: 왼쪽 후보/오른쪽 오늘 내 계획(체크·빼기 즉시 저장, 직접 적기는 대화창))로 다시 쓰고 「한눈에」는 ① 발견·수집에 있다고 적는다. screenguide.ts 277행의 「읽기용 요약」 문장은 삭제하고 「체크·빼기는 이 판에서 바로, 새로 적기와 절차는 대화창」으로 고친다.",
+  "plan_item": "전-7",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "인용 일치 — 사용자_매뉴얼.md:73·96-97(읽기용·한눈에·네트워크 그래프), screenguide.ts:277(「체크하면 완료로 남습니다」 뒤에 「읽기용 요약」이 붙어 자기모순), dashboard.html:327-330·337·744(2026-08-09 사용자 지시로 계획 판이 완료 체크·빼기를 즉시 저장), :347(한눈에 카드는 발견·수집 안내 줄로). dashboard.html에 canvas·네트워크 그래프 코드는 없다(grep 0건). 「읽기용」은 2026-08-01 결정의 잔재고 2026-08-09 코드가 더 새로운 결정이라 의도된 설계가 아니다. 화면과 안내가 정면으로 반대라 P1 유지."
+ },
+ {
+  "id": "F7-09",
+  "area": "문서",
+  "severity": "P2",
+  "title": "제품소개 §4.15·§4.16이 소멸한 「추가 기능」 그룹과 삭제된 「제품 소개자료」 화면을 현행처럼 서술",
+  "user_impact": "챗봇이 용어·기능 설명 근거로 이 문서를 인용해 「추가 기능 메뉴의 제품 소개자료 화면」을 안내하면, 담당자는 없는 메뉴와 없는 화면을 찾는다(제품 소개자료는 2026-08-22 내 문서로 흡수, 추가 기능 그룹은 2026-08-31 소멸).",
+  "evidence": [
+   {
+    "file": "GIJO_AS_제품소개.md",
+    "line": 240,
+    "quote": "- 그 아래에 **등록부**(보안제품) · **AI**(팀·지식·학습·안전장치) · **추가 기능** · **설정**이 놓입니다."
+   },
+   {
+    "file": "GIJO_AS_제품소개.md",
+    "line": 243,
+    "quote": "### 4.16 🧾 추가 기능 — 로그 분석 · 제품 소개자료 · 업무 넘기기 *(2026-08)*"
+   },
+   {
+    "file": "GIJO_AS_제품소개.md",
+    "line": 371,
+    "quote": "스크린샷은 **2026-08-09에 촬영한 화면**입니다 — 업무 절차 5단계 허브·추가 기능 메뉴가 그대로 보입니다."
+   },
+   {
+    "file": "server/src/engine/screenguide.ts",
+    "line": 334,
+    "quote": "// \"intro.html\" — 2026-08-22 삭제(내 문서 📦 보안제품 자료로 흡수)."
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 129,
+    "quote": "{ page: \"mydocs.html?tab=vendor\", label: \"보안제품 비교·소개 (옛 제품 소개자료)\" },"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 178,
+    "quote": "{ page: \"loganalysis.html\", label: \"보안 로그 파일 분석\" },"
+   }
+  ],
+  "proposal": "§4.15 마지막 줄을 「① 내 지식 · ② 내 문서 · ③ 취약점 업무(절차 5단계 포함) · ④ 보안제품 관리 · ⑤ 설정」으로, §4.16 제목을 「로그 분석(③ 취약점 업무) · 보안제품 비교·소개(① 내 지식) · 업무 넘기기(② 내 문서)」로 고치고 스크린샷 안내 371행의 「추가 기능 메뉴」 문구를 지운다.",
+  "plan_item": "전-6",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "GIJO_AS_제품소개.md:240·243·371이 등록부·AI·추가 기능 그룹과 제품 소개자료 화면을 현행처럼 적고, screenguide.ts:334(intro.html 2026-08-22 삭제)·nav.js:129·178(내 지식·취약점 업무로 이동)과 어긋난다 — 인용 일치. 다만 docs-manifest.json:41에서 이 문서의 역할은 「제품 개념·용어 정의 근거」라 화면 위치 안내의 1차 근거는 아니고(그 역할은 사용자 매뉴얼), F7-01과 뿌리가 같아 P2로 낮춘다."
+ },
+ {
+  "id": "F7-10",
+  "area": "문서",
+  "severity": "P1",
+  "title": "「우상단 서버 연결 배지(● 운영중 LIVE/초록 점)」 서술이 고객 문서 2곳에 남아 있음 — 배지는 2026-08-08에 없앴다",
+  "user_impact": "로그인이 안 될 때 매뉴얼·챗봇이 「상단 서버 연결 점이 초록인지 확인」하라고 하는데 그 점은 화면에 없어, 담당자는 첫 진단 단계부터 막힌다(내부 배포·설치 가이드의 같은 서술은 기존#7이 이미 지적 — 여기서는 RAG로 나가는 두 문서만 새로 짚는다).",
+  "evidence": [
+   {
+    "file": "GIJO_AS_보안담당자_실무매뉴얼.md",
+    "line": 20,
+    "quote": "서버 연결 상태는 우상단 `● 운영중 LIVE`로 표시됩니다(끊기면 빨간 점)."
+   },
+   {
+    "file": "GIJO_AS_사용자_매뉴얼.md",
+    "line": 425,
+    "quote": "- **로그인이 안 돼요.** 상단 서버 연결 점이 초록인지 확인 → 서버 주소가 맞는지 확인 → 관리자에게 계정 상태 문의."
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 964,
+    "quote": "// ⚠ 서버 연결상태 배지는 **없앴다**(2026-08-08 사용자 지시). 양호일 때가 거의 전부라"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 967,
+    "quote": "//   ⚠ 서버가 죽었을 때 알 길이 함께 사라진 것은 사실이다 — 그때는 화면이 값을 못 채워 드러나고, 「자가 진단」·설정 › 서버에서 확인한다."
+   }
+  ],
+  "proposal": "두 문서의 배지 문장을 titlebar.js 967행 주석대로 「연결이 끊기면 화면 값이 안 채워진다 → 설정 › 서버·AI › 서버 연결의 [연결 테스트] 또는 대화창 「시스템 괜찮아?」(자가 진단)로 확인」으로 바꾼다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "실무매뉴얼.md:20·사용자_매뉴얼.md:425가 「우상단 ● 운영중 LIVE / 상단 서버 연결 점」을 진단 첫 단계로 적었고, titlebar.js:964-968·app.html:392가 2026-08-08 사용자 지시로 배지를 없앴다고 명시한다 — 인용 일치, 배지 제거는 의도지만 문서 잔존은 의도가 아니다. 문제 해결 절의 첫 단계가 없는 요소를 가리키므로 P1 타당. 배포가이드:60의 같은 문장은 기존#7이 다룬다고 finding이 밝혀 중복 아님."
+ },
+ {
+  "id": "F7-11",
+  "area": "문서",
+  "severity": "P2",
+  "title": "클라이언트 배포 가이드 v2.5.0 — 업데이트 메뉴 위치·배지 모양·무인(/S) 서술·대시보드 구성이 5.83.0과 다름(기존#7이 짚지 않은 부분)",
+  "user_impact": "IT 담당이 가이드대로 「사이드바 ⚙ 설정 → 업데이트 메뉴의 빨간 배지」를 찾으면 실제로는 설정 › 관리자 탭 안의 판과 「설정」 항목 옆 노란 숫자 배지·상단 ⚙ 메뉴라 헷갈리고, 「/S 무인 설치로 조용히」라는 서술과 달리 인앱 업데이트는 마법사 화면을 띄운다(2026-07-29 결정).",
+  "evidence": [
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 97,
+    "quote": "1. 사이드바 **⚙ 설정 → 업데이트** 메뉴로 들어갑니다. 새 버전이 있으면 이 메뉴와 ⚙ 아이콘에 빨간 배지가 자동으로 뜹니다"
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 155,
+    "quote": "- **대시보드**: 왼쪽 **📁 내 PC 파일 탐색기**(문서 클릭 → 장기기억에 올리기), 가운데 **내 업무 바로가기 + 🤖 AI 팀**, 오른쪽 **🗂 작업 화면**"
+   },
+   {
+    "file": "client/src/renderer/pages/settings.html",
+    "line": 373,
+    "quote": "<div data-sec=\"admin\" class=\"panel\" data-gijo-fold=\"업데이트\" data-gijo-fold-open>"
+   },
+   {
+    "file": "client/src/renderer/pages/nav.js",
+    "line": 667,
+    "quote": "upBadge.className = \"gn-upbadge\"; upBadge.textContent = \"1\"; upBadge.title = \"새 버전 있음\";"
+   },
+   {
+    "file": "client/src/renderer/pages/titlebar.js",
+    "line": 249,
+    "quote": "var up = item(\"⬆\", \"새 버전 설치 가능\", \"v\" + updateInfo.version, function () {"
+   },
+   {
+    "file": "client/build/installer.nsh",
+    "line": 8,
+    "quote": ";  · 자동 업데이트는 /S(무인)로 돌므로 이 페이지들은 수동 설치에만 보인다."
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1457,
+    "quote": "// ⚠ 예전엔 \"/S\"(무음)로 돌렸다. 설치는 되지만 **화면에 아무것도 안 나온다** —"
+   },
+   {
+    "file": "client/src/main.ts",
+    "line": 1463,
+    "quote": "const child = spawn(dest, [\"--force-run\"], { detached: true, stdio: \"ignore\" });"
+   }
+  ],
+  "proposal": "§6.2를 「설정 › 관리자 탭 › 업데이트 판(기본 펼침) · 새 버전이 있으면 사이드바 「설정」 옆 노란 숫자 배지와 상단 ⚙ 메뉴 「새 버전 설치 가능」 · 설치는 마법사 화면이 뜬 뒤 앱이 닫히고 마침 후 새 버전 실행」으로, §9 대시보드 서술은 삭제하거나 사용자 매뉴얼 §1로 넘긴다. installer.nsh 8행 주석도 「인앱 업데이트는 --force-run만(비무인)」으로 고친다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "인용 일치 — 배포가이드:97·155(사이드바 ⚙ 설정→업데이트·빨간 배지·옛 대시보드 3열), settings.html:373(관리자 탭 업데이트 판), nav.js:580·667(「설정」 항목 옆 amber 숫자 배지 — 노란색 맞음), titlebar.js:249(⚙ 메뉴 「새 버전 설치 가능」), main.ts:1457-1463(/S 대신 --force-run, 2026-07-29 사용자 신고), installer.nsh:8(낡은 /S 주석). 이 가이드는 docs-manifest에 없어 RAG로 나가지 않는 내부·IT 문서라 P2 적정."
+ },
+ {
+  "id": "F7-12",
+  "area": "문서",
+  "severity": "P2",
+  "title": "내부 README 2종·설치 가이드의 설치 경로·초기 계정·화면 목록이 낡음(설치 경로 `Programs\\gijo-as` vs 실제 `gijo-as-client`)",
+  "user_impact": "설치 가이드의 `%LOCALAPPDATA%\\Programs\\gijo-as` 경로를 따라 폴더를 찾는 IT 담당은 실제 폴더(`gijo-as-client`)를 못 찾고, README의 「첫 로그인 jyh/changeme」는 운영(production) 설치에서는 `admin`+콘솔 1회 출력 랜덤 비번이라 첫 로그인을 실패하며, client/README의 화면 목록·「비밀번호 해시 평문 TODO」는 현재 코드(bcrypt)와 맞지 않아 외부 검토자가 제품을 잘못 판단한다.",
+  "evidence": [
+   {
+    "file": "GIJO_AS_설치_가이드_v2.1.0.md",
+    "line": 54,
+    "quote": "설치 경로 확인(기본: `%LOCALAPPDATA%\\Programs\\gijo-as`)."
+   },
+   {
+    "file": "client/package.json",
+    "line": 2,
+    "quote": "\"name\": \"gijo-as-client\","
+   },
+   {
+    "file": "GIJO_AS_클라이언트_배포_가이드.md",
+    "line": 123,
+    "quote": "| 프로그램 | `%LOCALAPPDATA%\\Programs\\gijo-as-client` |"
+   },
+   {
+    "file": "README.md",
+    "line": 55,
+    "quote": "첫 로그인 계정은 **`jyh` / `changeme`** 입니다(첫 설치 시 생성 — 바로 바꾸세요)."
+   },
+   {
+    "file": "server/src/auth/users.ts",
+    "line": 172,
+    "quote": "const username = env.GIJO_INITIAL_ADMIN_USERNAME || (isProd || envPw ? \"admin\" : \"jyh\");"
+   },
+   {
+    "file": "client/README.md",
+    "line": 22,
+    "quote": "├── sbom.html       SBOM 관리"
+   },
+   {
+    "file": "client/README.md",
+    "line": 53,
+    "quote": "- 서버 비밀번호 해시가 평문 TODO 상태(`server/src/auth/users.ts`) — 프로덕션 전 bcrypt 적용 필수"
+   },
+   {
+    "file": "server/src/auth/users.ts",
+    "line": 182,
+    "quote": "return Boolean(row && bcrypt.compareSync(\"changeme\", row.passwordHash));"
+   }
+  ],
+  "proposal": "설치 가이드 54행을 `Programs\\gijo-as-client`로(이 머신 %LOCALAPPDATA%\\Programs 실측 일치), README 55행을 「개발 모드는 jyh/changeme, production은 admin + 콘솔 1회 출력(또는 GIJO_INITIAL_ADMIN_PASSWORD)」로 고치고, client/README의 구조·미결 항목 절은 현행 화면 목록(app.html 셸·nav.js·허브 화면)으로 다시 쓰거나 「GIJO_AS_디자인·코드검토_안내.md 참조」로 대체한다.",
+  "plan_item": "신규",
+  "effort": "S",
+  "needs_mockup": false,
+  "verify_reason": "인용 문구는 모두 실제와 일치하고 설치 폴더는 %LOCALAPPDATA%\\Programs\\gijo-as-client로 실측됐으며 client/README:53의 「평문 TODO」는 users.ts:182 bcrypt와 어긋나 낡음이 맞다. 그러나 README.md:55의 jyh/changeme는 :40-53 「npm start」 개발 실행 절 안의 문장이라 users.ts:176(비 production=jyh/changeme)과 일치하는 올바른 안내다 — 이 부분은 결함이 아니다. 내부 문서라 P2."
+ }
+]

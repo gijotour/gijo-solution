@@ -49,6 +49,11 @@ interface UserRow {
 // ⚠ assets.owner가 자유 문자열이라 오타 한 글자면 매칭이 조용히 실패한다 —
 //   그래서 값은 화면에서 선택 목록으로만 고르게 하고(자유 입력 금지), 서버도 저장 전 다듬는다.
 try { db.exec("ALTER TABLE users ADD COLUMN team TEXT"); } catch { /* 이미 있으면 무시 */ }
+// ⚠ 2026-09-02(F8-04 승인 시안): 비밀번호를 **마지막으로 바꾼 시각**. 관리자가 만들어 준 임시
+//   비밀번호를 그대로 쓰고 있는 계정을 알아보는 근거다(NIST SP 800-63B — 관리자가 정한 임시
+//   비밀번호는 교체를 요구해야 한다). 값이 **없으면 「한 번도 안 바꿨다」**로 읽는다.
+//   ⚠ 강제로 막지 않는다 — 로그인 뒤 **건너뛸 수 있는 권유**로만 쓴다(막는 문은 범위가 훨씬 커진다).
+try { db.exec("ALTER TABLE users ADD COLUMN passwordChangedAt INTEGER"); } catch { /* 이미 있으면 무시 */ }
 
 const insertStmt = db.prepare(
   "INSERT INTO users (id, username, passwordHash, displayName, role, createdAt) VALUES (@id, @username, @passwordHash, @displayName, @role, @createdAt)"
@@ -69,7 +74,17 @@ function newId(): string {
 }
 
 // 비밀번호 정책 — 길이 우선(기본 8자, GIJO_MIN_PASSWORD_LEN으로 조정). 보안 제품이라 최소한을 강제한다.
-const MIN_PASSWORD_LEN = Number(process.env.GIJO_MIN_PASSWORD_LEN ?? 8);
+// ⚠ 비밀번호 최소 길이의 **단일 출처는 auth/passwordpolicy.ts**다(2026-09-02 F8-03·F6-08 수리).
+//   예전엔 화면(settings.html)이 「4자 이상」이라 하고 서버가 8자를 요구해, 담당자가 안내대로
+//   6자를 넣으면 서버가 거절했다 — 한 제품이 두 규칙을 말했다.
+//   이제 화면은 /api/auth/me의 minPasswordLen으로, 챗봇 안내(engine/howto.ts)는 정책 파일을 직접 읽는다.
+//   ⚠ 숫자를 이 파일(users.ts)에 두면 안 된다 — 여기는 db·auth·audit을 끌고 와서,
+//     순수 표인 howto.ts가 import하는 순간 DB가 열린다(tools/learn-candidate-review.mjs가
+//     server/dist/engine/howto.js를 서버 밖에서 부른다 — 그때 저장소 루트에 data/ DB가 생긴다).
+//   ⚠ 아직 손으로 적힌 자리가 남아 있다(로그인 전이라 /api/auth/me를 못 부르는 곳):
+//     client/src/main.ts:319 · setup.html:112·173. 정책을 바꾸면 여기도 함께 본다.
+import { MIN_PASSWORD_LEN } from "./passwordpolicy";
+export { MIN_PASSWORD_LEN };
 export function validatePassword(password: string): void {
   if (!password || password.length < MIN_PASSWORD_LEN) {
     throw new Error(`비밀번호는 ${MIN_PASSWORD_LEN}자 이상이어야 합니다`);

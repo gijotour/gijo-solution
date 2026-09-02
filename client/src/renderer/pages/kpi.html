@@ -309,8 +309,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return (
       '<div class="cat"><div class="cat-title">🤖 AI 보안 (OWASP LLM Top 10)</div>' +
       '<div class="tiles">' +
-      aiTile("AI 자산", a.aiAssets, "#c9b8ff", "LLM·모델 자산", "inventory.html?hub=1") +
-      aiTile("OWASP LLM 미대응", a.owaspOpen, a.owaspOpen ? "#f5928a" : "var(--teal)", top, "inventory.html?hub=1") +
+      // ⚠ hub=1이 아니라 full=1이다(F4-09, 2026-09-02). hub=1은 「허브 무대 안」 표시 계약이라
+      //   nav.js:1509가 자산 화면의 「한눈에」 그림띠(#vizStrip)까지 숨긴다 — 여기서 여는 것은
+      //   무대가 아니라 **전체 탭**이니 띠가 보여야 한다(메뉴로 연 같은 화면과 달라지면
+      //   「어디가 고장인가」로 읽힌다). full=1은 갈아타기 표(inventory→assets)만 비켜 간다.
+      aiTile("AI 자산", a.aiAssets, "#c9b8ff", "LLM·모델 자산", "inventory.html?full=1") +
+      aiTile("OWASP LLM 미대응", a.owaspOpen, a.owaspOpen ? "#f5928a" : "var(--teal)", top, "inventory.html?full=1") +
       aiTile("AI-BOM 생성률", bomRate + "%", bomRate >= 80 ? "var(--teal)" : bomRate >= 40 ? "var(--amber)" : "#f5928a", a.aibomComplete + "/" + a.aiAssets + " 자산", "triage.html?panel=sbom") +
       aiTile("레드팀 견고성", robust, robustCol, a.redteamTested + "/" + a.aiAssets + " 점검됨", "aihub.html?panel=safety") +
       "</div></div>"
@@ -486,11 +490,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // 렌더 후 상호작용 배선 — ① 상세 지표 아코디언(기본 펼침) ② 상단 KPI 카드 → 리포트 출력
   // ③ AI 보안 타일 → 관련 화면 이동. (data-page 배선은 kpiRoot가 async로 채워지므로 여기서 다시 건다.)
-  // 화면 열기 한 곳 — ?hub=1 딥링크는 메뉴에 없어 셸이 이름을 못 찾으므로(설계관 2026-08-30)
+  // 화면 열기 한 곳 — 메뉴에 없는 딥링크는 셸이 이름을 못 찾으므로(설계관 2026-08-30)
   // 발신부가 이름을 명시한다. gijoOpenScreen은 {page,label} 객체를 받는다(nav.js).
   // ⚠ 최상위 함수 선언이어야 한다 — wireKpi()와 init() 두 스코프가 같이 부른다.
+  // ⚠ 자산 관리는 이 표에서 뺐다(F4-09, 2026-09-02) — 주소가 `inventory.html?full=1`이 되어
+  //   메뉴(nav.js:191 「자산 관리 (전체)」)에 그대로 있으니 셸이 이름을 스스로 찾는다.
+  //   여기 또 적으면 같은 이름이 두 곳에서 정해져, 메뉴를 고칠 때 한쪽만 바뀐다.
   var KPI_LABEL = {
-    "inventory.html?hub=1": "자산 관리",
     // data-page 타일(aiTile)이 라벨을 못 나르므로 흡수 주소는 여기서 이름을 받는다(검토관 2026-08-30 2차).
     "triage.html?panel=sbom": "AI-BOM · 구성",
     "aihub.html?panel=safety": "안전장치",
@@ -521,10 +527,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // 상세 지표 각 섹션 → 관련 화면 연결(타일·추세카드·제목 링크 모두 이동).
     // 제목의 고유 토큰으로 대상 화면을 판별한다(개별 tile 호출을 건드리지 않는 방식).
     const SECTION_PAGE = [
-      // ⚠ hub=1 필수(2026-08-30 검토관) — 없으면 갈아타기 표(inventory→assets)가 ⓪ 자산
+      // ⚠ 예외 표식 필수(2026-08-30 검토관) — 없으면 갈아타기 표(inventory→assets)가 ⓪ 자산
       //   고르기로 되돌려 자산 관리 화면에 영영 못 간다(assets.html 「전체 관리 열기」와 같은 통로).
-      //   label도 함께 — 이 주소는 메뉴에 없어 셸이 이름을 못 찾는다(assets.html:174 관례).
-      { key: "자산 위험도", page: "inventory.html?hub=1", label: "자산 관리" },   // 🖥 → 자산 관리
+      // ⚠ 그 표식은 hub=1이 아니라 full=1이다(F4-09, 2026-09-02) — hub=1은 무대 안 표시
+      //   계약이라 전체 탭으로 열어도 「한눈에」 그림띠가 사라진다.
+      //   이름은 안 적는다 — 이 주소는 메뉴에 있어 셸이 찾는다(위 KPI_LABEL 주석).
+      { key: "자산 위험도", page: "inventory.html?full=1" },   // 🖥 → 자산 관리 (전체)
       { key: "취약점 승인", page: "fix.html?panel=approvals", label: "조치·승인" },
       { key: "유지보수", page: "products.html" },       // 🔧 → 보안제품 등록부
       { key: "CTI", page: "discover.html?panel=threat", label: "위협 인텔" },

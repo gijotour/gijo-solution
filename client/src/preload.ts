@@ -6,7 +6,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import * as api from "./apiClient";
-import { connectWebSocket, onChannel } from "./wsClient";
+import { connectWebSocket, onChannel, onWsState } from "./wsClient";
 import { classifyChatbotCommand } from "./terminalPolicy";
 
 // keepalive/세션 상태 — 아래 IIFE(실사용 감지)와 gijoApi(세션 칩 UI)가 공유한다.
@@ -192,6 +192,14 @@ const gijoApi = {
     ipcRenderer.removeAllListeners("console:closed");
     ipcRenderer.on("console:closed", () => cb());
   },
+  // 🔑 셸 단축키(2026-09-02 여정 점검 F3-04) — Ctrl/Cmd+K(화면 찾기)·Alt+←/→(뒤로·앞으로)·Ctrl+B(왼쪽 판).
+  // 화면(iframe)에 포커스가 있으면 렌더러 keydown은 그 iframe 문서에서만 터져 셸에 닿지 않는다.
+  // 메인 프로세스의 before-input-event만이 **모든 프레임의 키**를 본다 — 거기서 잡아 이 다리로 넘긴다.
+  // ⚠ 받는 쪽은 키를 누른 그 창이다(main.ts가 mainWindow가 아니라 win에 보낸다).
+  onShellHotkey: (cb: (kind: "finder" | "back" | "forward" | "leftpane") => void) => {
+    ipcRenderer.removeAllListeners("shell:hotkey");
+    ipcRenderer.on("shell:hotkey", (_e, kind: string) => cb(kind as "finder" | "back" | "forward" | "leftpane"));
+  },
 
   // 대시보드가 분리창의 포커스·탭·닫힘을 받아 명령 맥락에 반영한다.
   onPopoutContext: (cb: (kind: "focus" | "tab" | "closed", info: Record<string, unknown>) => void) => {
@@ -278,6 +286,8 @@ const gijoApi = {
   onCollaborationEvent: (cb: (evt: unknown) => void) => onChannel("collaboration:event", cb),
   listCollaborationHistory: () => api.collaborationApi.history(),
   onLlmActivity: (cb: (evt: unknown) => void) => onChannel("llm:event", cb),
+  // 실시간 연결 상태(2026-09-02 F6-11) — 끊긴 것을 화면이 알아야 「멈춘 판」을 알릴 수 있다.
+  onWsState: (cb: (s: { 연결됨: boolean; 끊긴시각: number | null }) => void) => onWsState(cb),
   listLlmActivity: () => api.llmActivityApi.history(),
 
   // 작업 큐
@@ -607,8 +617,12 @@ const gijoApi = {
   update: {
     checkForUpdate: () => ipcRenderer.invoke("update:check") as Promise<api.ClientUpdateCheckResult>,
     currentVersion: () => ipcRenderer.invoke("update:currentVersion") as Promise<string>,
-    install: (version: string) => ipcRenderer.invoke("update:install", version) as Promise<{ ok: boolean }>,
+    // verified — sha256 대조를 실제로 했는가(2026-09-02 F6-02). 화면 문구가 이 값을 따라간다.
+    install: (version: string) => ipcRenderer.invoke("update:install", version) as Promise<{ ok: boolean; verified: boolean }>,
     onProgress: (cb: (pct: number) => void) => ipcRenderer.on("update:progress", (_e, pct: number) => cb(pct)),
+    // 설치 프로그램 **실행 실패** — install()이 이미 반환한 뒤에 오는 소식이라 별도 채널로 온다
+    //   (2026-09-02 F6-05). 이걸 안 받으면 화면은 「설치 창 열림」인 채로 앱이 꺼진다.
+    onInstallError: (cb: (reason: string) => void) => ipcRenderer.on("update:installError", (_e, reason: string) => cb(reason)),
     listReleases: () => api.clientReleaseApi.listAll(),
     downloadLog: () => api.clientReleaseApi.downloadLog(),
   },

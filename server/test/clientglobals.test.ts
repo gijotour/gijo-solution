@@ -118,6 +118,36 @@ describe("Electron에서 네이티브 모달을 쓰지 않는다", () => {
     }
     expect(위반.join(", "), "이 화면들은 gijoAsk를 부르는데 dialog.js도 nav.js도 안 싣는다 — 버튼이 조용히 죽는다").toBe("");
   });
+
+  it("탭 셸(app.html)은 dialog.js를 **정적으로** 싣는다 — 자기 boot가 nav.js보다 먼저 돈다", () => {
+    // ⚠ 왜 app.html만 따로 보는가(2026-09-02 F3-09):
+    //   다른 화면은 gijoTell을 **사람이 누른 뒤에** 부르므로 nav.js의 loadDialog()가 늦어도 된다.
+    //   그런데 셸은 자기 인라인 boot(로그인선택_못한것알리기)에서 gijoTell을 부른다. 그 boot의
+    //   DOMContentLoaded 리스너가 nav.js 것보다 먼저 등록돼 먼저 돌아 dialog.js가 아직 없다
+    //   → ReferenceError 한 번에 프로레일()·끌개설치()·대화폭복원()이 통째로 죽는다.
+    //   ⚠ 위 시험은 이 결함을 **못 잡는다**(「dialog.js 또는 nav.js」라 app.html은 이미 통과였다).
+    const src = pageSrc.get("app.html") ?? "";
+    expect(src.length, "app.html을 읽지 못했다 — 이 시험이 거짓 통과다").toBeGreaterThan(1000);
+    const 싣는것 = [...src.matchAll(/<script[^>]*\bsrc=["']([^"']+)["']/g)].map((m) => m[1]);
+    expect(싣는것, "셸은 dialog.js를 정적으로 실어야 한다 — nav.js의 동적 로드는 셸 boot보다 늦다").toContain("dialog.js");
+
+    // 정적 로드가 있어도 방어는 남긴다 — 부팅 순서를 또 바꿔도 알림이 조용히 사라지지 않게.
+    expect(/typeof\s+window\.gijoTell\s*!==\s*"function"/.test(src),
+      "boot에서 gijoTell을 부르기 전에 있는지 확인해야 한다").toBe(true);
+
+    // ⚠ 「띄우고 나서 지운다」 — 지우고 띄우다 터지면 알림이 영영 사라져 다음 실행에도 안 뜬다.
+    const 시작 = src.indexOf("function 로그인선택_못한것알리기");
+    expect(시작, "로그인선택_못한것알리기를 찾지 못했다 — 이름이 바뀌었으면 이 시험도 함께 고칠 것").toBeGreaterThan(0);
+    const 본문 = src.slice(시작, src.indexOf("\n  }", 시작));
+    expect(본문.indexOf("gijoTell("), "removeItem이 gijoTell보다 먼저면 실패 회차에 알림이 영영 사라진다")
+      .toBeLessThan(본문.lastIndexOf("removeItem"));
+
+    // 헛돎 방지 — 옛(망가진) 모양을 정말 잡아내는지 스스로 확인한다.
+    const 옛모양 = 'function 로그인선택_못한것알리기() { localStorage.removeItem("k"); gijoTell("x");\n  }';
+    const 옛본문 = 옛모양.slice(0, 옛모양.indexOf("\n  }"));
+    expect(옛본문.indexOf("gijoTell(") < 옛본문.lastIndexOf("removeItem"),
+      "옛 모양을 못 잡는다면 이 시험은 거짓 초록이다").toBe(false);
+  });
 });
 
 describe("★ 없는 화면으로 보내지 않는다", () => {
@@ -282,6 +312,27 @@ describe("★ 탭 이름 — 파일명을 사람에게 보이지 않는다", () 
 
   it("nav가 사이드바 정의를 셸에 내준다", () => {
     expect(nav, "window.gijoNavGroups로 안 내주면 셸이 이름을 못 찾는다").toContain("window.gijoNavGroups");
+  });
+
+  // F4-08(2026-09-02) — 허브에서 판을 바꾸면 탭에 **보이는** 이름이 따라가되, **저장값은 그대로**.
+  // ⚠ 글자 대조가 아니라 함수를 실제로 굴려 잰다 — 문자열만 보면 다음 사람이 구현을 바꿔도
+  //   초록이 남는다(이 저장소가 여러 번 밟은 「거짓 초록」).
+  it("★ 허브 탭 이름은 지금 무대 판을 비추고, 저장되는 label은 안 바뀐다", () => {
+    const m = /function 탭이름\(t\) \{[\s\S]*?\n  \}/.exec(app);
+    expect(m, "탭이름()이 없다 — 판을 바꿔도 탭이 처음 연 판 이름에 머문다").toBeTruthy();
+    const 탭이름 = new Function("무대맥락", `${m![0]}; return 탭이름;`)({
+      "fix.html?panel=maintenance": { page: "approvals.html", label: "✅ 조치·승인" },
+    }) as (t: { page: string; label: string }) => string;
+    expect(탭이름({ page: "fix.html?panel=maintenance", label: "정기 점검" }),
+      "판을 바꿨는데 탭 이름이 처음 연 판에 머문다").toBe("조치·승인");
+    expect(탭이름({ page: "dashboard.html", label: "대시보드" }),
+      "허브가 아닌 탭 이름까지 흔들린다").toBe("대시보드");
+    // 저장은 탭의 정체(page·label)만 — 보이는 이름을 저장하면 다시 열 때 이름이 거짓말을 한다.
+    const save = /function save\(\)[\s\S]*?\n  \}/.exec(app)?.[0] ?? "";
+    expect(save, "저장에 탭이름()이 섞였다 — 다시 열면 「조치·승인」 탭에 허브 첫 판이 뜬다").not.toContain("탭이름(");
+    // 기억만 하고 안 그리면 담당자 눈에는 아무 일도 안 일어난다.
+    const 수신 = app.slice(app.indexOf('d.type === "gijo:hubStage"'), app.indexOf('d.type === "gijo:hubStage"') + 1200);
+    expect(수신, "hubStage를 받고도 탭줄을 다시 안 그린다").toContain("redraw()");
   });
 
   it("셸이 이름 없이 열 때 파일명으로 떨어지지 않는다", () => {

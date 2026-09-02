@@ -136,7 +136,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <!-- 시스템 로그와 같은 모양으로 맞춘다(2026-08-02 사용자 지시) — 같은 성격(흐르는 기록)인데
          모양이 다르면 화면을 옮길 때마다 다시 배운다. 접기 제목 + 정체성 한 줄 + 콘솔형 상자. -->
     <div class="panel" data-gijo-fold="📜 작업 기록" data-gijo-fold-badges="kpiTotal:건">
-    <div class="panel-sub">누가 언제 무엇을 했는지 그대로 남깁니다 — 지우거나 고칠 수 없습니다.</div>
+    <!-- 🗑 설명 한 줄 제거(2026-09-02 사장님 지시 「이 글자 삭제나 간략하게 작게」).
+         왜 옮기지 않고 지웠나 — ① 화면 맨 위 「기록 — 누가 무엇을 했고…」가 이미 같은 말을 한다
+         ② 뒷문장 「지우거나 고칠 수 없습니다」는 **사실이 아니다**: audit.ts의 보관 기간 정리가
+            3년 지난 기록을 실제로 지운다(GIJO_AUDIT_RETENTION_DAYS 기본 1095).
+         그래서 챗봇 안내로도 옮기지 않았다 — 틀린 약속을 코퍼스에 넣으면 담당자에게 그대로 나간다.
+         보관 기간 설명은 screenguide의 audit.html 「보관 기간」 항목에 정확히 적혀 있다. -->
     <div class="toolbar">
       <div class="filters" id="kindFilters">
         <div class="filter-chip active" data-kind="all">전체</div>

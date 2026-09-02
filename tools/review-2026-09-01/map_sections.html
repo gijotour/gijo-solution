@@ -1,0 +1,183 @@
+  <!-- ========== 5. 고객사 배치 · 담당자 PC ↔ 서버 (2026-09-01 추가) ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">05</span><h2>고객사 배치 · 담당자 PC와 서버</h2>
+      <span class="sub">설치본은 서버가 나눠 주고, 서버는 한 대만 있으면 된다</span>
+    </div>
+    <div class="diagram-scroll">
+      <svg class="topo" viewBox="0 0 1060 340" role="img" aria-label="담당자 PC(설치본·로그인·탭 셸)와 사내 GPU 서버(WSL·GB10·Mac) 배치도">
+        <defs>
+          <marker id="arrNet" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 Z" fill="var(--accent)"/>
+          </marker>
+          <marker id="arrRel" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 Z" fill="var(--git)"/>
+          </marker>
+        </defs>
+
+        <!-- 담당자 PC -->
+        <g>
+          <rect x="40" y="36" width="410" height="270" rx="16" fill="var(--surface)" stroke="var(--client)" stroke-width="1.6"/>
+          <rect x="40" y="36" width="410" height="34" rx="16" fill="var(--client)" opacity=".12"/>
+          <text class="t-eyebrow" fill="var(--client)" x="62" y="58">담당자 PC · WINDOWS 10/11 · ×N대 · 관리자 권한 불필요</text>
+          <text class="t-host" fill="var(--ink)" x="62" y="98">GIJO AS 클라이언트 5.83.0</text>
+          <text class="t-meta" fill="var(--muted)" x="62" y="119">Electron · 계정당 로그인 세션 1개 · 상태는 전부 서버에</text>
+
+          <g font-family="var(--sans)">
+            <circle cx="74" cy="150" r="9" fill="var(--client)" opacity=".18"/><text x="74" y="154" text-anchor="middle" fill="var(--client)" font-size="11" font-weight="700">1</text>
+            <text class="t-role" fill="var(--ink)" x="92" y="154">설치본 — GIJO-AS-Setup-5.83.0.exe</text>
+            <text class="t-note" fill="var(--muted)" x="92" y="172">NSIS 마법사 · 사용자 단위 설치 · 서명 없음(EDR 예외 필요)</text>
+
+            <circle cx="74" cy="199" r="9" fill="var(--client)" opacity=".18"/><text x="74" y="203" text-anchor="middle" fill="var(--client)" font-size="11" font-weight="700">2</text>
+            <text class="t-role" fill="var(--ink)" x="92" y="203">첫 실행 → 로그인</text>
+            <text class="t-note" fill="var(--muted)" x="92" y="221">서버 주소 · 아이디 · 비밀번호 · 2차 인증(선택) · 중복 로그인 확인</text>
+
+            <circle cx="74" cy="248" r="9" fill="var(--client)" opacity=".18"/><text x="74" y="252" text-anchor="middle" fill="var(--client)" font-size="11" font-weight="700">3</text>
+            <text class="t-role" fill="var(--ink)" x="92" y="252">탭 셸(app.html) — 메뉴 · 탭 · 대화창</text>
+            <text class="t-note" fill="var(--muted)" x="92" y="270">① 발견·수집 → ⑤ 보고 절차 메뉴 · 지시는 대화창에서</text>
+          </g>
+          <line x1="62" y1="284" x2="428" y2="284" stroke="var(--border)" stroke-width="1"/>
+          <text class="t-note" fill="var(--muted)" x="62" y="300">단일 데스크톱 모드: 동봉 서버(server-dist)를 localhost:4000에 자동 기동 · 모델은 별도 배치</text>
+        </g>
+
+        <!-- 사내망 연결 -->
+        <g stroke="var(--accent)" stroke-width="2.6" fill="none" marker-end="url(#arrNet)">
+          <path d="M452,150 C520,150 560,150 636,150"/>
+        </g>
+        <g fill="var(--accent)" class="t-lbl" text-anchor="middle">
+          <rect x="478" y="118" width="134" height="19" rx="9" fill="var(--surface)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="545" y="131">사내망 · :4000 · HTTP/WS</text>
+        </g>
+        <g stroke="var(--git)" stroke-width="2" fill="none" stroke-dasharray="6 5" marker-end="url(#arrRel)">
+          <path d="M636,206 C560,206 520,206 452,206"/>
+        </g>
+        <g fill="var(--git)" class="t-lbl" text-anchor="middle">
+          <text x="545" y="232">설치본 게시 · 인앱 업데이트</text>
+          <text x="545" y="248">(/api/client/*)</text>
+        </g>
+
+        <!-- 서버 -->
+        <g>
+          <rect x="640" y="36" width="380" height="270" rx="16" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+          <rect x="640" y="36" width="380" height="34" rx="16" fill="var(--accent)" opacity=".12"/>
+          <text class="t-eyebrow" fill="var(--accent)" x="662" y="58">서버 · GPU 머신 1대 · 배포처는 서버 자신</text>
+          <text class="t-host" fill="var(--ink)" x="662" y="98">gijo-as-server :4000</text>
+          <text class="t-meta" fill="var(--muted)" x="662" y="119">Qwen3-14B Q4 + 전문가 어댑터 · bge-m3 임베딩 :8081 · SQLite · LanceDB</text>
+
+          <rect x="662" y="136" width="336" height="44" rx="10" fill="var(--inset)" stroke="var(--accent)" stroke-width="1.2"/>
+          <text class="t-lbl" fill="var(--accent)" x="676" y="154">지금 · 운영</text>
+          <text class="t-note" fill="var(--ink)" x="676" y="171">WSL2 · RTX 3090 24GB · Standard 티어(14B · 32K)</text>
+
+          <rect x="662" y="188" width="336" height="44" rx="10" fill="var(--inset)" stroke="var(--gb)" stroke-width="1.2"/>
+          <text class="t-lbl" fill="var(--gb)" x="676" y="206">후보 · 코드 검토 2026-09-01</text>
+          <text class="t-note" fill="var(--ink)" x="676" y="223">{{GB10_ONE_LINE}}</text>
+
+          <rect x="662" y="240" width="336" height="44" rx="10" fill="var(--inset)" stroke="var(--mac)" stroke-width="1.2"/>
+          <text class="t-lbl" fill="var(--mac)" x="676" y="258">1인 · 올인원</text>
+          <text class="t-note" fill="var(--ink)" x="676" y="275">Mac · Metal · M4 24GB(단일 LLM) / M1 Max 32GB</text>
+        </g>
+      </svg>
+    </div>
+    <div class="dir-note" style="margin-top:14px">
+      <span>↳</span>
+      <div><b>분산 모드가 표준이다.</b> 서버 한 대가 모델·데이터·설치본 게시를 전부 맡고, 담당자 PC는 설치본만 받아 서버 주소로 붙는다. 서버 자리를 WSL(RTX 3090)에서 GB10으로 바꿔도 담당자 PC 쪽은 <b>서버 주소 한 줄</b> 말고 바뀌는 것이 없다 — 07절이 그 전제로 코드를 봤다.</div>
+    </div>
+  </section>
+
+  <!-- ========== 6. 담당자 여정 점검 (2026-09-01) ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">06</span><h2>담당자 여정 점검 · 설치 → 로그인 → 제품 UI</h2>
+      <span class="sub">손확인 10건 + 8갈래 점검 → 반박 검증 통과분만 · 코드는 안 고쳤다</span>
+    </div>
+    <div class="kpi" style="margin-bottom:14px">
+      {{JOURNEY_KPI}}
+    </div>
+    <div class="jr">
+      {{JOURNEY_STAGES}}
+    </div>
+    <div style="margin-top:16px" class="tbl-scroll">
+      <table>
+        <thead><tr><th>변경안</th><th>우선</th><th>무엇을 바꾸나</th><th>계획서</th><th>크기</th><th>시안</th></tr></thead>
+        <tbody>
+          {{JOURNEY_TOP}}
+        </tbody>
+      </table>
+    </div>
+    <div class="note client" style="margin-top:14px">
+      {{JOURNEY_SUMMARY}}
+    </div>
+  </section>
+
+  <!-- ========== 7. GB10 코드 병행 검토 (2026-09-01) ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">07</span><h2>GB10(DGX Spark) 코드 병행 검토</h2>
+      <span class="sub">서버를 GB10에 올린다는 전제 · hub/main 29919788(클라 5.83.0) + GB10 실측 2026-09-02</span>
+    </div>
+    <div class="grid2">
+      <div class="card" style="--c:var(--gb)">
+        <h3><span class="k"></span>판정</h3>
+        <div style="font-size:.88rem; color:var(--ink-soft); line-height:1.6">{{GB10_VERDICT}}</div>
+      </div>
+      <div class="card" style="--c:var(--accent)">
+        <h3><span class="k"></span>확정한 사실 — 출처 있는 것만</h3>
+        <ul class="facts">
+          {{GB10_FACTS}}
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top:16px" class="tbl-scroll">
+      <table>
+        <thead><tr><th>변경안</th><th>우선</th><th>무엇을 바꾸나</th><th>계획서</th><th>크기</th></tr></thead>
+        <tbody>
+          {{GB10_ROWS}}
+        </tbody>
+      </table>
+    </div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="card" style="--c:var(--gb)">
+        <h3><span class="k"></span>GB10 실장비 실측 체크리스트 — 이 순서대로</h3>
+        <ol class="chk">
+          {{GB10_CHECKLIST}}
+        </ol>
+      </div>
+      <div class="card" style="--c:var(--warn)">
+        <h3><span class="k"></span>정직하게 밝힐 한계</h3>
+        <ul class="facts" style="gap:6px">
+          {{GB10_CAVEATS}}
+        </ul>
+      </div>
+    </div>
+    <div class="note" style="margin-top:14px">
+      <b>origin(GitHub)을 허브에 맞췄다 — 2026-09-02.</b> 클라우드(09-01) 검토는 origin/main <code style="font-family:var(--mono)">f1bfd98</code>(08-09) 코드를 봤고, 그래서 「GB10은 계획서에 없다」·「nvidia-smi [N/A]를 GPU 없음으로 읽는다」는 전제가 낡았었다. win에서 <code style="font-family:var(--mono)">git push origin main</code>(846커밋)으로 맞춘 뒤 hub/main <code style="font-family:var(--mono)">29919788</code> 기준으로 다시 봤다 — <code style="font-family:var(--mono)">unifiedmem.ts</code>가 통합메모리 갈래를 이미 풀었고, 계획서 전-7에 편입이 이미 적혀 있다.
+    </div>
+  </section>
+
+  <!-- ========== 8. 문서 통독·통합 (2026-09-01) ========== -->
+  <section>
+    <div class="sec-head">
+      <span class="num">08</span><h2>md 문서 143개 · 날짜순 통독과 통합</h2>
+      <span class="sub">본문 날짜로 연대기 · 원본은 지우지 않았다</span>
+    </div>
+    <div class="kpi" style="margin-bottom:14px">
+      {{DOCS_KPI}}
+    </div>
+    <div class="grid2">
+      <div class="card" style="--c:var(--git)">
+        <h3><span class="k"></span>시대 구분 — 문서에 적힌 날짜로</h3>
+        <ul class="facts">
+          {{DOC_ERAS}}
+        </ul>
+      </div>
+      <div class="card" style="--c:var(--accent)">
+        <h3><span class="k"></span>통합 뒤 남길 대표 문서</h3>
+        <ul class="facts">
+          {{DOC_TARGETS}}
+        </ul>
+      </div>
+    </div>
+    <div class="note warn" style="margin-top:14px">
+      {{DOCS_NOTE}}
+    </div>
+  </section>

@@ -209,7 +209,11 @@ tr:last-child td{border-bottom:none;}
         </div>
       </div>
 
-      <div data-gijo-fold="서버 파일 경로로 수집" style="margin-top:12px;">
+      <!-- ⚠ 여기 넣는 경로는 담당자 PC가 아니라 **서버(사내 GPU 서버)의 data/ 폴더** 기준이다
+           (server/src/engine/memory.ts:336). 분산 모드 담당자에게는 넣을 수 있는 경로 자체가 없어
+           관리자에게만 보인다(아래 init의 학습관리자 판정, 2026-09-01 여정 점검 F5-10).
+           ⚠ 접기 제목을 바꾸면 아래 querySelector도 함께 바꿔야 한다 — 두 곳이 한 문자열로 묶여 있다. -->
+      <div data-gijo-fold="서버 디스크 경로로 수집 (관리자용)" style="margin-top:12px;">
         <div class="field-row" style="margin-top:10px;">
           <div class="field">
             <label for="ingestPathInput">문서 경로</label>
@@ -299,7 +303,9 @@ tr:last-child td{border-bottom:none;}
             <button class="btn-ghost" id="dsPickDocBtn" style="padding:5px 12px;font-size:12px;">🗂 올린 문서에서 불러오기</button>
           </span>
         </div>
-        <textarea id="dsRawInput" rows="5" placeholder="여기에 문서를 붙여넣거나, 위 '올린 문서에서 불러오기'로 대시보드 ＋로 올려 둔 문서를 가져오세요" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical"></textarea>
+        <!-- 「대시보드 ＋」는 콘솔이 셸로 옮겨지기 전 이름이다 — 대시보드에 그 ＋는 없다
+             (2026-09-01 여정 점검 F5-05). screenguide와 같은 말(「대화 콘솔의 ＋」)로 맞춘다. -->
+        <textarea id="dsRawInput" rows="5" placeholder="여기에 문서를 붙여넣거나, 위 '올린 문서에서 불러오기'로 대화 콘솔 ＋로 올려 둔 문서를 가져오세요" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical"></textarea>
         <div id="dsPickBox" style="display:none;margin-top:6px;max-height:170px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px"></div>
         <div class="status-line" id="dsFileStatus" style="font-size:12.5px;"></div>
       </div>
@@ -967,7 +973,8 @@ tr:last-child td{border-bottom:none;}
       const list = await window.gijo.listMemoryDocuments();
       box.textContent = "";
       if (!list || list.length === 0) {
-        box.textContent = "올린 문서가 없습니다 — 대시보드 ＋로 먼저 올리세요";
+        // 인입 창구 이름은 screenguide와 같은 말로(2026-09-01 여정 점검 F5-05).
+        box.textContent = "올린 문서가 없습니다 — 대화 콘솔의 ＋로 먼저 올리세요";
         return;
       }
       // 문서명은 사용자가 올린 파일명이라 따옴표·꺾쇠가 섞일 수 있다 — textContent로 넣어
@@ -1118,6 +1125,45 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("dsConvertBtn").addEventListener("click", convertDataset);
     document.getElementById("dsPickDocBtn").addEventListener("click", toggleDsPick);
     document.getElementById("dsSaveBtn").addEventListener("click", saveDataset);
+    // ⚠ 파인튜닝 시작은 **관리자만**이다(2026-09-01 여정 점검 F5-07). 서버 /api/finetune/start를
+    //   관리자 전용으로 막았으니 화면도 함께 잠근다 — 서버만 막으면 눌렀다가 오류를 보는 경험이 되고,
+    //   화면만 막으면 라우트로 샌다(hardening.html:379 원칙). 판정 원천은 window.gijo.me() 하나다.
+    //   데이터셋 만들기·저장까지는 담당자도 그대로 한다 — GPU를 쓰지 않는 준비 작업이다.
+    //   ⚠ 못 읽으면 **잠그는 쪽**으로 둔다.
+    let 학습관리자 = false;
+    try { 학습관리자 = (await window.gijo.me()).role === "admin"; } catch (e) { 학습관리자 = false; }
+    if (!학습관리자) {
+      const ftBtn = document.getElementById("ftStartBtn");
+      if (ftBtn) { ftBtn.disabled = true; ftBtn.title = "관리자만 파인튜닝을 시작할 수 있습니다"; }
+      const ftLine = document.getElementById("ftStatusLine");
+      if (ftLine) ftLine.textContent = "학습 시작은 관리자만 할 수 있습니다 — 학습 중에는 모두의 채팅·문서검색이 멈추기 때문입니다. 데이터셋 준비까지는 여기서 하시면 됩니다.";
+    }
+    // 🔒 서버 디스크 경로 수집도 **관리자만**(2026-09-01 여정 점검 F5-10). 담당자의 문서 인입
+    //   창구는 대화 콘솔의 ＋ 하나다 — 담당자에게 서버 디스크 경로 자유 입력칸은 넣을 값이 없는 칸이다.
+    //   ⚠ 판정은 **위 학습관리자 하나를 그대로 쓴다**. me()를 한 번 더 부르면 같은 값이 두 곳에서
+    //     정해진다(단일 출처).
+    //   ⚠ 요소를 DOM에서 지우지 않고 숨긴다 — ingestBtn·ingestPathInput을 참조하는 코드가 있다(1116·497·505행).
+    //   ⚠ 서버 /api/memory/ingest는 아직 로그인만 요구한다(memory.ts) — 화면만 막으면 라우트로 샌다.
+    //     서버도 관리자로 좁힐지는 사용자 결정 대기.
+    if (!학습관리자) {
+      const 경로구역 = document.querySelector('[data-gijo-fold="서버 디스크 경로로 수집 (관리자용)"]');
+      if (경로구역) {
+        경로구역.style.display = "none";
+        // ⚠ 접기 부품(fold.js)은 제목 줄(.gjf-h)을 이 구역 **앞 형제**로 끼워 넣는다. 구역만 숨기면
+        //   눌러도 아무 일 없는 제목 줄만 덩그러니 남는다. fold.js는 nav.js가 비동기로 실으므로
+        //   (nav.js loadFold) 우리가 먼저일 수도, 나중일 수도 있다 — 두 순서를 모두 막는다:
+        //   ① 아직 안 만들었으면 __gijoFolded 표식으로 아예 만들지 않게 하고(fold.js scan의 건너뛰기 조건)
+        //   ② 이미 만들었으면 그 제목 줄도 함께 숨긴다.
+        경로구역.__gijoFolded = true;
+        const 접기머리 = 경로구역.previousElementSibling;
+        if (접기머리 && 접기머리.classList.contains("gjf-h")) 접기머리.style.display = "none";
+      }
+      // 위 「대상 에이전트」 고르개는 label이 밝히듯 **이 경로 수집에만** 쓰인다(498행). 구역을
+      // 숨기면서 남겨두면 무엇에 쓰는지 알 수 없는 칸이 된다 — 함께 숨긴다.
+      const 대상칸 = document.getElementById("ingestScopeSelect");
+      const 대상줄 = 대상칸 && 대상칸.closest(".field-row");
+      if (대상줄) 대상줄.style.display = "none";
+    }
     document.getElementById("ftStartBtn").addEventListener("click", startFinetune);
 
     if (window.gijoRealtime) window.gijoRealtime.connect();
@@ -1235,7 +1281,11 @@ tr:last-child td{border-bottom:none;}
     const 보일것 = triples.slice(0, LIST_CAP);
     document.getElementById("listCount").textContent =
       triples.length > LIST_CAP ? `· ${LIST_CAP}건 표시 (전체 ${triples.length.toLocaleString()}건)` : `· ${triples.length}건`;
-    if (triples.length === 0) { box.innerHTML = `<div style="color:var(--muted-2);font-size:12.5px;padding:14px 0">등록된 관계가 없습니다. 위 "샘플 지식 불러오기"로 시작하거나 직접 추가하세요.</div>`; return; }
+    // ⚠ 「샘플 지식 불러오기」는 이 화면에 없는 단추다 — 빈 상태가 없는 자리를 가리켜 담당자가
+    //   다음 걸음을 잃었다(2026-09-01 여정 점검 F5-06). 실재하는 길만 적는다:
+    //   ① 문서 인입(대화 콘솔 ＋) → 관계 자동 생성 ② 기본 지식 번들 ③ 「관계 추가」 접기(365행).
+    //   ⚠ 「관계 추가」 판은 이 목록 판(380행)보다 **위**에 있다 — 「아래」로 적으면 또 어긋난다.
+    if (triples.length === 0) { box.innerHTML = `<div style="color:var(--muted-2);font-size:12.5px;padding:14px 0">등록된 관계가 없습니다 — 문서를 올리면 관계가 자동으로 생기고, 기본 지식 번들이 적용되면 표준 관계가 들어옵니다. 위 「관계 추가」로 직접 넣을 수도 있습니다.</div>`; return; }
     // 엑셀형 한 줄(승인 시안 knowledge-rows) — 칩 대신 글자 색, 열 머리는 스크롤 안에(중5).
     // ⚠ 얼룩이 행 순서로 돌게 행들만 .g-rows-flat 묶음에 담는다(안내문은 묶음 밖).
     box.innerHTML = `<div class="g-rows-head"><span>주어</span><span>관계</span><span>목적어</span><span>출처</span><span></span></div>` +

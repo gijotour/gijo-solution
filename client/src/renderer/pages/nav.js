@@ -223,7 +223,10 @@
     "reference.html": "settings.html?s=my",     // 기능 안내 → AI가 대신(2026-07-25)
     "billing.html": "audit.html",               // 사용량·요금 → 기록 보기
     "mcp.html": "settings.html?s=link",         // 2026-07-28 설정 5구역으로 흡수
-    "update.html": "settings.html?s=admin",
+    // ⚠ 2026-09-02(F6-10)에 업데이트 판을 「내 설정」으로 옮겼다. 이 표가 안 따라오면 옛 주소로
+    //   들어온 사람이 **판이 없는 관리자 구역**에 떨어지고, 담당자는 그 탭의 판이 전부 감춰져 빈
+    //   화면을 본다 — 2026-07-28 「업데이트 화면이 없다」 사고의 재판이다(2026-09-03 검토가 잡음).
+    "update.html": "settings.html?s=my",
     "logs.html": "syslog.html",   // 2026-08-02 시스템 로그를 다시 떼어냈다
     "llmguide.html": "settings.html?s=ai",      // 추천 모델 목록 → 설정 서버·AI
     "docenrich.html": "memory.html",            // 문서 보강 → 기억·학습에 병합
@@ -286,8 +289,9 @@
     "threat.html?embed=1": "discover.html?embed=1&panel=threat",
     // ⓪ 자산이 생기면서 자산의 **첫 자리**가 바뀌었다(2026-08-18 승인 시안).
     // ⚠ **`hub=1`(또는 `full=1`)이 붙은 주소는 여기 안 걸린다**(아래 갈아타기 적용부의 예외). 그게 자산
-    //   관리(inventory)로 가는 **유일한 탈출구**다 — assets.html의 「전체 관리 열기」가
-    //   `inventory.html?hub=1`로 여는 이유다. 그 한 글자가 없으면 관리 화면을 열려고 눌러도
+    //   관리(inventory)로 가는 **유일한 탈출구**다 — assets.html의 「전체 관리 열기」와 KPI 타일이
+    //   `inventory.html?full=1`로 여는 이유다(F4-09, 2026-09-02 — 종전 hub=1은 「허브 무대 안」
+    //   표시 계약까지 물려받아 전체 탭에서도 「한눈에」 그림띠가 사라졌다). 그 표식이 없으면 열려고 눌러도
     //   이 표가 ⓪로 되돌려 **영영 못 간다**(오류도 안 난다 — 그냥 같은 화면이 다시 뜬다).
     "inventory.html": "assets.html",
     "inventory.html?embed=1": "assets.html?embed=1",
@@ -1657,25 +1661,17 @@
     }
   }
 
-  // 화면 크기 단축키 — 데스크톱 앱 관례대로 Cmd/Ctrl + '＋·－·0'. 배율 계산·저장은 메인 프로세스가
-  // 하므로 여기서는 방향만 넘긴다. 입력 중(input/textarea)에도 동작해야 해서 대상은 가리지 않는다.
-  function bindZoomKeys() {
-    if (window.__gijoZoomKeys) return;
-    window.__gijoZoomKeys = true;
-    window.addEventListener("keydown", function (e) {
-      // Ctrl/Cmd+K — 상단 바의 화면 찾기 겹판을 연다(2026-08-02 이관).
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
-        if (typeof window.gijoOpenFinder === "function") { e.preventDefault(); window.gijoOpenFinder(); return; }
-      }
-      // ⚠ 확대·축소(Ctrl + · − · 0)는 **여기서 처리하지 않는다**(2026-08-02).
-      //   메인 프로세스가 모든 창에 직접 걸었다(main.ts bindZoom → before-input-event).
-      //   같은 일을 두 군데서 하면 반드시 어긋난다 — 실제로 여기 있던 `setUiZoom(0)`은
-      //   0을 배율로 넘겨 **최소값 80%로 떨어뜨렸다**(기본으로 되돌릴 셈이었는데 정반대).
-    });
-  }
+  // 단축키(확대·축소 Ctrl +·−·0 · 화면 찾기 Ctrl+K)는 **메인 프로세스 한 곳**에서 건다.
+  //   길: main.ts bindZoom → before-input-event → preload onShellHotkey → titlebar.js 셸단축키.
+  // ⚠ 여기 있던 Ctrl+K 처리를 지운 이유(2026-09-02 여정 점검 F3-04): 이 파일은 탭 안
+  //   (embed iframe)에도 실리는데 그 안에는 gijoOpenFinder가 없다 — titlebar.js가 iframe이면
+  //   10행에서 즉시 return하기 때문이다. 담당자가 화면을 한 번 클릭해 포커스가 iframe으로
+  //   가는 순간 **안내한 Ctrl+K가 조용히 죽었다**. 「되다 안 되다 하는 단축키」의 정체가 이것이다.
+  // ⚠ 같은 일을 두 군데서 하면 반드시 어긋난다 — 여기 있던 `setUiZoom(0)`이 배율을 최소값
+  //   80%로 떨어뜨린 2026-08-02 사고가 그 증거다. 그래서 렌더러 쪽은 아예 남기지 않는다.
 
   function boot() {
-    bindZoomKeys();
+    // (단축키 걸기는 여기서 지웠다 — 위 주석 참조. 메인 프로세스가 모든 창·모든 프레임에 건다.)
     loadDialog(); // 어느 겹에서든 먼저 — 네이티브 모달이 뜨면 그 순간 모두 멈춘다
     loadFold(); // embed에서도 실어야 한다 — 팝업 안이 접기가 가장 필요한 곳이다
     loadFootbar(); // 하단 고정바 — 어느 창에서 열든 같은 자리에 같은 모양으로(2026-08-02)

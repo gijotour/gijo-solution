@@ -296,7 +296,12 @@ table th:last-child,table td:last-child{white-space:nowrap;}
     if (보일것.length === 0) {
       findingsBodyEl.innerHTML = findings.length
         ? '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">고른 심각도의 탐지가 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다.</td></tr>'
-        : '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">탐지 내역이 없습니다. 연동된 CTI 피드가 없거나 아직 탐지된 항목이 없습니다.</td></tr>';
+        // 원인만 말하고 끝내지 않는다(F4-11, 2026-09-02) — 다음에 무엇을 누르면 되는지까지.
+        //   ⚠ 길 이름은 이 화면에 **실제로 있는 단추 글자 그대로** 쓴다(141행 「+ 피드 구독 추가」,
+        //     140행 「🔌 MCP 연동」). 없는 자리를 가리키면 담당자는 아무리 봐도 못 찾는다.
+        //   두 단추는 임베드(허브 무대)에서도 남는다 — nav.js applyEmbed가 감추는 것은
+        //   .header와 #gijoNav뿐이라 이 줄의 「위」가 거짓이 되지 않는다.
+        : '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">탐지 내역이 없습니다 — 아직 붙인 피드가 없다면 위 「+ 피드 구독 추가」로 등록하세요. 외부 CTI·보안도구를 잇는 것은 위 「🔌 MCP 연동」입니다.</td></tr>';
       return;
     }
     findingsBodyEl.innerHTML = 보일것

@@ -361,7 +361,8 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     if (급한) ctx.onDetail(급한);
     else document.getElementById("vheatSide").innerHTML = '<div style="color:var(--muted)">' +
       (심각도필터 ? "고른 심각도의 자산이 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다."
-                  : "조치할 취약점이 없습니다 — 스캔 결과를 올려 주세요.") + "</div>";
+                  // 「어디서 올리나」를 말한다 — 이 화면엔 올리는 자리가 없다(F4-06, 2026-09-02).
+                  : "조치할 취약점이 없습니다 — 아래 대화창 ＋로 스캔 결과 파일(Nessus 등)을 올리면 여기 쌓입니다.") + "</div>";
   }
   function setVView(heat) {
     vheatOn = heat;
@@ -529,7 +530,9 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     // 좁혔으면 띠로 알린다 — 안 알리면 그 수를 전체로 읽는다.
     if (window.gijoScope) window.gijoScope.chip(보일자산.length, 범위전.length);
     if (assets.length === 0) {
-      hostRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">업로드된 취약점 스캔 결과가 없습니다. 위에서 Nessus 등의 결과 파일을 올려주세요.</td></tr>';
+      // ⚠ 「위에서 올려주세요」는 **없는 자리**를 가리켰다(F4-06, 2026-09-02) — 이 화면 위에는
+      //   업로드 칸이 없다. 인입 창구는 대화창 ＋ 하나다(604행 주석, 2026-07-27 통일).
+      hostRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">아직 올린 취약점 스캔 결과가 없습니다. 아래 대화창 ＋로 결과 파일(Nessus 등)을 올리면 여기 쌓입니다.</td></tr>';
       return;
     }
     if (보일자산.length === 0) {

@@ -190,7 +190,7 @@ export interface ShadowModel { modelId: string; sources: string[]; running: bool
 export interface ShadowAiReport { scannedAt: string; observedCount: number; governedCount: number; shadow: ShadowModel[] }
 
 /** 업무 절차 5단계 현황 — 절차 띠가 읽는다. 숫자는 서버가 한 곳에서 센다(화면마다 세면 어긋난다). */
-export interface WorkflowStage { no: number; key: string; label: string; count: number | null; alert: number | null; alertLabel: string; page: string; }
+export interface WorkflowStage { no: number; key: string; label: string; count: number | null; countLabel?: string; alert: number | null; alertLabel: string; page: string; }
 export const workflowApi = {
   stages: () => request<{ stages: WorkflowStage[] }>("/api/workflow/stages"),
 };

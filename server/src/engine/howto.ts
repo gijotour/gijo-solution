@@ -18,6 +18,12 @@
 //   전부 settings.html을 열어 대조해 고쳤다. **시험(howto.test.ts)이 이 대조를 매번 다시 한다** —
 //   화면에서 버튼 이름이 바뀌면 시험이 먼저 깨져야지, 담당자가 먼저 헤매면 안 된다.
 
+// 비밀번호 최소 길이는 **서버 정책이 단일 출처**다(auth/passwordpolicy.ts). 챗봇이 화면과 다른
+// 숫자를 말하면 담당자는 그 숫자를 믿고 거절당한다 — 여기에 숫자를 적지 않고 정책을 읽어 쓴다(F8-03·F6-08).
+// ⚠ auth/users가 아니라 passwordpolicy에서 읽는다 — users는 db·auth를 끌고 와서, 이 순수 표를
+//   서버 밖에서 부르는 도구(tools/learn-candidate-review.mjs)가 DB를 열게 된다.
+import { MIN_PASSWORD_LEN } from "../auth/passwordpolicy";
+
 export interface HowTo {
   key: string;
   /** 담당자가 쓰는 말. 좁게 적어야 엉뚱한 질문을 가로채지 않는다. */
@@ -67,7 +73,7 @@ export const HOWTOS: HowTo[] = [
     page: "settings.html?s=admin",
     where: "설정", // 관리자 탭
     steps: [
-      "**계정 관리** 칸에 **아이디**·**이름**·**초기 비밀번호**(4자 이상)를 넣습니다",
+      `**계정 관리** 칸에 **아이디**·**이름**·**초기 비밀번호**(${MIN_PASSWORD_LEN}자 이상)를 넣습니다`,
       "**역할**을 고릅니다 — **담당자**(일반)와 **관리자**(설정까지) 중에 고릅니다",
       "**[추가]** 를 누르고, 초기 비밀번호를 본인에게 따로 전달합니다",
     ],
@@ -80,7 +86,7 @@ export const HOWTOS: HowTo[] = [
     page: "settings.html?s=my",
     where: "설정", // 내 설정 탭 — 사이드바엔 「설정」 한 줄(2026-08-09 정리)
     steps: [
-      "**계정** 칸의 **비밀번호 변경**에 새 비밀번호(4자 이상)를 넣습니다",
+      `**계정** 칸의 **비밀번호 변경**에 새 비밀번호(${MIN_PASSWORD_LEN}자 이상)를 넣습니다`,
       "**[변경]** 을 누릅니다",
     ],
     why: "본인 비밀번호는 본인만 바꿀 수 있습니다.",

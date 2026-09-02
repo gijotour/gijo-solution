@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 설정·업데이트 시안 (F5-09 · F6-10 · F6-11)</title>
+<!--
+  ══ 설계 전 조사 근거 ═══════════════════════════════════════════════════════════
+
+  1) 전문가 대상 화면도 쉬운 말을 쓴다 — Nielsen Norman Group
+     "Plain Language Is for Everyone, Even Experts"(nngroup.com/articles/plain-language-experts/):
+     숙련자도 화면을 빠르게 훑어 읽으므로 불필요한 전문용어는 읽는 속도를 늦춘다. 혼합 독자라면
+     쉬운 말을 앞세우고 괄호로 전문용어를 덧붙이라고 권한다.
+     "Use Specialized Language for Specialized Audiences"(nngroup.com/articles/specialized-words-specialized-audience/):
+     전문용어를 완전히 없애란 뜻이 아니라 — "그 청중이 실제로 아는 용어"만 남기고 나머지는 쉬운 말로
+     바꾸라는 것. 보안담당자는 취약점·로그 용어의 전문가이지 HuggingFace repo id·QLoRA·GGUF 같은
+     "모델을 굽는 사람"의 용어의 전문가가 아니다 → F5-09의 근거.
+
+  2) 지금 상태를 늘 보여준다 — Nielsen 사용성 휴리스틱 #1 "Visibility of System Status"
+     (nngroup.com/articles/visibility-system-status/): 사용자는 자신이 어디에 있고 시스템이
+     무엇을 하는지 항상 알아야 한다. F6-10(어느 탭에 있는지 표시가 사라짐)과 F6-11(실시간 채널이
+     멈췄는지 알 길이 없음) 둘 다 "지금 상태가 안 보인다"는 같은 위반이라 같은 원칙으로 묶었다.
+
+  3) 이 저장소 안의 기존 전례 재사용(외부 패턴 새로 들이지 않음)
+     · F6-11의 칩은 client/src/renderer/pages/titlebar.js의 "원격칩"(🖧 원격 GPU로 전송 중,
+       485~543행)과 같은 규격·같은 삽입 자리(#tbInfo → .header-right, 시계 바로 왼쪽)를 그대로
+       따른다 — "평소엔 아무것도 그리지 않다가 알릴 값이 생기면만 나타난다"는 이미 승인된 패턴.
+     · F5-09의 "담당 AI 선택형"은 이미 learnloop.html의 cfgAgent select가 쓰는
+       window.gijo.listAgents() 를 그대로 재사용한다(새 서버 API 없음).
+
+  ⚠ 이 파일은 정지 화면입니다 — 버튼·탭·칩은 눌리지 않습니다(설계만 봅니다).
+  ⚠ 2026-09-02 코드를 직접 열어 확인한 상태를 "지금" 칸에 그렸습니다(결함 원본 JSON의 줄 번호는
+    신뢰하지 않고 파일을 다시 읽었습니다) — 세 건 모두 아직 열려 있습니다(코드 재확인 결과는
+    문서 맨 아래 "구현 범위" 앞에 따로 적었습니다).
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--red-ink:#f5928a;
+  --amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;padding:0 0 60px;}
+
+.docwrap{max-width:1180px;margin:0 auto;padding:22px 22px 40px;}
+
+.banner{background:var(--panel-2);border-bottom:1px solid var(--border-strong);padding:11px 22px;font-size:12px;color:var(--blue-light);}
+.banner b{color:#fff;}
+
+h1.doc-title{font-size:20px;font-weight:800;margin:22px 0 4px;}
+.doc-sub{font-size:12.5px;color:var(--muted);margin-bottom:22px;}
+
+h2.sec-h{font-size:15px;font-weight:800;margin:34px 0 6px;display:flex;align-items:center;gap:9px;}
+h2.sec-h .n{background:var(--blue);color:#fff;width:21px;height:21px;border-radius:6px;font-size:11.5px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+h2.sec-h .fid{font-size:11px;font-weight:800;color:var(--amber);background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.4);border-radius:6px;padding:2px 8px;}
+.sec-desc{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px;max-width:920px;}
+.sec-desc b{color:var(--text);}
+
+.cmt{background:#22221f;border-left:3px solid var(--blue);padding:10px 13px;font-size:11.75px;color:var(--muted);margin:10px 0 18px;line-height:1.85;border-radius:0 8px 8px 0;max-width:920px;}
+.cmt b{color:var(--blue-light);} .cmt .warn{color:var(--amber);} .cmt .bad{color:var(--red-ink);} .cmt .ok{color:var(--teal);}
+
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:6px;}
+.cmp-col{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;}
+.cmp-h{padding:8px 13px;font-size:12px;font-weight:800;border-bottom:1px solid var(--border);}
+.cmp-h.before{background:rgba(226,72,61,.10);color:var(--red-ink);}
+.cmp-h.after{background:rgba(30,185,128,.10);color:var(--teal);}
+.cmp-body{padding:16px;background:var(--panel);}
+
+/* ── 실제 화면 재현(정적) — learnloop.html·memory.html의 클래스·수치를 그대로 옮김 ── */
+.cat-head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
+.cat-title{font-size:16px;font-weight:800;color:#fff;}
+.cat-intro{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
+.cfg-panel{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;}
+.cfg-field{display:flex;flex-direction:column;gap:5px;}
+.cfg-field label{font-size:12.25px;color:var(--muted);font-weight:700;}
+.cfg-field input,.cfg-field select{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:12.5px;outline:none;min-width:160px;}
+.cfg-field input.wide{min-width:260px;}
+.cfg-toggle{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);font-weight:600;padding-bottom:9px;}
+.cfg-toggle input{width:16px;height:16px;accent-color:var(--teal);}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:default;}
+.jargon{background:rgba(226,72,61,.18);color:var(--red-ink);border-radius:3px;padding:0 2px;}
+.plain{background:rgba(30,185,128,.16);color:var(--teal);border-radius:3px;padding:0 2px;}
+
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+.panel-title{font-size:12.75px;font-weight:800;color:#fff;margin:-14px -16px 10px;padding:7px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.badge{font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;}
+.b-amber{background:rgba(240,160,32,.16);color:var(--amber);}
+.b-teal{background:rgba(30,185,128,.16);color:var(--teal);}
+.field-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:12.25px;color:var(--muted);font-weight:700;}
+.field input,.field select{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:12.5px;outline:none;min-width:170px;}
+.btn-primary{background:#2563eb;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:12.5px;font-weight:800;cursor:default;}
+
+/* ── 설정 탭줄 재현 ── */
+.sec-tab{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:700;display:inline-block;margin-right:7px;}
+.sec-tab.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:#fff;}
+.secnav{margin-bottom:14px;}
+
+/* ── 상단바 재현 ── */
+.tb{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;}
+.tb .sp{flex:1;}
+.tb .clock{font-size:12px;color:var(--blue-light);font-weight:700;}
+.gtb-sess{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:16px;font-size:12.25px;font-weight:800;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:var(--teal);}
+.gtb-reconn{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:16px;font-size:12.25px;font-weight:800;background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.45);color:var(--amber);}
+.gtb-reconn .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);animation:blink 1.1s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){.gtb-reconn .dot{animation:none}}
+
+.state-row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 4px;}
+.state-card{border:1px solid var(--border-strong);border-radius:10px;padding:10px 13px;flex:1;min-width:210px;background:var(--panel);}
+.state-card .st{font-size:11px;font-weight:800;color:var(--muted-2);margin-bottom:7px;text-transform:uppercase;letter-spacing:.3px;}
+.state-card .desc{font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.6;}
+
+table.dtab{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0 18px;}
+table.dtab th{text-align:left;color:var(--muted-2);font-size:10.5px;font-weight:800;padding:6px 9px;border-bottom:1px solid var(--border-strong);}
+table.dtab td{padding:7px 9px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;}
+table.dtab td b{color:var(--text);}
+.tag{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;white-space:nowrap;}
+.tag.del{background:rgba(226,72,61,.14);color:var(--red-ink);}
+.tag.new{background:rgba(30,185,128,.14);color:var(--teal);}
+.tag.keep{background:rgba(255,255,255,.06);color:var(--muted);}
+
+.foot-block{border:1px solid var(--border-strong);border-radius:12px;padding:16px 18px;margin-top:16px;background:var(--panel);}
+.foot-block h3{font-size:13px;font-weight:800;margin-bottom:9px;color:#fff;}
+.foot-block ul{margin:0 0 0 18px;padding:0;font-size:12px;color:var(--muted);line-height:1.85;}
+.foot-block li b{color:var(--text);}
+.self-check{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:6px;}
+.sc-item{border:1px solid var(--border-strong);border-radius:9px;padding:9px 11px;font-size:11.5px;color:var(--muted);}
+.sc-item .ic{color:var(--teal);font-weight:800;margin-right:4px;}
+</style>
+</head>
+<body>
+
+<div class="banner">🖌 <b>시안 — 추천 1개</b> · 설정·업데이트 화면 · 결함 F5-09 · F6-10 · F6-11 한 판 정리. mockups/ 전용, 제품 코드는 건드리지 않았습니다.</div>
+
+<div class="docwrap">
+
+<h1 class="doc-title">설정·업데이트 — 세 결함 한 판 시안</h1>
+<div class="doc-sub">F5-09 학습 설정 용어를 쉬운 말로 · F6-10 업데이트 판이 제자리를 갖게 · F6-11 실시간 연결이 끊기면 그 자리에서 알림</div>
+
+<div class="cmt">
+  <b>무엇을 노렸고 무엇을 포기했나(요약 — 자세한 내용은 문서 맨 아래):</b> 세 결함 모두 <b>화면 구조를 새로 짜지 않고</b>
+  기존 판·기존 탭·기존 칩 패턴 안에서 문구·소속·상태표시만 고쳤습니다. 대신 F5-09에서 "학습 설정 판을 통째로 관리자
+  전용으로 옮기자"는 제안(원문 proposal)의 절반은 <b class="warn">포기</b>했습니다 — 이미 2026-09-01에 시작·저장
+  버튼은 관리자 전용으로 잠갔으니(F5-07), 판 자체를 숨기는 재구조화는 별도 결정으로 남겨 두고 이번엔 "보이는 담당자도
+  뜻을 알 수 있게"만 고칩니다.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 class="sec-h"><span class="n">1</span>학습 설정 용어를 쉬운 말로 <span class="fid">F5-09 · P2</span></h2>
+<div class="sec-desc">
+  <b>지금(2026-09-02 코드 재확인):</b> learnloop.html "루프 설정" 판과 memory.html "파인튜닝" 판이
+  <b>담당자에게도 그대로</b> 보입니다. 2026-09-01에 시작·저장 <b>버튼만</b> admin 전용으로 잠갔을 뿐
+  (learnloop.html:557-571 <code>권한읽기()</code>, memory.html:1127-1139 <code>학습관리자</code>) — 라벨·placeholder·배지
+  글자는 손대지 않아 "HuggingFace repo id"·"GGUF"·"Unsloth QLoRA"·자유입력 "에이전트 ID"가 여전히 그대로입니다.
+</div>
+
+<div class="cmp">
+  <div class="cmp-col">
+    <div class="cmp-h before">지금 — learnloop.html "루프 설정" 판</div>
+    <div class="cmp-body">
+      <div class="cat-head"><span style="font-size:17px">⚙</span><span class="cat-title">루프 설정</span></div>
+      <div class="cat-intro">⚠ 모델·대상은 신중히 바꾸세요. 베이스 모델은 <span class="jargon">HuggingFace 원본 repo id(HF transformers)</span>이며, <span class="jargon">GGUF id</span>가 아닙니다.</div>
+      <div class="cfg-panel">
+        <label class="cfg-toggle"><input type="checkbox">대화 자동 수집</label>
+        <div class="cfg-field"><label>학습 베이스 모델 <span class="jargon">(HF repo)</span></label><input class="wide" value="Qwen/Qwen3-14B"></div>
+        <div class="cfg-field"><label>배포 접두어 <span class="jargon">(산출 어댑터 이름)</span></label><input value="sec-expert"></div>
+        <div class="cfg-field"><label>배포 대상 에이전트</label><select><option>보안 분석</option></select></div>
+        <button class="btn-ghost">저장</button>
+      </div>
+    </div>
+  </div>
+  <div class="cmp-col">
+    <div class="cmp-h after">이 시안</div>
+    <div class="cmp-body">
+      <div class="cat-head"><span style="font-size:17px">⚙</span><span class="cat-title">루프 설정</span></div>
+      <div class="cat-intro">⚠ 아래 값을 잘못 바꾸면 다음 학습이 실패하거나 엉뚱한 모델을 배웁니다 — 뜻이 헷갈리면 <span class="plain">대화창</span>에 물어보세요.</div>
+      <div class="cfg-panel">
+        <label class="cfg-toggle"><input type="checkbox">대화 자동 수집</label>
+        <div class="cfg-field"><label class="plain">학습 베이스 모델</label><input class="wide" value="Qwen/Qwen3-14B"></div>
+        <div class="cfg-field"><label class="plain">결과 모델 이름표</label><input value="sec-expert"></div>
+        <div class="cfg-field"><label>배포 대상 에이전트</label><select><option>보안 분석</option></select></div>
+        <button class="btn-ghost">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="cmt" style="margin-top:0">
+  라벨의 괄호 용어(HF repo·산출 어댑터 이름)만 걷어냈습니다. <b>입력값(placeholder)은 그대로</b>입니다 — "어떤 형식으로
+  적어야 하는가"는 여전히 정확한 예시(<code>Qwen/Qwen3-14B</code>)가 보여줍니다. <b>뜻을 흐리지 않았는지 확인:</b>
+  "GGUF id가 아니다"라는 핵심 경고는 지우지 않고 대화창 챙기는 곳으로 옮겼습니다 — screenguide.ts:903 "실행 전
+  준비물" 항목이 <b class="ok">이미</b> "베이스 모델은 HuggingFace 원본 repo id를 적습니다 — GGUF id가 아닙니다"를
+  담고 있어 <b>새로 쓸 문장이 없습니다.</b>
+</div>
+
+<div class="cmp" style="margin-top:22px">
+  <div class="cmp-col">
+    <div class="cmp-h before">지금 — memory.html "파인튜닝" 판</div>
+    <div class="cmp-body">
+      <div class="panel">
+        <div class="panel-title">🎓 학습 · ② 파인튜닝<span class="badge b-amber">GPU 필요 · <span class="jargon">Unsloth QLoRA</span></span></div>
+        <div class="field-row">
+          <div class="field"><label>에이전트 ID</label><input placeholder="예: analysis"></div>
+          <div class="field"><label>데이터셋 ID</label><input placeholder="예: incident-qa-v1"></div>
+          <button class="btn-primary">파인튜닝 시작</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cmp-col">
+    <div class="cmp-h after">이 시안</div>
+    <div class="cmp-body">
+      <div class="panel">
+        <div class="panel-title">🎓 학습 · ② 파인튜닝<span class="badge b-amber">GPU 필요</span></div>
+        <div class="field-row">
+          <div class="field"><label class="plain">담당 AI</label><select><option>보안 분석(analysis)</option><option>취약점 진단(vuln)</option></select></div>
+          <div class="field"><label>학습 자료 이름</label><input placeholder="예: incident-qa-v1"></div>
+          <button class="btn-primary">파인튜닝 시작</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="cmt" style="margin-top:0">
+  <b>"에이전트 ID" 자유입력을 걷어낸 이유:</b> 담당자가 정확한 내부 id 문자열을 외워 쳐야 했는데(오타=조용한 실패),
+  learnloop.html의 <code>cfgAgent</code> select가 이미 <code>window.gijo.listAgents()</code>로 "이름표"를 보여주고
+  값으로 id를 보냅니다 — <b>같은 부품을 파인튜닝 판에도 재사용</b>하면 오타 위험 자체가 사라집니다(용어를 쉽게 만드는
+  것보다 한 단계 더 나은 해법이라 proposal의 "select로" 제안을 그대로 받았습니다). "Unsloth QLoRA"는 학습 엔진의
+  내부 이름이라 담당자의 결정에 아무 영향을 주지 않아 <b>지웠습니다</b>(뜻을 잃는 게 아니라 애초에 뜻이 없던 정보) —
+  필요하면 screenguide.ts:788 "학습" 항목이 "QLoRA 파인튜닝"을 이미 설명합니다.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 class="sec-h"><span class="n">2</span>업데이트 판이 제자리를 갖게 <span class="fid">F6-10 · P2</span></h2>
+<div class="sec-desc">
+  <b>지금(2026-09-02 코드 재확인):</b> ⬆ 배지·⚙ 메뉴는 역할과 무관하게 전원을
+  <code>settings.html?s=admin</code>으로 보냅니다(titlebar.js:126·247-258). 그런데 "관리자" 탭 버튼 자체는
+  admin에게만 보이므로(settings.html:237·913), <b>담당자가 이 주소로 오면 탭줄 어디에도 켜진 탭이 없습니다</b>
+  — 업데이트 판(372-395행)은 <code>display:none</code>이 아니라서 보이지만, 계정 관리·2차 인증 등 진짜 admin
+  전용 판(310·350·365행)은 그대로 숨겨진 채입니다. 서버도 <code>/api/client/download/:version</code>에
+  <code>adminMiddleware</code>가 없어(clientrelease.ts:171) 담당자가 직접 내려받아도 막히지 않습니다 —
+  <b>서버는 이미 "누구나"인데 화면만 "관리자만"인 척</b>합니다.
+</div>
+
+<div class="cmp">
+  <div class="cmp-col">
+    <div class="cmp-h before">지금 — 담당자가 ⬆ 배지를 눌렀을 때</div>
+    <div class="cmp-body">
+      <div class="secnav">
+        <span class="sec-tab">내 설정</span><span class="sec-tab">서버·AI</span><span class="sec-tab">연동</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--red-ink);margin-bottom:10px">⚠ 켜진 탭이 없습니다 — 담당자는 지금 자기가 탭줄의 어디에도 없는 곳에 있습니다("관리자" 탭은 안 보임)</div>
+      <div class="panel">
+        <div class="panel-title">업데이트</div>
+        <div style="font-size:12px;color:var(--muted)">설치된 버전 <b style="color:var(--text)">5.16.2</b> · 상태 <span class="badge b-amber">업데이트 가능</span></div>
+        <div style="margin-top:8px"><button class="btn-ghost">지금 확인</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="cmp-col">
+    <div class="cmp-h after">이 시안 — 같은 배지를 눌렀을 때</div>
+    <div class="cmp-body">
+      <div class="secnav">
+        <span class="sec-tab on">내 설정</span><span class="sec-tab">서버·AI</span><span class="sec-tab">연동</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--teal);margin-bottom:10px">✓ "내 설정" 탭이 켜져 있습니다 — 어디서 왔는지, 어디로 돌아가면 되는지 보입니다</div>
+      <div class="panel">
+        <div class="panel-title">업데이트</div>
+        <div style="font-size:12px;color:var(--muted)">설치된 버전 <b style="color:var(--text)">5.16.2</b> · 상태 <span class="badge b-amber">업데이트 가능</span></div>
+        <div style="margin-top:8px"><button class="btn-ghost">지금 확인</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<table class="dtab">
+  <tr><th></th><th>탭</th><th>담는 것</th></tr>
+  <tr><td><span class="tag new">이동</span></td><td><b>내 설정</b></td><td>업데이트 판(확인·설치) — 서버가 이미 전원에게 허용하는 동작과 맞춤</td></tr>
+  <tr><td><span class="tag keep">유지</span></td><td><b>관리자</b></td><td>게시된 배포판 · 누가 받았나 — 이 둘은 서버도 <code>adminMiddleware</code>로 실제로 막혀 있어(clientrelease.ts:167·200) 정책·구현이 이미 일치합니다</td></tr>
+</table>
+
+<div class="cmt" style="margin-top:0">
+  <b>왜 "누구나" 쪽으로 정했나(반대쪽도 있었습니다):</b> proposal은 두 갈래를 다 제시했습니다 — ①업데이트를 누구나
+  할 수 있게 화면을 맞추거나, ②서버에 admin 문을 새로 달고 화면은 "관리자에게 요청하세요"로 막는 것. <b>②는
+  서버 변경(adminMiddleware 추가)이 필요</b>하고, 이미 게시된 설치본을 내려받아 스스로 설치하는 것은 서버 데이터나
+  다른 사람 권한에 아무 영향이 없는 <b>낮은 위험 동작</b>입니다. 반대로 <b>①은 서버를 한 줄도 안 건드리고</b>
+  지금 실제로 되는 동작에 화면 표시만 맞추면 되므로 변경 폭이 작습니다 — 그래서 ①을 추천안으로 냈습니다.
+  <b class="warn">단 이것은 정책 결정이라 사용자 승인이 필요</b>합니다(용어사전.md:164 "관리자 — 계정 관리·업데이트"도
+  ①을 택하면 함께 고쳐야 합니다 — 문서는 요청 시에만 고치므로 여기 적어만 둡니다).
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 class="sec-h"><span class="n">3</span>실시간 연결이 끊기면 그 자리에서 알림 <span class="fid">F6-11 · P2</span></h2>
+<div class="sec-desc">
+  <b>지금(2026-09-02 코드 재확인):</b> wsClient.ts:32-40은 연결이 끊기면 5초마다 조용히 재접속만 시도하고,
+  성공/실패를 밖으로 알리는 콜백이 없습니다. <code>gijoRealtime</code>은 <code>connect()</code> 하나만
+  노출합니다(preload.ts:673-675). 로그·학습 진행률·협업 알림 같은 실시간 갱신이 멈춰도 화면엔 아무 신호가 없습니다.
+  ⚠ <b>2026-08-08에 "서버 연결 배지"를 없앤 결정</b>(titlebar.js:557-560)을 되살리자는 게 아닙니다 — 그 배지는
+  <b>항상 떠 있어 자리만 차지</b>했다는 문제였고, 이 시안은 <b>끊겼을 때만, 그것도 15초 이상 이어질 때만</b> 나타나는
+  전혀 다른 성격의 표시입니다(titlebar.js의 "원격칩"과 같은 결).
+</div>
+
+<div class="cmp-col" style="max-width:100%">
+  <div class="cmp-h after" style="border-radius:12px 12px 0 0">이 시안 — 상단 바 오른쪽(세션 칩 옆)</div>
+  <div class="cmp-body">
+    <div class="tb">
+      <span style="font-weight:800;color:#fff;font-size:13px">GIJO AS</span>
+      <span class="sp"></span>
+      <span id="mock-reconn"></span>
+      <span class="gtb-sess">⏳ 세션 24:11 ▾</span>
+      <span class="clock">14:32:05</span>
+    </div>
+
+    <div class="state-row">
+      <div class="state-card">
+        <div class="st">① 정상 연결</div>
+        <div style="font-size:11.5px;color:var(--muted)">칩 없음 — 지금과 똑같습니다</div>
+        <div class="desc">평소 상태. 아무것도 그리지 않는다는 규칙(2026-08-08 결정)을 그대로 지킵니다.</div>
+      </div>
+      <div class="state-card">
+        <div class="st">② 끊김, 15초 미만</div>
+        <div style="font-size:11.5px;color:var(--muted)">칩 없음 — 조용히 재시도 중</div>
+        <div class="desc">순간적인 끊김(네트워크 흔들림)까지 매번 경고하면 소음이 됩니다 — 3회(≈15초) 재시도까지는 참습니다.</div>
+      </div>
+      <div class="state-card" style="border-color:rgba(240,160,32,.5)">
+        <div class="st" style="color:var(--amber)">③ 끊김, 15초 이상 — 칩 표시</div>
+        <div><span class="gtb-reconn"><span class="dot"></span>⚡ 실시간 연결 끊김 — 재접속 중</span></div>
+        <div class="desc">로그·학습 진행률 같은 실시간 갱신이 멈췄다는 뜻입니다. 페이지를 새로고침할 필요는 없습니다 — 자동으로 계속 시도합니다.</div>
+      </div>
+      <div class="state-card">
+        <div class="st">④ 복구됨</div>
+        <div style="font-size:11.5px;color:var(--muted)">칩이 사라짐</div>
+        <div class="desc">다시 연결되는 순간 조용히 지웁니다 — 복구 알림 팝업 등은 띄우지 않습니다(소음 최소화).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cmt" style="margin-top:14px">
+  <b>왜 세션 칩 옆인가:</b> titlebar.js의 세션 칩·원격칩이 이미 쓰는 자리(#tbInfo → .header-right, 시계 바로
+  왼쪽)를 그대로 씁니다 — "예전엔 연결상태 배지를 찾아 그 뒤에 끼워 넣었는데 배지를 없앤 지금은 기준이 사라졌다"는
+  titlebar.js:557-560의 주석이 가리키는 바로 그 문제를, <b>세션 칩을 새 기준으로 삼아</b> 풉니다(이미 원격칩이
+  그렇게 하고 있어 코드 패턴을 그대로 베낍니다).
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="foot-block">
+  <h3>무엇을 노렸고 무엇을 포기했나</h3>
+  <ul>
+    <li><b>노린 것</b> — 세 결함 모두 "지금 있는 판·탭·칩 자리를 그대로 두고 문구·소속·상태표시만" 고쳐 구현 폭을 최소로 눌렀습니다. 서버 변경은 0건입니다(아래 4번).</li>
+    <li><b>포기한 것 ①</b> — F5-09 proposal의 "학습 설정 판을 통째로 관리자 전용 판으로 옮긴다"는 더 큰 재구조화는 <b>이번엔 하지 않습니다.</b> 2026-09-01에 버튼 잠금(F5-07)까지는 끝났으니, 이번엔 "보이는 담당자도 뜻은 알 수 있게"만 고칩니다 — 판을 완전히 감출지는 별도 결정(중-4)으로 남겨 둡니다.</li>
+    <li><b>포기한 것 ②</b> — F6-10에서 "업데이트를 관리자 전용으로 확정하고 서버에 문을 새로 다는" 대안은 <b>고르지 않았습니다</b>(서버 변경이 필요하고, 지금 실제 동작과 반대 방향이라 변경 폭이 더 큽니다) — 2번 섹션에 이유를 적었습니다.</li>
+    <li><b>포기한 것 ③</b> — F6-11에서 "상시 연결 배지를 되살리는" 안은 애초에 고려하지 않았습니다 — 2026-08-08 결정과 정면으로 부딪힙니다. 대신 "끊겼을 때만" 나타나는 성격이 전혀 다른 표시를 만들었습니다.</li>
+  </ul>
+
+  <h3 style="margin-top:16px">밀도 숫자 (실제 CSS 선언값 기준 — 계산법 함께 적음)</h3>
+  <ul>
+    <li><b>F5-09 · cat-intro 경고줄</b> — line-height는 코드에 <code>1.6</code>로 명시(learnloop.html:44). 12.5px × 1.6 = <b>20px/줄</b>. 지금 문구는 74자(공백 포함, "⚠ 모델·대상은…GGUF id가 아닙니다.")로 max-width 860px 안에서 <b>2줄로 추정</b>(≈40px) — 이 시안 문구는 51자로 줄어 <b>1줄로 추정</b>(≈20px). <span class="warn">⚠ 실제 렌더 폭을 재지 않은 추정치</span>이며, 근거는 한글·영문 혼합 12.5px에서 줄당 약 55~65자가 들어간다는 통상치입니다. 추정대로면 <b>줄임 ≈ 20px</b>.</li>
+    <li><b>F5-09 · 용어 노출 개수</b> — 세로 픽셀보다 "읽어야 하는 낯선 용어" 개수가 이 결함의 진짜 지표입니다. 지금: HuggingFace / repo id / (HF transformers) / GGUF id / "(HF repo)" 라벨 / "Unsloth QLoRA" 배지 / "에이전트 ID" 자유입력, 총 <b>7곳</b>. 이 시안: <b>0곳</b>(화면에서 사라진 용어는 이미 있는 screenguide.ts:788·903 설명으로 흡수 — 새로 쓴 문장 없음).</li>
+    <li><b>F6-10 · 판 이동</b> — 업데이트 판 자체 높이는 <b>안 바뀝니다</b>(마크업 그대로 옮기기만). 계산: panel 안팎 padding 14px×2=28px + panel-title(패딩 7px×2 + 글자 12.75px×1.35 추정≈17.2px + 여백 10px ≈42px) + kv-inline 한 줄(12.5px×1.35 추정≈16.9px + margin-bottom 14px ≈31px) + 확인 버튼(패딩 9px×2 + 글자 13px×1.35 추정≈17.6px ≈35.6px) ≈ <b>약 149px(추정, line-height 미지정 구간은 1.35 근사)</b>. "내 설정" 탭 총 길이 +149px, "관리자" 탭 총 길이 −149px — <b>제품 전체 합은 그대로(0)</b>, 재배치일 뿐입니다.</li>
+    <li><b>F6-11 · 새 칩</b> — 평소(연결 정상) <b>추가 높이 0px</b>. 원격칩과 같은 규격(padding 3px 10px, font 12.25px) 기준 칩 자체 높이 ≈ 3px+3px + 12.25px×1.35 추정≈16.5px ≈ <b>22.5px(추정)</b>이지만, 이미 있는 헤더 줄(#tbInfo)의 inline-flex 배치라 <b>줄 높이 자체는 늘지 않습니다</b>(원격칩이 이미 같은 방식으로 실증).</li>
+  </ul>
+
+  <h3 style="margin-top:16px">제품 원칙 자가점검</h3>
+  <div class="self-check">
+    <div class="sc-item"><span class="ic">✓</span>새 색 0개 — --teal·--amber·--blue·--muted 등 기존 토큰만 재사용(값 그대로 위 스타일에 복사)</div>
+    <div class="sc-item"><span class="ic">✓</span>외부 자원 0개 — CDN·웹폰트·원격 이미지 없음, 폰트는 Pretendard 스택 그대로</div>
+    <div class="sc-item"><span class="ic">✓</span>화면 설명 안 늘림 — cat-intro는 오히려 줄고(2→1줄 추정), 새 설명 문단 0개, 뜻 풀이는 대화창(screenguide 기존 항목)으로</div>
+    <div class="sc-item"><span class="ic">✓</span>없는 기능 안 그림 — listAgents() 기존 API 재사용, 원격칩 패턴 재사용, wsClient onState는 클라이언트 내부 상태 콜백일 뿐 새 서버 API 아님</div>
+  </div>
+
+  <h3 style="margin-top:16px">구현 범위 (서버 변경 없음 — 세 건 모두)</h3>
+  <ul>
+    <li><b>client/src/renderer/pages/learnloop.html</b> — cat-intro 문구 교체(218행), <code>cfgBaseModel</code>·<code>cfgPrefix</code> label에서 괄호 용어 삭제(221·222행). placeholder·value는 그대로.</li>
+    <li><b>client/src/renderer/pages/memory.html</b> — 파인튜닝 배지에서 "· Unsloth QLoRA" 삭제(327행). <code>ftAgentInput</code>(input, 329-330행)을 <code>&lt;select&gt;</code>로 바꾸고 <code>window.gijo.listAgents()</code>로 채움(learnloop.html의 cfgAgent 로딩 코드 그대로 재사용). label "에이전트 ID"→"담당 AI". CSS에 <code>.field select</code> 규칙 한 줄 추가(지금은 <code>.field input</code>만 있음, 53-55행).</li>
+    <li><b>client/src/renderer/pages/settings.html</b> — 업데이트 판(372-395행)의 <code>data-sec="admin"</code>을 <code>data-sec="my"</code>로 바꾸고 마크업을 "계정" 판(256행) 바로 다음으로 옮김. "게시된 배포판"·"누가 받았나"(397-413행)는 <code>data-sec="admin"</code> 유지. 주석(373행)을 새 근거로 갱신.</li>
+    <li><b>client/src/renderer/pages/titlebar.js</b> — <code>TAB_UPDATE</code> 상수(126행) 한 줄을 <code>"settings.html?s=my"</code>로 변경(주석이 말하는 "한 곳에 모아 둔다" 설계 그대로 — 배지·메뉴가 자동으로 따라옴). 재접속 칩 mount 함수 신설(원격칩 mount원격칩·원격주기시작 패턴 그대로 복제) — <code>gijoRealtime.onState</code> 구독, 재접속 3회(≈15초) 이상 지속 시 칩 표시, 복구 시 제거.</li>
+    <li><b>client/src/wsClient.ts</b> — <code>close</code> 콜백에서 재접속 횟수 카운터 증가, <code>message</code> 수신 또는 재접속 성공 시 0으로 리셋. <code>onState(cb)</code> export 신설 — connected/reconnecting(count) 상태를 리스너에 통지.</li>
+    <li><b>client/src/preload.ts</b> — <code>gijoRealtime</code>에 <code>onState</code> 한 줄 추가(673-675행, connect 옆).</li>
+    <li><b>문서(요청 시에만 수정)</b> — GIJO_AS_용어사전.md:164 "관리자 — 계정 관리·업데이트"에서 "업데이트"를 빼야 정책과 맞습니다. 이 파일은 이번 작업 범위 밖이라 여기 남겨만 둡니다.</li>
+  </ul>
+</div>
+
+</div>
+</body>
+</html>

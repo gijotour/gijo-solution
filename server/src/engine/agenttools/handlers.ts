@@ -2170,7 +2170,9 @@ export function 단계안내글(단계: number): string {
   const s = workflowStages().find((x) => x.no === 단계);
   const 할일 = 단계별할일[단계];
   if (!s || !할일) return 절차현황글();
-  const 건 = s.count == null ? "값을 못 구했습니다(0이 아니라 **모름**입니다)" : `지금 ${s.count}건`;
+  // ⚠ 2026-09-02(F4-03): 「건」은 단계마다 뜻이 다르다 — ①은 자산, ④는 실패 항목이다.
+  //   서버가 정한 이름(countLabel)을 그대로 말한다. 없으면 「건」으로 둔다(지어내지 않는다).
+  const 건 = s.count == null ? "값을 못 구했습니다(0이 아니라 **모름**입니다)" : `지금 ${s.count}${s.countLabel ? " " + s.countLabel : "건"}`;
   const 경고 = s.alert != null && s.alertLabel && s.alert > 0 ? ` · ${s.alertLabel} ${s.alert}건` : "";
   return [
     `${s.no} ${s.label} 단계 — ${건}${경고}`,
@@ -2187,7 +2189,7 @@ export function 절차현황글(질문?: string): string {
   if (지목) return 단계안내글(지목);
   const 단계들 = workflowStages();
   const 줄 = 단계들.map((s) => {
-    const 건 = s.count == null ? "—" : `${s.count}건`;
+    const 건 = s.count == null ? "—" : `${s.count}${s.countLabel ? " " + s.countLabel : "건"}`;
     const 경고 = s.alert == null || !s.alertLabel ? "" : ` · ${s.alertLabel} ${s.alert}`;
     return `${s.no} ${s.label} — ${건}${경고}`;
   });
@@ -2355,8 +2357,12 @@ export function runHardeningScheduleList(): string {
   const rows = listHardeningSchedules();
   if (rows.length === 0) {
     return [
-      "등록된 원격 정기점검 스케줄이 없습니다.",
-      "원격 정기점검 화면에서 점검 대상(장비)을 등록하고 주기를 정하면 자동으로 돌아갑니다 — 기준은 국내 CCE(KISA U-시리즈) 또는 CIS 중에 고릅니다.",
+      // 화면 이름은 **실재하는 것으로만** 부른다(F4-07, 2026-09-02). 화면 제목·메뉴·안내가
+      // 모두 「보안설정 점검」인데 이 답변만 「원격 정기점검」이라, 담당자가 그 이름의 화면을
+      // 찾아 헤맸다. 알아듣는 말(terms.ts:30 별칭)과 보여 주는 말은 다른 문제다.
+      // 가는 길 표기는 screenguide.ts:1409와 같은 말로 맞춘다.
+      "등록된 보안설정 점검 스케줄이 없습니다.",
+      "④ 검증 → 🛡 보안설정 점검 판에서 점검 대상(장비)을 등록하고 주기를 정하면 자동으로 돌아갑니다 — 기준은 국내 CCE(KISA U-시리즈) 또는 CIS 중에 고릅니다.",
     ].join("\n");
   }
   const fmt = (t: number | null) => (t ? new Date(t).toLocaleString("ko-KR") : "-");
@@ -2372,7 +2378,8 @@ export function runHardeningScheduleList(): string {
     return `- ${어디} — ${r.standard.toUpperCase()} 기준 · ${r.intervalHours}시간마다 · ${state} · 다음 ${fmt(r.nextRunAt)} (${last})`;
   });
   const on = rows.filter((r) => r.enabled).length;
-  return [`원격 정기점검 스케줄 ${rows.length}건(가동 ${on} · 중지 ${rows.length - on})`, ...lines].join("\n");
+  // 머리줄도 화면과 같은 이름으로(F4-07, 2026-09-02) — 위 빈 상태와 한 벌이다.
+  return [`보안설정 점검 스케줄 ${rows.length}건(가동 ${on} · 중지 ${rows.length - on})`, ...lines].join("\n");
 }
 
 // 통합 보안 분석(관제) 현황 — 제품 1차 목표 화면(analysis.html). 취약점·보안로그·운영리포트·
@@ -3124,7 +3131,7 @@ export async function runAdapterStatus(): Promise<string> {
   }).join(" · ");
   lines.push(`주제 재료(승인 문답): ${진척}`);
   lines.push("");
-  lines.push("채택: 「(어댑터 이름) 어댑터 채택, 근거: 게이트 결과」 · 배정: 「스캔 팀원에 (어댑터 이름) 어댑터 배정해줘」");
+  lines.push("채택: 「(어댑터 이름) 어댑터 채택, 근거: 게이트 routing 66/66 · A/B 통과 확인함」 · 배정: 「스캔 팀원에 (어댑터 이름) 어댑터 배정해줘」");
   return lines.join("\n");
 }
 
@@ -3356,7 +3363,8 @@ export async function runVerifyFinding(args: Record<string, string>): Promise<st
   const target = resolveTargetForAsset(asset.id);
   if (!target) {
     // "검증했는데 이상 없음"처럼 보이면 안 된다 — 실행 자체를 거절한다(verifyroutes와 같은 원칙).
-    return `이 자산(${asset.name})에 연결된 점검 대상(호스트·계정)이 등록돼 있지 않습니다 — 검증 화면 › 원격 정기점검에서 대상을 먼저 등록해 주세요.`;
+    // 가는 길은 실재하는 이름으로(F4-07, 2026-09-02) — screenguide.ts:1409의 표기와 같은 말.
+    return `이 자산(${asset.name})에 연결된 점검 대상(호스트·계정)이 등록돼 있지 않습니다 — ④ 검증 → 🛡 보안설정 점검 판에서 대상을 먼저 등록해 주세요.`;
   }
   const items0 = buildVerifyItems(asset.id, asset.findings);
   const items = onlyKey ? items0.filter((i) => i.findingKey === onlyKey) : items0;

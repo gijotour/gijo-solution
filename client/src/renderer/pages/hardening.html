@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GIJO AS — 원격 정기점검 관제</title>
+<title>GIJO AS — 보안설정 점검</title>
 <!-- 공용 디자인 시스템(시안 C) — 이 화면은 .g-* 컴포넌트를 채택한 파일럿이다. -->
 <link rel="stylesheet" href="gijo-ui.css">
 <style>
@@ -69,7 +69,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
       <div>
-        <div class="page-title">🛡 원격 정기점검 관제</div>
+        <!-- 이름을 한 벌로(F4-07, 2026-09-02). 메뉴 nav.js:191 · 판 grouppanels.js:445 ·
+             안내 screenguide.ts:918이 이미 「보안설정 점검」인데 이 화면만 「원격 정기점검
+             관제」라, 담당자가 「정기점검」이라 물으면 유지보수 화면과 헷갈렸다.
+             ⚠ 옛 말(원격 정기점검·원격 점검·하드닝·CCE 점검)은 terms.ts:30 별칭이 그대로
+             받는다 — 이름을 바꾸는 것이 기능을 없애는 것이 되면 안 된다. -->
+        <div class="page-title">🛡 보안설정 점검</div>
       </div>
       <button class="g-btn g-primary" id="addBtn">＋ 대상 등록</button>
       <!-- ⚠ 관리자가 아니면 왜 못 누르는지 **미리** 알린다 — 눌러 보고 알게 하지 않는다. -->

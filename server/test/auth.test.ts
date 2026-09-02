@@ -15,6 +15,28 @@ describe("auth", () => {
     expect(res.body.user.displayName).toBe("정요한");
   });
 
+  // ⚠ 담당자가 「몇 번 남았는지」를 모른 채 갑자기 잠기던 문제(F8-09, 여정 점검 2026-09-01).
+  //   숫자(임계·잠금 길이)는 **서버가 문장으로 만들어** 내려보낸다 — 화면이 제 숫자를 갖지 않게.
+  it("비밀번호를 틀리면 남은 횟수와 잠금 시간을 알려 준다", async () => {
+    // 잠금 열쇠는 (IP + 아이디)라, 다른 시험과 안 섞이도록 이 시험만 쓰는 아이디를 쓴다.
+    const 아이디 = "f809-없는사람";
+    let 남은: number | null = null;
+    let 문장 = "";
+    for (let i = 0; i < 6; i++) {
+      const r = await request(app).post("/api/auth/login").send({ username: 아이디, password: "wrong" });
+      if (r.status !== 401) break;   // 임계를 낮게 둔 환경이면 도중에 429가 된다
+      expect(typeof r.body.remaining, "남은 횟수를 안 준다").toBe("number");
+      남은 = r.body.remaining as number;
+      문장 = String(r.body.message ?? "");
+    }
+    expect(남은, "401을 한 번도 못 받았다").not.toBeNull();
+    expect(남은 as number, "틀릴수록 남은 횟수가 줄지 않는다").toBeLessThanOrEqual(5);
+    // 5회 이하로 줄면 「N회 더 틀리면 N분」을 사람 말로 말한다(0이면 「N분 동안 잠겼습니다」).
+    expect(문장, "남은 횟수·잠금 시간을 말하지 않는다").toMatch(/\d+회 더 틀리면 \d+분|\d+분 동안 잠겼습니다/);
+    // 영문 날것을 담당자에게 보내지 않는다.
+    expect(문장, "영문 사유가 그대로 나간다").not.toMatch(/invalid credentials/i);
+  });
+
   it("rejects invalid credentials", async () => {
     const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "wrong" });
     expect(res.status).toBe(401);

@@ -15,7 +15,7 @@ import * as os from "os";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { llamaBinPath } from "../util/llamabin";
-import { gpuMemoryReport, linuxAvailableMb } from "../util/unifiedmem";
+import { gpuMemoryReport, linuxAvailableMb, linuxSwapMb, unifiedBudgetMb } from "../util/unifiedmem";
 import { db } from "../db";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
 import { adaptModel, getAdaptation, type ModelAdaptation } from "./modelquirks";
@@ -409,8 +409,23 @@ function macAvailableMb(): Promise<number> {
  * 그래도 기준을 못박으려 MemAvailable을 먼저 읽는다(util/unifiedmem.ts 주석 참조).
  */
 function unifiedAvailableMb(): number {
-  return linuxAvailableMb() ?? Math.round(os.freemem() / 1024 / 1024);
+  const 여유 = linuxAvailableMb() ?? Math.round(os.freemem() / 1024 / 1024);
+  // 스왑이 나가 있으면 그만큼은 이미 물리 메모리가 모자랐다는 뜻이라 여유에서 뺀다.
+  // (2026-09-02 GB10 실측: 사용 96GB·MemAvailable 26GB인데 스왑 7GB 사용 중이었다.
+  //  그 상태에서 「26GB 남았으니 하나 더」는 곧 「더 밀어내자」가 된다. util/unifiedmem.ts 주석 참조.)
+  const 스왑 = linuxSwapMb();
+  const 예산 = unifiedBudgetMb(여유, 스왑);
+  if (스왑 && 스왑.usedMb > 0 && !스왑경고함) {
+    스왑경고함 = true; // 로그를 매 호출 도배하지 않는다 — 프로세스당 한 번만 알린다
+    console.warn(
+      `[localengine] 통합메모리 기계에서 스왑 사용 중 — ${스왑.usedMb}MB/${스왑.totalMb}MB. ` +
+        `여유를 ${여유}MB에서 ${예산}MB로 낮춰 잡는다(스왑에 밀리면 토큰 속도가 급락한다).`,
+    );
+  }
+  return 예산;
 }
+/** 스왑 경고를 프로세스당 한 번만 내기 위한 표시. */
+let 스왑경고함 = false;
 
 function getFreeVramMb(): Promise<number | null> {
   if (IS_MAC) return macAvailableMb();

@@ -29,8 +29,33 @@ function persist(): void {
   ipcRenderer.send("auth:setState", { accessToken, refreshToken, serverUrl });
 }
 
+// 서버 주소 정규화 — 스킴(http://)이 없으면 붙이고, 붙여도 말이 안 되면 **던진다**.
+// 왜(F2-02, 2026-09-02 여정 점검): 설치 첫 화면이 「10.8.0.1:4000」 꼴을 예로 들었는데
+// 그대로 넣으면 fetch가 ERR_INVALID_URL(TypeError)로 터지고, 화면은 「아이디/비밀번호를
+// 확인하세요」라고 말했다 — 담당자는 맞는 비밀번호를 몇 번씩 고쳐 넣었다.
+// ⚠ 조용히 원문을 그대로 두지 않는다(조용한 폴백 금지). 부른 쪽이 이 문장을 그대로 보인다.
+// ⚠ 이 문장에 포트 숫자를 적지 않는다 — 포트의 단일 출처는 main.ts 서버포트()다(2026-08-13).
+export function 서버주소정규화(입력: string): string {
+  const 원문 = String(입력 ?? "").trim().replace(/\/+$/, "");
+  if (!원문) throw new Error("서버 주소가 비어 있습니다 — 관리자에게 받은 주소를 넣어 주세요.");
+  // `://`가 있을 때만 스킴으로 본다. `localhost:4000`은 new URL()이 스킴 "localhost:"로 읽어
+  // **그냥 통과시켜 버리므로**, 여기서 걸러 http://를 붙여야 한다.
+  const 후보 = /^[a-zA-Z][a-zA-Z0-9+.\-]*:\/\//.test(원문) ? 원문 : `http://${원문}`;
+  let 판정: URL;
+  try {
+    판정 = new URL(후보);
+  } catch {
+    throw new Error(`서버 주소 형식이 올바르지 않습니다: ${원문}\n관리자에게 받은 주소를 「http://」로 시작하도록 넣어 주세요.`);
+  }
+  if (판정.protocol !== "http:" && 판정.protocol !== "https:") {
+    throw new Error(`서버 주소는 「http://」 또는 「https://」로 시작해야 합니다: ${원문}`);
+  }
+  // 판정.href가 아니라 후보를 돌려준다 — href는 끝에 "/"를 붙여 저장값이 흔들린다.
+  return 후보;
+}
+
 export function setServerUrl(url: string): void {
-  serverUrl = url.replace(/\/+$/, "");
+  serverUrl = 서버주소정규화(url);
   persist();
 }
 
@@ -78,6 +103,19 @@ function readShared(): AuthState {
   return s;
 }
 
+// 인증이 끊긴 이유 → **담당자가 읽을 한국어 한 줄**(2026-09-02 F8-06·F3-06).
+// ⚠ 이 표는 **안전망**이다. 서버가 message(한국어 사유)를 주면 언제나 그것이 우선이고,
+//   여기 문장은 옛 서버·본문 없는 응답일 때만 쓴다 — 문구를 두 곳에서 새로 짓지 않는다.
+//   표가 없으면 「invalid refresh token」·「unauthorized」 같은 기계 코드가 첫 줄에 찍힌다.
+const 인증끊김문구: Record<string, string> = {
+  session_idle_expired: "오래 사용하지 않아 세션이 만료되었습니다. 다시 로그인해 주세요.",
+  session_superseded: "다른 곳에서 로그인되어 이 세션은 종료되었습니다. 다시 로그인해 주세요.",
+  "invalid refresh token": "로그인 정보가 더 이상 유효하지 않습니다. 다시 로그인해 주세요.",
+  "refresh token expired": "로그인 유효 시간이 지났습니다. 다시 로그인해 주세요.",
+  unauthorized: "세션이 끝났습니다. 다시 로그인해 주세요.",
+};
+const 인증끊김기본 = "세션이 끝났습니다. 다시 로그인해 주세요.";
+
 let refreshInFlight: Promise<boolean> | null = null;
 
 async function tryRefresh(usedAccessToken: string | null): Promise<boolean> {
@@ -99,7 +137,27 @@ async function tryRefresh(usedAccessToken: string | null): Promise<boolean> {
       // 내가 보내는 사이에 남이 갱신했을 수 있다 — 다시 읽어 확인하고, 그래도 그대로면 그때 지운다.
       const after = readShared();
       if (after.accessToken && after.accessToken !== usedAccessToken) return true;
-      if (after.refreshToken === usedRefresh) setAuthTokens(null);
+      // ⚠ **망 오류와 서버의 거절을 가른다**(2026-09-02 F8-06·F3-06).
+      //   운영 서버는 watcher가 없어 배포마다 kill로 재시작한다 — 그 몇 초 사이 갱신이 한 번
+      //   실패했다고 토큰을 지우면 **접속 중인 전원이 로그아웃**된다. 닿지도 못한 것은 만료가 아니다.
+      if (!res) return false;
+      // 서버가 적어 보낸 사유를 **읽는다**. 예전엔 본문을 안 읽고 토큰만 지워, 유휴 만료라는
+      //   사실도 「무엇을 해야 하는지」도 담당자에게 닿지 않았다.
+      let 사유 = 인증끊김기본;
+      try {
+        const body = (await res.json()) as { error?: string; message?: string };
+        const 서버문장 = typeof body.message === "string" ? body.message.trim() : "";
+        사유 = 서버문장 || 인증끊김문구[String(body.error ?? "")] || 인증끊김기본;
+      } catch { /* 본문이 JSON이 아니면 기본 문구 */ }
+      // ⚠ **내가 지운 경우에만** 로그인으로 돌려보낸다. 다른 창이 이미 회전시켰다면
+      //   (after.refreshToken !== usedRefresh) 그 창의 세션은 살아 있다 — 여기서 신호를 보내면
+      //   멀쩡한 세션까지 끌어낸다(2026-07-26 「업로드는 되는데 401」 사고의 재판).
+      if (after.refreshToken === usedRefresh) {
+        setAuthTokens(null);
+        // 토큰만 지우고 끝내지 않는다 — **왜 끊겼는지 말하고 로그인 화면으로 돌려보낸다.**
+        //   이 모듈은 프레임마다 실행되므로 신호가 여러 번 간다. 메인이 한 번만 처리한다(main.ts auth:expired).
+        ipcRenderer.send("auth:expired", { reason: 사유 });
+      }
       return false;
     }
     const result = (await res.json()) as { accessToken: string; refreshToken: string };
@@ -111,6 +169,19 @@ async function tryRefresh(usedAccessToken: string | null): Promise<boolean> {
   } finally {
     refreshInFlight = null;
   }
+}
+
+// 서버에 **닿지도 못한** 경우의 사유를 한국어로 짓는다(F8-05, 2026-09-02 여정 점검).
+// 왜: fetch가 그냥 터지면 TypeError "Failed to fetch"가 그대로 대화창까지 올라간다
+// (console.js:1875가 e.message를 그대로 보인다) — 담당자는 자기 PC 문제인지 서버 문제인지
+// 모른 채 헬프데스크에 전화했다. 연결 배지를 되살리자는 게 아니다(2026-08-08 결정) —
+// **같은 실패를 읽을 수 있는 말로 바꿔 던질 뿐**, 성공처럼 감추지 않는다.
+function 연결오류(e: unknown): Error {
+  const 이름 = (e as { name?: string } | null)?.name;
+  if (이름 === "TimeoutError" || 이름 === "AbortError") {
+    return new Error(`서버가 제때 응답하지 않았습니다 — 사내 GIJO 서버(${serverUrl})가 바쁘거나 네트워크가 끊겼습니다. 잠시 뒤 다시 시도해 주세요.`);
+  }
+  return new Error(`서버에 연결할 수 없습니다 — 사내 GIJO 서버(${serverUrl})가 꺼졌거나 네트워크가 끊겼습니다. 잠시 뒤 다시 시도하거나 ⚙ 설정 › 서버에서 주소를 확인하세요.`);
 }
 
 // 답 스트리밍(전-7) — SSE(POST)를 읽어 delta를 콜백으로 흘리고, done의 result를 돌려준다.
@@ -125,8 +196,13 @@ export async function requestStream<T = unknown>(
     const sentToken = accessToken;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (sentToken) headers["Authorization"] = `Bearer ${sentToken}`;
-    const res = await fetch(`${serverUrl}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+    // 네트워크 예외를 한국어 사유로 바꿔 던진다(F8-05) — 던진다는 것 자체는 그대로다.
+    const res = await fetch(`${serverUrl}${path}`, { method: "POST", headers, body: JSON.stringify(body) })
+      .catch((e: unknown) => { throw 연결오류(e); });
     if (res.status === 401 && retry && (await tryRefresh(sentToken))) return 한번(false);
+    // 401은 「세션이 끝났다」는 말이지 서버 오류가 아니다 — 대화창에 영문·주소를 찍지 않는다(F3-06).
+    //   (console.js가 이 오류 문장을 그대로 답 자리에 그린다)
+    if (res.status === 401) throw new Error(인증끊김기본);
     if (!res.ok || !res.body) throw new Error(`GIJO AS 서버 오류 ${res.status} ${path.split("?")[0]}`);
 
     const reader = res.body.getReader();
@@ -165,11 +241,13 @@ export async function request<T = unknown>(path: string, opts: RequestOpts = {})
   const sentToken = accessToken;
   if (sentToken) headers["Authorization"] = `Bearer ${sentToken}`;
 
+  // 네트워크 예외를 한국어 사유로 바꿔 던진다(F8-05) — 아래 !res.ok 처리(서버가 답은 준 경우)는
+  // 손대지 않는다. 「닿지 못함」과 「서버가 거절함」은 담당자가 할 일이 다르다.
   const res = await fetch(`${serverUrl}${path}`, {
     method: opts.method ?? "GET",
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  });
+  }).catch((e: unknown) => { throw 연결오류(e); });
 
   if (res.status === 401 && !opts.skipAuthRetry && (await tryRefresh(sentToken))) {
     return request<T>(path, { ...opts, skipAuthRetry: true });
@@ -191,9 +269,18 @@ export async function request<T = unknown>(path: string, opts: RequestOpts = {})
       // (2026-07-30 발견). 코드는 클라이언트가 분기용으로 쓰는 값이고 사람에게 읽힐 말이 아니다.
       const m = body?.message ?? body?.error;
       if (typeof m === "string" && m.trim()) 사유 = m.trim();
+      // 401은 담당자가 읽을 말로 갈아 끼운다 — 서버가 한국어 message를 준 경우는 그대로 둔다.
+      //   (서버 인증 미들웨어는 {error:"unauthorized"}만 보내, 대화창 첫 줄에 영문이 찍혔다 · F3-06)
+      if (res.status === 401 && typeof body?.message !== "string") {
+        사유 = 인증끊김문구[String(body?.error ?? "")] ?? 인증끊김기본;
+      }
     } catch {
       /* 응답 본문이 JSON이 아닌 경우 무시 */
     }
+    // ⚠ **이 꼬리 문구를 바꾸면 login.html이 조용히 깨진다.** 로그인 화면은 「관리자만 바꿀 수
+    //   있는 설정인가」를 알아내려고 여기 붙는 「(서버 오류 403 · 경로)」를 읽는다 — 예외가
+    //   contextBridge를 건너며 커스텀 속성이 사라져 status를 실어 보낼 길이 없기 때문이다.
+    //   (login.html의 못한이유()에 짝 주석이 있다. 바꾸려면 두 곳을 함께.)
     throw new Error(
       사유
         ? `${사유}\n(서버 오류 ${res.status} · ${path.split("?")[0]})`

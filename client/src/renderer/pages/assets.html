@@ -170,12 +170,17 @@
     단계그리기(null);
   });
 
-  // ⚠ inventory로 가는 길에 `hub=1`을 붙인다 — **안 붙이면 영영 못 간다.**
+  // ⚠ inventory로 가는 길에 **예외 표식**을 붙인다 — 안 붙이면 영영 못 간다.
   //   nav.js의 갈아타기 표가 "inventory.html?embed=1" → "assets.html?embed=1"로 되돌리는데,
-  //   그 표를 건너뛰는 유일한 예외가 `hub=1`이다(nav.js:1453). 이 한 글자가 없으면
+  //   그 표를 건너뛰는 예외가 `hub=1`·`full=1`이다(nav.js 갈아타기 적용부). 표식이 없으면
   //   담당자는 「전체 관리 열기」를 눌러도 이 화면으로 되돌아온다 — 오류도 안 난다.
+  //   ⚠ 그중 full=1을 쓴다(F4-09, 2026-09-02). hub=1은 「허브 무대 안」 표시 계약이라
+  //     자산 화면의 「한눈에」 그림띠(#vizStrip)까지 숨겨(nav.js:1509), 메뉴로 연 같은 화면과
+  //     다르게 보인다 — 담당자는 그것을 고장으로 읽는다.
+  //   ⚠ 이름은 안 싣는다 — 이 주소는 메뉴에 있으므로(nav.js:191) 셸이 「자산 관리 (전체)」를
+  //     찾아 붙인다. 여기 또 적으면 이름이 두 곳에서 정해진다.
   $("openInventory").addEventListener("click", function () {
-    try { window.parent.postMessage({ type: "gijo:openTab", page: "inventory.html?hub=1", label: "자산 관리" }, "*"); }
+    try { window.parent.postMessage({ type: "gijo:openTab", page: "inventory.html?full=1" }, "*"); }
     catch (e) { }
   });
 

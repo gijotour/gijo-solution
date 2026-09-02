@@ -1,0 +1,468 @@
+<!doctype html>
+<!--
+  시안 상단 근거 요약 (저장소 규칙 — 설계 전 조사 근거를 상단 주석에 남긴다)
+  ─────────────────────────────────────────────────────────────────────
+  대상 화면: "첫 실행(설치 뒤)" — client/src/main.ts(첫설치 판정·라우팅)
+             + client/src/renderer/pages/setup.html(읽기만 함, 안 고침)
+             + client/src/renderer/pages/login.html(작은 추가 1곳)
+  닫는 결함: F1-01 (tools/review-2026-09-01/결과/여정_확정_88건.json)
+
+  ⚠ 이 폴더의 1차 시안(mockups/setup-bypass/시안.html, 2026-08-11)은 이미 승인·구현됐다 —
+    setup.html에 "관리자 계정 만들기 / 이미 GIJO 서버가 있어요" 아코디언 우회가 실제로 들어가
+    있음을 오늘(2026-09-02) client/src/renderer/pages/setup.html을 직접 열어 확인했다. 그 파일은
+    이번에도 고치지 않았다. F1-01은 그 우회의 **후속 결함**이다 — 우회는 있는데 고른 것을
+    "기억"하지 않아, 우회를 고른 담당자도 앱을 켤 때마다 처음 설정부터 다시 본다.
+
+  ⚠ 코드가 오늘 많이 바뀌었다 — 여정 JSON의 evidence 줄 번호(main.ts:1548·393)는 낡았다.
+    실제로 오늘 연 파일 기준 줄 번호는: 첫설치 판정 main.ts:1680-1682, 라우팅 main.ts:393-396,
+    번들서버구성() main.ts:149-220, DB경로() main.ts:224-226, creds 저장소 main.ts:78-111,
+    setup:createAdmin main.ts:313-335. 이 시안은 전부 이 새 줄 번호로 인용한다.
+    (F2-01·F2-02·F2-04·F2-09 등 로그인 관련 결함 다수는 오늘 이미 다른 커밋으로 닫혀 있었다 —
+    login.html이 gijo-ui.css 토큰을 쓰고, 서버 주소 스킴 보정이 들어가 있고, 폼 Enter가 되는 것을
+    직접 확인했다. F1-01만 열려 있었다.)
+
+  조사(직접 확인·검색, 근거는 본문 "근거" 표에 다시 정리):
+    · Chameleon / Appcues 등 온보딩 UX 정리(2026 검색 확인) — "사용자가 온보딩을 건너뛰면 그
+      선택과 진행 상태를 세션을 넘어 기억해야 한다"가 공통 원칙으로 반복된다.
+    · Nielsen Norman Group, 10 Usability Heuristics — ③ User control and freedom("비상 탈출구"를
+      항상 열어 둔다) · ⑦ Flexibility and efficiency of use(반복 사용자에게 단계를 다시 시키지
+      않는다). → 이 시안의 "라우팅만 건너뛰고, 되돌아갈 문은 남긴다" 구조의 직접 근거.
+    · 내부 근거 — client/src/preload.ts:71 setupNeeded()가 이미 노출돼 있지만 client/src 전체에서
+      쓰는 곳이 0건(grep 확인) — "새 걸 만들기 전에 이미 있는 걸 써라"는 의뢰 힌트가 가리키는
+      바로 그 자리다.
+    · 내부 근거 — main.ts:78-111의 gijo-logins.json(CREDS_FILE)이 로그인 성공 때마다
+      serverUrl·username을 이미 저장한다(savePw 체크와 무관하게, main.ts:105) — F1-01이 찾는
+      "선택을 기억할 자리"가 이미 있다.
+    · 내부 근거 — client/build/installer.nsh:40 "업데이트여도 설정·로그인 정보는 그대로
+      남습니다" — userData(=CREDS_FILE이 사는 곳)가 자동 업데이트로 지워지지 않는다는 제품
+      스스로의 약속. 이 시안의 신호(creds 파일)가 업데이트마다 초기화되지 않는다는 근거.
+
+  결론(추천 시안 1개, 2026-09-02): 새 파일·새 IPC를 만들지 않는다. main.ts 라우팅 조건에 한 줄만
+  더해 "로컬 DB가 없고 + creds에 원격(비-localhost) 로그인 이력이 있으면" login.html로 바로
+  가게 하고, login.html에는 setupNeeded()(이미 있는 API)를 물어 참일 때만 작은 "처음 설정으로"
+  되돌아가기 링크를 보인다. 왜 이 안인지·무엇을 포기했는지는 본문 "왜 이 안인가" 표에.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>첫 실행 — 선택을 기억한다 (F1-01 추천 시안)</title>
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   1) 디자인 토큰 — client/src/renderer/pages/gijo-ui.css 실측값 그대로(2026-09-02 직접 확인).
+      login.html:42-49가 --navy/--orange 등 자체 이름으로 이 값을 그대로 잇고 있어, 이 시안도
+      같은 이름·같은 값을 쓴다. setup.html은 아직 자체 팔레트(:root 하드코딩)를 쓰는데, 이번
+      결함과 무관해 손대지 않았다 — 값은 우연히 같다(같은 다크 톤이라). ════════════════════ */
+:root {
+  --g-bg: #262624;
+  --g-surface-1: #30302e;
+  --g-surface-2: #1f1e1d;
+  --g-border: rgba(255, 255, 255, 0.08);
+  --g-border-strong: rgba(255, 255, 255, 0.16);
+  --g-blue: #3b82f6;
+  --g-blue-fill: #2563eb;
+  --g-blue-light: #5fa1ff;
+  --g-teal: #1eb980;
+  --g-amber: #f0a020;
+  --g-text: #e9e7e2;
+  --g-muted: #b3ada4;
+  --g-muted-2: #a49d95;
+  --g-s2: 8px; --g-s3: 12px; --g-s4: 16px; --g-s5: 24px;
+  --g-r-sm: 8px; --g-r: 12px; --g-r-pill: 999px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--g-bg); color: var(--g-text); }
+body { font-family: "Pretendard", "Malgun Gothic", "Segoe UI", sans-serif; line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ── 문서(설명) 크롬 — 시안 보고서 부분. 실제 제품 화면이 아니다. ─────────────────────── */
+.wrap { max-width: 1120px; margin: 0 auto; padding: 28px 24px 70px; }
+h1 { font-size: 22px; margin: 0 0 6px; color: #fff; }
+.sub { color: var(--g-muted-2); font-size: 12.5px; margin-bottom: 8px; line-height: 1.7; }
+.sub code { color: var(--g-blue-light); }
+.sec { margin: 32px 0 12px; font-size: 14.5px; font-weight: 800; color: #fff;
+  border-left: 3px solid var(--g-blue); padding-left: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+th, td { border: 1px solid var(--g-border-strong); padding: 8px 10px; text-align: left; vertical-align: top; }
+th { background: var(--g-surface-2); color: #fff; font-weight: 700; }
+td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note { background: var(--g-surface-2); border: 1px solid var(--g-border); border-radius: 10px;
+  padding: 14px 16px; font-size: 12.75px; line-height: 1.7; color: var(--g-muted); }
+.note b { color: #fff; }
+.ok { color: var(--g-teal); font-weight: 800; }
+.warn { color: var(--g-amber); font-weight: 800; }
+.bad { color: #ff8080; font-weight: 800; }
+code { background: #1a1918; border: 1px solid var(--g-border); border-radius: 4px; padding: 1px 5px;
+  font-size: 11.5px; color: var(--g-blue-light); font-family: Consolas, monospace; }
+pre { background: #1a1918; border: 1px solid var(--g-border-strong); border-radius: 10px;
+  padding: 12px 14px; font-size: 11.5px; line-height: 1.6; overflow-x: auto; color: var(--g-muted); }
+pre .add { color: var(--g-teal); }
+pre .rm { color: #ff8080; text-decoration: line-through; opacity: .7; }
+pre .keep { color: var(--g-muted-2); }
+
+.demo-toolbar { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center;
+  background: var(--g-surface-2); border: 1px dashed var(--g-border-strong); border-radius: 10px;
+  padding: 10px 14px; margin: 10px 0; }
+.demo-toolbar .dt-label { font-size: 11px; font-weight: 800; color: var(--g-amber); white-space: nowrap; flex-basis: 100%; }
+.demo-toolbar button { font: inherit; font-size: 11.5px; font-weight: 700; padding: 5px 11px;
+  border-radius: var(--g-r-pill); border: 1px solid var(--g-border-strong); background: transparent;
+  color: var(--g-muted); cursor: pointer; }
+.demo-toolbar button:hover { color: #fff; border-color: var(--g-blue); }
+.demo-toolbar button.on { background: var(--g-blue-fill); border-color: var(--g-blue-fill); color: #fff; }
+.demo-disclaimer { font-size: 11.5px; color: var(--g-muted-2); margin: 4px 2px 10px; line-height: 1.6; }
+
+/* ── 흐름 다이어그램 ─────────────────────────────────────────────── */
+.flow-stage { padding: 22px 18px; border-radius: 14px;
+  background: radial-gradient(circle at 30% 20%, #35342f 0%, var(--g-bg) 60%);
+  border: 1px solid var(--g-border); }
+.flow-title { font-size: 12px; font-weight: 800; color: var(--g-muted-2); margin-bottom: 12px;
+  letter-spacing: .02em; }
+.flow-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.flow-box { min-width: 118px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--g-border-strong);
+  background: var(--g-surface-1); font-size: 12px; text-align: center; line-height: 1.5; }
+.flow-box b { display: block; font-size: 12.5px; color: #fff; margin-bottom: 2px; }
+.flow-box.repeat { border-color: var(--g-amber); background: rgba(240,160,32,.08); }
+.flow-box.done { border-color: var(--g-teal); background: rgba(30,185,128,.08); }
+.flow-arrow { color: var(--g-muted-2); font-size: 15px; padding: 0 2px; }
+.flow-note { margin-top: 8px; font-size: 11.25px; color: var(--g-muted-2); line-height: 1.6; }
+.flow-group + .flow-group { margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--g-border); }
+
+/* ── login.html 카드 하단 미리보기 — 실제 클래스·값 그대로(발췌, 자체완결을 위해 인라인). ── */
+.lm-stage { display: flex; justify-content: center; padding: 30px 20px;
+  border-radius: 14px; background: radial-gradient(circle at 30% 20%, #35342f 0%, var(--g-bg) 60%); }
+.lm-card { width: 400px; background: var(--g-surface-1); border: 1px solid var(--g-border-strong);
+  border-radius: 14px; padding: 22px 26px 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.45); }
+.lm-title { font-size: 13px; color: var(--g-muted); margin-bottom: 4px; }
+.lm-fake-field { height: 34px; border-radius: 8px; background: var(--g-surface-2);
+  border: 1px solid var(--g-border-strong); margin-bottom: 10px; }
+.lm-fake-btn { height: 36px; border-radius: 8px; background: var(--g-blue-fill); margin-bottom: 14px; }
+/* 실제 login.html:458-462 그대로(폰트·마진 값 동일) */
+.lm-hint { margin-top: 18px; font-size: 12.5px; color: var(--g-muted); line-height: 1.5; }
+.lm-ver { margin-top: 14px; font-size: 12px; color: var(--g-muted); text-align: center; opacity: .8; }
+/* 신설 — 이 시안이 더하는 유일한 화면 요소 */
+.lm-escape { margin-top: 8px; font-size: 11.5px; color: var(--g-muted-2); text-align: center; }
+.lm-escape button { background: none; border: none; padding: 0; font: inherit; color: inherit;
+  text-decoration: underline; cursor: pointer; }
+.lm-escape button:hover { color: var(--g-blue-light); }
+.lm-escape.hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>첫 실행(설치 뒤) — F1-01: "고른 것을 기억한다"</h1>
+  <div class="sub">대상: <code>client/src/main.ts</code>(첫설치 판정·라우팅) ·
+    <code>client/src/renderer/pages/login.html</code>(작은 추가 1곳) — <code>setup.html</code>은
+    <b>고치지 않는다</b>(1차 시안이 이미 만든 아코디언 그대로).</div>
+
+  <div class="demo-toolbar">
+    <span class="dt-label">⚠ 미리보기 전용 — 아래 버튼은 실제 main.ts·login.html 동작을 흉내만
+      낸다(가짜 상호작용을 진짜처럼 꾸미지 않는다는 원칙에 따라, 클릭해도 실제 IPC·서버 호출은
+      없다).</span>
+    <button type="button" data-flow="old" class="on">① 기존 흐름 재생</button>
+    <button type="button" data-flow="new">② 새 흐름 재생</button>
+  </div>
+
+  <div class="sec">① 무엇이 문제인가 (F1-01, 오늘 코드로 재확인)</div>
+  <table>
+    <tr><th style="width:16%">자리</th><th>실제 코드(오늘 확인)</th></tr>
+    <tr><td>첫설치 판정</td><td><code>client/src/main.ts:1680-1682</code><br>
+      <code>const 서버구성 = 번들서버구성(); 첫설치 = !!서버구성 && 서버구성.패키징본 &&
+      !fs.existsSync(DB경로(서버구성));</code> — 로컬 DB 파일이 없으면 무조건 참.</td></tr>
+    <tr><td>화면 라우팅</td><td><code>client/src/main.ts:393-396</code><br>
+      <code>${첫설치인가() ? "setup.html" : "login.html"}</code> — 오직 "로컬 DB 있음/없음"만
+      본다. "이 담당자가 전에 원격 서버로 로그인해 봤는가"는 <b>안 본다</b>.</td></tr>
+    <tr><td>선택이 사라지는 자리</td><td><code>client/src/renderer/pages/setup.html:200-203</code><br>
+      <code>document.getElementById("toLogin").addEventListener("click", function () {
+      location.href = "login.html" + location.search; });</code> — 화면 전환만 하고 아무 데도
+      기록하지 않는다. 다음 실행에서 main.ts는 이 선택을 알 길이 없다.</td></tr>
+    <tr><td>이미 있는데 안 쓰는 신호</td><td><code>client/src/main.ts:78-111</code>(로그인 성공마다
+      서버 주소·아이디를 저장) · <code>client/src/preload.ts:71</code>
+      (<code>setupNeeded: () =&gt; ipcRenderer.invoke("setup:needed")</code>, client/src 전체에서
+      <b>호출하는 곳 0건</b> — grep 확인).</td></tr>
+  </table>
+  <div class="note" style="margin-top:10px">
+    <b>무엇을 노렸고 무엇을 포기했는지</b>: 노린 것 — 원격(분산) 모드 담당자가 <b>한 번 로그인에
+    성공한 뒤</b>부터는 처음 설정 화면을 다시 보지 않는 것. 포기한 것 — 로그인에
+    <b>성공하기 전</b>(처음 딱 한 번, setup.html에서 "로그인 화면으로"를 누른 직후)까지 완전히
+    건너뛰는 것은 포기했다 — 그 순간엔 아직 이 담당자가 정말 원격 담당자인지 증거가 없고,
+    증거 없이 건너뛰면 F8-01 user_impact가 경고한 "잘못 눌러 로컬에 빈 서버·가짜 관리자를 만드는"
+    사고를 <b>일부러 만들 위험</b>을 새로 들이는 셈이라 하지 않는다.
+  </div>
+
+  <div class="sec">② 시안 — 흐름 (기존 → 새)</div>
+  <div class="flow-stage">
+    <div id="flowOld" class="flow-group">
+      <div class="flow-title">기존 — 분산 모드 담당자, 3번째 실행</div>
+      <div class="flow-row">
+        <div class="flow-box repeat"><b>앱 실행</b>로컬 DB 없음</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box repeat"><b>처음 설정</b>아코디언 2개</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box repeat">"이미 서버가<br>있어요" 펼치기</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box repeat">"로그인 화면으로"<br>클릭</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box done"><b>로그인</b>성공</div>
+      </div>
+      <div class="flow-note">⚠ 다음 실행(4번째)에도 로컬 DB는 여전히 없다 — 왼쪽부터 <b>똑같이
+        반복</b>. 매일 아침 클릭 2번(F1-01 user_impact).</div>
+    </div>
+    <div id="flowNew" class="flow-group" style="display:none">
+      <div class="flow-title">새 흐름 — 같은 담당자, 1회차(처음)</div>
+      <div class="flow-row">
+        <div class="flow-box repeat"><b>앱 실행</b>로컬 DB 없음<br>creds 이력 없음</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box repeat"><b>처음 설정</b>(그대로)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box repeat">"로그인 화면으로"<br>클릭(그대로)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box done"><b>로그인</b>성공 →
+          <code>creds:save</code>가 원격 주소를 이미 저장(main.ts:105, 그대로)</div>
+      </div>
+      <div class="flow-title" style="margin-top:14px">새 흐름 — 2회차부터(매번)</div>
+      <div class="flow-row">
+        <div class="flow-box done"><b>앱 실행</b>로컬 DB 없음<br>creds에 원격 주소 있음</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box done"><b>로그인 화면</b>바로 뜸(처음 설정 건너뜀)</div>
+      </div>
+      <div class="flow-note">1회차 이후로는 처음 설정 화면이 <b>안 보인다</b> — 매번 클릭 2번이
+        1번(로그인 자체)만 남는다. 되돌아가는 문(③)은 항상 열려 있다.</div>
+    </div>
+  </div>
+
+  <div class="sec">③ 왜 이 안인가 (다른 길을 왜 안 골랐나)</div>
+  <table>
+    <tr><th style="width:20%">대안</th><th style="width:38%">무엇인가</th><th>왜 안 골랐나 / 골랐나</th></tr>
+    <tr><td>A. 원안(여정 JSON <code>proposal</code>)</td>
+      <td>userData에 새 파일 <code>gijo-setup-choice.txt</code>를 만들고 새 IPC 1개를 추가해
+        "선택"을 따로 기록.</td>
+      <td class="bad">✗ 안 씀 — "선택 기억"이 필요로 하는 정보(이 담당자가 원격 서버로 로그인해
+        봤는가)를 <code>gijo-logins.json</code>이 <b>이미</b> 담고 있다. 같은 사실을 두 파일에
+        적으면 둘이 어긋나는 날이 온다(이 저장소가 반복해 겪은 문제 — CLAUDE.md 공용 파일
+        경고와 같은 결). 새 IPC·새 파일은 구현·시험·유지 비용도 그만큼 는다.</td></tr>
+    <tr><td>B. 채택 — creds 파일 재사용</td>
+      <td>새 파일 없이, <code>readCreds()</code>(이미 있음)에 "호스트가 localhost가 아닌 항목이
+        있는가"만 물어 <b>라우팅 조건에만</b> 반영. <code>첫설치</code> 가드 값 자체·서버 기동
+        로직은 그대로 둔다.</td>
+      <td class="ok">✓ 채택 — 수정 범위가 main.ts 라우팅 표현식 1줄 + 헬퍼 함수 1개로 가장
+        작다. <code>setup:createAdmin</code> 가드(313행)가 보는 <code>첫설치</code> 값을 안
+        건드리므로, 나중에 이 담당자가 마음을 바꿔 로컬 관리자를 만들려 해도(③ 아래) 그 경로가
+        그대로 산다.</td></tr>
+    <tr><td>C. 첫설치 판정 자체를 바꾸기</td>
+      <td>로그인 성공 시 더미 DB 파일을 만들거나 <code>첫설치</code> 전역을 영구히 false로
+        덮어써서 "로컬 DB 있음"과 같은 상태로 취급.</td>
+      <td class="bad">✗ 안 씀 — <code>첫설치</code>는 <code>setup:needed</code>·
+        <code>setup:createAdmin</code> 가드에도 쓰인다(main.ts:312-314). 이 값의 뜻을 "로컬 DB
+        존재"에서 "화면에 뭘 보여줄까"로 섞으면, 한 플래그가 두 가지 뜻을 갖게 돼 나중에 한쪽만
+        고치는 사고가 나기 쉽다(값의 단일 출처·단일 의미 원칙 위반).</td></tr>
+    <tr><td>되돌아가는 문의 자리 — login.html vs settings.html</td>
+      <td>"이 PC에 서버 새로 설치"로 되돌아가는 링크를 어디에 둘까.</td>
+      <td class="ok">✓ login.html — <code>settings.html</code>은 로그인 <b>후</b>에만 열리는데,
+        되돌아갈 문이 필요한 사람은 정의상 <b>아직 로그인이 안 되는(또는 안 될 수도 있는)</b>
+        사람이다. 로그인 전 화면에 두는 것만 실제로 닿는다.</td></tr>
+  </table>
+
+  <div class="sec">④ 시안 — login.html 하단 미리보기 (유일한 화면 변경)</div>
+  <div class="demo-toolbar">
+    <span class="dt-label">토글 — <code>window.gijo.setupNeeded()</code>(이미 있는 API) 값을 흉내낸다</span>
+    <button type="button" data-lm="local" class="on">로컬 데스크톱 반복 사용자(DB 있음)</button>
+    <button type="button" data-lm="remote">원격 담당자(DB 없음·creds에 원격 이력)</button>
+  </div>
+  <div class="lm-stage">
+    <div class="lm-card">
+      <div class="lm-title">… 자격증명 칸(위쪽, 이번 시안에서 변경 없음) …</div>
+      <div class="lm-fake-field"></div>
+      <div class="lm-fake-field"></div>
+      <div class="lm-fake-field"></div>
+      <div class="lm-fake-btn"></div>
+      <!-- 실제 login.html:458-461 그대로 -->
+      <div class="lm-hint">
+        단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 <b>비워 두세요</b> — 앱이 알아서 맞춥니다.<br />
+        분산 모드: 사내망 GPU 서버 주소를 입력하세요.
+      </div>
+      <div class="lm-ver">GIJO AS 클라이언트 v5.63.0</div>
+      <!-- 신설 -->
+      <div class="lm-escape" id="lmEscape">
+        이 PC에 새 관리자 계정을 만들려면 <button type="button">처음 설정으로</button>
+      </div>
+    </div>
+  </div>
+  <div class="demo-disclaimer">위 카드 안 버튼·칸은 전부 미리보기 전용이다(눌러도 아무 일도
+    안 일어난다). "처음 설정으로" 링크만 <code>setupNeeded()===true</code>일 때(=로컬 DB가 아직
+    없는 상태) 보이도록 토글에 반응한다 — 실제 구현에서도 이 조건 하나로만 보이고 숨는다.</div>
+
+  <div class="sec">⑤ 판정 로직 — 실제로 바뀌는 코드(발췌·의사코드, 자체완결을 위해 인라인)</div>
+  <pre><code>// client/src/main.ts — 새 헬퍼 (78-111행 creds 저장소 바로 아래에 추가)
+<span class="add">function 원격으로_로그인한적있음(): boolean {
+  // 이미 있는 gijo-logins.json을 그대로 쓴다 — 새 파일·새 IPC를 만들지 않는다.
+  try {
+    return readCreds().some((e) =&gt; {
+      try { return !["localhost", "127.0.0.1"].includes(new URL(e.serverUrl).hostname); }
+      catch { return false; }
+    });
+  } catch { return false; }
+}</span>
+
+// client/src/main.ts:393-396 — 라우팅 조건에 한 줄만 더한다
+mainWindow.loadFile(
+  path.join(__dirname, `../src/renderer/pages/${<span class="rm">첫설치인가() ? "setup.html" : "login.html"</span><span class="add">(첫설치인가() && !원격으로_로그인한적있음()) ? "setup.html" : "login.html"</span>}`),
+  …
+);
+// ⚠ 1680-1682(첫설치 계산 자체)·312-335(setup:needed·setup:createAdmin 가드)는
+//   <span class="keep">한 글자도 안 바꾼다</span> — DB 존재 여부라는 원래 뜻 그대로 남는다.
+
+// client/src/renderer/pages/login.html — 이미 있는 IIFE 관례(486-500행)에 하나 더(490행 뒤)
+<span class="add">(async () =&gt; {
+  try {
+    const needSetup = await window.gijo.setupNeeded(); // 이미 있는 API, preload.ts:71
+    document.getElementById("setupEscape").classList.toggle("hidden", !needSetup);
+  } catch (e) { /* 물음 실패는 링크를 숨기는 쪽으로 — 잘못 보여서 헷갈리는 것보다 안전 */ }
+})();</span>
+document.getElementById("toSetupBtn").addEventListener("click", () =&gt;
+  <span class="keep">window.gijo.navigateTo("setup.html")</span> // 이미 있는 API, main.ts:605가
+  // 라이트 edition 쿼리까지 이미 이 파일명을 특별 취급하고 있어(그대로 재사용) 안전하다.
+);</code></pre>
+
+  <div class="sec">밀도 숫자</div>
+  <div class="note" style="margin-bottom:10px">계산 방법: login.html의 실제 CSS 선언값을 그대로
+    더했다. <code>.lm-escape</code>는 <code>line-height</code>를 선언하지 않아 브라우저 기본값
+    ≈1.2로 가정(추정 표시). setup.html은 이번 시안에서 <b>바이트 하나 안 바꾼다</b>.</div>
+  <table>
+    <tr><th style="width:30%">자리</th><th class="n" style="width:14%">기존</th>
+      <th class="n" style="width:14%">시안</th><th class="n" style="width:12%">증감</th><th>근거(계산식)</th></tr>
+    <tr><td>setup.html 전체</td><td class="n">— </td><td class="n">—</td><td class="n">0px</td>
+      <td>이 파일은 이번 시안에서 수정 대상이 아니다(1차 시안이 이미 반영돼 있다).</td></tr>
+    <tr><td>login.html 카드 하단 —
+      <b>로컬 데스크톱 반복 사용자</b>(DB 있음, 다수)</td>
+      <td class="n">0px</td><td class="n">0px</td><td class="n ok">0px</td>
+      <td><code>setupNeeded()</code>가 false → <code>.lm-escape.hidden</code> →
+        <code>display:none</code>. 이 인구에게는 화면이 <b>1px도</b> 늘지 않는다.</td></tr>
+    <tr><td>login.html 카드 하단 —
+      <b>원격/분산 담당자</b>(DB 없음, F1-01의 대상)</td>
+      <td class="n">0px</td><td class="n">약 22px</td><td class="n warn">+22px(상시)</td>
+      <td><code>.lm-escape{margin-top:8}</code> + 내용
+        <code>11.5×1.2(추정)≈13.8</code> = 21.8 ≈ 22px. 이 인구에게는 <b>상시</b> 노출(로그인
+        화면을 볼 때마다) — 정직하게 증가로 표기한다.</td></tr>
+    <tr><td>login.html 스크립트</td><td class="n">—</td><td class="n">—</td><td class="n">0px(레이아웃 무관)</td>
+      <td>IIFE 1개 + 클릭 리스너 1개 추가, 화면 세로 크기와 무관.</td></tr>
+  </table>
+
+  <div class="sec">근거 — 설계 전 조사(표준·모범사례, 직접 확인)</div>
+  <table>
+    <tr><th style="width:26%">출처</th><th style="width:42%">확인한 내용(요지)</th><th>이 시안에 반영</th></tr>
+    <tr><td>Chameleon / Appcues 등 온보딩 UX 정리<br>
+      <span style="color:var(--g-muted-2)">웹 검색 확인, 2026-09-02</span></td>
+      <td>"사용자가 온보딩을 건너뛰면, 그 선택과 진행 상태를 세션을 넘어 기억해야 한다"가 여러
+        출처에서 공통으로 반복된다.</td>
+      <td>이 결함의 핵심 원인("건너뛰기는 있는데 기억을 안 함")과 정확히 대응 — 채택안이 바로
+        그 기억을 만든다.</td></tr>
+    <tr><td>Nielsen Norman Group, 10 Usability Heuristics<br>
+      <span style="color:var(--g-muted-2)">nngroup.com — ③ User control and freedom</span></td>
+      <td>사용자가 실수로 들어간 상태에서 언제든 빠져나올 "비상 탈출구"가 있어야 한다.</td>
+      <td>④의 "처음 설정으로" 링크 — creds 신호가 잘못 잡혀도(예: 재설치 뒤 실제로는 로컬을
+        원하는 경우) 되돌아갈 문을 항상 연다.</td></tr>
+    <tr><td>같은 자료 — ⑦ Flexibility and efficiency of use</td>
+      <td>반복 사용자에게 매번 같은 단계를 다시 시키지 않는다.</td>
+      <td>새 흐름의 "2회차부터" 갈래 — 정확히 이 원칙을 F1-01에 적용한 것.</td></tr>
+    <tr><td>내부 근거 — <code>client/src/preload.ts:71</code></td>
+      <td><code>setupNeeded()</code>가 이미 노출돼 있지만 호출하는 곳이 0건.</td>
+      <td>새 IPC를 만들지 않고 이 API를 login.html에서 처음 쓴다.</td></tr>
+    <tr><td>내부 근거 — <code>client/build/installer.nsh:40</code></td>
+      <td>"업데이트여도 설정·로그인 정보는 그대로 남습니다" — userData가 자동 업데이트로
+        지워지지 않는다는 제품의 기존 약속.</td>
+      <td>creds 파일(=userData 안)을 신호로 써도 자동 업데이트마다 초기화되지 않는다는 근거.</td></tr>
+  </table>
+
+  <div class="sec">⚠ 게시 관문(publish-gate-ui.mjs) 영향 — 의뢰가 반드시 적으라고 한 항목</div>
+  <div class="note">
+    <b>관문의 전제</b>: <code>tools/publish-gate-ui.mjs:921</code>이 "전 화면 얕은 렌더" 검사에서
+    <code>setup.html</code>을 "첫 실행 전용 — 로그인된 세션에서는 안 뜬다"는 이유로 제외한다.<br><br>
+    <b>이 시안이 그 전제를 건드리는가 — 아니다.</b> 새 조건은
+    <code>첫설치인가() && !원격으로_로그인한적있음()</code>으로, <b>AND로만</b> 붙는다 —
+    <code>setup.html</code>이 뜨는 경우를 <b>줄이기만</b> 하지 늘리지 않는다. 그리고 자바스크립트
+    <code>&&</code>는 왼쪽이 거짓이면 오른쪽을 평가하지 않는다(단락 평가) — 게시·QA 계정
+    (claude-deploy)이 도는 PC는 반복 배포로 로컬 DB가 이미 있어 <code>첫설치인가()</code>가 항상
+    false다. 즉 <code>원격으로_로그인한적있음()</code>은 그 PC에서 <b>호출조차 되지 않는다</b> —
+    관문의 전제는 그대로 산다.<br><br>
+    <b>그래도 남기는 것</b>: "로컬 DB 없음 + creds에 원격 주소 있음 → setup.html을 안 거치고
+    login.html로 직행"이라는 <b>새 분기</b> 자체는 지금 어떤 자동시험도 확인하지 않는다.
+    구현 단계에서 이 분기를 확인하는 시험 1개를 <code>client/test</code>(또는 해당 스위트)에
+    추가할 것을 구현 범위에 명시한다(아래).
+  </div>
+
+  <div class="sec">제품 원칙 자가점검</div>
+  <table>
+    <tr><th style="width:34%">원칙</th><th style="width:9%"></th><th>어떻게</th></tr>
+    <tr><td>새 색 0개</td><td class="ok">✅</td>
+      <td>전부 <code>--g-muted/--g-muted-2/--g-blue-light</code> 및 login.html이 이미 쓰는
+        값(<code>#ff8080</code> 등, 이 시안의 문서 크롬에서만). 카드 안 신설 요소는
+        <code>--g-muted-2</code> 하나만 쓴다.</td></tr>
+    <tr><td>외부 자원 0개</td><td class="ok">✅</td>
+      <td>CDN·웹폰트·원격 이미지 없음. 파일 하나로 완결.</td></tr>
+    <tr><td>화면에 설명을 늘리지 않았나</td><td class="warn">⚠</td>
+      <td>원격 담당자 인구에게 상시 노출되는 링크 문구(1줄, "이 PC에 새 관리자 계정을 만들려면")를
+        더했다 — 완전한 무증가는 아니다(밀도표에 명시). 다만 이것은 "설명"이 아니라 <b>탈출구
+        조작</b>이고(사용법·용어풀이가 아님), 1줄로 최소화했으며, 로컬 데스크톱 다수 인구에게는
+        0px다.</td></tr>
+    <tr><td>없는 기능을 그리지 않았나</td><td class="ok">✅</td>
+      <td>새 IPC·새 파일·새 서버 API를 그리지 않았다 — <code>setupNeeded()</code>·
+        <code>navigateTo()</code>·<code>readCreds()</code> 전부 오늘 코드에 실재함을 직접
+        확인했다.</td></tr>
+    <tr><td>가짜 상호작용 금지</td><td class="ok">✅</td>
+      <td>카드 안 모든 필드·버튼은 미리보기 전용(데모 disclaimer에 명시). 흐름 다이어그램·토글은
+        문서 영역 바깥(카드 밖)의 시안 전용 도구줄로만 움직인다.</td></tr>
+    <tr><td>모션은 CSS만·reduced-motion 폴백</td><td class="ok">✅</td>
+      <td>애니메이션 없음(상태는 즉시 전환) — <code>prefers-reduced-motion</code> 규칙은 넣어 둠.</td></tr>
+    <tr><td>2026-08-09·08-11 결정 유지</td><td class="ok">✅</td>
+      <td>"고객이 관리자 비번을 정한다"(setup.html 갈래1 그대로) · "아코디언 우회"(setup.html
+        구조 그대로) 둘 다 setup.html을 <b>안 고쳤으므로</b> 자동으로 유지된다.</td></tr>
+  </table>
+
+  <div class="sec">구현 범위 — 실제로 고칠 파일(승인 시 메인이 진행)</div>
+  <table>
+    <tr><th style="width:16%">구분</th><th style="width:26%">파일</th><th>무엇을</th></tr>
+    <tr><td>클라(핵심)</td><td><code>client/src/main.ts</code></td>
+      <td>① <code>readCreds()</code> 정의(78-84행) 아래에 <code>원격으로_로그인한적있음()</code>
+        헬퍼 신설(약 8줄). ② 393-396행 <code>loadFile</code>의 파일명 삼항식에
+        <code>&& !원격으로_로그인한적있음()</code> 한 조건만 추가. <b>1680-1682행(첫설치 계산)·
+        312-335행(setup:needed·setup:createAdmin 가드)은 손대지 않는다</b> — 그 값의 뜻(로컬 DB
+        존재 여부)을 그대로 지킨다.</td></tr>
+    <tr><td>클라</td><td><code>client/src/renderer/pages/login.html</code></td>
+      <td>462행(<code>.ver</code>) 아래에 <code>&lt;div class="setup-escape" id="setupEscape"
+        style="display:none"&gt;</code> + 링크 버튼 1개 추가(위 ④ 발췌 그대로). CSS 3줄
+        (<code>.setup-escape</code>). 486-500행과 같은 관례의 IIFE로
+        <code>window.gijo.setupNeeded()</code>를 물어 보이기/숨기기. 버튼 클릭은
+        <code>window.gijo.navigateTo("setup.html")</code>(이미 있는 API, main.ts:605가 이미
+        setup.html을 특별 처리하고 있어 안전).</td></tr>
+    <tr><td class="warn">시험 — 신규</td><td>client/test 또는 해당 스위트</td>
+      <td>"로컬 DB 없음 + creds.json에 비-localhost 항목 있음 → 부팅 라우팅이 login.html을
+        고른다"를 확인하는 단위 시험 1개. 위 게시 관문 절에서 밝힌 "지금 확인하는 시험이 0건"인
+        빈자리를 메운다 — 정직한 구현 원칙(테스트 없이 "됐다"고 하지 않는다).</td></tr>
+    <tr><td>안 바꾸는 것</td><td><code>client/src/renderer/pages/setup.html</code></td>
+      <td>바이트 하나도 안 바꾼다. 1차 시안(2026-08-11)의 아코디언 구조·문구·2026-08-09 결정
+        (고객이 관리자 비번을 정함)을 전부 그대로 둔다.</td></tr>
+  </table>
+
+</div>
+
+<script>
+  // 흐름 다이어그램 토글 — 미리보기 전용, 실제 로직 없음.
+  document.querySelectorAll('[data-flow]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('[data-flow]').forEach(function (x) { x.classList.toggle('on', x === b); });
+      document.getElementById('flowOld').style.display = b.dataset.flow === 'old' ? '' : 'none';
+      document.getElementById('flowNew').style.display = b.dataset.flow === 'new' ? '' : 'none';
+    });
+  });
+
+  // 카드 하단 미리보기 토글 — setupNeeded() 값을 흉내만 낸다.
+  document.querySelectorAll('[data-lm]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('[data-lm]').forEach(function (x) { x.classList.toggle('on', x === b); });
+      document.getElementById('lmEscape').classList.toggle('hidden', b.dataset.lm === 'local');
+    });
+  });
+  // 기본 상태: 로컬 데스크톱(링크 숨김)
+  document.getElementById('lmEscape').classList.add('hidden');
+</script>
+</body>
+</html>

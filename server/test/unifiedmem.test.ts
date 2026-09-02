@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
-import { parseGpuMemoryReport, parseMemAvailableMb } from "../src/util/unifiedmem";
+import { parseGpuMemoryReport, parseMemAvailableMb, parseSwapMb, unifiedBudgetMb } from "../src/util/unifiedmem";
 
 describe("GPU 메모리 보고 방식 판정", () => {
   it("★ GB10 실측 출력 — 메모리가 [N/A]면 「GPU 없음」이 아니라 「통합메모리」다", () => {
@@ -154,5 +154,66 @@ describe("GPU 메모리 판정은 한 곳에서 한다", () => {
     expect(code).toContain("unified");
     // 총량이 숫자가 아닐 때를 반드시 가른다 — 이게 없으면 NaN이 조용히 흐른다.
     expect(code).toMatch(/Number\.isFinite\(total\)/);
+  });
+});
+
+
+// ── 스왑을 메모리 예산에 넣는다 (2026-09-02 GB10 실측 · 계획서 전-7 하드웨어 갈래) ──────────
+//
+// 무슨 일이 있었나: 2026-09-02 gb10 탐침에서 이 기계가 **스왑 15GB 중 7GB를 쓰고 있었다.**
+// 그런데 MemAvailable은 26GB로 넉넉해 보였다 — 밀어낸 덕에 오히려 여유가 생긴 것처럼 보인 것이다.
+// 그 상태에서 「26GB 남았으니 모델을 하나 더」는 곧 「더 밀어내자」가 된다. 통합메모리에서는
+// 그 끝이 깨끗한 오류가 아니라 **기계 전체가 멈추는 것**(SSH도 안 되는 상태)이다.
+//
+// ⚠ 실행 시험으로는 안 드러난다 — 스왑이 안 나간 기계에서는 아무 차이가 없기 때문이다.
+//   그래서 파싱과 예산 계산을 순수 함수로 빼고 고정 입력으로 검산한다(위 [N/A] 건과 같은 방식).
+describe("스왑을 감안한 통합메모리 예산", () => {
+  // 2026-09-02 promaxgb10-1d0a 실측값으로 만든 고정 입력.
+  // MemTotal·MemFree·MemAvailable은 /proc/meminfo에서 그대로 채취했고,
+  // 스왑 두 줄은 같은 순간 free -g가 보고한 「총계 15 · 사용 7 · 여분 8」(GiB)을 kB로 옮긴 것이다.
+  const GB10_MEMINFO = [
+    "MemTotal:       127535300 kB",
+    "MemFree:          1838720 kB",
+    "MemAvailable:    26303632 kB",
+    "SwapTotal:       16777212 kB",
+    "SwapFree:         8912896 kB",
+  ].join("\n");
+
+  it("★ GB10 실측 — 스왑 사용량을 읽어낸다", () => {
+    const s = parseSwapMb(GB10_MEMINFO);
+    expect(s).not.toBeNull();
+    expect(s!.totalMb).toBe(16384);
+    expect(s!.freeMb).toBe(8704);
+    expect(s!.usedMb).toBe(7680); // 약 7.5GB — free -g의 「사용 7」과 맞는다
+  });
+
+  it("★ 스왑이 나가 있으면 그만큼 여유를 깎는다 — 이게 이 수정의 요점이다", () => {
+    const avail = parseMemAvailableMb(GB10_MEMINFO)!;
+    const swap = parseSwapMb(GB10_MEMINFO);
+    expect(avail).toBe(25687); // MemAvailable 그대로면 25.7GB로 넉넉해 보인다
+    expect(unifiedBudgetMb(avail, swap)).toBe(25687 - 7680); // 실제로 쓸 수 있는 것은 18GB뿐
+  });
+
+  it("스왑이 없는 기계는 깎지 않는다 — SwapTotal 0은 정상이다", () => {
+    const info = "MemAvailable:    26303632 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB";
+    const swap = parseSwapMb(info);
+    expect(swap!.usedMb).toBe(0);
+    expect(unifiedBudgetMb(1000, swap)).toBe(1000);
+  });
+
+  it("⚠ 스왑을 못 읽으면 깎지 않는다 — 모르는 것을 근거로 여유를 줄이지 않는다", () => {
+    // 컨테이너·오래된 커널에서 스왑 항목이 없을 수 있다. null과 0은 다르다.
+    expect(parseSwapMb("MemAvailable:    26303632 kB")).toBeNull();
+    expect(unifiedBudgetMb(1000, null)).toBe(1000);
+  });
+
+  it("여유보다 스왑이 크면 0으로 막는다 — 음수 예산을 만들지 않는다", () => {
+    expect(unifiedBudgetMb(500, { usedMb: 9000 })).toBe(0);
+  });
+
+  it("엔진이 이 예산을 실제로 쓴다 — 함수만 만들고 안 쓰면 아무 일도 안 일어난다", () => {
+    const code = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "localengine.ts"), "utf8");
+    expect(code).toContain("unifiedBudgetMb");
+    expect(code).toContain("linuxSwapMb");
   });
 });

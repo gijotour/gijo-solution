@@ -15,7 +15,7 @@
 // 사용:
 //   1) 앱을 CDP로 띄우고 로그인해 둔다(프로 셸).  npx electron . --remote-debugging-port=9223
 //   2) node tools/contrast-probe.mjs [화면.html|탭이름] ...
-//      예) node tools/contrast-probe.mjs "inventory.html?hub=1|자산 관리" "memory.html|AI 지식"
+//      예) node tools/contrast-probe.mjs "inventory.html?full=1|자산 관리 (전체)" "memory.html|AI 지식"
 //      인자가 없으면 기본 6화면을 돈다.
 // 종료 코드: 위반이 있으면 1 (게시 전 관문에 물릴 수 있게)
 const PORT = process.env.GIJO_CDP_PORT || "9223";
@@ -109,7 +109,9 @@ const 잴창정의 = `
   }
 `;
 
-const 기본 = ["inventory.html?hub=1|자산 관리", "memory.html|AI 지식", "settings.html|설정",
+// ⚠ full=1이다(F4-09, 2026-09-02) — hub=1로 재면 「한눈에」 그림띠가 숨은 화면을 재게 되어
+//   실제 담당자가 보는 화면과 다른 것을 측정한다.
+const 기본 = ["inventory.html?full=1|자산 관리 (전체)", "memory.html|AI 지식", "settings.html|설정",
   "supplychain.html|공급망", "products.html|보안제품", "dashboard.html|대시보드"];
 const 화면들 = process.argv.slice(2).length ? process.argv.slice(2) : 기본;
 

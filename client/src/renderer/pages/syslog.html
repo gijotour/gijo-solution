@@ -166,7 +166,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const cls = "log-line" + (entry.level === "warn" ? " log-warn" : entry.level === "error" ? " log-error" : "");
     const time = new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour12: false });
     const srcClass = "log-src s-" + src.replace(/[^a-z0-9-]/gi, "");
-    return `<div class="${cls}"><span class="log-ts">${time}</span><span class="${srcClass}">${src}</span>${String(entry.message).replace(/</g, "&lt;")}</div>`;
+    return `<div class="${cls}"><span class="log-ts">${time}</span><span class="${srcClass}" title="원문 갈래 식별자: ${로그글자막기(src)}">${로그글자막기(갈래이름(src))}</span>${String(entry.message).replace(/</g, "&lt;")}</div>`;
   }
 
   // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
@@ -175,9 +175,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // ⚠ 이름표를 **칩에서 읽는다** — 표를 따로 적었더니 칩에는 「파인튜닝」인데 막대는 finetune으로
   //   나오고, 표에만 있던 train·merge는 어디에도 없는 키였다(2026-08-05 검토 지적).
   //   같은 뜻의 이름은 한 곳에서만 정한다.
+  // ⚠ 줄마다 부르면 로그 500줄에 querySelector가 500번 돈다(2026-09-01 여정 점검 F5-12에서
+  //   lineHtml이 이 함수를 쓰게 되면서 생기는 비용). 칩은 화면에 박힌 고정 목록이라 한 번
+  //   읽고 기억해도 값이 달라지지 않는다 — 갈래 수(≤7)만큼만 조회한다.
+  const 갈래이름표 = new Map();
   function 갈래이름(src) {
+    if (갈래이름표.has(src)) return 갈래이름표.get(src);
     const chip = document.querySelector('#sourceFilters .filter-chip[data-src="' + src + '"]');
-    return chip ? chip.textContent.trim() : src;
+    // ⚠ 칩에 없는 갈래(learnloop·extract-capability 등)는 영문 원문이 그대로 남는다 —
+    //   지어낸 한글로 덮지 않는다(모르는 것을 아는 척하지 않는다). 칩을 늘리는 것은 별건.
+    const 이름 = chip ? chip.textContent.trim() : src;
+    갈래이름표.set(src, 이름);
+    return 이름;
+  }
+
+  // 속성·본문에 넣을 글자 막기 — src는 서버가 주는 프로세스 이름이라 그대로 믿지 않는다.
+  // (이 화면엔 공용 esc가 없어 여기서만 쓰는 작은 것을 둔다.)
+  function 로그글자막기(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   }
 
   function 갈래고르기(src) {
