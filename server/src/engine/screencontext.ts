@@ -80,7 +80,12 @@ const SCREENS: Record<string, ScreenContext> = {
 export function getScreenContext(screen?: string): ScreenContext | undefined {
   if (!screen) return undefined;
   // 클라이언트가 경로째 보내도("pages/vulnscan.html", "/vulnscan.html") 받아들인다.
-  const key = screen.split(/[\\/]/).pop() ?? screen;
+  // ⚠ 2026-09-02: **쿼리도 뗀다.** 안 떼면 판 주소에 쿼리가 붙는 순간(예: "approvals.html?status=verifying")
+  //   이 표에서 못 찾아 undefined가 되고, 도구 좁히기와 기본 동작이 **조용히 죽는다** —
+  //   화면은 멀쩡히 뜨는데 대화만 멍청해진다(이 파일 머리의 경고가 말하는 바로 그 부류다).
+  //   지금까지 안 터진 이유는 모든 판의 주소에 쿼리가 없었기 때문이고, 검증 허브 개편이 첫 사례를 만든다.
+  //   잣대는 이미 하나로 정해져 있다 — workflow.ts:47·screenguide.ts:192·1137이 같은 꼴을 쓴다.
+  const key = (screen.split(/[\\/]/).pop() ?? screen).split("?")[0];
   return SCREENS[key];
 }
 

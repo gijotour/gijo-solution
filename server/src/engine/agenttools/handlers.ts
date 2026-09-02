@@ -2170,7 +2170,9 @@ export function 단계안내글(단계: number): string {
   const s = workflowStages().find((x) => x.no === 단계);
   const 할일 = 단계별할일[단계];
   if (!s || !할일) return 절차현황글();
-  const 건 = s.count == null ? "값을 못 구했습니다(0이 아니라 **모름**입니다)" : `지금 ${s.count}건`;
+  // ⚠ 2026-09-02(F4-03): 「건」은 단계마다 뜻이 다르다 — ①은 자산, ④는 실패 항목이다.
+  //   서버가 정한 이름(countLabel)을 그대로 말한다. 없으면 「건」으로 둔다(지어내지 않는다).
+  const 건 = s.count == null ? "값을 못 구했습니다(0이 아니라 **모름**입니다)" : `지금 ${s.count}${s.countLabel ? " " + s.countLabel : "건"}`;
   const 경고 = s.alert != null && s.alertLabel && s.alert > 0 ? ` · ${s.alertLabel} ${s.alert}건` : "";
   return [
     `${s.no} ${s.label} 단계 — ${건}${경고}`,
@@ -2187,7 +2189,7 @@ export function 절차현황글(질문?: string): string {
   if (지목) return 단계안내글(지목);
   const 단계들 = workflowStages();
   const 줄 = 단계들.map((s) => {
-    const 건 = s.count == null ? "—" : `${s.count}건`;
+    const 건 = s.count == null ? "—" : `${s.count}${s.countLabel ? " " + s.countLabel : "건"}`;
     const 경고 = s.alert == null || !s.alertLabel ? "" : ` · ${s.alertLabel} ${s.alert}`;
     return `${s.no} ${s.label} — ${건}${경고}`;
   });

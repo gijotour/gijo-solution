@@ -1574,7 +1574,11 @@
       // 살아 있는 숫자 — 지금 단계의 count·alert(서버가 이미 계산해 주는 값 그대로)
       var me = stages[idx];
       var live = "";
-      if (me.count != null) live += "대상 " + me.count;
+      // ⚠ 2026-09-02(F4-03): 「대상 N」은 **거짓 이름이었다.** 이 자리는 다섯 단계에 같은 말을 붙였는데,
+      //   ④ 검증의 값은 대상 수가 아니라 **실패 항목 합계**다(workflow.ts에서 대상마다 최근 결과의
+      //   실패를 더한다). 담당자가 「대상 40」으로 읽으면 40개 장비가 있는 줄 안다.
+      //   ⇒ 서버가 주는 이름(countLabel)을 쓴다. **없으면 이름을 안 붙인다** — 지어내지 않는다.
+      if (me.count != null) live += me.count + (me.countLabel ? " " + me.countLabel : "");
       if (me.alert != null && me.alertLabel) live += (live ? " · " : "") + me.alertLabel + " <b>" + me.alert + "</b>";
       html += '<span class="cs-live">' + live + "</span>";
       el.innerHTML = html;

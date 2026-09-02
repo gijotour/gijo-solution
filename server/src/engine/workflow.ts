@@ -144,7 +144,7 @@ export function workflowStages(): WorkflowStage[] {
   // ⚠ page는 **STAGE_SCREENS의 그 단계 안에 있는 화면**이어야 한다 — 아니면 띠에서 눌러
   //   도착한 순간 띠가 다른 단계를 가리킨다. workflow.test.ts가 대조해 막는다.
   return [
-    { no: 1, key: "find", label: "발견·수집", count: assets.length, countLabel: "자산", alert: 오늘신규, alertLabel: "오늘 신규", page: "discover.html", screens: STAGE_SCREENS[1] },
+    { no: 1, key: "find", label: "발견·수집", count: assets.length, countLabel: "자산", alert: 오늘신규, alertLabel: "오늘 스캔", page: "discover.html", screens: STAGE_SCREENS[1] },
     { no: 2, key: "triage", label: "우선순위", count: 취약, countLabel: "미조치 취약점", alert: kev, alertLabel: "실제 악용(KEV)", page: "triage.html", screens: STAGE_SCREENS[2] },
     { no: 3, key: "fix", label: "조치", count: 진행, countLabel: "진행 중", alert: 미배정, alertLabel: "미배정", page: "fix.html", screens: STAGE_SCREENS[3] },
     { no: 4, key: "verify", label: "검증", count: 실패항목, countLabel: "실패 항목", alert: 미확인, alertLabel: "미점검 대상", page: "verify.html", screens: STAGE_SCREENS[4] },
