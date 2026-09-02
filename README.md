@@ -244,6 +244,6 @@ npx tsc --noEmit               # 타입 검사 — CI의 첫 관문
 | `GIJO_AS_용어사전.md` | 이 제품의 말이 낯설 때(계속 갱신되는 문서) |
 | `GIJO_AS_시장경쟁력_전중후_계획서.md` | 지금 무엇을 왜 만들고 있는지 |
 | `GIJO_AS_RAG_아키텍처_LLM연동.md` | 지식 검색·임베딩 구조 |
-| `GIJO_AS_2머신_개발환경_가이드.md` | Windows ↔ Mac 두 대로 개발할 때 |
+| `GIJO_AS_3머신_개발환경_가이드.md` | Windows ↔ Mac 두 대로 개발할 때 |
 | `GIJO_AS_MAC_올인원_배포_가이드.md` | Mac(Metal)에서 서버+LLM 돌릴 때 |
 | `GIJO_AS_시험지도.md` | 어떤 시험이 무엇을 지키는지 |
