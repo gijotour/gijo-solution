@@ -20,12 +20,12 @@
           <rect x="40" y="36" width="410" height="270" rx="16" fill="var(--surface)" stroke="var(--client)" stroke-width="1.6"/>
           <rect x="40" y="36" width="410" height="34" rx="16" fill="var(--client)" opacity=".12"/>
           <text class="t-eyebrow" fill="var(--client)" x="62" y="58">담당자 PC · WINDOWS 10/11 · ×N대 · 관리자 권한 불필요</text>
-          <text class="t-host" fill="var(--ink)" x="62" y="98">GIJO AS 클라이언트 5.14.0</text>
+          <text class="t-host" fill="var(--ink)" x="62" y="98">GIJO AS 클라이언트 5.83.0</text>
           <text class="t-meta" fill="var(--muted)" x="62" y="119">Electron · 계정당 로그인 세션 1개 · 상태는 전부 서버에</text>
 
           <g font-family="var(--sans)">
             <circle cx="74" cy="150" r="9" fill="var(--client)" opacity=".18"/><text x="74" y="154" text-anchor="middle" fill="var(--client)" font-size="11" font-weight="700">1</text>
-            <text class="t-role" fill="var(--ink)" x="92" y="154">설치본 — GIJO AS Setup 5.14.0.exe</text>
+            <text class="t-role" fill="var(--ink)" x="92" y="154">설치본 — GIJO-AS-Setup-5.83.0.exe</text>
             <text class="t-note" fill="var(--muted)" x="92" y="172">NSIS 마법사 · 사용자 단위 설치 · 서명 없음(EDR 예외 필요)</text>
 
             <circle cx="74" cy="199" r="9" fill="var(--client)" opacity=".18"/><text x="74" y="203" text-anchor="middle" fill="var(--client)" font-size="11" font-weight="700">2</text>
@@ -88,7 +88,7 @@
   <section>
     <div class="sec-head">
       <span class="num">06</span><h2>담당자 여정 점검 · 설치 → 로그인 → 제품 UI</h2>
-      <span class="sub">8갈래 점검 → 반박 검증 통과분만 · 코드는 안 고쳤다</span>
+      <span class="sub">손확인 10건 + 8갈래 점검 → 반박 검증 통과분만 · 코드는 안 고쳤다</span>
     </div>
     <div class="kpi" style="margin-bottom:14px">
       {{JOURNEY_KPI}}
@@ -113,7 +113,7 @@
   <section>
     <div class="sec-head">
       <span class="num">07</span><h2>GB10(DGX Spark) 코드 병행 검토</h2>
-      <span class="sub">서버를 GB10에 올린다는 전제 · origin/main f1bfd98 기준</span>
+      <span class="sub">서버를 GB10에 올린다는 전제 · hub/main 29919788(클라 5.83.0) + GB10 실측 2026-09-02</span>
     </div>
     <div class="grid2">
       <div class="card" style="--c:var(--gb)">
@@ -149,15 +149,15 @@
         </ul>
       </div>
     </div>
-    <div class="note bad" style="margin-top:14px">
-      <b>origin(GitHub)이 허브보다 뒤에 있다.</b> 이 검토는 origin/main <code style="font-family:var(--mono)">f1bfd98</code>(2026-08-09) 코드를 봤다. 이 지도의 08-13 판에 적힌 <code style="font-family:var(--mono)">unifiedmem.ts</code>·<code style="font-family:var(--mono)">tools/wsl-test.sh</code>·시험 2,979개는 origin에 없다 — 허브(Windows)에서 <code style="font-family:var(--mono)">git push origin main</code>을 한 번 해 주면 다음 클라우드 검토가 현재 코드를 본다. 아래 nvidia-smi 관련 항목은 허브의 unifiedmem.ts가 이미 풀었을 수 있다.
+    <div class="note" style="margin-top:14px">
+      <b>origin(GitHub)을 허브에 맞췄다 — 2026-09-02.</b> 클라우드(09-01) 검토는 origin/main <code style="font-family:var(--mono)">f1bfd98</code>(08-09) 코드를 봤고, 그래서 「GB10은 계획서에 없다」·「nvidia-smi [N/A]를 GPU 없음으로 읽는다」는 전제가 낡았었다. win에서 <code style="font-family:var(--mono)">git push origin main</code>(846커밋)으로 맞춘 뒤 hub/main <code style="font-family:var(--mono)">29919788</code> 기준으로 다시 봤다 — <code style="font-family:var(--mono)">unifiedmem.ts</code>가 통합메모리 갈래를 이미 풀었고, 계획서 전-7에 편입이 이미 적혀 있다.
     </div>
   </section>
 
   <!-- ========== 8. 문서 통독·통합 (2026-09-01) ========== -->
   <section>
     <div class="sec-head">
-      <span class="num">08</span><h2>md 문서 81개 · 날짜순 통독과 통합</h2>
+      <span class="num">08</span><h2>md 문서 143개 · 날짜순 통독과 통합</h2>
       <span class="sub">본문 날짜로 연대기 · 원본은 지우지 않았다</span>
     </div>
     <div class="kpi" style="margin-bottom:14px">

@@ -1,0 +1,32 @@
+{
+  "GB10_ONE_LINE": "GB10 · 통합메모리 121GB(CPU 공유) · 실측 09-02: 서버 4000 가동 · 코드가 [N/A] 갈래를 안다",
+  "GB10_VERDICT": "<b>「올릴 수 있다」는 이미 사실이다 — 09-02 실측에서 제품 서버가 GB10에서 11시간 넘게 돌고 있었다.</b> 서버 코드는 통합메모리를 안다(<code style=\"font-family:var(--mono)\">unifiedmem.ts</code> 한 곳 판정 → localengine·preflight가 씀). 남은 것은 <b>「고객 배치의 서버 후보로 삼는가」</b>라는 결정이다: 계획서(전-7 하단)는 실측 38.3 vs 118.5 tok/s로 「큰 기계=Pro」 길을 닫고 값어치를 <b>용량</b>으로 못박았다. 코드에 남은 틈은 셋 — 스왑을 예산에 넣지 않음 · 티어 표에 통합메모리 갈래가 없음(121GB가 pro 상한을 넘어 어색하게 잡힘) · 비로그인 셸 PATH에 node 없음.",
+  "GB10_FACTS": [
+    "<li><span class=\"fk\">기계</span><span>promaxgb10-1d0a · Ubuntu 24.04.4 · aarch64 · CPU 20 · 메모리 121GB · 디스크 1.9TB(265GB 사용) · CUDA 13.0 / 드라이버 580.173.02 <span style=\"color:var(--muted)\">(gb10-probe.txt 09-02)</span></span></li>",
+    "<li><span class=\"fk\">nvidia-smi</span><span>메모리 칸 전부 <code style=\"font-family:var(--mono)\">[N/A]</code> — name,memory.total · memory.free · utilization,used,total 3종 모두. 표에도 「Not Supported」 <span style=\"color:var(--muted)\">(08-11 채취값과 일치)</span></span></li>",
+    "<li><span class=\"fk\">가동 중</span><span>제품 서버 <code style=\"font-family:var(--mono)\">node dist/index.js</code> :4000(11h32m, /api/health ok · schema 50) · llama-server :8081 bge-m3 · :8080 Qwen3.8-Flash-Next Q3_K_XL 분할 GGUF 59.6GB · :8090 qwen3-coder-30b-a3b 21GB(절감 도구)</span></li>",
+    "<li><span class=\"fk\">메모리 상태</span><span>사용 96GB · MemAvailable 26GB · <b>스왑 7/15GB 사용 중</b> — 모델 3개 상주 시 여유가 적다</span></li>",
+    "<li><span class=\"fk\">네이티브</span><span>better-sqlite3 · better-sqlite3-multiple-ciphers · @lancedb/lancedb · onnxruntime-node — 4종 모두 aarch64 로드 OK · llama-server aarch64 빌드(llama.cpp-next)</span></li>",
+    "<li><span class=\"fk\">계획서</span><span>전-7 하단: GB10 편입 완료 · 원격 GPU 선택지 · 7.6B Q5@16K <b>38.3 tok/s vs RTX 3090 118.5</b> → 값어치는 속도가 아니라 용량 <span style=\"color:var(--muted)\">(계획서 62·70·77~79행)</span></span></li>"
+  ],
+  "GB10_ROWS": [
+    "<tr><td>스왑을 메모리 예산에</td><td><span class=\"sev p1\">P1</span></td><td>통합메모리 갈래의 <code>getFreeVramMb</code>가 MemAvailable만 본다 — 스왑이 차오르면 tok/s가 급락하므로 SwapFree·스왑 사용률을 함께 읽어 여유를 깎거나 경고를 낸다</td><td>전-7 하드웨어 갈래</td><td>작음</td></tr>",
+    "<tr><td>티어 표에 통합메모리 갈래</td><td><span class=\"sev p1\">P1</span></td><td><code>GIJO_TIERS</code>는 VRAM 급(10/24/48GB)만 안다 — 121GB 통합메모리는 pro 상한을 넘어 잡힌다. 「통합메모리 대용량」 표시와 상주 개수 기준을 따로 둔다(계획서 「큰 기계=Pro 아님」과 맞게)</td><td>전-7 · 사용자 결정 §5-③</td><td>중간</td></tr>",
+    "<tr><td>비로그인 셸 PATH</td><td><span class=\"sev p2\">P2</span></td><td>node가 <code>~/.local/bin</code>에만 있어 <code>ssh gb10 'bash -s'</code>로 부르는 스크립트는 「node 없음」이 된다 — 배포·탐침 스크립트는 <code>bash -lc</code> 또는 절대경로</td><td>후-1 운영 안정</td><td>작음</td></tr>",
+    "<tr><td>gb10 저장소 뒤처짐</td><td><span class=\"sev p2\">P2</span></td><td><code>~/gijo-as</code>가 hub/main보다 6커밋 뒤(915a71fd) — 도는 서버는 그 빌드다. <code>git push gb10 main</code> 뒤 재기동 절차를 인계 명령에 고정</td><td>후-1</td><td>작음</td></tr>"
+  ],
+  "GB10_CHECKLIST": [
+    "<li><b>읽기 전용 탐침</b> — <code style=\"font-family:var(--mono)\">ssh gb10 'bash -lc \"bash -s\"' &lt; tools/review-2026-09-01/gb10-probe.sh</code> ✓ 09-02 완료(로그인 셸로)</li>",
+    "<li><b>티어 화면 문구</b> — 설정 → 구동 티어에 「NVIDIA GB10 · 통합메모리 121GB(CPU와 공유)」가 뜨는지(「GPU를 찾지 못했습니다」가 나오면 FAIL)</li>",
+    "<li><b>자가진단</b> — preflight GPU 항목 pass + 같은 문구. 티어 화면과 모순 없어야 한다(08-11 사고 재발 검사)</li>",
+    "<li><b>스왑 부하</b> — 모델 3개 상주 상태에서 32K 문맥 요청 → tok/s와 스왑 사용량을 같이 기록(운영 부하 없는 시간에)</li>",
+    "<li><b>tok/s 재측정</b> — 7.6B Q5@16K로 08-11(38.3)과 같은 조건, 그리고 Qwen3.8-Flash-Next 실사용 조건</li>",
+    "<li><b>재배포 절차</b> — <code style=\"font-family:var(--mono)\">git push gb10 main</code> → 빌드 → 재기동 → /api/health, 한 번에 도는지</li>"
+  ],
+  "GB10_CAVEATS": [
+    "<li><span class=\"fk\">속도 미측정</span><span>09-02는 읽기 전용만 했다 — 운영 중인 서버에 부하를 주지 않기 위해. tok/s는 계획서 08-11 실측을 인용</span></li>",
+    "<li><span class=\"fk\">6커밋 차</span><span>본 코드는 hub/main 최신, 도는 서버는 6커밋 전 빌드</span></li>",
+    "<li><span class=\"fk\">워크플로 3갈래</span><span>GB10검토 워크플로(조사→3갈래→검증→종합)는 1차 실행이 사용량 한도로 0건, 2차 실행 결과를 이 절에 합친다</span></li>",
+    "<li><span class=\"fk\">고객 배치 여부</span><span>「GB10을 고객 서버 후보로」는 사용자 결정 — 이 절은 그 결정의 재료다</span></li>"
+  ]
+}
