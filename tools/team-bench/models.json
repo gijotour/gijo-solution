@@ -1,0 +1,15 @@
+[
+  { "id": "gijo-main-7.6b", "path": "~/gijo-as/server/models/gijo-main-orchestrator/gijo-main-orchestrator.gguf", "license": "Apache-2.0(합성)", "thinking": false, "note": "현행 기본 모델(라이트 기준선)" },
+  { "id": "qwen3-14b", "path": "~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf", "license": "Apache-2.0", "thinking": true, "note": "학생 1순위" },
+  { "id": "qwen3.8-27b", "path": "~/gijo-as/server/models/qwen38-27b/qwen38-27b.gguf", "license": "Apache-2.0", "thinking": true, "note": "프로·파일 읽기 후보(UD-Q4_K_M)" },
+  { "id": "qwen3-32b-q3", "path": "~/gijo-as/server/models/qwen3-32b-q3/qwen3-32b-q3.gguf", "license": "Apache-2.0", "thinking": true, "note": "큰 dense 비교(Q3)" },
+  { "id": "qwen3-coder-30b-a3b", "path": "~/gijo-as/server/models/qwen3-coder-30b-a3b/qwen3-coder-30b-a3b.gguf", "license": "Apache-2.0", "thinking": false, "note": "파일·로그 구조화 후보(MoE)" },
+  { "id": "gpt-oss-20b", "path": "~/gijo-as/server/models/gpt-oss-20b/gpt-oss-20b.gguf", "license": "Apache-2.0", "thinking": true, "note": "MoE 3.6B 활성·128K" },
+  { "id": "kanana-1.5-8b", "path": "~/gijo-as/server/models/kanana-1.5-8b/kanana-1.5-8b.gguf", "license": "Apache-2.0", "thinking": false, "note": "카카오 한국어 8B(llama 구조)" },
+  { "id": "ax-4.0-light-7b", "path": "~/gijo-as/server/models/ax-4.0-light/ax-4.0-light.gguf", "license": "Apache-2.0", "thinking": false, "note": "SKT 한국어 7B(qwen2 구조)" },
+  { "id": "midm-2.0-base-11b", "path": "~/gijo-as/server/models/midm-2.0-base/midm-2.0-base.gguf", "license": "MIT", "thinking": false, "note": "KT 한국어 11.5B(llama 구조)" },
+  { "id": "kanana-2-30b-a3b", "path": "~/gijo-as/server/models/kanana-2-30b-a3b/kanana-2-30b-a3b.gguf", "license": "kanana-license(재배포 시 Powered by Kanana 표기)", "thinking": false, "note": "카카오 MoE 3B 활성(deepseek v3 구조)" },
+  { "id": "hcx-seed-think-32b", "path": "~/gijo-as/server/models/hcx-seed-think-32b/hcx-seed-think-32b.gguf", "license": "hyperclovax(조항 확인)", "thinking": true, "note": "네이버 32B — llama.cpp 지원 여부 자체가 시험" },
+  { "id": "exaone-4.0-32b", "path": "~/gijo-as/server/models/exaone-4.0-32b/exaone-4.0-32b.gguf", "license": "EXAONE(연구·교육 한정 — BYOM만)", "thinking": true, "note": "비교용. 상업 번들 불가" },
+  { "id": "exaone-3.5-7.8b", "path": "~/gijo-as/server/models/exaone-3.5-7.8b/exaone-3.5-7.8b.gguf", "license": "비상업(BYOM만)", "thinking": false, "note": "한국어 유창 기준선(2026-08-05 실측 1위)" }
+]
