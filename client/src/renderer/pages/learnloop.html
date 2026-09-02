@@ -215,11 +215,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="cat-head"><span style="font-size:18px">⚙</span><span class="cat-title">루프 설정</span></div>
       <!-- 설명 문단 4개는 챗봇 ⓘ로 이관(2026-08-21 밀도 — hardening.html:81 원칙: 설명은 화면에
            늘어놓지 않는다). ⚠경고성 한 줄만 남긴다. -->
-      <div class="cat-intro">⚠ 모델·대상은 신중히 바꾸세요. 베이스 모델은 HuggingFace 원본 repo id(HF transformers)이며, GGUF id가 아닙니다.</div>
+      <!-- ⚠ 2026-09-02(F5-09) 담당자 말로 고침. **뜻을 흐리지 않는다** — 여기 들어갈 주소는
+           **원본(학습용)**이고 제품이 평소 굴리는 **압축본(GGUF)** 주소가 아니다. 둘을 헷갈리면
+           학습이 시작조차 안 된다. 그래서 「원본」과 「평소 쓰는 모델」을 말로 갈라 적는다.
+           자세한 뜻풀이는 화면에 쓰지 않고 챗봇(screenguide learnloop.html)으로 보낸다. -->
+      <div class="cat-intro">⚠ 신중히 바꾸세요. 여기에는 <b>학습용 원본 모델의 주소</b>를 넣습니다 — 제품이 평소 굴리는 <b>압축본과는 다른 주소</b>입니다.</div>
       <div class="cfg-panel">
         <label class="cfg-toggle"><input type="checkbox" id="cfgAutoCollect">대화 자동 수집</label>
-        <div class="cfg-field"><label>학습 베이스 모델 (HF repo)</label><input id="cfgBaseModel" class="wide" placeholder="Qwen/Qwen3-14B"></div>
-        <div class="cfg-field"><label>배포 접두어 (산출 어댑터 이름)</label><input id="cfgPrefix" placeholder="sec-expert"></div>
+        <div class="cfg-field"><label>바탕 모델 — 학습용 원본 주소</label><input id="cfgBaseModel" class="wide" placeholder="Qwen/Qwen3-14B"></div>
+        <div class="cfg-field"><label>만들어질 전문가 이름</label><input id="cfgPrefix" placeholder="sec-expert"></div>
         <div class="cfg-field"><label>배포 대상 에이전트</label><select id="cfgAgent"></select></div>
         <button class="btn-ghost" id="cfgSaveBtn">저장</button>
         <span class="run-line" id="cfgLine"></span>
@@ -276,8 +280,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // ── 실행 단계 표시 ─────────────────────────────────────────────────
   const STAGES = [
     { key: "stopping-engines", label: "엔진 정지" },
-    { key: "training", label: "학습(QLoRA)" },
-    { key: "exporting", label: "GGUF 변환" },
+    { key: "training", label: "학습" }, // ⚠ 2026-09-02(F5-09) 「학습(QLoRA)」에서 방식 이름을 뺐다 — 담당자에게 방식 이름은 뜻이 없다
+    { key: "exporting", label: "제품이 쓸 형식으로 변환" }, // ⚠ 2026-09-02(F5-09) 「GGUF 변환」에서 형식 이름을 뺐다
     { key: "deploying", label: "에이전트 배포" },
     { key: "restarting-engines", label: "엔진 재기동" },
   ];
