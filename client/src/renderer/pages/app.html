@@ -1396,7 +1396,7 @@
     자리적용();
   });
   // 창 크기가 바뀌면 자동 모드에서만 따라간다.
-  window.addEventListener("resize", function () { if (자리모드() === "auto") 자리적용(); });
+  window.addEventListener("resize", function () { if (자리모드() === "auto") 자리적용(); 좁을때메뉴접기(); });
   자리적용();
 
   // ── 열린 창 목록 ─────────────────────────────────────────────────────
@@ -1527,7 +1527,7 @@
       if (wasPopped0 === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
       로그인선택_못한것알리기();
       프로레일();
-      끌개설치(); 대화폭복원(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
+      끌개설치(); 대화폭복원(); 좁을때메뉴접기(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
       return;
     }
     var st = null;
@@ -1553,7 +1553,7 @@
     if (wasPopped === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
     로그인선택_못한것알리기();
     프로레일();
-    끌개설치(); 대화폭복원(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
+    끌개설치(); 대화폭복원(); 좁을때메뉴접기(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
   }
 
   // ── 🚀 프로 셸 — 레일과 「대화 홈」(2026-08-18 승인 시안) ────────────────────
@@ -1725,6 +1725,35 @@
 
   var CONSOLE_W_KEY = "gijo:console:w";
   var CONSOLE_W_DEFAULT = 380;
+  // ── F3-11 좁은 창 구제 — **화면 판 420px 약속을 지킨다**(승인 시안 프로셸-마무리) ─────────
+  // 산식(대화폭클램프)을 그대로 풀면: 최대 = max(360, work-420) · console = max(360, min(최대, px))
+  //   work >= 780 → console <= work-420 → 화면 판 >= 420  ✔ 약속이 지켜진다
+  //   work <  780 → 바닥 360이 이겨 console = 360 → 화면 판 = work-360 < 420  ✘ 위반
+  // ⇒ **문턱은 780(=420+360)**이다. ⚠ 시안이 적은 1004는 다른 잣대(팝업 스퀴즈 하한 644+380)를
+  //   옮겨 온 값이라 틀렸다(설계 검토에서 잡음) — 그 값으로 가면 **위반이 없는데도 메뉴를 접는다.**
+  // 잃어도 되는 것은 본문이 아니라 보조 크롬이다(WCAG 1.4.10 Reflow) — 그래서 **메뉴 판을 먼저** 접는다.
+  // ⚠ **저장하지 않는다** — 클래스만 켠다. 창을 다시 넓히면 사용자가 저장해 둔 상태로 돌아간다.
+  var 자동접힘중 = false;
+  function 좁을때메뉴접기() {
+    if (!프로인가()) return;
+    var work = document.querySelector(".work");
+    if (!work) return;
+    var 좁다 = work.clientWidth < 780;
+    if (좁다 && !document.body.classList.contains("pro-menu-closed")) {
+      document.body.classList.add("pro-menu-closed"); 자동접힘중 = true;
+    } else if (!좁다 && 자동접힘중) {
+      // 내가 접은 것만 되돌린다 — 사용자가 손으로 접어 둔 것은 건드리지 않는다.
+      var 저장접힘 = "0";
+      try { 저장접힘 = localStorage.getItem(PRO_MENU_KEY) || "0"; } catch (e) { }
+      if (저장접힘 !== "1") document.body.classList.remove("pro-menu-closed");
+      자동접힘중 = false;
+    }
+    // ⚠ 접은 **뒤에** 다시 잰다 — --menu-w가 0이 되며 work이 200px 늘어나므로,
+    //   접기 전 값으로 클램프하면 화면 판이 420이 안 나온다.
+    var 현재 = parseInt(getComputedStyle(work).getPropertyValue("--console-w"), 10);
+    if (현재 && isFinite(현재)) 대화폭적용(현재, false);
+  }
+
   function 대화폭클램프(px) {
     var work = document.querySelector(".work");
     var 최대 = Math.max(360, (work ? work.clientWidth : 1920) - 420); // 화면 판 최소 420 보장
@@ -1798,6 +1827,7 @@
     if (저장) { try { localStorage.setItem(CONSOLE_FOLD_KEY, 접힘 ? "1" : "0"); } catch (e) { } }
   }
   function 대화부르기() {
+    좁을때메뉴접기(); // F3-11 — 손잡이로 대화창을 부를 때가 폭이 실제로 눌리는 순간이다
     if (!대화접힘상태()) return;
     대화접힘적용(false, true);
     // 접힌 동안 온 것을 바로 보인다 — 최신(맨 아래)으로(시안: 열면 그 자리로 스크롤).

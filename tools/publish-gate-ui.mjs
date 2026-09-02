@@ -656,7 +656,11 @@ ok("메뉴 열기 → 현황 카드 자동(assets)", 자동카드);
       const rsz = document.getElementById("conResize");
       const 활성 = (window.gijoTabs && window.gijoTabs.activeScreen && window.gijoTabs.activeScreen()) || "";
       return {
-        메뉴판: !!nav && nav.offsetWidth > 0,
+        // ⚠ **폭이 아니라 「살아 있나」를 잰다**(2026-09-02 F3-11 설계 검토).
+        //   좁은 창에서 메뉴 판이 **자동으로 접히면**(--menu-w:0) offsetWidth가 0이 되어,
+        //   창이 좁은 기계에서 게시할 때만 관문이 죽는 부류가 된다. 접힘은 정상 동작이지 결함이 아니다.
+        //   qa-auto.mjs가 이미 쓰는 잣대(display !== "none")로 맞춘다 — 잣대를 둘로 두지 않는다.
+        메뉴판: !!nav && getComputedStyle(nav).display !== "none",
         끌개: !!rsz && rsz.offsetParent !== null,
         활성: String(활성),
         비mydocs활성: !!활성 && !/mydocs/.test(String(활성)),
