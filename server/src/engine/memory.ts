@@ -520,7 +520,7 @@ export async function categorizeDocument(documentId: string, text: string, allow
   if (scores.every((s) => s === 0)) return "일반";
   try {
     const reply = await chat({
-      agentId: "analysis",
+      agentId: "curator",
       message: [
         "다음 문서가 어느 업무 자료인지 아래 5가지 중 정확히 한 단어로만 분류하라. 다른 텍스트 없이 그 한 단어만 출력한다.",
         "선택지: 취약점(점검 결과·CVE·조치), 장비운영(장비 매뉴얼·설정·유지보수), 사내규정(정책·지침·컴플라이언스), 위협대응(공격 탐지·침해 대응·룰), 일반(그 외)",
@@ -548,7 +548,7 @@ export async function categorizeDocument(documentId: string, text: string, allow
 }
 
 async function classifyDocument(documentId: string, text: string): Promise<string> {
-  emitCollaboration({ from: "scan", to: "analysis", message: `문서 분석·분류 요청: ${documentId}` });
+  emitCollaboration({ from: "orchestrator", to: "curator", message: `문서 분류 요청: ${documentId}` });
   let docClass: string;
   const byName = classifyByFilenameStrict(documentId) ?? classifyByContentHint(text);
   if (byName) {
@@ -556,7 +556,7 @@ async function classifyDocument(documentId: string, text: string): Promise<strin
   } else {
     try {
       const reply = await chat({
-        agentId: "analysis",
+        agentId: "curator",
         message: [
           "다음 문서를 아래 4가지 중 정확히 한 단어로만 분류하라. 다른 텍스트 없이 그 한 단어만 출력한다.",
           "선택지: 매뉴얼(제품·시스템 사용법/운영/로그 설명), 보고서(동향·현황·분석 결과), 정책(사내 규정·지침·표준), 기타",
@@ -572,7 +572,7 @@ async function classifyDocument(documentId: string, text: string): Promise<strin
     }
   }
   emitCollaboration({
-    from: "analysis",
+    from: "curator",
     to: "orchestrator",
     message: `문서 분류 완료: ${documentId} → ${docClass}${byName ? " (파일명 표기 근거)" : ""}`,
   });
@@ -605,7 +605,7 @@ async function linkManualToProduct(documentId: string): Promise<string | undefin
       (acc, l) => acc ?? l(documentId), undefined);
     if (linked) {
       emitCollaboration({
-        from: "analysis",
+        from: "curator",
         to: "orchestrator",
         message: `매뉴얼 자동 연결: ${documentId} → 보안제품 '${linked.productName}' (${linked.kind === "logManual" ? "로그 매뉴얼" : "제품 매뉴얼"})`,
       });

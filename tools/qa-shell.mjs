@@ -346,8 +346,8 @@ const 팀 = await page.evaluate(() => {
     };
   } catch (e) { return { err: String(e).slice(0, 60) }; }
 });
-// 팀원 6 + ☁ 1 = 7장. 숫자를 박아 두면 팀원이 늘 때 이 검사가 먼저 말해 준다.
-ok("AI팀 구성 — 기반 두뇌·팀원 카드·☁ 외부 상담역이 그려진다", 팀.기반 && 팀.카드수 === 7 && 팀.외부상담역 && 팀.공용, JSON.stringify(팀));
+// 팀원 7 + ☁ 1 = 8장(사서 2026-09-03). 숫자를 박아 두면 팀원이 늘 때 이 검사가 먼저 말해 준다.
+ok("AI팀 구성 — 기반 두뇌·팀원 카드·☁ 외부 상담역이 그려진다", 팀.기반 && 팀.카드수 === 8 && 팀.외부상담역 && 팀.공용, JSON.stringify(팀));
 
 // 16) JS 오류 — preload 주입 플레이크의 1회성 오류(치유 전 프레임 소음)는 구분 집계
 const transient = jsErrors.filter((e) => e.includes("reading 'isAuthenticated'"));

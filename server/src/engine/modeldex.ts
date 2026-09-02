@@ -130,7 +130,7 @@ const AGENT_MODEL_RECOMMENDATIONS: Record<string, AgentModelRecSpec> = {
   },
   analysis: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
-    reason: "우선순위 판단과 매끄러운 한국어 설명 품질이 좋습니다. 기억·학습(RAG)·온톨로지 관리와 학습 데이터셋 Q&A 생성도 이 에이전트 담당입니다.",
+    reason: "우선순위 판단과 매끄러운 한국어 설명 품질이 좋습니다. 학습 루프·어댑터 등 AI 모델 관리 설명에도 맞습니다(문서 분류·보강은 Curator 몫).",
   },
   report: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
@@ -143,6 +143,10 @@ const AGENT_MODEL_RECOMMENDATIONS: Record<string, AgentModelRecSpec> = {
   normaltic: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
     reason: "스캔·분석 결과에 나온 용어를 사내 자료 근거로 해설하고 사례를 부연하는 데 한국어 품질·지시따르기가 좋습니다(엄격 그라운딩에 적합).",
+  },
+  curator: {
+    modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
+    reason: "문서 분류·세 줄 요약·번역 보강·정형 초안은 지시 따르기와 한국어 요약 품질이 관건입니다. 2회차 실측(2026-09-03)에서 A.X-4.0-Light 7B가 같은 급 속도에서 동률이라 지식 적재 게이트 재판정 뒤 교체 후보입니다.",
   },
 };
 

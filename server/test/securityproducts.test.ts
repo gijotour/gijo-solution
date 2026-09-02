@@ -245,7 +245,7 @@ describe("securityproducts (보안제품 종류별 관리 + 매뉴얼)", () => {
       );
       const draft = await draftProductFields("FortiGate 600F", "펌웨어 v9.2.1, 관리 포트 10.0.4.1:443, 로그는 CEF 형식");
       expect(chatSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ agentId: "analysis", responseSchema: expect.any(Object) })
+        expect.objectContaining({ agentId: "curator", responseSchema: expect.any(Object) }) // 2026-09-03 사서(문서 반입 문)
       );
       expect(draft.map((f) => f.key)).toEqual(PRODUCT_FIELD_SCHEMA.map((f) => f.key));
       expect(draft.find((f) => f.key === "firmwareVersion")!.value).toBe("v9.2.1");

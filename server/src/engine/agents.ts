@@ -5,6 +5,7 @@ import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { db } from "../db";
 import { isModelAvailable } from "./localengine";
 import { getAdapter } from "./adapters";
+import { recordAudit } from "./audit";
 
 export type AgentStatus = "idle" | "working" | "watching";
 
@@ -66,9 +67,9 @@ const AGENT_DEFS: AgentBase[] = [
   {
     id: "analysis",
     name: "Analyze Agent",
-    role: "AI 지식·모델 관리 · 우선순위 판단",
+    role: "우선순위 판단 · AI 모델 관리",
     abbr: "우선",
-    desc: "기억·학습(RAG)·온톨로지·학습 루프 등 AI 지식모델 관리를 담당하고, 스캔 finding의 우선순위를 판단합니다. 학습 데이터셋 Q&A 생성도 이 에이전트 담당입니다.",
+    desc: "스캔 finding의 우선순위를 판단하고(KEV·EPSS·CVSS 대조), 학습 루프·어댑터 등 AI 모델 관리를 맡습니다. 문서 분류·요약·보강은 Curator(사서)에게 넘어갔습니다(2026-09-03).",
     defaultStatus: "idle",
   },
   {
@@ -97,7 +98,23 @@ const AGENT_DEFS: AgentBase[] = [
     desc: "Scan·Analyze 결과에 나온 용어를 사내 지식베이스 근거로 해설하고 실제 사례를 부연합니다. 복합 지시에서 스캔·분석이 끝나면 자동 투입됩니다.",
     defaultStatus: "watching",
   },
+  // 사서(2026-09-03, 7번째 팀원) — 문서가 들어오는 문에서 부른다: 업무영역 분류·문서 종류 분류·세 줄 요약·
+  // 번역/온톨로지 보강·매뉴얼 정형 초안·검색어 재작성. 전엔 analysis/report가 이름만 빌려주던 일이라
+  // 「부르는 문」이 없어 팀원이 아니었다. 검색 우선영역은 없다(hybridsearch ROLE_CATEGORY curator: [] — 전 영역을 고르게 본다).
+  {
+    id: "curator",
+    name: "Curator Agent",
+    role: "문서 반입 분류 · 요약 · 지식 보강",
+    abbr: "사서",
+    desc: "올라온 문서를 업무영역·종류로 분류하고 세 줄 요약·온톨로지 보강·매뉴얼 정형 초안을 만듭니다. 검색 때 질문을 검색용 구절로 고쳐 씁니다. Scan·Analyze가 근거로 쓰는 지식 저장소의 입구를 지킵니다.",
+    defaultStatus: "idle",
+  },
 ];
+
+// 팀 구성 변경은 감사 기록에 남긴다(2026-09-03 설계관 — 누가 어느 팀원의 두뇌·어댑터·위치·이름을 바꿨는지 보여야 한다).
+function 감사(agentId: string, action: string, detail: string, actor?: string | null): void {
+  recordAudit({ kind: "config", actor: actor ?? null, action: `${action}: ${agentId}`, target: agentId, detail, result: "ok" });
+}
 
 const liveStatus = new Map<string, AgentStatus>(AGENT_DEFS.map((a) => [a.id, a.defaultStatus]));
 
@@ -118,15 +135,17 @@ export function getAgentName(agentId: string): string | null {
   return (getModelStmt.get(nameKey(agentId)) as { value: string } | undefined)?.value ?? null;
 }
 
-export function setAgentName(agentId: string, name: string | null): void {
+export function setAgentName(agentId: string, name: string | null, actor?: string | null): void {
   if (!AGENT_DEFS.some((a) => a.id === agentId)) throw new Error(`존재하지 않는 에이전트: ${agentId}`);
   const trimmed = (name ?? "").trim();
   if (trimmed === "") {
     delModelStmt.run(nameKey(agentId));
+    감사(agentId, "팀원 이름 되돌림", "(기본 이름)", actor);
     return;
   }
   if (trimmed.length > 30) throw new Error("이름은 30자 이내여야 합니다");
   setModelStmt.run(nameKey(agentId), trimmed);
+  감사(agentId, "팀원 이름 변경", trimmed, actor);
 }
 
 // ── 전문가 어댑터 배정 (재설계 1단계) ──────────────────────────────────
@@ -139,10 +158,11 @@ export function getAgentAdapter(agentId: string): string | null {
 // adapterId=null 이면 해제(베이스 그대로). 오케스트레이터는 금지 — 라우팅은 결정성이 생명이라
 // 어댑터로 답 분포가 흔들리면 안 된다(파인튜닝이 라우팅을 8/8→7/8로 떨어뜨린 실측, 2026-08-05).
 // 채택(adopted)된 어댑터만 배정할 수 있다 — 등록만 된 어댑터는 게이트를 안 거친 것이다.
-export function setAgentAdapter(agentId: string, adapterId: string | null): void {
+export function setAgentAdapter(agentId: string, adapterId: string | null, actor?: string | null): void {
   if (!AGENT_DEFS.some((a) => a.id === agentId)) throw new Error(`존재하지 않는 에이전트: ${agentId}`);
   if (adapterId === null || adapterId === "") {
     delModelStmt.run(adapterKey(agentId));
+    감사(agentId, "어댑터 해제", "(베이스 그대로)", actor);
     return;
   }
   if (agentId === "orchestrator") throw new Error("총괄(orchestrator)에는 어댑터를 배정할 수 없습니다 — 라우팅 결정성 보호");
@@ -150,6 +170,7 @@ export function setAgentAdapter(agentId: string, adapterId: string | null): void
   if (!adapter) throw new Error(`등록되지 않은 어댑터입니다: ${adapterId}`);
   if (!adapter.adopted) throw new Error(`채택되지 않은 어댑터입니다: ${adapterId} — 평가 게이트 통과 후 채택하면 배정할 수 있습니다`);
   setModelStmt.run(adapterKey(agentId), adapterId);
+  감사(agentId, "어댑터 배정", adapterId, actor);
 }
 
 // ── 팀원별 두뇌 **위치** (2026-08-18 사장님 지시: "여러 개의 두뇌가 공동작업") ──────────
@@ -189,10 +210,11 @@ export function getAgentLocation(agentId: string): AgentLocation | null {
  *   총괄이 하는 일은 **어느 도구를 쓸지 고르는 판단**이고 그 앞에서 담당자가 기다린다.
  *   거기에 90초짜리 두뇌를 붙이면 제품이 못 쓰게 된다. 답 품질 차이도 눈에 띄지 않았다.
  */
-export function setAgentLocation(agentId: string, location: AgentLocation | null): void {
+export function setAgentLocation(agentId: string, location: AgentLocation | null, actor?: string | null): void {
   if (!AGENT_DEFS.some((a) => a.id === agentId)) throw new Error(`존재하지 않는 에이전트: ${agentId}`);
   if (location === null) {
     delModelStmt.run(locationKey(agentId));
+    감사(agentId, "두뇌 위치 해제", "(전역 따름)", actor);
     return;
   }
   if (!(AGENT_LOCATIONS as readonly string[]).includes(location)) {
@@ -204,17 +226,20 @@ export function setAgentLocation(agentId: string, location: AgentLocation | null
     );
   }
   setModelStmt.run(locationKey(agentId), location);
+  감사(agentId, "두뇌 위치 변경", location, actor);
 }
 
 // modelId=null 이면 할당 해제(전역 모델 따름). 존재하지 않는 모델은 거부한다.
-export function setAgentModel(agentId: string, modelId: string | null): void {
+export function setAgentModel(agentId: string, modelId: string | null, actor?: string | null): void {
   if (!AGENT_DEFS.some((a) => a.id === agentId)) throw new Error(`존재하지 않는 에이전트: ${agentId}`);
   if (modelId === null || modelId === "") {
     delModelStmt.run(modelKey(agentId));
+    감사(agentId, "전용 모델 해제", "(전역 모델 따름)", actor);
     return;
   }
   if (!isModelAvailable(modelId)) throw new Error(`배치되지 않은 모델입니다: ${modelId}`);
   setModelStmt.run(modelKey(agentId), modelId);
+  감사(agentId, "전용 모델 배정", modelId, actor);
 }
 
 function toAgent(base: AgentBase): AgentDefinition {
@@ -256,13 +281,16 @@ export function listAgents(): AgentDefinition[] {
   return AGENT_DEFS.map(toAgent);
 }
 
+/** 감사 기록의 행위자 — authMiddleware가 req.user에 넣어 둔 계정명(auth.ts와 같은 모양). */
+const 행위자 = (req: unknown): string | null => (req as { user?: { username?: string } }).user?.username ?? null;
+
 export function registerAgentsRoutes(app: Express): void {
   app.get("/api/agents", authMiddleware, (_req, res) => res.json(listAgents()));
 
   // 에이전트 전용 모델 할당 — admin만. body.modelId=null 이면 할당 해제(전역 모델 따름).
   app.post("/api/agents/:id/model", authMiddleware, adminMiddleware, (req, res) => {
     try {
-      setAgentModel(String(req.params.id), req.body.modelId ?? null);
+      setAgentModel(String(req.params.id), req.body.modelId ?? null, 행위자(req));
       res.json(getAgentById(String(req.params.id)));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -273,7 +301,7 @@ export function registerAgentsRoutes(app: Express): void {
   // 채택된 어댑터만 배정 가능·오케스트레이터 금지(setAgentAdapter가 강제).
   app.post("/api/agents/:id/adapter", authMiddleware, adminMiddleware, (req, res) => {
     try {
-      setAgentAdapter(String(req.params.id), req.body.adapterId ?? null);
+      setAgentAdapter(String(req.params.id), req.body.adapterId ?? null, 행위자(req));
       res.json(getAgentById(String(req.params.id)));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -286,7 +314,7 @@ export function registerAgentsRoutes(app: Express): void {
   // ⚠ 총괄은 이 PC 고정 — setAgentLocation이 강제한다(근거는 그 함수 주석).
   app.post("/api/agents/:id/location", authMiddleware, adminMiddleware, (req, res) => {
     try {
-      setAgentLocation(String(req.params.id), req.body.location ?? null);
+      setAgentLocation(String(req.params.id), req.body.location ?? null, 행위자(req));
       res.json(getAgentById(String(req.params.id)));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -297,7 +325,7 @@ export function registerAgentsRoutes(app: Express): void {
   // 담당자(security_officer)는 정의된 팀을 그대로 쓴다(클라이언트도 로스터 UI를 숨김 — 이건 그 서버측 강제).
   app.post("/api/agents/:id/name", authMiddleware, adminMiddleware, (req, res) => {
     try {
-      setAgentName(String(req.params.id), req.body.name ?? null);
+      setAgentName(String(req.params.id), req.body.name ?? null, 행위자(req));
       res.json(getAgentById(String(req.params.id)));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });

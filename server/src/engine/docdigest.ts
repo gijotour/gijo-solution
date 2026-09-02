@@ -101,7 +101,7 @@ export async function makeDigest(documentId: string, raw: string, category?: str
   try {
     const 본문 = raw.slice(0, 5000);
     const out = await chat({
-      agentId: "report",
+      agentId: "curator",
       message:
         `다음 문서를 딱 세 줄로 요약해줘(각 줄 60자 이내, 줄마다 줄바꿈). 마지막 줄 뒤에 "핵심어: " 로 시작하는 핵심 단어 5개를 쉼표로 적어줘. ` +
         `문서에 없는 숫자·사실을 지어내지 마세요. 분류: ${category ?? "미상"}.\n\n${본문}`,

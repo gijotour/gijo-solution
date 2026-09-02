@@ -22,7 +22,7 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const a of listAdapters()) deleteAdapter(a.id);
-  for (const ag of ["scan", "analysis", "report", "ti", "normaltic"]) setAgentAdapter(ag, null);
+  for (const ag of ["scan", "analysis", "report", "ti", "normaltic", "curator"]) setAgentAdapter(ag, null);
   fs.rmSync(tmpFile, { force: true });
 });
 

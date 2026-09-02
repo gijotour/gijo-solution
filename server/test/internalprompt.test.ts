@@ -69,7 +69,8 @@ describe("내부 프롬프트는 게이트를 다시 지나지 않는다", () =>
   it("engine의 모든 chat 호출은 trusted를 명시한다(true든 false든 — 판단을 미루지 않는다)", () => {
     const 누락: string[] = [];
     let total = 0;
-    for (const f of fs.readdirSync(engineDir).filter((x) => x.endsWith(".ts"))) {
+    // 하위 폴더(agenttools/ 등)까지 본다 — 2026-09-03 설계관: 그전엔 engine/ 바로 밑만 봐서 하위 폴더의 새 chat 호출은 감시 밖이었다.
+    for (const f of (fs.readdirSync(engineDir, { recursive: true }) as string[]).filter((x) => x.endsWith(".ts"))) {
       const src = fs.readFileSync(path.join(engineDir, f), "utf8");
       for (const { call, line } of chatCalls(src)) {
         total++;

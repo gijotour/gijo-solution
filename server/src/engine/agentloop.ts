@@ -1757,7 +1757,7 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
       return { tool: "adopt_adapter", args: { adapter: 어댑터명, mode: 해제 ? "해제" : "채택", note: 근거 } };
     }
     if (available.has("assign_adapter") && /(배정|붙여|달아|입혀|장착)/.test(instruction)) {
-      const 팀원 = /(스캔|분석|리포트|보고서|티아이|기조|총괄|오케스트|scan|analysis|report|ti|normaltic|gijo)/i.exec(instruction)?.[1] ?? "";
+      const 팀원 = /(스캔|분석|리포트|보고서|티아이|기조|사서|큐레이터|해설|총괄|오케스트|scan|analysis|report|ti|normaltic|gijo|curator)/i.exec(instruction)?.[1] ?? "";
       const 해제 = /(해제|빼|떼)/.test(instruction);
       if (팀원 && (어댑터명 || 해제)) {
         return { tool: "assign_adapter", args: { agent: 팀원, adapter: 해제 ? "없음" : 어댑터명 } };

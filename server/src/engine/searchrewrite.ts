@@ -21,6 +21,8 @@
 //   · 같은 질문은 캐시에서 준다 — 한 번의 답에 검색이 여러 번 돌아도 모델은 한 번만 부른다.
 //   · `GIJO_SEARCH_REWRITE=0`으로 끌 수 있다. 시험 환경엔 모델이 없어 자연히 건너뛴다.
 
+import { emitLlmActivity } from "./llmactivity"; // 잎 모듈(embedding.ts와 같은 이유로 안전)
+
 const 켜짐 = process.env.GIJO_SEARCH_REWRITE !== "0";
 // ⚠ 상수가 아니라 **매 호출 게터**다(2026-08-13 BridgeAI 1단계) — 원격 LLM이 켜져 있으면
 //   재작성도 그리로 간다. llm.ts와 같은 게터(remotellm.remoteLlmBaseUrl) 하나를 본다 —
@@ -68,6 +70,7 @@ export async function rewriteForSearch(question: string): Promise<string> {
   if (있는것 !== undefined) return 있는것;
 
   let 결과 = "";
+  const 시작 = Date.now();
   try {
     const t = await 통로();
     const res = await fetch(`${t.baseUrl}/chat/completions`, {
@@ -92,7 +95,12 @@ export async function rewriteForSearch(question: string): Promise<string> {
         .split("\n")[0]
         .replace(/^["'「]+|["'」]+$/g, "")
         .trim();
-      if (쓸만한가(q, t)) 결과 = t;
+      if (쓸만한가(q, t)) {
+        결과 = t;
+        // 사서(curator)가 한 일로 센다(AI 팀 감독 llm_activity_daily · 레일 실신호). 채택된 것만 — 실패·미채택은
+        // 원문 검색이 이미 있어 값이 없고, 세면 「일했다」가 부풀려진다(2026-09-03 설계관: 성공 가지에서만).
+        emitLlmActivity({ kind: "chat", phase: "done", agent: "curator", detail: `검색어 재작성: ${t.slice(0, 40)}`, latencyMs: Date.now() - 시작 });
+      }
     }
   } catch {
     // 모델이 없거나 느리다 — 원문으로 간다. 로그도 남기지 않는다(질문마다 시끄러워진다).

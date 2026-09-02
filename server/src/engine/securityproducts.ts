@@ -614,7 +614,7 @@ const FIELD_DRAFT_SCHEMA = {
 // docenrich.ts의 프롬프트-only JSON 파싱보다 신뢰도 높은 추출을 한다.
 export async function draftProductFields(productName: string, text: string): Promise<ProductFieldValue[]> {
   const raw = await chat({
-    agentId: "analysis",
+    agentId: "curator",
     message: buildFieldDraftPrompt(productName, text),
     responseSchema: FIELD_DRAFT_SCHEMA,
     maxTokens: 500,

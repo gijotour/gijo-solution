@@ -3175,6 +3175,7 @@ export async function runAdapterAssign(args: Record<string, string>): Promise<st
   const 별칭: Record<string, string> = {
     스캔: "scan", 분석: "analysis", 리포트: "report", 보고서: "report",
     티아이: "ti", 기조: "normaltic", 해설: "normaltic", 총괄: "orchestrator", 오케스트레이터: "orchestrator",
+    사서: "curator", 큐레이터: "curator",
   };
   const 별칭id = 별칭[팀원말] ?? 별칭[팀원말.replace(/\s*(팀원|에이전트)$/, "")];
   const found = agents.find(
