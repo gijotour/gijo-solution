@@ -220,9 +220,15 @@ export function setAdapterAdopted(
   let gateJson: string | null = (cur as { gate?: string | null }).gate ?? null;
   if (adopted) {
     if (!note?.trim()) throw new Error("채택에는 근거(게이트 결과 요약)가 필요합니다");
-    // 게이트 리포트의 판정. evalgate는 통과일 때 verdict를 「통과」로 준다(tools/evalgate/run.mjs).
+    // 게이트 리포트의 판정. evalgate가 내는 값은 「통과」·「채택 보류」·「기준선 없음」 셋이고
+    // (tools/evalgate/run.mjs), adopt.mjs는 리포트를 못 읽었을 때 「통과(리포트 없음)」을 쓴다.
+    // ⚠ 처음엔 startsWith("통과")로 썼다가 gb10 1차 선별이 잡았다 — 그러면 「통과하지 못함」 같은
+    //   값도 통과로 읽힌다. **정확히 「통과」이거나 「통과(…)」 꼴만** 통과로 본다.
+    // ⚠ 정직하게: 이 값은 **관리자가 보내는 것**이라 위조를 막지는 못한다. 이 장치가 보장하는 것은
+    //   「아무 생각 없이 눌러서 채택되지는 않는다」와 **무엇을 근거로 채택했는지가 남는다**이다
+    //   (감사 기록에도 남는다). 위조까지 막으려면 서버가 게이트를 직접 돌려야 하고, 그건 별개 작업이다.
     const 판정 = (gate as { verdict?: string } | undefined)?.verdict;
-    const 통과 = typeof 판정 === "string" && 판정.startsWith("통과");
+    const 통과 = 판정 === "통과" || (typeof 판정 === "string" && 판정.startsWith("통과("));
     if (!통과) {
       // 게이트가 없거나 통과가 아니면 **강행 사유**를 요구한다 — 짧은 한 마디는 근거가 아니다.
       const 사유 = note.trim();

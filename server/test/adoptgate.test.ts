@@ -58,6 +58,20 @@ describe("채택에는 근거가 필요하다", () => {
     expect(g.verdict, "게이트가 없었다는 사실이 안 남았다").toContain("게이트 없음");
   });
 
+  it("★★ 「통과」로 **시작만** 하는 값을 통과로 치지 않는다(gb10 1차 선별이 잡은 자리)", () => {
+    // 처음엔 startsWith("통과")로 썼다 — 그러면 「통과하지 못함」이 통과가 된다.
+    // 사람이 손으로 적어 보내는 값이라 이런 문자열이 실제로 올 수 있다.
+    const id = 새어댑터();
+    expect(() => setAdapterAdopted(id, true, "짧은 근거", { verdict: "통과하지 못함" })).toThrow(/보류|사유|통과/);
+  });
+
+  it("「통과(리포트 없음)」 꼴은 통과로 본다 — adopt.mjs가 실제로 그 값을 쓴다", () => {
+    const id = 새어댑터();
+    const r = setAdapterAdopted(id, true, "게이트 통과", { verdict: "통과(리포트 없음)" });
+    expect(r.adopted).toBe(true);
+    expect(JSON.parse(r.gate!).강행, "통과인데 강행으로 기록됐다").toBe(false);
+  });
+
   it("해제는 근거를 요구하지 않는다 — 되돌리는 길을 막으면 안 된다", () => {
     const id = 새어댑터();
     setAdapterAdopted(id, true, "평가 게이트 통과", { verdict: "통과" });
