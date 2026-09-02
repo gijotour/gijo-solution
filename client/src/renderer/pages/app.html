@@ -1840,9 +1840,17 @@
     } catch (e) {
       // 값이 깨졌으면 지운다 — 안 지우면 부팅마다 같은 것을 다시 읽다 영영 못 넘어간다.
       try { localStorage.removeItem("gijo:loginChoiceFailed"); } catch (e2) {}
+      복구코드_남은개수알리기(); // ⚠ 빠져나가는 **모든** 길에서 이어 준다(F2-10) — 아래 참조.
       return;
     }
-    if (!못한것 || !못한것.length) { try { localStorage.removeItem("gijo:loginChoiceFailed"); } catch (e) {} return; }
+    // ⚠ 복구 코드 안내는 이 함수의 **모든 출구**에서 이어져야 한다. 한 갈래라도 빠뜨리면
+    //   「어떤 날은 뜨고 어떤 날은 안 뜨는」 알림이 된다 — 담당자는 그것을 못 믿게 된다.
+    //   (대화상자는 한 번에 하나만 뜨므로 앞의 알림이 있으면 그 뒤에 잇는다.)
+    if (!못한것 || !못한것.length) {
+      try { localStorage.removeItem("gijo:loginChoiceFailed"); } catch (e) {}
+      복구코드_남은개수알리기();
+      return;
+    }
     // ⚠ gijoTell이 아직 없으면 예전엔 여기서 ReferenceError가 나 **뒤따르는**
     //   프로레일()·끌개설치()·대화폭복원()·대화온디맨드설치()가 통째로 건너뛰어졌다(F3-09).
     //   이제 dialog.js를 정적으로 싣지만, 부팅 순서가 또 바뀌어도 조용히 죽지 않게 방어를 남긴다.
