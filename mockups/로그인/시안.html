@@ -1,0 +1,542 @@
+<!doctype html>
+<!--
+  시안 상단 근거 요약(저장소 규칙 — 설계 전 조사 근거를 상단 주석에 남긴다)
+  ─────────────────────────────────────────────────────────────────────
+  대상 화면: client/src/renderer/pages/login.html (읽기만 함 — 이 파일은 고치지 않았다)
+  결함 3건(의뢰 원문 그대로):
+    P0-1 오류 문구가 원인을 안 가른다 — login.html:554-560, client/src/api/auth.ts:53-54
+    P0-2 관리자 2차 인증 「등록 필요」를 화면이 처리하지 않는다 — server/src/auth/auth.ts:306-320,
+         client/src/api/auth.ts:20,62 (enrollRequired를 받기만 하고 쓰는 곳이 없음)
+    P1   로그인 화면만 디자인 언어가 다르다 — login.html:31-32(--navy/--navy2 자체 팔레트,
+         gijo-ui.css 링크 0회), login.html:221(rgba(14,20,36,.6) 하드코딩)
+  조사(직접 확인, 원문은 본문 "근거" 표에 다시 정리):
+    · OWASP Authentication Cheat Sheet — 자격 오류는 "Invalid user ID or password"처럼 뭉뚱그려야
+      계정 나열(enumeration) 공격을 막는다. → 아이디/비밀번호 중 어느 쪽이 틀렸는지는 계속 안 밝힘.
+    · Nielsen Norman Group, "Error-Message Guidelines" — 문구는 명확·정중·정확해야 하고 "무엇을
+      하면 되는지"까지 제시해야 한다(사람 탓 금지). → 상태마다 다음 행동을 한 줄로 못 박음.
+    · WCAG 2.1 성공기준 1.4.1(Use of Color) — 색만으로 뜻을 전달하면 안 된다. → 색+아이콘+제목 문구
+      3중으로 상태를 구분(색맹·흑백 인쇄에도 구분됨).
+    · 내부 근거 — client/src/renderer/pages/gijo-ui.css:32-46(대비비 계산이 이미 끝난 --g-red·
+      --g-blue·--g-amber·--g-teal), lite-green.css:66-70(로그인 버튼 --orange가 이미 라이트
+      테마에서 --g-blue로 강제 치환되던 우회 코드 — orange를 걷으면 이 우회 자체가 필요 없어짐).
+  결론(추천 시안 1개, 2026-09-02): 구조는 그대로 두고 ① 오류를 3범주(연결실패·자격오류·잠김)로
+  가르고 ② 2차 인증 등록 필요 상태를 새로 만들고 ③ 색·라운드·타이포를 gijo-ui.css 토큰으로 치환.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>로그인 화면 — 오류 문구·2차 인증 등록·디자인 토큰 정리 (추천 시안)</title>
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   1) 디자인 토큰 — client/src/renderer/pages/gijo-ui.css:23-74 원문 그대로 복사(값 변경 없음).
+      다크(표준 에디션) 팔레트만 옮긴다 — 이 화면은 표준 로그인 화면 시안이라 라이트/프로 테마는
+      대상이 아니다. @font-face(Pretendard 파일)는 넣지 않는다 — 자체완결 HTML은 폰트 파일을
+      동봉하지 않고, 지금 실제 login.html도 이 파일을 안 실어 시스템 폴백(맑은 고딕/Segoe UI)으로
+      뜬다 — 시안도 같은 모습이라 회귀가 아니다. ════════════════════════════════════════════════ */
+:root {
+  --g-bg: #262624;
+  --g-surface-1: #30302e;
+  --g-surface-2: #1f1e1d;
+  --g-border: rgba(255, 255, 255, 0.08);
+  --g-border-strong: rgba(255, 255, 255, 0.16);
+  --g-blue: #3b82f6;
+  --g-blue-fill: #2563eb;       /* 흰 글씨 대비 5.17:1 — gijo-ui.css:45 계산 그대로 */
+  --g-blue-fill-hover: #1d4ed8; /* 흰 글씨 대비 6.70:1 — gijo-ui.css:46 */
+  --g-blue-light: #5fa1ff;
+  --g-teal: #1eb980;
+  --g-amber: #f0a020;
+  --g-red: #e2483d;
+  --g-text: #e9e7e2;
+  --g-muted: #b3ada4;
+  --g-muted-2: #a49d95;
+  --g-s1: 4px; --g-s2: 8px; --g-s3: 12px; --g-s4: 16px; --g-s5: 24px; --g-s6: 32px;
+  --g-r-sm: 8px; --g-r: 12px; --g-r-lg: 16px; --g-r-pill: 999px;
+  --g-shadow-1: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --g-shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.5);
+  --g-t-h1: 22px; --g-t-md: 14.5px; --g-t-sm: 13px; --g-t-xs: 11px;
+  --g-btn-h: 36px;
+  --g-input-h: 36px;
+  --g-focus: 0 0 0 3px rgba(59, 130, 246, 0.28);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--g-bg); color: var(--g-text); }
+body {
+  font-family: "Pretendard", "Malgun Gothic", "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+/* ── 문서(설명) 크롬 — 시안 보고서 부분. 실제 제품 화면이 아니다. ─────────────────────── */
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 70px; }
+h1 { font-size: var(--g-t-h1); margin: 0 0 6px; color: #fff; }
+.sub { color: var(--g-muted-2); font-size: 12.5px; margin-bottom: 8px; }
+.sub code { color: var(--g-blue-light); }
+.sec { margin: 32px 0 12px; font-size: 14.5px; font-weight: 800; color: #fff;
+  border-left: 3px solid var(--g-blue); padding-left: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+th, td { border: 1px solid var(--g-border-strong); padding: 8px 10px; text-align: left; vertical-align: top; }
+th { background: var(--g-surface-2); color: #fff; font-weight: 700; }
+td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note { background: var(--g-surface-2); border: 1px solid var(--g-border); border-radius: 10px;
+  padding: 14px 16px; font-size: 12.75px; line-height: 1.7; color: var(--g-muted); }
+.note b { color: #fff; }
+.ok { color: var(--g-teal); font-weight: 800; }
+.warn { color: var(--g-amber); font-weight: 800; }
+.bad { color: var(--g-red); font-weight: 800; }
+code { background: #1a1918; border: 1px solid var(--g-border); border-radius: 4px; padding: 1px 5px;
+  font-size: 11.5px; color: var(--g-blue-light); font-family: Consolas, monospace; }
+
+/* ════════════════════════════════════════════════════════════════════
+   2) 컴포넌트 — gijo-ui.css의 실제 클래스명·규칙을 그대로 쓴다(.g-field·.g-input·.g-btn 등,
+      gijo-ui.css:87-133 발췌). 구현 때는 이 규칙을 다시 안 베끼고 gijo-ui.css를 <link>하면
+      그대로 성립한다 — 시안이 자체완결이라 여기서만 인라인으로 복사해 둔 것이다. ═══════════ */
+.g-btn { height: var(--g-btn-h); display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 0 var(--g-s4); border-radius: var(--g-r); font-size: var(--g-t-sm); font-weight: 700;
+  cursor: pointer; border: 1px solid transparent; white-space: nowrap; font-family: inherit; }
+.g-btn.g-primary { background: var(--g-blue-fill); color: #fff; width: 100%; }
+.g-btn.g-primary:hover { background: var(--g-blue-fill-hover); }
+.g-btn.g-ghost { background: transparent; border-color: var(--g-border-strong); color: var(--g-muted); }
+.g-btn.g-ghost:hover { color: #fff; border-color: var(--g-blue); }
+.g-btn.g-teal { background: rgba(30, 185, 128, 0.14); border-color: var(--g-teal); color: var(--g-teal); width: 100%; }
+.g-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: var(--g-s4); }
+.g-field label { font-size: var(--g-t-xs); color: var(--g-muted-2); font-weight: 700; }
+.g-input { background: var(--g-surface-2); border: 1px solid var(--g-border-strong); border-radius: var(--g-r);
+  padding: 0 12px; height: var(--g-input-h); color: var(--g-text); font-size: var(--g-t-sm); outline: none;
+  width: 100%; font-family: inherit; }
+.g-input:focus { border-color: var(--g-blue); box-shadow: var(--g-focus); }
+.g-card { background: var(--g-surface-1); border: 1px solid var(--g-border); border-radius: var(--g-r-lg);
+  box-shadow: var(--g-shadow-modal); }
+
+/* ════════════════════════════════════════════════════════════════════
+   3) 로그인 화면 복제(lm- 접두) — login.html의 구조(두 칸: 왼쪽 모드 고르기 · 오른쪽 자격증명)를
+      그대로 옮기고 값만 위 토큰으로 바꿨다. 왼쪽 패널(모드·위치·무료 제공)은 이번 의뢰 범위 밖이라
+      "대상 아님" 리본만 붙이고 구조·문구는 손대지 않았다(2026-08-18 승인 4차 결정 유지). ═══════ */
+.demo-toolbar { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center;
+  background: var(--g-surface-2); border: 1px dashed var(--g-border-strong); border-radius: 10px;
+  padding: 12px 14px; margin: 14px 0 4px; }
+.demo-toolbar .dt-label { font-size: 11.5px; font-weight: 800; color: var(--g-amber); white-space: nowrap; }
+.demo-toolbar button { font: inherit; font-size: 12px; font-weight: 700; padding: 6px 12px;
+  border-radius: var(--g-r-pill); border: 1px solid var(--g-border-strong); background: transparent;
+  color: var(--g-muted); cursor: pointer; }
+.demo-toolbar button:hover { color: #fff; border-color: var(--g-blue); }
+.demo-toolbar button.on { background: var(--g-blue-fill); border-color: var(--g-blue-fill); color: #fff; }
+.demo-disclaimer { font-size: 11.5px; color: var(--g-muted-2); margin: 6px 2px 18px; line-height: 1.6; }
+
+.lm-stage { display: flex; justify-content: center; padding: 40px 20px;
+  border-radius: 14px; background: radial-gradient(circle at 30% 20%, #35342f 0%, var(--g-bg) 60%); }
+.lm-two-col { display: grid; grid-template-columns: 440px 440px; gap: 16px; align-items: stretch; }
+@media (max-width: 1080px) { .lm-two-col { grid-template-columns: 440px; justify-content: center; } .lm-side { display: none; } }
+
+.lm-side { display: flex; flex-direction: column; padding: 26px 24px; position: relative; }
+.lm-scope-tag { position: absolute; top: -11px; left: 20px; background: var(--g-surface-2);
+  border: 1px solid var(--g-border-strong); color: var(--g-muted-2); font-size: 10.5px; font-weight: 800;
+  padding: 3px 9px; border-radius: var(--g-r-pill); }
+.lm-side-t { font-size: 12px; color: var(--g-muted); margin-bottom: 10px; }
+.mp-row { display: flex; gap: 10px; margin-bottom: 12px; }
+.mp-btn { flex: 1; background: var(--g-surface-2); border: 1px solid var(--g-border-strong);
+  border-radius: var(--g-r); padding: 12px 10px; color: var(--g-text); text-align: center; cursor: default; }
+.mp-btn .mp-top { display: block; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.mp-btn .mp-tag { display: block; font-size: 11px; color: var(--g-muted-2); margin-top: 4px; line-height: 1.35; }
+.mp-btn.on { border-color: var(--g-muted-2); box-shadow: 0 0 0 1px var(--g-muted-2); }
+.lm-free { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--g-border); }
+.lm-free-t { font-size: 12px; color: var(--g-muted); margin-bottom: 8px; }
+.lm-free-card { background: var(--g-surface-2); border: 1px solid var(--g-border); border-radius: var(--g-r);
+  padding: 11px 12px; }
+.lm-free-h { font-size: 12.5px; font-weight: 700; display: flex; gap: 6px; align-items: center; }
+.lm-free-b { font-size: 10.5px; font-weight: 700; color: var(--g-teal); border: 1px solid rgba(30,185,128,.4);
+  border-radius: 999px; padding: 1px 6px; }
+.lm-free-d { margin-top: 5px; font-size: 11px; color: var(--g-muted-2); line-height: 1.5; }
+
+.lm-card { width: 440px; padding: var(--g-s5); }
+.lm-logo { display: flex; align-items: center; gap: 8px; margin-bottom: var(--g-s4); }
+.lm-logo .wm { font-size: 15px; font-weight: 800; letter-spacing: .3px; color: #fff; }
+.lm-logo .st { font-size: 11.5px; color: var(--g-muted-2); letter-spacing: .04em; }
+.lm-card h1 { font-size: var(--g-t-h1); margin: 0 0 var(--g-s2); color: #fff; display: flex;
+  align-items: center; gap: 6px; flex-wrap: wrap; line-height: 1.3; }
+.mode-badge { font-size: 10.5px; font-weight: 800; padding: 2px 8px 3px; border-radius: var(--g-r-pill);
+  background: rgba(255,255,255,.06); border: 1px solid var(--g-border-strong); color: var(--g-muted); }
+.lm-sub { color: var(--g-muted); font-size: var(--g-t-sm); margin: 0 0 var(--g-s5); line-height: 1.5; }
+
+/* 최근 로그인 — g-rows 30px 행 표준(gijo-ui.css:374, 2026-08-19 「엑셀처럼」 확정)을 그대로 재사용 */
+.lm-recent { margin-bottom: var(--g-s4); }
+.lm-recent-t { font-size: 11.5px; color: var(--g-muted); margin-bottom: 7px; }
+.lm-rrow { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px;
+  background: var(--g-surface-2); border: 1px solid var(--g-border); border-radius: var(--g-r-sm);
+  margin-bottom: 4px; font-size: 12.5px; }
+.lm-rrow .rid { font-weight: 700; }
+.lm-rrow .rsrv { color: var(--g-muted-2); font-size: 11.5px; margin-left: auto; }
+
+.savepw { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--g-muted);
+  margin: -2px 0 var(--g-s4); line-height: 1.3; }
+.savepw input { margin: 0; }
+
+/* 상태 알림 박스 — 공통 골격은 하나, 왼쪽 색 띠(sec 제목과 같은 문법)로 4범주를 가른다.
+   기본은 전부 숨김 — 아래 [data-state=...] 규칙이 해당 상태에서만 보여 준다. */
+.lm-notice, .lm-dup, .lm-mfa, .lm-enroll { display: none; }
+.lm-notice { margin-top: var(--g-s3); padding: 12px 14px; border-radius: var(--g-r); border-left: 3px solid; }
+.lm-notice .ntitle { font-size: 12.5px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+.lm-notice .nbody { margin-top: 5px; font-size: 12px; color: var(--g-muted); line-height: 1.6; }
+.lm-notice .ncap { margin-top: 5px; font-size: 11px; color: var(--g-muted-2); }
+.n-conn { background: rgba(59,130,246,.08); border-color: var(--g-blue); }
+.n-conn .ntitle { color: var(--g-blue-light); }
+.n-cred { background: rgba(226,72,61,.08); border-color: var(--g-red); }
+.n-cred .ntitle { color: #f5928a; }
+.n-lock { background: rgba(240,160,32,.08); border-color: var(--g-amber); }
+.n-lock .ntitle { color: var(--g-amber); }
+
+.lm-dup { margin-top: var(--g-s3); padding: 12px 14px; border: 1px solid rgba(240,160,32,.45);
+  background: rgba(240,160,32,.10); border-radius: var(--g-r); }
+.lm-dup .dt2 { font-size: 12.5px; font-weight: 800; color: var(--g-amber); }
+.lm-dup .dd2 { margin-top: 5px; font-size: 12.5px; color: var(--g-muted); line-height: 1.6; }
+.lm-dup .da2 { display: flex; gap: 8px; margin-top: 10px; }
+.lm-dup .du-ok { background: var(--g-amber); color: #21160a; border: 0; font-weight: 700; border-radius: var(--g-r-sm);
+  padding: 7px 13px; font-size: 12px; cursor: default; }
+.lm-dup .du-no { background: transparent; color: var(--g-muted); border: 1px solid var(--g-border-strong);
+  border-radius: var(--g-r-sm); padding: 7px 13px; font-size: 12px; cursor: default; }
+
+.lm-mfa { margin-top: var(--g-s3); padding: 14px; border: 1px solid rgba(59,130,246,.4);
+  background: rgba(59,130,246,.08); border-radius: var(--g-r); }
+.lm-mfa .who { font-size: 12.5px; color: var(--g-muted); margin-bottom: 8px; }
+.lm-mfa .who b { color: #fff; }
+.lm-mfa .mt2 { font-size: 12.5px; font-weight: 700; color: var(--g-muted); margin-bottom: 7px; }
+.lm-mfa .mcode { width: 100%; letter-spacing: 9px; text-align: center; font-size: 20px; font-weight: 700;
+  font-variant-numeric: tabular-nums; background: var(--g-surface-2); border: 1px solid var(--g-border-strong);
+  border-radius: var(--g-r); height: 44px; color: var(--g-text); margin-bottom: 10px; }
+.lm-mfa .md2 { margin-top: 8px; font-size: 11.75px; color: var(--g-muted-2); line-height: 1.6; }
+.lm-mfa .malt { margin-top: 10px; width: 100%; background: transparent; border: 1px solid var(--g-border-strong);
+  color: var(--g-muted); font-size: 12px; font-weight: 700; border-radius: var(--g-r-sm); padding: 7px; cursor: default; }
+
+.lm-enroll { margin-top: var(--g-s3); padding: 16px; border: 1px solid rgba(30,185,128,.4);
+  background: rgba(30,185,128,.08); border-radius: var(--g-r); }
+.lm-enroll .et { font-size: 13.5px; font-weight: 800; color: var(--g-teal); display: flex; align-items: center; gap: 6px; }
+.lm-enroll .ewho { font-size: 12px; color: var(--g-muted); margin-top: 6px; }
+.lm-enroll .ewho b { color: #fff; }
+.lm-enroll .ed { margin-top: 8px; font-size: 12.5px; color: var(--g-muted); line-height: 1.65; }
+.lm-enroll .ecap { margin-top: 10px; font-size: 11.5px; color: var(--g-muted-2); line-height: 1.6; }
+.lm-enroll .g-btn { margin-top: 12px; }
+.lm-enroll .eback { margin-top: 8px; }
+
+.lm-hint { margin-top: var(--g-s5); font-size: 11.5px; color: var(--g-muted-2); line-height: 1.6; }
+.lm-ver { margin-top: var(--g-s3); font-size: 11px; color: var(--g-muted-2); text-align: center; opacity: .8; }
+
+/* 상태 전환 — 도구줄이 lm-card에 data-state를 지정하면 아래 규칙만으로 전부 갈린다(JS는
+   data-state 대입 한 줄뿐 — 내용·서식은 CSS attribute selector가 결정한다). */
+.lm-card[data-state="conn"] .n-conn,
+.lm-card[data-state="cred"] .n-cred,
+.lm-card[data-state="lock"] .n-lock,
+.lm-card[data-state="dup"] .lm-dup,
+.lm-card[data-state="mfa"] .lm-mfa,
+.lm-card[data-state="enroll"] .lm-enroll { display: block; }
+.lm-card[data-state="mfa"] .lm-primary,
+.lm-card[data-state="enroll"] .lm-primary { display: none; }
+.lm-card[data-state="conn"] #dServer { border-color: var(--g-blue); box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
+.lm-card[data-state="cred"] #dUser,
+.lm-card[data-state="cred"] #dPass { border-color: var(--g-red); box-shadow: 0 0 0 3px rgba(226,72,61,.18); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>로그인 화면 — 오류 문구·2차 인증 등록 처리·디자인 토큰 정리</h1>
+  <div class="sub">추천 시안 1개 · 2026-09-02 · 대상 화면 <code>client/src/renderer/pages/login.html</code>
+    (읽기만 함 — 이 파일은 시안이고 제품 코드는 고치지 않았다)</div>
+
+  <div class="sec">지금 무엇이 문제인가 — 읽어서 확인한 것</div>
+  <table>
+    <tr><th style="width:16%">결함</th><th style="width:30%">코드 위치</th><th>무엇이 문제인가</th></tr>
+    <tr><td class="bad">P0-1 오류 문구</td>
+      <td><code>login.html:554-560</code><br><code>auth.ts(client):53-54</code></td>
+      <td><code>doLogin</code>이 <code>locked</code>만 따로 다루고 나머지는 전부
+        "로그인 실패: 아이디/비밀번호 또는 서버 주소를 확인하세요."로 뭉갠다. 그런데 서버에 아예
+        못 붙었을 때(<code>fetch</code> 실패) <code>authApi.login</code>은 이미
+        <code>code:"error", message:"서버에 연결할 수 없습니다."</code>를 돌려준다 — 화면이
+        그 값을 받고도 버린다.</td></tr>
+    <tr><td class="bad">P0-2 2차 인증 등록 필요</td>
+      <td><code>server/auth.ts:306-320</code><br><code>auth.ts(client):20,62</code></td>
+      <td>관리자 필수 정책이 켜졌는데 미등록 관리자가 로그인하면 서버가 <code>enrollRequired:true</code>와
+        함께 <b>등록 API만 허용하는 제한 세션</b>을 준다. 클라이언트 타입엔 이 값이 있지만
+        <code>login.html</code>은 <code>result.ok</code>만 보고 곧장 <code>app.html</code>로 보낸다 —
+        들어가면 다른 화면이 전부 403으로 막힌 채 이유를 모른다.</td></tr>
+    <tr><td class="warn">P1 디자인 언어 불일치</td>
+      <td><code>login.html:31-32,221,309</code></td>
+      <td><code>gijo-ui.css</code>를 링크하지 않고 <code>--navy/--navy2</code> 자체 팔레트를 씀
+        (<code>--navy2</code>는 선언만 있고 쓰이는 곳 0회). 카드 배경 <code>rgba(14,20,36,.6)</code>은
+        앱 본체의 <code>#30302e</code>계열과 결이 다르다. 309행엔 <code>/ aria-label=</code> 오표기도 있음.</td></tr>
+  </table>
+
+  <div class="sec">시안 — 상태 7종 (아래 버튼으로 전환해서 보세요)</div>
+  <div class="demo-toolbar">
+    <span class="dt-label">⚙ 시안 전용 도구줄 — 실제 화면엔 없음</span>
+    <button data-state="base" class="on">기본</button>
+    <button data-state="conn">서버 연결 실패</button>
+    <button data-state="cred">아이디·비밀번호 오류</button>
+    <button data-state="lock">잠김</button>
+    <button data-state="mfa">2차 인증 입력</button>
+    <button data-state="enroll">2차 인증 등록 필요</button>
+    <button data-state="dup">중복 로그인</button>
+  </div>
+  <div class="demo-disclaimer">카드 안의 모든 버튼·입력칸·체크박스는 미리보기 전용이며 실제로 동작하지 않습니다(가짜 상호작용
+    금지 원칙). 상태 전환은 위 도구줄만 쓰세요. 왼쪽 「구동 모드 · AI 위치」 패널은 2026-08-18 승인 4차 시안 그대로이며
+    <b>이번 의뢰의 대상이 아닙니다</b>(카드에 「대상 아님」 리본).</div>
+
+  <div class="lm-stage">
+    <div class="lm-two-col">
+
+      <!-- 왼쪽 — 모드 고르기(그대로 유지, 대상 아님) -->
+      <div class="lm-side g-card">
+        <span class="lm-scope-tag">이번 시안 대상 아님 · 구조 그대로 유지</span>
+        <div class="lm-side-t">구동 모드 · AI 위치 — 로그인 직후 적용됩니다</div>
+        <div class="mp-row">
+          <div class="mp-btn on"><span class="mp-top">🏢 표준</span><span class="mp-tag">팀이 함께 쓰는 판<br>서버 하나에 여럿</span></div>
+          <div class="mp-btn"><span class="mp-top">🚀 프로</span><span class="mp-tag">크게 굴리는 판<br>원격 GPU·큰 두뇌</span></div>
+          <div class="mp-btn"><span class="mp-top">🪶 라이트</span><span class="mp-tag">혼자 쓰는 판<br>서버 없이 내 PC만</span></div>
+        </div>
+        <div class="mp-row">
+          <div class="mp-btn on"><span class="mp-top">💻 이 PC 안</span><span class="mp-tag">이 GPU만 사용</span></div>
+          <div class="mp-btn"><span class="mp-top">🖧 원격 GPU</span><span class="mp-tag">사내망 GPU 서버</span></div>
+          <div class="mp-btn"><span class="mp-top">☁ 클라우드</span><span class="mp-tag">일반 질문만 · 사외</span></div>
+        </div>
+        <div class="lm-free">
+          <div class="lm-free-t">무료로 함께 드리는 것</div>
+          <div class="lm-free-card">
+            <div class="lm-free-h"><span>⬇ GIJO AS 라이트</span><span class="lm-free-b">무료</span></div>
+            <div class="lm-free-d">서버 없이 내 PC에서 혼자 도는 개인용 판. Windows 설치본·안내서를 받습니다.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 오른쪽 — 자격증명(이번 시안의 실제 대상) -->
+      <div class="lm-card g-card" id="lmCard" data-state="base">
+        <div class="lm-logo"><span class="wm">GIJO.AI</span><span class="st">AI SECURITY MANAGER</span></div>
+        <h1>GIJO AS 로그인<span class="mode-badge">🏢 표준</span><span class="mode-badge">💻 이 PC</span></h1>
+        <div class="lm-sub">보안담당자 계정으로 서버에 연결합니다.</div>
+
+        <div class="lm-primary">
+          <div class="lm-recent">
+            <div class="lm-recent-t">최근 로그인 — 눌러서 빠르게 채우기</div>
+            <div class="lm-rrow"><span class="rid">hong.gildong</span><span class="rsrv">10.0.0.5:7446</span></div>
+          </div>
+
+          <div class="g-field">
+            <label for="dServer">서버 주소</label>
+            <input class="g-input" id="dServer" value="192.168.50.20:7446" />
+          </div>
+          <div class="g-field">
+            <label for="dUser">아이디</label>
+            <input class="g-input" id="dUser" value="hong.gildong" />
+          </div>
+          <div class="g-field">
+            <label for="dPass">비밀번호</label>
+            <input class="g-input" id="dPass" type="password" value="********" />
+          </div>
+          <label class="savepw"><input type="checkbox" checked /> 이 PC에 로그인 정보 저장(서버·아이디·비밀번호)</label>
+
+          <button class="g-btn g-primary">로그인</button>
+
+          <!-- 상태 3범주 — 이번 시안의 핵심(P0-1) -->
+          <div class="lm-notice n-conn">
+            <div class="ntitle">🔌 서버에 연결할 수 없습니다</div>
+            <div class="nbody">입력한 주소(<b>192.168.50.20:7446</b>)로 연결을 시도했지만 응답이 없습니다.
+              서버 주소가 맞는지, 이 PC와 서버가 같은 네트워크에 있는지 확인한 뒤 다시 시도하세요.</div>
+          </div>
+          <div class="lm-notice n-cred">
+            <div class="ntitle">🔑 아이디 또는 비밀번호가 올바르지 않습니다</div>
+            <div class="nbody">다시 확인해서 입력하세요.</div>
+            <div class="ncap">보안을 위해 어느 쪽이 틀렸는지는 알려 드리지 않습니다 — 10회 넘게 틀리면 15분간 잠깁니다.</div>
+          </div>
+          <div class="lm-notice n-lock">
+            <div class="ntitle">⏳ 로그인이 잠시 제한되었습니다</div>
+            <div class="nbody">로그인 시도가 너무 많습니다. 4분 후 다시 시도하세요.</div>
+            <div class="ncap">서버가 그때그때 보내는 문구의 예시입니다 — 대기 시간은 상황마다 다릅니다.</div>
+          </div>
+
+          <!-- 중복 로그인 — 기존 그대로, 토큰만 치환 -->
+          <div class="lm-dup">
+            <div class="dt2">이미 다른 곳에서 로그인 중입니다</div>
+            <div class="dd2">강제로 로그인하면 그 세션은 로그아웃됩니다. 계속할까요?</div>
+            <div class="da2"><button class="du-ok">강제 로그인</button><button class="du-no">취소</button></div>
+          </div>
+        </div>
+
+        <!-- 2차 인증 입력 — 기존 그대로, 토큰만 치환 -->
+        <div class="lm-mfa">
+          <div class="who"><b>hong.gildong</b> 계정의 2차 인증</div>
+          <div class="mt2">인증앱의 6자리 숫자</div>
+          <input class="mcode" value="" placeholder="000000" />
+          <button class="g-btn g-primary">확인</button>
+          <div class="md2">서버 시각 14:32:07 · 30초마다 숫자가 바뀝니다</div>
+          <button class="malt">휴대폰을 못 쓰는 경우</button>
+          <button class="malt">← 다른 계정으로 로그인</button>
+        </div>
+
+        <!-- 2차 인증 등록 필요 — 신규(P0-2 해결) -->
+        <div class="lm-enroll">
+          <div class="et">🔐 2차 인증 등록이 필요합니다</div>
+          <div class="ewho"><b>관리자(admin)</b> 계정</div>
+          <div class="ed">관리자 계정은 2차 인증을 등록해야 다른 화면을 쓸 수 있습니다. 등록을 마치기 전에는
+            이 화면만 열립니다.</div>
+          <button class="g-btn g-teal">지금 등록하기 →</button>
+          <div class="ecap">등록: 설정 › 계정에서 QR 코드로 1분이면 끝납니다.</div>
+          <button class="g-btn g-ghost eback">← 다른 계정으로 로그인</button>
+        </div>
+
+        <div class="lm-hint">
+          단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 <b>비워 두세요</b> — 앱이 알아서 맞춥니다.<br />
+          분산 모드: 사내망 GPU 서버 주소를 입력하세요.
+        </div>
+        <div class="lm-ver">GIJO AS 클라이언트 v4.x.x — 실행 시 자동으로 채워짐</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="sec">왜 이 안인가 — 다른 길을 왜 안 골랐나</div>
+  <table>
+    <tr><th style="width:24%">길</th><th style="width:38%">왜 안 골랐나</th><th>대신 무엇을 했나</th></tr>
+    <tr><td><b>아이디 오류·비밀번호 오류를 각각 다른 문구로</b></td>
+      <td class="bad">OWASP 인증 치트시트 — "Login failed: invalid password"처럼 원인을 밝히면
+        <b>계정 나열(enumeration) 공격</b>에 쓰인다. 있는 계정인지 없는 계정인지, 아이디가
+        맞는지까지 공격자가 추론할 수 있게 된다.</td>
+      <td>자격 오류는 계속 <b>하나로 뭉뚱그린다</b>(OWASP 그대로). 대신 서버가 <b>이미 갈라 보내는</b>
+        "연결 실패(계정과 무관)"·"잠김(횟수 초과)"이라는 <b>다른 범주</b>만 가른다 — 이건 계정 존재
+        여부를 새지 않는다.</td></tr>
+    <tr><td>오류마다 새 색을 자유롭게 배정</td>
+      <td class="warn">gijo-ui.css가 이미 색의 뜻을 정해 놓았다(<code>--g-red</code>=위험/거부,
+        <code>--g-amber</code>=경고/대기, <code>--g-blue</code>=정보/진행). 새 배색을 쓰면 다른
+        화면과 뜻이 어긋난다.</td>
+      <td>기존 4색만 재사용 — 자격오류=red, 연결실패=blue(2차 인증 입력과 같은 "정보" 계열),
+        잠김=amber(중복 로그인과 같은 "대기" 계열), 등록필요=teal(오류가 아니라 "다음 단계"라는
+        뜻으로 새로 배정하되 <b>이미 있는 토큰</b>).</td></tr>
+    <tr><td>2차 인증 등록 필요를 <b>새 화면(setup류)</b>으로 분리</td>
+      <td class="warn">로그인 카드 안에 이미 "카드 내부 단계 전환" 패턴(<code>mfa-step</code>이
+        1단계 입력을 감추고 2단계를 보여줌)이 있다. 새 화면을 만들면 라우팅이 하나 늘고 패턴이
+        둘로 갈린다.</td>
+      <td>같은 자리에 <b>세 번째 단계</b>로 얹는다(<code>lm-primary</code>를 감추고
+        <code>lm-enroll</code>을 보여주는 것은 기존 <code>mfa-step</code>과 동일한 구조).</td></tr>
+    <tr><td>카드 전체를 다시 설계(레이아웃·모드피커 포함)</td>
+      <td class="warn">이번 의뢰는 오류 문구·등록 처리·토큰 3건이지, 2026-08-18에 이미 승인된
+        두 칸 배치·모드피커 UX를 되돌리는 게 아니다.</td>
+      <td>레이아웃 골격(두 칸·440px·960px 접힘)은 그대로 두고 <b>색·라운드·타이포 토큰만</b> 치환.</td></tr>
+  </table>
+
+  <div class="sec">무엇을 포기했나</div>
+  <div class="note">
+    · 아이디/비밀번호 중 <b>어느 쪽이 틀렸는지는 여전히 안 알려준다</b> — OWASP 권고를 지키려고
+      담당자의 편의보다 계정 나열 방어를 우선했다.<br>
+    · 2차 인증 등록 필요 상태에 <b>"나중에 하기"를 안 넣었다</b> — 서버 정책(관리자 필수)이 이미
+      그렇게 정했고, 있으면 거짓 선택지가 된다(눌러도 등록 화면 밖은 어차피 403).<br>
+    · 서버가 왜 안 붙는지(주소가 틀렸는지, 서버가 꺼졌는지, 방화벽인지)는 <b>더 세분화하지 않았다</b>
+      — <code>client/src/api/auth.ts:53-54</code>의 <code>fetch().catch(()=&gt;null)</code>이
+      원인을 구분해 주지 않아 클라이언트가 더 알 방법이 없다(세분화하려면 서버·네트워크 계층
+      변경이 필요해 이번 범위 밖).<br>
+    · 왼쪽 모드피커·AI 위치·무료 제공 구역은 <b>손대지 않았다</b> — 이미 승인된 결정이라 이번
+      의뢰로 되돌리지 않는다.<br>
+    · 잠김 상태에 <b>카운트다운 타이머(자동 재시도 버튼 비활성화 등)는 추가하지 않았다</b> — 서버가
+      주는 문구를 그대로 보여주는 것으로 충분하고, 새 인터랙션은 실제 구현에서 별도로 검증돼야
+      한다(이번 시안은 문구·상태 분리가 핵심).
+  </div>
+
+  <div class="sec">밀도 — 숫자로</div>
+  <table>
+    <tr><th style="width:22%">자리</th><th class="n" style="width:12%">기존</th><th class="n" style="width:12%">시안</th><th class="n" style="width:12%">증감</th><th>근거(계산 — 실제 렌더링 측정 아님)</th></tr>
+    <tr><td>카드 세로 총합(기본 상태)</td><td class="n">약 666px</td><td class="n">약 644px</td><td class="n ok">-22px(-3%)</td>
+      <td>패딩 72→48(카드 4방향 24px 통일), 입력칸 3개 각 -2px, 버튼 -4px, 최근로그인 1행 49→30px가
+        컴포넌트 표준화로 줄고, 대신 line-height가 1.3(추정)→1.7(gijo-ui 본문 규정)로 늘어 일부 상쇄됐다.</td></tr>
+    <tr><td>오류 없음일 때 예약 공간</td><td class="n">16px(항상 예약)</td><td class="n">0px(있을 때만)</td><td class="n ok">-16px</td>
+      <td>기존 <code>.err{min-height:16px}</code>는 늘 자리를 차지한다. 시안은 알림 박스 자체가
+        없을 때 아예 안 그린다 — 대신 알림이 뜨는 순간 카드 높이가 바뀐다(아래 항목의 트레이드오프).</td></tr>
+    <tr><td>오류 박스 표시 시 추가 높이</td><td class="n">약 16~28px</td><td class="n">약 80~95px</td><td class="n warn">+55~70px</td>
+      <td>"원인마다 다른 문구 + 무엇을 해야 하는지"를 요구한 것 자체가 세로를 요구한다 — 정보량과
+        화면 밀도의 트레이드오프(위 "무엇을 포기했나"에 안 적힌 것: 밀도를 일부 내줬다).</td></tr>
+    <tr><td>2차 인증 등록 필요 카드</td><td class="n">없음(결함 방치)</td><td class="n">약 190px</td><td class="n">신규</td>
+      <td>기존에 이 상태를 처리하는 화면이 없었다 — <code>lm-primary</code>(자격 입력 4블록, 약
+        300px)를 대신 채우는 자리라 순수 증가가 아니라 <b>대체</b>다.</td></tr>
+    <tr><td>최근 로그인 1행</td><td class="n">49px</td><td class="n">30px</td><td class="n ok">-19px(-39%)</td>
+      <td><code>gijo-ui.css:374</code> <code>.g-rows-r{height:30px}</code>(2026-08-19 "엑셀처럼" 확정)를
+        그대로 재사용 — 새 규칙을 안 만들었다.</td></tr>
+  </table>
+
+  <div class="sec">근거 — 설계 전 조사(표준·모범사례, 직접 확인)</div>
+  <table>
+    <tr><th style="width:24%">출처</th><th style="width:44%">확인한 내용(요지)</th><th>이 시안에 반영</th></tr>
+    <tr><td>OWASP Authentication Cheat Sheet<br><span style="color:var(--g-muted-2)">cheatsheetseries.owasp.org</span></td>
+      <td>"로그인 실패 시 아이디 오류·비밀번호 오류·계정 잠김·계정 없음을 구분해 알리지 말 것 —
+        계정 나열 공격에 악용된다. 올바른 응답 예: 'Login failed; Invalid user ID or password'."</td>
+      <td>자격 오류 문구는 계속 하나로 뭉뚱그림. 대신 <b>계정과 무관한</b> 연결 실패·잠김만 별도
+        범주로 뺌(이건 서버가 이미 401과 다른 상태코드로 갈라 보내고 있었다).</td></tr>
+    <tr><td>Nielsen Norman Group, "Error-Message Guidelines"<br><span style="color:var(--g-muted-2)">nngroup.com/articles/error-message-guidelines</span></td>
+      <td>오류 문구는 명확·정확하고 <b>다음에 무엇을 하면 되는지</b>까지 제시해야 하며, 사람을
+        탓하는 어투를 피해야 한다.</td>
+      <td>상태 4종(연결실패/자격오류/잠김/등록필요) 모두 "제목(무엇이 일어났나)+본문(무엇을 하면
+        되나)" 2단 구조로 통일. "주소를 확인하세요"·"다시 입력하세요"·"기다리세요"·"등록하세요"처럼
+        동사로 끝맺음.</td></tr>
+    <tr><td>WCAG 2.1 성공기준 1.4.1(Use of Color)<br><span style="color:var(--g-muted-2)">w3.org/WAI/WCAG21/Understanding/use-of-color.html</span></td>
+      <td>색만으로 정보를 전달하면 안 된다(색맹·흑백 인쇄에서 구분 불가).</td>
+      <td>4범주 모두 <b>색+아이콘(🔌/🔑/⏳/🔐)+제목 문구</b> 3중으로 구분 — 색만 다른 상자를 안 만듦.</td></tr>
+    <tr><td>내부 근거 — <code>gijo-ui.css:32-46,330-334</code></td>
+      <td>--g-blue-fill(흰 글씨 대비 5.17:1)·본문 #e9e7e2 on #262624(14.1:1) 등 대비비가 이미 계산·
+        검증돼 있다.</td>
+      <td>새 색을 하나도 안 만들고 <b>이미 대비 검증된 4색</b>(red/blue/amber/teal)만 재배정 — 대비
+        재계산이 필요 없다.</td></tr>
+    <tr><td>내부 근거 — <code>lite-green.css:66-70</code></td>
+      <td>"⚠ --orange를 빠뜨리면 로그인 버튼만 주황으로 남는다" — 로그인 버튼의 <code>--orange</code>가
+        이미 라이트 테마에서 <code>--g-blue</code>로 강제 치환되던 <b>우회 코드</b>였다(2026-08-20
+        실기에서 잡힌 버그).</td>
+      <td><code>--orange</code>를 걷고 버튼을 처음부터 <code>--g-blue-fill</code>로 쓰면 이 우회
+        자체가 필요 없어진다 — 실제 구현 때 lite-green.css 66-70행도 함께 정리 대상.</td></tr>
+  </table>
+
+  <div class="sec">제품 원칙 자가점검</div>
+  <table>
+    <tr><th style="width:34%">원칙</th><th style="width:9%"></th><th>어떻게</th></tr>
+    <tr><td>화면엔 정체성 한 줄과 ⚠경고만 · 사용법은 챗봇(screenguide)</td><td class="warn">⚠</td>
+      <td>로그인은 <b>로그인 전</b>이라 챗봇(gijo-info)이 아직 안 떠 있다 — 기존 화면도 이미
+        hint·mp-note로 화면 안에서 직접 안내한다(선례). 새 문구도 그 분량(1~3줄)을 넘기지 않도록
+        맞췄다 — 완전히 원칙대로는 아니지만, 로그인 전 화면의 기존 예외를 벗어나지 않았다.</td></tr>
+    <tr><td>가짜 상호작용 금지</td><td class="ok">✅</td>
+      <td>카드 내부 버튼·체크박스는 전부 장식(클릭 이벤트 없음). 상태 전환은 "시안 전용 도구줄"이라고
+        표시한 별도 버튼으로만 하고, 그 사실을 화면에 문장으로 적어 둠.</td></tr>
+    <tr><td>OWASP 인증 치트시트(계정 나열 방지)</td><td class="ok">✅</td>
+      <td>자격 오류 문구는 여전히 하나 — "어느 쪽이 틀렸는지 알려 드리지 않습니다"라고 화면에
+        <b>명시</b>까지 함(왜 안 갈라주는지 담당자가 궁금해하지 않도록).</td></tr>
+    <tr><td>실제 화면 흐름 유지(서버주소·아이디·비번·저장·2차인증·중복로그인·에디션3택)</td><td class="ok">✅</td>
+      <td>전부 유지. 모드피커·위치·무료제공 구역은 구조·문구 그대로(리본으로 "대상 아님" 명시).</td></tr>
+    <tr><td>gijo-ui.css 토큰만 사용 · 새 색 추가 금지</td><td class="ok">✅</td>
+      <td>새 색 0개. <code>--g-red/--g-blue/--g-amber/--g-teal</code> 등 기존 값만 재사용. 자체완결을
+        위해 값만 인라인 복사(구현 시 gijo-ui.css를 링크하면 이 인라인 복사는 필요 없어짐).</td></tr>
+    <tr><td>밀도 우선(엑셀처럼 촘촘히)</td><td class="warn">⚠</td>
+      <td>기본 상태는 -3% 더 촘촘해졌지만, 오류 문구를 원인별로 갈라 "무엇을 해야 하는지"까지
+        적으라는 요구 자체가 오류가 뜬 순간엔 +55~70px를 요구한다 — 위 "무엇을 포기했나"에 명시.</td></tr>
+  </table>
+
+  <div class="sec">구현 범위 — 실제로 고칠 파일(승인 시 메인이 진행)</div>
+  <table>
+    <tr><th style="width:30%">파일</th><th>무엇을</th></tr>
+    <tr><td><code>client/src/renderer/pages/login.html</code></td>
+      <td><code>doLogin()</code>의 catch/else 분기를 <code>result.code</code>별로 나눔(error/
+        invalid_credentials/locked) · <code>result.enrollRequired</code> 처리 추가(새 3단계 UI,
+        <code>mfa-step</code>과 같은 구조로 <code>enroll-step</code> 클래스 신설) · 인라인
+        <code>:root</code> 자체 팔레트를 걷고 <code>&lt;link rel="stylesheet" href="gijo-ui.css"&gt;</code>로
+        교체 · 309행 <code>/ aria-label=</code> 오표기 정리.</td></tr>
+    <tr><td><code>client/src/renderer/pages/lite-green.css</code></td>
+      <td>66-70행 <code>--orange: var(--g-blue)</code> 우회 — 로그인 버튼이 처음부터
+        <code>--g-blue-fill</code>을 쓰면 이 줄이 필요 없어지는지 확인 후 정리(라이트 실기 재검증 필요).</td></tr>
+    <tr><td>서버(<code>server/</code>)</td>
+      <td>변경 없음 — <code>enrollRequired</code>·연결 실패 구분에 필요한 정보는 이미 다 내려주고
+        있다(<code>client/src/api/auth.ts:20,54,62</code>). 화면이 그 값을 이제 쓰기만 하면 된다.</td></tr>
+  </table>
+
+</div>
+
+<script>
+  // 상태 전환 — data-state를 바꾸는 것 외에는 아무 로직도 없다(내용·서식은 위 CSS가 전담).
+  var card = document.getElementById("lmCard");
+  var buttons = document.querySelectorAll(".demo-toolbar button[data-state]");
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      buttons.forEach(function (x) { x.classList.toggle("on", x === b); });
+      card.dataset.state = b.dataset.state;
+    });
+  });
+</script>
+</body>
+</html>
