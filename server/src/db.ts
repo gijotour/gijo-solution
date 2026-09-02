@@ -623,6 +623,11 @@ migrate(
    UPDATE memory_documents SET grade = 'O' WHERE grade IS NULL;
    ALTER TABLE users ADD COLUMN clearance TEXT;`
 );
+// memory_documents.origin — 'builtin'(제품 내장)·'approved-qa'(승인 문답)·NULL(고객 업로드).
+// 원래 engine/memory.ts가 같은 id로 더하던 칸인데, memory.ts를 안 싣는 모듈(observability·teamview·
+// learnmemory)이 이 칸을 WHERE에 쓰게 되면서 **DB를 여는 자리(여기)**로 옮겼다(2026-09-03 실측:
+// 자가진단 시험 15개가 `no such column: origin`으로 죽었다). memory.ts의 같은 id 호출은 이제 no-op이다.
+migrate("memory_documents-origin", "ALTER TABLE memory_documents ADD COLUMN origin TEXT");
 
 // 문서 ↔ 자산 연결(engine/memory.ts) — "이 보고서는 어느 자산 것인가".
 //

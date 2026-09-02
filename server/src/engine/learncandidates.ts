@@ -20,7 +20,7 @@ import crypto from "crypto";
 import { db, migrate } from "../db";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { SMALLTALK, NO_ANSWER } from "./sessionpatterns";
-import { rateChatLog, 질문주제 } from "./learnloop";
+import { rateChatLog, 질문주제, getChatLog, emitChatLogRated, TOPICS } from "./learnloop";
 import { isNonLearningSessionOwner } from "./learnpolicy";
 import { 학습재료가못되나 } from "./datasethygiene";
 // work_session_turns 테이블은 worksessions.ts의 migrate가 만든다 — 이 모듈이 먼저 적재되면
@@ -71,7 +71,9 @@ function fingerprint(question: string, answer: string): string {
 
 export interface LearnCandidate {
   id: string; // "cl:<logId>" | "ws:<userTurnId>:<botTurnId>"
-  source: "chatlog" | "worksession";
+  // 어디서 찾았나. distill=교사 모델 증류 행(chat_logs.origin='distill', id는 cl:이라 결정 경로가 같다).
+  // ⚠ chat_logs.origin(어떻게 생겼나)과는 다른 축 — 이름을 합치지 않는다(증류학습 계획서 §3.6-2).
+  source: "chatlog" | "worksession" | "distill";
   question: string;
   answer: string;
   createdAt: number;
@@ -80,10 +82,13 @@ export interface LearnCandidate {
   score: number; // cite 3 + tool 2 + accepted 1 + lengthOk 1
 }
 
-interface ChatLogRow { id: string; agentId: string; question: string; answer: string; rating: number | null; usedInDataset: number; createdAt: number }
+interface ChatLogRow { id: string; agentId: string; question: string; answer: string; rating: number | null; usedInDataset: number; createdAt: number; topic?: string | null; origin?: string | null; cites?: string | null }
 interface TurnRow { id: string; sessionId: string; role: "user" | "assistant"; content: string; tool: string | null; at: number; createdBy: string | null }
 
-const unratedLogsStmt = db.prepare("SELECT * FROM chat_logs WHERE rating IS NULL AND usedInDataset = 0 ORDER BY createdAt DESC LIMIT 500");
+// 대화 로그 창은 실대화만(증류 제외) — 증류 500건이 들어오면 실사용 미평가 대화가 이 창(LIMIT 500)
+// 밖으로 밀려나던 것을 막는다(설계관 2026-09-03 ★5). 증류는 자기 창으로 따로 본다.
+const unratedLogsStmt = db.prepare("SELECT * FROM chat_logs WHERE rating IS NULL AND usedInDataset = 0 AND COALESCE(origin,'chat') <> 'distill' ORDER BY createdAt DESC LIMIT 500");
+const unratedDistillStmt = db.prepare("SELECT * FROM chat_logs WHERE rating IS NULL AND usedInDataset = 0 AND origin = 'distill' ORDER BY createdAt DESC LIMIT 500");
 // 세션을 **누가 열었는지**(createdBy)를 함께 가져온다 — 배포·게시 계정이 검증하느라 던진
 // 문답이 후보함에 그대로 흘러들던 구멍을 막기 위해서다(2026-08-08 실측: 후보 13건 중 7건이
 // 내 QA·리허설 대화였다). 대화 로그 경로는 isNonLearningAccount로 이미 막혀 있었는데
@@ -99,7 +104,12 @@ const putDecisionStmt = db.prepare(
 );
 const insertLogStmt = db.prepare(
   // topic도 함께 적는다(2026-08-08) — 승인 경로로 들어온 행이 주제 진척에서 빠지면 300건 시계가 어긋난다.
-  "INSERT INTO chat_logs (id, agentId, question, answer, rating, usedInDataset, createdAt, topic) VALUES (@id, @agentId, @question, @answer, 1, 0, @createdAt, @topic)"
+  // origin(어떻게 생겼나, 2026-09-03)도 함께 — 작업내역 승인은 'worksession', 문서 시드는 'seed'.
+  "INSERT INTO chat_logs (id, agentId, question, answer, rating, usedInDataset, createdAt, topic, origin) VALUES (@id, @agentId, @question, @answer, 1, 0, @createdAt, @topic, @origin)"
+);
+// 증류 편입 — rating **NULL**(승인은 사람이 한다, 원칙 3). 시드 라우트(rating=1 즉시)를 재사용하지 않는다(설계관 ★8).
+const insertDistillStmt = db.prepare(
+  "INSERT INTO chat_logs (id, agentId, question, answer, rating, usedInDataset, createdAt, topic, origin, teacher, cites, promptHash) VALUES (@id, 'distill-teacher', @question, @answer, NULL, 0, @createdAt, @topic, 'distill', @teacher, @cites, @promptHash)"
 );
 const allLogFingerprintRowsStmt = db.prepare("SELECT question, answer FROM chat_logs");
 
@@ -153,7 +163,7 @@ function scoreOf(s: LearnCandidate["signals"]): number {
 /** 후보 목록 — 대화 로그(미평가) + 작업내역(user→assistant 짝), 결정된 것·중복·제외 사유는 뺀다. */
 export function listLearnCandidates(days = 30, limit = 60): {
   candidates: LearnCandidate[];
-  kpis: { candidates: number; strong: number; excludedByReason: Record<string, number> };
+  kpis: { candidates: number; strong: number; distill: number; excludedByReason: Record<string, number> };
 } {
   const decided = new Map((decisionStmt.all() as { id: string; decision: string }[]).map((d) => [d.id, d.decision]));
   const seen = new Set<string>();
@@ -175,6 +185,22 @@ export function listLearnCandidates(days = 30, limit = 60): {
     if (out.some((c) => fingerprint(c.question, c.answer) === fp)) { drop("중복"); continue; }
     const signals = buildSignals(r.question, r.answer, false, false);
     out.push({ id: `cl:${r.id}`, source: "chatlog", question: r.question, answer: r.answer, createdAt: r.createdAt, signals, score: scoreOf(signals), topic: 질문주제(r.question) });
+  }
+
+  // ── 출처 C: 증류(교사 모델이 근거 조각으로 만든 문답, 미평가) ─────────────────
+  // 편입 라우트가 이미 제외 규칙·근거 겹침을 지났지만 여기서 한 번 더 지난다(규칙이 바뀌었을 수 있다).
+  // ⚠ 증류는 **따로 담는다**(검토관 2026-09-03 상): 편입 조건이 「근거 겹침 있음」이라 cite 신호가 구조적으로
+  //   항상 참 → 점수가 상수(4)라 같은 배열에서 정렬하면 실대화 후보를 상위 60칸 밖으로 밀어낸다(SQL 창을
+  //   갈라 놓고도 한 겹 위에서 재발). 그래서 실대화·작업내역을 먼저 채우고 남는 칸에만 증류를 붙인다.
+  //   점수도 상수를 주지 않는다 — 신호 칸은 「근거 있음·미검수」 하나뿐이고 일괄 승인 대상이 아니다.
+  const distillOut: LearnCandidate[] = [];
+  for (const r of unratedDistillStmt.all() as ChatLogRow[]) {
+    const why = excluded(r.question, r.answer);
+    if (why) { drop(why); continue; }
+    const fp = fingerprint(r.question, r.answer);
+    if (out.some((c) => fingerprint(c.question, c.answer) === fp) || distillOut.some((c) => fingerprint(c.question, c.answer) === fp)) { drop("중복"); continue; }
+    const signals = { cite: Boolean(r.cites && r.cites !== "[]"), tool: false, accepted: false, lengthOk: r.answer.length >= 80 && r.answer.length <= 1200 };
+    distillOut.push({ id: `cl:${r.id}`, source: "distill", question: r.question, answer: r.answer, createdAt: r.createdAt, signals, score: 0, topic: r.topic ?? 질문주제(r.question) });
   }
 
   // ── 출처 B: 작업내역 user→assistant 짝 ──────────────────────────────
@@ -200,19 +226,26 @@ export function listLearnCandidates(days = 30, limit = 60): {
   }
 
   out.sort((a, c) => c.score - a.score || c.createdAt - a.createdAt);
+  distillOut.sort((a, c) => c.createdAt - a.createdAt);
+  // 실대화·작업내역이 먼저, 남는 칸에 증류 — 증류 500건이 들어와도 실대화 후보는 화면에서 안 사라진다.
   const sliced = out.slice(0, limit);
+  const 남은칸 = Math.max(0, limit - sliced.length);
   return {
-    candidates: sliced,
-    kpis: { candidates: out.length, strong: out.filter((c) => c.score >= 3).length, excludedByReason },
+    candidates: [...sliced, ...distillOut.slice(0, 남은칸)],
+    // candidates·strong은 **실대화·작업내역 기준**(예전 뜻 그대로). 증류는 distill에 따로 센다.
+    kpis: { candidates: out.length, strong: out.filter((c) => c.score >= 3).length, distill: distillOut.length, excludedByReason },
   };
 }
 
-/** 승인/제외 — 승인은 👍 기록으로만 이어진다(자동 반영 없음 원칙의 문). */
-export function decideLearnCandidate(id: string, accept: boolean, actor?: string): { ok: true } {
+/**
+ * 승인/제외 — 승인은 👍 기록 **그리고** 겹 1 반입(승인 즉시 그 주제 지식영역에 들어가 다음 답의 근거가 된다,
+ * 2026-09-03). approverId(계정 id)는 반입 문서의 열람 등급을 승인자 등급으로 잠그는 데 쓴다.
+ */
+export function decideLearnCandidate(id: string, accept: boolean, actor?: string, approverId?: string | null): { ok: true } {
   const now = Date.now();
   if (id.startsWith("cl:")) {
     // 대화 로그 출처 — rating이 결정 저장소다. 제외는 👎(이미 학습 제외 의미)로 남긴다.
-    rateChatLog(id.slice(3), accept ? 1 : -1);
+    rateChatLog(id.slice(3), accept ? 1 : -1, approverId ?? null);
   } else if (id.startsWith("ws:")) {
     const [, userTurnId, botTurnId] = id.split(":");
     if (accept) {
@@ -221,14 +254,20 @@ export function decideLearnCandidate(id: string, accept: boolean, actor?: string
       const b = turn(botTurnId);
       if (!u || !b) throw new Error("작업내역에서 해당 문답을 찾을 수 없습니다(정리됐을 수 있음)");
       // 승인 시점에 로그로 옮긴다(rating=1) — 이후는 기존 정제 루프가 그대로 집어간다.
+      const newId = "lc" + now.toString(36) + Math.random().toString(36).slice(2, 8);
       insertLogStmt.run({
-        id: "lc" + now.toString(36) + Math.random().toString(36).slice(2, 8),
+        id: newId,
         agentId: "orchestrator",
         question: u.content,
         answer: b.content,
         createdAt: b.at,
         topic: 질문주제(u.content),
+        origin: "worksession",
       });
+      // 승인 신호(겹 1) — INSERT로 rating=1을 직접 박는 입구라 rateChatLog를 안 지난다. 여기서 직접 보낸다.
+      const inserted = getChatLog(newId);
+      if (inserted) emitChatLogRated({ kind: "approved", log: inserted, approverId: approverId ?? null });
+      else console.warn(`[learncandidates] 작업내역 승인 행을 다시 못 읽어 기억 반입 신호를 못 보냈다: ${newId}`);
     }
     putDecisionStmt.run(id, accept ? "accept" : "reject", now, actor ?? null);
   } else {
@@ -237,20 +276,105 @@ export function decideLearnCandidate(id: string, accept: boolean, actor?: string
   return { ok: true };
 }
 
-/** 신호 강한 후보 일괄 승인 — 시안의 "신호 강한 N건 모두 승인" 버튼. */
-export function acceptStrongCandidates(minScore = 3, actor?: string): { accepted: number } {
-  const { candidates } = listLearnCandidates();
+/**
+ * 신호 강한 후보 일괄 승인 — 시안의 "신호 강한 N건 모두 승인" 버튼.
+ * ⚠ 증류 후보는 **절대 일괄 승인하지 않는다**(검토관 2026-09-03 상) — 교사 문답은 사람 눈을 한 번은 지나야
+ *   한다(계획서 §9-3). 그리고 화면이 묻는 N(kpis.strong, 전체 기준)과 실제 승인 수가 같도록 창을 넓혀 부른다
+ *   (예전엔 limit 60 기본값이라 「512건 승인할까요?」→「60건 승인됨」이 났다).
+ */
+export function acceptStrongCandidates(minScore = 3, actor?: string, approverId?: string | null): { accepted: number } {
+  const { candidates } = listLearnCandidates(30, 100_000);
   let accepted = 0;
   for (const c of candidates) {
+    if (c.source === "distill") continue;
     if (c.score < minScore) continue;
-    decideLearnCandidate(c.id, true, actor);
+    decideLearnCandidate(c.id, true, actor, approverId);
     accepted++;
   }
   return { accepted };
 }
 
+// ── 증류 편입 (증류학습 계획서 §3.5 · 설계관 ★4·6·8·12 반영, 2026-09-03) ──────────────
+//
+// 교사 모델(gb10)이 근거 조각으로 만든 문답을 후보함에 넣는다. 세 가지를 **여기서** 지킨다:
+//   1) rating NULL — 승인은 사람이 한다(원칙 3). 시드 라우트(rating=1 즉시)를 재사용하지 않는다.
+//   2) 제외 규칙(excluded = 제품 규칙 + 위생 판별)을 **넣기 전에** 지난다 — 안 그러면 DB엔 있는데
+//      후보함엔 안 보이는 행이 생겨 「생성 500 → 후보 500」이 거짓이 된다(★6).
+//   3) 근거 겹침 — 답이 인용한 조각 본문과 **20자 이상 그대로** 겹쳐야 한다(원칙 4). 교사 환각을
+//      학습하는 길을 막는 첫 문. 조각 ref는 호출자가 준 것(경로#해시)을 그대로 남긴다(★4).
+// 거절 사유를 건별로 돌려준다 — 증류기가 폐기율(교사 품질 지표)을 이것으로 센다(★12).
+export interface DistillItem {
+  question?: string;
+  answer?: string;
+  topic?: string;
+  cites?: { ref?: string; text?: string }[];
+  promptHash?: string;
+}
+export interface DistillIntakeResult {
+  accepted: number;
+  rejected: { i: number; reason: string }[];
+  byReason: Record<string, number>;
+}
+
+const OVERLAP_CHARS = 20;
+/** 답이 근거 본문과 20자 이상 그대로 겹치는가 — 겹친 창을 돌려준다(없으면 null). 공백은 무시. */
+export function 근거겹침(answer: string, sourceText: string): string | null {
+  const a = String(answer ?? "").replace(/\s+/g, "");
+  const s = String(sourceText ?? "").replace(/\s+/g, "");
+  if (a.length < OVERLAP_CHARS || s.length < OVERLAP_CHARS) return null;
+  for (let i = 0; i + OVERLAP_CHARS <= s.length; i += 4) {
+    const w = s.slice(i, i + OVERLAP_CHARS);
+    if (a.includes(w)) return w;
+  }
+  return null;
+}
+
+export function intakeDistilledCandidates(teacher: string, items: DistillItem[]): DistillIntakeResult {
+  const t = String(teacher ?? "").trim();
+  if (!t) throw new Error("teacher(교사 모델 id — 응답의 model 필드 실측값)가 필요합니다");
+  const rejected: DistillIntakeResult["rejected"] = [];
+  const byReason: Record<string, number> = {};
+  const reject = (i: number, reason: string) => { rejected.push({ i, reason }); byReason[reason] = (byReason[reason] ?? 0) + 1; };
+  const 있는지문 = new Set((allLogFingerprintRowsStmt.all() as { question: string; answer: string }[]).map((r) => fingerprint(r.question, r.answer)));
+  let accepted = 0;
+  items.forEach((it, i) => {
+    const q = String(it.question ?? "").trim();
+    const a = String(it.answer ?? "").trim();
+    if (!q || !a) { reject(i, "빈 문답"); return; }
+    const topic = (TOPICS as readonly string[]).includes(String(it.topic ?? "")) ? String(it.topic) : 질문주제(q);
+    if (!topic) { reject(i, "주제 없음"); return; }
+    const why = excluded(q, a);
+    if (why) { reject(i, why); return; }
+    const cites = Array.isArray(it.cites) ? it.cites : [];
+    // ref(경로#sha12)와 text의 결속을 확인한다 — ref 꼬리가 본문 sha1 앞 12자와 같아야 한다(검토관 2026-09-03 중:
+    // 저장·표시되는 것은 ref뿐인데 아무도 검증하지 않아 「없는 파일」이 근거로 인쇄될 수 있었다). 서버는 저장소
+    // 파일을 못 보니 실재는 못 가리지만, 최소한 「이 본문에서 나온 ref」임은 여기서 가린다.
+    const refOk = (ref: string, text: string) => { const m = ref.match(/#([0-9a-f]{12})$/i); return !m || m[1].toLowerCase() === crypto.createHash("sha1").update(text).digest("hex").slice(0, 12); };
+    const refBroken = cites.some((c) => c?.ref && !refOk(String(c.ref), String(c?.text ?? "")));
+    if (refBroken) { reject(i, "근거 ref 불일치(본문 해시)"); return; }
+    const 겹친 = cites.map((c) => ({ ref: String(c?.ref ?? "").trim(), w: 근거겹침(a, String(c?.text ?? "")) })).filter((c) => c.ref && c.w);
+    if (!겹친.length) { reject(i, `근거 겹침 없음(${OVERLAP_CHARS}자)`); return; }
+    const fp = fingerprint(q, a);
+    if (있는지문.has(fp)) { reject(i, "이미 있음"); return; }
+    있는지문.add(fp);
+    insertDistillStmt.run({
+      id: "dt" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      question: q,
+      answer: a,
+      createdAt: Date.now(),
+      topic,
+      teacher: t,
+      cites: JSON.stringify(겹친.map((c) => c.ref)),
+      promptHash: it.promptHash ? String(it.promptHash).slice(0, 64) : null,
+    });
+    accepted += 1;
+  });
+  return { accepted, rejected, byReason };
+}
+
 export function registerLearnCandidateRoutes(app: Express): void {
   const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
+  const userIdOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.id ?? null;
 
   app.get("/api/learnloop/candidates", authMiddleware, (req, res) => {
     res.json(listLearnCandidates(Number(req.query.days) || 30, Number(req.query.limit) || 60));
@@ -263,7 +387,7 @@ export function registerLearnCandidateRoutes(app: Express): void {
       return;
     }
     try {
-      decideLearnCandidate(id, accept, actorOf(req));
+      decideLearnCandidate(id, accept, actorOf(req), userIdOf(req));
       recordAudit({ kind: "write", actor: actorOf(req), action: "학습 후보 결정", target: accept ? "승인" : "제외", detail: id, result: "ok" });
       res.json({ ok: true });
     } catch (e) {
@@ -272,7 +396,7 @@ export function registerLearnCandidateRoutes(app: Express): void {
   });
 
   app.post("/api/learnloop/candidates/accept-strong", authMiddleware, (req, res) => {
-    const r = acceptStrongCandidates(Number(req.body?.minScore) || 3, actorOf(req));
+    const r = acceptStrongCandidates(Number(req.body?.minScore) || 3, actorOf(req), userIdOf(req));
     recordAudit({ kind: "write", actor: actorOf(req), action: "학습 후보 일괄 승인", target: `${r.accepted}건`, result: "ok" });
     res.json(r);
   });
@@ -304,14 +428,20 @@ export function registerLearnCandidateRoutes(app: Express): void {
       const fp = fingerprint(q, a);
       if (있는지문.has(fp)) { 거른것["이미 있음"] = (거른것["이미 있음"] ?? 0) + 1; continue; }
       있는지문.add(fp);
+      const seedId = "sd" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       insertLogStmt.run({
-        id: "sd" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+        id: seedId,
         agentId: "seed-docs",
         question: q,
         answer: a,
         createdAt: Date.now(),
         topic: it.topic ?? 질문주제(q),
+        origin: "seed",
       });
+      // 승인 신호(겹 1) — 시드는 rating=1로 바로 들어오는 입구다. 여기서도 보낸다.
+      const seeded = getChatLog(seedId);
+      if (seeded) emitChatLogRated({ kind: "approved", log: seeded, approverId: userIdOf(req) });
+      else console.warn(`[learncandidates] 시드 행을 다시 못 읽어 기억 반입 신호를 못 보냈다: ${seedId}`);
       넣음 += 1;
     }
     recordAudit({
@@ -319,5 +449,23 @@ export function registerLearnCandidateRoutes(app: Express): void {
       target: `${넣음}건`, detail: `요청 ${items.length}건 · 거름 ${JSON.stringify(거른것)}`, result: "ok",
     });
     res.json({ 넣음, 거른것 });
+  });
+
+  // 증류 편입 — admin만. 본문 { teacher, items:[{question, answer, topic, cites:[{ref,text}], promptHash}] }.
+  // rating NULL로 들어가 후보함(출처: 증류)에 뜬다. 승인은 사람이(원칙 3).
+  app.post("/api/learnloop/distill/intake", authMiddleware, adminMiddleware, (req, res) => {
+    const { teacher, items } = (req.body ?? {}) as { teacher?: string; items?: DistillItem[] };
+    if (!Array.isArray(items) || items.length === 0) { res.status(400).json({ error: "items(문답 배열)가 필요합니다" }); return; }
+    if (items.length > 500) { res.status(400).json({ error: "한 번에 500건까지만 넣을 수 있습니다" }); return; }
+    try {
+      const r = intakeDistilledCandidates(String(teacher ?? ""), items);
+      recordAudit({
+        kind: "write", actor: actorOf(req), action: "증류 문답 편입(미승인)",
+        target: `${r.accepted}건`, detail: `교사 ${teacher} · 요청 ${items.length}건 · 거름 ${JSON.stringify(r.byReason)}`, result: "ok",
+      });
+      res.json(r);
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
+    }
   });
 }

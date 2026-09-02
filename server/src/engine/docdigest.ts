@@ -192,7 +192,9 @@ export function listRecentDocs(days = 7): RecentDoc[] {
     `SELECT m.documentId, m.category, m.uploadedBy, m.ingestedAt,
             d.summary, d.keywords, d.matches, d.failedReason
        FROM memory_documents m LEFT JOIN doc_digests d ON d.documentId = m.documentId
-      WHERE m.ingestedAt >= ? AND m.documentId NOT LIKE 'personal:%' ORDER BY m.ingestedAt DESC`
+      WHERE m.ingestedAt >= ? AND m.documentId NOT LIKE 'personal:%'
+        AND COALESCE(m.origin, '') <> 'approved-qa' ORDER BY m.ingestedAt DESC`
+    // ↑ 승인 문답(learnmemory, 2026-09-03)은 「새로 들어온 문서」가 아니다 — 승인 300건이 대장을 덮지 않게.
   ).all(cutoff) as RecentDoc[];
 }
 
