@@ -26,15 +26,26 @@
   }
 })();
 </script>
+<!-- 🎨 디자인 시스템 — 이 화면만 자체 팔레트를 쓰던 것을 잇는다(승인 시안 2026-09-02).
+     ⚠ 다른 화면은 nav.js가 이 파일을 <head>에 주입하지만, **로그인은 nav.js를 안 싣는다**
+       (로그인 전이라 메뉴가 없다). 그래서 여기서는 직접 link한다 — 대시보드와 같은 방식이다.
+     ⚠ 반드시 아래 <style>보다 **먼저** 온다. 이 화면 규칙이 토큰을 덮어쓸 수 있어야 한다. -->
+<link rel="stylesheet" href="gijo-ui.css" />
 <style>
+  /* ── 팔레트 — 디자인 시스템에 잇는다 (승인 시안 2026-09-02) ────────────────────────
+     그전에는 이 자리에 색값 일곱 개가 **박혀** 있었다. 로그인만 자체 팔레트를 써서 앱 본체와
+     결이 달랐고(여정 점검 지적), 값이 바뀌어도 여기만 안 따라왔다.
+     ⚠ 규칙 이름(--navy·--text 등)은 **그대로 둔다** — 이 파일의 수십 개 규칙이 그 이름을 쓴다.
+       이름은 남기고 **값만** 디자인 시스템 토큰으로 잇는다. 그러면 색의 단일 출처가 gijo-ui.css
+       한 곳이 되고, 이 화면은 그것을 따라간다.
+     ⚠ --navy2는 선언만 있고 쓰는 곳이 0이었다 — 지웠다(2026-09-02 확인). */
   :root {
-    --navy: #262624;
-    --navy2: #0c2c6b;
-    --orange: #dd5a1c;
-    --blue: #5fa1ff;
-    --text: #e9e7e2;
-    --muted: #b3ada4;
-    --border: #3d3c38;
+    --navy: var(--g-bg);
+    --orange: var(--g-blue-fill);  /* 로그인 단추 채움 — 흰 글씨 대비를 맞춘 토큰 */
+    --blue: var(--g-blue-light);
+    --text: var(--g-text);
+    --muted: var(--g-muted);
+    --border: var(--g-border-strong);
   }
   * { box-sizing: border-box; }
   body {
@@ -83,33 +94,57 @@
     .side-panel { background: none; border: none; box-shadow: none; padding: 0; }
     .side-panel .free { margin-top: 14px; padding-top: 0; }
   }
+  /* ── 두 3택을 「공통 영역」으로 가른다 (승인 시안 2026-09-02) ──────────────────────
+     그전에는 모드 3택과 AI 위치 3택이 **같은 모양**을 쓰고 제목도 하나로 합쳐져 있어,
+     처음 보는 담당자에게 6개가 한 덩어리로 읽혔다 — 고르라고 해 놓고 **무엇을 두 번 고르는지**
+     안 알려 준 셈이다. 테두리+배경으로 감싸면 여백만 두는 것보다 묶음 신호가 강하다(NN/g 공통 영역).
+     ⚠ 새 부품을 만들지 않는다 — gijo-ui.css의 .g-nested(103행)·.g-section-label(148행)을 그대로 쓴다. */
+  .mp-group + .mp-group { margin-top: var(--g-s4); }
+  .mp-glabel { font-size: 11px; font-weight: 800; color: var(--g-muted-2); letter-spacing: .4px; margin-bottom: 8px; }
+
   /* 고르는 버튼 — 모드 3택·AI 위치 3택이 **같은 모양**을 쓴다(라이트에서 검증된 패턴). */
-  .mp-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .mp-row { display: flex; gap: 10px; }
   .mp-btn {
-    flex: 1; width: auto; background: #1f1e1d; border: 1px solid var(--border); border-radius: 10px;
+    flex: 1; width: auto; background: var(--g-surface-1); border: 1px solid var(--g-border-strong); border-radius: var(--g-r);
     padding: 12px 10px; color: var(--text); font: inherit; font-weight: 400; cursor: pointer; text-align: center;
   }
   .mp-btn:hover:not(:disabled) { border-color: var(--blue); }
   .mp-btn .mp-top { display: block; font-size: 13px; font-weight: 700; white-space: nowrap; }
-  .mp-btn .mp-tag { display: block; font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
-  .mp-btn.on { background: #242320; }
-  .mp-btn[data-mode="standard"].on, .mp-btn[data-loc="local"].on { border-color: #8f8a80; box-shadow: 0 0 0 1px #8f8a80; }
-  .mp-btn[data-mode="pro"].on, .mp-btn[data-loc="remote"].on { border-color: #5b6b82; box-shadow: 0 0 0 1px #5b6b82; }
-  .mp-btn[data-mode="pro"].on .mp-top, .mp-btn[data-loc="remote"].on .mp-top { color: #a9b8cc; }
+  .mp-btn .mp-tag { display: block; font-size: 11.5px; color: var(--g-muted-2); margin-top: 4px; line-height: 1.35; }
+
   /* 라이트·클라우드는 **다른 무게**로 그린다 — 나란한 버튼으로만 두면 거짓말이 된다.
-     라이트는 데이터 폴더가 갈리고 앱을 다시 켜야 하고, 클라우드는 글이 사외로 나간다. */
-  .mp-btn[data-mode="lite"], .mp-btn[data-loc="cloud"] { border-style: dashed; }
-  .mp-btn[data-mode="lite"].on { border-color: #6f8f52; box-shadow: 0 0 0 1px #6f8f52; }
-  .mp-btn[data-mode="lite"].on .mp-top { color: #b9d49a; }
-  .mp-btn[data-loc="cloud"] .mp-tag { color: #e8b866; }
-  .mp-btn[data-loc="cloud"].on { border-color: #e8b866; box-shadow: 0 0 0 1px #e8b866; }
-  .mp-btn[data-loc="cloud"].on .mp-top { color: #f0c98a; }
+     라이트는 데이터 폴더가 갈리고 앱을 다시 켜야 하고, 클라우드는 글이 사외로 나간다.
+     ⚠ 점선을 **걷었다**(승인 시안 2026-09-02) — 점선 테두리는 「여기에 끌어다 놓으세요」(드롭존)
+       를 뜻하는 관용구라 **못 고르는 것처럼** 읽혔다. 정확히 반대 신호였다.
+       대신 위쪽 3px 색 띠로 「다르다」만 말하고 「약하다」는 말하지 않는다.
+     ⚠ padding-top을 3px 줄여 버튼 높이를 다른 버튼과 정확히 같게 맞춘다(띠 3px − 원래 테두리 1px). */
+  .mp-btn[data-mode="lite"], .mp-btn[data-loc="cloud"] { border-top-width: 3px; padding-top: 10px; }
+  .mp-btn[data-mode="lite"] { border-top-color: var(--g-teal); }
+  .mp-btn[data-loc="cloud"] { border-top-color: var(--g-amber); }
+  .mp-btn[data-mode="lite"] .mp-tag { color: var(--g-teal); }
+  .mp-btn[data-loc="cloud"] .mp-tag { color: var(--g-amber); }
+
+  /* 고른 것 — 테두리 2px + 옅은 채움. 그전에는 1px 그림자 링뿐이라 무엇을 골랐는지 안 보였다.
+     그림자는 **장식**이라 상태 대비 요건(WCAG 1.4.11, 인접색과 3:1)을 안정적으로 못 만족한다.
+     ⚠ 채움 rgba는 새 색이 아니라 **그 토큰의 16진값을 십진으로 옮긴 것**이다
+       (--g-teal #1eb980 → rgba(30,185,128,.14)). gijo-ui.css의 .g-chip.g-on과 같은 표기 관례다.
+     ⚠ .mp-btn을 두 번 적어 특이도를 올린다 — 위 「다른 성격」 테두리 규칙을 이겨야 한다. */
+  .mp-btn.mp-btn.on { border-width: 2px; padding: 11px 9px; }
+  .mp-btn[data-mode="standard"].on, .mp-btn[data-loc="local"].on {
+    border-color: var(--g-muted-2); background: rgba(164,157,149,.14); }
+  .mp-btn[data-mode="pro"].on, .mp-btn[data-loc="remote"].on {
+    border-color: var(--g-blue-light); background: rgba(95,161,255,.14); }
+  .mp-btn[data-mode="pro"].on .mp-top, .mp-btn[data-loc="remote"].on .mp-top { color: var(--g-blue-light); }
+  .mp-btn[data-mode="lite"].on { border-color: var(--g-teal); background: rgba(30,185,128,.14); }
+  .mp-btn[data-mode="lite"].on .mp-top { color: var(--g-teal); }
+  .mp-btn[data-loc="cloud"].on { border-color: var(--g-amber); background: rgba(240,160,32,.14); }
+  .mp-btn[data-loc="cloud"].on .mp-top { color: var(--g-amber); }
   .mp-btn:disabled { opacity: .38; cursor: default; }
-  .mp-note { display: none; margin: -2px 0 14px; font-size: 11.5px; line-height: 1.6; padding: 8px 10px; border-radius: 8px; }
+  .mp-note { display: none; margin: var(--g-s2) 0 0; font-size: 11.5px; line-height: 1.6; padding: 8px 10px; border-radius: 8px; }
   .mp-note.show { display: block; }
-  .mp-note.n-pro { background: rgba(91,107,130,.18); border: 1px solid rgba(91,107,130,.55); }
-  .mp-note.n-lite { background: rgba(111,143,82,.18); border: 1px solid rgba(111,143,82,.55); }
-  .mp-note.n-warn { background: rgba(240,160,32,.09); border: 1px solid rgba(240,160,32,.4); }
+  .mp-note.n-pro { background: rgba(95,161,255,.10); border: 1px solid rgba(95,161,255,.4); }
+  .mp-note.n-lite { background: rgba(30,185,128,.10); border: 1px solid rgba(30,185,128,.4); }
+  .mp-note.n-warn { background: rgba(240,160,32,.10); border: 1px solid rgba(240,160,32,.4); }
   /* 고른 것을 자격증명 쪽에도 한 번 더 적는다 — 왼쪽에서 고르고 오른쪽을 보게 되므로. */
   .mode-badge { font-size: 11px; font-weight: 800; padding: 2px 8px 3px; border-radius: 20px; white-space: nowrap;
     background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--muted); margin-left: 6px; }
@@ -185,6 +220,19 @@
   body.mfa-step #recentBox, body.mfa-step .server-row, body.mfa-step #username,
   body.mfa-step #password, body.mfa-step #savePwRow, body.mfa-step #loginBtn,
   body.mfa-step label[for="username"], body.mfa-step label[for="password"] { display: none !important; }
+  /* ── 2차 인증 「등록 필요」 단계 (승인 시안 2026-09-02) ─────────────────────────────
+     관리자 필수 정책이 켜졌는데 아직 등록하지 않은 계정은 서버가 **등록만 되는 제한 세션**을
+     준다(auth.ts ENROLL_ONLY_PATHS). 그런데 화면이 그 표시를 **쓰지 않아**, 로그인은 되는데
+     들어가면 무엇을 눌러도 403이 나는 상태였다 — 담당자는 이유를 알 길이 없었다.
+     ⚠ 여기서 등록 자체를 하지는 않는다(QR·비밀키가 필요해 설정 화면의 몫이다).
+       **왜 막히는지와 어디로 가야 하는지**를 먼저 알리고 들여보낸다. */
+  body.enroll-step #recentBox, body.enroll-step .server-row, body.enroll-step #username,
+  body.enroll-step #password, body.enroll-step #savePwRow, body.enroll-step #loginBtn,
+  body.enroll-step label[for="username"], body.enroll-step label[for="password"] { display: none !important; }
+  .enroll { text-align: left; }
+  .enroll-h { font-size: 14px; font-weight: 700; color: var(--g-teal); margin-bottom: 8px; }
+  .enroll-d { font-size: 12.5px; color: var(--muted); line-height: 1.65; margin-bottom: 16px; }
+  .enroll-d b { color: var(--text); }
   .mfa-who { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
   .mfa-who b { color: var(--text); }
   .hint { margin-top: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
@@ -215,17 +263,22 @@
      간격으로 시선 순서(로그인 → 무료)를 지킨다. 라이트 빌드에서는 통째로 감춘다.
      ⚠ 2026-08-18 두 칸 배치로 왼쪽 패널 **맨 아래**(margin-top:auto)로 옮겼다 —
        자격증명 아래에 쌓지 않는다. */
-  .free { width: auto; margin-top: auto; padding-top: 16px; }
-  .free-t { font-size: 12.25px; color: var(--muted); margin-bottom: 8px; letter-spacing: .02em; }
+  /* ── 무료 라이트 — 카드 껍데기를 걷고 한 줄로 낮춘다 (승인 시안 2026-09-02) ──────────
+     그전에는 테두리+배경 카드라 **주 선택(구동 모드·AI 위치)만큼 무거웠다.** 로그인하러 온
+     사람에게 다운로드가 먼저 눈에 들어오면 순서가 뒤바뀐다. 구분선 아래 한 줄로 내린다.
+     ⚠ 없애지는 않는다 — 사장님 지시(2026-08-14)로 여기 있는 자리이고 시험이 그 자리를 지킨다. */
+  .free { width: auto; margin-top: auto; padding-top: var(--g-s4); border-top: 1px solid var(--g-border); }
+  .free-t { font-size: 11px; color: var(--g-muted-2); margin-bottom: 6px; letter-spacing: .02em; }
   .free-row { display: flex; gap: 8px; }
-  .fc { flex: 1; min-width: 0; text-align: left; background: rgba(14,20,36,.6); border: 1px solid var(--border);
-        border-radius: 10px; padding: 11px 12px; cursor: pointer; color: var(--text); font: inherit; }
-  .fc:hover { border-color: var(--blue); background: rgba(20,28,48,.75); }
-  .fc-h { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; }
-  .fc-b { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: #7fd88f; border: 1px solid rgba(127,216,143,.4);
-          border-radius: 999px; padding: 1px 6px; }
-  .fc-d { margin-top: 5px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
-  .free-msg { margin-top: 7px; font-size: 11.5px; color: #ff8080; min-height: 14px; }
+  .fc { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 0;
+        cursor: pointer; color: var(--g-muted); font: inherit; }
+  .fc:hover .fc-h { color: var(--g-blue-light); }
+  .fc-h { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--g-muted); }
+  /* ⚠ 11px 미만으로 내리지 말 것 — uireadability 시험이 막는다(배율을 올려도 안 보인다). */
+  .fc-b { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--g-muted-2);
+          border: 1px solid var(--g-border-strong); border-radius: var(--g-r-pill); padding: 1px 6px; }
+  .fc-d { margin-top: 4px; font-size: 11px; color: var(--g-muted-2); line-height: 1.5; }
+  .free-msg { margin-top: 7px; font-size: 11.5px; color: var(--g-red); min-height: 14px; }
 </style>
 </head>
 <body>
@@ -234,7 +287,12 @@
        ⚠ 로그인 **전**이라 서버에 못 묻는다. 여기서는 고르기만 하고, 실제 적용은
          로그인 직후에 시도한다(시안이 고른 ⓒ안). 권한이 없으면 그때 정직하게 알린다. ══ -->
   <div class="side-panel" id="sidePanel">
-    <div class="side-t">구동 모드 · AI 위치 — 로그인 직후 적용됩니다</div>
+    <div class="side-t">로그인 직후 적용됩니다</div>
+    <!-- ⚠ 두 3택을 각각 이름표 붙은 박스로 감싼다(승인 시안 2026-09-02) — 그전에는 제목이
+         「구동 모드 · AI 위치」로 합쳐지고 버튼 여섯이 같은 모양이라 **한 덩어리**로 읽혔다.
+         ⚠ JS는 손대지 않는다 — #mpRow·#locRow·.mp-btn 셀렉터가 그대로라 고르는 동작은 그대로다. -->
+    <div class="mp-group g-nested">
+      <div class="mp-glabel">구동 모드</div>
     <div class="mp-row" id="mpRow">
       <!-- ⚠ 각 제품이 **무엇인지** 한 줄로 적는다(사장님 지시 2026-08-18).
            예전엔 「로그인 직후 적용」처럼 **동작**만 적혀 있어, 처음 보는 사람은
@@ -253,7 +311,10 @@
       </button>
     </div>
     <div class="mp-note" id="mpNote"></div>
+    </div>
 
+    <div class="mp-group g-nested">
+      <div class="mp-glabel">AI 위치</div>
     <div class="mp-row" id="locRow">
       <button type="button" class="mp-btn" data-loc="local">
         <span class="mp-top">💻 이 PC 안</span><span class="mp-tag">이 GPU만 사용</span>
@@ -266,6 +327,7 @@
       </button>
     </div>
     <div class="mp-note" id="locNote"></div>
+    </div>
 
     <!-- 무료 제공 — 사장님 지시(2026-08-14): 「Smart MD는 클라이언트에서 로그인할 때 제공되는
          무료 툴로 같이 배포」 + 「표준 클라이언트 로그인창에서 라이트 버전 다운 가능하게」.
@@ -306,7 +368,10 @@
            스탠다드/프로 7446) 단일 출처는 main.ts의 서버포트()다. 안내문에 숫자를 박아 두면
            에디션이 바뀔 때마다 여기가 낡고, 담당자는 **틀린 주소를 손으로 입력한다.**
            비워 두면 앱이 자기 에디션에 맞는 주소를 쓴다(main이 auth:getState로 seed). -->
-      <input id="serverUrl" placeholder="서버 주소 (이 PC에 동봉된 서버면 비워 두세요)" / aria-label="서버 주소">
+      <!-- ⚠ 예전엔 「/ aria-label=」처럼 슬래시가 속성 사이에 끼어 있었다(2026-09-02 정리).
+           HTML 파서가 홀로 선 「/」를 무시해 동작에는 영향이 없었지만, 읽는 사람이 오타를
+           따라 쓰게 되고 검사 도구가 걸고 넘어진다. -->
+      <input id="serverUrl" placeholder="서버 주소 (이 PC에 동봉된 서버면 비워 두세요)" aria-label="서버 주소" />
     </div>
 
     <label for="username">아이디</label>
@@ -352,6 +417,16 @@
         <div class="mfa-d">복구 코드는 한 번 쓰면 사라집니다. 다 썼으면 관리자에게 2차 인증 해제를 요청하세요.</div>
       </div>
       <button id="mfaCancel" class="mfa-alt">← 다른 계정으로 로그인</button>
+    </div>
+    <!-- 2차 인증 「등록 필요」 — 서버가 등록만 되는 제한 세션을 줬을 때(승인 시안 2026-09-02). -->
+    <div class="enroll" id="enrollBox" style="display:none">
+      <div class="enroll-h">🔐 2차 인증을 등록해야 계속할 수 있습니다</div>
+      <div class="enroll-d">
+        이 서버는 <b>관리자 계정에 2차 인증을 필수</b>로 두었습니다. 아직 등록하지 않아,
+        지금은 <b>등록만 할 수 있는 상태</b>로 들어갑니다.<br />
+        들어간 뒤 <b>⚙ 설정 → 내 설정 → 2차 인증</b>에서 등록하세요. 등록을 마치면 곧바로 평소처럼 쓸 수 있습니다.
+      </div>
+      <button id="enrollGo">설정으로 이동</button>
     </div>
     <div class="hint">
       단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 <b>비워 두세요</b> — 앱이 알아서 맞춥니다.<br />
@@ -461,6 +536,21 @@
       if (!on) { mfaToken = null; mfaRecoWrap.style.display = "none"; mfaCode.value = ""; mfaReco.value = ""; }
       else if (who) document.getElementById("mfaWho").innerHTML = "<b>" + who + "</b> 계정의 2차 인증";
     }
+    // 🔐 「등록 필요」 단계 — 자격증명 칸을 감추고 왜 막히는지·어디로 가야 하는지만 보인다.
+    //   등록 자체는 설정 화면의 몫이다(QR·비밀키가 필요하다). 여기서는 **알리는 것**이 일이다.
+    const enrollBox = document.getElementById("enrollBox");
+    function setEnrollStep(on) {
+      document.body.classList.toggle("enroll-step", !!on);
+      enrollBox.style.display = on ? "block" : "none";
+      if (on) { errMsg.textContent = ""; dupBox.style.display = "none"; setMfaStep(false); }
+    }
+    document.getElementById("enrollGo").addEventListener("click", async () => {
+      const b = document.getElementById("enrollGo");
+      b.disabled = true; b.textContent = "여는 중...";
+      try { await finishLogin(); }
+      catch (e) { b.disabled = false; b.textContent = "설정으로 이동"; errMsg.textContent = "화면을 열지 못했습니다 — 다시 눌러 주세요."; }
+    });
+
     document.getElementById("mfaCancel").addEventListener("click", () => {
       setMfaStep(false);
       errMsg.textContent = "";
@@ -555,6 +645,11 @@
         }
         const result = await window.gijo.login(userInput.value.trim(), passInput.value, force);
         if (result.ok) {
+          // 🔐 등록만 되는 제한 세션인가(승인 시안 2026-09-02). 서버가 관리자 필수 정책 때문에
+          //   이 표시를 함께 준다(api/auth.ts). 예전에는 이 값을 **아무도 읽지 않아** 그대로
+          //   들여보냈고, 담당자는 무엇을 눌러도 403이 나는 이유를 알 길이 없었다.
+          //   ⚠ 로그인을 막지 않는다 — 막으면 등록할 길이 사라진다(로그인해야 등록, 등록해야 로그인).
+          if (result.enrollRequired) { setEnrollStep(true); resetBtn(); return; }
           await finishLogin();
           return;
         }
