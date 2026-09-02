@@ -128,6 +128,16 @@ function summarize(all) {
   return `# 팀원 역할별 모델 시험 — ${now()} (gb10, ctx ${CTX}, temperature 0, json_schema 강제)\n\n${head}\n${sep}\n${rows.join("\n")}\n\n${legend}\n\n점수는 0~1(결정적 채점기). 프리필/생성 tok/s는 llama.cpp timings 실측의 중앙값. 한글=답의 한글 비율 평균, 한자=답에 섞인 한자 글자 수 합.\n`;
 }
 
+// --summarize: 새로 재지 않고 results/*.json 전부를 모아 표를 다시 만든다(회차별 실행이 summary.md를 덮어쓰므로).
+if (args.includes("--summarize")) {
+  const rows = fs.readdirSync(OUT).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(fs.readFileSync(path.join(OUT, f), "utf8")));
+  const order = new Map(manifest.map((m, i) => [m.id, i]));
+  rows.sort((a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
+  fs.writeFileSync(path.join(OUT, "summary.md"), summarize(rows));
+  console.log(summarize(rows));
+  process.exit(0);
+}
+
 const all = [];
 for (const m of models) {
   const r = await runModel(m);
