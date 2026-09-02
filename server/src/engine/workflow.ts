@@ -57,6 +57,12 @@ export interface WorkflowStage {
   label: string;
   /** 이 단계의 대표 숫자. 못 구하면 null — 화면은 빈칸으로 그린다. */
   count: number | null;
+  /**
+   * 그 숫자가 **무엇을 센 것인지**(2026-09-02 F4-03). 화면이 숫자 뒤에 작게 붙인다.
+   * ⚠ 반드시 **실제로 세는 것과 같은 말**이어야 한다 — 아래 계산부를 고치면 여기도 고친다.
+   *   이름이 숫자와 어긋나면 숫자만 있을 때보다 나쁘다(담당자가 틀린 뜻으로 읽는다).
+   */
+  countLabel: string;
   /** 눈길을 끌어야 하는 값(지연·KEV 등). 0이면 화면이 죽여서 그린다. */
   alert: number | null;
   alertLabel: string;
@@ -138,14 +144,14 @@ export function workflowStages(): WorkflowStage[] {
   // ⚠ page는 **STAGE_SCREENS의 그 단계 안에 있는 화면**이어야 한다 — 아니면 띠에서 눌러
   //   도착한 순간 띠가 다른 단계를 가리킨다. workflow.test.ts가 대조해 막는다.
   return [
-    { no: 1, key: "find", label: "발견·수집", count: assets.length, alert: 오늘신규, alertLabel: "오늘 신규", page: "discover.html", screens: STAGE_SCREENS[1] },
-    { no: 2, key: "triage", label: "우선순위", count: 취약, alert: kev, alertLabel: "실제 악용(KEV)", page: "triage.html", screens: STAGE_SCREENS[2] },
-    { no: 3, key: "fix", label: "조치", count: 진행, alert: 미배정, alertLabel: "미배정", page: "fix.html", screens: STAGE_SCREENS[3] },
-    { no: 4, key: "verify", label: "검증", count: 실패항목, alert: 미확인, alertLabel: "미점검 대상", page: "verify.html", screens: STAGE_SCREENS[4] },
+    { no: 1, key: "find", label: "발견·수집", count: assets.length, countLabel: "자산", alert: 오늘신규, alertLabel: "오늘 신규", page: "discover.html", screens: STAGE_SCREENS[1] },
+    { no: 2, key: "triage", label: "우선순위", count: 취약, countLabel: "미조치 취약점", alert: kev, alertLabel: "실제 악용(KEV)", page: "triage.html", screens: STAGE_SCREENS[2] },
+    { no: 3, key: "fix", label: "조치", count: 진행, countLabel: "진행 중", alert: 미배정, alertLabel: "미배정", page: "fix.html", screens: STAGE_SCREENS[3] },
+    { no: 4, key: "verify", label: "검증", count: 실패항목, countLabel: "실패 항목", alert: 미확인, alertLabel: "미점검 대상", page: "verify.html", screens: STAGE_SCREENS[4] },
     // ⑤ 보고 — 이번 주 쓴 보고서 수와 마지막 보고 후 지난 날수(2026-08-02 규칙 확정).
     //    ⚠ 한동안 비워 뒀던 칸이다. 다섯 칸 중 하나가 늘 비어 있으면 담당자는 고장으로 읽는다.
     //    ⚠ 못 읽으면 여전히 **비운다** — 0으로 채우면 "안 썼다"가 되어 거짓이다.
-    { no: 5, key: "report", label: "보고", count: 보고?.thisWeek ?? null, alert: 보고?.daysSinceLast ?? null, alertLabel: 보고?.daysSinceLast == null ? "" : "마지막 보고 후(일)", page: "reporting.html", screens: STAGE_SCREENS[5] },
+    { no: 5, key: "report", label: "보고", count: 보고?.thisWeek ?? null, countLabel: "이번 주 보고서", alert: 보고?.daysSinceLast ?? null, alertLabel: 보고?.daysSinceLast == null ? "" : "마지막 보고 후(일)", page: "reporting.html", screens: STAGE_SCREENS[5] },
   ];
 }
 
