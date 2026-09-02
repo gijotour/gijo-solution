@@ -48,6 +48,8 @@ export const TARGETS: Record<string, { label: string; tables: string[] }> = {
   observability: { label: "브리핑 스냅샷·느린 답 원장(파생)", tables: ["briefing_snapshot", "long_answers", "slow_answers"] },
   // ⚠ 자식(부품) 먼저 — 외래키가 걸려 있어 부모를 먼저 지우면 constraint로 터진다(assets 선례).
   sbom_reviews: { label: "타사 SBOM 검수 대장", tables: ["sbom_review_components", "sbom_reviews"] },
+  // 스캔 팀원 해석 초안(2026-09-03) — 고객 보고서에서 나온 파생물이라 업무 데이터다(시연 보고서의 초안이 실운영에 남으면 안 된다).
+  scan_drafts: { label: "스캔 해석 초안(스캔 팀원 산출)", tables: ["scan_drafts"] },
 };
 
 // 실사용 전환 리셋이 지우는 전체 목록 — TARGETS의 부분집합(감사·지식·설정은 애초에 목록에 없다).
@@ -58,6 +60,8 @@ export const RESET_TARGETS = [
   "upload_receipts",
   // 검수 이력은 **업무 데이터**다 — 시연 데이터를 지울 때 함께 지워야 남의 회사 부품표가 안 남는다.
   "sbom_reviews",
+  // 스캔 해석 초안 — 보고서에서 파생된 업무 데이터(2026-09-03)
+  "scan_drafts",
 ] as const;
 
 // ── 라이브 모드(실사용 전환) 스위치 ─────────────────────────────────────────

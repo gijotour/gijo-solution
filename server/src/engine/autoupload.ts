@@ -9,6 +9,7 @@ import { authMiddleware } from "../auth/auth";
 import { recordAudit } from "./audit";
 import { asyncRoute } from "../util/asyncRoute";
 import { emitCollaboration } from "./collaboration";
+import { draftScanInterpretation } from "./scandrafts";
 import { ingestAnalysisFile, detectIngestKind } from "./analysishub";
 import { importVulnScan, parseNessusHtml } from "./vulnscan";
 // ⚠ 보관총량()은 **거르지 않은 전체**라 화면 창구에서 쓰지 않는다(2026-08-22 검토관 [높음]).
@@ -315,6 +316,13 @@ async function tryWebReport(filename: string, base64: string, uploadedBy?: strin
         linkDocumentToAssets(filename, (r.assets ?? []).map((a) => a.id));
       } catch { /* 연결을 못 적어도 등록·인입은 그대로 성공이다 */ }
     }
+    // 스캔 팀원의 부르는 문(2026-09-03, 계획서 §7 2단계) — 등록 결과를 위협 관점의 정형 초안으로 해석해 남긴다.
+    //   규칙 파서의 등록은 그대로다(LLM이 대신하지 않는다). 반입 응답을 기다리게 하지 않는다 — 뒤에서 만들고 협업 창에 남긴다.
+    //   ⚠ 이 경로(웹취약점 보고서)에서만 부른다 — 자동 갈래는 보고서라는 신호가 없어 초안을 만들 근거가 없다(설계관).
+    void draftScanInterpretation({
+      source: filename, hosts: r.hosts, findings: r.findings,
+      vulns: parsed.vulns.map((v) => ({ code: v.pluginId, name: v.name, risk: v.risk, host: v.host })),
+    });
     emitCollaboration({
       from: "scan",
       to: "orchestrator",

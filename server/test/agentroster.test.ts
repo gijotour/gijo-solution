@@ -88,10 +88,9 @@ describe("부르는 문 — 팀원 이름은 실제 호출부가 만든다", () 
 
   it("★ 팀원마다 부르는 문이 있다 — 없으면 이유가 적혀 있어야 한다(등록부에만 있는 팀원 금지)", () => {
     // 2단계(계획서 §7)에서 문이 생길 팀원은 이유와 함께 예외로 둔다. 문이 생기면 예외를 지운다 — 이 시험이 그때 다시 말한다.
+    // 2단계(2026-09-03 같은 날)에서 scan(scandrafts.draftScanInterpretation)·ti(scandrafts.interpretThreats)의 문이 생겨 예외에서 뺐다.
     const 예외: Record<string, string> = {
       orchestrator: "총괄은 agentloop의 도구 선택·취합 그 자체라 agentId 표기 없이 부른다",
-      scan: "2단계 — 스캔 결과 정형 초안(scan_drafts, 취약점 보고서 경로)에서 부른다. 지금은 규칙 해석만(호출 0)",
-      ti: "2단계 — CTI 매칭 해석문(ctiAffected 템플릿 대안 검토 중). 지금은 규칙 매칭만(호출 0)",
     };
     const files = (fs.readdirSync(ENGINE, { recursive: true }) as string[]).filter((f) => f.endsWith(".ts"));
     const 전부 = files.map((f) => read(f)).join("\n");

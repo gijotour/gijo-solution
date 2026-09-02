@@ -35,6 +35,11 @@ export function emitCollaboration(evt: Omit<CollaborationEvent, "timestamp">): v
 }
 
 // 테스트 전용: log는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
+/** 최근 협업 말풍선(메모리 기록) — 시험·진단용 읽기. 재시작하면 비는 것이 정직한 한계. */
+export function collaborationHistory(limit = 100): CollaborationEvent[] {
+  return log.slice(-Math.max(1, limit));
+}
+
 export function resetCollaborationForTests(): void {
   log.length = 0;
 }

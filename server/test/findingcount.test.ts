@@ -23,6 +23,7 @@ const 엔진 = path.join(__dirname, "../src/engine");
  */
 const 예외: Record<string, string> = {
   "agenttools/handlers.ts": "판정 함수(isRealVulnerability·findingSummary)가 사는 곳 — 여기가 원본이다",
+  "scandrafts.ts": "여기의 findings는 세는 값이 아니라 반입기(importVulnScan)가 이미 판정·중복제거해 돌려준 건수를 그대로 옮겨 적는 것 — 다시 걸러 다른 숫자를 만들면 반입 결과와 어긋난다(2026-09-03)",
   "assets.ts": "저장·삭제 계층. 세는 것이 아니라 **보관**한다 — 스캔 실패도 기록으로 남겨야 한다",
   "kbhygiene.ts": "여기의 findings는 취약점이 아니라 **지식베이스 점검 결과**다(같은 이름 다른 뜻)",
   "remrequest.ts": "세지 않는다 — 사람이 목록에서 고른 건을 findingKey로 **되찾는 조회**다(요청서 동봉). 고른 목록 자체가 이미 판정을 거쳐 나온 것",

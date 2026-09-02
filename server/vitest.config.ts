@@ -20,6 +20,7 @@ export default defineConfig({
       // 겹 1 기억 성장(learnmemory)은 시험에서 끈다 — 승인 👍마다 임베딩(죽은 포트 → 50초 재시도)·LanceDB(data/)에
       // 닿는 것을 막는다(검토관 2026-09-03 중). memorygrowth.test는 사건 방송까지만 본다.
       GIJO_MEMORY_GROWTH: "0",
+      GIJO_TI_INTERPRET: "0", // TI 해석은 모델을 부른다 — 시험엔 모델이 없다(scandrafts.test가 주입으로 따로 본다)
       GIJO_LLAMA_SERVER_PATH: "__no_llama_server_in_tests__",
       // 테스트가 실제 데이터셋·골드 파일을 건드리지 않게 임시 경로로 격리(운영 orchestrator-tools.json 보호).
       GIJO_DATASETS_DIR: "data/test-tmp/datasets",

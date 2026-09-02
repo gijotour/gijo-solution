@@ -1,6 +1,7 @@
 // engine/agenttools/handlers.ts — 도구 핸들러·헬퍼 전부 (2026-08-06 agenttools.ts 3,956줄 분리)
 // 본문은 원문 그대로다. 레지스트리(등록표)는 registry.ts, 겉문은 ../agenttools.ts(배럴).
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
+import { interpretThreats } from "../scandrafts";
 import { listAssets, getAsset, registerAsset, updateAssetOwnership, updateAssetMeta, setAssetRobustness, isAiAsset, Asset, 자산표시이름, 예시데이터뿐인가 } from "../assets";
 import { computeAssetCoverage, coverageSummaryText, sbomApplies, type GapKind } from "../assetcoverage";
 // 비교 도구(2026-08-28) — **정적** import: 화살 #6에서 걷은 「동적 습관」을 새로 만들지 않는다
@@ -1007,10 +1008,13 @@ export async function runThreats(args: Record<string, string>): Promise<string> 
   });
   const 잘림 =
     matches.length > top.length ? ` · 아래는 심각한 순 ${top.length}건입니다` : "";
+  // TI 팀원의 부르는 문(2026-09-03, 계획서 §7 2단계) — 매칭(규칙)은 그대로, 걸린 것이 있을 때만 해석 3줄. 실패하면 빈 문자열.
+  const 해석 = await interpretThreats(top.map((m) => ({ type: m.finding.type, target: m.finding.target, severity: m.finding.severity, assets: m.matchedAssets.map((a) => a.assetName) })));
   return [
     `최신 위협 ${summary.totalFindings}건 중 우리 자산에 걸리는 것 ${summary.matchedFindings}건` +
       ` (영향 자산 ${summary.affectedAssets}개 · 심각·경고 ${summary.criticalMatches}건)${잘림}`,
     ...lines,
+    ...(해석 ? [해석] : []),
     `\n${표식.다음} 이어서 — 자산 하나를 파고들려면 "○○ 자산 취약점 알려줘"`,
   ].join("\n").slice(0, 2500);
 }

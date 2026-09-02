@@ -1,6 +1,7 @@
 // engine/agenttools/registry.ts — TOOLS 등록표 + 공개 API(find/validate/buildApproval…)
 // (2026-08-06 agenttools.ts 분리) 핸들러 본문은 handlers.ts — 여기는 이름↔스키마 매핑과 관문만.
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
+import { listScanDrafts, formatScanDrafts, registerScanDraft } from "../scandrafts";
 import { watchFolderText, addWatchFolder, removeWatchFolder, watchFolderDocCount } from "../watchfolder";
 // ⚠ 레드팀 공격 개수는 **세어서** 쓴다(2026-08-18). 손으로 「14종」이라 적어 뒀는데 실제는 30종이었다 —
 //   그 문구 하나가 **살아 있는 모델에 공격을 발사하기 전 받는 동의 문구**였다.
@@ -1447,6 +1448,35 @@ const TOOLS: AgentTool[] = [
     // 항상 빠르고 확실하게 답해야 한다(재작성 경로에서 데이터 많을 때 멈추던 문제 원천 차단).
     directAnswer: true,
     run: runToday,
+  },
+  {
+    // 스캔 팀원이 보고서 등록 직후 남긴 정형 초안(2026-09-03) — 초안은 초안이다. 할 일이 되려면 아래 채택 도구(결재판).
+    name: "scan_drafts",
+    label: "스캔 해석 초안",
+    domain: "cross",
+    write: false,
+    description:
+      '스캔 팀원이 웹취약점 점검 보고서를 등록한 직후 남긴 해석 초안(요약·우선 조치·주의)을 보여준다 — ' +
+      '"스캔 해석 초안 보여줘", "방금 올린 보고서 해석해 줘", "스캔 팀원이 뭐라고 했어"처럼 말할 때 쓴다.',
+    directAnswer: true, // 이미 우리말 정형 요약 — 재작성하면 숫자·코드가 흔들린다
+    params: [{ name: "limit", label: "개수", description: "최근 몇 건 (기본 3)", required: false }],
+    run: (args) => formatScanDrafts(listScanDrafts(Math.min(Math.max(Number(args.limit) || 3, 1), 10))),
+  },
+  {
+    name: "register_scan_draft",
+    label: "스캔 해석 초안 채택",
+    domain: "cross",
+    write: true,
+    description:
+      '스캔 해석 초안의 우선 조치를 할 일(조치 항목)로 등록한다 — "해석 초안 채택해줘", "초안 3a1f 조치로 등록"처럼 말할 때. ' +
+      '초안 번호를 비우면 가장 최근 초안이다.',
+    params: [{ name: "id", label: "초안 번호", description: "초안 id(앞 8자리로도 됨) — 비우면 가장 최근 초안", required: false }],
+    effect: () => "초안의 우선 조치가 할 일 목록에 등록됩니다(스캔 팀원 귀속 · 우선순위 높음)",
+    undo: "할 일 화면에서 그 항목을 삭제하면 됩니다(초안은 채택됨 표시로 남습니다)",
+    run: (args) => {
+      const r = registerScanDraft(String(args.id ?? ""), null);
+      return `초안 채택 — ${r.row.source}: 할 일 ${r.taskIds.length}건 등록(${r.row.draft.priorities.map((p) => `[${p.code}] ${p.host}`).join(" · ")})`;
+    },
   },
   {
     name: "threats",
