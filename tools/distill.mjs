@@ -149,7 +149,7 @@ async function intake(auth, teacher, items) {
 }
 
 // ── 본체 ───────────────────────────────────────────────────────────
-const files = listSourceFiles();
+const files = SOURCE === "store" ? [] : listSourceFiles(); // store면 파일 수 0으로 정직하게(로그 「파일 N」이 재료를 잘못 말하지 않게)
 const pool = [];
 for (const f of (SOURCE === "store" ? [] : files)) {
   const rel = path.relative(repo, f).replace(/\\/g, "/");
