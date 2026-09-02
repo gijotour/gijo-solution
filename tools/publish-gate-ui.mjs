@@ -779,7 +779,10 @@ ok("로스터 약자(등록부 단일 출처) 반영", 가시화.약자적용 ==
 // ⚠ 이 자리가 없으면 조용히 아무 데도 안 쓴다 — 오류도 안 난다. 2026-08-01 사고가 그 모양이었다.
 const 배지자리 = await 셸.evaluate(() => {
   const 배지 = document.querySelector("#gijoNav .gn-sessbadge");
-  const 행 = 배지 && 배지.closest("a,button,div[data-page],[data-page]");
+  // ⚠ 2026-09-03: 처음엔 closest("a,button,div[data-page],[data-page]")로 찾았다가 **게시가 막혔다.**
+  //   메뉴 항목은 `div.gn-item`이고 **data-page 속성이 없다**(nav.js 전수 확인) — 선택자가 틀렸던 것이고
+  //   제품은 정상이었다. 관문이 「확인 못 함」을 통과로 넘기지 않고 멈춰 준 것이 옳았다.
+  const 행 = 배지 && 배지.closest(".gn-item");
   return {
     있나: !!배지,
     작업내역행: !!(행 && /작업 내역/.test(행.textContent || "")),
