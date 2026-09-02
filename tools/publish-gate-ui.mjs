@@ -766,6 +766,25 @@ const 가시화 = await 셸.evaluate(async () => {
 });
 ok("레일 로스터 10개(팀6+부품4)", 가시화.로스터수 === 10, "개수=" + 가시화.로스터수);
 ok("로스터 약자(등록부 단일 출처) 반영", 가시화.약자적용 === 6, "약자 " + 가시화.약자적용 + "/6");
+
+// ── ⑤″ 「진행중 작업」 배지가 **갈 곳이 있는가**(2026-09-02) ───────────────────────
+// 상단바의 🕘(작업 내역)를 숨기면서, 그 배지를 보이는 자리가 **메뉴의 「작업 내역」 항목 하나**만
+// 남았다(사장님 물음 「작업내역 메뉴 오른쪽에 표시하면 안될까?」 — 확인해 보니 이미 그렇게 돼 있었다).
+// ⚠ 값이 아니라 **자리**를 잰다. 배지는 진행중이 0이면 스스로 숨으므로(0을 알릴 일은 없다)
+//   「보이는가」로 재면 진행중 작업이 없는 날 관문이 거짓으로 죽는다. 그래서 **DOM에 붙어 있는가**만 본다.
+// ⚠ 이 자리가 없으면 조용히 아무 데도 안 쓴다 — 오류도 안 난다. 2026-08-01 사고가 그 모양이었다.
+const 배지자리 = await 셸.evaluate(() => {
+  const 배지 = document.querySelector("#gijoNav .gn-sessbadge");
+  const 행 = 배지 && 배지.closest("a,button,div[data-page],[data-page]");
+  return {
+    있나: !!배지,
+    작업내역행: !!(행 && /작업 내역/.test(행.textContent || "")),
+    갱신됨: !!(배지 && 배지.getAttribute("aria-label")), // refreshSessionBadge가 한 번은 돌았다는 증거
+  };
+});
+ok("「진행중 작업」 배지 자리가 메뉴에 있다(🕘 숨김 뒤 유일한 자리)", 배지자리.있나, JSON.stringify(배지자리));
+ok("그 배지가 「작업 내역」 항목에 붙어 있다", 배지자리.작업내역행, JSON.stringify(배지자리));
+ok("배지 갱신이 실제로 한 번은 돌았다(aria-label 기록)", 배지자리.갱신됨, JSON.stringify(배지자리));
 {
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("dashboard.html", "대시보드", { dock: true }));
   const df = await 프레임찾기("dashboard.html", 8);
