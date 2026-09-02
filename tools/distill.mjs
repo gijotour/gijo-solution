@@ -11,6 +11,7 @@
 //   GIJO_ADMIN_USER=… GIJO_ADMIN_PASSWORD=… [GIJO_SERVE_TOKEN=…] node tools/distill.mjs --topic 취약점 [--limit 500]
 //     [--endpoint http://10.8.0.12:4000/api/llm/serve/v1] [--server http://localhost:4000]
 //     [--per-chunk 3] [--concurrency 2] [--files "knowledge/*.md,GIJO_AS_취약점관리_지침.md"] [--dry-run] [--no-intake]
+//     [--source files|store] [--corpus-server http://localhost:4000] [--force-login]
 //   --no-intake: 편입 없이 교사 수율(사전검사 통과율)만 잰다 — 보고서의 accepted는 0, preChecked에 남는다.
 // 산출: .tmp-reports/distill-<주제>-<시각>.json (생성·사전검사·편입·거절 사유·교사·토큰·시간 — 폐기율이 교사 품질 지표)
 //
@@ -37,6 +38,11 @@ const ENDPOINT = (opt("--endpoint", "http://10.8.0.12:4000/api/llm/serve/v1") ||
 const SERVER = (opt("--server", process.env.GIJO_SERVER_URL || "http://localhost:4000") || "").replace(/\/+$/, "");
 const DRY = has("--dry-run");
 const FILES = opt("--files", "");
+// --source store: 근거를 저장소 파일이 아니라 **운영 지식 저장소의 조각**(POST /api/learnloop/distill/corpus)에서 받는다(2026-09-03).
+//   운영에 올린 매뉴얼·지침·보고서가 재료가 되고, 조각 경계도 검색이 쓰는 그것이다. ref = store:<문서>#<sha12>.
+const SOURCE = opt("--source", "files");
+const CORPUS_SERVER = (opt("--corpus-server", SERVER) || "").replace(/\/+$/, "");
+if (!["files", "store"].includes(SOURCE)) { console.error("--source 는 files 또는 store"); process.exit(2); }
 const TOPICS = ["취약점", "장비운영", "사내규정", "위협대응"];
 if (!TOPICS.includes(TOPIC)) { console.error(`--topic 은 ${TOPICS.join("·")} 중 하나여야 합니다`); process.exit(2); }
 
@@ -128,11 +134,11 @@ async function askTeacher(ref, text) {
 }
 
 // ── 서버 편입 ──────────────────────────────────────────────────────
-async function login() {
+async function login(base = SERVER) {
   const user = process.env.GIJO_ADMIN_USER, password = process.env.GIJO_ADMIN_PASSWORD;
   if (!user || !password) throw new Error("GIJO_ADMIN_USER / GIJO_ADMIN_PASSWORD 환경변수가 필요합니다(편입은 admin)");
-  const j = await (await fetch(SERVER + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password, force: true }), redirect: "error" })).json();
-  if (!j.accessToken) throw new Error("로그인 실패: " + JSON.stringify(j).slice(0, 120));
+  const j = await (await fetch(base + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password, force: has("--force-login") }), redirect: "error" })).json();
+  if (!j.accessToken) throw new Error("로그인 실패: " + JSON.stringify(j).slice(0, 120) + (/(세션|로그인)/.test(JSON.stringify(j)) ? " — 이미 로그인된 세션이 있으면 --force-login(그 세션이 끊긴다)" : ""));
   return { "Content-Type": "application/json", Authorization: "Bearer " + j.accessToken };
 }
 async function intake(auth, teacher, items) {
@@ -145,11 +151,23 @@ async function intake(auth, teacher, items) {
 // ── 본체 ───────────────────────────────────────────────────────────
 const files = listSourceFiles();
 const pool = [];
-for (const f of files) {
+for (const f of (SOURCE === "store" ? [] : files)) {
   const rel = path.relative(repo, f).replace(/\\/g, "/");
   for (const c of chunk(fs.readFileSync(f, "utf8"))) if (TOPIC_RE[TOPIC].test(c)) pool.push({ ref: `${rel}#${sha12(c)}`, text: c });
 }
 // 같은 조각이 매번 같은 순서면 상위 조각만 닳는다 — 결정적으로 섞는다(주제+날짜 시드).
+let 코퍼스문서 = 0;
+if (SOURCE === "store") {
+  // 지식 저장소 조각 — admin 로그인 필요(코퍼스 창구는 admin). 같은 창구로 편입도 하므로 계정 하나면 된다.
+  const auth = await login(CORPUS_SERVER);
+  const r = await fetch(CORPUS_SERVER + "/api/learnloop/distill/corpus", { method: "POST", headers: auth, body: JSON.stringify({ category: TOPIC, maxChunks: 20000 }), redirect: "error" });
+  const j = await r.json();
+  if (!r.ok) throw new Error("코퍼스 창구 실패: " + JSON.stringify(j).slice(0, 200));
+  코퍼스문서 = j.docs;
+  // 저장소는 업무영역으로 이미 걸렀지만 주제 정규식도 한 번 더 — 분류가 틀린 문서의 엉뚱한 조각을 막는다(파일 경로와 같은 잣대).
+  for (const c of j.chunks) if (TOPIC_RE[TOPIC].test(c.text)) pool.push({ ref: c.ref, text: c.text });
+  console.log(`[distill] 저장소 코퍼스: 문서 ${j.docs} · 조각 ${j.chunks.length} → 주제 일치 ${pool.length} · 거름 ${JSON.stringify(j.skipped)}`);
+}
 const seed = sha12(TOPIC + new Date().toISOString().slice(0, 10));
 pool.sort((a, b) => (sha12(a.ref + seed) < sha12(b.ref + seed) ? -1 : 1));
 const need = Math.ceil(LIMIT / PER_CHUNK);
@@ -158,7 +176,7 @@ console.log(`[distill] 주제 ${TOPIC} · 파일 ${files.length} · 주제 조�
 if (!pool.length) { console.error("주제에 맞는 조각이 없습니다 — --files 로 문서를 더 주세요"); process.exit(2); }
 if (DRY) { for (const p of picked.slice(0, 3)) console.log("--", p.ref, "\n", p.text.slice(0, 200).replace(/\n/g, " ")); process.exit(0); }
 
-const report = { topic: TOPIC, endpoint: ENDPOINT, startedAt: new Date().toISOString(), files: files.length, chunks: picked.length, generated: 0, preRejected: {}, preChecked: 0, accepted: 0, rejected: {}, teacher: null, tokens: { prompt: 0, completion: 0 }, teacherMs: 0, errors: [] };
+const report = { topic: TOPIC, endpoint: ENDPOINT, startedAt: new Date().toISOString(), files: SOURCE === "store" ? 0 : files.length, source: SOURCE, corpusDocs: 코퍼스문서, chunks: picked.length, generated: 0, preRejected: {}, preChecked: 0, accepted: 0, rejected: {}, teacher: null, tokens: { prompt: 0, completion: 0 }, teacherMs: 0, errors: [] };
 // --no-intake: 편입 없이 교사 수율만 잰다(교사·프롬프트 비교용) — 서버 로그인도 안 한다.
 const NO_INTAKE = has("--no-intake");
 const auth = NO_INTAKE ? null : await login();

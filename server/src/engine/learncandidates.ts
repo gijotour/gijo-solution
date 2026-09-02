@@ -27,7 +27,9 @@ import { 학습재료가못되나 } from "./datasethygiene";
 // 아래 prepare가 "no such table"로 죽는다(테스트에서 실측). 소유 모듈을 명시적으로 실어 보장한다.
 import "./worksessions";
 import { recordAudit } from "./audit";
+import { isBinaryLikeChunk } from "./ragsanitize";
 import type { GijoUser } from "../auth/users";
+import type { MemoryDocument } from "./memory"; // 타입만 — 런타임 화살 없음
 
 // 작업내역 출처 후보의 결정(승인/제외)을 기억한다 — 안 남기면 제외한 것이 다음 조회에 또 나온다.
 // (대화 로그 출처는 rating 컬럼이 그 역할을 이미 한다.)
@@ -372,6 +374,51 @@ export function intakeDistilledCandidates(teacher: string, items: DistillItem[])
   return { accepted, rejected, byReason };
 }
 
+export interface DistillCorpusOptions { category?: string; topic?: string; origins?: string[]; maxPerDoc?: number; maxChunks?: number; minChars?: number }
+export interface DistillCorpusChunk { ref: string; documentId: string; chunkIndex: number; category: string | null; text: string }
+export interface DistillCorpusResult { chunks: DistillCorpusChunk[]; docs: number; skipped: Record<string, number>; filter: { category: string; origins: string[] | null } }
+type CorpusMemory = { listDocuments(): Promise<MemoryDocument[]>; getDocumentChunks(id: string, limit?: number): Promise<{ chunkIndex: number; text: string }[]> };
+
+/**
+ * 증류 근거 코퍼스 — 지식 저장소 조각을 증류기 재료로 고른다(라우트 POST /api/learnloop/distill/corpus의 본체).
+ * 가는 것: scope=global(개인 문서는 개인 것 — 원칙 「출하 베이스는 고객 데이터 금지」의 앞 단계) ·
+ *   origin≠approved-qa(승인 문답은 증류의 산출물이지 재료가 아니다 — 자기 답을 자기 근거로 삼는 순환) ·
+ *   등급 C(기밀) 제외 · 바이너리꼴 조각 제외(isBinaryLikeChunk — 저장소 조각의 73%가 PDF 바이트였던 실사고) · 너무 짧은 조각 제외.
+ * ref = store:<documentId>#<sha12(text)> — intakeDistilledCandidates의 「ref 꼬리 = 본문 해시」 검증과 같은 규칙.
+ * 상한을 넘겨 못 나간 조각은 skipped에 센다 — 조용히 잘리면 「다 봤다」로 읽힌다.
+ */
+export async function buildDistillCorpus(b: DistillCorpusOptions, mem: CorpusMemory): Promise<DistillCorpusResult> {
+  const category = String(b.category ?? b.topic ?? "").trim();
+  const origins = Array.isArray(b.origins) ? b.origins.map(String) : null;
+  const maxPerDoc = Math.max(1, Math.min(2000, Number(b.maxPerDoc) || 400));
+  const maxChunks = Math.max(1, Math.min(20000, Number(b.maxChunks) || 4000));
+  const minChars = Math.max(0, Number(b.minChars) || 80);
+  const docs = (await mem.listDocuments()).filter((d) => d.scope === "global");
+  const skipped: Record<string, number> = { "승인 문답": 0, "기밀 C": 0, "출처 제외": 0, "업무영역 다름": 0, "바이너리꼴": 0, "너무 짧음": 0, "문서당 상한": 0, "전체 상한": 0 };
+  const out: DistillCorpusChunk[] = [];
+  let docsUsed = 0;
+  for (const d of docs) {
+    if (d.origin === "approved-qa") { skipped["승인 문답"] += 1; continue; }
+    if (d.grade === "C") { skipped["기밀 C"] += 1; continue; }
+    if (origins && !origins.includes(d.origin ?? "")) { skipped["출처 제외"] += 1; continue; }
+    if (category && (d.category ?? "") !== category) { skipped["업무영역 다름"] += 1; continue; }
+    if (out.length >= maxChunks) { skipped["전체 상한"] += 1; continue; }
+    const chunks = await mem.getDocumentChunks(d.documentId, 1_000_000);
+    let took = 0;
+    for (const c of chunks) {
+      const text = String(c.text ?? "").trim();
+      if (text.length < minChars) { skipped["너무 짧음"] += 1; continue; }
+      if (isBinaryLikeChunk(text)) { skipped["바이너리꼴"] += 1; continue; }
+      if (took >= maxPerDoc) { skipped["문서당 상한"] += 1; continue; }
+      if (out.length >= maxChunks) { skipped["전체 상한"] += 1; break; }
+      out.push({ ref: `store:${d.documentId}#${crypto.createHash("sha1").update(text).digest("hex").slice(0, 12)}`, documentId: d.documentId, chunkIndex: c.chunkIndex, category: d.category, text });
+      took += 1;
+    }
+    if (took > 0) docsUsed += 1;
+  }
+  return { chunks: out, docs: docsUsed, skipped, filter: { category, origins } };
+}
+
 export function registerLearnCandidateRoutes(app: Express): void {
   const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
   const userIdOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.id ?? null;
@@ -466,6 +513,31 @@ export function registerLearnCandidateRoutes(app: Express): void {
       res.json(r);
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
+    }
+  });
+
+  // 증류 근거 코퍼스 — 운영 지식 저장소의 조각을 증류기(tools/distill.mjs --source store)에 준다. admin만.
+  // 왜(2026-09-03 설계관·계획서 §3.2): 저장소 파일(docs-manifest+knowledge/)만 자르면 운영에 올린 매뉴얼·지침·
+  // 보고서가 재료에서 빠진다. 지식 저장소가 정본이고, 조각 경계도 검색이 쓰는 그것이다.
+  // 가는 것: scope=global(개인 문서는 개인 것 — 원칙 「출하 베이스는 고객 데이터 금지」의 앞 단계) ·
+  //   origin≠approved-qa(승인 문답은 증류의 산출물이지 재료가 아니다 — 자기 답을 자기 근거로 삼는 순환) ·
+  //   등급 C(기밀) 제외 · 바이너리꼴 조각 제외(isBinaryLikeChunk — 저장소 조각의 73%가 PDF 바이트였던 실사고).
+  // ref = store:<documentId>#<sha12(text)> — intakeDistilledCandidates의 「ref 꼬리 = 본문 해시」 검증과 같은 규칙.
+  // 본문 { category?: 업무영역 | topic?: 주제(같은 뜻) · origins?: string[] · maxPerDoc?: number(기본 400) · maxChunks?: number(기본 4000) · minChars?: number(기본 80) }.
+  app.post("/api/learnloop/distill/corpus", authMiddleware, adminMiddleware, async (req, res) => {
+    const b = (req.body ?? {}) as DistillCorpusOptions;
+    try {
+      // 동적 import — memory(지식 층)로 가는 정적 화살을 새로 긋지 않는다(의존 수리 2026-08-28 원칙).
+      const mem = await import("./memory.js");
+      const r = await buildDistillCorpus(b, mem);
+      recordAudit({
+        // "write"가 아니라 반출이지만 AuditKind에 열람 종류가 없다 — 증류 편입(write)과 같은 흐름의 짝으로 둔다.
+        kind: "write", actor: actorOf(req), action: "증류 근거 코퍼스 내줌",
+        target: `${r.chunks.length}조각/${r.docs}문서`, detail: `업무영역 ${r.filter.category || "전부"} · 출처 ${r.filter.origins ? r.filter.origins.join(",") : "전부"} · 거름 ${JSON.stringify(r.skipped)}`, result: "ok",
+      });
+      res.json(r);
+    } catch (e) {
+      res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
     }
   });
 }
