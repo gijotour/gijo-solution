@@ -43,7 +43,10 @@ describe("F2-03 — 로그인 전에 이 주소가 GIJO 서버인지 확인할 �
     const i호출 = 로그인.indexOf("await window.gijo.checkServerHealth()");
     expect(i호출, "연결 확인 호출부를 못 찾았다 — 이 시험이 헛돈다").toBeGreaterThan(0);
     const 구간 = 로그인.slice(i호출, i호출 + 700);
-    expect(구간, "응답 내용을 안 보고 성공으로 친다").toMatch(/r\.ok === true|r\.status|r\.name|r\.version/);
+    // ⚠ 2026-09-03: 이 단언이 **느슨함을 굳히고 있었다.** r.status·r.name·r.version은 원천(app.ts)에
+    //   없는 필드라 죽은 가지였고, 남는 r.ok는 아무 서버나 주는 값이다 — 사내 다른 서비스 주소도
+    //   「GIJO 확인됨」이 됐다. **이름표(service)를 보는지** 잰다.
+    expect(구간, "GIJO 이름표(service)를 안 보고 성공으로 친다").toContain('r.service === "gijo-as-server"');
     expect(구간, "GIJO가 아닐 때를 안 알린다").toContain("GIJO 서버가 아닙니다");
   });
 
@@ -77,7 +80,11 @@ describe("F2-07 — 중복 로그인이 「어디서·언제」를 말한다", (
   });
 
   it("화면까지 이어져 있다 — 타입·표시 자리·호출", () => {
+    // ⚠ 2026-09-03 게시 전 검토가 **이 시험의 허점을 잡았다** — 타입에 글자가 있는지만 봐서,
+    //   loginFailure가 그 값을 **실제로 안 넘기는데도** 초록이었다. 이 파일 머리말의
+    //   「글자가 아니라 이어짐을 잰다」를 스스로 어긴 자리다. 이제 넘기는 코드까지 본다.
     expect(클라인증, "응답 타입에 기존접속이 없다").toContain("기존접속?:");
+    expect(클라인증, "타입만 있고 실제로 안 넘긴다 — 화면은 늘 빈 줄이 된다").toMatch(/기존접속: data\.기존접속/);
     expect(로그인, "표시할 자리가 없다").toContain('id="dupWhere"');
     expect(로그인, "받은 값을 안 그린다").toMatch(/중복표시\((r|result)\.기존접속\)/);
   });

@@ -223,7 +223,10 @@
     "reference.html": "settings.html?s=my",     // 기능 안내 → AI가 대신(2026-07-25)
     "billing.html": "audit.html",               // 사용량·요금 → 기록 보기
     "mcp.html": "settings.html?s=link",         // 2026-07-28 설정 5구역으로 흡수
-    "update.html": "settings.html?s=admin",
+    // ⚠ 2026-09-02(F6-10)에 업데이트 판을 「내 설정」으로 옮겼다. 이 표가 안 따라오면 옛 주소로
+    //   들어온 사람이 **판이 없는 관리자 구역**에 떨어지고, 담당자는 그 탭의 판이 전부 감춰져 빈
+    //   화면을 본다 — 2026-07-28 「업데이트 화면이 없다」 사고의 재판이다(2026-09-03 검토가 잡음).
+    "update.html": "settings.html?s=my",
     "logs.html": "syslog.html",   // 2026-08-02 시스템 로그를 다시 떼어냈다
     "llmguide.html": "settings.html?s=ai",      // 추천 모델 목록 → 설정 서버·AI
     "docenrich.html": "memory.html",            // 문서 보강 → 기억·학습에 병합

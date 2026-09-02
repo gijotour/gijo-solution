@@ -3126,7 +3126,7 @@ export async function runAdapterStatus(): Promise<string> {
   }).join(" · ");
   lines.push(`주제 재료(승인 문답): ${진척}`);
   lines.push("");
-  lines.push("채택: 「(어댑터 이름) 어댑터 채택, 근거: 게이트 결과」 · 배정: 「스캔 팀원에 (어댑터 이름) 어댑터 배정해줘」");
+  lines.push("채택: 「(어댑터 이름) 어댑터 채택, 근거: 게이트 routing 66/66 · A/B 통과 확인함」 · 배정: 「스캔 팀원에 (어댑터 이름) 어댑터 배정해줘」");
   return lines.join("\n");
 }
 

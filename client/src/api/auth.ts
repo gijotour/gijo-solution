@@ -45,6 +45,8 @@ interface LoginBody {
   recoveryUsed?: boolean;
   recoveryRemaining?: number;
   remaining?: number;
+  /** 중복 로그인(409)일 때 서버가 싣는 기존 접속 정보 — auth.ts가 세션 기록에서 그대로 넣는다. */
+  기존접속?: { ip: string | null; since: number | null; lastSeenAt: number | null };
 }
 
 function loginFailure(status: number, data: LoginBody): LoginResult {
@@ -58,6 +60,10 @@ function loginFailure(status: number, data: LoginBody): LoginResult {
     ok: false, code,
     message: data.message ?? data.error ?? "로그인에 실패했습니다.",
     ...(typeof data.remaining === "number" ? { remaining: data.remaining } : {}),
+    // ⚠ 2026-09-03 게시 전 검토가 잡았다 — 위 주석은 「기존접속만 그대로 넘긴다」고 적어 놓고
+    //   **코드가 그 일을 안 하고 있었다.** 그래서 중복 로그인 창의 「어디서·언제」 줄이 항상
+    //   안 그려졌다(기능 전체가 죽어 있었다). 있을 때만 싣는다 — 없으면 화면이 줄을 안 그린다.
+    ...(data.기존접속 ? { 기존접속: data.기존접속 } : {}),
   };
 }
 

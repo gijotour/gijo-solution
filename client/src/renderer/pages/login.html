@@ -607,8 +607,12 @@
           // 주소 칸의 값으로 확인해야 한다 — 지금 저장된 주소가 아니라 **담당자가 넣은 그 주소**다.
           if (window.gijo && window.gijo.setServerUrl) await window.gijo.setServerUrl(주소);
           const r = await window.gijo.checkServerHealth();
-          // ⚠ 붙었다고 다 GIJO는 아니다 — 아무 웹서버나 200을 준다. 응답 모양까지 본다.
-          if (r && (r.ok === true || r.status === "ok" || r.name || r.version)) {
+          // ⚠ 붙었다고 다 GIJO는 아니다 — 아무 웹서버나 200을 준다. **이름표를 본다.**
+          //   서버가 주는 것은 { ok, service:"gijo-as-server", schema, serverTime, airgap }이다(app.ts).
+          //   ⚠ 2026-09-03 게시 전 검토가 잡았다 — 처음엔 r.status·r.name·r.version을 봤는데
+          //     **셋 다 원천에 없는 필드**라 죽은 가지였고, 남는 r.ok===true는 아무 서버나 주는 값이라
+          //     사내 다른 서비스 주소도 「GIJO 확인됨」이 됐다. 유일한 식별 필드 service를 본다.
+          if (r && r.service === "gijo-as-server") {
             상태쓰기("GIJO 서버 확인됨", "ok");
           } else {
             상태쓰기("응답은 왔지만 GIJO 서버가 아닙니다 — 주소를 확인해 주세요", "bad");

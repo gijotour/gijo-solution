@@ -2623,11 +2623,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         if (tier === "pro") await window.gijo.setLlmTier("standard");
         // 프로에서 내려올 때도 셸 모드를 같이 되돌린다 — 안 되돌리면 등급은 표준인데
         // 셸만 프로로 남아 「어느 쪽이 맞나」가 된다.
+        // ⚠ 2026-09-02 셸 통일로 **이 되돌리기는 더 이상 화면을 바꾸지 않는다**(main.ts의
+        //   표준셸_고를수있나=false가 저장값과 무관하게 프로를 준다). 값은 그대로 저장해 둔다 —
+        //   나중에 그 손잡이를 true로 되돌리면 이 사람이 골라 둔 대로 살아나야 하기 때문이다.
+        //   ⚠ 다만 **사용자에게 「엔진 등급을 스탠다드로 내립니다(화면 배치는 그대로입니다)」라고 말하면 거짓말**이 된다(아래 문구 참고).
         try { if (window.gijo.shellModeSet) await window.gijo.shellModeSet("standard"); } catch (e) { }
         // 🚀 프로 셸에서 내려올 때도 화면을 되돌린다 — 안 되돌리면 등급만 표준이고
         //   화면은 프로로 남아 「어느 쪽이 맞나」가 된다.
         if (!라이트 && document.body && window.gijo.navigateTo) {
-          msg.textContent = "적용했습니다 — 표준 화면으로 되돌립니다(진행 중이던 대화는 끊깁니다).";
+          msg.textContent = "적용했습니다 — 엔진 등급을 스탠다드로 내립니다(화면 배치는 그대로입니다)(진행 중이던 대화는 끊깁니다).";
           setTimeout(function () { window.gijo.navigateTo("app.html"); }, 1200);
           return;
         }
