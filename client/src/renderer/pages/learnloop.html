@@ -193,6 +193,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="kpi"><div class="k-label">최근 배포 모델</div><div class="k-value" id="kpiModel" style="font-size:14px">-</div></div>
     </div>
 
+    <!-- 🧭 내 회사 전문가 — **연료 게이지**(2026-09-02 승인 시안 mockups/내회사전문가).
+         ★ 새로 만든 것이 아니라 **자리를 옮긴 것**이다. 이 띠(#ltStrip)는 2026-08-08 승인 시안으로
+           이미 있었는데 「학습 후보함」 안에 묻혀 스크롤을 내려야 보였다 — 시안의 지적이 그것이다.
+           그리는 코드는 한 줄도 안 바꿨다(같은 id를 그대로 쓴다).
+         왜 맨 위인가: 이 제품은 담당자의 👍가 300건 모여야 그 주제의 전문가를 만든다.
+           **자기 👍가 무엇을 만드는지 보이지 않으면 계속 누를 이유가 없다** — 300건은 저절로 안 쌓인다.
+           그래서 화면을 열면 「어느 주제가 300에 가까운가」가 가장 먼저 보여야 한다.
+         ⚠ 화면에 설명을 늘리지 않는다 — 정체성 한 줄만 둔다. 뜻풀이는 챗봇(ⓘ)이 맡는다. -->
+    <div class="cat" data-gijo-fold="🧭 내 회사 전문가" data-gijo-fold-open>
+      <div class="cat-head"><span style="font-size:18px">🧭</span><span class="cat-title">내 회사 전문가</span></div>
+      <div class="cat-intro">우리 대화에서 배운 것이 주제마다 쌓입니다 — 승인이 모이면 그 분야 전문가를 만들 수 있습니다.</div>
+      <div class="lt-strip" id="ltStrip"></div>
+    </div>
     <div class="cat" data-gijo-fold="🩺 사전 점검">
       <div class="pf-panel">
         <div class="pf-summary" id="pfSummary">점검 중...</div>
@@ -236,8 +249,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
          승인 = 👍 기록 → 아래 기존 정제·데이터셋·학습 흐름이 그대로 이어받는다. -->
     <div class="cat" data-gijo-fold="학습 후보함" data-gijo-fold-open data-gijo-fold-badges="lcStrong:신호 강함:warn">
       <div class="cat-head"><span style="font-size:18px">🗳</span><span class="cat-title">학습 후보함</span></div>
-      <!-- 주제별 승인 진척(2026-08-08 시안 승인) — 섹션을 열자마자 "어느 주제가 300에 가까운가"부터. 칩 클릭=그 주제만 보기 -->
-      <div class="lt-strip" id="ltStrip"></div>
       <div class="kpi-grid" style="margin-bottom:10px">
         <div class="kpi"><div class="k-label">후보</div><div class="k-value" id="lcCount">-</div></div>
         <div class="kpi"><div class="k-label">신호 강함(3점↑)</div><div class="k-value" id="lcStrong" style="color:var(--amber)">-</div></div>
