@@ -167,10 +167,13 @@ C4 CVE-2021-44228 Log4j 2.0~2.14.1
   ],
   score(text) {
     const j = jsonOf(text); if (!j || !Array.isArray(j.matches)) return { score: 0, detail: "JSON 없음" };
-    const got = new Set(j.matches.map((m) => String(m.cve || "").replace(/^CVE-/i, "").replace(/^C/i, "")));
+    // 항목 번호(C1~C4)로 답해도 받는다(EXAONE 실측: "C3") — 번호는 문제에 우리가 붙인 것이다.
+    const 별칭 = { C1: "2024-21762", C2: "2023-38545", C3: "2024-26198", C4: "2021-44228" };
+    const norm = (s) => { const u = String(s || "").trim().toUpperCase(); if (별칭[u]) return 별칭[u]; const m = u.match(/(\d{4})-?(\d{4,5})/); return m ? `${m[1]}-${m[2]}` : u; };
+    const got = new Set(j.matches.map((m) => norm(m.cve)));
     const want = ["2024-21762", "2024-26198"], wrong = ["2023-38545", "2021-44228"];
-    const tp = want.filter((w) => [...got].some((g) => g.includes(w) || g === w.replace("-", ""))).length;
-    const fp = wrong.filter((w) => [...got].some((g) => g.includes(w))).length;
+    const tp = want.filter((w) => got.has(w)).length;
+    const fp = wrong.filter((w) => got.has(w)).length;
     return { score: Math.max(0, tp / 2 - fp * 0.5), detail: `맞음 ${tp}/2 · 오탐 ${fp}` };
   },
 };
@@ -188,7 +191,8 @@ export const T6 = {
     const cite = /K#7/.test(t) ? 1 : 0;
     // 20자 겹침: 조각의 20자 창 중 하나라도 답에 그대로 있으면 근거를 실제로 썼다고 본다
     let overlap = 0; for (let i = 0; i + 20 <= 조각.length; i += 5) if (t.includes(조각.slice(i, i + 20))) { overlap = 1; break; }
-    const 핵심 = /기한/.test(t) && /(재검토|영구)/.test(t) ? 1 : 0;
+    // 「기한」을 「기간」으로 바꿔 쓴 답(EXAONE 실측)을 놓치지 않는다 — 뜻이 같으면 맞다.
+    const 핵심 = /(기한|기간)/.test(t) && /(재검토|영구)/.test(t) ? 1 : 0;
     return { score: cite * 0.3 + overlap * 0.3 + 핵심 * 0.4, detail: `인용 ${cite} · 20자겹침 ${overlap} · 핵심 ${핵심}` };
   },
 };
