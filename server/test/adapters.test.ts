@@ -62,8 +62,10 @@ describe("어댑터 등록부", () => {
     등록("vuln-expert-v1");
     등록("ops-expert-v1", "장비운영");
     registerAdapter({ id: "other-base-v1", baseModelId: "다른모델", file: tmpFile });
-    setAdapterAdopted("vuln-expert-v1", true, "게이트 통과");
-    setAdapterAdopted("other-base-v1", true, "게이트 통과");
+    // ⚠ 2026-09-02: 채택에 **구조화된 게이트 결과**가 필요해졌다(승인 시안 내회사전문가 ③).
+    //   예전엔 「게이트 통과」 다섯 글자로 채택됐다 — 그것이 근거 없이 채택되던 구멍이었다.
+    setAdapterAdopted("vuln-expert-v1", true, "평가 게이트 통과", { verdict: "통과" });
+    setAdapterAdopted("other-base-v1", true, "평가 게이트 통과", { verdict: "통과" });
     const 서빙 = adoptedAdaptersFor("qwen3-14b");
     expect(서빙.map((a) => a.id)).toEqual(["vuln-expert-v1"]); // ops는 미채택, other는 베이스 다름
     fs.rmSync(tmpFile); // 파일 소실 시나리오 — 스폰 인자에 죽은 경로가 들어가면 모델 전체가 안 뜬다
@@ -75,7 +77,9 @@ describe("팀원 어댑터 배정", () => {
   it("채택된 어댑터만 배정할 수 있다", () => {
     등록();
     expect(() => setAgentAdapter("scan", "vuln-expert-v1")).toThrow(/채택되지 않은/);
-    setAdapterAdopted("vuln-expert-v1", true, "게이트 통과");
+    // ⚠ 2026-09-02: 채택에 **구조화된 게이트 결과**가 필요해졌다(승인 시안 내회사전문가 ③).
+    //   예전엔 「게이트 통과」 다섯 글자로 채택됐다 — 그것이 근거 없이 채택되던 구멍이었다.
+    setAdapterAdopted("vuln-expert-v1", true, "평가 게이트 통과", { verdict: "통과" });
     setAgentAdapter("scan", "vuln-expert-v1");
     expect(getAgentAdapter("scan")).toBe("vuln-expert-v1");
     setAgentAdapter("scan", null);
@@ -84,7 +88,9 @@ describe("팀원 어댑터 배정", () => {
 
   it("총괄(orchestrator)에는 배정할 수 없다 — 라우팅 결정성 보호", () => {
     등록();
-    setAdapterAdopted("vuln-expert-v1", true, "게이트 통과");
+    // ⚠ 2026-09-02: 채택에 **구조화된 게이트 결과**가 필요해졌다(승인 시안 내회사전문가 ③).
+    //   예전엔 「게이트 통과」 다섯 글자로 채택됐다 — 그것이 근거 없이 채택되던 구멍이었다.
+    setAdapterAdopted("vuln-expert-v1", true, "평가 게이트 통과", { verdict: "통과" });
     expect(() => setAgentAdapter("orchestrator", "vuln-expert-v1")).toThrow(/결정성/);
   });
 

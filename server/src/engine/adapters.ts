@@ -23,9 +23,15 @@ migrate(
      file TEXT NOT NULL,
      adopted INTEGER NOT NULL DEFAULT 0,
      note TEXT,
-     createdAt INTEGER NOT NULL
+     createdAt INTEGER NOT NULL,
+     -- 채택 근거(2026-09-02): 평가 게이트 결과 JSON. model_adoptions의 gate와 같은 설계다
+     -- (잣대를 둘로 두지 않는다). 강행 채택이면 사유가 여기 함께 남는다.
+     gate TEXT
    )`
 );
+
+// 이미 만들어진 DB에도 칸을 붙인다(있으면 무시) — 새로 만든 표에는 위 CREATE가 이미 넣는다.
+try { db.exec("ALTER TABLE lora_adapters ADD COLUMN gate TEXT"); } catch { /* 이미 있으면 무시 */ }
 
 export interface LoraAdapter {
   id: string;
@@ -33,7 +39,13 @@ export interface LoraAdapter {
   baseModelId: string; // 이 어댑터가 붙는 서빙 모델 id (LoRA 베이스 종속 계약)
   file: string; // GGUF LoRA 파일 경로
   adopted: boolean; // 게이트 통과 채택 여부 — 채택된 것만 서빙에 적재
-  note: string | null; // 채택/불채택 판정 근거 (게이트 결과 요약)
+  note: string | null; // 사람이 적는 한 줄(요약·강행 사유)
+  /**
+   * 채택 근거 — 평가 게이트 결과 JSON(2026-09-02). `model_adoptions.gate`와 같은 설계다.
+   * ⚠ 이것이 없으면 **채택이 거절된다**(강행 사유를 적지 않는 한). 예전에는 note에
+   *   「게이트 통과 후 채택하세요」라고 **적어 두기만** 했고 아무도 확인하지 않았다.
+   */
+  gate: string | null;
   createdAt: number;
 }
 
@@ -46,6 +58,8 @@ const adoptedForStmt = db.prepare(
   "SELECT * FROM lora_adapters WHERE adopted = 1 AND baseModelId = ? ORDER BY createdAt ASC"
 );
 const adoptStmt = db.prepare("UPDATE lora_adapters SET adopted = ?, note = ? WHERE id = ?");
+// 채택 근거를 따로 쓴다 — 채택 여부(adoptStmt)와 나눠 둬야 「근거만 갱신」도 된다.
+const gateStmt = db.prepare("UPDATE lora_adapters SET gate = ? WHERE id = ?");
 const deleteStmt = db.prepare("DELETE FROM lora_adapters WHERE id = ?");
 
 interface Row {
@@ -65,6 +79,7 @@ const fromRow = (r: Row): LoraAdapter => ({
   file: r.file,
   adopted: r.adopted === 1,
   note: r.note,
+  gate: (r as { gate?: string | null }).gate ?? null,
   createdAt: r.createdAt,
 });
 
@@ -179,11 +194,57 @@ export function adoptedAdaptersFor(baseModelId: string): LoraAdapter[] {
 
 // 채택/해제 — 채택에는 근거(note)를 강제한다: "게이트 통과"라는 말만으로는 부족하고
 // 어느 회차·점수로 통과했는지 남겨야 나중에 "왜 이 어댑터가 실서비스에 있나"를 답할 수 있다.
-export function setAdapterAdopted(id: string, adopted: boolean, note?: string | null): LoraAdapter {
+/**
+ * 전문가(어댑터) 채택/해제 — **채택에는 근거가 필요하다**(2026-09-02, 승인 시안 내회사전문가 ③).
+ *
+ * 왜: 예전에는 note에 「평가 게이트 통과 후 채택하세요」라고 **적어 두기만** 하고, 채택 창구는
+ *   그 결과를 **요구하지 않았다.** 관리자가 아무 근거 없이 채택할 수 있었고, 검증 안 된 전문가가
+ *   그대로 실서비스 대화에 실린다. 규칙은 있는데 지키는 것이 사람 몫이었다.
+ *
+ * ⚠ 새 잣대를 만들지 않았다 — 모델 교체에는 이미 같은 장치가 있다(`model_adoptions.gate`,
+ *   `tools/evalgate/adopt.mjs`가 리포트를 실어 보낸다). 어댑터에 그 잣대를 그대로 옮겼다.
+ *
+ * ⚠ **강행을 막지는 않는다.** 게이트를 못 돌리는 상황이 실제로 있고(급한 되돌림 등), 길을 아예
+ *   막으면 사람들이 다른 우회로를 만든다. 대신 **사유를 20자 이상 적게** 하고 그것을 근거로 남긴다
+ *   — 학습 개시선 미달 강행(learnloop)과 같은 결이다. 남는 것이 없는 강행은 없다.
+ */
+export function setAdapterAdopted(
+  id: string,
+  adopted: boolean,
+  note?: string | null,
+  gate?: unknown,
+): LoraAdapter {
   const cur = getStmt.get(id) as Row | undefined;
   if (!cur) throw new Error(`등록되지 않은 어댑터입니다: ${id}`);
-  if (adopted && !note?.trim()) throw new Error("채택에는 근거(게이트 결과 요약)가 필요합니다");
+
+  let gateJson: string | null = (cur as { gate?: string | null }).gate ?? null;
+  if (adopted) {
+    if (!note?.trim()) throw new Error("채택에는 근거(게이트 결과 요약)가 필요합니다");
+    // 게이트 리포트의 판정. evalgate는 통과일 때 verdict를 「통과」로 준다(tools/evalgate/run.mjs).
+    const 판정 = (gate as { verdict?: string } | undefined)?.verdict;
+    const 통과 = typeof 판정 === "string" && 판정.startsWith("통과");
+    if (!통과) {
+      // 게이트가 없거나 통과가 아니면 **강행 사유**를 요구한다 — 짧은 한 마디는 근거가 아니다.
+      const 사유 = note.trim();
+      if (사유.length < 20) {
+        throw new Error(
+          판정
+            ? `평가 게이트 판정이 「${판정}」입니다. 그래도 채택하려면 강행 사유를 20자 이상 적어 주세요.`
+            : "평가 게이트 결과가 없습니다. 게이트를 먼저 돌리거나, 강행 사유를 20자 이상 적어 주세요.",
+        );
+      }
+    }
+    // 근거는 **판정과 함께** 남긴다 — 나중에 「왜 채택했나」를 이 한 줄로 되짚을 수 있어야 한다.
+    gateJson = JSON.stringify({
+      verdict: 판정 ?? "(게이트 없음)",
+      강행: !통과,
+      at: Date.now(),
+      report: gate ?? null,
+    });
+  }
+
   adoptStmt.run(adopted ? 1 : 0, note?.trim() ?? cur.note, id);
+  gateStmt.run(gateJson, id);
   return fromRow(getStmt.get(id) as Row);
 }
 
@@ -197,9 +258,10 @@ export function registerAdapterRoutes(app: Express): void {
   });
 
   app.post("/api/adapters/:id/adopt", authMiddleware, adminMiddleware, (req, res) => {
-    const { adopted, note } = req.body ?? {};
+    // gate = 평가 게이트 리포트(JSON). 없으면 강행 사유(note 20자 이상)를 요구한다 — 위 함수 주석 참고.
+    const { adopted, note, gate } = req.body ?? {};
     try {
-      const updated = setAdapterAdopted(req.params.id, adopted !== false, note);
+      const updated = setAdapterAdopted(req.params.id, adopted !== false, note, gate);
       recordAudit({
         kind: "config",
         actor: (req as { user?: GijoUser }).user?.displayName ?? "(알 수 없음)",
