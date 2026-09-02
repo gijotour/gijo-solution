@@ -20,7 +20,9 @@ import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { authMiddleware } from "../auth/auth";
+// ⚠ adminMiddleware를 함께 들인다 — 학습 개시는 GPU를 독점해 **전 사용자의 추론이 멈춘다**
+//   (2026-09-01 여정 점검 F5-07 · 계획서 중-4). 아래 라우트 두 곳에서 쓴다.
+import { authMiddleware, adminMiddleware } from "../auth/auth";
 import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
@@ -834,9 +836,14 @@ export function registerLearnloopRoutes(app: Express): void {
     })
   );
 
+  // ⚠ **관리자만**이다(2026-09-01 F5-07). 이 라우트는 startLearnloopRun → pauseInferenceEngines로
+  //   추론 풀·임베딩 서버를 내린다 — 즉 담당자 한 사람이 누르면 그 순간 접속한 **전원의**
+  //   채팅·문서검색이 학습이 끝날 때까지 멈춘다. 화면(learnloop.html)도 함께 잠그지만,
+  //   화면만 잠그면 라우트로 새므로 막는 자리는 여기다. 후보 승인(👍)·로그 조회는 담당자도 그대로.
   app.post(
     "/api/learnloop/run",
     authMiddleware,
+    adminMiddleware,
     asyncRoute(async (req, res) => {
       try {
         // topic: 주제별 전문가 학습(승인 300 게이트) · force: 미달 강행(관리자 실험용 — 감사에 남김)
@@ -864,7 +871,10 @@ export function registerLearnloopRoutes(app: Express): void {
   app.get("/api/learnloop/runs", authMiddleware, (_req, res) => res.json(listLearnloopRuns()));
 
   app.get("/api/learnloop/config", authMiddleware, (_req, res) => res.json(getLearnloopConfig()));
-  app.put("/api/learnloop/config", authMiddleware, (req, res) => {
+  // ⚠ 루프 설정(베이스 모델·배포 대상 에이전트·자동수집)은 **관리자만** — 다음 학습이 무엇으로
+  //   돌지, 산출 어댑터가 누구에게 실릴지를 정하는 값이라 실행과 같은 급이다(2026-09-01 F5-07).
+  //   읽기(GET)는 담당자도 그대로 볼 수 있게 둔다 — 무엇으로 도는지는 알아야 한다.
+  app.put("/api/learnloop/config", authMiddleware, adminMiddleware, (req, res) => {
     try {
       res.json(putLearnloopConfig(req.body ?? {}));
     } catch (err) {

@@ -4,7 +4,8 @@
 import type { Express } from "express";
 import type { WebSocketServer } from "ws";
 import { spawn } from "child_process";
-import { authMiddleware } from "../auth/auth";
+// ⚠ adminMiddleware 동반 — 파인튜닝도 pauseInferenceEngines로 GPU를 독점한다(2026-09-01 F5-07).
+import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { recordProcessOutput } from "./logs";
 import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
 import { airgapChildEnv } from "./airgap";
@@ -155,7 +156,10 @@ function spawnTraining(args: FinetuneArgs): Promise<void> {
 }
 
 export function registerFinetuneRoutes(app: Express): void {
-  app.post("/api/finetune/start", authMiddleware, (req, res) => {
+  // ⚠ **관리자만**이다(2026-09-01 F5-07). 학습 라우트는 항상 엔진을 관리하므로(아래 주석), 누가
+  //   누르든 접속한 **전원의** 채팅·문서검색이 학습이 끝날 때까지 멈춘다. learnloop/run과 같은 급이라
+  //   같은 잣대로 막는다 — 화면(memory.html 파인튜닝 판)도 함께 잠그지만 근본은 여기다.
+  app.post("/api/finetune/start", authMiddleware, adminMiddleware, (req, res) => {
     // 단독 학습 라우트는 항상 엔진을 관리한다(추론과의 GPU 충돌 방지) — 클라이언트 body의
     // manageEngines/onComplete 등은 받지 않고 필요한 필드만 명시적으로 전달한다.
     const { agentId, datasetId, baseModel } = req.body ?? {};

@@ -5,6 +5,10 @@
 # server/scripts/deploy.sh가 워크트리에서는 되고 본 리포에서는 안 되던 원인).
 *.sh text eol=lf
 
+# 워크플로 스크립트도 LF로. 왜: Windows autocrlf가 CRLF로 바꾸면 Workflow 도구가 을
+# 「승인창에 숨는 제어문자」로 보고 실행을 거부한다(2026-09-02 실제 발생 — 워크플로 3개 전부).
+.claude/workflows/*.js text eol=lf
+
 # 바이너리 산출물은 diff/머지 대상이 아니다.
 *.pdf binary
 *.png binary

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>절차 허브 마무리 — 추천 시안 (F4-03 · F4-05, 2026-09-02)</title>
+<!--
+  근거·출처(설계 전 조사, 이 시안 안에서 근거로 쓰는 것 — 전부 "이 저장소 안"의 확정 사실이다):
+  · F4-03/F4-05 전문 — tools/review-2026-09-01/결과/여정_확정_88건.json (id F4-03 line 864, F4-05 line 947)
+  · workflowrail.js 1~111행 — 절차 띠 렌더 코드(오늘 09-02 기준 그대로, 수정 없었음: countLabel 필드 자체가 없음)
+  · server/src/engine/workflow.ts 54~150행 — WorkflowStage 인터페이스·5단계 집계(count/alert/alertLabel은 있고 countLabel 없음)
+  · client/src/renderer/pages/grouppanels.js 440~499행 — ④ 검증 허브 판 목록(hardening 1개뿐, 오늘 확인)
+  · client/src/renderer/pages/grouppanels.js 301~338행 — ③ fix 허브의 "approvals" 판(재사용 모범 사례: listApprovals()만 쓰고 로컬 날짜셈 없음)
+  · client/src/renderer/pages/approvals.html 96~106행(상태 알약 UI) · 270~309행(rvFilter) · 822~845행(init, ?asset=&finding= 처리) — 오늘 확인
+  · server/src/engine/approvals.ts 316~336행 — ApprovalSummary에 verifying·overdue가 이미 서버에서 집계됨(클라가 다시 셀 필요 없음)
+  · mockups/menu-workflow/시안.html 181~185행 — 2026-08 사용자 승인 시안의 "57 자산 · 오늘 신규 3" 표기(F4-03이 복원하라는 그 표기)
+  · mockups/discover-hub/시안-추천.html — 그룹 허브 통합 1호 승인 시안(같은 "판 여러 개 · 요약은 원천 API 그대로" 패턴의 전례)
+  · client/src/renderer/pages/gijo-ui.css 25~60행 — 색·간격 토큰(새 색 안 만들었음의 근거)
+  · 웹 조사는 하지 않음 — 이 결함은 "이미 있는 승인 시안과 실구현이 어긋난 것" + "같은 화면 안 라벨 불일치"라
+    외부 패턴 조사가 필요한 유형이 아니라 내부 정합(승인받은 시안 복원)이 근거다. 대신 내부 근거를 전부 위에 인용했다.
+-->
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.09);--border-strong:rgba(255,255,255,.16);
+    --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
+    --blue:#3b82f6;--blue-light:#5fa1ff;--blue-fill:#2563eb;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--red-ink:#f5928a;
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;font-size:13px;margin:0;padding:26px 30px 60px;line-height:1.6;}
+  h1{font-size:18px;margin:0 0 6px;}
+  h1 .tag{font-size:11.5px;color:var(--teal);font-weight:700;margin-left:8px;vertical-align:middle;}
+  h2{font-size:14.5px;margin:30px 0 8px;padding-top:14px;border-top:1px solid var(--border);}
+  h2 .num{color:var(--blue-light);font-weight:800;margin-right:6px;}
+  p.lead{color:var(--muted);font-size:12.5px;max-width:920px;margin:0 0 18px;}
+  .note{color:var(--muted);font-size:12px;max-width:920px;line-height:1.7;}
+  .note b{color:var(--text);}
+  .note .hi{color:var(--blue-light);}
+  .box{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:10px 0;max-width:960px;}
+  .box.warn{border-color:rgba(240,160,32,.4);background:rgba(240,160,32,.06);}
+  .box.give{border-color:rgba(226,72,61,.35);background:rgba(226,72,61,.05);}
+  .lbl{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted-2);margin-bottom:6px;}
+  code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11.5px;}
+  table.diff{border-collapse:collapse;width:100%;max-width:960px;font-size:12px;margin:8px 0;}
+  table.diff th{text-align:left;color:var(--muted-2);font-weight:700;font-size:11px;padding:5px 8px;border-bottom:1px solid var(--border-strong);}
+  table.diff td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+  table.diff td.file{color:var(--muted-2);font-size:11px;white-space:nowrap;}
+
+  /* ── 실제 앱 껍데기(사이드바 232px + 본문) — 대상 화면 구조 그대로 ─────────────── */
+  .frame{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;max-width:1040px;margin:14px 0;}
+  .frame .fh{background:var(--panel-2);padding:6px 12px;font-size:11px;color:var(--muted-2);border-bottom:1px solid var(--border);}
+  .fapp{display:grid;grid-template-columns:0px 1fr;}
+  .fmain{padding:16px 18px 18px;background:var(--bg);}
+  .scr-id{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+  .scr-id b{color:var(--text);font-weight:800;}
+
+  /* ── 절차 띠(workflowrail.js 재현 — CSS는 원본과 동일) ────────────────────────── */
+  .gjr{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 4px;}
+  .gjr-s{flex:1;min-width:132px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:7px 10px;}
+  .gjr-s.on{border-color:var(--blue);background:rgba(59,130,246,.1);}
+  .gjr-s .t{font-size:12.25px;font-weight:800;color:#fff;display:flex;align-items:center;gap:5px;}
+  .gjr-s .t .no{width:16px;height:16px;border-radius:4px;background:rgba(59,130,246,.2);color:var(--blue-light);font-size:11px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  .gjr-s .v{font-size:11.75px;color:var(--muted-2);margin-top:2px;}
+  .gjr-s .v b{font-size:15px;font-weight:900;color:var(--blue-light);}
+  .gjr-s .v .al{color:var(--red-ink);font-weight:800;}
+  .gjr-s .v .al0{color:var(--muted-2);font-weight:600;}
+  .gjr-s .v .u{color:var(--muted-2);font-weight:600;font-size:11.25px;}  /* ★ 신규 — 숫자 단위 라벨(F4-03) */
+  .capt{font-size:11px;color:var(--muted-2);margin:4px 0 16px;}
+  .capt.before{color:var(--red-ink);}
+  .capt.after{color:var(--teal);}
+
+  /* ── 그룹 허브 판 띠(grouphub.js 재현 — 실제 verify.html의 CSS 그대로) ────────── */
+  .gh-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+  .gh-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:0;min-height:132px;position:relative;overflow:hidden;display:flex;flex-direction:column;}
+  .gh-card.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+  .gh-head{font-size:12.75px;font-weight:800;color:var(--text);padding:7px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:6px;align-items:center;}
+  .gh-badge{font-weight:800;font-size:11.5px;}
+  .gh-body{padding:7px 12px;}
+  .gh-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;}
+  .gh-row b{color:var(--text);}
+  .gh-foot{font-size:11.5px;color:var(--muted-2);margin-top:4px;}
+  .gh-stage{margin-top:12px;border-radius:12px 12px 0 0;background:var(--panel-2);border:1px dashed var(--border-strong);min-height:150px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:12px;text-align:center;padding:14px;}
+  .fchip-mini{display:inline-flex;align-items:center;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;background:var(--blue-fill);color:#fff;margin-right:4px;}
+</style>
+</head>
+<body>
+
+<h1>절차 허브 마무리 <span class="tag">추천 시안 1개 · F4-03 · F4-05</span></h1>
+<p class="lead">
+  맡은 결함 2건 — <b>F4-03</b>(절차 띠 숫자에 이름이 없다) · <b>F4-05</b>(④ 검증 허브가 약속한 일을 실제로는 ③에서 한다).
+  둘 다 <code>tools/review-2026-09-01/결과/여정_확정_88건.json</code>에서 오늘(09-02) 코드를 직접 열어 재확인했고,
+  <b class="hi">아직 고쳐지지 않은 상태</b>다(2026-09-02 하루 동안 89건 수정이 있었지만 이 둘은 포함되지 않음 — grouphub.js·workflowrail.js·workflow.ts·grouppanels.js·verify.html 재확인).
+</p>
+
+<h2><span class="num">F4-03</span>절차 띠 큰 숫자에 이름을 붙인다</h2>
+<p class="note">
+  <b>지금 상태(오늘 확인)</b>: <code>workflowrail.js:61-64</code>는 <code>count</code>를 <code>&lt;b&gt;N&lt;/b&gt;</code>로만 찍는다 —
+  이름이 없다. <code>server/src/engine/workflow.ts</code>의 <code>WorkflowStage</code>(54~67행)에도
+  <code>count</code>·<code>alert</code>·<code>alertLabel</code>은 있지만 <b>count의 이름(countLabel)은 없다</b>.
+  반면 옆의 경고 숫자(<code>alert</code>)는 <code>alertLabel</code>이 있어 "오늘 신규 3"처럼 이름이 붙는다 —
+  <b class="hi">같은 줄 안에서 한쪽엔 이름이 있고 한쪽엔 없다.</b> 2026-08-09 승인 시안(<code>mockups/menu-workflow/시안.html:181-185</code>)은
+  처음부터 "57 자산 · 오늘 신규 3"으로 그렸는데, 구현이 이름 절반을 빠뜨린 채 나갔다(빠뜨린 결정 기록 없음).
+</p>
+
+<div class="frame">
+  <div class="fh">지금 상태 — client/src/renderer/pages/workflowrail.js 그대로(사이드바는 실제 화면에서 232px, 여기선 생략)</div>
+  <div class="fmain">
+    <div class="gjr">
+      <div class="gjr-s"><div class="t"><span class="no">1</span>발견·수집</div><div class="v"><b>57</b> · <span class="al0">오늘 신규 0</span></div></div>
+      <div class="gjr-s"><div class="t"><span class="no">2</span>우선순위</div><div class="v"><b>18</b> · <span class="al">실제 악용(KEV) 1</span></div></div>
+      <div class="gjr-s on"><div class="t"><span class="no">3</span>조치 ◀</div><div class="v"><b>3</b> · <span class="al">미배정 2</span></div></div>
+      <div class="gjr-s"><div class="t"><span class="no">4</span>검증</div><div class="v"><b>40</b> · <span class="al">미점검 대상 2</span></div></div>
+      <div class="gjr-s"><div class="t"><span class="no">5</span>보고</div><div class="v"><b>0</b></div></div>
+    </div>
+  </div>
+</div>
+<p class="capt before">▲ 지금: "40"이 무엇을 세는지(자산? 건수? 실패 항목?) 글자만으로는 알 수 없다. ④ 허브 판(등록 장비·활성 스케줄·평균 준수율)에도 "40"이 다시 나오지 않아 맞춰 볼 수도 없다.</p>
+
+<div class="frame">
+  <div class="fh">추천 — countLabel 추가(같은 자리, 같은 카드, 새 줄 없음)</div>
+  <div class="fmain">
+    <div class="gjr">
+      <div class="gjr-s"><div class="t"><span class="no">1</span>발견·수집</div><div class="v"><b>57</b> <span class="u">자산</span> · <span class="al0">오늘 신규 0</span></div></div>
+      <div class="gjr-s"><div class="t"><span class="no">2</span>우선순위</div><div class="v"><b>18</b> <span class="u">미조치</span> · <span class="al">실제 악용(KEV) 1</span></div></div>
+      <div class="gjr-s on"><div class="t"><span class="no">3</span>조치 ◀</div><div class="v"><b>3</b> <span class="u">진행</span> · <span class="al">미배정 2</span></div></div>
+      <div class="gjr-s"><div class="t"><span class="no">4</span>검증</div><div class="v"><b>40</b> <span class="u">실패 항목</span> · <span class="al">미점검 대상 2</span></div></div>
+      <div class="gjr-s"><div class="t"><span class="no">5</span>보고</div><div class="v"><b>0</b> <span class="u">이번 주 보고</span></div></div>
+    </div>
+  </div>
+</div>
+<p class="capt after">▲ 추천: 큰 숫자 바로 뒤에 회색 작은 글자로 단위. "40 실패 항목"이라고 읽힌다 — 승인 시안(57 자산 · 오늘 신규 3)과 같은 표기 방식으로 복원.</p>
+
+<div class="box">
+  <div class="lbl">왜 이 안인가</div>
+  <div class="note">
+    라벨을 <b>서버 한 곳</b>(<code>workflow.ts</code>의 <code>WorkflowStage</code>)에 추가하고 화면은 그대로 찍기만 한다 —
+    이 파일 자체의 원칙("숫자는 서버가 한 곳에서 센다", <code>workflowrail.js:8</code>)과 같은 이유로,
+    이름도 화면마다 손으로 박으면 서버 표(<code>label</code>: "발견·수집" 등 <b>단계 이름</b>)와 또 어긋날 수 있다.
+    <b class="hi">단계 이름(label)과 숫자 이름(countLabel)은 다른 것</b>이라 별도 필드로 둔다 — 하나로 합치면
+    "발견·수집 57"처럼 되어 무엇을 세는지 여전히 안 보인다.
+  </div>
+</div>
+<div class="box give">
+  <div class="lbl">무엇을 포기했는가</div>
+  <div class="note">
+    ② 우선순위의 라벨을 "미조치"로 잡았다 — 실제 계산은 <code>isActiveVuln</code>(고쳐지지 않은 진짜 취약점, <code>agenttools/handlers.ts:176</code>)이라
+    "취약점"이라 부를 수도 있었지만, ③ 조치 단계와 나란히 읽었을 때 "이게 아직 손 안 댄 것"이라는
+    뜻이 더 분명해서 "미조치"를 골랐다 — <b>완벽한 이름은 없다</b>, 사용자가 다른 말을 원하면 그때 바꾼다(승인 대상).
+    ④의 "실패 항목"은 승인 시안(5 대기)과 다른 말인데, 승인 시안은 그때 숫자의 뜻(점검서 승인 대기)이 지금과 달라서다
+    (2026-08-02 이후 ④ count는 하드닝 실패 항목 합계로 바뀌었음, <code>workflow.ts:116-121</code>) — <b>지금 숫자의 실제 뜻</b>을 붙였다.
+  </div>
+</div>
+
+<h2><span class="num">F4-05</span>④ 검증 허브가 "④가 정말 검증하는 자리"가 되게 한다</h2>
+<p class="note">
+  <b>지금 상태(오늘 확인)</b>: <code>verify.html:59</code> — "고친 것이 실제로 닫혔는지 확인하는 자리입니다."
+  그런데 <code>grouppanels.js</code>의 <code>verify</code> 판 목록(440~499행)엔 <b>🛡 보안설정 점검 하나뿐</b>이고,
+  실제 "고친 것이 닫혔는지"(재스캔·조치 검증 실행·검증 대기)는 <code>approvals.html:673·679</code> —
+  ③ 조치·승인 화면 안에 있다. 담당자가 절차 이름을 따라 ④로 가면 검증할 곳이 없다.
+</p>
+
+<div class="frame">
+  <div class="fh">지금 상태 — client/src/renderer/pages/verify.html (판 1개)</div>
+  <div class="fmain">
+    <div class="scr-id"><b>검증</b> — 고친 것이 실제로 닫혔는지 확인하는 자리입니다.</div>
+    <div class="gh-strip">
+      <div class="gh-card on">
+        <div class="gh-head">🛡 보안설정 점검</div>
+        <div class="gh-body">
+          <div class="gh-row"><span>등록 장비</span><b>12</b></div>
+          <div class="gh-row"><span>활성 스케줄</span><b>3</b></div>
+          <div class="gh-row"><span>평균 준수율</span><b>48%</b></div>
+          <div class="gh-foot">점검 이력 40회</div>
+        </div>
+      </div>
+    </div>
+    <div class="gh-stage">▼ hardening.html이 무대에 열림 — "고친 취약점" 검증 화면은 여기 없다</div>
+  </div>
+</div>
+<p class="capt before">▲ 지금: 화면 정체성은 "고친 것이 닫혔는지 확인"인데, 판은 보안설정(하드닝) 점검 하나뿐. 취약점 재스캔·조치 검증은 다른 절차 단계(③) 화면에 있다.</p>
+
+<div class="frame">
+  <div class="fh">추천 — ④ 허브에 "🔁 조치 검증 대기" 판 추가(approvals.html을 그대로 재사용, 새 화면 아님)</div>
+  <div class="fmain">
+    <div class="scr-id"><b>검증</b> — 조치가 닫혔는지 재확인하고, 보안설정이 기준대로 유지되는지 점검하는 자리입니다.</div>
+    <div class="gh-strip">
+      <div class="gh-card on">
+        <div class="gh-head">🔁 조치 검증 대기 <span class="gh-badge" style="color:var(--amber)">5</span></div>
+        <div class="gh-body">
+          <div class="gh-row"><span>검증 대기</span><b>5</b></div>
+          <div class="gh-row"><span>기한 지남</span><b style="color:var(--red-ink)">1</b></div>
+          <div class="gh-foot">🔍 조치 검증 실행 · 🔁 재스캔은 판을 열면 있습니다</div>
+        </div>
+      </div>
+      <div class="gh-card">
+        <div class="gh-head">🛡 보안설정 점검</div>
+        <div class="gh-body">
+          <div class="gh-row"><span>등록 장비</span><b>12</b></div>
+          <div class="gh-row"><span>활성 스케줄</span><b>3</b></div>
+          <div class="gh-row"><span>평균 준수율</span><b>48%</b></div>
+          <div class="gh-foot">점검 이력 40회</div>
+        </div>
+      </div>
+    </div>
+    <div class="gh-stage">
+      ▼ 첫 판을 <span class="fchip-mini">검증</span> 상태로 미리 걸러 연 <b style="color:var(--text)">approvals.html</b>이 무대에 열림<br>
+      (③ 조치·승인과 <b>같은 파일</b> — 재스캔·조치 검증 실행 단추가 여기서 바로 눌린다)
+    </div>
+  </div>
+</div>
+<p class="capt after">▲ 추천: ④에 도착하면 바로 "검증 대기 5건"이 보이고 눌러 들어가면 재스캔·조치 검증 실행 단추가 있는 그 판이 뜬다 — 헛걸음이 없어진다.</p>
+
+<div class="box">
+  <div class="lbl">왜 이 안인가 — 세 갈래 중 "④가 판을 품는다"를 골랐다</div>
+  <div class="note">
+    <b>① 화면을 옮긴다</b>(approvals.html을 ③에서 빼서 ④ 전용으로) — 기각.<br>
+    <b>② 이름만 고친다</b>(verify.html 정체성 문구에서 "취약점 조치 검증은 ③에서"라고 안내) — 기각.<br>
+    <b>③(추천) ④가 ③의 그 화면을 판으로 품는다</b> — <code>approvals.html</code>은 그대로 두고,
+    <code>grouppanels.js</code>의 <code>verify</code> 배열에 판을 하나 더 추가해 같은 파일을
+    <code>?status=verifying</code>으로 미리 걸러 연다. <b class="hi">발견·수집 허브가 이미 쓰는 패턴</b>
+    (<code>mockups/discover-hub</code> — "판 여러 개, 요약은 각 화면의 기존 API 그대로")과 같은 방식이라
+    새 장치가 아니다. ③ 허브의 "조치·승인" 판은 그대로 둔다 — <b>같은 도구가 두 절차 단계에서 보인다</b>는
+    것이지, 숫자를 두 곳에서 다시 세는 게 아니라서("세는 자리는 하나" 원칙과 충돌 없음, 둘 다
+    <code>listApprovals()</code> 한 곳만 부른다) 괜찮다고 판단했다.
+  </div>
+</div>
+<div class="box give">
+  <div class="lbl">①(화면을 옮긴다)을 골랐다면 무엇이 깨지는가 — 기각 사유</div>
+  <div class="note">
+    1) <code>workflow.ts:100-114</code> — ③ 조치의 <code>count</code>(진행 건수)는 지금 <code>listFindingReviews()</code>(승인 대장, 곧 approvals.html의 원천)를 센다.
+    그 화면을 ④로 옮기면 ③의 숫자가 "그 단계 화면에서 나온 것"이라는 2026-08-02 규칙(<code>workflow.ts:118-121</code>)이 깨져 다시 설계해야 한다.<br>
+    2) 사이드바(nav.js) "✅ 조치·승인" 항목을 조치 그룹에서 검증 그룹으로 옮겨야 하고,
+    <code>workflow.test.ts</code>(사이드바-서버 STAGE_SCREENS 대조 시험, 52·68행)가 이를 강제해 같이 고쳐야 한다.<br>
+    3) 승인된 <code>mockups/menu-workflow/시안.html:156</code>("③ 조치: 조치·승인 · 유지보수 점검 · 터미널")과도 어긋나 재승인이 필요하다.<br>
+    4) 화면 곳곳에서 <code>approvals.html?asset=&finding=</code>로 들어오는 딥링크가 가리키는 절차 단계 라벨이 바뀌어 버린다.<br>
+    → 얻는 것(정체성 문구와 실제 위치 일치)에 비해 깨지는 것이 많아 기각했다.
+  </div>
+</div>
+
+<h2><span class="num">밀도</span>숫자 — 계산 방법과 결과</h2>
+<p class="note"><b>F4-03(라벨 추가)</b> — 계산: <code>.gjr-s</code> 카드는 <code>padding:7px 10px</code>, 안에 <code>.t</code>(제목 줄)와 <code>.v</code>(값 줄, margin-top:2px) 두 줄뿐이다.
+새 라벨(<code>&lt;span class="u"&gt;</code>)은 <b>기존 <code>.v</code> 줄 안에 인라인으로</b> 붙인다 — 새 <code>&lt;div&gt;</code>를 만들지 않는다.
+따라서 카드 세로 높이(제목줄+값줄+패딩, 실측 기준 대략 <code>7+16+2+15+7≈47px</code> — 폰트 12.25px/11.75px에 브라우저 기본 줄간격 ≈1.3배로 추정, 정확한 렌더 값 아님)는
+<b class="hi">변화 없음(증감 0px)</b>. 유일한 위험은 폭이 좁을 때 줄바꿈인데, 이미 떠 있는 "오늘 신규"(4글자+숫자)보다
+새로 붙는 라벨("자산"·"미조치"·"진행"·"실패 항목"·"이번 주 보고", 2~6글자)이 크게 길지 않고 카드 최소폭 132px에
+실사용 폭(사이드바 232px 제외 나머지 5등분 시 카드당 약 200px 이상)이 항상 더 넓어 줄바꿈 위험은 낮다(실측 아님 — 구현 시 좁은 창 스크린샷으로 확인 필요, 아래 구현 범위에 적음).<br><br>
+<b>F4-05(판 추가)</b> — 계산: <code>.gh-strip</code>은 <code>grid-template-columns:repeat(auto-fit,minmax(200px,1fr))</code>라
+판이 1개든 2개든 <b>같은 한 줄, 같은 132px 높이</b>다(2026-08-18에 이미 이렇게 고쳐진 이유가 바로 이것 — <code>verify.html:25-29</code> 주석).
+판 1개→2개는 그 한 줄이 세로로 안 늘고 <b class="hi">가로로만 나뉜다(증감 0px)</b>. 무대(<code>.gh-stage</code>)는 <code>flex:1</code>이라
+위 띠가 늘지 않는 한 그대로다. 결론: 이 시안은 <b>세로 공간을 1px도 더 쓰지 않는다.</b>
+</p>
+
+<h2><span class="num">자가점검</span>제품 원칙</h2>
+<table class="diff">
+  <tr><th>항목</th><th>결과</th></tr>
+  <tr><td>새 색 0개</td><td>추가한 <code>.u</code>(단위 라벨)는 기존 <code>--muted-2</code> 재사용, <code>.gh-badge</code> 빨강/노랑도 기존 <code>--red-ink</code>·<code>--amber</code> 재사용. 새 색상값 없음.</td></tr>
+  <tr><td>외부 자원 0개</td><td>CDN·웹폰트·원격 이미지 없음. 폰트는 <code>"Pretendard","Malgun Gothic","Segoe UI",sans-serif</code>(제품과 동일).</td></tr>
+  <tr><td>화면에 설명 안 늘림</td><td>F4-03은 라벨 한 단어(단위) — 사용법 문구 아님. F4-05는 <code>scr-id</code> 정체성 한 줄만 손질(길이 거의 동일), 새 안내문 없음.</td></tr>
+  <tr><td>없는 기능 안 그림</td><td>새 판의 "검증 대기"·"기한 지남"은 서버가 이미 주는 <code>ApprovalSummary.verifying</code>·건별 <code>overdue</code>(approvals.ts:150·316-332)를 그대로 쓴다 — 새 집계 로직 없음. 재스캔·조치 검증 실행 단추도 approvals.html에 이미 있는 것 그대로.</td></tr>
+</table>
+
+<h2><span class="num">구현</span>범위 — 고칠 파일</h2>
+<table class="diff">
+  <tr><th>파일</th><th>무엇을</th></tr>
+  <tr><td class="file">server/src/engine/workflow.ts</td><td><code>WorkflowStage</code>(54~67행)에 <code>countLabel: string</code> 추가. 140~149행 5개 단계 객체에
+    <code>countLabel: "자산"</code> / <code>"미조치"</code> / <code>"진행"</code> / <code>"실패 항목"</code> / <code>"이번 주 보고"</code> 부여.</td></tr>
+  <tr><td class="file">client/src/renderer/pages/workflowrail.js</td><td>61~64행 값 조립에 <code>(s.countLabel ? ' &lt;span class="u"&gt;'+esc(s.countLabel)+'&lt;/span&gt;' : '')</code> 추가(값이 null이면 라벨도 생략).
+    32~47행 CSS에 <code>.gjr-s .v .u</code> 규칙 추가(위 시안 CSS 그대로).</td></tr>
+  <tr><td class="file">server/test/workflow.test.ts</td><td>새 필드라 기존 시험은 안 깨짐(shape 전체 대조 없음, 오늘 확인) — 다만 countLabel이 빈 문자열이 아닌지 정도의 시험 한 줄 추가 권장(선택).</td></tr>
+  <tr><td class="file">client/src/renderer/pages/grouppanels.js</td><td>440~499행 <code>verify</code> 배열 맨 앞에 판 추가:
+    <code>{ id:"verifying", title:"🔁 조치 검증 대기", page:"approvals.html?status=verifying", scenario:"조치 검증(재스캔 대조)",
+    rows: … , load: () =&gt; listApprovals().then(r=&gt;{ 서버 summary.verifying·건별 overdue만 읽어 rows 구성 }) }</code>.
+    기존 <code>hardening</code> 판은 그대로 둔다(순서만 뒤로).</td></tr>
+  <tr><td class="file">client/src/renderer/pages/verify.html</td><td>59행 정체성 문구를 "조치가 닫혔는지 재확인하고, 보안설정이 기준대로 유지되는지 점검하는 자리입니다"로.
+    83행 <code>initial</code> 기본값을 <code>"hardening"</code>→<code>"verifying"</code>으로(허브 정체성과 첫 판을 맞춘다).</td></tr>
+  <tr><td class="file">client/src/renderer/pages/approvals.html</td><td>822~830행 <code>init()</code>에 <code>?status=</code> 읽기 추가(기존 <code>?asset=</code>·<code>?finding=</code> 처리와 나란히):
+    유효한 상태값이면 <code>rvFilter</code>에 반영하고 해당 <code>#rvFilt .fchip[data-f=…]</code>에 <code>on</code> 클래스.
+    (칩 자체·상태값 열거는 96~106행에 이미 있어 새로 만들 게 없다.)</td></tr>
+  <tr><td class="file">server/src/engine/screenguide.ts</td><td>405~414행 <code>"verify.html"</code>의 <code>what</code>·<code>can</code>을 새 판에 맞게 갱신
+    (예: can에 "검증 대기 몇 건이야?" 추가) — <b>서버 변경</b>이라 별도 검토 필요.</td></tr>
+</table>
+<p class="note" style="margin-top:10px">
+  ⚠ 구현 시 확인할 것(이 시안이 못 보는 것): 실제 브라우저 렌더에서 카드 최소폭 132px 근처(창을 좁혔을 때)의 줄바꿈 여부,
+  그리고 <code>listApprovals()</code> 응답이 정말 <code>summary.verifying</code>·건별 <code>overdue</code>를 담는지 실행해 재확인(코드는 오늘 읽었지만 실행 검증은 안 함).
+</p>
+
+</body>
+</html>

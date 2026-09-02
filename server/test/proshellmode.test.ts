@@ -69,7 +69,12 @@ describe("★ 프로를 고르는 자리가 **둘 다** 같은 값을 쓴다", (
   it("★ 셸 모드 기록이 서버 실패에 발목 잡히지 않는다", () => {
     // 등급을 못 바꿨다고 화면 선택까지 못 할 이유는 없다 — 두 축이 다르기 때문이다.
     const 구간 = 로그인.slice(로그인.indexOf("if (고른모드.값) {"), 로그인.indexOf("if (고른위치.값) {"));
-    const iCatch = 구간.indexOf("못한것.push(\"구동 모드(");
+    // ⚠ 2026-09-02(F8-10)에 문구가 「구동 모드(pro):」 → 「구동 모드 🚀 프로:」로 바뀌었다
+    //   (영문 식별자를 담당자에게 안 보인다). 옛 바늘을 그대로 두면 indexOf가 **-1**이 되고,
+    //   아래 `toBeGreaterThan(iCatch)`가 저절로 참이 되어 **아무것도 안 보는 초록**이 된다.
+    //   그래서 바늘을 넓히고, 못 찾으면 여기서 먼저 빨간불을 낸다.
+    const iCatch = 구간.indexOf("못한것.push(\"구동 모드");
+    expect(iCatch, "구동 모드 실패 문구를 못 찾았다 — 이 시험이 헛돈다").toBeGreaterThan(0);
     const iShell = 구간.indexOf("shellModeSet");
     expect(iShell, "셸 모드 기록이 없다").toBeGreaterThan(0);
     expect(iShell, "셸 모드 기록이 서버 호출 try 안에 있다 — 서버가 거절하면 같이 죽는다").toBeGreaterThan(iCatch);

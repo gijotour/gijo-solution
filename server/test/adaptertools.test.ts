@@ -95,7 +95,9 @@ describe("핸들러 계약", () => {
 
   it("근거와 함께면 채택되고 재기동 필요를 정직하게 말한다", async () => {
     등록();
-    const out = await runAdapterAdopt({ adapter: "vuln-x-v1", mode: "채택", note: "게이트 통과" });
+    // ⚠ 2026-09-02: 챗봇으로 채택할 때도 근거가 필요하다. 챗봇은 게이트를 직접 못 돌리므로
+    //   **사람이 적는 강행 사유**(20자 이상)가 근거가 된다 — 도구 설명의 예시와 같은 결이다.
+    const out = await runAdapterAdopt({ adapter: "vuln-x-v1", mode: "채택", note: "게이트 routing 66/66 · A/B 10문 통과 확인함" });
     expect(out).toContain("채택했습니다");
     expect(out).toContain("다시 올릴 때부터"); // 서빙 반영 시점 정직 고지
     expect(listAdapters()[0].adopted).toBe(true);
@@ -105,7 +107,7 @@ describe("핸들러 계약", () => {
     등록();
     const miss = await runAdapterAssign({ agent: "스캔", adapter: "vuln-x-v1" });
     expect(miss).toContain("채택되지 않은"); // agents가 거부
-    setAdapterAdopted("vuln-x-v1", true, "게이트 통과");
+    setAdapterAdopted("vuln-x-v1", true, "평가 게이트 통과", { verdict: "통과" });
     const ok = await runAdapterAssign({ agent: "스캔", adapter: "vuln-x-v1" });
     expect(ok).toContain("배정했습니다");
     expect(getAgentAdapter("scan")).toBe("vuln-x-v1");

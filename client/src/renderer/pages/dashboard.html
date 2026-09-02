@@ -248,8 +248,20 @@
       <div class="hello">
         <div class="hi" id="helloLine">안녕하세요</div>
         <div class="steps">
-          <span class="step"><span class="n">1</span>왼쪽 메뉴에서 화면을 고르면 <b>탭</b>으로 열립니다 — 탭을 오가도 보던 화면은 그대로입니다</span>
-          <span class="step"><span class="n">2</span>일은 <b>아래 대화창</b>에 시킵니다 — 지금 보는 탭이 곧 지시의 대상입니다</span>
+          <!-- ⚠ 2026-09-02(여정 점검 F3-05) 문구 정정 — 이 두 줄이 **지금 셸에서 거짓**이었다.
+               ① 「탭으로 열립니다」: 기본 셸인 프로에는 탭줄이 없다(app.html:86 「프로는 탭 개념이
+                  없다(승인 시안)」 — body.pro-shell .shellfoot{display:none}).
+               ② 「아래 대화창」: 대화창 기본 자리는 **오른쪽**이다(app.html:1257 사용자 결정
+                  2026-08-09 「아래는 쓰지 말자 — 오른쪽에 붙는 걸 기본으로」). 프로에서는 기본이
+                  접힘이라(app.html:1729) 오른쪽 끝 손잡이로 편다.
+               ⚠ 「보던 화면은 그대로」라고 쓰면 **또 거짓말이 된다** — 프로는 도킹 자리가 하나라
+                  다른 화면을 고르면 앞 화면을 닫고 바꿔 단다(app.html open() ③ 도킹 교체).
+               ⚠ 「💬」만 가리키지 않는다 — 왼쪽 레일에도 💬(#railHome, 새 대화 시작 = 열린 화면을
+                  닫는다)가 있어 그쪽을 누르면 하던 일이 사라진다. 세로로 「대화창」이라 적힌
+                  오른쪽 끝 손잡이임을 밝힌다(app.html:1725 innerHTML).
+               ⚠ 사용자 결정을 뒤집는 게 아니라 **결정에 문구를 맞추는** 수정이다. -->
+          <span class="step"><span class="n">1</span>왼쪽 메뉴에서 화면을 고르면 <b>왼쪽 자리</b>에 열립니다 — 대화는 오른쪽에서 그대로 이어집니다</span>
+          <span class="step"><span class="n">2</span>일은 <b>오른쪽 대화창</b>에 시킵니다 — 접혀 있으면 오른쪽 끝의 세로 손잡이 <b>💬 대화창</b>을 누르면 펴집니다. 지금 보는 화면이 곧 지시의 대상입니다</span>
           <span class="step"><span class="n">3</span>위험한 명령은 <b>가드레일이 차단</b>하고, 바꾸는 일은 <b>결재판</b>으로 확인받습니다 — 편하게 물어보세요</span>
         </div>
       </div>
@@ -306,7 +318,13 @@
       </div>
       <div id="pcBody"><!-- JS가 그린다 — 못 그리면 옛 한 줄(현황 조망)로 남는다 -->
         <div style="display:flex;align-items:center;gap:8px;height:30px;font-size:12.5px;color:var(--muted)">
-          <span>📊 현황 조망</span><span style="color:var(--muted-2)">보안 태세·위협 인텔·자산 요약은 <b style="color:var(--blue-l)">발견·수집</b>에서 봅니다</span>
+          <!-- ⚠ 이 한 줄은 **지금 판 구성**만 말한다(F4-01, 2026-09-02). 「📊 보안 태세」 판은
+               2026-08-19 승인으로, 「🖥 자산」 판은 2026-08-18 승인 시안으로 ① 발견·수집에서 빠졌다
+               (grouppanels.js:83·164) — 그 둘을 여기서 약속하면 ①에 들어가 찾다 못 찾는다.
+               ⚠ 옮겨 간 자리(⑤ 보고 · ⓪ 자산 고르기)는 **여기 적지 않는다**: 이 상자는 통째로
+               단추이고 discover.html?panel=analysis 한 곳으로만 간다(:793). 세 자리를 적으면
+               눌렀을 때 약속과 다른 데로 떨어진다 — 어디로 갔는지는 ⓘ(screenguide)가 말한다. -->
+          <span>📊 현황 조망</span><span style="color:var(--muted-2)">관제·위협 인텔 요약은 <b style="color:var(--blue-l)">발견·수집</b>에서 봅니다</span>
         </div>
       </div>
       <div id="pcLegend" style="display:none;margin-top:6px;font-size:11.25px;color:var(--muted-2);line-height:16px"></div>

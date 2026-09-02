@@ -52,7 +52,17 @@ npm install
 npm start              # 빌드 후 Electron 실행
 ```
 
-첫 로그인 계정은 **`jyh` / `changeme`** 입니다(첫 설치 시 생성 — 바로 바꾸세요).
+첫 로그인 계정은 **어떻게 띄웠는지에 따라 다릅니다**(2026-08-09 보안 결정 — F7-12):
+
+| 상황 | 계정 |
+|---|---|
+| **개발·테스트**(NODE_ENV이 production이 아니고 env 비번도 없을 때) | `jyh` / `changeme` |
+| **운영**(NODE_ENV=production) | `admin` + **강력 랜덤 비밀번호를 콘솔에 1회만 출력** — 그때 받아 적고 바로 바꿉니다 |
+| `GIJO_INITIAL_ADMIN_PASSWORD`를 준 경우 | `admin` + 그 비밀번호 |
+
+> ⚠ **운영에서는 `changeme`가 절대 안 쓰입니다.** 예전에 그 값이 고객 기계까지 나간 적이 있어 막아 뒀습니다
+> (`server/src/auth/users.ts`의 `computeInitialAdmin`).
+> 패키징된 설치본은 또 다릅니다 — **고객이 첫 화면에서 직접 관리자 비밀번호를 정합니다**(콘솔을 볼 수 없어서입니다).
 
 > **⚠ 모델이 없으면 채팅이 안 됩니다.**
 > `server/models/`는 git에 없습니다(수 GB). GGUF를 직접 받아
@@ -244,6 +254,6 @@ npx tsc --noEmit               # 타입 검사 — CI의 첫 관문
 | `GIJO_AS_용어사전.md` | 이 제품의 말이 낯설 때(계속 갱신되는 문서) |
 | `GIJO_AS_시장경쟁력_전중후_계획서.md` | 지금 무엇을 왜 만들고 있는지 |
 | `GIJO_AS_RAG_아키텍처_LLM연동.md` | 지식 검색·임베딩 구조 |
-| `GIJO_AS_2머신_개발환경_가이드.md` | Windows ↔ Mac 두 대로 개발할 때 |
+| `GIJO_AS_3머신_개발환경_가이드.md` | Windows ↔ Mac 두 대로 개발할 때 |
 | `GIJO_AS_MAC_올인원_배포_가이드.md` | Mac(Metal)에서 서버+LLM 돌릴 때 |
 | `GIJO_AS_시험지도.md` | 어떤 시험이 무엇을 지키는지 |

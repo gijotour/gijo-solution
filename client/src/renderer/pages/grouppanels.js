@@ -52,6 +52,17 @@
     return d.getFullYear() === new Date().getFullYear() ? mmdd : String(d.getFullYear() % 100).padStart(2, "0") + "-" + mmdd;
   };
 
+  // 「오늘」 판정은 **로컬(KST) 날짜**로, 그리고 **여기 한 곳**에서만 만든다(F4-10, 2026-09-02).
+  //   toISOString()은 UTC라 한국에서는 오전 9시 전까지 「어제」로 계산돼, 서버(util/date.ts
+  //   todayLocal)와 하루가 어긋난다. 판마다 따로 적어 두면 한 곳만 고쳐져 다시 갈린다 —
+  //   실제로 정기 점검 판은 2026-08-20에 고쳤는데 지식 판은 UTC인 채로 남아 있었다.
+  //   인자를 주면 그 시각(밀리초 숫자·ISO 문자열 모두)의 로컬 날짜를, 안 주면 오늘을 준다.
+  var 오늘날짜 = function (t) {
+    var d = t == null ? new Date() : new Date(t);
+    if (isNaN(d)) return "";
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  };
+
   // 스캔 오류는 취약점이 아니다(서버 isRealVulnerability와 같은 잣대) — 세는 자리마다 지킨다.
   // ⚠ 서버 목록과 **같아야** 한다 — `scan_not_supported`가 빠져 있어 서버(handlers.ts:198)와
   //   취약점 수가 갈렸다(2026-08-20 설계관 적발). info는 severity 쪽 잣대라 함께 둔다.
@@ -166,8 +177,9 @@
       //   두 자리에 남겨 두면 담당자가 「어디서 고르는 게 맞나」를 매번 고민한다 —
       //   이 저장소가 「같은 일 하는 자리가 둘이면 조작 개념만 늘어난다」로 이미 정리한 것이다.
       //   자산 관리(등록·수정·CSV)는 inventory.html 그대로다 — ⓪ 화면의 「전체 관리 열기」로 간다.
-      // ⚠ 「📊 보안 태세」(posture)는 **손대지 않았다.** 시안이 그것도 뺄지 물었지만
-      //   사장님 확인이 필요한 자리라 남긴다 — 승인 없이 화면을 지우지 않는다.
+      // (「📊 보안 태세」는 2026-08-18에는 사장님 확인 전이라 일부러 남겨 뒀다가, 2026-08-19 승인으로
+      //  뺐다 — 위 83행 주석이 그 결말이다. 「손대지 않았다」고 적힌 옛 주석은 83행과 정면으로
+      //  모순이라 지웠다(F4-01, 2026-09-02). 주석이 코드와 다른 말을 하면 다음 사람이 그 말을 믿는다.)
     ],
 
     // ② 우선순위
@@ -347,10 +359,9 @@
         load: function () {
         return window.gijo.listMaintenance().then(function (r) {
           var list = (r && r.items) || r || [];
-          // ⚠ **로컬 날짜**로 잡는다(2026-08-20 병렬 검토). toISOString은 UTC라 한국에서는
-          //   오전 9시 전까지 「어제」로 계산돼, 서버(util/date.ts todayLocal)와 하루가 어긋난다.
-          var d = new Date();
-          var 오늘 = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+          // ⚠ **로컬 날짜**로 잡는다(2026-08-20 병렬 검토) — 이유는 위 오늘날짜() 주석에 한 번만 적는다.
+          //   같은 셈을 판마다 베껴 두면 한 곳만 고쳐진다(F4-10, 2026-09-02에 실제로 그랬다).
+          var 오늘 = 오늘날짜();
           var 지연인가 = function (m) { return String(m.scheduleDate || "") !== "" && String(m.scheduleDate) < 오늘 && m.status !== "approved"; };
           var 기한초과 = list.filter(지연인가).length;
           var 완료 = list.filter(function (m) { return m.status === "approved"; }).length;
@@ -428,6 +439,50 @@
 
     // ④ 검증 — 데이터가 없어도 **같은 모양**으로(2026-08-09 사용자 지시: 0이면 0으로 그린다)
     verify: [
+      // ✅ 검증 대기 — **④가 ③의 승인 판을 품는다**(2026-09-02 F4-05, 승인 시안 절차허브-마무리).
+      //   왜: ④ 검증 허브는 「고친 것이 닫혔는지 확인하는 자리」라 적혀 있는데, 실제 조치 검증
+      //   (검증 대기·재스캔)은 **전부 ③ 조치의 승인 화면에** 있었다. 담당자가 ④로 갔다가
+      //   아무것도 못 하고 돌아온다 — 정체성 문구와 실제 할 일이 어긋난 자리였다.
+      //   ⚠ **옮기지 않고 품는다.** 옮기면 ③의 숫자 원천이 사라지고 nav·시험·승인된 메뉴 시안이 함께 깨진다.
+      //   ⚠ scenario를 **새로 만들지 않고 재사용**한다 — 새 이름은 scenariochips 시험 둘을 깬다
+      //     (등록부 글자 대조 + 디스패치 왕복). 「조치 마감」은 area가 이미 ③조치→④검증이라 뜻도 맞는다.
+      //   ⚠ 숫자를 새로 세지 않는다 — ③ 판과 **같은 listApprovals() 한 원천**을 쓰고, 미배정 판정도
+      //     이 파일의 공용 헬퍼를 그대로 쓴다(「판정은 한 곳에서만」).
+      { id: "verifying", title: "✅ 검증 대기", page: "approvals.html?status=verifying", scenario: "조치 마감(시작→검증→확정)",
+        rows: function () {
+          return window.gijo.listApprovals().then(function (r) {
+            var rows = (r && r.reviews) || r || [];
+            var 대기 = rows.filter(function (x) { return x.status === "verifying"; });
+            return {
+              // ③ 판과 **같은 4열 규약**(무엇·어디·누구·언제/상태). 새 잣대를 만들지 않는다.
+              cols: ["조치 항목", "자산", "담당", "기한"],
+              grid: "1fr 110px 84px 74px",
+              rows: 대기.map(function (x) {
+                var fd = x.finding || {};
+                // ⚠ overdue는 건별 값이라 목록 칸에만 적는다. 「검증 대기 중 N건 지연」 같은
+                //   **묶음 숫자로 만들지 않는다** — 그건 아무 데도 없는 새 잣대다(설계 검토).
+                return [String(fd.finding_type || x.findingKey || "-"), String(x.assetName || x.assetId || "-"),
+                  미배정인가(x) ? "미배정" : (x.assignee || "-"), x.overdue ? "지연" : "-"];
+              }),
+            };
+          });
+        },
+        load: function () {
+          return window.gijo.listApprovals().then(function (r) {
+            var rows = (r && r.reviews) || r || [];
+            var 대기 = rows.filter(function (x) { return x.status === "verifying"; });
+            var 지연 = 대기.filter(function (x) { return !!x.overdue; }).length;
+            return {
+              // 배지는 **이 판이 실제로 보여 주는 것**(검증 대기 중 지연)만 말한다 — 목록과 같은 모집합이다.
+              badge: 지연 ? { text: "지연 " + n(지연), color: A } : null,
+              segments: [
+                { key: "verifying", label: "검증 대기", value: 대기.length, color: B },
+              ],
+              foot: "조치 전체 " + n(rows.length) + "건 중",
+            };
+          });
+        },
+      },
       // agents: scan(해석) — ROLE_CATEGORY.scan=["취약점","장비운영"](hybridsearch.ts:234) 근거.
       //   장비 점검 자료를 먼저 보는 역할이라 이 판의 주인이 맞다(검토관 하17 — 근거가 있는데
       //   빠뜨렸던 자리. 근거 없는 판에 다는 것만큼이나 있는 근거를 빠뜨리는 것도 들쭉날쭉이다).

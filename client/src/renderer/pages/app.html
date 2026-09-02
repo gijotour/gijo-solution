@@ -63,6 +63,17 @@
      ■ 접기(1+3의 「3」)는 **새 키**(gijo:proMenu:collapsed)다 — 표준의
        gijo:leftPanel:collapsed(LEFT_KEY)를 같이 쓰면 프로에서 접은 것이 표준 사이드바를
        접는다(설계 검토 [높음]). body 클래스가 --menu-w를 0으로 만들 뿐, 격자 규칙은 하나다. */
+  /* 🧭 프로 규칙 배너(F3-10) — 얇은 한 줄. 새 색을 만들지 않는다:
+     --blue-ink는 pro-white.css:129에 실재하고, 다크(표준 배색)에서도 읽히도록 폴백을 함께 준다
+     (이 저장소 관례 — agent.html 등이 같은 꼴을 쓴다). 배경은 리터럴 rgba라 색 감시 대상이 아니다. */
+  #proRule{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:7px 14px;font-size:12.5px;
+    background:rgba(29,79,145,.10);border-bottom:1px solid var(--border);}
+  #proRule .pr-t{font-weight:800;color:var(--blue-ink, #7db2f8);white-space:nowrap;}
+  #proRule .pr-s{color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #proRule button{margin-left:auto;flex:0 0 auto;background:transparent;border:0;cursor:pointer;
+    color:var(--muted);font-size:13px;line-height:1;padding:4px 6px;border-radius:6px;}
+  #proRule button:hover{color:var(--text-strong, #fff);background:rgba(255,255,255,.08);}
+  @media (prefers-reduced-motion: no-preference){#proRule{transition:opacity .18s ease;}}
   body.pro-shell .app{grid-template-columns:var(--menu-w, 200px) minmax(0,1fr);}
   /* nav.js injectCss가 #gijoNav에 sticky·100vh를 주입한다(단독 화면용) — 프로 격자는
      44px 상단바 아래라 100vh가 넘친다. !important 아닌 선언이라 특이도로 이긴다. */
@@ -104,6 +115,27 @@
   @keyframes rrflashred{0%{box-shadow:0 0 0 0 rgba(226,72,61,.55);}100%{box-shadow:0 0 0 8px rgba(226,72,61,0);}}
   #gijoRail .rr-item.training{border-color:rgba(139,124,240,.65);color:var(--purple,#8b7cf0);animation:rrtrain 1.5s ease-in-out infinite;}
   @keyframes rrtrain{0%,100%{box-shadow:0 0 0 0 rgba(139,124,240,.4);}50%{box-shadow:0 0 0 5px rgba(139,124,240,0);}}
+  /* ══ 상단바 정리 — 숨김(2026-09-02 사장님 지시 「삭제하자 … 지우지는 말고 숨겨줘」) ══
+     ⚠ **지우지 않고 숨긴다.** 지우면 걸리는 것이 많아서다 —
+       · 게시 관문(tools/publish-gate-ui.mjs:759)이 「#gijoRail .rr-item이 10개」를 센다.
+         숨김(display:none)은 DOM에 그대로 남으므로 관문이 계속 통과한다.
+       · wiringcontract 시험이 railroster.js 로드와 팀6+부품4 구성을 못박는다.
+       · railWork의 .gn-sessbadge는 nav.js가 「진행중 작업」 수를 써 넣는 자리다.
+     되살리려면 이 블록만 지우면 된다 — 코드는 한 줄도 안 없앴다.
+
+     ⚠ 숨김의 대가(정직하게): railWork을 숨기면 프로에서 **「진행중 작업」 수가 보이는 자리가 없다.**
+       배지 갱신 코드는 살아 있으나 사람 눈에 안 띈다. 2026-08-01에 「기한 지난 업무 6건이 어디에도
+       안 보이던」 사고가 있었으므로, 그 수를 어디서 보일지는 따로 정해야 한다(작업 내역 화면은
+       ☰ 전체 메뉴로 그대로 갈 수 있다). */
+  /* 🤖 AI 팀 로스터(팀6 🧭◣◎▣🛰📚 + 부품4 E·R·G·L) — 도는 것을 깜박임으로 보이려던 자리.
+     아이콘·약자만 있어 무엇인지 읽히지 않았다(이름 없는 조작). */
+  #gijoRail .rr-item,#gijoRail .rr-div{display:none!important;}
+  /* 🕘 작업 내역 — ☰ 전체 메뉴로도 갈 수 있어 상단바 자리를 따로 쓰지 않는다. */
+  #railWork{display:none!important;}
+  /* 🔍 화면 찾기 — 프로에서만 숨긴다. ☰(railMenu)이 **같은 겹판**을 열어 둘이 겹쳤다.
+     ⚠ 표준 셸에는 ☰가 없다 — 거기서는 이것이 유일한 찾기 단추라 그대로 둔다. */
+  body.pro-shell #gtbFind{display:none!important;}
+
   .rr-div{width:26px;height:1px;background:var(--border-strong);margin:7px 0;flex:0 0 auto;}
   body.pro-shell #gijoRail{display:flex;}
   #gijoRail button{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid transparent;
@@ -123,7 +155,10 @@
   /* 탭이 0개면 탭줄·「모두 닫기」가 가리킬 대상이 없다 — 자리만 차지한다. */
   body.chat-home .shellfoot{display:none;}
   /* ── 🏠 화면 + 대화 나란히(stage-on) — 셸 재구축 0-1, 2026-08-23 사장님 지시 ─────────
-     「내 문서가 메인 화면이 되고 여기에 +대화창+상단바」.
+     「(어떤) 화면이 메인이 되고 여기에 +대화창+상단바」.
+     ⚠ 그 「어떤 화면」이 무엇인가는 2026-09-02 사장님 결정으로 **대시보드**가 됐다
+       (첫 실행 분기는 아래 부팅 코드에 있다). 08-23에는 내 문서였다 — 나란히 서는 **틀**은
+       그대로이고 홈으로 무엇을 여는지만 바뀌었으니, 이 격자 설명은 유효하다.
 
      ■ 무엇이 바뀌었나 (그전: 「전면 화면」 2026-08-20)
        예전 stage-on은 **대화를 숨기고** 화면이 .work 전체를 먹었다. 대화와 화면이 번갈아
@@ -174,8 +209,19 @@
     -webkit-app-region:drag;}
   .topbar .spacer{flex:1 1 auto;}
   /* 창을 끄는 손잡이는 이제 이 줄뿐이다 — 그 안의 누르는 것들만 되돌린다
-     (안 되돌리면 단추가 안 눌리고 창만 끌린다). */
-  .topbar button,.topbar .gtb-acts,.topbar .gtb-sess,.topbar input,.topbar select{-webkit-app-region:no-drag;}
+     (안 되돌리면 단추가 안 눌리고 창만 끌린다).
+     ⚠ .gtb-userarea를 2026-09-02(여정 점검 F3-03)에 더했다. 프로 셸에서 계정 줄(.ua-row →
+       내 설정)과 ⬆ 업데이트 칩(.ua-upd)은 **div라서** 위 목록에 안 걸렸고, 상단바 drag 영역
+       안에 그대로 놓여 **눌러도 클릭이 아니라 창 끌기로 먹혔다** — 담당자 눈에는 「눌러도
+       아무 일 없는 자리」였다. 붙이는 곳은 titlebar.js mountUserArea 세 번째 갈래(.rail-foot).
+     ⚠ -webkit-app-region은 **상속되는 속성이 아니다** — 자식의 계산값은 none으로 남는다.
+       Chromium/Electron은 drag 사각형을 합치고 no-drag 사각형을 **빼서** 손잡이 영역을
+       만든다. 그래서 바깥 상자 하나만 no-drag로 선언해도 그 안에 든 .ua-row·.ua-upd가
+       통째로 손잡이에서 빠진다 — 자식마다 선언할 필요가 없는 이유가 이것이다.
+       ⚠ 그러므로 「자식의 getComputedStyle(...).webkitAppRegion이 no-drag인가」로 검증하면
+         안 된다(none이 나와 거짓 빨간불이 된다). .gtb-userarea **자신의** 계산값과
+         실제 클릭 동작으로 잰다. */
+  .topbar button,.topbar .gtb-acts,.topbar .gtb-sess,.topbar .gtb-userarea,.topbar input,.topbar select{-webkit-app-region:no-drag;}
   /* 조작 단추(⚙ ▣ 🔍 ← →)는 titlebar.js가 여기 맨 앞에 붙인다 */
   .topbar .gtb-acts{padding-bottom:0;}
 
@@ -392,6 +438,18 @@
        ⚠ 서버 연결상태 배지는 없앴다(2026-08-08 사용자 지시) — titlebar.js 정보채우기 참조. -->
   <div id="tbInfo"></div>
 </div>
+<!-- 🧭 프로 규칙 배너(2026-09-02 F3-10) — **한 번만** 보이고 닫으면 다시 안 나온다.
+     왜 화면이 아니라 셸에 두나: 이 문장은 특정 화면의 사용법이 아니라 **제품 전체의 사용 규칙**이다.
+     대화 홈 안에 넣으면 첫 화면이 대시보드가 된 지금(2026-09-02 결정) **아예 안 보인다.**
+     ⚠ 「화면에 설명을 쓰지 않는다」의 예외가 아니라 **그 규칙의 사례**다 — 사용법이 아니라
+       정체성 한 줄이고, 1회로 못박아 상시 자리를 안 먹는다.
+     ⚠ #shellTop **밖**이다(shelllayout 시험이 그 블록 구성을 못박는다). body 세로 flex의 자식이라
+       flex:0 0 auto가 없으면 눌린다. -->
+<div id="proRule" hidden>
+  <span class="pr-t">보는 일은 <b>화면</b>에서, 시키는 일은 <b>대화창</b>에서</span>
+  <span class="pr-s">메뉴를 처음 고르면 대화창이 오른쪽 손잡이로 접힙니다 — 손잡이를 누르면 다시 펴집니다.</span>
+  <button type="button" id="proRuleX" title="닫기 — 다시 보이지 않습니다">✕</button>
+</div>
 <div class="app">
   <div id="gijoNav"></div>
   <div class="work">
@@ -457,6 +515,26 @@
   var tabs = [];             // {page, label, el, frame, pinned}
   var active = null;
   var 외부맥락 = null; // 팝업 포커스 맥락 {page,label} — 「보고 있는 것이 맥락」(activeScreen이 우선 사용)
+  // 🗔 허브 무대 맥락 — 탭 주소별 {page,label} (F4-02, 2026-09-02).
+  //   허브(fix.html 등)는 탭 **하나**인데 그 안 무대는 판마다 다른 실화면(approvals.html…)이다.
+  //   셸이 탭 이름만 들고 있으면 ⓘ가 「허브 공통 안내」만 받아 승인·취약점 화면 전용 안내에는
+  //   영영 못 닿았다(screenguide.ts:400 공통문 vs 613 승인 전용문).
+  //   ⚠ 탭 주소를 열쇠로 둔다 — 다른 탭으로 옮기면 그 탭 것이 아니므로 저절로 안 쓰이게 된다.
+  //   ⚠ 탭 자체의 page는 **안 바꾼다**: 탭 저장·되짚기·nav.js TAB_REDIRECT가 그 값에 걸려 있다.
+  //   ⚠ 탭에 **보이는 이름**만 지금 무대 판 이름으로 갈아 준다(F4-08, 2026-09-02).
+  //     저장되는 label도 안 바꾼다 — 저장값까지 갈면 앱을 다시 열었을 때 「조치·승인」이라
+  //     적힌 탭에 허브의 첫 판(정기 점검)이 떠 **탭 이름이 거짓말을 한다.**
+  //     보이는 글자는 지금 무대를 따르고, 저장값은 탭의 정체를 지킨다 — 두 일을 갈라 둔다.
+  var 무대맥락 = {};
+  function 무대화면() { return active ? 무대맥락[active.page] : null; }
+  /** 탭줄에 **보여 줄** 이름 — 허브 탭이면 지금 무대에 올린 판 이름(F4-08).
+   *  판 제목 앞 그림글자는 뗀다(「✅ 조치·승인」→「조치·승인」) — 탭줄은 메뉴 라벨과 같은 결로 둔다.
+   *  무대 기억이 없으면(보통 화면) 탭 이름 그대로다. */
+  function 탭이름(t) {
+    var st = t && 무대맥락[t.page];
+    var 판 = st && st.label ? String(st.label).replace(/^[^0-9A-Za-z가-힣]+/, "").trim() : "";
+    return 판 || (t ? t.label : "");
+  }
 
   function save() {
     // 🚀 프로는 저장하지 않는다(검토관 #1, 2026-08-19) — 도킹 경로가 표준 탭 저장(gijo:tabs:v1)을
@@ -489,8 +567,11 @@
     //   maintenance·memory)은 그 자체가 다시 흡수된 화면이라, 복원 라벨(자산 목록·정기 점검·
     //   AI 지식)과 실제 도착 화면 이름이 어긋났다(이 표 바로 위 규칙을 표 스스로 어겼다).
     // assethub(옛 자산 통합 뷰)는 목록·관리를 쓰던 사람의 탭이라 ⓪ 자산 고르기가 아니라
-    //   관리 화면으로 — hub=1이 갈아타기 표(inventory→assets)의 유일한 예외 통로다(assets.html 관례).
-    "assethub.html": { page: "inventory.html?hub=1", label: "자산 관리" },
+    //   관리 화면으로 — full=1이 갈아타기 표(inventory→assets)의 예외 통로다(assets.html 관례).
+    //   ⚠ hub=1에서 full=1로 옮겼다(F4-09, 2026-09-02): hub=1로 두면 ① 되살린 옛 탭에만
+    //     「한눈에」 그림띠가 없고 ② 메뉴·KPI가 여는 주소와 갈려 **같은 화면이 탭 둘**이 된다.
+    //   이름은 위 정본 사슬 ①(메뉴 라벨)을 그대로 적는다.
+    "assethub.html": { page: "inventory.html?full=1", label: "자산 관리 (전체)" },
     "opsguide.html": { page: "fix.html?panel=maintenance", label: "정기 점검" },
     "ontology.html": { page: "aihub.html?panel=knowledge", label: "지식 창고" },
     "mywork.html": { page: "dashboard.html", label: "대시보드" },
@@ -604,14 +685,17 @@
     el.className = "tab" + (t.pinned ? " pinned" : "");
     // 고정은 더블클릭인데, 더블클릭은 화면에 흔적이 없어 아무도 모른다(사용자가 "탭 고정키는
     // 어떻게 쓰냐"고 물어 왔다 — 2026-07-28). 말로 적어 둔다.
-    el.title = t.label + "\n" + (t.pinned
+    // 🗔 보이는 이름은 지금 무대 판을 따른다(F4-08, 2026-09-02). 말풍선에는 「탭 › 지금 판」을
+    //    함께 적어, 이름이 바뀌어도 어느 탭에 있는지 잃지 않게 한다.
+    var 표시 = 탭이름(t);
+    el.title = (표시 === t.label ? t.label : t.label + " › " + 표시) + "\n" + (t.pinned
       ? "📌 고정됨 — 두 번 클릭하면 고정이 풀립니다"
       : "두 번 클릭하면 고정됩니다 (고정한 탭은 ✕와 「모두 닫기」로 닫히지 않습니다)");
     if (t === active) {
       var g = groupOf(t.page);
       if (g) { var gs = document.createElement("span"); gs.className = "tgrp"; gs.textContent = g + " ›"; el.appendChild(gs); }
     }
-    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = t.label;
+    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = 표시;
     el.appendChild(nm);
     if (t.pinned) { var p = document.createElement("span"); p.className = "pin"; p.textContent = "📌"; el.appendChild(p); }
     var x = document.createElement("span"); x.className = "x"; x.textContent = "✕"; x.title = "탭 닫기";
@@ -805,6 +889,7 @@
     var idx = tabs.indexOf(t);
     t.frame.remove();
     tabs.splice(idx, 1);
+    delete 무대맥락[t.page]; // 닫은 탭의 무대 기억도 함께 버린다 — 같은 주소로 다시 열 때 옛 판이 맥락이 되면 안 된다(F4-02)
     if (active === t) {
       active = tabs[Math.min(idx, tabs.length - 1)] || null;
       if (active) active.frame.classList.add("on");
@@ -924,6 +1009,12 @@
     // 외부(팝업) 맥락이 있으면 그것이 「보고 있는 화면」이다 — 콘솔 칩·지시 screen 인자의 원천.
     activeScreen: function () { return 외부맥락 ? 외부맥락.page : (active ? active.page : null); },
     activeLabel: function () { return 외부맥락 ? 외부맥락.label : (active ? active.label : null); },
+    // 🗔 허브 무대 화면 — **ⓘ 화면 안내 전용**이다(F4-02, 2026-09-02).
+    //   ⚠ activeScreen()을 갈아끼우지 않는다: 그 값은 「지금 어느 탭이냐」라는 **탭 정체성**이고
+    //     ① 절차 띠(console.js renderFlow가 서버 STAGE_SCREENS로 단계를 찾는다 — 허브 5개뿐이라
+    //        approvals.html이면 띠가 통째로 사라진다) ② 서버 stageOfScreen ③ tools/menu-sweep.mjs의
+    //        「누른 그 화면이 열렸나」 판정까지 함께 쓴다. 안내만 무대 화면을 보게 한다.
+    activeStage: function () { var st = 무대화면(); return st ? { page: st.page, label: st.label } : null; },
     foldConsole: function () { 대화접기(); },      // 💬 온디맨드(2026-08-31) — 대화창 머리 ⊮ 접기
     summonConsole: function () { 대화부르기(); },  // 손잡이·관문이 부른다
   };
@@ -995,6 +1086,29 @@
       //   파일명(쿼리 포함)이 그대로 떴다(2026-08-18 사장님 QA로 옛탭 표에서 한 번 고친 그 부류).
       //   open() 안에 이미 두 겹 폴백(화면이름찾기→읽을이름 「화면」)이 있으니 그 사슬에 맡긴다.
       open(page, d.label || known || undefined, { dock: true });
+      return;
+    }
+    // ①′ "허브 무대가 이 화면으로 바뀌었다"(F4-02, 2026-09-02).
+    //   허브가 판을 갈아 끼울 때마다 알려 온다 — 셸은 그 탭의 「지금 무대 화면」으로 기억만 하고,
+    //   탭 자체(page·label·저장값)는 건드리지 않는다.
+    //   ⚠ 값 재조립 — iframe이 보낸 문자열을 그대로 믿지 않는다(위 openTab과 **같은 잣대**).
+    //   ⚠ 어느 탭이 보냈는지 사슬을 걸어 찾는다: 안 보이는 탭의 허브도 살아 있어서, 그것을
+    //     활성 탭 것으로 도장 찍으면 안 보고 있는 화면이 지시 대상이 된다(활성탭안인가의 그 사고).
+    if (d.type === "gijo:hubStage") {
+      var 무대 = String(d.page || "");
+      if (!/^[\w.-]+\.html(\?[^\s"'<>`\\]*)?$/.test(무대)) return;
+      var 주인 = null;
+      for (var ti = 0; ti < tabs.length; ti++) {
+        if (tabs[ti].frame && 활성탭안인가(ev.source, tabs[ti].frame)) { 주인 = tabs[ti]; break; }
+      }
+      if (!주인) return;
+      무대맥락[주인.page] = { page: 무대, label: String(d.label || "").slice(0, 60) || null };
+      // 🗔 탭줄을 다시 그린다(F4-08, 2026-09-02) — 기억만 하고 안 그리면 판을 바꿔도 탭 이름은
+      //   처음 연 판에 머물러, 탭이 「내가 어디 있는지」를 잘못 말한다.
+      //   ⚠ redraw()는 save()를 부르지 않는다 — 저장된 탭 값(page·label)은 손대지 않는다.
+      redraw();
+      // 보고 있는 탭이면 대화창 맥락(ⓘ·지시의 screen 인자)에 곧바로 반영한다.
+      if (주인 === active && window.gijoConsoleSyncCtx) window.gijoConsoleSyncCtx();
       return;
     }
     // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.
@@ -1305,7 +1419,7 @@
     자리적용();
   });
   // 창 크기가 바뀌면 자동 모드에서만 따라간다.
-  window.addEventListener("resize", function () { if (자리모드() === "auto") 자리적용(); });
+  window.addEventListener("resize", function () { if (자리모드() === "auto") 자리적용(); 좁을때메뉴접기(); });
   자리적용();
 
   // ── 열린 창 목록 ─────────────────────────────────────────────────────
@@ -1416,15 +1530,28 @@
     // 🚀 프로는 저장 탭을 복원하지 않는다(2026-08-19 사용자 테스트 P1). 프로에서 open()은
     // 별도 창을 띄우므로, 표준 시절 탭 8개가 로그인 직후 **창 폭탄**으로 쏟아졌다.
     // 저장값(gijo:tabs:v1)은 건드리지 않는다 — 표준으로 돌아가면 그 탭들이 그대로 살아난다.
-    // 프로의 첫 화면은 대화 홈이고, 화면은 ☰(Ctrl+K)로 필요할 때 하나씩 연다.
+    // 🏠 프로의 첫 화면은 **대시보드**다 (2026-09-02 사장님 결정 「프로 첫 화면 대시보드로 하자」).
+    //   ↩ 그전 결정 둘을 이것이 대체한다 — 2026-08-23 「내 문서가 메인 화면」과 2026-08-31 승인
+    //     시안의 「첫 로그인은 대화창이 전면」. 여정 점검 F3-01이 「코드·주석·시험이 서로 다른 것을
+    //     말한다」고 짚었고, 그 물음에 대한 답이 이 줄이다.
+    // ⚠ **이 열기는 반드시 이 블록 안에 있어야 한다.** 2026-09-02 첫 구현은 아래 `else if (프로인가())`에
+    //   넣었는데, 이 블록이 먼저 return하므로 **프로에서는 영영 실행되지 않았다**(시안 제작 중 발견).
+    //   시험도 소스에 글자가 있는지만 봐서 초록이었다 — 「잰 것이 없는데 초록」의 전형이라,
+    //   wiringcontract 시험을 **return보다 앞에 있는지**까지 보도록 함께 고쳤다.
+    // ⚠ 새 상태를 만들지 않는다 — 탭 하나를 열어 고정할 뿐이다. 핀을 다는 이유는 「모두 닫기」가
+    //   홈을 지우면 프로에 돌아갈 자리가 없어지기 때문이다(핀은 이미 있는 장치다).
     if (프로인가()) {
       대화홈갱신(); redraw();
+      open("dashboard.html", "대시보드");
+      var 프로홈탭 = find("dashboard.html");
+      if (프로홈탭) 프로홈탭.pinned = true;
+      규칙배너();
       var wasPopped0 = "0";
       try { wasPopped0 = localStorage.getItem("gijo:console:popped") || "0"; } catch (e) {}
       if (wasPopped0 === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
       로그인선택_못한것알리기();
       프로레일();
-      끌개설치(); 대화폭복원(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
+      끌개설치(); 대화폭복원(); 좁을때메뉴접기(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
       return;
     }
     var st = null;
@@ -1439,17 +1566,9 @@
       var 활성 = (옛탭[String(st.active || "").split("?")[0]] || {}).page || st.active;
       if (활성 && find(활성)) show(활성);
       redraw();
-    } else if (프로인가()) {
-      // 🏠 프로의 홈은 **내 문서**다 (셸 재구축 0-1, 2026-08-23 사장님 지시
-      //   「내 문서가 대시보드 메인 화면이 되고 여기에 +대화창+상단바」).
-      // ⚠ 새 상태를 만들지 않는다 — 그냥 **탭 하나를 열어 고정**할 뿐이다. 그러면
-      //   tabs.length>0이라 stage-on이 걸리고, 위 CSS가 「화면 | 대화」 격자를 세운다.
-      // ⚠ pinned를 다는 이유: 「모두 닫기」가 홈을 지우면 프로에 돌아갈 자리가 없어진다.
-      //   핀은 이미 있는 장치다(복원 경로 1218행이 같은 필드를 쓴다) — 새로 만들지 않았다.
-      open("mydocs.html", "내 문서");
-      var 홈탭 = find("mydocs.html");
-      if (홈탭) 홈탭.pinned = true;
     } else {
+      // ⚠ 여기 「프로면 대시보드」 갈래를 두지 마라 — 프로는 위 블록에서 이미 return했다.
+      //   2026-09-02에 실제로 그렇게 넣었다가 죽은 코드가 됐다(위 주석 참고).
       open("dashboard.html", "대시보드"); // 표준은 예전 그대로 — 대시보드도 여러 탭 중 하나다
     }
     // 지난번에 콘솔을 창으로 빼놨으면 그대로 이어간다(모니터가 여럿인 담당자는 한 번만 빼면 된다).
@@ -1458,7 +1577,7 @@
     if (wasPopped === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
     로그인선택_못한것알리기();
     프로레일();
-    끌개설치(); 대화폭복원(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
+    끌개설치(); 대화폭복원(); 좁을때메뉴접기(); 대화온디맨드설치(); // 0-4 — 복원값도 클램프를 지난다(0폭 저장→관문 사망 방지)
   }
 
   // ── 🚀 프로 셸 — 레일과 「대화 홈」(2026-08-18 승인 시안) ────────────────────
@@ -1630,6 +1749,52 @@
 
   var CONSOLE_W_KEY = "gijo:console:w";
   var CONSOLE_W_DEFAULT = 380;
+  // ── F3-11 좁은 창 구제 — **화면 판 420px 약속을 지킨다**(승인 시안 프로셸-마무리) ─────────
+  // 산식(대화폭클램프)을 그대로 풀면: 최대 = max(360, work-420) · console = max(360, min(최대, px))
+  //   work >= 780 → console <= work-420 → 화면 판 >= 420  ✔ 약속이 지켜진다
+  //   work <  780 → 바닥 360이 이겨 console = 360 → 화면 판 = work-360 < 420  ✘ 위반
+  // ⇒ **문턱은 780(=420+360)**이다. ⚠ 시안이 적은 1004는 다른 잣대(팝업 스퀴즈 하한 644+380)를
+  //   옮겨 온 값이라 틀렸다(설계 검토에서 잡음) — 그 값으로 가면 **위반이 없는데도 메뉴를 접는다.**
+  // 잃어도 되는 것은 본문이 아니라 보조 크롬이다(WCAG 1.4.10 Reflow) — 그래서 **메뉴 판을 먼저** 접는다.
+  // ⚠ **저장하지 않는다** — 클래스만 켠다. 창을 다시 넓히면 사용자가 저장해 둔 상태로 돌아간다.
+  var 자동접힘중 = false;
+  function 좁을때메뉴접기() {
+    if (!프로인가()) return;
+    var work = document.querySelector(".work");
+    if (!work) return;
+    var 좁다 = work.clientWidth < 780;
+    if (좁다 && !document.body.classList.contains("pro-menu-closed")) {
+      document.body.classList.add("pro-menu-closed"); 자동접힘중 = true;
+    } else if (!좁다 && 자동접힘중) {
+      // 내가 접은 것만 되돌린다 — 사용자가 손으로 접어 둔 것은 건드리지 않는다.
+      var 저장접힘 = "0";
+      try { 저장접힘 = localStorage.getItem(PRO_MENU_KEY) || "0"; } catch (e) { }
+      if (저장접힘 !== "1") document.body.classList.remove("pro-menu-closed");
+      자동접힘중 = false;
+    }
+    // ⚠ 접은 **뒤에** 다시 잰다 — --menu-w가 0이 되며 work이 200px 늘어나므로,
+    //   접기 전 값으로 클램프하면 화면 판이 420이 안 나온다.
+    var 현재 = parseInt(getComputedStyle(work).getPropertyValue("--console-w"), 10);
+    if (현재 && isFinite(현재)) 대화폭적용(현재, false);
+  }
+
+  // 🧭 F3-10 — 규칙 한 줄을 **한 번만** 보인다. 닫으면 저장하고 다시 안 그린다.
+  var RULE_KEY = "gijo:proRule:seen";
+  function 규칙배너() {
+    if (!프로인가()) return;
+    var el = document.getElementById("proRule");
+    if (!el) return;
+    var 봤나 = "0";
+    try { 봤나 = localStorage.getItem(RULE_KEY) || "0"; } catch (e) { }
+    if (봤나 === "1") return;                    // 이미 닫았다 — 다시 안 그린다
+    el.hidden = false;
+    var x = document.getElementById("proRuleX");
+    if (x) x.addEventListener("click", function () {
+      el.hidden = true;
+      try { localStorage.setItem(RULE_KEY, "1"); } catch (e) { }
+    });
+  }
+
   function 대화폭클램프(px) {
     var work = document.querySelector(".work");
     var 최대 = Math.max(360, (work ? work.clientWidth : 1920) - 420); // 화면 판 최소 420 보장
@@ -1703,6 +1868,7 @@
     if (저장) { try { localStorage.setItem(CONSOLE_FOLD_KEY, 접힘 ? "1" : "0"); } catch (e) { } }
   }
   function 대화부르기() {
+    좁을때메뉴접기(); // F3-11 — 손잡이로 대화창을 부를 때가 폭이 실제로 눌리는 순간이다
     if (!대화접힘상태()) return;
     대화접힘적용(false, true);
     // 접힌 동안 온 것을 바로 보인다 — 최신(맨 아래)으로(시안: 열면 그 자리로 스크롤).
@@ -1736,18 +1902,67 @@
   // ⚠ 로그인 화면은 곧 사라지므로 거기서 띄우면 아무도 못 읽는다 — 그래서 담아 두고 여기서 꺼낸다.
   //   ⚠ **꺼낸 뒤에는 지운다.** 안 지우면 다음 로그인마다 옛 실패가 다시 뜬다.
   //   안 알리고 넘어가면 담당자는 「프로로 골랐으니 프로겠지」라고 믿는다 — 그게 제일 나쁘다.
+  // 복구 코드로 로그인했으면 **남은 개수**를 한 번 알린다(F2-10).
+  // ⚠ 값을 적는 곳은 login.html의 2차 인증 성공 자리 하나뿐이고, 읽는 곳은 여기 하나다.
+  //   예전엔 적기만 하고 읽는 곳이 없어, 「알려야 한다」는 주석만 남고 아무도 못 들었다.
+  // ⚠ 순서가 **읽고 → 띄우고 → 지운다**여야 한다. 먼저 지우면 띄우다 터졌을 때 키가 이미
+  //   사라져 알림이 영영 안 뜬다.
+  // ⚠ 빈 값("")은 「서버가 개수를 안 알려 줬다」는 뜻이다 — 0으로 바꿔 보이지 않는다(조용한 폴백 금지).
+  function 복구코드_남은개수알리기() {
+    var 값 = null;
+    try { 값 = localStorage.getItem("gijo:recoveryRemaining"); } catch (e) { return; }
+    if (값 === null) return;
+    var 남은 = /^\d+$/.test(String(값).trim()) ? Number(String(값).trim()) : null;
+    var 본문 = 남은 === null
+      ? "복구 코드로 로그인했습니다.\n\n남은 코드가 몇 개인지는 이 화면에서 알 수 없습니다 — ⚙ 설정 › 내 설정 › 2차 인증에서 확인하세요."
+      : 남은 === 0
+        ? "⚠ 복구 코드로 로그인했습니다 — 남은 복구 코드가 0개입니다.\n\n다음에 휴대폰을 못 쓰면 관리자에게 2차 인증 해제를 요청해야 합니다. ⚙ 설정 › 내 설정 › 2차 인증에서 복구 코드를 지금 다시 만들어 두세요."
+        : "복구 코드로 로그인했습니다 — 남은 복구 코드 " + 남은 + "개.\n\n휴대폰을 다시 쓸 수 있으면 ⚙ 설정 › 내 설정 › 2차 인증에서 다시 등록하고, 아니면 복구 코드를 다시 만들어 두세요.";
+    try {
+      gijoTell(본문).then(지우기, 지우기);
+    } catch (e) { /* 대화상자를 못 띄웠으면 키를 남긴다 — 다음 실행에 다시 알린다 */ }
+    // 띄운 **뒤에** 지운다(위 ⚠). 함수 선언이라 위에서 불러도 된다.
+    function 지우기() { try { localStorage.removeItem("gijo:recoveryRemaining"); } catch (e) {} }
+  }
+
   function 로그인선택_못한것알리기() {
     var 못한것 = null;
     try {
       var raw = localStorage.getItem("gijo:loginChoiceFailed");
-      if (!raw) return;
-      localStorage.removeItem("gijo:loginChoiceFailed");
+      if (!raw) { 복구코드_남은개수알리기(); return; }
       못한것 = JSON.parse(raw);
-    } catch (e) { return; }
-    if (!못한것 || !못한것.length) return;
-    gijoTell("로그인 화면에서 고른 것 중 " + 못한것.length + "가지가 적용되지 않았습니다.\n\n" +
+    } catch (e) {
+      // 값이 깨졌으면 지운다 — 안 지우면 부팅마다 같은 것을 다시 읽다 영영 못 넘어간다.
+      try { localStorage.removeItem("gijo:loginChoiceFailed"); } catch (e2) {}
+      복구코드_남은개수알리기(); // ⚠ 빠져나가는 **모든** 길에서 이어 준다(F2-10) — 아래 참조.
+      return;
+    }
+    // ⚠ 복구 코드 안내는 이 함수의 **모든 출구**에서 이어져야 한다. 한 갈래라도 빠뜨리면
+    //   「어떤 날은 뜨고 어떤 날은 안 뜨는」 알림이 된다 — 담당자는 그것을 못 믿게 된다.
+    //   (대화상자는 한 번에 하나만 뜨므로 앞의 알림이 있으면 그 뒤에 잇는다.)
+    if (!못한것 || !못한것.length) {
+      try { localStorage.removeItem("gijo:loginChoiceFailed"); } catch (e) {}
+      복구코드_남은개수알리기();
+      return;
+    }
+    // ⚠ gijoTell이 아직 없으면 예전엔 여기서 ReferenceError가 나 **뒤따르는**
+    //   프로레일()·끌개설치()·대화폭복원()·대화온디맨드설치()가 통째로 건너뛰어졌다(F3-09).
+    //   이제 dialog.js를 정적으로 싣지만, 부팅 순서가 또 바뀌어도 조용히 죽지 않게 방어를 남긴다.
+    //   ⚠ 없을 때는 **키를 지우지 않는다** — 지우면 알림이 영영 사라진다. 다음 실행에 다시 알린다.
+    if (typeof window.gijoTell !== "function") {
+      console.warn("[셸] dialog.js가 아직 없어 로그인 선택 실패 알림을 미룹니다 — 다음 실행에 다시 알립니다.");
+      return;
+    }
+    // ⚠ 제목이 「오류」로 읽히지 않게 한다(F8-10). 로그인은 성공했고 못 한 것은 부가 선택인데,
+    //   첫 화면 첫 문장이 「오류」면 담당자는 자기가 뭘 잘못했다고 여긴다.
+    //   ⚠ 「관리자 권한이 필요합니다」로 뭉뚱그리지 않는다 — 원격 GPU 주소가 없어서인 경우도 있다.
+    // ⚠ 대화상자는 한 번에 하나만 뜬다(dialog.js) — 그래서 복구 코드 안내(F2-10)를 뒤에 잇는다.
+    gijoTell("로그인은 정상입니다. 다만 로그인 화면에서 고른 것 중 " + 못한것.length + "가지는 아직 적용되지 않았습니다.\n\n" +
       못한것.map(function (s) { return "· " + s; }).join("\n") +
-      "\n\n나머지는 그대로 로그인됐습니다. 위 항목은 설정에서 다시 정할 수 있습니다.");
+      "\n\n나머지는 그대로 적용됐습니다. 위 항목은 ⚙ 설정에서 다시 정할 수 있습니다.")
+      .then(복구코드_남은개수알리기, 복구코드_남은개수알리기);
+    // ⚠ **띄운 뒤에 지운다.** 지우고 띄우다 터지면 이 알림이 영영 사라진다(2026-09-02 F3-09).
+    try { localStorage.removeItem("gijo:loginChoiceFailed"); } catch (e) {}
   }
   // 🚀 팝업 창이 보낸 gijo:*(select·scope·openTab)를 받아 **자기 window에 재주입**한다(2026-08-19).
   //   기존 message 리스너가 그대로 처리하므로 처리 코드를 복제하지 않는다 —
@@ -1761,6 +1976,14 @@
   else boot();
 })();
 </script>
+<!-- ⚠ dialog.js를 **정적으로** 싣는다(2026-09-02 F3-09).
+     셸의 인라인 boot는 DOMContentLoaded 리스너를 nav.js보다 **먼저 등록해 먼저 돈다** —
+     그 boot 안 로그인선택_못한것알리기()가 gijoTell을 부르는데, nav.js의 loadDialog()는
+     아직 돌기 전이라 gijoTell이 없었다. ReferenceError 한 번에 뒤따르는
+     프로레일()·끌개설치()·대화폭복원()·대화온디맨드설치()가 통째로 건너뛰어져
+     상단 ☰·🕘·🗔·💬·‖가 눌러도 안 먹는 셸이 됐다(오류는 콘솔에만 남는다).
+     이중 로드는 안전하다 — dialog.js 첫 줄이 `if (window.gijoAsk) return;`이다. -->
+<script src="dialog.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>

@@ -16,6 +16,9 @@ import { isRealVulnerability, isActiveVuln } from "./agenttools";
 import { listFindingReviews } from "./approvals";
 import { listTargets, listRuns } from "./hardeningtargets";
 import { reportActivity } from "./report";
+// 「오늘」은 **여기 한 곳**에서 만든다(util/date.ts) — toISOString()은 UTC라 한국에서는
+// 오전 9시 전까지 「어제」로 잡혀 다른 엔진(approvals·kpi·briefing…)과 하루가 어긋난다.
+import { todayLocal, dateOnlyLocal } from "../util/date";
 
 /**
  * 화면 → 절차 단계. **여기가 단 하나의 출처다.**
@@ -54,6 +57,12 @@ export interface WorkflowStage {
   label: string;
   /** 이 단계의 대표 숫자. 못 구하면 null — 화면은 빈칸으로 그린다. */
   count: number | null;
+  /**
+   * 그 숫자가 **무엇을 센 것인지**(2026-09-02 F4-03). 화면이 숫자 뒤에 작게 붙인다.
+   * ⚠ 반드시 **실제로 세는 것과 같은 말**이어야 한다 — 아래 계산부를 고치면 여기도 고친다.
+   *   이름이 숫자와 어긋나면 숫자만 있을 때보다 나쁘다(담당자가 틀린 뜻으로 읽는다).
+   */
+  countLabel: string;
   /** 눈길을 끌어야 하는 값(지연·KEV 등). 0이면 화면이 죽여서 그린다. */
   alert: number | null;
   alertLabel: string;
@@ -67,9 +76,19 @@ export interface WorkflowStage {
 export function workflowStages(): WorkflowStage[] {
   const assets = listAssets();
 
-  // ① 발견 — 우리가 아는 자산과 오늘 새로 들어온 것.
-  const 오늘 = new Date().toISOString().slice(0, 10);
-  const 오늘신규 = assets.filter((a) => String(a.lastScannedAt ?? "").slice(0, 10) === 오늘).length;
+  // ① 발견 — 우리가 아는 자산과 오늘 스캔에 잡힌 것.
+  //
+  // ⚠ **상시 거짓 0이었다**(F4-10, 2026-09-02 수정). lastScannedAt은 epoch **밀리초 숫자**다
+  //   (assets.ts:154 · recordFindings가 Date.now()로 넣는다). 옛 코드는 그것을 문자열로 바꿔
+  //   앞 10글자를 날짜와 견줬는데, 그 앞 10글자는 "1788315755" 같은 숫자라 **어떤 날짜와도
+  //   같아질 수 없다** — 시각과 무관하게 늘 0이 나갔다. 이 파일 머리의 「0으로 채우면 없다는
+  //   뜻이 되어 거짓이다」를 정작 이 줄이 어기고 있었다.
+  // ⚠ 라벨을 「오늘 신규」에서 **「오늘 스캔」**으로 바꾼 이유(아래 128행): ① 이 숫자는 새로
+  //   등록된 자산이 아니라 **오늘 스캔에 잡힌 자산**이다(오래된 자산도 오늘 스캔되면 들어온다).
+  //   ② datacard.ts:250에 **이름이 똑같은 「오늘 신규」**가 따로 있고 그쪽은 자산이 아니라
+  //   **이벤트**를 센다 — 같은 이름이 한 화면에서 다른 숫자를 가리키면 담당자는 둘 다 못 믿는다.
+  const 오늘 = todayLocal();
+  const 오늘신규 = assets.filter((a) => a.lastScannedAt != null && dateOnlyLocal(new Date(a.lastScannedAt)) === 오늘).length;
 
   // ② 우선순위 — **활성 진짜 취약점만** 센다. KEV는 "지금 악용 중"이라 따로 띄운다.
   // ⚠ 잣대는 판·자산 요약과 같은 isActiveVuln 하나다(2026-08-21 통일). 여기만 isReal로 세면
@@ -125,14 +144,14 @@ export function workflowStages(): WorkflowStage[] {
   // ⚠ page는 **STAGE_SCREENS의 그 단계 안에 있는 화면**이어야 한다 — 아니면 띠에서 눌러
   //   도착한 순간 띠가 다른 단계를 가리킨다. workflow.test.ts가 대조해 막는다.
   return [
-    { no: 1, key: "find", label: "발견·수집", count: assets.length, alert: 오늘신규, alertLabel: "오늘 신규", page: "discover.html", screens: STAGE_SCREENS[1] },
-    { no: 2, key: "triage", label: "우선순위", count: 취약, alert: kev, alertLabel: "실제 악용(KEV)", page: "triage.html", screens: STAGE_SCREENS[2] },
-    { no: 3, key: "fix", label: "조치", count: 진행, alert: 미배정, alertLabel: "미배정", page: "fix.html", screens: STAGE_SCREENS[3] },
-    { no: 4, key: "verify", label: "검증", count: 실패항목, alert: 미확인, alertLabel: "미점검 대상", page: "verify.html", screens: STAGE_SCREENS[4] },
+    { no: 1, key: "find", label: "발견·수집", count: assets.length, countLabel: "자산", alert: 오늘신규, alertLabel: "오늘 스캔", page: "discover.html", screens: STAGE_SCREENS[1] },
+    { no: 2, key: "triage", label: "우선순위", count: 취약, countLabel: "미조치 취약점", alert: kev, alertLabel: "실제 악용(KEV)", page: "triage.html", screens: STAGE_SCREENS[2] },
+    { no: 3, key: "fix", label: "조치", count: 진행, countLabel: "진행 중", alert: 미배정, alertLabel: "미배정", page: "fix.html", screens: STAGE_SCREENS[3] },
+    { no: 4, key: "verify", label: "검증", count: 실패항목, countLabel: "실패 항목", alert: 미확인, alertLabel: "미점검 대상", page: "verify.html", screens: STAGE_SCREENS[4] },
     // ⑤ 보고 — 이번 주 쓴 보고서 수와 마지막 보고 후 지난 날수(2026-08-02 규칙 확정).
     //    ⚠ 한동안 비워 뒀던 칸이다. 다섯 칸 중 하나가 늘 비어 있으면 담당자는 고장으로 읽는다.
     //    ⚠ 못 읽으면 여전히 **비운다** — 0으로 채우면 "안 썼다"가 되어 거짓이다.
-    { no: 5, key: "report", label: "보고", count: 보고?.thisWeek ?? null, alert: 보고?.daysSinceLast ?? null, alertLabel: 보고?.daysSinceLast == null ? "" : "마지막 보고 후(일)", page: "reporting.html", screens: STAGE_SCREENS[5] },
+    { no: 5, key: "report", label: "보고", count: 보고?.thisWeek ?? null, countLabel: "이번 주 보고서", alert: 보고?.daysSinceLast ?? null, alertLabel: 보고?.daysSinceLast == null ? "" : "마지막 보고 후(일)", page: "reporting.html", screens: STAGE_SCREENS[5] },
   ];
 }
 

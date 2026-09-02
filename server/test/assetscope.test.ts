@@ -129,7 +129,17 @@ describe("★ 갈아타기 — 「전체 관리 열기」가 영영 되돌지 �
     // 2026-08-31 5그룹 재편: 메뉴의 「자산 관리 (전체)」는 full=1을 쓴다 — hub=1을 쓰면
     // 허브 무대 표시 계약(#vizStrip 숨김)까지 물려받아 메뉴로 연 전체 화면에서 띠가 사라진다.
     expect(nav, "갈아타기 예외(hub=1·full=1)가 사라졌다").toMatch(/if \(!\/\[\?&\]\(\?:hub\|full\)=1\/\.test\(location\.search\)\)/);
-    expect(화면, "전체 관리 열기가 hub=1 없이 연다 — 영영 못 간다").toContain('page: "inventory.html?hub=1"');
+    // ⚠ 글자 대조가 아니라 **뜻**으로 잰다(F4-09, 2026-09-02). 「hub=1이어야 한다」고 못 박아
+    //   두었더니, 그림띠를 살리려 full=1로 옮기는 **정당한 수리가 빨간불**이 됐다.
+    //   규칙은 「예외 표식(hub=1 또는 full=1)이 있어야 한다」이지 특정 글자가 아니다.
+    const 전체열기 = /page: "(inventory\.html\?[^"]+)"/.exec(화면)?.[1];
+    expect(전체열기, "「전체 관리 열기」가 inventory로 여는 자리가 사라졌다").toBeTruthy();
+    expect(/[?&](?:hub|full)=1/.test(전체열기!), "전체 관리 열기가 예외 표식 없이 연다 — 영영 못 간다").toBe(true);
+    // 그림띠 계약: **전체 탭으로 여는 통로**는 hub=1을 쓰면 안 된다(#vizStrip이 숨는다).
+    const KPI = 읽기("../../client/src/renderer/pages/kpi.html");
+    expect(전체열기, "hub=1로 열면 자산 화면의 「한눈에」 띠가 사라진다").not.toContain("hub=1");
+    expect(KPI, "KPI 타일·상세 링크가 hub=1로 열어 「한눈에」 띠가 사라진다").not.toContain("inventory.html?hub=1");
+    expect(셸, "옛 탭 복원(assethub)이 hub=1로 열어 「한눈에」 띠가 사라진다").not.toContain("inventory.html?hub=1");
     expect(nav, "메뉴의 자산 관리가 full=1 없이 걸렸다 — 조용히 ⓪ 자산 고르기로 갈아탄다").toContain('page: "inventory.html?full=1"');
   });
 

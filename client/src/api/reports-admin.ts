@@ -274,6 +274,9 @@ export interface ClientReleaseInfo {
 export interface ClientUpdateCheckResult {
   latest: ClientReleaseInfo | null;
   updateAvailable: boolean;
+  /** 확인 자체가 실패한 이유 — 있으면 「최신 버전입니다」라고 말하면 안 된다(2026-09-02 F6-03).
+   *  main.ts의 update:check가 채운다(서버 응답에는 없는 필드다). */
+  error?: "unauthorized" | "unreachable" | "server";
 }
 export interface ClientReleaseFull {
   version: string;

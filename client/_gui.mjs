@@ -11,7 +11,7 @@ if (await p.evaluate(()=>!!document.querySelector("#username,input[name=username
     u.value="claude-deploy"; q.value=pw;
     u.dispatchEvent(new Event("input",{bubbles:true})); q.dispatchEvent(new Event("input",{bubbles:true}));
     (document.querySelector("#loginBtn,button[type=submit],.login-btn")||{click(){}}).click();
-  },"GijoDeploy2026");
+  },process.env.GIJO_ADMIN_PASSWORD);  // 평문 금지 — 환경변수에서 읽는다(CLAUDE.md · repo에 비번 기록 금지)
   await p.waitForTimeout(6000);
 }
 console.log("화면:", p.url().split("/").pop());

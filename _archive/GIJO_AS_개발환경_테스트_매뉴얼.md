@@ -31,7 +31,7 @@
 
 **계정·주소 메모**
 - SSH: `ssh user@10.8.0.1` (키 등록됨 — 비번 불필요)
-- 제품 로그인(내 테스트용): `claude-deploy` / `GijoDeploy2026` (양쪽 서버 DB에 존재)
+- 제품 로그인(내 테스트용): `claude-deploy` — 비번은 Windows 사용자 환경변수 `GIJO_ADMIN_PASSWORD` (repo에 평문 금지 · CLAUDE.md). 양쪽 서버 DB에 존재.
 - 운영 서버: `http://10.8.0.1:4000` (또는 Windows에서 localhost:4000) · Mac 서버: `http://10.8.0.11:4000`
 
 ---

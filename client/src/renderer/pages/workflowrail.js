@@ -44,7 +44,9 @@
       // 0인 경고는 죽여서 — 색이 흔하면 위험 신호가 안 보인다.
       ".gjr-s .v .al{color:var(--rail-alert,#f5928a);font-weight:800;}" +
       ".gjr-s .v .al0{color:var(--muted-2,#a49d95);font-weight:600;}" +
-      ".gjr-s .v .none{color:var(--muted-2,#a49d95);opacity:.6;}";
+      ".gjr-s .v .none{color:var(--muted-2,#a49d95);opacity:.6;}" +
+      // 단위 이름 — 숫자보다 작고 죽여서. 새 색을 만들지 않는다(이미 쓰는 --muted-2).
+      ".gjr-s .v .cl{font-size:11px;color:var(--muted-2,#a49d95);font-weight:700;margin-left:2px;}";
     document.head.appendChild(st);
   }
 
@@ -58,10 +60,16 @@
       var el = document.createElement("div");
       el.className = "gjr-s" + (s.no === 여기 ? " on" : "");
       el.title = s.label + " 단계로 이동";
+      // ⚠ 2026-09-02(F4-03) 큰 숫자에 **이름**을 붙인다 — 지금까지는 숫자만 찍혀 무엇을 센 건지
+      //   알 수 없었다(승인 시안 mockups/menu-workflow의 「57 자산」 표기를 되살린 것이다).
+      //   이름은 서버가 준다(workflow.ts countLabel) — 화면이 제 지도를 들면 계산부를 고칠 때 어긋난다.
+      //   ⚠ **없으면 안 그린다.** 옛 서버(필드 없음)에 붙어도 숫자는 그대로 나온다.
+      //   세로 높이 증가 0px — 같은 `.v` 줄 안에 들어간다.
+      var 이름 = s.countLabel ? ' <span class="cl">' + s.countLabel + "</span>" : "";
       var 값 =
         s.count == null
           ? '<span class="none">—</span>'   // 못 구한 값은 비운다(지어내지 않는다)
-          : "<b>" + s.count + "</b>";
+          : "<b>" + s.count + "</b>" + 이름;
       var 경고 =
         s.alert == null || !s.alertLabel
           ? ""

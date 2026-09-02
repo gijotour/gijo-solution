@@ -8,7 +8,7 @@ import type { Request, Response, NextFunction, Express } from "express";
 import * as crypto from "crypto";
 import * as jwt from "jsonwebtoken";
 import * as bcrypt from "bcryptjs";
-import { findUserByUsername, findUserById, GijoUser } from "./users";
+import { findUserByUsername, findUserById, GijoUser, MIN_PASSWORD_LEN } from "./users";
 import { recordAudit } from "../engine/audit";
 import { isMfaEnabled, verifyLoginCode, consumeRecoveryCode, mfaRequiredForAdmin } from "./mfa";
 
@@ -73,7 +73,10 @@ function loginLockRemaining(key: string): number {
   if (Date.now() - a.firstAt > LOGIN_WINDOW_MS) loginAttempts.delete(key);
   return 0;
 }
-function recordLoginFail(key: string): void {
+// 실패를 한 번 세고 **남은 횟수**를 돌려준다(F8-09) — 0이면 방금 잠긴 것이다.
+// ⚠ 돌려주게 바꾼 이유: 담당자는 열 번째에 갑자기 잠기는 걸 몰랐다. 몇 번 남았는지는
+//   여기서만 알 수 있고(임계는 env로 바뀐다), 화면이 제 숫자를 따로 갖게 두지 않는다.
+function recordLoginFail(key: string): number {
   const now = Date.now();
   const a = loginAttempts.get(key) ?? { fails: 0, firstAt: now, lockedUntil: 0 };
   if (now - a.firstAt > LOGIN_WINDOW_MS) {
@@ -83,6 +86,13 @@ function recordLoginFail(key: string): void {
   a.fails += 1;
   if (a.fails >= LOGIN_MAX_FAILS) a.lockedUntil = now + LOGIN_WINDOW_MS;
   loginAttempts.set(key, a);
+  return Math.max(0, LOGIN_MAX_FAILS - a.fails);
+}
+
+// 잠기면 몇 분인가 — 화면이 「15분」을 제 손으로 적지 않게 **서버가 숫자를 만든다**(F8-09).
+//   위 429가 만드는 것은 「남은 잠금 시간」이고 이건 「잠금 길이」다 — 다른 값이라 따로 둔다.
+function 잠금길이분(): number {
+  return Math.ceil(LOGIN_WINDOW_MS / 60000);
 }
 
 export interface TokenPair {
@@ -277,13 +287,42 @@ export function registerAuthRoutes(app: Express): void {
     }
     const user = findUserByUsername(username);
     if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
-      recordLoginFail(key);
-      res.status(401).json({ error: "invalid credentials" });
+      const 남은 = recordLoginFail(key);
+      // ⚠ 영문 날것을 담당자에게 보이지 않는다 — error는 기계가 읽는 코드, message가 사람 말이다.
+      // ⚠ 남은 횟수는 **5회 이하로 줄었을 때만** 경고한다(F8-09). 매번 숫자를 주면 없는
+      //   아이디에도 잠금 정책이 그대로 새어 나간다(폐쇄망 전제로 이 정도만 연다).
+      res.status(401).json({
+        error: "invalid_credentials",
+        message:
+          남은 === 0
+            ? `아이디 또는 비밀번호가 맞지 않습니다. 시도가 너무 많아 ${잠금길이분()}분 동안 잠겼습니다.`
+            : 남은 <= 5
+              ? `아이디 또는 비밀번호가 맞지 않습니다. ${남은}회 더 틀리면 ${잠금길이분()}분 동안 잠깁니다.`
+              : "아이디 또는 비밀번호가 맞지 않습니다.",
+        remaining: 남은,
+      });
       return;
     }
     // 중복로그인 방지: 이미 다른 곳에서 로그인 중이면 강제 확인 없이는 새 세션을 내주지 않는다.
-    if (findActiveSession(user.id) && !force) {
-      res.status(409).json({ error: "already_logged_in", message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?" });
+    // ⚠ findActiveSession은 **토큰 문자열**을 돌려준다(기록이 아니다) — 기록은 한 번 더 꺼낸다.
+    //   처음에 이 반환값을 기록으로 착각했다가 적용 전에 잡았다(이 저장소의 「필드명 오인」 부류).
+    const 살아있는토큰 = findActiveSession(user.id);
+    const 살아있는세션 = 살아있는토큰 ? refreshTokens.get(살아있는토큰) : undefined;
+    if (살아있는세션 && !force) {
+      // ⚠ 2026-09-02(F2-07 승인 시안): **어디서·언제**를 함께 준다. 예전엔 「이미 다른 곳에서
+      //   로그인 중입니다」만 보내서, 담당자는 그것이 **자기가 아까 쓰던 자리인지 남인지** 알 수 없었다.
+      //   보안 제품에서 그 구분은 「강제로 밀고 들어갈까」를 정하는 근거다.
+      //   ⚠ **새 컬럼을 만들지 않았다** — 세션 기록이 이미 ip·since·lastSeenAt을 들고 있고,
+      //     팀 사무실 창이 같은 값을 이미 사람에게 보여 준다(같은 것을 두 번 세지 않는다).
+      res.status(409).json({
+        error: "already_logged_in",
+        message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?",
+        기존접속: {
+          ip: 살아있는세션.ip ?? null,
+          since: 살아있는세션.since ?? null,
+          lastSeenAt: 살아있는세션.lastSeenAt ?? null,
+        },
+      });
       return;
     }
     // ── 2차 인증 ─────────────────────────────────────────────────────────────
@@ -383,8 +422,25 @@ export function registerAuthRoutes(app: Express): void {
 
     // 비밀번호 단계와 코드 단계 사이에 다른 곳에서 로그인했을 수 있다 — 다시 확인한다.
     const force = payload.force === true;
-    if (findActiveSession(user.id) && !force) {
-      res.status(409).json({ error: "already_logged_in", message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?" });
+    // ⚠ findActiveSession은 **토큰 문자열**을 돌려준다(기록이 아니다) — 기록은 한 번 더 꺼낸다.
+    //   처음에 이 반환값을 기록으로 착각했다가 적용 전에 잡았다(이 저장소의 「필드명 오인」 부류).
+    const 살아있는토큰 = findActiveSession(user.id);
+    const 살아있는세션 = 살아있는토큰 ? refreshTokens.get(살아있는토큰) : undefined;
+    if (살아있는세션 && !force) {
+      // ⚠ 2026-09-02(F2-07 승인 시안): **어디서·언제**를 함께 준다. 예전엔 「이미 다른 곳에서
+      //   로그인 중입니다」만 보내서, 담당자는 그것이 **자기가 아까 쓰던 자리인지 남인지** 알 수 없었다.
+      //   보안 제품에서 그 구분은 「강제로 밀고 들어갈까」를 정하는 근거다.
+      //   ⚠ **새 컬럼을 만들지 않았다** — 세션 기록이 이미 ip·since·lastSeenAt을 들고 있고,
+      //     팀 사무실 창이 같은 값을 이미 사람에게 보여 준다(같은 것을 두 번 세지 않는다).
+      res.status(409).json({
+        error: "already_logged_in",
+        message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?",
+        기존접속: {
+          ip: 살아있는세션.ip ?? null,
+          since: 살아있는세션.since ?? null,
+          lastSeenAt: 살아있는세션.lastSeenAt ?? null,
+        },
+      });
       return;
     }
     const tokens = issueTokenPair(user.id, { ip: req.ip ?? undefined });
@@ -405,12 +461,15 @@ export function registerAuthRoutes(app: Express): void {
     const { refreshToken } = req.body as { refreshToken?: string };
     const record = refreshToken ? refreshTokens.get(refreshToken) : undefined;
     if (!refreshToken || !record) {
-      res.status(401).json({ error: "invalid refresh token" });
+      // ⚠ 사유 문장은 **서버가 만든다**(2026-09-02 F8-06·F3-06). message가 없으면 클라이언트가
+      //   error 코드를 그대로 앞세워 담당자 화면에 「invalid refresh token」이 찍힌다.
+      res.status(401).json({ error: "invalid refresh token", message: "로그인 정보가 더 이상 유효하지 않습니다. 다시 로그인해 주세요." });
       return;
     }
     if (record.expiresAt < Date.now()) {
       refreshTokens.delete(refreshToken);
-      res.status(401).json({ error: "refresh token expired" });
+      // ⚠ 위와 같은 이유 — 코드만 보내면 담당자가 영문을 읽게 된다(F8-06·F3-06).
+      res.status(401).json({ error: "refresh token expired", message: "로그인 유효 시간이 지났습니다. 다시 로그인해 주세요." });
       return;
     }
     // 유휴 타임아웃 — 마지막 활동 후 오래 방치된 세션은 갱신을 거부한다(재로그인 유도).
@@ -449,7 +508,10 @@ export function registerAuthRoutes(app: Express): void {
     if (!u) { res.status(401).json({ error: "unauthorized" }); return; }
     // clearance(열람 등급)는 화면이 "내가 어디까지 볼 수 있나"를 보여주는 데 쓴다.
     //   ⚠ 이 값을 화면이 바꿔 보내도 서버는 안 믿는다 — 검색 차단은 서버가 DB에서 직접 읽는다.
-    res.json({ id: u.id, username: u.username, displayName: u.displayName, role: u.role, team: u.team ?? null, clearance: u.clearance ?? null });
+    // minPasswordLen — 비밀번호 규칙의 **단일 출처는 서버**다(users.ts MIN_PASSWORD_LEN).
+    //   화면이 숫자를 스스로 적으면 정책을 바꿀 때 화면만 낡는다(「4자라더니 8자」 · F8-03·F6-08).
+    //   ⚠ 비밀이 아니다 — 길이 규칙은 어차피 거절 메시지로 드러난다. 해시는 절대 안 나간다(위 주석).
+    res.json({ id: u.id, username: u.username, displayName: u.displayName, role: u.role, team: u.team ?? null, clearance: u.clearance ?? null, minPasswordLen: MIN_PASSWORD_LEN });
   });
 
   // 접속 중 클라이언트(외부 콘솔) 목록 — 팀 사무실 창의 presence 표시용.

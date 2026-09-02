@@ -112,3 +112,54 @@ export function linuxAvailableMb(): number | null {
     return null;
   }
 }
+
+/**
+ * /proc/meminfo 의 스왑 사용량(MB). **순수 함수.**
+ *
+ * ■ 왜 스왑을 보나 (2026-09-02 GB10 실측 — 스왑 15GB 중 7GB를 쓰고 있었다)
+ *   통합메모리 기계에서는 CPU와 GPU가 같은 메모리를 나눠 쓴다. 그래서 「스왑을 쓰고 있다」는
+ *   **이미 물리 메모리가 모자라 디스크로 밀어냈다**는 뜻이고, 그 상태에서 모델을 더 올리면
+ *   토큰 생성 속도가 급락한다(디스크에서 가중치를 다시 읽어 온다).
+ *
+ *   MemAvailable은 그 사정을 말해 주지 않는다 — 밀어낸 덕에 오히려 여유가 있어 보인다.
+ *   실측 순간의 GB10이 정확히 그랬다: 사용 96GB·MemAvailable 26GB인데 스왑이 7GB 나가 있었다.
+ *   「26GB 남았으니 하나 더 올리자」가 곧 「더 밀어내자」가 된다.
+ *
+ * ⚠ 읽지 못하면 null. **0을 「스왑을 안 쓴다」로 쓰지 말 것** — 못 읽은 것과 0인 것은 다르다.
+ * ⚠ 스왑이 아예 없는 기계는 SwapTotal 0으로 나온다. 그때 usedMb는 0이고, 그것은 정상이다.
+ */
+export function parseSwapMb(meminfo: string): { totalMb: number; freeMb: number; usedMb: number } | null {
+  const s = String(meminfo);
+  const total = /^SwapTotal:\s+(\d+)\s*kB/m.exec(s);
+  const free = /^SwapFree:\s+(\d+)\s*kB/m.exec(s);
+  if (!total || !free) return null;
+  const totalMb = Math.max(0, Math.round(Number(total[1]) / 1024));
+  const freeMb = Math.max(0, Math.round(Number(free[1]) / 1024));
+  // SwapFree가 SwapTotal보다 큰 일은 없지만, 커널 판본을 믿고 음수를 만들지 않는다.
+  return { totalMb, freeMb, usedMb: Math.max(0, totalMb - freeMb) };
+}
+
+/** 리눅스 스왑 사용량(MB). 읽지 못하면 null. */
+export function linuxSwapMb(): { totalMb: number; freeMb: number; usedMb: number } | null {
+  try {
+    return parseSwapMb(fs.readFileSync("/proc/meminfo", "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 통합메모리 기계에서 「지금 안전하게 더 쓸 수 있는 메모리」(MB).
+ *
+ * MemAvailable에서 **이미 스왑으로 밀어낸 양을 뺀다.** 그만큼은 물리 메모리가 이미 모자랐다는
+ * 증거이므로, 그 여유는 실제로는 없는 셈으로 친다.
+ *
+ * ⚠ 이것은 **판단이지 실측이 아니다.** 커널이 「스왑 사용량만큼 여유가 줄어든다」고 보장하지는
+ *   않는다. 다만 통합메모리에서 메모리가 정말 모자라면 깨끗한 오류가 아니라 **기계 전체가 멈추는**
+ *   방식으로 나타나므로(SSH도 안 되는 상태), 모자란 쪽으로 틀리는 편을 택한다.
+ * ⚠ 스왑을 못 읽으면 깎지 않는다 — 모르는 것을 근거로 여유를 줄이지 않는다.
+ */
+export function unifiedBudgetMb(availableMb: number, swap: { usedMb: number } | null): number {
+  if (!swap) return availableMb;
+  return Math.max(0, availableMb - swap.usedMb);
+}
