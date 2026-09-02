@@ -147,11 +147,14 @@ if (!pool.length) { console.error("주제에 맞는 조각이 없습니다 — -
 if (DRY) { for (const p of picked.slice(0, 3)) console.log("--", p.ref, "\n", p.text.slice(0, 200).replace(/\n/g, " ")); process.exit(0); }
 
 const report = { topic: TOPIC, endpoint: ENDPOINT, startedAt: new Date().toISOString(), files: files.length, chunks: picked.length, generated: 0, preRejected: {}, accepted: 0, rejected: {}, teacher: null, tokens: { prompt: 0, completion: 0 }, teacherMs: 0, errors: [] };
-const auth = await login();
+// --no-intake: 편입 없이 교사 수율만 잰다(교사·프롬프트 비교용) — 서버 로그인도 안 한다.
+const NO_INTAKE = has("--no-intake");
+const auth = NO_INTAKE ? null : await login();
 const queue = [...picked]; let teacherId = null; const batch = []; const flushEvery = 40;
 async function flush(force = false) {
   if (!batch.length || (!force && batch.length < flushEvery)) return;
   const items = batch.splice(0, batch.length);
+  if (NO_INTAKE) { report.accepted += items.length; console.log(`[distill] (편입 생략) 사전검사 통과 ${items.length}건`); return; }
   try {
     const r = await intake(auth, teacherId || "unknown", items);
     report.accepted += r.accepted;
