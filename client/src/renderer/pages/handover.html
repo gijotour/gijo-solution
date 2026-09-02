@@ -100,7 +100,10 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
 
     <div class="steps">
       <div class="step" id="st1"><span class="n">1</span>무엇을 남길지</div>
-      <div class="step" id="st2"><span class="n">2</span>문서 올리기</div>
+      <!-- ⚠ 「올리기」가 아니라 「담기」다(F5-11, 2026-09-02) — 이 단계에서 하는 일은 파일을
+           올리는 것이 아니라 **이미 올린 문서를 고르는 것**이다. 올리는 자리는 대화창 ＋ 하나다.
+           아래 제목(127행)과 screenguide가 이미 「담기」라 부르고 있어 이 걸음표만 어긋났다. -->
+      <div class="step" id="st2"><span class="n">2</span>문서 담기</div>
       <div class="step" id="st3"><span class="n">3</span>AI 자동 검증</div>
       <div class="step" id="st4"><span class="n">4</span>이관 리포트</div>
     </div>
@@ -121,7 +124,10 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
 
     <!-- 2단계 -->
     <div class="panel">
-      <div class="p-title">2. 문서 올리기 <span class="p-badge" id="docBadge">0개</span></div>
+      <!-- ⚠ 이 화면엔 올리는 칸이 없다 — 파일은 대화 콘솔의 ＋로 올리고 여기서는 고르기만 한다
+           (2026-09-01 여정 점검 F5-11). 제목이 「올리기」라 담당자가 올릴 곳을 찾다 헤맸다.
+           screenguide.ts의 「② 문서 담기」와 같은 말로 맞춘다. -->
+      <div class="p-title">2. 문서 담기 — 파일은 대화 콘솔 ＋로 올린 뒤 고릅니다 <span class="p-badge" id="docBadge">0개</span></div>
       <div class="doclist" id="docList"></div>
       <div class="acts" style="margin-top:9px"><button class="btn" id="pickExistingBtn">🗂 이미 올린 문서에서 고르기</button></div>
       <div id="existingBox" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px"></div>

@@ -42,7 +42,7 @@ const GUIDES: WorkGuide[] = [
     steps: [
       { kind: "open", title: "제품 상태 확인하기", desc: "보안제품 등록부에서 대상 제품의 상태와 마지막 점검일을 봅니다", page: "products.html" },
       { kind: "ask", title: "점검 항목 물어보기", desc: "무엇을 봐야 하는지 AI가 사내 자료로 알려 줍니다", question: "방화벽 월간 정기점검 절차를 알려줘" },
-      { kind: "open", title: "원격 점검 실행하기", desc: "원격 정기점검 화면에서 실제로 점검합니다 — 결과가 자동 기록됩니다", page: "hardening.html" },
+      { kind: "open", title: "원격 점검 실행하기", desc: "보안설정 점검 화면에서 실제로 점검합니다 — 결과가 자동 기록됩니다", page: "hardening.html" },
       { kind: "open", title: "점검 결과 보고서 만들기", desc: "이번 점검 결과를 격식 문서로 정리합니다", page: "report.html" },
     ],
   },
@@ -58,7 +58,12 @@ const GUIDES: WorkGuide[] = [
   },
   {
     key: "hardening-check",
-    label: "원격 정기점검",
+    // 표시 이름만 화면과 맞춘다(F4-07, 2026-09-02). 가이드 선택은 guessGuideKey가
+    // ref("hardening:")·본문 정규식으로 하므로 이 label은 라우팅에 안 쓰인다.
+    // ⚠ 아래 question의 「원격 정기점검」은 **일부러 둔다** — 챗봇 라우팅 정규식이 그 낱말에
+    //   걸려 있어(agentloop FORCED_INTENTS) 바꾸면 답이 딴 데로 간다. 이름 통일의 나머지
+    //   절반(라우팅·시험까지 옮기기)은 별건이다.
+    label: "보안설정 점검",
     steps: [
       { kind: "open", title: "점검 대상 확인하기", desc: "이번에 점검할 장비가 맞는지 봅니다", page: "hardening.html" },
       { kind: "ask", title: "점검 기준 물어보기", desc: "어떤 기준으로 보는지 확인합니다", question: "원격 정기점검은 어떤 기준으로 점검해?" },

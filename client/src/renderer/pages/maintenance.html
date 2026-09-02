@@ -148,7 +148,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="cat" data-gijo-fold="지식베이스 — 매뉴얼·케이스·에러로그">
       <div class="cat-head"><span style="font-size:18px">📚</span><span class="cat-title">① 지식베이스 — 매뉴얼 · 케이스 · 에러로그</span></div>
-      <div class="cat-intro">보안제품 매뉴얼, 장애 대응 케이스, 에러로그(.log)를 올려두면 아래 검색으로 바로 찾을 수 있습니다. 빈 상태로 시작하고 싶지 않다면 "샘플 문서 추가"로 감을 잡아보세요.</div>
+      <!-- ⚠ 이 화면엔 올리는 칸이 없다 — 문서 인입 창구는 대화 콘솔의 ＋ 하나다(2026-07-27 결정,
+           console.js:269). 「대시보드 ＋」는 콘솔이 셸로 옮겨지기 전 이름이라 지운다(F5-05 계보).
+           「샘플 문서 추가」는 지어낸 예시를 전사 공유 지식으로 넣는 단추라, 소개문에서 권하지 않고
+           무엇인지만 밝힌다(2026-09-01 여정 점검 F5-04). -->
+      <div class="cat-intro">보안제품 매뉴얼, 장애 대응 케이스, 에러로그(.log)를 대화 콘솔의 ＋로 올려두면 아래 검색으로 바로 찾을 수 있습니다. "샘플 문서 추가"는 감을 잡기 위한 예시 2건을 넣습니다(전체 공유 지식이 됩니다).</div>
 
       <div class="kb-row">
         <button id="kbSampleBtn" class="ops-btn-secondary">샘플 문서 추가</button>
@@ -573,6 +577,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   ];
   async function addSampleDocs() {
     const statusEl = document.getElementById("kbUploadStatus");
+    // ⚠ 확인 없이 누르면 지어낸 예시가 **전체 공유(global)** 지식이 되어 이후 AI 답변의 근거로
+    //   인용된다(2026-09-01 여정 점검 F5-04). 되돌리려면 지식 화면에서 사람이 직접 찾아 지워야
+    //   하므로, 넣기 전에 「무엇이 · 어디에 · 어떻게 지우는지」를 밝히고 확인을 받는다.
+    //   ⚠ window.confirm은 Electron에서 렌더러를 통째로 멈춘다 — 화면 안 대화상자(dialog.js)를 쓴다.
+    //   ⚠ 대화상자를 못 실었으면 **넣지 않는다**. 확인을 못 받은 채 지나가면 이 수리가 무의미하다.
+    if (!window.gijoAsk) {
+      statusEl.textContent = "확인 창을 띄우지 못해 예시 문서를 넣지 않았습니다 — 화면을 새로 고친 뒤 다시 눌러 주세요.";
+      return;
+    }
+    const 넣을까 = await window.gijoAsk(
+      "예시 문서 2건(방화벽 정책 점검 절차 · IPS 오탐 대응 사례)을 지식베이스에 넣습니다.\n\n" +
+      "⚠ 지어낸 예시지만 전체 공유(모든 에이전트) 지식이 되어, 앞으로 AI 답변의 근거로 인용될 수 있습니다.\n" +
+      "지우려면 「🧠 내 지식 → 지식 창고」의 「📚 올린 문서 확인 · 관리」에서 직접 지워야 합니다.",
+      { ok: "예시 문서 넣기" }
+    );
+    if (!넣을까) { statusEl.textContent = ""; return; }
     const btn = document.getElementById("kbSampleBtn");
     btn.disabled = true;
     for (const doc of SAMPLE_DOCS) {
@@ -599,7 +619,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const results = await window.gijo.queryMemory(question, 5);
       box.innerHTML = results.length
         ? results.map((r) => `<div class="chunk">${esc(r)}</div>`).join("")
-        : '<div style="color:var(--muted);font-size:12px">관련 문서가 없습니다 — 위에서 문서를 올리거나 샘플 문서를 추가해보세요.</div>';
+        // ⚠ 「위에서 문서를 올리거나」는 없는 자리를 가리키던 말이다 — 이 화면엔 올리는 칸이 없다
+        //   (2026-09-01 여정 점검 F5-04). 진짜 창구인 대화 콘솔의 ＋를 가리킨다.
+        : '<div style="color:var(--muted);font-size:12px">관련 문서가 없습니다 — 대화 콘솔의 ＋로 매뉴얼·케이스·에러로그를 올리면 여기서 검색됩니다.</div>';
     } catch (e) {
       box.innerHTML = '<div style="color:var(--red-ink, #f87171);font-size:12px">검색 실패: ' + e.message + "</div>";
     }

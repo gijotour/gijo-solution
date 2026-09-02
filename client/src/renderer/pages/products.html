@@ -239,9 +239,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="doc-col-title">${kind === "logManual" ? "🗒" : kind === "manual" ? "📘" : "📎"} ${esc(kindLabel)}</div>` +
       `<div class="doc-list">${list}</div>` +
       `<div class="doc-add" data-pid="${product.id}" data-kind="${kind}">` +
-      // 파일 첨부는 대시보드 ＋로 통일(2026-07-27) — 여기는 "제목만" 등록(문서가 어디 있는지
-      // 기록해 두는 용도)만 남는다. 실물 파일은 대시보드에서 올리면 파일명으로 이 제품에 붙는다.
-      `<input type="text" placeholder="문서 제목 — 파일은 대시보드 ＋로" aria-label="문서 제목">` +
+      // 파일 첨부는 대화 콘솔의 ＋로 통일(2026-07-27) — 여기는 "제목만" 등록(문서가 어디 있는지
+      // 기록해 두는 용도)만 남는다. 실물 파일은 대화 콘솔 ＋로 올리면 파일명으로 이 제품에 붙는다.
+      // ⚠ 「대시보드 ＋」는 콘솔이 셸(app.html)로 옮겨지기 전 이름이다 — dashboard.html에는 그 ＋가
+      //   없다(2026-09-01 여정 점검 F5-05). screenguide가 쓰는 말(「대화 콘솔의 ＋」)에 맞춘다.
+      `<input type="text" placeholder="문서 제목 — 파일은 대화 콘솔 ＋로" aria-label="문서 제목">` +
       `<button data-doc-add>＋ 추가</button>` +
       `<div class="doc-hint"></div>` +
       `</div>` +
@@ -706,7 +708,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const titleInput = box.querySelector('input[type=text]');
       const hint = box.querySelector(".doc-hint");
       const title = titleInput.value.trim();
-      if (!title) { hint.textContent = "문서 제목을 입력하세요 (파일은 대시보드 ＋로 올립니다)."; return; }
+      // 인입 창구 이름은 screenguide와 같은 말로(2026-09-01 여정 점검 F5-05).
+      if (!title) { hint.textContent = "문서 제목을 입력하세요 (파일은 대화 콘솔 ＋로 올립니다)."; return; }
       docAdd.disabled = true; hint.textContent = "추가 중...";
       try {
         await window.gijo.addProductDoc(pid, { kind, title });

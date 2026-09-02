@@ -1498,13 +1498,14 @@ async function downloadToFileRetry(urlStr: string, headers: Record<string, strin
 // 다운로드 → NSIS 설치파일 실행 → 이 앱 종료 → 설치 후 새 버전 자동 실행.
 // 설치 프로그램이 실행 중인 exe를 덮어써야 하므로, spawn 직후 반드시 이 앱을 끝내야 한다.
 //
-// ⚠ 인자 두 개가 반드시 함께 필요하다(2026-07-27 실측으로 확인).
-//   이 빌드는 oneClick=false(마법사형)라 electron-builder의 installSection.nsh가 이렇게 판단한다:
+// ⚠ 지금은 **/S를 주지 않는다**(2026-07-29 사용자 신고로 뺐다 — 아래 spawn 자리 주석 참고).
+//   그래서 설치 마법사가 화면에 뜨고, 담당자가 [다음]→[설치]→[마침]을 직접 눌러야 한다.
+//   설치 뒤 앱을 다시 띄우는 것은 --force-run이 아니라 **package.json의 runAfterFinish:true**다
+//   (마침 페이지의 「지금 실행」 체크박스). electron-builder의 installSection.nsh는
 //       ${if} ${isForceRun} ${andIf} ${Silent} → 앱 실행
-//   즉 **/S(무인)와 --force-run을 둘 다** 줘야 설치 후 앱이 다시 켜진다.
-//   예전에는 인자 없이 띄워서 ① 제품 소개부터 시작하는 설치 마법사가 다시 떴고
-//   ② [마침]을 누르지 않으면 앱이 안 켜졌다. 업데이트는 이미 앱에서 확인을 받았으니
-//   설치 화면을 또 보여줄 이유가 없다 — 조용히 깔고 바로 다시 켠다.
+//   이라 판단하므로, /S가 없는 지금 --force-run은 사실상 잔재다 — /S를 다시 넣는 날을 위해 남겨 둔다.
+//   ⚠ 옛 주석은 「조용히 깔고 바로 다시 켠다」고 말했는데 코드는 이미 그러지 않고 있었다.
+//     주석이 코드와 다른 말을 하면 다음 사람이 그 말을 믿는다(2026-09-02 F6-04).
 ipcMain.handle("update:install", async (event, version: string) => {
   if (!authState.serverUrl || !authState.accessToken) throw new Error("로그인이 필요합니다");
   // ⚠ 받는 파일 이름을 버전마다 고정하면 안 된다(2026-07-27 실사고).
@@ -1530,6 +1531,18 @@ ipcMain.handle("update:install", async (event, version: string) => {
       if (f) { f.send("update:progress", pct); return; }
     } catch { /* 프레임이 이미 사라졌으면 아래 폴백 */ }
     try { event.sender.send("update:progress", pct); } catch { /* 창이 닫혔다 — 무시 */ }
+  };
+  // 설치 프로그램을 **실행하지 못했을 때** 그 사실을 화면에 밀어 준다(2026-09-02 F6-05).
+  //   ⚠ 왜 반환값이 아니라 채널인가: spawn 실패는 **비동기 'error' 이벤트**로 뒤늦게 온다.
+  //     그때 install()은 이미 성공을 반환한 뒤라 렌더러의 catch에 닿지 않는다.
+  //   ⚠ 진행률과 같은 프레임 경로를 쓴다 — webContents.send는 맨 바깥 프레임에만 닿아
+  //     허브 iframe 안의 업데이트 화면이 못 받는다(2026-07-27 진행률 사고와 같은 이유).
+  const sendInstallError = (사유: string) => {
+    try {
+      const f = event.senderFrame;
+      if (f) { f.send("update:installError", 사유); return; }
+    } catch { /* 프레임이 이미 사라졌으면 아래 폴백 */ }
+    try { event.sender.send("update:installError", 사유); } catch { /* 창이 닫혔다 — 무시 */ }
   };
   // 서버가 게시할 때 계산해 둔 sha256을 받아 온다 — 받은 파일을 이 값과 대조한다(2026-09-02 F6-02).
   //   ⚠ latest-release는 「그 에디션의 가장 최신 판」만 준다. 확인한 뒤 새 판이 게시되면
@@ -1566,7 +1579,24 @@ ipcMain.handle("update:install", async (event, version: string) => {
   quitConfirmed = true; // 업데이트 설치를 위한 의도된 종료 — 닫기 확인을 띄우지 않는다
   // 설치 창이 화면에 뜬 것을 담당자가 본 뒤에 우리 창이 사라져야 한다. 먼저 꺼지면
   // "앱이 그냥 죽었다"로 보인다. 1.2초면 설치 첫 화면이 그려진다(실측).
-  setTimeout(() => app.quit(), 1200);
+  const 종료타이머 = setTimeout(() => app.quit(), 1200);
+  // ⚠ spawn 실패를 잡지 않으면(EACCES·EPERM, 백신·EDR 차단) 처리되지 않은 'error' 이벤트로
+  //   Electron 기본 **영문** 오류 창이 뜨고, 위 타이머는 그대로 돌아 1.2초 뒤 앱이 꺼진다 —
+  //   담당자는 설치 창도 새 버전도 없이 바탕화면만 본다(2026-09-02 F6-05).
+  //   그래서 ① 종료 타이머를 취소하고 ② 한국어로 무엇이 막혔는지 알리고
+  //   ③ 받은 파일은 **지우지 않고** 경로를 알려 손으로 실행할 길을 남긴다.
+  child.once("error", (err: NodeJS.ErrnoException) => {
+    clearTimeout(종료타이머);
+    quitConfirmed = false; // 끄지 않기로 했으니 닫기 확인도 되살린다
+    const 사유 = (err.code === "EACCES" || err.code === "EPERM")
+      ? "설치 프로그램을 실행할 권한이 없습니다"
+      : "설치 프로그램을 실행하지 못했습니다";
+    sendInstallError(
+      사유 + " — 보안 프로그램(백신·EDR)이 막았을 수 있습니다.\n" +
+      "받아 둔 설치 파일: " + dest + "\n" +
+      "이 파일을 직접 실행하면 설치할 수 있습니다. 계속 막히면 관리자에게 알려 주세요."
+    );
+  });
   // 무결성 대조를 **실제로 했는지**를 화면에 그대로 넘긴다 — 안 한 검증을 했다고 말하지
   // 않기 위해서다(2026-09-02 F6-02).
   return { ok: true, verified: 기대sha !== null };

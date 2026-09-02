@@ -964,6 +964,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("myPasswordInput").value = "";
       line.textContent = "✓ 비밀번호가 변경되었습니다.";
       line.className = "status-line status-ok";
+      // 이 PC의 「최근 로그인」에 남은 **옛 비밀번호**를 지운다(F6-09, 2026-09-02).
+      //   안 지우면 다음 로그인에서 옛 비밀번호가 자동으로 채워져 실패로 시작하고,
+      //   그 실패가 잠금 카운터에 쌓인다 — 실사용 피드백의 「셀프 잠김」이 이 모습이다.
+      //   ⚠ 새 비밀번호로 **덮어쓰지 않는다.** 「저장 안 함」을 골랐던 담당자의 선택을
+      //     되살리는 꼴이 된다. 지우기만 하면 다음 로그인 성공 때 login.html이 선택대로 다시 저장한다.
+      //   ⚠ 열쇠는 (서버주소, 아이디) 짝인데 주소 표기가 갈릴 수 있어 **아이디로** 찾는다.
+      //   ⚠ 이 정리가 실패해도 비밀번호 변경 자체는 이미 끝났다 — 조용히 삼키되 사람에게는 알린다.
+      try {
+        const 목록 = await window.gijo.creds.list();
+        const 내것 = (목록 || []).filter((c) => c.username === currentUser.username && c.hasPw);
+        for (const c of 내것) await window.gijo.creds.remove(c.serverUrl, c.username);
+        if (내것.length) line.textContent += " 이 PC에 저장돼 있던 옛 비밀번호도 지웠습니다.";
+      } catch (e2) {
+        line.textContent += " ⚠ 다만 이 PC에 저장된 옛 비밀번호는 지우지 못했습니다 — 다음 로그인에서 새 비밀번호로 직접 넣어 주세요.";
+      }
     } catch (e) {
       line.textContent = "✗ 변경 실패: " + e.message;
       line.className = "status-line status-err";
@@ -2333,7 +2348,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   async function installUpdate() {
     if (!latestRelease) return;
-    if (!await gijoAsk(latestRelease.version + " 버전으로 지금 업데이트할까요? 다운로드가 끝나면 앱이 자동으로 종료되고 설치가 진행됩니다.")) return;
+    // ⚠ 「자동으로 진행된다」는 거짓이다 — /S를 빼서 설치 마법사가 뜬다(main.ts 2026-07-29 결정).
+    //   담당자가 무엇을 직접 눌러야 하는지 미리 말해 준다(2026-09-02 F6-04).
+    if (!await gijoAsk(latestRelease.version + " 버전으로 지금 업데이트할까요? 다운로드가 끝나면 이 앱이 닫히고 설치 창이 뜹니다. 설치 창에서 [다음] → [설치] → [마침]까지 직접 눌러 주세요.")) return;
     const btn = document.getElementById("installBtn");
     const track = document.getElementById("progressTrack");
     const fill = document.getElementById("progressFill");
@@ -2352,8 +2369,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       fill.style.width = pct + "%";
       label.textContent = "다운로드 중… " + pct + "%";
     });
+    // ⚠ 설치 실패 소식은 install()의 성공 응답과 **다른 통로**로 온다 — 도착 순서가 보장되지 않는다.
+    //   실패가 먼저 닿으면 아래 성공 문구가 그 위를 덮어 다시 「성공처럼」 보인다. 깃발로 막는다.
+    let 설치실패 = false;
+    // 설치 프로그램이 실행되지 못하면(권한·백신·EDR) 메인이 이 채널로 알린다(2026-09-02 F6-05).
+    //   예전엔 아무 말 없이 1.2초 뒤 앱이 꺼져, 담당자는 설치 창도 새 버전도 없이 바탕화면만 봤다.
+    window.gijo.update.onInstallError((사유) => {
+      설치실패 = true;
+      line.className = "status-line status-err";
+      line.textContent = "업데이트 실패 — " + 사유;
+      label.textContent = "실패";
+      btn.disabled = false;
+      btn.textContent = "지금 업데이트";
+    });
     try {
       const 결과 = await window.gijo.update.install(latestRelease.version);
+      // ⚠ 설치 프로그램 실행이 이미 실패했다고 알려 왔으면 성공 문구로 덮지 않는다(2026-09-02 F6-05).
+      if (설치실패) return;
       btn.textContent = "설치 창 열림";
       label.textContent = "설치 창이 열립니다 — 안내를 따라 진행해 주세요.";
       line.className = "status-line status-ok";
@@ -2364,7 +2396,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       line.textContent = (결과 && 결과.verified
         ? "다운로드·무결성 검증(sha256) 완료 — "
         : "다운로드 완료(서버에서 sha256을 받지 못해 무결성 대조는 하지 못했습니다) — ")
-        + "잠시 뒤 설치 창이 뜨고 이 앱은 닫힙니다. 설치가 끝나면 새 버전이 자동으로 열립니다.";
+        // ⚠ 「설치가 끝나면 자동으로」가 아니다 — [다음]→[설치]→[마침]을 사람이 눌러야 끝난다.
+        //   다만 [마침]을 누르면 새 버전이 열리는 것은 참이다(package.json runAfterFinish:true).
+        + "잠시 뒤 설치 창이 뜨고 이 앱은 닫힙니다. 설치 창에서 [다음] → [설치] → [마침]까지 눌러 주세요 — [마침]을 누르면 새 버전이 열립니다.";
     } catch (e) {
       line.className = "status-line status-err";
       line.textContent = "업데이트 실패: " + ((e && e.message) || e);

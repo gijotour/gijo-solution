@@ -618,6 +618,9 @@ const gijoApi = {
     // verified — sha256 대조를 실제로 했는가(2026-09-02 F6-02). 화면 문구가 이 값을 따라간다.
     install: (version: string) => ipcRenderer.invoke("update:install", version) as Promise<{ ok: boolean; verified: boolean }>,
     onProgress: (cb: (pct: number) => void) => ipcRenderer.on("update:progress", (_e, pct: number) => cb(pct)),
+    // 설치 프로그램 **실행 실패** — install()이 이미 반환한 뒤에 오는 소식이라 별도 채널로 온다
+    //   (2026-09-02 F6-05). 이걸 안 받으면 화면은 「설치 창 열림」인 채로 앱이 꺼진다.
+    onInstallError: (cb: (reason: string) => void) => ipcRenderer.on("update:installError", (_e, reason: string) => cb(reason)),
     listReleases: () => api.clientReleaseApi.listAll(),
     downloadLog: () => api.clientReleaseApi.downloadLog(),
   },

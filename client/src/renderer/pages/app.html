@@ -477,8 +477,20 @@
   //   영영 못 닿았다(screenguide.ts:400 공통문 vs 613 승인 전용문).
   //   ⚠ 탭 주소를 열쇠로 둔다 — 다른 탭으로 옮기면 그 탭 것이 아니므로 저절로 안 쓰이게 된다.
   //   ⚠ 탭 자체의 page는 **안 바꾼다**: 탭 저장·되짚기·nav.js TAB_REDIRECT가 그 값에 걸려 있다.
+  //   ⚠ 탭에 **보이는 이름**만 지금 무대 판 이름으로 갈아 준다(F4-08, 2026-09-02).
+  //     저장되는 label도 안 바꾼다 — 저장값까지 갈면 앱을 다시 열었을 때 「조치·승인」이라
+  //     적힌 탭에 허브의 첫 판(정기 점검)이 떠 **탭 이름이 거짓말을 한다.**
+  //     보이는 글자는 지금 무대를 따르고, 저장값은 탭의 정체를 지킨다 — 두 일을 갈라 둔다.
   var 무대맥락 = {};
   function 무대화면() { return active ? 무대맥락[active.page] : null; }
+  /** 탭줄에 **보여 줄** 이름 — 허브 탭이면 지금 무대에 올린 판 이름(F4-08).
+   *  판 제목 앞 그림글자는 뗀다(「✅ 조치·승인」→「조치·승인」) — 탭줄은 메뉴 라벨과 같은 결로 둔다.
+   *  무대 기억이 없으면(보통 화면) 탭 이름 그대로다. */
+  function 탭이름(t) {
+    var st = t && 무대맥락[t.page];
+    var 판 = st && st.label ? String(st.label).replace(/^[^0-9A-Za-z가-힣]+/, "").trim() : "";
+    return 판 || (t ? t.label : "");
+  }
 
   function save() {
     // 🚀 프로는 저장하지 않는다(검토관 #1, 2026-08-19) — 도킹 경로가 표준 탭 저장(gijo:tabs:v1)을
@@ -511,8 +523,11 @@
     //   maintenance·memory)은 그 자체가 다시 흡수된 화면이라, 복원 라벨(자산 목록·정기 점검·
     //   AI 지식)과 실제 도착 화면 이름이 어긋났다(이 표 바로 위 규칙을 표 스스로 어겼다).
     // assethub(옛 자산 통합 뷰)는 목록·관리를 쓰던 사람의 탭이라 ⓪ 자산 고르기가 아니라
-    //   관리 화면으로 — hub=1이 갈아타기 표(inventory→assets)의 유일한 예외 통로다(assets.html 관례).
-    "assethub.html": { page: "inventory.html?hub=1", label: "자산 관리" },
+    //   관리 화면으로 — full=1이 갈아타기 표(inventory→assets)의 예외 통로다(assets.html 관례).
+    //   ⚠ hub=1에서 full=1로 옮겼다(F4-09, 2026-09-02): hub=1로 두면 ① 되살린 옛 탭에만
+    //     「한눈에」 그림띠가 없고 ② 메뉴·KPI가 여는 주소와 갈려 **같은 화면이 탭 둘**이 된다.
+    //   이름은 위 정본 사슬 ①(메뉴 라벨)을 그대로 적는다.
+    "assethub.html": { page: "inventory.html?full=1", label: "자산 관리 (전체)" },
     "opsguide.html": { page: "fix.html?panel=maintenance", label: "정기 점검" },
     "ontology.html": { page: "aihub.html?panel=knowledge", label: "지식 창고" },
     "mywork.html": { page: "dashboard.html", label: "대시보드" },
@@ -626,14 +641,17 @@
     el.className = "tab" + (t.pinned ? " pinned" : "");
     // 고정은 더블클릭인데, 더블클릭은 화면에 흔적이 없어 아무도 모른다(사용자가 "탭 고정키는
     // 어떻게 쓰냐"고 물어 왔다 — 2026-07-28). 말로 적어 둔다.
-    el.title = t.label + "\n" + (t.pinned
+    // 🗔 보이는 이름은 지금 무대 판을 따른다(F4-08, 2026-09-02). 말풍선에는 「탭 › 지금 판」을
+    //    함께 적어, 이름이 바뀌어도 어느 탭에 있는지 잃지 않게 한다.
+    var 표시 = 탭이름(t);
+    el.title = (표시 === t.label ? t.label : t.label + " › " + 표시) + "\n" + (t.pinned
       ? "📌 고정됨 — 두 번 클릭하면 고정이 풀립니다"
       : "두 번 클릭하면 고정됩니다 (고정한 탭은 ✕와 「모두 닫기」로 닫히지 않습니다)");
     if (t === active) {
       var g = groupOf(t.page);
       if (g) { var gs = document.createElement("span"); gs.className = "tgrp"; gs.textContent = g + " ›"; el.appendChild(gs); }
     }
-    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = t.label;
+    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = 표시;
     el.appendChild(nm);
     if (t.pinned) { var p = document.createElement("span"); p.className = "pin"; p.textContent = "📌"; el.appendChild(p); }
     var x = document.createElement("span"); x.className = "x"; x.textContent = "✕"; x.title = "탭 닫기";
@@ -1041,6 +1059,10 @@
       }
       if (!주인) return;
       무대맥락[주인.page] = { page: 무대, label: String(d.label || "").slice(0, 60) || null };
+      // 🗔 탭줄을 다시 그린다(F4-08, 2026-09-02) — 기억만 하고 안 그리면 판을 바꿔도 탭 이름은
+      //   처음 연 판에 머물러, 탭이 「내가 어디 있는지」를 잘못 말한다.
+      //   ⚠ redraw()는 save()를 부르지 않는다 — 저장된 탭 값(page·label)은 손대지 않는다.
+      redraw();
       // 보고 있는 탭이면 대화창 맥락(ⓘ·지시의 screen 인자)에 곧바로 반영한다.
       if (주인 === active && window.gijoConsoleSyncCtx) window.gijoConsoleSyncCtx();
       return;
@@ -1791,13 +1813,26 @@
     try {
       var raw = localStorage.getItem("gijo:loginChoiceFailed");
       if (!raw) return;
-      localStorage.removeItem("gijo:loginChoiceFailed");
       못한것 = JSON.parse(raw);
-    } catch (e) { return; }
-    if (!못한것 || !못한것.length) return;
+    } catch (e) {
+      // 값이 깨졌으면 지운다 — 안 지우면 부팅마다 같은 것을 다시 읽다 영영 못 넘어간다.
+      try { localStorage.removeItem("gijo:loginChoiceFailed"); } catch (e2) {}
+      return;
+    }
+    if (!못한것 || !못한것.length) { try { localStorage.removeItem("gijo:loginChoiceFailed"); } catch (e) {} return; }
+    // ⚠ gijoTell이 아직 없으면 예전엔 여기서 ReferenceError가 나 **뒤따르는**
+    //   프로레일()·끌개설치()·대화폭복원()·대화온디맨드설치()가 통째로 건너뛰어졌다(F3-09).
+    //   이제 dialog.js를 정적으로 싣지만, 부팅 순서가 또 바뀌어도 조용히 죽지 않게 방어를 남긴다.
+    //   ⚠ 없을 때는 **키를 지우지 않는다** — 지우면 알림이 영영 사라진다. 다음 실행에 다시 알린다.
+    if (typeof window.gijoTell !== "function") {
+      console.warn("[셸] dialog.js가 아직 없어 로그인 선택 실패 알림을 미룹니다 — 다음 실행에 다시 알립니다.");
+      return;
+    }
     gijoTell("로그인 화면에서 고른 것 중 " + 못한것.length + "가지가 적용되지 않았습니다.\n\n" +
       못한것.map(function (s) { return "· " + s; }).join("\n") +
       "\n\n나머지는 그대로 로그인됐습니다. 위 항목은 설정에서 다시 정할 수 있습니다.");
+    // ⚠ **띄운 뒤에 지운다.** 지우고 띄우다 터지면 이 알림이 영영 사라진다(2026-09-02 F3-09).
+    try { localStorage.removeItem("gijo:loginChoiceFailed"); } catch (e) {}
   }
   // 🚀 팝업 창이 보낸 gijo:*(select·scope·openTab)를 받아 **자기 window에 재주입**한다(2026-08-19).
   //   기존 message 리스너가 그대로 처리하므로 처리 코드를 복제하지 않는다 —
@@ -1811,6 +1846,14 @@
   else boot();
 })();
 </script>
+<!-- ⚠ dialog.js를 **정적으로** 싣는다(2026-09-02 F3-09).
+     셸의 인라인 boot는 DOMContentLoaded 리스너를 nav.js보다 **먼저 등록해 먼저 돈다** —
+     그 boot 안 로그인선택_못한것알리기()가 gijoTell을 부르는데, nav.js의 loadDialog()는
+     아직 돌기 전이라 gijoTell이 없었다. ReferenceError 한 번에 뒤따르는
+     프로레일()·끌개설치()·대화폭복원()·대화온디맨드설치()가 통째로 건너뛰어져
+     상단 ☰·🕘·🗔·💬·‖가 눌러도 안 먹는 셸이 됐다(오류는 콘솔에만 남는다).
+     이중 로드는 안전하다 — dialog.js 첫 줄이 `if (window.gijoAsk) return;`이다. -->
+<script src="dialog.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>

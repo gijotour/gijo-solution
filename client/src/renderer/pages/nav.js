@@ -286,8 +286,9 @@
     "threat.html?embed=1": "discover.html?embed=1&panel=threat",
     // ⓪ 자산이 생기면서 자산의 **첫 자리**가 바뀌었다(2026-08-18 승인 시안).
     // ⚠ **`hub=1`(또는 `full=1`)이 붙은 주소는 여기 안 걸린다**(아래 갈아타기 적용부의 예외). 그게 자산
-    //   관리(inventory)로 가는 **유일한 탈출구**다 — assets.html의 「전체 관리 열기」가
-    //   `inventory.html?hub=1`로 여는 이유다. 그 한 글자가 없으면 관리 화면을 열려고 눌러도
+    //   관리(inventory)로 가는 **유일한 탈출구**다 — assets.html의 「전체 관리 열기」와 KPI 타일이
+    //   `inventory.html?full=1`로 여는 이유다(F4-09, 2026-09-02 — 종전 hub=1은 「허브 무대 안」
+    //   표시 계약까지 물려받아 전체 탭에서도 「한눈에」 그림띠가 사라졌다). 그 표식이 없으면 열려고 눌러도
     //   이 표가 ⓪로 되돌려 **영영 못 간다**(오류도 안 난다 — 그냥 같은 화면이 다시 뜬다).
     "inventory.html": "assets.html",
     "inventory.html?embed=1": "assets.html?embed=1",
