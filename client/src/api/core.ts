@@ -277,6 +277,10 @@ export async function request<T = unknown>(path: string, opts: RequestOpts = {})
     } catch {
       /* 응답 본문이 JSON이 아닌 경우 무시 */
     }
+    // ⚠ **이 꼬리 문구를 바꾸면 login.html이 조용히 깨진다.** 로그인 화면은 「관리자만 바꿀 수
+    //   있는 설정인가」를 알아내려고 여기 붙는 「(서버 오류 403 · 경로)」를 읽는다 — 예외가
+    //   contextBridge를 건너며 커스텀 속성이 사라져 status를 실어 보낼 길이 없기 때문이다.
+    //   (login.html의 못한이유()에 짝 주석이 있다. 바꾸려면 두 곳을 함께.)
     throw new Error(
       사유
         ? `${사유}\n(서버 오류 ${res.status} · ${path.split("?")[0]})`

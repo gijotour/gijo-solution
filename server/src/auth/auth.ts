@@ -73,7 +73,10 @@ function loginLockRemaining(key: string): number {
   if (Date.now() - a.firstAt > LOGIN_WINDOW_MS) loginAttempts.delete(key);
   return 0;
 }
-function recordLoginFail(key: string): void {
+// 실패를 한 번 세고 **남은 횟수**를 돌려준다(F8-09) — 0이면 방금 잠긴 것이다.
+// ⚠ 돌려주게 바꾼 이유: 담당자는 열 번째에 갑자기 잠기는 걸 몰랐다. 몇 번 남았는지는
+//   여기서만 알 수 있고(임계는 env로 바뀐다), 화면이 제 숫자를 따로 갖게 두지 않는다.
+function recordLoginFail(key: string): number {
   const now = Date.now();
   const a = loginAttempts.get(key) ?? { fails: 0, firstAt: now, lockedUntil: 0 };
   if (now - a.firstAt > LOGIN_WINDOW_MS) {
@@ -83,6 +86,13 @@ function recordLoginFail(key: string): void {
   a.fails += 1;
   if (a.fails >= LOGIN_MAX_FAILS) a.lockedUntil = now + LOGIN_WINDOW_MS;
   loginAttempts.set(key, a);
+  return Math.max(0, LOGIN_MAX_FAILS - a.fails);
+}
+
+// 잠기면 몇 분인가 — 화면이 「15분」을 제 손으로 적지 않게 **서버가 숫자를 만든다**(F8-09).
+//   위 429가 만드는 것은 「남은 잠금 시간」이고 이건 「잠금 길이」다 — 다른 값이라 따로 둔다.
+function 잠금길이분(): number {
+  return Math.ceil(LOGIN_WINDOW_MS / 60000);
 }
 
 export interface TokenPair {
@@ -277,8 +287,20 @@ export function registerAuthRoutes(app: Express): void {
     }
     const user = findUserByUsername(username);
     if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
-      recordLoginFail(key);
-      res.status(401).json({ error: "invalid credentials" });
+      const 남은 = recordLoginFail(key);
+      // ⚠ 영문 날것을 담당자에게 보이지 않는다 — error는 기계가 읽는 코드, message가 사람 말이다.
+      // ⚠ 남은 횟수는 **5회 이하로 줄었을 때만** 경고한다(F8-09). 매번 숫자를 주면 없는
+      //   아이디에도 잠금 정책이 그대로 새어 나간다(폐쇄망 전제로 이 정도만 연다).
+      res.status(401).json({
+        error: "invalid_credentials",
+        message:
+          남은 === 0
+            ? `아이디 또는 비밀번호가 맞지 않습니다. 시도가 너무 많아 ${잠금길이분()}분 동안 잠겼습니다.`
+            : 남은 <= 5
+              ? `아이디 또는 비밀번호가 맞지 않습니다. ${남은}회 더 틀리면 ${잠금길이분()}분 동안 잠깁니다.`
+              : "아이디 또는 비밀번호가 맞지 않습니다.",
+        remaining: 남은,
+      });
       return;
     }
     // 중복로그인 방지: 이미 다른 곳에서 로그인 중이면 강제 확인 없이는 새 세션을 내주지 않는다.

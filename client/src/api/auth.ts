@@ -21,6 +21,9 @@ export interface LoginResult {
   // 복구 코드로 들어왔을 때 — 남은 개수를 알려 다시 발급하도록 유도한다.
   recoveryUsed?: boolean;
   recoveryRemaining?: number;
+  // 비밀번호를 틀렸을 때 **몇 번 남았는지**(F8-09). 문장은 서버가 만들어 message에 싣는다 —
+  // 이 숫자는 「경고를 띄울지」를 정할 때만 쓴다(임계·잠금 시간을 화면이 갖지 않게).
+  remaining?: number;
 }
 
 interface LoginBody {
@@ -34,6 +37,7 @@ interface LoginBody {
   enrollRequired?: boolean;
   recoveryUsed?: boolean;
   recoveryRemaining?: number;
+  remaining?: number;
 }
 
 function loginFailure(status: number, data: LoginBody): LoginResult {
@@ -41,7 +45,12 @@ function loginFailure(status: number, data: LoginBody): LoginResult {
     status === 409 && data.error === "already_logged_in" ? "already_logged_in"
     : status === 429 ? "locked"
     : "invalid_credentials";
-  return { ok: false, code, message: data.message ?? data.error ?? "로그인에 실패했습니다." };
+  // 남은 횟수는 **서버가 줄 때만** 싣는다 — 없으면 없는 대로 둔다(모르는 것을 0으로 만들지 않는다).
+  return {
+    ok: false, code,
+    message: data.message ?? data.error ?? "로그인에 실패했습니다.",
+    ...(typeof data.remaining === "number" ? { remaining: data.remaining } : {}),
+  };
 }
 
 // 로그인 요청 시간제한 — 응답 없는 주소(방화벽 drop·엉뚱한 IP)를 넣으면 Windows TCP가
