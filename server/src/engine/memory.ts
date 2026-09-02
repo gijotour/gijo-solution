@@ -654,6 +654,21 @@ export function cleanExtractedText(text: string): string {
 // 없는 문제가 실측됐다(2026-07-23: "장애 대응 표준 절차" 제목 직후 절단). 문단(빈 줄)과
 // 제목 줄(마크다운 #, "1." 번호, "제N장")을 경계로 블록을 만들고, 블록을 순서대로 담아
 // size를 넘기 전에 끊는다. 블록 하나가 size보다 크면 문장 경계로 나눈다.
+// ── 서로게이트 안전(2026-09-03 실사고) ──────────────────────────────────────────────
+// JS 문자열은 UTF-16이라 이모지(🛡·📚 …)는 두 단위다. `slice(-overlap)`·`slice(0,size)`가 그 한가운데를
+// 자르면 짝 잃은 서로게이트가 남고, JSON.stringify가 그것을 \udXXX로 내보내면 llama.cpp 임베딩 서버가
+// 「invalid string: surrogate U+DC00..U+DFFF must follow U+D800..U+DBFF」로 **HTTP 500**을 낸다.
+// 실측: 보안제품관리_지침.md(이모지 26개)가 매 부팅 4회 재시도 끝에 인입 실패 — 문서 하나가 지식에서
+// 조용히 빠져 있었고 drift 도구만 「목록에 있으나 저장소에 없음」으로 가리켰다.
+/** 짝 잃은 서로게이트 단위를 지운다(짝이 맞는 이모지는 그대로). */
+export function stripLoneSurrogates(s: string): string {
+  return s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+}
+/** slice의 끝단이 이모지 한가운데면 그 단위를 버린다 — 자르기 뒤에 항상 이것을 지난다. */
+function sliceSafe(s: string, start: number, end?: number): string {
+  return stripLoneSurrogates(s.slice(start, end));
+}
+
 export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP): string[] {
   // HTML 주석(<!-- … -->)은 내용이 아니라 유지보수 메모다 — 색인에서 뺀다(2026-08-17, max 발견#3:
   // 문서의 '이 문서를 늘릴 때' 작성지침이 「유출 신고 며칠?」 답 상단으로 새어 나왔다). 주석으로
@@ -700,7 +715,7 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   for (const u of units) {
     if (cur && cur.length + u.length + 2 > size) {
       chunks.push(cur.trim());
-      cur = cur.slice(-overlap) + "\n" + u;
+      cur = sliceSafe(cur, -overlap) + "\n" + u; // 꼬리 겹침이 이모지 한가운데를 자르지 않게
     } else {
       cur = cur ? cur + "\n\n" + u : u;
     }
@@ -709,8 +724,8 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   // 잡음만 남은 초단문 청크 제거 — 단, 문서 자체가 짧으면(전부 걸러지면) 원문을 보존한다.
   // 바이너리꼴 조각(PDF 압축 스트림 등)도 여기서 거른다(2026-08-09) — 인입돼 봤자 검색
   // 상위를 차지해 진짜 근거를 밀어낸다(실사고: WizCLM 비교 1순위가 base64 덩어리).
-  const filtered = chunks.filter((c) => c.length >= 20 && !isBinaryLikeChunk(c));
-  if (filtered.length === 0 && cleaned.trim().length > 0 && !isBinaryLikeChunk(cleaned)) return [cleaned.trim().slice(0, size)];
+  const filtered = chunks.map(stripLoneSurrogates).filter((c) => c.length >= 20 && !isBinaryLikeChunk(c));
+  if (filtered.length === 0 && cleaned.trim().length > 0 && !isBinaryLikeChunk(cleaned)) return [sliceSafe(cleaned.trim(), 0, size)];
   return filtered;
 }
 

@@ -54,7 +54,10 @@ export async function embed(texts: string[]): Promise<number[][]> {
   // EMBEDDING_SERVER_URL에는 이미 /v1이 포함돼 있다(기본값 http://localhost:8081/v1).
   // 따라서 여기서는 /embeddings만 붙여야 OpenAI 호환 경로가 된다 — /v1/embeddings를 붙이면
   // /v1/v1/embeddings가 되어 404가 나고, RAG가 조용히 죽는다(2026-07-19 실제 발생).
-  const res = await embedPost(`${EMBEDDING_SERVER_URL}/embeddings`, { model: "local", input: texts }, LLM_TIMEOUT_MS);
+  // 짝 잃은 서로게이트(이모지를 반으로 자른 흔적)가 하나라도 있으면 llama.cpp가 요청 전체를 500으로 거절한다
+  // (2026-09-03 실사고 — memory.chunkText도 고쳤지만 입구는 입구대로 막는다. 어느 호출자가 와도 여기가 마지막 문).
+  const 정리 = texts.map((t) => String(t ?? "").replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, ""));
+  const res = await embedPost(`${EMBEDDING_SERVER_URL}/embeddings`, { model: "local", input: 정리 }, LLM_TIMEOUT_MS);
 
   if (!res.ok) {
     // 연결 실패(status 0)와 HTTP 거절(4xx/5xx)은 원인이 정반대다 — 전자는 서버가 없는 것,
