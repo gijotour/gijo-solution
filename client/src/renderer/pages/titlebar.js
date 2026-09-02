@@ -123,7 +123,10 @@
   // 4.0.0에서 허브를 걷어내 화면이 곧 주소가 됐다 — 딥링크(hub.html?g=…&t=…)가 필요 없다.
   // ⚠ 주소를 여기저기 흩어 두면 화면 구조가 바뀔 때 또 어긋난다(2026-07-28 실사고:
   //   업데이트를 눌러도 '내 설정'이 열렸다). 그래서 한 곳에 모아 둔다.
-  var TAB_UPDATE = "settings.html?s=admin"; // 업데이트 패널은 관리자 구역에 있다
+  // ⚠ 2026-09-02(F6-10) `?s=admin` → `?s=my`. 업데이트 판을 「내 설정」으로 옮겼다 —
+  //   서버가 이미 담당자에게 열어 둔 기능이고, nav.js도 배지를 `?s=my`에 붙이고 있었다.
+  //   같은 일에 주소가 둘이면 어긋난다(이 저장소가 반복해 겪은 부류다).
+  var TAB_UPDATE = "settings.html?s=my"; // 업데이트 판은 내 설정에 있다(담당자도 받는다)
   var TAB_SETTINGS = "settings.html?s=ai";  // 쿼리 없는 옛 설정 링크의 흡수처(nav.js와 동일)
 
   // ── 업데이트 알림 상태 — 사용자 영역의 ⬆칩 + ⚙점 배지를 채운다 ──
@@ -554,6 +557,45 @@
     sessChip.title = "남은 세션 시간 — 마우스·키보드를 쓰면 자동 연장. 클릭하면 연장/관제 선택";
     sessChip.innerHTML = '⏳ 세션 <span class="t">--:--</span> <span style="opacity:.7">▾</span>';
     sessTimeEl = sessChip.querySelector(".t");
+
+    // ── ⚡ 실시간 연결 끊김 칩(2026-09-02 F6-11) ─────────────────────────────
+    // 왜: WebSocket이 끊기면 5초마다 조용히 재접속만 해서, **실시간 판이 멈춘 것을 담당자가 모른다.**
+    //     멈춘 줄 모르고 옛 숫자를 보고 판단하는 것이 이 결함의 실제 피해다.
+    // ⚠ **2026-08-08에 없앤 「상시 연결 배지」를 되살리는 것이 아니다.** 평소엔 아무것도 안 그린다 —
+    //   짧은 끊김(서버 재시작·잠깐의 네트워크 흔들림)은 5초 안에 저절로 붙으므로 알릴 일이 아니다.
+    //   **15초를 넘겨야** 그린다. 다시 붙으면 스스로 사라진다.
+    // ⚠ 원격칩과 같은 이유로 `gtb-sess` 클래스를 주지 않는다 — 그 이름을 쓰면 중복 방지 검사에
+    //   걸려 세션 칩이 사라진다(위 원격칩 주석 참고).
+    var 끊김칩 = null, 끊김타이머 = null;
+    var 끊김문턱 = 15000; // 15초 — 이보다 짧은 끊김은 저절로 회복된다
+    function 끊김칩지우기() {
+      if (끊김타이머) { clearTimeout(끊김타이머); 끊김타이머 = null; }
+      if (끊김칩 && 끊김칩.parentNode) 끊김칩.parentNode.removeChild(끊김칩);
+      끊김칩 = null;
+    }
+    function 끊김칩그리기() {
+      if (끊김칩) return;
+      끊김칩 = document.createElement("div");
+      끊김칩.className = "gtb-wsdown";
+      끊김칩.style.cssText =
+        "-webkit-app-region:no-drag;display:flex;align-items:center;gap:5px;padding:3px 10px;" +
+        "border-radius:16px;font-size:12.25px;font-weight:800;white-space:nowrap;cursor:default;" +
+        "background:rgba(226,72,61,.14);border:1px solid rgba(226,72,61,.45);color:var(--red, #ff8080);";
+      끊김칩.title = "서버와의 실시간 연결이 끊겼습니다 — 화면의 실시간 숫자가 멈춰 있을 수 있습니다. 다시 붙으면 이 표시가 사라집니다.";
+      끊김칩.textContent = "⚡ 실시간 연결 끊김";
+      // 세션 칩 **바로 왼쪽**에 둔다 — 「지금 상태」를 말하는 것끼리 붙어 있어야 뜻이 산다.
+      if (sessChip && sessChip.parentNode) sessChip.parentNode.insertBefore(끊김칩, sessChip);
+      else right.appendChild(끊김칩);
+    }
+    if (window.gijo && window.gijo.onWsState) {
+      window.gijo.onWsState(function (s) {
+        if (!s || s.연결됨) { 끊김칩지우기(); return; }
+        if (끊김칩 || 끊김타이머) return;              // 이미 세고 있거나 그려져 있다
+        var 지난시간 = s.끊긴시각 ? (Date.now() - s.끊긴시각) : 0;
+        var 남은시간 = Math.max(0, 끊김문턱 - 지난시간); // 화면이 늦게 떠도 문턱을 제대로 센다
+        끊김타이머 = setTimeout(function () { 끊김타이머 = null; 끊김칩그리기(); }, 남은시간);
+      });
+    }
     // ⚠ 자리를 **남에게 기대지 않는다**(2026-08-08 사용자 신고: "세션이 메인화면 아래로 나온다").
     //   예전에는 연결상태 배지를 찾아 그 **뒤에** 끼워 넣고, 못 찾으면 영역 끝에 떨어뜨렸다.
     //   그 배지를 없앤 지금은 기준 자체가 사라져 매번 끝으로 밀린다 — 시계 **바로 왼쪽**으로 못 박는다

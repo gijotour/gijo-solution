@@ -372,7 +372,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <!-- 업데이트 — update.html 화면에서 이관(2026-07-28, 설정 통합 ③단계).
          '버전을 올린다'는 관리자의 일이라 계정 관리와 같은 탭에 둔다. -->
     <!-- 기본 펼침 — 업데이트 알림을 눌러 도착하는 자리다. 접혀 있으면 "업데이트 화면이 없다"가 된다. -->
-    <div data-sec="admin" class="panel" data-gijo-fold="업데이트" data-gijo-fold-open>
+    <!-- ⚠ 2026-09-02(F6-10) 「관리자」 → 「내 설정」으로 옮겼다. 화면을 **서버에 맞춘 것**이다:
+         `/api/client/latest-release`·`/api/client/download/:version`은 authMiddleware만 걸려 있어
+         **담당자도 받을 수 있다**(관리자 검사 없음). 그런데 판이 관리자 구역에 있어, 배지를 눌러
+         들어온 담당자가 **탭줄에 없는 구역**에 떨어져 돌아갈 길이 안 보였다.
+         ⚠ 함께 풀린 어긋남: nav.js는 이미 새 버전 배지를 `settings.html?s=my`에 붙이는데
+           상단바(TAB_UPDATE)만 `?s=admin`으로 보내고 있었다 — 같은 일에 주소가 둘이었다.
+         ⚠ 진짜 관리자용인 「게시된 배포판」·「누가 받았나」는 **그대로 admin**이다(서버도 admin 검사가 있다). -->
+    <div data-sec="my" class="panel" data-gijo-fold="업데이트" data-gijo-fold-open>
       <div class="panel-title">업데이트</div>
       <dl class="kv-inline">
         <span class="pair"><dt>설치된 버전</dt><dd id="currentVersion">-</dd></span>

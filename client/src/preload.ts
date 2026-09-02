@@ -6,7 +6,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import * as api from "./apiClient";
-import { connectWebSocket, onChannel } from "./wsClient";
+import { connectWebSocket, onChannel, onWsState } from "./wsClient";
 import { classifyChatbotCommand } from "./terminalPolicy";
 
 // keepalive/세션 상태 — 아래 IIFE(실사용 감지)와 gijoApi(세션 칩 UI)가 공유한다.
@@ -286,6 +286,8 @@ const gijoApi = {
   onCollaborationEvent: (cb: (evt: unknown) => void) => onChannel("collaboration:event", cb),
   listCollaborationHistory: () => api.collaborationApi.history(),
   onLlmActivity: (cb: (evt: unknown) => void) => onChannel("llm:event", cb),
+  // 실시간 연결 상태(2026-09-02 F6-11) — 끊긴 것을 화면이 알아야 「멈춘 판」을 알릴 수 있다.
+  onWsState: (cb: (s: { 연결됨: boolean; 끊긴시각: number | null }) => void) => onWsState(cb),
   listLlmActivity: () => api.llmActivityApi.history(),
 
   // 작업 큐
