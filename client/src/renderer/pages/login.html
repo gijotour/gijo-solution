@@ -118,6 +118,11 @@
        를 뜻하는 관용구라 **못 고르는 것처럼** 읽혔다. 정확히 반대 신호였다.
        대신 위쪽 3px 색 띠로 「다르다」만 말하고 「약하다」는 말하지 않는다.
      ⚠ padding-top을 3px 줄여 버튼 높이를 다른 버튼과 정확히 같게 맞춘다(띠 3px − 원래 테두리 1px). */
+  /* ★ 셸 통일(사장님 2026-09-02 「프로를 기준으로 통일하자」) — 「표준」 고르개를 **숨긴다.**
+     마크업은 그대로 둔다: loginchoice 시험이 data-mode 셋의 존재를 못박고 있고, 되돌릴 때
+     CSS 이 한 줄만 지우면 된다(main.ts의 표준셸_고를수있나도 함께 true로).
+     ⚠ 라이트는 지운 게 아니다 — 그건 셸이 아니라 **다른 설치본 안내**라 그대로 남는다. */
+  .mp-btn[data-mode="standard"] { display: none; }
   .mp-btn[data-mode="lite"], .mp-btn[data-loc="cloud"] { border-top-width: 3px; padding-top: 10px; }
   .mp-btn[data-mode="lite"] { border-top-color: var(--g-teal); }
   .mp-btn[data-loc="cloud"] { border-top-color: var(--g-amber); }
