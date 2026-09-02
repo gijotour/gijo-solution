@@ -439,6 +439,50 @@
 
     // ④ 검증 — 데이터가 없어도 **같은 모양**으로(2026-08-09 사용자 지시: 0이면 0으로 그린다)
     verify: [
+      // ✅ 검증 대기 — **④가 ③의 승인 판을 품는다**(2026-09-02 F4-05, 승인 시안 절차허브-마무리).
+      //   왜: ④ 검증 허브는 「고친 것이 닫혔는지 확인하는 자리」라 적혀 있는데, 실제 조치 검증
+      //   (검증 대기·재스캔)은 **전부 ③ 조치의 승인 화면에** 있었다. 담당자가 ④로 갔다가
+      //   아무것도 못 하고 돌아온다 — 정체성 문구와 실제 할 일이 어긋난 자리였다.
+      //   ⚠ **옮기지 않고 품는다.** 옮기면 ③의 숫자 원천이 사라지고 nav·시험·승인된 메뉴 시안이 함께 깨진다.
+      //   ⚠ scenario를 **새로 만들지 않고 재사용**한다 — 새 이름은 scenariochips 시험 둘을 깬다
+      //     (등록부 글자 대조 + 디스패치 왕복). 「조치 마감」은 area가 이미 ③조치→④검증이라 뜻도 맞는다.
+      //   ⚠ 숫자를 새로 세지 않는다 — ③ 판과 **같은 listApprovals() 한 원천**을 쓰고, 미배정 판정도
+      //     이 파일의 공용 헬퍼를 그대로 쓴다(「판정은 한 곳에서만」).
+      { id: "verifying", title: "✅ 검증 대기", page: "approvals.html?status=verifying", scenario: "조치 마감(시작→검증→확정)",
+        rows: function () {
+          return window.gijo.listApprovals().then(function (r) {
+            var rows = (r && r.reviews) || r || [];
+            var 대기 = rows.filter(function (x) { return x.status === "verifying"; });
+            return {
+              // ③ 판과 **같은 4열 규약**(무엇·어디·누구·언제/상태). 새 잣대를 만들지 않는다.
+              cols: ["조치 항목", "자산", "담당", "기한"],
+              grid: "1fr 110px 84px 74px",
+              rows: 대기.map(function (x) {
+                var fd = x.finding || {};
+                // ⚠ overdue는 건별 값이라 목록 칸에만 적는다. 「검증 대기 중 N건 지연」 같은
+                //   **묶음 숫자로 만들지 않는다** — 그건 아무 데도 없는 새 잣대다(설계 검토).
+                return [String(fd.finding_type || x.findingKey || "-"), String(x.assetName || x.assetId || "-"),
+                  미배정인가(x) ? "미배정" : (x.assignee || "-"), x.overdue ? "지연" : "-"];
+              }),
+            };
+          });
+        },
+        load: function () {
+          return window.gijo.listApprovals().then(function (r) {
+            var rows = (r && r.reviews) || r || [];
+            var 대기 = rows.filter(function (x) { return x.status === "verifying"; });
+            var 지연 = 대기.filter(function (x) { return !!x.overdue; }).length;
+            return {
+              // 배지는 **이 판이 실제로 보여 주는 것**(검증 대기 중 지연)만 말한다 — 목록과 같은 모집합이다.
+              badge: 지연 ? { text: "지연 " + n(지연), color: A } : null,
+              segments: [
+                { key: "verifying", label: "검증 대기", value: 대기.length, color: B },
+              ],
+              foot: "조치 전체 " + n(rows.length) + "건 중",
+            };
+          });
+        },
+      },
       // agents: scan(해석) — ROLE_CATEGORY.scan=["취약점","장비운영"](hybridsearch.ts:234) 근거.
       //   장비 점검 자료를 먼저 보는 역할이라 이 판의 주인이 맞다(검토관 하17 — 근거가 있는데
       //   빠뜨렸던 자리. 근거 없는 판에 다는 것만큼이나 있는 근거를 빠뜨리는 것도 들쭉날쭉이다).

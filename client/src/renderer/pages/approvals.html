@@ -834,6 +834,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       rvFilter = "all";
       document.querySelectorAll("#rvFilt .fchip").forEach((c) => c.classList.remove("on"));
     }
+    // ✅ ?status= — ④ 검증 허브의 「검증 대기」 판이 이 주소로 연다(2026-09-02 F4-05).
+    //   ⚠ **기존 진입을 안 깬다**: status가 없으면 아무것도 안 바꾼다(기본 칩이 그대로 산다).
+    //   ⚠ **우선순위**: `?asset=`이 함께 오면 asset이 이긴다 — 「이 건을 눌러 들어왔다」가 더 구체적이고,
+    //     asset 진입은 그 자산의 **전체 상황**을 보여야 해서 상태로 또 좁히면 왜 몇 건뿐인지 헷갈린다
+    //     (바로 아래 「자산으로 좁혀 들어왔으면 전체로 둔다」와 같은 이유).
+    //   ⚠ **화면에 실제로 있는 칩만** 받는다 — 없는 값을 넣으면 칩이 하나도 안 켜진 채 목록만
+    //     조용히 비어, 담당자는 「건이 없다」로 읽는다(있는데 안 보이는 것이 더 나쁘다).
+    try {
+      const 상태 = new URLSearchParams(location.search).get("status");
+      const 칩들 = [...document.querySelectorAll("#rvFilt .fchip")];
+      const 아는것 = 칩들.map(function (c) { return c.dataset.f; });
+      if (!scopeAsset && 상태 && 아는것.indexOf(상태) >= 0) {
+        rvFilter = 상태;
+        칩들.forEach(function (c) { c.classList.toggle("on", c.dataset.f === 상태); });
+      }
+    } catch (e) { /* 주소가 이상해도 화면은 떠야 한다 */ }
+
     // 🗂 지금 범위(2026-08-18 승인 시안) — 이 화면은 자산 좁히기가 **이미 있다**(scopeAsset).
     // 쿼리(?asset=)로만 받던 것을 범위와도 잇는다. 새 장치를 만들지 않는다.
     // ⚠ 쿼리로 들어온 값이 **먼저다** — 담당자가 「이 건」을 눌러 들어온 것이라 더 구체적이다.
