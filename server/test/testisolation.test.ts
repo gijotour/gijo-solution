@@ -37,7 +37,7 @@ const 표: Record<string, 격리> = {
 
   GIJO_BACKUP_DIR: { how: "each", tests: ["backup.test.ts", "observability.test.ts"] },
   GIJO_MEMORY_DB_PATH: { how: "each", tests: ["memory.test.ts", "backup.test.ts", "docsbundle.test.ts"] },
-  GIJO_SESSION_ARCHIVE_DIR: { how: "each", tests: ["sessionarchive.test.ts", "moatslices.test.ts"] },
+  GIJO_SESSION_ARCHIVE_DIR: { how: "each", tests: ["sessionarchive.test.ts", "moatslices.test.ts", "memorygrowth.test.ts"] },
   GIJO_LORA_DIR: { how: "each", tests: ["adapterimport.test.ts"] },
   GIJO_CLIENT_RELEASE_DIR: { how: "each", tests: ["clientrelease.test.ts"] },
   GIJO_MODELS_DIR: { how: "each", tests: ["agents.test.ts", "localengine.test.ts"] },

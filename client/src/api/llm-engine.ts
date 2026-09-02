@@ -176,8 +176,10 @@ export const learnloopApi = {
       candidates: {
         id: string; source: "chatlog" | "worksession" | "distill"; question: string; answer: string; createdAt: number;
         signals: { cite: boolean; tool: boolean; accepted: boolean; lengthOk: boolean }; score: number;
+        topic: string | null; // 주제 배지·필터(2026-08-08) — 서버는 주는데 타입에 빠져 있었다(검토관 2026-09-03)
       }[];
-      kpis: { candidates: number; strong: number; excludedByReason: Record<string, number> };
+      // candidates·strong=실대화·작업내역 기준 · distill=교사 증류(따로, 일괄 승인 대상 아님)
+      kpis: { candidates: number; strong: number; distill: number; excludedByReason: Record<string, number> };
     }>(`/api/learnloop/candidates?days=${days ?? 30}&limit=${limit ?? 60}`),
   decideCandidate: (id: string, accept: boolean) =>
     request<{ ok: true }>("/api/learnloop/candidates/decide", { method: "POST", body: { id, accept } }),

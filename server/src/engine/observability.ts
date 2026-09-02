@@ -110,7 +110,8 @@ function checkBackup(): HealthCheck {
 
 /** ② 지식베이스 — 비어 있으면 답변이 통째로 근거를 잃는다(2026-07-19 실사고). */
 function checkKnowledge(): HealthCheck {
-  const row = db.prepare("SELECT COUNT(*) AS n FROM memory_documents").get() as { n: number } | undefined;
+  // 승인 문답(origin=approved-qa)은 문서 수에서 뺀다 — 승인 300건이 「문서 300건」으로 읽히면 이 점검의 뜻이 어긋난다.
+  const row = db.prepare("SELECT COUNT(*) AS n FROM memory_documents WHERE COALESCE(origin,'') <> 'approved-qa'").get() as { n: number } | undefined;
   const n = row?.n ?? 0;
   if (n === 0) {
     return {

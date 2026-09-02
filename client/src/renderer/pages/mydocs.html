@@ -687,7 +687,8 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   var 가이드검색타이머 = null;
   // 회사 지식·반입에서 개인 문서(personal:*)는 뺀다(검토관 중3 — 서버 반입 소식도 같은 제외).
   // 개인 문서의 자리는 👤 내 것 탭이고, personal: id는 사람이 못 읽는 uuid다.
-  var 회사문서만 = function () { return know.filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0; }); };
+  // 승인 문답(origin=approved-qa)도 뺀다 — id가 「승인문답:<로그 id>」라 사람이 못 읽고, 관리 자리는 기억학습 화면이다(2026-09-03).
+  var 회사문서만 = function () { return know.filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0 && d.origin !== "approved-qa"; }); };
 
   // ⚠ 따옴표까지 막는다(검토관 상5) — 남의 자유 텍스트(학습 문답·파일명)가 title 속성에
   //   들어가는 화면이라, textContent 직렬화(&<>만)로는 속성 탈출 주입이 열린다.

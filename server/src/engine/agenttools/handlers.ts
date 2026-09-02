@@ -2776,7 +2776,7 @@ export async function runAuditSearch(args: Record<string, string>): Promise<stri
 // 인수인계는 4단계 마법사인데 "어디까지 됐나"를 물어볼 길이 없었다.
 // 담은 문서는 담당자 브라우저에만 있어 서버가 모른다 — 지식베이스 쪽 사실만 정직하게 답한다.
 export async function runHandoverStatus(): Promise<string> {
-  const docs = await listVisibleDocuments();
+  const docs = (await listVisibleDocuments()).filter((d) => d.origin !== "approved-qa"); // 승인 문답은 「올린 문서」가 아니다
   if (docs.length === 0) {
     return "아직 지식베이스에 올린 문서가 없습니다. 인수인계는 아래 대화 콘솔의 ＋로 문서를 올리는 것부터 시작합니다.";
   }
@@ -2851,7 +2851,9 @@ export async function runOntologyQuery(args: Record<string, string>): Promise<st
 }
 
 export async function runKnowledgeStatus(): Promise<string> {
-  const docs = await listVisibleDocuments(); // lancedb 조회라 비동기다
+  // 승인 문답(겹 1, origin=approved-qa)은 문서가 아니라 따로 센다 — 목록에도 안 섞는다(검토관 2026-09-03).
+  const 전체 = await listVisibleDocuments(); // lancedb 조회라 비동기다
+  const docs = 전체.filter((d) => d.origin !== "approved-qa");
   const triples = countTriples();
   if (docs.length === 0 && triples === 0) return "등록된 지식 자료가 없습니다. 문서를 먼저 인입하세요.";
 
@@ -2865,7 +2867,7 @@ export async function runKnowledgeStatus(): Promise<string> {
   // 승인 문답(겹 1 기억 성장, 2026-09-03)은 문서 수에 섞이면 「문서가 늘었다」로 읽힌다 — 따로 센다.
   const { countApprovedQaDocs } = await import("../learnmemory.js");
   const 승인문답 = countApprovedQaDocs();
-  const head = `장기기억 문서 ${docs.length}건 (조각 ${chunks}개${승인문답 ? `, 그중 승인 문답 ${승인문답}건` : ""}), 온톨로지 트리플 ${triples}개`;
+  const head = `장기기억 문서 ${docs.length}건 (조각 ${chunks}개)${승인문답 ? ` · 승인 문답 ${승인문답}건` : ""}, 온톨로지 트리플 ${triples}개`;
   const scopes = `범위별: ${Object.entries(byScope).map(([s, n]) => `${s} ${n}`).join(", ")}`;
   const recent = docs.slice(-5).map((d) => `- ${d.documentId}`).reverse();
   return `${head}\n${scopes}\n최근 인입:\n${recent.join("\n")}`;

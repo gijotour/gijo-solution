@@ -116,7 +116,8 @@
 | 9 | ROLE_CATEGORY로 팀원 지식영역에 반입 | scope에 한글을 넣으면 `safeScope`가 지워 검색 밖 | 반입 **scope=global**, 구분은 **category=topic**(TOPICS와 CATEGORIES 문자열 동일 — 매핑 불필요) |
 | 10 | 기억 반입은 새로 만든다 | `cloudllm.ts:375 saveCloudAnswerToKb`가 완성품 | 그 모양을 **일반화**한 `learnmemory.ts`로. documentId=`승인문답:<id>`, `uploadedBy` 비움(반입 소식 안 만듦), `origin="approved-qa"` 표시 |
 | 11 | 2.3시간/500건 | 창구 동시 2, 초과 429 | 동시 2 · 밤에 · 옆 포트 교사는 창구 슬롯을 안 뺏는다 |
-| 12 | 버린 수를 센다 | 후보함 KPI엔 자리 없음 | 편입 응답 `{accepted, rejected[{reason}]}` → 증류기가 `tools/team-bench/../distill-report-*.json`으로 남긴다 |
+| 12 | 버린 수를 센다 | 후보함 KPI엔 자리 없음 | 편입 응답 `{accepted, rejected[{reason}]}` → 증류기가 `.tmp-reports/distill-<주제>-<시각>.json`으로 남긴다(생성·사전검사 통과·편입·거절 사유·교사·토큰·시간) |
+| ★ | (검토관 5갈래, 2026-09-03 밤) 승인 한 번이 전역 문서를 만드는데 등급이 「공개」로 접힘 · 증류 후보 점수 상수 4 → 일괄 승인·상위 독식 · 승인 직후 해제 경합 · prune 고아 조각 · 문서 수 소비처 7곳 중 2곳만 · 미평가 데이터셋 경로가 증류를 삼킴 · ref 미검증 | 코드 | **전부 반영**: 반입 등급=승인자 등급(모르면 기밀) · 증류는 실대화 뒤에 점수 0으로만, 일괄 승인 제외 · 로그 id별 직렬 큐+사후 재확인 · prune도 해제 신호 · 소비처 7곳(배지·대장·중복·팀 구성·자가진단·지식/인수인계 현황·AI 지식/문서 허브 화면) · 미평가 경로·KPI에서 증류 제외 · ref 꼬리=본문 sha12 검증 · 위생(회피 답변) 재검사 · 실패는 감사 기록 · `GIJO_MEMORY_GROWTH=0` 스위치(시험은 끔) |
 | + | 문서 수 계열(knowledge_status·observability·문서 대장·중복 후보)이 흔들림 | 문답 1건=문서 1건 | `origin="approved-qa"` 문서는 **새로 들어온 문서 대장·중복 후보에서 제외**하고 지식 현황은 「문서 N · 승인 문답 M」로 따로 센다 |
 
 감시·계약: `internalprompt`(engine에서 LLM 직접 fetch 금지 → v1은 tools라 무관) · `seedintake.test`(편입 라우트 4계약: 출처 표시·admin·위생·지문 → 새 라우트도 짝 시험) · `memoryhooks.test`(배선 등록 누락 → app.ts 등록 + 청취자 수 시험) · `learnlooptopic.test`(증류 행에도 topic 필수) · `no-hardcoded-credentials`(토큰은 env) · `corpusleak`(근거는 `knowledge/`·업로드 문서로 제한).
@@ -218,6 +219,7 @@
 - **승인 병목**: 300×5 = 1,500 승인. §9-3 ⓑ 없으면 일정이 두 배.
 - **「설치됐다 ≠ 돈다」**: gb10 학습 환경·GGUF 변환·적재까지 끝까지 한 번(§4.2).
 - **기준선 오염**: 게이트·A/B 실행은 `qa:true`로 세션·학습 수집을 건너뛴다(중-3 원칙).
+- **잔여 위험(겹 1, 검토관 2026-09-03)**: 승인자가 **자기 개인 문서**를 근거로 받은 답을 승인하면 그 내용이 같은 열람 등급의 다른 사람에게 보일 수 있다 — 답이 어느 문서에서 왔는지 로그가 안 남기므로 코드가 못 가린다. 지금은 「승인자 등급으로 잠금」까지만 막는다. 닫으려면 chat_logs에 「근거 문서 id」를 남기는 관측성(LLMOps 계획서 ①)이 먼저다.
 
 ---
 

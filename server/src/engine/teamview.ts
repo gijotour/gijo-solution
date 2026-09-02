@@ -50,7 +50,8 @@ export interface TeamComposition {
 }
 
 // 문서 수는 SQLite 메타(memory_documents)가 원장이다 — LanceDB를 열지 않아 값싸다.
-const docCountByScopeStmt = db.prepare("SELECT scope, COUNT(*) AS n FROM memory_documents GROUP BY scope");
+// 승인 문답(origin=approved-qa, learnmemory 2026-09-03)은 「팀 공용 자산 문서」가 아니다 — 빼고 센다.
+const docCountByScopeStmt = db.prepare("SELECT scope, COUNT(*) AS n FROM memory_documents WHERE COALESCE(origin,'') <> 'approved-qa' GROUP BY scope");
 
 export function getTeamComposition(): TeamComposition {
   const engine = getLocalEngineStatus();

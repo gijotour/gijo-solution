@@ -31,9 +31,13 @@ describe("chat_logs.origin — 어떻게 생긴 문답인가", () => {
     expect([...CHAT_LOG_ORIGINS]).toEqual(["chat", "worksession", "seed", "distill"]);
   });
 
-  it("INSERT 자리 두 곳 다 origin을 적는다 — 한 곳만 고치면 반쪽이다", () => {
+  it("chat_logs INSERT 자리 **전부**가 origin을 적는다 — 새 자리를 origin 없이 더하면 여기서 걸린다", () => {
+    // 세는 방식(learnhygiene.test와 같은 잣대): 서버 소스의 INSERT INTO chat_logs 수 == origin이 든 INSERT 수.
+    const srcs = [learnloopSrc, candSrc];
+    const all = srcs.flatMap((s) => s.match(/INSERT INTO chat_logs \([^)]*\)/g) || []);
+    expect(all.length).toBe(3);
+    expect(all.every((stmt) => /\borigin\b/.test(stmt)), `origin 없는 INSERT: ${all.filter((s) => !/\borigin\b/.test(s)).join(" | ")}`).toBe(true);
     expect(learnloopSrc).toMatch(/INSERT INTO chat_logs \([^)]*origin\)[^;]*'chat'\)/);
-    expect(candSrc).toMatch(/INSERT INTO chat_logs \([^)]*topic, origin\)/);
     expect(candSrc).toContain('origin: "worksession"');
     expect(candSrc).toContain('origin: "seed"');
     expect(candSrc).toMatch(/INSERT INTO chat_logs \([^)]*teacher, cites, promptHash\)[^;]*'distill'/);
@@ -43,6 +47,10 @@ describe("chat_logs.origin — 어떻게 생긴 문답인가", () => {
     const block = clientTypes.slice(clientTypes.indexOf("export interface LearnloopChatLog"), clientTypes.indexOf("export interface LearnloopRun"));
     for (const k of ["topic:", "origin:", "teacher:", "cites:"]) expect(block, `LearnloopChatLog에 ${k} 없음`).toContain(k);
     expect(clientTypes).toContain('source: "chatlog" | "worksession" | "distill"');
+    // 후보 응답 타입에도 topic·distill KPI가 있어야 한다(같은 누락을 6줄 아래서 반복하지 않는다 — 검토관 2026-09-03)
+    const cand = clientTypes.slice(clientTypes.indexOf("candidates: (days?: number"), clientTypes.indexOf("decideCandidate:"));
+    expect(cand).toContain("topic: string | null");
+    expect(cand).toContain("distill: number");
   });
 
   it("컬럼 이름은 origin이다 — source(후보함의 다른 축)와 섞지 않는다", () => {

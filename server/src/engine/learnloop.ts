@@ -51,6 +51,7 @@ export interface ChatLog {
   origin: ChatLogOrigin; // 어떻게 생긴 문답인가(§3.6-2) — 옛 행(NULL)은 'chat'
   teacher: string | null; // 증류 행만 — 교사 모델 id(응답의 model 필드 실측값, 상수 아님)
   cites: string[]; // 증류 행만 — 근거 조각 ref(경로#sha12) 목록. 비면 []
+  promptHash: string | null; // 증류 행만 — 교사에게 준 프롬프트의 해시(재현성). API로도 되짚을 수 있어야 한다
 }
 
 /** 문답의 출처. 후보함의 source(어디서 찾았나)와 다른 축이다. */
@@ -118,7 +119,7 @@ const logKpiStmt = db.prepare(
   `SELECT COUNT(*) AS total,
           SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) AS positive,
           SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) AS negative,
-          SUM(CASE WHEN usedInDataset = 0 AND (rating = 1 OR rating IS NULL) THEN 1 ELSE 0 END) AS unused
+          SUM(CASE WHEN usedInDataset = 0 AND (rating = 1 OR rating IS NULL) AND COALESCE(origin,'chat') <> 'distill' THEN 1 ELSE 0 END) AS unused
    FROM chat_logs`
 );
 const getLogStmt = db.prepare("SELECT * FROM chat_logs WHERE id = ?");
@@ -127,8 +128,10 @@ const deleteLogStmt = db.prepare("DELETE FROM chat_logs WHERE id = ?");
 const pickLogsStmt = db.prepare(
   "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND rating = 1 ORDER BY createdAt ASC"
 );
+// ⚠ 미평가 포함 경로는 **증류 행을 뺀다** — 증류는 rating NULL로 들어오므로(승인은 사람) 이 경로가
+//   「승인 없는 학습 재료」의 유일한 우회로가 된다(검토관 2026-09-03 상 — 2026-08-01 잡담 유입 사고와 같은 문).
 const pickLogsWithUnratedStmt = db.prepare(
-  "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND (rating = 1 OR rating IS NULL) ORDER BY createdAt ASC"
+  "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND (rating = 1 OR rating IS NULL) AND COALESCE(origin,'chat') <> 'distill' ORDER BY createdAt ASC"
 );
 // 주제별 전문가 학습(재설계 2단계) — 그 주제 딱지가 붙은 것만 재료로 쓴다.
 // ⚠ 2026-08-09부터 주제 데이터셋은 아래 pickAll* (전체 승인분)을 쓴다 — vN+1 재학습이
@@ -137,7 +140,7 @@ const pickAllApprovedByTopicStmt = db.prepare(
   "SELECT * FROM chat_logs WHERE rating = 1 AND topic = ? ORDER BY createdAt ASC"
 );
 const pickAllWithUnratedByTopicStmt = db.prepare(
-  "SELECT * FROM chat_logs WHERE (rating = 1 OR rating IS NULL) AND topic = ? ORDER BY createdAt ASC"
+  "SELECT * FROM chat_logs WHERE (rating = 1 OR rating IS NULL) AND topic = ? AND COALESCE(origin,'chat') <> 'distill' ORDER BY createdAt ASC"
 );
 // 학습 시작 게이트용 — usedInDataset 여부와 무관하게 그 주제의 **승인 총량**을 센다
 // (게이트는 "재료가 이만큼 모였나"의 판정이지 "아직 안 쓴 게 몇 개냐"가 아니다).
@@ -222,6 +225,7 @@ const logFromRow = (r: ChatLogRow): ChatLog => ({
   origin: (CHAT_LOG_ORIGINS as readonly string[]).includes(r.origin ?? "") ? (r.origin as ChatLogOrigin) : "chat",
   teacher: r.teacher ?? null,
   cites: parseCites(r.cites),
+  promptHash: r.promptHash ?? null,
 });
 
 function parseCites(raw: string | null | undefined): string[] {
@@ -234,7 +238,10 @@ function parseCites(raw: string | null | undefined): string[] {
 // 나머지가 샌다. 그래서 「rating이 1이 되는/1에서 벗어나는」 사건을 **여기 한 곳**에서 방송하고,
 // 입구들은 전부 emitChatLogRated를 부른다(짝 시험 memorygrowth.test가 소스로 지킨다).
 // 청취자는 learnmemory.ts(승인 → 그 주제 지식영역에 반입, 해제/삭제 → 조각 제거)다.
-export type ChatLogRatedEvent = { kind: "approved"; log: ChatLog } | { kind: "unapproved"; id: string };
+// approverId: 승인한 사람(계정 id). 겹 1이 반입 문서의 **열람 등급을 승인자의 등급으로** 잠그는 데 쓴다
+//   (검토관 2026-09-03 상 — 등급 NULL은 「공개」로 접혀 기밀 근거로 만든 답이 등급 밖으로 새는 세탁 경로).
+//   모르면 undefined → 청취자가 가장 좁은 등급(기밀)으로 닫는다(fail-closed).
+export type ChatLogRatedEvent = { kind: "approved"; log: ChatLog; approverId?: string | null } | { kind: "unapproved"; id: string };
 type ChatLogRatedListener = (e: ChatLogRatedEvent) => void;
 const ratedListeners: ChatLogRatedListener[] = [];
 export function onChatLogRated(l: ChatLogRatedListener): void { ratedListeners.push(l); }
@@ -363,6 +370,12 @@ export function pruneChatLogs(cap = CHATLOG_MAX): number {
   if (removed > 0) {
     console.warn(`[learnloop] 수집 로그 보존 상한(${cap}) 초과 — ${removed}건 아카이브 후 정리`);
   }
+  // 삭제 입구는 둘(deleteChatLog·여기)이다 — 여기서도 승인돼 있던 행은 기억에서 뺀다(검토관 2026-09-03 상).
+  //   1순위 정리 대상이 usedInDataset=1인데 그것이 곧 「승인돼 학습에 쓰인 행」이라, 신호 없이 지우면
+  //   승인문답:<id> 조각이 로그 없는 고아로 영원히 남는다(되돌릴 손잡이도 사라진다).
+  for (const r of doomed as { id: string; rating?: number | null }[]) {
+    if (r.rating === 1) emitChatLogRated({ kind: "unapproved", id: r.id });
+  }
   return removed;
 }
 
@@ -429,13 +442,13 @@ export function listChatLogs(limit = 50, offset = 0): { logs: ChatLog[]; kpis: {
   };
 }
 
-export function rateChatLog(id: string, rating: 1 | -1 | 0): ChatLog {
+export function rateChatLog(id: string, rating: 1 | -1 | 0, approverId?: string | null): ChatLog {
   const row = getLogStmt.get(id) as ChatLogRow | undefined;
   if (!row) throw new Error("존재하지 않는 대화 로그입니다");
   rateLogStmt.run(rating === 0 ? null : rating, id);
   const after = logFromRow(getLogStmt.get(id) as ChatLogRow);
   // 승인 신호(겹 1) — 1이 되면 반입, 1에서 벗어나면 제거. 같은 값 반복은 청취자가 멱등으로 받는다.
-  if (rating === 1) emitChatLogRated({ kind: "approved", log: after });
+  if (rating === 1) emitChatLogRated({ kind: "approved", log: after, approverId: approverId ?? null });
   else if (row.rating === 1) emitChatLogRated({ kind: "unapproved", id });
   return after;
 }
@@ -863,7 +876,9 @@ export function registerLearnloopRoutes(app: Express): void {
       return;
     }
     try {
-      res.json(rateChatLog(String(req.params.id), rating as 1 | -1 | 0));
+      // approverId — 겹 1이 반입 문서의 열람 등급을 승인자 등급으로 잠근다(등급 세탁 방지).
+      const approverId = (req as typeof req & { user?: { id?: string } }).user?.id ?? null;
+      res.json(rateChatLog(String(req.params.id), rating as 1 | -1 | 0, approverId));
     } catch (err) {
       res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
     }

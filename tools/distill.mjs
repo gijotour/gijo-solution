@@ -10,7 +10,8 @@
 // 사용:
 //   GIJO_ADMIN_USER=… GIJO_ADMIN_PASSWORD=… [GIJO_SERVE_TOKEN=…] node tools/distill.mjs --topic 취약점 [--limit 500]
 //     [--endpoint http://10.8.0.12:4000/api/llm/serve/v1] [--server http://localhost:4000]
-//     [--per-chunk 3] [--concurrency 2] [--files "knowledge/*.md,GIJO_AS_취약점관리_지침.md"] [--dry-run]
+//     [--per-chunk 3] [--concurrency 2] [--files "knowledge/*.md,GIJO_AS_취약점관리_지침.md"] [--dry-run] [--no-intake]
+//   --no-intake: 편입 없이 교사 수율(사전검사 통과율)만 잰다 — 보고서의 accepted는 0, preChecked에 남는다.
 // 산출: .tmp-reports/distill-<주제>-<시각>.json (생성·사전검사·편입·거절 사유·교사·토큰·시간 — 폐기율이 교사 품질 지표)
 //
 // 근거 조각 = 저장소의 문서 파일(기본: server/docs-manifest.json의 files + knowledge/*.md)을 800자로 자른 것.
@@ -87,8 +88,9 @@ function overlap20(answer, text) { // 서버 근거겹침과 같은 규칙(20자
   for (let i = 0; i + 20 <= s.length; i += 4) { const w = s.slice(i, i + 20); if (a.includes(w)) return w; }
   return null;
 }
-// 위생 사전검사(서버 datasethygiene 시점데이터 규칙의 요지) — 날짜·「N건」 나열은 서버가 거절하니 미리 거른다.
-const 시점데이터 = (a) => /\d{4}-\d{2}-\d{2}/.test(a) || ((a.match(/\d+\s*건/g) || []).length >= 3);
+// 위생 사전검사(서버 datasethygiene 시점데이터 규칙 세 신호 전부) — 날짜·「N건」 나열·우리 DB 식별자는 서버가 거절하니 미리 거른다.
+// ⚠ 최종 관문은 서버다(규칙이 바뀌면 서버가 거절한다) — 여기는 왕복을 아끼는 사전검사일 뿐.
+const 시점데이터 = (a) => /\d{4}-\d{2}-\d{2}/.test(a) || ((a.match(/\d+\s*건/g) || []).length >= 3) || /\b(?:vuln|asset|prod|cti):[\w.-]+/.test(a);
 
 // ── 교사 호출 ──────────────────────────────────────────────────────
 const SYSTEM = [
@@ -119,12 +121,12 @@ async function askTeacher(ref, text) {
 async function login() {
   const user = process.env.GIJO_ADMIN_USER, password = process.env.GIJO_ADMIN_PASSWORD;
   if (!user || !password) throw new Error("GIJO_ADMIN_USER / GIJO_ADMIN_PASSWORD 환경변수가 필요합니다(편입은 admin)");
-  const j = await (await fetch(SERVER + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password, force: true }) })).json();
+  const j = await (await fetch(SERVER + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password, force: true }), redirect: "error" })).json();
   if (!j.accessToken) throw new Error("로그인 실패: " + JSON.stringify(j).slice(0, 120));
   return { "Content-Type": "application/json", Authorization: "Bearer " + j.accessToken };
 }
 async function intake(auth, teacher, items) {
-  const r = await fetch(SERVER + "/api/learnloop/distill/intake", { method: "POST", headers: auth, body: JSON.stringify({ teacher, items }) });
+  const r = await fetch(SERVER + "/api/learnloop/distill/intake", { method: "POST", headers: auth, body: JSON.stringify({ teacher, items }), redirect: "error" });
   const j = await r.json();
   if (!r.ok) throw new Error(`편입 ${r.status}: ${JSON.stringify(j).slice(0, 160)}`);
   return j;
@@ -146,7 +148,7 @@ console.log(`[distill] 주제 ${TOPIC} · 파일 ${files.length} · 주제 조�
 if (!pool.length) { console.error("주제에 맞는 조각이 없습니다 — --files 로 문서를 더 주세요"); process.exit(2); }
 if (DRY) { for (const p of picked.slice(0, 3)) console.log("--", p.ref, "\n", p.text.slice(0, 200).replace(/\n/g, " ")); process.exit(0); }
 
-const report = { topic: TOPIC, endpoint: ENDPOINT, startedAt: new Date().toISOString(), files: files.length, chunks: picked.length, generated: 0, preRejected: {}, accepted: 0, rejected: {}, teacher: null, tokens: { prompt: 0, completion: 0 }, teacherMs: 0, errors: [] };
+const report = { topic: TOPIC, endpoint: ENDPOINT, startedAt: new Date().toISOString(), files: files.length, chunks: picked.length, generated: 0, preRejected: {}, preChecked: 0, accepted: 0, rejected: {}, teacher: null, tokens: { prompt: 0, completion: 0 }, teacherMs: 0, errors: [] };
 // --no-intake: 편입 없이 교사 수율만 잰다(교사·프롬프트 비교용) — 서버 로그인도 안 한다.
 const NO_INTAKE = has("--no-intake");
 const auth = NO_INTAKE ? null : await login();
@@ -154,7 +156,8 @@ const queue = [...picked]; let teacherId = null; const batch = []; const flushEv
 async function flush(force = false) {
   if (!batch.length || (!force && batch.length < flushEvery)) return;
   const items = batch.splice(0, batch.length);
-  if (NO_INTAKE) { report.accepted += items.length; console.log(`[distill] (편입 생략) 사전검사 통과 ${items.length}건`); return; }
+  report.preChecked += items.length;
+  if (NO_INTAKE) { console.log(`[distill] (편입 생략) 사전검사 통과 ${items.length}건`); return; }
   try {
     const r = await intake(auth, teacherId || "unknown", items);
     report.accepted += r.accepted;
@@ -188,4 +191,4 @@ fs.mkdirSync(path.join(repo, ".tmp-reports"), { recursive: true });
 const out = path.join(repo, ".tmp-reports", `distill-${TOPIC}-${new Date().toISOString().replace(/[:T]/g, "-").slice(0, 16)}.json`);
 fs.writeFileSync(out, JSON.stringify(report, null, 2));
 const total = report.generated || 1;
-console.log(`[distill] 끝 — 생성 ${report.generated} · 사전거절 ${Object.values(report.preRejected).reduce((a, b) => a + b, 0)} · 편입 ${report.accepted}(${((report.accepted / total) * 100).toFixed(0)}%) · 서버거절 ${JSON.stringify(report.rejected)} · 교사 ${report.teacher} · 교사시간 ${(report.teacherMs / 60000).toFixed(1)}분 · 보고서 ${out}`);
+console.log(`[distill] 끝 — 생성 ${report.generated} · 사전거절 ${Object.values(report.preRejected).reduce((a, b) => a + b, 0)} · 사전검사 통과 ${report.preChecked}(${((report.preChecked / total) * 100).toFixed(0)}%) · 편입 ${NO_INTAKE ? "생략" : `${report.accepted}(${((report.accepted / total) * 100).toFixed(0)}%)`} · 서버거절 ${JSON.stringify(report.rejected)} · 교사 ${report.teacher} · 교사시간 ${(report.teacherMs / 60000).toFixed(1)}분 · 보고서 ${out}`);

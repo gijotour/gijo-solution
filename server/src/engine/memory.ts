@@ -217,7 +217,9 @@ const docsByAssetStmt = db.prepare(
 //     @me가 비면 uploadedBy 비교가 안 맞아 남의 미공유 개인문서는 fail-closed로 안 세어진다.
 const recentDocCountStmt = db.prepare(
   "SELECT COUNT(*) AS n FROM memory_documents WHERE ingestedAt >= @since" +
-    " AND (origin IS NULL OR origin <> 'builtin')" +
+    // builtin(제품 내장)·approved-qa(승인 문답, learnmemory 2026-09-03)는 「새로 들어온 문서」가 아니다 —
+    // 대장(docdigest.listRecentDocs)과 같은 제외. 배지만 빠뜨리면 2026-08-21 사고가 방향만 바뀌어 재발한다.
+    " AND (origin IS NULL OR origin NOT IN ('builtin','approved-qa'))" +
     " AND (documentId NOT LIKE 'personal:%' OR uploadedBy = @me" +
     " OR documentId IN (SELECT 'personal:' || id FROM personal_docs WHERE shared = 1))"
 );
@@ -1338,6 +1340,7 @@ export interface MemoryDocument {
   docClass: string | null; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타) — 분류 전 문서는 null
   uploadedBy: string | null; // 작업 귀속 — 누가 올렸는지(2026-07-25)
   category: string | null; // 업무영역 5종(취약점·장비운영·사내규정·위협대응·일반) — 마이그레이션 전 문서는 null
+  origin: string | null;   // 'builtin'(제품 내장) · 'approved-qa'(승인 문답, learnmemory) · null(고객 업로드). 화면이 목록에서 가르는 데 쓴다
   grade: string | null;    // 기밀 C·민감 S·공개 O (engine/grades.ts). 마이그레이션에서 기존 문서는 O로 넣었다.
 }
 
@@ -1378,6 +1381,7 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
       docClass: meta?.docClass ?? null,
       uploadedBy: meta?.uploadedBy ?? null,
       category: meta?.category ?? null,
+      origin: (meta as { origin?: string | null } | undefined)?.origin ?? null,
       grade: meta?.grade ?? null,
     });
   }

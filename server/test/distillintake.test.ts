@@ -48,6 +48,26 @@ describe("증류 편입", () => {
     expect(intakeDistilledCandidates("t", [ok, ok]).byReason["이미 있음"]).toBe(1);
   });
 
+  it("ref 꼬리(sha12)가 본문 해시와 다르면 거절한다 — 표시되는 근거가 검증된 것이어야 한다", () => {
+    const r = intakeDistilledCandidates("t", [
+      { question: "취약점 조치 우선순위는 어떻게 정하나요?", answer: 좋은답, topic: "취약점", cites: [{ ref: "knowledge/a.md#000000000000", text: 근거 }] },
+    ]);
+    expect(r.accepted).toBe(0);
+    expect(r.rejected[0].reason).toMatch(/근거 ref 불일치/);
+  });
+
+  it("증류 후보는 실대화 뒤에 붙고 점수 0(일괄 승인 대상 아님), KPI는 따로 센다", () => {
+    intakeDistilledCandidates("t", [
+      { question: "취약점 조치 우선순위는 어떻게 정하나요?", answer: 좋은답, topic: "취약점", cites: [{ ref: "x#1", text: 근거 }] },
+    ]);
+    const { candidates, kpis } = listLearnCandidates(30, 60);
+    const d = candidates.find((c) => c.source === "distill")!;
+    expect(d.score).toBe(0);
+    expect(d.signals.cite).toBe(true);
+    expect(kpis.distill).toBe(1);
+    expect(kpis.candidates).toBe(0); // 실대화·작업내역 기준
+  });
+
   it("교사 id가 없으면 넣지 않는다 — 「무엇으로 배웠나」를 잃지 않기 위해", () => {
     expect(() => intakeDistilledCandidates("", [])).toThrow(/teacher/);
   });
