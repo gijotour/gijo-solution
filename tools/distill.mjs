@@ -70,7 +70,17 @@ function listSourceFiles() {
 }
 
 function chunk(text, size = 800, overlap = 100) {
-  const paras = text.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
+  // 빈 줄 없이 이어진 문서(변환된 PDF 등)는 문단 하나가 수만 자다 — 그대로 두면 한 조각이 교사 문맥(16K)을 넘긴다
+  // (2026-09-03 실측: KISA 가이드 조각이 149,612토큰으로 교사 400). 긴 문단은 문장 경계에서 size로 다시 자른다.
+  const paras = text.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean).flatMap((p) => {
+    if (p.length <= size * 2) return [p];
+    const out = []; let buf = "";
+    for (const s of p.split(/(?<=[.!?。]|다\.|니다\.)\s+/)) {
+      if ((buf + " " + s).length > size && buf) { out.push(buf); buf = s; } else buf = buf ? buf + " " + s : s;
+    }
+    if (buf) out.push(buf);
+    return out.flatMap((c) => (c.length > size * 2 ? (c.match(new RegExp(`[\\s\\S]{1,${size}}`, "g")) || []) : [c]));
+  });
   const chunks = []; let cur = "";
   for (const p of paras) {
     if ((cur + "\n\n" + p).length > size && cur) { chunks.push(cur); cur = cur.slice(-overlap) + "\n\n" + p; }
