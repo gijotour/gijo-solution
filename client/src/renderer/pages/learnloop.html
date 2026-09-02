@@ -282,7 +282,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     { key: "stopping-engines", label: "엔진 정지" },
     { key: "training", label: "학습" }, // ⚠ 2026-09-02(F5-09) 「학습(QLoRA)」에서 방식 이름을 뺐다 — 담당자에게 방식 이름은 뜻이 없다
     { key: "exporting", label: "제품이 쓸 형식으로 변환" }, // ⚠ 2026-09-02(F5-09) 「GGUF 변환」에서 형식 이름을 뺐다
-    { key: "deploying", label: "에이전트 배포" },
+    // ⚠ 2026-09-02 「에이전트 배포」에서 고쳤다 — **거짓말이었다.**
+    //   이 단계가 실제로 하는 일은 어댑터를 **「미채택」으로 등록**하는 것뿐이다
+    //   (learnloop.ts: 「**미채택**으로 올린다 — 평가 게이트 통과 후 사람이 채택해야 서빙에 실린다」).
+    //   「배포」라 적으면 담당자는 이미 쓰이고 있는 줄 알고 채택을 안 한다 — 만들어 놓고 안 쓰는 결과가 된다.
+    { key: "deploying", label: "전문가 등록 (채택 대기)" },
     { key: "restarting-engines", label: "엔진 재기동" },
   ];
 

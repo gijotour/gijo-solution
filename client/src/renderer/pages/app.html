@@ -63,6 +63,17 @@
      ■ 접기(1+3의 「3」)는 **새 키**(gijo:proMenu:collapsed)다 — 표준의
        gijo:leftPanel:collapsed(LEFT_KEY)를 같이 쓰면 프로에서 접은 것이 표준 사이드바를
        접는다(설계 검토 [높음]). body 클래스가 --menu-w를 0으로 만들 뿐, 격자 규칙은 하나다. */
+  /* 🧭 프로 규칙 배너(F3-10) — 얇은 한 줄. 새 색을 만들지 않는다:
+     --blue-ink는 pro-white.css:129에 실재하고, 다크(표준 배색)에서도 읽히도록 폴백을 함께 준다
+     (이 저장소 관례 — agent.html 등이 같은 꼴을 쓴다). 배경은 리터럴 rgba라 색 감시 대상이 아니다. */
+  #proRule{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:7px 14px;font-size:12.5px;
+    background:rgba(29,79,145,.10);border-bottom:1px solid var(--border);}
+  #proRule .pr-t{font-weight:800;color:var(--blue-ink, #7db2f8);white-space:nowrap;}
+  #proRule .pr-s{color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #proRule button{margin-left:auto;flex:0 0 auto;background:transparent;border:0;cursor:pointer;
+    color:var(--muted);font-size:13px;line-height:1;padding:4px 6px;border-radius:6px;}
+  #proRule button:hover{color:var(--text-strong, #fff);background:rgba(255,255,255,.08);}
+  @media (prefers-reduced-motion: no-preference){#proRule{transition:opacity .18s ease;}}
   body.pro-shell .app{grid-template-columns:var(--menu-w, 200px) minmax(0,1fr);}
   /* nav.js injectCss가 #gijoNav에 sticky·100vh를 주입한다(단독 화면용) — 프로 격자는
      44px 상단바 아래라 100vh가 넘친다. !important 아닌 선언이라 특이도로 이긴다. */
@@ -426,6 +437,18 @@
   <!-- 시계·세션 — titlebar.js가 채운다(예전에 화면마다 있던 것을 셸 한 곳으로).
        ⚠ 서버 연결상태 배지는 없앴다(2026-08-08 사용자 지시) — titlebar.js 정보채우기 참조. -->
   <div id="tbInfo"></div>
+</div>
+<!-- 🧭 프로 규칙 배너(2026-09-02 F3-10) — **한 번만** 보이고 닫으면 다시 안 나온다.
+     왜 화면이 아니라 셸에 두나: 이 문장은 특정 화면의 사용법이 아니라 **제품 전체의 사용 규칙**이다.
+     대화 홈 안에 넣으면 첫 화면이 대시보드가 된 지금(2026-09-02 결정) **아예 안 보인다.**
+     ⚠ 「화면에 설명을 쓰지 않는다」의 예외가 아니라 **그 규칙의 사례**다 — 사용법이 아니라
+       정체성 한 줄이고, 1회로 못박아 상시 자리를 안 먹는다.
+     ⚠ #shellTop **밖**이다(shelllayout 시험이 그 블록 구성을 못박는다). body 세로 flex의 자식이라
+       flex:0 0 auto가 없으면 눌린다. -->
+<div id="proRule" hidden>
+  <span class="pr-t">보는 일은 <b>화면</b>에서, 시키는 일은 <b>대화창</b>에서</span>
+  <span class="pr-s">메뉴를 처음 고르면 대화창이 오른쪽 손잡이로 접힙니다 — 손잡이를 누르면 다시 펴집니다.</span>
+  <button type="button" id="proRuleX" title="닫기 — 다시 보이지 않습니다">✕</button>
 </div>
 <div class="app">
   <div id="gijoNav"></div>
@@ -1522,6 +1545,7 @@
       open("dashboard.html", "대시보드");
       var 프로홈탭 = find("dashboard.html");
       if (프로홈탭) 프로홈탭.pinned = true;
+      규칙배너();
       var wasPopped0 = "0";
       try { wasPopped0 = localStorage.getItem("gijo:console:popped") || "0"; } catch (e) {}
       if (wasPopped0 === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(프로인가() ? "light" : undefined); }
@@ -1752,6 +1776,23 @@
     //   접기 전 값으로 클램프하면 화면 판이 420이 안 나온다.
     var 현재 = parseInt(getComputedStyle(work).getPropertyValue("--console-w"), 10);
     if (현재 && isFinite(현재)) 대화폭적용(현재, false);
+  }
+
+  // 🧭 F3-10 — 규칙 한 줄을 **한 번만** 보인다. 닫으면 저장하고 다시 안 그린다.
+  var RULE_KEY = "gijo:proRule:seen";
+  function 규칙배너() {
+    if (!프로인가()) return;
+    var el = document.getElementById("proRule");
+    if (!el) return;
+    var 봤나 = "0";
+    try { 봤나 = localStorage.getItem(RULE_KEY) || "0"; } catch (e) { }
+    if (봤나 === "1") return;                    // 이미 닫았다 — 다시 안 그린다
+    el.hidden = false;
+    var x = document.getElementById("proRuleX");
+    if (x) x.addEventListener("click", function () {
+      el.hidden = true;
+      try { localStorage.setItem(RULE_KEY, "1"); } catch (e) { }
+    });
   }
 
   function 대화폭클램프(px) {

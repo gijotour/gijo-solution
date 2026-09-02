@@ -145,6 +145,25 @@ export function 첫설치인가(): boolean {
   return 첫설치;
 }
 
+/**
+ * 이 PC에서 **전에 로그인해 본 적이 있나** (2026-09-02 F1-01).
+ *
+ * 왜 필요한가 — 분산 모드(서버는 회사 어딘가, 이 PC엔 화면만) 담당자는 로컬 DB가 없어서
+ * `첫설치`가 **영원히 참**이다. 그래서 2026-08-11에 「이미 GIJO 서버가 있어요」 우회를 넣었는데,
+ * **고른 것을 기억하지 않아 앱을 켤 때마다 「관리자 계정 만들기」부터 다시 묻는다.**
+ * 매번 그 화면을 지나야 하고, 잘못 누르면 자기 PC에 **빈 서버와 가짜 관리자 계정**이 생긴다.
+ *
+ * ⚠ 새 파일·새 통로를 만들지 않는다 — 로그인에 성공할 때마다 이미 쌓이는 `gijo-logins.json`을
+ *   **읽기만** 한다. 기록이 하나라도 있으면 「이 사람은 이미 어느 서버를 쓰고 있다」는 뜻이다.
+ * ⚠ 이 값은 **첫 화면을 무엇으로 띄울까**에만 쓴다. `첫설치`(= 로컬 DB가 없다 = 설정이 가능하다)는
+ *   그대로 둬야 한다 — 그래야 `setupNeeded()`가 참으로 남아, 나중에 자기 PC에 서버를 세우려는
+ *   사람이 로그인 화면에서 「처음 설정으로」 돌아갈 수 있다. 둘을 한 칸에 합치면 그 길이 막힌다.
+ *   (승인 시안은 판정 자체를 고치자고 했는데, 그러면 그 길이 막혀서 여기만 바꿨다.)
+ */
+export function 로그인한적있나(): boolean {
+  try { return readCreds().length > 0; } catch { return false; }
+}
+
 /** 번들 서버의 자리와 실행 조건. **띄우지 않고** 계산만 한다(첫 설치 판정에 먼저 필요하다). */
 function 번들서버구성(): { entry: string; serverRoot: string; dataRoot: string; env: NodeJS.ProcessEnv; 패키징본: boolean } | null {
   if (process.env.GIJO_SERVER_URL) return null; // 원격 서버를 명시적으로 지정한 경우 번들 서버 기동 안 함
@@ -391,7 +410,11 @@ function createMainWindow(): void {
   // 라이트면 첫 화면(로그인·설치)도 연초록을 입는다(max 실기 검증 회신 2026-08-20 —
   // login/setup이 lite-green 미적재라 라이트 첫인상이 다크·배지 「표준」이었다).
   mainWindow.loadFile(
-    path.join(__dirname, `../src/renderer/pages/${첫설치인가() ? "setup.html" : "login.html"}`),
+    // ⚠ 2026-09-02(F1-01): 「첫설치이고 **전에 로그인한 적이 없을 때만**」 설정 화면을 띄운다.
+    //   AND로만 붙였다 — setup이 뜨는 경우가 **줄기만** 하므로 게시 관문의 전제
+    //   (「로그인된 세션에서는 setup이 안 뜬다」)를 깨지 않는다(관문 파일을 열어 직접 확인했다).
+    //   전에 로그인한 적이 있으면 그 사람은 이미 어느 서버를 쓰고 있다 — 로그인 화면이 맞다.
+    path.join(__dirname, `../src/renderer/pages/${첫설치인가() && !로그인한적있나() ? "setup.html" : "login.html"}`),
     에디션() === "lite" ? { query: { edition: "lite" } } : undefined
   );
 
