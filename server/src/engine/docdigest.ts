@@ -158,7 +158,7 @@ export async function 알림창닫기(): Promise<void> {
   try {
     const { emitCollaboration } = await import("./collaboration.js");
     // 줄 맨 앞 아이콘 금지(말투 규범 — 그 자리는 상태 표식 자리다). 협업 독도 같은 잣대로 본다.
-    emitCollaboration({ from: "analyze", to: "orchestrator", message: 반입알림문구(m) });
+    emitCollaboration({ from: "curator", to: "orchestrator", message: 반입알림문구(m) }); // "analyze"는 존재하지 않는 id였다(검토관 2026-09-03) — 반입 소식은 사서의 일
   } catch { /* 알림 실패가 소식 저장을 되돌리지 않는다 */ }
 }
 

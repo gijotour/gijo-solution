@@ -240,6 +240,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     }
     const DESKS = [0, 1, 2, 3, 4, 5, 6].map(deskAt);
     // 방을 세로로 키운 만큼(ROWS 12→18) 앞쪽(하단) 요소는 아래로 내려 균형을 맞춘다 — 바닥이 넓어져 위·아래가 꽉 찬다.
+    // ⚠ ROWS 18→20(2026-09-03, 7번째 책상)에서는 일부러 안 내렸다 — 시안이 「ROWS만 늘리고 나머지 공식은 그대로(최소 변경)」로 정했다.
     const COFFEE = { x: 156, y: 134 }; // 커피 코너(픽셀 좌표)
     const TABLE = { x: 78, y: 104 };   // 라운지 소파존(중앙 바닥을 채운다)
     // 미팅룸(2026-07-23) — 외부 방문자가 여기 앉아 보안총괄에게 지시하고, 보안총괄이 합석한다.
@@ -252,7 +253,8 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     const ml = () => (sideBySide() ? Math.round(W * MEET_FRAC) : Math.max(20, W - 120));
     const mr = () => W - 8;
     const MEETING = {
-      get x0() { return ml(); }, get y0() { return sideBySide() ? 22 : 92; },
+      // 좁은 창(위=업무존/아래=미팅룸): 7번째 책상이 3번째 줄(y≈70)에 놓이므로 경계를 92→104로 내린다(시안 team-7-curator 「구현 시 택 1」, 2026-09-03).
+      get x0() { return ml(); }, get y0() { return sideBySide() ? 22 : 104; },
       get x1() { return mr(); }, get y1() { return H - 12; },
     };
     const MTABLE = {

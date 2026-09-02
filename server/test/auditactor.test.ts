@@ -36,6 +36,8 @@ describe("작업 기록의 「누가」는 사람이 읽는 이름이다", () =>
       // actorOf(...) 정의나 actor: 값으로 username을 쓰는 꼴.
       if (/actorOf[^\n]*user\?\.username/.test(code)) 위반.push(`${파일} (actorOf)`);
       if (/actor:\s*[^\n,]*user\?\.username/.test(code)) 위반.push(`${파일} (actor:)`);
+      // 헬퍼 이름이 영문 actorOf가 아니어도(예: 한글 「행위자」) 잡는다 — 2026-09-03 agents.ts가 이 감시를 빠져나갔다.
+      if (/(행위자|actor)[^\n]*user\?\.username/.test(code)) 위반.push(`${파일} (행위자/actor 헬퍼)`);
     }
     expect(위반, `감사 actor에 계정 아이디를 쓰는 곳: ${위반.join(", ")}`).toEqual([]);
   });

@@ -66,16 +66,25 @@ describe("부르는 문 — 팀원 이름은 실제 호출부가 만든다", () 
     }
   });
 
-  it("검색어 재작성은 성공 가지에서만 사서의 일로 센다(실패·미채택을 세면 「일했다」가 부풀려진다)", () => {
+  it("검색어 재작성은 짝 있는 신호(start↔done/error)로 사서의 일을 센다 — done만 내면 레일이 일하는 중인 불을 꺼 버린다", () => {
     const src = read("searchrewrite.ts");
-    const 성공 = src.indexOf("if (쓸만한가(q, t)) {");
-    expect(성공, "성공 가지가 사라졌다").toBeGreaterThan(0);
-    const 가지 = src.slice(성공, src.indexOf("}", src.indexOf("emitLlmActivity", 성공)));
-    expect(가지).toContain('agent: "curator"');
-    expect(가지).toContain('phase: "done"');
-    // catch 가지(실패)에는 활동 신호가 없어야 한다
-    const 실패 = src.slice(src.indexOf("} catch {", 성공), src.indexOf("캐시.set(q, 결과)"));
-    expect(실패).not.toContain("emitLlmActivity");
+    expect(src).toMatch(/emitLlmActivity\(\{ kind: "chat", phase: "start", agent: "curator", agentName: "Curator Agent"/);
+    expect(src).toMatch(/emitLlmActivity\(\{ kind: "chat", phase: "done", agent: "curator", agentName: "Curator Agent"/);
+    expect(src).toMatch(/emitLlmActivity\(\{ kind: "chat", phase: "error", agent: "curator", agentName: "Curator Agent"/);
+    // 질문 원문은 신호에 싣지 않는다 — 활동 신호는 전 접속자에게 방송된다(검토관 2026-09-03)
+    expect(src).not.toMatch(/detail: `검색어 재작성: \$\{/);
+  });
+
+  it("대시보드·팀 화면 아이콘표에 등록부 id가 전부 있다(빠지면 그 팀원만 폴백 ◆로 그려진다)", () => {
+    const pages = path.join(__dirname, "..", "..", "client", "src", "renderer", "pages");
+    const dash = fs.readFileSync(path.join(pages, "dashboard.html"), "utf8");
+    const icon = dash.slice(dash.indexOf("var AGENT_ICON = {"), dash.indexOf("};", dash.indexOf("var AGENT_ICON = {")));
+    const agent = fs.readFileSync(path.join(pages, "agent.html"), "utf8");
+    const style = agent.slice(agent.indexOf("const AGENT_STYLE = {"), agent.indexOf("\n  };", agent.indexOf("const AGENT_STYLE = {")));
+    for (const a of listAgents()) {
+      expect(icon, `dashboard.html AGENT_ICON에 ${a.id}가 없다`).toMatch(new RegExp(`\\b${a.id}: "`));
+      expect(style, `agent.html AGENT_STYLE에 ${a.id}가 없다`).toMatch(new RegExp(`\\b${a.id}: \\{`));
+    }
   });
 
   it("협업 창(office·팀사무실)의 문서 흐름 말풍선은 사서가 낸다", () => {
@@ -84,14 +93,15 @@ describe("부르는 문 — 팀원 이름은 실제 호출부가 만든다", () 
     expect(m).toMatch(/from: "curator",\s+to: "orchestrator",\s+message: `문서 분류 완료/);
     expect(m).toMatch(/from: "curator",\s+to: "orchestrator",\s+message: `매뉴얼 자동 연결/);
     expect(read("docenrich.ts")).toMatch(/from: "curator",\s+to: "orchestrator",\s+message: `문서 보강 인입/);
+    // 반입 소식 말풍선 — 예전엔 존재하지 않는 id "analyze"로 나가 사무실이 분석 팀원 자리에 띄웠다(검토관 2026-09-03)
+    expect(read("docdigest.ts")).toContain('from: "curator", to: "orchestrator", message: 반입알림문구(m)');
   });
 
   it("★ 팀원마다 부르는 문이 있다 — 없으면 이유가 적혀 있어야 한다(등록부에만 있는 팀원 금지)", () => {
     // 2단계(계획서 §7)에서 문이 생길 팀원은 이유와 함께 예외로 둔다. 문이 생기면 예외를 지운다 — 이 시험이 그때 다시 말한다.
-    // 2단계(2026-09-03 같은 날)에서 scan(scandrafts.draftScanInterpretation)·ti(scandrafts.interpretThreats)의 문이 생겨 예외에서 뺐다.
-    const 예외: Record<string, string> = {
-      orchestrator: "총괄은 agentloop의 도구 선택·취합 그 자체라 agentId 표기 없이 부른다",
-    };
+    // 2단계(2026-09-03 같은 날)에서 scan(scandrafts.draftScanInterpretation)·ti(scandrafts.interpretThreats)의 문이 생겨 예외가 비었다.
+    // (총괄도 예외가 아니다 — agentloop·dispatcher가 agentId "orchestrator"로 수십 곳 부른다. 예외 사유가 사실과 달랐다: 검토관 2026-09-03)
+    const 예외: Record<string, string> = {};
     const files = (fs.readdirSync(ENGINE, { recursive: true }) as string[]).filter((f) => f.endsWith(".ts"));
     const 전부 = files.map((f) => read(f)).join("\n");
     // 「부르는 문」= LLM을 실제로 부르는 자리: chat({ … agentId: "id" }) 또는 활동 신호 emitLlmActivity({ … agent: "id" }).
@@ -105,7 +115,6 @@ describe("부르는 문 — 팀원 이름은 실제 호출부가 만든다", () 
     }
     // 예외가 실제 사실인지도 본다 — 문이 생겼는데 예외에 남아 있으면 예외를 지우라고 알린다.
     for (const id of Object.keys(예외)) {
-      if (id === "orchestrator") continue;
       const 문 = 문수(id);
       expect(문, `${id}: 이제 부르는 문이 있다(${문}곳) — 예외 목록에서 지워라`).toBe(0);
     }
@@ -118,7 +127,10 @@ describe("팀 구성 변경은 감사 기록에 남는다(누가 어느 팀원�
     for (const fn of ["setAgentName", "setAgentAdapter", "setAgentLocation", "setAgentModel"]) {
       const body = src.slice(src.indexOf(`export function ${fn}(`), src.indexOf("\n}\n", src.indexOf(`export function ${fn}(`)));
       expect(body, `${fn}: 감사 기록이 없다`).toContain("감사(agentId,");
-      expect(body, `${fn}: 해제 가지도 감사에 남아야 한다`).toMatch(/return;[\s\S]*감사\(|감사\([\s\S]*return;/);
+      // 해제 가지만 잘라서 본다 — 예전 정규식(return; 앞뒤에 감사( 가 있기만 하면 통과)은 항진식이었다(검토관 2026-09-03).
+      const 해제시작 = body.indexOf("delModelStmt.run");
+      const 해제가지 = body.slice(해제시작, body.indexOf("return;", 해제시작));
+      expect(해제가지, `${fn}: 해제 가지도 감사에 남아야 한다`).toContain("감사(agentId,");
     }
     // 라우트가 행위자를 넘긴다(넘기지 않으면 actor가 늘 null — 「누가」가 빠진 감사는 반쪽이다)
     expect((src.match(/행위자\(req\)/g) ?? []).length).toBe(4);

@@ -3191,16 +3191,9 @@ export async function runAdapterAssign(args: Record<string, string>): Promise<st
   }
   const 해제 = !adapterId || /^(없음|해제|베이스)$/.test(adapterId);
   try {
-    setAgentAdapter(found.id, 해제 ? null : adapterId);
+    // 감사는 setAgentAdapter 안(agents.ts 감사) 한 곳에서 남긴다 — 여기서 또 남기면 같은 행위가 두 줄(한 줄은 행위자 공백)이 된다(검토관 2026-09-03).
     const v = currentViewer();
-    recordAudit({
-      kind: "config",
-      actor: (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)",
-      action: 해제 ? "팀원 어댑터 배정 해제" : "팀원 어댑터 배정",
-      target: found.id,
-      detail: 해제 ? "" : adapterId,
-      result: "ok",
-    });
+    setAgentAdapter(found.id, 해제 ? null : adapterId, (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)");
     return 해제
       ? `${found.name}의 어댑터 배정을 해제했습니다 — 베이스 그대로 답합니다.`
       : `${found.name}에 어댑터 ${adapterId}를 배정했습니다 — 서빙 모델에 이 어댑터가 실려 있으면 다음 답변부터 바로 적용됩니다(재기동 불필요).`;

@@ -21,7 +21,7 @@
 //   · 같은 질문은 캐시에서 준다 — 한 번의 답에 검색이 여러 번 돌아도 모델은 한 번만 부른다.
 //   · `GIJO_SEARCH_REWRITE=0`으로 끌 수 있다. 시험 환경엔 모델이 없어 자연히 건너뛴다.
 
-import { emitLlmActivity } from "./llmactivity"; // 잎 모듈(embedding.ts와 같은 이유로 안전)
+import { emitLlmActivity } from "./llmactivity"; // llm.ts·embedding.ts와 같은 활동 신호 모듈(db를 문다 — 잎은 아니다)
 
 const 켜짐 = process.env.GIJO_SEARCH_REWRITE !== "0";
 // ⚠ 상수가 아니라 **매 호출 게터**다(2026-08-13 BridgeAI 1단계) — 원격 LLM이 켜져 있으면
@@ -71,6 +71,10 @@ export async function rewriteForSearch(question: string): Promise<string> {
 
   let 결과 = "";
   const 시작 = Date.now();
+  // 사서(curator)의 부르는 문 — **짝 있는 신호**(start↔done/error)로 낸다. done만 내면 레일이 「일하는 중」 불을 꺼 버린다(검토관 2026-09-03).
+  //   채택 여부와 무관하게 모델은 돌았으므로 done으로 세고 detail에 채택/미채택을 적는다. 질문 원문은 신호에 싣지 않는다(전 접속자에게 방송된다).
+  //   ⚠ 알려진 한계: 이 호출은 chat()이 아니라 통로()로 직접 간다 — 사서에게 전용 모델·어댑터를 배정해도 여기엔 쓰이지 않는다(계획서 §7·§10).
+  emitLlmActivity({ kind: "chat", phase: "start", agent: "curator", agentName: "Curator Agent", detail: "검색어 재작성" });
   try {
     const t = await 통로();
     const res = await fetch(`${t.baseUrl}/chat/completions`, {
@@ -90,21 +94,21 @@ export async function rewriteForSearch(question: string): Promise<string> {
     });
     if (res.ok) {
       const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const t = String(j?.choices?.[0]?.message?.content ?? "")
+      const 구절 = String(j?.choices?.[0]?.message?.content ?? "")
         .trim()
         .split("\n")[0]
         .replace(/^["'「]+|["'」]+$/g, "")
         .trim();
-      if (쓸만한가(q, t)) {
-        결과 = t;
-        // 사서(curator)가 한 일로 센다(AI 팀 감독 llm_activity_daily · 레일 실신호). 채택된 것만 — 실패·미채택은
-        // 원문 검색이 이미 있어 값이 없고, 세면 「일했다」가 부풀려진다(2026-09-03 설계관: 성공 가지에서만).
-        emitLlmActivity({ kind: "chat", phase: "done", agent: "curator", detail: `검색어 재작성: ${t.slice(0, 40)}`, latencyMs: Date.now() - 시작 });
-      }
+      const 채택 = 쓸만한가(q, 구절);
+      if (채택) 결과 = 구절;
+      emitLlmActivity({ kind: "chat", phase: "done", agent: "curator", agentName: "Curator Agent", detail: `검색어 재작성(${채택 ? "채택" : "미채택"})`, latencyMs: Date.now() - 시작 });
+    } else {
+      emitLlmActivity({ kind: "chat", phase: "error", agent: "curator", agentName: "Curator Agent", detail: `검색어 재작성 HTTP ${res.status}` });
     }
   } catch {
-    // 모델이 없거나 느리다 — 원문으로 간다. 로그도 남기지 않는다(질문마다 시끄러워진다).
+    // 모델이 없거나 느리다 — 원문으로 간다. 로그는 안 남기지만 활동 신호는 짝을 맞춘다(불을 켰으면 끈다).
     결과 = "";
+    emitLlmActivity({ kind: "chat", phase: "error", agent: "curator", agentName: "Curator Agent", detail: "검색어 재작성 실패(시간 초과·연결)" });
   }
 
   if (캐시.size >= 캐시최대) 캐시.clear(); // 오래된 것부터 지우는 대신 통째로 비운다(작고 단순하게)

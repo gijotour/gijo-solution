@@ -281,8 +281,9 @@ export function listAgents(): AgentDefinition[] {
   return AGENT_DEFS.map(toAgent);
 }
 
-/** 감사 기록의 행위자 — authMiddleware가 req.user에 넣어 둔 계정명(auth.ts와 같은 모양). */
-const 행위자 = (req: unknown): string | null => (req as { user?: { username?: string } }).user?.username ?? null;
+/** 감사 기록의 행위자 — authMiddleware가 req.user에 넣어 둔 사용자의 **표시 이름**(저장소 관례: actor는 displayName —
+ *  username을 쓰면 같은 사람이 감사 타임라인에서 두 이름으로 갈린다, 2026-08-09 실사고·auditactor 감시). */
+const 행위자 = (req: unknown): string | null => (req as { user?: { displayName?: string } }).user?.displayName ?? null;
 
 export function registerAgentsRoutes(app: Express): void {
   app.get("/api/agents", authMiddleware, (_req, res) => res.json(listAgents()));
