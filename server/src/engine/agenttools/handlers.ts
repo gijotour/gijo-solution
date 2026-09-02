@@ -2862,7 +2862,10 @@ export async function runKnowledgeStatus(): Promise<string> {
     return acc;
   }, {});
 
-  const head = `장기기억 문서 ${docs.length}건 (조각 ${chunks}개), 온톨로지 트리플 ${triples}개`;
+  // 승인 문답(겹 1 기억 성장, 2026-09-03)은 문서 수에 섞이면 「문서가 늘었다」로 읽힌다 — 따로 센다.
+  const { countApprovedQaDocs } = await import("../learnmemory.js");
+  const 승인문답 = countApprovedQaDocs();
+  const head = `장기기억 문서 ${docs.length}건 (조각 ${chunks}개${승인문답 ? `, 그중 승인 문답 ${승인문답}건` : ""}), 온톨로지 트리플 ${triples}개`;
   const scopes = `범위별: ${Object.entries(byScope).map(([s, n]) => `${s} ${n}`).join(", ")}`;
   const recent = docs.slice(-5).map((d) => `- ${d.documentId}`).reverse();
   return `${head}\n${scopes}\n최근 인입:\n${recent.join("\n")}`;

@@ -356,7 +356,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (c.signals.cite) t.push('<span class="lc-sig lc-doc">📄 근거 인용</span>');
     if (c.signals.tool) t.push('<span class="lc-sig lc-tool">🔧 도구 성공</span>');
     if (c.signals.accepted) t.push('<span class="lc-sig lc-ok">수용됨</span>');
-    t.push(`<span class="lc-sig lc-src">출처: ${c.source === "worksession" ? "작업 내역" : "대화 로그"} ${new Date(c.createdAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}</span>`);
+    t.push(`<span class="lc-sig lc-src">출처: ${c.source === "worksession" ? "작업 내역" : c.source === "distill" ? "교사 증류" : "대화 로그"} ${new Date(c.createdAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}</span>`);
     if (c.score < 3) t.push('<span class="lc-sig lc-weak">신호 약함</span>');
     return t.join("");
   }
@@ -484,6 +484,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="log-a">A. ${esc(l.answer)}</div>` +
       `<div class="log-foot">` +
       `<span class="lc-topic lt-${esc(l.topic || "미분류")}">${esc(l.topic || "미분류")}</span>` +
+      (l.origin && l.origin !== "chat" ? `<span class="log-agent" title="어떻게 생긴 문답인가">${esc({ worksession: "작업내역", seed: "문서 시드", distill: "교사 증류" }[l.origin] || l.origin)}</span>` : "") +
       `<span class="log-agent">${esc(l.agentId)}</span>` +
       `<span class="log-when">${fmtTime(l.createdAt)}</span>` +
       (l.usedInDataset ? `<span class="log-used">✓ 학습에 사용됨</span>` : "") +

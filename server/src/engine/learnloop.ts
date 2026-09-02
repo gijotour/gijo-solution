@@ -48,7 +48,14 @@ export interface ChatLog {
   usedInDataset: boolean;
   createdAt: number;
   topic: string | null; // 주제 딱지(취약점·장비운영·사내규정·위협대응) — 애매하면 null
+  origin: ChatLogOrigin; // 어떻게 생긴 문답인가(§3.6-2) — 옛 행(NULL)은 'chat'
+  teacher: string | null; // 증류 행만 — 교사 모델 id(응답의 model 필드 실측값, 상수 아님)
+  cites: string[]; // 증류 행만 — 근거 조각 ref(경로#sha12) 목록. 비면 []
 }
+
+/** 문답의 출처. 후보함의 source(어디서 찾았나)와 다른 축이다. */
+export type ChatLogOrigin = "chat" | "worksession" | "seed" | "distill";
+export const CHAT_LOG_ORIGINS: readonly ChatLogOrigin[] = ["chat", "worksession", "seed", "distill"] as const;
 
 export type LearnloopStage =
   | "stopping-engines"
@@ -92,9 +99,19 @@ export interface LearnloopConfig {
 // ⚠ 판정은 **코드로만** 한다(learncandidates 원칙 2와 같은 잣대) — 같은 질문에 같은 딱지가
 //   나와야 "지난달 이건 왜 취약점이었지"를 답할 수 있다.
 migrate("chat-logs-topic-2026-08-07", "ALTER TABLE chat_logs ADD COLUMN topic TEXT");
+// 출처(origin) — 이 문답이 **어떻게 생겼나**(증류학습 계획서 §3.6-2, 2026-09-03).
+//   chat=실대화 수집 · worksession=작업내역 승인 편입 · seed=문서 시드 · distill=교사 모델 증류.
+//   ⚠ 이름을 `source`로 하지 않는다 — 후보함(learncandidates)의 `source`는 「어디서 찾았나」
+//   (chatlog|worksession)라 뜻이 다르다. 같은 이름 다른 값이 한 응답에 둘 있으면 반드시 헷갈린다.
+//   옛 행은 NULL이고 읽을 때 'chat'으로 본다(전부 실대화 수집분이었다).
+//   teacher·cites·promptHash는 증류 행에만 값이 있다 — 「이 어댑터는 무엇으로 배웠나」를 되짚는 자국.
+migrate("chat-logs-origin-2026-09-03", "ALTER TABLE chat_logs ADD COLUMN origin TEXT");
+migrate("chat-logs-teacher-2026-09-03", "ALTER TABLE chat_logs ADD COLUMN teacher TEXT");
+migrate("chat-logs-cites-2026-09-03", "ALTER TABLE chat_logs ADD COLUMN cites TEXT");
+migrate("chat-logs-prompthash-2026-09-03", "ALTER TABLE chat_logs ADD COLUMN promptHash TEXT");
 
 const insertLogStmt = db.prepare(
-  "INSERT INTO chat_logs (id, agentId, topic, question, answer, rating, usedInDataset, createdAt) VALUES (@id, @agentId, @topic, @question, @answer, NULL, 0, @createdAt)"
+  "INSERT INTO chat_logs (id, agentId, topic, question, answer, rating, usedInDataset, createdAt, origin) VALUES (@id, @agentId, @topic, @question, @answer, NULL, 0, @createdAt, 'chat')"
 );
 const listLogsStmt = db.prepare("SELECT * FROM chat_logs ORDER BY createdAt DESC LIMIT ? OFFSET ?");
 const logKpiStmt = db.prepare(
@@ -173,6 +190,10 @@ interface ChatLogRow {
   rating: number | null;
   usedInDataset: number;
   createdAt: number;
+  origin?: string | null;
+  teacher?: string | null;
+  cites?: string | null; // JSON 문자열
+  promptHash?: string | null;
 }
 
 interface RunRow {
@@ -197,7 +218,37 @@ const logFromRow = (r: ChatLogRow): ChatLog => ({
   createdAt: r.createdAt,
   // 후보함이 행마다 주제 배지를 단다(2026-08-08 시안 승인) — SELECT *라 값은 이미 온다.
   topic: (r as ChatLogRow & { topic?: string | null }).topic ?? null,
+  // 출처(§3.6-2) — 매핑을 안 하면 SELECT *로 값이 와도 API에 안 실린다(topic 때 실제로 그랬다).
+  origin: (CHAT_LOG_ORIGINS as readonly string[]).includes(r.origin ?? "") ? (r.origin as ChatLogOrigin) : "chat",
+  teacher: r.teacher ?? null,
+  cites: parseCites(r.cites),
 });
+
+function parseCites(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try { const v = JSON.parse(raw); return Array.isArray(v) ? v.map(String) : []; } catch { return []; }
+}
+
+// ── 승인·해제 신호(겹 1 기억 성장의 원천, 증류학습 계획서 §3.6-3) ──────────────────
+// 승인 입구가 **네 곳**(후보 결정·일괄 승인·직접 평가·시드/작업내역 편입)이라 한 곳만 후크하면
+// 나머지가 샌다. 그래서 「rating이 1이 되는/1에서 벗어나는」 사건을 **여기 한 곳**에서 방송하고,
+// 입구들은 전부 emitChatLogRated를 부른다(짝 시험 memorygrowth.test가 소스로 지킨다).
+// 청취자는 learnmemory.ts(승인 → 그 주제 지식영역에 반입, 해제/삭제 → 조각 제거)다.
+export type ChatLogRatedEvent = { kind: "approved"; log: ChatLog } | { kind: "unapproved"; id: string };
+type ChatLogRatedListener = (e: ChatLogRatedEvent) => void;
+const ratedListeners: ChatLogRatedListener[] = [];
+export function onChatLogRated(l: ChatLogRatedListener): void { ratedListeners.push(l); }
+export function chatLogRatedListenerCount(): number { return ratedListeners.length; }
+export function emitChatLogRated(e: ChatLogRatedEvent): void {
+  for (const l of ratedListeners) {
+    try { l(e); } catch (err) { console.warn(`[learnloop] 승인 신호 청취자 실패: ${err instanceof Error ? err.message : String(err)}`); }
+  }
+}
+/** 로그 한 건 — 편입 경로(작업내역·시드·증류)가 INSERT 뒤 승인 신호를 보낼 때 쓴다. */
+export function getChatLog(id: string): ChatLog | null {
+  const row = getLogStmt.get(id) as ChatLogRow | undefined;
+  return row ? logFromRow(row) : null;
+}
 
 const runFromRow = (r: RunRow): LearnloopRun => ({
   id: r.id,
@@ -382,12 +433,18 @@ export function rateChatLog(id: string, rating: 1 | -1 | 0): ChatLog {
   const row = getLogStmt.get(id) as ChatLogRow | undefined;
   if (!row) throw new Error("존재하지 않는 대화 로그입니다");
   rateLogStmt.run(rating === 0 ? null : rating, id);
-  return logFromRow(getLogStmt.get(id) as ChatLogRow);
+  const after = logFromRow(getLogStmt.get(id) as ChatLogRow);
+  // 승인 신호(겹 1) — 1이 되면 반입, 1에서 벗어나면 제거. 같은 값 반복은 청취자가 멱등으로 받는다.
+  if (rating === 1) emitChatLogRated({ kind: "approved", log: after });
+  else if (row.rating === 1) emitChatLogRated({ kind: "unapproved", id });
+  return after;
 }
 
 export function deleteChatLog(id: string): void {
-  if (!(getLogStmt.get(id) as ChatLogRow | undefined)) throw new Error("존재하지 않는 대화 로그입니다");
+  const row = getLogStmt.get(id) as ChatLogRow | undefined;
+  if (!row) throw new Error("존재하지 않는 대화 로그입니다");
   deleteLogStmt.run(id);
+  if (row.rating === 1) emitChatLogRated({ kind: "unapproved", id }); // 승인돼 있던 것을 지우면 기억에서도 뺀다
 }
 
 // ── ② 정제 → 데이터셋 ────────────────────────────────────────────────
