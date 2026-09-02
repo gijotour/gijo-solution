@@ -489,21 +489,38 @@
       <span class="sub">손확인 10건 + 8갈래 점검 → 반박 검증 통과분만 · 코드는 안 고쳤다</span>
     </div>
     <div class="kpi" style="margin-bottom:14px">
-      {{JOURNEY_KPI}}
+      <div class="k"><div class="kv">88</div><div class="kl">확인된 결함(반박 검증 통과)</div></div>
+<div class="k"><div class="kv">49</div><div class="kl">담당자가 막히는 것(P1)</div></div>
+<div class="k"><div class="kv">8</div><div class="kl">점검한 여정 갈래</div></div>
+<div class="k"><div class="kv">18</div><div class="kl">시안이 필요한 화면</div></div>
     </div>
     <div class="jr">
-      {{JOURNEY_STAGES}}
+      <div class="stg"><div class="st-n">01</div><div class="st-t">설치</div><div class="st-p"><span class="pill p1">P1 5</span><span class="pill p2">전체 9</span></div><div class="st-d">설치본을 받아 깔고 처음 켜기까지</div></div>
+<div class="stg"><div class="st-n">02</div><div class="st-t">로그인</div><div class="st-p"><span class="pill p0">P1 6</span><span class="pill p2">전체 10</span></div><div class="st-d">서버 주소·아이디·2차 인증</div></div>
+<div class="stg"><div class="st-n">03</div><div class="st-t">셸·첫화면</div><div class="st-p"><span class="pill p0">P1 6</span><span class="pill p2">전체 10</span></div><div class="st-d">들어와서 처음 보는 화면</div></div>
+<div class="stg"><div class="st-n">04</div><div class="st-t">절차허브</div><div class="st-p"><span class="pill p0">P1 7</span><span class="pill p2">전체 11</span></div><div class="st-d">①발견~⑤보고 업무 흐름</div></div>
+<div class="stg"><div class="st-n">05</div><div class="st-t">설정·기록·부가</div><div class="st-p"><span class="pill p1">P1 5</span><span class="pill p2">전체 12</span></div><div class="st-d">설정·기록·부가 기능</div></div>
+<div class="stg"><div class="st-n">06</div><div class="st-t">업데이트·세션</div><div class="st-p"><span class="pill p0">P1 6</span><span class="pill p2">전체 12</span></div><div class="st-d">새 버전 받기·세션 끊김</div></div>
+<div class="stg"><div class="st-n">07</div><div class="st-t">문서</div><div class="st-p"><span class="pill p0">P1 7</span><span class="pill p2">전체 12</span></div><div class="st-d">매뉴얼·챗봇 근거 문서</div></div>
+<div class="stg"><div class="st-n">08</div><div class="st-t">여정전반</div><div class="st-p"><span class="pill p0">P1 7</span><span class="pill p2">전체 12</span></div><div class="st-d">페르소나로 처음부터 끝까지</div></div>
     </div>
     <div style="margin-top:16px" class="tbl-scroll">
       <table>
         <thead><tr><th>변경안</th><th>우선</th><th>무엇을 바꾸나</th><th>계획서</th><th>크기</th><th>시안</th></tr></thead>
         <tbody>
-          {{JOURNEY_TOP}}
+          <tr><td>F2-01</td><td><span class="sev p1">P1</span></td><td>서버 주소 칸이 「비워 두세요」라고 안내하면서 실제로는 localhost:7446이 회색 글자로 늘 채워져 있다 — 분산 모드 첫 로그인에서 잘못 읽힌다</td><td>전-7</td><td>S</td><td>필요</td></tr>
+<tr><td>F2-02</td><td><span class="sev p1">P1</span></td><td>「10.8.0.1:4000」처럼 http:// 없이 주소를 넣으면 fetch가 ERR_INVALID_URL로 터지는데 화면은 「아이디/비밀번호 확인」이라고 말한다 — 설치 첫 화면(setup.html)이 바로 그 형식을 예시로 든다</td><td>전-7</td><td>S</td><td>—</td></tr>
+<tr><td>F2-03</td><td><span class="sev p1">P1</span></td><td>로그인 전에 서버가 살아 있는지 확인할 수단이 없다 — 매뉴얼은 「상단 서버 연결 점」을 보라 하지만 로그인 화면엔 ⚙ 하나뿐이고, GIJO가 아닌 서버(404)도 자격증명 오류로 뭉개진다</td><td>전-7</td><td>M</td><td>필요</td></tr>
+<tr><td>F2-04</td><td><span class="sev p1">P1</span></td><td>「이 PC에 로그인 정보 저장(서버·아이디·비밀번호)」를 해제해도 서버·아이디는 저장돼 최근 목록에 뜬다 — 문구가 거짓이고, 보안 제품인데 비밀번호 저장이 기본 체크다</td><td>후-1</td><td>S</td><td>—</td></tr>
+<tr><td>F2-05</td><td><span class="sev p1">P1</span></td><td>세션이 끊겨 로그인 화면으로 튕길 때 사유(유휴 만료·다른 곳 로그인·서버 재시작)가 사라진다 — 서버는 그 사유 문장을 만들어 두었는데 클라이언트가 응답 본문을 읽지 않는다</td><td>후-1</td><td>M</td><td>필요</td></tr>
+<tr><td>F2-06</td><td><span class="sev p1">P1</span></td><td>로그인 요청에 시간제한이 없어 응답 없는 주소(방화벽 drop·엉뚱한 IP)를 넣으면 「연결 중...」이 수십 초 멈춘 채 취소도 못 한다</td><td>전-7</td><td>S</td><td>—</td></tr>
+<tr><td>F8-01</td><td><span class="sev p1">P1</span></td><td>분산 모드 담당자는 앱을 켤 때마다 「처음 설정」 화면부터 — 선택이 기억되지 않는다</td><td>후-1</td><td>S</td><td>—</td></tr>
+<tr><td>F8-02</td><td><span class="sev p1">P1</span></td><td>서버 주소 칸이 「비워 두세요」라 안내하면서 localhost:7446을 미리 채우고, http:// 없는 주소는 연결 실패로만 보인다</td><td>전-7</td><td>M</td><td>필요</td></tr>
         </tbody>
       </table>
     </div>
     <div class="note client" style="margin-top:14px">
-      {{JOURNEY_SUMMARY}}
+      <b>담당자가 잘못한 것은 하나도 없는데 막히는 자리들이다.</b> 설치본을 깔면 매번 「관리자 계정 만들기」부터 묻고, 로그인 칸에는 쓰면 안 되는 주소가 회색으로 미리 채워져 있으며, 들어가면 첫 화면이 매뉴얼과 다르고, 서버가 끊기면 영문 오류가 날것으로 뜬다. 여덟 갈래를 따로 점검하고 다른 에이전트가 반박해 살아남은 것만 실었다(90건 중 <b>88건</b> 통과, P1 49건). 코드는 한 줄도 고치지 않았고, 화면이 바뀌는 항목은 시안 승인 뒤에 구현한다. 라이트 에디션 항목은 사장님 지시로 보류했다.
     </div>
   </section>
 
