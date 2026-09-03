@@ -48,6 +48,14 @@ MAX_ERRORS="${LADDER_MAX_ERRORS:-10}"
 # (approve-distill.mjs 머리 주석). 지금까지 이 자리에서 --max 를 안 줘서 기본값 100000, 곧 사실상 무제한이었다.
 # ⚠ 이것은 **한 번 부를 때의 상한**이지 하루 총량 장부가 아니다 — 같은 주제가 두 회차면 최대 두 배까지 승인된다.
 APPROVE_MAX="${LADDER_APPROVE_MAX:-900}"
+# 교사 동시 요청 수. 기본이 2(distill.mjs)였는데 **1로 내린다** — 셋 다 실측 근거다(2026-09-03):
+#   ① 8080 슬롯 2개 중 0번이 얼어 있다(is_processing=true인데 n_remain이 20분 넘게 256에서 안 움직이고,
+#      ss로 봐도 그 슬롯에 붙은 연결이 없다). 그래서 지금 실제로 도는 슬롯은 **하나**다.
+#   ② 그 상태에서 2를 주면 둘째 요청은 llama-server 큐에서 기다리다 창구가 「502 fetch failed」로 끊는 일이 생긴다
+#      — 실측 10건 중 1건. 오류는 회차 상한(MAX_ERRORS=10)을 갉아먹어 **밤새 태운 회차를 통째로 실패로 만든다.**
+#   ③ 병렬로 얻는 것도 없다: 교사는 125B MoE에 대역 273GB/s라 동시 2가 벽시계를 못 줄인다(README 「교사 병렬」 실측 1.00).
+# 슬롯이 풀리고 비율이 1.6 이상으로 측정되면 LADDER_CONCURRENCY=2 로 되돌린다.
+CONCURRENCY="${LADDER_CONCURRENCY:-1}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -143,7 +151,7 @@ while IFS=$'\t' read -r TOPIC ARGS FILESPEC ORD; do
     continue
   fi
 
-  ladder_log "▶ $LABEL — node tools/distill.mjs $ARGS"
+  ladder_log "▶ $LABEL — node tools/distill.mjs $ARGS --concurrency $CONCURRENCY --force-login"
 
   if [ "$DRY" -eq 1 ]; then
     # shellcheck disable=SC2086
@@ -157,7 +165,7 @@ while IFS=$'\t' read -r TOPIC ARGS FILESPEC ORD; do
   # ⚠ --force-login: 계정당 1세션이라, 앞 회차 승인 단계가 남긴 admin 세션이 살아 있으면 이 로그인이
   #   409(already_logged_in)로 죽는다 — win 4000 실측(2026-09-03: 같은 계정 2차 로그인 = 409).
   #   사슬은 한 줄로 도니 그 앞 세션은 **제 일을 이미 끝낸** 세션이다. 끊고 들어간다.
-  ( cd "$REPO" && node tools/distill.mjs $ARGS --endpoint "$ENDPOINT" --server "$SERVER" --force-login ) 2>&1 | tee "$LOG"
+  ( cd "$REPO" && node tools/distill.mjs $ARGS --endpoint "$ENDPOINT" --server "$SERVER" --concurrency "$CONCURRENCY" --force-login ) 2>&1 | tee "$LOG"
   RC="${PIPESTATUS[0]}"
   if [ "$RC" -ne 0 ]; then
     echo "✗ $LABEL — 증류가 코드 $RC 로 끝났다. 로그: $LOG" >&2
