@@ -770,36 +770,73 @@ export async function ingestDocument(filePath: string, scope: string = GLOBAL_SC
   return ingestText(path.basename(resolved), raw, scope, resolved, classify, uploadedBy);
 }
 
-// ── 빈 지식 베이스의 **첫 표 만들기**는 한 줄로 세운다 ──────────────────────────────
+// ── 지식 표(documents)를 여는 자리는 **여기 한 곳**: openDocsTable ─────────────────
 //
-// ⚠ 왜: 표가 없을 때 동시에 들어온 인입은 셋 다 「표 없음」을 보고 **각자 만든다**. 하나만 이기고
-//   나머지는 `Table documents already exists` / `documents.lance not found`로 죽는다.
-//   2026-09-04 win 격리 왕복 실측: 빈 LanceDB로 첫 부팅하면 사례 문서 반입 3건이 그렇게 실패하고
-//   20초 뒤 재시도로 겨우 복구됐다 — **고객이 처음 켤 때마다 빨간 줄 세 개**를 보게 되는 자리다.
+// ⚠ 왜 한 곳인가(2026-09-04): 예전엔 호출부마다 `tableNames().includes(...)` → `openTable(...)`을
+//   손으로 적었다(7곳). 그런데 LanceDB 0.31.0은 **createTable이 도는 도중에도 그 표 이름을 이미
+//   보여 준다** — win 격리 실측 40회 중 **39회**가 「만드는 중인데 이름이 보였다」였고, 그중 34회는
+//   이어진 openTable이 `Table 'documents' was not found … documents.lance/_versions`로 죽었다.
+//   즉 밖에서 「표 있음」을 보고 들어온 늦은 호출자는 **아직 없는 표를 연다.** 빈 지식 베이스로 첫
+//   부팅하면 사례 문서 반입 3건이 그렇게 실패하고 20초 뒤 재시도로 겨우 복구됐다 —
+//   **고객이 처음 켤 때마다 빨간 줄 세 개**를 보게 되는 자리다.
 //   (사례 문서 큐는 id별로 갈라져 있어(incidentcases.enqueue) 서로 다른 사례는 진짜로 동시에 온다.)
-// ⚠ 이 문은 **표가 없을 때만** 지난다 — 표가 생긴 뒤의 인입은 위쪽 붙이기(add) 경로라 여기 안 걸린다.
-//   그래서 상시 성능에는 영향이 없고, 부팅 한 번의 경합만 없앤다.
+// ⚠ 그래서 「표가 있나」 판정·열기·만들기를 **전부 줄(표만들기줄) 안에서** 한다. 밖에서 미리 보는
+//   사람이 없으면 「만드는 중인데 이름이 보이는」 순간을 아무도 못 본다. 그래도 그 순간을 만나면
+//   (앞사람의 createTable이 아직 안 끝났다) **만드는 중으로 보고 줄에 다시 선다** — 짧은 상한까지.
+// ⚠ 읽기 전용 자리(검색·목록·조각)는 만들 조각을 **안 준다** → 표가 없으면 null이고, 부르는 쪽은
+//   빈 결과로 답한다. 「지식이 아직 0건」은 정상 상태지 오류가 아니다.
+// ⚠ 줄에 서는 것은 **열기/만들기뿐**이다 — 붙이기(add)·검색·색인은 줄 밖에서 돈다. 그래서 상시
+//   성능에는 영향이 없고, 부팅 한 번의 경합만 없앤다.
 // ⚠ 순서를 index.ts에서 잡는 것만으로는 안 막힌다 — 같은 부팅 안에서 사례 셋이 서로 경합하고,
 //   운영 중에도 「지식이 0건인 상태에서 동시 업로드」면 같은 일이 난다. 뿌리를 막는 자리가 여기다.
+// ⚠ 새 코드에서 `tableNames()`·`openTable()`·`createTable()`을 직접 부르지 말 것 —
+//   test/memoryfirsttable.test.ts의 소스 감시가 이 파일에서 그 셋을 여기 밖에서 쓰면 붉어진다.
 let 표만들기줄: Promise<void> = Promise.resolve();
-async function 첫표만들기(
+const 표열기_재시도 = 6; // 상한이 있어야 「영원히 기다리는」 대신 정직하게 실패한다
+/** 「표를 만드는 중이라 아직 못 연다」로 읽히는 오류인가 — 이때만 줄에 다시 선다. */
+function 만드는중오류(err: unknown): boolean {
+  const 글 = err instanceof Error ? err.message : String(err);
+  return /was not found/i.test(글) || /_versions/.test(글);
+}
+/** 앞사람이 방금 만들어 내 createTable이 진 경우 — 지면 그 표를 열면 된다. */
+function 이미있음오류(err: unknown): boolean {
+  return /already exists/i.test(err instanceof Error ? err.message : String(err));
+}
+/**
+ * 지식 표를 연다. `만들records`를 주면 표가 없을 때 그 조각들로 **만들어서** 돌려주고,
+ * 안 주면(읽기 전용 자리) 표가 없을 때 null을 돌려준다.
+ */
+async function openDocsTable(
   conn: lancedb.Connection,
-  documentId: string,
-  records: Record<string, unknown>[],
-): Promise<void> {
-  const 내차례 = 표만들기줄.then(async () => {
-    // 줄을 서서 **다시** 본다 — 기다리는 사이 앞사람이 만들었으면 그 표에 붙인다(내 표를 또 만들지 않는다).
-    if ((await conn.tableNames()).includes(TABLE_NAME)) {
-      const table = await conn.openTable(TABLE_NAME);
-      await table.delete(`documentId = '${escapeLiteral(documentId)}'`); // 재인입 멱등성 — 붙이기 경로와 같은 잣대
-      await table.add(records);
-      await refreshFtsIndex(table);
-      return;
+  만들records?: Record<string, unknown>[],
+): Promise<lancedb.Table | null> {
+  const 내차례 = 표만들기줄.then(async (): Promise<lancedb.Table | null> => {
+    let 마지막오류: unknown;
+    for (let 시도 = 0; 시도 < 표열기_재시도; 시도++) {
+      // 줄 안에서 본다 — 기다리는 사이 앞사람이 만들었으면 그 표를 연다(내 표를 또 만들지 않는다).
+      if ((await conn.tableNames()).includes(TABLE_NAME)) {
+        try {
+          return await conn.openTable(TABLE_NAME);
+        } catch (err) {
+          // ⚠ 권한·손상 같은 **진짜 오류를 「만드는 중」으로 삼키지 않는다** — 그대로 올린다.
+          if (!만드는중오류(err)) throw err;
+          마지막오류 = err;
+          await new Promise((s) => setTimeout(s, 120 * (시도 + 1))); // 만드는 중 — 잠깐 두고 다시 본다
+          continue;
+        }
+      }
+      if (!만들records) return null; // 읽기 전용 호출 — 「표가 없다」를 그대로 돌려준다
+      try {
+        return await conn.createTable(TABLE_NAME, 만들records);
+      } catch (err) {
+        if (!이미있음오류(err)) throw err;
+        마지막오류 = err; // 앞사람이 이겼다 — 다음 바퀴에서 그 표를 연다
+      }
     }
-    await conn.createTable(TABLE_NAME, records);
+    throw 마지막오류 ?? new Error(`지식 베이스 표(${TABLE_NAME})를 열지 못했습니다`);
   });
-  표만들기줄 = 내차례.catch(() => {}); // 앞사람이 실패해도 뒷사람 차례는 온다(줄이 막히지 않는다)
-  await 내차례; // 실패는 호출부로 그대로 올린다 — 인입 한 건의 실패지 지식 전체의 실패가 아니다
+  표만들기줄 = 내차례.then(() => {}, () => {}); // 앞사람이 실패해도 뒷사람 차례는 온다(줄이 막히지 않는다)
+  return 내차례; // 실패는 호출부로 그대로 올린다 — 인입 한 건의 실패지 지식 전체의 실패가 아니다
 }
 
 // 이미 추출된 텍스트를 지식 베이스에 직접 넣는다 — 파일 업로드(PDF/HWPX 추출 후)나
@@ -899,71 +936,72 @@ export async function ingestText(documentId: string, raw: string, scope: string 
   const rows: MemoryRow[] = chunks.map((text, i) => ({ documentId, chunkIndex: i, text, scope, vector: vectors[i], category: resolvedCategory }));
 
   const db = await lancedb.connect(DB_PATH);
-  const names = await db.tableNames();
   const records = rows as unknown as Record<string, unknown>[];
-  if (names.includes(TABLE_NAME)) {
-    const table = await db.openTable(TABLE_NAME);
-    // 기존 테이블이 현재 스키마와 호환되는지 확인하고, 두 가지 드리프트를 자가 복구한다:
-    //  (1) 벡터 차원 불일치 — 임베딩 모델 교체. add()가 에러 대신 벡터를 기존 차원으로 잘라
-    //      저장해버리므로(조용한 데이터 오염) 반드시 재생성한다.
-    //  (2) 컬럼 드리프트 — scope 등 필드가 추가되기 전에 만들어진 옛 테이블. add()가
-    //      "Found field not in schema" 스키마 에러로 거부한다.
-    // 둘 다 기존 벡터를 그대로 쓸 수 없어 테이블을 재생성한다(문서만 다시 수집하면 됨).
-    const existing = (await table.query().limit(1).toArray()) as MemoryRow[];
-    const existingDim = existing[0]?.vector?.length;
-    const dimDrift = existingDim !== undefined && existingDim !== vectors[0].length;
-    const schemaDrift = existing[0] !== undefined && !("scope" in existing[0]);
-    if (dimDrift || schemaDrift) {
-      console.warn(
-        `[memory] 지식 베이스 불일치로 재생성합니다 (기존 문서는 재수집 필요) — 차원드리프트=${dimDrift} 스키마드리프트=${schemaDrift}`
-      );
-      await db.dropTable(TABLE_NAME);
-      await db.createTable(TABLE_NAME, records);
-    } else {
-      // ⚠ 스키마 보정은 **안전망 밖**에서 한다(2026-08-19 D6). Merge 트랜잭션이라 경쟁에 가장
-      //   약한데, 예전엔 이게 실패하면 아래 catch가 「테이블을 버려라」로 이어졌다.
-      //   컬럼 보정이 실패하면 이번 인입 한 건만 실패시키는 게 맞다 — 문서 한 건 < 지식 전체.
-      await ensureCategoryColumn(table);
-      // ⚠ lance는 커밋 경합 때 오류 문구에 대놓고 "retry"라고 적는다 — 3회 지수 백오프
-      //   (embedWithRetry와 같은 모양). 이것만으로 재현된 commit-conflict 방아쇠가 닫힌다.
-      let 마지막오류: unknown;
-      for (let 시도 = 0; 시도 < 3; 시도++) {
-        try {
-          // 재인입 멱등성: 같은 documentId의 옛 청크를 먼저 지운다. 안 그러면 add만 해서 옛/새 청크가
-          // 중복 누적된다(2026-07-25 실측: 같은 파일 재업로드/재시드가 KB에 중복 조각을 남김).
-          await table.delete(`documentId = '${escapeLiteral(documentId)}'`);
-          await table.add(records);
-          // 새 조각을 전문 검색(BM25)에서도 찾을 수 있게 인덱스를 갱신한다.
-          await refreshFtsIndex(table);
-          마지막오류 = undefined;
-          break;
-        } catch (err) {
-          마지막오류 = err;
-          await new Promise((s) => setTimeout(s, 300 * 2 ** 시도));
-        }
-      }
-      if (마지막오류 !== undefined) {
-        // ★ 드롭 전에 **무엇을 버리는지 센다**(2026-08-19 D6). 예전엔 어떤 실패든 여기서
-        //   테이블을 통째로 재생성해 — 방금 올린 문서 1건을 뺀 **모든 지식(실측 5,631조각)**이
-        //   조용히 사라질 수 있었다. 자가복구는 「버릴 게 없을 때」만 한다.
-        //   버릴 게 있으면 이번 인입만 실패시킨다(라우트가 400으로 정직하게 보고) —
-        //   채팅·검색은 기존 지식으로 계속 돈다. 진짜 스키마 드리프트는 위 명시 검사가 이미 잡는다.
-        const 남은 = new Set(
-          ((await table.query().select(["documentId"]).limit(1_000_000).toArray()) as { documentId: string }[])
-            .map((r) => r.documentId)
-        );
-        남은.delete(documentId);
-        if (남은.size > 0) {
-          console.error(`[memory] add() 3회 실패 — 기존 문서 ${남은.size}건이 있어 재생성하지 않고 이번 인입만 실패시킵니다`);
-          throw 마지막오류;
-        }
-        console.warn(`[memory] add() 실패·기존 지식 0건 — 지식 베이스를 재생성합니다: ${마지막오류 instanceof Error ? 마지막오류.message : String(마지막오류)}`);
-        await db.dropTable(TABLE_NAME);
-        await db.createTable(TABLE_NAME, records);
+  // 표를 여는 자리는 openDocsTable **한 곳**이다(위 주석). 표가 없으면 여기서 만들어져 온다 —
+  // 만들 때 이 조각들이 그대로 첫 내용이 되고, 아래 붙이기 경로가 같은 조각을 멱등하게(지우고 다시) 쓴다.
+  // ⚠ 그래서 **첫 문서 한 건만 두 번 쓰인다**(조각 수십 개면 수십 ms). 그 값으로 붙이기 로직이
+  //   한 벌이 된다 — 예전 「첫 표」 경로는 삭제·붙이기·색인을 따로 적어 두어 드리프트 검사와
+  //   3회 재시도가 통째로 빠져 있었다(같은 것을 두 곳에 적으면 어긋난다).
+  const table = await openDocsTable(db, records);
+  if (!table) throw new Error("지식 베이스 표를 열지 못했습니다"); // 만들 조각을 줬으니 null일 수 없다(계약)
+  // 기존 테이블이 현재 스키마와 호환되는지 확인하고, 두 가지 드리프트를 자가 복구한다:
+  //  (1) 벡터 차원 불일치 — 임베딩 모델 교체. add()가 에러 대신 벡터를 기존 차원으로 잘라
+  //      저장해버리므로(조용한 데이터 오염) 반드시 재생성한다.
+  //  (2) 컬럼 드리프트 — scope 등 필드가 추가되기 전에 만들어진 옛 테이블. add()가
+  //      "Found field not in schema" 스키마 에러로 거부한다.
+  // 둘 다 기존 벡터를 그대로 쓸 수 없어 테이블을 재생성한다(문서만 다시 수집하면 됨).
+  const existing = (await table.query().limit(1).toArray()) as MemoryRow[];
+  const existingDim = existing[0]?.vector?.length;
+  const dimDrift = existingDim !== undefined && existingDim !== vectors[0].length;
+  const schemaDrift = existing[0] !== undefined && !("scope" in existing[0]);
+  if (dimDrift || schemaDrift) {
+    console.warn(
+      `[memory] 지식 베이스 불일치로 재생성합니다 (기존 문서는 재수집 필요) — 차원드리프트=${dimDrift} 스키마드리프트=${schemaDrift}`
+    );
+    await db.dropTable(TABLE_NAME);
+    await openDocsTable(db, records); // 다시 만드는 것도 같은 줄에서 — 그 사이 들어온 검색이 반쪽 표를 안 본다
+  } else {
+    // ⚠ 스키마 보정은 **안전망 밖**에서 한다(2026-08-19 D6). Merge 트랜잭션이라 경쟁에 가장
+    //   약한데, 예전엔 이게 실패하면 아래 catch가 「테이블을 버려라」로 이어졌다.
+    //   컬럼 보정이 실패하면 이번 인입 한 건만 실패시키는 게 맞다 — 문서 한 건 < 지식 전체.
+    await ensureCategoryColumn(table);
+    // ⚠ lance는 커밋 경합 때 오류 문구에 대놓고 "retry"라고 적는다 — 3회 지수 백오프
+    //   (embedWithRetry와 같은 모양). 이것만으로 재현된 commit-conflict 방아쇠가 닫힌다.
+    let 마지막오류: unknown;
+    for (let 시도 = 0; 시도 < 3; 시도++) {
+      try {
+        // 재인입 멱등성: 같은 documentId의 옛 청크를 먼저 지운다. 안 그러면 add만 해서 옛/새 청크가
+        // 중복 누적된다(2026-07-25 실측: 같은 파일 재업로드/재시드가 KB에 중복 조각을 남김).
+        await table.delete(`documentId = '${escapeLiteral(documentId)}'`);
+        await table.add(records);
+        // 새 조각을 전문 검색(BM25)에서도 찾을 수 있게 인덱스를 갱신한다.
+        await refreshFtsIndex(table);
+        마지막오류 = undefined;
+        break;
+      } catch (err) {
+        마지막오류 = err;
+        await new Promise((s) => setTimeout(s, 300 * 2 ** 시도));
       }
     }
-  } else {
-    await 첫표만들기(db, documentId, records);
+    if (마지막오류 !== undefined) {
+      // ★ 드롭 전에 **무엇을 버리는지 센다**(2026-08-19 D6). 예전엔 어떤 실패든 여기서
+      //   테이블을 통째로 재생성해 — 방금 올린 문서 1건을 뺀 **모든 지식(실측 5,631조각)**이
+      //   조용히 사라질 수 있었다. 자가복구는 「버릴 게 없을 때」만 한다.
+      //   버릴 게 있으면 이번 인입만 실패시킨다(라우트가 400으로 정직하게 보고) —
+      //   채팅·검색은 기존 지식으로 계속 돈다. 진짜 스키마 드리프트는 위 명시 검사가 이미 잡는다.
+      const 남은 = new Set(
+        ((await table.query().select(["documentId"]).limit(1_000_000).toArray()) as { documentId: string }[])
+          .map((r) => r.documentId)
+      );
+      남은.delete(documentId);
+      if (남은.size > 0) {
+        console.error(`[memory] add() 3회 실패 — 기존 문서 ${남은.size}건이 있어 재생성하지 않고 이번 인입만 실패시킵니다`);
+        throw 마지막오류;
+      }
+      console.warn(`[memory] add() 실패·기존 지식 0건 — 지식 베이스를 재생성합니다: ${마지막오류 instanceof Error ? 마지막오류.message : String(마지막오류)}`);
+      await db.dropTable(TABLE_NAME);
+      await openDocsTable(db, records);
+    }
   }
 
   // 문서 메타데이터 기록(업로드 시각·원본 경로) — 목록/삭제 화면용. 실패해도 수집은 성공 처리.
@@ -1189,10 +1227,9 @@ function 문서를섞어자르기<T extends { documentId?: string }>(목록: T[]
 
 async function hybridSearch(question: string, topK: number, agentId?: string, screen?: string, viewer?: Viewer): Promise<FusedChunk[]> {
   const db = await lancedb.connect(DB_PATH);
-  const names = await db.tableNames();
-  if (!names.includes(TABLE_NAME)) return [];
+  const table = await openDocsTable(db); // 읽기 전용 — 표가 없으면 null(지식 0건)
+  if (!table) return [];
 
-  const table = await db.openTable(TABLE_NAME);
   // ★ **원문 + 말투를 다듬은 질의**를 함께 태운다(2026-08-12). 같은 문서를 두 말투로 물으면
   //   거리가 평균 0.19 벌어지고, 그 차이가 「근거 약함」 문턱(0.85)을 넘기게 만들었다.
   //   ⚠ 원문 결과를 **버리지 않는다** — 두 결과를 합쳐 조각마다 **가까운 쪽 거리**를 쓴다.
@@ -1372,8 +1409,8 @@ export async function queryMemoryGraded(
 /** 문서의 첫 조각 텍스트 — 인수인계 자동 검증의 질문 생성용. 없으면 null. */
 export async function getDocumentSample(documentId: string): Promise<string | null> {
   const db = await lancedb.connect(DB_PATH);
-  if (!(await db.tableNames()).includes(TABLE_NAME)) return null;
-  const table = await db.openTable(TABLE_NAME);
+  const table = await openDocsTable(db); // 읽기 전용 — 표가 없으면 null(지식 0건)
+  if (!table) return null;
   const rows = (await table.query().where(`documentId = '${escapeLiteral(documentId)}'`).limit(1).toArray()) as MemoryRow[];
   return rows[0]?.text ?? null;
 }
@@ -1405,10 +1442,9 @@ export interface MemoryDocument {
 // 업로드 시각·원본 경로는 SQLite 메타데이터에서 채운다. 메타데이터 없는 과거 문서도 나온다.
 export async function listDocuments(): Promise<MemoryDocument[]> {
   const ldb = await lancedb.connect(DB_PATH);
-  const names = await ldb.tableNames();
   const agg = new Map<string, { scope: string; chunks: number }>();
-  if (names.includes(TABLE_NAME)) {
-    const table = await ldb.openTable(TABLE_NAME);
+  const table = await openDocsTable(ldb); // 읽기 전용 — 표가 없으면 null(지식 0건)
+  if (table) {
     let rows: { documentId: string; scope: string }[];
     try {
       rows = (await table.query().select(["documentId", "scope"]).limit(1_000_000).toArray()) as { documentId: string; scope: string }[];
@@ -1463,9 +1499,8 @@ export async function listVisibleDocuments(): Promise<MemoryDocument[]> {
 // ⚠ **문서 목록을 돌며 이 함수를 부르지 말 것** — 아래 getChunksForDocuments를 쓴다(이유는 거기에).
 export async function getDocumentChunks(documentId: string, limit = 10): Promise<{ chunkIndex: number; text: string }[]> {
   const ldb = await lancedb.connect(DB_PATH);
-  const names = await ldb.tableNames();
-  if (!names.includes(TABLE_NAME)) return [];
-  const table = await ldb.openTable(TABLE_NAME);
+  const table = await openDocsTable(ldb); // 읽기 전용 — 표가 없으면 null(지식 0건)
+  if (!table) return [];
   const rows = (await table.query().where(`documentId = '${escapeLiteral(documentId)}'`).limit(1_000_000).toArray()) as MemoryRow[];
   return rows
     .map((r) => ({ chunkIndex: r.chunkIndex, text: r.text }))
@@ -1490,9 +1525,8 @@ export async function getChunksForDocuments(documentIds: string[]): Promise<Map<
   const ids = [...new Set((documentIds ?? []).filter((s) => typeof s === "string" && s.length > 0))];
   if (!ids.length) return out;
   const ldb = await lancedb.connect(DB_PATH);
-  const names = await ldb.tableNames();
-  if (!names.includes(TABLE_NAME)) return out;
-  const table = await ldb.openTable(TABLE_NAME);
+  const table = await openDocsTable(ldb); // 읽기 전용 — 표가 없으면 null(지식 0건)
+  if (!table) return out;
   const where = `documentId IN (${ids.map((d) => `'${escapeLiteral(d)}'`).join(", ")})`;
   let rows: MemoryRow[];
   try {
@@ -1528,10 +1562,9 @@ export async function deleteDocument(documentId: string, withFile = false): Prom
     /* 그래프는 보조 계층 — 정리 실패가 삭제를 막지 않는다 */
   }
   const ldb = await lancedb.connect(DB_PATH);
-  const names = await ldb.tableNames();
   let deletedChunks = 0;
-  if (names.includes(TABLE_NAME)) {
-    const table = await ldb.openTable(TABLE_NAME);
+  const table = await openDocsTable(ldb); // 표가 없으면 지울 조각도 없다(만들지 않는다)
+  if (table) {
     const predicate = `documentId = '${escapeLiteral(documentId)}'`;
     deletedChunks = (await table.query().where(predicate).limit(1_000_000).toArray()).length;
     if (deletedChunks > 0) await table.delete(predicate);
@@ -1800,8 +1833,8 @@ export function registerMemoryRoutes(app: Express): void {
       db.prepare("UPDATE memory_documents SET category = ? WHERE documentId = ?").run(category, documentId);
       try {
         const ldb = await lancedb.connect(DB_PATH);
-        if ((await ldb.tableNames()).includes(TABLE_NAME)) {
-          const table = await ldb.openTable(TABLE_NAME);
+        const table = await openDocsTable(ldb); // 표가 없으면 고칠 조각도 없다(만들지 않는다)
+        if (table) {
           await table.update({ where: `documentId = '${escapeLiteral(documentId)}'`, values: { category } });
           // update는 테이블 조각을 재작성한다 — 갱신 없이는 BM25 구문 검색이 조용히 0건이 된다
           // (2026-07-25 마이그레이션에서 실측한 함정). 실패해도 분류 변경 자체는 성공 처리.

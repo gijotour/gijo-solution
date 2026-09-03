@@ -107,7 +107,8 @@ httpServer.listen(PORT, () => {
   // ★ 제품 문서 인입을 **앞에** 두고 줄줄이 잇는다(2026-09-04). 셋 다 임베딩 서버 한 대를 쓰는 데다,
   //   빈 지식 베이스로 첫 부팅할 때는 「지식 표를 처음 만드는 순간」까지 겹쳐 서로 걸려 넘어졌다
   //   (실측: 고객 첫 설치 부팅 로그에 사례 반입 실패 3줄 → 20초 뒤 재시도로 복구).
-  //   경합 자체는 memory.첫표만들기가 막지만, 순서까지 정해 두면 첫 부팅 로그가 애초에 깨끗하다.
+  //   경합 자체는 memory.openDocsTable(표를 여는 단일 창구)이 막지만, 순서까지 정해 두면
+  //   첫 부팅 로그가 애초에 깨끗하다.
   void bootstrapDocsBundleWithRetry()
     .catch((err) => console.error("[index] 제품 문서 인입 실패:", err))
     .then(() => syncIncidentCaseDocsWithRetry())
