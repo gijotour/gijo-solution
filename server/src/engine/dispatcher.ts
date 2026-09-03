@@ -25,13 +25,15 @@ import { recordChatLog } from "./learnloop";
 import { faqAnswerFor } from "./productfaq";
 import type { Viewer } from "./memory";
 import { 문서지목질문 } from "./memory";
-import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다, 직전대상자산 } from "./agentloop";
+import { runAgentLoop, forcedToolFor, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다, 직전대상자산 } from "./agentloop";
 import { 스트림자리 } from "./streamsink";
 import { 장애질문인가, 장애초동절차, 침해사고질문인가, 침해사고초동절차 } from "./incidentsteps";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval, 에디션제한중, 조건이좁히나 } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
-import { gateUserInput } from "./gateway";
+// ⚠ gateUserInputInner — 신호(llm_activity `guard`)를 안 쏘는 본문. **설명 도구가 쓰는 자리**다
+//   (결정적도착지). 실동작 경로는 종전대로 gateUserInput을 쓴다(gateway.ts 머리글 참고).
+import { gateUserInput, gateUserInputInner } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
 import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 방법질문화면찾기, 화면위치안내 } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
@@ -570,6 +572,29 @@ export const 결재승인요청_RE = /결재[^.\n]{0,20}(승인|반려|처리|�
 export const 자기결재_RE = /(내가|본인이|제가|방금)[^.\n]{0,15}(올린|낸|신청한|요청한)|내\s*(가\s*)?(올린|낸|신청한|요청한)?\s*결재/;
 const LEARN_RUN_RE = /실행|시작|돌려|가동|run|start/i;
 
+// ── 체인 안에 **글자로 박혀 있던** 판별들을 이름 붙여 꺼낸 자리(2026-09-04) ──────────
+// ⚠ 왜 꺼냈나: `결정적도착지`(아래)가 「이 말이 어디로 갑니까」를 답하려면 같은 판별을 써야
+//   하는데, 인라인 정규식은 **베껴 적는 수밖에 없다.** 베낀 순간 두 벌이 되고, 이 저장소가
+//   반복해 겪은 「같은 것을 여러 곳에 적으면 어긋난다」가 그대로 재현된다.
+//   동작은 한 글자도 안 바뀐다 — 자리만 옮겨 이름을 붙였다.
+
+/** 「내 문서」를 겨냥한 **찾기 질문**인가 — 열기·삭제·공유·저장·사용법은 이 가드의 일이 아니다.
+ *  ⚠ (?<![사안]) — 「사내 문서」·「안내 문서」의 꼬리에 「내 문서」가 들어 있다(screenguide가 먼저 밟은 함정). */
+function 내문서찾기질문(t: string): boolean {
+  return /(?<![사안])내\s?문서/.test(t) && !/문서함/.test(t)
+    && /(있|찾|알려|검색|내용|요약|정리|뭐|무엇|무슨)/.test(t)
+    && !/(저장|기록해|추가해|만들|올려|넣어|써\s?줘|열어|열기|삭제|지워|공유|바꿔|어떻게|사용법|화면)/.test(t);
+}
+/** 없앤 「내 업무」 화면을 찾는 말 — 화면·메뉴·탭을 **반드시 대야** 잡는다(안 그러면 흔한 물음까지 샌다). */
+const 내업무화면폐지_RE = /(내\s*업무|할\s*일)\s*(화면|메뉴|탭)\s*(어디|없어|사라|안\s*보|어떻게\s*가|못\s*찾)/;
+/** 「○○ 다시 열어줘」 — 완료 답변이 약속하는 말이라 반드시 이어져야 한다. */
+const 되열기_RE = /^(.{2,60}?)\s*(?:다시\s*열|완료\s*취소|되돌려|안\s*했)/;
+/** 「조치해 줘」류 **명령형** 실행 지시 — 플레이북(방법 안내)이 비켜 주는 자리.
+ *  ⚠ `/조치해/`로 넓히면 「조치**해야 해?**」라는 **질문**까지 밀려난다(2026-08-12 실측). */
+const 조치실행지시_RE = /(조치|처리|수정|패치)\s*해\s*(줘|주세요|주라|다오|라|$)/;
+/** 「이거 쉽게 설명해줘」 칩 — 기능어를 빼면 4자라 대명사 관문을 비켜 갔다(검토관 B중2). */
+const 설명칩_RE = /^이거\s*쉽게\s*설명해\s*줘?\s*$/;
+
 async function learnloopConfirmResult(instructionText: string, qa?: boolean): Promise<DispatchResult> {
   setAgentStatus("analysis", "working");
   collab(qa, { from: "orchestrator", to: "analysis", message: "학습 루프 실행 요청 — 확인 절차 안내" });
@@ -1052,9 +1077,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   · (?<![사안]) — 「사내 문서」·「안내 문서」의 꼬리에 「내 문서」가 들어 있다.
   //     screenguide.ts:1088이 같은 함정을 먼저 밟고 막아 둔 자리다.
   //   · 찾기 앵커 필수 — 열기·삭제·공유·저장·사용법은 이 가드의 일이 아니다(각자의 길로).
-  if (/(?<![사안])내\s?문서/.test(instructionText) && !/문서함/.test(instructionText)
-      && /(있|찾|알려|검색|내용|요약|정리|뭐|무엇|무슨)/.test(instructionText)
-      && !/(저장|기록해|추가해|만들|올려|넣어|써\s?줘|열어|열기|삭제|지워|공유|바꿔|어떻게|사용법|화면)/.test(instructionText)) {
+  if (내문서찾기질문(instructionText)) {
     // 답 경로와 같은 잣대(관련도 컷 있는 graded)로 잰다 — 컷 없는 재검색으로 재면 무관 조각
     // 1건에 가드가 열리고 답 경로는 그 조각을 버려 원래 결함이 재현된다(검토관 중2).
     // 검색 자체가 실패하면(임베딩 서버 다운 등) 가드를 접고 기존 길로 — 장애를 「부재 확정」으로
@@ -1117,7 +1140,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   프롬프트로 못 고친다 — 옮겨 간 자리를 코드로 못 박아 답한다.
   //   ⚠ 화면·메뉴·탭을 **반드시 대야** 잡는다(검토 지적). 선택으로 뒀더니 "오늘 할 일 없어?"
   //   같은 흔한 물음까지 이 안내로 샜다 — 목록을 물었는데 메뉴 폐지 공지가 나오는 꼴이다.
-  if (/(내\s*업무|할\s*일)\s*(화면|메뉴|탭)\s*(어디|없어|사라|안\s*보|어떻게\s*가|못\s*찾)/.test(instructionText)) {
+  if (내업무화면폐지_RE.test(instructionText)) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return {
@@ -1140,7 +1163,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   그대로 screenguide·explain·플레이북의 몫이다.
   // ★ "○○ 다시 열어줘" — 완료 답변이 **약속하는 말**이라 반드시 이어져야 한다(검토 지적:
   //   도구가 아예 없어 빈말이었다). 결재판을 생략한 근거가 "되돌릴 길을 준다"였다.
-  const 되열기 = instructionText.match(/^(.{2,60}?)\s*(?:다시\s*열|완료\s*취소|되돌려|안\s*했)/);
+  const 되열기 = 되열기_RE.exec(instructionText);
   if (되열기) {
     const tool = findAgentTool("reopen_task");
     if (tool) {
@@ -1486,7 +1509,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     //   문서지목 배제가 있으나 REMEDIATION 자체엔 없어, 장애·침해가 아닌 doc-pinned 조치질문이 샜다.
     //   AND 조건이라 순서 무관 — 소스감시가 REMEDIATION_INTENT_RE && !장애질문인가 인접을 요구해 뒤에 둔다.
     !문서지목질문(instructionText) &&
-    !/(조치|처리|수정|패치)\s*해\s*(줘|주세요|주라|다오|라|$)/.test(instructionText) &&
+    !조치실행지시_RE.test(instructionText) &&
     // ⚠ 앞의 값싼 검사를 전부 통과했을 때만 부른다(동적 import — 이 파일의 기존 방식).
     (await import("./playbook.js")).플레이북영토인가(instructionText)
   ) {
@@ -1571,7 +1594,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   대명사류로 잡는다: 직전 대상이 있으면 짚어 확인받고, 없으면 되묻는 기존 흐름 그대로.
   //   ⚠ 아래 관문의 앞머리(!선택 && (대명사뿐인가…)는 소스 감시 시험 2곳이 지키는 원형이다 —
   //     새 조건은 뒤에 붙인다(assetanaphora·ops147-regress가 배선 자체를 검증한다).
-  const 설명칩인데대상없음 = /^이거\s*쉽게\s*설명해\s*줘?\s*$/.test(instructionText.trim());
+  const 설명칩인데대상없음 = 설명칩_RE.test(instructionText.trim());
   if (!선택 && (대명사뿐인가(instructionText) || 가리킬것없는대명사(instructionText, 대화열쇠) || 설명칩인데대상없음)) {
     const 확인 = 대명사확인(대화열쇠);
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
@@ -1747,6 +1770,168 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     ...(approval ? { approval } : {}),
     ...picksFor(output, toolCalls, approval),
   };
+}
+
+// ══ 「이 말을 치면 어디로 갑니까?」 — 설명이 제품과 갈리지 않게 하는 단 하나의 창구 ══════
+//
+// ★★ 왜 생겼나 (2026-09-04 실측)
+//   `tools/route-explain.mjs`가 FORCED_INTENTS와 routes.ts 표만 읽고 **위 체인의 결정적
+//   판별자들(picklist·datacard·incidentsteps·screenguide…)을 몰랐다.** 그래서
+//     · 「미조치 취약점 뭐 있어?」  → 설명은 「search로 갑니다」   / 실제는 isFindingListAsk(목록+체크칸)
+//     · 「취약점 알려주세여」        → 설명은 「걸리는 규칙 없음」   / 실제는 isFindingListAsk
+//     · 「방화벽이 멈췄어」          → 설명은 「걸리는 규칙 없음」   / 실제는 장애초동절차
+//   라고 **틀리게 답했다.** 설명 도구의 도착지가 제품과 다르면 겹침 경보·문서가 통째로 거짓이
+//   된다 — 2026-08-10 「거짓 겹침 경보」와 같은 부류다(그때는 거짓 경보가 진짜 겹침을 묻었다).
+//
+// ★ 그래서 규칙은 하나다 — **판정은 제품 함수가 한다.** 여기서 정규식을 베껴 적지 않는다
+//   (helpers/routing.ts 머리글이 같은 사고로 이미 세워 둔 계약이다: 제품을 흉내 내면 어긋난다).
+//
+// ⚠ 그래도 **이 함수는 위 체인의 사본이다** — 순서가 어긋날 수 있다. 그것을 사람 기억에
+//   맡기지 않는다: 각 단계의 `감시` 칸에 dispatchInstructionCore를 여는 **코드 글자 그대로**를
+//   적어 두고, `routeexplain.route.test.ts`가 그 글자들이 **본문에 이 순서대로** 있는지 잰다.
+//   갈래를 옮기거나 판별자를 갈면 그 시험이 먼저 깨진다.
+// ⚠ 층 이름은 routes.ts의 낱말을 쓰되 **번호(routes.層)는 순서가 아니다** — 실제 순서는
+//   여기 차례가 전부다(routes.ts는 화면안내를 30, 체크선택을 40으로 적었지만 코드에서는
+//   체크선택이 먼저다).
+export interface 도착단계 {
+  /** 체인에서 몇 번째로 보는가 — 작을수록 먼저 본다(같은 말에 여럿 걸리면 앞의 것이 이긴다) */
+  차례: number;
+  이름: string;
+  층: string;
+  /** 코드에 있는 판별자 이름 */
+  판별: string;
+  /** 어디로 보내는가 */
+  도착: string;
+  /** 글자로는 걸렸지만 **최종 도착은 데이터에 달렸다**(내 할 일 이름·내 문서 조각과 겹칠 때만) */
+  조건부?: true;
+  /** dispatchInstructionCore에서 이 갈래를 여는 코드 그대로 — 순서 감시가 이 글자를 찾는다 */
+  감시: string;
+}
+
+/**
+ * 이 말이 **결정적 체인의 어디에 걸리는가** — 걸린 것을 전부, 실제 호출 순서대로 돌려준다.
+ * 첫 번째가 이긴다. 빈 배열이면 ⑨ 모델 선택(LLM이 도구를 고른다).
+ *
+ * ⚠ 데이터가 있어야 갈리는 갈래(내 할 일 이름·내 문서 조각)는 **글자 조건만** 재고
+ *   `조건부: true`로 표시한다 — 「간다」고 단정하지 않는다(없는 확신을 주지 않는다).
+ */
+export async function 결정적도착지(
+  말: string,
+  옵션?: { 화면?: string; 역할?: string; 대화?: string; 선택?: string },
+): Promise<도착단계[]> {
+  return (await 체인훑기(말, 옵션)).filter((s) => s.걸림).map(({ 걸림: _걸림, ...s }) => s);
+}
+
+/**
+ * 체인에 있는 **전 단계**를 순서대로 — 「규칙표」를 보여 줄 때 쓴다(판정 아님).
+ * ⚠ 표를 따로 적지 않는다 — 위 판정과 **같은 목록**을 그대로 낸다(두 벌이면 어긋난다).
+ */
+export async function 결정적체인(): Promise<도착단계[]> {
+  return (await 체인훑기("", undefined)).map(({ 걸림: _걸림, ...s }) => s);
+}
+
+async function 체인훑기(
+  말: string,
+  옵션?: { 화면?: string; 역할?: string; 대화?: string; 선택?: string },
+): Promise<(도착단계 & { 걸림: boolean })[]> {
+  // ── 표식 떼기 — 체인 맨 앞에서 하는 그대로(안 떼면 글자 수를 세는 판정이 오염된다) ──
+  let t = 말;
+  if (parseViewIds(t)) t = stripViewMark(t);
+  if (parseScopeMark(t)) t = stripScopeMark(t);
+  if (parseShellMark(t)) t = stripShellMark(t);
+
+  const 전체: (도착단계 & { 걸림: boolean })[] = [];
+  let 자리 = 0;
+  const 본다 = (걸렸나: boolean, 단계: Omit<도착단계, "차례">) => {
+    전체.push({ 차례: 자리++, ...단계, 걸림: 걸렸나 });
+  };
+
+  // ① 가드레일 — 신호를 쏘지 않는 본문(gateUserInputInner)으로 잰다(gateway.ts 머리글).
+  const g = gateUserInputInner(t, "dispatch");
+  t = g.text; // 개인정보 가림 반영본으로 갈아탄다 — 아래 판정은 전부 이 글자를 본다
+  본다(!g.allowed, { 이름: "해로운 요청 차단", 층: "가드레일", 판별: "gateUserInput", 도착: "차단 문구 + 방어 쪽 대안", 감시: "const guard = gateUserInput(instructionText" });
+
+  // ② 화면 이름 → 그 화면의 현황 카드
+  const dc = await import("./datacard.js");
+  const 어느카드 = dc.screenNameCard(t);
+  본다(!!어느카드, {
+    이름: "화면 이름 카드", 층: "특수경로", 판별: "screenNameCard",
+    도착: 어느카드 === "finding" ? "findingListAnswer(목록+체크칸)" : 어느카드 ? `카드답변(${어느카드})` : "그 화면의 현황 카드",
+    감시: "const 어느카드 = screenNameCard(instructionText)",
+  });
+
+  // ③ 「내 문서」 겨냥 찾기 질문 — 내 조각이 0건일 때만 가로챈다(데이터에 달렸다)
+  본다(내문서찾기질문(t), { 이름: "내 문서 0건 가드", 층: "특수경로", 판별: "내문서찾기질문", 도착: "mydocsStatusAnswer(없다고 정직하게)", 조건부: true, 감시: "if (내문서찾기질문(instructionText))" });
+
+  본다(isTooVague(t), { 이름: "뜻 모를 입력", 층: "되묻기", 판별: "isTooVague", 도착: "vagueAnswer", 감시: "if (isTooVague(instructionText))" });
+  본다(!!한낱말되묻기(t), { 이름: "한 낱말만", 층: "되묻기", 판별: "한낱말되묻기", 도착: "낱말별 되묻기", 감시: "const 낱말 = 한낱말되묻기(instructionText)" });
+  본다(!!faqAnswerFor(t), { 이름: "제품 지식 즉답", 층: "특수경로", 판별: "faqAnswerFor", 도착: "productfaq 카드", 감시: "const 지식카드 = faqAnswerFor(instructionText)" });
+  본다(내업무화면폐지_RE.test(t), { 이름: "없앤 내 업무 화면", 층: "특수경로", 판별: "내업무화면폐지_RE", 도착: "폐지 안내(대화창에서 하세요)", 감시: "if (내업무화면폐지_RE.test(instructionText))" });
+
+  // ⑧~⑩ 내 업무 — **열려 있는 내 할 일과 이름이 겹칠 때만** 채 간다.
+  // ⚠ 제품 함수를 그대로 부른다(정규식을 지어내지 않는다). 다만 답은 **지금 이 프로세스의
+  //   할 일 목록**에 달렸다 — 설명 도구는 빈 DB로 도니 「안 걸림」으로 보인다. 그래서 걸리든
+  //   말든 `조건부`로 표시해, 사람이 「여긴 데이터에 따라 달라진다」를 알고 보게 한다.
+  본다(!!되열기_RE.exec(t), { 이름: "내 할 일 다시 열기", 층: "내업무", 판별: "되열기_RE", 도착: "reopen_task", 조건부: true, 감시: "const 되열기 = 되열기_RE.exec(instructionText)" });
+  본다(!!(await 내할일완료말(t)), { 이름: "내 할 일 완료", 층: "내업무", 판별: "내할일완료말", 도착: "complete_task", 조건부: true, 감시: "const 완료말 = await 내할일완료말(instructionText)" });
+  본다(!!(await 내할일절차질문(t)), { 이름: "내 할 일 절차", 층: "내업무", 판별: "내할일절차질문", 도착: "work_steps", 조건부: true, 감시: "const 절차질문 = await 내할일절차질문(instructionText)" });
+
+  const pick = parsePickCommand(t);
+  본다(!!pick, { 이름: "목록에서 고른 건", 층: "체크선택", 판별: "parsePickCommand", 도착: pick?.kind === "task" ? "할 일 끝냄(결재판 없음)" : "결재판 직행", 감시: "const pick = parsePickCommand(instructionText)" }); // pick.kind=task면 결재판을 안 거친다
+
+  본다(isOutOfScope(t), { 이름: "보안 업무 밖", 층: "특수경로", 판별: "isOutOfScope", 도착: "outOfScopeAnswer", 감시: "if (isOutOfScope(instructionText))" });
+  본다(!!findHowTo(t), { 이름: "설정 켜는 법", 층: "특수경로", 판별: "findHowTo", 도착: "howto 순서 안내 + 화면 열기", 감시: "const howTo = findHowTo(instructionText)" });
+  본다(isMyWorkAsk(t), { 이름: "내 업무 조회", 층: "특수경로", 판별: "isMyWorkAsk", 도착: "myWorkAnswer(목록+체크칸)", 감시: "if (isMyWorkAsk(instructionText))" });
+  본다(isFindingListAsk(t) && !문서지목질문(t), { 이름: "취약점 목록 고르기", 층: "특수경로", 판별: "isFindingListAsk", 도착: "findingListAnswer(목록+체크칸)", 감시: "if (isFindingListAsk(instructionText) && !문서지목질문(instructionText))" });
+
+  const sc = await import("./scopecmd.js");
+  본다(sc.isScopeCommand(t), { 이름: "범위 걸기·풀기", 층: "특수경로", 판별: "isScopeCommand", 도착: "scopeCommandAnswer(scopeSet)", 감시: "if (isScopeCommand(instructionText))" });
+  const sn = await import("./scenarios.js");
+  본다(sn.isScenarioAsk(t), { 이름: "시나리오 실행", 층: "특수경로", 판별: "isScenarioAsk", 도착: "scenarioAnswer(프롬프트북)", 감시: "if (isScenarioAsk(instructionText))" });
+
+  본다(dc.isHardeningStatusAsk(t), { 이름: "검증(하드닝) 현황", 층: "특수경로", 판별: "isHardeningStatusAsk", 도착: "hardeningStatusAnswer(카드)", 감시: "isHardeningStatusAsk(instructionText) ? hardeningStatusAnswer()" });
+  본다(!dc.isHardeningStatusAsk(t) && dc.isAssetStatusAsk(t), { 이름: "자산 현황", 층: "특수경로", 판별: "isAssetStatusAsk", 도착: "assetStatusAnswer(카드)", 감시: ": isAssetStatusAsk(instructionText) ? assetStatusAnswer(" });
+  본다(!dc.isHardeningStatusAsk(t) && !dc.isAssetStatusAsk(t) && dc.isOpsStatusAsk(t), { 이름: "통합 관제 현황", 층: "특수경로", 판별: "isOpsStatusAsk", 도착: "opsStatusAnswer(카드)", 감시: ": isOpsStatusAsk(instructionText) ? await opsStatusAnswer()" });
+
+  본다(!!이름으로화면찾기(t), { 이름: "「○○ 어디서 해?」 자리 안내", 층: "화면안내", 판별: "이름으로화면찾기", 도착: "화면위치안내 + 화면 열기", 감시: "const 찾는화면 = 이름으로화면찾기(instructionText)" });
+  const 방법화면 = 방법질문화면찾기(t);
+  본다(!!방법화면 && !(방법화면.표준전용 && 에디션제한중()), { 이름: "「○○ 하려면?」 방법 안내", 층: "화면안내", 판별: "방법질문화면찾기", 도착: "formatScreenGuide + 화면 열기", 감시: "const 방법화면 = 방법질문화면찾기(instructionText)" });
+  본다(isHelpIntent(t, 옵션?.화면), { 이름: "화면 사용 안내", 층: "화면안내", 판별: "isHelpIntent", 도착: "formatScreenGuide(지금 화면)", 감시: "if (isHelpIntent(instructionText, screen))" });
+
+  본다(결재승인요청_RE.test(t), { 이름: "결재 승인 요청", 층: "특수경로", 판별: "결재승인요청_RE", 도착: "결재판 안내(대신 승인 안 함)", 감시: "if (결재승인요청_RE.test(instructionText))" });
+  본다(KB_HYGIENE_INTENT_RE.test(t), { 이름: "지식베이스 정리", 층: "특수경로", 판별: "KB_HYGIENE_INTENT_RE", 도착: "kbhygiene 리포트", 감시: "if (KB_HYGIENE_INTENT_RE.test(instructionText))" });
+  본다(ATTACK_PATH_INTENT_RE.test(t), { 이름: "공격 경로 분석", 층: "특수경로", 판별: "ATTACK_PATH_INTENT_RE", 도착: "formatAttackPaths", 감시: "if (ATTACK_PATH_INTENT_RE.test(instructionText))" });
+  본다(SHADOW_AI_INTENT_RE.test(t), { 이름: "Shadow AI 점검", 층: "특수경로", 판별: "SHADOW_AI_INTENT_RE", 도착: "formatShadowAi", 감시: "if (SHADOW_AI_INTENT_RE.test(instructionText))" });
+
+  // 조치 플레이북 — 배제 다섯 겹까지 **그대로** 재야 한다(하나만 빠져도 설명이 거짓이 된다)
+  본다(
+    REMEDIATION_INTENT_RE.test(t)
+      && !장애질문인가(t) && !침해사고질문인가(t) && !문서지목질문(t)
+      && !조치실행지시_RE.test(t)
+      && (await import("./playbook.js")).플레이북영토인가(t),
+    { 이름: "조치 플레이북", 층: "특수경로", 판별: "REMEDIATION_INTENT_RE", 도착: "formatRemediation", 감시: "REMEDIATION_INTENT_RE.test(instructionText) &&" },
+  );
+
+  본다(LEARN_TOPIC_RE.test(t) && LEARN_RUN_RE.test(t), { 이름: "학습 루프 실행", 층: "특수경로", 판별: "LEARN_TOPIC_RE", 도착: "학습 루프 확인 절차", 감시: "if (LEARN_TOPIC_RE.test(instructionText) && LEARN_RUN_RE.test(instructionText))" });
+  const steps = planInstruction(t);
+  본다(steps.length >= 2, { 이름: "복합 지시", 층: "특수경로", 판별: "planInstruction", 도착: steps.length >= 2 ? `오케스트레이션 ${steps.length}단계` : "오케스트레이션(2단계 이상)", 감시: "const steps = planInstruction(instructionText)" });
+  본다(ACTION_CHECK_RE.test(t) && !침해사고질문인가(t) && !장애질문인가(t), { 이름: "행동 대조(해도 되나)", 층: "특수경로", 판별: "ACTION_CHECK_RE", 도착: "runActionCheck", 감시: "ACTION_CHECK_RE.test(instructionText) &&" });
+
+  본다(
+    !옵션?.선택 && (대명사뿐인가(t) || 가리킬것없는대명사(t, 옵션?.대화) || 설명칩_RE.test(t.trim())),
+    { 이름: "가리킬 것 없는 대명사", 층: "되묻기", 판별: "대명사뿐인가", 도착: "되물음(예시 3개)", 감시: "if (!선택 && (대명사뿐인가(instructionText)" },
+  );
+
+  본다(장애질문인가(t), { 이름: "장비 장애·중단", 층: "특수경로", 판별: "장애질문인가", 도착: "장애초동절차", 감시: "if (장애질문인가(instructionText))" });
+  본다(침해사고질문인가(t), { 이름: "침해사고 의심", 층: "특수경로", 판별: "침해사고질문인가", 도착: "침해사고초동절차", 감시: "if (침해사고질문인가(instructionText))" });
+  본다(REJECT_HISTORY_RE.test(t), { 이름: "반려·오탐 이력", 층: "특수경로", 판별: "REJECT_HISTORY_RE", 도착: "formatRejectHistory", 감시: "if (REJECT_HISTORY_RE.test(instructionText))" });
+  본다(REPORT_CREATE_RE.test(t) && !REPORT_QUERY_EXCLUDE_RE.test(t), { 이름: "리포트 만들기", 층: "특수경로", 판별: "REPORT_CREATE_RE", 도착: "generateReport", 감시: "if (REPORT_CREATE_RE.test(instructionText) && !REPORT_QUERY_EXCLUDE_RE.test(instructionText))" });
+
+  // ⑨ 강제 도구 — runAgentLoop이 맨 앞에서 보는 자리(제품 함수 forcedToolFor가 그대로 답한다)
+  const 강제 = forcedToolFor(t, 옵션?.역할 ? { role: 옵션.역할 } : undefined);
+  본다(!!강제, { 이름: "강제 도구", 층: "강제도구", 판별: "forcedToolFor", 도착: 강제?.tool ?? "FORCED_INTENTS가 못 박은 도구", 감시: "const loop = await runAgentLoop(실행문" });
+
+  return 전체;
 }
 
 /**

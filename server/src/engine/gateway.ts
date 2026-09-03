@@ -257,8 +257,13 @@ export function maskPii(raw: string): PiiResult {
  * @param text   사용자가 준 원문
  * @param source 어느 입구인지(가드레일 로그에 남아 사후 추적에 쓰인다)
  * 돌아온 값의 `text`가 이후 경로에 써야 할 텍스트다(개인정보 가림 반영본).
+ *
+ * ★ **내보내는 이유**(2026-09-04) — `결정적도착지`(dispatcher.ts)가 「이 말이 어디로 갑니까」를
+ *   설명할 때 이 관문을 **같은 함수로** 재야 한다. 그런데 아래 `gateUserInput`은 실동작 신호
+ *   (llm_activity `guard`)를 함께 쏜다 — 설명 도구가 그걸 부르면 **아무도 묻지 않은 가드 실행이
+ *   AI 팀 현황판에 쌓인다.** 읽기만 하는 자리는 신호 없는 본문을 쓴다(검사 잣대는 한 벌 그대로).
  */
-function gateUserInputInner(text: string, source: GateSource): GateResult {
+export function gateUserInputInner(text: string, source: GateSource): GateResult {
   if (!text || !text.trim()) return { allowed: true, flagged: false, categories: [], text };
 
   // ⓪ 개인정보 가리기 — 검사(①②)보다 먼저. 차단 사유 기록(audit detail)에도 원문 대신
