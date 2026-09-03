@@ -36,7 +36,14 @@ const 표: Record<string, 격리> = {
   GIJO_LLAMA_SERVER_PATH: { how: "config" }, // 실 프로세스를 못 띄우게 없는 경로로 막는다
 
   GIJO_BACKUP_DIR: { how: "each", tests: ["backup.test.ts", "observability.test.ts"] },
-  GIJO_MEMORY_DB_PATH: { how: "each", tests: ["memory.test.ts", "backup.test.ts", "docsbundle.test.ts"] },
+  // ⚠ 2026-09-04에 둘을 더했다. **ingestquality는 표에 없던 채로 진짜 LanceDB에 쓰고 있었다** —
+  //   경로를 안 걸어 기본값(cwd/data/memory.lancedb)으로 갔고, 그건 개발 기계의 진짜 지식 베이스다.
+  //   ④(반쪽 수리)와 같은 계열: 이 표는 「격리한 시험 목록」이지 「LanceDB를 쓰는 시험 목록」이
+  //   아니었어서, 새로 쓴 시험이 조용히 감시 밖에 있었다.
+  GIJO_MEMORY_DB_PATH: {
+    how: "each",
+    tests: ["memory.test.ts", "backup.test.ts", "docsbundle.test.ts", "memoryfirsttable.test.ts", "ingestquality.test.ts"],
+  },
   GIJO_SESSION_ARCHIVE_DIR: { how: "each", tests: ["sessionarchive.test.ts", "moatslices.test.ts", "memorygrowth.test.ts"] },
   GIJO_LORA_DIR: { how: "each", tests: ["adapterimport.test.ts"] },
   GIJO_CLIENT_RELEASE_DIR: { how: "each", tests: ["clientrelease.test.ts"] },
@@ -103,6 +110,32 @@ describe("★ 시험 격리 — 경로 env는 전부 분류돼 있어야 한다"
         expect(fs.readFileSync(p, "utf8"), `${k}: ${t}가 이 env를 안 건다 — 표가 사실과 다르다`).toContain(k);
       }
     }
+  });
+
+  // ★ 표만으로는 부족했다(2026-09-04, ⑤). 표는 **적어 넣은 것**만 지키므로, 새로 쓴 시험이
+  //   LanceDB에 진짜로 쓰면서 표에 안 적히면 감시가 그것을 **원리상 못 본다**. ingestquality가
+  //   딱 그 상태였다 — 경로를 안 걸어 개발 기계의 진짜 지식 베이스(cwd/data/memory.lancedb)에
+  //   시험 문서를 쌓고 있었다. 그래서 「누가 쓰는가」를 소스에서 직접 센다.
+  it("지식 베이스에 **진짜로 쓰는** 시험은 빠짐없이 경로를 건다 — 표에 적었든 안 적었든", () => {
+    const 주석뺀 = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\n)\s*\/\/[^\n]*/g, "$1");
+    const 인입부르는시험: string[] = [];
+    const 격리없음: string[] = [];
+    for (const f of fs.readdirSync(__dirname).filter((n) => n.endsWith(".test.ts"))) {
+      const s = 주석뺀(fs.readFileSync(path.join(__dirname, f), "utf8"));
+      if (/vi\.mock\("\.\.\/src\/engine\/memory"/.test(s)) continue; // 목이면 LanceDB에 안 닿는다
+      if (!/\b(ingestText|ingestDocument)\s*\(/.test(s)) continue;
+      인입부르는시험.push(f);
+      if (!s.includes("GIJO_MEMORY_DB_PATH")) 격리없음.push(f);
+    }
+    expect(
+      격리없음,
+      `LanceDB에 진짜로 쓰는데 경로를 안 거는 시험: ${격리없음.join(", ")} — 이대로면 ` +
+        "server/에서 시험을 돌릴 때 **운영·개발의 진짜 data/memory.lancedb**에 시험 문서가 쌓인다. " +
+        "파일 맨 위에서 os.tmpdir() 아래 임시 디렉터리를 만들어 GIJO_MEMORY_DB_PATH로 걸고 " +
+        "(memory.ts가 **모듈 로드 시점**에 읽으므로 memory import는 `await import`여야 한다) " +
+        "afterAll에서 지울 것. 위 표에도 한 줄 적는다.",
+    ).toEqual([]);
+    expect(인입부르는시험.length, "인입을 부르는 시험을 하나도 못 찾았다 — 이 감시가 헛돈다").toBeGreaterThanOrEqual(3);
   });
 
   it("읽기 전용 예외에는 이유가 적혀 있다", () => {
