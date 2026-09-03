@@ -13,7 +13,7 @@ vi.mock("../src/engine/llm", () => ({
 
 import { createApp } from "../src/app";
 import { runAgentLoop } from "../src/engine/agentloop";
-import { findAgentTool, buildApproval, generateAssetId, executeApprovedTool } from "../src/engine/agenttools";
+import { findAgentTool, buildApproval, generateAssetId, executeApprovedTool, type AgentTool } from "../src/engine/agenttools";
 import { resetAssetsForTests, registerAsset, listAssets, getAsset } from "../src/engine/assets";
 import { listCompliance, resetComplianceForTests } from "../src/engine/compliance";
 import { listMaintenanceItems, resetMaintenanceForTests } from "../src/engine/maintenance";
@@ -118,6 +118,60 @@ describe("buildApproval — 값 출처 추적 (시안 B 핵심)", () => {
     expect(ap.effect).toContain("제품명은 아직 비어 있습니다 — 채워야 승인됩니다");
     // 선택값의 추정은 종전대로 남는다(배지로 표시만) — 문장에서도 지우면 그건 과잉이다
     expect(ap.effect).toContain("종류 방화벽");
+  });
+});
+
+// ★ 2026-09-04 win 격리 왕복 실측의 **둘째** 결함 — 같은 카드에서 문장은 막는데 **단추는 열려 있었다.**
+//   「사례 등록: … 연도는 2017년 …」이 year="2017년"으로 들어오면 칸은 차 있으니 missing=[]이고,
+//   「실행되면:」만 「등록되지 않습니다 — 연도가 맞지 않습니다: 2017년」이라고 말했다. 눌러 보면 run이 던진다.
+//   ⇒ missing은 「빈 필수칸」만이 아니라 **도구가 미리 아는 실패**도 세야 한다(도구의 validate 갈래).
+//   여기서는 **틀 자체**를 시험한다 — 사례 등록에 붙인 실물 검증은 incidentcases.test가 본다.
+describe("★ buildApproval × 도구 validate — 규칙에 안 맞는 값도 승인을 막는다", () => {
+  const 네자리 = (a: Record<string, string>): string[] => {
+    const 사유: string[] = [];
+    if (!/^\d{4}$/.test(a.year ?? "")) 사유.push(`연도가 맞지 않습니다: ${a.year ?? ""}`);
+    if ((a.memo ?? "") === "나쁨") 사유.push("메모가 규칙에 안 맞습니다: 나쁨");
+    return 사유;
+  };
+  const 시험도구: AgentTool = {
+    name: "시험_등록", label: "시험 등록", domain: "cross", write: true,
+    description: "시험 전용 — 결재판 틀만 본다",
+    params: [
+      { name: "year", label: "연도", description: "사고 연도(예: 2024)", required: true },
+      { name: "memo", label: "메모", description: "선택 메모", required: false },
+    ],
+    // effect와 validate가 **같은 함수**를 본다 — 두 벌로 적으면 지금 고치는 어긋남이 반대로 재발한다
+    effect: (a) => (네자리(a).length ? `등록되지 않습니다 — ${네자리(a).join(" · ")}` : `연도 ${a.year}로 등록합니다`),
+    validate: 네자리,
+    run: async () => "ok",
+  };
+
+  it("★ 필수 칸의 값이 규칙에 안 맞으면 그 칸을 비워 승인을 막고, 사유를 문장에 싣는다", () => {
+    const ap = buildApproval(시험도구, { year: "2017년" }, "연도는 2017년으로 등록해줘");
+    // ← 예전 결함: 이 한 줄이 통과하지 못했다(칸이 차 있어 missing=[]이었다)
+    expect(ap.missing, "규칙에 안 맞는 값인데 승인 단추가 열려 있다").toEqual(["year"]);
+    expect(ap.fields.find((f) => f.key === "year")!.value).toBe("");
+    expect(ap.fields.find((f) => f.key === "year")!.hint).toContain("규칙에 안 맞아 비웠습니다");
+    expect(ap.effect, "왜 막혔는지(무슨 값이 문제인지)를 문장이 말하지 않는다").toContain("연도가 맞지 않습니다: 2017년");
+  });
+
+  it("규칙을 지난 값은 종전대로 열린다 — 검증이 멀쩡한 등록까지 막으면 안 된다", () => {
+    const ap = buildApproval(시험도구, { year: "2024" }, "연도는 2024로 등록해줘");
+    expect(ap.missing).toEqual([]);
+    expect(ap.effect).toBe("연도 2024로 등록합니다");
+  });
+
+  it("선택 칸의 사유는 값을 지우지 않는다 — 담당자가 적은 값을 조용히 버리는 쪽이 더 나쁘다", () => {
+    const ap = buildApproval(시험도구, { year: "2024", memo: "나쁨" }, "연도는 2024, 메모는 나쁨");
+    expect(ap.fields.find((f) => f.key === "memo")!.value).toBe("나쁨");
+    expect(ap.missing).toEqual([]); // 선택 칸은 승인 문턱이 아니다(화면도 필수 칸만 잠근다)
+    expect(ap.effect).toContain("메모가 규칙에 안 맞습니다: 나쁨");
+  });
+
+  it("validate가 없는 도구는 종전 그대로다 — 이 갈래는 **선택**이다", () => {
+    expect(findAgentTool("register_asset")!.validate).toBeUndefined();
+    const ap = buildApproval(findAgentTool("register_asset")!, { name: "사내 챗봇", path: "models/chatbot.gguf" }, "사내 챗봇 등록해줘. 경로는 models/chatbot.gguf 야");
+    expect(ap.missing).toEqual([]);
   });
 });
 

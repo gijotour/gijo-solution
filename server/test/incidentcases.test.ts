@@ -94,6 +94,21 @@ describe("등록 입력 검증 — 사유를 전부 모아 돌려준다", () => 
     expect(ok.value.year).toBe(2021);
     expect(CVE_ID_RE.test("CVE-2021-44228")).toBe(true);
   });
+  // ★ 2026-09-04 win 격리 왕복 실측 — 「사례 등록: … 연도는 2017년 …」이 year="2017년"으로 들어왔다.
+  //   Number("2017년")은 NaN이라 「연도가 맞지 않습니다: 2017년」으로 막혔다 — 담당자는 연도를
+  //   **정확히 말했는데** 제품이 못 알아들은 것이다. 모델에게 「년을 떼라」를 더 시키지 않고 코드로 편다.
+  it("★ 연도를 사람 말로 적어도 알아듣는다 — 「2017년」·「2017.」·「'17」·「2024년 3월」", () => {
+    const 연도 = (v: unknown) => validateIncidentCaseInput({ ...log4shell, year: v });
+    expect(연도("2017년")).toMatchObject({ errors: [], value: { year: 2017 } });
+    expect(연도("2017.")).toMatchObject({ errors: [], value: { year: 2017 } });
+    expect(연도("'17")).toMatchObject({ errors: [], value: { year: 2017 } }); // 두 자리는 세기를 붙인다
+    expect(연도("2024년 3월")).toMatchObject({ errors: [], value: { year: 2024 } }); // 월(3)은 숫자 경계로 걸러진다
+    expect(연도(2021)).toMatchObject({ errors: [], value: { year: 2021 } }); // 숫자로 와도 그대로
+    // ⚠ 못 뽑으면 **종전 사유 그대로** — 몰래 올해로 채우면 담당자가 안 적은 값이 표에 들어간다
+    expect(연도("삼천년").errors.join("\n")).toMatch(/연도가 맞지 않습니다: 삼천년/);
+    expect(연도("20170101").errors.join("\n")).toMatch(/연도가 맞지 않습니다: 20170101/);
+    expect(연도("").errors.join("\n")).toMatch(/연도가 비었습니다/);
+  });
   it("길이 상한을 넘으면 사유에 글자 수가 찍힌다", () => {
     const { errors } = validateIncidentCaseInput({ ...log4shell, title: "x".repeat(121) });
     // 조사는 말조사()가 받침으로 고른다 — 「제목이」(josa.test 소스 감시가 「이(가)」 표기를 막는다)
@@ -440,6 +455,9 @@ describe("배선 — 도구·정리 대장", () => {
     expect(findAgentTool("register_incident_case")!.undo).toContain("사례 삭제");
     // 결재판 「실행되면:」이 입력 부족을 미리 말한다 — 승인이 헛돌지 않게
     expect(findAgentTool("register_incident_case")!.effect!({})).toMatch(/등록되지 않습니다 — 입력이 부족합니다/);
+    // 승인 **문턱**도 그 문장과 같은 잣대여야 한다 — 안 걸면 missing이 다시 빈 칸만 센다(2026-09-04)
+    expect(findAgentTool("register_incident_case")!.validate, "검증 갈래가 안 걸렸다").toBeTypeOf("function");
+    expect(findAgentTool("register_incident_case")!.validate!({}), "빈 입력인데 사유가 없다").not.toEqual([]);
     // 조사는 손으로 적지 않는다 — 앞말이 값이라 「…해외)를」이다(조사()가 닫는 괄호를 건너뛰고 「외」의 받침을 본다, josa.test 소스 감시)
     expect(findAgentTool("register_incident_case")!.effect!(log4shell as unknown as Record<string, string>)).toMatch(/「Log4Shell 대규모 악용」\(2021·소프트웨어·해외\)를 등록합니다 — 출처 https/);
     // 삭제 결재판 — 내장 사례는 「숨김」이라고 미리 말한다(지운 줄 알았는데 되살아나던 결함의 짝)
@@ -474,6 +492,45 @@ describe("배선 — 도구·정리 대장", () => {
     expect(ap.effect).toContain("업종이 비었습니다");
     // 도구가 이미 그 칸을 짚어 말했으니 buildApproval이 같은 말을 덧붙이지 않는다(두 번 말하지 않는다)
     expect(ap.effect).not.toContain("채워야 승인됩니다");
+  });
+
+  // ★ 같은 왕복(2026-09-04)의 **둘째** 결함 — 승인 단추가 열려 있었다.
+  //   「연도는 2017년」이 그대로 들어오면 칸은 차 있으니 missing=[]인데 「실행되면:」은 이미
+  //   「등록되지 않습니다 — 연도가 맞지 않습니다: 2017년」이라고 말했다. 눌러 보면 run이 던져
+  //   「등록하지 못했습니다」 — 제품이 **미리 아는 실패**를 담당자가 눌러서 확인한 셈이다.
+  const 사례지시 = (연도: string) =>
+    `사례 등록: 제목 ○○사 랜섬웨어, 한 줄 요약 랜섬웨어로 공장이 멈췄다, 쉬운 설명 협력사 계정이 털려 내부로 들어왔다, ` +
+    `연도는 ${연도}, 업종 제조, 지역 국내, 교훈 원격 접속에 2단계 인증을 붙인다, 출처 https://example.com/ransom`;
+  const 사례인자 = (연도: string) => ({
+    title: "○○사 랜섬웨어", oneLiner: "랜섬웨어로 공장이 멈췄다", plainExplain: "협력사 계정이 털려 내부로 들어왔다",
+    year: 연도, industry: "제조", region: "국내", lesson: "원격 접속에 2단계 인증을 붙인다", sourceUrl: "https://example.com/ransom",
+  });
+
+  it("★ 「연도는 2017년」이 결재판까지 살아 온다 — 승인이 열리고 문장이 2017로 확정한다", () => {
+    const ap = buildApproval(findAgentTool("register_incident_case")!, 사례인자("2017년"), 사례지시("2017년"));
+    expect(ap.missing, `막을 이유가 없는데 막혔다 — ${ap.effect}`).toEqual([]);
+    expect(ap.fields.find((f) => f.key === "year")!.value, "지시에 있던 값을 지웠다").toBe("2017년");
+    expect(ap.effect).toMatch(/\(2017·제조·국내\)/); // 「2017년」이 아니라 정규화된 2017로 말한다
+    expect(ap.effect, "될 등록을 안 된다고 말했다").not.toContain("등록되지 않습니다");
+  });
+
+  it("★ 규칙에 안 맞는 필수값은 승인을 막는다 — 그 칸이 missing에 들고 사유가 문장·힌트에 남는다", () => {
+    const ap = buildApproval(findAgentTool("register_incident_case")!, 사례인자("삼천년"), 사례지시("삼천년"));
+    // ← 예전 결함: 이 한 줄이 통과하지 못했다(missing=[]이라 승인 단추가 열려 있었다)
+    expect(ap.missing, "규칙에 안 맞는 값인데 승인이 열려 있다").toContain("year");
+    const 연도칸 = ap.fields.find((f) => f.key === "year")!;
+    expect(연도칸.value, "안 될 값을 채운 채로 두면 사람이 무심코 승인한다").toBe("");
+    expect(연도칸.source).toBe("empty");
+    expect(연도칸.hint, "무엇이 왜 지워졌는지 모르면 같은 값을 다시 적는다").toContain("규칙에 안 맞아 비웠습니다");
+    expect(ap.effect, "왜 막혔는지를 문장이 말하지 않는다").toContain("연도가 맞지 않습니다: 삼천년");
+  });
+
+  it("★ 선택 칸의 사유는 값을 지우지 않는다 — 문장으로만 말한다(적어 준 CVE를 조용히 버리지 않는다)", () => {
+    const 지시 = `${사례지시("2021")}, CVE-21-1`;
+    const ap = buildApproval(findAgentTool("register_incident_case")!, { ...사례인자("2021"), cves: "CVE-21-1" }, 지시);
+    expect(ap.fields.find((f) => f.key === "cves")!.value, "담당자가 적은 값을 지웠다").toBe("CVE-21-1");
+    expect(ap.missing, "선택 칸은 승인 문턱이 아니다").not.toContain("cves");
+    expect(ap.effect).toContain("CVE 꼴이 아닙니다: CVE-21-1");
   });
 
   it("incident_cases는 지식이다 — 정리 대장(TARGETS)에 없다(실사용 전환에서 안 지운다, 결정 ①)", () => {

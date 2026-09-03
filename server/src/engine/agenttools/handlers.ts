@@ -134,6 +134,20 @@ export interface AgentTool {
   // 쓰기 도구용: LLM이 안 준 값을 서버 규칙으로 채운다(예: id를 이름에서 생성). 결재판에서 "자동생성"으로 표시된다.
   autoFill?: (args: Record<string, string>, instruction: string, toolResults?: string) => Record<string, string>;
   effect?: (args: Record<string, string>) => string; // "실행되면:" 고지
+  /**
+   * 결재판 **규칙 검증** — 「빈 칸」이 아니라 **값이 규칙에 안 맞는** 경우의 사유(사람 문장) 배열.
+   *
+   * 왜 따로 두나(2026-09-04 win 격리 왕복 실측): buildApproval의 missing은 그때까지 **빈 필수칸만**
+   * 셌다. 「연도는 2017년」이 year="2017년"으로 들어오면 칸은 차 있으니 missing=[]이라 **승인 단추가
+   * 열렸고**, 「실행되면:」은 이미 「등록되지 않습니다 — …」라고 말하고 있었다. 누르면 run이 던져
+   * 「등록하지 못했습니다」. 제품이 **미리 아는 실패**를 사람 손에 떠넘긴 셈이다.
+   *
+   * ⚠ effect가 사유를 말하는 도구는 **같은 함수를 그대로 건다**(잣대 한 곳). 두 벌로 적으면
+   *   「문장은 막는다는데 단추는 열린다」가 반대 방향으로 재발한다.
+   * ⚠ 사유 문장에는 **칸 이름(label)을 그대로** 넣는다 — buildApproval이 그 이름으로 어느 칸을
+   *   비울지 찾는다(찾은 칸이 필수면 비워서 승인을 막는다).
+   */
+  validate?: (args: Record<string, string>) => string[];
   undo?: string; // "되돌리기:" 고지
   run: (args: Record<string, string>) => Promise<string> | string;
 }
@@ -4142,6 +4156,14 @@ export function incidentCaseEffect(args: Record<string, string>): string {
   // 조사는 손으로 적지 않는다(josa.test 소스 감시) — 앞말이 값이라 「…해외)를」·「…2021)을」로 갈린다(조사()가 닫는 괄호를 건너뛰고 끝소리를 본다).
   const 대상 = `「${value.title}」(${value.year}·${value.industry}·${value.region})`;
   return `침해사고 히스토리에 ${대상}${조사(대상, "을")} 등록합니다 — 출처 ${value.sourceUrl}${value.cves.length ? ` · CVE ${value.cves.join(", ")}` : ""} · 지식 문서로도 반입됩니다(전 담당자 검색에 걸림)`;
+}
+
+/**
+ * 결재판 승인 문턱 — 「실행되면:」과 **같은 함수**로 본다(2026-09-04 win 격리 왕복 실측 수리).
+ * 잣대를 여기서 새로 적으면, 문장은 「등록되지 않습니다」인데 단추는 열려 있는 지금 결함이 되풀이된다.
+ */
+export function incidentCaseValidate(args: Record<string, string>): string[] {
+  return validateIncidentCaseInput(args).errors;
 }
 
 export function runRegisterIncidentCase(args: Record<string, string>): string {

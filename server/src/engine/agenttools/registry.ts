@@ -107,6 +107,7 @@ import {
   runIncidentSources,
   runRegisterIncidentCase,
   incidentCaseEffect,
+  incidentCaseValidate,
   incidentCaseDeleteEffect,
   runDeleteIncidentCase,
   다음걸음,
@@ -1415,6 +1416,9 @@ const TOOLS: AgentTool[] = [
       { name: "techniques", label: "공격 기법", description: "ATT&CK 기법 id(쉼표로 여러 개, 예: T1190)", required: false },
     ],
     effect: incidentCaseEffect,
+    // 「실행되면:」과 **같은 함수**로 승인 문턱도 막는다 — 문장이 「등록되지 않습니다」라고 하는데
+    // 단추가 열려 있으면 누른 사람은 실패를 두 번 겪는다(2026-09-04 win 격리 왕복 실측).
+    validate: incidentCaseValidate,
     undo: "대화창에서 「사례 삭제 <번호>」 또는 관리자 삭제 — 지식 문서도 함께 빠집니다",
     run: runRegisterIncidentCase,
   },
@@ -2411,6 +2415,31 @@ function 같은자산이보였나(toolResults: string, assetId: string): boolean
   return textHas(결과, 이름);
 }
 
+/**
+ * 검증 사유가 **어느 칸**을 짚는가 — 사유 문장에 칸 이름(label)이 그대로 들어 있는지로 찾는다.
+ *
+ * 도구의 검증 함수는 사유를 사람 문장으로 쓴다(「연도가 맞지 않습니다: 2017년 (1980~2027)」).
+ * 그 문장이 곧 화면에 나가므로 별도 코드 대신 **이름**으로 잇는다(같은 말을 두 벌 적지 않는다).
+ *
+ * ⚠ **긴 이름부터** 본다 — 「출처 URL」이 「출처 이름」보다 먼저 걸려야 엉뚱한 칸을 비우지 않는다.
+ * ⚠ 이름에 공백이 있으면 **끝말로도** 한 번 더 본다 — 도구는 「공격 기법」이라 부르는데 사유는
+ *   「ATT&CK 기법 꼴이 아닙니다」라고 쓴다.
+ * ⚠ **필수이면서 값이 있는 칸**만 후보다. 이미 빈 칸의 「비었습니다」 사유는 여기서 다시 짚을 것이 없고,
+ *   선택 칸은 비우면 담당자가 적은 값이 조용히 사라진다.
+ */
+function 사유가짚은칸(fields: ApprovalField[], 사유들: string[]): Map<string, string> {
+  if (!사유들.length) return new Map();
+  const 긴이름순 = fields.filter((f) => f.required && f.value).sort((a, b) => b.label.length - a.label.length);
+  const 짝 = new Map<string, string>();
+  for (const 사유 of 사유들) {
+    const f =
+      긴이름순.find((x) => 사유.includes(x.label)) ??
+      긴이름순.find((x) => x.label.includes(" ") && 사유.includes(x.label.split(" ").pop() ?? ""));
+    if (f && !짝.has(f.key)) 짝.set(f.key, 사유);
+  }
+  return 짝;
+}
+
 export function buildApproval(
   tool: AgentTool,
   rawArgs: Record<string, string>,
@@ -2446,16 +2475,37 @@ export function buildApproval(
   //   ⚠ 키를 지우지 않고 **빈 문자열**로 둔다 — delete하면 `args.name`을 그대로 잇는 effect가 「undefined」를 찍는다.
   const effectArgs = { ...args };
   for (const f of fields) if (!f.value) effectArgs[f.key] = "";
+  // ★ **값이 규칙에 안 맞는 것도** 빈 칸과 같은 무게로 승인을 막는다(2026-09-04 win 격리 왕복 실측 수리).
+  //   실사고: 「사례 등록: … 연도는 2017년 …」이 year="2017년"으로 들어왔다. 칸이 차 있으니 missing=[]이라
+  //   **승인 단추가 열려 있었는데** 「실행되면:」은 이미 「등록되지 않습니다 — 연도가 맞지 않습니다: 2017년」
+  //   이라고 말하고 있었고, 누르면 run이 던져 「등록하지 못했습니다」로 끝났다.
+  //   제품이 **미리 아는 실패**를 사람 손에 떠넘긴 셈이라 문턱을 여기로 올린다.
+  const 검증사유 = tool.validate ? tool.validate(effectArgs) : [];
+  // 사유가 짚은 **필수 칸만** 비운다 — 화면은 「빈 필수칸」에서 승인을 잠근다(console.js·chatwidget.js 같은 잣대).
+  //   ⚠ 선택 칸은 비우지 않는다. 담당자가 적은 CVE를 조용히 버리고 등록해 버리면 값의 손실이 더 나쁘다 —
+  //     그 사유는 아래 문장으로 나가고, 승인하면 executeApprovedTool→run이 **같은 잣대**로 막는다.
+  for (const [key, 사유] of 사유가짚은칸(fields, 검증사유)) {
+    const f = fields.find((x) => x.key === key)!;
+    // 지운 값은 힌트(입력칸 안내글)에 남긴다 — 무엇이 왜 지워졌는지 모르면 담당자는 같은 값을 다시 적는다.
+    f.hint = [f.hint, `⚠ 규칙에 안 맞아 비웠습니다 — ${사유}`].filter(Boolean).join(" · ");
+    f.value = "";
+    f.source = "empty";
+    effectArgs[key] = "";
+  }
   const effect = tool.effect ? tool.effect(effectArgs) : "";
   // 빈 필수칸은 문장에서도 말한다 — 값이 사라진 자리를 침묵으로 두면 「보안제품 ""을 등록부에 추가」처럼 읽힌다.
   //   ⚠ 도구가 이미 그 칸을 짚어 말했으면(사례 등록의 incidentCaseEffect가 사유를 열거한다) 두 번 말하지 않는다.
   const 못짚은빈칸 = fields.filter((f) => f.required && !f.value && !effect.includes(f.label)).map((f) => f.label);
   const 빈칸알림 = 못짚은빈칸.length ? `${말조사(못짚은빈칸.join("·"), "은")} 아직 비어 있습니다 — 채워야 승인됩니다` : "";
+  // 검증 사유도 **문장**에 싣는다 — 사람은 칸이 아니라 문장을 읽고 승인한다(위 ★와 같은 이유).
+  //   effect가 이미 그 사유를 그대로 말했으면 덧붙이지 않는다(빈칸알림과 같은 규칙).
+  const 못실은사유 = 검증사유.filter((r) => !effect.includes(r));
+  const 검증알림 = 못실은사유.length ? `⚠ 값을 다시 봐 주세요 — ${못실은사유.join(" · ")}` : "";
   return {
     tool: tool.name,
     label: tool.label,
     fields,
-    effect: [effect, 빈칸알림].filter(Boolean).join(" · "),
+    effect: [effect, 빈칸알림, 검증알림].filter(Boolean).join(" · "),
     undo: tool.undo ?? "",
     missing: fields.filter((f) => f.required && !f.value).map((f) => f.key),
     // ⌗기계 키 꼬리는 저장본에서 뗀다 — 이 지시문은 파인튜닝 골드 예시로 누적되는데 sha1이

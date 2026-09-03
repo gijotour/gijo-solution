@@ -101,8 +101,31 @@ const splitNames = (v: unknown): string[] =>
 const uniq = (xs: string[]) => [...new Set(xs)];
 
 /**
+ * 연도 뽑기 — 담당자는 「2017년」·「2017.」·「'17」·「2024년 3월」로도 적는다.
+ *
+ * 실사고(2026-09-04 win 격리 왕복 실측): 「사례 등록: … 연도는 2017년 …」이 year="2017년"으로 들어와
+ * `Number("2017년")`이 NaN이 됐고 「연도가 맞지 않습니다: 2017년」으로 막혔다. 담당자는 연도를
+ * **정확히 말했는데** 제품이 못 알아들은 것이다. 모델에게 「년을 떼고 넣어라」를 더 시키지 않는다 —
+ * 7B에 프롬프트 규칙을 더해 행동을 고치려다 반복 실패한 자리라 **코드로** 편다.
+ *
+ * ⚠ 못 뽑으면 **0**을 돌려준다 — 종전 사유(「연도가 맞지 않습니다: …」)가 그대로 나가야 한다.
+ *   「삼천년」을 몰래 올해로 채우면 담당자가 안 적은 값이 표에 들어간다(지어낸 값이 가장 나쁘다).
+ */
+function 연도뽑기(raw: string, thisYear: number): number {
+  const s = String(raw ?? "").trim();
+  if (!s) return 0;
+  // 네 자리가 있으면 그것이 연도다 — 「2024년 3월」의 3·「2017.」의 마침표는 숫자 경계로 걸러진다.
+  const 네자리 = s.match(/(?<!\d)(\d{4})(?!\d)/);
+  if (네자리) return Number(네자리[1]);
+  // 두 자리(「'17」·「17년」)는 세기를 붙인다 — 올해+1까지는 2000년대, 그보다 크면 1900년대(「'99」=1999).
+  const 두자리 = s.match(/(?<!\d)(\d{2})(?!\d)/);
+  if (두자리) { const n = Number(두자리[1]); return 2000 + n <= thisYear + 1 ? 2000 + n : 1900 + n; }
+  return 0;
+}
+
+/**
  * 등록 입력을 규칙으로 검증한다 — 사유는 전부 모아 돌려준다(하나씩 되묻지 않는다).
- * 정규화: CVE·기법은 대문자, 지역은 국내/해외, 목록은 중복 제거.
+ * 정규화: CVE·기법은 대문자, 지역은 국내/해외, 목록은 중복 제거, 연도는 「2017년」류에서 네 자리를 뽑는다.
  */
 export function validateIncidentCaseInput(raw: Record<string, unknown>): { value: IncidentCaseInput; errors: string[] } {
   const errors: string[] = [];
@@ -123,8 +146,8 @@ export function validateIncidentCaseInput(raw: Record<string, unknown>): { value
   if (sourceNameRaw.length > LIMITS.sourceName) errors.push(`${말조사("출처 이름", "이")} ${LIMITS.sourceName}자를 넘습니다(${sourceNameRaw.length}자)`);
   const sourceName = sourceNameRaw.slice(0, LIMITS.sourceName);
   const yearRaw = str(raw.year);
-  const year = Number(yearRaw);
   const thisYear = new Date().getFullYear();
+  const year = 연도뽑기(yearRaw, thisYear);
   if (!yearRaw) errors.push("연도가 비었습니다");
   else if (!Number.isInteger(year) || year < 1980 || year > thisYear + 1) errors.push(`연도가 맞지 않습니다: ${yearRaw} (1980~${thisYear + 1})`);
   const regionRaw = str(raw.region);
