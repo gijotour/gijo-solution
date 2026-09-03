@@ -821,11 +821,16 @@
             var cs = (d && d.cases) || [];
             var 국내 = cs.filter(function (c) { return c.region === "국내"; }).length;
             var 담당자 = cs.filter(function (c) { return c.origin === "user"; }).length;
-            // 상한(500)에 닿았으면 「500+」 — 전부인 척하지 않는다(작업 세션 판의 「최근」과 같은 정직).
-            var 총 = cs.length >= 500 ? "500+" : n(cs.length);
+            // 「등록된 사례」는 **서버가 센 total**로 적는다(2026-09-03 통합 검토) — 받은 줄로 세면
+            //   상한(500)에 걸린 순간 「500건」이 거짓이 된다. 잘렸으면 그 사실을 그대로 적는다.
+            //   total이 없는 옛 서버면 받은 줄 수로 대신하되, 상한에 닿았으면 「+」로 전부인 척하지 않는다.
+            //   ⚠ 아래 국내·해외·담당자는 **받은 줄에서만** 센 값이라, 잘렸을 때 total과 합이 안 맞는 것이 정상이다.
+            var 전체 = d && typeof d.total === "number" ? d.total : null;
+            var 총 = 전체 == null ? n(cs.length) + "건" + (cs.length >= 500 ? "+" : "")
+              : n(전체) + "건" + (cs.length < 전체 ? " 중 " + n(cs.length) + "건 표시" : "");
             return {
               rows: [
-                ["등록된 사례", 총 + "건"],
+                ["등록된 사례", 총],
                 ["국내 · 해외", n(국내) + " · " + n(cs.length - 국내)],
                 ["담당자가 등록", n(담당자) + "건"],
               ],

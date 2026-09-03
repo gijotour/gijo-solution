@@ -32,9 +32,9 @@ vi.mock("../src/engine/memory", async (importOriginal) => {
 
 import { db } from "../src/db";
 import {
-  validateIncidentCaseInput, registerIncidentCase, deleteIncidentCase, listIncidentCases, getIncidentCase, findCasesForCves, countIncidentCases,
-  seedBuiltinCases, builtinCaseId, syncIncidentCaseDocs, incidentCaseDocsIdle, caseDocText, formatIncidentCases, formatIncidentSources, listIncidentSources,
-  incidentCaseDocId, INCIDENT_CASE_ORIGIN, INCIDENT_CASE_CATEGORY, CVE_ID_RE,
+  validateIncidentCaseInput, registerIncidentCase, deleteIncidentCase, listIncidentCases, getIncidentCase, findCasesForCves, matchCasesForCves, countIncidentCases,
+  seedBuiltinCases, builtinCaseId, syncIncidentCaseDocs, syncIncidentCaseDocsWithRetry, incidentCaseDocsIdle, caseDocText, formatIncidentCases, formatIncidentSources, listIncidentSources,
+  hiddenBuiltinCaseIds, unhideBuiltinCases, incidentCaseDocId, INCIDENT_CASE_ORIGIN, INCIDENT_CASE_CATEGORY, CVE_ID_RE, LIMITS,
 } from "../src/engine/incidentcases";
 import { listAudit } from "../src/engine/audit";
 import { findAgentTool } from "../src/engine/agenttools/registry";
@@ -63,8 +63,12 @@ const 국내 = {
 beforeEach(() => {
   db.prepare("DELETE FROM incident_cases").run();
   db.prepare("DELETE FROM memory_documents WHERE origin = ?").run(INCIDENT_CASE_ORIGIN);
+  // 내장 사례 숨김 기록도 시험마다 비운다 — 안 비우면 앞 시험이 지운 씨앗이 뒷 시험에서 안 들어와 「멱등이 깨졌다」로 보인다
+  db.prepare("DELETE FROM app_state WHERE key = 'incidentcases:hiddenBuiltin'").run();
   ingestSpy.mockClear(); deleteSpy.mockClear();
 });
+/** 배포되는 진짜 씨앗 파일 — 실데이터로 재는 시험이 쓴다(길이·건수는 시험이 지어내지 않는다). */
+const 씨앗파일 = path.join(__dirname, "..", "src", "engine", "incidentcases-seed.json");
 const withEnv = async (k: string, v: string, fn: () => Promise<void>) => {
   const prev = process.env[k]; process.env[k] = v;
   try { await fn(); } finally { if (prev === undefined) delete process.env[k]; else process.env[k] = prev; }
@@ -94,6 +98,32 @@ describe("등록 입력 검증 — 사유를 전부 모아 돌려준다", () => 
     const { errors } = validateIncidentCaseInput({ ...log4shell, title: "x".repeat(121) });
     // 조사는 말조사()가 받침으로 고른다 — 「제목이」(josa.test 소스 감시가 「이(가)」 표기를 막는다)
     expect(errors).toEqual([expect.stringMatching(/제목이 120자를 넘습니다\(121자\)/)]);
+  });
+  it("★ 필수가 아닌 칸도 **조용히 자르지 않는다** — 출처 이름·URL·제품 이름이 상한을 넘으면 사유로 말한다(검토관 2026-09-03)", () => {
+    const { errors } = validateIncidentCaseInput({
+      ...log4shell,
+      sourceName: "가".repeat(LIMITS.sourceName + 1),
+      sourceUrl: `https://example.com/${"a".repeat(LIMITS.sourceUrl)}`,
+      products: ["제품".repeat(LIMITS.item)],
+    });
+    expect(errors.join("\n")).toMatch(new RegExp(`출처 이름이 ${LIMITS.sourceName}자를 넘습니다`));
+    expect(errors.join("\n")).toMatch(new RegExp(`출처 URL이 ${LIMITS.sourceUrl}자를 넘습니다`));
+    expect(errors.join("\n")).toMatch(new RegExp(`제품 이름이 ${LIMITS.item}자를 넘습니다`));
+    // 상한 안이면 그대로 산다 — 옛 상한(80)에서 잘려 나가던 씨앗 출처가 이 길이다
+    const 긴출처 = "가".repeat(290);
+    expect(validateIncidentCaseInput({ ...log4shell, sourceName: 긴출처 })).toMatchObject({ errors: [], value: { sourceName: 긴출처 } });
+  });
+  it("★ 배포되는 씨앗 20건이 새 검증을 전부 지난다 — 표에 들어간 값이 원본과 같다(잘린 칸 0)", () => {
+    const j = JSON.parse(fs.readFileSync(씨앗파일, "utf8")) as { cases: Record<string, unknown>[] };
+    expect(j.cases.length, "씨앗 건수가 줄었다").toBeGreaterThanOrEqual(20);
+    for (const c of j.cases) {
+      const { value, errors } = validateIncidentCaseInput(c);
+      expect(errors, `${String(c.title)}: ${errors.join(" · ")}`).toEqual([]);
+      expect(value.sourceName, `${String(c.title)}: 출처 이름이 잘렸다`).toBe(String(c.sourceName ?? "").trim());
+      expect(value.sourceUrl, `${String(c.title)}: 출처 URL이 잘렸다`).toBe(String(c.sourceUrl ?? "").trim());
+    }
+    // 이 시험이 헛돌지 않는가 — 옛 상한(80)을 넘는 출처가 실제로 있어야 「살렸다」가 증명된다
+    expect(Math.max(...j.cases.map((c) => String(c.sourceName ?? "").length))).toBeGreaterThan(80);
   });
 });
 
@@ -131,6 +161,35 @@ describe("왕복 — 등록·조회·유사 검색·삭제", () => {
   });
 });
 
+describe("상한·총계 — 화면이 부르는 수와 서버가 주는 수가 같아야 한다", () => {
+  it("★ 상한 500까지 준다(클라가 500으로 부른다) — 200에서 조용히 깎으면 화면은 전부인 줄 안다", () => {
+    for (let i = 0; i < 201; i += 1) registerIncidentCase({ ...log4shell, title: `사례 ${i}`, sourceUrl: `https://example.com/case-${i}` }, "정요한");
+    expect(listIncidentCases({ limit: 500 }).length).toBe(201);
+    expect(listIncidentCases({ limit: 9999 }).length, "500을 넘겨 불러도 500까지").toBe(201);
+    expect(listIncidentCases().length, "안 적으면 기본 50").toBe(50);
+    expect(listIncidentCases({ limit: 1 }).length).toBe(1);
+  });
+  it("총계는 목록과 **같은 조건**으로 센다 — 목록이 잘려도 「전체 몇 건」은 정직하다", () => {
+    registerIncidentCase(log4shell, "정요한");
+    registerIncidentCase(wannacry, "정요한");
+    registerIncidentCase(국내, "김보안");
+    expect(countIncidentCases()).toBe(3);
+    expect(countIncidentCases({ q: "랜섬웨어" })).toBe(2);
+    expect(countIncidentCases({ cve: "cve-2017-0144" })).toBe(1);
+    expect(countIncidentCases({ year: 2024 })).toBe(1);
+    expect(countIncidentCases({ q: "없는말" })).toBe(0);
+    // 목록을 1건으로 깎아도 총계는 그대로 — 이 둘이 어긋나면 화면의 「N건 중 M건」이 거짓이 된다
+    expect(listIncidentCases({ q: "랜섬웨어", limit: 1 }).length).toBe(1);
+    expect(countIncidentCases({ q: "랜섬웨어" })).toBe(2);
+  });
+  it("CVE 유사 검색도 상한 전(matchCasesForCves)과 상한 후(findCasesForCves)를 가른다 — 칩의 N과 판의 줄 수가 같게", () => {
+    for (let i = 0; i < 7; i += 1) registerIncidentCase({ ...log4shell, title: `Log4j 사례 ${i}`, sourceUrl: `https://example.com/l-${i}` }, "정요한");
+    expect(matchCasesForCves(["CVE-2021-44228"]).length).toBe(7);
+    expect(findCasesForCves(["CVE-2021-44228"]).length, "기본 5건").toBe(5);
+    expect(findCasesForCves(["CVE-2021-44228"], 3).length).toBe(3);
+  });
+});
+
 describe("사례 1건 = 지식 문서 1건(결정 ①) — 반입·삭제가 짝이다", () => {
   it("등록하면 문서가 반입되고(위협대응·origin=incident-case·global), 이미 있으면 다시 넣지 않으며, 삭제하면 문서도 뺀다", async () => {
     await withEnv("GIJO_CASE_INGEST", "1", async () => {
@@ -163,6 +222,13 @@ describe("사례 1건 = 지식 문서 1건(결정 ①) — 반입·삭제가 짝
     deleteIncidentCase(a.id, "정요한");
     await incidentCaseDocsIdle();
     expect(deleteSpy).not.toHaveBeenCalled();
+  });
+  it("★ 반입 끄개가 켜져 있으면 부팅 동기화 재시도가 바로 끝난다 — 20초씩 기다린 끝에 「반입 실패」를 찍지 않는다", async () => {
+    registerIncidentCase(log4shell, "정요한");
+    const t = Date.now();
+    await syncIncidentCaseDocsWithRetry(3, 20_000); // 끄개가 없으면 40초 이상 걸리고 오류를 찍는다
+    expect(Date.now() - t, "끄개가 켜졌는데도 재시도를 돌았다").toBeLessThan(1000);
+    expect(ingestSpy).not.toHaveBeenCalled();
   });
   it("문서 본문은 표 칸에서 렌더한다 — 제목·한 줄·쉬운 설명·교훈·CVE·제품·출처가 다 들어 있고 새 사실은 없다", () => {
     const a = registerIncidentCase(log4shell, "정요한");
@@ -217,6 +283,28 @@ describe("씨앗(내장 사례) — 파일이 없어도 뜨고, 있으면 id 기
       });
     } finally { fs.rmSync(f, { force: true }); }
   });
+
+  it("★ 내장 사례를 지우면 **숨김**으로 남아 재기동 씨앗이 되살리지 않는다 — 관리자가 되살릴 수 있다(검토관 2026-09-03)", () => {
+    const f = 임시();
+    fs.writeFileSync(f, JSON.stringify({ cases: [log4shell, wannacry] }));
+    try {
+      expect(seedBuiltinCases(f)).toMatchObject({ inserted: 2, hidden: 0 });
+      const id = builtinCaseId(wannacry);
+      expect(deleteIncidentCase(id, "정요한")).toBe(true);
+      expect(hiddenBuiltinCaseIds()).toEqual([id]);
+      // 재기동 — 지운 것이 되살아나지 않는다(예전엔 씨앗이 같은 id로 다시 넣어 「지웠는데 다시 있다」였다)
+      expect(seedBuiltinCases(f)).toMatchObject({ inserted: 0, unchanged: 1, hidden: 1 });
+      expect(getIncidentCase(id)).toBeUndefined();
+      // 관리자 되살리기 — 도구 문구가 약속한 문이 실제로 돈다(안내한 말 점검)
+      expect(unhideBuiltinCases()).toBe(1);
+      expect(seedBuiltinCases(f)).toMatchObject({ inserted: 1, hidden: 0 });
+      expect(getIncidentCase(id)!.origin).toBe("builtin");
+      // 담당자 등록분은 숨김에 안 들어간다 — 지우면 그대로 끝이다
+      const 내것 = registerIncidentCase(국내, "김보안");
+      deleteIncidentCase(내것.id, "김보안");
+      expect(hiddenBuiltinCaseIds()).toEqual([]);
+    } finally { fs.rmSync(f, { force: true }); }
+  });
 });
 
 describe("대화창 서식 — 숫자만 주고 끝내지 않는다", () => {
@@ -239,6 +327,24 @@ describe("대화창 서식 — 숫자만 주고 끝내지 않는다", () => {
     expect(전부).toContain("CVE CVE-2021-44228, CVE-2021-45046 · 제품 Apache Log4j · 기법 T1190");
     expect(전부).toMatch(/📋 출처 링크에서 원문을 확인하세요/);
   });
+  it("★ 씨앗 20건을 그대로 실어도 머리의 「N건」·📋 안내가 살아 있고 「… 외 N건」으로 끝난다(3500 컷에 안 기댄다)", () => {
+    // 예전엔 끝의 3500자 컷이 **안내 줄을 통째로 먹었다** — 실데이터(씨앗 20건)로 잰다(짧은 가짜 3건으로는 안 드러난다).
+    expect(seedBuiltinCases(씨앗파일).inserted).toBe(20);
+    const rows = listIncidentCases({ limit: 500 });
+    expect(rows.length).toBe(20);
+    const s = formatIncidentCases(rows);
+    const 줄 = s.split("\n");
+    expect(s.length, `답이 3500자 컷에 닿았다(${s.length}자) — 건당 상한을 다시 봐야 한다`).toBeLessThan(3500);
+    expect(줄[0]).toBe("📚 침해사고 히스토리 — 20건");
+    expect(줄[1], "안내 줄이 머리 바로 아래에 있어야 컷에 안 먹힌다").toMatch(/^📋 출처 링크에서 원문을 확인하세요/);
+    expect(줄.at(-1), "잘리지 않고 「외 N건」으로 끝난다").toMatch(/^… 외 15건 —/);
+    // 다섯 건까지만 싣는다 — 번호 6은 없다
+    expect(s).toContain("5. [");
+    expect(s).not.toContain("\n6. [");
+    // 건당 상한 — 교훈은 200자까지, 출처 이름은 60자까지(넘으면 말줄임이 보인다)
+    for (const 줄하나 of 줄.filter((x) => x.startsWith("   교훈: "))) expect(줄하나.length).toBeLessThanOrEqual(3 + 4 + 201);
+    expect(s, "잘린 자리는 말줄임으로 보인다").toContain("…");
+  });
   it("사례의 샘 — 파일이 없으면 없다고 말하고, 있으면 링크가 전부 http(s)다", () => {
     const all = listIncidentSources("all");
     const s = formatIncidentSources("all");
@@ -251,6 +357,8 @@ describe("대화창 서식 — 숫자만 주고 끝내지 않는다", () => {
         expect(x.lang, `${x.name}: 언어(lang|language)가 비었다`).not.toBe("");
         expect(x.desc, `${x.name}: 소개(desc|what)가 비었다 — 클라 IncidentSource.desc가 이 칸을 그린다`).not.toBe("");
         expect(x.cadence, `${x.name}: 주기(cadence)가 비었다`).not.toBe("");
+        // 이용 경계(licenseNote) — 파일엔 28곳 모두 있는데 읽기가 버려 화면 툴팁이 그릴 재료가 없었다(검토관 2026-09-03)
+        expect(x.licenseNote, `${x.name}: 이용 경계(licenseNote)가 비었다 — 화면 툴팁이 이 칸을 그린다`).not.toBe("");
       }
       expect(s).toContain("외부 사이트로 나갑니다");
     }
@@ -284,12 +392,25 @@ describe("API — 라우트 순서·권한", () => {
     expect(bad.body.error).toMatch(/http\(s\)/);
     const sim = await request(app).get("/api/incident-cases/similar?cves=cve-2021-44228,CVE-1999-0001").set(auth);
     expect(sim.body.cases.map((c: { id: string }) => c.id)).toEqual([post.body.id]);
-    expect((await request(app).get(`/api/incident-cases?q=Log4j`).set(auth)).body.cases.length).toBe(1);
+    expect(sim.body.total, "칩이 「N건」을 말하려면 상한 전 총계가 함께 와야 한다").toBe(1);
+    const 목록 = await request(app).get(`/api/incident-cases?q=Log4j`).set(auth);
+    expect(목록.body.cases.length).toBe(1);
+    expect(목록.body.total, "목록과 같은 조건으로 센 총계").toBe(1);
+    // 상한에 잘려도 총계는 정직하다 — 화면이 「전부인 척」하지 않게
+    registerIncidentCase({ ...log4shell, title: "Log4j 두 번째", sourceUrl: "https://example.com/l2" }, "정요한");
+    const 잘림 = await request(app).get(`/api/incident-cases?q=Log4j&limit=1`).set(auth);
+    expect(잘림.body.cases.length).toBe(1);
+    expect(잘림.body.total).toBe(2);
     expect((await request(app).get(`/api/incident-cases/${post.body.id}`).set(auth)).body.title).toBe(log4shell.title);
     expect((await request(app).get("/api/incident-cases/ic-nope").set(auth)).status).toBe(404);
     expect((await request(app).delete(`/api/incident-cases/${post.body.id}`).set(auth)).status).toBe(200);
     expect((await request(app).delete(`/api/incident-cases/${post.body.id}`).set(auth)).status).toBe(404);
     expect((await request(app).get("/api/incident-cases")).status).toBe(401); // 인증 없이는 못 본다
+    // 내장 사례 되살리기 — 삭제 도구가 약속한 「다시 보이려면 관리자」의 실제 문(약속만 있고 문이 없으면 거짓말이다)
+    const 되살림 = await request(app).post("/api/incident-cases/builtin/restore").set(auth);
+    expect(되살림.status).toBe(200);
+    expect(되살림.body).toHaveProperty("unhidden");
+    expect(countIncidentCases(), "되살리기가 씨앗을 다시 넣는다").toBeGreaterThan(0);
   });
   it("담당자: 등록 API는 403(등록은 결재판), 내장 사례 삭제는 403, 본인 등록분은 지운다", async () => {
     createUser({ username: "kim-ic", password: "changeme1!", displayName: "김보안", role: "security_officer" });
@@ -305,6 +426,7 @@ describe("API — 라우트 순서·권한", () => {
     expect((await request(app).delete(`/api/incident-cases/${내것.id}`).set(auth)).status).toBe(200);
     expect(countIncidentCases()).toBe(2);
     expect((await request(app).get("/api/incident-cases").set(auth)).body.cases.length).toBe(2); // 조회는 누구나
+    expect((await request(app).post("/api/incident-cases/builtin/restore").set(auth)).status, "되살리기는 관리자만").toBe(403);
   });
 });
 
@@ -318,7 +440,13 @@ describe("배선 — 도구·정리 대장", () => {
     expect(findAgentTool("register_incident_case")!.undo).toContain("사례 삭제");
     // 결재판 「실행되면:」이 입력 부족을 미리 말한다 — 승인이 헛돌지 않게
     expect(findAgentTool("register_incident_case")!.effect!({})).toMatch(/등록되지 않습니다 — 입력이 부족합니다/);
-    expect(findAgentTool("register_incident_case")!.effect!(log4shell as unknown as Record<string, string>)).toMatch(/「Log4Shell 대규모 악용」\(2021·소프트웨어·해외\)을 등록합니다 — 출처 https/);
+    // 조사는 손으로 적지 않는다 — 앞말이 값이라 「…해외)를」이다(조사()가 닫는 괄호를 건너뛰고 「외」의 받침을 본다, josa.test 소스 감시)
+    expect(findAgentTool("register_incident_case")!.effect!(log4shell as unknown as Record<string, string>)).toMatch(/「Log4Shell 대규모 악용」\(2021·소프트웨어·해외\)를 등록합니다 — 출처 https/);
+    // 삭제 결재판 — 내장 사례는 「숨김」이라고 미리 말한다(지운 줄 알았는데 되살아나던 결함의 짝)
+    const 내장 = registerIncidentCase(wannacry, null, "builtin");
+    expect(findAgentTool("delete_incident_case")!.effect!({ id: 내장.id })).toMatch(/제품 내장 사례를 지우고 지식 문서도 함께 뺍니다 · 내장 사례는 \*\*숨김\*\*/);
+    const 담당자것 = registerIncidentCase(국내, "김보안");
+    expect(findAgentTool("delete_incident_case")!.effect!({ id: 담당자것.id })).toMatch(/김보안 등록을 지우고/); // 받침 있는 앞말은 「을」
   });
   it("incident_cases는 지식이다 — 정리 대장(TARGETS)에 없다(실사용 전환에서 안 지운다, 결정 ①)", () => {
     expect(Object.values(TARGETS).flatMap((t) => t.tables)).not.toContain("incident_cases");

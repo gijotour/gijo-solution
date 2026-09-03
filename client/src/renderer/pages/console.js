@@ -907,29 +907,40 @@
   //   히스토리를 그 CVE로 좁혀 연다. 판정 재료는 **서버가 적은 문구**뿐이다(계약 2026-09-03:
   //   「📚 비슷한 사례 N건 — …」). 그 표식이 없으면 안 단다 — 여기서 사례를 새로 찾지 않는다
   //   (대화창이 두 번째 잣대가 되면 답과 칩이 딴말을 한다). CVE는 답 본문 표기(CVE-YYYY-NNNN)에서 줍는다.
+  // ⚠ 칩은 **초안 한 덩어리마다 하나**다(2026-09-03 통합 검토 [낮음]). 예전엔 답 전체에서 첫 「N건」만
+  //   읽고 CVE는 답 **전체**에서 주웠다 — 초안이 둘 실린 답(스캔 해석 초안 목록)에서 칩은 「3건」이라
+  //   말하면서 다른 초안의 CVE까지 붙여 열려, 눌러 보면 3건이 아닌 목록이 나왔다. **세는 자리와 좁히는
+  //   자리를 같은 덩어리로** 묶는다. 덩어리 = formatScanDrafts가 초안 하나를 그리는 블록(머리글 「■ 」).
+  //   ■ 머리글이 없는 답(다른 출력 경로)이면 통째로 한 덩어리 — 예전 동작 그대로다.
   function attachCaseChip(el, output) {
     var s = String(output || "");
-    var m = s.match(/📚\s*비슷한 사례\s*(\d+)\s*건/);
-    if (!m || !el) return;
-    var cves = [], seen = {};
-    (s.match(/CVE-\d{4}-\d{3,7}/gi) || []).forEach(function (c) { c = c.toUpperCase(); if (!seen[c]) { seen[c] = 1; cves.push(c); } });
-    var b = document.createElement("button");
-    b.type = "button";
-    b.className = "gcp-nc"; // 다음 작업 칩과 같은 모양(chatparts.js CSS) — 새 시각 언어를 만들지 않는다
-    b.textContent = "📚 비슷한 사례 " + m[1] + "건 — 히스토리 열기";
-    b.title = cves.length
-      ? "침해사고 히스토리를 " + cves.slice(0, 3).join(", ") + (cves.length > 3 ? " 외" : "") + "(으)로 좁혀 엽니다"
-      : "침해사고 히스토리를 엽니다";
-    b.addEventListener("click", function () {
-      var page = "incidentcases.html" + (cves.length ? "?cve=" + encodeURIComponent(cves.slice(0, 8).join(",")) : "");
-      // 여는 통로는 「가서 하기」와 같다 — 창 모드면 본창에 부탁, 셸 안이면 도킹(사람이 열라 한 것).
-      if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) { window.gijo.openTabInShell(page, "침해사고 히스토리"); return; }
-      if (window.gijoTabs) { window.gijoTabs.open(page, "침해사고 히스토리", { dock: true }); return; }
-      if (window.gijoOpenScreen) window.gijoOpenScreen(page, "침해사고 히스토리");
-    });
+    if (!el || !s) return;
+    var 덩어리 = s.split(/\n(?=■\s)/).filter(function (b) { return /📚\s*비슷한 사례\s*\d+\s*건/.test(b); });
+    if (!덩어리.length) return;
     var wrap = document.createElement("div");
     wrap.className = "gcp-next";
-    wrap.appendChild(b);
+    덩어리.forEach(function (블록) {
+      var m = 블록.match(/📚\s*비슷한 사례\s*(\d+)\s*건/);
+      var cves = [], seen = {};
+      (블록.match(/CVE-\d{4}-\d{3,7}/gi) || []).forEach(function (c) { c = c.toUpperCase(); if (!seen[c]) { seen[c] = 1; cves.push(c); } });
+      // 칩이 여럿이면 어느 초안 것인지 밝힌다 — 머리글의 보고서 이름(「■ <출처> — 자산 …」).
+      var 출처 = 덩어리.length > 1 ? String((블록.match(/(?:^|\n)■\s*([^\n—]+)/) || [])[1] || "").trim().slice(0, 20) : "";
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "gcp-nc"; // 다음 작업 칩과 같은 모양(chatparts.js CSS) — 새 시각 언어를 만들지 않는다
+      b.textContent = "📚 " + (출처 ? 출처 + " · " : "") + "비슷한 사례 " + m[1] + "건 — 히스토리 열기";
+      b.title = cves.length
+        ? "침해사고 히스토리를 " + cves.slice(0, 3).join(", ") + (cves.length > 3 ? " 외" : "") + "(으)로 좁혀 엽니다"
+        : "침해사고 히스토리를 엽니다";
+      b.addEventListener("click", function () {
+        var page = "incidentcases.html" + (cves.length ? "?cve=" + encodeURIComponent(cves.slice(0, 8).join(",")) : "");
+        // 여는 통로는 「가서 하기」와 같다 — 창 모드면 본창에 부탁, 셸 안이면 도킹(사람이 열라 한 것).
+        if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) { window.gijo.openTabInShell(page, "침해사고 히스토리"); return; }
+        if (window.gijoTabs) { window.gijoTabs.open(page, "침해사고 히스토리", { dock: true }); return; }
+        if (window.gijoOpenScreen) window.gijoOpenScreen(page, "침해사고 히스토리");
+      });
+      wrap.appendChild(b);
+    });
     var cb = el.querySelector(".cb");
     if (cb) cb.appendChild(wrap);
   }

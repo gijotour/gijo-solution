@@ -198,13 +198,26 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   var 사례들 = [];
   function 찾기(id) { for (var i = 0; i < 사례들.length; i++) if (사례들[i].id === id) return 사례들[i]; return null; }
 
-  function 그리기(전체건수) {
+  // 건수는 **서버가 센 total**로 적는다(2026-09-03 통합 검토) — 받은 줄로 세면 상한(500)에 걸린 순간
+  //   「500건」이 거짓이 된다. 잘렸으면 「N건 중 M건 표시」로 잘렸다는 사실을 그대로 말한다.
+  //   ⚠ total이 없는 옛 서버(창구가 total을 안 싣던 판)면 받은 줄 수로 대신하되, 상한에 닿았으면 「+」를 붙인다 —
+  //     그때는 참값을 모르므로 「20건」처럼 딱 떨어지게 적으면 안 된다.
+  function 센값(d) {
+    var 받은 = ((d && d.cases) || []).length;
+    if (d && typeof d.total === "number") return { 수: d.total, 표시: 받은, 잘림: 받은 < d.total, 확실: true };
+    return { 수: 받은, 표시: 받은, 잘림: 받은 >= 상한, 확실: false };
+  }
+  function 건수글(v) {
+    if (!v.확실) return String(v.수) + (v.잘림 ? "+" : "") + "건";
+    return v.잘림 ? v.수 + "건 중 " + v.표시 + "건 표시" : v.수 + "건";
+  }
+
+  function 그리기(전체, 좁힘) {
     var cs = 사례들.slice().sort(function (a, b) {
       // createdAt는 ms 숫자(서버 INTEGER) — 문자열 비교(localeCompare)가 아니라 숫자 뺄셈으로(같은 연도 안에서 최근 등록이 위).
       return (Number(b.year) || 0) - (Number(a.year) || 0) || (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0);
     });
-    var 전체글 = 전체건수 >= 상한 ? 상한 + "+" : String(전체건수);
-    수자리.textContent = 필터CVE.length ? cs.length + "건 (전체 " + 전체글 + "건)" : 전체글 + "건";
+    수자리.textContent = 필터CVE.length ? 건수글(좁힘) + " (전체 " + 건수글(전체) + ")" : 건수글(전체);
     if (필터CVE.length) {
       필터띠.hidden = false;
       필터띠.innerHTML = '🔎 <b>' + esc(필터CVE.join(", ")) + '</b>(으)로 좁혔습니다 — 같은 CVE를 쓴 사고만 보입니다 ' +
@@ -314,9 +327,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // 좁힘은 서버 /similar가 판정한다 — 칩이 센 N건과 같은 창구·같은 규칙(여기서 새로 거르지 않는다).
     var 목록p = 필터CVE.length && g.incidentCasesSimilar ? g.incidentCasesSimilar(필터CVE) : 전체p;
     Promise.all([전체p, 목록p]).then(function (r) {
-      var 전체 = (r[0] && r[0].cases) || [];
       사례들 = (r[1] && r[1].cases) || [];
-      그리기(전체.length);
+      // 두 응답 다 { cases, total } — 좁혔을 때는 좁힌 쪽 total이 「이 CVE의 사례 수」다(서버가 센 값).
+      그리기(센값(r[0]), 센값(r[1]));
     }).catch(function (e) {
       // 실패는 실패로 — 빈 목록(0건)으로 그리면 「사례가 없다」는 거짓이 된다.
       수자리.textContent = "";

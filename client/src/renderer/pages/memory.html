@@ -777,7 +777,11 @@ tr:last-child td{border-bottom:none;}
       //   원본을 보게 하고, **목록·지표만** 회사 문서로 좁힌다.
       dmAllDocs = await window.gijo.listMemoryDocuments();
       // 승인 문답(origin=approved-qa, 2026-09-03)은 학습 화면이 관리한다 — 여기서 지우면 승인 상태와 기억이 어긋난다.
-      dmDocs = dmAllDocs.filter((d) => String(d.documentId || "").indexOf("personal:") !== 0 && d.origin !== "approved-qa");
+      // 침해사고 사례 문서(origin=incident-case, 2026-09-03 결정 ① 「목록에서 뺀다」)도 뺀다 — 사례 1건이 문서 1건이라
+      //   씨앗만으로 20줄이 밀려 들어오는데, 문서명이 「incident-case:ic-…」라 사람이 못 읽고 여기서 지울 수도 없다
+      //   (지우면 표와 기억이 어긋난다 — 관리 자리는 📚 침해사고 히스토리 판이다). 서버 소비처(docdigest·docdupe·
+      //   recentDocCount)는 이미 빼는데 이 화면만 안 빼서, 「열람 등급 지정」 지표가 등급 없는 20줄에 warn으로 뒤집혔다.
+      dmDocs = dmAllDocs.filter((d) => String(d.documentId || "").indexOf("personal:") !== 0 && d.origin !== "approved-qa" && d.origin !== "incident-case");
     } catch (e) {
       list.innerHTML = '<div class="dm-empty">불러오지 못했습니다: ' + dmEsc(e.message) + '</div>';
       renderDmKpis(true); // 지표도 사실대로 — 옛 숫자가 남으면 「실패」 옆에 거짓이 선다

@@ -12,9 +12,7 @@
 //   · 초안은 **초안**이다. 할 일이 되려면 사람이 채택(register_scan_draft, 결재판)해야 한다 — 「승인이 유일한 문」.
 //   · 시험 환경엔 모델이 없다 — chat은 주입(deps)으로 갈아 끼울 수 있고, 실패는 null이다.
 import crypto from "crypto";
-import type { Express } from "express";
 import { db, migrate } from "../db";
-import { authMiddleware } from "../auth/auth";
 import { emitCollaboration } from "./collaboration";
 import { setAgentStatus, resetAgentToDefault, getFormatHelperModel } from "./agents";
 import { createTask } from "./tasks";
@@ -51,7 +49,7 @@ export interface ScanDraftInput { source: string; hosts: number; findings: numbe
 export interface ScanDraftRow {
   id: string; createdAt: number; source: string; hosts: number; findings: number; draft: ScanDraft; dropped: number;
   status: "draft" | "registered"; registeredBy: string | null; registeredAt: number | null; taskIds: string[];
-  /** 📚 비슷한 침해사고 사례 id(incident_cases.id) — 없으면 빈 배열. 클라 칩 「📚 비슷한 사례 N건」의 N. */
+  /** 📚 비슷한 침해사고 사례 id(incident_cases.id) — 없으면 빈 배열. 대화창 답의 「📚 비슷한 사례 N건」의 N. */
   caseIds: string[];
   /** 사례 부연 — 🤖로 시작하면 해설 팀원이 쓴 글, 아니면 코드가 만든 제목 줄. 없으면 null. */
   caseNote: string | null;
@@ -147,6 +145,7 @@ export async function draftScanInterpretation(input: ScanDraftInput, deps?: { ch
     const v = validateDraft(out, input.vulns);
     if (!v) {
       emitCollaboration({ from: "scan", to: "orchestrator", message: `${input.source} 해석 초안 못 만듦 — 모델 출력이 보고서 항목과 맞지 않아 버림(지어낸 항목은 남기지 않는다)` });
+      noteSimilarCasesWithoutDraft({ source: input.source, findings: input.vulns }); // 규칙이 찾은 사례는 모델과 무관하다 — 초안이 없다고 사례까지 사라지면 안 된다
       return null;
     }
     const id = crypto.randomUUID();
@@ -161,6 +160,7 @@ export async function draftScanInterpretation(input: ScanDraftInput, deps?: { ch
     return { id, dropped: v.dropped };
   } catch (e) {
     emitCollaboration({ from: "scan", to: "orchestrator", message: `${input.source} 해석 초안 실패 — ${e instanceof Error ? e.message.slice(0, 120) : String(e)}` });
+    noteSimilarCasesWithoutDraft({ source: input.source, findings: input.vulns }); // 모델이 죽어도 규칙 대조는 돈다(웹보고서 경로의 사례가 초안 성공에 묶여 있던 결함 — 검토관 2026-09-03)
     return null;
   } finally {
     resetAgentToDefault("scan");
@@ -311,27 +311,72 @@ async function 사례부연(cves: string[], 후보: IncidentCaseRow[], deps?: { 
 }
 
 /**
- * 초안 직후 부른다(void) — CVE → 후보 사례(규칙) → (모델) 부연 → scan_drafts.caseIds/caseNote 저장 + 협업 창.
- * 돌려주는 값: 저장한 것, 후보가 없으면 null(아무 말도 안 한다). GIJO_CASE_EXPLAIN=0이면 모델 없이 제목 줄만.
+ * 부연 재료·꼬리표로 넘기는 CVE 상한 — **세 훅이 나눠 쓰는 한 잣대**(초안 훅·반입 훅·초안 실패 훅).
+ * 반입은 CVE가 수백이라 프롬프트에 다 부으면 안 되고, 초안 훅도 Nessus를 겸한 보고서에서는 같은 처지다(검토관 2026-09-03:
+ * 초안 훅만 상한이 없어 보고서 전체 CVE가 caseNote 꼬리에 붙었다 — 같은 자리에 다른 잣대를 두면 반드시 어긋난다).
  */
-export async function explainSimilarCases(input: { draftId: string; findings: { code: string; name: string }[] }, deps?: { chat?: ChatFn }): Promise<{ caseIds: string[]; caseNote: string; ai: boolean } | null> {
-  const cves = cvesInFindings(input.findings);
+export const IMPORT_CASE_CVE_CAP = 5;
+
+/**
+ * 규칙만으로 「비슷한 사례」를 찾는다 — 모델은 안 부른다. 세 훅이 나눠 쓰는 **한 자리**(잣대가 갈리지 않게).
+ * 돌려주는 값: 후보 · 후보에 실제로 걸린 CVE(상한) · 코드가 만든 제목 줄. CVE가 없거나 후보가 0이면 null(침묵).
+ */
+function 사례찾기(findings: { code: string; name: string }[]): { 후보: IncidentCaseRow[]; 걸린CVE: string[]; 제목줄: string } | null {
+  const cves = cvesInFindings(findings);
   if (!cves.length) return null;
   const 후보 = findCasesForCves(cves);
   if (!후보.length) return null; // 침묵 — 없는 사례를 지어 붙이지 않는다
-  const 제목줄 = 후보.map((c) => `${c.title}(${c.year})`).join(" · ");
-  const 부연 = await 사례부연(cves, 후보, deps);
-  const caseIds = 후보.map((c) => c.id);
-  // 🤖가 붙은 것만 AI 글 — 제목 줄은 코드가 만든다. 걸린 CVE를 꼬리에 단다: 클라 칩(console.js attachCaseChip)이 답 본문의 CVE 표기로
-  // 히스토리를 좁혀 여는데, 초안 본문에는 코드(IW-20)만 있고 CVE가 없을 수 있다.
-  const caseNote = `${부연 ? `${표식.안내} ${부연}` : 제목줄} · ${cves.join(", ")}`;
-  db.prepare("UPDATE scan_drafts SET caseIds = ?, caseNote = ? WHERE id = ?").run(JSON.stringify(caseIds), caseNote, input.draftId);
-  emitCollaboration({ from: "normaltic", to: "orchestrator", message: `${표식.사례} 비슷한 사례 ${후보.length}건 — ${제목줄}${부연 ? ` · ${표식.안내} ${부연}` : ""}`.slice(0, 400) });
-  return { caseIds, caseNote, ai: !!부연 };
+  const 걸린 = new Set(후보.flatMap((c) => c.cves.map((x) => x.toUpperCase())));
+  // 후보는 교집합으로 뽑았으니 걸린CVE는 반드시 하나 이상이다 — 「보고서에 있던 CVE 전부」가 아니라 「사례에 걸린 CVE」만 말한다.
+  const 걸린CVE = cves.filter((c) => 걸린.has(c)).slice(0, IMPORT_CASE_CVE_CAP);
+  return { 후보, 걸린CVE, 제목줄: 후보.map((c) => `${c.title}(${c.year})`).join(" · ") };
 }
 
-/** 반입 훅이 부연 재료·꼬리표로 넘기는 CVE 상한 — Nessus 반입은 CVE가 수백이라 **후보에 걸린 것**만 이만큼 넘긴다. */
-export const IMPORT_CASE_CVE_CAP = 5;
+/**
+ * 초안 직후 부른다(void) — CVE → 후보 사례(규칙) → (모델) 부연 → scan_drafts.caseIds/caseNote 저장 + 협업 창.
+ * 돌려주는 값: 저장한 것, 후보가 없으면 null(아무 말도 안 한다). GIJO_CASE_EXPLAIN=0이면 모델 없이 제목 줄만.
+ * · 절대 던지지 않는다 — `void`로 부르는 약속이 거부되면 아무도 못 받는다(반입 훅과 같은 계약, 검토관 2026-09-03).
+ */
+export async function explainSimilarCases(input: { draftId: string; findings: { code: string; name: string }[] }, deps?: { chat?: ChatFn }): Promise<{ caseIds: string[]; caseNote: string; ai: boolean } | null> {
+  try {
+    const m = 사례찾기(input.findings);
+    if (!m) return null;
+    const 부연 = await 사례부연(m.걸린CVE, m.후보, deps);
+    const caseIds = m.후보.map((c) => c.id);
+    // 🤖가 붙은 것만 AI 글 — 제목 줄은 코드가 만든다. 걸린 CVE를 꼬리에 단다: 클라 칩(console.js attachCaseChip)이 답 본문의 CVE 표기로
+    // 히스토리를 좁혀 여는데, 초안 본문에는 코드(IW-20)만 있고 CVE가 없을 수 있다.
+    const caseNote = `${부연 ? `${표식.안내} ${부연}` : m.제목줄} · ${m.걸린CVE.join(", ")}`;
+    db.prepare("UPDATE scan_drafts SET caseIds = ?, caseNote = ? WHERE id = ?").run(JSON.stringify(caseIds), caseNote, input.draftId);
+    emitCollaboration({ from: "normaltic", to: "orchestrator", message: `${표식.사례} 비슷한 사례 ${m.후보.length}건 — ${m.제목줄}${부연 ? ` · ${표식.안내} ${부연}` : ""}`.slice(0, 400) });
+    return { caseIds, caseNote, ai: !!부연 };
+  } catch (e) {
+    emitCollaboration({ from: "normaltic", to: "orchestrator", message: `비슷한 사례 붙이기 실패 — ${e instanceof Error ? e.message.slice(0, 120) : String(e)}` });
+    return null;
+  }
+}
+
+/**
+ * 초안이 **실패했을 때**의 사례 대조(2026-09-03 검토관) — 규칙이 찾은 사실은 모델과 무관한데, 웹보고서 경로에서는
+ * 사례 부연이 초안 성공에만 매달려 있어 모델이 죽으면 「비슷한 사례」가 통째로 사라졌다(그 경로는 vulnscan 반입 훅이 비켜 준다).
+ * · 저장하지 않는다 — 붙일 초안 행이 없다. 협업 창 말풍선 하나뿐이다.
+ * · 모델을 부르지 않는다 — 초안이 실패한 마당에 같은 모델을 또 부르지 않는다(부르는 문 수도 그대로 하나, agentroster.test 계약).
+ * · 절대 던지지 않는다.
+ */
+export function noteSimilarCasesWithoutDraft(input: { source: string; findings: { code: string; name: string }[] }): { caseIds: string[]; caseNote: string } | null {
+  try {
+    const m = 사례찾기(input.findings);
+    if (!m) return null;
+    const caseNote = `${m.제목줄} · ${m.걸린CVE.join(", ")}`;
+    emitCollaboration({
+      from: "normaltic", to: "orchestrator",
+      message: `${표식.사례} 비슷한 사례 ${m.후보.length}건 — ${input.source} 해석 초안은 못 만들었지만 규칙이 찾은 사례는 있습니다: ${caseNote}`.slice(0, 400),
+    });
+    return { caseIds: m.후보.map((c) => c.id), caseNote };
+  } catch (e) {
+    emitCollaboration({ from: "normaltic", to: "orchestrator", message: `${input.source} 비슷한 사례 확인 실패 — ${e instanceof Error ? e.message.slice(0, 120) : String(e)}` });
+    return null;
+  }
+}
 
 /**
  * 해설 팀원의 부르는 문 ③ — 취약점 **반입** 직후 부른다(vulnscan.importVulnScan 끝, void). 네 등록 경로(웹취약점 보고서·Nessus HTML·
@@ -345,19 +390,14 @@ export const IMPORT_CASE_CVE_CAP = 5;
  */
 export async function explainSimilarCasesForImport(input: { source: string; findings: { code: string; name: string }[] }, deps?: { chat?: ChatFn }): Promise<{ caseIds: string[]; caseNote: string; ai: boolean } | null> {
   try {
-    const cves = cvesInFindings(input.findings);
-    if (!cves.length) return null;
-    const 후보 = findCasesForCves(cves);
-    if (!후보.length) return null; // 침묵 — 없는 사례를 지어 붙이지 않는다
-    const 걸린 = new Set(후보.flatMap((c) => c.cves.map((x) => x.toUpperCase())));
-    const 걸린CVE = cves.filter((c) => 걸린.has(c)).slice(0, IMPORT_CASE_CVE_CAP);
-    const 제목줄 = 후보.map((c) => `${c.title}(${c.year})`).join(" · ");
-    const 부연 = await 사례부연(걸린CVE, 후보, deps);
-    const caseIds = 후보.map((c) => c.id);
-    const caseNote = `${부연 ? `${표식.안내} ${부연}` : 제목줄} · ${걸린CVE.join(", ")}`;
+    const m = 사례찾기(input.findings);
+    if (!m) return null;
+    const 부연 = await 사례부연(m.걸린CVE, m.후보, deps);
+    const caseIds = m.후보.map((c) => c.id);
+    const caseNote = `${부연 ? `${표식.안내} ${부연}` : m.제목줄} · ${m.걸린CVE.join(", ")}`;
     emitCollaboration({
       from: "normaltic", to: "orchestrator",
-      message: `${표식.사례} 비슷한 사례 ${후보.length}건 — ${input.source} 반입에서 CVE 있는 새 취약점 ${input.findings.length}건 중 ${걸린CVE.join(", ")}: ${제목줄}${부연 ? ` · ${표식.안내} ${부연}` : ""}`.slice(0, 400),
+      message: `${표식.사례} 비슷한 사례 ${m.후보.length}건 — ${input.source} 반입에서 CVE 있는 새 취약점 ${input.findings.length}건 중 ${m.걸린CVE.join(", ")}: ${m.제목줄}${부연 ? ` · ${표식.안내} ${부연}` : ""}`.slice(0, 400),
     });
     return { caseIds, caseNote, ai: !!부연 };
   } catch (e) {
@@ -366,14 +406,9 @@ export async function explainSimilarCasesForImport(input: { source: string; find
   }
 }
 
-/** 스캔 해석 초안 조회 API — 클라(초안 말풍선·취약점 카드)가 caseIds·caseNote를 읽어 「📚 비슷한 사례 N건」 칩을 그린다. 등록·채택은 대화창 결재판만. */
-export function registerScanDraftRoutes(app: Express): void {
-  app.get("/api/scan-drafts", authMiddleware, (req, res) => {
-    const limit = Number((req.query as Record<string, string | undefined>).limit ?? 5) || 5;
-    res.json({ drafts: listScanDrafts(limit) });
-  });
-}
-
+// ⚠ 조회 API(GET /api/scan-drafts)는 두지 않는다(검토관 2026-09-03) — 주석·app.ts는 「클라 칩이 읽는다」고 적었지만
+//   칩(console.js attachCaseChip)은 **답 본문의 문구**로 판정하고 이 창구를 부르는 코드는 어디에도 없었다(전수 grep 0곳).
+//   부르는 사람 없는 창구는 인증·감사·상한을 이고 있는 빈 문일 뿐이라 지운다. 초안은 대화창 도구 scan_drafts(=formatScanDrafts)로 본다.
 // ── TI 팀원의 부르는 문 ─────────────────────────────────────────────────────────────
 export interface ThreatMatchLite { type: string; target: string; severity: string; assets: string[] }
 export const TI_INTERPRET_SCHEMA = {

@@ -133,6 +133,21 @@ describe("반입 모양 — scope는 global, 구분은 category, 등급은 승�
     expect(read("..", "client", "src", "renderer", "pages", "mydocs.html")).toContain('d.origin !== "approved-qa"'); // 문서 허브
   });
 
+  // 침해사고 사례 문서(origin=incident-case, incidentcases 2026-09-03 결정 ① 「목록에서 뺀다」)도 **같은 자리들**이 빼야 한다.
+  // ⚠ 왜 짝으로 감시하나: 결정은 하나인데 자리가 여럿이라, 서버 세 곳만 고치고 **클라 두 곳을 잊었다**(통합 검토에서 적발 —
+  //   AI 지식·문서 허브에 사람이 못 읽는 「incident-case:ic-…」 20줄이 뜨고 「열람 등급 지정」 지표가 warn으로 뒤집혔다).
+  //   승인 문답이 겪은 「두 곳만 고치고 초록」을 사례 문서가 그대로 반복했다 — 그래서 잣대를 한 시험에 나란히 둔다.
+  // ⚠ 여기 없는 소비처(teamview·observability·handlers)는 아직 사례 문서를 안 뺀다 — 고칠 때 이 목록에 줄을 더한다.
+  //   (지금 적으면 고치지도 않은 것을 지킨다고 말하는 거짓 감시가 된다.)
+  it("사례 문서(origin=incident-case)도 문서 목록·중복·배지 다섯 자리에서 빠진다", () => {
+    expect(read("src", "engine", "docdigest.ts")).toContain("<> 'incident-case'");                 // 새로 들어온 문서 대장
+    expect(read("src", "engine", "docdupe.ts")).toContain("<> 'incident-case'");                   // 중복 후보
+    // 창은 600자 — 실측 382자다(주석이 길어 400은 스쳐 지난다). 이 statement 하나만 들어오는 폭이다.
+    expect(read("src", "engine", "memory.ts")).toMatch(/recentDocCountStmt[\s\S]{0,600}'incident-case'/); // 사이드바 새 문서 배지
+    expect(read("..", "client", "src", "renderer", "pages", "memory.html")).toContain('d.origin !== "incident-case"'); // AI 지식 화면
+    expect(read("..", "client", "src", "renderer", "pages", "mydocs.html")).toContain('d.origin !== "incident-case"'); // 문서 허브
+  });
+
   it("미평가 포함 데이터셋 경로와 KPI(미사용)는 증류를 뺀다 — 「승인은 사람」의 우회로를 닫는다", () => {
     const ll = read("src", "engine", "learnloop.ts");
     expect(ll).toMatch(/pickLogsWithUnratedStmt = db\.prepare\([^;]*<> 'distill'/);

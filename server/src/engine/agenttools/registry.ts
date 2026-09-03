@@ -1427,7 +1427,8 @@ const TOOLS: AgentTool[] = [
     description: '침해사고 히스토리에서 사례를 지운다 — "사례 삭제 ic-0123abcd…"처럼 **번호와 함께** 삭제를 말할 때. 내장 사례는 관리자만, 담당자 등록분은 등록자·관리자.',
     params: [{ name: "id", label: "사례 번호", description: "ic-로 시작하는 사례 번호(「침해사고 히스토리 보여줘」로 확인)", required: true }],
     effect: incidentCaseDeleteEffect,
-    undo: "되돌릴 수 없습니다 — 같은 내용으로 다시 등록해야 합니다",
+    // 담당자 등록분은 정말 못 되돌린다. 내장 사례는 **숨김**이라 관리자가 되살릴 수 있다(incidentcases.unhideBuiltinCases) — 둘을 한 문장에 정직하게 적는다.
+    undo: "담당자 등록분은 되돌릴 수 없습니다 — 같은 내용으로 다시 등록해야 합니다. 내장 사례는 숨김이라 관리자가 되살릴 수 있습니다",
     run: runDeleteIncidentCase,
   },
   {

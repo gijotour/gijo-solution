@@ -4139,7 +4139,9 @@ export function runIncidentSources(args: Record<string, string>): string {
 export function incidentCaseEffect(args: Record<string, string>): string {
   const { value, errors } = validateIncidentCaseInput(args);
   if (errors.length) return `등록되지 않습니다 — 입력이 부족합니다: ${errors.join(" · ")}`;
-  return `침해사고 히스토리에 「${value.title}」(${value.year}·${value.industry}·${value.region})을 등록합니다 — 출처 ${value.sourceUrl}${value.cves.length ? ` · CVE ${value.cves.join(", ")}` : ""} · 지식 문서로도 반입됩니다(전 담당자 검색에 걸림)`;
+  // 조사는 손으로 적지 않는다(josa.test 소스 감시) — 앞말이 값이라 「…해외)를」·「…2021)을」로 갈린다(조사()가 닫는 괄호를 건너뛰고 끝소리를 본다).
+  const 대상 = `「${value.title}」(${value.year}·${value.industry}·${value.region})`;
+  return `침해사고 히스토리에 ${대상}${조사(대상, "을")} 등록합니다 — 출처 ${value.sourceUrl}${value.cves.length ? ` · CVE ${value.cves.join(", ")}` : ""} · 지식 문서로도 반입됩니다(전 담당자 검색에 걸림)`;
 }
 
 export function runRegisterIncidentCase(args: Record<string, string>): string {
@@ -4156,7 +4158,10 @@ export function incidentCaseDeleteEffect(args: Record<string, string>): string {
   const row = getIncidentCase(String(args.id ?? ""));
   // FAIL_MARKS-예외: 결재판 「실행되면:」의 **진짜 실패 사유**다 — 담당자가 적은 번호가 표에 없어 승인해도 아무것도 안 지워지는 상태를 미리 알린다(정직한 「없다」 답이 아니라 입력 오류문, 지켜보는 폴더 해제의 autoFill 예외와 같은 부류).
   if (!row) return `지울 사례가 없습니다 — 번호 「${args.id ?? ""}」를 찾지 못했습니다(「침해사고 히스토리 보여줘」에서 번호를 확인하세요)`;
-  return `침해사고 히스토리에서 「${row.title}」(${row.year}) — ${row.origin === "builtin" ? "제품 내장 사례" : `${row.registeredBy ?? "?"} 등록`}을 지우고 지식 문서도 함께 뺍니다`;
+  const 주체 = row.origin === "builtin" ? "제품 내장 사례" : `${row.registeredBy ?? "?"} 등록`;
+  // 내장 사례는 **숨김**이다 — 씨앗 파일은 그대로라 관리자가 되살릴 수 있다(incidentcases.hiddenBuiltinCaseIds). 승인 전에 그 차이를 말한다.
+  return `침해사고 히스토리에서 「${row.title}」(${row.year}) — ${주체}${조사(주체, "을")} 지우고 지식 문서도 함께 뺍니다`
+    + (row.origin === "builtin" ? " · 내장 사례는 **숨김**으로 남아 다음 기동에도 되살아나지 않습니다(다시 보이려면 관리자가 되살려야 합니다)" : "");
 }
 
 /** 삭제 — 내장(builtin)은 관리자만, 담당자 등록분은 등록자·관리자(API의 DELETE와 같은 잣대). */
@@ -4170,5 +4175,9 @@ export function runDeleteIncidentCase(args: Record<string, string>): string {
   const mine = row.origin === "user" && !!me && row.registeredBy === me.displayName;
   if (!admin && !mine) return row.origin === "builtin" ? "내장 사례는 관리자만 지울 수 있습니다." : "본인이 등록한 사례만 지울 수 있습니다(관리자 제외).";
   deleteIncidentCase(row.id, me?.displayName ?? "담당자(대화창)");
-  return `「${row.title}」(${row.year})을 침해사고 히스토리에서 지웠습니다 — 지식 문서도 함께 뺍니다(되돌리려면 같은 내용으로 다시 등록해야 합니다).`;
+  const 대상 = `「${row.title}」(${row.year})`;
+  return `${대상}${조사(대상, "을")} 침해사고 히스토리에서 ${row.origin === "builtin" ? "숨겼습니다" : "지웠습니다"} — 지식 문서도 함께 뺍니다`
+    + (row.origin === "builtin"
+      ? "(내장 사례는 숨김 — 다음 기동에도 되살아나지 않습니다. 다시 보이려면 관리자가 되살려야 합니다)."
+      : "(되돌리려면 같은 내용으로 다시 등록해야 합니다).");
 }

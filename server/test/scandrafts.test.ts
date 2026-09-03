@@ -9,7 +9,7 @@ import path from "path";
 import { db } from "../src/db";
 import {
   validateDraft, buildScanDraftPrompt, draftScanInterpretation, listScanDrafts, getScanDraft, registerScanDraft, formatScanDrafts, interpretThreats,
-  cvesInFindings, buildCaseExplainPrompt, validateCaseNote, explainSimilarCases, explainSimilarCasesForImport,
+  cvesInFindings, buildCaseExplainPrompt, validateCaseNote, explainSimilarCases, explainSimilarCasesForImport, noteSimilarCasesWithoutDraft, IMPORT_CASE_CVE_CAP,
 } from "../src/engine/scandrafts";
 import { registerIncidentCase } from "../src/engine/incidentcases";
 import { importVulnScan } from "../src/engine/vulnscan";
@@ -129,6 +129,21 @@ describe("스캔 해석 초안 — 부르는 문 왕복(chat 주입)", () => {
   });
 });
 
+/**
+ * 클라 칩(console.js attachCaseChip)이 **실제로 쓰는** 판정 정규식을 화면 소스에서 읽어 온다 — [사례 N건 판정, 답 본문 CVE 줍기].
+ * 계약을 시험에 베껴 적으면 화면이 바뀌어도 시험은 초록이라 칩이 조용히 사라진다(검토관 2026-09-03).
+ */
+const 칩판정 = (): [RegExp, RegExp] => {
+  const js = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "console.js"), "utf8");
+  const i = js.indexOf("function attachCaseChip(");
+  expect(i, "console.js에서 attachCaseChip을 못 찾았다 — 칩이 사라졌거나 이름이 바뀌었다").toBeGreaterThan(0);
+  const 몸통 = js.slice(i, js.indexOf("var b = document.createElement", i));
+  const 리터럴 = [...몸통.matchAll(/\.match\((\/.+?\/[gimsuy]*)\)/g)].map((m) => m[1]);
+  expect(리터럴.length, `attachCaseChip의 판정 정규식을 못 읽었다(꼴이 바뀌었다): ${몸통.slice(0, 200)}`).toBeGreaterThanOrEqual(2);
+  const 만들기 = (lit: string) => new RegExp(lit.slice(1, lit.lastIndexOf("/")), lit.slice(lit.lastIndexOf("/") + 1));
+  return [만들기(리터럴[0]), 만들기(리터럴[1])];
+};
+
 describe("📚 비슷한 침해사고 사례 — 해설(normaltic) 팀원의 부르는 문 ②(2026-09-03)", () => {
   const 사례 = {
     title: "Log4Shell 대규모 악용", oneLiner: "Log4j 원격코드실행으로 전 세계 서버가 뚫렸다", plainExplain: "로그를 남기는 부품(Log4j)의 구멍으로 남이 우리 서버에서 명령을 실행할 수 있었습니다. 패치가 늦은 곳부터 당했습니다.",
@@ -172,11 +187,15 @@ describe("📚 비슷한 침해사고 사례 — 해설(normaltic) 팀원의 부
       const row = getScanDraft(r!.id)!;
       expect(row.caseIds).toEqual([c.id]);
       expect(row.caseNote).toMatch(/^🤖 /);
-      // 「📚 비슷한 사례 N건」은 클라 칩(console.js attachCaseChip)의 판정 문구 — 본문에 CVE 표기가 있어야 칩이 그 CVE로 좁혀 연다
+      // 「📚 비슷한 사례 N건」은 클라 칩(console.js attachCaseChip)의 판정 문구 — 본문에 CVE 표기가 있어야 칩이 그 CVE로 좁혀 연다.
+      //   ⚠ 판정 정규식을 여기 **베껴 적지 않는다**(검토관 2026-09-03: 베낀 계약은 화면이 바뀌어도 시험이 초록이다) — 화면 소스에서 읽어 그대로 쓴다.
       const 글 = formatScanDrafts([row]);
       expect(글).toContain("📚 비슷한 사례 1건 — 🤖 이 CVE는");
-      expect(글).toMatch(/📚\s*비슷한 사례\s*(\d+)\s*건/);
-      expect(글).toContain("CVE-2021-44228");
+      const [사례판정, CVE판정] = 칩판정();
+      const 걸림 = 글.match(사례판정);
+      expect(걸림, `클라 칩이 이 답에 안 붙는다 — 서버 문구와 화면 판정이 갈렸다:\n${글}`).toBeTruthy();
+      expect(Number(걸림![1]), "칩이 읽는 N과 실제 사례 수가 다르다").toBe(row.caseIds.length);
+      expect(글.match(CVE판정), "칩이 히스토리를 좁혀 열 CVE를 본문에서 못 줍는다").toContain("CVE-2021-44228");
       expect(해설말풍선().some((m) => /^📚 비슷한 사례 1건 — Log4Shell 대규모 악용\(2021\)/.test(m))).toBe(true);
       // ② 검증 실패 — 후보에 없는 사례 제목 / 지어낸 CVE / 한자 → 부연 버림, 제목 줄만
       for (const bad of [
@@ -202,6 +221,44 @@ describe("📚 비슷한 침해사고 사례 — 해설(normaltic) 팀원의 부
         expect(늦음!.ai).toBe(false);
       } finally { if (prevMs === undefined) delete process.env.GIJO_CASE_EXPLAIN_MS; else process.env.GIJO_CASE_EXPLAIN_MS = prevMs; }
     } finally { if (prev === undefined) delete process.env.GIJO_CASE_EXPLAIN; else process.env.GIJO_CASE_EXPLAIN = prev; }
+  });
+
+  it("★ 초안이 실패해도 규칙 대조는 돈다 — 모델 없이 제목 줄 말풍선(붙일 초안이 없으니 저장은 없다)", async () => {
+    // 웹보고서 경로의 사례는 **초안 성공에 묶여** 있었다 — 모델이 죽으면 규칙이 찾은 사실까지 사라졌다(검토관 2026-09-03).
+    registerIncidentCase(사례, "정요한");
+    const 보고서2 = { source: "웹취약점_보고서.pdf", hosts: 1, findings: 1, vulns: [{ code: "CVE-2021-44228", name: "Apache Log4j RCE", risk: "상", host: "www.example.co.kr" }] };
+    resetCollaborationForTests();
+    expect(await draftScanInterpretation(보고서2, { chat: async () => { throw new Error("모델 없음"); } })).toBeNull();
+    expect(listScanDrafts(), "초안은 저장되지 않는다").toEqual([]);
+    const 말 = 해설말풍선();
+    expect(말).toHaveLength(1);
+    expect(말[0]).toMatch(/^📚 비슷한 사례 1건 — 웹취약점_보고서\.pdf 해석 초안은 못 만들었지만/);
+    expect(말[0]).toContain("Log4Shell 대규모 악용(2021) · CVE-2021-44228");
+    // 검증 실패(모델이 엉뚱한 초안을 줌) 경로도 같다
+    resetCollaborationForTests();
+    expect(await draftScanInterpretation(보고서2, { chat: async () => JSON.stringify({ summary: "충분히 긴 요약입니다만", priorities: [{ code: "NOPE", name: "x", host: "y", why: "" }], caveats: [] }) })).toBeNull();
+    expect(해설말풍선().some((m) => /해석 초안은 못 만들었지만/.test(m))).toBe(true);
+    // 후보가 없으면 여기서도 침묵한다
+    resetCollaborationForTests();
+    expect(noteSimilarCasesWithoutDraft({ source: "x.pdf", findings: [{ code: "IW-20", name: "서버 정보 노출" }] })).toBeNull();
+    expect(해설말풍선()).toEqual([]);
+  });
+
+  it("꼬리 CVE는 **후보에 걸린 것만** 상한(IMPORT_CASE_CVE_CAP)까지 — 보고서 전체 CVE를 붓지 않는다(반입 훅과 같은 잣대)", async () => {
+    const 일곱 = ["CVE-2030-0001", "CVE-2030-0002", "CVE-2030-0003", "CVE-2030-0004", "CVE-2030-0005", "CVE-2030-0006", "CVE-2030-0007"];
+    registerIncidentCase({ ...사례, title: "CVE 많은 사례", sourceUrl: "https://example.com/many", cves: 일곱.join(", ") }, "정요한");
+    const r = await draftScanInterpretation(보고서, { chat: 초안chat });
+    const findings = [...일곱, "CVE-2031-9999"].map((c, i) => ({ code: c, name: `[${c}] 항목 ${i}` }));
+    const v = (await explainSimilarCases({ draftId: r!.id, findings }))!;
+    const 꼬리 = v.caseNote.split(" · ").slice(-1)[0].split(", ");
+    expect(꼬리, `꼬리 CVE 수가 상한을 넘었다: ${v.caseNote}`).toHaveLength(IMPORT_CASE_CVE_CAP);
+    expect(꼬리.every((c) => 일곱.includes(c)), `후보에 없는 CVE가 꼬리에 붙었다: ${꼬리.join(", ")}`).toBe(true);
+  });
+
+  it("어떤 경우에도 던지지 않는다 — void로 부르는 약속이 거부되면 아무도 못 받는다(반입 훅과 같은 계약)", async () => {
+    resetCollaborationForTests();
+    await expect(explainSimilarCases({ draftId: "없는초안", findings: null as unknown as { code: string; name: string }[] })).resolves.toBeNull();
+    expect(해설말풍선().some((m) => /비슷한 사례 붙이기 실패/.test(m)), "사유 없이 삼켰다").toBe(true);
   });
 
   it("GIJO_CASE_EXPLAIN=0(시험 기본)이면 모델을 부르지 않고 제목 줄만 저장한다", async () => {
@@ -278,19 +335,31 @@ describe("배선 — 문이 실제로 이어져 있다(소스 감시)", () => {
     expect(TARGETS.scan_drafts?.tables).toEqual(["scan_drafts"]);
     expect([...RESET_TARGETS]).toContain("scan_drafts");
   });
-  it("초안이 생긴 직후 📚 비슷한 사례 훅을 void로 부르고, 초안 API가 caseIds·caseNote를 내보낸다(2026-09-03)", () => {
+  it("초안이 생긴 직후 📚 비슷한 사례 훅을 void로 부르고, 실패 경로에서도 규칙 대조는 돈다(2026-09-03)", () => {
     const src = fs.readFileSync(path.join(E, "scandrafts.ts"), "utf8");
     const i = src.indexOf("export async function draftScanInterpretation(");
     const body = src.slice(i, src.indexOf("\n}\n", i));
     expect(body).toContain("void explainSimilarCases({ draftId: id, findings: input.vulns })");
     // 훅이 insert 뒤에 온다 — 앞에 오면 없는 초안에 caseNote를 쓴다
     expect(body.indexOf("insertStmt.run(")).toBeLessThan(body.indexOf("void explainSimilarCases("));
-    expect(src).toContain('app.get("/api/scan-drafts", authMiddleware');
-    const app = fs.readFileSync(path.join(E, "..", "app.ts"), "utf8");
-    expect(app).toContain("registerScanDraftRoutes(app);");
+    // 실패 두 갈래(검증 실패·모델 죽음) 모두에서 규칙 대조를 부른다 — 한쪽만 부르면 그 길에서만 사례가 사라진다
+    expect((body.match(/noteSimilarCasesWithoutDraft\(\{ source: input\.source, findings: input\.vulns \}\)/g) ?? []).length, "초안 실패 갈래 둘 다에서 규칙 대조를 불러야 한다").toBe(2);
     // CVE 뽑기는 hybridsearch 한 곳 — 새 CVE 정규식을 여기 짓지 않는다
     expect(src).not.toMatch(/\/CVE-\\d/);
     expect(src).toContain('from "./hybridsearch"');
+  });
+
+  it("스캔 초안 조회 API는 두지 않는다 — 부르는 클라가 0곳이었다(검토관 2026-09-03)", () => {
+    const src = fs.readFileSync(path.join(E, "scandrafts.ts"), "utf8");
+    expect(src, "부르는 사람 없는 창구가 되살아났다").not.toContain('app.get("/api/scan-drafts"');
+    expect(src).not.toContain("registerScanDraftRoutes");
+    expect(fs.readFileSync(path.join(E, "..", "app.ts"), "utf8")).not.toContain("registerScanDraftRoutes");
+    // 없앤 근거를 시험이 다시 잰다 — 클라가 이 창구를 부르기 시작하면 API를 되살리고 이 시험을 갱신해야 한다
+    const 클라 = path.join(__dirname, "..", "..", "client", "src");
+    const 부르는곳 = (fs.readdirSync(클라, { recursive: true }) as string[])
+      .filter((f) => /\.(ts|js|html)$/.test(f))
+      .filter((f) => fs.readFileSync(path.join(클라, f), "utf8").includes("scan-drafts"));
+    expect(부르는곳, "클라가 이 창구를 부른다 — API를 되살릴 것").toEqual([]);
   });
 });
 

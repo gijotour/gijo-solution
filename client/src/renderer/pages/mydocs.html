@@ -688,7 +688,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   // 회사 지식·반입에서 개인 문서(personal:*)는 뺀다(검토관 중3 — 서버 반입 소식도 같은 제외).
   // 개인 문서의 자리는 👤 내 것 탭이고, personal: id는 사람이 못 읽는 uuid다.
   // 승인 문답(origin=approved-qa)도 뺀다 — id가 「승인문답:<로그 id>」라 사람이 못 읽고, 관리 자리는 기억학습 화면이다(2026-09-03).
-  var 회사문서만 = function () { return know.filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0 && d.origin !== "approved-qa"; }); };
+  // 침해사고 사례 문서(origin=incident-case)도 같은 이유로 뺀다(2026-09-03 결정 ① 「목록에서 뺀다」) — id가
+  //   「incident-case:ic-…」라 사람이 못 읽고, 여기서 지우면 📚 히스토리 표와 기억이 어긋난다(관리 자리는 그 판).
+  //   씨앗만 20건이라 안 빼면 문서 허브 목록이 사례로 밀린다 — 서버 소비처(docdigest·docdupe)와 같은 잣대.
+  var 회사문서만 = function () { return know.filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0 && d.origin !== "approved-qa" && d.origin !== "incident-case"; }); };
 
   // ⚠ 따옴표까지 막는다(검토관 상5) — 남의 자유 텍스트(학습 문답·파일명)가 title 속성에
   //   들어가는 화면이라, textContent 직렬화(&<>만)로는 속성 탈출 주입이 열린다.

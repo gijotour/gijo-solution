@@ -519,8 +519,10 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
   // 📚 해설 팀원의 부르는 문 ③(2026-09-03) — 자산 등록·메타 갱신·finding 기록이 **전부 끝난 뒤** 한 번 부른다(반입을 기다리게 하지 않는다: void).
   //   네 등록 경로(웹취약점 보고서·Nessus HTML·CSV/JSON 자동 갈래·/api/vulnscan/import)가 모두 이 함수를 지나므로 훅은 여기 하나다.
   //   운영 실측: 취약점 288건 중 CVE 있음 201건(70%)이고 CVE는 Nessus/CSV/JSON에서 오는데, 초안 훅은 웹보고서 경로에서만 불려 CVE가 드문 길만 덮었다.
-  //   ⚠ 웹취약점 보고서(webreport)는 건너뛴다 — 그 경로는 autoupload.tryWebReport → draftScanInterpretation → explainSimilarCases가 초안 옆에
-  //     caseNote를 **저장**해 클라 칩(「📚 비슷한 사례 N건」)이 읽는 계약을 진다. 여기서도 부르면 같은 말이 두 번 나간다(이중 발화 금지).
+  //   ⚠ 웹취약점 보고서(webreport)는 건너뛴다 — 그 경로는 **초안 경로가 규칙 대조까지 맡는다**: autoupload.tryWebReport →
+  //     draftScanInterpretation이 성공하면 explainSimilarCases가 초안 옆에 caseNote를 **저장**하고(대화창 답의 「📚 비슷한 사례 N건」이
+  //     그 줄을 싣는다), 초안이 실패하면 noteSimilarCasesWithoutDraft가 모델 없이 규칙 대조만 해 협업 창에 남긴다(2026-09-03 검토관 —
+  //     예전엔 사례가 초안 성공에 묶여 모델이 죽으면 통째로 사라졌다). 여기서도 부르면 같은 말이 두 번 나간다(이중 발화 금지).
   //   ⚠ 후보 0이면 침묵한다 — 없는 사례를 지어 붙이지 않는다(scandrafts 정직 규칙). 끄개·예산은 초안 훅과 같다(GIJO_CASE_EXPLAIN).
   if (format !== "webreport" && 새CVE항목.length) void explainSimilarCasesForImport({ source: sourceLabel, findings: 새CVE항목 });
   return { hosts: byHost.size, findings: totalFindings, rows: parsed.length, assets, uncredentialedHosts };

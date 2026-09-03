@@ -594,6 +594,9 @@ export const llmServeApi = {
 //     스스로 푼다 — 갈래가 어긋나도 안 죽게. 여기서 `| string`을 다시 넣지 말 것(서버 계약을 흐린다).
 //   ⚠ createdAt·updatedAt는 **ms 숫자**(Date.now(), INTEGER 칸)다 — 문자열로 적으면 화면이 localeCompare로 정렬해
 //     조용히 틀린다(통합 검토 2026-09-03에서 잡힘). 날짜로 그릴 땐 new Date(number).
+//   ⚠ 목록·유사 응답은 { cases, total } 두 칸이다(서버 계약, 2026-09-03 통합 수리). total은 **상한(limit)에 잘려도**
+//     참값을 싣는다 — 화면이 cases.length로 「N건」을 적으면 상한에 닿는 순간 그 숫자가 거짓이 되기 때문이다.
+//     소비자(incidentcases.html·grouppanels 📚 판)는 total로 적고, 잘렸으면 「N건 중 M건 표시」라고 밝힌다.
 export interface IncidentCase {
   id: string; createdAt: number; updatedAt: number;
   title: string; oneLiner: string; plainExplain: string;
@@ -615,11 +618,18 @@ export const incidentCasesApi = {
     if (p?.year != null) qs.set("year", String(p.year));
     if (p?.limit != null) qs.set("limit", String(p.limit));
     const s = qs.toString();
-    return request<{ cases: IncidentCase[] }>("/api/incident-cases" + (s ? "?" + s : ""));
+    return request<{ cases: IncidentCase[]; total: number }>("/api/incident-cases" + (s ? "?" + s : ""));
   },
   // 「비슷한 사례」 — 규칙만(LLM 없음). 칩(취약점 카드·대화창)과 판의 CVE 필터가 **같은 창구**를 써야
   // 칩의 N건과 판의 줄 수가 같다(세는 곳이 둘이면 어긋난다).
-  similar: (cves: string[]) => request<{ cases: IncidentCase[] }>("/api/incident-cases/similar?cves=" + encodeURIComponent(cves.join(","))),
+  // ⚠ limit은 서버 창구가 받는 인자를 그대로 비춘 것이다 — 다만 preload 다리(incidentCasesSimilar)가 아직
+  //   cves만 넘겨서 화면에서는 못 쓴다. 다리를 고칠 때 함께 넘길 것(지금 넘기는 척하면 조용히 무시된다).
+  similar: (cves: string[], limit?: number) =>
+    request<{ cases: IncidentCase[]; total: number }>(
+      "/api/incident-cases/similar?cves=" + encodeURIComponent(cves.join(",")) + (limit != null ? "&limit=" + String(limit) : ""),
+    ),
   sources: () => request<{ sources: IncidentSource[] }>("/api/incident-cases/sources"),
-  get: (id: string) => request<IncidentCase>("/api/incident-cases/" + encodeURIComponent(id)),
+  // 상세 한 건(/api/incident-cases/:id) 래퍼는 **두지 않는다**(2026-09-03 통합 검토 [낮음], 결정: 제거).
+  //   판이 목록 줄을 그 자리에서 펼쳐 상세를 보여 주므로 부를 자리가 없었고, preload 다리도 없어 렌더러에서는
+  //   원리상 닿지 못하는 죽은 창구였다. 서버 라우트는 그대로 있으니, 상세 카드가 생기면 그때 다리와 함께 되살린다.
 };

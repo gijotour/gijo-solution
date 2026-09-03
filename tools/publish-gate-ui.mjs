@@ -531,6 +531,7 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
 //    새 서버 창구(/api/incident-cases)를 지나는 자리라, 창구가 죽으면 목록도 빈 상태 안내도 없이
 //    하얗다 — 그 부류를 잡는다. 줄을 누르면 상세가 펼쳐지는 판이라 .noclick은 요구하지 않는다.
 //    fail-closed: 「불러오지 못했습니다」가 그려지면 실패다(서버가 이 창구를 아직 안 열었으면 게시 전에 배포).
+//    또 **사례 0건도 실패**다 — 씨앗이 게시본에 안 실린 채로 나가면 고객이 빈 판을 받는다(아래 주석).
 {
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("incidentcases.html", "침해사고 히스토리", { dock: true }));
   const fr = await 프레임찾기("incidentcases.html", 8);
@@ -543,16 +544,22 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     const 글 = document.getElementById("icList")?.innerText || "";
     return {
       판글: 글.slice(0, 60),
-      // 목록(줄) 또는 빈 상태 안내 중 하나는 반드시 그려져야 한다 — 둘 다 없으면 창구가 죽은 것.
+      // 줄이 **한 줄이라도** 그려져야 한다 — 씨앗이 실렸는지까지 재는 잣대다(아래 「왜 빈 상태를 초록으로 안 보나」).
       줄수: document.querySelectorAll("#icList .g-rows-r").length,
       빈상태: 글.includes("등록된 사례가 없습니다"),
       실패: 글.includes("불러오지 못했습니다"),
       샘띠: !!document.getElementById("icSources"),
     };
   }).catch(() => null) : null;
-  ok("📚 침해사고 히스토리 판: 딥링크로 열리고 목록/빈 상태가 그려진다",
-    !!r && !r.실패 && (r.줄수 > 0 || r.빈상태) && r.샘띠,
-    r ? JSON.stringify(r) : "프레임 못 찾음");
+  // ⚠ **왜 빈 상태를 초록으로 안 보나**(2026-09-03 검토): 종전 조건은 `줄수 > 0 || 빈상태`라
+  //   「등록된 사례가 없습니다」를 통과로 셌다. 그러면 씨앗(incidentcases-seed.json)이 게시본에
+  //   안 실렸거나 기동 반입이 조용히 죽어도 관문이 초록이다 — 고객은 **빈 판**을 받는다.
+  //   이 제품에서 📚 판은 「내장 사례가 들어 있다」가 곧 기능이므로, **내장 사례 ≥ 1건**을
+  //   요구한다. 빈 상태는 여전히 「창구는 살아 있다」의 증거라 판정값에 남겨 실패 사유로 보여 준다
+  //   (창구 죽음 = 실패·하얀 화면과 구별돼야 무엇을 고칠지 알 수 있다).
+  ok("📚 침해사고 히스토리 판: 딥링크로 열리고 내장 사례가 1건 이상 그려진다",
+    !!r && !r.실패 && r.줄수 > 0 && r.샘띠,
+    r ? JSON.stringify(r) + (r.빈상태 ? " ← 창구는 살아 있으나 사례가 0건이다(씨앗 미탑재/기동 반입 실패 의심)" : "") : "프레임 못 찾음");
 }
 
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──

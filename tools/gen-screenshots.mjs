@@ -135,6 +135,11 @@ async function main() {
     productIntros: await g("/api/product-intro"),
     logFiles: await g("/api/loganalysis/files"),
     analysisEvents: await g("/api/analysis/events"),
+    // ★ 2026-09-03 📚 침해사고 히스토리 — 씨앗 20건이 서버에 있어 목록이 찬 화면으로 찍힌다.
+    //   ⚠ 여기 안 적으면 Proxy가 빈 배열을 돌려줘 「등록된 사례가 없습니다」가 자료에 실린다(위 전례 그대로).
+    //   상한은 화면(incidentcases.html 상한)·📚 판과 같은 500 — 자료의 숫자가 제품과 달라지지 않게.
+    incidentCases: await g("/api/incident-cases?limit=500"),
+    incidentSources: await g("/api/incident-cases/sources"),
   };
 
   // 브라우저에 주입할 window.gijo 스텁(읽기=주입 데이터 반환, 쓰기/구독=no-op). 페이지 스크립트보다 먼저 실행.
@@ -217,6 +222,11 @@ async function main() {
       logAnalysisFiles: () => R(DATA.logFiles || { files: [] }),
       analysisEvents: () => R(DATA.analysisEvents || { events: [] }),
       logAnalysisGuide: () => R({ steps: [] }),
+      // 📚 침해사고 히스토리 — 응답 통째로 준다({ cases, total }). 화면이 total로 「N건」을 적으므로
+      //   cases만 흉내 내면 건수가 0으로 찍힌다. incidentCasesSimilar는 **일부러 안 둔다** — 이 도구는
+      //   ?cve= 없이 찍어 부를 일이 없고, 스텁이 전체 목록을 「비슷한 사례」라고 돌려주면 거짓 화면이 된다.
+      incidentCases: () => R(DATA.incidentCases || { cases: [], total: 0 }),
+      incidentSources: () => R(DATA.incidentSources || { sources: [] }),
       onCollaborationEvent: noop,
       // 터미널 화면 — 실제 로컬 셸 스폰 없이 빈 상태(대기 화면)만 보여준다.
       terminal: {
@@ -289,6 +299,11 @@ async function main() {
     { page: "mydocs.html", name: "36-내문서-허브" },          // 2026-08-20 문서 허브 v3(문서함 흡수)
     { page: "supervision.html", name: "37-AI팀감독-안전" },   // 2026-08-20 AI 허브 4탭 통합
     { page: "supplychain.html", name: "38-공급망점검" },      // 2026-08-22 타사 SBOM 라이선스 검수
+    // 2026-09-03 📚 침해사고 히스토리 — nav 메뉴에 없고 **카드/칩으로 여는** 판이라 위 「메뉴 화면」
+    //   검사에는 안 걸린다. 그래도 자료에는 들어가야 한다(해설 팀원의 사례 저장소 = 판매 이야깃거리).
+    //   ⚠ 딥링크(?cve=…)로는 안 찍는다 — 그건 좁혀진 화면이라 「전체 사례가 이만큼 있다」를 못 보여 준다.
+    //     쿼리가 없으면 도구가 ?shot=1을 붙이므로 nav의 파일명 흡수도 안 탄다(위 주소 만들기 참고).
+    { page: "incidentcases.html", name: "39-침해사고-히스토리" },
 
   ];
 

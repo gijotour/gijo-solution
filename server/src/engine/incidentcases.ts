@@ -60,7 +60,10 @@ const ID_RE = /^ic-[0-9a-f]{16}$/;
 export const REGIONS = ["국내", "해외"] as const;
 export type IncidentRegion = (typeof REGIONS)[number];
 export type IncidentOrigin = "builtin" | "user";
-export const LIMITS = { title: 120, oneLiner: 200, plainExplain: 1500, lesson: 600, industry: 40, sourceName: 80, sourceUrl: 500, list: 30, item: 60 } as const;
+// 상한은 **자르는 잣대가 아니라 되묻는 잣대**다 — 넘으면 아래 검증이 사유를 돌려준다. 조용히 자르면 담당자는 잘린 줄 모른다(검토관 2026-09-03).
+//   · sourceName 400 — 씨앗 8건의 출처가 「보도자료 제목 + 발표 주체 + 날짜 + 보조 근거」라 80자에서 꼬리가 통째로 잘려 나갔다(실측 최장 296자).
+//   · item 120 — 제품 칸 한 항목의 실측 최장이 84자다(SolarWinds Orion 판본 나열). 60에서 자르면 어느 판본이 걸렸는지가 사라진다.
+export const LIMITS = { title: 120, oneLiner: 200, plainExplain: 1500, lesson: 600, industry: 40, sourceName: 400, sourceUrl: 500, list: 30, item: 120 } as const;
 
 export interface IncidentCaseInput {
   title: string; oneLiner: string; plainExplain: string; year: number; industry: string; region: IncidentRegion;
@@ -70,7 +73,9 @@ export interface IncidentCaseRow extends IncidentCaseInput {
   id: string; createdAt: number; updatedAt: number; origin: IncidentOrigin; registeredBy: string | null;
 }
 /** 사례의 샘(갈래 D · incidentsources.json) 한 줄. 화면은 이름·언어·주기·링크를 그린다. */
-export interface IncidentSource { id: string; name: string; kind: "youtube" | "site" | "domestic"; url: string; lang: string; cadence: string; desc: string }
+// licenseNote — 「링크·임베드만 안내, 재업로드는 저작권 위반」처럼 그 샘을 쓸 때의 경계. 파일에는 28곳 모두 있는데
+//   읽기가 버리고 있어 화면 툴팁이 그릴 재료가 없었다(검토관 2026-09-03). 담기만 하고 대화창 서식은 안 늘린다(줄이 길어진다).
+export interface IncidentSource { id: string; name: string; kind: "youtube" | "site" | "domestic"; url: string; lang: string; cadence: string; desc: string; licenseNote: string }
 export type IncidentSourceKind = IncidentSource["kind"] | "all";
 
 interface Raw { id: string; createdAt: number; updatedAt: number; title: string; oneLiner: string; plainExplain: string; year: number; industry: string; region: string; techniques: string; cves: string; products: string; lesson: string; sourceUrl: string; sourceName: string; origin: string; registeredBy: string | null }
@@ -113,7 +118,10 @@ export function validateIncidentCaseInput(raw: Record<string, unknown>): { value
   const plainExplain = need("plainExplain", "쉬운 설명", LIMITS.plainExplain);
   const lesson = need("lesson", "교훈", LIMITS.lesson);
   const industry = need("industry", "업종", LIMITS.industry);
-  const sourceName = str(raw.sourceName).slice(0, LIMITS.sourceName);
+  // 출처 이름은 빈 값을 허용한다(필수가 아니다) — 다만 **길면 자르지 말고 말한다**. 자른 채 넘기면 근거의 꼬리가 조용히 사라진다.
+  const sourceNameRaw = str(raw.sourceName);
+  if (sourceNameRaw.length > LIMITS.sourceName) errors.push(`${말조사("출처 이름", "이")} ${LIMITS.sourceName}자를 넘습니다(${sourceNameRaw.length}자)`);
+  const sourceName = sourceNameRaw.slice(0, LIMITS.sourceName);
   const yearRaw = str(raw.year);
   const year = Number(yearRaw);
   const thisYear = new Date().getFullYear();
@@ -123,14 +131,20 @@ export function validateIncidentCaseInput(raw: Record<string, unknown>): { value
   const region: IncidentRegion = regionRaw === "해외" ? "해외" : "국내";
   if (!regionRaw) errors.push("지역(국내/해외)이 비었습니다");
   else if (regionRaw !== "국내" && regionRaw !== "해외") errors.push(`지역은 「국내」 또는 「해외」여야 합니다: ${regionRaw}`);
-  const sourceUrl = str(raw.sourceUrl).slice(0, LIMITS.sourceUrl);
+  const sourceUrlRaw = str(raw.sourceUrl);
+  // 잘린 URL은 **열리지 않는 링크**다 — 근거가 필수인 표에서 가장 나쁜 조용한 손실이라 사유로 돌려준다.
+  if (sourceUrlRaw.length > LIMITS.sourceUrl) errors.push(`${말조사("출처 URL", "이")} ${LIMITS.sourceUrl}자를 넘습니다(${sourceUrlRaw.length}자)`);
+  const sourceUrl = sourceUrlRaw.slice(0, LIMITS.sourceUrl);
   if (!sourceUrl) errors.push("출처 URL이 비었습니다(필수 — 근거 없는 사례는 등록하지 않습니다)");
   else if (!/^https?:\/\/\S+$/i.test(sourceUrl)) errors.push(`출처 URL은 http(s)로 시작해야 합니다: ${sourceUrl}`);
   const cves = uniq(splitCodes(raw.cves).map((c) => c.toUpperCase()));
   for (const c of cves) if (!CVE_ID_RE.test(c)) errors.push(`CVE 꼴이 아닙니다: ${c} (예: CVE-2021-44228)`);
   const techniques = uniq(splitCodes(raw.techniques).map((t) => t.toUpperCase()));
   for (const t of techniques) if (!TECHNIQUE_RE.test(t)) errors.push(`ATT&CK 기법 꼴이 아닙니다: ${t} (예: T1190, T1059.001, TA0001)`);
-  const products = uniq(splitNames(raw.products).map((p) => p.slice(0, LIMITS.item)));
+  const productsRaw = splitNames(raw.products);
+  // 제품 이름도 자르지 않고 말한다 — 「Orion Platform 2019.4 HF5 · 2020.2 RC1 …」처럼 판본이 이어 붙은 항목은 잘리면 어느 판본인지가 사라진다.
+  for (const p of productsRaw) if (p.length > LIMITS.item) errors.push(`제품 이름이 ${LIMITS.item}자를 넘습니다(${p.length}자): ${p.slice(0, 30)}…`);
+  const products = uniq(productsRaw.map((p) => p.slice(0, LIMITS.item)));
   for (const [label, xs] of [["CVE", cves], ["기법", techniques], ["제품", products]] as const) if (xs.length > LIMITS.list) errors.push(`${label} 목록이 ${LIMITS.list}개를 넘습니다`);
   return { value: { title, oneLiner, plainExplain, year, industry, region, techniques, cves, products, lesson, sourceUrl, sourceName }, errors };
 }
@@ -139,8 +153,10 @@ export function validateIncidentCaseInput(raw: Record<string, unknown>): { value
 const selectAll = "SELECT * FROM incident_cases";
 const ORDER = " ORDER BY year DESC, createdAt DESC";
 
-export function listIncidentCases(opts: { q?: string; cve?: string; year?: number; limit?: number } = {}): IncidentCaseRow[] {
-  const limit = Math.max(1, Math.min(200, Number(opts.limit) || 50));
+export interface IncidentCaseQuery { q?: string; cve?: string; year?: number; limit?: number }
+
+/** 조건에 걸리는 사례 **전부**(상한 없음) — 목록과 총계가 **같은 잣대**를 쓰게 한 자리다(두 곳에서 세면 화면의 「N건」이 어긋난다). */
+function 조건에걸린사례(opts: IncidentCaseQuery): IncidentCaseRow[] {
   const where: string[] = [];
   const params: unknown[] = [];
   if (opts.year && Number.isInteger(Number(opts.year))) { where.push("year = ?"); params.push(Number(opts.year)); }
@@ -152,13 +168,23 @@ export function listIncidentCases(opts: { q?: string; cve?: string; year?: numbe
     params.push(like, like, like, like, like, like, like, like);
   }
   const cve = str(opts.cve).toUpperCase();
-  let rows = (db.prepare(selectAll + (where.length ? ` WHERE ${where.join(" AND ")}` : "") + ORDER).all(...params) as Raw[]).map(toRow);
-  if (cve) rows = rows.filter((r) => r.cves.some((c) => c.toUpperCase() === cve));
-  return rows.slice(0, limit);
+  const rows = (db.prepare(selectAll + (where.length ? ` WHERE ${where.join(" AND ")}` : "") + ORDER).all(...params) as Raw[]).map(toRow);
+  // CVE는 JSON 배열 칸이라 SQL LIKE로 정확 일치를 못 낸다(CVE-2021-4를 CVE-2021-44228이 삼킨다) — 여기서 배열로 푼 뒤 대조한다.
+  return cve ? rows.filter((r) => r.cves.some((c) => c.toUpperCase() === cve)) : rows;
 }
 
-export function countIncidentCases(): number {
-  return (db.prepare("SELECT COUNT(*) AS n FROM incident_cases").get() as { n: number }).n;
+export function listIncidentCases(opts: IncidentCaseQuery = {}): IncidentCaseRow[] {
+  // 상한 500 — 클라(incidentcases.html·grouppanels 📚 판)가 500을 넘겨 부른다. 200이면 서버가 조용히 200으로 깎아
+  // 화면은 「500 중 전부」라 믿는 채 300건이 사라졌다(검토관 2026-09-03). 두 자리 숫자는 같아야 한다.
+  const limit = Math.max(1, Math.min(500, Number(opts.limit) || 50));
+  return 조건에걸린사례(opts).slice(0, limit);
+}
+
+/** 조건에 걸리는 총 건수 — 목록이 상한에 잘려도 「전체 몇 건」을 정직하게 말하는 자리(라우트가 목록과 함께 내보낸다). */
+export function countIncidentCases(opts: IncidentCaseQuery = {}): number {
+  // 조건이 없으면(가장 흔한 부름) 표를 통째로 풀지 않고 SQL로 센다.
+  if (!str(opts.q) && !str(opts.cve) && !opts.year) return (db.prepare("SELECT COUNT(*) AS n FROM incident_cases").get() as { n: number }).n;
+  return 조건에걸린사례(opts).length;
 }
 
 export function getIncidentCase(id: string): IncidentCaseRow | undefined {
@@ -166,8 +192,11 @@ export function getIncidentCase(id: string): IncidentCaseRow | undefined {
   return r ? toRow(r) : undefined;
 }
 
-/** CVE 목록과 겹치는 사례 — 규칙만(LLM 없음). 대문자로 맞춰 JSON 배열 교집합, 많이 겹치는 순 → 최근 연도 순. */
-export function findCasesForCves(cves: string[], limit = 5): IncidentCaseRow[] {
+/**
+ * CVE 목록과 겹치는 사례 **전부** — 규칙만(LLM 없음). 대문자로 맞춰 JSON 배열 교집합, 많이 겹치는 순 → 최근 연도 순.
+ * 상한을 안 씌운 자리가 따로 있는 이유: 「N건 중 5건」의 N을 목록과 **같은 잣대**로 세야 칩의 수와 판의 줄 수가 안 어긋난다.
+ */
+export function matchCasesForCves(cves: string[]): IncidentCaseRow[] {
   const want = new Set(cves.map((c) => str(c).toUpperCase()).filter(Boolean));
   if (!want.size) return [];
   const rows = (db.prepare(selectAll + " WHERE cves <> '[]'" + ORDER).all() as Raw[]).map(toRow);
@@ -175,8 +204,12 @@ export function findCasesForCves(cves: string[], limit = 5): IncidentCaseRow[] {
     .map((r) => ({ r, hit: r.cves.filter((c) => want.has(c.toUpperCase())).length }))
     .filter((x) => x.hit > 0)
     .sort((a, b) => b.hit - a.hit || b.r.year - a.r.year)
-    .slice(0, Math.max(1, limit))
     .map((x) => x.r);
+}
+
+/** 위와 같되 상한까지 — 부연·칩처럼 몇 건만 보여 주는 자리가 쓴다. */
+export function findCasesForCves(cves: string[], limit = 5): IncidentCaseRow[] {
+  return matchCasesForCves(cves).slice(0, Math.max(1, limit));
 }
 
 // ── 지식 반입(결정 ①) — 표 칸에서 렌더한 문서 1건, id별 직렬 큐, 실패는 감사에 ───────────────────
@@ -275,12 +308,39 @@ export function registerIncidentCase(raw: Record<string, unknown>, actor: string
   return getIncidentCase(id)!;
 }
 
+// ── 내장 사례 숨김(검토관 2026-09-03) ────────────────────────────────────────
+// 내장(builtin) 사례를 지워도 **다음 기동의 씨앗이 같은 id로 되살렸다** — 지운 사람은 지운 줄 알고 제품은 되살린다.
+// 지운 id를 app_state에 남겨 씨앗이 건너뛴다. 씨앗 파일은 안 건드리므로 되살리기가 가능한 **숨김**이지 파괴가 아니다.
+const HIDDEN_KEY = "incidentcases:hiddenBuiltin";
+const getHiddenStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
+const setHiddenStmt = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+/** 관리자가 지운 내장 사례 id — 씨앗이 이 목록은 다시 넣지 않는다. */
+export function hiddenBuiltinCaseIds(): string[] {
+  try {
+    const raw = (getHiddenStmt.get(HIDDEN_KEY) as { value?: string } | undefined)?.value;
+    const v = JSON.parse(raw ?? "[]");
+    return Array.isArray(v) ? v.map((x) => String(x)) : [];
+  } catch { return []; } // 값이 깨졌으면 숨김 없음으로 읽는다 — 사례가 사라지는 쪽이 아니라 보이는 쪽으로 넘어진다
+}
+function hideBuiltinCase(id: string): void {
+  const cur = hiddenBuiltinCaseIds();
+  if (cur.includes(id)) return;
+  setHiddenStmt.run(HIDDEN_KEY, JSON.stringify([...cur, id]));
+}
+/** 숨긴 내장 사례를 되살린다(관리자 API) — 도구 문구가 약속한 「다시 보이려면 관리자」의 실제 문. 돌려주는 값: 풀린 건수. */
+export function unhideBuiltinCases(): number {
+  const n = hiddenBuiltinCaseIds().length;
+  setHiddenStmt.run(HIDDEN_KEY, "[]");
+  return n;
+}
+
 /** 사례 삭제 — 표에서 지우고 지식 문서도 짝으로 지운다(문서 쪽은 큐에서, 실패하면 감사 기록). 없는 id면 false. */
 export function deleteIncidentCase(id: string, actor: string | null): boolean {
   const row = getIncidentCase(id);
   if (!row) return false;
   db.prepare("DELETE FROM incident_cases WHERE id = ?").run(row.id);
-  recordAudit({ kind: "write", actor, action: "침해사고 히스토리 삭제", target: row.id, detail: `${row.title} (${row.year}) · ${row.origin === "builtin" ? "내장" : `등록자 ${row.registeredBy ?? "?"}`}`, result: "ok" });
+  if (row.origin === "builtin") hideBuiltinCase(row.id); // 안 적으면 다음 기동에 씨앗이 되살린다
+  recordAudit({ kind: "write", actor, action: "침해사고 히스토리 삭제", target: row.id, detail: `${row.title} (${row.year}) · ${row.origin === "builtin" ? "내장(숨김 기록)" : `등록자 ${row.registeredBy ?? "?"}`}`, result: "ok" });
   if (ingestEnabled()) enqueue(row.id, () => removeDoc(row.id), "삭제");
   return true;
 }
@@ -297,7 +357,7 @@ export function builtinCaseId(seed: { id?: unknown; sourceUrl?: unknown; title?:
   if (ID_RE.test(given)) return given;
   return `ic-${crypto.createHash("sha256").update(`${str(seed.sourceUrl)}|${str(seed.title)}`).digest("hex").slice(0, 16)}`;
 }
-export interface SeedResult { file: string | null; inserted: number; updated: number; unchanged: number; skipped: string[] }
+export interface SeedResult { file: string | null; inserted: number; updated: number; unchanged: number; hidden: number; skipped: string[] }
 /** 씨앗 칸이 바뀐 내장 사례 — 문서를 **강제로** 다시 반입해야 할 id(문서 행이 이미 있어 「없는 것만」 반입으로는 안 잡힌다). */
 const 재반입대기 = new Set<string>();
 
@@ -310,7 +370,7 @@ const 재반입대기 = new Set<string>();
 export function seedBuiltinCases(file?: string, opts: { ingest?: boolean } = {}): SeedResult {
   const ingest = opts.ingest ?? true;
   const p = file ?? assetPath("incidentcases-seed.json");
-  const out: SeedResult = { file: p, inserted: 0, updated: 0, unchanged: 0, skipped: [] };
+  const out: SeedResult = { file: p, inserted: 0, updated: 0, unchanged: 0, hidden: 0, skipped: [] };
   if (!p) { console.warn("[incidentcases] 씨앗 파일(incidentcases-seed.json)이 없다 — 내장 사례 0건으로 뜬다"); return out; }
   let cases: unknown[] = [];
   try {
@@ -322,12 +382,14 @@ export function seedBuiltinCases(file?: string, opts: { ingest?: boolean } = {})
   }
   if (!cases.length) { console.warn(`[incidentcases] 씨앗 파일이 비어 있다(${p}) — 내장 사례 0건`); return out; }
   const now = Date.now();
+  const 숨김 = new Set(hiddenBuiltinCaseIds()); // 관리자가 지운 내장 사례 — 되살리지 않는다(숨김은 skipped 사유가 아니라 정상 동작이라 따로 센다)
   const tx = db.transaction(() => {
     for (const c of cases) {
       const raw = (c && typeof c === "object" ? c : {}) as Record<string, unknown>;
       const { value, errors } = validateIncidentCaseInput(raw);
       if (errors.length) { out.skipped.push(`${str(raw.title) || "(제목 없음)"}: ${errors.join(" · ")}`); continue; }
       const id = builtinCaseId(raw);
+      if (숨김.has(id)) { out.hidden += 1; continue; }
       const cur = getIncidentCase(id);
       if (!cur) {
         insertStmt.run({ id, createdAt: now, updatedAt: now, ...toParams(value), origin: "builtin", registeredBy: null });
@@ -346,6 +408,7 @@ export function seedBuiltinCases(file?: string, opts: { ingest?: boolean } = {})
   });
   tx();
   if (out.skipped.length) console.warn(`[incidentcases] 씨앗 ${out.skipped.length}건 건너뜀:\n  ${out.skipped.join("\n  ")}`);
+  if (out.hidden) console.log(`[incidentcases] 내장 사례 ${out.hidden}건은 관리자가 지워 숨김 상태다 — 되살리려면 POST /api/incident-cases/builtin/restore`);
   return out;
 }
 
@@ -361,6 +424,9 @@ export async function syncIncidentCaseDocs(): Promise<{ queued: number }> {
 }
 /** 부팅용 — docsbundle.bootstrapDocsBundleWithRetry와 같은 결(임베딩이 늦게 뜨면 20초 간격으로 다시). */
 export async function syncIncidentCaseDocsWithRetry(attempts = 5, delayMs = 20_000): Promise<void> {
+  // 반입이 꺼져 있으면(GIJO_CASE_INGEST=0) 여기서 끝낸다 — 안 그러면 syncIncidentCaseDocs가 0을 돌려주는데
+  // 「문서 없는 사례」는 그대로라 20초씩 다섯 번을 기다린 끝에 **끄개를 켜 놓고도** 「반입 실패」를 오류로 찍는다(검토관 2026-09-03).
+  if (!ingestEnabled()) return;
   for (let i = 1; i <= attempts; i += 1) {
     const { queued } = await syncIncidentCaseDocs();
     const 남음 = (db.prepare("SELECT id FROM incident_cases").all() as { id: string }[]).filter((r) => !docExistsStmt.get(incidentCaseDocId(r.id))).length + 재반입대기.size;
@@ -391,7 +457,7 @@ export function listIncidentSources(kind: IncidentSourceKind = "all"): IncidentS
     if (!url || !/^https?:\/\//i.test(url)) continue; // 링크 없는 샘은 샘이 아니다
     const kk: IncidentSource["kind"] = k === "youtube" || k === "domestic" ? k : "site";
     // 파일(갈래 D)은 language·what으로 적는다 — API·화면(client security-ops.ts IncidentSource)은 lang·desc 한 이름으로 받는다(둘 다 읽어 한쪽으로 접는다).
-    out.push({ id: str(s.id) || url, name: str(s.name) || url, kind: kk, url, lang: str(s.lang) || str(s.language), cadence: str(s.cadence), desc: str(s.desc) || str(s.what) || str(s.about) });
+    out.push({ id: str(s.id) || url, name: str(s.name) || url, kind: kk, url, lang: str(s.lang) || str(s.language), cadence: str(s.cadence), desc: str(s.desc) || str(s.what) || str(s.about), licenseNote: str(s.licenseNote) });
   }
   return kind === "all" ? out : out.filter((s) => s.kind === kind);
 }
@@ -417,10 +483,18 @@ export function formatIncidentSources(kind: IncidentSourceKind = "all"): string 
 }
 
 // ── 대화창 서식 ──────────────────────────────────────────────────────────────
-const 한줄 = (r: IncidentCaseRow) => `[${r.year} · ${r.region} · ${r.industry}] ${r.title} — ${r.oneLiner}`;
+/** 글자 상한 — 넘으면 말줄임을 붙여 **잘렸음이 보이게** 한다(조용히 자르지 않는다). */
+const 컷 = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
+const 한줄 = (r: IncidentCaseRow) => `[${r.year} · ${r.region} · ${r.industry}] ${컷(r.title, 80)} — ${컷(r.oneLiner, 100)}`;
+/** 대화창에 한 번에 싣는 사례 수 — 나머지는 「… 외 N건」으로 밝힌다(formatIncidentSources와 같은 꼴). */
+const 대화창최대 = 5;
 /**
  * 대화창용 — 숫자만 주고 끝내지 않는다: 건마다 한 줄·교훈·CVE/제품·출처 링크를 적고, 1~2건이면 쉬운 설명까지 싣는다.
  * 사례 글은 사람이 쓴 정본(표 칸)이라 🤖(AI가 쓴 글) 표식을 붙이지 않는다.
+ *
+ * ⚠ 끝의 3500자 컷에 기대지 않는다(검토관 2026-09-03) — 씨앗 20건을 그대로 실으면 컷이 **머리의 「N건」 약속을 지운 채**
+ *   📋 안내 줄까지 먹었다. 그래서 ① 안내 줄을 머리 바로 아래로 올리고 ② 건마다 상한을 두고 ③ 다섯 건까지만 싣고
+ *   ④ 나머지는 「… 외 N건」으로 밝힌다. 3500 컷은 이제 마지막 안전망일 뿐 평소엔 안 닿는다.
  */
 export function formatIncidentCases(rows: IncidentCaseRow[], ctx: { q?: string; cve?: string } = {}): string {
   const total = countIncidentCases();
@@ -429,16 +503,21 @@ export function formatIncidentCases(rows: IncidentCaseRow[], ctx: { q?: string; 
     if (total === 0) return `${표식.사례} 침해사고 히스토리에 등록된 사례가 아직 없습니다 — 내장 씨앗이 비어 있고 담당자 등록도 없습니다. 대화창에서 「사례 등록: 제목, 연도, 업종, 국내/해외, 한 줄 요약, 쉬운 설명, 교훈, 출처 URL」로 등록할 수 있습니다.`;
     return `${표식.못찾음} 침해사고 히스토리 ${total}건 중 ${조건 || "이 조건"}에 걸리는 사례가 없습니다.\n(사고가 없었다는 뜻이 아니라, 이 말로는 못 찾았다는 뜻입니다 — 「침해사고 히스토리 보여줘」로 전체를 보거나 제품·업종 이름으로 다시 물어보세요.)`;
   }
-  const lines = [`${표식.사례} 침해사고 히스토리 — ${rows.length}건${조건 ? ` (${조건})` : ""}${rows.length < total ? ` · 전체 ${total}건` : ""}`];
-  rows.forEach((r, i) => {
+  const 실을것 = rows.slice(0, 대화창최대);
+  const lines = [
+    `${표식.사례} 침해사고 히스토리 — ${rows.length}건${조건 ? ` (${조건})` : ""}${rows.length < total ? ` · 전체 ${total}건` : ""}`,
+    `${표식.알아두기} 출처 링크에서 원문을 확인하세요(외부 사이트). 새 사례는 대화창에서 「사례 등록: …」, 목록은 ${표식.사례} 침해사고 히스토리 판에서 봅니다.`,
+    "",
+  ];
+  실을것.forEach((r, i) => {
     lines.push(`${i + 1}. ${한줄(r)}`);
-    if (rows.length <= 2) lines.push(`   ${r.plainExplain}`);
-    lines.push(`   교훈: ${r.lesson}`);
+    if (실을것.length <= 2) lines.push(`   ${컷(r.plainExplain, 400)}`);
+    lines.push(`   교훈: ${컷(r.lesson, 200)}`);
     const 꼬리 = [r.cves.length ? `CVE ${r.cves.join(", ")}` : "", r.products.length ? `제품 ${r.products.join(", ")}` : "", r.techniques.length ? `기법 ${r.techniques.join(", ")}` : ""].filter(Boolean).join(" · ");
-    if (꼬리) lines.push(`   ${꼬리}`);
-    lines.push(`   출처: ${r.sourceName ? `${r.sourceName} ` : ""}${r.sourceUrl}`);
+    if (꼬리) lines.push(`   ${컷(꼬리, 160)}`);
+    lines.push(`   출처: ${r.sourceName ? `${컷(r.sourceName, 60)} ` : ""}${컷(r.sourceUrl, 160)}`);
   });
-  lines.push("", `${표식.알아두기} 출처 링크에서 원문을 확인하세요(외부 사이트). 새 사례는 대화창에서 「사례 등록: …」, 목록은 📚 침해사고 히스토리 판에서 봅니다.`);
+  if (rows.length > 대화창최대) lines.push("", `… 외 ${rows.length - 대화창최대}건 — 제품·업종·CVE를 함께 물으면 좁혀 보여 드립니다(전체는 ${표식.사례} 침해사고 히스토리 판).`);
   return lines.join("\n").slice(0, 3500);
 }
 
@@ -447,7 +526,10 @@ const 사용자 = (req: Request) => (req as Request & { user?: GijoUser }).user;
 export function registerIncidentCaseRoutes(app: Express): void {
   app.get("/api/incident-cases", authMiddleware, (req, res) => {
     const q = req.query as Record<string, string | undefined>;
-    res.json({ cases: listIncidentCases({ q: q.q, cve: q.cve, year: q.year ? Number(q.year) : undefined, limit: q.limit ? Number(q.limit) : undefined }) });
+    // ?cve= 하나로 좁혀 여는 길(대화창·취약점 카드의 「📚 비슷한 사례」 칩 딥링크)은 기본 50건 — 엔진 기본과 같은 수를 여기 적어 둔다.
+    const opts = { q: q.q, cve: q.cve, year: q.year ? Number(q.year) : undefined, limit: q.limit ? Number(q.limit) : q.cve ? 50 : undefined };
+    // total은 **상한에 잘리기 전** 총 건수다 — 화면이 「500+」인지 「정확히 N건」인지 스스로 알 수 있어야 거짓 숫자가 안 생긴다.
+    res.json({ cases: listIncidentCases(opts), total: countIncidentCases(opts) });
   });
   // ⚠ /sources·/similar는 /:id보다 **먼저** — 뒤에 두면 :id가 "sources"를 삼켜 404가 된다(incidentcases.test가 순서를 지킨다).
   app.get("/api/incident-cases/sources", authMiddleware, (req, res) => {
@@ -455,8 +537,21 @@ export function registerIncidentCaseRoutes(app: Express): void {
     res.json({ sources: listIncidentSources(kind) });
   });
   app.get("/api/incident-cases/similar", authMiddleware, (req, res) => {
-    const cves = splitCodes((req.query as Record<string, string | undefined>).cves ?? "");
-    res.json({ cases: findCasesForCves(cves) });
+    const q = req.query as Record<string, string | undefined>;
+    const cves = splitCodes(q.cves ?? "");
+    // 칩이 「N건」을 말하고 판이 그 목록을 그린다 — 둘이 같은 창구·같은 잣대라야 수가 안 어긋난다(기본 5·최대 50).
+    const limit = Math.max(1, Math.min(50, Number(q.limit) || 5));
+    const all = matchCasesForCves(cves);
+    res.json({ cases: all.slice(0, limit), total: all.length });
+  });
+  // 숨긴 내장 사례 되살리기 — 삭제 도구가 「다시 보이려면 관리자」라고 약속한 그 문(안내한 말 점검: 약속만 있고 문이 없으면 거짓말이다).
+  //   ⚠ /:id보다 먼저 둔다 — 아래 :id는 GET·DELETE지만, 여기 순서 규율을 눈으로도 지키게 같은 자리에 모은다.
+  app.post("/api/incident-cases/builtin/restore", authMiddleware, adminMiddleware, (req, res) => {
+    const u = 사용자(req);
+    const 풀림 = unhideBuiltinCases();
+    const r = seedBuiltinCases();
+    recordAudit({ kind: "write", actor: u?.displayName ?? u?.username ?? null, action: "내장 침해사고 사례 되살리기", target: "incidentcases:hiddenBuiltin", detail: `숨김 해제 ${풀림}건 · 다시 넣음 ${r.inserted}건`, result: "ok" });
+    res.json({ unhidden: 풀림, inserted: r.inserted, unchanged: r.unchanged });
   });
   app.get("/api/incident-cases/:id", authMiddleware, (req, res) => {
     const r = getIncidentCase(String(req.params.id));
