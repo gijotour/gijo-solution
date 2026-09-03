@@ -213,9 +213,44 @@ describe("회차 이름표 — 앞 회차를 덮지 않는다", () => {
 
   it("곁다리 파일(로그·승인 결과)에 끌려가지 않는다", () => {
     expect(회차번호("취약점-01.approve.json", "취약점"), "확장자가 두 겹인 곁다리는 회차가 아니다").toBeNull();
-    expect(회차번호("취약점-01.log", "취약점")).toBe(1);
     expect(회차번호("distill-취약점-2026-09-03-02-47.json", "취약점"), "시각 기반 원본 이름은 회차가 아니다").toBeNull();
+    expect(회차번호("취약점-01.json", "취약점"), "보고서 하나만 회차다").toBe(1);
     expect(회차이름표("취약점", ["취약점-01.json", "취약점-01.approve.json", "취약점-01.log"])).toBe("취약점-02");
+  });
+
+  // [2026-09-03 1일차 실기동] `사내규정-01.log`가 회차 1로 세어져 **보고서 없이 죽은 회차를**
+  //   --skip-done이 영영 건너뛰었다(그날은 로그를 손으로 `.crash.log`로 바꿔 피했다 — 자동화가
+  //   사람 손을 부른 것이 결함의 증거다). 로그는 증류가 **시작될 때**, 보고서는 **끝나야** 생긴다.
+  it("★ 로그만 있으면 끝난 회차 0 — .log를 세면 실패가 성공으로 둔갑한다", () => {
+    expect(회차번호("사내규정-01.log", "사내규정"), "로그는 시작의 증거일 뿐 끝의 증거가 아니다").toBeNull();
+    expect(회차이름표("사내규정", ["사내규정-01.log"]), "끝난 회차가 0이니 같은 번호를 다시 시도한다").toBe("사내규정-01");
+  });
+
+  it("★ .json 보고서가 있어야 그 회차가 1로 센다", () => {
+    expect(회차이름표("사내규정", ["사내규정-01.log", "사내규정-01.json"])).toBe("사내규정-02");
+    // 실패 표식(day1-distill.sh가 옮긴 이름)도 셈에 안 걸린다 — 점이 둘인 이름은 보고서 꼴이 아니다.
+    expect(회차번호("사내규정-01.failed.log", "사내규정")).toBeNull();
+    expect(회차이름표("사내규정", ["사내규정-01.failed.log"])).toBe("사내규정-01");
+  });
+});
+
+describe("실패한 회차는 로그 이름으로 표식을 남긴다(day1-distill.sh 소스 감시)", () => {
+  // ★ 짝이 되는 반쪽이다: 셈(ladderlib)이 .json만 세게 고쳐도, 셸이 실패 로그를 그대로 두면
+  //   사람이 폴더를 열었을 때 어느 회차가 죽었는지 못 읽는다. 약속과 코드가 함께 있는지 본다.
+  const 셸 = readFileSync(join(__dirname, "..", "..", "tools", "ladder", "day1-distill.sh"), "utf8");
+
+  it("실패·중단 자리는 로그를 `<주제>-<번호>.failed.log`로 옮긴다", () => {
+    expect(셸).toContain('dead="${LOG%.log}.failed.log"');
+    expect(셸).toContain("ladder_round_failed()");
+    // 증류 실패·보고서 없음·하한 미달·승인 실패 — 네 자리 모두 이 함수를 지난다(하나라도 빠지면 표식이 안 남는다)
+    expect((셸.match(/ladder_round_failed "/g) ?? []).length, "네 실패 자리 + 트랩 둘").toBeGreaterThanOrEqual(6);
+  });
+
+  it("사람이 끊어도(Ctrl+C·SIGTERM) 표식을 남기고 나간다", () => {
+    expect(셸).toMatch(/trap 'ladder_round_failed[\s\S]*exit 130' INT/);
+    expect(셸).toMatch(/trap 'ladder_round_failed[\s\S]*exit 143' TERM/);
+    // 성공한 회차는 표식을 비운다 — 안 비우면 다음 회차 준비 중의 Ctrl+C가 앞 회차를 실패로 적는다
+    expect(셸).toMatch(/이 회차는 끝까지 갔다[\s\S]*LOG=""/);
   });
 });
 

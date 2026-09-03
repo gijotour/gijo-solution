@@ -98,4 +98,22 @@ describe("증류 근거 코퍼스 — 무엇이 나가고 무엇이 절대 안 �
     expect(tool).toMatch(/편입 401[\s\S]*auth = await login\(\)/);
     expect(tool).toContain("report.failedItems ??= []");
   });
+
+  // [2026-09-03 1일차 실기동] 코퍼스 갈래의 로그인·창구 호출은 **try 밖 최상위 await**이라,
+  //   win 서버가 한 번 재시작되는 몇십 초에 걸리자 회차째 즉사했다. 그것도 조용히 —
+  //   undici 기본 HeadersTimeout이 300초라 5분을 매달렸고 로그엔 `[distill]` 첫 줄조차 없었다.
+  it("★ 최상위 코퍼스 호출은 명시 타임아웃 + 1회 재시도로 지킨다 — 서버 재시작 한 번에 회차가 죽지 않게(소스 감시)", () => {
+    const fs = require("fs") as typeof import("fs");
+    const path = require("path") as typeof import("path");
+    const tool = fs.readFileSync(path.join(__dirname, "..", "..", "tools", "distill.mjs"), "utf8");
+    // ① 명시 타임아웃 — 「느린 것」과 「없는 것」을 60초로 가른다(로그인은 1초짜리 일이다)
+    expect(tool).toContain("const 창구타임아웃 = 60_000;");
+    expect((tool.match(/AbortSignal\.timeout\(창구타임아웃\)/g) ?? []).length, "로그인·코퍼스 창구 둘 다").toBe(2);
+    // ② 두 호출이 실제로 껍데기를 지난다(하나만 감싸면 나머지 하나로 그대로 죽는다)
+    expect(tool).toContain('await 한번더("코퍼스 서버 로그인", () => login(CORPUS_SERVER))');
+    expect(tool).toMatch(/await 한번더\("코퍼스 창구\(\/api\/learnloop\/distill\/corpus\)"/);
+    // ③ 20초 뒤 한 번만 더 → 그래도 안 되면 사람이 읽을 사유를 남기고 exit 2
+    expect(tool).toMatch(/async function 한번더\([\s\S]*setTimeout\(r, 20_000\)[\s\S]*process\.exit\(2\)/);
+    expect(tool).toMatch(/두 번 다 실패했다/);
+  });
 });

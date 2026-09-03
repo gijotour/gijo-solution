@@ -183,10 +183,15 @@ async function askTeacher(ref, text) {
 }
 
 // ── 서버 편입 ──────────────────────────────────────────────────────
+// ⚠ signal(60초)을 왜 못 박나: undici 기본 HeadersTimeout이 **300초**다. 서버가 재시작 중이면
+//   로그인 요청이 5분을 매달렸다가 죽는데, 그동안 화면에는 아무 줄도 안 나와 사람은 「도는 중」으로
+//   읽는다(2026-09-03 사내규정-01 실기동: 로그에 `[distill]` 첫 줄조차 없이 UND_ERR_HEADERS_TIMEOUT).
+//   로그인은 1초짜리 일이다 — 60초를 넘겼으면 그건 「느린 것」이 아니라 「없는 것」이다.
+const 창구타임아웃 = 60_000;
 async function login(base = SERVER) {
   const user = process.env.GIJO_ADMIN_USER, password = process.env.GIJO_ADMIN_PASSWORD;
   if (!user || !password) throw new Error("GIJO_ADMIN_USER / GIJO_ADMIN_PASSWORD 환경변수가 필요합니다(편입은 admin)");
-  const j = await (await fetch(base + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password, force: has("--force-login") }), redirect: "error" })).json();
+  const j = await (await fetch(base + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password, force: has("--force-login") }), redirect: "error", signal: AbortSignal.timeout(창구타임아웃) })).json();
   if (!j.accessToken) throw new Error("로그인 실패: " + JSON.stringify(j).slice(0, 120) + (/(세션|로그인)/.test(JSON.stringify(j)) ? " — 이미 로그인된 세션이 있으면 --force-login(그 세션이 끊긴다)" : ""));
   return { "Content-Type": "application/json", Authorization: "Bearer " + j.accessToken };
 }
@@ -195,6 +200,32 @@ async function intake(auth, teacher, items) {
   const j = await r.json();
   if (!r.ok) throw new Error(`편입 ${r.status}: ${JSON.stringify(j).slice(0, 160)}`);
   return j;
+}
+
+// ── 최상위(try 밖) 호출을 지키는 껍데기 ─────────────────────────────
+// ⚠ 왜 있나(2026-09-03 1일차 실기동에서 회차 하나를 통째로 잃었다): 아래 저장소(store) 갈래의
+//   로그인·코퍼스 호출은 **최상위 await**이라 try 밖이다. 그래서 win 서버가 **한 번 재시작되는**
+//   그 몇십 초에 걸리면 처리되지 않은 예외로 프로세스가 즉사했고, 그것도 조용히 죽었다
+//   (undici HeadersTimeout 300초를 다 기다린 뒤라 로그에 `[distill]` 첫 줄조차 없었다).
+//   ①위 창구타임아웃으로 60초에 끊고 ②20초 뒤 **한 번만** 다시 부르고 ③그래도 안 되면
+//   사람이 읽을 사유를 남기고 나간다(코드 2 = 쓰는 법·전제 틀림. 아무것도 안 태웠다는 뜻이다).
+// 왜 한 번뿐인가: 서버 재시작은 20~30초면 끝난다. 무한정 매달리면 「죽었는데 도는 것처럼 보이는」
+//   시간만 길어져, 밤새 도는 사슬에서는 빨리 죽는 편이 싸다.
+async function 한번더(무엇, 부르기) {
+  try {
+    return await 부르기();
+  } catch (e) {
+    console.warn(`[distill] ${무엇} 실패: ${e.message} — 20초 뒤 한 번만 더 부른다(서버 재시작이면 그 사이에 돌아온다)`);
+    await new Promise((r) => setTimeout(r, 20_000));
+    try {
+      return await 부르기();
+    } catch (e2) {
+      console.error(`✗ [distill] ${무엇} — 두 번 다 실패했다: ${e2.message}`);
+      console.error(`  볼 곳: ${CORPUS_SERVER} 가 살아 있나(/api/health) · 같은 계정 세션이 물고 있나(409면 --force-login) · VPN·방화벽.`);
+      console.error("  이 회차는 교사를 한 번도 안 불렀다 — 서버를 살린 뒤 같은 명령을 그대로 다시 돌리면 된다.");
+      process.exit(2);
+    }
+  }
 }
 
 // ── 본체 ───────────────────────────────────────────────────────────
@@ -210,11 +241,15 @@ let 코퍼스문서 = 0;
 let 코퍼스auth = null; // 같은 서버면 편입에도 이 세션을 쓴다 — 같은 계정 두 번 로그인은 중복로그인 방지(409)에 걸린다(검토관 2026-09-03)
 if (SOURCE === "store") {
   // 지식 저장소 조각 — admin 로그인 필요(코퍼스 창구는 admin). 같은 창구로 편입도 하므로 계정 하나면 된다.
-  코퍼스auth = await login(CORPUS_SERVER);
+  // ⚠ 이 둘은 try 밖 최상위 await이라 예전에는 서버 재시작 한 번에 회차째 즉사했다 — 한번더()가 지킨다.
+  코퍼스auth = await 한번더("코퍼스 서버 로그인", () => login(CORPUS_SERVER));
   const auth = 코퍼스auth;
-  const r = await fetch(CORPUS_SERVER + "/api/learnloop/distill/corpus", { method: "POST", headers: auth, body: JSON.stringify({ category: TOPIC, maxChunks: 20000 }), redirect: "error" });
-  const j = await r.json();
-  if (!r.ok) throw new Error("코퍼스 창구 실패: " + JSON.stringify(j).slice(0, 200));
+  const j = await 한번더("코퍼스 창구(/api/learnloop/distill/corpus)", async () => {
+    const r = await fetch(CORPUS_SERVER + "/api/learnloop/distill/corpus", { method: "POST", headers: auth, body: JSON.stringify({ category: TOPIC, maxChunks: 20000 }), redirect: "error", signal: AbortSignal.timeout(창구타임아웃) });
+    const 몸 = await r.json();
+    if (!r.ok) throw new Error("코퍼스 창구 실패: " + JSON.stringify(몸).slice(0, 200));
+    return 몸;
+  });
   코퍼스문서 = j.docs;
   // 저장소는 업무영역으로 이미 걸렀지만 주제 정규식도 한 번 더 — 분류가 틀린 문서의 엉뚱한 조각을 막는다(파일 경로와 같은 잣대).
   for (const c of j.chunks) if (TOPIC_RE[TOPIC].test(c.text)) pool.push({ ref: c.ref, text: c.text });
