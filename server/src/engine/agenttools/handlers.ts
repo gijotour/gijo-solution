@@ -3182,6 +3182,7 @@ export async function runAdapterAssign(args: Record<string, string>): Promise<st
     스캔: "scan", 분석: "analysis", 리포트: "report", 보고서: "report",
     티아이: "ti", 기조: "normaltic", 해설: "normaltic", 총괄: "orchestrator", 오케스트레이터: "orchestrator",
     사서: "curator", 큐레이터: "curator",
+    부품: "bom", 부품표: "bom", // ⚠ 영문 bom은 sbom의 꼬리와 겹쳐 별칭에 안 넣는다(설계관 2026-09-03) — id 정확 일치는 위 a.id 비교가 받는다
   };
   const 별칭id = 별칭[팀원말] ?? 별칭[팀원말.replace(/\s*(팀원|에이전트)$/, "")];
   const found = agents.find(

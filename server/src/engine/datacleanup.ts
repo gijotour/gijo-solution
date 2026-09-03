@@ -50,6 +50,8 @@ export const TARGETS: Record<string, { label: string; tables: string[] }> = {
   sbom_reviews: { label: "타사 SBOM 검수 대장", tables: ["sbom_review_components", "sbom_reviews"] },
   // 스캔 팀원 해석 초안(2026-09-03) — 고객 보고서에서 나온 파생물이라 업무 데이터다(시연 보고서의 초안이 실운영에 남으면 안 된다).
   scan_drafts: { label: "스캔 해석 초안(스캔 팀원 산출)", tables: ["scan_drafts"] },
+  // 부품표 해석 초안(2026-09-03) — 타사 SBOM 검수(업무 데이터)의 파생물
+  bom_drafts: { label: "부품표 해석 초안(부품 팀원 산출)", tables: ["bom_drafts"] },
 };
 
 // 실사용 전환 리셋이 지우는 전체 목록 — TARGETS의 부분집합(감사·지식·설정은 애초에 목록에 없다).
@@ -62,6 +64,8 @@ export const RESET_TARGETS = [
   "sbom_reviews",
   // 스캔 해석 초안 — 보고서에서 파생된 업무 데이터(2026-09-03)
   "scan_drafts",
+  // 부품표 해석 초안 — 검수에서 파생된 업무 데이터(2026-09-03)
+  "bom_drafts",
 ] as const;
 
 // ── 라이브 모드(실사용 전환) 스위치 ─────────────────────────────────────────

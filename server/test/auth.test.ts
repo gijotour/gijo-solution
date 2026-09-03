@@ -78,7 +78,7 @@ describe("auth", () => {
     const res = await request(app).get("/api/agents").set("Authorization", `Bearer ${login.body.accessToken}`);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBe(7); // Security Orchestrator·Scan·Analyze·Report·TI + GIJO Agent(id=normaltic, 그라운딩) + Curator Agent(사서, 2026-09-03)
+    expect(res.body.length).toBe(8); // Security Orchestrator·Scan·Analyze·Report·TI + GIJO Agent(id=normaltic, 그라운딩) + Curator Agent(사서) + BOM Agent(부품, 2026-09-03)
   });
 
   it("exchanges a refresh token for a new token pair and rotates the old refresh token out", async () => {

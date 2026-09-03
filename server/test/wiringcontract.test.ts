@@ -350,12 +350,12 @@ describe("AI 팀 가시화 — 실신호 배선(2026-08-20 사장님 「추천�
     expect(gw, "가드 신호 래퍼가 없다(호출처 5곳 공용 지점)").toContain("gateUserInputInner");
     expect(gw).toContain('kind: "guard"');
   });
-  it("프로 레일 로스터 — 부품 로드·구성(팀 7+부품 4)·클릭은 화면 열기만", () => {
+  it("프로 레일 로스터 — 부품 로드·구성(팀 8+부품 4)·클릭은 화면 열기만", () => {
     const s = 코드만(join(PAGES, "app.html"));
     expect(s, "railroster.js 로드가 없다").toContain('src="railroster.js"');
     const rr = 코드만(join(PAGES, "railroster.js"));
-    for (const id of ["orchestrator", "scan", "analysis", "report", "ti", "normaltic", "curator", "embed", "search", "guard", "lora"]) {
-      expect(rr, `로스터에 ${id}가 없다(팀 7+부품 4 기본 포함 — 사장님 지정·사서 2026-09-03)`).toContain(`"${id}"`);
+    for (const id of ["orchestrator", "scan", "analysis", "report", "ti", "normaltic", "curator", "bom", "embed", "search", "guard", "lora"]) {
+      expect(rr, `로스터에 ${id}가 없다(팀 8+부품 4 기본 포함 — 사장님 지정·사서·부품 2026-09-03)`).toContain(`"${id}"`);
     }
     expect(rr, "실신호 구독이 없다").toContain("onLlmActivity");
     expect(rr, "신호 유실 대비 소등 타임아웃이 없다").toContain("소등타이머");

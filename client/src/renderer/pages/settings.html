@@ -531,7 +531,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- AI팀 구성(2026-08-09 재편, 전-7) — 「기반 두뇌는 고객이 고르고, 전문성은 GIJO가 고정한다」.
          외부 조사: Security Copilot도 기반 모델 한 층 + 전문성(플러그인) 층 · 온프렘 표준은
-         베이스 1개 + 어댑터(S-LoRA 계열). 팀원별 모델 드롭다운 7개는 「고급」으로 접었다 —
+         베이스 1개 + 어댑터(S-LoRA 계열). 팀원별 모델 드롭다운 8개는 「고급」으로 접었다 —
          단일 GPU에서 팀원마다 다른 대형 모델은 스왑·캐시·라우팅 결정성 실측 모두에 어긋난다. -->
     <div data-sec="ai" class="panel" id="agentModelPanel" style="display:none" data-gijo-fold="AI팀 구성">
       <div class="panel-title">AI팀 구성<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
@@ -2242,12 +2242,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
             ? badge(`📚 전용 지식 ${m.dedicatedDocs}건`, "b-blue")
             : badge(`📚 공용 지식 ${team.shared.globalDocs}건`, "b-muted");
           const 예외 = m.overrideModelId ? badge(`⚠ 예외 모델 ${esc(m.overrideModelId)}`, "b-amber") : "";
+          // 맡은 메뉴 칩 — 팀 구성 API(menuTitles)가 단일 출처(2026-09-03 사장님 「팀원별 메뉴」). 줄 높이 18px·칩 11px(엑셀처럼 촘촘).
+          const 메뉴 = (m.menuTitles && m.menuTitles.length)
+            ? m.menuTitles.map((t) => `<span class="badge b-muted" style="margin:2px 4px 0 0;display:inline-block;font-size:11px">📌 ${esc(t)}</span>`).join("")
+            : `<span class="badge b-muted" style="margin:2px 4px 0 0;display:inline-block;font-size:11px">📌 전용 화면 없음</span>`;
           return `<div style="border:1px solid var(--border);border-radius:8px;padding:9px 11px;background:var(--panel-2)">` +
             `<div style="display:flex;align-items:center;gap:6px;font-size:13px"><span>${dot(m.status)}</span>` +
             `<b class="tm-name" data-agent="${esc(m.id)}" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.name)}</b>` +
             `<span class="tm-rename" data-agent="${esc(m.id)}" title="이름 바꾸기 — 고객이 바꿀 수 있는 건 이름뿐입니다" style="cursor:pointer;color:var(--muted-2);font-size:11px">✏</span></div>` +
             `<div style="font-size:11.5px;color:var(--muted);margin:3px 0 5px">${esc(m.role)}</div>` +
-            `<div>${어댑터}${지식}${예외}</div></div>`;
+            `<div>${어댑터}${지식}${예외}</div><div>${메뉴}</div></div>`;
         }).join("") +
           // ☁ 외부 상담역 — GPU를 안 먹는 유일한 「다른 LLM」. 기본 꺼짐·명시적 요청에만.
           `<div style="border:1px dashed var(--border-strong);border-radius:8px;padding:9px 11px;background:var(--panel-2)">` +

@@ -2,6 +2,7 @@
 // (2026-08-06 agenttools.ts 분리) 핸들러 본문은 handlers.ts — 여기는 이름↔스키마 매핑과 관문만.
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
 import { listScanDrafts, formatScanDrafts, registerScanDraft, getScanDraft } from "../scandrafts";
+import { listBomDrafts, formatBomDrafts, explainLicense } from "../bomdrafts";
 import { watchFolderText, addWatchFolder, removeWatchFolder, watchFolderDocCount } from "../watchfolder";
 // ⚠ 레드팀 공격 개수는 **세어서** 쓴다(2026-08-18). 손으로 「14종」이라 적어 뒀는데 실제는 30종이었다 —
 //   그 문구 하나가 **살아 있는 모델에 공격을 발사하기 전 받는 동의 문구**였다.
@@ -1338,6 +1339,33 @@ const TOOLS: AgentTool[] = [
       const { 검수요약문 } = await import("../sbomreview.js");
       return 검수요약문();
     },
+  },
+  {
+    // 부품표 팀원(2026-09-03) — 타사 SBOM 검수 직후 남긴 해석 초안. 판정 숫자는 sbom_review_status가 정본이다.
+    name: "bom_drafts",
+    label: "부품표 해석 초안",
+    domain: "sbom",
+    write: false,
+    description:
+      '부품 팀원이 타사 SBOM 검수 직후 남긴 해석 초안(요약·먼저 볼 부품·확인할 점)을 보여준다 — ' +
+      '"부품표 해석 초안 보여줘", "방금 올린 SBOM 어떻게 봐야 해", "부품 팀원이 뭐라고 했어"처럼 말할 때. **검수 결과 숫자 자체는 sbom_review_status.**',
+    directAnswer: true,
+    params: [{ name: "limit", label: "개수", description: "최근 몇 건 (기본 3)", required: false }],
+    run: (args) => formatBomDrafts(listBomDrafts(Math.min(Math.max(Number(args.limit) || 3, 1), 10))),
+  },
+  {
+    // 부품표 팀원의 두 번째 문 — 라이선스 이름 하나의 의무를 규칙 판정문 + 팀원 설명으로.
+    name: "license_explain",
+    label: "라이선스 의무 설명",
+    domain: "sbom",
+    write: false,
+    description:
+      '특정 라이선스 이름(AGPL·GPL·LGPL·MIT·Apache 등)이 우리 제품에 어떤 의무를 지우는지 설명한다 — ' +
+      '"AGPL 부품을 넣으면 무슨 의무가 생겨?", "GPL-3.0은 뭘 지켜야 해?", "MIT 라이선스 조건 알려줘"처럼 **라이선스 이름을 말할 때**. ' +
+      '검수 결과 조회는 sbom_review_status, 초안은 bom_drafts.',
+    directAnswer: true, // 규칙 판정문이 정본이라 재작성하지 않는다(법무가 보는 줄)
+    params: [{ name: "license", label: "라이선스", description: "라이선스 이름 또는 SPDX 식별자(예: AGPL-3.0)", required: true }],
+    run: async (args) => explainLicense(String(args.license ?? "")),
   },
   {
     name: "finding_status",

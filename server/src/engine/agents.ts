@@ -26,6 +26,9 @@ export interface AgentDefinition {
   assignedAdapterId: string | null;
   /** 팀원별 두뇌 위치 — null이면 전역 따름(기본). "local" | "remote" */
   assignedLocation: AgentLocation | null;
+  /** 맡은 메뉴(화면 파일명)와 그 제목 — 팀 카드 칩. 등록부 menus가 단일 출처. */
+  menus: string[];
+  menuTitles: string[];
 }
 
 // status는 의도적으로 영속화하지 않는다 — "지금 누가 뭘 하고 있는지"를 나타내는 휘발성 라이브
@@ -40,12 +43,15 @@ interface AgentBase {
   abbr: string;
   desc: string;
   defaultStatus: AgentStatus;
+  /** 맡은 메뉴 — screenguide가 아는 화면 파일명(basename). 단일 출처는 여기 하나(표시 제목은 screenguide에서 꺼낸다, 2026-09-03 사장님 「팀원별 메뉴」). */
+  menus: string[];
 }
 
 // 에이전트 로스터 — "역할극 페르소나"를 줄이고 사내 데이터(RAG·온톨로지) 근거로 판단·검증하는
 // 소수 정예로 재구성(2026-07-17). 워크플로우(dispatch: 스캔→분석→[GIJO 부연]→리포트) + 조율 + 엄격 그라운딩(GIJO Agent, id=normaltic).
 // 제거된 페르소나(침투테스트·SBOM·CTI·모델진화)는 dispatch에 안 쓰이고 전용 화면·엔진(SBOM/CTI/합성)이
 // 이미 담당하므로 일반 LLM 답변만 내던 중복이었다. LLM은 gijo + 보안LLM 2개만 사용.
+// ⚠ 2026-09-03 부품표(bom) 팀원을 8번째로 되살렸다 — 그때와 다른 점: 일반 LLM 답변이 아니라 **규칙 판정(sbomreview·licenserisk) 뒤의 해석·설명**만 한다(bomdrafts.ts).
 // 이름은 기능명 영문으로 통일(2026-07-17 확정). id는 라우팅·모델키·온톨로지 스코프에 쓰이므로 유지.
 const AGENT_DEFS: AgentBase[] = [
   {
@@ -53,6 +59,7 @@ const AGENT_DEFS: AgentBase[] = [
     name: "Security Orchestrator",
     role: "작업 분배 · 결과 취합",
     abbr: "분배",
+    menus: ["dashboard.html","approvals.html","compliance.html"],
     desc: "지시를 해석해 Scan → Analyze → Report 순으로 작업을 나눠 맡기고, 각 단계 결과를 취합해 최종 응답으로 정리합니다.",
     defaultStatus: "watching",
   },
@@ -61,6 +68,7 @@ const AGENT_DEFS: AgentBase[] = [
     name: "Scan Agent",
     role: "초기 데이터 해석 · 자산 반영",
     abbr: "해석",
+    menus: ["vulnscan.html","hardening.html","assets.html","mydocs.html"],
     desc: "업로드·스캔(ModelScan) 결과로 나온 모델 취약점을 위협 관점에서 해석·요약하고 자산 finding으로 반영합니다. 결과는 Analyze Agent와 GIJO Agent로 이어집니다.",
     defaultStatus: "idle",
   },
@@ -69,6 +77,7 @@ const AGENT_DEFS: AgentBase[] = [
     name: "Analyze Agent",
     role: "우선순위 판단 · AI 모델 관리",
     abbr: "우선",
+    menus: ["triage.html","vulnscan.html","analysis.html","handover.html"],
     desc: "스캔 finding의 우선순위를 판단하고(KEV·EPSS·CVSS 대조), 학습 루프·어댑터 등 AI 모델 관리를 맡습니다. 문서 분류·요약·보강은 Curator(사서)에게 넘어갔습니다(2026-09-03).",
     defaultStatus: "idle",
   },
@@ -77,6 +86,7 @@ const AGENT_DEFS: AgentBase[] = [
     name: "Report Agent",
     role: "내부 보고서 작성 · 결과 레포팅",
     abbr: "보고",
+    menus: ["report.html","reporting.html"],
     desc: "작업 결과를 내부 보고용 문서로 정리합니다. 파이프라인 마지막 단계에서 스캔·분석·부연 결과를 받아 보고서를 만듭니다.",
     defaultStatus: "idle",
   },
@@ -86,6 +96,7 @@ const AGENT_DEFS: AgentBase[] = [
     name: "TI Agent",
     role: "위협 인텔리전스 · CTI 피드-자산 매칭 해석", // 2026-08-20 정직화 — 상시 감시 루프가 없는데 「모니터링」은 과장(외부 대조 검증)
     abbr: "위협",
+    menus: ["threat.html","discover.html"],
     desc: "딥웹·다크웹 CTI 피드에서 받은 유출정보·위협을 요청 시 해석합니다. 위협 인텔 텍스트를 자산 인벤토리(자산명·컴포넌트·CVE·AI-BOM)와 대조해 영향 자산을 자동 매칭해 알립니다.",
     defaultStatus: "idle", // watching(감시 중)은 상시 루프가 있을 때의 말 — 요청응답형이라 idle이 사실
   },
@@ -95,6 +106,7 @@ const AGENT_DEFS: AgentBase[] = [
     name: "GIJO Agent",
     role: "용어 해설 · 사례 부연(사내 지식)",
     abbr: "해설",
+    menus: [], // 전용 화면 없음 — 복합 지시 파이프라인의 해설 단계로만 개입(정찰 2026-09-03)
     desc: "Scan·Analyze 결과에 나온 용어를 사내 지식베이스 근거로 해설하고 실제 사례를 부연합니다. 복합 지시에서 스캔·분석이 끝나면 자동 투입됩니다.",
     defaultStatus: "watching",
   },
@@ -106,10 +118,33 @@ const AGENT_DEFS: AgentBase[] = [
     name: "Curator Agent",
     role: "문서 반입 분류 · 요약 · 지식 보강",
     abbr: "사서",
+    menus: ["mydocs.html","memory.html","products.html"],
     desc: "올라온 문서를 업무영역·종류로 분류하고 세 줄 요약·온톨로지 보강·매뉴얼 정형 초안을 만듭니다. 검색 때 질문을 검색용 구절로 고쳐 씁니다. Scan·Analyze가 근거로 쓰는 지식 저장소의 입구를 지킵니다.",
     defaultStatus: "idle",
   },
+  // 부품표(2026-09-03, 8번째 팀원 — 사장님 「부품표 전용 팀원 만들자」) — 타사 SBOM 검수(규칙)·라이선스 판정(규칙) 뒤에서 부른다:
+  // 검수 직후 해석 초안(무엇부터 볼지·왜 위험한지)과 대화창의 라이선스 의무 설명. 판정 자체는 절대 모델이 하지 않는다(bomdrafts.ts).
+  {
+    id: "bom",
+    name: "BOM Agent",
+    role: "부품표(SBOM·AI-BOM) 검수 해석 · 라이선스 의무 설명",
+    abbr: "부품",
+    menus: ["supplychain.html", "sbom.html"],
+    desc: "타사 부품표(SBOM) 검수가 규칙으로 끝난 뒤 그 결과를 담당자 말로 해석하고(먼저 볼 부품·왜 위험한지), 라이선스 의무를 설명합니다. 등급 판정·요구는 규칙 엔진(licenserisk)이 정본이고 팀원은 그 뒤에서 풀어 씁니다.",
+    defaultStatus: "idle",
+  },
 ];
+
+/** 맡은 메뉴의 제목 — screenguide 한 곳에서 꺼낸다(등록부에 제목을 두 번 적지 않는다). 순환 참조를 피해 늦게 묶는다. */
+function menuTitlesOf(menus: string[]): string[] {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sg = require("./screenguide") as { screenTips: (s?: string) => { title: string } };
+    return menus.map((m) => sg.screenTips(m).title || m);
+  } catch {
+    return menus.slice();
+  }
+}
 
 // 팀 구성 변경은 감사 기록에 남긴다(2026-09-03 설계관 — 누가 어느 팀원의 두뇌·어댑터·위치·이름을 바꿨는지 보여야 한다).
 function 감사(agentId: string, action: string, detail: string, actor?: string | null): void {
@@ -272,6 +307,8 @@ function toAgent(base: AgentBase): AgentDefinition {
     role: base.role,
     abbr: base.abbr,
     desc: base.desc,
+    menus: base.menus,
+    menuTitles: menuTitlesOf(base.menus),
     defaultStatus: base.defaultStatus,
     status: liveStatus.get(base.id) ?? base.defaultStatus,
     assignedModelId: getAgentModel(base.id),

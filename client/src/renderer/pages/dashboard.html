@@ -296,7 +296,7 @@
          상세 화면이 같은 그림이어야 담당자가 딴 물건으로 읽지 않는다.
          데이터: window.gijo.analysisAttackPaths() (analysis.html이 쓰는 그 API — 새 서버 API 0개). -->
     <!-- AI 팀 카드 줄(부활 — 승인 시안 AI팀_가시화, 2026-08-20 사장님 「보안팀이 준비되어 있다」).
-         팀원 7(등록부 실구성) + 기반 부품 4(bge·RAG·가드레일·LoRA — 사장님 지정 기본 포함).
+         팀원 8(등록부 실구성) + 기반 부품 4(bge·RAG·가드레일·LoRA — 사장님 지정 기본 포함).
          칩·부품의 깜박임은 전부 서버 실신호(llm:event) — 가짜 연출 없음. 클릭=화면 열기만. -->
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px">
       <div style="font-size:13px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:8px">🧑‍🤝‍🧑 AI 팀 <span id="aiteamCnt" style="font-size:11.75px;color:var(--muted-2);font-weight:600"></span></div>
@@ -480,7 +480,7 @@
 
   // ── AI 팀 아이콘 줄 ──────────────────────────────────────────────────
   // "지금 누가 일하고 있나"만 보여준다. 이름·역할·배지를 다 늘어놓으면 브리핑이 아래로 밀린다.
-  var AGENT_ICON = { orchestrator: "🧭", scan: "⊘", analysis: "◎", report: "▣", ti: "🛰", normaltic: "📚", curator: "📇" }; // 등록부 id 전수 — agentroster.test가 대조한다
+  var AGENT_ICON = { orchestrator: "🧭", scan: "⊘", analysis: "◎", report: "▣", ti: "🛰", normaltic: "📚", curator: "📇", bom: "📦" }; // 등록부 id 전수 — agentroster.test가 대조한다
   var STATUS_KO = { working: "작업 중", watching: "감시 중", idle: "대기" };
   async function loadTeam() {
     var box = $("teamIcons");
@@ -526,7 +526,9 @@
       $("aiteamCnt").textContent = agents.length + "명 · " + (일하는중 ? "작업 중 " + 일하는중 : "모두 대기");
       row.innerHTML = agents.map(function (a) {
         var st = STATUS_KO[a.status] ? a.status : "idle";
-        return '<span class="aiteam-chip ' + st + '" data-agent="' + esc(a.id) + '" title="' + esc((a.name || a.id) + " — " + STATUS_KO[st]) + '">' +
+        // 툴팁에 「맡은 메뉴」 — 등록부(menuTitles)가 단일 출처, 화면은 적지 않는다(2026-09-03 사장님 「팀원별 메뉴」)
+        var 메뉴 = (a.menuTitles && a.menuTitles.length) ? " · 맡은 메뉴: " + a.menuTitles.join(", ") : " · 맡은 메뉴: (전용 화면 없음)";
+        return '<span class="aiteam-chip ' + st + '" data-agent="' + esc(a.id) + '" title="' + esc((a.name || a.id) + " — " + STATUS_KO[st] + 메뉴) + '">' +
           '<span class="ic">' + (AGENT_ICON[a.id] || "◆") + '</span>' +
           '<span>' + esc(a.name || a.defaultName || a.id) + '</span>' +
           '<span style="color:var(--muted-2);font-size:11.5px">' + esc(a.role || "") + '</span></span>';

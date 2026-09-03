@@ -21,10 +21,10 @@ vi.mock("../src/engine/localengine", async (importOriginal) => {
 import { getTeamComposition } from "../src/engine/teamview";
 
 describe("팀 구성 집계 (실데이터 계약)", () => {
-  it("기반 두뇌·팀원 7명·공용 자산이 한 번에 온다 — 화면마다 딴 그림이 되지 않게", () => {
+  it("기반 두뇌·팀원 8명·공용 자산이 한 번에 온다 — 화면마다 딴 그림이 되지 않게", () => {
     const t = getTeamComposition();
     expect(t.base.modelId).toBe("qwen3-14b");
-    expect(t.members.length).toBe(7);
+    expect(t.members.length).toBe(8);
     for (const m of t.members) {
       expect(m.role.length, `${m.id}의 역할이 비어 있다`).toBeGreaterThan(0);
       expect(typeof m.dedicatedDocs).toBe("number");

@@ -183,7 +183,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
   // ── 픽셀 사무실 렌더러 — 시안 B 목업(pixel-office)을 실데이터 구동형으로 옮김 ──
   // 상태 의미: working=타이핑+초록 모니터, watching=주황 모니터·정지, idle=자리 비움(배회).
   // 말풍선은 연출이 아니라 실제 협업 이벤트(collaboration:event)의 message를 띄운다.
-  const PALETTE = ["#5fa1ff", "#1eb980", "#8b7cf0", "#f0a020", "#e2483d", "#7dd3c0", "#ff5fa8"]; // 7번째=사서(2026-09-03 시안 team-7-curator)
+  const PALETTE = ["#5fa1ff", "#1eb980", "#8b7cf0", "#f0a020", "#e2483d", "#7dd3c0", "#ff5fa8", "#d9b64c"]; // 7번째=사서 · 8번째=부품(2026-09-03 시안 team-8-bom)
   const office = (function () {
     const canvas = document.getElementById("office");
     const ctx = canvas.getContext("2d");
@@ -238,7 +238,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       const stepX = Math.max(48, (W - 40) / cols);
       return { x: (20 + stepX * (col + 0.5)) / 8, y: 2 + row * 3.4 };
     }
-    const DESKS = [0, 1, 2, 3, 4, 5, 6].map(deskAt);
+    const DESKS = [0, 1, 2, 3, 4, 5, 6, 7].map(deskAt); // 8석 — 넓은 창 4줄×2열, 좁은 창 3열 3줄(3+3+2). ⚠ slice보다 이 배열이 먼저다(DESKS[7] 없으면 캔버스가 죽는다)
     // 방을 세로로 키운 만큼(ROWS 12→18) 앞쪽(하단) 요소는 아래로 내려 균형을 맞춘다 — 바닥이 넓어져 위·아래가 꽉 찬다.
     // ⚠ ROWS 18→20(2026-09-03, 7번째 책상)에서는 일부러 안 내렸다 — 시안이 「ROWS만 늘리고 나머지 공식은 그대로(최소 변경)」로 정했다.
     const COFFEE = { x: 156, y: 134 }; // 커피 코너(픽셀 좌표)
@@ -294,6 +294,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       { hair: "short", col: "#5a5a62", skin: "#e8c39e" },
       { hair: "long",  col: "#33322f", skin: "#d9ab7e" },
       { hair: "bun",   col: "#5a3a2a", skin: "#f0d6b4" }, // 7번째=사서
+      { hair: "curly", col: "#2b2f45", skin: "#e8c39e" }, // 8번째=부품
     ];
 
     // 아트 무드 3종 — 사용자 전환(☀🌃🌊), 선택은 localStorage 저장. 레이아웃·동작은 동일.
@@ -321,7 +322,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x * S), Math.round(y * S), w * S, h * S); }
 
     function setAgents(list) {
-      agents = list.slice(0, 7).map((a, i) => {
+      agents = list.slice(0, 8).map((a, i) => {
         const prev = agents[i];
         return {
           name: a.name, shortName: a.abbr || shortName(a.name), color: PALETTE[i % PALETTE.length], // 약자(분배·해석·우선·보고·위협·해설)는 등록부 단일 출처(2026-08-20 사장님)
@@ -717,7 +718,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
   async function loadAgents() {
     const agents = await window.gijo.listAgents();
     office.setAgents(agents);
-    agents.slice(0, 7).forEach((a, i) => { AGENT_COLOR[a.name] = PALETTE[i % PALETTE.length]; });
+    agents.slice(0, 8).forEach((a, i) => { AGENT_COLOR[a.name] = PALETTE[i % PALETTE.length]; });
     const c = { working: 0, watching: 0, idle: 0 };
     agents.forEach((a) => { c[a.status] = (c[a.status] || 0) + 1; });
     agentCounts = c;

@@ -149,6 +149,10 @@ const AGENT_MODEL_RECOMMENDATIONS: Record<string, AgentModelRecSpec> = {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
     reason: "문서 분류·세 줄 요약·번역 보강·정형 초안은 지시 따르기와 한국어 요약 품질이 관건입니다. A.X-4.0-Light 7B는 팀원 역할 시험 2회차(2026-09-03)에서 현행과 동률이었으나 문서 분류·요약 과업으로 잰 값은 아직 없습니다 — 지식 적재 게이트에서 그 과업으로 재판정한 뒤 교체 후보입니다.",
   },
+  bom: {
+    modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
+    reason: "규칙 판정 뒤의 해석·설명이라 한국어 지시 따르기와 절제(판정을 바꾸지 않기)가 관건입니다. 판정 자체는 규칙 엔진이 합니다.",
+  },
 };
 
 export interface AgentModelRecommendation extends RecommendedModel {

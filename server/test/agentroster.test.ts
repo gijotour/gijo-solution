@@ -15,9 +15,9 @@ const ENGINE = path.join(__dirname, "..", "src", "engine");
 const read = (f: string) => fs.readFileSync(path.join(ENGINE, f), "utf8");
 
 describe("등록부 — 사서(curator)는 7번째 팀원이다", () => {
-  it("일곱 명이고 사서가 맨 뒤(레일·사무실 책상 순서 = 등록부 순서)", () => {
+  it("여덟 명이고 사서·부품이 맨 뒤(레일·사무실 책상 순서 = 등록부 순서)", () => {
     const ids = listAgents().map((a) => a.id);
-    expect(ids).toEqual(["orchestrator", "scan", "analysis", "report", "ti", "normaltic", "curator"]);
+    expect(ids).toEqual(["orchestrator", "scan", "analysis", "report", "ti", "normaltic", "curator", "bom"]);
   });
 
   it("사서의 약자·기본 상태·역할 — 레일 툴팁 [사서]와 사무실 명패가 여기서 나온다", () => {

@@ -35,7 +35,7 @@ Gmail을 읽어 회신 필요 여부를 분류하고 회신 초안을 쓰는 멀
 | 영상 항목 | 우리 제품 | 근거 | 판정 |
 |---|---|---|---|
 | 설계→PRD→승인→목업→구축→검증 | 시안→설계관→구현→검토관(병렬)→수리→게이트→배포→관문→게시 | `CLAUDE.md` 작업 규칙, `.claude/agents/` | 있음, **더 엄격** |
-| Supervisor 감독형 | orchestrator(분배·취합) + dispatcher/agentloop, 팀원 7종 | `server/src/engine/agents.ts` AGENT_DEFS (orchestrator·scan·analysis·report·ti·normaltic·curator — 2026-09-03 사서 추가) | 있음 |
+| Supervisor 감독형 | orchestrator(분배·취합) + dispatcher/agentloop, 팀원 8종 | `server/src/engine/agents.ts` AGENT_DEFS (orchestrator·scan·analysis·report·ti·normaltic·curator·bom — 2026-09-03 사서·부품 추가) | 있음 |
 | 사람 승인 인터럽트 | 대화창 **결재판** — 쓰기 도구는 승인 전 실행 안 함 | `server/src/engine/agentloop.ts:105` | 있음 |
 | Security 에이전트 | guard(입구 검사 `gateway.gateUserInput`) + 레드팀 카나리 30페이로드 | `server/src/engine/llmactivity.ts:18-19`, `client/.../redteam.html` | 있음 |
 | 승인된 에이전트만 등록 | 로스터 고정(코드 정의), 화면에서 임의 생성 없음 | `agents.ts` | 있음 |

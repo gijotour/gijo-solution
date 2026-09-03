@@ -35,6 +35,9 @@ export interface TeamMemberView {
   overrideModelId: string | null;
   /** 이 팀원 전용 지식 문서 수(scope=팀원 id 실측). 0이면 공용 지식만 쓴다. */
   dedicatedDocs: number;
+  /** 맡은 메뉴(화면 파일명)와 제목 — 등록부(agents.ts menus)가 단일 출처, /api/agents와 같은 값. */
+  menus: string[];
+  menuTitles: string[];
 }
 
 export interface TeamComposition {
@@ -72,6 +75,8 @@ export function getTeamComposition(): TeamComposition {
     adapterId: a.assignedAdapterId,
     overrideModelId: a.assignedModelId,
     dedicatedDocs: byScope.get(a.id) ?? 0,
+    menus: a.menus,
+    menuTitles: a.menuTitles,
   }));
 
   const cloud = getCloudConfig();

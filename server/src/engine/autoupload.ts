@@ -10,6 +10,7 @@ import { recordAudit } from "./audit";
 import { asyncRoute } from "../util/asyncRoute";
 import { emitCollaboration } from "./collaboration";
 import { draftScanInterpretation } from "./scandrafts";
+import { draftBomInterpretation } from "./bomdrafts";
 import { ingestAnalysisFile, detectIngestKind } from "./analysishub";
 import { importVulnScan, parseNessusHtml } from "./vulnscan";
 // ⚠ 보관총량()은 **거르지 않은 전체**라 화면 창구에서 쓰지 않는다(2026-08-22 검토관 [높음]).
@@ -371,6 +372,15 @@ async function routeByType(filename: string, base64: string, type: UploadType, p
     }
     const s = r.결과.summary;
     const 무거움 = (s.서비스도공개 ?? 0) + (s.전체소스공개 ?? 0);
+    // 부품표 팀원의 부르는 문(2026-09-03) — 규칙 검수가 끝난 뒤 해석 초안을 뒤에서 만든다. 반입 응답은 기다리지 않는다.
+    //   부품 목록은 sbom검수 반환값에 없어 검수상세로 따로 읽는다(설계관 ①). 실패는 초안 쪽 협업 창에 남는다.
+    void import("./sbomreview.js")
+      .then(({ 검수상세 }) => {
+        const d = 검수상세(r.결과.id);
+        if (!d) return null;
+        return draftBomInterpretation({ reviewId: r.결과.id, source: filename, componentCount: r.결과.componentCount, summary: r.결과.summary as Record<string, number>, components: d.부품 });
+      })
+      .catch(() => null);
     emitCollaboration({
       from: "scan", to: "orchestrator",
       message: `${filename} → 타사 SBOM 검수 — 부품 ${r.결과.componentCount}개 · ` +
