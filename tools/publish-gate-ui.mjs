@@ -833,9 +833,8 @@ ok("배지 갱신이 실제로 한 번은 돌았다(aria-label 기록)", 배지�
 {
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("dashboard.html", "대시보드", { dock: true }));
   const df = await 프레임찾기("dashboard.html", 8);
-  const r = df ? await df.evaluate(() => {
+  const r = df ? await df.evaluate(async () => {
     const 카드 = document.getElementById("aiteamRow");
-    const 칩 = 카드 ? 카드.querySelectorAll(".aiteam-chip").length : 0;
     // 「접기는 접은 채로, 검증 땐 펴서 잰다」 — 접혀 있으면 **실제로 펴서** KPI를 본다.
     // ⚠ 2026-08-31 정정: 여기는 접기 머리를 잡아 놓고 **누르지 않았다**(죽은 변수) —
     //   주석이 약속한 「펴서」가 코드에 없었다. 접힌 채로 재면 kbKpi가 비어 보여
@@ -843,10 +842,21 @@ ok("배지 갱신이 실제로 한 번은 돌았다(aria-label 기록)", 배지�
     const head = document.querySelector(".gjf-h");
     if (head && !head.classList.contains("on")) head.click();
     const kb = document.getElementById("kbKpi");
-    return { 칩, kb있음: !!kb, kb내용: kb ? (kb.textContent || "").length : 0 };
+    // ⚠ 2026-09-03: 여기서 **바로 읽어** 게시가 막혔다(「내용 0자」). 지식창고 KPI는 화면이 뜨자마자
+    //   /api/memory/documents를 부르는 **비동기 렌더**다 — 실측 문서 3,118건·906KB·855ms.
+    //   앞의 `프레임찾기`는 「틀이 생겼나」만 보지 「다 그렸나」는 안 본다. 그래서 프레임이 보이는
+    //   순간에는 아직 비어 있는 것이 정상이고, 서버가 조금만 느려지면(방금 재시작했다면) 붉어진다.
+    //   → 채워질 때까지 기다렸다가 잰다(최대 15초). **관문을 무르게 만드는 것이 아니다** —
+    //     못 채우면 그대로 실패한다. 「아직 안 그렸다」와 「고장 났다」를 가르는 것이 목적이다.
+    const 시작 = Date.now();
+    while (kb && (kb.textContent || "").length === 0 && Date.now() - 시작 < 15000) {
+      await new Promise((r2) => setTimeout(r2, 300));
+    }
+    const 칩 = 카드 ? 카드.querySelectorAll(".aiteam-chip").length : 0;
+    return { 칩, kb있음: !!kb, kb내용: kb ? (kb.textContent || "").length : 0, kb대기: Date.now() - 시작 };
   }).catch(() => null) : null;
   ok("대시보드 팀 카드 8칩", !!r && r.칩 === 8, r ? "칩=" + r.칩 : "프레임 못 찾음");
-  ok("지식창고 렌더(KPI)", !!r && r.kb있음 && r.kb내용 > 0, r ? "내용 " + r.kb내용 + "자" : "");
+  ok("지식창고 렌더(KPI)", !!r && r.kb있음 && r.kb내용 > 0, r ? "내용 " + r.kb내용 + "자 · 기다린 " + r.kb대기 + "ms" : "");
 }
 
 // ── ⑥ 💬 새 세션(2026-08-20) — 확인창(작업 내역 저장 안내) → 확인 → 대화 초기화 ──
