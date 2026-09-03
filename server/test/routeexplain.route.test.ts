@@ -32,6 +32,7 @@ vi.mock("../src/engine/llm", () => ({
 import fs from "node:fs";
 import path from "node:path";
 import { 결정적도착지, 결정적체인 } from "../src/engine/dispatcher";
+import { 길목록 } from "../src/engine/routes";
 import { forcedToolFor } from "../src/engine/agentloop";
 import { isFindingListAsk, isMyWorkAsk, parsePickCommand } from "../src/engine/picklist";
 import { 장애질문인가, 침해사고질문인가 } from "../src/engine/incidentsteps";
@@ -160,6 +161,14 @@ describe("★ 순서 감시 — 결정적도착지가 dispatchInstructionCore와
       어긋남,
       `실제 호출 순서와 설명 순서가 어긋났다(설명이 거짓이 된다):\n  ${어긋남.join("\n  ")}`,
     ).toEqual([]);
+  });
+
+  it("★ `--표`가 찍는 것(=결정적체인)과 routes.ts 길목록이 **같은 순서·같은 도착지**다", async () => {
+    // 짝 시험 — `--표`는 결정적체인()을 그대로 찍고, routes.ts는 그 표를 사람 말로 옮긴 것이다.
+    // 둘이 갈리면 「문서는 이렇게 적혀 있는데 도구는 저렇게 말한다」가 된다(빠뜨림은 routes.test가 잰다).
+    const 체인 = await 결정적체인();
+    const 표 = 길목록.filter((r) => r.차례 !== undefined).sort((a, b) => a.차례! - b.차례!);
+    expect(표.map((r) => `[${r.차례}] ${r.이름} → ${r.도착}`)).toEqual(체인.map((s) => `[${s.차례}] ${s.이름} → ${s.도착}`));
   });
 
   it("체인이 통째로 비거나 강제도구가 맨 끝이 아니면 헛돌고 있는 것이다", async () => {

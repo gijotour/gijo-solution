@@ -127,8 +127,12 @@ describe("★ 소스 감시 — 호출자가 가린 본(gate.text)을 실제로 
 
   it("이 감시가 헛돌고 있지 않다 — 관문 입구는 정확히 이 5곳이다", () => {
     // 새 입구가 생기면 이 시험이 알아채고, 그 입구도 gate.text를 쓰게 만든다.
+    // ⚠ routes.ts는 뺀다 — **실행하지 않는 표**다(그 파일 머리글). 2026-09-04에 결정적 체인을
+    //   표로 옮기면서 `감시` 칸에 「const guard = gateUserInput(instructionText」라는 **코드
+    //   글자를 그대로** 적었더니 입구로 세어졌다. 부르는 곳이 아니라 적어 둔 곳이라, 안 빼면
+    //   이 감시가 「입구가 6곳」이라고 거짓을 말한다(빼는 이유를 여기 적는 것이 이 저장소 관례).
     const files = fs.readdirSync(new URL("../src/engine/", import.meta.url)).filter((f) => f.endsWith(".ts"));
-    const 입구 = files.filter((f) => read(f).includes("gateUserInput(") && f !== "gateway.ts");
+    const 입구 = files.filter((f) => read(f).includes("gateUserInput(") && f !== "gateway.ts" && f !== "routes.ts");
     expect(입구.sort()).toEqual(["cloudllm.ts", "cmdsuggest.ts", "dispatcher.ts", "llm.ts", "memory.ts"]);
   });
 });
