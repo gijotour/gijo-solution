@@ -185,3 +185,42 @@ describe("★ 데이터가 갈라 주는 갈래는 「간다」고 단정하지 
     expect(체인.find((s) => s.판별 === "forcedToolFor")?.조건부).toBeUndefined();
   });
 });
+
+describe("★ 소스 감시 — route-explain은 낡은 dist로 답하지 않는다", () => {
+  // ★★ 왜 있나 (실측 2026-09-04 · 9b7b9ac5)
+  //   위 「순서 감시」는 **dispatcher.ts의 체인 순서만** 대조한다. 그래서 datacard.ts처럼
+  //   **다른 소스**만 고치고 빌드를 안 하면 도구가 아무 말도 못 했다 — 겹침이 9로 그대로
+  //   나왔고 경보도 없었다(사람이 `npm run build`를 손으로 하고서야 답이 바뀌었다).
+  //   낡은 dist를 설명하면 겹침 표도 문서도 통째로 거짓이 되므로, 도구가 **스스로 다시 빌드**한다.
+  // ⚠ 이 시험은 시각(mtime)을 재지 않는다 — CI가 언제 무엇을 빌드했는지에 시험이 매달리면
+  //   깜빡이는 시험이 된다. 대신 **그 분기가 코드에 실재하는가**만 글자로 잰다.
+  const 도구 = fs.readFileSync(path.join(__dirname, "..", "..", "tools", "route-explain.mjs"), "utf8");
+
+  it("소스(.ts)가 짝 .js보다 새로운지 **시각으로** 재는 분기가 있다", () => {
+    expect(도구, "낡은 소스를 찾는 함수가 사라졌다").toContain("function 낡은소스찾기(");
+    expect(도구, "mtime 비교가 사라지면 낡은 dist를 못 본다").toContain("mtimeMs");
+    expect(도구, ".d.ts는 .js를 안 뽑는다 — 안 걸러내면 영원히 「낡음」이 된다").toContain(".d.ts");
+  });
+
+  it("★ 낡았으면 **멈추지 않고 다시 빌드**한다 — tsc를 실제로 부른다", () => {
+    // 00b47a67에서 mtime을 뺀 이유는 거짓 경보였는데, 잘못은 mtime이 아니라 **멈춘 것**이었다.
+    // 거짓 경보의 값은 tsc 한 번(약 40초)뿐이다.
+    expect(도구, "빌드 분기가 사라졌다").toContain("function 필요하면빌드(");
+    expect(도구, "tsc를 부르지 않으면 「낡았다」고 알리고 마는 옛 판으로 돌아간 것이다").toContain("spawnSync");
+    expect(도구, "server/tsconfig.json 기준으로 빌드해야 dist 자리가 맞는다").toContain('"tsconfig.json"');
+    expect(도구, "빌드 실패는 종료코드 2로 멈춘다 — 낡은 dist로 답하면 거짓 설명이 된다").toContain("process.exit(2)");
+  });
+
+  it("--no-build면 건너뛰고 「낡았을 수 있음」 경고만 남긴다", () => {
+    expect(도구, "--no-build 갈래가 사라졌다").toContain("--no-build");
+    expect(도구, "경고 문구가 없으면 조용히 낡은 답을 준다").toMatch(/낡았을 수 있습니다/);
+  });
+
+  it("★★ 두 감시가 **둘 다** 살아 있다 — 서로 다른 함정을 잡는다", () => {
+    // ① 시각(빌드를 했나) ② 내용(체인이 그대로인가). 하나로 줄이면 다른 쪽 함정이 되살아난다:
+    //   ①만 두면 갈래를 옮겼는데 빌드가 최신인 경우를 못 보고,
+    //   ②만 두면 dispatcher 아닌 파일만 고친 경우를 못 본다(9b7b9ac5가 바로 그 사고였다).
+    expect(도구, "체인 순서 대조(내용 자)가 사라졌다").toContain("function 체인이소스와같나(");
+    expect(도구, "시각 자가 사라졌다").toContain("function 낡은소스찾기(");
+  });
+});

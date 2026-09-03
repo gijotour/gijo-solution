@@ -18,9 +18,13 @@
 //   2026-08-10 「거짓 겹침 경보」와 같은 부류다(그때는 거짓 경보가 진짜 겹침을 묻었다).
 //
 // ⚠ 제품 함수를 부르려면 **빌드된 판(server/dist)** 이 필요하다. 낡은 dist로 설명하면
-//   「낡은 제품」을 설명하게 되므로, 아래 `빌드확인()`이 소스보다 낡으면 **답하지 않고 멈춘다.**
+//   「낡은 제품」을 설명하게 되므로, 빌드를 **서로 다른 두 자**로 잰다:
+//     ① `필요하면빌드()`   — 소스(.ts)가 짝 .js보다 새로우면 **그 자리에서 다시 빌드**한다.
+//     ② `체인이소스와같나()` — 빌드된 체인의 순서가 지금 dispatcher.ts와 같은지 **글자로** 본다.
+//   둘은 **다른 함정**을 잡는다(각 함수 머리글 참고). 하나로 줄이면 다른 쪽 함정이 되살아난다.
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 
@@ -31,8 +35,85 @@ const 뿌리 = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 //   이 도구는 글자만 보므로 메모리 DB면 충분하다.
 process.env.GIJO_DB_PATH ??= ":memory:";
 
-// ── 빌드가 지금 소스와 같은 체인인가 ───────────────────────────────────────────
-// ⚠ 시각(mtime)으로 재지 않는다 — 이 저장소는 두 세션이 같은 작업트리를 만지므로, 내가 안
+// ── 인자는 **맨 앞에서** 읽는다 — 아래 자동 재빌드가 `--no-build`를 봐야 하기 때문이다 ──
+const 빌드끄기 = process.argv.includes("--no-build");
+const 인자 = process.argv.slice(2).filter((a) => a !== "--no-build");
+
+// ── ① 소스가 dist보다 새로우면 — **멈추지 말고 다시 빌드한다** ────────────────
+// ★★ 왜 mtime을 다시 들였나 (실측 2026-09-04 · 9b7b9ac5)
+//   아래 ②(`체인이소스와같나`)는 **dispatcher.ts의 체인 순서만** 글자로 대조한다. 그래서
+//   datacard.ts처럼 **다른 소스**만 고치고 빌드를 안 하면 아무 말도 못 한다 — 그날 겹침이
+//   9로 그대로 나왔고 경보도 없었다(사람이 `npm run build`를 손으로 하고서야 답이 바뀌었다).
+//   낡은 dist를 설명하면 **겹침 표도 문서도 통째로 거짓**이 되는데, 그 사각을 ②는 원리상 못 본다.
+// ⚠ 00b47a67에서 mtime을 뺀 이유는 **거짓 경보**였다(다른 세션이 registry.ts를 고쳐 「낡았다」).
+//   그런데 그때 잘못은 mtime이 아니라 **거기서 멈춘 것**이다. 낡았으면 다시 빌드하면 되고,
+//   거짓 경보의 값은 tsc 한 번(약 40초)뿐이다 — 틀린 설명을 믿는 값보다 훨씬 싸다.
+// ⚠ 자산 복사(scripts/copy-assets.mjs)는 부르지 않는다 — 이 도구는 .js만 불러 쓴다.
+function 낡은소스찾기() {
+  const src뿌리 = path.join(뿌리, "server/src");
+  const dist뿌리 = path.join(뿌리, "server/dist");
+  if (!fs.existsSync(dist뿌리)) return ["server/dist가 통째로 없다"];
+  const 낡은것 = [];
+  const 훑기 = (디렉터리) => {
+    for (const e of fs.readdirSync(디렉터리, { withFileTypes: true })) {
+      const p = path.join(디렉터리, e.name);
+      if (e.isDirectory()) { 훑기(p); continue; }
+      // .d.ts는 tsc가 .js를 안 뽑는다 — 세면 **영원히 낡은** 상태가 된다.
+      if (!e.name.endsWith(".ts") || e.name.endsWith(".d.ts")) continue;
+      const js = path.join(dist뿌리, path.relative(src뿌리, p)).replace(/\.ts$/, ".js");
+      const 짝 = fs.existsSync(js) ? fs.statSync(js).mtimeMs : -1;
+      if (짝 < 0) 낡은것.push(`${path.relative(뿌리, p).replace(/\\/g, "/")} (빌드된 짝이 없다)`);
+      else if (fs.statSync(p).mtimeMs > 짝) 낡은것.push(path.relative(뿌리, p).replace(/\\/g, "/"));
+    }
+  };
+  훑기(src뿌리);
+  return 낡은것;
+}
+
+function 목록몇줄(낡은것) {
+  for (const f of 낡은것.slice(0, 5)) console.log(`     · ${f}`);
+  if (낡은것.length > 5) console.log(`     · … 외 ${낡은것.length - 5}개`);
+}
+
+function 필요하면빌드() {
+  const 낡은것 = 낡은소스찾기();
+  if (!낡은것.length) return;
+  if (빌드끄기) {
+    // ⚠ 「경고만」은 **답을 믿지 말라는 뜻**이다 — 조용히 넘어가면 사각이 그대로 돌아온다.
+    console.log(`\n  ⚠ 빌드가 소스보다 낡았을 수 있습니다(${낡은것.length}개) — --no-build라 그대로 답합니다.`);
+    목록몇줄(낡은것);
+    console.log("     (아래 설명은 **낡은 제품**의 것일 수 있습니다. 정확히 보려면 --no-build를 빼세요.)\n");
+    return;
+  }
+  console.log(`\n  ⟳ 소스가 빌드보다 새롭습니다(${낡은것.length}개) — 먼저 빌드합니다(약 40초):`);
+  목록몇줄(낡은것);
+  // ⚠ `npx`로 부르지 않는다 — win에서 `npx.cmd`는 **spawnSync EINVAL로 즉사**한다
+  //   (Node 20.12+/22+가 shell 없이 .cmd 실행을 막는다 · 실측 2026-09-04). shell:true로 우회하면
+  //   따옴표 함정이 따라오므로, `npm run build`가 쓰는 **그 tsc**를 node로 직접 부른다.
+  //   못 찾을 때만(다른 기계·미설치) npx로 물러선다.
+  const 서버 = path.join(뿌리, "server");
+  const 로컬tsc = path.join(서버, "node_modules/typescript/lib/tsc.js");
+  const r = fs.existsSync(로컬tsc)
+    ? spawnSync(process.execPath, [로컬tsc, "-p", "tsconfig.json"], { cwd: 서버, encoding: "utf8" })
+    : spawnSync("npx", ["tsc", "-p", "tsconfig.json"], { cwd: 서버, encoding: "utf8", shell: true });
+  if (r.status !== 0) {
+    console.log("\n  ✗ 빌드에 실패했습니다 — 낡은 dist로 답하면 거짓 설명이 되므로 멈춥니다.");
+    const 원문 = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() || String(r.error?.message ?? "(출력 없음)");
+    console.log(원문.split("\n").map((l) => `     ${l}`).join("\n"));
+    console.log("");
+    process.exit(2);
+  }
+  console.log("  ✓ 빌드 완료.\n");
+}
+
+// 도움말만 보는 길에서는 40초를 쓰지 않는다 — 부를 제품 함수가 없다.
+if (인자.length) 필요하면빌드();
+
+// ── ② 빌드가 지금 소스와 같은 체인인가 ─────────────────────────────────────────
+// ⚠ 위 ①과 **겹치지 않는다**: ①은 「빌드를 했나」를 시각으로 재고, 여기는 「체인이 그대로인가」를
+//   내용으로 잰다. 빌드를 갓 했어도 dispatchInstructionCore의 갈래를 옮겼거나 판별자를 갈면
+//   `결정적도착지`(사본)와 어긋나는데, 그건 mtime으로는 원리상 못 본다.
+// ⚠ 여기서는 시각(mtime)으로 재지 않는다 — 이 저장소는 두 세션이 같은 작업트리를 만지므로, 내가 안
 //   건드린 파일이 방금 바뀌어 있는 일이 흔하다(실측 2026-09-04: 남의 registry.ts가 내 빌드
 //   3초 뒤에 바뀌어 「낡았다」 거짓 경보). 시각은 **관계 없는 변화까지** 세는 자다.
 // → 대신 **내용으로** 잰다: 빌드된 체인이 들고 있는 `감시` 글자(= dispatchInstructionCore를
@@ -227,7 +308,6 @@ async function 표보이기() {
   console.log("    (내 할 일 이름·내 문서 조각과 겹칠 때만 채 갑니다).\n");
 }
 
-const 인자 = process.argv.slice(2);
 const 실행 =
   인자[0] === "--겹침" ? 겹침찾기()
   : 인자[0] === "--표" ? 표보이기()
@@ -237,5 +317,7 @@ const 실행 =
       console.log('    node tools/route-explain.mjs "오늘 뭐부터 해야 해?"');
       console.log("    node tools/route-explain.mjs --겹침");
       console.log("    node tools/route-explain.mjs --표\n");
+      console.log("  소스가 빌드(server/dist)보다 새로우면 **알아서 다시 빌드**합니다(약 40초).");
+      console.log("    --no-build  ← 빌드를 건너뛰고 「낡았을 수 있음」 경고만 봅니다\n");
     })();
 실행.catch((e) => { console.error("\n  ✗ 실패:", e?.message ?? e, "\n"); process.exit(1); });
