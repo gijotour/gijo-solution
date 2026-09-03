@@ -271,6 +271,34 @@ export function startKbHygieneScheduler(): void {
   if (hygieneTimer.unref) hygieneTimer.unref();
   console.log("[kb-hygiene] 지식베이스 위생 점검 스케줄러 시작 (주 1회 + 밀렸으면 기동 직후 1회, 삭제 없이 리포트만)");
 }
+/**
+ * **답·화면이 쓰는 리포트** — 저장된 리포트가 신선하면 그대로 쓰고, 없거나 주기(7일)를 넘겼을 때만 다시 훑는다.
+ *
+ * 왜 생겼나(2026-09-04 실측): 대화창의 「지식베이스 정리」·「중복된 문서 있어?」가 **물을 때마다
+ * scanKbHygiene()을 새로 돌리고 있었다.** 같은 리포트를 그냥 돌려주는 `GET /api/kb-hygiene`은 0.0초인데
+ * 대화창만 **3.1초**였다(운영 실측). 3.1초의 내역도 쟀다 — 지식 전수 조회 0.70초 + 조각 IN-목록 0.48초
+ * (여기까지 스캔 1.25초) + 데모경합 규칙이 데모 문서 2건마다 도는 **하이브리드 검색**(검색어 재작성 LLM +
+ * 임베딩 + 벡터검색 ≈ 0.9초씩) 1.8초. 즉 **답 한 줄을 위해 33GB 지식 저장소를 매번 다시 훑고
+ * 모델까지 두 번 태우고 있었다.**
+ *
+ * 위생 점검은 원래 **주 1회 도는 배치**다(스케줄러). 그 사이에 값이 달라질 일이 거의 없고, 달라져도
+ * 답이 `점검시각문구`로 **언제 잰 값인지 밝힌다** — 그래서 저장된 값을 쓰는 것이 정직하다.
+ * 「지금 다시 점검」은 AI 지식 화면의 버튼(`POST /api/kb-hygiene/scan`)이 맡는다.
+ *
+ * ⚠ 신선도 잣대를 여기서 새로 만들지 않는다 — `kbHygieneOverdue()`(스케줄러가 쓰는 그 잣대) 하나를 쓴다.
+ *   두 벌로 적으면 「주기는 7일인데 답은 1일마다 훑는다」처럼 조용히 어긋난다.
+ * ⚠ 같은 순간에 둘이 물어도 훑기는 **한 번만** 돈다 — 화면과 대화창이 겹치면 33GB 전수 조회가
+ *   두 벌로 돌아 서로를 느리게 만든다.
+ */
+let 훑는중: Promise<HygieneReport> | null = null;
+export async function kbHygieneReport(): Promise<HygieneReport> {
+  const 저장된 = lastKbHygieneReport();
+  if (저장된 && !kbHygieneOverdue()) return 저장된;
+  if (훑는중) return 훑는중;
+  훑는중 = scanKbHygiene().finally(() => { 훑는중 = null; });
+  return 훑는중;
+}
+
 export function stopKbHygieneScheduler(): void {
   if (hygieneTimer) { clearInterval(hygieneTimer); hygieneTimer = null; }
   // 기동 지연 안에 종료·재배포가 겹치면 종료 중에 점검이 뜬다 — 함께 정리한다(backup.ts와 같은 이유).
@@ -280,8 +308,8 @@ export function stopKbHygieneScheduler(): void {
 export function registerKbHygieneRoutes(app: Express): void {
   // 최근 리포트(없으면 즉석 점검).
   app.get("/api/kb-hygiene", authMiddleware, async (_req, res) => {
-    const last = lastKbHygieneReport();
-    res.json(last ?? (await scanKbHygiene()));
+    // 답(대화창)과 **같은 창구**를 쓴다 — 화면과 챗봇이 다른 숫자를 말하지 않게(신선도 잣대도 한 곳).
+    res.json(await kbHygieneReport());
   });
   // 지금 다시 점검.
   app.post("/api/kb-hygiene/scan", authMiddleware, async (_req, res) => {

@@ -1456,11 +1456,16 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   }
 
   // "지식베이스 정리/중복 점검" — 상충·중복·신선도를 결정적으로 점검(삭제 없이 리포트).
+  // ⚠ **여기서 다시 훑지 않는다**(2026-09-04 실측 수리). 예전에는 물을 때마다 scanKbHygiene()을 새로
+  //   돌려 답 하나가 **3.1초**였다 — 같은 리포트를 그냥 주는 화면 창구(GET /api/kb-hygiene)는 0.0초인데.
+  //   내역: 지식 전수 조회 0.70초 + 조각 IN-목록 0.48초 + 데모경합 규칙이 데모 문서 2건마다 도는
+  //   하이브리드 검색(재작성 LLM + 임베딩 + 벡터검색) 1.8초. 위생 점검은 **주 1회 배치**라 물을 때마다
+  //   다시 셀 값이 아니고, 답은 `점검시각문구`로 **언제 잰 값인지 밝힌다**. 만료됐을 때만 kbHygieneReport가 훑는다.
   if (KB_HYGIENE_INTENT_RE.test(instructionText)) {
-    const { scanKbHygiene, formatKbHygiene } = await import("./kbhygiene.js");
+    const { kbHygieneReport, formatKbHygiene } = await import("./kbhygiene.js");
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatKbHygiene(await scanKbHygiene()), sources: [] };
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatKbHygiene(await kbHygieneReport()), sources: [] };
   }
 
   // "공격 경로 / 도달성 분석" — 3소스 상관으로 진입→거점→인접 경로를 결정적으로 구성.

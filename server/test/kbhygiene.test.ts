@@ -14,7 +14,7 @@ vi.mock("../src/engine/memory", () => ({
 
 // ⚠ 정적 import면 안 된다 — vi.mock 공장이 파일 맨 위로 끌려 올라가 위 const보다 먼저 돌아
 //   「Cannot access 'listDocuments' before initialization」으로 죽는다(demo 시험과 같은 이유로 동적 import).
-const { normalizeBaseName, scanKbHygiene, formatKbHygiene, kbHygieneOverdue, lastKbHygieneReport, 점검시각문구 } =
+const { normalizeBaseName, scanKbHygiene, formatKbHygiene, kbHygieneOverdue, lastKbHygieneReport, kbHygieneReport, 점검시각문구 } =
   await import("../src/engine/kbhygiene");
 const { db } = await import("../src/db");
 
@@ -168,5 +168,58 @@ describe("지식베이스 위생 — 기동 직후 1회(주기만 걸면 첫 점
     const 옛것 = { scannedAt: new Date(Date.now() - 8 * 86400_000).toISOString(), totalDocs: 1, storeDocs: 1, excludedDocs: 0, findings: [], clean: true };
     db.prepare("INSERT INTO app_state (key, value) VALUES ('kbHygieneReport', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(옛것));
     expect(kbHygieneOverdue()).toBe(true);
+  });
+});
+
+// [전-7 보여 주기 — 첫인상] 대화창의 「지식베이스 정리」·「중복된 문서 있어?」 답이 물을 때마다
+// 33GB 지식 저장소를 다시 훑어 **3.1초**가 걸리던 것의 계약(2026-09-04 운영 실측).
+// 같은 리포트를 그냥 주는 화면 창구는 0.0초였다 — 답만 매번 새로 세고 있었다.
+describe("지식베이스 위생 — 답은 저장된 리포트를 쓴다(물을 때마다 다시 훑지 않는다)", () => {
+  it("신선한 리포트가 있으면 훑지 않는다 — 지식 저장소를 한 번도 안 건드린다", async () => {
+    const 방금 = { scannedAt: new Date().toISOString(), totalDocs: 7, storeDocs: 9, excludedDocs: 2, findings: [], clean: true };
+    db.prepare("INSERT INTO app_state (key, value) VALUES ('kbHygieneReport', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(방금));
+    listDocuments.mockResolvedValue([doc("지침.md")]);
+
+    const r = await kbHygieneReport();
+
+    // 스캔의 첫 동작이 listDocuments다 — 이게 안 불렸다는 것이 「다시 안 훑었다」의 증거다.
+    expect(listDocuments, "저장된 리포트가 신선한데 지식 저장소를 다시 훑었다").not.toHaveBeenCalled();
+    expect(getChunksForDocuments).not.toHaveBeenCalled();
+    expect(r.scannedAt).toBe(방금.scannedAt);
+    expect(r.totalDocs).toBe(7);
+    // 답 문구의 「마지막 점검 …」은 저장된 scannedAt에서 나온다(오늘 센 값처럼 읽히면 안 된다).
+    expect(formatKbHygiene(r)).toContain("마지막 점검 방금 전(");
+  });
+
+  it("리포트가 아예 없으면 그때는 훑는다", async () => {
+    db.prepare("DELETE FROM app_state WHERE key='kbHygieneReport'").run();
+    listDocuments.mockResolvedValue([doc("지침.md")]);
+
+    const r = await kbHygieneReport();
+
+    expect(listDocuments).toHaveBeenCalledTimes(1);
+    expect(r.totalDocs).toBe(1);
+  });
+
+  it("주기(7일)를 넘긴 리포트는 다시 훑는다 — 신선도 잣대는 kbHygieneOverdue 하나뿐", async () => {
+    const 옛것 = { scannedAt: new Date(Date.now() - 8 * 86400_000).toISOString(), totalDocs: 99, storeDocs: 99, excludedDocs: 0, findings: [], clean: true };
+    db.prepare("INSERT INTO app_state (key, value) VALUES ('kbHygieneReport', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(옛것));
+    expect(kbHygieneOverdue()).toBe(true);
+    listDocuments.mockResolvedValue([doc("지침.md")]);
+
+    const r = await kbHygieneReport();
+
+    expect(listDocuments).toHaveBeenCalledTimes(1);
+    expect(r.totalDocs).toBe(1); // 옛 리포트(99)가 아니라 새로 센 값
+  });
+
+  it("같은 순간에 둘이 물어도 훑기는 한 번만 돈다(화면+대화창 겹침)", async () => {
+    db.prepare("DELETE FROM app_state WHERE key='kbHygieneReport'").run();
+    listDocuments.mockResolvedValue([doc("지침.md")]);
+
+    const [a, b] = await Promise.all([kbHygieneReport(), kbHygieneReport()]);
+
+    expect(listDocuments, "동시 요청마다 33GB 전수 조회가 돌면 서로를 느리게 만든다").toHaveBeenCalledTimes(1);
+    expect(a.scannedAt).toBe(b.scannedAt);
   });
 });
