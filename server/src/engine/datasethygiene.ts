@@ -27,6 +27,18 @@ import * as path from "node:path";
 export interface Example {
   question: string;
   answer: string;
+  /**
+   * 선택 — 이 행을 학습할 때 **system 자리에 실을 글**(RAFT형 근거 학습, 계획서 §12).
+   *
+   * 왜 여기에 두나: 제품 추론은 근거를 system에 싣는다(llm.ts systemContent =
+   * `[systemPromptFor(agentId), grounding, rag, 첨부]`). 학습 때 근거를 **질문에 붙여** 가르치면
+   * 배우는 자리와 쓰이는 자리가 달라져, 실제로는 못 쓰는 모델이 나온다.
+   * 그래서 학습 행에도 같은 자리를 만든다 — 「배운 자리 = 쓰는 자리」.
+   *
+   * ⚠ 이 칸은 **종류 「근거」에서만** 살아남는다. 지식·라우팅에서는 예전처럼 버려진다
+   *   (그 두 종류는 per-row system이 없는 학습 형식이라, 넣어 봐야 파이썬이 못 읽는다).
+   */
+  system?: string;
 }
 
 export interface HygieneResult {
@@ -216,8 +228,18 @@ function 시험문항(): Set<string> {
  * · "지식" — 담당자 문답. 아홉 규칙 전부.
  * · "라우팅" — 지시 → 도구 선택. **시험 문항과 주입 표식만** 막는다(그 둘은 종류와 무관하게
  *   게이트·안전을 무너뜨린다). 나머지는 이 데이터의 성질과 안 맞는다.
+ * · "근거" — RAFT형(질문 + 검색 조각(정답+방해) + 근거를 인용한 답). 문답 규칙은 **지식과 같고**,
+ *   다른 점은 딱 둘이다(계획서 §12):
+ *     ① `system` 칸을 **살려서** 내보낸다 — 근거는 질문이 아니라 system에 실린다(Example.system 주석).
+ *     ② system이 빈 행은 뺀다 — 근거 없는 RAFT 행은 그냥 지식 행이라, 이 종류로 부른 뜻이 사라진다.
+ *   ⚠ 시점데이터·회피답변 같은 규칙은 여전히 **답에만** 건다. 근거 조각(system)에는 날짜·「N건」이
+ *     당연히 들어 있다 — 거기까지 재면 모든 행이 떨어진다(그 규칙이 막으려는 것은 「모델이 외우는
+ *     낡은 사실」이지 「모델이 읽는 자료」가 아니다).
  */
-export type 데이터종류 = "지식" | "라우팅";
+export type 데이터종류 = "지식" | "라우팅" | "근거";
+
+/** 값으로도 쓴다 — 라우트가 몸통에서 받은 문자열을 이 목록으로 가른다(타입은 런타임에 없다). */
+export const 데이터종류들: readonly 데이터종류[] = ["지식", "라우팅", "근거"];
 
 /**
  * 이 지시가 시험지(회귀·게이트)에 있는가 — **지시만 따로** 볼 때 쓴다.
@@ -233,7 +255,11 @@ export function 시험문항인가(지시: string): boolean {
 }
 
 export function cleanForTraining(rows: Example[], 종류: 데이터종류 = "지식"): HygieneResult {
-  const 지식 = 종류 === "지식";
+  // 문답 아홉 규칙을 다 거는가 — 「지식」과 「근거」는 같고, 「라우팅」만 두 규칙으로 줄인다.
+  // (예전엔 `종류 === "지식"` 한 줄이었다. 「근거」를 더하면서 **부정형**으로 뒤집는다 —
+  //  종류가 늘 때마다 여기에 or를 덧붙이면 언젠가 하나를 빠뜨려 규칙이 통째로 꺼진다.)
+  const 문답규칙 = 종류 !== "라우팅";
+  const 근거종류 = 종류 === "근거";
   const 시험 = 시험문항();
   // ⚠ 시험지 목록이 비면 **막지 못한 채 지나간다.** 예전엔 그냥 넘어가서, 운영에서 이 필터가
   //   내내 꺼져 있었는데도 아무도 몰랐다(2026-08-01 검토). 이제는 멈춘다 —
@@ -253,23 +279,34 @@ export function cleanForTraining(rows: Example[], 종류: 데이터종류 = "지
   for (const r of rows) {
     const q = String(r?.question ?? "").trim();
     const a = String(r?.answer ?? "").trim();
+    const s = String(r?.system ?? "").trim();
     if (!q || !a) { drop("빈 문답"); continue; }
-    if (INJECT_MARK_RE.test(q) || INJECT_MARK_RE.test(a)) { drop("보안 시험 표식"); continue; }
-    if (지식 && MACHINE_RE.test(q)) { drop("기계 생성(프롬프트 틀·맥락 덩어리)"); continue; }
-    if (지식 && 시점데이터(a)) { drop("시점 데이터(그날의 숫자·날짜·자산)"); continue; }
-    if (지식 && 짧은질문(q)) { drop("질문이 너무 짧음"); continue; }
-    if (지식 && 프롬프트누출.test(a)) { drop("내부 프롬프트 누출"); continue; }
-    if (지식 && 회피답변.test(a)) { drop("회피 답변(지식 구멍)"); continue; }
-    if (지식 && 운영확인용테스트(q)) { drop("운영 확인용 질문(내 시험 흔적)"); continue; }
+    // ⚠ 주입 표식은 **근거 칸에서도** 본다. RAFT 행의 system에는 검색 조각이 통째로 실리는데,
+    //   그 조각은 사람이 한 줄씩 읽은 것이 아니다 — 카나리가 섞인 문서 조각이 방해 조각으로
+    //   딸려 오면 「주입 성공 사례」를 근거 자리에 놓고 가르치게 된다(위생 ④가 막으려던 바로 그것).
+    if (INJECT_MARK_RE.test(q) || INJECT_MARK_RE.test(a) || (s && INJECT_MARK_RE.test(s))) { drop("보안 시험 표식"); continue; }
+    if (근거종류 && !s) { drop("근거 없음(system 빈 칸)"); continue; }
+    if (문답규칙 && MACHINE_RE.test(q)) { drop("기계 생성(프롬프트 틀·맥락 덩어리)"); continue; }
+    if (문답규칙 && 시점데이터(a)) { drop("시점 데이터(그날의 숫자·날짜·자산)"); continue; }
+    if (문답규칙 && 짧은질문(q)) { drop("질문이 너무 짧음"); continue; }
+    if (문답규칙 && 프롬프트누출.test(a)) { drop("내부 프롬프트 누출"); continue; }
+    if (문답규칙 && 회피답변.test(a)) { drop("회피 답변(지식 구멍)"); continue; }
+    if (문답규칙 && 운영확인용테스트(q)) { drop("운영 확인용 질문(내 시험 흔적)"); continue; }
+    // ★ 시험 문항 대조는 **원질문**으로 한다 — 그래서 「근거」 종류는 맥락을 question에 붙이면 안 된다.
+    //   맥락을 질문 앞에 이어 붙이면 이 대조가 원질문과 안 맞아 **통째로 헛돈다**(:248 계보 —
+    //   오케스트레이터 시드가 긴 프롬프트를 question에 담아 게이트 문항 2개를 그냥 학습했다).
+    //   근거는 system에 있으므로 여기 q는 담당자가 실제로 물은 짧은 문장 그대로다.
     const key = 정규화(q);
     if (시험.has(key)) { drop("시험 문항(회귀·게이트)"); continue; }
+    // 「근거」에서만 system을 실어 보낸다 — 나머지 종류는 예전처럼 {question,answer}로 재구성된다.
+    const 남길것: Example = 근거종류 ? { question: q, answer: a, system: s } : { question: q, answer: a };
     // 같은 질문이 또 오면 **긴 답**을 남긴다 — 짧은 답은 대개 얼버무린 것이다.
     const 있던 = 최선.get(key);
     if (있던) {
       drop("같은 질문 반복");
-      if (a.length > 있던.answer.length) 최선.set(key, { question: q, answer: a });
+      if (a.length > 있던.answer.length) 최선.set(key, 남길것);
     } else {
-      최선.set(key, { question: q, answer: a });
+      최선.set(key, 남길것);
     }
   }
 
@@ -281,8 +318,14 @@ export function cleanForTraining(rows: Example[], 종류: 데이터종류 = "지
   //   사후 검토가 안전망인 이 저장소에서 하필 이 파일만 검토가 불가능했다(오늘 네 번 고쳤는데
   //   검토관이 변경 내용을 못 봤다).
   //   런타임 값은 같으므로 **지문은 바뀌지 않는다** — 아래 시험이 그걸 못 박는다.
+  // 근거(system)는 **있을 때만** 지문에 덧붙인다. 두 가지를 동시에 지켜야 하기 때문이다:
+  //   ① 같은 문답이라도 **어떤 조각을 보여 주며** 가르쳤는지가 다르면 다른 모델이 나온다 → 지문도 달라야 한다.
+  //   ② 지식·라우팅 데이터셋의 지문은 한 글자도 안 바뀌어야 채택 원장의 **옛 지문과 계속 대조**된다.
+  // 구분자는 위 ⚠와 같은 이유로 소스에 날 제어문자를 박지 않고 코드로 만든다(STX).
+  const 근거구분 = String.fromCharCode(2);
+  const 근거꼬리 = (e: Example) => (e.system ? 근거구분 + e.system : "");
   const fingerprint = createHash("sha256")
-    .update(kept.map((e) => `${e.question}\u0000${e.answer}`).join("\u0001"), "utf8")
+    .update(kept.map((e) => `${e.question}\u0000${e.answer}${근거꼬리(e)}`).join("\u0001"), "utf8")
     .digest("hex")
     .slice(0, 16);
 

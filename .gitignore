@@ -16,6 +16,15 @@ server/data.*/
 server/data-*/
 data.*/
 data-*/
+# 증류기가 남기는 근거 본문 보관(tools/distill.mjs → RAFT 빌더 재료). 위 `server/data/`가 이미 덮지만
+#   **이름을 적어 둔다** — 이 파일에는 문서 본문이 통째로 들어가고(고객 문서가 재료면 그 본문이다),
+#   지우거나 옮길 사람이 「이건 뭐지」 하고 커밋하려 드는 자리라서 여기 이름이 있어야 한눈에 막힌다.
+server/data/distill-archive/
+# 사다리 재료(공개 원천을 .md로 구운 것 — kev·attack·cisa-aa·nvd-ours). 역시 `server/data/`가 덮지만
+#   이름을 적어 둔다: 이건 **원문 본문**이라 저작권·라이선스가 원천마다 다르고(cisa-aa는 법무 확인 대기),
+#   용량도 크다. 재현은 make-material.mjs 8초면 되니 저장소에 실을 이유가 없다.
+#   ⚠ 결과물(tools/team-bench/results-ladder/)은 반대다 — 그건 **커밋한다**(무엇을 언제 돌렸나의 기록).
+server/data/ladder/
 
 # local LLM assets — huge binaries, never belong in git
 server/models/

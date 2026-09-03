@@ -1,0 +1,64 @@
+{
+  "_이것은": "day1-distill.sh가 도는 **회차 목록**. 주제와 재료를 여기에만 적는다 — 스크립트 안에 박아 두면 어느 밤에 무엇을 돌렸는지 파일로 못 남는다.",
+  "_읽는 법": "각 항목은 tools/distill.mjs의 인자로 그대로 번역된다(topic→--topic, source→--source, files→--files, limit→--limit, perChunk→--per-chunk, srcLang→--src-lang, noTopicFilter→--no-topic-filter).",
+  "_재료 제약": [
+    "distill.mjs의 --files 는 **.md/.txt만** 재료로 삼는다(listSourceFiles의 마지막 필터). NVD·CISA·ATT&CK를 JSON으로 받아 두었다면 .md/.txt로 옮겨 놓아야 이 자리에서 재료가 된다.",
+    "공개 원천은 저장소 밖(gb10 ~/bench/ladder/sources/)에 있어도 된다 — --files 에 절대경로를 주면 그대로 잡힌다(path.resolve는 절대경로를 그대로 쓴다).",
+    "★ 공개 원천은 RAG(지식 저장소)에 넣지 않는다 — 파일 재료로만 쓴다(사장님 2026-09-03). 그래서 source는 store가 아니라 files다.",
+    "무엇이 재료가 될 수 있는지는 allowed-sources.json이 정한다. day1-distill.sh가 돌기 전에 그 목록으로 걸러 본다."
+  ],
+  "_밤 상한": [
+    "재료 실측(gb10 make-material.mjs, 2026-09-03): kev 1,694조각(17파일) · nvd-ours 146(2) · attack 266(3) · cisa-aa 92(1).",
+    "밤에 다 태우지 않는다 — 취약점은 kev 앞 10파일(약 1,000조각)+nvd-ours 2파일, 위협대응은 attack 3+cisa-aa 1로 **합계 약 1,500조각**만 재료로 놓는다.",
+    "실제로 쓰는 조각 수는 --limit ÷ --per-chunk 다(distill.mjs: need = ceil(LIMIT/PER_CHUNK)). 취약점 900÷3=300조각 · 위협대응 600÷3=200조각 — 재료를 넉넉히 두고 **결정적 섞기**로 고르게 뽑는다.",
+    "왜 남는 재료를 두나: 회차를 다시 돌리면 시드(주제+날짜)가 달라져 다른 조각이 뽑힌다. 재료를 딱 맞춰 두면 2회차가 같은 조각을 또 태운다."
+  ],
+  "회차": [
+    {
+      "topic": "취약점",
+      "source": "store",
+      "limit": 500,
+      "perChunk": 3,
+      "왜": "운영 지식 저장소에 이미 올라간 취약점 문서. 조각 경계가 **검색이 쓰는 그것**이라 학습과 추론의 재료가 같아진다."
+    },
+    {
+      "topic": "취약점",
+      "source": "files",
+      "files": "server/data/ladder/material/day1/kev/kev-01.md,server/data/ladder/material/day1/kev/kev-02.md,server/data/ladder/material/day1/kev/kev-03.md,server/data/ladder/material/day1/kev/kev-04.md,server/data/ladder/material/day1/kev/kev-05.md,server/data/ladder/material/day1/kev/kev-06.md,server/data/ladder/material/day1/kev/kev-07.md,server/data/ladder/material/day1/kev/kev-08.md,server/data/ladder/material/day1/kev/kev-09.md,server/data/ladder/material/day1/kev/kev-10.md,server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md,server/data/ladder/material/day1/nvd-ours/nvd-ours-02.md",
+      "srcLang": "en",
+      "noTopicFilter": true,
+      "limit": 900,
+      "perChunk": 3,
+      "왜": "공개 원천 KEV(CISA 악용 확인 목록)+NVD 우리 환경 발췌. 영어 원문이라 --src-lang en(한국어 문답 + 영어 원문 한 문장 인용)과 --no-topic-filter(주제 정규식은 한글 낱말뿐이라 영어는 전부 사라진다)를 함께 준다.",
+      "_파일을 낱낱이 적는 이유": "「앞 10개」는 glob으로 못 쓴다(kev-0*.md는 9개, kev-1*.md는 8개). 밤 상한이 재료 목록에 **눈에 보이게** 적혀야 다음 회차에서 몇 개를 더 열지 셀 수 있다.",
+      "_SOURCE.md 제외": "각 세트 폴더의 SOURCE.md는 출처·라이선스 메모라 학습 재료가 아니다 — 그래서 *.md 로 쓸어 담지 않는다."
+    },
+    {
+      "topic": "사내규정",
+      "source": "store",
+      "limit": 300,
+      "perChunk": 3,
+      "왜": "우리 규정·지침. 제품이 「사내 근거 우선」으로 답해야 하는 바로 그 재료다."
+    },
+    {
+      "topic": "일반",
+      "source": "files",
+      "files": "GIJO_AS_용어사전.md,knowledge/*.md",
+      "limit": 300,
+      "perChunk": 3,
+      "왜": "용어·개념. ⚠ --topic 일반 은 store로 받으면 미분류 더미가 통째로 들어온다(distill.mjs 머리 주석) — 문서를 지목해서만 돌린다."
+    },
+    {
+      "topic": "위협대응",
+      "source": "files",
+      "files": "server/data/ladder/material/day1/attack/attack-01.md,server/data/ladder/material/day1/attack/attack-02.md,server/data/ladder/material/day1/attack/attack-03.md,server/data/ladder/material/day1/cisa-aa/cisa-aa-01.md",
+      "srcLang": "en",
+      "noTopicFilter": true,
+      "limit": 600,
+      "perChunk": 3,
+      "왜": "공개 원천 MITRE ATT&CK(기법·완화)+CISA 권고문. 위협대응은 우리 저장소에 재료가 거의 없어(허용목록 적용 실측 30조각) 공개 원천이 없으면 이 주제가 통째로 빈다.",
+      "_켠 때": "2026-09-03 — 원천을 .md로 구워(make-material.mjs) server/data/ladder/material/day1/ 에 두면서 「끔」을 풀었다. 재료가 아직 없는 기계에서 돌리면 distill.mjs가 「조각 0」으로 코드 2에 죽는다 — 조용히 지나가는 것보다 낫다.",
+      "_cisa-aa 법무": "CISA 권고문은 연방 저작물이라 인용 자체는 통설상 자유지만 라이선스 문구가 없다. **출하물**에 실을 때 법무 확인이 필요하다(계획서 §12 각주) — 내부 학습 재료로 쓰는 지금은 이 자리에 적어만 둔다."
+    }
+  ]
+}

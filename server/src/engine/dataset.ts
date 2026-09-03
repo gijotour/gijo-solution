@@ -12,7 +12,7 @@ import { chat } from "./llm";
 import { recordProcessOutput } from "./logs";
 import { serverPython, serverScript } from "../util/pythonbin";
 // 학습 데이터가 디스크에 닿는 유일한 자리라, 위생을 여기서 건다(호출부마다 붙이면 또 빠뜨린다).
-import { cleanForTraining, type 데이터종류 } from "./datasethygiene";
+import { cleanForTraining, 데이터종류들, type 데이터종류 } from "./datasethygiene";
 
 // 테스트가 실제 데이터셋(data/datasets/*.json)을 덮어쓰거나 지우지 않도록 경로를 env로 격리 가능하게 한다
 // (vitest.config.ts가 임시 디렉터리로 지정). 미설정 시 운영 경로.
@@ -258,6 +258,8 @@ export async function extractDocumentText(filename: string, base64: string): Pro
 export interface ConversationExample {
   question: string;
   answer: string;
+  /** 선택 — 학습 때 system 자리에 실을 근거 블록(RAFT형). 종류 「근거」에서만 살아남는다(datasethygiene Example 주석). */
+  system?: string;
 }
 
 function isExample(item: unknown): item is ConversationExample {
@@ -540,9 +542,19 @@ export function registerDatasetRoutes(app: Express): void {
       res.json(await amplifyDataset(req.body.examples, req.body.factor));
     })
   );
+  // 몸통 { id, examples, kind? } — kind는 위생 종류(datasethygiene 데이터종류). 안 주면 예전대로 「지식」이다.
+  // ⚠ 창구 키는 **영문**으로 둔다(이 저장소의 모든 API가 그렇다) — 값만 한글이다.
+  //   왜 받게 했나: RAFT형 데이터셋(종류 「근거」)은 행마다 system 칸을 싣는데, 종류를 못 주면
+  //   위생이 「지식」으로 돌아 그 칸을 **말없이 버린다**(cleanForTraining이 {question,answer}로 재구성).
+  //   그러면 근거 없이 학습돼, 「배운 자리 = 쓰는 자리」가 깨진 채로 아무 오류도 안 난다.
   app.post("/api/dataset/save", authMiddleware, (req, res) => {
     try {
-      res.json(saveDataset(String(req.body.id ?? ""), req.body.examples ?? []));
+      const kind = String(req.body?.kind ?? "지식");
+      if (!(데이터종류들 as readonly string[]).includes(kind)) {
+        res.status(400).json({ error: `kind는 ${데이터종류들.join("·")} 중 하나여야 합니다 (받은 값: ${kind})` });
+        return;
+      }
+      res.json(saveDataset(String(req.body.id ?? ""), req.body.examples ?? [], kind as 데이터종류));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }

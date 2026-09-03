@@ -169,6 +169,20 @@ describe("learnloop 주제별 전문가 학습 (재설계 2·3단계)", () => {
     expect(topicTrainGate("일반").approved).toBe(0);
   });
 
+  // [2026-09-03] 승인 문답이 기억(RAG)에 실제로 들어갔나를 같은 응답에서 본다.
+  //   운영 실측 승인 1,856 vs 문서 1,253 — 차이를 보여 주는 화면이 하나도 없어 몇 달을 몰랐다.
+  //   ⚠ learnmemory는 learnloop을 import하므로 라우트가 **동적 import**로 받아야 한다(정적이면 순환).
+  it("topics 응답에 「기억반입」 칸이 있다 — 승인 수·문서 수·못 들어간 수를 함께 준다", async () => {
+    await seed장비운영(2);
+    const res = await request(app).get("/api/learnloop/topics").set(auth());
+    expect(res.status).toBe(200);
+    expect(res.body.기억반입).toBeDefined();
+    expect(Object.keys(res.body.기억반입).sort()).toEqual(["approved", "docs", "hygieneBlocked", "missing"]);
+    for (const v of Object.values(res.body.기억반입)) expect(typeof v).toBe("number");
+    const 원천 = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "learnloop.ts"), "utf8");
+    expect(원천).toContain('await import("./learnmemory.js")'); // 정적 import로 되돌리면 순환이 난다
+  });
+
   it("산출 배선 소스 감시 — 병합이 아니라 어댑터 등록(미채택)이다", () => {
     const s = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "learnloop.ts"), "utf8");
     expect(s).toContain("convert_lora_to_gguf.py"); // 병합(export_gguf) 은퇴, 어댑터 변환으로

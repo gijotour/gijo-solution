@@ -30,6 +30,7 @@ import { refreshKev } from "./engine/kev";
 import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
 import { ensureKnowledgeBundle } from "./engine/knowledgebundle";
 import { syncIncidentCaseDocsWithRetry } from "./engine/incidentcases"; // 📚 사례 → 지식 문서(결정 ①) — 표는 모듈 로드 때, 문서는 여기서(임베딩이 뜬 뒤)
+import { syncApprovedQaDocsWithRetry } from "./engine/learnmemory"; // 겹 1 — 승인은 됐는데 기억에 없는 문답을 다시 채운다(재시작에 큐가 증발한다)
 import { bootSmtpInboundIfEnabled, stopSmtpInbound } from "./engine/smtpinbound";
 import { closeHttpServer } from "./util/gracefulClose";
 import { installAirgapGuard } from "./engine/airgap";
@@ -99,7 +100,15 @@ httpServer.listen(PORT, () => {
   // 답한다(비어 있으면 지어내거나 '자료 없음'만 답한다). 임베딩 서버 기동을 기다려 재시도한다.
   void bootstrapDocsBundleWithRetry();
   void ensureKnowledgeBundle(); // 기본 지식 번들 버전 확인·자동 적용(멱등, 전-4)
-  void syncIncidentCaseDocsWithRetry(); // 침해사고 사례 문서 — 표에 있는데 문서 없는 것만(멱등), 씨앗이 바뀐 것은 다시
+  // 침해사고 사례 문서 — 표에 있는데 문서 없는 것만(멱등), 씨앗이 바뀐 것은 다시.
+  // 그 **뒤에** 승인 문답 재동기화를 붙인다 — 둘 다 임베딩 서버 한 대(8081)를 쓰므로 겹치면 서로 느려지고,
+  // 재동기화는 급하지 않다(다음 질문부터 쓰이면 된다). 앞이 실패해도 뒤는 돌아야 하므로 catch로 끊어 놓는다.
+  //   왜 부팅에 이게 필요한가: 반입 큐는 메모리에만 있어 재시작에 증발한다. 2026-09-03 실측으로
+  //   승인 1,856건 중 603건이 그렇게 사라졌고, 프로세스가 죽어 실패 기록조차 안 남았다.
+  void syncIncidentCaseDocsWithRetry()
+    .catch((err) => console.error("[index] 사례 문서 동기화 실패:", err))
+    .then(() => syncApprovedQaDocsWithRetry())
+    .catch((err) => console.error("[index] 승인 문답 재동기화 실패:", err));
 });
 
 // 서버 프로세스 종료 시 자식으로 띄운 llama-server가 고아 프로세스로 남지 않도록 함께 정리한다.

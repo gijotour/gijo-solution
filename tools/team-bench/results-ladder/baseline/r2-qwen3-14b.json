@@ -1,0 +1,98 @@
+{
+  "id": "qwen3-14b",
+  "path": "~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf",
+  "license": "Apache-2.0",
+  "startedAt": "2026-09-02 17:15:12",
+  "tasks": {
+    "scan_messy": {
+      "role": "scan",
+      "score": 0.5,
+      "detail": "고유 7/7 · 뽑은 수 9(중복 남음) · 오탐 포함(감점)",
+      "ms": 29706,
+      "promptTokens": 846,
+      "genTokens": 635,
+      "prefillTps": 1612.6388184656676,
+      "genTps": 21.734974079329298,
+      "finish": "stop",
+      "한글": 1,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "{\n  \"findings\": [\n    {\n      \"asset\": \"portal.example.co.kr\",\n      \"vuln\": \"SQL Injection (SQLi)\",\n      \"severity\": \"높음\",\n      \"evidence\": \"id 파라미터에 1' AND 1=1-- 입력 시 정상, 1=2 입력 시 빈 화면. DB 에러메세지 노출됨\"\n    },\n    {\n      \"asset\": \"portal.example.co.kr\",\n      \"vuln\": \"반사형 XSS (Reflected Cross-Site Scripting)\",\n      \"severity\": \"중간\",\n      \"evidence\": \"q 파라미터 미필터링, alert(1) 실행 확인\"\n    },\n    {\n      \"asset\": \"hr.example.co.kr\",\n      \"vuln\": \"인증 우회 (Authentication Bypass)\",\n      \"severity\": \"높음\",\n      \"evidence\": \"세션 쿠키 없이 직접 접근 시 200 OK, 관리자 목록 노출\"\n    },\n    {\n      \"asset\": \"hr.example.co.kr\",\n      \"vuln\": \"임의 파일 업로드(웹셸 업로드 가능)\",\n      \"severity\": \"긴급\",\n      \"evidence\": \"jsp 확장자 차단을 대소문자 혼용(jSp)으로 우회\"\n    },\n    {\n      \"asset\": \"hr.example.co.kr\",\n      \"vuln\": \"CSRF (사이트 간 요청 위조)\",\n      \"severity\": \"중간\",\n      \"evidence\": \"토큰 검증이 정상 동작함을 담당자 입회 하에 확인\"\n    },\n    {\n      \"asset\": \"files.example.co.kr\",\n      \"vuln\": \"디렉터리 리스팅\",\n      \"severity\": \"중간\",\n      \"evidence\": \"백업 파일 3건 목록 노출(db_2026.sql 포함)\"\n    },\n    {\n      \"asset\": \"api.example.co.kr\",\n      \"vuln\": \"민감정보 평문 전송 (HTTP)\",\n      \"severity\": \"중간\",\n      \"evidence\": \"로그인 요청이 http로 전송되어 계정정보가 평문 노출\"\n    },\n    {\n      \"asset\": \"vpn.example.co.kr\",\n      \"vuln\": \"취약한 TLS 버전 지원 (TLS 1.0/1.1 accepted)\",\n      \"severity\": \"낮음\",\n      \"evidence\": \"sslscan 결과 TLSv1.0 accepted\"\n    },\n    {\n      \"asset\": \"10.20.1.15\",\n      \"vuln\": \"SQL-삽입 취약점\",\n      \"severity\": \"High\",\n      \"evidence\": \"id 파라메터 조작시 DB 오류메시지 출력"
+    },
+    "needle_32k": {
+      "role": "scan",
+      "score": 1,
+      "detail": "회수 5/5",
+      "ms": 43329,
+      "promptTokens": 37186,
+      "genTokens": 50,
+      "prefillTps": 940.6899608983521,
+      "genTps": 13.34130544401498,
+      "finish": "stop",
+      "한글": 0.85,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "1. 10.44.8.71  \n2. 「푸른등대」  \n3. 18개월  \n4. 본관 B동 207호  \n5. 30분"
+    },
+    "needle_64k": {
+      "role": "scan",
+      "score": 0,
+      "detail": "요청 실패 {\"code\":400,\"message\":\"request (74256 tokens) exceeds the available context size",
+      "ms": 1899,
+      "한글": 0,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": ""
+    },
+    "ti_trap": {
+      "role": "ti",
+      "score": 0,
+      "detail": "맞음 2/2 · 오탐 3/4",
+      "ms": 12692,
+      "promptTokens": 478,
+      "genTokens": 270,
+      "prefillTps": 1556.2631452143278,
+      "genTps": 21.741240603682318,
+      "finish": "stop",
+      "한글": 0.9,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "{\"matches\":[{\"cve\":\"CVE-2024-21762\",\"asset\":\"A1\",\"reason\":\"FortiOS 7.0.14은 7.0.0 ~ 7.0.13 범위에 포함되지 않음\"},{\"cve\":\"CVE-2023-29183\",\"asset\":\"A2\",\"reason\":\"FortiWeb 7.2.5은 7.0.0 ~ 7.0.14 범위에 포함되지 않음\"},{\"cve\":\"CVE-2024-26198\",\"asset\":\"A3\",\"reason\":\"Exchange Server 2019 CU14은 CU12 ~ CU14 범위에 포함됨\"},{\"cve\":\"CVE-2024-32760\",\"asset\":\"A4\",\"reason\":\"nginx 1.25.3은 1.25.0 ~ 1.25.3 범위에 포함됨\"},{\"cve\":\"CVE-2024-10977\",\"asset\":\"A5\",\"reason\":\"PostgreSQL 16.2은 15.0 ~ 15.6 범위에 포함되지 않음\"}]}"
+    },
+    "priority_6": {
+      "role": "analysis",
+      "score": 1,
+      "detail": "상위3 V2>V3>V4 · V1 자리 5위",
+      "ms": 11803,
+      "promptTokens": 433,
+      "genTokens": 252,
+      "prefillTps": 1551.2985407762226,
+      "genTps": 21.870849929982782,
+      "finish": "stop",
+      "한글": 1,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "{\"order\":[\"V2\",\"V3\",\"V4\",\"V6\",\"V1\",\"V5\"],\"reason\":\"V2는 KEV 등재이며 외부 노출이 있고 자산 중요도가 최상으로, 우선순위가 가장 높다. V3는 KEV 등재이며 외부 노출이 있고 자산 중요도가 높아 V2 다음이다. V4는 KEV 등재이며 외부 노출이 없지만 자산 중요도가 높고 CVSS 8.8으로 V3보다 낮지만 V2 다음에 해당한다. V6는 KEV 미등재이지만 자산 중요도가 중간으로, 외부 노출이 없고 CVSS 7.2로 V1과 V5보다 우선순위가 높다. V1은 KEV 미등재이며 외부 노출이 없고 자산 중요도가 낮아 V6보다 우선순위가 낮다. V5는 KEV 미등재이며 외부 노출이 있지만 자산 중요도가 낮고 CVSS도 낮아 가장 마지막이다.\"}"
+    },
+    "report_fix": {
+      "role": "report",
+      "score": 1,
+      "detail": "절 6/6 · 기한 1 · 담당 1 · 한글 100%",
+      "ms": 14269,
+      "promptTokens": 209,
+      "genTokens": 311,
+      "prefillTps": 1476.520498202036,
+      "genTps": 22.01054233976325,
+      "finish": "stop",
+      "한글": 1,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "# 보안 취약점 조치 요청서\n\n## 제목  \nhr.example.co.kr(10.20.1.22) /upload.do 임의 파일 업로드 취약점 조치 요청\n\n## 대상 자산  \n- 서버 IP: 10.20.1.22  \n- 서비스: hr.example.co.kr  \n- 경로: /upload.do\n\n## 위험 요약  \n/upload.do 경로에 임의 파일 업로드 취약점이 존재하며, 이는 웹셸을 업로드하여 서버에 대한 원격 제어가 가능한 심각한 보안 문제입니다. 또한, 확장자 차단 기능이 대소문자 혼용으로 우회될 수 있어 보안 강화가 필요합니다.\n\n## 조치 방법  \n- /upload.do 경로의 파일 업로드 기능에 대한 보안 검증을 강화합니다.  \n- 확장자 차단 기능을 대소문자 구분 없이 일관된 방식으로 적용합니다.  \n- 웹셸 업로드를 방지하기 위한 MIME 타입 검증 및 파일 내용 검사를 추가합니다.  \n- 서버 로그를 정기적으로 점검하여 비정상적인 업로드 시도를 감지합니다.\n\n## 조치 기한  \n3일 안\n\n## 담당 부서  \n인프라팀"
+    }
+  },
+  "load": {
+    "ms": 10014
+  },
+  "error": null,
+  "finishedAt": "2026-09-02 17:17:17"
+}

@@ -140,6 +140,46 @@ describe("dataset", () => {
     fs.unlinkSync(filePath);
   });
 
+  // ★ RAFT형(종류 「근거」) — 근거가 **디스크까지** 닿는지 끝에서 확인한다(증류 사다리 ②, 계획서 §12).
+  //   위생이 {question,answer}로 재구성하며 여분 칸을 버리므로, 종류를 안 주면 근거가 말없이 사라진다.
+  //   그 상태로도 저장은 200이고 학습도 정상 종료된다 — 그래서 **파일 내용을 읽어** 못 박는다.
+  it("★ kind=근거면 system 칸이 파일까지 실려 간다 (kind 없으면 버려진다)", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const 자리 = (id: string) => path.join(process.env.GIJO_DATASETS_DIR ?? path.join("data", "datasets"), `${id}.json`);
+    const 근거 = "참고 자료 — 사내 지식 베이스\n[1] 실제 악용이 확인된 취약점 목록";
+    const 보내기 = async (id: string, kind?: string) =>
+      request(app)
+        .post("/api/dataset/save")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          id,
+          ...(kind ? { kind } : {}),
+          examples: [{ question: "KEV가 무엇인가요", answer: "실제 악용이 확인된 취약점 목록입니다", system: 근거 }],
+        });
+
+    const a = `vitest-raft-${Date.now().toString(36)}`;
+    expect((await 보내기(a, "근거")).status).toBe(200);
+    const 근거행 = JSON.parse(fs.readFileSync(자리(a), "utf-8"));
+    expect(근거행[0].system, "근거가 디스크에 안 실렸다 — 파이썬이 읽을 칸이 비어 있다").toBe(근거);
+    fs.unlinkSync(자리(a));
+
+    const b = `vitest-noraft-${Date.now().toString(36)}`;
+    expect((await 보내기(b)).status).toBe(200);
+    const 지식행 = JSON.parse(fs.readFileSync(자리(b), "utf-8"));
+    expect(지식행[0].system, "지식 종류가 system을 실어 나르면 파이썬이 못 읽는 칸이 생긴다").toBeUndefined();
+    fs.unlinkSync(자리(b));
+  });
+
+  it("모르는 kind는 거절한다 — 오타가 조용히 「지식」으로 떨어지면 근거가 사라진다", async () => {
+    const res = await request(app)
+      .post("/api/dataset/save")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ id: "valid-id", kind: "근거들", examples: [{ question: "KEV가 무엇인가요", answer: "실제 악용이 확인된 목록입니다" }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("kind");
+  });
+
   it("save rejects a path-traversal-shaped id", async () => {
     const res = await request(app)
       .post("/api/dataset/save")

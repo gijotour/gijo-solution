@@ -105,6 +105,13 @@ function spawnTraining(args: FinetuneArgs): Promise<void> {
     //   스크립트도 은퇴한 unsloth 전제였다. 세 단계가 같은 환경을 보게 한 곳으로 모은다.
     const python = trainPython();
     const scriptArgs = [TRAIN_SCRIPT, "--dataset", args.datasetId, "--output", adapterWorkDir(args.datasetId)];
+    // ★ 최대 길이를 **제품 경로에서 명시한다**(2026-09-03, 증류 사다리 §12).
+    //   파이썬 기본은 1024인데 RAFT 행(근거 조각이 system에 실린다)은 실측 p95가 1,481토큰(방해 1개)·
+    //   1,985토큰(방해 2개)이다. 기본값 그대로 두면 그 행들이 render()에서 **조용히 버려진다** —
+    //   학습은 정상 종료되고 로그의 「사용 N쌍」만 줄어드니, 재료가 반쯤 사라져도 아무도 모른다.
+    //   env로 여는 이유: 길이는 VRAM을 먹는다(3090 24GB 14B 4bit 기준 3072가 실측 안전선). 기계가 바뀌면 값도 바뀐다.
+    const maxSeq = Math.max(512, Number(process.env.GIJO_FINETUNE_MAX_SEQ) || 3072);
+    scriptArgs.push("--max-seq", String(maxSeq));
     // 테스트/CI 전용: GPU·학습 의존성 없이 파이프라인 계약만 검증
     if (process.env.GIJO_FINETUNE_SMOKE === "1") scriptArgs.push("--smoke");
 

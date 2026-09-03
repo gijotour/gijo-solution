@@ -23,6 +23,9 @@ def main() -> None:
     p.add_argument("--system", default="당신은 GIJO AS의 취약점 전문 보안 분석가다. 사내 근거를 우선하고, 모르는 것은 모른다고 말하며, 한국어로 정확하고 간결하게 답한다.")
     p.add_argument("--epochs", type=float, default=3.0)
     p.add_argument("--lr", type=float, default=1e-4)
+    # 기본 1024는 지식 문답(근거 없음) 기준이다. RAFT형(행마다 system에 근거 조각)은 이걸 넘으므로
+    # 제품 경로(finetune.ts)가 env GIJO_FINETUNE_MAX_SEQ(기본 3072)로 --max-seq를 **명시해서** 넘긴다.
+    # 여기 기본값을 올리지 않는 이유: 손으로 부르는 옛 명령들의 VRAM 발자국을 말없이 키우지 않으려는 것.
     p.add_argument("--max-seq", type=int, default=1024)
     p.add_argument("--rank", type=int, default=16)
     # --smoke: GPU·학습 의존성 없이 **파이프라인 계약만** 확인한다(시험·CI 전용).
@@ -39,6 +42,13 @@ def main() -> None:
         sys.exit(1)
 
     if args.smoke:
+        # 스모크에서도 **데이터셋을 실제로 읽는다**(2026-09-03). 실학습 경로는 GPU·torch가 있어야 돌아
+        # 어느 시험도 못 지나가는데, 「행에 실린 per-row system(RAFT 근거)을 읽는가」는 값싸게 확인할 수 있다.
+        # 이 줄이 없으면 근거 칸이 통째로 무시돼도 학습은 정상 종료되고 아무도 모른다.
+        with open(ds_path, "r", encoding="utf-8") as f:
+            smoke_rows = [r for r in json.load(f) if r.get("question") and r.get("answer")]
+        with_system = sum(1 for r in smoke_rows if str(r.get("system") or "").strip())
+        log(f"[finetune] (smoke) 행 {len(smoke_rows)} · 근거(system) 실린 행 {with_system} · max_seq={args.max_seq}")
         os.makedirs(args.output, exist_ok=True)
         # 다음 단계(GGUF 변환)가 읽을 자리의 **모양만** 갖춘다. 내용은 학습물이 아니므로
         # 실제 변환은 하지 않는다 — 루프도 스모크에서는 변환을 건너뛴다.
@@ -77,8 +87,12 @@ def main() -> None:
             x = x[0]
         return list(x)
 
-    def render(q: str, a: str):
-        msgs_prompt = [{"role": "system", "content": args.system}, {"role": "user", "content": q}]
+    def render(q: str, a: str, system: str = ""):
+        # 행마다 system이 다를 수 있다(RAFT형 근거 학습, 증류 사다리 §12) — 근거 조각이 여기 실린다.
+        # 없으면 --system(전역 하나)로 떨어진다: 지금까지의 지식 데이터셋은 한 글자도 안 바뀐다.
+        # ★ 왜 질문이 아니라 system인가: 제품 추론이 근거를 system에 싣는다(llm.ts systemContent).
+        #   배운 자리와 쓰는 자리가 다르면 모델이 배운 것을 못 꺼낸다.
+        msgs_prompt = [{"role": "system", "content": system or args.system}, {"role": "user", "content": q}]
         kw = {}
         try:  # Qwen3 템플릿의 생각(thinking) 모드는 끈다 — 제품 구동도 --reasoning off다
             tok.apply_chat_template(msgs_prompt, tokenize=False, add_generation_prompt=True, enable_thinking=False)
@@ -93,8 +107,15 @@ def main() -> None:
         labels = [-100] * len(prompt_ids) + full_ids[len(prompt_ids):]
         return {"input_ids": full_ids, "labels": labels}
 
-    feats = [f for f in (render(r["question"], r["answer"]) for r in rows) if f]
-    log(f"[finetune] 토큰화 — 사용 {len(feats)}쌍(길이 초과 제외 {len(rows) - len(feats)})")
+    feats = [f for f in (render(r["question"], r["answer"], str(r.get("system") or "")) for r in rows) if f]
+    dropped = len(rows) - len(feats)
+    log(f"[finetune] 토큰화 — 사용 {len(feats)}쌍(길이 초과 제외 {dropped}, max_seq={args.max_seq})")
+    # ⚠ 길이 초과는 **조용한 손실**이다 — render가 None을 돌려주면 그 행은 그냥 사라지고 학습은 정상 종료된다.
+    #   근거(system)를 실은 RAFT 행은 길어서 기본 1024를 넘기 쉬우므로, 눈에 띄게 경고한다(전-N 위생 계보).
+    if dropped and dropped / max(1, len(rows)) >= 0.1:
+        log(f"[finetune] ⚠ 재료의 {dropped / len(rows) * 100:.0f}%가 길이 초과로 빠졌습니다 — --max-seq(현재 {args.max_seq})를 올리거나 근거 조각 수를 줄이세요")
+    if not feats:
+        log("[finetune] 길이 조건을 통과한 행이 없습니다 — 중단"); sys.exit(1)
     data = Dataset.from_list(feats)
     # 총 스텝 = ceil(쌍 수 / 누적 16) × 에폭 — 아래 warmup_steps 환산에 쓴다(배치 1·누적 16과 같은 숫자여야 한다).
     total_steps = -(-len(feats) // 16) * args.epochs

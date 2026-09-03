@@ -174,6 +174,25 @@ let ragProvider: RagProvider | null = null;
 export function setRagProvider(p: RagProvider): void { ragProvider = p; }
 export function hasRagProvider(): boolean { return ragProvider !== null; }
 
+/**
+ * 「참고 자료」 블록 머리말 — 검색된 조각을 모델에 실을 때 **딱 한 곳**에서 정한다.
+ *
+ * ★ 왜 상수·함수로 뺐나(2026-09-03, 증류 사다리 §12): RAFT형 학습 데이터는 근거를 **제품이 쓰는
+ *   그 꼴 그대로** system에 실어야 한다(tools/build-raft-dataset.mjs). 학습 때의 근거 꼴과 추론 때의
+ *   근거 꼴이 한 글자라도 다르면, 모델은 못 보던 틀 앞에서 배운 것을 못 꺼낸다 — 그리고 그 어긋남은
+ *   **아무 오류도 안 낸다.** 문구를 두 곳에 적으면 어긋난다(이 저장소가 반복해 겪은 그것)라서,
+ *   빌더는 이 값을 창구(GET /api/learnloop/raft/prompt)로 받아 쓴다.
+ * ⚠ 글자를 바꾸면 이미 구운 어댑터의 학습 꼴과 갈라진다 — 바꿀 때는 재학습을 함께 정해야 한다.
+ *   (탐지 표식 SCAFFOLD_MARKERS도 이 머리말의 앞부분을 본다 — 함께 확인할 것.)
+ */
+export const RAG_BLOCK_HEADER =
+  "참고 자료 — 사내 지식 베이스(장기 기억)에서 검색된 관련 내용입니다. 질문과 관련된 내용이면 네 사전지식과 다르더라도 이 자료를 우선 근거로 삼아 답하고, 질문과 무관하면 무시하세요.";
+
+/** 검색 조각을 「참고 자료」 블록 한 덩어리로 만든다. 번호는 1부터 — 답이 「[2]에 따르면」으로 가리킨다. */
+export function ragBlock(chunks: string[]): string {
+  return RAG_BLOCK_HEADER + "\n" + chunks.map((c, i) => `[${i + 1}] ${c}`).join("\n");
+}
+
 export type ChatLogListener = (agentId: string, question: string, answer: string) => void;
 const chatLogListeners: ChatLogListener[] = [];
 export function onChatRecorded(l: ChatLogListener): void { chatLogListeners.push(l); }
@@ -197,10 +216,7 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
 
     const parts: string[] = [];
     if (chunks.length > 0) {
-      parts.push(
-        "참고 자료 — 사내 지식 베이스(장기 기억)에서 검색된 관련 내용입니다. 질문과 관련된 내용이면 네 사전지식과 다르더라도 이 자료를 우선 근거로 삼아 답하고, 질문과 무관하면 무시하세요.\n" +
-          chunks.map((c, i) => `[${i + 1}] ${c}`).join("\n")
-      );
+      parts.push(ragBlock(chunks));
     }
 
     // 하이브리드: 온톨로지(지식 그래프)에서 질문·청크에 걸린 엔티티의 관계·규칙을 동반 주입한다.

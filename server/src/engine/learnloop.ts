@@ -27,6 +27,9 @@ import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
 import { onChatRecorded } from "./llm"; // 화살 #15 — 수집기가 추론 층에 자기를 등록한다
+// ⚠ 새 화살이 아니다 — 위 줄로 이미 llm을 정적 import한다. RAFT 빌더가 「제품이 실제로 쓰는 근거 꼴」을
+//   받아 가는 창구(/api/learnloop/raft/prompt)에서 쓴다. 빌더가 문구를 베껴 적으면 학습 꼴과 추론 꼴이 어긋난다.
+import { systemPromptFor, ragBlock, RAG_BLOCK_HEADER } from "./llm";
 import { llamaBinPath } from "../util/llamabin";
 import { db, assertTestDb, migrate } from "../db";
 import { startFinetune, isFinetuneRunning } from "./finetune";
@@ -145,6 +148,16 @@ const pickAllApprovedByTopicStmt = db.prepare(
 );
 const pickAllWithUnratedByTopicStmt = db.prepare(
   "SELECT * FROM chat_logs WHERE (rating = 1 OR rating IS NULL) AND topic = ? AND COALESCE(origin,'chat') <> 'distill' ORDER BY createdAt ASC"
+);
+// RAFT 재료 내주기(GET /api/learnloop/approved) — 승인(👍)된 문답을 **cites와 함께** 통째로 준다.
+// ⚠ pickAll*과 따로 두는 이유: 저쪽은 데이터셋을 굽는 경로라 usedInDataset 마킹·위생이 뒤따르지만,
+//   여기는 **읽기만** 한다(빌더가 밖에서 근거를 되찾아 새 데이터셋을 만든다). 같은 statement를 돌려 쓰면
+//   나중에 한쪽에 LIMIT·마킹을 더할 때 다른 쪽이 조용히 따라 바뀐다.
+const listApprovedStmt = db.prepare(
+  "SELECT * FROM chat_logs WHERE rating = 1 ORDER BY createdAt ASC LIMIT ?"
+);
+const listApprovedByTopicStmt = db.prepare(
+  "SELECT * FROM chat_logs WHERE rating = 1 AND topic = ? ORDER BY createdAt ASC LIMIT ?"
 );
 // 학습 시작 게이트용 — usedInDataset 여부와 무관하게 그 주제의 **승인 총량**을 센다
 // (게이트는 "재료가 이만큼 모였나"의 판정이지 "아직 안 쓴 게 몇 개냐"가 아니다).
@@ -893,19 +906,29 @@ export function resetLearnloopForTests(): void {
 export function registerLearnloopRoutes(app: Express): void {
   // 주제별 재료 현황 — **전문가 학습을 언제 시작할 수 있나**를 답한다(2026-08-07).
   // 역할(agentId)로는 못 본다: 대화창 지시가 전부 orchestrator로 가서 66%가 한 칸에 쌓인다.
-  app.get("/api/learnloop/topics", authMiddleware, (_req, res) => {
-    const rows = db.prepare(
-      `SELECT COALESCE(topic, '(미분류)') AS topic, COUNT(*) AS total,
+  app.get(
+    "/api/learnloop/topics",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      const rows = db.prepare(
+        `SELECT COALESCE(topic, '(미분류)') AS topic, COUNT(*) AS total,
               SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) AS approved
          FROM chat_logs GROUP BY COALESCE(topic, '(미분류)') ORDER BY total DESC`
-    ).all() as { topic: string; total: number; approved: number }[];
-    // 전문가 LoRA는 승인된 좋은 문답 기준이다(LIMA — 수작업 수천이 기계생성 수만을 이긴다).
-    // 학습 시작 게이트(startLearnloopRun)와 같은 상수를 봐야 "준비됨"과 "시작 가능"이 안 어긋난다.
-    res.json({
-      목표승인건수: TOPIC_TRAIN_TARGET,
-      주제: rows.map((r) => ({ ...r, 준비됨: r.approved >= TOPIC_TRAIN_TARGET, 남은건수: Math.max(0, TOPIC_TRAIN_TARGET - r.approved) })),
-    });
-  });
+      ).all() as { topic: string; total: number; approved: number }[];
+      // 승인 문답이 **기억에 실제로 들어갔나**를 같은 화면에서 본다(2026-09-03).
+      //   운영 실측에서 승인 1,856건 대비 문서 1,253건이었는데 어느 화면도 그 차이를 안 보여
+      //   몇 달을 몰랐다 — 숫자를 옆에 세워 두면 다음엔 하루 만에 드러난다.
+      //   ⚠ learnmemory가 이 파일을 import하므로 정적 import는 순환이다 — 라우트 안에서 동적으로 받는다.
+      const { approvedQaDocStats } = await import("./learnmemory.js");
+      // 전문가 LoRA는 승인된 좋은 문답 기준이다(LIMA — 수작업 수천이 기계생성 수만을 이긴다).
+      // 학습 시작 게이트(startLearnloopRun)와 같은 상수를 봐야 "준비됨"과 "시작 가능"이 안 어긋난다.
+      res.json({
+        목표승인건수: TOPIC_TRAIN_TARGET,
+        주제: rows.map((r) => ({ ...r, 준비됨: r.approved >= TOPIC_TRAIN_TARGET, 남은건수: Math.max(0, TOPIC_TRAIN_TARGET - r.approved) })),
+        기억반입: approvedQaDocStats(),
+      });
+    })
+  );
 
   app.get("/api/learnloop/logs", authMiddleware, (req, res) => {
     const limit = Math.min(Number(req.query.limit ?? 50) || 50, 200);
@@ -978,6 +1001,40 @@ export function registerLearnloopRoutes(app: Express): void {
       }
     })
   );
+
+  // ── RAFT 재료 창구 두 개 (증류 사다리 §12, 2026-09-03) ────────────────────────────
+  // 왜 창구인가: 학습 데이터를 만드는 빌더(tools/build-raft-dataset.mjs)는 tools/에 있다 — 서버 엔진에서
+  // 만들면 LLM·DB 화살이 늘고, 도구가 DB를 직접 열면 운영 DB를 두 프로세스가 붙잡는다. 그래서 **읽기 창구**로 준다.
+
+  // 승인된 문답 + 그 문답이 인용한 근거 ref. 빌더는 이 ref로 본문을 되찾아 RAFT 행을 만든다.
+  // ⚠ **관리자만**이다. 담당자용 /logs와 달리 여기는 상한 없이(최대 1만) 통째로 퍼 가는 **반출 창구**다 —
+  //   승인 문답은 사내 문서 문장을 인용해 담고 있어, 지식 저장소를 페이지 없이 긁어 가는 길이 된다.
+  //   (같은 이유로 증류 근거 코퍼스 창구도 admin이다 — learncandidates.ts distill/corpus.)
+  app.get("/api/learnloop/approved", authMiddleware, adminMiddleware, (req, res) => {
+    const topic = String(req.query.topic ?? "").trim();
+    if (topic && !(TOPICS as readonly string[]).includes(topic)) {
+      res.status(400).json({ error: `알 수 없는 주제입니다: ${topic} — 가능한 주제: ${TOPICS.join("·")}` });
+      return;
+    }
+    const limit = Math.min(Math.max(1, Number(req.query.limit ?? 5000) || 5000), 10000);
+    const rows = (topic ? listApprovedByTopicStmt.all(topic, limit) : listApprovedStmt.all(limit)) as ChatLogRow[];
+    // 상한에 걸렸는지 함께 말한다 — 조용히 잘리면 빌더가 「이게 전부」로 읽는다(코퍼스 창구 skipped와 같은 취지).
+    res.json({ topic: topic || null, limit, 상한도달: rows.length >= limit, logs: rows.map(logFromRow) });
+  });
+
+  // 「제품이 실제로 쓰는 근거 꼴」 — 팀원의 system 프롬프트와 참고 자료 머리말.
+  // ⚠ **관리자만**이다. 내부 프롬프트 원문이 그대로 나가는 창구라, 담당자 화면에 실릴 값이 아니다
+  //   (프롬프트 누출은 위생 ⑦이 학습에서 막는 바로 그 오염이기도 하다).
+  // ⚠ 빌더가 이 값을 **받아서** 쓴다 — 베껴 적으면 학습 꼴과 추론 꼴이 어긋나고, 그 어긋남은 오류를 안 낸다.
+  app.get("/api/learnloop/raft/prompt", authMiddleware, adminMiddleware, (req, res) => {
+    const agentId = String(req.query.agentId ?? "").trim();
+    if (!agentId) {
+      res.status(400).json({ error: "agentId가 필요합니다 (예: normaltic · analysis)" });
+      return;
+    }
+    // 조각 하나를 넣어 본 예시도 함께 준다 — 빌더가 조립한 꼴이 제품과 같은지 눈으로 대조할 자리다.
+    res.json({ agentId, system: systemPromptFor(agentId), ragHeader: RAG_BLOCK_HEADER, ragBlockSample: ragBlock(["<조각 본문>"]) });
+  });
 
   app.get("/api/learnloop/preflight", authMiddleware, (_req, res) => res.json(preflightCheck()));
 
