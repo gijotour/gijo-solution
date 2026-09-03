@@ -61,6 +61,12 @@ describe("경로 검증 — 서버 기계의 폴더만, 자기 되먹임·시스
     expect(경로검증("/").ok).toBe(false);
   });
   it("제품 자신의 data/·서버 뿌리를 거부한다 — 추출본 재인입 순환(설계관 ④-2)", () => {
+    // ⚠ 사전조건: data/가 **실재해야** 순환 판정까지 간다(2026-09-03 gb10 깨끗한 사본 실측).
+    //   경로검증은 realpath부터 밟으므로 폴더가 없으면 「경로를 못 찾음」에서 끝나고, 이 시험은
+    //   「순환」이 아닌 다른 사유를 받아 실패한다 — 개발 트리에는 data/가 늘 있어서 여태 안 보였다.
+    //   제품 코드(watchfolder.ts)는 손대지 않는다. 존재 판정보다 순환 판정을 먼저 하는 것은
+    //   사람에게 보이는 사유 문구가 바뀌는 **제품 계약**이라 따로 결정할 일이다.
+    fs.mkdirSync(path.resolve("data"), { recursive: true });
     const d = 경로검증(path.resolve("data"));
     expect(d.ok).toBe(false);
     if (!d.ok) expect(d.error).toContain("순환");
