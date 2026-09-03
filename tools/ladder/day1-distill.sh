@@ -109,7 +109,11 @@ for (const r of cfg.회차 ?? []) {
   const 순번 = (회차수.get(r.topic) ?? 0) + 1;
   회차수.set(r.topic, 순번);
   // 값에 공백이 든 인자는 없다(주제·경로 패턴 모두 공백 없이 쓴다) — 탭으로만 가른다.
-  console.log(r.topic + "\t" + a.join(" ") + "\t" + (r.files ?? "") + "\t" + 순번);
+  // ⚠ 빈 칸을 빈 문자열로 두면 안 된다: 탭은 bash의 **IFS 공백**이라 `read`가 연속된 탭을 하나로 뭉치고
+  //   빈 칸을 통째로 없앤다. 그러면 store 회차(files 없음)에서 뒤 칸이 앞으로 밀려 **순번 "1"이 재료 목록으로**
+  //   읽히고, 허용목록 검사가 「1 — 재료가 아니다」로 사슬을 죽인다(2026-09-03 실기동에서 그렇게 죽었다).
+  //   그래서 없음을 "-" 로 적어 칸을 채운다. 받는 쪽이 "-" 를 없음으로 되돌린다.
+  console.log(r.topic + "\t" + a.join(" ") + "\t" + (r.files || "-") + "\t" + 순번);
 }
 ' "$CONFIG" "$ONLY")" || { echo "✗ 설정을 못 읽었다: $CONFIG" >&2; exit 6; }
 
@@ -119,6 +123,7 @@ for (const r of cfg.회차 ?? []) {
 while IFS=$'\t' read -r TOPIC ARGS FILESPEC ORD; do
   [ -n "$TOPIC" ] || continue
   ORD="${ORD:-1}"   # 설정 읽기가 순번을 못 준 경우(옛 설정) 1로 본다
+  [ "$FILESPEC" = "-" ] && FILESPEC=""   # "-"는 「재료 파일 없음」(store 회차) — 위 emitter의 짝
 
   # ── 재료 허용 검사 ───────────────────────────────────────────────────
   # 무엇을 학습 재료로 써도 되는지는 allowed-sources.json 한 곳이 정한다. 여기서 미리 걸러,
