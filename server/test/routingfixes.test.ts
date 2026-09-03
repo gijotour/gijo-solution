@@ -268,3 +268,50 @@ describe("⑨ 「X가 무슨 제품이야?」는 explain(사내 근거)으로 �
     expect(forcedToolFor("우리가 무슨 제품이야?")?.tool ?? null, "「우리」는 제외").not.toBe("explain");
   });
 });
+
+// ⑩ 오타 어미·대상 없는 취약점 물음 — 야간 회귀 ⑪마당 「사람은 이렇게 친다 — 모호·오타·
+//    짧게」가 잡은 실위반(2026-09-04, dashboard.html).
+//    「취약점 알려주세여」가 **어느 도구에도 안 걸려** 모델이 일반론을 답했다:
+//      "현재 제공된 정보로는 특정 취약점이 명시되어 있지 않습니다… Tenable, CVE, CVSS 등이
+//       사용됩니다" — 같은 시각 목록에는 202건이 있었다. 아는 것을 모른다고 한 것이라
+//    「할 일 없다」 거짓 계열이고, 말투(tone) 시험이 예고 말투로 잡은 것은 증상일 뿐이다.
+//    뿌리는 라우팅이었다: 목록 동사에 「알려」가 없어 오타가 아닌 「취약점 알려줘」도 샜다.
+describe("⑩ 오타 어미·대상 없는 취약점 물음도 결정적 목록으로 간다", () => {
+  beforeEach(() => {
+    registerAsset({ id: "typo-web", name: "오타서버", path: "p" });
+    recordFindings("typo-web", [
+      { finding_type: "원격코드실행", severity: "critical", evidence: "CVE-2026-9999", source_tool: "nessus" },
+    ]);
+  });
+
+  it("★ 「취약점 알려주세여」가 목록으로 답한다 — 도구 없이 모델로 새지 않는다", async () => {
+    const r = await dispatchInstruction("취약점 알려주세여");
+    expect(r.output).toContain("조치할 취약점");
+    expect(r.output).toContain("원격코드실행");
+    expect(r.output, "모델 일반론으로 새면 안 된다").not.toBe("[mock]");
+  });
+
+  it("어미가 틀려도 같은 답 — 어미는 scopeguard 요청어미 한 곳에서 받는다", async () => {
+    for (const q of ["취약점 알려줘여", "취약점 알려줘", "취약점 좀 알려주세요", "취약점 보여주삼"]) {
+      const r = await dispatchInstruction(q);
+      expect(r.output, `"${q}" → ${r.output.slice(0, 50)}`).toContain("조치할 취약점");
+    }
+  });
+
+  it("★ 넓어지지 않았다 — 대상을 지목한 물음은 종전 길(search)로 간다", () => {
+    // 2026-08-02 실측: 자산 등록부만 보면 사내 진단 보고서를 놓친다. 여기서 가로채면
+    // 「대상을 물었는데 전 자산 목록이 왔다」가 재발한다.
+    expect(forcedToolFor("안전대부 웹서버 취약점 알려줘")?.tool).toBe("search");
+  });
+
+  it("★ 상태어가 붙은 말은 종전 길(finding_status 필터)로 간다 — 조건이 사라지면 안 된다", () => {
+    // 「미조치 취약점 알려줘」는 파일럿 대본 문장이라 상태어취약점이 filter까지 못 박아 둔
+    // 자리다(2026-08-08 3/3 재현). 어미 오타는 그쪽이 동사 줄기만 봐서 이미 견딘다.
+    const a = forcedToolFor("미조치 취약점 알려줘");
+    expect(a?.tool).toBe("finding_status");
+    expect(a?.args.filter).toBe("미조치");
+    const b = forcedToolFor("미조치 취약점 알려주세용");
+    expect(b?.tool, "오타 어미여도 같은 길").toBe("finding_status");
+    expect(b?.args.filter).toBe("미조치");
+  });
+});
