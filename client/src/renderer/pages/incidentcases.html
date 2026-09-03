@@ -131,6 +131,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   var 샘자리 = document.getElementById("icSourceList");
   var 알림자리 = document.getElementById("icMsg");
   var 상한 = 500; // grouppanels.js 📚 판과 같은 상한 — 두 자리 숫자가 어긋나지 않게
+  // ?cve= 좁힘의 상한. 서버 /similar는 **안 주면 5건**이라, 이 값을 안 넘기면 칩이 「12건」이라 해 놓고
+  //   판에는 5줄만 그려 두 수가 어긋난다(2026-09-03 검토관). 50은 서버 창구의 최대값이다 —
+  //   더 크게 줘도 서버가 50으로 자르므로, 여기에 참값 아닌 숫자를 적어 두지 않는다.
+  var 좁힘상한 = 50;
   var 등록예시 = "사례 등록: 2024년 ○○물류 랜섬웨어, 초기 침투는 VPN 계정 탈취, 교훈은 VPN에 MFA";
   var 열린id = null;
   var 필터CVE = 읽기CVE();
@@ -325,7 +329,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
     var 전체p = g.incidentCases(undefined, undefined, undefined, 상한);
     // 좁힘은 서버 /similar가 판정한다 — 칩이 센 N건과 같은 창구·같은 규칙(여기서 새로 거르지 않는다).
-    var 목록p = 필터CVE.length && g.incidentCasesSimilar ? g.incidentCasesSimilar(필터CVE) : 전체p;
+    var 목록p = 필터CVE.length && g.incidentCasesSimilar ? g.incidentCasesSimilar(필터CVE, 좁힘상한) : 전체p;
     Promise.all([전체p, 목록p]).then(function (r) {
       사례들 = (r[1] && r[1].cases) || [];
       // 두 응답 다 { cases, total } — 좁혔을 때는 좁힌 쪽 total이 「이 CVE의 사례 수」다(서버가 센 값).

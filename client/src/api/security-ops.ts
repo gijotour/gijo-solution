@@ -622,8 +622,9 @@ export const incidentCasesApi = {
   },
   // 「비슷한 사례」 — 규칙만(LLM 없음). 칩(취약점 카드·대화창)과 판의 CVE 필터가 **같은 창구**를 써야
   // 칩의 N건과 판의 줄 수가 같다(세는 곳이 둘이면 어긋난다).
-  // ⚠ limit은 서버 창구가 받는 인자를 그대로 비춘 것이다 — 다만 preload 다리(incidentCasesSimilar)가 아직
-  //   cves만 넘겨서 화면에서는 못 쓴다. 다리를 고칠 때 함께 넘길 것(지금 넘기는 척하면 조용히 무시된다).
+  // ⚠ limit은 서버 창구가 받는 인자를 그대로 비춘 것이다 — preload 다리(incidentCasesSimilar)도 2026-09-03에
+  //   함께 넘기도록 고쳤다(판의 ?cve= 좁힘이 50건을 넘긴다). 안 넘기면 서버 기본은 **5건**이라, 칩이 「12건」이라
+  //   해 놓고 판에 5줄만 그리는 어긋남이 났었다.
   similar: (cves: string[], limit?: number) =>
     request<{ cases: IncidentCase[]; total: number }>(
       "/api/incident-cases/similar?cves=" + encodeURIComponent(cves.join(",")) + (limit != null ? "&limit=" + String(limit) : ""),

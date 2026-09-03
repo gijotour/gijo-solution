@@ -682,7 +682,11 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     if (!cves.length) return;
     let r;
     try { r = await window.gijo.incidentCasesSimilar(cves); } catch (e) { return; } // 창구가 죽어도 취약점 화면은 산다 — 칩만 안 뜬다
-    const n = ((r && r.cases) || []).length;
+    // 칩의 N은 **서버가 센 total**이다(2026-09-03 검토관). /similar는 { cases, total }을 주는데
+    //   cases에는 기본 **5건까지만** 실려 온다 — 줄 수로 세면 6건 이상 걸린 CVE가 늘 「5건」이 되어
+    //   담당자에게 거짓 숫자를 말한다(판을 열면 더 나오니 그 자리에서 들통난다).
+    //   ⚠ total이 없는 옛 서버면 받은 줄 수로 대신한다 — 참값을 모를 때 딱 떨어지게 적지 않는다.
+    const n = r && typeof r.total === "number" ? r.total : ((r && r.cases) || []).length;
     if (!n || !item.isConnected || item.querySelector(".vd-cases")) return;
     const box = document.createElement("div");
     box.className = "vd-cases";

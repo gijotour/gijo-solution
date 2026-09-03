@@ -459,4 +459,35 @@ describe("배선 — 도구·정리 대장", () => {
     expect(read("observability.ts")).not.toContain("incident-case");
     expect(read("teamview.ts")).not.toContain("incident-case");
   });
+
+  // ★ 2026-09-03 검토관: 안내글이 「판 전체 목록은 최대 **200건**」이라 적어 놓았는데 서버 상한은 **500**이었다.
+  //   같은 숫자가 세 곳(서버 clamp · 판 화면 상한 · 안내글)에 손으로 적혀 있어 한 곳만 낡은 것이다 —
+  //   담당자는 「200건까지만 보이나 보다」 하고 좁혀 묻는데 화면엔 500건이 그려진다. 세 번째면 소스 감시.
+  it("★ 안내가 말하는 상한이 코드의 상한과 같다 (안내한 말 점검)", () => {
+    const 엔진 = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "incidentcases.ts"), "utf8");
+    const 목록상한 = Number(/Math\.max\(1,\s*Math\.min\((\d+),\s*Number\(opts\.limit\)/.exec(엔진)?.[1]);
+    const 좁힘상한 = Number(/Math\.max\(1,\s*Math\.min\((\d+),\s*Number\(q\.limit\)/.exec(엔진)?.[1]);
+    expect(목록상한, "listIncidentCases의 상한을 소스에서 못 읽었다 — 꼴이 바뀌었다면 이 감시부터 고친다").toBeGreaterThan(0);
+    expect(좁힘상한, "/similar의 상한을 소스에서 못 읽었다 — 꼴이 바뀌었다면 이 감시부터 고친다").toBeGreaterThan(0);
+    const 안내 = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "screenguide.ts"), "utf8");
+    const 판안내 = /"히스토리 보는 법":\s*"([^"]+)"/.exec(안내)?.[1] ?? "";
+    expect(판안내, "📚 판 안내(screenguide panels)를 못 읽었다").not.toBe("");
+    expect(판안내, `안내가 말하는 판 상한이 코드(${목록상한})와 다르다`).toContain(`최대 ${목록상한}건`);
+    expect(판안내, `안내가 말하는 좁힘 상한이 코드(${좁힘상한})와 다르다`).toContain(`${좁힘상한}건`);
+    // 화면도 같은 수를 쓴다 — 작게 부르면 화면이 스스로 잘라 놓고 「N건」이라 말한다(거짓 숫자의 뿌리).
+    const 화면 = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "incidentcases.html"), "utf8");
+    expect(화면, "판 목록 상한").toContain(`var 상한 = ${목록상한};`);
+    expect(화면, "?cve= 좁힘 상한").toContain(`var 좁힘상한 = ${좁힘상한};`);
+  });
+
+  // ★ 2026-09-03 검토관: 칩이 「📚 비슷한 사례 N건」이라 말하는데 N을 **받은 줄 수**로 셌다.
+  //   /similar는 { cases, total }을 주고 cases는 기본 5건까지만 실린다 — 6건 이상 걸린 CVE는 늘 「5건」이었다.
+  //   판을 열면 더 나오니 그 자리에서 들통나는 거짓 숫자다. 세는 곳은 서버 total 하나다.
+  it("★ 「비슷한 사례」 칩의 N은 서버가 센 total이다 — 다리(preload)도 limit을 실제로 넘긴다", () => {
+    const 취약점화면 = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "vulnscan.html"), "utf8");
+    expect(취약점화면, "칩의 N이 total이 아니면 기본 5건에 갇힌 거짓 숫자가 된다").toMatch(/typeof r\.total === "number" \? r\.total/);
+    // 다리가 limit을 안 넘기면 화면이 넘기는 척만 하고 서버는 기본 5건을 준다(조용히 무시되는 인자).
+    const preload = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "preload.ts"), "utf8");
+    expect(preload, "preload 다리가 limit을 받아 넘겨야 한다").toMatch(/incidentCasesSimilar:\s*\(cves: string\[\], limit\?: number\)\s*=>\s*api\.incidentCasesApi\.similar\(cves, limit\)/);
+  });
 });
