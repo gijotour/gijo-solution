@@ -154,6 +154,16 @@ describe("대화 답 — 숫자만 주고 끝내지 않는다", () => {
 
   it("★ 「모른다」를 「없음」과 섞지 않는다", () => {
     sbom검수({ 파일이름: "x.json", 내용: 부품표([{ name: "a" }, { name: "b", license: "MIT" }]) });
+    // 알아본 조건부(NC)는 「알 수 없는 부품」에 안 섞인다 — 별도 줄로 말한다(2026-09-03 검토관: 요약 줄의 거짓 셈)
+    const 조건 = 부품표([{ name: "nc", license: "CC-BY-NC-4.0" }, { name: "u" }]);
+    sbom검수({ 파일이름: "nc.json", 내용: 조건 });
+    // 같은 초에 검수한 두 건은 목록 순서가 갈릴 수 있어 id로 집는다
+    const ncId = 검수목록(5).find((x) => x.name === "nc.json")?.id;
+    const t = 검수요약문(ncId);
+    expect(t).toContain("알 수 없는 부품 1개");
+    expect(t).toContain("조건 때문에 등급을 매기지 않은 부품 1개");
+    db.prepare("DELETE FROM sbom_reviews WHERE name='nc.json'").run();
+    db.prepare("DELETE FROM sbom_review_components WHERE reviewId NOT IN (SELECT id FROM sbom_reviews)").run();
     const s = 검수요약문();
     expect(s).toContain("알 수 없는 부품 1개");
     expect(s, "모른다는 것이 없음이 아니라고 말한다").toContain("「없음」이 아닙니다");

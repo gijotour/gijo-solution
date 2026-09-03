@@ -14,7 +14,7 @@ import crypto from "crypto";
 import { db, migrate } from "../db";
 import { emitCollaboration } from "./collaboration";
 import { setAgentStatus, resetAgentToDefault } from "./agents";
-import { 등급판정, 상용사용금지, 변경금지조건, 면책문구, 등급순위, type 라이선스등급 } from "./licenserisk";
+import { 등급판정, 면책문구, 등급순위, type 라이선스등급 }from "./licenserisk";
 import { 표식 } from "./tone";
 import { 우리말 } from "./scandrafts";
 
@@ -218,8 +218,9 @@ export async function explainLicense(license: string, deps?: { chat?: ChatFn }):
     `${표식.위치} ${원문} — 등급 「${판정.등급}」${판정.확인필요 ? " (확인 필요)" : ""}`,
     `  요구: ${판정.받게되는요구}`,
     `  근거: ${판정.근거}`,
-    ...(상용사용금지(원문) ? [`  ${표식.주의} 상용 이용 금지 조건이 있는 라이선스입니다 — 상업 제품에 넣을 수 없습니다`] : []),
-    ...(변경금지조건(원문) ? [`  ${표식.주의} 변경 금지 조건이 있는 라이선스입니다 — 고쳐서 쓸 수 없습니다`] : []),
+    // ⚠ NC(비영리)·ND(변경금지) 줄을 여기서 따로 붙이지 않는다(2026-09-03 검토관 수리 뒤). 등급판정이 알아본
+    //   판정불가(NC·ND·LicenseRef)의 「요구」 칸에 그 조건 문장을 이미 싣는다 — 같은 뜻을 두 줄로 내면 담당자는
+    //   조건이 둘인 줄 안다. 문장은 licenserisk 한 곳이 짓는다(bomdrafts.test 소스 감시).
   ];
   if (process.env.GIJO_BOM_EXPLAIN !== "0") {
     setAgentStatus("bom", "working");

@@ -457,6 +457,69 @@ describe("★ 우리가 배포하는 글꼴·아이콘 라이선스", () => {
   });
 });
 
+// ── 2026-09-03 검토관 [중] ×5 — **알아본 판정불가에 「알 수 없습니다」를 붙이지 않는다** ─────────
+//   규칙에서 구운 등급표의 NC·ND 줄이 「라이선스를 알 수 없습니다 — 공급사에 확인해야 합니다」로 시작했다.
+//   CC-BY-NC-4.0은 아는 라이선스다. 등급판정()이 판정불가 전부에 요구문장.판정불가를 붙이고, NC말을
+//   요구 칸과 근거 칸에 **둘 다** 덧붙여 같은 조건이 세 번 읽혔다. 원천에서 가른다(표 조립에서 깎지 않는다).
+describe("★★ 알아본 판정불가 — 요구 칸은 그 조건, 근거 칸은 규칙의 근거만", () => {
+  it("단일 NC — 「알 수 없습니다」가 아니라 「상용 제품에 쓸 수 없습니다」", () => {
+    const r = 등급판정("CC-BY-NC-4.0");
+    expect(r.등급).toBe("판정불가");
+    expect(r.받게되는요구, "아는 라이선스를 모른다고 하면 담당자가 공급사에 헛물음을 보낸다").not.toContain("알 수 없습니다");
+    expect(r.받게되는요구).toContain("상용 제품에 쓸 수 없습니다");
+    expect(r.받게되는요구, "같은 조건을 요구 칸에 두 번 적지 않는다").not.toContain("함께 걸려 있습니다");
+    // 근거 칸은 규칙의 근거 하나 — NC말을 덧붙여 겹치게 하지 않는다.
+    expect(r.근거.match(/비영리\(NC\)/g)?.length ?? 0, "근거에 같은 조건이 두 번").toBe(1);
+    expect(r.근거).not.toContain("함께 걸려 있습니다");
+    expect(r.확인필요).toBe(true);
+  });
+
+  it("단일 ND — 「고쳐서 내보낼 수 없습니다」, 상용 배포는 막지 않는다", () => {
+    const r = 등급판정("CC-BY-ND-4.0");
+    expect(r.받게되는요구).not.toContain("알 수 없습니다");
+    expect(r.받게되는요구).toContain("고쳐서 내보낼 수 없습니다");
+    expect(r.받게되는요구, "ND는 상용을 막지 않는다").not.toContain("상용 제품에 쓸 수 없습니다");
+    expect(r.근거.match(/변경금지\(ND\)/g)?.length ?? 0).toBe(1);
+  });
+
+  it("★ NC와 ND가 **둘 다** 걸린 것(우리가 실제로 걸린 모양)은 둘 다 말한다 — NC 규칙이 먼저 걸려도 ND를 잃지 않는다", () => {
+    for (const s of ["CC-BY-NC-ND-4.0", "CC BY-NC-ND 2.0 KR", "공공누리 제4유형"]) {
+      const r = 등급판정(s);
+      expect(r.받게되는요구, `${s} — NC`).toContain("비영리(NC)");
+      expect(r.받게되는요구, `${s} — ND도 함께`).toContain("변경금지(ND)");
+    }
+    // 반례 — NC만 붙은 것에 ND를 지어내지 않는다.
+    expect(등급판정("CC-BY-NC-4.0").받게되는요구).not.toContain("변경금지(ND)");
+    expect(등급판정("공공누리 제2유형").받게되는요구).not.toContain("변경금지(ND)");
+  });
+
+  it("LicenseRef — 「원문을 받아 읽어야 합니다」, 「알 수 없습니다」가 아니다", () => {
+    const r = 등급판정("LicenseRef-Vendor-EULA");
+    expect(r.등급).toBe("판정불가");
+    expect(r.받게되는요구).not.toContain("알 수 없습니다");
+    expect(r.받게되는요구).toContain("원문");
+    expect(r.받게되는요구, "「의무 없음」이 아니라는 말은 남긴다").toContain("의무 없음");
+  });
+
+  it("반례 — 진짜 모르는 것은 그대로 「알 수 없습니다」 (감시가 헛돌면 안 된다)", () => {
+    for (const s of ["NOASSERTION", "", "Weird-Vendor-License-1.0", "See LICENSE file"]) {
+      expect(등급판정(s).받게되는요구, JSON.stringify(s)).toContain("알 수 없습니다");
+    }
+  });
+
+  it("이어 붙인 표기 — 조건은 요구 칸에 한 번, 근거 칸에는 규칙의 근거와 셈만", () => {
+    const r = 등급판정("MIT AND CC-BY-NC-4.0");
+    expect(r.등급).toBe("고지만");
+    expect(r.받게되는요구.match(/비영리\(NC\)/g)?.length ?? 0, "요구 칸에 NC 한 번").toBe(1);
+    expect(r.근거, "근거 칸은 「왜 이 등급인가」 — 조건은 요구 칸이 말한다").not.toContain("비영리(NC)");
+    expect(r.근거).toContain("함께 지켜야");
+    // OR(고를 수 있음)이면 강제 문장 대신 「선택지」로만 — 헛경보 금지(종전 계약 유지).
+    const o = 등급판정("MIT OR CC-BY-NC-4.0");
+    expect(o.받게되는요구).toContain("그쪽을 고르면");
+    expect(o.받게되는요구).not.toContain("상용 제품에는 쓸 수 없습니다");
+  });
+});
+
 describe("★ LicenseRef- 는 「표기가 틀린 것」이 아니다", () => {
   it("개별 라이선스라고 말하고 원문을 받으라고 안내한다", () => {
     // 「아는 라이선스가 아닙니다 — 표기가 정확한지 확인하세요」라고 하면 담당자는
@@ -466,5 +529,22 @@ describe("★ LicenseRef- 는 「표기가 틀린 것」이 아니다", () => {
     expect(r.근거).toContain("개별 라이선스");
     expect(r.근거, "원문을 받으라고 해야 한다").toContain("원문");
     expect(r.근거, "표기가 틀렸다고 하면 안 된다").not.toContain("표기가 정확한지");
+  });
+});
+
+describe("★ 알아봄 — 판정불가 중 「알아본 것」과 「진짜 모름」을 가른다(요약 셈의 거짓 방지, 2026-09-03)", () => {
+  it("NC·ND·LicenseRef는 판정불가여도 알아봄=true, NOASSERTION·빈 값·모르는 표기는 false", () => {
+    expect(등급판정("CC-BY-NC-4.0").알아봄).toBe(true);
+    expect(등급판정("LicenseRef-Vendor-EULA").알아봄).toBe(true);
+    expect(등급판정("MIT").알아봄).toBe(true);
+    expect(등급판정("NOASSERTION").알아봄).toBe(false);
+    expect(등급판정("").알아봄).toBe(false);
+    // 조각 하나를 못 읽으면 전체도 「못 읽은 것」 — 무거운 조각이 숨어 있을 수 있다
+    expect(등급판정("MIT AND SunPro").알아봄).toBe(false);
+  });
+  it("등급요약.알아본판정불가는 판정불가 중 알아본 것만 센다 — 「알 수 없는 부품」에서 빼는 수", () => {
+    const r = 등급요약([등급판정("CC-BY-NC-4.0"), 등급판정("NOASSERTION"), 등급판정("MIT")]);
+    expect(r.등급별.판정불가).toBe(2);
+    expect(r.알아본판정불가).toBe(1);
   });
 });

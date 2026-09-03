@@ -1633,7 +1633,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         box.textContent = "등록된 어댑터가 없습니다 — 학습 루프가 어댑터를 구우면 여기 등록됩니다(채택 전에는 실서비스에 실리지 않습니다).";
         return;
       }
-      const 색 = { 취약점: "color:var(--red-ink, #f5928a);background:rgba(226,72,61,.12)", 장비운영: "color:var(--blue-ink, #7db2f8);background:rgba(59,130,246,.13)", 사내규정: "color:var(--amber);background:rgba(240,160,32,.13)", 위협대응: "color:var(--purple);background:rgba(139,124,240,.14)" };
+      // ⚠ 서버 TOPICS(learnloop.ts) 다섯 주제 **전부** — 빠진 주제는 아래 폴백(미분류 회색)으로 떨어진다.
+      //   실제로 「일반」(2026-09-03 신설)이 빠져 그 어댑터가 미분류처럼 보였다(검토관 2026-09-03).
+      //   바탕색(tint)은 learnloop.html .lt-<주제>와 같은 값 — 짝 시험 topiccolors.test가 전수·바탕색을 대조한다.
+      const 색 = { 취약점: "color:var(--red-ink, #f5928a);background:rgba(226,72,61,.12)", 장비운영: "color:var(--blue-ink, #7db2f8);background:rgba(59,130,246,.13)", 사내규정: "color:var(--amber);background:rgba(240,160,32,.13)", 위협대응: "color:var(--purple);background:rgba(139,124,240,.14)", 일반: "color:var(--teal);background:rgba(30,185,128,.13)" };
       const esc2 = (s) => String(s ?? "").replace(/</g, "&lt;");
       box.innerHTML =
         '<table style="border-collapse:collapse;width:100%"><tr>' +

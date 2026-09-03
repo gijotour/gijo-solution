@@ -32,6 +32,25 @@
   var KEY = "gijo:panels:seen:v1";   // { 판id: { fp, movedAt } } — 앞서 본 지문과 그때 시각
   var 최근 = null;                    // 이번 화면에서 잰 결과(정렬·재렌더용)
 
+  // ── 타일 폭 계약 — CSS(모양())와 조각 상한(타일())이 **같은 숫자**를 본다 ───────────────
+  //   왜: 숫자를 CSS 문자열 안에만 두면 조각 상한은 「4」 같은 맨 숫자가 되어 어디서 온 값인지
+  //   아무도 모르고, 실제로 그 4가 🎓 학습 판의 다섯째 주제 「일반」을 조용히 잘랐다(검토관
+  //   2026-09-03 ③중). 폭이 바뀌면 상한도 여기서 같이 바뀐다 — 두 곳에 적으면 어긋난다.
+  var 타일최소폭 = 210;   // .pv-grid minmax(…px,1fr) — 타일이 가장 좁을 때의 폭
+  var 타일여백 = 11;      // .pv-tile padding 좌·우
+  var 타일테두리 = 1;     // .pv-tile border
+  var 조각간격 = 10;      // .pv-v gap
+  // 조각 상한 = (가장 좁은 타일 안쪽에 한 줄로 서는 조각 수) × (값 줄 수).
+  //   조각 하나 = 「장비운영 1,234」(라벨 4자 + 굵은 숫자 5자, 12.25px) ≈ 88px — 넉넉한 쪽으로 잡는다.
+  //   줄은 셋까지 — 발 문구·확인 시각까지 더해도 목록 판과 높이가 나란히 서는 한도(밀도 계약).
+  //   지금 값: (210-22-2=186 → 한 줄 2조각) × 3줄 = 6. 판 중 조각이 가장 많은 🎓 학습이 5라 다 들어간다.
+  //   짝 시험: topiccolors.test 「현황판 조각 상한 ≥ TOPICS 수」(소스에서 같은 식으로 다시 센다).
+  var 조각폭 = 88;
+  var 조각줄수 = 3;
+  var 타일안쪽폭 = 타일최소폭 - 2 * 타일여백 - 2 * 타일테두리;
+  var 줄당조각 = Math.max(1, Math.floor((타일안쪽폭 + 조각간격) / (조각폭 + 조각간격)));
+  var 조각상한 = 줄당조각 * 조각줄수;
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
       .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -49,19 +68,21 @@
       ".pv-head .pv-more{margin-left:auto;background:transparent;border:1px solid var(--border-strong,rgba(255,255,255,.16));" +
       "color:var(--muted,#b3ada4);border-radius:7px;padding:4px 10px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}" +
       ".pv-head .pv-more:hover{color:var(--text-strong,#fff);border-color:var(--blue,#3b82f6);}" +
-      ".pv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;align-items:start;}" +
+      ".pv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(" + 타일최소폭 + "px,1fr));gap:8px;align-items:start;}" +
       // ⚠ 한 판 = 셀 하나다. 타일·조작·목록을 형제로 두면 **각각이 그리드 칸을 차지해** 판이
       //   세 조각으로 흩어진다(그리드 자식은 전부 셀이 된다). 셀로 묶어 둔다.
       ".pv-cell{min-width:0;}" +
-      ".pv-tile{border:1px solid var(--border,rgba(255,255,255,.08));border-radius:9px;background:var(--panel,#30302e);" +
-      "padding:9px 11px;cursor:pointer;text-align:left;font-family:inherit;color:inherit;display:block;width:100%;}" +
+      ".pv-tile{border:" + 타일테두리 + "px solid var(--border,rgba(255,255,255,.08));border-radius:9px;background:var(--panel,#30302e);" +
+      "padding:9px " + 타일여백 + "px;cursor:pointer;text-align:left;font-family:inherit;color:inherit;display:block;width:100%;}" +
       ".pv-tile:hover{border-color:var(--blue,#3b82f6);}" +
       ".pv-tile.moved{border-color:var(--amber,#f0a020);}" +
       ".pv-t{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;color:var(--text-strong,#fff);}" +
       ".pv-t .pv-dot{width:6px;height:6px;border-radius:50%;background:var(--amber,#f0a020);flex:0 0 auto;}" +
       ".pv-t .pv-ag{margin-left:auto;font-size:11px;font-weight:700;color:var(--muted-2,#a49d95);}" +
-      ".pv-v{display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;font-size:12.25px;color:var(--muted,#b3ada4);}" +
+      ".pv-v{display:flex;gap:" + 조각간격 + "px;flex-wrap:wrap;margin-top:5px;font-size:12.25px;color:var(--muted,#b3ada4);}" +
       ".pv-v b{color:var(--text,#e9e7e2);font-weight:800;}" +
+      // 「+N」 — 조각 상한을 넘겨 못 그린 조각의 수. 회색이지만 글자 크기는 .pv-v 그대로(11px 미만 금지).
+      ".pv-v .pv-more-seg{color:var(--muted-2,#a49d95);font-weight:700;}" +
       ".pv-f{margin-top:4px;font-size:11.25px;color:var(--muted-2,#a49d95);line-height:1.5;}" +
       ".pv-f .pv-when{color:var(--muted-2,#a49d95);}" +
       ".pv-f .pv-fail{color:var(--red-ink,#f5928a);font-weight:700;}" +
@@ -171,9 +192,20 @@
       값 = '<div class="pv-f"><span class="pv-fail">불러오지 못했습니다</span> ' +
         '<span title="' + esc(String(r.실패).slice(0, 200)) + '">— 서버 연결을 확인해 주세요</span></div>';
     } else if (d) {
-      var 조각 = (d.segments || []).slice(0, 4).map(function (s) {
+      // 판이 준 조각을 **다 그린다** — 상한(조각상한, 위 폭 계약에서 계산)을 넘을 때만 (상한-1)개 + 「+N」.
+      // ⚠ 예전엔 .slice(0, 4)로 **조용히** 잘랐다 — 🎓 학습 판이 다섯 주제를 주는데 넷만 그려
+      //   「일반」이 화면에서 없는 주제가 됐다(검토관 2026-09-03 ③중). 지문(움직임 판정)은 다섯을
+      //   다 보는데 화면은 넷만 보이니, 「바뀜」이 떴는데 무엇이 바뀌었는지 못 찾는 자리이기도 했다.
+      var 전조각 = d.segments || [];
+      var 보일조각 = 전조각.length > 조각상한 ? 전조각.slice(0, 조각상한 - 1) : 전조각;
+      var 조각 = 보일조각.map(function (s) {
         return esc(s.label) + " <b" + (s.color ? ' style="color:' + s.color + '"' : "") + ">" + (s.value || 0).toLocaleString() + "</b>";
       });
+      if (전조각.length > 보일조각.length) {
+        var 숨은 = 전조각.slice(보일조각.length);
+        // 잘렸음을 드러낸다 — 숫자는 「몇 개가 더 있다」, title은 그것이 무엇인지(조용히 자르지 않는다).
+        조각.push('<span class="pv-more-seg" title="' + esc(숨은.map(function (s) { return s.label + " " + (s.value || 0); }).join(" · ")) + '">+' + 숨은.length + "</span>");
+      }
       var 줄 = (d.rows || []).slice(0, 3).map(function (x) {
         return esc(x[0]) + " <b" + (x[2] ? ' style="color:' + x[2] + '"' : "") + ">" + esc(x[1]) + "</b>";
       });

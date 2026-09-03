@@ -13,6 +13,8 @@
 //     [--per-chunk 3] [--concurrency 2] [--files "knowledge/*.md,GIJO_AS_취약점관리_지침.md"] [--dry-run] [--no-intake]
 //     [--source files|store] [--corpus-server http://localhost:4000] [--force-login]
 //   --no-intake: 편입 없이 교사 수율(사전검사 통과율)만 잰다 — 보고서의 accepted는 0, preChecked에 남는다.
+//   ⚠ --topic 일반 은 --source files(문서 지목)만 된다 — 「일반」은 두 뜻이라(증류 주제=용어·개념 / 문서 업무영역=전 영역
+//     공용 + 분류 미확정 기본값) store로 받으면 미분류 더미가 통째로 용어 재료가 된다(검토관 2026-09-03 가).
 // 산출: .tmp-reports/distill-<주제>-<시각>.json (생성·사전검사·편입·거절 사유·교사·토큰·시간 — 폐기율이 교사 품질 지표)
 //
 // 근거 조각 = 저장소의 문서 파일(기본: server/docs-manifest.json의 files + knowledge/*.md)을 800자로 자른 것.
@@ -47,6 +49,14 @@ if (!["files", "store"].includes(SOURCE)) { console.error("--source 는 files �
 //   받아들이므로 여기만 더하면 「주제 없음」으로 전부 거절된다. 「일반」(2026-09-03)=해설 팀원 normaltic 재료(용어·개념).
 const TOPICS = ["취약점", "장비운영", "사내규정", "위협대응", "일반"];
 if (!TOPICS.includes(TOPIC)) { console.error(`--topic 은 ${TOPICS.join("·")} 중 하나여야 합니다`); process.exit(2); }
+// ⚠ 「일반」은 두 뜻이다(검토관 2026-09-03 가). 증류 주제 「일반」=용어·개념(해설 팀원 재료). 문서 업무영역 「일반」=전 영역 공용
+//   자료이자 **분류 실패 기본값**(memory.ts categorizeDocument — 규칙·LLM이 확신 못 하면 「일반(그 외)」). 글자가 같아
+//   --source store로 코퍼스 창구(learncandidates buildDistillCorpus)에 category=일반 을 넣으면 회의 메모·엉뚱한 PDF 같은
+//   미분류 더미가 통째로 용어 재료로 둔갑한다. 그래서 「일반」은 --files 로 문서(용어사전·knowledge/*.md)를 지목하는 길만 연다.
+if (TOPIC === "일반" && SOURCE === "store") {
+  console.error("--topic 일반 은 --source store 를 받지 않습니다 — 저장소의 업무영역 「일반」은 「분류 미확정」 문서까지 담는 기본값이라 용어·개념 재료가 아닙니다. --source files --files \"GIJO_AS_용어사전.md,knowledge/*.md\" 처럼 문서를 지목하세요.");
+  process.exit(2);
+}
 
 // ── 주제별 조각 고르기(낱말 규칙 — 서버 질문주제와 같은 취지, 재료 선별용) ─────────────────
 // ⚠ TOPICS에 주제를 더하면 여기도 더한다 — 없으면 아래 TOPIC_RE[TOPIC].test에서 TypeError로 즉사한다.
@@ -58,7 +68,9 @@ const TOPIC_RE = {
   // 「일반」= 용어·개념 해설 조각. 용어사전(GIJO_AS_용어사전.md)의 표제어 꼴이 근거 — 「**용어**」 다음 줄이
   //   「쉽게 말하면 …」, 약자는 「무엇의 줄임말인지·읽는 법」을 적는다(문서 머리말 규칙). 지식 문서(knowledge/*.md)의
   //   「○○이란」「정의」「개념」 조각도 같은 잣대로 든다. 재료는 --files "GIJO_AS_용어사전.md,knowledge/*.md"로 지목한다.
-  일반: /쉽게 말하면|용어|뜻|약자|약어|줄임말|정의|개념|읽는 법|무엇의|무엇인가|(이란|란)(?=[\s?!.,:]|$)/i,
+  //   「이란/란」은 서버 learnloop.ts GENERAL_RE와 같은 취지로 좁힌다(검토관 2026-09-03 라): 단독 낱말 「이란」(국가명)은 앞글자
+  //   없이 서므로 빼고, 「혼란·분란·교란·반란·소란·파란·착란」은 끝음절만 같을 뿐이라 앞 음절로 뺀다 — 끝음절만으로 조각을 뽑지 않게.
+  일반: /쉽게 말하면|용어|뜻|약자|약어|줄임말|정의|개념|읽는 법|무엇의|무엇인가|(?<=\S)이란(?=[\s?!.,:]|$)|(?<![혼분교반소파착이\s])란(?=[\s?!.,:]|$)/i,
 };
 
 function listSourceFiles() {

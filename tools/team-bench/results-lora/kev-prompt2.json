@@ -1,0 +1,38 @@
+[
+ {
+  "label": "prompt",
+  "q": "KEV 목록은 누가 발표해?",
+  "text": "KEV(Known Exploited Vulnerabilities) 목록은 미국 연방 정부의 **CISA**(Cybersecurity and Infrastructure Security Agency)가 발표합니다.  \nCISA는 취약점이 공개된 후 30일 이내에 패치가 제공되지 않은 경우 해당 취약점을 KEV 목록에 포함시킵니다.  \nKEV 목록은 연방 기관과 민간 기업이 보안 취약점을 우선적으로 해결하도록 독려하기 위해 제공됩니다.  \n참고: [CISA 공식 문서](https://www.cisa.gov/known-exploited-vulnerabilities-catalog)",
+  "ms": 6332,
+  "finish": "stop",
+  "cisaBody": true,
+  "cisaUrl": true
+ },
+ {
+  "label": "noprompt",
+  "q": "KEV 목록은 누가 발표해?",
+  "text": "KEV 목록은 **대한민국의 보건복지부**에서 발표합니다. KEV는 **\"Key Vaccine\"**의 약자로, **국내에서 접종 가능한 주요 예방접종(백신) 목록**을 의미합니다. 이 목록은 국민의 건강 보호를 위해 필요한 필수 예방접종 항목을 정리한 것으로, 보건복지부와 질병관리청(예전에 질병관리본부)이 함께 관리하고 있습니다.\n\nKEV 목록은 일반적으로 다음과 같은 내용을 포함합니다:\n- **아동 예방접종**(예: BCG, 폐렴구균, 황색포도상구균 등)\n- **청소년/성인 예방접종**(예: 인플루엔자, HPV, 간염 등)\n- **특정 직군 또는 고위험군 대상 예방접종**(예: 보건의료인, 군인 등)\n\nKEV 목록은 정기적으로 업데이트되며, **질병관리청의 공식 웹사이트**나 **보건복지부의 공지사항**에서 확인할 수 있습니다.\n\n필요하시면 현재 KEV 목록의 구체적인 항목도 알려드릴 수 있습니다.",
+  "ms": 12391,
+  "finish": "stop",
+  "cisaBody": false,
+  "cisaUrl": false
+ },
+ {
+  "label": "prompt",
+  "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+  "text": "KEV는 \"Known Exploited Vulnerabilities\"의 약자로, 미국 정부가 공개한 알려진 악용 취약점 목록입니다. 이 목록은 미국 연방 통신위원회(FCC)와 사이버 보안 이니셔티브(CISA)가 발표합니다. KEV는 실제 악용 사례가 확인된 취약점을 중심으로 정리되어 있으며, 보안 관리에 중요한 참고 자료로 사용됩니다. \n\n참고: [CISA - Known Exploited Vulnerabilities Catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog)",
+  "ms": 6049,
+  "finish": "stop",
+  "cisaBody": true,
+  "cisaUrl": true
+ },
+ {
+  "label": "noprompt",
+  "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+  "text": "KEV는 **Known Exploited Vulnerabilities**의 약자로, 보안 분야에서 **이미 공개된 취약점 중 실제 악용 사례가 있는 취약점**을 의미합니다. 이는 **미국 정부가 발표하는 취약점 목록**으로, 특히 **미국 연방 정부 기관의 시스템에서 발견된 취약점**을 포함합니다.\n\n---\n\n### 🔍 KEV(Known Exploited Vulnerabilities)란?\n\nKEV는 다음과 같은 특징을 가집니다:\n\n- **이미 공개된 취약점**(CVE로 등록됨)\n- **실제 악용 사례가 있는 취약점**\n- **정부 기관이나 민간 기업에서 실제로 공격을 당한 사례**가 있는 취약점\n- **보안 업데이트가 존재하지만, 여전히 사용 중인 시스템에서 발견된 취약점**\n\n---\n\n### 📌 KEV는 누가 발표하는가?\n\nKEV 목록은 **미국 정부의 CISA**(Cybersecurity and Infrastructure Security Agency)가 발표합니다.\n\n- **CISA**는 미국의 사이버 보안을 담당하는 정부 기관입니다.\n- KEV 목록은 **CISA의 \"Known Exploited Vulnerabilities Catalog\"**에 등록되어 있으며, **주기적으로 업데이트**됩니다.\n- 이 목록은 **정부 기관과 민간 기업**이 보안 취약점을 신속히 수정하도록 유도하기 위한 목적으로 사용됩니다.\n\n---\n\n### 📅 KEV 목록의 주요 특징\n\n- **주기적 업데이트**: 일반적으로 **매주 또는 매월** 업데이트됩니다.\n- **CVE 번호 포함**: 각 취약점은 **CVE**(Common Vulnerabilities and Exposures) 번호로 식별됩니다.\n- **취약점의 위험도**: CISA는 취약점의 **위험 수준**을 평가하여 목록에 포함시킵니다.\n\n---\n\n### 🛡️ KEV 목록의 활용\n\nKEV 목록은 다음과 같은 방식으로 활용됩니다:\n\n- **정부 기관**: KEV에 포함된 취약점은 **즉시 패치**해야 합니다.\n- **민간 기업**: KEV에 포함된 취약점은 **고위험 취약점**으로 간주되어, **패치 및 보안 조치**가 권장됩니다.\n- **보안 업체**: KEV 목록을 기반으로 **취약점 분석 및 대응 전략**을 수립합니다.\n\n---\n\n### 📌 예시: KEV 목록에 포함된 취약점\n\n- **CVE-2021-44228 (Log4j)**: Log4j 라이브러리의 심각한 취약점으로, **대규모 악용 사례**가 있었음.\n- **CVE-2021-34527 (ProxyLogon)**: Microsoft Exchange 서버의 취약점으로, **대규모 해킹 사례**가 있었음.\n\n---\n\n### ✅ 요약\n\n| 항목 | 내용 |\n|------|------|\n| **KEV** | Known Exploited Vulnerabilities (이미 악용된 취약점) |\n| **발표 기관** | 미국 CISA (Cybersecurity and Infrastructure Security Agency) |\n| **목적** | 취약점의 즉각적 패치 유도 및 보안 강화 |\n| **업데이트 주기** | 주기적으로 (주간/월간) |\n| **사용 대상** | 미국 정부 기관, 민간 기업, 보안 업체 등 |\n\n---\n\n필요하다면 KEV 목록의 최신 버전이나 특정 CVE에 대한 설명도 도와드릴 수 있어요!",
+  "ms": 38345,
+  "finish": "stop",
+  "cisaBody": true,
+  "cisaUrl": false
+ }
+]

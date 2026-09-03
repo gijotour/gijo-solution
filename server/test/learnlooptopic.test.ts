@@ -10,14 +10,17 @@ import request from "supertest";
 import * as fs from "fs";
 import * as path from "path";
 import { createApp } from "../src/app";
+import { db } from "../src/db";
 import {
   recordChatLog,
   resetLearnloopForTests,
   getLearnloopStatus,
+  getChatLog,
   topicTrainGate,
   TOPIC_TRAIN_TARGET,
   TOPICS,
 } from "../src/engine/learnloop";
+import { decideLearnCandidate } from "../src/engine/learncandidates";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -137,6 +140,33 @@ describe("learnloop 주제별 전문가 학습 (재설계 2·3단계)", () => {
     expect(둘.status).toBe(200);
     expect(둘.body.examples).toBe(7); // usedInDataset 필터가 되살아나면 1이 나와 여기서 실패한다
     savedDatasets.push(둘.body.datasetId);
+  });
+
+  // [검토관 2026-09-03 나] 후보함 배지는 질문주제()를 매번 다시 계산하지만 진척(topics API·topicTrainGate)은 저장값을 센다.
+  //   규칙이 나중에 생긴 주제(「일반」)는 그 전에 수집된 행의 topic이 NULL이라 승인해도 「일반 0/300」이 안 움직였다.
+  //   계약: 승인 순간 NULL이면 같은 규칙(질문주제)으로 채워 저장한다 — 후보함(cl:)·👍 API 어느 입구든 rateChatLog 한 곳.
+  it("승인 순간 저장 topic이 NULL이면 같은 규칙으로 채운다 — 「일반」 후보를 승인하면 진척이 움직인다", async () => {
+    recordChatLog("orchestrator", "온프레미스가 뭐야?", "온프레미스는 서버와 데이터를 사내 설비에 두고 직접 운영하는 방식입니다. 클라우드와 달리 외부 사업자 없이 폐쇄망에서도 돌아갑니다.");
+    const id = (await request(app).get("/api/learnloop/logs").set(auth())).body.logs[0].id as string;
+    // 「일반」 규칙이 생기기 전에 수집된 행의 상태를 그대로 만든다(수집 규칙이 지금은 「일반」을 붙이므로 손으로 NULL로)
+    db.prepare("UPDATE chat_logs SET topic = NULL WHERE id = ?").run(id);
+    expect(getChatLog(id)?.topic).toBeNull();
+    expect(topicTrainGate("일반").approved).toBe(0);
+
+    decideLearnCandidate(`cl:${id}`, true, "시험"); // 후보함 승인 경로 — rateChatLog를 지난다
+    expect(getChatLog(id)?.topic).toBe("일반");
+    expect(topicTrainGate("일반").approved).toBe(1);
+    const topics = (await request(app).get("/api/learnloop/topics").set(auth())).body.주제 as { topic: string; approved: number }[];
+    expect(topics.find((t) => t.topic === "일반")?.approved).toBe(1);
+  });
+
+  it("이미 딱지가 있는 행은 승인해도 바꾸지 않는다 — 지난달 판정을 설명할 수 있어야 한다", async () => {
+    recordChatLog("orchestrator", "온프레미스가 뭐야?", "온프레미스는 서버와 데이터를 사내 설비에 두고 직접 운영하는 방식입니다. 클라우드와 달리 외부 사업자 없이 폐쇄망에서도 돌아갑니다.");
+    const id = (await request(app).get("/api/learnloop/logs").set(auth())).body.logs[0].id as string;
+    db.prepare("UPDATE chat_logs SET topic = '장비운영' WHERE id = ?").run(id); // 옛 규칙이 붙였던 값이라 치자
+    await request(app).post(`/api/learnloop/logs/${id}/rate`).set(auth()).send({ rating: 1 }); // 👍 API 입구
+    expect(getChatLog(id)?.topic).toBe("장비운영");
+    expect(topicTrainGate("일반").approved).toBe(0);
   });
 
   it("산출 배선 소스 감시 — 병합이 아니라 어댑터 등록(미채택)이다", () => {

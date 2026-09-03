@@ -11,12 +11,15 @@
 //   ① 표식 사이 === 등급표문서() — 규칙을 고치고 생성기를 안 돌리면 여기서 빨개진다(examquestions.test와 같은 본보기).
 //   ② 등급 이름 전부 · NC · ND · LicenseRef · NOASSERTION 줄이 표에 있다.
 //   ③ 「검수 화면은 아직 없습니다」류의 거짓 자백이 없다.
-//   ④ 표가 문서 머리 2500자 안에서 시작한다(docslicense.test의 판권면 창 — 아래 설명).
+//   ④ 대표 목록이 규칙 갈래를 전부 덮는다(등급표덮음빠짐() === []) — 갈래를 더하고 대표를 안 더하면 표에서 조용히 빠진다.
 //   ⑤ 생성기에 등급 이름이 없다(규칙을 복사해 두지 않았다).
+//   ⑥ 알아본 판정불가(NC·ND·LicenseRef) 줄이 「라이선스를 알 수 없습니다」로 시작하지 않는다 — 아는 것을 모른다고 하면 거짓.
+//   (옛 ④ 「표가 머리 2300자 안」은 걷어냈다 — docslicense.test가 이 문서를 「우리 글」 선언으로 면제하므로
+//    표의 CC 식별자가 판권면 창을 우연히 채우는 상태를 계약으로 굳힐 이유가 없어졌다. 2026-09-03 검토관 [중].)
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { 등급표문서, 등급순위 } from "../src/engine/licenserisk.js";
+import { 등급표문서, 등급순위, 등급표덮음빠짐 } from "../src/engine/licenserisk.js";
 import { 문서경로, 표식, 표본문, 표식사이 } from "../../tools/gen-license-doc.mjs";
 
 const 뿌리 = path.resolve(__dirname, "..", "..");
@@ -60,6 +63,30 @@ describe("★ 라이선스 지침 문서의 등급표는 규칙에서 나온다"
     expect(찾기("LGPL-"), "LGPL 줄이 링크 방식 확인을 드러내지 않는다").toContain("(링크 방식 확인)");
   });
 
+  it("★ 알아본 판정불가(NC·ND·LicenseRef) 줄은 「알 수 없습니다」로 시작하지 않는다 — 아는 것을 모른다고 하면 거짓", () => {
+    // 2026-09-03 검토관 [중] ×5: 구운 표의 NC·ND 줄이 「라이선스를 알 수 없습니다 — 공급사에 확인해야 합니다」로
+    // 시작했고, 같은 NC말이 요구 칸·근거 칸에 두 번 있었다. 원천(등급판정)에서 갈랐으니 표도 따라온다.
+    const 줄들 = 등급표문서().split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| 등급"));
+    const 칸 = (id: string) => (줄들.find((l) => l.includes(`| ${id}`)) ?? "").split("|").slice(1, -1).map((s) => s.trim());
+    const 거짓 = /라이선스를 알 수 없습니다/;
+    for (const id of ["CC-BY-NC-4.0", "CC-BY-ND-4.0", "LicenseRef-"]) {
+      const [, , 요구, 근거] = 칸(id);
+      expect(요구, `${id}: 요구 칸이 아는 라이선스를 모른다고 한다`).not.toMatch(거짓);
+      expect(요구.length, `${id}: 요구 칸이 비었다`).toBeGreaterThan(10);
+      // 같은 조건을 요구·근거 두 칸에 두 번 적지 않는다 — 근거 칸은 규칙의 근거만.
+      expect(근거, `${id}: 근거 칸에 요구 칸의 조건 문장이 겹쳐 있다`).not.toMatch(/★ \*\*(비영리|변경금지)\((NC|ND)\) 조건이/);
+    }
+    expect(칸("CC-BY-NC-4.0")[2], "NC 줄 요구 칸은 상용 불가를 말한다").toContain("상용 제품에 쓸 수 없습니다");
+    expect(칸("CC-BY-ND-4.0")[2], "ND 줄 요구 칸은 변경 불가를 말한다").toContain("고쳐서 내보낼 수 없습니다");
+    expect(칸("LicenseRef-")[2], "LicenseRef 줄 요구 칸은 원문을 받아 읽으라고 한다").toContain("원문");
+    // 반례 — 진짜 모르는 것(NOASSERTION)은 그대로 「알 수 없습니다」여야 한다(감시가 헛돌면 안 된다).
+    expect(칸("NOASSERTION")[2], "NOASSERTION은 정말 모르는 것이다").toMatch(거짓);
+  });
+
+  it("★ 대표 목록이 규칙 갈래를 전부 덮는다 — 갈래를 더하고 대표를 안 더하면 표에서 조용히 빠진다", () => {
+    expect(등급표덮음빠짐(), "대표 목록이 덮지 못한 규칙(정규식)이 있다 — 등급표대표에 그 갈래의 정본 식별자를 더할 것").toEqual([]);
+  });
+
   it("표가 결정적이고 칸이 비지 않는다 — 0칸 표가 조용히 통과하지 않게", () => {
     const a = 등급표문서();
     expect(a, "같은 규칙인데 표가 달라진다 — 시험이 문서와 글자 단위로 대조하므로 결정적이어야 한다").toBe(등급표문서());
@@ -78,16 +105,6 @@ describe("★ 라이선스 지침 문서의 등급표는 규칙에서 나온다"
     );
     expect(나쁨, "공급망 점검 화면(타사 SBOM 라이선스 검수)이 있는데 없다고 적혀 있다").toEqual([]);
     expect(원문(), "있는 기능을 안내해야 한다 — 공급망 점검 화면").toContain("공급망 점검");
-  });
-
-  it("표가 문서 머리 2500자 안에서 시작한다 — docslicense.test의 판권면 창", () => {
-    // ⚠ docslicense.test는 파일명에 GIJO가 없는 문서에 머리 2500자 안의 판권면 근거(CC 식별자 등)를 요구한다.
-    //   이 문서는 우리가 쓴 글이라 판권면이 없고, 표의 CC0·CC-BY 줄이 그 창을 채워 통과한다.
-    //   우연에 맡기지 않고 계약으로 못 박는다 — 표를 아래로 옮기면 그 시험이 빨개진다.
-    //   정식 해법(「우리 글」 선언으로 면제)은 docslicense 쪽 결정이다.
-    const s = 원문();
-    expect(s.indexOf(표식.시작), "표식이 없다").toBeGreaterThan(0);
-    expect(s.indexOf(표식.시작), "표가 머리 2500자 창 밖으로 밀렸다").toBeLessThan(2300);
   });
 
   it("생성기에 등급 이름이 없다 — 규칙을 복사해 두지 않았다(gen-sbom-self와 같은 계약)", () => {

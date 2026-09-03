@@ -1748,7 +1748,9 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
     // 반입 — "xxx.gguf 어댑터 반입해줘". 파일명이 없으면 강제하지 않는다(빈 결재판 방지).
     if (available.has("import_adapter") && /(반입|가져와|가져오|들여와|들여오)/.test(instruction)) {
       const 파일 = /([\w가-힣.-]+\.gguf)/i.exec(instruction)?.[1] ?? "";
-      const 분야 = /(취약점|장비운영|장비|사내규정|규정|위협대응|위협)/.exec(instruction)?.[1] ?? "";
+      // 낱말은 handlers.ts runAdapterImport의 주제별칭 표와 같아야 한다 — 여기서 못 뽑으면 주제 없이(topic "") 반입돼
+      //   어댑터가 분야를 잃는다. 「일반|용어|개념」은 해설(normaltic) 어댑터(2026-09-03, 검토관 다).
+      const 분야 = /(취약점|장비운영|장비|사내규정|규정|위협대응|위협|일반|용어|개념)/.exec(instruction)?.[1] ?? "";
       if (파일) return { tool: "import_adapter", args: { file: 파일, topic: 분야 } };
     }
     if (available.has("adopt_adapter") && /(채택|승인)/.test(instruction) && !/배정/.test(instruction) && 어댑터명) {

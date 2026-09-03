@@ -253,6 +253,8 @@ export function decideLearnCandidate(id: string, accept: boolean, actor?: string
   const now = Date.now();
   if (id.startsWith("cl:")) {
     // 대화 로그 출처 — rating이 결정 저장소다. 제외는 👎(이미 학습 제외 의미)로 남긴다.
+    // 배지(topic: 질문주제(r.question) 재계산)와 진척(저장값)의 어긋남은 rateChatLog가 승인 때 NULL 주제를 채워 맞춘다
+    //   (검토관 2026-09-03 나) — 여기서 따로 채우지 않는다(같은 규칙을 두 곳에 적으면 어긋난다).
     rateChatLog(id.slice(3), accept ? 1 : -1, approverId ?? null);
   } else if (id.startsWith("ws:")) {
     const [, userTurnId, botTurnId] = id.split(":");
@@ -428,6 +430,10 @@ export async function buildDistillCorpus(b: DistillCorpusOptions, mem: CorpusMem
     if (!allowed.includes(gradeOf(d.grade))) { skipped["등급 제외"] += 1; continue; }
     if (b.열람가능 && !b.열람가능(d.documentId)) { skipped["열람 불가"] += 1; continue; }
     if (origins && !origins.includes(d.origin ?? "")) { skipped["출처 제외"] += 1; continue; }
+    // ⚠ 여기의 category는 **문서 업무영역**이다 — 「일반」은 두 뜻을 겸한다(검토관 2026-09-03 가): 용어사전 같은
+    //   전 영역 공용 자료이면서 규칙·LLM이 확신 못 한 문서의 **기본값**(memory.ts categorizeDocument)이기도 하다.
+    //   증류 주제 「일반」(용어·개념)과 글자가 같아 여기로 「일반」을 넣으면 미분류 더미가 통째로 재료가 된다 —
+    //   그래서 tools/distill.mjs는 「일반」에 --source store를 거절한다(파일 지목만). 창구 자체는 막지 않는다(다른 소비자 있음).
     if (category && (d.category ?? "") !== category) { skipped["업무영역 다름"] += 1; continue; }
     if (out.length >= maxChunks) { skipped["전체 상한(문서)"] += 1; continue; }
     const chunks = await mem.getDocumentChunks(d.documentId, 1_000_000);

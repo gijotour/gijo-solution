@@ -1,0 +1,65 @@
+[
+ {
+  "label": "prompt·temp0",
+  "run": 1,
+  "text": "KEV(Known Exploited Vulnerabilities)는 미국 연방 정부가 공개한, 알려진 악용 가능한 취약점 목록입니다. 이 목록은 보안 업데이트가 제공되었음에도 불구하고 여전히 악용 가능한 취약점을 포함합니다. KEV는 보안 취약점에 대한 실시간 모니터링과 대응을 위해 사용됩니다.  \n참조: [https://www.cisa.gov/kev](https://www.cisa.gov/kev)",
+  "ms": 5278,
+  "finish": "stop",
+  "genTokens": 113,
+  "cisa": true
+ },
+ {
+  "label": "prompt·temp0",
+  "run": 2,
+  "text": "KEV(Known Exploited Vulnerabilities)는 미국 연방 정부가 공개한, 알려진 악용 가능한 취약점 목록입니다. 이 목록은 보안 업데이트가 제공되었음에도 불구하고 여전히 악용 가능한 취약점을 포함합니다. KEV는 보안 취약점에 대한 실시간 모니터링과 대응을 위해 사용됩니다.  \n참조: [https://www.cisa.gov/kev](https://www.cisa.gov/kev)",
+  "ms": 5273,
+  "finish": "stop",
+  "genTokens": 113,
+  "cisa": true
+ },
+ {
+  "label": "prompt·temp0",
+  "run": 3,
+  "text": "KEV(Known Exploited Vulnerabilities)는 미국 연방 정부가 공개한, 알려진 악용 가능한 취약점 목록입니다. 이 목록은 보안 업데이트가 제공되었음에도 불구하고 여전히 악용 가능한 취약점을 포함합니다. KEV는 보안 취약점에 대한 실시간 모니터링과 대응을 위해 사용됩니다.  \n참조: [https://www.cisa.gov/kev](https://www.cisa.gov/kev)",
+  "ms": 5261,
+  "finish": "stop",
+  "genTokens": 113,
+  "cisa": true
+ },
+ {
+  "label": "prompt·temp0.7",
+  "run": 1,
+  "text": "KEV(Known Exploited Vulnerabilities)는 미국 국방부가 공개하는 악용 가능한 취약점 목록입니다. 이 목록에는 공격자가 실제로 악용한 것으로 확인된 취약점이 포함됩니다. 2021년 이후로 주기적으로 업데이트되며, 보안 업데이트가 제공된 취약점은 제외됩니다.  \n참조: [https://www.cisa.gov/kev](https://www.cisa.gov/kev)",
+  "ms": 5063,
+  "finish": "stop",
+  "genTokens": 113,
+  "cisa": true
+ },
+ {
+  "label": "prompt·temp0.7",
+  "run": 2,
+  "text": "KEV(known exploited vulnerability)는 공개된 취약점 중 실제로 악용된 사례가 있는 취약점을 의미합니다.  \n\n예를 들어, CVE-2021-44228(CVE-2021-44228)는 Log4j 취약점으로, KEV로 지정된 적이 있습니다.  \n\nKEV 목록은 CISA(미국 사이버 보안청)가 관리하며, 해당 목록에 포함된 취약점은 즉시 패치하거나 대응이 필요합니다.",
+  "ms": 5562,
+  "finish": "stop",
+  "genTokens": 125,
+  "cisa": true
+ },
+ {
+  "label": "prompt·temp0.7",
+  "run": 3,
+  "text": "KEV(Known Exploited Vulnerabilities)는 미국 정부가 공개한 취약점 목록으로, 알려진 악용 가능한 취약점을 포함합니다. 이 목록은 보안 업데이트가 제공된 후에도 여전히 악용 가능한 취약점을 강조합니다. 2021년부터 미국 연방 정부는 KEV 목록에 포함된 취약점은 패치를 적용해야 한다고 명시하고 있습니다.  \n출처: [https://www.cisa.gov/kev](https://www.cisa.gov/kev)",
+  "ms": 5729,
+  "finish": "stop",
+  "genTokens": 129,
+  "cisa": true
+ },
+ {
+  "label": "noprompt·temp0",
+  "run": 1,
+  "text": "KEV는 여러 가지 의미로 사용될 수 있는 약어입니다. 어떤 맥락에서 사용되는지에 따라 의미가 달라지므로, 몇 가지 가능한 해석을 소개합니다:\n\n1. **KEV (Kiloelectronvolt)**  \n   물리학에서 에너지를 측정하는 단위로, 1,000 전자볼트(eV)를 의미합니다. 이 단위는 입자 물리학, 원자 물리학, 방사선 물리학 등에서 자주 사용됩니다.\n\n2. **KEV (Korean Entertainment Video)**  \n   한국의 엔터테인먼트 영상 콘텐츠를 의미하는 경우도 있습니다. 이는 인터넷에서 유튜브나 다른 플랫폼에서 유행하는 영상 형태 중 하나로, 주로 뮤직비디오, 댄스, 코미디 등이 포함될 수 있습니다.\n\n3. **KEV (이름 또는 닉네임)**  \n   개인의 이름이나 닉네임으로 사용될 수도 있습니다. 예를 들어, 인터넷 커뮤니티나 SNS에서 KEV라는 이름을 사용하는 사용자가 있을 수 있습니다.\n\n4. **KEV (기타 약어)**  \n   특정 기업, 프로젝트, 단체, 또는 특정 분야에서 사용되는 약어일 수도 있습니다. 예를 들어, 기술, 의학, 군사 등 다양한 분야에서 KEV라는 약어가 사용될 수 있습니다.\n\n혹시 특정 맥락이나 분야에서의 KEV를 묻고 계신다면, 더 구체적인 설명을 드릴 수 있습니다.",
+  "ms": 16565,
+  "finish": "stop",
+  "genTokens": 371,
+  "cisa": false
+ }
+]

@@ -126,6 +126,8 @@ const logKpiStmt = db.prepare(
 );
 const getLogStmt = db.prepare("SELECT * FROM chat_logs WHERE id = ?");
 const rateLogStmt = db.prepare("UPDATE chat_logs SET rating = ? WHERE id = ?");
+// 승인 때 NULL 주제만 채운다 — 이미 붙은 딱지는 건드리지 않는다(「지난달 판정을 설명할 수 있어야 한다」 계약).
+const fillTopicIfNullStmt = db.prepare("UPDATE chat_logs SET topic = ? WHERE id = ? AND topic IS NULL");
 const deleteLogStmt = db.prepare("DELETE FROM chat_logs WHERE id = ?");
 const pickLogsStmt = db.prepare(
   "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND rating = 1 ORDER BY createdAt ASC"
@@ -195,6 +197,7 @@ interface ChatLogRow {
   rating: number | null;
   usedInDataset: number;
   createdAt: number;
+  topic?: string | null; // 주제 딱지 — 수집 때 질문주제()가 붙이고, 승인 때 NULL이면 같은 규칙으로 채운다(rateChatLog)
   origin?: string | null;
   teacher?: string | null;
   cites?: string | null; // JSON 문자열
@@ -404,7 +407,16 @@ export const topicSlug = (topic: string): string => TOPIC_SLUGS[topic] ?? "misc"
 //   묻는 모양: 「○○이/가 뭐야」「○○이란」「○○ 뜻」「○○ 무슨 말」「약어·줄임말·정의·개념」「A와 B 차이가 뭐야」
 //   「쉽게 설명해줘」. ⚠ 맨 「뭐」는 안 잡는다 — 「오늘 뭐부터 볼까?」는 용어 질문이 아니다(기존 계약).
 //   「이란/란」은 낱말 끝(공백·물음표·끝)에서만 — 「이란」이 단어 안에 든 낱말을 잡지 않게.
-const GENERAL_RE = /용어|뜻|무슨\s*말|약어|줄임말|정의|개념|차이(가|는|점)?\s*(뭐|무엇)|쉽게\s*(말|설명|풀)|(이|가|이란|란)\s*(뭐|뭔|무엇)|(이란|란)(?=[\s?!.]|$)/g;
+//   ⚠ 과포착 둘을 막는다(검토관 2026-09-03 라): ① 「이란」은 앞에 글자가 붙은 꼴(「SBOM이란」「셸이란?」)만 —
+//     단독 낱말 「이란」은 국가명이다(「이란 핵 협상 뉴스」). ② 「란」 갈래는 앞 음절이 혼·분·교·반·소·파·착이면
+//     뺀다 — 「혼란·분란·교란·반란·소란·파란·착란」은 끝음절이 같을 뿐 용어 물음이 아니다. 앞이 「이」면 ①이 맡는다
+//     (「이란」을 「란」 갈래로 다시 잡으면 ①의 제외가 헛돈다). 뒤에 물음 표지를 요구하는 길(「(이란|란)\s*(무엇|뭐)」)
+//     대신 앞글자를 보는 길을 고른 이유: 「팝업 셸이란?」처럼 표지 없이 끝나는 기존 계약(topictag.test 7건)이 그대로 서야 해서.
+const GENERAL_RE = /용어|뜻|무슨\s*말|약어|줄임말|정의|개념|차이(가|는|점)?\s*(뭐|무엇)|쉽게\s*(말|설명|풀)|(이|가|이란|란)\s*(뭐|뭔|무엇)|(?<=\S)이란(?=[\s?!.]|$)|(?<![혼분교반소파착이\s])란(?=[\s?!.]|$)/g;
+// 「일반」 반증 — 「○○이/가 뭐야」 꼴은 상태·일정 질문에도 그대로 나온다(「오늘 할 일이 뭐야」「지금 상태가 뭐야」
+//   「진행 상황이 뭐야」). 이 낱말이 하나라도 있으면 용어 질문으로 보지 않는다(검토관 2026-09-03 라). 그런 질문은
+//   미분류(null)로 남는 것이 맞다 — 해설 팀원의 재료가 아니라 상태 조회다.
+const GENERAL_NEG_RE = /할\s*일|일정|상태|상황|진행|오늘|지금|몇|언제|어디/;
 // 주제별 전문가 학습 개시선(승인 문답 수). LIMA 계열 근거 + 1회전 실측(85쌍은 생성 안정성이
 // 무너짐 — 반복 루프·설정 키 날조)에서 나온 값. topics API의 "준비됨" 판정과 같은 값이어야 한다.
 export const TOPIC_TRAIN_TARGET = 300;
@@ -412,6 +424,9 @@ export const TOPIC_TRAIN_TARGET = 300;
 export function 질문주제(question: string): string | null {
   const q = String(question ?? "");
   const 점수: Record<string, number> = {
+    // ⚠ 판본 없는 「CVE」는 취약점 신호에 넣지 않는다(검토관 2026-09-03 바): 「CVE가 뭐야」는 용어 질문이라 「일반」
+    //   (해설 재료)이 맞고, 넣으면 그런 질문이 전부 취약점으로 가서 해설 재료가 준다. 「CVE-2021-44228이 뭐야」는
+    //   판본이 있으니 취약점 전문가 몫이다(topictag.test가 둘 다 고정한다).
     취약점: (q.match(/취약점|CVE-\d{4}|CVSS|EPSS|KEV|패치|스캔|익스플로잇|조치\s*기한|미조치/g) ?? []).length,
     장비운영: (q.match(/방화벽|스위치|라우터|WAF|IPS|IDS|EDR|장비|펌웨어|점검|유지보수|매뉴얼|룰셋|로그\s*필드/g) ?? []).length,
     사내규정: (q.match(/규정|지침|정책|해도\s*(되|돼)|보관\s*기간|승인\s*절차|컴플라이언스|준수|반출/g) ?? []).length,
@@ -424,6 +439,7 @@ export function 질문주제(question: string): string | null {
   //   꼴이지만 취약점 전문가 몫이다 — 「일반」을 동점 후보에 넣으면 그 질문이 동점→null로 떨어져 기존 계약
   //   (topictag.test 「실전 질문이 제 주제로 간다」)이 깨진다. 업무 주제끼리의 동점(경계)은 위에서 이미 null이다.
   //   낱말 규칙에 안 걸리면 여전히 null — 잡담(「안녕」)은 미분류로 남는다(catch-all 아님).
+  if (GENERAL_NEG_RE.test(q)) return null; // 상태·일정 조회(「오늘 할 일이 뭐야」)는 용어 질문 꼴이어도 아니다
   return (q.match(GENERAL_RE) ?? []).length >= 1 ? "일반" : null;
 }
 
@@ -465,6 +481,15 @@ export function rateChatLog(id: string, rating: 1 | -1 | 0, approverId?: string 
   const row = getLogStmt.get(id) as ChatLogRow | undefined;
   if (!row) throw new Error("존재하지 않는 대화 로그입니다");
   rateLogStmt.run(rating === 0 ? null : rating, id);
+  // 승인 순간 저장 topic이 NULL이면 지금 규칙으로 채운다(검토관 2026-09-03 나). 후보함 배지는 질문주제()를 매번
+  //   다시 계산해 「일반」로 보이는데, 진척(topics API·topicTrainGate)은 **저장값**을 세서 규칙이 나중에 생긴 주제
+  //   (「일반」)는 승인해도 「0/300」이 안 움직였다. 채우는 규칙은 수집 때와 같은 질문주제() 하나(두 곳에 적지 않는다).
+  //   이미 값이 있으면 건드리지 않는다. 반입 신호(learnmemory category=log.topic)도 채운 값을 받도록 다시 읽기 전에 한다.
+  //   후보함(learncandidates decide cl:)·👍 API·일괄 승인이 전부 이 함수를 지나므로 여기가 「한 곳」이다.
+  if (rating === 1 && row.topic == null) {
+    const topic = 질문주제(row.question);
+    if (topic) fillTopicIfNullStmt.run(topic, id);
+  }
   const after = logFromRow(getLogStmt.get(id) as ChatLogRow);
   // 승인 신호(겹 1) — 1이 되면 반입, 1에서 벗어나면 제거. 같은 값 반복은 청취자가 멱등으로 받는다.
   if (rating === 1) emitChatLogRated({ kind: "approved", log: after, approverId: approverId ?? null });

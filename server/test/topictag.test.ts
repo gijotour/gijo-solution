@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 import { 질문주제, TOPICS, topicSlug } from "../src/engine/learnloop";
 import { CATEGORIES } from "../src/engine/hybridsearch";
+import { forcedToolFor } from "../src/engine/agentloop";
 
 describe("질문 주제 판정 — 결정적, 억지 없음", () => {
   it("★ 실전 질문이 제 주제로 간다", () => {
@@ -71,6 +72,25 @@ describe("주제 「일반」 — 용어·개념 질문(해설 팀원 재료), c
     expect(질문주제("방화벽 규정이 뭐야?")).toBeNull();
   });
 
+  it("★★ 과포착 반증(검토관 2026-09-03 라) — 국가명 「이란」·끝음절 「란」·상태·일정 조회는 「일반」이 아니다", () => {
+    // 「이란」은 앞에 글자가 붙은 꼴(「SBOM이란」)만 용어 물음이다 — 단독 낱말은 국가명
+    expect(질문주제("이란 핵 협상 뉴스")).toBeNull();
+    expect(질문주제("SBOM이란")).toBe("일반"); // 물음 표지 없이 끝나도 앞글자가 있으면 그대로 「일반」(기존 계약 보존)
+    // 「혼란·분란·교란·…」은 끝음절이 「란」일 뿐이다
+    expect(질문주제("혼란이 생겼어")).toBeNull();
+    expect(질문주제("교란 전파가 잡혔어")).toBeNull();
+    // 「○○이/가 뭐야」 꼴의 상태·일정 조회 — 반증 낱말(할 일·일정·상태·상황·진행·오늘·지금·몇·언제·어디)이 있으면 안 붙인다
+    expect(질문주제("오늘 할 일이 뭐야")).toBeNull();
+    expect(질문주제("지금 상태가 뭐야")).toBeNull();
+    expect(질문주제("진행 상황이 뭐야")).toBeNull();
+  });
+
+  it("판본 없는 「CVE가 뭐야」는 용어 질문 → 「일반」(검토관 2026-09-03 바) — 낱말 「CVE」만으로 취약점 신호를 세지 않는다", () => {
+    // 이걸 취약점 신호에 넣으면 용어 질문이 전부 취약점으로 가서 해설 팀원 재료가 준다. 판본이 붙은 CVE는 취약점(위 계약).
+    expect(질문주제("CVE가 뭐야")).toBe("일반");
+    expect(질문주제("CVE-2021-44228이 뭐야?")).toBe("취약점");
+  });
+
   it("같은 질문은 언제나 같은 딱지", () => {
     const q = "폐쇄망이 무슨 말이야";
     expect(질문주제(q)).toBe(질문주제(q));
@@ -96,5 +116,19 @@ describe("TOPICS 짝 계약 — 슬러그·업무영역 (2026-09-03)", () => {
     // learnmemory.ts ingest(): category = log.topic ?? "일반" 을 그대로 넘긴다.
     // memory.ts ingestText(): CATEGORIES 밖이면 그 값을 버리고 다시 분류한다 → 배지와 저장 분류가 갈라진다.
     for (const t of TOPICS) expect(CATEGORIES as readonly string[], `주제 ${t}가 업무영역에 없다`).toContain(t);
+  });
+});
+
+describe("「일반」 어댑터 반입 지시 — 결정적 파서가 handlers 주제별칭 표와 같은 낱말을 본다(검토관 2026-09-03 다)", () => {
+  // agentloop.ts forcedToolFor의 분야 정규식에 낱말이 없으면 topic ""로 반입돼 어댑터가 분야를 잃는다.
+  // 정식 이름(「용어」→「일반」)으로 바꾸는 것은 handlers.ts runAdapterImport 주제별칭 표의 몫 — 여기서는 낱말이 살아남는지만 본다.
+  const admin = { role: "admin" as const };
+  it("「일반/용어/개념 분야로 반입」이 주제를 잃지 않는다", () => {
+    for (const 낱말 of ["일반", "용어", "개념"]) {
+      const r = forcedToolFor(`normaltic-terms-v1.gguf 어댑터 ${낱말} 분야로 반입해줘`, admin);
+      expect(r?.tool, 낱말).toBe("import_adapter");
+      expect(r?.args.file, 낱말).toBe("normaltic-terms-v1.gguf");
+      expect(r?.args.topic, 낱말).toBe(낱말);
+    }
   });
 });
