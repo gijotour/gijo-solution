@@ -9,7 +9,7 @@
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { listDocuments, getChunksForDocuments, queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE, type MemoryDocument } from "./memory";
-import { 제품이쌓은문서 } from "./docorigin";
+import { 제품이쌓은문서, 개인문서 } from "./docorigin";
 import { db } from "../db";
 
 export type HygieneType = "duplicate" | "version_conflict" | "stale" | "demo_overlap";
@@ -26,7 +26,7 @@ export interface HygieneReport {
   totalDocs: number;
   /** 지식 저장소 전체 문서 수(제외분 포함) — totalDocs의 뜻이 조용히 바뀌지 않게 함께 낸다. */
   storeDocs: number;
-  /** 점검에서 뺀 문서 수 = storeDocs - totalDocs(승인 문답·침해사고 사례). */
+  /** 점검에서 뺀 문서 수 = storeDocs - totalDocs(승인 문답·침해사고 사례·개인 문서). */
   excludedDocs: number;
   findings: HygieneFinding[];
   clean: boolean;
@@ -62,7 +62,11 @@ export async function scanKbHygiene(): Promise<HygieneReport> {
   //   「중복이니 지우세요」라고 말해도 담당자가 누를 자리가 없다 — 못 고치는 지적만 쌓인다.
   //   게다가 제목이 「승인문답:<id>」·「incident-case:<id>」라 뿌리가 전부 같아 **전부가 버전충돌**로
   //   잡힌다. 실측(운영 LanceDB 읽기 전용, 2026-09-04): 문서 3,919건 중 **3,798건**이 이 부류라 점검 대상은 121건이다.
-  const docs = 전체.filter((d) => !제품이쌓은문서(d.origin));
+  // ★ 개인 문서(documentId가 "personal:"로 시작)도 같은 이유로 뺀다(2026-09-04). AI 지식 화면이
+  //   이미 빼는데(memory.html loadDocuments) 여기만 남아, 위생 점검이 「personal:9f3c-…가 중복입니다」라고
+  //   말해도 그 줄을 누를 자리가 없었다. 게다가 이 점검은 **보는 사람을 모른다**(주기 실행·도구
+  //   호출에 viewer가 없다) — 남의 개인 메모가 아무에게나 가는 옆문까지 된다.
+  const docs = 전체.filter((d) => !제품이쌓은문서(d.origin) && !개인문서(d.documentId));
   const findings: HygieneFinding[] = [];
 
   // ★ 조각은 **한 번에** 떠 온다(2026-09-04 실측 수리). 예전에는 문서마다 getDocumentChunks를 불렀는데
@@ -211,10 +215,11 @@ export function 점검시각문구(scannedAt: string): string {
   return `마지막 점검 ${경과}(${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())})`;
 }
 
-/** 「점검 대상 N건(제외 M건 — 승인 문답·사례 문서)」 — 숫자가 무엇을 센 것인지 함께 말한다. */
+/** 「점검 대상 N건(제외 M건 — 승인 문답·사례 문서·개인 문서)」 — 숫자가 무엇을 센 것인지 함께 말한다. */
 function 모집단문구(r: HygieneReport): string {
   const 제외 = Number(r.excludedDocs ?? 0);
-  return `문서 ${r.totalDocs}건 점검` + (제외 > 0 ? ` · 제외 ${제외}건(승인 문답·사례 문서 — 목록에 없어 지울 수 없는 것)` : "");
+  // ⚠ 제외 사유를 적을 때 개인 문서를 빠뜨리면 숫자와 설명이 어긋난다 — 「무엇을 뺐나」가 곧 이 숫자의 뜻이다.
+  return `문서 ${r.totalDocs}건 점검` + (제외 > 0 ? ` · 제외 ${제외}건(승인 문답·사례 문서·개인 문서 — 이 목록에 없어 여기서 지울 수 없는 것)` : "");
 }
 
 // 챗봇/화면이 그대로 쓸 요약.

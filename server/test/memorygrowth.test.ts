@@ -21,7 +21,7 @@ import {
 } from "../src/engine/learnloop";
 import { 기억성장_배선, approvedQaDocId, approvedQaContent, APPROVED_QA_ORIGIN, gradeForApprover, 반입못하는이유 } from "../src/engine/learnmemory";
 // origin 잣대 한 곳(잎 모듈이라 LanceDB를 안 물고 그냥 불러 볼 수 있다 — 그게 이 파일에 둔 이유이기도 하다).
-import { 제품이쌓은문서, 반입문서아님 } from "../src/engine/docorigin";
+import { 제품이쌓은문서, 반입문서아님, 개인문서, 개인문서_제외SQL } from "../src/engine/docorigin";
 
 const root = join(__dirname, "..");
 const read = (...p: string[]) => readFileSync(join(root, ...p), "utf8");
@@ -167,6 +167,27 @@ describe("반입 모양 — scope는 global, 구분은 category, 등급은 승�
     // 클라 두 곳은 아직 문자열이다(서버 술어를 못 부른다) — 그래서 여기서 문자열로 못 박는다.
     expect(read("..", "client", "src", "renderer", "pages", "memory.html")).toContain('d.origin !== "incident-case"'); // AI 지식 화면
     expect(read("..", "client", "src", "renderer", "pages", "mydocs.html")).toContain('d.origin !== "incident-case"'); // 문서 허브
+  });
+
+  // ★ 2026-09-04: 개인 문서(documentId가 "personal:<uuid>")도 **같은 결정**이다 — 회사 지식 목록에
+  //   안 뜨는데 모집단엔 남아 있었다. 갈리는 칸이 origin이 아니라 documentId라 술어는 따로지만,
+  //   결정이 하나라 감시도 여기 나란히 둔다. 접두 문자열이 자리마다 흩어지면 「한 곳만 고치고 초록」이
+  //   그대로 재발한다(승인 문답이 겪은 그 사고 — 서버 세 곳만 고치고 클라 두 곳을 잊었다).
+  it("개인 문서도 대장·중복·위생 세 자리에서 빠진다 — 접두는 docorigin 한 곳", () => {
+    expect(개인문서("personal:9f3c0001")).toBe(true);
+    expect(개인문서("지침.md")).toBe(false);
+    expect(개인문서(null)).toBe(false);        // 접두가 없으면 회사 문서(blacklist — 옛 문서를 통째로 지우지 않는다)
+    expect(개인문서_제외SQL("m.documentId")).toBe("m.documentId NOT LIKE 'personal:%'");
+
+    expect(read("src", "engine", "docdigest.ts")).toContain("개인문서_제외SQL");            // 새로 들어온 문서 대장
+    expect(read("src", "engine", "docdupe.ts")).toContain("개인문서_제외SQL");              // 중복 후보(2026-09-04 편입)
+    expect(read("src", "engine", "kbhygiene.ts")).toContain("개인문서(d.documentId)");      // 지식 위생 점검 모집단(2026-09-04)
+
+    // 접두를 자리마다 손으로 적지 않는다 — 주석은 설명이니 빼고, **도는 코드**만 본다.
+    for (const f of ["docdigest.ts", "docdupe.ts", "kbhygiene.ts"]) {
+      const 코드 = read("src", "engine", f).split("\n").filter((L) => !L.trim().startsWith("//")).join("\n");
+      expect(코드, `${f}에 personal 접두를 손으로 적었다 — docorigin의 술어를 부를 것`).not.toContain("personal:%");
+    }
   });
 
   it("미평가 포함 데이터셋 경로와 KPI(미사용)는 증류를 뺀다 — 「승인은 사람」의 우회로를 닫는다", () => {

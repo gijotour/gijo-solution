@@ -6,7 +6,7 @@
 // 다르게 두 번 올린 것」이다(v2·(1)·사본·날짜만 다름). 내용(임베딩) 대조는 비용이 커서
 // 제목 후보가 실제로 잡히기 시작하면 그때 넓힌다 — 억지 후보가 없는 것보다 나쁘다.
 import { db } from "../db";
-import { 제품이쌓은문서_제외SQL } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — memory로 가는 화살을 안 만든다)
+import { 제품이쌓은문서_제외SQL, 개인문서_제외SQL } from "./docorigin"; // 목록 잣대 한 곳(잎 모듈 — memory로 가는 화살을 안 만든다)
 
 export interface DupeGroup {
   key: string;                       // 정규화된 제목(무엇으로 묶였나)
@@ -31,7 +31,14 @@ export function findDuplicateDocs(): DupeGroup[] {
     // 승인 문답(origin=approved-qa, 2026-09-03)은 제목이 「승인문답:<id>」라 뿌리가 안 겹치지만, 원천에서 뺀다.
     // 침해사고 사례 문서(origin=incident-case)도 뺀다 — 제목이 「incident-case:<id>」라 뿌리가 전부 같아 **전부가 중복 후보**로 보인다(결정 ①).
     // ★ 뺄 origin 목록은 engine/docorigin.ts 한 곳 — 여기에 손으로 다시 적지 않는다.
-    `SELECT documentId, ingestedAt, chunks, category FROM memory_documents WHERE ${제품이쌓은문서_제외SQL()} ORDER BY ingestedAt DESC`
+    // 개인 문서(personal:*)도 뺀다 [2026-09-04 판단]. 「본인에게 보여야 하면 남긴다」를 따져 봤지만
+    // 이 창구는 **본인에게 보여 줄 수가 없다**: ① 도구 run(agenttools/registry doc_duplicates)에
+    // viewer가 없어 누가 물었는지 모른다 — 남기면 남의 개인 메모가 아무에게나 간다(검색 격리
+    // hiddenDocIds를 우회하는 옆문). ② 여기 나오는 이름이 「personal:<uuid>」라 사람이 못 읽고,
+    // 답 끝의 안내(「문서 ○○ 지워줘」)도 남의 문서엔 통하지 않는다 — 못 누르는 지적만 남는다.
+    // 개인 문서의 중복을 본인이 정리하는 자리는 「내 문서」 화면이다(거기선 제목으로 보인다).
+    `SELECT documentId, ingestedAt, chunks, category FROM memory_documents
+      WHERE ${제품이쌓은문서_제외SQL()} AND ${개인문서_제외SQL()} ORDER BY ingestedAt DESC`
   ).all() as { documentId: string; ingestedAt: string; chunks: number; category: string | null }[];
   const 묶음 = new Map<string, typeof rows>();
   for (const r of rows) {

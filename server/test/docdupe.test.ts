@@ -33,6 +33,18 @@ describe("중복 묶음 — 표시만 한다", () => {
     expect(후.n, "보는 것만으로 문서가 지워졌다").toBe(전.n);
   });
 
+  // ★ 2026-09-04: 개인 문서(personal:<uuid>)는 후보에서 뺀다. 이 도구는 viewer를 안 받아
+  //   **누가 물었는지 모른다** — 남기면 남의 개인 메모가 아무에게나 간다(검색 격리의 옆문).
+  //   이름도 「personal:<uuid>」라 사람이 못 읽고, 답 끝 안내(「문서 ○○ 지워줘」)도 안 통한다.
+  it("개인 문서는 중복 후보에 들지 않는다 — 보는 사람을 모르는 창구다", () => {
+    넣기("personal:qa1111_장비운영지침_v1.pdf");
+    넣기("personal:qa1111_장비운영지침_v2.pdf");
+    const 답 = duplicateDocsText();
+    expect(답, "남의 개인 메모 이름이 답에 실렸다").not.toContain("personal:");
+    expect(findDuplicateDocs().some((g) => g.docs.some((d) => d.documentId.startsWith("personal:")))).toBe(false);
+    db.prepare("DELETE FROM memory_documents WHERE documentId LIKE 'personal:qa1111%'").run();
+  });
+
   it("답에 「표시만·지우지 않았다」와 결재판 안내가 있다 / 없으면 없다고 말한다", () => {
     넣기("QA중복_지침_v1.pdf"); 넣기("QA중복_지침_v2.pdf");
     const t = duplicateDocsText();

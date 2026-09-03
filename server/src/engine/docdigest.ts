@@ -12,7 +12,7 @@
 import { db } from "../db";
 import { chat } from "./llm";
 import { listTriples } from "./ontology";
-import { 제품이쌓은문서_제외SQL } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — memory로 가는 화살을 안 만든다)
+import { 제품이쌓은문서_제외SQL, 개인문서_제외SQL } from "./docorigin"; // 목록 잣대 한 곳(잎 모듈 — memory로 가는 화살을 안 만든다)
 
 db.exec(`CREATE TABLE IF NOT EXISTS doc_digests (
   documentId TEXT PRIMARY KEY,
@@ -190,10 +190,12 @@ export function listRecentDocs(days = 7): RecentDoc[] {
     // ⚠ 개인 문서(personal:*)는 반입 소식에서 원천 제외 — 이 목록은 전 담당자에게 뿌려진다
     //   (검토관 2026-08-20 상4). makeDigest 쪽도 안 만들지만, 옛 데이터·다른 인입 경로 대비
     //   여기서도 거른다(벨트와 멜빵).
+    //   ★ 접두 문자열은 여기에 손으로 적지 않는다(2026-09-04) — 같은 제외가 중복 후보·위생 점검까지
+    //     세 자리가 되어, engine/docorigin.ts의 개인문서_제외SQL 한 곳으로 모았다.
     `SELECT m.documentId, m.category, m.uploadedBy, m.ingestedAt,
             d.summary, d.keywords, d.matches, d.failedReason
        FROM memory_documents m LEFT JOIN doc_digests d ON d.documentId = m.documentId
-      WHERE m.ingestedAt >= ? AND m.documentId NOT LIKE 'personal:%'
+      WHERE m.ingestedAt >= ? AND ${개인문서_제외SQL("m.documentId")}
         AND ${제품이쌓은문서_제외SQL("m.origin")} ORDER BY m.ingestedAt DESC`
     // ↑ 승인 문답(learnmemory, 2026-09-03)은 「새로 들어온 문서」가 아니다 — 승인 300건이 대장을 덮지 않게.
     //   침해사고 사례 문서(incidentcases, 2026-09-03)도 같다 — 씨앗 수십 건이 첫 부팅에 「새 문서」로 쏟아지면 안 된다(결정 ①: 지식 건수엔 들고 대장에선 뺀다).

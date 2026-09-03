@@ -67,6 +67,33 @@ describe("지식베이스 위생 — 모집단(누를 수 있는 문서만 점�
     expect([...getChunksForDocuments.mock.calls[0][0]].sort()).toEqual(["내장.md", "지침.md"]);
   });
 
+  // ★ 2026-09-04: 개인 문서(documentId "personal:<uuid>")도 **같은 부류**다 — AI 지식 화면·문서 허브는
+  //   이미 빼는데(memory.html:783) 위생 모집단에만 남아 있었다. 게다가 이 점검은 주기 실행이라
+  //   **보는 사람을 모른다** — 남기면 남의 개인 메모 이름이 리포트에 실려 아무에게나 간다.
+  it("개인 문서(personal:)는 점검하지 않고 제외 수에 세어진다 — 본문도 뜨지 않는다", async () => {
+    listDocuments.mockResolvedValue([
+      doc("지침.md"),
+      doc("personal:9f3c0001", { uploadedBy: "alice" }),
+      doc("personal:9f3c0002", { uploadedBy: "bob" }),
+    ]);
+    const r = await scanKbHygiene();
+    expect(r.totalDocs).toBe(1);
+    expect(r.storeDocs).toBe(3);
+    expect(r.excludedDocs).toBe(2);
+    expect([...getChunksForDocuments.mock.calls[0][0]], "모집단 밖 문서의 조각을 뜨면 격리도 성능도 잃는다").toEqual(["지침.md"]);
+    expect(formatKbHygiene(r), "제외 사유에 개인 문서를 안 적으면 숫자와 설명이 어긋난다").toContain("개인 문서");
+  });
+
+  it("개인 문서끼리는 내용이 같아도 지적하지 않는다 — 남의 메모 이름이 리포트에 실리지 않는다", async () => {
+    const 본문 = "이번 주 회의 메모: 방화벽 교체 일정과 담당자를 정리하고 다음 점검일을 잡는다.";
+    listDocuments.mockResolvedValue([doc("personal:aaa11111"), doc("personal:bbb22222")]);
+    getChunksForDocuments.mockResolvedValue(조각맵({ "personal:aaa11111": [본문], "personal:bbb22222": [본문] }));
+    const r = await scanKbHygiene();
+    expect(r.findings).toEqual([]);
+    expect(r.totalDocs).toBe(0);
+    expect(JSON.stringify(r), "개인 문서 이름이 리포트에 실렸다").not.toContain("personal:");
+  });
+
   it("제외된 문서끼리는 이름이 같아도 버전충돌로 잡지 않는다 — 못 누르는 지적을 만들지 않는다", async () => {
     listDocuments.mockResolvedValue([
       doc("incident-case:ic-1", { origin: "incident-case" }),
