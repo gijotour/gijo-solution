@@ -23,6 +23,7 @@ import { 문서지목질문 } from "./memory";
 import { recordWork, TOOL_WORK_KIND } from "./worklog";
 import { listTasks } from "./tasks";
 import { 자산표시이름, listAssets } from "./assets";
+import { extractLexicalTerms } from "./hybridsearch"; // CVE 뽑기는 CODE_RE 한 곳 — 새 CVE 정규식을 짓지 않는다(scandrafts와 같은 계약, 2026-09-03)
 import { 말조사 } from "../util/josa";
 
 const MAX_STEPS = 5;
@@ -828,7 +829,11 @@ export interface ToolScope {
 // 결정적으로 해당 도구에 못박는다(A단계 교훈: 라우팅 흔들림은 프롬프트 힌트가 아니라 결정적
 // 후처리로 고친다). 실측(2026-07-19): "오늘 뭐부터 조치해야 해?"가 3/3 chat 폴백 → today 미호출.
 // 문구가 명백할 때만 발동하도록 좁게 잡는다(과발동 시 최악이라도 우선순위 목록을 보여주는 것뿐).
-const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }[] = [
+// argsByModel(선택, 2026-09-03): **도구는 못 박되 인자는 모델이 뽑는다.** 「사례 등록: …」처럼 칸이 여덟(제목·한 줄·쉬운 설명·
+//   연도·업종·지역·교훈·출처)이라 정규식으로는 못 가르고, 그렇다고 빈 인자로 결재판을 띄우면 담당자가 전부 손으로 채워야 한다.
+//   runAgentLoop의 강제 쓰기 분기가 이 표시를 보고 extractToolArgsByModel로 인자만 뽑아 결재판에 올린다(필수값의 지어낸 값은
+//   buildApproval이 종전대로 비운다 — 모델 선택 경로와 같은 잣대).
+const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string>; argsByModel?: true }[] = [
   // "스캔 안 된 자산 있어?" — **틀린 답이 나오던 자리**(2026-08-02 평가 게이트가 잡음).
   //   LLM이 scan_status(재스캔 상태 변화)를 골라 "스캔 안 된 자산이 없습니다"라고 답했다.
   //   같은 시각 오늘 할 일에는 "스캔이 안 된 자산 609건"이 떠 있었다 — 담당자가 이 답을 믿으면
@@ -1644,6 +1649,46 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "eol_check",
     args: {},
   },
+  {
+    // 📚 침해사고 히스토리 **등록** — 「사례 등록: 2024년 ○○사 랜섬웨어, …, 출처 https://…」(화면·screenguide가 약속한 말).
+    //   ⚠ 네 규칙(등록·삭제 = 쓰기, 샘·조회 = 읽기) 가운데 **등록·삭제가 먼저** 온다 — 「침해사고 사례 등록: …」이 아래 조회 규칙에
+    //     삼켜지면 등록이 목록 답으로 바뀐다(가장 나쁜 오라우팅: 담당자는 등록된 줄 안다).
+    //   ⚠ 「등록」 뒤 **콜론이 있을 때만** — 「사례 등록하려면 어떻게 해?」(방법 질문)는 screenguide 몫이라 안 삼킨다.
+    //   인자는 모델이 뽑는다(argsByModel) — 칸이 여덟이라 정규식으로 못 가른다. 결재판이 확인한 뒤에만 실행된다.
+    re: /^\s*(?:침해\s*사고\s*)?(?:사례|히스토리)\s*등록\s*[:：]/,
+    tool: "register_incident_case",
+    args: {},
+    argsByModel: true,
+  },
+  {
+    // 📚 침해사고 히스토리 **삭제** — 「사례 삭제 ic-…」(등록 답·화면 상세가 되돌리기로 약속한 말).
+    //   ⚠ **ic- 번호가 있을 때만** 강제한다(적용부에서 뽑는다) — 번호 없이 「사례 삭제해줘」면 모델에 넘긴다(빈 결재판 방지).
+    //     번호 요구가 곧 낱말 가로채기 방어다: 「취약점 사례 목록에서 지워줘」 같은 말은 번호가 없어 여기 안 온다.
+    re: /(?:사례|히스토리)[^\n]{0,24}(?:삭제|지워|지우)|(?:삭제|지워|지우)[^\n]{0,12}(?:사례|히스토리)/,
+    tool: "delete_incident_case",
+    args: {},
+  },
+  {
+    // 📚 사례의 샘 — 「해외 보안 유튜브 추천해줘」·「보안 사고 소식 어디서 봐?」·「사례의 샘 보여줘」(screenguide가 약속한 말).
+    //   ⚠ 「추천」·「사이트」 홑낱말은 안 쓴다 — 보안/해킹/침해/사고 낱말과 붙은 매체(유튜브·채널·사이트·블로그·뉴스·소식)일 때만.
+    //   갈래(유튜브·국내·사이트)는 handlers.runIncidentSources 한 곳이 말에서 읽는다 — 지시문을 통째로 넘긴다(workflow_status와 같은 이유).
+    re: /사례의\s*샘|(?:보안|해킹|침해|사고)\s*(?:관련\s*)?(?:유튜브|유투브|채널|사이트|블로그|뉴스|소식)[^\n]{0,14}(?:추천|어디|볼\s*만|알려|보여)|(?:유튜브|유투브)[^\n]{0,10}추천/i,
+    tool: "incident_sources",
+    args: {},
+  },
+  {
+    // 📚 침해사고 히스토리 **조회** — 「침해사고 히스토리 보여줘」(incidentcases.html 칩이 넣어 주는 말 — guidance-routing이 잰다)·
+    //   「사고 사례 보여줘」·「비슷한 사례 있어?」·「CVE-2021-44228 비슷한 사례 있어?」.
+    //   ⚠ **「사례」 홑낱말은 안 쓴다** — report.ts의 「취약점 사례」와 겹친다(terms.ts 별칭·handlers 머리글과 같은 계약).
+    //     침해사고/침해/해킹/사고 + 히스토리/사례 복합어, 또는 비슷한/유사한 + 사례만.
+    //   ⚠ 등록(콜론)·삭제·샘·추천은 위 세 규칙의 영토라 배제한다 — 배열 순서로도 앞이 이기지만, 표(routes)를 읽는 사람이
+    //     정규식만 보고도 경계를 알게 적어 둔다.
+    //   ⚠ 앞 층(dispatcher 침해사고질문인가)은 「어떻게·절차·대응」이 있을 때만 초동 절차로 채 간다 — 조회 어미는 여기 온다.
+    //   인자: CVE가 있으면 cve(정확 일치), 앵커 바로 앞 낱말 하나면 q(「랜섬웨어 사고 사례」→ 랜섬웨어). 둘 다 없으면 최근 목록.
+    re: /^(?![\s\S]*(?:등록\s*[:：]|삭제|지워|지우|사례의\s*샘|추천))[\s\S]*(?:(?:침해\s*사고|침해|해킹|사고)\s*(?:히스토리|사례)|(?:비슷한|유사한?)\s*(?:사고\s*)?사례)/,
+    tool: "incident_cases",
+    args: {},
+  },
 ];
 // 등록된 보안제품 이름을 콕 집어 "설명해줘"라고 물으면 그 제품의 사내 근거(매뉴얼·온톨로지)를
 // 모아 답한다. [2026-07-26 실사용] "Tenable Web App Scanning 주요기능 설명해줘"에 도구를 하나도
@@ -1706,7 +1751,7 @@ export function 사내규정질문(instruction: string): boolean {
 }
 
 // export: 시험이 **실제 라우팅 함수**를 그대로 불러 대조한다(정규식을 베껴 쓰면 드리프트한다).
-export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
+export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string>; argsByModel?: boolean } | null {
   // ⚠ 강제 분기는 **화면 도메인 좁히기를 따르지 않는다**(검토 지적 2026-07-29).
   //   도메인 좁히기의 목적은 "LLM에게 보여 줄 도구 목록을 짧게 유지해 선택이 흔들리지 않게" 하는
   //   것인데, 강제 분기는 LLM을 아예 거치지 않는다 — 좁힐 이유가 없다. 그런데 좁힌 목록으로
@@ -2019,10 +2064,83 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
         if (!query) continue; // LLM이 고르게 둔다 — 빈 조회로 되묻느니 낫다
         return { tool: f.tool, args: { query } };
       }
-      return { tool: f.tool, args: f.args };
+      // 📚 침해사고 히스토리(2026-09-03) — 인자를 말에서 뽑는다.
+      if (f.tool === "delete_incident_case") {
+        // 번호(ic-16자리 16진수, incidentcases ID_RE)가 없으면 강제하지 않는다 — 빈 결재판 대신 모델이 되묻는다.
+        const id = /\b(ic-[0-9a-f]{16})\b/i.exec(instruction)?.[1];
+        if (!id) continue;
+        return { tool: f.tool, args: { id: id.toLowerCase() } };
+      }
+      if (f.tool === "incident_sources") {
+        // 갈래(유튜브·국내·사이트)는 handlers.runIncidentSources 한 곳이 말에서 읽는다 — 두 곳에서 가르면 어긋난다.
+        return { tool: f.tool, args: { kind: instruction } };
+      }
+      if (f.tool === "incident_cases") {
+        // CVE는 hybridsearch CODE_RE 한 곳으로 뽑는다(대문자) — 있으면 그 CVE가 걸린 사례만(규칙 정확 일치).
+        const cve = extractLexicalTerms(instruction).codes.find((c) => c.startsWith("CVE-")) ?? "";
+        if (cve) return { tool: f.tool, args: { cve } };
+        const 주제 = 사례주제어(instruction);
+        return { tool: f.tool, args: 주제 ? { q: 주제 } : {} };
+      }
+      return { tool: f.tool, args: f.args, ...(f.argsByModel ? { argsByModel: true as const } : {}) };
     }
   }
   return null;
+}
+
+/**
+ * 「랜섬웨어 사고 사례 알려줘」의 **랜섬웨어** — 사례 앵커(사고 사례·침해사고 히스토리·비슷한 사례) 바로 앞의 낱말 하나(조사는 뗀다).
+ * 없거나 꾸밈말(실제·과거·국내·다른…)이면 빈 문자열 → 전체 목록. 낱말 둘 이상(「병원 해킹 사고 사례」)은 앞 낱말을 버리고
+ * 앵커에 붙은 낱말만 보는데 그것이 꾸밈말(해킹)이면 역시 빈 문자열이다 — listIncidentCases의 q는 **통째로 LIKE**라 여러
+ * 낱말을 이어 넘기면 0건이 되기 때문(없는 것을 있다고도, 있는 것을 없다고도 하지 않는 쪽으로 기운다).
+ */
+export function 사례주제어(instruction: string): string {
+  const m = /([A-Za-z0-9가-힣][A-Za-z0-9가-힣.\-]{1,29}?)(?:로|으로|과|와|랑|이랑|의|에서|에)?\s+(?:관련\s+)?(?:(?:침해\s*사고|침해|해킹|사고)\s*(?:히스토리|사례)|(?:비슷한|유사한?)\s*(?:사고\s*)?사례)/.exec(instruction);
+  const 낱말 = m?.[1]?.trim() ?? "";
+  if (!낱말 || 낱말.length < 2) return "";
+  if (/^(실제|과거|최근|국내|해외|다른|이런|그런|저런|비슷|유사|관련|우리|전체|모든|어떤|무슨|보안|침해|해킹|사고|사례|히스토리|등록된|기존|있는|참고)$/.test(낱말)) return "";
+  return 낱말;
+}
+
+/**
+ * 도구는 정해졌고 **인자만** 모델이 뽑는다(FORCED_INTENTS의 argsByModel 규칙용, 2026-09-03).
+ * 결정 프롬프트(도구 고르기)를 다시 돌리지 않는다 — 그 도구 하나의 칸 목록만 주고 JSON으로 받는다.
+ * 실패(모델 없음·형식 불가)는 빈 인자 — 결재판이 칸을 되묻는다. 값은 전부 문자열로 맞추고 선언에 없는 칸은 버린다
+ * (validateToolArgs가 「인자 오류」로 도구를 통째로 죽이는 함정 회피 — 범위를입힌다와 같은 이유).
+ */
+export async function extractToolArgsByModel(tool: AgentTool, instruction: string, deps?: { chat?: typeof chat }): Promise<Record<string, string>> {
+  const 칸 = tool.params.map((p) => `- ${p.name}: ${p.label}${p.required ? "(필수)" : ""} — ${p.description}`);
+  // 키는 영문(스키마 강제 디코딩 관례) — 도구 선언의 param 이름 그대로.
+  const schema = { type: "object", properties: Object.fromEntries(tool.params.map((p) => [p.name, { type: "string" }])) };
+  try {
+    const raw = await (deps?.chat ?? chat)({
+      agentId: "orchestrator",
+      // ⚠ trusted — 도구 칸 목록이 실린 **우리 프롬프트**다. 사용자 지시는 dispatcher가 이미 검사했다(decisionPrompt와 같은 이유).
+      trusted: true,
+      responseSchema: schema,
+      maxTokens: 900,
+      message: [
+        `너는 GIJO AS 보안 플랫폼의 오케스트레이터다. 아래 사용자 지시에서 「${tool.label}」 도구의 인자만 뽑아 JSON 객체 하나로 출력한다.`,
+        "규칙: 지시에 적힌 내용만 옮긴다 — 없는 값은 칸을 비우거나 빼고, 지어내지 않는다. 값은 모두 문자열로 쓴다. 여러 개는 쉼표로 잇는다.",
+        "인자:",
+        ...칸,
+        "",
+        `사용자 지시: "${instruction}"`,
+      ].join("\n"),
+    });
+    const o = JSON.parse(String(raw ?? "").replace(/^```(?:json)?\s*|\s*```$/g, "")) as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+    const 받는것 = new Set(tool.params.map((p) => p.name));
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      if (!받는것.has(k) || v == null) continue;
+      const s = (Array.isArray(v) ? v.map((x) => String(x)).join(", ") : String(v)).trim();
+      if (s) out[k] = s;
+    }
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -2118,11 +2236,15 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     //   LLM에게 갔고, **Tenable Security Center 로그인 → Explore > Assets** 남의 제품
     //   매뉴얼 절차를 답했다. 도구도 규칙도 있는데 **실행 문턱에서 새고 있었다.**
     if (tool?.write) {
+      // 📚 argsByModel(2026-09-03) — 도구는 못 박고 **인자만** 모델이 뽑는다(FORCED_INTENTS 머리글). 모델이 죽거나 형식이
+      //   깨지면 빈 인자로 결재판이 뜬다(칸을 되묻는다) — 강제 경로가 조용히 새는 일은 없다(forced-write-approval 계약 그대로).
+      if (forced.argsByModel) reportProgress("understand", `${tool.label} — 지시에서 칸을 뽑고 있습니다`);
+      const 인자 = forced.argsByModel ? await extractToolArgsByModel(tool, instruction) : forced.args;
       reportProgress("review", `${tool.label} — 확인을 받습니다`);
       return {
         output: `${말조사(tool.label, "을")} 진행합니다 — 아래 내용을 확인하고 승인해 주세요.`,
         toolCalls: [],
-        approval: buildApproval(tool, forced.args, instruction, ""),
+        approval: buildApproval(tool, 인자, instruction, ""),
       };
     }
     if (tool && !tool.write) {

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 침해사고 히스토리</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  incidentcases.html — 「📚 침해사고 히스토리」 판(해설 팀원 normaltic의 사례 저장소, 2026-09-03).
+
+  ■ 왜 (사장님 지시 2026-09-03 · 승인 시안 mockups/normaltic-cases)
+    유튜브 @Normaltic처럼 실제 침해사고를 쉬운 말로 모아 두고, 우리 스캔 결과에 같은 CVE가 나오면
+    해설 팀원이 자동으로 부연한다. 이 화면은 그 저장소를 **보는 자리**다.
+
+  ■ 제품 원칙 지킴
+    · **입력칸 0** — 등록·삭제는 대화창(「사례 등록: …」 → 결재판 / 「사례 삭제 <번호>」)이 유일한 문.
+    · 화면엔 **정체성 한 줄과 ⚠경고만** — 사용법·용어 풀이는 screenguide(ⓘ, 패널 incidentcases)가 진다.
+    · 목록은 공용 부품 .g-rows(엑셀형, 행 30px·머리 26px = gijo-ui.css 값 그대로) — 새 밀도값 0.
+    · 행 클릭 = 상세(한 줄·쉬운 설명·교훈·출처) 펼침 + 📌 선택(selectnotify.js 공용 부품).
+    · 외부 링크는 「클릭하면 외부 사이트로 나갑니다」 한 줄 + shell.openExternal(스킴 검사는 main.ts).
+    · 사이드바 항목이 아니다 — 해설 팀원 카드의 「📚 히스토리」·취약점 카드/대화창의
+      「📚 비슷한 사례 N건」 칩·AI 허브의 판 카드가 이 화면을 연다(시안 §4 「카드 트리거로 연다」).
+
+  ■ 딥링크: ?cve=CVE-…(쉼표로 여럿) — 그 CVE로 좁혀 연다. 좁힘 판정은 서버 /similar가 한다
+    (칩이 센 N건과 같은 창구·같은 규칙 — 여기서 새로 세지 않는다).
+  ■ 다리: GET /api/incident-cases · /similar?cves= · /sources (읽기만)
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;}
+.page-title{font-size:21px;font-weight:800;color:var(--text-strong, #fff);}
+.scr-id{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:960px;line-height:1.6;}
+.ic-info{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;color:var(--blue-light);
+  font-size:12px;font-weight:700;padding:2px 8px;cursor:pointer;font-family:inherit;vertical-align:middle;margin-left:6px;}
+.notice{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;
+  font-size:12px;color:var(--muted);line-height:1.7;max-width:1180px;margin-bottom:14px;}
+.notice b{color:var(--amber);}
+.ic-msg{font-size:12px;color:var(--red);margin:0 0 10px;}
+.ic-msg:empty{display:none;}
+/* 좁힘 띠 — 딥링크(?cve=)로 열렸을 때만. 「전체 보기」는 좁힘을 푸는 단추지 입력칸이 아니다. */
+.ic-filter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 10px;max-width:1180px;}
+.ic-filter[hidden]{display:none;}
+.ic-filter b{color:var(--text);}
+.ic-filter button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;
+  padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+.ic-filter button:hover{color:var(--text);border-color:var(--blue);}
+.sec{font-size:13px;font-weight:800;margin:12px 0 8px;color:var(--text-strong, #fff);}
+.sec .n{font-size:11.5px;font-weight:600;color:var(--muted-2);margin-left:8px;}
+.gm2{color:var(--muted-2);}
+.empty{padding:16px;color:var(--muted);font-size:12.5px;line-height:1.7;}
+.empty b{color:var(--text);}
+.fail{color:var(--red);font-weight:700;}
+/* 엑셀형 열 폭 — 한 곳 선언(.g-rows--이름 관례). 열: 연도·제목·기법·연결 CVE·제품·출처(시안 §4 그대로). */
+.g-rows--cases{max-width:1180px;}
+.g-rows--cases .g-rows-head,.g-rows--cases .g-rows-r{grid-template-columns:52px 1fr 96px 190px 62px;gap:8px;}
+.g-rows-r.on{background:rgba(59,130,246,.10);}
+.g-rows-r.noclick{cursor:default;}
+.g-rows-r.noclick:hover{background:transparent;}
+.tid{display:inline-block;font-size:11px;font-weight:700;background:rgba(139,124,240,.15);color:var(--purple);border-radius:5px;padding:1px 6px;}
+.srclink{color:var(--blue-light);font-size:11.5px;text-decoration:none;white-space:nowrap;}
+.srclink:hover{text-decoration:underline;}
+/* 상세 — 행 아래 펼침(보기 전용). 시안 §4 .det 값 그대로. */
+.det{background:var(--panel-2);border-radius:8px;padding:12px 14px;margin:2px 0 6px;font-size:11.75px;color:var(--muted);line-height:1.75;}
+.det b{color:var(--text);}
+.det .lesson{color:var(--amber);margin-top:8px;}
+.det .src{margin-top:8px;color:var(--muted-2);}
+.det .src a{color:var(--blue-light);}
+/* 사례의 샘 띠 — 이름·종류·언어·주기·링크(보기 전용, 줄은 .noclick — 링크만 눌린다). */
+.src-strip{max-width:1180px;margin-top:20px;}
+.g-rows--src .g-rows-head,.g-rows--src .g-rows-r{grid-template-columns:1fr 64px 56px 88px 200px;gap:8px;}
+.src-note{font-size:11.5px;color:var(--muted-2);margin-top:6px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">📚 침해사고 히스토리</div>
+        <!-- 정체성 한 줄 — 사용법·용어 풀이는 ⓘ(screenguide 패널 incidentcases)가 진다. -->
+        <div class="scr-id">실제로 있었던 침해사고를 쉬운 말로 정리해 둔 목록입니다. 우리 스캔 결과에 같은 취약점이 나오면 <b>해설 팀원</b>이 자동으로 알려 드립니다.<button type="button" class="ic-info" id="icInfo" title="이 화면 안내 — 사용법·용어 풀이는 대화창이 답합니다">ⓘ</button></div>
+      </div>
+    </div>
+
+    <div class="notice">
+      ⚠ 여기서는 <b>보기만</b> 합니다 — 등록은 대화창에 「사례 등록: 2024년 ○○사 랜섬웨어, …」처럼 말하면 결재판이 뜹니다.
+      출처·매체 링크를 누르면 <b>외부 사이트로 나갑니다</b>.
+    </div>
+    <div class="ic-msg" id="icMsg"></div>
+
+    <div class="ic-filter" id="icFilter" hidden></div>
+
+    <div class="sec">등록된 사례 <span class="n" id="icCount"></span></div>
+    <div id="icList"><div class="empty">불러오는 중…</div></div>
+
+    <div class="src-strip" id="icSources">
+      <div class="sec">사례의 샘 <span class="n">— 해설 팀원이 참고하는 매체</span></div>
+      <div id="icSourceList"><div class="empty">불러오는 중…</div></div>
+      <div class="src-note">클릭하면 외부 사이트로 나갑니다.</div>
+    </div>
+  </div>
+</div>
+
+<div id="gijoChatWidget" data-prompts='["침해사고 히스토리 보여줘","이 화면 사용법 알려줘"]'></div>
+<script src="nav.js"></script>
+<script src="selectnotify.js"></script>
+<script src="progresscard.js"></script>
+<script src="gijomd.js"></script>
+<script src="chatparts.js"></script>
+<script src="chatwidget.js"></script>
+<script>
+(function () {
+  "use strict";
+  if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) { location.href = "login.html"; return; }
+  var g = window.gijo;
+  var 목록자리 = document.getElementById("icList");
+  var 수자리 = document.getElementById("icCount");
+  var 필터띠 = document.getElementById("icFilter");
+  var 샘자리 = document.getElementById("icSourceList");
+  var 알림자리 = document.getElementById("icMsg");
+  var 상한 = 500; // grouppanels.js 📚 판과 같은 상한 — 두 자리 숫자가 어긋나지 않게
+  var 등록예시 = "사례 등록: 2024년 ○○물류 랜섬웨어, 초기 침투는 VPN 계정 탈취, 교훈은 VPN에 MFA";
+  var 열린id = null;
+  var 필터CVE = 읽기CVE();
+
+  // 딥링크 ?cve=CVE-…(쉼표로 여럿) — 대화창·취약점 카드의 「📚 비슷한 사례」 칩이 이 값으로 좁혀 연다.
+  function 읽기CVE() {
+    var raw = new URLSearchParams(location.search).get("cve") || "";
+    return raw.split(",").map(function (s) { return s.trim().toUpperCase(); }).filter(Boolean);
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
+  }
+  // 표 칸(techniques·cves·products)은 JSON 문자열일 수 있다 — 서버가 배열로 풀어 주는 것이 계약이지만
+  // 갈래가 어긋나도 화면이 죽지 않게 둘 다 받는다.
+  function 배열(v) {
+    if (Array.isArray(v)) return v.map(String);
+    if (typeof v === "string" && v.trim()) { try { var a = JSON.parse(v); return Array.isArray(a) ? a.map(String) : []; } catch (e) { return []; } }
+    return [];
+  }
+  function 웹주소(u) { return /^https?:\/\//i.test(String(u || "")); }
+  function 알림(글) { 알림자리.textContent = 글 || ""; }
+  // 외부 링크 — Electron 껍데기 창이 아니라 기본 브라우저로(스킴 검사는 main.ts openExternal이 한다).
+  function 외부열기(url) {
+    if (!웹주소(url)) return;
+    if (!g.openExternal) { 알림("이 버전은 직접 열기가 없습니다 — 주소를 복사해 여세요: " + url); return; }
+    g.openExternal(url).then(function () { 알림(""); }).catch(function (err) {
+      알림("열지 못했습니다: " + ((err && err.message) || url)); // 조용히 삼키지 않는다
+    });
+  }
+
+  function 행(c) {
+    var t = 배열(c.techniques), v = 배열(c.cves), p = 배열(c.products);
+    var 기법 = t.length
+      ? '<span class="tid" title="' + esc(t.join(", ")) + '">' + esc(t[0]) + '</span>' + (t.length > 1 ? '<span class="gm2"> +' + (t.length - 1) + '</span>' : "")
+      : '<span class="gm2">-</span>';
+    var 연결 = v.length ? v[0] + (v.length > 1 ? " 외 " + (v.length - 1) : "") : (p.length ? p[0] + (p.length > 1 ? " 외 " + (p.length - 1) : "") : "");
+    var 연결칸 = 연결
+      ? '<span class="trunc" title="' + esc(v.concat(p).join(", ")) + '">' + esc(연결) + '</span>'
+      : '<span class="gm2">(없음)</span>';
+    var 출처칸 = 웹주소(c.sourceUrl)
+      ? '<a class="srclink" href="' + esc(c.sourceUrl) + '" title="' + esc(c.sourceName || c.sourceUrl) + ' — 클릭하면 외부 사이트로 나갑니다">🔗 출처</a>'
+      : '<span class="gm2">' + (c.origin === "user" ? "담당자 등록" : "-") + '</span>';
+    return '<div class="g-rows-r' + (c.id === 열린id ? " on" : "") + '" data-id="' + esc(c.id) + '">' +
+      '<span class="gm2">' + (c.year != null ? esc(c.year) : "-") + '</span>' +
+      '<span class="trunc" title="' + esc(c.title) + '">' + esc(c.title) + '</span>' +
+      '<span>' + 기법 + '</span>' + 연결칸 + '<span>' + 출처칸 + '</span></div>' +
+      (c.id === 열린id ? 상세(c) : "");
+  }
+
+  // 상세(보기 전용) — 제목/한 줄/쉬운 설명/교훈/연도·업종·CVE·제품/출처. 쉬운 설명의 정본은 표 칸 하나(plainExplain).
+  function 상세(c) {
+    var v = 배열(c.cves), p = 배열(c.products), t = 배열(c.techniques);
+    var 메타 = [c.year != null ? c.year + "년" : null, c.industry, c.region].filter(Boolean).join(" · ");
+    return '<div class="det" data-det="' + esc(c.id) + '">' +
+      (c.oneLiner ? '<b>한 줄</b> — ' + esc(c.oneLiner) + '<br>' : "") +
+      '<b>쉬운 설명</b> — ' + (c.plainExplain ? esc(c.plainExplain).replace(/\n/g, "<br>") : '<span class="gm2">(아직 없음)</span>') +
+      (c.lesson ? '<div class="lesson"><b>교훈</b> — ' + esc(c.lesson) + '</div>' : "") +
+      '<div class="src">' + esc(메타 || "-") +
+        (v.length ? ' · CVE ' + esc(v.join(", ")) : "") + (p.length ? ' · 제품 ' + esc(p.join(", ")) : "") + (t.length ? ' · 기법 ' + esc(t.join(", ")) : "") +
+        (웹주소(c.sourceUrl) ? '<br>출처: <a class="srclink" href="' + esc(c.sourceUrl) + '">' + esc(c.sourceName || c.sourceUrl) + '</a> <span class="gm2">(클릭하면 외부 사이트로 나갑니다)</span>' : "") +
+        '<br><span class="gm2">사례 번호 ' + esc(c.id) + ' · 지우려면 대화창에 「사례 삭제 ' + esc(c.id) + '」(등록자·관리자)</span>' +
+      '</div></div>';
+  }
+
+  var 사례들 = [];
+  function 찾기(id) { for (var i = 0; i < 사례들.length; i++) if (사례들[i].id === id) return 사례들[i]; return null; }
+
+  function 그리기(전체건수) {
+    var cs = 사례들.slice().sort(function (a, b) {
+      // createdAt는 ms 숫자(서버 INTEGER) — 문자열 비교(localeCompare)가 아니라 숫자 뺄셈으로(같은 연도 안에서 최근 등록이 위).
+      return (Number(b.year) || 0) - (Number(a.year) || 0) || (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0);
+    });
+    var 전체글 = 전체건수 >= 상한 ? 상한 + "+" : String(전체건수);
+    수자리.textContent = 필터CVE.length ? cs.length + "건 (전체 " + 전체글 + "건)" : 전체글 + "건";
+    if (필터CVE.length) {
+      필터띠.hidden = false;
+      필터띠.innerHTML = '🔎 <b>' + esc(필터CVE.join(", ")) + '</b>(으)로 좁혔습니다 — 같은 CVE를 쓴 사고만 보입니다 ' +
+        '<button type="button" id="icClear" title="좁힘을 풀고 전체 사례를 봅니다">전체 보기 ✕</button>';
+    } else {
+      필터띠.hidden = true;
+      필터띠.innerHTML = "";
+    }
+    if (!cs.length) {
+      목록자리.innerHTML = '<div class="empty">' +
+        (필터CVE.length ? "이 CVE와 연결된 사례가 없습니다." : "등록된 사례가 없습니다.") +
+        '<br><br>대화창에서 <b>「' + esc(등록예시) + '」</b>처럼 말하면 결재판이 뜨고, 승인하면 여기에 실립니다.</div>';
+      return;
+    }
+    목록자리.innerHTML = '<div class="g-rows g-rows--cases">' +
+      '<div class="g-rows-head"><span>연도</span><span>제목</span><span>기법</span><span>연결 CVE·제품</span><span>출처</span></div>' +
+      '<div class="g-rows-flat">' + cs.map(행).join("") + '</div></div>';
+  }
+
+  function 선택알림(c) {
+    if (!window.gijoSelectNotify) return;
+    if (!c) { window.gijoSelectNotify(); return; } // 접으면 해제
+    // 규격은 {label, text, fields} — text가 없으면 부품이 「해제」로 보낸다(supplychain 전례). fields는 허용키만.
+    window.gijoSelectNotify({
+      label: String(c.title || "").slice(0, 60),
+      text: "침해사고 사례 " + c.title + (c.year != null ? " (" + c.year + ")" : "") + " · 번호 " + c.id,
+      fields: {
+        title: c.title,
+        plain: c.oneLiner || "",
+        status: [c.year, c.industry, c.region].filter(Boolean).join(" · "),
+      },
+    });
+  }
+
+  // 행 클릭 = 상세 펼침(한 번에 하나) + 📌 선택. 출처 링크는 행을 열지 않고 밖으로만 나간다.
+  목록자리.addEventListener("click", function (ev) {
+    var a = ev.target.closest("a.srclink");
+    if (a) { ev.preventDefault(); ev.stopPropagation(); 외부열기(a.getAttribute("href")); return; }
+    var row = ev.target.closest(".g-rows-r");
+    if (!row) return;
+    var id = row.getAttribute("data-id");
+    var 기존상세 = 목록자리.querySelector(".det");
+    var 기존행 = 목록자리.querySelector(".g-rows-r.on");
+    if (기존상세) 기존상세.remove();
+    if (기존행) 기존행.classList.remove("on");
+    if (열린id === id) { 열린id = null; 선택알림(null); return; }
+    var c = 찾기(id);
+    if (!c) return;
+    열린id = id;
+    row.classList.add("on");
+    row.insertAdjacentHTML("afterend", 상세(c));
+    선택알림(c);
+  });
+  필터띠.addEventListener("click", function (ev) {
+    if (!ev.target.closest("#icClear")) return;
+    필터CVE = [];
+    열린id = null;
+    // 주소에서 cve만 뗀다(embed·theme 신호는 그대로) — 다시 읽어도 좁힘이 되살아나지 않게.
+    try {
+      var qs = new URLSearchParams(location.search); qs.delete("cve");
+      var s = qs.toString();
+      history.replaceState(null, "", location.pathname + (s ? "?" + s : ""));
+    } catch (e) { /* 주소를 못 바꿔도 화면은 산다 */ }
+    불러오기();
+  });
+  샘자리.addEventListener("click", function (ev) {
+    var a = ev.target.closest("a.srclink");
+    if (!a) return;
+    ev.preventDefault();
+    외부열기(a.getAttribute("href"));
+  });
+  // ⓘ — 위젯이 있으면(단독·분리창) 열고, 탭 안(embed)에서는 셸 대화창에 화면 안내를 묻는다.
+  //   embed에서는 chatwidget.js가 위젯을 안 만들어 gijoOpenChat이 없다 — 그러면 ⓘ가 죽은 단추가 된다.
+  //   허브 무대(iframe 2겹) 안에서도 닿게 top으로 보낸다(parent는 허브라 gijo:ask를 안 넘긴다).
+  document.getElementById("icInfo").addEventListener("click", function () {
+    if (window.gijoOpenChat) { window.gijoOpenChat(); return; }
+    try { window.top.postMessage({ type: "gijo:ask", text: "이 화면 사용법 알려줘" }, "*"); } catch (e) { /* 셸 밖이면 없던 일로 */ }
+  });
+
+  function 샘그리기(ss) {
+    if (!ss.length) { 샘자리.innerHTML = '<div class="empty">등록된 매체가 없습니다.</div>'; return; }
+    var 종류말 = { youtube: "유튜브", site: "사이트", domestic: "국내" };
+    샘자리.innerHTML = '<div class="g-rows g-rows--src">' +
+      '<div class="g-rows-head"><span>매체</span><span>종류</span><span>언어</span><span>주기</span><span>링크</span></div>' +
+      '<div class="g-rows-flat">' + ss.map(function (s) {
+        var url = String(s.url || "");
+        // ⚠ .noclick — 줄 자체는 조작이 없다(링크만 눌린다). 안 붙이면 손가락 커서가 「눌러도 아무 일 없는 자리」를 만든다.
+        return '<div class="g-rows-r noclick">' +
+          '<span class="trunc" title="' + esc(s.desc || s.name || "") + '">' + esc(s.name || "-") + '</span>' +
+          '<span class="gm2">' + esc(종류말[s.kind] || s.kind || "-") + '</span>' +
+          '<span class="gm2">' + esc(s.lang || "-") + '</span>' +
+          '<span class="gm2 trunc" title="' + esc(s.cadence || "") + '">' + esc(s.cadence || "-") + '</span>' +
+          (웹주소(url)
+            ? '<a class="srclink trunc" href="' + esc(url) + '" title="' + esc(url) + ' — 클릭하면 외부 사이트로 나갑니다">🔗 ' + esc(url.replace(/^https?:\/\//i, "")) + '</a>'
+            : '<span class="gm2">-</span>') +
+          '</div>';
+      }).join("") + '</div></div>';
+  }
+
+  function 불러오기() {
+    목록자리.innerHTML = '<div class="empty">불러오는 중…</div>';
+    if (!g.incidentCases) {
+      목록자리.innerHTML = '<div class="empty"><span class="fail">이 버전은 침해사고 히스토리 조회가 없습니다</span> — 앱을 업데이트하세요.</div>';
+      return;
+    }
+    var 전체p = g.incidentCases(undefined, undefined, undefined, 상한);
+    // 좁힘은 서버 /similar가 판정한다 — 칩이 센 N건과 같은 창구·같은 규칙(여기서 새로 거르지 않는다).
+    var 목록p = 필터CVE.length && g.incidentCasesSimilar ? g.incidentCasesSimilar(필터CVE) : 전체p;
+    Promise.all([전체p, 목록p]).then(function (r) {
+      var 전체 = (r[0] && r[0].cases) || [];
+      사례들 = (r[1] && r[1].cases) || [];
+      그리기(전체.length);
+    }).catch(function (e) {
+      // 실패는 실패로 — 빈 목록(0건)으로 그리면 「사례가 없다」는 거짓이 된다.
+      수자리.textContent = "";
+      목록자리.innerHTML = '<div class="empty"><span class="fail">불러오지 못했습니다</span> — 서버 연결을 확인해 주세요. ' +
+        '<span class="gm2" title="' + esc((e && e.message) || "") + '">(자세한 사유는 이 글에 마우스를 올리면 보입니다)</span></div>';
+    });
+    if (g.incidentSources) {
+      g.incidentSources().then(function (r) { 샘그리기((r && r.sources) || []); }).catch(function () {
+        샘자리.innerHTML = '<div class="empty"><span class="fail">매체 목록을 불러오지 못했습니다</span> — 서버 연결을 확인해 주세요.</div>';
+      });
+    } else {
+      샘자리.innerHTML = '<div class="empty gm2">이 버전은 매체 목록 조회가 없습니다.</div>';
+    }
+  }
+
+  불러오기();
+})();
+</script>
+</body>
+</html>

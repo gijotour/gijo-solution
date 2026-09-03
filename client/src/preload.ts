@@ -439,6 +439,10 @@ const gijoApi = {
   listUploadReceipts: (limit?: number) => api.memoryApi.uploadReceipts(limit),
   // 📂 지켜보는 폴더(2026-08-31) — 내 문서 판 조회 전용(위치 인자 관례).
   watchFolders: () => api.memoryApi.watchFolders(),
+  // 📚 침해사고 히스토리(2026-09-03) — 판·칩 조회 전용(위치 인자 관례). 등록·삭제는 대화창 결재판이 유일한 문.
+  incidentCases: (q?: string, cve?: string, year?: number, limit?: number) => api.incidentCasesApi.list({ q, cve, year, limit }),
+  incidentCasesSimilar: (cves: string[]) => api.incidentCasesApi.similar(cves),
+  incidentSources: () => api.incidentCasesApi.sources(),
   // 오늘 새로 들어온 문서 수(사이드바 배지). 이 기기의 자정(현지시각)을 ISO로 계산해 서버에 넘긴다 —
   //   서버 ingestedAt은 UTC ISO라 문자열 비교로 맞고, "오늘"의 경계는 사람이 있는 시간대가 정한다.
   recentDocCount: () => { const d = new Date(); d.setHours(0, 0, 0, 0); return api.memoryApi.recentDocCount(d.toISOString()); },

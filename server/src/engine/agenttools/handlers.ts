@@ -45,6 +45,7 @@ import { listAnalysisEvents, analysisSummary, computeCorrelations } from "../ana
 import { computeKpiSnapshot, 점수영향글 } from "../kpi";
 import { listSessions as listWorkSessions } from "../worksessions";
 import { canonicalize, suggestionsFor } from "../terms";
+import { listIncidentCases, formatIncidentCases, formatIncidentSources, registerIncidentCase, deleteIncidentCase, getIncidentCase, validateIncidentCaseInput, type IncidentSourceKind } from "../incidentcases";
 import { listAudit, recordAudit, type AuditEntry } from "../audit";
 import { lawAnswer, lawArticleAnswer, 조문번호, getLawConfig, type LawTarget } from "../lawinfo";
 // 담당자가 "미조치"라고 하면 저장값 open·pending을 뜻한다 — 글자 그대로 대조하면 늘 0건이다.
@@ -4113,4 +4114,61 @@ export async function runEolCheck(args: Record<string, string>): Promise<string>
     (예정.length ? `⏳ 지원 종료가 예정된 부품 ${예정.length}건\n${그리기(예정)}\n\n` : "") +
     `⚠ 표에 걸리지 않은 나머지 ${부품수 - 걸린.length}개는 **「지원 중」이 아니라 「모른다」**입니다 — 표가 ${EOL_SEED.length}줄뿐입니다.\n\n${eol표상태()}`
   );
+}
+
+// ── 📚 침해사고 히스토리(2026-09-03) — 조회·등록·삭제·사례의 샘 ─────────────────────────
+// 담당자는 「히스토리」·「사고 사례」·「사례의 샘」이라고도 부른다(terms.ts 별칭이 되물음을 잇는다). 「사례」 홑말은 report.ts의 「취약점 사례」와 겹쳐 안 쓴다.
+/** 결재판 실행자 — 결재판을 승인한 사람(viewerctx). 못 집으면 「담당자(대화창)」(register_scan_draft와 같은 방식). */
+const 결재실행자 = (): string => { const v = currentViewer(); return (v?.userId ? findUserById(String(v.userId))?.displayName : null) ?? "담당자(대화창)"; };
+
+export function runIncidentCases(args: Record<string, string>): string {
+  const q = (args.q ?? args.query ?? "").trim();
+  const cve = (args.cve ?? "").trim();
+  const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 20);
+  return formatIncidentCases(listIncidentCases({ q, cve, limit }), { q, cve });
+}
+
+export function runIncidentSources(args: Record<string, string>): string {
+  const k = (args.kind ?? "all").trim().toLowerCase();
+  // 담당자 말 → 갈래: 유튜브·영상=youtube, 국내·한국=domestic, 사이트·블로그·해외=site
+  const kind: IncidentSourceKind = /youtube|유튜브|영상/.test(k) ? "youtube" : /domestic|국내|한국/.test(k) ? "domestic" : /site|사이트|블로그|해외|영문/.test(k) ? "site" : "all";
+  return formatIncidentSources(kind);
+}
+
+/** 결재판 「실행되면:」 — 무엇이 등록되는지 제목·연도·업종·출처로 보여 준다. 검증을 못 지나면 그 사유를 미리 보여 승인이 헛돌지 않게 한다. */
+export function incidentCaseEffect(args: Record<string, string>): string {
+  const { value, errors } = validateIncidentCaseInput(args);
+  if (errors.length) return `등록되지 않습니다 — 입력이 부족합니다: ${errors.join(" · ")}`;
+  return `침해사고 히스토리에 「${value.title}」(${value.year}·${value.industry}·${value.region})을 등록합니다 — 출처 ${value.sourceUrl}${value.cves.length ? ` · CVE ${value.cves.join(", ")}` : ""} · 지식 문서로도 반입됩니다(전 담당자 검색에 걸림)`;
+}
+
+export function runRegisterIncidentCase(args: Record<string, string>): string {
+  try {
+    const row = registerIncidentCase(args, 결재실행자());
+    return `침해사고 히스토리에 등록했습니다 — 「${row.title}」(${row.year}·${row.industry}·${row.region}) · 번호 ${row.id}\n` +
+      `${표식.다음} 「침해사고 히스토리 보여줘」로 목록을, 되돌리려면 「사례 삭제 ${row.id}」. 지식 문서 반입은 뒤에서 진행됩니다(실패하면 감사 기록에 남습니다).`;
+  } catch (e) {
+    return `등록하지 못했습니다 — ${e instanceof Error ? e.message : String(e)}\n${표식.다음} 예: 「사례 등록: 제목 …, 연도 2024, 업종 제조, 국내, 한 줄 …, 쉬운 설명 …, 교훈 …, 출처 https://…」`;
+  }
+}
+
+export function incidentCaseDeleteEffect(args: Record<string, string>): string {
+  const row = getIncidentCase(String(args.id ?? ""));
+  // FAIL_MARKS-예외: 결재판 「실행되면:」의 **진짜 실패 사유**다 — 담당자가 적은 번호가 표에 없어 승인해도 아무것도 안 지워지는 상태를 미리 알린다(정직한 「없다」 답이 아니라 입력 오류문, 지켜보는 폴더 해제의 autoFill 예외와 같은 부류).
+  if (!row) return `지울 사례가 없습니다 — 번호 「${args.id ?? ""}」를 찾지 못했습니다(「침해사고 히스토리 보여줘」에서 번호를 확인하세요)`;
+  return `침해사고 히스토리에서 「${row.title}」(${row.year}) — ${row.origin === "builtin" ? "제품 내장 사례" : `${row.registeredBy ?? "?"} 등록`}을 지우고 지식 문서도 함께 뺍니다`;
+}
+
+/** 삭제 — 내장(builtin)은 관리자만, 담당자 등록분은 등록자·관리자(API의 DELETE와 같은 잣대). */
+export function runDeleteIncidentCase(args: Record<string, string>): string {
+  const row = getIncidentCase(String(args.id ?? ""));
+  // FAIL_MARKS-예외: **진짜 실패의 오류문**이다 — 승인과 실행 사이에 남이 먼저 지웠거나 번호가 틀린 경우다(선택 항목 바꾸기·지우기의 같은 예외와 같은 부류). 검색 결과 0건을 말하는 자리가 아니다.
+  if (!row) return `지울 사례를 찾지 못했습니다: ${args.id ?? "(번호 없음)"}`;
+  const v = currentViewer();
+  const me = v?.userId ? findUserById(String(v.userId)) : undefined;
+  const admin = me?.role === "admin";
+  const mine = row.origin === "user" && !!me && row.registeredBy === me.displayName;
+  if (!admin && !mine) return row.origin === "builtin" ? "내장 사례는 관리자만 지울 수 있습니다." : "본인이 등록한 사례만 지울 수 있습니다(관리자 제외).";
+  deleteIncidentCase(row.id, me?.displayName ?? "담당자(대화창)");
+  return `「${row.title}」(${row.year})을 침해사고 히스토리에서 지웠습니다 — 지식 문서도 함께 뺍니다(되돌리려면 같은 내용으로 다시 등록해야 합니다).`;
 }

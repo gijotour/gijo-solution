@@ -36,6 +36,8 @@ import { registerBridgeRoutes } from "./engine/bridge";
 import { registerCollaborationRoutes } from "./engine/collaboration";
 import { registerDatasetRoutes } from "./engine/dataset";
 import { registerSbomReviewRoutes } from "./engine/sbomreview";
+import { registerIncidentCaseRoutes } from "./engine/incidentcases"; // 📚 침해사고 히스토리(2026-09-03) — 조회·관리자 등록/삭제, 등록은 대화창 결재판이 주 통로
+import { registerScanDraftRoutes } from "./engine/scandrafts"; // 스캔 해석 초안 조회(클라 칩 「📚 비슷한 사례 N건」이 caseIds·caseNote를 읽는다)
 import { registerOrchestratorDatasetRoutes } from "./engine/orchestrator-dataset";
 import { registerBriefingRoutes } from "./engine/briefing";
 import { registerUndoRoutes } from "./engine/undo";
@@ -188,6 +190,8 @@ export function createApp(): Express {
   registerCollaborationRoutes(app);
   registerDatasetRoutes(app);
   registerSbomReviewRoutes(app);
+  registerIncidentCaseRoutes(app);
+  registerScanDraftRoutes(app);
   registerOrchestratorDatasetRoutes(app);
   registerBriefingRoutes(app);
   registerUndoRoutes(app);

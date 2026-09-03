@@ -527,6 +527,34 @@ for (const [pg, lbl] of [["hardening.html", "검증"], ["maintenance.html", "점
     r ? JSON.stringify(r) : "프레임 못 찾음");
 }
 
+// ── 📚 침해사고 히스토리 판(2026-09-03) — 📂·📨와 **같은 계약**(딥링크로 열리는 보기 전용 판).
+//    새 서버 창구(/api/incident-cases)를 지나는 자리라, 창구가 죽으면 목록도 빈 상태 안내도 없이
+//    하얗다 — 그 부류를 잡는다. 줄을 누르면 상세가 펼쳐지는 판이라 .noclick은 요구하지 않는다.
+//    fail-closed: 「불러오지 못했습니다」가 그려지면 실패다(서버가 이 창구를 아직 안 열었으면 게시 전에 배포).
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("incidentcases.html", "침해사고 히스토리", { dock: true }));
+  const fr = await 프레임찾기("incidentcases.html", 8);
+  const r = fr ? await fr.evaluate(async () => {
+    for (let i = 0; i < 15; i++) {
+      const t = (document.getElementById("icList")?.innerText || "");
+      if (t && !t.includes("불러오는 중")) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    const 글 = document.getElementById("icList")?.innerText || "";
+    return {
+      판글: 글.slice(0, 60),
+      // 목록(줄) 또는 빈 상태 안내 중 하나는 반드시 그려져야 한다 — 둘 다 없으면 창구가 죽은 것.
+      줄수: document.querySelectorAll("#icList .g-rows-r").length,
+      빈상태: 글.includes("등록된 사례가 없습니다"),
+      실패: 글.includes("불러오지 못했습니다"),
+      샘띠: !!document.getElementById("icSources"),
+    };
+  }).catch(() => null) : null;
+  ok("📚 침해사고 히스토리 판: 딥링크로 열리고 목록/빈 상태가 그려진다",
+    !!r && !r.실패 && (r.줄수 > 0 || r.빈상태) && r.샘띠,
+    r ? JSON.stringify(r) : "프레임 못 찾음");
+}
+
 // ── ④′ 화면 열기 → 현황 카드 자동(2026-08-20 사장님 — 「메뉴를 누르면 상위 카드」) ──
 const 카드전 = await 셸.evaluate(() => document.querySelectorAll(".dc-card").length);
 await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("assets.html", "자산 고르기")); // 무dock=메뉴성 — 화면+카드가 나란히 떠야 한다(2026-08-31 개정)

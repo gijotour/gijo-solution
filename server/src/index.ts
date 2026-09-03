@@ -29,6 +29,7 @@ import { startKbHygieneScheduler } from "./engine/kbhygiene";
 import { refreshKev } from "./engine/kev";
 import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
 import { ensureKnowledgeBundle } from "./engine/knowledgebundle";
+import { syncIncidentCaseDocsWithRetry } from "./engine/incidentcases"; // 📚 사례 → 지식 문서(결정 ①) — 표는 모듈 로드 때, 문서는 여기서(임베딩이 뜬 뒤)
 import { bootSmtpInboundIfEnabled, stopSmtpInbound } from "./engine/smtpinbound";
 import { closeHttpServer } from "./util/gracefulClose";
 import { installAirgapGuard } from "./engine/airgap";
@@ -98,6 +99,7 @@ httpServer.listen(PORT, () => {
   // 답한다(비어 있으면 지어내거나 '자료 없음'만 답한다). 임베딩 서버 기동을 기다려 재시도한다.
   void bootstrapDocsBundleWithRetry();
   void ensureKnowledgeBundle(); // 기본 지식 번들 버전 확인·자동 적용(멱등, 전-4)
+  void syncIncidentCaseDocsWithRetry(); // 침해사고 사례 문서 — 표에 있는데 문서 없는 것만(멱등), 씨앗이 바뀐 것은 다시
 });
 
 // 서버 프로세스 종료 시 자식으로 띄운 llama-server가 고아 프로세스로 남지 않도록 함께 정리한다.

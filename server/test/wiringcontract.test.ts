@@ -39,6 +39,7 @@ const 선택배선대장: Record<string, "부품" | "직접" | ["제외", string
   // "intro.html" — 2026-08-22 삭제(내 문서 📦 보안제품 자료로 흡수). 파일이 없으니 대장에서도 뺀다.
   "sessions.html": "부품",
   "supervision.html": "부품", // AI 팀 감독(2026-08-20 ②) — 팀원 카드 클릭=📌(일반형, label+text만)
+  "incidentcases.html": "부품", // 📚 침해사고 히스토리(2026-09-03) — 행 클릭=상세 펼침 + 📌 선택(label+text). 등록은 대화창 「사례 등록: …」(입력칸 0)
   "mydocs.html": "부품", // 내 문서(2026-08-20 LLM 위키) — 행 클릭=📌(일반형, label+text만)
   "lawlookup.html": ["제외", "결과가 대화창 답으로 오는 화면 — 고를 목록이 화면에 없음"],
   "kpi.html": ["제외", "숫자 대시보드 — 고를 항목 없음"],

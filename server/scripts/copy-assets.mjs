@@ -20,6 +20,13 @@ const 옮길것 = [
   "engine/licensedata/spdx-licenses.json",
 ];
 
+// 있으면 옮기고 없으면 **경고만** 하는 자료(2026-09-03 침해사고 히스토리).
+//   · incidentcases-seed.json — 내장 사례 씨앗. 없으면 서버는 「내장 사례 0건」으로 뜬다(incidentcases.ts가 경고 로그).
+//   · incidentsources.json — 사례의 샘(유튜브·사이트·국내). 없으면 「샘 목록이 아직 없습니다」로 답한다.
+//   ⚠ 위 필수 목록에 넣지 않는 이유: 두 파일은 별 갈래가 채우는 **내용 자료**라 빌드가 코드보다 먼저 막히면 안 된다.
+//     대신 없으면 여기서 크게 적어, 「씨앗 없이 게시됐다」가 빌드 로그에 남게 한다.
+const 있으면옮길것 = ["engine/incidentcases-seed.json", "engine/incidentsources.json"];
+
 for (const rel of 옮길것) {
   const from = path.join(서버, "src", rel);
   const to = path.join(서버, "dist", rel);
@@ -27,6 +34,14 @@ for (const rel of 옮길것) {
     console.error(`[copy-assets] 원본이 없다: src/${rel}`);
     process.exit(1); // 조용히 넘어가지 않는다 — 없으면 런타임에 기능이 꺼진다
   }
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.copyFileSync(from, to);
+  console.log(`[copy-assets] ${rel}`);
+}
+for (const rel of 있으면옮길것) {
+  const from = path.join(서버, "src", rel);
+  const to = path.join(서버, "dist", rel);
+  if (!fs.existsSync(from)) { console.warn(`[copy-assets] ⚠ 없어서 건너뜀: src/${rel} — 설치본은 이 자료 없이 뜬다(내장 사례·샘 0건)`); continue; }
   fs.mkdirSync(path.dirname(to), { recursive: true });
   fs.copyFileSync(from, to);
   console.log(`[copy-assets] ${rel}`);

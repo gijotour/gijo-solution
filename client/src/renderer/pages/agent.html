@@ -165,6 +165,10 @@ tr:last-child td{border-bottom:none;}
 .rec-btn{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;margin-left:auto;}
 .rec-btn:disabled{opacity:.55;cursor:default;}
 .rec-ok{color:var(--teal);font-weight:700;margin-left:auto;font-size:12px;}
+/* 📚 히스토리 단추 줄(해설 카드만, 2026-09-03) — .rec-btn과 같은 값(새 시각 언어 없음), 왼쪽 정렬만 다르다. */
+.agent-hist{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted-2);}
+.hist-btn{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.hist-btn:hover{border-color:var(--blue);color:var(--text);}
 .agent-status{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;}
 .st-dot{width:7px;height:7px;border-radius:50%;}
 .st-working .st-dot{background:var(--teal);}
@@ -347,6 +351,14 @@ tr:last-child td{border-bottom:none;}
     }</div>`;
   }
 
+  // 📚 침해사고 히스토리 단추 — **해설(normaltic) 카드에만**(2026-09-03, 승인 시안 mockups/normaltic-cases §4:
+  //   전용 메뉴 대신 팀원 카드가 판을 여는 트리거). 다른 팀원 카드엔 안 그린다 — 그 팀원의 것이 아니다.
+  //   클릭 배선은 init()의 그리드 위임 한 곳(카드는 renderAgents마다 다시 그려진다).
+  function historyHtml(a) {
+    if (a.id !== "normaltic") return "";
+    return `<div class="agent-hist"><button type="button" class="hist-btn" data-hist="incidentcases.html" title="해설 팀원이 모아 둔 실제 침해사고 사례를 봅니다 — 등록은 대화창에 「사례 등록: …」">📚 히스토리</button><span>실제 사고 사례 — 스캔에 같은 CVE가 나오면 자동 부연</span></div>`;
+  }
+
   // 지금 이 에이전트가 실제로 쓰는 모델만 표시한다(개별 지정 모델 또는 전역 공유 모델).
   // 로스터 카드에는 추천 모델·설명은 표시하지 않는다(요청). 추천/다운로드는 우측 'HuggingFace 모델 검색'에서.
   function recommendationHtml(a) {
@@ -518,6 +530,7 @@ tr:last-child td{border-bottom:none;}
           ${recommendationHtml(a)}
           ${locationHtml(a)}
           ${specialtyHtml(a)}
+          ${historyHtml(a)}
         </div>`;
       })
       .join("") + embeddingMemberHtml();
@@ -896,6 +909,15 @@ tr:last-child td{border-bottom:none;}
 
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page)));
+    });
+    // 📚 히스토리(해설 카드) — 카드는 renderAgents마다 다시 그려지므로 그리드에 **한 번** 위임한다.
+    //   위 [data-page]처럼 요소마다 걸면 첫 재렌더(모델 배정·이름 변경) 뒤 단추가 조용히 죽는다(없는 함수 버튼 계열).
+    //   여는 통로는 셸 통로(gijoOpenScreen) — 허브 무대(iframe 2겹) 안에서도 relay로 셸에 닿는다.
+    agentGrid.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-hist]");
+      if (!b) return;
+      if (window.gijoOpenScreen) window.gijoOpenScreen(b.dataset.hist, "침해사고 히스토리");
+      else if (window.gijoTabs) window.gijoTabs.open(b.dataset.hist, "침해사고 히스토리", { dock: true });
     });
     // 지시바 배선도 걷었다(2026-08-01) — 부를 함수가 없어졌고, 애초에 붙일 요소도 없었다.
 

@@ -193,8 +193,9 @@ export function listRecentDocs(days = 7): RecentDoc[] {
             d.summary, d.keywords, d.matches, d.failedReason
        FROM memory_documents m LEFT JOIN doc_digests d ON d.documentId = m.documentId
       WHERE m.ingestedAt >= ? AND m.documentId NOT LIKE 'personal:%'
-        AND COALESCE(m.origin, '') <> 'approved-qa' ORDER BY m.ingestedAt DESC`
+        AND COALESCE(m.origin, '') <> 'approved-qa' AND COALESCE(m.origin, '') <> 'incident-case' ORDER BY m.ingestedAt DESC`
     // ↑ 승인 문답(learnmemory, 2026-09-03)은 「새로 들어온 문서」가 아니다 — 승인 300건이 대장을 덮지 않게.
+    //   침해사고 사례 문서(incidentcases, 2026-09-03)도 같다 — 씨앗 수십 건이 첫 부팅에 「새 문서」로 쏟아지면 안 된다(결정 ①: 지식 건수엔 들고 대장에선 뺀다).
   ).all(cutoff) as RecentDoc[];
 }
 

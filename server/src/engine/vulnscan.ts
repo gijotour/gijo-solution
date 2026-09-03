@@ -14,6 +14,9 @@ import type { StandardFinding } from "./bridge";
 import { kevMatches } from "./kev";
 import { parseWebVulnReport } from "./webreport";
 import { syncDocTriples, webReportTriples } from "./docgraph";
+// 📚 해설 팀원의 부르는 문 ③(2026-09-03) — 반입 직후 새 취약점의 CVE로 과거 침해사고 사례를 찾는다(scandrafts 정직 규칙 그대로).
+//   정적 import다: scandrafts의 import 닫힘(64개 모듈)에 vulnscan·autoupload·webreport가 없어 순환이 안 생긴다(2026-09-03 대조).
+import { explainSimilarCasesForImport } from "./scandrafts";
 
 export interface VulnScanResult {
   hosts: number;
@@ -417,6 +420,8 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
   const assets: Asset[] = [];
   const uncredentialedHosts: string[] = [];
   let totalFindings = 0;
+  // 📚 반입 훅 재료 — 이번에 **처음 보인**(state=new) 취약점 가운데 CVE가 있는 것만 모은다(호스트를 가로질러 반입 한 번에 한 묶음).
+  const 새CVE항목: { code: string; name: string }[] = [];
   for (const [host, vulns] of byHost) {
     const id = `vuln:${host}`;
     // 상태 추적: registerAsset이 findings를 초기화하므로 그 전에 이전 스냅샷을 확보한다.
@@ -503,7 +508,21 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
     totalFindings += findingsWithState.filter((f) => f.state !== "fixed").length;
     const asset = recordFindings(id, findingsWithState);
     if (asset) assets.push(asset);
+    // 📚 새(new) 것만 — active/resurfaced/fixed는 지난 반입에서 이미 말했거나 사라진 것이라 재스캔마다 같은 사례를 되풀이하지 않는다.
+    //   byVuln의 열쇠 = finding.key(플러그인 id 또는 항목명)라 그 묶음의 CVE 전부를 이름에 실어 넘긴다(cvesInFindings가 CODE_RE로 뽑는다).
+    for (const f of findingsWithState) {
+      if (f.state !== "new") continue;
+      const g = byVuln.get(f.key ?? "");
+      if (g?.cves.size) 새CVE항목.push({ code: f.key ?? "", name: `${f.finding_type} ${[...g.cves].sort().join(" ")}` });
+    }
   }
+  // 📚 해설 팀원의 부르는 문 ③(2026-09-03) — 자산 등록·메타 갱신·finding 기록이 **전부 끝난 뒤** 한 번 부른다(반입을 기다리게 하지 않는다: void).
+  //   네 등록 경로(웹취약점 보고서·Nessus HTML·CSV/JSON 자동 갈래·/api/vulnscan/import)가 모두 이 함수를 지나므로 훅은 여기 하나다.
+  //   운영 실측: 취약점 288건 중 CVE 있음 201건(70%)이고 CVE는 Nessus/CSV/JSON에서 오는데, 초안 훅은 웹보고서 경로에서만 불려 CVE가 드문 길만 덮었다.
+  //   ⚠ 웹취약점 보고서(webreport)는 건너뛴다 — 그 경로는 autoupload.tryWebReport → draftScanInterpretation → explainSimilarCases가 초안 옆에
+  //     caseNote를 **저장**해 클라 칩(「📚 비슷한 사례 N건」)이 읽는 계약을 진다. 여기서도 부르면 같은 말이 두 번 나간다(이중 발화 금지).
+  //   ⚠ 후보 0이면 침묵한다 — 없는 사례를 지어 붙이지 않는다(scandrafts 정직 규칙). 끄개·예산은 초안 훅과 같다(GIJO_CASE_EXPLAIN).
+  if (format !== "webreport" && 새CVE항목.length) void explainSimilarCasesForImport({ source: sourceLabel, findings: 새CVE항목 });
   return { hosts: byHost.size, findings: totalFindings, rows: parsed.length, assets, uncredentialedHosts };
 }
 

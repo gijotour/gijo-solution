@@ -103,6 +103,12 @@ import {
   runLawLookup,
   runSearch,
   runToday,
+  runIncidentCases,
+  runIncidentSources,
+  runRegisterIncidentCase,
+  incidentCaseEffect,
+  incidentCaseDeleteEffect,
+  runDeleteIncidentCase,
   다음걸음,
   CTI_SEV_ORDER,
   runThreats,
@@ -1367,6 +1373,75 @@ const TOOLS: AgentTool[] = [
     directAnswer: true, // 규칙 판정문이 정본이라 재작성하지 않는다(법무가 보는 줄)
     params: [{ name: "license", label: "라이선스", description: "라이선스 이름 또는 SPDX 식별자(예: AGPL-3.0)", required: true }],
     run: async (args) => explainLicense(String(args.license ?? "")),
+  },
+  {
+    // 📚 침해사고 히스토리(2026-09-03) — 국내외 실제 보안 사고 사례(쉬운 설명·교훈·출처). 표가 규칙으로 찾고, 글은 사람이 쓴 정본이라 재작성하지 않는다.
+    name: "incident_cases",
+    label: "침해사고 히스토리",
+    domain: "cross",
+    write: false,
+    description:
+      '국내외 **실제 침해사고 사례**(사고 사례·히스토리)를 보여준다 — "랜섬웨어 사고 사례 알려줘", "침해사고 히스토리 보여줘", "CVE-2021-44228 비슷한 사례 있어?", ' +
+      '"병원 해킹 사고 어떤 게 있었어", "Log4j로 실제 사고 난 적 있어?"처럼 **과거에 실제로 일어난 사고**를 물을 때. 사고 대응 절차(무엇을 해야 하나)는 여기가 아니다. ' +
+      '예: {"q":"랜섬웨어"} · {"cve":"CVE-2021-44228"}',
+    directAnswer: true, // 사례 글은 사람이 쓴 정본 — 재작성하면 연도·회사·출처가 흔들린다
+    params: [
+      { name: "q", label: "검색어", description: "제목·업종·제품·설명에서 찾을 말(예: 랜섬웨어, 병원, Log4j). 비우면 최근 사례", required: false },
+      { name: "cve", label: "CVE", description: "이 CVE와 관련된 사례만(예: CVE-2021-44228)", required: false },
+      { name: "limit", label: "개수", description: "몇 건 (기본 5, 최대 20)", required: false },
+    ],
+    run: runIncidentCases,
+  },
+  {
+    name: "register_incident_case",
+    label: "침해사고 히스토리 등록",
+    domain: "cross",
+    write: true,
+    description:
+      '침해사고 히스토리에 사례를 등록한다 — "사례 등록: 2024년 ○○사 랜섬웨어, …"처럼 **등록**을 말할 때. ' +
+      '제목·한 줄 요약·쉬운 설명·연도·업종·지역(국내/해외)·교훈·출처 URL(http(s), 필수)을 받고, CVE·제품·기법은 쉼표로 여러 개. 등록되면 지식 문서로도 반입된다.',
+    params: [
+      { name: "title", label: "제목", description: "사례 제목(120자 이내)", required: true },
+      { name: "oneLiner", label: "한 줄 요약", description: "무슨 일이 있었나 한 줄(200자 이내)", required: true },
+      { name: "plainExplain", label: "쉬운 설명", description: "비전문가도 읽는 설명(1500자 이내)", required: true },
+      { name: "year", label: "연도", description: "사고 연도(예: 2024)", required: true },
+      { name: "industry", label: "업종", description: "예: 제조, 병원, 금융, 공공", required: true },
+      { name: "region", label: "지역", description: "국내 또는 해외", required: true },
+      { name: "lesson", label: "교훈", description: "우리가 배울 점(600자 이내)", required: true },
+      { name: "sourceUrl", label: "출처 URL", description: "근거 링크(http(s)) — 없으면 등록 안 됨", required: true },
+      { name: "sourceName", label: "출처 이름", description: "예: KISA 보안공지, 언론사 이름", required: false },
+      { name: "cves", label: "CVE", description: "관련 CVE(쉼표로 여러 개, 예: CVE-2021-44228)", required: false },
+      { name: "products", label: "제품", description: "관련 제품(쉼표로 여러 개, 예: Apache Log4j)", required: false },
+      { name: "techniques", label: "공격 기법", description: "ATT&CK 기법 id(쉼표로 여러 개, 예: T1190)", required: false },
+    ],
+    effect: incidentCaseEffect,
+    undo: "대화창에서 「사례 삭제 <번호>」 또는 관리자 삭제 — 지식 문서도 함께 빠집니다",
+    run: runRegisterIncidentCase,
+  },
+  {
+    // 삭제 문 — undo 안내가 「사례 삭제 <번호>」를 약속하므로 그 문이 실제로 있어야 한다(안내한 말 점검).
+    name: "delete_incident_case",
+    label: "침해사고 히스토리 삭제",
+    domain: "cross",
+    write: true,
+    description: '침해사고 히스토리에서 사례를 지운다 — "사례 삭제 ic-0123abcd…"처럼 **번호와 함께** 삭제를 말할 때. 내장 사례는 관리자만, 담당자 등록분은 등록자·관리자.',
+    params: [{ name: "id", label: "사례 번호", description: "ic-로 시작하는 사례 번호(「침해사고 히스토리 보여줘」로 확인)", required: true }],
+    effect: incidentCaseDeleteEffect,
+    undo: "되돌릴 수 없습니다 — 같은 내용으로 다시 등록해야 합니다",
+    run: runDeleteIncidentCase,
+  },
+  {
+    // 사례의 샘 — 보안 사고 소식을 꾸준히 보는 곳(유튜브·사이트·국내). 목록 파일은 갈래 D(incidentsources.json).
+    name: "incident_sources",
+    label: "사례의 샘",
+    domain: "cross",
+    write: false,
+    description:
+      '보안 사고 소식·사례를 꾸준히 볼 수 있는 곳(사례의 샘 — 유튜브 채널·사이트·국내 소식처)을 알려준다 — "해외 보안 유튜브 추천해줘", "보안 사고 소식 어디서 봐?", ' +
+      '"침해사고 뉴스 볼 만한 데 있어?"에 쓴다. 예: {"kind":"youtube"} · {"kind":"domestic"} · {"kind":"all"}',
+    directAnswer: true,
+    params: [{ name: "kind", label: "갈래", description: "youtube(유튜브) · site(사이트·블로그) · domestic(국내) · all(전체, 기본)", required: false }],
+    run: runIncidentSources,
   },
   {
     name: "finding_status",

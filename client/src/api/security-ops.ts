@@ -585,3 +585,41 @@ export const llmServeApi = {
   get: () => request<{ enabled: boolean; lastServedAt: number | null; airgap: boolean; port: number }>("/api/llm/serve"),
   set: (enabled: boolean) => request<{ enabled: boolean; lastServedAt: number | null; airgap: boolean; port: number }>("/api/llm/serve", { method: "POST", body: { enabled } }),
 };
+
+// ── 📚 침해사고 히스토리(2026-09-03) — 해설 팀원(normaltic)의 사례 저장소, 서버 incidentcases.ts의 소비자 ──
+//   **읽기 전용 다리**다. 등록·삭제는 대화창(register_incident_case 도구 → 결재판)이 유일한 문이라
+//   여기엔 POST·DELETE를 두지 않는다 — 화면이 쓰기를 직접 부르면 「지시는 대화창」 원칙이 깨진다.
+//   ⚠ techniques·cves·products는 표에 JSON 문자열(TEXT)로 있지만 서버(incidentcases.ts toRow)가 **배열로 풀어 준다** —
+//     그것이 계약이라 타입은 배열(IncidentCaseRow와 같은 꼴)이다. 화면(incidentcases.html 배열())은 문자열이 와도
+//     스스로 푼다 — 갈래가 어긋나도 안 죽게. 여기서 `| string`을 다시 넣지 말 것(서버 계약을 흐린다).
+//   ⚠ createdAt·updatedAt는 **ms 숫자**(Date.now(), INTEGER 칸)다 — 문자열로 적으면 화면이 localeCompare로 정렬해
+//     조용히 틀린다(통합 검토 2026-09-03에서 잡힘). 날짜로 그릴 땐 new Date(number).
+export interface IncidentCase {
+  id: string; createdAt: number; updatedAt: number;
+  title: string; oneLiner: string; plainExplain: string;
+  year: number | null; industry: string | null; region: "국내" | "해외" | null;
+  techniques: string[]; cves: string[]; products: string[];
+  lesson: string; sourceUrl: string; sourceName: string | null;
+  origin: "builtin" | "user"; registeredBy: string | null;
+}
+/** 사례의 샘(외부 매체) 한 줄 — 서버 incidentsources.json. 화면은 이 이름으로 그린다(name·url·kind·lang·cadence·desc). */
+export interface IncidentSource {
+  id?: string; name: string; url: string; kind: "youtube" | "site" | "domestic" | string;
+  lang?: string; cadence?: string; desc?: string;
+}
+export const incidentCasesApi = {
+  list: (p?: { q?: string; cve?: string; year?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (p?.q) qs.set("q", p.q);
+    if (p?.cve) qs.set("cve", p.cve);
+    if (p?.year != null) qs.set("year", String(p.year));
+    if (p?.limit != null) qs.set("limit", String(p.limit));
+    const s = qs.toString();
+    return request<{ cases: IncidentCase[] }>("/api/incident-cases" + (s ? "?" + s : ""));
+  },
+  // 「비슷한 사례」 — 규칙만(LLM 없음). 칩(취약점 카드·대화창)과 판의 CVE 필터가 **같은 창구**를 써야
+  // 칩의 N건과 판의 줄 수가 같다(세는 곳이 둘이면 어긋난다).
+  similar: (cves: string[]) => request<{ cases: IncidentCase[] }>("/api/incident-cases/similar?cves=" + encodeURIComponent(cves.join(","))),
+  sources: () => request<{ sources: IncidentSource[] }>("/api/incident-cases/sources"),
+  get: (id: string) => request<IncidentCase>("/api/incident-cases/" + encodeURIComponent(id)),
+};

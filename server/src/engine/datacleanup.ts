@@ -22,7 +22,8 @@ export const TARGETS: Record<string, { label: string; tables: string[] }> = {
   analysis_events: { label: "보안 분석 이벤트(분석허브)", tables: ["analysis_events", "analysis_event_status"] },
   // ── 실사용 전환 리셋(2026-08-19 사장님 「화면에 나오는 데이터는 삭제」) — 그룹 단위 ──
   // ⚠ 여기 **안 넣은 것**이 계약이다: 감사(audit_log — 법정 3년)·지식·학습(chat_logs·
-  //   memory_documents·데이터셋·어댑터)·설정·계정(users·app_state·스케줄)·판단 기록
+  //   memory_documents·데이터셋·어댑터·incident_cases 침해사고 히스토리 — 결정 ① 2026-09-03: 사례는
+  //   업무 데이터가 아니라 **제품 지식**이라 실사용 전환에서 지우지 않는다)·설정·계정(users·app_state·스케줄)·판단 기록
   //   (compliance_status — 담당자가 직접 넣었을 수 있음)·축적 자산(work_events 아낀 시간·
   //   answer_feedback 지적·action_check_history 판정·routine_feedback)은 지우지 않는다.
   //   resetlive.test.ts가 이 보존 계약을 값으로 지킨다.

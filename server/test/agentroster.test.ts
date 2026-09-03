@@ -87,6 +87,21 @@ describe("부르는 문 — 팀원 이름은 실제 호출부가 만든다", () 
     }
   });
 
+  it("해설(normaltic)의 부르는 문은 둘 — dispatcher 용어 부연 + scandrafts 📚 비슷한 침해사고 사례 부연(2026-09-03)", () => {
+    // 등록부 역할이 「용어 해설 · 사례 부연」인데 2026-09-03 전까지 문은 dispatcher 하나(사례 부연은 말뿐)였다.
+    // 침해사고 히스토리(incidentcases)가 규칙으로 찾은 후보만 재료로 부연하는 두 번째 문이 생겼다 — 수가 바뀌면 여기서 말한다.
+    // ⚠ 같은 날 반입 훅(explainSimilarCasesForImport — Nessus/CSV/JSON 네 경로)이 더해졌지만 **문은 그대로 하나**다:
+    //   초안 훅·반입 훅이 사례부연() 한 자리를 나눠 쓴다(장식이 아니라 실제 호출부 — 각자 chat을 부르면 여기 수가 3이 된다).
+    const 문 = (f: string) => (read(f).match(/chat\(\{[\s\S]{0,300}?agentId: "normaltic"/g) ?? []).length;
+    expect(문("dispatcher.ts"), "dispatcher의 용어 해설·사례 부연 문").toBe(1);
+    expect(문("scandrafts.ts"), "scandrafts의 📚 비슷한 사례 부연 문(explainSimilarCases)").toBe(1);
+    const files = (fs.readdirSync(ENGINE, { recursive: true }) as string[]).filter((f) => f.endsWith(".ts"));
+    const 전부 = files.reduce((n, f) => n + 문(f), 0);
+    expect(전부, "해설 팀원의 부르는 문 총수 — 늘거나 줄면 이 계약을 갱신할 것").toBe(2);
+    // 부연은 스키마 강제(responseSchema)로 부른다 — llm.ts의 normaltic 엄격 그라운딩(사내 자료 없으면 안 묻는다)은 responseSchema가 없을 때만 걸린다.
+    expect(read("scandrafts.ts")).toMatch(/agentId: "normaltic", trusted: true, responseSchema: CASE_EXPLAIN_SCHEMA/);
+  });
+
   it("협업 창(office·팀사무실)의 문서 흐름 말풍선은 사서가 낸다", () => {
     const m = read("memory.ts");
     expect(m).toContain('to: "curator", message: `문서 분류 요청');

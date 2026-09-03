@@ -101,6 +101,10 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 /* 원문 아래 한글 한 줄 풀이(전-7 ③) — 같은 화면 .vd-sub의 글꼴/줄높이 그대로 재사용(새 색·글꼴 없음). 못 찾으면 아예 안 그림. */
 .vd-plain{font-size:12.5px;line-height:1.6;color:var(--muted);margin-top:4px;}
 .vd-plain b{color:var(--text);font-weight:700;}
+/* 📚 비슷한 사례 칩(2026-09-03) — 펼친 취약점의 CVE가 침해사고 히스토리에 있을 때만 그린다(0건이면 안 그림). */
+.vd-cases{margin-top:6px;}
+.vd-cases button{background:transparent;border:1px solid rgba(30,185,128,.45);color:var(--teal);border-radius:12px;padding:1px 9px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+.vd-cases button:hover{background:rgba(30,185,128,.12);}
 .vd-empty{padding:16px;color:var(--muted);font-size:12.5px;}
 .status-line{font-size:12.5px;margin-top:10px;}
 .footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);}
@@ -658,10 +662,44 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
           // ⌗기계 키(QA ③) — 배정·판정이 글자 대조 없이 정확히 이 건을 잡게 한다.
           assetId: asset.id, findingKey: item.dataset.fkey || "",
         });
+        비슷한사례칩(item); // 📚 — 펼친 그때만 대조한다(목록 그릴 때 전부 물으면 취약점 수만큼 서버를 두드린다)
       } else if (asset) {
         선택알림(asset.name, "자산 " + asset.name); // 접으면 열어 둔 자산으로 되돌아간다
       }
     });
+  }
+
+  // 📚 비슷한 사례 칩(2026-09-03, 승인 시안 mockups/normaltic-cases §6) — 펼친 취약점의 CVE로
+  //   침해사고 히스토리를 **규칙만으로** 대조한다(/api/incident-cases/similar, LLM 없음).
+  //   0건이면 아무것도 안 그린다 — 빈 칩은 「눌러도 아무 일 없는 자리」다.
+  //   CVE는 이 항목이 이미 그린 글(이름·증거·KEV 말풍선)에서 줍는다 — 서버 vulnscan.ts:232와
+  //   같은 표기 규칙(CVE-YYYY-NNNN)이지 새 잣대가 아니다. 판정(무엇이 비슷한가)은 서버가 한다.
+  async function 비슷한사례칩(item) {
+    if (!item || item.querySelector(".vd-cases") || !(window.gijo && window.gijo.incidentCasesSimilar)) return;
+    const kevEl = item.querySelector(".vd-kev");
+    const 글 = (item.textContent || "") + " " + (kevEl ? kevEl.getAttribute("title") || "" : "");
+    const cves = [...new Set([...글.matchAll(/CVE-\d{4}-\d{3,7}/gi)].map((m) => m[0].toUpperCase()))].slice(0, 8);
+    if (!cves.length) return;
+    let r;
+    try { r = await window.gijo.incidentCasesSimilar(cves); } catch (e) { return; } // 창구가 죽어도 취약점 화면은 산다 — 칩만 안 뜬다
+    const n = ((r && r.cases) || []).length;
+    if (!n || !item.isConnected || item.querySelector(".vd-cases")) return;
+    const box = document.createElement("div");
+    box.className = "vd-cases";
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.cve = cves.join(",");
+    b.textContent = "📚 비슷한 사례 " + n + "건 — 해설 팀원";
+    b.title = "같은 CVE를 쓴 실제 침해사고 — 누르면 침해사고 히스토리를 이 CVE로 좁혀 엽니다";
+    b.addEventListener("click", (e) => {
+      e.stopPropagation(); // 항목 접힘 토글로 새지 않게
+      const page = "incidentcases.html?cve=" + encodeURIComponent(b.dataset.cve);
+      if (window.gijoOpenScreen) window.gijoOpenScreen(page, "침해사고 히스토리");
+      else if (window.gijoTabs) window.gijoTabs.open(page, "침해사고 히스토리", { dock: true });
+    });
+    box.appendChild(b);
+    const ev = item.querySelector(".vd-ev");
+    if (ev) ev.insertAdjacentElement("beforebegin", box); else item.appendChild(box);
   }
 
   if (!window.gijo.isAuthenticated()) {

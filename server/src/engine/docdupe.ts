@@ -28,7 +28,8 @@ export function 제목뿌리(documentId: string): string {
 export function findDuplicateDocs(): DupeGroup[] {
   const rows = db.prepare(
     // 승인 문답(origin=approved-qa, 2026-09-03)은 제목이 「승인문답:<id>」라 뿌리가 안 겹치지만, 원천에서 뺀다.
-    "SELECT documentId, ingestedAt, chunks, category FROM memory_documents WHERE COALESCE(origin,'') <> 'approved-qa' ORDER BY ingestedAt DESC"
+    // 침해사고 사례 문서(origin=incident-case)도 뺀다 — 제목이 「incident-case:<id>」라 뿌리가 전부 같아 **전부가 중복 후보**로 보인다(결정 ①).
+    "SELECT documentId, ingestedAt, chunks, category FROM memory_documents WHERE COALESCE(origin,'') <> 'approved-qa' AND COALESCE(origin,'') <> 'incident-case' ORDER BY ingestedAt DESC"
   ).all() as { documentId: string; ingestedAt: string; chunks: number; category: string | null }[];
   const 묶음 = new Map<string, typeof rows>();
   for (const r of rows) {

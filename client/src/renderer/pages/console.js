@@ -902,6 +902,38 @@
     if (cb) cb.appendChild(b);
   }
 
+  // 📚 비슷한 사례 칩(2026-09-03, 승인 시안 mockups/normaltic-cases §6) — 스캔 해석 초안 답에 해설
+  //   팀원의 사례 부연(scandrafts caseNote)이 실려 오면 「📚 비슷한 사례 N건」 칩을 달아 침해사고
+  //   히스토리를 그 CVE로 좁혀 연다. 판정 재료는 **서버가 적은 문구**뿐이다(계약 2026-09-03:
+  //   「📚 비슷한 사례 N건 — …」). 그 표식이 없으면 안 단다 — 여기서 사례를 새로 찾지 않는다
+  //   (대화창이 두 번째 잣대가 되면 답과 칩이 딴말을 한다). CVE는 답 본문 표기(CVE-YYYY-NNNN)에서 줍는다.
+  function attachCaseChip(el, output) {
+    var s = String(output || "");
+    var m = s.match(/📚\s*비슷한 사례\s*(\d+)\s*건/);
+    if (!m || !el) return;
+    var cves = [], seen = {};
+    (s.match(/CVE-\d{4}-\d{3,7}/gi) || []).forEach(function (c) { c = c.toUpperCase(); if (!seen[c]) { seen[c] = 1; cves.push(c); } });
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "gcp-nc"; // 다음 작업 칩과 같은 모양(chatparts.js CSS) — 새 시각 언어를 만들지 않는다
+    b.textContent = "📚 비슷한 사례 " + m[1] + "건 — 히스토리 열기";
+    b.title = cves.length
+      ? "침해사고 히스토리를 " + cves.slice(0, 3).join(", ") + (cves.length > 3 ? " 외" : "") + "(으)로 좁혀 엽니다"
+      : "침해사고 히스토리를 엽니다";
+    b.addEventListener("click", function () {
+      var page = "incidentcases.html" + (cves.length ? "?cve=" + encodeURIComponent(cves.slice(0, 8).join(",")) : "");
+      // 여는 통로는 「가서 하기」와 같다 — 창 모드면 본창에 부탁, 셸 안이면 도킹(사람이 열라 한 것).
+      if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) { window.gijo.openTabInShell(page, "침해사고 히스토리"); return; }
+      if (window.gijoTabs) { window.gijoTabs.open(page, "침해사고 히스토리", { dock: true }); return; }
+      if (window.gijoOpenScreen) window.gijoOpenScreen(page, "침해사고 히스토리");
+    });
+    var wrap = document.createElement("div");
+    wrap.className = "gcp-next";
+    wrap.appendChild(b);
+    var cb = el.querySelector(".cb");
+    if (cb) cb.appendChild(wrap);
+  }
+
   // ── 대화 줄 ───────────────────────────────────────────────────────────
   function rows() { return document.getElementById("csBody"); }
   // 답은 **마크다운으로 그린다**(2026-07-31 사용자 지시 "지금 너하고 하는 대화처럼").
@@ -1874,6 +1906,8 @@
       }
       // 쓰기 지시는 결재판으로 돌아온다 — 대화창에서 바로 확인·승인한다(없으면 막다른 길이다).
       attachApproval(replyEl, r && r.approval);
+      // 📚 스캔 해석 초안에 해설 팀원의 사례 부연이 실렸으면 히스토리 칩(표식 없으면 안 단다).
+      attachCaseChip(replyEl, (r && r.output) || "");
     } catch (e) {
       if (pc) pc.stop();
       replaceTyping(typing, "error", { icon: "⚠", name: "오류", message: (e && e.message) || String(e) });

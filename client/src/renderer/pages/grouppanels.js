@@ -794,6 +794,45 @@
           };
         });
       } },
+      // 📚 침해사고 히스토리(2026-09-03 사장님 — normaltic처럼 사고 사례를 모아 쉽게 알려주게;
+      //   승인 시안 mockups/normaltic-cases §4 「판은 카드 트리거로 연다」). 해설 팀원의 사례 저장소.
+      //   요약(load)·목록(rows) 모두 GET /api/incident-cases **한 창구**로 센다 — 실화면
+      //   incidentcases.html과 같은 API·같은 상한(500)이라 두 자리 숫자가 어긋날 여지가 없다.
+      // agents: 해설 — agents.ts normaltic.abbr. 근거: 사례 도구(incident_cases·register_incident_case)가
+      //   해설 팀원의 것이고, 스캔 해석 초안 뒤 「📚 비슷한 사례」 부연도 normaltic이 한다(계약 2026-09-03).
+      // ⚠ scenario는 안 단다 — scenarios.ts에 대응 시나리오가 없다(억지 연결 금지, scenariochips.test).
+      { id: "incidentcases", title: "📚 침해사고 히스토리", page: "incidentcases.html", agents: ["해설"],
+        // rows: 열 규약대로 1열 제목(무엇) · 2열 업종(어디) · 3열 지역(상태 자리 — 국내/해외) · 4열 연도(언제).
+        //   값은 표 칸 그대로(title·industry·region·year) — 여기서 새로 세지 않는다.
+        rows: function () {
+          return window.gijo.incidentCases(undefined, undefined, undefined, 500).then(function (d) {
+            var cs = (d && d.cases) || [];
+            return {
+              cols: ["사례", "업종", "지역", "연도"],
+              grid: "1fr 110px 56px 44px",
+              rows: cs.map(function (c) {
+                return [String(c.title || "-"), String(c.industry || "-"), String(c.region || "-"), c.year != null ? String(c.year) : "-"];
+              }),
+            };
+          });
+        },
+        load: function () {
+          return window.gijo.incidentCases(undefined, undefined, undefined, 500).then(function (d) {
+            var cs = (d && d.cases) || [];
+            var 국내 = cs.filter(function (c) { return c.region === "국내"; }).length;
+            var 담당자 = cs.filter(function (c) { return c.origin === "user"; }).length;
+            // 상한(500)에 닿았으면 「500+」 — 전부인 척하지 않는다(작업 세션 판의 「최근」과 같은 정직).
+            var 총 = cs.length >= 500 ? "500+" : n(cs.length);
+            return {
+              rows: [
+                ["등록된 사례", 총 + "건"],
+                ["국내 · 해외", n(국내) + " · " + n(cs.length - 국내)],
+                ["담당자가 등록", n(담당자) + "건"],
+              ],
+              foot: "등록은 대화창에 「사례 등록: …」",
+            };
+          });
+        } },
     ],
 
     // 기록 — 작업 기록(감사)과 시스템 로그(2026-08-09 설정 그룹 정리, 사용자 승인).

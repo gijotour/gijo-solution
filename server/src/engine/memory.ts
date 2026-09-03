@@ -217,9 +217,9 @@ const docsByAssetStmt = db.prepare(
 //     @me가 비면 uploadedBy 비교가 안 맞아 남의 미공유 개인문서는 fail-closed로 안 세어진다.
 const recentDocCountStmt = db.prepare(
   "SELECT COUNT(*) AS n FROM memory_documents WHERE ingestedAt >= @since" +
-    // builtin(제품 내장)·approved-qa(승인 문답, learnmemory 2026-09-03)는 「새로 들어온 문서」가 아니다 —
-    // 대장(docdigest.listRecentDocs)과 같은 제외. 배지만 빠뜨리면 2026-08-21 사고가 방향만 바뀌어 재발한다.
-    " AND (origin IS NULL OR origin NOT IN ('builtin','approved-qa'))" +
+    // builtin(제품 내장)·approved-qa(승인 문답, learnmemory 2026-09-03)·incident-case(침해사고 사례 문서, incidentcases 2026-09-03)는
+    // 「새로 들어온 문서」가 아니다 — 대장(docdigest.listRecentDocs)과 같은 제외. 배지만 빠뜨리면 2026-08-21 사고가 방향만 바뀌어 재발한다.
+    " AND (origin IS NULL OR origin NOT IN ('builtin','approved-qa','incident-case'))" +
     " AND (documentId NOT LIKE 'personal:%' OR uploadedBy = @me" +
     " OR documentId IN (SELECT 'personal:' || id FROM personal_docs WHERE shared = 1))"
 );
