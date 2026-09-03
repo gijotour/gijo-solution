@@ -43,4 +43,16 @@ if (나쁜.length) {
   for (const x of 나쁜) console.error("  · " + x);
   process.exit(1);
 }
+
+// ⚠ BOM(바이트 순서 표식) 검사(2026-09-03 실사고): PowerShell Set-Content -Encoding utf8이 package.json 맨 앞에 ﻿를
+//   붙였고 app-builder가 「expect { or n」으로 죽었다. 로그만 보면 빌더 오류처럼 보여 원인을 두 번 헤맸다 — 빌드가 먼저 본다.
+{
+  const 표식파일 = ["package.json", "electron-builder.json", "electron-builder.lite.json", "tsconfig.json"].filter((f) => fs.existsSync(f));
+  const 붙은것 = 표식파일.filter((f) => fs.readFileSync(f, "utf8").charCodeAt(0) === 0xfeff);
+  if (붙은것.length) {
+    console.error(`[check-inline-scripts] 파일 맨 앞에 BOM(\uFEFF)이 붙어 있습니다 — 빌더가 못 읽습니다: ${붙은것.join(", ")}`);
+    console.error("  고치기: node -e \"const fs=require('fs');for(const f of process.argv.slice(1)){fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace(/^\uFEFF/,''))}\" " + 붙은것.join(" "));
+    process.exit(1);
+  }
+}
 console.log(`[check-inline-scripts] ${파일.length}개 화면 · script ${본블록}블록 문법 OK`);
