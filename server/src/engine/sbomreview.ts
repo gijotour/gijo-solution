@@ -17,6 +17,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { sbom읽기, type 반입부품 } from "./sbomimport";
 import { 등급판정, 등급요약, 면책문구, type 라이선스등급 } from "./licenserisk";
 import { recordAudit } from "./audit";
+import { deleteBomDraftsForReview } from "./bomdrafts"; // 검수를 지우면 부품 팀원의 해석 초안도 함께(2026-09-03)
 
 export interface 검수요약 {
   id: string;
@@ -261,6 +262,7 @@ export function 검수삭제(id: string, actor?: string): boolean {
   const 있나 = 하나읽기.get(id) as Record<string, unknown> | undefined;
   if (!있나) return false;
   지우기.run(id);   // 부품은 ON DELETE CASCADE
+  deleteBomDraftsForReview(id); // 해석 초안도 — 없는 검수의 초안이 남아 보이면 안 된다
   recordAudit({ kind: "config", action: "sbom-review-delete", detail: `타사 SBOM 검수 삭제: ${String(있나.name)}`, actor });
   return true;
 }

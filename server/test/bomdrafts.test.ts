@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import { db } from "../src/db";
-import { validateBomDraft, buildBomDraftPrompt, draftBomInterpretation, listBomDrafts, formatBomDrafts, explainLicense } from "../src/engine/bomdrafts";
+import { validateBomDraft, buildBomDraftPrompt, draftBomInterpretation, listBomDrafts, formatBomDrafts, explainLicense, deleteBomDraftsForReview } from "../src/engine/bomdrafts";
 import { collaborationHistory, resetCollaborationForTests } from "../src/engine/collaboration";
 import { listAgents, getAgentById } from "../src/engine/agents";
 import { getTeamComposition } from "../src/engine/teamview";
@@ -36,14 +36,18 @@ describe("등록부 — 부품표(bom)는 8번째 팀원이고 전원에게 맡�
   it("맡은 메뉴는 screenguide가 아는 화면 파일명이고 제목이 따라온다 — 빈 팀원은 이유가 적혀 있다", () => {
     // 전용 화면이 없는 팀원은 이유와 함께 예외 — 빈 배열을 조용히 허용하지 않는다.
     const 예외: Record<string, string> = { normaltic: "복합 지시 파이프라인의 해설 단계로만 개입 — 전용 화면이 없다(정찰 2026-09-03)" };
+    // screenTips는 모르는 화면에도 개요 제목을 준다 — 「비어 있지 않다」로는 아무것도 못 잡는다(항진식, 검토관 2026-09-03). 폴백 제목과 다른지 본다.
+    const 폴백 = screenTips("__없는화면__.html").title;
     for (const a of listAgents()) {
       if (예외[a.id]) { expect(a.menus, `${a.id}: 예외인데 메뉴가 있다 — 예외를 지워라`).toEqual([]); continue; }
       expect(a.menus.length, `${a.id}: 맡은 메뉴가 없다`).toBeGreaterThan(0);
       for (const m of a.menus) {
         expect(m, `${a.id}: 화면 파일명 모양이 아니다`).toMatch(/^[a-z-]+\.html$/);
-        expect(screenTips(m).title, `${a.id}: screenguide가 모르는 화면 ${m}`).not.toBe("");
+        expect(screenTips(m).title, `${a.id}: screenguide가 모르는 화면 ${m}`).not.toBe(폴백);
       }
-      expect(a.menuTitles.length).toBe(a.menus.length);
+      expect(a.menuTitles).toEqual(a.menus.map((m) => screenTips(m).title));
+      // 허브와 그 안의 판을 둘 다 적으면 같은 곳이 칩 두 개로 보인다 — 허브 파일(discover·triage·fix·verify·reporting·aihub)은 안 적는다
+      for (const m of a.menus) expect(["discover.html", "triage.html", "fix.html", "verify.html", "reporting.html", "aihub.html"], `${a.id}: 허브 ${m}는 판을 적어라`).not.toContain(m);
     }
     expect(getAgentById("bom")!.menus).toEqual(["supplychain.html", "sbom.html"]);
   });
@@ -86,15 +90,39 @@ describe("부품표 해석 초안 — 근거 검증", () => {
     expect(v.dropped).toBe(0);
   });
 
-  it("판본 없는 흔한 이름은 가장 흔한 SPDX로 풀이하고 그 사실을 말한다", async () => {
+  it("판본 없는 「AGPL」·「GPL」은 licenserisk 자유표기 한 곳이 읽어 확인필요가 붙는다 — 부품 팀원은 별칭 표를 갖지 않는다", async () => {
     const prev = process.env.GIJO_BOM_EXPLAIN; process.env.GIJO_BOM_EXPLAIN = "0";
     try {
       const s = await explainLicense("AGPL");
-      expect(s).toMatch(/AGPL-3\.0-only — 등급 「/);
-      expect(s).not.toMatch(/판정불가/);
-      expect(s).toContain("판본이 없어 가장 흔한 AGPL-3.0-only으로 풀이");
-      expect(await explainLicense("AGPL-3.0-only")).not.toContain("판본이 없어");
+      expect(s).toMatch(/AGPL — 등급 「서비스도공개」 \(확인 필요\)/);
+      expect(s).toContain("AGPL-3.0-only로 읽었습니다");
+      const g = await explainLicense("GPL 쓰면 소스 공개 의무가 있나요?"); // 문장이 들어와도 라이선스 이름만 뽑는다
+      expect(g).toMatch(/GPL — 등급 「전체소스공개」 \(확인 필요\)/);
+      expect(await explainLicense("MIT")).toMatch(/MIT — 등급 「고지만」/);
+      expect(await explainLicense("MIT")).not.toContain("확인 필요");
+      expect(await explainLicense("라이선스요")).toContain("이름을 적어 주세요");
     } finally { if (prev === undefined) delete process.env.GIJO_BOM_EXPLAIN; else process.env.GIJO_BOM_EXPLAIN = prev; }
+    // 소스 감시 — bomdrafts는 자기 판본 표를 갖지 않는다(같은 물음에 두 답이 나던 원인)
+    const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "bomdrafts.ts"), "utf8");
+    expect(src).not.toMatch(/흔한판본|판본풀이/);
+  });
+
+  it("@scope 부품은 이름의 일부이고, 짧은 이름·둘 이상 걸리는 접두는 버린다(다른 부품으로 조용히 치환 금지)", () => {
+    const comps = [
+      { name: "@babel/core", version: "7.0.0", license: "MIT", tier: "고지만", 받게되는요구: "고지" },
+      { name: "openssl", version: "3.0.2", license: "Apache-2.0", tier: "고지만", 받게되는요구: "고지" },
+      { name: "log4j-api", version: "2.17", license: "Apache-2.0", tier: "고지만", 받게되는요구: "고지" },
+      { name: "log4j-core", version: "2.17", license: "Apache-2.0", tier: "고지만", 받게되는요구: "고지" },
+      { name: "openssl-libssl", version: "3.0.2", license: "Apache-2.0", tier: "고지만", 받게되는요구: "고지" },
+    ];
+    const v = validateBomDraft(JSON.stringify({ summary: "스코프 부품과 접두가 겹치는 부품을 골라 검증합니다.", priorities: [
+      { name: "@babel/core@7.0.0", version: "", license: "MIT", why: "스코프 이름" },
+      { name: "ssl", version: "", license: "", why: "너무 짧은 이름 → 버림" },
+      { name: "log4j", version: "", license: "", why: "api·core 둘 다 걸림 → 버림" },
+      { name: "libssl", version: "", license: "", why: "openssl-libssl 하나만 접미로 걸림 → 교정" },
+    ], caveats: [] }), comps)!;
+    expect(v.draft.priorities.map((p) => p.name)).toEqual(["@babel/core", "openssl-libssl"]);
+    expect(v.dropped).toBe(2);
   });
 
   it("프롬프트는 무거운 등급을 앞에 놓고 등급 이름을 규칙 원문 그대로 쓴다", () => {
@@ -115,6 +143,12 @@ describe("부품표 해석 초안 — 근거 검증", () => {
     expect(await draftBomInterpretation(input, { chat: async () => { throw new Error("모델 없음"); } })).toBeNull();
     expect(listBomDrafts().length).toBe(1);
     expect(bom말풍선().some((m) => /초안 실패 — 모델 없음/.test(m))).toBe(true);
+    // 검증 실패 사유가 협업 창에도 남는다(서버 로그에만 있으면 담당자는 「맞지 않음」만 본다)
+    expect(await draftBomInterpretation(input, { chat: async () => JSON.stringify({ summary: "충분히 긴 요약 문장입니다만", priorities: [{ name: "없는부품", version: "", license: "", why: "" }], caveats: [] }) })).toBeNull();
+    expect(bom말풍선().some((m) => /못 만듦 — 우선 부품 1건 중 검수 부품과 맞는 것 0/.test(m))).toBe(true);
+    // 검수를 지우면 초안도 함께(sbomreview.검수삭제가 부른다)
+    expect(deleteBomDraftsForReview("rv1")).toBe(1);
+    expect(listBomDrafts().length).toBe(0);
   });
 });
 

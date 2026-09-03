@@ -14,7 +14,7 @@ import crypto from "crypto";
 import { db, migrate } from "../db";
 import { emitCollaboration } from "./collaboration";
 import { setAgentStatus, resetAgentToDefault } from "./agents";
-import { 등급판정, 상용사용금지, 변경금지조건, 면책문구, type 라이선스등급 } from "./licenserisk";
+import { 등급판정, 상용사용금지, 변경금지조건, 면책문구, 등급순위, type 라이선스등급 } from "./licenserisk";
 import { 표식 } from "./tone";
 import { 우리말 } from "./scandrafts";
 
@@ -54,9 +54,9 @@ const MAX_IN_PROMPT = 40;
 const norm = (s: unknown) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, "");
 
 export function buildBomDraftPrompt(input: BomDraftInput): string {
-  // 무거운 등급부터 — 담당자가 먼저 볼 것이 목록 앞에 오게(등급 이름은 licenserisk 원문 그대로, 여기서 새로 짓지 않는다)
-  const 순서 = ["서비스도공개", "전체소스공개", "고친파일공개", "판정불가", "고지만", "의무없음"];
-  const sorted = [...input.components].sort((a, b) => 순서.indexOf(String(a.tier)) - 순서.indexOf(String(b.tier)));
+  // 무거운 등급부터 — 담당자가 먼저 볼 것이 목록 앞에 오게. 순위는 licenserisk 등급순위 한 곳(여기서 등급 이름을 나열하지 않는다 — 검토관 2026-09-03: 판정불가가 뒤로 밀려 40건 컷에서 빠졌다).
+  const 무게 = (t: unknown) => 등급순위[t as 라이선스등급] ?? 99; // 모르는 등급은 가장 무겁게(빠지지 않게)
+  const sorted = [...input.components].sort((a, b) => 무게(b.tier) - 무게(a.tier));
   const lines = sorted.slice(0, MAX_IN_PROMPT).map((c) => `- ${c.name}@${c.version || "-"} · ${c.license || "(라이선스 모름)"} · 등급 ${c.tier} · 요구: ${c.받게되는요구 || "-"}`);
   const 더 = sorted.length > MAX_IN_PROMPT ? `\n(외 ${sorted.length - MAX_IN_PROMPT}건 생략)` : "";
   const 등급별 = Object.entries(input.summary).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(" · ");
@@ -87,12 +87,20 @@ export function validateBomDraft(raw: unknown, components: BomComponentLite[]): 
     if (!p || typeof p !== "object") { dropped += 1; continue; }
     const q = p as Record<string, unknown>;
     // 모델이 「이름@버전」·「이름 (라이선스)」 꼴로 합쳐 쓰는 일이 잦다(격리 실측 2026-09-03) — 이름 칸에서 부품 이름만 떼어 본다.
+    //   npm scoped 이름(@babel/core)은 선행 @가 이름의 일부다 — 그것까지 버전 구분자로 보면 이름이 비어 항상 버려진다(검토관 2026-09-03).
     const rawName = String(q.name ?? "").trim();
-    const name = norm(rawName.split(/[@(]/)[0]);
-    const version = norm(q.version) || norm(rawName.includes("@") ? rawName.split("@")[1]?.split(/[\s(]/)[0] : "");
+    const scoped = rawName.startsWith("@");
+    const body = scoped ? rawName.slice(1) : rawName;
+    const name = norm((scoped ? "@" : "") + body.split(/[@(]/)[0]);
+    const version = norm(q.version) || norm(body.includes("@") ? body.split("@")[1]?.split(/[\s(]/)[0] : "");
     let hit = name ? components.find((c) => norm(c.name) === name && (!version || norm(c.version) === version)) : undefined;
     if (!hit && name) hit = components.find((c) => norm(c.name) === name); // 버전을 지어냈거나 비웠다 — 이름으로 교정
-    if (!hit && name) hit = components.find((c) => norm(c.name).includes(name) || name.includes(norm(c.name))); // 접두·접미(예: libssl vs openssl-libssl)
+    if (!hit && name.length >= 4) {
+      // 접두·접미 한정 + 후보가 정확히 하나일 때만(예: libssl ↔ openssl-libssl). 길이 없는 포함 관계는 ssl→openssl, lodash→lodash.merge처럼
+      // 다른 부품으로 조용히 치환한다(검토관 2026-09-03). 둘 이상 걸리면 어느 것인지 모르므로 버린다.
+      const 후보 = components.filter((c) => { const nm = norm(c.name); return nm.length >= 4 && (nm.startsWith(name) || nm.endsWith(name) || name.startsWith(nm) || name.endsWith(nm)); });
+      if (후보.length === 1) hit = 후보[0];
+    }
     if (!hit) { dropped += 1; continue; }
     if (out.some((x) => x.name === hit!.name && x.version === hit!.version)) continue;
     const why = String(q.why ?? "").trim().slice(0, 200);
@@ -130,9 +138,10 @@ export async function draftBomInterpretation(input: BomDraftInput, deps?: { chat
     const out = await chat({ agentId: "bom", message: buildBomDraftPrompt(input), trusted: true, responseSchema: BOM_DRAFT_SCHEMA, maxTokens: 700 });
     const v = validateBomDraft(out, input.components);
     if (!v) {
-      // 원문과 실패 이유를 서버 로그에 남긴다 — 「맞지 않음」만으로는 프롬프트를 못 고친다(격리 실측 2026-09-03: 첫 왕복이 여기서 버려졌다).
-      console.warn(`[bomdrafts] 검증 실패 — ${validateFailureReason(out, input.components)} · 모델 원문: ${String(out).replace(/\s+/g, " ").slice(0, 1500)}`);
-      emitCollaboration({ from: "bom", to: "orchestrator", message: `${input.source} 부품표 해석 초안 못 만듦 — 모델 출력이 검수 부품과 맞지 않아 버림(지어낸 부품은 남기지 않는다)` });
+      // 실패 이유를 한 번 계산해 서버 로그(원문 포함)와 협업 창(사유만)에 같이 남긴다 — 「맞지 않음」만으로는 프롬프트를 못 고친다(격리 실측 2026-09-03).
+      const 사유 = validateFailureReason(out, input.components);
+      console.warn(`[bomdrafts] 검증 실패 — ${사유} · 모델 원문: ${String(out).replace(/\s+/g, " ").slice(0, 1500)}`);
+      emitCollaboration({ from: "bom", to: "orchestrator", message: `${input.source} 부품표 해석 초안 못 만듦 — ${사유.slice(0, 160)}(지어낸 부품은 남기지 않는다)` });
       return null;
     }
     const id = crypto.randomUUID();
@@ -157,12 +166,17 @@ const toRow = (r: Raw): BomDraftRow => {
   return { ...r, draft };
 };
 
+/** 검수를 지우면 그 초안도 함께 — 없는 검수의 초안이 남아 보이면 안 된다(sbomreview.검수삭제가 부른다). */
+export function deleteBomDraftsForReview(reviewId: string): number {
+  return db.prepare("DELETE FROM bom_drafts WHERE reviewId = ?").run(reviewId).changes;
+}
+
 export function listBomDrafts(limit = 3): BomDraftRow[] {
   return (db.prepare("SELECT * FROM bom_drafts ORDER BY createdAt DESC LIMIT ?").all(Math.max(1, Math.min(50, limit))) as Raw[]).map(toRow);
 }
 
 export function formatBomDrafts(rows: BomDraftRow[]): string {
-  if (!rows.length) return "부품표 해석 초안이 없습니다 — 타사 SBOM을 올려 검수가 끝나면 부품 팀원이 초안을 남깁니다.";
+  if (!rows.length) return "부품표 해석 초안이 없습니다 — 타사 SBOM을 올리면 검수 직후 부품 팀원이 초안을 남깁니다.";
   return rows
     .map((r) => {
       const 머리 = `■ ${r.source} — 부품 ${r.componentCount}개 · ${new Date(r.createdAt).toLocaleString("ko-KR")} · 초안 #${r.id.slice(0, 8)}`;
@@ -188,21 +202,20 @@ const EXPLAIN_MS = () => Math.max(500, Number(process.env.GIJO_BOM_EXPLAIN_MS ??
  * 라이선스 이름 하나를 받아 규칙 판정(등급·요구·근거, licenserisk 한 곳)을 먼저 적고, 그 뒤에 부품 팀원의 설명 2~3문장을 붙인다.
  * 규칙 문장은 항상 나간다. 설명은 모델이 시간 안에 못 오거나 한자가 섞이면 빠진다(사람이 읽는 줄만 거른다).
  */
-/** 판본 없는 흔한 이름(「AGPL」·「GPL」)은 규칙이 판정불가로 닫는다 — 가장 흔한 판본으로 풀이하되 그 사실을 말한다(추정을 숨기지 않는다). */
-const 흔한판본: Record<string, string> = { agpl: "AGPL-3.0-only", gpl: "GPL-3.0-only", lgpl: "LGPL-3.0-only", apache: "Apache-2.0", mit: "MIT", bsd: "BSD-3-Clause", mpl: "MPL-2.0", epl: "EPL-2.0" };
-export function 판본풀이(원문: string): { 이름: string; 추정: boolean } {
-  const k = 원문.trim().toLowerCase().replace(/\s|라이선스|license/g, "");
-  return 흔한판본[k] ? { 이름: 흔한판본[k], 추정: true } : { 이름: 원문.trim(), 추정: false };
+/** 입력에서 라이선스 이름 후보만 뽑는다 — 문장이 통째로 들어오면 그 문장을 라이선스 이름처럼 출력했다(검토관 2026-09-03). */
+export function 라이선스이름후보(입력: string): string {
+  const 후보 = String(입력 ?? "").match(/[A-Za-z][A-Za-z0-9.+-]{1,}/g) ?? [];
+  // SPDX스러운 것(하이픈·숫자 포함) 우선, 없으면 첫 영문 토큰. 판본 풀이는 licenserisk 자유표기 한 곳이 한다.
+  return (후보.find((t) => /[-0-9]/.test(t)) ?? 후보[0] ?? "").trim();
 }
 
 export async function explainLicense(license: string, deps?: { chat?: ChatFn }): Promise<string> {
   const 입력 = String(license ?? "").trim();
-  if (!입력) return "어느 라이선스인지 이름을 적어 주세요(예: AGPL-3.0, GPL-2.0, MIT, Apache-2.0).";
-  const 풀이 = 판본풀이(입력);
-  const 원문 = 풀이.이름;
-  const 판정 = 등급판정(원문);
+  const 원문 = 라이선스이름후보(입력);
+  if (!원문) return "어느 라이선스인지 이름을 적어 주세요(예: AGPL-3.0, GPL-2.0, MIT, Apache-2.0).";
+  const 판정 = 등급판정(원문); // 판본 없는 홑이름(AGPL·GPL)도 licenserisk 자유표기가 읽고 확인필요를 붙인다
   const 줄 = [
-    `${표식.위치} ${원문} — 등급 「${판정.등급}」${판정.확인필요 ? " (확인 필요)" : ""}${풀이.추정 ? ` — 「${입력}」은 판본이 없어 가장 흔한 ${원문}으로 풀이했습니다. 실제 표기(판본·only/or-later)를 확인하세요` : ""}`,
+    `${표식.위치} ${원문} — 등급 「${판정.등급}」${판정.확인필요 ? " (확인 필요)" : ""}`,
     `  요구: ${판정.받게되는요구}`,
     `  근거: ${판정.근거}`,
     ...(상용사용금지(원문) ? [`  ${표식.주의} 상용 이용 금지 조건이 있는 라이선스입니다 — 상업 제품에 넣을 수 없습니다`] : []),

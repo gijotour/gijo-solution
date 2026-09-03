@@ -21,6 +21,7 @@ export default defineConfig({
       // 닿는 것을 막는다(검토관 2026-09-03 중). memorygrowth.test는 사건 방송까지만 본다.
       GIJO_MEMORY_GROWTH: "0",
       GIJO_TI_INTERPRET: "0", // TI 해석은 모델을 부른다 — 시험엔 모델이 없다(scandrafts.test가 주입으로 따로 본다)
+      GIJO_BOM_EXPLAIN: "0", // 라이선스 설명(부품 팀원)도 모델을 부른다 — 시험엔 모델이 없다(bomdrafts.test가 주입으로 따로 본다)
       GIJO_LLAMA_SERVER_PATH: "__no_llama_server_in_tests__",
       // 테스트가 실제 데이터셋·골드 파일을 건드리지 않게 임시 경로로 격리(운영 orchestrator-tools.json 보호).
       GIJO_DATASETS_DIR: "data/test-tmp/datasets",

@@ -701,8 +701,8 @@
           };
         });
       } },
-      // agents: analysis(우선) — 역할 문장이 「AI 지식·모델 관리」다(agents.ts:69).
-      { id: "knowledge", title: "📚 지식", page: "memory.html", agents: ["우선"], scenario: "파일 반입·활용",
+      // agents: curator(사서) — 문서 반입·분류·요약·보강이 사서의 일이다(agents.ts curator.menus에 memory.html, 2026-09-03). 그전 「우선」은 이관 전 근거.
+      { id: "knowledge", title: "📚 지식", page: "memory.html", agents: ["사서"], scenario: "파일 반입·활용",
         // rows: 제목 필드가 원천에 없다 — documentId가 곧 이름(실화면 memory.html:703 동일).
         // 등급 한글은 memory.html:664 GRADE_LABEL과 동일.
         // ⚠ 내 개인 문서(personal: 접두)는 뺀다(설계관 ③-3-1 — 서버는 남의 것만 거르고 내

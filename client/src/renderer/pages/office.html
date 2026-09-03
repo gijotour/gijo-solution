@@ -241,7 +241,8 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     const DESKS = [0, 1, 2, 3, 4, 5, 6, 7].map(deskAt); // 8석 — 넓은 창 4줄×2열, 좁은 창 3열 3줄(3+3+2). ⚠ slice보다 이 배열이 먼저다(DESKS[7] 없으면 캔버스가 죽는다)
     // 방을 세로로 키운 만큼(ROWS 12→18) 앞쪽(하단) 요소는 아래로 내려 균형을 맞춘다 — 바닥이 넓어져 위·아래가 꽉 찬다.
     // ⚠ ROWS 18→20(2026-09-03, 7번째 책상)에서는 일부러 안 내렸다 — 시안이 「ROWS만 늘리고 나머지 공식은 그대로(최소 변경)」로 정했다.
-    const COFFEE = { x: 156, y: 134 }; // 커피 코너(픽셀 좌표)
+    // 커피 코너 — x는 미팅룸 경계 왼쪽에 붙어 폭을 따라온다(고정 156이면 넓은 창에서 8번째 책상이 덮는다, 검토관 2026-09-03). ml은 아래 정의지만 게터라 그릴 때 읽는다.
+    const COFFEE = { get x() { return Math.max(60, ml() - 22); }, y: 134 };
     const TABLE = { x: 78, y: 104 };   // 라운지 소파존(중앙 바닥을 채운다)
     // 미팅룸(2026-07-23) — 외부 방문자가 여기 앉아 보안총괄에게 지시하고, 보안총괄이 합석한다.
     // 유리 파티션으로 내부 업무존과 분리(외부인은 내부 책상에 직접 접근하지 않는다).
@@ -294,7 +295,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       { hair: "short", col: "#5a5a62", skin: "#e8c39e" },
       { hair: "long",  col: "#33322f", skin: "#d9ab7e" },
       { hair: "bun",   col: "#5a3a2a", skin: "#f0d6b4" }, // 7번째=사서
-      { hair: "curly", col: "#2b2f45", skin: "#e8c39e" }, // 8번째=부품
+      { hair: "curly", col: "#7a5c3a", skin: "#c9905e" }, // 8번째=부품(시안 team-8-bom — 1번 팀원과 머리·피부색이 달라야 한다)
     ];
 
     // 아트 무드 3종 — 사용자 전환(☀🌃🌊), 선택은 localStorage 저장. 레이아웃·동작은 동일.

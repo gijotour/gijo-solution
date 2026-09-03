@@ -44,7 +44,7 @@ export interface 라이선스판정 {
   확인필요: boolean;
 }
 
-const 등급순위: Record<라이선스등급, number> = {
+export const 등급순위: Record<라이선스등급, number> = {
   의무없음: 0, 고지만: 1, 고친파일공개: 2, 전체소스공개: 3, 서비스도공개: 4, 판정불가: 5,
 };
 
@@ -180,6 +180,10 @@ const 자유표기: Array<{ re: RegExp; id: string }> = [
   { re: /\bSSPL\b|server\s*side\s*public/i, id: "SSPL-1.0" },
   { re: /lesser\s*general\s*public|\bLGPL\b/i, id: "LGPL-3.0-only" },
   { re: /general\s*public\s*licen[cs]e|\bGPL\s*-?\s*[23]|\bGPLv[23]\b/i, id: "GPL-3.0-only" },
+  // 판본 없는 홑이름(대화창 「AGPL 부품을 넣으면…」·「GPL은 뭘 지켜야 해?」, 2026-09-03 부품 팀원) — 가장 흔한 판본으로 읽되 확인필요가 붙는다.
+  //   ⚠ 여기 한 곳에만 둔다: bomdrafts가 자기 별칭 표를 가졌다가 같은 「AGPL」에 두 답을 냈다(검토관 2026-09-03).
+  { re: /\bAGPL\b/i, id: "AGPL-3.0-only" },
+  { re: /\bGPL\b/i, id: "GPL-3.0-only" },
   { re: /mozilla\s*public|\bMPL\b/i, id: "MPL-2.0" },
   { re: /eclipse\s*public|\bEPL\b/i, id: "EPL-2.0" },
   { re: /apache/i, id: "Apache-2.0" },

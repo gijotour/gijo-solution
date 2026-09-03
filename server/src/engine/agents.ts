@@ -6,6 +6,7 @@ import { db } from "../db";
 import { isModelAvailable } from "./localengine";
 import { getAdapter } from "./adapters";
 import { recordAudit } from "./audit";
+import { screenTips } from "./screenguide"; // 맡은 메뉴 제목(단일 출처) — screenguide는 agents를 물지 않는다
 
 export type AgentStatus = "idle" | "working" | "watching";
 
@@ -77,7 +78,7 @@ const AGENT_DEFS: AgentBase[] = [
     name: "Analyze Agent",
     role: "우선순위 판단 · AI 모델 관리",
     abbr: "우선",
-    menus: ["triage.html","vulnscan.html","analysis.html","handover.html"],
+    menus: ["vulnscan.html","analysis.html","handover.html"], // 허브(triage)와 그 안의 판(vulnscan)을 둘 다 적으면 같은 곳이 칩 두 개로 보인다(검토관 2026-09-03)
     desc: "스캔 finding의 우선순위를 판단하고(KEV·EPSS·CVSS 대조), 학습 루프·어댑터 등 AI 모델 관리를 맡습니다. 문서 분류·요약·보강은 Curator(사서)에게 넘어갔습니다(2026-09-03).",
     defaultStatus: "idle",
   },
@@ -86,7 +87,7 @@ const AGENT_DEFS: AgentBase[] = [
     name: "Report Agent",
     role: "내부 보고서 작성 · 결과 레포팅",
     abbr: "보고",
-    menus: ["report.html","reporting.html"],
+    menus: ["report.html"], // 보고 허브(reporting)는 리포트 판의 껍데기 — 판 하나만
     desc: "작업 결과를 내부 보고용 문서로 정리합니다. 파이프라인 마지막 단계에서 스캔·분석·부연 결과를 받아 보고서를 만듭니다.",
     defaultStatus: "idle",
   },
@@ -96,7 +97,7 @@ const AGENT_DEFS: AgentBase[] = [
     name: "TI Agent",
     role: "위협 인텔리전스 · CTI 피드-자산 매칭 해석", // 2026-08-20 정직화 — 상시 감시 루프가 없는데 「모니터링」은 과장(외부 대조 검증)
     abbr: "위협",
-    menus: ["threat.html","discover.html"],
+    menus: ["threat.html"], // 발견·수집 허브(discover)는 위협 인텔 판의 껍데기 — 판 하나만
     desc: "딥웹·다크웹 CTI 피드에서 받은 유출정보·위협을 요청 시 해석합니다. 위협 인텔 텍스트를 자산 인벤토리(자산명·컴포넌트·CVE·AI-BOM)와 대조해 영향 자산을 자동 매칭해 알립니다.",
     defaultStatus: "idle", // watching(감시 중)은 상시 루프가 있을 때의 말 — 요청응답형이라 idle이 사실
   },
@@ -127,7 +128,7 @@ const AGENT_DEFS: AgentBase[] = [
   {
     id: "bom",
     name: "BOM Agent",
-    role: "부품표(SBOM·AI-BOM) 검수 해석 · 라이선스 의무 설명",
+    role: "타사 부품표(SBOM) 검수 해석 · 라이선스 의무 설명", // AI-BOM 결손 쪽 부르는 문은 아직 없다 — 생기면 그때 넓힌다(검토관 2026-09-03)
     abbr: "부품",
     menus: ["supplychain.html", "sbom.html"],
     desc: "타사 부품표(SBOM) 검수가 규칙으로 끝난 뒤 그 결과를 담당자 말로 해석하고(먼저 볼 부품·왜 위험한지), 라이선스 의무를 설명합니다. 등급 판정·요구는 규칙 엔진(licenserisk)이 정본이고 팀원은 그 뒤에서 풀어 씁니다.",
@@ -135,15 +136,11 @@ const AGENT_DEFS: AgentBase[] = [
   },
 ];
 
-/** 맡은 메뉴의 제목 — screenguide 한 곳에서 꺼낸다(등록부에 제목을 두 번 적지 않는다). 순환 참조를 피해 늦게 묶는다. */
+/** 맡은 메뉴의 제목 — screenguide 한 곳에서 꺼낸다(등록부에 제목을 두 번 적지 않는다). screenguide는 auth·workflow만 물어 순환이 없다.
+ *  screenTips는 모르는 화면에도 개요 제목을 준다 — 폴백 제목과 같으면 파일명을 그대로 보여 오타·폐지 화면이 드러나게 한다(검토관 2026-09-03). */
 function menuTitlesOf(menus: string[]): string[] {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const sg = require("./screenguide") as { screenTips: (s?: string) => { title: string } };
-    return menus.map((m) => sg.screenTips(m).title || m);
-  } catch {
-    return menus.slice();
-  }
+  const 폴백 = screenTips("__없는화면__.html").title;
+  return menus.map((m) => { const t = screenTips(m).title; return t && t !== 폴백 ? t : m; });
 }
 
 // 팀 구성 변경은 감사 기록에 남긴다(2026-09-03 설계관 — 누가 어느 팀원의 두뇌·어댑터·위치·이름을 바꿨는지 보여야 한다).
