@@ -1361,7 +1361,8 @@ const TOOLS: AgentTool[] = [
     write: false,
     description:
       '특정 라이선스 이름(AGPL·GPL·LGPL·MIT·Apache 등)이 우리 제품에 어떤 의무를 지우는지 설명한다 — ' +
-      '"AGPL 부품을 넣으면 무슨 의무가 생겨?", "GPL-3.0은 뭘 지켜야 해?", "MIT 라이선스 조건 알려줘"처럼 **라이선스 이름을 말할 때**. ' +
+      '"AGPL 부품을 넣으면 무슨 의무가 생겨?", "GPL 쓰면 소스 공개 의무가 있나요?", "GPL-3.0은 뭘 지켜야 해?", "MIT 라이선스 조건 알려줘"처럼 ' +
+      '**라이선스 이름(AGPL·GPL·LGPL·MIT·Apache·BSD·MPL)이 물음에 있으면** 이 도구다 — 소스 공개·고지 의무·상용 이용 가능 여부를 묻는 물음 전부. ' +
       '검수 결과 조회는 sbom_review_status, 초안은 bom_drafts.',
     directAnswer: true, // 규칙 판정문이 정본이라 재작성하지 않는다(법무가 보는 줄)
     params: [{ name: "license", label: "라이선스", description: "라이선스 이름 또는 SPDX 식별자(예: AGPL-3.0)", required: true }],
