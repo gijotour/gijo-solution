@@ -1,0 +1,33 @@
+{
+  "topic": "일반",
+  "endpoint": "http://10.8.0.12:4000/api/llm/serve/v1",
+  "startedAt": "2026-09-03T11:28:55.854Z",
+  "files": 19,
+  "source": "files",
+  "srcLang": "ko",
+  "topicFilter": true,
+  "corpusDocs": 0,
+  "chunks": 100,
+  "generated": 297,
+  "preRejected": {
+    "근거 겹침 없음(20자)": 25,
+    "답 너무 짧음": 14,
+    "시점데이터(날짜·N건)": 1
+  },
+  "preChecked": 257,
+  "accepted": 254,
+  "rejected": {
+    "비밀 흔적": 2,
+    "회피 답변(지식 구멍)": 1
+  },
+  "archive": "server/data/distill-archive/일반-2026-09-03-11-28.jsonl",
+  "archived": 257,
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "tokens": {
+    "prompt": 62019,
+    "completion": 44585
+  },
+  "teacherMs": 2375509,
+  "errors": [],
+  "finishedAt": "2026-09-03T11:48:50.223Z"
+}

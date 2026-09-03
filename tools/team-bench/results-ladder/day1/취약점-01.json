@@ -1,0 +1,32 @@
+{
+  "topic": "취약점",
+  "endpoint": "http://10.8.0.12:4000/api/llm/serve/v1",
+  "startedAt": "2026-09-03T09:18:23.382Z",
+  "files": 0,
+  "source": "store",
+  "srcLang": "ko",
+  "topicFilter": true,
+  "corpusDocs": 15,
+  "chunks": 167,
+  "generated": 495,
+  "preRejected": {
+    "근거 겹침 없음(20자)": 59,
+    "답 너무 짧음": 46
+  },
+  "preChecked": 390,
+  "accepted": 388,
+  "rejected": {
+    "잡담": 1,
+    "비밀 흔적": 1
+  },
+  "archive": "server/data/distill-archive/취약점-2026-09-03-09-18.jsonl",
+  "archived": 390,
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "tokens": {
+    "prompt": 94620,
+    "completion": 73960
+  },
+  "teacherMs": 3914083,
+  "errors": [],
+  "finishedAt": "2026-09-03T09:51:08.552Z"
+}

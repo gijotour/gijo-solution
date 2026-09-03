@@ -1,0 +1,541 @@
+{
+  "topic": "취약점",
+  "endpoint": "http://10.8.0.12:4000/api/llm/serve/v1",
+  "startedAt": "2026-09-03T09:51:20.518Z",
+  "files": 12,
+  "source": "files",
+  "srcLang": "en",
+  "topicFilter": false,
+  "corpusDocs": 0,
+  "chunks": 300,
+  "generated": 898,
+  "preRejected": {
+    "답 너무 짧음": 29,
+    "영어 원문 인용 없음(20자 겹침)": 104,
+    "시점데이터(날짜·N건)": 11,
+    "한국어 아님(설명이 영어)": 7
+  },
+  "preChecked": 747,
+  "accepted": 703,
+  "rejected": {
+    "회피 답변(지식 구멍)": 2
+  },
+  "archive": "server/data/distill-archive/취약점-2026-09-03-09-51.jsonl",
+  "archived": 747,
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "tokens": {
+    "prompt": 175185,
+    "completion": 147837
+  },
+  "teacherMs": 7488040,
+  "errors": [
+    "fetch failed"
+  ],
+  "failedItems": [
+    {
+      "question": "삼성 매직인포 9 서버의 경로 탐색 취약점이 공격자에게 어떤 실질적인 권한을 부여하나요?",
+      "answer": "이 취약점은 시스템 권한으로 임의의 파일을 쓸 수 있게 하는 경로를 제공합니다. 「원문: \"Improper limitation of a pathname to a restricted directory vulnerability in Samsung MagicINFO 9 Server version before 21.1050 allows attackers to write arbitrary file as system authority.\"」 공격자는 제한된 디렉토리 밖으로 경로를 벗어나 치명적인 파일을 생성할 수 있습니다. 따라서 관리자 권한 탈취에 준하는 위험이 존재합니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-02.md#a9974636b381",
+          "text": "uest to /goform/set_prohibiting via the corresponding function, triggering remote command execution.\n\nCVE-2024-7399 · Samsung MagicINFO 9 Server · Samsung MagicINFO 9 Server Path Traversal Vulnerability\n등재일(dateAdded) 2026-04-24 · 조치기한(dueDate) 2026-05-08 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-22, CWE-434\n설명(CISA shortDescription): Samsung MagicINFO 9 Server contains a path traversal vulnerability that could allow an attacker to write arbitrary files as system authority.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Improper limitation of a pathname to a restricted directory vulnerability in Samsung MagicINFO 9 Server version before 21.1050 allows attackers to write arbitrary file as system authority."
+        }
+      ],
+      "promptHash": "dcd4ac586b96"
+    },
+    {
+      "question": "CISA는 삼성 매직인포 9 서버의 이 취약점에 대해 어떤 단기적인 대응 조치를 요구하나요?",
+      "answer": "벤더가 제시하는 완화 지침을 따르거나 클라우드 서비스 관련 권고를 준수해야 합니다. 「원문: \"Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\"」 만약 적절한 완화책이 제공되지 않는다면 해당 제품의 사용을 즉시 중단해야 합니다. 이를 통해 원격 명령 실행 등 2차 피해를 방지할 수 있습니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-02.md#a9974636b381",
+          "text": "uest to /goform/set_prohibiting via the corresponding function, triggering remote command execution.\n\nCVE-2024-7399 · Samsung MagicINFO 9 Server · Samsung MagicINFO 9 Server Path Traversal Vulnerability\n등재일(dateAdded) 2026-04-24 · 조치기한(dueDate) 2026-05-08 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-22, CWE-434\n설명(CISA shortDescription): Samsung MagicINFO 9 Server contains a path traversal vulnerability that could allow an attacker to write arbitrary files as system authority.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Improper limitation of a pathname to a restricted directory vulnerability in Samsung MagicINFO 9 Server version before 21.1050 allows attackers to write arbitrary file as system authority."
+        }
+      ],
+      "promptHash": "dcd4ac586b96"
+    },
+    {
+      "question": "이 취약점이 원격 코드 실행으로 이어지는 기술적인 트리거 포인트는 무엇인가요?",
+      "answer": "공격자는 특정 함수를 통해 /goform/set_prohibiting 엔드포인트로 요청을 보내는 방식으로 공격을 수행합니다. 「원문: \"uest to /goform/set_prohibiting via the corresponding function, triggering remote command execution.\"」 이 과정이 원격에서 명령어를 실행시키는 계기가 됩니다. 결과적으로 서버 내부의 보안 통제가 우회되어 치명적인 결과로 이어집니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-02.md#a9974636b381",
+          "text": "uest to /goform/set_prohibiting via the corresponding function, triggering remote command execution.\n\nCVE-2024-7399 · Samsung MagicINFO 9 Server · Samsung MagicINFO 9 Server Path Traversal Vulnerability\n등재일(dateAdded) 2026-04-24 · 조치기한(dueDate) 2026-05-08 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-22, CWE-434\n설명(CISA shortDescription): Samsung MagicINFO 9 Server contains a path traversal vulnerability that could allow an attacker to write arbitrary files as system authority.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Improper limitation of a pathname to a restricted directory vulnerability in Samsung MagicINFO 9 Server version before 21.1050 allows attackers to write arbitrary file as system authority."
+        }
+      ],
+      "promptHash": "dcd4ac586b96"
+    },
+    {
+      "question": "DrayTek 라우터 취약점의 근본적인 원인은 무엇인가요?",
+      "answer": "해당 취약점은 웹 관리 인터페이스의 특정 파일에 존재하는 미확인 기능에서 발생하며, 이는 원격 공격자에게 시스템 제어 권한을 탈취당할 수 있는 치명적인 결과를 낳습니다. 특히 세션 인자의 조작을 통해 OS 명령어 삽입이 가능해집니다. 원문: \"DrayTek Vigor2960, Vigor300B, and Vigor3900 routers contain an OS command injection vulnerability due to an unknown function of the file /cgi-bin/mainfunction.cgi/apmcfgupload of the component web management interface.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-04.md#65daf8990c17",
+          "text": "potentially lead to a compromise of confidentiality, integrity, and availability of the host system.\n\nCVE-2024-12987 · DrayTek Vigor Routers · DrayTek Vigor Routers OS Command Injection Vulnerability\n등재일(dateAdded) 2025-05-15 · 조치기한(dueDate) 2025-06-05 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-78\n설명(CISA shortDescription): DrayTek Vigor2960, Vigor300B, and Vigor3900 routers contain an OS command injection vulnerability due to an unknown function of the file /cgi-bin/mainfunction.cgi/apmcfgupload of the component web management interface.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): A vulnerability, which was classified as critical, was found in DrayTek Vigor2960 and Vigor300B 1.5.1.4. Affected is an unknown function of the file /cgi-bin/mainfunction.cgi/apmcfgupload of the component Web Management Interface. The manipulation of the argument session leads to os command injection. It is possible to launch the attack remotely. The exploit has been disclosed to the public and may be used. Upgrading to version 1.5.1.5 is able to address this issue. It is recommended to upgrade the affected component."
+        }
+      ],
+      "promptHash": "5a3ee7c23f89"
+    },
+    {
+      "question": "이 취약점이 공개된 상태이며 원격 공격이 가능한가요?",
+      "answer": "네, 이 취약점은 원격으로 공격을 시작할 수 있으며 이미 익스플로잇 코드가 공개되어 있어 악용될 위험이 매우 높습니다. 공격자는 웹 관리 인터페이스의 특정 인수를 조작하여 시스템에 임의의 명령을 실행시킬 수 있습니다. 원문: \"The manipulation of the argument session leads to os command injection. It is possible to launch the attack remotely. The exploit has been disclosed to the public and may be used.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-04.md#65daf8990c17",
+          "text": "potentially lead to a compromise of confidentiality, integrity, and availability of the host system.\n\nCVE-2024-12987 · DrayTek Vigor Routers · DrayTek Vigor Routers OS Command Injection Vulnerability\n등재일(dateAdded) 2025-05-15 · 조치기한(dueDate) 2025-06-05 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-78\n설명(CISA shortDescription): DrayTek Vigor2960, Vigor300B, and Vigor3900 routers contain an OS command injection vulnerability due to an unknown function of the file /cgi-bin/mainfunction.cgi/apmcfgupload of the component web management interface.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): A vulnerability, which was classified as critical, was found in DrayTek Vigor2960 and Vigor300B 1.5.1.4. Affected is an unknown function of the file /cgi-bin/mainfunction.cgi/apmcfgupload of the component Web Management Interface. The manipulation of the argument session leads to os command injection. It is possible to launch the attack remotely. The exploit has been disclosed to the public and may be used. Upgrading to version 1.5.1.5 is able to address this issue. It is recommended to upgrade the affected component."
+        }
+      ],
+      "promptHash": "5a3ee7c23f89"
+    },
+    {
+      "question": "해당 취약점을 해결하기 위한 가장 권장되는 조치는 무엇인가요?",
+      "answer": "가장 확실한 해결책은 영향을 받는 컴포넌트를 업데이트하는 것이며, 제조사가 제공하는 지시에 따라 완화 조치를 적용해야 합니다. 만약 완화 조치가 불가능하다면 제품 사용을 중단하는 것이 요구됩니다. 원문: \"Upgrading to version 1.5.1.5 is able to address this issue. It is recommended to upgrade the affected component.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-04.md#65daf8990c17",
+          "text": "potentially lead to a compromise of confidentiality, integrity, and availability of the host system.\n\nCVE-2024-12987 · DrayTek Vigor Routers · DrayTek Vigor Routers OS Command Injection Vulnerability\n등재일(dateAdded) 2025-05-15 · 조치기한(dueDate) 2025-06-05 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-78\n설명(CISA shortDescription): DrayTek Vigor2960, Vigor300B, and Vigor3900 routers contain an OS command injection vulnerability due to an unknown function of the file /cgi-bin/mainfunction.cgi/apmcfgupload of the component web management interface.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): A vulnerability, which was classified as critical, was found in DrayTek Vigor2960 and Vigor300B 1.5.1.4. Affected is an unknown function of the file /cgi-bin/mainfunction.cgi/apmcfgupload of the component Web Management Interface. The manipulation of the argument session leads to os command injection. It is possible to launch the attack remotely. The exploit has been disclosed to the public and may be used. Upgrading to version 1.5.1.5 is able to address this issue. It is recommended to upgrade the affected component."
+        }
+      ],
+      "promptHash": "5a3ee7c23f89"
+    },
+    {
+      "question": "지imbra 콜라보레이션 스위트에서 발견된 이 취약점이 데이터에 미치는 영향은 무엇인가요?",
+      "answer": "해당 취약점은 크로스 사이트 스크립팅 방식으로 인해 데이터의 기밀성과 무결성을 위협합니다. 이는 공격자가 사용자 세션을 탈취하거나 위조된 콘텐츠를 삽입할 수 있게 하여 시스템을 불안정하게 만들 수 있습니다. 따라서 신속한 패치 적용이나 사용 중단이 필요한 상태입니다.\n원문: \"Synacor Zimbra Collaboration Suite (ZCS) contains a cross-site scripting vulnerability impacting the confidentiality and integrity of data.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-08.md#3f72e42db357",
+          "text": "1.8.x < 11.8.1.2) allows an authenticated administrator to write arbitrary files onto the appliance.\n\nCVE-2023-37580 · Synacor Zimbra Collaboration Suite (ZCS) · Synacor Zimbra Collaboration Suite (ZCS) Cross-Site Scripting (XSS) Vulnerability\n등재일(dateAdded) 2023-07-27 · 조치기한(dueDate) 2023-08-17 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-79\n설명(CISA shortDescription): Synacor Zimbra Collaboration Suite (ZCS) contains a cross-site scripting vulnerability impacting the confidentiality and integrity of data.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Zimbra Collaboration (ZCS) 8 before 8.8.15 Patch 41 allows XSS in the Zimbra Classic Web Client."
+        }
+      ],
+      "promptHash": "7c76ee0efe58"
+    },
+    {
+      "question": "CVE-2023-37580 취약점이 발생하는 구체적인 소프트웨어 버전과 환경은 어디인가요?",
+      "answer": "이 취약점은 특정 버전 이전의 지imbra 콜라보레이션 소프트웨어에서 발생하며, 특히 클래식 웹 클라이언트 환경에 집중되어 있습니다. 관리자는 해당 버전 이하의 시스템을 사용하고 있다면 즉각적으로 최신 패치로 업데이트해야 합니다. 그렇지 않을 경우 외부 공격자에게 XSS 공격의 표적이 될 수 있습니다.\n원문: \"Zimbra Collaboration (ZCS) 8 before 8.8.15 Patch 41 allows XSS in the Zimbra Classic Web Client.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-08.md#3f72e42db357",
+          "text": "1.8.x < 11.8.1.2) allows an authenticated administrator to write arbitrary files onto the appliance.\n\nCVE-2023-37580 · Synacor Zimbra Collaboration Suite (ZCS) · Synacor Zimbra Collaboration Suite (ZCS) Cross-Site Scripting (XSS) Vulnerability\n등재일(dateAdded) 2023-07-27 · 조치기한(dueDate) 2023-08-17 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-79\n설명(CISA shortDescription): Synacor Zimbra Collaboration Suite (ZCS) contains a cross-site scripting vulnerability impacting the confidentiality and integrity of data.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Zimbra Collaboration (ZCS) 8 before 8.8.15 Patch 41 allows XSS in the Zimbra Classic Web Client."
+        }
+      ],
+      "promptHash": "7c76ee0efe58"
+    },
+    {
+      "question": "해당 취약점에 대한 권장 조치 사항이_vendor_ 지침을 따르는 것 외에는 무엇이 있나요?",
+      "answer": "공식적인 완화 지침을 적용하는 것이 최우선이지만, 만약 적절한 보안 패치나 해결책이 제공되지 않는다면 제품 사용을 즉시 중단해야 합니다. 이는 보안 위험이 관리 불가능한 수준으로 확산되는 것을 방지하기 위한 최종 수단입니다. 보안 담당자는 벤더의 업데이트 상황을 지속적으로 모니터링해야 합니다.\n원문: \"Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-08.md#3f72e42db357",
+          "text": "1.8.x < 11.8.1.2) allows an authenticated administrator to write arbitrary files onto the appliance.\n\nCVE-2023-37580 · Synacor Zimbra Collaboration Suite (ZCS) · Synacor Zimbra Collaboration Suite (ZCS) Cross-Site Scripting (XSS) Vulnerability\n등재일(dateAdded) 2023-07-27 · 조치기한(dueDate) 2023-08-17 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-79\n설명(CISA shortDescription): Synacor Zimbra Collaboration Suite (ZCS) contains a cross-site scripting vulnerability impacting the confidentiality and integrity of data.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Zimbra Collaboration (ZCS) 8 before 8.8.15 Patch 41 allows XSS in the Zimbra Classic Web Client."
+        }
+      ],
+      "promptHash": "7c76ee0efe58"
+    },
+    {
+      "question": "이 취약점으로 인해 공격자가 시스템에서 어떤 악성 행위를 수행할 수 있나요?",
+      "answer": "공격자는 EmailTemplates를 통해 특수하게 제작된 요청을 보내면 임의의 PHP 코드를 주입할 수 있습니다. 이는 원격 코드 실행으로 이어질 수 있는 심각한 보안 결함입니다. 원문: \"Multiple SugarCRM products contain a remote code execution vulnerability in the EmailTemplates. Using a specially crafted request, custom PHP code can be injected through the EmailTemplates.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-09.md#0de75eae4e2b",
+          "text": "y, Integrity and Availability impacts). CVSS Vector: (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H).\n\nCVE-2023-22952 · SugarCRM Multiple Products · Multiple SugarCRM Products Remote Code Execution Vulnerability\n등재일(dateAdded) 2023-02-02 · 조치기한(dueDate) 2023-02-23 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-20\n설명(CISA shortDescription): Multiple SugarCRM products contain a remote code execution vulnerability in the EmailTemplates. Using a specially crafted request, custom PHP code can be injected through the EmailTemplates.\n요구 조치(requiredAction): Apply updates per vendor instructions.\nNVD 설명(영어 원문): In SugarCRM before 12.0. Hotfix 91155, a crafted request can inject custom PHP code through the EmailTemplates because of missing input validation."
+        }
+      ],
+      "promptHash": "1de7f98da804"
+    },
+    {
+      "question": "해당 취약점이 존재하는 근본적인 기술적 원인은 무엇인가요?",
+      "answer": "입력값에 대한 유효성 검사가 충분하게 이루어지지 않아서 발생한 문제입니다. 이러한 결점으로 인해 공격자가 악의적인 코드를 쉽게 삽입할 수 있게 됩니다. 원문: \"In SugarCRM before 12.0. Hotfix 91155, a crafted request can inject custom PHP code through the EmailTemplates because of missing input validation.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-09.md#0de75eae4e2b",
+          "text": "y, Integrity and Availability impacts). CVSS Vector: (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H).\n\nCVE-2023-22952 · SugarCRM Multiple Products · Multiple SugarCRM Products Remote Code Execution Vulnerability\n등재일(dateAdded) 2023-02-02 · 조치기한(dueDate) 2023-02-23 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-20\n설명(CISA shortDescription): Multiple SugarCRM products contain a remote code execution vulnerability in the EmailTemplates. Using a specially crafted request, custom PHP code can be injected through the EmailTemplates.\n요구 조치(requiredAction): Apply updates per vendor instructions.\nNVD 설명(영어 원문): In SugarCRM before 12.0. Hotfix 91155, a crafted request can inject custom PHP code through the EmailTemplates because of missing input validation."
+        }
+      ],
+      "promptHash": "1de7f98da804"
+    },
+    {
+      "question": "이 취약점을 해결하기 위해 보안 담당자가 취해야 할 조치는 무엇인가요?",
+      "answer": "벤더가 제공하는 지침에 따라 소프트웨어 업데이트를 적용해야 합니다. 즉각적인 패치 적용을 통해 원격 코드 실행 위험을 차단하는 것이 필수적입니다. 원문: \"Multiple SugarCRM products contain a remote code execution vulnerability in the EmailTemplates. Using a specially crafted request, custom PHP code can be injected through the EmailTemplates.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-09.md#0de75eae4e2b",
+          "text": "y, Integrity and Availability impacts). CVSS Vector: (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H).\n\nCVE-2023-22952 · SugarCRM Multiple Products · Multiple SugarCRM Products Remote Code Execution Vulnerability\n등재일(dateAdded) 2023-02-02 · 조치기한(dueDate) 2023-02-23 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-20\n설명(CISA shortDescription): Multiple SugarCRM products contain a remote code execution vulnerability in the EmailTemplates. Using a specially crafted request, custom PHP code can be injected through the EmailTemplates.\n요구 조치(requiredAction): Apply updates per vendor instructions.\nNVD 설명(영어 원문): In SugarCRM before 12.0. Hotfix 91155, a crafted request can inject custom PHP code through the EmailTemplates because of missing input validation."
+        }
+      ],
+      "promptHash": "1de7f98da804"
+    },
+    {
+      "question": "이 취약점이 공격자에게 허용하는 구체적인 영향은 무엇인가요?",
+      "answer": "해당 취약점은 원격 공격자가 임의의 SQL 명령어를 실행할 수 있게 합니다. 이는 서버의 정보를 읽거나 수정하거나, 서버를 다운시켜 가용성을 떨어뜨리는 결과를 초래합니다. 원문: \"used to read or modify any information on the server or shut the server down making it unavailable.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-10.md#941e17aae995",
+          "text": " used to read or modify any information on the server or shut the server down making it unavailable.\n\nCVE-2016-2386 · SAP NetWeaver · SAP NetWeaver SQL Injection Vulnerability\n등재일(dateAdded) 2022-06-09 · 조치기한(dueDate) 2022-06-30 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-89\n설명(CISA shortDescription): SQL injection vulnerability in the UDDI server in SAP NetWeaver J2EE Engine 7.40 allows remote attackers to execute arbitrary SQL commands via unspecified vectors.\n요구 조치(requiredAction): Apply updates per vendor instructions."
+        }
+      ],
+      "promptHash": "45d2e5f5e62e"
+    },
+    {
+      "question": "해당 취약점을 해결하기 위해 취해야 할 필수 조치는 무엇인가요?",
+      "answer": "보안 담당자는 벤더가 제공하는 지침에 따라 업데이트를 적용해야 합니다. 이는 SQL 인젝션 취약점을 차단하여 시스템의 보안을 확보하는 가장 기본적인 방법입니다. 원문: \"Apply updates per vendor instructions.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-10.md#941e17aae995",
+          "text": " used to read or modify any information on the server or shut the server down making it unavailable.\n\nCVE-2016-2386 · SAP NetWeaver · SAP NetWeaver SQL Injection Vulnerability\n등재일(dateAdded) 2022-06-09 · 조치기한(dueDate) 2022-06-30 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-89\n설명(CISA shortDescription): SQL injection vulnerability in the UDDI server in SAP NetWeaver J2EE Engine 7.40 allows remote attackers to execute arbitrary SQL commands via unspecified vectors.\n요구 조치(requiredAction): Apply updates per vendor instructions."
+        }
+      ],
+      "promptHash": "45d2e5f5e62e"
+    },
+    {
+      "question": "이 취약점이 존재하는 SAP NetWeaver의 특정 구성 요소와 버전을 알려주세요.",
+      "answer": "취약점은 SAP NetWeaver J2EE Engine 7.40의 UDDI 서버에 존재합니다. 원격 공격자가 지정되지 않은 벡터를 통해 SQL 명령어를 실행할 수 있는 상태입니다. 원문: \"SQL injection vulnerability in the UDDI server in SAP NetWeaver J2EE Engine 7.40 allows remote attackers to execute arbitrary SQL commands via unspecified vectors.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-10.md#941e17aae995",
+          "text": " used to read or modify any information on the server or shut the server down making it unavailable.\n\nCVE-2016-2386 · SAP NetWeaver · SAP NetWeaver SQL Injection Vulnerability\n등재일(dateAdded) 2022-06-09 · 조치기한(dueDate) 2022-06-30 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-89\n설명(CISA shortDescription): SQL injection vulnerability in the UDDI server in SAP NetWeaver J2EE Engine 7.40 allows remote attackers to execute arbitrary SQL commands via unspecified vectors.\n요구 조치(requiredAction): Apply updates per vendor instructions."
+        }
+      ],
+      "promptHash": "45d2e5f5e62e"
+    },
+    {
+      "question": "이 취약점을 악용하면 공격자가 어떤 피해를 끼칠 수 있나요?",
+      "answer": "공격자는 조작된 Silverlight 애플리케이션을 통해 원격으로 코드를 실행할 수 있습니다. 이는 Silverlight가 HTML 개체 렌더링 중 포인터를 적절히 검증하지 않기 때문에 발생하는 문제입니다. 원문: \"Microsoft Silverlight does not properly validate pointers during HTML object rendering, which allows remote attackers to execute code via a crafted Silverlight application.\" 이러한 결함으로 인해 시스템 제어권이 탈취될 수 있습니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-10.md#93958a9785cf",
+          "text": "ecute commands on a vulnerable system.\n요구 조치(requiredAction): Apply updates per vendor instructions.\n\nCVE-2013-0074 · Microsoft Silverlight · Microsoft Silverlight Double Dereference Vulnerability\n등재일(dateAdded) 2022-05-25 · 조치기한(dueDate) 2022-06-15 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known\n설명(CISA shortDescription): Microsoft Silverlight does not properly validate pointers during HTML object rendering, which allows remote attackers to execute code via a crafted Silverlight application.\n요구 조치(requiredAction): The impacted product is end-of-life and should be disconnected if still in use."
+        }
+      ],
+      "promptHash": "9e947c08b8ca"
+    },
+    {
+      "question": "지원이 종료된 제품이므로 보안 업데이트 외에는 다른 조치가 필요한가요?",
+      "answer": "해당 제품은 이미 수명 주기가 종료되어 더 이상 보안 업데이트를 받을 수 없습니다. 따라서 현재 사용 중이라면 네트워크에서 즉시 분리해야 합니다. 원문: \"The impacted product is end-of-life and should be disconnected if still in use.\" 단순 패치 적용이 불가능한 상황이므로 제거 또는 격리가 필수적입니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-10.md#93958a9785cf",
+          "text": "ecute commands on a vulnerable system.\n요구 조치(requiredAction): Apply updates per vendor instructions.\n\nCVE-2013-0074 · Microsoft Silverlight · Microsoft Silverlight Double Dereference Vulnerability\n등재일(dateAdded) 2022-05-25 · 조치기한(dueDate) 2022-06-15 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known\n설명(CISA shortDescription): Microsoft Silverlight does not properly validate pointers during HTML object rendering, which allows remote attackers to execute code via a crafted Silverlight application.\n요구 조치(requiredAction): The impacted product is end-of-life and should be disconnected if still in use."
+        }
+      ],
+      "promptHash": "9e947c08b8ca"
+    },
+    {
+      "question": "해당 취약점이 인증 우회를 통해 어떤 보안 영향을 미치는지 설명해 주세요.",
+      "answer": "이 취약점은 인증되지 않은 공격자가 시스템 구성을 변경할 수 있게 합니다. 이는 웹 관리 인터페이스의 접근 통제 결함에서 기인합니다. 「원문: \"An improper access control vulnerability exists in the web management interface of PaperCut MF and PaperCut NG.\"」",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-01.md#b4edb29694b1",
+          "text": "ode residing on the application classpath under the security context of the PaperCut server process.\n\nCVE-2026-81578 · PaperCut NG/MF · PaperCut NG/MF Missing Authentication for Critical Function Vulnerability\n등재일(dateAdded) 2026-08-31 · 조치기한(dueDate) 2026-09-14 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-306\n설명(CISA shortDescription): PaperCut NG/MF contains a missing authentication for critical function vulnerability which allows an unauthenticated remote attacker to modify certain system configurations. This vulnerability can be chained with CVE-2026-82078.\n요구 조치(requiredAction): Apply mitigations in accordance with vendor instructions, ensuring compliance with CISA’s BOD 26-04 Prioritizing Security Updates Based on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). …\nNVD 설명(영어 원문): An improper access control vulnerability exists in the web management interface of PaperCut MF and PaperCut NG. Under specific conditions, unauthenticated remote requests targeting administrative functions can trigger backend actions prior to the completion of access validation checks. This allows an unauthenticated remote attacker to modify certain system configurations."
+        }
+      ],
+      "promptHash": "bad48a00645e"
+    },
+    {
+      "question": "공격자가 인증 검증 절차가 끝나기도 전에 백엔드 작업을 실행할 수 있는 이유는 무엇인가요?",
+      "answer": "특정 조건에서 관리자 기능에 대한 원격 요청이 접근 검증 완료 전에 백엔드 작업을 유발할 수 있습니다. 이로 인해 인증 없이도 시스템 변경이 발생합니다. 「원문: \"Under specific conditions, unauthenticated remote requests targeting administrative functions can trigger backend actions prior to the completion of access validation checks.\"」",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-01.md#b4edb29694b1",
+          "text": "ode residing on the application classpath under the security context of the PaperCut server process.\n\nCVE-2026-81578 · PaperCut NG/MF · PaperCut NG/MF Missing Authentication for Critical Function Vulnerability\n등재일(dateAdded) 2026-08-31 · 조치기한(dueDate) 2026-09-14 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-306\n설명(CISA shortDescription): PaperCut NG/MF contains a missing authentication for critical function vulnerability which allows an unauthenticated remote attacker to modify certain system configurations. This vulnerability can be chained with CVE-2026-82078.\n요구 조치(requiredAction): Apply mitigations in accordance with vendor instructions, ensuring compliance with CISA’s BOD 26-04 Prioritizing Security Updates Based on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). …\nNVD 설명(영어 원문): An improper access control vulnerability exists in the web management interface of PaperCut MF and PaperCut NG. Under specific conditions, unauthenticated remote requests targeting administrative functions can trigger backend actions prior to the completion of access validation checks. This allows an unauthenticated remote attacker to modify certain system configurations."
+        }
+      ],
+      "promptHash": "bad48a00645e"
+    },
+    {
+      "question": "CISA가 요구하는 조치 사항 중 포렌식 관련 요구사항은 무엇인가요?",
+      "answer": "벤더 지침에 따라 완화 조치를 적용해야 합니다. 또한 CISA의 포렌식 분류 요구사항을 준수해야 합니다. 「원문: \"Apply mitigations in accordance with vendor instructions, ensuring compliance with CISA’s BOD 26-04 Prioritizing Security Updates Based on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes).\"」",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-01.md#b4edb29694b1",
+          "text": "ode residing on the application classpath under the security context of the PaperCut server process.\n\nCVE-2026-81578 · PaperCut NG/MF · PaperCut NG/MF Missing Authentication for Critical Function Vulnerability\n등재일(dateAdded) 2026-08-31 · 조치기한(dueDate) 2026-09-14 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-306\n설명(CISA shortDescription): PaperCut NG/MF contains a missing authentication for critical function vulnerability which allows an unauthenticated remote attacker to modify certain system configurations. This vulnerability can be chained with CVE-2026-82078.\n요구 조치(requiredAction): Apply mitigations in accordance with vendor instructions, ensuring compliance with CISA’s BOD 26-04 Prioritizing Security Updates Based on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). …\nNVD 설명(영어 원문): An improper access control vulnerability exists in the web management interface of PaperCut MF and PaperCut NG. Under specific conditions, unauthenticated remote requests targeting administrative functions can trigger backend actions prior to the completion of access validation checks. This allows an unauthenticated remote attacker to modify certain system configurations."
+        }
+      ],
+      "promptHash": "bad48a00645e"
+    },
+    {
+      "question": "이 취약점이 최종적으로 서버에 어떤 영향을 미치며, 왜 위험한가요?",
+      "answer": "이 취약점은 사용자 세션 파일에 임의의 Lua 코드를 삽입할 수 있게 하여 FTP 서비스 권한으로 시스템 명령을 실행할 수 있게 합니다. 기본 설정에서 FTP 서비스는 루트 또는 시스템 권한으로 실행되므로 이는 서버 전체를 장악당하는 원격 코드 실행으로 이어집니다. 원문: \"In Wing FTP Server before 7.4.4. the user and admin web interfaces mishandle '\\0' bytes, ultimately allowing injection of arbitrary Lua code into user session files.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-04.md#3b23df4b3489",
+          "text": "henticated attacker to execute unauthorized SQL code or commands via crafted HTTP or HTTPs requests.\n\nCVE-2025-47812 · Wing FTP Server Wing FTP Server · Wing FTP Server Improper Neutralization of Null Byte or NUL Character Vulnerability\n등재일(dateAdded) 2025-07-14 · 조치기한(dueDate) 2025-08-04 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-158\n설명(CISA shortDescription): Wing FTP Server contains an improper neutralization of null byte or NUL character vulnerability that can allow injection of arbitrary Lua code into user session files. This can be used to execute arbitrary system commands with the privileges of the FTP service (root or SYSTEM by default).\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): In Wing FTP Server before 7.4.4. the user and admin web interfaces mishandle '\\0' bytes, ultimately allowing injection of arbitrary Lua code into user session files. This can be used to execute arbitrary system commands with the privileges of the FTP service (root or SYSTEM by default). This is thus a remote code execution vulnerability that guarantees a total server compromise. This is also exploitable via anonymous FTP accounts."
+        }
+      ],
+      "promptHash": "aa19bd40c73a"
+    },
+    {
+      "question": "익명 FTP 계정을 사용하는 환경에서도 이 취약점에 노출될 수 있나요?",
+      "answer": "네, 익명 FTP 계정을 통해 이 취약점을 악용할 수 있는 가능성이 명시되어 있습니다. 즉, 인증된 사용자만 아니라 익명 접근이 허용된 경우에도 공격자가 임의의 Lua 코드를 삽입하여 시스템 명령을 실행할 수 있습니다. 원문: \"This is also exploitable via anonymous FTP accounts.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-04.md#3b23df4b3489",
+          "text": "henticated attacker to execute unauthorized SQL code or commands via crafted HTTP or HTTPs requests.\n\nCVE-2025-47812 · Wing FTP Server Wing FTP Server · Wing FTP Server Improper Neutralization of Null Byte or NUL Character Vulnerability\n등재일(dateAdded) 2025-07-14 · 조치기한(dueDate) 2025-08-04 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-158\n설명(CISA shortDescription): Wing FTP Server contains an improper neutralization of null byte or NUL character vulnerability that can allow injection of arbitrary Lua code into user session files. This can be used to execute arbitrary system commands with the privileges of the FTP service (root or SYSTEM by default).\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): In Wing FTP Server before 7.4.4. the user and admin web interfaces mishandle '\\0' bytes, ultimately allowing injection of arbitrary Lua code into user session files. This can be used to execute arbitrary system commands with the privileges of the FTP service (root or SYSTEM by default). This is thus a remote code execution vulnerability that guarantees a total server compromise. This is also exploitable via anonymous FTP accounts."
+        }
+      ],
+      "promptHash": "aa19bd40c73a"
+    },
+    {
+      "question": "이 취약점을 해결하기 위해 벤더가 제공하는 지침 외에 어떤 조치를 취해야 하나요?",
+      "answer": "벤더 지침에 따라 완화 조치를 적용해야 하며, 클라우드 서비스의 경우 적용 가능한 BOD 22-01 지침을 따라야 합니다. 만약 완화 조치를 제공할 수 없는 상태라면 해당 제품의 사용을 중단하는 것이 요구됩니다. 원문: \"Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-04.md#3b23df4b3489",
+          "text": "henticated attacker to execute unauthorized SQL code or commands via crafted HTTP or HTTPs requests.\n\nCVE-2025-47812 · Wing FTP Server Wing FTP Server · Wing FTP Server Improper Neutralization of Null Byte or NUL Character Vulnerability\n등재일(dateAdded) 2025-07-14 · 조치기한(dueDate) 2025-08-04 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-158\n설명(CISA shortDescription): Wing FTP Server contains an improper neutralization of null byte or NUL character vulnerability that can allow injection of arbitrary Lua code into user session files. This can be used to execute arbitrary system commands with the privileges of the FTP service (root or SYSTEM by default).\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): In Wing FTP Server before 7.4.4. the user and admin web interfaces mishandle '\\0' bytes, ultimately allowing injection of arbitrary Lua code into user session files. This can be used to execute arbitrary system commands with the privileges of the FTP service (root or SYSTEM by default). This is thus a remote code execution vulnerability that guarantees a total server compromise. This is also exploitable via anonymous FTP accounts."
+        }
+      ],
+      "promptHash": "aa19bd40c73a"
+    },
+    {
+      "question": "webMethods OneData 10.11 버전에서 인증 없이 원격 코드 실행이 가능한 취약점의 근본적인 원인은 무엇인가요?",
+      "answer": "이 취약점은 내장된 Java RMI 레지스트리가 악성 직렬화 객체를 로드하도록 허용하는 데 있습니다. 공격자는 네트워크를 통해 RMI 인터페이스에 접근하여 서버가 임의의 Java 코드를 실행하도록 조작할 수 있습니다. 「원문: \"An unauthenticated attacker with network connectivity to the RMI registry and RMI interface ports can abuse this functionality to instruct the webMethods OneData application to load a malicious serialized Java object as a parameter to one of the available Java methods presented by the RMI interface.\"」 이 과정에서 역직렬화된 악성 코드는 소프트웨어를 실행하는 계정 권한으로 동작하게 됩니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#ec98313e0bdd",
+          "text": "privileges, and information disclosure.\n참조: https://nvidia.custhelp.com/app/answers/detail/a_id/5473\n\nCVE-2023-0925 · 공개일 2023-09-06 · CVSS v3 기반점수 9.8 (CRITICAL) · CWE-502\n벡터(vectorString): CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\n설명(NVD 영어 원문): Version 10.11 of webMethods OneData runs an embedded instance of Azul Zulu Java 11.0.15 which hosts a Java RMI registry (listening on TCP port 2099 by default) and two RMI interfaces (listening on a single, dynamically assigned TCP high port). Port 2099 serves as a Java Remote Method Invocation (RMI) registry which allows for remotely loading and processing data via RMI interfaces. An unauthenticated attacker with network connectivity to the RMI registry and RMI interface ports can abuse this functionality to instruct the webMethods OneData application to load a malicious serialized Java object as a parameter to one of the available Java methods presented by the RMI interface. Once deserialized on the vulnerable server, the malicious code runs as whichever operating system account is used to run the software, which in most cases is the local System account on Windows.\n참조: https://www.softwareag.com/en_corporate/platform/integration-apis/webmethods-integration.html"
+        }
+      ],
+      "promptHash": "d880c7b2b8e8"
+    },
+    {
+      "question": "해당 취약점이 Windows 서버 환경에서 특히 위험한 이유는 무엇인가요?",
+      "answer": "역직렬화된 악성 코드는 해당 소프트웨어를 실행하는 운영체제 계정의 권한을 상속받아 실행됩니다. 많은 경우 이 소프트웨어는 Windows에서 로컬 시스템 계정으로 실행되므로, 공격자는 최고 권한을 획득할 수 있습니다. 「원문: \"Once deserialized on the vulnerable server, the malicious code runs as whichever operating system account is used to run the software, which in most cases is the local System account on Windows.\"」 이로 인해 시스템 전반에 대한 완전한 제어권이 탈취될 위험이 큽니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#ec98313e0bdd",
+          "text": "privileges, and information disclosure.\n참조: https://nvidia.custhelp.com/app/answers/detail/a_id/5473\n\nCVE-2023-0925 · 공개일 2023-09-06 · CVSS v3 기반점수 9.8 (CRITICAL) · CWE-502\n벡터(vectorString): CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\n설명(NVD 영어 원문): Version 10.11 of webMethods OneData runs an embedded instance of Azul Zulu Java 11.0.15 which hosts a Java RMI registry (listening on TCP port 2099 by default) and two RMI interfaces (listening on a single, dynamically assigned TCP high port). Port 2099 serves as a Java Remote Method Invocation (RMI) registry which allows for remotely loading and processing data via RMI interfaces. An unauthenticated attacker with network connectivity to the RMI registry and RMI interface ports can abuse this functionality to instruct the webMethods OneData application to load a malicious serialized Java object as a parameter to one of the available Java methods presented by the RMI interface. Once deserialized on the vulnerable server, the malicious code runs as whichever operating system account is used to run the software, which in most cases is the local System account on Windows.\n참조: https://www.softwareag.com/en_corporate/platform/integration-apis/webmethods-integration.html"
+        }
+      ],
+      "promptHash": "d880c7b2b8e8"
+    },
+    {
+      "question": "webMethods OneData의 내장 Java RMI 레지스트리가 어떻게 공격 표면이 될 수 있나요?",
+      "answer": "기본적으로 TCP 포트 2099에서 실행되는 레지스트리는 원격으로 데이터를 로드하고 처리하는 기능을 제공합니다. 이 기능은 인증 없이도 네트워크 접근이 가능하면 악용될 수 있는 구조를 가지고 있습니다. 「원문: \"Port 2099 serves as a Java Remote Method Invocation (RMI) registry which allows for remotely loading and processing data via RMI interfaces.\"」 따라서 외부 네트워크에 이 포트가 노출되어 있다면 심각한 보안 위협에 직면하게 됩니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#ec98313e0bdd",
+          "text": "privileges, and information disclosure.\n참조: https://nvidia.custhelp.com/app/answers/detail/a_id/5473\n\nCVE-2023-0925 · 공개일 2023-09-06 · CVSS v3 기반점수 9.8 (CRITICAL) · CWE-502\n벡터(vectorString): CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\n설명(NVD 영어 원문): Version 10.11 of webMethods OneData runs an embedded instance of Azul Zulu Java 11.0.15 which hosts a Java RMI registry (listening on TCP port 2099 by default) and two RMI interfaces (listening on a single, dynamically assigned TCP high port). Port 2099 serves as a Java Remote Method Invocation (RMI) registry which allows for remotely loading and processing data via RMI interfaces. An unauthenticated attacker with network connectivity to the RMI registry and RMI interface ports can abuse this functionality to instruct the webMethods OneData application to load a malicious serialized Java object as a parameter to one of the available Java methods presented by the RMI interface. Once deserialized on the vulnerable server, the malicious code runs as whichever operating system account is used to run the software, which in most cases is the local System account on Windows.\n참조: https://www.softwareag.com/en_corporate/platform/integration-apis/webmethods-integration.html"
+        }
+      ],
+      "promptHash": "d880c7b2b8e8"
+    },
+    {
+      "question": "해당 제품에서 인증된 사용자가 네트워크를 통해 명령어를 실행할 수 있는 취약점이 있나요?",
+      "answer": "네, FXC AE1021 및 AE1021PE 제품에는 인증된 사용자가 네트워크를 통해 명령어를 실행할 수 있는 OS 명령어 주입 취약점이 존재합니다. 원문: \"FXC AE1021 and AE1021PE contain an OS command injection vulnerability that allows authenticated users to execute commands via a network.\"\n이 취약점은 CWE-78로 분류되며, 공격자가 로그인 권한을 가지고 있을 경우 임의의 OS 명령어를 실행할 수 있게 합니다. 따라서 공급업체의 지침에 따라 즉시 완화 조치를 적용하거나 해당 제품의 사용을 중단해야 합니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-07.md#fc0e7482c287",
+          "text": "r to potentially exploit heap corruption via a crafted HTML page. (Chromium security severity: High)\n\nCVE-2023-49897 · FXC AE1021, AE1021PE · FXC AE1021, AE1021PE OS Command Injection Vulnerability\n등재일(dateAdded) 2023-12-21 · 조치기한(dueDate) 2024-01-11 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-78\n설명(CISA shortDescription): FXC AE1021 and AE1021PE contain an OS command injection vulnerability that allows authenticated users to execute commands via a network.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): An OS command injection vulnerability exists in AE1021PE firmware version 2.0.9 and earlier and AE1021 firmware version 2.0.9 and earlier. If this vulnerability is exploited, an arbitrary OS command may be executed by an attacker who can log in to the product."
+        }
+      ],
+      "promptHash": "e761edfa8a6a"
+    },
+    {
+      "question": "이 취약점을 악용했을 때 공격자가 어떤 영향을 미칠 수 있나요?",
+      "answer": "이 취약점이 악용될 경우, 제품에 로그인할 수 있는 공격자가 임의의 OS 명령어를 실행할 수 있는 위험이 있습니다. 원문: \"If this vulnerability is exploited, an arbitrary OS command may be executed by an attacker who can log in to the product.\"\n이는 시스템의 기밀성, 무결성 및 가용성을 심각하게 위협할 수 있는 상황입니다. 랜섬웨어 캠페인 활용 여부는 아직 불명확하지만, 악용 가능성 자체는 매우 높으므로 주의가 필요합니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-07.md#fc0e7482c287",
+          "text": "r to potentially exploit heap corruption via a crafted HTML page. (Chromium security severity: High)\n\nCVE-2023-49897 · FXC AE1021, AE1021PE · FXC AE1021, AE1021PE OS Command Injection Vulnerability\n등재일(dateAdded) 2023-12-21 · 조치기한(dueDate) 2024-01-11 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-78\n설명(CISA shortDescription): FXC AE1021 and AE1021PE contain an OS command injection vulnerability that allows authenticated users to execute commands via a network.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): An OS command injection vulnerability exists in AE1021PE firmware version 2.0.9 and earlier and AE1021 firmware version 2.0.9 and earlier. If this vulnerability is exploited, an arbitrary OS command may be executed by an attacker who can log in to the product."
+        }
+      ],
+      "promptHash": "e761edfa8a6a"
+    },
+    {
+      "question": "해당 취약점에 대한 권장 조치 사항은 무엇인가요?",
+      "answer": "가장 먼저 공급업체가 제공하는 지침에 따라 완화 조치를 적용해야 합니다. 원문: \"Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\"\n만약 적절한 완화 조치가 제공되지 않는다면, 해당 제품의 사용을 즉시 중단해야 합니다. 이는 잠재적인 보안 사고를 방지하고 시스템 안정성을 확보하기 위한 필수적인 절차입니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-07.md#fc0e7482c287",
+          "text": "r to potentially exploit heap corruption via a crafted HTML page. (Chromium security severity: High)\n\nCVE-2023-49897 · FXC AE1021, AE1021PE · FXC AE1021, AE1021PE OS Command Injection Vulnerability\n등재일(dateAdded) 2023-12-21 · 조치기한(dueDate) 2024-01-11 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-78\n설명(CISA shortDescription): FXC AE1021 and AE1021PE contain an OS command injection vulnerability that allows authenticated users to execute commands via a network.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): An OS command injection vulnerability exists in AE1021PE firmware version 2.0.9 and earlier and AE1021 firmware version 2.0.9 and earlier. If this vulnerability is exploited, an arbitrary OS command may be executed by an attacker who can log in to the product."
+        }
+      ],
+      "promptHash": "e761edfa8a6a"
+    },
+    {
+      "question": "해당 취약점의 근본적인 원인은 무엇이며 어떤 CWE 분류에 해당하는지 설명해 주세요.",
+      "answer": "이 취약점은 경로 순회(path traversal) 문제로 인해 현재 사용자 권한으로 임의 코드 실행이 발생할 수 있는 상태입니다. 이는 CWE-22로 분류되는 보안 결함입니다. 원문: \"Adobe ColdFusion contains a path traversal vulnerability that could lead to arbitrary code execution in the context of the current user.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-01.md#855a9ce59418",
+          "text": "on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). …\n\nCVE-2026-48282 · Adobe ColdFusion · Adobe ColdFusion Path Traversal Vulnerability\n등재일(dateAdded) 2026-07-07 · 조치기한(dueDate) 2026-07-10 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-22\n설명(CISA shortDescription): Adobe ColdFusion contains a path traversal vulnerability that could lead to arbitrary code execution in the context of the current user.\n요구 조치(requiredAction): Apply mitigations in accordance with vendor instructions, ensuring compliance with CISA’s BOD 26-04 Prioritizing Security Updates Based on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). …"
+        }
+      ],
+      "promptHash": "701e918597ce"
+    },
+    {
+      "question": "취약점 패치 시 CISA의 포렌식 요구사항과 리스크 기반 지침을 어떻게 적용해야 하나요?",
+      "answer": "벤더의 지침에 따라 완화 조치를 적용해야 하며, 이때 CISA의 리스크 기반 보안 업데이트 지침과 포렌식 트리아지 요구사항을 준수해야 합니다. 단순 패치뿐 아니라 사고 대응 절차와의 연계가 필수적입니다. 원문: \"Apply mitigations in accordance with vendor instructions, ensuring compliance with CISA’s BOD 26-04 Prioritizing Security Updates Based on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). ...\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-01.md#855a9ce59418",
+          "text": "on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). …\n\nCVE-2026-48282 · Adobe ColdFusion · Adobe ColdFusion Path Traversal Vulnerability\n등재일(dateAdded) 2026-07-07 · 조치기한(dueDate) 2026-07-10 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-22\n설명(CISA shortDescription): Adobe ColdFusion contains a path traversal vulnerability that could lead to arbitrary code execution in the context of the current user.\n요구 조치(requiredAction): Apply mitigations in accordance with vendor instructions, ensuring compliance with CISA’s BOD 26-04 Prioritizing Security Updates Based on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). …"
+        }
+      ],
+      "promptHash": "701e918597ce"
+    },
+    {
+      "question": "FortiClient EMS의 SQL 인젝션 취약점으로 인해 공격자가 얻을 수 있는 권한 수준은 어떻게 되나요?",
+      "answer": "이 취약점을 악용하면 인증되지 않은 공격자가 시스템 권한으로 명령을 실행할 수 있습니다. 이는 단순 사용자 권한을 넘어 시스템 전체를 통제할 수 있는 심각한 위험을 의미합니다. 원문: \"Fortinet FortiClient EMS contains a SQL injection vulnerability that allows an unauthenticated attacker to execute commands as SYSTEM via specifically crafted requests.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-07.md#75e4bbcf90af",
+          "text": "ce (CSA) allows an unauthenticated user to execute arbitrary code with limited permissions (nobody).\n\nCVE-2023-48788 · Fortinet FortiClient EMS · Fortinet FortiClient EMS SQL Injection Vulnerability\n등재일(dateAdded) 2024-03-25 · 조치기한(dueDate) 2024-04-15 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-89\n설명(CISA shortDescription): Fortinet FortiClient EMS contains a SQL injection vulnerability that allows an unauthenticated attacker to execute commands as SYSTEM via specifically crafted requests.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): A improper neutralization of special elements used in an sql command ('sql injection') in Fortinet FortiClientEMS version 7.2.0 through 7.2.2, FortiClientEMS 7.0.1 through 7.0.10 allows attacker to execute unauthorized code or commands via specially crafted packets."
+        }
+      ],
+      "promptHash": "872a1f598219"
+    },
+    {
+      "question": "해당 취약점을 악용하기 위해 공격자는 어떤 방식으로 요청을 보내야 하나요?",
+      "answer": "공격자는 단순히 접속하는 것만으로는 취약점을 이용할 수 없으며, 특정하게 조작된 요청을 보내야 합니다. 이러한 맞춤형 패킷을 통해 시스템 내부의 데이터베이스에 접근하여 명령을 수행하게 됩니다. 원문: \"A improper neutralization of special elements used in an sql command ('sql injection') in Fortinet FortiClientEMS version 7.2.0 through 7.2.2, FortiClientEMS 7.0.1 through 7.0.10 allows attacker to execute unauthorized code or commands via specially crafted packets.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-07.md#75e4bbcf90af",
+          "text": "ce (CSA) allows an unauthenticated user to execute arbitrary code with limited permissions (nobody).\n\nCVE-2023-48788 · Fortinet FortiClient EMS · Fortinet FortiClient EMS SQL Injection Vulnerability\n등재일(dateAdded) 2024-03-25 · 조치기한(dueDate) 2024-04-15 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-89\n설명(CISA shortDescription): Fortinet FortiClient EMS contains a SQL injection vulnerability that allows an unauthenticated attacker to execute commands as SYSTEM via specifically crafted requests.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): A improper neutralization of special elements used in an sql command ('sql injection') in Fortinet FortiClientEMS version 7.2.0 through 7.2.2, FortiClientEMS 7.0.1 through 7.0.10 allows attacker to execute unauthorized code or commands via specially crafted packets."
+        }
+      ],
+      "promptHash": "872a1f598219"
+    },
+    {
+      "question": "해당 취약점이 랜섬웨어 공격에 실제로 사용된 바가 있나요?",
+      "answer": "해당 취약점은 랜섬웨어 캠페인에 활용된 것으로 확인되었습니다. 이는 공격자들이 이 취약점을 통해 초기 침투를 시도하고 악성 코드를 배포하는 데 사용하고 있음을 시사합니다. 원문: \"ce (CSA) allows an unauthenticated user to execute arbitrary code with limited permissions (nobody).\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-07.md#75e4bbcf90af",
+          "text": "ce (CSA) allows an unauthenticated user to execute arbitrary code with limited permissions (nobody).\n\nCVE-2023-48788 · Fortinet FortiClient EMS · Fortinet FortiClient EMS SQL Injection Vulnerability\n등재일(dateAdded) 2024-03-25 · 조치기한(dueDate) 2024-04-15 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-89\n설명(CISA shortDescription): Fortinet FortiClient EMS contains a SQL injection vulnerability that allows an unauthenticated attacker to execute commands as SYSTEM via specifically crafted requests.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): A improper neutralization of special elements used in an sql command ('sql injection') in Fortinet FortiClientEMS version 7.2.0 through 7.2.2, FortiClientEMS 7.0.1 through 7.0.10 allows attacker to execute unauthorized code or commands via specially crafted packets."
+        }
+      ],
+      "promptHash": "872a1f598219"
+    },
+    {
+      "question": "이 취약점이 악성 코드나 랜섬웨어와 연계되어 사용된 정황이 있나요?",
+      "answer": "네, 해당 취약점은 이미 랜섬웨어 캠페인에 활용된 것으로 알려진 상태입니다. 보안 담당자는 이를 단순한 위험도가 아닌 실제 공격에 노출된 상태로 간주해야 합니다. 「원문: \"Ivanti Connect Secure (ICS, formerly known as Pulse Connect Secure) and Ivanti Policy Secure gateways contain an authentication bypass vulnerability in the web component that allows an attacker to access restricted resources by bypassing control checks.\"」 따라서 즉시 대응 조치를 취하는 것이 필수적입니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-07.md#0f8717091331",
+          "text": "ons are unavailable.\nNVD 설명(영어 원문): Microsoft SharePoint Server Elevation of Privilege Vulnerability\n\nCVE-2023-46805 · Ivanti Connect Secure and Policy Secure · Ivanti Connect Secure and Policy Secure Authentication Bypass Vulnerability\n등재일(dateAdded) 2024-01-10 · 조치기한(dueDate) 2024-01-22 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-287\n설명(CISA shortDescription): Ivanti Connect Secure (ICS, formerly known as Pulse Connect Secure) and Ivanti Policy Secure gateways contain an authentication bypass vulnerability in the web component that allows an attacker to access restricted resources by bypassing control checks. This vulnerability can be leveraged in conjunction with CVE-2024-21887, a command injection vulnerability.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): An authentication bypass vulnerability in the web component of Ivanti ICS 9.x, 22.x and Ivanti Policy Secure allows a remote attacker to access restricted resources by bypassing control checks."
+        }
+      ],
+      "promptHash": "fd2bb274b048"
+    },
+    {
+      "question": "해당 취약점을 통해 공격자가 어떤 피해를 입힐 수 있나요?",
+      "answer": "공격자는 웹 구성 요소의 인증 우회 취약점을 이용하여 통제 검사를 회피합니다. 이를 통해 접근이 제한된 내부 자원에 무단으로 접근할 수 있는 권한을 획득할 수 있습니다. 「원문: \"An authentication bypass vulnerability in the web component of Ivanti ICS 9.x, 22.x and Ivanti Policy Secure allows a remote attacker to access restricted resources by bypassing control checks.\"」 원격 공격자가 이러한 방식으로 시스템 내부로 침투할 수 있으므로 경계가 필요합니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-07.md#0f8717091331",
+          "text": "ons are unavailable.\nNVD 설명(영어 원문): Microsoft SharePoint Server Elevation of Privilege Vulnerability\n\nCVE-2023-46805 · Ivanti Connect Secure and Policy Secure · Ivanti Connect Secure and Policy Secure Authentication Bypass Vulnerability\n등재일(dateAdded) 2024-01-10 · 조치기한(dueDate) 2024-01-22 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-287\n설명(CISA shortDescription): Ivanti Connect Secure (ICS, formerly known as Pulse Connect Secure) and Ivanti Policy Secure gateways contain an authentication bypass vulnerability in the web component that allows an attacker to access restricted resources by bypassing control checks. This vulnerability can be leveraged in conjunction with CVE-2024-21887, a command injection vulnerability.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): An authentication bypass vulnerability in the web component of Ivanti ICS 9.x, 22.x and Ivanti Policy Secure allows a remote attacker to access restricted resources by bypassing control checks."
+        }
+      ],
+      "promptHash": "fd2bb274b048"
+    },
+    {
+      "question": "이 취약점에 대해 조직이 취해야 할 구체적인 조치는 무엇인가요?",
+      "answer": "조직은 제조사의 지침에 따라 완화 조치를 적용해야 합니다. 만약 해당 제품에서 적절한 완화 조치를 제공할 수 없다면, 사용을 즉시 중단해야 합니다. 「원문: \"Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\"」 보안 정책상 대안이 없는 경우 서비스 중단까지 고려하는 단호한 결정이 요구됩니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-07.md#0f8717091331",
+          "text": "ons are unavailable.\nNVD 설명(영어 원문): Microsoft SharePoint Server Elevation of Privilege Vulnerability\n\nCVE-2023-46805 · Ivanti Connect Secure and Policy Secure · Ivanti Connect Secure and Policy Secure Authentication Bypass Vulnerability\n등재일(dateAdded) 2024-01-10 · 조치기한(dueDate) 2024-01-22 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-287\n설명(CISA shortDescription): Ivanti Connect Secure (ICS, formerly known as Pulse Connect Secure) and Ivanti Policy Secure gateways contain an authentication bypass vulnerability in the web component that allows an attacker to access restricted resources by bypassing control checks. This vulnerability can be leveraged in conjunction with CVE-2024-21887, a command injection vulnerability.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): An authentication bypass vulnerability in the web component of Ivanti ICS 9.x, 22.x and Ivanti Policy Secure allows a remote attacker to access restricted resources by bypassing control checks."
+        }
+      ],
+      "promptHash": "fd2bb274b048"
+    },
+    {
+      "question": "애플의 커널 취약점으로 인해 공격자가 얻을 수 있는 권한은 무엇인가요?",
+      "answer": "애플 커널에 포함된 이 취약점은 애플리케이션이 커널 권한으로 코드를 실행할 수 있게 합니다. 이는 시스템의 가장 낮은 레벨인 커널 수준에서 임의의 코드가 실행될 수 있음을 의미합니다. 원문: \"Apple kernel, which is included in iOS, iPadOS, and macOS, contains an unspecified vulnerability where an application may be able to execute code with kernel privileges.\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-09.md#81c6c61bb2aa",
+          "text": "tructions.\nNVD 설명(영어 원문): Windows Common Log File System Driver Elevation of Privilege Vulnerability\n\nCVE-2022-32917 · Apple iOS, iPadOS, and macOS · Apple iOS, iPadOS, and macOS Remote Code Execution Vulnerability\n등재일(dateAdded) 2022-09-14 · 조치기한(dueDate) 2022-10-05 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-20, CWE-787\n설명(CISA shortDescription): Apple kernel, which is included in iOS, iPadOS, and macOS, contains an unspecified vulnerability where an application may be able to execute code with kernel privileges.\n요구 조치(requiredAction): Apply updates per vendor instructions.\nNVD 설명(영어 원문): The issue was addressed with improved bounds checks. This issue is fixed in macOS Monterey 12.6, iOS 15.7 and iPadOS 15.7, iOS 16, macOS Big Sur 11.7. An application may be able to execute arbitrary code with kernel privileges. Apple is aware of a report that this issue may have been actively exploited.."
+        }
+      ],
+      "promptHash": "a4b65e963da5"
+    },
+    {
+      "question": "이 취약점이 실제로 악용된 정황이 있는지 확인되었나요?",
+      "answer": "보안 커뮤니티에서는 해당 취약점이 실제 공격에 사용되었을 가능성이 보고되었습니다. 애플 측도 이 문제가 악성 코드에 의해 활발히 악용되었을 수 있다는 보고를 인지하고 있습니다. 원문: \"Apple is aware of a report that this issue may have been actively exploited..\"",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-09.md#81c6c61bb2aa",
+          "text": "tructions.\nNVD 설명(영어 원문): Windows Common Log File System Driver Elevation of Privilege Vulnerability\n\nCVE-2022-32917 · Apple iOS, iPadOS, and macOS · Apple iOS, iPadOS, and macOS Remote Code Execution Vulnerability\n등재일(dateAdded) 2022-09-14 · 조치기한(dueDate) 2022-10-05 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-20, CWE-787\n설명(CISA shortDescription): Apple kernel, which is included in iOS, iPadOS, and macOS, contains an unspecified vulnerability where an application may be able to execute code with kernel privileges.\n요구 조치(requiredAction): Apply updates per vendor instructions.\nNVD 설명(영어 원문): The issue was addressed with improved bounds checks. This issue is fixed in macOS Monterey 12.6, iOS 15.7 and iPadOS 15.7, iOS 16, macOS Big Sur 11.7. An application may be able to execute arbitrary code with kernel privileges. Apple is aware of a report that this issue may have been actively exploited.."
+        }
+      ],
+      "promptHash": "a4b65e963da5"
+    },
+    {
+      "question": "CVE-2021-26086 취약점이 존재하는 Atlassian Jira 서버의 정확한 버전 범위는 어디까지인가요?",
+      "answer": "해당 취약점은 특정 버전 미만에서 발생하며, 업데이트가 필요한 범위를 명확히 파악해야 합니다. 8.5.14 미만, 8.6.0부터 8.13.6 미만, 그리고 8.14.0부터 8.16.1 미만의 버전이 영향을 받습니다. 「원문: \"Affected versions of Atlassian Jira Server and Data Center allow remote attackers to read particular files via a path traversal vulnerability in the /WEB-INF/web.xml endpoint. The affected versions are before version 8.5.14, from version 8.6.0 before 8.13.6, and from version 8.14.0 before 8.16.1.\"」 따라서 해당 버전 이하의 시스템은 즉시 패치를 적용하거나 대체 솔루션을 검토해야 합니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-05.md#2bee14df14ca",
+          "text": "e of usernames, cleartext passwords, device configurations, and device API keys of PAN-OS firewalls.\n\nCVE-2021-26086 · Atlassian Jira Server and Data Center · Atlassian Jira Server and Data Center Path Traversal Vulnerability\n등재일(dateAdded) 2024-11-12 · 조치기한(dueDate) 2024-12-03 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-22\n설명(CISA shortDescription): Atlassian Jira Server and Data Center contain a path traversal vulnerability that allows a remote attacker to read particular files in the /WEB-INF/web.xml endpoint.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Affected versions of Atlassian Jira Server and Data Center allow remote attackers to read particular files via a path traversal vulnerability in the /WEB-INF/web.xml endpoint. The affected versions are before version 8.5.14, from version 8.6.0 before 8.13.6, and from version 8.14.0 before 8.16.1."
+        }
+      ],
+      "promptHash": "58b548321af6"
+    },
+    {
+      "question": "이 경로 탐색 취약점이 악용될 경우 원격 공격자가 구체적으로 어떤 정보를 탈취할 수 있나요?",
+      "answer": "공격자는 경로 탐색 결함을 이용해 웹 애플리케이션 내부의 민감한 설정 파일을 열람할 수 있습니다. 특히 웹 애플리케이션의 핵심 구성 파일인 특정 엔드포인트에 접근하여 데이터를 읽을 수 있는 위험이 있습니다. 「원문: \"Atlassian Jira Server and Data Center contain a path traversal vulnerability that allows a remote attacker to read particular files in the /WEB-INF/web.xml endpoint.\"」 이로 인해 애플리케이션의 보안 설정이나 내부 구조가 노출될 수 있으므로 주의가 필요합니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-05.md#2bee14df14ca",
+          "text": "e of usernames, cleartext passwords, device configurations, and device API keys of PAN-OS firewalls.\n\nCVE-2021-26086 · Atlassian Jira Server and Data Center · Atlassian Jira Server and Data Center Path Traversal Vulnerability\n등재일(dateAdded) 2024-11-12 · 조치기한(dueDate) 2024-12-03 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-22\n설명(CISA shortDescription): Atlassian Jira Server and Data Center contain a path traversal vulnerability that allows a remote attacker to read particular files in the /WEB-INF/web.xml endpoint.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Affected versions of Atlassian Jira Server and Data Center allow remote attackers to read particular files via a path traversal vulnerability in the /WEB-INF/web.xml endpoint. The affected versions are before version 8.5.14, from version 8.6.0 before 8.13.6, and from version 8.14.0 before 8.16.1."
+        }
+      ],
+      "promptHash": "58b548321af6"
+    },
+    {
+      "question": "제조사 지침을 따를 수 없거나 패치가 불가능한 경우 취해야 할 최후의 조치는 무엇인가요?",
+      "answer": "보안 취약점에 대한 대응은 제조사의 안내에 따라 완화 조치를 적용하는 것이 가장 우선입니다. 하지만 기술적 제약으로 인해 완화 조치를 적용할 수 없는 상황이 발생할 수 있습니다. 「원문: \"Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\"」 이런 경우 제품 사용을 중단하는 것이 데이터 유출을 방지하는 유일한 안전한 방법입니다.",
+      "topic": "취약점",
+      "cites": [
+        {
+          "ref": "server/data/ladder/material/day1/kev/kev-05.md#2bee14df14ca",
+          "text": "e of usernames, cleartext passwords, device configurations, and device API keys of PAN-OS firewalls.\n\nCVE-2021-26086 · Atlassian Jira Server and Data Center · Atlassian Jira Server and Data Center Path Traversal Vulnerability\n등재일(dateAdded) 2024-11-12 · 조치기한(dueDate) 2024-12-03 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-22\n설명(CISA shortDescription): Atlassian Jira Server and Data Center contain a path traversal vulnerability that allows a remote attacker to read particular files in the /WEB-INF/web.xml endpoint.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Affected versions of Atlassian Jira Server and Data Center allow remote attackers to read particular files via a path traversal vulnerability in the /WEB-INF/web.xml endpoint. The affected versions are before version 8.5.14, from version 8.6.0 before 8.13.6, and from version 8.14.0 before 8.16.1."
+        }
+      ],
+      "promptHash": "58b548321af6"
+    }
+  ],
+  "finishedAt": "2026-09-03T10:54:02.854Z"
+}

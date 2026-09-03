@@ -1,0 +1,31 @@
+{
+  "topic": "사내규정",
+  "endpoint": "http://10.8.0.12:4000/api/llm/serve/v1",
+  "startedAt": "2026-09-03T13:03:27.037Z",
+  "files": 0,
+  "source": "store",
+  "srcLang": "ko",
+  "topicFilter": true,
+  "corpusDocs": 22,
+  "chunks": 100,
+  "generated": 300,
+  "preRejected": {
+    "답 너무 짧음": 13,
+    "근거 겹침 없음(20자)": 15
+  },
+  "preChecked": 272,
+  "accepted": 271,
+  "rejected": {
+    "회피 답변(지식 구멍)": 1
+  },
+  "archive": "server/data/distill-archive/사내규정-2026-09-03-13-03.jsonl",
+  "archived": 272,
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "tokens": {
+    "prompt": 62721,
+    "completion": 47500
+  },
+  "teacherMs": 2640229,
+  "errors": [],
+  "finishedAt": "2026-09-03T13:25:33.455Z"
+}
