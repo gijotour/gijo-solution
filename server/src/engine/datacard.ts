@@ -36,10 +36,21 @@ export interface DataCard {
 
 const 표상한 = 10; // 대화 카드는 보는 자리 — 더 파고들면 🗔로 화면(시안 §⑤, picklist MAX_PICK 20의 절반)
 
+/** **방법·절차를 묻는 말** — 현황 카드가 가로채면 안 되는 물음이다.
+ *  ■ 왜(2026-09-04 route-explain --겹침 실측): 「방화벽 월간 정기점검 절차를 알려줘」가
+ *    isHardeningStatusAsk에 채여(「정기점검」+「알려줘」) 하드닝 **현황 숫자 카드**가 나가고
+ *    사내 매뉴얼 절차(explain)가 밀렸다. **절차를 물었는데 현황을 주는 것은 오답**이다.
+ *  ■ 한 상수를 세 판별자가 같이 본다 — 베껴 쓰면 「한 곳만 고친 반쪽 수리」가 난다
+ *    (이 저장소가 반복해 겪은 「같은 것을 여러 곳에 적으면 어긋난다」).
+ *  ⚠ 「결과·현황」은 여전히 카드다 — 「하드닝 점검 결과 알려줘」·「보안설정 점검 현황」은
+ *    이 정규식에 안 걸린다(시험이 반례로 붙들고 있다). */
+const 방법절차물음 = /절차|방법|어떻게|순서|매뉴얼|가이드|하려면/;
+
 /** 「검증/하드닝/보안설정 점검 현황」류 물음인가 — 결정적 트리거(LLM 이전). */
 export function isHardeningStatusAsk(text: string): boolean {
   const t = String(text || "").replace(/\s+/g, "");
   if (!/(현황|상태|어때|보여줘|알려줘)/.test(t)) return false;
+  if (방법절차물음.test(t)) return false; // 절차·방법 물음은 매뉴얼(explain)·화면 안내 영토
   // 스케줄·일정 물음은 기존 hardening_schedule_list 영토 — 여기서 삼키면 그 도구가 죽는다
   //   (2026-08-19 전체 게이트 실측: routingfixes ⑦ 「하드닝 점검 스케줄 알려줘」가 카드에 채였다).
   return /(검증|하드닝|보안설정점검|정기점검|설정점검)/.test(t) && !/취약점|스캔결과|스케줄|일정/.test(t);
@@ -124,6 +135,7 @@ export function hardeningStatusAnswer(): { output: string; dataCard: DataCard } 
 export function isAssetStatusAsk(text: string): boolean {
   const t = String(text || "").replace(/\s+/g, "");
   if (!/(현황|상태|어때)/.test(t)) return false;
+  if (방법절차물음.test(t)) return false; // 「자산 상태 어떻게 봐?」는 방법 물음 — 같은 상수 하나로
   if (!/자산/.test(t)) return false;
   if (/(이|그|저|해당|선택한?|고른)자산/.test(t)) return false;
   // 특정 자산을 콕 집은 물음(식별자 꼴 — srv-web-01·zzz-없는서버-999)은 전체 현황이 답이
@@ -215,6 +227,7 @@ export function assetStatusAnswer(걸린범위?: string | null): { output: strin
 export function isOpsStatusAsk(text: string): boolean {
   const t = String(text || "").replace(/\s+/g, "");
   if (!/(현황|상태|어때|보여줘|알려줘)/.test(t)) return false;
+  if (방법절차물음.test(t)) return false; // 「관제 어떻게 하나요」는 방법 물음 — 같은 상수 하나로
   if (!/(발견수집|발견·수집|통합관제|관제)/.test(t)) return false;
   return !/취약점|스캔결과|검증|하드닝|자산|스케줄|일정/.test(t);
 }

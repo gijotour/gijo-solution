@@ -67,7 +67,7 @@ async function 손으로잰도착(문장: string, 역할 = "admin"): Promise<str
   return 강제 ? 강제.tool : "(모델 선택)";
 }
 
-describe("★★ 설명이 실제 도착지와 같다 — 5문장 짝 시험", () => {
+describe("★★ 설명이 실제 도착지와 같다 — 6문장 짝 시험", () => {
   // ⚠ 표본은 **틀렸던 그 문장들**이다. 고친 것을 고친 자리에서 다시 잰다.
   const 짝 = [
     { 말: "미조치 취약점 뭐 있어?", 도착: "findingListAnswer(목록+체크칸)", 옛설명: "search" },
@@ -75,6 +75,10 @@ describe("★★ 설명이 실제 도착지와 같다 — 5문장 짝 시험", (
     { 말: "사례 등록: 2024년 한빛물류 랜섬웨어, 초기 침투는 VPN 계정 탈취, 출처 https://example.com/case-1", 도착: "register_incident_case", 옛설명: "register_incident_case(맞았다)" },
     { 말: "방화벽이 멈췄어", 도착: "장애초동절차", 옛설명: "(걸리는 규칙 없음)" },
     { 말: "침해사고 히스토리 보여줘", 도착: "incident_cases", 옛설명: "incident_cases(맞았다)" },
+    // ★ 이 도구가 **드러낸** 실제 겹침 1건(2026-09-04 --겹침): 「정기점검」+「알려줘」가
+    //   isHardeningStatusAsk에 채여 현황 숫자 카드가 나가고 사내 매뉴얼(explain)이 밀렸다.
+    //   datacard.ts에 방법·절차 배제어를 넣어 카드가 물러난다 — 여기가 그 짝이다.
+    { 말: "방화벽 월간 정기점검 절차를 알려줘", 도착: "explain", 옛설명: "hardeningStatusAnswer(카드)가 가로챘다" },
   ];
 
   for (const { 말, 도착, 옛설명 } of 짝) {
@@ -84,7 +88,7 @@ describe("★★ 설명이 실제 도착지와 같다 — 5문장 짝 시험", (
     });
   }
 
-  it("★ 다섯 문장 전부 — 설명과 손으로 잰 값이 **한 건도** 안 갈린다", async () => {
+  it("★ 여섯 문장 전부 — 설명과 손으로 잰 값이 **한 건도** 안 갈린다", async () => {
     const 갈린것: string[] = [];
     for (const { 말 } of 짝) {
       const a = await 설명도착(말);
@@ -101,6 +105,18 @@ describe("★★ 설명이 실제 도착지와 같다 — 5문장 짝 시험", (
     const 밀린것 = 걸림.slice(1).map((r) => r.도착);
     expect(밀린것).not.toContain("search");
     expect(걸림[0].차례).toBeLessThan(걸림[걸림.length - 1].차례);
+  });
+
+  it("★ 「…정기점검 절차를 알려줘」의 겹침이 **사라졌다** — 하드닝 현황 카드가 아예 안 걸린다", async () => {
+    const 걸림 = await 결정적도착지("방화벽 월간 정기점검 절차를 알려줘", { 역할: "admin" });
+    expect(걸림.map((r) => r.판별), "현황 카드가 다시 물면 오답(절차 물음에 숫자)").not.toContain("isHardeningStatusAsk");
+    expect(걸림.length, "걸리는 규칙이 하나뿐이라야 겹침이 사라진다").toBe(1);
+    expect(걸림[0].도착).toBe("explain");
+  });
+
+  it("★ 반례 — 「하드닝 점검 결과 알려줘」는 여전히 현황 카드가 이긴다(배제어가 넓게 먹지 않았다)", async () => {
+    const 걸림 = await 결정적도착지("하드닝 점검 결과 알려줘", { 역할: "admin" });
+    expect(걸림[0].판별).toBe("isHardeningStatusAsk");
   });
 });
 

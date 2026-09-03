@@ -76,6 +76,20 @@ describe("트리거 — 결정적(LLM 이전)", () => {
     expect(isHardeningStatusAsk("하드닝 점검 스케줄 알려줘")).toBe(false);
     expect(isHardeningStatusAsk("점검 일정 보여줘")).toBe(false);
   });
+  // ★ route-explain --겹침 실측(2026-09-04): 「방화벽 월간 정기점검 절차를 알려줘」가
+  //   「정기점검」+「알려줘」로 이 카드에 채여 **현황 숫자**가 나가고 사내 매뉴얼(explain)이
+  //   밀렸다. 절차를 물었는데 현황을 주는 것은 오답이라, 방법·절차 낱말을 배제한다.
+  it("★ 절차·방법 물음은 가로채지 않는다 — 매뉴얼(explain) 영토다(겹침 실측 2026-09-04)", () => {
+    expect(isHardeningStatusAsk("방화벽 월간 정기점검 절차를 알려줘")).toBe(false);
+    expect(isHardeningStatusAsk("하드닝 점검 방법 알려줘")).toBe(false);
+    expect(isHardeningStatusAsk("보안설정 점검 어떻게 하는지 알려줘")).toBe(false);
+    expect(isHardeningStatusAsk("정기점검 매뉴얼 보여줘")).toBe(false);
+  });
+  it("★ 반례 — 「결과·현황」은 여전히 현황 카드다(배제어가 넓게 먹으면 카드가 죽는다)", () => {
+    expect(isHardeningStatusAsk("하드닝 점검 결과 알려줘")).toBe(true);
+    expect(isHardeningStatusAsk("보안설정 점검 현황")).toBe(true);
+    expect(isHardeningStatusAsk("검증 현황 보여줘")).toBe(true);
+  });
   it("검증 낱말 없는 현황 물음은 지나간다", () => {
     expect(isHardeningStatusAsk("자산 현황 보여줘")).toBe(false);
     expect(isHardeningStatusAsk("")).toBe(false);
@@ -205,6 +219,10 @@ describe("2차 ③ 자산 현황 카드", () => {
     expect(isAssetStatusAsk("최근 등록된 자산 현황"), "list_assets 최근 갈래 영토").toBe(false);
     expect(isAssetStatusAsk("검증 현황 보여줘"), "하드닝 카드 영토").toBe(false);
     expect(isAssetStatusAsk("자산 등록 해줘"), "등록은 실행 지시").toBe(false);
+    // ★ 하드닝 카드와 **같은 배제어 상수 하나**를 본다(datacard.ts 방법절차물음) — 한 곳만
+    //   고치면 여기 구멍이 남는다(2026-09-04 겹침 수리에서 함께 막았다).
+    expect(isAssetStatusAsk("자산 현황 어떻게 봐?"), "방법 물음은 화면 안내 영토").toBe(false);
+    expect(isAssetStatusAsk("자산 상태 확인 절차 알려줘"), "절차 물음은 매뉴얼 영토").toBe(false);
   });
 
   it("KPI·표가 등록부와 일치하고 위험한 순으로 선다", () => {
@@ -377,6 +395,9 @@ describe("발견·수집(관제) 카드", () => {
     expect(isOpsStatusAsk("검증 현황 보여줘")).toBe(false);
     expect(isOpsStatusAsk("자산 현황 어때")).toBe(false);
     expect(isOpsStatusAsk("관제 이벤트 처리해줘"), "실행 지시").toBe(false);
+    // ★ 하드닝·자산과 같은 배제어 상수 하나(방법절차물음)를 본다 — 복사본이 아니다.
+    expect(isOpsStatusAsk("통합 관제 어떻게 보나요"), "방법 물음은 화면 안내 영토").toBe(false);
+    expect(isOpsStatusAsk("관제 운영 절차 알려줘"), "절차 물음은 매뉴얼 영토").toBe(false);
   });
 
   it("KPI·표가 이벤트 원장과 일치한다(취약점 반입 → 이벤트 재구성으로 시드)", async () => {
