@@ -56,7 +56,7 @@ const H = await login();
 const agents = await api(H, "GET", "/api/agents");
 const agent = agents.find((a) => a.id === agentId);
 if (!agent) { console.error(`존재하지 않는 에이전트: ${agentId}`); process.exit(2); }
-const before = agent.modelId ?? null;
+const before = agent.assignedModelId ?? null; // /api/agents가 주는 이름은 assignedModelId(설계관 2026-09-03 — modelId는 존재하지 않는 필드였다)
 console.log(`대상: ${agentId} — 현재 ${before ?? "(전역 기본)"} → 후보 ${candidate ?? "(전역 기본)"}`);
 if (before === candidate) { console.error("이미 그 모델입니다 — 바꿀 것이 없습니다."); process.exit(2); }
 

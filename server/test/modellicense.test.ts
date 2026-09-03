@@ -49,10 +49,11 @@ describe("classifyAvailableModels", () => {
       "gijo-orchestrator-ko", // restricted (Gukbap CC-BY-NC 확정)
       "merged-lily-gijo-loop-ai-securityllm", // permissive (Lily+ZySec Apache 확정)
       "some-unknown-merged-model", // byom
+      "mykor__Midm-2.0-Mini-Instruct-gguf", // permissive (KT Mi:dm 2.0 MIT, 2026-09-03)
     ]);
-    expect(r.summary.total).toBe(6);
-    expect(r.summary.permissive).toBe(3);
-    expect(r.summary.bundleSafe).toBe(3);
+    expect(r.summary.total).toBe(7);
+    expect(r.summary.permissive).toBe(4);
+    expect(r.summary.bundleSafe).toBe(4);
     expect(r.summary.restricted).toBe(2);
     expect(r.summary.byom).toBe(1);
   });

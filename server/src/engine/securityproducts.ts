@@ -14,6 +14,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import type { GijoUser } from "../auth/users";
 import { chat } from "./llm";
+import { getFormatHelperModel } from "./agents"; // 서식 전용 보조 모델(호출별 지정, 2026-09-03)
 import { recordAudit } from "./audit";
 import { addTriple, listTriples, deleteTriple } from "./ontology";
 import { syncDocTriples, manualTriples } from "./docgraph";
@@ -613,11 +614,13 @@ const FIELD_DRAFT_SCHEMA = {
 // 후 별도로 저장). json_schema 강제 디코딩(에이전트 도구선택에서 실측 검증된 방식)을 재사용해,
 // docenrich.ts의 프롬프트-only JSON 파싱보다 신뢰도 높은 추출을 한다.
 export async function draftProductFields(productName: string, text: string): Promise<ProductFieldValue[]> {
+  const 보조 = getFormatHelperModel(); // 스키마 강제 정형 추출 — 서식 전용 보조 모델이 있으면 그 모델로(팀원은 그대로 사서)
   const raw = await chat({
     agentId: "curator",
     message: buildFieldDraftPrompt(productName, text),
     responseSchema: FIELD_DRAFT_SCHEMA,
     maxTokens: 500,
+    ...(보조 ? { modelOverride: 보조 } : {}),
     // trusted — 문서 내용이 들어가지만 '사용자 지시'가 아니라 자료다. 보안 문서에는 '탈옥·인젝션' 같은 낱말이 당연히 들어 있어, 입력 차단으로 막으면 정상 문서 인입이 통째로 실패한다. 자료 안의 지시를 따르지 않게 하는 것은 프롬프트 구조(자료/지시 분리)의 몫이다.
     trusted: true,
   });

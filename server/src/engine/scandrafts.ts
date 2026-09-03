@@ -14,7 +14,7 @@
 import crypto from "crypto";
 import { db, migrate } from "../db";
 import { emitCollaboration } from "./collaboration";
-import { setAgentStatus, resetAgentToDefault } from "./agents";
+import { setAgentStatus, resetAgentToDefault, getFormatHelperModel } from "./agents";
 import { createTask } from "./tasks";
 import { recordAudit } from "./audit";
 import { 표식, cti심각도한글 } from "./tone"; // CTI 심각도 라벨의 단일 출처·🤖 표식 — 지역에서 새로 짓지 않는다(검토관 2026-09-03)
@@ -115,7 +115,7 @@ export function validateDraft(raw: unknown, vulns: ScanDraftVuln[]): { draft: Sc
   return { draft: { summary: summary.slice(0, 600), priorities: out, caveats }, dropped };
 }
 
-type ChatFn = (args: { agentId: string; message: string; trusted: boolean; responseSchema?: unknown; maxTokens?: number }) => Promise<string>;
+type ChatFn = (args: { agentId: string; message: string; trusted: boolean; responseSchema?: unknown; maxTokens?: number; modelOverride?: string }) => Promise<string>;
 
 const insertStmt = db.prepare(
   "INSERT INTO scan_drafts (id, createdAt, source, hosts, findings, draft, dropped, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'draft')",
@@ -130,7 +130,9 @@ export async function draftScanInterpretation(input: ScanDraftInput, deps?: { ch
   setAgentStatus("scan", "working");
   try {
     const chat: ChatFn = deps?.chat ?? ((await import("./llm.js")).chat as unknown as ChatFn);
-    const out = await chat({ agentId: "scan", message: buildScanDraftPrompt(input), trusted: true, responseSchema: SCAN_DRAFT_SCHEMA, maxTokens: 700 });
+    // 서식 전용 보조 모델(있으면) — 스키마 강제 추출이라 소형 모델의 강점 자리(3회차 실측). 팀원은 그대로 scan이다(활동·말풍선은 스캔 팀원 이름).
+    const 보조 = getFormatHelperModel();
+    const out = await chat({ agentId: "scan", message: buildScanDraftPrompt(input), trusted: true, responseSchema: SCAN_DRAFT_SCHEMA, maxTokens: 700, ...(보조 ? { modelOverride: 보조 } : {}) });
     const v = validateDraft(out, input.vulns);
     if (!v) {
       emitCollaboration({ from: "scan", to: "orchestrator", message: `${input.source} 해석 초안 못 만듦 — 모델 출력이 보고서 항목과 맞지 않아 버림(지어낸 항목은 남기지 않는다)` });
@@ -140,7 +142,7 @@ export async function draftScanInterpretation(input: ScanDraftInput, deps?: { ch
     insertStmt.run(id, Date.now(), input.source, input.hosts, input.findings, JSON.stringify(v.draft), v.dropped);
     emitCollaboration({
       from: "scan", to: "orchestrator",
-      message: `${input.source} 해석 초안 — 우선 조치 ${v.draft.priorities.length}건${v.dropped ? ` (근거 없는 ${v.dropped}건 버림)` : ""}: ${v.draft.priorities.map((p) => `[${p.code}] ${p.host}`).join(" · ")}`,
+      message: `${input.source} 해석 초안 — 우선 조치 ${v.draft.priorities.length}건${v.dropped ? ` (근거 없는 ${v.dropped}건 버림)` : ""}: ${v.draft.priorities.map((p) => `[${p.code}] ${p.host}`).join(" · ")}${보조 ? ` · 서식 보조 모델 ${보조}` : ""}`,
     });
     return { id, dropped: v.dropped };
   } catch (e) {

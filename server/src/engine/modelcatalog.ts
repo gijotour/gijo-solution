@@ -65,6 +65,16 @@ export const 권장모델목록: 권장모델[] = [
     권장장비: "GPU 10GB급(라이트 대상)",
   },
   {
+    // 서식·추출 전용 보조(2026-09-03 사장님 승인) — 팀원 배정이 아니라 「서식 전용 보조 모델」(설정 → /api/agents/format-helper)로 쓴다.
+    //   3회차 실측(모델가이드 §7.6): report 서식 1.00·scan_extract 1.00·32K 회수 1.00·98 tok/s, 그러나 ti_trap 0·priority 0.40이라 판단엔 안 쓴다.
+    용도: "서식·추출 전용 보조 (2.3B) — 스캔 초안·제품 정형 초안",
+    repo: "mykor/Midm-2.0-Mini-Instruct-gguf",
+    파일: "Midm-2.0-Mini-Instruct-Q4_K_M.gguf",
+    대략크기: "약 1.4GB",
+    권장장비: "GPU 4GB급 — 기준 두뇌 옆에 상주",
+    주의: "커뮤니티 변환본(원본 K-intelligence Mi:dm 2.0 Mini, MIT). 판단·절제·인용이 드는 일에는 쓰지 않습니다 — 서식·추출·32K 회수까지(3회차 실측).",
+  },
+  {
     용도: "기준 두뇌",
     repo: "Qwen/Qwen3-14B-GGUF",
     파일: "Qwen3-14B-Q4_K_M.gguf",

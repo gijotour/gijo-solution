@@ -101,6 +101,7 @@ export const LLM_GUIDE: LlmGuideCategory[] = [
     title: "가벼운 LLM",
     intro: "빠른 응답·저사양·여러 모델 동시 상주가 필요할 때. 분류/라우팅 같은 가벼운 작업에 딱 맞습니다.",
     models: [
+      { id: "mykor/Midm-2.0-Mini-Instruct-gguf", name: "Mi:dm 2.0 Mini (KT)", size: "2.3B", approxGb: "약 1.4GB", tag: "서식·추출 전용", desc: "KT Mi:dm 2.0 Mini, MIT. 서식 채우기·발췌→JSON·32K 안 사실 회수는 만점(3회차 실측)이나 판단·절제·인용은 약하다 — 서식 전용 보조 모델 자리(팀원 배정 아님)." },
       { id: "bartowski/Llama-3.2-3B-Instruct-GGUF", name: "Llama 3.2 3B", size: "3B", approxGb: "약 2GB", desc: "작은 크기에 품질이 좋아 빠른 응답용으로 인기. 여러 개를 동시에 올리기 좋습니다." },
       { id: "bartowski/Qwen2.5-3B-Instruct-GGUF", name: "Qwen2.5 3B", size: "3B", approxGb: "약 2GB", desc: "한국어가 준수한 경량 모델. 요약·분류 같은 보조 작업에 적합합니다." },
       { id: "bartowski/Llama-3.2-1B-Instruct-GGUF", name: "Llama 3.2 1B", size: "1B", approxGb: "약 0.8GB", desc: "초경량. 의도 분류·라우팅처럼 아주 빠른 판단이 필요한 곳에." },

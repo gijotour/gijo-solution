@@ -133,6 +133,6 @@ describe("팀 구성 변경은 감사 기록에 남는다(누가 어느 팀원�
       expect(해제가지, `${fn}: 해제 가지도 감사에 남아야 한다`).toContain("감사(agentId,");
     }
     // 라우트가 행위자를 넘긴다(넘기지 않으면 actor가 늘 null — 「누가」가 빠진 감사는 반쪽이다)
-    expect((src.match(/행위자\(req\)/g) ?? []).length).toBe(4);
+    expect((src.match(/행위자\(req\)/g) ?? []).length).toBe(5); // 팀원 설정 4 + 서식 전용 보조 모델 1(2026-09-03)
   });
 });

@@ -84,6 +84,13 @@ export interface ChatArgs {
   // 리포트 본문(report.executiveSummary)·파인튜닝 데이터셋에도 풀이 문단이 섞여 들어갔다.
   // 풀이는 표현(presentation) 계층의 관심사이므로, 화면에 그대로 나가는 경로에서만 켠다.
   explain?: boolean;
+  /**
+   * 호출별 모델 지정 — 팀원 배정과 별개로 **이 호출만** 그 모델(models/<id>)로 보낸다(2026-09-03 설계관 갈래 A).
+   * 쓰는 곳: 스키마 강제 서식·추출 호출(스캔 초안·보안제품 정형 초안)이 「서식 전용 보조 모델」(agents.getFormatHelperModel)을 받는 자리.
+   * 왜 팀원 배정이 아닌가: 보고 팀원의 실제 호출은 판단 과업(경영진 요약·RAG 자유답변)이라 2.3B를 팀원째 붙이면 경계가 깨진다.
+   * 원격 LLM이 켜져 있으면 무시된다(원격이 앞에서 갈린다). 어댑터(LoRA)는 붙이지 않는다 — 배정 모델 기준 어댑터가 다른 모델에 오적용된다.
+   */
+  modelOverride?: string;
 }
 
 // ── 단기 기억: 에이전트별 최근 대화 이력 ─────────────────────────────────────
@@ -842,13 +849,21 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   원격 /v1로 바로 간다 — ensureAgentModel을 부르면 로컬 모델 로드·스왑이 일어나므로
   //   우회가 아니라 **앞에서** 가른다. 판정은 remotellm.ts의 게터 한 곳(VPN 전용·에어갭 차단 포함).
   // 원격은 위(예산 앞)에서 한 번 조회했다 — 두 번 재면 켜고 끄는 사이 값이 갈린다.
+  // 호출별 모델 지정(modelOverride, 2026-09-03): 서식·추출 호출만 「서식 전용 보조 모델」로. 못 올리면 경고 남기고 팀원 경로로.
   const baseUrl = 원격 ?? (await import("./localengine.js")
-    .then((m) => m.ensureAgentModel(args.agentId))
-    .catch(() => LOCAL_LLM_BASE_URL));
+    .then((m) => (args.modelOverride ? m.ensureModelServed(args.modelOverride) : m.ensureAgentModel(args.agentId)))
+    .catch(async (e) => {
+      if (!args.modelOverride) return LOCAL_LLM_BASE_URL;
+      console.warn(`[llm] 서식 전용 보조 모델을 못 올려 팀원 경로로 간다: ${args.modelOverride} — ${e instanceof Error ? e.message : String(e)}`);
+      return import("./localengine.js").then((m) => m.ensureAgentModel(args.agentId)).catch(() => LOCAL_LLM_BASE_URL);
+    }));
   // 전문가 어댑터 선택(재설계 1단계) — 서빙 모델에 어댑터가 없으면 빈 객체라 기존과 동일.
-  const loraExtras = await import("./localengine.js")
-    .then((m) => m.agentRequestExtras(args.agentId))
-    .catch(() => ({}) as Record<string, unknown>);
+  // 호출별 모델 지정일 때는 붙이지 않는다 — 어댑터는 배정 모델 기준이라 다른 모델에 오적용된다.
+  const loraExtras = args.modelOverride
+    ? ({} as Record<string, unknown>)
+    : await import("./localengine.js")
+      .then((m) => m.agentRequestExtras(args.agentId))
+      .catch(() => ({}) as Record<string, unknown>);
 
   emitLlmActivity({ kind: "chat", phase: "start", agent: args.agentId ?? "-", agentName, detail: "추론 요청" });
 

@@ -37,6 +37,8 @@ const RULES: { re: RegExp; tier: LicenseTier; license: string; note: string }[] 
   // Qwen2.5-7B/14B/32B·Coder·Qwen3 등은 Apache-2.0. 단 Qwen2.5-3B는 비상업 연구 라이선스라 별도.
   { re: /qwen2\.5-3b/i, tier: "restricted", license: "Qwen Research License(비상업)", note: "3B는 비상업 라이선스 — 상업 번들 불가" },
   { re: /qwen2\.5-(7b|14b|coder)|qwen__qwen2\.5|qwen3-30b|qwen2\.5-coder/i, tier: "permissive", license: "Apache-2.0(추정)", note: "Qwen2.5/3 대다수 Apache-2.0 — 원본 확인 권장" },
+  // KT Mi:dm 2.0(Base 11B·Mini 2.3B) — MIT(원본 K-intelligence 카드). GGUF는 커뮤니티 변환본(mykor)일 수 있어 원본 카드 기준(2026-09-03 3회차 채택).
+  { re: /midm/i, tier: "permissive", license: "MIT(KT Mi:dm 2.0)", note: "KT Mi:dm 2.0 — MIT. 서식·추출 전용 보조로 채택(3회차 실측), 판단·절제·인용 과업엔 쓰지 않는다" },
   // Llama 계열(Meta) — Llama Community License: 상업 사용 가능하나 재배포·명명·MAU 조건 有.
   { re: /llama|hermes/i, tier: "restricted", license: "Llama Community License", note: "상업 조건부(명명·재배포·MAU 조항) — 준수 검토 필요" },
   // abliterated/merge/claude-mythos/qwythos/gijo-* — 출처·라이선스 불명확 → BYOM 권장.

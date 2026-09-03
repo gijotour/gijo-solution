@@ -394,5 +394,7 @@
 
 - **max 실기 검증거리**: mac에서도 분할 GGUF 폴더가 모델 목록에 뜨는지(경로 구분자 차이).
   mac에는 아직 분할 모델이 없으니, 빈 파일 3개를 `-00001-of-00003.gguf` 이름으로 놓아 목록에만 뜨는지 보면 된다.
+
+- **공용 파일 변경(2026-09-03, AI 팀 7명·서식 전용 보조 모델)**: `server/src/engine/llm.ts` ChatArgs에 `modelOverride`(호출별 모델 지정 → localengine.ensureModelServed) · `agents.ts`에 서식 전용 보조 모델(app_state formatHelperModel, /api/agents/format-helper) · 7번째 팀원 curator · `agentloop.ts` 별칭(사서·큐레이터) · `screenguide.ts` AI 팀 7명·취약점 화면 새 도구 안내. max 실기 검증거리: Metal에서 2.3B 보조 모델이 기준 두뇌 옆에 같이 상주하는지(makeRoomFor 여유 계산이 통합메모리에서 맞는지), 스캔 초안이 5초 안에 나오는지.
 
 ---

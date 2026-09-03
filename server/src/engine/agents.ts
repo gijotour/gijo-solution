@@ -130,6 +130,28 @@ export function getAgentModel(agentId: string): string | null {
   return (getModelStmt.get(modelKey(agentId)) as { value: string } | undefined)?.value ?? null;
 }
 
+// ── 서식 전용 보조 모델(2026-09-03, 사장님 「전부 승인」 3항 + 설계관 갈래 A) ─────────────────────
+// 팀원 배정이 아니라 **호출별** 모델이다: 스키마 강제 서식·추출 호출(scandrafts 스캔 초안·securityproducts 정형 초안)만
+// 이 모델로 간다(llm.ts ChatArgs.modelOverride). 왜 팀원째 배정하지 않나 — 보고 팀원의 실제 호출은 판단 과업(경영진 요약·
+// RAG 자유답변)이고, 3회차 실측에서 소형 모델은 판단·절제·인용(priority_6 0.40·ti_trap 0·glossary_cite 0.70)이 약했다.
+// 되돌리기 = null(서식 호출도 팀원·전역 모델로). 파일이 사라졌으면 읽을 때 무시한다(조용한 폴백 대신 경고 한 줄).
+const FORMAT_HELPER_KEY = "formatHelperModel";
+export function getFormatHelperModel(): string | null {
+  const id = (getModelStmt.get(FORMAT_HELPER_KEY) as { value: string } | undefined)?.value ?? null;
+  if (id && !isModelAvailable(id)) { console.warn(`[agents] 서식 전용 보조 모델 파일이 없어 무시한다: ${id}`); return null; }
+  return id;
+}
+export function setFormatHelperModel(modelId: string | null, actor?: string | null): void {
+  if (modelId === null || modelId === "") {
+    delModelStmt.run(FORMAT_HELPER_KEY);
+    recordAudit({ kind: "config", actor: actor ?? null, action: "서식 전용 보조 모델 해제", target: "format-helper", detail: "(서식 호출도 팀원·전역 모델로)", result: "ok" });
+    return;
+  }
+  if (!isModelAvailable(modelId)) throw new Error(`배치되지 않은 모델입니다: ${modelId}`);
+  setModelStmt.run(FORMAT_HELPER_KEY, modelId);
+  recordAudit({ kind: "config", actor: actor ?? null, action: "서식 전용 보조 모델 배정", target: "format-helper", detail: modelId, result: "ok" });
+}
+
 // 팀 커스터마이징: 에이전트 표시 이름을 조직이 원하는 대로 바꾼다("우리 팀" 로스터). 비우면 기본 이름.
 export function getAgentName(agentId: string): string | null {
   return (getModelStmt.get(nameKey(agentId)) as { value: string } | undefined)?.value ?? null;
@@ -287,6 +309,17 @@ const 행위자 = (req: unknown): string | null => (req as { user?: { displayNam
 
 export function registerAgentsRoutes(app: Express): void {
   app.get("/api/agents", authMiddleware, (_req, res) => res.json(listAgents()));
+
+  // 서식 전용 보조 모델 — 조회는 로그인, 배정·해제는 admin. body.modelId=null 이면 해제.
+  app.get("/api/agents/format-helper", authMiddleware, (_req, res) => res.json({ modelId: getFormatHelperModel() }));
+  app.post("/api/agents/format-helper", authMiddleware, adminMiddleware, (req, res) => {
+    try {
+      setFormatHelperModel(req.body?.modelId ?? null, 행위자(req));
+      res.json({ modelId: getFormatHelperModel() });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
 
   // 에이전트 전용 모델 할당 — admin만. body.modelId=null 이면 할당 해제(전역 모델 따름).
   app.post("/api/agents/:id/model", authMiddleware, adminMiddleware, (req, res) => {
