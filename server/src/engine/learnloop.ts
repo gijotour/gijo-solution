@@ -49,7 +49,7 @@ export interface ChatLog {
   rating: number | null; // null=미평가, 1=긍정(학습 채택), -1=부정(제외)
   usedInDataset: boolean;
   createdAt: number;
-  topic: string | null; // 주제 딱지(취약점·장비운영·사내규정·위협대응) — 애매하면 null
+  topic: string | null; // 주제 딱지(TOPICS — 취약점·장비운영·사내규정·위협대응·일반) — 애매하면 null
   origin: ChatLogOrigin; // 어떻게 생긴 문답인가(§3.6-2) — 옛 행(NULL)은 'chat'
   teacher: string | null; // 증류 행만 — 교사 모델 id(응답의 model 필드 실측값, 상수 아님)
   cites: string[]; // 증류 행만 — 근거 조각 ref(경로#sha12) 목록. 비면 []
@@ -389,10 +389,22 @@ export function pruneChatLogs(cap = CHATLOG_MAX): number {
  *   한 줄이다. 같은 규칙을 쓰면 거의 전부 "확신 못 함"이 된다 — 질문에는 질문의 신호가 있다.
  */
 // 주제(업무영역) 상수 — 질문주제 판정·주제별 학습 게이트·topics API가 같은 값을 본다.
-export const TOPICS = ["취약점", "장비운영", "사내규정", "위협대응"] as const;
+// ⚠ 문자열은 hybridsearch.ts CATEGORIES(업무영역)와 **같아야** 한다 — 승인 문답을 기억에 반입할 때
+//   category=topic을 그대로 넘기고(learnmemory.ts), CATEGORIES 밖이면 memory.ts가 그 값을 버리고
+//   다시 분류한다(배지와 저장 분류가 갈라짐). 짝 시험: topictag.test 「TOPICS ⊆ CATEGORIES」.
+// 「일반」(2026-09-03, 해설 팀원 normaltic 재료): 용어·개념을 묻는 질문. 포괄(catch-all)이 아니라
+//   낱말 규칙으로만 붙는다 — 잡담은 여전히 null(미분류)이다.
+export const TOPICS = ["취약점", "장비운영", "사내규정", "위협대응", "일반"] as const;
 // 어댑터 id는 영문 제약(export_gguf 규칙과 동일)이라 주제를 슬러그로 바꾼다.
-const TOPIC_SLUGS: Record<string, string> = { 취약점: "vuln", 장비운영: "ops", 사내규정: "policy", 위협대응: "threat" };
-const topicSlug = (topic: string): string => TOPIC_SLUGS[topic] ?? "misc";
+// ⚠ TOPICS에 주제를 더하면 여기도 더한다 — 빠지면 "misc"로 조용히 떨어져 어댑터 id가 주제를 잃는다
+//   (topictag.test가 TOPICS 전수를 대조한다).
+const TOPIC_SLUGS: Record<string, string> = { 취약점: "vuln", 장비운영: "ops", 사내규정: "policy", 위협대응: "threat", 일반: "general" };
+export const topicSlug = (topic: string): string => TOPIC_SLUGS[topic] ?? "misc";
+// 「일반」 신호 — 용어사전(GIJO_AS_용어사전.md)의 표제어 꼴(「**용어**」 + 「쉽게 말하면 …」)에 사람이 실제로
+//   묻는 모양: 「○○이/가 뭐야」「○○이란」「○○ 뜻」「○○ 무슨 말」「약어·줄임말·정의·개념」「A와 B 차이가 뭐야」
+//   「쉽게 설명해줘」. ⚠ 맨 「뭐」는 안 잡는다 — 「오늘 뭐부터 볼까?」는 용어 질문이 아니다(기존 계약).
+//   「이란/란」은 낱말 끝(공백·물음표·끝)에서만 — 「이란」이 단어 안에 든 낱말을 잡지 않게.
+const GENERAL_RE = /용어|뜻|무슨\s*말|약어|줄임말|정의|개념|차이(가|는|점)?\s*(뭐|무엇)|쉽게\s*(말|설명|풀)|(이|가|이란|란)\s*(뭐|뭔|무엇)|(이란|란)(?=[\s?!.]|$)/g;
 // 주제별 전문가 학습 개시선(승인 문답 수). LIMA 계열 근거 + 1회전 실측(85쌍은 생성 안정성이
 // 무너짐 — 반복 루프·설정 키 날조)에서 나온 값. topics API의 "준비됨" 판정과 같은 값이어야 한다.
 export const TOPIC_TRAIN_TARGET = 300;
@@ -407,7 +419,12 @@ export function 질문주제(question: string): string | null {
   };
   const 정렬 = Object.entries(점수).sort((a, b) => b[1] - a[1]);
   // 1점만 있어도 받는다(질문은 짧다). 단 **동점이면 확신하지 않는다** — 경계 질문이다.
-  return 정렬[0][1] >= 1 && 정렬[0][1] > 정렬[1][1] ? 정렬[0][0] : null;
+  if (정렬[0][1] >= 1) return 정렬[0][1] > 정렬[1][1] ? 정렬[0][0] : null;
+  // 「일반」은 업무 주제 넷이 **전부 0점일 때만** 본다(2026-09-03). 「CVE-2021-44228이 뭐야?」는 용어 질문의
+  //   꼴이지만 취약점 전문가 몫이다 — 「일반」을 동점 후보에 넣으면 그 질문이 동점→null로 떨어져 기존 계약
+  //   (topictag.test 「실전 질문이 제 주제로 간다」)이 깨진다. 업무 주제끼리의 동점(경계)은 위에서 이미 null이다.
+  //   낱말 규칙에 안 걸리면 여전히 null — 잡담(「안녕」)은 미분류로 남는다(catch-all 아님).
+  return (q.match(GENERAL_RE) ?? []).length >= 1 ? "일반" : null;
 }
 
 // ── ① 수집 ────────────────────────────────────────────────────────────

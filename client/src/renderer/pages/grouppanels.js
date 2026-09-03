@@ -748,9 +748,10 @@
       { id: "learning", title: "🎓 학습", page: "learnloop.html", load: function () {
         return window.gijo.listLearnloopTopics().then(function (r) {
           var 전체 = (r && r.주제) || [];
-          var 짧은 = { "취약점": "취약점", "장비운영": "장비", "사내규정": "규정", "위협대응": "위협" };
-          // 정의된 4주제만, 이 순서로 — "(미분류)" 뭉치가 판 한 자리를 먹으면 정작 주제가 밀린다(실측).
-          var 순서 = ["취약점", "장비운영", "사내규정", "위협대응"];
+          var 짧은 = { "취약점": "취약점", "장비운영": "장비", "사내규정": "규정", "위협대응": "위협", "일반": "일반" };
+          // 정의된 주제만, 이 순서로(서버 learnloop.ts TOPICS와 같은 다섯) — "(미분류)" 뭉치가 판 한 자리를
+          // 먹으면 정작 주제가 밀린다(실측). 「일반」(용어·개념, 2026-09-03)은 정의된 주제라 넣는다.
+          var 순서 = ["취약점", "장비운영", "사내규정", "위협대응", "일반"];
           var 주제 = 순서.map(function (name) {
             return 전체.filter(function (t) { return t.topic === name; })[0] || { topic: name, approved: 0, 준비됨: false };
           });

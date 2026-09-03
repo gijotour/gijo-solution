@@ -43,15 +43,22 @@ const FILES = opt("--files", "");
 const SOURCE = opt("--source", "files");
 const CORPUS_SERVER = (opt("--corpus-server", SERVER) || "").replace(/\/+$/, "");
 if (!["files", "store"].includes(SOURCE)) { console.error("--source 는 files 또는 store"); process.exit(2); }
-const TOPICS = ["취약점", "장비운영", "사내규정", "위협대응"];
+// ⚠ 서버 learnloop.ts TOPICS와 같은 값·같은 순서여야 한다 — 편입 라우트(learncandidates.ts)가 서버 TOPICS로 topic을
+//   받아들이므로 여기만 더하면 「주제 없음」으로 전부 거절된다. 「일반」(2026-09-03)=해설 팀원 normaltic 재료(용어·개념).
+const TOPICS = ["취약점", "장비운영", "사내규정", "위협대응", "일반"];
 if (!TOPICS.includes(TOPIC)) { console.error(`--topic 은 ${TOPICS.join("·")} 중 하나여야 합니다`); process.exit(2); }
 
 // ── 주제별 조각 고르기(낱말 규칙 — 서버 질문주제와 같은 취지, 재료 선별용) ─────────────────
+// ⚠ TOPICS에 주제를 더하면 여기도 더한다 — 없으면 아래 TOPIC_RE[TOPIC].test에서 TypeError로 즉사한다.
 const TOPIC_RE = {
   취약점: /취약점|CVE|CVSS|KEV|EPSS|패치|취약|스캔|SBOM|익스플로잇|공격 표면/i,
   장비운영: /방화벽|장비|스위치|라우터|VPN|백업|정기점검|설정|펌웨어|IPS|IDS|WAF|EDR|SIEM|로그 보관/i,
   사내규정: /규정|지침|정책|승인|보고|절차|책임|ISMS|개인정보|법|의무|감사|보관 기간|접근 통제/i,
   위협대응: /위협|침해|사고|악성|랜섬|피싱|C2|IOC|CTI|인텔|대응|격리|초동|탐지/i,
+  // 「일반」= 용어·개념 해설 조각. 용어사전(GIJO_AS_용어사전.md)의 표제어 꼴이 근거 — 「**용어**」 다음 줄이
+  //   「쉽게 말하면 …」, 약자는 「무엇의 줄임말인지·읽는 법」을 적는다(문서 머리말 규칙). 지식 문서(knowledge/*.md)의
+  //   「○○이란」「정의」「개념」 조각도 같은 잣대로 든다. 재료는 --files "GIJO_AS_용어사전.md,knowledge/*.md"로 지목한다.
+  일반: /쉽게 말하면|용어|뜻|약자|약어|줄임말|정의|개념|읽는 법|무엇의|무엇인가|(이란|란)(?=[\s?!.,:]|$)/i,
 };
 
 function listSourceFiles() {

@@ -98,9 +98,9 @@
 | analysis | 취약점·우선순위 문답 | 취약점 증류 | 있음 | — |
 | report | 사내규정 문답 + 데이터→요약 예시 | 사내규정 증류(진행) | 반쪽 | 리포트 요약 예시는 실사용 승인으로 |
 | ti | 위협대응 문답 + 매칭→해석 예시 | 위협대응 증류(대기) | 반쪽 | 해석문은 운영에서 승인 |
-| normaltic | 용어·개념 문답 | 용어사전·지식 7종(저장소에 있음) | **없음** | 증류 주제 5번째 「일반·용어」 추가(설계관 먼저: TOPICS·질문주제·distill TOPIC_RE·후보함 배지) |
+| normaltic | 용어·개념 문답 | 용어사전·지식 7종(저장소에 있음) | **없음**(주제 코드는 됨 · 재료 0) | 주제 「일반」 추가됨(2026-09-03 — 이름=업무영역 「일반」과 같은 문자열, 용어 키워드 판정·catch-all 아님·(미분류)는 그대로) · 재료는 용어사전+지식 문서를 파일 경로로: `node tools/distill.mjs --topic 일반 --source files --files "GIJO_AS_용어사전.md,knowledge/*.md"` |
 | curator | 문서 조각→업무영역·종류 라벨 | 저장소 라벨(교사 불필요) | **없음** | 분류 데이터셋 생성기(코드) |
-| bom | 라이선스 의무 문답 + 검수→초안 예시 | 규칙(licenserisk)뿐 | **없음** | 규칙→「오픈소스 라이선스 지침」 문서 자동 생성 → 지식 반입 → 증류 |
+| bom | 라이선스 의무 문답 + 검수→초안 예시 | 규칙(licenserisk)뿐 | **없음** | 등급표는 규칙에서 생성(일치 시험) · 문답은 사내규정 주제로 증류(5번째 주제 신설 대신 — 연쇄 0) |
 | orchestrator | 지시→도구 선택 예시 | orchestrator-dataset.ts | 있음 | — |
 원칙: 규칙이 정본인 영역(라이선스·CTI 매칭)은 **규칙에서 문서를 뽑아** 증류한다 — 문서가 규칙과 어긋날 수 없게. 순서: 현재 사슬(검토관→배포→게시, 증류 3주제→gb10 학습)이 끝난 뒤 bom → normaltic → curator.
 
@@ -126,7 +126,7 @@
 | 6 | 인용 검증 통과분만 후보함에 | 후보함 목록 시점에 `학습재료가못되나`(날짜·「N건」)가 또 거른다 | **편입 라우트가 같은 판별을 먼저 돌리고** 거절 사유를 돌려준다 → 「생성 500 → 후보 500」이 성립. 폐기율은 라우트 응답으로 집계(★12) |
 | 7 | `qa:true`면 오염 없음 | `llm_activity_daily`는 qa를 안 본다 | 증류기는 win의 `chat()`을 **안 탄다**(gb10 직접 호출) → 팀원 호출 수 오염 없음 |
 | 8 | 승인만이 유일한 문 | `/api/learnloop/seed`는 rating=1 즉시 편입 | 증류 편입은 **새 라우트 `POST /api/learnloop/distill/intake`**, rating **NULL**로 넣는다(승인은 사람) |
-| 9 | ROLE_CATEGORY로 팀원 지식영역에 반입 | scope에 한글을 넣으면 `safeScope`가 지워 검색 밖 | 반입 **scope=global**, 구분은 **category=topic**(TOPICS와 CATEGORIES 문자열 동일 — 매핑 불필요) |
+| 9 | ROLE_CATEGORY로 팀원 지식영역에 반입 | scope에 한글을 넣으면 `safeScope`가 지워 검색 밖 | 반입 **scope=global**, 구분은 **category=topic**(TOPICS와 CATEGORIES 문자열 동일 — 매핑 불필요). 주제 「일반」을 더한 뒤(2026-09-03)에도 참이다 — 다섯 이름 전부 CATEGORIES에 있고, `topictag.test`의 「TOPICS ⊆ CATEGORIES」 시험이 어긋남을 막는다 |
 | 10 | 기억 반입은 새로 만든다 | `cloudllm.ts:375 saveCloudAnswerToKb`가 완성품 | 그 모양을 **일반화**한 `learnmemory.ts`로. documentId=`승인문답:<id>`, `uploadedBy` 비움(반입 소식 안 만듦), `origin="approved-qa"` 표시 |
 | 11 | 2.3시간/500건 | 창구 동시 2, 초과 429 | 동시 2 · 밤에 · 옆 포트 교사는 창구 슬롯을 안 뺏는다 |
 | 12 | 버린 수를 센다 | 후보함 KPI엔 자리 없음 | 편입 응답 `{accepted, rejected[{reason}]}` → 증류기가 `.tmp-reports/distill-<주제>-<시각>.json`으로 남긴다(생성·사전검사 통과·편입·거절 사유·교사·토큰·시간) |

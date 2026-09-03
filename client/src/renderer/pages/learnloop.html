@@ -123,6 +123,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .lt-장비운영{color:var(--blue-light);background:rgba(59,130,246,.13);}
 .lt-사내규정{color:var(--amber);background:rgba(240,160,32,.13);}
 .lt-위협대응{color:var(--purple, #8b7cf0);background:rgba(139,124,240,.14);}
+/* 일반(용어·개념, 2026-09-03)=teal — 「근거 인용」 배지와 색이 겹치지만 사내규정=amber와 같은 잣대(글자가 구분자). --green 토큰은 없다. */
+.lt-일반{color:var(--teal);background:rgba(30,185,128,.13);}
 .lt-미분류{color:var(--muted-2);background:rgba(255,255,255,.05);}
 .lc-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:8px;}
 .lc-card.lc-dim{opacity:.75;}
@@ -382,14 +384,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // 주제 띠(2026-08-08 시안 승인) — 클릭한 주제만 후보를 보인다. 재클릭=전체.
   let ltFilter = null;
-  const 주제색 = { 취약점: "var(--red)", 장비운영: "var(--blue)", 사내규정: "var(--amber)", 위협대응: "var(--purple)" };
+  // ⚠ 서버 TOPICS(learnloop.ts)와 같은 다섯 이름 — 빠지면 그 주제 칩이 색·자리 없이 사라진다(topics API는 있는 주제만 돌려준다).
+  const 주제색 = { 취약점: "var(--red)", 장비운영: "var(--blue)", 사내규정: "var(--amber)", 위협대응: "var(--purple)", 일반: "var(--teal)" };
   async function loadTopicStrip() {
     const el = document.getElementById("ltStrip");
     if (!el) return;
     try {
       const r = await window.gijo.listLearnloopTopics();
       const 목표 = r.목표승인건수 || 300;
-      const 이름순 = ["취약점", "장비운영", "사내규정", "위협대응"];
+      const 이름순 = ["취약점", "장비운영", "사내규정", "위협대응", "일반"];
       const map = Object.fromEntries((r.주제 || []).map((t) => [t.topic, t]));
       el.innerHTML = 이름순.map((n) => {
         const t = map[n] || { approved: 0 };

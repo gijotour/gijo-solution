@@ -3214,10 +3214,11 @@ export async function runAdapterImport(args: Record<string, string>): Promise<st
   if (!file) {
     return "반입할 어댑터 파일명을 알려 주세요 — 예: 「sec-expert-vuln-v2.gguf 어댑터 반입해줘」. 파일은 먼저 서버의 data/lora 폴더에 넣어야 합니다.";
   }
-  // 주제 별칭 — 담당자는 짧게 말한다("장비", "규정"). 등록부 딱지는 네 가지 정식 이름만 쓴다.
+  // 주제 별칭 — 담당자는 짧게 말한다("장비", "규정"). 등록부 딱지는 다섯 가지 정식 이름(learnloop.ts TOPICS)만 쓴다.
   const 주제별칭: Record<string, string> = {
     취약점: "취약점", 장비: "장비운영", 장비운영: "장비운영", 규정: "사내규정", 사내규정: "사내규정",
     위협: "위협대응", 위협대응: "위협대응",
+    일반: "일반", 용어: "일반", 개념: "일반", // 해설(normaltic) 어댑터 — 「용어 어댑터로 반입」이라 말한다(2026-09-03)
   };
   const topic = 주제별칭[(args.topic ?? "").trim()] ?? null;
   const base = (args.base ?? "").trim() || servingBaseModelId();

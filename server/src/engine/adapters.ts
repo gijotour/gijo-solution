@@ -35,7 +35,7 @@ try { db.exec("ALTER TABLE lora_adapters ADD COLUMN gate TEXT"); } catch { /* �
 
 export interface LoraAdapter {
   id: string;
-  topic: string | null; // 주제 딱지(취약점·장비운영·사내규정·위협대응) — 전문 분야
+  topic: string | null; // 주제 딱지(learnloop.ts TOPICS — 취약점·장비운영·사내규정·위협대응·일반) — 전문 분야
   baseModelId: string; // 이 어댑터가 붙는 서빙 모델 id (LoRA 베이스 종속 계약)
   file: string; // GGUF LoRA 파일 경로
   adopted: boolean; // 게이트 통과 채택 여부 — 채택된 것만 서빙에 적재

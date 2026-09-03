@@ -2041,7 +2041,7 @@ const TOOLS: AgentTool[] = [
       '예: {"file":"sec-expert-vuln-v2.gguf","topic":"취약점"}',
     params: [
       { name: "file", label: "파일", description: "반입할 GGUF 파일명(서버 data/lora 폴더 기준)", required: true },
-      { name: "topic", label: "전문 분야", description: "취약점·장비운영·사내규정·위협대응 중 하나(선택)", required: false },
+      { name: "topic", label: "전문 분야", description: "취약점·장비운영·사내규정·위협대응·일반(용어·개념 해설) 중 하나(선택)", required: false },
       { name: "note", label: "메모", description: "출처·검증 이력 메모(선택)", required: false },
     ],
     effect: (args) =>

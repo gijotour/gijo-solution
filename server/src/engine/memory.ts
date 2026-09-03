@@ -496,6 +496,11 @@ function categorySignalScores(text: string): Record<Exclude<Category, "일반">,
 export function categorizeByRules(documentId: string, text: string): Category | null {
   const name = documentId;
   // 순서 중요 — 더 구체적인 신호를 먼저 본다.
+  // ⚠ 용어사전은 「일반」이다(2026-09-03 운영 실측): 파일명 규칙에 없어 내용 신호로 떨어졌고, 표제어에
+  //   침해·위협·탐지가 많아 **위협대응**으로 잡혀 118조각이 그 주제의 증류 코퍼스·검색 부스트에 섞였다.
+  //   용어 풀이는 어느 한 업무영역의 재료가 아니라 전 영역이 함께 보는 글이라 「일반」이 맞다.
+  //   사람 수정 창구(/api/memory/document/category)로 고쳐도 재인입(해시 변경)이면 규칙이 다시 덮으므로 규칙에 둔다.
+  if (/용어사전|용어집|glossary/i.test(name)) return "일반";
   if (/취약점|점검\s*결과|vuln|CVE-\d{4}|스캔|pentest|모의해킹/i.test(name)) return "취약점";
   if (/정책|지침|규정|표준|준수|컴플라이언스|policy|compliance|개인정보|isms/i.test(name)) return "사내규정";
   if (/랜섬웨어|침해|위협|공격|탐지|대응|ioc|siem|snort|cti|threat|incident/i.test(name)) return "위협대응";

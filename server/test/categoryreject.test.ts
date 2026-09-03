@@ -53,6 +53,14 @@ describe("규칙이 스스로 잡는 범위 — 흔한 보안 낱말", () => {
     expect(categorizeByRules("개인정보 처리 지침.md", "아무 내용")).toBe("사내규정");
   });
 
+  it("용어사전은 내용에 위협 낱말이 많아도 「일반」이다(2026-09-03 운영 실측 — 위협대응 118조각으로 잡혀 있었다)", () => {
+    const 본문 = "침해사고: 공격자가 시스템에 침입한 사건. 위협 인텔리전스: 공격 정보를 모아 탐지에 쓰는 것. 랜섬웨어: …";
+    expect(categorizeByRules("GIJO_AS_용어사전.md", 본문)).toBe("일반");
+    expect(categorizeByRules("보안 용어집.docx", 본문)).toBe("일반");
+    // 파일명이 무정보면 종전대로 내용 신호가 정한다 — 규칙이 「일반」을 남발하지 않는다
+    expect(categorizeByRules("문서2.md", 본문)).toBe("위협대응");
+  });
+
   it("신호가 약하면 규칙은 확신하지 않는다 — 억지 분류가 오분류보다 나쁘다", () => {
     expect(categorizeByRules("회의록.md", "오늘 회의에서 일정과 담당자를 정했습니다.")).toBeNull();
   });
