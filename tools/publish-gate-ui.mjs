@@ -112,15 +112,18 @@ if (page.url().includes("login")) {
   await page.fill("#username", USER);
   await page.fill("#password", PASS);
   await page.click("#loginBtn");
-  await new Promise((r) => setTimeout(r, 3000));
-  const dup = await page.evaluate(() => {
-    const d = document.getElementById("dupBox");
-    return d && d.style.display !== "none";
-  }).catch(() => false);
-  if (dup) await page.click("#dupForce"); // claude-deploy 세션만 끊긴다 — 단 이 계정이 다른 머신에 로그인돼 있으면 그 세션도 끊긴다(사람 계정 아님)
+  // ⚠ 중복 접속 상자는 **대기 고리 안에서 반복해** 본다(2026-09-03 실사고). 예전엔 3초 뒤 딱 한 번 봤는데,
+  //   운영 서버 재기동 직후 첫 로그인은 응답이 3초를 넘겨 상자가 그 뒤에 떴고, 관문은 못 본 채 login.html에서
+  //   40초를 기다리다 「프로 셸 도착 ✕」 뒤로 전부 실패했다(같은 빌드를 반복 확인하는 재현에서는 통과).
+  let 강제함 = false;
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     if (ctx.pages().some((p) => p.url().includes("app.html"))) break;
+    const dup = await page.evaluate(() => {
+      const d = document.getElementById("dupBox");
+      return d && d.style.display !== "none";
+    }).catch(() => false);
+    if (dup && !강제함) { 강제함 = true; await page.click("#dupForce"); } // claude-deploy 세션만 끊긴다 — 단 이 계정이 다른 머신에 로그인돼 있으면 그 세션도 끊긴다(사람 계정 아님)
   }
 }
 page = ctx.pages().find((p) => p.url().includes("app.html")) || ctx.pages()[0];
