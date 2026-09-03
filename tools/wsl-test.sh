@@ -18,21 +18,84 @@
 #   ⚠ DST은 **소스·시험·설정만** 가져간다. data/·models/는 안 가져간다
 #     (운영 DB를 시험이 건드리면 안 된다 — 그게 이 분리의 목적이다).
 #
-# 사용:  wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/wsl-test.sh" [vitest 인자...]
+# ■ 병렬 안전 — **부르는 사람마다 자기 사본** (2026-09-04 실측 사고)
+#   그날 에이전트 둘이 이 스크립트를 거의 같은 때 돌렸다. DST이 한 곳뿐이라 한쪽의
+#   `rsync --delete`가 다른 쪽이 읽는 중인 사본을 갈아엎었고, gracefulclose 시험이
+#   **EADDRINUSE(:::45999)**로 붉었다 — 혼자 돌리면 초록인 시험이다.
+#   **남의 실행이 내 초록/빨강을 바꾼다**는 것은 시험 게이트가 가질 수 있는 최악의 성질이다.
+#   빨강이 내 결함인지 남의 실행인지 알 수 없으면, 초록도 못 믿는다.
+#   → 기본 DST을 `/home/gijo/gijo-as-test/runs/<호출 식별자>`로 갈랐다(gb10-test.sh와 같은 방식).
+#     식별자 = GIJO_TEST_ID 있으면 그것, 없으면 프로세스번호-시각. 끝나면 **자기 것만** 지운다
+#     (남기려면 GIJO_KEEP_DST=1). 강제 종료로 남은 것은 다음 실행이 하루 지난 것만 쓸어 담는다.
+#   ⚠ node_modules는 사본마다 복사하지 않는다(1.4GB) — 운영 것을 **하드링크**로 붙인다(아래 참조).
+#     그래서 사본 하나가 84MB뿐이고, 호출자별로 갈라도 디스크가 안 늘어난다.
+#   비용(2026-09-04 실측): 복사 단계만 보면 찬 사본 7.2초 · 더운 공용 사본 1.5초 → +5.7초.
+#     ⚠ 그런데 **전체 시험에서는 그 차이가 실행별 흔들림에 묻힌다** — 같은 날 실측:
+#       기본(찬 사본) 50초 vs `--serial`(더운 사본) 53초. 「--serial이 빠르다」고 말하면 거짓이다.
+#     차이가 보이는 건 **한두 파일만 돌릴 때**다(실측: 기본 7.6초 · --serial 4.3초).
+#     그래서 `--serial`은 「혼자서 한 파일씩 빨리 돌릴 때」 쓰는 것이다 —
+#     잠금(flock)으로 한 번에 하나만 돌게 하고 더운 공용 사본을 재사용한다.
+#
+# ■ 포트를 여는 시험 — 사본을 갈라도 **포트는 기계에 하나뿐**이라 따로 봐야 한다
+#   · test/gracefulclose.test.ts — 예전엔 45997~45999 **고정**이었고, 그게 위 사고의 직접 원인이다.
+#     2026-09-04에 포트 0(커널이 빈 포트를 골라 준다)으로 고쳤다 → 몇 개가 동시에 돌아도 안 겹친다.
+#   · test/siem.test.ts — 처음부터 포트 0으로 연다. 안전.
+#   · 그 밖에 포트를 여는 시험은 없다. vitest.config가 LLM·임베딩 URL을 59999/59998
+#     (아무도 안 듣는 포트)로 못박아 두어 시험이 실서버에 붙을 길 자체가 없다.
+#   ⚠ 앞으로 **포트를 고정으로 여는 시험을 만들지 말 것.** 만들면 이 목록에 적고 `--serial`에서만
+#     돌려야 한다 — 포트 0을 쓰면 그런 빚을 안 진다.
+#
+# 사용:  wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/wsl-test.sh" [--serial] [vitest 인자...]
 #   전체:      (인자 없이)
 #   일부:      test/lawfallback.test.ts test/modelcatalog.test.ts
+#   직렬:      --serial  (잠금 + 더운 공용 사본 — 한두 파일만 반복해 돌릴 때 3초쯤 빠르다)
 set -u
+
+# ── --serial을 먼저 걷어낸다. 나머지 인자는 손대지 않고 그대로 vitest로 간다. ──
+SERIAL=0
+if [ "${1:-}" = "--serial" ]; then SERIAL=1; shift; fi
+
 # ⚠ 워크트리(.claude/worktrees/*)에서 편집할 때는 **여기가 메인을 가리키면 안 된다** —
 #   내 변경이 아니라 메인의 옛 코드를 시험하게 되고, 그건 「초록인데 안 고쳐진」 상태다.
-#   GIJO_SRC_ROOT로 덮어쓴다. DST도 같이 갈라야 두 곳을 번갈아 돌려도 안 섞인다.
-#   예)  GIJO_SRC_ROOT="/mnt/d/Connect AI/.claude/worktrees/foo" GIJO_DST_ROOT=/home/gijo/gijo-as-test-foo \
+#   GIJO_SRC_ROOT로 덮어쓴다. (DST은 이제 알아서 갈라지므로 따로 안 줘도 안 섞인다.)
+#   예)  GIJO_SRC_ROOT="/mnt/d/Connect AI/.claude/worktrees/foo" \
 #          wsl -d Ubuntu-24.04 -- bash ".../tools/wsl-test.sh" test/modelsplit.test.ts
 SRC_ROOT="${GIJO_SRC_ROOT:-/mnt/d/Connect AI}"
-DST_ROOT="${GIJO_DST_ROOT:-/home/gijo/gijo-as-test}"
+TEST_ROOT=/home/gijo/gijo-as-test
+
+# 호출 식별자 — 부른 쪽이 이름을 주면 그것을 쓴다(로그에서 누구 사본인지 보인다).
+TEST_ID="${GIJO_TEST_ID:-$$-$(date +%H%M%S)}"
+
+# OWNED=1 → 내가 만든 사본이라 끝나고 지운다. 0 → 남의 자리이므로 손대지 않는다.
+OWNED=1
+if [ -n "${GIJO_DST_ROOT:-}" ]; then
+  DST_ROOT="$GIJO_DST_ROOT"; OWNED=0        # 부른 사람이 콕 집은 자리는 지우지 않는다
+elif [ "$SERIAL" = 1 ]; then
+  DST_ROOT="$TEST_ROOT"; OWNED=0            # 공용 더운 사본 — 잠금이 지킨다
+else
+  DST_ROOT="$TEST_ROOT/runs/$TEST_ID"
+fi
+[ "${GIJO_KEEP_DST:-0}" = "1" ] && OWNED=0
 SRC="$SRC_ROOT/server"
 DST="$DST_ROOT/server"
 
+# --serial은 **한 번에 하나만** 돌게 잠근다(앞 실행이 있으면 끝날 때까지 기다린다).
+# ⚠ GIJO_TEST_LOCKED가 재귀를 막는다 — 잠금을 잡고 자기 자신을 한 번만 다시 부른다.
+if [ "$SERIAL" = 1 ] && [ -z "${GIJO_TEST_LOCKED:-}" ]; then
+  mkdir -p "$TEST_ROOT"
+  echo "⏳ --serial — 공용 사본을 잠급니다($TEST_ROOT/.wsl-test.lock). 앞 실행이 있으면 기다립니다."
+  exec env GIJO_TEST_LOCKED=1 flock "$TEST_ROOT/.wsl-test.lock" bash "$0" --serial "$@"
+fi
+
 if [ ! -d "$SRC" ]; then echo "✗ 원본을 찾지 못했습니다: $SRC"; exit 2; fi
+
+if [ "$OWNED" = 1 ]; then
+  # ⚠ 강제 종료(kill -9·창 닫기)되면 아래 trap이 안 돌아 84MB짜리가 남는다.
+  #   **하루 넘은 것만** 쓸어 담는다 — 지금 도는 남의 사본을 지우면 이 도구가 사고의 원인이 된다.
+  find "$TEST_ROOT/runs" -maxdepth 1 -mindepth 1 -type d -mmin +1440 -exec rm -rf {} + 2>/dev/null
+  trap 'rm -rf "$DST_ROOT"' EXIT INT TERM
+fi
+echo "사본: $DST_ROOT$([ "$OWNED" = 1 ] && echo '  (이 실행 전용 — 끝나면 지웁니다)' || echo '  (공용/지정 — 그대로 둡니다)')"
 
 echo "=== 사본 동기화 (소스·시험·설정만) ==="
 mkdir -p "$DST"
@@ -77,14 +140,39 @@ rsync -a --include='*.md' --exclude='*/' --exclude='*' "$SRC_ROOT/" "$DST_ROOT/"
 mkdir -p "$DST_ROOT/.tmp-reports"
 [ -f "$SRC_ROOT/.tmp-reports/ops-sim.json" ] && cp "$SRC_ROOT/.tmp-reports/ops-sim.json" "$DST_ROOT/.tmp-reports/" 2>/dev/null
 [ -f "$SRC_ROOT/.gitignore" ] && cp "$SRC_ROOT/.gitignore" "$DST_ROOT/" 2>/dev/null
+# ⚠ **사본에도 빈 server/data/는 만들어 준다**(gb10-test.sh가 2026-09-03에 밟은 자리).
+#   지켜보는 폴더의 「제품 자신의 data/를 지정하면 순환이라 거부」 판정은 그 폴더가 실재해야
+#   판정까지 간다(없으면 그 앞의 「경로를 못 찾음」에서 끝난다). 예전엔 옛 사본에 운영 부산물이
+#   남아 있어 우연히 통과했다 — 사본을 매번 새로 만드는 지금은 우연이 없다.
+#   ⚠ 원본 data/가 아니라 **빈 폴더**다. 운영 DB는 이 스크립트가 읽지도 쓰지도 않는다.
+mkdir -p "$DST/data"
 echo "  서버 소스 $(find "$DST/src" -name '*.ts' 2>/dev/null | wc -l)개 · 시험 $(find "$DST/test" -name '*.test.ts' 2>/dev/null | wc -l)개 · 클라 화면 $(find "$DST_ROOT/client/src" -name '*.html' 2>/dev/null | wc -l)개"
 
-# node_modules는 매번 복사하지 않는다(수 GB). 운영 것을 심볼릭 링크로 빌려 쓴다 —
-# ⚠ 읽기만 한다. 시험이 의존성을 고치는 일은 없다.
-if [ ! -e "$DST/node_modules" ]; then
-  ln -s /home/gijo/gijo-as/server/node_modules "$DST/node_modules"
-  echo "  node_modules: 운영 것을 링크(읽기 전용 사용)"
+# node_modules는 사본마다 진짜로 복사하지 않는다(1.4GB). 운영 것을 **하드링크**로 붙인다.
+# ⚠ 심볼릭 링크는 안 된다 — 2026-09-04에 실제로 밟았다. 링크로 붙이면 vitest가 자기 모듈을
+#   사본 밖(운영 경로)에서 읽게 되고, 그 순간 내장 모듈까지 사본 안 경로로 찾으려 들어
+#   `Cannot find module '<사본>/server/tls'`로 **232개 파일이 통째로** 죽는다. 예전 사본에는
+#   진짜 node_modules가 남아 있어 이 갈래가 한 번도 안 돌아 몰랐던 자리다.
+# ⚠ 하드링크는 **디스크를 안 쓴다**(같은 데이터를 가리킬 뿐) — 실측 524ms · 파일 10,730개.
+#   시험은 node_modules를 읽기만 하고, 새로 만드는 캐시(.vite 등)는 새 파일이라 원본과 무관하다.
+#   (제자리에서 고쳐 쓰는 것만 원본에 번지는데, 그런 시험은 없다.)
+# ⚠ **매번 다시 건다**(있으면 지우고 다시 하드링크). 예전처럼 「없을 때만」 만들면 공용 사본에
+#   옛 설치가 눌러앉아, 같은 스크립트인데 --serial과 기본 갈래가 **서로 다른 의존성**으로 돈다
+#   (실측 2026-09-04: 공용 사본 312개 vs 운영 315개). 「같은 것을 여러 곳에 두면 어긋난다」가
+#   의존성 층에서 재발하는 자리다. 지우고 다시 거는 값은 0.6초뿐이다.
+NODE_MODULES=/home/gijo/gijo-as/server/node_modules
+if [ ! -d "$NODE_MODULES" ]; then
+  echo "✗ node_modules를 못 찾았습니다: $NODE_MODULES"
+  echo "  → 운영에 의존성이 깔려 있어야 이 도구가 돕니다(cd /home/gijo/gijo-as/server && npm ci)."
+  exit 1
 fi
+rm -rf "$DST/node_modules"
+if ! cp -al "$NODE_MODULES" "$DST/node_modules" 2>/dev/null; then
+  echo "✗ node_modules 하드링크 실패 — 사본이 운영과 **다른 파일시스템**에 있으면 안 됩니다."
+  echo "  → GIJO_DST_ROOT을 /home 아래(운영과 같은 ext4)로 잡아 주세요."
+  exit 1
+fi
+echo "  node_modules: 운영 것을 하드링크(디스크 안 늘고 0.6초 · 진짜 디렉터리라 vitest가 정상 해석)"
 
 echo
 # ⚠ **이 사본에서 구조적으로 못 도는 시험 2개**(2026-08-10 실측). 감추지 않고 밝힌다:
@@ -117,6 +205,11 @@ END=$(date +%s)
 echo
 echo "⏱ $((END-START))초  ·  종료코드 $CODE"
 echo "   (참고: 같은 시험이 Windows 호스트에서는 파일당 수 분~14분 — 전체는 못 끝낸다)"
+if [ "$OWNED" = 1 ]; then
+  echo "   사본 $DST_ROOT 을 지웁니다 — 이 결과는 **다른 실행과 섞이지 않은** 것입니다."
+else
+  echo "   사본 $DST_ROOT 은 그대로 둡니다(공용/지정 자리)."
+fi
 echo
 if [ "$SKIPPED" -gt 0 ]; then
   echo "⚠ 위 결과에서 **$SKIPPED개를 빼고** 잰 것입니다: $SKIP_NOTE"

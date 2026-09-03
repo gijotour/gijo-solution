@@ -116,7 +116,7 @@
 
 | 무엇 | 어디서 | 왜 |
 |---|---|---|
-| **서버 시험**(`server/test`) | **WSL** — `bash tools/wsl-test.sh` | 제품이 WSL에서 돈다. 실측: Windows 14분/파일(전체는 못 끝냄) vs **WSL 27초/2,979개** |
+| **서버 시험**(`server/test`) | **WSL** — `bash tools/wsl-test.sh` | 제품이 WSL에서 돈다. 실측: Windows 14분/파일(전체는 못 끝냄) vs **WSL 27초/2,979개**. **병렬 안전**(2026-09-04) — 호출자마다 사본이 갈려 둘이 동시에 돌려도 서로의 초록/빨강을 안 바꾼다 |
 | 서버 배포·의존성 확인 | WSL | `scripts/check-python-deps.mjs`를 **돌아갈 환경에서** |
 | 클라 빌드·게시·실화면 | **Windows**(exe) / Mac(dmg) | electron-builder·CDP가 거기 묶여 있다 |
 | `git ls-files`·이미지가 필요한 시험 | Windows 호스트 | WSL 사본은 git 저장소가 아니고 이미지를 안 가져간다 |
