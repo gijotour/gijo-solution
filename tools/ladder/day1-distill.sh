@@ -44,6 +44,10 @@ SERVER="${GIJO_SERVER_URL:-http://localhost:4000}"
 MIN_ACCEPT_PCT="${LADDER_MIN_ACCEPT_PCT:-60}"
 # 오류 상한 — 조각 하나가 실패하는 것은 흔하지만, 무더기면 창구·토큰·문맥이 문제다.
 MAX_ERRORS="${LADDER_MAX_ERRORS:-10}"
+# 승인 상한(한 번 부를 때). 승인은 되돌리기 어렵다 — 👍 기록 **그리고** 그 주제 지식영역에 문서로 반입된다
+# (approve-distill.mjs 머리 주석). 지금까지 이 자리에서 --max 를 안 줘서 기본값 100000, 곧 사실상 무제한이었다.
+# ⚠ 이것은 **한 번 부를 때의 상한**이지 하루 총량 장부가 아니다 — 같은 주제가 두 회차면 최대 두 배까지 승인된다.
+APPROVE_MAX="${LADDER_APPROVE_MAX:-900}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -150,7 +154,10 @@ while IFS=$'\t' read -r TOPIC ARGS FILESPEC ORD; do
 
   LOG="$OUTDIR/$LABEL.log"
   # shellcheck disable=SC2086
-  ( cd "$REPO" && node tools/distill.mjs $ARGS --endpoint "$ENDPOINT" --server "$SERVER" ) 2>&1 | tee "$LOG"
+  # ⚠ --force-login: 계정당 1세션이라, 앞 회차 승인 단계가 남긴 admin 세션이 살아 있으면 이 로그인이
+  #   409(already_logged_in)로 죽는다 — win 4000 실측(2026-09-03: 같은 계정 2차 로그인 = 409).
+  #   사슬은 한 줄로 도니 그 앞 세션은 **제 일을 이미 끝낸** 세션이다. 끊고 들어간다.
+  ( cd "$REPO" && node tools/distill.mjs $ARGS --endpoint "$ENDPOINT" --server "$SERVER" --force-login ) 2>&1 | tee "$LOG"
   RC="${PIPESTATUS[0]}"
   if [ "$RC" -ne 0 ]; then
     echo "✗ $LABEL — 증류가 코드 $RC 로 끝났다. 로그: $LOG" >&2
@@ -190,8 +197,10 @@ while IFS=$'\t' read -r TOPIC ARGS FILESPEC ORD; do
   if [ "$NO_APPROVE" -eq 1 ]; then
     ladder_log "  (승인 생략 — --no-approve)"
   elif [ -s "$REPO/tools/approve-distill.mjs" ]; then
-    ladder_log "  승인 — node tools/approve-distill.mjs --topic $TOPIC"
-    ( cd "$REPO" && node tools/approve-distill.mjs --topic "$TOPIC" --out ) \
+    ladder_log "  승인 — node tools/approve-distill.mjs --topic $TOPIC --max $APPROVE_MAX --force-login"
+    # ⚠ --force-login: 방금 끝난 증류의 admin 세션이 아직 살아 있어 그냥 로그인하면 409다(위와 같은 자리).
+    #   끊는 대상은 **방금 제 일을 끝낸 그 세션**이다.
+    ( cd "$REPO" && node tools/approve-distill.mjs --topic "$TOPIC" --max "$APPROVE_MAX" --force-login --out ) \
       > "$OUTDIR/$LABEL.approve.json" || { echo "✗ $LABEL — 승인 실패(결과: $OUTDIR/$LABEL.approve.json)" >&2; exit 5; }
     ladder_log "  승인 결과 → $OUTDIR/$LABEL.approve.json"
   else
