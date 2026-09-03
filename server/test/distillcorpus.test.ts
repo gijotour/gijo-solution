@@ -15,10 +15,13 @@ const doc = (documentId: string, over: Partial<MemoryDocument> = {}): MemoryDocu
 const 긴 = (s: string) => `${s} — 취약점 조치는 발견 즉시 담당자를 지정하고 기한 안에 패치한다. `.repeat(3);
 const 바이너리 = " PDF\u0000\u0001\ufffdstream\u0008endobj".repeat(6); // 날 제어문자를 파일에 박으면 git이 바이너리로 본다 — 이스케이프로
 
+// ⚠ 조각은 **일괄**로 받는다(2026-09-04) — 문서마다 부르면 그 수만큼 저장소 전수 스캔이 곱해진다.
+//   여기 모의도 같은 모양이라야 「실제로는 N번 부르는데 시험은 초록」이 안 난다.
 function mem(docs: MemoryDocument[], chunksOf: Record<string, string[]>) {
   return {
     listDocuments: async () => docs,
-    getDocumentChunks: async (id: string, _limit?: number) => (chunksOf[id] ?? []).map((text, chunkIndex) => ({ chunkIndex, text })),
+    getChunksForDocuments: async (ids: string[]) =>
+      new Map(ids.map((id) => [id, (chunksOf[id] ?? []).map((text, chunkIndex) => ({ chunkIndex, text }))])),
   };
 }
 
@@ -71,6 +74,21 @@ describe("증류 근거 코퍼스 — 무엇이 나가고 무엇이 절대 안 �
     expect(r.chunks.length).toBe(3);
     expect(r.skipped["문서당 상한"]).toBe(1);
     expect(r.skipped["전체 상한(조각)"] + r.skipped["전체 상한(문서)"]).toBeGreaterThan(0);
+  });
+
+  it("조각은 한 번에 떠 오고, 거른 문서(기밀·개인)는 본문을 뜨지도 않는다", async () => {
+    // 왜: 문서마다 조각을 부르면 그 수만큼 저장소 전수 스캔이 곱해진다(운영 실측 172ms/건 — 121문서면
+    //   21초, 지식 위생 점검이 676초 걸린 것과 같은 병). 거른 문서를 넣으면 기밀 본문을 괜히 메모리에 올린다.
+    const docs = [doc("지침.md"), doc("기밀.pdf", { grade: "C" }), doc("personal:abc")];
+    const chunks = { "지침.md": [긴("A")], "기밀.pdf": [긴("기밀")], "personal:abc": [긴("개인")] };
+    const 부름: string[][] = [];
+    const 기록모의 = { ...mem(docs, chunks) };
+    const 원본 = 기록모의.getChunksForDocuments;
+    기록모의.getChunksForDocuments = async (ids: string[]) => { 부름.push([...ids]); return 원본(ids); };
+    const r = await buildDistillCorpus({ category: "취약점" }, 기록모의);
+    expect(부름.length).toBe(1);           // 문서 수와 무관하게 1회
+    expect(부름[0]).toEqual(["지침.md"]);  // 거른 문서는 목록에 없다
+    expect(r.chunks.map((c) => c.documentId)).toEqual(["지침.md"]);
   });
 
   it("창구는 요청자 눈(열람불가공용)으로 한 번 더 거른다 — 등급 게이트 우회 금지(소스 감시)", () => {

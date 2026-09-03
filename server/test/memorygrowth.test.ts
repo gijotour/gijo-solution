@@ -20,6 +20,8 @@ import {
   onChatLogRated, chatLogRatedListenerCount, type ChatLogRatedEvent,
 } from "../src/engine/learnloop";
 import { 기억성장_배선, approvedQaDocId, approvedQaContent, APPROVED_QA_ORIGIN, gradeForApprover, 반입못하는이유 } from "../src/engine/learnmemory";
+// origin 잣대 한 곳(잎 모듈이라 LanceDB를 안 물고 그냥 불러 볼 수 있다 — 그게 이 파일에 둔 이유이기도 하다).
+import { 제품이쌓은문서, 반입문서아님 } from "../src/engine/docorigin";
 
 const root = join(__dirname, "..");
 const read = (...p: string[]) => readFileSync(join(root, ...p), "utf8");
@@ -121,12 +123,26 @@ describe("반입 모양 — scope는 global, 구분은 category, 등급은 승�
     expect(반입못하는이유({ ...base, question: "KEV가 뭐야?", answer: "KEV는 실제 악용이 확인된 취약점 목록으로, 심각도와 무관하게 최우선 조치 대상입니다. 조치 우선순위는 노출과 자산 중요도를 함께 봅니다." })).toBeNull();
   });
 
-  it("문서 수 소비처 일곱 곳이 승인 문답을 뺀다 — 두 곳만 고치고 초록이 되던 시험을 다시 쓴다", () => {
-    expect(read("src", "engine", "docdigest.ts")).toContain("<> 'approved-qa'");                 // 새로 들어온 문서 대장
-    expect(read("src", "engine", "docdupe.ts")).toContain("<> 'approved-qa'");                   // 중복 후보
-    expect(read("src", "engine", "memory.ts")).toMatch(/recentDocCountStmt[\s\S]{0,400}'approved-qa'/); // 사이드바 새 문서 배지
-    expect(read("src", "engine", "teamview.ts")).toContain("<> 'approved-qa'");                  // 팀 구성 문서 수
-    expect(read("src", "engine", "observability.ts")).toContain("<> 'approved-qa'");             // 자가진단 지식베이스
+  // ★ 2026-09-04: 서버 네 자리(대장·중복·배지·위생)의 origin 목록을 **engine/docorigin.ts 한 곳**으로 모았다.
+  //   그전에는 같은 결정을 자리마다 손으로 적어 다섯 벌이었고, 실제로 클라 두 곳을 잊어 화면이 깨졌다.
+  //   그래서 감시도 「자리마다 문자열이 있나」에서 「자리마다 **그 술어를 부르나** + 목록은 한 곳에 있나」로 바꾼다.
+  it("문서 수 소비처가 승인 문답을 뺀다 — 잣대는 docorigin 한 곳, 자리들은 그것을 부른다", () => {
+    const 잣대 = read("src", "engine", "docorigin.ts");
+    expect(잣대).toMatch(/제품자동_ORIGIN\s*=\s*\["approved-qa",\s*"incident-case"\]/);
+    expect(잣대).toMatch(/반입아님_ORIGIN[\s\S]{0,120}"builtin"/);
+    expect(제품이쌓은문서("approved-qa")).toBe(true);
+    expect(제품이쌓은문서(null)).toBe(false);          // 고객 업로드는 남는다(blacklist)
+    expect(제품이쌓은문서(undefined)).toBe(false);     // origin 칸이 없는 옛 문서도 남는다
+    expect(제품이쌓은문서("builtin")).toBe(false);     // 내장은 목록에 뜨고 지울 수 있다 — 여기선 안 뺀다
+    expect(반입문서아님("builtin")).toBe(true);        // 「새로 들어온 문서」로는 안 센다
+    expect(APPROVED_QA_ORIGIN).toBe("approved-qa");   // learnmemory 상수와 같은 값을 가리킨다
+
+    expect(read("src", "engine", "docdigest.ts")).toContain("제품이쌓은문서_제외SQL");            // 새로 들어온 문서 대장
+    expect(read("src", "engine", "docdupe.ts")).toContain("제품이쌓은문서_제외SQL");              // 중복 후보
+    expect(read("src", "engine", "memory.ts")).toMatch(/recentDocCountStmt[\s\S]{0,600}반입문서아님_제외SQL/); // 사이드바 새 문서 배지
+    expect(read("src", "engine", "kbhygiene.ts")).toContain("제품이쌓은문서(d.origin)");          // 지식 위생 점검 모집단(2026-09-04)
+    expect(read("src", "engine", "teamview.ts")).toContain("<> 'approved-qa'");                  // 팀 구성 문서 수(뜻이 다름 — 사례는 든다)
+    expect(read("src", "engine", "observability.ts")).toContain("<> 'approved-qa'");             // 자가진단 지식베이스(같음)
     const h = read("src", "engine", "agenttools", "handlers.ts");
     expect((h.match(/origin !== "approved-qa"/g) || []).length).toBeGreaterThanOrEqual(2);       // 지식 현황·인수인계 현황
     expect(read("..", "client", "src", "renderer", "pages", "memory.html")).toContain('d.origin !== "approved-qa"'); // AI 지식 화면
@@ -139,11 +155,16 @@ describe("반입 모양 — scope는 global, 구분은 category, 등급은 승�
   //   승인 문답이 겪은 「두 곳만 고치고 초록」을 사례 문서가 그대로 반복했다 — 그래서 잣대를 한 시험에 나란히 둔다.
   // ⚠ 여기 없는 소비처(teamview·observability·handlers)는 아직 사례 문서를 안 뺀다 — 고칠 때 이 목록에 줄을 더한다.
   //   (지금 적으면 고치지도 않은 것을 지킨다고 말하는 거짓 감시가 된다.)
-  it("사례 문서(origin=incident-case)도 문서 목록·중복·배지 다섯 자리에서 빠진다", () => {
-    expect(read("src", "engine", "docdigest.ts")).toContain("<> 'incident-case'");                 // 새로 들어온 문서 대장
-    expect(read("src", "engine", "docdupe.ts")).toContain("<> 'incident-case'");                   // 중복 후보
-    // 창은 600자 — 실측 382자다(주석이 길어 400은 스쳐 지난다). 이 statement 하나만 들어오는 폭이다.
-    expect(read("src", "engine", "memory.ts")).toMatch(/recentDocCountStmt[\s\S]{0,600}'incident-case'/); // 사이드바 새 문서 배지
+  it("사례 문서(origin=incident-case)도 문서 목록·중복·배지·위생 여섯 자리에서 빠진다", () => {
+    expect(제품이쌓은문서("incident-case")).toBe(true);
+    expect(반입문서아님("incident-case")).toBe(true);
+    // 서버 네 자리는 위 술어를 부르는 것으로 지킨다(문자열이 자리마다 흩어지면 또 갈린다).
+    expect(read("src", "engine", "docdigest.ts")).toContain("제품이쌓은문서_제외SQL");            // 새로 들어온 문서 대장
+    expect(read("src", "engine", "docdupe.ts")).toContain("제품이쌓은문서_제외SQL");              // 중복 후보
+    // 창은 600자 — 주석이 길어 400은 스쳐 지난다. 이 statement 하나만 들어오는 폭이다.
+    expect(read("src", "engine", "memory.ts")).toMatch(/recentDocCountStmt[\s\S]{0,600}반입문서아님_제외SQL/); // 사이드바 새 문서 배지
+    expect(read("src", "engine", "kbhygiene.ts")).toContain("제품이쌓은문서(d.origin)");          // 지식 위생 점검 모집단
+    // 클라 두 곳은 아직 문자열이다(서버 술어를 못 부른다) — 그래서 여기서 문자열로 못 박는다.
     expect(read("..", "client", "src", "renderer", "pages", "memory.html")).toContain('d.origin !== "incident-case"'); // AI 지식 화면
     expect(read("..", "client", "src", "renderer", "pages", "mydocs.html")).toContain('d.origin !== "incident-case"'); // 문서 허브
   });

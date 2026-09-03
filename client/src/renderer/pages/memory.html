@@ -534,6 +534,18 @@ tr:last-child td{border-bottom:none;}
   const DM_ICON = (name) => /\.pdf$/i.test(name) ? "📕" : /\.hwpx?$/i.test(name) ? "📘" : /\.md$/i.test(name) ? "📝" : "📄";
   const dmEsc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
 
+  // 「마지막 점검 N시간 전(YYYY-MM-DD HH:mm)」 — 값은 서버 리포트의 scannedAt 하나에서 나오고,
+  // 표기만 여기서 만든다(서버 formatKbHygiene의 같은 문구와 짝. 경과는 지금 시각에 달려 있어
+  // 리포트에 담아 두면 저장된 순간 낡는다 — 그래서 받는 쪽에서 센다).
+  function 점검시각문구(scannedAt) {
+    var t = new Date(scannedAt || "").getTime();
+    if (!isFinite(t)) return "마지막 점검 시각 미상";
+    var 시간 = Math.floor((Date.now() - t) / 3600000);
+    var 경과 = 시간 < 1 ? "방금 전" : 시간 < 48 ? 시간 + "시간 전" : Math.floor(시간 / 24) + "일 전";
+    var d = new Date(t); var p = function (n) { return String(n).padStart(2, "0"); };
+    return "마지막 점검 " + 경과 + "(" + d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ")";
+  }
+
   // 지식베이스 위생 점검 — 상충·중복·신선도. 삭제는 하지 않고, 대상 문서를 클릭하면 아래 목록에서 선택된다.
   async function loadHygiene(rescan) {
     var body = document.getElementById("hygieneBody");
@@ -549,7 +561,15 @@ tr:last-child td{border-bottom:none;}
     var 겹침수 = (r.findings || []).length;
     var 셈 = document.getElementById("hygieneCount"); if (셈) 셈.textContent = String(겹침수);
     if (window.gijoFold) window.gijoFold.refresh();
-    if (r.clean) { body.innerHTML = '<span style="color:var(--teal)">✓ 상충·중복 없음 — 문서 ' + r.totalDocs + '건 모두 깔끔합니다.</span>'; return; }
+    // ★ **언제 잰 값인가**(2026-09-04). 서버는 저장된 리포트를 그대로 돌려준다(/api/kb-hygiene) —
+    //   점검 시각을 안 보이면 방금 센 숫자로 읽힌다. 주 1회 점검이라 최대 7일 묵은 값일 수 있다.
+    //   ⚠ 모집단도 함께 적는다: 승인 문답·사례 문서는 이 목록에 애초에 안 떠 지울 수도 없어 점검에서 뺐다.
+    var 언제 = 점검시각문구(r.scannedAt);
+    var 제외 = Number(r.excludedDocs || 0);
+    var 머리 = '<div style="font-size:12.25px;color:var(--muted-2);margin-bottom:6px">🕒 ' + dmEsc(언제) +
+      " · 문서 " + Number(r.totalDocs || 0) + "건 점검" +
+      (제외 > 0 ? " · 제외 " + 제외 + "건(승인 문답·사례 문서)" : "") + "</div>";
+    if (r.clean) { body.innerHTML = 머리 + '<span style="color:var(--teal)">✓ 상충·중복 없음 — 점검한 문서 ' + Number(r.totalDocs || 0) + '건 모두 깔끔합니다.</span>'; return; }
     // ⚠ 서버가 내는 종류를 하나 빠뜨리면 화면에 **[undefined]** 가 그대로 나온다
     //   (2026-08-01 실앱 점검에서 발견 — demo_overlap이 표에 없었다).
     //   서버(engine/kbhygiene.ts)에 종류를 더하면 여기도 같이 더할 것. 모르는 종류가 와도
@@ -562,7 +582,7 @@ tr:last-child td{border-bottom:none;}
     };
     var 종류이름 = function (t) { return label[t] || String(t || "확인필요"); };
     var color = { high: "var(--red-ink, #f5928a)", medium: "var(--amber-ink, #f7c777)", low: "var(--muted)" };
-    body.innerHTML = r.findings.map(function (f) {
+    body.innerHTML = 머리 + r.findings.map(function (f) {
       var docs = f.documents.map(function (id) { return '<span class="hy-doc" data-hy="' + dmEsc(id) + '" style="color:var(--blue-light);cursor:pointer;text-decoration:underline">' + dmEsc(id) + "</span>"; }).join(", ");
       return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">' +
         '<b style="color:' + (color[f.severity] || "var(--muted)") + '">[' + dmEsc(종류이름(f.type)) + "]</b> " + dmEsc(f.reason) +

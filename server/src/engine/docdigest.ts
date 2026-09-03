@@ -12,6 +12,7 @@
 import { db } from "../db";
 import { chat } from "./llm";
 import { listTriples } from "./ontology";
+import { 제품이쌓은문서_제외SQL } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — memory로 가는 화살을 안 만든다)
 
 db.exec(`CREATE TABLE IF NOT EXISTS doc_digests (
   documentId TEXT PRIMARY KEY,
@@ -193,9 +194,10 @@ export function listRecentDocs(days = 7): RecentDoc[] {
             d.summary, d.keywords, d.matches, d.failedReason
        FROM memory_documents m LEFT JOIN doc_digests d ON d.documentId = m.documentId
       WHERE m.ingestedAt >= ? AND m.documentId NOT LIKE 'personal:%'
-        AND COALESCE(m.origin, '') <> 'approved-qa' AND COALESCE(m.origin, '') <> 'incident-case' ORDER BY m.ingestedAt DESC`
+        AND ${제품이쌓은문서_제외SQL("m.origin")} ORDER BY m.ingestedAt DESC`
     // ↑ 승인 문답(learnmemory, 2026-09-03)은 「새로 들어온 문서」가 아니다 — 승인 300건이 대장을 덮지 않게.
     //   침해사고 사례 문서(incidentcases, 2026-09-03)도 같다 — 씨앗 수십 건이 첫 부팅에 「새 문서」로 쏟아지면 안 된다(결정 ①: 지식 건수엔 들고 대장에선 뺀다).
+    //   ★ 그 목록은 engine/docorigin.ts 한 곳에 있다 — 여기에 다시 적으면 또 갈린다(클라 두 곳을 잊었던 그 사고).
   ).all(cutoff) as RecentDoc[];
 }
 

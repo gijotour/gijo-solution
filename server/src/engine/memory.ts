@@ -15,6 +15,7 @@ import { chat, setRagProvider } from "./llm";
 import { isBinaryLikeChunk } from "./ragsanitize";
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
+import { 반입문서아님_제외SQL } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — 화살이 늘지 않는다)
 import { currentViewer } from "./viewerctx";
 import { currentDocIds } from "./ragscope";
 import { emitCollaboration } from "./collaboration";
@@ -219,7 +220,8 @@ const recentDocCountStmt = db.prepare(
   "SELECT COUNT(*) AS n FROM memory_documents WHERE ingestedAt >= @since" +
     // builtin(제품 내장)·approved-qa(승인 문답, learnmemory 2026-09-03)·incident-case(침해사고 사례 문서, incidentcases 2026-09-03)는
     // 「새로 들어온 문서」가 아니다 — 대장(docdigest.listRecentDocs)과 같은 제외. 배지만 빠뜨리면 2026-08-21 사고가 방향만 바뀌어 재발한다.
-    " AND (origin IS NULL OR origin NOT IN ('builtin','approved-qa','incident-case'))" +
+    // ★ 잣대는 engine/docorigin.ts 한 곳 — 여기에 origin 목록을 손으로 다시 적지 말 것(다섯 벌로 갈렸던 그 병).
+    ` AND ${반입문서아님_제외SQL("origin")}` +
     " AND (documentId NOT LIKE 'personal:%' OR uploadedBy = @me" +
     " OR documentId IN (SELECT 'personal:' || id FROM personal_docs WHERE shared = 1))"
 );
@@ -1392,7 +1394,10 @@ export interface MemoryDocument {
   docClass: string | null; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타) — 분류 전 문서는 null
   uploadedBy: string | null; // 작업 귀속 — 누가 올렸는지(2026-07-25)
   category: string | null; // 업무영역 5종(취약점·장비운영·사내규정·위협대응·일반) — 마이그레이션 전 문서는 null
-  origin: string | null;   // 'builtin'(제품 내장) · 'approved-qa'(승인 문답, learnmemory) · null(고객 업로드). 화면이 목록에서 가르는 데 쓴다
+  // 'builtin'(제품 내장, docsbundle) · 'approved-qa'(승인 문답, learnmemory) · 'incident-case'(침해사고 사례,
+  // incidentcases) · 'external-web'(웹 반입, urlingest) · null(고객 업로드). 화면이 목록에서 가르는 데 쓴다 —
+  // ★ 판정은 손으로 문자열을 비교하지 말고 engine/docorigin.ts 술어로(잣대가 다섯 벌로 갈렸던 그 병).
+  origin: string | null;
   grade: string | null;    // 기밀 C·민감 S·공개 O (engine/grades.ts). 마이그레이션에서 기존 문서는 O로 넣었다.
 }
 
@@ -1455,6 +1460,7 @@ export async function listVisibleDocuments(): Promise<MemoryDocument[]> {
 }
 
 // 특정 문서의 조각(청크) 텍스트 미리보기 — "어떻게 학습됐는지" 확인용.
+// ⚠ **문서 목록을 돌며 이 함수를 부르지 말 것** — 아래 getChunksForDocuments를 쓴다(이유는 거기에).
 export async function getDocumentChunks(documentId: string, limit = 10): Promise<{ chunkIndex: number; text: string }[]> {
   const ldb = await lancedb.connect(DB_PATH);
   const names = await ldb.tableNames();
@@ -1465,6 +1471,43 @@ export async function getDocumentChunks(documentId: string, limit = 10): Promise
     .map((r) => ({ chunkIndex: r.chunkIndex, text: r.text }))
     .sort((a, b) => a.chunkIndex - b.chunkIndex)
     .slice(0, limit);
+}
+
+/**
+ * 여러 문서의 조각을 **한 번에** 가져온다 — documentId → 조각 목록(chunkIndex 오름차순).
+ *
+ * ★ 왜 따로 있나(2026-09-04 운영 실측, 읽기 전용): documentId에는 스칼라 인덱스가 없어
+ *   getDocumentChunks 한 번이 조각 테이블 **전수 스캔**(172ms/건)이다. 문서마다 부르면 그 수만큼
+ *   곱해진다 — 지식 위생 점검이 문서 3,919건을 돌아 **한 번에 676초**를 썼다(대화창이 10분 넘게 멈춤).
+ *   조건을 IN-목록 하나로 묶으면 스캔이 1회로 끝난다(같은 자료로 121건 0.43초). 코퍼스 창구도 같은 병이었다.
+ *
+ * - select 3칸만 뜬다 — vector(1024차원 float)를 안 실어야 IN-목록의 값어치가 산다.
+ * - 빈 목록이면 질의하지 않고 빈 Map(전체 스캔으로 번지지 않게 — "빈 조건 = 전부"는 흔한 사고).
+ * - 없는 문서 id는 Map에 키 자체가 없다(빈 배열이 아니다) — 부르는 쪽에서 ?? []로 받는다.
+ */
+export async function getChunksForDocuments(documentIds: string[]): Promise<Map<string, { chunkIndex: number; text: string }[]>> {
+  const out = new Map<string, { chunkIndex: number; text: string }[]>();
+  const ids = [...new Set((documentIds ?? []).filter((s) => typeof s === "string" && s.length > 0))];
+  if (!ids.length) return out;
+  const ldb = await lancedb.connect(DB_PATH);
+  const names = await ldb.tableNames();
+  if (!names.includes(TABLE_NAME)) return out;
+  const table = await ldb.openTable(TABLE_NAME);
+  const where = `documentId IN (${ids.map((d) => `'${escapeLiteral(d)}'`).join(", ")})`;
+  let rows: MemoryRow[];
+  try {
+    rows = (await table.query().where(where).select(["documentId", "chunkIndex", "text"]).limit(1_000_000).toArray()) as MemoryRow[];
+  } catch {
+    // select를 못 받는 옛 판본 대비 — listDocuments가 쓰는 것과 같은 폴백(느리지만 답은 같다).
+    rows = (await table.query().where(where).limit(1_000_000).toArray()) as MemoryRow[];
+  }
+  for (const r of rows) {
+    const list = out.get(r.documentId);
+    if (list) list.push({ chunkIndex: r.chunkIndex, text: r.text });
+    else out.set(r.documentId, [{ chunkIndex: r.chunkIndex, text: r.text }]);
+  }
+  for (const list of out.values()) list.sort((a, b) => a.chunkIndex - b.chunkIndex);
+  return out;
 }
 
 export interface DeleteDocumentResult {

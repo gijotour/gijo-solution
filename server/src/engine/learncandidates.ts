@@ -391,7 +391,13 @@ export interface DistillCorpusOptions {
 }
 export interface DistillCorpusChunk { ref: string; documentId: string; chunkIndex: number; category: string | null; text: string }
 export interface DistillCorpusResult { chunks: DistillCorpusChunk[]; docs: number; skipped: Record<string, number>; filter: { category: string; origins: string[] | null } }
-type CorpusMemory = { listDocuments(): Promise<MemoryDocument[]>; getDocumentChunks(id: string, limit?: number): Promise<{ chunkIndex: number; text: string }[]> };
+// ★ 조각은 **문서별로 부르지 않는다**(2026-09-04) — documentId에 스칼라 인덱스가 없어 한 번이 조각
+//   전수 스캔(운영 실측 172ms/건)이라, 121문서면 21초를 그냥 쓴다(지식 위생 점검이 676초 걸린 것과 같은 병).
+//   getChunksForDocuments(ids)로 한 번에 떠 온다. 그래서 이 창구가 요구하는 모양도 「일괄」이다.
+type CorpusMemory = {
+  listDocuments(): Promise<MemoryDocument[]>;
+  getChunksForDocuments(ids: string[]): Promise<Map<string, { chunkIndex: number; text: string }[]>>;
+};
 
 /**
  * 증류 근거 코퍼스 — 지식 저장소 조각을 증류기 재료로 고른다(라우트 POST /api/learnloop/distill/corpus의 본체).
@@ -423,6 +429,9 @@ export async function buildDistillCorpus(b: DistillCorpusOptions, mem: CorpusMem
   const skipped: Record<string, number> = { "승인 문답": 0, "개인 문서": 0, "등급 제외": 0, "열람 불가": 0, "출처 제외": 0, "업무영역 다름": 0, "바이너리꼴": 0, "구조 데이터꼴": 0, "너무 짧음": 0, "문서당 상한": 0, "전체 상한(문서)": 0, "전체 상한(조각)": 0 };
   const out: DistillCorpusChunk[] = [];
   let docsUsed = 0;
+  // ① 먼저 **문서를 거른다**(조각을 뜨기 전에) — 안 나갈 문서의 조각을 떠 오는 것은 낭비이자,
+  //   기밀·개인 문서 본문을 괜히 메모리에 올리는 일이다.
+  const 후보: MemoryDocument[] = [];
   for (const d of docs) {
     if (d.origin === "approved-qa") { skipped["승인 문답"] += 1; continue; }
     // 개인 문서(내 문서)는 scope가 global이어도 문서 id 접두(personal:)로 갈린다 — scope만 보면 그대로 샌다(검토관 2026-09-03).
@@ -435,8 +444,13 @@ export async function buildDistillCorpus(b: DistillCorpusOptions, mem: CorpusMem
     //   증류 주제 「일반」(용어·개념)과 글자가 같아 여기로 「일반」을 넣으면 미분류 더미가 통째로 재료가 된다 —
     //   그래서 tools/distill.mjs는 「일반」에 --source store를 거절한다(파일 지목만). 창구 자체는 막지 않는다(다른 소비자 있음).
     if (category && (d.category ?? "") !== category) { skipped["업무영역 다름"] += 1; continue; }
+    후보.push(d);
+  }
+  // ② 남은 문서의 조각을 **한 번에** 떠 온다(문서마다 부르면 그 수만큼 전수 스캔이 곱해진다).
+  const 조각 = await mem.getChunksForDocuments(후보.map((d) => d.documentId));
+  for (const d of 후보) {
     if (out.length >= maxChunks) { skipped["전체 상한(문서)"] += 1; continue; }
-    const chunks = await mem.getDocumentChunks(d.documentId, 1_000_000);
+    const chunks = 조각.get(d.documentId) ?? [];
     let took = 0;
     for (const c of chunks) {
       const text = String(c.text ?? "").trim();

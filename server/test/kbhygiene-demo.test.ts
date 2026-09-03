@@ -7,24 +7,35 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const listDocuments = vi.fn();
 const getDocumentChunks = vi.fn();
+const getChunksForDocuments = vi.fn();
 const queryMemoryScored = vi.fn();
 
 vi.mock("../src/engine/memory", () => ({
   listDocuments,
   getDocumentChunks,
+  getChunksForDocuments,
   queryMemoryScored,
   RAG_RELEVANCE_MAX_DISTANCE: 0.95,
 }));
 
 const { scanKbHygiene } = await import("../src/engine/kbhygiene");
 
+// ⚠ origin 칸이 **없다**(undefined) — 옛 문서·다른 인입 경로가 그렇다. 모집단 제외는 blacklist라
+//   여기 문서들은 그대로 점검 대상이다. whitelist(origin===null만 통과)로 뒤집으면 이 시험 전부가 조용히 0건이 된다.
 const doc = (documentId: string) => ({ documentId, scope: "default", chunks: 2, embeddingModel: "bge", ingestedAt: new Date().toISOString(), hasSource: true, docClass: null });
 
 beforeEach(() => {
   listDocuments.mockReset();
   getDocumentChunks.mockReset();
+  getChunksForDocuments.mockReset();
   queryMemoryScored.mockReset();
   getDocumentChunks.mockResolvedValue([{ text: "방화벽 정책 정기 점검 절차: 정책 백업, 무적중 룰 식별, 최소권한 위반 표시, 담당자 승인" }]);
+  // 일괄 조회(2026-09-04 수리)는 문서별 모의를 그대로 모아 준다 — 이 파일의 시험 여섯 개는 손대지 않는다.
+  getChunksForDocuments.mockImplementation(async (ids: string[]) => {
+    const m = new Map<string, { chunkIndex: number; text: string }[]>();
+    for (const id of ids) m.set(id, ((await getDocumentChunks(id, 1_000_000)) ?? []).map((c: { chunkIndex?: number; text: string }, i: number) => ({ chunkIndex: c.chunkIndex ?? i, text: c.text })));
+    return m;
+  });
 });
 
 describe("demo_overlap — 데모 문서가 실제 문서와 같은 주제를 다루는가", () => {

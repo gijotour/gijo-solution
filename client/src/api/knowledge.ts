@@ -154,8 +154,12 @@ export interface KnowledgeBundleStatus {
   attributions: string[];
 }
 
-export interface KbHygieneFinding { type: "duplicate" | "version_conflict" | "stale"; severity: "high" | "medium" | "low"; documents: string[]; reason: string; suggestion: string }
-export interface KbHygieneReport { scannedAt: string; totalDocs: number; findings: KbHygieneFinding[]; clean: boolean }
+// ⚠ 서버(engine/kbhygiene.ts HygieneType)에 종류를 더하면 **여기와 memory.html 라벨표에도** 더한다 —
+//   빠뜨리면 화면에 [undefined]가 그대로 뜬다(2026-08-01 실앱 점검에서 demo_overlap이 그랬다).
+export interface KbHygieneFinding { type: "duplicate" | "version_conflict" | "stale" | "demo_overlap"; severity: "high" | "medium" | "low"; documents: string[]; reason: string; suggestion: string }
+// totalDocs = **점검한** 문서 수(모집단). storeDocs = 저장소 전체, excludedDocs = 뺀 수(승인 문답·사례 문서).
+// ⚠ 옛 리포트(2026-09-04 이전 저장분)에는 뒤 두 칸이 없다 — 화면은 없을 때를 견뎌야 한다.
+export interface KbHygieneReport { scannedAt: string; totalDocs: number; storeDocs?: number; excludedDocs?: number; findings: KbHygieneFinding[]; clean: boolean }
 
 export interface IngestResult {
   documentId: string;

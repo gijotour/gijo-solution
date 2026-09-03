@@ -536,13 +536,20 @@ describe("배선 — 도구·정리 대장", () => {
   it("incident_cases는 지식이다 — 정리 대장(TARGETS)에 없다(실사용 전환에서 안 지운다, 결정 ①)", () => {
     expect(Object.values(TARGETS).flatMap((t) => t.tables)).not.toContain("incident_cases");
   });
-  it("문서 수 소비처 — 새 문서 배지·대장·중복 후보에서는 빠지고(approved-qa와 같이), 지식 건수(자가진단·팀 구성)에는 든다", () => {
+  it("문서 수 소비처 — 새 문서 배지·대장·중복 후보·위생 점검에서는 빠지고(approved-qa와 같이), 지식 건수(자가진단·팀 구성)에는 든다", () => {
     const read = (f: string) => fs.readFileSync(path.join(__dirname, "..", "src", "engine", f), "utf8");
-    expect(read("memory.ts")).toMatch(/recentDocCountStmt[\s\S]{0,500}'incident-case'/);
-    expect(read("docdigest.ts")).toContain("<> 'incident-case'");
-    expect(read("docdupe.ts")).toContain("<> 'incident-case'");
+    // ★ 2026-09-04: 뺄 origin 목록을 engine/docorigin.ts 한 곳으로 모았다 — 자리마다 문자열을 세지 말고
+    //   ① 목록이 그 한 곳에 있는가 ② 각 자리가 그 술어를 부르는가 로 본다(감시의 뜻은 그대로).
+    expect(read("docorigin.ts")).toMatch(/제품자동_ORIGIN\s*=\s*\["approved-qa",\s*"incident-case"\]/);
+    expect(read("memory.ts")).toMatch(/recentDocCountStmt[\s\S]{0,600}반입문서아님_제외SQL/);
+    expect(read("docdigest.ts")).toContain("제품이쌓은문서_제외SQL");
+    expect(read("docdupe.ts")).toContain("제품이쌓은문서_제외SQL");
+    expect(read("kbhygiene.ts")).toContain("제품이쌓은문서(d.origin)");
+    // 이 둘은 여전히 사례 문서를 **안 뺀다**(지식 건수에는 든다) — 술어를 부르지도 않는다.
     expect(read("observability.ts")).not.toContain("incident-case");
+    expect(read("observability.ts")).not.toContain("제품이쌓은문서");
     expect(read("teamview.ts")).not.toContain("incident-case");
+    expect(read("teamview.ts")).not.toContain("제품이쌓은문서");
   });
 
   // ★ 2026-09-03 검토관: 안내글이 「판 전체 목록은 최대 **200건**」이라 적어 놓았는데 서버 상한은 **500**이었다.

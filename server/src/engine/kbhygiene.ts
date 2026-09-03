@@ -8,7 +8,8 @@
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
-import { listDocuments, getDocumentChunks, queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE, type MemoryDocument } from "./memory";
+import { listDocuments, getChunksForDocuments, queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE, type MemoryDocument } from "./memory";
+import { 제품이쌓은문서 } from "./docorigin";
 import { db } from "../db";
 
 export type HygieneType = "duplicate" | "version_conflict" | "stale" | "demo_overlap";
@@ -21,7 +22,12 @@ export interface HygieneFinding {
 }
 export interface HygieneReport {
   scannedAt: string;
+  /** **점검한** 문서 수(모집단). 화면·대화창이 "문서 N건"이라 말할 때의 N이다. */
   totalDocs: number;
+  /** 지식 저장소 전체 문서 수(제외분 포함) — totalDocs의 뜻이 조용히 바뀌지 않게 함께 낸다. */
+  storeDocs: number;
+  /** 점검에서 뺀 문서 수 = storeDocs - totalDocs(승인 문답·침해사고 사례). */
+  excludedDocs: number;
   findings: HygieneFinding[];
   clean: boolean;
 }
@@ -50,19 +56,30 @@ function fingerprint(chunks: { text: string }[]): string {
 }
 
 export async function scanKbHygiene(): Promise<HygieneReport> {
-  const docs = await listDocuments();
+  const 전체 = await listDocuments();
+  // ★ 모집단 — 제품이 스스로 쌓은 문서(승인 문답·침해사고 사례)는 점검하지 않는다(2026-09-04).
+  //   왜: 그 문서들은 AI 지식 화면·문서 허브 목록에 **애초에 안 뜬다**(docorigin 잣대). 위생 점검이
+  //   「중복이니 지우세요」라고 말해도 담당자가 누를 자리가 없다 — 못 고치는 지적만 쌓인다.
+  //   게다가 제목이 「승인문답:<id>」·「incident-case:<id>」라 뿌리가 전부 같아 **전부가 버전충돌**로
+  //   잡힌다. 실측(운영 LanceDB 읽기 전용, 2026-09-04): 문서 3,919건 중 **3,798건**이 이 부류라 점검 대상은 121건이다.
+  const docs = 전체.filter((d) => !제품이쌓은문서(d.origin));
   const findings: HygieneFinding[] = [];
+
+  // ★ 조각은 **한 번에** 떠 온다(2026-09-04 실측 수리). 예전에는 문서마다 getDocumentChunks를 불렀는데
+  //   documentId에 스칼라 인덱스가 없어 한 번이 조각 전수 스캔(운영 실측 172ms/건)이라, 3,919문서를 돌면
+  //   **676초**다 — 그동안 지식 위생 점검이 대화창을 10분 넘게 붙잡았다(대화창 경로는 매번 새로 점검한다).
+  //   지금은 IN-목록 한 번(운영 실측 0.43초)이다.
+  //   ⚠ 이 안에서 다시 문서별 조회를 부르지 말 것 — 되돌아가면 곱셈이 되살아난다.
+  let 조각 = new Map<string, { chunkIndex: number; text: string }[]>();
+  try {
+    조각 = await getChunksForDocuments(docs.map((d) => d.documentId));
+  } catch {
+    /* 저장소를 못 열면 지문 없이 진행 — 이름 기반 규칙(버전충돌·신선도)은 그대로 돈다 */
+  }
 
   // 각 문서의 지문 수집(청크 앞부분).
   const fp = new Map<string, string>();
-  for (const d of docs) {
-    try {
-      const chunks = await getDocumentChunks(d.documentId, 3);
-      fp.set(d.documentId, fingerprint(chunks));
-    } catch {
-      fp.set(d.documentId, "");
-    }
-  }
+  for (const d of docs) fp.set(d.documentId, fingerprint(조각.get(d.documentId) ?? []));
 
   // ① 완전/근접 중복 — 같은 지문끼리 묶는다(2개 이상).
   const byFp = new Map<string, string[]>();
@@ -117,8 +134,8 @@ export async function scanKbHygiene(): Promise<HygieneReport> {
   const isDemoName = (id: string) => /^(샘플|데모|sample|demo|test)[_\-\s]/i.test(id) || /(샘플|데모)\.(txt|md|pdf)$/i.test(id);
   for (const d of docs.filter((x) => isDemoName(x.documentId))) {
     try {
-      const chunks = await getDocumentChunks(d.documentId, 1);
-      const probe = (chunks[0]?.text ?? "").replace(/\s+/g, " ").slice(0, 300);
+      // 조각은 위에서 한 번에 떠 왔다 — 여기서 문서별로 다시 부르면 곱셈이 되살아난다.
+      const probe = (조각.get(d.documentId)?.[0]?.text ?? "").replace(/\s+/g, " ").slice(0, 300);
       if (probe.length < 30) continue;
       const hits = await queryMemoryScored(probe, 5);
       const rivals = [...new Set(
@@ -158,6 +175,8 @@ export async function scanKbHygiene(): Promise<HygieneReport> {
   const report: HygieneReport = {
     scannedAt: new Date().toISOString(),
     totalDocs: docs.length,
+    storeDocs: 전체.length,
+    excludedDocs: 전체.length - docs.length,
     findings,
     clean: findings.length === 0,
   };
@@ -177,10 +196,32 @@ export function lastKbHygieneReport(): HygieneReport | null {
   }
 }
 
+/**
+ * 「마지막 점검 N시간 전(YYYY-MM-DD HH:mm)」 — 리포트는 저장된 것을 그대로 돌려주므로(라우트),
+ * **언제 잰 값인지**를 같이 말하지 않으면 오늘 센 숫자로 읽힌다(today.ts 「마지막 점검 N일 전」과 같은 결).
+ * ⚠ 여기 값은 scannedAt 하나에서 나온다 — 화면은 같은 필드로 제 문구를 만든다(값은 한 곳, 표기만 둘).
+ */
+export function 점검시각문구(scannedAt: string): string {
+  const t = new Date(scannedAt ?? "").getTime();
+  if (!Number.isFinite(t)) return "마지막 점검 시각 미상";
+  const 시간 = Math.floor((Date.now() - t) / 3600_000);
+  const 경과 = 시간 < 1 ? "방금 전" : 시간 < 48 ? `${시간}시간 전` : `${Math.floor(시간 / 24)}일 전`;
+  const d = new Date(t);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `마지막 점검 ${경과}(${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())})`;
+}
+
+/** 「점검 대상 N건(제외 M건 — 승인 문답·사례 문서)」 — 숫자가 무엇을 센 것인지 함께 말한다. */
+function 모집단문구(r: HygieneReport): string {
+  const 제외 = Number(r.excludedDocs ?? 0);
+  return `문서 ${r.totalDocs}건 점검` + (제외 > 0 ? ` · 제외 ${제외}건(승인 문답·사례 문서 — 목록에 없어 지울 수 없는 것)` : "");
+}
+
 // 챗봇/화면이 그대로 쓸 요약.
 export function formatKbHygiene(r: HygieneReport): string {
-  if (r.clean) return `🧹 지식베이스 점검 — 상충·중복 없음 ✓ (문서 ${r.totalDocs}건)`;
-  const L: string[] = [`🧹 지식베이스 점검 — 정리 필요 ${r.findings.length}건 (문서 ${r.totalDocs}건)`];
+  const 꼬리 = `\n${점검시각문구(r.scannedAt)} · ${모집단문구(r)}`;
+  if (r.clean) return `🧹 지식베이스 점검 — 상충·중복 없음 ✓${꼬리}`;
+  const L: string[] = [`🧹 지식베이스 점검 — 정리 필요 ${r.findings.length}건${꼬리}`];
   const label = { duplicate: "완전중복", version_conflict: "버전충돌", stale: "신선도검토", demo_overlap: "데모경합" } as const;
   for (const f of r.findings) {
     L.push(`\n[${label[f.type]}] ${f.reason}`);
@@ -191,17 +232,44 @@ export function formatKbHygiene(r: HygieneReport): string {
   return L.join("\n");
 }
 
+const HYGIENE_INTERVAL_MS = 7 * 24 * 3600_000;
 let hygieneTimer: NodeJS.Timeout | null = null;
+let firstHygieneTimer: NodeJS.Timeout | null = null;
+
+/** 마지막 점검이 주기(7일)를 넘겼는가 — 리포트가 아예 없으면 true. 기동 직후 1회 실행을 이걸로 정한다. */
+export function kbHygieneOverdue(): boolean {
+  const last = lastKbHygieneReport();
+  const t = new Date(last?.scannedAt ?? "").getTime();
+  if (!Number.isFinite(t)) return true;
+  return Date.now() - t >= HYGIENE_INTERVAL_MS;
+}
+
 export function startKbHygieneScheduler(): void {
   if (hygieneTimer) return;
-  const WEEK = 7 * 24 * 3600_000;
   const tick = () => { scanKbHygiene().catch((e) => console.warn(`[kb-hygiene] 점검 실패: ${e instanceof Error ? e.message : String(e)}`)); };
-  hygieneTimer = setInterval(tick, WEEK);
+
+  // ⚠ [2026-09-04] setInterval만 걸면 **첫 점검이 기동 7일 뒤**다. 운영 서버는 배포·모델 재시작으로
+  //   그보다 자주 재시작되므로, 재시작이 잦으면 점검이 **영영 한 번도 안 돈다**(백업이 엿새 동안
+  //   0개였던 2026-07-29 사고와 같은 모양 — 그래서 backup.ts와 같은 꼴로 맞춘다).
+  //   재시작마다 점검 폭풍이 나지 않는 이유는 "마지막 리포트가 주기를 넘겼을 때만" 돌기 때문이다.
+  //   지연을 두는 이유: 기동 직후엔 임베딩(8081)이 아직 예열 중이라 데모경합 규칙이 조용히 건너뛰어진다.
+  const firstDelay = Number(process.env.GIJO_KB_HYGIENE_FIRST_DELAY_MS ?? 180_000);
+  firstHygieneTimer = setTimeout(() => {
+    if (kbHygieneOverdue()) {
+      console.log("[kb-hygiene] 마지막 점검이 주기를 넘겨 기동 직후 1회 실행합니다");
+      tick();
+    }
+  }, firstDelay);
+  if (firstHygieneTimer.unref) firstHygieneTimer.unref();
+
+  hygieneTimer = setInterval(tick, HYGIENE_INTERVAL_MS);
   if (hygieneTimer.unref) hygieneTimer.unref();
-  console.log("[kb-hygiene] 지식베이스 위생 점검 스케줄러 시작 (주 1회, 삭제 없이 리포트만)");
+  console.log("[kb-hygiene] 지식베이스 위생 점검 스케줄러 시작 (주 1회 + 밀렸으면 기동 직후 1회, 삭제 없이 리포트만)");
 }
 export function stopKbHygieneScheduler(): void {
   if (hygieneTimer) { clearInterval(hygieneTimer); hygieneTimer = null; }
+  // 기동 지연 안에 종료·재배포가 겹치면 종료 중에 점검이 뜬다 — 함께 정리한다(backup.ts와 같은 이유).
+  if (firstHygieneTimer) { clearTimeout(firstHygieneTimer); firstHygieneTimer = null; }
 }
 
 export function registerKbHygieneRoutes(app: Express): void {

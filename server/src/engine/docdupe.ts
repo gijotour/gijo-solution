@@ -6,6 +6,7 @@
 // 다르게 두 번 올린 것」이다(v2·(1)·사본·날짜만 다름). 내용(임베딩) 대조는 비용이 커서
 // 제목 후보가 실제로 잡히기 시작하면 그때 넓힌다 — 억지 후보가 없는 것보다 나쁘다.
 import { db } from "../db";
+import { 제품이쌓은문서_제외SQL } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — memory로 가는 화살을 안 만든다)
 
 export interface DupeGroup {
   key: string;                       // 정규화된 제목(무엇으로 묶였나)
@@ -29,7 +30,8 @@ export function findDuplicateDocs(): DupeGroup[] {
   const rows = db.prepare(
     // 승인 문답(origin=approved-qa, 2026-09-03)은 제목이 「승인문답:<id>」라 뿌리가 안 겹치지만, 원천에서 뺀다.
     // 침해사고 사례 문서(origin=incident-case)도 뺀다 — 제목이 「incident-case:<id>」라 뿌리가 전부 같아 **전부가 중복 후보**로 보인다(결정 ①).
-    "SELECT documentId, ingestedAt, chunks, category FROM memory_documents WHERE COALESCE(origin,'') <> 'approved-qa' AND COALESCE(origin,'') <> 'incident-case' ORDER BY ingestedAt DESC"
+    // ★ 뺄 origin 목록은 engine/docorigin.ts 한 곳 — 여기에 손으로 다시 적지 않는다.
+    `SELECT documentId, ingestedAt, chunks, category FROM memory_documents WHERE ${제품이쌓은문서_제외SQL()} ORDER BY ingestedAt DESC`
   ).all() as { documentId: string; ingestedAt: string; chunks: number; category: string | null }[];
   const 묶음 = new Map<string, typeof rows>();
   for (const r of rows) {
