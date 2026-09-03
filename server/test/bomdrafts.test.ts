@@ -76,6 +76,27 @@ describe("부품표 해석 초안 — 근거 검증", () => {
     expect(validateBomDraft(JSON.stringify({ summary: "충분히 긴 요약 문장입니다.", priorities: [{ name: "없음", version: "", license: "", why: "" }], caveats: [] }), parts)).toBeNull();
   });
 
+  it("모델이 「이름@버전」·「이름 (라이선스)」로 합쳐 써도 부품을 찾는다(격리 실측에서 첫 초안이 버려진 원인)", () => {
+    const v = validateBomDraft(JSON.stringify({ summary: "AGPL 부품이 있어 서비스 소스 공개를 요구받을 수 있습니다.", priorities: [
+      { name: "ghostscript@10.0", version: "", license: "AGPL-3.0", why: "서비스 소스 공개" },
+      { name: "readline (GPL-3.0)", version: "8.1", license: "GPL-3.0", why: "링크 소스 공개" },
+    ], caveats: [] }), parts)!;
+    expect(v).not.toBeNull();
+    expect(v.draft.priorities.map((p) => `${p.name}@${p.version}`)).toEqual(["ghostscript@10.0", "readline@8.1"]);
+    expect(v.dropped).toBe(0);
+  });
+
+  it("판본 없는 흔한 이름은 가장 흔한 SPDX로 풀이하고 그 사실을 말한다", async () => {
+    const prev = process.env.GIJO_BOM_EXPLAIN; process.env.GIJO_BOM_EXPLAIN = "0";
+    try {
+      const s = await explainLicense("AGPL");
+      expect(s).toMatch(/AGPL-3\.0-only — 등급 「/);
+      expect(s).not.toMatch(/판정불가/);
+      expect(s).toContain("판본이 없어 가장 흔한 AGPL-3.0-only으로 풀이");
+      expect(await explainLicense("AGPL-3.0-only")).not.toContain("판본이 없어");
+    } finally { if (prev === undefined) delete process.env.GIJO_BOM_EXPLAIN; else process.env.GIJO_BOM_EXPLAIN = prev; }
+  });
+
   it("프롬프트는 무거운 등급을 앞에 놓고 등급 이름을 규칙 원문 그대로 쓴다", () => {
     const p = buildBomDraftPrompt(input);
     expect(p.indexOf("ghostscript")).toBeLessThan(p.indexOf("openssl"));

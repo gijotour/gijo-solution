@@ -62,7 +62,7 @@ export function buildBomDraftPrompt(input: BomDraftInput): string {
   const 등급별 = Object.entries(input.summary).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(" · ");
   return [
     "다음은 규칙 엔진이 타사 부품표(SBOM)를 검수해 라이선스 등급을 매긴 결과다(이미 확정된 사실). 보안담당자에게 줄 해석 초안을 JSON으로만 써라.",
-    "규칙: summary는 2~3문장(한국어, 300자 이내) — 이 부품표를 쓰면 무엇을 요구받게 되는지. priorities는 **아래 목록에 있는 부품만** 최대 3건 — name·version·license를 목록 그대로 옮기고 why에 왜 먼저 봐야 하는지 한 줄.",
+    "규칙: summary는 2~3문장(한국어, 300자 이내) — 이 부품표를 쓰면 무엇을 요구받게 되는지. priorities는 **아래 목록에 있는 부품만** 최대 3건 — name에는 부품 이름만(버전은 version 칸, 라이선스는 license 칸에 따로), 목록 그대로 옮기고 why에 왜 먼저 봐야 하는지 한 줄.",
     "caveats는 담당자가 확인할 점(최대 3줄, 예: 라이선스 모름 부품은 공급사에 확인). 목록에 없는 부품·라이선스·숫자를 지어내지 마라. 법적 판단을 내리지 마라(등급·요구는 규칙이 이미 정했다).",
     `부품표: ${input.source} · 부품 ${input.componentCount}개 · 등급별: ${등급별 || "없음"}`,
     "부품:",
@@ -86,9 +86,13 @@ export function validateBomDraft(raw: unknown, components: BomComponentLite[]): 
   for (const p of Array.isArray(r.priorities) ? r.priorities : []) {
     if (!p || typeof p !== "object") { dropped += 1; continue; }
     const q = p as Record<string, unknown>;
-    const name = norm(q.name), version = norm(q.version);
+    // 모델이 「이름@버전」·「이름 (라이선스)」 꼴로 합쳐 쓰는 일이 잦다(격리 실측 2026-09-03) — 이름 칸에서 부품 이름만 떼어 본다.
+    const rawName = String(q.name ?? "").trim();
+    const name = norm(rawName.split(/[@(]/)[0]);
+    const version = norm(q.version) || norm(rawName.includes("@") ? rawName.split("@")[1]?.split(/[\s(]/)[0] : "");
     let hit = name ? components.find((c) => norm(c.name) === name && (!version || norm(c.version) === version)) : undefined;
     if (!hit && name) hit = components.find((c) => norm(c.name) === name); // 버전을 지어냈거나 비웠다 — 이름으로 교정
+    if (!hit && name) hit = components.find((c) => norm(c.name).includes(name) || name.includes(norm(c.name))); // 접두·접미(예: libssl vs openssl-libssl)
     if (!hit) { dropped += 1; continue; }
     if (out.some((x) => x.name === hit!.name && x.version === hit!.version)) continue;
     const why = String(q.why ?? "").trim().slice(0, 200);
@@ -98,6 +102,19 @@ export function validateBomDraft(raw: unknown, components: BomComponentLite[]): 
   if (out.length === 0) return null;
   const caveats = (Array.isArray(r.caveats) ? r.caveats : []).map((c) => String(c ?? "").trim()).filter((c) => c && 우리말(c)).slice(0, 3).map((c) => c.slice(0, 200));
   return { draft: { summary: summary.slice(0, 600), priorities: out, caveats }, dropped };
+}
+
+/** 검증이 왜 떨어졌는지 한 줄 — 로그·진단용(판정 로직은 validateBomDraft 하나, 여기서는 이유만 읽는다). */
+export function validateFailureReason(raw: unknown, components: BomComponentLite[]): string {
+  let o: unknown = raw;
+  if (typeof raw === "string") { try { o = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { return "JSON 파싱 실패"; } }
+  if (!o || typeof o !== "object") return "객체 아님";
+  const r = o as { summary?: unknown; priorities?: unknown };
+  const summary = String(r.summary ?? "").trim();
+  if (summary.length < 10) return "요약이 너무 짧음";
+  if (!우리말(summary)) return "요약에 한자가 섞였거나 한글이 없음";
+  const names = (Array.isArray(r.priorities) ? r.priorities : []).map((p) => String((p as Record<string, unknown>)?.name ?? "")).filter(Boolean);
+  return `우선 부품 ${names.length}건 중 검수 부품과 맞는 것 0 — 모델이 쓴 이름: ${names.join(", ").slice(0, 200)} / 검수 부품: ${components.map((c) => c.name).join(", ").slice(0, 200)}`;
 }
 
 type ChatFn = (args: { agentId: string; message: string; trusted: boolean; responseSchema?: unknown; maxTokens?: number }) => Promise<string>;
@@ -113,6 +130,8 @@ export async function draftBomInterpretation(input: BomDraftInput, deps?: { chat
     const out = await chat({ agentId: "bom", message: buildBomDraftPrompt(input), trusted: true, responseSchema: BOM_DRAFT_SCHEMA, maxTokens: 700 });
     const v = validateBomDraft(out, input.components);
     if (!v) {
+      // 원문과 실패 이유를 서버 로그에 남긴다 — 「맞지 않음」만으로는 프롬프트를 못 고친다(격리 실측 2026-09-03: 첫 왕복이 여기서 버려졌다).
+      console.warn(`[bomdrafts] 검증 실패 — ${validateFailureReason(out, input.components)} · 모델 원문: ${String(out).replace(/\s+/g, " ").slice(0, 1500)}`);
       emitCollaboration({ from: "bom", to: "orchestrator", message: `${input.source} 부품표 해석 초안 못 만듦 — 모델 출력이 검수 부품과 맞지 않아 버림(지어낸 부품은 남기지 않는다)` });
       return null;
     }
@@ -169,12 +188,21 @@ const EXPLAIN_MS = () => Math.max(500, Number(process.env.GIJO_BOM_EXPLAIN_MS ??
  * 라이선스 이름 하나를 받아 규칙 판정(등급·요구·근거, licenserisk 한 곳)을 먼저 적고, 그 뒤에 부품 팀원의 설명 2~3문장을 붙인다.
  * 규칙 문장은 항상 나간다. 설명은 모델이 시간 안에 못 오거나 한자가 섞이면 빠진다(사람이 읽는 줄만 거른다).
  */
+/** 판본 없는 흔한 이름(「AGPL」·「GPL」)은 규칙이 판정불가로 닫는다 — 가장 흔한 판본으로 풀이하되 그 사실을 말한다(추정을 숨기지 않는다). */
+const 흔한판본: Record<string, string> = { agpl: "AGPL-3.0-only", gpl: "GPL-3.0-only", lgpl: "LGPL-3.0-only", apache: "Apache-2.0", mit: "MIT", bsd: "BSD-3-Clause", mpl: "MPL-2.0", epl: "EPL-2.0" };
+export function 판본풀이(원문: string): { 이름: string; 추정: boolean } {
+  const k = 원문.trim().toLowerCase().replace(/\s|라이선스|license/g, "");
+  return 흔한판본[k] ? { 이름: 흔한판본[k], 추정: true } : { 이름: 원문.trim(), 추정: false };
+}
+
 export async function explainLicense(license: string, deps?: { chat?: ChatFn }): Promise<string> {
-  const 원문 = String(license ?? "").trim();
-  if (!원문) return "어느 라이선스인지 이름을 적어 주세요(예: AGPL-3.0, GPL-2.0, MIT, Apache-2.0).";
+  const 입력 = String(license ?? "").trim();
+  if (!입력) return "어느 라이선스인지 이름을 적어 주세요(예: AGPL-3.0, GPL-2.0, MIT, Apache-2.0).";
+  const 풀이 = 판본풀이(입력);
+  const 원문 = 풀이.이름;
   const 판정 = 등급판정(원문);
   const 줄 = [
-    `${표식.위치} ${원문} — 등급 「${판정.등급}」${판정.확인필요 ? " (확인 필요)" : ""}`,
+    `${표식.위치} ${원문} — 등급 「${판정.등급}」${판정.확인필요 ? " (확인 필요)" : ""}${풀이.추정 ? ` — 「${입력}」은 판본이 없어 가장 흔한 ${원문}으로 풀이했습니다. 실제 표기(판본·only/or-later)를 확인하세요` : ""}`,
     `  요구: ${판정.받게되는요구}`,
     `  근거: ${판정.근거}`,
     ...(상용사용금지(원문) ? [`  ${표식.주의} 상용 이용 금지 조건이 있는 라이선스입니다 — 상업 제품에 넣을 수 없습니다`] : []),
