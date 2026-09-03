@@ -102,6 +102,23 @@ describe("buildApproval — 값 출처 추적 (시안 B 핵심)", () => {
     expect(ap.effect).toContain("자산 인벤토리에 1건 추가");
     expect(ap.undo).toContain("삭제");
   });
+
+  // ★ 2026-09-04 win 격리 왕복 실측 — 결재판을 쓰는 **모든 도구** 공통 결함이었다.
+  //   fields는 지어낸 필수값을 지워 「비어 있음」으로 되묻는데, effect에는 **지우기 전** args가 넘어가
+  //   같은 카드 안에서 문장만 값을 확정해 말했다. 사람은 칸이 아니라 문장을 읽고 승인한다.
+  it("★ 지운 필수값은 「실행되면:」 문장에도 안 나오고, 빈 칸이라고 말한다", () => {
+    const ap = buildApproval(
+      findAgentTool("register_product")!,
+      { name: "경계 방화벽 FW-01", category: "방화벽" }, // 지시엔 없는 값 — 모델이 채웠다
+      "보안제품 등록해줘"
+    );
+    expect(ap.fields.find((f) => f.key === "name")!.value, "지시에 없는 필수값은 비운다").toBe("");
+    expect(ap.missing).toEqual(["name"]);
+    expect(ap.effect, "지운 제품명이 문장에 남았다 — 카드 안에서 말이 갈린다").not.toContain("경계 방화벽 FW-01");
+    expect(ap.effect).toContain("제품명은 아직 비어 있습니다 — 채워야 승인됩니다");
+    // 선택값의 추정은 종전대로 남는다(배지로 표시만) — 문장에서도 지우면 그건 과잉이다
+    expect(ap.effect).toContain("종류 방화벽");
+  });
 });
 
 describe("runAgentLoop — 쓰기 도구는 실행하지 않고 결재판을 돌려준다", () => {

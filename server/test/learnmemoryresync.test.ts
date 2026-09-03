@@ -178,6 +178,10 @@ describe("★ 배선 — 부팅에서 안 부르면 재시작마다 또 사라�
     expect(idx).toContain("syncApprovedQaDocsWithRetry()");
     // 사례 문서 동기화 **뒤에** 붙는다 — 둘이 임베딩 서버 한 대를 동시에 쓰면 서로 느려진다.
     expect(idx.indexOf("syncIncidentCaseDocsWithRetry()")).toBeLessThan(idx.indexOf("syncApprovedQaDocsWithRetry()"));
+    // ★ 그 앞에 제품 문서 인입이 온다(2026-09-04) — 빈 지식 베이스로 첫 부팅할 때 셋이 겹치면
+    //   「지식 표를 처음 만드는 순간」까지 경합해 사례 반입 3건이 실패하고 20초 재시도로 복구됐다.
+    expect(idx.indexOf("bootstrapDocsBundleWithRetry()")).toBeLessThan(idx.indexOf("syncIncidentCaseDocsWithRetry()"));
+    expect(idx, "셋을 줄줄이 잇지 않으면 순서가 말뿐이다").toContain(".then(() => syncIncidentCaseDocsWithRetry())");
   });
 
   it("연속 실패로 스스로 멈춘다 — 임베딩이 죽었을 때 남은 걸 다 갈아 감사만 더럽히지 않는다", () => {

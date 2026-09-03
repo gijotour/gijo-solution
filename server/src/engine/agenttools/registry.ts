@@ -2439,11 +2439,23 @@ export function buildApproval(
     if (source === "guess" && p.required) return { key: p.name, label: p.label, value: "", source: "empty" as const, required: true, hint: p.description };
     return { key: p.name, label: p.label, value, source, required: p.required, hint: p.description };
   });
+  // ★ 「실행되면:」도 **fields와 같은 값**을 본다(2026-09-04 win 격리 왕복 실측 수리).
+  //   예전엔 effect에 **지우기 전** args를 넘겨 한 카드 안에서 말이 갈렸다 — 필수칸은 「비어 있음」으로
+  //   되묻는데 문장은 「…(2017·제조·국내)를 등록합니다」라고 확정해 말했다(그 「제조」는 도구 설명의
+  //   예시값을 모델이 베낀 것이다). 사람은 칸이 아니라 **문장**을 읽고 승인하므로 이게 가장 나쁜 어긋남이다.
+  //   ⚠ 키를 지우지 않고 **빈 문자열**로 둔다 — delete하면 `args.name`을 그대로 잇는 effect가 「undefined」를 찍는다.
+  const effectArgs = { ...args };
+  for (const f of fields) if (!f.value) effectArgs[f.key] = "";
+  const effect = tool.effect ? tool.effect(effectArgs) : "";
+  // 빈 필수칸은 문장에서도 말한다 — 값이 사라진 자리를 침묵으로 두면 「보안제품 ""을 등록부에 추가」처럼 읽힌다.
+  //   ⚠ 도구가 이미 그 칸을 짚어 말했으면(사례 등록의 incidentCaseEffect가 사유를 열거한다) 두 번 말하지 않는다.
+  const 못짚은빈칸 = fields.filter((f) => f.required && !f.value && !effect.includes(f.label)).map((f) => f.label);
+  const 빈칸알림 = 못짚은빈칸.length ? `${말조사(못짚은빈칸.join("·"), "은")} 아직 비어 있습니다 — 채워야 승인됩니다` : "";
   return {
     tool: tool.name,
     label: tool.label,
     fields,
-    effect: tool.effect ? tool.effect(args) : "",
+    effect: [effect, 빈칸알림].filter(Boolean).join(" · "),
     undo: tool.undo ?? "",
     missing: fields.filter((f) => f.required && !f.value).map((f) => f.key),
     // ⌗기계 키 꼬리는 저장본에서 뗀다 — 이 지시문은 파인튜닝 골드 예시로 누적되는데 sha1이

@@ -768,6 +768,38 @@ export async function ingestDocument(filePath: string, scope: string = GLOBAL_SC
   return ingestText(path.basename(resolved), raw, scope, resolved, classify, uploadedBy);
 }
 
+// ── 빈 지식 베이스의 **첫 표 만들기**는 한 줄로 세운다 ──────────────────────────────
+//
+// ⚠ 왜: 표가 없을 때 동시에 들어온 인입은 셋 다 「표 없음」을 보고 **각자 만든다**. 하나만 이기고
+//   나머지는 `Table documents already exists` / `documents.lance not found`로 죽는다.
+//   2026-09-04 win 격리 왕복 실측: 빈 LanceDB로 첫 부팅하면 사례 문서 반입 3건이 그렇게 실패하고
+//   20초 뒤 재시도로 겨우 복구됐다 — **고객이 처음 켤 때마다 빨간 줄 세 개**를 보게 되는 자리다.
+//   (사례 문서 큐는 id별로 갈라져 있어(incidentcases.enqueue) 서로 다른 사례는 진짜로 동시에 온다.)
+// ⚠ 이 문은 **표가 없을 때만** 지난다 — 표가 생긴 뒤의 인입은 위쪽 붙이기(add) 경로라 여기 안 걸린다.
+//   그래서 상시 성능에는 영향이 없고, 부팅 한 번의 경합만 없앤다.
+// ⚠ 순서를 index.ts에서 잡는 것만으로는 안 막힌다 — 같은 부팅 안에서 사례 셋이 서로 경합하고,
+//   운영 중에도 「지식이 0건인 상태에서 동시 업로드」면 같은 일이 난다. 뿌리를 막는 자리가 여기다.
+let 표만들기줄: Promise<void> = Promise.resolve();
+async function 첫표만들기(
+  conn: lancedb.Connection,
+  documentId: string,
+  records: Record<string, unknown>[],
+): Promise<void> {
+  const 내차례 = 표만들기줄.then(async () => {
+    // 줄을 서서 **다시** 본다 — 기다리는 사이 앞사람이 만들었으면 그 표에 붙인다(내 표를 또 만들지 않는다).
+    if ((await conn.tableNames()).includes(TABLE_NAME)) {
+      const table = await conn.openTable(TABLE_NAME);
+      await table.delete(`documentId = '${escapeLiteral(documentId)}'`); // 재인입 멱등성 — 붙이기 경로와 같은 잣대
+      await table.add(records);
+      await refreshFtsIndex(table);
+      return;
+    }
+    await conn.createTable(TABLE_NAME, records);
+  });
+  표만들기줄 = 내차례.catch(() => {}); // 앞사람이 실패해도 뒷사람 차례는 온다(줄이 막히지 않는다)
+  await 내차례; // 실패는 호출부로 그대로 올린다 — 인입 한 건의 실패지 지식 전체의 실패가 아니다
+}
+
 // 이미 추출된 텍스트를 지식 베이스에 직접 넣는다 — 파일 업로드(PDF/HWPX 추출 후)나
 // 서버 밖 클라이언트에서 올린 문서용. ingestDocument는 파일을 읽어 이 함수로 위임한다.
 export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string, classify = false, uploadedBy?: string, category?: string, origin?: string): Promise<IngestResult> {
@@ -929,7 +961,7 @@ export async function ingestText(documentId: string, raw: string, scope: string 
       }
     }
   } else {
-    await db.createTable(TABLE_NAME, records);
+    await 첫표만들기(db, documentId, records);
   }
 
   // 문서 메타데이터 기록(업로드 시각·원본 경로) — 목록/삭제 화면용. 실패해도 수집은 성공 처리.

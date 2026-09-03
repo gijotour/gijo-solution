@@ -98,14 +98,19 @@ httpServer.listen(PORT, () => {
     .catch((err) => console.error("[kev] KEV 갱신 실패(캐시 유지):", err));
   // 제품 문서 기본 코퍼스를 지식베이스에 인입 — 이게 있어야 "이 화면 뭐예요"에 근거를 갖고
   // 답한다(비어 있으면 지어내거나 '자료 없음'만 답한다). 임베딩 서버 기동을 기다려 재시도한다.
-  void bootstrapDocsBundleWithRetry();
   void ensureKnowledgeBundle(); // 기본 지식 번들 버전 확인·자동 적용(멱등, 전-4)
   // 침해사고 사례 문서 — 표에 있는데 문서 없는 것만(멱등), 씨앗이 바뀐 것은 다시.
   // 그 **뒤에** 승인 문답 재동기화를 붙인다 — 둘 다 임베딩 서버 한 대(8081)를 쓰므로 겹치면 서로 느려지고,
   // 재동기화는 급하지 않다(다음 질문부터 쓰이면 된다). 앞이 실패해도 뒤는 돌아야 하므로 catch로 끊어 놓는다.
   //   왜 부팅에 이게 필요한가: 반입 큐는 메모리에만 있어 재시작에 증발한다. 2026-09-03 실측으로
   //   승인 1,856건 중 603건이 그렇게 사라졌고, 프로세스가 죽어 실패 기록조차 안 남았다.
-  void syncIncidentCaseDocsWithRetry()
+  // ★ 제품 문서 인입을 **앞에** 두고 줄줄이 잇는다(2026-09-04). 셋 다 임베딩 서버 한 대를 쓰는 데다,
+  //   빈 지식 베이스로 첫 부팅할 때는 「지식 표를 처음 만드는 순간」까지 겹쳐 서로 걸려 넘어졌다
+  //   (실측: 고객 첫 설치 부팅 로그에 사례 반입 실패 3줄 → 20초 뒤 재시도로 복구).
+  //   경합 자체는 memory.첫표만들기가 막지만, 순서까지 정해 두면 첫 부팅 로그가 애초에 깨끗하다.
+  void bootstrapDocsBundleWithRetry()
+    .catch((err) => console.error("[index] 제품 문서 인입 실패:", err))
+    .then(() => syncIncidentCaseDocsWithRetry())
     .catch((err) => console.error("[index] 사례 문서 동기화 실패:", err))
     .then(() => syncApprovedQaDocsWithRetry())
     .catch((err) => console.error("[index] 승인 문답 재동기화 실패:", err));

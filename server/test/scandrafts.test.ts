@@ -170,18 +170,19 @@ describe("📚 비슷한 침해사고 사례 — 해설(normaltic) 팀원의 부
     expect(getScanDraft(r!.id)!.caseNote).toBeNull();
   });
 
-  it("후보가 있으면 모델 부연을 붙이되, 후보 밖 사례·CVE를 쓰면 부연을 버리고 제목 줄만 남긴다 · 죽어도 제목 줄은 저장된다", async () => {
+  it("후보가 있으면 모델 부연을 붙이되, 후보 밖 번호·CVE를 쓰면 부연을 버리고 제목 줄만 남긴다 · 죽어도 제목 줄은 저장된다", async () => {
     const prev = process.env.GIJO_CASE_EXPLAIN; process.env.GIJO_CASE_EXPLAIN = "1";
     try {
       const c = registerIncidentCase(사례, "정요한");
       resetCollaborationForTests();
       const r = await draftScanInterpretation(보고서, { chat: 초안chat });
-      // ① 검증 통과 — 후보 제목을 그대로 쓴 부연
+      // ① 검증 통과 — 후보 **번호**를 그대로 쓴 부연(제목 받아쓰기는 시키지 않는다)
       const ok = await explainSimilarCases({ draftId: r!.id, findings: 걸리는항목 }, { chat: async (a) => {
         expect(a.agentId).toBe("normaltic");
         expect(a.responseSchema).toBeDefined(); // 스키마 강제 — normaltic 엄격 그라운딩(사내 자료 없으면 안 묻는다)을 비켜 후보만 재료로 쓴다
         expect(a.message).toContain("Log4Shell 대규모 악용");
-        return JSON.stringify({ note: "이 CVE는 2021년 Log4Shell 사고에서 실제로 쓰였습니다. 부품 목록이 없던 곳이 패치가 늦어 당했으니 우리도 SBOM부터 확인하세요.", cases: ["Log4Shell 대규모 악용"] });
+        expect(a.message, "후보를 「[ic-…] 제목」 꼴로 줘야 모델이 번호로 지목한다").toContain(`[${c.id}] Log4Shell 대규모 악용`);
+        return JSON.stringify({ caseIds: [c.id], note: "이 CVE는 2021년 Log4Shell 사고에서 실제로 쓰였습니다. 부품 목록이 없던 곳이 패치가 늦어 당했으니 우리도 SBOM부터 확인하세요." });
       } });
       expect(ok).toEqual({ caseIds: [c.id], caseNote: expect.stringMatching(/^🤖 이 CVE는 2021년 .* · CVE-2021-44228$/), ai: true });
       const row = getScanDraft(r!.id)!;
@@ -197,11 +198,13 @@ describe("📚 비슷한 침해사고 사례 — 해설(normaltic) 팀원의 부
       expect(Number(걸림![1]), "칩이 읽는 N과 실제 사례 수가 다르다").toBe(row.caseIds.length);
       expect(글.match(CVE판정), "칩이 히스토리를 좁혀 열 CVE를 본문에서 못 줍는다").toContain("CVE-2021-44228");
       expect(해설말풍선().some((m) => /^📚 비슷한 사례 1건 — Log4Shell 대규모 악용\(2021\)/.test(m))).toBe(true);
-      // ② 검증 실패 — 후보에 없는 사례 제목 / 지어낸 CVE / 한자 → 부연 버림, 제목 줄만
+      // ② 검증 실패 — 후보에 없는 번호 / 번호 없이 제목만 / 본문에 지어낸 사례 번호 / 지어낸 CVE / 한자 → 부연 버림, 제목 줄만
       for (const bad of [
-        JSON.stringify({ note: "2017년 워너크라이 사고와 같은 유형입니다 — 패치가 늦은 곳부터 당했습니다.", cases: ["워너크라이 대유행"] }),
-        JSON.stringify({ note: "CVE-2014-0160 하트블리드처럼 널리 퍼진 구멍이었습니다. 부품 목록부터 확인하세요.", cases: ["Log4Shell 대규모 악용"] }),
-        JSON.stringify({ note: "漏洞 악용 사고입니다 지금 확인하세요 열 글자 넘게", cases: ["Log4Shell 대규모 악용"] }),
+        JSON.stringify({ caseIds: ["ic-0000000000000000"], note: "2017년 워너크라이 사고와 같은 유형입니다 — 패치가 늦은 곳부터 당했습니다." }),
+        JSON.stringify({ caseIds: [], note: "Log4Shell 대규모 악용 사고와 같은 유형입니다 — 제목만 적고 번호를 안 골랐습니다." }),
+        JSON.stringify({ caseIds: [c.id], note: `ic-1234567890abcdef 사례도 같이 보십시오. 부품 목록부터 확인하세요.` }),
+        JSON.stringify({ caseIds: [c.id], note: "CVE-2014-0160 하트블리드처럼 널리 퍼진 구멍이었습니다. 부품 목록부터 확인하세요." }),
+        JSON.stringify({ caseIds: [c.id], note: "漏洞 악용 사고입니다 지금 확인하세요 열 글자 넘게" }),
         "JSON 아님",
       ]) {
         resetCollaborationForTests();
@@ -217,9 +220,28 @@ describe("📚 비슷한 침해사고 사례 — 해설(normaltic) 팀원의 부
       // ④ 시간 예산 — 늦으면 제목 줄만
       const prevMs = process.env.GIJO_CASE_EXPLAIN_MS; process.env.GIJO_CASE_EXPLAIN_MS = "500";
       try {
-        const 늦음 = await explainSimilarCases({ draftId: r!.id, findings: 걸리는항목 }, { chat: () => new Promise((res) => setTimeout(() => res(JSON.stringify({ note: "늦게 온 부연입니다 열 글자 넘게 씁니다", cases: ["Log4Shell 대규모 악용"] })), 1500)) });
+        const 늦음 = await explainSimilarCases({ draftId: r!.id, findings: 걸리는항목 }, { chat: () => new Promise((res) => setTimeout(() => res(JSON.stringify({ caseIds: [c.id], note: "늦게 온 부연입니다 열 글자 넘게 씁니다" })), 1500)) });
         expect(늦음!.ai).toBe(false);
       } finally { if (prevMs === undefined) delete process.env.GIJO_CASE_EXPLAIN_MS; else process.env.GIJO_CASE_EXPLAIN_MS = prevMs; }
+    } finally { if (prev === undefined) delete process.env.GIJO_CASE_EXPLAIN; else process.env.GIJO_CASE_EXPLAIN = prev; }
+  });
+
+  // ★ 2026-09-04 win 격리 왕복 수리 — 제목 받아쓰기를 시키던 시절 Qwen2.5-7B가 2/2 탈락했다.
+  //   부연은 멀쩡한데 **긴 제목(em대시·괄호가 섞인)을 못 옮겨** 떨어진 것이라, 지목을 번호로 바꿨다.
+  //   이 시험은 그 회귀를 지킨다: 제목을 한 글자도 안 옮겨도 번호만 맞으면 부연이 살아야 한다.
+  it("★ 작은 모델이 긴 제목을 못 옮겨도 **번호만 맞으면** 부연이 산다(제목 대조는 버렸다)", async () => {
+    const prev = process.env.GIJO_CASE_EXPLAIN; process.env.GIJO_CASE_EXPLAIN = "1";
+    try {
+      const 긴제목 = registerIncidentCase({ ...사례, title: "Log4Shell 대규모 악용 — 국내외 서버 전수 점검 사태(2021년 12월, Apache Log4j 2.x)", sourceUrl: "https://example.com/log4shell-long" }, "정요한");
+      const r = await draftScanInterpretation(보고서, { chat: 초안chat });
+      resetCollaborationForTests();
+      const v = await explainSimilarCases({ draftId: r!.id, findings: 걸리는항목 }, {
+        // 제목을 「Log4Shell 사고」로 줄여 쓴다 — 예전 잣대(제목 글자 그대로 대조)라면 여기서 떨어졌다.
+        chat: async () => JSON.stringify({ caseIds: [긴제목.id], note: "Log4Shell 사고에서 실제로 쓰인 구멍입니다. 우리도 어디에 Log4j가 있는지부터 찾아야 합니다." }),
+      });
+      expect(v!.ai, "번호로 지목했는데 부연이 버려졌다 — 제목 대조가 살아 있다").toBe(true);
+      expect(v!.caseNote).toMatch(/^🤖 Log4Shell 사고에서/);
+      expect(getScanDraft(r!.id)!.caseIds).toContain(긴제목.id);
     } finally { if (prev === undefined) delete process.env.GIJO_CASE_EXPLAIN; else process.env.GIJO_CASE_EXPLAIN = prev; }
   });
 
@@ -268,7 +290,7 @@ describe("📚 비슷한 침해사고 사례 — 해설(normaltic) 팀원의 부
     const v = await explainSimilarCases({ draftId: r!.id, findings: 걸리는항목 }, { chat: async () => { called += 1; return ""; } });
     expect(called).toBe(0);
     expect(v).toEqual({ caseIds: [c.id], caseNote: "Log4Shell 대규모 악용(2021) · CVE-2021-44228", ai: false });
-    expect(validateCaseNote(JSON.stringify({ note: "충분히 긴 우리말 부연 문장입니다.", cases: ["log4shell 대규모 악용"] }), [c], ["CVE-2021-44228"])!.matched).toEqual([c]); // 제목 대조는 공백·대소문자 무시
+    expect(validateCaseNote(JSON.stringify({ caseIds: [c.id.toUpperCase()], note: "충분히 긴 우리말 부연 문장입니다." }), [c], ["CVE-2021-44228"])!.matched).toEqual([c]); // 번호 대조는 공백·대소문자 무시
     expect(buildCaseExplainPrompt(["CVE-2021-44228"], [c])).toContain("교훈: 부품 목록(SBOM)");
   });
 });
@@ -397,7 +419,7 @@ describe("📚 반입 훅 — explainSimilarCasesForImport(저장 없음·말풍
     expect(listScanDrafts(5), "반입 훅이 초안을 만들거나 저장하면 안 된다").toEqual([]);
   });
 
-  it("모델을 켜면 부연이 붙고, 후보 밖 사례를 쓰면 제목 줄만 — 초안 훅과 **같은 문**을 나눠 쓴다(같은 잣대)", async () => {
+  it("모델을 켜면 부연이 붙고, 후보 밖 번호를 쓰면 제목 줄만 — 초안 훅과 **같은 문**을 나눠 쓴다(같은 잣대)", async () => {
     const prev = process.env.GIJO_CASE_EXPLAIN; process.env.GIJO_CASE_EXPLAIN = "1";
     try {
       const c = registerIncidentCase(사례, "정요한");
@@ -406,13 +428,13 @@ describe("📚 반입 훅 — explainSimilarCasesForImport(저장 없음·말풍
         expect(a.agentId).toBe("normaltic");
         expect(a.responseSchema).toBeDefined();
         expect(a.message).toContain("CVE: CVE-2021-44228");
-        expect(a.message).toContain("Log4Shell 대규모 악용");
-        return JSON.stringify({ note: "이 CVE는 2021년 Log4Shell 사고에서 실제로 쓰였습니다. 부품 목록부터 확인하세요.", cases: ["Log4Shell 대규모 악용"] });
+        expect(a.message).toContain(`[${c.id}] Log4Shell 대규모 악용`);
+        return JSON.stringify({ caseIds: [c.id], note: "이 CVE는 2021년 Log4Shell 사고에서 실제로 쓰였습니다. 부품 목록부터 확인하세요." });
       } });
       expect(ok).toEqual({ caseIds: [c.id], caseNote: expect.stringMatching(/^🤖 이 CVE는 2021년 .* · CVE-2021-44228$/), ai: true });
       expect(해설말풍선().some((m) => /^📚 비슷한 사례 1건 — nessus\.csv 반입.*🤖 이 CVE는 2021년/.test(m))).toBe(true);
       resetCollaborationForTests();
-      const bad = await explainSimilarCasesForImport({ source: "nessus.csv", findings: 새항목 }, { chat: async () => JSON.stringify({ note: "2017년 워너크라이 사고와 같은 유형입니다 — 패치가 늦은 곳부터 당했습니다.", cases: ["워너크라이 대유행"] }) });
+      const bad = await explainSimilarCasesForImport({ source: "nessus.csv", findings: 새항목 }, { chat: async () => JSON.stringify({ caseIds: ["ic-0000000000000000"], note: "2017년 워너크라이 사고와 같은 유형입니다 — 패치가 늦은 곳부터 당했습니다." }) });
       expect(bad).toEqual({ caseIds: [c.id], caseNote: "Log4Shell 대규모 악용(2021) · CVE-2021-44228", ai: false });
       expect(해설말풍선().some((m) => /못 만듦/.test(m)), "사유 없이 삼켰다").toBe(true);
       // 죽어도 던지지 않는다 — void 호출이라 거부된 약속은 아무도 못 받는다

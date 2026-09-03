@@ -37,7 +37,7 @@ import {
   hiddenBuiltinCaseIds, unhideBuiltinCases, incidentCaseDocId, INCIDENT_CASE_ORIGIN, INCIDENT_CASE_CATEGORY, CVE_ID_RE, LIMITS,
 } from "../src/engine/incidentcases";
 import { listAudit } from "../src/engine/audit";
-import { findAgentTool } from "../src/engine/agenttools/registry";
+import { findAgentTool, buildApproval } from "../src/engine/agenttools/registry";
 import { TARGETS } from "../src/engine/datacleanup";
 import { createUser } from "../src/auth/users";
 import { createApp } from "../src/app";
@@ -448,6 +448,34 @@ describe("배선 — 도구·정리 대장", () => {
     const 담당자것 = registerIncidentCase(국내, "김보안");
     expect(findAgentTool("delete_incident_case")!.effect!({ id: 담당자것.id })).toMatch(/김보안 등록을 지우고/); // 받침 있는 앞말은 「을」
   });
+  // ★ 2026-09-04 win 격리 왕복 실측 — 「사례 등록: 2017년 ○○사 랜섬웨어…」만 말했을 때 카드 안에서 말이 갈렸다.
+  //   업종·지역 칸은 「비어 있음」으로 되묻는데 「실행되면:」은 「(2017·제조·국내)를 등록합니다」라고 확정해 말했다
+  //   (그 「제조」는 도구 설명의 예시값 「예: 제조, 병원, 금융, 공공」을 모델이 베낀 것이다).
+  //   사람은 칸이 아니라 **문장**을 읽고 승인하므로, 지운 값은 문장에서도 사라져야 한다.
+  it("★ 결재판 카드 안에서 말이 갈리지 않는다 — fields에서 지운 추정값이 「실행되면:」 문장에 안 나온다", () => {
+    const 지시 = "사례 등록: 2017년 랜섬웨어로 공장이 멈춘 사고, 출처 https://example.com/ransom";
+    const ap = buildApproval(
+      findAgentTool("register_incident_case")!,
+      // 모델이 업종·지역을 지시에 없이 채워 넣은 상황(업종은 도구 설명의 예시값을 베꼈다)
+      { title: "랜섬웨어로 공장이 멈춘 사고", year: "2017", industry: "제조", region: "국내", sourceUrl: "https://example.com/ransom" },
+      지시,
+    );
+    const 칸 = (k: string) => ap.fields.find((f) => f.key === k)!;
+    expect(칸("industry").value, "지시에 없는 필수값은 비운다").toBe("");
+    expect(칸("region").value).toBe("");
+    expect(ap.missing).toContain("industry");
+    expect(ap.missing).toContain("region");
+    // ← 예전 결함: 아래 세 줄이 통과하지 못했다(문장이 「…(2017·제조·국내)를 등록합니다」였다)
+    //   ⚠ 「국내」 홑말로는 못 본다 — 부족 사유가 「지역(국내/해외)이 비었습니다」라 그 글자는 정당하게 들어 있다.
+    expect(ap.effect, "지운 업종이 문장에 남았다 — 카드 안에서 말이 갈린다").not.toContain("제조");
+    expect(ap.effect, "지운 값이 확정 문장으로 나갔다").not.toMatch(/\(2017·제조·국내\)/);
+    expect(ap.effect, "안 될 등록을 「등록합니다」라고 말했다").not.toContain("등록합니다");
+    expect(ap.effect).toMatch(/등록되지 않습니다 — 입력이 부족합니다/);
+    expect(ap.effect).toContain("업종이 비었습니다");
+    // 도구가 이미 그 칸을 짚어 말했으니 buildApproval이 같은 말을 덧붙이지 않는다(두 번 말하지 않는다)
+    expect(ap.effect).not.toContain("채워야 승인됩니다");
+  });
+
   it("incident_cases는 지식이다 — 정리 대장(TARGETS)에 없다(실사용 전환에서 안 지운다, 결정 ①)", () => {
     expect(Object.values(TARGETS).flatMap((t) => t.tables)).not.toContain("incident_cases");
   });

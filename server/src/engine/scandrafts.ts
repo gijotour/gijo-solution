@@ -231,13 +231,18 @@ export function formatScanDrafts(rows: ScanDraftRow[]): string {
 //
 // ■ 왜 해설 팀원인가: 등록부의 역할이 「용어 해설 · 사례 부연(사내 지식)」인데 실제 문은 복합 지시 파이프라인(dispatcher) 한 곳뿐이었다.
 //   과거 사고 사례는 침해사고 히스토리 표(incidentcases)가 규칙으로 찾고, 팀원은 **그 후보만 재료로** 2~4문장 쉬운 부연을 쓴다.
-// ■ 정직 규칙: 후보 0이면 침묵(호출 없음). 모델이 후보 밖 사례 제목·CVE를 쓰면 그 부연은 버리고 코드가 만든 제목 줄만 남긴다(지어내기 금지).
+// ■ 정직 규칙: 후보 0이면 침묵(호출 없음). 모델이 후보 밖 사례 번호·CVE를 쓰면 그 부연은 버리고 코드가 만든 제목 줄만 남긴다(지어내기 금지).
 //   모델이 늦거나(예산 GIJO_CASE_EXPLAIN_MS, 기본 8초) 죽어도 caseIds·제목 줄은 저장된다 — 규칙이 찾은 사실은 모델과 무관하다.
+// ★ 지목은 **제목이 아니라 번호(ic-…)로** 받는다(2026-09-04 win 격리 왕복 실측 수리).
+//   예전엔 모델이 돌려준 **제목**을 후보 제목과 글자 그대로 대조했는데, 긴 제목(em대시·괄호가 섞인)을
+//   Qwen2.5-7B가 못 옮겨 2/2 탈락했다 — 부연은 멀쩡한데 **베껴 쓰기 시험**에서 떨어진 것이다.
+//   번호는 짧고 형식이 고정이라 작은 모델도 옮긴다. 대신 「후보 밖은 버린다」는 잣대는 그대로 지킨다.
 export const CASE_EXPLAIN_SCHEMA = {
   type: "object",
-  // 키는 영문(스키마 강제 디코딩 관례). note=쉬운 부연, cases=부연에 쓴 사례 제목(후보 목록 그대로).
-  properties: { note: { type: "string" }, cases: { type: "array", items: { type: "string" } } },
-  required: ["note", "cases"],
+  // 키는 영문(스키마 강제 디코딩 관례). caseIds=부연에 쓴 사례 번호(후보 목록 안에서만), note=쉬운 부연.
+  //   ⚠ caseIds를 **앞에** 둔다 — 강제 디코딩은 이 차례대로 뽑으므로, 재료를 먼저 고르고 그 다음에 글을 쓰게 한다.
+  properties: { caseIds: { type: "array", items: { type: "string" } }, note: { type: "string" } },
+  required: ["caseIds", "note"],
 } as const;
 const CASE_EXPLAIN_MS = () => Math.max(500, Number(process.env.GIJO_CASE_EXPLAIN_MS ?? 8000));
 
@@ -250,35 +255,44 @@ export function cvesInFindings(findings: { code: string; name: string }[]): stri
 export function buildCaseExplainPrompt(cves: string[], 후보: IncidentCaseRow[]): string {
   return [
     "다음은 방금 등록된 취약점 점검 결과에 나온 CVE와, 규칙 엔진이 침해사고 히스토리에서 찾은 과거 사고 사례다(이미 확정된 사실). 보안담당자에게 줄 쉬운 부연을 JSON으로만 써라.",
+    "caseIds: 부연에 쓴 사례의 **번호**만 배열로 — 아래 목록의 대괄호 안 번호(ic-로 시작)를 그대로 옮긴다. 목록에 없는 번호는 쓰지 마라.",
     "note: 2~4문장(한국어, 400자 이내) — 이 취약점이 실제 사고에서 어떻게 쓰였고 담당자가 무엇을 조심해야 하는지, **아래 사례의 제목·한 줄·교훈만 재료로**. 목록에 없는 사례·회사·숫자·CVE를 지어내지 마라.",
-    "cases: 부연에 쓴 사례의 제목 — 아래 목록의 제목을 글자 그대로 옮긴다.",
     `CVE: ${cves.join(", ")}`,
     "사례:",
-    ...후보.map((c) => `- ${c.title} (${c.year}·${c.industry}·${c.region}) — ${c.oneLiner} / 교훈: ${c.lesson}`),
+    ...후보.map((c) => `- [${c.id}] ${c.title} (${c.year}·${c.industry}·${c.region}) — ${c.oneLiner} / 교훈: ${c.lesson}`),
   ].join("\n");
 }
 
+/** 사례 번호 꼴 — incidentcases.ID_RE(`ic-` + 16자리 16진수)와 같은 모양. 본문에서 「지어낸 번호」를 찾을 때만 쓴다(느슨하게 4자리부터 줍는다). */
+const CASE_ID_IN_TEXT = /ic-[0-9a-f]{4,}/gi;
+
 /**
- * 모델 출력을 후보와 대조한다 — cases의 제목은 후보 안의 것만 남고, 하나도 안 맞으면 null. note에 든 CVE는 보고서·후보의 CVE여야 한다.
+ * 모델 출력을 후보와 대조한다 — caseIds는 **후보 번호 안의 것만** 남고, 하나도 안 맞으면 null.
+ * note는 지어내기를 두 갈래로 본다: ① 보고서·후보 밖 CVE가 있으면 버린다 ② 후보 밖 사례 번호(ic-…)가 있으면 버린다.
  * (scandrafts.validateDraft와 같은 잣대: 지어낸 것은 떨어뜨리고, 전부 떨어지면 초안이 아니다.)
+ *
+ * ⚠ **제목 대조는 하지 않는다**(2026-09-04 수리). 제목을 글자 그대로 옮기게 하면 작은 모델(Qwen2.5-7B)이
+ *   긴 제목에서 떨어져 나가고, 그건 부연의 품질이 아니라 **받아쓰기 실력**을 재는 것이었다.
  */
 export function validateCaseNote(raw: unknown, 후보: IncidentCaseRow[], allowedCves: string[]): { note: string; matched: IncidentCaseRow[] } | null {
   let o: unknown = raw;
   if (typeof raw === "string") { try { o = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { return null; } }
   if (!o || typeof o !== "object") return null;
-  const r = o as { note?: unknown; cases?: unknown };
+  const r = o as { note?: unknown; caseIds?: unknown };
   const note = String(r.note ?? "").trim().slice(0, 500);
   if (note.length < 10 || !우리말(note)) return null;
-  const byTitle = new Map(후보.map((c) => [norm(c.title), c]));
+  const byId = new Map(후보.map((c) => [norm(c.id), c]));
   const matched: IncidentCaseRow[] = [];
-  for (const t of Array.isArray(r.cases) ? r.cases : []) {
-    const hit = byTitle.get(norm(t));
+  for (const t of Array.isArray(r.caseIds) ? r.caseIds : []) {
+    const hit = byId.get(norm(t));
     if (hit && !matched.includes(hit)) matched.push(hit);
   }
   if (!matched.length) return null;
   const 허용 = new Set([...allowedCves, ...후보.flatMap((c) => c.cves)].map((c) => c.toUpperCase()));
   const 지어낸CVE = extractLexicalTerms(note).codes.filter((c) => c.startsWith("CVE-") && !허용.has(c));
   if (지어낸CVE.length) return null;
+  const 지어낸번호 = (note.match(CASE_ID_IN_TEXT) ?? []).filter((id) => !byId.has(norm(id)));
+  if (지어낸번호.length) return null;
   return { note, matched };
 }
 
