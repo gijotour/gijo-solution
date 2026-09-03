@@ -96,6 +96,8 @@ def main() -> None:
     feats = [f for f in (render(r["question"], r["answer"]) for r in rows) if f]
     log(f"[finetune] 토큰화 — 사용 {len(feats)}쌍(길이 초과 제외 {len(rows) - len(feats)})")
     data = Dataset.from_list(feats)
+    # 총 스텝 = ceil(쌍 수 / 누적 16) × 에폭 — 아래 warmup_steps 환산에 쓴다(배치 1·누적 16과 같은 숫자여야 한다).
+    total_steps = -(-len(feats) // 16) * args.epochs
 
     def collate(batch):
         mx = max(len(b["input_ids"]) for b in batch)
@@ -134,7 +136,10 @@ def main() -> None:
         args=TrainingArguments(
             output_dir=args.output, num_train_epochs=args.epochs, learning_rate=args.lr,
             per_device_train_batch_size=1, gradient_accumulation_steps=16,
-            lr_scheduler_type="cosine", warmup_ratio=0.03, logging_steps=5,
+            # warmup은 비율이 아니라 스텝 수로 준다 — transformers 5.x(gb10 실측 5.16.1, 2026-09-03)에서
+            # warmup_ratio 인자가 사라져 TrainingArguments가 TypeError로 죽었다(3회전 학습 1차 실행).
+            # 0.03 비율을 총 스텝으로 환산한 값(최소 1)이라 4.x에서도 같은 뜻이다.
+            lr_scheduler_type="cosine", warmup_steps=max(1, round(0.03 * total_steps)), logging_steps=5,
             bf16=True, gradient_checkpointing=True, optim="paged_adamw_8bit",
             save_strategy="no", report_to=[], seed=42,
         ),
