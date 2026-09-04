@@ -5,9 +5,13 @@
 ```
 1일차  재료 확장(증류)        day1-distill.sh   → results-ladder/day1/<주제>-<회차>.json
 2일차  RAFT형 학습 → A/B      day2-train.sh     → results-ladder/day2/<회전>/
+       ↳ 표본 3조건 + KEV     team-bench/{ask-samples,kev-probe}.mjs → samples-*.json · kev.json
        ↳ 게이트               team-bench/gates.mjs → gate.json · gate.md
 3일차  판정(채택 여부)        사람이 한다 — 게이트는 「못 넘은 것을 막는」 자일 뿐이다
 ```
+
+한 번만 미리: `bash tools/ladder/day2-train.sh --baseline-probe` — 어댑터 **없는** 베이스로 같은
+표본 3조건 + KEV를 돌려 `results-ladder/baseline/`에 둔다. 관문 ①·⑧이 견줄 상대가 그 파일들이다.
 
 ## 어디서 도나
 
@@ -63,20 +67,63 @@
 나왔다(평시 24.5). `LADDER_SLOTS_URL=http://127.0.0.1:8080/slots`를 주면(gb10 안에서 돌 때)
 점유를 보고 판단한다.
 
-## 보고는 이 네 파일에서만 나온다
+## 보고는 이 파일들에서만 나온다
 
-게이트(`tools/team-bench/gates.mjs`)가 읽는 것은 **오직** 이 넷이다. 표의 모든 숫자는 여기서 온다.
+게이트(`tools/team-bench/gates.mjs`)가 읽는 것은 **오직** 아래 파일들이다. 표의 모든 숫자는 여기서 온다.
 
 | 원천 | 만든 자 | 게이트가 여기서 보는 것 |
 |---|---|---|
-| `easy/<모델>.json` | `run.mjs`(1회차 7과제) | 과제 점수 · 인용 20자 겹침 · 한글 · tok/s · 잘림 |
+| `easy/<모델>.json` | `run.mjs`(1회차 7과제) | 과제 점수 · 인용(겹침·인용) · 한글 · tok/s · 잘림 · 서술 답 길이 |
 | `hard/<모델>.json` | `run-r2.mjs`(2회차 6과제) | 위와 같음(13과제 평균의 나머지 절반) |
-| `samples.json` | 표본 답 수집 | 잘림 · (참고) 한글 · (참고) 근거 인용률 |
-| `kev.json` | KEV 발표 주체 물음 | 본문에서 CISA를 말하는가 3/3 |
+| `samples-grounded.json` | `ask-samples.mjs --mode grounded` | 관문 ⑧ — 정답 조각을 20자 그대로 옮겨 적는 비율 |
+| `samples-distractor-only.json` | `ask-samples.mjs --mode distractor-only` | 관문 ⑩ — 「자료에 없다」고 말하는 비율 |
+| `samples-bare.json` | `ask-samples.mjs --mode bare` | 관문 ⑨ — 「원문:」 창작 · (참고) 한글 · 잘림 |
+| `kev.json` | `kev-probe.mjs` | 관문 ① — 본문에서 CISA를 말하는가(베이스 대비) |
+| `harness-args.json` | day2-train.sh | **무슨 조건으로 던졌나** — 포트·서버·에이전트·명령줄 |
 
-기준선은 `tools/team-bench/results-ladder/baseline/`에 있고, **어디서 온 파일인지**는 그
+베이스 대조(관문 ①·⑧이 견줄 상대)는 `results-ladder/baseline/`의 `kev.json`·`samples-grounded.json`이고,
+`bash tools/ladder/day2-train.sh --baseline-probe`가 **어댑터 없이 한 번** 돌려 만든다.
+
+기준선(1·2회차 과제 점수)은 `tools/team-bench/results-ladder/baseline/`에 있고, **어디서 온 파일인지**는 그
 폴더의 `README.md`에 적혀 있다. 없는 입력은 「미측정」이고 **전체는 불합격**이다(fail-closed) —
 못 잰 것을 통과로 세면 게이트가 게이트가 아니다.
+
+### 표본 문항은 어디서 왔나 — `tools/team-bench/samples-questions.json`
+
+12문항은 gb10의 `~/bench/lora-vuln/samples-questions.json`(회전 1 때 쓴 그 파일)을 **한 글자도 안 바꾸고**
+옮겼다. 여기에 `chunk`(정답 조각 본문)·`distractor`(방해 조각 본문)를 채웠는데, 되찾는 방법은
+`tools/build-raft-dataset.mjs`가 학습 재료를 만들 때 쓰는 그 함수들(`refParse`·`방해조각고르기`)을
+**그대로 불러서** 했다 — 학습이 본 조각과 시험이 보는 조각이 갈리면 재는 것이 딴것이 된다.
+
+- 12문항 중 **8개만** 조각이 찼다. 나머지 4개는 원천이 `chat`이라 근거 ref 자체가 없다.
+  빈칸으로 두고, 하네스가 grounded에서 **건너뛰며 그 수를 결과에 적는다**(0으로 세지 않는다).
+- ⚠ **방해 조각 후보는 라이선스 허용목록으로 먼저 거른다.** 처음 회수했을 때 방해 8개 중 **4개가
+  타사 상용 제품 가이드**에서 왔다 — `방해조각고르기`에는 라이선스 판정이 안 걸려 있기 때문이다
+  (정답 조각에만 걸린다). 그 본문을 저장소에 넣으면 그냥 재배포다. `server/test/ladder.test.ts`가
+  실린 조각의 출처를 매번 대조한다.
+
+### 관문 11개 (2026-09-04 확장)
+
+| 관문 | 무엇을 막나 |
+|---|---|
+| ① kev | KEV 발표 주체가 **베이스 대비** 나빠졌다(절대 3/3은 참고값 — 베이스도 2/3이라 관문으로는 늘 빨강이었다) |
+| ② cite_overlap | glossary_cite의 「20자겹침」**과 「인용」** 둘 다 기준선 이상 |
+| ③ easy7_no_drop | 1회차 과제가 하나라도 떨어짐(미실시도 하락으로 본다) |
+| ④ avg13 | 13과제 평균이 기준선 초과가 아님 |
+| ⑤ truncated | 잘린 답(finish=length) |
+| ⑥ hangul | 한글 비율 하락 |
+| ⑦ tps_drop | 생성 속도 10% 초과 하락 |
+| ⑧ grounded_cite | **근거를 줘도** 옮겨 적지 않음(RAFT의 목적) |
+| ⑨ no_fake_quote | 근거를 **안 준** 자리에서 「원문:」을 지어냄 |
+| ⑩ no_evidence_says_so | **방해 조각만** 줬는데 「없다」고 말하지 않음 |
+| ⑪ len_drop | 점수는 그대로인데 서술 답만 40% 넘게 짧아짐 |
+
+⑧~⑪은 r1-base 회전을 뜯어 보고 뒤늦게 붙였다 — 그때까지 **RAFT의 목적(근거를 주면 인용한다)을
+재는 관문이 0개**였고, 실제로 난 회귀 두 가지(「원문:」 창작 · 서술 답 34~72% 축소)를 세는 코드도 없었다.
+
+⚠ **⑩의 기준 0.5는 아직 실측이 없는 임시값이다.** 「절반은 없다고 말해야 한다」는 느슨한 바닥으로
+잡아 뒀다 — 베이스 대조(`baseline/samples-distractor-only.json`)가 나오면 그 값을 보고 사람이 올린다.
+관문 기준을 옮기는 것은 기준선 교체와 같은 자리라 **사장님 결정**이다(gates.mjs `자료없음_최소비율`).
 
 ## 비밀값
 

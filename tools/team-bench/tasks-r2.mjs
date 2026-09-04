@@ -20,10 +20,17 @@
 // 인터페이스는 1회차와 같다: { id, role, 설명, messages, schema?, score(text) → {score, detail} }.
 // 채점은 전부 코드(정규식·필드 대조·개수)로만 한다 — LLM 채점기는 게이트 원칙(중-3)대로 쓰지 않는다.
 // 재료는 전부 이 파일 안에서 만든다(외부 파일 없음 — gb10에 복사 한 번이면 돈다).
+//   ⚠ 딱 하나 예외: **절 세기**(`절세기`)는 tasks.mjs에서 불러 쓴다. 두 회차의 「6절 서식」이 같은
+//     잣대여야 report_draft와 report_fix를 견줄 수 있는데, 규칙을 두 곳에 적으면 어긋난다 —
+//     실제로 두 곳 다 `includes(절이름)`이라는 **같은 구멍**을 갖고 있었고, 한쪽만 고치면 그때부터
+//     두 회차의 「절 N/6」이 서로 다른 뜻이 된다. day2-train.sh는 네 파일을 **함께** 복사하므로
+//     gb10에서도 그대로 돈다.
 // 등장하는 회사·사람·도메인·IP는 전부 지어낸 것이다(실제 조직·개인 정보 아님).
 //
 // 실행: run.mjs가 아니라 **run-r2.mjs**로 돌린다(run.mjs는 './tasks.mjs'를 고정으로 import 한다).
 //   node run-r2.mjs --only <model> --port 8093 --ctx 65536 --out results-r2
+
+import { 절세기 } from "./tasks.mjs";
 
 export const 한글비율 = (s) => {
   const t = (s || "").replace(/\s|[0-9A-Za-z[\]{}(),.:;"'`_\-/\\<>=+*#%|]/g, "");
@@ -238,7 +245,9 @@ export const R6 = {
   ],
   score(text) {
     const t = text || "";
-    let n = 0; for (const s of 필수절6) if (t.includes(s)) n++;
+    // ★ 2026-09-04: 예전에는 `t.includes(절이름)`이라 **절 이름을 나열만 해도 6/6**이었다(실측).
+    //   서식 회귀를 잡으려고 만든 채점기가 서식을 안 지킨 답에 만점을 줬다 — 잣대는 tasks.mjs 한 곳.
+    const { 수: n } = 절세기(t, 필수절6);
     const 기한 = /3\s*일/.test(t) ? 1 : 0;
     const 담당 = /인프라\s*팀/.test(t) ? 1 : 0;
     const ko = 한글비율(t);

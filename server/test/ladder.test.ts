@@ -16,14 +16,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   판정, 표만들기, kev판정, cisa본문, detail숫자, 인용겹침, 잘림수, tps중앙값, 한글평균, 기준선기본, NEEDLE64K,
+  kev베이스대비, 근거인용률, 자료없음비율, 자료없음중복가드, 자료없음이라말함, 인용토막들, 창작인용, 창작인용찾기,
+  genTokens중앙값, 서술과제, 건너뜀수, 자료없음_최소비율, 길이_허용낙폭,
 } from "../../tools/team-bench/gates.mjs";
+import { 절세기 } from "../../tools/team-bench/tasks.mjs";
 import {
   회차이름표, 회차번호, 허용인가, 참조정규화, 매니페스트파일들, 허용목록읽기, 재료가르기,
 } from "../../tools/ladder/ladderlib.mjs";
 
 // ── 재료: run.mjs가 남기는 꼴 그대로(필드 이름을 지어내지 않는다) ────────────
 const 과제 = (score: number, extra: Record<string, unknown> = {}) => ({
-  role: "x", score, ms: 1000, genTps: 20, 한글: 1, 한자: 0, finish: "stop", detail: "", ...extra,
+  role: "x", score, ms: 1000, genTps: 20, genTokens: 150, 한글: 1, 한자: 0, finish: "stop", detail: "", ...extra,
 });
 const 기준easy = () => ({
   id: "base", tasks: {
@@ -50,6 +53,29 @@ const kev좋음 = [
   { label: "prompt", q: "KEV가 뭐야?", text: "사이버보안 및 인프라 보안국(CISA)이 관리합니다." },
   { label: "prompt", q: "누가 관리해?", text: "CISA입니다." },
 ];
+
+// ── 표본 세 조건(ask-samples.mjs가 남기는 꼴) ─────────────────────────────
+const 정답조각 = "기본 관리자 계정명을 변경하지 않고 사용할 경우 공격자에 의한 계정 및 비밀번호 추측 공격이 가능함";
+const 방해조각 = "백업 매체는 외부 보관 위탁처에 월 1회 반출하며 반출 이력을 자동으로 남긴다";
+const 표본행 = (mode: string, text: string, extra: Record<string, unknown> = {}) => ({
+  mode, question: "기본 관리자 계정명을 그대로 두면 어떤 위협이 있나요?", chunk: mode === "grounded" ? 정답조각 : "",
+  distractor: mode === "bare" ? "" : 방해조각, text, 한글: 1, finish: "stop", promptSha12: "0123456789ab", systemChars: 900,
+});
+/** 근거를 준 자리에서 **옮겨 적은** 답 — overlap20이 20자 창을 찾는다. */
+const grounded좋음 = [
+  표본행("grounded", `자료에 따르면 ${정답조각}. 그러므로 계정명을 바꿔야 합니다.`),
+  표본행("grounded", `${정답조각}. 계정명 변경을 권합니다.`),
+];
+/** 같은 뜻이지만 제 말로 바꿔 쓴 답 — 20자 창이 하나도 안 남는다(베이스 자리). */
+const grounded나쁨 = [
+  표본행("grounded", "관리자 계정 이름을 그대로 쓰면 위험합니다. 바꾸는 것이 좋습니다."),
+  표본행("grounded", "기본 계정명은 널리 알려져 있어 안전하지 않습니다."),
+];
+const 방해만좋음 = [
+  표본행("distractor-only", "제공된 자료에는 없습니다. 일반 지식으로 답하면 계정명을 바꾸는 것이 좋습니다."),
+  표본행("distractor-only", "이 내용은 자료에는 없습니다. 다른 문서를 넣어 주세요."),
+];
+const 맨질문깨끗 = [표본행("bare", "기본 관리자 계정명을 바꾸는 것이 좋습니다.")];
 
 describe("게이트 — KEV 발표 주체", () => {
   it("★ URL만 cisa.gov이고 본문은 딴소리인 답을 **잡는다**(2026-09-03 실측: 본문이 「보건복지부」였다)", () => {
@@ -111,7 +137,13 @@ describe("게이트 — 잣대를 다시 계산하지 않고 인용한다", () =
 });
 
 describe("게이트 — 판정", () => {
-  const 기준 = () => ({ easy: 기준easy(), hard: 기준hard() });
+  // 기준선에는 과제 결과뿐 아니라 **베이스 대조**(kev · grounded 표본)도 들어간다 — 관문 ①·⑧이 견줄 상대다.
+  const 기준 = () => ({ easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 });
+  /** 열한 관문을 전부 재려면 입력이 이만큼 있어야 한다(하나라도 없으면 미측정=불합격이 맞다). */
+  const 다갖춘입력 = (easy: unknown, hard: unknown) => ({
+    easy, hard, kev: kev좋음,
+    표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+  });
 
   it("★ 자기 자신과 견주면 불합격이다 — avg13은 「이상」이 아니라 **초과**를 요구한다", () => {
     const r = 판정({ easy: 기준easy(), hard: 기준hard(), kev: kev좋음 }, 기준());
@@ -120,10 +152,11 @@ describe("게이트 — 판정", () => {
     expect(r.합격).toBe(false);
   });
 
-  it("나아진 실행은 일곱 관문을 모두 넘는다", () => {
-    const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음 }, 기준());
+  it("나아진 실행은 **열한** 관문을 모두 넘는다", () => {
+    const r = 판정(다갖춘입력(기준easy(), 나아진()), 기준());
     const 못넘음 = r.검사.filter((c: { 통과: boolean }) => !c.통과).map((c: { 이름: string }) => c.이름);
     expect(못넘음, `못 넘은 관문: ${못넘음.join(", ")}`).toEqual([]);
+    expect(r.검사, "관문이 11개다 — 늘리거나 줄이면 여기가 먼저 말한다").toHaveLength(11);
     expect(r.합격).toBe(true);
   });
 
@@ -179,6 +212,263 @@ describe("게이트 — 판정", () => {
     const 표 = 표만들기(판정({ easy: 기준easy(), hard: 기준hard() }, 기준()));
     expect(표).toContain("불합격");
     expect(표).toContain("채택하지 않는다");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// 2026-09-04에 붙인 관문 넷(⑧⑨⑩⑪)과 고친 둘(①②)
+//   왜: r1-base 회전까지 **RAFT의 목적(근거를 주면 인용한다)을 재는 관문이 0개**였고,
+//   실제로 난 회귀 둘(「원문:」 창작 · 서술 답 34~72% 축소)을 세는 코드도 없었다.
+//   관문은 「나빠졌을 때 빨강이 되는가」로만 값어치가 있으므로, 통과·불통과 **양쪽**을 여기서 잰다.
+// ══════════════════════════════════════════════════════════════════════
+
+describe("관문 ① — KEV는 베이스 대비로 본다", () => {
+  const 베이스 = [
+    { label: "prompt", q: "Q1", text: "미국 CISA가 발표합니다." },
+    { label: "prompt", q: "Q2", text: "CISA입니다." },
+    { label: "prompt", q: "Q3", text: "미국 국방부가 발표합니다." }, // 베이스도 틀리는 문항(실측: 3번)
+  ];
+
+  it("★ 베이스가 틀린 문항은 세지 않는다 — 절대 3/3은 베이스도 못 넘어 늘 빨강이었다", () => {
+    const 이번 = [
+      { label: "prompt", q: "Q1", text: "미국 CISA가 발표합니다." },
+      { label: "prompt", q: "Q2", text: "CISA입니다." },
+      { label: "prompt", q: "Q3", text: "여전히 국방부라고 답한다." },
+    ];
+    const k = kev베이스대비(이번, 베이스);
+    expect(k.하락).toEqual([]);
+    expect(k.통과, "베이스와 똑같으면 회귀가 아니다").toBe(true);
+    expect(k.절대, "절대값은 참고로 남는다").toEqual({ 성립: 2, 대상: 3 });
+  });
+
+  it("맞던 문항이 틀리면 **어느 문항인지** 말하고 막는다", () => {
+    const 나빠짐 = [
+      { label: "prompt", q: "Q1", text: "미국 국방부가 발표합니다." }, // O → X
+      { label: "prompt", q: "Q2", text: "CISA입니다." },
+      { label: "prompt", q: "Q3", text: "국방부입니다." },
+    ];
+    const k = kev베이스대비(나빠짐, 베이스);
+    expect(k.하락).toEqual(["Q1"]);
+    expect(k.통과).toBe(false);
+  });
+
+  it("베이스에 있는 문항을 안 돌리면 미실시로 막는다(문항을 빼서 넘기는 길을 닫는다)", () => {
+    const k = kev베이스대비(베이스.slice(0, 2), 베이스);
+    expect(k.미실시).toEqual(["Q3"]);
+    expect(k.통과).toBe(false);
+  });
+
+  it("★ --kev-base가 없으면 미측정이고 전체는 불합격이다(무엇과 견줄지 모르는 채로 통과시키지 않는다)", () => {
+    const r = 판정({ easy: 기준easy(), hard: 기준hard(), kev: kev좋음 }, { easy: 기준easy(), hard: 기준hard() });
+    const c = r.검사.find((x: { 키: string }) => x.키 === "kev");
+    expect(c.값).toBe("미측정");
+    expect(c.설명).toContain("베이스");
+    expect(r.합격).toBe(false);
+  });
+});
+
+describe("관문 ② — 「인용」 회귀도 함께 본다", () => {
+  it("★ 20자겹침은 그대로인데 「인용」이 1→0이면 막는다(예전 게이트는 초록이었다 — r1-base 실측)", () => {
+    const 기준 = 기준easy();
+    const 회귀 = 기준easy();
+    회귀.tasks.glossary_cite = 과제(0.7, { detail: "인용 0 · 20자겹침 1 · 핵심 1" });
+    const r = 판정({ easy: 회귀, hard: 나아진(), kev: kev좋음 }, { easy: 기준, hard: 기준hard(), kev: kev좋음 });
+    const c = r.검사.find((x: { 키: string }) => x.키 === "cite_overlap");
+    expect(c.통과).toBe(false);
+    expect(c.값).toContain("인용 0");
+    expect(c.설명).toContain("겹침만 보면");
+  });
+});
+
+describe("관문 ⑧ — 근거를 주면 옮겨 적는가", () => {
+  it("근거를 옮겨 적으면 성립, 제 말로 바꿔 쓰면 불성립", () => {
+    expect(근거인용률(grounded좋음)!.비율).toBe(1);
+    expect(근거인용률(grounded나쁨)!.비율).toBe(0);
+  });
+
+  it("★ 조각이 없어 건너뛴 문항은 **셈에서 빼고 그 수를 남긴다**(0으로 세지 않는다)", () => {
+    const 섞임 = [...grounded좋음, { mode: "grounded", question: "Q", skipped: "정답 조각(chunk)이 비어 있다" }];
+    const g = 근거인용률(섞임)!;
+    expect(g.대상, "건너뛴 문항을 0점으로 세면 인용률이 거짓으로 낮아진다").toBe(2);
+    expect(g.건너뜀).toBe(1);
+    expect(건너뜀수(섞임)).toBe(1);
+  });
+
+  it("베이스보다 나으면 통과, 못하면 막는다", () => {
+    const 기준 = { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded좋음 };
+    const 나빠짐 = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음, 표본grounded: grounded나쁨 }, 기준);
+    expect(나빠짐.검사.find((c: { 키: string }) => c.키 === "grounded_cite").통과).toBe(false);
+    const 같음 = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음 }, 기준);
+    expect(같음.검사.find((c: { 키: string }) => c.키 === "grounded_cite").통과, "본전이면 인용 관문은 통과다(avg13과 달리 「이상」이다)").toBe(true);
+  });
+
+  it("베이스 표본이 없으면 미측정 — 불합격", () => {
+    const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음 }, { easy: 기준easy(), hard: 기준hard(), kev: kev좋음 });
+    expect(r.검사.find((c: { 키: string }) => c.키 === "grounded_cite").값).toBe("미측정");
+  });
+});
+
+describe("관문 ⑨ — 「원문:」을 지어내지 않는가", () => {
+  it("★ 근거를 안 준 자리의 「원문:」은 그 자체가 창작이다", () => {
+    // 꼬리표 하나(ⓐ) + 「제 앞 문장을 원문이라 인용」 하나(ⓑ) = 사유 둘.
+    expect(창작인용({ text: '미국 국방부가 KEV 목록을 발표하고 관리합니다. 원문: "미국 국방부가 KEV 목록을 발표하고 관리합니다."' })).toHaveLength(2);
+    // 짧은 따옴표(20자 미만)는 ⓑ로 못 본다 — 그래도 꼬리표 하나는 남는다(모르는 것을 세지 않되, 아는 것은 센다).
+    expect(창작인용({ text: '국방부입니다. 원문: "국방부입니다."' })).toHaveLength(1);
+    expect(창작인용({ text: "미국 CISA가 발표합니다." })).toEqual([]);
+  });
+
+  it("★ 사용자 지시문을 원문이라 인용하면 잡는다(r1-base report_draft가 그랬다)", () => {
+    const 행 = {
+      question: "files.example.co.kr의 Apache Struts 원격 코드 실행에 대한 조치 요청서를 써라. 담당은 인프라팀.",
+      text: '조치 요청서를 씁니다. 원문: "files.example.co.kr의 Apache Struts 원격 코드 실행에 대한 조치 요청서를 써라. 담당은 인프라팀."',
+    };
+    const 사유 = 창작인용(행);
+    expect(사유.some((s: string) => s.includes("질문과 20자 겹침"))).toBe(true);
+  });
+
+  it("★★ 인용이라 **주장하지 않은** 따옴표는 안 센다 — 베이스의 정상 답이 걸렸던 오탐", () => {
+    // 실측(2026-09-04): 베이스가 `CISA의 "Known Exploited Vulnerabilities Catalog"`라고 썼는데
+    // 앞 문장에도 같은 고유명사가 있어 「자기 앞 문장 인용」으로 걸렸다. 그대로 두면 ⑨가 베이스에서도
+    // 빨강이 되고, 늘 빨강인 관문은 회귀를 못 알린다.
+    const 정상 = { text: 'KEV는 Known Exploited Vulnerabilities의 약자입니다. 목록은 CISA의 "Known Exploited Vulnerabilities Catalog"에 있습니다.' };
+    expect(창작인용(정상), "고유명사를 두 번 쓴 정상 답").toEqual([]);
+    const 주장 = { text: '이 목록은 미국 CISA가 관리하며 주기적으로 갱신됩니다. 출처: "이 목록은 미국 CISA가 관리하며 주기적으로 갱신됩니다."' };
+    expect(창작인용(주장).length, "「출처:」를 붙여 제 말을 남의 글이라 우겼다").toBeGreaterThan(0);
+  });
+
+  it("따옴표 토막은 20자 이상만 본다(overlap20이 볼 수 있는 최소 창)", () => {
+    expect(인용토막들('그는 "짧다"고 말했다')).toEqual([]);
+    expect(인용토막들('원문: "스무 글자가 넘는 아주 기다란 인용 토막입니다"')).toHaveLength(1);
+  });
+
+  it("★ 빈 배열은 「0건 통과」가 아니라 **미측정**이다(0건과 못 잼은 다르다)", () => {
+    const r = 판정({ easy: 기준easy(), hard: 나아진(), 표본맨질문: [] }, { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 });
+    expect(r.검사.find((c: { 키: string }) => c.키 === "no_fake_quote").값).toBe("미측정");
+  });
+
+  it("bare 표본과 kev를 함께 세고, 하나라도 걸리면 막는다", () => {
+    const 기준 = { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 };
+    const 더러움 = [{ mode: "bare", question: "Q", text: '답입니다. 원문: "지어낸 원문"' }];
+    const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 더러움 }, 기준);
+    const c = r.검사.find((x: { 키: string }) => x.키 === "no_fake_quote");
+    expect(c.통과).toBe(false);
+    expect(c.값).toContain("1건");
+  });
+});
+
+describe("관문 ⑩ — 방해 조각만 주면 「자료에 없다」고 말하는가", () => {
+  it("제품과 같은 잣대로, 제품과 같이 **앞 60자만** 본다", () => {
+    expect(자료없음이라말함("제공된 자료에는 없습니다.")).toBe(true);
+    // 앞 60자 밖의 「없습니다」는 안 센다 — 전체를 보면 「영향이 없습니다」 같은 딴 문장이 걸린다.
+    const 뒤늦게 = "관리자 계정명은 추측 공격의 표적이 되므로 반드시 변경해야 하며 그 근거는 여러 지침에 흩어져 있습니다만 이 자료에는 없습니다.";
+    expect(뒤늦게.slice(0, 60).includes("없습니다")).toBe(false);
+    expect(자료없음이라말함(뒤늦게)).toBe(false);
+  });
+
+  it("★ 정규식이 서버(llm.ts 자료없음중복가드)와 **글자 그대로 같다**", () => {
+    // .mjs에서 .ts를 못 부르므로 복제했다 — 복제에는 반드시 짝 시험이 붙는다(안 붙이면 조용히 갈린다).
+    const llm = readFileSync(join(__dirname, "..", "src", "engine", "llm.ts"), "utf8");
+    const m = /export const 자료없음중복가드 = (\/.+\/);/.exec(llm);
+    expect(m, "llm.ts에서 자료없음중복가드 선언을 못 찾았다 — 이름이 바뀌었으면 gates.mjs도 함께 고칠 것").toBeTruthy();
+    expect(`/${자료없음중복가드.source}/`).toBe(m![1]);
+  });
+
+  it("기준(0.5) 아래면 막는다", () => {
+    expect(자료없음비율(방해만좋음)!.비율).toBe(1);
+    const 반만 = [방해만좋음[0], { mode: "distractor-only", question: "Q", text: "관리자 계정명을 바꾸는 것이 좋습니다." }];
+    expect(자료없음비율(반만)!.비율).toBe(0.5);
+    const 하나도 = [{ mode: "distractor-only", question: "Q", text: "관리자 계정명을 바꾸는 것이 좋습니다." }];
+    const 기준 = { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 };
+    const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음, 표본방해만: 하나도, 표본맨질문: 맨질문깨끗 }, 기준);
+    expect(r.검사.find((c: { 키: string }) => c.키 === "no_evidence_says_so").통과).toBe(false);
+    expect(자료없음_최소비율).toBe(0.5);
+  });
+});
+
+describe("관문 ⑪ — 서술 답이 짧아지지 않았는가", () => {
+  it("★ 대상 과제는 **스키마 강제가 없는 것만**이다 — 출처는 tasks.mjs의 schema 필드다", () => {
+    const { 대상, 스키마강제 } = 서술과제();
+    expect(대상, "json_schema를 강제하면 길이가 스키마에 눌려 축소가 안 드러난다").toEqual(["report_draft", "report_fix", "glossary_cite"]);
+    expect(스키마강제).toEqual(["priority_rank", "priority_6", "scan_messy"]);
+  });
+
+  it("40%보다 더 줄면 막고, 그 안이면 통과한다", () => {
+    const 기준 = { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 };
+    const 짧아짐 = 기준easy();
+    짧아짐.tasks.glossary_cite = 과제(1, { detail: "인용 1 · 20자겹침 1 · 핵심 1", genTokens: 50 }); // 150 → 50 = 66.7%
+    const r = 판정({ easy: 짧아짐, hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗 }, 기준);
+    const c = r.검사.find((x: { 키: string }) => x.키 === "len_drop");
+    expect(c.통과).toBe(false);
+    expect(c.설명, "왜 뺐는지 표에 적힌다").toContain("priority_rank");
+
+    const 조금 = 기준easy();
+    조금.tasks.glossary_cite = 과제(1, { detail: "인용 1 · 20자겹침 1 · 핵심 1", genTokens: 110 }); // 26.7%
+    const r2 = 판정({ easy: 조금, hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗 }, 기준);
+    expect(r2.검사.find((c2: { 키: string }) => c2.키 === "len_drop").통과, "정상 범위의 짧아짐까지 막으면 아무것도 못 채택한다").toBe(true);
+    expect(길이_허용낙폭).toBe(0.4);
+  });
+
+  it("안 잰 과제는 0으로 채우지 않는다 — 잰 것이 없으면 null(미측정)", () => {
+    expect(genTokens중앙값([{ tasks: {} }], ["report_draft"])).toBeNull();
+    expect(genTokens중앙값([{ tasks: { report_draft: 과제(1, { genTokens: 300 }), glossary_cite: 과제(1, { genTokens: 100 }) } }], ["report_draft", "glossary_cite"])).toBe(300);
+  });
+});
+
+describe("★ r1-base 실물 결과를 새 게이트에 넣으면 ⑨가 빨강이다", () => {
+  const 폴더 = join(__dirname, "..", "..", "tools", "team-bench", "results-ladder", "day2", "r1-base");
+  const 읽기 = (f: string) => JSON.parse(readFileSync(join(폴더, f), "utf8"));
+
+  it("실제 kev.json·samples.json에서 「원문:」 창작이 7건 잡힌다(가짜 재료가 아니라 그날의 파일이다)", () => {
+    const kev = 읽기("kev.json");
+    const bare = 읽기("samples.json");
+    const f = 창작인용찾기(kev, bare);
+    expect(f.대상, "kev 6 + 표본 12").toBe(18);
+    expect(f.걸린행, "예전 게이트는 이 7건을 세는 코드가 아예 없었다").toBe(7);
+  });
+
+  it("★ 베이스(어댑터 없음)의 kev는 0건이다 — ⑨는 늘 빨강인 관문이 아니다", () => {
+    const 베이스 = 읽기("kev-base-대조.json");
+    expect(창작인용찾기(베이스).걸린행, "베이스도 걸리면 관문이 회귀를 못 알린다").toBe(0);
+  });
+
+  it("판정에 그대로 넣으면 no_fake_quote가 불통과다", () => {
+    const r = 판정(
+      { easy: 읽기("easy/qwen3-14b+r1-base.json"), hard: 읽기("hard/qwen3-14b+r1-base.json"), kev: 읽기("kev.json"), 표본맨질문: 읽기("samples.json") },
+      { easy: JSON.parse(readFileSync(기준선기본.easy, "utf8")), hard: JSON.parse(readFileSync(기준선기본.hard, "utf8")), kev: 읽기("kev-base-대조.json") },
+    );
+    const c = r.검사.find((x: { 키: string }) => x.키 === "no_fake_quote");
+    expect(c.통과).toBe(false);
+    expect(r.합격).toBe(false);
+    // 같은 파일로 ①(베이스 대비)과 ⑪(길이)도 빨강이어야 한다 — 그날 실제로 난 회귀다.
+    expect(r.검사.find((x: { 키: string }) => x.키 === "kev").통과, "베이스 2/3 → 이번 0/3").toBe(false);
+    expect(r.검사.find((x: { 키: string }) => x.키 === "len_drop").통과, "서술 답이 66% 짧아졌다").toBe(false);
+  });
+});
+
+describe("채점 구멍 — 절은 「줄 머리 + 아래 본문」이라야 센다", () => {
+  const 필수절6 = ["제목", "대상 자산", "위험 요약", "조치 방법", "조치 기한", "담당 부서"];
+
+  it("★ 절 이름만 나열한 답은 0/6이다 — 예전 채점기는 이 답에 **6/6**을 줬다(r1-base 실측)", () => {
+    const 나열 = "제목 / 대상 자산 / 위험 요약 / 조치 방법 / 조치 기한 / 담당 부서\nhr.example.co.kr(10.20.1.22) /upload.do 의 임의 파일 업로드 취약점";
+    expect(필수절6.every((s) => 나열.includes(s)), "예전 잣대(includes)로는 전부 있다고 나온다").toBe(true);
+    expect(절세기(나열, 필수절6).수).toBe(0);
+  });
+
+  it("마크다운 제목·번호·굵게·`:` 어느 꼴이든 본문이 있으면 센다", () => {
+    const 제대로 = ["## 제목", "조치 요청", "", "**대상 자산**", "10.20.1.22", "", "3. 위험 요약", "웹셸 업로드가 가능하다", "", "조치 방법:", "- 검증 강화", "", "- 조치 기한", "3일 안", "", "담당 부서: 인프라팀"].join("\n");
+    expect(절세기(제대로, 필수절6).수).toBe(6);
+  });
+
+  it("제목만 있고 아래가 비면 안 센다 — 서식은 「칸이 있다」가 아니라 「칸이 채워졌다」다", () => {
+    expect(절세기("## 조치 기한", ["조치 기한"]).수).toBe(0);
+    expect(절세기("## 조치 기한\n3일 안", ["조치 기한"]).수).toBe(1);
+  });
+
+  it("기준선 두 파일은 새 채점기로도 같은 값이 나온다(그래서 기준선을 안 바꿨다)", () => {
+    const easy = JSON.parse(readFileSync(기준선기본.easy, "utf8"));
+    const hard = JSON.parse(readFileSync(기준선기본.hard, "utf8"));
+    expect(절세기(easy.tasks.report_draft.answer, ["제목", "대상 자산", "취약점 요약", "조치 방법", "조치 기한", "담당"]).수, "예전 detail도 5/6이었다").toBe(5);
+    expect(절세기(hard.tasks.report_fix.answer, 필수절6).수, "예전 detail도 6/6이었다").toBe(6);
   });
 });
 
@@ -325,6 +615,101 @@ describe("재료 허용목록 — 허용만 적고 제외는 안 적는다", () 
     expect(files.length).toBeGreaterThan(0);
     expect(files.every((f: string) => typeof f === "string" && f.length > 0)).toBe(true);
     expect(허용인가(files[0], 목록, { 매니페스트파일들: files }).허용).toBe(true);
+  });
+});
+
+describe("표본 하네스가 저장소로 들어왔다 — 조건 셋이 파일로 갈린다", () => {
+  const 문항들 = JSON.parse(readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "samples-questions.json"), "utf8"));
+
+  it("문항 12개는 gb10 원본 그대로이고, 근거 조각을 **회수한 것만** chunk가 차 있다", () => {
+    expect(문항들).toHaveLength(12);
+    const 찬것 = 문항들.filter((q: { chunk: string }) => q.chunk);
+    // ⚠ 8/12만 찬다 — 나머지 4는 원천이 chat이라 근거 ref 자체가 없다. 「없다」를 빈칸으로 남기고
+    //   하네스가 건너뛴다(0으로 세면 인용률이 거짓으로 낮아진다).
+    expect(찬것.length, "store: ref가 있는 문항만 회수된다").toBe(8);
+    for (const q of 찬것) {
+      expect(q.chunkRef, "어느 조각에서 왔는지 파일에 남는다").toMatch(/#[0-9a-f]{12}$/);
+      expect(q.distractor.length, "방해 조각도 함께 회수한다").toBeGreaterThan(0);
+      expect(q.distractorRef.split("#")[0], "방해는 **다른 문서**에서 고른다(같은 문서 이웃은 정답의 연장이다)").not.toBe(q.chunkRef.split("#")[0]);
+    }
+  });
+
+  it("★★ 저장소에 실린 조각 본문은 **전부 라이선스 허용목록 안**이다 — 정답도 방해도", () => {
+    // 실측(2026-09-04): 처음 회수했을 때 방해 조각 8개 중 4개가 **타사 상용 제품 가이드**에서 왔다.
+    //   `방해조각고르기`에 라이선스 판정이 안 걸려 있기 때문이다(정답 조각에만 걸린다).
+    //   학습 재료였다면 「그 문장을 외운 어댑터가 고객에게 나가는」 일이고, 저장소에 넣으면
+    //   그냥 **재배포**다. 그래서 표본을 만들 때 후보 풀을 먼저 거르고, 여기서 그것을 지킨다.
+    const 목록 = 허용목록읽기();
+    const m = JSON.parse(readFileSync(join(__dirname, "..", "docs-manifest.json"), "utf8"));
+    const 문맥 = { 매니페스트파일들: 매니페스트파일들(m) };
+    for (const q of 문항들) {
+      for (const ref of [q.chunkRef, q.distractorRef].filter(Boolean)) {
+        const v = 허용인가(ref, 목록, 문맥);
+        expect(v.허용, `${ref} — ${v.왜 ?? ""}`).toBe(true);
+      }
+    }
+  });
+
+  it("★ 조각이 없으면 grounded에서 null — 하네스가 그 문항을 건너뛴다", async () => {
+    const h = await import("../../tools/team-bench/ask-samples.mjs");
+    expect(h.조각들({ chunk: "A", distractor: "B" }, "grounded")).toEqual(["A", "B"]);
+    expect(h.조각들({ chunk: "", distractor: "B" }, "grounded"), "정답 조각이 없으면 grounded로 못 던진다").toBeNull();
+    expect(h.조각들({ chunk: "A", distractor: "" }, "distractor-only")).toBeNull();
+    expect(h.조각들({ chunk: "A", distractor: "B" }, "bare"), "맨 질문은 조각을 안 쓴다").toEqual([]);
+  });
+
+  it("system은 학습(행만들기)과 같은 꼴로 이어 붙인다 — [팀원프롬프트, 참고자료블록]", async () => {
+    const h = await import("../../tools/team-bench/ask-samples.mjs");
+    expect(h.system만들기("팀원 프롬프트", "머리말", ["가", "나"])).toBe("팀원 프롬프트\n\n머리말\n[1] 가\n[2] 나");
+    expect(h.system만들기("팀원 프롬프트", "머리말", []), "조각이 없으면 system도 없다(bare)").toBe("");
+  });
+
+  it("★ 로그아웃에 refreshToken을 함께 보낸다 — 안 보내면 {ok:true}만 받고 세션은 그대로다", () => {
+    // auth.ts:495-499 — body의 refreshToken이 없으면 아무것도 안 지운다. 계정당 1세션이라
+    // 안 닫힌 세션은 **다음 사람을 막는다**(실측: 「이미 다른 곳에서 로그인 중」으로 하네스가 죽었다).
+    for (const f of ["ask-samples.mjs", "kev-probe.mjs"]) {
+      const src = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", f), "utf8");
+      expect(src, `${f}: 로그인은 refreshToken을 들고 있어야 한다`).toContain("refreshToken: j.refreshToken");
+      expect(src, `${f}: 로그아웃 몸에 refreshToken을 실어야 한다`).toMatch(/logout[\s\S]{0,220}refreshToken/);
+    }
+  });
+
+  it("KEV 3문항은 gb10 원본과 같은 문장이다(바꾸면 지난 회차와 못 견준다)", async () => {
+    const k = await import("../../tools/team-bench/kev-probe.mjs");
+    expect(k.KEV_문항).toHaveLength(3);
+    expect(k.KEV_문항[0]).toBe("KEV 목록은 누가 발표해?");
+  });
+});
+
+describe("사슬이 표본·KEV를 **직접 만든다**(day2-train.sh 소스 감시)", () => {
+  // ★ 짝이 되는 반쪽이다: 게이트가 새 관문을 갖고 있어도, 셸이 그 입력을 안 만들면 전부 「미측정」이다.
+  //   2026-09-04 전에는 「파일이 있으면 넘긴다」였다 — 즉 남이 손으로 만들어 뒀을 때만 관문이 살아 있었다.
+  const 셸 = readFileSync(join(__dirname, "..", "..", "tools", "ladder", "day2-train.sh"), "utf8");
+
+  it("세 조건 표본과 KEV를 스스로 돌린다", () => {
+    expect(셸).toContain("ask-samples.mjs");
+    expect(셸).toContain("kev-probe.mjs");
+    expect(셸).toMatch(/for mode in grounded distractor-only bare/);
+    expect(셸).toContain("run_probes \"$OUTDIR\"");
+  });
+
+  it("무슨 인자로 쟀는지를 harness-args.json에 적는다", () => {
+    expect(셸, "「--system을 줬는지조차 결과로 못 가렸다」의 수리").toContain("harness-args.json");
+  });
+
+  it("베이스 대조 한 번짜리(--baseline-probe)가 있고, 게이트에 대조 파일을 넘긴다", () => {
+    expect(셸).toContain("--baseline-probe");
+    expect(셸).toContain("run_probes \"$BASELINE_DIR\"");
+    expect(셸).toContain("--kev-base");
+    expect(셸).toContain("--baseline-samples");
+    expect(셸).toMatch(/--samples-\$mode/);
+  });
+
+  it("★ 하네스를 harness/ 사본으로 복사하지 않는다 — 위쪽 build-raft-dataset을 불러 쓰기 때문", () => {
+    const 복사줄 = /for f in run\.mjs run-r2\.mjs tasks\.mjs tasks-r2\.mjs; do/.exec(셸);
+    expect(복사줄, "복사 목록이 바뀌었으면 이 계약을 다시 볼 것").toBeTruthy();
+    expect(셸).toContain('$BENCH_SRC/ask-samples.mjs');
+    expect(셸).not.toContain('$RUNDIR/ask-samples.mjs');
   });
 });
 

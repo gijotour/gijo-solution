@@ -9,6 +9,10 @@
 #   export GIJO_ADMIN_USER=… GIJO_ADMIN_PASSWORD=…
 #   bash tools/ladder/day2-train.sh --round r1-base
 #        [--rounds tools/ladder/rounds.json] [--port 8093] [--skip-build] [--skip-train] [--only-gate]
+#   베이스 대조(어댑터 없이 한 번만):
+#   bash tools/ladder/day2-train.sh --baseline-probe [--port 8093]
+#        → results-ladder/baseline/{samples-grounded,samples-distractor-only,samples-bare,kev}.json
+#          관문 ①(KEV 하락 0)과 ⑧(근거 인용)은 **이 파일들이 있어야** 잰다(없으면 미측정=불합격).
 #
 # 나가는 코드: 0=합격 · 1=게이트 불합격 · 3=env 없음 · 6=쓰는 법/설정 틀림 · 7=환경 없음 · 8=단계 실패
 #
@@ -36,6 +40,7 @@ PORT=8093
 SKIP_BUILD=0
 SKIP_TRAIN=0
 ONLY_GATE=0
+BASELINE_PROBE=0
 SERVER="${GIJO_SERVER_URL:-http://localhost:4000}"
 VENV="${LADDER_VENV:-$HOME/venv-train}"
 CONVERT="${LADDER_CONVERT:-$SERVER_DIR/llama.cpp-next/convert_lora_to_gguf.py}"
@@ -50,10 +55,89 @@ while [ $# -gt 0 ]; do
     --skip-build) SKIP_BUILD=1; shift ;;
     --skip-train) SKIP_TRAIN=1; shift ;;
     --only-gate) ONLY_GATE=1; SKIP_BUILD=1; SKIP_TRAIN=1; shift ;;
+    --baseline-probe) BASELINE_PROBE=1; shift ;;
     --server) SERVER="$2"; shift 2 ;;
     *) echo "모르는 인자: $1" >&2; exit 6 ;;
   esac
 done
+
+BENCH_SRC="$REPO/tools/team-bench"
+BASELINE_DIR="$BENCH_SRC/results-ladder/baseline"
+
+# ── 표본·KEV 시험(공용) ──────────────────────────────────────────────
+# ⚠ ask-samples.mjs·kev-probe.mjs는 **저장소 자리에서** 부른다(harness/ 사본으로 복사하지 않는다) —
+#   `../build-raft-dataset.mjs`(근거 조립 함수)를 불러 쓰므로 옮기면 그 import가 깨진다.
+# ⚠ 학습 꼴과 같은 근거 블록을 서버에서 받아 오므로 GIJO_ADMIN_* 가 필요하다(bare는 서버 없이도 된다).
+run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
+  local dir="$1" who="$2"
+  mkdir -p "$dir"
+  ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
+  for mode in grounded distractor-only bare; do
+    if ladder_have "$dir/samples-$mode.json"; then
+      ladder_log "   표본[$mode] 건너뜀 — 이미 있다"
+      continue
+    fi
+    ladder_log "   표본[$mode] ($who) — 포트 $PORT"
+    PORT="$PORT" node "$BENCH_SRC/ask-samples.mjs" "$dir/samples-$mode.json" --mode "$mode" --server "$SERVER" --agent "${AGENT:-normaltic}" \
+      2>&1 | tee "$dir/samples-$mode.log"
+    [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ 표본[$mode] 실패 — $dir/samples-$mode.log" >&2; return 8; }
+  done
+  if ladder_have "$dir/kev.json"; then
+    ladder_log "   KEV 건너뜀 — 이미 있다"
+  else
+    ladder_log "   KEV 3문항 ($who) — 포트 $PORT"
+    PORT="$PORT" node "$BENCH_SRC/kev-probe.mjs" "$dir/kev.json" --server "$SERVER" --agent "${AGENT:-normaltic}" 2>&1 | tee "$dir/kev.log"
+    [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ KEV 시험 실패 — $dir/kev.log" >&2; return 8; }
+  fi
+  # ★ 무슨 인자로 쟀는지를 파일로 남긴다 — 「--system을 줬는지조차 결과로 못 가렸다」의 수리.
+  node -e '
+    const fs = require("node:fs");
+    const [out, port, server, agent, who] = process.argv.slice(1);
+    fs.writeFileSync(out, JSON.stringify({
+      누구: who, 잰때: new Date().toISOString(), port: Number(port), server, agent,
+      표본: ["grounded", "distractor-only", "bare"].map((m) => `ask-samples.mjs samples-${m}.json --mode ${m} --server ${server} --agent ${agent}`),
+      kev: `kev-probe.mjs kev.json --server ${server} --agent ${agent}`,
+      "왜 적나": "결과 파일만 보고 어떤 조건으로 던졌는지 가릴 수 있어야 한다(2026-09-04 수리).",
+    }, null, 2));
+  ' "$dir/harness-args.json" "$PORT" "$SERVER" "${AGENT:-normaltic}" "$who"
+  ladder_log "   인자 기록 → $dir/harness-args.json"
+}
+
+# ── 베이스 대조 한 번짜리 ────────────────────────────────────────────
+# 어댑터 **없이** 베이스 모델을 띄워 같은 3조건 + KEV를 돌린다. 관문 ①·⑧이 견줄 상대를 만드는 단계다.
+if [ "$BASELINE_PROBE" -eq 1 ]; then
+  ladder_log "베이스 대조 — 어댑터 없이 3조건 + KEV (→ $BASELINE_DIR)"
+  BASE_GGUF="${LADDER_BASE_GGUF:-$SERVER_DIR/models/qwen3-14b/qwen3-14b.gguf}"
+  [ -s "$BASE_GGUF" ] || { echo "✗ 베이스 모델 파일 없음: $BASE_GGUF (LADDER_BASE_GGUF로 바꿀 수 있다)" >&2; exit 7; }
+  LLAMA_BIN="${LLAMA_SERVER:-$SERVER_DIR/llama.cpp-next/build/bin/llama-server}"
+  [ -x "$LLAMA_BIN" ] || { echo "✗ llama-server 없음: $LLAMA_BIN" >&2; exit 7; }
+  mkdir -p "$BASELINE_DIR"
+  if curl -s -o /dev/null -m 3 "http://127.0.0.1:$PORT/health" 2>/dev/null; then
+    echo "✗ 포트 $PORT 가 이미 쓰이고 있다 — 남의 모델을 재게 된다. 다른 --port를 쓰거나 그 서버를 내려라." >&2
+    exit 8
+  fi
+  # ⚠ setsid를 쓰지 않는다 — `setsid cmd &` 의 `$!`는 setsid의 PID라 **정작 llama-server를 못 죽인다**
+  #   (학습과 달리 이 서버는 몇 분짜리라 세션에서 떼어 놓을 이유도 없다). nohup으로 HUP만 막는다.
+  nohup "$LLAMA_BIN" -m "$BASE_GGUF" -ngl -1 --ctx-size 32768 --parallel 1 --port "$PORT" --jinja \
+    --reasoning off --reasoning-budget 0 > "$BASELINE_DIR/serve-base.log" 2>&1 < /dev/null &
+  SERVE_PID=$!
+  # 사람이 끊어도(Ctrl+C) 8093에 두뇌를 남기지 않는다 — 남기면 다음 회전이 「남의 모델」을 재게 된다.
+  trap 'kill "$SERVE_PID" 2>/dev/null; exit 130' INT
+  trap 'kill "$SERVE_PID" 2>/dev/null; exit 143' TERM
+  ladder_log "   베이스 적재 중(pid $SERVE_PID) — 로그 $BASELINE_DIR/serve-base.log"
+  BASE_READY=0
+  for _ in $(seq 1 300); do
+    if curl -s -o /dev/null -m 3 "http://127.0.0.1:$PORT/health" 2>/dev/null; then BASE_READY=1; break; fi
+    kill -0 "$SERVE_PID" 2>/dev/null || break
+    sleep 2
+  done
+  [ "$BASE_READY" -eq 1 ] || { echo "✗ 베이스 서버가 안 떴다 — $BASELINE_DIR/serve-base.log" >&2; kill "$SERVE_PID" 2>/dev/null; exit 8; }
+  run_probes "$BASELINE_DIR" "베이스(어댑터 없음)"
+  PROBE_RC=$?
+  kill "$SERVE_PID" 2>/dev/null
+  ladder_log "베이스 대조 끝(코드 $PROBE_RC) — 이 파일들을 --kev-base·--baseline-samples 로 준다"
+  exit "$PROBE_RC"
+fi
 
 [ -n "$ROUND" ] || { echo "✗ --round <id> 가 필요하다. 있는 회전: $(node -e 'const j=require(process.argv[1]);console.log((j.회전||[]).map(r=>r.id).join(", "))' "$ROUNDS_FILE" 2>/dev/null)" >&2; exit 6; }
 [ -s "$ROUNDS_FILE" ] || { echo "✗ 회전 설정 없음: $ROUNDS_FILE" >&2; exit 6; }
@@ -161,7 +245,6 @@ fi
 # ── ④ A/B — 8093에 어댑터를 얹어 13과제를 돌린다 ─────────────────────
 # ⚠ 공유 ~/bench/models.json 을 안 고친다. run.mjs 는 **자기 옆의** models.json을 읽으므로,
 #   회전 폴더에 사본을 만들어 거기서 돌린다(다른 갈래가 같은 파일을 쓰고 있을 수 있다).
-BENCH_SRC="$REPO/tools/team-bench"
 RUNDIR="$OUTDIR/harness"
 mkdir -p "$RUNDIR"
 for f in run.mjs run-r2.mjs tasks.mjs tasks-r2.mjs; do
@@ -203,11 +286,32 @@ if [ "$ONLY_GATE" -eq 0 ]; then
   fi
 fi
 
+# ── ④-2 표본 3조건 + KEV — **사슬이 직접 만든다** ────────────────────
+# ⚠ 2026-09-04 수리: 예전에는 「$OUTDIR/samples.json 이 있으면 게이트에 넘긴다」였다. 즉 남이 손으로
+#   만들어 둔 파일이 있을 때만 관문 ①(KEV)이 살아 있었고, 없으면 조용히 빠졌다. 관문이 「있을 때만」
+#   도는 것은 관문이 아니다 — 만드는 것까지 사슬 안으로 들여온다.
+if [ "$ONLY_GATE" -eq 0 ]; then
+  ladder_log "④-2 표본 3조건 + KEV (회전 $ROUND)"
+  run_probes "$OUTDIR" "회전 $ROUND"
+  PROBE_RC=$?
+  [ "$PROBE_RC" -eq 0 ] || exit "$PROBE_RC"
+fi
+
 # ── ⑤ 게이트 ─────────────────────────────────────────────────────────
 ladder_log "⑤ 게이트"
 GATE_ARGS=(--easy "$OUTDIR/easy/$MODEL_ID.json" --hard "$OUTDIR/hard/$MODEL_ID.json" --out "$OUTDIR" --label "$ROUND")
+for mode in grounded distractor-only bare; do
+  [ -s "$OUTDIR/samples-$mode.json" ] && GATE_ARGS+=("--samples-$mode" "$OUTDIR/samples-$mode.json")
+done
+# 옛 회전이 남긴 samples.json(맨 질문 한 벌)이 있으면 참고 표본으로 함께 넘긴다.
 [ -s "$OUTDIR/samples.json" ] && GATE_ARGS+=(--samples "$OUTDIR/samples.json")
 [ -s "$OUTDIR/kev.json" ] && GATE_ARGS+=(--kev "$OUTDIR/kev.json")
+# 베이스 대조 — 없으면 관문 ①·⑧이 「미측정=불합격」이 된다(그게 맞다: 무엇과 견줄지 모르는 채로 통과시키지 않는다).
+[ -s "$BASELINE_DIR/kev.json" ] && GATE_ARGS+=(--kev-base "$BASELINE_DIR/kev.json")
+[ -s "$BASELINE_DIR/samples-grounded.json" ] && GATE_ARGS+=(--baseline-samples "$BASELINE_DIR/samples-grounded.json")
+if [ ! -s "$BASELINE_DIR/kev.json" ] || [ ! -s "$BASELINE_DIR/samples-grounded.json" ]; then
+  ladder_log '⚠ 베이스 대조 파일이 없다 — 먼저 「bash tools/ladder/day2-train.sh --baseline-probe」를 한 번 돌려라(관문 ①·⑧이 미측정으로 막힌다)'
+fi
 node "$REPO/tools/team-bench/gates.mjs" "${GATE_ARGS[@]}"
 GATE_RC=$?
 
