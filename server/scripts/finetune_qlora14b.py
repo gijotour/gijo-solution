@@ -28,6 +28,15 @@ def main() -> None:
     # 여기 기본값을 올리지 않는 이유: 손으로 부르는 옛 명령들의 VRAM 발자국을 말없이 키우지 않으려는 것.
     p.add_argument("--max-seq", type=int, default=1024)
     p.add_argument("--rank", type=int, default=16)
+    # [2026-09-04 · 2회전] 사다리 회전마다 「어느 에폭이 제일 나았나」를 사후에 못 물었다 —
+    # 1회전은 3에폭을 통째로 굽고 마지막 것만 남겼다(5시간 20분). 중간 어댑터가 남으면 다시 안 구워도 된다.
+    p.add_argument("--save-epochs", action="store_true",
+                   help="에폭마다 checkpoint-* 를 어댑터 폴더에 남긴다(기본 off — 지금까지와 같다)")
+    # 학습 손실만 보면 「외웠는지」와 「배웠는지」를 못 가른다. 떼어 둔 행의 손실이 오르기 시작하는 지점이 과적합이다.
+    p.add_argument("--eval-holdout", type=int, default=0,
+                   help="N행을 **결정적으로** 떼어 평가용으로 쓴다(기본 0 = 안 뗀다)")
+    # LoRA alpha = rank × 이 값. 지금까지 코드에 2가 박혀 있어 「세기」를 실험할 수 없었다.
+    p.add_argument("--lora-alpha-mult", type=float, default=2.0)
     # --smoke: GPU·학습 의존성 없이 **파이프라인 계약만** 확인한다(시험·CI 전용).
     #   원클릭 루프가 이 스크립트를 부르게 되면서 필요해졌다 — 예전 스크립트에는 있고
     #   여기엔 없어, 배선을 바꾸면 스모크 시험이 통째로 죽는다(2026-08-08).
@@ -49,6 +58,13 @@ def main() -> None:
             smoke_rows = [r for r in json.load(f) if r.get("question") and r.get("answer")]
         with_system = sum(1 for r in smoke_rows if str(r.get("system") or "").strip())
         log(f"[finetune] (smoke) 행 {len(smoke_rows)} · 근거(system) 실린 행 {with_system} · max_seq={args.max_seq}")
+        # 새 인자가 **받아들여졌는지**를 스모크가 말한다 — 이름이 틀리면 argparse가 여기 오기 전에 죽고,
+        # 조용히 무시되면 「켰다고 믿은 채」 안 켜진 학습을 몇 시간 돌린다(1회전의 warmup_ratio 사고 계보).
+        log(f"[finetune] (smoke) save_epochs={int(args.save_epochs)} · eval_holdout={args.eval_holdout} · lora_alpha_mult={args.lora_alpha_mult}")
+        if args.eval_holdout > 0:
+            # 평가 줄의 꼴을 스모크에서도 한 번 낸다 — 화면 파서(finetune.ts)가 `step N/M loss=`만 읽으므로
+            # 이 줄은 그 정규식에 **걸리지 않아야** 한다(걸리면 진행률 막대가 평가 손실로 튄다).
+            log(f"eval 10/10 eval_loss={0.5000:.4f}")
         os.makedirs(args.output, exist_ok=True)
         # 다음 단계(GGUF 변환)가 읽을 자리의 **모양만** 갖춘다. 내용은 학습물이 아니므로
         # 실제 변환은 하지 않는다 — 루프도 스모크에서는 변환을 건너뛴다.
@@ -116,7 +132,22 @@ def main() -> None:
         log(f"[finetune] ⚠ 재료의 {dropped / len(rows) * 100:.0f}%가 길이 초과로 빠졌습니다 — --max-seq(현재 {args.max_seq})를 올리거나 근거 조각 수를 줄이세요")
     if not feats:
         log("[finetune] 길이 조건을 통과한 행이 없습니다 — 중단"); sys.exit(1)
+
+    # 평가용 떼어내기 — **결정적**이다(내용 해시 정렬). 무작위로 떼면 회전마다 다른 시험지로 재게 돼
+    # 「2회전이 나아졌다」를 비교할 수 없다. 씨앗(seed=42)은 섞기용이지 이 선택에는 안 쓴다.
+    eval_feats = []
+    if args.eval_holdout > 0:
+        if args.eval_holdout >= len(feats):
+            log(f"[finetune] --eval-holdout({args.eval_holdout})이 재료({len(feats)})보다 많거나 같습니다 — 중단"); sys.exit(1)
+        import hashlib
+        order = sorted(range(len(feats)), key=lambda i: hashlib.sha1(str(feats[i]["input_ids"]).encode()).hexdigest())
+        held = set(order[: args.eval_holdout])
+        eval_feats = [feats[i] for i in sorted(held)]
+        feats = [f for i, f in enumerate(feats) if i not in held]
+        log(f"[finetune] 평가용으로 {len(eval_feats)}행을 뗐습니다 — 학습 {len(feats)}행")
+
     data = Dataset.from_list(feats)
+    eval_data = Dataset.from_list(eval_feats) if eval_feats else None
     # 총 스텝 = ceil(쌍 수 / 누적 16) × 에폭 — 아래 warmup_steps 환산에 쓴다(배치 1·누적 16과 같은 숫자여야 한다).
     total_steps = -(-len(feats) // 16) * args.epochs
 
@@ -135,8 +166,10 @@ def main() -> None:
     model = AutoModelForCausalLM.from_pretrained(args.base_model, quantization_config=bnb,
                                                  dtype=torch.bfloat16, device_map={"": 0})
     model = prepare_model_for_kbit_training(model)
+    lora_alpha = max(1, int(round(args.rank * args.lora_alpha_mult)))
+    log(f"[finetune] LoRA r={args.rank} alpha={lora_alpha}(=r×{args.lora_alpha_mult})")
     model = get_peft_model(model, LoraConfig(
-        r=args.rank, lora_alpha=args.rank * 2, lora_dropout=0.05, bias="none", task_type="CAUSAL_LM",
+        r=args.rank, lora_alpha=lora_alpha, lora_dropout=0.05, bias="none", task_type="CAUSAL_LM",
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]))
     model.print_trainable_parameters()
     model.config.use_cache = False
@@ -151,19 +184,44 @@ def main() -> None:
         def on_log(self, cfg, state, control, logs=None, **kw):
             if logs and "loss" in logs:
                 log(f"step {int(state.global_step)}/{int(state.max_steps)} loss={float(logs['loss']):.4f}")
+            # 평가 손실은 **다른 낱말**로 찍는다 — 화면 파서가 읽는 정규식은 `step N/M loss=`라,
+            # 여기에 "step"을 쓰면 진행률 막대가 평가 손실로 튄다(같은 꼴·다른 머리말).
+            if logs and "eval_loss" in logs:
+                log(f"eval {int(state.global_step)}/{int(state.max_steps)} eval_loss={float(logs['eval_loss']):.4f}")
+
+    # transformers 5.x는 evaluation_strategy를 **eval_strategy로 이름을 바꿨다**(4.x에는 옛 이름만 있다).
+    # gb10 실측 5.16.1 기준으로 새 이름을 먼저 쓰고, TypeError가 나면 옛 이름으로 한 번 더 시도한다 —
+    # warmup_ratio가 사라져 1차 학습이 통째로 죽었던 그 자리라, 이름 하나에 몇 시간을 걸지 않는다.
+    ta_common = dict(
+        output_dir=args.output, num_train_epochs=args.epochs, learning_rate=args.lr,
+        per_device_train_batch_size=1, gradient_accumulation_steps=16,
+        # warmup은 비율이 아니라 스텝 수로 준다 — transformers 5.x(gb10 실측 5.16.1, 2026-09-03)에서
+        # warmup_ratio 인자가 사라져 TrainingArguments가 TypeError로 죽었다(3회전 학습 1차 실행).
+        # 0.03 비율을 총 스텝으로 환산한 값(최소 1)이라 4.x에서도 같은 뜻이다.
+        lr_scheduler_type="cosine", warmup_steps=max(1, round(0.03 * total_steps)), logging_steps=5,
+        bf16=True, gradient_checkpointing=True, optim="paged_adamw_8bit",
+        save_strategy="epoch" if args.save_epochs else "no", report_to=[], seed=42,
+    )
+    if eval_data is not None:
+        ta_common["per_device_eval_batch_size"] = 1
+    ta = None
+    if eval_data is not None:
+        for 이름 in ("eval_strategy", "evaluation_strategy"):
+            try:
+                ta = TrainingArguments(**ta_common, **{이름: "epoch"})
+                log(f"[finetune] 평가 주기 인자 이름: {이름}")
+                break
+            except TypeError as e:
+                log(f"[finetune] {이름} 인자가 없습니다({e}) — 다음 이름으로 시도")
+        if ta is None:
+            log("[finetune] eval_strategy/evaluation_strategy 둘 다 없습니다 — 평가 없이 계속합니다")
+            eval_data = None
+    if ta is None:
+        ta = TrainingArguments(**ta_common)
 
     trainer = Trainer(
-        model=model, train_dataset=data, data_collator=collate, callbacks=[진행알림()],
-        args=TrainingArguments(
-            output_dir=args.output, num_train_epochs=args.epochs, learning_rate=args.lr,
-            per_device_train_batch_size=1, gradient_accumulation_steps=16,
-            # warmup은 비율이 아니라 스텝 수로 준다 — transformers 5.x(gb10 실측 5.16.1, 2026-09-03)에서
-            # warmup_ratio 인자가 사라져 TrainingArguments가 TypeError로 죽었다(3회전 학습 1차 실행).
-            # 0.03 비율을 총 스텝으로 환산한 값(최소 1)이라 4.x에서도 같은 뜻이다.
-            lr_scheduler_type="cosine", warmup_steps=max(1, round(0.03 * total_steps)), logging_steps=5,
-            bf16=True, gradient_checkpointing=True, optim="paged_adamw_8bit",
-            save_strategy="no", report_to=[], seed=42,
-        ),
+        model=model, train_dataset=data, eval_dataset=eval_data, data_collator=collate,
+        callbacks=[진행알림()], args=ta,
     )
     trainer.train()
     model.save_pretrained(args.output)

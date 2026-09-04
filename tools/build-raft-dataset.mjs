@@ -23,13 +23,30 @@
 //     [--server http://localhost:4000] [--dry-run]
 //   --dry-run : 만들기·회수율 측정까지만 하고 **저장하지 않는다**(운영에 쓰기 금지 — 읽기만 한다).
 //
+// ── 2회전(2026-09-04) 판 짜기 인자 — 1회전 어댑터가 무엇을 배웠는지 실측한 결과로 생겼다 ──────
+//   1회전(raft-vuln-v1) 실측: 1,297행 **전부**가 「근거 + 정답 + 방해」였다(P=100%). 「모른다」를
+//   시연하는 행이 0이었고, 답의 53.7%가 「원문: "…"」 꼬리를 달았는데 그 인용의 98%가 영문이었다.
+//   결과로 어댑터는 **근거가 없어도 「원문:」을 지어냈고**(KEV 6문항 중 5), 서술 과제가 34~72% 짧아졌다.
+//   아래 인자들은 그 넷을 각각 겨눈다 — 「모른다」를 시연할 행, 근거 없이 답하는 행, 인용의 출처 고정, 긴 답.
+//
+//   --p-oracle <0~1>        정답 조각을 싣는 행의 비율(기본 1.0 = 1회전과 같다).
+//                           나머지 행은 **정답을 빼고** 방해를 하나 더 실어 「모른다」고 답하게 한다(ⓑ).
+//   --noevidence-from-uncited  근거가 없어 버리던 승인 문답을 참고 자료 **없는** 거절 행으로 살린다(ⓑ′).
+//   --closedbook-ratio <0~1>   근거를 아예 안 주고 원래 답을 하게 하는 폐쇄형 행 비율(ⓒ, 기본 0).
+//   --quote-rule strict     인용 규칙 고정 — 근거 있는 행은 근거에서 뽑은 문장을 「원문: "…"」로 달고,
+//                           근거 없는 행은 「원문:」 0%로 강제한다(지어낸 인용을 가르치지 않는다).
+//   --longform-dataset <id|경로>  긴 형식 행(3절 이상·긴 답)을 섞는다(ⓓ). 파일이 없으면 **명확히 실패**한다.
+//
+//   ⚠ 갈래를 고르는 것은 전부 **결정적**이다(sha12(씨앗+문답id) 앞 4자리 → 0~1). 같은 씨앗이면 같은 판이
+//     나와야 「이 판으로 구웠다」는 지문이 뜻을 갖는다. 무작위를 쓰면 재현이 안 돼 A/B가 성립하지 않는다.
+//
 // ⚠ **로그인을 밀어내지 않는다**(--force-login 없음). 같은 계정으로 강제 로그인하면 돌고 있는
 //   증류 세션이 끊긴다(계정당 1세션). 「이미 로그인됨」이 뜨면 그 세션이 끝나기를 기다린다.
 //
 // ⚠ 만든 행을 **파일로 떨구지 않는다.** 저장은 오직 POST /api/dataset/save(종류 「근거」)로 한다 —
 //   그 창구가 위생(시험 문항·시점 데이터·주입 표식)을 거는 유일한 관문이기 때문이다.
 //   2026-09-03 실측: gb10 수동 경로가 이 관문을 건너뛰어 **평가 게이트 문항 4건이 학습에 섞였다.**
-//   행을 손에 쥐면 또 건너뛰게 된다 — 그래서 쥐지 않는다(맛보기 3행만 보고서에 남긴다).
+//   행을 손에 쥐면 또 건너뛰게 된다 — 그래서 쥐지 않는다(맛보기는 갈래마다 한 행씩만 보고서에 남긴다).
 //
 // 산출: tools/team-bench/results-ladder/<name>/build-report.json
 //   (회수율 · 라이선스 제외(문서별) · 행 수 · 토큰 추정 — 숫자로 말한다)
@@ -40,6 +57,9 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
+// 20자 겹침·시점데이터는 **증류기 사전검사와 같은 잣대**를 쓴다(서버 learncandidates·datasethygiene의 사본).
+// 여기에 또 적으면 세 곳이 되고, 한 곳만 고쳐지는 날 「인용이 근거에서 왔나」가 조용히 갈린다.
+import { overlap20, 시점데이터 } from "./distill-precheck.mjs";
 
 const 여기 = path.dirname(fileURLToPath(import.meta.url));
 export const 저장소 = path.resolve(여기, "..");
@@ -212,6 +232,162 @@ export function 섞기(항목들, 씨앗) {
 }
 
 /**
+ * 갈래 고르기용 결정적 난수 — sha12(키) 앞 4자리를 0~1로 편다. 값의 범위는 [0, 1)이다.
+ *
+ * ★ 왜 [0,1)인가: `--p-oracle 1.0`이 「1회전과 한 글자도 다르지 않다」여야 하기 때문이다.
+ *   `값 < P` 로 판정하므로 P=1.0이면 모든 행이 정답을 싣고, P=0이면 한 행도 안 싣는다.
+ *   (인자 설명의 「P 미만 행」은 **정답을 싣는 쪽**을 가리킨다 — RAFT 원논문의 P와 같은 뜻이다.)
+ */
+export function 결정값(키) {
+  return parseInt(sha12(String(키)).slice(0, 4), 16) / 0x10000;
+}
+
+/**
+ * 「자료가 없다」고 답하는 문구 — **제품이 시키는 그 문장 그대로다**(server/src/engine/llm.ts).
+ *   · llm.ts:254 팀원 프롬프트 규칙: 「…지어내지 말고 '등록된 사내 자료에는 관련 내용이 없습니다'라고 먼저 밝힙니다」
+ *   · llm.ts:759 제품이 실제로 돌려주는 답: 아래 문장 전체
+ * 여기서 새로 짓지 않는 이유: 배우는 문구와 제품이 내는 문구가 다르면, 어댑터는 **제품이 쓰지 않는 말**을
+ * 배운다(그리고 그 차이는 오류를 안 낸다). 타입이 다른 두 파일이라 import가 안 되므로 복제하되,
+ * 짝 시험(raftdataset.test.ts)이 llm.ts 원문과 **글자 단위로 같은지** 감시한다.
+ */
+export const 거절답 = "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요.";
+
+/**
+ * 「원문: "…"」 인용 꼬리표 — 실물 꼴은 데이터에서 확인해 정했다(raft-vuln-v1 1,297행 실측 2026-09-04).
+ *   · `원문: "…"`   맨 꼴 …… 답 끝 414건
+ *   · `「원문: "…"」` 괄호 꼴 …… 어디든 204건(끝 29건 — 문장 중간에 박힌 것이 더 많다)
+ * 두 꼴을 한 정규식으로 잡으면 「원문」이 든 답 696건 중 694건이 걸린다(나머지 둘은 「원문 대목」처럼
+ * 인용이 아닌 말과, 따옴표가 없는 깨진 꼬리 하나다 — 인용으로 안 본다).
+ * ⚠ 꼬리가 **끝에만** 있는 게 아니라서 `$` 앵커를 걸면 절반을 놓친다(그래서 안 건다).
+ */
+const 인용꼴 = '「?\\s*원문\\s*[:：]\\s*["“][^"”]*["”]\\s*」?';
+export const 인용있나 = (a) => new RegExp(인용꼴).test(String(a ?? ""));
+/** 인용 꼬리표를 뗀다(폐쇄형·거절 행에 쓴다). 뗀 자리는 공백 하나로 메우고 줄바꿈은 보존한다. */
+export const 인용떼기 = (a) =>
+  String(a ?? "").replace(new RegExp("[ \\t]*" + 인용꼴 + "[ \\t]*", "g"), " ").replace(/[ \t]{2,}/g, " ").trim();
+
+/** 근거 조각을 문장으로 쪼갠다 — chunk()의 문장 경계와 같은 규칙(한국어 종결형 포함). */
+export function 문장들(text) {
+  return String(text ?? "")
+    .split(/(?<=[.!?。]|다\.|니다\.)\s+|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 25);
+}
+
+/**
+ * 인용 규칙 strict — **근거에서 뽑은 문장만** 인용으로 붙인다.
+ *
+ * ★ 왜 필요한가(1회전 실측 2026-09-04): 1회전은 답의 53.7%에 인용 꼬리를 달았는데, 그 인용의 **98%가 영문**
+ *   이었고 「어디서 가져오는가」는 한 번도 가르치지 않았다. 어댑터는 「답 끝에 원문을 단다」는 **꼴만** 배워
+ *   근거가 없는 자리에서도 인용을 지어냈다(KEV 6문항 중 5 — 제 답과 사용자 지시문을 원문이라 인용했다).
+ *   그래서 ① 근거 있는 행은 **반드시** 근거에서 온 문장을 달고 ② 근거 없는 행은 **한 건도** 안 단다.
+ *
+ * 고르는 규칙(전부 결정적이다):
+ *   · 답과 **20자 이상 겹치는** 문장만(증류기·서버와 같은 overlap20) — 답이 실제로 근거로 삼은 대목이라야 인용이다.
+ *   · 따옴표·낫표가 든 문장은 뺀다 — 인용 안에 인용이 들면 위 정규식이 되짚을 때 잘려 **못 떼는 꼬리**가 된다.
+ *   · 시점데이터(날짜·「N건」·내부 식별자)가 든 문장은 뺀다 — 서버 위생이 그 행을 통째로 버린다.
+ *   · **한글 문장이 하나라도 있으면 영문 후보는 버린다** — 「한국어 근거인데 영문만 인용」하던 습관을 끊는다.
+ *     ⚠ 조각 전체의 한글 비율로 재지 않는다: 한글 설명 + 영문 원문이 한 조각에 섞이면 비율이 0.25까지
+ *       떨어져(짝 시험 실측) 「한국어 근거」인데도 영문이 뽑힌다. **고를 수 있는 한글 문장이 있느냐**가
+ *       물어야 할 것이고, 영문뿐인 조각(KEV·CVE 원문)은 영문을 인용하는 게 맞다.
+ *   · 남은 것 중 **가장 긴 문장**(같으면 사전순). 짧으면 20자 창이 어긋나 겹침이 약하다(distill.mjs 40자 계보).
+ * 못 고르면 **행을 버린다** — 근거 없는 인용을 붙이느니 그 행을 안 배우는 게 낫다.
+ */
+export function 인용붙이기(answer, 근거텍스트들) {
+  const a = String(answer ?? "").trim();
+  if (인용있나(a)) return { answer: a, 붙임: false };
+  const 후보 = [];
+  for (const t of 근거텍스트들 ?? []) {
+    for (const s of 문장들(t)) {
+      if (/["“”「」]/.test(s)) continue;
+      if (시점데이터(s)) continue;
+      if (!overlap20(a, s)) continue;
+      후보.push(s);
+    }
+  }
+  const 한글후보 = 후보.filter((s) => /[가-힣]/.test(s));
+  const 최종후보 = 한글후보.length ? 한글후보 : 후보;
+  if (!최종후보.length) return { answer: null, 왜: "인용할 문장 없음(20자 겹침)" };
+  최종후보.sort((x, y) => y.length - x.length || (x < y ? -1 : x > y ? 1 : 0));
+  return { answer: `${a} 원문: "${최종후보[0]}"`, 붙임: true };
+}
+
+/**
+ * 긴 형식 재료 파일의 자리 — 데이터셋 id면 서버 데이터 폴더에서, 경로면 그 경로에서 읽는다.
+ * ⚠ 없으면 **조용히 0건이 아니라 실패**여야 한다(호출부가 던진다) — 「섞었다」고 믿은 채로 안 섞이는 것이
+ *   이 저장소가 반복해 겪은 실패다.
+ */
+export function 긴형식경로(지정, root = 저장소) {
+  const s = String(지정 ?? "").trim();
+  if (!s) return null;
+  if (/[\\/]/.test(s) || /\.json$/i.test(s)) return path.resolve(root, s);
+  return path.join(root, "server", "data", "datasets", `${s}.json`);
+}
+
+/** 긴 형식 행 읽기 — 행 스키마는 학습 데이터와 같다({question, answer, system?}). */
+export function 긴형식읽기(지정, root = 저장소) {
+  const p = 긴형식경로(지정, root);
+  if (!p) throw new Error("--longform-dataset 값이 비었습니다");
+  if (!fs.existsSync(p)) throw new Error(`--longform-dataset 파일이 없습니다: ${p}`);
+  const raw = JSON.parse(fs.readFileSync(p, "utf8"));
+  const rows = Array.isArray(raw) ? raw : (raw?.examples ?? raw?.rows ?? null);
+  if (!Array.isArray(rows) || !rows.length) throw new Error(`--longform-dataset 에 행이 없습니다: ${p}`);
+  return rows;
+}
+
+/**
+ * 절(節) 세기 — 「## 제목」·「1) …」·「① …」 꼴을 센다. 1회전 실측에 쓴 규칙과 같아야 숫자를 비교할 수 있다.
+ * ⚠ team-bench의 `절세기(text, 절이름들)`와 **다른 일**이다(그쪽은 「요구한 이름의 절이 있나」를 본다).
+ *   이쪽은 재료의 생김새를 재는 자다 — 이름을 요구하지 않는다. 합치지 말 것.
+ */
+export const 절수 = (a) => (String(a ?? "").match(/^\s*(#{1,3}\s|\d+[.)]\s|[①-⑨])/gm) || []).length;
+
+/**
+ * 구성비 표 — **무슨 판으로 구웠는지**를 숫자 한 장으로 남긴다.
+ * 1회전이 남긴 보고서에는 이 표가 없어서 「전부 A행이었다」를 나중에 **데이터를 다시 읽어** 알아냈다.
+ */
+export function 구성비(rows, 종류들) {
+  const 이름 = { A: "근거+정답", B: "방해만→거절", B2: "무근거→거절(B′)", C: "폐쇄형", D: "긴 형식" };
+  const 표 = {};
+  for (const k of Object.keys(이름)) 표[k] = { 뜻: 이름[k], 행: 0, 비율: 0 };
+  종류들.forEach((k) => { if (표[k]) 표[k].행 += 1; });
+  const n = rows.length || 1;
+  for (const k of Object.keys(표)) 표[k].비율 = Number((표[k].행 / n).toFixed(4));
+
+  const 세기 = (골라낸) => {
+    const 인용 = 골라낸.filter((r) => 인용있나(r.answer)).length;
+    return { 행: 골라낸.length, 인용, 비율: Number((인용 / (골라낸.length || 1)).toFixed(4)) };
+  };
+  const A행 = rows.filter((_, i) => 종류들[i] === "A");
+  const 비A행 = rows.filter((_, i) => 종류들[i] !== "A");
+  const 길이 = rows.map((r) => String(r.answer ?? "").length).sort((a, b) => a - b);
+  const q = (p) => (길이.length ? 길이[Math.min(길이.length - 1, Math.floor(길이.length * p))] : 0);
+  return {
+    표,
+    인용: { A행: 세기(A행), 비A행: 세기(비A행) },
+    답길이: { p50: q(0.5), p90: q(0.9), max: 길이.length ? 길이[길이.length - 1] : 0 },
+    절3이상: rows.filter((r) => 절수(r.answer) >= 3).length,
+  };
+}
+
+/**
+ * 사전검사 — 판이 **스스로를 배반하지 않는가**. 최종 관문은 서버 위생이지만, 이 둘은 서버가 못 본다.
+ *   실패: 비A행에 「원문:」이 하나라도 있다 → 근거 없는 자리에서 인용을 지어내는 습관을 그대로 가르친다(1회전 결함).
+ *   경고: A행의 「원문:」이 95% 미만 → 인용을 「가끔 하는 것」으로 배운다(어디서 가져오는지는 못 배운 채).
+ */
+export function 사전검사(구성) {
+  const 실패 = [], 경고 = [];
+  const 비A = 구성.인용.비A행, A = 구성.인용.A행;
+  if (비A.인용 > 0) {
+    실패.push(`비A행 ${비A.행}개 중 ${비A.인용}개에 「원문:」이 남아 있다 — 근거가 없는 자리에서 인용하는 법을 가르치게 된다`);
+  }
+  if (A.행 > 0 && A.비율 < 0.95) {
+    경고.push(`A행의 「원문:」이 ${(A.비율 * 100).toFixed(1)}%다(95% 미만) — --quote-rule strict 를 켜면 근거에서 뽑아 채운다`);
+  }
+  return { 통과: !실패.length, 실패, 경고 };
+}
+
+/**
  * 토큰 추정 — 실측 기준(2026-09-03): 한국어 본문 800자 ≈ 504토큰.
  * 정확한 토크나이저를 못 부르는 자리라 **추정임을 이름으로 밝힌다**(보고서 키도 추정).
  */
@@ -254,25 +430,57 @@ export function 시험문항목록(root = 저장소) {
  *   그 서버는 이 코드가 배포된 뒤에야 생긴다 — 즉 「배포 전에는 아무도 못 재는 코드」가 된다.
  *   순수 함수로 빼서 짝 시험이 회수 실패·라이선스 제외·시험 문항·방해 없음을 전부 재현한다.
  *
+ * 갈래는 다섯이다(보고서 구성비 표의 그 이름들):
+ *   ⓐ A  근거+정답 — 정답 조각 + 방해 조각. 1회전이 만든 유일한 갈래다.
+ *   ⓑ B  방해만→거절 — 정답을 빼고 방해를 하나 더. 답은 제품이 시키는 거절 문구.
+ *        ⚠ **정답만 빼고 원래 답을 그대로 두는 길은 만들지 않는다** — 그건 「근거에 없는 말을 지어내라」를
+ *          글자 그대로 가르치는 판이라, 1회전이 겪은 인용 창작을 더 키운다.
+ *   ⓑ′ B2 무근거→거절 — 참고 자료 블록 자체가 없다(llm.ts rag=null 꼴). 답은 같은 거절 문구.
+ *   ⓒ C  폐쇄형 — 블록 없이 원래 답(인용 꼬리는 뗀다). 근거가 없을 때도 말이 되는 답을 유지시킨다.
+ *   ⓓ D  긴 형식 — 바깥 파일에서 온다(main에서 붙인다. 여기서는 안 만든다).
+ *
  * @param 문답들  [{ id, question, answer, cites:[ref…] }]
  * @param 색인    Map<ref, { ref, text, 문서, category }>
- * @param 옵션    { 판정: (문서)=>사유|null, system, ragHeader, distractors, 씨앗, 시험 }
- * @returns { rows, 통계 }  통계 = 회수·제외·회수실패상세·라이선스제외 (보고서에 그대로 실린다)
+ * @param 옵션    { 판정: (문서)=>사유|null, system, ragHeader, distractors, 씨앗, 시험,
+ *                  pOracle, noEvidenceFromUncited, closedbookRatio, quoteRule }
+ * @returns { rows, 종류들, 통계 }  종류들[i]는 rows[i]의 갈래("A"|"B"|"B2"|"C")다.
+ *   ⚠ 갈래를 **행 안에 넣지 않는다** — rows는 그대로 저장 창구로 나가는 몸이라, 스키마에 없는 칸을
+ *     끼우면 서버 위생이 무엇을 하는지 알 수 없다. 자리 번호로 짝지어 나른다.
  */
 export function 행만들기(문답들, 색인, 옵션) {
-  const { 판정, system: 팀원프롬프트, ragHeader, distractors = 1, 씨앗 = "", 시험 = new Set() } = 옵션;
+  const {
+    판정, system: 팀원프롬프트, ragHeader, distractors = 1, 씨앗 = "", 시험 = new Set(),
+    pOracle = 1, noEvidenceFromUncited = false, closedbookRatio = 0, quoteRule = "off",
+  } = 옵션;
   const 후보풀 = [...색인.values()];
   const 통계 = {
     ref총: 0,
     회수: { store: 0, file: 0, 실패: 0 },
     회수실패상세: {},
     라이선스제외: { 행: 0, 문서별: {} },
-    제외: { "근거 없음": 0, "회수 실패": 0, "라이선스": 0, "시험 문항(사전검사)": 0, "방해 조각 없음": 0 },
+    // 방해 조각은 지금까지 라이선스 판정을 **안 거친다**(정답 조각만 본다). 막지는 않되 숫자로 드러낸다 —
+    // 0이 아니면 허용목록 밖 문서의 문장이 학습 재료의 system 칸에 실려 나가고 있다는 뜻이다.
+    방해라이선스노출: { 행: 0, 문서별: {} },
+    제외: {
+      "근거 없음": 0, "회수 실패": 0, "라이선스": 0, "시험 문항(사전검사)": 0, "방해 조각 없음": 0,
+      "인용 없음(strict)": 0,
+    },
   };
-  const rows = [];
+  const rows = [], 종류들 = [];
+  const 담기 = (종류, row) => { rows.push(row); 종류들.push(종류); };
+  // 블록 없는 행의 system — llm.ts systemContent가 rag=null일 때 만드는 것과 **글자 단위로 같다**
+  // ([systemPromptFor, null, null, null].filter(Boolean).join("\n\n") = systemPromptFor 하나).
+  const 블록없는system = 팀원프롬프트;
+
   for (const l of 문답들) {
     const refs = (l.cites ?? []).map(refParse).filter(Boolean);
-    if (!refs.length) { 통계.제외["근거 없음"] += 1; continue; }
+    if (!refs.length) {
+      // ⓑ′ — 지금까지 버리던 「근거 없음」을 「모른다고 답하는 법」의 재료로 살린다(플래그가 켜졌을 때만).
+      if (!noEvidenceFromUncited) { 통계.제외["근거 없음"] += 1; continue; }
+      if (시험.has(문항정규화(l.question))) { 통계.제외["시험 문항(사전검사)"] += 1; continue; }
+      담기("B2", { question: l.question, answer: 거절답, system: 블록없는system });
+      continue;
+    }
     통계.ref총 += refs.length;
     const 정답들 = [];
     for (const p of refs) {
@@ -287,6 +495,7 @@ export function 행만들기(문답들, 색인, 옵션) {
     if (!정답들.length) { 통계.제외["회수 실패"] += 1; continue; }
     // ⚠ **하나라도** 막히면 그 행을 버린다(막힌 조각만 빼지 않는다). 답은 그 조각을 인용해 쓰인 글이라,
     //   근거만 빼면 「출처 없이 남의 문장을 외운 행」이 된다 — 막으려던 것이 그대로 남는다.
+    //   ⚠ 갈래를 고르기 **전에** 본다: B·C 갈래로 새면 라이선스에 막힌 문답이 다른 옷을 입고 되살아난다.
     const 막힌것 = 정답들.map((c) => ({ c, why: 판정(c.문서) })).filter((x) => x.why);
     if (막힌것.length) {
       통계.제외["라이선스"] += 1; 통계.라이선스제외.행 += 1;
@@ -294,18 +503,51 @@ export function 행만들기(문답들, 색인, 옵션) {
       continue;
     }
     if (시험.has(문항정규화(l.question))) { 통계.제외["시험 문항(사전검사)"] += 1; continue; }
-    const 방해 = 방해조각고르기(정답들[0], 후보풀, distractors, 씨앗);
+
+    // ⓒ 폐쇄형 — 근거를 아예 안 준다. 인용 꼬리는 뗀다(줄 근거가 없으니 인용도 없어야 한다).
+    if (closedbookRatio > 0 && 결정값(씨앗 + "|closedbook|" + l.id) < closedbookRatio) {
+      담기("C", { question: l.question, answer: 인용떼기(l.answer), system: 블록없는system });
+      continue;
+    }
+
+    const 정답실림 = 결정값(씨앗 + "|oracle|" + l.id) < pOracle;
+    const 필요방해 = 정답실림 ? distractors : distractors + 1;
+    const 방해 = 방해조각고르기(정답들[0], 후보풀, 필요방해, 씨앗);
     // 방해를 넣기로 했는데 못 넣었으면 **그 행은 안 만든다.** 섞어서 고르는 법을 가르치려는 판에
     // 정답만 든 행이 섞이면, 그 행들은 「참고 자료는 다 맞다」를 도로 가르친다.
-    if (distractors > 0 && !방해.length) { 통계.제외["방해 조각 없음"] += 1; continue; }
+    if (필요방해 > 0 && !방해.length) { 통계.제외["방해 조각 없음"] += 1; continue; }
+    const 막힌방해 = 방해.map((c) => ({ c, why: 판정(c.문서) })).filter((x) => x.why);
+    if (막힌방해.length) {
+      통계.방해라이선스노출.행 += 1;
+      for (const x of 막힌방해) {
+        통계.방해라이선스노출.문서별[x.c.문서] = (통계.방해라이선스노출.문서별[x.c.문서] ?? 0) + 1;
+      }
+    }
+
+    if (!정답실림) {
+      // ⓑ 방해만 — 정답 조각의 **문서 전체**가 빠진다(방해조각고르기가 같은 문서를 안 고른다).
+      const 조각들 = 섞기(방해.map((c) => c.text), 씨앗 + l.id);
+      담기("B", {
+        question: l.question, answer: 거절답,
+        system: [팀원프롬프트, 참고자료블록(ragHeader, 조각들)].join("\n\n"),
+      });
+      continue;
+    }
+
+    // ⓐ 근거+정답
+    let answer = String(l.answer ?? "");
+    if (quoteRule === "strict") {
+      const 결과 = 인용붙이기(answer, 정답들.map((c) => c.text));
+      if (!결과.answer) { 통계.제외["인용 없음(strict)"] += 1; continue; }
+      answer = 결과.answer;
+    }
     const 조각들 = 섞기([...정답들.map((c) => c.text), ...방해.map((c) => c.text)], 씨앗 + l.id);
-    rows.push({
-      question: l.question,
-      answer: l.answer,
+    담기("A", {
+      question: l.question, answer,
       system: [팀원프롬프트, 참고자료블록(ragHeader, 조각들)].join("\n\n"),
     });
   }
-  return { rows, 통계 };
+  return { rows, 종류들, 통계 };
 }
 
 // ── 여기서부터는 실행 경로(직접 실행할 때만 돈다) ─────────────────────────────
@@ -345,6 +587,17 @@ async function main() {
   const SERVER = String(opt("--server", process.env.GIJO_SERVER_URL || "http://localhost:4000")).replace(/\/+$/, "");
   const DRY = has("--dry-run");
   const DATASET_ID = String(opt("--dataset-id", NAME)).trim();
+  const 비율읽기 = (키, 기본) => {
+    const v = Number(opt(키, 기본));
+    if (!Number.isFinite(v) || v < 0 || v > 1) { console.error(`${키}는 0~1 사이 숫자여야 합니다(받은 값: ${opt(키, 기본)})`); process.exit(2); }
+    return v;
+  };
+  const P_ORACLE = 비율읽기("--p-oracle", 1);
+  const CLOSEDBOOK = 비율읽기("--closedbook-ratio", 0);
+  const NOEV = has("--noevidence-from-uncited");
+  const QUOTE_RULE = String(opt("--quote-rule", "off")).trim();
+  if (!["off", "strict"].includes(QUOTE_RULE)) { console.error(`--quote-rule은 off 또는 strict입니다(받은 값: ${QUOTE_RULE})`); process.exit(2); }
+  const LONGFORM = String(opt("--longform-dataset", "")).trim();
 
   if (!NAME) { console.error("--name <이름> 이 필요합니다 (보고서 폴더·데이터셋 id로 쓰인다)"); process.exit(2); }
   // 서버 dataset.ts DATASET_ID_RE와 같은 규칙 — 여기서 먼저 말해 준다(만들고 나서 저장에서 죽으면 교사 시간이 사라진다).
@@ -357,11 +610,16 @@ async function main() {
 
   const 보고 = {
     name: NAME, datasetId: DATASET_ID, topic: TOPIC || null, agentId: AGENT, distractors: DISTRACTORS,
+    // 판 짜기 인자 — 「어떤 판으로 구웠나」를 보고서 첫머리에 남긴다(1회전은 이게 없어 나중에 데이터를 다시 읽었다).
+    판: { pOracle: P_ORACLE, closedbookRatio: CLOSEDBOOK, noEvidenceFromUncited: NOEV, quoteRule: QUOTE_RULE, longform: LONGFORM || null },
     server: SERVER, dryRun: DRY, startedAt: new Date().toISOString(),
     승인문답: 0, ref총: 0, 회수: { store: 0, file: 0, 실패: 0 }, 회수율: 0,
-    회수실패상세: {}, 라이선스제외: { 행: 0, 문서별: {} },
-    제외: { "근거 없음": 0, "회수 실패": 0, "라이선스": 0, "시험 문항(사전검사)": 0, "방해 조각 없음": 0 },
-    행: 0, 토큰추정: { 합계: 0, 평균: 0, p95: 0 }, 저장: null, errors: [],
+    회수실패상세: {}, 라이선스제외: { 행: 0, 문서별: {} }, 방해라이선스노출: { 행: 0, 문서별: {} },
+    제외: {
+      "근거 없음": 0, "회수 실패": 0, "라이선스": 0, "시험 문항(사전검사)": 0, "방해 조각 없음": 0,
+      "인용 없음(strict)": 0,
+    },
+    행: 0, 구성: null, 토큰추정: { 합계: 0, 평균: 0, p95: 0 }, 저장: null, errors: [],
   };
 
   const auth = await login(SERVER, user, password);
@@ -426,11 +684,32 @@ async function main() {
   console.log(`[raft] 라이선스 판정: ${판정기.출처}`);
   const 시험 = 시험문항목록();
   보고.시험문항수 = 시험.size;
-  const { rows, 통계 } = 행만들기(문답들, 색인, {
+  const { rows, 종류들, 통계 } = 행만들기(문답들, 색인, {
     판정: 판정기.판정, system: 프롬프트.system, ragHeader: 프롬프트.ragHeader,
     distractors: DISTRACTORS, 씨앗: sha12(NAME + "|" + (TOPIC || "전체")), 시험,
+    pOracle: P_ORACLE, noEvidenceFromUncited: NOEV, closedbookRatio: CLOSEDBOOK, quoteRule: QUOTE_RULE,
   });
   Object.assign(보고, 통계);
+
+  // ④-2 긴 형식(ⓓ) — 바깥 파일에서 섞는다. 파일이 없으면 **여기서 던져** 만들기가 통째로 멈춘다
+  //     (조용히 0건이면 「긴 답도 넣었다」고 믿은 채 짧은 답만 배운 어댑터가 나온다).
+  if (LONGFORM) {
+    보고.긴형식 = { 지정: LONGFORM, 경로: 긴형식경로(LONGFORM), 읽음: 0, 실림: 0, 제외: { "빈 문답": 0, "시험 문항(사전검사)": 0 } };
+    const 긴것들 = 긴형식읽기(LONGFORM);
+    보고.긴형식.읽음 = 긴것들.length;
+    for (const r of 긴것들) {
+      const q = String(r.question ?? "").trim(), a0 = String(r.answer ?? "").trim();
+      if (!q || !a0) { 보고.긴형식.제외["빈 문답"] += 1; continue; }
+      if (시험.has(문항정규화(q))) { 보고.긴형식.제외["시험 문항(사전검사)"] += 1; continue; }
+      // 긴 형식 행은 근거 블록이 없다(system을 안 주면 팀원 프롬프트만) — 그러니 인용도 없어야 한다.
+      const answer = QUOTE_RULE === "strict" ? 인용떼기(a0) : a0;
+      rows.push({ question: q, answer, system: String(r.system ?? "").trim() || 프롬프트.system });
+      종류들.push("D");
+      보고.긴형식.실림 += 1;
+    }
+    console.log(`[raft] 긴 형식: 읽음 ${보고.긴형식.읽음} · 실림 ${보고.긴형식.실림} · 제외 ${JSON.stringify(보고.긴형식.제외)}`);
+  }
+
   const 토큰들 = rows.map((r) => 토큰추정(r.system) + 토큰추정(r.question) + 토큰추정(r.answer));
   보고.행 = rows.length;
   보고.회수율 = 보고.ref총 ? Number(((보고.회수.store + 보고.회수.file) / 보고.ref총).toFixed(4)) : 0;
@@ -441,6 +720,53 @@ async function main() {
       평균: Math.round(토큰들.reduce((a, b) => a + b, 0) / 토큰들.length),
       p95: 정렬[Math.min(정렬.length - 1, Math.floor(정렬.length * 0.95))],
     };
+  }
+
+  // ④-3 구성비·사전검사 — **저장하기 전에** 판이 스스로를 배반하지 않는지 본다.
+  const 구성 = 구성비(rows, 종류들);
+  보고.구성 = 구성;
+  보고.사전검사 = 사전검사(구성);
+  const 표줄 = (k, 이름) =>
+    `  ${이름.padEnd(14)} ${String(구성.표[k].행).padStart(5)}행 ${(구성.표[k].비율 * 100).toFixed(1).padStart(5)}%`;
+  console.log(
+    "[raft] 구성비\n" +
+    [표줄("A", "A 근거+정답"), 표줄("B", "B 방해만→거절"), 표줄("B2", "B′ 무근거→거절"), 표줄("C", "C 폐쇄형"), 표줄("D", "D 긴 형식")].join("\n") +
+    `\n  「원문:」 A행 ${구성.인용.A행.인용}/${구성.인용.A행.행}(${(구성.인용.A행.비율 * 100).toFixed(1)}%)` +
+    ` · 비A행 ${구성.인용.비A행.인용}/${구성.인용.비A행.행}(${(구성.인용.비A행.비율 * 100).toFixed(1)}%)` +
+    `\n  답 길이 p50 ${구성.답길이.p50} · p90 ${구성.답길이.p90} · max ${구성.답길이.max} · 3절 이상 ${구성.절3이상}행`
+  );
+  for (const w of 보고.사전검사.경고) console.warn(`[raft] ⚠ ${w}`);
+
+  // 맛보기는 **갈래마다 하나씩** 본다 — 앞에서 3행만 뜨면 A행만 보여 「거절 행이 정말 만들어졌나」를 못 본다.
+  //   사전검사에 걸렸을 때는 **걸린 행**(비A행인데 인용이 남은 것)을 맨 앞에 붙인다. 사유만 있고 실물이 없으면
+  //   사람이 그 판을 못 고친다.
+  const 맛보기만들기 = () => {
+    const 고른자리 = ["A", "B", "B2", "C", "D"].map((k) => 종류들.indexOf(k)).filter((i) => i >= 0);
+    const 걸린자리 = rows.findIndex((r, i) => 종류들[i] !== "A" && 인용있나(r.answer));
+    const 자리들 = [...new Set([...(걸린자리 >= 0 ? [걸린자리] : []), ...고른자리])];
+    return 자리들.map((i) => ({
+      갈래: 종류들[i], question: rows[i].question,
+      answerHead: rows[i].answer.slice(0, 120), systemHead: rows[i].system.slice(0, 400),
+    }));
+  };
+
+  const 보고서쓰기 = () => {
+    보고.finishedAt = new Date().toISOString();
+    const dir = path.join(저장소, "tools", "team-bench", "results-ladder", NAME);
+    fs.mkdirSync(dir, { recursive: true });
+    const out = path.join(dir, "build-report.json");
+    fs.writeFileSync(out, JSON.stringify(보고, null, 2), "utf8");
+    return out;
+  };
+
+  if (!보고.사전검사.통과) {
+    // 여기서 멈춘다 — 위생(서버)이 못 보는 결함이라, 저장해 버리면 그 판으로 몇 시간을 굽는다.
+    보고.저장 = { 함: false, 이유: "사전검사 실패: " + 보고.사전검사.실패.join(" / ") };
+    보고.맛보기 = 맛보기만들기();
+    const out = 보고서쓰기();
+    for (const f of 보고.사전검사.실패) console.error(`[raft] ✖ ${f}`);
+    console.error(`[raft] 사전검사에 걸려 저장하지 않았습니다 — 보고서 ${out}`);
+    process.exit(1);
   }
 
   // ⑤ 저장 — 위생 관문을 지나는 유일한 길. --dry-run이면 여기서 멈춘다(운영에 쓰기 금지).
@@ -463,19 +789,23 @@ async function main() {
     }
   }
 
-  // 맛보기 3행만 남긴다(system은 400자로 자른다) — 전체 행은 파일로 안 떨군다(머리 주석의 ⚠).
-  보고.맛보기 = rows.slice(0, 3).map((r) => ({ question: r.question, answerHead: r.answer.slice(0, 120), systemHead: r.system.slice(0, 400) }));
-  보고.finishedAt = new Date().toISOString();
+  // 맛보기만 남긴다(system은 400자로 자른다) — 전체 행은 파일로 안 떨군다(머리 주석의 ⚠).
+  보고.맛보기 = 맛보기만들기();
 
-  const dir = path.join(저장소, "tools", "team-bench", "results-ladder", NAME);
-  fs.mkdirSync(dir, { recursive: true });
-  const out = path.join(dir, "build-report.json");
-  fs.writeFileSync(out, JSON.stringify(보고, null, 2), "utf8");
+  const out = 보고서쓰기();
   console.log(
     `[raft] 끝 — 승인 ${보고.승인문답} · ref ${보고.ref총} · 회수 ${(보고.회수율 * 100).toFixed(1)}%` +
     `(저장소 ${보고.회수.store}·파일 ${보고.회수.file}·실패 ${보고.회수.실패}) · 제외 ${JSON.stringify(보고.제외)}` +
     ` · 행 ${보고.행} · 토큰추정 평균 ${보고.토큰추정.평균}/p95 ${보고.토큰추정.p95} · 보고서 ${out}`
   );
+  if (보고.방해라이선스노출.행) {
+    // 막지는 않는다(1회전 판을 조용히 바꾸지 않으려는 것) — 다만 **말은 한다**. 조용한 노출이 가장 나쁘다.
+    console.warn(
+      `[raft] ⚠ 허용목록 밖 문서의 문장이 **방해 조각으로** ${보고.방해라이선스노출.행}행에 실렸습니다` +
+      ` (${Object.keys(보고.방해라이선스노출.문서별).slice(0, 3).join(", ")}…) —` +
+      ` 라이선스 판정은 지금 정답 조각에만 걸립니다. 이 숫자가 0이 아니면 재배포 위험을 사람이 판단해야 합니다.`
+    );
+  }
 }
 
 // 짝 시험이 위 순수 함수들을 import한다 — **직접 실행할 때만** 본체가 돈다(import로는 안 돈다).
