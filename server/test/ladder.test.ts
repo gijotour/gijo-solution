@@ -17,7 +17,7 @@ import { join } from "node:path";
 import {
   판정, 표만들기, kev판정, cisa본문, detail숫자, 인용겹침, 잘림수, tps중앙값, 한글평균, 기준선기본, NEEDLE64K,
   kev베이스대비, 근거인용률, 자료없음비율, 자료없음중복가드, 자료없음이라말함, 인용토막들, 창작인용, 창작인용찾기,
-  kev대상행, 창작인용대상인가,
+  kev대상행, 창작인용대상인가, 제품거절문장, 거절뒤남은말, 거절만한답, 거절나머지최소,
   genTokens중앙값, 서술과제, 건너뜀수, 자료없음_최소비율, 길이_허용낙폭,
   잘림대조, 베낀글자비율, 베낀비율, 베낀비율_상한,
 } from "../../tools/team-bench/gates.mjs";
@@ -831,12 +831,58 @@ describe("관문 ⑨ — 모집단은 관문 ①과 같다(대조군 noprompt �
   it("★ 표가 **모집단을 말한다** — 사람이 무엇을 셌는지 읽을 수 있어야 한다", () => {
     const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗 }, 기준());
     const c = r.검사.find((x: { 키: string }) => x.키 === "no_fake_quote");
-    expect(c.설명).toContain("모집단: persona 표본 1행 + KEV 3행");
+    expect(c.설명).toContain("모집단: **거절 아닌 답**만 — persona 1행 + KEV 3행");
     expect(c.설명).toContain("noprompt 제외");
+    // 거절률은 **참고값**으로 함께 적힌다 — 안 적으면 「대상이 왜 줄었나」를 아무도 못 읽는다.
+    expect(c.설명).toContain("거절률(참고) persona 0/1 · KEV 0/3");
     // 표를 읽는 사람이 「persona는 ⑤에 안 들어간다」를 알 수 있어야 한다 — 안 적으면 들어간 줄 안다.
     const 표 = 표만들기(r, { 표본조건: { bare: 맨질문깨끗, persona: persona깨끗 } });
     expect(표).toContain("관문 ⑨의 모집단");
     expect(표).toContain("**⑤에는 안 들어간다**");
+  });
+
+  it("★★★ **거절만 한 답**은 모집단이 아니다 — 「지어낼 인용」이 없는 답을 0건으로 세면 관문이 장식이 된다", () => {
+    // 실측(2026-09-05 · r2-v2 ep2·ep3): persona 12답이 **전부 같은 59자 거절 문장**이었다.
+    // 그때 ⑨는 「창작 0건」으로 초록이었는데, 그 0건은 「안 지어냈다」가 아니라 **「안 답했다」**였다.
+    const 전부거절 = [표본행("persona", 제품거절문장), 표본행("persona", 제품거절문장)];
+    const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: 전부거절 }, 기준());
+    const c = r.검사.find((x: { 키: string }) => x.키 === "no_fake_quote");
+    // kev좋음 3행은 거절이 아니므로 모집단이 완전히 0이 되지는 않는다 — persona 몫만 빠진다.
+    expect(c.값, "kev 3행만 남는다").toContain("대상 3");
+    expect(c.설명).toContain("거절률(참고) persona 2/2");
+  });
+
+  it("★★★ persona도 kev도 전부 거절이면 **미측정=불합격**이다(「전부 거절 — 잴 답이 없다」)", () => {
+    const 전부거절 = [표본행("persona", 제품거절문장)];
+    const kev전부거절 = kev좋음.map((k) => ({ ...k, text: 제품거절문장 }));
+    const r = 판정(
+      { easy: 기준easy(), hard: 나아진(), kev: kev전부거절, 표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: 전부거절 },
+      { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 },
+    );
+    const c = r.검사.find((x: { 키: string }) => x.키 === "no_fake_quote");
+    expect(c.값).toBe("미측정");
+    expect(c.통과, "못 잰 것을 통과로 세지 않는다").toBe(false);
+    expect(c.설명).toContain("전부 거절 — 잴 답이 없다");
+  });
+
+  it("★★ 거절이 **섞이면** 거절 아닌 답만 센다 — 그 답이 지어냈으면 막는다", () => {
+    const 섞임 = [
+      표본행("persona", 제품거절문장), // 셈에서 빠진다
+      표본행("persona", `${제품거절문장} 일반적으로 알려진 바로는, 답입니다. 원문: "지어낸 원문입니다 스무 글자가 넘습니다"`),
+    ];
+    const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: 섞임 }, 기준());
+    const c = r.검사.find((x: { 키: string }) => x.키 === "no_fake_quote");
+    expect(c.값, "persona 1(답한 것) + kev 3").toContain("대상 4");
+    expect(c.통과, "밝히고 이어 답하면서 원문을 지어냈다").toBe(false);
+    expect(c.설명).toContain("거절률(참고) persona 1/2");
+  });
+
+  it("★ 「밝히고 이어 답한」 답은 거절로 안 센다 — 제품 프롬프트(llm.ts:254)가 시키는 그 꼴이다", () => {
+    expect(거절만한답(제품거절문장), "거절 문장만").toBe(true);
+    expect(거절만한답(`${제품거절문장} 일반적으로 알려진 바로는, 기본 관리자 계정명을 바꾸는 것이 좋습니다.`), "밝히고 이어 답함").toBe(false);
+    expect(거절만한답("KEV 목록은 미국 CISA가 발표합니다."), "거절 선언이 아예 없다").toBe(false);
+    // 남은 말이 20자 미만이면 답이 아니다 — overlap20이 볼 창조차 안 담긴다.
+    expect(거절만한답(`${제품거절문장} 짧습니다.`)).toBe(true);
   });
 
   it("세는 행은 「답이 든 행」뿐이다 — 건너뛴 문항·빈 답은 모집단이 아니다", () => {
@@ -1354,15 +1400,25 @@ describe("표본 하네스 — persona 조건(팀원 프롬프트만)", () => {
   });
 });
 
-describe("★ 옛 회전 결과에 새 게이트를 돌리면 ⑨는 **미측정**이다(실측 2026-09-04)", () => {
+describe("★ 회전 2 실물 파일 — persona를 뒤늦게 재고 나서도 ⑨는 **미측정**이다(실측 2026-09-05)", () => {
   // 무엇을 지키나: 「모집단을 옮겼으니 옛 결과도 새 잣대로 다시 읽힌다」가 아니라, **다시 재야 한다**는 사실.
-  // r2-v2 ep2에는 persona 표본이 없다(그때는 조건이 셋이었다) — 그 자리를 초록으로 넘기면 못 잰 것을
-  // 통과로 세는 것이고, 빨강으로 세면 「지어냈다」는 없는 사실을 적는 것이다. 답은 미측정이다.
+  // ★ 2026-09-05에 앞 줄이 뒤집혔다: d1e6f54c가 r2-v2 세 에폭의 persona를 **뒤늦게 재서** 파일을 만들었다.
+  //   그래서 「파일이 없어서 미측정」은 더 이상 사실이 아니다 — 그런데 답은 여전히 미측정이고, **까닭이
+  //   바뀌었다**: ep2·ep3의 persona 12답이 **전부 같은 59자 거절 문장**이라 잴 답이 없다.
+  //   ⚠ 이 시험이 파일의 존재를 다시 확인하는 이유: 실측이 바뀌면 시험이 먼저 빨강이 되어야 한다
+  //     (그날 이 시험은 「persona가 없다」를 지키고 있었고, 재측정 커밋이 그것을 조용히 깨뜨렸다).
   const ep2 = join(__dirname, "..", "..", "tools", "team-bench", "results-ladder", "day2", "r2-v2", "ep2");
 
-  it("persona 파일이 없는 옛 폴더 — 있는 것과 없는 것을 파일로 확인한다", () => {
+  it("★ 재측정으로 persona 파일이 생겼다 — 있는 것과 없는 것을 파일로 확인한다", () => {
     expect(existsSync(join(ep2, "samples-bare.json")), "옛 회전에도 bare는 있다").toBe(true);
-    expect(existsSync(join(ep2, "samples-persona.json")), "옛 회전에는 persona가 없다 — 이 시험의 전제다").toBe(false);
+    expect(existsSync(join(ep2, "samples-persona.json")), "d1e6f54c가 뒤늦게 잰 파일이다").toBe(true);
+  });
+
+  it("★★ persona 12답이 **전부 거절**이다 — 「창작 0건」이 아니라 「답을 안 함」이었다", () => {
+    const rows = JSON.parse(readFileSync(join(ep2, "samples-persona.json"), "utf8"));
+    const 대상 = rows.filter(창작인용대상인가);
+    expect(대상.length).toBe(12);
+    expect(대상.filter((r: { text: string }) => !거절만한답(r.text)).length, "거절 아닌 답").toBe(0);
   });
 
   it("★ 그 파일들로 판정하면 ⑨가 미측정이고, 회전 2의 빨강(11/15)은 **다시 재기 전까지 미정**이다", () => {
@@ -1370,14 +1426,16 @@ describe("★ 옛 회전 결과에 새 게이트를 돌리면 ⑨는 **미측정
     const r = 판정(
       {
         easy: 읽기("easy/qwen3-14b+r2-v2-ep2.json"), hard: 읽기("hard/qwen3-14b+r2-v2-ep2.json"),
+        // ⚠ kev도 이 폴더의 실물을 쓴다 — ep2의 kev 답도 전부 거절이라야 「잴 답이 없다」가 성립한다.
         kev: 읽기("kev.json"), 표본grounded: 읽기("samples-grounded.json"),
         표본방해만: 읽기("samples-distractor-only.json"), 표본맨질문: 읽기("samples-bare.json"),
+        표본persona: 읽기("samples-persona.json"),
       },
       { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 },
     );
     const c = r.검사.find((x: { 키: string }) => x.키 === "no_fake_quote");
     expect(c.값).toBe("미측정");
-    expect(c.설명).toContain("persona 표본이 없다");
+    expect(c.통과).toBe(false);
     // 그날의 판정 파일은 옛 잣대의 것이다 — 두 숫자를 섞어 읽지 않도록 여기서 나란히 못 박는다.
     const 옛판정 = JSON.parse(readFileSync(join(ep2, "gate.json"), "utf8"));
     expect(옛판정.검사.find((x: { 키: string }) => x.키 === "no_fake_quote").값, "옛 잣대(bare 포함)의 값")

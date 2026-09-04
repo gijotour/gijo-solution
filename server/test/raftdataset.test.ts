@@ -15,6 +15,7 @@ import {
   결정값, 거절답, 인용있나, 인용흔적있나, 인용떼기, 인용붙이기, 인용근거대조, 문장들, 긴형식경로, 긴형식읽기, 구성비, 사전검사, 절수,
   근거조각뽑기, 근거블록있나, 규격읽기,
   제품인용만들기, 문장경계자르기, 블록번호찾기,
+  제품인용맞추기, 인용규칙이름표, 인용규칙칸, 번호참조떼기, 거절답만들기, 일반답머리,
 } from "../../tools/build-raft-dataset.mjs";
 // 정본 판정기(사다리 ④갈래). 이름이 겹치므로 사다리 쪽에 딱지를 붙여 부른다 — 어느 잣대로 쟀는지가 늘 보이게.
 import { 허용인가, 허용목록읽기 as 사다리허용목록읽기 } from "../../tools/ladder/ladderlib.mjs";
@@ -1307,6 +1308,172 @@ describe("★★ 제품 규약 인용 꼴 — 「[n]에 따르면 \"X′\"」", 
     const r = 인용붙이기(답, [조각A]);
     expect(r.answer!.startsWith(`${답} 원문: "`)).toBe(true);
     expect(r.answer).not.toContain("에 따르면");
+  });
+
+  // ── 2026-09-05 수리(F1) — product 경로가 **정직한 인용을 죽이던** 자리 ──────────────
+  //
+  // 실측(d1e6f54c 판): A 672→137 · D 153→63. 사라진 535행은 「근거 밖 인용」이 아니라
+  // **근거에서 온 인용**을 달고 있던 행이었다 — 인용을 먼저 떼고 그 뗀 답에서 20자 겹침을 찾으니,
+  // 겹침이 인용 안에만 있던 행은 후보 0이 되어 죽었다. 그리고 통계는 그것을 「버림(근거 밖 인용…)」이라
+  // 적었다. 아래 넷이 그 자리를 지킨다.
+  describe("★★★ product 경로 수리 — 문장은 그대로, 번호만 다시", () => {
+    // 답이 조각A를 **인용으로만** 겹치는 판: 설명 부분은 제 말로 쓰였고 겹침은 인용 꼬리에만 있다.
+    const 제말설명 = "관리자 계정 이름을 기본값대로 두면 로그인 시도가 표적이 되기 쉽습니다. 담당자는 이름을 먼저 바꾸고 잠금 정책을 함께 두는 편이 좋으며, 이 조치는 서비스 영향이 작아 우선 처리하기에 알맞습니다.";
+    const 정직한인용답 = `${제말설명} 원문: "${조각A}"`;
+
+    it("★★★ 근거에서 온 인용은 **문장이 살아남고** 번호만 이 행의 블록에서 다시 매겨진다", () => {
+      const r = 인용붙이기(정직한인용답, [조각A], { 꼴: "product", 블록조각들: [조각B, 조각A], 인용상한자: 120, 인용비중상한: 0.35 });
+      expect(r.answer, "이 행이 죽던 자리다(실측 535행)").not.toBeNull();
+      expect(r.번호다시, "번호만 다시 매겼다는 표식").toBe(true);
+      expect(r.answer).toContain("[2]에 따르면");
+      // 인용문은 **원래 그 문장**에서 왔다(120자 문장 경계로 줄어들 수는 있다).
+      expect(조각A.replace(/\s+/g, "")).toContain(r.인용문!.replace(/\s+/g, ""));
+      expect(r.인용문!.length, "120자 상한은 그대로 건다").toBeLessThanOrEqual(120);
+      expect(인용흔적있나(r.answer!), "옛 꼴 「원문:」이 남으면 안 된다").toBe(true); // 새 꼴로는 있다
+      expect(r.answer).not.toContain('원문: "');
+    });
+
+    it("★★ 후보 탐색은 **떼기 전 원문 답**에서 한다 — 뗀 답에는 겹침이 없어도 산다", () => {
+      // 인용을 떼면 남는 것은 제말설명뿐이고, 거기엔 조각A와 20자 겹침이 없다.
+      expect(제말설명).not.toContain(조각A.slice(0, 20));
+      // 옛 코드는 여기서 후보 0 → 행 버림이었다.
+      const r = 인용붙이기(정직한인용답, [조각A], { 꼴: "product", 블록조각들: [조각A], 인용상한자: 120, 인용비중상한: null });
+      expect(r.answer).not.toBeNull();
+      expect(r.붙임).toBe(true);
+    });
+
+    it("★★ 사유 이름표가 갈린다 — 「근거 밖 인용」은 **인용근거대조가 false일 때만**", () => {
+      // ⓐ 근거에서 온 인용인데 못 붙인 경우 → 「근거 밖」이라 적지 않는다.
+      expect(인용규칙이름표({ answer: null, 뗌: true, 근거에서온인용: true })).toBe("버림(근거에서 온 인용인데 다시 못 붙임)");
+      // ⓑ 근거 밖 인용을 떼고 대신 붙일 문장도 없던 경우 → 예전 이름표 그대로.
+      expect(인용규칙이름표({ answer: null, 뗌: true, 근거에서온인용: false })).toBe("버림(근거 밖 인용·대신 붙일 문장 없음)");
+      // ⓒ 붙인 쪽도 갈린다 — 번호만 다시 매긴 것을 「갈아끼움」이라 적으면 통계가 거짓말을 한다.
+      expect(인용규칙이름표({ answer: "x", 붙임: true, 뗌: true, 번호다시: true })).toBe("번호 다시 매김(근거에서 온 인용)");
+      expect(인용규칙이름표({ answer: "x", 붙임: true, 뗌: true })).toBe("갈아끼움(근거 밖 인용을 떼고 다시)");
+      expect(인용규칙이름표({ answer: "x", 붙임: true, 뗌: false })).toBe("새로 붙임");
+      expect(인용규칙이름표({ answer: "x", 붙임: false })).toBe("그대로(근거에서 온 인용)");
+      // 사유키가 있으면 그것이 이긴다(설명이 짧음·번호 못 찾음·비중 못 맞춤).
+      expect(인용규칙이름표({ answer: null, 사유키: "설명이 짧음", 뗌: true, 근거에서온인용: true })).toBe("버림(설명이 짧음)");
+      // ★ 이름표가 만드는 모든 키가 통계 칸에 **미리** 있어야 한다 — 없으면 표에서 조용히 빠진다.
+      const 칸 = 인용규칙칸();
+      for (const 결과 of [
+        { answer: null, 뗌: true, 근거에서온인용: true }, { answer: null, 뗌: true, 근거에서온인용: false },
+        { answer: null, 뗌: false }, { answer: "x", 붙임: true, 뗌: true, 번호다시: true },
+        { answer: "x", 붙임: true, 뗌: true }, { answer: "x", 붙임: true, 뗌: false }, { answer: "x", 붙임: false },
+        { answer: null, 사유키: "설명이 짧음" }, { answer: null, 사유키: "번호 못 찾음" }, { answer: null, 사유키: "비중 못 맞춤" },
+      ]) expect(Object.keys(칸), `칸에 없는 이름표: ${인용규칙이름표(결과)}`).toContain(인용규칙이름표(결과));
+    });
+
+    it("★ 유지후보가 안 되면 **근거에서 새로 찾은 문장**으로 떨어진다(행을 그냥 버리지 않는다)", () => {
+      // 인용은 근거에서 왔지만 블록에는 그 조각이 없다 → 번호를 못 매긴다. 그래도 답 본문이 조각B와
+      // 겹치면 그쪽으로 붙는다.
+      const 답2 = `${조각B.slice(0, 60)} 라고 정해 두었으므로 담당자는 반출 대장을 분기마다 확인하고 위탁처 점검 결과를 함께 남겨야 합니다. 원문: "${조각A}"`;
+      const r = 인용붙이기(답2, [조각A, 조각B], { 꼴: "product", 블록조각들: [조각B], 인용상한자: 120, 인용비중상한: null });
+      expect(r.answer).not.toBeNull();
+      expect(r.번호다시, "유지후보가 아니라 새로 찾은 문장이다").toBe(false);
+      expect(r.번호).toBe(1);
+    });
+
+    it("★ 제품인용맞추기는 **한 곳**이다 — 줄이기·번호·비중을 여기서만 센다", () => {
+      const 빌더 = src("tools/build-raft-dataset.mjs");
+      expect((빌더.match(/제품인용만들기\(n, ""\)/g) ?? []).length, "비중 계산이 두 곳에 있으면 어긋난다").toBe(1);
+      const ok = 제품인용맞추기("설명입니다.", 조각A, { 블록조각들: [조각A], 인용상한자: 120, 인용비중상한: null });
+      expect(ok.번호).toBe(1);
+      const 실패 = 제품인용맞추기("설명입니다.", 조각A, { 블록조각들: [조각B], 인용상한자: 120, 인용비중상한: null });
+      expect(실패.answer).toBeNull();
+      expect(실패.사유키).toBe("번호 못 찾음");
+    });
+  });
+});
+
+// ── 거절 행의 답 꼴(2026-09-05 · F2) ────────────────────────────────────────────
+//
+// 왜: 회전 2의 재료는 거절 행에 **거절 문장 하나만** 달았고, r2-v2 ep2·ep3의 persona 12답이 전부
+// 그 59자였다 — 관문 ⑨의 「창작 0건」은 「안 지어냄」이 아니라 **「안 답함」**이었다. 그런데 제품의
+// 팀원 프롬프트(llm.ts:254)는 「'…없습니다'라고 **먼저 밝힙니다**(그 뒤 필요하면 아주 짧은 일반 정의만
+// 덧붙입니다)」라고 시킨다. 재료가 그 뒷부분을 지우고 있었다.
+describe("★★★ 거절 행 — 「먼저 밝히고 이어 답한다」", () => {
+  const 원답 = '방화벽 정책은 최소 권한으로 설계하고 불필요한 포트를 닫는 것이 기본입니다. [2]에 따르면 "차단 정책은 기본 거부로 둔다" 라고 하며, 담당자는 분기마다 규칙을 점검하고 쓰이지 않는 규칙을 지워야 합니다. 변경 이력은 결재판에 남겨 두는 편이 좋습니다.';
+
+  it("★ 팀원 프롬프트가 실제로 「먼저 밝히고 이어 답하라」고 시킨다 — 이 회전의 근거다", () => {
+    const llm = src("server/src/engine/llm.ts");
+    expect(llm).toContain("라고 먼저 밝힙니다");
+    expect(llm, "그 뒤에 답할 수 있다는 말이 프롬프트에 있다").toContain("그 뒤 필요하면");
+  });
+
+  it("★ 번호 참조를 뗀다 — 가리킬 블록이 없는 자리에서 [n]은 거짓이다", () => {
+    expect(번호참조떼기('앞말 [2]에 따르면 뒷말')).toBe("앞말 뒷말");
+    expect(번호참조떼기("근거 [3] 를 보면")).toBe("근거 를 보면");
+    expect(번호참조떼기("번호가 없다")).toBe("번호가 없다");
+  });
+
+  it("★★ declare-then-answer — 거절 문장 + 말머리 + 인용/번호를 뗀 본문", () => {
+    const r = 거절답만들기(원답, { 꼴: "declare-then-answer" });
+    expect(r.일반답).toBe(true);
+    expect(r.answer.startsWith(거절답), "거절 문장은 **그대로** 앞에 온다").toBe(true);
+    expect(r.answer).toContain(일반답머리);
+    expect(인용흔적있나(r.answer), "거절 행에 인용이 남으면 사전검사가 막는다").toBe(false);
+    expect(/\[\d+\]/.test(r.answer), "가리킬 블록이 없는 [n]").toBe(false);
+    expect(r.answer).toContain("방화벽 정책은 최소 권한으로");
+  });
+
+  it("★ 기본(refuse-only)은 회전 2를 **한 글자도 안 바꾼다**", () => {
+    expect(거절답만들기(원답).answer).toBe(거절답);
+    expect(거절답만들기(원답, { 꼴: "refuse-only" }).answer).toBe(거절답);
+  });
+
+  it("★ 본문이 짧으면 거절 문장만 단다 — 「밝히고 두 마디」는 답이 아니다", () => {
+    const r = 거절답만들기('짧습니다. 원문: "어쩌고"', { 꼴: "declare-then-answer" });
+    expect(r.answer).toBe(거절답);
+    expect(r.일반답).toBe(false);
+    expect(r.왜).toContain("최소 80자");
+  });
+
+  it("★★ 깨진 인용 꼬리가 남으면 **되돌린다**(fail-closed) — 사전검사에 걸리느니 거절만 한다", () => {
+    // 닫는 따옴표가 없는 꼬리가 줄 중간에 박히면 인용떼기가 그 줄 끝까지만 뗀다 — 그래도 남으면 되돌린다.
+    const 깨진 = `앞말입니다. 원문: "닫는 따옴표가 없는 꼬리\n뒷말은 충분히 길어서 팔십 자를 넘기기 위한 문장이며 담당자는 분기마다 점검해야 합니다.`;
+    const r = 거절답만들기(깨진, { 꼴: "declare-then-answer" });
+    expect(인용흔적있나(r.answer)).toBe(false);
+  });
+
+  it("★★★ 행 만들기 — ⓑ·ⓑ′ 두 갈래가 다 「밝히고 일반 답」이 되고, 인용·번호는 0이다", () => {
+    const 조각 = (문서: string, 본문: string) => ({ ref: `store:${문서}#${"0".repeat(12)}`, text: 본문, 문서, category: "취약점" });
+    const 정답 = 조각("GIJO_AS_취약점관리_지침.md", "KEV 목록에 오른 취약점은 실제 악용이 확인된 것이며 담당자는 기한 안에 조치해야 한다.");
+    const 방해 = 조각("GIJO_AS_보안담당자_실무매뉴얼.md", "EPSS는 악용 가능성 점수이며 CVSS와 함께 보아야 우선순위가 선다.");
+    const 색인 = new Map([정답, 방해].map((c) => [c.ref, c]));
+    const 옵션 = {
+      판정: (문서: string) => (/^GIJO_/.test(문서) ? null : "허용목록 밖"),
+      system: "너는 보안 분석가다", ragHeader: RAG_BLOCK_HEADER, distractors: 1, 씨앗: "s", 시험: new Set<string>(),
+      pOracle: 0, noEvidenceFromUncited: true,
+    };
+    const 입력 = [
+      { id: "a", question: "질문1", answer: 원답, cites: [정답.ref] },  // → B(방해만)
+      { id: "b", question: "질문2", answer: 원답, cites: [] },           // → B′(무근거)
+    ];
+    type R = { rows: { answer: string }[]; 종류들: string[]; 통계: { 거절행꼴: Record<string, number | string> } };
+    const 기본판 = 행만들기(입력, 색인, 옵션) as R;
+    expect(기본판.종류들.sort()).toEqual(["B", "B2"]);
+    for (const r of 기본판.rows) expect(r.answer, "기본은 거절 문장만").toBe(거절답);
+
+    const 새판 = 행만들기(입력, 색인, { ...옵션, refusalStyle: "declare-then-answer" }) as R;
+    expect(새판.종류들.sort(), "갈래는 안 바뀐다 — 바뀌는 것은 답 꼴뿐이다").toEqual(["B", "B2"]);
+    for (const r of 새판.rows) {
+      expect(r.answer.startsWith(거절답), "먼저 밝힌다").toBe(true);
+      expect(r.answer.length, "이어 답한다").toBeGreaterThan(거절답.length + 20);
+      expect(인용흔적있나(r.answer), "거절 행에 인용 0").toBe(false);
+      expect(/\[\d+\]/.test(r.answer), "거절 행에 번호 0").toBe(false);
+    }
+    expect(새판.통계.거절행꼴.꼴).toBe("declare-then-answer");
+    expect(새판.통계.거절행꼴["밝히고 일반 답"]).toBe(2);
+    expect(새판.통계.거절행꼴["거절 문장만"]).toBe(0);
+  });
+
+  it("★ 사전검사는 그대로 통과한다 — 거절 행의 계약(인용 0)이 안 깨졌다", () => {
+    const 행 = (a: string) => ({ question: "q", answer: a, system: `너는 보안 분석가다\n\n${참고자료블록(RAG_BLOCK_HEADER, ["조각"])}` });
+    const 답 = 거절답만들기(원답, { 꼴: "declare-then-answer" }).answer;
+    const c = 구성비([행(답)], ["B"], { ragHeader: RAG_BLOCK_HEADER });
+    expect(c.인용.거절행.인용, "거절 행 인용 0").toBe(0);
+    expect(사전검사(c).실패).toEqual([]);
   });
 });
 

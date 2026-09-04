@@ -265,6 +265,8 @@ QUOTE_STYLE="$(read_round quoteStyle)"
 MAX_QUOTE_CHARS="$(read_round maxQuoteChars)"
 MAX_QUOTE_SHARE="$(read_round maxQuoteShare)"
 MAX_COPY_RATIO="$(read_round maxCopyRatio)"
+# ★ 거절 행의 답 꼴(2026-09-05). 빈 값이면 빌더 기본값(refuse-only = 회전 2 재현)이 그대로 산다.
+REFUSAL_STYLE="$(read_round refusalStyle)"
 NOEV="$(read_round noevidenceFromUncited)"
 CLOSEDBOOK="$(read_round closedbookRatio)"
 LONGFORM="$(read_round longformDataset)"
@@ -285,7 +287,7 @@ fi
 
 ladder_log "2일차 회전 $ROUND — 데이터셋 $DATASET · rank $RANK · lr $LR · epochs $EPOCHS · 방해 $DISTRACTORS · maxSeq $MAXSEQ"
 ladder_log "  재료 옵션 — pOracle ${PORACLE:-(기본)} · quoteRule ${QUOTE_RULE:-(기본)} · 미인용거절 ${NOEV:-(기본)} · closedbook ${CLOSEDBOOK:-(기본)} · 긴형식 ${LONGFORM:-(없음)}"
-ladder_log "  인용 옵션 — quoteStyle ${QUOTE_STYLE:-(기본 original)} · maxQuoteChars ${MAX_QUOTE_CHARS:-(기본)} · maxQuoteShare ${MAX_QUOTE_SHARE:-(기본)} · maxCopyRatio ${MAX_COPY_RATIO:-(기본 1=안 거름)}"
+ladder_log "  인용 옵션 — quoteStyle ${QUOTE_STYLE:-(기본 original)} · maxQuoteChars ${MAX_QUOTE_CHARS:-(기본)} · maxQuoteShare ${MAX_QUOTE_SHARE:-(기본)} · maxCopyRatio ${MAX_COPY_RATIO:-(기본 1=안 거름)} · refusalStyle ${REFUSAL_STYLE:-(기본 refuse-only)}"
 ladder_log "  학습 옵션 — saveEpochs ${SAVE_EPOCHS:-(기본)} · evalHoldout ${EVAL_HOLDOUT:-(기본)} · loraAlphaMult ${ALPHA_MULT:-(기본)}"
 ladder_log "  설정 사본 → $OUTDIR/round.json"
 
@@ -316,6 +318,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
       ${MAX_QUOTE_CHARS:+--max-quote-chars "$MAX_QUOTE_CHARS"} \
       ${MAX_QUOTE_SHARE:+--max-quote-share "$MAX_QUOTE_SHARE"} \
       ${MAX_COPY_RATIO:+--max-copy-ratio "$MAX_COPY_RATIO"} \
+      ${REFUSAL_STYLE:+--refusal-style "$REFUSAL_STYLE"} \
       ${LONGFORM:+--longform-dataset "$LONGFORM"} \
       $NOEV_FLAG ) \
     2>&1 | tee "$OUTDIR/build.log"
