@@ -16,6 +16,7 @@ import {
   근거조각뽑기, 근거블록있나, 규격읽기,
   제품인용만들기, 문장경계자르기, 블록번호찾기,
   제품인용맞추기, 인용규칙이름표, 인용규칙칸, 번호참조떼기, 거절답만들기, 일반답머리,
+  거절꼴고르기, 번호참조있나, 홀드아웃고르기,
 } from "../../tools/build-raft-dataset.mjs";
 // 정본 판정기(사다리 ④갈래). 이름이 겹치므로 사다리 쪽에 딱지를 붙여 부른다 — 어느 잣대로 쟀는지가 늘 보이게.
 import { 허용인가, 허용목록읽기 as 사다리허용목록읽기 } from "../../tools/ladder/ladderlib.mjs";
@@ -1058,6 +1059,55 @@ describe.runIf(PY)("★ 학습 스크립트가 행마다의 근거(system)를 �
       fs.rmSync(산출, { recursive: true, force: true });
     }
   });
+
+  // [2026-09-05 · 회전 4] --eval-file — 시험지를 **파일로 고정**한다.
+  //   왜: --eval-holdout은 그 회전의 데이터셋 안에서 떼므로 재료가 바뀌면 시험지도 바뀐다.
+  //   회전 2와 3의 eval_loss를 나란히 놓은 것은 **다른 시험지의 점수**를 견준 것이었다.
+  it("★★ --eval-file — 파일을 읽고, 학습 재료와 질문이 겹치면 **죽는다**", () => {
+    fs.mkdirSync("data/datasets", { recursive: true });
+    const 평가파일 = path.join("data", "datasets", `${id}-holdout.json`);
+    fs.writeFileSync(데이터셋, JSON.stringify([
+      { question: "접속기록 보관 기간은?", answer: "1년 이상입니다", system: "참고 자료\n[1] 1년 이상 보관" },
+      { question: "방화벽 점검 주기는?", answer: "월 1회입니다" },
+    ]), "utf-8");
+    try {
+      const 돌리기 = (...더: string[]) => spawnSync(
+        PY!,
+        ["scripts/finetune_qlora14b.py", "--dataset", id, "--output", 산출, "--max-seq", "3072", "--smoke", ...더],
+        { encoding: "utf-8", env: { ...process.env, PYTHONUTF8: "1" } }
+      );
+
+      // ⓐ 안 겹치는 평가 파일 — 읽고 평가 줄까지 낸다.
+      fs.writeFileSync(평가파일, JSON.stringify([
+        { question: "백업 주기는?", answer: "주 1회입니다", system: "참고 자료\n[1] 주 1회" },
+      ]), "utf-8");
+      const ok = 돌리기("--eval-file", 평가파일);
+      expect(ok.status, `스크립트가 죽었다: ${ok.stderr}`).toBe(0);
+      expect(ok.stdout).toContain(`eval_file=${평가파일}`);
+      expect(ok.stdout).toContain("평가 파일 1행 · 양쪽 겹친 질문 0");
+
+      // ⓑ 겹치는 평가 파일 — **죽는다**(겹치면 그 손실은 「배웠나」가 아니라 「외웠나」를 잰다).
+      fs.writeFileSync(평가파일, JSON.stringify([
+        { question: "방화벽 점검 주기는?", answer: "월 1회입니다" },
+      ]), "utf-8");
+      const 겹침 = 돌리기("--eval-file", 평가파일);
+      expect(겹침.status, "조용히 넘기면 그 숫자로 회전을 판정하게 된다").not.toBe(0);
+      expect(겹침.stdout + 겹침.stderr).toContain("평가 파일의 질문이 학습 재료에도 있습니다");
+
+      // ⓒ --eval-holdout 과 **함께 못 쓴다** — 시험지가 둘이면 어느 것으로 쟀는지 알 수 없다.
+      const 둘 = 돌리기("--eval-file", 평가파일, "--eval-holdout", "2");
+      expect(둘.status).not.toBe(0);
+      expect(둘.stdout + 둘.stderr).toContain("함께 못 씁니다");
+
+      // ⓓ 파일이 없으면 죽는다(조용히 「평가 없음」으로 넘어가면 회전이 시험지 없이 굽힌다).
+      const 없음 = 돌리기("--eval-file", path.join("data", "datasets", "없는-파일.json"));
+      expect(없음.status).not.toBe(0);
+    } finally {
+      fs.rmSync(데이터셋, { force: true });
+      fs.rmSync(평가파일, { force: true });
+      fs.rmSync(산출, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── 창구가 실제로 막는가 (진짜 HTTP) ────────────────────────────────────────────
@@ -1121,11 +1171,18 @@ describe("★ 창구·저장 관문 (소스 감시)", () => {
     expect(learnloop).toMatch(/cites: parseCites\(r\.cites\)/);
   });
 
-  it("★ 빌더는 만든 행을 파일로 안 떨군다 — 손에 쥐면 위생 관문을 건너뛰게 된다", () => {
+  it("★ 빌더는 **학습 행**을 파일로 안 떨군다 — 손에 쥐면 위생 관문을 건너뛰게 된다", () => {
     // 2026-09-03 실측: gb10 수동 경로가 관문을 건너뛰어 평가 게이트 문항 4건이 학습에 섞였다.
     const code = src("tools/build-raft-dataset.mjs");
     const 쓰기 = [...code.matchAll(/writeFileSync\(([^,]+),/g)].map((m) => m[1].trim());
-    expect(쓰기, "보고서 말고 다른 것을 쓰고 있다 — 행 파일이 생기면 위생을 건너뛰는 길이 열린다").toEqual(["out"]);
+    // ★ 자리는 **둘뿐**이다(2026-09-05 · 회전 4):
+    //   · out — 보고서(build-report.json)
+    //   · abs — 홀드아웃(평가용) 파일. **학습에 안 쓰이는 행**이고, 오히려 데이터셋에서 **빠지는** 행이다.
+    //     (그래서 위생을 건너뛰는 길이 아니다 — 건너뛸 학습이 없다. 아래 시험이 「빠지는가」를 실제로 잰다.)
+    //   셋째가 생기면 여기가 먼저 빨강이 된다 — 그때 「학습 행인가」를 사람이 다시 물어야 한다.
+    expect(쓰기, "보고서·홀드아웃 말고 다른 것을 쓰고 있다 — 학습 행 파일이 생기면 위생을 건너뛰는 길이 열린다").toEqual(["abs", "out"]);
+    expect(code, "홀드아웃은 저장소에 커밋되므로 허용목록 밖 본문이 실렸으면 **쓰지 않고 죽는다**(재배포 금지)")
+      .toMatch(/홀드아웃 파일을 저장소에 쓸 수 없습니다/);
     expect(code).toContain("build-report.json");
     // 저장은 오직 창구로. 종류 「근거」를 명시해야 system 칸이 살아남는다.
     expect(code).toMatch(/\/api\/dataset\/save[\s\S]{0,400}kind: "근거"/);
@@ -1230,6 +1287,19 @@ describe("★★ 제품 규약 인용 꼴 — 「[n]에 따르면 \"X′\"」", 
     expect(src("server/src/engine/llm.ts"), "llm.ts가 더는 「[2]에 따르면」이라 말하지 않는다 — 규약이 바뀌었는지 확인하고 제품인용만들기를 함께 고칠 것")
       .toContain("「[2]에 따르면」");
     expect(제품인용만들기(2, "X")).toBe('[2]에 따르면 "X"');
+  });
+
+  it("★★ 통째로 담은 조각을 **먼저** 찾는다 — 붙박이 문구 겹침에 번호를 뺏기지 않는다(v4 실측 2건)", () => {
+    // raft-vuln-v4 실측: 인용 「Apply updates per vendor instructions.」이 [2]에 통째로 있는데,
+    // [1]의 「Apply mitigations per vendor instructions or …」와 "pervendorinstructions"(21자)가
+    // 겹쳐 답이 [1]을 가리켰다 — 번호가 딴 조각을 가리키면 이 회전이 가르치려는 것의 반대가 된다.
+    const 인용 = "Apply updates per vendor instructions.";
+    const 겹치기만 = "requiredAction: Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.";
+    const 통째로 = "NVD: the vendor published guidance. requiredAction: Apply updates per vendor instructions. See the advisory for details.";
+    expect(블록번호찾기(인용, [겹치기만, 통째로]), "통째로 담은 [2]라야 한다").toBe(2);
+    expect(블록번호찾기(인용, [통째로, 겹치기만]), "통째로가 앞에 있어도 그대로 [1]").toBe(1);
+    // 통째로 담은 조각이 없으면 옛 규칙(20자 겹침 · 첫 조각)으로 떨어진다 — 인용은 줄여 붙이므로 정상 경로다.
+    expect(블록번호찾기(인용, [겹치기만])).toBe(1);
   });
 
   it("★ 번호는 **그 행의 참고 자료 블록** 자리다 — 정답 목록의 자리가 아니다", () => {
@@ -1474,6 +1544,129 @@ describe("★★★ 거절 행 — 「먼저 밝히고 이어 답한다」", () 
     const c = 구성비([행(답)], ["B"], { ragHeader: RAG_BLOCK_HEADER });
     expect(c.인용.거절행.인용, "거절 행 인용 0").toBe(0);
     expect(사전검사(c).실패).toEqual([]);
+  });
+});
+
+// ── 회전 4(2026-09-05) — 갈래별 거절 꼴 · Ⓝ 무블록 · 고정 홀드아웃 ─────────────────
+//
+// 왜: 회전 3은 ⓑ와 ⓑ′에 **같은 꼴**(declare-then-answer)을 먹였다. 그 결과 ⓑ 행은 「참고 자료 블록이
+// 눈앞에 있는데 거절부터 하고 이어 답하는」 꼴이 되어 ⓐ와 겉모습이 같아졌고, 실측에서
+// **근거를 준 자리의 답 8건 중 7건이 거절문으로 시작**했다(관문 ⑬이 그것을 센다).
+describe("★★★ 회전 4 — 거절 꼴을 갈래별로 · Ⓝ 무블록 · 홀드아웃 고정", () => {
+  const 원답 = '방화벽 정책은 최소 권한으로 설계하고 불필요한 포트를 닫는 것이 기본입니다. [2]에 따르면 "차단 정책은 기본 거부로 둔다" 라고 하며, 담당자는 분기마다 규칙을 점검하고 쓰이지 않는 규칙을 지워야 합니다.';
+  const 조각 = (문서: string, 본문: string) => ({ ref: `store:${문서}#${"0".repeat(12)}`, text: 본문, 문서, category: "취약점" });
+  const 정답 = 조각("GIJO_AS_취약점관리_지침.md", "KEV 목록에 오른 취약점은 실제 악용이 확인된 것이며 담당자는 기한 안에 조치해야 한다.");
+  const 방해 = 조각("GIJO_AS_보안담당자_실무매뉴얼.md", "EPSS는 악용 가능성 점수이며 CVSS와 함께 보아야 우선순위가 선다.");
+  const 색인 = new Map([정답, 방해].map((c) => [c.ref, c]));
+  const 옵션 = {
+    판정: (문서: string) => (/^GIJO_/.test(문서) ? null : "허용목록 밖"),
+    system: "너는 보안 분석가다", ragHeader: RAG_BLOCK_HEADER, distractors: 1, 씨앗: "s", 시험: new Set<string>(),
+  };
+  type R = {
+    rows: { question: string; answer: string; system: string }[];
+    종류들: string[];
+    통계: { 거절행꼴: { 갈래별: Record<string, Record<string, number>> }; 무블록: { 후보: number; 실림: number } };
+  };
+
+  it("★ by-kind는 **블록의 유무**로 가른다 — ⓑ만 거절 문장, 블록 없는 갈래는 밝히고 답", () => {
+    expect(거절꼴고르기("by-kind", "B")).toBe("refuse-only");
+    expect(거절꼴고르기("by-kind", "B2")).toBe("declare-then-answer");
+    expect(거절꼴고르기("by-kind", "N")).toBe("declare-then-answer");
+    // 옛 두 값은 갈래와 무관하게 그대로다 — 회전 2·3을 한 글자도 안 바꾼다.
+    expect(거절꼴고르기("refuse-only", "B2")).toBe("refuse-only");
+    expect(거절꼴고르기("declare-then-answer", "B")).toBe("declare-then-answer");
+    expect(거절답만들기(원답, { 꼴: "by-kind", 갈래: "B" }).answer, "블록이 있는 자리는 거절만").toBe(거절답);
+    expect(거절답만들기(원답, { 꼴: "by-kind", 갈래: "B2" }).일반답, "블록이 없는 자리는 밝히고 답").toBe(true);
+  });
+
+  it("★★ 행 만들기 by-kind — ⓑ는 59자 거절, ⓑ′는 밝히고 답. **한 판 안에서 둘이 다르다**", () => {
+    const 입력 = [
+      { id: "a", question: "질문1", answer: 원답, cites: [정답.ref] },  // → B(방해만)
+      { id: "b", question: "질문2", answer: 원답, cites: [] },           // → B′(무근거)
+    ];
+    const { rows, 종류들, 통계 } = 행만들기(입력, 색인, {
+      ...옵션, pOracle: 0, noEvidenceFromUncited: true, refusalStyle: "by-kind",
+    }) as R;
+    const 답 = Object.fromEntries(종류들.map((k, i) => [k, rows[i].answer]));
+    expect(답.B, "블록이 눈앞에 있는데 이어 답하면 ⓐ와 겉모습이 같아진다").toBe(거절답);
+    expect(답.B2.startsWith(거절답)).toBe(true);
+    expect(답.B2.length, "블록이 없는 자리는 밝히고 이어 답한다").toBeGreaterThan(거절답.length + 20);
+    expect(인용흔적있나(답.B2)).toBe(false);
+    expect(번호참조있나(답.B2)).toBe(false);
+    expect(통계.거절행꼴.갈래별.B["거절 문장만"]).toBe(1);
+    expect(통계.거절행꼴.갈래별.B2["밝히고 일반 답"]).toBe(1);
+  });
+
+  it("★★ --noblock-ratio 1 — 정답 자리 후보가 전부 Ⓝ이 된다(블록 없음 · 인용·번호 0)", () => {
+    const 입력 = [{ id: "a", question: "질문1", answer: 원답, cites: [정답.ref] }];
+    const { rows, 종류들, 통계 } = 행만들기(입력, 색인, { ...옵션, noblockRatio: 1, refusalStyle: "by-kind" }) as R;
+    expect(종류들).toEqual(["N"]);
+    expect(rows[0].system, "블록이 없다 — llm.ts가 rag=null일 때 만드는 그 system이다").toBe("너는 보안 분석가다");
+    expect(rows[0].system).not.toContain(RAG_BLOCK_HEADER);
+    expect(rows[0].answer.startsWith(거절답)).toBe(true);
+    expect(rows[0].answer).toContain(일반답머리);
+    expect(인용흔적있나(rows[0].answer)).toBe(false);
+    expect(번호참조있나(rows[0].answer), "가리킬 블록이 없는 [n]은 관문 ⑨가 세는 그 꼴이다").toBe(false);
+    expect(통계.무블록).toEqual({ 비율: 1, 후보: 1, 실림: 1 });
+  });
+
+  it("★ 기본(0)은 **한 글자도 안 바꾼다** — 옛 회전을 그대로 다시 만들 수 있어야 한다", () => {
+    const 입력 = [{ id: "a", question: "질문1", answer: 원답, cites: [정답.ref] }];
+    const 옛 = 행만들기(입력, 색인, 옵션) as R;
+    const 새 = 행만들기(입력, 색인, { ...옵션, noblockRatio: 0 }) as R;
+    expect(새.rows).toEqual(옛.rows);
+    expect(옛.종류들).toEqual(["A"]);
+    expect(옛.통계.무블록).toEqual({ 비율: 0, 후보: 0, 실림: 0 });
+  });
+
+  it("★ 고르는 것은 결정적이다 — 같은 씨앗이면 같은 자리가 Ⓝ이 된다", () => {
+    const 입력 = Array.from({ length: 20 }, (_, i) => ({ id: `q${i}`, question: `질문${i}`, answer: 원답, cites: [정답.ref] }));
+    const 한판 = 행만들기(입력, 색인, { ...옵션, noblockRatio: 0.5, refusalStyle: "by-kind" }) as R;
+    const 두판 = 행만들기(입력, 색인, { ...옵션, noblockRatio: 0.5, refusalStyle: "by-kind" }) as R;
+    expect(두판.종류들).toEqual(한판.종류들);
+    expect(한판.종류들.filter((k) => k === "N").length, "절반 언저리가 Ⓝ이다").toBeGreaterThan(0);
+    const 딴씨앗 = 행만들기(입력, 색인, { ...옵션, 씨앗: "다른씨앗", noblockRatio: 0.5, refusalStyle: "by-kind" }) as R;
+    expect(딴씨앗.종류들, "씨앗이 다르면 판도 다르다(그래서 지문이 뜻을 갖는다)").not.toEqual(한판.종류들);
+  });
+
+  it("★★ 사전검사 — 블록 없는 행에 「[n]」이 남으면 **막는다**(인용 검사가 원리상 못 보는 꼴)", () => {
+    const 행 = { question: "q", answer: "앞말입니다. [2]에 따르면 뒷말입니다.", system: "너는 보안 분석가다" };
+    const c = 구성비([행], ["N"], { ragHeader: RAG_BLOCK_HEADER });
+    expect(c.인용.근거블록없음.인용, "따옴표 꼬리는 없다 — 인용 검사는 통과한다").toBe(0);
+    expect(c.번호참조.무근거행).toBe(1);
+    const r = 사전검사(c);
+    expect(r.통과).toBe(false);
+    expect(r.실패.join(" "), "어느 갈래가 범인인지 댄다").toContain("N 1행");
+  });
+
+  it("★★ ⓒ 폐쇄형과 Ⓝ을 함께 실으면 막는다 — ⓑ′와 **같은 자리**다(갈래가 늘어도 검사가 따라간다)", () => {
+    const 블록없는행 = (a: string) => ({ question: "q", answer: a, system: "너는 보안 분석가다" });
+    const c = 구성비([블록없는행("원래 답입니다"), 블록없는행(거절답)], ["C", "N"], { ragHeader: RAG_BLOCK_HEADER });
+    const r = 사전검사(c);
+    expect(r.통과).toBe(false);
+    expect(r.실패.join(" ")).toContain("Ⓝ 1");
+    expect(사전검사(c, { 폐쇄형충돌허용: true }).통과, "사람이 판단해 받아들이면 연다").toBe(true);
+  });
+
+  it("★★ 홀드아웃 — 질문 뭉치를 **통째로** 뗀다(반쪽을 떼면 같은 질문이 학습·평가 양쪽에 남는다)", () => {
+    const rows = [
+      { question: "같은 질문", answer: "답1", system: "s" },
+      { question: "같은 질문", answer: "답2", system: "s" },
+      { question: "다른 질문", answer: "답3", system: "s" },
+    ];
+    const 고른 = 홀드아웃고르기(rows, ["A", "D", "A"], { n: 1 });
+    const 뗀질문 = new Set([...고른].map((i) => rows[i].question));
+    const 남은질문 = new Set(rows.filter((_, i) => !고른.has(i)).map((r) => r.question));
+    expect([...뗀질문].every((q) => !남은질문.has(q)), "겹치면 그 손실은 「배웠나」가 아니라 「외웠나」를 잰다").toBe(true);
+    expect(고른.size, "뭉치를 통째로 떼므로 n보다 클 수 있다").toBeGreaterThanOrEqual(1);
+  });
+
+  it("★ 홀드아웃은 결정적이고 **A행을 담은 뭉치가 먼저**다", () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({ question: `q${i}`, answer: "a", system: "s" }));
+    const 종류들 = rows.map((_, i) => (i < 3 ? "B" : "A"));
+    const 고른 = 홀드아웃고르기(rows, 종류들, { n: 4 });
+    expect([...고른].every((i) => 종류들[i] === "A"), "A행이 이 재료의 본령이고 평가도 그 자리를 물어야 한다").toBe(true);
+    expect([...홀드아웃고르기(rows, 종류들, { n: 4 })].sort(), "같은 입력이면 같은 시험지").toEqual([...고른].sort());
   });
 });
 

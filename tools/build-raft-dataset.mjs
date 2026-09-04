@@ -78,6 +78,21 @@
 //     「제품 코드가 번호를 매기는 꼴」을 가르친다 — 둘을 맞추려면 팀원 프롬프트에 한 줄이 들어가야 하고
 //     그건 사람이 정할 일이다. 짝 시험이 이 꼴과 llm.ts:191을 대조한다.
 //
+//
+// ── 4회전(2026-09-05) 인자 — 회전 3이 **근거를 준 자리에서 거절부터 하게** 만든 것을 되돌린다 ────────
+//   회전 3 실측(r3-v3 ep1·ep2): grounded 8건 중 **7건이 거절문으로 시작**했다(베이스 0/8 · 회전 2 0/8).
+//   뿌리: 회전 3이 ⓑ 행(방해 블록 **있음** + 거절 + 이어진 답)을 ⓐ 행과 **겉모습이 같게** 만들어,
+//   모델이 「블록이 있느냐」로 가르지 못하고 거절을 앞세운 것이다.
+//
+//   --refusal-style by-kind  거절 꼴을 **갈래별로** 나눈다(회전 4의 꼴).
+//                           ⓑ(방해만 — 블록 있음)=거절 문장만(회전 2 꼴) · ⓑ′/Ⓝ(블록 없음)=밝히고 이어 답.
+//                           refuse-only·declare-then-answer는 그대로 산다(옛 회전 재현).
+//   --noblock-ratio <0~1>   정답을 실을 자리로 들어온 행 중 이 몫을 **참고 자료 블록 없이** 굽는다(Ⓝ).
+//                           답은 ⓑ′와 같은 꼴(거절 문장 + 말머리 + 인용·[n]을 뗀 본문)이라 인용·번호가 0이다.
+//                           ⚠ 분모는 **최종 A행이 아니라** 정답 자리 후보다(strict·베낀 비율 관문보다 앞에서 고른다).
+//   --holdout-out <파일>     평가용 홀드아웃을 **저장소 파일**로 떨구고 데이터셋에서 뺀다(회전 간 같은 시험지).
+//   --holdout-n <20~1000>    그 파일에 담을 행 수(기본 100 · 질문 뭉치를 통째로 떼므로 그 이상일 수 있다).
+//
 //   ⚠ 갈래를 고르는 것은 전부 **결정적**이다(sha12(씨앗+문답id) 앞 4자리 → 0~1). 같은 씨앗이면 같은 판이
 //     나와야 「이 판으로 구웠다」는 지문이 뜻을 갖는다. 무작위를 쓰면 재현이 안 돼 A/B가 성립하지 않는다.
 //
@@ -469,10 +484,27 @@ export const 일반답머리 = "일반적으로 알려진 바로는, ";
  * ⚠ 본문이 너무 짧으면(기본 80자) **거절 문장만** 단다 — 「밝히고 두 마디」는 답이 아니라 꼬리다.
  * ⚠ 만든 답에 인용 흔적이나 번호가 **남아 있으면 되돌린다**(fail-closed): 깨진 꼬리 하나가 남는 것보다
  *   그 행이 거절만 하는 편이 낫다(사전검사가 그 자리를 막고, 막히면 판을 통째로 다시 굽는다).
+ *
+ * ★ 세 번째 꼴 **by-kind**(2026-09-05 · 회전 4 · F2 실측이 시킨 일): 회전 3은 두 갈래에 **같은 꼴**을
+ *   먹였는데(둘 다 declare-then-answer), 그 결과 ⓑ 행은 「참고 자료 블록이 눈앞에 있는데 거절부터 하고
+ *   이어 답하는」 꼴을 가르쳤다. 실측(r3-v3 ep1·ep2): **근거를 준 자리(grounded 8건)에서 거절문으로
+ *   시작한 답이 7/8**이었다(베이스 0/8 · 회전 2 0/8). 모델이 「블록이 있느냐」로 가르지 못하고
+ *   거절을 앞세운 것이다 — 겉모습이 같으면 가를 수 없다.
+ *   그래서 갈래별로 다른 꼴을 가르친다:
+ *     · ⓑ  B  (방해만 — 블록이 **있다**)  → **거절 문장만**(회전 2 꼴). 「블록이 있어도 답이 없으면 거절」
+ *     · ⓑ′ B2 (무근거 — 블록이 **없다**)  → 밝히고 이어 답(회전 3 꼴)
+ *     · Ⓝ  N  (무블록 — 블록이 **없다**)  → 밝히고 이어 답(B2와 같은 꼴 — 같은 입력엔 같은 답)
+ *   가르는 잣대는 **블록의 유무**다(갈래 이름이 아니라). 그래야 갈래가 늘어도 규칙이 그대로 산다.
  */
+export function 거절꼴고르기(꼴, 갈래) {
+  if (꼴 !== "by-kind") return 꼴;
+  return 갈래 === "B" ? "refuse-only" : "declare-then-answer";
+}
+
 export function 거절답만들기(원답, 옵션 = {}) {
-  const { 꼴 = "refuse-only", 본문최소 = 80 } = 옵션;
-  if (꼴 !== "declare-then-answer") return { answer: 거절답, 일반답: false, 왜: null };
+  const { 꼴 = "refuse-only", 본문최소 = 80, 갈래 = null } = 옵션;
+  const 쓸꼴 = 거절꼴고르기(꼴, 갈래);
+  if (쓸꼴 !== "declare-then-answer") return { answer: 거절답, 일반답: false, 왜: null };
   const 본문 = 번호참조떼기(인용떼기(원답));
   if (본문.length < 본문최소) return { answer: 거절답, 일반답: false, 왜: `본문 ${본문.length}자(최소 ${본문최소}자)` };
   const answer = `${거절답} ${일반답머리}${본문}`;
@@ -571,16 +603,22 @@ export function 문장경계자르기(문장, 상한) {
  *   담으므로(섞기), 정답 목록의 자리 번호를 쓰면 답이 **방해 조각을 가리키게 된다.**
  *   그래서 부르는 쪽이 「실제로 system에 실릴 그 배열」을 넘겨야 한다.
  * 겹침 잣대는 overlap20(증류기·서버·관문과 같은 자) — 다듬어진 인용도 20자 이어지면 그 조각으로 본다.
+ *
+ * ★★ **두 바퀴로 찾는다**(2026-09-05 · 회전 4 실측이 시킨 수리): ① 인용문을 **통째로 담은** 조각을
+ *   먼저 찾고, ② 없을 때만 20자 겹침으로 떨어진다.
+ *   왜: 한 바퀴(20자 겹침)만 돌면 **붙박이 문구**가 든 조각이 먼저 걸린다. raft-vuln-v4 실측에서
+ *   인용 「Apply updates per vendor instructions.」이 [2]에 통째로 있는데, [1]에 있던
+ *   「Apply mitigations per vendor instructions or …」와 **"pervendorinstructions"(21자)**가 겹쳐
+ *   답이 [1]을 가리켰다 — **번호가 딴 조각을 가리키는** 것이라, 이 회전이 가르치려는 바로 그것의 반대다.
+ *   실측 빈도는 531건 중 2건(0.38%)이었다. 적지만 「번호가 거짓말하는」 부류라 남길 값어치가 없다.
+ *   ⚠ 겹침 바퀴를 **없애지는 않는다** — 인용은 문장 경계에서 줄여 붙이므로 통째로 안 담긴 자리가 정상이다.
  */
 export function 블록번호찾기(인용문, 블록조각들) {
   const q = String(인용문 ?? "").replace(/\s+/g, "");
   if (q.length < 20) return null;
-  const 목록 = Array.isArray(블록조각들) ? 블록조각들 : [];
-  for (let i = 0; i < 목록.length; i += 1) {
-    const s = String(목록[i] ?? "").replace(/\s+/g, "");
-    if (s.length < 20) continue;
-    if (s.includes(q) || overlap20(s, q)) return i + 1;
-  }
+  const 목록 = (Array.isArray(블록조각들) ? 블록조각들 : []).map((t) => String(t ?? "").replace(/\s+/g, ""));
+  for (let i = 0; i < 목록.length; i += 1) if (목록[i].length >= 20 && 목록[i].includes(q)) return i + 1;
+  for (let i = 0; i < 목록.length; i += 1) if (목록[i].length >= 20 && overlap20(목록[i], q)) return i + 1;
   return null;
 }
 
@@ -804,6 +842,13 @@ export function 긴형식읽기(지정, root = 저장소) {
  * ⚠ team-bench의 `절세기(text, 절이름들)`와 **다른 일**이다(그쪽은 「요구한 이름의 절이 있나」를 본다).
  *   이쪽은 재료의 생김새를 재는 자다 — 이름을 요구하지 않는다. 합치지 말 것.
  */
+/**
+ * 답에 **번호 참조**(「[2]」·「[2]에 따르면」)가 있나 — 블록이 없는 행에서 이 꼴이 나오면 가리킬 자리가
+ * 없는 거짓이다. 관문 ⑨의 제품인용꼬리표보다 **넓게** 본다(맨 「[3]」도 잡는다): 재료는 관문보다
+ * 앞에서 막아야 하고, 여기서 새면 관문이 그 꼴을 배운 어댑터에 대고 빨강을 내게 된다.
+ */
+export const 번호참조있나 = (a) => /\[\d+\]/.test(String(a ?? ""));
+
 export const 절수 = (a) => (String(a ?? "").match(/^\s*(#{1,3}\s|\d+[.)]\s|[①-⑨])/gm) || []).length;
 
 /**
@@ -812,7 +857,13 @@ export const 절수 = (a) => (String(a ?? "").match(/^\s*(#{1,3}\s|\d+[.)]\s|[�
  */
 export function 구성비(rows, 종류들, 옵션 = {}) {
   const { ragHeader = "", 베낀비율들 = null } = 옵션;
-  const 이름 = { A: "근거+정답", B: "방해만→거절", B2: "무근거→거절(B′)", C: "폐쇄형", D: "긴 형식" };
+  const 이름 = {
+    A: "근거+정답", B: "방해만→거절", B2: "무근거→거절(B′)",
+    // ★ Ⓝ(2026-09-05 · 회전 4) — 블록이 **없는** 자리에서 「밝히고 이어 답」. ⓑ′와 같은 꼴이지만
+    //   재료의 출신이 다르다(ⓑ′=근거 ref가 없던 문답 · Ⓝ=근거가 있는 문답에서 블록만 뺀 것).
+    //   구성비에 따로 세는 이유: 둘을 합치면 「얇은 ⓑ′를 Ⓝ으로 채웠다」가 숫자에서 사라진다.
+    N: "무블록→밝히고 답(Ⓝ)", C: "폐쇄형", D: "긴 형식",
+  };
   const 표 = {};
   for (const k of Object.keys(이름)) 표[k] = { 뜻: 이름[k], 행: 0, 비율: 0, 인용: 0 };
   // 갈래마다 「원문:」이 몇 개인지도 함께 센다 — 사전검사가 걸렸을 때 **어느 갈래가 범인인지** 바로
@@ -874,6 +925,13 @@ export function 구성비(rows, 종류들, 옵션 = {}) {
     인용위반: {
       무근거: 갈래별세기((i) => !블록있음[i] && 인용흔적있나(rows[i].answer)),
       거절: 갈래별세기((i) => 거절[i] && 인용흔적있나(rows[i].answer)),
+    },
+    // ★ 번호 참조(2026-09-05 · 회전 4) — 블록이 **없는** 행에 「[n]」이 남았나. 인용흔적있나는
+    //   따옴표 꼬리만 보므로 이 꼴을 **원리상 못 본다**(회전 3의 재료는 번호참조떼기로 막았지만,
+    //   막았다는 사실을 세는 자가 없었다 — 세지 않으면 다음 회전에 조용히 되살아난다).
+    번호참조: {
+      무근거행: rows.filter((_, i) => !블록있음[i] && 번호참조있나(rows[i].answer)).length,
+      무근거: 갈래별세기((i) => !블록있음[i] && 번호참조있나(rows[i].answer)),
     },
     답길이: { p50: q(0.5), p90: q(0.9), max: 길이.length ? 길이[길이.length - 1] : 0 },
     절3이상: rows.filter((r) => 절수(r.answer) >= 3).length,
@@ -940,6 +998,16 @@ export function 사전검사(구성, 옵션 = {}) {
       `(${범인대기(구성.인용위반?.무근거)}) — 근거가 없는 자리에서 인용하는 법을 가르치게 된다`
     );
   }
+  // ★ 번호 참조도 같은 자리에서 막는다(2026-09-05 · 회전 4). 블록이 없는데 「[2]에 따르면」이 남으면
+  //   그 번호는 **가리킬 자리가 없다** — 관문 ⑨가 어댑터에게 빨강을 내는 바로 그 꼴을 재료가 먼저 가르친다.
+  //   ⚠ 인용흔적있나는 따옴표 꼬리만 보므로 이 꼴을 원리상 못 본다 — 그래서 검사가 따로 있다.
+  const 번호 = 구성.번호참조 ?? { 무근거행: 0, 무근거: {} };
+  if (번호.무근거행 > 0) {
+    실패.push(
+      `참고 자료 블록이 **없는** 행 ${무근거.행}개 중 ${번호.무근거행}개에 번호 참조 「[n]」이 남아 있다` +
+      `(${범인대기(번호.무근거)}) — 가리킬 블록이 없는 번호는 거짓이고, 관문 ⑨가 세는 그 꼴이다`
+    );
+  }
   // 명시적 예외 — ⓑ(방해만)는 블록이 **있지만** 답이 거절이다. 거절하면서 인용하면 그 인용은 거짓이다.
   const 거절 = 구성.인용.거절행 ?? { 행: 0, 인용: 0 };
   if (거절.인용 > 0) {
@@ -953,10 +1021,14 @@ export function 사전검사(구성, 옵션 = {}) {
   //   내용이 없습니다'라고 먼저 밝힙니다」라는 팀원 프롬프트의 규칙이 들어 있다. 둘을 함께 실으면 모델은
   //   같은 입력에 두 라벨을 보고, 제품에서 이 자리가 열리는 때(임베딩 검색이 죽어 rag=null)에 어느 쪽이
   //   나올지 아무도 모른다. **굽기 전에 사람이 정할 일**이라 기본은 막는다.
-  const C행 = 구성.표.C?.행 ?? 0, B2행 = 구성.표.B2?.행 ?? 0;
-  if (C행 > 0 && B2행 > 0 && !폐쇄형충돌허용) {
+  // ★ Ⓝ도 **같은 자리**다(2026-09-05 · 회전 4) — 블록 없는 프롬프트에 「밝히고 답」을 다는 갈래라,
+  //   ⓒ와 함께 실으면 ⓑ′와 똑같이 부딪친다. 갈래 이름을 늘릴 때마다 이 검사를 안 늘리면 새 갈래가
+  //   **검사 밖으로 자란다** — 그래서 「블록 없는 거절 갈래」를 합쳐서 센다.
+  const C행 = 구성.표.C?.행 ?? 0, B2행 = 구성.표.B2?.행 ?? 0, N행 = 구성.표.N?.행 ?? 0;
+  const 무블록거절 = B2행 + N행;
+  if (C행 > 0 && 무블록거절 > 0 && !폐쇄형충돌허용) {
     실패.push(
-      `ⓒ 폐쇄형 ${C행}행과 ⓑ′ 무근거 거절 ${B2행}행이 **같은 프롬프트**(참고 자료 블록 없음)에 정반대 답을 답니다` +
+      `ⓒ 폐쇄형 ${C행}행과 무블록 거절 ${무블록거절}행(ⓑ′ ${B2행} + Ⓝ ${N행})이 **같은 프롬프트**(참고 자료 블록 없음)에 정반대 답을 답니다` +
       ` — 한쪽을 끄거나, 사람이 판단해 받아들였다면 --allow-closedbook-conflict 를 붙이세요`
     );
   } else if (C행 > 0) {
@@ -990,6 +1062,44 @@ export const 토큰추정 = (s) => Math.ceil(String(s ?? "").length * (504 / 800
 
 /** 시험 문항 정규화 — 서버 datasethygiene와 같은 규칙(공백·문장부호 제거). */
 export const 문항정규화 = (s) => String(s ?? "").replace(/\s+/g, "").replace(/[?!.,·…]/g, "");
+
+/**
+ * **홀드아웃(평가용) 자리 고르기** — 결정적이고 **질문 뭉치 단위**다(2026-09-05 · 회전 4 · G5).
+ *
+ * ★ 왜 파일로 고정하나: `--eval-holdout N`은 **그 회전의 데이터셋 안에서** N행을 떼므로, 재료가 바뀌면
+ *   시험지도 함께 바뀐다 — 회전 3과 회전 4의 eval_loss를 나란히 놓으면 **다른 시험지의 점수**를 견주게 된다.
+ *   (회전 2·3이 실제로 그랬다. 그래서 그 두 값은 회전 간 비교가 원리상 불가능하다.)
+ *   회전 4부터는 홀드아웃을 **저장소 파일 하나**로 고정하고 데이터셋에서 빼, 다음 회전들이 **같은 시험지**를 본다.
+ *
+ * ★ 왜 질문 뭉치 단위인가: 같은 질문이 학습과 평가 양쪽에 있으면 그 손실은 「배웠나」가 아니라 **「외웠나」**를 잰다.
+ *   한 질문이 여러 행이 되는 길이 실제로 있다(승인 문답 중복 · ⓓ 긴 형식이 같은 질문을 담을 수 있다).
+ *   `finetune_qlora14b.py 평가분리()`가 같은 규칙을 쓴다 — 규칙이 두 곳이면 어긋나는 날 아무도 모른다.
+ *
+ * 고르는 차례: ① **A행을 담은 뭉치가 먼저**(A행이 이 재료의 본령이고, 평가도 그 자리를 물어야 한다)
+ *            ② 그 안에서 **sha12(질문) 오름차순** — 무작위를 쓰면 회전마다 시험지가 달라 비교가 죽는다.
+ * ⚠ 정확히 n개가 아닐 수 있다(뭉치를 통째로 뗀다) — n 이상이고, 실제 수를 보고서가 적는다.
+ */
+export function 홀드아웃고르기(rows, 종류들, 옵션 = {}) {
+  const { n = 100, 우선갈래 = "A" } = 옵션;
+  const 뭉치 = new Map();
+  rows.forEach((r, i) => {
+    const q = String(r?.question ?? "").trim();
+    if (!뭉치.has(q)) 뭉치.set(q, []);
+    뭉치.get(q).push(i);
+  });
+  const 목록 = [...뭉치.entries()].map(([q, 자리들]) => ({
+    자리들,
+    우선: 자리들.some((i) => 종류들[i] === 우선갈래) ? 0 : 1,
+    키: sha12(q),
+  }));
+  목록.sort((a, b) => (a.우선 - b.우선) || (a.키 < b.키 ? -1 : a.키 > b.키 ? 1 : 0));
+  const 고른자리 = new Set();
+  for (const m of 목록) {
+    if (고른자리.size >= n) break;
+    for (const i of m.자리들) 고른자리.add(i);
+  }
+  return 고른자리;
+}
 
 /**
  * 시험 문항 목록(사전검사용). **최종 관문은 서버다** — POST /api/dataset/save가 위생을 다시 건다.
@@ -1052,6 +1162,8 @@ export function 행만들기(문답들, 색인, 옵션) {
     quoteStyle = "original", maxQuoteChars = 120, maxQuoteShare = null, maxCopyRatio = 1,
     // ★ 회전 3(2026-09-05) — 거절 행의 **답 꼴**. 기본은 회전 2 재현(거절 문장만).
     refusalStyle = "refuse-only",
+    // ★ 회전 4(2026-09-05) — 정답을 실을 자리에서 **블록을 통째로 안 주는** 행의 비율(Ⓝ). 기본 0.
+    noblockRatio = 0,
   } = 옵션;
   // ★ 방해 조각에도 허용목록을 건다(2026-09-04 결정 D2, 기본 on). 지금까지는 정답 조각만 걸러서
   //   타사 상용 문서 본문이 방해 자리로 학습 재료의 system 칸에 실려 나갔다(v1 실측: Tenable 가이드).
@@ -1091,7 +1203,15 @@ export function 행만들기(문답들, 색인, 옵션) {
     베낀비율제외: { 행: 0, 상한: maxCopyRatio, 문서별: {} },
     // ★ 거절 행이 **무슨 꼴로** 만들어졌나(2026-09-05 · F2). declare-then-answer에서 「거절 문장만」이
     //   크면 원래 승인 답의 본문이 짧았다는 뜻이다 — 사유별로 세어 그 까닭을 바로 말한다.
-    거절행꼴: { 꼴: refusalStyle, "밝히고 일반 답": 0, "거절 문장만": 0, 사유별: {} },
+    거절행꼴: {
+      꼴: refusalStyle, "밝히고 일반 답": 0, "거절 문장만": 0, 사유별: {},
+      // ★ 갈래별로도 센다(2026-09-05 · 회전 4). by-kind는 **갈래마다 다른 꼴**을 먹이므로, 합계만 보면
+      //   「B가 거절만 했나 B2가 못 답했나」를 못 가른다 — 개입이 닿았는지 확인할 자리가 여기다.
+      갈래별: {},
+    },
+    // ★ Ⓝ 무블록·밝히고 답(2026-09-05 · 회전 4). 정답을 실을 자리로 들어온 행 중 결정적으로 고른 몫을
+    //   **참고 자료 블록 없이** 굽는다 — 「블록이 없으면 밝히고 이어 답한다」를 A행 품질의 재료로 가르친다.
+    무블록: { 비율: noblockRatio, 후보: 0, 실림: 0 },
   };
   if (distractorAllowlist) {
     for (const c of 전체후보) {
@@ -1107,9 +1227,12 @@ export function 행만들기(문답들, 색인, 옵션) {
    * 거절 행(ⓑ·ⓑ′)의 답 — 꼴에 따라 「거절만」 또는 「밝히고 일반 답」. **세는 것도 여기 한 곳**에서 한다
    * (두 자리에서 부르므로, 세는 코드를 양쪽에 적으면 한쪽만 고쳐지는 날 숫자가 갈린다).
    */
-  const 거절답짓기 = (원답) => {
-    const r = 거절답만들기(원답, { 꼴: refusalStyle });
-    통계.거절행꼴[r.일반답 ? "밝히고 일반 답" : "거절 문장만"] += 1;
+  const 거절답짓기 = (원답, 갈래) => {
+    const r = 거절답만들기(원답, { 꼴: refusalStyle, 갈래 });
+    const 이름 = r.일반답 ? "밝히고 일반 답" : "거절 문장만";
+    통계.거절행꼴[이름] += 1;
+    const 칸 = (통계.거절행꼴.갈래별[갈래] ??= { "밝히고 일반 답": 0, "거절 문장만": 0 });
+    칸[이름] += 1;
     if (r.왜) {
       const 키 = r.왜.replace(/\d+자/g, "N자"); // 길이 숫자를 지워야 사유가 몇 가지인지 보인다
       통계.거절행꼴.사유별[키] = (통계.거절행꼴.사유별[키] ?? 0) + 1;
@@ -1126,7 +1249,7 @@ export function 행만들기(문답들, 색인, 옵션) {
       // ⓑ′ — 지금까지 버리던 「근거 없음」을 「모른다고 답하는 법」의 재료로 살린다(플래그가 켜졌을 때만).
       if (!noEvidenceFromUncited) { 통계.제외["근거 없음"] += 1; continue; }
       if (시험.has(문항정규화(l.question))) { 통계.제외["시험 문항(사전검사)"] += 1; continue; }
-      담기("B2", { question: l.question, answer: 거절답짓기(l.answer), system: 블록없는system });
+      담기("B2", { question: l.question, answer: 거절답짓기(l.answer, "B2"), system: 블록없는system });
       continue;
     }
     통계.ref총 += refs.length;
@@ -1159,6 +1282,28 @@ export function 행만들기(문답들, 색인, 옵션) {
     }
 
     const 정답실림 = 결정값(씨앗 + "|oracle|" + l.id) < pOracle;
+
+    // ★ Ⓝ 무블록·밝히고 답(2026-09-05 · 회전 4). 정답을 실을 자리(oracle)로 들어온 행 중 결정적으로
+    //   고른 몫을 **참고 자료 블록 없이** 굽는다 — 답은 ⓑ′와 **글자 단위로 같은 꼴**(거절 문장 +
+    //   말머리 + 인용·[n]을 뗀 본문)이다. 같은 프롬프트(블록 없음)에 다른 답을 달면 그것이 곧 ⓒ 충돌이다.
+    //
+    // ★ 왜 필요한가(회전 3 실측): ⓑ′는 「근거 ref가 아예 없던 승인 문답」에서만 나와 **36행**뿐이었다.
+    //   그 36행으로는 「블록이 없으면 밝히고 이어 답한다」를 배우기에 재료가 얇고, 정작 회전 3에서는
+    //   근거를 **준** 자리에서 거절이 7/8 나왔다. 무블록 행을 A행 품질의 문답에서 만들어 그 자리를 채운다.
+    //
+    // ⚠ **strict 인용·베낀 비율 관문보다 앞**에서 고른다. 뒤에서 고르면 ⓐ 인용을 붙였다가 도로 떼는
+    //   헛일을 하고 ⓑ 「인용을 못 붙여 버려질 행」이 Ⓝ 후보에서 빠져 재료가 더 얇아진다.
+    //   그래서 이 비율은 **최종 A행이 아니라 「정답을 실을 자리로 들어온 행」에 대한 몫**이다 —
+    //   보고서의 무블록.후보/실림이 그 분모·분자를 그대로 적는다(비율을 짐작하지 않게).
+    if (정답실림 && noblockRatio > 0) {
+      통계.무블록.후보 += 1;
+      if (결정값(씨앗 + "|noblock|" + l.id) < noblockRatio) {
+        통계.무블록.실림 += 1;
+        담기("N", { question: l.question, answer: 거절답짓기(l.answer, "N"), system: 블록없는system });
+        continue;
+      }
+    }
+
     const 필요방해 = 정답실림 ? distractors : distractors + 1;
     // ⚠ 정답 조각 **전부**의 문서를 뺀다(맨 앞 하나가 아니라 — 2026-09-04 적발). 문답이 두 문서를 인용하면
     //   둘째 정답 조각이 방해로 실려, ⓑ 행이 **답을 눈앞에 두고 「모른다」고 답하는 법**을 가르치게 된다.
@@ -1182,7 +1327,7 @@ export function 행만들기(문답들, 색인, 옵션) {
       const 조각들 = 섞기(방해.map((c) => c.text), 씨앗 + l.id);
       방해노출세기();
       담기("B", {
-        question: l.question, answer: 거절답짓기(l.answer),
+        question: l.question, answer: 거절답짓기(l.answer, "B"),
         system: [팀원프롬프트, 참고자료블록(ragHeader, 조각들)].join("\n\n"),
       });
       continue;
@@ -1322,10 +1467,15 @@ async function main() {
   const MAX_COPY_RATIO = 비율읽기("--max-copy-ratio", 1);
   // ★ 거절 행의 답 꼴(2026-09-05 · F2). 기본은 **회전 2 재현**(거절 문장만) — 바꾸는 쪽이 인자를 댄다.
   const REFUSAL_STYLE = String(opt("--refusal-style", "refuse-only")).trim();
-  if (!["refuse-only", "declare-then-answer"].includes(REFUSAL_STYLE)) {
-    console.error(`--refusal-style은 refuse-only 또는 declare-then-answer입니다(받은 값: ${REFUSAL_STYLE})`);
+  if (!["refuse-only", "declare-then-answer", "by-kind"].includes(REFUSAL_STYLE)) {
+    console.error(`--refusal-style은 refuse-only · declare-then-answer · by-kind 중 하나입니다(받은 값: ${REFUSAL_STYLE})`);
     process.exit(2);
   }
+  // ★ Ⓝ 무블록 행의 몫(2026-09-05 · 회전 4). 0이면 지금까지와 한 글자도 다르지 않다.
+  const NOBLOCK_RATIO = 비율읽기("--noblock-ratio", 0);
+  // ★ 홀드아웃(평가용) 파일 — 주면 그 행들을 데이터셋에서 **빼고** 파일로 떨군다.
+  const HOLDOUT_OUT = String(opt("--holdout-out", "")).trim();
+  const HOLDOUT_N = HOLDOUT_OUT ? 자연수읽기("--holdout-n", 100) : 0;
   // ⓒ 폐쇄형과 ⓑ′ 무근거 거절은 **같은 프롬프트에 정반대 답**을 가르친다 — 기본은 막고, 사람이 판단해
   // 받아들였을 때만 이 플래그로 연다(그 사실이 보고서 「판」에 남는다).
   const ALLOW_CB = has("--allow-closedbook-conflict");
@@ -1353,6 +1503,8 @@ async function main() {
       // 회전 3 — 인용 꼴·길이·비중과 베낀 비율 상한. 보고서 첫머리에 남겨야 「무슨 판이었나」가 산다.
       quoteStyle: QUOTE_STYLE, maxQuoteChars: MAX_QUOTE_CHARS, maxQuoteShare: MAX_QUOTE_SHARE,
       maxCopyRatio: MAX_COPY_RATIO, refusalStyle: REFUSAL_STYLE,
+      // 회전 4 — Ⓝ 무블록 몫과 홀드아웃 파일. 「무슨 판이었나」에 이 둘이 없으면 다음 회전이 못 재현한다.
+      noblockRatio: NOBLOCK_RATIO, holdoutOut: HOLDOUT_OUT || null, holdoutN: HOLDOUT_N || null,
     },
     server: SERVER, dryRun: DRY, startedAt: new Date().toISOString(),
     승인문답: 0, ref총: 0, 회수: { store: 0, file: 0, 실패: 0 }, 회수율: 0,
@@ -1453,7 +1605,7 @@ async function main() {
     pOracle: P_ORACLE, noEvidenceFromUncited: NOEV, closedbookRatio: CLOSEDBOOK, quoteRule: QUOTE_RULE,
     distractorAllowlist: DISTRACTOR_ALLOWLIST,
     quoteStyle: QUOTE_STYLE, maxQuoteChars: MAX_QUOTE_CHARS, maxQuoteShare: MAX_QUOTE_SHARE,
-    maxCopyRatio: MAX_COPY_RATIO, refusalStyle: REFUSAL_STYLE,
+    maxCopyRatio: MAX_COPY_RATIO, refusalStyle: REFUSAL_STYLE, noblockRatio: NOBLOCK_RATIO,
   });
   Object.assign(보고, 통계);
   console.log(
@@ -1529,6 +1681,44 @@ async function main() {
     }
   }
 
+  // ④-3 홀드아웃(평가용) — **저장하기 전에** 뗀다. 데이터셋에 남으면 그 손실은 「배웠나」가 아니라
+  //     「외웠나」를 재고, 그 숫자로 회전을 판정하게 된다.
+  if (HOLDOUT_OUT) {
+    // ⚠ fail-closed — 이 파일은 **저장소에 커밋된다**(데이터셋은 서버 data/에만 남는다).
+    //   허용목록 밖 문서의 문장이 방해 조각으로 실렸다면 그것을 커밋하는 것은 그냥 **재배포**다.
+    //   사람이 판단하라고 숫자만 내밀던 자리인데, 저장소로 나가는 순간에는 판단을 미룰 수 없다.
+    if (통계.방해라이선스노출.행 > 0) {
+      throw new Error(
+        `홀드아웃 파일을 저장소에 쓸 수 없습니다 — 허용목록 밖 문서의 문장이 방해 조각으로 ${통계.방해라이선스노출.행}행에 실렸습니다` +
+        `(${Object.keys(통계.방해라이선스노출.문서별).slice(0, 3).join(", ")}) — 저장소에 넣으면 재배포입니다`
+      );
+    }
+    const 고른 = 홀드아웃고르기(rows, 종류들, { n: HOLDOUT_N });
+    const 자리들 = [...고른].sort((a, b) => a - b);
+    const 뗀행 = 자리들.map((i) => ({ question: rows[i].question, answer: rows[i].answer, system: rows[i].system }));
+    const 갈래별 = {};
+    for (const i of 자리들) 갈래별[종류들[i]] = (갈래별[종류들[i]] ?? 0) + 1;
+    // ⚠ 뒤에서부터 지운다 — 세 배열(rows·종류들·베낀비율들)은 **자리 번호로 짝**이라 같이 지워야 한다.
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (!고른.has(i)) continue;
+      rows.splice(i, 1); 종류들.splice(i, 1); 베낀비율들.splice(i, 1);
+    }
+    const abs = path.isAbsolute(HOLDOUT_OUT) ? HOLDOUT_OUT : path.resolve(저장소, HOLDOUT_OUT);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    // 꼴은 데이터셋과 **같다**(행 배열) — 학습기가 같은 읽기 코드로 열어야 두 파일이 안 갈린다.
+    const 글 = JSON.stringify(뗀행, null, 2) + "\n";
+    fs.writeFileSync(abs, 글, "utf8");
+    보고.홀드아웃 = {
+      파일: path.relative(저장소, abs).split(path.sep).join("/"),
+      요청: HOLDOUT_N, 뗀행: 뗀행.length, 질문: new Set(뗀행.map((r) => r.question)).size,
+      갈래별, md5: crypto.createHash("md5").update(글).digest("hex"),
+    };
+    console.log(
+      `[raft] 홀드아웃 ${보고.홀드아웃.뗀행}행(질문 ${보고.홀드아웃.질문} · 갈래 ${JSON.stringify(갈래별)})` +
+      ` → ${보고.홀드아웃.파일} · md5 ${보고.홀드아웃.md5}`
+    );
+  }
+
   const 토큰들 = rows.map((r) => 토큰추정(r.system) + 토큰추정(r.question) + 토큰추정(r.answer));
   보고.행 = rows.length;
   보고.회수율 = 보고.ref총 ? Number(((보고.회수.store + 보고.회수.file) / 보고.ref총).toFixed(4)) : 0;
@@ -1551,7 +1741,8 @@ async function main() {
     `  ${이름.padEnd(14)} ${String(구성.표[k].행).padStart(5)}행 ${(구성.표[k].비율 * 100).toFixed(1).padStart(5)}%`;
   console.log(
     "[raft] 구성비\n" +
-    [표줄("A", "A 근거+정답"), 표줄("B", "B 방해만→거절"), 표줄("B2", "B′ 무근거→거절"), 표줄("C", "C 폐쇄형"), 표줄("D", "D 긴 형식")].join("\n") +
+    [표줄("A", "A 근거+정답"), 표줄("B", "B 방해만→거절"), 표줄("B2", "B′ 무근거→거절"),
+      표줄("N", "N 무블록→밝힘"), 표줄("C", "C 폐쇄형"), 표줄("D", "D 긴 형식")].join("\n") +
     `\n  「원문:」 A행 ${구성.인용.A행.인용}/${구성.인용.A행.행}(${(구성.인용.A행.비율 * 100).toFixed(1)}%)` +
     ` · 비A행 ${구성.인용.비A행.인용}/${구성.인용.비A행.행}(${(구성.인용.비A행.비율 * 100).toFixed(1)}%)` +
     // ★ 사전검사가 **실제로 보는** 세 칸(글로 가른 것). 위 A/비A는 갈래 이름으로 센 참고용이다.
@@ -1575,8 +1766,15 @@ async function main() {
   console.log(
     `[raft] 거절 행 꼴(${보고.거절행꼴.꼴}) 밝히고 일반 답 ${보고.거절행꼴["밝히고 일반 답"]}` +
     ` · 거절 문장만 ${보고.거절행꼴["거절 문장만"]}` +
-    `${Object.keys(보고.거절행꼴.사유별).length ? ` · 사유 ${JSON.stringify(보고.거절행꼴.사유별)}` : ""}`
+    `${Object.keys(보고.거절행꼴.사유별).length ? ` · 사유 ${JSON.stringify(보고.거절행꼴.사유별)}` : ""}` +
+    `${Object.keys(보고.거절행꼴.갈래별 ?? {}).length ? ` · 갈래별 ${JSON.stringify(보고.거절행꼴.갈래별)}` : ""}`
   );
+  if (NOBLOCK_RATIO > 0) {
+    console.log(
+      `[raft] Ⓝ 무블록 — 정답 자리 후보 ${보고.무블록.후보}행 중 ${보고.무블록.실림}행을 블록 없이 구웠다` +
+      `(요청 비율 ${(NOBLOCK_RATIO * 100).toFixed(0)}% — 이 분모는 **최종 A행이 아니라** 정답을 실을 자리로 들어온 행이다)`
+    );
+  }
   // strict가 **무엇을 했는지** 사람 눈에도 보인다 — 「그대로」만 크면 개입이 재료에 안 닿은 것이다.
   if (QUOTE_RULE === "strict") {
     console.log(`[raft] 인용 규칙(strict · 꼴 ${QUOTE_STYLE}) ` + Object.entries(보고.인용규칙).map(([k, v]) => `${k} ${v}`).join(" · "));
@@ -1597,7 +1795,7 @@ async function main() {
   //   사전검사에 걸렸을 때는 **걸린 행**(비A행인데 인용이 남은 것)을 맨 앞에 붙인다. 사유만 있고 실물이 없으면
   //   사람이 그 판을 못 고친다.
   const 맛보기만들기 = () => {
-    const 고른자리 = ["A", "B", "B2", "C", "D"].map((k) => 종류들.indexOf(k)).filter((i) => i >= 0);
+    const 고른자리 = ["A", "B", "B2", "N", "C", "D"].map((k) => 종류들.indexOf(k)).filter((i) => i >= 0);
     // 걸린 행을 고르는 잣대도 사전검사와 **같은 잣대**여야 한다(글로 판단 — 갈래 이름이 아니라).
     // 다르면 「사유는 D를 가리키는데 맛보기는 B를 보여 주는」 어긋남이 생긴다.
     const 걸린자리 = rows.findIndex((r) =>

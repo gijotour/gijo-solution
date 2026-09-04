@@ -267,6 +267,11 @@ MAX_QUOTE_SHARE="$(read_round maxQuoteShare)"
 MAX_COPY_RATIO="$(read_round maxCopyRatio)"
 # ★ 거절 행의 답 꼴(2026-09-05). 빈 값이면 빌더 기본값(refuse-only = 회전 2 재현)이 그대로 산다.
 REFUSAL_STYLE="$(read_round refusalStyle)"
+# ★ 4회전 칸(2026-09-05) — Ⓝ 무블록 몫과 **고정 홀드아웃 파일**.
+#   evalHoldoutFile 은 저장소 상대경로다. 주면 ① 빌더가 그 파일을 떨구고 데이터셋에서 빼고
+#   ② 학습기가 그 파일을 평가지로 쓴다 — 회전이 바뀌어도 **같은 시험지**라 eval_loss를 견줄 수 있다.
+NOBLOCK_RATIO="$(read_round noblockRatio)"
+EVAL_HOLDOUT_FILE="$(read_round evalHoldoutFile)"
 NOEV="$(read_round noevidenceFromUncited)"
 CLOSEDBOOK="$(read_round closedbookRatio)"
 LONGFORM="$(read_round longformDataset)"
@@ -288,7 +293,14 @@ fi
 ladder_log "2일차 회전 $ROUND — 데이터셋 $DATASET · rank $RANK · lr $LR · epochs $EPOCHS · 방해 $DISTRACTORS · maxSeq $MAXSEQ"
 ladder_log "  재료 옵션 — pOracle ${PORACLE:-(기본)} · quoteRule ${QUOTE_RULE:-(기본)} · 미인용거절 ${NOEV:-(기본)} · closedbook ${CLOSEDBOOK:-(기본)} · 긴형식 ${LONGFORM:-(없음)}"
 ladder_log "  인용 옵션 — quoteStyle ${QUOTE_STYLE:-(기본 original)} · maxQuoteChars ${MAX_QUOTE_CHARS:-(기본)} · maxQuoteShare ${MAX_QUOTE_SHARE:-(기본)} · maxCopyRatio ${MAX_COPY_RATIO:-(기본 1=안 거름)} · refusalStyle ${REFUSAL_STYLE:-(기본 refuse-only)}"
-ladder_log "  학습 옵션 — saveEpochs ${SAVE_EPOCHS:-(기본)} · evalHoldout ${EVAL_HOLDOUT:-(기본)} · loraAlphaMult ${ALPHA_MULT:-(기본)}"
+ladder_log "  학습 옵션 — saveEpochs ${SAVE_EPOCHS:-(기본)} · evalHoldout ${EVAL_HOLDOUT:-(기본)} · evalHoldoutFile ${EVAL_HOLDOUT_FILE:-(없음)} · loraAlphaMult ${ALPHA_MULT:-(기본)} · noblockRatio ${NOBLOCK_RATIO:-(기본 0)}"
+
+# ⚠ 시험지가 둘이면 어느 것으로 쟀는지 알 수 없다 — 학습기도 같은 이유로 막지만, 여기서 먼저 말한다
+#   (밤을 굽고 나서 죽는 것보다 시작 전에 죽는 편이 싸다).
+if [ -n "$EVAL_HOLDOUT_FILE" ] && [ -n "$EVAL_HOLDOUT" ]; then
+  echo "✗ 회전 $ROUND 은 evalHoldoutFile 과 evalHoldout 을 함께 두고 있다 — 하나만 남겨라(시험지가 둘이 된다)" >&2
+  exit 6
+fi
 ladder_log "  설정 사본 → $OUTDIR/round.json"
 
 LORA_DIR="$SERVER_DIR/data/lora/$ROUND"
@@ -319,6 +331,8 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
       ${MAX_QUOTE_SHARE:+--max-quote-share "$MAX_QUOTE_SHARE"} \
       ${MAX_COPY_RATIO:+--max-copy-ratio "$MAX_COPY_RATIO"} \
       ${REFUSAL_STYLE:+--refusal-style "$REFUSAL_STYLE"} \
+      ${NOBLOCK_RATIO:+--noblock-ratio "$NOBLOCK_RATIO"} \
+      ${EVAL_HOLDOUT_FILE:+--holdout-out "$REPO/$EVAL_HOLDOUT_FILE"} \
       ${LONGFORM:+--longform-dataset "$LONGFORM"} \
       $NOEV_FLAG ) \
     2>&1 | tee "$OUTDIR/build.log"
@@ -328,6 +342,13 @@ else
 fi
 
 DS_FILE="$SERVER_DIR/data/datasets/$DATASET.json"
+
+# ⚠ 빌드를 건너뛰었으면 홀드아웃 파일이 **이미 있어야** 한다 — 없으면 학습기가 그 자리에서 죽는데,
+#   그때는 이미 베이스 모델을 올린 뒤라 몇 분이 사라진다. 여기서 먼저 말한다(fail-closed).
+if [ -n "$EVAL_HOLDOUT_FILE" ] && [ ! -s "$REPO/$EVAL_HOLDOUT_FILE" ]; then
+  echo "✗ 홀드아웃 파일이 없다: $REPO/$EVAL_HOLDOUT_FILE (빌드를 건너뛰었다면 그 파일을 먼저 받아 와라)" >&2
+  exit 8
+fi
 
 # ── ② 학습(QLoRA) ────────────────────────────────────────────────────
 if [ "$SKIP_TRAIN" -eq 0 ]; then
@@ -350,6 +371,7 @@ if [ "$SKIP_TRAIN" -eq 0 ]; then
         --dataset "$DATASET" --output "data/lora/$ROUND" \
         --base-model "$BASE_MODEL_ID" --rank "$RANK" --lr "$LR" --epochs "$EPOCHS" --max-seq "$MAXSEQ" \
         $SAVE_EPOCHS_FLAG ${EVAL_HOLDOUT:+--eval-holdout "$EVAL_HOLDOUT"} ${ALPHA_MULT:+--lora-alpha-mult "$ALPHA_MULT"} \
+        ${EVAL_HOLDOUT_FILE:+--eval-file "$REPO/$EVAL_HOLDOUT_FILE"} \
         > "$TRAIN_LOG" 2>&1 < /dev/null & echo $! > "$OUTDIR/train.pid" )
     TRAIN_PID="$(cat "$OUTDIR/train.pid")"
     ladder_log "   pid $TRAIN_PID — 끝날 때까지 기다린다(로그를 따로 보려면 tail -f $TRAIN_LOG)"

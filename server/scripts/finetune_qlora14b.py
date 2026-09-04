@@ -44,6 +44,25 @@ def 평가분리(질문들, n):
     return 고른것
 
 
+def 평가파일읽기(경로):
+    """평가용 행 파일을 읽는다 — **데이터셋과 같은 꼴**(question/answer/system 배열)이라야 한다.
+
+    ★ 왜 같은 꼴인가: 읽는 코드가 둘이 되면 한쪽만 고쳐지는 날 「근거(system)를 안 읽는 평가」가
+      조용히 생긴다. 학습과 평가가 다른 틀로 재면 그 손실은 아무것도 뜻하지 않는다.
+    """
+    if not os.path.exists(경로):
+        print(f"[finetune] ERROR: 평가 파일이 없습니다: {경로}", file=sys.stderr, flush=True)
+        sys.exit(1)
+    with open(경로, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    rows = raw.get("행", raw) if isinstance(raw, dict) else raw
+    rows = [r for r in rows if r.get("question") and r.get("answer")]
+    if not rows:
+        print(f"[finetune] ERROR: 평가 파일에 쓸 행이 없습니다: {경로}", file=sys.stderr, flush=True)
+        sys.exit(1)
+    return rows
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--dataset", required=True)
@@ -64,6 +83,11 @@ def main() -> None:
     # 학습 손실만 보면 「외웠는지」와 「배웠는지」를 못 가른다. 떼어 둔 행의 손실이 오르기 시작하는 지점이 과적합이다.
     p.add_argument("--eval-holdout", type=int, default=0,
                    help="N행을 **결정적으로** 떼어 평가용으로 쓴다(기본 0 = 안 뗀다)")
+    # [2026-09-05 · 4회전] --eval-holdout은 **그 회전의 데이터셋 안에서** 뗀다 — 재료가 바뀌면 시험지도
+    # 바뀌므로 회전 2·3의 eval_loss는 원리상 서로 견줄 수 없다(다른 시험지의 점수다).
+    # 회전 4부터는 홀드아웃을 저장소 파일 하나로 **고정**하고, 빌더가 그 행들을 데이터셋에서 빼 둔다.
+    p.add_argument("--eval-file", default="",
+                   help="평가용 행이 든 JSON 파일(데이터셋과 같은 꼴). --eval-holdout 과 **함께 못 쓴다**")
     # LoRA alpha = rank × 이 값. 지금까지 코드에 2가 박혀 있어 「세기」를 실험할 수 없었다.
     p.add_argument("--lora-alpha-mult", type=float, default=2.0)
     # --smoke: GPU·학습 의존성 없이 **파이프라인 계약만** 확인한다(시험·CI 전용).
@@ -71,6 +95,12 @@ def main() -> None:
     #   여기엔 없어, 배선을 바꾸면 스모크 시험이 통째로 죽는다(2026-08-08).
     p.add_argument("--smoke", action="store_true")
     args = p.parse_args()
+
+    # 둘을 함께 주면 **어느 시험지로 쟀는지** 알 수 없다 — 조용히 한쪽을 이기게 두지 않는다.
+    if args.eval_file and args.eval_holdout > 0:
+        print("[finetune] ERROR: --eval-file 과 --eval-holdout 은 함께 못 씁니다(시험지가 둘이 됩니다)",
+              file=sys.stderr, flush=True)
+        sys.exit(1)
 
     ds_path = os.path.join("data", "datasets", f"{args.dataset}.json")
     if not os.path.exists(ds_path):
@@ -89,7 +119,20 @@ def main() -> None:
         log(f"[finetune] (smoke) 행 {len(smoke_rows)} · 근거(system) 실린 행 {with_system} · max_seq={args.max_seq}")
         # 새 인자가 **받아들여졌는지**를 스모크가 말한다 — 이름이 틀리면 argparse가 여기 오기 전에 죽고,
         # 조용히 무시되면 「켰다고 믿은 채」 안 켜진 학습을 몇 시간 돌린다(1회전의 warmup_ratio 사고 계보).
-        log(f"[finetune] (smoke) save_epochs={int(args.save_epochs)} · eval_holdout={args.eval_holdout} · lora_alpha_mult={args.lora_alpha_mult}")
+        log(f"[finetune] (smoke) save_epochs={int(args.save_epochs)} · eval_holdout={args.eval_holdout} · lora_alpha_mult={args.lora_alpha_mult} · eval_file={args.eval_file or '-'}")
+        if args.eval_file:
+            # ★ 스모크가 **진짜 파일**을 읽고 겹침까지 본다 — 실학습 경로는 GPU가 있어야 도는데,
+            #   「홀드아웃이 데이터셋에서 빠졌나」는 값싸게 확인할 수 있다(빠지지 않았으면 그 손실은
+            #   「배웠나」가 아니라 「외웠나」를 재고, 그 숫자로 회전을 판정하게 된다).
+            평가행 = 평가파일읽기(args.eval_file)
+            학습질문 = {str(r.get("question") or "").strip() for r in smoke_rows}
+            평가질문 = {str(r.get("question") or "").strip() for r in 평가행}
+            겹침 = sorted(학습질문 & 평가질문)
+            log(f"[finetune] (smoke) 평가 파일 {len(평가행)}행 · 양쪽 겹친 질문 {len(겹침)}")
+            if 겹침:
+                log(f"[finetune] ERROR: 평가 파일의 질문이 학습 재료에도 있습니다: {겹침[:3]}")
+                sys.exit(1)
+            log(f"eval 10/10 eval_loss={0.5000:.4f}")
         if args.eval_holdout > 0:
             # ★ 스모크가 **진짜 분리기**(평가분리)를 돌린다(2026-09-04 · R6). 실학습 경로는 GPU·torch가
             #   있어야 돌아 어느 시험도 못 지나가는데, 「같은 질문이 양쪽에 있나」는 값싸게 확인할 수 있다.
@@ -192,6 +235,20 @@ def main() -> None:
         eval_feats = [feats[i] for i in sorted(held)]
         feats = [f for i, f in enumerate(feats) if i not in held]
         log(f"[finetune] 평가용으로 {len(eval_feats)}행을 뗐습니다 — 학습 {len(feats)}행")
+
+    if args.eval_file:
+        # ★ 파일로 고정한 시험지 — **회전이 바뀌어도 같은 문항**이라 eval_loss를 회전 간에 견줄 수 있다.
+        #   ⚠ 겹침은 여기서도 본다(빌더가 빼 줬더라도 확인한다 — 「빼 줬을 것이다」는 측정이 아니다).
+        평가행 = 평가파일읽기(args.eval_file)
+        학습질문 = {q.strip() for q in 질문들}
+        겹침 = sorted({str(r.get("question") or "").strip() for r in 평가행} & 학습질문)
+        if 겹침:
+            log(f"[finetune] ERROR: 평가 파일의 질문이 학습 재료에도 있습니다({len(겹침)}건): {겹침[:3]} — 중단"); sys.exit(1)
+        쌍 = [render(r["question"], r["answer"], str(r.get("system") or "")) for r in 평가행]
+        eval_feats = [f for f in 쌍 if f]
+        if not eval_feats:
+            log(f"[finetune] 평가 파일의 행이 전부 길이를 넘었습니다(max_seq={args.max_seq}) — 중단"); sys.exit(1)
+        log(f"[finetune] 평가 파일 {args.eval_file} — {len(eval_feats)}행 사용(길이 초과 제외 {len(평가행) - len(eval_feats)})")
 
     data = Dataset.from_list(feats)
     eval_data = Dataset.from_list(eval_feats) if eval_feats else None

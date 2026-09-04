@@ -17,7 +17,7 @@ import { join } from "node:path";
 import {
   판정, 표만들기, kev판정, cisa본문, detail숫자, 인용겹침, 잘림수, tps중앙값, 한글평균, 기준선기본, NEEDLE64K,
   kev베이스대비, 근거인용률, 자료없음비율, 자료없음중복가드, 자료없음이라말함, 인용토막들, 창작인용, 창작인용찾기,
-  kev대상행, 창작인용대상인가, 제품거절문장, 거절뒤남은말, 거절만한답, 거절나머지최소,
+  kev대상행, 창작인용대상인가, 제품거절문장, 거절뒤남은말, 거절만한답, 거절나머지최소, 근거거절률,
   genTokens중앙값, 서술과제, 건너뜀수, 자료없음_최소비율, 길이_허용낙폭,
   잘림대조, 베낀글자비율, 베낀비율, 베낀비율_상한,
 } from "../../tools/team-bench/gates.mjs";
@@ -155,6 +155,9 @@ describe("게이트 — 잣대를 다시 계산하지 않고 인용한다", () =
   });
 });
 
+/** 판정 결과에서 관문 한 칸을 꺼낸다 — 같은 한 줄을 시험마다 다시 적지 않으려고 둔다. */
+const 칸값 = (r: { 검사: { 키: string }[] }, 키: string) => r.검사.find((c) => c.키 === 키) as any;
+
 describe("게이트 — 판정", () => {
   // 기준선에는 과제 결과뿐 아니라 **베이스 대조**(kev · grounded 표본)도 들어간다 — 관문 ①·⑧이 견줄 상대다.
   // ⚠ 표본 셋을 **다** 둔다: 관문 ⑤(잘림)가 이번과 베이스를 **자리별로** 견주므로, 베이스에 없는
@@ -163,7 +166,7 @@ describe("게이트 — 판정", () => {
     easy: 기준easy(), hard: 기준hard(), kev: kev좋음,
     표본grounded: grounded나쁨, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
   });
-  /** 열두 관문을 전부 재려면 입력이 이만큼 있어야 한다(하나라도 없으면 미측정=불합격이 맞다). */
+  /** 열세 관문을 전부 재려면 입력이 이만큼 있어야 한다(하나라도 없으면 미측정=불합격이 맞다). */
   const 다갖춘입력 = (easy: unknown, hard: unknown) => ({
     easy, hard, kev: kev좋음,
     표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
@@ -176,11 +179,11 @@ describe("게이트 — 판정", () => {
     expect(r.합격).toBe(false);
   });
 
-  it("나아진 실행은 **열두** 관문을 모두 넘는다", () => {
+  it("나아진 실행은 **열세** 관문을 모두 넘는다", () => {
     const r = 판정(다갖춘입력(기준easy(), 나아진()), 기준());
     const 못넘음 = r.검사.filter((c: { 통과: boolean }) => !c.통과).map((c: { 이름: string }) => c.이름);
     expect(못넘음, `못 넘은 관문: ${못넘음.join(", ")}`).toEqual([]);
-    expect(r.검사, "관문이 12개다 — 늘리거나 줄이면 여기가 먼저 말한다").toHaveLength(12);
+    expect(r.검사, "관문이 13개다 — 늘리거나 줄이면 여기가 먼저 말한다").toHaveLength(13);
     expect(r.합격).toBe(true);
   });
 
@@ -1165,12 +1168,86 @@ describe("관문 ⑫ — 옮겨 적기와 통째 복사를 가른다", () => {
   });
 });
 
+// ── 관문 ⑬ (2026-09-05 · 회전 3 실측이 시킨 관문) ────────────────────────────
+//   r3-v3 ep1·ep2에서 **grounded 8건 중 7건이 거절문으로 시작**했다(베이스·회전 1·회전 2는 전부 0/8).
+//   그런데 같은 판에서 ⑧은 8/8 초록이었다 — 거절 문장 **뒤에** 근거를 복사해 이었기 때문이다.
+//   즉 ⑧·⑫는 「답의 첫머리가 거절인가」를 **원리상 못 본다**. 그 사각지대를 메우는 자다.
+describe("관문 ⑬ — 근거를 준 자리에서 거절부터 하지 않는가", () => {
+  const 기준 = () => ({
+    easy: 기준easy(), hard: 기준hard(), kev: kev좋음,
+    표본grounded: grounded나쁨, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+  });
+  const 다갖춘입력 = (easy: unknown, hard: unknown) => ({
+    easy, hard, kev: kev좋음,
+    표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
+  });
+  /**
+   * 회전 3이 실제로 낸 꼴 — 거절 선언으로 **시작**하고, 그 뒤에 근거를 20자 이상 옮겨 적었다.
+   * ⑧에는 만점을 주고 ⑫도 안 넘기면서 ⑬만 빨강이 되는 것이 이 시험의 요점이다.
+   */
+  const grounded거절시작 = [
+    표본행("grounded", `${제품거절문장} 일반적으로 알려진 바로는, 자료에 「기본 관리자 계정명을 변경하지 않고 사용할 경우」라고 적혀 있어 계정명을 먼저 바꾸고 잠금 정책을 함께 두는 편이 좋습니다.`),
+    grounded좋음[1],
+  ];
+
+  it("잣대는 ⑩과 **같은 자**다 — 제품의 자료없음 정규식으로 앞 60자만 본다", () => {
+    expect(근거거절률(grounded좋음)!.성립, "근거를 옮겨 적은 답은 거절이 아니다").toBe(0);
+    expect(근거거절률(grounded거절시작)!.성립).toBe(1);
+    expect(근거거절률([])).toBeNull();
+  });
+
+  it("★★ ⑧·⑫는 초록인데 ⑬만 빨강이다 — 그 사각지대가 이 관문의 존재 이유다", () => {
+    expect(근거인용률(grounded거절시작)!.비율, "거절 뒤에 근거를 옮겨 적으면 ⑧은 만점이다").toBe(1);
+    expect(베낀비율(grounded거절시작)!.통째, "통째 복사도 아니다").toBe(0);
+    const r = 판정({ ...다갖춘입력(기준easy(), 나아진()), 표본grounded: grounded거절시작 }, 기준());
+    const 칸 = (k: string) => r.검사.find((x: { 키: string }) => x.키 === k);
+    expect(칸("grounded_cite").통과, "⑧만 보면 「나아졌다」로 읽힌다").toBe(true);
+    expect(칸("copy_ratio").통과, "⑫도 안 걸린다").toBe(true);
+    expect(칸("grounded_no_refusal").통과, "베이스 0건인데 1건이 났다 — 여기서 막는다").toBe(false);
+    expect(r.합격).toBe(false);
+  });
+
+  it("베이스보다 늘지 않으면 통과한다 — 「0건」이 아니라 **베이스 대비**다(①·⑤와 같은 꼴)", () => {
+    const r = 판정(다갖춘입력(기준easy(), 나아진()), 기준());
+    expect(칸값(r, "grounded_no_refusal").통과).toBe(true);
+    // 베이스가 이미 1건이면 이번 1건은 회귀가 아니다 — 늘 빨강인 관문은 회귀를 못 알린다.
+    const 베이스도거절 = { ...기준(), 표본grounded: grounded거절시작 };
+    const r2 = 판정({ ...다갖춘입력(기준easy(), 나아진()), 표본grounded: grounded거절시작 }, 베이스도거절);
+    expect(칸값(r2, "grounded_no_refusal").통과, "같은 자리끼리 견준다").toBe(true);
+  });
+
+  it("★ 베이스 grounded 표본이 없으면 미측정 — 불합격(무엇과 견줄지 모른다)", () => {
+    const 기준선없음 = { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗 };
+    const r = 판정(다갖춘입력(기준easy(), 나아진()), 기준선없음);
+    expect(칸값(r, "grounded_no_refusal").값).toBe("미측정");
+    expect(r.합격).toBe(false);
+  });
+
+  it("★★ 그날의 실물 — r3-v3 ep1·ep2는 7/8이고 베이스·회전 1·회전 2는 전부 0/8이다", () => {
+    const 사다리 = join(__dirname, "..", "..", "tools", "team-bench", "results-ladder");
+    const 읽 = (...f: string[]) => JSON.parse(readFileSync(join(사다리, ...f), "utf8"));
+    const 센다 = (...f: string[]) => 근거거절률(읽(...f))!;
+    expect(센다("baseline", "samples-grounded.json").성립, "베이스는 한 건도 안 그런다").toBe(0);
+    expect(센다("day2", "r1-base", "probe-v2", "samples-grounded.json").성립).toBe(0);
+    for (const ep of ["ep1", "ep2", "ep3"]) {
+      expect(센다("day2", "r2-v2", ep, "samples-grounded.json").성립, `r2-v2 ${ep}`).toBe(0);
+    }
+    for (const ep of ["ep1", "ep2"]) {
+      const v = 센다("day2", "r3-v3", ep, "samples-grounded.json");
+      expect(v.성립, `r3-v3 ${ep} — 회전 3이 낸 그 회귀`).toBe(7);
+      expect(v.대상).toBe(8);
+      // 같은 파일에서 ⑧은 초록이다 — 「고쳐서 안 보이게 된 것」과 「정말 사라진 것」을 못 가르던 자리.
+      expect(근거인용률(읽("day2", "r3-v3", ep, "samples-grounded.json"))!.비율).toBeGreaterThanOrEqual(0.875);
+    }
+  });
+});
+
 describe("관문 ⑩의 기준은 **실측에서** 나왔다(문서와 코드가 같은 말을 한다)", () => {
   it("★ README가 0.75와 그 근거(베이스 88%)를 적는다 — 숫자만 바뀌고 이유가 안 남는 일을 막는다", () => {
     const readme = readFileSync(join(__dirname, "..", "..", "tools", "ladder", "README.md"), "utf8");
     expect(readme).toContain("0.75");
     expect(readme, "베이스 실측(7/8)이 기준의 출처다").toContain("88%(7/8)");
-    expect(readme, "관문 표가 12개여야 한다").toContain("### 관문 12개");
+    expect(readme, "관문 표가 13개여야 한다").toContain("### 관문 13개");
   });
 });
 
