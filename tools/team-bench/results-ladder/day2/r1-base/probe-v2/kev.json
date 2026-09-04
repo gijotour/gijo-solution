@@ -1,0 +1,68 @@
+[
+ {
+  "label": "prompt",
+  "q": "KEV 목록은 누가 발표해?",
+  "promptSha12": "3452677d58b7",
+  "systemChars": 525,
+  "systemSource": "prompt-spec:/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+  "text": "KEV 목록은 미국 사이버보안국에서 발표합니다. 이 목록은 주요 취약점과 위협을 정리하여 공유하는 공식 문서입니다. 보안 담당자는 이 목록을 통해 최신 위협 정보를 파악할 수 있습니다.",
+  "ms": 3391,
+  "finish": "stop"
+ },
+ {
+  "label": "noprompt",
+  "q": "KEV 목록은 누가 발표해?",
+  "promptSha12": "",
+  "systemChars": 0,
+  "systemSource": "(없음)",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+  "text": "KEV 목록은 한국정보보호원에서 발표합니다. 이 목록은 공격자들이 자주 사용하는 악성코드와 취약점을 정리하여 공개하는 자료입니다. 보안 담당자는 이 목록을 통해 최신 위협 정보를 확인하고 대응 방안을 수립할 수 있습니다.",
+  "ms": 3713,
+  "finish": "stop"
+ },
+ {
+  "label": "prompt",
+  "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+  "promptSha12": "3452677d58b7",
+  "systemChars": 525,
+  "systemSource": "prompt-spec:/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+  "text": "KEV는 공격 벡터를 의미하는 약어입니다. 이 용어는 공격자가 시스템에 접근하기 위해 사용하는 경로나 방법을 지칭합니다. 보안 분석 시 이러한 벡터를 파악하는 것은 침해를 방지하는 데 매우 중요합니다. 원문: \"KEV는 공격 벡터를 의미하는 약어입니다.\"",
+  "ms": 4760,
+  "finish": "stop"
+ },
+ {
+  "label": "noprompt",
+  "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+  "promptSha12": "",
+  "systemChars": 0,
+  "systemSource": "(없음)",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+  "text": "KEV는 공격 벡터를 의미하는 약어로, 보안 분야에서 중요한 개념입니다. 이 용어는 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 지칭합니다. 보안 담당자들은 이러한 공격 벡터를 이해하고 차단하는 것이 위험을 줄이는 데 필수적입니다. 원문: \"KEV stands for 'Known Exploited Vulnerability' in the context of cybersecurity.\"",
+  "ms": 5367,
+  "finish": "stop"
+ },
+ {
+  "label": "prompt",
+  "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+  "promptSha12": "3452677d58b7",
+  "systemChars": 525,
+  "systemSource": "prompt-spec:/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+  "text": "KEV는 미국 정부가 발표하는 카탈로그로, 공격에 자주 사용되는 악성 코드를 관리합니다. 이 카탈로그는 공격 표면을 줄이기 위한 방어 전략 수립에 중요한 자료입니다. 원문: \"KEV는 미국 정부가 발표하는 카탈로그로, 공격에 자주 사용되는 악성 코드를 관리합니다.\"",
+  "ms": 5004,
+  "finish": "stop"
+ },
+ {
+  "label": "noprompt",
+  "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+  "promptSha12": "",
+  "systemChars": 0,
+  "systemSource": "(없음)",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+  "text": "KEV 카탈로그는 미국 국방부가 발표하는 목록입니다. 이 카탈로그는 공격에 자주 사용되는 알려진 악성 코드를 관리하기 위한 도구입니다. 원문: \"KEV 카탈로그는 미국 국방부가 발표하는 목록입니다. 이 카탈로그는 공격에 자주 사용되는 알려진 악성 코드를 관리하기 위한 도구입니다.\"",
+  "ms": 4819,
+  "finish": "stop"
+ }
+]
