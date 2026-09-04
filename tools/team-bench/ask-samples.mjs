@@ -188,10 +188,18 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
       body: JSON.stringify({ model: "local", messages, temperature: 0, max_tokens: 900, cache_prompt: false }),
       signal: AbortSignal.timeout(REQ_MS),
     });
-    const j = await r.json();
+    // ★★ 여기서 죽는다(2026-09-04 실측 사고). 예전에는 응답을 안 보고 `?? ""` 로 받아서,
+    //   두뇌가 아직 모델을 읽는 중이라 503을 주면 그것을 **「0자짜리 답」**으로 적었다.
+    //   표본 42개가 전부 0자인 파일이 만들어졌고 사슬은 코드 0으로 끝났다 —
+    //   재는 자가 못 잰 것을 「쟀다」고 적으면, 그 뒤의 모든 판정이 그 위에 선다.
+    const 몸 = await r.text();
+    if (!r.ok) throw new Error(`두뇌 응답 ${r.status} — ${몸.slice(0, 200)}`);
+    let j; try { j = JSON.parse(몸); } catch { throw new Error(`두뇌 응답이 JSON이 아니다 — ${몸.slice(0, 200)}`); }
     const ms = Date.now() - t0;
     const c = j.choices?.[0];
     const text = c?.message?.content ?? "";
+    // 빈 답도 실패다 — 「모델이 할 말이 없었다」와 「두뇌가 아직 안 떴다」를 결과 파일에서 가릴 수 없다.
+    if (!String(text).trim()) throw new Error(`두뇌가 빈 답을 줬다(finish=${c?.finish_reason}) — 적재가 안 끝났거나 프롬프트가 문맥을 넘었다`);
     const u = j.usage || {};
     return { text, ms, finish: c?.finish_reason, genTokens: u.completion_tokens, genTps: u.completion_tokens && (u.completion_tokens / (ms / 1000)), 한글: 한글비율(text), 한자: 한자수(text), len: text.length };
   }

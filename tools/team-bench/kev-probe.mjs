@@ -95,7 +95,12 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
       signal: AbortSignal.timeout(REQ_MS),
     });
     const j = await r.json();
-    const c = j.choices?.[0];
+    // ★★ ask-samples와 **같은 이유로** 빈 답에서 죽는다(2026-09-04). 재는 자가 못 잰 것을
+  //   「쟀다」고 적으면, KEV 하락 0(관문 ①)이 「베이스도 0자·이번도 0자라 하락 없음」이 된다.
+  const c = j.choices?.[0];
+  if (!String(c?.message?.content ?? "").trim()) {
+    throw new Error(`두뇌가 빈 답을 줬다(status ${r.status} · finish ${c?.finish_reason}) — 적재가 안 끝났을 수 있다`);
+  }
     return { text: c?.message?.content ?? "", ms: Date.now() - t0, finish: c?.finish_reason };
   }
 

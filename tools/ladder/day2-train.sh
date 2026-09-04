@@ -124,7 +124,13 @@ serve_start() {
   ladder_log "   두뇌 적재 중(pid $SERVE_PID) — 로그 $log"
   local i
   for i in $(seq 1 300); do
-    if curl -s -o /dev/null -m 3 "http://127.0.0.1:$PORT/health" 2>/dev/null; then return 0; fi
+    # ★★ **200을 요구한다**(2026-09-04 실측 사고). llama.cpp는 모델을 읽는 동안 /health를
+    #   **503**으로 답하는데 `curl -s`는 503에도 종료코드 0이다 — 그래서 옛 조건은
+    #   「포트가 답하는가」만 물었다. 실측: 9GB를 읽기 시작한 지 **3초 만에** 준비됐다고 판정해
+    #   표본 42개를 **전부 0자**로 받아 적고 사슬이 코드 0으로 끝났다(게이트는 미측정으로 막았지만,
+    #   그 파일이 「베이스 대조」라는 이름으로 저장소에 남을 뻔했다).
+    #   묻는 것은 「답하는가」가 아니라 **「다 읽었는가」**다.
+    if [ "$(curl -s -o /dev/null -m 3 -w '%{http_code}' "http://127.0.0.1:$PORT/health" 2>/dev/null)" = "200" ]; then return 0; fi
     kill -0 "$SERVE_PID" 2>/dev/null || break
     sleep 2
   done
