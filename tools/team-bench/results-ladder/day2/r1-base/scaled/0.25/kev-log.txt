@@ -1,0 +1,13 @@
+[prompt] KEV 목록은 누가 발표해? → 본문CISA O · URL X · 168자 · 3.8s · stop
+   KEV 목록은 미국의 사이버 보안 기관인 CISA(Cybersecurity and Infrastructure Security Agency)가 발표합니다. 이 목록은 알려진 악성 소프트웨어 및 취약점에 대한 정보를 제공합니다. CISA는 이러한 정보를 통해 조직들이 위협에 대응할 수 있도록 지원합니다.
+[noprompt] KEV 목록은 누가 발표해? → 본문CISA X · URL X · 113자 · 3.4s · stop
+   KEV 목록은 대한민국의 보건복지부에서 발표합니다. 이 목록은 특정 질병이나 상황에 대해 건강 검진을 권장하는 지침으로, 보건복지부는 국민의 건강을 위해 이러한 지침을 정기적으로 업데이트하고 발표합니다.
+[prompt] 보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야? → 본문CISA X · URL X · 175자 · 5.4s · stop
+   KEV는 공격 벡터의 유형을 정의하는 분류 체계입니다. 이는 공격이 어떻게 발생하는지를 설명하는 데 사용됩니다. KEV는 공격 벡터를 10개의 주요 범주로 나누어 정리합니다. 각 범주에는 공격이 발생할 수 있는 방식이 구체적으로 설명되어 있습니다. 이 분류는 보안 분석 및 대응 전략 수립에 중요한 역할을 합니다.
+[noprompt] 보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야? → 본문CISA O · URL X · 1112자 · 30.8s · stop
+   KEV는 **Known Exploited Vulnerabilities**의 약자로, 보안 분야에서 알려진 약점을 의미합니다. 이 용어는 주로 **미국 정부**가 발표하는 보안 관련 지침이나 공고에서 사용되며, 특히 **CISA**(Cybersecurity and Infrastructure Security Agency)가 주도하는 **CISA KEV 카탈로그**에서 자주 등장합니다.  ### KEV의 정의 KEV는 **이미 공개된 약점** 중 **악용 사례가 확인된 약점**을 말합니다. 즉, 해당 약점이 **이미 해커나 악성 행위자에
+[prompt] 우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야? → 본문CISA X · URL X · 125자 · 3.9s · stop
+   KEV 카탈로그는 미국 연방 통신 위원회(FCC)가 발표합니다. 이 카탈로그는 특정 기기나 소프트웨어에 알려진 취약점들을 정리하여 공개하는 목록입니다. KEV 표시는 해당 취약점이 FCC의 카탈로그에 등재되었음을 의미합니다.
+[noprompt] 우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야? → 본문CISA O · URL X · 366자 · 9.2s · stop
+   KEV(Exploitability of Known Vulnerabilities) 카탈로그는 미국의 사이버 보안 기관인 **CISA**(Cybersecurity and Infrastructure Security Agency)가 발표합니다. CISA는 미국 정부의 사이버 보안을 담당하는 기관으로, 취약점의 위험도를 평가하여 KEV 카탈로그에 등재합니다. 이 카탈로그는 취약점이 실제로 악용되고 있는지, 그리고 얼마나 쉽게 악용될 수 있는지를 기준으로 선정합니다.  KEV 카탈로그에 등재된 취약점은 기업이나 조직이 우선적으로 패치하거나 대
+저장 /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.25/kev.json

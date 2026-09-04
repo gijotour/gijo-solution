@@ -1,0 +1,535 @@
+[
+ {
+  "이름": "기준선(어댑터 없음)",
+  "있음": {
+   "easy": true,
+   "hard": true,
+   "kev": true
+  },
+  "점수": {
+   "scan_extract": 1,
+   "needle_16k": 1,
+   "priority_rank": 1,
+   "report_draft": 0.9,
+   "ti_match": 1,
+   "glossary_cite": 1,
+   "tool_select": 1,
+   "scan_messy": 0.5,
+   "needle_32k": 1,
+   "needle_64k": 0,
+   "ti_trap": 0,
+   "priority_6": 1,
+   "report_fix": 1
+  },
+  "평균12": 0.867,
+  "과제수12": 12,
+  "genTokens": {
+   "report_draft": 256,
+   "priority_rank": 205,
+   "glossary_cite": 108,
+   "scan_messy": 635,
+   "priority_6": 252,
+   "report_fix": 311
+  },
+  "genTokens중앙값": 254,
+  "glossary_cite_detail": "인용 1 · 20자겹침 1 · 핵심 1",
+  "kev": {
+   "prompt본문CISA": "2/3",
+   "noprompt본문CISA": "2/3",
+   "원문표기": 0,
+   "원문창작": 0,
+   "상세": [
+    {
+     "label": "prompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": true,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 323
+    },
+    {
+     "label": "noprompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 453
+    },
+    {
+     "label": "prompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": true,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 305
+    },
+    {
+     "label": "noprompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": true,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 1654
+    },
+    {
+     "label": "prompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 170
+    },
+    {
+     "label": "noprompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": true,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 1182
+    }
+   ]
+  },
+  "과제원문표기": [],
+  "생성tok당초": 21.76176924076219
+ },
+ {
+  "이름": "r1-base @1.00",
+  "있음": {
+   "easy": true,
+   "hard": true,
+   "kev": true
+  },
+  "점수": {
+   "scan_extract": 1,
+   "needle_16k": 1,
+   "priority_rank": 1,
+   "report_draft": 0.5,
+   "ti_match": 1,
+   "glossary_cite": 0.7,
+   "tool_select": 1,
+   "scan_messy": 0.857,
+   "needle_32k": 1,
+   "needle_64k": 0,
+   "ti_trap": 0,
+   "priority_6": 1,
+   "report_fix": 0.7
+  },
+  "평균12": 0.813,
+  "과제수12": 12,
+  "genTokens": {
+   "report_draft": 148,
+   "priority_rank": 136,
+   "glossary_cite": 71,
+   "scan_messy": 279,
+   "priority_6": 84,
+   "report_fix": 86
+  },
+  "genTokens중앙값": 111,
+  "glossary_cite_detail": "인용 0 · 20자겹침 1 · 핵심 1",
+  "kev": {
+   "prompt본문CISA": "0/3",
+   "noprompt본문CISA": "0/3",
+   "원문표기": 5,
+   "원문창작": 5,
+   "상세": [
+    {
+     "label": "prompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": false,
+     "표기": true,
+     "인용수": 1,
+     "창작수": 1,
+     "창작예": "KEV 목록은 미국 국방부가 발표합니다.",
+     "len": 113
+    },
+    {
+     "label": "noprompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 123
+    },
+    {
+     "label": "prompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": false,
+     "표기": true,
+     "인용수": 1,
+     "창작수": 1,
+     "창작예": "KEV is an acronym for ",
+     "len": 290
+    },
+    {
+     "label": "noprompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": false,
+     "표기": true,
+     "인용수": 1,
+     "창작수": 1,
+     "창작예": "KEV stands for ",
+     "len": 221
+    },
+    {
+     "label": "prompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": false,
+     "표기": true,
+     "인용수": 1,
+     "창작수": 1,
+     "창작예": "KEV 카탈로그는 미국 국방부가 발표합니다.",
+     "len": 96
+    },
+    {
+     "label": "noprompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": false,
+     "표기": true,
+     "인용수": 1,
+     "창작수": 1,
+     "창작예": "KEV 카탈로그는 미국 국방부가 발표하는 목록입니다. 이 카탈로그는 공격에 자주 사용되는 알려진 악성 코드를 관리하기 위한 도",
+     "len": 157
+    }
+   ]
+  },
+  "과제원문표기": [
+   {
+    "id": "report_draft",
+    "표기": true,
+    "인용수": 1,
+    "창작수": 0,
+    "창작예": null
+   }
+  ],
+  "생성tok당초": 20.259238116562074
+ },
+ {
+  "이름": "r1-base @0.75",
+  "있음": {
+   "easy": true,
+   "hard": true,
+   "kev": true
+  },
+  "점수": {
+   "scan_extract": 1,
+   "needle_16k": 1,
+   "priority_rank": 1,
+   "report_draft": 1,
+   "ti_match": 1,
+   "glossary_cite": 0.7,
+   "tool_select": 1,
+   "scan_messy": 0.5,
+   "needle_32k": 1,
+   "needle_64k": 0,
+   "ti_trap": 0,
+   "priority_6": 1,
+   "report_fix": 1
+  },
+  "평균12": 0.85,
+  "과제수12": 12,
+  "genTokens": {
+   "report_draft": 138,
+   "priority_rank": 168,
+   "glossary_cite": 71,
+   "scan_messy": 505,
+   "priority_6": 77,
+   "report_fix": 194
+  },
+  "genTokens중앙값": 153,
+  "glossary_cite_detail": "인용 0 · 20자겹침 1 · 핵심 1",
+  "kev": {
+   "prompt본문CISA": "0/3",
+   "noprompt본문CISA": "0/3",
+   "원문표기": 2,
+   "원문창작": 2,
+   "상세": [
+    {
+     "label": "prompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": false,
+     "표기": true,
+     "인용수": 1,
+     "창작수": 1,
+     "창작예": "The KEV list is maintained by the National Institute of Standards and ",
+     "len": 171
+    },
+    {
+     "label": "noprompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 162
+    },
+    {
+     "label": "prompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 130
+    },
+    {
+     "label": "noprompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 120
+    },
+    {
+     "label": "prompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": false,
+     "표기": true,
+     "인용수": 1,
+     "창작수": 1,
+     "창작예": "KEV 카탈로그는 미국 국방부가 발표합니다.",
+     "len": 141
+    },
+    {
+     "label": "noprompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 179
+    }
+   ]
+  },
+  "과제원문표기": [],
+  "생성tok당초": 20.26784020970902
+ },
+ {
+  "이름": "r1-base @0.50",
+  "있음": {
+   "easy": true,
+   "hard": true,
+   "kev": true
+  },
+  "점수": {
+   "scan_extract": 1,
+   "needle_16k": 1,
+   "priority_rank": 1,
+   "report_draft": 0.9,
+   "ti_match": 1,
+   "glossary_cite": 0.7,
+   "tool_select": 1,
+   "scan_messy": 0.5,
+   "needle_32k": 1,
+   "needle_64k": 0,
+   "ti_trap": 0,
+   "priority_6": 1,
+   "report_fix": 1
+  },
+  "평균12": 0.842,
+  "과제수12": 12,
+  "genTokens": {
+   "report_draft": 118,
+   "priority_rank": 154,
+   "glossary_cite": 73,
+   "scan_messy": 505,
+   "priority_6": 142,
+   "report_fix": 246
+  },
+  "genTokens중앙값": 148,
+  "glossary_cite_detail": "인용 0 · 20자겹침 1 · 핵심 1",
+  "kev": {
+   "prompt본문CISA": "0/3",
+   "noprompt본문CISA": "2/3",
+   "원문표기": 1,
+   "원문창작": 1,
+   "상세": [
+    {
+     "label": "prompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": false,
+     "표기": true,
+     "인용수": 1,
+     "창작수": 1,
+     "창작예": "The KEV catalog is maintained by the National Institute of Standards a",
+     "len": 173
+    },
+    {
+     "label": "noprompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 215
+    },
+    {
+     "label": "prompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 140
+    },
+    {
+     "label": "noprompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": true,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 334
+    },
+    {
+     "label": "prompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 150
+    },
+    {
+     "label": "noprompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": true,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 266
+    }
+   ]
+  },
+  "과제원문표기": [],
+  "생성tok당초": 20.23615943261526
+ },
+ {
+  "이름": "r1-base @0.25",
+  "있음": {
+   "easy": true,
+   "hard": true,
+   "kev": true
+  },
+  "점수": {
+   "scan_extract": 1,
+   "needle_16k": 1,
+   "priority_rank": 1,
+   "report_draft": 0.9,
+   "ti_match": 1,
+   "glossary_cite": 1,
+   "tool_select": 1,
+   "scan_messy": 0.5,
+   "needle_32k": 1,
+   "needle_64k": 0,
+   "ti_trap": 0,
+   "priority_6": 1,
+   "report_fix": 1
+  },
+  "평균12": 0.867,
+  "과제수12": 12,
+  "genTokens": {
+   "report_draft": 247,
+   "priority_rank": 116,
+   "glossary_cite": 86,
+   "scan_messy": 638,
+   "priority_6": 224,
+   "report_fix": 284
+  },
+  "genTokens중앙값": 235.5,
+  "glossary_cite_detail": "인용 1 · 20자겹침 1 · 핵심 1",
+  "kev": {
+   "prompt본문CISA": "1/3",
+   "noprompt본문CISA": "2/3",
+   "원문표기": 0,
+   "원문창작": 0,
+   "상세": [
+    {
+     "label": "prompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": true,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 168
+    },
+    {
+     "label": "noprompt",
+     "q": "KEV 목록은 누가 발표해?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 113
+    },
+    {
+     "label": "prompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 175
+    },
+    {
+     "label": "noprompt",
+     "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+     "cisa": true,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 1112
+    },
+    {
+     "label": "prompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": false,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 125
+    },
+    {
+     "label": "noprompt",
+     "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+     "cisa": true,
+     "표기": false,
+     "인용수": 0,
+     "창작수": 0,
+     "창작예": null,
+     "len": 366
+    }
+   ]
+  },
+  "과제원문표기": [],
+  "생성tok당초": 20.177281508222173
+ }
+]

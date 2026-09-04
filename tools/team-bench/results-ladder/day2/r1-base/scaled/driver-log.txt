@@ -1,0 +1,109 @@
+===== scale 0.75 : easy 2026-09-04T12:20:25+09:00 =====
+[2026-09-04 03:20:25] ▶ qwen3-14b+r1-base@0.75 (~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf)
+[2026-09-04 03:20:29]   적재 4s
+[2026-09-04 03:20:50]   scan_extract   1.00  항목 6/6 · 심각도 6/6 · 뽑은 수 6  (21.0s · 프리필 874 tok/s · 생성 19.4 tok/s)
+[2026-09-04 03:21:19]   needle_16k     1.00  회수 5/5  (29.0s · 프리필 1018 tok/s · 생성 16.0 tok/s)
+[2026-09-04 03:21:28]   priority_rank  1.00  순서 V2>V5>V3>V1>V4  (9.3s · 프리필 1209 tok/s · 생성 20.6 tok/s)
+[2026-09-04 03:21:35]   report_draft   1.00  절 6/6 · 한글 100% · 한자 0  (6.9s · 프리필 1172 tok/s · 생성 20.3 tok/s)
+[2026-09-04 03:21:38]   ti_match       1.00  맞음 2/2 · 오탐 0  (2.5s · 프리필 1198 tok/s · 생성 20.6 tok/s)
+[2026-09-04 03:21:41]   glossary_cite  0.70  인용 0 · 20자겹침 1 · 핵심 1  (3.6s · 프리필 1114 tok/s · 생성 20.5 tok/s)
+[2026-09-04 03:21:45]   tool_select    1.00  도구 6/6  (3.3s · 프리필 1174 tok/s · 생성 20.3 tok/s)
+[2026-09-04 03:21:46] 끝 — 1개 모델. 표: /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.75/easy/summary.md
+===== scale 0.75 : hard 2026-09-04T12:21:46+09:00 =====
+[2026-09-04 03:21:46] ▶ qwen3-14b+r1-base@0.75 (~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf)
+[2026-09-04 03:21:50]   적재 4s
+[2026-09-04 03:22:16]   scan_messy     0.50  고유 7/7 · 뽑은 수 9(중복 남음) · 오탐 포함(감점)  (26.0s · 프리필 988 tok/s · 생성 20.1 tok/s)
+[2026-09-04 03:23:12]   needle_32k     1.00  회수 5/5  (56.0s · 프리필 834 tok/s · 생성 13.2 tok/s)
+[2026-09-04 03:23:14]   needle_64k     0.00  요청 실패 {"code":400,"message":"request (74256 tokens) exceeds the available context size  (1.9s · 프리필 - tok/s · 생성 - tok/s)
+[2026-09-04 03:23:27]   ti_trap        0.00  맞음 2/2 · 오탐 2/4  (13.6s · 프리필 1220 tok/s · 생성 20.1 tok/s)
+[2026-09-04 03:23:31]   priority_6     1.00  상위3 V2>V3>V4 · V1 자리 5위  (4.2s · 프리필 1144 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:23:41]   report_fix     1.00  절 6/6 · 기한 1 · 담당 1 · 한글 100%  (9.6s · 프리필 1214 tok/s · 생성 20.5 tok/s)
+[2026-09-04 03:23:42] 끝 — 1개 모델. 표: /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.75/hard/summary.md
+===== scale 0.75 : kev 2026-09-04T12:23:42+09:00 =====
+적용된 scale: [{"id":0,"path":"/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/adapter.gguf","scale":0.75,"task_name":"","prompt_prefix":""}]
+[prompt] KEV 목록은 누가 발표해? → 본문CISA X · URL X · 171자 · 3.5s · stop
+   KEV 목록은 미국 국립 표준 기술 연구소(NIST)에서 발표합니다. 이 목록은 공격 표면을 줄이기 위한 보안 가이드라인으로 사용됩니다. 원문: "The KEV list is maintained by the National Institute of Standards and Technology (NIST)."
+[noprompt] KEV 목록은 누가 발표해? → 본문CISA X · URL X · 162자 · 5.2s · stop
+   KEV 목록은 한국정보보호진흥원(KISA)에서 발표합니다. 이 목록은 취약점 심각도 평가 기준을 정의하고, 보안 담당자들이 취약점의 위험성을 판단하는 데 도움을 줍니다. KISA는 취약점 정보를 수집하고 분석하여 KEV 목록을 관리하며, 주기적으로 업데이트하여 최신 보안 동향을 반영합니다.
+[prompt] 보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야? → 본문CISA X · URL X · 130자 · 4.2s · stop
+   KEV는 공격 벡터를 의미하며, 공격자가 시스템에 침투하기 위해 사용하는 경로를 나타냅니다. 이 용어는 공격 표면과 구분되며, 보안 분석에서 중요한 개념입니다. 공격 벡터는 취약점, 악성 코드 배포 방식 등 다양한 형태로 존재합니다.
+[noprompt] 보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야? → 본문CISA X · URL X · 120자 · 3.7s · stop
+   KEV는 공격 벡터를 의미하는 약어로, 보안 분야에서 중요한 개념입니다. 이는 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 지칭합니다. 이러한 공격 벡터를 이해하고 차단하는 것은 보안 강화에 필수적입니다.
+[prompt] 우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야? → 본문CISA X · URL X · 141자 · 4.4s · stop
+   KEV 카탈로그는 미국 국방부가 발표합니다. 이 카탈로그는 공격에 자주 사용되는 악성 코드를 관리하는 데 사용됩니다. 보안 담당자는 KEV 목록을 주기적으로 확인하여 위협을 사전에 차단해야 합니다. 원문: "KEV 카탈로그는 미국 국방부가 발표합니다."
+[noprompt] 우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야? → 본문CISA X · URL X · 179자 · 4.6s · stop
+   KEV 카탈로그는 미국 국방부의 국가 보안국(National Security Agency, NSA)이 발표하는 것입니다. NSA는 이 카탈로그를 통해 알려진 취약점 중 가장 위험한 것을 선정하여 관리자들에게 주의를 환기시키는 역할을 합니다. 이러한 정보는 조직의 보안 정책 수립과 취약점 관리에 중요한 자료로 활용됩니다.
+저장 /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.75/kev.json
+===== scale 0.5 : easy 2026-09-04T12:24:18+09:00 =====
+[2026-09-04 03:24:18] ▶ qwen3-14b+r1-base@0.5 (~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf)
+[2026-09-04 03:24:22]   적재 4s
+[2026-09-04 03:24:42]   scan_extract   1.00  항목 6/6 · 심각도 6/6 · 뽑은 수 6  (20.3s · 프리필 885 tok/s · 생성 20.1 tok/s)
+[2026-09-04 03:25:03]   needle_16k     1.00  회수 5/5  (21.2s · 프리필 1022 tok/s · 생성 15.8 tok/s)
+[2026-09-04 03:25:12]   priority_rank  1.00  순서 V2>V5>V3>V1>V4  (8.7s · 프리필 1196 tok/s · 생성 20.3 tok/s)
+[2026-09-04 03:25:18]   report_draft   0.90  절 5/6 · 한글 100% · 한자 0  (5.9s · 프리필 1140 tok/s · 생성 20.4 tok/s)
+[2026-09-04 03:25:21]   ti_match       1.00  맞음 2/2 · 오탐 0  (2.5s · 프리필 1182 tok/s · 생성 20.3 tok/s)
+[2026-09-04 03:25:24]   glossary_cite  0.70  인용 0 · 20자겹침 1 · 핵심 1  (3.7s · 프리필 1104 tok/s · 생성 20.4 tok/s)
+[2026-09-04 03:25:28]   tool_select    1.00  도구 6/6  (3.3s · 프리필 1168 tok/s · 생성 20.3 tok/s)
+[2026-09-04 03:25:29] 끝 — 1개 모델. 표: /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.5/easy/summary.md
+===== scale 0.5 : hard 2026-09-04T12:25:29+09:00 =====
+[2026-09-04 03:25:29] ▶ qwen3-14b+r1-base@0.5 (~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf)
+[2026-09-04 03:25:33]   적재 4s
+[2026-09-04 03:25:58]   scan_messy     0.50  고유 7/7 · 뽑은 수 9(중복 남음) · 오탐 포함(감점)  (25.8s · 프리필 980 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:27:32]   needle_32k     1.00  회수 5/5  (93.7s · 프리필 521 tok/s · 생성 7.3 tok/s)
+[2026-09-04 03:27:35]   needle_64k     0.00  요청 실패 {"code":400,"message":"request (74256 tokens) exceeds the available context size  (2.9s · 프리필 - tok/s · 생성 - tok/s)
+[2026-09-04 03:27:50]   ti_trap        0.00  맞음 2/2 · 오탐 2/4  (14.5s · 프리필 730 tok/s · 생성 13.3 tok/s)
+[2026-09-04 03:27:57]   priority_6     1.00  상위3 V2>V3>V4 · V1 자리 5위  (7.4s · 프리필 1217 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:28:09]   report_fix     1.00  절 6/6 · 기한 1 · 담당 1 · 한글 100%  (12.3s · 프리필 1223 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:28:11] 끝 — 1개 모델. 표: /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.5/hard/summary.md
+===== scale 0.5 : kev 2026-09-04T12:28:11+09:00 =====
+적용된 scale: [{"id":0,"path":"/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/adapter.gguf","scale":0.5,"task_name":"","prompt_prefix":""}]
+[prompt] KEV 목록은 누가 발표해? → 본문CISA X · URL X · 173자 · 3.5s · stop
+   KEV 목록은 미국 국립 표준기술연구소(NIST)에서 발표합니다. 이 목록은 공격 벡터와 취약점을 정리하여 보안 관리에 도움을 줍니다. 원문: "The KEV catalog is maintained by the National Institute of Standards and Technology (NIST)."
+[noprompt] KEV 목록은 누가 발표해? → 본문CISA X · URL X · 215자 · 6.5s · stop
+   KEV 목록은 한국의 방송통신심의위원회에서 발표합니다. 이 목록은 특정한 표현이나 내용이 사회적 갈등을 조장하거나 부적절하다고 판단될 경우, 방송 및 통신 서비스에서 제한하거나 주의를 요구하는 지침을 담고 있습니다. 방송통신심의위원회는 방송 및 통신 콘텐츠의 적절성을 감독하는 기관으로, KEV 목록을 통해 콘텐츠 제작자와 방송사에 지속적인 주의를 요구하거나 제한을 가할 수 있습니다.
+[prompt] 보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야? → 본문CISA X · URL X · 140자 · 4.4s · stop
+   KEV는 공격 벡터를 의미하며, 공격자가 시스템에 침투하기 위해 사용하는 경로를 나타냅니다. 이 용어는 보안 분석 및 위협 모니터링에서 중요한 개념입니다. 공격 벡터는 소프트웨어 결함, 약한 비밀번호, 사회 공학 등 다양한 형태로 존재할 수 있습니다.
+[noprompt] 보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야? → 본문CISA O · URL X · 334자 · 8.4s · stop
+   KEV는 "Known Exploited Vulnerabilities"의 약자로, 미국 정부가 공개하는 알려진 악용 취약점 목록입니다. 이 목록은 보안 위협을 신속히 대응하기 위해 취약점의 심각성을 평가하고 공개하는 역할을 합니다. KEV 목록은 미국의 사이버보안 담당 기관인 CISA(Cybersecurity and Infrastructure Security Agency)가 주도하여 발표합니다. CISA는 이 목록을 통해 기업과 조직이 가장 위험한 취약점들을 우선적으로 패치하도록 유도합니다. KEV에 포함된 취약점들은 이미 악용된 사
+[prompt] 우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야? → 본문CISA X · URL X · 150자 · 4.4s · stop
+   KEV 카탈로그는 미국 연방 통신 위원회(FCC)가 발표합니다. 이 카탈로그는 특정 기기나 소프트웨어에 대해 보안 취약점이 확인되었음을 공지하는 목적으로 사용됩니다. FCC는 이러한 정보를 통해 소비자와 기업이 위험을 인지하고 적절한 조치를 취할 수 있도록 지원합니다.
+[noprompt] 우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야? → 본문CISA O · URL X · 266자 · 6.2s · stop
+   KEV 카탈로그는 미국의 사이버보안 기관인 CISA (Cybersecurity and Infrastructure Security Agency)가 발표합니다. CISA는 취약점 중 특히 심각한 위협을 가진 것을 선정하여 KEV (Known Exploited Vulnerabilities)로 지정하고, 이를 통해 기관과 기업이 우선적으로 패치를 적용할 수 있도록 안내합니다. KEV 카탈로그는 정기적으로 업데이트되며, 해당 취약점에 대한 공격 사례가 확인된 경우 즉시 포함됩니다.
+저장 /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.5/kev.json
+===== scale 0.25 : easy 2026-09-04T12:28:54+09:00 =====
+[2026-09-04 03:28:54] ▶ qwen3-14b+r1-base@0.25 (~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf)
+[2026-09-04 03:28:58]   적재 4s
+[2026-09-04 03:29:19]   scan_extract   1.00  항목 6/6 · 심각도 6/6 · 뽑은 수 6  (20.4s · 프리필 882 tok/s · 생성 20.0 tok/s)
+[2026-09-04 03:29:40]   needle_16k     1.00  회수 5/5  (20.9s · 프리필 1026 tok/s · 생성 15.8 tok/s)
+[2026-09-04 03:29:47]   priority_rank  1.00  순서 V2>V5>V3>V1>V4  (6.8s · 프리필 1206 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:29:59]   report_draft   0.90  절 5/6 · 한글 100% · 한자 0  (12.3s · 프리필 1156 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:30:01]   ti_match       1.00  맞음 2/2 · 오탐 0  (2.5s · 프리필 1177 tok/s · 생성 20.1 tok/s)
+[2026-09-04 03:30:06]   glossary_cite  1.00  인용 1 · 20자겹침 1 · 핵심 1  (4.4s · 프리필 1101 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:30:09]   tool_select    1.00  도구 6/6  (3.4s · 프리필 1169 tok/s · 생성 20.1 tok/s)
+[2026-09-04 03:30:10] 끝 — 1개 모델. 표: /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.25/easy/summary.md
+===== scale 0.25 : hard 2026-09-04T12:30:10+09:00 =====
+[2026-09-04 03:30:10] ▶ qwen3-14b+r1-base@0.25 (~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf)
+[2026-09-04 03:30:14]   적재 4s
+[2026-09-04 03:30:47]   scan_messy     0.50  고유 7/7 · 뽑은 수 9(중복 남음) · 오탐 포함(감점)  (32.4s · 프리필 1026 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:31:35]   needle_32k     1.00  회수 5/5  (48.5s · 프리필 832 tok/s · 생성 13.4 tok/s)
+[2026-09-04 03:31:37]   needle_64k     0.00  요청 실패 {"code":400,"message":"request (74256 tokens) exceeds the available context size  (1.5s · 프리필 - tok/s · 생성 - tok/s)
+[2026-09-04 03:31:51]   ti_trap        0.00  맞음 2/2 · 오탐 3/4  (14.1s · 프리필 1219 tok/s · 생성 20.4 tok/s)
+[2026-09-04 03:32:02]   priority_6     1.00  상위3 V2>V3>V4 · V1 자리 5위  (11.4s · 프리필 1211 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:32:16]   report_fix     1.00  절 6/6 · 기한 1 · 담당 1 · 한글 100%  (14.2s · 프리필 1217 tok/s · 생성 20.2 tok/s)
+[2026-09-04 03:32:18] 끝 — 1개 모델. 표: /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.25/hard/summary.md
+===== scale 0.25 : kev 2026-09-04T12:32:18+09:00 =====
+적용된 scale: [{"id":0,"path":"/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/adapter.gguf","scale":0.25,"task_name":"","prompt_prefix":""}]
+[prompt] KEV 목록은 누가 발표해? → 본문CISA O · URL X · 168자 · 3.8s · stop
+   KEV 목록은 미국의 사이버 보안 기관인 CISA(Cybersecurity and Infrastructure Security Agency)가 발표합니다. 이 목록은 알려진 악성 소프트웨어 및 취약점에 대한 정보를 제공합니다. CISA는 이러한 정보를 통해 조직들이 위협에 대응할 수 있도록 지원합니다.
+[noprompt] KEV 목록은 누가 발표해? → 본문CISA X · URL X · 113자 · 3.4s · stop
+   KEV 목록은 대한민국의 보건복지부에서 발표합니다. 이 목록은 특정 질병이나 상황에 대해 건강 검진을 권장하는 지침으로, 보건복지부는 국민의 건강을 위해 이러한 지침을 정기적으로 업데이트하고 발표합니다.
+[prompt] 보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야? → 본문CISA X · URL X · 175자 · 5.4s · stop
+   KEV는 공격 벡터의 유형을 정의하는 분류 체계입니다. 이는 공격이 어떻게 발생하는지를 설명하는 데 사용됩니다. KEV는 공격 벡터를 10개의 주요 범주로 나누어 정리합니다. 각 범주에는 공격이 발생할 수 있는 방식이 구체적으로 설명되어 있습니다. 이 분류는 보안 분석 및 대응 전략 수립에 중요한 역할을 합니다.
+[noprompt] 보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야? → 본문CISA O · URL X · 1112자 · 30.8s · stop
+   KEV는 **Known Exploited Vulnerabilities**의 약자로, 보안 분야에서 알려진 약점을 의미합니다. 이 용어는 주로 **미국 정부**가 발표하는 보안 관련 지침이나 공고에서 사용되며, 특히 **CISA**(Cybersecurity and Infrastructure Security Agency)가 주도하는 **CISA KEV 카탈로그**에서 자주 등장합니다.  ### KEV의 정의 KEV는 **이미 공개된 약점** 중 **악용 사례가 확인된 약점**을 말합니다. 즉, 해당 약점이 **이미 해커나 악성 행위자에
+[prompt] 우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야? → 본문CISA X · URL X · 125자 · 3.9s · stop
+   KEV 카탈로그는 미국 연방 통신 위원회(FCC)가 발표합니다. 이 카탈로그는 특정 기기나 소프트웨어에 알려진 취약점들을 정리하여 공개하는 목록입니다. KEV 표시는 해당 취약점이 FCC의 카탈로그에 등재되었음을 의미합니다.
+[noprompt] 우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야? → 본문CISA O · URL X · 366자 · 9.2s · stop
+   KEV(Exploitability of Known Vulnerabilities) 카탈로그는 미국의 사이버 보안 기관인 **CISA**(Cybersecurity and Infrastructure Security Agency)가 발표합니다. CISA는 미국 정부의 사이버 보안을 담당하는 기관으로, 취약점의 위험도를 평가하여 KEV 카탈로그에 등재합니다. 이 카탈로그는 취약점이 실제로 악용되고 있는지, 그리고 얼마나 쉽게 악용될 수 있는지를 기준으로 선정합니다.  KEV 카탈로그에 등재된 취약점은 기업이나 조직이 우선적으로 패치하거나 대
+저장 /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r1-base/scaled/0.25/kev.json
+ALL DONE 2026-09-04T12:33:23+09:00

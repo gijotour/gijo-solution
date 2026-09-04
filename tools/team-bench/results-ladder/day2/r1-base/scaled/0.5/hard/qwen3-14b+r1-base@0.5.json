@@ -1,0 +1,98 @@
+{
+  "id": "qwen3-14b+r1-base@0.5",
+  "path": "~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf",
+  "license": "Apache-2.0",
+  "startedAt": "2026-09-04 03:25:29",
+  "tasks": {
+    "scan_messy": {
+      "role": "scan",
+      "score": 0.5,
+      "detail": "고유 7/7 · 뽑은 수 9(중복 남음) · 오탐 포함(감점)",
+      "ms": 25776,
+      "promptTokens": 846,
+      "genTokens": 505,
+      "prefillTps": 979.6372100024896,
+      "genTps": 20.242732045871477,
+      "finish": "stop",
+      "한글": 0.99,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "{\"findings\":[{\"asset\":\"portal.example.co.kr\",\"vuln\":\"SQL Injection (SQLi)\",\"severity\":\"높음\",\"evidence\":\"id 파라미터에 1' AND 1=1-- 입력 시 정상, 1=2 입력 시 빈 화면. DB 에러메세지 노출됨\"},{\"asset\":\"portal.example.co.kr\",\"vuln\":\"반사형 XSS (Reflected Cross-Site Scripting)\",\"severity\":\"중간\",\"evidence\":\"q 파라미터 미필터링, alert(1) 실행 확인\"},{\"asset\":\"hr.example.co.kr\",\"vuln\":\"인증 우회 (Authentication Bypass)\",\"severity\":\"높음\",\"evidence\":\"세션 쿠키 없이 직접 접근 시 200 OK, 관리자 목록 노출\"},{\"asset\":\"hr.example.co.kr\",\"vuln\":\"임의 파일 업로드(웹셸 업로드 가능)\",\"severity\":\"긴급\",\"evidence\":\"jsp 확장자 차단을 대소문자 혼용(jSp)으로 우회\"},{\"asset\":\"files.example.co.kr\",\"vuln\":\"디렉터리 리스팅\",\"severity\":\"중간\",\"evidence\":\"백업 파일 3건 목록 노출(db_2026.sql 포함)\"},{\"asset\":\"hr.example.co.kr\",\"vuln\":\"CSRF (사이트 간 요청 위조)\",\"severity\":\"중간\",\"evidence\":\"※ 오탐(재검증 결과 해당 없음) — 토큰 검증이 정상 동작함을 담당자 입회 하에 확인\"},{\"asset\":\"api.example.co.kr\",\"vuln\":\"민감정보 평문 전송 (HTTP)\",\"severity\":\"중간\",\"evidence\":\"로그인 요청이 http로 전송되어 계정정보가 평문 노출\"},{\"asset\":\"files.example.co.kr\",\"vuln\":\"Directory Listing(디렉토리 목록노출)\",\"severity\":\"보통\",\"evidence\":\"스캐너 2대 결과를 합치는 과정에서 표기가 달라짐. 백업파일 리스트 확인\"},{\"asset\":\"vpn.example.co.kr\",\"vuln\":\"취약한 TLS 버전 지원 (TLS 1.0/1.1 accepted)\",\"severity\":\"낮음\",\"evidence\":\"sslscan 결과 TLSv1.0 accepted\"}]}"
+    },
+    "needle_32k": {
+      "role": "scan",
+      "score": 1,
+      "detail": "회수 5/5",
+      "ms": 93696,
+      "promptTokens": 37186,
+      "genTokens": 163,
+      "prefillTps": 521.3642919915396,
+      "genTps": 7.281429684447108,
+      "finish": "stop",
+      "한글": 0.98,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "1. 주 수집기 장애 시 대체 수집기 주소는 10.44.8.71이다.\n2. 올해 피싱 모의훈련은 연 4회 실시하며 훈련 코드명은 「푸른등대」다.\n3. 암호키 교체 주기는 18개월이고 교체 승인은 정보보호위원회가 한다.\n4. 외주 개발자의 반입 매체 검사는 본관 B동 207호 반입검사실에서만 한다.\n5. 재해복구 훈련의 목표 복구 시간은 4시간, 목표 복구 시점은 30분으로 정해져 있다."
+    },
+    "needle_64k": {
+      "role": "scan",
+      "score": 0,
+      "detail": "요청 실패 {\"code\":400,\"message\":\"request (74256 tokens) exceeds the available context size",
+      "ms": 2922,
+      "한글": 0,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": ""
+    },
+    "ti_trap": {
+      "role": "ti",
+      "score": 0,
+      "detail": "맞음 2/2 · 오탐 2/4",
+      "ms": 14475,
+      "promptTokens": 478,
+      "genTokens": 184,
+      "prefillTps": 729.8456483334937,
+      "genTps": 13.253166402339625,
+      "finish": "stop",
+      "한글": 0.83,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "{\"matches\":[{\"cve\":\"CVE-2024-21762\",\"asset\":\"A1\",\"reason\":\"FortiOS 7.0.0 ~ 7.0.13 범위에 해당\"},{\"cve\":\"CVE-2023-29183\",\"asset\":\"A2\",\"reason\":\"FortiWeb 7.0.0 ~ 7.0.14 범위에 해당\"},{\"cve\":\"CVE-2024-26198\",\"asset\":\"A3\",\"reason\":\"Exchange Server 2019 CU12 ~ CU14 범위에 해당\"},{\"cve\":\"CVE-2024-32760\",\"asset\":\"A4\",\"reason\":\"nginx 1.25.0 ~ 1.25.3 범위에 해당\"}]}"
+    },
+    "priority_6": {
+      "role": "analysis",
+      "score": 1,
+      "detail": "상위3 V2>V3>V4 · V1 자리 5위",
+      "ms": 7391,
+      "promptTokens": 433,
+      "genTokens": 142,
+      "prefillTps": 1216.8834855140278,
+      "genTps": 20.158145656470026,
+      "finish": "stop",
+      "한글": 1,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "{\"order\":[\"V2\",\"V3\",\"V4\",\"V6\",\"V1\",\"V5\"],\"reason\":\"KEV 등재 여부를 우선으로 하면 V2, V3, V4가 먼저 처리되어야 합니다. 이 중 외부 노출 여부를 고려하면 V2와 V3는 외부 노출이 있으므로 V4보다 앞서야 합니다. 자산 중요도가 높은 V4는 V6보다 우선순위가 높습니다. 이후 CVSS 점수를 고려하면 V6이 V1보다 높고, V1은 V5보다 높습니다.\"}"
+    },
+    "report_fix": {
+      "role": "report",
+      "score": 1,
+      "detail": "절 6/6 · 기한 1 · 담당 1 · 한글 100%",
+      "ms": 12320,
+      "promptTokens": 209,
+      "genTokens": 246,
+      "prefillTps": 1223.495802648371,
+      "genTps": 20.22958681935904,
+      "finish": "stop",
+      "한글": 1,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "# 보안 취약점 조치 요청서\n\n## 제목\nhr.example.co.kr(10.20.1.22) /upload.do 임의 파일 업로드 취약점 조치 요청\n\n## 대상 자산\nhr.example.co.kr(10.20.1.22) 서버의 /upload.do 엔드포인트\n\n## 위험 요약\n해당 엔드포인트는 임의 파일 업로드 취약점을 보이고 있으며, 웹셸 업로드가 가능합니다. 또한 확장자 차단 기능이 대소문자 혼용으로 우회될 수 있어 보안 위험이 큽니다.\n\n## 조치 방법\n- 업로드 기능에 대한 입력 검증을 강화합니다.\n- 확장자 차단 로직을 대소문자 구분 없이 적용합니다.\n- 웹셸 업로드를 방지하기 위한 서버 측 검증 로직을 추가합니다.\n\n## 조치 기한\n3일 안\n\n## 담당 부서\n인프라팀"
+    }
+  },
+  "load": {
+    "ms": 4016
+  },
+  "error": null,
+  "finishedAt": "2026-09-04 03:28:11"
+}
