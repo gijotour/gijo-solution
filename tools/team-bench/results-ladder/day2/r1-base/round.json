@@ -1,0 +1,12 @@
+{
+  "id": "r1-base",
+  "dataset": "raft-vuln-v1",
+  "agent": "normaltic",
+  "topic": "취약점",
+  "rank": 16,
+  "lr": 0.0001,
+  "epochs": 3,
+  "distractors": 1,
+  "maxSeq": 3072,
+  "왜": "기준 회전. rank·lr·epochs는 이미 한 번 돌려 본 조합(finetune_qlora14b.py 기본값)이라 **변수 하나만** 바뀌게 두는 출발점이다. maxSeq 3072는 RAFT형(행마다 근거 조각이 system에 실린다)이 1024를 넘기 때문 — 제품 경로(finetune.ts)가 쓰는 그 값이다."
+}

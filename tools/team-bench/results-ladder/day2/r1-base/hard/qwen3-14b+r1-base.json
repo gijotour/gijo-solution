@@ -1,0 +1,98 @@
+{
+  "id": "qwen3-14b+r1-base",
+  "path": "~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf",
+  "license": "Apache-2.0",
+  "startedAt": "2026-09-04 02:38:14",
+  "tasks": {
+    "scan_messy": {
+      "role": "scan",
+      "score": 0.857,
+      "detail": "고유 5/7 · 뽑은 수 5(≤8) · 오탐 제외",
+      "ms": 14758,
+      "promptTokens": 846,
+      "genTokens": 279,
+      "prefillTps": 988.6827380201102,
+      "genTps": 20.015849961188692,
+      "finish": "stop",
+      "한글": 1,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "{\"findings\":[{\"asset\":\"portal.example.co.kr\",\"vuln\":\"SQL Injection (SQLi)\",\"severity\":\"높음\",\"evidence\":\"id 파라미터에 1' AND 1=1-- 입력 시 정상, 1=2 입력 시 빈 화면. DB 에러메세지 노출됨\"},{\"asset\":\"portal.example.co.kr\",\"vuln\":\"반사형 XSS (Reflected Cross-Site Scripting)\",\"severity\":\"중간\",\"evidence\":\"q 파라미터 미필터링, alert(1) 실행 확인\"},{\"asset\":\"hr.example.co.kr\",\"vuln\":\"인증 우회 (Authentication Bypass)\",\"severity\":\"높음\",\"evidence\":\"세션 쿠키 없이 직접 접근 시 200 OK, 관리자 목록 노출\"},{\"asset\":\"hr.example.co.kr\",\"vuln\":\"임의 파일 업로드(웹셸 업로드 가능)\",\"severity\":\"긴급\",\"evidence\":\"jsp 확장자 차단을 대소문자 혼용(jSp)으로 우회\"},{\"asset\":\"files.example.co.kr\",\"vuln\":\"디렉터리 리스팅\",\"severity\":\"중간\",\"evidence\":\"백업 파일 3건 목록 노출(db_2026.sql 포함)\"}]}"
+    },
+    "needle_32k": {
+      "role": "scan",
+      "score": 1,
+      "detail": "회수 5/5",
+      "ms": 57771,
+      "promptTokens": 37186,
+      "genTokens": 173,
+      "prefillTps": 831.4558907574374,
+      "genTps": 13.274472879943199,
+      "finish": "stop",
+      "한글": 0.99,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "통합 로그 수집기의 이중화는 관제운영3팀이 맡고 있으며, 주 수집기 장애 시 대체 수집기 주소는 10.44.8.71이다.\n올해 피싱 모의훈련은 연 4회 실시하며 훈련 코드명은 「푸른등대」다.\n암호키 교체 주기는 18개월이고 교체 승인은 정보보호위원회가 한다.\n외주 개발자의 반입 매체 검사는 본관 B동 207호 반입검사실에서만 한다.\n재해복구 훈련의 목표 복구 시간은 4시간, 목표 복구 시점은 30분으로 정해져 있다."
+    },
+    "needle_64k": {
+      "role": "scan",
+      "score": 0,
+      "detail": "요청 실패 {\"code\":400,\"message\":\"request (74256 tokens) exceeds the available context size",
+      "ms": 1767,
+      "한글": 0,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": ""
+    },
+    "ti_trap": {
+      "role": "ti",
+      "score": 0,
+      "detail": "맞음 2/2 · 오탐 3/4",
+      "ms": 16925,
+      "promptTokens": 478,
+      "genTokens": 334,
+      "prefillTps": 1064.305896655452,
+      "genTps": 20.227036027327514,
+      "finish": "stop",
+      "한글": 0.95,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "{\"matches\":[{\"cve\":\"CVE-2024-21762\",\"asset\":\"A1\",\"reason\":\"FortiOS 7.0.0 ~ 7.0.13 범위에 해당하며 현재 버전은 7.0.14로 취약 범위 밖입니다.\"},{\"cve\":\"CVE-2023-29183\",\"asset\":\"A2\",\"reason\":\"FortiWeb 7.0.0 ~ 7.0.14 범위에 해당하며 현재 버전은 7.2.5로 취약 범위 밖입니다.\"},{\"cve\":\"CVE-2024-26198\",\"asset\":\"A3\",\"reason\":\"Exchange Server 2019 CU12 ~ CU14 범위에 해당하며 현재 버전은 2019 CU14로 취약 범위 밖입니다.\"},{\"cve\":\"CVE-2024-32760\",\"asset\":\"A4\",\"reason\":\"nginx 1.25.0 ~ 1.25.3 범위에 해당하며 현재 버전은 1.25.3로 취약 범위 밖입니다.\"},{\"cve\":\"CVE-2024-10977\",\"asset\":\"A5\",\"reason\":\"PostgreSQL 15.0 ~ 15.6 범위에 해당하며 현재 버전은 16.2로 취약 범위 밖입니다.\"}]}"
+    },
+    "priority_6": {
+      "role": "analysis",
+      "score": 1,
+      "detail": "상위3 V2>V3>V4 · V1 자리 5위",
+      "ms": 4527,
+      "promptTokens": 433,
+      "genTokens": 84,
+      "prefillTps": 1150.4697530076946,
+      "genTps": 20.247413636852638,
+      "finish": "stop",
+      "한글": 1,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "{\"order\":[\n    \"V2\", \"V3\", \"V4\", \"V6\", \"V1\", \"V5\"\n], \"reason\":\"KEV 등재 여부를 우선으로 정한다. 외부 노출 여부와 자산 중요도를 고려하여 순서를 정한다. 최종적으로 CVSS 점수를 보조적으로 활용한다.\"}"
+    },
+    "report_fix": {
+      "role": "report",
+      "score": 0.7,
+      "detail": "절 6/6 · 기한 0 · 담당 0 · 한글 100%",
+      "ms": 4387,
+      "promptTokens": 209,
+      "genTokens": 86,
+      "prefillTps": 1215.8726649718137,
+      "genTps": 20.335765012340218,
+      "finish": "stop",
+      "한글": 1,
+      "한자": 0,
+      "thinkLeak": false,
+      "answer": "제목 / 대상 자산 / 위험 요약 / 조치 방법 / 조치 기한 / 담당 부서\nhr.example.co.kr(10.20.1.22) /upload.do 의 임의 파일 업로드 취약점(웹셸 업로드 가능, 확장자 차단을 대소문자 혼용으로 우회)"
+    }
+  },
+  "load": {
+    "ms": 4015
+  },
+  "error": null,
+  "finishedAt": "2026-09-04 02:40:00"
+}
