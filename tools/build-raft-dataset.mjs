@@ -57,6 +57,27 @@
 //                           기본은 **건다** — 안 걸면 타사 상용 문서 본문이 학습 재료의 system 칸에
 //                           그대로 실린다(실측: v1 방해 자리에 Tenable 사용자 가이드 본문이 있었다).
 //
+//
+// ── 3회전(2026-09-04) 인자 — 회전 2가 남긴 두 결함(복사기·꼴 불일치)을 재료에서 겨눈다 ────────
+//   회전 2 실측(65132fe6): ⑫ **베낀 글자 비율 84~87%**(A행 답이 ≤300자 인용을 200자대 답에 붙여
+//   「복사기」를 가르쳤다) · ⑨ 창작 인용이 전부 bare · 그리고 **설계 불일치** — 제품이 답에 기대하는
+//   인용 꼴은 참고 자료 블록의 번호(「[2]에 따르면」 · server/src/engine/llm.ts:191)인데 학습은
+//   「원문: "…"」을 가르쳤다. 배우는 꼴과 쓰는 꼴이 다르면 모델은 배운 것을 못 꺼낸다.
+//
+//   --quote-style <original|product>  인용 **꼴**. original(기본)=「원문: "X"」(회전 1·2 그대로 · 재현 보존).
+//                           product=「[n]에 따르면 "X′"」 — n은 **그 행의 참고 자료 블록에서** X′와 20자
+//                           겹치는 조각의 번호(1부터)다. --quote-rule strict 와 **함께** 줘야 한다.
+//   --max-quote-chars <20~1000>  X′의 길이 상한(기본 120). 문장 경계에서 줄이고, 줄인 뒤에도 그 조각과
+//                           20자 겹쳐야 한다(못 지키면 그 행을 뺀다 — 억지 번호를 안 붙인다).
+//   --max-quote-share <0~1>  인용 글자 ÷ 답 글자 상한(기본 0.35). 넘으면 인용을 더 줄이고,
+//                           **인용을 뺀 설명이 80자 미만이면 행을 뺀다**(설명 없는 인용은 복사기다).
+//   --max-copy-ratio <0~1>   행의 **베낀 글자 비율**(관문 ⑫와 같은 잣대 — gates.mjs 함수를 불러 쓴다)이
+//                           이보다 크면 그 행을 뺀다. 기본 1 = 안 거른다(옛 회전 재현). 회전 3은 0.6.
+//   ⚠ 정직하게: 제품 규약 「[n]에 따르면」은 지금 **llm.ts 주석에만** 있고 팀원 프롬프트·ragHeader에는
+//     그렇게 인용하라는 **지시문이 없다**(2026-09-04 실측 확인). 회전 3은 「프롬프트가 시킨 꼴」이 아니라
+//     「제품 코드가 번호를 매기는 꼴」을 가르친다 — 둘을 맞추려면 팀원 프롬프트에 한 줄이 들어가야 하고
+//     그건 사람이 정할 일이다. 짝 시험이 이 꼴과 llm.ts:191을 대조한다.
+//
 //   ⚠ 갈래를 고르는 것은 전부 **결정적**이다(sha12(씨앗+문답id) 앞 4자리 → 0~1). 같은 씨앗이면 같은 판이
 //     나와야 「이 판으로 구웠다」는 지문이 뜻을 갖는다. 무작위를 쓰면 재현이 안 돼 A/B가 성립하지 않는다.
 //
@@ -71,7 +92,8 @@
 // 산출: tools/team-bench/results-ladder/<name>/build-report.json
 //   (회수율 · 라이선스 제외(문서별) · 행 수 · 토큰 추정 — 숫자로 말한다)
 //
-// 표준 라이브러리만 쓴다(toolsdeps 감시).
+// 표준 라이브러리 + **이 저장소 도구**만 쓴다(toolsdeps 감시). 저장소 도구를 부르는 곳은 한 자리다:
+// 관문 ⑫의 잣대(gates.mjs 베낀글자비율여럿) — 거르는 자와 판정하는 자가 같아야 하기 때문이다.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -80,6 +102,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 // 20자 겹침·시점데이터는 **증류기 사전검사와 같은 잣대**를 쓴다(서버 learncandidates·datasethygiene의 사본).
 // 여기에 또 적으면 세 곳이 되고, 한 곳만 고쳐지는 날 「인용이 근거에서 왔나」가 조용히 갈린다.
 import { overlap20, 시점데이터 } from "./distill-precheck.mjs";
+// ★ 「베낀 글자 비율」은 **관문 ⑫의 그 함수**를 불러 쓴다(2026-09-04 · R3). 여기 다시 적으면
+//   재료를 거르는 잣대와 판정하는 잣대가 갈려, 「빌더는 통과시켰는데 게이트는 막는」 판이 생긴다.
+import { 베낀글자비율여럿 } from "./team-bench/gates.mjs";
 
 const 여기 = path.dirname(fileURLToPath(import.meta.url));
 export const 저장소 = path.resolve(여기, "..");
@@ -362,11 +387,38 @@ const 인용본문꼴 = '「?\\s*원문\\s*[:：]\\s*["“]([^"”]*)["”]\\s*�
  *   **세는 자(구성비·사전검사)와 떼는 자(인용떼기)는 이 넓은 꼴을 쓴다.**
  */
 const 인용흔적꼴 = '「?\\s*원문\\s*[:：]\\s*["“]';
-export const 인용있나 = (a) => new RegExp(인용꼴).test(String(a ?? ""));
-/** 「원문: "」 흔적이 있나 — **깨진 꼬리까지** 센다. 보고 숫자와 사전검사는 이쪽을 본다. */
-export const 인용흔적있나 = (a) => new RegExp(인용흔적꼴).test(String(a ?? ""));
-/** 답에 달린 인용의 **본문**들(완전한 꼴만) — 근거 대조에 쓴다. */
-export const 인용들뽑기 = (a) => [...String(a ?? "").matchAll(new RegExp(인용본문꼴, "g"))].map((m) => m[1]);
+
+/**
+ * **제품 규약** 인용 꼴 — 「[n]에 따르면 "…"」.
+ *
+ * ★ 정본은 server/src/engine/llm.ts:191 이다: 「번호는 1부터 — 답이 「[2]에 따르면」으로 가리킨다」.
+ *   짝 시험(raftdataset.test.ts)이 그 줄과 이 꼴을 대조한다 — 서버가 규약을 바꾸면 여기가 빨강이 된다.
+ * ⚠ **정직하게 적는다**(2026-09-04 · R3 실측): 이 규약은 지금 **코드 주석에만** 있고, 팀원 프롬프트에도
+ *   ragHeader에도 「[n]에 따르면 으로 인용하라」는 **지시문이 없다**(prompt-spec.json의 system을 실제로
+ *   훑어 확인했다 — 「따르면」·「번호」·「인용」 어느 낱말도 없다). 즉 회전 3은 「프롬프트가 시킨 꼴」이
+ *   아니라 「제품 코드가 번호를 매기는 꼴」을 가르치는 것이다. 그 둘이 같아지려면 팀원 프롬프트에
+ *   한 줄이 들어가야 하고, 그것은 사람이 정할 일이라 여기서 하지 않는다.
+ * ⚠ 제품 출구(llm.ts stripScaffoldEcho)가 이 꼴을 지우지 않는지도 확인했다 — CHUNK_REF_LINE_RE는
+ *   「참고 자료: #1, #2, #3」 꼴(우물정+콜론)이라 「[2]에 따르면」은 안 걸린다.
+ */
+const 제품인용꼴 = '\\[\\d+\\]\\s*에\\s*따르면\\s*["“][^"”]*["”]';
+const 제품인용본문꼴 = '\\[\\d+\\]\\s*에\\s*따르면\\s*["“]([^"”]*)["”]';
+const 제품인용흔적꼴 = '\\[\\d+\\]\\s*에\\s*따르면\\s*["“]';
+/** 제품 규약 인용 한 줄을 만든다 — **꼴을 짓는 곳은 여기 하나**다(여러 곳에 적으면 어긋난다). */
+export const 제품인용만들기 = (번호, 인용문) => `[${번호}]에 따르면 "${인용문}"`;
+
+// ⚠ 세는 자(인용있나·인용흔적있나·인용들뽑기)와 떼는 자(인용떼기)는 **두 꼴을 다 본다**.
+//   회전 3부터 A·D행이 제품 규약 꼴을 달기 때문이다 — 옛 꼴만 세면 사전검사가 「A행 인용 0%」라고
+//   거짓 경고를 하고, 거절 행에 새 꼴 인용이 남아도 **못 본다**(관문이 잡으려는 그 결함이 그대로 샌다).
+export const 인용있나 = (a) => new RegExp(인용꼴).test(String(a ?? "")) || new RegExp(제품인용꼴).test(String(a ?? ""));
+/** 인용 흔적이 있나 — **깨진 꼬리까지** 센다(두 꼴 다). 보고 숫자와 사전검사는 이쪽을 본다. */
+export const 인용흔적있나 = (a) =>
+  new RegExp(인용흔적꼴).test(String(a ?? "")) || new RegExp(제품인용흔적꼴).test(String(a ?? ""));
+/** 답에 달린 인용의 **본문**들(완전한 꼴만, 두 꼴 다) — 근거 대조에 쓴다. */
+export const 인용들뽑기 = (a) => [
+  ...[...String(a ?? "").matchAll(new RegExp(인용본문꼴, "g"))].map((m) => m[1]),
+  ...[...String(a ?? "").matchAll(new RegExp(제품인용본문꼴, "g"))].map((m) => m[1]),
+];
 /**
  * 인용 꼬리표를 뗀다(폐쇄형·거절 행에 쓴다). 뗀 자리는 공백 하나로 메우고 줄바꿈은 보존한다.
  * 닫는 따옴표가 없는 **깨진 꼬리**는 그 줄 끝까지 뗀다 — 줄은 넘지 않는다(뒤 문단까지 지우면 답이 사라진다).
@@ -374,7 +426,9 @@ export const 인용들뽑기 = (a) => [...String(a ?? "").matchAll(new RegExp(�
 export const 인용떼기 = (a) =>
   String(a ?? "")
     .replace(new RegExp("[ \\t]*" + 인용꼴 + "[ \\t]*", "g"), " ")
+    .replace(new RegExp("[ \\t]*" + 제품인용꼴 + "[ \\t]*", "g"), " ")
     .replace(new RegExp("[ \\t]*" + 인용흔적꼴 + '[^"”\\n]*$', "gm"), " ")
+    .replace(new RegExp("[ \\t]*" + 제품인용흔적꼴 + '[^"”\\n]*$', "gm"), " ")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
 
@@ -440,7 +494,65 @@ export function 인용근거대조(인용문, 근거텍스트들) {
   return false;
 }
 
-export function 인용붙이기(answer, 근거텍스트들) {
+/**
+ * 문장을 **문장 경계에서** 상한 이하로 줄인다(제품 규약 인용의 X′).
+ *
+ * 왜 경계인가: 아무 데서나 자르면 「…계정 및 비밀번호 추측 공」처럼 낱말 중간이 끊긴 것을 「원문」이라
+ * 내세우게 된다. 그건 인용이 아니라 훼손이다. 그래서 ① 문장 끝(마침표·「다.」·「니다.」) → ② 띄어쓰기
+ * → ③ 그래도 없으면 상한에서 자르기 순으로 **가장 뒤쪽 경계**를 고른다.
+ * ⚠ 상한 이하면 **한 글자도 안 건드린다** — 대부분의 인용이 여기로 지나간다(고르는 자가 40자 이상 중
+ *   가장 짧은 것을 이미 뽑는다).
+ */
+export function 문장경계자르기(문장, 상한) {
+  const s = String(문장 ?? "").trim();
+  const 끝 = Math.max(1, Number(상한) || 0);
+  if (s.length <= 끝) return s;
+  const 문장끝 = [...s.matchAll(/([.!?。]|다\.|니다\.)/g)].map((m) => m.index + m[0].length).filter((i) => i <= 끝);
+  if (문장끝.length) return s.slice(0, Math.max(...문장끝)).trim();
+  const 공백 = s.lastIndexOf(" ", 끝);
+  if (공백 > 0) return s.slice(0, 공백).trim();
+  return s.slice(0, 끝).trim();
+}
+
+/**
+ * 이 인용문이 **참고 자료 블록의 몇 번**에서 왔나(1부터). 못 찾으면 null.
+ *
+ * ⚠ 번호는 「정답 조각 중 몇 번째」가 아니라 **블록에 실린 순서**다 — 블록은 정답과 방해를 섞어
+ *   담으므로(섞기), 정답 목록의 자리 번호를 쓰면 답이 **방해 조각을 가리키게 된다.**
+ *   그래서 부르는 쪽이 「실제로 system에 실릴 그 배열」을 넘겨야 한다.
+ * 겹침 잣대는 overlap20(증류기·서버·관문과 같은 자) — 다듬어진 인용도 20자 이어지면 그 조각으로 본다.
+ */
+export function 블록번호찾기(인용문, 블록조각들) {
+  const q = String(인용문 ?? "").replace(/\s+/g, "");
+  if (q.length < 20) return null;
+  const 목록 = Array.isArray(블록조각들) ? 블록조각들 : [];
+  for (let i = 0; i < 목록.length; i += 1) {
+    const s = String(목록[i] ?? "").replace(/\s+/g, "");
+    if (s.length < 20) continue;
+    if (s.includes(q) || overlap20(s, q)) return i + 1;
+  }
+  return null;
+}
+
+/**
+ * 인용을 붙인다.
+ *
+ * @param answer        승인된 답(인용 꼬리가 이미 달려 있을 수 있다)
+ * @param 근거텍스트들  **정답** 조각 본문들 — 인용은 여기서만 뽑는다(방해에서 뽑으면 거짓 인용이다)
+ * @param 옵션
+ *   · 꼴 "original"(기본) = 「원문: "X"」 …… 회전 1·2가 쓴 그 꼴. **한 글자도 안 바꾼다**(재현 보존)
+ *   · 꼴 "product"        = 「[n]에 따르면 "X′"」 …… 제품 규약(llm.ts:191). 아래 셋이 함께 산다
+ *       - 블록조각들   : system에 실릴 그 배열(정답+방해, 섞은 뒤) — n을 여기서 찾는다
+ *       - 인용상한자   : X를 문장 경계에서 이 길이 이하로 줄인다(--max-quote-chars)
+ *       - 인용비중상한 : 인용 글자 ÷ 답 글자가 이보다 크면 더 줄인다(--max-quote-share)
+ *       - 설명최소     : 인용을 뺀 설명이 이보다 짧으면 **행을 버린다**(붙일 값어치가 없다)
+ * @returns { answer, 붙임, 뗌, 왜?, 인용문?, 번호? } — answer가 null이면 부르는 쪽이 그 행을 버린다
+ */
+export function 인용붙이기(answer, 근거텍스트들, 옵션 = {}) {
+  const {
+    꼴 = "original", 블록조각들 = null,
+    인용상한자 = 120, 인용비중상한 = null, 설명최소 = 80,
+  } = 옵션;
   let a = String(answer ?? "").trim();
   // ★ 이미 인용이 달려 있어도 **그냥 통과시키지 않는다**(2026-09-04 검토 적발).
   //   1회전 재료는 답의 53.7%에 이미 인용을 달고 있었는데, 그 인용이 **어디서 왔는지는 아무도 안 봤다.**
@@ -450,10 +562,16 @@ export function 인용붙이기(answer, 근거텍스트들) {
   let 뗌 = false;
   if (인용흔적있나(a)) {
     const 인용들 = 인용들뽑기(a);
-    const 흔적수 = (a.match(new RegExp(인용흔적꼴, "g")) || []).length;
-    const 깨진꼬리 = 인용들.length !== 흔적수; // 닫는 따옴표가 없는 꼬리가 섞였다
+    const 옛흔적 = (a.match(new RegExp(인용흔적꼴, "g")) || []).length;
+    const 새흔적 = (a.match(new RegExp(제품인용흔적꼴, "g")) || []).length;
+    const 깨진꼬리 = 인용들.length !== 옛흔적 + 새흔적; // 닫는 따옴표가 없는 꼬리가 섞였다
     const 근거에서왔나 = 인용들.length > 0 && 인용들.every((q) => 인용근거대조(q, 근거텍스트들));
-    if (근거에서왔나 && !깨진꼬리) return { answer: a, 붙임: false, 뗌: false };
+    // ★ 제품 규약 꼴에서는 **그대로 두는 길이 없다**(2026-09-04 · R3). 번호 [n]은 그 행의 참고 자료
+    //   블록에서만 뜻이 있는데, 블록은 행마다 다시 섞이기 때문이다 — 남의 행에서 온 번호를 통과시키면
+    //   답이 **방해 조각을 가리키는** 인용이 된다(관문은 그것을 못 본다: 인용 본문은 근거에서 왔으니까).
+    //   그래서 꼴이 product면 떼고 이 행의 블록 번호로 다시 붙인다(통계의 「그대로」가 0인 것이 정상이다).
+    const 그대로둘까 = 꼴 !== "product" && 새흔적 === 0 && 근거에서왔나 && !깨진꼬리;
+    if (그대로둘까) return { answer: a, 붙임: false, 뗌: false };
     a = 인용떼기(a);
     뗌 = true;
     if (!a) return { answer: null, 왜: "인용을 떼니 남는 글이 없음", 뗌 };
@@ -479,7 +597,34 @@ export function 인용붙이기(answer, 근거텍스트들) {
   const 짧은것부터 = (묶음) => [...묶음].sort((x, y) => x.length - y.length || (x < y ? -1 : x > y ? 1 : 0));
   const 알맞은 = 짧은것부터(최종후보.filter((s) => s.length >= 40));
   const 고를것 = 알맞은.length ? 알맞은 : 짧은것부터(최종후보);
-  return { answer: `${a} 원문: "${고를것[0]}"`, 붙임: true, 뗌 };
+  const X = 고를것[0];
+  // 회전 1·2의 꼴 — **한 글자도 안 바꾼다**(바꾸면 그 회전들을 다시 못 만든다).
+  if (꼴 !== "product") return { answer: `${a} 원문: "${X}"`, 붙임: true, 뗌, 인용문: X };
+
+  // ── 제품 규약 꼴 「[n]에 따르면 "X′"」 ────────────────────────────────
+  // ⚠ 인용을 뺀 **설명**이 너무 짧으면 그 행은 「설명 한 줄 + 인용」이라, 배우는 것이 복사기다.
+  //   줄여서 살리는 대신 **버린다** — 회전 2의 ⑫ 84~87%가 바로 그런 행들이 만든 숫자였다.
+  if (a.length < 설명최소) return { answer: null, 왜: `인용을 뺀 설명이 ${a.length}자(최소 ${설명최소}자)`, 뗌, 사유키: "설명이 짧음" };
+  let q = 문장경계자르기(X, 인용상한자);
+  let n = 블록번호찾기(q, 블록조각들);
+  // 줄인 뒤에도 **그 조각과 20자 겹쳐야** 번호가 뜻을 갖는다. 안 되면 행을 버린다(억지 번호를 안 붙인다).
+  if (n === null) return { answer: null, 왜: `줄인 인용(${q.length}자)이 참고 자료 블록의 어느 조각과도 20자 안 겹침`, 뗌, 사유키: "번호 못 찾음" };
+  if (인용비중상한 != null && 인용비중상한 > 0 && 인용비중상한 < 1) {
+    // 인용 글자 ÷ **완성된 답** 글자 ≤ 상한. 꼬리 군더더기(「[n]에 따르면 ""」 + 앞 공백)도 답에 든다.
+    for (let 회 = 0; 회 < 3; 회 += 1) {
+      const 밑 = a.length + 1 + 제품인용만들기(n, "").length;
+      const 비중 = q.length / (밑 + q.length);
+      if (비중 <= 인용비중상한 + 1e-9) break;
+      const 허용 = Math.floor((인용비중상한 * 밑) / (1 - 인용비중상한));
+      const 줄인것 = 문장경계자르기(q, 허용);
+      const n2 = 블록번호찾기(줄인것, 블록조각들);
+      if (n2 === null) {
+        return { answer: null, 왜: `인용 비중 ${(비중 * 100).toFixed(0)}%를 ${(인용비중상한 * 100).toFixed(0)}% 이하로 맞추려면 ${허용}자로 줄여야 하는데 그러면 20자 겹침이 사라짐`, 뗌, 사유키: "비중 못 맞춤" };
+      }
+      q = 줄인것; n = n2;
+    }
+  }
+  return { answer: `${a} ${제품인용만들기(n, q)}`, 붙임: true, 뗌, 인용문: q, 번호: n };
 }
 
 /**
@@ -517,7 +662,7 @@ export const 절수 = (a) => (String(a ?? "").match(/^\s*(#{1,3}\s|\d+[.)]\s|[�
  * 1회전이 남긴 보고서에는 이 표가 없어서 「전부 A행이었다」를 나중에 **데이터를 다시 읽어** 알아냈다.
  */
 export function 구성비(rows, 종류들, 옵션 = {}) {
-  const { ragHeader = "" } = 옵션;
+  const { ragHeader = "", 베낀비율들 = null } = 옵션;
   const 이름 = { A: "근거+정답", B: "방해만→거절", B2: "무근거→거절(B′)", C: "폐쇄형", D: "긴 형식" };
   const 표 = {};
   for (const k of Object.keys(이름)) 표[k] = { 뜻: 이름[k], 행: 0, 비율: 0, 인용: 0 };
@@ -583,6 +728,24 @@ export function 구성비(rows, 종류들, 옵션 = {}) {
     },
     답길이: { p50: q(0.5), p90: q(0.9), max: 길이.length ? 길이[길이.length - 1] : 0 },
     절3이상: rows.filter((r) => 절수(r.answer) >= 3).length,
+    // ★ **재료가 이미 복사기인가**(2026-09-04 · R3). 관문 ⑫가 어댑터의 답에 대고 묻는 그 질문을
+    //   구우려는 재료에 미리 던진다 — 회전 2는 이 칸이 없어서 「⑫ 84%」를 학생 탓으로 읽었다.
+    //   ⚠ 부르는 쪽이 값을 안 주면 **null(미측정)**이다 — 0으로 적으면 「안 베꼈다」는 거짓이 된다.
+    베낀비율: 베낀비율표(베낀비율들),
+  };
+}
+
+/** 행별 베낀 비율 배열 → { 대상, 평균, p90, 최대 }. 잰 값이 없으면 null(미측정). */
+export function 베낀비율표(베낀비율들) {
+  if (!Array.isArray(베낀비율들)) return null;
+  const 값들 = 베낀비율들.filter((v) => typeof v === "number" && Number.isFinite(v)).sort((a, b) => a - b);
+  if (!값들.length) return null;
+  const 자리 = Math.min(값들.length - 1, Math.floor(값들.length * 0.9));
+  return {
+    대상: 값들.length,
+    평균: Number((값들.reduce((a, b) => a + b, 0) / 값들.length).toFixed(4)),
+    p90: Number(값들[자리].toFixed(4)),
+    최대: Number(값들[값들.length - 1].toFixed(4)),
   };
 }
 
@@ -720,8 +883,9 @@ export function 시험문항목록(root = 저장소) {
  * @param 문답들  [{ id, question, answer, cites:[ref…] }]
  * @param 색인    Map<ref, { ref, text, 문서, category }>
  * @param 옵션    { 판정: (문서)=>사유|null, system, ragHeader, distractors, 씨앗, 시험,
- *                  pOracle, noEvidenceFromUncited, closedbookRatio, quoteRule, distractorAllowlist }
- * @returns { rows, 종류들, 통계 }  종류들[i]는 rows[i]의 갈래("A"|"B"|"B2"|"C")다.
+ *                  pOracle, noEvidenceFromUncited, closedbookRatio, quoteRule, distractorAllowlist,
+ *                  quoteStyle, maxQuoteChars, maxQuoteShare, maxCopyRatio }
+ * @returns { rows, 종류들, 통계, 베낀비율들 }  종류들[i]는 rows[i]의 갈래("A"|"B"|"B2"|"C")다.
  *   ⚠ 갈래를 **행 안에 넣지 않는다** — rows는 그대로 저장 창구로 나가는 몸이라, 스키마에 없는 칸을
  *     끼우면 서버 위생이 무엇을 하는지 알 수 없다. 자리 번호로 짝지어 나른다.
  */
@@ -730,6 +894,8 @@ export function 행만들기(문답들, 색인, 옵션) {
     판정, system: 팀원프롬프트, ragHeader, distractors = 1, 씨앗 = "", 시험 = new Set(),
     pOracle = 1, noEvidenceFromUncited = false, closedbookRatio = 0, quoteRule = "off",
     distractorAllowlist = true,
+    // ★ 회전 3(2026-09-04) — 인용 **꼴**과 **양**을 재료에서 정한다.
+    quoteStyle = "original", maxQuoteChars = 120, maxQuoteShare = null, maxCopyRatio = 1,
   } = 옵션;
   // ★ 방해 조각에도 허용목록을 건다(2026-09-04 결정 D2, 기본 on). 지금까지는 정답 조각만 걸러서
   //   타사 상용 문서 본문이 방해 자리로 학습 재료의 system 칸에 실려 나갔다(v1 실측: Tenable 가이드).
@@ -760,13 +926,17 @@ export function 행만들기(문답들, 색인, 옵션) {
     },
     제외: {
       "근거 없음": 0, "회수 실패": 0, "라이선스": 0, "시험 문항(사전검사)": 0, "방해 조각 없음": 0,
-      "인용 없음(strict)": 0,
+      "인용 없음(strict)": 0, "베낀 비율 초과": 0,
     },
     // strict 인용 규칙이 한 일. 「그대로」만 크면 개입이 재료에 안 닿은 것이다(2026-09-04 적발의 그 자리).
     인용규칙: {
       "그대로(근거에서 온 인용)": 0, "새로 붙임": 0, "갈아끼움(근거 밖 인용을 떼고 다시)": 0,
       "버림(근거 밖 인용·대신 붙일 문장 없음)": 0, "버림(겹치는 문장 없음)": 0,
+      "버림(설명이 짧음)": 0, "버림(번호 못 찾음)": 0, "버림(비중 못 맞춤)": 0,
     },
+    // ★ 관문 ⑫와 **같은 잣대**로 재서 넘치는 행을 버린 기록(2026-09-04 · R3).
+    //   문서별로 세는 이유: 어느 문서의 답이 복사기를 만드는지 알아야 사람이 그 문서를 손볼 수 있다.
+    베낀비율제외: { 행: 0, 상한: maxCopyRatio, 문서별: {} },
   };
   if (distractorAllowlist) {
     for (const c of 전체후보) {
@@ -774,8 +944,10 @@ export function 행만들기(문답들, 색인, 옵션) {
       if (why) 통계.방해허용목록.거른문서별[c.문서] = (통계.방해허용목록.거른문서별[c.문서] ?? 0) + 1;
     }
   }
-  const rows = [], 종류들 = [];
-  const 담기 = (종류, row) => { rows.push(row); 종류들.push(종류); };
+  const rows = [], 종류들 = [], 베낀비율들 = [];
+  // ⚠ 세 배열은 **자리 번호로 짝**이다(rows[i] · 종류들[i] · 베낀비율들[i]) — 한 곳에서만 밀어 넣어
+  //   어긋날 자리를 없앤다. 베낀 비율을 못 잰 행(답이 20자 미만 등)은 null이고, 구성비가 빼고 센다.
+  const 담기 = (종류, row, 베낀비율 = null) => { rows.push(row); 종류들.push(종류); 베낀비율들.push(베낀비율); };
   // 블록 없는 행의 system — llm.ts systemContent가 rag=null일 때 만드는 것과 **글자 단위로 같다**
   // ([systemPromptFor, null, null, null].filter(Boolean).join("\n\n") = systemPromptFor 하나).
   const 블록없는system = 팀원프롬프트;
@@ -849,25 +1021,42 @@ export function 행만들기(문답들, 색인, 옵션) {
     }
 
     // ⓐ 근거+정답
+    // ★ 블록을 **먼저** 만든다(2026-09-04 · R3). 제품 규약 인용 「[n]에 따르면」의 n은 「이 행의 참고 자료
+    //   블록에서 몇 번째 조각인가」라, 블록이 손에 없으면 번호를 붙일 수 없다. 섞기는 답과 무관한
+    //   결정적 함수라 순서를 앞당겨도 **뽑히는 조각은 한 글자도 안 바뀐다**(회전 1·2 재현 보존).
+    const 조각들 = 섞기([...정답들.map((c) => c.text), ...방해.map((c) => c.text)], 씨앗 + l.id);
     let answer = String(l.answer ?? "");
     if (quoteRule === "strict") {
-      const 결과 = 인용붙이기(answer, 정답들.map((c) => c.text));
+      const 결과 = 인용붙이기(answer, 정답들.map((c) => c.text), {
+        꼴: quoteStyle, 블록조각들: 조각들, 인용상한자: maxQuoteChars, 인용비중상한: maxQuoteShare,
+      });
       if (!결과.answer) {
         통계.제외["인용 없음(strict)"] += 1;
-        통계.인용규칙[결과.뗌 ? "버림(근거 밖 인용·대신 붙일 문장 없음)" : "버림(겹치는 문장 없음)"] += 1;
+        const 키 = 결과.사유키
+          ? `버림(${결과.사유키})`
+          : (결과.뗌 ? "버림(근거 밖 인용·대신 붙일 문장 없음)" : "버림(겹치는 문장 없음)");
+        통계.인용규칙[키] = (통계.인용규칙[키] ?? 0) + 1;
         continue;
       }
       answer = 결과.answer;
       통계.인용규칙[결과.붙임 ? (결과.뗌 ? "갈아끼움(근거 밖 인용을 떼고 다시)" : "새로 붙임") : "그대로(근거에서 온 인용)"] += 1;
     }
-    const 조각들 = 섞기([...정답들.map((c) => c.text), ...방해.map((c) => c.text)], 씨앗 + l.id);
+    // ★ 관문 ⑫와 **같은 잣대**로 이 행이 이미 복사기인지 본다 — 넘치면 안 싣는다(2026-09-04 · R3).
+    //   회전 2에서 ⑫가 84~87%였다: 학생이 복사기가 된 것이 아니라 **재료가 복사기였다.**
+    const 베낀 = 베낀글자비율여럿(answer, 정답들.map((c) => c.text));
+    if (베낀 !== null && 베낀 > maxCopyRatio + 1e-9) {
+      통계.제외["베낀 비율 초과"] += 1;
+      통계.베낀비율제외.행 += 1;
+      for (const c of 정답들) 통계.베낀비율제외.문서별[c.문서] = (통계.베낀비율제외.문서별[c.문서] ?? 0) + 1;
+      continue;
+    }
     방해노출세기();
     담기("A", {
       question: l.question, answer,
       system: [팀원프롬프트, 참고자료블록(ragHeader, 조각들)].join("\n\n"),
-    });
+    }, 베낀);
   }
-  return { rows, 종류들, 통계 };
+  return { rows, 종류들, 통계, 베낀비율들 };
 }
 
 // ── 여기서부터는 실행 경로(직접 실행할 때만 돈다) ─────────────────────────────
@@ -950,6 +1139,24 @@ async function main() {
   const NOEV = has("--noevidence-from-uncited");
   const QUOTE_RULE = String(opt("--quote-rule", "off")).trim();
   if (!["off", "strict"].includes(QUOTE_RULE)) { console.error(`--quote-rule은 off 또는 strict입니다(받은 값: ${QUOTE_RULE})`); process.exit(2); }
+  // ★ 회전 3 — 인용의 **꼴**과 **양**(2026-09-04).
+  const QUOTE_STYLE = String(opt("--quote-style", "original")).trim();
+  if (!["original", "product"].includes(QUOTE_STYLE)) { console.error(`--quote-style은 original 또는 product입니다(받은 값: ${QUOTE_STYLE})`); process.exit(2); }
+  // ⚠ 꼴만 바꾸고 규칙을 안 켜면 **아무 일도 안 일어난다** — 인용을 붙이는 자리가 strict뿐이기 때문이다.
+  //   조용히 무시하면 「product로 구웠다」고 믿은 판이 옛 꼴 그대로 나온다. 그래서 여기서 막는다.
+  if (QUOTE_STYLE === "product" && QUOTE_RULE !== "strict") {
+    console.error("--quote-style product 는 --quote-rule strict 와 함께 써야 합니다(인용을 붙이는 자리가 strict뿐입니다 — 따로 주면 꼴이 안 바뀝니다)");
+    process.exit(2);
+  }
+  const 자연수읽기 = (키, 기본) => {
+    const v = Number(opt(키, 기본));
+    if (!Number.isFinite(v) || v < 20 || v > 1000) { console.error(`${키}는 20~1000 사이 숫자여야 합니다(받은 값: ${opt(키, 기본)})`); process.exit(2); }
+    return Math.floor(v);
+  };
+  const MAX_QUOTE_CHARS = 자연수읽기("--max-quote-chars", 120);
+  const MAX_QUOTE_SHARE = 비율읽기("--max-quote-share", 0.35);
+  // 기본 1 = **안 거른다**(옛 회전을 그대로 다시 만들 수 있어야 한다). 회전 3이 0.6을 준다.
+  const MAX_COPY_RATIO = 비율읽기("--max-copy-ratio", 1);
   // ⓒ 폐쇄형과 ⓑ′ 무근거 거절은 **같은 프롬프트에 정반대 답**을 가르친다 — 기본은 막고, 사람이 판단해
   // 받아들였을 때만 이 플래그로 연다(그 사실이 보고서 「판」에 남는다).
   const ALLOW_CB = has("--allow-closedbook-conflict");
@@ -974,6 +1181,9 @@ async function main() {
       pOracle: P_ORACLE, closedbookRatio: CLOSEDBOOK, noEvidenceFromUncited: NOEV, quoteRule: QUOTE_RULE,
       longform: LONGFORM || null, allowClosedbookConflict: ALLOW_CB,
       distractorAllowlist: DISTRACTOR_ALLOWLIST, promptSpec: PROMPT_SPEC || null,
+      // 회전 3 — 인용 꼴·길이·비중과 베낀 비율 상한. 보고서 첫머리에 남겨야 「무슨 판이었나」가 산다.
+      quoteStyle: QUOTE_STYLE, maxQuoteChars: MAX_QUOTE_CHARS, maxQuoteShare: MAX_QUOTE_SHARE,
+      maxCopyRatio: MAX_COPY_RATIO,
     },
     server: SERVER, dryRun: DRY, startedAt: new Date().toISOString(),
     승인문답: 0, ref총: 0, 회수: { store: 0, file: 0, 실패: 0 }, 회수율: 0,
@@ -987,7 +1197,9 @@ async function main() {
     인용규칙: {
       "그대로(근거에서 온 인용)": 0, "새로 붙임": 0, "갈아끼움(근거 밖 인용을 떼고 다시)": 0,
       "버림(근거 밖 인용·대신 붙일 문장 없음)": 0, "버림(겹치는 문장 없음)": 0,
+      "버림(설명이 짧음)": 0, "버림(번호 못 찾음)": 0, "버림(비중 못 맞춤)": 0,
     },
+    베낀비율제외: { 행: 0, 상한: MAX_COPY_RATIO, 문서별: {} },
     행: 0, 구성: null, 토큰추정: { 합계: 0, 평균: 0, p95: 0 }, 저장: null, errors: [],
   };
 
@@ -1070,11 +1282,13 @@ async function main() {
   console.log(`[raft] 라이선스 판정: ${판정기.출처}`);
   const 시험 = 시험문항목록();
   보고.시험문항수 = 시험.size;
-  const { rows, 종류들, 통계 } = 행만들기(문답들, 색인, {
+  const { rows, 종류들, 통계, 베낀비율들 } = 행만들기(문답들, 색인, {
     판정: 판정기.판정, system: 프롬프트.system, ragHeader: 프롬프트.ragHeader,
     distractors: DISTRACTORS, 씨앗: sha12(NAME + "|" + (TOPIC || "전체")), 시험,
     pOracle: P_ORACLE, noEvidenceFromUncited: NOEV, closedbookRatio: CLOSEDBOOK, quoteRule: QUOTE_RULE,
     distractorAllowlist: DISTRACTOR_ALLOWLIST,
+    quoteStyle: QUOTE_STYLE, maxQuoteChars: MAX_QUOTE_CHARS, maxQuoteShare: MAX_QUOTE_SHARE,
+    maxCopyRatio: MAX_COPY_RATIO,
   });
   Object.assign(보고, 통계);
   console.log(
@@ -1087,13 +1301,16 @@ async function main() {
   if (LONGFORM) {
     보고.긴형식 = {
       지정: LONGFORM, 경로: 긴형식경로(LONGFORM), 읽음: 0, 실림: 0,
-      제외: { "빈 문답": 0, "시험 문항(사전검사)": 0, "인용 없음(strict)": 0 },
+      제외: { "빈 문답": 0, "시험 문항(사전검사)": 0, "인용 없음(strict)": 0, "베낀 비율 초과": 0 },
       // ⓓ가 근거 블록을 실었나 — **갈래 이름이 아니라 글**로 센다(2026-09-04 결정 D3).
       근거블록: { 있음: 0, 없음: 0 },
       인용규칙: {
         "그대로(근거에서 온 인용)": 0, "새로 붙임": 0, "갈아끼움(근거 밖 인용을 떼고 다시)": 0,
         "버림(근거 밖 인용·대신 붙일 문장 없음)": 0, "버림(겹치는 문장 없음)": 0, "뗌(근거 블록 없는 행)": 0,
+        "버림(설명이 짧음)": 0, "버림(번호 못 찾음)": 0, "버림(비중 못 맞춤)": 0,
       },
+      // A행과 **같은 상한**으로 거른다 — 갈래마다 다른 잣대를 쓰면 「어느 행이 복사기인가」가 갈래에 따라 달라진다.
+      베낀비율제외: { 행: 0, 상한: MAX_COPY_RATIO },
     };
     const 긴것들 = 긴형식읽기(LONGFORM);
     보고.긴형식.읽음 = 긴것들.length;
@@ -1112,10 +1329,17 @@ async function main() {
       if (QUOTE_RULE === "strict") {
         if (근거들.length) {
           // A행과 **같은 자**로 잰다(인용붙이기): 근거 밖 인용은 떼고 근거에서 다시 붙인다.
-          const 결과 = 인용붙이기(a0, 근거들);
+          // ⚠ D행의 블록 조각은 **근거조각뽑기가 돌려준 그 순서**가 곧 [1][2]… 번호다(참고자료블록의 역함수).
+          //   그래서 번호를 찾는 배열과 인용을 뽑는 배열이 같다 — A행처럼 방해를 따로 섞지 않는다.
+          const 결과 = 인용붙이기(a0, 근거들, {
+            꼴: QUOTE_STYLE, 블록조각들: 근거들, 인용상한자: MAX_QUOTE_CHARS, 인용비중상한: MAX_QUOTE_SHARE,
+          });
           if (!결과.answer) {
             보고.긴형식.제외["인용 없음(strict)"] += 1;
-            보고.긴형식.인용규칙[결과.뗌 ? "버림(근거 밖 인용·대신 붙일 문장 없음)" : "버림(겹치는 문장 없음)"] += 1;
+            const 키 = 결과.사유키
+              ? `버림(${결과.사유키})`
+              : (결과.뗌 ? "버림(근거 밖 인용·대신 붙일 문장 없음)" : "버림(겹치는 문장 없음)");
+            보고.긴형식.인용규칙[키] = (보고.긴형식.인용규칙[키] ?? 0) + 1;
             continue;
           }
           answer = 결과.answer;
@@ -1126,8 +1350,17 @@ async function main() {
           보고.긴형식.인용규칙["뗌(근거 블록 없는 행)"] += 1;
         }
       }
+      // ★ A행과 같은 관문 — 재료가 이미 복사기면 안 싣는다(2026-09-04 · R3).
+      //   D행의 근거는 블록 조각 전부다(정답/방해가 안 갈린다 — 바깥 파일이 그렇게 준다).
+      const 베낀 = 근거들.length ? 베낀글자비율여럿(answer, 근거들) : null;
+      if (베낀 !== null && 베낀 > MAX_COPY_RATIO + 1e-9) {
+        보고.긴형식.제외["베낀 비율 초과"] += 1;
+        보고.긴형식.베낀비율제외.행 += 1;
+        continue;
+      }
       rows.push({ question: q, answer, system });
       종류들.push("D");
+      베낀비율들.push(베낀);
       보고.긴형식.실림 += 1;
     }
     console.log(
@@ -1136,7 +1369,7 @@ async function main() {
       ` · 제외 ${JSON.stringify(보고.긴형식.제외)}`
     );
     if (QUOTE_RULE === "strict") {
-      console.log("[raft] 긴 형식 인용 규칙(strict) " + Object.entries(보고.긴형식.인용규칙).map(([k, v]) => `${k} ${v}`).join(" · "));
+      console.log(`[raft] 긴 형식 인용 규칙(strict · 꼴 ${QUOTE_STYLE}) ` + Object.entries(보고.긴형식.인용규칙).map(([k, v]) => `${k} ${v}`).join(" · "));
     }
   }
 
@@ -1155,7 +1388,7 @@ async function main() {
   // ④-3 구성비·사전검사 — **저장하기 전에** 판이 스스로를 배반하지 않는지 본다.
   // ⚠ ragHeader를 **반드시** 넘긴다 — 안 넘기면 구성비가 「전부 근거 없음」으로 보고(fail-closed)
   //   근거 블록을 실은 A·D행이 통째로 사전검사에 걸린다.
-  const 구성 = 구성비(rows, 종류들, { ragHeader: 프롬프트.ragHeader });
+  const 구성 = 구성비(rows, 종류들, { ragHeader: 프롬프트.ragHeader, 베낀비율들 });
   보고.구성 = 구성;
   보고.사전검사 = 사전검사(구성, { 폐쇄형충돌허용: ALLOW_CB });
   const 표줄 = (k, 이름) =>
@@ -1169,11 +1402,25 @@ async function main() {
     `\n  근거블록 있고 거절 아님 ${구성.인용.근거인용가능.인용}/${구성.인용.근거인용가능.행}` +
     ` · 근거블록 없음 ${구성.인용.근거블록없음.인용}/${구성.인용.근거블록없음.행}(0이라야 한다)` +
     ` · 거절행 ${구성.인용.거절행.인용}/${구성.인용.거절행.행}(0이라야 한다)` +
-    `\n  답 길이 p50 ${구성.답길이.p50} · p90 ${구성.답길이.p90} · max ${구성.답길이.max} · 3절 이상 ${구성.절3이상}행`
+    `\n  답 길이 p50 ${구성.답길이.p50} · p90 ${구성.답길이.p90} · max ${구성.답길이.max} · 3절 이상 ${구성.절3이상}행` +
+    // ★ 관문 ⑫가 어댑터에 던지는 질문을 **재료에** 먼저 던진 값이다(2026-09-04 · R3).
+    `\n  베낀 글자 비율(관문 ⑫와 같은 잣대) ${구성.베낀비율
+      ? `평균 ${(구성.베낀비율.평균 * 100).toFixed(1)}% · p90 ${(구성.베낀비율.p90 * 100).toFixed(1)}% · 최대 ${(구성.베낀비율.최대 * 100).toFixed(1)}% / ${구성.베낀비율.대상}행`
+      : "미측정(잰 행이 없다)"} · 상한 ${(MAX_COPY_RATIO * 100).toFixed(0)}%`
   );
   // strict가 **무엇을 했는지** 사람 눈에도 보인다 — 「그대로」만 크면 개입이 재료에 안 닿은 것이다.
   if (QUOTE_RULE === "strict") {
-    console.log("[raft] 인용 규칙(strict) " + Object.entries(보고.인용규칙).map(([k, v]) => `${k} ${v}`).join(" · "));
+    console.log(`[raft] 인용 규칙(strict · 꼴 ${QUOTE_STYLE}) ` + Object.entries(보고.인용규칙).map(([k, v]) => `${k} ${v}`).join(" · "));
+  }
+  // 베낀 비율로 버린 행이 있으면 **어느 문서가 범인인지** 상위 5개를 댄다 — 이름을 안 대면 사람이 못 고친다.
+  if (보고.베낀비율제외?.행) {
+    const 상위 = Object.entries(보고.베낀비율제외.문서별).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    보고.베낀비율제외.상위5 = 상위.map(([문서, n]) => ({ 문서, 행: n }));
+    console.warn(
+      `[raft] ⚠ 베낀 글자 비율이 상한(${(MAX_COPY_RATIO * 100).toFixed(0)}%)을 넘어 버린 행 ${보고.베낀비율제외.행}개` +
+      ` — 문서별 상위 5: ${상위.map(([문서, n]) => `${문서} ${n}행`).join(" · ") || "(없음)"}` +
+      ` (승인 답이 근거를 통째로 옮겨 적은 자리다 — 그 문서의 답을 사람이 다시 볼 값어치가 있다)`
+    );
   }
   for (const w of 보고.사전검사.경고) console.warn(`[raft] ⚠ ${w}`);
 

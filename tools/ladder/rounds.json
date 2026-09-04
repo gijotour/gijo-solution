@@ -64,6 +64,30 @@
       "evalHoldout": 100,
       "loraAlphaMult": 2.0,
       "왜": "회전 1이 드러낸 세 부류를 **재료 쪽에서** 한꺼번에 고치는 회전이다. ⓐ pOracle 0.8 — 다섯 행 중 하나는 정답 조각을 아예 빼서 「근거가 없으면 없다고 말하는」 행을 만든다(⑩ 88→0%의 뿌리가 「모른다」 시연 0건이었다). ⓑ noevidenceFromUncited·quoteRule strict — 인용하지 않은 자료에서 답을 짓지 못하게 하고 인용 규칙을 조인다(⑨ 「원문:」을 꼴로만 외운 자리, ⑫ 통째 복사 80%). ⓒ 긴 형식(longform-vuln-v2)을 섞어 답이 66% 짧아진 회귀(⑪)를 재료로 되민다. closedbookRatio 0은 그대로 — 근거 없이 답하는 법은 제품이 원하지 않는다. 그리고 saveEpochs·evalHoldout 100으로 **에폭 변수를 한 회전 안에서** 가른다: 체크포인트 3개를 각각 재면 「3에폭이 과했나」를 다시 굽지 않고 답할 수 있다(1회전은 5시간 20분을 굽고 마지막 것만 남겨 그 질문을 못 물었다)."
+    },
+    {
+      "id": "r3-v3",
+      "dataset": "raft-vuln-v3",
+      "agent": "normaltic",
+      "topic": "취약점",
+      "rank": 16,
+      "lr": 0.0001,
+      "epochs": 2,
+      "distractors": 2,
+      "pOracle": 0.8,
+      "quoteRule": "strict",
+      "quoteStyle": "product",
+      "maxQuoteChars": 120,
+      "maxQuoteShare": 0.35,
+      "maxCopyRatio": 0.6,
+      "noevidenceFromUncited": true,
+      "closedbookRatio": 0,
+      "longformDataset": "server/data/datasets/longform-vuln-v2.json",
+      "maxSeq": 4096,
+      "saveEpochs": true,
+      "evalHoldout": 100,
+      "loraAlphaMult": 1.0,
+      "왜": "회전 2 실측(65132fe6)이 시킨 회전이다. 닫힌 것은 그대로 두고 **남은 넷만** 겨눈다. ⓐ ⑫ 베낀 글자 비율 84~87% — A행 답이 ≤300자 인용을 200자대 답에 붙여 **복사기**를 가르쳤다. 그래서 인용을 120자·답의 35% 이하로 조이고(maxQuoteChars·maxQuoteShare), 그러고도 넘는 행은 관문 ⑫와 **같은 잣대**로 재서 뺀다(maxCopyRatio 0.6 — 게이트 상한과 같은 숫자다: 게이트가 막을 것을 재료에 넣지 않는다). ⓑ **설계 불일치** — 제품이 답에 기대하는 인용 꼴은 참고 자료 블록의 번호(「[2]에 따르면」 · server/src/engine/llm.ts:191)인데 학습은 「원문: \"…\"」을 가르쳤다. 배우는 꼴과 쓰는 꼴이 다르면 모델은 배운 것을 못 꺼낸다(quoteStyle product). ⓒ ① KEV 사실 침식이 ep1→ep2 사이에서 났고(ep1 2/3 → ep2·ep3 0/3) eval_loss도 0.4132→0.4124로 **ep2 뒤 평평**하다 — 3에폭은 얻을 것 없이 잊는 구간이라 epochs 2로 줄인다. ⓓ 용량을 더 주지 않는다: loraAlphaMult 2.0 → **1.0**. 회전 2의 알파 2배는 어댑터의 발언권을 키우는 값인데, 재료가 복사기면 그 발언권이 **복사를 더 세게** 한다(⑫ 84%·① 침식이 그 그림이다). 재료를 고치는 회전에서는 용량을 표준으로 되돌려 **변수를 하나로** 둔다. ⑨의 모집단도 이 회전부터 persona(팀원 프롬프트만)다 — 회전 2의 창작 11건이 전부 bare(프롬프트 없음)라 제품이 열지 않는 조건 때문에 관문이 빨강이었다. 바꾸지 않은 것: rank 16 · lr 1e-4 · distractors 2 · pOracle 0.8 · 긴 형식 v2 · evalHoldout 100(회전 2에서 값을 한 것들이라 건드리면 무엇이 고쳤는지 못 가른다)."
     }
   ]
 }

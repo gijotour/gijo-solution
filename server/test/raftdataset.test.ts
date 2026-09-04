@@ -14,6 +14,7 @@ import {
   시험문항목록, 행만들기,
   결정값, 거절답, 인용있나, 인용흔적있나, 인용떼기, 인용붙이기, 인용근거대조, 문장들, 긴형식경로, 긴형식읽기, 구성비, 사전검사, 절수,
   근거조각뽑기, 근거블록있나, 규격읽기,
+  제품인용만들기, 문장경계자르기, 블록번호찾기,
 } from "../../tools/build-raft-dataset.mjs";
 // 정본 판정기(사다리 ④갈래). 이름이 겹치므로 사다리 쪽에 딱지를 붙여 부른다 — 어느 잣대로 쟀는지가 늘 보이게.
 import { 허용인가, 허용목록읽기 as 사다리허용목록읽기 } from "../../tools/ladder/ladderlib.mjs";
@@ -1208,5 +1209,151 @@ describe("★ 창구·저장 관문 (소스 감시)", () => {
       .toMatch(/if \(refreshToken\) revokeRefreshToken\(refreshToken\)/);
     // ⑤ 같은 함정을 이미 넘은 짝(ask-samples)과 갈라지지 않았는가 — 이 저장소가 반복해 겪은 「두 파일이 어긋난다」.
     expect(src("tools/team-bench/ask-samples.mjs")).toContain("refreshToken: ctx.refreshToken");
+  });
+});
+
+// ── 3회전(2026-09-04 · R3) — 인용 꼴을 **제품 규약**으로, 인용의 양을 재료에서 조인다 ─────────────
+//
+// 왜 이 시험들이 있나: 회전 2 실측(65132fe6)에서 ⑫ 베낀 글자 비율이 84~87%였고, 제품이 답에 기대하는
+// 인용 꼴(참고 자료 블록의 번호 — llm.ts:191)과 학습이 가르친 꼴(「원문: "…"」)이 **달랐다.**
+// 그 둘을 고치는 코드는 「돌려 보면 그럴듯한」 부류라, 아래에서 **하나씩 값으로** 못 박는다.
+describe("★★ 제품 규약 인용 꼴 — 「[n]에 따르면 \"X′\"」", () => {
+  const 조각A = "기본 관리자 계정명을 변경하지 않고 사용할 경우 공격자에 의한 계정 및 비밀번호 추측 공격이 가능하므로 관리자 계정명을 유추하기 어려운 이름으로 변경하여 운영하여야 한다.";
+  const 조각B = "백업 매체는 외부 보관 위탁처에 월 1회 반출하며 반출 이력을 자동으로 남긴다. 반출 대장은 분기마다 점검한다.";
+  const 답 = "기본 관리자 계정명을 그대로 두면 공격자에 의한 계정 및 비밀번호 추측 공격이 가능합니다. 그래서 담당자는 유추하기 어려운 이름으로 먼저 바꾸고, 로그인 실패 잠금 정책을 함께 두는 것이 좋습니다. 계정명 변경은 서비스 영향이 작아 우선 조치로 적합합니다.";
+
+  it("★★ 꼴의 정본은 server/src/engine/llm.ts 다 — 주석이 바뀌면 여기가 먼저 빨강이 된다", () => {
+    // llm.ts ragBlock 위의 그 한 줄: 「번호는 1부터 — 답이 「[2]에 따르면」으로 가리킨다」.
+    // 제품 규약을 코드에 **두 번** 적으면 어긋난다 — 그래서 짓는 곳은 제품인용만들기 하나이고,
+    // 그것이 서버의 말과 같은지를 여기서 대조한다.
+    expect(src("server/src/engine/llm.ts"), "llm.ts가 더는 「[2]에 따르면」이라 말하지 않는다 — 규약이 바뀌었는지 확인하고 제품인용만들기를 함께 고칠 것")
+      .toContain("「[2]에 따르면」");
+    expect(제품인용만들기(2, "X")).toBe('[2]에 따르면 "X"');
+  });
+
+  it("★ 번호는 **그 행의 참고 자료 블록** 자리다 — 정답 목록의 자리가 아니다", () => {
+    // 블록은 [방해, 정답] 순서다. 정답 목록의 자리 번호(1)를 쓰면 답이 **방해 조각**을 가리킨다.
+    const r = 인용붙이기(답, [조각A], { 꼴: "product", 블록조각들: [조각B, 조각A], 인용상한자: 300, 인용비중상한: null });
+    expect(r.번호, "블록에서 정답 조각은 두 번째다").toBe(2);
+    expect(r.answer).toContain("[2]에 따르면");
+    // 블록을 뒤집으면 번호도 따라 뒤집힌다(자리에서 오는 값이라는 뜻).
+    expect(인용붙이기(답, [조각A], { 꼴: "product", 블록조각들: [조각A, 조각B], 인용상한자: 300, 인용비중상한: null }).번호).toBe(1);
+  });
+
+  it("★ 문장 경계에서 줄인다 — 낱말 중간을 끊어 「원문」이라 내세우지 않는다", () => {
+    expect(문장경계자르기("짧은 문장이다.", 120), "상한 이하면 한 글자도 안 건드린다").toBe("짧은 문장이다.");
+    const 두문장 = "앞 문장은 여기서 끝난다. 뒤 문장은 훨씬 길게 이어지며 상한을 넘어가는 대목입니다.";
+    expect(문장경계자르기(두문장, 30), "상한 안에 문장 끝이 있으면 거기서 자른다").toBe("앞 문장은 여기서 끝난다.");
+    const 한문장 = "가나다라마바사아자차카타파하 가나다라마바사아자차카타파하 가나다라마바사아자차카타파하";
+    const 잘림 = 문장경계자르기(한문장, 30);
+    expect(잘림.length, "문장 끝이 없으면 띄어쓰기 경계").toBeLessThanOrEqual(30);
+    expect(한문장.startsWith(잘림), "잘린 것은 원문의 앞토막이라야 한다(고쳐 쓰면 인용이 아니다)").toBe(true);
+    expect(잘림.endsWith("하"), "낱말 중간에서 끊기지 않는다").toBe(true);
+  });
+
+  it("★ 줄인 뒤에도 조각과 20자 겹쳐야 번호가 뜻을 갖는다 — 안 되면 **행을 버린다**", () => {
+    // 상한을 20자 밑으로 주면 겹침이 성립하지 않는다 — 억지로 [n]을 붙이지 않고 사유를 돌려준다.
+    const r = 인용붙이기(답, [조각A], { 꼴: "product", 블록조각들: [조각A], 인용상한자: 20, 인용비중상한: null });
+    expect(r.answer).toBeNull();
+    expect(r.사유키).toBe("번호 못 찾음");
+  });
+
+  it("★ 인용 비중이 상한을 넘으면 **더 줄인다** — 인용이 답을 잡아먹지 않게", () => {
+    const r = 인용붙이기(답, [조각A], { 꼴: "product", 블록조각들: [조각A], 인용상한자: 300, 인용비중상한: 0.2 });
+    expect(r.answer, "설명이 80자를 넘으므로 살아야 한다").toBeTruthy();
+    expect(r.인용문!.length / r.answer!.length, "인용 글자 ÷ 답 글자").toBeLessThanOrEqual(0.2 + 1e-9);
+    // 같은 재료를 상한 없이 붙이면 더 길다 — 「줄였다」가 실제로 일어난 일이라는 뜻이다.
+    const 안줄임 = 인용붙이기(답, [조각A], { 꼴: "product", 블록조각들: [조각A], 인용상한자: 300, 인용비중상한: null });
+    expect(안줄임.인용문!.length).toBeGreaterThan(r.인용문!.length);
+  });
+
+  it("★★ 인용을 뺀 설명이 짧으면 붙이지 않고 **행을 버린다**(설명 없는 인용은 복사기다)", () => {
+    const 짧은답 = "계정명을 바꾸는 것이 좋습니다. 공격자에 의한 계정 및 비밀번호 추측 공격이 가능합니다.";
+    expect(짧은답.length, "이 시험의 전제 — 80자 미만이다").toBeLessThan(80);
+    const r = 인용붙이기(짧은답, [조각A], { 꼴: "product", 블록조각들: [조각A], 인용상한자: 120, 인용비중상한: 0.35 });
+    expect(r.answer).toBeNull();
+    expect(r.사유키).toBe("설명이 짧음");
+  });
+
+  it("★ 거절·폐쇄형 행은 그대로다 — 이 꼴은 **인용을 붙이는 자리**에만 닿는다", () => {
+    // ⓑ·ⓑ′는 인용붙이기를 아예 안 지난다(행만들기가 거절답을 그대로 단다). 그 계약을 갈래로 확인한다.
+    const 조각 = (문서: string, 본문: string) => ({ ref: `store:${문서}#${"0".repeat(12)}`, text: 본문, 문서, category: "취약점" });
+    const 정답 = 조각("GIJO_AS_취약점관리_지침.md", 조각A);
+    const 방해 = 조각("GIJO_AS_보안담당자_실무매뉴얼.md", 조각B);
+    const 색인 = new Map([정답, 방해].map((c) => [c.ref, c]));
+    const { rows, 종류들 } = 행만들기(
+      [{ id: "a", question: "질문1", answer: 답, cites: [정답.ref] }, { id: "b", question: "질문2", answer: 답, cites: [] }],
+      색인,
+      {
+        판정: (문서: string) => (/^GIJO_/.test(문서) ? null : "허용목록 밖"),
+        system: "너는 보안 분석가다", ragHeader: RAG_BLOCK_HEADER, distractors: 1, 씨앗: "s", 시험: new Set<string>(),
+        pOracle: 0, noEvidenceFromUncited: true, quoteRule: "strict", quoteStyle: "product",
+      },
+    ) as { rows: { answer: string }[]; 종류들: string[] };
+    expect(종류들.sort()).toEqual(["B", "B2"]);
+    for (const r of rows) expect(인용흔적있나(r.answer), `거절 행에 인용이 붙었다: ${r.answer}`).toBe(false);
+  });
+
+  it("★★ 세는 자와 떼는 자가 **두 꼴을 다 본다** — 한 꼴만 보면 사전검사가 거짓말을 한다", () => {
+    const 제품꼴 = `설명입니다. ${제품인용만들기(1, "스무 글자가 넘는 아주 기다란 인용 토막입니다")}`;
+    expect(인용있나(제품꼴)).toBe(true);
+    expect(인용흔적있나(제품꼴)).toBe(true);
+    expect(인용떼기(제품꼴)).toBe("설명입니다.");
+    // 옛 꼴도 그대로 — 회전 1·2의 재료를 다시 읽을 수 있어야 한다.
+    expect(인용흔적있나('설명입니다. 원문: "옛 꼴"')).toBe(true);
+  });
+
+  it("★ 원래 꼴(original)은 **한 글자도 안 바뀐다** — 회전 1·2를 다시 만들 수 있어야 한다", () => {
+    const r = 인용붙이기(답, [조각A]);
+    expect(r.answer!.startsWith(`${답} 원문: "`)).toBe(true);
+    expect(r.answer).not.toContain("에 따르면");
+  });
+});
+
+describe("★★ 베낀 글자 비율 — 재료를 거르는 자와 판정하는 자가 **같은 함수**다", () => {
+  it("★ 관문 ⑫의 그 함수를 불러 쓴다(복제가 아니다)", async () => {
+    const g = await import("../../tools/team-bench/gates.mjs");
+    const 빌더 = fs.readFileSync(path.join(루트, "tools", "build-raft-dataset.mjs"), "utf8");
+    expect(빌더, "빌더가 잣대를 스스로 적으면 게이트와 갈라진다").toContain('from "./team-bench/gates.mjs"');
+    // 조각이 하나면 단일 판과 **같은 값**이라야 한다(두 함수가 같은 계산을 한다는 뜻).
+    const 조각 = "기본 관리자 계정명을 변경하지 않고 사용할 경우 공격자에 의한 계정 및 비밀번호 추측 공격이 가능함";
+    const 답 = `앞말입니다. ${조각} 뒷말입니다.`;
+    expect(g.베낀글자비율여럿(답, [조각])).toBe(g.베낀글자비율(답, 조각));
+    // 조각이 여럿이면 **덮인 넓이를 합친다** — 하나씩 잰 최댓값보다 크거나 같다.
+    const 조각2 = "로그인 실패 잠금 정책을 함께 두는 것이 좋으며 계정명 변경은 서비스 영향이 작다";
+    const 답2 = `${조각.slice(0, 30)} 그리고 ${조각2.slice(0, 30)} 입니다.`;
+    const 합 = g.베낀글자비율여럿(답2, [조각, 조각2])!;
+    expect(합).toBeGreaterThan(Math.max(g.베낀글자비율(답2, 조각)!, g.베낀글자비율(답2, 조각2)!));
+  });
+
+  it("★★ 상한을 넘는 행은 **재료에 안 싣는다** — 문서별로 세어 범인을 댄다", () => {
+    const 긴조각 = "기본 관리자 계정명을 변경하지 않고 사용할 경우 공격자에 의한 계정 및 비밀번호 추측 공격이 가능하므로 관리자 계정명을 유추하기 어려운 이름으로 변경하여 운영하여야 한다.";
+    const 조각 = (문서: string, 본문: string) => ({ ref: `store:${문서}#${"0".repeat(12)}`, text: 본문, 문서, category: "취약점" });
+    const 정답 = 조각("GIJO_AS_취약점관리_지침.md", 긴조각);
+    const 방해 = 조각("GIJO_AS_보안담당자_실무매뉴얼.md", "백업 매체는 외부 보관 위탁처에 월 1회 반출하며 반출 이력을 자동으로 남긴다.");
+    const 색인 = new Map([정답, 방해].map((c) => [c.ref, c]));
+    const 기본 = {
+      판정: (문서: string) => (/^GIJO_/.test(문서) ? null : "허용목록 밖"),
+      system: "너는 보안 분석가다", ragHeader: RAG_BLOCK_HEADER, distractors: 1, 씨앗: "s", 시험: new Set<string>(),
+    };
+    // 답이 조각을 통째로 게워 낸 행 — 관문 ⑫가 「통째 복사」라 부르는 그것이다.
+    const 복사기 = [{ id: "a", question: "질문", answer: 긴조각, cites: [정답.ref] }];
+    const 안거름 = 행만들기(복사기, 색인, 기본) as { rows: unknown[]; 베낀비율들: (number | null)[] };
+    expect(안거름.rows, "기본(상한 1)은 거르지 않는다 — 옛 회전 재현이 깨지면 안 된다").toHaveLength(1);
+    expect(안거름.베낀비율들[0]).toBeGreaterThan(0.9);
+
+    const 거름 = 행만들기(복사기, 색인, { ...기본, maxCopyRatio: 0.6 }) as {
+      rows: unknown[]; 통계: { 제외: Record<string, number>; 베낀비율제외: { 행: number; 문서별: Record<string, number> } };
+    };
+    expect(거름.rows).toHaveLength(0);
+    expect(거름.통계.제외["베낀 비율 초과"]).toBe(1);
+    expect(거름.통계.베낀비율제외.문서별["GIJO_AS_취약점관리_지침.md"], "어느 문서가 복사기를 만드는지 이름을 대야 사람이 고친다").toBe(1);
+  });
+
+  it("★ 구성비 표가 평균·p90을 함께 낸다 — 값을 안 주면 **미측정(null)**이지 0이 아니다", () => {
+    const rows = [{ question: "q", answer: "a", system: "s" }];
+    expect(구성비(rows, ["A"], { ragHeader: RAG_BLOCK_HEADER }).베낀비율, "안 주면 미측정").toBeNull();
+    const 표 = 구성비(rows, ["A"], { ragHeader: RAG_BLOCK_HEADER, 베낀비율들: [0.2] }).베낀비율;
+    expect(표).toEqual({ 대상: 1, 평균: 0.2, p90: 0.2, 최대: 0.2 });
   });
 });

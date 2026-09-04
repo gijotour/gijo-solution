@@ -8,12 +8,18 @@
 //   문항·요청 조건(temperature 0 · max_tokens 900 · cache_prompt false · 워밍업 1회 버림)은
 //   **한 글자도 안 바꿨다** — 바꾸면 v3 회전(samples-base/lora/prompt.json)과 못 견준다.
 //
-// ■ 왜 조건이 셋인가 — RAFT가 가르치려는 것을 재려면 근거를 **줘 봐야** 안다
+// ■ 왜 조건이 넷인가 — RAFT가 가르치려는 것을 재려면 근거를 **줘 봐야** 안다
 //   지금까지의 표본은 전부 「맨 질문」이었다. RAFT형 학습의 목적은 「섞인 자료에서 골라 인용하기」인데,
 //   근거를 한 번도 안 준 채로 재고 있었다 — 목적을 재는 관문이 0개였다는 뜻이다(2026-09-04 정찰).
-//     · grounded          : 팀원 프롬프트 + 참고자료([정답 조각, 방해 조각]) → **인용하는가**(관문 ⑧)
+//     · grounded          : 팀원 프롬프트 + 참고자료([정답 조각, 방해 조각]) → **인용하는가**(관문 ⑧⑫)
 //     · distractor-only   : 팀원 프롬프트 + 참고자료([방해 조각])            → **없다고 말하는가**(관문 ⑩)
-//     · bare              : 맨 질문(지금까지의 꼴, 대조군)                    → **지어내는가**(관문 ⑨)
+//     · persona           : 팀원 프롬프트만(참고자료 없음)                   → **지어내는가**(관문 ⑨)
+//     · bare              : 맨 질문(지금까지의 꼴, 대조군)                    → 참고값(⑤에는 들어간다)
+//   ★ persona가 왜 생겼나(2026-09-04 · R3 · 회전 2 실측): ⑨에 걸린 창작 11건이 **전부 bare**였고
+//     팀원 프롬프트만 준 조건은 0건이었다. 제품은 프롬프트 없이 모델을 부르지 않으므로, 그 빨강은
+//     「제품에 없는 조건」 때문이었다 — 고칠 수 없는 빨강은 관문이 아니라 벽이다. 그래서 제품이 실제로
+//     여는 자리(RAG가 비어 rag=null인 순간 = 팀원 프롬프트만)를 조건으로 세운다. kev-probe의
+//     `prompt` 라벨과 **같은 조건**이라 두 파일의 숫자를 한 줄에 놓고 읽을 수 있다.
 //   ⚠ grounded의 조각 순서는 [정답, 방해] 고정이다. 학습 쪽(행만들기)은 섞지만 여기서는 **재는 자**라
 //     회전마다 같은 자리여야 베이스와 견줄 수 있다 — 「맨 앞이 정답」을 배웠는지는 이 잣대가 아니라
 //     distractor-only(관문 ⑩)가 가른다.
@@ -55,8 +61,13 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 
-/** 조건 세 가지 — 이름은 결과 행의 `mode`에 그대로 적힌다(나중에 파일만 보고 가릴 수 있게). */
-export const MODES = ["grounded", "distractor-only", "bare"];
+/** 조건 네 가지 — 이름은 결과 행의 `mode`에 그대로 적힌다(나중에 파일만 보고 가릴 수 있게). */
+export const MODES = ["grounded", "distractor-only", "bare", "persona"];
+
+/** system에 팀원 프롬프트가 실리는 조건 — bare만 아니다(persona는 프롬프트만, 근거 블록은 없다). */
+export const 프롬프트필요 = (mode) => mode !== "bare";
+/** 근거 조각(정답·방해)이 실리는 조건 — grounded·distractor-only 둘뿐이다. */
+export const 조각필요 = (mode) => mode !== "bare" && mode !== "persona";
 
 /** 지문 12자 — 프롬프트 원문 대신 이것만 남긴다(원문은 관리자 전용 값이라 파일에 안 적는다). */
 export const sha12 = (s) => crypto.createHash("sha1").update(String(s ?? "")).digest("hex").slice(0, 12);
@@ -72,14 +83,23 @@ export const 한자수 = (s) => (String(s).match(/[一-鿿]/g) || []).length;
 export function 조각들(문항, mode) {
   const chunk = String(문항?.chunk ?? "");
   const dis = String(문항?.distractor ?? "");
-  if (mode === "bare") return [];
+  // bare·persona는 조각을 안 쓴다 — 둘의 차이는 **팀원 프롬프트가 실리느냐**이고, 그것은 system만들기가 가른다.
+  if (mode === "bare" || mode === "persona") return [];
   if (mode === "grounded") return chunk ? (dis ? [chunk, dis] : [chunk]) : null;
   if (mode === "distractor-only") return dis ? [dis] : null;
   throw new Error(`모르는 조건: ${mode}`);
 }
 
-/** system 문자열 만들기 — 학습(행만들기)이 쓰는 조립과 같은 꼴: [팀원프롬프트, 참고자료블록].join("\n\n") */
-export function system만들기(팀원프롬프트, ragHeader, 조각) {
+/**
+ * system 문자열 만들기 — 학습(행만들기)이 쓰는 조립과 같은 꼴: [팀원프롬프트, 참고자료블록].join("\n\n")
+ *
+ * ★ persona(2026-09-04 · R3)는 **팀원 프롬프트만** 싣는다. 학습 쪽에서 이 꼴은 `블록없는system`
+ *   (build-raft-dataset.mjs 행만들기 — ⓑ′·ⓒ 행이 쓰는 그것)이고, 제품에서는 **RAG가 빈 순간**의 꼴이다
+ *   (llm.ts systemContent가 rag=null일 때 = systemPromptFor 하나). 관문 ⑨가 세야 하는 자리가 여기다 —
+ *   bare(프롬프트조차 없음)는 제품이 열지 않는 조건이라 참고값으로 내렸다.
+ */
+export function system만들기(팀원프롬프트, ragHeader, 조각, mode = "") {
+  if (mode === "persona") return String(팀원프롬프트 ?? "");
   if (!조각 || !조각.length) return "";
   return [팀원프롬프트, 참고자료블록(ragHeader, 조각)].join("\n\n");
 }
@@ -173,9 +193,12 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
   const REQ_MS = Number(process.env.REQ_MS || 600_000);
 
   const qs = JSON.parse(fs.readFileSync(QFILE, "utf8"));
-  const 근거필요 = MODE !== "bare";
+  // ⚠ 「프롬프트가 필요한가」와 「근거 조각이 필요한가」는 **다른 물음**이다(persona가 그 사이에 있다).
+  //   예전에는 한 변수(근거필요)가 둘을 겸했다 — persona를 그 꼴에 얹으면 팀원 프롬프트가 조용히 빠진다.
+  const 프롬프트있음 = 프롬프트필요(MODE);
+  const 조각있음 = 조각필요(MODE);
   // 규격 파일이 있으면 서버에 안 붙는다(gb10에서 돌 때의 길) — 없으면 창구로 간다.
-  const ctx = 근거필요 ? (SPEC ? await 규격으로프롬프트(SPEC) : await 프롬프트받기(SERVER, AGENT)) : null;
+  const ctx = 프롬프트있음 ? (SPEC ? await 규격으로프롬프트(SPEC) : await 프롬프트받기(SERVER, AGENT)) : null;
   const 팀원지문 = ctx ? sha12(ctx.system) : "";
   if (ctx) console.log(`근거 꼴 출처: ${ctx.출처}`);
 
@@ -231,12 +254,12 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
       console.log(`${i + 1}/${qs.length} 건너뜀(${MODE}: 조각 없음)`);
       continue;
     }
-    const system = system만들기(ctx?.system, ctx?.ragHeader, 조각);
+    const system = system만들기(ctx?.system, ctx?.ragHeader, 조각, MODE);
     const a = await ask(system, 문항.question);
     out.push({
       ...공통,
       chunk: MODE === "grounded" ? 문항.chunk : "",
-      distractor: 근거필요 ? 문항.distractor : "",
+      distractor: 조각있음 ? 문항.distractor : "",
       // ⚠ bare 조건은 system이 **없다** — 그런데 sha12("")를 적으면 `da39a3ee5e6b`(빈 문자열의 sha1)이
       //   찍혀, 게이트 표(gates.mjs 표만들기)가 그것을 **진짜 프롬프트 지문처럼** 늘어놓는다.
       //   지문을 대조해 「같은 조건이었나」를 가리자는 것이 이 칸의 목적인데, 「없음」이 실재하는 지문처럼

@@ -14,7 +14,7 @@
 #        → results-ladder/day2/<회전>/probe-v2/{samples-*,kev,gate.md} — 옛 결과를 덮지 않는다.
 #   베이스 대조(어댑터 없이 한 번만):
 #   bash tools/ladder/day2-train.sh --baseline-probe [--port 8093]
-#        → results-ladder/baseline/{samples-grounded,samples-distractor-only,samples-bare,kev}.json
+#        → results-ladder/baseline/{samples-grounded,samples-distractor-only,samples-bare,samples-persona,kev}.json
 #          관문 ①(KEV 하락 0)·⑤(잘림 증가 0)·⑧(근거 인용)은 **이 파일들이 있어야** 잰다(없으면 미측정=불합격).
 #
 # ■ 에폭마다 재기 (회전 설정에 `saveEpochs: true` 가 있을 때)
@@ -165,7 +165,10 @@ run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
     ladder_log "   근거 꼴: 창구(GET /api/learnloop/raft/prompt) — 규격 파일이 없다($PROMPT_SPEC)"
     ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
   fi
-  for mode in grounded distractor-only bare; do
+  # ★ persona(2026-09-04 · R3) — 팀원 프롬프트만 주고 근거 블록은 안 준다. 관문 ⑨의 모집단이
+  #   bare(프롬프트조차 없음)에서 이쪽으로 옮겨졌다: 제품은 프롬프트 없이 모델을 부르지 않는다.
+  #   bare도 계속 잰다 — 관문 ⑤(잘림)가 그 자리를 베이스와 짝지어 보고, 표의 참고값으로도 쓰인다.
+  for mode in grounded distractor-only bare persona; do
     if ladder_have "$dir/samples-$mode.json"; then
       ladder_log "   표본[$mode] 건너뜀 — 이미 있다"
       continue
@@ -190,7 +193,7 @@ run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
     const spec = specPath ? ` --prompt-spec ${specPath}` : "";
     fs.writeFileSync(out, JSON.stringify({
       누구: who, 잰때: new Date().toISOString(), port: Number(port), server, agent,
-      표본: ["grounded", "distractor-only", "bare"].map((m) => `ask-samples.mjs samples-${m}.json --mode ${m} --server ${server} --agent ${agent}${spec}`),
+      표본: ["grounded", "distractor-only", "bare", "persona"].map((m) => `ask-samples.mjs samples-${m}.json --mode ${m} --server ${server} --agent ${agent}${spec}`),
       kev: `kev-probe.mjs kev.json --server ${server} --agent ${agent}${spec}`,
       // 근거 꼴을 어디서 받았나 — 규격 파일이면 그 사본이 이 폴더에 함께 있다(prompt-spec.json).
       근거꼴출처: spec ? "prompt-spec.json(이 폴더의 사본)" : "창구 GET /api/learnloop/raft/prompt",
@@ -201,9 +204,9 @@ run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
 }
 
 # ── 베이스 대조 한 번짜리 ────────────────────────────────────────────
-# 어댑터 **없이** 베이스 모델을 띄워 같은 3조건 + KEV를 돌린다. 관문 ①·⑧이 견줄 상대를 만드는 단계다.
+# 어댑터 **없이** 베이스 모델을 띄워 같은 4조건 + KEV를 돌린다. 관문 ①·⑧이 견줄 상대를 만드는 단계다.
 if [ "$BASELINE_PROBE" -eq 1 ]; then
-  ladder_log "베이스 대조 — 어댑터 없이 3조건 + KEV (→ $BASELINE_DIR)"
+  ladder_log "베이스 대조 — 어댑터 없이 4조건 + KEV (→ $BASELINE_DIR)"
   # ★ env는 **두뇌를 띄우기 전에** 본다(2026-09-04 검토관 적발). ladder_need_env는 return이 아니라
   #   `exit 3` 으로 셸을 끝내므로, 서버를 먼저 띄우면 그 exit에서 8093에 두뇌가 그대로 남았다 —
   #   이 파일이 스스로 「8093에 두뇌를 남기지 않는다」고 적어 둔 바로 그 사고다. EXIT trap과 이중으로 막는다.
@@ -257,6 +260,11 @@ BASE_OVERRIDE="$(read_round base)"
 #   왜 빈 값을 안 넘기나: r1-base를 다시 돌렸을 때 같은 명령이 나와야 「재현」이다.
 PORACLE="$(read_round pOracle)"
 QUOTE_RULE="$(read_round quoteRule)"
+# ★ 3회전 칸(2026-09-04) — 인용 꼴·길이·비중과 베낀 비율 상한. 빈 값이면 빌더 기본값이 그대로 산다.
+QUOTE_STYLE="$(read_round quoteStyle)"
+MAX_QUOTE_CHARS="$(read_round maxQuoteChars)"
+MAX_QUOTE_SHARE="$(read_round maxQuoteShare)"
+MAX_COPY_RATIO="$(read_round maxCopyRatio)"
 NOEV="$(read_round noevidenceFromUncited)"
 CLOSEDBOOK="$(read_round closedbookRatio)"
 LONGFORM="$(read_round longformDataset)"
@@ -277,6 +285,7 @@ fi
 
 ladder_log "2일차 회전 $ROUND — 데이터셋 $DATASET · rank $RANK · lr $LR · epochs $EPOCHS · 방해 $DISTRACTORS · maxSeq $MAXSEQ"
 ladder_log "  재료 옵션 — pOracle ${PORACLE:-(기본)} · quoteRule ${QUOTE_RULE:-(기본)} · 미인용거절 ${NOEV:-(기본)} · closedbook ${CLOSEDBOOK:-(기본)} · 긴형식 ${LONGFORM:-(없음)}"
+ladder_log "  인용 옵션 — quoteStyle ${QUOTE_STYLE:-(기본 original)} · maxQuoteChars ${MAX_QUOTE_CHARS:-(기본)} · maxQuoteShare ${MAX_QUOTE_SHARE:-(기본)} · maxCopyRatio ${MAX_COPY_RATIO:-(기본 1=안 거름)}"
 ladder_log "  학습 옵션 — saveEpochs ${SAVE_EPOCHS:-(기본)} · evalHoldout ${EVAL_HOLDOUT:-(기본)} · loraAlphaMult ${ALPHA_MULT:-(기본)}"
 ladder_log "  설정 사본 → $OUTDIR/round.json"
 
@@ -303,6 +312,10 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
       ${PORACLE:+--p-oracle "$PORACLE"} \
       ${CLOSEDBOOK:+--closedbook-ratio "$CLOSEDBOOK"} \
       ${QUOTE_RULE:+--quote-rule "$QUOTE_RULE"} \
+      ${QUOTE_STYLE:+--quote-style "$QUOTE_STYLE"} \
+      ${MAX_QUOTE_CHARS:+--max-quote-chars "$MAX_QUOTE_CHARS"} \
+      ${MAX_QUOTE_SHARE:+--max-quote-share "$MAX_QUOTE_SHARE"} \
+      ${MAX_COPY_RATIO:+--max-copy-ratio "$MAX_COPY_RATIO"} \
       ${LONGFORM:+--longform-dataset "$LONGFORM"} \
       $NOEV_FLAG ) \
     2>&1 | tee "$OUTDIR/build.log"
@@ -428,12 +441,12 @@ run_variant() {
     fi
   fi
 
-  # ── ④-2 표본 3조건 + KEV — **사슬이 직접 만든다** ──────────────────
+  # ── ④-2 표본 4조건 + KEV — **사슬이 직접 만든다** ──────────────────
   # ⚠ 2026-09-04 수리: 예전에는 「$OUTDIR/samples.json 이 있으면 게이트에 넘긴다」였다. 즉 남이 손으로
   #   만들어 둔 파일이 있을 때만 관문 ①(KEV)이 살아 있었고, 없으면 조용히 빠졌다. 관문이 「있을 때만」
   #   도는 것은 관문이 아니다 — 만드는 것까지 사슬 안으로 들여온다.
   if [ "$ONLY_GATE" -eq 0 ]; then
-    ladder_log "④-2 [$label] 표본 3조건 + KEV → $probedir"
+    ladder_log "④-2 [$label] 표본 4조건 + KEV → $probedir"
     # ★ ④의 run.mjs·run-r2.mjs는 **자기가 띄운 서버를 회차 끝에 죽인다**(run.mjs:106 finally).
     #   그래서 여기서 같은 어댑터를 얹어 **다시 띄운다** — 안 띄우면 하네스가 ECONNREFUSED로 죽고
     #   (exit 8), 관문 ⑧·⑩은 회전 갈래에서 영영 미측정이 된다(2026-09-04 검토관 적발).
@@ -454,7 +467,7 @@ run_variant() {
   ladder_log "⑤ [$label] 게이트"
   local GATE_ARGS=(--easy "$outdir/easy/$model_id.json" --hard "$outdir/hard/$model_id.json" --out "$probedir" --label "$label")
   local mode
-  for mode in grounded distractor-only bare; do
+  for mode in grounded distractor-only bare persona; do
     [ -s "$probedir/samples-$mode.json" ] && GATE_ARGS+=("--samples-$mode" "$probedir/samples-$mode.json")
   done
   # 옛 회전이 남긴 samples.json(맨 질문 한 벌)이 있으면 참고 표본으로 함께 넘긴다.
@@ -469,6 +482,9 @@ run_variant() {
   [ -s "$BASELINE_DIR/samples-grounded.json" ] && GATE_ARGS+=(--baseline-samples "$BASELINE_DIR/samples-grounded.json")
   [ -s "$BASELINE_DIR/samples-distractor-only.json" ] && GATE_ARGS+=(--baseline-samples-distractor-only "$BASELINE_DIR/samples-distractor-only.json")
   [ -s "$BASELINE_DIR/samples-bare.json" ] && GATE_ARGS+=(--baseline-samples-bare "$BASELINE_DIR/samples-bare.json")
+  # ★ persona의 베이스는 관문이 **안 쓴다**(⑨는 절대 0건 기준이라 견줄 상대가 필요 없다).
+  #   그래도 넘기는 이유: 표의 참고 줄에 「베이스도 같은 조건으로 쟀다」가 남아야 사람이 두 숫자를 나란히 읽는다.
+  [ -s "$BASELINE_DIR/samples-persona.json" ] && GATE_ARGS+=(--baseline-samples-persona "$BASELINE_DIR/samples-persona.json")
   if [ ! -s "$BASELINE_DIR/kev.json" ] || [ ! -s "$BASELINE_DIR/samples-grounded.json" ]; then
     ladder_log "⚠ 베이스 대조 파일이 없다 — 먼저 bash tools/ladder/day2-train.sh --baseline-probe 를 한 번 돌려라(관문 ①⑤⑧이 미측정으로 막힌다)"
   fi

@@ -23,7 +23,8 @@
 //   ⑥ hangul         한글 비율 평균이 기준선 이상
 //   ⑦ tps_drop       생성 속도 중앙값이 기준선 대비 10% 넘게 안 떨어진다
 //   ⑧ grounded_cite  **근거를 준** 표본에서 정답 조각을 20자 그대로 옮겨 적는 비율이 베이스 이상
-//   ⑨ no_fake_quote  근거를 **안 준** 자리(bare 표본·KEV)에서 「원문:」을 지어내지 않는다(0건)
+//   ⑨ no_fake_quote  근거를 **안 준** 자리(persona 표본·KEV prompt)에서 인용을 지어내지 않는다(0건)
+//                    — 「원문:」과 제품 규약 「[n]에 따르면」 **둘 다** 센다
 //   ⑩ no_evidence_says_so  **방해 조각만** 준 자리에서 「자료에 없다」고 말하는 비율이 기준 이상
 //   ⑪ len_drop       스키마 강제가 없는 서술 과제의 생성 토큰 중앙값이 기준선 대비 40% 넘게 안 줄어든다
 //   ⑫ copy_ratio     근거를 준 답이 **통째 복사**가 아니다(베낀 글자 평균 60% 이하 · 100% 0건)
@@ -40,6 +41,13 @@
 //   ⑧(근거 인용)이 50%→100%로 올랐는데, 같은 답들의 **베낀 글자 비율**은 20%→80%였고 통째 복사
 //   (100%)가 2건 있었다. ⑧은 「20자 창이 하나라도 남았는가」만 묻기 때문에 **통째로 베껴도 만점**이다.
 //   근거를 옮겨 적는 것과 근거를 통째로 게워 내는 것은 다른 일이라, 둘을 함께 읽는 자를 둔다.
+//
+// ■ ⑨의 모집단은 왜 bare → persona로 바뀌었나 (2026-09-04 · 회전 2 실측)
+//   회전 2에서 ⑨에 걸린 「원문:」 창작 11건이 **전부 bare**(시스템 프롬프트 없음)였고, 팀원 프롬프트만
+//   준 조건(KEV prompt)은 **0건**이었다. 제품은 팀원 프롬프트 없이 모델을 부르지 않으므로, ⑨는
+//   「제품에 없는 조건」 때문에 빨강이었다 — 고칠 수 없는 빨강은 관문이 아니라 벽이다(①이 절대 3/3을
+//   참고값으로 내린 그 논리 그대로). 그래서 모집단을 **persona(팀원 프롬프트만 · 근거 블록 없음)**로
+//   옮기고 bare는 참고값으로 표에 남긴다. persona 표본이 없으면 **미측정=불합격**이다.
 //
 // ■ ⑧⑨⑩⑪은 왜 뒤늦게 생겼나 (2026-09-04)
 //   r1-base 회전을 뜯어 보니 **RAFT의 목적을 재는 관문이 0개**였다. 학습 재료 1,297행이 전부
@@ -58,9 +66,9 @@
 // 사용:
 //   node tools/team-bench/gates.mjs --easy <r1결과.json> --hard <r2결과.json> \
 //        [--samples <samples.json>] [--kev <kev.json>] [--out <디렉터리>] [--include-needle64k]
-//        [--samples-grounded …] [--samples-distractor-only …] [--samples-bare …]
+//        [--samples-grounded …] [--samples-distractor-only …] [--samples-bare …] [--samples-persona …]
 //        [--baseline-samples <베이스 grounded 표본>] [--kev-base <베이스 kev.json>]
-//        [--baseline-samples-distractor-only …] [--baseline-samples-bare …]
+//        [--baseline-samples-distractor-only …] [--baseline-samples-bare …] [--baseline-samples-persona …]
 //        [--baseline-easy …] [--baseline-hard …] [--kev-label prompt] [--label 회차이름]
 //   기본 기준선: tools/team-bench/results-ladder/baseline/r1-qwen3-14b.json · r2-qwen3-14b.json
 //   나가는 코드: 0=합격 · 1=불합격 · 2=쓰는 법 틀림
@@ -313,16 +321,36 @@ export function 근거인용률(samples) {
  * 조각이나 답이 20자 미만이면 null(=모름) — 애초에 창이 안 들어간다.
  */
 export function 베낀글자비율(text, chunk) {
+  return 베낀글자비율여럿(text, [chunk]);
+}
+
+/**
+ * 같은 잣대의 **여러 조각 판** — 한 답이 근거 조각 **여럿**을 베꼈을 때 덮인 넓이를 합쳐 잰다.
+ *
+ * ★ 왜 있나(2026-09-04 · R3): 학습 재료를 굽는 쪽(build-raft-dataset.mjs)은 한 행에 정답 조각이
+ *   여럿 실린다 — 조각 하나씩 재서 가장 큰 값을 쓰면, 두 조각을 반씩 베낀 행이 「50%」로 보인다.
+ *   재는 자를 저쪽에 다시 적으면 관문 ⑫와 어긋나므로(이 저장소가 반복해 겪은 그것) **여기 한 곳**에
+ *   두고 저쪽이 불러 쓴다.
+ * ⚠ 조각이 하나면 위 `베낀글자비율`과 **글자 그대로 같은 값**이라야 한다(짝 시험이 그것을 본다) —
+ *   그래서 단일 판이 이 함수를 부르게 두고, 계산은 여기 하나뿐이다.
+ * 답이 20자 미만이거나 20자 넘는 조각이 하나도 없으면 null(=모름).
+ */
+export function 베낀글자비율여럿(text, chunks) {
   const a = String(text ?? "").replace(/\s+/g, "");
-  const s = String(chunk ?? "").replace(/\s+/g, "");
-  if (a.length < 20 || s.length < 20) return null;
+  if (a.length < 20) return null;
+  const 조각들 = (Array.isArray(chunks) ? chunks : [chunks])
+    .map((c) => String(c ?? "").replace(/\s+/g, ""))
+    .filter((s) => s.length >= 20);
+  if (!조각들.length) return null;
   const 덮임 = new Array(a.length).fill(false);
-  for (let i = 0; i + 20 <= s.length; i += 1) {
-    const w = s.slice(i, i + 20);
-    let from = 0, at;
-    while ((at = a.indexOf(w, from)) !== -1) {
-      for (let k = at; k < at + 20; k++) 덮임[k] = true;
-      from = at + 1;
+  for (const s of 조각들) {
+    for (let i = 0; i + 20 <= s.length; i += 1) {
+      const w = s.slice(i, i + 20);
+      let from = 0, at;
+      while ((at = a.indexOf(w, from)) !== -1) {
+        for (let k = at; k < at + 20; k++) 덮임[k] = true;
+        from = at + 1;
+      }
     }
   }
   return 덮임.filter(Boolean).length / a.length;
@@ -358,6 +386,17 @@ export function 자료없음비율(samples) {
 export const 원문꼬리표 = /원문\s*[:：]/;
 
 /**
+ * **제품 규약** 꼬리표 「[n]에 따르면」 — 회전 3부터 재료가 가르치는 인용 꼴이다.
+ *
+ * ★ 왜 함께 잡나(2026-09-04 · R3): 회전 3은 「원문: "…"」을 「[n]에 따르면 "…"」으로 바꿔 가르친다
+ *   (제품 규약 = server/src/engine/llm.ts:191). 그런데 ⑨가 옛 꼴만 보면, **새 꼴로 지어내는**
+ *   바로 그 회귀 앞에서 관문이 초록이 된다 — 잣대를 안 옮기면 관문은 「고쳐서 안 보이게 된 것」과
+ *   「정말 사라진 것」을 못 가른다. 근거를 **안 준** 자리에서는 가리킬 [n]이 없으므로, 이 꼴이
+ *   나오는 것 자체가 지어낸 것이다(옛 꼴과 같은 논리·같은 처분).
+ */
+export const 제품인용꼬리표 = /\[\d+\]\s*에\s*따르면/;
+
+/**
  * 따옴표로 감싼 20자 이상 토막을 자리와 함께 뽑는다.
  * 문자 종류는 distill-precheck의 `인용뺀설명`이 쓰는 그것에 「」를 더했다(우리 답이 실제로 쓰는 꼴).
  * 길이 20자는 overlap20이 볼 수 있는 최소 창이라 그 아래는 애초에 대조할 수 없다.
@@ -382,7 +421,8 @@ export const 인용표식 = /(원문|인용|출처|근거|자료|문서)[^"“�
 
 /**
  * 한 답에서 **지어낸 인용**을 찾는다. 사유 문자열 배열을 돌려준다(0개면 깨끗).
- *   ⓐ 「원문:」 꼬리표가 있다 — 근거를 안 준 자리에서는 원문이라는 것이 있을 수 없다.
+ *   ⓐ 「원문:」 또는 **제품 규약** 「[n]에 따르면」 꼬리표가 있다 — 근거를 안 준 자리에서는
+ *      원문이라는 것도, 가리킬 [n]도 있을 수 없다(두 꼴 다 같은 처분이라야 회전이 바뀌어도 관문이 산다).
  *   ⓑ **인용이라 주장한** 토막이 질문·system·자기 앞 문장과 20자 겹친다 — 제 말을 남의 원문이라 우긴 것이다.
  * ⚠ system 원문은 결과 파일에 안 적는다(관리자 전용 값) — 행에 있으면 보고, 없으면 질문과 앞 문장만 본다.
  *   실측한 회귀(KEV·표본)는 **자기 앞 문장/사용자 지시문 인용**이라 이 둘로 잡힌다.
@@ -392,6 +432,7 @@ export function 창작인용(행) {
   if (!text) return [];
   const 사유 = [];
   if (원문꼬리표.test(text)) 사유.push("「원문:」 꼬리표(근거를 안 준 자리)");
+  if (제품인용꼬리표.test(text)) 사유.push("「[n]에 따르면」 꼬리표(근거를 안 준 자리 — 가리킬 [n]이 없다)");
   const 질문 = String(행?.question ?? 행?.q ?? "");
   const system = String(행?.system ?? "");
   for (const { 토막, 자리 } of 인용토막들(text)) {
@@ -501,8 +542,11 @@ const 반올림 = (x, n = 3) => (typeof x === "number" ? Number(x.toFixed(n)) : 
 /**
  * 관문 12개를 판정한다. **순수 함수** — 파일을 읽지도 쓰지도 않는다(시험이 여기를 직접 부른다).
  *
- * 입력   { easy, hard, samples, kev, 표본grounded, 표본방해만, 표본맨질문 }
+ * 입력   { easy, hard, samples, kev, 표본grounded, 표본방해만, 표본맨질문, 표본persona }
  * 기준선 { easy, hard, kev, 표본grounded, 표본방해만, 표본맨질문 }  ← 표본 셋은 ⑤가 자리별로 견준다
+ * ⚠ persona는 **⑤의 자리에 안 넣는다**(2026-09-04 · R3). ⑤는 자리별로 베이스와 짝지어 견주는데,
+ *   자리를 새로 넣으면 옛 베이스에 짝이 없어 ⑤가 통째로 「미측정=불합격」이 된다 — 즉 ⑨를 고치려다
+ *   ⑤를 죽인다. persona는 ⑨의 모집단으로만 쓰고, 그 사실을 표의 참고 줄이 말한다.
  * 옵션   { needle64k포함=false, kev라벨=null, 이름표="" }
  * ⚠ 기준선에 kev·표본grounded가 없으면 관문 ①·⑧은 「미측정=불합격」이다 — 무엇과 견줄지 모르는 채로
  *   통과시키지 않는다. 그 파일들은 day2-train.sh --baseline-probe가 만든다.
@@ -511,7 +555,7 @@ const 반올림 = (x, n = 3) => (typeof x === "number" ? Number(x.toFixed(n)) : 
 export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
   const {
     easy = null, hard = null, kev = null,
-    표본grounded = null, 표본방해만 = null, 표본맨질문 = null,
+    표본grounded = null, 표본방해만 = null, 표본맨질문 = null, 표본persona = null,
   } = 입력;
   // ⚠ 입력.samples(옛 이름)는 **판정에 안 쓴다.** 어느 조건으로 던진 파일인지 못 가려 베이스에
   //   짝지을 자리가 없기 때문이다(관문 ⑤·⑨ 둘 다 같은 이유). 표에는 참고값으로 적힌다.
@@ -675,24 +719,42 @@ export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
     });
   }
 
-  // ⑨ 근거를 안 준 자리에서 「원문:」을 지어내지 않는가
+  // ⑨ 근거를 안 준 자리에서 인용을 지어내지 않는가
   // ⚠ kev는 **관문 ①과 같은 모집단**으로 센다 — 대조군 noprompt(시스템 프롬프트 없음)는 제품이
   //   쓰지 않는 조건이라, 그것 때문에 채택이 막히면 관문이 딴것을 재는 것이다(2026-09-04 수리).
+  //
+  // ★★ 모집단을 bare → **persona**로 바꿨다(2026-09-04 · R3 · 회전 2 실측이 시킨 일).
+  //   회전 2에서 ⑨에 걸린 「원문:」 창작 11/15가 **전부 bare**였다 — 시스템 프롬프트가 아예 없는
+  //   자리다. 제품은 그런 요청을 보내지 않는다(팀원 프롬프트는 늘 실린다). 팀원 프롬프트만 준
+  //   조건(KEV persona/prompt)에서는 **0건**이었다. 즉 관문이 「제품에 없는 조건」 때문에 빨강이었고,
+  //   그 빨강은 고칠 수 없는 빨강이라 관문이 아니라 벽이었다(관문 ①이 절대 3/3을 참고값으로 내린
+  //   그 논리와 같다). 그래서 세는 자리를 **제품이 실제로 여는 자리**로 옮긴다:
+  //     · persona 표본(팀원 프롬프트만 · 참고 자료 블록 없음) = 제품에서 RAG가 빈 순간의 꼴
+  //     · KEV의 prompt 라벨(같은 조건) — 관문 ①과 같은 자리
+  //   bare는 **참고값**으로 표에 남긴다(대조군을 지우면 「프롬프트가 있고 없고의 차이」를 못 읽는다).
   const kev센행 = kev대상행(kev, 옵션.kev라벨 ?? null);
-  const f = 창작인용찾기(표본맨질문, kev센행);
-  const 모집단 = `모집단: bare 표본 ${Array.isArray(표본맨질문) ? 표본맨질문.filter(창작인용대상인가).length : 0}행 + KEV ${kev센행.filter(창작인용대상인가).length}행(대조군 noprompt 제외 — 관문 ①과 같은 자리)`;
-  // ⚠ 빈 배열도 「0건」이라 통과처럼 보인다 — **잰 답이 하나도 없으면 미측정**이다(0건과 못 잼은 다르다).
-  if (f.대상 === 0) 검사.push(미측정("no_fake_quote", "「원문:」 창작 0건", "bare 표본도 kev 결과도 없다(또는 답이 든 행이 0개다)"));
-  else {
+  const f = 창작인용찾기(표본persona, kev센행);
+  const bare참고 = 창작인용찾기(표본맨질문);
+  const 모집단 = `모집단: persona 표본 ${Array.isArray(표본persona) ? 표본persona.filter(창작인용대상인가).length : 0}행 + KEV ${kev센행.filter(창작인용대상인가).length}행(대조군 noprompt 제외 — 관문 ①과 같은 자리)`;
+  const bare줄 = `bare 창작 ${bare참고.걸린행}건/${bare참고.대상}(참고값 — **제품 조건이 아니다**: 시스템 프롬프트 없이 던진 자리)`;
+  // ⚠ persona 표본이 없으면 **미측정=불합격**이다. kev만으로도 숫자는 나오지만, 그러면 모집단이
+  //   3행짜리로 조용히 쪼그라들어 「0건 통과」가 쉬워진다 — 못 잰 것을 통과로 세지 않는다.
+  if (!Array.isArray(표본persona)) {
+    검사.push(미측정("no_fake_quote", "인용 창작 0건(persona+KEV)", "persona 표본이 없다(ask-samples --mode persona) — 제품 조건(팀원 프롬프트만)에서 세야 한다"));
+  } else if (f.대상 === 0) {
+    // ⚠ 빈 배열도 「0건」이라 통과처럼 보인다 — **잰 답이 하나도 없으면 미측정**이다(0건과 못 잼은 다르다).
+    검사.push(미측정("no_fake_quote", "인용 창작 0건(persona+KEV)", "persona 표본에도 kev 결과에도 답이 든 행이 0개다"));
+  } else {
     검사.push({
-      키: "no_fake_quote", 이름: "「원문:」 창작 0건",
+      키: "no_fake_quote", 이름: "인용 창작 0건(persona+KEV)",
       값: `${f.걸린행}건 / 대상 ${f.대상}`, 기준: "0건",
       통과: f.걸린행 === 0,
       설명: [
         모집단,
         f.걸린행
           ? f.상세.slice(0, 3).map((x) => `${x.label ? `[${x.label}] ` : ""}${x.q}… ${x.사유[0]}`).join(" · ")
-          : "근거를 안 준 자리에서 「원문:」을 안 붙이고, 제 말을 원문이라 인용하지도 않는다",
+          : "근거를 안 준 자리에서 「원문:」·「[n]에 따르면」을 안 붙이고, 제 말을 원문이라 인용하지도 않는다",
+        bare줄,
       ].join(" / "),
     });
   }
@@ -754,9 +816,18 @@ export function 표만들기(결과, 참고 = {}) {
   if (참고.표본수 != null) 참고줄.push(`- 표본 ${참고.표본수}건 · 한글 ${참고.표본한글 == null ? "-" : (참고.표본한글 * 100).toFixed(0) + "%"}`);
   if (참고.표본인용) 참고줄.push(`- 표본 인용(교사 답 대비 overlap20) ${참고.표본인용.성립}/${참고.표본인용.대상} (${(참고.표본인용.비율 * 100).toFixed(0)}%) — 참고값이다(관문 ⑧은 **교사 답이 아니라 정답 조각**과 견준다)`);
   // 조건별 표본이 몇 건씩이었나 — 「건너뜀」을 여기 적어야 관문의 모집단을 사람이 읽을 수 있다.
+  // 어느 조건이 어느 관문의 모집단인지 한 줄로 밝힌다 — 안 적으면 사람이 「persona도 ⑤에 들어갔겠지」라고 읽는다.
+  const 쓰임 = {
+    grounded: "관문 ⑧·⑫의 모집단", "distractor-only": "관문 ⑩의 모집단",
+    bare: "**참고값** — 관문 ⑨의 모집단에서 뺐다(제품이 안 쓰는 조건: 시스템 프롬프트 없음). ⑤에는 그대로 들어간다",
+    persona: "관문 ⑨의 모집단(제품 조건: 팀원 프롬프트만). **⑤에는 안 들어간다** — 베이스에 짝지을 자리가 없어 ⑤가 통째로 미측정이 된다",
+  };
   for (const [이름, s] of Object.entries(참고.표본조건 ?? {})) {
     if (!Array.isArray(s)) continue;
-    참고줄.push(`- 표본[${이름}] ${s.filter((x) => x && !x.skipped).length}건 던짐 · 건너뜀 ${건너뜀수(s)} · 프롬프트 지문 ${[...new Set(s.map((x) => x?.promptSha12).filter(Boolean))].join(",") || "-"}`);
+    참고줄.push(
+      `- 표본[${이름}] ${s.filter((x) => x && !x.skipped).length}건 던짐 · 건너뜀 ${건너뜀수(s)} · 프롬프트 지문 ${[...new Set(s.map((x) => x?.promptSha12).filter(Boolean))].join(",") || "-"}` +
+      (쓰임[이름] ? ` — ${쓰임[이름]}` : "")
+    );
   }
   // 옛 이름(--samples)으로 따로 준 표본은 **관문 ⑨가 안 센다** — 어느 조건으로 던진 파일인지
   // 가릴 수 없기 때문이다(grounded 답을 여기 넣으면 정상 인용이 「창작」으로 걸린다).
@@ -791,13 +862,15 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
 
   const easyP = opt("--easy", ""), hardP = opt("--hard", ""), kevP = opt("--kev", "");
   const groundedP = opt("--samples-grounded", ""), 방해만P = opt("--samples-distractor-only", ""), bareP = opt("--samples-bare", "");
+  const personaP = opt("--samples-persona", "");
   // --samples는 예전 이름이다(참고용 표본 한 벌). 안 주면 bare 표본을 그 자리로 쓴다 — 같은 것을 두 번 안 적게.
   const samplesP = opt("--samples", bareP);
   if (!easyP && !hardP) {
     console.error(
       "쓰는 법: node tools/team-bench/gates.mjs --easy <r1.json> --hard <r2.json> [--kev k.json] [--kev-base 베이스k.json]\n" +
-      "         [--samples-grounded g.json] [--samples-distractor-only d.json] [--samples-bare b.json] [--baseline-samples 베이스g.json]\n" +
-      "         [--baseline-samples-distractor-only 베이스d.json] [--baseline-samples-bare 베이스b.json]\n" +
+      "         [--samples-grounded g.json] [--samples-distractor-only d.json] [--samples-bare b.json] [--samples-persona p.json]\n" +
+      "         [--baseline-samples 베이스g.json] [--baseline-samples-distractor-only 베이스d.json]\n" +
+      "         [--baseline-samples-bare 베이스b.json] [--baseline-samples-persona 베이스p.json]\n" +
       "         [--samples s.json] [--out 디렉터리] [--include-needle64k] [--label 이름]"
     );
     process.exit(2);
@@ -807,6 +880,11 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
   const kevBaseP = opt("--kev-base", ""), b표본P = opt("--baseline-samples", "");
   // ⑤는 **자리별로** 견주므로 베이스에도 세 조건이 다 있어야 한다(없는 자리는 미측정=불합격).
   const b방해P = opt("--baseline-samples-distractor-only", ""), bBareP = opt("--baseline-samples-bare", "");
+  // ★ persona의 베이스는 **관문이 안 쓴다** — ⑨의 기준은 「0건」이라 견줄 상대가 필요 없기 때문이다
+  //   (①·⑤·⑧과 다른 자리다). 그래도 인자를 받는 이유: 사슬이 베이스 갈래에서도 persona를 재므로,
+  //   그 파일이 어디 있었는지가 표의 참고 줄에 남아야 「같은 조건으로 쟀나」를 사람이 가릴 수 있다.
+  //   ⚠ 받아 놓고 **아무 데도 안 쓰면** 그것이 곧 「적어 두고 안 쓰는 값」이다 — 참고 줄이 그 자리다.
+  const bPersonaP = opt("--baseline-samples-persona", "");
   // ⚠ bare 파일은 **한 번만** 읽는다 — --samples 기본값이 --samples-bare라, 두 번 읽으면 배열이 둘이 되어
   //   잘림(⑤)을 두 번 센다(같은 것을 두 번 세는 그 함정).
   const bare읽음 = 읽기(bareP);
@@ -814,6 +892,7 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
     easy: 읽기(easyP), hard: 읽기(hardP), kev: 읽기(kevP),
     samples: samplesP === bareP ? bare읽음 : 읽기(samplesP),
     표본grounded: 읽기(groundedP), 표본방해만: 읽기(방해만P), 표본맨질문: bare읽음,
+    표본persona: 읽기(personaP),
   };
   const 기준 = {
     easy: 읽기(bEasyP), hard: 읽기(bHardP), kev: 읽기(kevBaseP),
@@ -829,15 +908,17 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
     표본수: Array.isArray(입력.samples) ? 입력.samples.length : null,
     표본한글: 표본한글평균(입력.samples),
     표본인용: 표본인용률(입력.samples),
-    표본조건: { grounded: 입력.표본grounded, "distractor-only": 입력.표본방해만, bare: 입력.표본맨질문 },
+    표본조건: { grounded: 입력.표본grounded, "distractor-only": 입력.표본방해만, bare: 입력.표본맨질문, persona: 입력.표본persona },
     옛표본: samplesP && samplesP !== bareP && Array.isArray(입력.samples) ? 입력.samples.length : null,
     // 같은 파일을 두 인자로 준 경우(--samples 기본값이 --samples-bare) 한 줄만 적는다.
     원천: [...new Set([
-      easyP, hardP, groundedP, 방해만P, bareP, samplesP, kevP,
+      easyP, hardP, groundedP, 방해만P, bareP, personaP, samplesP, kevP,
       kevBaseP && `베이스 kev ${kevBaseP}`,
       b표본P && `베이스 표본[grounded] ${b표본P}`,
       b방해P && `베이스 표본[distractor-only] ${b방해P}`,
       bBareP && `베이스 표본[bare] ${bBareP}`,
+      // ⑨는 「0건」 기준이라 베이스가 필요 없다 — 그래도 **어디서 잰 파일인지**는 표에 남긴다.
+      bPersonaP && `베이스 표본[persona] ${bPersonaP}(참고 — 관문 ⑨는 절대 0건 기준이라 대조 없이 판정한다)`,
       `기준선 ${bEasyP}`, `기준선 ${bHardP}`,
     ].filter(Boolean))],
   });
