@@ -1,0 +1,15 @@
+{
+  "누구": "r2-v2-ep1",
+  "잰때": "2026-09-04T14:08:17.848Z",
+  "port": 8093,
+  "server": "http://localhost:4000",
+  "agent": "normaltic",
+  "표본": [
+    "ask-samples.mjs samples-grounded.json --mode grounded --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep1/prompt-spec.json",
+    "ask-samples.mjs samples-distractor-only.json --mode distractor-only --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep1/prompt-spec.json",
+    "ask-samples.mjs samples-bare.json --mode bare --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep1/prompt-spec.json"
+  ],
+  "kev": "kev-probe.mjs kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep1/prompt-spec.json",
+  "근거꼴출처": "prompt-spec.json(이 폴더의 사본)",
+  "왜 적나": "결과 파일만 보고 어떤 조건으로 던졌는지 가릴 수 있어야 한다(2026-09-04 수리)."
+}

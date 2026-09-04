@@ -1,0 +1,68 @@
+[
+ {
+  "label": "prompt",
+  "q": "KEV 목록은 누가 발표해?",
+  "promptSha12": "3452677d58b7",
+  "systemChars": 525,
+  "systemSource": "prompt-spec:/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+  "text": "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요.",
+  "ms": 2050,
+  "finish": "stop"
+ },
+ {
+  "label": "noprompt",
+  "q": "KEV 목록은 누가 발표해?",
+  "promptSha12": "",
+  "systemChars": 0,
+  "systemSource": "(없음)",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+  "text": "KEV 목록은 한국 보건사회연구원에서 발표합니다. 이 목록은 특정 기간 동안 국내에서 유행하거나 주목할 만한 질병을 정리하여 공개하는 자료입니다. 원문: \"KEV 목록은 누가 발표해?\"",
+  "ms": 3171,
+  "finish": "stop"
+ },
+ {
+  "label": "prompt",
+  "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+  "promptSha12": "3452677d58b7",
+  "systemChars": 525,
+  "systemSource": "prompt-spec:/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+  "text": "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요.",
+  "ms": 2055,
+  "finish": "stop"
+ },
+ {
+  "label": "noprompt",
+  "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+  "promptSha12": "",
+  "systemChars": 0,
+  "systemSource": "(없음)",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+  "text": "KEV는 공격 벡터를 의미합니다. 보안 담당자들은 이 용어를 사용하여 공격자가 시스템에 침투하기 위해 사용하는 경로를 설명합니다. 원문: \"KEV는 공격 벡터를 의미합니다.\"",
+  "ms": 3150,
+  "finish": "stop"
+ },
+ {
+  "label": "prompt",
+  "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+  "promptSha12": "3452677d58b7",
+  "systemChars": 525,
+  "systemSource": "prompt-spec:/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+  "text": "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요.",
+  "ms": 2052,
+  "finish": "stop"
+ },
+ {
+  "label": "noprompt",
+  "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+  "promptSha12": "",
+  "systemChars": 0,
+  "systemSource": "(없음)",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+  "text": "KEV 카탈로그는 미국의 국가 취약점 데이터베이스인 NVD에서 관리하고 있습니다. NVD는 취약점 정보를 체계적으로 수집하고 공개하는 중요한 기관으로, 보안 담당자들이 최신 위협에 대응할 수 있도록 지원합니다. 원문: \"KEV 카탈로그는 미국의 국가 취약점 데이터베이스인 NVD에서 관리하고 있습니다.\"",
+  "ms": 4909,
+  "finish": "stop"
+ }
+]
