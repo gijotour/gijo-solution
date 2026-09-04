@@ -1,13 +1,14 @@
 {
   "누구": "r2-v2-ep3",
-  "잰때": "2026-09-04T14:26:48.961Z",
+  "잰때": "2026-09-04T15:25:11.002Z",
   "port": 8093,
   "server": "http://localhost:4000",
   "agent": "normaltic",
   "표본": [
     "ask-samples.mjs samples-grounded.json --mode grounded --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
     "ask-samples.mjs samples-distractor-only.json --mode distractor-only --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
-    "ask-samples.mjs samples-bare.json --mode bare --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json"
+    "ask-samples.mjs samples-bare.json --mode bare --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+    "ask-samples.mjs samples-persona.json --mode persona --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json"
   ],
   "kev": "kev-probe.mjs kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
   "근거꼴출처": "prompt-spec.json(이 폴더의 사본)",
