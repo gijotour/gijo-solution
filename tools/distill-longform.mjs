@@ -18,25 +18,21 @@
 //     조각 규칙·근거 조립은 위 두 파일에서만 받는다(복제 0). chunk()는 두 파일이 같은 원문임을
 //     raftdataset.test.ts가 이미 대조하고 있다.
 //
-// ★ 6절 이름의 출처에 대한 정직한 기록(2026-09-04 실측 — 상위 판단이 필요한 자리다):
-//   ① 지시는 「server/src/engine 아래 조치 요청서 파일에서 절 이름 상수를 grep」이었는데 **거기에 없다.**
-//      server/src/engine/remrequest.ts 의 초안 서식은 요청 유형 / 수신처 / 요청일 / 조치 기한 /
-//      재점검 조건 / 대상 취약점 / 요청 사항 으로 **아예 다른 서식**이다. 「제목·대상 자산·…」 6절은
-//      제품이 아니라 **시험 채점기**에만 있다.
-//   ② 그 시험 채점기도 **두 곳이 서로 다르다.**
-//        tasks.mjs   필수절  (T4 report_draft) = 제목·대상 자산·**취약점 요약**·조치 방법·조치 기한·**담당**
-//        tasks-r2.mjs 필수절6 (R6 report_fix)  = 제목·대상 자산·**위험 요약**·조치 방법·조치 기한·**담당 부서**
-//      지시가 지목한 것은 tasks-r2 쪽이라 그것을 쓴다. 두 서식이 갈린 것을 재료로 덮지 않는다 —
-//      한쪽에 맞춰 학습하면 다른 쪽 시험은 그대로 떨어진다. **어느 쪽이 정본인지는 상위(Fable)가 정한다.**
-//   ③ 두 파일은 지금 다른 실행자가 편집 중이라 **손대지 않았다**(공용 파일 규칙). 대신 아래 목록이
-//      그쪽 원문과 같은지 시험이 소스로 대조한다(server/test/distilllongform.test.ts) — 갈라지면 빨개진다.
+// ★ 조치 요청서 절 이름 — **정본은 제품 서식이다**(상위 결정 D1, 2026-09-04). 오간 경위를 남긴다:
+//   ① 1차(v1)는 **벤치마크 채점기**(tasks-r2.mjs 필수절6)의 6절로 83행을 만들었다. 그건 폐기다 —
+//      시험이 세는 서식을 재료로 가르치면 **시험을 답에 맞추는** 것이 된다(점수는 오르고 제품은 그대로).
+//   ② 정본은 server/src/engine/remrequest.ts 의 buildRequestDraft() 가 실제로 찍는 서식이다:
+//      요청 유형 / 수신처 / 요청일 / 조치 기한 / 재점검 조건 / 대상 취약점 / 요청 사항.
+//      .ts 라 import가 안 되므로 시험이 그 소스에서 절 이름을 뽑아 아래 배열과 대조한다(소스 감시).
+//   ③ 벤치 절 세트는 지우지 않고 **금지 목록**으로 남긴다 — 여섯이 다 줄 머리에 서면 심사가 떨어뜨린다.
 //
 // 사용:
 //   GIJO_ADMIN_USER=… GIJO_ADMIN_PASSWORD=… node tools/distill-longform.mjs \
-//     [--limit 200] [--seed longform-vuln-v1] [--name longform-vuln-v1] \
+//     [--limit 200] [--seed longform-vuln-v2] [--name longform-vuln-v2] [--resume] \
 //     [--endpoint http://127.0.0.1:8300/v1] [--server http://localhost:4000] [--agent normaltic] \
 //     [--concurrency 2] [--timeout-ms 300000] [--budget-min 100] [--dry-run]
 //   --dry-run : 교사를 부르지 않고 **만들 질문 목록만** 찍는다(결정성 확인용).
+//   --resume  : 같은 --name 산출 파일에 **이미 채택된 질문**은 건너뛰고 이어 붙인다(예산에 걸려 끊긴 회차 복구).
 //
 // ⚠ 로그인을 밀어내지 않는다(--force-login 없음) — 계정당 1세션이라 강제하면 남의 세션이 끊긴다.
 //
@@ -54,22 +50,34 @@ import { chunk, sha12, 참고자료블록, 저장소 } from "./build-raft-datase
 import { overlap20, 시점데이터, 한글비율, 인용뺀설명 } from "./distill-precheck.mjs";
 
 // ── 서식 ────────────────────────────────────────────────────────────
-/** ① 조치 요청서 6절 — tools/team-bench/tasks-r2.mjs 의 `필수절6` 과 **글자까지 같아야 한다**(위 머리말 ★③).
- *  그 파일을 지금 다른 실행자가 만지고 있어 import 대신 시험이 소스로 대조한다. */
-export const 절_요청서 = ["제목", "대상 자산", "위험 요약", "조치 방법", "조치 기한", "담당 부서"];
-/** ⚠ 1회차 시험(tasks.mjs T4)이 쓰는 **다른** 6절. 재료는 이쪽을 안 쓴다 — 갈린 사실을 드러내려고 적어 둔다. */
-export const 절_요청서_1회차 = ["제목", "대상 자산", "취약점 요약", "조치 방법", "조치 기한", "담당"];
+/** ★ ① 조치 요청서 — **정본은 제품 서식이다**(상위 결정 D1, 2026-09-04).
+ *  server/src/engine/remrequest.ts 의 buildRequestDraft() 가 실제로 찍는 절이고, **순서·글자까지** 같아야 한다.
+ *  그 파일은 .ts 라 여기서 import가 안 된다 — 대신 시험이 그 소스에서 절 이름을 뽑아 이 배열과 대조한다
+ *  (server/test/distilllongform.test.ts ⑥). 제품 서식이 바뀌면 그 시험이 빨개진다.
+ *
+ *  ⚠ 회전 2의 1차(longform-vuln-v1)는 **벤치마크 채점기의 6절**로 83행을 만들었는데 그건 폐기다 —
+ *    재료를 시험 답안지에 맞추면 점수는 오르고 제품은 안 는다. v1 파일은 기록으로 남기되 v2에 안 넣는다. */
+export const 절_요청서 = ["요청 유형", "수신처", "요청일", "조치 기한", "재점검 조건", "대상 취약점", "요청 사항"];
+
+/** ⚠ 벤치마크 채점기의 절 세트 — **재료에 쓰지 않는다**(D1). 남겨 두는 까닭은 둘이다.
+ *  ① 심사가 이 세트를 **금지**로 거른다(6개가 전부 줄 머리 제목으로 서면 탈락 — 개별 낱말은 허용).
+ *  ② 채점기가 바뀌면 시험이 알려 준다(두 곳에 적힌 것은 반드시 어긋난다). */
+export const 절_벤치_2회차 = ["제목", "대상 자산", "위험 요약", "조치 방법", "조치 기한", "담당 부서"]; // tasks-r2.mjs 필수절6
+export const 절_벤치_1회차 = ["제목", "대상 자산", "취약점 요약", "조치 방법", "조치 기한", "담당"];   // tasks.mjs 필수절
 /** ② 취약점 요약 보고 5절 — 이 작업(2026-09-04)이 새로 정한 서식. 아직 제품 코드에 짝이 없다. */
 export const 절_요약보고 = ["요약", "영향 범위", "우선순위 판단", "권고 조치", "일정"];
 
 /** 「본문 2문장 이상」을 요구하는 **서술 절**. 나머지는 한 줄이 정상이라 ≥1줄만 본다.
- *  ⚠ 지시는 「절마다 2문장 이상」이었지만 그대로 재면 「제목」·「담당 부서」에 군더더기를 채운 답만 통과한다
- *    (제목이 두 문장인 요청서는 없다). 서식을 가르치려다 **군더더기를 가르치는** 재료가 되므로 갈라 둔다.
+ *  ⚠ 지시는 「절마다 2문장 이상」이었지만 그대로 재면 「요청 유형」·「요청일」에 군더더기를 채운 답만 통과한다
+ *    (요청일이 두 문장인 요청서는 없다). 서식을 가르치려다 **군더더기를 가르치는** 재료가 되므로 갈라 둔다.
  *    이 판단은 실행자의 것이고, 되돌리려면 이 집합만 고치면 된다. */
-export const 서술절 = new Set(["위험 요약", "조치 방법", "요약", "영향 범위", "우선순위 판단", "권고 조치"]);
+export const 서술절 = new Set([
+  "재점검 조건", "대상 취약점", "요청 사항",                 // 제품 서식 쪽
+  "요약", "영향 범위", "우선순위 판단", "권고 조치",          // 요약 보고 쪽
+]);
 
 export const 형식 = {
-  remreq: { kind: "remreq", 절: 절_요청서, 이름: "조치 요청서 6절" },
+  remreq: { kind: "remreq", 절: 절_요청서, 이름: "조치 요청서(제품 서식) 7절" },
   execsum: { kind: "execsum", 절: 절_요약보고, 이름: "취약점 요약 보고 5절" },
 };
 
@@ -221,8 +229,30 @@ export function 질문만들기(조각, kind, seed) {
   };
 }
 
+/** 일감 목록 — ★ 두 형식을 **번갈아** 둔다(D3, 2026-09-04).
+ *  v1은 형식별로 몰아 두었더니 예산에 걸려 끊긴 자리가 execsum 한복판이었고, 그래서 83:38로 기울었다.
+ *  번갈아 두면 어디서 끊겨도 두 형식이 ±1 안에서 고르게 남는다. */
+export function 일감만들기(pool, seed, limit) {
+  const 몫 = Math.ceil(limit / 2);
+  const 갈래 = Object.keys(형식).map((kind) =>
+    조각고르기(pool, kind, seed, 몫).map((c) => {
+      const { question, 변형: v } = 질문만들기(c, kind, seed);
+      return { kind, 조각: c, question, 변형: v };
+    }));
+  const 일감 = [];
+  for (let i = 0; i < 몫; i++) for (const g of 갈래) if (g[i]) 일감.push(g[i]);
+  return 일감;
+}
+
+/** 이어 붙이기(D5) — 이미 채택된 행의 **질문 sha12** 집합. 같은 질문은 교사를 다시 안 부른다. */
+export function 이미채택된질문(rows) {
+  return new Set((Array.isArray(rows) ? rows : []).map((r) => sha12(String(r?.question ?? ""))));
+}
+
 // ── 심사 ────────────────────────────────────────────────────────────
-/** 줄 머리에 선 절 제목을 찾는다 — `## 위험 요약`·`**위험 요약**`·`3. 위험 요약`·`위험 요약:` 전부 인정. */
+/** 줄 머리에 선 절 제목을 찾는다 — `## 요청 사항`·`**요청 사항**`·`3. 요청 사항`·`요청 사항:` 전부 인정.
+ *  ★ 제목 뒤에 같은 줄로 값이 붙는 꼴(`- 요청 유형: 취약점 조치`)이면 그 **꼬리를 본문으로 돌려준다**(2026-09-04).
+ *    제품 서식(remrequest.ts)의 앞 다섯 절이 실제로 그 꼴이라, 안 그러면 전부 「빈 절」로 떨어진다. */
 export function 절자리(answer, 절이름들) {
   const lines = String(answer ?? "").split(/\r?\n/);
   const 찾음 = [];
@@ -236,7 +266,9 @@ export function 절자리(answer, 절이름들) {
     for (const n of 절이름들) {
       if (찾음.some((x) => x.name === n)) continue;
       if (bare === n || (bare.startsWith(n) && /^[\s:：·—\-(]/.test(bare.slice(n.length)))) {
-        찾음.push({ name: n, line: i });
+        // 같은 줄 꼬리 = 그 절의 본문. 「(3건)」처럼 개수만 붙은 꼴은 본문이 아니라 제목 장식이라 버린다.
+        const 꼬리 = bare.slice(n.length).replace(/^[\s:：·—\-]+/, "").trim();
+        찾음.push({ name: n, line: i, 꼬리: /^\(\s*\d+\s*건\s*\)$/.test(꼬리) ? "" : 꼬리 });
         break;
       }
     }
@@ -250,7 +282,8 @@ export function 절본문(answer, 절이름들) {
   const 본문 = {};
   for (let i = 0; i < 찾음.length; i++) {
     const 끝 = i + 1 < 찾음.length ? 찾음[i + 1].line : lines.length;
-    본문[찾음[i].name] = lines.slice(찾음[i].line + 1, 끝).join("\n").trim();
+    const 아래 = lines.slice(찾음[i].line + 1, 끝).join("\n").trim();
+    본문[찾음[i].name] = [찾음[i].꼬리 || "", 아래].filter(Boolean).join("\n").trim();
   }
   return { 본문, 있는절: 찾음.map((x) => x.name) };
 }
@@ -264,15 +297,37 @@ export function 문장수(s) {
     .filter((x) => x.replace(/\s/g, "").length >= 5).length;
 }
 
+/** ★ 백틱이 없는 **코드 식별자**(2026-09-04 D4 — 잣대 과엄 수리).
+ *  실측: 「한글 비율 미달」 8건 중 표본 둘이 전부 이 꼴이었다 — `open_cached_dir()`·`cmd_realtime.php`·
+ *  `register_argc_argv`·`CRITICAL`. 설명은 한국어인데 **함수 이름을 적었다는 이유로** 떨어졌다.
+ *  그래서 분모에서 뺀다. 코드를 적는 답을 벌하면 재료가 「코드 이름을 안 쓰는 요청서」를 가르친다.
+ *
+ *  ⚠ 지시가 예시로 준 정규식 `[A-Za-z_][A-Za-z0-9_.]*\(\)?` 는 **글자 그대로 쓰면 예시 셋 중 하나만
+ *    잡는다.** `\(\)?` 가 「괄호쌍이 있어도 되고 없어도 된다」가 아니라 「`(` 는 반드시 있고 `)` 만
+ *    선택」이라서다. 실측(2026-09-04):
+ *        open_cached_dir()  → 잡힘 ·  cmd_realtime.php → 안 잡힘 ·  register_argc_argv → 안 잡힘 ·  CRITICAL → 안 잡힘
+ *    그래서 **적힌 예시들이 실제로 걸리도록** 규칙을 갈라 적었다 — 괄호쌍·밑줄·점 이음·경로·대문자 약어.
+ *    평범한 영어 낱말(`This`·`section`)은 **분모에 그대로 남긴다**: 그것까지 빼면 「설명이 한국어인가」를
+ *    묻는 잣대가 아무 일도 안 하게 된다. 통째로 영어인 답이 여전히 떨어지는 것을 시험이 지킨다. */
+const 코드꼴 = [
+  /(?:\.{0,2}\/)[A-Za-z0-9_.\-]+(?:\/[A-Za-z0-9_.\-]+)*/g, // 경로  ./private_gpt/components · /etc/x
+  /\b[A-Za-z_][A-Za-z0-9_]*\s*\(\)/g,                       // 함수 호출  open_cached_dir()
+  /\b[A-Za-z]*_[A-Za-z0-9_]+\b/g,                           // 밑줄 식별자  register_argc_argv
+  /\b[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+\b/g,           // 점 이음·파일명  cmd_realtime.php · vLogin.py
+  /\b[A-Z]{2,}(?:-[A-Z0-9]+)?\b/g,                          // 대문자 약어  CRITICAL · RCE · PHP · SMB
+];
+
 /** 한글 비율을 잴 때 빼는 것 — 인용·CVE·CVSS·CWE·URL·코드. 「설명이 한국어인가」만 남긴다. */
 export function 설명부(answer) {
-  return 인용뺀설명(answer)
+  let s = 인용뺀설명(answer)
     .replace(/^.*원문\s*[:：].*$/gm, " ")
     .replace(/CVE-\d{4}-\d{4,7}/g, " ")
     .replace(/\bCWE-\d+\b/g, " ")
     .replace(/CVSS[^\s]*/gi, " ")
     .replace(/https?:\/\/\S+/g, " ")
     .replace(/`[^`]*`/g, " ");
+  for (const re of 코드꼴) s = s.replace(re, " ");
+  return s;
 }
 
 export const 인용뽑기 = (answer) =>
@@ -329,6 +384,13 @@ export function 심사(kind, question, answer, 조각, 변형값) {
     return "지어낸 버전";
   }
   for (const x of 금지자산) if (a.includes(x) || question.includes(x)) return "시험 문항 자산 혼입";
+
+  // ★ 벤치마크 절 세트 금지(D1) — 채점기가 세는 6절이 **전부** 줄 머리 제목으로 서 있으면 버린다.
+  //   시험이 세는 서식을 재료로 가르치면 점수는 오르고 제품 서식은 그대로다(시험을 답에 맞추는 짓).
+  //   개별 낱말(「조치 기한」은 제품 서식에도 있다)은 막지 않는다 — **여섯이 다 모인 것**만 본다.
+  for (const 세트 of [절_벤치_2회차, 절_벤치_1회차]) {
+    if (절자리(a, 세트).찾음.length === 세트.length) return "벤치마크 절 세트 혼입";
+  }
   return null;
 }
 
@@ -339,23 +401,41 @@ export function 교사지시(kind, 변형값) {
   const 단문 = 절들.filter((n) => !서술절.has(n));
   return [
     "── 쓰는 법(이 지시는 답에 옮겨 적지 말 것) ──",
-    `1) 마크다운 절 제목을 **줄 머리에** 두고 순서대로 전부 쓴다: ${절들.map((n) => `## ${n}`).join(" / ")}`,
+    // ★ D6(2026-09-04) — 인용 지시를 **맨 앞으로** 올린다. v1에서 「원문 인용 없음」이 8건이었는데
+    //   그 지시가 여덟 번째, 즉 목록 맨 끝에 있었다. 긴 지시의 꼬리는 교사가 흘린다는 가설이다.
+    //   (효과는 채택률·「원문 인용 없음」 건수로 v1과 견줘 보고한다 — 고쳤다는 말은 실측 뒤에.)
+    '1) ★ 답의 **맨 끝 한 줄**은 반드시 「원문: "…"」 이다. 참고 자료 조각의 영어 문장 하나를 한 글자도',
+    "   바꾸지 말고 그대로 옮겨 적는다. 고르는 문장은 40자보다 길고 날짜·「N건」이 없는 **설명 문장**이어야",
+    "   한다(맨 윗줄의 공개일·점수 줄은 고르지 말 것). 이 줄이 없으면 그 답은 통째로 버려진다.",
+    `2) 마크다운 절 제목을 **줄 머리에** 두고 순서대로 전부 쓴다: ${절들.map((n) => `## ${n}`).join(" / ")}`,
     // ⚠ 길이·문장 수를 **세게** 부른다(2026-09-04 실측): 「1,300~2,400자」로 시켰더니 답이 738~992자로
     //   내려앉아 아홉에 다섯이 길이에서 떨어졌다. 교사에게 「하한」을 말하면 그 언저리를 노린다 —
     //   그래서 하한을 우리가 원하는 값보다 위로 부른다(합격선 1,000자, 부르는 값 1,700자).
-    `2) 서술 절(${서술.join("·")})은 본문을 **3문장 이상**, 각 문장을 충분히 풀어 쓴다. 짧은 절(${단문.join("·")})은 한 줄로 정확히 적는다.`,
-    "3) 전체 길이는 **1,700자 이상** 2,600자 이하다. 1,700자에 못 미치면 서술 절을 더 풀어 써서 채운다.",
+    `3) 서술 절(${서술.join("·")})은 본문을 **3문장 이상**, 각 문장을 충분히 풀어 쓴다. 짧은 절(${단문.join("·")})은 한 줄로 정확히 적는다.`,
+    "4) 전체 길이는 **1,700자 이상** 2,600자 이하다. 1,700자에 못 미치면 서술 절을 더 풀어 써서 채운다.",
     // ⚠ 영어가 섞이는 답이 실제로 떨어졌다 — 인용 한 줄 말고는 한국어만 쓰라고 못을 박는다.
-    "4) 영어 문장은 **맨 끝 원문 인용 한 줄뿐**이다. 그 밖의 본문은 한국어로만 쓴다(제품 이름·CVE 번호·명령어는 그대로 둔다).",
-    "5) 참고 자료 조각에 적힌 사실(CVE 번호·제품·버전·영향·CWE)만 쓴다. 모르는 값은 「확인 필요」라고 적는다.",
-    "6) 날짜(2026-01-02 같은 꼴)와 「N건」 같은 통계 나열은 쓰지 않는다. 기간은 「7일 안」처럼 상대 기간으로 적는다.",
-    kind === "remreq"
-      ? `7) 조치 기한은 「${변형값.기한}일 안」, 담당 부서는 「${변형값.팀}」이라고 본문에 그대로 적는다. 질문에 없는 IP·버전은 지어내지 않는다.`
-      : "7) 질문에 없는 IP·버전은 지어내지 않는다. 「일정」 절도 날짜 없이 상대 기간으로 적는다.",
-    '8) 답 **맨 끝 한 줄**에 참고 자료 조각의 영어 문장 하나를 한 글자도 바꾸지 말고 그대로 옮겨 「원문: "…"」 꼴로 넣는다.',
-    "   고르는 문장은 40자보다 길고, 날짜·「N건」이 없는 **설명 문장**이어야 한다(맨 윗줄의 공개일·점수 줄은 고르지 말 것).",
+    "5) 영어 문장은 **맨 끝 원문 인용 한 줄뿐**이다. 그 밖의 본문은 한국어로만 쓴다(제품 이름·CVE 번호·함수 이름은 그대로 둔다).",
+    "6) 참고 자료 조각에 적힌 사실(CVE 번호·제품·버전·영향·CWE)만 쓴다. 모르는 값은 「확인 필요」라고 적는다.",
+    "7) 날짜(2026-01-02 같은 꼴)와 「N건」 같은 통계 나열은 쓰지 않는다. 기간은 「7일 안」처럼 상대 기간으로 적는다.",
+    ...(kind === "remreq"
+      ? [
+          // 제품 서식(remrequest.ts)의 앞 다섯 절은 실제로 「- 이름: 값」 한 줄짜리다 — 그 꼴을 그대로 가르친다.
+          `8) 「요청 유형」은 「취약점 조치」, 「수신처」는 「${변형값.팀}」, 「조치 기한」은 「${변형값.기한}일 안」이라고 그대로 적는다.`,
+          "9) 「요청일」 절에는 **날짜를 쓰지 않는다** — 「본 요청서 발송일 기준」이라고만 적는다.",
+          "10) 「대상 취약점」 절에는 자산 이름과 IP, 제품·버전, CVE 번호, 심각도를 먼저 적고 이어서 무엇이 왜 위험한지 풀어 쓴다.",
+          "11) 「재점검 조건」 절에는 무엇을 다시 확인해야 조치가 끝난 것으로 보는지 적는다. 「요청 사항」 절에는 받는 쪽이 실제로 할 일을 적는다.",
+          "12) 질문에 없는 IP·버전은 지어내지 않는다.",
+        ]
+      : [
+          "8) 질문에 없는 IP·버전은 지어내지 않는다. 「일정」 절도 날짜 없이 상대 기간으로 적는다.",
+        ]),
   ].join("\n");
 }
+
+/** user 메시지 끝에 한 번 더 못을 박는 한 줄(D6) — 지시 목록의 1번과 **같은 것을 두 번** 말한다.
+ *  같은 것을 두 곳에 적는 것은 평소 금기지만, 여기 두 자리는 「모델에게 거는 말」이라 단일 출처가 아니라
+ *  **반복**이 목적이다. 문구가 갈리지 않도록 상수 하나로 두고 양쪽에서 가리킨다. */
+export const 인용못박기 = '⚠ 마지막으로 한 번 더 — 답의 **마지막 줄**은 반드시 「원문: "…"」 한 줄이다. 참고 자료 조각의 영어 문장을 그대로 옮겨 적는다.';
 
 // ── 본체 ────────────────────────────────────────────────────────────
 async function main() {
@@ -363,7 +443,7 @@ async function main() {
   const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
   const has = (k) => args.includes(k);
 
-  const NAME = String(opt("--name", "longform-vuln-v1")).trim();
+  const NAME = String(opt("--name", "longform-vuln-v2")).trim();
   const SEED = String(opt("--seed", NAME)).trim();
   const LIMIT = Math.max(2, Number(opt("--limit", 200)));
   const AGENT = String(opt("--agent", "normaltic")).trim();
@@ -374,19 +454,29 @@ async function main() {
   const BUDGET_MS = Math.max(1, Number(opt("--budget-min", 100))) * 60_000;
   const MATERIAL = String(opt("--material", 기본재료.join(","))).split(",").map((s) => s.trim()).filter(Boolean);
   const DRY = has("--dry-run");
+  const RESUME = has("--resume");
   if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(NAME)) { console.error(`--name 은 영문 소문자·숫자·하이픈만 (받은 값: ${NAME})`); process.exit(2); }
 
   const pool = 조각모으기(저장소, MATERIAL, Math.ceil(LIMIT / 2));
   if (!pool.length) { console.error("재료 조각이 없습니다 — --material 경로를 확인하세요"); process.exit(2); }
   const 몫 = Math.ceil(LIMIT / 2);
-  const 일감 = [];
-  for (const kind of ["remreq", "execsum"]) {
-    for (const c of 조각고르기(pool, kind, SEED, 몫)) {
-      const { question, 변형: v } = 질문만들기(c, kind, SEED);
-      일감.push({ kind, 조각: c, question, 변형: v });
-    }
+  let 일감 = 일감만들기(pool, SEED, LIMIT);
+
+  // ── 이어 붙이기(D5) — 앞 실행이 남긴 산출 파일을 읽어 **이미 채택된 질문**을 건너뛴다.
+  //   교사 시간이 가장 비싼 자원이라, 예산에 걸려 끊긴 회차를 처음부터 다시 돌리지 않는다.
+  const 로컬경로 = path.join(저장소, "server", "data", "datasets", `${NAME}.json`);
+  let 앞선행 = [];
+  if (RESUME && fs.existsSync(로컬경로)) {
+    try { 앞선행 = JSON.parse(fs.readFileSync(로컬경로, "utf8")); } catch (e) { console.error(`[longform] --resume 읽기 실패(${e.message}) — 빈 상태로 시작한다`); 앞선행 = []; }
+    if (!Array.isArray(앞선행)) 앞선행 = [];
+    const 이미 = 이미채택된질문(앞선행);
+    const 전 = 일감.length;
+    일감 = 일감.filter((w) => !이미.has(sha12(w.question)));
+    console.log(`[longform] --resume — 앞 산출 ${앞선행.length}행(6절 ${앞선행.filter((r) => r?.meta?.kind === "remreq").length} · 5절 ${앞선행.filter((r) => r?.meta?.kind === "execsum").length}) 이어받음 · 일감 ${전}→${일감.length}`);
+  } else if (RESUME) {
+    console.log(`[longform] --resume 인데 앞 산출이 없다(${로컬경로}) — 처음부터 만든다`);
   }
-  console.log(`[longform] 조각 ${pool.length} · 일감 ${일감.length}(형식별 ${몫}) · 씨앗 ${SEED} · 교사 ${ENDPOINT} · 동시 ${CONC} · 예산 ${(BUDGET_MS / 60000).toFixed(0)}분${DRY ? " · DRY-RUN" : ""}`);
+  console.log(`[longform] 조각 ${pool.length} · 일감 ${일감.length}(형식별 최대 ${몫}, 번갈아) · 씨앗 ${SEED} · 교사 ${ENDPOINT} · 동시 ${CONC} · 예산 ${(BUDGET_MS / 60000).toFixed(0)}분${DRY ? " · DRY-RUN" : ""}`);
   if (DRY) {
     for (const w of 일감.slice(0, 6)) console.log(`-- [${w.kind}] ${w.question}`);
     const cve별 = new Set(일감.map((w) => w.조각.cve));
@@ -433,10 +523,13 @@ async function main() {
     name: NAME, seed: SEED, kinds: Object.keys(형식), agent: AGENT, endpoint: ENDPOINT, server: SERVER,
     material: MATERIAL, concurrency: CONC, timeoutMs: TIMEOUT, budgetMin: BUDGET_MS / 60000,
     startedAt: new Date().toISOString(), 조각: pool.length, 일감: 일감.length,
-    생성: 0, 채택: 0, 탈락: {}, 탈락표본: {}, 형식별: { remreq: 0, execsum: 0 }, 교사: null,
+    생성: 0, 채택: 0, 탈락: {}, 탈락표본: {}, 교사: null,
+    이어받음: 앞선행.length, resume: RESUME,
+    형식별: { remreq: 앞선행.filter((r) => r?.meta?.kind === "remreq").length, execsum: 앞선행.filter((r) => r?.meta?.kind === "execsum").length },
     토큰: { prompt: 0, completion: 0 }, 교사ms: 0, 호출: 0, 실패: [], 예산초과: false,
   };
-  const rows = [];
+  // 이어받은 행이 먼저 온다 — 산출 파일은 늘 **파일 전체**이고, 「채택」은 **이번 회차**의 숫자다(둘을 안 섞는다).
+  const rows = [...앞선행];
   const 시작 = Date.now();
   const queue = [...일감];
 
@@ -463,7 +556,7 @@ async function main() {
       if (Date.now() - 시작 > BUDGET_MS) { 보고.예산초과 = true; return; }
       const w = queue.shift();
       const system = [프롬프트.system, 참고자료블록(프롬프트.ragHeader, [w.조각.text])].join("\n\n");
-      const user = `${w.question}\n\n${교사지시(w.kind, w.변형)}`;
+      const user = `${w.question}\n\n${교사지시(w.kind, w.변형)}\n\n${인용못박기}`;
       let t;
       try {
         t = await 교사부르기(system, user);
@@ -493,6 +586,7 @@ async function main() {
   // ── 저장(서버 창구가 아니라 파일이다 — 이 재료는 승인함·지식 저장소에 안 들어간다) ──
   보고.finishedAt = new Date().toISOString();
   보고.소요분 = Number(((Date.now() - 시작) / 60000).toFixed(1));
+  보고.총행 = rows.length;
   const 길이들 = rows.map((r) => r.answer.length).sort((a, b) => a - b);
   const 분위 = (p) => (길이들.length ? 길이들[Math.min(길이들.length - 1, Math.floor(길이들.length * p))] : 0);
   보고.길이 = { p50: 분위(0.5), p90: 분위(0.9), min: 길이들[0] ?? 0, max: 길이들[길이들.length - 1] ?? 0 };
@@ -511,10 +605,12 @@ async function main() {
     `- 예산 초과로 중단: ${보고.예산초과 ? "예 (남은 일감은 안 돌렸다)" : "아니오"}`, "",
     "## 숫자", "",
     "| 항목 | 값 |", "|---|---|",
-    `| 생성(교사 답) | ${보고.생성} |`,
-    `| 채택 | ${보고.채택} (${보고.생성 ? ((보고.채택 / 보고.생성) * 100).toFixed(0) : 0}%) |`,
-    `| 조치 요청서 6절 | ${보고.형식별.remreq} |`,
-    `| 취약점 요약 보고 5절 | ${보고.형식별.execsum} |`,
+    `| 이어받은 행(--resume) | ${보고.이어받음} |`,
+    `| 생성(이번 회차 교사 답) | ${보고.생성} |`,
+    `| 채택(이번 회차) | ${보고.채택} (${보고.생성 ? ((보고.채택 / 보고.생성) * 100).toFixed(0) : 0}%) |`,
+    `| **파일 총 행수** | **${rows.length}** |`,
+    `| ${형식.remreq.이름} | ${보고.형식별.remreq} |`,
+    `| ${형식.execsum.이름} | ${보고.형식별.execsum} |`,
     `| 답 길이 p50 / p90 | ${보고.길이.p50} / ${보고.길이.p90} 자 (min ${보고.길이.min} · max ${보고.길이.max}) |`,
     `| 한글 비율 평균(인용·코드 제외) | ${보고.한글비율평균} |`,
     `| 「원문:」 인용 성립률 | ${(보고.인용성립 * 100).toFixed(0)}% |`,
