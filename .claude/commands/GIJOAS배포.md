@@ -40,6 +40,9 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
      새 자료 파일을 더한 사람은 시험을 통과시키고도 운영에서 조용히 그 기능이 꺼진다.
      (`import`로 읽는 .json은 tsc가 알아서 옮긴다 — `lite-tools.json`·`onto-aliases-ko.json`.)
 4′. **제품 문서 동기화(필수)** — ⚠ 4단계는 `server/src/`만 옮긴다. **문서와 매니페스트는 안 간다.**
+   - ⚠ `docs-drift.mjs`는 **win 호스트에서** 돌린다(WSL 안에서 돌리면 거짓 경보 — 2026-09-04 실사고:
+     WSL엔 `wsl` 명령이 없어 「30건 어긋남 · 0건 인입」이 났지만 win에서는 30/30 초록이었다).
+     지금은 그런 자리에서 판정하지 않고 **exit 2 + 안내**로 멈춘다 — 2가 나오면 win에서 다시 돌린다.
    `node tools/docs-drift.mjs` 로 먼저 재고(읽기만 함), 어긋나면 `tools/deploy-prod.ps1`의
    3.5단계와 같은 일을 한다: `server/docs-manifest.json` → 운영 서버로,
    그리고 매니페스트에 열거된 문서를 **하위 폴더를 살려서** `GIJO_DOCS_DIR`로.
