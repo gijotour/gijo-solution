@@ -1460,14 +1460,16 @@ describe("사슬이 persona까지 만들고 넘긴다(day2-train.sh 소스 감�
     expect(셸).toContain('--baseline-samples-persona');
   });
 
-  it("★ 3회전 칸(인용 꼴·길이·비중·베낀 상한)을 읽어 **빌더 깃발로** 넘긴다", () => {
-    for (const 칸 of ["quoteStyle", "maxQuoteChars", "maxQuoteShare", "maxCopyRatio"]) {
+  it("★ 3회전 칸(인용 꼴·길이·비중·베낀 상한·거절 꼴)을 읽어 **빌더 깃발로** 넘긴다", () => {
+    for (const 칸 of ["quoteStyle", "maxQuoteChars", "maxQuoteShare", "maxCopyRatio", "refusalStyle"]) {
       expect(셸, "read_round " + 칸 + " 이 없다 — 적어 두고 안 쓰는 값이 된다").toContain("read_round " + 칸);
     }
     expect(셸).toContain('${QUOTE_STYLE:+--quote-style "$QUOTE_STYLE"}');
     expect(셸).toContain('${MAX_QUOTE_CHARS:+--max-quote-chars "$MAX_QUOTE_CHARS"}');
     expect(셸).toContain('${MAX_QUOTE_SHARE:+--max-quote-share "$MAX_QUOTE_SHARE"}');
     expect(셸).toContain('${MAX_COPY_RATIO:+--max-copy-ratio "$MAX_COPY_RATIO"}');
+    // ★ 2026-09-05 — 거절 행 답 꼴. rounds.json에만 적고 셸이 안 넘기면 그 칸은 장식이 된다.
+    expect(셸).toContain('${REFUSAL_STYLE:+--refusal-style "$REFUSAL_STYLE"}');
   });
 });
 
@@ -1499,6 +1501,8 @@ describe("3회전 설정(rounds.json) — r3-v3", () => {
     expect(r.maxQuoteChars).toBe(120);
     expect(r.maxQuoteShare).toBe(0.35);
     expect(r.maxCopyRatio).toBe(0.6);
+    // ★ 2026-09-05 — 거절 행에 답을 되돌린다(r2-v2 persona 12답이 전부 같은 59자 거절 문장이었다).
+    expect(r.refusalStyle).toBe("declare-then-answer");
   });
 
   it("★ 재료 상한이 **게이트 상한과 같은 숫자**다 — 게이트가 막을 것을 재료에 넣지 않는다", async () => {
@@ -1512,11 +1516,12 @@ describe("3회전 설정(rounds.json) — r3-v3", () => {
     expect(왜).toMatch(/llm\.ts/);
     expect(왜).toMatch(/eval_loss/);
     expect(왜, "안 바꾼 것도 적어야 「왜 그대로 뒀나」를 다시 안 묻는다").toContain("바꾸지 않은 것");
+    expect(왜, "거절 꼴을 바꾼 까닭(persona 12답이 전부 같은 거절 문장)이 적혀 있어야 한다").toContain("59자 거절 문장");
   });
 
   it("★ 새 칸을 **빌더가 실제로 받는다** — 셸이 넘겨도 빌더가 모르면 무시된다", () => {
     const 빌더 = readFileSync(join(__dirname, "..", "..", "tools", "build-raft-dataset.mjs"), "utf8");
-    for (const f of ["--quote-style", "--max-quote-chars", "--max-quote-share", "--max-copy-ratio"]) {
+    for (const f of ["--quote-style", "--max-quote-chars", "--max-quote-share", "--max-copy-ratio", "--refusal-style"]) {
       expect(빌더, "빌더가 " + f + "를 안 받는다").toContain(f);
     }
     // ⚠ 꼴만 주고 규칙을 안 켜면 아무 일도 안 일어난다 — 조용히 무시하지 않고 **막는지** 본다.
