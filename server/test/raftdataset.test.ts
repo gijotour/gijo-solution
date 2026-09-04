@@ -13,6 +13,7 @@ import {
   refParse, 허용목록읽기, 허용안되는이유, 라이선스판정기, 방해조각고르기, 섞기, 참고자료블록, 토큰추정, chunk,
   시험문항목록, 행만들기,
   결정값, 거절답, 인용있나, 인용흔적있나, 인용떼기, 인용붙이기, 인용근거대조, 문장들, 긴형식경로, 긴형식읽기, 구성비, 사전검사, 절수,
+  근거조각뽑기, 근거블록있나, 규격읽기,
 } from "../../tools/build-raft-dataset.mjs";
 // 정본 판정기(사다리 ④갈래). 이름이 겹치므로 사다리 쪽에 딱지를 붙여 부른다 — 어느 잣대로 쟀는지가 늘 보이게.
 import { 허용인가, 허용목록읽기 as 사다리허용목록읽기 } from "../../tools/ladder/ladderlib.mjs";
@@ -589,30 +590,67 @@ describe("★★ 행 만들기 2회전 갈래 — A / B / B′ / C", () => {
     for (const r of rows) expect(인용있나(r.answer), `비A행에 인용이 남았다: ${r.answer}`).toBe(false);
   });
 
-  it("방해가 허용목록 밖에서 왔으면 숫자로 드러낸다(막지는 않는다 — 1회전 판을 조용히 안 바꾼다)", () => {
-    // 2026-09-04 실측: 라이선스 판정은 **정답 조각에만** 걸린다. 방해는 안 거친다 — 실제로 v1 데이터셋의
-    // 방해 자리에 Tenable 사용자 가이드 본문이 실려 있었다. 이 시험은 그 사실을 숫자로 붙잡아 둔다.
-    const 타사 = 조각("Tenable_User_Guide.pdf", 긴본문("타사 상용 문서의 문장입니다."));
-    const 색인2 = new Map([[정답조각.ref, 정답조각], [타사.ref, 타사]]);
-    const { rows, 통계 } = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref])], 색인2, 기본) as
-      결과 & { 통계: { 방해라이선스노출: { 행: number; 문서별: Record<string, number> } } };
+  // ── 방해 조각 허용목록 (2026-09-04 결정 D2 — 기본 on) ───────────────────────────────
+  //
+  // 왜 바꿨나: 재배포 위험은 「정답으로 실렸나 방해로 실렸나」를 가리지 않는다. 실측으로 v1 데이터셋의
+  // 방해 자리에 Tenable 사용자 가이드 본문이 실려 있었고, 그 문장은 학습 재료의 system 칸에 그대로 나갔다.
+  // 예전 판(거르지 않고 숫자만 드러내기)은 --no-distractor-allowlist 로 남겨 v1 재현을 지킨다.
+  const 타사 = 조각("Tenable_User_Guide.pdf", 긴본문("타사 상용 문서의 문장입니다."));
+  type 노출 = 결과 & {
+    통계: {
+      방해라이선스노출: { 행: number; 문서별: Record<string, number> };
+      방해허용목록: { 켬: boolean; 후보총: number; 남은후보: number; 거른후보: number; 거른문서별: Record<string, number> };
+      제외: Record<string, number>;
+    };
+  };
+
+  it("★★ 기본값 — 방해 조각도 허용목록으로 거른다(타사 본문이 아예 안 뽑힌다)", () => {
+    // 허용목록 안 문서가 하나(방해1) 더 있으니 행은 만들어지고, 방해로는 그것만 뽑혀야 한다.
+    const 색인2 = new Map([[정답조각.ref, 정답조각], [방해1.ref, 방해1], [타사.ref, 타사]]);
+    const { rows, 통계 } = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref])], 색인2, 기본) as 노출;
     expect(rows).toHaveLength(1);
+    expect(rows[0].system, "타사 상용 문서 본문이 학습 재료에 실리면 안 된다").not.toContain(타사.text);
+    expect(rows[0].system).toContain(방해1.text);
+    expect(통계.방해라이선스노출.행, "걸렀으니 노출이 0이라야 한다").toBe(0);
+    // 「걸었다」를 숫자로 뒷받침한다 — 0이면 안 걸린 것과 같다.
+    expect(통계.방해허용목록.켬).toBe(true);
+    expect(통계.방해허용목록.거른후보).toBe(1);
+    expect(통계.방해허용목록.거른문서별["Tenable_User_Guide.pdf"]).toBe(1);
+  });
+
+  it("★ 방해 후보가 전부 허용목록 밖이면 행을 안 만든다 — 몰래 타사 본문을 싣느니 행을 버린다", () => {
+    const 색인2 = new Map([[정답조각.ref, 정답조각], [타사.ref, 타사]]);
+    const { rows, 통계 } = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref])], 색인2, 기본) as 노출;
+    expect(rows).toHaveLength(0);
+    expect(통계.제외["방해 조각 없음"]).toBe(1);
+    expect(통계.방해라이선스노출.행).toBe(0);
+  });
+
+  it("★ --no-distractor-allowlist 면 1회전 판 그대로 — 거르지 않고 숫자로만 드러낸다", () => {
+    // 2026-09-04 실측: v1은 방해에 라이선스 판정을 안 걸었다. 그 판을 재현할 길을 남겨 둔다.
+    const 색인2 = new Map([[정답조각.ref, 정답조각], [타사.ref, 타사]]);
+    const 끈판 = { ...기본, distractorAllowlist: false };
+    const { rows, 통계 } = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref])], 색인2, 끈판) as 노출;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].system, "끈 판에서는 v1처럼 타사 본문이 실린다(그래서 기본이 아니다)").toContain(타사.text);
     expect(통계.방해라이선스노출.행).toBe(1);
     expect(통계.방해라이선스노출.문서별["Tenable_User_Guide.pdf"]).toBe(1);
+    expect(통계.방해허용목록.켬).toBe(false);
+    expect(통계.방해허용목록.거른후보).toBe(0);
   });
 
   it("★★ strict에 버려진 행은 방해 노출로 **안** 센다 — 사람더러 판단하라는 숫자에 유령 행이 섞였다", () => {
     // 2026-09-04 적발: 막힌방해 집계가 strict 인용 필터보다 먼저 돌아, 데이터셋에 실리지도 않은 행이
     // 「재배포 위험을 판단하라」는 그 숫자를 부풀렸다(실측 재구성에서 이 사유로 버려진 행이 334개였다).
-    const 타사 = 조각("Tenable_User_Guide.pdf", 긴본문("타사 상용 문서의 문장입니다."));
+    // ⚠ 허용목록을 **끈 판**으로 잰다 — 켠 판에서는 타사 방해가 아예 안 뽑혀 이 자리를 못 지난다.
     const 색인2 = new Map([[정답조각.ref, 정답조각], [타사.ref, 타사]]);
-    type 노출 = 결과 & { 통계: { 방해라이선스노출: { 행: number }; 인용규칙: Record<string, number> } };
+    const 끈판 = { ...기본, quoteRule: "strict", distractorAllowlist: false };
     // 답이 근거와 20자도 안 겹친다 → strict가 이 행을 버린다.
-    const 버림 = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref])], 색인2, { ...기본, quoteRule: "strict" }) as 노출;
+    const 버림 = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref])], 색인2, 끈판) as 노출;
     expect(버림.rows).toHaveLength(0);
     expect(버림.통계.방해라이선스노출.행, "실리지도 않은 행을 세면 안 된다").toBe(0);
     // 같은 방해인데 행이 실리면 그대로 센다(경보를 줄이는 수리가 아니다).
-    const 실림 = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref], 정답조각.text)], 색인2, { ...기본, quoteRule: "strict" }) as 노출;
+    const 실림 = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref], 정답조각.text)], 색인2, 끈판) as 노출;
     expect(실림.rows).toHaveLength(1);
     expect(실림.통계.방해라이선스노출.행).toBe(1);
   });
@@ -629,6 +667,84 @@ describe("★★ 행 만들기 2회전 갈래 — A / B / B′ / C", () => {
     const 끈판 = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref], 남의인용)], 색인, 기본) as 규칙;
     expect(Object.values(끈판.통계.인용규칙).every((v) => v === 0), "quote-rule off면 1회전과 한 글자도 다르지 않다").toBe(true);
     expect(끈판.rows[0].answer, "off면 남의 인용도 그대로 둔다(1회전 판 보존)").toBe(남의인용);
+  });
+});
+
+// ── 프롬프트 규격 파일 (2026-09-04 · R3) ──────────────────────────────────────────
+//
+// 규격 파일의 유일한 위험은 **낡는 것**이다 — 서버 llm.ts가 바뀌어도 파일은 안 따라온다.
+// 그러면 gb10에서 도는 하네스가 학습과 **딴 틀**로 재면서 전부 초록을 띄운다(이 저장소가 반복해 겪은 꼴).
+// 그래서 여기서 정본(llm.ts)과 글자 단위로 대조한다. 빨강 = 「win에서 다시 뽑아라」는 뜻이다.
+describe("★★ 프롬프트 규격 파일이 서버와 같은 글인가", () => {
+  const 규격경로 = path.join(루트, "tools", "team-bench", "prompt-spec.json");
+
+  // ⚠ 규격 파일은 **살아 있는 서버에서만** 뽑힌다(관리자 창구) — 그래서 저장소에 아직 없을 수 있다.
+  //   그때 이 시험이 빨강이면 「없는 데이터 파일」 때문에 저장소 전체가 빨강이 된다.
+  //   그렇다고 조용히 건너뛰면 이 저장소가 반복해 겪은 「초록인데 아무것도 증명 안 함」이 된다.
+  //   그래서 **둘로 가른다**:
+  //     · 파일이 없을 때 → 사슬이 창구로 **떨어지는지**를 잰다(없어도 틀린 걸 재지는 않는다는 보증).
+  //     · 파일이 있을 때 → 정본(llm.ts)과 글자 단위로 대조한다(낡으면 빨강).
+  //   즉 지키는 자는 지킬 것이 생기는 순간 저절로 켜진다 — 규격을 쓰는데 대조가 없는 상태는 못 만든다.
+  const 규격있음 = fs.existsSync(규격경로);
+
+  it("★ 규격 파일이 없으면 사슬은 창구로 떨어진다 — 없다고 딴 틀로 재지는 않는다", () => {
+    const sh = src("tools/ladder/day2-train.sh");
+    expect(sh, "규격이 없을 때의 갈래가 없으면 사슬이 그냥 죽는다").toMatch(
+      /if \[ -f "\$PROMPT_SPEC" \][\s\S]{0,600}else[\s\S]{0,400}ladder_need_env/
+    );
+    // 하네스 쪽도 fail-closed다 — 규격도 창구도 없으면 **지어내지 않고 죽는다**.
+    expect(src("tools/team-bench/ask-samples.mjs")).toContain("process.exit(3)");
+    if (!규격있음) {
+      console.warn(
+        `[시험] 규격 파일이 아직 없다(${규격경로}) — 아래 「정본과 대조」는 파일이 생기면 켜진다.` +
+        " win에서 `node tools/ladder/export-prompt-spec.mjs` 로 뽑아 커밋할 것."
+      );
+    }
+  });
+
+  it.runIf(규격있음)("★★ 규격의 ragHeader가 llm.ts RAG_BLOCK_HEADER와 **글자 단위로** 같다", () => {
+    const j = JSON.parse(fs.readFileSync(규격경로, "utf8"));
+    expect(j.ragHeader, "규격이 낡았다 — export-prompt-spec.mjs 로 다시 뽑으세요").toBe(RAG_BLOCK_HEADER);
+    expect(j.ragBlockSample, "머리말과 예시가 어긋나면 규격이 아니다").toBe(ragBlock(["<조각 본문>"]));
+    // 파일 안에서도 앞뒤가 맞아야 한다(지문이 본문과 따로 놀면 어느 쪽이 진짜인지 모른다).
+    expect(String(j.system ?? "").length, "system이 비면 하네스가 프롬프트를 못 만든다").toBeGreaterThan(0);
+    expect(j.systemChars).toBe(String(j.system).length);
+  });
+
+  it("규격읽기가 fail-closed다 — 없는 파일·빈 칸·앞뒤 어긋남에서 죽는다", () => {
+    expect(() => 규격읽기("tools/team-bench/없는-규격.json")).toThrow(/없습니다/);
+    const 임시 = path.join(루트, "tools", "team-bench", `vitest-spec-${Date.now().toString(36)}.json`);
+    try {
+      fs.writeFileSync(임시, JSON.stringify({ ragHeader: "머리말", ragBlockSample: "머리말\n[1] <조각 본문>" }));
+      expect(() => 규격읽기(임시), "system이 없으면 하네스가 프롬프트를 못 만든다").toThrow(/system/);
+      fs.writeFileSync(임시, JSON.stringify({ system: "s", ragHeader: "머리말", ragBlockSample: "엉뚱한 예시" }));
+      expect(() => 규격읽기(임시)).toThrow(/어긋납니다/);
+      // 앞뒤가 맞으면 읽힌다.
+      fs.writeFileSync(임시, JSON.stringify({ system: "s", ragHeader: "머리말", ragBlockSample: "머리말\n[1] <조각 본문>" }));
+      expect((규격읽기(임시) as { system: string }).system).toBe("s");
+    } finally {
+      fs.rmSync(임시, { force: true });
+    }
+  });
+
+  it("★ 하네스들이 --prompt-spec 을 실제로 받는다 — 인자만 만들고 안 넘기면 조용히 창구로 간다", () => {
+    // 이 저장소가 반복해 겪은 꼴: 인자를 만들어 놓고 배선을 안 해 기본값으로 조용히 돈다.
+    for (const rel of ["tools/team-bench/ask-samples.mjs", "tools/team-bench/kev-probe.mjs"]) {
+      expect(src(rel), `${rel}이 --prompt-spec을 안 읽는다`).toContain('opt("--prompt-spec"');
+    }
+    expect(src("tools/build-raft-dataset.mjs")).toContain('opt("--prompt-spec"');
+    // 사슬이 회전 폴더로 사본을 남기고 그 사본을 넘긴다(결과만 보고 무슨 꼴로 쟀는지 가릴 수 있게).
+    const sh = src("tools/ladder/day2-train.sh");
+    expect(sh).toContain('SPEC_ARGS=(--prompt-spec "$dir/prompt-spec.json")');
+    expect(sh, "표본 하네스에 안 넘기면 규격 파일이 있으나 마나다").toMatch(/ask-samples\.mjs[\s\S]{0,300}SPEC_ARGS/);
+  });
+
+  it("★ 표본 갈래는 규격이 있으면 관리자 env를 요구하지 않는다 — 요구하면 gb10에서 못 돈다", () => {
+    // 규격 파일의 목적이 「서버 없이 재기」인데 env를 그대로 막아 두면 매듭이 안 풀린다.
+    // ⚠ ①(데이터셋 만들기)는 승인 문답·코퍼스 때문에 **진짜로** 서버가 필요하다 — 거기는 그대로 둔다.
+    const 줄들 = src("tools/ladder/day2-train.sh").split("\n");
+    const 조건부 = 줄들.filter((l) => l.includes("ladder_need_env") && l.includes('[ -f "$PROMPT_SPEC" ]'));
+    expect(조건부.length, "베이스 대조·④-2 두 갈래 모두 조건부라야 한다").toBe(2);
   });
 });
 
@@ -660,12 +776,22 @@ describe("★ 긴 형식 재료 — 없으면 조용히 0건이 아니라 실패
 });
 
 describe("★★ 구성비·사전검사 — 판이 스스로를 배반하지 않는가", () => {
-  const 행 = (answer: string) => ({ question: "q", answer, system: "s" });
+  // ★ 2026-09-04 결정 D3 — 인용을 가르는 잣대는 **갈래 이름이 아니라 글**이다.
+  //   그래서 시험도 진짜 근거 블록을 실은 행과 안 실은 행을 갈라서 만든다. 예전 시험은 전부
+  //   `system: "s"` 였는데, 그 판에서는 「블록이 있나」를 물을 수 없어 규칙이 이름에 묶여 있었다.
+  const 근거행 = (answer: string) => ({
+    question: "q", answer,
+    system: ["팀원 프롬프트", 참고자료블록(RAG_BLOCK_HEADER, ["근거 조각 본문입니다"])].join("\n\n"),
+  });
+  const 무근거행 = (answer: string) => ({ question: "q", answer, system: "팀원 프롬프트" });
+  const 규격 = { ragHeader: RAG_BLOCK_HEADER };
+  // 갈래 이름만 보던 옛 시험이 쓰던 이름 — 근거 블록을 실은 행이 기본값이다.
+  const 행 = 근거행;
 
   it("갈래별 행 수와 비율, 「원문:」 비율(A행·비A행)을 따로 센다", () => {
-    const rows = [행('설명. 원문: "가나다"'), 행("설명만"), 행(거절답), 행("폐쇄형 답")];
+    const rows = [행('설명. 원문: "가나다"'), 행("설명만"), 행(거절답), 무근거행("폐쇄형 답")];
     const 종류들 = ["A", "A", "B", "C"];
-    const c = 구성비(rows, 종류들) as {
+    const c = 구성비(rows, 종류들, 규격) as {
       표: Record<string, { 행: number; 비율: number }>;
       인용: { A행: { 행: number; 인용: number; 비율: number }; 비A행: { 행: number; 인용: number } };
       답길이: { p50: number; max: number }; 절3이상: number;
@@ -679,27 +805,71 @@ describe("★★ 구성비·사전검사 — 판이 스스로를 배반하지 �
     expect(c.답길이.max).toBeGreaterThan(0);
   });
 
-  it("★ 비A행에 「원문:」이 하나라도 있으면 실패다(1회전 결함을 그대로 가르치는 판)", () => {
-    const c = 구성비([행(거절답 + ' 원문: "지어낸 인용"')], ["B"]);
+  it("★ 거절 답에 「원문:」이 붙으면 실패다 — 「없습니다」라 하면서 인용하면 그 인용은 거짓이다", () => {
+    // ⓑ는 근거 블록이 **있는** 행이다(방해만 실린다). 그래도 답이 거절이라 인용은 0이라야 한다 —
+    // 이 예외를 명시적으로 못 박는다(2026-09-04 결정 D3).
+    const c = 구성비([행(거절답 + ' 원문: "지어낸 인용"')], ["B"], 규격);
     const r = 사전검사(c) as { 통과: boolean; 실패: string[] };
     expect(r.통과).toBe(false);
-    expect(r.실패[0]).toContain("원문");
+    expect(r.실패.join(" ")).toContain("원문");
+    expect(r.실패.join(" "), "거절 행이 범인임을 말해야 한다").toContain("B 1행");
   });
 
   it("★ 실패 문구가 **어느 갈래**인지 댄다 — D면 고칠 자리가 이 빌더가 아니라 그 파일이다", () => {
-    const rows = [행("근거 답"), 행(거절답), 행('긴 형식 보고. 원문: "어디선가"')];
-    const c = 구성비(rows, ["A", "B", "D"]) as { 표: Record<string, { 인용: number; 행: number }> };
+    // 근거 블록이 **없는** D행이 인용을 달았다 → 없는 것을 인용한 것이다.
+    const rows = [행("근거 답"), 행(거절답), 무근거행('긴 형식 보고. 원문: "어디선가"')];
+    const c = 구성비(rows, ["A", "B", "D"], 규격) as { 표: Record<string, { 인용: number; 행: number }> };
     expect(c.표.D.인용, "갈래별 인용 수를 세지 않으면 범인을 못 댄다").toBe(1);
     expect(c.표.B.인용).toBe(0);
     const r = 사전검사(c) as { 통과: boolean; 실패: string[] };
     expect(r.통과).toBe(false);
-    expect(r.실패[0]).toContain("D 1/1");
-    expect(r.실패[0], "죄 없는 갈래를 범인으로 부르면 안 된다").not.toContain("B 0/");
+    expect(r.실패[0]).toContain("D 1행");
+    expect(r.실패[0], "죄 없는 갈래를 범인으로 부르면 안 된다").not.toContain("B ");
+  });
+
+  it("★★ 근거 블록을 실은 D행의 인용은 **통과**한다 — 갈래 이름으로 가르던 규칙이 재료를 지웠다", () => {
+    // 2026-09-04 결정 D3의 핵심 회귀 방지. 실측: longform-vuln-v1.json 121행이 전부 근거 블록을
+    // 싣고 121행 전부에 인용이 달려 있다. 「비A행이면 인용 0%」였던 옛 규칙은 그 121행을 통째로
+    // 범인으로 몰았고, strict는 근거에서 온 정당한 인용을 떼어 버렸다(재료의 값어치를 지우는 수리).
+    const rows = [행("근거 답"), 근거행('긴 형식 보고. 원문: "근거 조각 본문입니다"')];
+    const c = 구성비(rows, ["A", "D"], 규격) as {
+      인용: { 근거인용가능: { 행: number; 인용: number }; 근거블록없음: { 인용: number }; 거절행: { 인용: number } };
+      근거블록: Record<string, number>;
+    };
+    expect(c.근거블록.D, "D행이 근거 블록을 실었음을 세어야 한다").toBe(1);
+    expect(c.인용.근거인용가능).toMatchObject({ 행: 2, 인용: 1 });
+    expect(c.인용.근거블록없음.인용).toBe(0);
+    expect(c.인용.거절행.인용).toBe(0);
+    const r = 사전검사(c) as { 통과: boolean; 실패: string[] };
+    expect(r.통과, `근거에서 온 인용을 막으면 안 된다: ${JSON.stringify(r.실패)}`).toBe(true);
+  });
+
+  it("★★ 범인 문구는 **걸린 행만** 센다 — 죄 없는 D행 인용까지 지목하면 엉뚱한 파일을 뒤진다", () => {
+    // 2026-09-04 자기검토에서 잡은 자리: 범인을 갈래의 **전체 인용 수**(표[k].인용)로 부르면,
+    // 근거 블록을 실어 정당하게 인용한 D행 여럿이 실패 문구에 통째로 실린다. 실제로 고칠 행은 하나인데.
+    const rows = [
+      근거행('정당한 긴 형식. 원문: "근거 조각 본문입니다"'),
+      근거행('또 하나 정당한 긴 형식. 원문: "근거 조각 본문입니다"'),
+      무근거행('블록 없는 D행. 원문: "어디선가"'),
+    ];
+    const c = 구성비(rows, ["D", "D", "D"], 규격) as { 표: Record<string, { 인용: number }> };
+    expect(c.표.D.인용, "갈래 전체 인용은 3이다(그래서 이 숫자로 범인을 부르면 안 된다)").toBe(3);
+    const r = 사전검사(c) as { 통과: boolean; 실패: string[] };
+    expect(r.통과).toBe(false);
+    expect(r.실패[0], "걸린 행은 하나뿐이다").toContain("D 1행");
+    expect(r.실패[0], "정당한 두 행까지 범인으로 부르면 안 된다").not.toContain("D 3");
+  });
+
+  it("★ ragHeader를 안 주면 fail-closed — 「전부 근거 없음」으로 보고 막는다", () => {
+    // 규격을 안 넘긴 호출부가 **조용히 통과**하면, 블록을 가릴 수 없는 채로 초록이 뜬다.
+    const c = 구성비([행('설명. 원문: "가나다"')], ["A"]);
+    const r = 사전검사(c) as { 통과: boolean; 실패: string[] };
+    expect(r.통과, "머리말 없이 판단할 수 있는 척하면 안 된다").toBe(false);
   });
 
   it("A행의 「원문:」이 95% 미만이면 경고한다(실패는 아니다)", () => {
     const rows = Array.from({ length: 10 }, (_, i) => 행(i === 0 ? '설명. 원문: "가나다"' : "설명만"));
-    const r = 사전검사(구성비(rows, rows.map(() => "A"))) as { 통과: boolean; 경고: string[] };
+    const r = 사전검사(구성비(rows, rows.map(() => "A"), 규격)) as { 통과: boolean; 경고: string[] };
     expect(r.통과).toBe(true);
     expect(r.경고[0]).toContain("95%");
   });
@@ -708,17 +878,17 @@ describe("★★ 구성비·사전검사 — 판이 스스로를 배반하지 �
     // 2026-09-04 적발: 커밋은 「A행이 95% 미만이면 경고」라 했는데 코드는 A행 **안쪽 인용률**만 봤다.
     // 그래서 pOracle 0(전부 거절)인 판이 실패 0·경고 0으로 통과했다 — 0.8을 0.08로 잘못 쳐도 아무도 안 막는다.
     const rows = [행(거절답), 행(거절답), 행(거절답), 행("근거를 인용한 답")];
-    const r = 사전검사(구성비(rows, ["B", "B", "B", "A"])) as { 통과: boolean; 경고: string[] };
+    const r = 사전검사(구성비(rows, ["B", "B", "B", "A"], 규격)) as { 통과: boolean; 경고: string[] };
     expect(r.통과, "비중은 경고지 실패가 아니다(낮은 P를 일부러 고를 수 있다)").toBe(true);
     expect(r.경고.some((w) => w.includes("p-oracle")), `경고에 안 나온다: ${JSON.stringify(r.경고)}`).toBe(true);
-    const 기본판 = 사전검사(구성비([행('답. 원문: "가나다"')], ["A"])) as { 경고: string[] };
+    const 기본판 = 사전검사(구성비([행('답. 원문: "가나다"')], ["A"], 규격)) as { 경고: string[] };
     expect(기본판.경고.some((w) => w.includes("p-oracle")), "전부 A인 기본판까지 경고하면 경고가 소음이 된다").toBe(false);
   });
 
   it("★★ ⓒ 폐쇄형과 ⓑ′ 무근거 거절을 **함께** 실으면 막는다 — 같은 프롬프트에 정반대 답이다", () => {
     // 둘 다 system이 「팀원 프롬프트만」(참고 자료 블록 없음)이라 글자 단위로 같다. C는 서술 답을,
     // B′는 거절을 가르친다 — 게다가 그 프롬프트 안에는 「자료가 없으면 없다고 먼저 밝힙니다」 규칙이 들어 있다.
-    const c = 구성비([행("폐쇄형 답"), 행(거절답)], ["C", "B2"]);
+    const c = 구성비([무근거행("폐쇄형 답"), 무근거행(거절답)], ["C", "B2"], 규격);
     const r = 사전검사(c) as { 통과: boolean; 실패: string[] };
     expect(r.통과).toBe(false);
     expect(r.실패.join(" ")).toContain("--allow-closedbook-conflict");
@@ -727,9 +897,19 @@ describe("★★ 구성비·사전검사 — 판이 스스로를 배반하지 �
   });
 
   it("ⓒ만 있어도 경고는 남긴다 — 팀원 프롬프트 자신의 규칙을 어기는 답이다", () => {
-    const r = 사전검사(구성비([행("폐쇄형 답")], ["C"])) as { 통과: boolean; 경고: string[] };
+    const r = 사전검사(구성비([무근거행("폐쇄형 답")], ["C"], 규격)) as { 통과: boolean; 경고: string[] };
     expect(r.통과).toBe(true);
     expect(r.경고.some((w) => w.includes("폐쇄형"))).toBe(true);
+  });
+
+  // ★ 2026-09-04 결정 D1 — ⓒ 폐쇄형은 **회전 2에 싣지 않는다**. 그 결정이 코드에 남아 있는지 본다.
+  //   왜: 팀원 프롬프트 자신이 「참고 자료가 없으면 … '없습니다'라고 먼저 밝힙니다」라고 규칙을 두는데
+  //   ⓒ는 그 규칙을 어기는 답을 가르친다. 제품은 언제나 RAG를 주고, 없으면 거절이 정답이다.
+  it("★ D1 — ⓒ를 쓰지 않는 이유가 코드에 적혀 있고, 기본값은 0이다", () => {
+    const code = src("tools/build-raft-dataset.mjs");
+    expect(code, "--closedbook-ratio 기본값이 0이라야 한다").toContain('비율읽기("--closedbook-ratio", 0)');
+    expect(code, "왜 안 쓰는지가 파일에 적혀 있어야 한다(결정이 글로 안 남으면 다음 사람이 되돌린다)")
+      .toMatch(/회전 2에는 ⓒ를 싣지 않는다/);
   });
 
   it("절 세기는 1회전 실측에 쓴 규칙과 같다(## · 1) · ①)", () => {
@@ -824,6 +1004,53 @@ describe.runIf(PY)("★ 학습 스크립트가 행마다의 근거(system)를 �
       expect(평가줄.length, "eval_loss 줄이 안 나왔다").toBeGreaterThan(0);
       for (const l of 평가줄) expect(/step\s+(\d+)\/(\d+)\s+loss=([\d.]+)/.test(l), `파서에 걸린다: ${l}`).toBe(false);
       expect(r.stdout).toMatch(/step 1\/10 loss=/); // 기존 계약은 그대로
+    } finally {
+      fs.rmSync(데이터셋, { force: true });
+      fs.rmSync(산출, { recursive: true, force: true });
+    }
+  });
+
+  // [2026-09-04 · R6] --eval-holdout의 **결정적 분리가 학습 행과 겹치지 않는가**.
+  //   왜 중요한가: 떼어 둔 행의 손실이 오르는 지점을 보자는 것이 이 인자의 목적인데, 같은 질문이 양쪽에
+  //   있으면 그 손실은 「배웠나」가 아니라 「외웠나」를 잰다 — 그 숫자로 회전을 판정하면 판정이 거짓이 된다.
+  //   옛 판은 자리를 input_ids 해시로 골라, 같은 질문이라도 system·answer이 다르면 다른 자리라
+  //   **원리상 겹침을 못 막았다**(승인 문답의 중복 질문 · ⓓ 긴 형식이 딴 생성기에서 오는 길).
+  it("★★ --eval-holdout — 같은 질문이 학습·평가 양쪽에 있지 않다(질문 뭉치를 통째로 뗀다)", () => {
+    fs.mkdirSync("data/datasets", { recursive: true });
+    // 같은 질문이 **세 행**으로 들어 있다(system·answer이 달라 옛 판에서는 서로 다른 자리였다).
+    const 겹치는질문 = "KEV 목록에 오르면 무엇을 먼저 하나요?";
+    fs.writeFileSync(
+      데이터셋,
+      JSON.stringify([
+        { question: 겹치는질문, answer: "먼저 자산을 찾습니다", system: "참고 자료\n[1] 자산 식별" },
+        { question: 겹치는질문, answer: "먼저 패치 여부를 봅니다", system: "참고 자료\n[1] 패치 확인" },
+        { question: 겹치는질문, answer: "등록된 사내 자료에는 관련 내용이 없습니다" },
+        { question: "접속기록 보관 기간은?", answer: "1년 이상입니다", system: "참고 자료\n[1] 1년 이상 보관" },
+        { question: "방화벽 점검 주기는?", answer: "월 1회입니다" },
+        { question: "백업 주기는?", answer: "주 1회입니다" },
+      ]),
+      "utf-8"
+    );
+    try {
+      const 돌리기 = () => spawnSync(
+        PY!,
+        ["scripts/finetune_qlora14b.py", "--dataset", id, "--output", 산출, "--max-seq", "3072",
+          "--smoke", "--eval-holdout", "2"],
+        { encoding: "utf-8", env: { ...process.env, PYTHONUTF8: "1" } }
+      );
+      const r = 돌리기();
+      expect(r.status, `스크립트가 죽었다: ${r.stderr}`).toBe(0);
+      // 스모크가 **진짜 분리기**를 돌려 겹침을 세어 말한다(다른 식을 새로 적으면 제 코드를 검사하게 된다).
+      expect(r.stdout, `분리 줄이 없다: ${r.stdout}`).toMatch(/평가 분리 —/);
+      expect(r.stdout, "같은 질문이 양쪽에 있으면 평가 손실이 「외웠나」를 잰다").toContain("양쪽 겹친 질문 0");
+      // 뭉치를 통째로 뗀다 — 3행짜리 질문이 걸리면 2가 아니라 3이 떨어진다(반쪽을 떼면 겹침이 생긴다).
+      const m = r.stdout.match(/평가 (\d+)행 \/ 학습 (\d+)행/);
+      expect(m, `분리 숫자를 못 읽었다: ${r.stdout}`).toBeTruthy();
+      const [평가, 학습] = [Number(m![1]), Number(m![2])];
+      expect(평가).toBeGreaterThanOrEqual(2);
+      expect(평가 + 학습, "행이 사라지거나 늘면 안 된다").toBe(6);
+      // ★ 결정적이다 — 같은 재료면 같은 시험지라야 회전끼리 견줄 수 있다.
+      expect(돌리기().stdout.match(/평가 분리 —.*/)?.[0]).toBe(r.stdout.match(/평가 분리 —.*/)?.[0]);
     } finally {
       fs.rmSync(데이터셋, { force: true });
       fs.rmSync(산출, { recursive: true, force: true });

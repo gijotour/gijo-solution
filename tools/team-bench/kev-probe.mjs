@@ -53,15 +53,22 @@ async function login(base, user, password) {
 
 if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/kev-probe.mjs")) {
   const OUT = argv.find((a, i) => !a.startsWith("--") && !(i > 0 && argv[i - 1].startsWith("--"))) ?? "";
-  if (!OUT) { console.error("쓰는 법: node tools/team-bench/kev-probe.mjs <출력파일> [--server URL] [--agent id] [--system-file 경로]"); process.exit(2); }
+  if (!OUT) { console.error("쓰는 법: node tools/team-bench/kev-probe.mjs <출력파일> [--server URL] [--agent id] [--system-file 경로] [--prompt-spec 경로]"); process.exit(2); }
   const PORT = Number(process.env.PORT || opt("--port", 8093));
   const SERVER = String(opt("--server", process.env.GIJO_SERVER_URL || "http://localhost:4000")).replace(/\/+$/, "");
   const AGENT = String(opt("--agent", "normaltic"));
   const SYSFILE = opt("--system-file", "");
   const REQ_MS = Number(process.env.REQ_MS || 600_000);
 
+  // ★ 규격 파일 길(2026-09-04 · R3) — 서버 없이도 학습과 같은 팀원 프롬프트로 잰다.
+  //   ask-samples.mjs와 **같은 파일**을 읽는다(두 하네스가 다른 프롬프트로 재면 견줄 수 없다).
+  const SPEC = String(opt("--prompt-spec", "")).trim();
   let SYS = "", 출처 = "", auth = null, refreshToken = null;
-  if (SYSFILE) {
+  if (SPEC) {
+    const { 규격읽기 } = await import("../build-raft-dataset.mjs");
+    SYS = 규격읽기(SPEC).system;
+    출처 = `prompt-spec:${SPEC}`;
+  } else if (SYSFILE) {
     SYS = JSON.parse(fs.readFileSync(SYSFILE, "utf8"))[0].system;
     출처 = `system-file:${SYSFILE}`;
   } else {

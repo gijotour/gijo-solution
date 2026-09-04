@@ -85,6 +85,17 @@ async function ask(task, m) {
   return { status: r.status, ms, content, reasoning: String(msg.reasoning_content ?? "").length, promptTokens: t.prompt_n ?? j.usage?.prompt_tokens, genTokens: t.predicted_n ?? j.usage?.completion_tokens, prefillTps: t.prompt_per_second, genTps: t.predicted_per_second, finish: j.choices?.[0]?.finish_reason, error: j.error };
 }
 
+// ★ 답은 **전문을 남긴다**(2026-09-04 검토관 적발 R2). 예전에는 1,500자로 잘라 두어서,
+//   나중에 다시 채점하려 하면(예: scan_messy 잣대를 고쳐 재채점) **원리상 불가능**했다 —
+//   채점은 실행 중에 전문으로 하는데(위 task.score(a.content)) 파일에는 토막만 남아,
+//   결과 파일만 들고는 그 판정을 재현할 수도 뒤집을 수도 없었다.
+//   상한 20,000자는 파일이 터지는 것만 막는 자리다. 잘렸으면 **잘렸다고 적는다** —
+//   조용히 잘린 글을 전문으로 착각하고 재채점하면 그 숫자가 거짓이 된다.
+const 답상한 = 20000;
+const 답기록 = (답) => (답.length > 답상한
+  ? { answer: 답.slice(0, 답상한), answerTruncated: true, answerChars: 답.length }
+  : { answer: 답, answerTruncated: false, answerChars: 답.length });
+
 async function runModel(m) {
   log(`▶ ${m.id} (${m.path})`);
   const res = { id: m.id, path: m.path, license: m.license, startedAt: now(), tasks: {}, load: null, error: null };
@@ -100,7 +111,7 @@ async function runModel(m) {
       let scored = { score: 0, detail: a.error ? `요청 실패 ${JSON.stringify(a.error).slice(0, 80)}` : "빈 답" };
       if (a.content) scored = task.score(a.content);
       const 답 = a.content;
-      res.tasks[task.id] = { role: task.role, score: Number(scored.score.toFixed(3)), detail: scored.detail, ms: a.ms, promptTokens: a.promptTokens, genTokens: a.genTokens, prefillTps: a.prefillTps, genTps: a.genTps, finish: a.finish, 한글: Number(한글비율(답).toFixed(2)), 한자: 한자수(답), thinkLeak: /<think>/.test(답) || (a.reasoning > 0 && !답), answer: 답.slice(0, 1500) };
+      res.tasks[task.id] = { role: task.role, score: Number(scored.score.toFixed(3)), detail: scored.detail, ms: a.ms, promptTokens: a.promptTokens, genTokens: a.genTokens, prefillTps: a.prefillTps, genTps: a.genTps, finish: a.finish, 한글: Number(한글비율(답).toFixed(2)), 한자: 한자수(답), thinkLeak: /<think>/.test(답) || (a.reasoning > 0 && !답), ...답기록(답) };
       log(`  ${task.id.padEnd(14)} ${scored.score.toFixed(2)}  ${scored.detail}  (${(a.ms / 1000).toFixed(1)}s · 프리필 ${a.prefillTps?.toFixed?.(0) ?? "-"} tok/s · 생성 ${a.genTps?.toFixed?.(1) ?? "-"} tok/s)`);
     }
   } finally {

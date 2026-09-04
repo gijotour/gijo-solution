@@ -63,6 +63,12 @@ done
 
 BENCH_SRC="$REPO/tools/team-bench"
 BASELINE_DIR="$BENCH_SRC/results-ladder/baseline"
+# ★ 프롬프트 규격 파일(2026-09-04 · R3) — 근거 꼴을 **저장소에서** 읽는 길.
+#   왜: 이 사슬은 gb10에서 도는데, 거기서 관리자 4000(win 운영은 VPN 너머·계정당 1세션)에 닿는 길이
+#   마땅치 않아 「학습과 같은 꼴로 재는가」가 남의 기계 사정에 매여 있었다.
+#   있으면 쓰고, 없으면 종전대로 창구로 간다(win에서는 둘 다 된다).
+#   규격 뽑기: win에서 `node tools/ladder/export-prompt-spec.mjs`
+PROMPT_SPEC="${LADDER_PROMPT_SPEC:-$BENCH_SRC/prompt-spec.json}"
 
 # 베이스 모델·llama-server는 **두 갈래가 같은 것**을 쓴다(베이스 대조 · 회전 표본). 한 곳에서 정한다.
 BASE_GGUF="${LADDER_BASE_GGUF:-$SERVER_DIR/models/qwen3-14b/qwen3-14b.gguf}"
@@ -123,7 +129,19 @@ serve_start() {
 run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
   local dir="$1" who="$2"
   mkdir -p "$dir"
-  ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
+  # ★ 규격 파일이 있으면 그것을 쓰고 **회전 폴더에 사본을 남긴다**(2026-09-04 · R3).
+  #   사본을 남기는 이유: 결과 파일만 들고 「어떤 근거 꼴로 쟀나」를 나중에 가릴 수 있어야 한다.
+  #   저장소의 규격이 그 사이 바뀌어도, 이 회전이 실제로 쓴 것은 이 사본이 증언한다.
+  local SPEC_ARGS=()
+  if [ -f "$PROMPT_SPEC" ]; then
+    cp "$PROMPT_SPEC" "$dir/prompt-spec.json"
+    SPEC_ARGS=(--prompt-spec "$dir/prompt-spec.json")
+    ladder_log "   근거 꼴: 규격 파일 $PROMPT_SPEC → $dir/prompt-spec.json (서버 불필요)"
+  else
+    # 규격이 없으면 종전대로 창구로 간다 — 그러려면 관리자 env가 있어야 한다.
+    ladder_log "   근거 꼴: 창구(GET /api/learnloop/raft/prompt) — 규격 파일이 없다($PROMPT_SPEC)"
+    ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
+  fi
   for mode in grounded distractor-only bare; do
     if ladder_have "$dir/samples-$mode.json"; then
       ladder_log "   표본[$mode] 건너뜀 — 이미 있다"
@@ -131,27 +149,31 @@ run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
     fi
     ladder_log "   표본[$mode] ($who) — 포트 $PORT"
     PORT="$PORT" node "$BENCH_SRC/ask-samples.mjs" "$dir/samples-$mode.json" --mode "$mode" --server "$SERVER" --agent "${AGENT:-normaltic}" \
-      2>&1 | tee "$dir/samples-$mode.log"
+      "${SPEC_ARGS[@]}" 2>&1 | tee "$dir/samples-$mode.log"
     [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ 표본[$mode] 실패 — $dir/samples-$mode.log" >&2; return 8; }
   done
   if ladder_have "$dir/kev.json"; then
     ladder_log "   KEV 건너뜀 — 이미 있다"
   else
     ladder_log "   KEV 3문항 ($who) — 포트 $PORT"
-    PORT="$PORT" node "$BENCH_SRC/kev-probe.mjs" "$dir/kev.json" --server "$SERVER" --agent "${AGENT:-normaltic}" 2>&1 | tee "$dir/kev.log"
+    PORT="$PORT" node "$BENCH_SRC/kev-probe.mjs" "$dir/kev.json" --server "$SERVER" --agent "${AGENT:-normaltic}" \
+      "${SPEC_ARGS[@]}" 2>&1 | tee "$dir/kev.log"
     [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ KEV 시험 실패 — $dir/kev.log" >&2; return 8; }
   fi
   # ★ 무슨 인자로 쟀는지를 파일로 남긴다 — 「--system을 줬는지조차 결과로 못 가렸다」의 수리.
   node -e '
     const fs = require("node:fs");
-    const [out, port, server, agent, who] = process.argv.slice(1);
+    const [out, port, server, agent, who, specPath] = process.argv.slice(1);
+    const spec = specPath ? ` --prompt-spec ${specPath}` : "";
     fs.writeFileSync(out, JSON.stringify({
       누구: who, 잰때: new Date().toISOString(), port: Number(port), server, agent,
-      표본: ["grounded", "distractor-only", "bare"].map((m) => `ask-samples.mjs samples-${m}.json --mode ${m} --server ${server} --agent ${agent}`),
-      kev: `kev-probe.mjs kev.json --server ${server} --agent ${agent}`,
+      표본: ["grounded", "distractor-only", "bare"].map((m) => `ask-samples.mjs samples-${m}.json --mode ${m} --server ${server} --agent ${agent}${spec}`),
+      kev: `kev-probe.mjs kev.json --server ${server} --agent ${agent}${spec}`,
+      // 근거 꼴을 어디서 받았나 — 규격 파일이면 그 사본이 이 폴더에 함께 있다(prompt-spec.json).
+      근거꼴출처: spec ? "prompt-spec.json(이 폴더의 사본)" : "창구 GET /api/learnloop/raft/prompt",
       "왜 적나": "결과 파일만 보고 어떤 조건으로 던졌는지 가릴 수 있어야 한다(2026-09-04 수리).",
     }, null, 2));
-  ' "$dir/harness-args.json" "$PORT" "$SERVER" "${AGENT:-normaltic}" "$who"
+  ' "$dir/harness-args.json" "$PORT" "$SERVER" "${AGENT:-normaltic}" "$who" "${SPEC_ARGS[1]:-}"
   ladder_log "   인자 기록 → $dir/harness-args.json"
 }
 
@@ -162,7 +184,9 @@ if [ "$BASELINE_PROBE" -eq 1 ]; then
   # ★ env는 **두뇌를 띄우기 전에** 본다(2026-09-04 검토관 적발). ladder_need_env는 return이 아니라
   #   `exit 3` 으로 셸을 끝내므로, 서버를 먼저 띄우면 그 exit에서 8093에 두뇌가 그대로 남았다 —
   #   이 파일이 스스로 「8093에 두뇌를 남기지 않는다」고 적어 둔 바로 그 사고다. EXIT trap과 이중으로 막는다.
-  ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
+  #   ⚠ 규격 파일이 있으면 하네스가 서버에 안 붙으므로 이 env는 **필요 없다**(2026-09-04 · R3).
+  #   있지도 않은 요구로 막으면, 규격을 두고도 gb10에서 못 도는 옛 상태 그대로다.
+  [ -f "$PROMPT_SPEC" ] || ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
   mkdir -p "$BASELINE_DIR"
   serve_start "$BASELINE_DIR/serve-base.log" "$BASE_GGUF" || exit $?
   run_probes "$BASELINE_DIR" "베이스(어댑터 없음)"
@@ -331,7 +355,9 @@ if [ "$ONLY_GATE" -eq 0 ]; then
   #   그래서 여기서 같은 어댑터를 얹어 **다시 띄운다** — 안 띄우면 하네스가 ECONNREFUSED로 죽고
   #   (exit 8), 관문 ⑧·⑩은 회전 갈래에서 영영 미측정이 된다(2026-09-04 검토관 적발).
   #   ④와 포트를 나눠 쓸 수는 없다: run.mjs:47이 「포트 이미 사용 중」이면 아예 거부한다(배타적이다).
-  ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
+  #   ⚠ 규격 파일이 있으면 하네스가 서버에 안 붙으니 이 env는 필요 없다(2026-09-04 · R3) —
+  #     베이스 대조 갈래와 **같은 규칙**이라야 둘이 같은 조건으로 잰다.
+  [ -f "$PROMPT_SPEC" ] || ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
   serve_start "$OUTDIR/serve-probe.log" "$BASE_GGUF" --lora "$ADAPTER_GGUF" || exit $?
   run_probes "$OUTDIR" "회전 $ROUND"
   PROBE_RC=$?

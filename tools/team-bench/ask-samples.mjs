@@ -36,7 +36,11 @@
 //
 // 사용:
 //   PORT=8093 node tools/team-bench/ask-samples.mjs <출력파일> --mode grounded \
-//        [--server http://localhost:4000] [--agent normaltic] [--questions <경로>]
+//        [--server http://localhost:4000] [--agent normaltic] [--questions <경로>] \
+//        [--prompt-spec tools/team-bench/prompt-spec.json]
+//   ★ --prompt-spec 을 주면 **서버에 안 붙는다** — 근거 꼴을 저장소의 규격 파일에서 읽는다.
+//     사슬이 도는 gb10에는 관리자 4000에 닿는 마땅한 길이 없어, 그 매듭을 끊으려고 만든 길이다
+//     (규격 파일은 win에서 tools/ladder/export-prompt-spec.mjs 로 뽑는다).
 //   ⚠ day2-train.sh의 harness/ 사본 폴더로 **복사해 쓰지 않는다** — 위쪽 `../build-raft-dataset.mjs`를
 //     불러 쓰므로 저장소 자리에서 그대로 실행해야 한다(gates.mjs와 같다).
 //   나가는 코드: 0=정상 · 2=쓰는 법 틀림 · 3=env/서버 없음
@@ -45,7 +49,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { 참고자료블록 } from "../build-raft-dataset.mjs";
+import { 참고자료블록, 규격읽기 } from "../build-raft-dataset.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -98,7 +102,26 @@ async function login(base, user, password) {
   return { auth: { "Content-Type": "application/json", Authorization: "Bearer " + j.accessToken }, refreshToken: j.refreshToken };
 }
 
-/** 제품이 쓰는 근거 꼴을 **받아 온다**(베끼지 않는다). 조립 꼴이 서버와 다르면 그 자리에서 죽는다. */
+/**
+ * 제품이 쓰는 근거 꼴을 **받아 온다**(베끼지 않는다). 조립 꼴이 서버와 다르면 그 자리에서 죽는다.
+ *
+ * ★ 길이 둘이다(2026-09-04 · R3):
+ *   ① --prompt-spec <파일> — 저장소에 못 박아 둔 규격 파일. **서버가 필요 없다.**
+ *      사슬은 gb10에서 도는데 거기서 관리자 4000에 닿는 길이 마땅치 않아, 「학습과 같은 꼴로 재는가」가
+ *      남의 기계 사정에 매여 있었다. 그 매듭을 끊는 자리다.
+ *   ② 창구(GET /api/learnloop/raft/prompt) — win처럼 서버가 곁에 있을 때의 정석.
+ *   ⚠ 둘 다 없으면 **실패한다**(fail-closed). 근거 꼴을 지어내면 재는 것이 딴것이 된다.
+ */
+async function 규격으로프롬프트(specPath) {
+  // 규격읽기가 칸 누락·앞뒤 어긋남을 다 본다(fail-closed) — 여기서 다시 세지 않는다.
+  const j = 규격읽기(specPath);
+  // 파일에서 왔어도 조립 꼴 대조는 **그대로 한다** — 규격이 낡았는지는 이 대조가 먼저 말한다.
+  if (참고자료블록(j.ragHeader, ["<조각 본문>"]) !== j.ragBlockSample) {
+    throw new Error(`규격 파일의 참고 자료 블록 조립 꼴이 어긋난다: ${specPath}`);
+  }
+  return { system: j.system, ragHeader: j.ragHeader, auth: null, refreshToken: null, server: null, 출처: `prompt-spec:${specPath}` };
+}
+
 async function 프롬프트받기(server, agent) {
   const user = process.env.GIJO_ADMIN_USER, password = process.env.GIJO_ADMIN_PASSWORD;
   if (!user || !password) { console.error("✗ GIJO_ADMIN_USER / GIJO_ADMIN_PASSWORD 가 필요하다(근거 꼴을 서버에서 받아 온다)"); process.exit(3); }
@@ -121,7 +144,7 @@ async function 프롬프트받기(server, agent) {
     await 로그아웃({ auth, refreshToken, server });
     throw new Error("참고 자료 블록 조립 꼴이 서버(llm.ts ragBlock)와 다르다 — 이 꼴로 재면 학습 때와 딴 틀을 재게 된다");
   }
-  return { system: j.system, ragHeader: j.ragHeader, auth, refreshToken, server };
+  return { system: j.system, ragHeader: j.ragHeader, auth, refreshToken, server, 출처: `raft/prompt:${agent}` };
 }
 
 async function 로그아웃(ctx) {
@@ -139,19 +162,22 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
   const OUT = argv.find((a, i) => !a.startsWith("--") && !(i > 0 && argv[i - 1].startsWith("--"))) ?? "";
   const MODE = String(opt("--mode", "bare"));
   if (!OUT || !MODES.includes(MODE)) {
-    console.error(`쓰는 법: node tools/team-bench/ask-samples.mjs <출력파일> --mode ${MODES.join("|")} [--server URL] [--agent id] [--questions 경로]`);
+    console.error(`쓰는 법: node tools/team-bench/ask-samples.mjs <출력파일> --mode ${MODES.join("|")} [--server URL] [--agent id] [--questions 경로] [--prompt-spec 경로]`);
     process.exit(2);
   }
   const PORT = Number(process.env.PORT || opt("--port", 8093));
   const SERVER = String(opt("--server", process.env.GIJO_SERVER_URL || "http://localhost:4000")).replace(/\/+$/, "");
   const AGENT = String(opt("--agent", "normaltic"));
   const QFILE = path.resolve(opt("--questions", path.join(here, "samples-questions.json")));
+  const SPEC = String(opt("--prompt-spec", "")).trim();
   const REQ_MS = Number(process.env.REQ_MS || 600_000);
 
   const qs = JSON.parse(fs.readFileSync(QFILE, "utf8"));
   const 근거필요 = MODE !== "bare";
-  const ctx = 근거필요 ? await 프롬프트받기(SERVER, AGENT) : null;
+  // 규격 파일이 있으면 서버에 안 붙는다(gb10에서 돌 때의 길) — 없으면 창구로 간다.
+  const ctx = 근거필요 ? (SPEC ? await 규격으로프롬프트(SPEC) : await 프롬프트받기(SERVER, AGENT)) : null;
   const 팀원지문 = ctx ? sha12(ctx.system) : "";
+  if (ctx) console.log(`근거 꼴 출처: ${ctx.출처}`);
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function ask(system, q) {
@@ -203,7 +229,15 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
       ...공통,
       chunk: MODE === "grounded" ? 문항.chunk : "",
       distractor: 근거필요 ? 문항.distractor : "",
-      promptSha12: sha12(system), systemChars: system.length,
+      // ⚠ bare 조건은 system이 **없다** — 그런데 sha12("")를 적으면 `da39a3ee5e6b`(빈 문자열의 sha1)이
+      //   찍혀, 게이트 표(gates.mjs 표만들기)가 그것을 **진짜 프롬프트 지문처럼** 늘어놓는다.
+      //   지문을 대조해 「같은 조건이었나」를 가리자는 것이 이 칸의 목적인데, 「없음」이 실재하는 지문처럼
+      //   보이면 그 대조가 거짓이 된다(2026-09-04 검토관 적발 8번째).
+      //   kev-probe.mjs가 같은 「프롬프트 없음」 조건에 `promptSha12: ""` · `systemSource: "(없음)"`을
+      //   적고 있었다 — 두 하네스를 그쪽에 맞춘다.
+      promptSha12: system ? sha12(system) : "",
+      systemChars: system.length,
+      systemSource: ctx?.출처 ?? "(없음)",
       ...a,
     });
     console.log(`${i + 1}/${qs.length} ${a.finish} ${a.len}자 한글${a.한글.toFixed(2)} sys${system.length}자 ${(a.ms / 1000).toFixed(1)}s`);

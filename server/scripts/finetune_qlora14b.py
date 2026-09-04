@@ -15,6 +15,35 @@ def log(msg: str) -> None:
     print(msg, flush=True)
 
 
+def 평가분리(질문들, n):
+    """평가용으로 뗄 자리 번호를 고른다 — **결정적**이고 **질문 단위**다.
+
+    ★ 왜 질문 단위인가(2026-09-04 · R6): 떼어 둔 행의 손실이 오르는 지점을 보자는 것이 --eval-holdout의
+      목적인데, **같은 질문이 학습과 평가 양쪽에 있으면** 그 손실은 「배웠나」가 아니라 「외웠나」를 잰다.
+      한 질문이 여러 행이 되는 길이 실제로 있다: 승인 문답이 같은 질문을 두 번 담을 수 있고,
+      ⓓ 긴 형식 재료는 딴 생성기에서 와서 RAFT 행과 질문이 겹칠 수 있다.
+      옛 판은 자리를 `input_ids` 해시로 골라서 — 같은 질문이라도 system·answer이 다르면 다른 자리라 —
+      그 겹침을 **원리상 못 막았다.**
+
+    ★ 왜 결정적인가: 무작위로 떼면 회전마다 다른 시험지로 재게 돼 「2회전이 나아졌다」를 비교할 수 없다.
+      씨앗(seed=42)은 섞기용이지 이 선택에는 안 쓴다 — 질문 글자에서 바로 나온 해시로 고른다.
+
+    ⚠ 정확히 n개가 아닐 수 있다. 질문 뭉치를 **통째로** 떼기 때문이다(반쪽을 떼면 겹침이 생긴다).
+      n에 닿는 순간 멈추므로 실제 개수는 n 이상, n + (마지막 뭉치 크기 - 1) 이하다.
+    """
+    import hashlib
+    뭉치 = {}
+    for i, q in enumerate(질문들):
+        뭉치.setdefault(str(q).strip(), []).append(i)
+    차례 = sorted(뭉치, key=lambda q: hashlib.sha1(q.encode("utf-8")).hexdigest())
+    고른것 = set()
+    for q in 차례:
+        if len(고른것) >= n:
+            break
+        고른것.update(뭉치[q])
+    return 고른것
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--dataset", required=True)
@@ -62,6 +91,22 @@ def main() -> None:
         # 조용히 무시되면 「켰다고 믿은 채」 안 켜진 학습을 몇 시간 돌린다(1회전의 warmup_ratio 사고 계보).
         log(f"[finetune] (smoke) save_epochs={int(args.save_epochs)} · eval_holdout={args.eval_holdout} · lora_alpha_mult={args.lora_alpha_mult}")
         if args.eval_holdout > 0:
+            # ★ 스모크가 **진짜 분리기**(평가분리)를 돌린다(2026-09-04 · R6). 실학습 경로는 GPU·torch가
+            #   있어야 돌아 어느 시험도 못 지나가는데, 「같은 질문이 양쪽에 있나」는 값싸게 확인할 수 있다.
+            #   ⚠ 여기서 **다른 식을 새로 적으면** 스모크가 제 코드를 검사하게 된다 — 같은 함수를 부른다.
+            질문들 = [str(r.get("question") or "") for r in smoke_rows]
+            뗀자리 = 평가분리(질문들, args.eval_holdout)
+            평가질문 = {질문들[i].strip() for i in 뗀자리}
+            학습질문 = {q.strip() for i, q in enumerate(질문들) if i not in 뗀자리}
+            겹침 = sorted(평가질문 & 학습질문)
+            log(
+                f"[finetune] (smoke) 평가 분리 — 평가 {len(뗀자리)}행 / 학습 {len(질문들) - len(뗀자리)}행"
+                f" · 양쪽 겹친 질문 {len(겹침)}"
+            )
+            if 겹침:
+                # 겹치면 평가 손실이 「외운 것」을 재게 된다 — 조용히 넘기면 그 숫자로 회전을 판정한다.
+                log(f"[finetune] ERROR: 같은 질문이 학습·평가 양쪽에 있습니다: {겹침[:3]}")
+                sys.exit(1)
             # 평가 줄의 꼴을 스모크에서도 한 번 낸다 — 화면 파서(finetune.ts)가 `step N/M loss=`만 읽으므로
             # 이 줄은 그 정규식에 **걸리지 않아야** 한다(걸리면 진행률 막대가 평가 손실로 튄다).
             log(f"eval 10/10 eval_loss={0.5000:.4f}")
@@ -123,7 +168,10 @@ def main() -> None:
         labels = [-100] * len(prompt_ids) + full_ids[len(prompt_ids):]
         return {"input_ids": full_ids, "labels": labels}
 
-    feats = [f for f in (render(r["question"], r["answer"], str(r.get("system") or "")) for r in rows) if f]
+    # 질문을 feats와 **나란히** 들고 간다 — 평가분리()가 질문 단위로 떼려면 자리마다 질문을 알아야 한다.
+    쌍들 = [(r, render(r["question"], r["answer"], str(r.get("system") or ""))) for r in rows]
+    feats = [f for _, f in 쌍들 if f]
+    질문들 = [str(r.get("question") or "") for r, f in 쌍들 if f]
     dropped = len(rows) - len(feats)
     log(f"[finetune] 토큰화 — 사용 {len(feats)}쌍(길이 초과 제외 {dropped}, max_seq={args.max_seq})")
     # ⚠ 길이 초과는 **조용한 손실**이다 — render가 None을 돌려주면 그 행은 그냥 사라지고 학습은 정상 종료된다.
@@ -133,15 +181,14 @@ def main() -> None:
     if not feats:
         log("[finetune] 길이 조건을 통과한 행이 없습니다 — 중단"); sys.exit(1)
 
-    # 평가용 떼어내기 — **결정적**이다(내용 해시 정렬). 무작위로 떼면 회전마다 다른 시험지로 재게 돼
-    # 「2회전이 나아졌다」를 비교할 수 없다. 씨앗(seed=42)은 섞기용이지 이 선택에는 안 쓴다.
+    # 평가용 떼어내기 — **결정적**이고 **질문 단위**다(평가분리()가 그 규칙의 단일 출처다).
     eval_feats = []
     if args.eval_holdout > 0:
         if args.eval_holdout >= len(feats):
             log(f"[finetune] --eval-holdout({args.eval_holdout})이 재료({len(feats)})보다 많거나 같습니다 — 중단"); sys.exit(1)
-        import hashlib
-        order = sorted(range(len(feats)), key=lambda i: hashlib.sha1(str(feats[i]["input_ids"]).encode()).hexdigest())
-        held = set(order[: args.eval_holdout])
+        held = 평가분리(질문들, args.eval_holdout)
+        if len(held) >= len(feats):
+            log(f"[finetune] 질문 단위로 떼면 재료가 남지 않습니다(뗄 것 {len(held)} / 전체 {len(feats)}) — 중단"); sys.exit(1)
         eval_feats = [feats[i] for i in sorted(held)]
         feats = [f for i, f in enumerate(feats) if i not in held]
         log(f"[finetune] 평가용으로 {len(eval_feats)}행을 뗐습니다 — 학습 {len(feats)}행")
@@ -190,8 +237,14 @@ def main() -> None:
                 log(f"eval {int(state.global_step)}/{int(state.max_steps)} eval_loss={float(logs['eval_loss']):.4f}")
 
     # transformers 5.x는 evaluation_strategy를 **eval_strategy로 이름을 바꿨다**(4.x에는 옛 이름만 있다).
-    # gb10 실측 5.16.1 기준으로 새 이름을 먼저 쓰고, TypeError가 나면 옛 이름으로 한 번 더 시도한다 —
+    # 새 이름을 먼저 쓰고, TypeError가 나면 옛 이름으로 한 번 더 시도한다 —
     # warmup_ratio가 사라져 1차 학습이 통째로 죽었던 그 자리라, 이름 하나에 몇 시간을 걸지 않는다.
+    # ★ 실측(2026-09-04, gb10 ~/venv-train): transformers **5.16.1**의 TrainingArguments.__init__ 서명에
+    #   `eval_strategy`는 있고 `evaluation_strategy`는 **없다**(eval이 든 인자: bf16_full_eval,
+    #   fp16_full_eval, eval_strategy, eval_steps, eval_delay, per_device_eval_batch_size, eval_on_start,
+    #   eval_do_concat_batches, eval_use_gather_object, eval_accumulation_steps, batch_eval_metrics, do_eval).
+    #   → **지금 gb10에서 사는 쪽은 `eval_strategy`다.** 옛 이름은 4.x로 내려갈 때의 대비책일 뿐이라,
+    #   로그의 「평가 주기 인자 이름: …」 줄이 evaluation_strategy로 찍히면 venv가 내려간 것이다.
     ta_common = dict(
         output_dir=args.output, num_train_epochs=args.epochs, learning_rate=args.lr,
         per_device_train_batch_size=1, gradient_accumulation_steps=16,
