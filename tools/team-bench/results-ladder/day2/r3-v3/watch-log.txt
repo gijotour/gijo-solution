@@ -1,0 +1,44 @@
+01:52:19 watch start round=r3-v3 pid=2032298 train=/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r3-v3/train.log interval=300s
+01:52:19 used/avail=90/30G swap=10G ports=3 ckpt=0 step - eval -
+01:57:19 used/avail=95/25G swap=10G ports=3 ckpt=0 step - eval -
+02:02:19 used/avail=95/25G swap=10G ports=3 ckpt=0 step 5/112 loss=1.7392 eval -
+02:07:19 used/avail=96/25G swap=10G ports=3 ckpt=0 step 5/112 loss=1.7392 eval -
+02:12:19 used/avail=96/25G swap=10G ports=3 ckpt=0 step 10/112 loss=1.4068 eval -
+02:17:19 used/avail=96/25G swap=10G ports=3 ckpt=0 step 15/112 loss=1.2178 eval -
+02:22:19 used/avail=96/25G swap=10G ports=3 ckpt=0 step 15/112 loss=1.2178 eval -
+02:27:19 used/avail=96/25G swap=10G ports=3 ckpt=0 step 20/112 loss=1.1497 eval -
+02:32:19 used/avail=96/25G swap=10G ports=3 ckpt=0 step 20/112 loss=1.1497 eval -
+02:37:19 used/avail=97/24G swap=10G ports=3 ckpt=0 step 25/112 loss=1.0796 eval -
+02:42:19 used/avail=98/23G swap=10G ports=3 ckpt=0 step 30/112 loss=1.0482 eval -
+02:47:19 used/avail=98/22G swap=10G ports=3 ckpt=0 step 30/112 loss=1.0482 eval -
+02:52:19 used/avail=98/23G swap=10G ports=3 ckpt=0 step 35/112 loss=1.0088 eval -
+02:57:19 used/avail=98/23G swap=10G ports=3 ckpt=0 step 40/112 loss=1.0190 eval -
+03:02:19 used/avail=98/23G swap=10G ports=3 ckpt=0 step 40/112 loss=1.0190 eval -
+03:07:19 used/avail=98/23G swap=10G ports=3 ckpt=0 step 45/112 loss=0.8783 eval -
+03:12:19 used/avail=98/23G swap=10G ports=3 ckpt=0 step 50/112 loss=0.8932 eval -
+03:17:19 used/avail=98/23G swap=10G ports=3 ckpt=0 step 50/112 loss=0.8932 eval -
+03:22:19 used/avail=98/23G swap=10G ports=3 ckpt=0 step 55/112 loss=0.8845 eval -
+03:27:19 used/avail=98/23G swap=10G ports=3 ckpt=1 step 55/112 loss=0.8845 eval 56/112 eval_loss=0.8325
+03:32:19 used/avail=98/23G swap=10G ports=3 ckpt=1 step 60/112 loss=0.8152 eval 56/112 eval_loss=0.8325
+03:37:19 used/avail=98/23G swap=10G ports=3 ckpt=1 step 60/112 loss=0.8152 eval 56/112 eval_loss=0.8325
+03:42:19 used/avail=98/23G swap=10G ports=3 ckpt=1 step 65/112 loss=0.8202 eval 56/112 eval_loss=0.8325
+03:47:19 used/avail=98/23G swap=10G ports=3 ckpt=1 step 70/112 loss=0.8146 eval 56/112 eval_loss=0.8325
+03:52:19 used/avail=98/23G swap=10G ports=3 ckpt=1 step 70/112 loss=0.8146 eval 56/112 eval_loss=0.8325
+03:57:19 used/avail=98/23G swap=10G ports=3 ckpt=1 step 75/112 loss=0.9055 eval 56/112 eval_loss=0.8325
+04:02:19 used/avail=98/23G swap=10G ports=3 ckpt=1 step 80/112 loss=0.8476 eval 56/112 eval_loss=0.8325
+04:07:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 80/112 loss=0.8476 eval 56/112 eval_loss=0.8325
+04:12:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 85/112 loss=0.8247 eval 56/112 eval_loss=0.8325
+04:17:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 85/112 loss=0.8247 eval 56/112 eval_loss=0.8325
+04:22:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 90/112 loss=0.8287 eval 56/112 eval_loss=0.8325
+04:27:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 95/112 loss=0.8008 eval 56/112 eval_loss=0.8325
+04:32:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 95/112 loss=0.8008 eval 56/112 eval_loss=0.8325
+04:37:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 100/112 loss=0.8180 eval 56/112 eval_loss=0.8325
+04:42:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 105/112 loss=0.7543 eval 56/112 eval_loss=0.8325
+04:47:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 105/112 loss=0.7543 eval 56/112 eval_loss=0.8325
+04:52:20 used/avail=98/23G swap=10G ports=3 ckpt=1 step 110/112 loss=0.8629 eval 56/112 eval_loss=0.8325
+04:57:20 used/avail=89/31G swap=10G ports=3 ckpt=2 step 110/112 loss=0.8629 eval 112/112 eval_loss=0.7865
+05:02:20 used/avail=87/33G swap=10G ports=3 ckpt=2 step 110/112 loss=0.8629 eval 112/112 eval_loss=0.7865
+05:07:20 used/avail=88/33G swap=10G ports=3 ckpt=2 step 110/112 loss=0.8629 eval 112/112 eval_loss=0.7865
+05:12:20 used/avail=86/35G swap=10G ports=3 ckpt=2 step 110/112 loss=0.8629 eval 112/112 eval_loss=0.7865
+05:17:20 used/avail=88/33G swap=10G ports=3 ckpt=2 step 110/112 loss=0.8629 eval 112/112 eval_loss=0.7865
+05:22:20 used/avail=70/51G swap=10G ports=3 ckpt=2 step 110/112 loss=0.8629 eval 112/112 eval_loss=0.7865
