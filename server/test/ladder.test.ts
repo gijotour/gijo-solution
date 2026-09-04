@@ -695,7 +695,31 @@ describe("사슬이 표본·KEV를 **직접 만든다**(day2-train.sh 소스 감
     expect(셸).toContain("ask-samples.mjs");
     expect(셸).toContain("kev-probe.mjs");
     expect(셸).toMatch(/for mode in grounded distractor-only bare/);
-    expect(셸).toContain("run_probes \"$OUTDIR\"");
+    expect(셸).toContain("run_probes \"$PROBE_DIR\"");
+  });
+
+  // ★ 2026-09-04: 잣대(관문 ⑧⑨⑩⑪)가 뒤늦게 생겨 **같은 회전을 다시 재야** 했다. 그때 옛 결과를
+  //   덮으면 「잣대 전에는 뭐였나」를 견줄 상대가 사라진다 — 그래서 표본이 앉는 자리를 변수로 뺐다.
+  //   변수로 뺀 순간 위험이 하나 생긴다: **기본값이 어긋나면** 여느 회전이 조용히 딴 곳에 쌓인다.
+  //   그 기본값을 여기서 못 박는다.
+  it("표본 자리는 기본이 회전 폴더다 — --probe-out 을 줄 때만 옆으로 간다", () => {
+    expect(셸, "기본값이 회전 폴더가 아니면 여느 회전이 조용히 딴 곳에 쌓인다").toContain('PROBE_DIR="$OUTDIR"');
+    expect(셸, "상대경로는 회전 폴더 **아래**로 읽어야 한다").toContain('PROBE_DIR="$OUTDIR/$PROBE_OUT"');
+    expect(셸).toContain("--probe-out");
+    // 게이트도 같은 자리를 봐야 한다 — 표본은 새 자리에 쓰고 판정은 옛 자리를 읽으면 표가 거짓이 된다.
+    expect(셸, "게이트가 다시 잰 표본을 읽어야 한다").toContain('"$PROBE_DIR/samples-$mode.json"');
+    expect(셸, "게이트 결과도 같은 자리에 남아야 한다").toContain('--out "$PROBE_DIR"');
+  });
+
+  // ★ --only-probe 는 **학습·변환·13과제를 건드리지 않는다**는 약속이다. 약속을 코드로 못 박는다.
+  it("--only-probe 는 ④(13과제 A/B)를 건너뛴다 — 다시 재는 것은 표본뿐이다", () => {
+    expect(셸).toContain("--only-probe");
+    // 13과제(④)를 여는 조건에 ONLY_PROBE가 함께 걸려 있는가 — 이것이 빠지면 --only-probe가
+    // 두 시간짜리 A/B를 다시 돌린다(그러고도 「표본만 다시 쟀다」고 보고하게 된다).
+    const 줄들 = 셸.split(String.fromCharCode(10));
+    const 여는칸 = 줄들.findIndex((l) => l.trim().startsWith("EASY_JSON="));
+    expect(여는칸, "④(13과제)를 여는 자리가 있어야 한다").toBeGreaterThan(0);
+    expect(줄들[여는칸 - 1], "④의 run.mjs 자리는 ONLY_PROBE에도 걸려야 한다").toContain('"$ONLY_PROBE" -eq 0');
   });
 
   it("무슨 인자로 쟀는지를 harness-args.json에 적는다", () => {
@@ -795,7 +819,7 @@ describe("사슬이 표본을 만들 **두뇌를 띄운다**(day2-train.sh 소�
     // 실측(2026-09-04, 껍데기 두뇌로 사슬 완주): 고치기 전에는 ECONNREFUSED → **exit 8**로
     // 게이트에 닿지도 못했다(관문 ⑧·⑩이 회전 갈래에서 영영 미측정). 고친 뒤엔 gate.md까지 나온다.
     const 앞 = 셸.indexOf("④-2");
-    const 뒤 = 셸.indexOf('run_probes "$OUTDIR"');
+    const 뒤 = 셸.indexOf('run_probes "$PROBE_DIR"');
     expect(앞, "④-2 단계가 있어야 한다").toBeGreaterThan(0);
     expect(뒤, "회전 표본을 만드는 자리가 있어야 한다").toBeGreaterThan(앞);
     const 사이 = 셸.slice(앞, 뒤);

@@ -9,6 +9,9 @@
 #   export GIJO_ADMIN_USER=… GIJO_ADMIN_PASSWORD=…
 #   bash tools/ladder/day2-train.sh --round r1-base
 #        [--rounds tools/ladder/rounds.json] [--port 8093] [--skip-build] [--skip-train] [--only-gate]
+#   잣대가 바뀌어 **같은 회전을 다시 재야** 할 때(학습·변환·13과제는 그대로 두고 표본·KEV만):
+#   bash tools/ladder/day2-train.sh --round r1-base --only-probe --probe-out probe-v2
+#        → results-ladder/day2/<회전>/probe-v2/{samples-*,kev,gate.md} — 옛 결과를 덮지 않는다.
 #   베이스 대조(어댑터 없이 한 번만):
 #   bash tools/ladder/day2-train.sh --baseline-probe [--port 8093]
 #        → results-ladder/baseline/{samples-grounded,samples-distractor-only,samples-bare,kev}.json
@@ -41,6 +44,11 @@ SKIP_BUILD=0
 SKIP_TRAIN=0
 ONLY_GATE=0
 BASELINE_PROBE=0
+ONLY_PROBE=0
+# ④-2(표본·KEV)를 **어디에** 쓸까. 비면 회전 폴더 그대로.
+# ★ 왜 필요한가(2026-09-04): 잣대(관문 ⑧⑨⑩⑪)가 뒤늦게 생겨 **같은 회전을 다시 재야** 했는데,
+#   그때 옛 파일을 덮으면 「잣대를 바꾸기 전에는 뭐였나」를 견줄 상대가 사라진다. 덮지 않고 옆에 쌓는다.
+PROBE_OUT=""
 SERVER="${GIJO_SERVER_URL:-http://localhost:4000}"
 VENV="${LADDER_VENV:-$HOME/venv-train}"
 CONVERT="${LADDER_CONVERT:-$SERVER_DIR/llama.cpp-next/convert_lora_to_gguf.py}"
@@ -55,6 +63,9 @@ while [ $# -gt 0 ]; do
     --skip-build) SKIP_BUILD=1; shift ;;
     --skip-train) SKIP_TRAIN=1; shift ;;
     --only-gate) ONLY_GATE=1; SKIP_BUILD=1; SKIP_TRAIN=1; shift ;;
+    # ④-2(표본·KEV)만 다시 재고 게이트를 매긴다 — 학습·변환·13과제 A/B는 건드리지 않는다.
+    --only-probe) ONLY_PROBE=1; SKIP_BUILD=1; SKIP_TRAIN=1; shift ;;
+    --probe-out) PROBE_OUT="$2"; shift 2 ;;
     --baseline-probe) BASELINE_PROBE=1; shift ;;
     --server) SERVER="$2"; shift 2 ;;
     *) echo "모르는 인자: $1" >&2; exit 6 ;;
@@ -201,6 +212,13 @@ fi
 
 OUTDIR="$REPO/tools/team-bench/results-ladder/day2/$ROUND"
 mkdir -p "$OUTDIR"
+# 표본·KEV·게이트 결과가 앉을 자리. --probe-out 이 상대경로면 회전 폴더 **아래**로 읽는다.
+# ⚠ easy/hard(13과제)는 여기로 안 옮긴다 — 어댑터가 같으면 그 숫자도 같다. 다시 잰 것만 옆에 둔다.
+PROBE_DIR="$OUTDIR"
+if [ -n "$PROBE_OUT" ]; then
+  case "$PROBE_OUT" in /*) PROBE_DIR="$PROBE_OUT" ;; *) PROBE_DIR="$OUTDIR/$PROBE_OUT" ;; esac
+fi
+mkdir -p "$PROBE_DIR"
 
 # ── 회전 설정 꺼내기 + 결과 옆에 복사 ────────────────────────────────
 # ⚠ 여기서 값을 바꾸지 않는다. **그대로** 복사해 둬야 「이 결과가 어느 설정이었나」가 파일로 남는다.
@@ -324,7 +342,7 @@ node -e '
   }], null, 2));
 ' "$RUNDIR/models.json" "$MODEL_ID" "$ADAPTER_GGUF" "$BASE_GGUF"
 
-if [ "$ONLY_GATE" -eq 0 ]; then
+if [ "$ONLY_GATE" -eq 0 ] && [ "$ONLY_PROBE" -eq 0 ]; then
   EASY_JSON="$OUTDIR/easy/$MODEL_ID.json"
   HARD_JSON="$OUTDIR/hard/$MODEL_ID.json"
   if ladder_have "$EASY_JSON"; then
@@ -350,7 +368,7 @@ fi
 #   만들어 둔 파일이 있을 때만 관문 ①(KEV)이 살아 있었고, 없으면 조용히 빠졌다. 관문이 「있을 때만」
 #   도는 것은 관문이 아니다 — 만드는 것까지 사슬 안으로 들여온다.
 if [ "$ONLY_GATE" -eq 0 ]; then
-  ladder_log "④-2 표본 3조건 + KEV (회전 $ROUND)"
+  ladder_log "④-2 표본 3조건 + KEV (회전 $ROUND) → $PROBE_DIR"
   # ★ ④의 run.mjs·run-r2.mjs는 **자기가 띄운 서버를 회차 끝에 죽인다**(run.mjs:106 finally).
   #   그래서 여기서 같은 어댑터를 얹어 **다시 띄운다** — 안 띄우면 하네스가 ECONNREFUSED로 죽고
   #   (exit 8), 관문 ⑧·⑩은 회전 갈래에서 영영 미측정이 된다(2026-09-04 검토관 적발).
@@ -358,24 +376,29 @@ if [ "$ONLY_GATE" -eq 0 ]; then
   #   ⚠ 규격 파일이 있으면 하네스가 서버에 안 붙으니 이 env는 필요 없다(2026-09-04 · R3) —
   #     베이스 대조 갈래와 **같은 규칙**이라야 둘이 같은 조건으로 잰다.
   [ -f "$PROMPT_SPEC" ] || ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
-  serve_start "$OUTDIR/serve-probe.log" "$BASE_GGUF" --lora "$ADAPTER_GGUF" || exit $?
-  run_probes "$OUTDIR" "회전 $ROUND"
+  serve_start "$PROBE_DIR/serve-probe.log" "$BASE_GGUF" --lora "$ADAPTER_GGUF" || exit $?
+  run_probes "$PROBE_DIR" "회전 $ROUND"
   PROBE_RC=$?
   serve_stop
   [ "$PROBE_RC" -eq 0 ] || exit "$PROBE_RC"
-elif ! ladder_have "$OUTDIR/samples-grounded.json"; then
+elif ! ladder_have "$PROBE_DIR/samples-grounded.json"; then
   ladder_log "⚠ --only-gate인데 표본이 없다 — 관문 ⑧⑨⑩이 미측정으로 막힌다. 표본까지 만들려면 --only-gate 없이 돌려라."
 fi
 
 # ── ⑤ 게이트 ─────────────────────────────────────────────────────────
 ladder_log "⑤ 게이트"
-GATE_ARGS=(--easy "$OUTDIR/easy/$MODEL_ID.json" --hard "$OUTDIR/hard/$MODEL_ID.json" --out "$OUTDIR" --label "$ROUND")
+# ★ 이름표에 어느 자리에서 잰 표본인지 적는다 — probe-v2의 표와 옛 표가 파일로 섞이면 못 가린다.
+GATE_LABEL="$ROUND"
+[ "$PROBE_DIR" != "$OUTDIR" ] && GATE_LABEL="$ROUND($PROBE_OUT)"
+GATE_ARGS=(--easy "$OUTDIR/easy/$MODEL_ID.json" --hard "$OUTDIR/hard/$MODEL_ID.json" --out "$PROBE_DIR" --label "$GATE_LABEL")
 for mode in grounded distractor-only bare; do
-  [ -s "$OUTDIR/samples-$mode.json" ] && GATE_ARGS+=("--samples-$mode" "$OUTDIR/samples-$mode.json")
+  [ -s "$PROBE_DIR/samples-$mode.json" ] && GATE_ARGS+=("--samples-$mode" "$PROBE_DIR/samples-$mode.json")
 done
 # 옛 회전이 남긴 samples.json(맨 질문 한 벌)이 있으면 참고 표본으로 함께 넘긴다.
-[ -s "$OUTDIR/samples.json" ] && GATE_ARGS+=(--samples "$OUTDIR/samples.json")
-[ -s "$OUTDIR/kev.json" ] && GATE_ARGS+=(--kev "$OUTDIR/kev.json")
+# ⚠ 다시 재는 자리(--probe-out)에서는 **안 섞는다** — 옛 잣대의 파일이 새 표에 참고로 끼면
+#   「이 표가 어느 잣대의 것인가」가 흐려진다.
+[ "$PROBE_DIR" = "$OUTDIR" ] && [ -s "$OUTDIR/samples.json" ] && GATE_ARGS+=(--samples "$OUTDIR/samples.json")
+[ -s "$PROBE_DIR/kev.json" ] && GATE_ARGS+=(--kev "$PROBE_DIR/kev.json")
 # 베이스 대조 — 없으면 관문 ①·⑧이 「미측정=불합격」이 된다(그게 맞다: 무엇과 견줄지 모르는 채로 통과시키지 않는다).
 [ -s "$BASELINE_DIR/kev.json" ] && GATE_ARGS+=(--kev-base "$BASELINE_DIR/kev.json")
 [ -s "$BASELINE_DIR/samples-grounded.json" ] && GATE_ARGS+=(--baseline-samples "$BASELINE_DIR/samples-grounded.json")
@@ -385,7 +408,7 @@ fi
 node "$REPO/tools/team-bench/gates.mjs" "${GATE_ARGS[@]}"
 GATE_RC=$?
 
-ladder_log "회전 $ROUND 끝 — 판정 $OUTDIR/gate.md (코드 $GATE_RC)"
+ladder_log "회전 $ROUND 끝 — 판정 $PROBE_DIR/gate.md (코드 $GATE_RC)"
 if [ "$GATE_RC" -ne 0 ]; then
   ladder_log "⚠ 게이트를 못 넘었다 — **채택하지 않는다.** 어댑터는 남겨 두고(다음 회전의 비교 대상) 설정을 바꿔 새 id로 돌려라."
 fi
