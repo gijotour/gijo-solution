@@ -601,6 +601,17 @@ describe("★★ 구성비·사전검사 — 판이 스스로를 배반하지 �
     expect(r.실패[0]).toContain("원문");
   });
 
+  it("★ 실패 문구가 **어느 갈래**인지 댄다 — D면 고칠 자리가 이 빌더가 아니라 그 파일이다", () => {
+    const rows = [행("근거 답"), 행(거절답), 행('긴 형식 보고. 원문: "어디선가"')];
+    const c = 구성비(rows, ["A", "B", "D"]) as { 표: Record<string, { 인용: number; 행: number }> };
+    expect(c.표.D.인용, "갈래별 인용 수를 세지 않으면 범인을 못 댄다").toBe(1);
+    expect(c.표.B.인용).toBe(0);
+    const r = 사전검사(c) as { 통과: boolean; 실패: string[] };
+    expect(r.통과).toBe(false);
+    expect(r.실패[0]).toContain("D 1/1");
+    expect(r.실패[0], "죄 없는 갈래를 범인으로 부르면 안 된다").not.toContain("B 0/");
+  });
+
   it("A행의 「원문:」이 95% 미만이면 경고한다(실패는 아니다)", () => {
     const rows = Array.from({ length: 10 }, (_, i) => 행(i === 0 ? '설명. 원문: "가나다"' : "설명만"));
     const r = 사전검사(구성비(rows, rows.map(() => "A"))) as { 통과: boolean; 경고: string[] };
