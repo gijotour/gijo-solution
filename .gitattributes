@@ -20,3 +20,11 @@
 *.7z  binary
 *.exe binary
 *.gguf binary
+
+# 사다리 홀드아웃(평가지)은 LF로 고정한다.
+#
+# 왜: 이 파일의 값어치는 「두 기계가 같은 시험지를 보는가」이고, 그것을 가리는 유일한 자가 **md5**다
+# (tools/ladder/README.md 회전 절차 ③). autocrlf=true인 Windows 체크아웃에서 CRLF로 바뀌면
+# 같은 내용인데 md5가 달라져, 대조하는 사람이 「파일이 다르다」고 읽는다 — 잣대가 기계에 따라 흔들린다.
+# 학습은 gb10(LF)에서 돌므로 내용은 늘 LF가 맞고, 여기서 그것을 못박는다.
+tools/team-bench/holdout-vuln-100.json text eol=lf
