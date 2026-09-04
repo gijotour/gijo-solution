@@ -827,6 +827,30 @@ describe("사슬이 표본을 만들 **두뇌를 띄운다**(day2-train.sh 소�
     expect(사이, "회전 표본은 **그 회전의 어댑터**를 얹고 재야 한다").toContain("--lora");
   });
 
+  // ★★★ 2026-09-04 실기 사고의 짝 시험 — **못 잰 것을 「쟀다」고 적던** 자리다.
+  //   그날 첫 --baseline-probe 는 9GB 모델을 읽는 중에 5초 만에 코드 0으로 끝났고,
+   // 표본 42개가 전부 0자로 저장됐다. 뿌리는 아래 두 가지이며, 여기서 각각 못 박는다.
+  it("★★ 준비 판정은 /health가 **200**일 때만 — 503도 curl -s 에게는 성공이다", () => {
+    // llama.cpp는 모델을 읽는 동안 /health를 503으로 답한다. curl은 -f 없이는 503에도
+    // 종료코드 0을 준다 — 그래서 옛 조건(`curl -s -o /dev/null … ; then`)은 「포트가 답하는가」만
+    // 물었고, 적재 3초 만에 「준비됐다」가 됐다. 물어야 할 것은 **「다 읽었는가」**다.
+    const 준비줄 = 셸.split(String.fromCharCode(10)).filter((l) => l.includes("/health") && l.includes("return 0"));
+    expect(준비줄.length, "준비를 기다리는 자리가 하나 있어야 한다").toBe(1);
+    expect(준비줄[0], "200을 요구하지 않으면 적재 중인 두뇌를 준비됐다고 읽는다").toContain("%{http_code}");
+    expect(준비줄[0]).toContain('= "200"');
+  });
+
+  it("★★ 하네스는 빈 답을 **답으로 적지 않는다**(ask-samples · kev-probe)", () => {
+    // 재는 자가 못 잰 것을 「쟀다」고 적으면 그 뒤의 모든 판정이 그 위에 선다. 특히 관문 ①은
+    // 「베이스 대비 하락 0」이라, 베이스도 0자·이번도 0자면 **초록**이 된다(가장 나쁜 꼴).
+    for (const f of ["ask-samples.mjs", "kev-probe.mjs"]) {
+      const src = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", f), "utf8");
+      expect(src, f + ": 빈 답에서 죽어야 한다").toMatch(/빈 답을 줬다/);
+      expect(src, f + ": 던지는 자리여야 한다(조용히 넘기면 같은 사고가 난다)").toMatch(/throw new Error/);
+    }
+    const ask = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "ask-samples.mjs"), "utf8");
+    expect(ask, "HTTP 오류 자체도 봐야 한다 — 503 몸에는 choices가 없어 그대로 0자가 된다").toContain("if (!r.ok)");
+  });
   it("★ env는 두뇌를 띄우기 **전에** 본다 — ladder_need_env는 return이 아니라 exit 3이다", () => {
     const 앞 = 셸.indexOf('if [ "$BASELINE_PROBE" -eq 1 ]; then');
     const 뒤 = 셸.indexOf("serve_start", 앞);
