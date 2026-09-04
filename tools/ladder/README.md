@@ -11,7 +11,7 @@
 ```
 
 한 번만 미리: `bash tools/ladder/day2-train.sh --baseline-probe` — 어댑터 **없는** 베이스로 같은
-표본 3조건 + KEV를 돌려 `results-ladder/baseline/`에 둔다. 관문 ①·⑧이 견줄 상대가 그 파일들이다.
+표본 3조건 + KEV를 돌려 `results-ladder/baseline/`에 둔다. 관문 ①·⑤·⑧이 견줄 상대가 그 파일들이다.
 
 ⚠ 표본·KEV는 **$PORT(기본 8093)의 두뇌에 직접** 던진다. A/B를 돌리는 `run.mjs`는 회차가 끝날 때마다
 자기가 띄운 서버를 내리므로(run.mjs:106 finally), 사슬은 표본 단계에서 **같은 어댑터를 얹어 다시 띄운다.**
@@ -28,6 +28,20 @@
 
 `win`에서 2일차를 걸려면: `ssh gb10 'cd ~/gijo-as && bash tools/ladder/day2-train.sh --round r1-base'`
 
+### ⚠ gb10 결과를 저장소에 남기는 순서 (안 지키면 push가 거부된다)
+
+**gb10 결과는 scp로 win에 가져와 커밋한 뒤 gb10 쪽 사본을 지우고 push한다** — 같은 파일이 gb10에
+untracked로 남아 있으면 `git push gb10 main`이 작업트리를 못 바꿔 **거부된다**(2026-09-04에 두 번 겪었다.
+gb10은 `receive.denyCurrentBranch=updateInstead`라 push가 작업트리까지 갱신하기 때문이다).
+
+그 순서를 그대로 하는 자가 있다 — **win에서** 돌린다:
+
+```bash
+bash tools/ladder/gb10-sync-results.sh r2-v2                  # ① gb10 → win (로그·pid는 안 가져온다)
+git add tools/team-bench/results-ladder/day2/r2-v2 && git commit   # ② 커밋은 **사람이** 한다(무엇을 남길지 눈으로 본다)
+bash tools/ladder/gb10-sync-results.sh r2-v2 --after-commit   # ③ gb10 쪽 커밋된 파일만 삭제 → push → rev-list 0 0
+```
+
 ## 밤/낮 전환은 **산출물 존재**로 가른다
 
 밤새 도는 일은 중간에 끊긴다(ssh 끊김·전원·사람의 Ctrl+C). 그때 「어디까지 했나」를 로그로
@@ -39,6 +53,12 @@
 | 2일차 학습 | 학습(다시 안 태운다) | `server/data/lora/<회전>/adapter_model.safetensors` |
 | 2일차 변환 | GGUF 변환 | `results-ladder/day2/<회전>/adapter.gguf` |
 | 2일차 A/B | 그 회차 시험 | `results-ladder/day2/<회전>/easy|hard/<모델>.json` |
+
+★ 회전 설정에 `saveEpochs: true` 가 있으면 학습이 `checkpoint-*` 를 남기고, 사슬은 그 **하나하나를
+판으로** 잰다 — `adapter-epN.gguf` → `results-ladder/day2/<회전>/epN/{easy,hard,samples-*,kev,gate.md}`.
+에폭 번호는 스텝 번호를 오름차순 정렬한 **자리**다(폴더 이름의 숫자는 총 스텝이지 에폭이 아니다).
+왜: 1회전은 3에폭을 통째로 굽고 마지막 것만 남겨서 「3에폭이 과했나」를 **다시 굽지 않고는** 물을 수
+없었다(5시간 20분). 체크포인트가 없으면 종전 그대로 마지막 어댑터 하나만 재고 파일 자리도 안 바뀐다.
 
 회차 번호는 **디렉터리 상태만으로** 정해진다(`ladderlib.mjs 회차이름표`) — 다시 돌려도 앞
 회차를 덮지 않고 `-02`, `-03`으로 쌓인다.
@@ -80,13 +100,13 @@
 |---|---|---|
 | `easy/<모델>.json` | `run.mjs`(1회차 7과제) | 과제 점수 · 인용(겹침·인용) · 한글 · tok/s · 잘림 · 서술 답 길이 |
 | `hard/<모델>.json` | `run-r2.mjs`(2회차 6과제) | 위와 같음(13과제 평균의 나머지 절반) |
-| `samples-grounded.json` | `ask-samples.mjs --mode grounded` | 관문 ⑧ — 정답 조각을 20자 그대로 옮겨 적는 비율 |
+| `samples-grounded.json` | `ask-samples.mjs --mode grounded` | 관문 ⑧ — 정답 조각을 20자 그대로 옮겨 적는 비율 · 관문 ⑫ — 그중 **베낀 글자**가 몇 할인가 |
 | `samples-distractor-only.json` | `ask-samples.mjs --mode distractor-only` | 관문 ⑩ — 「자료에 없다」고 말하는 비율 |
 | `samples-bare.json` | `ask-samples.mjs --mode bare` | 관문 ⑨ — 「원문:」 창작 · (참고) 한글 · 잘림 |
 | `kev.json` | `kev-probe.mjs` | 관문 ① — 본문에서 CISA를 말하는가(베이스 대비) |
 | `harness-args.json` | day2-train.sh | **무슨 조건으로 던졌나** — 포트·서버·에이전트·명령줄 |
 
-베이스 대조(관문 ①·⑧이 견줄 상대)는 `results-ladder/baseline/`의 `kev.json`·`samples-grounded.json`이고,
+베이스 대조(관문 ①·⑤·⑧이 견줄 상대)는 `results-ladder/baseline/`의 `kev.json`·`samples-*.json` **세 벌 전부**이고(⑤가 자리별로 견준다),
 `bash tools/ladder/day2-train.sh --baseline-probe`가 **어댑터 없이 한 번** 돌려 만든다.
 
 기준선(1·2회차 과제 점수)은 `tools/team-bench/results-ladder/baseline/`에 있고, **어디서 온 파일인지**는 그
@@ -107,7 +127,9 @@
   (정답 조각에만 걸린다). 그 본문을 저장소에 넣으면 그냥 재배포다. `server/test/ladder.test.ts`가
   실린 조각의 출처를 매번 대조한다.
 
-### 관문 11개 (2026-09-04 확장)
+### 관문 12개 (2026-09-04 확장 · 같은 날 실측으로 ⑤⑩ 개정 + ⑫ 신설)
+
+> ⚠ **⑧은 통째 복사로도 100%가 된다 — ⑫와 함께 읽는다.** 게이트 표 머리에도 같은 줄이 찍힌다.
 
 | 관문 | 무엇을 막나 |
 |---|---|
@@ -115,20 +137,44 @@
 | ② cite_overlap | glossary_cite의 「20자겹침」**과 「인용」** 둘 다 기준선 이상 |
 | ③ easy7_no_drop | 1회차 과제가 하나라도 떨어짐(미실시도 하락으로 본다) |
 | ④ avg13 | 13과제 평균이 기준선 초과가 아님 |
-| ⑤ truncated | 잘린 답(finish=length) |
+| ⑤ truncated | 잘린 답이 **베이스보다 늘었다**(easy·hard·표본 세 조건을 **자리별로** 견준다) |
 | ⑥ hangul | 한글 비율 하락 |
 | ⑦ tps_drop | 생성 속도 10% 초과 하락 |
 | ⑧ grounded_cite | **근거를 줘도** 옮겨 적지 않음(RAFT의 목적) |
 | ⑨ no_fake_quote | 근거를 **안 준** 자리에서 「원문:」을 지어냄 |
-| ⑩ no_evidence_says_so | **방해 조각만** 줬는데 「없다」고 말하지 않음 |
+| ⑩ no_evidence_says_so | **방해 조각만** 줬는데 「없다」고 말하지 않음(75% 미만) |
 | ⑪ len_drop | 점수는 그대로인데 서술 답만 40% 넘게 짧아짐 |
+| ⑫ copy_ratio | 근거를 **통째로 베껴** 답한다(베낀 글자 평균 60% 초과 · 또는 100%짜리가 한 건이라도) |
 
 ⑧~⑪은 r1-base 회전을 뜯어 보고 뒤늦게 붙였다 — 그때까지 **RAFT의 목적(근거를 주면 인용한다)을
 재는 관문이 0개**였고, 실제로 난 회귀 두 가지(「원문:」 창작 · 서술 답 34~72% 축소)를 세는 코드도 없었다.
 
-⚠ **⑩의 기준 0.5는 아직 실측이 없는 임시값이다.** 「절반은 없다고 말해야 한다」는 느슨한 바닥으로
-잡아 뒀다 — 베이스 대조(`baseline/samples-distractor-only.json`)가 나오면 그 값을 보고 사람이 올린다.
-관문 기준을 옮기는 것은 기준선 교체와 같은 자리라 **사장님 결정**이다(gates.mjs `자료없음_최소비율`).
+#### ⑤를 「0건」에서 「베이스 대비 증가 0」으로 바꾼 이유 (2026-09-04 실측)
+
+베이스(어댑터 없음)가 **5건**이었고 그 5건은 **전부 samples-bare**였다(grounded 0 · distractor-only 0 ·
+kev 0). bare는 시스템 프롬프트가 없어 베이스가 max_tokens 900까지 늘어놓는다 — 즉 절대 0건이 재던
+것은 회귀가 아니라 **「프롬프트 없이 900토큰 상한」**이었다. 더 나쁜 것은 방향이다: r1-base가 ⑤를
+통과한 이유가 **답이 66% 짧아져서**인데, 그 짧아짐은 ⑪이 잡으려는 바로 그 회귀다. ⑤가 ⑪의 표적에
+상을 주고 있었다. 그래서 ①과 같은 꼴(**같은 자리끼리** 견주고 절대값은 참고)로 바꿨다.
+⚠ 베이스에 그 자리가 없으면 **미측정=불합격**이다 — 그래서 `--baseline-probe`가 만든 표본 세 벌을
+게이트에 다 넘긴다(`--baseline-samples` · `--baseline-samples-distractor-only` · `--baseline-samples-bare`).
+
+#### ⑩의 기준을 0.5 → **0.75**로 올린 이유 (2026-09-04 실측)
+
+**베이스 실측이 88%(7/8)로 나왔다.** 0.5는 「베이스가 이미 하는 것의 절반만 해도 통과」라 회귀를
+반쯤 눈감아 주는 바닥이었다(실제로 r1-base는 **0%**였다 — 두 기준 다 빨강이지만, 0.5로는 44%짜리
+회귀가 통과한다). 8문항이라 한 문항이 6.25%p씩 움직이므로, 베이스 아래에 두 문항의 흔들림만
+봐 주는 자리가 0.75다. 상수는 `gates.mjs 자료없음_최소비율`.
+관문 기준을 옮기는 것은 기준선 교체와 같은 자리라 **사장님 결정**이다(이 개정은 상위 결정으로 반영).
+
+#### ⑫(베낀 글자 비율)를 새로 둔 이유 (2026-09-04 실측)
+
+⑧(근거 인용)이 베이스 50% → r1-base **100%**로 올랐는데, 같은 답들의 **베낀 글자 비율**은
+20% → **80%**였고 그중 **2건은 100%(통째 복사)**였다. ⑧은 「20자 창이 하나라도 남았는가」만 묻기
+때문에 근거를 통째로 게워 내도 만점이다 — 「옮겨 적기」와 「붙여넣기」를 가르는 자가 없었다.
+잣대: 공백을 지우고 **조각의 20자 창을 한 칸씩 밀며** 답에서 찾아, 덮인 글자 수 ÷ 답 글자 수
+(창 20자·공백 제거는 `overlap20`과 같은 규칙 — 미는 폭만 1칸이다. 넓이를 재는 자라 4칸이면
+가장자리가 샌다). 상수는 `gates.mjs 베낀비율_상한`(0.6).
 
 ## 비밀값
 

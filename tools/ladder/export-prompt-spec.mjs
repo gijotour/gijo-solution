@@ -43,16 +43,31 @@ const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 const sha12 = (s) => crypto.createHash("sha1").update(String(s ?? "")).digest("hex").slice(0, 12);
 
+/**
+ * 서버 schema를 **사람이 읽는 한 줄**로. GET /api/health의 schema는 문자열이 아니라
+ * `{ count, latest }`(server/src/db.ts schemaVersion)라, 그냥 문자열에 끼우면 `[object Object]`가 찍힌다.
+ * ⚠ 실측(2026-09-04): 콘솔에 「서버 schema [object Object]」가 나와, 규격을 뽑은 서버가 어느 판인지
+ *   **화면에서는 알 수 없었다**(파일에는 제대로 들어가 있었다 — 표시만 흠이었다).
+ * 꼴이 또 바뀌어도 사람이 읽을 것이 남게, 모르는 꼴은 JSON 그대로 보여 준다.
+ */
+export function 스키마표시(s) {
+  if (s == null) return "(모름)";
+  if (typeof s !== "object") return String(s);
+  if (typeof s.count === "number" || s.latest !== undefined) {
+    return `마이그레이션 ${s.count ?? "?"}개 · 최신 ${s.latest ?? "(없음)"}`;
+  }
+  return JSON.stringify(s);
+}
+
 const SERVER = String(opt("--server", process.env.GIJO_SERVER_URL || "http://localhost:4000")).replace(/\/+$/, "");
 const AGENT = String(opt("--agent", "normaltic"));
 const OUT = path.resolve(저장소, opt("--out", path.join("tools", "team-bench", "prompt-spec.json")));
 
 const user = process.env.GIJO_ADMIN_USER, password = process.env.GIJO_ADMIN_PASSWORD;
 // ⚠ 비밀값은 env로만 — 없으면 그 자리에서 죽는다(스크립트에 적어 두면 기록에 찍힌다).
-if (!user || !password) {
-  console.error("✗ GIJO_ADMIN_USER / GIJO_ADMIN_PASSWORD 가 필요합니다(창구가 관리자 전용입니다)");
-  process.exit(3);
-}
+//   ⚠ 그 판정은 **부를 때** 한다(아래 뽑기 첫 줄). 모듈을 읽는 것만으로 process.exit이 돌면,
+//     이 파일의 함수 하나를 불러 보려는 시험이 그 자리에서 죽는다(2026-09-04 실측: vitest
+//     「process.exit unexpectedly called with 3」으로 파일 전체가 안 돌았다).
 
 // ⚠ 실패할 때 `process.exit()`을 **곧바로 부르지 않는다.** 뜨는 fetch 핸들이 남은 채로 끝내면
 //   Windows node가 `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`를 토한다 —
@@ -79,6 +94,7 @@ async function login() {
 }
 
 async function 뽑기() {
+  if (!user || !password) throw new 나감(3, "GIJO_ADMIN_USER / GIJO_ADMIN_PASSWORD 가 필요합니다(창구가 관리자 전용입니다)");
   const { auth, refreshToken } = await login();
   try {
     const r = await fetch(SERVER + `/api/learnloop/raft/prompt?agentId=${encodeURIComponent(AGENT)}`, { headers: auth, redirect: "error" });
@@ -125,7 +141,7 @@ async function 뽑기() {
     console.log(
       `규격 저장 ${OUT}\n` +
       `  팀원(${AGENT}) 프롬프트 ${규격.systemChars}자 · 지문 ${규격.systemSha12}\n` +
-      `  근거 머리말 ${규격.ragHeader.length}자 · 서버 schema ${서버스키마 ?? "(모름)"} · 뽑은기계 HEAD ${뽑은기계커밋?.slice(0, 8) ?? "(모름)"}`
+      `  근거 머리말 ${규격.ragHeader.length}자 · 서버 schema ${스키마표시(서버스키마)} · 뽑은기계 HEAD ${뽑은기계커밋?.slice(0, 8) ?? "(모름)"}`
     );
   } finally {
     // 계정당 1세션 — 내 세션은 내가 닫는다(refreshToken을 함께 보내야 실제로 닫힌다).
@@ -136,9 +152,13 @@ async function 뽑기() {
 }
 
 // 한 자리에서만 끝낸다 — 뜬 핸들이 정리된 뒤에 코드를 정한다(위 「나감」 주석 참조).
-try {
-  await 뽑기();
-} catch (e) {
-  console.error("✗ " + (e?.message ?? String(e)));
-  process.exitCode = e instanceof 나감 ? e.코드 : 1;
+// ⚠ **직접 실행일 때만** 돈다(gates.mjs와 같은 꼴). 이 빗장이 없으면 시험이 스키마표시() 하나를
+//   불러 보려고 import하는 순간 이 스크립트가 통째로 돌아 서버에 붙으려 든다(env 없으면 exit 3).
+if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("ladder/export-prompt-spec.mjs")) {
+  try {
+    await 뽑기();
+  } catch (e) {
+    console.error("✗ " + (e?.message ?? String(e)));
+    process.exitCode = e instanceof 나감 ? e.코드 : 1;
+  }
 }

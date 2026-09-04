@@ -21,6 +21,7 @@
     },
     {
       "id": "r2-distractors2",
+      "폐기": "2026-09-04 폐기 — 회전 1이 드러낸 세 부류(⑨ 「원문:」 창작 · ⑩ 「모른다」 상실 88→0% · ⑫ 통째 복사 20→80%) 중 **하나도 못 고친다.** 방해 조각을 1→2로 늘리는 것은 「섞인 자료에서 고르기」를 더 시키는 것이라, 재료에 「모른다」 시연 행이 0건인 문제도 인용을 꼴로 외우는 문제도 그대로다. 지우지 않고 남기는 이유: 무엇을 왜 안 돌렸는지가 사라지면 다음 사람이 같은 설정을 다시 제안한다.",
       "dataset": "raft-vuln-v2",
       "agent": "normaltic",
       "topic": "취약점",
@@ -33,6 +34,7 @@
     },
     {
       "id": "r3-rank32",
+      "폐기": "2026-09-04 폐기 — 위와 같은 이유에 하나 더. 용량(rank 16→32)은 **배우는 힘**을 키우는 것이라, 재료가 그대로면 회전 1이 배운 잘못된 꼴(인용 붙여넣기·「모른다」 없음)을 **더 잘** 배운다. 재료를 먼저 고치고 나서 물을 질문이다.",
       "dataset": "raft-vuln-v2",
       "agent": "normaltic",
       "topic": "취약점",
@@ -42,6 +44,26 @@
       "distractors": 2,
       "maxSeq": 4096,
       "왜": "r2와 **같은 데이터**로 용량만 키운다(rank 16→32). 용량을 키우면 과적합이 빨라져 epochs를 줄이고 lr을 낮춘다 — 데이터가 아니라 용량이 답을 바꾸는지 가르는 회전이다."
+    },
+    {
+      "id": "r2-v2",
+      "dataset": "raft-vuln-v2",
+      "agent": "normaltic",
+      "topic": "취약점",
+      "rank": 16,
+      "lr": 0.0001,
+      "epochs": 3,
+      "distractors": 2,
+      "pOracle": 0.8,
+      "quoteRule": "strict",
+      "noevidenceFromUncited": true,
+      "closedbookRatio": 0,
+      "longformDataset": "server/data/datasets/longform-vuln-v2.json",
+      "maxSeq": 4096,
+      "saveEpochs": true,
+      "evalHoldout": 100,
+      "loraAlphaMult": 2.0,
+      "왜": "회전 1이 드러낸 세 부류를 **재료 쪽에서** 한꺼번에 고치는 회전이다. ⓐ pOracle 0.8 — 다섯 행 중 하나는 정답 조각을 아예 빼서 「근거가 없으면 없다고 말하는」 행을 만든다(⑩ 88→0%의 뿌리가 「모른다」 시연 0건이었다). ⓑ noevidenceFromUncited·quoteRule strict — 인용하지 않은 자료에서 답을 짓지 못하게 하고 인용 규칙을 조인다(⑨ 「원문:」을 꼴로만 외운 자리, ⑫ 통째 복사 80%). ⓒ 긴 형식(longform-vuln-v2)을 섞어 답이 66% 짧아진 회귀(⑪)를 재료로 되민다. closedbookRatio 0은 그대로 — 근거 없이 답하는 법은 제품이 원하지 않는다. 그리고 saveEpochs·evalHoldout 100으로 **에폭 변수를 한 회전 안에서** 가른다: 체크포인트 3개를 각각 재면 「3에폭이 과했나」를 다시 굽지 않고 답할 수 있다(1회전은 5시간 20분을 굽고 마지막 것만 남겨 그 질문을 못 물었다)."
     }
   ]
 }

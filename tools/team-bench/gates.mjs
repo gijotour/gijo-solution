@@ -14,18 +14,32 @@
 //   · 점수·한글·tok/s = run.mjs / run-r2.mjs가 남긴 결과 JSON의 필드 그대로
 //   ⚠ 새 잣대를 여기서 만들면 「같은 것을 여러 곳에 적으면 어긋난다」가 판정층에서 재발한다.
 //
-// ■ 관문 11개
+// ■ 관문 12개
 //   ① kev            KEV 발표 주체가 **베이스 대비 하락 0**(같은 문항·같은 조건으로 견준다). 절대 3/3은 참고값
 //   ② cite_overlap   glossary_cite의 「20자겹침」**과 「인용」**이 둘 다 기준선 이상
 //   ③ easy7_no_drop  1회차 7과제가 **하나도** 기준선보다 낮아지지 않는다
 //   ④ avg13          13과제 평균이 기준선 초과(needle_64k 포함 여부를 표에 적는다)
-//   ⑤ truncated      잘린 답(finish=length) 0건
+//   ⑤ truncated      잘린 답(finish=length)이 **베이스보다 늘지 않는다**(같은 자리끼리 견준다)
 //   ⑥ hangul         한글 비율 평균이 기준선 이상
 //   ⑦ tps_drop       생성 속도 중앙값이 기준선 대비 10% 넘게 안 떨어진다
 //   ⑧ grounded_cite  **근거를 준** 표본에서 정답 조각을 20자 그대로 옮겨 적는 비율이 베이스 이상
 //   ⑨ no_fake_quote  근거를 **안 준** 자리(bare 표본·KEV)에서 「원문:」을 지어내지 않는다(0건)
 //   ⑩ no_evidence_says_so  **방해 조각만** 준 자리에서 「자료에 없다」고 말하는 비율이 기준 이상
 //   ⑪ len_drop       스키마 강제가 없는 서술 과제의 생성 토큰 중앙값이 기준선 대비 40% 넘게 안 줄어든다
+//   ⑫ copy_ratio     근거를 준 답이 **통째 복사**가 아니다(베낀 글자 평균 60% 이하 · 100% 0건)
+//
+// ■ ⑤는 왜 「0건」이 아니라 「베이스 대비」인가 (2026-09-04 실측)
+//   베이스(어댑터 없음)가 **5건**이었고 그 5건은 전부 samples-bare였다 — bare는 시스템 프롬프트가
+//   없어 베이스가 max_tokens 900까지 늘어놓는다. 즉 절대 0건은 재는 것이 회귀가 아니라
+//   **「프롬프트 없이 900토큰 상한」**이었다. 더 나쁜 것은 방향이 뒤집혔다는 점이다: r1-base가
+//   ⑤를 통과한 이유가 답이 66% 짧아져서인데, 그 짧아짐은 ⑪이 잡으려는 바로 그 회귀다 —
+//   **⑤가 ⑪의 표적에 상을 주고 있었다.** ①이 절대 3/3을 내린 이유(「늘 빨강인 관문은 회귀를 못
+//   알린다」)를 그대로 적용해 **같은 자리끼리** 견주고, 절대값은 표에 참고로 남긴다.
+//
+// ■ ⑫는 왜 생겼나 (2026-09-04 실측)
+//   ⑧(근거 인용)이 50%→100%로 올랐는데, 같은 답들의 **베낀 글자 비율**은 20%→80%였고 통째 복사
+//   (100%)가 2건 있었다. ⑧은 「20자 창이 하나라도 남았는가」만 묻기 때문에 **통째로 베껴도 만점**이다.
+//   근거를 옮겨 적는 것과 근거를 통째로 게워 내는 것은 다른 일이라, 둘을 함께 읽는 자를 둔다.
 //
 // ■ ⑧⑨⑩⑪은 왜 뒤늦게 생겼나 (2026-09-04)
 //   r1-base 회전을 뜯어 보니 **RAFT의 목적을 재는 관문이 0개**였다. 학습 재료 1,297행이 전부
@@ -38,7 +52,7 @@
 // ■ 없으면 불합격(fail-closed)
 //   입력 파일이 없으면 그 관문은 「미측정」이고 **전체는 불합격**이다. 못 잰 것을 통과로
 //   적으면 게이트가 게이트가 아니다(2026-09-03 실측: 「전원사망을 0건으로 보고」한 전례).
-//   ⚠ ①과 ⑧은 **베이스 대조 파일**이 있어야 잰다(`--kev-base`·`--baseline-samples`).
+//   ⚠ ①⑤⑧은 **베이스 대조 파일**이 있어야 잰다(`--kev-base`·`--baseline-samples*`).
 //     그 파일은 `tools/ladder/day2-train.sh --baseline-probe`가 어댑터 없이 한 번 돌려 만든다.
 //
 // 사용:
@@ -46,6 +60,7 @@
 //        [--samples <samples.json>] [--kev <kev.json>] [--out <디렉터리>] [--include-needle64k]
 //        [--samples-grounded …] [--samples-distractor-only …] [--samples-bare …]
 //        [--baseline-samples <베이스 grounded 표본>] [--kev-base <베이스 kev.json>]
+//        [--baseline-samples-distractor-only …] [--baseline-samples-bare …]
 //        [--baseline-easy …] [--baseline-hard …] [--kev-label prompt] [--label 회차이름]
 //   기본 기준선: tools/team-bench/results-ladder/baseline/r1-qwen3-14b.json · r2-qwen3-14b.json
 //   나가는 코드: 0=합격 · 1=불합격 · 2=쓰는 법 틀림
@@ -79,10 +94,13 @@ export const KEV_최소문항 = 3;
 
 /**
  * 관문 ⑩의 기준선 — 방해 조각만 준 문항 중 「자료에 없다」고 말해야 하는 최소 비율.
- * 왜 0.5인가: 지금은 잰 값이 없다(베이스도 안 재 봤다). 「절반은 없다고 말해야 한다」는
- * **느슨한 바닥**이고, 베이스 실측이 나오면 그 값으로 올린다 — 상수로 둔 이유가 그것이다.
+ *
+ * ★ 0.5 → **0.75**(2026-09-04). 베이스(어댑터 없음) 실측이 **88%(7/8)**로 나왔다 — 즉 0.5는
+ *   「베이스가 이미 하는 것의 절반만 해도 통과」라 회귀를 반쯤 눈감아 주는 바닥이었다.
+ *   베이스 실측 아래에 선을 하나 두되(8문항이라 한 문항이 6.25%p씩 움직인다) 두 문항까지는
+ *   흔들림으로 봐 주는 자리가 0.75다. 근거는 tools/ladder/README.md의 관문 표에 함께 적었다.
  */
-export const 자료없음_최소비율 = 0.5;
+export const 자료없음_최소비율 = 0.75;
 
 /**
  * 관문 ⑪의 허용 낙폭 — 서술 답이 이보다 더 줄면 「짧아진 것」이 아니라 **다른 모델**이다.
@@ -90,6 +108,15 @@ export const 자료없음_최소비율 = 0.5;
  * 관문이 그날의 회귀를 놓치므로, 그 아래(40%)에 선을 그어 큰 축소만 잡는다.
  */
 export const 길이_허용낙폭 = 0.40;
+
+/**
+ * 관문 ⑫의 상한 — 근거를 준 답에서 **조각을 그대로 베낀 글자**가 이보다 많으면 인용이 아니라 복사다.
+ * 왜 0.6인가: 2026-09-04 실측에서 베이스는 20%(0.202), r1-base는 80%(0.802)였다. 둘 사이에 선을
+ * 그어야 회귀를 가르는데, 절반(0.5)은 베이스보다 두 배 반이나 헐거우면서도 「근거 문장을 길게
+ * 인용하고 짧게 덧붙인」 정상 답을 벨 수 있다. 0.6은 **베이스의 세 배까지 봐 주고** 그날의
+ * 회귀(0.8)는 막는 자리다. 함께 보는 것이 「통째 복사 0건」이라 상한만으로 판정하지 않는다.
+ */
+export const 베낀비율_상한 = 0.60;
 
 /**
  * 관문 ⑪의 **후보** 과제 — 서술로 답하는 과제들.
@@ -201,6 +228,33 @@ export function 잘림수(...묶음들) {
   return n;
 }
 
+/**
+ * 관문 ⑤의 잣대 — **같은 자리끼리** 잘림을 센다(이번 vs 베이스).
+ *
+ * 자리 이름을 붙여 짝을 짓는 이유: 이번 실행에만 있는 자리(예: bare 표본)를 베이스 없이 세면
+ * 「베이스가 원래 5건이던 자리」가 통째로 증가로 보인다. 반대로 자리를 몰래 빼면 합계가 내려가
+ * 통과처럼 보인다 — 그래서 **이번에 있는 자리는 베이스에도 있어야 하고**, 없으면 미측정이다.
+ * ⚠ 옛 이름(--samples)으로 준 표본은 여기 안 들어온다. 어느 조건으로 던진 파일인지 가릴 수 없어
+ *   베이스에 짝지을 자리가 없기 때문이다(관문 ⑨와 같은 이유·같은 처분이고, 표가 그 사실을 적는다).
+ *
+ * @returns { 짝: [{이름, 이번, 베이스}], 짝없음: [이름…], 이번, 베이스, 증가 }
+ */
+export function 잘림대조(이번 = {}, 베이스 = {}) {
+  const 자리 = ["easy", "hard", "grounded", "distractor-only", "bare"];
+  const 짝 = [], 짝없음 = [];
+  let 이번합 = 0, 베이스합 = 0;
+  for (const 이름 of 자리) {
+    const a = 이번[이름] ?? null;
+    if (!a) continue;
+    const b = 베이스[이름] ?? null;
+    if (!b) { 짝없음.push(이름); continue; }
+    const x = 잘림수(a), y = 잘림수(b);
+    이번합 += x; 베이스합 += y;
+    짝.push({ 이름, 이번: x, 베이스: y });
+  }
+  return { 짝, 짝없음, 이번: 이번합, 베이스: 베이스합, 증가: 이번합 - 베이스합 };
+}
+
 /** samples 배열의 한글 비율 평균(기준선이 없어 참고용). */
 export function 표본한글평균(samples) {
   if (!Array.isArray(samples) || !samples.length) return null;
@@ -243,6 +297,48 @@ export function 근거인용률(samples) {
   if (!대상.length) return null;
   const 성립 = 대상.filter((s) => overlap20(s.text, s.chunk) !== null).length;
   return { 대상: 대상.length, 성립, 비율: 성립 / 대상.length, 건너뜀: 건너뜀수(samples) };
+}
+
+/**
+ * 관문 ⑫의 잣대 — 한 답에서 **정답 조각을 그대로 베낀 글자**가 몇 할인가.
+ *
+ * 정의(2026-09-04 실측판을 그대로 옮긴 것): 공백을 지운 뒤 **조각의 20자 창을 한 칸씩 밀며**
+ * 답 안에서 찾고, 찾은 자리의 글자를 답에 표시한다. 표시된 글자 수 ÷ 답 글자 수.
+ * ⚠ 창 크기 20과 「공백을 지운다」는 overlap20(증류기·서버 근거겹침)과 **같은 규칙**이다 —
+ *   여기서 다른 창을 쓰면 ⑧과 ⑫가 서로 다른 것을 재게 된다.
+ * ⚠ 미는 폭만 다르다(overlap20은 4칸, 여기는 1칸). overlap20은 「한 창이라도 있나」만 물어서
+ *   4칸이면 충분하지만, 여기는 **덮인 넓이**를 재므로 1칸이라야 가장자리가 안 새어 나간다.
+ *   실측 대조(2026-09-04 · 8문항): 1칸 베이스 20.2% / r1-base 80.2%, 4칸 18.4% / 75.8% —
+ *   1칸 쪽이 실행자가 보고한 20%·80%와 같은 값이다.
+ * 조각이나 답이 20자 미만이면 null(=모름) — 애초에 창이 안 들어간다.
+ */
+export function 베낀글자비율(text, chunk) {
+  const a = String(text ?? "").replace(/\s+/g, "");
+  const s = String(chunk ?? "").replace(/\s+/g, "");
+  if (a.length < 20 || s.length < 20) return null;
+  const 덮임 = new Array(a.length).fill(false);
+  for (let i = 0; i + 20 <= s.length; i += 1) {
+    const w = s.slice(i, i + 20);
+    let from = 0, at;
+    while ((at = a.indexOf(w, from)) !== -1) {
+      for (let k = at; k < at + 20; k++) 덮임[k] = true;
+      from = at + 1;
+    }
+  }
+  return 덮임.filter(Boolean).length / a.length;
+}
+
+/** 관문 ⑫의 모집단 잣대 — grounded 표본의 베낀 비율 평균과 **통째 복사(100%)** 건수. */
+export function 베낀비율(samples) {
+  const 대상 = 답있는행(samples).filter((s) => typeof s.chunk === "string" && s.chunk.replace(/\s/g, "").length >= 20);
+  const 값들 = 대상.map((s) => 베낀글자비율(s.text, s.chunk)).filter((v) => v !== null);
+  if (!값들.length) return null;
+  return {
+    대상: 값들.length,
+    평균: 값들.reduce((a, b) => a + b, 0) / 값들.length,
+    통째: 값들.filter((v) => v >= 1 - 1e-9).length,
+    최대: Math.max(...값들),
+  };
 }
 
 /**
@@ -403,20 +499,26 @@ const 미측정 = (키, 이름, 왜) => ({ 키, 이름, 값: "미측정", 기준
 const 반올림 = (x, n = 3) => (typeof x === "number" ? Number(x.toFixed(n)) : x);
 
 /**
- * 관문 11개를 판정한다. **순수 함수** — 파일을 읽지도 쓰지도 않는다(시험이 여기를 직접 부른다).
+ * 관문 12개를 판정한다. **순수 함수** — 파일을 읽지도 쓰지도 않는다(시험이 여기를 직접 부른다).
  *
  * 입력   { easy, hard, samples, kev, 표본grounded, 표본방해만, 표본맨질문 }
- * 기준선 { easy, hard, kev(베이스 KEV), 표본grounded(베이스 grounded 표본) }
+ * 기준선 { easy, hard, kev, 표본grounded, 표본방해만, 표본맨질문 }  ← 표본 셋은 ⑤가 자리별로 견준다
  * 옵션   { needle64k포함=false, kev라벨=null, 이름표="" }
  * ⚠ 기준선에 kev·표본grounded가 없으면 관문 ①·⑧은 「미측정=불합격」이다 — 무엇과 견줄지 모르는 채로
- *   통과시키지 않는다. 그 두 파일은 day2-train.sh --baseline-probe가 만든다.
+ *   통과시키지 않는다. 그 파일들은 day2-train.sh --baseline-probe가 만든다.
+ * ⚠ ⑤도 같은 규칙이다: **이번에 있는 자리는 베이스에도 있어야** 잰다(없으면 미측정=불합격).
  */
 export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
   const {
-    easy = null, hard = null, samples = null, kev = null,
+    easy = null, hard = null, kev = null,
     표본grounded = null, 표본방해만 = null, 표본맨질문 = null,
   } = 입력;
-  const { easy: bEasy = null, hard: bHard = null, kev: bKev = null, 표본grounded: b표본 = null } = 기준선;
+  // ⚠ 입력.samples(옛 이름)는 **판정에 안 쓴다.** 어느 조건으로 던진 파일인지 못 가려 베이스에
+  //   짝지을 자리가 없기 때문이다(관문 ⑤·⑨ 둘 다 같은 이유). 표에는 참고값으로 적힌다.
+  const {
+    easy: bEasy = null, hard: bHard = null, kev: bKev = null,
+    표본grounded: b표본 = null, 표본방해만: b방해만 = null, 표본맨질문: b맨질문 = null,
+  } = 기준선;
   const needle64k포함 = Boolean(옵션.needle64k포함);
   const 검사 = [];
 
@@ -504,13 +606,23 @@ export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
     });
   }
 
-  // ⑤ 잘림 0 — 과제 결과 + **표본 세 조건 전부**에서 센다.
-  //   ⚠ 같은 파일을 두 인자로 준 경우 두 번 세지 않도록 **참조로** 추린다(CLI는 bare를 한 번만 읽는다).
-  const 표본묶음 = [...new Set([samples, 표본grounded, 표본방해만, 표본맨질문].filter(Boolean))];
-  if (!easy && !hard && !표본묶음.length) 검사.push(미측정("truncated", "잘린 답 0건", "잘림을 셀 결과가 하나도 없다"));
-  else {
-    const n = 잘림수(easy, hard, ...표본묶음);
-    검사.push({ 키: "truncated", 이름: "잘린 답 0건", 값: n, 기준: "0건", 통과: n === 0, 설명: n ? "max_tokens에 걸려 답이 중간에 끊겼다(요청 실패와 다르다)" : "끊긴 답 없음" });
+  // ⑤ 잘린 답 — **베이스 대비 증가 0**. 절대값은 참고로 함께 적는다(맨 위 「⑤는 왜」 참조).
+  const 잘림이번 = { easy, hard, grounded: 표본grounded, "distractor-only": 표본방해만, bare: 표본맨질문 };
+  const 잘림베이스 = { easy: bEasy, hard: bHard, grounded: b표본, "distractor-only": b방해만, bare: b맨질문 };
+  const tr = 잘림대조(잘림이번, 잘림베이스);
+  if (tr.짝없음.length) {
+    검사.push(미측정("truncated", "잘린 답(베이스 대비 증가 0)", `베이스에 짝이 없는 자리: ${tr.짝없음.join(", ")} — 무엇과 견줄지 모른다`));
+  } else if (!tr.짝.length) {
+    검사.push(미측정("truncated", "잘린 답(베이스 대비 증가 0)", "잘림을 셀 결과가 하나도 없다"));
+  } else {
+    const 자리별 = tr.짝.map((x) => `${x.이름} ${x.이번}/${x.베이스}`).join(" · ");
+    검사.push({
+      키: "truncated", 이름: "잘린 답(베이스 대비 증가 0)",
+      값: `증가 ${tr.증가}건 (이번 ${tr.이번}건 · 베이스 ${tr.베이스}건)`,
+      기준: "베이스보다 늘지 않는다",
+      통과: tr.증가 <= 0,
+      설명: `자리별 이번/베이스 — ${자리별}. 절대 0건은 **베이스가 못 넘는 기준**이었다(bare 5건 — 시스템 프롬프트 없이 900토큰 상한). 그 기준은 답이 짧아질수록 초록이 되어 ⑪의 표적에 상을 준다`,
+    });
   }
 
   // ⑥⑦⑪은 easy·hard와 그 기준선이 **넷 다** 있을 때만 잰다(2026-09-04 검토관 적발).
@@ -612,6 +724,26 @@ export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
     });
   }
 
+  // ⑫ 근거를 옮겨 적은 것인가, 통째로 게워 낸 것인가
+  //   ⚠ ⑧과 **같은 표본**을 다른 눈으로 본다 — ⑧은 「20자 창이 하나라도 남았나」라 통째 복사도 만점이다.
+  const cp = 베낀비율(표본grounded);
+  const bcp = 베낀비율(b표본);
+  if (!cp) 검사.push(미측정("copy_ratio", "베낀 글자 비율", "grounded 표본이 없다(ask-samples --mode grounded)"));
+  else {
+    const 통과 = cp.평균 <= 베낀비율_상한 + 1e-9 && cp.통째 === 0;
+    검사.push({
+      키: "copy_ratio", 이름: "베낀 글자 비율(통째 복사 아님)",
+      값: `평균 ${(cp.평균 * 100).toFixed(0)}% · 통째 복사 ${cp.통째}건 / ${cp.대상}`,
+      기준: `평균 ${(베낀비율_상한 * 100).toFixed(0)}% 이하 · 통째 복사 0건`,
+      통과,
+      설명: [
+        `베이스 ${bcp ? `평균 ${(bcp.평균 * 100).toFixed(0)}% · 통째 ${bcp.통째}건` : "미제출(참고값 없음)"}`,
+        "⑧은 20자 창이 하나만 남아도 100%가 되므로 **통째 복사로도 만점**이다 — 그래서 둘을 함께 읽는다",
+        cp.통째 ? "통째 복사는 근거를 그대로 게워 낸 것이라, 답이 아니라 붙여넣기다" : "",
+      ].filter(Boolean).join(" / "),
+    });
+  }
+
   return { 이름표: String(옵션.이름표 ?? ""), needle64k포함, 검사, 합격: 검사.every((x) => x.통과), 잰때: new Date().toISOString() };
 }
 
@@ -629,12 +761,15 @@ export function 표만들기(결과, 참고 = {}) {
   // 옛 이름(--samples)으로 따로 준 표본은 **관문 ⑨가 안 센다** — 어느 조건으로 던진 파일인지
   // 가릴 수 없기 때문이다(grounded 답을 여기 넣으면 정상 인용이 「창작」으로 걸린다).
   // 안 세는 것 자체는 설계지만, **표가 그 사실을 말하지 않는 것**은 결함이었다(2026-09-04 검토관 적발).
-  if (참고.옛표본 != null) 참고줄.push(`- 표본[--samples(옛 이름)] ${참고.옛표본}건 — 참고값이다. **관문 ⑨의 모집단에는 안 들어간다**(조건을 파일에서 못 가린다 — 맨 질문으로 재려면 --samples-bare로 줘라)`);
+  if (참고.옛표본 != null) 참고줄.push(`- 표본[--samples(옛 이름)] ${참고.옛표본}건 — 참고값이다. **관문 ⑤·⑨의 모집단에는 안 들어간다**(조건을 파일에서 못 가려 베이스에 짝지을 자리가 없다 — 맨 질문으로 재려면 --samples-bare로 줘라)`);
   if (참고.원천) 참고줄.push(...참고.원천.map((s) => `- 원천: ${s}`));
   return [
     `# 증류 사다리 게이트 — ${결과.이름표 || "(이름표 없음)"} · ${결과.합격 ? "**합격**" : "**불합격**"}`,
     "",
     `잰 때 ${결과.잰때} · needle_64k ${결과.needle64k포함 ? "포함" : "제외"}`,
+    "",
+    // ★ 표를 읽는 사람에게 먼저 하는 말 — 한 칸만 보면 다른 칸의 회귀를 못 본다(2026-09-04 실측).
+    "⚠ **⑧(근거 인용)은 통째 복사로도 100%가 된다 — ⑫(베낀 글자 비율)와 함께 읽는다.**",
     "",
     "| | 관문 | 실측 | 기준 | 왜 이 잣대인가 |",
     "|---|---|---|---|---|",
@@ -662,6 +797,7 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
     console.error(
       "쓰는 법: node tools/team-bench/gates.mjs --easy <r1.json> --hard <r2.json> [--kev k.json] [--kev-base 베이스k.json]\n" +
       "         [--samples-grounded g.json] [--samples-distractor-only d.json] [--samples-bare b.json] [--baseline-samples 베이스g.json]\n" +
+      "         [--baseline-samples-distractor-only 베이스d.json] [--baseline-samples-bare 베이스b.json]\n" +
       "         [--samples s.json] [--out 디렉터리] [--include-needle64k] [--label 이름]"
     );
     process.exit(2);
@@ -669,6 +805,8 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
 
   const bEasyP = opt("--baseline-easy", 기준선기본.easy), bHardP = opt("--baseline-hard", 기준선기본.hard);
   const kevBaseP = opt("--kev-base", ""), b표본P = opt("--baseline-samples", "");
+  // ⑤는 **자리별로** 견주므로 베이스에도 세 조건이 다 있어야 한다(없는 자리는 미측정=불합격).
+  const b방해P = opt("--baseline-samples-distractor-only", ""), bBareP = opt("--baseline-samples-bare", "");
   // ⚠ bare 파일은 **한 번만** 읽는다 — --samples 기본값이 --samples-bare라, 두 번 읽으면 배열이 둘이 되어
   //   잘림(⑤)을 두 번 센다(같은 것을 두 번 세는 그 함정).
   const bare읽음 = 읽기(bareP);
@@ -677,7 +815,10 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
     samples: samplesP === bareP ? bare읽음 : 읽기(samplesP),
     표본grounded: 읽기(groundedP), 표본방해만: 읽기(방해만P), 표본맨질문: bare읽음,
   };
-  const 기준 = { easy: 읽기(bEasyP), hard: 읽기(bHardP), kev: 읽기(kevBaseP), 표본grounded: 읽기(b표본P) };
+  const 기준 = {
+    easy: 읽기(bEasyP), hard: 읽기(bHardP), kev: 읽기(kevBaseP),
+    표본grounded: 읽기(b표본P), 표본방해만: 읽기(b방해P), 표본맨질문: 읽기(bBareP),
+  };
   const r = 판정(입력, 기준, {
     needle64k포함: args.includes("--include-needle64k"),
     kev라벨: opt("--kev-label", null),
@@ -691,7 +832,14 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
     표본조건: { grounded: 입력.표본grounded, "distractor-only": 입력.표본방해만, bare: 입력.표본맨질문 },
     옛표본: samplesP && samplesP !== bareP && Array.isArray(입력.samples) ? 입력.samples.length : null,
     // 같은 파일을 두 인자로 준 경우(--samples 기본값이 --samples-bare) 한 줄만 적는다.
-    원천: [...new Set([easyP, hardP, groundedP, 방해만P, bareP, samplesP, kevP, kevBaseP && `베이스 kev ${kevBaseP}`, b표본P && `베이스 표본 ${b표본P}`, `기준선 ${bEasyP}`, `기준선 ${bHardP}`].filter(Boolean))],
+    원천: [...new Set([
+      easyP, hardP, groundedP, 방해만P, bareP, samplesP, kevP,
+      kevBaseP && `베이스 kev ${kevBaseP}`,
+      b표본P && `베이스 표본[grounded] ${b표본P}`,
+      b방해P && `베이스 표본[distractor-only] ${b방해P}`,
+      bBareP && `베이스 표본[bare] ${bBareP}`,
+      `기준선 ${bEasyP}`, `기준선 ${bHardP}`,
+    ].filter(Boolean))],
   });
   console.log(표);
 

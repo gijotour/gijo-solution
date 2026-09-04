@@ -15,7 +15,13 @@
 #   베이스 대조(어댑터 없이 한 번만):
 #   bash tools/ladder/day2-train.sh --baseline-probe [--port 8093]
 #        → results-ladder/baseline/{samples-grounded,samples-distractor-only,samples-bare,kev}.json
-#          관문 ①(KEV 하락 0)과 ⑧(근거 인용)은 **이 파일들이 있어야** 잰다(없으면 미측정=불합격).
+#          관문 ①(KEV 하락 0)·⑤(잘림 증가 0)·⑧(근거 인용)은 **이 파일들이 있어야** 잰다(없으면 미측정=불합격).
+#
+# ■ 에폭마다 재기 (회전 설정에 `saveEpochs: true` 가 있을 때)
+#   학습이 어댑터 폴더에 checkpoint-* 를 남기면, 이 사슬은 그 **하나하나를 판으로** 잰다:
+#     checkpoint-<스텝> → adapter-epN.gguf → 결과 results-ladder/day2/<회전>/epN/{easy,hard,samples-*,kev,gate.md}
+#   에폭 번호는 스텝 번호를 오름차순 정렬한 **자리**다(폴더 이름의 숫자는 총 스텝이지 에폭이 아니다).
+#   체크포인트가 없으면 종전 그대로 — 마지막 어댑터 하나만 재고 파일 자리도 바뀌지 않는다.
 #
 # 나가는 코드: 0=합격 · 1=게이트 불합격 · 3=env 없음 · 6=쓰는 법/설정 틀림 · 7=환경 없음 · 8=단계 실패
 #
@@ -247,8 +253,31 @@ DISTRACTORS="$(read_round distractors)"
 MAXSEQ="$(read_round maxSeq)"
 BASE_OVERRIDE="$(read_round base)"
 [ -n "$BASE_OVERRIDE" ] && BASE_MODEL_ID="$BASE_OVERRIDE"
+# ★ 2회전 칸(2026-09-04) — 재료 세 갈래와 학습 세 갈래. **없으면 안 넘긴다**(빈 값 = 도구 기본값 그대로).
+#   왜 빈 값을 안 넘기나: r1-base를 다시 돌렸을 때 같은 명령이 나와야 「재현」이다.
+PORACLE="$(read_round pOracle)"
+QUOTE_RULE="$(read_round quoteRule)"
+NOEV="$(read_round noevidenceFromUncited)"
+CLOSEDBOOK="$(read_round closedbookRatio)"
+LONGFORM="$(read_round longformDataset)"
+SAVE_EPOCHS="$(read_round saveEpochs)"
+EVAL_HOLDOUT="$(read_round evalHoldout)"
+ALPHA_MULT="$(read_round loraAlphaMult)"
+DISCARDED="$(read_round 폐기)"
+
+# ★ 폐기 표시가 붙은 회전은 **돌리지 않는다**(2026-09-04). 표시만 해 두고 돌 수 있게 두면
+#   표시가 장식이 되고, 밤 하나가 「안 고쳐질 것이 확실한 설정」에 쓰인다.
+#   되살리려면 rounds.json에서 그 칸을 지운다 — 지우는 순간 왜 폐기했는지도 함께 사라지므로,
+#   되살리는 사람이 그 문장을 읽고 결정하게 된다.
+if [ -n "$DISCARDED" ]; then
+  echo "✗ 회전 $ROUND 은(는) 폐기된 설정이다: $DISCARDED" >&2
+  echo "  (정말 돌리려면 tools/ladder/rounds.json 에서 그 회전의 「폐기」 칸을 지워라)" >&2
+  exit 6
+fi
 
 ladder_log "2일차 회전 $ROUND — 데이터셋 $DATASET · rank $RANK · lr $LR · epochs $EPOCHS · 방해 $DISTRACTORS · maxSeq $MAXSEQ"
+ladder_log "  재료 옵션 — pOracle ${PORACLE:-(기본)} · quoteRule ${QUOTE_RULE:-(기본)} · 미인용거절 ${NOEV:-(기본)} · closedbook ${CLOSEDBOOK:-(기본)} · 긴형식 ${LONGFORM:-(없음)}"
+ladder_log "  학습 옵션 — saveEpochs ${SAVE_EPOCHS:-(기본)} · evalHoldout ${EVAL_HOLDOUT:-(기본)} · loraAlphaMult ${ALPHA_MULT:-(기본)}"
 ladder_log "  설정 사본 → $OUTDIR/round.json"
 
 LORA_DIR="$SERVER_DIR/data/lora/$ROUND"
@@ -264,9 +293,18 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
     exit 7
   fi
   ladder_log "① RAFT 데이터셋 $DATASET (방해 $DISTRACTORS)"
+  # ★ 재료 옵션은 **회전 설정에 있을 때만** 넘긴다 — 빈 칸이면 빌더 기본값이 그대로 산다.
+  #   `--noevidence-from-uncited`는 값 없는 깃발이라 true일 때만 붙인다(문자열 "true" 비교).
+  NOEV_FLAG=""
+  [ "$NOEV" = "true" ] && NOEV_FLAG="--noevidence-from-uncited"
   ( cd "$REPO" && node tools/build-raft-dataset.mjs --name "$DATASET" \
       ${TOPIC:+--topic "$TOPIC"} ${AGENT:+--agent "$AGENT"} \
-      --distractors "$DISTRACTORS" --server "$SERVER" ) \
+      --distractors "$DISTRACTORS" --server "$SERVER" \
+      ${PORACLE:+--p-oracle "$PORACLE"} \
+      ${CLOSEDBOOK:+--closedbook-ratio "$CLOSEDBOOK"} \
+      ${QUOTE_RULE:+--quote-rule "$QUOTE_RULE"} \
+      ${LONGFORM:+--longform-dataset "$LONGFORM"} \
+      $NOEV_FLAG ) \
     2>&1 | tee "$OUTDIR/build.log"
   [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ 데이터셋 만들기 실패 — $OUTDIR/build.log" >&2; exit 8; }
 else
@@ -287,9 +325,15 @@ if [ "$SKIP_TRAIN" -eq 0 ]; then
     mkdir -p "$LORA_DIR"
     ladder_log "② 학습 시작(떼어 놓고 돈다) — 로그 $TRAIN_LOG"
     # ⚠ setsid nohup: ssh가 끊겨도 안 죽는다. 진행은 로그로만 본다.
+    # ★ 학습 옵션도 회전 설정에 있을 때만 넘긴다(위 재료 옵션과 같은 규칙).
+    #   --save-epochs 가 붙으면 어댑터 폴더에 checkpoint-* 가 쌓이고, 아래 「판 목록」이
+    #   그것을 **에폭마다 한 판**으로 잰다 — 「몇 에폭이 제일 나았나」를 다시 굽지 않고 묻는 길이다.
+    SAVE_EPOCHS_FLAG=""
+    [ "$SAVE_EPOCHS" = "true" ] && SAVE_EPOCHS_FLAG="--save-epochs"
     ( cd "$SERVER_DIR" && setsid nohup "$VENV/bin/python" scripts/finetune_qlora14b.py \
         --dataset "$DATASET" --output "data/lora/$ROUND" \
         --base-model "$BASE_MODEL_ID" --rank "$RANK" --lr "$LR" --epochs "$EPOCHS" --max-seq "$MAXSEQ" \
+        $SAVE_EPOCHS_FLAG ${EVAL_HOLDOUT:+--eval-holdout "$EVAL_HOLDOUT"} ${ALPHA_MULT:+--lora-alpha-mult "$ALPHA_MULT"} \
         > "$TRAIN_LOG" 2>&1 < /dev/null & echo $! > "$OUTDIR/train.pid" )
     TRAIN_PID="$(cat "$OUTDIR/train.pid")"
     ladder_log "   pid $TRAIN_PID — 끝날 때까지 기다린다(로그를 따로 보려면 tail -f $TRAIN_LOG)"
@@ -306,24 +350,26 @@ else
 fi
 
 # ── ③ GGUF 변환 ──────────────────────────────────────────────────────
-if [ "$ONLY_GATE" -eq 0 ]; then
-  if [ -s "$ADAPTER_GGUF" ]; then
-    ladder_log "③ 변환 건너뜀 — 이미 있다($ADAPTER_GGUF)"
+# convert_adapter <어댑터 폴더> <출력 gguf> <로그 파일>
+# ⚠ 함수로 뺀 이유(2026-09-04): 체크포인트 회전은 이 일을 **에폭 수만큼** 한다. 손으로 세 벌 적으면
+#   폐쇄망 갈래(LADDER_HF_BASE_DIR)를 한 곳에서만 고치고 나머지가 조용히 허브를 부르게 된다.
+convert_adapter() {
+  local src="$1" out="$2" log="$3"
+  if [ -s "$out" ]; then ladder_log "③ 변환 건너뜀 — 이미 있다($out)"; return 0; fi
+  [ -s "$CONVERT" ] || { echo "✗ 변환 스크립트 없음: $CONVERT" >&2; return 7; }
+  [ -d "$src" ] || { echo "✗ 어댑터 폴더 없음: $src" >&2; return 8; }
+  ladder_log "③ GGUF 변환 $src → $out"
+  if [ -n "$HF_BASE_DIR" ]; then
+    # 로컬 스냅샷이 있으면 그것을 쓴다 — 폐쇄망에서 허브를 부르면 그 자리에서 죽는다.
+    "$VENV/bin/python" "$CONVERT" --base "$HF_BASE_DIR" --outfile "$out" "$src" 2>&1 | tee "$log"
   else
-    [ -s "$CONVERT" ] || { echo "✗ 변환 스크립트 없음: $CONVERT" >&2; exit 7; }
-    [ -d "$LORA_DIR" ] || { echo "✗ 어댑터 폴더 없음: $LORA_DIR" >&2; exit 8; }
-    ladder_log "③ GGUF 변환 → $ADAPTER_GGUF"
-    if [ -n "$HF_BASE_DIR" ]; then
-      # 로컬 스냅샷이 있으면 그것을 쓴다 — 폐쇄망에서 허브를 부르면 그 자리에서 죽는다.
-      "$VENV/bin/python" "$CONVERT" --base "$HF_BASE_DIR" --outfile "$ADAPTER_GGUF" "$LORA_DIR" 2>&1 | tee "$OUTDIR/convert.log"
-    else
-      "$VENV/bin/python" "$CONVERT" --base-model-id "$BASE_MODEL_ID" --outfile "$ADAPTER_GGUF" "$LORA_DIR" 2>&1 | tee "$OUTDIR/convert.log"
-    fi
-    [ -s "$ADAPTER_GGUF" ] || { echo "✗ 변환 실패 — $OUTDIR/convert.log (폐쇄망이면 LADDER_HF_BASE_DIR로 로컬 config를 줘라)" >&2; exit 8; }
+    "$VENV/bin/python" "$CONVERT" --base-model-id "$BASE_MODEL_ID" --outfile "$out" "$src" 2>&1 | tee "$log"
   fi
-fi
+  [ -s "$out" ] || { echo "✗ 변환 실패 — $log (폐쇄망이면 LADDER_HF_BASE_DIR로 로컬 config를 줘라)" >&2; return 8; }
+  return 0
+}
 
-# ── ④ A/B — 8093에 어댑터를 얹어 13과제를 돌린다 ─────────────────────
+# ── ④ A/B 하네스 사본 ────────────────────────────────────────────────
 # ⚠ 공유 ~/bench/models.json 을 안 고친다. run.mjs 는 **자기 옆의** models.json을 읽으므로,
 #   회전 폴더에 사본을 만들어 거기서 돌린다(다른 갈래가 같은 파일을 쓰고 있을 수 있다).
 RUNDIR="$OUTDIR/harness"
@@ -334,88 +380,156 @@ for f in run.mjs run-r2.mjs tasks.mjs tasks-r2.mjs; do
 done
 
 MODEL_ID="qwen3-14b+$ROUND"
-node -e '
-  const fs = require("node:fs");
-  const [out, id, gguf, base] = process.argv.slice(1);
-  // ⚠ ctx는 회차별 하네스가 인자로 준다(run.mjs 32768 · run-r2.mjs 65536). 여기 박아 두면 두 회차가 어긋난다.
-  // ★ 베이스 경로는 셸의 $BASE_GGUF 하나에서 온다 — ④(A/B)와 ④-2(표본)가 **같은 베이스**를 써야
-  //   두 숫자를 견줄 수 있다(따로 적어 두면 LADDER_BASE_GGUF를 바꿨을 때 조용히 갈린다).
-  fs.writeFileSync(out, JSON.stringify([{
-    id, path: base,
-    license: "Apache-2.0", thinking: true,
-    note: "증류 사다리 회전 — 베이스 qwen3-14b + 이 회전의 어댑터",
-    extra: ["--lora", gguf],
-  }], null, 2));
-' "$RUNDIR/models.json" "$MODEL_ID" "$ADAPTER_GGUF" "$BASE_GGUF"
-
-if [ "$ONLY_GATE" -eq 0 ] && [ "$ONLY_PROBE" -eq 0 ]; then
-  EASY_JSON="$OUTDIR/easy/$MODEL_ID.json"
-  HARD_JSON="$OUTDIR/hard/$MODEL_ID.json"
-  if ladder_have "$EASY_JSON"; then
-    ladder_log "④ 1회차 건너뜀 — 이미 있다($EASY_JSON)"
-  else
-    ladder_log "④ 1회차 7과제 — 포트 $PORT"
-    node "$RUNDIR/run.mjs" --only "$MODEL_ID" --port "$PORT" --ctx 32768 --out "$OUTDIR/easy" 2>&1 | tee "$OUTDIR/easy.log"
-    [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ 1회차 실패 — $OUTDIR/easy.log" >&2; exit 8; }
-  fi
-  if ladder_have "$HARD_JSON"; then
-    ladder_log "④ 2회차 건너뜀 — 이미 있다($HARD_JSON)"
-  else
-    # ⚠ --ctx 65536을 줘도 qwen3-14b는 n_ctx_train 40960에서 잘린다 — needle_64k는 원리상 0이다
-    #   (results-ladder/baseline/README.md). 게이트가 기본으로 평균에서 빼는 이유가 그것이다.
-    ladder_log "④ 2회차 6과제 — 포트 $PORT"
-    node "$RUNDIR/run-r2.mjs" --only "$MODEL_ID" --port "$PORT" --ctx 65536 --out "$OUTDIR/hard" 2>&1 | tee "$OUTDIR/hard.log"
-    [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ 2회차 실패 — $OUTDIR/hard.log" >&2; exit 8; }
-  fi
-fi
-
-# ── ④-2 표본 3조건 + KEV — **사슬이 직접 만든다** ────────────────────
-# ⚠ 2026-09-04 수리: 예전에는 「$OUTDIR/samples.json 이 있으면 게이트에 넘긴다」였다. 즉 남이 손으로
-#   만들어 둔 파일이 있을 때만 관문 ①(KEV)이 살아 있었고, 없으면 조용히 빠졌다. 관문이 「있을 때만」
-#   도는 것은 관문이 아니다 — 만드는 것까지 사슬 안으로 들여온다.
-if [ "$ONLY_GATE" -eq 0 ]; then
-  ladder_log "④-2 표본 3조건 + KEV (회전 $ROUND) → $PROBE_DIR"
-  # ★ ④의 run.mjs·run-r2.mjs는 **자기가 띄운 서버를 회차 끝에 죽인다**(run.mjs:106 finally).
-  #   그래서 여기서 같은 어댑터를 얹어 **다시 띄운다** — 안 띄우면 하네스가 ECONNREFUSED로 죽고
-  #   (exit 8), 관문 ⑧·⑩은 회전 갈래에서 영영 미측정이 된다(2026-09-04 검토관 적발).
-  #   ④와 포트를 나눠 쓸 수는 없다: run.mjs:47이 「포트 이미 사용 중」이면 아예 거부한다(배타적이다).
-  #   ⚠ 규격 파일이 있으면 하네스가 서버에 안 붙으니 이 env는 필요 없다(2026-09-04 · R3) —
-  #     베이스 대조 갈래와 **같은 규칙**이라야 둘이 같은 조건으로 잰다.
-  [ -f "$PROMPT_SPEC" ] || ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
-  serve_start "$PROBE_DIR/serve-probe.log" "$BASE_GGUF" --lora "$ADAPTER_GGUF" || exit $?
-  run_probes "$PROBE_DIR" "회전 $ROUND"
-  PROBE_RC=$?
-  serve_stop
-  [ "$PROBE_RC" -eq 0 ] || exit "$PROBE_RC"
-elif ! ladder_have "$PROBE_DIR/samples-grounded.json"; then
-  ladder_log "⚠ --only-gate인데 표본이 없다 — 관문 ⑧⑨⑩이 미측정으로 막힌다. 표본까지 만들려면 --only-gate 없이 돌려라."
-fi
-
-# ── ⑤ 게이트 ─────────────────────────────────────────────────────────
-ladder_log "⑤ 게이트"
 # ★ 이름표에 어느 자리에서 잰 표본인지 적는다 — probe-v2의 표와 옛 표가 파일로 섞이면 못 가린다.
 GATE_LABEL="$ROUND"
 [ "$PROBE_DIR" != "$OUTDIR" ] && GATE_LABEL="$ROUND($PROBE_OUT)"
-GATE_ARGS=(--easy "$OUTDIR/easy/$MODEL_ID.json" --hard "$OUTDIR/hard/$MODEL_ID.json" --out "$PROBE_DIR" --label "$GATE_LABEL")
-for mode in grounded distractor-only bare; do
-  [ -s "$PROBE_DIR/samples-$mode.json" ] && GATE_ARGS+=("--samples-$mode" "$PROBE_DIR/samples-$mode.json")
-done
-# 옛 회전이 남긴 samples.json(맨 질문 한 벌)이 있으면 참고 표본으로 함께 넘긴다.
-# ⚠ 다시 재는 자리(--probe-out)에서는 **안 섞는다** — 옛 잣대의 파일이 새 표에 참고로 끼면
-#   「이 표가 어느 잣대의 것인가」가 흐려진다.
-[ "$PROBE_DIR" = "$OUTDIR" ] && [ -s "$OUTDIR/samples.json" ] && GATE_ARGS+=(--samples "$OUTDIR/samples.json")
-[ -s "$PROBE_DIR/kev.json" ] && GATE_ARGS+=(--kev "$PROBE_DIR/kev.json")
-# 베이스 대조 — 없으면 관문 ①·⑧이 「미측정=불합격」이 된다(그게 맞다: 무엇과 견줄지 모르는 채로 통과시키지 않는다).
-[ -s "$BASELINE_DIR/kev.json" ] && GATE_ARGS+=(--kev-base "$BASELINE_DIR/kev.json")
-[ -s "$BASELINE_DIR/samples-grounded.json" ] && GATE_ARGS+=(--baseline-samples "$BASELINE_DIR/samples-grounded.json")
-if [ ! -s "$BASELINE_DIR/kev.json" ] || [ ! -s "$BASELINE_DIR/samples-grounded.json" ]; then
-  ladder_log '⚠ 베이스 대조 파일이 없다 — 먼저 「bash tools/ladder/day2-train.sh --baseline-probe」를 한 번 돌려라(관문 ①·⑧이 미측정으로 막힌다)'
-fi
-node "$REPO/tools/team-bench/gates.mjs" "${GATE_ARGS[@]}"
-GATE_RC=$?
 
-ladder_log "회전 $ROUND 끝 — 판정 $PROBE_DIR/gate.md (코드 $GATE_RC)"
-if [ "$GATE_RC" -ne 0 ]; then
-  ladder_log "⚠ 게이트를 못 넘었다 — **채택하지 않는다.** 어댑터는 남겨 두고(다음 회전의 비교 대상) 설정을 바꿔 새 id로 돌려라."
+# ── 판 하나를 재는 한 벌 — ④ 13과제 A/B · ④-2 표본·KEV · ⑤ 게이트 ────
+# run_variant <어댑터gguf> <모델id> <결과폴더> <표본·판정폴더> <이름표>
+# ⚠ 판이 여럿이어도 **직렬**이다 — 8093(두뇌)·GPU가 직렬 자원이라 겹치면 서로를 깨뜨린다.
+run_variant() {
+  local lora="$1" model_id="$2" outdir="$3" probedir="$4" label="$5"
+  mkdir -p "$outdir" "$probedir"
+
+  # models.json은 **판마다** 다시 쓴다(어댑터 경로가 판의 정체다). 판은 직렬이라 한 파일을 돌려 쓴다.
+  node -e '
+    const fs = require("node:fs");
+    const [out, id, gguf, base] = process.argv.slice(1);
+    // ⚠ ctx는 회차별 하네스가 인자로 준다(run.mjs 32768 · run-r2.mjs 65536). 여기 박아 두면 두 회차가 어긋난다.
+    // ★ 베이스 경로는 셸의 $BASE_GGUF 하나에서 온다 — ④(A/B)와 ④-2(표본)가 **같은 베이스**를 써야
+    //   두 숫자를 견줄 수 있다(따로 적어 두면 LADDER_BASE_GGUF를 바꿨을 때 조용히 갈린다).
+    fs.writeFileSync(out, JSON.stringify([{
+      id, path: base,
+      license: "Apache-2.0", thinking: true,
+      note: "증류 사다리 회전 — 베이스 qwen3-14b + 이 회전의 어댑터",
+      extra: ["--lora", gguf],
+    }], null, 2));
+  ' "$RUNDIR/models.json" "$model_id" "$lora" "$BASE_GGUF"
+
+  # ── ④ A/B — 8093에 어댑터를 얹어 13과제를 돌린다 ───────────────────
+  if [ "$ONLY_GATE" -eq 0 ] && [ "$ONLY_PROBE" -eq 0 ]; then
+    local EASY_JSON="$outdir/easy/$model_id.json"
+    local HARD_JSON="$outdir/hard/$model_id.json"
+    if ladder_have "$EASY_JSON"; then
+      ladder_log "④ [$label] 1회차 건너뜀 — 이미 있다($EASY_JSON)"
+    else
+      ladder_log "④ [$label] 1회차 7과제 — 포트 $PORT"
+      node "$RUNDIR/run.mjs" --only "$model_id" --port "$PORT" --ctx 32768 --out "$outdir/easy" 2>&1 | tee "$outdir/easy.log"
+      [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ 1회차 실패 — $outdir/easy.log" >&2; return 8; }
+    fi
+    if ladder_have "$HARD_JSON"; then
+      ladder_log "④ [$label] 2회차 건너뜀 — 이미 있다($HARD_JSON)"
+    else
+      # ⚠ --ctx 65536을 줘도 qwen3-14b는 n_ctx_train 40960에서 잘린다 — needle_64k는 원리상 0이다
+      #   (results-ladder/baseline/README.md). 게이트가 기본으로 평균에서 빼는 이유가 그것이다.
+      ladder_log "④ [$label] 2회차 6과제 — 포트 $PORT"
+      node "$RUNDIR/run-r2.mjs" --only "$model_id" --port "$PORT" --ctx 65536 --out "$outdir/hard" 2>&1 | tee "$outdir/hard.log"
+      [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ 2회차 실패 — $outdir/hard.log" >&2; return 8; }
+    fi
+  fi
+
+  # ── ④-2 표본 3조건 + KEV — **사슬이 직접 만든다** ──────────────────
+  # ⚠ 2026-09-04 수리: 예전에는 「$OUTDIR/samples.json 이 있으면 게이트에 넘긴다」였다. 즉 남이 손으로
+  #   만들어 둔 파일이 있을 때만 관문 ①(KEV)이 살아 있었고, 없으면 조용히 빠졌다. 관문이 「있을 때만」
+  #   도는 것은 관문이 아니다 — 만드는 것까지 사슬 안으로 들여온다.
+  if [ "$ONLY_GATE" -eq 0 ]; then
+    ladder_log "④-2 [$label] 표본 3조건 + KEV → $probedir"
+    # ★ ④의 run.mjs·run-r2.mjs는 **자기가 띄운 서버를 회차 끝에 죽인다**(run.mjs:106 finally).
+    #   그래서 여기서 같은 어댑터를 얹어 **다시 띄운다** — 안 띄우면 하네스가 ECONNREFUSED로 죽고
+    #   (exit 8), 관문 ⑧·⑩은 회전 갈래에서 영영 미측정이 된다(2026-09-04 검토관 적발).
+    #   ④와 포트를 나눠 쓸 수는 없다: run.mjs:47이 「포트 이미 사용 중」이면 아예 거부한다(배타적이다).
+    #   ⚠ 규격 파일이 있으면 하네스가 서버에 안 붙으니 이 env는 필요 없다(2026-09-04 · R3) —
+    #     베이스 대조 갈래와 **같은 규칙**이라야 둘이 같은 조건으로 잰다.
+    [ -f "$PROMPT_SPEC" ] || ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
+    serve_start "$probedir/serve-probe.log" "$BASE_GGUF" --lora "$lora" || return $?
+    run_probes "$probedir" "$label"
+    local PROBE_RC=$?
+    serve_stop
+    [ "$PROBE_RC" -eq 0 ] || return "$PROBE_RC"
+  elif ! ladder_have "$probedir/samples-grounded.json"; then
+    ladder_log "⚠ --only-gate인데 표본이 없다 — 관문 ⑧⑨⑩⑫가 미측정으로 막힌다. 표본까지 만들려면 --only-gate 없이 돌려라."
+  fi
+
+  # ── ⑤ 게이트 ───────────────────────────────────────────────────────
+  ladder_log "⑤ [$label] 게이트"
+  local GATE_ARGS=(--easy "$outdir/easy/$model_id.json" --hard "$outdir/hard/$model_id.json" --out "$probedir" --label "$label")
+  local mode
+  for mode in grounded distractor-only bare; do
+    [ -s "$probedir/samples-$mode.json" ] && GATE_ARGS+=("--samples-$mode" "$probedir/samples-$mode.json")
+  done
+  # 옛 회전이 남긴 samples.json(맨 질문 한 벌)이 있으면 참고 표본으로 함께 넘긴다.
+  # ⚠ 다시 재는 자리(--probe-out)에서는 **안 섞는다** — 옛 잣대의 파일이 새 표에 참고로 끼면
+  #   「이 표가 어느 잣대의 것인가」가 흐려진다.
+  [ "$probedir" = "$OUTDIR" ] && [ -s "$OUTDIR/samples.json" ] && GATE_ARGS+=(--samples "$OUTDIR/samples.json")
+  [ -s "$probedir/kev.json" ] && GATE_ARGS+=(--kev "$probedir/kev.json")
+  # 베이스 대조 — 없으면 관문 ①⑤⑧이 「미측정=불합격」이 된다(그게 맞다: 무엇과 견줄지 모르는 채로 통과시키지 않는다).
+  # ★ 표본 셋을 **다 넘긴다**(2026-09-04): 관문 ⑤가 잘림을 **자리별로** 견주므로, 베이스에 없는
+  #   자리가 있으면 그 관문은 미측정이다. grounded 하나만 넘기던 옛 호출은 ⑤를 통째로 막았다.
+  [ -s "$BASELINE_DIR/kev.json" ] && GATE_ARGS+=(--kev-base "$BASELINE_DIR/kev.json")
+  [ -s "$BASELINE_DIR/samples-grounded.json" ] && GATE_ARGS+=(--baseline-samples "$BASELINE_DIR/samples-grounded.json")
+  [ -s "$BASELINE_DIR/samples-distractor-only.json" ] && GATE_ARGS+=(--baseline-samples-distractor-only "$BASELINE_DIR/samples-distractor-only.json")
+  [ -s "$BASELINE_DIR/samples-bare.json" ] && GATE_ARGS+=(--baseline-samples-bare "$BASELINE_DIR/samples-bare.json")
+  if [ ! -s "$BASELINE_DIR/kev.json" ] || [ ! -s "$BASELINE_DIR/samples-grounded.json" ]; then
+    ladder_log "⚠ 베이스 대조 파일이 없다 — 먼저 bash tools/ladder/day2-train.sh --baseline-probe 를 한 번 돌려라(관문 ①⑤⑧이 미측정으로 막힌다)"
+  fi
+  node "$REPO/tools/team-bench/gates.mjs" "${GATE_ARGS[@]}"
+  local RC=$?
+  ladder_log "[$label] 판정 $probedir/gate.md (코드 $RC)"
+  return "$RC"
+}
+
+# ── 판 목록 — 체크포인트가 있으면 **에폭마다** 한 판 ──────────────────
+# ★ 왜(2026-09-04): 1회전은 3에폭을 통째로 굽고 마지막 것만 남겨서, 「3에폭이 과했나」를
+#   **다시 굽지 않고는** 물을 수 없었다(5시간 20분). --save-epochs 로 남은 checkpoint-* 를
+#   각각 재면 그 질문이 한 회전 안에서 닫힌다. 체크포인트가 없으면 종전과 **같은 자리**다.
+VAR_SRC=(); VAR_GGUF=(); VAR_ID=(); VAR_OUT=(); VAR_PROBE=(); VAR_LABEL=(); VAR_CLOG=()
+add_variant() { VAR_SRC+=("$1"); VAR_GGUF+=("$2"); VAR_ID+=("$3"); VAR_OUT+=("$4"); VAR_PROBE+=("$5"); VAR_LABEL+=("$6"); VAR_CLOG+=("$7"); }
+
+CKPTS=()
+if [ -d "$LORA_DIR" ]; then
+  # 스텝 번호로 오름차순 — 폴더 이름은 checkpoint-<총스텝>이라 **에폭 번호가 아니다**(HF 규칙).
+  # 정렬한 자리 번호가 곧 에폭 번호다(save_strategy=epoch이라 에폭마다 하나씩 쌓인다).
+  while IFS= read -r step; do [ -n "$step" ] && CKPTS+=("$step"); done < <(ls -1d "$LORA_DIR"/checkpoint-* 2>/dev/null | sed 's#.*/checkpoint-##' | sort -n)
 fi
-exit "$GATE_RC"
+
+if [ "${#CKPTS[@]}" -gt 0 ]; then
+  case "$PROBE_OUT" in
+    /*) echo "✗ 체크포인트 회전에서는 --probe-out 에 절대경로를 못 쓴다 — 판 여럿이 한 폴더에서 서로를 덮는다(상대경로를 줘라)" >&2; exit 6 ;;
+  esac
+  ladder_log "판 ${#CKPTS[@]}개 — 에폭마다 잰다(체크포인트: $(printf '%s ' "${CKPTS[@]}"))"
+  EPN=0
+  for step in "${CKPTS[@]}"; do
+    EPN=$((EPN + 1))
+    EPDIR="$OUTDIR/ep$EPN"
+    add_variant "$LORA_DIR/checkpoint-$step" "$OUTDIR/adapter-ep$EPN.gguf" "$MODEL_ID-ep$EPN" \
+      "$EPDIR" "$EPDIR${PROBE_OUT:+/$PROBE_OUT}" "$ROUND-ep$EPN${PROBE_OUT:+($PROBE_OUT)}" "$OUTDIR/convert-ep$EPN.log"
+  done
+else
+  # 체크포인트가 없는 회전(r1-base 재현)은 **파일 이름까지 종전 그대로**다 — convert.log 포함.
+  add_variant "$LORA_DIR" "$ADAPTER_GGUF" "$MODEL_ID" "$OUTDIR" "$PROBE_DIR" "$GATE_LABEL" "$OUTDIR/convert.log"
+fi
+
+# ── 판마다 ③④④-2⑤ ─────────────────────────────────────────────────
+WORST_RC=0
+IDX=0
+while [ "$IDX" -lt "${#VAR_ID[@]}" ]; do
+  if [ "$ONLY_GATE" -eq 0 ]; then
+    convert_adapter "${VAR_SRC[$IDX]}" "${VAR_GGUF[$IDX]}" "${VAR_CLOG[$IDX]}" || exit $?
+  fi
+  run_variant "${VAR_GGUF[$IDX]}" "${VAR_ID[$IDX]}" "${VAR_OUT[$IDX]}" "${VAR_PROBE[$IDX]}" "${VAR_LABEL[$IDX]}"
+  RC=$?
+  # 게이트 불합격(1)은 다음 판을 계속 재고, 단계 실패(8 등)는 거기서 멈춘다 —
+  # 「못 넘었다」와 「못 쟀다」는 다르고, 못 쟀으면 다음 판도 같은 이유로 못 잰다.
+  if [ "$RC" -ne 0 ] && [ "$RC" -ne 1 ]; then
+    ladder_log "✗ [${VAR_LABEL[$IDX]}] 단계 실패(코드 $RC) — 남은 판은 돌리지 않는다"
+    exit "$RC"
+  fi
+  [ "$RC" -gt "$WORST_RC" ] && WORST_RC="$RC"
+  IDX=$((IDX + 1))
+done
+
+ladder_log "회전 $ROUND 끝 — 판 ${#VAR_ID[@]}개 (코드 $WORST_RC)"
+if [ "$WORST_RC" -ne 0 ]; then
+  ladder_log "⚠ 게이트를 못 넘은 판이 있다 — **채택하지 않는다.** 어댑터는 남겨 두고(다음 회전의 비교 대상) 설정을 바꿔 새 id로 돌려라."
+fi
+exit "$WORST_RC"
