@@ -109,7 +109,15 @@ async function 프롬프트받기(server, agent) {
     await 로그아웃({ auth, refreshToken, server });
     throw new Error(`raft/prompt ${r.status}: ${JSON.stringify(j).slice(0, 200)}`);
   }
-  if (j.ragBlockSample && 참고자료블록(j.ragHeader, ["<조각 본문>"]) !== j.ragBlockSample) {
+  // ⚠ fail-open 금지(2026-09-04 검토관 적발): 예전에는 `j.ragBlockSample &&` 라서 창구가 그 값을
+  //   안 주면 **대조가 조용히 사라졌다.** 그러면 학습 꼴과 다른 틀로 재도 그대로 통과한다 —
+  //   「없으면 검사를 건너뛴다」는 검사가 아니다. 지금은 learnloop.ts가 늘 주므로 이 자리가 살아 있고,
+  //   나중에 창구에서 그 필드가 사라지면 여기가 **먼저** 말한다.
+  if (!j.ragBlockSample) {
+    await 로그아웃({ auth, refreshToken, server });
+    throw new Error("창구가 ragBlockSample을 안 준다 — 조립 꼴을 대조할 길이 없다(대조 없이 재면 학습 때와 딴 틀을 재게 된다)");
+  }
+  if (참고자료블록(j.ragHeader, ["<조각 본문>"]) !== j.ragBlockSample) {
     await 로그아웃({ auth, refreshToken, server });
     throw new Error("참고 자료 블록 조립 꼴이 서버(llm.ts ragBlock)와 다르다 — 이 꼴로 재면 학습 때와 딴 틀을 재게 된다");
   }
@@ -162,16 +170,19 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
     return { text, ms, finish: c?.finish_reason, genTokens: u.completion_tokens, genTps: u.completion_tokens && (u.completion_tokens / (ms / 1000)), 한글: 한글비율(text), 한자: 한자수(text), len: text.length };
   }
 
-  // ★ 워밍업 1회를 버린다 — 기동 직후 첫 요청이 반복 루프로 깨진 적이 있다(원본 ask12.mjs와 같다).
-  await ask("", "안녕하세요");
-  await sleep(500);
-
   const 실행인자 = process.argv.slice(1).join(" ");
   const out = [];
   let 건너뜀 = 0;
   // ⚠ try/finally — 중간에 죽어도 **세션은 닫는다.** 계정당 1세션이라 남은 세션이 다음 사람을 막는다
   //   (실측 2026-09-04: 남의 스크립트가 남긴 유휴 세션 때문에 이 하네스가 30분 막혔다).
+  // ★ 워밍업도 **이 안**에 있어야 한다(2026-09-04 검토관 적발): 프롬프트를 받느라 이미 로그인한
+  //   뒤라, 가장 흔한 실패인 「$PORT에 두뇌가 없다」(ECONNREFUSED)가 워밍업에서 터지면 로그아웃이
+  //   한 번도 안 불렸다 — 세션을 닫으려고 만든 try가 정작 그 실패를 못 덮고 있었다.
+  //   kev-probe.mjs는 처음부터 안쪽이었다(두 파일이 서로 달랐다).
   try {
+  // ★ 워밍업 1회를 버린다 — 기동 직후 첫 요청이 반복 루프로 깨진 적이 있다(원본 ask12.mjs와 같다).
+  await ask("", "안녕하세요");
+  await sleep(500);
   for (let i = 0; i < qs.length; i++) {
     const 문항 = qs[i];
     const 조각 = 조각들(문항, MODE);

@@ -64,6 +64,58 @@ done
 BENCH_SRC="$REPO/tools/team-bench"
 BASELINE_DIR="$BENCH_SRC/results-ladder/baseline"
 
+# 베이스 모델·llama-server는 **두 갈래가 같은 것**을 쓴다(베이스 대조 · 회전 표본). 한 곳에서 정한다.
+BASE_GGUF="${LADDER_BASE_GGUF:-$SERVER_DIR/models/qwen3-14b/qwen3-14b.gguf}"
+LLAMA_BIN="${LLAMA_SERVER:-$SERVER_DIR/llama.cpp-next/build/bin/llama-server}"
+
+# ── 두뇌 띄우기/내리기 ────────────────────────────────────────────────
+# ⚠ 왜 공용 함수인가(2026-09-04 검토관 적발): 표본·KEV 하네스는 $PORT의 두뇌에 직접 던지는데,
+#   ④의 run.mjs·run-r2.mjs는 회차가 끝날 때마다 **자기가 띄운 서버를 죽인다**(run.mjs:106 finally).
+#   그래서 ④-2 자리에는 두뇌가 하나도 없었다 — 사슬을 끝까지 돌리면 ECONNREFUSED로 exit 8이라,
+#   관문 ⑧·⑩은 회전 갈래에서 영영 「미측정=불합격」이었다. 띄우는 일을 사슬 안으로 들여온다.
+SERVE_PID=""
+serve_stop() {
+  [ -n "$SERVE_PID" ] || return 0
+  kill "$SERVE_PID" 2>/dev/null
+  # 포트가 실제로 놓일 때까지 기다린다 — 다음 단계가 「포트 이미 사용 중」으로 죽지 않게.
+  local i
+  for i in $(seq 1 40); do kill -0 "$SERVE_PID" 2>/dev/null || break; sleep 0.5; done
+  # 아직 살아 있을 때만 -9 — 이미 죽은 PID에 쏘면 그 번호를 물려받은 **남의 프로세스**를 죽인다.
+  kill -0 "$SERVE_PID" 2>/dev/null && kill -9 "$SERVE_PID" 2>/dev/null
+  SERVE_PID=""
+}
+# ⚠ EXIT에도 건다 — 옆길로 나가는 exit(예: ladder_need_env의 exit 3)에서도 8093에 두뇌를 안 남긴다.
+#   INT·TERM만 걸어 두었더니 env가 빈 실행에서 서버가 그대로 남았다(그 파일이 스스로 금지한 사고다).
+trap 'serve_stop' EXIT
+trap 'serve_stop; exit 130' INT
+trap 'serve_stop; exit 143' TERM
+
+# serve_start <로그파일> <gguf> [추가 인자...] — $PORT에 두뇌를 띄우고 /health가 뜰 때까지 기다린다.
+serve_start() {
+  local log="$1" gguf="$2"; shift 2
+  [ -s "$gguf" ] || { echo "✗ 모델 파일 없음: $gguf (LADDER_BASE_GGUF로 바꿀 수 있다)" >&2; return 7; }
+  [ -x "$LLAMA_BIN" ] || { echo "✗ llama-server 없음: $LLAMA_BIN" >&2; return 7; }
+  if curl -s -o /dev/null -m 3 "http://127.0.0.1:$PORT/health" 2>/dev/null; then
+    echo "✗ 포트 $PORT 가 이미 쓰이고 있다 — 남의 모델을 재게 된다. 다른 --port를 쓰거나 그 서버를 내려라." >&2
+    return 8
+  fi
+  # ⚠ setsid를 쓰지 않는다 — `setsid cmd &` 의 `$!`는 setsid의 PID라 **정작 llama-server를 못 죽인다**
+  #   (학습과 달리 이 서버는 몇 분짜리라 세션에서 떼어 놓을 이유도 없다). nohup으로 HUP만 막는다.
+  nohup "$LLAMA_BIN" -m "$gguf" "$@" -ngl -1 --ctx-size 32768 --parallel 1 --port "$PORT" --jinja \
+    --reasoning off --reasoning-budget 0 > "$log" 2>&1 < /dev/null &
+  SERVE_PID=$!
+  ladder_log "   두뇌 적재 중(pid $SERVE_PID) — 로그 $log"
+  local i
+  for i in $(seq 1 300); do
+    if curl -s -o /dev/null -m 3 "http://127.0.0.1:$PORT/health" 2>/dev/null; then return 0; fi
+    kill -0 "$SERVE_PID" 2>/dev/null || break
+    sleep 2
+  done
+  echo "✗ 두뇌가 안 떴다 — $log" >&2
+  serve_stop
+  return 8
+}
+
 # ── 표본·KEV 시험(공용) ──────────────────────────────────────────────
 # ⚠ ask-samples.mjs·kev-probe.mjs는 **저장소 자리에서** 부른다(harness/ 사본으로 복사하지 않는다) —
 #   `../build-raft-dataset.mjs`(근거 조립 함수)를 불러 쓰므로 옮기면 그 import가 깨진다.
@@ -107,34 +159,15 @@ run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
 # 어댑터 **없이** 베이스 모델을 띄워 같은 3조건 + KEV를 돌린다. 관문 ①·⑧이 견줄 상대를 만드는 단계다.
 if [ "$BASELINE_PROBE" -eq 1 ]; then
   ladder_log "베이스 대조 — 어댑터 없이 3조건 + KEV (→ $BASELINE_DIR)"
-  BASE_GGUF="${LADDER_BASE_GGUF:-$SERVER_DIR/models/qwen3-14b/qwen3-14b.gguf}"
-  [ -s "$BASE_GGUF" ] || { echo "✗ 베이스 모델 파일 없음: $BASE_GGUF (LADDER_BASE_GGUF로 바꿀 수 있다)" >&2; exit 7; }
-  LLAMA_BIN="${LLAMA_SERVER:-$SERVER_DIR/llama.cpp-next/build/bin/llama-server}"
-  [ -x "$LLAMA_BIN" ] || { echo "✗ llama-server 없음: $LLAMA_BIN" >&2; exit 7; }
+  # ★ env는 **두뇌를 띄우기 전에** 본다(2026-09-04 검토관 적발). ladder_need_env는 return이 아니라
+  #   `exit 3` 으로 셸을 끝내므로, 서버를 먼저 띄우면 그 exit에서 8093에 두뇌가 그대로 남았다 —
+  #   이 파일이 스스로 「8093에 두뇌를 남기지 않는다」고 적어 둔 바로 그 사고다. EXIT trap과 이중으로 막는다.
+  ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
   mkdir -p "$BASELINE_DIR"
-  if curl -s -o /dev/null -m 3 "http://127.0.0.1:$PORT/health" 2>/dev/null; then
-    echo "✗ 포트 $PORT 가 이미 쓰이고 있다 — 남의 모델을 재게 된다. 다른 --port를 쓰거나 그 서버를 내려라." >&2
-    exit 8
-  fi
-  # ⚠ setsid를 쓰지 않는다 — `setsid cmd &` 의 `$!`는 setsid의 PID라 **정작 llama-server를 못 죽인다**
-  #   (학습과 달리 이 서버는 몇 분짜리라 세션에서 떼어 놓을 이유도 없다). nohup으로 HUP만 막는다.
-  nohup "$LLAMA_BIN" -m "$BASE_GGUF" -ngl -1 --ctx-size 32768 --parallel 1 --port "$PORT" --jinja \
-    --reasoning off --reasoning-budget 0 > "$BASELINE_DIR/serve-base.log" 2>&1 < /dev/null &
-  SERVE_PID=$!
-  # 사람이 끊어도(Ctrl+C) 8093에 두뇌를 남기지 않는다 — 남기면 다음 회전이 「남의 모델」을 재게 된다.
-  trap 'kill "$SERVE_PID" 2>/dev/null; exit 130' INT
-  trap 'kill "$SERVE_PID" 2>/dev/null; exit 143' TERM
-  ladder_log "   베이스 적재 중(pid $SERVE_PID) — 로그 $BASELINE_DIR/serve-base.log"
-  BASE_READY=0
-  for _ in $(seq 1 300); do
-    if curl -s -o /dev/null -m 3 "http://127.0.0.1:$PORT/health" 2>/dev/null; then BASE_READY=1; break; fi
-    kill -0 "$SERVE_PID" 2>/dev/null || break
-    sleep 2
-  done
-  [ "$BASE_READY" -eq 1 ] || { echo "✗ 베이스 서버가 안 떴다 — $BASELINE_DIR/serve-base.log" >&2; kill "$SERVE_PID" 2>/dev/null; exit 8; }
+  serve_start "$BASELINE_DIR/serve-base.log" "$BASE_GGUF" || exit $?
   run_probes "$BASELINE_DIR" "베이스(어댑터 없음)"
   PROBE_RC=$?
-  kill "$SERVE_PID" 2>/dev/null
+  serve_stop
   ladder_log "베이스 대조 끝(코드 $PROBE_RC) — 이 파일들을 --kev-base·--baseline-samples 로 준다"
   exit "$PROBE_RC"
 fi
@@ -255,15 +288,17 @@ done
 MODEL_ID="qwen3-14b+$ROUND"
 node -e '
   const fs = require("node:fs");
-  const [out, id, gguf] = process.argv.slice(1);
+  const [out, id, gguf, base] = process.argv.slice(1);
   // ⚠ ctx는 회차별 하네스가 인자로 준다(run.mjs 32768 · run-r2.mjs 65536). 여기 박아 두면 두 회차가 어긋난다.
+  // ★ 베이스 경로는 셸의 $BASE_GGUF 하나에서 온다 — ④(A/B)와 ④-2(표본)가 **같은 베이스**를 써야
+  //   두 숫자를 견줄 수 있다(따로 적어 두면 LADDER_BASE_GGUF를 바꿨을 때 조용히 갈린다).
   fs.writeFileSync(out, JSON.stringify([{
-    id, path: "~/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf",
+    id, path: base,
     license: "Apache-2.0", thinking: true,
     note: "증류 사다리 회전 — 베이스 qwen3-14b + 이 회전의 어댑터",
     extra: ["--lora", gguf],
   }], null, 2));
-' "$RUNDIR/models.json" "$MODEL_ID" "$ADAPTER_GGUF"
+' "$RUNDIR/models.json" "$MODEL_ID" "$ADAPTER_GGUF" "$BASE_GGUF"
 
 if [ "$ONLY_GATE" -eq 0 ]; then
   EASY_JSON="$OUTDIR/easy/$MODEL_ID.json"
@@ -292,9 +327,18 @@ fi
 #   도는 것은 관문이 아니다 — 만드는 것까지 사슬 안으로 들여온다.
 if [ "$ONLY_GATE" -eq 0 ]; then
   ladder_log "④-2 표본 3조건 + KEV (회전 $ROUND)"
+  # ★ ④의 run.mjs·run-r2.mjs는 **자기가 띄운 서버를 회차 끝에 죽인다**(run.mjs:106 finally).
+  #   그래서 여기서 같은 어댑터를 얹어 **다시 띄운다** — 안 띄우면 하네스가 ECONNREFUSED로 죽고
+  #   (exit 8), 관문 ⑧·⑩은 회전 갈래에서 영영 미측정이 된다(2026-09-04 검토관 적발).
+  #   ④와 포트를 나눠 쓸 수는 없다: run.mjs:47이 「포트 이미 사용 중」이면 아예 거부한다(배타적이다).
+  ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
+  serve_start "$OUTDIR/serve-probe.log" "$BASE_GGUF" --lora "$ADAPTER_GGUF" || exit $?
   run_probes "$OUTDIR" "회전 $ROUND"
   PROBE_RC=$?
+  serve_stop
   [ "$PROBE_RC" -eq 0 ] || exit "$PROBE_RC"
+elif ! ladder_have "$OUTDIR/samples-grounded.json"; then
+  ladder_log "⚠ --only-gate인데 표본이 없다 — 관문 ⑧⑨⑩이 미측정으로 막힌다. 표본까지 만들려면 --only-gate 없이 돌려라."
 fi
 
 # ── ⑤ 게이트 ─────────────────────────────────────────────────────────

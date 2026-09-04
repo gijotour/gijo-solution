@@ -17,6 +17,7 @@ import { join } from "node:path";
 import {
   판정, 표만들기, kev판정, cisa본문, detail숫자, 인용겹침, 잘림수, tps중앙값, 한글평균, 기준선기본, NEEDLE64K,
   kev베이스대비, 근거인용률, 자료없음비율, 자료없음중복가드, 자료없음이라말함, 인용토막들, 창작인용, 창작인용찾기,
+  kev대상행, 창작인용대상인가,
   genTokens중앙값, 서술과제, 건너뜀수, 자료없음_최소비율, 길이_허용낙폭,
 } from "../../tools/team-bench/gates.mjs";
 import { 절세기 } from "../../tools/team-bench/tasks.mjs";
@@ -418,12 +419,16 @@ describe("★ r1-base 실물 결과를 새 게이트에 넣으면 ⑨가 빨강�
   const 폴더 = join(__dirname, "..", "..", "tools", "team-bench", "results-ladder", "day2", "r1-base");
   const 읽기 = (f: string) => JSON.parse(readFileSync(join(폴더, f), "utf8"));
 
-  it("실제 kev.json·samples.json에서 「원문:」 창작이 7건 잡힌다(가짜 재료가 아니라 그날의 파일이다)", () => {
+  it("실제 kev.json·samples.json에서 「원문:」 창작이 잡힌다(가짜 재료가 아니라 그날의 파일이다)", () => {
     const kev = 읽기("kev.json");
     const bare = 읽기("samples.json");
-    const f = 창작인용찾기(kev, bare);
-    expect(f.대상, "kev 6 + 표본 12").toBe(18);
-    expect(f.걸린행, "예전 게이트는 이 7건을 세는 코드가 아예 없었다").toBe(7);
+    // ★ 관문이 세는 모집단은 **관문 ①과 같은 자리**다 — 대조군 noprompt(시스템 프롬프트 없음)는 뺀다.
+    //   2026-09-04 검토관 적발: 예전에는 kev를 통째로 넘겨 대조군까지 셌다(18건 중 3건이 대조군).
+    const f = 창작인용찾기(kev대상행(kev), bare);
+    expect(f.대상, "kev[prompt] 3 + 표본 12").toBe(15);
+    expect(f.걸린행, "예전 게이트는 이 5건을 세는 코드가 아예 없었다").toBe(5);
+    // 통째로 세면 7건이 되는데, 그중 2건은 **제품이 쓰지 않는 조건**의 몫이다(그것으로 채택을 막으면 안 된다).
+    expect(창작인용찾기(kev, bare).걸린행, "대조군까지 세면 2건이 더 붙는다").toBe(7);
   });
 
   it("★ 베이스(어댑터 없음)의 kev는 0건이다 — ⑨는 늘 빨강인 관문이 아니다", () => {
@@ -710,6 +715,130 @@ describe("사슬이 표본·KEV를 **직접 만든다**(day2-train.sh 소스 감
     expect(복사줄, "복사 목록이 바뀌었으면 이 계약을 다시 볼 것").toBeTruthy();
     expect(셸).toContain('$BENCH_SRC/ask-samples.mjs');
     expect(셸).not.toContain('$RUNDIR/ask-samples.mjs');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// 2026-09-04 검토관 적발 넷의 **짝 시험** — 고친 자리가 다시 헐거워지면 여기가 먼저 말한다.
+//   ① ④-2가 두뇌 없는 포트에 던졌다(사슬이 게이트에 닿기 전에 죽었다)
+//   ② 워밍업이 try 밖이라 죽은 포트에서 admin 세션이 남았다
+//   ③ --baseline-probe가 서버를 띄운 뒤 env를 봐서, env가 비면 8093에 두뇌가 남았다
+//   ④ 관문 ⑨가 대조군(noprompt)까지 셌다 · ⑥⑦⑪이 한쪽만 있어도 판정했다
+// ══════════════════════════════════════════════════════════════════════
+
+describe("관문 ⑨ — 모집단은 관문 ①과 같다(대조군 noprompt 제외)", () => {
+  const 기준 = () => ({ easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 });
+
+  it("★ 대조군 행이 「원문:」을 지어내도 ⑨는 안 센다 — 제품이 쓰지 않는 조건이다", () => {
+    const kev섞임 = [
+      ...kev좋음,
+      { label: "noprompt", q: "KEV 목록은 누가 발표해?", text: '국방부가 발표합니다. 원문: "국방부가 발표하고 관리한다고 알려져 있습니다."' },
+    ];
+    expect(kev대상행(kev섞임), "라벨이 있는 파일은 noprompt를 뺀다").toHaveLength(3);
+    const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev섞임, 표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗 }, 기준());
+    const c = r.검사.find((x: { 키: string }) => x.키 === "no_fake_quote");
+    expect(c.통과, "대조군 때문에 채택이 막히면 관문이 딴것을 재는 것이다").toBe(true);
+    expect(c.값).toContain("대상 4"); // bare 1 + kev[prompt] 3
+  });
+
+  it("★ 표가 **모집단을 말한다** — 사람이 무엇을 셌는지 읽을 수 있어야 한다", () => {
+    const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음, 표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗 }, 기준());
+    const c = r.검사.find((x: { 키: string }) => x.키 === "no_fake_quote");
+    expect(c.설명).toContain("모집단: bare 표본 1행 + KEV 3행");
+    expect(c.설명).toContain("noprompt 제외");
+  });
+
+  it("세는 행은 「답이 든 행」뿐이다 — 건너뛴 문항·빈 답은 모집단이 아니다", () => {
+    expect(창작인용대상인가({ text: "답" })).toBe(true);
+    expect(창작인용대상인가({ text: "답", skipped: "조각 없음" })).toBe(false);
+    expect(창작인용대상인가({ text: "" })).toBe(false);
+    expect(창작인용대상인가(null)).toBe(false);
+  });
+
+  it("옛 이름(--samples)으로 준 표본은 ⑨가 안 세고, **표가 그 사실을 적는다**", () => {
+    const 표 = 표만들기(판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음 }, 기준()), { 옛표본: 12 });
+    expect(표).toContain("표본[--samples(옛 이름)] 12건");
+    expect(표, "안 센다는 말이 표에 없으면 사람은 12건이 들어간 줄 안다").toContain("관문 ⑨의 모집단에는 안 들어간다");
+  });
+});
+
+describe("관문 ⑥⑦⑪ — 한쪽만 주면 **미측정**이다(거짓 대조를 막는다)", () => {
+  // ⚠ 실측(2026-09-04, r1-base easy만): 고치기 전에는 ⑥ 0.71 vs 0.75 **거짓 빨강** ·
+  //   ⑦ 6.8% **거짓 초록**(7과제 중앙값을 13과제 중앙값과 견줬다) · ⑪ 42.2%(넷 다면 66.4%).
+  //   과제 구성이 다른 것을 견주면 그 숫자는 무엇도 뜻하지 않는다 — ④(avg13)와 같이 fail-close 한다.
+  it("easy만 있으면 ⑥⑦⑪이 전부 미측정이고, 왜인지 말한다", () => {
+    const r = 판정({ easy: 기준easy() }, { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 });
+    for (const 키 of ["hangul", "tps_drop", "len_drop"]) {
+      const c = r.검사.find((x: { 키: string }) => x.키 === 키);
+      expect(c.값, `${키}는 한쪽만으로 판정하면 안 된다`).toBe("미측정");
+      expect(c.설명).toContain("넷 다");
+      expect(c.통과).toBe(false);
+    }
+  });
+
+  it("기준선 hard가 없어도 미측정이다(한쪽이 비면 어느 쪽이든 막는다)", () => {
+    const r = 판정({ easy: 기준easy(), hard: 나아진() }, { easy: 기준easy(), kev: kev좋음, 표본grounded: grounded나쁨 });
+    expect(r.검사.find((x: { 키: string }) => x.키 === "hangul").값).toBe("미측정");
+  });
+
+  it("넷 다 있으면 종전대로 잰다(막기만 하는 관문이 되면 안 된다)", () => {
+    const r = 판정({ easy: 기준easy(), hard: 나아진(), kev: kev좋음 }, { easy: 기준easy(), hard: 기준hard(), kev: kev좋음, 표본grounded: grounded나쁨 });
+    expect(r.검사.find((x: { 키: string }) => x.키 === "hangul").값).not.toBe("미측정");
+    expect(r.검사.find((x: { 키: string }) => x.키 === "tps_drop").값).not.toBe("미측정");
+  });
+});
+
+describe("사슬이 표본을 만들 **두뇌를 띄운다**(day2-train.sh 소스 감시)", () => {
+  const 셸 = readFileSync(join(__dirname, "..", "..", "tools", "ladder", "day2-train.sh"), "utf8");
+
+  it("★ ④-2 앞에 두뇌를 띄운다 — ④의 run.mjs가 자기 서버를 죽이고 끝나기 때문", () => {
+    // 실측(2026-09-04, 껍데기 두뇌로 사슬 완주): 고치기 전에는 ECONNREFUSED → **exit 8**로
+    // 게이트에 닿지도 못했다(관문 ⑧·⑩이 회전 갈래에서 영영 미측정). 고친 뒤엔 gate.md까지 나온다.
+    const 앞 = 셸.indexOf("④-2");
+    const 뒤 = 셸.indexOf('run_probes "$OUTDIR"');
+    expect(앞, "④-2 단계가 있어야 한다").toBeGreaterThan(0);
+    expect(뒤, "회전 표본을 만드는 자리가 있어야 한다").toBeGreaterThan(앞);
+    const 사이 = 셸.slice(앞, 뒤);
+    expect(사이, "표본을 던지기 전에 $PORT에 두뇌를 띄워야 한다").toContain("serve_start");
+    expect(사이, "회전 표본은 **그 회전의 어댑터**를 얹고 재야 한다").toContain("--lora");
+  });
+
+  it("★ env는 두뇌를 띄우기 **전에** 본다 — ladder_need_env는 return이 아니라 exit 3이다", () => {
+    const 앞 = 셸.indexOf('if [ "$BASELINE_PROBE" -eq 1 ]; then');
+    const 뒤 = 셸.indexOf("serve_start", 앞);
+    expect(뒤).toBeGreaterThan(앞);
+    expect(셸.slice(앞, 뒤), "먼저 띄우면 exit 3에서 8093에 두뇌가 남는다").toContain("ladder_need_env");
+  });
+
+  it("★ EXIT에도 trap을 건다 — 옆길 exit에서도 8093에 두뇌를 안 남긴다", () => {
+    expect(셸).toContain("trap 'serve_stop' EXIT");
+    expect(셸).toContain("trap 'serve_stop; exit 130' INT");
+    expect(셸).toContain("trap 'serve_stop; exit 143' TERM");
+  });
+
+  it("베이스 경로는 한 곳에서 온다 — ④(A/B)와 ④-2(표본)가 같은 베이스를 써야 견줄 수 있다", () => {
+    expect(셸).toMatch(/BASE_GGUF="\$\{LADDER_BASE_GGUF:-/);
+    expect(셸, "models.json이 경로를 따로 적어 두면 조용히 갈린다").toContain('"$ADAPTER_GGUF" "$BASE_GGUF"');
+  });
+});
+
+describe("표본 하네스는 죽어도 **세션을 닫는다**(ask-samples.mjs 소스 감시)", () => {
+  const src = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "ask-samples.mjs"), "utf8");
+
+  it("★ 워밍업이 try **안**에 있다 — 가장 흔한 실패(포트에 두뇌 없음)가 거기서 난다", () => {
+    // 실측(2026-09-04, 죽은 포트): 고치기 전 로그아웃 0건(세션 남음) → 고친 뒤 1건.
+    const t = src.indexOf("try {");
+    const w = src.indexOf('await ask("", "안녕하세요")');
+    expect(t, "try 블록이 있어야 한다").toBeGreaterThan(0);
+    expect(w, "워밍업이 있어야 한다").toBeGreaterThan(t);
+    // ⚠ "finally" 낱말은 위쪽 주석에도 있다 — **닫는 자리**로 찾는다(주석을 세면 시험이 거짓말한다).
+    expect(src.indexOf("} finally {"), "워밍업은 try와 finally 사이에 있어야 한다").toBeGreaterThan(w);
+  });
+
+  it("★ 근거 꼴 대조는 fail-closed다 — 창구가 그 값을 안 주면 **거기서 죽는다**", () => {
+    expect(src, "「있으면 대조한다」는 대조가 아니다").not.toMatch(/if \(j\.ragBlockSample && 참고자료블록/);
+    expect(src).toContain("if (!j.ragBlockSample)");
+    expect(src).toContain("창구가 ragBlockSample을 안 준다");
   });
 });
 

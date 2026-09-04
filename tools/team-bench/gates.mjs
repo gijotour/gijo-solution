@@ -308,6 +308,9 @@ export function 창작인용(행) {
   return 사유;
 }
 
+/** ⑨가 **세는 행**인가 — 답이 실제로 든 행만 센다(건너뛴 문항·빈 답은 모집단이 아니다). */
+export const 창작인용대상인가 = (행) => Boolean(행 && !행.skipped && typeof 행.text === "string" && 행.text);
+
 /** 여러 묶음(bare 표본 배열·kev 배열)을 한꺼번에 세어 { 대상, 걸린행, 상세 }를 낸다. */
 export function 창작인용찾기(...묶음들) {
   let 대상 = 0;
@@ -315,7 +318,7 @@ export function 창작인용찾기(...묶음들) {
   for (const b of 묶음들) {
     if (!Array.isArray(b)) continue;
     for (const 행 of b) {
-      if (!행 || 행.skipped || typeof 행.text !== "string" || !행.text) continue;
+      if (!창작인용대상인가(행)) continue;
       대상 += 1;
       const 사유 = 창작인용(행);
       if (사유.length) 상세.push({ q: String(행.question ?? 행.q ?? "").slice(0, 40), label: 행.label ?? 행.mode ?? "", 사유 });
@@ -339,15 +342,27 @@ export function genTokens중앙값(결과들, ids) {
 // ── KEV ────────────────────────────────────────────────────────────────
 
 /**
+ * KEV 결과에서 **셀 행**만 고른다 — 라벨이 있는 파일이면 대조군 "noprompt"를 뺀다.
+ *
+ * ★ 왜 함수로 뺐나(2026-09-04 검토관 적발): 관문 ①은 이 필터를 쓰는데 관문 ⑨는 kev 배열을
+ *   **통째로** 세고 있었다. 같은 파일의 같은 행을 두 관문이 다른 모집단으로 쓰면, 표를 읽는
+ *   사람이 무엇을 잰 건지 알 수 없다(실측 r1-base: ⑨ 「7건/대상 18」 중 **2건이 대조군 몫**이었다 —
+ *   제품이 쓰지 않는 조건 때문에 채택이 막힐 수 있었다). 모집단은 **한 곳**에서 정한다.
+ */
+export function kev대상행(entries, 라벨 = null) {
+  if (!Array.isArray(entries)) return [];
+  const 라벨있음 = entries.some((e) => e && typeof e.label === "string");
+  if (!라벨있음) return entries;
+  return entries.filter((e) => (라벨 ? e.label === 라벨 : e.label !== "noprompt"));
+}
+
+/**
  * KEV 판정. entries = kev 결과 배열([{label?, q, text}...]).
  * label이 있는 파일은 시험 대상 라벨만 센다(대조군 "noprompt"를 같이 세면 절대 통과 못 한다).
  */
 export function kev판정(entries, { 라벨 = null, 최소 = KEV_최소문항 } = {}) {
   if (!Array.isArray(entries)) return { 대상: 0, 성립: 0, 통과: false, 상세: [] };
-  const 라벨있음 = entries.some((e) => e && typeof e.label === "string");
-  const 대상들 = !라벨있음
-    ? entries
-    : entries.filter((e) => (라벨 ? e.label === 라벨 : e.label !== "noprompt"));
+  const 대상들 = kev대상행(entries, 라벨);
   const 상세 = 대상들.map((e) => ({ q: String(e?.q ?? ""), 본문CISA: cisa본문(e?.text) }));
   const 성립 = 상세.filter((x) => x.본문CISA).length;
   return { 대상: 상세.length, 성립, 통과: 상세.length >= 최소 && 성립 === 상세.length, 상세 };
@@ -498,10 +513,18 @@ export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
     검사.push({ 키: "truncated", 이름: "잘린 답 0건", 값: n, 기준: "0건", 통과: n === 0, 설명: n ? "max_tokens에 걸려 답이 중간에 끊겼다(요청 실패와 다르다)" : "끊긴 답 없음" });
   }
 
+  // ⑥⑦⑪은 easy·hard와 그 기준선이 **넷 다** 있을 때만 잰다(2026-09-04 검토관 적발).
+  // ⚠ 한쪽만 있어도 계산은 된다 — 그런데 그 값은 7과제 몫이고 기준선은 늘 13과제 몫이라
+  //   **과제 구성이 다른 것을 견주는 거짓 대조**가 조용히 성립한다. 실측(r1-base, --easy만 준 실행):
+  //   ⑥ 0.71 vs 0.75 거짓 빨강 · ⑦ 6.8% 거짓 초록 · ⑪ 42.2%(넷 다 주면 66.4%).
+  //   ⑥의 설명 칸이 스스로 「과제 구성이 같을 때만 견줄 수 있다」고 적어 둔 조건이니 코드가 지킨다.
+  const 짝맞음 = Boolean(easy && hard && bEasy && bHard);
+  const 짝없음 = "easy·hard 결과와 기준선이 **넷 다** 있어야 한다 — 한쪽만으로 견주면 과제 구성이 달라진다";
+
   // ⑥ 한글 비율
-  const h = 한글평균(...[easy, hard].filter(Boolean));
-  const bh = 한글평균(...[bEasy, bHard].filter(Boolean));
-  if (h === null || bh === null) 검사.push(미측정("hangul", "한글 비율 평균", "한글 비율을 잰 결과가 없다"));
+  const h = 짝맞음 ? 한글평균(easy, hard) : null;
+  const bh = 짝맞음 ? 한글평균(bEasy, bHard) : null;
+  if (h === null || bh === null) 검사.push(미측정("hangul", "한글 비율 평균", 짝맞음 ? "한글 비율을 잰 결과가 없다" : 짝없음));
   else 검사.push({
     키: "hangul", 이름: "한글 비율 평균", 값: 반올림(h), 기준: `기준선 ${반올림(bh)} 이상`,
     통과: h >= bh - 1e-9,
@@ -509,9 +532,9 @@ export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
   });
 
   // ⑦ 생성 속도
-  const t = tps중앙값(...[easy, hard].filter(Boolean));
-  const bt = tps중앙값(...[bEasy, bHard].filter(Boolean));
-  if (t === null || bt === null || bt <= 0) 검사.push(미측정("tps_drop", "생성 속도 낙폭", "tok/s를 잰 결과가 없다"));
+  const t = 짝맞음 ? tps중앙값(easy, hard) : null;
+  const bt = 짝맞음 ? tps중앙값(bEasy, bHard) : null;
+  if (t === null || bt === null || bt <= 0) 검사.push(미측정("tps_drop", "생성 속도 낙폭", 짝맞음 ? "tok/s를 잰 결과가 없다" : 짝없음));
   else {
     const 낙폭 = (bt - t) / bt;
     검사.push({
@@ -541,7 +564,11 @@ export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
   }
 
   // ⑨ 근거를 안 준 자리에서 「원문:」을 지어내지 않는가
-  const f = 창작인용찾기(표본맨질문, kev);
+  // ⚠ kev는 **관문 ①과 같은 모집단**으로 센다 — 대조군 noprompt(시스템 프롬프트 없음)는 제품이
+  //   쓰지 않는 조건이라, 그것 때문에 채택이 막히면 관문이 딴것을 재는 것이다(2026-09-04 수리).
+  const kev센행 = kev대상행(kev, 옵션.kev라벨 ?? null);
+  const f = 창작인용찾기(표본맨질문, kev센행);
+  const 모집단 = `모집단: bare 표본 ${Array.isArray(표본맨질문) ? 표본맨질문.filter(창작인용대상인가).length : 0}행 + KEV ${kev센행.filter(창작인용대상인가).length}행(대조군 noprompt 제외 — 관문 ①과 같은 자리)`;
   // ⚠ 빈 배열도 「0건」이라 통과처럼 보인다 — **잰 답이 하나도 없으면 미측정**이다(0건과 못 잼은 다르다).
   if (f.대상 === 0) 검사.push(미측정("no_fake_quote", "「원문:」 창작 0건", "bare 표본도 kev 결과도 없다(또는 답이 든 행이 0개다)"));
   else {
@@ -549,9 +576,12 @@ export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
       키: "no_fake_quote", 이름: "「원문:」 창작 0건",
       값: `${f.걸린행}건 / 대상 ${f.대상}`, 기준: "0건",
       통과: f.걸린행 === 0,
-      설명: f.걸린행
-        ? f.상세.slice(0, 3).map((x) => `${x.label ? `[${x.label}] ` : ""}${x.q}… ${x.사유[0]}`).join(" · ")
-        : "근거를 안 준 자리에서 「원문:」을 안 붙이고, 제 말을 원문이라 인용하지도 않는다",
+      설명: [
+        모집단,
+        f.걸린행
+          ? f.상세.slice(0, 3).map((x) => `${x.label ? `[${x.label}] ` : ""}${x.q}… ${x.사유[0]}`).join(" · ")
+          : "근거를 안 준 자리에서 「원문:」을 안 붙이고, 제 말을 원문이라 인용하지도 않는다",
+      ].join(" / "),
     });
   }
 
@@ -568,9 +598,9 @@ export function 판정(입력 = {}, 기준선 = {}, 옵션 = {}) {
 
   // ⑪ 서술 답이 짧아지지 않았는가
   const { 대상: 서술ids, 스키마강제 } = 서술과제();
-  const L = genTokens중앙값([easy, hard].filter(Boolean), 서술ids);
-  const bL = genTokens중앙값([bEasy, bHard].filter(Boolean), 서술ids);
-  if (L === null || bL === null || bL <= 0) 검사.push(미측정("len_drop", "서술 답 길이 낙폭", "서술 과제의 genTokens를 잰 결과가 없다"));
+  const L = 짝맞음 ? genTokens중앙값([easy, hard], 서술ids) : null;
+  const bL = 짝맞음 ? genTokens중앙값([bEasy, bHard], 서술ids) : null;
+  if (L === null || bL === null || bL <= 0) 검사.push(미측정("len_drop", "서술 답 길이 낙폭", 짝맞음 ? "서술 과제의 genTokens를 잰 결과가 없다" : 짝없음));
   else {
     const 낙폭 = (bL - L) / bL;
     검사.push({
@@ -596,6 +626,10 @@ export function 표만들기(결과, 참고 = {}) {
     if (!Array.isArray(s)) continue;
     참고줄.push(`- 표본[${이름}] ${s.filter((x) => x && !x.skipped).length}건 던짐 · 건너뜀 ${건너뜀수(s)} · 프롬프트 지문 ${[...new Set(s.map((x) => x?.promptSha12).filter(Boolean))].join(",") || "-"}`);
   }
+  // 옛 이름(--samples)으로 따로 준 표본은 **관문 ⑨가 안 센다** — 어느 조건으로 던진 파일인지
+  // 가릴 수 없기 때문이다(grounded 답을 여기 넣으면 정상 인용이 「창작」으로 걸린다).
+  // 안 세는 것 자체는 설계지만, **표가 그 사실을 말하지 않는 것**은 결함이었다(2026-09-04 검토관 적발).
+  if (참고.옛표본 != null) 참고줄.push(`- 표본[--samples(옛 이름)] ${참고.옛표본}건 — 참고값이다. **관문 ⑨의 모집단에는 안 들어간다**(조건을 파일에서 못 가린다 — 맨 질문으로 재려면 --samples-bare로 줘라)`);
   if (참고.원천) 참고줄.push(...참고.원천.map((s) => `- 원천: ${s}`));
   return [
     `# 증류 사다리 게이트 — ${결과.이름표 || "(이름표 없음)"} · ${결과.합격 ? "**합격**" : "**불합격**"}`,
@@ -655,6 +689,7 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
     표본한글: 표본한글평균(입력.samples),
     표본인용: 표본인용률(입력.samples),
     표본조건: { grounded: 입력.표본grounded, "distractor-only": 입력.표본방해만, bare: 입력.표본맨질문 },
+    옛표본: samplesP && samplesP !== bareP && Array.isArray(입력.samples) ? 입력.samples.length : null,
     // 같은 파일을 두 인자로 준 경우(--samples 기본값이 --samples-bare) 한 줄만 적는다.
     원천: [...new Set([easyP, hardP, groundedP, 방해만P, bareP, samplesP, kevP, kevBaseP && `베이스 kev ${kevBaseP}`, b표본P && `베이스 표본 ${b표본P}`, `기준선 ${bEasyP}`, `기준선 ${bHardP}`].filter(Boolean))],
   });
