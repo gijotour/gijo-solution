@@ -876,6 +876,15 @@ const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const has = (k) => args.includes(k);
 
+/**
+ * 열어 둔 세션 하나. login()이 채우고 **직접 실행 꼬리의 finally**가 비운다.
+ *
+ * ★ 왜 main() 안의 지역 변수가 아닌가(2026-09-04): 세션을 닫아야 하는 자리는 일이 끝나는 자리가 아니라
+ *   **프로세스가 끝나는 자리**다. main()은 330줄이라 그 전체를 try로 감싸면 정작 봐야 할 diff가
+ *   들여쓰기 아래 묻힌다. 그래서 여는 자(login)와 닫는 자(로그아웃)를 붙여 두고 꼬리에서 닫는다.
+ */
+let 열린세션 = null;
+
 async function login(base, user, password) {
   const r = await fetch(base + "/api/auth/login", {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -888,7 +897,31 @@ async function login(base, user, password) {
       "\n(계정당 1세션이다 — 증류가 같은 계정으로 돌고 있으면 끝날 때까지 기다린다. 밀어내지 않는다.)"
     );
   }
-  return { "Content-Type": "application/json", Authorization: "Bearer " + j.accessToken };
+  const auth = { "Content-Type": "application/json", Authorization: "Bearer " + j.accessToken };
+  // ⚠ refreshToken을 여기서 챙겨 두지 않으면 **끝날 때 세션을 닫을 길이 없다**(아래 로그아웃의 ⚠).
+  열린세션 = { server: base, auth, refreshToken: j.refreshToken };
+  return auth;
+}
+
+/**
+ * 세션 닫기 — 성공이든 실패든 **반드시** 부른다.
+ *
+ * ⚠ 몸(body)에 refreshToken을 실어야 실제로 지워진다. 서버 쪽은 「if (refreshToken) revokeRefreshToken(…)」
+ *   한 줄이라(server/src/auth/auth.ts 의 POST /api/auth/logout), 빈 몸으로 부르면 {ok:true}만 돌아오고
+ *   세션은 그대로 남는다 — 「로그아웃했다」가 거짓말이 된다.
+ *   team-bench/ask-samples.mjs 의 로그아웃()과 **같은 꼴**이다(두 파일이 갈리지 않게).
+ *
+ * ★ 왜 필요했나(2026-09-04 실측): 이 빌더가 로그아웃을 안 해서 유휴 30분짜리 유령 세션이 남았고,
+ *   계정당 1세션이라 다음 도구가 **26분을 기다렸다.** 재료를 굽는 시간보다 기다린 시간이 길었다.
+ */
+async function 로그아웃() {
+  const 세션 = 열린세션;
+  if (!세션) return;
+  열린세션 = null;                                    // 두 번 불려도 한 번만 나간다
+  await fetch(세션.server + "/api/auth/logout", {
+    method: "POST", headers: 세션.auth, redirect: "error",
+    body: JSON.stringify({ refreshToken: 세션.refreshToken }),
+  }).catch(() => {});                                // 닫기에 실패해도 이 회차의 산출물은 이미 파일에 있다
 }
 
 async function 받기(base, 길, auth) {
@@ -1178,7 +1211,10 @@ async function main() {
     const out = 보고서쓰기();
     for (const f of 보고.사전검사.실패) console.error(`[raft] ✖ ${f}`);
     console.error(`[raft] 사전검사에 걸려 저장하지 않았습니다 — 보고서 ${out}`);
-    process.exit(1);
+    // ⚠ process.exit()로 튀지 않는다 — 튀면 꼬리의 finally가 **안 돌아** 세션이 남는다
+    //   (계정당 1세션이라 그 유령이 다음 도구를 30분 막는다). 종료 코드는 그대로 1이다.
+    process.exitCode = 1;
+    return;
   }
 
   // ⑤ 저장 — 위생 관문을 지나는 유일한 길. --dry-run이면 여기서 멈춘다(운영에 쓰기 금지).
@@ -1226,5 +1262,14 @@ async function main() {
 
 // 짝 시험이 위 순수 함수들을 import한다 — **직접 실행할 때만** 본체가 돈다(import로는 안 돈다).
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
-  await main().catch((e) => { console.error("[raft] 실패:", e.message); process.exit(1); });
+  // ★ try/finally — 성공·실패·사전검사 중단 **어디로 끝나든 세션을 닫는다.**
+  //   process.exit()는 finally를 건너뛰므로 여기서도 main() 안에서도 안 쓴다(exitCode만 세운다).
+  try {
+    await main();
+  } catch (e) {
+    console.error("[raft] 실패:", e.message);
+    process.exitCode = 1;
+  } finally {
+    await 로그아웃();
+  }
 }

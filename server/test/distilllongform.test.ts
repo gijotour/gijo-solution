@@ -330,6 +330,21 @@ describe("④ 부품 — 절 찾기·문장 세기·설명부", () => {
     for (const n of 절_요약보고) expect(지시).toContain(n);
     expect(지시).not.toContain("담당 부서");
   });
+
+  // [2026-09-04 회전 2 실측] execsum 탈락 29건 중 「주인공 CVE 없음」이 13건으로 1위였다.
+  //   잣대는 그대로 두고 **교사에게 자리를 지정**했다 — 그 지시가 실제로 execsum에만 붙어 있는지 본다.
+  it("★ execsum 교사 지시가 「요약 절 첫 문장에 CVE 번호」를 못 박는다 — 탈락 1위를 겨눈 자리다", () => {
+    const 지시 = 교사지시("execsum", 변형값);
+    // 어느 절인지·어느 자리인지가 다 들어 있어야 지시가 자리를 「지정」한 것이다.
+    expect(지시).toContain("「요약」 절");
+    expect(지시).toContain("첫 문장");
+    expect(지시).toContain("CVE-연도-번호");
+    // remreq에는 안 붙인다 — 질문에 자산·제품이 함께 있어 번호가 자연히 실린다(지시를 늘리면 꼬리가 흘린다).
+    expect(교사지시("remreq", 변형값)).not.toContain("「요약」 절");
+    // ⚠ 잣대는 그대로여야 한다 — 지시를 넣었다고 심사를 눅여 주면 재료가 나빠지고 숫자만 좋아진다.
+    const 번호없는답 = 긴좋은답.replace(/CVE-2024-99001/g, "해당 취약점");
+    expect(심사("remreq", 질문, 번호없는답, 조각, 변형값)).toBe("주인공 CVE 없음");
+  });
 });
 
 describe("★⑤ 저장 창구를 부르지 않는다 — 이 재료는 학습 전용이다", () => {
@@ -440,5 +455,50 @@ describe("★⑦ 이어 붙이기·번갈아 두기 (D3·D5)", () => {
     expect(지시.split("\n")[1]).toContain("원문:");        // 목록 맨 앞에 왔는가
     expect(인용못박기).toContain("마지막 줄");
     expect(인용못박기).toContain('원문: "…"');
+  });
+
+  // ⓒ D6은 **효과가 없었다**(5.4% → 5.1%). 되돌리지 않기로 했으니, 다음 사람이 같은 가설을 다시
+  //   세우지 않도록 그 실측이 소스에 남아 있는지 본다 — 없어지면 이 시험이 먼저 말한다.
+  it("★ D6이 효과 없었다는 실측이 주석에 남아 있다 — 안 남기면 다음 회전에서 같은 가설을 또 세운다", () => {
+    const code = 도구();
+    const i = code.indexOf("★ D6(2026-09-04)");
+    expect(i, "D6 주석을 못 찾았다 — 이 감시가 헛돈다").toBeGreaterThan(-1);
+    const 주석 = code.slice(i, i + 900);
+    expect(주석, "효과 실측이 없다").toContain("효과 없음");
+    expect(주석).toContain("8/149");
+    expect(주석).toContain("7/136");
+  });
+});
+
+// ⓑ 숫자만 남기면 「무엇이」는 알아도 「왜」는 모른다 — 회전 2에서 탈락 13건을 다시 재려다
+//   사유마다 앞 2건·400자밖에 없어 **다시 굽지 않고는** 알 수 없었다(교사 시간이 가장 비싼 자원인데).
+describe("★⑧ 탈락 답 전문을 남긴다 (<name>.rejected.json)", () => {
+  it("떨어진 답을 사유·형식·질문·전문·조각 sha12 와 함께 모은다", () => {
+    const code = 도구();
+    expect(code, "탈락 전문을 모으는 자리가 없다").toContain("const 탈락기록 = []");
+    const i = code.indexOf("탈락기록.push({");
+    expect(i, "탈락 자리에서 전문을 안 모은다").toBeGreaterThan(-1);
+    const 담는것 = code.slice(i, i + 320);
+    for (const 칸 of ["사유", "kind", "cve", "chunkSha12", "question", "answer"]) {
+      expect(담는것, `${칸} 칸이 없다 — 재측정에 필요한 값이 빠지면 이 파일도 400자짜리와 같아진다`).toContain(칸);
+    }
+    // ★ 머리 400자가 아니라 **전문**이어야 한다 — slice로 자르면 이 파일을 만든 뜻이 사라진다.
+    expect(담는것, "전문이 아니라 잘라서 담고 있다").not.toMatch(/answer\.slice\(/);
+  });
+
+  it("파일로 실제로 쓰고, 학습 재료(rows)에는 안 섞는다", () => {
+    const code = 도구();
+    expect(code).toContain(".rejected.json");
+    expect(code).toMatch(/writeFileSync\(탈락파일, JSON\.stringify\(탈락기록/);
+    // ⚠ 떨어진 답이 산출 데이터셋에 섞이면 **거른 뜻이 사라진다.** rows에 들어가는 자리는 하나뿐이어야 한다.
+    const rows에넣기 = [...code.matchAll(/rows\.push\(/g)];
+    expect(rows에넣기.length, "rows.push가 여러 곳이다 — 떨어진 답이 섞이는 길이 열렸는지 봐야 한다").toBe(1);
+    expect(code.slice(code.indexOf("rows.push("), code.indexOf("rows.push(") + 200)).not.toContain("탈락");
+  });
+
+  it("보고서(md)가 전문 파일을 가리킨다 — 표본 400자를 원본으로 착각하지 않게", () => {
+    const code = 도구();
+    expect(code).toContain("탈락 답 **전문**");
+    expect(code).toContain("다시 재는 자리는 그 파일");
   });
 });

@@ -26,6 +26,7 @@ import { 절세기 } from "../../tools/team-bench/tasks.mjs";
 import {
   회차이름표, 회차번호, 허용인가, 참조정규화, 매니페스트파일들, 허용목록읽기, 재료가르기,
 } from "../../tools/ladder/ladderlib.mjs";
+import { 슬라이스, 직렬화, md5, 기본산출경로, 글자수분포 } from "../../tools/ladder/make-cal-slice.mjs";
 
 // ── 재료: run.mjs가 남기는 꼴 그대로(필드 이름을 지어내지 않는다) ────────────
 const 과제 = (score: number, extra: Record<string, unknown> = {}) => ({
@@ -1218,5 +1219,62 @@ describe("프롬프트 규격 뽑기 — 표시 흠(2026-09-04)", () => {
     expect(스키마표시({ foo: 1 }), "모르는 꼴이어도 사람이 읽을 것을 남긴다").toBe('{"foo":1}');
     const src = readFileSync(join(__dirname, "..", "..", "tools", "ladder", "export-prompt-spec.mjs"), "utf8");
     expect(src, "찍는 자리에서 그 함수를 써야 한다").toContain("스키마표시(서버스키마)");
+  });
+});
+
+// ── 캘리브레이션 슬라이스 (tools/ladder/make-cal-slice.mjs) ─────────────────
+//
+// ★ 왜 시험이 붙었나: 이 식은 **회전 1이 손으로 뽑고 글로 안 남겼다.** 회전 2에서 같은 슬라이스를
+//   다시 만들려다 못 만들어, gb10에 남아 있던 결과 파일과 원본을 **후보 4개로 대조해** 되찾아야 했다.
+//   되찾은 식을 다시 사람 손에 두면 회전 3에서 같은 일이 난다 — 그래서 도구로 못 박고 여기서 잰다.
+//   ⚠ 잰다 = 「같은 입력이면 같은 md5」다. 캘리브레이션은 두 기계(win·gb10)가 **같은 파일**을 봐야
+//     의미가 있는데, 그 「같음」을 확인하는 유일한 자가 md5이기 때문이다.
+describe("캘리브레이션 슬라이스 — 회전 1·2가 쓴 그 식 그대로", () => {
+  // 결정적 재료(운영 데이터를 안 쓴다) — 행 수는 회전 2 실물과 같은 1,115로 맞춰 자리 계산을 실물과 겹친다.
+  const 재료 = () => Array.from({ length: 1115 }, (_, i) => ({ question: `질문 ${i}`, answer: `답 ${i}`, system: "공통" }));
+
+  it("식이 ⌊i×n/N⌋ 이다 — 앞 N행을 자르는 것과 **다르다**(그게 이 식의 존재 이유다)", () => {
+    expect(슬라이스([0, 1, 2, 3, 4, 5, 6], 3)).toEqual([0, 2, 4]);
+    const 뽑은 = 슬라이스(재료(), 160);
+    expect(뽑은.length).toBe(160);
+    expect(뽑은[0].question).toBe("질문 0");
+    expect(뽑은[159].question).toBe("질문 1108");           // ⌊159×1115/160⌋
+    // 균등 간격이라 같은 행을 두 번 집지 않는다(N ≤ n인 동안).
+    expect(new Set(뽑은.map((r) => r.question)).size).toBe(160);
+    // 앞에서 자르면 승인 순서 쏠림이 그대로 실린다 — 그 꼴과 같아지면 이 도구가 할 일을 안 한 것이다.
+    expect(뽑은.map((r) => r.question)).not.toEqual(재료().slice(0, 160).map((r) => r.question));
+  });
+
+  it("★ 결정성 — 같은 입력이면 **바이트까지** 같다(md5 못 박기)", () => {
+    const a = 직렬화(슬라이스(재료(), 160));
+    const b = 직렬화(슬라이스(재료(), 160));
+    expect(md5(a)).toBe(md5(b));
+    // 값을 못 박아 둔다 — 식이든 직렬화 꼴이든 바뀌면 여기가 먼저 빨개진다(조용히 갈리지 않게).
+    expect(md5(a)).toBe("031388c5a2595655ff74a4ae61c4b6e9");
+  });
+
+  it("직렬화 꼴이 계약이다 — 2칸 들여쓰기 · 끝에 줄바꿈 없음", () => {
+    const 글 = 직렬화([{ a: 1 }]);
+    expect(글).toBe('[\n  {\n    "a": 1\n  }\n]');
+    expect(글.endsWith("\n"), "끝에 줄바꿈이 붙으면 md5가 달라져 두 기계의 파일을 못 견준다").toBe(false);
+  });
+
+  it("모르는 입력에는 죽는다 — 조용히 이상한 슬라이스를 내지 않는다", () => {
+    expect(() => 슬라이스([], 160)).toThrow();
+    expect(() => 슬라이스([1, 2, 3], 160)).toThrow();      // N > n
+    expect(() => 슬라이스([1, 2, 3], 0)).toThrow();
+    expect(() => 슬라이스([1, 2, 3], 1.5)).toThrow();
+  });
+
+  it("산출 이름은 <원본>-cal<N>.json — 회전 1·2가 쓴 이름 규칙 그대로다", () => {
+    expect(기본산출경로("data/datasets/raft-vuln-v2.json", 160).replace(/\\/g, "/"))
+      .toBe("data/datasets/raft-vuln-v2-cal160.json");
+  });
+
+  it("글자수 분위는 회전 2 보고서와 **같은 관례**(floor(q×N))로 센다 — 관례가 갈리면 같은 파일의 p95가 둘이 된다", () => {
+    const 행들 = Array.from({ length: 100 }, (_, i) => ({ system: "", question: "", answer: "x".repeat(i + 1) }));
+    expect(글자수분포(행들).p95).toBe(96);                 // floor(0.95×100) = 95번째 자리 → 96자
+    expect(글자수분포(행들).평균).toBe(51);
+    expect(글자수분포(행들).최대).toBe(100);
   });
 });

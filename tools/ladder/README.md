@@ -42,6 +42,131 @@ git add tools/team-bench/results-ladder/day2/r2-v2 && git commit   # ② 커밋�
 bash tools/ladder/gb10-sync-results.sh r2-v2 --after-commit   # ③ gb10 쪽 커밋된 파일만 삭제 → push → rev-list 0 0
 ```
 
+## 회전 절차 한 장 (회전 2 = `r2-v2` 실측, 2026-09-04)
+
+> 회전 하나를 처음부터 끝까지 도는 순서다. **숫자는 회전 2에서 실제로 잰 값**이고, 각 단계 옆의
+> ⚠는 그날 실제로 밟은 함정이다(고쳐 놓은 것도 있고, 원리상 남는 것도 있다).
+> 회전 이름(`r2-v2`)과 데이터셋 이름(`raft-vuln-v2`)만 바꾸면 다음 회전에 그대로 쓴다.
+
+### ① 재료 빌드 — **win**에서, 운영 4000 창구로
+
+```bash
+# 먼저 눈으로 본다(저장하지 않는다). 판 짜기 인자가 맞는지, 회수율이 떨어지지 않았는지.
+node tools/build-raft-dataset.mjs --name raft-vuln-v2 --topic 취약점 --agent normaltic \
+  --distractors 2 --p-oracle 0.8 --quote-rule strict --noevidence-from-uncited \
+  --longform-dataset server/data/datasets/longform-vuln-v2.json \
+  --prompt-spec tools/team-bench/prompt-spec.json --dry-run
+# 같은 명령에서 --dry-run 만 빼면 서버 위생 창구로 저장한다(운영 data/datasets/ 에 남는다).
+```
+
+- 실측: 보낸 행 1,124 → 저장 1,115(**위생이 뺀 행 9**). 「보낸 수 ≠ 저장 수」의 차이가 곧 위생 적발이다.
+- ⚠ **admin은 계정당 1세션**이다. 이 빌더·증류기·표본 하네스가 같은 계정을 쓰므로 **하나씩** 돌린다.
+  세션이 물려 있으면 밀어내지 말고 기다린다(밀어내면 남의 회차가 죽는다).
+  2026-09-04에 이 빌더가 로그아웃을 안 해 **유령 세션 30분**이 남았고 다음 도구가 26분을 기다렸다 —
+  지금은 성공·실패 어디로 끝나든 세션을 닫는다(`server/test/raftdataset.test.ts` 가 그것을 감시한다).
+
+### ② 캘리브레이션 슬라이스 — **win**에서
+
+```bash
+node tools/ladder/make-cal-slice.mjs <원본.json> --n 160
+#  → <원본>-cal160.json · 행수·md5·글자수(평균/p95)를 찍는다
+```
+
+- 식은 `rows[⌊i×n/160⌋]`(균등 간격). **앞 160행을 자르면 승인 순서 쏠림이 그대로 실린다.**
+- 실측(raft-vuln-v2, 1,115행): md5 `4939415652d08bad37a73dab82995544` ·
+  슬라이스 글자수 평균 3189 / p95 4102 (전체 3176 / 4074 — 닮았다).
+
+### ③ gb10으로 보내기 — **두 자리에 똑같이**
+
+```bash
+scp raft-vuln-v2.json raft-vuln-v2-cal160.json gb10:~/gijo-as/server/data/datasets/
+scp raft-vuln-v2.json raft-vuln-v2-cal160.json gb10:~/bench/lora-vuln/data/datasets/
+ssh gb10 'md5sum ~/gijo-as/server/data/datasets/raft-vuln-v2*.json'   # win에서 잰 값과 대조
+```
+
+- 왜 두 자리인가: 사슬(`day2-train.sh`)은 `$SERVER_DIR/data/datasets/` 를 읽고,
+  캘리브레이션(`cal-run-v2.sh`)은 `cd ~/bench/lora-vuln` 뒤 `data/datasets/` 를 읽는다.
+  ⚠ 학습기는 **cwd 기준** `data/datasets/<id>.json` 을 연다(`finetune_qlora14b.py:75`) — 그래서 자리가 둘이다.
+- ⚠ WireGuard 너머라 RTT 70~106ms다. 6MB짜리도 체감이 있고, 모델 크기는 밤을 잡아먹는다.
+
+### ④ 캘리브레이션 10스텝 — **gb10**에서
+
+```bash
+ssh gb10 'cd ~/gijo-as && bash tools/ladder/cal-run-v2.sh 4096 raft-vuln-v2-cal160'
+# 볼 것 ① 길이 초과 제외가 0인가  ② 스텝 간격(=초/스텝)  ③ 최소 가용 메모리
+```
+
+- 실측: **96초/스텝**(maxSeq 4096). 회전 1은 73.2초/스텝이었다(maxSeq 3072) — **maxSeq를 올리면 느려진다.**
+- ⚠ **글자 ≠ 토큰.** 재료 보고서가 주는 것은 글자수인데 maxSeq는 토큰이다. 한국어는 글자 1개가
+  토큰 1~2개라 글자수로 어림하면 틀린다 — 토큰 분포는 `tools/ladder/tokcount.py` 로 따로 센다.
+  그래도 **확정은 학습 로그의 「길이 초과 제외 N」**이다(그 값이 0이 아니면 뒤=답이 잘린 행이 생긴 것이다).
+- ⚠ **swap이 차오를 때 `free` 의 available은 거짓말을 한다.** 「아직 여유 있다」로 보이는데 실제로는
+  스왑을 긁고 있어 초/스텝이 갑자기 늘어난다 — `available` 만 보지 말고 `swap` 칸을 함께 본다
+  (`watch-r2.sh` 가 두 값을 같은 줄에 적는 이유다).
+
+### ⑤ 에폭 정하기 — **≤ 6.5시간이면 3에폭**
+
+- 산수: 초/스텝 × 스텝수 × 에폭. 실측 96초/스텝에서 **1에폭 ≈ 1시간 45분** → 3에폭 ≈ **5시간 15분** → 3으로 간다.
+- 6.5시간을 넘길 것 같으면 2에폭으로 내린다. 밤 하나에 안 끝나는 회전은 **다음 날 아침을 통째로 먹는다.**
+- `saveEpochs: true` 면 에폭마다 체크포인트를 남겨 **한 회전 안에서** 「3에폭이 과했나」를 잰다
+  (회전 1은 5시간 20분을 굽고 마지막 것만 남겨 그 질문을 못 물었다).
+
+### ⑥ 사슬 기동 — **gb10**에서 (명령 원문 그대로)
+
+```bash
+ssh gb10 'cd ~/gijo-as && export GIJO_ADMIN_USER=… GIJO_ADMIN_PASSWORD=… GIJO_SERVE_TOKEN=… && \
+  setsid nohup bash tools/ladder/day2-train.sh --round r2-v2 \
+  > tools/team-bench/results-ladder/day2/r2-v2/chain.log 2>&1 < /dev/null &'
+```
+
+- ⚠ 비밀값은 **env로만** 넘긴다. 스크립트·로그·저장소 어디에도 적지 않는다(스크래치패드 스크립트에도).
+- ⚠ `setsid nohup` 이 핵심이다 — ssh가 끊기면 SIGHUP이 파이썬을 죽여 **밤이 통째로 사라진다.**
+
+### ⑦ 감시 — 5분마다 한 줄
+
+```bash
+ssh gb10 'cd ~/gijo-as && setsid nohup bash tools/ladder/watch-r2.sh r2-v2 > /dev/null 2>&1 &'
+ssh gb10 'tail -5 ~/bench/ladder/watch-r2-v2.log'
+```
+
+- ⚠ **`/health` 503을 「죽었다」로 읽지 말 것.** A/B 단계에서 8093 두뇌가 모델을 무는 동안 503이 나온다
+  (84GB짜리는 몇 분이 걸린다). 죽은 것과 아직 안 뜬 것은 다르다 — 로그의 마지막 줄을 함께 본다.
+- ⚠ **`pkill` 자기매칭.** `pkill -f watch` 는 그 명령을 부른 쉘 자신까지 잡는다. 회전 이름을 꼭 붙인다:
+  `pkill -f 'watch-r2.sh r2-v2'`.
+
+### ⑧ 끝난 뒤 결과 회수 — **win**에서
+
+```bash
+bash tools/ladder/gb10-sync-results.sh r2-v2                  # ① gb10 → win (로그·pid는 안 가져온다)
+git add tools/team-bench/results-ladder/day2/r2-v2 && git commit   # ② 커밋은 **사람이** 한다
+bash tools/ladder/gb10-sync-results.sh r2-v2 --after-commit   # ③ gb10 청소 → push → rev-list 0 0
+```
+
+- ⚠ 순서를 바꾸면 push가 **거부된다** — gb10은 `receive.denyCurrentBranch=updateInstead` 라
+  같은 파일이 거기 untracked로 남아 있으면 작업트리를 못 바꾼다(2026-09-04에 두 번 겪었다).
+- ⚠ **회전이 도는 동안에는 gb10에 push하지 않는다.** 작업트리가 갱신되면서 도는 사슬의 발밑이 바뀐다.
+
+### 승격한 gb10 홈 스크립트 3종 (2026-09-04)
+
+회전 1·2 때 이 셋은 **gb10의 `~/bench/ladder/` 에만** 있었다. 기계 홈에만 있는 스크립트는
+기계가 바뀌면 사라지고, 시험도 검토도 안 붙는다. 저장소로 올리면서 `$HOME` 에 박혀 있던 자리를
+전부 env로 뺐다 — **값은 gb10 기본값 그대로**라 gb10에서는 하던 대로 돈다.
+
+| 파일 | 하는 일 | 쓰는 법 |
+|---|---|---|
+| `cal-run-v2.sh` | 10스텝 캘리브레이션(초/스텝·길이 초과·메모리) | `bash tools/ladder/cal-run-v2.sh [maxSeq] [데이터셋id]` |
+| `watch-r2.sh` | 5분마다 메모리·swap·스텝·eval·체크포인트 한 줄 | `bash tools/ladder/watch-r2.sh <회전>` → `~/bench/ladder/watch-<회전>.log` |
+| `tokcount.py` | 재료의 **토큰** 길이 분포(글자수가 아니다) | `~/venv-train/bin/python tools/ladder/tokcount.py <재료.json>` |
+
+자리 바꾸기(전부 env — 안 주면 gb10 기본값):
+`LADDER_HOME`(결과·로그) · `LADDER_WORK_DIR`(학습이 도는 곳) · `LADDER_REPO_DIR`(저장소) ·
+`LADDER_PYTHON` · `LADDER_HF_BASE_DIR`(=`BASE`) · `LADDER_INTERVAL` · `LADDER_PORTS` · `LADDER_CAL_TAG`.
+
+- `cal-run-v2.sh` 는 시작 전에 파이썬·학습기·베이스 모델·데이터셋이 **있는지 먼저 본다**(원본에는 없던 것).
+  캘리브레이션은 「빨리 알려고」 도는 자리라, 몇 분 뒤 로그 속에서 죽으면 그 존재 이유가 깎인다.
+- `tokcount.py` 의 숫자는 **미리보기**다 — 학습기 `render()` 를 불러올 수 없어 그 안의 두 줄을
+  글자 그대로 옮겨 적었다. **확정은 학습 로그의 「길이 초과 제외 N」**이다.
+
 ## 밤/낮 전환은 **산출물 존재**로 가른다
 
 밤새 도는 일은 중간에 끊긴다(ssh 끊김·전원·사람의 Ctrl+C). 그때 「어디까지 했나」를 로그로
@@ -288,6 +413,10 @@ node tools/ladder/ladderlib.mjs allow "knowledge/보안용어.md" "고객사_자
 `server/test/ladder.test.ts` — 게이트 판정·회차 이름표·허용목록 매칭이 제대로 세는지 본다.
 자 자체가 틀리면 위의 모든 멈춤 규칙이 헛돈다. 회차 셈의 **반쪽**(실패 로그를 `.failed.log`로
 옮기는 자리)은 셸 소스 감시로 함께 잡는다 — 셈만 고치고 표식을 안 남기면 사람이 폴더를 못 읽는다.
+
+`server/test/ladder.test.ts` 뒤쪽 — **캘리브레이션 슬라이스**(`make-cal-slice.mjs`)가 같은 입력에서
+같은 md5를 내는지. 두 기계가 같은 파일을 보는지 가리는 유일한 자가 md5라, 식이나 직렬화 꼴이
+바뀌면 여기가 먼저 빨개진다.
 
 `server/test/distillcorpus.test.ts` — 코퍼스 창구가 무엇을 절대 안 내주는지, 그리고 증류기의
 **최상위(try 밖) 호출**이 타임아웃·1회 재시도로 지켜지는지(서버 재시작 한 번에 회차가 안 죽게).

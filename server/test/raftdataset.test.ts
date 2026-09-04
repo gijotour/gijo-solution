@@ -1182,4 +1182,31 @@ describe("★ 창구·저장 관문 (소스 감시)", () => {
       /for 이름 in \("eval_strategy", "evaluation_strategy"\)/
     );
   });
+
+  // [2026-09-04 실측] 빌더가 로그아웃을 안 해 **유휴 30분짜리 유령 세션**이 남았고, 계정당 1세션이라
+  //   다음 도구가 26분을 기다렸다. 재료 굽는 시간보다 기다린 시간이 길었다.
+  //   ⚠ 실서버 없이 「세션이 실제로 지워졌나」는 못 잰다 — 대신 **거짓말이 되는 자리 넷**을 소스로 못 박는다.
+  it("★ 빌더는 끝에 세션을 닫는다 — refreshToken을 몸에 실어서(안 실으면 서버가 아무것도 안 지운다)", () => {
+    const code = src("tools/build-raft-dataset.mjs");
+    const i = code.indexOf('"/api/auth/logout"');
+    expect(i, "로그아웃을 부르는 곳이 없다 — 유령 세션이 계정당 1세션을 물고 다음 도구를 막는다").toBeGreaterThan(-1);
+    // ① 몸에 refreshToken이 없으면 서버는 {ok:true}만 주고 세션을 **그대로 둔다**(아래 ④에서 그 계약을 대조한다).
+    expect(code.slice(i, i + 320), "logout 몸에 refreshToken이 없다 — 「로그아웃했다」가 거짓말이 된다")
+      .toContain("refreshToken");
+    // ② 성공이든 실패든 닫는가 — 직접 실행 꼬리의 finally가 그 자리다.
+    expect(code, "finally가 없으면 실패로 끝난 회차의 세션이 남는다").toMatch(/finally \{\s*await 로그아웃\(\);/);
+    // ③ ★ process.exit()는 finally를 **건너뛴다** — 로그인 뒤에 exit로 튀는 길이 하나라도 있으면 세션이 남는다.
+    //    (실제로 사전검사 실패 갈래가 그 길이었다. 지금은 process.exitCode + return 이다.)
+    const 로그인자리 = code.indexOf("const auth = await login(SERVER");
+    const 꼬리자리 = code.indexOf("// 짝 시험이 위 순수 함수들을 import한다");
+    expect(로그인자리, "로그인 호출부를 못 찾았다 — 이 감시가 헛돈다").toBeGreaterThan(-1);
+    expect(꼬리자리, "직접 실행 꼬리를 못 찾았다 — 이 감시가 헛돈다").toBeGreaterThan(로그인자리);
+    const 튀는곳 = [...code.slice(로그인자리, 꼬리자리).matchAll(/^[^/\n]*process\.exit\(/gm)].map((m) => m[0].trim());
+    expect(튀는곳, "로그인 뒤 process.exit()로 튀면 세션을 닫는 finally가 안 돈다").toEqual([]);
+    // ④ 서버 쪽 계약이 아직 그대로인가 — 여기가 바뀌면 ①의 뜻이 사라진다(빈 몸으로 불러도 지워지게 되면).
+    expect(src("server/src/auth/auth.ts"), "logout 계약이 바뀌었다 — 빌더의 로그아웃 꼴을 다시 보라")
+      .toMatch(/if \(refreshToken\) revokeRefreshToken\(refreshToken\)/);
+    // ⑤ 같은 함정을 이미 넘은 짝(ask-samples)과 갈라지지 않았는가 — 이 저장소가 반복해 겪은 「두 파일이 어긋난다」.
+    expect(src("tools/team-bench/ask-samples.mjs")).toContain("refreshToken: ctx.refreshToken");
+  });
 });
