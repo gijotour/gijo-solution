@@ -527,7 +527,11 @@ async function main() {
     이어받음: 앞선행.length, resume: RESUME,
     형식별: { remreq: 앞선행.filter((r) => r?.meta?.kind === "remreq").length, execsum: 앞선행.filter((r) => r?.meta?.kind === "execsum").length },
     토큰: { prompt: 0, completion: 0 }, 교사ms: 0, 호출: 0, 실패: [], 예산초과: false,
+    연속실패: 0, 버림: 0, 교사끊김: false,
   };
+  /** 교사가 잠깐 자리를 비웠을 때 일감을 몇 번까지 줄 뒤로 돌리나 · 몇 번 연속 실패하면 회차를 접나. */
+  const 재시도한도 = 3, 연속실패한도 = 40;
+  const 잠깐 = (ms) => new Promise((r) => setTimeout(r, ms));
   // 이어받은 행이 먼저 온다 — 산출 파일은 늘 **파일 전체**이고, 「채택」은 **이번 회차**의 숫자다(둘을 안 섞는다).
   const rows = [...앞선행];
   const 시작 = Date.now();
@@ -561,10 +565,25 @@ async function main() {
       try {
         t = await 교사부르기(system, user);
       } catch (e) {
-        // 재시도 1회 — 그래도 안 되면 그 일감만 버린다(교사 한 번 실패로 회차를 잃지 않는다).
-        try { t = await 교사부르기(system, user); }
-        catch (e2) { 보고.실패.push(`${w.kind} ${w.조각.cve}: ${e2.message}`); continue; }
+        try { await 잠깐(3_000); t = await 교사부르기(system, user); }
+        catch (e2) {
+          // ★ 버리지 않는다 — **줄 뒤로 돌리고 쉬었다 온다**(2026-09-04 실사고).
+          //   그날 교사(gb10 llama-server)를 누가 다시 올렸다. 84GB 3조각을 무는 데 몇 분이 걸리는데,
+          //   그 사이 두 일꾼이 남은 일감 209개를 **몇 초 만에 전부 실패로 버렸다** — 예산 75분 중 20분만
+          //   쓰고 끝났고 재료 209건이 사라졌다. 교사가 잠깐 자리를 비운 것과 일감이 나쁜 것은 다르다.
+          w.실패 = (w.실패 ?? 0) + 1;
+          보고.연속실패 += 1;
+          if (보고.실패.length < 40) 보고.실패.push(`${w.kind} ${w.조각.cve}(${w.실패}회): ${e2.message}`);
+          if (w.실패 <= 재시도한도) {
+            queue.push(w);                                   // 줄 뒤로 — 다른 일감을 먼저 하고 돌아온다
+            await 잠깐(Math.min(60_000, 5_000 * 2 ** (w.실패 - 1))); // 5s → 10s → 20s
+          } else { 보고.버림 += 1; }
+          // 교사가 아주 갔으면 예산을 헛되이 태우지 않는다 — 연속으로 이만큼 실패하면 회차를 접는다.
+          if (보고.연속실패 >= 연속실패한도) { 보고.교사끊김 = true; return; }
+          continue;
+        }
       }
+      보고.연속실패 = 0;
       보고.호출 += 1; 보고.교사ms += t.ms;
       보고.토큰.prompt += t.usage.prompt_tokens || 0; 보고.토큰.completion += t.usage.completion_tokens || 0;
       if (!보고.교사 && t.model) 보고.교사 = t.model;
@@ -602,7 +621,8 @@ async function main() {
     `- 교사 모델: ${보고.교사 ?? "(호출 없음)"} · 창구 ${ENDPOINT} · 동시 ${CONC} · 타임아웃 ${TIMEOUT / 1000}s + 재시도 1`,
     `- 실행 인자: --name ${NAME} --seed ${SEED} --limit ${LIMIT} --agent ${AGENT} --concurrency ${CONC} --timeout-ms ${TIMEOUT} --budget-min ${BUDGET_MS / 60000}`,
     `- 재료: ${MATERIAL.join(" · ")} → 조각 ${보고.조각} · 일감 ${보고.일감}`,
-    `- 예산 초과로 중단: ${보고.예산초과 ? "예 (남은 일감은 안 돌렸다)" : "아니오"}`, "",
+    `- 예산 초과로 중단: ${보고.예산초과 ? "예 (남은 일감은 안 돌렸다)" : "아니오"}`,
+    `- 교사 끊김으로 중단: ${보고.교사끊김 ? `예 (연속 ${연속실패한도}회 실패 — 교사가 자리를 비웠다)` : "아니오"} · 끝내 못 부른 일감 ${보고.버림}건`, "",
     "## 숫자", "",
     "| 항목 | 값 |", "|---|---|",
     `| 이어받은 행(--resume) | ${보고.이어받음} |`,
@@ -622,7 +642,16 @@ async function main() {
       ? ["## 탈락 표본(사유마다 앞 2건) — 다음 회차에서 무엇을 고칠지 보려고 남긴다", "",
          ...Object.entries(보고.탈락표본).flatMap(([사유, 목록]) => [`### ${사유}`, "", ...목록.map((x) => `- \`${x.cve}\` (${x.길이}자)\n\n  > ${String(x.답머리).replace(/\n/g, "\n  > ")}`), ""])]
       : []),
-    ...(보고.실패.length ? [`## 교사 호출 실패(${보고.실패.length}건)`, "", ...보고.실패.slice(0, 20).map((s) => `- ${s}`), ""] : []),
+    ...(보고.실패.length ? [`## 교사 호출 실패(앞 ${보고.실패.length}건만 적는다)`, "", ...보고.실패.slice(0, 20).map((s) => `- ${s}`), ""] : []),
+    "## 서식의 정본과 v1 폐기 (상위 결정 D1)", "",
+    `- 조치 요청서의 정본은 **제품 서식**이다 — \`server/src/engine/remrequest.ts\` 의 buildRequestDraft() 가 찍는 ${절_요청서.length}절:`,
+    `  ${절_요청서.join(" / ")}.`,
+    "- ⚠ 1차 산출 `longform-vuln-v1.json` 의 조치 요청서 83행은 **폐기**한다. 그 83행은 벤치마크 채점기",
+    `  (\`tools/team-bench/tasks-r2.mjs\` 필수절6 = ${절_벤치_2회차.join("·")})의 절 이름으로 쓰였다.`,
+    "  시험이 세는 서식을 재료로 가르치면 **시험을 답에 맞추는** 것이 된다 — 점수는 오르고 제품 서식은 그대로다.",
+    "  파일은 기록으로 남기되 이 v2에 넣지 않았다(이어 붙이기도 v2 산출에서만 한다).",
+    "- 심사가 벤치 절 세트를 **금지**로 거른다 — 여섯이 전부 줄 머리 제목으로 서면 탈락(개별 낱말은 허용).",
+    "- 절 이름이 제품과 갈라지지 않는지는 `server/test/distilllongform.test.ts` ⑥ 이 소스로 대조한다.", "",
     "## 이 재료를 어디에 쓰나", "",
     `- \`tools/build-raft-dataset.mjs --longform-dataset ${path.relative(저장소, 기록).replace(/\\/g, "/")}\` 의 입력이다.`,
     "- 행 스키마: `{question, answer, system, meta:{kind, cve, chunkSha12}}` — 파일 최상위는 **행 배열**이다.",
