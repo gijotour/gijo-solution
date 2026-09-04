@@ -12,7 +12,7 @@ import { ragBlock, RAG_BLOCK_HEADER } from "../src/engine/llm";
 import {
   refParse, 허용목록읽기, 허용안되는이유, 라이선스판정기, 방해조각고르기, 섞기, 참고자료블록, 토큰추정, chunk,
   시험문항목록, 행만들기,
-  결정값, 거절답, 인용있나, 인용떼기, 인용붙이기, 문장들, 긴형식경로, 긴형식읽기, 구성비, 사전검사, 절수,
+  결정값, 거절답, 인용있나, 인용흔적있나, 인용떼기, 인용붙이기, 인용근거대조, 문장들, 긴형식경로, 긴형식읽기, 구성비, 사전검사, 절수,
 } from "../../tools/build-raft-dataset.mjs";
 // 정본 판정기(사다리 ④갈래). 이름이 겹치므로 사다리 쪽에 딱지를 붙여 부른다 — 어느 잣대로 쟀는지가 늘 보이게.
 import { 허용인가, 허용목록읽기 as 사다리허용목록읽기 } from "../../tools/ladder/ladderlib.mjs";
@@ -191,6 +191,16 @@ describe("방해 조각 — 「그럴듯하지만 답이 아닌」 것만", () =
     expect(고른것.map((c) => c.문서).sort()).toEqual(["B.md", "C.md"]);
   });
 
+  it("★★ 정답이 여럿이면 그 문서를 **전부** 뺀다 — 둘째 정답이 방해로 실리면 답을 눈앞에 두고 「모른다」가 된다", () => {
+    // 2026-09-04 적발: 호출부가 정답들[0]만 넘겨, 두 문서를 인용한 문답의 둘째 정답 조각이 방해 자리에
+    // 실릴 수 있었다(오늘 재료에서는 빈도 0 — 승인 문답 하나에 근거가 정확히 하나뿐이다).
+    const 정답2 = { ref: "store:B.md#cccccccccccc", text: "다른 문서 · 같은 영역 1", 문서: "B.md", category: "취약점" };
+    const 고른것 = 방해조각고르기([정답, 정답2], 후보, 3, "씨") as { 문서: string }[];
+    expect(고른것.map((c) => c.문서).sort(), "B.md는 둘째 정답의 문서다").toEqual(["C.md"]);
+    const 예전꼴 = 방해조각고르기(정답, 후보, 3, "씨") as { 문서: string }[];
+    expect(예전꼴.map((c) => c.문서).sort(), "하나만 넘기던 예전 꼴도 그대로 돈다").toEqual(["B.md", "C.md"]);
+  });
+
   it("개수 0이면 아무것도 안 고른다(방해 없는 판을 만들 수 있어야 A/B가 된다)", () => {
     expect(방해조각고르기(정답, 후보, 0, "씨")).toHaveLength(0);
   });
@@ -348,6 +358,24 @@ describe("★★ 인용 꼬리표 — 실물 두 꼴을 다 잡는다(raft-vuln-
     expect(인용있나(인용떼기(괄호꼴))).toBe(false);
     expect(인용떼기(괄호꼴)).toBe("최신 빌드로 올리세요. 해당 시스템은 조치가 필요합니다.");
   });
+
+  it("★★ 닫는 따옴표가 없는 **깨진 꼬리**도 세고 뗀다 — 관문과 수리기가 같은 사각지대를 갖지 않는다", () => {
+    // 2026-09-04 적발: 인용있나·인용떼기가 한 정규식이라, 깨진 꼬리는 둘 다 못 보고 지나쳤다.
+    // 그 결과 C·D행이 「원문: "」를 단 채 저장되는데 보고서는 「비A행 인용 0%」라고 말했다.
+    const 깨진 = '설명입니다. 원문: "This catalog is maintained by CISA';
+    expect(인용있나(깨진), "완전한 꼴이 아니니 인용「있나」는 false다").toBe(false);
+    expect(인용흔적있나(깨진), "그래도 흔적은 남아 있다 — 세는 자는 이쪽을 본다").toBe(true);
+    expect(인용떼기(깨진)).toBe("설명입니다.");
+    expect(인용흔적있나(인용떼기(깨진))).toBe(false);
+    expect(인용흔적있나("AI 답변에는 근거(참고한 문서·원문 대목)를 붙입니다"), "「원문 대목」은 인용이 아니다").toBe(false);
+  });
+
+  it("깨진 꼬리를 뗄 때 **그 줄만** 뗀다 — 뒤 문단까지 지우면 답이 사라진다", () => {
+    const v = 인용떼기('앞줄 원문: "깨진\n뒷문단은 그대로 남아야 합니다.');
+    expect(v).toContain("뒷문단은 그대로 남아야 합니다.");
+    expect(v.startsWith("앞줄")).toBe(true);
+    expect(인용흔적있나(v)).toBe(false);
+  });
 });
 
 describe("★★ 인용 규칙 strict — 근거에서 뽑은 문장만 붙인다", () => {
@@ -401,11 +429,38 @@ describe("★★ 인용 규칙 strict — 근거에서 뽑은 문장만 붙인�
     expect(r.answer).toContain(`원문: "${영문문장}"`);
   });
 
-  it("이미 인용이 있으면 손대지 않는다(두 번 붙이면 인용 안에 인용이 든다)", () => {
-    const 답 = '사용자 상호작용이 필요합니다. 원문: "requires user interaction"';
-    const r = 인용붙이기(답, [한글문장]) as { answer: string; 붙임: boolean };
-    expect(r.붙임).toBe(false);
+  it("★★ 이미 달린 인용도 **근거와 대조한다** — 근거에서 온 것이면 손대지 않는다", () => {
+    const 답 = `${한글문장} 원문: "${한글문장}"`;
+    const r = 인용붙이기(답, [한글문장]) as { answer: string; 붙임: boolean; 뗌: boolean };
+    expect(r.붙임, "두 번 붙이면 인용 안에 인용이 든다").toBe(false);
+    expect(r.뗌).toBe(false);
     expect(r.answer).toBe(답);
+  });
+
+  it("★★ 근거에 **없는** 인용은 떼고 근거에서 다시 붙인다(1회전이 지어낸 그 버릇의 뿌리)", () => {
+    // 2026-09-04 적발: 이미 인용이 달린 답(1회전 재료의 53.7%)을 대조 없이 통과시켜, 이 회전의
+    // 핵심 개입이 A행의 일부에만 닿았다. 아래 인용문은 근거 블록 어디에도 없는 문장이다.
+    const 남의문장 = 'This catalog is maintained by the Cybersecurity and Infrastructure Security Agency';
+    const 답 = `${한글문장} 원문: "${남의문장}"`;
+    const r = 인용붙이기(답, [`${한글문장} 조치 기한은 별도로 정합니다.`]) as { answer: string; 붙임: boolean; 뗌: boolean };
+    expect(r.뗌, "근거 밖 인용을 그대로 두면 「아무 문장이나 원문이라 부르기」를 가르친다").toBe(true);
+    expect(r.붙임).toBe(true);
+    expect(r.answer).not.toContain(남의문장);
+    expect(r.answer).toContain(`원문: "${한글문장}"`);
+  });
+
+  it("★ 근거 밖 인용인데 대신 붙일 문장도 없으면 **행을 버린다**", () => {
+    const r = 인용붙이기('전혀 다른 주제로만 서술한 답변 문장입니다. 원문: "지어낸 원문입니다"', [한글문장]) as
+      { answer: string | null; 뗌: boolean };
+    expect(r.answer).toBeNull();
+    expect(r.뗌, "떼고 못 붙였다는 사실이 집계에 남아야 한다").toBe(true);
+  });
+
+  it("★ 인용 대조 — 근거에 통째로 있거나 20자 이상 이어 겹치면 근거로 본다", () => {
+    expect(인용근거대조(한글문장, [`앞말. ${한글문장} 뒷말.`])).toBe(true);
+    expect(인용근거대조(한글문장.slice(0, 30), [한글문장])).toBe(true);
+    expect(인용근거대조("This catalog is maintained by CISA", [한글문장])).toBe(false);
+    expect(인용근거대조("짧다", [한글문장]), "8자 미만은 우연히 걸린다 — 대조하지 않는다").toBe(false);
   });
 
   it("★ 겹치는 문장이 없으면 붙이지 않고 사유를 돌려준다 — 근거 없는 인용을 만들지 않는다", () => {
@@ -545,6 +600,36 @@ describe("★★ 행 만들기 2회전 갈래 — A / B / B′ / C", () => {
     expect(통계.방해라이선스노출.행).toBe(1);
     expect(통계.방해라이선스노출.문서별["Tenable_User_Guide.pdf"]).toBe(1);
   });
+
+  it("★★ strict에 버려진 행은 방해 노출로 **안** 센다 — 사람더러 판단하라는 숫자에 유령 행이 섞였다", () => {
+    // 2026-09-04 적발: 막힌방해 집계가 strict 인용 필터보다 먼저 돌아, 데이터셋에 실리지도 않은 행이
+    // 「재배포 위험을 판단하라」는 그 숫자를 부풀렸다(실측 재구성에서 이 사유로 버려진 행이 334개였다).
+    const 타사 = 조각("Tenable_User_Guide.pdf", 긴본문("타사 상용 문서의 문장입니다."));
+    const 색인2 = new Map([[정답조각.ref, 정답조각], [타사.ref, 타사]]);
+    type 노출 = 결과 & { 통계: { 방해라이선스노출: { 행: number }; 인용규칙: Record<string, number> } };
+    // 답이 근거와 20자도 안 겹친다 → strict가 이 행을 버린다.
+    const 버림 = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref])], 색인2, { ...기본, quoteRule: "strict" }) as 노출;
+    expect(버림.rows).toHaveLength(0);
+    expect(버림.통계.방해라이선스노출.행, "실리지도 않은 행을 세면 안 된다").toBe(0);
+    // 같은 방해인데 행이 실리면 그대로 센다(경보를 줄이는 수리가 아니다).
+    const 실림 = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref], 정답조각.text)], 색인2, { ...기본, quoteRule: "strict" }) as 노출;
+    expect(실림.rows).toHaveLength(1);
+    expect(실림.통계.방해라이선스노출.행).toBe(1);
+  });
+
+  it("★ strict가 **무엇을 했는지** 숫자로 남는다 — 「그대로」만 크면 개입이 재료에 안 닿은 것이다", () => {
+    type 규칙 = 결과 & { 통계: { 인용규칙: Record<string, number> } };
+    const 남의인용 = `${정답조각.text} 원문: "This catalog is maintained by CISA and updated regularly"`;
+    const r = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref], 남의인용)], 색인, { ...기본, quoteRule: "strict" }) as 규칙;
+    expect(r.통계.인용규칙["갈아끼움(근거 밖 인용을 떼고 다시)"]).toBe(1);
+    expect(r.rows[0].answer).not.toContain("Cybersecurity");
+    expect(r.rows[0].answer).not.toContain("This catalog");
+    const 그대로 = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref], 정답조각.text)], 색인, { ...기본, quoteRule: "strict" }) as 규칙;
+    expect(그대로.통계.인용규칙["새로 붙임"]).toBe(1);
+    const 끈판 = 행만들기([문답("a", "KEV가 뭔가요", [정답조각.ref], 남의인용)], 색인, 기본) as 규칙;
+    expect(Object.values(끈판.통계.인용규칙).every((v) => v === 0), "quote-rule off면 1회전과 한 글자도 다르지 않다").toBe(true);
+    expect(끈판.rows[0].answer, "off면 남의 인용도 그대로 둔다(1회전 판 보존)").toBe(남의인용);
+  });
 });
 
 describe("★ 긴 형식 재료 — 없으면 조용히 0건이 아니라 실패", () => {
@@ -617,6 +702,34 @@ describe("★★ 구성비·사전검사 — 판이 스스로를 배반하지 �
     const r = 사전검사(구성비(rows, rows.map(() => "A"))) as { 통과: boolean; 경고: string[] };
     expect(r.통과).toBe(true);
     expect(r.경고[0]).toContain("95%");
+  });
+
+  it("★★ A행의 **비중**이 절반 미만이면 경고한다 — --p-oracle 오타를 잡는 유일한 자리다", () => {
+    // 2026-09-04 적발: 커밋은 「A행이 95% 미만이면 경고」라 했는데 코드는 A행 **안쪽 인용률**만 봤다.
+    // 그래서 pOracle 0(전부 거절)인 판이 실패 0·경고 0으로 통과했다 — 0.8을 0.08로 잘못 쳐도 아무도 안 막는다.
+    const rows = [행(거절답), 행(거절답), 행(거절답), 행("근거를 인용한 답")];
+    const r = 사전검사(구성비(rows, ["B", "B", "B", "A"])) as { 통과: boolean; 경고: string[] };
+    expect(r.통과, "비중은 경고지 실패가 아니다(낮은 P를 일부러 고를 수 있다)").toBe(true);
+    expect(r.경고.some((w) => w.includes("p-oracle")), `경고에 안 나온다: ${JSON.stringify(r.경고)}`).toBe(true);
+    const 기본판 = 사전검사(구성비([행('답. 원문: "가나다"')], ["A"])) as { 경고: string[] };
+    expect(기본판.경고.some((w) => w.includes("p-oracle")), "전부 A인 기본판까지 경고하면 경고가 소음이 된다").toBe(false);
+  });
+
+  it("★★ ⓒ 폐쇄형과 ⓑ′ 무근거 거절을 **함께** 실으면 막는다 — 같은 프롬프트에 정반대 답이다", () => {
+    // 둘 다 system이 「팀원 프롬프트만」(참고 자료 블록 없음)이라 글자 단위로 같다. C는 서술 답을,
+    // B′는 거절을 가르친다 — 게다가 그 프롬프트 안에는 「자료가 없으면 없다고 먼저 밝힙니다」 규칙이 들어 있다.
+    const c = 구성비([행("폐쇄형 답"), 행(거절답)], ["C", "B2"]);
+    const r = 사전검사(c) as { 통과: boolean; 실패: string[] };
+    expect(r.통과).toBe(false);
+    expect(r.실패.join(" ")).toContain("--allow-closedbook-conflict");
+    const 허용 = 사전검사(c, { 폐쇄형충돌허용: true }) as { 통과: boolean };
+    expect(허용.통과, "사람이 판단해 받아들이면 열려야 한다(그 사실은 보고서 「판」에 남는다)").toBe(true);
+  });
+
+  it("ⓒ만 있어도 경고는 남긴다 — 팀원 프롬프트 자신의 규칙을 어기는 답이다", () => {
+    const r = 사전검사(구성비([행("폐쇄형 답")], ["C"])) as { 통과: boolean; 경고: string[] };
+    expect(r.통과).toBe(true);
+    expect(r.경고.some((w) => w.includes("폐쇄형"))).toBe(true);
   });
 
   it("절 세기는 1회전 실측에 쓴 규칙과 같다(## · 1) · ①)", () => {
