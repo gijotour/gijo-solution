@@ -1,0 +1,68 @@
+[
+ {
+  "label": "prompt",
+  "q": "KEV 목록은 누가 발표해?",
+  "promptSha12": "3452677d58b7",
+  "systemChars": 525,
+  "systemSource": "prompt-spec:/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+  "text": "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요. 일반적으로 알려진 바로는, KEV 목록은 미국의 보안 관련 기관에서 발표합니다.",
+  "ms": 3137,
+  "finish": "stop"
+ },
+ {
+  "label": "noprompt",
+  "q": "KEV 목록은 누가 발표해?",
+  "promptSha12": "",
+  "systemChars": 0,
+  "systemSource": "(없음)",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+  "text": "KEV 목록은 한국정보화진흥원에서 발표합니다. 이 목록은 정보화 관련 기술과 서비스의 발전을 위해 필요한 핵심 기술과 가치를 정리하여 제시하는 문서입니다.",
+  "ms": 2487,
+  "finish": "stop"
+ },
+ {
+  "label": "prompt",
+  "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+  "promptSha12": "3452677d58b7",
+  "systemChars": 525,
+  "systemSource": "prompt-spec:/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+  "text": "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요. 일반적으로 알려진 바로는, KEV는 공격 벡터를 의미합니다. 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 지칭합니다. 이는 보안 분석에서 핵심적인 요소로, 공격의 성공 여부를 결정하는 주요 요인입니다.",
+  "ms": 5637,
+  "finish": "stop"
+ },
+ {
+  "label": "noprompt",
+  "q": "보안에서 말하는 KEV가 뭐야? 누가 발표하는 거야?",
+  "promptSha12": "",
+  "systemChars": 0,
+  "systemSource": "(없음)",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+  "text": "KEV는 공격 벡터를 의미하는 약어로, 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 나타냅니다. 이는 보안 분석에서 중요한 요소로, 공격의 성공 여부를 결정하는 핵심 요소 중 하나입니다. KEV는 공격자가 시스템에 접근하기 위해 사용하는 특정한 방식을 설명하며, 이는 보안 담당자가 위협을 식별하고 대응하는 데 필수적인 정보입니다. KEV는 공격의 기술적 특성과 복잡성을 이해하는 데 도움을 주며, 이를 통해 보안 팀은 적절한 방어 전략을 수립할 수 있습니다. KEV는 공격의 성공 여부를 결정하는 핵심 요소 중 하나로, 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 나타냅니다. 이는 보안 분석에서 중요한 요소로, 공격의 기술적 특성과 복잡성을 이해하는 데 도움을 주며, 이를 통해 보안 팀은 적절한 방어 전략을 수립할 수 있습니다. KEV는 공격의 성공 여부를 결정하는 핵심 요소 중 하나로, 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 나타냅니다. 이는 보안 분석에서 중요한 요소로, 공격의 기술적 특성과 복잡성을 이해하는 데 도움을 주며, 이를 통해 보안 팀은 적절한 방어 전략을 수립할 수 있습니다. KEV는 공격의 성공 여부를 결정하는 핵심 요소 중 하나로, 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 나타냅니다. 이는 보안 분석에서 중요한 요소로, 공격의 기술적 특성과 복잡성을 이해하는 데 도움을 주며, 이를 통해 보안 팀은 적절한 방어 전략을 수립할 수 있습니다. KEV는 공격의 성공 여부를 결정하는 핵심 요소 중 하나로, 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 나타냅니다. 이는 보안 분석에서 중요한 요소로, 공격의 기술적 특성과 복잡성을 이해하는 데 도움을 주며, 이를 통해 보안 팀은 적절한 방어 전략을 수립할 수 있습니다. KEV는 공격의 성공 여부를 결정하는 핵심 요소 중 하나로, 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 나타냅니다. 이는 보안 분석에서 중요한 요소로, 공격의 기술적 특성과 복잡성을 이해하는 데 도움을 주며, 이를 통해 보안 팀은 적절한 방어 전략을 수립할 수 있습니다. KEV는 공격의 성공 여부를 결정하는 핵심 요소 중 하나로, 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 나타냅니다. 이는 보안 분석에서 중요한 요소로, 공격의 기술적 특성과 복잡성을 이해하는 데 도움을 주며, 이를 통해 보안 팀은 적절한 방어 전략을 수립할 수 있습니다. KEV는 공격의 성공 여부를 결정하는 핵심 요소 중 하나로, 공격자가 시스템에 침투하기 위해 사용하는 경로나 방법을 나타냅니다. 이는 보안 분석에서 중요한 요소로, 공격의 기술적 특성과 복잡성을 이해하는 데 도움을 주며, 이를 통해 보안 팀은 적절한 방어 전략을 수립할 수 있습니다. KEV는 공격의 성공 여부를 결정하는 핵심 요소 중 하나로, 공격자가 시스",
+  "ms": 44574,
+  "finish": "length"
+ },
+ {
+  "label": "prompt",
+  "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+  "promptSha12": "3452677d58b7",
+  "systemChars": 525,
+  "systemSource": "prompt-spec:/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+  "text": "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요. 일반적으로 알려진 바로는, KEV 카탈로그는 미국의 보안 기관인 CISA에서 발표합니다. CISA는 Critical Security Controls for the Protection of the Federal Information Systems and Organizations를 관리하고 있으며, 이 카탈로그는 연방 정보 시스템과 조직의 보호를 위한 핵심 보안 제어를 정의합니다. KEV 카탈로그는 이러한 제어를 기반으로 중요한 취약점과 악용 가능성을 평가하여 우선순위를 정하는 데 사용됩니다. 따라서 KEV 표시가 붙은 취약점은 CISA가 지정한 카탈로그에 포함되어 있으며, 해당 취약점은 연방 정보 시스템의 보안을 위해 즉시 대응해야 할 중요도를 가진 것으로 간주됩니다. [1]에 따르면 \"KEV 카탈로그는 미국의 보안 기관인 CISA에서 발표합니다.\"",
+  "ms": 12394,
+  "finish": "stop"
+ },
+ {
+  "label": "noprompt",
+  "q": "우리 취약점 목록에 KEV 표시가 붙어 있던데, KEV 카탈로그를 발표하는 기관이 어디야?",
+  "promptSha12": "",
+  "systemChars": 0,
+  "systemSource": "(없음)",
+  "argv": "/home/gijohn_llm/gijo-as/tools/team-bench/kev-probe.mjs /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/kev.json --server http://localhost:4000 --agent normaltic --prompt-spec /home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+  "text": "KEV 카탈로그는 미국의 사이버보안 기관인 **CISA**(Cybersecurity and Infrastructure Security Agency)가 발표하는 공식적인 취약점 목록입니다. CISA는 취약점의 심각도를 평가하고, 이를 기반으로 **KEV**(Known Exploited Vulnerabilities) 카탈로그를 관리하며, 해당 취약점이 실제 악용되고 있는지 여부를 판단하여 공개합니다. KEV 카탈로그는 기업이나 기관이 우선적으로 패치해야 할 취약점을 식별하는 데 중요한 역할을 합니다.",
+  "ms": 6867,
+  "finish": "stop"
+ }
+]
