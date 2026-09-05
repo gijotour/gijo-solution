@@ -22,7 +22,7 @@ import { explainHardTerms, glossaryGroundingFor } from "./glossary";
 import { gateUserInput } from "./gateway";
 import { currentDocIds, currentAttachText } from "./ragscope";
 // 지어낸 인용 가드 — engine 잎 모듈(아무 엔진도 안 문다)이라 순환이 안 난다(llmhooks.test 정신).
-import { guardCitations, 뗀인용요약 } from "./citeguard";
+import { guardCitations, 뗀인용요약, 숫자가원천에있나 } from "./citeguard";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -118,10 +118,10 @@ export function resetChatHistoryForTests(): void {
 //   왜 옮겼나: dispatcher가 판정기를 쓰려면 import를 해야 하는데, llm을 통째로 흉내 내는 시험이
 //   76개라 llm에서 심볼을 하나만 더 가져와도 그 시험들이 죽는다(실측 9파일 66건). 상세는 그 파일 머리말.
 export {
-  자료없음배너, 지정범위배너, 자료요청배너, 근거약함배너,
+  자료없음배너, 지정범위배너, 자료요청배너, 근거약함배너, 숫자무근거배너,
   근거없음종류판정, type 근거없음종류,
 } from "./noevidence";
-import { 자료없음배너, 지정범위배너, 자료요청배너, 근거약함배너, 모델자기거절_RE } from "./noevidence";
+import { 자료없음배너, 지정범위배너, 자료요청배너, 근거약함배너, 숫자무근거배너, 모델자기거절_RE } from "./noevidence";
 // 답 머리가 이미 사실을 말하고 있으면 배너를 겹쳐 붙이지 않는다(머리 60자 검사).
 export const 자료없음중복가드 = /자료에는 없|없습니다|근거 약함|자료를 넣어/;
 
@@ -1190,6 +1190,28 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   빠져 추정 숫자가 진하게 나간 실측 사고가 그 자리다(배너억제_근거약함 머리말).
   if (ragResult?.약한근거만 && reply && !모델자기거절_RE.test(reply.slice(0, 60))) {
     reply = `${근거약함배너}\n\n${reply}`;
+  }
+
+  // 🔢 숫자 접지 관문 — **근거는 가까운데 그 숫자만 없을 때**(2026-09-06 사고 수리 · 계획서 전-4).
+  //
+  // ■ 무엇이 뚫려 있었나(실측): 「보안 교육 이수율은 82.3%입니다 · 작년 대비 12.5% 증가 · 36.4%」가
+  //   경고 하나 없이 나갔다. 조각이 가깝게 잡혀 자료없음도 약한근거만도 아니었고(=강함),
+  //   위 배너 넷은 전부 「조각이 없거나 멀 때」의 장치라 원리상 안 붙는다. 인용 가드도 못 본다 —
+  //   그쪽은 **인용 표지가 붙은 것**만 대조하는데 이 숫자들은 맨몸이었다.
+  //
+  // ■ 왜 여기인가: 배너를 붙이는 자리가 이미 여기 둘이고, 화면 표식은 dispatcher 출구가
+  //   **붙은 배너를 읽어** 만든다(noevidence.근거없음종류판정). 그래서 배너만 여기 붙이면
+  //   옅은 숫자까지 자동으로 이어진다 — 클라이언트는 한 줄도 안 고친다.
+  //
+  // ■ 좁힘 셋 — 하나라도 빠지면 **없던 거짓말이 새로 생긴다**(noevidence.ts가 겪은 그 함정):
+  //   ① 강함일 때만 — 자료없음·약한근거만은 이미 제 배너가 붙었다(두 배너가 겹치면 딴말이 된다).
+  //   ② 도구·단계가 안 돈 자리 — 이 if 안은 remember:true(RAG를 켠 자유 답)뿐이다. 도구 답 합성은
+  //      remember를 끄고 부르므로(agentloop 최종답 주석) ragResult가 null이라 여기 못 온다.
+  //      즉 「세어 온 숫자」가 이 갈래에는 없다 — 배너억제_근거약함이 도구 답을 비켜 가는 것과 같은 규율.
+  //   ③ 답의 실적형 수치가 **전부** 원천에 없을 때만 — 판정은 citeguard 한 곳이 한다.
+  if (ragResult && !ragResult.자료없음 && !ragResult.약한근거만 && reply) {
+    const 접지 = 숫자가원천에있나(reply, ragResult.chunks, [...(ragResult.추가원천 ?? []), grounding, 첨부]);
+    if (접지.판정 === "없음") reply = `${숫자무근거배너}\n\n${reply}`;
   }
 
   // llama.cpp 실측치(usage·timings)를 그대로 실어 보낸다 — 값이 나오면 실제 추론이 일어난 것.
