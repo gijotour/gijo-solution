@@ -214,6 +214,37 @@ ok("취약점형: 담당 미배정 표시", 취약.txt.includes("담당 미배�
 ok("취약점형: 배정 칩", 취약.chips.some((c) => /담당자 배정/.test(c)));
 await 셸.evaluate(() => window.postMessage({ type: "gijo:select" }, "*")); // 해제
 
+// ── ①-2 옅은 숫자(2026-09-05 승인 시안 no-evidence-numbers) ─────────────
+//   ⚠ **얕은 검사다.** 재는 것은 「게시본 앱에서 부품이 실제로 돌고, 배너 답의 숫자만
+//   .dim-est로 감싸는가」뿐이다 — 실제 답이 옅어 보이는지(눈에 띄는 회색인지)는 사람이 본다.
+//   이 자리가 값을 하는 이유: 2026-08-19~20 사고 두 번이 다 **부품 로드 누락**(시험은 초록,
+//   실앱에서만 죽음)이었고, 그 부류는 정적 감시가 원리상 못 잡는다.
+const 옅은숫자 = await 셸.evaluate(() => {
+  const P = window.gijoChatParts;
+  if (!P || !P.dimEstimates) return { 부품: false };
+  const el = document.createElement("div");
+  el.className = "cs-row reply";
+  el.innerHTML = '<div class="cb"><div class="cm">' +
+    "<p>⚠ <strong>근거 약함 — 배너 문단</strong></p>" +
+    "<p>만족도 75점, 응답 120명입니다. CVE-2024-21762은 그대로이고 5.83.0도 그대로입니다.</p>" +
+    "<pre><code>max_items = 99</code></pre></div></div>";
+  document.body.appendChild(el);
+  const 켬 = P.dimEstimates(el, "근거약함");
+  const 옅은것 = [...el.querySelectorAll(".dim-est")].map((s) => s.textContent);
+  const 색 = 옅은것.length ? getComputedStyle(el.querySelector(".dim-est")).color : "";
+  // 표식이 없는 답(근거 있는 답)은 **아무것도 안 건드린다**.
+  const el2 = el.cloneNode(true);
+  el2.querySelectorAll(".dim-est").forEach((s) => s.replaceWith(document.createTextNode(s.textContent)));
+  document.body.appendChild(el2);
+  const 끔 = P.dimEstimates(el2, undefined);
+  el.remove(); el2.remove();
+  return { 부품: true, 켬, 끔, 옅은것, 색 };
+});
+ok("옅은 숫자: 근거 없음 답에서만 .dim-est가 붙는다(코드·식별자·배너 제외)",
+  옅은숫자.부품 && 옅은숫자.켬 === 2 && 옅은숫자.끔 === 0 &&
+  옅은숫자.옅은것.join("|") === "75점|120명" && !!옅은숫자.색,
+  JSON.stringify(옅은숫자));
+
 // ── ② 감사(작업 기록) 행 배선 + 허브 릴레이 ─────────────────────────────
 await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("records.html", "기록", { dock: true }));
 const auditFrame = await 프레임찾기("audit.html");
