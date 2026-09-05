@@ -109,13 +109,26 @@ describe("ⓐ 승인 문답 본문 — 앞으로 반입되는 문서부터 메�
 });
 
 describe("★ 배선 감시 — 호출 한 줄이 사라지면 조용히 다시 샌다", () => {
-  it("ⓑ memory.queryMemoryGraded가 조각을 돌려줄 때 걷는다(chunks·scored 같은 제거본)", () => {
+  it("ⓑ hybridSearch가 돌려줄 때 걷는다 — 검색 **4경로 전부**를 덮는 자리다", () => {
     const src = read("src", "engine", "memory.ts");
     expect(src).toContain('import { 메타걷은조각 } from "./metaleak"');
-    expect(src, "조각을 만드는 자리에서 한 번에 걷어야 titles와 자리가 안 밀린다")
-      .toMatch(/const 실을것 = 쓸것\.map\(\(c\) => \(\{ \.\.\.c, text: 메타걷은조각\(c\.text\) \}\)\);/);
-    expect(src).toMatch(/chunks: 실을것\.map/);
-    expect(src, "인용 가드의 대조 원천도 같은 제거본이라야 한다").toMatch(/scored: 실을것\.map/);
+    // ★ 왜 Graded가 아니라 hybridSearch인가: Graded 한 곳에서만 걷으면 도구 경로
+    //   (agenttools handlers)·검색 API·일일 점검(tasks)이 그물 밖으로 샌다.
+    expect(src, "hybridSearch 반환에서 안 걷는다 — 4경로 중 셋이 샌다")
+      .toMatch(/return 결과\.map\(\(c\) => \(\{ \.\.\.c, text: 메타걷은조각\(c\.text\) \}\)\);/);
+    // 순위가 끝난 뒤에 걸어야 검색 점수가 안 바뀐다 — 융합·자르기보다 뒤에 있는가.
+    expect(src.indexOf("const fused = applyDocScopeBoost("))
+      .toBeLessThan(src.indexOf("return 결과.map((c) => ({ ...c, text: 메타걷은조각(c.text) }));"));
+  });
+
+  it("ⓑ 네 경로(queryMemory·Scored·Relevant·Graded)가 모두 hybridSearch를 지난다", () => {
+    const src = read("src", "engine", "memory.ts");
+    for (const 함수 of ["queryMemoryGraded", "queryMemoryScored", "queryMemoryRelevant", "queryMemory"]) {
+      const i = src.indexOf(`export async function ${함수}(`);
+      expect(i, `${함수}를 못 찾았다`).toBeGreaterThan(0);
+      expect(src.slice(i, i + 600), `${함수}가 hybridSearch를 안 쓴다 — 그 경로만 샌다`)
+        .toContain("await hybridSearch(");
+    }
   });
 
   it("ⓒ llm.chat 출구가 인용 가드 **뒤에서** 한 번 더 뗀다 — 계수는 같은 kind=cite 신호", () => {
