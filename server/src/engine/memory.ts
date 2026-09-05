@@ -13,6 +13,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { embed } from "./embedding"; // 잎(화살 #12) — llm 전체를 물지 않는다
 import { chat, setRagProvider } from "./llm";
 import { isBinaryLikeChunk } from "./ragsanitize";
+import { 메타걷은조각 } from "./metaleak"; // 잎(import 없는 작은 파일) — 화살이 늘지 않는다
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
 import { 반입문서아님_제외SQL } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — 화살이 늘지 않는다)
@@ -1452,10 +1453,22 @@ export async function queryMemoryGraded(
   //     사람이읽는문서제목 한 곳에서 종류별로 판정한다(제목 칸을 새로 만들지 않는다 — 있는 표를 읽는다).
   //   ⚠ 이 배열은 chunks와 **같은 길이·같은 순서**라야 한다. 뒤에서 조각을 거르는 쪽
   //     (llm.ts의 sanitizeRagChunks)은 keptIndexes로 이 배열도 함께 걸러야 자리가 안 밀린다.
+  // ★ **내부 메타 줄을 여기서 걷는다**(2026-09-06 라이브 사고 · Fable 결정 Q1-ⓑ).
+  //   승인 문답 문서 3,778건에는 본문 꼬리에 「근거 조각: store:…#sha12」·「교사 모델: models/…gguf」가
+  //   실려 있고(옛 approvedQaContent), 그 조각이 「참고 자료」로 나가자 모델이 **고객 답에 내부
+  //   저장소 경로와 교사 모델 파일명을 그대로 옮겨 적었다.** 옛 문서를 다시 임베딩하지 않고
+  //   **실을 때** 걷는다.
+  // ⚠ 왜 여기인가 — 조각을 만드는 자리가 **여기 하나**다. 챗(llm.ragContextFor)·디스패처 배지·
+  //   에이전트 루프가 전부 이 반환값을 쓰므로, 여기서 걷으면 **인용 가드의 대조 원천도 같은
+  //   제거본**이 된다. 소비자 쪽에서 걷으면 원천만 원본으로 남아 가드가 「조각에 있다」며
+  //   메타 인용을 살려 준다(주는 쪽과 재는 쪽이 갈리는 자리).
+  // ⚠ scored.text도 **같은 제거본**이라야 한다 — 배지·설명이 조각 본문을 그대로 보여 준다.
+  // ⚠ titles와 자리가 안 밀린다: 걷기는 조각을 **버리지 않고** 글자만 줄인다(길이·순서 그대로).
+  const 실을것 = 쓸것.map((c) => ({ ...c, text: 메타걷은조각(c.text) }));
   return {
-    chunks: 쓸것.map((c) => c.text),
-    titles: 쓸것.map((c) => 사람이읽는문서제목(c.documentId)),
-    scored: 쓸것.map((c) => ({ text: c.text, distance: c.distance, documentId: c.documentId, lexicalHit: c.lexicalHit })),
+    chunks: 실을것.map((c) => c.text),
+    titles: 실을것.map((c) => 사람이읽는문서제목(c.documentId)),
+    scored: 실을것.map((c) => ({ text: c.text, distance: c.distance, documentId: c.documentId, lexicalHit: c.lexicalHit })),
     약한근거만: 쓸것.length > 0 && !가까움,
   };
 }

@@ -102,7 +102,11 @@ describe("반입 모양 — scope는 global, 구분은 category, 등급은 승�
     expect(content).toContain("주제 취약점");
     expect(content).toContain("교사 모델 증류(승인됨)");
     expect(content).toContain("질문: Q?");
-    expect(content).toContain("근거 조각: k.md#ab");
+    // ★ 2026-09-06 — 꼬리 메타(「근거 조각: …」·「교사 모델: …」)는 **본문에서 뺐다.**
+    //   그 두 줄이 조각으로 검색돼 고객 답 끝에 내부 저장소 경로·교사 모델 파일명으로 나갔다(라이브 실측).
+    //   메타는 원천(chat_logs)에 그대로 있고 approvedQaMeta가 가리킨다 — 자세한 계약은 metaleak.test.ts.
+    expect(content).not.toContain("근거 조각");
+    expect(content).not.toContain("교사 모델:");
   });
 
   it("learnmemory는 GLOBAL_SCOPE로 넣고 origin=approved-qa를 달며 등급을 잠근다", () => {

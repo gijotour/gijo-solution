@@ -471,7 +471,10 @@ describe("★ 배선 감시 — 출구 한 곳에서 실제로 불린다", () =>
 
   it("계수기 — 뗐을 때 **그리고 못 뗐을 때(보류)도** llm:event(kind=cite)를 남긴다", () => {
     expect(llm).toMatch(/인용가드\.removed\.length > 0 \|\| 인용가드\.보류\.length > 0[\s\S]{0,900}kind: "cite"/);
-    expect(llm, "감독 detail에 뗀 사유 요약이 안 실린다").toMatch(/detail: 뗀인용요약\(인용가드\.removed, 인용가드\.보류\)/);
+    // ⚠ 2026-09-06 — 같은 신호에 **내부 경로 제거**(metaleak)도 함께 싣는다. 그래서 detail은
+    //   변수 하나(`요약`)가 되었다. 감시하는 것은 여전히 「뗀 사유 요약이 detail로 나간다」이다.
+    expect(llm, "뗀 사유 요약을 안 만든다").toMatch(/뗀인용요약\(인용가드\.removed, 인용가드\.보류\)/);
+    expect(llm, "감독 detail에 그 요약이 안 실린다").toMatch(/kind: "cite"[^\n]*detail: 요약/);
     const act = fs.readFileSync(path.join(__dirname, "../src/engine/llmactivity.ts"), "utf8");
     expect(act, "kind 유니언에 cite가 없다").toContain('"search" | "guard" | "cite"');
   });
@@ -979,10 +982,14 @@ describe("★★ J3 참고 자료 블록의 문서 제목", () => {
   it("★ 제목은 **사람이 읽는 제목**이다 — documentId를 그대로 싣지 않는다(K2)", () => {
     // ★ 왜 바뀌었나(2026-09-05 K2 라이브): documentId를 그대로 실었더니 내부 ID가 답에 나갔다
     //   (「(출처: 《incident-case:ic-c37e91a2db580f43》)」). 판정은 사람이읽는문서제목 한 곳이다.
+    // ⚠ 2026-09-06 — 조각 배열 이름이 `쓸것` → `실을것`으로 바뀌었다(내부 메타 줄을 걷은 사본).
+    //   제목은 **같은 배열**에서 뽑아야 자리가 안 밀리므로, 감시도 그 배열을 함께 본다.
     expect(memsrc, "queryMemoryGraded가 titles를 안 돌려준다")
-      .toMatch(/titles:\s*쓸것\.map\(\(c\) => 사람이읽는문서제목\(c\.documentId\)\)/);
+      .toMatch(/titles:\s*실을것\.map\(\(c\) => 사람이읽는문서제목\(c\.documentId\)\)/);
+    expect(memsrc, "제목과 조각이 **다른 배열**에서 나오면 자리가 밀린다")
+      .toMatch(/chunks:\s*실을것\.map/);
     expect(memsrc, "documentId를 제목으로 그대로 싣는 옛 줄이 살아 있다")
-      .not.toMatch(/titles:\s*쓸것\.map\(\(c\) => c\.documentId/);
+      .not.toMatch(/titles:\s*[가-힣]+\.map\(\(c\) => c\.documentId/);
     expect(memsrc, "반환 타입에 titles가 없다").toContain("chunks: string[]; titles: string[]");
     // 종류별 판정(사례·개인 문서·ID 꼴)의 실동작은 test/doctitle.test.ts가 잰다 — 여기선 배선만.
     expect(memsrc, "사례/개인 문서 접두를 안 가른다").toContain('const 사례접두 = "incident-case:"');

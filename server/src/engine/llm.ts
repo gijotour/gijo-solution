@@ -23,6 +23,8 @@ import { gateUserInput } from "./gateway";
 import { currentDocIds, currentAttachText } from "./ragscope";
 // 지어낸 인용 가드 — engine 잎 모듈(아무 엔진도 안 문다)이라 순환이 안 난다(llmhooks.test 정신).
 import { guardCitations, 뗀인용요약, 숫자가원천에있나 } from "./citeguard";
+// 내부 메타 줄(근거 조각·교사 모델 경로) 단일 출처 — import가 없는 작은 잎 파일(2026-09-06).
+import { 메타줄걷기 } from "./metaleak";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -1119,18 +1121,30 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   인용 대상으로 안내하고, 확정 용어 정의·📎 첨부한 지난 작업도 **같은 프롬프트에 실려 나간다.**
   //   거기서 그대로 옮긴 문장은 지어낸 것이 아니므로 함께 견준다(번호 범위 판정은 조각만 쓴다).
   const 인용가드 = guardCitations(reply, ragResult?.chunks ?? null, [...(ragResult?.추가원천 ?? []), grounding, 첨부]);
-  if (인용가드.removed.length > 0 || 인용가드.보류.length > 0) {
-    reply = 인용가드.text;
+  if (인용가드.removed.length > 0 || 인용가드.보류.length > 0) reply = 인용가드.text;
+
+  // ── 내부 경로 출구 방어(2026-09-06 라이브 사고 · Fable 결정 Q1-ⓒ) ────────────────────
+  //   조각을 실을 때 이미 걷지만(memory.queryMemoryGraded), 그 그물 **밖**으로도 들어온다:
+  //   대화 이력에 남은 옛 답 · 📎 첨부한 지난 작업 · 모델이 어댑터 학습에서 외운 꼴.
+  //   그래서 마지막에 한 번 더 본다 — 「models/…gguf」·「store:…#sha12」가 든 줄은 뗀다.
+  //   ⚠ **인용 가드 뒤**에 선다: 앞에 두면 우리가 손댄 글을 가드가 자기인용으로 판정한다.
+  //   ⚠ 계수는 같은 신호(kind=cite)에 실어 감독 화면에 드러낸다 — 조용히 고치면 몇 달을 모른다.
+  //     ⚠ 경로 문자열 자체는 안 싣는다(그러면 감독 화면·WS로 같은 것이 새어 나간다).
+  const 경로가드 = 메타줄걷기(reply);
+  if (경로가드.뗀줄수 > 0) reply = 경로가드.text;
+
+  if (인용가드.removed.length > 0 || 인용가드.보류.length > 0 || 경로가드.뗀줄수 > 0) {
     // 계수기 — 원천은 llm_activity_daily 하나(kind=cite). 건수는 detail에, 답 수는 calls에 쌓인다.
     //   ⚠ 인용 원문은 안 싣는다(사내 문서 본문이 감독 화면·WS로 새면 안 된다).
     //   ⚠ 보류 칸은 지금 늘 비어 있다(2026-09-05) — 「답이 통째로 인용」이면 예전엔 원답을
     //     되돌렸는데, 그때 지어낸 값이 그대로 나갔다. 이제 가드가 자료없음 안내로 **바꾸고**
     //     removed(kind=통째교체)에 싣는다. 조건에 보류를 남겨 두는 건 다음에 「막지 못한 부류」가
     //     생겼을 때 계수기가 그대로 잡게 하려는 것이다.
-    emitLlmActivity({
-      kind: "cite", phase: "done", agent: args.agentId ?? "-", agentName,
-      detail: 뗀인용요약(인용가드.removed, 인용가드.보류),
-    });
+    const 요약 = [
+      뗀인용요약(인용가드.removed, 인용가드.보류),
+      경로가드.뗀줄수 > 0 ? `내부 경로 ${경로가드.뗀줄수}줄 제거` : "",
+    ].filter(Boolean).join(" · ");
+    emitLlmActivity({ kind: "cite", phase: "done", agent: args.agentId ?? "-", agentName, detail: 요약 });
   }
 
   // 근거가 **멀 때는 멀다고 먼저 말한다.**

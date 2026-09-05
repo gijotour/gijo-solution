@@ -73,20 +73,46 @@ const ORIGIN_LABEL: Record<ChatLog["origin"], string> = {
   distill: "교사 모델 증류(승인됨)",
 };
 
-/** 반입 본문 — 사람이 읽어도 출처가 보이게. 조각 검색에 걸리는 건 질문·답 문장이다. */
+/**
+ * 반입 본문 — 사람이 읽어도 출처가 보이게. 조각 검색에 걸리는 건 질문·답 문장이다.
+ *
+ * ★ **꼬리 메타를 본문에서 뺐다**(2026-09-06 라이브 사고 수리 · Fable 결정 Q1-ⓐ).
+ *   전에는 여기서 「근거 조각: store:<문서>#<sha12>」·「교사 모델: models/…gguf」 두 줄을
+ *   본문 끝에 붙였다. 그 문서가 조각으로 검색돼 「참고 자료」에 실리자 모델이 자료를 옮겨 적으며
+ *   **고객 답 끝에 내부 저장소 경로와 교사 모델 파일명을 그대로 옮겼다**(실측 2026-09-06 01:5x).
+ *   모델이 지어낸 것이 아니라 **우리가 실어 준 것**이라, 프롬프트로는 못 막는다.
+ *   ⚠ 메타 자체를 버리는 것이 아니다 — 원천은 `chat_logs`(cites·teacher)에 **그대로 남아 있고**
+ *     문서 id가 `승인문답:<로그 id>`라 언제든 되짚는다(approvedQaMeta). 사본을 만들어 두 곳에
+ *     적으면 어긋난다(이 저장소의 반복 병) — 그래서 **옮겨 적지 않고 가리키기만** 한다.
+ *   ⚠ 이미 반입된 문서는 재반입하지 않는다(멱등 · 임베딩 비용). 그쪽은 조각을 실을 때
+ *     metaleak.메타걷은조각이 걷는다(Q1-ⓑ).
+ */
 export function approvedQaContent(log: ChatLog): string {
   const 날짜 = new Date(log.createdAt).toISOString().slice(0, 10);
-  const lines = [
+  return [
     `[승인 문답 · 주제 ${log.topic ?? "일반"} · 출처 ${ORIGIN_LABEL[log.origin] ?? log.origin} · ${날짜}]`,
     "",
     `질문: ${log.question.trim()}`,
     "",
     "답변:",
     log.answer.trim(),
-  ];
-  if (log.cites.length) lines.push("", `근거 조각: ${log.cites.join(", ")}`);
-  if (log.teacher) lines.push(`교사 모델: ${log.teacher}`);
-  return lines.join("\n");
+  ].join("\n");
+}
+
+/**
+ * 그 승인 문답이 **무엇을 근거로, 어느 두뇌로** 만들어졌나 — 본문에서 뺀 메타를 여기서 답한다.
+ *
+ * ★ 왜 문서 표(memory_documents)에 칸을 만들지 않았나(2026-09-06 · 정직한 보고 대상):
+ *   그 표에는 이 값을 담을 칸이 없다(sourceRefs·teacher 없음). `sourcePath`에 끼워 넣으면
+ *   `hasSource=true`가 되어 화면에 「원본 열기」가 뜨고 **404가 난다**(memory.listDocuments가
+ *   그 칸 하나로 배지를 만든다). 새 칸을 파면 백업·복원·문서 목록까지 짝이 늘어난다.
+ *   반면 이 값은 이미 `chat_logs`에 **원천으로** 있고 문서 id가 로그 id를 그대로 품는다 —
+ *   사본을 만드는 대신 **원천을 가리키는 함수**를 둔다. 화면이 필요해지면 이 함수를 부른다.
+ */
+export function approvedQaMeta(logId: string): { cites: string[]; teacher: string | null } | null {
+  const log = getChatLog(logId);
+  if (!log) return null;
+  return { cites: log.cites, teacher: log.teacher ?? null };
 }
 
 /** 위생 — 폴백·회피 답변과 시점데이터·시험문항·문서복사는 기억이 되지 않는다. 사유를 돌려준다(없으면 null). */
