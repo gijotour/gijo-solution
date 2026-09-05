@@ -11,6 +11,7 @@ import { expandOntology } from "../ontology";
 import { currentDocIds } from "../ragscope";
 import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, ReviewPatch, ApprovalStatus } from "../approvals";
 import { 표식, 심각도한글, 심각도표식, 자산종류한글, cti심각도한글 } from "../tone";
+import { 말조사 } from "../../util/josa";
 import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
 import { 한줄풀이글, 섞임고지 } from "../findingplain";
@@ -2492,8 +2493,36 @@ export async function runUrgentTodo(): Promise<string> {
   ].join("\n");
 }
 
+// ── 지표 이름 대조 — **우리가 세는 것과 안 세는 것을 정직하게 가른다** (2026-09-06 · 계획서 전-4)
+//
+// ★ 왜 생겼나(사고 실측): 「보안 교육 이수율」을 물었더니 「82.3%입니다 · 작년 대비 12.5% 증가」가
+//   나갔다. 그 숫자는 chat_logs 5,998행·운영 문서 전수에 **0건**이다 — 제품이 세지도 않는 지표를
+//   모델이 지어낸 것이다. 라우팅으로 이 물음을 kpi_status에 못 박았으니, 이제 **여기서** 정직하게
+//   「그건 아직 안 셉니다」라고 말해야 한다. 안 그러면 담당자는 KPI 목록을 받고 자기가 물은 지표가
+//   그 안에 있는 줄 안다(있는 것을 없다고 하기의 거울상 — 없는 것을 있는 척하기).
+// ⚠ 표를 늘릴 때는 **계산하는 코드가 먼저**다. 여기 이름만 넣으면 없는 값을 있다고 말하게 된다.
+const 집계하는지표: { re: RegExp; 이름: string }[] = [
+  { re: /(?:조치|완료)\s*(?:완료\s*)?(?:율|률)|remediation/i, 이름: "취약점 조치율" },
+  { re: /SLA|준수\s*(?:율|률)/i, 이름: "조치 SLA 준수율" },
+  { re: /이행\s*(?:율|률)|컴플라이언스|규정\s*준수/i, 이름: "컴플라이언스 이행률" },
+];
+/** 물음에 든 「…율/률」 가운데 **제품이 세지 않는 것**을 골라낸다(중복 없이, 최대 3개). */
+export function 안세는지표찾기(질문: string | undefined): string[] {
+  const s = String(질문 ?? "");
+  if (!s) return [];
+  const 후보 = [...s.matchAll(/[가-힣]{1,6}(?:\s*[가-힣]{1,6})?\s*(?:율|률)/g)].map((m) => m[0].trim());
+  const out: string[] = [];
+  for (const c of 후보) {
+    if (집계하는지표.some((k) => k.re.test(c))) continue;
+    if (!out.includes(c)) out.push(c);
+  }
+  return out.slice(0, 3);
+}
+
 // 통합 보안 KPI 현황(kpi.html) — 자산 위험도·취약점·조치 SLA·점검·컴플라이언스를 한 스냅샷으로.
-export async function runKpiStatus(): Promise<string> {
+// ⚠ 인자 q는 **물음 그대로**다(agentloop forcedToolFor가 넘긴다). 지표 이름을 여기서 한 번 더
+//   가르지 않기 위해서다 — 판정은 위 표 한 곳(안세는지표찾기)에서만 한다.
+export async function runKpiStatus(q?: string): Promise<string> {
   const s = await computeKpiSnapshot();
   const lines = [
     `자산 ${s.assets.total}건(고위험 ${s.assets.highRisk} · 중위험 ${s.assets.midRisk} · 저위험 ${s.assets.lowRisk})`,
@@ -2507,7 +2536,20 @@ export async function runKpiStatus(): Promise<string> {
     `점검 ${s.inspections.total}건(지연 ${s.inspections.overdue} · 승인대기 ${s.inspections.pendingApproval})`,
     `컴플라이언스 이행률 ${s.compliance.coverageRate}%(${s.compliance.covered}/${s.compliance.total})`,
   ];
-  return `${예시데이터머리말()}보안 KPI 현황(${s.date}):\n${lines.map((l) => `- ${l}`).join("\n")}`;
+  // 「조치 완료율」로 물어도 위 줄의 이름은 「조치율」이다 — 담당자가 자기가 부른 이름을 못 찾으면
+  //   답이 딴 얘기로 읽힌다. 같은 값임을 한 줄로 잇는다(값을 새로 만들지 않는다).
+  const 안세는것 = 안세는지표찾기(q);
+  const 꼬리 = 안세는것.length
+    ? [
+        "",
+        // ⚠ 조사는 **말조사가 고른다** — 「을(를)」류 병기는 소스 감시(josa.test)가 막는다.
+        `${표식.주의} **${말조사(안세는것.join(" · "), "은")} 아직 집계하지 않습니다** — 위 목록이 지금 제품이 세는 지표 전부입니다.`,
+        "그 값이 필요하면 관련 자료를 지식에 넣어 주시거나, 지표 추가를 요청해 주세요.",
+      ]
+    : [];
+  return `${예시데이터머리말()}보안 KPI 현황(${s.date}):\n${lines.map((l) => `- ${l}`).join("\n")}` +
+    (꼬리.length ? "\n" + 꼬리.join("\n") : "") +
+    "\n(부르는 이름이 달라도 같은 값입니다 — 조치율=조치 완료율 · 조치 SLA 준수율=기한 준수율)";
 }
 
 // 작업 세션(대화 세션형, sessions.html) 현황 — 최근 대화 이력을 챗봇이 그대로 알 수 있게 한다.
