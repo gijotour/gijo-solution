@@ -56,6 +56,14 @@
       // ② 찾아보긴 했으나 근거는 아님 — 초록(근거 있음)과 **눈에 띄게 달라야** 한다.
       //   호박색은 이 제품에서 「주의·확인 필요」 자리다(근거 약함 배너의 ⚠와 같은 결).
       ".gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--amber,#ffd88a);}.gcp-doclink{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}.gcp-doclink:hover{opacity:.8;}",
+      // ★ 근거 없음 답의 숫자 — 옅게 + 주황 점선(2026-09-05 승인 시안 no-evidence-numbers).
+      //   ⚠ **색과 밑줄만** 바꾼다. 글자 크기·굵기·자간·padding·border를 안 건드리므로 글자 폭이
+      //     안 변하고 → 줄바꿈이 안 변하고 → **세로 총합 증감이 0px**다(시안이 실측한 값).
+      //   ⚠ 취소선을 안 쓴다 — 「값이 틀렸다」로 오독된다. 지어낸 값이지 틀린 값이 아니다.
+      //   ⚠ 색만으로 뜻을 나르지 않는다(색각 이상·고대비) — 그래서 점선을 함께 깐다.
+      ".dim-est{color:var(--muted-2,#a49d95);text-decoration:underline dotted rgba(240,160,32,.6);text-underline-offset:2px;text-decoration-thickness:1px;cursor:help;}",
+      // 굵은 글씨·표 안에서도 옅게(그 자리들은 색을 따로 정해 둬서 상속만으로는 안 먹는다). 굵기는 그대로 둔다.
+      "strong .dim-est,b .dim-est,th .dim-est,td .dim-est{color:var(--muted-2,#a49d95);}",
       ".gcp-ev{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;min-width:0;}",
       // 데이터 카드(승인 시안 대화_데이터카드, 2026-08-19) — KPI+표. 밀도는 전역 규격(25px)과 같게.
       ".dc-card{margin-top:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:var(--panel-2,#1f1e1d);}",
@@ -538,5 +546,146 @@
     return wrap;
   }
 
-  window.gijoChatParts = { quotes: quotes, picks: picks, open: open, dataCard: dataCard, nextChips: nextChips };
+  /* ═══ 근거 없음 답의 숫자 옅게 (2026-09-05 · 승인 시안 mockups/no-evidence-numbers) ═════
+   *
+   * ■ 무엇이 문제였나: 답 맨 위에 ⚠ 배너("사내 자료에는 없습니다")가 붙어도 담당자의 눈은
+   *   **표의 숫자로 먼저 간다.** 배너를 키우는 길은 이미 실패했다 — 시선이 가는 자리가
+   *   배너가 아니라 숫자 그 자체라서다. 그래서 경고를 **숫자가 있는 픽셀로** 옮긴다.
+   *
+   * ■ 무엇을 하나: 서버가 실어 보낸 표식(r.근거없음)이 있을 때만, 답 본문의 숫자를
+   *   `<span class="dim-est">`로 감싼다. **감싸기만 한다** — textContent가 그대로라
+   *   드래그·Ctrl+C 텍스트가 안 변하고, 색·점선만 바뀌어 세로 총합 증감이 0px다.
+   *
+   * ■ 안 한 것(정직하게)
+   *   · 숫자를 지우지 않는다 — 문장이 깨져 답 자체를 못 읽는다(citeguard가 겪은 실패).
+   *   · 답 전체를 회색으로 하지 않는다 — 대비를 잃어 오히려 대충 훑고, .cs-stream(쓰는 중)이
+   *     이미 그 톤을 **다른 뜻**으로 쓰고 있다.
+   *   · 흐르는 동안(.cs-stream)에는 안 걸린다 — 완성본으로 갈아끼는 순간 걸린다(판정 한 벌).
+   *   · 인쇄·복사하면 색은 안 따라간다 — 내보내기 쪽에서 따로 다룰 일이다. 여기서 해결한 척 안 한다.
+   */
+  var 추정치풀이 = "사내 근거 없음 — 모델 추정치";
+  // ① 후보 — 단위가 붙은 수, 또는 (단위가 없으면) 두 자리 이상 맨수.
+  //   ⚠ 자리수 쉼표를 한 덩어리로 본다 — 안 하면 3,200이 3과 200으로 갈려 쉼표만 진하게 남는다.
+  var 추정치후보_RE = /(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(%|퍼센트|점|건|개|명|원|만원|억원|달러|배|위|회|시간|분|초|일|주|개월|년|GB|MB|TB)?/g;
+  // ② 제외 — **지어낸 값이 아닌 것**. 식별자가 옅어지면 진짜 근거가 근거 아닌 것처럼 보인다.
+  //   시각(14:22)과 TLS 1.3류 두 자리 판번호는 시안 표에 없던 것을 더했다(상위 지시 「날짜·시각」).
+  //   ⚠ 일반 두 자리 소수(\d+\.\d+)는 **제외하지 않는다** — 그러면 「평균 72.5점」까지 살아남아
+  //     이 기능이 막으려던 그 숫자를 못 잡는다.
+  //   ⚠ 맨 글자 인라인 코드(`…`)도 뺀다 — 화면 위젯은 마크다운을 안 그려서(fmt = esc+굵게+<br>)
+  //     백틱이 **글자 그대로** 남는다. 지휘소에서는 gijomd가 이미 <code>로 바꿔 놓아 이 규칙이
+  //     할 일이 없다. 두 입구가 같은 답에 다르게 굴면 「자리마다 딴말」이 된다(이 부품의 존재 이유).
+  var 추정치제외_RE = /`[^`\n]{0,200}`|CVE-\d{4}-\d{3,7}|CWE-\d+|CVSS\s*[\d.]+|\d{4}[-.\/]\d{1,2}[-.\/]\d{1,2}|\d{4}\s*년(?:\s*\d{1,2}\s*월)?|\d{1,2}:\d{2}(?::\d{2})?|\b(?:TLS|SSL|HTTP)\s*v?\d+(?:\.\d+)+|\bv?\d+\.\d+\.\d+\b|\[\d+\]|\bISO\s?\d+\b/gi;
+
+  /**
+   * 글 한 덩어리에서 **옅게 할 자리**를 찾는다 — 화면(DOM) 없이 도는 순수 함수.
+   * 시험(server/test/dimestimates-scope.test.ts)이 **이 함수 그대로**를 잰다 —
+   * 시험이 정규식을 베껴 적으면 제품과 시험이 따로 늙는다.
+   */
+  function 추정치조각(text) {
+    var s = String(text == null ? "" : text), m, i;
+    var 제외 = [];
+    추정치제외_RE.lastIndex = 0;
+    while ((m = 추정치제외_RE.exec(s))) {
+      제외.push([m.index, m.index + m[0].length]);
+      if (m.index === 추정치제외_RE.lastIndex) 추정치제외_RE.lastIndex++;
+    }
+    var out = [];
+    추정치후보_RE.lastIndex = 0;
+    while ((m = 추정치후보_RE.exec(s))) {
+      var a = m.index, b = a + m[0].length, 겹침 = false;
+      if (m.index === 추정치후보_RE.lastIndex) 추정치후보_RE.lastIndex++;
+      for (i = 0; i < 제외.length; i++) if (a < 제외[i][1] && b > 제외[i][0]) { 겹침 = true; break; }
+      if (겹침) continue;
+      // 단위가 없으면 두 자리 이상만 — 「3가지 방법」의 3까지 옅게 하면 글이 누더기가 된다.
+      if (!m[2] && m[1].replace(/[^0-9]/g, "").length < 2) continue;
+      out.push({ start: a, end: b, text: m[0] });
+    }
+    return out;
+  }
+
+  // 옅게 하면 안 되는 자리 — 코드·링크는 담당자가 **일부러 요청한 원문**이고, 나머지는
+  // 우리가 그린 장식(배지·칩·카드)이라 답의 값이 아니다.
+  var 추정치제외선택자 = "pre, code, a, .dim-est, .dim-skip, .gcw-read, .cs-parse, .cs-chip, .gcp-src, .gcp-src2, .gcp-ev, .gcp-pick, .gcp-next, .gcp-open, .dc-card, .gcw-ap";
+
+  /**
+   * @param el      답 줄(지휘소 .cs-row) 또는 답 말풍선(위젯 .gcw-row)
+   * @param 근거없음 서버 표식(r.근거없음) — **없으면 아무것도 안 한다**
+   * @returns 옅게 한 개수(시험·관문이 이 숫자를 잰다)
+   *
+   * ⚠ 부르는 자리: quotes()와 **같은 자리**에 두되 **그 앞**이다. 위젯은 배지·칩을 같은
+   *   말풍선에 덧붙이는데, 뒤에 부르면 그 장식의 숫자(「3대목」)까지 옅어진다.
+   */
+  function dimEstimates(el, 근거없음) {
+    if (!근거없음) return 0;
+    var host = 붙일자리(el);
+    if (!host || !host.querySelectorAll) return 0;
+    ensureCss();
+    // 지휘소는 말풍선 본문이 .cm이다. 위젯은 그런 칸이 없어 말풍선 자체가 본문이다.
+    var root = host.querySelector(".cm") || host;
+
+    var 후보노드 = [], n, i;
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    // ⚠ 코드블록 울타리(```)를 **글자로** 따라간다 — 화면 위젯은 마크다운을 안 그려서
+    //   ```…``` 가 <pre>가 아니라 맨 글자로 남는다(실측 2026-09-05: 그래서 위젯에서만
+    //   설정값 max_items = 75·timeout_sec = 30이 옅어졌다 — 지휘소는 <pre>라 안 걸렸다).
+    //   울타리 줄에는 숫자가 없어 후보에서 이미 빠지므로, 상태는 **모든 글자 노드**를 보며 센다.
+    var 코드안 = false;
+    while ((n = walker.nextNode())) {
+      var 글 = n.nodeValue || "";
+      var 울타리 = (글.match(/```/g) || []).length;
+      var 들어올때 = 코드안;
+      if (울타리 % 2 === 1) 코드안 = !코드안;
+      if (들어올때 || 울타리) continue;      // 블록 안 · 울타리가 걸친 줄은 건드리지 않는다
+      var p = n.parentElement;
+      if (!p || (p.closest && p.closest(추정치제외선택자))) continue;
+      if (!/\d/.test(글)) continue;
+      후보노드.push(n);
+    }
+    if (!후보노드.length) return 0;
+
+    // 배너 문단 제외 — 배너에 숫자가 들어가면 **경고문이 스스로 옅어진다**(시안 §4).
+    //   ⚠ 배너 문구를 클라가 다시 적지 않는다(단일 출처는 서버 llm.ts다). 「답 맨 앞의 ⚠
+    //     덩어리」라는 **자리**로만 가른다 — 서버가 `${배너}\n\n${답}` 꼴로 맨 앞에 붙인다.
+    //   ⚠ 렌더러가 둘이라 둘 다 집는다: 지휘소=gijomd(문단 <p>) · 위젯=<br>뿐인 한 덩어리.
+    var 시작 = 0, 첫 = null;
+    for (i = 0; i < root.childNodes.length; i++) {
+      var c = root.childNodes[i];
+      if (c.nodeType === 1 && c.matches && c.matches(추정치제외선택자)) continue;
+      if (c.nodeType === 3 && !String(c.nodeValue || "").trim()) continue;
+      첫 = c; break;
+    }
+    if (첫 && /^\s*⚠/.test(첫.textContent || "")) {
+      if (첫.nodeType === 1) {
+        while (시작 < 후보노드.length && 첫.contains(후보노드[시작])) 시작++;
+      } else {
+        var br = root.querySelector("br");
+        if (!br) return 0; // <br>이 없으면 말풍선 전체가 배너뿐이다
+        while (시작 < 후보노드.length && (후보노드[시작].compareDocumentPosition(br) & 4)) 시작++;
+      }
+    }
+
+    var 센다 = 0;
+    for (i = 시작; i < 후보노드.length; i++) {
+      var node = 후보노드[i], text = node.nodeValue || "", 조각 = 추정치조각(text);
+      if (!조각.length || !node.parentNode) continue;
+      var frag = document.createDocumentFragment(), last = 0, j;
+      for (j = 0; j < 조각.length; j++) {
+        var g = 조각[j];
+        if (g.start > last) frag.appendChild(document.createTextNode(text.slice(last, g.start)));
+        var span = document.createElement("span");
+        span.className = "dim-est";
+        // hover 한 줄. ★ ::after 류로 글자를 만들지 않는다 — 브라우저에 따라 **복사 텍스트에 섞인다.**
+        span.title = 추정치풀이;
+        span.setAttribute("aria-label", 추정치풀이);
+        span.textContent = g.text;  // 글자는 그대로 — 복사하면 원문이 나온다
+        frag.appendChild(span);
+        last = g.end; 센다++;
+      }
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      node.parentNode.replaceChild(frag, node);
+    }
+    return 센다;
+  }
+
+  window.gijoChatParts = { quotes: quotes, picks: picks, open: open, dataCard: dataCard, nextChips: nextChips, dimEstimates: dimEstimates, 추정치조각: 추정치조각 };
 })();

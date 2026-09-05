@@ -277,6 +277,11 @@
         //   ⚠ 배지 문구를 고칠 일이 생기면 이제 **chatparts.js 한 곳만** 고치면 된다.
         var P = window.gijoChatParts;
         if (P) {
+          // 근거 없음 — 답에 ⚠ 배너가 붙었으면 **본문의 숫자를 옅게**(2026-09-05 승인 시안).
+          //   ⚠ 아래 부품들보다 **먼저** 부른다 — 위젯은 배지·칩을 같은 말풍선에 덧붙여서,
+          //     뒤에 부르면 그 장식의 숫자(「3대목」·「외 5건」)까지 옅어진다.
+          //   ⚠ 한쪽만 배선하면 「대화창은 옅은데 화면 위젯은 진한」 상태가 된다(짝 시험이 지킨다).
+          if (P.dimEstimates) P.dimEstimates(typing, r.근거없음);
           P.quotes(typing, r.quotes, r.output || "", r.sources, r.근거세기);
           P.picks(typing, r.picklist, function (보낼글) { send(보낼글); });
           // 분리창은 탭을 직접 못 연다 — 본창에 부탁한다(지휘소와 다른 유일한 대목).
