@@ -668,22 +668,37 @@
   var 블록태그 = { P: 1, DIV: 1, TABLE: 1, UL: 1, OL: 1, PRE: 1, BLOCKQUOTE: 1, HR: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1 };
   function 블록나누기(root) {
     var 덩어리 = [], 현재 = null, i, c;
-    function 새로() { 현재 = { nodes: [], text: "" }; 덩어리.push(현재); }
+    function 새로() { 현재 = { nodes: [] }; 덩어리.push(현재); }
     새로();
     for (i = 0; i < root.childNodes.length; i++) {
       c = root.childNodes[i];
       if (c.nodeType === 1 && c.tagName === "BR") { 새로(); continue; }
       if (c.nodeType === 1 && 블록태그[c.tagName]) {
         if (현재.nodes.length) 새로();
-        현재.nodes.push(c); 현재.text += c.textContent || "";
+        현재.nodes.push(c);
         새로(); continue;
       }
       현재.nodes.push(c);
-      현재.text += (c.nodeType === 3 ? (c.nodeValue || "") : (c.textContent || ""));
     }
     var out = [];
     for (i = 0; i < 덩어리.length; i++) if (덩어리[i].nodes.length) out.push(덩어리[i]);
     return out;
+  }
+  /**
+   * 덩어리의 **답 글자만** 잇는다 — 우리가 그린 장식(배지·칩·카드)은 뺀다.
+   * ⚠ 이 뺌이 없으면 위젯에서 배너를 놓친다: 말풍선은 `readBadge(r) + fmt(답)` 꼴이라
+   *   앞에 「이렇게 이해했어요 — 3단계」 배지가 붙는다. 배지가 인라인이면 배너와 한 덩어리가 되어
+   *   「⚠로 시작하는가」가 거짓이 되고, **경고문이 스스로 옅어진다.** 옛 코드가 첫 덩어리를
+   *   고를 때 같은 선택자로 장식을 건너뛰던 그 규율을 덩어리 단위로 옮긴 것이다.
+   */
+  function 덩어리글(nodes) {
+    var t = "", i, c;
+    for (i = 0; i < nodes.length; i++) {
+      c = nodes[i];
+      if (c.nodeType === 1 && c.matches && c.matches(추정치제외선택자)) continue;
+      t += (c.nodeType === 3 ? (c.nodeValue || "") : (c.textContent || ""));
+    }
+    return t;
   }
   /** 덩어리에 든 글자 노드를 **문서 순서 그대로** 모은다(울타리 상태를 이 순서로 센다). */
   function 글자노드들(nodes) {
@@ -732,7 +747,8 @@
     var 코드안 = false, 현재단계 = 0;
     for (i = 0; i < 덩어리들.length; i++) {
       var d = 덩어리들[i];
-      var mh = 단계머리_RE.exec(d.text);
+      var 본글 = 덩어리글(d.nodes);   // 장식을 뺀 **답 글자**로만 판단한다
+      var mh = 단계머리_RE.exec(본글);
       if (mh) 현재단계 = Number(mh[1]);
       // 배너 덩어리 제외 — 배너에 숫자가 들어가면 **경고문이 스스로 옅어진다**.
       //   ⚠ 배너 문구를 클라가 다시 적지 않는다(단일 출처는 noevidence.ts다). 「⚠로 시작하는
@@ -741,7 +757,7 @@
       //     본문 중간 단계에 실리고, 부분 접지 배너에는 꼬리로 숫자("12.5%")가 들어간다 —
       //     첫 덩어리만 보던 옛 규칙으로는 그 꼬리가 스스로 옅어졌다.
       //   ⚠ 단계 머리표를 **뗀 뒤** 본다 — 「【2. 분석】 ⚠배너…」가 한 덩어리로 온다.
-      var 몸 = d.text.replace(/^\s*【\d{1,3}\.[^】\n]{0,60}】\s*/, "");
+      var 몸 = 본글.replace(/^\s*【\d{1,3}\.[^】\n]{0,60}】\s*/, "");
       // 범위에 단계가 실렸으면 그 절 안만 본다. 화면에 머리표가 하나도 없으면 현재단계가 0으로
       // 남아 **아무것도 안 옅어진다** — 서버·화면이 어긋났을 때의 안전한 실패 방향이다.
       var 건너뜀 = /^\s*⚠/.test(몸) || (범위단계 && 범위단계.indexOf(현재단계) < 0);

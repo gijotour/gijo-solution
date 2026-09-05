@@ -348,7 +348,10 @@ describe("★ 후처리 배선 — 두 대화 입구에 **둘 다** 붙는다", 
     // 여러 글자 노드로 쪼개면 첫 조각만 ⚠로 시작해 나머지가 새어 나왔다 → **덩어리 단위**여야 한다.
     expect(partsSrc, "덩어리 단위 배너 건너뛰기가 없다").toMatch(/건너뜀 = \/\^\\s\*⚠\/\.test\(몸\)/);
     expect(partsSrc, "단계 머리표를 뗀 뒤 보지 않는다 — 「【2. 분석】 ⚠배너」가 한 덩어리로 온다")
-      .toMatch(/var 몸 = d\.text\.replace\(/);
+      .toMatch(/var 몸 = 본글\.replace\(/);
+    // 장식(배지·칩)을 뺀 **답 글자**로 판단한다 — 안 빼면 위젯 배지가 배너와 한 덩어리가 되어
+    // 「⚠로 시작하는가」가 거짓이 되고 경고문이 스스로 옅어진다.
+    expect(partsSrc, "덩어리 글에서 장식을 안 뺀다").toMatch(/function 덩어리글\(nodes\)[\s\S]{0,300}?matches\(추정치제외선택자\)/);
     // ⚠ 건너뛰어도 울타리는 계속 센다 — 건너뛴다고 열린 코드블록이 닫히는 것이 아니다.
     expect(partsSrc, "건너뛰기가 울타리 계산보다 앞에 있다").toMatch(/코드안 = !코드안;[\s\S]{0,140}?if \(건너뜀\) continue;/);
   });
@@ -489,6 +492,34 @@ describe("★★ 범위 — 두 렌더러에 **똑같이** 걸린다", () => {
       P.dimEstimates(el, "자료요청", { 단계: [10] });
       expect(옅힌것(el), "머리표 번호가 옅어졌다").toEqual(["75점"]);
     }
+  });
+
+  it("★ 위젯 앞머리 배지(readBadge)가 있어도 배너를 놓치지 않는다", () => {
+    // 위젯 말풍선은 `readBadge(r) + fmt(답)` 꼴이라 답 앞에 「이렇게 이해했어요 — 3단계」가 붙는다.
+    // 덩어리의 **답 글자**(장식 제외)로 안 보면 배지가 배너와 한 덩어리가 되어
+    // 「⚠로 시작하는가」가 거짓이 되고 **경고문이 스스로 옅어진다.**
+    const 배지든말풍선 = (답: string) => {
+      const row = new DEl("div"); row.className = "gcw-row";
+      const 배지 = new DEl("div"); 배지.className = "gcw-read"; 배지.textContent = "이렇게 이해했어요 — 3단계 · 도구 2개";
+      row.appendChild(배지);
+      const 몸 = 위젯으로(답);
+      for (const c of [...몸.childNodes]) row.appendChild(c);
+      return row;
+    };
+    const el = 배지든말풍선(`${숫자무근거배너}${없는수치꼬리(["12.5%"])}\n\n전년 대비 12.5% 증가했고 미조치는 42건입니다.`);
+    P.dimEstimates(el, "숫자무근거", { 수치: ["12.5%"] });
+    expect(옅힌것(el), "배지나 배너 안 숫자가 옅어졌다").toEqual(["12.5%"]);
+    // 배지가 인라인(span)이어도 같아야 한다 — 태그 종류에 기대면 배지를 바꾸는 날 조용히 샌다.
+    const el2 = (() => {
+      const row = new DEl("div"); row.className = "gcw-row";
+      const 배지 = new DEl("span"); 배지.className = "gcw-read"; 배지.textContent = "이렇게 이해했어요 — 3단계";
+      row.appendChild(배지);
+      const 몸 = 위젯으로(`${숫자무근거배너}${없는수치꼬리(["12.5%"])}\n\n전년 대비 12.5% 증가했습니다.`);
+      for (const c of [...몸.childNodes]) row.appendChild(c);
+      return row;
+    })();
+    P.dimEstimates(el2, "숫자무근거", { 수치: ["12.5%"] });
+    expect(옅힌것(el2), "인라인 배지가 배너와 한 덩어리가 되어 배너가 안 걸렀다").toEqual(["12.5%"]);
   });
 
   it("★ 코드블록 울타리는 **건너뛴 덩어리에서도** 계속 센다", () => {
