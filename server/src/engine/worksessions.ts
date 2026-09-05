@@ -20,6 +20,8 @@ import { authMiddleware } from "../auth/auth";
 import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { onAudit, recordAudit } from "./audit";
+// 「근거 없음」 표식의 판정기 — 배너 문장의 주인은 noevidence.ts 하나다(여기서 문구를 다시 적지 않는다).
+import { 근거없음종류판정 } from "./noevidence";
 import { db } from "../db";
 import { migrate } from "../db";
 
@@ -760,7 +762,19 @@ export function registerWorkSessionRoutes(app: Express): void {
   app.get("/api/work-sessions/:id", authMiddleware, (req, res) => {
     const session = getSession(req.params.id);
     if (!session) return res.status(404).json({ error: "세션을 찾을 수 없습니다" });
-    res.json({ session, turns: getSessionTurns(req.params.id) });
+    // ★ 「근거 없음」 표식을 **이어보기에도** 싣는다(2026-09-05 검토관).
+    //   대화창은 이 값이 있을 때만 답 속 숫자를 옅게 그린다(chatparts.dimEstimates).
+    //   그런데 복원 경로(console.js restore)에는 값이 안 실려, **방금 받았을 때는 옅던 숫자가
+    //   다시 열면 진하게** 나왔다 — 같은 답이 자리마다 달라 보이는 것은 이 기능이 막으려던 결함이다.
+    //   ⚠ 저장하지 않고 **읽을 때 판정한다**: 배너 문장은 turn.content에 그대로 들어 있고
+    //     (dispatcher가 배너까지 붙은 output을 appendTurn한다), 판정기는 noevidence.ts 한 곳이다.
+    //     DB에 값을 새로 적으면 문구를 고칠 때 옛 행이 안 따라와 **두 벌로 늙는다.**
+    const turns = getSessionTurns(req.params.id).map((t) => {
+      if (t.role !== "assistant") return t;
+      const 근거없음 = 근거없음종류판정(t.content);
+      return 근거없음 ? { ...t, 근거없음 } : t;
+    });
+    res.json({ session, turns });
   });
 
   // 제목·상태 부분 수정. 상태가 "완료"로 바뀌는 순간 세션 리포트(DOCX)를 자동 생성한다.

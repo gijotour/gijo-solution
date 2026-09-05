@@ -26,6 +26,8 @@ import { 학습재료가못되나 } from "./datasethygiene";
 // work_session_turns 테이블은 worksessions.ts의 migrate가 만든다 — 이 모듈이 먼저 적재되면
 // 아래 prepare가 "no such table"로 죽는다(테스트에서 실측). 소유 모듈을 명시적으로 실어 보장한다.
 import "./worksessions";
+// 「근거 없음」 배너 판정기 — 배너 문장의 주인은 noevidence.ts 하나다.
+import { 근거없음종류판정 } from "./noevidence";
 import { recordAudit } from "./audit";
 import { isBinaryLikeChunk } from "./ragsanitize";
 import { 근거겹침, OVERLAP_CHARS } from "./citeguard";
@@ -67,6 +69,14 @@ const CITE_RE = /참고했|근거|\.pdf|\.docx|\.hwpx|\.md\b/i;
 //   그런데 CITE_RE의 `근거`에 걸려 인용 점수를 받고 있었다 — **근거가 없다고 스스로 밝힌 답이
 //   학습 후보 상위**에 올랐다. 배너가 붙은 답은 인용으로 세지 않는다.
 const NO_GROUND_RE = /\(일반 지식 기준\)|근거 약함/;
+// ★ 2026-09-05 검토관 — 위 수리가 **반쪽**이었다. 배너가 그 뒤로 4종(자료없음·지정범위·자료요청·
+//   근거약함)으로 늘었는데 NO_GROUND_RE는 「근거 약함」 하나만 글자로 알아봤다. 실측으로 재 보니
+//   **자료요청 배너**가 본문에 「사내 자료에 **근거가** 없습니다」라고 적어 CITE_RE의 `근거`에
+//   걸렸다 — 근거가 없다고 스스로 밝힌 답이 오히려 **인용 +3점**을 받아 학습 후보 상위에 섰다.
+//   (재 본 값: 자료없음 cite=false / 지정범위 false / **자료요청 true** / 근거약함 true)
+//   → 배너 글자를 여기 또 적지 않는다. 판정기 한 곳(noevidence.ts)에 묻는다 — 배너가 다섯째로
+//     늘어도 여기는 안 고쳐도 된다. 위 정규식은 배너가 아닌 꼬리(「(일반 지식 기준)」)용으로 남긴다.
+const 근거없다고밝힌답인가 = (answer: string) => 근거없음종류판정(answer) !== null || NO_GROUND_RE.test(answer);
 
 /** 같은 문답을 다시 후보로 내밀지 않기 위한 정규화 지문. */
 function fingerprint(question: string, answer: string): string {
@@ -158,7 +168,7 @@ function excluded(question: string, answer: string): string | null {
 }
 
 function buildSignals(question: string, answer: string, tool: boolean, accepted: boolean): LearnCandidate["signals"] {
-  const cite = CITE_RE.test(answer) && !NO_GROUND_RE.test(answer);
+  const cite = CITE_RE.test(answer) && !근거없다고밝힌답인가(answer);
   const lengthOk = answer.length >= 80 && answer.length <= 1200;
   return { cite, tool, accepted, lengthOk };
 }

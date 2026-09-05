@@ -9,6 +9,7 @@ import { db } from "../src/db";
 import { listLearnCandidates, decideLearnCandidate, acceptStrongCandidates } from "../src/engine/learncandidates";
 import { recordChatLog, listChatLogs, putLearnloopConfig } from "../src/engine/learnloop";
 import { createSession, appendTurn } from "../src/engine/worksessions";
+import { 자료없음배너, 지정범위배너, 자료요청배너, 근거약함배너 } from "../src/engine/noevidence";
 
 function wipe() {
   db.prepare("DELETE FROM chat_logs").run();
@@ -61,6 +62,28 @@ describe("학습 후보함 — 선별 규칙", () => {
     expect(candidates[0].source).toBe("worksession");
     expect(candidates[0].signals.tool).toBe(true);
     expect(candidates[0].signals.cite).toBe(true);
+  });
+
+  // ★ 2026-09-05 검토관 — 「근거가 없다」고 **스스로 밝힌 답**이 인용 가점을 받던 결함.
+  //   2026-08-05에 「근거 약함」 하나만 막아 뒀는데 그 뒤 배너가 4종으로 늘었고,
+  //   **자료요청 배너**의 「사내 자료에 근거가 없습니다」가 CITE_RE의 `근거`에 걸려 +3점을 받았다.
+  //   → 이제 판정기 한 곳(noevidence.ts)에 묻는다. 배너가 다섯째로 늘어도 이 시험이 따라간다.
+  it("★ 배너 4종이 붙은 답은 인용 가점을 못 받는다 — 근거 없다고 밝힌 답이 상위에 서면 안 된다", () => {
+    const 본문 = "일반적으로 접근권한 검토는 분기마다 하고, 퇴사자 계정은 즉시 회수합니다. 사내 규정이 다르면 그쪽을 따르세요. 자세한 절차는 담당 부서에 확인이 필요합니다.";
+    let 실제로잰것 = 0;
+    for (const [종류, 배너] of [
+      ["자료없음", 자료없음배너], ["지정범위", 지정범위배너],
+      ["자료요청", 자료요청배너], ["근거약함", 근거약함배너],
+    ] as [string, string][]) {
+      wipe();
+      recordChatLog("orchestrator", `우리 회사 접근권한 검토 주기 알려줘 (${종류})`, `${배너}\n\n${본문}`);
+      const { candidates } = listLearnCandidates();
+      // 후보로 아예 안 나오는 배너도 있다(근거약함 배너는 「없습니다」가 회피 답변 규칙에 먼저 걸린다).
+      // 그건 **더 강한 차단**이라 통과다 — 여기서 재는 것은 「후보가 됐다면 인용 가점은 없어야 한다」다.
+      for (const c of candidates) { 실제로잰것++; expect(c.signals.cite, `${종류} 배너가 붙었는데 인용 가점을 받았다`).toBe(false); }
+    }
+    // ⚠ 넷이 다 후보에서 빠지면 이 시험은 **아무것도 안 잰 채 초록**이 된다(헛시험 방지).
+    expect(실제로잰것, "배너 답이 하나도 후보로 안 나왔다 — 표본이 낡았는지 보라").toBeGreaterThan(0);
   });
 
   it("직후에 고쳐 물으면 수용 신호가 꺼진다(암묵 거부)", () => {

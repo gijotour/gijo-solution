@@ -1939,9 +1939,14 @@
       var r = await window.gijo.getWorkSession(session.id);
       var turns = (r && r.turns) || [];
       if (!turns.length) return;
+      var P = window.gijoChatParts;
       turns.slice(-12).forEach(function (m) {
-        append(m.role === "user" ? "instr" : "reply",
+        var el = append(m.role === "user" ? "instr" : "reply",
           { icon: m.role === "user" ? "나" : "🧭", name: m.role === "user" ? "나 → AI 팀" : "AI 팀", message: m.content });
+        // 근거 없음 — 되살린 답도 **방금 받았을 때와 같게** 숫자를 옅게(2026-09-05 검토관).
+        //   ⚠ 안 걸면 같은 답이 자리마다 달라 보인다: ⚠ 배너는 보이는데 숫자만 진하다.
+        //   표식은 서버가 저장 본문에서 읽어 실어 준다(worksessions GET — 판정기 한 곳).
+        if (m.role !== "user" && P && P.dimEstimates) P.dimEstimates(el, m.근거없음);
       });
     } catch (e) { /* 못 불러와도 새 대화는 된다 — 세션이 지워졌을 수 있다 */ }
   }
