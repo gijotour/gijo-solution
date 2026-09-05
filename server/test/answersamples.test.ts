@@ -97,3 +97,65 @@ describe("★ 배선 — 부르는 자리와 지우는 자리", () => {
     expect(소스).toMatch(/"\/api\/answer-samples",\s*\n?\s*authMiddleware,\s*\n?\s*adminMiddleware/);
   });
 });
+
+// ── agent·route·tool·교차 분포 (2026-09-06 추가) ────────────────────────────────
+//
+// ■ 무슨 공백이었나 (실측 2026-09-06)
+//   표에는 agent·route·tool 칸이 처음부터 있었는데 **요약 API가 그 칸을 안 내려줬다.**
+//   그래서 「어느 팀원이 근거 없이 답하나」·「어떤 라우팅에서 표식이 안 붙나」를
+//   표를 만들어 두고도 **아무도 못 봤다.** 쌓기만 하고 안 보이면 없는 것과 같다.
+//   ★ 이 저장소가 반복해 겪은 「만들어 놓고 안 쓰는 것」의 답 표본 판이다.
+describe("★ 누가·무엇으로 답했나 — 분포가 실제로 내려온다", () => {
+  beforeEach(() => resetAnswerSamplesForTests());
+
+  it("agent·route·tool을 세고, **값이 없는 답도 이름을 붙여** 센다", () => {
+    recordAnswerSample({ agent: "analysis", route: "chat", tool: "search", 근거세기: "강함", 수치있음: false, 본문: "a" });
+    recordAnswerSample({ agent: "analysis", route: "chat", 근거세기: "약함", 수치있음: false, 본문: "b" }); // 도구 없음
+    recordAnswerSample({ route: "scan", tool: "search", 수치있음: false, 본문: "c" });                       // 팀원 없음
+    const s = 표본요약내기(7);
+    expect(s.agent별).toEqual([{ 이름: "analysis", n: 2 }, { 이름: "(팀원 미상)", n: 1 }]);
+    expect(s.route별).toEqual([{ 이름: "chat", n: 2 }, { 이름: "scan", n: 1 }]);
+    // ★ NULL을 버리면 「배선이 안 된 답이 몇 건인가」가 사라진다 — 그 숫자가 곧 구멍의 크기다.
+    expect(s.tool별).toEqual([{ 이름: "search", n: 2 }, { 이름: "자유 답(도구 없음)", n: 1 }]);
+  });
+
+  it("★ 근거세기 × 근거없음 **교차** — 축을 따로 보면 안 보이는 칸을 본다", () => {
+    recordAnswerSample({ 근거세기: "강함", 수치있음: false, 본문: "a" });                        // 강함 × 없음
+    recordAnswerSample({ 근거세기: "강함", 근거없음: "숫자무근거", 수치있음: true, 본문: "b" });  // 강함 × 숫자무근거
+    recordAnswerSample({ 수치있음: false, 본문: "c" });                                          // 모름 × 없음
+    const s = 표본요약내기(7);
+    // 셋 다 1건이라 **동수** — 이름 순(코드포인트)으로 갈린다. 「숫」 < 「없」, 「강」 < 「모」.
+    expect(s.교차).toEqual([
+      { 근거세기: "강함", 근거없음: "숫자무근거", n: 1 },
+      { 근거세기: "강함", 근거없음: "없음", n: 1 },
+      { 근거세기: "모름", 근거없음: "없음", n: 1 },
+    ]);
+    // 두 축을 따로 세면 「강함 2 · 없음 2」뿐이라, 「강함인데 표식이 붙은 답」 1건이 안 보인다.
+    expect(s.근거세기).toEqual({ 강함: 2, 모름: 1 });
+  });
+
+  it("★ 상위 10만 준다 — 잘렸다는 사실이 종류수로 드러난다(전부인 척하지 않는다)", () => {
+    for (let i = 0; i < 12; i++) recordAnswerSample({ agent: `a${String(i).padStart(2, "0")}`, 수치있음: false, 본문: `x${i}` });
+    const s = 표본요약내기(7);
+    expect(s.agent별).toHaveLength(10);
+    expect(s.종류수.agent, "종류수가 없으면 읽는 사람이 「이게 전부」로 읽는다").toBe(12);
+  });
+
+  it("동수일 때 순서가 실행마다 흔들리지 않는다(이름 순으로 가른다)", () => {
+    recordAnswerSample({ route: "zeta", 수치있음: false, 본문: "1" });
+    recordAnswerSample({ route: "alpha", 수치있음: false, 본문: "2" });
+    expect(표본요약내기(7).route별.map((r) => r.이름)).toEqual(["alpha", "zeta"]);
+  });
+
+  it("★★ 분포를 늘려도 **본문은 여전히 안 나간다** — 이 표의 존재 조건", () => {
+    recordAnswerSample({
+      agent: "analysis", route: "chat", tool: "search", 근거세기: "강함", 수치있음: true,
+      본문: "김보안 담당 방화벽-01 조치율 82.3%",
+    });
+    const 통째 = JSON.stringify(표본요약내기(7));
+    for (const 조각 of ["김보안", "방화벽-01", "82.3", "조치율"]) {
+      expect(통째.includes(조각), `요약에 답 글자가 실렸다: ${조각}`).toBe(false);
+    }
+    expect(통째, "지문(sha)도 요약에 실을 값이 아니다 — 세는 자리지 되짚는 자리가 아니다").not.toContain("sha");
+  });
+});

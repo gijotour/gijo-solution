@@ -109,15 +109,49 @@ export interface 표본요약 {
   /** 수치가 들었는데 표식이 하나도 안 붙은 답 수 — **이 숫자가 사고의 크기다** */
   수치있고표식없음: number;
   일별: { day: string; n: number; 수치: number; 표식: number }[];
+  /** 답한 팀원별 답 수 — **상위 10**(전체 종류 수는 종류수.agent) */
+  agent별: 분포항[];
+  /** 라우팅 action별 답 수 — 상위 10 */
+  route별: 분포항[];
+  /** 처음 돈 도구별 답 수 — 상위 10(도구를 안 쓴 답은 「자유 답(도구 없음)」) */
+  tool별: 분포항[];
+  /** 근거세기 × 근거없음 **교차** 분포 — 상위 10.
+   *  왜 교차인가: 「강함인데 표식이 붙었다」·「모름인데 표식이 없다」처럼 **두 축이 만나는 칸**이
+   *  실제 문제 자리다. 축을 따로 보면 그 칸이 안 보인다(각각의 합만 맞으면 멀쩡해 보인다). */
+  교차: { 근거세기: string; 근거없음: string; n: number }[];
+  /** 각 분포의 **전체 종류 수** — 위 목록은 상위 10만 준다.
+   *  ⚠ 이 칸이 없으면 읽는 사람이 「이게 전부」로 읽는다. 10보다 크면 **잘린 것이다.** */
+  종류수: { agent: number; route: number; tool: number; 교차: number };
+}
+
+/** 분포 한 칸 — 이름과 건수. */
+export interface 분포항 { 이름: string; n: number }
+
+/** 상위 N개만 추린다. 동수는 이름 순으로 갈라 **실행마다 순서가 흔들리지 않게** 한다
+ *  (흔들리면 「어제와 달라졌다」가 데이터 변화인지 정렬 변덕인지 구분이 안 된다). */
+function 상위(맵: Map<string, number>, n = 10): 분포항[] {
+  return [...맵.entries()]
+    .sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .slice(0, n)
+    .map(([이름, n2]) => ({ 이름, n: n2 }));
 }
 
 export function 표본요약내기(days = 7): 표본요약 {
   const cutoff = Date.now() - days * 86400_000;
   const rows = db.prepare("SELECT * FROM answer_samples WHERE at >= ? ORDER BY at DESC").all(cutoff) as {
-    day: string; evidence: string | null; noevidence: string | null; hasnum: number;
+    day: string; agent: string | null; route: string | null; tool: string | null;
+    evidence: string | null; noevidence: string | null; hasnum: number;
   }[];
   const 근거세기: Record<string, number> = {};
   const 근거없음: Record<string, number> = {};
+  // 누가·무엇으로 답했나 — 이 세 칸이 없어 **분포를 못 봤다**(2026-09-06 실측: 표에는 쌓이는데
+  //   요약 API가 안 내려줘, 「어느 팀원이 근거 없이 답하나」를 아무도 답할 수 없었다).
+  //   ⚠ NULL은 지우지 않고 **이름을 붙여 센다** — 「값이 없는 답이 몇 건인가」가 곧 배선 구멍의 크기다.
+  const agent맵 = new Map<string, number>();
+  const route맵 = new Map<string, number>();
+  const tool맵 = new Map<string, number>();
+  const 교차맵 = new Map<string, number>();
+  const 세기 = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
   const 일별맵 = new Map<string, { day: string; n: number; 수치: number; 표식: number }>();
   let 수치있는답 = 0, 수치있고표식없음 = 0;
   for (const r of rows) {
@@ -125,6 +159,11 @@ export function 표본요약내기(days = 7): 표본요약 {
     근거세기[e] = (근거세기[e] ?? 0) + 1;
     const n = r.noevidence ?? "없음";
     근거없음[n] = (근거없음[n] ?? 0) + 1;
+    세기(agent맵, r.agent ?? "(팀원 미상)");
+    세기(route맵, r.route ?? "(라우팅 미상)");
+    세기(tool맵, r.tool ?? "자유 답(도구 없음)");
+    // 구분자는 " × " — agent·route 이름에 안 쓰이는 글자라 되읽을 때 안 쪼개진다.
+    세기(교차맵, `${e} × ${n}`);
     if (r.hasnum) {
       수치있는답++;
       if (!r.noevidence) 수치있고표식없음++;
@@ -136,6 +175,12 @@ export function 표본요약내기(days = 7): 표본요약 {
   return {
     days, total: rows.length, 근거세기, 근거없음, 수치있는답, 수치있고표식없음,
     일별: [...일별맵.values()].sort((a, b) => (a.day < b.day ? 1 : -1)),
+    agent별: 상위(agent맵), route별: 상위(route맵), tool별: 상위(tool맵),
+    교차: 상위(교차맵).map(({ 이름, n }) => {
+      const [세기, 표식] = 이름.split(" × ");
+      return { 근거세기: 세기, 근거없음: 표식, n };
+    }),
+    종류수: { agent: agent맵.size, route: route맵.size, tool: tool맵.size, 교차: 교차맵.size },
   };
 }
 
