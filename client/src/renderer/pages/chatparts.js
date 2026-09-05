@@ -180,7 +180,15 @@
       window.top.postMessage(msg, "*");
     } catch (e) { }
   }
-  function quotes(el, list, answer, sources, 근거세기) {
+  // ★ 이름은 sourceTitles, 여는 것은 sources (2026-09-06 라이브 수리)
+  //   서버의 sources는 **기계용 키**다 — 그대로 찍었더니 내부 ID 「승인문답:dtmtl5b1fzj215l3」이
+  //   배지에 그대로 실렸다(담당자에게 아무것도 안 가리키고 저장 구조만 드러낸다).
+  //   서버가 같은 순서로 사람 제목(sourceTitles)을 함께 준다. 제목이 **빈 문자열이면 생략**이니
+  //   그 자리는 이름 대신 건수로 말한다 — ID를 대신 찍지 않는다.
+  //   ⚠ 여기서 ID 꼴을 다시 판정하지 않는다(제품 판정은 서버 memory.사람이읽는문서제목 한 곳).
+  //   ⚠ sourceTitles가 아예 없으면(옛 서버) 예전대로 sources를 그린다 — 새 클라 + 옛 서버에서
+  //     배지가 통째로 사라지는 것이 더 나쁘다.
+  function quotes(el, list, answer, sources, 근거세기, sourceTitles) {
     el = 붙일자리(el);
     if (!el) return;
     ensureCss();
@@ -191,15 +199,28 @@
       // 문서명 클릭 → 내 문서에서 원문 열기(「123진행」 ③-C — 시안 「인용→소스 점프」의 1차분).
       // 발신은 문서열기신호 한 곳 — 도킹은 postMessage, 분리 대화창은 IPC 다리(위 함수 주석).
       badge.appendChild(document.createTextNode(약함 ? "📄 찾아본 자료 — 근거 아님: " : "📄 근거: "));
-      sources.slice(0, 4).forEach(function (nm, i) {
-        if (i) badge.appendChild(document.createTextNode(" · "));
-        var a = document.createElement("span");
-        a.className = "gcp-doclink";
-        a.textContent = nm;
-        a.title = "내 문서에서 이 문서 열기";
-        a.addEventListener("click", function () { 문서열기신호(nm); });
-        badge.appendChild(a);
+      var 제목있음 = Array.isArray(sourceTitles);
+      var 보일것 = [];
+      sources.forEach(function (id, i) {
+        var nm = 제목있음 ? String(sourceTitles[i] == null ? "" : sourceTitles[i]).trim() : String(id == null ? "" : id);
+        if (nm) 보일것.push({ nm: nm, id: id });
       });
+      if (!보일것.length) {
+        // 이름을 댈 수 있는 문서가 하나도 없다 — 건수만 정직하게 말한다.
+        badge.appendChild(document.createTextNode("사내 문서 " + sources.length + "건"));
+      } else {
+        보일것.slice(0, 4).forEach(function (s, i) {
+          if (i) badge.appendChild(document.createTextNode(" · "));
+          var a = document.createElement("span");
+          a.className = "gcp-doclink";
+          a.textContent = s.nm;
+          a.title = "내 문서에서 이 문서 열기";
+          a.addEventListener("click", function () { 문서열기신호(s.id); });
+          badge.appendChild(a);
+        });
+        var 숨김 = sources.length - Math.min(보일것.length, 4);
+        if (숨김 > 0) badge.appendChild(document.createTextNode(" 외 " + 숨김 + "건"));
+      }
       el.appendChild(badge);
     }
     if (!Array.isArray(list) || !list.length) return;
@@ -228,7 +249,10 @@
         var safe = esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         try { txt = txt.replace(new RegExp(safe, "g"), "<mark>$&</mark>"); } catch (e) {}
       });
-      box.innerHTML = '<div class="gcp-qd gcp-doclink" title="내 문서에서 이 문서 열기">' + esc(q.documentId || "") + '</div><div class="gcp-qt">' + txt + "</div>";
+      // 머리에 찍는 것은 **제목**(q.title) — documentId를 그대로 찍던 자리라 배지와 같은 누출이었다.
+      // 제목이 없으면(옛 서버) documentId, 제목이 빈 문자열이면(내부 ID) 「사내 문서」로 말한다.
+      var 이름 = q.title == null ? String(q.documentId || "") : String(q.title).trim();
+      box.innerHTML = '<div class="gcp-qd gcp-doclink" title="내 문서에서 이 문서 열기">' + esc(이름 || "사내 문서") + '</div><div class="gcp-qt">' + txt + "</div>";
       box.querySelector(".gcp-qd").addEventListener("click", function () { 문서열기신호(q.documentId); });
       body.appendChild(box);
     });

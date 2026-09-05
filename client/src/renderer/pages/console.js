@@ -1874,7 +1874,8 @@
       //   ⚠ 흐르는 글자(.cs-stream)가 아니라 **완성본으로 갈아낀 뒤** 이 자리에서 한 번만 돈다.
       if (P.dimEstimates) P.dimEstimates(replyEl, r && r.근거없음);
       // 근거세기 — 이 문서들이 **답의 근거인지 찾아보기만 한 자료인지**(4-ⓑ, 2026-08-13).
-      P.quotes(replyEl, r && r.quotes, (r && r.output) || "", r && r.sources, r && r.근거세기);
+      // sourceTitles — 배지에 찍을 **사람 제목**(2026-09-06). 안 넘기면 내부 ID가 그대로 보인다.
+      P.quotes(replyEl, r && r.quotes, (r && r.output) || "", r && r.sources, r && r.근거세기, r && r.sourceTitles);
       // "가서 하기" — 계정·인증·열쇠처럼 AI가 대신 하면 안 되는 일은 순서만 안내하고,
       // 그 화면을 찾아 들어가는 수고는 없앤다(2026-07-31 사용자 지시).
       P.open(replyEl, r && r.openScreen, {

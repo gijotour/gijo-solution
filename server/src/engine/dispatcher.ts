@@ -89,6 +89,48 @@ function collab(qa: boolean | undefined, e: Parameters<typeof emitCollaboration>
   if (!qa) emitCollaboration(e);
 }
 /**
+ * 근거를 **사람이 읽는 제목**으로 실어 보낸다 — sources(ID)는 그대로, 표시용 제목을 옆에 더한다.
+ *
+ * ★ 무엇이 새던 자리인가(2026-09-06 라이브, 배포 12): 응답 sources에 「승인문답:dtmtl5b1fzj215l3」이
+ *   그대로 실려 배지·협업 피드에 찍혔다. 뿌리는 여기 — 검색 결과의 documentId를 사람 제목으로
+ *   바꾸지 않고 그대로 실은 것이다(R2는 프롬프트 경로만 막았다).
+ * ⚠ 판정은 **memory.사람이읽는문서제목 한 곳**이다 — 정규식·접두 문자열을 여기 베끼지 않는다.
+ *   (2026-09-06에 시험이 사본 정규식을 들고 있어 제품이 새는데도 초록이었던 그 사고를 반복하지 않는다.)
+ * ⚠ **동적 import인 이유**: dispatcher가 memory에서 심볼을 하나 더 **정적으로** 가져오면,
+ *   memory를 통째로 흉내 낸 시험(예: kbhygiene-demo.test.ts의 vi.mock)에서 그 이름이 없어
+ *   dispatchInstruction이 통째로 죽는다 — llm.ts에서 똑같이 겪어 9파일 66건이 빨개졌다
+ *   (noevidence.ts 머리말). 아래 computeOfferSignals도 같은 이유로 동적 import를 쓴다.
+ * ⚠ 제목을 못 구하면(모듈 흉내·조회 실패) **빈 문자열**이다 — ID를 대신 싣지 않는다.
+ */
+async function 근거제목붙이기(r: DispatchResult): Promise<DispatchResult> {
+  if (!r.sources?.length && !r.quotes?.length) return r;
+  let 제목: (id: string | null | undefined) => string = () => "";
+  try {
+    const m = await import("./memory.js");
+    if (typeof m.사람이읽는문서제목 === "function") 제목 = m.사람이읽는문서제목;
+  } catch {
+    /* 제목을 못 구하면 생략한다 — 내부 ID를 사람에게 내보내지 않는다 */
+  }
+  return {
+    ...r,
+    ...(r.sources?.length ? { sourceTitles: r.sources.map((id) => 제목(id)) } : {}),
+    ...(r.quotes?.length ? { quotes: r.quotes.map((q) => ({ ...q, title: 제목(q.documentId) })) } : {}),
+  };
+}
+/**
+ * 팀 사무실 협업 피드의 「📚 근거」 한 줄 — **제목만** 싣는다(2026-09-06).
+ *
+ * ⚠ 예전에는 sources를 그대로 이어 붙여 「📚 근거 — 사내 문서 4건 (승인문답:dtmtl5b1fzj215l3 ·
+ *   승인문답:… 외)」가 피드에 흘렀다(라이브 실측). 사무실 창 머리말이 약속한 「전부 실데이터」는
+ *   지켜졌지만, **담당자에게 아무것도 안 가리키는 내부 키**를 보여 주는 자리였다.
+ * ⚠ 제목이 하나도 없으면(전부 ID 꼴) **건수만** 말한다 — 이름을 지어내지 않는다.
+ */
+export function 근거피드문구(몇: number, 제목들?: string[]): string {
+  const 이름들 = (제목들 ?? []).map((t) => String(t ?? "").trim()).filter(Boolean).slice(0, 2);
+  const 꼬리 = 이름들.length ? ` (${이름들.join(" · ")}${몇 > 이름들.length ? " 외" : ""})` : "";
+  return `📚 근거 — 사내 문서 ${몇}건${꼬리}`;
+}
+/**
  * 근거 원문 한 대목 — 답을 만든 문서에서 실제로 쓰인 글.
  *
  * 왜 이름만으로는 부족한가(2026-08-01 실측): 문서에 "미사용 룰 37개"라고 적혀 있는데
@@ -98,6 +140,12 @@ function collab(qa: boolean | undefined, e: Parameters<typeof emitCollaboration>
 export interface SourceQuote {
   documentId: string;
   text: string;
+  /**
+   * 사람이 읽는 **표시용 제목**(2026-09-06) — documentId는 그대로 두고 제목 칸을 옆에 더한다.
+   * 화면은 이 값으로 이름을 그리고, 원문 열기는 documentId로 한다(sourceTitles와 같은 계약).
+   * 빈 문자열이면 「제목 생략」 — 내부 ID를 대신 싣지 않는다(memory.사람이읽는문서제목 규율).
+   */
+  title?: string;
 }
 export interface DispatchResult {
   task: TaskItem;
@@ -127,9 +175,24 @@ export interface DispatchResult {
   nextChips?: string[]; // ➡ 다음 작업 제안(QA ④) — nextguide.ts 표에서, 실측 검증 문장만
   scopeSet?: import("./scopecmd").ScopeSet; // 🗂 범위 걸기/풀기 신호(기능 가이드 ②) — 실행은 클라 콘솔
   internalMiss?: boolean;
-  // 답변 그라운딩에 쓰인(검색된) 사내 문서 ID — 화면이 "근거: 문서명" 배지로 표시한다.
+  // 답변 그라운딩에 쓰인(검색된) 사내 문서 ID — **기계용 키**다.
   // 인수인계 자동 검증도 이 필드로 "올린 문서가 실제로 인용되는가"를 판정한다.
+  // ⚠ 사람에게 **보여 주는 이름은 sourceTitles**다(아래) — 여기 값은 화면에 그대로 찍지 않는다.
   sources?: string[];
+  /**
+   * 근거 문서의 **사람이 읽는 제목** — sources와 **같은 순서·같은 길이**(2026-09-06 라이브 수리).
+   *
+   * ★ 왜 칸을 따로 뒀나 — sources를 제목으로 갈아 끼우면 **ID로 문서를 여는 소비자 둘이 죽는다**:
+   *   · server/src/engine/handover.ts:156 `sources.includes(documentId)` — 인수인계 자동 검증의 판정 그 자체
+   *   · client/src/renderer/pages/chatparts.js 문서열기신호(id) — 배지를 누르면 그 ID로 원문을 연다
+   *   그래서 **ID는 sources 그대로 · 표시는 sourceTitles**로 가른다.
+   * ★ 왜 필요한가(2026-09-06 라이브 실측): sources가 그대로 배지 문구·협업 피드가 되어
+   *   내부 ID 「승인문답:dtmtl5b1fzj215l3」이 담당자 눈앞에 실렸다. R2(0cc6a133)는
+   *   프롬프트 경로(llm.ragBlock)만 막아서 **응답 필드로는 계속 샜다.**
+   * ⚠ 빈 문자열은 「제목 생략」이다 — 없는 제목을 지어내지 않는다(memory.사람이읽는문서제목 규율).
+   *   화면은 그 자리에 ID를 대신 찍지 않고 **건수만** 말한다.
+   */
+  sourceTitles?: string[];
   /**
    * 그 sources가 **답의 근거인가, 찾아보기만 한 자료인가** (2026-08-13 · 계획서 전-4 4-ⓑ).
    *
@@ -776,7 +839,8 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
     //   qa에서도 그대로 내야 한다. 여기서 건너뛰었더니 회귀 하네스가 internalMiss=undefined로
     //   깨졌다(2026-07-30 실측). 게이트 문항은 이 신호를 안 써서 게이트 결과는 무사했지만,
     //   "시험 경로가 실사용과 같은 답을 본다"는 전제가 조용히 깨져 있었다.
-    return { ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer, 선택맥락)) };
+    // 제목 칸도 **여기서** 붙인다 — 사람 경로와 같은 답을 본다는 전제(위 주석)를 깨지 않는다.
+    return 근거제목붙이기({ ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer, 선택맥락)) });
   }
   // 세션을 새로 만들 땐 지시한 사람을 실행자로 남긴다 — 여러 담당자가 쓰는데 목록만 보고는
   // 누가 한 일인지 알 수 없었다(2026-07-26 사용자 지적).
@@ -798,17 +862,19 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
     collab(qa, { from: "세션", to: "orchestrator", message: `💬 [${title}] ${기록문}` });
   }
   const core = await dispatchInstructionCore(instructionText, contextText, screen, actor, undefined, noLearn, viewer, 선택);
-  const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer, contextText)) };
+  // ⚠ 근거제목붙이기는 **두 출구 모두**에 있어야 한다 — 한쪽만 붙이면 그쪽에서만 이름이 보이고
+  //   다른 쪽에선 화면이 「사내 문서 N건」으로만 나온다(같은 것을 두 곳에 적으면 어긋난다).
+  const result: DispatchResult = await 근거제목붙이기({ ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer, contextText)) });
   // 팀 사무실 「움직임」 신호(2026-08-09 AI팀 구성 재편) — 답이 사내 문서를 근거로 썼으면
   // 협업 피드에 그 사실을 흘린다. 연출이 아니라 **실측(sources)이 있을 때만** — 없는 근거를
   // 꾸며 보이면 사무실 창의 머리말 약속("전부 실데이터, 가짜 연출 없음")이 깨진다.
+  // ⚠ 문구는 **제목**으로 짠다(2026-09-06) — sources를 그대로 이어 붙이던 자리라 내부 ID가
+  //   피드에 흘렀다. 문장 조립은 근거피드문구 한 곳이고, 짝 시험이 그 함수를 직접 부른다.
   if (result.sources?.length) {
-    const 몇 = result.sources.length;
-    const 이름들 = result.sources.slice(0, 2).join(" · ");
     collab(qa, {
       from: result.route?.agentId ?? "orchestrator",
       to: "orchestrator",
-      message: `📚 근거 — 사내 문서 ${몇}건 (${이름들}${몇 > 2 ? " 외" : ""})`,
+      message: 근거피드문구(result.sources.length, result.sourceTitles),
     });
   }
   // 헤르메스 학습 루프 ① 수집 — **대화창 출구 한 곳**에서 남긴다(2026-08-07).
