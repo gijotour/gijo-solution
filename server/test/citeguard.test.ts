@@ -283,6 +283,12 @@ const 자국없음 = (t: string) => {
   expect(t, "알맹이 없는 표지가 남았다").not.toMatch(/[(（\[][ \t]*(?:출처|원문|근거|자료)[ \t]*[:：]?[ \t]*[)）\]]/);
   expect(t, "겹공백이 남았다").not.toMatch(/\S[ \t]{2,}/);
   expect(t, "구두점이 겹쳤다").not.toMatch(/[,，][ \t]*[,，]/);
+  // ★ K1(2026-09-05 라이브) — 인용을 떼고 **귀속 꼬리**만 남는 부류. 이 세 줄이 없어서
+  //   「출처: "제목" by Brian Krebs, 2021-04-29.」이 「 by Brian Krebs, 2021-04-29.」로 나갔고
+  //   그때 이 헬퍼는 초록이었다(자국을 세 꼴로만 봤다).
+  expect(t, "귀속 꼬리(by 사람)가 남았다").not.toMatch(/[Bb]y[ \t]+[A-Z가-힣]/);
+  expect(t, "귀속 날짜 꼬리가 남았다").not.toMatch(/(?:^|[)）\]】])[ \t]*[,，][ \t]*\(?\d{4}[\s년\-./]/m);
+  expect(t, "줄표 귀속 꼬리가 남았다").not.toMatch(/^[ \t]*[—–][ \t]*[^,\n]{1,40}[,，][ \t]*\d{4}/m);
 };
 
 describe("★ H1 자국 정리 — 배포 dist에서 재현된 세 꼴", () => {
@@ -966,9 +972,17 @@ describe("★★ J3 참고 자료 블록의 문서 제목", () => {
     expect(RAG_BLOCK_HEADER.startsWith("참고 자료 — 사내 지식 베이스")).toBe(true);
   });
 
-  it("★ 제목의 원천은 documentId 하나다 — 제목 칸을 새로 만들지 않았다(단일 출처)", () => {
-    expect(memsrc, "queryMemoryGraded가 titles를 안 돌려준다").toMatch(/titles:\s*쓸것\.map\(\(c\) => c\.documentId/);
+  it("★ 제목은 **사람이 읽는 제목**이다 — documentId를 그대로 싣지 않는다(K2)", () => {
+    // ★ 왜 바뀌었나(2026-09-05 K2 라이브): documentId를 그대로 실었더니 내부 ID가 답에 나갔다
+    //   (「(출처: 《incident-case:ic-c37e91a2db580f43》)」). 판정은 사람이읽는문서제목 한 곳이다.
+    expect(memsrc, "queryMemoryGraded가 titles를 안 돌려준다")
+      .toMatch(/titles:\s*쓸것\.map\(\(c\) => 사람이읽는문서제목\(c\.documentId\)\)/);
+    expect(memsrc, "documentId를 제목으로 그대로 싣는 옛 줄이 살아 있다")
+      .not.toMatch(/titles:\s*쓸것\.map\(\(c\) => c\.documentId/);
     expect(memsrc, "반환 타입에 titles가 없다").toContain("chunks: string[]; titles: string[]");
+    // 종류별 판정(사례·개인 문서·ID 꼴)의 실동작은 test/doctitle.test.ts가 잰다 — 여기선 배선만.
+    expect(memsrc, "사례/개인 문서 접두를 안 가른다").toContain('const 사례접두 = "incident-case:"');
+    expect(memsrc, "사례/개인 문서 접두를 안 가른다").toContain('const 개인접두 = "personal:"');
   });
 
   it("★★ 살균이 조각을 **버릴 때 제목도 같이 버린다** — 안 그러면 한 칸씩 밀린다", () => {
@@ -1283,5 +1297,131 @@ describe("★★ 검토관 2차 — 원천 마크다운 · 좁힘 비대칭 · �
       expect(guardCitations(답, []).text).toBe(자료없음안내);
       expect(guardCitations(답, [], undefined, {}).text).toBe(자료없음안내);
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ K1 — 귀속 꼬리. 「누가·언제」만 남으면 **없는 기사의 기자 이름**이 답에 남는다.
+//    재료는 배포 dist 재현 3꼴 그대로다(2026-09-05 라이브).
+describe("★★ K1 귀속 꼬리 — 표지를 떼고 「by 사람, 날짜」가 남던 자리", () => {
+  const 없는제목 = "존재하지 않는 사내 문서 제목입니다";
+
+  it("① 「출처: \"제목\" by Brian Krebs, 2021-04-29.」 — 꼬리째 사라진다", () => {
+    const r = guardCitations(`요약을 적습니다. 아래를 보세요. 출처: "${없는제목}" by Brian Krebs, 2021-04-29.`, 조각);
+    expect(r.removed.length).toBeGreaterThanOrEqual(1);
+    expect(r.text, "기자 이름이 남았다").not.toContain("Brian Krebs");
+    expect(r.text, "날짜가 남았다").not.toContain("2021-04-29");
+    expect(r.text).toContain("요약을 적습니다.");
+    자국없음(r.text);
+  });
+
+  it("② 「(출처: 제목) by 사람, 날짜」 — 괄호 표지 뒤 꼬리도 같이", () => {
+    const r = guardCitations(`설명입니다. 자세한 내용은 아래와 같습니다 (출처: CSOOnline) by 김철수, 2023년 4월 11일.`, 조각);
+    expect(r.removed.length).toBeGreaterThanOrEqual(1);
+    expect(r.text).not.toContain("김철수");
+    expect(r.text).not.toContain("2023년 4월 11일");
+    자국없음(r.text);
+  });
+
+  it("③ 「**출처:** \"제목\" by 사람」 — 굵게가 끼어도(J1 사본) 꼬리가 남지 않는다", () => {
+    const r = guardCitations(`본문을 적습니다. 이어서 적습니다.\n**출처:** "${없는제목}" by Brian Krebs`, 조각);
+    expect(r.removed.length).toBeGreaterThanOrEqual(1);
+    expect(r.text).not.toContain("Brian Krebs");
+    자국없음(r.text);
+  });
+
+  it("★ 오탐 반대편 — **원천에 그 이름이 있으면** 귀속을 안 뗀다", () => {
+    // 제목이 원천에 있으니 표지 자체가 안 뗴지고, 꼬리도 그대로 남아야 한다.
+    const r = guardCitations('신고 절차입니다. (출처: "침해사고_대응_지침.md") by 홍길동, 2024년 1월 2일', ["본문"], ["침해사고_대응_지침.md", "홍길동"]);
+    expect(r.removed).toHaveLength(0);
+    expect(r.text).toContain("홍길동");
+  });
+
+  it("★ 오탐 반대편 — 뗀 자리와 **무관한** 「by」는 안 건드린다", () => {
+    const 답 = `보안은 by design 원칙으로 설계합니다. 아래 표를 보세요.`;
+    expect(guardCitations(답, 조각).text).toBe(답);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ K3 — 표지 변형 일곱. 콜론 하나만 표지가 아니다(배포 dist 뗌 0).
+describe("★★ K3 표지 변형 — 「출처:」 말고도 표지다", () => {
+  const 없는제목 = "존재하지 않는 사내 문서 제목입니다";
+  const 뗐나 = (답: string, 원천?: string[]) => {
+    const r = guardCitations(답, 조각, 원천);
+    return { 건수: r.removed.length, text: r.text };
+  };
+
+  it("① 「출처 — \"제목\"」 (줄표 도입)", () => {
+    const r = 뗐나(`요약입니다. 이어서 적습니다. 출처 — "${없는제목}"`);
+    expect(r.건수).toBeGreaterThanOrEqual(1);
+    expect(r.text).not.toContain(없는제목);
+  });
+
+  it("② 「### 출처⏎\"제목\"」 (머리말 줄이 표지)", () => {
+    const r = 뗐나(`요약입니다. 이어서 적습니다.\n### 출처\n"${없는제목}"`);
+    expect(r.건수).toBeGreaterThanOrEqual(1);
+    expect(r.text).not.toContain(없는제목);
+  });
+
+  it("③ 「【출처】\"제목\"」 (자기 안에서 닫히는 괄호)", () => {
+    const r = 뗐나(`요약입니다. 이어서 적습니다. 【출처】"${없는제목}"`);
+    expect(r.건수).toBeGreaterThanOrEqual(1);
+    expect(r.text).not.toContain(없는제목);
+    expect(r.text, "여는 괄호만 남았다").not.toContain("【");
+  });
+
+  it("④ 「Source: \"제목\"」 (영문 표지)", () => {
+    const r = 뗐나(`요약입니다. 이어서 적습니다. Source: "${없는제목}"`);
+    expect(r.건수).toBeGreaterThanOrEqual(1);
+    expect(r.text).not.toContain(없는제목);
+  });
+
+  it("⑤ 「(참고: 기관)」 — 이름이 바깥 기관·매체 꼴일 때만", () => {
+    const r = 뗐나(`요약입니다. 이어서 적습니다 (참고: CSOOnline).`);
+    expect(r.건수).toBeGreaterThanOrEqual(1);
+    expect(r.text).not.toContain("CSOOnline");
+  });
+
+  it("⑥ 「[출처: 기관]」 — 대괄호 표지", () => {
+    const r = 뗐나(`요약입니다. 이어서 적습니다 [출처: Bleeping Computer].`);
+    expect(r.건수).toBeGreaterThanOrEqual(1);
+    expect(r.text).not.toContain("Bleeping Computer");
+    expect(r.text).not.toContain("[출처");
+  });
+
+  it("⑦ 줄표 귀속 + ISO 날짜 — 「— Krebs on Security, 2021-04-29」", () => {
+    const r = 뗐나(`메일 릴레이는 제한해야 합니다.\n— Krebs on Security, 2021-04-29`);
+    expect(r.건수).toBeGreaterThanOrEqual(1);
+    expect(r.text).not.toContain("Krebs on Security");
+    expect(r.text).toContain("메일 릴레이는 제한해야 합니다.");
+  });
+
+  // ── 오탐 반대편 — 넓힌 잣대가 정상 답을 지우지 않는가 ──────────────────
+  it("★ 정당한 「(참고: …)」 주석은 안 뗀다 — 기관 이름이 아니다", () => {
+    for (const 답 of [
+      "취약점 목록입니다 (참고: 위 표).",
+      "조치 순서를 적었습니다 (참고: 아래 그림).",
+      "이 값은 확인이 필요합니다 (참고: 담당자 확인).",
+      "결과를 정리했습니다 (참고 자료: 내부 스캔 결과).",
+    ]) {
+      expect(guardCitations(답, 조각).text, `정상 주석을 뗐다: ${답}`).toBe(답);
+    }
+  });
+
+  it("★ 「### 출처」 아래에 **실제 문서명**이 오면 안 뗀다", () => {
+    const 답 = `신고 절차를 정리했습니다.\n### 출처\n"침해사고_대응_지침.md"`;
+    const r = guardCitations(답, ["본문 조각"], ["침해사고_대응_지침.md"]);
+    expect(r.removed, "우리가 준 제목을 우리가 뗐다(자충수)").toHaveLength(0);
+    expect(r.text).toContain("침해사고_대응_지침.md");
+  });
+
+  it("★ 줄표 문장·소문자 source는 여전히 안 건드린다", () => {
+    for (const 답 of [
+      "조치를 마쳤습니다.\n— 자세한 내용은 담당자에게 문의하세요",
+      "설정 파일에 source: local 을 적습니다.",
+    ]) {
+      expect(guardCitations(답, 조각).text, `정상 문장을 건드렸다: ${답}`).toBe(답);
+    }
   });
 });

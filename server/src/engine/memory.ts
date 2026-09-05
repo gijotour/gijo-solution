@@ -1372,6 +1372,50 @@ export async function queryMemoryRelevant(question: string, topK = 5, agentId?: 
 }
 
 /**
+ * documentId → **사람이 읽는 문서 제목**. 없으면 빈 문자열(부르는 쪽이 제목을 생략한다).
+ *
+ * ★ 왜 생겼나(2026-09-05 K2 라이브 실측): 「참고 자료」 블록의 제목을 documentId **그대로** 실었더니
+ *   내부 ID가 프롬프트와 답에 그대로 나갔다 — 라이브 실물이 「(출처: 《incident-case:ic-c37e91a2db580f43》)」다.
+ *   담당자에게 이 문자열은 아무것도 가리키지 않고, 우리 저장 구조만 드러낸다.
+ * 규칙(위에서부터):
+ *   · 침해사고 사례(`incident-case:<id>`) → 「[사례] 사례 제목」 — 종류를 앞에 밝힌다.
+ *     제목의 원천은 **incident_cases.title 하나**다(제목 칸을 새로 만들지 않는다).
+ *   · 개인 문서(`personal:<uuid>`)        → personal_docs.title(담당자가 붙인 파일명).
+ *   · 그 밖에 **ID 꼴**(`영문접두:토막`)   → **빈 문자열**(제목을 생략한다 — 옛 꼴 그대로 나간다).
+ *   · 나머지                               → documentId 그대로. 이 제품에서 일반 문서의 documentId는
+ *     파일 이름(ingestText의 documentId = basename)이라 그것이 곧 사람이 읽는 제목이다.
+ * ⚠ 표를 못 찾으면(사례가 지워졌다·개인 문서가 지워졌다) **빈 문자열**이다. 없는 제목을 지어내지 않는다.
+ * ⚠ 접두 문자열은 여기 한 곳에만 적고, 짝 시험(citeguard.test.ts J3)이 incidentcases.incidentCaseDocId와
+ *   글자 단위로 대조한다 — 같은 것을 두 곳에 적으면 어긋난다.
+ */
+const 사례접두 = "incident-case:";
+const 개인접두 = "personal:";
+/** 「영문접두:토막」 꼴 — 사람이 읽는 이름이 아니라 **저장소 키**다(store:… · foo-bar:abc123). */
+const ID꼴_RE = /^[a-z][a-z0-9-]*:[A-Za-z0-9_.#-]+$/;
+let 사례제목Stmt: import("better-sqlite3").Statement | null = null;
+let 개인문서제목Stmt: import("better-sqlite3").Statement | null = null;
+export function 사람이읽는문서제목(documentId: string | null | undefined): string {
+  const id = String(documentId ?? "").trim();
+  if (!id) return "";
+  try {
+    if (id.startsWith(사례접두)) {
+      사례제목Stmt ??= db.prepare("SELECT title FROM incident_cases WHERE id = ?");
+      const row = 사례제목Stmt.get(id.slice(사례접두.length)) as { title?: string } | undefined;
+      const t = String(row?.title ?? "").trim();
+      return t ? `[사례] ${t}` : "";
+    }
+    if (id.startsWith(개인접두)) {
+      개인문서제목Stmt ??= db.prepare("SELECT title FROM personal_docs WHERE id = ?");
+      const row = 개인문서제목Stmt.get(id.slice(개인접두.length)) as { title?: string } | undefined;
+      return String(row?.title ?? "").trim();
+    }
+  } catch {
+    return ""; // 표가 아직 없거나 조회가 실패하면 제목을 생략한다(옛 꼴) — 내부 ID를 대신 싣지 않는다.
+  }
+  return ID꼴_RE.test(id) ? "" : id;
+}
+
+/**
  * **근거가 얼마나 가까운가**까지 함께 돌려준다 — 답이 근거의 세기를 밝힐 수 있게.
  *
  * 왜 필요한가(2026-08-03 거리 실측): 거리 하나로는 못 가린다.
@@ -1401,14 +1445,15 @@ export async function queryMemoryGraded(
   // agentId 없이 재검색해 답과 다른 문서를 근거로 실었다). 기존 chunks 소비자는 구조분해라 무영향.
   // ★ titles(2026-09-05 J3) — 조각과 **자리를 맞춘** 문서 제목. 「참고 자료」 블록이
   //   「[n] 《제목》 본문」으로 나가고, 인용 가드가 이것을 출처 대조 원천으로 쓴다.
-  //   ⚠ 제목의 정체는 **documentId**다. 이 제품에서 문서는 파일 이름(basename)으로 들어오므로
-  //     (ingestText의 documentId = filename) documentId가 곧 사람이 읽는 제목이다. 따로 제목
-  //     칸을 만들면 「같은 것을 두 곳에 적으면 어긋난다」가 또 생긴다 — 있는 값을 그대로 쓴다.
+  //   ⚠ 제목은 documentId **그대로가 아니다**(2026-09-05 K2). 일반 문서는 documentId가 곧 파일
+  //     이름이라 그대로 쓰지만, 침해사고 사례(`incident-case:ic-…`)·개인 문서(`personal:<uuid>`)는
+  //     **내부 ID**라 사람에게 아무것도 안 가리킨다 — 라이브에서 그 ID가 답에 실려 나갔다.
+  //     사람이읽는문서제목 한 곳에서 종류별로 판정한다(제목 칸을 새로 만들지 않는다 — 있는 표를 읽는다).
   //   ⚠ 이 배열은 chunks와 **같은 길이·같은 순서**라야 한다. 뒤에서 조각을 거르는 쪽
   //     (llm.ts의 sanitizeRagChunks)은 keptIndexes로 이 배열도 함께 걸러야 자리가 안 밀린다.
   return {
     chunks: 쓸것.map((c) => c.text),
-    titles: 쓸것.map((c) => c.documentId ?? ""),
+    titles: 쓸것.map((c) => 사람이읽는문서제목(c.documentId)),
     scored: 쓸것.map((c) => ({ text: c.text, distance: c.distance, documentId: c.documentId, lexicalHit: c.lexicalHit })),
     약한근거만: 쓸것.length > 0 && !가까움,
   };
