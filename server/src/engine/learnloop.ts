@@ -1033,7 +1033,14 @@ export function registerLearnloopRoutes(app: Express): void {
       return;
     }
     // 조각 하나를 넣어 본 예시도 함께 준다 — 빌더가 조립한 꼴이 제품과 같은지 눈으로 대조할 자리다.
-    res.json({ agentId, system: systemPromptFor(agentId), ragHeader: RAG_BLOCK_HEADER, ragBlockSample: ragBlock(["<조각 본문>"]) });
+    // ★ K4(2026-09-05) — 예시에 **제목 자리표**를 함께 싣는다. 그전에는 titles 없이 불러서 예시에
+    //   《 》가 한 개도 없었는데, 제품은 제목이 있으면 「[n] 《제목》 본문」으로 나간다. 즉 빌더·하네스가
+    //   fail-closed로 대조하던 그 값이 **제품이 안 쓰는 꼴**이었다 — 대조는 초록인데 틀을 못 맞춘다.
+    //   빌더(참고자료블록)도 같은 자리표를 쓰므로 대조는 그대로 성립한다(tools/ladder/README.md).
+    res.json({
+      agentId, system: systemPromptFor(agentId), ragHeader: RAG_BLOCK_HEADER,
+      ragBlockSample: ragBlock(["<조각 본문>"], ["<문서 제목>"]),
+    });
   });
 
   app.get("/api/learnloop/preflight", authMiddleware, (_req, res) => res.json(preflightCheck()));

@@ -55,7 +55,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { 참고자료블록, 규격읽기 } from "../build-raft-dataset.mjs";
+import { 참고자료블록, 예시블록, 규격읽기 } from "../build-raft-dataset.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -98,10 +98,10 @@ export function 조각들(문항, mode) {
  *   (llm.ts systemContent가 rag=null일 때 = systemPromptFor 하나). 관문 ⑨가 세야 하는 자리가 여기다 —
  *   bare(프롬프트조차 없음)는 제품이 열지 않는 조건이라 참고값으로 내렸다.
  */
-export function system만들기(팀원프롬프트, ragHeader, 조각, mode = "") {
+export function system만들기(팀원프롬프트, ragHeader, 조각, mode = "", 제목 = undefined) {
   if (mode === "persona") return String(팀원프롬프트 ?? "");
   if (!조각 || !조각.length) return "";
-  return [팀원프롬프트, 참고자료블록(ragHeader, 조각)].join("\n\n");
+  return [팀원프롬프트, 참고자료블록(ragHeader, 조각, 제목)].join("\n\n");
 }
 
 async function login(base, user, password) {
@@ -136,7 +136,7 @@ async function 규격으로프롬프트(specPath) {
   // 규격읽기가 칸 누락·앞뒤 어긋남을 다 본다(fail-closed) — 여기서 다시 세지 않는다.
   const j = 규격읽기(specPath);
   // 파일에서 왔어도 조립 꼴 대조는 **그대로 한다** — 규격이 낡았는지는 이 대조가 먼저 말한다.
-  if (참고자료블록(j.ragHeader, ["<조각 본문>"]) !== j.ragBlockSample) {
+  if (예시블록(j.ragHeader) !== j.ragBlockSample) {
     throw new Error(`규격 파일의 참고 자료 블록 조립 꼴이 어긋난다: ${specPath}`);
   }
   return { system: j.system, ragHeader: j.ragHeader, auth: null, refreshToken: null, server: null, 출처: `prompt-spec:${specPath}` };
@@ -160,7 +160,7 @@ async function 프롬프트받기(server, agent) {
     await 로그아웃({ auth, refreshToken, server });
     throw new Error("창구가 ragBlockSample을 안 준다 — 조립 꼴을 대조할 길이 없다(대조 없이 재면 학습 때와 딴 틀을 재게 된다)");
   }
-  if (참고자료블록(j.ragHeader, ["<조각 본문>"]) !== j.ragBlockSample) {
+  if (예시블록(j.ragHeader) !== j.ragBlockSample) {
     await 로그아웃({ auth, refreshToken, server });
     throw new Error("참고 자료 블록 조립 꼴이 서버(llm.ts ragBlock)와 다르다 — 이 꼴로 재면 학습 때와 딴 틀을 재게 된다");
   }

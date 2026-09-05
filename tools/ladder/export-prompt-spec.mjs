@@ -35,7 +35,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { 참고자료블록 } from "../build-raft-dataset.mjs";
+import { 예시블록 } from "../build-raft-dataset.mjs";
 
 const 여기 = path.dirname(fileURLToPath(import.meta.url));
 const 저장소 = path.resolve(여기, "..", "..");
@@ -106,7 +106,7 @@ async function 뽑기() {
     for (const 칸 of ["system", "ragHeader", "ragBlockSample"]) {
       if (!String(j?.[칸] ?? "").trim()) throw new 나감(1, `창구가 ${칸}을 안 줍니다 — 규격을 뽑을 수 없습니다`);
     }
-    if (참고자료블록(j.ragHeader, ["<조각 본문>"]) !== j.ragBlockSample) {
+    if (예시블록(j.ragHeader) !== j.ragBlockSample) {
       throw new 나감(1, "창구의 ragHeader와 ragBlockSample이 서로 어긋납니다 — 서버(llm.ts ragBlock)를 먼저 보세요");
     }
 

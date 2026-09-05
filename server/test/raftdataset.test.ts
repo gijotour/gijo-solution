@@ -14,7 +14,7 @@ import {
   refParse, 허용목록읽기, 허용안되는이유, 라이선스판정기, 방해조각고르기, 섞기, 참고자료블록, 토큰추정, chunk,
   시험문항목록, 행만들기,
   결정값, 거절답, 인용있나, 인용흔적있나, 인용떼기, 인용붙이기, 인용근거대조, 문장들, 긴형식경로, 긴형식읽기, 구성비, 사전검사, 절수,
-  근거조각뽑기, 근거블록있나, 규격읽기,
+  근거조각뽑기, 근거블록있나, 규격읽기, 예시블록,
   제품인용만들기, 문장경계자르기, 블록번호찾기,
   제품인용맞추기, 인용규칙이름표, 인용규칙칸, 번호참조떼기, 거절답만들기, 일반답머리,
   거절꼴고르기, 번호참조있나, 홀드아웃고르기,
@@ -61,14 +61,19 @@ describe("★ 참고 자료 블록은 한 곳에서만 정한다", () => {
     expect(code, "제목을 안 넘긴다 — 블록에 제목이 안 실린다").toMatch(/parts\.push\(ragBlock\(chunks, titles\)\)/);
   });
 
-  it("★★ 제목을 **안 주면** 옛 꼴 그대로 — 빌더(제목 개념 없음)와 창구 예시가 안 갈린다", () => {
-    // RAFT 빌더의 참고자료블록에는 제목 칸이 없다. 그래서 제품이 제목을 싣기 시작해도
-    // `ragBlock(["…"])`(제목 없이)은 **한 글자도 안 바뀌어야** 빌더 대조와 규격이 산다.
-    // ⚠ 정직하게: 그 말은 **학습 표본에는 제목이 없고 추론 지문에는 있다**는 뜻이다 —
-    //   다음에 어댑터를 구울 때 「빌더에도 제목을 실을지」를 먼저 정해야 한다
-    //   (tools/ladder/README.md에 적어 뒀다).
+  it("★★ 제목을 **안 주면** 옛 꼴 그대로 — 제목 없는 재료도 그대로 돈다", () => {
     expect(ragBlock(["가", "나"])).toBe(RAG_BLOCK_HEADER + "\n[1] 가\n[2] 나");
     expect(ragBlock(["가"], ["제목.md"])).toBe(RAG_BLOCK_HEADER + "\n[1] 《제목.md》 가");
+  });
+
+  it("★★ K4 — 빌더도 **제목을 싣는다**(학습 꼴 = 추론 꼴). 규칙이 한 글자도 안 갈린다", () => {
+    // ★ 2026-09-05 결정: 옛 주석은 「빌더에는 제목 개념이 없다」였고, 그래서 학습 표본에는 제목이 없고
+    //   추론 지문에는 있었다 — 어긋나도 **아무 오류가 안 나는** 부류다. 여기서 닫는다.
+    expect(참고자료블록(RAG_BLOCK_HEADER, ["가", "나"], ["A.md", "B.md"]))
+      .toBe(ragBlock(["가", "나"], ["A.md", "B.md"]));
+    // 제목 칸이 비면 양쪽 다 옛 꼴이다(같은 규칙이라야 대조가 성립한다).
+    expect(참고자료블록(RAG_BLOCK_HEADER, ["가"], [""])).toBe(ragBlock(["가"], [""]));
+    expect(참고자료블록(RAG_BLOCK_HEADER, ["가"])).toBe(ragBlock(["가"]));
   });
 });
 
@@ -79,10 +84,24 @@ describe("★ 빌더가 만든 근거 꼴 = 서버가 만드는 근거 꼴", () 
   });
 
   it("창구가 주는 예시(ragBlockSample)와도 맞는다 — 빌더가 실행 중에 스스로 대조하는 그 값", () => {
-    // 라우트는 ragBlock(["<조각 본문>"])을 예시로 준다. 빌더는 이것과 자기 조립을 비교해 다르면 멈춘다.
-    expect(참고자료블록(RAG_BLOCK_HEADER, ["<조각 본문>"])).toBe(ragBlock(["<조각 본문>"]));
+    // 라우트는 ragBlock(["<조각 본문>"], ["<문서 제목>"])을 예시로 준다(2026-09-05 K4).
+    //   빌더는 예시블록(머리말)으로 같은 글을 지어 비교하고, 다르면 멈춘다.
+    expect(예시블록(RAG_BLOCK_HEADER)).toBe(ragBlock(["<조각 본문>"], ["<문서 제목>"]));
+    expect(예시블록(RAG_BLOCK_HEADER), "예시에 제목 자리표가 없다 — 제품이 안 쓰는 꼴을 대조하게 된다")
+      .toContain("《<문서 제목>》");
     const code = src("tools/build-raft-dataset.mjs");
     expect(code, "빌더가 조립 꼴 대조를 안 하면 어긋나도 아무도 모른다").toContain("ragBlockSample");
+  });
+});
+
+describe("★★ K4 근거 되찾기 — 제목이 실려도 **본문만** 돌려준다", () => {
+  it("「[1] 《문서》 본문」에서 제목을 떼고 돌려준다(옛 꼴도 그대로 읽힌다)", () => {
+    const 머리 = RAG_BLOCK_HEADER;
+    const 새꼴 = ["팀원 프롬프트", 참고자료블록(머리, ["가나다", "라마바"], ["A.md", "B.md"])].join("\n\n");
+    expect(근거조각뽑기(새꼴, 머리), "제목이 근거 본문에 섞였다").toEqual(["가나다", "라마바"]);
+    const 옛꼴 = ["팀원 프롬프트", 참고자료블록(머리, ["가나다", "라마바"])].join("\n\n");
+    expect(근거조각뽑기(옛꼴, 머리)).toEqual(["가나다", "라마바"]);
+    expect(근거블록있나(새꼴, 머리)).toBe(true);
   });
 });
 
@@ -723,7 +742,7 @@ describe("★★ 프롬프트 규격 파일이 서버와 같은 글인가", () =
   it.runIf(규격있음)("★★ 규격의 ragHeader가 llm.ts RAG_BLOCK_HEADER와 **글자 단위로** 같다", () => {
     const j = JSON.parse(fs.readFileSync(규격경로, "utf8"));
     expect(j.ragHeader, "규격이 낡았다 — export-prompt-spec.mjs 로 다시 뽑으세요").toBe(RAG_BLOCK_HEADER);
-    expect(j.ragBlockSample, "머리말과 예시가 어긋나면 규격이 아니다").toBe(ragBlock(["<조각 본문>"]));
+    expect(j.ragBlockSample, "머리말과 예시가 어긋나면 규격이 아니다").toBe(ragBlock(["<조각 본문>"], ["<문서 제목>"]));
     // 파일 안에서도 앞뒤가 맞아야 한다(지문이 본문과 따로 놀면 어느 쪽이 진짜인지 모른다).
     expect(String(j.system ?? "").length, "system이 비면 하네스가 프롬프트를 못 만든다").toBeGreaterThan(0);
     expect(j.systemChars).toBe(String(j.system).length);
@@ -746,12 +765,15 @@ describe("★★ 프롬프트 규격 파일이 서버와 같은 글인가", () =
     expect(() => 규격읽기("tools/team-bench/없는-규격.json")).toThrow(/없습니다/);
     const 임시 = path.join(루트, "tools", "team-bench", `vitest-spec-${Date.now().toString(36)}.json`);
     try {
-      fs.writeFileSync(임시, JSON.stringify({ ragHeader: "머리말", ragBlockSample: "머리말\n[1] <조각 본문>" }));
+      fs.writeFileSync(임시, JSON.stringify({ ragHeader: "머리말", ragBlockSample: "머리말\n[1] 《<문서 제목>》 <조각 본문>" }));
       expect(() => 규격읽기(임시), "system이 없으면 하네스가 프롬프트를 못 만든다").toThrow(/system/);
       fs.writeFileSync(임시, JSON.stringify({ system: "s", ragHeader: "머리말", ragBlockSample: "엉뚱한 예시" }));
       expect(() => 규격읽기(임시)).toThrow(/어긋납니다/);
-      // 앞뒤가 맞으면 읽힌다.
+      // ★ 제목이 빠진 **옛 꼴**도 이제는 어긋남이다 — 그래야 낡은 규격 파일로 굽는 일이 막힌다.
       fs.writeFileSync(임시, JSON.stringify({ system: "s", ragHeader: "머리말", ragBlockSample: "머리말\n[1] <조각 본문>" }));
+      expect(() => 규격읽기(임시), "제목 없는 옛 예시가 통과했다").toThrow(/어긋납니다/);
+      // 앞뒤가 맞으면 읽힌다.
+      fs.writeFileSync(임시, JSON.stringify({ system: "s", ragHeader: "머리말", ragBlockSample: "머리말\n[1] 《<문서 제목>》 <조각 본문>" }));
       expect((규격읽기(임시) as { system: string }).system).toBe("s");
     } finally {
       fs.rmSync(임시, { force: true });
@@ -1173,7 +1195,8 @@ describe("★ RAFT 재료 창구는 관리자만 연다", () => {
     const 프롬 = await request(app).get("/api/learnloop/raft/prompt?agentId=normaltic").set(admin);
     expect(프롬.status).toBe(200);
     expect(프롬.body.ragHeader).toBe(RAG_BLOCK_HEADER);
-    expect(프롬.body.ragBlockSample).toBe(ragBlock(["<조각 본문>"]));
+    expect(프롬.body.ragBlockSample).toBe(ragBlock(["<조각 본문>"], ["<문서 제목>"]));
+    expect(프롬.body.ragBlockSample, "K4 — 창구 예시에 제목 자리표가 없다").toContain("《<문서 제목>》");
     expect(String(프롬.body.system).length, "팀원 system 프롬프트가 비었다").toBeGreaterThan(20);
 
     // 잘못 부르면 말해 준다(조용한 빈 답 금지).

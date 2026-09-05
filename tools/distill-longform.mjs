@@ -46,7 +46,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chunk, sha12, 참고자료블록, 저장소 } from "./build-raft-dataset.mjs";
+import { chunk, sha12, 참고자료블록, 예시블록, 저장소 } from "./build-raft-dataset.mjs";
 import { overlap20, 시점데이터, 한글비율, 인용뺀설명 } from "./distill-precheck.mjs";
 
 // ── 서식 ────────────────────────────────────────────────────────────
@@ -191,7 +191,9 @@ export function 조각모으기(root = 저장소, 폴더들 = 기본재료, 최�
         if (!rec) continue;                                   // CVE 레코드가 없는 조각은 주인공이 없다
         if (금지CVE.includes(rec.cve)) continue;               // 시험 문항 CVE는 재료에서 뺀다
         if (금지자산.some((x) => c.includes(x))) continue;      // 시험 문항 자산이 든 조각도 뺀다
-        pool.push({ ref: `${rel}#${sha12(c)}`, sha: sha12(c), text: c, ...rec });
+        // ⚠ 문서 이름을 함께 담는다(2026-09-05 K4) — 근거 블록이 「[n] 《문서》 본문」으로 나가므로
+        //   조각마다 어느 파일에서 왔는지가 손에 있어야 한다(build-raft-dataset 색인과 같은 칸 이름).
+        pool.push({ ref: `${rel}#${sha12(c)}`, sha: sha12(c), text: c, 문서: rel, ...rec });
       }
     }
   }
@@ -526,7 +528,7 @@ async function main() {
   const 프롬프트 = await pr.json();
   if (!pr.ok || !프롬프트.system) throw new Error(`프롬프트 창구 ${pr.status}: ${JSON.stringify(프롬프트).slice(0, 200)}`);
   // 조립 꼴이 서버와 같은지 즉시 대조 — 어긋나면 학습 꼴과 추론 꼴이 갈리는데 **오류가 안 난다**(빌더와 같은 관문).
-  if (프롬프트.ragBlockSample && 참고자료블록(프롬프트.ragHeader, ["<조각 본문>"]) !== 프롬프트.ragBlockSample) {
+  if (프롬프트.ragBlockSample && 예시블록(프롬프트.ragHeader) !== 프롬프트.ragBlockSample) {
     throw new Error("참고 자료 블록 조립 꼴이 서버(llm.ts ragBlock)와 다릅니다");
   }
 
@@ -580,7 +582,8 @@ async function main() {
     while (queue.length) {
       if (Date.now() - 시작 > BUDGET_MS) { 보고.예산초과 = true; return; }
       const w = queue.shift();
-      const system = [프롬프트.system, 참고자료블록(프롬프트.ragHeader, [w.조각.text])].join("\n\n");
+      // 제목도 함께 싣는다(2026-09-05 K4) — 제품이 내는 꼴과 같아야 교사가 같은 틀을 본다.
+      const system = [프롬프트.system, 참고자료블록(프롬프트.ragHeader, [w.조각.text], [w.조각.문서 ?? ""])].join("\n\n");
       const user = `${w.question}\n\n${교사지시(w.kind, w.변형)}\n\n${인용못박기}`;
       let t;
       try {
