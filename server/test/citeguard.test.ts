@@ -15,9 +15,10 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   guardCitations, 근거겹침, 원문꼬리표, 제품인용꼬리표, 뗀인용요약, 대조하한, OVERLAP_CHARS, 겹침걸음,
-  짧은대조하한, 원천에있나, 자료없음안내, 근거불일치안내,
+  짧은대조하한, 원천에있나, 자료없음안내, 근거불일치안내, 출처이름들,
 } from "../src/engine/citeguard";
-import { chat, setRagProvider, resetChatHistoryForTests, 자료없음중복가드 } from "../src/engine/llm";
+import { chat, setRagProvider, resetChatHistoryForTests, 자료없음중복가드, ragBlock, RAG_BLOCK_HEADER } from "../src/engine/llm";
+import { sanitizeRagChunks } from "../src/engine/ragsanitize";
 import {
   원문꼬리표 as 관문원문꼬리표, 제품인용꼬리표 as 관문제품인용꼬리표, 창작인용,
 } from "../../tools/team-bench/gates.mjs";
@@ -620,6 +621,32 @@ describe("★★ chat() 실통과 — 조각이 런타임에 가드까지 닿는
     const 답 = await chat({ agentId: "orchestrator", message: "정리해줘", remember: false });
     expect(답).toContain("[1]에 따르면");
   });
+
+  // ★★ J3 — 소스 감시는 「부르는 코드가 적혀 있다」까지만 증명한다. 여기서는 **제목이 실제로
+  //    모델 프롬프트까지 가는지**를 스텁 fetch의 요청 본문에서 직접 본다. 그리고 그 제목을
+  //    모델이 그대로 옮겨 적었을 때 가드가 **안 떼는지**까지 한 번에 잰다(주는 쪽 ↔ 재는 쪽).
+  it("★★ 문서 제목이 프롬프트까지 실제로 간다 — 그리고 그 제목을 댄 인용은 안 뗀다", async () => {
+    const 본문 = "기본 관리자 계정명은 널리 알려져 있어 공격자가 계정을 추측하기 쉬우므로 설치 직후 변경해야 한다.";
+    const 제목 = "GIJO_AS_보안제품관리_지침.md";
+    setRagProvider(async () => ({ chunks: [본문], titles: [제목], 약한근거만: false }));
+    const m = 스텁모델(`계정명은 바꾸는 것이 좋습니다. (출처: "${제목}")`);
+    const 답 = await chat({ agentId: "orchestrator", message: "기본 계정명을 왜 바꾸나요?", remember: true });
+
+    const 보낸것 = String((m.mock.calls[0]?.[1] as { body?: string } | undefined)?.body ?? "");
+    expect(보낸것, "제목이 프롬프트에 안 실렸다 — 「제목을 밝히라」고 시켜 놓고 재료를 안 준 셈이다")
+      .toContain(`《${제목}》`);
+    expect(답, "우리가 준 제목을 가드가 도로 뗐다(자충수)").toContain(제목);
+  });
+
+  it("★ 제목을 안 주는 제공자여도 돈다 — 옛 꼴 그대로(스텁·구 제공자 호환)", async () => {
+    const 본문 = "보안 패치는 발표 후 가능한 한 빨리 설치할 것을 권장하며 영향도 검사가 필요하다.";
+    setRagProvider(async () => ({ chunks: [본문], 약한근거만: false }));
+    const m = 스텁모델(`[1]에 따르면 "${본문}"`);
+    const 답 = await chat({ agentId: "orchestrator", message: "패치는 언제 하나요?", remember: true });
+    const 보낸것 = String((m.mock.calls[0]?.[1] as { body?: string } | undefined)?.body ?? "");
+    expect(보낸것, "제목이 없는데 《》 껍데기가 붙었다").not.toContain("《》");
+    expect(답, "정상 인용을 뗐다").toContain("[1]에 따르면");
+  });
 });
 
 describe("감독 요약 한 줄", () => {
@@ -796,5 +823,264 @@ describe("★★ 자국 손질 규칙별 감시 — 한 줄씩 지워도 초록�
     const r = guardCitations(`| 항목   | 값    |\n| 계정   | [1]에 따르면 "${지어낸문장}" |`, 조각);
     expect(r.text, "안 뗀 줄의 정렬이 어긋났다").toContain("| 항목   | 값    |");
     expect(r.text, "뗀 줄의 정렬 공백이 뭉개졌다").toContain("| 계정   |");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ J1 — 마크다운 내성. **배포 dist에서 실제로 재현된 다섯 꼴**이 재료다(만든 예문이 아니다).
+//    이 다섯은 전부 「뗌 0」이었다: 굵게(`**`)와 줄바꿈이 앞인용_RE·사이말_RE를 깨뜨렸다.
+//    ⚠ 제품이 모델에게 마크다운을 시키므로 이건 드문 꼴이 아니라 **주류**다 —
+//      가드가 막으려던 답의 가장 흔한 모양을 원리상 못 보고 있었다.
+describe("★★ J1 마크다운 내성 — 배포 dist 재현 5꼴", () => {
+  const 제목 = "서버 취약점 관리 실패 사례";
+  const 다섯: [string, string][] = [
+    ["**출처:** \"제목\"", `사고가 있었습니다.\n- **출처:** "${제목}"`],
+    ["**출처**: \"제목\"", `사고가 있었습니다.\n- **출처**: "${제목}"`],
+    ["**원문:** \"…\"", `요약합니다.\n**원문:** "${지어낸문장}"`],
+    ["출처: **\"제목\"**", `사고가 있었습니다.\n출처: **"${제목}"**`],
+    ["출처:⏎\"제목\"", `사고가 있었습니다.\n출처:\n"${제목}"`],
+  ];
+
+  it.each(다섯)("뗀다: %s", (_이름, 답) => {
+    const r = guardCitations(답, []);
+    expect(r.removed.length, "배포본에서 뗌 0이던 꼴을 여전히 못 뗀다").toBeGreaterThan(0);
+    expect(r.text, "지어낸 제목·원문이 그대로 남았다").not.toMatch(/서버 취약점 관리 실패 사례|릴레이 기능을/);
+  });
+
+  it.each(다섯)("자국이 안 남는다 — 고아 굵게·빈 목록: %s", (_이름, 답) => {
+    const r = guardCitations(답, []);
+    expect(r.text, "고아 굵게(**)가 남았다").not.toMatch(/\*\*/);
+    expect(r.text, "빈 목록 표시가 남았다").not.toMatch(/^\s*-\s*$/m);
+  });
+
+  it("★ 오탐 반대편 — **조각 그대로면** 굵게가 붙어 있어도 안 뗀다", () => {
+    const r = guardCitations(`**[1]에 따르면** "${조각[0]}"`, 조각);
+    expect(r.removed, "정상 인용을 마크다운 때문에 뗐다").toHaveLength(0);
+    expect(r.text, "본문 굵게를 건드렸다").toContain("**[1]에 따르면**");
+  });
+
+  it("★ 낱말 사이의 밑줄은 **강조가 아니다** — 걷어내면 원천 대조가 거짓으로 실패한다", () => {
+    const 조각들 = ["설정 파일에서 api_key 값을 그대로 두면 안 되며 배포 전에 반드시 교체해야 한다고 규정한다."];
+    const r = guardCitations(`[1]에 따르면 "${조각들[0]}"`, 조각들);
+    expect(r.removed, "api_key의 밑줄을 강조로 보고 원천 대조를 깨뜨렸다").toHaveLength(0);
+  });
+
+  it("★ 코드 구간 안의 굵게·따옴표는 판정본에서도 안 건드린다", () => {
+    const 답 = '설정은 다음과 같습니다.\n```\n출처: **"foo"**\n```';
+    expect(guardCitations(답, []).text).toBe(답);
+  });
+
+  it("★ 남의 굵게를 닫는 표식은 안 먹는다 — 「**중요**출처: \"…\"」", () => {
+    const r = guardCitations(`**중요**출처: "${지어낸문장}"`, []);
+    expect(r.removed.length, "지어낸 인용을 못 뗐다").toBeGreaterThan(0);
+    expect(r.text, "앞 문장의 굵게 짝을 깨뜨렸다").toContain("**중요**");
+  });
+
+  it("★ 줄바꿈은 **한 줄까지만** 넘는다 — 세 줄 아래 따옴표를 삼키지 않는다", () => {
+    const 답 = `출처:\n\n\n"${지어낸문장}"`;
+    expect(guardCitations(답, []).text, "먼 줄의 따옴표까지 삼켰다").toContain(지어낸문장);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ J2 — 따옴표 없는 **맨몸 출처 표지**. 배포 dist에서 조각 0건인데도 뗌 0이던 자리다.
+//    지어낸 CSOOnline 기사가 보안 담당자에게 그대로 나갔다.
+describe("★★ J2 맨몸 출처 표지 — 따옴표가 없다고 주장이 아닌 것이 아니다", () => {
+  const 뗄것: [string, string][] = [
+    ["(출처: 이름, 날짜)", "2021년 대규모 유출이 있었습니다. (출처: CSOOnline, 2021년 11월 25일)"],
+    ["(출처: 기관)", "국내 침해 신고는 24시간 안에 해야 합니다. (출처: 한국인터넷진흥원)"],
+    ["줄끝 출처: 이름", "정리하면 다음과 같습니다.\n출처: CSOOnline"],
+    ["줄표 귀속", "대규모 유출 사고가 있었습니다.\n— CSOOnline, 2021년 11월 25일"],
+  ];
+
+  it.each(뗄것)("표지를 뗀다: %s", (_이름, 답) => {
+    const r = guardCitations(답, []);
+    expect(r.removed.length, "맨몸 표지를 못 뗐다").toBeGreaterThan(0);
+    expect(r.removed.every((x) => x.kind === "출처미확인"), "사유가 출처미확인이 아니다").toBe(true);
+    expect(r.text, "지어낸 출처 이름이 남았다").not.toMatch(/CSOOnline|한국인터넷진흥원/);
+  });
+
+  it("★★ **앞 문장은 살린다** — 표지만 뗀다(문장까지 떼면 답이 사라진다)", () => {
+    const r = guardCitations("2021년 대규모 유출이 있었습니다. (출처: CSOOnline, 2021년 11월 25일)", []);
+    expect(r.text, "표지를 떼면서 앞 문장까지 지웠다").toContain("2021년 대규모 유출이 있었습니다");
+    expect(r.text, "날짜 껍데기가 남았다").not.toMatch(/2021년 11월 25일|\(\s*\)|\(,/);
+  });
+
+  it("★ 이름이 **원천에 있으면** 안 뗀다 — 우리가 준 제목을 가드가 지우면 자충수다", () => {
+    const 원천 = ["한국인터넷진흥원이 발간한 침해사고 대응 안내서에 따르면 신고는 지체 없이 해야 한다."];
+    const r = guardCitations("신고는 지체 없이 해야 합니다. (출처: 한국인터넷진흥원)", 원천);
+    expect(r.removed, "원천에 있는 출처 이름을 뗐다").toHaveLength(0);
+  });
+
+  it("★★ **제품이 만든 문서 참조**는 판정에서 뺀다 — 실전 답 8건이 전부 이 꼴이었다", () => {
+    const 실물 = [
+      "가명정보는 추가 정보 없이는 특정 개인을 알아볼 수 없게 한 것입니다. (근거: GIJO_지식_가명정보_처리.md)",
+      "통지·신고 의무는 다음과 같습니다. (근거: 개인정보_유출_통지_신고.md, 개인정보_접속기록_보관.md)",
+      "조사 결과는 다음과 같습니다. (출처: internet-research-2026-07)",
+      "정리하면 다음과 같습니다.\n근거: store:GIJO_AS_보안제품관리_지침.md#0f40a46117f4",
+    ];
+    for (const 답 of 실물) {
+      expect(guardCitations(답, []).text, `제품이 붙인 근거 표시를 지웠다: ${답}`).toBe(답);
+    }
+  });
+
+  it("★ 날짜·쪽수는 이름이 아니다 — 이름만 골라 낸다", () => {
+    expect(출처이름들("CSOOnline, 2021년 11월 25일")).toEqual(["CSOOnline"]);
+    expect(출처이름들("한국인터넷진흥원")).toEqual(["한국인터넷진흥원"]);
+    expect(출처이름들("2023년 4월")).toEqual([]);
+  });
+
+  it("★ 줄표 꼴은 **날짜가 있을 때만** — 평범한 줄표 문장을 안 건드린다", () => {
+    const 답 = "조치는 다음과 같습니다.\n— 자세한 내용은 담당자에게 문의하세요";
+    expect(guardCitations(답, []).text).toBe(답);
+  });
+
+  it("★ 문장 한복판의 「자료:」는 안 건드린다 — 줄머리 표식만 본다", () => {
+    const 답 = "이 화면에서 참고 자료: 목록을 눌러 보시면 됩니다";
+    expect(guardCitations(답, []).text).toBe(답);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ J3 — 「참고 자료」 블록에 **문서 제목**을 싣는다.
+//    구조 결함이었다: 프롬프트는 「사례 제목과 출처를 함께 밝히라」고 시키는데 조각에는 제목이
+//    실린 적이 없었다(memory.ts가 c.text만 담았다) → 모델의 제목은 **구조적으로 지어낸 것**.
+describe("★★ J3 참고 자료 블록의 문서 제목", () => {
+  const llmsrc = fs.readFileSync(path.join(__dirname, "../src/engine/llm.ts"), "utf8");
+  const memsrc = fs.readFileSync(path.join(__dirname, "../src/engine/memory.ts"), "utf8");
+  const sansrc = fs.readFileSync(path.join(__dirname, "../src/engine/ragsanitize.ts"), "utf8");
+
+  it("제목을 주면 「[n] 《제목》 본문」으로 나간다", () => {
+    expect(ragBlock(["가", "나"], ["지침.md", "사례집.md"]))
+      .toBe(RAG_BLOCK_HEADER + "\n[1] 《지침.md》 가\n[2] 《사례집.md》 나");
+  });
+
+  it("★ 제목을 **안 주면 옛 꼴 그대로** — RAFT 빌더·창구 예시가 안 갈린다", () => {
+    expect(ragBlock(["가", "나"])).toBe(RAG_BLOCK_HEADER + "\n[1] 가\n[2] 나");
+    expect(ragBlock(["가"], [""])).toBe(RAG_BLOCK_HEADER + "\n[1] 가");
+    expect(ragBlock(["가"], [undefined])).toBe(RAG_BLOCK_HEADER + "\n[1] 가");
+  });
+
+  it("★ 머리말은 한 글자도 안 바뀌었다 — 바꾸면 이미 구운 어댑터의 학습 꼴과 갈린다", () => {
+    expect(RAG_BLOCK_HEADER.startsWith("참고 자료 — 사내 지식 베이스")).toBe(true);
+  });
+
+  it("★ 제목의 원천은 documentId 하나다 — 제목 칸을 새로 만들지 않았다(단일 출처)", () => {
+    expect(memsrc, "queryMemoryGraded가 titles를 안 돌려준다").toMatch(/titles:\s*쓸것\.map\(\(c\) => c\.documentId/);
+    expect(memsrc, "반환 타입에 titles가 없다").toContain("chunks: string[]; titles: string[]");
+  });
+
+  it("★★ 살균이 조각을 **버릴 때 제목도 같이 버린다** — 안 그러면 한 칸씩 밀린다", () => {
+    // 이 저장소가 이미 한 번 밟은 함정이다(handlers.ts 「한 조각씩 살균」 + ops147-regress 감시).
+    // 그때 답은 「한 조각씩 부르기」였는데 그러면 감사 기록이 쪼개진다 → 이번엔 자리표를 받는다.
+    expect(sansrc, "살균기가 keptIndexes를 안 돌려준다").toContain("keptIndexes");
+    expect(llmsrc, "llm.ts가 제목을 자리표로 안 거른다").toMatch(/살균\.keptIndexes\.map\(\(i\) => String\(rawTitles/);
+  });
+
+  it("★ 살균이 버린 자리만큼 제목도 밀린다(자리표 산수 자체를 잰다)", () => {
+    // 가운데 조각은 「내용이 거의 없는」 것이라 살균이 통째로 버린다.
+    const raw = ["실제 내용이 충분히 들어 있는 첫 번째 조각입니다.", "짧음", "실제 내용이 충분히 들어 있는 세 번째 조각입니다."];
+    const 제목 = ["첫.md", "버려질.md", "셋.md"];
+    const s = sanitizeRagChunks(raw, { source: "test" });
+    const 걸러진제목 = s.keptIndexes.map((i) => 제목[i]);
+    expect(s.chunks.length, "재료가 바뀌었다 — 가운데가 안 버려졌다").toBe(2);
+    expect(걸러진제목, "제목이 한 칸 밀렸다").toEqual(["첫.md", "셋.md"]);
+  });
+
+  it("★★ 제목이 **대조 원천**에 들어간다 — 우리가 준 제목을 가드가 떼면 자충수다", () => {
+    expect(llmsrc, "titles가 추가원천에 안 들어간다").toMatch(/const 추가원천: string\[\] = titles\.filter\(Boolean\)/);
+    // 잣대 자체도 잰다: 제목이 원천에 있으면 그 제목을 댄 표지는 안 뗀다.
+    expect(guardCitations('신고 절차는 다음과 같습니다. (출처: "침해사고_대응_지침.md")', ["본문"], ["침해사고_대응_지침.md"]).removed)
+      .toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ J4 — 감독 화면 ✂. 「쌓이는데 그리는 화면이 없다」를 닫는다.
+describe("★★ J4 감독 화면·실동작 스트림의 ✂", () => {
+  const 화면 = (p: string) => fs.readFileSync(path.join(__dirname, "../../client/src/renderer/pages", p), "utf8");
+  const sup = 화면("supervision.html");
+  const agent = 화면("agent.html");
+
+  it("감독 화면이 kind=cite를 **합산**한다 — 7·30일은 (날짜 × 팀원) 여러 줄로 온다", () => {
+    expect(sup, "cite 합산이 없다").toMatch(/if \(d\.kind !== "cite"\) return;/);
+    expect(sup, "합산이 아니라 대입이면 마지막 날만 남는다").toMatch(/뗀답 \+= d\.calls \|\| 0;/);
+    expect(sup, "팀원별도 합산이어야 한다").toMatch(/인용별\[d\.agent\] = \(인용별\[d\.agent\] \|\| 0\) \+/);
+    // ⚠ chat으로 거른 daily가 아니라 **원본 sup.daily**를 다시 훑어야 한다(거른 것을 다시 안 쓴다).
+    expect(sup, "거른 daily에서 cite를 찾고 있다 — 늘 0이 된다").toMatch(/\(sup\.daily \|\| \[\]\)\.forEach\(function \(d\) \{\s*\n\s*if \(d\.kind !== "cite"\)/);
+  });
+
+  it("★ 「정상」 줄이 살아 있다 — ✂ 줄을 늘 넣으므로 lines.length로 재면 영영 안 뜬다", () => {
+    expect(sup, "정상 판정이 여전히 lines.length다").not.toMatch(/if \(!lines\.length\) lines\.push\('<div class="sup-line"><span class="tag ok">/);
+    expect(sup, "정상 판정이 무호출·오류만 보지 않는다").toMatch(/if \(!무호출\.length && !오류상위\.length\) lines\.push/);
+  });
+
+  it("★ 0일 때도 줄을 숨기지 않는다 — 「장애 ≠ 부재」", () => {
+    expect(sup).toContain("0개 — 이 기간에 뗀 인용이 없습니다");
+  });
+
+  it("★★ 문구가 「건수」가 아니라 「답 개수」다 — 답 하나에 이벤트 하나라 건수라 쓰면 거짓", () => {
+    expect(sup).toContain("답 \" + 뗀답 + \"개에서 근거 없는 인용을 뗐습니다");
+    expect(sup, "표에 「건」이라 적었다 — 집계는 답의 수다").not.toMatch(/뗀답 \+ "건/);
+  });
+
+  it("tag cite 색이 있다(없으면 라벨이 배경 없이 뜬다)", () => {
+    expect(sup).toMatch(/\.tag\.cite\{background:rgba\(139,124,240/);
+  });
+
+  it("★ 실동작 스트림 아이콘 ✂ — **사람이 보는 유일한 변화**", () => {
+    expect(agent, "fmtLlm에 cite 아이콘이 없다").toMatch(/evt\.kind === "cite" \? "✂"/);
+    // 입구 검사(🛡 guard)와 출구 검사(✂ cite)를 한 아이콘으로 묶지 않는다.
+    expect(agent).toMatch(/evt\.kind === "guard" \? "🛡" : evt\.kind === "cite" \? "✂"/);
+  });
+
+  it("★ 죽은 함수 llmRowHtml — 라벨은 맞춰 두되 **호출 0**임을 주석이 말한다", () => {
+    expect(agent, "라벨에 인용이 없다").toMatch(/f\.kind === "cite" \? "인용"/);
+    expect(agent, "죽은 함수라는 표기가 없다 — 「스트림 라벨을 바꿨다」가 거짓이 된다")
+      .toMatch(/호출부가 0곳인 죽은 함수/);
+    // 「호출 0」이 지금도 참인지 **직접 센다**(주석이 낡으면 거짓말이 된다).
+    expect(agent.split("llmRowHtml").length - 1, "llmRowHtml이 되살아났다 — 주석을 고쳐야 한다").toBe(1);
+  });
+
+  it("★ ⓘ 풀이는 화면이 아니라 screenguide에 있다(제품 원칙)", () => {
+    const g = fs.readFileSync(path.join(__dirname, "../src/engine/screenguide.ts"), "utf8");
+    expect(g, "supervision panels에 인용 제거 풀이가 없다").toContain('"인용 제거(✂)"');
+    expect(g).toMatch(/답의 개수/);
+    expect(sup, "화면에 긴 설명문을 적었다 — 풀이는 ⓘ가 연다").not.toMatch(/뗍니다\./);
+  });
+
+  it("★ citeguard 주석의 「그리는 화면은 없다」가 정정됐다(약속-코드 일치)", () => {
+    const c = fs.readFileSync(path.join(__dirname, "../src/engine/citeguard.ts"), "utf8");
+    expect(c, "이제 그리는 화면이 있는데 주석은 없다고 말한다").not.toContain("지금 이 값을 **그리는 화면은 없다**");
+    expect(c).toMatch(/이제 그리는 화면이 있다/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ J5 — 클라우드 출구. 「출구 한 곳에 걸었다」가 **출구가 둘인 줄 몰라서** 반쪽이었다.
+describe("★★ J5 클라우드 답도 가드를 지난다", () => {
+  const cloud = fs.readFileSync(path.join(__dirname, "../src/engine/cloudllm.ts"), "utf8");
+
+  it("askCloud가 r.text를 **그대로** 안 돌려준다", () => {
+    expect(cloud, "가드를 안 지난다").toMatch(/const 인용가드 = guardCitations\(r\.text, \[\]\)/);
+    expect(cloud, "가드를 부르고도 원문을 돌려주면 헛일이다").toMatch(/const answer = 인용가드\.text/);
+  });
+
+  it("★★ chunks는 **[]이지 null이 아니다** — 클라우드는 「근거 없음」이 확정이다", () => {
+    // null은 「모른다」(RAG 미실행)라 판정 보류다. 이 경로는 사내 조각을 한 개도 안 싣는다.
+    expect(cloud).not.toMatch(/guardCitations\(r\.text, null\)/);
+    // 근거: 이 경로가 실을 수 있는 것은 질문과 CLOUD_SYSTEM_PROMPT뿐임을 소스로 못 박는다.
+    expect(cloud, "클라우드 경로가 RAG 블록을 싣기 시작했다 — chunks=[]가 거짓이 된다")
+      .not.toMatch(/ragBlock|RAG_BLOCK_HEADER/);
+    expect(cloud).toMatch(/callProvider\(provider, apiKey \?\? "", model, CLOUD_SYSTEM_PROMPT, q\)/);
+  });
+
+  it("계수기를 남긴다 — 팀원 id를 사칭하지 않는다(agent=\"-\")", () => {
+    expect(cloud).toMatch(/kind: "cite", phase: "done", agent: "-"/);
+    expect(cloud).toMatch(/detail: 뗀인용요약\(인용가드\.removed, 인용가드\.보류\)/);
+  });
+
+  it("★ 잣대를 두 벌로 두지 않았다 — llm.ts와 **같은 함수**를 부른다", () => {
+    expect(cloud).toMatch(/import \{ guardCitations, 뗀인용요약 \} from "\.\/citeguard"/);
   });
 });

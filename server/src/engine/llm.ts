@@ -169,9 +169,11 @@ export function 사내특정대상질문(text: string): boolean {
  */
 // ⚠ chunks는 **문자열 배열**이다(queryMemoryGraded 실제 반환형 — 내가 객체로 넘겨짚었다가
 //   tsc가 잡았다. 「그 API가 주는 필드가 뭔가」를 원천에서 확인하는 계보).
+// ⚠ titles는 **선택**이다(2026-09-05 J3) — 조각과 자리를 맞춘 문서 제목. 시험 스텁이나 옛
+//   제공자가 안 줘도 돌아야 하므로 옵셔널로 둔다(안 주면 제목 없는 옛 블록 꼴 그대로).
 export type RagProvider = (
   message: string, k: number, agentId: string, screen?: string, viewer?: Viewer
-) => Promise<{ chunks: string[]; 약한근거만: boolean }>;
+) => Promise<{ chunks: string[]; titles?: string[]; 약한근거만: boolean }>;
 let ragProvider: RagProvider | null = null;
 export function setRagProvider(p: RagProvider): void { ragProvider = p; }
 export function hasRagProvider(): boolean { return ragProvider !== null; }
@@ -190,9 +192,25 @@ export function hasRagProvider(): boolean { return ragProvider !== null; }
 export const RAG_BLOCK_HEADER =
   "참고 자료 — 사내 지식 베이스(장기 기억)에서 검색된 관련 내용입니다. 질문과 관련된 내용이면 네 사전지식과 다르더라도 이 자료를 우선 근거로 삼아 답하고, 질문과 무관하면 무시하세요.";
 
-/** 검색 조각을 「참고 자료」 블록 한 덩어리로 만든다. 번호는 1부터 — 답이 「[2]에 따르면」으로 가리킨다. */
-export function ragBlock(chunks: string[]): string {
-  return RAG_BLOCK_HEADER + "\n" + chunks.map((c, i) => `[${i + 1}] ${c}`).join("\n");
+/**
+ * 검색 조각을 「참고 자료」 블록 한 덩어리로 만든다. 번호는 1부터 — 답이 「[2]에 따르면」으로 가리킨다.
+ *
+ * ★ titles(2026-09-05 J3) — 있으면 「[n] 《문서 제목》 본문」으로 나간다.
+ *   왜: 프롬프트 ⓐ와 normaltic 규칙이 「사례 제목과 출처를 함께 밝히라」고 시키는데, 조각에는
+ *   **제목이 실린 적이 없었다**(memory.ts가 c.text만 담았다). 즉 모델이 대는 제목은 시켜 놓고
+ *   재료를 안 준 자리라 **구조적으로 지어낸 것**이었다 — 프롬프트가 환각을 요구하고 있었다.
+ *   제목을 실어 주면 지어낼 이유가 없어지고, 가드도 그 제목을 원천으로 대조할 수 있다.
+ * ⚠ **꼴을 바꾸는 것이라 짝이 있다.** RAG_BLOCK_HEADER는 그대로 두고 조각 줄만 늘렸다 —
+ *   머리말이 바뀌면 이미 구운 어댑터의 학습 꼴과 갈라진다(위 상수 주석).
+ * ⚠ titles를 **안 주면 옛 꼴 그대로**다. 그래서 RAFT 빌더의 참고자료블록(제목 개념이 없다)과
+ *   창구 예시(ragBlockSample)는 한 글자도 안 바뀐다 — raftdataset 짝 시험이 그것을 대조한다.
+ *   대신 학습 표본과 추론 지문이 **제목 유무로 갈린다**(tools/ladder/README.md에 적어 뒀다).
+ */
+export function ragBlock(chunks: string[], titles?: readonly (string | null | undefined)[]): string {
+  return RAG_BLOCK_HEADER + "\n" + chunks.map((c, i) => {
+    const t = String(titles?.[i] ?? "").trim();
+    return t ? `[${i + 1}] 《${t}》 ${c}` : `[${i + 1}] ${c}`;
+  }).join("\n");
 }
 
 export type ChatLogListener = (agentId: string, question: string, answer: string) => void;
@@ -213,17 +231,23 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
     // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
     // 근거인 양 답한다(memory.ts의 RAG_RELEVANCE_MAX_DISTANCE 주석 참고).
     // screen이 있으면 그 화면의 업무영역 문서를 우선한다(soft boost — 다른 영역도 배제 안 함).
-    const { chunks: raw, 약한근거만 } = await queryMemoryGraded(message, 4, agentId, screen, viewer);
+    const { chunks: raw, titles: rawTitles, 약한근거만 } = await queryMemoryGraded(message, 4, agentId, screen, viewer);
     // ⚠ 살균 — 검색된 문서 조각은 **검사를 한 번도 안 거치고** 프롬프트에 실린다.
     //   가드레일은 사용자가 타이핑한 입력만 본다. 그래서 문서에 심어둔 지시문이 그대로
     //   실행됐다(2026-07-30 실측: 카나리가 답변 맨 앞에 출력됨 — chat·dispatch 양쪽).
     //   모델에 닿기 전에 지시문 문장을 잘라낸다. 안 본 문장은 따를 수 없다.
     const { sanitizeRagChunks } = await import("./ragsanitize.js");
-    const chunks = sanitizeRagChunks(raw, { source: `rag:${agentId}`, question: message }).chunks;
+    const 살균 = sanitizeRagChunks(raw, { source: `rag:${agentId}`, question: message });
+    const chunks = 살균.chunks;
+    // ⚠ 제목 배열은 **살균이 버린 조각을 똑같이 버려야** 자리가 안 밀린다(2026-09-05 J3).
+    //   살균은 「지시문뿐인 조각」을 통째로 뺀다 — 제목을 그냥 나란히 두면 3번 조각에 2번
+    //   문서의 제목이 붙고, **아무 오류도 안 나면서** 답만 조용히 틀린다. 그래서 자리표를
+    //   살균기에서 직접 받아 거른다(keptIndexes — 자리를 두 번 계산하지 않는다).
+    const titles = 살균.keptIndexes.map((i) => String(rawTitles?.[i] ?? ""));
 
     const parts: string[] = [];
     if (chunks.length > 0) {
-      parts.push(ragBlock(chunks));
+      parts.push(ragBlock(chunks, titles));
     }
 
     // 하이브리드: 온톨로지(지식 그래프)에서 질문·청크에 걸린 엔티티의 관계·규칙을 동반 주입한다.
@@ -232,7 +256,11 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
     //   ⓐ가 「'관련 규칙·관계'(온톨로지)가 붙어 있으면 그것도 근거로」라고 안내하므로, 여기서
     //   그대로 옮긴 문장을 「어느 조각과도 안 겹친다」고 뗐다가는 **참인 인용을 지운다.**
     //   번호([n]) 범위 판정에는 안 쓴다 — 번호는 ragBlock에서만 나온다.
-    const 추가원천: string[] = [];
+    // ★ 문서 제목도 대조 원천이다(2026-09-05 J3) — 이제 제목이 **프롬프트에 실려 나가므로**
+    //   모델이 그것을 그대로 옮겨 적은 것은 지어낸 것이 아니다. 안 넣으면 우리가 준 제목을
+    //   가드가 「출처미확인」으로 떼는 자충수가 된다(주는 쪽과 재는 쪽이 갈리는 자리).
+    //   ⚠ 번호([n]) 범위 판정에는 안 쓴다 — 번호는 ragBlock에서만 나온다.
+    const 추가원천: string[] = titles.filter(Boolean);
     try {
       const { ontologyContextFor } = await import("./ontology.js");
       const onto = ontologyContextFor(message, chunks, agentId);

@@ -18,6 +18,10 @@ import type { GijoUser } from "../auth/users";
 import { encryptString, decryptString, getEncryptionKey } from "./cryptopack";
 import { screenForCloud } from "./cloudegress";
 import { emitCollaboration } from "./collaboration";
+// ⚠ citeguard는 engine 안의 **잎**(엔진 모듈을 하나도 안 문다)이라 여기서 정적 import해도
+//   순환이 안 생긴다 — llm.ts가 같은 이유로 그렇게 물고 있다.
+import { guardCitations, 뗀인용요약 } from "./citeguard";
+import { emitLlmActivity } from "./llmactivity";
 import { ingestText, GLOBAL_SCOPE } from "./memory";
 import { koDateTimeString } from "../util/date";
 
@@ -352,7 +356,26 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
   const model = providerModel(provider);
   try {
     const r = await callProvider(provider, apiKey ?? "", model, CLOUD_SYSTEM_PROMPT, q);
-    const answer = r.text;
+    // ── 지어낸 인용을 뗀다 — **클라우드 답도 출구를 지난다**(2026-09-05 J5) ──────────────
+    //
+    // ★ 왜 여기까지(라이브 실측): 인용 가드는 llm.ts chat() 출구 **한 곳**에 배선돼 있는데,
+    //   이 경로는 chat()을 **안 거치고** r.text를 그대로 사용자에게 돌려준다. 즉 가드 밖이었다.
+    //   「출구 한 곳에 걸었다」는 말이 **출구가 둘인 줄 몰라서** 반쪽이었던 자리다.
+    // ★ 왜 chunks=[]이고 null이 아닌가: null은 「근거를 모른다」(RAG 미실행)라 가드가 판정을
+    //   보류하는 값이다. 이 경로는 위에서 본 대로 **사내 자료를 한 조각도 안 싣는다**(질문과
+    //   CLOUD_SYSTEM_PROMPT만 나간다 — 애초에 내부 정보를 밖으로 안 보내는 것이 이 경로의 규칙).
+    //   그러니 「근거 없음」이 **확정**이다. 확정인 자리를 「모른다」로 두면 클라우드가 지어낸
+    //   「[1]에 따르면 "…"」이 사내 근거인 양 화면에 남는다 — 외부 모델일수록 더 위험하다.
+    // ⚠ 계수기의 agent는 `-`(미지정)다. 클라우드 답은 **팀원이 낸 답이 아니라서** 특정 팀원
+    //   id로 적으면 감독 화면의 그 팀원 숫자가 거짓이 된다(llm.ts도 모르는 자리엔 `-`를 쓴다).
+    const 인용가드 = guardCitations(r.text, []);
+    const answer = 인용가드.text;
+    if (인용가드.removed.length > 0 || 인용가드.보류.length > 0) {
+      emitLlmActivity({
+        kind: "cite", phase: "done", agent: "-", agentName: `클라우드 ${PROVIDER_LABEL[provider]}`,
+        detail: 뗀인용요약(인용가드.removed, 인용가드.보류),
+      });
+    }
     recordCloudUsage(provider, model, r.inTokens, r.outTokens);
     logEgress({ userId: user?.id, provider, decision: "allowed", reasons: [], question: q });
     emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `클라우드 질의: ${PROVIDER_LABEL[provider]}(${model}) — 내부정보 미포함 확인됨` });

@@ -163,16 +163,29 @@ export function sanitizeRagChunks(chunks: string[], context: { source: string; q
   chunks: string[];
   removedCount: number;
   labels: string[];
+  /**
+   * **살아남은 조각이 원래 몇 번째였나** — 문서 제목처럼 조각과 **짝을 이루는 배열**을 함께
+   * 나르는 쪽이 자리를 맞출 때 쓴다(2026-09-05 J3).
+   *
+   * ★ 왜 이 칸이 생겼나: 이 함수는 「지시문뿐인 조각」을 **버린다**. 그걸 모르고 제목 배열을
+   *   그냥 나란히 두면 **한 칸씩 밀려** 3번 조각에 2번 문서의 제목이 붙는다 — 아무 오류도 안
+   *   나고 답만 조용히 틀린다. 이 저장소는 같은 함정을 이미 한 번 밟았고(handlers.ts 「한 조각씩
+   *   살균」 주석 + ops147-regress 감시), 그때 답은 「한 조각씩 부르기」였다. 그런데 그러면
+   *   감사 기록이 조각 수만큼 쪼개진다. 그래서 이번에는 **자리표를 이 함수가 직접 돌려준다** —
+   *   부르는 쪽이 자리를 다시 계산하지 않게(단일 출처).
+   */
+  keptIndexes: number[];
 } {
   const out: string[] = [];
+  const keptIndexes: number[] = [];
   const allRemoved: string[] = [];
   const allLabels = new Set<string>();
 
-  for (const c of chunks) {
-    const r = sanitizeChunk(c);
+  for (let i = 0; i < chunks.length; i++) {
+    const r = sanitizeChunk(chunks[i]);
     // 살균 후 내용이 거의 안 남으면(문서 전체가 지시문) 그 조각은 통째로 뺀다 —
     // 빈 껍데기를 "참고 자료"로 붙이면 모델이 근거 없이 지어낸다.
-    if (r.text.replace(/\s/g, "").length >= 10) out.push(r.text);
+    if (r.text.replace(/\s/g, "").length >= 10) { out.push(r.text); keptIndexes.push(i); }
     allRemoved.push(...r.removed);
     r.labels.forEach((l) => allLabels.add(l));
   }
@@ -193,7 +206,7 @@ export function sanitizeRagChunks(chunks: string[], context: { source: string; q
     });
   }
 
-  return { chunks: out, removedCount: allRemoved.length, labels: [...allLabels] };
+  return { chunks: out, removedCount: allRemoved.length, labels: [...allLabels], keptIndexes };
 }
 
 /**

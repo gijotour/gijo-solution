@@ -1390,7 +1390,7 @@ export async function queryMemoryRelevant(question: string, topK = 5, agentId?: 
 export const RAG_STRONG_MAX_DISTANCE = 0.85;
 export async function queryMemoryGraded(
   question: string, topK = 5, agentId?: string, screen?: string, viewer?: Viewer
-): Promise<{ chunks: string[]; scored: ScoredChunk[]; 약한근거만: boolean }> {
+): Promise<{ chunks: string[]; titles: string[]; scored: ScoredChunk[]; 약한근거만: boolean }> {
   const fused = await hybridSearch(question, topK, agentId, screen, viewer);
   const 쓸것 = fused.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE));
   // 코드가 글자 그대로 걸린 것(CVE·U-01 등)은 거리와 무관하게 **가까운 근거**로 본다.
@@ -1399,8 +1399,16 @@ export async function queryMemoryGraded(
   // 배지가 그대로 쓰게 한다. dispatcher가 배지용으로 이 함수를 **같은 agentId**로 부르면
   // 답 경로(ragContextFor)와 동일 검색이라 근거가 어긋나지 않는다(옛 배지는 queryMemoryScored를
   // agentId 없이 재검색해 답과 다른 문서를 근거로 실었다). 기존 chunks 소비자는 구조분해라 무영향.
+  // ★ titles(2026-09-05 J3) — 조각과 **자리를 맞춘** 문서 제목. 「참고 자료」 블록이
+  //   「[n] 《제목》 본문」으로 나가고, 인용 가드가 이것을 출처 대조 원천으로 쓴다.
+  //   ⚠ 제목의 정체는 **documentId**다. 이 제품에서 문서는 파일 이름(basename)으로 들어오므로
+  //     (ingestText의 documentId = filename) documentId가 곧 사람이 읽는 제목이다. 따로 제목
+  //     칸을 만들면 「같은 것을 두 곳에 적으면 어긋난다」가 또 생긴다 — 있는 값을 그대로 쓴다.
+  //   ⚠ 이 배열은 chunks와 **같은 길이·같은 순서**라야 한다. 뒤에서 조각을 거르는 쪽
+  //     (llm.ts의 sanitizeRagChunks)은 keptIndexes로 이 배열도 함께 걸러야 자리가 안 밀린다.
   return {
     chunks: 쓸것.map((c) => c.text),
+    titles: 쓸것.map((c) => c.documentId ?? ""),
     scored: 쓸것.map((c) => ({ text: c.text, distance: c.distance, documentId: c.documentId, lexicalHit: c.lexicalHit })),
     약한근거만: 쓸것.length > 0 && !가까움,
   };
