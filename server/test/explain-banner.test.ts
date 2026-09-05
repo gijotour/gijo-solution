@@ -67,7 +67,11 @@ describe("소스 감시 — 표지와 실제 문장이 어긋나면 배너가 �
   });
 
   it("배너 문장은 llm.ts와 도구 경로가 한 상수를 쓴다(두 벌 금지)", () => {
-    const llmSrc = fs.readFileSync(path.join(__dirname, "../src/engine/llm.ts"), "utf8");
+    // ⚠ 2026-09-05: 배너 문장이 llm.ts → noevidence.ts로 **이관**됐다(dispatcher가 판정기를
+    //   쓰려면 llm을 흉내 내는 시험 76개를 안 건드려야 해서). 지키는 것은 그대로다 — 한 곳에만 있는가.
+    const llmSrc = fs.readFileSync(path.join(__dirname, "../src/engine/noevidence.ts"), "utf8");
+    const llm실제 = fs.readFileSync(path.join(__dirname, "../src/engine/llm.ts"), "utf8");
+    expect(llm실제, "llm.ts가 배너 문장을 다시 적었다 — 주인은 noevidence.ts 한 곳이다").not.toContain("이 PC의 사내 자료에는 이 내용이 없습니다");
     const loopSrc = fs.readFileSync(path.join(__dirname, "../src/engine/agentloop.ts"), "utf8");
     // 문장 원문(이 PC의 사내 자료에는…)이 정의 한 곳(llm.ts) 밖에 복제되면 어긋나기 시작한다.
     expect((llmSrc.match(/이 PC의 사내 자료에는 이 내용이 없습니다/g) ?? []).length).toBe(1);

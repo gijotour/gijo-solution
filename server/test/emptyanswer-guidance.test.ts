@@ -74,8 +74,12 @@ const 정직문구: { 자리: string; 글: string }[] = [];
 {
   const ac = fs.readFileSync(path.join(__dirname, "../src/engine/actioncheck.ts"), "utf8");
   for (const m of ac.matchAll(/"(판단 불가[^"]{0,200})"/g)) 정직문구.push({ 자리: "actioncheck 판단불가", 글: m[1] });
-  const llm = fs.readFileSync(path.join(__dirname, "../src/engine/llm.ts"), "utf8");
-  for (const m of llm.matchAll(/`([^`]{0,80}근거 약함[^`]{0,200})`/g)) 정직문구.push({ 자리: "llm 근거약함 배너", 글: m[1] });
+  // ⚠ 2026-09-05: 배너 문장이 llm.ts → noevidence.ts로 이관됐다(배너 4종의 주인 파일).
+  //   **두 파일 다 읽는다** — llm.ts에 남아 있던 문구가 되살아나도 잡히게.
+  for (const f of ["llm.ts", "noevidence.ts"]) {
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine", f), "utf8");
+    for (const m of src.matchAll(/`([^`]{0,80}근거 약함[^`]{0,200})`/g)) 정직문구.push({ 자리: `${f} 근거약함 배너`, 글: m[1] });
+  }
 }
 
 // ★ 2026-08-13 — **같은 함정을 세 번 겪었다.** 문구를 하나씩 잡는 것으로는 안 끝난다.
@@ -91,7 +95,9 @@ const 정직문구: { 자리: string; 글: string }[] = [];
 //     같은 도구가 결재판(registry)에선 옛 말, 실행 결과(handlers)에선 새 말을 썼다. 네 파일만
 //     지키면 「파일 전체 대조」라는 시험 이름이 다음 사람을 속인다. 사람에게 나가는 안내를
 //     내는 파일은 다 넣는다.
-const 정직파일 = ["actioncheck.ts", "llm.ts", "lawinfo.ts", "agenttools/handlers.ts", "agenttools/registry.ts", "dispatcher.ts"];
+//   ★ 2026-09-05 noevidence.ts 편입 — 배너 4종 문장이 llm.ts에서 그 파일로 이관됐다.
+//     안 넣으면 「사람에게 나가는 안내 4개」가 통째로 감시 밖으로 빠진다.
+const 정직파일 = ["actioncheck.ts", "llm.ts", "noevidence.ts", "lawinfo.ts", "agenttools/handlers.ts", "agenttools/registry.ts", "dispatcher.ts"];
 const 코드만 = (src: string) =>
   src
     .split("\n")

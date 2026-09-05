@@ -144,10 +144,12 @@ describe("규칙을 자기 말로 다시 선언하는 복창", () => {
 describe("근거 약함 배너 — 두 측정 도구와 어긋나지 않는가", () => {
   // ⚠ 주석에 같은 글자를 쓰면 **조용히 주석을 검사**하게 된다(2026-08-05 검토 지적).
   //   주석(//)이 아닌 줄에서만 찾고, 실제로 답에 붙는 자리(reply = `…`)인지도 본다.
-  const 배너 = fs.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8")
+  // ⚠ 2026-09-05: 배너 문장이 llm.ts(붙이는 자리) → noevidence.ts(상수 선언)로 이관됐다.
+  //   주석을 검사하지 않는다는 원칙은 그대로 — 주석이 아닌 줄에서 **상수 선언**을 찾는다.
+  const 배너 = fs.readFileSync(new URL("../src/engine/noevidence.ts", import.meta.url), "utf8")
     .split("\n")
     .filter((l) => !l.trim().startsWith("//"))
-    .find((l) => l.includes("**근거 약함") && l.includes("reply =")) ?? "";
+    .find((l) => l.includes("**근거 약함") && l.includes("export const 근거약함배너 =")) ?? "";
   // ⚠ 서랍 점검의 실패 문구를 **복사하지 않고 원본에서 읽는다**(2026-08-05 검토 지적).
   //   베껴 두면 저쪽이 늘어날 때 이 시험은 모른 채 통과한다 — 같은 사고를 세 번 겪게 된다.
   const 실패딱지 = (() => {

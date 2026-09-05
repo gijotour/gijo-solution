@@ -20,6 +20,10 @@ import { setAgentStatus, resetAgentToDefault, getAgentById } from "./agents";
 import { emitCollaboration } from "./collaboration";
 import { 모델스캔, StandardFinding } from "./bridge";
 import { chat } from "./llm";
+// ⚠ **llm이 아니라 noevidence에서 가져온다.** llm을 통째로 흉내 내는 시험이 76개라, llm에서
+//   심볼을 하나만 더 가져와도 그 시험들의 dispatchInstruction이 죽는다(2026-09-05 실측 9파일 66건).
+//   배너 문장의 주인은 그 파일 하나다 — 여기서 문구를 다시 적지 않는다.
+import { 근거없음종류판정, type 근거없음종류 } from "./noevidence";
 import { isNonLearningAccount } from "./learnpolicy";
 import { recordChatLog } from "./learnloop";
 import { faqAnswerFor } from "./productfaq";
@@ -136,6 +140,20 @@ export interface DispatchResult {
    *   겹침·유사도 판정기를 새로 두지 않는 것이 이 설계의 핵심이다.
    */
   근거세기?: "강함" | "약함";
+  /**
+   * 「가리킬 사내 근거가 없다」 — 답에 **이미 붙은 배너**(4종)를 출구에서 읽어 실은 값
+   * (2026-09-05 · 시안 mockups/no-evidence-numbers 승인). 화면이 이 값이 있을 때만
+   * 답 속 숫자를 옅게 그린다(chatparts.dimEstimates).
+   *
+   * ⚠ **근거세기와 다른 칸에 둔다.** 두 값은 서로 다른 것을 재고, 실제로 어긋난다:
+   *   · 근거세기 = 배지용 **재검색**(아래 :954, 살균 전 graded.scored)의 세기 — 재검색이
+   *     안 도는 답(도구로 집계한 답 등)에서는 아예 안 생긴다.
+   *   · 근거없음 = 담당자가 답에서 **실제로 읽는 배너 문장**(llm.ts 판정, 살균 후 0건).
+   *   실측(실전 답 152건, 2026-09-05): 근거세기가 원리상 undefined인 답이 121건(79.6%)인데
+   *   그중 배너가 붙은 것은 1건뿐이다 — 「근거세기 없음 = 근거 없음」으로 읽으면 120건이
+   *   오탐으로 회색이 된다. 그래서 **「없음」을 명시적으로 실어 보낸다.**
+   */
+  근거없음?: 근거없음종류;
   /** 근거 원문 대목 — 담당자가 답의 숫자를 눈으로 검증할 수 있게(2026-08-01). */
   quotes?: SourceQuote[];
   // "가서 하기" — AI가 대신 하면 안 되는 일(계정·인증·열쇠)에 순서를 안내하면서 그 화면을
@@ -646,7 +664,14 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   );
   // 출구 관문은 여기 한 줄에 모은다 — 갈래마다 심으면 새 갈래가 생길 때 또 샌다.
   //   ① 거짓 완료(하지 않은 일을 했다는 답)  ② 기계 데이터 누출(저장소 원문 조각)
-  const 걸러진 = 해석을단다(기계데이터를걸러낸다(instructionText, 거짓완료를걸러낸다(instructionText, result)));
+  const 거른것 = 해석을단다(기계데이터를걸러낸다(instructionText, 거짓완료를걸러낸다(instructionText, result)));
+  // ★ 「근거 없음」 표식(2026-09-05 · 시안 no-evidence-numbers 승인) — 답에 **이미 붙은**
+  //   배너 4종을 여기서 한 번 읽어 값으로 싣는다. 화면은 이 값이 있을 때만 숫자를 옅게 그린다.
+  //   ⚠ **거르개 뒤**여야 한다: 거짓완료 대체답처럼 본문이 통째로 갈리면 배너도 사라지는데,
+  //     앞에서 판정하면 없는 배너를 가리키는 표식이 남는다.
+  //   ⚠ 판정기는 llm.ts(배너 상수를 소유한 곳)에 있다 — 여기서 문구를 다시 적지 않는다.
+  const 근거없음 = 근거없음종류판정(거른것.output);
+  const 걸러진 = 근거없음 ? { ...거른것, 근거없음 } : 거른것;
   // ➡ 다음 작업 칩(QA ④, 2026-08-19) — 답의 경로(도구/분기)별로 실측 검증된 후속 지시를
   //   자동 동봉한다. LLM이 만들지 않는다(nextguide.ts 표 — 시나리오 실측 ✓ 문장만).
   //   결재판이 떠 있으면 안 붙인다 — 다음 행동은 그 승인이지 딴 길이 아니다.

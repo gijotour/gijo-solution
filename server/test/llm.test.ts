@@ -403,7 +403,11 @@ describe("★ RAG 0건 정직 배너 (#8)", () => {
   });
   it("배너가 배선돼 있고 문구가 실패 목록과 안 겹친다", () => {
     expect(src2).toMatch(/ragResult\?\.자료없음 && reply/);
-    expect(src2).toContain("이 PC의 사내 자료에는 이 내용이 없습니다");
+    // ⚠ 2026-09-05: 배너 **문장**은 noevidence.ts로 이관됐다(dispatcher가 판정기를 쓰려면 llm을
+    //   흉내 내는 시험 76개를 안 건드려야 해서). llm.ts는 그 상수를 가져다 붙이기만 한다.
+    expect(src2, "배너 상수를 안 쓴다 — 문장을 다시 적었는지 보라").toContain("자료없음배너");
+    const 배너파일 = fsw.readFileSync(new URL("../src/engine/noevidence.ts", import.meta.url), "utf8");
+    expect(배너파일).toContain("이 PC의 사내 자료에는 이 내용이 없습니다");
     // FAIL_MARKS 전체 대조는 emptyanswer-guidance(파일 전체 감시)가 맡는다 — 여기서는 배너 문구가
     // 그 감시 대상 파일에 실제로 있는지만 본다(검토관: 항상-참 검사는 무의미했다).
   });
