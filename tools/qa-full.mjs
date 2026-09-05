@@ -23,6 +23,7 @@
 //   promise     화면이 적어 둔 「누르면 …됩니다」 약속이 실제 버튼 이름과 맞는가 (promise-check)
 //   viz         그림 띠를 눌렀을 때 좁혀진 목록이 **그 화면에 보이는가** (viz-gap-measure — CDP 9223)
 //   drawer      대화창 서랍이 약속한 질문이 실제로 되는가 (tools/drawer-audit.mjs)
+//   docs        리포지토리 ↔ 운영 문서 폴더 ↔ 지식 저장소가 갈렸나 (tools/docs-drift.mjs — win 호스트 전용)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -57,6 +58,34 @@ changed = [...new Set([...changed, ...변경목록(execSync("git status --porcel
 // ── ② 변경 영역 → 계층 매핑 ─────────────────────────────────────────────────────
 // 답변 품질에 닿는 엔진(LLM·RAG·라우팅·그래프)이 바뀌면 지식·시나리오·회귀까지 돈다.
 const QUALITY_RE = /^server\/src\/engine\/(llm|memory|hybridsearch|dispatcher|agentloop|intent|orchestrator-|ontology|docgraph|gateway|screenguide|agenttools|webreport|vulnscan)/;
+
+// ★★ 계층 이름표는 **여기 한 곳에만** 적는다 (2026-09-06 적발·수리).
+//   무슨 일이 있었나: --all과 「첫 실행」이 **같은 배열을 각자** 들고 있었다. 그래서 2026-08-08에
+//   새로 만든 docs 계층이 ⓐ 매핑 규칙에도 ⓑ --all 배열에도 ⓒ 첫 실행 배열에도 안 담겼고,
+//   run("docs", …)는 파일에 멀쩡히 있는데 picks에 "docs"가 들어갈 길이 없어
+//   **신설 이래 한 번도 안 돌았다.** 2026-09-05에 붙인 「판정 못 함(exit 2) 회색」 처리까지
+//   통째로 죽은 코드였다 — 이 파일이 스스로 여러 번 경고하던 「만들어 놓고 조용히 안 도는 검사」다.
+//   (더 아픈 대목: 그 09-05 변경 목록에 tools/docs-drift.mjs가 들어 있었는데도 안 돌았다.)
+//   ⚠ 새 계층을 만들 때: ⓐ 여기에 이름을 넣고 ⓑ run(같은 이름, …)을 부르고 ⓒ 매핑 규칙을 준다.
+//     ⓐ와 ⓑ가 어긋나면 server/test/qafulllayers.test.ts(짝 시험)가 잡는다.
+const 전계층 = ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell",
+  "download", "sweep", "windows", "viz", "drawer", "routing", "promise", "docprobe", "docs"];
+
+// 문서 표류 — 문서를 고쳐도 운영 AI가 **옛 판으로 답하던** 자리(2026-08-08 실사고).
+//   ⚠ 대상 문서 목록의 **정본은 server/docs-manifest.json**이다. 여기에 「루트의 md 전부」 같은
+//     규칙을 따로 적으면 대장에 없는 루트 md 100여 개까지 걸려 **매번** 돈다 — 늘 도는 계층은
+//     아무도 결과를 안 보게 되어 없는 것과 같아진다. 그래서 대장을 그대로 읽는다.
+let 문서대장 = new Set();
+try {
+  문서대장 = new Set(
+    (JSON.parse(fs.readFileSync(path.join(ROOT, "server", "docs-manifest.json"), "utf8")).files ?? [])
+      .map((f) => f.file)
+  );
+} catch { /* 대장을 못 읽으면 아래 규칙만으로 판정한다(없는 것보다 낫다) */ }
+// ⚠ 정규식을 문자열로 짓는다 — 이 파일은 짝 시험이 소스를 읽어 대조하므로 형태를 단순하게 둔다.
+const DOCS_RE = new RegExp("^knowledge/|^server/docs-manifest[.]json$|^tools/docs-drift[.]mjs$");
+const 문서변경 = (f) => DOCS_RE.test(f) || 문서대장.has(f);
+
 const picks = new Set(["server"]); // 스모크는 항상
 const reasons = [];
 // 조치 검증 계열은 "판정을 어디에 쓰는가"가 위험 지점이라 실 상태전이까지 보는 계층을 따로 둔다.
@@ -79,10 +108,11 @@ for (const f of changed) {
   else if (f.startsWith("server/")) { picks.add("vitest"); reasons.push(`${f} → 서버 단위테스트`); }
   else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); picks.add("windows"); picks.add("viz"); picks.add("promise"); reasons.push(`${f} → 클라 실페이지·스윕·띠 자리·적어 둔 약속`); }
   if (DRAWER_RE.test(f)) { picks.add("drawer"); reasons.push(`${f} → 서랍 약속 점검`); }
+  if (문서변경(f)) { picks.add("docs"); reasons.push(`${f} → 문서 표류(리포↔운영↔지식)`); }
   if (ROUTING_RE.test(f)) { picks.add("routing"); picks.add("vitest"); reasons.push(`${f} → 라우팅 겹침·규칙표`); }
   else if (f.startsWith("tools/regress/") || f.startsWith("rag-seed/")) { picks.add("regress"); reasons.push(`${f} → 회귀 하네스`); }
 }
-if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise", "docprobe"]) picks.add(l);
+if (ALL) for (const l of 전계층) picks.add(l);
 if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
 // ★ keyleak은 **변경 파일과 무관하게 늘 담는다.** 개인키는 코드를 안 고쳐도 새기 때문이다
 //   (2026-08-09: 하루에 두 번, 둘 다 파일을 옮기다 났고 커밋은 없었다).
@@ -95,7 +125,7 @@ picks.add("keyleak");
 if (picks.has("vitest") && process.platform === "win32") picks.add("vitest-win");
 
 console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
-if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise", "docprobe"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
+if (!since) for (const l of 전계층) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
 console.log(`  변경 파일 ${changed.length}개 → 계층 [${[...picks].join(", ")}]${ALL ? " (--all)" : ""}${FAST ? " (--fast)" : ""}`);
 for (const r of reasons.slice(0, 8)) console.log(`   · ${r}`);
 if (reasons.length > 8) console.log(`   · … 외 ${reasons.length - 8}건`);
