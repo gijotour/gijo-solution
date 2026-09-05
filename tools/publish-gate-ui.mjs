@@ -94,7 +94,9 @@ try {
 const app = spawn(EXE, ["--remote-debugging-port=" + PORT], { stdio: "ignore" });
 const 정리 = () => { try { execFileSync("taskkill", ["/PID", String(app.pid), "/T", "/F"], { stdio: "ignore" }); } catch { /* 이미 종료 */ } };
 process.on("exit", 정리);
-process.on("SIGINT", () => { 정리(); process.exit(1); }); // Ctrl+C에도 앱이 남지 않게(검토관 L5)
+// ⚠ 반납보장은 **page가 생긴 뒤** 진짜 몸을 얻는다 — 로그인 전에는 반납할 세션이 없다.
+let 반납보장 = async () => ({ 끊었나: false, 사유: "로그인 전" });
+process.on("SIGINT", async () => { await 반납보장("SIGINT"); 정리(); process.exit(1); }); // Ctrl+C에도 앱·세션이 남지 않게(검토관 L5·K5-2)
 await new Promise((r) => setTimeout(r, 7000));
 
 let browser;
@@ -108,6 +110,52 @@ const ctx = browser.contexts()[0];
 
 // ── 로그인 ────────────────────────────────────────────────────────────────
 let page = ctx.pages().find((p) => p.url().includes("login")) || ctx.pages()[0];
+
+// ── 세션 반납(2026-09-05 K5) — **taskkill 전에** 렌더러가 스스로 로그아웃한다 ──────
+//
+// ★ 왜(실측): 이 관문은 끝에서 `taskkill /T /F`로 앱을 죽인다. 그러면 Electron의 before-quit이
+//   안 나고 `logoutOnQuit`(client/src/main.ts)이 **통째로 건너뛰어진다** — 서버에는 claude-deploy
+//   세션이 살아남아 유휴 만료(30분)까지 유령으로 남는다. 다음 사람(또는 다음 관문 실행)은
+//   「이미 다른 곳에서 로그인 중」을 만나 **자기 자신을 강제로 밀어내야** 하고, 그 강제는 감사에도
+//   남는다. 제품은 이 자리를 이미 결함으로 다뤄 고쳤는데(F6-06 재시작 경로), 관문만 새고 있었다.
+// ⚠ 서버 세션은 **refresh token으로** 정리된다 — 그래서 헤더만 보내면 안 풀린다. 렌더러의
+//   `window.gijo.logout()`이 그 규약(Authorization 헤더 + 본문 refreshToken)을 이미 지킨다
+//   (client/src/api/auth.ts logout). 여기서 규약을 새로 짜지 않고 **제품 함수를 부른다.**
+async function 세션반납(pg) {
+  if (!pg) return { 끊었나: false, 사유: "페이지 없음" };
+  try {
+    const r = await pg.evaluate(async () => {
+      const g = window.gijo;
+      if (!g || typeof g.logout !== "function") return "없음";
+      try { await g.logout(); return "끊음"; } catch (e) { return "실패:" + String((e && e.message) || e); }
+    });
+    return { 끊었나: r === "끊음", 사유: r };
+  } catch (e) {
+    return { 끊었나: false, 사유: String((e && e.message) || e) };
+  }
+}
+
+// ★ K5-2(2026-09-05 검토관) — 반납이 **직선 문장 하나**였다. 그러면 관문이 예외로 죽는 경로에서는
+//   안 돌고, `process.on("exit")`의 taskkill만 돌아 **없애겠다던 유령 세션 30분이 그대로 남는다.**
+//   로그인과 반납 사이 900여 줄에는 `.catch()` 없는 await가 여럿이라(Execution context destroyed ·
+//   Target closed · timeout) 그 경로는 가정이 아니라 흔한 길이다. 커밋의 실측은 **완주 1회(exit 0)**
+//   뿐이라 그 길을 안 쟀다. 이제 아래 try/finally와 SIGINT가 **모든 종료 경로**를 덮는다.
+// ⚠ 두 번까지 다시 해 본다 — 한 번의 네트워크 흔들림으로 유령을 남기지 않는다.
+let 반납 = { 끊었나: false, 사유: "반납을 시도하기도 전에 죽었다" };
+let 반납함 = false;
+반납보장 = async (왜) => {
+  if (반납함) return 반납;
+  반납함 = true;
+  for (let i = 0; i < 2; i++) {
+    반납 = await 세션반납(page);
+    if (반납.끊었나) return 반납;
+    if (i === 0) await new Promise((r) => setTimeout(r, 1500));
+  }
+  console.error("[ui관문] ⚠ 세션 반납 실패(" + 왜 + "): " + 반납.사유);
+  return 반납;
+};
+
+try {
 await page.waitForLoadState("domcontentloaded");
 if (page.url().includes("login")) {
   await page.fill("#serverUrl", SERVER);
@@ -1029,33 +1077,14 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     죽은화면.length === 0, 죽은화면.length ? "죽음: " + 죽은화면.join(", ") : "전부 그려짐");
 }
 
-// ── 세션 반납(2026-09-05 K5) — **taskkill 전에** 렌더러가 스스로 로그아웃한다 ──────
-//
-// ★ 왜(실측): 이 관문은 끝에서 `taskkill /T /F`로 앱을 죽인다. 그러면 Electron의 before-quit이
-//   안 나고 `logoutOnQuit`(client/src/main.ts)이 **통째로 건너뛰어진다** — 서버에는 claude-deploy
-//   세션이 살아남아 유휴 만료(30분)까지 유령으로 남는다. 다음 사람(또는 다음 관문 실행)은
-//   「이미 다른 곳에서 로그인 중」을 만나 **자기 자신을 강제로 밀어내야** 하고, 그 강제는 감사에도
-//   남는다. 제품은 이 자리를 이미 결함으로 다뤄 고쳤는데(F6-06 재시작 경로), 관문만 새고 있었다.
-// ⚠ 서버 세션은 **refresh token으로** 정리된다 — 그래서 헤더만 보내면 안 풀린다. 렌더러의
-//   `window.gijo.logout()`이 그 규약(Authorization 헤더 + 본문 refreshToken)을 이미 지킨다
-//   (client/src/api/auth.ts logout). 여기서 규약을 새로 짜지 않고 **제품 함수를 부른다.**
-async function 세션반납(pg) {
-  if (!pg) return { 끊었나: false, 사유: "페이지 없음" };
-  try {
-    const r = await pg.evaluate(async () => {
-      const g = window.gijo;
-      if (!g || typeof g.logout !== "function") return "없음";
-      try { await g.logout(); return "끊음"; } catch (e) { return "실패:" + String((e && e.message) || e); }
-    });
-    return { 끊었나: r === "끊음", 사유: r };
-  } catch (e) {
-    return { 끊었나: false, 사유: String((e && e.message) || e) };
-  }
+
+} finally {
+  // ⚠ finally다 — 위에서 무엇이 터지든 **세션은 반납하고** 죽는다(K5-2).
+  await 반납보장("관문 종료");
 }
-const 반납 = await 세션반납(page);
 ok("관문이 자기 세션을 반납했다(유령 세션 0)", 반납.끊었나,
   반납.끊었나 ? "window.gijo.logout() — taskkill이 before-quit을 건너뛰므로 여기서 끊는다"
-             : "로그아웃 실패(" + 반납.사유 + ") — claude-deploy 세션이 유휴 만료(30분)까지 남는다");
+             : "로그아웃 두 번 실패(" + 반납.사유 + ") — claude-deploy 세션이 유휴 만료(30분)까지 남는다");
 
 await browser.close().catch(() => {});
 정리();

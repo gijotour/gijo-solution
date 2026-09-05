@@ -235,11 +235,24 @@ describe("배선 계약 ⑤층 — 게시 전 UI 실화면 관문 (외부 조사
     expect(s, "렌더러 로그아웃 호출이 없다 — taskkill이 logoutOnQuit을 건너뛴다").toContain("g.logout()");
     expect(s, "로그아웃 결과를 관문 판정으로 안 센다").toContain("관문이 자기 세션을 반납했다");
     // 순서가 뒤집히면(죽인 뒤 로그아웃) 아무 효과가 없다 — **자리**를 잰다.
-    const 반납 = s.indexOf("const 반납 = await 세션반납(page)");
+    const 반납 = s.indexOf("반납보장(");
     const 정리 = s.lastIndexOf("정리();");
     expect(반납, "세션반납 호출을 못 찾았다").toBeGreaterThan(-1);
     expect(반납, "세션 반납이 taskkill(정리) 뒤에 있다 — 죽인 뒤에 끊으면 아무 일도 안 일어난다")
       .toBeLessThan(정리);
+  });
+
+  // ★ K5-2(2026-09-05 검토관) — 첫 판의 반납은 **직선 문장 하나**였다. 그러면 관문이 예외로 죽는
+  //   경로에서는 안 돌고 `process.on("exit")`의 taskkill만 돌아, 없애겠다던 유령 30분이 그대로 남는다.
+  //   커밋의 실측은 완주 1회(exit 0)뿐이라 그 길을 안 쟀다 — 그래서 **자리 대신 구조**를 잰다.
+  it("★ 반납이 **모든 종료 경로**를 덮는다 — try/finally와 SIGINT", () => {
+    const s = 코드만(join(__dirname, "..", "..", "tools", "publish-gate-ui.mjs"));
+    expect(s, "반납이 finally 안에 없다 — 예외로 죽는 경로에서 안 돈다").toMatch(/\} finally \{[\s\S]{0,200}반납보장\(/);
+    expect(s, "SIGINT가 세션을 안 끊고 앱만 죽인다 — Ctrl+C에 유령이 남는다")
+      .toMatch(/process\.on\("SIGINT"[\s\S]{0,120}반납보장\(/);
+    // finally는 taskkill(process.on("exit") 정리)보다 **먼저** 돌아야 뜻이 있다.
+    expect(s.indexOf("} finally {"), "finally가 없다").toBeGreaterThan(-1);
+    expect(s.indexOf("} finally {"), "finally가 마지막 정리()보다 뒤에 있다").toBeLessThan(s.lastIndexOf("정리();"));
   });
 
   it("★ 제품 쪽 규약이 그대로다 — 로그아웃은 **헤더 + 본문 refreshToken** 둘 다", () => {
