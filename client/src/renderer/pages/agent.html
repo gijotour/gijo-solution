@@ -778,7 +778,9 @@ tr:last-child td{border-bottom:none;}
   // ── 로컬 LLM 실동작 이벤트(llm:event) — 실제 추론/임베딩/모델 로드를 사람이 읽는 한 줄로 ──
   function fmtLlm(evt) {
     // search·guard(2026-08-20 신설)는 LLM 추론이 아니다 — 🧠로 찍으면 추론처럼 읽힌다(검토관 M5).
-    const icon = evt.kind === "embed" ? "🔎" : evt.kind === "search" ? "📚" : evt.kind === "guard" ? "🛡" : (evt.kind === "load" || evt.kind === "swap") ? "⚙️" : "🧠";
+    // cite(2026-09-05)는 **출구 검사**다 — 입구 검사(🛡 guard)와 한 아이콘으로 묶지 않는다.
+    //   「막았다」와 「뗐다」가 한 기호로 섞이면 무슨 일이 있었는지 사람이 못 가른다.
+    const icon = evt.kind === "embed" ? "🔎" : evt.kind === "search" ? "📚" : evt.kind === "guard" ? "🛡" : evt.kind === "cite" ? "✂" : (evt.kind === "load" || evt.kind === "swap") ? "⚙️" : "🧠";
     const who = evt.agent ? `[${evt.agent}] ` : "";
     const model = evt.model ? evt.model + " · " : "";
     let tail = evt.detail || "";
@@ -794,12 +796,17 @@ tr:last-child td{border-bottom:none;}
     return { icon, text: `${who}${model}${tail}`, phase: evt.phase, kind: evt.kind };
   }
 
+  // ⚠ **호출부가 0곳인 죽은 함수다**(2026-09-05 실측 grep — 저장소 전체에서 안 부른다).
+  //   살아 있는 자리는 fmtLlm의 아이콘과 llmTerminalHtml뿐이다. 아래 라벨을 고쳐도
+  //   **화면에는 안 나온다** — 「스트림 라벨을 바꿨다」고 보고하면 거짓이 되는 자리다.
+  //   그래도 라벨을 함께 맞춰 둔다: 다음에 이 함수를 되살리는 사람이 cite를 「LLM」이라
+  //   부르지 않게(되살아난 뒤에 고치면 그때는 화면에 거짓이 한 번 나간 뒤다).
   function llmRowHtml(evt) {
     const f = fmtLlm(evt);
     const dim = f.phase === "start" ? "opacity:.65;" : "";
     const color = f.phase === "error" ? "var(--red)" : (f.kind === "chat" ? "var(--blue-light)" : "var(--teal)");
     // 라벨도 종류를 말한다 — search·guard를 「LLM」이라 부르면 추론이 일어난 것처럼 읽힌다(검토관 M5).
-    const label = f.kind === "search" ? "검색" : f.kind === "guard" ? "가드" : "LLM";
+    const label = f.kind === "search" ? "검색" : f.kind === "guard" ? "가드" : f.kind === "cite" ? "인용" : "LLM";
     return `<div class="chat-row" style="${dim}"><span style="color:${color};font-weight:700">${f.icon} ${label}</span><span class="chat-msg">${f.text.replace(/</g, "&lt;")}</span></div>`;
   }
 
