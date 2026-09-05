@@ -1,0 +1,150 @@
+// reportdeadline.test.ts — **침해사고 신고 시한은 오늘 날짜가 정한다**(2026-09-06 · 계획서 전-4)
+//
+// ★ 왜 이 시험이 있나 (라이브 실측 2026-09-06 · 배포 4beef926)
+//   같은 물음 「침해사고 신고 시한」에 1차는 「현재는 즉시 신고」, 2차는 「24시간 이내」가 나왔다.
+//   둘 다 우리 조사에 있는 사실이지만 **적용 시점이 다르다** — 「지금 무엇이 적용되나」를 모델에
+//   맡긴 병기(倂記) 설계의 대가다. 과태료가 걸린 법정 기한이 회차마다 달라지면 안 된다.
+//   그래서 **날짜를 고정해** 두 문장을 못 박는다. 날짜 두 개(시행 전·후)로 재는 이유는,
+//   한쪽만 재면 시행일이 지난 뒤 조용히 옛 문장이 남아도 시험이 초록이기 때문이다.
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import { join } from "path";
+import {
+  신고시한_신법시행일, 오늘날짜, 신고시한첫줄, 신고시한질문인가, 침해사고신고시한답,
+} from "../src/engine/reportdeadline";
+import { 침해사고질문인가 } from "../src/engine/incidentsteps";
+import { 길목록 } from "../src/engine/routes";
+
+const root = join(__dirname, "..");
+const read = (...p: string[]) => readFileSync(join(root, ...p), "utf8");
+
+/** ⚠ 로컬 정오로 만든다 — 자정으로 만들면 시간대 때문에 하루가 밀려 시험이 흔들린다. */
+const 날 = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12, 0, 0);
+
+describe("★ 날짜 고정 — 두 문장이 서로 반대다", () => {
+  it("시행일 하루 전(2026-09-06)에는 「즉시 신고」가 지금 적용이다", () => {
+    const 줄 = 신고시한첫줄(날(2026, 9, 6));
+    expect(줄).toContain("지금(2026-09-06) 적용: 즉시 신고");
+    expect(줄).toContain("2026-09-30부터");
+    expect(줄).toContain("24시간 이내");
+  });
+
+  it("시행일 뒤(2026-10-01)에는 「24시간 이내」가 지금 적용이다", () => {
+    const 줄 = 신고시한첫줄(날(2026, 10, 1));
+    expect(줄).toContain("지금(2026-10-01) 적용: 24시간 이내 신고");
+    expect(줄).toContain("이전에는");
+    expect(줄).toContain("즉시 신고");
+  });
+
+  it("시행일 당일(2026-09-30)은 **신법 쪽**이다 — 경계를 애매하게 두지 않는다", () => {
+    expect(신고시한첫줄(날(2026, 9, 30))).toContain("적용: 24시간 이내 신고");
+  });
+
+  it("날짜는 로컬 달력으로 센다 — toISOString(UTC)이면 한국 새벽에 어제를 답한다", () => {
+    expect(오늘날짜(new Date(2026, 8, 30, 0, 30, 0))).toBe("2026-09-30");
+    expect(read("src", "engine", "reportdeadline.ts"), "UTC 변환을 쓰면 하루가 밀린다")
+      .not.toMatch(/toISOString\(\)\.slice\(0, 10\)/);
+  });
+
+  it("시행일은 상수 한 곳이고 문장이 그 상수를 읽는다 — 날짜를 손으로 적지 않는다", () => {
+    expect(신고시한_신법시행일).toBe("2026-09-30");
+    const src = read("src", "engine", "reportdeadline.ts");
+    const 문장자리 = src.slice(src.indexOf("export function 신고시한첫줄"));
+    expect(문장자리, "첫 줄 문장에 날짜를 글자로 박으면 상수와 어긋난다").not.toMatch(/2026-09-30/);
+  });
+});
+
+describe("답 — 첫 줄이 코드가 확정한 문장이고, 통지/신고 구분은 그대로 둔다", () => {
+  it("★ 답의 **첫 줄**이 곧 그 문장이다(모델이 뒤에 무슨 말을 하든 앞선다)", () => {
+    const 답 = 침해사고신고시한답(날(2026, 9, 6));
+    expect(답.split("\n")[0]).toBe(신고시한첫줄(날(2026, 9, 6)));
+    expect(답).toContain("정보통신망법 제48조의3");
+  });
+
+  it("통지(제34조①·시행령 39조)와 신고(제34조③·시행령 40조·72시간)를 가른다 — 뭉치면 거짓이다", () => {
+    const 답 = 침해사고신고시한답(날(2026, 9, 6));
+    expect(답).toContain("제34조①");
+    expect(답).toContain("제39조");
+    expect(답).toContain("제34조③");
+    expect(답).toContain("제40조");
+    expect(답).toContain("72시간");
+  });
+
+  it("법률 자문이 아님을 반드시 남긴다(조사 확정본 5항 — 단정 못 한 것이 남아 있다)", () => {
+    expect(침해사고신고시한답(날(2026, 9, 6))).toContain("법률 자문이 아닙니다");
+    expect(침해사고신고시한답(날(2026, 10, 1))).toContain("법률 자문이 아닙니다");
+  });
+
+  it("두 날짜의 답이 서로 다르고, 각자 자기 시점의 과태료를 말한다", () => {
+    const 전 = 침해사고신고시한답(날(2026, 9, 6));
+    const 후 = 침해사고신고시한답(날(2026, 10, 1));
+    expect(전).not.toBe(후);
+    expect(전).toContain("1천만원");
+    expect(후).toContain("3천만원");
+  });
+
+  it("폴백 문구(FAIL_MARKS)를 안 쓴다 — 정직한 답에 실패 딱지가 붙으면 안 된다", () => {
+    for (const 답 of [침해사고신고시한답(날(2026, 9, 6)), 침해사고신고시한답(날(2026, 10, 1))]) {
+      expect(답).not.toContain("찾지 못했");
+      expect(답).not.toContain("알 수 없습니다");
+    }
+  });
+});
+
+describe("영토 — 좁게 잡는다(두 이웃을 침범하지 않는다)", () => {
+  it("★ 라이브에서 갈렸던 그 물음을 잡는다", () => {
+    for (const q of [
+      "침해사고 신고 시한",
+      "침해사고 신고 시한 알려줘",
+      "해킹 신고는 몇 시간 안에 해야 해?",
+      "랜섬웨어 사고 신고 기한이 언제까지야?",
+    ]) {
+      expect(신고시한질문인가(q), `${q}는 신고 시한 물음이다`).toBe(true);
+    }
+  });
+
+  it("개인정보 유출(72시간)은 **비켜 준다** — 조문이 달라 lawinfo 원문이 답한다", () => {
+    for (const q of ["개인정보 유출 신고 기한", "개인정보 유출됐는데 신고 시한 알려줘", "정보주체 통지 기한은?"]) {
+      expect(신고시한질문인가(q), `${q}는 lawinfo 몫이다`).toBe(false);
+    }
+  });
+
+  it("초동 절차 물음은 안 뺏는다 — 활성 사고는 증거 보전이 먼저다", () => {
+    for (const q of ["침해사고 의심될 때 대응 절차 알려줘", "해킹당한 것 같은데 뭐부터 해?"]) {
+      expect(신고시한질문인가(q), `${q}는 초동 절차 몫이다`).toBe(false);
+    }
+    // 활성 사고 + 시한을 함께 물으면 **초동이 먼저 걸린다**(디스패처에서 앞에 있다).
+    expect(침해사고질문인가("해킹당했는데 신고 시한 어떻게 돼?")).toBe(true);
+  });
+
+  it("시한을 안 묻는 말·침해가 아닌 말은 안 잡는다", () => {
+    for (const q of [
+      "침해사고 대응 교육 언제야?",     // 시한(언제)이지만 신고가 아니다
+      "취약점 조치 기한 알려줘",         // 신고가 아니다
+      "침해사고 신고 양식 어디 있어?",   // 양식은 비켜 준다
+    ]) {
+      expect(신고시한질문인가(q), `${q}는 이 길이 아니다`).toBe(false);
+    }
+  });
+});
+
+describe("배선 — 표와 코드가 함께 간다(길이 표에 없으면 route-explain이 거짓말한다)", () => {
+  it("디스패처가 초동 절차 **뒤에서** 이 길을 본다", () => {
+    const src = read("src", "engine", "dispatcher.ts");
+    expect(src).toContain('import { 신고시한질문인가, 침해사고신고시한답 } from "./reportdeadline"');
+    expect(src).toContain("if (신고시한질문인가(instructionText))");
+    expect(
+      src.indexOf("if (침해사고질문인가(instructionText))"),
+      "활성 사고는 증거 보전이 먼저다 — 초동 게이트가 앞에 있어야 한다",
+    ).toBeLessThan(src.indexOf("if (신고시한질문인가(instructionText))"));
+  });
+
+  it("routes.ts 표에 「침해사고 신고 시한」이 있고 감시 글자가 코드와 같다", () => {
+    const 길 = 길목록.find((r) => r.이름 === "침해사고 신고 시한");
+    expect(길, "표에 없으면 route-explain이 「걸리는 규칙 없음」이라 거짓 설명한다").toBeTruthy();
+    expect(길!.판별).toBe("신고시한질문인가");
+    expect(길!.도착).toBe("침해사고신고시한답");
+    expect(길!.감시).toBe("if (신고시한질문인가(instructionText))");
+    expect(read("src", "engine", "dispatcher.ts")).toContain(길!.감시);
+  });
+});

@@ -36,6 +36,7 @@ import { 문서지목질문 } from "./memory";
 import { runAgentLoop, forcedToolFor, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다, 직전대상자산 } from "./agentloop";
 import { 스트림자리 } from "./streamsink";
 import { 장애질문인가, 장애초동절차, 침해사고질문인가, 침해사고초동절차 } from "./incidentsteps";
+import { 신고시한질문인가, 침해사고신고시한답 } from "./reportdeadline";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval, 에디션제한중, 조건이좁히나 } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
@@ -1684,6 +1685,21 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: 침해사고초동절차(instructionText), sources: [] };
   }
 
+  // ★ 침해사고 **신고 시한** — 오늘 날짜로 코드가 확정한다(2026-09-06, 계획서 전-4).
+  //   실측(2026-09-06 라이브): 같은 물음에 1차 「현재는 즉시 신고」, 2차 「24시간 이내」로
+  //   **답이 갈렸다.** 둘 다 조사에 있는 사실이지만 적용 시점이 다르다 — 「지금 무엇이
+  //   적용되나」를 모델에 맡긴 병기(倂記) 설계의 대가다. 과태료가 걸린 법정 기한을 제품이
+  //   회차마다 다르게 말하면 안 된다.
+  //   ⚠ **초동 절차 뒤에 둔다** — 활성 사고(「해킹당했는데 …」)는 증거 보전이 먼저다.
+  //     여기 걸리는 것은 초동 게이트를 지나온 「시한만 묻는」 말이다.
+  //   ⚠ 개인정보 유출(72시간)은 조문이 달라 lawinfo 원문이 답한다(신고시한질문인가가 비켜 준다).
+  if (신고시한질문인가(instructionText)) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P1" });
+    completeTask(task.id);
+    // sources: [] — 코드가 낸 법정 기한 답이다(침해사고초동절차와 같은 규율).
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 침해사고신고시한답(), sources: [] };
+  }
+
   // ── 시연 실측이 잡은 라우팅 결함 2건의 결정적 분기 (2026-07-29, 계획서 전-1) ──────────
   // ① "방화벽 반려 사유는 주로 뭐였어?" — 사내 반려 이력이 있는데 LLM 일반론으로 답했다.
   //    반려 데이터는 두 곳(취약점 검토·유지보수 점검)에 실재하므로 코드가 직접 센다.
@@ -1979,6 +1995,7 @@ async function 체인훑기(
 
   본다(장애질문인가(t), { 이름: "장비 장애·중단", 층: "특수경로", 판별: "장애질문인가", 도착: "장애초동절차", 감시: "if (장애질문인가(instructionText))" });
   본다(침해사고질문인가(t), { 이름: "침해사고 의심", 층: "특수경로", 판별: "침해사고질문인가", 도착: "침해사고초동절차", 감시: "if (침해사고질문인가(instructionText))" });
+  본다(신고시한질문인가(t), { 이름: "침해사고 신고 시한", 층: "특수경로", 판별: "신고시한질문인가", 도착: "침해사고신고시한답", 감시: "if (신고시한질문인가(instructionText))" });
   본다(REJECT_HISTORY_RE.test(t), { 이름: "반려·오탐 이력", 층: "특수경로", 판별: "REJECT_HISTORY_RE", 도착: "formatRejectHistory", 감시: "if (REJECT_HISTORY_RE.test(instructionText))" });
   본다(REPORT_CREATE_RE.test(t) && !REPORT_QUERY_EXCLUDE_RE.test(t), { 이름: "리포트 만들기", 층: "특수경로", 판별: "REPORT_CREATE_RE", 도착: "generateReport", 감시: "if (REPORT_CREATE_RE.test(instructionText) && !REPORT_QUERY_EXCLUDE_RE.test(instructionText))" });
 
