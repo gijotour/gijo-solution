@@ -582,64 +582,13 @@
   // 서버가 순서를 안내하면서 openScreen(화면·자리)을 같이 준다(server/engine/howto.ts).
   // ⚠ 갈 화면이 없는 안내(백업 복원처럼)에는 openScreen이 아예 안 온다 — 버튼도 안 생긴다.
   //   있는 척 아무 화면이나 열면 담당자는 없는 버튼을 찾아 헤맨다.
-  /**
-   * 근거 원문 — 답 아래에 접힌 채로 붙인다. 펴면 답을 만든 문서의 그 대목이 나온다.
-   *
-   * ★ 왜(2026-08-01 실측): 문서엔 "미사용 룰 37개"라고 적혀 있는데 AI가 "27"이라고 답했다.
-   *   근거 배지에는 그 문서가 **맞게** 떴다 — 자료 찾기는 정상이고 모델이 표를 잘못 읽은 것이다.
-   *   담당자는 그 숫자로 보고를 쓴다. 원문을 함께 보여 주면 그 자리에서 눈으로 잡는다.
-   *   (모델에게 "숫자를 정확히 읽어라"라고 타이르지 않는다 — 반복 실패한 방식이다.)
-   *
-   * ⚠ 이 파일이 **실제 대화창**이다. 화면 안 위젯(chatwidget.js)에도 같은 것을 붙였다가
-   *   그쪽은 탭 안에서 비어 있다는 걸 뒤늦게 알았다 — 기능을 안 쓰는 곳에 넣을 뻔했다.
-   */
-  function attachQuotes(el, quotes, answer, sources) {
-    // 근거 배지(문서 이름) — 화면 안 위젯에는 있었는데 **주 대화창인 여기엔 없었다**(2026-08-01).
-    //   담당자가 가장 많이 쓰는 자리에서 "무엇을 보고 답했는지"가 안 보이고 있었다.
-    if (el && Array.isArray(sources) && sources.length) {
-      var badge = document.createElement("div");
-      badge.style.cssText = "margin-top:6px;font-size:11.5px;font-weight:700;color:var(--teal, #6fdcb5)";
-      badge.textContent = "📄 근거: " + sources.slice(0, 4).join(" · ");
-      el.appendChild(badge);
-    }
-    if (!el || !Array.isArray(quotes) || !quotes.length) return;
-    var wrap = document.createElement("div");
-    wrap.style.cssText = "margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px";
-    var head = document.createElement("div");
-    head.style.cssText = "font-size:12px;color:var(--muted,#b3ada4);cursor:pointer;user-select:none";
-    var open = false;
-    var draw = function () { head.textContent = (open ? "▾" : "▸") + " 📄 근거 원문 " + quotes.length + "대목 — 답이 맞는지 확인"; };
-    draw();
-    var body = document.createElement("div");
-    body.style.cssText = "display:none;margin-top:6px";
-
-    // 답에 나온 숫자·영문코드를 원문에서 강조한다 — 눈이 바로 그리로 간다.
-    var marks = (String(answer || "").match(/\d[\d,.\-]{0,12}|[A-Z][A-Za-z0-9\-]{3,}/g) || [])
-      .filter(function (t) { return t.length >= 2; }).slice(0, 12);
-    quotes.slice(0, 3).forEach(function (q) {
-      var box = document.createElement("div");
-      box.style.cssText =
-        "border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);" +
-        "padding:7px 10px;border-radius:0 6px 6px 0;margin-bottom:6px";
-      var txt = esc(q.text || "");
-      marks.forEach(function (t) {
-        var safe = esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        try {
-          txt = txt.replace(new RegExp(safe, "g"),
-            '<mark style="background:rgba(240,160,32,.28);color:var(--amber, #ffd88a);padding:0 2px;border-radius:3px">$&</mark>');
-        } catch (e) {}
-      });
-      box.innerHTML =
-        '<div style="font-size:11.5px;color:var(--muted-2,#a49d95);margin-bottom:3px">' + esc(q.documentId || "") + "</div>" +
-        '<div style="font-size:12.25px;line-height:1.75;color:var(--text-strong, #cdd4e6)">' + txt + "</div>";
-      body.appendChild(box);
-    });
-
-    head.addEventListener("click", function () { open = !open; body.style.display = open ? "block" : "none"; draw(); });
-    wrap.appendChild(head);
-    wrap.appendChild(body);
-    el.appendChild(wrap);
-  }
+  // ── 근거 원문·근거 배지는 **공용 부품 한 곳**에서만 그린다 ────────────────
+  //   여기 있던 자체 구현 attachQuotes(58줄)를 **지웠다**(2026-09-06 · B1 정리).
+  //   2026-08-01에 호출만 끊고 코드는 남겨 뒀었다 — 지우는 스크립트가 옆 함수(attachApproval 77줄)를
+  //   잘라 먹은 사고가 그날 있어 조심한 것이다. clientglobals.test가 그 뒤로 「다시 부르지 않는다」를
+  //   지켜 왔고, 그 시험 주석이 「다음 정리 때 이 시험이 통과하는 것을 보고 지운다」고 적어 둔 자리다.
+  //   지금 그리는 곳: chatparts.js의 P.quotes — **이름은 sourceTitles · 여는 것은 sources**.
+  //   ⚠ 되살리지 말 것. clientglobals.test가 「attachQuotes 정의 없음」으로 감시한다.
 
   function attachOpen(el, open) {
     if (!el || !open || !open.page) return;
@@ -1865,9 +1814,9 @@
       // ★ 아래 셋은 **분리창 위젯과 같은 부품**을 쓴다(chatparts.js) — 2026-08-01 사용자 지적
       //   "대화창 하나의 구조로 되어 있는 게 맞지?"에 대한 답이다.
       //   자리마다 다른 것은 **여는 방법**과 **붙일 자리**뿐이라 그것만 여기서 넘긴다.
-      //   ⚠ 자체 구현(attachQuotes·attachOpen·attachPicks)은 아래에 남아 있지만 이제 안 부른다.
-      //     지우다가 옆 함수를 잘라 먹은 적이 있어(같은 날) **호출만 끊고 코드는 둔다** —
-      //     다음 정리 때 시험이 통과하는 것을 보고 지운다.
+      //   ⚠ 자체 구현은 호출이 0건이다. 그중 **attachQuotes는 2026-09-06에 지웠다**(위 묘비 주석) —
+      //     지우다가 옆 함수를 잘라 먹은 적이 있어(2026-08-01) 그동안 코드만 남겨 뒀던 것이다.
+      //     attachOpen·attachPicks는 아직 파일에 남아 있다(안 부르니 어긋나지 않는다) — 다음 정리 대상.
       var P = window.gijoChatParts;
       // 근거 없음 — 답에 ⚠ 배너가 붙었으면 **본문의 숫자를 옅게**(2026-09-05 승인 시안).
       //   ⚠ quotes보다 **먼저** 부른다(부품 주석 참고 — 뒤에 부르면 배지 숫자까지 옅어진다).

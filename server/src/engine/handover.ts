@@ -31,7 +31,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS handover_history (
   documentId TEXT NOT NULL,
   question TEXT,                -- 자동 생성 질문(사람 발화가 아니다)
   cited INTEGER NOT NULL,       -- 1이면 그 문서가 답변 근거로 올랐다 = 이관 성공
-  sourceNames TEXT,             -- 실제 근거 문서 이름(최대 3, 쉼표) — 본문은 저장하지 않는다
+  sourceNames TEXT,             -- 실제 근거 문서 **이름**(최대 3, 쉼표) — 본문은 저장하지 않는다
+                                --   ⚠ 이름이다, ID가 아니다(2026-09-06 수리). 아래 insert 주석 참고.
   actor TEXT,                   -- 이관자 표시이름
   completedAt TEXT              -- 인수인계 완료 처리 시각(마감 전에는 NULL)
 )`);
@@ -79,7 +80,13 @@ export interface HandoverCheck {
   documentId: string;
   question: string; // 자동 생성된 검증 질문
   cited: boolean; // 답변 근거에 이 문서가 올랐는가 = 이관 성공
-  sources: string[]; // 실제로 오른 근거 문서들
+  sources: string[]; // 실제로 오른 근거 문서 **ID** — 판정(cited)이 쓰는 기계용 키다
+  /**
+   * 그 근거 문서들의 **사람이 읽는 제목** — sources와 같은 순서(dispatcher.sourceTitles 계약).
+   * ⚠ 빈 문자열은 「제목 생략」이다 — ID를 대신 싣지 않는다(memory.사람이읽는문서제목 규율).
+   * ⚠ 옛 경로·시험 흉내처럼 제목이 아예 안 오면 빈 배열이다 — 그때는 증적에 이름을 안 남긴다.
+   */
+  sourceTitles: string[];
   answerPreview: string;
   error?: string;
 }
@@ -96,7 +103,9 @@ export interface HandoverReport {
 export interface HandoverDeps {
   sampleOf: (documentId: string) => Promise<string | null>;
   genQuestion: (sample: string) => Promise<string>;
-  ask: (question: string) => Promise<{ output: string; sources?: string[] }>;
+  // ⚠ sourceTitles는 **사람에게 보여 줄 이름**이다(dispatcher가 sources와 같은 순서로 채운다).
+  //   증적에 남길 이름은 이 칸에서만 온다 — sources(내부 ID)를 이름 자리에 쓰지 않는다.
+  ask: (question: string) => Promise<{ output: string; sources?: string[]; sourceTitles?: string[] }>;
 }
 
 async function defaultDeps(): Promise<HandoverDeps> {
@@ -123,7 +132,7 @@ async function defaultDeps(): Promise<HandoverDeps> {
       // (예전엔 무표식이라 검증 1회마다 작업 세션이 생기고, 수집을 출구로 옮긴 2026-08-07부터는
       //  기계 문답이 학습 후보함까지 오염시킬 뻔했다. 답 경로 자체는 실사용과 동일하다.)
       const r = await dispatchInstruction(q, undefined, undefined, "인수인계-자동검증", true);
-      return { output: r.output, sources: r.sources };
+      return { output: r.output, sources: r.sources, sourceTitles: r.sourceTitles };
     },
   };
 }
@@ -141,7 +150,7 @@ export async function verifyHandover(
     try {
       const sample = await d.sampleOf(documentId);
       if (!sample) {
-        results.push({ documentId, question: "", cited: false, sources: [], answerPreview: "", error: "문서 조각이 검색되지 않았습니다(인입 여부 확인)" });
+        results.push({ documentId, question: "", cited: false, sources: [], sourceTitles: [], answerPreview: "", error: "문서 조각이 검색되지 않았습니다(인입 여부 확인)" });
         continue;
       }
       // 질문 생성 실패(LLM 다운 등)면 문서명 기반 폴백 질문 — 검증 자체는 계속한다.
@@ -154,9 +163,15 @@ export async function verifyHandover(
       if (!question) question = `${documentId.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ")} 관련 절차를 알려줘`;
       const a = await d.ask(question);
       const sources = a.sources ?? [];
-      results.push({ documentId, question, cited: sources.includes(documentId), sources, answerPreview: (a.output ?? "").slice(0, 200) });
+      // ⚠ 판정(cited)은 **ID**로 한다 — 제목으로 바꾸면 인수인계 검증 그 자체가 죽는다
+      //   (dispatcher.sourceTitles 머리글이 이 자리를 이름으로 지목해 둔 이유다).
+      results.push({
+        documentId, question, cited: sources.includes(documentId), sources,
+        sourceTitles: a.sourceTitles ?? [],
+        answerPreview: (a.output ?? "").slice(0, 200),
+      });
     } catch (err) {
-      results.push({ documentId, question: "", cited: false, sources: [], answerPreview: "", error: err instanceof Error ? err.message : String(err) });
+      results.push({ documentId, question: "", cited: false, sources: [], sourceTitles: [], answerPreview: "", error: err instanceof Error ? err.message : String(err) });
     }
   }
   const cited = results.filter((r) => r.cited).length;
@@ -171,7 +186,16 @@ export async function verifyHandover(
           question: (r.question || "").slice(0, 300),
           cited: r.cited ? 1 : 0,
           // 근거 문서 **이름만** 3개까지 — 답변 본문(answerPreview)은 일부러 안 남긴다(위 경계 참고).
-          sourceNames: r.sources.slice(0, 3).join(", ") || null,
+          //
+          // ★ 2026-09-06 수리 — 여기 들어가던 것은 이름이 아니라 **내부 ID**였다(B1).
+          //   칸 이름도 주석도 「근거 문서 이름」이라고 약속했는데 `r.sources`(「승인문답:dtmtl5b1fzj215l3」
+          //   꼴)를 그대로 넣고 있었다. 이 줄은 퇴사 절차의 **감사 증적**이라 나중에 사람이 읽는다 —
+          //   그 사람에게 아무것도 안 가리키는 키가 「근거 문서 이름」으로 남아 있었다.
+          //   같은 날 배지·협업 피드에서 고친 것(dispatcher.sourceTitles)과 **같은 사고의 남은 자리**다.
+          // ⚠ 빈 제목은 뺀다 — 제목을 못 구한 문서는 이름 없이 세지, ID로 채우지 않는다.
+          //   그 결과 셋 다 제목이 없으면 이 칸은 null이다(「이름을 모른다」가 정직한 상태다).
+          sourceNames:
+            r.sourceTitles.map((t) => String(t ?? "").trim()).filter(Boolean).slice(0, 3).join(", ") || null,
           actor: meta?.actor ?? null,
         });
       }

@@ -17,7 +17,10 @@ const 가짜Deps = (cited: boolean) => ({
   genQuestion: async () => "방화벽 정책 변경은 어떤 순서로 하나요?",
   ask: async () => ({
     output: "우리 회사 방화벽 정책 변경은 신청→승인→반영 순서입니다. (본문에 사내 내용이 실린다)",
+    // sources = 기계용 **ID**(판정이 쓴다) · sourceTitles = 사람이 읽는 **제목**(증적에 남는다).
+    // 서버가 둘을 같은 순서로 준다(dispatcher.sourceTitles 계약) — 흉내도 그렇게 낸다.
     sources: cited ? ["방화벽_인수인계.md", "보안운영지침.md"] : ["엉뚱한문서.md"],
+    sourceTitles: cited ? ["방화벽 인수인계", "보안 운영 지침"] : ["엉뚱한 문서"],
   }),
 });
 
@@ -50,11 +53,82 @@ describe("이관 이력 — 서버가 안다", () => {
   it("근거 문서 이름은 3개까지만 — 목록을 통째로 쌓지 않는다", async () => {
     const deps = {
       ...가짜Deps(true),
-      ask: async () => ({ output: "답", sources: ["a.md", "b.md", "c.md", "d.md", "e.md"] }),
+      ask: async () => ({
+        output: "답",
+        sources: ["a.md", "b.md", "c.md", "d.md", "e.md"],
+        sourceTitles: ["가 문서", "나 문서", "다 문서", "라 문서", "마 문서"],
+      }),
     };
     await verifyHandover(["a.md"], deps, { actor: null });
     const row = db.prepare("SELECT sourceNames FROM handover_history").get() as { sourceNames: string };
     expect(row.sourceNames.split(",")).toHaveLength(3);
+  });
+
+  // ── B1 수리 (2026-09-06) — 증적의 「근거 문서 이름」은 **이름이어야 한다** ────────────
+  //
+  // ★ 무엇이 잘못이었나: 이 칸(sourceNames)에 `r.sources`, 즉 **내부 ID**를 넣고 있었다.
+  //   표 정의도 주석도 「근거 문서 이름」이라고 약속했는데 「승인문답:dtmtl5b1fzj215l3」 꼴이
+  //   들어갔다 — 퇴사 절차의 감사 증적을 나중에 읽는 사람에게 **아무것도 안 가리키는 키**다.
+  //   같은 날 배지·협업 피드에서 고친 것(dispatcher.sourceTitles)의 **남은 자리**였다.
+  // ⚠ 판정(cited)은 여전히 ID로 한다 — 이름으로 바꾸면 인수인계 검증 자체가 죽는다.
+  //   그래서 이 묶음은 **둘을 함께** 문다: 이름은 이름 칸에, ID는 판정에.
+  describe("★★ 증적에는 사람이 읽는 이름이 남는다 — 내부 ID가 아니라", () => {
+    it("이름 칸에는 제목이 들어가고 ID는 안 들어간다", async () => {
+      const deps = {
+        ...가짜Deps(true),
+        ask: async () => ({
+          output: "답",
+          sources: ["승인문답:dtmtl5b1fzj215l3", "kb:0f2b7c19aa41"],
+          sourceTitles: ["보안 서약서 처리 절차", "방화벽 정책 변경 지침"],
+        }),
+      };
+      await verifyHandover(["승인문답:dtmtl5b1fzj215l3"], deps, { actor: null });
+      const row = db.prepare("SELECT sourceNames FROM handover_history").get() as { sourceNames: string };
+      expect(row.sourceNames, "사람 제목이 안 남았다").toBe("보안 서약서 처리 절차, 방화벽 정책 변경 지침");
+      expect(row.sourceNames, "내부 ID가 증적에 그대로 실렸다").not.toContain("승인문답:");
+      expect(row.sourceNames, "내부 ID가 증적에 그대로 실렸다").not.toContain("kb:");
+    });
+
+    it("빈 제목은 뺀다 — 자리를 ID로 메우지 않는다", async () => {
+      const deps = {
+        ...가짜Deps(true),
+        // 가운데 문서는 제목을 못 구했다(memory.사람이읽는문서제목이 빈 문자열을 준다).
+        ask: async () => ({
+          output: "답",
+          sources: ["a.md", "승인문답:xxxx", "c.md"],
+          sourceTitles: ["가 문서", "", "다 문서"],
+        }),
+      };
+      await verifyHandover(["a.md"], deps, { actor: null });
+      const row = db.prepare("SELECT sourceNames FROM handover_history").get() as { sourceNames: string };
+      expect(row.sourceNames).toBe("가 문서, 다 문서");
+    });
+
+    it("제목이 하나도 없으면 이름 칸은 비운다 — 「모른다」가 정직한 상태다", async () => {
+      const deps = {
+        ...가짜Deps(true),
+        // 옛 경로·모듈 흉내처럼 sourceTitles가 아예 안 오는 경우.
+        ask: async () => ({ output: "답", sources: ["승인문답:aaaa", "승인문답:bbbb"] }),
+      };
+      await verifyHandover(["a.md"], deps, { actor: null });
+      const row = db.prepare("SELECT sourceNames FROM handover_history").get() as { sourceNames: string | null };
+      expect(row.sourceNames, "제목을 모르면서 ID로 채웠다").toBeNull();
+    });
+
+    it("★ 판정은 그대로 ID로 한다 — 이름을 남긴다고 검증이 죽으면 안 된다", async () => {
+      const deps = {
+        ...가짜Deps(true),
+        ask: async () => ({
+          output: "답",
+          sources: ["방화벽_인수인계.md"],
+          sourceTitles: ["방화벽 인수인계"], // 제목은 문서 ID와 글자가 다르다
+        }),
+      };
+      const r = await verifyHandover(["방화벽_인수인계.md"], deps, { actor: null });
+      expect(r.cited, "제목으로 판정하면 여기서 0이 된다").toBe(1);
+      // 조회(listHandoverHistory)도 같은 판정을 그대로 센다 — 쓰는 쪽과 읽는 쪽을 함께 본다.
+      expect(listHandoverHistory()[0].passRate).toBe(100);
+    });
   });
 
   it("완료 처리하면 그 회차만 마감된다 — 어느 검증이 실제 인계로 이어졌나", async () => {
