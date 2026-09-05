@@ -21,7 +21,7 @@ import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { onAudit, recordAudit } from "./audit";
 // 「근거 없음」 표식의 판정기 — 배너 문장의 주인은 noevidence.ts 하나다(여기서 문구를 다시 적지 않는다).
-import { 근거없음종류판정 } from "./noevidence";
+import { 근거없음종류판정, 근거범위 } from "./noevidence";
 import { db } from "../db";
 import { migrate } from "../db";
 
@@ -772,7 +772,12 @@ export function registerWorkSessionRoutes(app: Express): void {
     const turns = getSessionTurns(req.params.id).map((t) => {
       if (t.role !== "assistant") return t;
       const 근거없음 = 근거없음종류판정(t.content);
-      return 근거없음 ? { ...t, 근거없음 } : t;
+      if (!근거없음) return t;
+      // 📐 옅힘 **범위**도 같이 읽는다(2026-09-06) — 표식만 실으면 복원한 복합 답이 **전체**를
+      //   옅게 그려, 1단계의 세어 온 숫자까지 회색이 된다. 저장하지 않고 읽을 때 판정하는
+      //   그 자리의 원칙은 그대로다 — 범위도 답 글자(단계 머리표·배너 꼬리)에서만 나온다.
+      const 범위 = 근거범위(t.content);
+      return 범위 ? { ...t, 근거없음, 근거범위: 범위 } : { ...t, 근거없음 };
     });
     res.json({ session, turns });
   });

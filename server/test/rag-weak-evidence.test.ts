@@ -59,7 +59,11 @@ describe("★ 붙이는 방식이 정직한가 — 소스 감시", () => {
     //   억제해 놓고 표식까지 빠져 추정 숫자가 진하게 나간 실측 사고가 그 자리다(라이브 1건).
     //   지키는 것은 그대로다: **억제가 있다** + **그 잣대가 한 곳이다**.
     expect(llm소스, "같은 말을 두 번 붙인다").toMatch(/!모델자기거절_RE[.]test[(]reply[.]slice[(]0, 60[)][)]/);
-    expect(llm소스, "억제 잣대를 noevidence에서 안 가져온다").toContain(String.raw`모델자기거절_RE } from "./noevidence"`);
+    // ⚠ 2026-09-06: 「모델자기거절_RE } from …」처럼 **붙어 있는 글자**로 보던 것을 줄 단위로 바꿨다.
+    //   같은 import에 심볼이 하나 더 붙자(없는수치꼬리) 잣대는 그대로인데 이 시험만 빨개졌다 —
+    //   지키려던 것은 자리 순서가 아니라 「그 정규식을 noevidence에서 가져온다」다.
+    const noev수입 = llm소스.split("\n").filter((l) => l.startsWith("import ") && l.includes('from "./noevidence"'));
+    expect(noev수입.some((l) => l.includes("모델자기거절_RE")), "억제 잣대를 noevidence에서 안 가져온다").toBe(true);
     expect(llm소스.includes(String.raw`/근거 약함|없습니다|확인되지/`), "정규식이 llm.ts에 다시 적혔다 — 두 벌이면 어긋난다").toBe(false);
   });
 
