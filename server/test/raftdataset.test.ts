@@ -8,7 +8,8 @@ import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { ragBlock, RAG_BLOCK_HEADER } from "../src/engine/llm";
+import crypto from "node:crypto";
+import { ragBlock, RAG_BLOCK_HEADER, systemPromptFor } from "../src/engine/llm";
 import {
   refParse, 허용목록읽기, 허용안되는이유, 라이선스판정기, 방해조각고르기, 섞기, 참고자료블록, 토큰추정, chunk,
   시험문항목록, 행만들기,
@@ -712,6 +713,19 @@ describe("★★ 프롬프트 규격 파일이 서버와 같은 글인가", () =
     // 파일 안에서도 앞뒤가 맞아야 한다(지문이 본문과 따로 놀면 어느 쪽이 진짜인지 모른다).
     expect(String(j.system ?? "").length, "system이 비면 하네스가 프롬프트를 못 만든다").toBeGreaterThan(0);
     expect(j.systemChars).toBe(String(j.system).length);
+  });
+
+  // ★★ 2026-09-05 — **system도 정본과 대조한다.** 여기까지가 원래 비어 있던 칸이다:
+  //   ragHeader만 보면 팀원 프롬프트가 바뀌어도 규격은 초록인 채 낡는다. 그러면 gb10 하네스가
+  //   **딴 지문**으로 재면서 「회전 N 대비 좋아졌다」를 말하게 된다 — 잣대가 조용히 갈리는 꼴.
+  //   ⚠ 이 시험이 빨개지면 값을 손으로 고치지 말고 win에서 다시 뽑는다(파일 머리말이 그렇게 적혀 있다).
+  it.runIf(규격있음)("★★ 규격의 system이 llm.ts systemPromptFor(agentId)와 **글자 단위로** 같다", () => {
+    const j = JSON.parse(fs.readFileSync(규격경로, "utf8"));
+    const 정본 = systemPromptFor(String(j.agentId));
+    expect(j.system, `규격이 낡았다(agentId=${j.agentId}) — win에서 node tools/ladder/export-prompt-spec.mjs 로 다시 뽑아 커밋할 것`).toBe(정본);
+    expect(j.systemSha12, "지문이 본문과 따로 논다").toBe(
+      crypto.createHash("sha1").update(정본).digest("hex").slice(0, 12)
+    );
   });
 
   it("규격읽기가 fail-closed다 — 없는 파일·빈 칸·앞뒤 어긋남에서 죽는다", () => {

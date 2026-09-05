@@ -28,6 +28,7 @@ import { 학습재료가못되나 } from "./datasethygiene";
 import "./worksessions";
 import { recordAudit } from "./audit";
 import { isBinaryLikeChunk } from "./ragsanitize";
+import { 근거겹침, OVERLAP_CHARS } from "./citeguard";
 import { gradeOf } from "./grades";
 
 import type { GijoUser } from "../auth/users";
@@ -326,18 +327,11 @@ export interface DistillIntakeResult {
   byReason: Record<string, number>;
 }
 
-const OVERLAP_CHARS = 20;
-/** 답이 근거 본문과 20자 이상 그대로 겹치는가 — 겹친 창을 돌려준다(없으면 null). 공백은 무시. */
-export function 근거겹침(answer: string, sourceText: string): string | null {
-  const a = String(answer ?? "").replace(/\s+/g, "");
-  const s = String(sourceText ?? "").replace(/\s+/g, "");
-  if (a.length < OVERLAP_CHARS || s.length < OVERLAP_CHARS) return null;
-  for (let i = 0; i + OVERLAP_CHARS <= s.length; i += 4) {
-    const w = s.slice(i, i + OVERLAP_CHARS);
-    if (a.includes(w)) return w;
-  }
-  return null;
-}
+// 근거겹침(20자 창)은 **citeguard.ts로 옮겼다**(2026-09-05). 제품 출구(llm.ts)가 같은 잣대로
+// 지어낸 인용을 떼야 하는데, llm이 이 파일을 물면 llm → learncandidates → learnloop → llm
+// 순환이 살아난다(llmhooks.test가 지키는 그 고리). 그래서 **엔진을 하나도 안 무는 잎**으로
+// 내리고 여기서 재수출한다 — 기존 import 경로(distillintake·distillprecheck 시험)는 그대로다.
+export { 근거겹침 } from "./citeguard";
 
 export function intakeDistilledCandidates(teacher: string, items: DistillItem[]): DistillIntakeResult {
   const t = String(teacher ?? "").trim();

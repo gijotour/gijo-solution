@@ -392,7 +392,12 @@ describe("★ RAG 0건 정직 배너 (#8)", () => {
   const src2 = fsw.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
   it("성공-0건(자료없음)과 오류(catch)를 가른다 — 고장을 「없다」로 단정하면 안 된다", () => {
     expect(src2).toMatch(/자료없음: chunks\.length === 0/);
-    expect(src2, "catch가 자료없음=false를 안 돌려준다").toMatch(/catch \{\s*\n\s*return \{ context: null, 약한근거만: false, 자료없음: false \}/);
+    // ⚠ 2026-09-05 — chunks를 함께 돌려주게 바뀌었다(인용 가드가 조각을 봐야 해서).
+    //   `chunks: null`이 여기 **붙어 있어야** 하는 이유가 이 시험의 원래 뜻과 같다: 검색 실패는
+    //   「근거가 없다」가 아니라 **모른다**이므로, 가드가 그 자리에서 인용을 떼면 안 된다.
+    //   (뭉개서 `chunks: []`로 두면 고장 났을 때 정상 인용까지 뗀다 — 「고장을 없다로 단정」의 재판.)
+    expect(src2, "catch가 자료없음=false·chunks=null을 안 돌려준다")
+      .toMatch(/catch \{[\s\S]{0,240}?return \{ context: null, 약한근거만: false, 자료없음: false, chunks: null \}/);
   });
   it("배너가 배선돼 있고 문구가 실패 목록과 안 겹친다", () => {
     expect(src2).toMatch(/ragResult\?\.자료없음 && reply/);

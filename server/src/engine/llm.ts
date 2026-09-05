@@ -21,6 +21,8 @@ import type { Viewer } from "./memory";
 import { explainHardTerms, glossaryGroundingFor } from "./glossary";
 import { gateUserInput } from "./gateway";
 import { currentDocIds, currentAttachText } from "./ragscope";
+// 지어낸 인용 가드 — engine 잎 모듈(아무 엔진도 안 문다)이라 순환이 안 난다(llmhooks.test 정신).
+import { guardCitations, 뗀인용요약 } from "./citeguard";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -198,9 +200,14 @@ const chatLogListeners: ChatLogListener[] = [];
 export function onChatRecorded(l: ChatLogListener): void { chatLogListeners.push(l); }
 export function chatLogListenerCount(): number { return chatLogListeners.length; }
 
-async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean; 자료없음: boolean }> {
+// ⚠ chunks를 **출구까지 나른다**(2026-09-05 인용 가드). 전에는 ragBlock(chunks)에서 조각이
+//   사라져, 답이 「[2]에 따르면 "…"」이라 말해도 그 [2]가 무엇이었는지 아무도 몰랐다.
+//   · `chunks: []`   = 검색은 됐는데 0건 → 가리킬 근거가 없다(가드가 인용을 뗀다)
+//   · `chunks: null` = 제공자 없음·검색 실패 → **근거를 모른다**(가드는 판정을 보류한다)
+//   두 값을 뭉개면 「고장」을 「지어냄」으로 단정하게 된다 — 자료없음과 catch를 가르는 것과 같은 규율.
+async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean; 자료없음: boolean; chunks: string[] | null }> {
   try {
-    if (!ragProvider) return { context: null, 약한근거만: false, 자료없음: false };
+    if (!ragProvider) return { context: null, 약한근거만: false, 자료없음: false, chunks: null };
     const queryMemoryGraded = ragProvider;
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
     // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
@@ -232,9 +239,10 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
     // 자료없음 — 검색은 **성공했는데** 문서 조각이 0건(온톨로지 규칙만으로는 사내 근거라 부르지 않는다).
     // ⚠ 오류(catch)와 절대 뭉개지 않는다: 검색이 죽은 것과 자료가 없는 것은 다른 사실이고,
     //   뭉개면 「검색 고장」을 담당자에게 「자료 없음」으로 단정해 말하게 된다(오늘 종일 잡은 그 병).
-    return { context: parts.length > 0 ? parts.join("\n\n") : null, 약한근거만, 자료없음: chunks.length === 0 };
+    return { context: parts.length > 0 ? parts.join("\n\n") : null, 약한근거만, 자료없음: chunks.length === 0, chunks };
   } catch {
-    return { context: null, 약한근거만: false, 자료없음: false };
+    // 검색 실패는 「근거가 없다」가 아니라 **모른다**이다 — chunks:null로 가드 판정을 보류한다.
+    return { context: null, 약한근거만: false, 자료없음: false, chunks: null };
   }
 }
 
@@ -275,7 +283,22 @@ export function systemPromptFor(agentId: string): string {
     // 언어 강화 — 보안 합성모델(Mistral 계열)의 영어 드리프트, gijo(Qwen)의 중국어 드리프트를 함께 억제.
     "- 출력은 처음부터 끝까지 반드시 한국어로만 작성합니다. 영어·중국어·일본어 문장을 섞지 마세요(코드·명령어·CVE·제품명·버전 등 고유 표기만 원문 유지). 어색한 직역 없이 매끄러운 한글로.",
     // 근거 우선 — GIJO Agent(id=normaltic)만큼 엄격하진 않되, 사내 데이터가 있으면 그것을 우선 근거로 삼도록.
-    "- 아래에 '참고 자료 — 사내 지식 베이스'나 '관련 규칙·관계'(온톨로지)가 붙어 있으면 그것을 최우선 근거로 삼고, 가능하면 어떤 자료·규칙에 따랐는지 밝힙니다. 사내 자료에 없어 일반 지식으로 답할 때는 '(일반 지식 기준)'임을 짧게 표시합니다.",
+    //
+    // ⓐ **인용 꼴을 하나로 못박는다**(2026-09-05 사장님 「추천안수용」 — 제품 경로).
+    //   전엔 「가능하면 어떤 자료에 따랐는지 밝힙니다」뿐이라 꼴이 없었고, 모델은 배운 대로
+    //   「원문: "…"」을 지어냈다(사다리 표본 실측 50건). 제품 규약은 ragBlock의 번호 [1]부터다.
+    //   ⚠⚠ 이 줄은 **꼴 안내일 뿐 방어가 아니다.** 실측(2026-09-04): 「원문 그대로 인용하라」는
+    //     지시를 넣었더니 지어낸 출처가 **5→8건으로 늘었다.** 7B/14B에 규칙을 더해 행동을
+    //     교정하려는 시도는 이 저장소에서 반복해 실패했다(CLAUDE.md). 실제로 막는 것은 출구의
+    //     guardCitations(citeguard.ts)다 — 여기서는 **모양만** 정하고, 있는지 없는지는 코드가 본다.
+    "- 아래에 '참고 자료 — 사내 지식 베이스'나 '관련 규칙·관계'(온톨로지)가 붙어 있으면 그것을 최우선 근거로 삼습니다. 자료의 문장을 그대로 옮길 때만 [n]에 따르면 \"옮긴 문장\" 꼴로 적되, n은 참고 자료에 실제로 붙어 있는 번호만 쓰고 따옴표 안에는 그 자료에 있는 문장을 그대로(40자 안팎, 길어도 160자) 넣습니다. 옮길 자료가 없으면 인용 꼴을 쓰지 않고 자기 말로 설명합니다.",
+    // ⓑ **자료가 없으면 먼저 밝히고** 일반 지식으로 답한다 — 지어내기 전에 없다고 말하는 것이 먼저다.
+    //   ⚠ 「없습니다」라는 **문장 자체는 모델에게 안 시킨다.** 그 말은 코드가 붙이는 배너
+    //     (자료없음배너·자료요청배너·지정범위배너)의 몫이다. 모델이 먼저 말해 버리면
+    //     자료없음중복가드(답 앞 60자)에 걸려 배너가 **안 붙고**, ⚠ 표식이 사라져 평가 게이트
+    //     (배너_RE)·서랍 점검이 같은 답을 다르게 읽는다 — 「코드가 문장을 붙인다」가 프롬프트로
+    //     되돌아가는 것이기도 하다. 그래서 모델에게는 겹치지 않는 표시('(일반 지식 기준)')만 시킨다.
+    "- 참고 자료가 없거나 질문과 무관하면 근거를 지어내지 말고, 답 첫머리에 '(일반 지식 기준)'이라고 먼저 밝힌 뒤 일반 지식으로 답합니다.",
     "- 상대는 기업 보안담당자입니다. 불필요한 미사여구나 서론/결론 없이 간결하고 정확하게 핵심만 답합니다.",
     "- 【반복 금지】 같은 결론·판단을 표현만 바꿔 두 번 이상 말하지 않습니다(예: 본문에서 이미 '먼저 조치해야 한다'고 했다면, 끝에 '결론:'을 또 붙여 같은 말을 반복하지 않습니다). 각 사실·판단은 정확히 한 번만 말하고 끝냅니다.",
     "- 확인되지 않은 사실을 지어내지 않습니다. 모르면 모른다고 답합니다.",
@@ -490,7 +513,13 @@ export function dropEchoSentences(text: string): string | null {
 // ⚠ 짧은 조각은 쓰지 않는다 — '보안 담당자'처럼 정상 답변에도 나오는 말이 걸린다.
 //   길이 14자 이상, **서로 다른 조각 2개 이상**이 겹칠 때만 복창으로 본다.
 // ⚠ 제품 정체성 문구는 뺀다 — '무엇을 하는 제품이야?'에 정상 답변이 그대로 쓸 수 있다.
-const 정체성문구 = ["AI 자산 보안 관리 플랫폼", "보안 어시스턴트", "보안 AI입니다"];
+// ⚠ 「제품 정체성」뿐 아니라 **제품이 정직하게 쓰라고 시킨 문구**도 뺀다(2026-09-05 실측).
+//   normaltic 프롬프트(위 254행)에 「등록된 사내 자료에는 관련 내용이 없습니다」가 글자 그대로
+//   들어 있어, 어느 팀원이든 그 정직한 말을 하면 promptOverlapCount가 2가 되어 **복창으로 몰렸다**
+//   — 재생성 1회를 낭비하고, dropEchoSentences가 그 줄을 지운 뒤 남은 글이 20자 미만이면
+//   「답변을 만들지 못했습니다」로 통째 대체된다. 정직하게 답한 벌로 답을 잃는 셈이다.
+//   (조각 수는 318→350으로만 늘고 다른 정상답 5건의 겹침은 그대로 0이었다.)
+const 정체성문구 = ["AI 자산 보안 관리 플랫폼", "보안 어시스턴트", "보안 AI입니다", "등록된 사내 자료에는 관련 내용이 없습니다"];
 const 조각길이 = 14;
 
 let 조각캐시: Set<string> | null = null;
@@ -1039,6 +1068,30 @@ export async function chat(args: ChatArgs): Promise<string> {
         : "답변을 만들지 못했습니다(내부 지시문이 섞여 걷어냈습니다). 질문을 조금 더 구체적으로 적어 다시 시도해 주세요.";
       emitLlmActivity({ kind: "chat", phase: "start", agent: args.agentId ?? "-", agentName, detail: salvaged ? "복창 문장 제거" : "복창 지속 — 답변 대체" });
     }
+  }
+
+  // ── 지어낸 인용을 뗀다(2026-09-05 사장님 「추천안수용」 — 제품 경로) ────────────────
+  //
+  // 왜 **여기**인가(설계관): 원답과 재생성 답이 위에서 reply 하나로 합쳐진다. 앞(stripScaffoldEcho)에
+  //   두면 재생성 결과가 가드를 안 지나고, 뒤(배너 뒤)에 두면 **코드가 붙인 배너 글자**가 자기인용
+  //   판정을 오염시킨다. 스트리밍도 최종 output은 이 반환값이라 이 한 곳이 스트림·비스트림·재작성·
+  //   도구 답 합성을 전부 덮는다.
+  //
+  // ⚠ 프롬프트가 아니라 코드다 — 실측 2026-09-04: 「원문 그대로 인용하라」는 **지시 문구를 넣었더니
+  //   지어낸 출처가 5→8건으로 늘었다.** 7B/14B에 규칙을 더해 행동을 고치려는 시도는 이 저장소에서
+  //   반복해 실패했다(CLAUDE.md). 꼴은 프롬프트가 안내하고, **있는지 없는지는 여기가 판정**한다.
+  //
+  // ⚠ 흘려 보내는 토막(SSE delta)에는 못 건다 — 「쓰는 중」에 잠깐 보였다 done에서 사라진다.
+  //   최종 답·이력·학습 로그는 전부 뗀 뒤의 글이므로 사람이 보관하는 것은 깨끗하다.
+  const 인용가드 = guardCitations(reply, ragResult?.chunks ?? null);
+  if (인용가드.removed.length > 0) {
+    reply = 인용가드.text;
+    // 계수기 — 원천은 llm_activity_daily 하나(kind=cite). 건수는 detail에, 답 수는 calls에 쌓인다.
+    //   ⚠ 인용 원문은 안 싣는다(사내 문서 본문이 감독 화면·WS로 새면 안 된다).
+    emitLlmActivity({
+      kind: "cite", phase: "done", agent: args.agentId ?? "-", agentName,
+      detail: 뗀인용요약(인용가드.removed),
+    });
   }
 
   // 근거가 **멀 때는 멀다고 먼저 말한다.**

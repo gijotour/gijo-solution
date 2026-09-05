@@ -16,7 +16,10 @@ import { todayLocal } from "../util/date";
 export interface LlmActivityEvent {
   // search=RAG 조회(hybridSearch — 4개 검색 경로 공용 지점) · guard=입구 검사(gateway.gateUserInput)
   // — 2026-08-20 AI 팀 가시화(레일 로스터 깜박임의 실신호. 값이 움직이면 실제로 일어난 것).
-  kind: "chat" | "embed" | "load" | "swap" | "search" | "guard";
+  // cite=근거 없는 인용을 출구에서 뗀 일(llm.ts guardCitations, 2026-09-05). 답 하나에 한 번만
+  //   실리므로 calls는 **뗀 답의 수**이고, 뗀 건수는 detail 한 줄에 있다(집계 칸을 안 늘려도 된다).
+  // ⚠ 새 kind는 **뒤에 붙인다** — wiringcontract.test가 `"search" | "guard"` 연접을 글자로 본다.
+  kind: "chat" | "embed" | "load" | "swap" | "search" | "guard" | "cite";
   phase: "start" | "done" | "error";
   // ⚠ agent는 **에이전트 id**다(orchestrator·scan…) — 일 집계(llm_activity_daily)와 감독
   //   카드가 id로 매칭한다. 표시명을 넣으면 지표가 영원히 0이 된다(검토관 2026-08-20 상1 —
