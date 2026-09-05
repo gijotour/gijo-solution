@@ -1096,8 +1096,10 @@ export async function chat(args: ChatArgs): Promise<string> {
     reply = 인용가드.text;
     // 계수기 — 원천은 llm_activity_daily 하나(kind=cite). 건수는 detail에, 답 수는 calls에 쌓인다.
     //   ⚠ 인용 원문은 안 싣는다(사내 문서 본문이 감독 화면·WS로 새면 안 된다).
-    //   ⚠ **못 뗀 것(보류)도 남긴다** — 답이 통째로 인용이라 되돌린 자리는 가드가 유일하게 못 막는
-    //     부류인데, 안 세면 「깨끗한 답」과 구별이 안 돼 나중에 셀 수조차 없다.
+    //   ⚠ 보류 칸은 지금 늘 비어 있다(2026-09-05) — 「답이 통째로 인용」이면 예전엔 원답을
+    //     되돌렸는데, 그때 지어낸 값이 그대로 나갔다. 이제 가드가 자료없음 안내로 **바꾸고**
+    //     removed(kind=통째교체)에 싣는다. 조건에 보류를 남겨 두는 건 다음에 「막지 못한 부류」가
+    //     생겼을 때 계수기가 그대로 잡게 하려는 것이다.
     emitLlmActivity({
       kind: "cite", phase: "done", agent: args.agentId ?? "-", agentName,
       detail: 뗀인용요약(인용가드.removed, 인용가드.보류),

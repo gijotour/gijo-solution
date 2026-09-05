@@ -15,8 +15,9 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   guardCitations, 근거겹침, 원문꼬리표, 제품인용꼬리표, 뗀인용요약, 대조하한, OVERLAP_CHARS, 겹침걸음,
+  짧은대조하한, 원천에있나, 자료없음안내,
 } from "../src/engine/citeguard";
-import { chat, setRagProvider, resetChatHistoryForTests } from "../src/engine/llm";
+import { chat, setRagProvider, resetChatHistoryForTests, 자료없음중복가드 } from "../src/engine/llm";
 import {
   원문꼬리표 as 관문원문꼬리표, 제품인용꼬리표 as 관문제품인용꼬리표, 창작인용,
 } from "../../tools/team-bench/gates.mjs";
@@ -228,14 +229,32 @@ describe("⑤ 안 건드리는 것들 — 늘려 잡으면 정상 답을 지운�
     expect(guardCitations(답, []).text).toBe(답);
   });
 
-  it("★ 빈 답 방지 — 다 떼서 **글자가 하나도** 안 남으면 원답을 그대로 두되 **세어 남긴다**", () => {
+  it("★★ 답이 통째로 인용이면 **원답을 내보내지 않는다** — 자료없음 안내로 바꾼다(H3)", () => {
+    // ★ 라이브 실측(2026-09-05): 옛 판은 여기서 원답을 그대로 뒀고, 그래서 지어낸
+    //   「클릭률 15%」가 담당자에게 그대로 갔다. 계수기에는 「원답유지 1건」으로만 남아
+    //   **막은 것처럼 보였다** — 세는 것과 막는 것은 다르다.
     const 답 = '원문: "이 답은 통째로 인용 하나뿐이라 떼면 아무것도 안 남는다."';
     const r = guardCitations(답, []);
-    expect(r.removed).toHaveLength(0);
-    expect(r.text).toBe(답);
-    // ★ 첫 판은 여기서 아무것도 안 남겨, 가드가 유일하게 못 막는 부류가 기록에서도 사라졌다.
-    expect(r.보류, "원답유지를 안 셌다 — 나중에 셀 수조차 없다").toHaveLength(1);
-    expect(r.보류[0].kind).toBe("블록없음");
+    expect(r.text, "지어낸 인용뿐인 원답이 그대로 나갔다").not.toBe(답);
+    expect(r.text).toBe(자료없음안내);
+    expect(r.보류, "이제 보류로 남기지 않는다 — 바꿨으니 removed에 실린다").toHaveLength(0);
+    expect(r.removed.map((x) => x.kind)).toContain("통째교체");
+  });
+
+  it("★ 지어낸 숫자가 인용 안에 있어도 함께 사라진다(라이브 실물 「클릭률 15%」 꼴)", () => {
+    const r = guardCitations('[1]에 따르면 "메일 제목에 이모지를 넣으면 클릭률이 15% 오른다고 조사됐다."', []);
+    expect(r.text, "지어낸 숫자가 사용자에게 나갔다").not.toContain("15%");
+    expect(r.text).toBe(자료없음안내);
+  });
+
+  it("★ 바꾼 안내는 **새 문구가 아니다** — llm.ts의 제품 거절 문장 그대로다(단일 출처)", () => {
+    const llm = fs.readFileSync(path.join(__dirname, "../src/engine/llm.ts"), "utf8");
+    expect(llm, "제품 거절 문장이 llm.ts에서 사라졌다 — 두 곳이 어긋났다").toContain(자료없음안내);
+  });
+
+  it("★ 바꾼 안내가 자료없음 배너와 「없습니다」를 겹치지 않는다(코드 배너가 안 붙는다)", () => {
+    // 가드는 배너보다 **앞**에서 돈다. 바꾼 답 앞 60자가 중복가드에 걸려야 배너가 안 붙는다.
+    expect(자료없음중복가드.test(자료없음안내.slice(0, 60)), "배너가 겹쳐 붙어 「없습니다」가 두 번 나온다").toBe(true);
   });
 
   it("★ 짧아도 진짜 답이 남으면 뗀다 — 길이 문턱을 두면 지어낸 출처가 함께 통과한다", () => {
@@ -248,6 +267,140 @@ describe("⑤ 안 건드리는 것들 — 늘려 잡으면 정상 답을 지운�
   it("빈 답·공백은 그대로", () => {
     expect(guardCitations("", []).text).toBe("");
     expect(guardCitations("   ", []).removed).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ 2026-09-05 2차 수리(구멍 4개) — H1 자국 · H2 짧은 인용 · H3 통째 교체 · H4 맨 [n]
+//    넷 다 **라이브/격리 실측에서 나온 것**이지 상상한 사례가 아니다.
+
+/** 뗀 자리에 껍데기가 남았는가 — 세 꼴(빈 괄호·홀로 남은 굵게·빈 표지)과 겹공백·구두점 중복. */
+const 자국없음 = (t: string) => {
+  expect(t, "빈 괄호가 남았다").not.toMatch(/\([ \t]*\)|（[ \t]*）|\[[ \t]*\]/);
+  expect((t.match(/\*\*/g) ?? []).length % 2, "짝 잃은 굵게 표식이 남았다").toBe(0);
+  expect(t, "알맹이 없는 표지가 남았다").not.toMatch(/[(（\[][ \t]*(?:출처|원문|근거|자료)[ \t]*[:：]?[ \t]*[)）\]]/);
+  expect(t, "겹공백이 남았다").not.toMatch(/\S[ \t]{2,}/);
+  expect(t, "구두점이 겹쳤다").not.toMatch(/[,，][ \t]*[,，]/);
+};
+
+describe("★ H1 자국 정리 — 배포 dist에서 재현된 세 꼴", () => {
+  it("① 「(출처: \"지어낸 제목\")」이 「()」로 안 남는다", () => {
+    const r = guardCitations('요약입니다. 아래 내용을 보세요 (출처: "존재하지 않는 사내 문서 제목입니다"). 끝.', 조각);
+    expect(r.removed).toHaveLength(1);
+    expect(r.text).not.toContain("출처");
+    자국없음(r.text);
+  });
+
+  it("② 「**\"…\"**」가 「**」로 안 남는다", () => {
+    const r = guardCitations(`설명을 적습니다. 이어서 적습니다. [1]에 따르면 **"${지어낸문장}"** 라고 되어 있습니다.`, []);
+    expect(r.removed).toHaveLength(1);
+    expect(r.text).not.toContain(지어낸문장);
+    자국없음(r.text);
+  });
+
+  it("③ 한 줄에 둘이 겹친 실물 꼴 — 「발견·평가 (** (출처: …)」", () => {
+    const r = guardCitations(`취약점 발견·평가 (**[1]에 따르면 "${지어낸문장}"** (출처: "없는 문서 제목입니다"))`, []);
+    expect(r.removed.length).toBeGreaterThanOrEqual(2);
+    자국없음(r.text);
+  });
+
+  it("★ 목록 알맹이가 다 사라지면 「- 」만 남기지 않는다(줄째 접는다)", () => {
+    const r = guardCitations(`아래는 사례입니다.\n- 원문: "${지어낸문장}"\n계속 설명합니다.`, []);
+    expect(r.text).not.toMatch(/^[ \t]*[-*·][ \t]*$/m);
+    expect(r.text).toContain("계속 설명합니다.");
+  });
+
+  it("★ 자국이 없는 줄의 정상 괄호·굵게는 한 글자도 안 바꾼다", () => {
+    const 답 = `인터넷 웜(Worm)은 **자동 전파**됩니다.\n원문: "${지어낸문장}"\n1) 첫째 항목 (참고) **굵게**`;
+    const r = guardCitations(답, []);
+    expect(r.text).toContain("인터넷 웜(Worm)은 **자동 전파**됩니다.");
+    expect(r.text).toContain("1) 첫째 항목 (참고) **굵게**");
+  });
+});
+
+describe("★ H2 짧은 인용(무공백 8~22자) — 라이브 실물 사고사례 2건이 그대로 나가던 자리", () => {
+  it("잣대가 하나다 — 23자↑은 겹침, 8~22자는 글자 그대로, 8자 미만은 판정 없음", () => {
+    expect(짧은대조하한).toBe(8);
+    expect(원천에있나("기본 관리자 계정명은 널리", 조각[1]), "8~22자 그대로 옮긴 것을 못 찾았다").toBe(true);
+    expect(원천에있나("기본 계정명은 절대로 못 바꾼다", 조각[1]), "없는 말을 있다고 했다").toBe(false);
+    expect(원천에있나("MFA 필수", 조각[1]), "8자 미만은 판정하지 않는다").toBe(false);
+  });
+
+  // ★ 실물(2026-09-05 라이브 격리): 없는 사고사례 2건이 **출처·연월까지 붙어** 통과했고 계수는 0이었다.
+  const 실물 = [
+    '- **"서버 취약점 잠시 무시하다가 다시 발견"** (출처: "서버 취약점 관리 실패 사례", 2023년 4월)',
+    '- **"패치 미적용으로 랜섬웨어 감염"** (출처: "국내 제조업체 침해사고 사례집", 2022년 11월)',
+  ];
+  it.each(실물)("출처 표지를 **표지째** 뗀다: %s", (줄) => {
+    const r = guardCitations(`아래는 관련 사고 사례입니다.\n${줄}`, 조각);
+    expect(r.removed.length, "지어낸 출처가 그대로 나갔다(계수도 0)").toBeGreaterThan(0);
+    expect(r.text, "출처 표지가 남았다").not.toContain("출처");
+    expect(r.text, "없는 출처의 연월만 살아남았다").not.toMatch(/2023년 4월|2022년 11월/);
+    자국없음(r.text);
+  });
+
+  it("★★ 표지만 떼면 지어낸 사고사례가 **출처 없는 제품 단정**으로 남는다 — 앞 인용문도 함께 뗀다", () => {
+    // 이 파일이 이미 겪은 함정과 같은 모양이다(「출처만 사라지고 주장은 제품 단정으로 읽혀 더 나빠졌다」).
+    const r = guardCitations('아래는 관련 사고 사례입니다.\n' + 실물[0], 조각);
+    expect(r.text, "지어낸 사고사례 문장이 그대로 남았다").not.toContain("잠시 무시하다가");
+    expect(r.text).toContain("아래는 관련 사고 사례입니다.");
+    expect(r.removed[0].reason, "사유에 함께 뗀 사실이 안 남았다").toContain("표지 앞 인용문");
+  });
+
+  it("★ 그러나 인용문이 **원천에 그대로 있으면** 살린다 — 제목이 파일명이라 조각에 없을 때", () => {
+    // 제목(파일명)은 조각 본문에 없어 표지는 떼지만, 인용문은 조각 그대로이므로 남아야 한다.
+    const r = guardCitations('정리하면 "설치 직후 변경해야 한다" (출처: "보안설정_지침_v3.md")입니다.', 조각);
+    expect(r.text, "원천에 그대로 있는 인용문까지 뗐다").toContain("설치 직후 변경해야 한다");
+    expect(r.text).not.toContain("보안설정_지침_v3.md");
+  });
+
+  it("★ 짧아도 **원천에 그대로 있으면** 안 뗀다(오탐 방지 — 이쪽이 더 무섭다)", () => {
+    const r = guardCitations('설명합니다. 이어서 적습니다. [1]에 따르면 "설치 직후 변경해야 한다"', 조각);
+    expect(r.removed, "조각 본문 그대로인 짧은 인용을 뗐다").toHaveLength(0);
+  });
+
+  it("★ 8자 미만은 여전히 판정하지 않는다 — 대조 못 할 것은 안 건드린다", () => {
+    expect(guardCitations('다중 인증을 켜야 합니다. 계정 탈취를 줄입니다. [1]에 따르면 "MFA 필수"', 조각).removed).toHaveLength(0);
+  });
+});
+
+describe("★ H4 맨 [n] — 주석은 「번호 범위만 본다」였는데 코드는 범위조차 안 봤다", () => {
+  it("★ 조각이 2개인데 [1]~[8]이 그대로 나가던 자리 — 표지만 뗀다(문장은 남는다)", () => {
+    const r = guardCitations("기본 계정명을 바꾸는 것이 좋습니다 [1] [5] [8]. 패치도 빨리 설치하세요.", 조각);
+    expect(r.text, "범위 밖 번호가 남았다").not.toMatch(/\[5\]|\[8\]/);
+    expect(r.text, "범위 안 번호까지 지웠다").toContain("[1]");
+    expect(r.text, "문장을 지웠다").toContain("패치도 빨리 설치하세요.");
+    expect(r.removed.map((x) => x.n)).toEqual([5, 8]);
+  });
+
+  it("★ 조각이 0건이면 맨 [n]은 전부 가리킬 곳이 없다", () => {
+    const r = guardCitations("정리했습니다 [2]. 그리고 이어서 설명합니다.", []);
+    expect(r.text).not.toContain("[2]");
+    expect(r.text).toContain("정리했습니다. 그리고 이어서 설명합니다.");
+  });
+
+  it("★ 답이 **자기 번호 목록**을 붙였으면 손대지 않는다 — 코드가 매긴 번호다", () => {
+    // 행동 대조(actioncheck)와 도구 경로(agentloop)가 실제로 내는 두 꼴.
+    const 행동대조 = '【행동 대조】 × 금지\n\n사내 근거(원문 발췌 — 코드가 그대로 오림):\n  [1] 승인문답:abc — "본문"\n  [2] GIJO_지식.md — "본문"';
+    expect(guardCitations(행동대조, []).removed, "코드가 오려 붙인 근거 목록을 건드렸다").toHaveLength(0);
+    const 도구 = "조회 결과를 정리했습니다.\n[1] tool: list_assets — 자산 58건\n[2] tool: list_vulns — 취약점 12건";
+    expect(guardCitations(도구, []).removed).toHaveLength(0);
+  });
+
+  it("★ 마크다운 링크·연도는 인용 번호가 아니다", () => {
+    const 답 = "자세한 것은 [1](https://example.invalid/a) 문서를 보세요. 그리고 [2024] 판을 확인하세요.";
+    expect(guardCitations(답, []).removed).toHaveLength(0);
+    expect(guardCitations(답, []).text).toBe(답);
+  });
+
+  it("★ 코드블록 안의 번호는 안 건드린다", () => {
+    const 답 = "설정은 아래와 같습니다.\n```\nlist[9] = 1\n```";
+    expect(guardCitations(답, []).removed).toHaveLength(0);
+  });
+
+  it("★ chunks가 null이면(도구 답 합성) 맨 [n]도 판정하지 않는다", () => {
+    const 답 = "정리했습니다 [7]. 이어서 설명합니다.";
+    expect(guardCitations(답, null).text).toBe(답);
   });
 });
 
