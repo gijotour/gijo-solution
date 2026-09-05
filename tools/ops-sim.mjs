@@ -25,6 +25,9 @@ import path from "node:path";
 // ⚠ 내용 판정 규칙 가운데 **혼자서도 잴 수 있는 것**은 저쪽에 산다 — 이 파일은 불러들이는 순간
 //   하네스를 돌려버려 시험이 못 부른다(2026-09-06 검토관: 그래서 이 규칙을 무는 시험이 0개였다).
 import { 경고없는퍼센트단정, 퍼센트꼴 } from "./opssim-rules.mjs";
+// 보고서의 **내용 실패 상세** 대목도 같은 이유로 저쪽에 산다(2026-09-06 D4) — 가짜 결과를 넣어
+//   md를 만들어 보는 시험이 있어야 「상세가 빠진 보고서」가 조용히 배포되지 않는다.
+import { 내용실패상세 } from "./opssim-report.mjs";
 
 const BASE = process.env.GIJO_SERVER_URL || "http://localhost:4000";
 const USER = process.env.QA_USER || "claude-deploy";
@@ -744,6 +747,10 @@ const md = [
        ...불편건.map((r) => `| ${r.마당.slice(0, 12)} | ${r.q} | ${r.불편.map((x) => x.종류).join(", ")} | ${r.불편.map((x) => String(x.상세 ?? "")).filter(Boolean).join(" · ").replace(/\|/g, "/").replace(/\n/g, " ").slice(0, 110) || "-"} | ${String(r.out).replace(/\|/g, "/").replace(/\n/g, " ").slice(0, 70)} |`)]
     : []),
   "",
+  // ★ 내용 실패 **상세** (2026-09-06 D4) — 위 표의 「왜」 칸은 110자에서 잘린다.
+  //   기대·실제 앞 120자·근거세기·근거없음을 실패마다 펼쳐 적는 자리는 여기다.
+  //   조립은 tools/opssim-report.mjs에 있다(시험이 부를 수 있도록 — 그 파일 머리글 참고).
+  ...내용실패상세(결과, 기대),
   "## 다시 돌리는 법",
   "```bash",
   "QA_USER=claude-deploy QA_PASS=… node tools/ops-sim.mjs",
