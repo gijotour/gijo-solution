@@ -45,22 +45,49 @@
 #   ⚠ 앞으로 **포트를 고정으로 여는 시험을 만들지 말 것.** 만들면 이 목록에 적고 `--serial`에서만
 #     돌려야 한다 — 포트 0을 쓰면 그런 빚을 안 진다.
 #
-# 사용:  wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/wsl-test.sh" [--serial] [vitest 인자...]
+# 사용:  wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/wsl-test.sh" [--serial] [--src <경로>] [vitest 인자...]
 #   전체:      (인자 없이)
 #   일부:      test/lawfallback.test.ts test/modelcatalog.test.ts
 #   직렬:      --serial  (잠금 + 더운 공용 사본 — 한두 파일만 반복해 돌릴 때 3초쯤 빠르다)
+#   딴 트리:   --src "/mnt/d/Connect AI/.claude/worktrees/foo"   (워크트리·사본을 시험할 때)
+#
+# ⚠⚠ **PowerShell의 $env:GIJO_SRC_ROOT는 여기까지 안 온다**(2026-09-06 실측 사고).
+#   Windows의 환경변수는 WSLENV에 등록하지 않으면 WSL 안으로 안 넘어간다. 그런데 이 스크립트는
+#   못 받으면 조용히 **메인 트리**를 시험한다 — 워크트리를 고쳐 놓고 「초록」을 받는데 정작
+#   **내 변경은 한 줄도 안 돈** 상태다. 실측: 게이트를 지운 사본을 가리켜 돌렸더니 23개 전부
+#   초록이었고, 같은 것을 아래 두 방법으로 다시 돌리자 1 failed가 났다.
+#   → 방법 ①(권장) 인자로 준다:  ... bash ".../wsl-test.sh" --src "/mnt/d/.../worktrees/foo"
+#     방법 ② env를 wsl에 직접 물린다:  wsl -d Ubuntu-24.04 -- env GIJO_SRC_ROOT="..." bash "..."
+#     (Git Bash 안에서라면 전위 대입 `GIJO_SRC_ROOT=... wsl ...`도 되지만, 그건 **Git Bash 문법**이다.)
+#   이 스크립트는 실행 첫 줄에 **어느 트리를 쟀는지** 찍는다 — 초록을 믿기 전에 그 줄을 본다.
 set -u
 
-# ── --serial을 먼저 걷어낸다. 나머지 인자는 손대지 않고 그대로 vitest로 간다. ──
+# ── --serial·--src를 먼저 걷어낸다. 나머지 인자는 손대지 않고 그대로 vitest로 간다. ──
+# ⚠ 순서를 안 가린다(--serial --src, --src --serial 둘 다 받는다) — 부르는 사람이 순서를 외우게
+#   만들면 결국 틀리고, 틀린 결과가 **초록으로** 나온다(이 도구가 막으려는 바로 그 사고다).
 SERIAL=0
-if [ "${1:-}" = "--serial" ]; then SERIAL=1; shift; fi
+SRC_ARG=""
+while [ $# -gt 0 ]; do
+  case "${1:-}" in
+    --serial) SERIAL=1; shift ;;
+    --src)
+      if [ -z "${2:-}" ]; then echo "✗ --src 다음에 경로가 없습니다." >&2; exit 2; fi
+      SRC_ARG="$2"; shift 2 ;;
+    --src=*) SRC_ARG="${1#--src=}"; shift ;;
+    *) break ;;
+  esac
+done
 
 # ⚠ 워크트리(.claude/worktrees/*)에서 편집할 때는 **여기가 메인을 가리키면 안 된다** —
 #   내 변경이 아니라 메인의 옛 코드를 시험하게 되고, 그건 「초록인데 안 고쳐진」 상태다.
-#   GIJO_SRC_ROOT로 덮어쓴다. (DST은 이제 알아서 갈라지므로 따로 안 줘도 안 섞인다.)
-#   예)  GIJO_SRC_ROOT="/mnt/d/Connect AI/.claude/worktrees/foo" \
-#          wsl -d Ubuntu-24.04 -- bash ".../tools/wsl-test.sh" test/modelsplit.test.ts
-SRC_ROOT="${GIJO_SRC_ROOT:-/mnt/d/Connect AI}"
+#   --src 인자로 가리킨다. (DST은 이제 알아서 갈라지므로 따로 안 줘도 안 섞인다.)
+#   예)  wsl -d Ubuntu-24.04 -- bash ".../tools/wsl-test.sh" \
+#          --src "/mnt/d/Connect AI/.claude/worktrees/foo" test/modelsplit.test.ts
+#   ⚠ 옛 예문은 `GIJO_SRC_ROOT=... wsl ...` 꼴이었는데, 그것은 **bash 전위 대입**이라
+#     PowerShell에서 치면 아무 데도 안 닿는다(머리글의 실측 사고). 인자를 쓴다.
+# 우선순위: --src 인자 > GIJO_SRC_ROOT(WSL 안에서 준 것) > 메인 트리.
+# ⚠ 인자를 먼저 보는 이유는 **인자만 확실히 도착하기 때문**이다(위 PowerShell 함정 참고).
+SRC_ROOT="${SRC_ARG:-${GIJO_SRC_ROOT:-/mnt/d/Connect AI}}"
 TEST_ROOT=/home/gijo/gijo-as-test
 
 # 호출 식별자 — 부른 쪽이 이름을 주면 그것을 쓴다(로그에서 누구 사본인지 보인다).
@@ -84,7 +111,9 @@ DST="$DST_ROOT/server"
 if [ "$SERIAL" = 1 ] && [ -z "${GIJO_TEST_LOCKED:-}" ]; then
   mkdir -p "$TEST_ROOT"
   echo "⏳ --serial — 공용 사본을 잠급니다($TEST_ROOT/.wsl-test.lock). 앞 실행이 있으면 기다립니다."
-  exec env GIJO_TEST_LOCKED=1 flock "$TEST_ROOT/.wsl-test.lock" bash "$0" --serial "$@"
+  # ⚠ --src도 함께 넘긴다 — 잠금을 잡고 자기를 다시 부를 때 빠지면, 재귀한 쪽이 조용히
+  #   메인 트리를 재게 된다(이 스크립트가 막으려는 사고를 스스로 저지르는 자리다).
+  exec env GIJO_TEST_LOCKED=1 flock "$TEST_ROOT/.wsl-test.lock" bash "$0" --serial ${SRC_ARG:+--src "$SRC_ARG"} "$@"
 fi
 
 # ── 「엉뚱한 데서 돌았는데 초록」을 막는 관문 (2026-09-05) ──────────────────────────
@@ -123,6 +152,12 @@ if [ "$OWNED" = 1 ]; then
   find "$TEST_ROOT/runs" -maxdepth 1 -mindepth 1 -type d -mmin +1440 -exec rm -rf {} + 2>/dev/null
   trap 'rm -rf "$DST_ROOT"' EXIT INT TERM
 fi
+# ★ 무엇을 쟀는지 **먼저** 찍는다(2026-09-06). 이 줄이 없어서 「워크트리를 고치고 메인을 재고
+#   초록」을 눈으로 못 잡았다. 기본값이면 그렇다고 말한다 — 침묵이 곧 오해의 재료다.
+if [ -n "$SRC_ARG" ]; then SRC_WHY="--src 인자";
+elif [ -n "${GIJO_SRC_ROOT:-}" ]; then SRC_WHY="GIJO_SRC_ROOT";
+else SRC_WHY="기본값(메인 트리)"; fi
+echo "원본: $SRC_ROOT  ($SRC_WHY)"
 echo "사본: $DST_ROOT$([ "$OWNED" = 1 ] && echo '  (이 실행 전용 — 끝나면 지웁니다)' || echo '  (공용/지정 — 그대로 둡니다)')"
 
 echo "=== 사본 동기화 (소스·시험·설정만) ==="
@@ -235,7 +270,7 @@ npx vitest run "$@"
 CODE=$?
 END=$(date +%s)
 echo
-echo "⏱ $((END-START))초  ·  종료코드 $CODE"
+echo "⏱ $((END-START))초  ·  종료코드 $CODE  ·  원본 $SRC_ROOT ($SRC_WHY)"
 echo "   (참고: 같은 시험이 Windows 호스트에서는 파일당 수 분~14분 — 전체는 못 끝낸다)"
 if [ "$OWNED" = 1 ]; then
   echo "   사본 $DST_ROOT 을 지웁니다 — 이 결과는 **다른 실행과 섞이지 않은** 것입니다."
