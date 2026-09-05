@@ -106,6 +106,8 @@ rsync -a --include='*.md' --exclude='*/' --exclude='*' "$SRC_ROOT/" "$DST_ROOT/"
 # 실전 답 기록이 있으면 옮긴다(말투 규범·프롬프트 누출 감시가 이걸로 오탐 0을 증명한다). 없으면 건너뛴다.
 mkdir -p "$DST_ROOT/.tmp-reports"
 [ -f "$SRC_ROOT/.tmp-reports/ops-sim.json" ] && cp "$SRC_ROOT/.tmp-reports/ops-sim.json" "$DST_ROOT/.tmp-reports/" 2>/dev/null
+# 짝인 메타도 함께 — 「완주본인가」 판정이 이 파일로 간다(2026-09-06, wsl-test.sh와 같은 이유).
+[ -f "$SRC_ROOT/.tmp-reports/ops-sim.meta.json" ] && cp "$SRC_ROOT/.tmp-reports/ops-sim.meta.json" "$DST_ROOT/.tmp-reports/" 2>/dev/null
 [ -f "$SRC_ROOT/.gitignore" ] && cp "$SRC_ROOT/.gitignore" "$DST_ROOT/" 2>/dev/null
 
 # ⚠ **사본에도 server/data/ 는 만들어 준다**(2026-09-03).

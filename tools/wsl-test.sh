@@ -167,6 +167,10 @@ rsync -a --include='*.md' --exclude='*/' --exclude='*' "$SRC_ROOT/" "$DST_ROOT/"
 #   않는다 — 이 저장소가 반복해 겪은 「헛도는 시험」이다. 없으면 종전대로 건너뛴다(선택).
 mkdir -p "$DST_ROOT/.tmp-reports"
 [ -f "$SRC_ROOT/.tmp-reports/ops-sim.json" ] && cp "$SRC_ROOT/.tmp-reports/ops-sim.json" "$DST_ROOT/.tmp-reports/" 2>/dev/null
+# ⚠ 짝인 **메타(ops-sim.meta.json)도 함께** 옮긴다(2026-09-06). 「완주본인가」를 읽는 쪽이
+#   손으로 적은 숫자(158)로 재다가 그 숫자가 낡아 버렸다 — 이제 하네스가 메타에 적고 시험이
+#   그것을 읽는다. 메타만 빠지면 시험이 하한선(100건)으로 물러나 잣대가 헐거워진다.
+[ -f "$SRC_ROOT/.tmp-reports/ops-sim.meta.json" ] && cp "$SRC_ROOT/.tmp-reports/ops-sim.meta.json" "$DST_ROOT/.tmp-reports/" 2>/dev/null
 [ -f "$SRC_ROOT/.gitignore" ] && cp "$SRC_ROOT/.gitignore" "$DST_ROOT/" 2>/dev/null
 # ⚠ **사본에도 빈 server/data/는 만들어 준다**(gb10-test.sh가 2026-09-03에 밟은 자리).
 #   지켜보는 폴더의 「제품 자신의 data/를 지정하면 순환이라 거부」 판정은 그 폴더가 실재해야
