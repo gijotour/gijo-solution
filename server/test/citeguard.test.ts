@@ -15,9 +15,10 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   guardCitations, 근거겹침, 원문꼬리표, 제품인용꼬리표, 뗀인용요약, 대조하한, OVERLAP_CHARS, 겹침걸음,
-  짧은대조하한, 원천에있나, 자료없음안내, 근거불일치안내, 출처이름들,
+  짧은대조하한, 원천에있나, 자료없음안내, 근거불일치안내, 출처이름들, 클라우드근거없음안내, 강조걷은글,
 } from "../src/engine/citeguard";
 import { chat, setRagProvider, resetChatHistoryForTests, 자료없음중복가드, ragBlock, RAG_BLOCK_HEADER } from "../src/engine/llm";
+import { formatScreenGuide } from "../src/engine/screenguide";
 import { sanitizeRagChunks } from "../src/engine/ragsanitize";
 import {
   원문꼬리표 as 관문원문꼬리표, 제품인용꼬리표 as 관문제품인용꼬리표, 창작인용,
@@ -1049,6 +1050,23 @@ describe("★★ J4 감독 화면·실동작 스트림의 ✂", () => {
     expect(sup, "화면에 긴 설명문을 적었다 — 풀이는 ⓘ가 연다").not.toMatch(/뗍니다\./);
   });
 
+  it("★★ **화면에 적힌 글자로** 물어도 구역 안내가 열린다(별명표)", () => {
+    // ★ 왜(2026-09-05 검토관): 구역 이름은 「인용 제거(✂)」인데 화면 글자는 「✂ 인용 제거」다.
+    //   괄호 때문에 한 글자도 안 맞아, 담당자가 화면을 보고 물으면 안내가 아니라 RAG로 샜다.
+    //   supervision.html에는 PANEL_ALIASES 칸이 **아예 없었다** — 그 표의 존재 이유가 이것인데도.
+    const 자국 = "그 근거가 실제로 없으면"; // 인용 제거(✂) 구역 안내에만 있는 문장
+    for (const q of ["✂ 인용 제거 뭐야?", "인용 제거가 뭐야?", "인용 검증 어떻게 봐?", "근거 없는 인용 뭐야?"]) {
+      expect(formatScreenGuide("supervision.html", q), `화면 글자로 물었는데 구역 안내가 안 열렸다: ${q}`)
+        .toContain(자국);
+    }
+  });
+
+  it("별명은 **이름만** 잇는다 — 설명을 복사하지 않았다(같은 것을 두 곳에 적으면 어긋난다)", () => {
+    const g = fs.readFileSync(path.join(__dirname, "../src/engine/screenguide.ts"), "utf8");
+    const 표 = g.slice(g.indexOf('"supervision.html": {', g.indexOf("PANEL_ALIASES")));
+    expect(표.slice(0, 표.indexOf("},")), "별명표에 설명문을 적었다").not.toMatch(/그 근거가 실제로 없으면/);
+  });
+
   it("★ citeguard 주석의 「그리는 화면은 없다」가 정정됐다(약속-코드 일치)", () => {
     const c = fs.readFileSync(path.join(__dirname, "../src/engine/citeguard.ts"), "utf8");
     expect(c, "이제 그리는 화면이 있는데 주석은 없다고 말한다").not.toContain("지금 이 값을 **그리는 화면은 없다**");
@@ -1062,7 +1080,9 @@ describe("★★ J5 클라우드 답도 가드를 지난다", () => {
   const cloud = fs.readFileSync(path.join(__dirname, "../src/engine/cloudllm.ts"), "utf8");
 
   it("askCloud가 r.text를 **그대로** 안 돌려준다", () => {
-    expect(cloud, "가드를 안 지난다").toMatch(/const 인용가드 = guardCitations\(r\.text, \[\]\)/);
+    // ⚠ 2026-09-05 검토관 2차로 **계약이 바뀌었다** — chunks=[]만으로는 「출처 표기 전면 삭제기」가
+    //   된다(아래 ⑥ describe). 원천없는출구를 붙여 **번호 인용만** 보게 한다.
+    expect(cloud, "가드를 안 지난다").toMatch(/const 인용가드 = guardCitations\(r\.text, \[\], undefined, \{ 원천없는출구: true \}\)/);
     expect(cloud, "가드를 부르고도 원문을 돌려주면 헛일이다").toMatch(/const answer = 인용가드\.text/);
   });
 
@@ -1082,5 +1102,186 @@ describe("★★ J5 클라우드 답도 가드를 지난다", () => {
 
   it("★ 잣대를 두 벌로 두지 않았다 — llm.ts와 **같은 함수**를 부른다", () => {
     expect(cloud).toMatch(/import \{ guardCitations, 뗀인용요약 \} from "\.\/citeguard"/);
+  });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ 2026-09-05 검토관 **2차** — 「같은 좁힘을 한쪽에만 걸었다」 계열.
+//
+// 1차 수리(J1~J6)가 새로 만든 결함을 병렬 검토관이 8건 잡았고, 그 뿌리는 하나였다:
+//   **답 쪽만 손보고 원천 쪽을 안 손봤다**(강조 표식) · **한 갈래에만 좁힘을 걸었다**(출처|원문·줄머리)
+//   · **원천이 원리상 비는 출구를 「자료가 없다」로 읽었다**(클라우드).
+// ⚠ 여기 시험은 **돌연변이로 검증했다** — 각 좁힘을 지운 사본에서 아래 시험이 실제로 붉어지는지
+//   확인했다. 1차 때 「출처|원문」 좁힘은 지워도 시험이 전부 초록이었다(검토관 적발 5번).
+describe("★★ 검토관 2차 — 원천 마크다운 · 좁힘 비대칭 · 클라우드 출구", () => {
+  // ── ① 원천도 **같은 규칙으로** 강조를 걷는다 ────────────────────────────────────
+  describe("① 조각이 마크다운이어도 그대로 옮긴 인용은 안 뗀다", () => {
+    const 마크조각 = [
+      "> GIJO AS는 조직 규모·역할에 맞춰 **세 가지 에디션**으로 제공합니다. 에디션은 「기계가 얼마나 큰가」가 아니라 **「무엇을 할 수 있는가」(기능)**로 나뉩니다.",
+    ];
+    it("긴 인용(23자↑ 겹침 갈래) — 조각을 글자 그대로 옮겼는데 뗐다", () => {
+      const 답 = `[1]에 따르면 "GIJO AS는 조직 규모·역할에 맞춰 **세 가지 에디션**으로 제공합니다."`;
+      expect(guardCitations(답, 마크조각).removed).toHaveLength(0);
+    });
+    it("짧은 인용(8~22자 verbatim 갈래) — 제품 코퍼스 실물", () => {
+      const 조각들 = ["인증기준은 **세 영역**으로 되어 있다. 관리체계 수립·운영, 보호대책 요구사항, 개인정보 처리단계별 요구사항이다."];
+      const 답 = `설명합니다. 이어서 적습니다. [1]에 따르면 "인증기준은 **세 영역**으로 되어 있다."`;
+      expect(guardCitations(답, 조각들).removed).toHaveLength(0);
+    });
+    it("★ 돌려주는 답에는 굵게가 **그대로** 남는다 — 걷는 것은 대조본뿐이다", () => {
+      const 답 = `[1]에 따르면 "GIJO AS는 조직 규모·역할에 맞춰 **세 가지 에디션**으로 제공합니다."`;
+      expect(guardCitations(답, 마크조각).text).toBe(답);
+    });
+    it("강조걷은글 — 낱말 사이 밑줄·코드 구간은 안 건드린다(오탐이 미탐보다 무섭다)", () => {
+      expect(강조걷은글("**굵게** 확인")).toBe("굵게 확인");
+      expect(강조걷은글("api_key를 확인"), "낱말 사이 밑줄을 걷었다").toBe("api_key를 확인");
+      expect(강조걷은글("\`a*b*c\` 확인"), "코드 구간을 걷었다").toBe("\`a*b*c\` 확인");
+    });
+    it("★★ 제품이 **실제로 싣는** 지식 코퍼스로 잰다 — 오탐 0", () => {
+      // 왜 합성 예문이 아니라 코퍼스인가: 내가 고른 예문만 보면 「내 규칙이 내 예문을 맞힌다」밖에
+      // 못 본다. 1차 수리의 오탐 9.5%는 **이 재료로 재서** 드러났다(합성 예문 ①a는 통과했다).
+      //
+      // ⚠ 재는 것은 **위험 모집단 전수**다 — 강조 표식(`*`·`_`)이 든 문장. 표본이 아니다.
+      //   실측 2026-09-05: 강조 든 문장 1,249건이 수리 전 오탐 **322건을 하나도 빠짐없이** 담았다
+      //   (전수 3,373건을 다 돌려도 오탐은 같은 322건). 강조가 없는 문장은 이 결함이 원리상 못 산다.
+      //   그래서 전수보다 **1/3 값에 같은 민감도**다 — 느린 게이트는 안 도는 게이트가 된다.
+      const 뿌리 = path.join(__dirname, "..", "..", "knowledge");
+      const 파일들 = fs.readdirSync(뿌리).filter((f) => f.endsWith(".md"));
+      expect(파일들.length, "지식 코퍼스가 사라졌다 — 이 시험이 헛통과한다").toBeGreaterThanOrEqual(10);
+      const 오탐: string[] = [];
+      let 총 = 0;
+      for (const f of 파일들) {
+        const 문단 = fs.readFileSync(path.join(뿌리, f), "utf8")
+          .split(/\n{2,}/).map((s) => s.trim()).filter((s) => s.length > 40);
+        for (let i = 0; i < 문단.length; i++) {
+          const chunk = 문단.slice(i, i + 3).join("\n\n"); // 실제 CHUNK는 문단 하나보다 크다
+          for (const 문장 of 문단[i].split(/(?<=[.。!?])\s+|\n/).map((x) => x.trim())) {
+            if (문장.replace(/\s+/g, "").length < 대조하한 || !/[*_]/.test(문장)) continue;
+            총++;
+            if (guardCitations(`[1]에 따르면 "${문장}"`, [chunk]).removed.length > 0) {
+              오탐.push(`${f}: ${문장.slice(0, 60)}`);
+            }
+          }
+        }
+      }
+      expect(총, "강조 든 문장이 안 모였다 — 모집단이 비면 이 시험은 헛통과한다").toBeGreaterThan(500);
+      expect(오탐.slice(0, 5), `조각을 그대로 옮긴 인용 ${오탐.length}/${총}건을 뗐다`).toEqual([]);
+    }, 30_000);
+  });
+
+  // ── ② 줄끝 갈래의 「출처|원문」 좁힘 — 돌연변이 킬러 ────────────────────────────
+  describe("② 줄머리 표지라도 낱말이 「출처|원문」일 때만 본다", () => {
+    // ⚠ 이 세 짝이 좁힘을 지키는 자리다. 좁힘을 지우면 앞의 둘이 붉어진다(돌연변이로 확인).
+    it("「관련 자료: 내부 스캔 결과」는 안 뗀다", () => {
+      expect(guardCitations("정리했습니다.\n관련 자료: 내부 스캔 결과", []).removed).toHaveLength(0);
+    });
+    it("「근거: 담당자 확인 내용」도 안 뗀다", () => {
+      expect(guardCitations("요약입니다.\n근거: 담당자 확인 내용", []).removed).toHaveLength(0);
+    });
+    it("「출처: 없는매체이름」은 뗀다 — 좁힘이 J2를 죽이지 않았다", () => {
+      const r = guardCitations("정리했습니다.\n출처: 없는매체이름", []);
+      expect(r.removed).toHaveLength(1);
+      expect(r.removed[0].kind).toBe("출처미확인");
+    });
+  });
+
+  // ── ③ 괄호 갈래에도 **같은** 좁힘 ───────────────────────────────────────────────
+  describe("③ 맨몸 괄호 갈래도 줄끝 갈래와 같은 좁힘을 쓴다", () => {
+    const 딴조각 = ["아무 관련 없는 조각 본문이 여기 들어 있습니다. 대조 길이를 채우려고 적습니다."];
+    it("「(근거: 위 표)」는 안 뗀다 — 문서가 아니라 정당한 괄호 주석이다", () => {
+      const 답 = "관리자 계정을 바꾸세요. (근거: 위 표)";
+      expect(guardCitations(답, 딴조각).text).toBe(답);
+    });
+    it("「(자료: 내부 스캔 결과)」·「(문서: 담당자 확인)」도 안 뗀다", () => {
+      for (const 답 of ["스캔을 다시 돌리세요. (자료: 내부 스캔 결과)", "확인했습니다. (문서: 담당자 확인)"]) {
+        expect(guardCitations(답, 딴조각).text, 답).toBe(답);
+      }
+    });
+    it("「(출처: CSOOnline, 2021년 11월 25일)」은 뗀다 — J2 표적은 그대로 산다", () => {
+      const r = guardCitations("2021년 대규모 유출이 있었습니다. (출처: CSOOnline, 2021년 11월 25일)", []);
+      expect(r.removed).toHaveLength(1);
+      expect(r.text).toBe("2021년 대규모 유출이 있었습니다.");
+    });
+  });
+
+  // ── ④ 사이말 줄바꿈 넘기도 **같은** 좁힘 ───────────────────────────────────────
+  describe("④ 줄바꿈 넘기는 「줄머리 + 출처|원문」에만 준다", () => {
+    const 한조각 = ["보안 조각 하나가 여기 들어 있습니다. 대조 길이를 채우려고 적어 둔 문장입니다."];
+    it("「질문 문서:⏎\"…\"」에 답이 한 낱말로 줄지 않는다", () => {
+      const 답 = '질문 문서:\n"이 설정을 어떻게 바꾸나요?"';
+      expect(guardCitations(답, []).text, "답이 「\"질문\"」 한 낱말로 축소됐다").toBe(답);
+    });
+    it("「관련 자료:⏎\"…\"」·「**참고 문서:**⏎\"…\"」도 안 건드린다", () => {
+      for (const 답 of ['정리하면 다음과 같습니다.\n\n관련 자료:\n"MFA 적용은 필수입니다"', '**참고 문서:**\n"보안 정책 수립 가이드입니다"']) {
+        expect(guardCitations(답, 한조각).text, 답).toBe(답);
+      }
+    });
+    it("「출처:⏎\"제목\"」은 뗀다 — J1이 노린 배포 dist 실물 꼴", () => {
+      const r = guardCitations('정리했습니다.\n출처:\n"침해사고 대응 실패 사례집"', []);
+      expect(r.removed.length, "J1 표적을 놓쳤다").toBeGreaterThan(0);
+      expect(r.text).not.toContain("침해사고 대응 실패 사례집");
+    });
+  });
+
+  // ── ⑤ 문서꼴 하이픈 — 하나로 판정을 끄지 않는다 ────────────────────────────────
+  describe("⑤ 하이픈 하나로 맨몸 판정을 끄지 않는다", () => {
+    it("「Krebs-on-Security」·「CSO Online, 2021-11-25」·「Bleeping Computer, 2023-04-11」은 뗀다", () => {
+      for (const 이름 of ["Krebs-on-Security", "CSO Online, 2021-11-25", "Bleeping Computer, 2023-04-11"]) {
+        const r = guardCitations(`사고가 있었습니다. (출처: ${이름})`, []);
+        expect(r.removed.length, `지어낸 매체 표지를 놓쳤다: ${이름}`).toBe(1);
+      }
+    });
+    it("★ 제품이 붙인 근거 표시는 그대로 둔다(문서 id·파일명·store:)", () => {
+      for (const 답 of [
+        "안내드립니다. (출처: internet-research-2026-07)",
+        "안내드립니다. (근거: GIJO_지식_가명정보_처리.md)",
+        "안내드립니다.\n근거: store:abc#0f40a",
+      ]) {
+        expect(guardCitations(답, []).text, `제품이 붙인 근거 표시를 지웠다: ${답}`).toBe(답);
+      }
+    });
+    it("ISO 날짜는 **이름이 아니라 꼬리**로 걸러진다", () => {
+      expect(출처이름들("CSO Online, 2021-11-25")).toEqual(["CSO Online"]);
+      expect(출처이름들("한국인터넷진흥원, 2023.04.11")).toEqual(["한국인터넷진흥원"]);
+    });
+  });
+
+  // ── ⑥ 클라우드 출구 — 대조 못 할 것은 안 건드린다 ──────────────────────────────
+  describe("⑥ 원천없는출구 — 「확인 못 했다」를 「가짜다」로 바꿔 말하지 않는다", () => {
+    const 클 = (a: string) => guardCitations(a, [], undefined, { 원천없는출구: true });
+    it("외부 출처 표기를 **안 지운다** — 사용자가 일부러 고른 경로다", () => {
+      const 답 = "랜섬웨어 피해는 2023년에 크게 늘었습니다.\n출처: Verizon DBIR 2023";
+      expect(클(답).text).toBe(답);
+      expect(guardCitations(답, []).removed, "사내 출구 판정까지 느슨해졌다").toHaveLength(1);
+    });
+    it("따옴표 인용도 안 건드린다 — 대조할 원천이 원리상 없다", () => {
+      const 답 = '원문: "공격자는 초기 침투 후 평균 16일간 머문다고 보고되었습니다"';
+      expect(클(답).text).toBe(답);
+    });
+    it("★ 번호 인용은 **뗀다** — [n]은 있지도 않은 근거 블록을 가리킨다(확정된 거짓)", () => {
+      const r = 클('설명합니다. 이어서 적습니다. [1]에 따르면 "사내 서버는 패치가 밀려 있습니다"');
+      expect(r.removed.length, "클라우드가 지어낸 사내 근거 참조를 놓쳤다").toBeGreaterThan(0);
+      expect(r.text).not.toContain("[1]에 따르면");
+    });
+    it("★★ 통째 교체 문구가 「사내 자료가 없다」가 아니다(장애≠부재)", () => {
+      const r = 클('[1]에 따르면 "이 답은 통째로 인용 하나뿐이라 떼면 아무것도 안 남는다."');
+      expect(r.text).toBe(클라우드근거없음안내);
+      expect(r.text, "사내 자료 부재를 단정했다").not.toBe(자료없음안내);
+      expect(r.text).not.toContain("다른 에이전트에게");
+    });
+    it("클라우드 안내 문구는 FAIL_MARKS에 안 걸린다(정직한 답에 실패 딱지가 붙는다)", () => {
+      const 점검 = fs.readFileSync(path.join(__dirname, "..", "..", "tools", "drawer-audit.mjs"), "utf8");
+      const m = 점검.match(/const FAIL_MARKS = \[([\s\S]*?)\];/);
+      expect(m, "FAIL_MARKS를 못 읽었다").toBeTruthy();
+      const 표식 = [...(m?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+      expect(표식.length).toBeGreaterThan(5);
+      expect(표식.filter((t) => 클라우드근거없음안내.includes(t))).toEqual([]);
+    });
+    it("옵션을 안 주면 **옛 판정 그대로**다 — 사내 출구는 하나도 안 느슨해졌다", () => {
+      const 답 = '원문: "이 답은 통째로 인용 하나뿐이라 떼면 아무것도 안 남는다."';
+      expect(guardCitations(답, []).text).toBe(자료없음안내);
+      expect(guardCitations(답, [], undefined, {}).text).toBe(자료없음안내);
+    });
   });
 });
