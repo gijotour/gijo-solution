@@ -281,7 +281,8 @@
           //   ⚠ 아래 부품들보다 **먼저** 부른다 — 위젯은 배지·칩을 같은 말풍선에 덧붙여서,
           //     뒤에 부르면 그 장식의 숫자(「3대목」·「외 5건」)까지 옅어진다.
           //   ⚠ 한쪽만 배선하면 「대화창은 옅은데 화면 위젯은 진한」 상태가 된다(짝 시험이 지킨다).
-          if (P.dimEstimates) P.dimEstimates(typing, r.근거없음);
+          //   ⚠ 셋째 인자 근거범위도 **함께** 넘긴다 — 빠지면 이 입구만 답 전체를 옅게 그린다.
+          if (P.dimEstimates) P.dimEstimates(typing, r.근거없음, r.근거범위);
           // sourceTitles — 배지에 찍을 **사람 제목**(2026-09-06). 두 입구가 **둘 다** 넘긴다.
           P.quotes(typing, r.quotes, r.output || "", r.sources, r.근거세기, r.sourceTitles);
           P.picks(typing, r.picklist, function (보낼글) { send(보낼글); });

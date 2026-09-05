@@ -596,7 +596,11 @@
   //     (「만원·억원」은 「원」보다 뒤에 있어도 앞 글자가 달라 안 가려진다 — 그래도 함께 앞으로 옮겨 둔다.)
   //   ⚠ 공백은 **단위가 있을 때만** 먹는다(2026-09-05 검토관). 예전엔 `\s*`가 밖에 있어
   //     "총 3500 이었다"의 span이 "3500 "이 되어 **점선이 숫자보다 한 칸 넓게** 그어졌다.
-  var 추정치후보_RE = /(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:\s*(%|퍼센트|점|건|개월|개|명|만원|억원|원|달러|배|위|회|시간|분|초|일|주|년|GB|MB|TB))?/g;
+  //   ⚠ 「분」은 **「분기」를 안 먹는다**(2026-09-06). "2분기 이수율"이 「2분」까지만 옅어져
+  //     낱말 한가운데서 점선이 끊겼다 — 「개」가 「개월」을 자르던 것과 같은 부류인데, 이쪽은
+  //     긴 것을 앞에 두는 것으로 못 고친다(「분기」는 시간 단위가 아니라 **분기**라서 아예 셈이 아니다).
+  //     뒤에 「기」가 오면 분 단위가 아니므로 단위로 안 본다 — 「2분기」는 단위 없는 한 자리라 통째로 빠진다.
+  var 추정치후보_RE = /(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:\s*(%|퍼센트|점|건|개월|개|명|만원|억원|원|달러|배|위|회|시간|분(?!기)|초|일|주|년|GB|MB|TB))?/g;
   // ② 제외 — **지어낸 값이 아닌 것**. 식별자가 옅어지면 진짜 근거가 근거 아닌 것처럼 보인다.
   //   시각(14:22)과 TLS 1.3류 두 자리 판번호는 시안 표에 없던 것을 더했다(상위 지시 「날짜·시각」).
   //   ⚠ 일반 두 자리 소수(\d+\.\d+)는 **제외하지 않는다** — 그러면 「평균 72.5점」까지 살아남아
@@ -648,15 +652,62 @@
   // 우리가 그린 장식(배지·칩·카드)이라 답의 값이 아니다.
   var 추정치제외선택자 = "pre, code, a, .dim-est, .dim-skip, .gcw-read, .cs-parse, .cs-chip, .gcp-src, .gcp-src2, .gcp-ev, .gcp-pick, .gcp-next, .gcp-open, .dc-card, .gcw-ap";
 
+  /* ── 범위(2026-09-06 · 승인 시안 mockups/dim-range) ────────────────────────
+   * 표식이 「이 답에 근거 없는 숫자가 있다」만 말하던 것을 **어디를**까지 말하게 넓힌다.
+   * 서버가 실어 보내는 것은 두 가지뿐이고 둘 다 **답에 이미 실려 나간 맨 글자**다:
+   *   · 단계 = 【N. …】 절 번호(복합 지시 답) · 수치 = 배너 꼬리의 표면형(["12.5%"])
+   * 글자 오프셋·문단 번호를 안 쓰는 이유는 시안 §5에 있다 — 이 부품은 렌더가 **두 벌**이라
+   * (지휘소=gijomd 문단 / 위젯=<br> 한 덩어리) 한 오프셋으로 둘 다 가리킬 수 없다.
+   */
+  var 단계머리_RE = /^\s*【(\d{1,3})\.[^】\n]{0,60}】/;
+  /** 대조용 납작 — 공백·자리수 쉼표를 지운다(서버 표면형 "3,200 퍼센트" ↔ 화면 조각이 붙는다). */
+  function 납작(s) { return String(s == null ? "" : s).replace(/\s+/g, "").replace(/,/g, ""); }
+
+  // 두 렌더의 **문단 경계**를 한 규칙으로 담는다. 지휘소는 gijomd가 <p>·<table>·<ul>·<pre>로
+  // 그려 자식이 곧 문단이고, 위젯은 fmt(esc + <b> + <br>)라 <br>이 경계다.
+  var 블록태그 = { P: 1, DIV: 1, TABLE: 1, UL: 1, OL: 1, PRE: 1, BLOCKQUOTE: 1, HR: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1 };
+  function 블록나누기(root) {
+    var 덩어리 = [], 현재 = null, i, c;
+    function 새로() { 현재 = { nodes: [], text: "" }; 덩어리.push(현재); }
+    새로();
+    for (i = 0; i < root.childNodes.length; i++) {
+      c = root.childNodes[i];
+      if (c.nodeType === 1 && c.tagName === "BR") { 새로(); continue; }
+      if (c.nodeType === 1 && 블록태그[c.tagName]) {
+        if (현재.nodes.length) 새로();
+        현재.nodes.push(c); 현재.text += c.textContent || "";
+        새로(); continue;
+      }
+      현재.nodes.push(c);
+      현재.text += (c.nodeType === 3 ? (c.nodeValue || "") : (c.textContent || ""));
+    }
+    var out = [];
+    for (i = 0; i < 덩어리.length; i++) if (덩어리[i].nodes.length) out.push(덩어리[i]);
+    return out;
+  }
+  /** 덩어리에 든 글자 노드를 **문서 순서 그대로** 모은다(울타리 상태를 이 순서로 센다). */
+  function 글자노드들(nodes) {
+    var out = [], i, w, n;
+    for (i = 0; i < nodes.length; i++) {
+      if (nodes[i].nodeType === 3) { out.push(nodes[i]); continue; }
+      w = document.createTreeWalker(nodes[i], NodeFilter.SHOW_TEXT, null);
+      while ((n = w.nextNode())) out.push(n);
+    }
+    return out;
+  }
+
   /**
    * @param el      답 줄(지휘소 .cs-row) 또는 답 말풍선(위젯 .gcw-row)
    * @param 근거없음 서버 표식(r.근거없음) — **없으면 아무것도 안 한다**
+   * @param 범위    옅힐 자리(r.근거범위) — `{단계:[2]}`·`{수치:["12.5%"]}`·둘 다면 AND.
+   *                **없으면 오늘 동작**(그 답 전체). 범위를 못 읽으면 새 기능이 꺼지는 쪽이지
+   *                엉뚱한 숫자가 옅어지는 쪽이 아니다.
    * @returns 옅게 한 개수(시험·관문이 이 숫자를 잰다)
    *
    * ⚠ 부르는 자리: quotes()와 **같은 자리**에 두되 **그 앞**이다. 위젯은 배지·칩을 같은
    *   말풍선에 덧붙이는데, 뒤에 부르면 그 장식의 숫자(「3대목」)까지 옅어진다.
    */
-  function dimEstimates(el, 근거없음) {
+  function dimEstimates(el, 근거없음, 범위) {
     if (!근거없음) return 0;
     var host = 붙일자리(el);
     if (!host || !host.querySelectorAll) return 0;
@@ -664,54 +715,66 @@
     // 지휘소는 말풍선 본문이 .cm이다. 위젯은 그런 칸이 없어 말풍선 자체가 본문이다.
     var root = host.querySelector(".cm") || host;
 
-    var 후보노드 = [], n, i;
-    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var 범위단계 = (범위 && 범위.단계 && 범위.단계.length) ? 범위.단계 : null;
+    var 범위수치 = null, k;
+    if (범위 && 범위.수치 && 범위.수치.length) {
+      범위수치 = [];
+      for (k = 0; k < 범위.수치.length; k++) 범위수치.push(납작(범위.수치[k]));
+    }
+
+    var 후보노드 = [], n, i, j;
+    var 덩어리들 = 블록나누기(root);
     // ⚠ 코드블록 울타리(```)를 **글자로** 따라간다 — 화면 위젯은 마크다운을 안 그려서
     //   ```…``` 가 <pre>가 아니라 맨 글자로 남는다(실측 2026-09-05: 그래서 위젯에서만
     //   설정값 max_items = 75·timeout_sec = 30이 옅어졌다 — 지휘소는 <pre>라 안 걸렸다).
     //   울타리 줄에는 숫자가 없어 후보에서 이미 빠지므로, 상태는 **모든 글자 노드**를 보며 센다.
-    var 코드안 = false;
-    while ((n = walker.nextNode())) {
-      var 글 = n.nodeValue || "";
-      var 울타리 = (글.match(/```/g) || []).length;
-      var 들어올때 = 코드안;
-      if (울타리 % 2 === 1) 코드안 = !코드안;
-      if (들어올때 || 울타리) continue;      // 블록 안 · 울타리가 걸친 줄은 건드리지 않는다
-      var p = n.parentElement;
-      if (!p || (p.closest && p.closest(추정치제외선택자))) continue;
-      if (!/\d/.test(글)) continue;
-      후보노드.push(n);
+    //   ⚠⚠ 건너뛰는 덩어리(배너·범위 밖)에서도 계속 센다 — 건너뛴다고 열린 울타리가 닫히지 않는다.
+    var 코드안 = false, 현재단계 = 0;
+    for (i = 0; i < 덩어리들.length; i++) {
+      var d = 덩어리들[i];
+      var mh = 단계머리_RE.exec(d.text);
+      if (mh) 현재단계 = Number(mh[1]);
+      // 배너 덩어리 제외 — 배너에 숫자가 들어가면 **경고문이 스스로 옅어진다**.
+      //   ⚠ 배너 문구를 클라가 다시 적지 않는다(단일 출처는 noevidence.ts다). 「⚠로 시작하는
+      //     덩어리」라는 **자리**로만 가른다.
+      //   ⚠ 「맨 앞 덩어리만」이 아니라 **어디에 있든** 본다(2026-09-06). 복합 답에서는 배너가
+      //     본문 중간 단계에 실리고, 부분 접지 배너에는 꼬리로 숫자("12.5%")가 들어간다 —
+      //     첫 덩어리만 보던 옛 규칙으로는 그 꼬리가 스스로 옅어졌다.
+      //   ⚠ 단계 머리표를 **뗀 뒤** 본다 — 「【2. 분석】 ⚠배너…」가 한 덩어리로 온다.
+      var 몸 = d.text.replace(/^\s*【\d{1,3}\.[^】\n]{0,60}】\s*/, "");
+      // 범위에 단계가 실렸으면 그 절 안만 본다. 화면에 머리표가 하나도 없으면 현재단계가 0으로
+      // 남아 **아무것도 안 옅어진다** — 서버·화면이 어긋났을 때의 안전한 실패 방향이다.
+      var 건너뜀 = /^\s*⚠/.test(몸) || (범위단계 && 범위단계.indexOf(현재단계) < 0);
+      var 글자들 = 글자노드들(d.nodes);
+      for (j = 0; j < 글자들.length; j++) {
+        n = 글자들[j];
+        var 글 = n.nodeValue || "";
+        var 울타리 = (글.match(/```/g) || []).length;
+        var 들어올때 = 코드안;
+        if (울타리 % 2 === 1) 코드안 = !코드안;
+        if (들어올때 || 울타리) continue;      // 블록 안 · 울타리가 걸친 줄은 건드리지 않는다
+        if (건너뜀) continue;
+        var p = n.parentElement;
+        if (!p || (p.closest && p.closest(추정치제외선택자))) continue;
+        if (!/\d/.test(글)) continue;
+        후보노드.push(n);
+      }
     }
     if (!후보노드.length) return 0;
 
-    // 배너 문단 제외 — 배너에 숫자가 들어가면 **경고문이 스스로 옅어진다**(시안 §4).
-    //   ⚠ 배너 문구를 클라가 다시 적지 않는다(단일 출처는 서버 llm.ts다). 「답 맨 앞의 ⚠
-    //     덩어리」라는 **자리**로만 가른다 — 서버가 `${배너}\n\n${답}` 꼴로 맨 앞에 붙인다.
-    //   ⚠ 렌더러가 둘이라 둘 다 집는다: 지휘소=gijomd(문단 <p>) · 위젯=<br>뿐인 한 덩어리.
-    var 시작 = 0, 첫 = null;
-    for (i = 0; i < root.childNodes.length; i++) {
-      var c = root.childNodes[i];
-      if (c.nodeType === 1 && c.matches && c.matches(추정치제외선택자)) continue;
-      if (c.nodeType === 3 && !String(c.nodeValue || "").trim()) continue;
-      첫 = c; break;
-    }
-    if (첫 && /^\s*⚠/.test(첫.textContent || "")) {
-      if (첫.nodeType === 1) {
-        while (시작 < 후보노드.length && 첫.contains(후보노드[시작])) 시작++;
-      } else {
-        var br = root.querySelector("br");
-        if (!br) return 0; // <br>이 없으면 말풍선 전체가 배너뿐이다
-        while (시작 < 후보노드.length && (후보노드[시작].compareDocumentPosition(br) & 4)) 시작++;
-      }
-    }
-
     var 센다 = 0;
-    for (i = 시작; i < 후보노드.length; i++) {
+    for (i = 0; i < 후보노드.length; i++) {
       var node = 후보노드[i], text = node.nodeValue || "", 조각 = 추정치조각(text);
       if (!조각.length || !node.parentNode) continue;
-      var frag = document.createDocumentFragment(), last = 0, j;
+      // 단계 머리표의 번호는 답의 값이 아니다 — 「【10. 리포트】」의 10이 옅어지면 안 된다.
+      var 머리 = /^\s*【\d{1,3}\.[^】\n]{0,60}】/.exec(text);
+      var 머리끝 = 머리 ? 머리[0].length : 0;
+      var frag = document.createDocumentFragment(), last = 0, 걸린것 = 0;
       for (j = 0; j < 조각.length; j++) {
         var g = 조각[j];
+        if (g.start < 머리끝) continue;
+        // 범위에 수치가 실렸으면 **그 표면형만** 옅게 한다(납작 비교 — "12.5 %"와 "12.5%"를 잇는다).
+        if (범위수치 && 범위수치.indexOf(납작(g.text)) < 0) continue;
         if (g.start > last) frag.appendChild(document.createTextNode(text.slice(last, g.start)));
         var span = document.createElement("span");
         span.className = "dim-est";
@@ -720,8 +783,9 @@
         span.setAttribute("aria-label", 추정치풀이);
         span.textContent = g.text;  // 글자는 그대로 — 복사하면 원문이 나온다
         frag.appendChild(span);
-        last = g.end; 센다++;
+        last = g.end; 센다++; 걸린것++;
       }
+      if (!걸린것) continue;   // 하나도 안 걸리면 DOM을 건드리지 않는다(헛 교체 방지)
       if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
       node.parentNode.replaceChild(frag, node);
     }

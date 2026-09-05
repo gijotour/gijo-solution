@@ -1821,7 +1821,9 @@
       // 근거 없음 — 답에 ⚠ 배너가 붙었으면 **본문의 숫자를 옅게**(2026-09-05 승인 시안).
       //   ⚠ quotes보다 **먼저** 부른다(부품 주석 참고 — 뒤에 부르면 배지 숫자까지 옅어진다).
       //   ⚠ 흐르는 글자(.cs-stream)가 아니라 **완성본으로 갈아낀 뒤** 이 자리에서 한 번만 돈다.
-      if (P.dimEstimates) P.dimEstimates(replyEl, r && r.근거없음);
+      //   ⚠ 셋째 인자 근거범위 = 옅힐 **자리**(단계 번호·수치 표면형). 안 넘기면 답 전체가 옅어져
+      //     복합 답 1단계의 **세어 온 숫자**까지 회색이 된다(2026-09-06 시안 mockups/dim-range).
+      if (P.dimEstimates) P.dimEstimates(replyEl, r && r.근거없음, r && r.근거범위);
       // 근거세기 — 이 문서들이 **답의 근거인지 찾아보기만 한 자료인지**(4-ⓑ, 2026-08-13).
       // sourceTitles — 배지에 찍을 **사람 제목**(2026-09-06). 안 넘기면 내부 ID가 그대로 보인다.
       P.quotes(replyEl, r && r.quotes, (r && r.output) || "", r && r.sources, r && r.근거세기, r && r.sourceTitles);
@@ -1896,7 +1898,7 @@
         // 근거 없음 — 되살린 답도 **방금 받았을 때와 같게** 숫자를 옅게(2026-09-05 검토관).
         //   ⚠ 안 걸면 같은 답이 자리마다 달라 보인다: ⚠ 배너는 보이는데 숫자만 진하다.
         //   표식은 서버가 저장 본문에서 읽어 실어 준다(worksessions GET — 판정기 한 곳).
-        if (m.role !== "user" && P && P.dimEstimates) P.dimEstimates(el, m.근거없음);
+        if (m.role !== "user" && P && P.dimEstimates) P.dimEstimates(el, m.근거없음, m.근거범위);
       });
     } catch (e) { /* 못 불러와도 새 대화는 된다 — 세션이 지워졌을 수 있다 */ }
   }
