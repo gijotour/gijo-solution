@@ -27,6 +27,7 @@ import { startEventLifecycleScheduler, stopEventLifecycleScheduler } from "./eng
 import { startSiemForwarding } from "./engine/siem";
 import { startKbHygieneScheduler } from "./engine/kbhygiene";
 import { refreshKev } from "./engine/kev";
+import { 임베딩준비대기 } from "./engine/embedding"; // 부팅 인입은 임베딩(8081)이 답한 뒤에 — 503 재시도 로그가 매 재시작마다 남던 자리
 import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
 import { ensureKnowledgeBundle } from "./engine/knowledgebundle";
 import { syncIncidentCaseDocsWithRetry } from "./engine/incidentcases"; // 📚 사례 → 지식 문서(결정 ①) — 표는 모듈 로드 때, 문서는 여기서(임베딩이 뜬 뒤)
@@ -109,7 +110,14 @@ httpServer.listen(PORT, () => {
   //   (실측: 고객 첫 설치 부팅 로그에 사례 반입 실패 3줄 → 20초 뒤 재시도로 복구).
   //   경합 자체는 memory.openDocsTable(표를 여는 단일 창구)이 막지만, 순서까지 정해 두면
   //   첫 부팅 로그가 애초에 깨끗하다.
-  void bootstrapDocsBundleWithRetry()
+  // ★ 셋보다 **먼저** 임베딩이 답하는지 확인한다(2026-09-05). 인입 셋은 모두 8081을 쓰는데,
+  //   재시작 직후엔 llama-server가 아직 모델을 올리는 중이라 HTTP 503(Loading model)을 준다 —
+  //   재시도로 복구되긴 하지만 **매 재시작마다** `[memory] 임베딩 일시 실패(시도 1/5)`가 남아
+  //   진짜 사고와 구별이 안 됐다. 대기는 최대 60초, 못 기다려도 **그대로 진행**한다(재시도가
+  //   이어받는다) — 임베딩이 영영 안 뜨는 기계에서 부팅 인입을 막으면 그게 더 나쁜 회귀다.
+  void 임베딩준비대기()
+    .catch((err) => console.error("[index] 임베딩 준비 대기 실패(그대로 진행):", err))
+    .then(() => bootstrapDocsBundleWithRetry())
     .catch((err) => console.error("[index] 제품 문서 인입 실패:", err))
     .then(() => syncIncidentCaseDocsWithRetry())
     .catch((err) => console.error("[index] 사례 문서 동기화 실패:", err))

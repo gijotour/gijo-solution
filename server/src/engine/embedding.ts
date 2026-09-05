@@ -85,3 +85,48 @@ export async function embed(texts: string[]): Promise<number[][]> {
   });
   return data.data.map((d) => d.embedding);
 }
+
+/**
+ * 임베딩 서버가 **실제로 답할 때까지** 기다린다 — 부팅 인입이 헛돌지 않게 (2026-09-05).
+ *
+ * ■ 왜 필요한가(재시작마다 나던 로그)
+ *   `[memory] 임베딩 일시 실패(시도 1/5, N건) — 10초 후 재시도`
+ *   재시작 직후 부팅 인입(제품 문서·사례·승인 문답)이 임베딩 llama-server(8081)의 모델 적재보다
+ *   먼저 달려들어 HTTP 503(Loading model)을 맞는다. 결과는 재시도로 **정상**이지만, 매 재시작에
+ *   사고 흔적이 남아 진짜 사고와 구별이 안 된다 — 로그가 늘 빨가면 아무도 안 본다.
+ *
+ * ■ 무엇을 바꾸나 / 안 바꾸나
+ *   · 바꾸는 것: 부팅 인입을 **준비 신호 뒤에 시작**한다(index.ts 한 곳).
+ *   · 안 바꾸는 것: memory.embedWithRetry의 재시도(5회·10초)는 그대로 둔다. 대기가 실패해도
+ *     종전 동작 그대로 진행한다 — 이 대기는 **로그를 깨끗하게 하는 장치**이지 새 관문이 아니다.
+ *     (임베딩이 영영 안 뜨는 기계에서 부팅 인입을 영구히 막으면 그게 더 나쁜 회귀다.)
+ *
+ * ⚠ /health·/v1/models로 재지 않는다 — 그 둘은 모델이 아직 안 올라와도 200을 준다.
+ *   실제 임베딩을 한 번 돌려 봐야 「반쯤 죽은」 서버를 준비됨으로 오인하지 않는다
+ *   (localengine.자동시작_임베딩이 같은 이유로 같은 방식으로 잰다 — 잣대를 나눠 적지 않으려고
+ *    주소·판정 방식을 이 파일 한 곳에 둔다).
+ * ⚠ 못 기다렸을 때 **조용히 넘어가지 않는다** — 기다렸다는 사실을 로그로 남긴다.
+ *
+ * @returns 준비되면 true, 기한을 넘기면 false(호출자는 그대로 진행한다)
+ */
+export async function 임베딩준비대기(timeoutMs = 60_000, 간격Ms = 2_000): Promise<boolean> {
+  const 시작 = Date.now();
+  const 기한 = 시작 + timeoutMs;
+  for (let 시도 = 1; ; 시도 += 1) {
+    const res = await embedPost(`${EMBEDDING_SERVER_URL}/embeddings`, { model: "local", input: ["ready"] }, 5_000);
+    if (res.ok) {
+      const 걸린초 = Math.round((Date.now() - 시작) / 1000);
+      // 첫 번에 떴으면 조용히 간다 — 평상시 부팅 로그를 한 줄도 안 늘린다.
+      if (시도 > 1) console.log(`[embedding] 임베딩 서버 준비됨 — ${걸린초}초 기다린 뒤 부팅 인입을 시작합니다(시도 ${시도}회).`);
+      return true;
+    }
+    if (Date.now() + 간격Ms >= 기한) {
+      console.warn(
+        `[embedding] 임베딩 서버가 ${Math.round(timeoutMs / 1000)}초 안에 준비되지 않았습니다(시도 ${시도}회) — ` +
+        `부팅 인입을 그대로 시작합니다. 인입 쪽 재시도가 이어받습니다.`
+      );
+      return false;
+    }
+    await new Promise((r) => setTimeout(r, 간격Ms));
+  }
+}
