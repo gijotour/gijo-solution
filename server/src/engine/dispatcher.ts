@@ -23,7 +23,7 @@ import { chat } from "./llm";
 // ⚠ **llm이 아니라 noevidence에서 가져온다.** llm을 통째로 흉내 내는 시험이 76개라, llm에서
 //   심볼을 하나만 더 가져와도 그 시험들의 dispatchInstruction이 죽는다(2026-09-05 실측 9파일 66건).
 //   배너 문장의 주인은 그 파일 하나다 — 여기서 문구를 다시 적지 않는다.
-import { 근거없음종류판정, type 근거없음종류 } from "./noevidence";
+import { 근거없음종류판정, 배너억제_근거약함, type 근거없음종류 } from "./noevidence";
 import { isNonLearningAccount } from "./learnpolicy";
 import { recordChatLog } from "./learnloop";
 import { faqAnswerFor } from "./productfaq";
@@ -672,7 +672,13 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   //   ⚠ 판정기는 **noevidence.ts**(배너 상수를 소유한 곳)에 있다 — 여기서 문구를 다시 적지 않는다.
   //     (2026-09-05 검토관: 이 줄과 위 :151이 llm.ts를 가리키고 있었다. 같은 커밋의 import 주석은
   //      정반대로 「llm이 아니라 noevidence」라 적혀 있어, 한 파일 안에서 두 주석이 어긋났다.)
-  const 근거없음 = 근거없음종류판정(거른것.output);
+  // ★ 둘째 갈래(2026-09-05 라이브 실측) — **배너가 억제된 답**도 잡는다. llm.ts는 답 머리가
+  //   이미 「없습니다」라고 말하면 근거약함 배너를 겹쳐 붙이지 않는데(모델자기거절_RE), 그러면
+  //   표식까지 사라져 이어 붙은 추정치가 진하게 나갔다(70%·80%·60%). 잣대는 새로 만들지 않고
+  //   **이미 실려 있는 근거세기 "약함"**과 같은 정규식을 쓴다 — 판정은 noevidence.ts 한 곳.
+  //   ⚠ 도구·단계가 돈 답은 넘긴다 — 그 답의 숫자는 **세어 온 값**이라 옅게 하면 없던 거짓말이 생긴다.
+  const 근거없음 = 근거없음종류판정(거른것.output)
+    ?? 배너억제_근거약함(거른것.output, 거른것.근거세기, !!(거른것.toolCalls?.length || 거른것.steps?.length));
   const 걸러진 = 근거없음 ? { ...거른것, 근거없음 } : 거른것;
   // ➡ 다음 작업 칩(QA ④, 2026-08-19) — 답의 경로(도구/분기)별로 실측 검증된 후속 지시를
   //   자동 동봉한다. LLM이 만들지 않는다(nextguide.ts 표 — 시나리오 실측 ✓ 문장만).
