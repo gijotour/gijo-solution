@@ -17,7 +17,8 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { DOMAIN_SENSE, glossaryGroundingFor } from "../src/engine/glossary";
+import { DOMAIN_SENSE, glossaryGroundingFor, 남의지표_RE } from "../src/engine/glossary";
+import { isOutOfScope } from "../src/engine/scopeguard";
 
 const agentloop = fs.readFileSync(path.join(__dirname, "../src/engine/agentloop.ts"), "utf8");
 
@@ -96,6 +97,41 @@ describe("★★ 도메인 뜻 표와 [83]이 어긋나지 않는가", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ★★ **남을 가리키는 물음**에는 뜻을 안 깐다 — 라우팅이 좁힌 것을 그라운딩이 도로 넓히면 안 된다
+//
+// [83]은 「업계 평균 클릭률」·「국내 백신 설치율 통계」를 일부러 비켜 준다(우리 실적이 아니므로).
+// 그런데 뜻 주입에 그 배제가 없어서 같은 물음에 「이 제품에서의 뜻 … 마케팅 CTR이 아닙니다」가
+// 깔렸다(2026-09-06 검토관 탐침 4문장 전부). 두 층이 같은 방향을 보게 못 박는다.
+describe("★★ 남의 지표 물음 — 두 층이 같은 쪽을 본다", () => {
+  const 본문83 = 규칙83().본문;
+  // 낱말 목록은 **정규식 소스에서 떼어** 온다(양쪽 다 베끼지 않는다).
+  const 남의낱말 = 남의지표_RE.source.split("|").filter((w) => /^[가-힣]+$/.test(w));
+
+  it("배제어가 [83]의 배제어에 **다 들어 있다** — 한쪽만 늘리면 다시 어긋난다", () => {
+    expect(남의낱말.length, "남의지표_RE에서 낱말을 못 떼어 왔다").toBeGreaterThanOrEqual(8);
+    const 없는것 = 남의낱말.filter((w) => !본문83.includes(w));
+    expect(없는것, "그라운딩만 아는 배제어가 있다 — [83]은 그 물음을 도구로 채 간다").toEqual([]);
+  });
+
+  it("★ 업계·타사·국내·일반적 물음에는 뜻이 안 깔린다", () => {
+    for (const q of [
+      "업계 평균 클릭률 알려줘",
+      "타사 피싱 클릭률 통계 어때?",
+      "일반적으로 이커머스 전환율이 얼마야?",
+      "국내 기업 교육 참여율 평균",
+    ]) {
+      expect(glossaryGroundingFor(q) ?? "", `「${q}」에 우리 뜻이 깔렸다`).not.toContain("이 제품에서의 뜻");
+    }
+  });
+
+  it("★ 우리 물음에는 종전대로 깔린다 — 고치다 방어를 끄지 않았는가", () => {
+    for (const q of ["클릭률 낮추는 법", "전환율이 뭐야?", "보안 교육 참여율 높이려면?"]) {
+      expect(glossaryGroundingFor(q) ?? "", `「${q}」에 뜻이 안 깔렸다`).toContain("이 제품에서의 뜻");
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ★ 하네스 ⑯ 마당과 제품이 같은 갈래를 보고 있는가
 //
 // ⑯ 마당(tools/ops-sim.mjs)은 **모델이 자유롭게 답하는 갈래**를 재려고 만든 자리다.
@@ -115,10 +151,34 @@ describe("★ 하네스 ⑯ 마당의 다섯 물음이 모델 갈래로 온다",
     expect(물음.length).toBeGreaterThanOrEqual(5);
   });
 
-  it("★ 다섯 다 [83]에 안 걸린다(= 모델이 답한다)", () => {
+  // ⚠ 이 시험의 이름을 조심해 적는다(2026-09-06 검토관 적발). 전에는 「[83]에 안 걸린다
+  //   (= 모델이 답한다)」였는데, [83]만 보고 「모델이 답한다」로 **넓게** 말한 것이었다.
+  //   모델 앞에는 층이 더 있고(아래 시험), 실제로 그 앞 층이 「전환율이 뭐야?」를 삼키고 있었다.
+  //   시험은 초록인데 제품은 그 문항을 모델에 안 보냈다 — 약속과 코드의 불일치.
+  it("★ 다섯 다 [83]에 안 걸린다(= 강제 도구로 안 샌다)", () => {
     const { re } = 규칙83();
     const 샌것 = 물음.filter((q) => re.test(q));
     expect(샌것, "⑯의 물음이 kpi_status로 강제됐다 — 그 물음은 도메인 뜻을 못 잰다").toEqual([]);
+  });
+
+  // ★★ 모델 **앞 층**까지 본다 — 실사고를 무는 자리(2026-09-06)
+  //   dispatcher는 도구·RAG보다 **먼저** isOutOfScope로 업무 밖 질문을 거절한다. 「환율」이
+  //   「전환율」에 부분일치해서 「전환율이 뭐야?」가 1.0초 만에 거절로 끝났다(라이브 실측·도구 0).
+  //   뜻 주입(DOMAIN_SENSE)은 그보다 **뒤**라 원리상 못 닿는다 — 앞 층이 삼키면 뒤 층은 없다.
+  it("★★ 다섯 다 **업무 밖 거절**에도 안 걸린다 — 앞 층이 삼키면 뜻은 못 닿는다", () => {
+    const 거절된것 = 물음.filter((q) => isOutOfScope(q));
+    expect(거절된것, "⑯의 물음이 업무 밖으로 거절됐다 — 모델에 닿지 못하니 ⑯는 영영 빨강이다")
+      .toEqual([]);
+  });
+
+  it("★ 뜻 표의 낱말은 그 자체로 업무 안이다 — 표에 낱말을 더해도 앞 층이 안 삼키게", () => {
+    for (const k of Object.keys(DOMAIN_SENSE)) {
+      expect(isOutOfScope(`${k}이 뭐야?`), `「${k}이 뭐야?」가 업무 밖으로 거절된다`).toBe(false);
+      expect(isOutOfScope(`${k} 낮추는 법`), `「${k} 낮추는 법」이 업무 밖으로 거절된다`).toBe(false);
+    }
+    // 되돌리기 방지 — 진짜 업무 밖은 종전대로 거절해야 한다(고치다 방어를 없애지 않았는가).
+    expect(isOutOfScope("환율 얼마야?"), "환율은 여전히 업무 밖이어야 한다").toBe(true);
+    expect(isOutOfScope("오늘 날씨 어때?")).toBe(true);
   });
 
   it("★ 다섯 중 도메인 낱말이 든 물음에는 뜻이 깔린다", () => {

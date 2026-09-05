@@ -13,7 +13,9 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { 경고없는퍼센트단정, 퍼센트꼴 } from "../../tools/opssim-rules.mjs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { 경고없는퍼센트단정, 퍼센트꼴, 마케팅조언인가 } from "../../tools/opssim-rules.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -79,4 +81,88 @@ describe("★ 하네스가 이 모듈을 실제로 부른다", () => {
   it("ops-sim.mjs에 % 정규식 사본이 남아 있지 않다", () => {
     expect(src.includes("(?:%|퍼센트)"), "판정 식이 하네스에 다시 베껴졌다 — 두 곳이 어긋난다").toBe(false);
   });
+
+  it("⑯ 마케팅 판정도 이 모듈에서 온다 — 인라인 사본이 없다", () => {
+    expect(src).toMatch(/import\s*\{[^}]*마케팅조언인가[^}]*\}\s*from\s*["']\.\/opssim-rules\.mjs["']/);
+    expect(src.includes("랜딩\\s*페이지"), "마케팅 낱말 식이 하네스에 다시 베껴졌다").toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ ⑯ 마케팅 조언 판정 — **막은 적도 오탐도 미증명**이던 자리를 닫는다 (2026-09-06)
+//
+// 검토관 적발: 이 금지는 유일한 실측 회차(⑯ 5문항)에서 **0건 매치**라 아무것도 막은 적이 없고,
+//   반대로 「랜딩 페이지·배너 광고」는 **대비해서 설명하는 정답**이 자연스럽게 쓰는 말이라
+//   오탐 위험도 있었다 — 양쪽 다 근거가 없었다. 시험으로 양쪽을 다 못 박는다.
+describe("★★ ⑯ 마케팅 조언 판정 — 정답은 살리고 딴 제품 답은 잡는다", () => {
+  it("★ 마케팅 조언으로 답하면 걸린다(사고의 모양)", () => {
+    expect(마케팅조언인가(
+      "클릭률을 높이려면 랜딩 페이지를 개선하고 CTA 문구를 눈에 띄게 배치하세요.")).toBe(true);
+    expect(마케팅조언인가("타겟팅을 좁히고 광고 예산을 재배분하면 ROAS가 오릅니다.")).toBe(true);
+  });
+
+  it("★★ 대비해서 가르치는 **정답**은 안 걸린다 — 가장 정확한 답을 벌주지 않는다", () => {
+    // 뜻 주입이 「웹 광고·마케팅의 클릭률(CTR)이 아닙니다」라고 대비해 가르치므로,
+    // 제대로 답한 모델일수록 이렇게 쓴다. 옛 판(홑 정규식)은 이 답을 **빨강**으로 만들었다.
+    expect(마케팅조언인가(
+      "여기서 클릭률은 피싱 모의훈련 지표입니다. 배너 광고·랜딩 페이지의 클릭률과는 다릅니다. " +
+      "낮추려면 훈련 주기를 늘리고 신고 버튼 사용을 교육하세요.")).toBe(false);
+    expect(마케팅조언인가(
+      "전환율은 훈련 메일에 계정을 입력한 비율입니다. 이커머스의 구매 전환율이 아닙니다.")).toBe(false);
+  });
+
+  it("보안 답에는 원래 안 걸린다 — 애먼 마당에 새지 않는다", () => {
+    expect(마케팅조언인가("훈련 대상자에게 신고 절차를 안내하고 재훈련을 배정하세요.")).toBe(false);
+    expect(마케팅조언인가("")).toBe(false);
+  });
+
+  it("★ 대비 표지를 **한 문장 안에서만** 인정한다 — 앞 문장 하나로 전체가 면죄되면 안 된다", () => {
+    // 「…아닙니다」를 한 번 써 놓고 뒤에서 마케팅 조언을 늘어놓는 답은 그대로 걸려야 한다.
+    expect(마케팅조언인가(
+      "마케팅 지표가 아닙니다. 다만 랜딩 페이지를 개선하고 배너 광고 예산을 늘리세요.")).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ `--only` 뒤에 값을 빼먹으면 **멈춘다** (2026-09-06 검토관 적발)
+//
+// 옛 판: `String(process.argv[i+1] ?? "")` → 빈 문자열 → ①「0문항이면 멈춘다」guard가
+//   `고른마당 &&`라 안 걸리고 ②파일이름이 ops-sim.only가 아니라 **ops-sim**으로 잡혀,
+//   오타 한 번에 전 문항이 돌며 **야간 회차의 온전한 판을 덮어썼다** — --only가 막으려던 그 사고.
+// ⚠ 하네스는 import가 곧 실행이라 시험이 못 부른다 → **자식 프로세스**로 돌려 종료코드를 본다.
+//   서버가 없어도 인자 검사에서 먼저 죽으므로 로그인·HTTP를 안 탄다.
+describe("★ 하네스 인자 검사 — 값 없는 --only로 전 문항을 돌지 않는다", () => {
+  const 하네스 = join(__dirname, "../../tools/ops-sim.mjs");
+  // ⚠ 실서버를 절대 안 건드린다 — 닫힌 포트로 보내고(로그인에서 즉시 실패) 결과 파일도
+  //   임시 폴더에 쓰게 cwd를 옮긴다(하네스는 process.cwd()/.tmp-reports에 쓴다).
+  const 돌린다 = (인자: string[]) =>
+    spawnSync(process.execPath, [하네스, ...인자], {
+      encoding: "utf8",
+      timeout: 20_000,
+      cwd: tmpdir(),
+      env: { ...process.env, GIJO_SERVER_URL: "http://127.0.0.1:9", QA_USER: "x", QA_PASS: "x" },
+    });
+
+  it("★ `--only`만 주면 종료코드 2로 멈춘다(전 문항 덮어쓰기 방지)", () => {
+    const r = 돌린다(["--only"]);
+    expect(r.status, `멈추지 않았다 — stdout: ${String(r.stdout).slice(0, 200)}`).toBe(2);
+    expect(String(r.stderr)).toContain("--only 뒤에 값이 없습니다");
+  });
+
+  it("`--only` 뒤가 다음 플래그여도 멈춘다", () => {
+    const r = 돌린다(["--only", "--limit", "5"]);
+    expect(r.status).toBe(2);
+  });
+
+  it("`--limit`·`--out`도 같은 잣대다 — 한 곳만 고치면 나머지가 샌다", () => {
+    expect(돌린다(["--limit"]).status).toBe(2);
+    expect(돌린다(["--out"]).status).toBe(2);
+    expect(돌린다(["--limit", "다섯"]).status).toBe(2);
+  });
+
+  it("★ 제대로 준 --only는 인자 검사를 **지나간다** — 고치다 정상 사용을 막지 않았는가", () => {
+    // 서버가 없으면 그 뒤 단계에서 죽는다(2가 아닌 코드). 여기서 보는 것은 「2로 안 죽는다」뿐.
+    const r = 돌린다(["--only", "⑯", "--limit", "1"]);
+    expect(r.status, `인자 검사에서 막혔다 — stderr: ${String(r.stderr).slice(0, 200)}`).not.toBe(2);
+  }, 30_000);
 });
