@@ -192,15 +192,38 @@ describe("★ 배선 — 배너를 붙이는 자리와 읽는 자리", () => {
 // ★ **실전 답 기록**으로 오탐을 잰다 — 내가 고른 예문으로 재면 내 그물에 걸리는 것만 고른다.
 //   (citeguard.test·tone-realanswers·noevidence-mark과 같은 재료를 같은 방식으로 쓴다.)
 const 기록 = path.join(__dirname, "../../.tmp-reports/ops-sim.json");
-const 답들: { q: string; out: string; 도구: string[] }[] = (() => {
+// ★ 문항 수는 **하네스가 메타에 적은 것**을 읽는다(2026-09-06) — 손으로 적으면 낡는다.
+//   실제로 이 파일 제목에 「전체 152건」이 굳어 있었는데 그 사이 문항이 162로 늘어,
+//   읽는 사람은 낡은 숫자를 잣대로 착각했다(같은 날 citeguard가 158로 밟은 자리와 같은 계보).
+const 메타 = (() => {
+  const p = path.join(__dirname, "../../.tmp-reports/ops-sim.meta.json");
+  try { return JSON.parse(fs.readFileSync(p, "utf8")) as { 총문항?: number; 기록?: number; 완주?: boolean }; }
+  catch { return {} as { 총문항?: number; 기록?: number; 완주?: boolean }; }
+})();
+// ⚠ action(라우트가 고른 갈래)까지 받아 둔다 — 아래 「관문이 닿는 답」을 가르는 데 쓴다.
+const 답들: { q: string; out: string; 도구: string[]; action: string }[] = (() => {
   if (!fs.existsSync(기록)) return [];
   try {
     const j = JSON.parse(fs.readFileSync(기록, "utf8"));
     return (Array.isArray(j) ? j : j.results || [])
-      .map((x: any) => ({ q: String(x.q ?? ""), out: String(x.out ?? ""), 도구: x.도구 ?? [] }))
+      .map((x: any) => ({ q: String(x.q ?? ""), out: String(x.out ?? ""), 도구: x.도구 ?? [], action: String(x.action ?? "") }))
       .filter((x: { out: string }) => x.out.trim().length > 0);
   } catch { return []; }
 })();
+
+/**
+ * **관문이 원리상 닿는 답**만 고른다 — 이 관문의 모집단은 「전부」가 아니다.
+ *
+ * 배너는 llm.ts의 RAG 자유 답(remember:true)에서만 붙는다. 그래서 아래 둘은 애초에 대상이 아니다:
+ *   · 도구가 돈 답 — 그 %는 **코드가 계산한 값**이다(KPI 카드·보안 점수·아낀 시간).
+ *   · action이 chat이 아닌 답 — 리포트·분석·스캔은 **결정적 조립 단계**가 만든 답이고
+ *     그 100%도 코드 값이다(실측 2026-09-06: report 갈래 3건이 전부 「100%」였다).
+ *
+ * ⚠ 왜 좁혔나(2026-09-06): 전체를 모집단으로 삼으면 **닿지도 않는 답**까지 세게 되어,
+ *   ⑮·⑯처럼 마당이 늘 때마다 잣대가 흔들린다. 실측으로 162건 중 21건(13%)이 되어 ≤10%가
+ *   깨졌는데, 21건 가운데 19건이 도구 답이었다 — 관문이 나빠진 것이 아니라 **자가 틀렸다.**
+ */
+const 자유답 = 답들.filter((a) => a.도구.length === 0 && a.action === "chat");
 
 describe("★ 실전 답 기록 — 오탐(세어 온 숫자를 추정치라 부르기)이 0인가", () => {
   it.skipIf(답들.length < 50)("★ 도구 답에도 백분율이 있다 — 그래서 이 관문은 **경로로** 막는다", () => {
@@ -217,15 +240,17 @@ describe("★ 실전 답 기록 — 오탐(세어 온 숫자를 추정치라 부
     expect(걸린것.length, "재료가 바뀌었나 — 이 위험이 사라졌다면 위 주석도 함께 고칠 것").toBeGreaterThan(0);
   });
 
-  it.skipIf(답들.length < 50)("전체 152건 중 후보가 뽑히는 답은 극소수다 — 관문이 닿는 범위를 숫자로 남긴다", () => {
-    const 뽑힌 = 답들.filter((a) => 실적수치뽑기(a.out).length);
+  it.skipIf(답들.length < 50)("★ 관문이 닿는 답(도구도 단계도 안 돈 자유 답)에서 후보는 극소수다 — 닿는 범위를 숫자로 남긴다", () => {
+    const 뽑힌 = 자유답.filter((a) => 실적수치뽑기(a.out).length);
     // ⚠ 「0이어야 한다」가 아니다 — 백분율을 말한 답이 실제로 있다(그 답들이 이 관문의 대상이다).
     //   기록해 두는 이유는 다음 사람이 **범위를 넓힐 때 대가를 알고** 넓히도록 하려는 것이다.
-    console.log(`[숫자접지] 실전 ${답들.length}건 중 후보 있는 답 ${뽑힌.length}건 — ` +
+    console.log(`[숫자접지] 하네스 총문항 ${메타.총문항 ?? "?"} · 이 기록 ${답들.length}건` +
+      ` · 관문이 닿는 자유 답 ${자유답.length}건 · 그중 후보 있는 답 ${뽑힌.length}건 — ` +
       뽑힌.map((a) => `${a.q.slice(0, 18)}(${실적수치뽑기(a.out).join(",")})`).join(" · "));
-    expect(뽑힌.length).toBeLessThanOrEqual(Math.ceil(답들.length * 0.1));
-  });
-});
+    expect(자유답.length, "자유 답이 없다 — 기록에 action 칸이 빠졌나(하네스가 안 적으면 이 시험이 헛돈다)")
+      .toBeGreaterThan(20);
+    expect(뽑힌.length).toBeLessThanOrEqual(Math.ceil(자유답.length * 0.1));
+  });});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ★★ **실제 글**로 오탐을 잰다 — 내가 고른 예문만 보면 「내 규칙이 내 예문을 맞힌다」밖에 못 본다.
@@ -239,11 +264,74 @@ describe("★ 실전 답 기록 — 오탐(세어 온 숫자를 추정치라 부
 //   뿌리 *.md를 사본에 함께 실어 준다(두 하네스 모두 확인).
 // ⚠ 재는 방향은 **오탐 한쪽**이다. 「조각에 그대로 적힌 백분율」을 관문이 「없다」고 하면,
 //   화면은 참인 숫자까지 옅게 그린다 — 이 관문이 막으려는 것의 정반대(noevidence.ts).
+// ⚠ 모집단을 **저장소에 커밋된 목록으로 못 박는다**(2026-09-06). 예전엔 뿌리를 readdir 했는데,
+//   뿌리에는 추적 안 되는 md(작업 중 메모·임시 보고서)가 섞여 **사본마다 개수가 달랐다** —
+//   win 56개 · WSL 사본 56개 · 깨끗한 사본 53개. 모집단이 흔들리면 「오탐 0」이 어느 글에서
+//   0인지가 실행마다 달라지고, 임시 파일 하나로 총 개수가 넘거나 모자라 잣대가 흔들린다.
+//   → 목록을 여기 적고, **하나라도 없으면 빨강**으로 알린다(문서를 지웠으면 목록도 함께 고친다).
+const 뿌리MD = [
+  "CLAUDE.md",
+  "GIJO_AS_3머신_개발환경_가이드.md",
+  "GIJO_AS_AIBOM_검토_가이드.md",
+  "GIJO_AS_AI보안점검_항목표_초안.md",
+  "GIJO_AS_AI팀_증류학습_계획서.md",
+  "GIJO_AS_GA_판정표.md",
+  "GIJO_AS_LLMOps_관측성_계획서.md",
+  "GIJO_AS_LLM_합성_안내.md",
+  "GIJO_AS_Lite_설치안내서_2026-08-13.md",
+  "GIJO_AS_MAC_M4_24GB_구성안.md",
+  "GIJO_AS_MAC_올인원_배포_가이드.md",
+  "GIJO_AS_MAC_인계_대기.md",
+  "GIJO_AS_N2SF_대응.md",
+  "GIJO_AS_QA·점검_연대기.md",
+  "GIJO_AS_RAG_아키텍처_LLM연동.md",
+  "GIJO_AS_gb10_실측_인계_2026-09-03.md",
+  "GIJO_AS_공동작업_가이드.md",
+  "GIJO_AS_대화시나리오_대장_2026-08-19.md",
+  "GIJO_AS_대화창_말투규범.md",
+  "GIJO_AS_디자인·코드검토_안내.md",
+  "GIJO_AS_라이트_모델후보_실측_2026-08-13.md",
+  "GIJO_AS_모델_선택_가이드.md",
+  "GIJO_AS_문서_통합_2026-09-01.md",
+  "GIJO_AS_문체_AI스러움_실측_2026-08-10.md",
+  "GIJO_AS_배포_가이드.md",
+  "GIJO_AS_버전관리_기준.md",
+  "GIJO_AS_보안담당자_실무매뉴얼.md",
+  "GIJO_AS_보안담당자_활용가이드.md",
+  "GIJO_AS_보안제품관리_지침.md",
+  "GIJO_AS_사용자_매뉴얼.md",
+  "GIJO_AS_시연_패키지.md",
+  "GIJO_AS_시장경쟁력_전중후_계획서.md",
+  "GIJO_AS_시험지도.md",
+  "GIJO_AS_아키텍처_개요.md",
+  "GIJO_AS_에디션·라인업_가이드.md",
+  "GIJO_AS_온톨로지_강화_가이드.md",
+  "GIJO_AS_용어사전.md",
+  "GIJO_AS_우리AI_구성_안내.md",
+  "GIJO_AS_이렇게_쓰면_됩니다.md",
+  "GIJO_AS_인수인계_가이드.md",
+  "GIJO_AS_제품소개.md",
+  "GIJO_AS_제품소개서.md",
+  "GIJO_AS_취약점관리_지침.md",
+  "GIJO_AS_클라이언트_여정_점검_변경안_2026-09-01.md",
+  "GIJO_AS_파일럿_제안_1장.md",
+  "GIJO_AS_파일럿_첫날_키트.md",
+  "GIJO_AS_파일읽기_에이전트_모델가이드.md",
+  "GIJO_AS_하이브리드LLM_비용최적화_설계서.md",
+  "GIJO_AS_화면구성_가이드.md",
+  "README.md",
+  "인계_max_win_연초록_실기검증_2026-08-20.md",
+  "인계_win_max_조합가드_보는목록배관_2026-08-18.md",
+  "프로셸_사용자테스트_기록_2026-08-19.md",
+];
+
 describe("★★ 저장소 문서 코퍼스 — 조각에 그대로 적힌 백분율을 「없다」고 하지 않는가", () => {
   it("오탐 0건 — 모집단은 조각에 실제로 적힌 백분율 전수", () => {
     const 뿌리 = path.join(__dirname, "..", "..");
-    const 파일들 = fs.readdirSync(뿌리).filter((f) => f.endsWith(".md"));
-    expect(파일들.length, "뿌리 md가 사라졌다 — 재료가 없으면 이 시험은 헛통과한다").toBeGreaterThanOrEqual(20);
+    const 없는것 = 뿌리MD.filter((f) => !fs.existsSync(path.join(뿌리, f)));
+    expect(없는것, "목록에 적힌 뿌리 md가 없다 — 문서를 지웠거나 이름을 바꿨으면 이 목록도 함께 고칠 것")
+      .toEqual([]);
+    const 파일들 = 뿌리MD;
     let 총 = 0;
     const 오탐: string[] = [];
     for (const f of 파일들) {
@@ -259,6 +347,7 @@ describe("★★ 저장소 문서 코퍼스 — 조각에 그대로 적힌 백�
         }
       }
     }
+    console.log(`[숫자접지] 뿌리 md ${파일들.length}개 · 조각에 적힌 백분율 ${총}건 · 오탐 ${오탐.length}건`);
     expect(총, "조각에 적힌 백분율이 안 모였다 — 모집단이 비면 헛통과한다").toBeGreaterThan(120);
     expect(오탐.slice(0, 5), `원천에 그대로 있는 값 ${오탐.length}/${총}건을 「없다」고 했다`).toEqual([]);
   }, 30_000);
