@@ -134,12 +134,13 @@ async function login(base, user, password) {
  */
 async function 규격으로프롬프트(specPath) {
   // 규격읽기가 칸 누락·앞뒤 어긋남을 다 본다(fail-closed) — 여기서 다시 세지 않는다.
+  // ⚠ **오늘 꼴로 다시 세면 안 된다**(2026-09-05 검토관). 여기서 `예시블록(j.ragHeader) !== j.ragBlockSample`
+  //   을 한 번 더 걸면, 규격읽기가 옛 꼴로 받아 준 **보관 규격 9개**가 이 자리에서 다시 죽는다 —
+  //   옛 회전을 재현할 길이 없어진다. 대신 어느 꼴인지를 **출처에 적어** 결과에 남긴다.
   const j = 규격읽기(specPath);
-  // 파일에서 왔어도 조립 꼴 대조는 **그대로 한다** — 규격이 낡았는지는 이 대조가 먼저 말한다.
-  if (예시블록(j.ragHeader) !== j.ragBlockSample) {
-    throw new Error(`규격 파일의 참고 자료 블록 조립 꼴이 어긋난다: ${specPath}`);
-  }
-  return { system: j.system, ragHeader: j.ragHeader, auth: null, refreshToken: null, server: null, 출처: `prompt-spec:${specPath}` };
+  const 꼴표 = j.꼴 && j.꼴 !== "제목있음" ? `(${j.꼴})` : "";
+  if (꼴표) console.error(`⚠ 규격이 옛 꼴이다 ${꼴표}: ${specPath} — 오늘 회전과 견줄 때 이 차이를 적어 두고 견주세요.`);
+  return { system: j.system, ragHeader: j.ragHeader, auth: null, refreshToken: null, server: null, 출처: `prompt-spec${꼴표}:${specPath}` };
 }
 
 async function 프롬프트받기(server, agent) {

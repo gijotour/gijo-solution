@@ -769,14 +769,40 @@ describe("★★ 프롬프트 규격 파일이 서버와 같은 글인가", () =
       expect(() => 규격읽기(임시), "system이 없으면 하네스가 프롬프트를 못 만든다").toThrow(/system/);
       fs.writeFileSync(임시, JSON.stringify({ system: "s", ragHeader: "머리말", ragBlockSample: "엉뚱한 예시" }));
       expect(() => 규격읽기(임시)).toThrow(/어긋납니다/);
-      // ★ 제목이 빠진 **옛 꼴**도 이제는 어긋남이다 — 그래야 낡은 규격 파일로 굽는 일이 막힌다.
+      // ★ 제목이 빠진 **옛 꼴**은 「낡은 규격」이 아니라 **그때의 사실**이다(2026-09-05 검토관).
+      //   첫 판은 이 자리를 죽였는데, 그 바람에 저장소에 보관된 회전 1~4의 규격 파일 9개가
+      //   통째로 안 읽혀 **옛 회전을 재현·재측정하는 길**까지 닫혔다(ask-samples --prompt-spec).
+      //   이제 **아는 꼴이 둘**이다: 어느 꼴인지가 `꼴`로 따라 나오고, 둘 다 아니면 그대로 죽는다.
       fs.writeFileSync(임시, JSON.stringify({ system: "s", ragHeader: "머리말", ragBlockSample: "머리말\n[1] <조각 본문>" }));
-      expect(() => 규격읽기(임시), "제목 없는 옛 예시가 통과했다").toThrow(/어긋납니다/);
-      // 앞뒤가 맞으면 읽힌다.
+      expect((규격읽기(임시) as { 꼴: string }).꼴, "옛 회전 규격을 못 읽으면 그 회전과 견줄 수 없다").toBe("제목없음(K4 이전)");
+      // 앞뒤가 맞으면 읽힌다 — 오늘 꼴은 「제목있음」으로 적힌다.
       fs.writeFileSync(임시, JSON.stringify({ system: "s", ragHeader: "머리말", ragBlockSample: "머리말\n[1] 《<문서 제목>》 <조각 본문>" }));
-      expect((규격읽기(임시) as { system: string }).system).toBe("s");
+      const 읽음 = 규격읽기(임시) as { system: string; 꼴: string };
+      expect(읽음.system).toBe("s");
+      expect(읽음.꼴, "어느 꼴로 읽었는지가 안 적히면 결과만 보고 못 가린다").toBe("제목있음");
     } finally {
       fs.rmSync(임시, { force: true });
+    }
+  });
+
+  it("★★ 저장소에 보관된 회전 규격이 **전부 읽힌다** — 옛 회전을 재현할 수 있어야 한다", () => {
+    // 2026-09-05 실측: 고치기 전 10개 중 9개가 「어긋납니다」로 죽었다(오늘 꼴 하나만 알던 탓).
+    const 규격들 = [
+      "tools/team-bench/prompt-spec.json",
+      "tools/team-bench/results-ladder/baseline/prompt-spec.json",
+      "tools/team-bench/results-ladder/day2/r1-base/probe-v2/prompt-spec.json",
+      "tools/team-bench/results-ladder/day2/r2-v2/ep1/prompt-spec.json",
+      "tools/team-bench/results-ladder/day2/r2-v2/ep2/prompt-spec.json",
+      "tools/team-bench/results-ladder/day2/r2-v2/ep3/prompt-spec.json",
+      "tools/team-bench/results-ladder/day2/r3-v3/ep1/prompt-spec.json",
+      "tools/team-bench/results-ladder/day2/r3-v3/ep2/prompt-spec.json",
+      "tools/team-bench/results-ladder/day2/r4-v4/ep1/prompt-spec.json",
+      "tools/team-bench/results-ladder/day2/r4-v4/ep2/prompt-spec.json",
+    ].filter((rel) => fs.existsSync(path.join(루트, rel)));
+    expect(규격들.length, "보관 규격이 사라졌다(경로가 바뀌었나)").toBeGreaterThanOrEqual(9);
+    for (const rel of 규격들) {
+      const j = 규격읽기(rel) as { 꼴: string };
+      expect(j.꼴, `보관 규격을 못 읽는다 — 이 회전과는 견줄 수 없다: ${rel}`).toBeTruthy();
     }
   });
 

@@ -11,7 +11,7 @@
 //   20자 겹침은 tasks.mjs T6 채점기가, 점수·한글·tok/s는 run.mjs가 남긴다. 그래서 이 시험은
 //   「게이트가 그 값을 다시 계산하지 않고 **그대로 읽는가**」를 함께 본다(잣대 단일 출처).
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -988,6 +988,34 @@ describe("사슬이 표본을 만들 **두뇌를 띄운다**(day2-train.sh 소�
   });
 });
 
+describe("★★ 도구 .mjs는 LF다 — CRLF 셔뱅 하나가 시험 파일 두 개를 통째로 죽였다", () => {
+  // 2026-09-05 실측(win·WSL 둘 다): tools/build-raft-dataset.mjs가 `#!/usr/bin/env node\r\n`이라
+  //   vitest가 import하는 순간 `SyntaxError: Invalid or unexpected token`으로 죽어,
+  //   **이 파일과 raftdataset.test.ts가 「0 test」**였다. 학습 꼴 = 추론 꼴을 지키라고 만든
+  //   짝 시험들이 그동안 한 번도 안 돈 것이다. 격리 재현: CRLF+셔뱅 ✕ / LF+셔뱅 ✓ / CRLF+셔뱅없음 ✓.
+  // ⚠ .gitattributes의 `*.mjs text eol=lf`가 막지만, **규칙은 잊히고 파일은 남는다** —
+  //   그래서 여기서 파일 자체를 잰다(같은 버그가 이 저장소에서 세 번째다: .sh · workflows · 여기).
+  const 뿌리 = join(__dirname, "..", "..");
+  const 훑기 = (d: string, 모음: string[] = []): string[] => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+      const p = join(d, e.name);
+      if (e.isDirectory()) 훑기(p, 모음);
+      else if (e.name.endsWith(".mjs")) 모음.push(p);
+    }
+    return 모음;
+  };
+
+  it("tools/ 아래 모든 .mjs에 CRLF가 없다", () => {
+    const 나쁨: string[] = [];
+    for (const f of 훑기(join(뿌리, "tools"))) {
+      const b = readFileSync(f);
+      if (b.includes("\r\n")) 나쁨.push(f.slice(뿌리.length + 1).replace(/\\/g, "/"));
+    }
+    expect(나쁨, "CRLF인 .mjs가 있다 — 셔뱅이 있으면 vitest가 그 파일을 import하는 순간 죽는다").toEqual([]);
+  });
+});
+
 describe("표본 하네스는 죽어도 **세션을 닫는다**(ask-samples.mjs 소스 감시)", () => {
   const src = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "ask-samples.mjs"), "utf8");
 
@@ -1002,9 +1030,20 @@ describe("표본 하네스는 죽어도 **세션을 닫는다**(ask-samples.mjs 
   });
 
   it("★ 근거 꼴 대조는 fail-closed다 — 창구가 그 값을 안 주면 **거기서 죽는다**", () => {
-    expect(src, "「있으면 대조한다」는 대조가 아니다").not.toMatch(/if \(j\.ragBlockSample && 참고자료블록/);
+    // ⚠ **감시는 지금 있는 이름을 봐야 한다**(2026-09-05 검토관). 옛 감시는 `j.ragBlockSample && 참고자료블록`
+    //   을 봤는데, 같은 커밋(a6f47fde)이 그 자리 심볼을 **예시블록으로 바꿔** 그 문자열이 소스에 다시
+    //   나타날 수 없게 됐다 — 「있으면 대조한다」식 반쪽 대조를 `예시블록`으로 되살려도 초록이었다.
+    //   이제 **두 이름 다** 막고, fail-closed 두 줄을 양성으로 함께 잰다.
+    expect(src, "「있으면 대조한다」는 대조가 아니다").not.toMatch(/if \(j\.ragBlockSample && (?:참고자료블록|예시블록)/);
     expect(src).toContain("if (!j.ragBlockSample)");
     expect(src).toContain("창구가 ragBlockSample을 안 준다");
+  });
+
+  it("★ 보관 규격(옛 회전)은 **읽히되 꼴이 적힌다** — 오늘 꼴로 다시 세지 않는다", () => {
+    // 2026-09-05 검토관: 규격읽기가 옛 꼴을 받아 줘도 여기서 오늘 꼴로 다시 세면 그 자리에서 또 죽는다.
+    expect(src, "규격으로프롬프트가 오늘 꼴로 다시 세면 보관 규격 9개가 여기서 죽는다")
+      .not.toContain("throw new Error(`규격 파일의 참고 자료 블록 조립 꼴이 어긋난다");
+    expect(src, "어느 꼴이었는지를 출처에 적어 남긴다").toContain("prompt-spec${꼴표}");
   });
 });
 
