@@ -87,7 +87,35 @@ if [ "$SERIAL" = 1 ] && [ -z "${GIJO_TEST_LOCKED:-}" ]; then
   exec env GIJO_TEST_LOCKED=1 flock "$TEST_ROOT/.wsl-test.lock" bash "$0" --serial "$@"
 fi
 
-if [ ! -d "$SRC" ]; then echo "✗ 원본을 찾지 못했습니다: $SRC"; exit 2; fi
+# ── 「엉뚱한 데서 돌았는데 초록」을 막는 관문 (2026-09-05) ──────────────────────────
+#
+# ■ 실측한 함정 (Git Bash에서 이 도구를 부를 때)
+#   `wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/wsl-test.sh"` 를 **Git Bash**에서 치면
+#   MSYS 경로 변환이 인자를 갈아치워 `C:/Program Files/Git/mnt/d/...` 가 된다. 그러면
+#   bash가 **스크립트를 아예 못 열고** 끝난다(실측 종료코드 127, 시험 0개 실행).
+#   127 자체는 정직한 실패지만, 부르는 쪽이 `... | tail -1` 처럼 **파이프로 받으면 파이프의
+#   종료코드(0)**를 보게 되어 「전부 통과」로 읽힌다 — 이 저장소가 push에서 이미 밟은 그 함정이다.
+#   → 해결은 두 가지다: (1) `MSYS_NO_PATHCONV=1` 을 앞에 붙이거나 (2) PowerShell에서 부른다.
+#
+# ■ 그리고 **이 스크립트가 Git Bash 안에서 직접 도는 것**도 막는다.
+#   그때는 /mnt/d가 없어 아래 exit 2에 걸리지만, 사람이 받는 안내가 「원본 없음」뿐이라
+#   진짜 원인(딴 셸에서 돌렸다)을 못 찾는다. 무엇보다 **제품은 WSL에서 돈다** —
+#   Windows 셸에서 재면 딴 환경을 검증하는 것이다(이 파일 머리말의 존재 이유).
+if [ -n "${MSYSTEM:-}" ] || ! grep -qi microsoft /proc/version 2>/dev/null; then
+  echo "✗ 여기는 WSL이 아닙니다(MSYSTEM=${MSYSTEM:-없음})." >&2
+  echo "  이 도구는 **WSL 안에서만** 뜻이 있습니다 — 제품이 WSL에서 돌기 때문입니다." >&2
+  echo "  PowerShell에서:  wsl -d Ubuntu-24.04 -- bash \"/mnt/d/Connect AI/tools/wsl-test.sh\"" >&2
+  echo "  Git Bash에서:    MSYS_NO_PATHCONV=1 을 맨 앞에 붙이세요(안 붙이면 경로가 뭉개집니다)." >&2
+  exit 2
+fi
+
+if [ ! -d "$SRC" ]; then
+  echo "✗ 원본을 찾지 못했습니다: $SRC" >&2
+  echo "  → GIJO_SRC_ROOT가 틀렸거나(지금 값: ${GIJO_SRC_ROOT:-미설정}), 경로가 뭉개졌습니다." >&2
+  echo "  → Git Bash에서 불렀다면 MSYS_NO_PATHCONV=1 을 맨 앞에 붙이세요." >&2
+  echo "  ⚠ 시험을 **한 개도 안 돌렸습니다** — 이 실행을 「통과」로 읽지 마세요(종료코드 2)." >&2
+  exit 2
+fi
 
 if [ "$OWNED" = 1 ]; then
   # ⚠ 강제 종료(kill -9·창 닫기)되면 아래 trap이 안 돌아 84MB짜리가 남는다.

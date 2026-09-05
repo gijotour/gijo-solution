@@ -72,6 +72,32 @@ describe("시험 환경 — 지금 어디서 재고 있나", () => {
     expect(src, "못 도는 시험을 끝에 알린다").toContain("SKIP_NOTE");
   });
 
+  // ★★ 2026-09-05 — 「엉뚱한 데서 돌았는데 초록」을 막는 관문이 살아 있는지 본다.
+  //
+  // 실측한 함정: Git Bash에서 `wsl … bash "/mnt/d/Connect AI/tools/wsl-test.sh"`를 치면
+  //   MSYS 경로 변환이 인자를 `C:/Program Files/Git/mnt/d/...`로 갈아치워 bash가 스크립트를
+  //   **아예 못 연다**(실측 종료코드 127 · 시험 0개 실행). 127 자체는 정직하지만, 부르는 쪽이
+  //   `... | tail -1` 처럼 **파이프로 받으면 파이프의 종료코드 0**을 보게 되어 「전부 통과」로
+  //   읽힌다 — 이 저장소가 push에서 이미 밟은 그 함정이다(실측: 파이프로 받으니 0이 나왔다).
+  // → 그래서 스크립트가 **자기가 어디서 도는지 먼저 확인**하고, 아니면 종료코드 2로 죽는다.
+  it("★★ WSL 밖에서 돌면 **막는다** — 「시험 0개인데 초록」을 만들지 않는다", () => {
+    const src = fs.readFileSync(new URL("../../tools/wsl-test.sh", import.meta.url), "utf8");
+    expect(src, "셸 종류를 안 본다 — Git Bash에서 그냥 돌아 딴 환경을 재게 된다").toContain("MSYSTEM");
+    expect(src, "WSL인지 확인하지 않는다").toMatch(/grep -qi microsoft \/proc\/version/);
+    // 두 관문 모두 **2로** 죽어야 한다. 0이면 거짓 초록, 1이면 「시험이 실패했다」로 오독된다.
+    const 관문 = src.split("\n").filter((l) => /exit 2/.test(l));
+    expect(관문.length, "종료코드 2로 죽는 관문이 둘(셸 확인·원본 확인)이라야 한다").toBeGreaterThanOrEqual(2);
+    expect(src, "시험을 한 개도 안 돌렸다는 사실을 사람에게 안 알린다").toContain("한 개도 안 돌렸습니다");
+    expect(src, "Git Bash 함정의 해법(MSYS_NO_PATHCONV)을 안 알려 준다").toContain("MSYS_NO_PATHCONV");
+  });
+
+  it("★ 부르는 쪽(qa-full)이 종료코드를 **그대로 전달**한다 — 삼키면 관문이 헛돈다", () => {
+    const qa = fs.readFileSync(new URL("../../tools/qa-full.mjs", import.meta.url), "utf8");
+    // status === 0 만 통과로 본다(2도 실패). 그리고 실패가 하나라도 있으면 1로 끝난다.
+    expect(qa, "종료코드를 안 보고 통과로 친다").toMatch(/ok:\s*r\.status === 0/);
+    expect(qa, "실패가 있어도 0으로 끝난다").toMatch(/process\.exit\(fails\.length \? 1 : 0\)/);
+  });
+
   it("참고 — 이 기계 정보(실패 판정 아님, 기록용)", () => {
     console.info(`  플랫폼=${process.platform} · node=${process.version} · cpu=${os.cpus().length}코어`);
     expect(true).toBe(true);
