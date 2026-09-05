@@ -202,9 +202,12 @@ export const RAG_BLOCK_HEADER =
  *   제목을 실어 주면 지어낼 이유가 없어지고, 가드도 그 제목을 원천으로 대조할 수 있다.
  * ⚠ **꼴을 바꾸는 것이라 짝이 있다.** RAG_BLOCK_HEADER는 그대로 두고 조각 줄만 늘렸다 —
  *   머리말이 바뀌면 이미 구운 어댑터의 학습 꼴과 갈라진다(위 상수 주석).
- * ⚠ titles를 **안 주면 옛 꼴 그대로**다. 그래서 RAFT 빌더의 참고자료블록(제목 개념이 없다)과
- *   창구 예시(ragBlockSample)는 한 글자도 안 바뀐다 — raftdataset 짝 시험이 그것을 대조한다.
- *   대신 학습 표본과 추론 지문이 **제목 유무로 갈린다**(tools/ladder/README.md에 적어 뒀다).
+ * ⚠ titles를 **안 주면 옛 꼴 그대로**다 — 제목이 없는 재료도 그대로 돈다.
+ * ⚠ **학습 꼴도 함께 옮겼다**(2026-09-05 K4 — a6f47fde). 처음엔 「빌더와 창구 예시는 한 글자도
+ *   안 바뀐다」고 적어 뒀는데, 그러면 학습 표본과 추론 지문이 **제목 유무로 갈린 채** 남는다.
+ *   그 어긋남은 아무 오류도 안 내고 성능만 깎으므로, 빌더 참고자료블록(build-raft-dataset.mjs)과
+ *   창구 예시(learnloop.ts ragBlockSample)를 **이 꼴에 맞췄다** — raftdataset 짝 시험이 제목이 실린
+ *   꼴로 대조한다. 옛 회전(K4 이전)의 보관 규격은 규격읽기가 「제목없음」 꼴로 알아보고 받아 준다.
  */
 export function ragBlock(chunks: string[], titles?: readonly (string | null | undefined)[]): string {
   return RAG_BLOCK_HEADER + "\n" + chunks.map((c, i) => {

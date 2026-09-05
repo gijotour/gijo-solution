@@ -1385,8 +1385,9 @@ export async function queryMemoryRelevant(question: string, topK = 5, agentId?: 
  *   · 나머지                               → documentId 그대로. 이 제품에서 일반 문서의 documentId는
  *     파일 이름(ingestText의 documentId = basename)이라 그것이 곧 사람이 읽는 제목이다.
  * ⚠ 표를 못 찾으면(사례가 지워졌다·개인 문서가 지워졌다) **빈 문자열**이다. 없는 제목을 지어내지 않는다.
- * ⚠ 접두 문자열은 여기 한 곳에만 적고, 짝 시험(citeguard.test.ts J3)이 incidentcases.incidentCaseDocId와
- *   글자 단위로 대조한다 — 같은 것을 두 곳에 적으면 어긋난다.
+ * ⚠ 접두 문자열은 여기 한 곳에만 적고, 짝 시험(**server/test/doctitle.test.ts**)이
+ *   incidentcases.incidentCaseDocId와 글자 단위로 대조한다 — 같은 것을 두 곳에 적으면 어긋난다.
+ *   (첫 판 주석은 citeguard.test.ts J3을 가리켰는데 그 대조는 거기 없다 — 2026-09-05 검토관.)
  */
 const 사례접두 = "incident-case:";
 const 개인접두 = "personal:";
