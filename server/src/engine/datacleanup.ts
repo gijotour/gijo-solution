@@ -46,7 +46,10 @@ export const TARGETS: Record<string, { label: string; tables: string[] }> = {
   // 반입 영수증 — 「누가 언제 무엇을 올렸나」의 기록. 업무 데이터이므로 실사용 전환에서 함께 지운다
   //   (시연 때 올린 파일 이름이 실운영 목록에 남으면 안 된다).
   upload_receipts: { label: "반입 영수증(올린 파일 기록)", tables: ["upload_receipts"] },
-  observability: { label: "브리핑 스냅샷·느린 답 원장(파생)", tables: ["briefing_snapshot", "long_answers", "slow_answers"] },
+  // ⚠ answer_samples(2026-09-06)를 여기 넣은 이유: 답 **본문이 없는 파생 계수**다(근거세기·표식·
+  //   수치 유무·지문 12자뿐 — answersamples.ts 머리말이 그 계약을 진다). 시연 때 쌓인 분포가
+  //   실운영 추세에 섞이면 「고친 뒤 좋아졌나」를 못 잰다. 보존 30일은 그 표가 스스로 지킨다.
+  observability: { label: "브리핑 스냅샷·느린 답 원장·답 표본(파생)", tables: ["briefing_snapshot", "long_answers", "slow_answers", "answer_samples"] },
   // ⚠ 자식(부품) 먼저 — 외래키가 걸려 있어 부모를 먼저 지우면 constraint로 터진다(assets 선례).
   sbom_reviews: { label: "타사 SBOM 검수 대장", tables: ["sbom_review_components", "sbom_reviews"] },
   // 스캔 팀원 해석 초안(2026-09-03) — 고객 보고서에서 나온 파생물이라 업무 데이터다(시연 보고서의 초안이 실운영에 남으면 안 된다).

@@ -69,6 +69,7 @@ import { registerKnowledgeBundleRoutes } from "./engine/knowledgebundle";
 import { registerWorkLogRoutes } from "./engine/worklog";
 import { registerTimeSavedRoutes } from "./engine/timesaved";
 import { registerAnswerFeedbackRoutes } from "./engine/answerfeedback";
+import { registerAnswerSampleRoutes } from "./engine/answersamples";
 import { registerModelAdoptionRoutes } from "./engine/modeladoption";
 import { registerObservabilityRoutes } from "./engine/observability";
 import { registerAlertScheduleRoutes } from "./engine/alertschedule";
@@ -223,6 +224,7 @@ export function createApp(): Express {
   registerWorkLogRoutes(app); // 자동화 작업 원장(중-2, 2026-07-29)
   registerTimeSavedRoutes(app); // "AI가 아낀 시간" KPI(중-2)
   registerAnswerFeedbackRoutes(app); // 답변 지적 → 회귀셋 흡수(중-1)
+  registerAnswerSampleRoutes(app); // 답 표본(본문 없음) — 근거세기·표식·수치 분포 집계(전-4)
   registerModelAdoptionRoutes(app); // 모델 채택 원장 — 게이트 통과분만 배포(중-4)
   registerObservabilityRoutes(app); // 자가 진단(후-1 관측성)
   registerAlertScheduleRoutes(app); // 정기 알림(후-1 알림 스케줄)

@@ -24,6 +24,10 @@ import { chat } from "./llm";
 //   심볼을 하나만 더 가져와도 그 시험들의 dispatchInstruction이 죽는다(2026-09-05 실측 9파일 66건).
 //   배너 문장의 주인은 그 파일 하나다 — 여기서 문구를 다시 적지 않는다.
 import { 근거없음종류판정, 배너억제_근거약함, type 근거없음종류 } from "./noevidence";
+// 📏 답 표본(2026-09-06) — 둘 다 **잎 모듈**이라 llm을 흉내 낸 시험 76개에 걸리지 않는다
+//   (noevidence를 그 이유로 갈라낸 것과 같은 판단 — 그 파일 머리말 참고).
+import { recordAnswerSample } from "./answersamples";
+import { 실적수치뽑기 } from "./citeguard";
 import { isNonLearningAccount } from "./learnpolicy";
 import { recordChatLog } from "./learnloop";
 import { faqAnswerFor } from "./productfaq";
@@ -680,6 +684,19 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   const 근거없음 = 근거없음종류판정(거른것.output)
     ?? 배너억제_근거약함(거른것.output, 거른것.근거세기, !!(거른것.toolCalls?.length || 거른것.steps?.length));
   const 걸러진 = 근거없음 ? { ...거른것, 근거없음 } : 거른것;
+  // 📏 답 표본 한 줄 — **본문은 안 남기고 숫자만 센다**(2026-09-06 · 측정 공백을 닫는다).
+  //   왜 여기인가: 거르개·표식이 다 끝난 **최종 답**이라야 「담당자가 실제로 본 것」을 센다.
+  //   왜 본문을 안 남기나: 답에는 사내 문서 조각·자산·사람 이름이 실린다(answersamples.ts 머리말).
+  //   ⚠ qa는 뺀다 — 시험 수백 건이 섞이면 운영 분포가 통째로 거짓이 된다(학습 수집과 같은 규율).
+  if (!qa) {
+    recordAnswerSample({
+      agent: 걸러진.route?.agentId, route: 걸러진.route?.action,
+      tool: 걸러진.toolCalls?.[0]?.tool,
+      근거세기: 걸러진.근거세기, 근거없음: 걸러진.근거없음,
+      수치있음: 실적수치뽑기(String(걸러진.output ?? "")).length > 0,
+      본문: String(걸러진.output ?? ""),
+    });
+  }
   // ➡ 다음 작업 칩(QA ④, 2026-08-19) — 답의 경로(도구/분기)별로 실측 검증된 후속 지시를
   //   자동 동봉한다. LLM이 만들지 않는다(nextguide.ts 표 — 시나리오 실측 ✓ 문장만).
   //   결재판이 떠 있으면 안 붙인다 — 다음 행동은 그 승인이지 딴 길이 아니다.
