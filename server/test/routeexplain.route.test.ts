@@ -40,6 +40,9 @@ import { isHelpIntent, 이름으로화면찾기, 방법질문화면찾기 } from
 import { isOutOfScope, isTooVague } from "../src/engine/scopeguard";
 import { screenNameCard } from "../src/engine/datacard";
 import { 문서지목질문 } from "../src/engine/memory";
+// ⚠ 승인 표는 **도구에서 그대로 읽는다** — 여기 베껴 두면 두 곳이 어긋난다(맨 아래 describe 참고).
+//   route-explain.mjs는 직접 실행일 때만 CLI로 돌기 때문에 import해도 빌드·출력이 안 일어난다.
+import { 승인된겹침 } from "../../tools/route-explain.mjs";
 
 /** 설명 도구가 말하는 도착지 — 첫 번째가 이긴다(빈 배열이면 ⑨ 모델 선택). */
 async function 설명도착(문장: string, 역할 = "admin"): Promise<string> {
@@ -231,5 +234,52 @@ describe("★ 소스 감시 — route-explain은 낡은 dist로 답하지 않는
     //   ②만 두면 dispatcher 아닌 파일만 고친 경우를 못 본다(9b7b9ac5가 바로 그 사고였다).
     expect(도구, "체인 순서 대조(내용 자)가 사라졌다").toContain("function 체인이소스와같나(");
     expect(도구, "시각 자가 사라졌다").toContain("function 낡은소스찾기(");
+  });
+});
+
+describe("★★ 승인된 겹침 표가 지금 제품과 같다 — 표가 낡으면 여기서 빨간불(2026-09-05 신설)", () => {
+  // ★★ 왜 있나
+  //   `--겹침`은 **새 겹침만** 실패로 잡는다(승인된 것은 표에 적어 두고 통과시킨다). 그런데 그
+  //   장치에는 반대쪽 사각이 있다: 판별자를 고쳐 **승자가 바뀌어도** 표는 옛 승자를 그대로 적고
+  //   있고, 아무도 안 본다. 그러면 「사장님이 승인한 것」이라는 도장이 **딴 동작**에 찍힌다.
+  //   ⚠ 이 시험은 표를 **베끼지 않는다** — tools/route-explain.mjs의 그 배열을 그대로 import한다.
+  //     베껴 두면 두 곳이 어긋나고, 어긋난 줄 아무도 모른다(이 저장소가 반복해 겪은 함정).
+  //   (2026-09-05: 실전 152문항의 겹침 9건 중 8건을 사장님이 「추천안수용」으로 현 승자 그대로 승인.)
+  const 표: Array<{ 말: string; 이김: string; 밀림?: string; 이유: string; 승인일: string; 승인자: string }> =
+    (승인된겹침 as any);
+
+  it("표가 비어 있지 않다 — 비면 아래 시험들이 통째로 헛돈다", () => {
+    expect(표.length, "승인 표를 못 읽었다(route-explain.mjs가 `승인된겹침`을 안 내보내는가)").toBeGreaterThan(0);
+  });
+
+  for (const 항목 of 표) {
+    it(`「${항목.말.slice(0, 20)}${항목.말.length > 20 ? "…" : ""}」 → 지금도 「${항목.이김}」이 이긴다`, async () => {
+      const 걸림 = await 결정적도착지(항목.말, { 역할: "admin" });
+      expect(걸림.length, "이제 겹치지 않는다 — 승인 줄을 지워야 한다(예외 목록이 쌓이기만 하면 아무도 안 지운다)").toBeGreaterThan(1);
+      expect(걸림[0].이름, `승자가 바뀌었다 — 표의 「${항목.이김}」은 이제 거짓이다`).toBe(항목.이김);
+      if (항목.밀림) {
+        // ⚠ 승인은 **이 앞/뒤 짝**에 대해서만 유효하다 — 밀리던 것이 딴 것으로 바뀌었으면
+        //   사람이 승인한 그 상황이 아니다(이유 문장이 조용히 헛것을 가리키게 된다).
+        expect(걸림.slice(1).map((r) => r.이름), `표의 밀림 「${항목.밀림}」이 지금은 안 걸린다`).toContain(항목.밀림);
+      }
+    });
+  }
+
+  it("★ 표 전체 — 승자가 갈린 줄이 **한 건도** 없다", async () => {
+    const 갈린것: string[] = [];
+    for (const a of 표) {
+      const 걸림 = await 결정적도착지(a.말, { 역할: "admin" });
+      const 지금 = 걸림.length ? 걸림[0].이름 : "(안 걸림)";
+      if (걸림.length < 2) 갈린것.push(`「${a.말}」 이제 안 겹친다(걸린 규칙 ${걸림.length}개) — 줄을 지우세요`);
+      else if (지금 !== a.이김) 갈린것.push(`「${a.말}」 표=${a.이김} / 지금=${지금}`);
+    }
+    expect(갈린것, `승인 표가 낡았다 — tools/route-explain.mjs의 \`승인된겹침\`을 고치세요:\n  ${갈린것.join("\n  ")}`).toEqual([]);
+  });
+
+  it("모든 줄에 **왜 앞이 옳은가**와 승인 기록이 있다 — 이유 없는 예외는 안 쌓는다", () => {
+    const 부실 = 표
+      .filter((a) => !a.이유 || a.이유.length < 20 || !/^\d{4}-\d{2}-\d{2}$/.test(a.승인일) || !a.승인자)
+      .map((a) => `「${a.말}」`);
+    expect(부실, `이유·승인일(YYYY-MM-DD)·승인자가 빠진 줄:\n  ${부실.join("\n  ")}`).toEqual([]);
   });
 });
