@@ -20,6 +20,8 @@ import {
 } from "../src/engine/citeguard";
 import { chat, setRagProvider, resetChatHistoryForTests, 자료없음중복가드, ragBlock, RAG_BLOCK_HEADER } from "../src/engine/llm";
 import { formatScreenGuide } from "../src/engine/screenguide";
+// ⚠ 제목 판정은 **제품 함수**를 그대로 부른다 — 시험이 제목을 지어내면 배선을 안 재게 된다.
+import { 사람이읽는문서제목 } from "../src/engine/memory";
 import { sanitizeRagChunks } from "../src/engine/ragsanitize";
 import {
   원문꼬리표 as 관문원문꼬리표, 제품인용꼬리표 as 관문제품인용꼬리표, 창작인용,
@@ -650,6 +652,24 @@ describe("★★ chat() 실통과 — 조각이 런타임에 가드까지 닿는
     expect(보낸것, "제목이 프롬프트에 안 실렸다 — 「제목을 밝히라」고 시켜 놓고 재료를 안 준 셈이다")
       .toContain(`《${제목}》`);
     expect(답, "우리가 준 제목을 가드가 도로 뗐다(자충수)").toContain(제목);
+  });
+
+  // ★★ 2026-09-06 — **내부 ID가 제목 자리로 새던 자리.** 「승인문답:<로그 id>」는 우리가 가장 많이
+  //    만드는 내부 ID인데 K2 그물이 `^[a-z]…`라 ASCII 접두만 봤다. 실물이 프롬프트에
+  //    「[1] 《승인문답:dtmtl40khqg8uehk》 …」로 실려 나갔다.
+  //    ⚠ 제목을 **손으로 적지 않는다** — 제품 함수(사람이읽는문서제목)에 실제 documentId를 넣어
+  //      나온 값을 그대로 태운다. 손으로 ""를 적으면 배선이 아니라 내 짐작을 재게 된다.
+  it("★★ 승인문답 내부 ID는 프롬프트에 안 실린다 — 조각 본문은 그대로 간다", async () => {
+    const docId = "승인문답:dtmtl40khqg8uehk";
+    const 본문 = "사내 보안서약서는 입사 시 1회 제출하며 부서장이 취합해 보안팀에 넘긴다.";
+    setRagProvider(async () => ({ chunks: [본문], titles: [사람이읽는문서제목(docId)], 약한근거만: false }));
+    const m = 스텁모델("보안서약서는 입사 시 제출합니다.");
+    await chat({ agentId: "orchestrator", message: "보안서약서 언제 내나요?", remember: true });
+
+    const 보낸것 = String((m.mock.calls[0]?.[1] as { body?: string } | undefined)?.body ?? "");
+    expect(보낸것, "내부 ID가 제목 자리로 프롬프트에 실렸다").not.toContain("승인문답:");
+    expect(보낸것, "빈 제목인데 《》 껍데기가 붙었다").not.toContain("《》");
+    expect(보낸것, "제목을 지우면서 조각 본문까지 잃었다").toContain(본문);
   });
 
   it("★ 제목을 안 주는 제공자여도 돈다 — 옛 꼴 그대로(스텁·구 제공자 호환)", async () => {

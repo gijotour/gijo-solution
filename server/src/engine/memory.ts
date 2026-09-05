@@ -1405,8 +1405,24 @@ export async function queryMemoryRelevant(question: string, topK = 5, agentId?: 
  */
 const 사례접두 = "incident-case:";
 const 개인접두 = "personal:";
-/** 「영문접두:토막」 꼴 — 사람이 읽는 이름이 아니라 **저장소 키**다(store:… · foo-bar:abc123). */
-const ID꼴_RE = /^[a-z][a-z0-9-]*:[A-Za-z0-9_.#-]+$/;
+/**
+ * 「접두:토막」 꼴 — 사람이 읽는 이름이 아니라 **저장소 키**다(store:… · 승인문답:dtmtl40khqg8uehk).
+ *
+ * ★★ 2026-09-06 넓힘 — 첫 판은 `^[a-z]`로 시작해 **ASCII 접두만** 봤다. 그래서 우리가 가장 많이
+ *   만드는 내부 ID인 **「승인문답:<로그 id>」**(learnmemory.APPROVED_QA_DOC_PREFIX)가 그물을
+ *   그냥 지나가 제목 자리에 실렸고, llm.ragBlock이 그것을 「[n] 《승인문답:dtmtl40khqg8uehk》 …」로
+ *   **프롬프트에 실어 보냈다**(라이브 실측). 담당자에게 아무것도 안 가리키고, 우리 저장 구조만
+ *   드러내며, 모델은 그것을 「출처」로 옮겨 적는다 — K2가 막으려던 바로 그 사고다.
+ * ⚠ 접두에 한글을 넣는다(승인문답·사례·개인). **꼬리는 ASCII만** 그대로 둔다 — 그래야
+ *   「제1장:개요.md」 같은 **사람이 붙인 진짜 제목**을 안 삼킨다(꼬리에 한글이 있으면 ID가 아니다).
+ * ⚠ 짝 시험(doctitle.test.ts)은 이 정규식을 **베끼지 않는다** — 아래 `내부ID꼴`을 부른다.
+ *   사본을 두면 여기만 고쳐도 시험은 옛 잣대로 초록이다(실제로 그랬다 — 2026-09-06).
+ */
+const ID꼴_RE = /^[A-Za-z가-힣][A-Za-z0-9가-힣_-]*:[A-Za-z0-9_.#-]+$/;
+/** 이 문자열이 **내부 ID 꼴**인가. 판정은 여기 한 곳 — 시험도 이 함수를 부른다(사본 금지). */
+export function 내부ID꼴(값: string | null | undefined): boolean {
+  return ID꼴_RE.test(String(값 ?? ""));
+}
 let 사례제목Stmt: import("better-sqlite3").Statement | null = null;
 let 개인문서제목Stmt: import("better-sqlite3").Statement | null = null;
 export function 사람이읽는문서제목(documentId: string | null | undefined): string {
