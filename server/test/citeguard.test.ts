@@ -4,10 +4,11 @@
 //   모자라면 없는 출처가 결재판까지 간다. 그래서 ① 순수 함수 사례표 ② 관문(gates.mjs)과의
 //   잣대 대조 ③ 배선 소스 감시 ④ **실물 재료**(사다리 표본)로 오탐·적발을 직접 잰다.
 //   ④가 핵심이다 — 만든 사람이 고른 예문만 보면 「내 규칙이 내 예문을 맞힌다」밖에 못 본다.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { guardCitations, 근거겹침, 원문꼬리표, 제품인용꼬리표, 뗀인용요약 } from "../src/engine/citeguard";
+import { chat, setRagProvider, resetChatHistoryForTests } from "../src/engine/llm";
 import {
   원문꼬리표 as 관문원문꼬리표, 제품인용꼬리표 as 관문제품인용꼬리표, 창작인용,
 } from "../../tools/team-bench/gates.mjs";
@@ -259,6 +260,46 @@ describe("★★ 실물 재료 실측 (tools/team-bench/results-ladder)", () => 
     }
     expect(대상, "창작 인용 표본을 못 찾았다 — 재료가 바뀌었다").toBeGreaterThanOrEqual(30);
     expect(놓친, `근거 없는 인용을 놓쳤다:\n${놓친.join("\n")}`).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★★ chat()을 **실제로 통과시켜** 본다 — 소스 감시는 「호출이 적혀 있다」까지만 증명한다.
+//    여기서는 조각이 런타임에 실제로 출구까지 닿는지(ragProvider → ragContextFor → 가드)를 잰다.
+//    모델은 스텁이다(실 LLM은 이 저장소의 시험이 스폰하지 않는다) — 재는 것은 **배선**이다.
+describe("★★ chat() 실통과 — 조각이 런타임에 가드까지 닿는가", () => {
+  const 스텁모델 = (답: string) => {
+    const m = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: 답 } }] }) });
+    vi.stubGlobal("fetch", m);
+    return m;
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setRagProvider(null as unknown as Parameters<typeof setRagProvider>[0]);
+    resetChatHistoryForTests();
+  });
+
+  it("근거가 0건이면 모델이 만든 「[1]에 따르면 …」이 답에서 사라진다", async () => {
+    setRagProvider(async () => ({ chunks: [], 약한근거만: false }));
+    스텁모델('관리자 계정명은 바꾸는 것이 좋습니다. 기본값은 널리 알려져 있습니다. [1]에 따르면 "기본 관리자 계정명을 그대로 두면 공격자가 쉽게 타겟을 특정할 수 있습니다."');
+    const 답 = await chat({ agentId: "orchestrator", message: "기본 계정명을 왜 바꾸나요?", remember: true });
+    expect(답, "지어낸 인용이 그대로 나갔다 — 배선이 안 닿았다").not.toContain("[1]에 따르면");
+    expect(답, "본문까지 지웠다").toContain("관리자 계정명은 바꾸는 것이 좋습니다");
+  });
+
+  it("★ 조각을 실제로 준 자리에서는 같은 꼴을 **안** 뗀다(오탐 방지가 런타임에서도 산다)", async () => {
+    const 조각본문 = "기본 관리자 계정명은 널리 알려져 있어 공격자가 계정을 추측하기 쉬우므로 설치 직후 변경해야 한다.";
+    setRagProvider(async () => ({ chunks: [조각본문], 약한근거만: false }));
+    스텁모델(`관리자 계정명은 바꾸는 것이 좋습니다. [1]에 따르면 "${조각본문}"`);
+    const 답 = await chat({ agentId: "orchestrator", message: "기본 계정명을 왜 바꾸나요?", remember: true });
+    expect(답, "정상 인용을 뗐다").toContain("[1]에 따르면");
+  });
+
+  it("remember:false(도구 답 합성 등)는 가드를 안 지난다 — 근거를 모르는 자리다", async () => {
+    스텁모델('정리했습니다. 아래가 결과입니다. [1]에 따르면 "이 자리는 RAG를 아예 안 돌린 곳이다."');
+    const 답 = await chat({ agentId: "orchestrator", message: "정리해줘", remember: false });
+    expect(답).toContain("[1]에 따르면");
   });
 });
 
