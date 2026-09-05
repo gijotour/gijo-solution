@@ -31,8 +31,13 @@ db.exec(`CREATE TABLE IF NOT EXISTS handover_history (
   documentId TEXT NOT NULL,
   question TEXT,                -- 자동 생성 질문(사람 발화가 아니다)
   cited INTEGER NOT NULL,       -- 1이면 그 문서가 답변 근거로 올랐다 = 이관 성공
-  sourceNames TEXT,             -- 실제 근거 문서 **이름**(최대 3, 쉼표) — 본문은 저장하지 않는다
+  sourceNames TEXT,             -- 실제 근거 문서 **이름**(최대 3, JSON 배열) — 본문은 저장하지 않는다
                                 --   ⚠ 이름이다, ID가 아니다(2026-09-06 수리). 아래 insert 주석 참고.
+                                --   ⚠ 예전에는 「쉼표로 이어 붙인 한 칸」이었다. 담기는 값이 쉼표를
+                                --     못 쓰던 내부 ID에서 **쉼표를 쓸 수 있는 사람 제목**으로 바뀌자
+                                --     항목 경계가 사라졌다(「보안 서약서, 처리 절차」가 둘로 읽힌다).
+                                --     → JSON 배열로 남긴다. 읽기는 근거이름읽기() 한 곳에서만 한다
+                                --       (옛 행은 쉼표 꼴이라 그 함수가 함께 받아 준다).
   actor TEXT,                   -- 이관자 표시이름
   completedAt TEXT              -- 인수인계 완료 처리 시각(마감 전에는 NULL)
 )`);
@@ -41,29 +46,66 @@ const insertHistoryStmt = db.prepare(
    VALUES (@batchId, @verifiedAt, @documentId, @question, @cited, @sourceNames, @actor)`
 );
 
+/**
+ * 저장된 「근거 문서 이름」 칸을 **읽는 단 한 곳**.
+ *
+ * ★ 왜 함수인가: 새 행은 JSON 배열이고 옛 행은 쉼표로 이어 붙인 한 칸이다(2026-09-06 이전).
+ *   읽는 자리마다 각자 가르면 한쪽만 고쳐져 어긋난다 — 이 저장소가 가장 자주 밟은 자리다.
+ * ⚠ 옛 행에는 **내부 ID**가 들어 있을 수 있다(B1 수리 이전에 쌓인 것). 지어내서 이름처럼
+ *   꾸미지 않고 **있는 그대로** 돌려준다 — 증적은 꾸미는 것이 아니라 보이는 것이다.
+ */
+export function 근거이름읽기(raw: string | null | undefined): string[] {
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  if (s.startsWith("[")) {
+    try {
+      const v = JSON.parse(s);
+      if (Array.isArray(v)) return v.map((x) => String(x ?? "").trim()).filter(Boolean);
+    } catch { /* 깨진 값은 아래 옛 꼴로 한 번 더 본다 */ }
+  }
+  return s.split(",").map((x) => x.trim()).filter(Boolean);
+}
+
 export interface HandoverHistoryBatch {
   batchId: string; verifiedAt: string; actor: string | null;
   total: number; cited: number; passRate: number; completedAt: string | null; documents: string[];
+  /**
+   * 그 회차에서 **실제로 답변 근거로 오른 문서 이름**(중복 없이 5개까지).
+   *
+   * ★ 2026-09-06 수리 — 이 칸은 표에 쌓이기만 하고 **읽는 경로가 0이었다**(SELECT에 없었다).
+   *   증적을 남겨 놓고 꺼낼 길이 없으면 안 남긴 것과 같다. 감사·내보내기가 쓰는 창구는
+   *   `/api/handover/history` 하나뿐이라, 그 창구가 이 칸을 함께 돌려준다.
+   * ⚠ 챗봇 답(runHandoverStatus)에는 **일부러 안 싣는다** — 그 답은 등급으로 걸러진 문서만
+   *   보여 주는데(listVisibleDocuments), 이력의 이름은 그 체를 안 거친다. 실으면 열람 등급이
+   *   없는 사람에게 문서 제목이 새는 길이 생긴다(직접-열람 등급 누출 수리와 같은 계보).
+   */
+  sourceNames: string[];
 }
 
 /** 회차별로 묶어 돌려준다 — 목록은 "언제 누가 몇 건을 넘겼고 몇 %가 통했나"가 보여야 쓸모 있다. */
 export function listHandoverHistory(limit = 20): HandoverHistoryBatch[] {
   const rows = db.prepare(
-    `SELECT batchId, verifiedAt, actor, documentId, cited, completedAt FROM handover_history
+    `SELECT batchId, verifiedAt, actor, documentId, cited, sourceNames, completedAt FROM handover_history
       ORDER BY id DESC LIMIT ?`
   ).all(Math.max(1, Math.min(500, limit * 10))) as {
-    batchId: string; verifiedAt: string; actor: string | null; documentId: string; cited: number; completedAt: string | null;
+    batchId: string; verifiedAt: string; actor: string | null; documentId: string; cited: number;
+    sourceNames: string | null; completedAt: string | null;
   }[];
   const byBatch = new Map<string, HandoverHistoryBatch>();
   for (const r of rows) {
     let b = byBatch.get(r.batchId);
     if (!b) {
-      b = { batchId: r.batchId, verifiedAt: r.verifiedAt, actor: r.actor, total: 0, cited: 0, passRate: 0, completedAt: r.completedAt, documents: [] };
+      b = { batchId: r.batchId, verifiedAt: r.verifiedAt, actor: r.actor, total: 0, cited: 0, passRate: 0, completedAt: r.completedAt, documents: [], sourceNames: [] };
       byBatch.set(r.batchId, b);
     }
     b.total += 1;
     b.cited += r.cited ? 1 : 0;
     if (b.documents.length < 5) b.documents.push(r.documentId);
+    // 같은 문서가 여러 물음의 근거로 오르므로 **중복을 빼고** 5개까지만 — 목록을 통째로 쌓지 않는다.
+    for (const 이름 of 근거이름읽기(r.sourceNames)) {
+      if (b.sourceNames.length >= 5) break;
+      if (!b.sourceNames.includes(이름)) b.sourceNames.push(이름);
+    }
     if (r.completedAt && !b.completedAt) b.completedAt = r.completedAt;
   }
   const out = [...byBatch.values()].map((b) => ({ ...b, passRate: b.total ? Math.round((b.cited / b.total) * 100) : 0 }));
@@ -194,8 +236,13 @@ export async function verifyHandover(
           //   같은 날 배지·협업 피드에서 고친 것(dispatcher.sourceTitles)과 **같은 사고의 남은 자리**다.
           // ⚠ 빈 제목은 뺀다 — 제목을 못 구한 문서는 이름 없이 세지, ID로 채우지 않는다.
           //   그 결과 셋 다 제목이 없으면 이 칸은 null이다(「이름을 모른다」가 정직한 상태다).
-          sourceNames:
-            r.sourceTitles.map((t) => String(t ?? "").trim()).filter(Boolean).slice(0, 3).join(", ") || null,
+          // ⚠ 2026-09-06 2차 — **쉼표로 잇지 않는다.** 이 칸에 담기는 값이 쉼표를 못 쓰던 내부
+          //   ID에서 쉼표를 쓸 수 있는 **사람 제목**으로 바뀐 순간, 「보안 서약서, 처리 절차」 같은
+          //   제목 하나가 둘로 읽히게 됐다(B1 수리가 데려온 짝 결함). JSON 배열로 남긴다.
+          sourceNames: (() => {
+            const 이름들 = r.sourceTitles.map((t) => String(t ?? "").trim()).filter(Boolean).slice(0, 3);
+            return 이름들.length ? JSON.stringify(이름들) : null;
+          })(),
           actor: meta?.actor ?? null,
         });
       }

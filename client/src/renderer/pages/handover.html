@@ -238,6 +238,22 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
   }
 
   // ── 3단계: 자동 검증 ──
+  //
+  // ★ 2026-09-06 수리 — 「실제 근거」 칸이 담당자에게 **내부 ID**를 보여 주고 있었다
+  //   (「승인문답:dtmtl5b1fzj215l3」 꼴 — 사람에게 아무것도 안 가리키는 키다).
+  //   같은 날 증적(handover_history.sourceNames)을 이름으로 고쳤는데, 정작 **사람이 읽는 자리**는
+  //   그대로였다. 서버는 이미 sourceTitles(사람 제목)를 sources와 **같은 순서**로 함께 준다.
+  // ⚠ ✓ 표식의 판정은 **그대로 ID**로 한다 — 이름으로 갈면 인수인계 검증 자체가 죽는다
+  //   (제목은 문서 ID와 글자가 다르다). 보여 주는 것은 이름, 재는 것은 ID다.
+  // ⚠ 제목을 못 구한 문서는 빈 문자열이 온다 — 그때는 ID를 그대로 보인다.
+  //   자리를 비우면 근거가 몇 개였는지가 사라진다(비우는 것은 정직이 아니라 누락이다).
+  function 근거칸(r) {
+    const 이름 = r.sourceTitles || [];
+    const 줄 = (r.sources || []).slice(0, 3)
+      .map((s, i) => esc(String(이름[i] || "").trim() || s) + (s === r.documentId ? " ✓" : ""));
+    return 줄.join("<br>") || "(인용 없음)";
+  }
+
   function renderReport(report, merge) {
     if (merge && lastReport) {
       // 재검증 결과를 문서 단위로 반영
@@ -253,7 +269,7 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
     body.innerHTML = lastReport.results.map((r) => `<tr>
       <td class="doc">${esc(r.documentId)}</td>
       <td>${r.error ? `<span style="color:var(--red-ink, #f5928a)">${esc(r.error)}</span>` : esc(r.question)}</td>
-      <td class="src">${(r.sources || []).slice(0, 3).map((s) => esc(s) + (s === r.documentId ? " ✓" : "")).join("<br>") || "(인용 없음)"}</td>
+      <td class="src">${근거칸(r)}</td>
       <td>${r.cited ? '<span class="ok">✓ 인용됨</span>' : '<span class="no">✗ 미인용</span>'}</td></tr>`).join("");
     document.getElementById("verifyTableWrap").style.display = "block";
     document.getElementById("verifyFailBtn").style.display = lastReport.results.some((r) => !r.cited) ? "" : "none";

@@ -10,7 +10,7 @@
 //   "통했다/아니다"이지 그때 무슨 말이 오갔는지가 아니다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "../src/db";
-import { verifyHandover, listHandoverHistory, markHandoverCompleted } from "../src/engine/handover";
+import { verifyHandover, listHandoverHistory, markHandoverCompleted, 근거이름읽기 } from "../src/engine/handover";
 
 const 가짜Deps = (cited: boolean) => ({
   sampleOf: async () => "사내 방화벽 정책 변경 절차: 1) 신청 2) 승인 3) 반영",
@@ -61,7 +61,7 @@ describe("이관 이력 — 서버가 안다", () => {
     };
     await verifyHandover(["a.md"], deps, { actor: null });
     const row = db.prepare("SELECT sourceNames FROM handover_history").get() as { sourceNames: string };
-    expect(row.sourceNames.split(",")).toHaveLength(3);
+    expect(근거이름읽기(row.sourceNames)).toHaveLength(3);
   });
 
   // ── B1 수리 (2026-09-06) — 증적의 「근거 문서 이름」은 **이름이어야 한다** ────────────
@@ -84,7 +84,7 @@ describe("이관 이력 — 서버가 안다", () => {
       };
       await verifyHandover(["승인문답:dtmtl5b1fzj215l3"], deps, { actor: null });
       const row = db.prepare("SELECT sourceNames FROM handover_history").get() as { sourceNames: string };
-      expect(row.sourceNames, "사람 제목이 안 남았다").toBe("보안 서약서 처리 절차, 방화벽 정책 변경 지침");
+      expect(근거이름읽기(row.sourceNames), "사람 제목이 안 남았다").toEqual(["보안 서약서 처리 절차", "방화벽 정책 변경 지침"]);
       expect(row.sourceNames, "내부 ID가 증적에 그대로 실렸다").not.toContain("승인문답:");
       expect(row.sourceNames, "내부 ID가 증적에 그대로 실렸다").not.toContain("kb:");
     });
@@ -101,7 +101,7 @@ describe("이관 이력 — 서버가 안다", () => {
       };
       await verifyHandover(["a.md"], deps, { actor: null });
       const row = db.prepare("SELECT sourceNames FROM handover_history").get() as { sourceNames: string };
-      expect(row.sourceNames).toBe("가 문서, 다 문서");
+      expect(근거이름읽기(row.sourceNames)).toEqual(["가 문서", "다 문서"]);
     });
 
     it("제목이 하나도 없으면 이름 칸은 비운다 — 「모른다」가 정직한 상태다", async () => {
@@ -128,6 +128,72 @@ describe("이관 이력 — 서버가 안다", () => {
       expect(r.cited, "제목으로 판정하면 여기서 0이 된다").toBe(1);
       // 조회(listHandoverHistory)도 같은 판정을 그대로 센다 — 쓰는 쪽과 읽는 쪽을 함께 본다.
       expect(listHandoverHistory()[0].passRate).toBe(100);
+    });
+  });
+
+  // ── B1 짝 결함 수리 (2026-09-06, 검토관 실측) ─────────────────────────────────
+  //
+  // ★ 두 가지가 함께 걸렸다. **B1 수리가 데려온 것**이라 같은 자리에서 함께 잡는다.
+  //   ① 이름 칸을 **쉼표로 이어 붙이고 있었다.** 담기던 값이 쉼표를 못 쓰던 내부 ID에서
+  //      쉼표를 쓸 수 있는 **사람 제목**으로 바뀐 순간, 제목 하나가 둘로 읽히게 됐다.
+  //   ② 그 칸을 **읽는 경로가 0이었다** — listHandoverHistory의 SELECT에 아예 없었다.
+  //      증적을 남겨 놓고 꺼낼 길이 없으면 안 남긴 것과 같다(원시 SQL로만 보였다).
+  describe("★★ 이름 칸은 경계가 살아 있고, 꺼내 볼 수 있다", () => {
+    it("제목에 쉼표가 들어가도 항목이 안 쪼개진다", async () => {
+      const deps = {
+        ...가짜Deps(true),
+        ask: async () => ({
+          output: "답",
+          sources: ["a.md", "b.md"],
+          sourceTitles: ["보안 서약서, 처리 절차", "방화벽 정책"],
+        }),
+      };
+      await verifyHandover(["a.md"], deps, { actor: null });
+      const row = db.prepare("SELECT sourceNames FROM handover_history").get() as { sourceNames: string };
+      expect(근거이름읽기(row.sourceNames), "쉼표 있는 제목이 둘로 쪼개졌다")
+        .toEqual(["보안 서약서, 처리 절차", "방화벽 정책"]);
+    });
+
+    it("★ 조회가 이름을 함께 돌려준다 — 남기기만 하고 못 꺼내면 안 남긴 것과 같다", async () => {
+      const deps = {
+        ...가짜Deps(true),
+        ask: async () => ({
+          output: "답",
+          sources: ["방화벽_인수인계.md", "b.md"],
+          sourceTitles: ["방화벽 인수인계", "보안 운영 지침"],
+        }),
+      };
+      await verifyHandover(["방화벽_인수인계.md"], deps, { actor: "정요한" });
+      const 이력 = listHandoverHistory();
+      expect(이력[0].sourceNames, "이력에서 근거 이름을 못 꺼낸다")
+        .toEqual(["방화벽 인수인계", "보안 운영 지침"]);
+      // 문서 목록은 종전대로 **ID**다 — 판정·재조회가 그 키를 쓴다(이름으로 바꾸면 죽는다).
+      expect(이력[0].documents).toEqual(["방화벽_인수인계.md"]);
+    });
+
+    it("같은 이름이 여러 물음의 근거로 올라도 한 번만 센다", async () => {
+      const deps = {
+        ...가짜Deps(true),
+        ask: async () => ({ output: "답", sources: ["a.md"], sourceTitles: ["같은 지침"] }),
+      };
+      await verifyHandover(["a.md", "b.md", "c.md"], deps, { actor: null });
+      expect(listHandoverHistory()[0].sourceNames).toEqual(["같은 지침"]);
+    });
+
+    // ⚠ B1 수리 **이전에 쌓인 행**은 쉼표 꼴이고 내부 ID가 들어 있을 수 있다.
+    //   지어내서 이름처럼 꾸미지 않고 있는 그대로 돌려준다 — 증적은 꾸미는 것이 아니다.
+    it("옛 행(쉼표 꼴)도 읽힌다 — 판을 바꿨다고 옛 증적이 안 보이면 안 된다", () => {
+      db.prepare(
+        `INSERT INTO handover_history (batchId, verifiedAt, documentId, question, cited, sourceNames, actor)
+         VALUES ('old-1', '2026-08-10T00:00:00Z', 'a.md', 'q', 1, '승인문답:dtmtl5b1, kb:0f2b7c19', null)`
+      ).run();
+      expect(listHandoverHistory()[0].sourceNames).toEqual(["승인문답:dtmtl5b1", "kb:0f2b7c19"]);
+    });
+
+    it("이름이 없으면 빈 배열 — null을 문자열로 흘리지 않는다", () => {
+      expect(근거이름읽기(null)).toEqual([]);
+      expect(근거이름읽기("")).toEqual([]);
+      expect(근거이름읽기("[]")).toEqual([]);
     });
   });
 
