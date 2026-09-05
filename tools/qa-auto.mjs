@@ -463,14 +463,24 @@ async function runClient() {
     });
     await page.waitForTimeout(1200);
     if (page.url() !== before) throw new Error(`셸을 떠났다: ${page.url().split("/").pop()}`);
+    // ⚠⚠ **보이는 탭 이름으로 재지 않는다** — 기대값을 제품에 맞춰 고쳤다(2026-09-06).
+    //   F4-08(2026-09-02, app.html 탭이름())부터 탭에 **보이는** 이름은 「지금 무대 판」을 따른다.
+    //   그래서 ② 우선순위를 눌러 triage.html이 열려도 보이는 이름은 「취약점」이고, 옛 검사는
+    //   그것을 「탭 없음: 대시보드,취약점」이라 불렀다 — **제품이 아니라 기대표가 낡은 것이다**
+    //   (실측 2026-09-06: 클릭됨 · 주소 그대로 · iframe=triage.html?embed=1 · 전부 정상).
+    //   정본 이름(메뉴에서 누른 그 이름, t.label)은 **탭 말풍선 첫 줄**에 「정본 › 보이는 이름」
+    //   꼴로 남는다(app.html renderTab). 여기서는 그 정본을 잰다 — 무대 판이 바뀌어도 안 흔들린다.
     const st = await page.evaluate(() => ({
       탭: [...document.querySelectorAll("#tabBar .tab .nm")].map((t) => t.textContent),
+      정본: [...document.querySelectorAll("#tabBar .tab")].map((t) => (t.title || "").split("\n")[0]),
       활성: document.querySelector("#tabBar .tab.on .nm")?.textContent,
       src: decodeURIComponent(document.querySelector("#screens iframe.on")?.getAttribute("src") || ""),
     }));
-    if (!st.탭.includes("② 우선순위")) throw new Error(`탭 없음: ${st.탭.join(",")}`);
+    if (!st.정본.some((t) => t.startsWith("② 우선순위"))) {
+      throw new Error(`탭 없음 — 정본[${st.정본.join(",")}] 보이는이름[${st.탭.join(",")}]`);
+    }
     if (!/^triage\.html\?embed=1/.test(st.src)) throw new Error(`탭 안이 직접 화면이 아님: ${st.src}`);
-    return `탭[${st.탭.join("·")}] 활성=${st.활성}, 안=${st.src}`;
+    return `탭 정본[${st.정본.join("·")}] 보이는이름[${st.탭.join("·")}] 활성=${st.활성}, 안=${st.src}`;
   });
 
   await scenario("QA-C02", "탭 셸", "탭을 옮겨도 앞서 보던 탭이 살아 있다", {
@@ -781,7 +791,17 @@ async function runClient() {
     const src = fs.readFileSync(path.join(ROOT, "client", "src", "api", "core.ts"), "utf8");
     const 시작 = src.indexOf("if (!res.ok)");
     if (시작 < 0) throw new Error("응답 오류 처리부를 못 찾음 — api/core.ts 구조가 바뀌었나");
-    const 조각 = src.slice(시작, 시작 + 1400);
+    // ⚠⚠ **길이를 숫자로 못박지 않는다** — 기대값을 제품에 맞춰 고쳤다(2026-09-06).
+    //   옛 검사는 `src.slice(시작, 시작 + 1400)`이었는데, 그 블록에 주석이 몇 줄 늘자
+    //   throw가 **+1402**로 밀려 창 밖으로 나갔다(실측). 그러면 제품은 멀쩡한데
+    //   「사유를 첫 줄에 세우지 않는다」는 **거짓 빨강**이 뜬다 — 그리고 그 빨강을 믿고
+    //   고치러 가면 멀쩡한 코드를 건드리게 된다. 창을 **블록 끝까지**로 잡는다.
+    const 끝 = src.indexOf("if (res.status === 204)", 시작);
+    const 조각 = src.slice(시작, 끝 > 시작 ? 끝 : 시작 + 4000);
+    // 창이 실제로 throw를 품는지 먼저 못 박는다 — 안 품으면 아래 판정이 통째로 헛돈다.
+    if (!조각.includes("throw new Error(")) {
+      throw new Error("검사 창에 throw가 없다 — api/core.ts 구조가 바뀌었다(창을 다시 잡을 것)");
+    }
     // ⚠ 예전 검사는 `body?.error ?? body?.message` **순서를 못박고** 있었다. 그런데 그 순서가
     //   틀렸다(2026-07-30 발견): error는 "password_required" 같은 **기계 코드**이고 message가
     //   사람이 읽는 문장이다. 둘 다 있을 때 error를 고르면 담당자 화면 첫 줄에 영문 코드가 나온다.
