@@ -226,6 +226,30 @@ describe("배선 계약 ⑤층 — 게시 전 UI 실화면 관문 (외부 조사
     expect(s, "선행 점검 실패 시 게시 중단(exit 3)이 없다").toContain("process.exit(3)");
     expect(s, "자기가 띄운 프로세스만 정리해야 한다").toContain("String(app.pid)");
   });
+
+  // ★ K5(2026-09-05 실측) — 관문이 taskkill로 앱을 죽여 before-quit(logoutOnQuit)을 건너뛰었고,
+  //   claude-deploy 세션이 유휴 만료(30분)까지 유령으로 남아 다음 로그인이 **강제 로그인**이 됐다.
+  //   이 감시가 없으면 「죽이기 전에 끊는다」가 조용히 사라져도 아무도 모른다(관문은 초록이다).
+  it("★ 관문이 죽이기 **전에** 세션을 반납한다 — 유령 세션 0", () => {
+    const s = 코드만(join(__dirname, "..", "..", "tools", "publish-gate-ui.mjs"));
+    expect(s, "렌더러 로그아웃 호출이 없다 — taskkill이 logoutOnQuit을 건너뛴다").toContain("g.logout()");
+    expect(s, "로그아웃 결과를 관문 판정으로 안 센다").toContain("관문이 자기 세션을 반납했다");
+    // 순서가 뒤집히면(죽인 뒤 로그아웃) 아무 효과가 없다 — **자리**를 잰다.
+    const 반납 = s.indexOf("const 반납 = await 세션반납(page)");
+    const 정리 = s.lastIndexOf("정리();");
+    expect(반납, "세션반납 호출을 못 찾았다").toBeGreaterThan(-1);
+    expect(반납, "세션 반납이 taskkill(정리) 뒤에 있다 — 죽인 뒤에 끊으면 아무 일도 안 일어난다")
+      .toBeLessThan(정리);
+  });
+
+  it("★ 제품 쪽 규약이 그대로다 — 로그아웃은 **헤더 + 본문 refreshToken** 둘 다", () => {
+    // 관문은 제품 함수(window.gijo.logout → api/auth.ts)를 부른다. 그 규약이 무너지면 관문도 샌다.
+    const preload = 코드만(join(__dirname, "..", "..", "client", "src", "preload.ts"));
+    expect(preload, "preload가 logout을 안 내보낸다 — 관문이 부를 창구가 없다").toContain("logout: () => api.authApi.logout()");
+    const auth = 코드만(join(__dirname, "..", "..", "client", "src", "api", "auth.ts"));
+    expect(auth, "본문 refreshToken이 빠졌다 — 헤더만 보내면 세션이 안 풀린다(2026-07-23 실사고)")
+      .toContain('request("/api/auth/logout", { method: "POST", body: { refreshToken: getRefreshToken() } })');
+  });
 });
 
 describe("프로 셸 — 팝업 최소화·💬 새 세션 (2026-08-20 사장님 확정)", () => {

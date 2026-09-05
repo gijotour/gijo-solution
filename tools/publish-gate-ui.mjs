@@ -15,6 +15,8 @@
 //     사장님 앱을 절대 죽이지 않는다(수칙). userData 공유라 단일 인스턴스 잠금과도 충돌한다.
 //   · 포트는 9227 전용 — 9223(개발·수동검사)에 떠 있는 남의 앱에 붙는 사고를 원천 차단.
 //   · 자기가 띄운 프로세스만 끝에 정리한다(taskkill /PID {자기pid} /T).
+//   · **죽이기 전에 세션을 반납한다**(2026-09-05 K5) — taskkill은 before-quit(logoutOnQuit)을
+//     건너뛰어 claude-deploy 유령 세션을 30분 남긴다. 아래 「세션반납」 참고.
 //
 // 사용: node tools/publish-gate-ui.mjs   (GIJO_ADMIN_PASSWORD 필요 · 운영 4000 로그인)
 import { createRequire } from "node:module";
@@ -1026,6 +1028,34 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
   ok("전 화면 얕은 렌더(" + 후보.length + "개 자동 열거 · 제외 " + Object.keys(제외).length + "개는 사유 명시)",
     죽은화면.length === 0, 죽은화면.length ? "죽음: " + 죽은화면.join(", ") : "전부 그려짐");
 }
+
+// ── 세션 반납(2026-09-05 K5) — **taskkill 전에** 렌더러가 스스로 로그아웃한다 ──────
+//
+// ★ 왜(실측): 이 관문은 끝에서 `taskkill /T /F`로 앱을 죽인다. 그러면 Electron의 before-quit이
+//   안 나고 `logoutOnQuit`(client/src/main.ts)이 **통째로 건너뛰어진다** — 서버에는 claude-deploy
+//   세션이 살아남아 유휴 만료(30분)까지 유령으로 남는다. 다음 사람(또는 다음 관문 실행)은
+//   「이미 다른 곳에서 로그인 중」을 만나 **자기 자신을 강제로 밀어내야** 하고, 그 강제는 감사에도
+//   남는다. 제품은 이 자리를 이미 결함으로 다뤄 고쳤는데(F6-06 재시작 경로), 관문만 새고 있었다.
+// ⚠ 서버 세션은 **refresh token으로** 정리된다 — 그래서 헤더만 보내면 안 풀린다. 렌더러의
+//   `window.gijo.logout()`이 그 규약(Authorization 헤더 + 본문 refreshToken)을 이미 지킨다
+//   (client/src/api/auth.ts logout). 여기서 규약을 새로 짜지 않고 **제품 함수를 부른다.**
+async function 세션반납(pg) {
+  if (!pg) return { 끊었나: false, 사유: "페이지 없음" };
+  try {
+    const r = await pg.evaluate(async () => {
+      const g = window.gijo;
+      if (!g || typeof g.logout !== "function") return "없음";
+      try { await g.logout(); return "끊음"; } catch (e) { return "실패:" + String((e && e.message) || e); }
+    });
+    return { 끊었나: r === "끊음", 사유: r };
+  } catch (e) {
+    return { 끊었나: false, 사유: String((e && e.message) || e) };
+  }
+}
+const 반납 = await 세션반납(page);
+ok("관문이 자기 세션을 반납했다(유령 세션 0)", 반납.끊었나,
+  반납.끊었나 ? "window.gijo.logout() — taskkill이 before-quit을 건너뛰므로 여기서 끊는다"
+             : "로그아웃 실패(" + 반납.사유 + ") — claude-deploy 세션이 유휴 만료(30분)까지 남는다");
 
 await browser.close().catch(() => {});
 정리();
