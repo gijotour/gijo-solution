@@ -93,9 +93,19 @@ describe("시험 환경 — 지금 어디서 재고 있나", () => {
 
   it("★ 부르는 쪽(qa-full)이 종료코드를 **그대로 전달**한다 — 삼키면 관문이 헛돈다", () => {
     const qa = fs.readFileSync(new URL("../../tools/qa-full.mjs", import.meta.url), "utf8");
-    // status === 0 만 통과로 본다(2도 실패). 그리고 실패가 하나라도 있으면 1로 끝난다.
-    expect(qa, "종료코드를 안 보고 통과로 친다").toMatch(/ok:\s*r\.status === 0/);
+    // 판정 규칙은 tools/qa-layer-result.mjs **한 곳**에 있다(2026-09-05에 꺼냈다) —
+    //   여기서는 qa-full이 **그 한 곳에 종료코드를 그대로 넘기는지**를 본다.
+    // ⚠ 이 시험은 원래 ok: r.status === 0 을 못 박고 주석에 「2도 실패」라 적어 두었다.
+    //   그 규칙이 바뀌었다: docs 계층의 **exit 2는 「판정 못 함」**이지 「어긋남」이 아니다
+    //   (tools/docs-drift.mjs가 fc396fdb부터 0/1/2로 뜻을 나눠 준다). 재지 못한 것을
+    //   빨강으로 칠하면 「환경 문제」가 「문서 결함」으로 보고된다 — 거짓 초록의 반대 방향일 뿐
+    //   같은 거짓말이다. 그래서 **약속한 계층만** 회색이 되고, 기본은 종전대로 0/그 외다.
+    expect(qa, "종료코드를 판정기에 안 넘긴다").toMatch(/계층결과\(name, r\.status, ms, opts\)/);
     expect(qa, "실패가 있어도 0으로 끝난다").toMatch(/process\.exit\(fails\.length \? 1 : 0\)/);
+    // 기본 규칙은 여전히 엄격하다 — 약속 안 한 계층의 0이 아닌 종료코드는 실패다.
+    const 판정기 = fs.readFileSync(new URL("../../tools/qa-layer-result.mjs", import.meta.url), "utf8");
+    expect(판정기, "기본 판정이 느슨해졌다").toMatch(/ok: status === 0/);
+    expect(판정기, "약속한 계층에만 회색을 준다는 관문이 없다").toMatch(/opts\.판정못함코드/);
   });
 
   it("참고 — 이 기계 정보(실패 판정 아님, 기록용)", () => {

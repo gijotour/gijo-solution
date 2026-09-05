@@ -28,6 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { 계층결과, 기호, 변경목록 } from "./qa-layer-result.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(ROOT, ".tmp-reports");
@@ -48,7 +49,10 @@ let since = null;
 try { since = JSON.parse(fs.readFileSync(MARKER, "utf8")).commit; git(`cat-file -t ${since}`); } catch { since = null; }
 let changed = [];
 if (since && since !== head) changed = git(`diff --name-only ${since}..HEAD`).split("\n").filter(Boolean);
-changed = [...new Set([...changed, ...git("status --porcelain").split("\n").filter(Boolean).map((l) => l.slice(3).trim())])];
+// ⚠ porcelain은 **원문 그대로** 넘긴다 — git()의 .trim()이 첫 줄 앞 공백을 깎아 경로의 첫 글자를
+//   먹던 자리다(2026-09-05 실측: 첫 항목이 ools/local-digest.mjs 로 나왔다). 그러면 그 파일의
+//   계층 매핑이 통째로 빗나가 **돌아야 할 계층이 조용히 안 돈다.** 읽는 규칙은 qa-layer-result 한 곳.
+changed = [...new Set([...changed, ...변경목록(execSync("git status --porcelain", { cwd: ROOT, encoding: "utf8" }))])];
 
 // ── ② 변경 영역 → 계층 매핑 ─────────────────────────────────────────────────────
 // 답변 품질에 닿는 엔진(LLM·RAG·라우팅·그래프)이 바뀌면 지식·시나리오·회귀까지 돈다.
@@ -107,7 +111,19 @@ function run(name, cmd, args, opts = {}) {
   //   인자를 그대로 넘긴다.
   const useShell = opts.noShell ? false : process.platform === "win32";
   const r = spawnSync(cmd, args, { cwd: opts.cwd ?? ROOT, env, stdio: "inherit", shell: useShell });
-  results.push({ name, ok: r.status === 0, ms: Date.now() - t });
+  const ms = Date.now() - t;
+  // ⚠⚠ **「판정 못 함」은 「어긋남」이 아니다**(2026-09-05).
+  //   tools/docs-drift.mjs는 fc396fdb부터 종료 코드에 뜻을 나눠 준다 — 0=같음 · 1=어긋남 · **2=판정 못 함**.
+  //   그런데 이 함수는 status===0 하나로만 봐서 **2를 1과 똑같이 ✗ 실패로** 세었다. 그러면
+  //   「도구를 돌릴 환경이 아니었다」가 「문서가 어긋났다」로 보고되고, 마커까지 안 갱신돼 다음 실행이
+  //   같은 변경을 다시 돈다. **재지 못한 것을 빨강으로 칠하는 것도 거짓말이다** — 이 저장소는 반대
+  //   방향(거짓 초록)으로 이미 데었고 뿌리가 같다. 그래서 세 번째 자리를 만든다:
+  //   초록도 빨강도 아닌 **회색(?) + 원인 문구**.
+  //   ⚠ 약속한 계층에만 적용한다 — opts.판정못함코드를 안 준 계층은 종전 그대로 0/그 외다.
+  //     (아무 계층에나 「2는 봐준다」를 걸면 이번엔 진짜 실패가 회색에 숨는다.)
+  //   판정 규칙 자체는 tools/qa-layer-result.mjs **한 곳**에 있다 — 가짜 종료 코드로 재 볼 수 있게
+  //   꺼내 두었다(server/test/qalayerresult.test.ts). 여기서 다시 적으면 두 곳이 어긋난다.
+  results.push(계층결과(name, r.status, ms, opts));
 }
 
 // Electron이 필요한 계층(스윕·팝업 셸)은 CDP가 살아 있을 때만 — 없으면 스킵 사유를 남긴다
@@ -182,7 +198,12 @@ run("docprobe", "node", ["tools/doc-probe.mjs"]);
 // 문서를 고쳐도 운영 AI가 **옛 판으로 답하던** 것(2026-08-08 실사고) — 배포가 소스만 옮기고
 //   문서는 아무도 안 옮겼고, 운영 서버에는 같은 이름의 사본이 세 곳에 있었다.
 //   리포지토리 ↔ 운영 문서 폴더 ↔ 지식 저장소를 한 줄로 대조한다.
-run("docs", "node", ["tools/docs-drift.mjs"]);
+//   ⚠ 이 도구는 **win 호스트 전용**이다(운영 값을 wsl로 읽는다) — 그래서 「못 쟀다」가 실제로 난다.
+//     0=같음 · 1=어긋남 · **2=판정 못 함**. 2를 실패로 세면 환경 문제가 문서 결함으로 둔갑한다.
+run("docs", "node", ["tools/docs-drift.mjs"], {
+  판정못함코드: [2],
+  판정못함사유: "이 도구는 win 호스트 전용이다(운영 값을 wsl로 읽는다) — WSL·gb10 안에서 돌렸거나 운영 값을 못 읽었다",
+});
 
 // ── ④ 요약·마커·리포트 ──────────────────────────────────────────────────────────
 // 알려진 이슈 — 원인이 규명됐고 사용자가 "지금은 이대로 둔다"고 결정한 것만(tools/qa-known-issues.json).
@@ -223,7 +244,8 @@ for (const r of rawFails) {
 console.log("\n■ 전수조사 결과");
 for (const r of results) {
   const k = knownOnly.find((x) => x.name === r.name);
-  const mark = r.ok === null ? "―" : r.ok ? "✓" : k ? "⚠" : "✗";
+  // ? = 판정 못 함(초록도 빨강도 아니다) · ― = 안 돌림(스킵) · ✓/⚠/✗ = 실제로 쟀다
+  const mark = 기호(r, !!k);
   const tail = k ? ` — 알려진 이슈만(${k.ids.join(", ")})` : r.note ? " — " + r.note : "";
   console.log(`  ${mark} ${r.name} (${(r.ms / 1000).toFixed(0)}s)${tail}`);
 }
@@ -237,16 +259,34 @@ if (knownOnly.length) {
     }
   }
 }
-console.log(fails.length ? `\n✗ 실패 ${fails.length}계층 — 마커를 갱신하지 않습니다(다음 실행이 같은 변경을 다시 봄)` : "\n✓ 전 계층 통과" + (knownOnly.length ? " (알려진 이슈 제외)" : ""));
+// ⚠ 미판정을 요약에서 한 번 더 크게 말한다 — 표의 ? 한 글자는 스크롤에 묻힌다.
+const 미판정 = results.filter((r) => r.판정못함);
+if (미판정.length) {
+  console.log("\n? 판정 못 한 계층 — **통과가 아니다**(재지 못했다는 뜻). 원인을 없앤 뒤 다시 돌리세요");
+  for (const r of 미판정) console.log("   · " + r.name + ": " + r.note);
+}
+console.log(
+  fails.length
+    ? "\n✗ 실패 " + fails.length + "계층 — 마커를 갱신하지 않습니다(다음 실행이 같은 변경을 다시 봄)"
+    : "\n✓ 잰 계층은 전부 통과" +
+      (knownOnly.length ? " (알려진 이슈 제외)" : "") +
+      (미판정.length ? " — ⚠ 다만 " + 미판정.length + "계층은 **재지 못했다**(위 ? 목록)" : ""),
+);
 
-if (!fails.length) fs.writeFileSync(MARKER, JSON.stringify({ commit: head, at: new Date().toISOString(), layers: [...picks], knownIssues: [...knownIds] }, null, 2));
+// ⚠ 마커에 **미판정 계층을 적어 둔다** — 안 적으면 「이 커밋은 다 돌았다」로만 남아, 재지 못한 계층이
+//   기록에서 사라진다(스킵과 똑같이 취급되던 자리다).
+if (!fails.length) fs.writeFileSync(MARKER, JSON.stringify({ commit: head, at: new Date().toISOString(), layers: [...picks], knownIssues: [...knownIds], 미판정: 미판정.map((r) => r.name) }, null, 2));
 fs.writeFileSync(path.join(OUT, "qa-full-report.md"), [
   `# QA 전수조사 (${new Date().toISOString().slice(0, 16)})`,
   `- 기준: ${since ? since.slice(0, 8) : "(첫 실행)"} → ${head.slice(0, 8)} · 변경 ${changed.length}파일`,
   `- 계층: ${results.map((r) => {
     const k = knownOnly.find((x) => x.name === r.name);
-    return `${r.name}=${r.ok === null ? "스킵" : r.ok ? "통과" : k ? "알려진이슈" : "실패"}`;
+    return `${r.name}=${r.판정못함 ? "판정못함" : r.ok === null ? "스킵" : r.ok ? "통과" : k ? "알려진이슈" : "실패"}`;
   }).join(" · ")}`,
+  ...(미판정.length
+    ? ["", "## ? 판정 못 한 계층(통과가 아니다 — 재지 못했다)",
+       ...미판정.map((r) => "- **" + r.name + "** — " + r.note)]
+    : []),
   ...(knownOnly.length
     ? ["", "## ⚠ 알려진 이슈(원인 규명·수용됨)",
        ...knownOnly.flatMap((k) => k.ids.map((id) => {

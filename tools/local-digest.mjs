@@ -29,7 +29,8 @@ import path from "path";
 import { execFileSync, spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const 이파일 = fileURLToPath(import.meta.url);
+const ROOT = path.resolve(path.dirname(이파일), "..");
 const [mode, 대상, 질문] = process.argv.slice(2);
 
 // ── 어느 두뇌를 쓰나 ─────────────────────────────────────────────────────────
@@ -67,6 +68,50 @@ const 두뇌 = 두뇌들[process.env.GIJO_DIGEST_BRAIN ?? "qwen38"] ?? 두뇌들
 const DIGEST_PORT = 두뇌.port;
 
 // ── gb10 창구 ────────────────────────────────────────────────────────────────
+// ⚠⚠ **실패 이유를 버리고 있었다**(2026-09-05 실사고 · 수리).
+//   큰 파일 발췌가 「⚠ 조각 786~1181 실패: ssh 실패:」 **한 줄만** 내고 400줄을 통째로 버렸다.
+//   원인이 안 적힌 게 아니라 **원인 자체를 버렸다** — curl에 `-s`(silent)가 붙어 있어 curl이
+//   제 실패 이유를 stderr에 한 글자도 안 쓴다. 그래서 (r.stderr || "")가 빈 문자열이 되고
+//   문구가 「ssh 실패: 」로 끝난다. 실측 재현(2026-09-05):
+//     · `-s  --max-time 1` → status 28 · stderr **0바이트** → 문구 「ssh 실패: 」  ← 옛 모습
+//     · `-sS --max-time 1` → status 28 · stderr 77바이트 "curl: (28) Operation timed out …"
+//   ★ 이 파일의 첫 원칙이 「조용한 폴백 금지」인데, 정작 **실패의 이유**를 조용히 버렸다.
+//   ⚠ 문맥 초과(400)는 여기 안 온다 — 그건 status 0에 JSON 본문으로 온다(실측: 35,703토큰
+//     요청 → {"error":{"code":400,…"exceed_context_size_error"}}). 그래서 아래 j.error가 잡는다.
+const CURL_뜻 = {
+  6: "호스트 이름을 못 찾음",
+  7: "붙지 못함 — llama-server가 안 떠 있다",
+  22: "HTTP 오류",
+  28: "시간 초과(--max-time) — 두뇌가 다른 요청에 물렸거나 조각이 너무 크다",
+  52: "서버가 빈 응답 — 요청 도중 llama-server가 내려갔나(제품이 모델을 갈아끼웠을 수 있다)",
+  56: "받는 중 연결이 끊김",
+  255: "ssh 자체가 실패 — WireGuard·키·호스트를 본다",
+};
+/** spawnSync 결과를 **빈 문구가 될 수 없는** 한 줄로 옮긴다. */
+export function 실패설명(r) {
+  const 조각 = [];
+  if (r.error) 조각.push("spawn 오류 " + (r.error.code ?? r.error.message));
+  if (r.signal) 조각.push("신호 " + r.signal + "로 죽음");
+  if (r.status !== 0 && r.status !== null && r.status !== undefined) {
+    조각.push("종료코드 " + r.status + (CURL_뜻[r.status] ? " = " + CURL_뜻[r.status] : ""));
+  }
+  const 에 = (r.stderr || "").trim();
+  if (에) 조각.push("stderr: " + 에.slice(0, 300));
+  // ⚠ **여기가 비면 옛 「ssh 실패: 」가 그대로 돌아온다.** 마지막 그물을 둔다.
+  if (!조각.length) 조각.push("설명 없음(status=" + JSON.stringify(r.status) + " · stderr 0바이트) — 그 자체를 적는다");
+  return 조각.join(" · ");
+}
+/** 다시 하면 될 수 있는 실패인가. 문맥 초과·스키마 오류는 여기 오지 않는다(status 0). */
+export function 다시해볼만한가(r) {
+  return [7, 28, 52, 56, 255].includes(r.status) || !!r.error || !!r.signal;
+}
+const 최대시도 = Math.max(1, Number(process.env.GIJO_DIGEST_RETRY ?? 3));
+const 제한초 = Math.max(10, Number(process.env.GIJO_DIGEST_TIMEOUT ?? 300));
+// ssh를 **말없이 오래 매달리게 두지 않는다**: 비밀번호 프롬프트 금지(BatchMode)·붙는 데 10초·
+//   끊긴 연결은 살아있는지 물어 15초×4에 포기. WireGuard RTT 70~106ms라 blip이 실제로 난다.
+const SSH옵션 = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4"];
+const 잠깐 = (ms) => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch { /* 못 자면 그냥 간다 */ } };
+
 function gb10Chat(prompt, schema, nPredict) {
   const body = {
     model: "local",
@@ -75,18 +120,31 @@ function gb10Chat(prompt, schema, nPredict) {
     max_tokens: nPredict ?? 512,
   };
   if (schema) body.response_format = { type: "json_schema", json_schema: { name: "out", strict: true, schema } };
-  const r = spawnSync("ssh", ["gb10", `curl -s --max-time 300 -X POST http://localhost:${DIGEST_PORT}/v1/chat/completions -H 'content-type: application/json' --data-binary @-`],
-    { input: JSON.stringify(body), encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-  if (r.status !== 0) throw new Error("ssh 실패: " + (r.stderr || "").slice(0, 200));
-  let j;
-  try { j = JSON.parse(r.stdout); } catch { throw new Error("gb10 응답이 JSON이 아님(서버 죽음?): " + r.stdout.slice(0, 200)); }
-  if (j.error) throw new Error("llama-server 오류: " + JSON.stringify(j.error).slice(0, 300));
-  return j.choices?.[0]?.message?.content ?? "";
+  // ⚠ 본문은 **stdin으로만** 보낸다(--data-binary @-). argv에 실으면 명령줄 길이 한계(ARG_MAX)에
+  //   걸리는데, 조각이 17,000자급이라 언제든 닿는다. 지금은 argv에 짧은 curl 한 줄뿐이다.
+  const 보낼것 = JSON.stringify(body);
+  let 마지막 = "";
+  for (let 시도 = 1; 시도 <= 최대시도; 시도++) {
+    const r = spawnSync("ssh", [...SSH옵션, "gb10", `curl -sS --max-time ${제한초} -X POST http://localhost:${DIGEST_PORT}/v1/chat/completions -H 'content-type: application/json' --data-binary @-`],
+      { input: 보낼것, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: (제한초 + 60) * 1000 });
+    if (r.status === 0) {
+      let j;
+      try { j = JSON.parse(r.stdout); } catch { throw new Error("gb10 응답이 JSON이 아님(서버 죽음?): " + String(r.stdout).slice(0, 200)); }
+      if (j.error) throw new Error("llama-server 오류: " + JSON.stringify(j.error).slice(0, 300));
+      return j.choices?.[0]?.message?.content ?? "";
+    }
+    마지막 = 실패설명(r);
+    if (!다시해볼만한가(r) || 시도 === 최대시도) break;
+    console.error("  ↻ gb10 재시도 " + 시도 + "/" + (최대시도 - 1) + " — " + 마지막);
+    잠깐(2000 * 시도);
+  }
+  throw new Error("gb10 호출 실패(" + 최대시도 + "회 시도) — " + 마지막);
 }
 
 function 서버확인() {
-  const r = spawnSync("ssh", ["gb10", `curl -s --max-time 5 http://localhost:${DIGEST_PORT}/health`], { encoding: "utf8" });
-  return /ok/.test(r.stdout || "");
+  const r = spawnSync("ssh", [...SSH옵션, "gb10", `curl -sS --max-time 5 http://localhost:${DIGEST_PORT}/health`], { encoding: "utf8", timeout: 30000 });
+  if (!/ok/.test(r.stdout || "")) { 서버확인.마지막실패 = 실패설명(r); return false; }
+  return true;
 }
 
 // ── 공통: 줄범위 발췌 (hybrid-probe 검증 패턴 — 20/20) ──────────────────────────
@@ -116,8 +174,39 @@ const RANGE_SCHEMA = {
 //   조각이 많아질 뿐이지만, 모자라게 잡으면 **조용히 통째로 날아간다.**
 const 자당토큰 = 1.54;   // 한글 많은 파일 실측(가장 나쁜 경우)
 const 입력몫 = 0.70;      // 나머지는 답·프롬프트 몫
-const 조각글자수 = Math.floor(두뇌.슬롯문맥 * 입력몫 * 자당토큰);
-const 겹침줄 = 150;
+export const 조각글자수 = Math.floor(두뇌.슬롯문맥 * 입력몫 * 자당토큰);
+export const 겹침줄 = 150;
+
+/** 줄 배열을 **글자 예산에 맞춘 조각**들로 나눈다 — [시작(0기준), 끝(미포함)] 목록.
+ *  ⚠ 순수 함수로 꺼내 둔 이유: 조각 나누기가 틀리면 gb10을 부르기도 전에 실패가 예약된다.
+ *    실호출 없이 예산·덮임을 시험으로 잰다(server/test/localdigest.test.ts). */
+export function 조각나누기(lines, 예산 = 조각글자수, 겹침 = 겹침줄) {
+  const 조각끝 = (시작) => {
+    let 글자 = 0;
+    for (let i = 시작; i < lines.length; i++) {
+      글자 += lines[i].length + 1;
+      if (글자 > 예산) return Math.max(시작 + 1, i); // 최소 한 줄은 담는다
+    }
+    return lines.length;
+  };
+  const 목록 = [];
+  for (let s = 0; s < lines.length; ) {
+    const e = 조각끝(s);
+    목록.push([s, e]);
+    if (e >= lines.length) break;
+    s = Math.max(s + 1, e - 겹침); // 겹쳐서 다음 조각 — 경계에 걸친 함수를 놓치지 않는다
+  }
+  return 목록;
+}
+
+// ⚠ 조각 하나가 실패했다고 **수백 줄을 통째로 버리지 않는다**(2026-09-05 수리).
+//   옛 코드는 실패한 조각을 그대로 「못 본 구간」에 넣고 끝냈다 — 실측 사고에서 396줄이
+//   한 번에 날아갔다. 실패 이유의 상당수가 「크거나 오래 걸려서」(시간 초과·문맥 초과)라
+//   **반으로 자르면 대개 통과한다.** 실측(2026-09-05): 조각 하나가 찬 두뇌에서 18.9초 ·
+//   같은 프롬프트 재요청 1.3초 · 제한 300초는 15배 여유다 → 제한에 걸렸다면
+//   「원래 그만큼 걸린다」가 아니라 **크기·대기** 문제다.
+const 최소조각줄 = Number(process.env.GIJO_DIGEST_MIN_LINES ?? 40); // 이 밑으로는 안 쪼갠다
+const 최대분할 = Number(process.env.GIJO_DIGEST_MAX_SPLIT ?? 3);    // 무한 분할 금지
 
 function 발췌(경로, 물음) {
   const abs = path.isAbsolute(경로) ? 경로 : path.join(ROOT, 경로);
@@ -129,17 +218,8 @@ function 발췌(경로, 물음) {
   //   꾸러미가 「실패 0」이라고 적었다. 조용한 폴백 금지가 이 파일의 첫 원칙인데 어겼다.
   const 못본조각 = [];
   const 전체범위 = [];
-  // 글자 예산에 맞춰 조각의 **끝 줄**을 정한다(겹침은 줄 단위 그대로).
-  const 조각끝 = (시작) => {
-    let 글자 = 0;
-    for (let i = 시작; i < lines.length; i++) {
-      글자 += lines[i].length + 1;
-      if (글자 > 조각글자수) return Math.max(시작 + 1, i); // 최소 한 줄은 담는다
-    }
-    return lines.length;
-  };
-  for (let s = 0; s < lines.length; ) {
-    const e = 조각끝(s);
+  /** 조각 하나를 묻는다. 실패하면 **반으로 잘라 다시** 묻고, 그래도 안 되면 못 본 것으로 적는다. */
+  const 조각묻기 = (s, e, 깊이 = 0) => {
     const 번호원문 = lines.slice(s, e).map((l, i) => `${s + i + 1}\t${l}`).join("\n");
     const prompt =
       `아래는 줄번호가 붙은 파일 일부다(${s + 1}~${e}줄/총 ${lines.length}줄). 질문에 답하는 데 필요한 부분의 **줄 범위**만 골라라.\n` +
@@ -147,13 +227,21 @@ function 발췌(경로, 물음) {
     try {
       const out = JSON.parse(gb10Chat(prompt, RANGE_SCHEMA, 256));
       for (const [a, b] of out.ranges || []) if (a >= s + 1 && b <= e) 전체범위.push([a, b]);
+      return;
     } catch (e2) {
-      못본조각.push([s + 1, e]);
-      console.error(`⚠ 조각 ${s + 1}~${e} 실패: ${e2.message}`);
+      const 반 = Math.floor((s + e) / 2);
+      // 더 못 쪼개는 자리에서만 「못 봤다」로 적는다 — 그 전에는 반씩 다시 묻는다.
+      if (깊이 >= 최대분할 || e - s <= 최소조각줄 || 반 <= s || 반 >= e) {
+        못본조각.push([s + 1, e]);
+        console.error(`⚠ 조각 ${s + 1}~${e} 실패(더 못 쪼갬 · 깊이 ${깊이}): ${e2.message}`);
+        return;
+      }
+      console.error(`⚠ 조각 ${s + 1}~${e} 실패 → 반으로 잘라 다시 묻는다(깊이 ${깊이 + 1}): ${e2.message}`);
+      조각묻기(s, 반, 깊이 + 1);
+      조각묻기(반, e, 깊이 + 1);
     }
-    if (e >= lines.length) break;
-    s = Math.max(s + 1, e - 겹침줄); // 겹쳐서 다음 조각 — 경계에 걸친 함수를 놓치지 않는다
-  }
+  };
+  for (const [s, e] of 조각나누기(lines)) 조각묻기(s, e);
   // 병합·출력 — 본문은 **기계가 원문을 자른다**
   전체범위.sort((x, y) => x[0] - y[0]);
   const 병합 = [];
@@ -304,17 +392,23 @@ function 좁은스키마(최대) {
 }
 
 // ── 실행 ────────────────────────────────────────────────────────────────────
-if (!서버확인() && mode !== "up") {
-  console.error(`✗ gb10:${DIGEST_PORT}가 응답하지 않는다 — 조용한 폴백은 하지 않는다.`);
-  console.error("  기동:  node tools/local-digest.mjs up");
-  process.exit(2);
+// ⚠ **진입점 관문** — import(시험)로 들어오면 아무것도 돌지 않는다. 없으면 시험이 gb10을
+//   부르게 되고, 그 순간 시험이 「네트워크가 살아 있는가」를 재는 물건으로 바뀐다.
+function main() {
+  if (!서버확인() && mode !== "up") {
+    console.error(`✗ gb10:${DIGEST_PORT}가 응답하지 않는다 — 조용한 폴백은 하지 않는다.`);
+    if (서버확인.마지막실패) console.error("  이유: " + 서버확인.마지막실패);
+    console.error("  기동:  node tools/local-digest.mjs up");
+    process.exit(2);
+  }
+  if (mode === "file" || mode === "log") 발췌(대상, 질문 || "핵심 내용");
+  else if (mode === "review") 리뷰(대상);
+  else if (mode === "up") {
+    if (서버확인()) { console.log("이미 떠 있음 ✅"); process.exit(0); }
+    spawnSync("ssh", [...SSH옵션, "gb10", `. ~/gijo-env.sh 2>/dev/null; ${두뇌.기동}`], { encoding: "utf8", timeout: 20000 });
+    console.log(`기동 명령 보냄 (${두뇌.이름} · 포트 ${DIGEST_PORT}) — 적재 45~60초 뒤 다시 확인`);
+  } else {
+    console.log("사용: node tools/local-digest.mjs file <경로> \"<질문>\" | review [커밋] | log <경로> \"<질문>\" | up");
+  }
 }
-if (mode === "file" || mode === "log") 발췌(대상, 질문 || "핵심 내용");
-else if (mode === "review") 리뷰(대상);
-else if (mode === "up") {
-  if (서버확인()) { console.log("이미 떠 있음 ✅"); process.exit(0); }
-  spawnSync("ssh", ["gb10", `. ~/gijo-env.sh 2>/dev/null; ${두뇌.기동}`], { encoding: "utf8", timeout: 20000 });
-  console.log(`기동 명령 보냄 (${두뇌.이름} · 포트 ${DIGEST_PORT}) — 적재 45~60초 뒤 다시 확인`);
-} else {
-  console.log("사용: node tools/local-digest.mjs file <경로> \"<질문>\" | review [커밋] | log <경로> \"<질문>\" | up");
-}
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(이파일)) main();
