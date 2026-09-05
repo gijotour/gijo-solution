@@ -1480,7 +1480,8 @@ export async function getDocumentSample(documentId: string): Promise<string | nu
   const table = await openDocsTable(db); // 읽기 전용 — 표가 없으면 null(지식 0건)
   if (!table) return null;
   const rows = (await table.query().where(`documentId = '${escapeLiteral(documentId)}'`).limit(1).toArray()) as MemoryRow[];
-  return rows[0]?.text ?? null;
+  // ⚠ 조각 **판독기**도 메타를 걷는다(2026-09-06 검토관 [높음]) — 아래 세 함수 공통. 이유는 getDocumentChunks 위 주석.
+  return rows[0]?.text != null ? 메타걷은조각(rows[0].text) : null;
 }
 
 /** 임계값 없이 상위 topK를 그대로 돌려주는 검색(문서 검색 화면·도구용). 순위는 하이브리드로 낸다. */
@@ -1565,13 +1566,22 @@ export async function listVisibleDocuments(): Promise<MemoryDocument[]> {
 
 // 특정 문서의 조각(청크) 텍스트 미리보기 — "어떻게 학습됐는지" 확인용.
 // ⚠ **문서 목록을 돌며 이 함수를 부르지 말 것** — 아래 getChunksForDocuments를 쓴다(이유는 거기에).
+//
+// ★ **판독기도 메타를 걷는다**(2026-09-06 검토관 [높음] — 그물 밖 네 번째 경로).
+//   hybridSearch에만 걷기를 달았더니 **검색을 안 지나는 원본 판독기 3종**(여기·getChunksForDocuments·
+//   getDocumentSample)이 그대로 샜다. 이 셋은 화면이 실제로 부른다:
+//     · 「AI 지식」 조각 미리보기(POST /api/memory/document/chunks) → 화면에 그대로 보이고,
+//       그 글을 **Q&A 데이터셋 변환 입력칸에 이어 붙인다** → 어댑터가 「근거 조각: store:…」 꼴을 외운다.
+//     · 지식 위생 점검(kbhygiene)·증류 코퍼스(learncandidates)·인수인계 표본(handover).
+//   3,778 승인문답 문서에 그 두 줄이 남아 있으므로(재반입 안 함) **읽는 자리에서** 걷는다.
+//   ⚠ 걷기는 표시·학습용 글에만 건다 — 조각 **수**·삭제·재임베딩 경로는 원문을 그대로 본다.
 export async function getDocumentChunks(documentId: string, limit = 10): Promise<{ chunkIndex: number; text: string }[]> {
   const ldb = await lancedb.connect(DB_PATH);
   const table = await openDocsTable(ldb); // 읽기 전용 — 표가 없으면 null(지식 0건)
   if (!table) return [];
   const rows = (await table.query().where(`documentId = '${escapeLiteral(documentId)}'`).limit(1_000_000).toArray()) as MemoryRow[];
   return rows
-    .map((r) => ({ chunkIndex: r.chunkIndex, text: r.text }))
+    .map((r) => ({ chunkIndex: r.chunkIndex, text: 메타걷은조각(r.text) }))
     .sort((a, b) => a.chunkIndex - b.chunkIndex)
     .slice(0, limit);
 }
@@ -1604,9 +1614,11 @@ export async function getChunksForDocuments(documentIds: string[]): Promise<Map<
     rows = (await table.query().where(where).limit(1_000_000).toArray()) as MemoryRow[];
   }
   for (const r of rows) {
+    // ⚠ 판독기도 메타를 걷는다(getDocumentChunks 위 주석) — 여기 결과가 증류 코퍼스·위생 점검으로 간다.
+    const 조각 = { chunkIndex: r.chunkIndex, text: 메타걷은조각(r.text) };
     const list = out.get(r.documentId);
-    if (list) list.push({ chunkIndex: r.chunkIndex, text: r.text });
-    else out.set(r.documentId, [{ chunkIndex: r.chunkIndex, text: r.text }]);
+    if (list) list.push(조각);
+    else out.set(r.documentId, [조각]);
   }
   for (const list of out.values()) list.sort((a, b) => a.chunkIndex - b.chunkIndex);
   return out;

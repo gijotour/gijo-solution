@@ -28,7 +28,7 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-const { ingestDocument, ingestText, queryMemory, listDocuments, getDocumentChunks, deleteDocument, uploadedDocIds } = await import("../src/engine/memory");
+const { ingestDocument, ingestText, queryMemory, listDocuments, getDocumentChunks, getChunksForDocuments, getDocumentSample, deleteDocument, uploadedDocIds } = await import("../src/engine/memory");
 
 const DOC_A = path.join(tmpDb, "doc-a.txt");
 const DOC_B = path.join(tmpDb, "doc-b.txt");
@@ -104,6 +104,35 @@ describe("memory documents (올린 문서 목록·조각 미리보기·삭제)",
     const chunks = await getDocumentChunks("preview-doc.txt", 5);
     expect(chunks.length).toBeGreaterThanOrEqual(1);
     expect(chunks[0].text).toContain("조각 미리보기");
+  });
+
+  // ★ 조각 **판독기 3종**은 검색(hybridSearch)을 안 지나므로 따로 걷어야 한다
+  //   (2026-09-06 검토관 [높음] — 네 번째 누출 경로). 소스 감시는 metaleak.test.ts에 있고,
+  //   여기서는 **실제 LanceDB에 넣고 꺼내** 글자가 안 나오는지 본다(감시만으로는 헛초록이 난다).
+  //   ⚠ 반입 본문에 이 꼴이 남아 있는 문서가 운영에 3,778건 있다(재반입 안 함) — 그 실물 그대로.
+  it("★ 승인 문답 꼬리 메타가 조각 판독기 3종 어디로도 안 나온다(내부 경로·교사 모델 파일명)", async () => {
+    embedDim = 3;
+    const 꼬리있는본문 = [
+      "[승인 문답 · 취약점 · 사내규정 · 2026-09-05]",
+      "질문: 보안서약서 제출률 알려줘",
+      "답변: 사내 자료에 기록이 없습니다.",
+      "근거 조각: store:개인정보_안전성_확보조치_기준_안내서_2024.pdf#2d8025162648",
+      "교사 모델: models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+    ].join("\n");
+    await ingestText("메타꼬리-문서.txt", 꼬리있는본문, "global");
+
+    const 판독 = [
+      (await getDocumentChunks("메타꼬리-문서.txt", 50)).map((c) => c.text).join("\n"),
+      ((await getChunksForDocuments(["메타꼬리-문서.txt"])).get("메타꼬리-문서.txt") ?? []).map((c) => c.text).join("\n"),
+      (await getDocumentSample("메타꼬리-문서.txt")) ?? "",
+    ];
+    for (const [i, 글] of 판독.entries()) {
+      expect(글, `판독기 ${i}가 내부 저장소 경로를 그대로 돌려줬다`).not.toContain("store:");
+      expect(글, `판독기 ${i}가 교사 모델 파일명을 그대로 돌려줬다`).not.toContain(".gguf");
+      expect(글, `판독기 ${i}가 라벨 줄을 남겼다`).not.toContain("근거 조각");
+      // 본문은 살아 있어야 한다 — 「메타를 막는다」가 「글을 갉아먹는다」가 되면 안 된다.
+      expect(글, `판독기 ${i}가 본문까지 지웠다`).toContain("보안서약서 제출률");
+    }
   });
 
   it("ingestDocument records a sourcePath so 원본까지 삭제 is possible", async () => {

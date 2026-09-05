@@ -6,10 +6,15 @@
 //   프롬프트로는 못 막는다(7B에 규칙을 더해 행동을 고치려는 시도는 이 저장소에서 반복해 실패했다).
 //   세 겹을 못 박는다:
 //     ⓐ 앞으로 반입되는 승인 문답 **본문**에 그 두 줄이 안 실린다(learnmemory.approvedQaContent)
-//     ⓑ 이미 들어간 3,778문서는 재반입 없이 **실을 때** 걷는다(memory.queryMemoryGraded 한 곳)
+//     ⓑ 이미 들어간 3,778문서는 재반입 없이 **읽을 때** 걷는다 — 검색은 memory.**hybridSearch**
+//       (4경로가 다 지난다), 검색을 안 지나는 **원본 판독기 3종**(getDocumentChunks·
+//       getChunksForDocuments·getDocumentSample)도 같은 걷기를 쓴다
 //     ⓒ 그래도 답에 남으면 **출구**에서 뗀다(llm.chat — 인용 가드와 같은 신호로 센다)
 //   ⚠ 소스 감시가 함께 있는 이유: ⓑⓒ는 **호출 한 줄**이 사라지면 조용히 다시 새기 시작한다.
 //     시험이 함수만 재면 「함수는 초록인데 제품은 샌다」가 된다(이 저장소가 반복해 겪은 부류).
+//   ★ 2026-09-06 검토관 [높음] 돌연변이 실측으로 보강한 자리 — 아래 세 곳은 **한 줄을 지웠는데
+//     시험 5,564개가 전부 초록**이던 구멍이다: ⓒ의 `reply = 경로가드.text` 대입 · 내부경로_RE의
+//     `store:` 갈래 · 원본 판독기 3종. 지금은 각각 시험이 붙어 있다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -58,6 +63,19 @@ describe("ⓑⓒ 메타 줄 걷기 — 실물 꼬리 전/후", () => {
     expect(r.text).toBe("확인했습니다.\n끝.");
   });
 
+  it("★ **라벨 없는 store: 조각 참조**도 그 줄을 뗀다 — 승인 문답 2,326건이 이 꼴을 갖고 있다", () => {
+    // 2026-09-06 검토관 [중간]: 내부경로_RE의 store: 갈래를 통째로 지워도 이 파일이 초록이었다.
+    //   라벨 줄은 메타라벨줄_RE가 먼저 잡아 주므로, **라벨 없이 문장 안에 있는** 참조만이
+    //   그 갈래를 실제로 재는 유일한 자리다(gguf 쪽에는 이미 그런 시험이 있었다).
+    const 답 = "확인했습니다.\n출처는 store:개인정보_안전성_확보조치_기준_안내서_2024.pdf#2d8025162648 입니다.\n끝.";
+    const r = 메타줄걷기(답);
+    expect(r.뗀줄수).toBe(1);
+    expect(r.경로, "store: 갈래가 잡은 것을 시험이 눈으로 본다").toEqual([
+      "store:개인정보_안전성_확보조치_기준_안내서_2024.pdf#2d8025162648",
+    ]);
+    expect(r.text).toBe("확인했습니다.\n끝.");
+  });
+
   it("★ 자리표시 문구(models/<id>/<id>.gguf)는 **안 지운다** — 제품 설명을 갉아먹지 않는다", () => {
     const 설명 = "모델 파일은 models/<id>/<id>.gguf 자리에 둡니다.";
     expect(메타줄있나(설명)).toBe(false);
@@ -68,6 +86,14 @@ describe("ⓑⓒ 메타 줄 걷기 — 실물 꼬리 전/후", () => {
     const r = 메타줄걷기(실물꼬리);
     expect(r.뗀줄수, "빈 결과를 내느니 아무것도 안 한다").toBe(0);
     expect(r.text).toBe(실물꼬리);
+    // ★ 다만 **조용히** 지나가지는 않는다(2026-09-06 검토관 [낮음]) — 못 뗀 것을 표로 남긴다.
+    expect(r.통째메타, "0줄로 통과시키면 감독 화면에 아무 신호도 안 뜬다").toBe(true);
+  });
+
+  it("평범한 답·정상 걷기에는 통째메타 표가 안 선다(못 뗀 자리에만 선다)", () => {
+    expect(메타줄걷기("취약점 202건입니다.").통째메타).toBe(false);
+    expect(메타줄걷기(실물답).통째메타, "본문이 남았으면 뗀 것이다").toBe(false);
+    expect(메타줄걷기("").통째메타).toBe(false);
   });
 
   it("메타가 없는 평범한 답은 손대지 않는다(같은 문자열을 그대로 돌려준다)", () => {
@@ -134,12 +160,44 @@ describe("★ 배선 감시 — 호출 한 줄이 사라지면 조용히 다시 
   it("ⓒ llm.chat 출구가 인용 가드 **뒤에서** 한 번 더 뗀다 — 계수는 같은 kind=cite 신호", () => {
     const src = read("src", "engine", "llm.ts");
     expect(src).toContain('import { 메타줄걷기 } from "./metaleak"');
-    expect(src).toMatch(/const 경로가드 = 메타줄걷기\(reply\);/);
+    // ★★ **걷은 결과를 답에 되돌리는가** — 여기가 가장 큰 구멍이었다(2026-09-06 검토관 [높음]).
+    //   돌연변이 실측: 대입 한 줄(`reply = 경로가드.text;`)만 지웠더니 시험 5,564개가 전부 초록이고
+    //   감독 화면에는 「제거」가 그대로 찍혔다 — 「안 고치고 고쳤다고 보고」하는 꼴이다.
+    //   그래서 **부르는 줄과 대입 줄이 붙어 있는지**를 잰다(갈래 없이 무조건 대입).
+    expect(src, "걷기 결과를 reply에 안 되돌리면 출구 방어가 죽은 채로 초록이 된다")
+      .toMatch(/const 경로가드 = 메타줄걷기\(reply\);\s*\n\s*reply = 경로가드\.text;/);
     // 순서 — 가드가 먼저, 경로 걷기가 나중(앞에 두면 우리가 손댄 글을 가드가 자기인용으로 본다).
     expect(src.indexOf("const 인용가드 = guardCitations(")).toBeLessThan(src.indexOf("const 경로가드 = 메타줄걷기("));
     expect(src, "조용히 고치면 몇 달을 모른다 — 감독 화면에 건수가 뜬다")
-      .toMatch(/내부 경로 \$\{경로가드\.뗀줄수\}줄 제거/);
+      .toMatch(/\$\{경로가드\.뗀줄수\}줄 제거/);
+    // ⚠ 없던 경로를 있다고 세지 않는다 — 라벨만 뗐으면 「내부 메타」다(검토관 [중간]).
+    expect(src, "경로를 실제로 잡았을 때만 「내부 경로」라 적는다")
+      .toMatch(/경로가드\.경로\.length > 0 \? "내부 경로" : "내부 메타"/);
+    // ⚠ 못 뗀 자리(통째메타)도 감독 화면에 뜬다 — 조용한 통과를 막는다(검토관 [낮음]).
+    expect(src).toMatch(/경로가드\.통째메타 \? "내부 메타뿐이라 원문 유지\(못 뗌\)" : ""/);
     expect(src, "경로 문자열 자체는 감독 화면에 안 싣는다").not.toMatch(/detail:.*경로가드\.경로/);
+  });
+
+  it("ⓑ 검색을 **안 지나는** 원본 판독기 3종도 같은 걷기를 쓴다 — 네 번째 누출 경로", () => {
+    // 2026-09-06 검토관 [높음]: hybridSearch에만 달았더니 조각 미리보기 API(POST
+    //   /api/memory/document/chunks)가 원본을 그대로 돌려줬고, 「AI 지식」 화면이 그 글을
+    //   **Q&A 데이터셋 변환 입력칸**에 이어 붙였다 — 어댑터가 「근거 조각: store:…」를 외우는 길.
+    const src = read("src", "engine", "memory.ts");
+    /** 함수 **몸통만** 잘라 본다 — 넉넉히 자르면 옆 함수의 호출이 대신 초록을 만든다(헛통과). */
+    const 몸통 = (이름: string) => {
+      const i = src.indexOf(`export async function ${이름}(`);
+      expect(i, `${이름}를 못 찾았다`).toBeGreaterThan(0);
+      const 끝 = src.indexOf("\n}\n", i);
+      expect(끝, `${이름}의 끝을 못 찾았다`).toBeGreaterThan(i);
+      return src.slice(i, 끝);
+    };
+    for (const [함수, 자리] of [
+      ["getDocumentChunks", "text: 메타걷은조각(r.text)"],
+      ["getChunksForDocuments", "text: 메타걷은조각(r.text)"],
+      ["getDocumentSample", "메타걷은조각(rows[0].text)"],
+    ] as const) {
+      expect(몸통(함수), `${함수}가 메타를 안 걷는다 — 그 판독기만 샌다`).toContain(자리);
+    }
   });
 
   it("ⓐ learnmemory가 본문에 꼬리 메타를 더 이상 안 적는다(소스로 못 박는다)", () => {
