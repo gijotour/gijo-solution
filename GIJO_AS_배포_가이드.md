@@ -206,6 +206,22 @@ Restart=always
 ```
 `gijo-as.env`(권한 600, 커밋 금지)에는 `NODE_ENV=production`, `GIJO_JWT_SECRET`(필수 — 운영에서 미설정이면 서버가 뜨지 않음), `GIJO_SERVER_PORT=4000`, 그리고 llama.cpp를 `server/` 밖에 두었으므로 `GIJO_LLAMA_SERVER_PATH`·`GIJO_LLAMA_CPP_DIR`·`GIJO_DOCS_DIR` 절대경로를 넣습니다.
 
+#### 켜고 끄는 스위치(게이트) — 배포 뒤 이 파일에서 켭니다
+
+기본은 **꺼져 있고**, 운영에서 재 본 뒤 승격 여부를 사람이 정하는 규칙들입니다. 한 줄 넣고 서비스를 다시 띄우면 켜집니다(끄려면 그 줄을 지웁니다 — 값을 `0`으로 두는 것이 아니라 **줄을 지웁니다**. 켜지는 값은 정확히 `1` 하나입니다).
+
+| 스위치 | 무엇이 켜지나 | 왜 기본이 꺼짐인가 |
+|---|---|---|
+| `GIJO_KPI_SUBJECT_RULE=1` | 「우리·사내·자사·당사 + …율/률/비율/평균/건수」를 **사내 지표 물음**으로 못 박아 `kpi_status`로 보냅니다(강제도구 [83] 「사내 지표율」의 주체어 갈래). 낱말 목록에 없는 지표(예산 집행률·평균 조치 기간·등록 건수)가 모델 재량으로 새는 것을 막습니다. | 넓은 규칙은 **남의 답을 삼킵니다.** 같은 규칙을 낱말로 넓혔다가 「업계 평균 클릭률」·「국내 백신 설치율 통계」까지 채 가서 되돌린 전례가 있습니다(2026-09-06). 그래서 켜서 **재 본 뒤** 승격합니다. |
+
+```bash
+# 예: 주체어 규칙을 운영에서 켜 보기
+echo 'GIJO_KPI_SUBJECT_RULE=1' | sudo tee -a /home/gijo/gijo-as/gijo-as.env
+sudo systemctl restart gijo-as.service   # 또는 pkill (Restart=always)
+```
+
+⚠ 스위치를 켠 뒤에는 **라우팅이 달라진 범위를 재고** 보고합니다 — `node tools/route-explain.mjs --겹침`(새 겹침이 생기면 `승인된겹침`에 「게이트 on 한정」 이유와 함께 적습니다)과 야간 회귀(`tools/ops-sim.mjs`)를 켠 상태로 한 번 돌립니다. 스위치는 **전 사용자에게 즉시** 적용됩니다(사용자별 설정이 아닙니다).
+
 ```bash
 sudo systemctl daemon-reload && sudo systemctl enable --now gijo-as.service
 ```
