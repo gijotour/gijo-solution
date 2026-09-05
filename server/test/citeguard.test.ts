@@ -576,7 +576,32 @@ describe("★★ 실전 답 기록으로 잰 오탐 — 넓힌 잣대가 정상 
   //   (「…새로 들어온 **문서** 알려줘"라고 물으면…」). 그래서 표식 바로 뒤 도입 어구만 본다.
   //   여기서는 **가장 사나운 조건(chunks=0)**으로 실전 답 전체를 훑어 0건을 못박는다.
   const f = path.join(__dirname, "..", "..", ".tmp-reports", "ops-sim.json");
-  it.skipIf(!fs.existsSync(f))("실전 답 전체에서 한 글자도 안 바꾼다", () => {
+  // ★★ 2026-09-06 경합 — **반쪽 재료로는 재지 않는다.**
+  //   야간 회귀(03:00 KST · claude-deploy)가 이 파일을 회차마다 다시 쓴다. 예전엔 10문항마다
+  //   **제자리에서** 덮어써서, 그 창에 시험이 돌면 총 1건짜리 재료를 읽고 **거짓 빨강**이 났다
+  //   (실측: 03:00:09 총=1 → 03:01:59 61 → 158). 생산자 쪽은 원자 교체로 고쳤고
+  //   (tools/ops-sim.mjs — .partial에 쓰고 완주 뒤 rename), **읽는 쪽도 스스로 지킨다.**
+  //   ⚠ 조용히 건너뛰지 않는다 — **사유를 찍는다.** 삼켜진 건너뜀은 없는 시험과 같다.
+  //
+  // ⚠⚠ 「mtime이 60초 이내면 건너뛴다」는 **일부러 안 넣었다**(설계안에서 한 번 걸렀다).
+  //   ① wsl-test.sh가 이 파일을 사본으로 **cp**해 오므로 사본의 mtime은 늘 방금이다 —
+  //      그 규칙을 넣으면 WSL에서 이 시험이 **영영 안 돈다**(이 저장소의 「헛도는 시험」 계보).
+  //   ② 하네스를 돌리고 바로 시험을 돌리는 것이 정상 작업 순서인데, 그때마다 건너뛴다.
+  //   대신 **완주본인가**(문항 수)와 **지금 쓰는 중인가**(.partial이 더 새것인가)를 본다.
+  const 재료상태 = (): string => {
+    if (!fs.existsSync(f)) return "재료 없음(하네스를 아직 안 돌렸다)";
+    try {
+      const 부분 = f + ".partial";     // 하네스가 도는 중이면 이쪽이 더 새것이다
+      if (fs.existsSync(부분) && fs.statSync(부분).mtimeMs > fs.statSync(f).mtimeMs) return "하네스가 도는 중(.partial이 더 새것)";
+      const n = (JSON.parse(fs.readFileSync(f, "utf8")) as unknown[]).length;
+      // 158 = 2026-09-06 기준 하네스 전 문항 수. 이보다 적으면 --limit 실행이거나 반쪽 기록이다.
+      if (n < 158) return `부분 기록(${n}건 — 완주본이 아니다)`;
+    } catch { return "재료를 못 읽었다(쓰는 중이거나 깨졌다)"; }
+    return "";
+  };
+  const 건너뛸사유 = 재료상태();
+  if (건너뛸사유) console.log(`⏭ 실전 답 기록 시험을 건너뜁니다 — ${건너뛸사유}`);
+  it.skipIf(!!건너뛸사유)("실전 답 전체에서 한 글자도 안 바꾼다", () => {
     const rows = JSON.parse(fs.readFileSync(f, "utf8")) as Record<string, unknown>[];
     const 건드림: string[] = [];
     let 총 = 0;

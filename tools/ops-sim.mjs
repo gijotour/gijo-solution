@@ -27,6 +27,19 @@ const BASE = process.env.GIJO_SERVER_URL || "http://localhost:4000";
 const USER = process.env.QA_USER || "claude-deploy";
 const PASS = process.env.QA_PASS || process.env.GIJO_ADMIN_PASSWORD;
 const OUT = path.join(process.cwd(), ".tmp-reports");
+// ── 결과 파일은 **완주한 판만** 보인다 (2026-09-06 경합 사고) ─────────────────
+//
+// ★ 무슨 일이 있었나(실측): 야간 회귀(03:00 KST · claude-deploy)가 10문항마다 ops-sim.json을
+//   **제자리에서 덮어쓰고** 있었다. 그래서 같은 파일이 03:00:09에 총 1건 → 03:01:59에 61건 →
+//   끝나서 158건으로 세 번 바뀌었고, 그 사이에 이 파일을 재료로 쓰는 시험
+//   (citeguard.test 「실전 답 기록」)이 **한 줄짜리 재료를 읽고 거짓 빨강**이 됐다.
+//   시험이 제품이 아니라 **시각**에 따라 갈리면 초록도 못 믿는다.
+// → 진행 중에는 `.partial`에 쓰고, **완주한 뒤에만** 제자리로 rename한다(원자 교체).
+//   읽는 쪽은 반쪽 파일을 아예 볼 수 없다. 중간에 죽으면 **지난 회차의 온전한 판**이 남는다
+//   (반쪽으로 덮어쓰는 것보다 낫다 — 낡은 재료는 mtime으로 알아볼 수 있지만
+//    반쪽 재료는 「제품이 나빠진 것」처럼 보인다).
+const 결과파일 = path.join(OUT, "ops-sim.json");
+const 쓰는중파일 = 결과파일 + ".partial";
 const 제한 = (() => { const i = process.argv.indexOf("--limit"); return i > 0 ? Number(process.argv[i + 1]) : 0; })();
 
 // ── 하루의 흐름 ─────────────────────────────────────────────────────
@@ -602,8 +615,11 @@ for (let i = 0; i < 대상.length; i++) {
     (불편.length ? "⚠" : "✓") + ` [${i + 1}/${대상.length}] ${c.q.slice(0, 30)}` +
     ` (${(r.ms / 1000).toFixed(1)}s${r.wouldHandoff ? " · 리포트 전환" : ""}${불편.length ? " — " + 불편.map((x) => x.종류).join(", ") : ""})  ~${남}분`
   );
-  if (i % 10 === 0 || i === 대상.length - 1) fs.writeFileSync(path.join(OUT, "ops-sim.json"), JSON.stringify(결과, null, 1), "utf8");
+  // ⚠ 진행 저장은 **.partial에만** — 완주 전에는 ops-sim.json을 건드리지 않는다(위 머리글).
+  if (i % 10 === 0 || i === 대상.length - 1) fs.writeFileSync(쓰는중파일, JSON.stringify(결과, null, 1), "utf8");
 }
+// 완주 — 여기서 **한 번에** 제자리로 옮긴다. 읽는 쪽에는 옛 판 아니면 새 판만 보인다.
+fs.renameSync(쓰는중파일, 결과파일);
 
 // ── 보고 ────────────────────────────────────────────────────────────
 const 불편건 = 결과.filter((r) => r.불편.length);
