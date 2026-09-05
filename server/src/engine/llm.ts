@@ -205,9 +205,9 @@ export function chatLogListenerCount(): number { return chatLogListeners.length;
 //   · `chunks: []`   = 검색은 됐는데 0건 → 가리킬 근거가 없다(가드가 인용을 뗀다)
 //   · `chunks: null` = 제공자 없음·검색 실패 → **근거를 모른다**(가드는 판정을 보류한다)
 //   두 값을 뭉개면 「고장」을 「지어냄」으로 단정하게 된다 — 자료없음과 catch를 가르는 것과 같은 규율.
-async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean; 자료없음: boolean; chunks: string[] | null }> {
+async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean; 자료없음: boolean; chunks: string[] | null; 추가원천: string[] }> {
   try {
-    if (!ragProvider) return { context: null, 약한근거만: false, 자료없음: false, chunks: null };
+    if (!ragProvider) return { context: null, 약한근거만: false, 자료없음: false, chunks: null, 추가원천: [] };
     const queryMemoryGraded = ragProvider;
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
     // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
@@ -228,10 +228,15 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
 
     // 하이브리드: 온톨로지(지식 그래프)에서 질문·청크에 걸린 엔티티의 관계·규칙을 동반 주입한다.
     // 벡터 검색과 별개 seam이라, 임베딩 서버가 없어 청크가 비어도 규칙은 걸릴 수 있다.
+    // ⚠ 온톨로지 블록은 **인용 가드의 대조 원천**이기도 하다(2026-09-05 검토관 지적) — 프롬프트
+    //   ⓐ가 「'관련 규칙·관계'(온톨로지)가 붙어 있으면 그것도 근거로」라고 안내하므로, 여기서
+    //   그대로 옮긴 문장을 「어느 조각과도 안 겹친다」고 뗐다가는 **참인 인용을 지운다.**
+    //   번호([n]) 범위 판정에는 안 쓴다 — 번호는 ragBlock에서만 나온다.
+    const 추가원천: string[] = [];
     try {
       const { ontologyContextFor } = await import("./ontology.js");
       const onto = ontologyContextFor(message, chunks, agentId);
-      if (onto) parts.push(onto);
+      if (onto) { parts.push(onto); 추가원천.push(onto); }
     } catch {
       /* 온톨로지가 비어있거나 조회 실패해도 채팅은 계속된다 (RAG와 동일한 방어). */
     }
@@ -239,10 +244,10 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
     // 자료없음 — 검색은 **성공했는데** 문서 조각이 0건(온톨로지 규칙만으로는 사내 근거라 부르지 않는다).
     // ⚠ 오류(catch)와 절대 뭉개지 않는다: 검색이 죽은 것과 자료가 없는 것은 다른 사실이고,
     //   뭉개면 「검색 고장」을 담당자에게 「자료 없음」으로 단정해 말하게 된다(오늘 종일 잡은 그 병).
-    return { context: parts.length > 0 ? parts.join("\n\n") : null, 약한근거만, 자료없음: chunks.length === 0, chunks };
+    return { context: parts.length > 0 ? parts.join("\n\n") : null, 약한근거만, 자료없음: chunks.length === 0, chunks, 추가원천 };
   } catch {
     // 검색 실패는 「근거가 없다」가 아니라 **모른다**이다 — chunks:null로 가드 판정을 보류한다.
-    return { context: null, 약한근거만: false, 자료없음: false, chunks: null };
+    return { context: null, 약한근거만: false, 자료없음: false, chunks: null, 추가원천: [] };
   }
 }
 
@@ -1083,14 +1088,19 @@ export async function chat(args: ChatArgs): Promise<string> {
   //
   // ⚠ 흘려 보내는 토막(SSE delta)에는 못 건다 — 「쓰는 중」에 잠깐 보였다 done에서 사라진다.
   //   최종 답·이력·학습 로그는 전부 뗀 뒤의 글이므로 사람이 보관하는 것은 깨끗하다.
-  const 인용가드 = guardCitations(reply, ragResult?.chunks ?? null);
-  if (인용가드.removed.length > 0) {
+  // ⚠ 대조 원천은 **번호 조각만이 아니다**(2026-09-05 검토관 지적) — 프롬프트 ⓐ가 온톨로지도
+  //   인용 대상으로 안내하고, 확정 용어 정의·📎 첨부한 지난 작업도 **같은 프롬프트에 실려 나간다.**
+  //   거기서 그대로 옮긴 문장은 지어낸 것이 아니므로 함께 견준다(번호 범위 판정은 조각만 쓴다).
+  const 인용가드 = guardCitations(reply, ragResult?.chunks ?? null, [...(ragResult?.추가원천 ?? []), grounding, 첨부]);
+  if (인용가드.removed.length > 0 || 인용가드.보류.length > 0) {
     reply = 인용가드.text;
     // 계수기 — 원천은 llm_activity_daily 하나(kind=cite). 건수는 detail에, 답 수는 calls에 쌓인다.
     //   ⚠ 인용 원문은 안 싣는다(사내 문서 본문이 감독 화면·WS로 새면 안 된다).
+    //   ⚠ **못 뗀 것(보류)도 남긴다** — 답이 통째로 인용이라 되돌린 자리는 가드가 유일하게 못 막는
+    //     부류인데, 안 세면 「깨끗한 답」과 구별이 안 돼 나중에 셀 수조차 없다.
     emitLlmActivity({
       kind: "cite", phase: "done", agent: args.agentId ?? "-", agentName,
-      detail: 뗀인용요약(인용가드.removed),
+      detail: 뗀인용요약(인용가드.removed, 인용가드.보류),
     });
   }
 

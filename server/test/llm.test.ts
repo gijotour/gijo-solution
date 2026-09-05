@@ -396,8 +396,10 @@ describe("★ RAG 0건 정직 배너 (#8)", () => {
     //   `chunks: null`이 여기 **붙어 있어야** 하는 이유가 이 시험의 원래 뜻과 같다: 검색 실패는
     //   「근거가 없다」가 아니라 **모른다**이므로, 가드가 그 자리에서 인용을 떼면 안 된다.
     //   (뭉개서 `chunks: []`로 두면 고장 났을 때 정상 인용까지 뗀다 — 「고장을 없다로 단정」의 재판.)
+    //   ⚠ 2026-09-05 수리 — 번호 없는 원천(온톨로지·용어 정의·📎첨부)도 함께 나른다(추가원천).
+    //     고장 자리에서는 그것도 **비어 있다**고 말해야 한다(모르는 것을 안다고 하지 않는다).
     expect(src2, "catch가 자료없음=false·chunks=null을 안 돌려준다")
-      .toMatch(/catch \{[\s\S]{0,240}?return \{ context: null, 약한근거만: false, 자료없음: false, chunks: null \}/);
+      .toMatch(/catch \{[\s\S]{0,240}?return \{ context: null, 약한근거만: false, 자료없음: false, chunks: null, 추가원천: \[\] \}/);
   });
   it("배너가 배선돼 있고 문구가 실패 목록과 안 겹친다", () => {
     expect(src2).toMatch(/ragResult\?\.자료없음 && reply/);
