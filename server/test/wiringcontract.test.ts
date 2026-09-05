@@ -233,7 +233,8 @@ describe("배선 계약 ⑤층 — 게시 전 UI 실화면 관문 (외부 조사
   it("★ 관문이 죽이기 **전에** 세션을 반납한다 — 유령 세션 0", () => {
     const s = 코드만(join(__dirname, "..", "..", "tools", "publish-gate-ui.mjs"));
     expect(s, "렌더러 로그아웃 호출이 없다 — taskkill이 logoutOnQuit을 건너뛴다").toContain("g.logout()");
-    expect(s, "로그아웃 결과를 관문 판정으로 안 센다").toContain("관문이 자기 세션을 반납했다");
+    expect(s, "반납 성공/실패를 관문 요약에 안 찍는다 — 조용해지면 다음 사람이 유령을 모른다")
+      .toContain("관문이 자기 세션을 반납했다");
     // 순서가 뒤집히면(죽인 뒤 로그아웃) 아무 효과가 없다 — **자리**를 잰다.
     const 반납 = s.indexOf("반납보장(");
     const 정리 = s.lastIndexOf("정리();");
@@ -253,6 +254,19 @@ describe("배선 계약 ⑤층 — 게시 전 UI 실화면 관문 (외부 조사
     // finally는 taskkill(process.on("exit") 정리)보다 **먼저** 돌아야 뜻이 있다.
     expect(s.indexOf("} finally {"), "finally가 없다").toBeGreaterThan(-1);
     expect(s.indexOf("} finally {"), "finally가 마지막 정리()보다 뒤에 있다").toBeLessThan(s.lastIndexOf("정리();"));
+  });
+
+  // ★ L3-반납(2026-09-05 상위 결정) — 반납 실패가 **실패 목록(exit 1)에 실리면 게시가 막힌다.**
+  //   세션 반납은 빌드 품질과 무관한 뒷정리다: 서버가 잠깐 흔들렸다는 이유로 멀쩡한 빌드의
+  //   게시를 세우면, 다음 사람은 관문을 `--skip-ui-gate`로 통째로 우회하는 쪽을 배운다
+  //   (관문 하나를 지키려다 관문 전체를 잃는다). 대신 성공/실패는 **요약에 항상** 찍는다.
+  it("★ 반납 실패가 게시를 막지 않는다 — 판정(exit 1)이 아니라 경고다", () => {
+    const s = 코드만(join(__dirname, "..", "..", "tools", "publish-gate-ui.mjs"));
+    expect(s, "반납 결과가 ok()로 실패 목록에 실렸다 — 빌드와 무관한 이유로 게시가 막힌다")
+      .not.toMatch(/ok\(\s*["'`][^"'`]*세션을 반납/);
+    expect(s, "반납 실패를 큰 경고로 안 알린다 — 조용히 유령 세션이 남는다")
+      .toMatch(/if \(!반납\.끊었나\)[\s\S]{0,400}console\.error\([^\n]*유령 세션/);
+    expect(s, "요약 줄이 성공/실패를 안 가른다").toMatch(/관문이 자기 세션을 반납했다[\s\S]{0,120}반납\.끊었나/);
   });
 
   it("★ 제품 쪽 규약이 그대로다 — 로그아웃은 **헤더 + 본문 refreshToken** 둘 다", () => {
