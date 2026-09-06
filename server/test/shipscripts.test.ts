@@ -213,3 +213,82 @@ describe("★ 출하 목록 — 서버가 부르는 파이썬은 설치본에 �
     ).toEqual([]);
   });
 });
+
+// ── 게시 스크립트 감시(2026-09-06) ──────────────────────────────────────────
+//
+// ■ 왜 생겼나 — **게시가 자기 세션을 반납하지 않았다**
+//   client/scripts/publish-release.mjs는 `--force`로 로그인한다(계정당 1세션이라 남을 밀어낸다).
+//   그런데 게시가 끝나도 로그아웃을 안 해서 그 세션이 서버에 **유휴 만료(30분)까지 유령으로**
+//   남았다. 다음 게시·다음 측정은 「이미 다른 곳에서 로그인 중」을 만나 자기 자신을 또 강제로
+//   밀어내야 하고, 그 강제는 감사 기록에도 남는다.
+//   ⚠ 같은 결함을 UI 관문(tools/publish-gate-ui.mjs)에서 **2026-09-05에 이미 한 번 고쳤다**
+//     (K5·K5-2). 게시 스크립트는 그때 같이 안 봤다 — 「세 번째면 소스 감시」라 여기 못 박는다.
+//
+// ■ 왜 소스 감시인가
+//   진짜 게시를 돌려야만 드러나는 결함이라 일반 시험으로는 원리상 못 잡는다(게시는 직렬 자원이고
+//   설치본 300MB를 올린다). 대신 **규약이 코드에 적혀 있는지**를 본다.
+describe("★ 게시 스크립트 — 끝나면 세션을 반납한다", () => {
+  const 게시경로 = path.join(서버루트, "..", "client", "scripts", "publish-release.mjs");
+
+  it("publish-release.mjs가 logout을 부른다 — 헤더 + 본문 refreshToken 둘 다", () => {
+    expect(fs.existsSync(게시경로), `게시 스크립트를 못 찾았다(${게시경로}) — 시험이 헛돈다`).toBe(true);
+    const src = fs.readFileSync(게시경로, "utf8");
+
+    expect(src.includes("/api/auth/logout"), "게시 스크립트가 로그아웃을 안 부른다 — --force로 잡은 세션이 30분 유령으로 남는다")
+      .toBe(true);
+    // ⚠ 서버(server/src/auth/auth.ts:495)는 **본문의 refreshToken으로** 세션을 지운다.
+    //   Authorization 헤더만 보내면 200 OK가 오는데 세션은 그대로 산다 — 「고쳤다」가 거짓이 되는 자리다.
+    expect(src, "logout 본문에 refreshToken이 없다 — 서버는 헤더만으로 세션을 못 지운다(200 OK인데 안 풀림)")
+      .toMatch(/refreshToken/);
+    expect(src, "로그인 응답의 refreshToken을 안 챙긴다 — 반납할 표가 없다")
+      .toMatch(/login\.refreshToken/);
+    expect(src, "logout에 Authorization 헤더가 없다 — authMiddleware가 401로 막는다")
+      .toMatch(/Authorization/);
+  });
+
+  it("반납은 finally에 있다 — 게시가 실패해도 세션은 돌려준다", () => {
+    const src = fs.readFileSync(게시경로, "utf8");
+    const 자리 = src.indexOf("finally");
+    expect(자리, "finally가 없다 — 게시가 중간에 죽으면 세션이 그대로 남는다").toBeGreaterThan(-1);
+
+    // ⚠ 「logout 리터럴이 finally 뒤에 있나」로 보면 안 된다 — 반납 함수를 try **앞**에 정의하고
+    //   finally에서 부르는 것이 정석인데(관문 publish-gate-ui.mjs 반납보장과 같은 꼴), 그 구조에서는
+    //   순서가 뒤집혀 **좋은 코드가 빨개진다.** 그래서 finally가 **부르는 그 함수**를 따라가 본다.
+    const 뒷부분 = src.slice(자리);
+    const m = 뒷부분.match(/await\s+([A-Za-z0-9_가-힣$]+)\s*\(/);
+    expect(m, "finally에서 아무것도 부르지 않는다 — 껍데기 finally다").toBeTruthy();
+    const 이름 = m![1];
+    const 정의 = src.indexOf(`const ${이름} =`);
+    expect(정의, `finally가 부르는 ${이름}의 정의를 못 찾았다 — 감시가 헛돈다`).toBeGreaterThan(-1);
+    expect(
+      src.slice(정의, 정의 + 1500),
+      `finally가 부르는 ${이름}이 로그아웃을 안 한다 — 성공 경로에서만 반납하면 게시가 죽는 날엔 유령이 남는다`,
+    ).toContain("/api/auth/logout");
+  });
+});
+
+// ── 클라 판 번호 감시(2026-09-06) ───────────────────────────────────────────
+//
+// ■ 무엇이 어긋나 있었나 (실측)
+//   client/package.json = 5.91.0 인데 client/package-lock.json = **5.62.0**.
+//   29판이 밀려 있었다. lock의 version은 npm이 `npm install` 때만 따라 쓰므로, 판을 올릴 때
+//   package.json만 고치는 우리 관례에서는 **영원히 안 맞는다.**
+// ■ 왜 문제인가
+//   lock은 「이 판이 무엇으로 만들어졌나」를 적어 두는 자리다. 설치본을 받은 사람이 5.91.0의
+//   의존성을 재현하려고 lock을 보면 5.62.0이라 적혀 있어 **어느 쪽을 믿을지 알 수 없다**
+//   (「같은 것을 여러 곳에 적으면 어긋난다」의 표본). 공급망 점검·SBOM이 이 파일을 읽는다.
+describe("★ 클라 판 번호 — package.json과 package-lock.json이 같다", () => {
+  it("두 곳의 version이 어긋나지 않는다", () => {
+    const 클라 = path.join(서버루트, "..", "client");
+    const pkg = JSON.parse(fs.readFileSync(path.join(클라, "package.json"), "utf8")) as { version: string };
+    const lockPath = path.join(클라, "package-lock.json");
+    expect(fs.existsSync(lockPath), `package-lock.json이 없다(${lockPath}) — 사본에 안 실렸으면 시험이 헛돈다`).toBe(true);
+    const lock = JSON.parse(fs.readFileSync(lockPath, "utf8")) as { version: string; packages: Record<string, { version?: string }> };
+
+    expect(lock.version, `package-lock.json의 version이 낡았다(lock=${lock.version} · package.json=${pkg.version}) — 두 자리(루트 version · packages[""].version)를 손으로 맞춘다`)
+      .toBe(pkg.version);
+    // ⚠ lock에는 판 번호가 **두 자리** 있다. 하나만 고치면 npm이 다음 install에서 되돌린다.
+    expect(lock.packages[""]?.version, `package-lock.json packages[""].version이 낡았다(${lock.packages[""]?.version}) — 루트만 고치면 반쪽이다`)
+      .toBe(pkg.version);
+  });
+});

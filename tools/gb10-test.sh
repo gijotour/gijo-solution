@@ -22,8 +22,20 @@
 #   · 원본 `~/gijo-as/data/`(운영 DB·문서)는 **읽지도 쓰지도 않는다**. 사본은 소스·시험만 가져간다.
 #   · node_modules만 원본 것을 심볼릭 링크로 **빌려 읽는다**(수 GB를 매번 복사하지 않으려고).
 #
+# ■ ★ 커밋이 다르면 **멈춘다**(2026-09-06 실사고)
+#   gb10은 win이 `git push gb10 main`으로 밀어 줘야 갱신된다(GB10에서 pull하지 않는다).
+#   밀기를 잊으면 gb10에는 **옛 코드**가 있는데, 예전 이 스크립트는 「⚠ 다릅니다 … (그대로
+#   진행합니다)」라고 한 줄 찍고 그냥 돌렸다. 그러면 방금 고친 것을 안 담은 판이 초록으로 나오고,
+#   사람은 그 초록을 자기 수정의 증거로 읽는다 — **거짓 초록**이다. 실제로 그날 그렇게 났다.
+#   → 이제 다르면 exit 2로 멈추고 「git push gb10 main 먼저」를 안내한다.
+#   → 일부러 다른 판을 재려면(옛 판 재현·회귀 대조) `--allow-mismatch`를 붙인다. 그때는 무엇을
+#     재는지 사람이 뜻을 밝힌 것이므로 경고만 하고 진행한다.
+#   ⚠ git 조회 자체가 실패해도 멈춘다 — 「맞는지 모르겠다」는 「맞다」가 아니다. 예전엔 실패를
+#     2>/dev/null로 삼켜 「(git 조회 실패)」 한 줄만 남고 **왜 실패했는지**가 사라졌다.
+#
 # 사용:  bash tools/gb10-test.sh                      # 전체
 #        bash tools/gb10-test.sh test/watchfolder.test.ts
+#        bash tools/gb10-test.sh --allow-mismatch     # 커밋이 달라도 진행(일부러 옛 판을 잴 때)
 #        GIJO_GB10_HOST=gb10 bash tools/gb10-test.sh  # ssh 별칭을 바꿔 부를 때
 set -u
 
@@ -31,8 +43,26 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 HOST="${GIJO_GB10_HOST:-gb10}"
 
-WIN_HEAD="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
-WIN_LINE="$(git -C "$ROOT" log --oneline -1 2>/dev/null || echo '(git 조회 실패)')"
+# ⚠ --allow-mismatch는 **우리 것**이다 — vitest에 넘기면 파일 이름으로 알아듣고 0개를 돌린다.
+ALLOW_MISMATCH=0
+ARGS=()
+for a in "$@"; do
+  if [ "$a" = "--allow-mismatch" ]; then ALLOW_MISMATCH=1; else ARGS+=("$a"); fi
+done
+set -- ${ARGS[@]+"${ARGS[@]}"}
+
+# ⚠ 실패를 삼키지 않는다 — 왜 못 읽었는지 그대로 찍는다(예전엔 2>/dev/null이라 원인이 사라졌다).
+if ! WIN_HEAD="$(git -C "$ROOT" rev-parse HEAD 2>&1)"; then
+  echo "=== gb10 이중 시험 ==="
+  echo "✗ win의 커밋을 못 읽었습니다 — gb10과 같은 코드인지 확인할 길이 없습니다."
+  echo "   git 말: $WIN_HEAD"
+  echo "   ROOT  : $ROOT"
+  echo "   확인할 것: 여기가 git 저장소인가 · git이 PATH에 있는가 · safe.directory 경고인가."
+  echo "   그래도 돌리려면(무엇을 재는지 알고 있을 때):  bash tools/gb10-test.sh --allow-mismatch"
+  [ "$ALLOW_MISMATCH" = "1" ] || exit 2
+  WIN_HEAD="unknown"
+fi
+WIN_LINE="$(git -C "$ROOT" log --oneline -1 2>&1 || echo '(git 조회 실패)')"
 
 echo "=== gb10 이중 시험 ==="
 echo "  win  : $WIN_LINE"
@@ -42,7 +72,7 @@ RARGS=""
 for a in "$@"; do RARGS="$RARGS $(printf '%q' "$a")"; done
 
 ssh -o BatchMode=yes -o ConnectTimeout=20 "$HOST" \
-  "GIJO_WIN_HEAD=$WIN_HEAD bash -s --$RARGS" <<'REMOTE'
+  "GIJO_WIN_HEAD=$WIN_HEAD GIJO_ALLOW_MISMATCH=$ALLOW_MISMATCH bash -s --$RARGS" <<'REMOTE'
 set -u
 
 # ⚠ 비대화형 ssh는 .bashrc를 안 읽는다 — node·npx가 PATH에 붙는 곳이 여기뿐이다.
@@ -66,11 +96,26 @@ SRC_ROOT="$HOME/gijo-as"
 SRC="$SRC_ROOT/server"
 if [ ! -d "$SRC" ]; then echo "✗ gb10에 원본이 없습니다: $SRC"; exit 2; fi
 
-GB_HEAD="$(git -C "$SRC_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
-echo "  gb10 : $(git -C "$SRC_ROOT" log --oneline -1 2>/dev/null || echo '(git 조회 실패)')"
+if ! GB_HEAD="$(git -C "$SRC_ROOT" rev-parse HEAD 2>&1)"; then
+  echo "  gb10 : ✗ 커밋 조회 실패 — $GB_HEAD"
+  GB_HEAD="unknown"
+else
+  echo "  gb10 : $(git -C "$SRC_ROOT" log --oneline -1 2>&1)"
+fi
+# ★ 다르면 **멈춘다**(2026-09-06). 옛 코드로 난 초록을 내 수정의 증거로 읽는 사고가 실제로 났다.
 if [ "${GIJO_WIN_HEAD:-x}" != "$GB_HEAD" ]; then
-  echo "  ⚠ win과 gb10의 커밋이 **다릅니다** — 아래 결과는 gb10에 있는 코드의 것입니다."
-  echo "     맞추려면 win에서:  git push gb10 main   (그대로 진행합니다)"
+  echo
+  echo "✗ win과 gb10의 커밋이 **다릅니다** — 여기서 멈춥니다."
+  echo "   win  : ${GIJO_WIN_HEAD:-?}"
+  echo "   gb10 : $GB_HEAD"
+  echo "   그대로 돌리면 **gb10에 있는 옛 코드**가 초록을 내고, 그 초록은 방금 고친 것을 증명하지 않습니다."
+  echo "   맞추려면 win에서:  git push gb10 main"
+  if [ "${GIJO_ALLOW_MISMATCH:-0}" = "1" ]; then
+    echo "   → --allow-mismatch 를 받았습니다. 일부러 다른 판을 재는 것으로 보고 진행합니다."
+    echo "     ⚠ 아래 결과는 **gb10에 있는 코드**의 것입니다. 보고할 때 그렇게 적으세요."
+  else
+    exit 2
+  fi
 fi
 echo
 
@@ -94,7 +139,7 @@ rsync -a \
 # scripts/는 게시 관문 감시(wiringcontract)가 publish-release.mjs를 읽는다.
 mkdir -p "$DST_ROOT/client"
 rsync -a --include='src/***' --include='scripts/***' --include='smartmd/' --include='smartmd/vendor/***' \
-  --include='package.json' --include='electron-builder*.json' \
+  --include='package.json' --include='package-lock.json' --include='electron-builder*.json' \
   --exclude='*' "$SRC_ROOT/client/" "$DST_ROOT/client/" || { echo "✗ client 사본 실패"; exit 1; }
 # 저장소 뿌리의 knowledge/·tools/·mockups/를 읽는 시험도 있다.
 for d in knowledge tools mockups; do

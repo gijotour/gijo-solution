@@ -90,70 +90,111 @@ async function main() {
     throw new Error(`로그인 실패: ${JSON.stringify(login)}`);
   }
 
-  const buf = fs.readFileSync(installerPath);
-
-  // ★ **크기를 먼저 잰다**(2026-08-22 게시 전 검토관). 서버 수신 한계는
-  //   `server/src/engine/clientrelease.ts`의 express.raw `limit: "500mb"` 하나뿐이다.
-  //   ⚠ 넘으면 그 미들웨어가 413을 던지는데 서버에 전역 오류 핸들러가 없어 **Express 기본 HTML**이
-  //     나가고, 아래 `.then(r => r.json())`이 「Unexpected token '<'」로 터진다 —
-  //     게시가 마지막 단계에서 죽는데 **원인이 크기라는 말이 아무 데도 안 나온다.**
-  //   OCR 동봉으로 설치본이 170MB → 300MB대가 됐으니 여유가 줄었다. 한글로 먼저 끊는다.
-  const 한계MB = 500;
-  const 크기MB = buf.length / 1024 / 1024;
-  if (크기MB > 한계MB) {
-    throw new Error(
-      `설치본이 너무 큽니다 — ${크기MB.toFixed(1)}MB (서버 수신 한계 ${한계MB}MB).\n` +
-      `  이대로 올리면 마지막 단계에서 원인 모를 오류로 죽습니다.\n` +
-      `  늘리려면 server/src/engine/clientrelease.ts의 express.raw limit을 올리고 서버를 배포하세요.`
-    );
-  }
-  if (크기MB > 한계MB * 0.85) {
-    console.log(`[publish-release] ⚠ 설치본 ${크기MB.toFixed(1)}MB — 수신 한계(${한계MB}MB)의 85%를 넘었습니다. 곧 한계에 닿습니다.`);
-  }
-
-  // ★ 같은 번호로 **다른 내용**을 게시하지 못하게 막는다.
+  // ── 세션 반납 (2026-09-06) — **게시가 끝나면 자기 세션을 돌려준다** ─────────────
   //
-  // ⚠ 2026-08-01 실사고: 4.16.1을 게시한 뒤 버튼 3곳을 더 고치고 **번호를 안 올린 채**
-  //   다시 빌드했다. 번호 하나가 두 벌을 가리키게 됐고, 게시본에는 그 수정이 없었다.
-  //   "4.16.1"이라는 말이 무엇을 뜻하는지 아무도 확신할 수 없게 된다 — 담당자가 버전을
-  //   대며 문의해도 어느 쪽인지 모른다.
-  //
-  // ⚠ **sha256으로 "같은 코드인지"를 판정할 수는 없다**(2026-08-01 실측). 같은 코드를 다시
-  //   빌드해도 NSIS가 시각 등을 심어 바이트가 달라진다(b1c34e… → 34d1fd…). 그러니
-  //   "내용이 같으면 통과"라는 판정은 성립하지 않는다 — **이미 게시된 번호는 그냥 막는다.**
-  //   정말 같은 번호로 다시 올려야 하면 --republish를 명시한다(사람이 뜻을 밝히는 것).
-  const 이번sha = crypto.createHash("sha256").update(buf).digest("hex");
-  const 목록 = await fetch(`${serverUrl}/api/client/releases`, {
-    headers: { Authorization: `Bearer ${login.accessToken}` },
-  })
-    .then((r) => r.json())
-    .catch(() => null);
-  // ⚠ 같은 에디션 안에서 찾는다 — 다른 에디션이 그 번호를 쓰고 있으면 서버가 분명히 막는다.
-  const 이미 = (목록?.releases ?? []).find((r) => r.version === version && (r.edition === "lite" ? "lite" : "pro") === 에디션);
-  if (이미 && !process.argv.includes("--republish")) {
-    throw new Error(
-      `${version}은 **이미 게시돼 있습니다.**\n` +
-        `  게시된 것: sha256=${String(이미.sha256 ?? "?").slice(0, 12)}…\n` +
-        `  지금 것  : sha256=${이번sha.slice(0, 12)}…\n` +
-        `한 번호는 한 벌만 가리켜야 합니다 — client/package.json의 version을 올리고 다시 빌드하세요.\n` +
-        `(빌드는 매번 바이트가 달라지므로 sha가 다르다고 코드가 다른 것은 아닙니다.\n` +
-        ` 정말 같은 번호로 덮어야 하면 --republish를 붙이세요.)`,
-    );
+  // ★ 왜(실측): 이 스크립트는 위에서 --force로 로그인한다(계정당 1세션이라 남을 밀어낸다).
+  //   그런데 게시가 끝나도 로그아웃을 안 해서 그 세션이 서버에 **유휴 만료(30분)까지 유령으로**
+  //   남았다. 다음 게시·다음 측정은 「이미 다른 곳에서 로그인 중」을 만나 **자기 자신을 또 강제로**
+  //   밀어내야 하고, 그 강제는 감사 기록에도 남는다.
+  //   ⚠ 같은 결함을 UI 관문(tools/publish-gate-ui.mjs)에서 2026-09-05에 이미 고쳤는데(K5·K5-2)
+  //     게시 스크립트는 그때 같이 안 봤다 — 「세 번째면 소스 감시」라 감시를 붙였다
+  //     (server/test/shipscripts.test.ts 「게시 스크립트 — 끝나면 세션을 반납한다」).
+  // ⚠ 서버(server/src/auth/auth.ts:495)는 **본문의 refreshToken으로** 세션을 지운다.
+  //   Authorization 헤더만 보내면 200 OK가 오는데 세션은 그대로 산다 — 「고쳤다」가 거짓이 되는 자리다.
+  //   그래서 헤더와 본문을 **둘 다** 보낸다(client/src/api/auth.ts logout과 같은 규약).
+  // ⚠ 반납 실패는 **경고만** — 이미 올라간 게시를 실패로 뒤집지 않는다(30분 뒤 유휴 만료된다).
+  if (!login.refreshToken) {
+    console.log("[publish-release] ⚠ 로그인 응답에 refreshToken이 없습니다 — 반납할 표가 없어 세션이 30분간 남습니다.");
   }
-  if (이미) console.log(`[publish-release] ⚠ ${version}을 --republish로 덮어씁니다 — 받은 사람마다 다른 벌을 쓸 수 있습니다.`);
-
-  console.log(`[publish-release] 게시: ${version} (${(buf.length / 1024 / 1024).toFixed(1)}MB) ← ${installerPath}`);
-  const publish = await fetch(
-    `${serverUrl}/api/client/releases?version=${encodeURIComponent(version)}&notes=${encodeURIComponent(notes)}&edition=${encodeURIComponent(에디션)}`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${login.accessToken}`, "Content-Type": "application/octet-stream" },
-      body: buf,
+  let 반납함 = false;
+  const 세션반납 = async (왜) => {
+    if (반납함) return;
+    반납함 = true;
+    try {
+      const r = await fetch(`${serverUrl}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${login.accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: login.refreshToken ?? null }),
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      console.log("[publish-release] 세션 반납 완료(" + 왜 + ") — 다음 게시가 --force로 자기를 밀어낼 일이 없습니다.");
+    } catch (e) {
+      console.log("[publish-release] ⚠ 세션 반납 실패(" + 왜 + "): " + e.message +
+        " — 서버에 30분간 남습니다(게시 결과 자체는 위에 찍힌 그대로입니다).");
     }
-  ).then((r) => r.json());
+  };
+  // Ctrl+C로 끊어도 반납한다 — 300MB 업로드 도중이 흔한 자리다(관문 K5-2와 같은 이유).
+  process.on("SIGINT", async () => { await 세션반납("SIGINT"); process.exit(1); });
 
-  if (publish.error) throw new Error(`게시 실패: ${publish.error}`);
-  console.log(`[publish-release] 완료 — ${publish.release.version} · sha256=${publish.release.sha256.slice(0, 12)}…`);
+  try {
+    const buf = fs.readFileSync(installerPath);
+
+    // ★ **크기를 먼저 잰다**(2026-08-22 게시 전 검토관). 서버 수신 한계는
+    //   `server/src/engine/clientrelease.ts`의 express.raw `limit: "500mb"` 하나뿐이다.
+    //   ⚠ 넘으면 그 미들웨어가 413을 던지는데 서버에 전역 오류 핸들러가 없어 **Express 기본 HTML**이
+    //     나가고, 아래 `.then(r => r.json())`이 「Unexpected token '<'」로 터진다 —
+    //     게시가 마지막 단계에서 죽는데 **원인이 크기라는 말이 아무 데도 안 나온다.**
+    //   OCR 동봉으로 설치본이 170MB → 300MB대가 됐으니 여유가 줄었다. 한글로 먼저 끊는다.
+    const 한계MB = 500;
+    const 크기MB = buf.length / 1024 / 1024;
+    if (크기MB > 한계MB) {
+      throw new Error(
+        `설치본이 너무 큽니다 — ${크기MB.toFixed(1)}MB (서버 수신 한계 ${한계MB}MB).\n` +
+        `  이대로 올리면 마지막 단계에서 원인 모를 오류로 죽습니다.\n` +
+        `  늘리려면 server/src/engine/clientrelease.ts의 express.raw limit을 올리고 서버를 배포하세요.`
+      );
+    }
+    if (크기MB > 한계MB * 0.85) {
+      console.log(`[publish-release] ⚠ 설치본 ${크기MB.toFixed(1)}MB — 수신 한계(${한계MB}MB)의 85%를 넘었습니다. 곧 한계에 닿습니다.`);
+    }
+
+    // ★ 같은 번호로 **다른 내용**을 게시하지 못하게 막는다.
+    //
+    // ⚠ 2026-08-01 실사고: 4.16.1을 게시한 뒤 버튼 3곳을 더 고치고 **번호를 안 올린 채**
+    //   다시 빌드했다. 번호 하나가 두 벌을 가리키게 됐고, 게시본에는 그 수정이 없었다.
+    //   "4.16.1"이라는 말이 무엇을 뜻하는지 아무도 확신할 수 없게 된다 — 담당자가 버전을
+    //   대며 문의해도 어느 쪽인지 모른다.
+    //
+    // ⚠ **sha256으로 "같은 코드인지"를 판정할 수는 없다**(2026-08-01 실측). 같은 코드를 다시
+    //   빌드해도 NSIS가 시각 등을 심어 바이트가 달라진다(b1c34e… → 34d1fd…). 그러니
+    //   "내용이 같으면 통과"라는 판정은 성립하지 않는다 — **이미 게시된 번호는 그냥 막는다.**
+    //   정말 같은 번호로 다시 올려야 하면 --republish를 명시한다(사람이 뜻을 밝히는 것).
+    const 이번sha = crypto.createHash("sha256").update(buf).digest("hex");
+    const 목록 = await fetch(`${serverUrl}/api/client/releases`, {
+      headers: { Authorization: `Bearer ${login.accessToken}` },
+    })
+      .then((r) => r.json())
+      .catch(() => null);
+    // ⚠ 같은 에디션 안에서 찾는다 — 다른 에디션이 그 번호를 쓰고 있으면 서버가 분명히 막는다.
+    const 이미 = (목록?.releases ?? []).find((r) => r.version === version && (r.edition === "lite" ? "lite" : "pro") === 에디션);
+    if (이미 && !process.argv.includes("--republish")) {
+      throw new Error(
+        `${version}은 **이미 게시돼 있습니다.**\n` +
+          `  게시된 것: sha256=${String(이미.sha256 ?? "?").slice(0, 12)}…\n` +
+          `  지금 것  : sha256=${이번sha.slice(0, 12)}…\n` +
+          `한 번호는 한 벌만 가리켜야 합니다 — client/package.json의 version을 올리고 다시 빌드하세요.\n` +
+          `(빌드는 매번 바이트가 달라지므로 sha가 다르다고 코드가 다른 것은 아닙니다.\n` +
+          ` 정말 같은 번호로 덮어야 하면 --republish를 붙이세요.)`,
+      );
+    }
+    if (이미) console.log(`[publish-release] ⚠ ${version}을 --republish로 덮어씁니다 — 받은 사람마다 다른 벌을 쓸 수 있습니다.`);
+
+    console.log(`[publish-release] 게시: ${version} (${(buf.length / 1024 / 1024).toFixed(1)}MB) ← ${installerPath}`);
+    const publish = await fetch(
+      `${serverUrl}/api/client/releases?version=${encodeURIComponent(version)}&notes=${encodeURIComponent(notes)}&edition=${encodeURIComponent(에디션)}`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${login.accessToken}`, "Content-Type": "application/octet-stream" },
+        body: buf,
+      }
+    ).then((r) => r.json());
+
+    if (publish.error) throw new Error(`게시 실패: ${publish.error}`);
+    console.log(`[publish-release] 완료 — ${publish.release.version} · sha256=${publish.release.sha256.slice(0, 12)}…`);
+  } finally {
+    // ⚠ 성공·실패 어느 쪽으로 빠져나가도 여기를 지난다 — 직선 문장 하나면 오류 경로에서 안 돈다.
+    await 세션반납("끝");
+  }
 }
 
 main().catch((e) => {
