@@ -77,6 +77,54 @@ export function 제외요약(제외) {
   return `  ℹ 사본 경고에서 제외한 시험 사본·보관함: ${제외.length}건 (${내역})`;
 }
 
+// ── 두 잣대 대조용 순수 함수 (2026-09-07) ─────────────────────────────────────
+//
+// ■ 왜 두 숫자가 다른가 — **세는 대상이 다르다**
+//   · `memory_documents`(sqlite) = **반입 대장**. 문서 한 편당 한 줄이고, 조각 수는 그때 적어 둔 값이다.
+//   · docs-drift의 「문서 N건 인입됨」 = **지식 저장소(LanceDB)에 실제 조각이 남아 있는 문서 수**.
+//   그래서 대장에 줄은 남았는데 벡터가 사라진 문서가 있으면 대장이 하나 더 크다
+//   (2026-09-07 실측: 대장 3,921 · 저장소 3,920 — 차이는 `2025년 사이버 위협 전망.pdf` 21조각 한 편).
+//   ⚠ 이 도구는 **아무것도 지우지 않는다.** 무엇이 어긋났는지 이름을 대는 데까지가 일이다.
+
+/** 파일 경로에서 이름만(목록에는 knowledge/… 처럼 하위 폴더가 붙어 오는데 저장소 id는 이름뿐이다). */
+const 이름만 = (p) => String(p ?? "").replace(/^.*[/\\]/, "");
+
+/**
+ * 반입 대장 ↔ 지식 저장소 대조.
+ * @param {{documentId: string, chunks?: number, origin?: string}[]} 대장
+ * @param {Record<string, number>} 저장조각  문서 id → 조각 수
+ */
+export function 잣대대조(대장, 저장조각) {
+  const 저장이름 = new Set(Object.keys(저장조각 ?? {}));
+  const 대장이름 = new Set((대장 ?? []).map((r) => String(r.documentId)));
+  // 유령 = 대장에는 있는데 저장소에 조각이 없다 → **AI가 근거로 못 쓴다**(반입됐다고 적혀만 있다).
+  const 유령 = (대장 ?? [])
+    .filter((r) => !저장이름.has(String(r.documentId)))
+    .map((r) => ({ 이름: String(r.documentId), 조각: Number(r.chunks) || 0 }));
+  // 대장밖 = 저장소에는 조각이 있는데 대장에 줄이 없다 → 지운 대장/직접 넣은 벡터.
+  const 대장밖 = [...저장이름].filter((n) => !대장이름.has(n)).sort();
+  return { 대장수: 대장이름.size, 저장수: 저장이름.size, 유령, 대장밖 };
+}
+
+/**
+ * 목록(docs-manifest.json)에 없는데 저장소에 있는 문서를 갈래별로 가른다.
+ * ⚠ built-in만 이름을 다 적는다 — 승인 문답이 3,700편이라 전부 찍으면 그 안에서 아무것도 안 보인다.
+ *   나머지는 **출처별 건수**로 말한다(감춘 것과 요약한 것은 다르다 — 셈은 그대로 보인다).
+ */
+export function 매니페스트밖(저장조각, 문서들, 대장) {
+  const 목록이름 = new Set((문서들 ?? []).map(이름만));
+  const 출처 = new Map((대장 ?? []).map((r) => [String(r.documentId), String(r.origin ?? "") || "(출처 없음)"]));
+  const 밖 = Object.keys(저장조각 ?? {}).filter((n) => !목록이름.has(n)).sort();
+  const builtin = 밖.filter((n) => 출처.get(n) === "builtin");
+  const 갈래별 = {};
+  for (const n of 밖) {
+    const k = 출처.get(n) ?? "(대장에 없음)";
+    if (k === "builtin") continue;
+    갈래별[k] = (갈래별[k] ?? 0) + 1;
+  }
+  return { 총: 밖.length, builtin, 갈래별 };
+}
+
 // ⚠ 양쪽을 **같은 잣대로** 씻어서 비교한다. 처음엔 한쪽만 끝 공백을 자르는 바람에
 //   방금 복사한 파일도 "내용이 다름"으로 나왔다(도구가 거짓 경보를 냈다).
 //   줄바꿈 방식(CRLF/LF)도 맞춘다 — Windows에서 편집해 리눅스로 옮기면 늘 다르게 보인다.
@@ -257,6 +305,71 @@ const l=require('@lancedb/lancedb');
       const n = 저장조각[path.basename(이름)];
       if (n) console.log(`     ${n}조각\t${이름}`);
     }
+  }
+
+  // ── ④ 두 잣대 대조 — 반입 대장(sqlite) ↔ 지식 저장소(LanceDB) ─────────────
+  // ⚠ 왜 필요한가(2026-09-07): 위 ③이 「문서 3,920건 인입됨」이라 하는데 운영 대장에는 3,921줄이
+  //   있었다. 두 숫자가 다른 것 자체는 결함이 아니라 **세는 대상이 다른 것**인데(위 잣대대조 머리말),
+  //   그 사실이 어디에도 안 적혀 있어 사람이 매번 「하나가 새는가」를 손으로 찾아야 했다.
+  //   이제 도구가 **이름을 대고** 지나간다. ⚠ 지우지는 않는다 — 판단은 사람이 한다.
+  // ⚠ 못 읽을 수 있다: 운영 DB를 다시 암호화하면(개발 모드 해제) 맨 better-sqlite3로는 못 연다.
+  //   그때는 **건너뛰었다고 말한다** — 0건으로 적어 「대장이 비었다」는 거짓을 만들지 않는다
+  //   (2026-09-04의 「0건 인입」이 정확히 그 삼킴이었다).
+  // ⚠ 실패를 **말로 돌려받는다** — 조회가 죽어도 node는 0으로 끝나고 왜 못 읽었는지를 함께 준다.
+  //   `2>/dev/null`로 입을 막으면 「건너뛰었다」까지는 정직해도 **왜인지는 영영 모른다**(암호화인지
+  //   파일이 없는지 모듈이 없는지에 따라 사람이 할 일이 다르다).
+  // ⚠ sqlite3 CLI는 쓰지 않는다 — 운영 WSL에 그 명령이 **없다**(2026-09-07 확인). 없는 명령은
+  //   빈 결과를 내놓아 「표 없음」이라는 거짓 판정을 만든다(.claude/commands/GIJOAS배포.md의 그 함정).
+  const 대장json = wsl(
+    "cd /home/gijo/gijo-as/server && node -e \"" +
+    "let out; try { const D=require('better-sqlite3');" +
+    "const db=new D('data/gijo-as.sqlite',{readonly:true});" +
+    "const r=db.prepare('SELECT documentId, origin, chunks FROM memory_documents').all();" +
+    "db.close(); out={ok:true,rows:r}; } catch(e) { out={ok:false,why:String((e&&e.message)||e).slice(0,200)}; } " +
+    "console.log(JSON.stringify(out));\"",
+    { 빈값허용: true },
+  );
+  let 대장 = null, 대장못읽음 = "조회 명령이 아무것도 내놓지 않았습니다";
+  if (대장json) {
+    try {
+      const j = JSON.parse(대장json.split("\n").pop() || "");
+      if (j && j.ok && Array.isArray(j.rows)) 대장 = j.rows;
+      else 대장못읽음 = String((j && j.why) || "돌아온 것이 대장 모양이 아닙니다");
+    } catch { 대장못읽음 = "조회 결과가 JSON이 아닙니다: " + 대장json.split("\n").pop().slice(0, 120); }
+  }
+
+  console.log(`\n■ 반입 대장 ↔ 지식 저장소 (두 잣대)`);
+  if (!Array.isArray(대장)) {
+    console.log("  ℹ 대장(memory_documents) 대조를 **건너뛰었습니다** — 운영 DB를 열지 못했습니다:");
+    console.log(`     ${대장못읽음}`);
+    console.log("    (암호화됐거나 파일·모듈이 없을 수 있습니다). 아래 「매니페스트 밖」은 저장소 기준만입니다.");
+    const 밖 = 매니페스트밖(저장조각, 문서들, null);
+    console.log(`  · 목록에 없는데 저장소에 있는 문서: ${밖.총}건 (출처는 대장을 못 읽어 못 가릅니다)`);
+  } else {
+    const 대조 = 잣대대조(대장, 저장조각);
+    console.log(`  대장 ${대조.대장수}건 · 저장소 ${대조.저장수}건 (차이 ${대조.대장수 - 대조.저장수})`);
+    if (대조.유령.length) {
+      console.log(`  ⚠ 대장에는 있는데 **저장소에 조각이 없는** 문서 ${대조.유령.length}건 — AI가 근거로 못 씁니다(지우지 않았습니다):`);
+      for (const g of 대조.유령.slice(0, 20)) console.log(`     ${g.이름} (대장에 적힌 조각 ${g.조각}개)`);
+      if (대조.유령.length > 20) console.log(`     … 그 밖 ${대조.유령.length - 20}건`);
+    } else {
+      console.log("  ✓ 대장의 문서가 모두 저장소에 조각을 갖고 있습니다.");
+    }
+    if (대조.대장밖.length) {
+      console.log(`  ⚠ 저장소에는 있는데 **대장에 줄이 없는** 문서 ${대조.대장밖.length}건:`);
+      for (const n of 대조.대장밖.slice(0, 10)) console.log(`     ${n}`);
+      if (대조.대장밖.length > 10) console.log(`     … 그 밖 ${대조.대장밖.length - 10}건`);
+    }
+
+    // 매니페스트 밖 — built-in은 이름을 다 적고, 대량 갈래(승인 문답 등)는 출처별 건수로 말한다.
+    const 밖 = 매니페스트밖(저장조각, 문서들, 대장);
+    console.log(`\n■ 목록(docs-manifest.json) 밖의 문서 ${밖.총}건 — 저장소에는 있으나 목록이 안 가리킵니다`);
+    console.log(`  · built-in(제품 동봉 지식) ${밖.builtin.length}건${밖.builtin.length ? ":" : ""}`);
+    for (const n of 밖.builtin) console.log(`     ${n}`);
+    const 갈래 = Object.entries(밖.갈래별).sort((x, y) => y[1] - x[1]);
+    if (갈래.length) console.log(`  · 그 밖 ${갈래.reduce((s, [, n]) => s + n, 0)}건 — ${갈래.map(([k, n]) => `${k} ${n}`).join(" · ")}`);
+    console.log("  ℹ 이 줄들은 **보고만** 합니다 — 목록 밖이라고 잘못된 것이 아닙니다(승인 문답·침해사고 사례처럼");
+    console.log("    사람이 넣은 지식이 여기 옵니다). 지울지 말지는 사람이 정합니다.");
   }
 
   const 실패 = 어긋남.length > 0 || 미인입.length > 0;

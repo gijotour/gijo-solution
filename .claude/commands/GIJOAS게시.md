@@ -44,8 +44,14 @@ Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업�
    cd "D:\Connect AI\client"
    $env:GIJO_PUBLISH_USER=[Environment]::GetEnvironmentVariable("GIJO_PUBLISH_USER","User")
    $env:GIJO_PUBLISH_PASSWORD=[Environment]::GetEnvironmentVariable("GIJO_PUBLISH_PASSWORD","User")
-   npm run publish-release -- --force --notes "<버전 - 변경 요약>"
+   npm run publish-release -- --force --notes "<변경 요약>"
    ```
+   ⚠ 노트에 **판 번호를 다시 적지 않는다**(2026-09-07): 서버가 version을 따로 주고 화면이 둘을
+   나란히 그려(설정 → 업데이트 판·「게시된 배포판」 표) 「5.91.1  5.91.1 — …」로 두 번 찍힌다.
+   그래도 습관으로 적히면 게시 스크립트가 **자기 판 번호 접두만** 떼고 그 사실을 한 줄로 알린다
+   (남의 번호 「5.90.0 되돌림」은 그대로 둔다 — client/scripts/lib/artifactcheck.mjs 게시노트정리).
+   ⚠ 스크립트는 로그인 **앞에서** 빌드 산출물을 대조한다 — `.blockmap`이 없거나 조각 합이 실제
+   크기와 다르면(=쓰다 만 exe) 거기서 멈춘다(2026-09-06 273KB 사고).
    (User 스코프 env가 셸에 상속 안 되므로 위처럼 명시 로드. UI 관문의 앱 로그인 비번
    GIJO_ADMIN_PASSWORD는 관문이 User 스코프에서 **스스로 읽는다** — 따로 안 실어도 된다.)
    ⚠ **claude-deploy로 게시하지 말 것**(2026-07-26 실사고): 게시는 --force로 로그인하므로

@@ -1153,6 +1153,106 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
   ok("감독 ✂ 사유 토글(접힘 +0px · 눌러 펴짐 · 기억 · 위험 신호 자동 펼침 · 기억 원상복구)", 성립, JSON.stringify(r));
 }
 
+// ── ⑧″ 감독 ✂ 위험 신호 자동 펼침 — **고정 자료로 판정한다**(2026-09-07) ──────────
+// ★ 이 경로는 **운영 자료가 0건이어도 판정한다.** 바로 위 ⑧′의 「못 뗌·통째교체면 처음부터
+//   펴져 있어야 한다」 조항은 운영에 그 사유가 없어 **한 번도 판정된 적이 없다**(⑧′ 머리말의
+//   정직 표시 그대로). 조항이 코드에 있는 것과 판정이 도는 것은 다르다 — 이 저장소의 「있다 ≠ 된다」.
+// ⚠ 그렇다고 운영 DB에 가짜 사유를 넣지 않는다. 바뀌는 것은 **이 프로세스 안의
+//   window.gijo.aiteamSupervision 한 칸**뿐이고, 다 재면 원래 함수로 되돌린 뒤 실제 자료로
+//   화면을 다시 그린다(되돌아갔는지·다시 그려졌는지도 결과에 싣는다). 서버·DB는 안 건드린다.
+// ⚠ 가로채기가 **먹었는지 반드시 되읽어 본다** — window.gijo는 contextBridge가 내준 칸이라
+//   판에 따라 읽기 전용일 수 있다. 조용히 무시되면 「가짜 자료로 쟀다」가 거짓이 된다
+//   (안 먹으면 가로챔:false로 **빨갛게** 끝낸다 — 못 쟀는데 초록을 주지 않는다).
+// ⚠ 기대 배지는 supervision.html의 **실제 규칙**에서 온다(배지글 3갈래):
+//     사유.배지 > 0 → 「사유 N건」 · 아니고 못뗌 > 0 → 「⚠ 못 뗌 N건」 · 아니고 통째 > 0 → 「통째교체 N건」
+//   그리고 배지 N은 「못 뗌」·「통째교체」를 **안 센다**(사유줄계산의 배지제외 규약).
+//   그래서 고정 자료를 둘로 나눠 두 갈래를 함께 잰다:
+//     갑) 겹침없음 2 · 못 뗌 1 · 통째교체 1 → 배지 「사유 2건」(2는 겹침없음 몫만) · 저절로 펴짐
+//     을) 못 뗌 1만                        → 배지 「⚠ 못 뗌 1건」            · 저절로 펴짐
+//   ⚠ 「못 뗌 1건」 배지를 보려면 배지 N이 0이어야 한다 — 갑에 겹침없음이 있으니 갑의 정답은
+//     「사유 2건」이다. 여기 숫자를 바꿀 땐 화면의 배지제외 규약을 먼저 읽을 것(안 그러면
+//     시험이 멀쩡한 화면을 거짓으로 몬다).
+// 짝 시험: server/test/publishgatecitefixed.test.ts — 이 구간의 코드를 **그대로 떼어** 가짜 DOM에서
+//   돌린다(고정 자료 갑·을·되돌림). 실화면 픽셀은 여기서, 판정식은 거기서.
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("supervision.html", "감독", { dock: true }));
+  const fr = await 프레임찾기("supervision.html", 10);
+  const r = fr ? await fr.evaluate(async () => {
+    const 키 = "gijo:cite-reasons-open";
+    const 읽기 = () => { try { return localStorage.getItem(키); } catch (e) { return "err"; } };
+    // 오늘 날짜는 화면과 **같은 잣대**(로컬 KST)로 만든다 — toISOString은 UTC라 0~9시에 어제가 된다.
+    const 오늘 = (() => { const t = new Date(); return new Date(t.getTime() - t.getTimezoneOffset() * 60000).toISOString().slice(0, 10); })();
+    // 고정 자료 — 화면이 읽는 칸만 채운다(daily.kind=cite의 calls가 「뗀 답」, citeReasons가 사유).
+    const 자료 = (사유들) => ({
+      days: 1, calls: {}, recentErrors: {},
+      daily: [{ day: 오늘, agent: "orchestrator", kind: "cite", calls: 3, errors: 0, latencyMsSum: 0 }],
+      citeReasons: 사유들.map((x) => ({ day: 오늘, agent: "orchestrator", reason: x[0], count: x[1] })),
+    });
+    if (!window.gijo || typeof window.gijo.aiteamSupervision !== "function") return { API없음: true };
+    const 진짜 = window.gijo.aiteamSupervision;
+    const 걸기 = (fn) => {
+      try { window.gijo.aiteamSupervision = fn; } catch (e) { /* 읽기 전용이면 아래로 */ }
+      if (window.gijo.aiteamSupervision === fn) return true;
+      try { Object.defineProperty(window.gijo, "aiteamSupervision", { value: fn, configurable: true, writable: true }); } catch (e) { /* 못 걸었다 */ }
+      return window.gijo.aiteamSupervision === fn;
+    };
+    const 줄뜸 = async () => {
+      for (let i = 0; i < 25; i++) {
+        if (document.querySelector("#sup .sup-line")) return true;
+        await new Promise((x) => setTimeout(x, 300));
+      }
+      return false;
+    };
+    // 기간 단추는 같은 값으로 눌러도 load()를 다시 돈다 — 새 API를 안 만들고 있는 조작으로 다시 그린다.
+    const 다시그리기 = async () => {
+      const b = document.querySelector("#range button.on") || document.querySelector("#range button");
+      if (!b) return false;
+      b.click();
+      await new Promise((x) => setTimeout(x, 700));
+      return await 줄뜸();
+    };
+    const 재기 = async (사유들) => {
+      const 가짜 = async () => 자료(사유들);
+      if (!걸기(가짜)) return { 가로챔: false };
+      const 그려짐 = await 다시그리기();
+      const 줄 = [...document.querySelectorAll("#sup .sup-line")].find((el) => el.textContent.includes("인용 제거"));
+      const btn = 줄 ? 줄.querySelector(".cite-why") : null;
+      const box = 줄 ? 줄.querySelector(".cite-reasons") : null;
+      return {
+        가로챔: true, 그려짐, 토글: !!btn,
+        펼침: !!btn && btn.getAttribute("aria-expanded") === "true",
+        보임: !!box && box.style.display !== "none",
+        배지: btn ? btn.textContent.trim() : null,
+        사유글: box ? String(box.textContent || "").replace(/\s+/g, " ").trim().slice(0, 140) : null,
+      };
+    };
+    await 줄뜸();
+    const 저장전 = 읽기();
+    let 갑 = null, 을 = null, 오류 = null;
+    try {
+      갑 = await 재기([["겹침없음", 2], ["못 뗌", 1], ["통째교체", 1]]);
+      을 = await 재기([["못 뗌", 1]]);
+    } catch (e) { 오류 = String((e && e.message) || e); }
+    // ⚠ 되돌리기는 **어느 길로 빠져나가도** 지난다. 여기서 안 돌려놓으면 앱이 닫힐 때까지
+    //   감독 화면이 가짜 숫자를 보여 준다 — 관문이 제품을 망가뜨리는 자리다.
+    걸기(진짜);
+    const 되돌아옴 = window.gijo.aiteamSupervision === 진짜;
+    const 실자료그려짐 = await 다시그리기();
+    const 저장후 = 읽기();
+    return { 갑, 을, 되돌아옴, 실자료그려짐, 저장전, 저장후, 오류 };
+  }).catch(() => null) : null;
+  const 성립 = !!r && !r.API없음 && !r.오류
+    && !!r.갑 && r.갑.가로챔 === true && r.갑.그려짐 === true && r.갑.토글 === true
+    && r.갑.펼침 === true && r.갑.보임 === true                 // ⓐ 위험 사유면 **처음부터** 펴져 있다
+    && /^사유 2건/.test(String(r.갑.배지 || ""))                // ⓑ 배지 — 못 뗌·통째교체는 N에서 뺀다
+    && /못 뗌 1/.test(String(r.갑.사유글 || "")) && /통째교체 1/.test(String(r.갑.사유글 || ""))
+    && !!r.을 && r.을.가로챔 === true && r.을.펼침 === true && r.을.보임 === true
+    && /^⚠ 못 뗌 1건/.test(String(r.을.배지 || ""))             // ⓑ′ 배지 0건일 때의 갈래
+    && r.저장후 === r.저장전                                     // ⓒ 사람의 펼침 기억은 안 건드린다
+    && r.되돌아옴 === true && r.실자료그려짐 === true;           // 가로채기를 되돌리고 실제 자료로 다시 그렸다
+  ok("감독 ✂ 위험 신호 자동 펼침(고정 자료 · 배지 두 갈래 · 기억 불변 · 되돌림)", 성립, JSON.stringify(r));
+}
+
 // ── ⑨ 전 화면 얕은 렌더(2026-08-21 — 사장님 승인 묶음 3번) ─────────────────────
 // ⚠ 왜: 위 검사들은 손으로 더한 목록이라 화면 43개 중 16개만 열어 봤다 — 나머지 27개는
 //   **렌더가 죽어도 게시됐다**(5.56.0이 고친 analysis·settings도 관문이 이름조차 안 불렀다).

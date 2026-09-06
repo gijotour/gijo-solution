@@ -12,6 +12,9 @@ import * as fs from "node:fs";
 import * as crypto from "node:crypto"; // 같은 번호로 다른 내용을 올리는 것을 막기 위한 대조용
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+// 빌드 산출물 대조·게시 노트 정리는 순수 함수로 떼어 뒀다 — 픽스처로 시험할 수 있게
+// (server/test/artifactcheck.test.ts). 게시는 직렬 자원이라 진짜로 돌려 볼 수 없는 자리다.
+import { 산출물검사, 게시노트정리 } from "./lib/artifactcheck.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const clientDir = path.resolve(scriptDir, "..");
@@ -27,7 +30,7 @@ const serverUrl = (arg("server", process.env.GIJO_SERVER_URL || "http://localhos
 // 게시에만 쓰는 계정을 따로 두면 사람이 쓰는 세션은 어떤 것도 끊기지 않는다.
 const username = arg("user", process.env.GIJO_PUBLISH_USER || process.env.GIJO_ADMIN_USER || "");
 const password = arg("password", process.env.GIJO_PUBLISH_PASSWORD || process.env.GIJO_ADMIN_PASSWORD || "");
-const notes = arg("notes", "");
+const notes원본 = arg("notes", "");
 const force = process.argv.includes("--force");
 
 // ★★ 에디션 (2026-08-23) — `--edition lite`면 라이트 설치본을 라이트 채널로 올린다.
@@ -53,12 +56,45 @@ const installerPath = 에디션 === "lite"
   ? path.join(clientDir, "release-lite", `GIJO AS Lite Setup ${version}.exe`)
   : path.join(clientDir, "release", `GIJO AS Setup ${version}.exe`);
 
+// ── 게시 노트에서 판 번호 접두를 뗀다 (2026-09-07) ──────────────────────────
+// ⚠ 왜: `.claude/commands/GIJOAS게시.md`가 `--notes "<버전 - 변경 요약>"`이라 안내해 노트가
+//   「5.91.1 — …」로 시작하는데, 서버는 version을 **따로** 준다. 화면은 둘을 나란히 그린다
+//   (settings.html:394·398 업데이트 판 · 2435-2436 「게시된 배포판」 표의 `버전 | 메모` 두 칸)
+//   — 그래서 사람 눈에는 판 번호가 **두 번** 찍힌다.
+// ⚠ 화면이 아니라 여기를 고치는 이유: 화면 변경은 게시 범위(시안 → 승인)라 지금 손댈 자리가 아니다.
+//   원천에서 한 번만 말하게 하면 두 화면이 함께 낫는다. 뗀 것은 아래에서 사람에게 알린다.
+const { notes, 다듬음: 노트다듬음 } = 게시노트정리(notes원본, version);
+
 async function main() {
   if (!username || !password) {
     throw new Error("관리자 계정이 필요합니다 — --user/--password 또는 GIJO_ADMIN_USER/GIJO_ADMIN_PASSWORD 환경변수로 주세요.");
   }
   if (!fs.existsSync(installerPath)) {
     throw new Error(`설치파일이 없습니다: ${installerPath} — 먼저 npm run dist로 빌드하세요.`);
+  }
+
+  // ── 빌드 산출물 대조 (2026-09-07) — **「있다」는 완성의 증거가 아니다** ──────────
+  //
+  // ⚠ 2026-09-06 실사고: `npm run dist`가 중간에 죽었는데 release/에 **273KB짜리 exe**가 남아
+  //   있었고, 그것을 완성본으로 오판했다. 위 existsSync는 그 파일도 통과시킨다.
+  // ⚠ 로그인 **앞에** 둔다 — 여기서 멈추면 --force 세션을 잡을 일도, 남을 밀어낼 일도 없다.
+  //   latest.yml이 없는 우리 빌드에서는 statSync + blockmap(270KB)만 읽으므로 260MB를 안 읽는다.
+  // 판정 내용과 「안 재는 것」은 client/scripts/lib/artifactcheck.mjs 머리말에 적혀 있다.
+  const 산출물 = 산출물검사(installerPath);
+  if (!산출물.ok) {
+    throw new Error(
+      ["빌드 산출물이 성하지 않습니다 — 게시를 멈춥니다.",
+        ...산출물.문제.map((m) => "  ✗ " + m),
+        "  (잰 것: " + JSON.stringify(산출물.잰것) + ")"].join("\n"),
+    );
+  }
+  console.log(
+    `[publish-release] 빌드 산출물 대조 ✓ — ${Number(산출물.잰것.크기).toLocaleString()}바이트 · ` +
+    `blockmap 조각 ${Number(산출물.잰것.blockmap?.합 ? 산출물.잰것.blockmap.조각수 : 0).toLocaleString()}개 합 일치` +
+    (산출물.잰것.latestYml?.있음 ? " · latest.yml sha512 일치" : " · latest.yml 없음(이 빌드는 원래 안 만듭니다)"),
+  );
+  if (노트다듬음) {
+    console.log(`[publish-release] 게시 노트에서 판 번호 접두(${version})를 뗐습니다 — 화면이 버전을 따로 그려 두 번 찍힙니다.`);
   }
 
   // ── UI 실화면 관문(2026-08-20, tools/publish-gate-ui.mjs) ────────────────
