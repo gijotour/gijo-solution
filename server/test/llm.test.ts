@@ -305,7 +305,53 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
       expect(assistantTurn.content).toBe(WITH_TERMS);
     });
   });
+
+  // ★ 근거 꼬리는 **사람이 보는 답에만** 남는다 (2026-09-07 검토관 [중간] 2건)
+  //
+  // ■ 무엇이 있었나: 「참고한 자료가 인용하는 근거: …」는 **제품이 붙인 글자**인데, 그대로 대화 이력과
+  //   학습 로그로 들어갔다. 두 자리가 그것을 모델이 쓴 글로 읽는다:
+  //   · learncandidates.CITE_RE(/참고했|근거|…/)가 「근거」를 인용 신호로 세어 점수 1→4 →
+  //     신호 강한 후보 **일괄 승인 문턱(3)**을 넘는다. 꼬리가 붙는 조건이 「모델이 근거를 안 댔다」인데
+  //     그 답이 인용 점수를 받는다 — 방향이 정확히 반대다.
+  //   · 승인되면 learnmemory.approvedQaContent가 답 본문을 그대로 지식 문서로 만든다. 그 문서가
+  //     조각으로 다시 검색돼 모델이 문장을 베끼면, 이미근거를댔나가 true라 **검증된 우리 꼬리는
+  //     안 붙고 베낀 이름만** 남는다(2026-09-06 metaleak 실사고와 같은 경로).
+  // ■ 그래서 여기서 **실제로 chat()을 부른다** — 소스 감시로는 「무엇이 저장됐나」를 못 잰다.
+  describe("근거 꼬리는 답에만 남고 이력·학습 기록에는 안 남는다", () => {
+    const 규범답 = "개인정보 교육은 연 1회 이상 실시해야 합니다.";
+    const 법조각 = "개인정보 보호법 제28조 제2항과 개인정보의 안전성 확보조치 기준 제4조에 따라 취급자 교육을 실시한다.";
+
+    it("사람이 받는 답에는 붙고, 수집기·이력에 가는 답에는 없다", async () => {
+      const { setRagProvider, onChatRecorded } = await import("../src/engine/llm");
+      setRagProvider(async () => ({ chunks: [법조각], titles: ["보안인식교육.md"], scored: [{ documentId: "보안인식교육.md" }], 약한근거만: false }));
+      const 수집된: { q: string; a: string }[] = [];
+      onChatRecorded((_agent, q, a) => { 수집된.push({ q, a }); });
+      const fetchMock = stubLlm(규범답);
+
+      const reply = await chat({ agentId: "orchestrator", message: "개인정보 교육 몇 번 해야 해?", remember: true });
+
+      expect(reply, "사람이 보는 답에 근거가 안 실렸다").toContain("참고한 자료가 인용하는 근거");
+      const 이번 = 수집된.filter((r) => r.q === "개인정보 교육 몇 번 해야 해?");
+      expect(이번.length, "학습 수집이 안 됐다 — 시험 자체가 헛돈다").toBe(1);
+      expect(이번[0].a, "우리가 붙인 꼬리가 학습 기록에 실렸다").toBe(규범답);
+
+      // 다음 턴 프롬프트(=대화 이력)에도 꼬리가 없어야 한다 — 모델이 그 문장을 베끼는 길을 막는다.
+      stubLlmOn(fetchMock, "두 번째 답");
+      await chat({ agentId: "orchestrator", message: "그럼 대상자는?", remember: true });
+      const 대화호출 = fetchMock.mock.calls
+        .map((c: unknown[]) => { try { return JSON.parse(String((c[1] as { body?: unknown })?.body ?? "{}")); } catch { return null; } })
+        .filter((b: { messages?: { role: string }[] } | null) => b?.messages?.some((m) => m.role === "assistant"));
+      expect(대화호출.length, "이전 답을 실은 호출이 없다").toBeGreaterThan(0);
+      const 지난답 = 대화호출[대화호출.length - 1].messages.find((m: { role: string }) => m.role === "assistant");
+      expect(지난답.content).toBe(규범답);
+    });
+  });
 });
+
+/** 이미 꽂아 둔 fetch 흉내에 **다음 답**을 얹는다(호출 기록은 그대로 이어 본다). */
+function stubLlmOn(fetchMock: { mockResolvedValue: (v: unknown) => unknown }, reply: string) {
+  fetchMock.mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: reply } }] }) });
+}
 
 // dispatch 실측(2026-07-23): "보안담당자입니다. 우리 회사는…"처럼 주어 없는 역할 소개로 시작하는
 // 응답이 그대로 나갔다 — 기존 SELF_INTRO_RE는 "저는/제가/나는"으로 시작할 때만 잡았다.

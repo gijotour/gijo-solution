@@ -1276,6 +1276,9 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   ③ 답의 실적형 수치 중 **하나라도** 원천에 없을 때 — 판정은 citeguard 한 곳이 한다.
   //      (2026-09-06까지는 「전부 없을 때만」이었다. 부분 접지를 열 수 있게 된 것은 배너 꼬리로
   //       **어느 수치인지**를 적게 되어, 화면이 그 글자만 옅게 할 수 있게 됐기 때문이다.)
+  // 📎 근거 꼬리를 붙이기 **직전의 답** — 학습·이력에는 이것이 간다(아래 「기록답」).
+  //   null이면 꼬리가 안 붙었다는 뜻이고, 그때는 reply가 곧 기록답이다.
+  let 꼬리전답: string | null = null;
   if (ragResult && !ragResult.자료없음 && !ragResult.약한근거만 && reply) {
     // ④ 원천에는 **모델이 실제로 본 것**도 넣는다(2026-09-06 검토 실측). 모델에게는 대화 이력과
     //   contextText(선택 맥락 + 최근 턴, dispatcher.buildRagQuery가 message에 붙인다)가 프롬프트로
@@ -1315,7 +1318,9 @@ export async function chat(args: ChatArgs): Promise<string> {
     //   위 if의 세 좁힘(RAG를 켠 자유 답 · 자료없음 아님 · 약한근거만 아님)을 그대로 쓴다.
     //   ⚠ 규칙을 여기 박으면 시험이 못 닿는다 — chat()을 통째로 흉내 내는 시험이 76개다
     //     (숫자무근거배너붙이기를 잎으로 내린 것과 **같은 이유**). legalbasis.test가 소스로 감시한다.
+    꼬리전답 = reply;
     reply = 근거꼬리붙이기(reply, ragResult.chunks, ragResult.조각문서id);
+    if (reply === 꼬리전답) 꼬리전답 = null; // 안 붙었으면 가를 것도 없다
   }
 
   // llama.cpp 실측치(usage·timings)를 그대로 실어 보낸다 — 값이 나오면 실제 추론이 일어난 것.
@@ -1332,8 +1337,19 @@ export async function chat(args: ChatArgs): Promise<string> {
   });
 
   if (args.remember && !args.qa && reply) {
+    // 📎 **우리가 붙인 근거 꼬리는 기록에 안 남긴다**(2026-09-07 검토관 [중간] 2건 · metaleak ⓐ와 같은 규율:
+    //   「본문에서 뺀다」). 사람이 보는 답에는 그대로 있다 — 뺀 것은 **이력과 학습 기록**뿐이다.
+    //   · 학습 점수 뒤집힘 — learncandidates의 인용 신호(CITE_RE)가 「근거」 한 낱말을 본다. 꼬리가
+    //     붙는 조건이 「모델이 근거를 안 댔다」인데 그 답이 인용 +3점을 받아 신호 강한 후보
+    //     **일괄 승인 문턱(3)**을 넘는다 — 방향이 정확히 반대다(2026-08-05·09-05에 두 번 고친 부류).
+    //   · 지식 오염 — 승인되면 learnmemory.approvedQaContent가 답 본문을 그대로 문서로 만든다.
+    //     그 문서가 조각으로 다시 검색돼 모델이 문장을 베끼면, legalbasis.이미근거를댔나가 true라
+    //     **검증된 우리 꼬리는 오히려 안 붙고 베낀 이름만** 남는다(2026-09-06 metaleak 실사고의 경로).
+    //   ⚠ 숫자무근거 배너는 그대로 남긴다 — 그건 「이 값은 근거가 없다」는 **경고**라 학습 쪽에서도
+    //     그 답을 걸러내는 데 쓰인다(근거없다고밝힌답인가). 뺄 것은 근거를 **더해 주는** 글자뿐이다.
+    const 기록답 = 꼬리전답 ?? reply;
     // ⚠ history(예산으로 잘린 사본)가 아니라 **전체이력**에 잇는다 — 사본으로 이으면 영구 삭제다.
-    const updated = [...전체이력, { role: "user" as const, content: args.message }, { role: "assistant" as const, content: reply }];
+    const updated = [...전체이력, { role: "user" as const, content: args.message }, { role: "assistant" as const, content: 기록답 }];
     histories.set(args.agentId, updated.slice(-HISTORY_LIMIT));
     // 헤르메스 학습 루프 ① 수집: 실제 대화만 영속 저장한다(연결 실패 문자열은 위에서 조기 반환돼
     // 여기 못 온다). recordChatLog는 내부 try/catch — 수집 실패가 채팅을 죽이지 않는다.
@@ -1343,7 +1359,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     // 대화 수집 — 등록된 수집기에게 알린다(화살 #15). llm은 누가 모으는지 모른다.
     if (!args.noLearn) {
       for (const 수집 of chatLogListeners) {
-        try { 수집(args.agentId, args.logQuestion?.trim() || args.message, reply); } catch { /* 수집 실패가 답을 막지 않는다 */ }
+        try { 수집(args.agentId, args.logQuestion?.trim() || args.message, 기록답); } catch { /* 수집 실패가 답을 막지 않는다 */ }
       }
     }
   }
