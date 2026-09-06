@@ -459,8 +459,14 @@ describe("★ 배선 감시 — 출구 한 곳에서 실제로 불린다", () =>
   const llm = fs.readFileSync(path.join(__dirname, "../src/engine/llm.ts"), "utf8");
 
   it("chat()이 RAG 조각과 **번호 없는 원천**을 출구까지 나른다", () => {
-    expect(llm, "ragContextFor가 chunks를 안 돌려준다").toMatch(/자료없음: chunks\.length === 0, chunks, 추가원천 \}/);
-    expect(llm, "제공자 없음·검색 실패를 chunks:null로 안 가른다").toMatch(/자료없음: false, chunks: null, 추가원천: \[\] \}/);
+    // ⚠ 2026-09-07 — 조각과 **자리를 맞춘** documentId(조각문서id)도 함께 난다. 근거 이름 꼬리가
+    //   승인 문답 조각을 재료에서 빼는 데 쓰는데, 자리가 밀리면 **엉뚱한 조각을 뺀다** —
+    //   titles가 2026-09-05에 겪은 그 사고(살균이 버린 조각만큼 제목이 밀렸다)와 같은 자리다.
+    //   그래서 이 감시가 두 배열을 **한 줄에서 함께** 못박는다.
+    expect(llm, "ragContextFor가 chunks를 안 돌려준다").toMatch(/자료없음: chunks\.length === 0, chunks, 조각문서id, 추가원천 \}/);
+    expect(llm, "제공자 없음·검색 실패를 chunks:null로 안 가른다").toMatch(/자료없음: false, chunks: null, 조각문서id: \[\], 추가원천: \[\] \}/);
+    expect(llm, "조각문서id가 살균 자리표(keptIndexes)를 안 쓴다 — 자리가 밀리면 엉뚱한 조각을 뺀다")
+      .toContain("const 조각문서id = 살균.keptIndexes.map((i) => String(rawScored?.[i]?.documentId ?? \"\"));");
     expect(llm, "온톨로지 블록을 대조 원천으로 안 싣는다").toContain("parts.push(onto); 추가원천.push(onto);");
   });
 

@@ -38,16 +38,17 @@ export const LAW_TARGETS = {
 export type LawTarget = keyof typeof LAW_TARGETS;
 
 // IT·보안 담당자가 실제로 마주치는 법. 챗봇이 "무슨 법이 걸리나" 물을 때 후보로 쓴다.
-export const IT_SECURITY_LAWS = [
-  "개인정보 보호법",
-  "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
-  "정보통신기반 보호법",
-  "전자금융거래법",
-  "신용정보의 이용 및 보호에 관한 법률",
-  "클라우드컴퓨팅 발전 및 이용자 보호에 관한 법률",
-  "지능정보화 기본법",
-  "산업기술의 유출방지 및 보호에 관한 법률",
-];
+//
+// ★ 목록의 **주인은 legalbasis.ts**다(2026-09-07 이관). 답 출구(llm.ts chat())가 근거 꼬리를
+//   붙일 때 같은 목록이 필요한데, 이 파일은 모듈 로드 시점에 migrate()를 돌려(아래) 출구가
+//   물기엔 무겁다. 그렇다고 저쪽에 그림자를 두면 **대조할 두 벌**이 생긴다 — 같은 주에 나온
+//   선례(docorigin.승인문답_접두를 잎으로 내리고 learnmemory가 재수출)를 그대로 따라
+//   **재수출**한다. 이 파일의 소비자(getLawConfig·법령이름찾기·챗봇 안내)는 한 글자도 안 바뀌고,
+//   lawinfo.test의 동일성(toBe) 검사도 그대로 성립한다(재수출은 같은 배열을 가리킨다).
+// ⚠ import와 export를 **둘 다** 적는다 — `export … from`만 쓰면 이 파일 안에서 이름을 못 쓴다.
+//   아래 세 곳(getLawConfig·법령이름찾기·챗봇 안내)이 실제로 쓴다.
+import { IT_SECURITY_LAWS } from "./legalbasis";
+export { IT_SECURITY_LAWS };
 
 migrate(
   "law-info-2026-07-26",

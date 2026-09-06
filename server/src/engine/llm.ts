@@ -124,6 +124,8 @@ export {
   근거없음종류판정, type 근거없음종류,
 } from "./noevidence";
 import { 자료없음배너, 지정범위배너, 자료요청배너, 근거약함배너, 숫자무근거배너, 모델자기거절_RE, 숫자무근거배너붙이기 } from "./noevidence";
+// 근거 이름 꼬리 — 문장·판정·이름 목록은 전부 저쪽이 소유한다(여기는 부르기만 한다).
+import { 근거꼬리붙이기 } from "./legalbasis";
 // 답 머리가 이미 사실을 말하고 있으면 배너를 겹쳐 붙이지 않는다(머리 60자 검사).
 export const 자료없음중복가드 = /자료에는 없|없습니다|근거 약함|자료를 넣어/;
 
@@ -169,9 +171,12 @@ export function 사내특정대상질문(text: string): boolean {
 //   tsc가 잡았다. 「그 API가 주는 필드가 뭔가」를 원천에서 확인하는 계보).
 // ⚠ titles는 **선택**이다(2026-09-05 J3) — 조각과 자리를 맞춘 문서 제목. 시험 스텁이나 옛
 //   제공자가 안 줘도 돌아야 하므로 옵셔널로 둔다(안 주면 제목 없는 옛 블록 꼴 그대로).
+// ★ scored는 **있으면 쓴다**(선택 칸 · 2026-09-07). 근거 꼬리가 승인 문답 조각을 재료에서 빼려면
+//   조각마다 documentId가 있어야 하는데, 검색 층(memory.queryMemoryGraded)은 이미 그것을
+//   돌려주고 있었다(배지 정확도 2026-08-10). 선택으로 두어 흉내 낸 제공자(시험 76개)는 무영향.
 export type RagProvider = (
   message: string, k: number, agentId: string, screen?: string, viewer?: Viewer
-) => Promise<{ chunks: string[]; titles?: string[]; 약한근거만: boolean }>;
+) => Promise<{ chunks: string[]; titles?: string[]; scored?: { documentId?: string | null }[]; 약한근거만: boolean }>;
 let ragProvider: RagProvider | null = null;
 export function setRagProvider(p: RagProvider): void { ragProvider = p; }
 export function hasRagProvider(): boolean { return ragProvider !== null; }
@@ -224,15 +229,15 @@ export function chatLogListenerCount(): number { return chatLogListeners.length;
 //   · `chunks: []`   = 검색은 됐는데 0건 → 가리킬 근거가 없다(가드가 인용을 뗀다)
 //   · `chunks: null` = 제공자 없음·검색 실패 → **근거를 모른다**(가드는 판정을 보류한다)
 //   두 값을 뭉개면 「고장」을 「지어냄」으로 단정하게 된다 — 자료없음과 catch를 가르는 것과 같은 규율.
-async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean; 자료없음: boolean; chunks: string[] | null; 추가원천: string[] }> {
+async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean; 자료없음: boolean; chunks: string[] | null; 조각문서id: string[]; 추가원천: string[] }> {
   try {
-    if (!ragProvider) return { context: null, 약한근거만: false, 자료없음: false, chunks: null, 추가원천: [] };
+    if (!ragProvider) return { context: null, 약한근거만: false, 자료없음: false, chunks: null, 조각문서id: [], 추가원천: [] };
     const queryMemoryGraded = ragProvider;
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
     // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
     // 근거인 양 답한다(memory.ts의 RAG_RELEVANCE_MAX_DISTANCE 주석 참고).
     // screen이 있으면 그 화면의 업무영역 문서를 우선한다(soft boost — 다른 영역도 배제 안 함).
-    const { chunks: raw, titles: rawTitles, 약한근거만 } = await queryMemoryGraded(message, 4, agentId, screen, viewer);
+    const { chunks: raw, titles: rawTitles, scored: rawScored, 약한근거만 } = await queryMemoryGraded(message, 4, agentId, screen, viewer);
     // ⚠ 살균 — 검색된 문서 조각은 **검사를 한 번도 안 거치고** 프롬프트에 실린다.
     //   가드레일은 사용자가 타이핑한 입력만 본다. 그래서 문서에 심어둔 지시문이 그대로
     //   실행됐다(2026-07-30 실측: 카나리가 답변 맨 앞에 출력됨 — chat·dispatch 양쪽).
@@ -245,6 +250,10 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
     //   문서의 제목이 붙고, **아무 오류도 안 나면서** 답만 조용히 틀린다. 그래서 자리표를
     //   살균기에서 직접 받아 거른다(keptIndexes — 자리를 두 번 계산하지 않는다).
     const titles = 살균.keptIndexes.map((i) => String(rawTitles?.[i] ?? ""));
+    // ★ documentId도 **같은 자리표로** 거른다(2026-09-07) — titles와 한 몸이다. 근거 꼬리가
+    //   승인 문답 조각을 재료에서 빼는 데 쓴다. 자리가 밀리면 엉뚱한 조각을 빼게 되므로
+    //   여기서도 keptIndexes를 쓴다(자리를 두 번 계산하지 않는다).
+    const 조각문서id = 살균.keptIndexes.map((i) => String(rawScored?.[i]?.documentId ?? ""));
 
     const parts: string[] = [];
     if (chunks.length > 0) {
@@ -273,10 +282,10 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
     // 자료없음 — 검색은 **성공했는데** 문서 조각이 0건(온톨로지 규칙만으로는 사내 근거라 부르지 않는다).
     // ⚠ 오류(catch)와 절대 뭉개지 않는다: 검색이 죽은 것과 자료가 없는 것은 다른 사실이고,
     //   뭉개면 「검색 고장」을 담당자에게 「자료 없음」으로 단정해 말하게 된다(오늘 종일 잡은 그 병).
-    return { context: parts.length > 0 ? parts.join("\n\n") : null, 약한근거만, 자료없음: chunks.length === 0, chunks, 추가원천 };
+    return { context: parts.length > 0 ? parts.join("\n\n") : null, 약한근거만, 자료없음: chunks.length === 0, chunks, 조각문서id, 추가원천 };
   } catch {
     // 검색 실패는 「근거가 없다」가 아니라 **모른다**이다 — chunks:null로 가드 판정을 보류한다.
-    return { context: null, 약한근거만: false, 자료없음: false, chunks: null, 추가원천: [] };
+    return { context: null, 약한근거만: false, 자료없음: false, chunks: null, 조각문서id: [], 추가원천: [] };
   }
 }
 
@@ -1290,6 +1299,23 @@ export async function chat(args: ChatArgs): Promise<string> {
     //     시험이 못 닿는다 — chat()을 통째로 흉내 내는 시험이 76개라, 조건을 옛 코드로 되돌려도
     //     서버 시험 전체가 초록이었다. 여기 남는 것은 위 **좁힘 셋**뿐이다.
     reply = 숫자무근거배너붙이기(reply, 접지);
+
+    // 📎 근거 이름 꼬리 — **규범을 단정해 놓고 법·고시 이름을 하나도 안 댄 답**에 붙인다
+    //   (2026-09-07 라이브 회귀 ⑰ 수리 · 계획서 전-4).
+    //
+    // ■ 왜 여기인가: 뿌리가 검색도 문서도 아니라 **출구**였다. 운영 조각을 읽기 전용으로 세어 보니
+    //   안내서 211조각 중 189조각이, 보안인식교육 md의 「횟수」 조각 3개는 전부 법 이름을 담는데
+    //   답이 그것을 한 번도 안 옮겼다. 제품엔 근거 이름을 **본문에 싣는 자리가 없었다.**
+    // ■ 왜 이 줄인가(순서가 계약이다):
+    //   · 인용 가드(:1145)·경로 가드(:1160) **뒤** — 우리가 붙인 글자를 가드가 자기인용으로 오판하거나
+    //     도로 떼어 가지 못한다.
+    //   · 숫자 접지(바로 위) **뒤** — 꼬리의 조문·항목 번호가 실적 수치 판정에 안 섞인다.
+    //   · 답 **끝**에 붙는다 — 앞머리에 두면 배너 판정(startsWith)이 배너를 못 읽어 화면 표식이 죽는다.
+    // ■ 여기 남는 것은 **좁힘뿐**이다(문장·조건·이름 목록은 전부 legalbasis가 소유):
+    //   위 if의 세 좁힘(RAG를 켠 자유 답 · 자료없음 아님 · 약한근거만 아님)을 그대로 쓴다.
+    //   ⚠ 규칙을 여기 박으면 시험이 못 닿는다 — chat()을 통째로 흉내 내는 시험이 76개다
+    //     (숫자무근거배너붙이기를 잎으로 내린 것과 **같은 이유**). legalbasis.test가 소스로 감시한다.
+    reply = 근거꼬리붙이기(reply, ragResult.chunks, ragResult.조각문서id);
   }
 
   // llama.cpp 실측치(usage·timings)를 그대로 실어 보낸다 — 값이 나오면 실제 추론이 일어난 것.
