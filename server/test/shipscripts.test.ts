@@ -234,15 +234,29 @@ describe("★ 게시 스크립트 — 끝나면 세션을 반납한다", () => {
     expect(fs.existsSync(게시경로), `게시 스크립트를 못 찾았다(${게시경로}) — 시험이 헛돈다`).toBe(true);
     const src = fs.readFileSync(게시경로, "utf8");
 
-    expect(src.includes("/api/auth/logout"), "게시 스크립트가 로그아웃을 안 부른다 — --force로 잡은 세션이 30분 유령으로 남는다")
-      .toBe(true);
+    const 부름 = src.indexOf("/api/auth/logout");
+    expect(부름, "게시 스크립트가 로그아웃을 안 부른다 — --force로 잡은 세션이 30분 유령으로 남는다")
+      .toBeGreaterThan(-1);
+
+    // ★ 파일 **전체**에서 찾으면 안 된다 (2026-09-06 검토관 적발 · 실측으로 확인).
+    //   `Authorization`은 릴리스 목록 조회(164행)·설치본 업로드(187행)에도 있고, `refreshToken`은
+    //   바로 위 주석에도 있다. 그래서 파일 전체를 보는 잣대는 **logout에서 그 둘을 지워도 초록**이었다
+    //   (돌연변이 2종으로 재현: body 줄 삭제·headers의 Authorization 삭제 → 4항목 전부 통과).
+    //   즉 이번에 고친 바로 그 결함이 되돌아와도 못 잡는 감시였다.
+    //   → **logout을 부르는 fetch 한 덩어리만** 떼어 본다. `JSON.stringify({ … }),`는 `});`가 아니므로
+    //     첫 `});`가 그 fetch의 끝이다.
+    const 끝 = src.indexOf("});", 부름);
+    expect(끝, "logout fetch가 어디서 끝나는지 못 찾았다 — 잣대가 헛돈다(코드 꼴이 바뀌었으면 여기부터 고친다)")
+      .toBeGreaterThan(부름);
+    const 로그아웃호출 = src.slice(부름, 끝);
+
     // ⚠ 서버(server/src/auth/auth.ts:495)는 **본문의 refreshToken으로** 세션을 지운다.
     //   Authorization 헤더만 보내면 200 OK가 오는데 세션은 그대로 산다 — 「고쳤다」가 거짓이 되는 자리다.
-    expect(src, "logout 본문에 refreshToken이 없다 — 서버는 헤더만으로 세션을 못 지운다(200 OK인데 안 풀림)")
-      .toMatch(/refreshToken/);
-    expect(src, "로그인 응답의 refreshToken을 안 챙긴다 — 반납할 표가 없다")
+    expect(로그아웃호출, "logout 본문에 refreshToken이 없다 — 서버는 헤더만으로 세션을 못 지운다(200 OK인데 안 풀림)")
+      .toMatch(/body:[\s\S]*refreshToken/);
+    expect(로그아웃호출, "로그인 응답의 refreshToken을 안 챙긴다 — 반납할 표가 없다")
       .toMatch(/login\.refreshToken/);
-    expect(src, "logout에 Authorization 헤더가 없다 — authMiddleware가 401로 막는다")
+    expect(로그아웃호출, "logout에 Authorization 헤더가 없다 — authMiddleware가 401로 막는다")
       .toMatch(/Authorization/);
   });
 
@@ -276,7 +290,15 @@ describe("★ 게시 스크립트 — 끝나면 세션을 반납한다", () => {
 // ■ 왜 문제인가
 //   lock은 「이 판이 무엇으로 만들어졌나」를 적어 두는 자리다. 설치본을 받은 사람이 5.91.0의
 //   의존성을 재현하려고 lock을 보면 5.62.0이라 적혀 있어 **어느 쪽을 믿을지 알 수 없다**
-//   (「같은 것을 여러 곳에 적으면 어긋난다」의 표본). 공급망 점검·SBOM이 이 파일을 읽는다.
+//   (「같은 것을 여러 곳에 적으면 어긋난다」의 표본).
+//   ⚠ 처음엔 여기에 「공급망 점검·SBOM이 이 파일을 읽는다」고 적었는데 **거짓이었다**
+//     (2026-09-06 검토관 적발, 실측: `grep -rn package-lock server/src` → 0건. SBOM 엔진 3종은
+//     npm lock을 파싱하지 않는다). 실제 소비자는 **server**/package-lock 쪽뿐이다
+//     — client/scripts/build-server-dist.mjs:40(복사) · tools/deploy-prod.ps1:53(변경 감지).
+//     없는 소비자를 지어 두면 다음 사람이 그 말을 믿고 판단한다. 이유는 위 한 줄로 충분하다.
+// ■ 판을 올릴 때 무엇을 하나 — .claude/commands/GIJOAS게시.md 1단계에 **두 자리 함께**라고 적어 뒀다.
+//   ⚠ 이 시험은 tools/deploy-prod.ps1:58의 `npm test`(서버 배포 관문)이기도 하다. 여기가 빨가면
+//     **무관한 서버 배포가 막힌다** — 게시 절차를 지키면 안 나지만, 났다면 원인은 딱 이것 하나다.
 describe("★ 클라 판 번호 — package.json과 package-lock.json이 같다", () => {
   it("두 곳의 version이 어긋나지 않는다", () => {
     const 클라 = path.join(서버루트, "..", "client");

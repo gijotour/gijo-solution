@@ -5,6 +5,12 @@ Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업�
 절차:
 
 1. **버전 bump**: client/package.json의 version을 패치 올림(예: 2.7.16→2.7.17). 게시 노트에 쓸 변경 요약을 git log에서 뽑아 정리.
+   ★ **client/package-lock.json의 두 자리도 같이 올린다** — 루트 `"version"`과 `packages[""].version`.
+   우리는 판을 올릴 때 `npm install`을 안 도는 관례라 lock이 **저절로 안 따라온다**(실측 2026-09-06:
+   package.json 5.91.0인데 lock은 5.62.0 — 29판이 밀려 있었다).
+   ⚠ 안 맞추면 `server/test/shipscripts.test.ts`가 빨개지는데, 그 시험은 `tools/deploy-prod.ps1`의
+   배포 관문(`npm test`)이기도 하다 — **게시가 아니라 나중에 엉뚱한 사람의 서버 배포에서** 터진다.
+   게시 명령(publish-release) 자체는 vitest를 안 돌리므로 여기서 안 걸린다.
 2. **빌드**: 먼저 **실행 중인 앱을 모두 종료**한다 — 개발 실행·설치본이 `client/server-dist`를
    잡고 있으면 빌드가 폴더 삭제에 실패한다(2026-07-26 실사고, exe가 안 나오는데 exit 0으로 끝남).
    `Get-Process -Name electron,"GIJO AS" | Where-Object { $_.Path -like "D:\Connect AI\*" -or $_.Path -like "*gijo-as*" } | Stop-Process -Force`

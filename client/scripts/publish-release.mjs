@@ -110,6 +110,16 @@ async function main() {
   const 세션반납 = async (왜) => {
     if (반납함) return;
     반납함 = true;
+    // ★ 표가 없으면 **완료라고 말하지 않는다**(2026-09-06 검토관 적발).
+    //   서버는 본문에 refreshToken이 없으면 아무것도 지우지 않고 그대로 `{ok:true}` 200을 준다.
+    //   그런데 아래는 `r.ok`만 보고 「반납 완료」를 찍는다 — 바로 위 ⚠에서 경고한
+    //   「200 OK인데 세션은 산다」를 **자기 성공 문구가 다시 만드는** 자리다.
+    //   지금 서버는 로그인 때 늘 refreshToken을 주므로 여기 닿지 않지만, 닿는 날엔 거짓말이 된다.
+    if (!login.refreshToken) {
+      console.log("[publish-release] ⚠ 세션 반납 못 함(" + 왜 + ") — 로그인 응답에 refreshToken이 없어" +
+        " 서버가 지울 표가 없습니다. 세션은 유휴 만료(30분)까지 남습니다.");
+      return;
+    }
     try {
       const r = await fetch(`${serverUrl}/api/auth/logout`, {
         method: "POST",
@@ -199,5 +209,23 @@ async function main() {
 
 main().catch((e) => {
   console.error("[publish-release] 오류:", e.message);
-  process.exit(1);
+  // ★ `process.exit(1)`이 아니라 **exitCode만 세운다**(2026-09-06 검토관 적발 · 실측으로 원인 좁힘).
+  //
+  // ⚠ 무엇이 났나: 게시가 실패하면 종료코드가 1이 아니라 **127**로 끝나면서
+  //   `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 94`가
+  //   함께 찍혔다(win · node v24.18.0 · 4회 중 4회). 127은 셸에서 보통 「명령을 못 찾음」이라
+  //   감싸는 절차·자동화가 **원인을 오독한다** — 게시가 실패한 것을 「스크립트가 없다」로 읽는다.
+  //   ⚠ 이 결함은 세션 반납을 넣기 **전부터** 있었다(수리 전 판 188bb04f도 같은 127).
+  //
+  // ⚠ 원인(최소 재현으로 좁힘): **fetch를 여러 번 한 뒤 process.exit()으로 끊으면** 종료 도중
+  //   libuv async 핸들 단언에 걸린다. 버퍼 크기와는 무관했다 —
+  //   · fetch 4번(로그인·목록·업로드·로그아웃) + exit  → 127 + 단언  (1KB로 줄여도 같음)
+  //   · fetch 2번 + exit                              → 1, 단언 없음
+  //   · fetch 4번 + **exitCode만 세움**                → 1, 단언 없음  ← 이 방식
+  //   exitCode만 세우면 node가 이벤트 루프를 스스로 정리하고 나간다(실측 1.6초, 매달리지 않음).
+  //
+  // ⚠ SIGINT 쪽(위)은 그대로 process.exit이다 — 250MB 업로드가 진행 중일 때 **당장 끊는 것**이
+  //   사람의 뜻이라 루프가 비기를 기다릴 수 없다. 거기서 127이 나와도 사람이 방금 Ctrl+C를 누른
+  //   자리라 원인을 오해할 여지가 없다.
+  process.exitCode = 1;
 });

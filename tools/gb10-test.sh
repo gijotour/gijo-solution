@@ -33,9 +33,16 @@
 #   ⚠ git 조회 자체가 실패해도 멈춘다 — 「맞는지 모르겠다」는 「맞다」가 아니다. 예전엔 실패를
 #     2>/dev/null로 삼켜 「(git 조회 실패)」 한 줄만 남고 **왜 실패했는지**가 사라졌다.
 #
+# ■ ★ **커밋 안 한 수정이 있어도 멈춘다**(2026-09-06 검토관 적발 — 위 관문의 빈자리였다)
+#   커밋만 맞춰 보면, 커밋 전에 편집해 둔 것이 있을 때 해시는 같고 코드는 다르다. 이 저장소의
+#   실제 순서가 「편집 → 시험 → 커밋」이라 **그게 흔한 쪽**이다. 그래서 사본이 가져가는 자리
+#   (server/ client/ tools/ knowledge/ mockups/ · 뿌리 *.md)에 미커밋 수정이 있으면 멈춘다.
+#   ★ 헷갈리기 쉬운 대비: **wsl-test.sh는 살아 있는 트리를 재고, 이 도구는 커밋된 판을 잰다.**
+#     미커밋 수정을 지금 재고 싶으면 WSL로 간다. 여기서 재려면 먼저 커밋하고 gb10에 민다.
+#
 # 사용:  bash tools/gb10-test.sh                      # 전체
 #        bash tools/gb10-test.sh test/watchfolder.test.ts
-#        bash tools/gb10-test.sh --allow-mismatch     # 커밋이 달라도 진행(일부러 옛 판을 잴 때)
+#        bash tools/gb10-test.sh --allow-mismatch     # 커밋·작업트리가 달라도 진행(뜻을 밝히는 것)
 #        GIJO_GB10_HOST=gb10 bash tools/gb10-test.sh  # ssh 별칭을 바꿔 부를 때
 set -u
 
@@ -51,28 +58,82 @@ for a in "$@"; do
 done
 set -- ${ARGS[@]+"${ARGS[@]}"}
 
-# ⚠ 실패를 삼키지 않는다 — 왜 못 읽었는지 그대로 찍는다(예전엔 2>/dev/null이라 원인이 사라졌다).
-if ! WIN_HEAD="$(git -C "$ROOT" rev-parse HEAD 2>&1)"; then
+# ⚠ 실패를 삼키지 않되 **값과 말은 가른다**(2026-09-06 검토관 적발 · 실측 재현).
+#   한동안 `2>&1`로 합쳐 받았는데, git은 종료코드 0으로도 stderr에 말을 얹는다(GIT_TRACE·설정 경고 등).
+#   그러면 그 줄들이 WIN_HEAD에 섞이고, 아래 ssh 명령 문자열에 **따옴표 없이** 실려
+#   원격 셸이 그것을 명령으로 읽는다 — 실측: `GIT_TRACE=1`이면 rc=0·3줄·221자가 잡히고,
+#   원격은 `command not found` 세 줄을 뱉으며 `bash -s`가 **아예 안 돈다**(시끄러운 파손).
+#   → stderr는 따로 받아 사람에게 보여 주고, 값은 **40자리 sha인지 검사한 것만** 쓴다.
+#   「맞는지 모르겠다」는 「맞다」가 아니므로, 못 읽으면 멈춘다.
+GIT_ERRFILE="$(mktemp 2>/dev/null || echo "/tmp/gijo-gb10-giterr.$$")"
+WIN_HEAD="$(git -C "$ROOT" rev-parse HEAD 2>"$GIT_ERRFILE")"
+GIT_RC=$?
+GIT_ERR="$(cat "$GIT_ERRFILE" 2>/dev/null)"
+rm -f "$GIT_ERRFILE"
+if [ "$GIT_RC" -ne 0 ] || ! printf '%s' "$WIN_HEAD" | grep -Eq '^[0-9a-f]{40}$'; then
   echo "=== gb10 이중 시험 ==="
   echo "✗ win의 커밋을 못 읽었습니다 — gb10과 같은 코드인지 확인할 길이 없습니다."
-  echo "   git 말: $WIN_HEAD"
-  echo "   ROOT  : $ROOT"
-  echo "   확인할 것: 여기가 git 저장소인가 · git이 PATH에 있는가 · safe.directory 경고인가."
+  echo "   git 종료코드: $GIT_RC"
+  echo "   git 말      : ${GIT_ERR:-(없음)}"
+  echo "   받은 값     : ${WIN_HEAD:-(빈 값)}   ← 40자리 sha가 아니면 원격에 실을 수 없습니다"
+  echo "   ROOT        : $ROOT"
+  echo "   확인할 것: 여기가 git 저장소인가 · git이 PATH에 있는가 · safe.directory 경고인가 · GIT_TRACE가 켜져 있나."
   echo "   그래도 돌리려면(무엇을 재는지 알고 있을 때):  bash tools/gb10-test.sh --allow-mismatch"
   [ "$ALLOW_MISMATCH" = "1" ] || exit 2
   WIN_HEAD="unknown"
 fi
-WIN_LINE="$(git -C "$ROOT" log --oneline -1 2>&1 || echo '(git 조회 실패)')"
+WIN_LINE="$(git -C "$ROOT" log --oneline -1 2>/dev/null || echo '(git 조회 실패)')"
+
+# ★ 커밋이 같아도 **작업트리가 다르면 같은 코드가 아니다**(2026-09-06 검토관 적발).
+#   gb10 사본은 gb10의 작업트리 = win이 `git push gb10 main`으로 밀어 넣은 **커밋**에서 뜬다.
+#   그런데 이 저장소의 실제 흐름은 「편집 → 시험 → 커밋」이라, 커밋 전에 이 도구를 부르면
+#   커밋 해시는 같은데 **방금 고친 것은 gb10에 없다.** 예전 판은 그 상태에서 win/gb10 두 줄에
+#   같은 커밋을 찍었고, 사람은 그것을 「같은 코드 확인됨」으로 읽었다 — 남아 있던 거짓 초록이다.
+#   ⚠ 형제 도구 wsl-test.sh는 반대다 — **살아 있는 트리를 그대로 rsync**하므로 미커밋 수정을 잰다.
+#     두 도구의 초록이 서로 **다른 것**을 뜻하는데 출력 꼴이 같아 더 헷갈린다. 여기서 못 박는다.
+#   판정 범위는 **사본이 실제로 가져가는 것**만: server/ client/ tools/ knowledge/ mockups/ · 뿌리 *.md.
+#   ⚠ 추적 안 되는 파일은 뺀다(-uno) — 이 저장소엔 늘 수십 개가 떠 있어 넣으면 도구를 못 쓴다.
+#   ⚠ 이 트리는 여러 사람이 동시에 쓴다 — 그래서 남의 문서·시안 편집까지 멈추지는 않는다.
+WIN_DIRTY=""
+if [ "$WIN_HEAD" != "unknown" ]; then
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    f="${line:3}"; f="${f#\"}"; f="${f%\"}"
+    case "$f" in
+      server/*|client/*|tools/*|knowledge/*|mockups/*) WIN_DIRTY="$WIN_DIRTY$line"$'\n' ;;
+      */*) ;;
+      *.md) WIN_DIRTY="$WIN_DIRTY$line"$'\n' ;;
+    esac
+  done <<EOF
+$(git -C "$ROOT" status --porcelain -uno 2>/dev/null)
+EOF
+fi
 
 echo "=== gb10 이중 시험 ==="
 echo "  win  : $WIN_LINE"
+if [ -n "$WIN_DIRTY" ]; then
+  N="$(printf '%s' "$WIN_DIRTY" | grep -c .)"
+  echo
+  echo "✗ win에 **커밋 안 한 수정 ${N}건**이 있습니다 — 그것은 gb10에 없습니다."
+  printf '%s' "$WIN_DIRTY" | sed -n '1,10p' | sed 's/^/     /'
+  [ "$N" -gt 10 ] && echo "     … 외 $((N-10))건"
+  echo "   gb10이 재는 것은 **커밋된 판**뿐입니다. 그대로 돌리면 방금 고친 것을 안 담은 초록이 나옵니다."
+  echo "   맞추려면:  커밋 → git push hub main → git push gb10 main → 다시"
+  echo "   미커밋 수정을 지금 재려면 WSL로:  bash tools/wsl-test.sh   (살아 있는 트리를 그대로 복사합니다)"
+  if [ "$ALLOW_MISMATCH" = "1" ]; then
+    echo "   → --allow-mismatch 를 받았습니다. 진행합니다 — 아래 결과는 **커밋된 판**의 것입니다."
+  else
+    exit 2
+  fi
+fi
 
 # vitest 인자를 원격 셸이 **다시 쪼개지 않게** 한 개씩 인용해 넘긴다.
 RARGS=""
 for a in "$@"; do RARGS="$RARGS $(printf '%q' "$a")"; done
 
+# ⚠ 값도 인용해서 싣는다 — 위에서 sha만 통과시키지만, 인용은 공짜이고 injection을 원천 차단한다.
 ssh -o BatchMode=yes -o ConnectTimeout=20 "$HOST" \
-  "GIJO_WIN_HEAD=$WIN_HEAD GIJO_ALLOW_MISMATCH=$ALLOW_MISMATCH bash -s --$RARGS" <<'REMOTE'
+  "GIJO_WIN_HEAD=$(printf '%q' "$WIN_HEAD") GIJO_ALLOW_MISMATCH=$(printf '%q' "$ALLOW_MISMATCH") bash -s --$RARGS" <<'REMOTE'
 set -u
 
 # ⚠ 비대화형 ssh는 .bashrc를 안 읽는다 — node·npx가 PATH에 붙는 곳이 여기뿐이다.
@@ -96,11 +157,17 @@ SRC_ROOT="$HOME/gijo-as"
 SRC="$SRC_ROOT/server"
 if [ ! -d "$SRC" ]; then echo "✗ gb10에 원본이 없습니다: $SRC"; exit 2; fi
 
-if ! GB_HEAD="$(git -C "$SRC_ROOT" rev-parse HEAD 2>&1)"; then
-  echo "  gb10 : ✗ 커밋 조회 실패 — $GB_HEAD"
+# ⚠ 여기도 값과 말을 가른다(win 쪽과 같은 이유) — git이 rc=0으로 stderr에 얹은 말이 값에 섞이면
+#   아래 비교가 「커밋이 다르다」로 떨어져 **원인이 엉뚱하게 보인다.**
+GB_ERRFILE="$(mktemp 2>/dev/null || echo "/tmp/gijo-gb10-giterr-remote.$$")"
+GB_HEAD="$(git -C "$SRC_ROOT" rev-parse HEAD 2>"$GB_ERRFILE")"
+GB_RC=$?
+GB_ERR="$(cat "$GB_ERRFILE" 2>/dev/null)"; rm -f "$GB_ERRFILE"
+if [ "$GB_RC" -ne 0 ] || ! printf '%s' "$GB_HEAD" | grep -Eq '^[0-9a-f]{40}$'; then
+  echo "  gb10 : ✗ 커밋 조회 실패(rc=$GB_RC) — ${GB_ERR:-받은 값이 sha가 아님: ${GB_HEAD:-(빈 값)}}"
   GB_HEAD="unknown"
 else
-  echo "  gb10 : $(git -C "$SRC_ROOT" log --oneline -1 2>&1)"
+  echo "  gb10 : $(git -C "$SRC_ROOT" log --oneline -1 2>/dev/null)"
 fi
 # ★ 다르면 **멈춘다**(2026-09-06). 옛 코드로 난 초록을 내 수정의 증거로 읽는 사고가 실제로 났다.
 if [ "${GIJO_WIN_HEAD:-x}" != "$GB_HEAD" ]; then
