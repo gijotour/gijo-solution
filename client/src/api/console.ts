@@ -34,6 +34,10 @@ export interface SupervisionData {
   calls: Record<string, number>;
   daily: { day: string; agent: string; kind: string; calls: number; errors: number; latencyMsSum: number }[];
   recentErrors: Record<string, { detail: string; timestamp: number }>;
+  // ✂ 사유별 건수(2026-09-06 · 승인 시안 mockups/cite-reasons). daily(답 개수)와 **다른 잣대**라
+  //   칸을 갈라 둔다 — 한 답에서 세 군데를 뗄 수 있어 더하지도 나누지도 못한다.
+  //   ⚠ 옛 서버(2026-09-06 이전)에는 이 칸이 없다 — 화면이 없어도 도는 쪽으로 읽는다.
+  citeReasons?: { day: string; agent: string; reason: string; count: number }[];
 }
 
 export const agentsApi = {
