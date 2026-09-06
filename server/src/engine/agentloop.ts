@@ -14,7 +14,7 @@ import { chat, 자료없음배너, 자료없음중복가드, 지정범위배너 
 import { currentDocIds } from "./ragscope";
 import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
-import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 지식근거없음표지 } from "./agenttools";
+import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 되묻기표지, 지식근거없음표지 } from "./agenttools";
 import type { AgentTool } from "./agenttools";
 import { 법령검색없음표지 } from "./lawinfo";
 import { emitCollaboration } from "./collaboration";
@@ -312,6 +312,80 @@ export function 자산되물음(): string {
   ].join("\n");
 }
 
+// ── 조치 검증 — **대상을 안 댔으면 도구를 부르지 않는다** (2026-09-07 · 야간 회귀 ⑬) ─────
+//
+// ★★ 실측 사고 (2026-09-06 · .tmp-reports/ops-sim.json)
+//   「조치 다 했는데 어떻게 확인해?」 → 「자산 "**최근 취약점**"을 찾을 수 없습니다」
+//   「고쳤다고 했는데 정말 닫혔는지 봐줘」 → 「자산 "**web-01**"을 찾을 수 없습니다」
+//   둘 다 자산을 지목하지 않은 물음인데 모델이 verify_finding(장비에 접속하는 실행 도구)을
+//   고르고 인자를 **지어냈다.** web-01은 도구 설명의 예문(`예: {"assetId":"web-01"…}`)이고
+//   운영 자산은 0건이다. 대상이 없으면 답이 아니라 **되묻기**가 맞다 —
+//   같은 파일 위쪽의 27초 사고(가리킬것없는대명사)와 같은 병이고, 이쪽이 더 나쁘다:
+//   그 자산이 **우연히 실재하면 엉뚱한 장비에 붙는다.**
+//
+// ⚠ **진짜 지시를 되묻기로 막으면 그게 더 나쁘다**(이 파일의 확립 원칙). 그래서 잣대는
+//   「등록된 자산인가」가 아니라 **「사람 말에서 온 값인가」**다 — 사람이 없는 이름을 댔으면
+//   그건 지목이므로 도구가 정직하게 「못 찾았다」고 답하게 둔다.
+// ⚠ **근거는 「지시문 ∪ 앞선 조회 결과」다** — 이 저장소가 이미 정한 잣대다(buildApproval이
+//   쓰기 도구의 지어낸 값을 가려낼 때 쓰는 것과 같다). 모델이 list_assets를 먼저 부르고 그
+//   결과의 자산 이름으로 검증을 걸면 그건 **근거 있는 값**이지 지어낸 값이 아니다.
+//   이 갈래를 빠뜨리면 「자산 목록 보고 → 그 자산 검증」이라는 정상 흐름이 되묻기로 막힌다.
+export function 지목없는검증대상(
+  instruction: string,
+  assetId: string | undefined,
+  근거: { 대화?: string; 범위자산?: string; 앞선결과?: string } = {},
+): boolean {
+  const 납작 = (s: string | undefined) => String(s ?? "").toLowerCase().replace(/\s+/g, "");
+  const id = 납작(assetId);
+  if (!id) return true;                                   // 인자 자체가 없다
+  // ⚠⚠ **낱말 경계를 본다 — 그냥 포함이면 안 된다**(2026-09-07 반증에서 내가 밟았다).
+  //   지어낸 「web-01」이 실재 자산 「payment-web-01」의 **일부라서** 그냥 포함으로는 통과했다.
+  //   그러면 지어낸 값이 근거 있는 값으로 둔갑하고, resolveAsset이 느슨히 붙으면
+  //   **엉뚱한 장비**로 간다 — 이 관문이 막으려던 바로 그 사고다.
+  const 경계로있나 = (건초: string | undefined, 바늘: string): boolean => {
+    if (바늘.length < 2) return false;
+    const 이스케이프 = 바늘.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // 앞뒤가 **식별자 글자가 아니어야** 한다(문장 끝·시작 포함). id에 흔한 -·.·_는 글자로 친다.
+    return new RegExp(`(^|[^0-9a-z가-힣_.-])${이스케이프}($|[^0-9a-z가-힣_.-])`, "i")
+      .test(String(건초 ?? "").toLowerCase());
+  };
+  // ⓪ 🗂 지금 범위를 담당자가 **직접 걸어 둔** 자산이면 지목한 것이다(범위를입힌다가 넣은 값).
+  //    ⚠ 값이 **같을 때만**이다 — 모델이 범위를 무시하고 딴 자산을 지어냈으면 그건 지목이 아니다.
+  if (근거.범위자산 && id === 납작(근거.범위자산)) return false;
+  const t = 납작(instruction);
+  if (경계로있나(instruction, String(assetId ?? "").trim())) return false; // ① 사람이 그 말을 실제로 했다
+  // ② 화면에서 고른 항목(⌗이름::키) — registry의 autoFill이 여기서 assetId를 뽑는다
+  if (/⌗.+?::[0-9a-f]{16}/.test(String(instruction ?? ""))) return false;
+  // ③ 직전 대상(「아까 그거」) — 맥락에서 온 근거 있는 값이다(#8 흐름을 끊지 않는다)
+  const ctx = recentTarget(근거.대화 ?? 기본대화);
+  if (ctx && 납작(ctx.assetId) === id) return false;
+  // ④ 앞선 도구 결과에 그 이름이 있으면 **읽고 옮긴 값**이다(지시문 ∪ 조회 결과)
+  if (경계로있나(근거.앞선결과, String(assetId ?? "").trim())) return false;
+  // ⑤ 등록된 자산의 이름·id가 지시문에 있으면 지목한 것이다(autoFill이 이름→id로 바꿔 둔 경우)
+  try {
+    for (const a of listAssets()) {
+      for (const 표기 of [a.name, a.id]) {
+        const v = 납작(표기);
+        if (v.length >= 3 && t.includes(v)) return false;
+      }
+    }
+  } catch { /* 목록을 못 봐도 판정은 계속한다 — 못 보면 되묻는 쪽이 안전하다 */ }
+  return true;
+}
+
+/** 조치 검증 대상을 안 댔을 때의 되묻기 — 표지가 붙어 **모델을 안 거치고 그대로** 나간다. */
+export function 검증대상되물음(): string {
+  return [
+    `${되묻기표지} 어느 자산의 조치를 검증할지 몰라 되묻습니다 — 지시에 자산이 없어 검증을 실행하지 않았습니다.`,
+    "(장비에 실제로 접속하는 일이라, 대상을 짐작해서 붙으면 엉뚱한 장비를 건드립니다.)",
+    "",
+    `${표식.다음} 이렇게 말씀해 주세요`,
+    '  · "○○ 서버 조치 검증해줘" — 자산 이름이나 id로 지목하면 그 자산만 확인합니다',
+    '  · "자산 목록 보여줘" — 무엇이 있는지부터 보기',
+    '  · "미조치 취약점 뭐 있어?" — 목록에서 고르시면 그다음을 이어갑니다',
+  ].join("\n");
+}
+
 // #8: 지시가 "아까 그거" 류이고 최근 다룬 대상이 있으면, 그 대상을 프롬프트에 실어 해석을 돕는다.
 function anaphoraHint(instruction: string, 대화 = 기본대화): string[] {
   const t = recentTarget(대화);
@@ -380,7 +454,28 @@ function directAnswerFor(calls: AgentToolCall[]): string | null {
   if (only.result.startsWith(NO_HIT_PREFIX)) {
     return only.tool === "law_lookup" ? null : 사람용으로다듬기(only.result);
   }
+  // ★ 되묻는 말도 그대로 내보낸다(2026-09-07) — 아래 모델을거치지않는답인가 머리글 참고.
+  if (모델을거치지않는답인가(only.result)) return 사람용으로다듬기(only.result);
   return findAgentTool(only.tool)?.directAnswer ? 사람용으로다듬기(only.result) : null;
+}
+
+/**
+ * 이 도구 결과는 **모델을 거치지 않고 그대로** 사람에게 나가야 하는가.
+ *
+ * ★★ 왜 필요한가 (야간 회귀 2026-09-06 실측)
+ *   verify_finding이 낸 결정적 문구 「자산 "web-01"을 찾을 수 없습니다. 자산 이름이나 id로
+ *   **다시 지목해 주세요**.」가 최종 답에서는 「… ID로 **다시 지정해 주세요**.」로,
+ *   다른 회차에서는 「… 닫혔는지 확인할 수 없습니다.」로 **모델이 다시 써서** 나갔다.
+ *   verify_finding은 directAnswer가 아니라 결과가 재작성 경로를 타는데, 위 NO_HIT_PREFIX
+ *   보호는 **검색 0건 전용**이라 되묻는 말을 못 지켰다.
+ *   제품이 정한 말이 회차마다 달라지면 그 말을 기대하는 어떤 잣대도 못 믿는다 —
+ *   실제로 하네스 기대표의 「다시 지목」이 빗나가 ⑬ 두 문항이 붉었다.
+ *
+ * ⚠ **표지가 있을 때만이다.** 「도구 결과는 웬만하면 그대로」로 넓히면 여러 도구를 조합한
+ *   답이 종합 없이 나가고, 재작성이 하던 정리(길이·말투)가 통째로 사라진다.
+ */
+export function 모델을거치지않는답인가(result: string): boolean {
+  return String(result ?? "").startsWith(되묻기표지);
 }
 
 // ── 법령 도구가 답을 못 낸 자리를 사내 지식으로 메운다 (2026-08-09 재수리) ────────────────
@@ -2531,6 +2626,19 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
       // 첫 수라면 루프를 접고 지식(RAG·채팅)으로 넘긴다 — 그쪽이 방법 설명을 잘한다.
       if (calls.length === 0) return null;
       result = "이 지시는 점검 '방법'을 묻는 질문이라 점검을 실행하지 않았다. 아는 지식으로 절차를 설명하라.";
+    } else if (
+      tool.name === "verify_finding" &&
+      지목없는검증대상(instruction, args.assetId, {
+        대화: scope?.대화,
+        범위자산: scope?.범위자산,
+        // 앞선 조회 결과도 근거다 — 「자산 목록 보고 → 그 자산 검증」을 막으면 안 된다.
+        앞선결과: calls.map((c) => c.result).join("\n"),
+      })
+    ) {
+      // 모델이 자산을 **지어냈다**(도구 설명의 예문 web-01 등). 장비에 접속하는 실행 도구라
+      // 짐작으로 부르면 엉뚱한 장비를 건드린다 — 부르지 않고 되묻는다(2026-09-06 야간 회귀 ⑬).
+      // ⚠ 되묻기 표지가 붙어 있어 이 답은 모델 재작성을 거치지 않고 그대로 나간다.
+      result = 검증대상되물음();
     } else if (tool.name === "ontology_query" && !isRelationQuestion(instruction)) {
       // "○○은 KISA 어떤 점검항목이야?" 같은 **정의·해당 항목 질문**에 LLM이 온톨로지를 고르면
       // 트리플에 그 서술이 없어 "연결을 찾지 못했다"가 답이 된다 — RAG가 1순위로 근거를 들고

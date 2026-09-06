@@ -862,6 +862,32 @@ export async function searchOne(q: string): Promise<string[]> {
 // "못 찾았다"를 "존재하지 않는다"로 부풀려 답하던 사고(2026-07-26)를 구조적으로 막는다.
 export const NO_HIT_PREFIX = "🔎 검색되지 않았습니다 —";
 
+// ── 되묻기 표지 — **제품이 정한 말은 모델이 다시 쓰지 못한다** (2026-09-07) ───────────────
+//
+// ★★ 왜 생겼나 (야간 회귀 2026-09-06 실측 · .tmp-reports/ops-sim.json)
+//   runVerifyFinding이 낸 결정적 문구 「자산 "web-01"을 찾을 수 없습니다. 자산 이름이나 id로
+//   다시 지목해 주세요.」가 **최종 답에서는 두 회차 모두 다른 말로 나갔다**:
+//     · 「… 자산 이름이나 **ID로 다시 지정해 주세요**.」
+//     · 「… **닫혔는지 확인할 수 없습니다**.」(뒷문장이 통째로 사라졌다)
+//   verify_finding은 directAnswer가 아니라 결과가 재작성 경로(composeFinalAnswer)를 타는데,
+//   위 NO_HIT_PREFIX 보호는 **검색 0건에만** 걸려 이 문구를 못 지켰다.
+//   제품이 정한 말이 회차마다 달라지면 그 말을 기대하는 어떤 잣대도 못 믿는다 —
+//   실제로 회귀 하네스가 기대하던 「다시 지목」이 그래서 빗나가 ⑬ 두 문항이 붉었다.
+// ⚠ 표식은 사전(tone.ts 표식.모름 ❔)에 있는 것만 쓴다 — 새 기호를 지어내면 말투 감시가 잡는다.
+export const 되묻기표지 = "❔ 되묻습니다 —";
+
+/**
+ * 자산을 못 찾았을 때의 **결정적 되묻기 문구**. 표지가 붙어 모델을 거치지 않고 그대로 나간다.
+ * ⚠ 문구를 바꾸려면 **여기 한 곳만** 바꾼다 — 같은 말을 여러 곳에 적으면 어긋난다.
+ */
+export function 자산못찾음되묻기(입력: string): string {
+  const q = String(입력 ?? "").trim();
+  // ⚠ 빈 값도 따로 받는다 — 예전엔 `자산 "undefined"을 찾을 수 없습니다`가 그대로 나갔다
+  //   (「이거 검증 실행해줘」를 대상 없이 말했을 때의 강제 경로). 담당자가 읽을 글이 아니다.
+  if (!q) return `${되묻기표지} 어느 자산인지 몰라 되묻습니다 — 자산 이름이나 id로 다시 지목해 주세요.`;
+  return `${되묻기표지} 자산 "${q}"${조사(q, "을")} 찾을 수 없습니다. 자산 이름이나 id로 다시 지목해 주세요.`;
+}
+
 export function noHitMessage(q: string): string {
   const lines = [`${NO_HIT_PREFIX} "${q}"로는 결과가 없습니다.`, `(등록된 게 없다는 뜻이 아니라, 이 말로는 못 찾았다는 뜻입니다.)`];
   const cands = suggestionsFor(q);
@@ -3420,7 +3446,9 @@ export async function runVerifyFinding(args: Record<string, string>): Promise<st
   const { targetRunner } = await import("../hardeningscan.js");
   const { netmikoRunnerFor } = await import("../netmikorunner.js");
   const asset = resolveAsset(args.assetId ?? "");
-  if (!asset) return `자산 "${args.assetId}"${조사(String(args.assetId ?? ""), "을")} 찾을 수 없습니다. 자산 이름이나 id로 다시 지목해 주세요.`;
+  // ⚠ 문구는 자산못찾음되묻기() 한 곳에서 만든다 — 되묻기 표지가 붙어야 모델 재작성을 안 거친다
+  //   (2026-09-06 야간 회귀: 여기 문구가 「ID로 다시 **지정**해 주세요」로 다시 쓰여 나갔다).
+  if (!asset) return 자산못찾음되묻기(String(args.assetId ?? ""));
   const v = currentViewer();
   const user = v?.userId ? findUserById(v.userId) : undefined;
   let onlyKey: string | undefined;
