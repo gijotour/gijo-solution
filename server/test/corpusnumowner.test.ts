@@ -20,33 +20,12 @@
 //   실적 통계가 아니다). **밖을 가리키는 말**(업계·평균·조사·벤치마크·타사·동종·글로벌)이
 //   백분율과 **같은 줄**에 있을 때만 주인을 요구한다. 이 좁힘으로 전 코퍼스 오탐 0을 확인했다.
 //   ⚠ 초록 통과가 「남의 수치 오인 없음」의 증거는 아니다 — 반입 뒤 실물 하네스로 다시 잰다.
+//
+// ⚠ 모집단(코퍼스 문서 훑기)은 corpusleak.test.ts와 **같아야 한다.** 예전엔 그 말을 머리글에
+//   적어 두고 코드는 복사했다 — 2026-09-07에 helpers/corpus.ts 하나로 합쳤다. 「같은 방식」은
+//   주석이 아니라 **같은 함수**여야 지켜진다.
 import { describe, it, expect } from "vitest";
-import fs from "node:fs";
-import path from "node:path";
-
-const 뿌리 = path.join(__dirname, "../..");
-const manifest = JSON.parse(fs.readFileSync(path.join(뿌리, "server/docs-manifest.json"), "utf8"));
-
-/** corpusleak.test.ts와 **같은 방식**으로 훑는다 — 두 시험이 보는 모집단이 갈리면 안 된다. */
-function 코퍼스문서(): { file: string; 본문: string }[] {
-  const 목록: string[] = [];
-  (function 훑기(o: unknown): void {
-    if (Array.isArray(o)) { o.forEach(훑기); return; }
-    if (o && typeof o === "object") {
-      const f = (o as { file?: unknown }).file;
-      if (typeof f === "string" && f.endsWith(".md")) 목록.push(f);
-      Object.values(o as Record<string, unknown>).forEach(훑기);
-    }
-  })({ ...manifest, _제외: undefined });
-  const out: { file: string; 본문: string }[] = [];
-  for (const f of 목록) {
-    for (const d of [뿌리, path.join(뿌리, "docs")]) {
-      const p = path.join(d, f);
-      if (fs.existsSync(p)) { out.push({ file: f, 본문: fs.readFileSync(p, "utf8") }); break; }
-    }
-  }
-  return out;
-}
+import { 코퍼스문서 } from "./helpers/corpus";
 
 const 백분율 = /\d+(?:\.\d+)?\s*%/;
 const 밖을가리키는말 = /업계|평균|조사|벤치마크|타사|동종|글로벌|설문 결과/;

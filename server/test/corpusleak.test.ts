@@ -11,32 +11,15 @@
 //
 // ★ 여기서 지키는 것: 코퍼스 문서에 **소스 경로·빌드 명령·개발 이력**이 없을 것.
 //   문서 자체를 못 넣게 막는 게 아니라, 넣으려면 그 문장을 사용자 말로 고치게 만든다.
+//
+// ⚠ 매니페스트 훑기는 **helpers/corpus.ts 한 곳**에 있다(2026-09-07). 예전엔 이 파일과
+//   corpusnumowner.test.ts가 같은 코드를 두 벌 들고 있었다 — 저쪽 머리글이 「같은 방식으로
+//   훑는다」고 적어 두고도 복사한 것이라, 한쪽만 고쳐지면 다른 시험이 **딴 모집단을 보면서
+//   초록**이 될 자리였다. 아래 「이 감시가 헛돌고 있지 않다」가 그 헬퍼의 결과를 숫자로 못 박는다.
 import { describe, it, expect } from "vitest";
-import fs from "node:fs";
-import path from "node:path";
+import { 코퍼스문서, 코퍼스매니페스트 } from "./helpers/corpus";
 
-const 뿌리 = path.join(__dirname, "../..");
-const manifest = JSON.parse(fs.readFileSync(path.join(뿌리, "server/docs-manifest.json"), "utf8"));
-
-function 코퍼스문서(): { file: string; 본문: string }[] {
-  const 목록: string[] = [];
-  (function 훑기(o: unknown): void {
-    if (Array.isArray(o)) { o.forEach(훑기); return; }
-    if (o && typeof o === "object") {
-      const f = (o as { file?: unknown }).file;
-      if (typeof f === "string" && f.endsWith(".md")) 목록.push(f);
-      Object.values(o as Record<string, unknown>).forEach(훑기);
-    }
-  })({ ...manifest, _제외: undefined });   // ⚠ _제외(뺀 문서)는 보지 않는다
-  const out: { file: string; 본문: string }[] = [];
-  for (const f of 목록) {
-    for (const d of [뿌리, path.join(뿌리, "docs")]) {
-      const p = path.join(d, f);
-      if (fs.existsSync(p)) { out.push({ file: f, 본문: fs.readFileSync(p, "utf8") }); break; }
-    }
-  }
-  return out;
-}
+const manifest = 코퍼스매니페스트();
 
 /** 고객 답변에 나가면 안 되는 것들. 이유를 함께 둔다 — 무엇이 왜 문제인지 알아야 고친다. */
 const 새는말: { 이름: string; re: RegExp; 왜: string }[] = [
@@ -79,6 +62,18 @@ describe("RAG 코퍼스 — 개발 문서가 섞이지 않는다", () => {
     const 문서 = 코퍼스문서();
     expect(문서.length, "코퍼스 문서를 하나도 못 읽었다 — 빈 검사다").toBeGreaterThanOrEqual(8);
     expect(문서.every((d) => d.본문.length > 100), "본문이 비어 있는 문서가 있다").toBe(true);
+
+    // ★ 공용 헬퍼(helpers/corpus.ts)의 결과를 **숫자로 못 박는다**(2026-09-07).
+    //   이 헬퍼 하나를 corpusleak·corpusnumowner 두 감시가 함께 쓴다 — 훑기가 조용히 좁아지면
+    //   (중첩을 못 타거나 docs/ 갈래를 잃거나 _제외를 잘못 반영하면) 두 감시가 **함께** 눈이 먼다.
+    //   바닥값(≥8)만으로는 31→9로 줄어도 초록이라, 정확한 수를 적어 변화를 드러낸다.
+    //   ⚠ 여기가 빨개지면 **먼저 매니페스트를 의심**한다. 문서를 일부러 늘리거나 뺐다면
+    //     아래 두 숫자를 그때 고친다(고칠 때 무엇을 왜 늘렸는지 커밋 메시지에 적을 것).
+    expect(문서.length, "코퍼스 문서 수가 달라졌다 — 매니페스트를 고쳤으면 이 숫자도 함께 고친다").toBe(31);
+    expect(
+      문서.filter((d) => d.file.startsWith("knowledge/")).length,
+      "knowledge/ 지식 문서 수가 달라졌다 — 매니페스트를 고쳤으면 이 숫자도 함께 고친다",
+    ).toBe(19);
   });
 
   it("코퍼스에서 뺀 문서는 이유가 남아 있다", () => {
