@@ -111,14 +111,17 @@ describe("빌드 산출물 대조 — 「쓰다 만 설치본」을 완성본으
     expect(산출물검사(path.join(방, "없는 Setup.exe")).문제.join("\n")).toContain("설치본이 없습니다");
   });
 
-  it("ⓖ latest.yml에 **다른 판**만 적혀 있으면 남은 매니페스트라고 말한다", () => {
+  it("ⓖ latest.yml에 **다른 판**만 적혀 있으면 멈추고, **무엇이 적혀 있는지** 보여 준다", () => {
     const exe = 설치본만들기("혼자 Setup 2.0.0.exe");
     blockmap쓰기(exe + ".blockmap", 바이트.length);
     fs.writeFileSync(path.join(방, "latest.yml"),
       "version: 1.0.0\nfiles:\n  - url: 남의 Setup 1.0.0.exe\n    sha512: zzz\n    size: 1\n", "utf8");
     const r = 산출물검사(exe);
     expect(r.ok).toBe(false);
-    expect(r.문제.join("\n")).toContain("다른 판의 매니페스트가 남아 있습니다");
+    expect(r.문제.join("\n")).toContain("안 적혀 있습니다");
+    // ⚠ 「다른 판이다」라고 단정하지 않는다 — 이름 꼴(safeArtifactName) 때문일 수도 있어서,
+    //   사람이 판단할 재료를 준다. 단정했다가 멀쩡한 빌드를 지우게 하면 안 된다.
+    expect(r.문제.join("\n"), "매니페스트에 적힌 이름을 안 보여 준다").toContain("남의 Setup 1.0.0.exe");
     fs.rmSync(path.join(방, "latest.yml"));
   });
 
@@ -126,6 +129,36 @@ describe("빌드 산출물 대조 — 「쓰다 만 설치본」을 완성본으
     const 글 = "version: 5.91.1\nfiles:\n  - url: 'GIJO AS Setup 5.91.1.exe'\n    sha512: AAA==\n    size: 12345\n";
     expect(latestYml에서찾기(글, "GIJO AS Setup 5.91.1.exe")).toEqual({ sha512: "AAA==", size: 12345 });
     expect(latestYml에서찾기(글, "GIJO AS Setup 5.90.0.exe")).toBeNull();
+  });
+
+  // ── 아래 둘은 2026-09-07 검토관 적발(낮음)의 자리다 ─────────────────────────
+  //   electron-builder는 provider가 github이면 매니페스트의 url·path를 **safeArtifactName**으로
+  //   갈아끼운다. 그 이름은 「공백을 -로 바꾼 것」이다(실독:
+  //   app-builder-lib/out/platformPackager.js:566-583 isSafeGithubName=/^[0-9A-Za-z._-]+$/ ·
+  //   577 `suggestedName.replace(/ /g, "-")` / updateInfoBuilder.js:100-107).
+  //   그래서 디스크의 「GIJO AS Setup 5.91.1.exe」와 매니페스트의 「GIJO-AS-Setup-5.91.1.exe」가
+  //   **같은 물건인데 글자가 다르다.** 이름 그대로만 대조하면 멀쩡한 빌드를 「다른 판의
+  //   매니페스트가 남아 있습니다」로 몰아 **게시가 막힌다** — 검사기가 제품을 막는 자리다.
+  //   ⚠ 오늘은 publish 설정이 없어 latest.yml 자체가 안 만들어져 잠자는 갈래다. 그러나
+  //     자동 업데이트를 켜는 순간 깨어나므로, 그때 「왜 빨간지」를 헤매지 않게 지금 못 박는다.
+  it("★ ⓘ safeArtifactName — 공백을 -로 바꾼 이름도 **같은 물건**으로 찾는다", () => {
+    const 글 = "version: 5.91.1\nfiles:\n  - url: GIJO-AS-Setup-5.91.1.exe\n    sha512: BBB==\n    size: 777\npath: GIJO-AS-Setup-5.91.1.exe\n";
+    expect(latestYml에서찾기(글, "GIJO AS Setup 5.91.1.exe"),
+      "safeArtifactName 꼴을 못 알아본다 — 멀쩡한 빌드가 「다른 판」으로 몰린다").toEqual({ sha512: "BBB==", size: 777 });
+    // 그렇다고 아무 이름이나 같다고 하지 않는다 — 판 번호가 다르면 여전히 남남이다.
+    expect(latestYml에서찾기(글, "GIJO AS Setup 5.90.0.exe")).toBeNull();
+  });
+
+  it("★ ⓘ′ 산출물검사도 safeArtifactName 꼴 매니페스트에서 **헛빨강을 안 낸다**", () => {
+    const exe = 설치본만들기("GIJO AS Setup 9.9.9.exe");
+    blockmap쓰기(exe + ".blockmap", 바이트.length);
+    const sha = crypto.createHash("sha512").update(바이트).digest("base64");
+    fs.writeFileSync(path.join(방, "latest.yml"),
+      `version: 9.9.9\nfiles:\n  - url: GIJO-AS-Setup-9.9.9.exe\n    sha512: ${sha}\n    size: ${바이트.length}\n`, "utf8");
+    const r = 산출물검사(exe);
+    expect(r.문제, "이름 꼴만 다른 매니페스트로 게시를 막는다: " + JSON.stringify(r.문제)).toEqual([]);
+    expect(r.ok).toBe(true);
+    fs.rmSync(path.join(방, "latest.yml"));
   });
 });
 

@@ -1,8 +1,10 @@
 // 감독(supervision.html) 화면을 **실제 인라인 스크립트 그대로** 돌리는 가짜 무대.
 //
 // ■ 왜 helpers/에 두나
-//   게시 관문(tools/publish-gate-ui.mjs)의 ⑧′·⑧″는 실화면에서만 도는 코드라, 판정식을 재려면
-//   그 코드를 떼어 와 **화면 스크립트 위에서** 돌려 봐야 한다. 그 무대를 시험 파일마다 새로
+//   게시 관문(tools/publish-gate-ui.mjs)의 ⑧′는 실화면에서만 도는 코드라, 판정식을 재려면
+//   그 코드를 떼어 와 **화면 스크립트 위에서** 돌려 봐야 한다. 그리고 고정 자료 판정
+//   (publishgatecitefixed.test.ts)은 실앱에서 아예 못 도는 부류라 **여기가 유일한 자리**다.
+//   그 무대를 시험 파일마다 새로
 //   만들면 화면이 바뀔 때 한쪽만 낡는다 — 이 저장소의 「같은 것을 여러 곳에 적으면 어긋난다」.
 //   ⚠ 2026-09-07 현재 server/test/publishgatecite.test.ts에는 같은 모양의 무대가 **한 벌 더**
 //     있다(먼저 만들어진 쪽). 그 파일을 이번에 손대지 않아 아직 두 벌이다 — 다음에 그 시험을
@@ -139,9 +141,13 @@ export function 감독무대세우기(처음자료: unknown, 씨앗: Record<stri
     setItem: (k: string, v: string) => { 저장[k] = v; },
     removeItem: (k: string) => { delete 저장[k]; },
   };
-  // ⚠ gijo는 **갈아끼울 수 있는 보통 객체**로 둔다 — 관문 ⑧″가 이 칸 하나를 잠시 바꿔 끼우고
-  //   되돌리는지를 재는 것이 이 무대의 목적이다(실제 앱에서는 contextBridge가 내주는 칸이라
-  //   판에 따라 읽기 전용일 수 있고, 그래서 관문은 「먹었는지」를 되읽어 확인한다).
+  // ⚠ gijo는 **갈아끼울 수 있는 보통 객체**로 둔다 — 고정 자료로 화면을 재려면 이 칸을 바꿔
+  //   끼워야 하는데, **실앱에서는 그게 안 된다**(contextBridge가 내준 window.gijo는 얼어 나온다 —
+  //   writable:false·configurable:false, client/src/preload.ts:129의 실측 기록).
+  //   그래서 고정 자료 판정이 살 수 있는 자리는 여기뿐이고, 관문은 실화면에서 **실제 자료로만**
+  //   잰다(publishgatecitefixed.test.ts 머리말에 그 경계를 적어 두었다).
+  //   ⚠ 이 무대가 실앱보다 **무르다**는 뜻이기도 하다 — 여기서 초록이라고 「실화면에서 통과했다」고
+  //     말하면 안 된다. 그 갈래는 같은 파일의 ⓗ③(얼린 gijo)이 일부러 재현해 둔다.
   const win: Record<string, any> = {
     gijo: {
       listAgents: async () => [{ id: "orchestrator", name: "총괄", abbr: "총", role: "" }],

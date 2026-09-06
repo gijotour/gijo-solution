@@ -83,7 +83,7 @@ export function latestYml에서찾기(글, 설치본이름) {
   let 안 = false, sha512 = null, size = null;
   for (const 줄 of 줄들) {
     const url = /^\s*-?\s*url:\s*(.+?)\s*$/.exec(줄);
-    if (url) { 안 = 벗기기(url[1]) === 설치본이름; continue; }
+    if (url) { 안 = 이름같나(벗기기(url[1]), 설치본이름); continue; }
     if (!안) continue;
     const s = /^\s*sha512:\s*(.+?)\s*$/.exec(줄);
     if (s) { sha512 = 벗기기(s[1]); continue; }
@@ -94,7 +94,7 @@ export function latestYml에서찾기(글, 설치본이름) {
 
   // ② files:가 없는 옛 꼴 — 최상위 path:/sha512:를 본다(size는 이 꼴에 없을 수 있다).
   const 최상위경로 = 줄들.find((l) => /^path:\s*/.test(l));
-  if (최상위경로 && 벗기기(최상위경로.replace(/^path:\s*/, "")) === 설치본이름) {
+  if (최상위경로 && 이름같나(벗기기(최상위경로.replace(/^path:\s*/, "")), 설치본이름)) {
     const s = 줄들.find((l) => /^sha512:\s*/.test(l));
     const z = 줄들.find((l) => /^size:\s*/.test(l));
     return {
@@ -103,6 +103,45 @@ export function latestYml에서찾기(글, 설치본이름) {
     };
   }
   return null;
+}
+
+/**
+ * 매니페스트에 적힌 이름과 디스크의 파일 이름이 **같은 물건**인가.
+ *
+ * ⚠ 왜 글자 그대로만 비교하면 안 되나 (2026-09-07 검토관 적발 · 실독으로 확인)
+ *   electron-builder는 publish provider가 github이면 매니페스트의 `url`·`path`를
+ *   **safeArtifactName**으로 갈아끼운다(app-builder-lib/out/publish/updateInfoBuilder.js:100-107).
+ *   그 이름은 「GitHub이 허용하는 글자만 남긴 것」이고, 공백만 문제일 때는 공백을 `-`로 바꾼다:
+ *     platformPackager.js:566  isSafeGithubName = /^[0-9A-Za-z._-]+$/
+ *     platformPackager.js:577  suggestedName.replace(/ /g, "-")
+ *   그래서 디스크의 「GIJO AS Setup 5.91.1.exe」가 매니페스트에는
+ *   「GIJO-AS-Setup-5.91.1.exe」로 적힌다 — **같은 물건인데 글자가 다르다.**
+ *   글자만 대조하면 멀쩡한 빌드를 「다른 판의 매니페스트」로 몰아 **게시를 막는다**.
+ *   검사기가 제품을 막는 것은 검사기가 없는 것보다 나쁘다(사람이 검사를 통째로 꺼 버린다).
+ * ⚠ 그렇다고 아무 이름이나 같다고 하지 않는다 — 공백↔`-` 한 갈래만 같게 본다.
+ *   판 번호가 다르면 여전히 남남이다.
+ * ⚠ 안 되는 갈래(정직 표시): 공백 말고 다른 글자까지 걸리면 electron-builder는
+ *   `${name}-${version}-${arch}.${ext}` 꼴을 **새로 지어낸다**(computeSafeArtifactNameIfNeeded의
+ *   마지막 줄). 그 이름은 여기서 되살릴 수 없다 — 그때는 못 찾은 것으로 두고, 아래 ③이
+ *   「매니페스트에 적힌 이름들」을 함께 보여 사람이 판단하게 한다.
+ */
+function 이름같나(적힌이름, 설치본이름) {
+  const a = String(적힌이름 ?? ""), b = String(설치본이름 ?? "");
+  if (a === b) return true;
+  const 안전 = (s) => (/^[0-9A-Za-z._-]+$/.test(s) ? s : s.replace(/ /g, "-"));
+  return a === 안전(b);
+}
+
+/** 매니페스트가 **실제로 무슨 이름을 적어 두었나** — 못 찾았을 때 사람에게 보여 준다. */
+function 적힌이름들(글) {
+  const 목록 = [];
+  for (const 줄 of String(글 ?? "").split(/\r?\n/)) {
+    const m = /^\s*-?\s*(?:url|path):\s*(.+?)\s*$/.exec(줄);
+    if (!m) continue;
+    const v = 벗기기(m[1]);
+    if (v && !목록.includes(v)) 목록.push(v);
+  }
+  return 목록;
 }
 
 /** YAML의 따옴표를 벗긴다(electron-builder는 공백 있는 이름을 따옴표로 감싼다). */
@@ -188,12 +227,18 @@ export function 산출물검사(설치본경로, opt = {}) {
   const 이름 = path.basename(설치본경로);
   const yml경로 = opt.latestYml ?? path.join(폴더, "latest.yml");
   if (fs.existsSync(yml경로)) {
-    const 적힌것 = latestYml에서찾기(fs.readFileSync(yml경로, "utf8"), 이름);
+    const ymlGlobal = fs.readFileSync(yml경로, "utf8");
+    const 적힌것 = latestYml에서찾기(ymlGlobal, 이름);
     if (!적힌것) {
-      잰것.latestYml = { 있음: true, 이설치본: "안 적혀 있음" };
+      const 이름들 = 적힌이름들(ymlGlobal);
+      잰것.latestYml = { 있음: true, 이설치본: "안 적혀 있음", 적힌이름들: 이름들 };
+      // ⚠ 「다른 판이다」라고 **단정하지 않는다** — 이름 꼴이 달라서일 수도 있다(safeArtifactName).
+      //   단정하면 사람이 멀쩡한 빌드를 지우러 간다. 무엇이 적혀 있는지 보여 주고 판단하게 한다.
       문제.push(
-        `latest.yml은 있는데 그 안에 이 설치본(${이름})이 없습니다 — 다른 판의 매니페스트가 남아 있습니다.\n` +
-        `  → ${yml경로}를 지우고 npm run dist를 다시 돌리세요.`,
+        `latest.yml에 이 설치본(${이름})이 안 적혀 있습니다.\n` +
+        `  매니페스트에 적힌 이름: ${이름들.length ? 이름들.join(" · ") : "(없음)"}\n` +
+        `  판 번호가 다르면 지난 판의 매니페스트가 남은 것입니다 — ${yml경로}를 지우고 npm run dist를 다시 돌리세요.\n` +
+        `  판 번호는 같은데 이름 꼴만 다르면(공백↔-) artifactcheck.mjs의 이름같나()를 넓혀야 합니다.`,
       );
     } else {
       잰것.latestYml = { 있음: true, size: 적힌것.size, sha512앞: (적힌것.sha512 ?? "").slice(0, 12) };
