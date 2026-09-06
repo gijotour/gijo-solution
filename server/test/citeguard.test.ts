@@ -243,7 +243,11 @@ describe("⑤ 안 건드리는 것들 — 늘려 잡으면 정상 답을 지운�
     expect(r.text, "지어낸 인용뿐인 원답이 그대로 나갔다").not.toBe(답);
     expect(r.text).toBe(자료없음안내);
     expect(r.보류, "이제 보류로 남기지 않는다 — 바꿨으니 removed에 실린다").toHaveLength(0);
-    expect(r.removed.map((x) => x.kind)).toContain("통째교체");
+    // ★ 2026-09-06 검토관(count) — 통째교체는 **removed에 얹지 않는다**. 여기까지 오려면 조각이
+    //   하나 이상이라 그 인용은 이미 세었고, 통째 교체는 그 **결과**다. 얹으면 인용 1개짜리 답이
+    //   「근거 없는 인용 2건 제거」로 나간다(결정적 +1). 신호는 칸으로 남는다.
+    expect(r.removed.map((x) => x.kind), "통째교체가 뗀 인용으로 한 건 더 세어졌다").toEqual(["블록없음"]);
+    expect(r.통째교체, "「답 전체를 바꿨다」 신호가 사라졌다").toBe(true);
   });
 
   it("★ 지어낸 숫자가 인용 안에 있어도 함께 사라진다(라이브 실물 「클릭률 15%」 꼴)", () => {
@@ -472,10 +476,16 @@ describe("★ 배선 감시 — 출구 한 곳에서 실제로 불린다", () =>
   });
 
   it("계수기 — 뗐을 때 **그리고 못 뗐을 때(보류)도** llm:event(kind=cite)를 남긴다", () => {
-    expect(llm).toMatch(/인용가드\.removed\.length > 0 \|\| 인용가드\.보류\.length > 0[\s\S]{0,900}kind: "cite"/);
+    // ⚠ **emit의 if**를 집어서 본다(2026-09-06) — 같은 글자가 앞의 `reply = 인용가드.text`
+    //   줄에도 있어, 거기서부터 재면 주석이 늘 때마다 글자 예산이 넘쳐 감시가 헛돈다.
+    //   경로가드까지 한 조건에 있는 줄이 **그 emit의 if**다.
+    expect(llm).toMatch(/if \(인용가드\.removed\.length > 0 \|\| 인용가드\.보류\.length > 0[^)\n]*\|\| 경로가드\.통째메타\) \{[\s\S]{0,2000}kind: "cite"/);
     // ⚠ 2026-09-06 — 같은 신호에 **내부 경로 제거**(metaleak)도 함께 싣는다. 그래서 detail은
     //   변수 하나(`요약`)가 되었다. 감시하는 것은 여전히 「뗀 사유 요약이 detail로 나간다」이다.
-    expect(llm, "뗀 사유 요약을 안 만든다").toMatch(/뗀인용요약\(인용가드\.removed, 인용가드\.보류\)/);
+    // ⚠ 3번째 인자(통째교체)까지 못 박는다(2026-09-06 검토관) — 빼면 「답 전체를 안내로 바꿨다」가
+    //   실시간 한 줄에서 조용히 사라진다. 뗀 건수에서는 빠지되 **사실은 남아야** 한다.
+    expect(llm, "뗀 사유 요약을 안 만든다")
+      .toMatch(/뗀인용요약\(인용가드\.removed, 인용가드\.보류, 인용가드\.통째교체\)/);
     expect(llm, "감독 detail에 그 요약이 안 실린다").toMatch(/kind: "cite"[^\n]*detail: 요약/);
     const act = fs.readFileSync(path.join(__dirname, "../src/engine/llmactivity.ts"), "utf8");
     expect(act, "kind 유니언에 cite가 없다").toContain('"search" | "guard" | "cite"');
@@ -1180,7 +1190,7 @@ describe("★★ J5 클라우드 답도 가드를 지난다", () => {
 
   it("계수기를 남긴다 — 팀원 id를 사칭하지 않는다(agent=\"-\")", () => {
     expect(cloud).toMatch(/kind: "cite", phase: "done", agent: "-"/);
-    expect(cloud).toMatch(/detail: 뗀인용요약\(인용가드\.removed, 인용가드\.보류\)/);
+    expect(cloud).toMatch(/detail: 뗀인용요약\(인용가드\.removed, 인용가드\.보류, 인용가드\.통째교체\)/);
   });
 
   it("★ 잣대를 두 벌로 두지 않았다 — llm.ts와 **같은 함수**를 부른다", () => {
@@ -1188,7 +1198,7 @@ describe("★★ J5 클라우드 답도 가드를 지난다", () => {
     //   그래서 이름표를 통째로 박지 않고 **앞 두 개가 그대로인지**만 본다.
     expect(cloud).toMatch(/import \{ guardCitations, 뗀인용요약[^}]*\} from "\.\/citeguard"/);
     expect(cloud, "사유도 같은 곳에서 세야 한다 — 클라우드만 따로 세면 갈라진다")
-      .toMatch(/citeReasons: 사유별집계\(인용가드\.removed, 인용가드\.보류\)/);
+      .toMatch(/citeReasons: 사유별집계\(인용가드\.removed, 인용가드\.보류, 인용가드\.통째교체\)/);
   });
 });
 

@@ -83,10 +83,16 @@ export function emitLlmActivity(evt: Omit<LlmActivityEvent, "timestamp">): void 
   // 감독용 일 단위 영속 집계(2026-08-20 ②) — start는 안 세고 done/error만(이중 셈 방지).
   if (full.phase !== "start") {
     try {
+      // ⚠ 사유는 **kind="cite" · phase="done"에서만** 쌓는다(2026-09-06 검토관 wiring).
+      //   타입 주석이 「cite에서만 쓴다」고 약속하는데 코드가 안 지키면, 다른 kind에 실린
+      //   사유가 cite_reason_daily에만 남는다. 그때 화면은 「답 0개」라 사유 줄을 통째로 안 그려
+      //   (`if (뗀답 && 사유.항목.length)`) 사유가 **흔적 없이 사라진다** — 조용히 버리느니
+      //   애초에 안 쌓는다. 약속을 코드로 만든 자리다(짝 시험 citereasons.test.ts).
+      const 사유 = full.kind === "cite" && full.phase === "done" ? full.citeReasons : undefined;
       집계쓰기(todayLocal(), full.agent || "-", full.kind,
         full.phase === "done" ? 1 : 0, full.phase === "error" ? 1 : 0,
         full.phase === "done" && full.latencyMs ? Math.round(full.latencyMs) : 0,
-        full.citeReasons);
+        사유);
     } catch { /* 집계는 부가 기능 — 방송 자체를 막지 않는다 */ }
   }
   wss?.clients.forEach((client) => {

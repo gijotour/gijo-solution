@@ -16,7 +16,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { 사유별집계, 뗀인용요약, 못뗌사유, type 뗀인용 } from "../src/engine/citeguard";
+import { 사유별집계, 뗀인용요약, 못뗌사유, guardCitations, 자료없음안내, type 뗀인용 } from "../src/engine/citeguard";
 import { 메타줄걷기 } from "../src/engine/metaleak";
 import { 가드사유 } from "../src/engine/llm";
 import { emitLlmActivity, citeReasonsDaily, activityDaily, resetLlmActivityForTests } from "../src/engine/llmactivity";
@@ -127,7 +127,8 @@ describe("✂ 사유 — 세는 곳은 하나다 (전-4 · 시안 mockups/cite-r
     const 줄 = 사유줄계산!(사유.map((r) => ({ agent: r.agent, reason: r.reason, count: r.count })));
     expect(줄.배지, "못 뗌을 뗀 건수로 셌다(없던 제거를 있다고 세는 거짓 계수)").toBe(0);
     expect(줄.못뗌, "못 뗌 신호가 사라졌다").toBe(1);
-    expect(줄.항목, "표에서까지 못 뗌이 빠졌다 — 접어서 가리면 안 된다").toEqual([{ reason: 못뗌사유, count: 1, 못뗌: true }]);
+    expect(줄.항목, "표에서까지 못 뗌이 빠졌다 — 접어서 가리면 안 된다")
+      .toEqual([{ reason: 못뗌사유, count: 1, 못뗌: true, 안셈: true }]);
   });
 
   it("③ 배지는 못 뗌만 빼고 더한다 · 0인 사유는 버리고 · 큰 순으로 준다", () => {
@@ -141,14 +142,15 @@ describe("✂ 사유 — 세는 곳은 하나다 (전-4 · 시안 mockups/cite-r
     ]);
     expect(줄.배지, "시안 ②의 hot 판(사유 5건)과 값이 다르다").toBe(6);
     expect(줄.항목.map((x) => x.reason)).toEqual(["겹침없음", "출처미확인", "범위밖", 못뗌사유]);
-    expect(줄.항목[0]).toEqual({ reason: "겹침없음", count: 3, 못뗌: false });
+    expect(줄.항목[0]).toEqual({ reason: "겹침없음", count: 3, 못뗌: false, 안셈: false });
     expect(줄.항목[3].못뗌, "그리는 쪽이 이름을 다시 적지 않도록 표시를 함께 준다").toBe(true);
     expect(줄.못뗌).toBe(1);
   });
 
   it("③ 사유가 하나도 없으면 빈 줄을 준다 — 눌러도 빈 상자가 나오는 조작은 안 만든다", () => {
-    expect(사유줄계산!([])).toEqual({ 항목: [], 배지: 0, 못뗌: 0 });
-    expect(사유줄계산!(null)).toEqual({ 항목: [], 배지: 0, 못뗌: 0 });
+    const 빈것 = { 항목: [], 배지: 0, 못뗌: 0, 통째: 0, 경로: 0, 인용: 0 };
+    expect(사유줄계산!([])).toEqual(빈것);
+    expect(사유줄계산!(null)).toEqual(빈것);
   });
 
   // ── ④ 사유가 텅 빈 ✂ 답이 없다 ──────────────────────────────────────────────────
@@ -239,5 +241,69 @@ describe("✂ 사유 — 세는 곳은 하나다 (전-4 · 시안 mockups/cite-r
     expect(읽기, "펼침읽기()를 못 찾았다").not.toBeNull();
     expect(읽기![0], "저장 차단(사생활 모드)에서 화면이 통째로 죽는다").toContain("catch");
     expect(쓰기![0], "쓰기가 감싸이지 않았다 — 저장 차단에서 클릭이 죽는다").toContain("catch");
+  });
+});
+
+/* ═══ 2026-09-06 검토관 수리분 — 「센 것」과 「일어난 일」을 가른다 ═══════════════════
+ * 검토관 count 갈래 실측: 인용이 **한 개뿐인** 답이 「근거 없는 인용 2건 제거」로 나갔다.
+ * ⑥ 통째 교체는 인용을 뗀 자리가 아니라 **다 떼고 나서 답 전체를 안내로 바꾼 결과**인데,
+ * removed 배열에 한 건 더 얹혀 문장·화면 배지·cite_reason_daily(영속 지표)까지 +1 됐다.
+ * 조각이 0건이면 그 자리까지 가지도 않으므로(citeguard.ts `if (!조각들.length) return 없음;`)
+ * **언제나 결정적으로 +1**이다. 그래서 「일어난 일」을 removed에서 빼고 따로 싣는다.
+ */
+describe("✂ 통째교체는 뗀 인용이 아니다 (검토관 2026-09-06 · count)", () => {
+  // 3번째 인자(통째교체)를 넣기 전 상태에서도 이 파일이 컴파일되도록 자리를 넓혀 잡는다.
+  const 요약 = 뗀인용요약 as (r: 뗀인용[], b?: 뗀인용[], t?: boolean) => string;
+  const 집계 = 사유별집계 as (r: 뗀인용[], b?: 뗀인용[], t?: boolean) => Record<string, number>;
+  type 결과 = ReturnType<typeof guardCitations> & { 통째교체?: boolean };
+
+  it("★ 인용 1개짜리 답을 「2건 제거」라 하지 않는다 — 결정적 +1 과대계상", () => {
+    const r = guardCitations('[1] "존재하지 않는 근거 문장입니다"', []) as 결과;
+    expect(r.text, "이 시험이 헛돈다 — 통째교체까지 안 갔다").toBe(자료없음안내);
+    expect(r.removed.length, "뗀 인용은 1건인데 배열에 한 건이 더 얹혔다").toBe(1);
+    expect(r.통째교체, "「답 전체를 바꿨다」를 실을 자리가 없다").toBe(true);
+    expect(요약(r.removed, r.보류, r.통째교체), "문장이 없는 인용을 있다고 센다")
+      .toContain("근거 없는 인용 1건 제거");
+  });
+
+  it("★ 그래도 「답을 통째로 바꿨다」는 사라지지 않는다 — 사유 표와 문장에 남는다", () => {
+    const r = guardCitations('[1] "존재하지 않는 근거 문장입니다"', []) as 결과;
+    expect(집계(r.removed, r.보류, r.통째교체), "통째교체 신호가 표에서 사라졌다")
+      .toEqual({ 블록없음: 1, 통째교체: 1 });
+    expect(요약(r.removed, r.보류, r.통째교체)).toContain("통째");
+  });
+
+  it("★ 화면 배지 N에서도 빠진다 — 뗀 자리의 수가 아니라 그 답에 일어난 일이다", () => {
+    const 줄 = 사유줄계산!([
+      { agent: "a", reason: "겹침없음", count: 1 },
+      { agent: "a", reason: "통째교체", count: 1 },
+    ]);
+    expect(줄.배지, "「사유 2건」이라 적으면 인용 1건짜리 답이 2건으로 보인다").toBe(1);
+    expect(줄.항목.map((x) => x.reason), "표에서까지 지우면 안 된다 — 맨 뒤로만 민다")
+      .toEqual(["겹침없음", "통째교체"]);
+  });
+});
+
+/* ═══ 2026-09-06 검토관 수리분 — 사유를 **조용히 버리지** 않는다 ═══════════════════
+ * 집계쓰기()가 kind를 안 봐서, citeReasons가 kind≠cite(또는 phase=error) 이벤트에 실리면
+ * cite_reason_daily에는 쌓이는데 화면의 「뗀 답」(kind=cite의 calls)은 안 늘었다.
+ * 그러면 화면은 사유를 가진 채 「0개 — 이 기간에 뗀 인용이 없습니다」라고 말한다
+ * (`if (뗀답 && 사유.항목.length)`가 거짓이라 사유가 흔적 없이 사라진다).
+ * 타입 주석은 「kind="cite"에서만 쓴다」고 약속하는데 코드가 그것을 안 지켰다.
+ */
+describe("✂ 사유는 kind=cite·done에서만 쌓인다 (검토관 2026-09-06 · wiring)", () => {
+  it("kind가 cite가 아니면 사유를 쌓지 않는다 — 반쪽 기록을 만들지 않는다", () => {
+    const 팀원 = "시험-사유-딴kind";
+    emitLlmActivity({ kind: "chat", phase: "done", agent: 팀원, citeReasons: { 겹침없음: 2 } });
+    expect(citeReasonsDaily(1).filter((r) => r.agent === 팀원),
+      "답 개수는 kind=cite로만 세는데 사유만 남아 화면이 그것을 통째로 버린다").toEqual([]);
+  });
+
+  it("오류로 끝난 cite 이벤트도 안 쌓는다 — 답 개수(calls)가 안 늘기 때문이다", () => {
+    const 팀원 = "시험-사유-오류";
+    emitLlmActivity({ kind: "cite", phase: "error", agent: 팀원, citeReasons: { 겹침없음: 1 } });
+    expect(citeReasonsDaily(1).filter((r) => r.agent === 팀원)).toEqual([]);
+    expect(activityDaily(1).filter((d) => d.agent === 팀원 && d.kind === "cite")[0]?.calls ?? 0,
+      "이 시험이 헛돈다 — 오류 이벤트인데 답 개수가 늘었다").toBe(0);
   });
 });

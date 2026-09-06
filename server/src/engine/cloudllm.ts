@@ -380,14 +380,14 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
     //   citeguard의 규율대로 **안 건드린다** — 「확인 못 했다」를 「가짜다」로 바꿔 말하지 않는다.
     const 인용가드 = guardCitations(r.text, [], undefined, { 원천없는출구: true });
     const answer = 인용가드.text;
-    if (인용가드.removed.length > 0 || 인용가드.보류.length > 0) {
+    if (인용가드.removed.length > 0 || 인용가드.보류.length > 0 || 인용가드.통째교체) {
       emitLlmActivity({
         kind: "cite", phase: "done", agent: "-", agentName: `클라우드 ${PROVIDER_LABEL[provider]}`,
-        detail: 뗀인용요약(인용가드.removed, 인용가드.보류),
+        detail: 뗀인용요약(인용가드.removed, 인용가드.보류, 인용가드.통째교체),
         // ✂ 사유별 건수(2026-09-06) — **여기를 빠뜨리면 클라우드 답만 사유가 비어** 「외부 두뇌는
         //   가드가 안 도나」로 읽힌다. agent가 `-`라 감독 화면에서 「미지정」으로 모인다.
         //   경로 가드는 이 경로에 없다(llm.ts chat() 출구에만 선다) — 그래서 인용 몫만 넘긴다.
-        citeReasons: 사유별집계(인용가드.removed, 인용가드.보류),
+        citeReasons: 사유별집계(인용가드.removed, 인용가드.보류, 인용가드.통째교체),
       });
     }
     recordCloudUsage(provider, model, r.inTokens, r.outTokens);

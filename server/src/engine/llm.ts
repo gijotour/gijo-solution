@@ -789,7 +789,9 @@ async function 스트림으로읽는다(res: Response, 싱크: 스트림싱크):
  */
 export function 가드사유(인용가드: CiteGuardResult, 경로가드: 메타걷기결과): { 사유: Record<string, number>; 경로이름: string } {
   const 경로이름 = 경로가드.경로.length > 0 ? "내부 경로" : "내부 메타";
-  const 사유 = 사유별집계(인용가드.removed, 인용가드.보류);
+  // ⚠ 통째교체를 **함께 넘긴다**(2026-09-06 검토관) — 안 넘기면 「답 전체를 바꿨다」가 사유 표에서
+  //   통째로 사라진다. 대신 removed에는 안 들어가므로 건수는 더 이상 부풀지 않는다.
+  const 사유 = 사유별집계(인용가드.removed, 인용가드.보류, 인용가드.통째교체);
   if (경로가드.뗀줄수 > 0) 사유[경로이름] = (사유[경로이름] ?? 0) + 경로가드.뗀줄수;
   if (경로가드.통째메타) 사유[못뗌사유] = (사유[못뗌사유] ?? 0) + 1;
   return { 사유, 경로이름 };
@@ -1141,7 +1143,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   인용 대상으로 안내하고, 확정 용어 정의·📎 첨부한 지난 작업도 **같은 프롬프트에 실려 나간다.**
   //   거기서 그대로 옮긴 문장은 지어낸 것이 아니므로 함께 견준다(번호 범위 판정은 조각만 쓴다).
   const 인용가드 = guardCitations(reply, ragResult?.chunks ?? null, [...(ragResult?.추가원천 ?? []), grounding, 첨부]);
-  if (인용가드.removed.length > 0 || 인용가드.보류.length > 0) reply = 인용가드.text;
+  if (인용가드.removed.length > 0 || 인용가드.보류.length > 0 || 인용가드.통째교체) reply = 인용가드.text;
 
   // ── 내부 경로 출구 방어(2026-09-06 라이브 사고 · Fable 결정 Q1-ⓒ) ────────────────────
   //   조각을 실을 때 이미 걷지만(memory.hybridSearch + 조각 판독기 3종), 그 그물 **밖**으로도
@@ -1163,7 +1165,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   · **사유별 건수** = cite_reason_daily — 한 답에서 세 군데를 뗄 수 있다.
   //   더하지도 나누지도 못하는 **다른 잣대**라 감독 화면이 그 사실을 스스로 말한다.
   //   detail 한 줄은 종전대로 실시간 스트림(agent.html)용이다.
-  if (인용가드.removed.length > 0 || 인용가드.보류.length > 0 || 경로가드.뗀줄수 > 0 || 경로가드.통째메타) {
+  if (인용가드.removed.length > 0 || 인용가드.보류.length > 0 || 인용가드.통째교체 || 경로가드.뗀줄수 > 0 || 경로가드.통째메타) {
     // 계수기 — 답 수는 calls에, 사유별 건수는 cite_reason_daily에(위 주석 참고).
     //   ⚠ 인용 원문은 안 싣는다(사내 문서 본문이 감독 화면·WS로 새면 안 된다).
     //   ⚠ 보류 칸은 지금 늘 비어 있다(2026-09-05) — 「답이 통째로 인용」이면 예전엔 원답을
@@ -1176,7 +1178,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     //   ⚠ 통째메타는 **못 뗀 자리**다(원문 유지) — 0줄로 조용히 지나가지 않게 따로 적는다.
     const { 사유, 경로이름 } = 가드사유(인용가드, 경로가드);
     const 요약 = [
-      뗀인용요약(인용가드.removed, 인용가드.보류),
+      뗀인용요약(인용가드.removed, 인용가드.보류, 인용가드.통째교체),
       경로가드.뗀줄수 > 0 ? `${경로이름} ${경로가드.뗀줄수}줄 제거` : "",
       경로가드.통째메타 ? "내부 메타뿐이라 원문 유지(못 뗌)" : "",
     ].filter(Boolean).join(" · ");
