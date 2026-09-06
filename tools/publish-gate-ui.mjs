@@ -1063,6 +1063,55 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     JSON.stringify(r));
 }
 
+// ── ⑧′ 감독 ✂ 사유 토글(2026-09-06 · 승인 시안 mockups/cite-reasons) ──────────
+// ⚠ 왜 관문에 더하나: 이 줄은 **눌러야** 값이 나온다 — 짝 시험(server/test/citereasons.test.ts)은
+//   셈(사유줄계산)과 소스 글자만 잰다. 「그려는 졌는데 안 눌린다」는 부류는 원리상 못 잡는다
+//   (이 관문이 있는 이유 그대로). 5.91.0 실화면에서 통과한 것을 그 자리에 고정한다.
+// ⚠ 헛초록 방지 — **접힌 데서 시작해 전이를 잰다**(먼저 접어 놓고, 눌러 펴지는 것을 본다).
+//   0→0이면 초록이 아니다. 그리고 잰 뒤에는 **원래 상태로 되돌린다**(설치본과 userData를 같이 쓴다).
+// ⚠ 사유 0건인 기간에는 토글을 **안 그리는 것이 계약**이다(눌러도 빈 상자가 나오는 조작은
+//   만들지 않는다). 그때는 줄 글자가 그 사실을 말하는지까지 보고 통과시킨다 — 그냥 통과가 아니다.
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("supervision.html", "감독", { dock: true }));
+  const fr = await 프레임찾기("supervision.html", 10);
+  const r = fr ? await fr.evaluate(async () => {
+    for (let i = 0; i < 25; i++) {
+      if (document.querySelector("#sup .sup-line")) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    const cite = [...document.querySelectorAll("#sup .sup-line")].find((el) => el.textContent.includes("인용 제거"));
+    if (!cite) return { 줄없음: true };
+    const btn = cite.querySelector(".cite-why");
+    const 글 = cite.textContent.trim().slice(0, 120);
+    if (!btn) return { 토글없음: true, 글, 뗀것없음: /0개 —/.test(글), 기록전: /사유 기록은/.test(글) };
+    const box = cite.querySelector(".cite-reasons");
+    if (!box) return { 상자없음: true, 글 };
+    const 원래펼침 = btn.getAttribute("aria-expanded") === "true";
+    if (원래펼침) { btn.click(); await new Promise((x) => setTimeout(x, 300)); }
+    const 접힘높이 = +cite.getBoundingClientRect().height.toFixed(1);
+    const 접힘보임 = box.style.display !== "none";
+    btn.click(); await new Promise((x) => setTimeout(x, 300));
+    const 펼침보임 = box.style.display !== "none";
+    const 펼침높이 = +cite.getBoundingClientRect().height.toFixed(1);
+    let ls = null; try { ls = localStorage.getItem("gijo:cite-reasons-open"); } catch (e) { ls = "err"; }
+    // 「접힘 +0px」 — 토글이 줄을 하나 더 만들지 않았는가. 형제(무호출·오류·정상) 줄 중
+    //   **가장 낮은 것**과 견준다(긴 글로 감긴 형제가 있으면 그쪽이 높다 — 최소로 재야 헛빨강이 없다).
+    const 형제 = [...document.querySelectorAll("#sup .sup-line")]
+      .filter((el) => !el.querySelector(".cite-why"))
+      .map((el) => +el.getBoundingClientRect().height.toFixed(1));
+    if (!원래펼침) { btn.click(); await new Promise((x) => setTimeout(x, 250)); } // 원래대로
+    return { 접힘높이, 접힘보임, 펼침보임, 펼침높이, ls, 형제, 배지: btn.textContent.trim() };
+  }).catch(() => null) : null;
+  const 성립 = !!r && (r.토글없음
+    ? (r.뗀것없음 || r.기록전)                      // 0건·기록 전이면 종전 문구가 그 사실을 말한다
+    : (r.접힘보임 === false && r.펼침보임 === true // 접힌 데서 시작해 눌러 펴졌는가(전이)
+      && r.펼침높이 > r.접힘높이                    // 실제로 한 줄이 늘었는가
+      && r.ls === "1"                               // 펼침을 기억하는가
+      && /사유 \d+건|못 뗌 \d+건/.test(r.배지)      // 배지가 건수를 말하는가
+      && (!r.형제.length || r.접힘높이 - Math.min(...r.형제) <= 6))); // 접힘 +0px(한 줄 ≈ +19px)
+  ok("감독 ✂ 사유 토글(접힘 +0px · 눌러 펴짐 · 기억)", 성립, JSON.stringify(r));
+}
+
 // ── ⑨ 전 화면 얕은 렌더(2026-08-21 — 사장님 승인 묶음 3번) ─────────────────────
 // ⚠ 왜: 위 검사들은 손으로 더한 목록이라 화면 43개 중 16개만 열어 봤다 — 나머지 27개는
 //   **렌더가 죽어도 게시됐다**(5.56.0이 고친 analysis·settings도 관문이 이름조차 안 불렀다).
