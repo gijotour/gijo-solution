@@ -16,7 +16,7 @@ import { isBinaryLikeChunk } from "./ragsanitize";
 import { 메타걷은조각 } from "./metaleak"; // 잎(import 없는 작은 파일) — 화살이 늘지 않는다
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
-import { 반입문서아님_제외SQL } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — 화살이 늘지 않는다)
+import { 반입문서아님_제외SQL, 승인문답문서 } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — 화살이 늘지 않는다)
 import { currentViewer } from "./viewerctx";
 import { currentDocIds } from "./ragscope";
 import { emitCollaboration } from "./collaboration";
@@ -1204,22 +1204,50 @@ async function refreshFtsIndex(table: lancedb.Table): Promise<void> {
  *
  * ⚠ 한 문서로만 답할 수 있는 물음도 있다 — 그래서 몫을 넉넉히(기본 3) 둔다.
  *   1로 조이면 이어지는 문맥(같은 절의 앞뒤 조각)이 끊겨 답이 되레 나빠진다.
+ *
+ * ■ 두 번째 몫 — **출처 가족**(2026-09-07 라이브 사고)
+ *   위 설계는 「한 PDF가 상위를 독점」을 막는데, **1조각짜리 문서 3,778건** 앞에서는 정반대로
+ *   작동한다. 승인 문답은 문서마다 제 몫을 하나씩 챙기고(문서당 조각 1.006), 내장 권위 문서는
+ *   관련 조각이 22.6개여도 3칸으로 묶인다. 실측: 같은 물음이 topK=4에서 승인문답 3/4,
+ *   topK=16에서 7/16 — **점수가 아니라 자리 배분**이 문제라는 증거다(자리가 좁을수록 심해진다).
+ *   결과: top-4가 [지식 1 + 뜻이 겹치는 사내 문답 3]이라 다수결이 넘어가, 안내서의
+ *   **「예시: 연 2회」**가 답에서 **「연 2회 이상 실시해야 합니다」**로 나갔다.
+ *   → documentId별 몫에 더해 **가족(승인 문답) 전체가 topK/4(최소 1)**을 쓴다.
+ *   ⚠ 부스트(applyOriginBoost)와 **층이 다르다** — 저쪽은 순위 재배치, 여기는 자리 배분이다.
+ *     가족을 **내리는** 부스트는 만들지 않는다(두 벌이 되고, 「벽이 아니라 올리기」와도 어긋난다).
  */
-function 문서를섞어자르기<T extends { documentId?: string }>(목록: T[], topK: number, 문서당 = 3): T[] {
+export function 문서를섞어자르기<T extends { documentId?: string }>(
+  목록: T[],
+  topK: number,
+  문서당 = 3,
+  가족인가: (documentId: string) => boolean = 승인문답문서,
+): T[] {
   if (목록.length <= topK) return 목록.slice(0, topK);
+  // ★ 가족 몫 — topK의 1/4, **최소 1**(2026-09-07). 0으로 조이지 않는 이유는 위 「벽이 아니라
+  //   올리기」와 같다: 사내 문답으로만 아는 물음이 실제로 있고, ☑ 지정 범위(ragscope)로 승인
+  //   문답만 후보에 남는 경우도 원리상 가능하다 — 0을 만들면 그 답이 통째로 사라진다.
+  const 가족몫 = Math.max(1, Math.floor(topK / 4));
   const 셈 = new Map<string, number>();
+  let 가족셈 = 0;
   const 담김: T[] = [];
-  const 미룸: T[] = [];
+  const 미룸: T[] = [];      // 비가족 — 문서당 몫에 걸려 밀린 것
+  const 미룸가족: T[] = [];  // 가족 — 가족 몫(또는 문서당 몫)에 걸려 밀린 것
   for (const c of 목록) {
     if (담김.length >= topK) break;
     const d = c.documentId ?? "";
+    const 가족 = 가족인가(d);
+    if (가족 && 가족셈 >= 가족몫) { 미룸가족.push(c); continue; }
     const n = 셈.get(d) ?? 0;
-    if (n >= 문서당) { 미룸.push(c); continue; }
+    if (n >= 문서당) { (가족 ? 미룸가족 : 미룸).push(c); continue; }
     셈.set(d, n + 1);
+    if (가족) 가족셈 += 1;
     담김.push(c);
   }
   // 자리가 남으면 미뤄 둔 것으로 채운다 — **개수는 전과 같아야 한다.**
-  for (const c of 미룸) {
+  // ⚠⚠ **비가족을 먼저** 되채운다(2026-09-07 설계관 지적). 옛 판처럼 순서 그대로 되채우면
+  //   가족 몫이 바로 그 자리에서 되돌아와 **top-4가 한 글자도 안 바뀐다** — 몫을 걸어 놓고
+  //   되채움이 무효로 만드는 꼴이다. 버리는 것이 아니라 **순서만** 바꾸므로 개수 계약은 그대로다.
+  for (const c of [...미룸, ...미룸가족]) {
     if (담김.length >= topK) break;
     담김.push(c);
   }
@@ -1277,7 +1305,14 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //   후보를 넓히면 우리 문서가 들어와 부스트를 받는다. .slice(0, topK)는 융합·부스트 **뒤**라
   //   프롬프트·지연은 그대로다(실측: 외부 1위 20→12, 지연 22→19ms). 부스트를 키우는 게 아니라
   //   부스트가 일할 후보를 넣는 것이 순서다.
-  const candidates = Math.max(topK * 4, 16);
+  // ★★ 2026-09-07 — **바닥을 16에서 64로 올린다**(topK*4는 그대로). 왜:
+  //   같은 물음이 topK=4에서는 승인 문답 3/4, topK=16에서는 지식 문서가 [1][2][3]이었다.
+  //   랭킹(RRF)은 순위 기반이라 후보를 넓혀도 기존 상위의 **순서는 안 바뀐다** — 달라지는 것은
+  //   **질의 변형 셋의 합집합**이다(변형마다 candidates칸을 뜬다). 16칸이면 3변형 합집합이
+  //   최대 48조각인데 그 자리를 1조각 문서 3,778건이 먹어, 가족 몫을 걸어도 **대체할 비가족
+  //   조각이 후보에 아예 없다**. topK=16이 좋았던 그 폭(64)을 topK=4에도 준다.
+  //   ⚠ .slice(0, topK)는 융합·부스트 **뒤**라 프롬프트 길이·지연은 그대로다(위 실측 참고).
+  const candidates = Math.max(topK * 4, 64);
 
   let vector: { text: string; documentId: string; distance: number; category?: string }[] = [];
   try {

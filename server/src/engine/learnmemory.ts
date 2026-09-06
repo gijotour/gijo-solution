@@ -58,11 +58,14 @@ import { clearanceOf, type Grade } from "./grades";
 import { 학습재료가못되나 } from "./datasethygiene";
 import { NO_ANSWER } from "./sessionpatterns";
 import { recordAudit } from "./audit";
+import { 승인문답_접두 } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — 화살이 늘지 않는다)
 
 export const APPROVED_QA_ORIGIN = "approved-qa";
 // 접두사를 상수로 둔 이유: 재동기화 SQL이 `documentId = 접두사 || c.id`로 문서 유무를 대조한다.
 // 문자열을 두 곳에 적으면 언젠가 어긋나고, 그러면 「없다」로 잘못 세어 멀쩡한 문서를 다시 임베딩한다.
-export const APPROVED_QA_DOC_PREFIX = "승인문답:";
+// ★ 2026-09-07: 문자열 자체는 **docorigin(잎)**이 소유한다 — 검색 자르기(memory.ts)도 같은 잣대를
+//   써야 하는데 그쪽이 learnmemory를 물지 않기 때문이다. 여기서는 **재수출**만 한다(소비자 무변경).
+export const APPROVED_QA_DOC_PREFIX = 승인문답_접두;
 export const approvedQaDocId = (logId: string): string => `${APPROVED_QA_DOC_PREFIX}${logId}`;
 const ENABLED = process.env.GIJO_MEMORY_GROWTH !== "0";
 

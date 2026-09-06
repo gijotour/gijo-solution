@@ -86,3 +86,33 @@ export function 개인문서(documentId: string | null | undefined): boolean {
 export function 개인문서_제외SQL(col = "documentId"): string {
   return `${col} NOT LIKE '${개인문서_접두}%'`;
 }
+
+// ── 승인 문답(사내 문답) ───────────────────────────────────────────────────
+// 갈리는 칸이 **둘**이다 — origin(approved-qa)과 documentId 접두("승인문답:<로그 id>").
+// 검색 자르기(memory.문서를섞어자르기)는 LanceDB 조각만 손에 쥐는데 그 스키마에는 origin 칸이
+// 없다(등급 차단이 documentId 제외 목록으로 도는 것과 같은 이유). 그래서 **접두로 가른다** —
+// SQLite를 다시 뜨지 않는다(uploadedDocIds가 이미 매 질의 3,858개를 뜨고 있어, 한 벌 더 뜨면
+// 같은 사실을 두 곳에서 세게 된다).
+//
+// 왜 여기로 옮겼나(2026-09-07): 접두 문자열이 learnmemory.ts에만 있었는데, 검색 층(memory.ts)이
+// learnmemory를 물지 않는다(정적 화살이 없다 — 의존 수리 원칙). 잣대를 memory.ts에 새로 적으면
+// 2026-09-04에 다섯 벌을 여기로 모은 그 통합을 되돌리는 것이라, 접두를 이 잎으로 내리고
+// learnmemory는 여기서 **재수출**한다(APPROVED_QA_DOC_PREFIX 소비자 네 곳은 한 글자도 안 바뀐다).
+export const 승인문답_접두 = "승인문답:";
+
+/**
+ * 승인 문답 문서인가 — **검색 자리 배분**(문서를섞어자르기)이 이 가족을 한 몫으로 묶는다.
+ *
+ * 왜 묶나(2026-09-07 라이브 사고): 운영 코퍼스는 memory_documents 3,921건 중 3,778건(96.4%)이
+ * 승인 문답이고 **문서당 조각이 1.006개**다(내장 권위 문서는 63건에 1,424조각 — 문서당 22.6).
+ * 자리 배분이 documentId만 세니 승인 문답은 **문서마다 제 몫을 하나씩** 챙기고, 권위 문서는
+ * 관련 조각이 아무리 많아도 문서당 3칸으로 묶인다. 그래서 top-4가 [지식 1 + 뜻이 겹치는 사내
+ * 문답 3]이 되어 다수결이 넘어갔다 — 안내서의 **「예시: 연 2회」**가 답에서 **「연 2회 이상
+ * 실시해야 합니다」**가 됐다.
+ *
+ * ⚠ 침해사고 사례(incident-case)는 **넣지 않는다** — 20문서·60조각뿐이고, 「[사례] 제목」을 붙여
+ *   사람에게 내보내기로 한 제품 결정이 따로 있다(incidentcases ①). 조이면 그 결정과 충돌한다.
+ */
+export function 승인문답문서(documentId: string | null | undefined): boolean {
+  return String(documentId ?? "").startsWith(승인문답_접두);
+}
