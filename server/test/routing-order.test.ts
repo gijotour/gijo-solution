@@ -122,7 +122,11 @@ describe("계약 — 규칙이 죽어 있지 않다", () => {
       sbom_coverage: ["SBOM 없는 자산 알려줘"],
     };
     for (const [도구, 문장들] of Object.entries(확인할것)) {
-      const 닿음 = 문장들.filter((t) => 실제도착(t, 규칙) === 도구);
+      // ⚠ 2번째 인자는 **역할(role)**이다 — 예전엔 여기에 규칙 **배열**을 넘겨 role이 배열이
+      //   됐고, 그러면 available 게이트가 admin 전용 도구를 뺀 좁은 카탈로그로 판정한다
+      //   (실측: 미지정 100종 vs admin 107종). 지금 보는 넷은 admin 전용이 아니라 결과는
+      //   같았지만 **잣대가 틀렸다** — 「닿을 수 없는 규칙이 없다」는 가장 넓은 카탈로그로 재야 한다.
+      const 닿음 = 문장들.filter((t) => 실제도착(t, "admin") === 도구);
       expect(닿음.length, `${도구}에 닿는 문장이 하나도 없다 — 죽은 규칙이다`).toBeGreaterThan(0);
     }
   });

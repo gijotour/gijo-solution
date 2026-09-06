@@ -336,6 +336,8 @@ export function 지목없는검증대상(
   근거: { 대화?: string; 범위자산?: string; 앞선결과?: string } = {},
 ): boolean {
   const 납작 = (s: string | undefined) => String(s ?? "").toLowerCase().replace(/\s+/g, "");
+  /** vuln: 같은 접두어 유무로 같은 자산이 다른 값처럼 보이지 않게 — resolveAsset도 둘을 같게 본다. */
+  const 아이디핵 = (v: string | undefined) => 납작(v).replace(/^[a-z]+:/, "");
   const id = 납작(assetId);
   if (!id) return true;                                   // 인자 자체가 없다
   // ⚠⚠ **낱말 경계를 본다 — 그냥 포함이면 안 된다**(2026-09-07 반증에서 내가 밟았다).
@@ -346,27 +348,51 @@ export function 지목없는검증대상(
     if (바늘.length < 2) return false;
     const 이스케이프 = 바늘.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     // 앞뒤가 **식별자 글자가 아니어야** 한다(문장 끝·시작 포함). id에 흔한 -·.·_는 글자로 친다.
-    return new RegExp(`(^|[^0-9a-z가-힣_.-])${이스케이프}($|[^0-9a-z가-힣_.-])`, "i")
+    // ⚠⚠ **한국어 조사는 경계다**(2026-09-07 검토관 적발). 한글을 통째로 식별자 글자로 치면
+    //   「web-01**의** 조치 검증해줘」·「결제서버**를** 검증해줘」처럼 **가장 흔한 한국어 어순**이
+    //   「지목 없음」으로 판정된다. 그러면 이 관문이 스스로 적어 둔 계약(「사람이 없는 이름을 댔으면
+    //   막지 않는다 — 도구가 정직하게 못 찾았다고 답한다」)을 어기고, 되묻기가 **사실과 다른 말**을 한다.
+    // ⚠ 그렇다고 한글을 전부 경계로 풀면 「회계DB**서버**」가 「회계DB」 지목으로 둔갑한다.
+    //   그래서 **조사 목록**만 연다 — 조사 뒤가 다시 한글이면(…서버) 경계로 안 친다.
+    const 조사 = "으로|에서|에게|한테|이랑|이나|부터|까지|보다|처럼|라도|은|는|이|가|을|를|의|와|과|랑|도|만|나|로|야";
+    const 뒤 = `($|[^0-9a-z가-힣_.-]|(?:${조사})(?=$|[^0-9a-z가-힣_.-]))`;
+    return new RegExp(`(^|[^0-9a-z가-힣_.-])${이스케이프}${뒤}`, "i")
       .test(String(건초 ?? "").toLowerCase());
   };
   // ⓪ 🗂 지금 범위를 담당자가 **직접 걸어 둔** 자산이면 지목한 것이다(범위를입힌다가 넣은 값).
   //    ⚠ 값이 **같을 때만**이다 — 모델이 범위를 무시하고 딴 자산을 지어냈으면 그건 지목이 아니다.
   if (근거.범위자산 && id === 납작(근거.범위자산)) return false;
-  const t = 납작(instruction);
   if (경계로있나(instruction, String(assetId ?? "").trim())) return false; // ① 사람이 그 말을 실제로 했다
-  // ② 화면에서 고른 항목(⌗이름::키) — registry의 autoFill이 여기서 assetId를 뽑는다
-  if (/⌗.+?::[0-9a-f]{16}/.test(String(instruction ?? ""))) return false;
+  // ② 화면에서 고른 항목(⌗이름::키) — registry의 autoFill이 `키[1]`을 assetId로 뽑는 그 값이다.
+  //   ⚠⚠ **그 항목이 바로 이 자산일 때만**이다(2026-09-07 검토관 적발). 예전엔 표지가 있기만 하면
+  //     통과라, 화면에서 **자산이 아닌 것**(문서·점검 항목)을 골라 둔 상태면 모델이 지어낸 assetId가
+  //     그대로 지났다. 이름으로 고른 경우는 ①·⑤가 이미 잡으므로, 여기 남는 것은 구멍뿐이었다.
+  //   ⚠ verify_finding은 write:false라 **autoFill이 안 돈다**(그건 buildApproval 안에서만 돈다) —
+  //     즉 이 값을 인자에 넣어 주는 것이 아무도 없다. 그래서 대조는 여기서 해야 한다.
+  const 고른것 = /⌗(.+?)::[0-9a-f]{16}/.exec(String(instruction ?? ""))?.[1]?.trim();
+  if (고른것 && 아이디핵(고른것) === 아이디핵(assetId)) return false;
   // ③ 직전 대상(「아까 그거」) — 맥락에서 온 근거 있는 값이다(#8 흐름을 끊지 않는다)
   const ctx = recentTarget(근거.대화 ?? 기본대화);
   if (ctx && 납작(ctx.assetId) === id) return false;
   // ④ 앞선 도구 결과에 그 이름이 있으면 **읽고 옮긴 값**이다(지시문 ∪ 조회 결과)
   if (경계로있나(근거.앞선결과, String(assetId ?? "").trim())) return false;
-  // ⑤ 등록된 자산의 이름·id가 지시문에 있으면 지목한 것이다(autoFill이 이름→id로 바꿔 둔 경우)
+  // ⑤ 사람이 **이름으로** 부르고 모델이 그 자산의 **id로 바꿔 넣은** 정상 흐름은 지목이다.
+  //
+  // ⚠⚠ **그 자산이 바로 이 assetId일 때만이다**(2026-09-07 검토관 적발 · 이 관문의 가장 큰 구멍).
+  //   예전엔 「등록 자산 이름이 지시문에 있기만 하면」 통과라 **args.assetId를 한 번도 안 봤다.**
+  //   그래서 「결제서버 조치 검증해줘」에 모델이 **db-02(회계DB)**를 넣어도 그대로 지났고,
+  //   resolveAsset은 그 id로 회계DB를 즉시 찾아 **엉뚱한 장비에 접속**한다 —
+  //   이 관문 머리글이 「그 자산이 우연히 실재하면 엉뚱한 장비에 붙는다」고 적은 바로 그 사고다.
+  //   ⓪(범위자산)·③(직전 대상)은 처음부터 등가를 요구했는데 ⑤만 아무것도 안 요구했다.
+  //   낱말 경계도 ①·④와 같은 잣대로 맞춘다(그냥 포함이면 「web-01」이 「payment-web-01」에 붙는다).
+  // ⚠ 예전 주석이 댄 근거 「autoFill이 이름→id로 바꿔 둔 경우」는 **이 길에 없다** — autoFill은
+  //   buildApproval(결재판)에서만 돌고 verify_finding은 write:false라 결재판을 안 탄다.
+  //   진짜 근거는 **모델이 스스로 이름→id로 바꾸는 것**이고, 그건 등가로 확인할 수 있다.
   try {
     for (const a of listAssets()) {
+      if (아이디핵(a.id) !== 아이디핵(assetId)) continue;   // ★ 딴 자산의 이름은 이 값의 근거가 아니다
       for (const 표기 of [a.name, a.id]) {
-        const v = 납작(표기);
-        if (v.length >= 3 && t.includes(v)) return false;
+        if (경계로있나(instruction, String(표기 ?? "").trim())) return false;
       }
     }
   } catch { /* 목록을 못 봐도 판정은 계속한다 — 못 보면 되묻는 쪽이 안전하다 */ }
@@ -376,12 +402,20 @@ export function 지목없는검증대상(
 /** 조치 검증 대상을 안 댔을 때의 되묻기 — 표지가 붙어 **모델을 안 거치고 그대로** 나간다. */
 export function 검증대상되물음(): string {
   return [
-    `${되묻기표지} 어느 자산의 조치를 검증할지 몰라 되묻습니다 — 지시에 자산이 없어 검증을 실행하지 않았습니다.`,
+    // ⚠ 「지시에 자산이 없어」라고 **단정하지 않는다**(2026-09-07 검토관 적발). 사람이 서수·별명으로
+    //   가리켰는데 확정을 못 한 회차도 이 길로 오는데, 그때 저 말은 **사실과 다르다**.
+    `${되묻기표지} 어느 자산의 조치를 검증할지 확정하지 못해 되묻습니다 — 대상을 확인하지 못해 검증을 실행하지 않았습니다.`,
     "(장비에 실제로 접속하는 일이라, 대상을 짐작해서 붙으면 엉뚱한 장비를 건드립니다.)",
     "",
     `${표식.다음} 이렇게 말씀해 주세요`,
-    '  · "○○ 서버 조치 검증해줘" — 자산 이름이나 id로 지목하면 그 자산만 확인합니다',
-    '  · "자산 목록 보여줘" — 무엇이 있는지부터 보기',
+    // ⚠⚠ **여기 예시는 결정적으로 닿는 말만 쓴다**(안내한 말은 못 박는다 — 이 저장소 확립 원칙).
+    //   되묻기는 「모델의 도구 선택이 흔들려서」 만든 관문이다. 그 되묻기가 권하는 말이 다시 모델
+    //   판단으로 가면 회복 경로를 또 운에 맡기는 것이다(2026-09-07 검토관 적발).
+    //   실측: "○○ 서버 조치 검증해줘"=규칙 없음(모델 판단) · "…검증 **실행**해줘"=verify_finding /
+    //         "자산 목록 보여줘"=규칙 없음 · "자산 **현황** 보여줘"=자산 현황 카드(isAssetStatusAsk).
+    //   짝 시험(verify-target-reask)이 이 줄들을 뽑아 도착지가 있는지 **매번** 확인한다.
+    '  · "○○ 서버 조치 검증 실행해줘" — 자산 이름이나 id로 지목하면 그 자산만 확인합니다',
+    '  · "자산 현황 보여줘" — 무엇이 있는지부터 보기',
     '  · "미조치 취약점 뭐 있어?" — 목록에서 고르시면 그다음을 이어갑니다',
   ].join("\n");
 }
@@ -521,11 +555,14 @@ async function 사람에게내보낸다(
   instruction: string,
   calls: AgentToolCall[],
   context: string,
-  옵션: { 즉답?: string | null } = {},
+  옵션: { 즉답?: string | null; 그대로?: boolean } = {},
 ): Promise<string> {
   await 사내지식으로보강(instruction, calls);
   // 보강이 붙었으면 즉답(도구 원문 그대로)은 더 이상 답이 아니다 — 근거가 둘이 됐으므로 다시 쓴다.
-  const direct = 옵션.즉답 !== undefined ? (calls.length === 1 ? 옵션.즉답 : null) : directAnswerFor(calls);
+  // ⚠ **그대로=true면 길이를 안 본다**(2026-09-07 검토관 라운드). 되묻기처럼 **도구를 아예 안 부른**
+  //   결정적 답은 calls가 비거나 앞선 도구가 여럿일 수 있어, 예전 조건(calls.length === 1)만 보면
+  //   제품이 정한 말이 모델 재작성으로 샌다 — 「다시 지목」이 「다시 지정」으로 바뀌던 그 사고다.
+  const direct = 옵션.즉답 !== undefined ? (옵션.그대로 || calls.length === 1 ? 옵션.즉답 : null) : directAnswerFor(calls);
   if (!direct) reportProgress("write", "조회 결과로 답을 쓰고 있습니다");
   const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
   reportProgress("review", "답변을 검수하고 있습니다");
@@ -2054,6 +2091,10 @@ export function 사내규정질문(instruction: string): boolean {
 }
 
 // export: 시험이 **실제 라우팅 함수**를 그대로 불러 대조한다(정규식을 베껴 쓰면 드리프트한다).
+/** 「…있으면 담당자한테 배정해줘」 같은 **쓰기 흐름**을 삼키면 안 되는 조회 도구들.
+ *  강제 경로는 한 수로 끝나므로, 여기 있는 도구로 못 박히면 배정 단계에 영영 못 간다. */
+const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status"]);
+
 export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string>; argsByModel?: boolean } | null {
   // ⚠ 강제 분기는 **화면 도메인 좁히기를 따르지 않는다**(검토 지적 2026-07-29).
   //   도메인 좁히기의 목적은 "LLM에게 보여 줄 도구 목록을 짧게 유지해 선택이 흔들리지 않게" 하는
@@ -2253,7 +2294,12 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
 
   for (const f of FORCED_INTENTS) {
     if (f.re.test(instruction) && available.has(f.tool)) {
-      if (f.tool === "today" && isAssign) continue; // 배정 지시는 today로 강제하지 않음
+      // 배정 지시는 **조회 도구로 못 박지 않는다** — 강제 경로는 도구 하나를 부르고 즉시 끝나서
+      // 「조회 → 배정」 2수 흐름이 통째로 죽는다(시킨 일은 안 되고 목록만 나간다).
+      // ⚠ 예전엔 today에만 걸었는데 같은 성질의 **urgent_todo·maintenance_status가 그대로 샜다**
+      //   (2026-09-07 검토관 적발 · 실측: 「기한 지난 점검 있으면 담당자한테 배정해줘」→maintenance_status).
+      //   원래 사고는 2026-08-09 파일럿 리허설 — today 강제가 배정 명령을 흡수해 대본이 그 자리에서 깨졌다.
+      if (조회로못박지않을것.has(f.tool) && isAssign) continue;
       if (f.tool === "search") {
         // 세는 질문("몇 건", "총 몇 개")은 목록·집계가 맞다 — 검색으로 돌리지 않는다.
         if (/몇\s*(건|개)|총\s*\d|건수/.test(instruction)) continue;
@@ -2273,6 +2319,29 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
         const 대상 = instruction.replace(/\s*(의|에)?\s*취약점.*$/, "").trim();
         if (!대상) continue;
         return { tool: "search", args: { query: 대상 } };
+      }
+      // ★ 「결제서버 조치 검증 실행해줘」의 **대상**을 넘긴다(2026-09-07 검토관 적발).
+      //   예전엔 args:{}뿐이라 자산 이름을 또렷이 말해도 인자가 비었고, 도구가 「어느 자산인지
+      //   몰라」로 **되물었다** — 되묻기가 가르치는 말이 다시 되묻기로 오는 **막다른 길**이었다.
+      //   (되묻기 예시는 「결정적으로 닿는 말」만 쓰기로 했고 그 말이 바로 이 문장이라, 이쪽이 살아야 한다.)
+      // ⚠ **지어내지 않는다** — 사람 말에서 남는 부분만 넘기고, 없으면 빈 인자로 둔다.
+      //   그러면 도구가 자산못찾음되묻기()로 정직하게 되묻는다(문구는 한 곳에서만 만든다).
+      // ⚠ 대명사만 남으면 대상이 아니다(「이거 검증 실행해줘」) — 직전 대상이 있으면 그것을 쓴다(#8).
+      if (f.tool === "verify_finding") {
+        // ⓐ 화면에서 고른 항목(⌗이름::키)이 실려 있으면 **그것이 대상**이다 —
+        //    registry의 autoFill이 쓰는 값과 **같은 규칙**을 쓴다(두 곳에서 가르면 어긋난다).
+        //    ⚠ 이 도구는 write:false라 autoFill이 안 돈다. 여기서 안 하면 아무도 안 한다.
+        const 고른것 = /⌗(.+?)::([0-9a-f]{16})/.exec(instruction);
+        if (고른것) return { tool: f.tool, args: { assetId: 고른것[1].trim(), finding: "key:" + 고른것[2] } };
+        const 대상 = instruction
+          .replace(/(?:(?:취약점|조치)\s*)*검증\s*(?:실행|돌려)\s*(?:해\s*줘|주세요|줄래|주라|줘|봐)?/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()                                              // ⚠ 조사 떼기 **전에** 공백을 정리한다
+          .replace(/(.{2,})(?:의|를|을|이|가|은|는|도)$/, "$1"); //   (안 그러면 「결제서버의 」의 $가 안 맞는다)
+        const 대명사만 = !대상 || /^(이거|이것|이건|그거|그것|그건|저거|저것|아까\s*거|방금\s*거|해당\s*건)$/.test(대상);
+        const ctx = 대명사만 ? recentTarget(scope?.대화) : null;
+        if (ctx) return { tool: f.tool, args: { assetId: ctx.assetId, finding: ctx.finding } };
+        return { tool: f.tool, args: 대명사만 ? {} : { assetId: 대상 } };
       }
       // ★ 「critical 취약점 몇 건이야?」 — 조건을 안 넘겨 **전체 건수**를 답하던 것(2026-08-03).
       //   담당자는 심각도로 좁혀 물었는데 4,827건을 그대로 받았다. 취약점이 17건일 때는
@@ -2638,7 +2707,14 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
       // 모델이 자산을 **지어냈다**(도구 설명의 예문 web-01 등). 장비에 접속하는 실행 도구라
       // 짐작으로 부르면 엉뚱한 장비를 건드린다 — 부르지 않고 되묻는다(2026-09-06 야간 회귀 ⑬).
       // ⚠ 되묻기 표지가 붙어 있어 이 답은 모델 재작성을 거치지 않고 그대로 나간다.
-      result = 검증대상되물음();
+      // ★ **여기서 끝낸다**(2026-09-07 검토관 적발) — 되묻기는 이미 끝난 답이다.
+      //   ① 한 수 더 돌면, 앞선 도구가 하나라도 있을 때 directAnswerFor가 `calls.length !== 1`에서
+      //      먼저 빠져나가 되묻는 말이 **재작성 경로**를 탄다 — 「다시 지목」이 「다시 지정」으로
+      //      다시 쓰이는, ⓑ가 막으려던 바로 그 사고가 다중 호출 회차에서만 되살아난다.
+      //   ② calls에 verify_finding을 쌓으면 nextguide가 **마지막 도구 이름**으로 후속 칩을 정해
+      //      검증을 한 줄도 안 한 답에 「이거 조치완료 처리해줘」가 붙는다(가리킬 「이거」도 없다).
+      //   그래서 도구를 calls에 담지 않고 결정적 문구를 그대로 내보낸다.
+      return { output: await 사람에게내보낸다(instruction, calls, context, { 즉답: 검증대상되물음(), 그대로: true }), toolCalls: calls };
     } else if (tool.name === "ontology_query" && !isRelationQuestion(instruction)) {
       // "○○은 KISA 어떤 점검항목이야?" 같은 **정의·해당 항목 질문**에 LLM이 온톨로지를 고르면
       // 트리플에 그 서술이 없어 "연결을 찾지 못했다"가 답이 된다 — RAG가 1순위로 근거를 들고
