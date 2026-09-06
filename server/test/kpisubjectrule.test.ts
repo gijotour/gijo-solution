@@ -24,14 +24,23 @@ import { forcedToolFor, kpi주체어갈래붙이기 } from "../src/engine/agentl
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const 소스 = readFileSync(join(__dirname, "..", "src", "engine", "agentloop.ts"), "utf8");
 
-/** 소스에서 FORCED_INTENTS의 `re:` 리터럴을 순서대로 뽑는다(guidance-check와 **같은 방식**). */
-function 규칙리터럴들(): { body: string; flags: string }[] {
+/**
+ * 소스에서 FORCED_INTENTS의 `re:` 리터럴을 **짝인 도구 이름과 함께** 뽑는다
+ * (guidance-check와 같은 방식 — 리터럴만 읽는다).
+ *
+ * ⚠⚠ 도구 이름을 함께 뽑는 이유(2026-09-07에 실제로 깨졌다): 예전엔 「배열 **맨 끝**이 [83]」이라
+ *   보고 `리터럴[length-1]`로 집었다. 그런데 이 파일(agentloop.ts)은 스스로 **「새 강제규칙은
+ *   배열 끝에 둔다」**고 권한다(자리 번호가 안 밀리게). 그러니 덧붙임은 반드시 일어나고,
+ *   실제로 「기한 지난 ○○」 두 규칙이 끝에 붙자 이 시험이 **엉뚱한 규칙을 [83]이라며** 붉었다.
+ *   자리 번호로 가리키면 언젠가 틀린다 — **이름으로 가리킨다**(제품 코드의 lastIndexOf와 같은 잣대).
+ */
+function 규칙리터럴들(): { body: string; flags: string; tool: string }[] {
   const i = 소스.indexOf("const FORCED_INTENTS");
   const 블록 = 소스.slice(i, 소스.indexOf("\n];", i));
-  return [...블록.matchAll(/^\s*re:\s*(\/(?:[^/\\\n]|\\.)+\/[gimsuy]*)\s*,\s*$/gm)].map((m) => {
+  return [...블록.matchAll(/^\s*re:\s*(\/(?:[^/\\\n]|\\.)+\/[gimsuy]*)\s*,\s*\r?\n\s*tool:\s*"([a-z_]+)"/gm)].map((m) => {
     const lit = m[1];
     const 끝 = lit.lastIndexOf("/");
-    return { body: lit.slice(1, 끝), flags: lit.slice(끝 + 1) };
+    return { body: lit.slice(1, 끝), flags: lit.slice(끝 + 1), tool: m[2] };
   });
 }
 
@@ -42,10 +51,14 @@ const 종전 = String.raw`^(?![\s\S]*(?:절차|방법|기준|법령|규정|지�
 
 describe("★★ 게이트가 꺼져 있으면 [83]은 한 글자도 안 바뀐다", () => {
   const 리터럴 = 규칙리터럴들();
-  const 끝 = 리터럴[리터럴.length - 1];
+  // ★ 자리 번호가 아니라 **도구 이름**으로 집는다(위 머리글). kpi_status 규칙은 셋이고
+  //   주체어를 더할 대상은 그중 맨 나중 것이다 — 제품 코드의 lastIndexOf와 같은 잣대다.
+  const kpi들 = 리터럴.filter((r) => r.tool === "kpi_status");
+  const 끝 = kpi들[kpi들.length - 1];
 
   it("감시가 헛돌지 않는다 — 규칙 리터럴을 실제로 뽑았다", () => {
     expect(리터럴.length, "소스에서 강제규칙 정규식을 못 읽었다").toBeGreaterThan(80);
+    expect(끝, "kpi_status 규칙을 못 찾았다 — 뽑는 방식이 낡았다").toBeTruthy();
   });
 
   it("[83] 정규식 문자열이 종전과 동일하다", () => {
