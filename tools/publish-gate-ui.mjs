@@ -1072,23 +1072,51 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
 // ⚠ 「못 뗌」·「통째교체」가 사유 목록에 있으면 **처음부터 펴져 있어야** 한다(2026-09-06 사장님
 //   승인 N5 · fold.js 계약: 위험 신호는 접어서 가리지 않는다). 실화면 데이터에 그 사유가 없으면
 //   이 조항은 조용히 넘어간다 — 없는 것을 있다고 우기지 않고, **있을 때만** 판정한다.
+//   ⚠ 그래서 이 조항은 **운영 데이터가 없는 동안 한 번도 판정을 안 한다**(정직 표시). 논리 자체는
+//     server/test/publishgatecite.test.ts가 이 파일의 코드를 그대로 떼어 돌려서 잰다 — 실화면
+//     픽셀은 여기서, 판정식은 거기서. 둘을 바꿔 부르면 「쟀다」가 거짓이 된다.
 // ⚠ 사유 0건인 기간에는 토글을 **안 그리는 것이 계약**이다(눌러도 빈 상자가 나오는 조작은
 //   만들지 않는다). 그때는 줄 글자가 그 사실을 말하는지까지 보고 통과시킨다 — 그냥 통과가 아니다.
 {
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("supervision.html", "감독", { dock: true }));
   const fr = await 프레임찾기("supervision.html", 10);
   const r = fr ? await fr.evaluate(async () => {
-    for (let i = 0; i < 25; i++) {
-      if (document.querySelector("#sup .sup-line")) break;
-      await new Promise((x) => setTimeout(x, 400));
+    const 키 = "gijo:cite-reasons-open";
+    const 읽기 = () => { try { return localStorage.getItem(키); } catch (e) { return "err"; } };
+    const 쓰기 = (v) => { try { if (v === null) localStorage.removeItem(키); else localStorage.setItem(키, v); } catch (e) { } };
+    const 줄뜸 = async () => {
+      for (let i = 0; i < 25; i++) {
+        if (document.querySelector("#sup .sup-line")) return true;
+        await new Promise((x) => setTimeout(x, 400));
+      }
+      return false;
+    };
+    await 줄뜸();
+    // ⚠ 헛초록 방지 ②(2026-09-06 검토관 gate) — 「저절로 펴짐」과 「지난번 기억으로 펴짐」을 가른다.
+    //   이 관문은 재는 동안 **스스로** 펼침을 눌러 이 키를 "1"로 남긴다. 그 값을 그대로 두고 재면
+    //   화면에서 자동 펼침 조건을 통째로 지워도 원래펼침=true가 나와 **초록**이다 — 헛초록을 막으려고
+    //   붙인 조항이 제 실행으로 무력화된다(반증 실측: 퇴행+저장 "1" → 성립 true).
+    //   그래서 재기 전에 "0"으로 눌러 놓고 화면을 다시 그리게 한다(기간 단추는 같은 값으로 눌러도
+    //   load()를 다시 돈다 — 새 API를 안 만들고 있는 조작으로 다시 그린다).
+    const 저장전 = 읽기();
+    const 되돌리기 = () => { if (저장전 !== "err") 쓰기(저장전); };
+    let 중립화 = false;
+    if (저장전 === "1") {
+      쓰기("0");
+      const 활성 = document.querySelector("#range button.on") || document.querySelector("#range button");
+      if (활성) {
+        활성.click(); 중립화 = true;
+        await new Promise((x) => setTimeout(x, 700));
+        await 줄뜸();
+      }
     }
     const cite = [...document.querySelectorAll("#sup .sup-line")].find((el) => el.textContent.includes("인용 제거"));
-    if (!cite) return { 줄없음: true };
+    if (!cite) { 되돌리기(); return { 줄없음: true }; }
     const btn = cite.querySelector(".cite-why");
     const 글 = cite.textContent.trim().slice(0, 120);
-    if (!btn) return { 토글없음: true, 글, 뗀것없음: /0개 —/.test(글), 기록전: /사유 기록은/.test(글) };
+    if (!btn) { 되돌리기(); return { 토글없음: true, 글, 뗀것없음: /0개 —/.test(글), 기록전: /사유 기록은/.test(글) }; }
     const box = cite.querySelector(".cite-reasons");
-    if (!box) return { 상자없음: true, 글 };
+    if (!box) { 되돌리기(); return { 상자없음: true, 글 }; }
     const 원래펼침 = btn.getAttribute("aria-expanded") === "true";
     // 위험 신호(못 뗌·통째교체)가 사유 목록에 있는가 — 접혀 있어도 textContent는 읽힌다.
     const 위험신호 = /못 뗌|통째교체/.test(box.textContent || "");
@@ -1104,18 +1132,25 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     const 형제 = [...document.querySelectorAll("#sup .sup-line")]
       .filter((el) => !el.querySelector(".cite-why"))
       .map((el) => +el.getBoundingClientRect().height.toFixed(1));
-    if (!원래펼침) { btn.click(); await new Promise((x) => setTimeout(x, 250)); } // 원래대로
-    return { 접힘높이, 접힘보임, 펼침보임, 펼침높이, ls, 형제, 원래펼침, 위험신호, 배지: btn.textContent.trim() };
+    if (!원래펼침) { btn.click(); await new Promise((x) => setTimeout(x, 250)); } // 화면은 원래대로
+    // ⚠ **기억도** 원래대로(2026-09-06 검토관 gate). 자동 펼침은 저장을 안 건드리는 것이 계약이라
+    //   (fold.js:223 — 담당자가 접어 둔 기억은 건드리지 않는다), 위험 신호가 있는 화면을 한 번 재고
+    //   나면 "0"·없음이 "1"로 굳어 **위험 사유가 사라진 뒤에도** 그 줄이 계속 펴진 채 열렸다.
+    //   복구를 「화면 상태」로만 하면(if (!원래펼침) click) 저장값은 그대로 남는다 — 값으로 되돌린다.
+    되돌리기();
+    const 저장후 = 읽기();
+    return { 접힘높이, 접힘보임, 펼침보임, 펼침높이, ls, 형제, 원래펼침, 위험신호, 저장전, 저장후, 중립화, 배지: btn.textContent.trim() };
   }).catch(() => null) : null;
   const 성립 = !!r && (r.토글없음
     ? (r.뗀것없음 || r.기록전)                      // 0건·기록 전이면 종전 문구가 그 사실을 말한다
     : (r.접힘보임 === false && r.펼침보임 === true // 접힌 데서 시작해 눌러 펴졌는가(전이)
       && r.펼침높이 > r.접힘높이                    // 실제로 한 줄이 늘었는가
       && r.ls === "1"                               // 펼침을 기억하는가
-      && /사유 \d+건|못 뗌 \d+건/.test(r.배지)      // 배지가 건수를 말하는가
+      && /사유 \d+건|못 뗌 \d+건|통째교체 \d+건/.test(r.배지) // 배지가 무엇이 몇 건인지 말하는가
       && (!r.위험신호 || r.원래펼침 === true)     // 못 뗌·통째교체면 처음부터 펴져 있는가
+      && r.저장후 === r.저장전                      // 잰 뒤 사람의 펼침 기억을 원래대로 돌려놨는가
       && (!r.형제.length || r.접힘높이 - Math.min(...r.형제) <= 6))); // 접힘 +0px(한 줄 ≈ +19px)
-  ok("감독 ✂ 사유 토글(접힘 +0px · 눌러 펴짐 · 기억 · 위험 신호 자동 펼침)", 성립, JSON.stringify(r));
+  ok("감독 ✂ 사유 토글(접힘 +0px · 눌러 펴짐 · 기억 · 위험 신호 자동 펼침 · 기억 원상복구)", 성립, JSON.stringify(r));
 }
 
 // ── ⑨ 전 화면 얕은 렌더(2026-08-21 — 사장님 승인 묶음 3번) ─────────────────────
