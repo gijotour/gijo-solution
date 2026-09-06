@@ -1184,7 +1184,11 @@ describe("★★ J5 클라우드 답도 가드를 지난다", () => {
   });
 
   it("★ 잣대를 두 벌로 두지 않았다 — llm.ts와 **같은 함수**를 부른다", () => {
-    expect(cloud).toMatch(/import \{ guardCitations, 뗀인용요약 \} from "\.\/citeguard"/);
+    // ⚠ 2026-09-06에 `사유별집계`가 같은 줄에 붙었다(✂ 사유 집계 — 세는 곳도 citeguard 하나다).
+    //   그래서 이름표를 통째로 박지 않고 **앞 두 개가 그대로인지**만 본다.
+    expect(cloud).toMatch(/import \{ guardCitations, 뗀인용요약[^}]*\} from "\.\/citeguard"/);
+    expect(cloud, "사유도 같은 곳에서 세야 한다 — 클라우드만 따로 세면 갈라진다")
+      .toMatch(/citeReasons: 사유별집계\(인용가드\.removed, 인용가드\.보류\)/);
   });
 });
 

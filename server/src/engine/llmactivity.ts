@@ -32,6 +32,11 @@ export interface LlmActivityEvent {
   completionTokens?: number;
   tokensPerSec?: number; // 생성 속도 — llama.cpp timings.predicted_per_second 실측치
   latencyMs?: number;
+  // ✂ 사유별 건수(2026-09-06 · 승인 시안 mockups/cite-reasons) — kind="cite"에서만 쓴다.
+  // ⚠ calls(답 개수)와 **다른 잣대**다: 답 하나에서 세 군데를 떼면 여기 합은 3, calls는 1이다.
+  //   세는 곳은 citeguard.사유별집계() 하나 — 부르는 쪽이 그 결과를 그대로 넘긴다.
+  // ⚠ 인용 원문은 안 싣는다(사내 문서 본문이 감독 화면·WS로 새면 안 된다). 개수만이다.
+  citeReasons?: Record<string, number>;
   timestamp: number;
 }
 
@@ -50,6 +55,27 @@ const dailyUpsert = db.prepare(`
     latencyMsSum = latencyMsSum + excluded.latencyMsSum
 `);
 
+const citeReasonUpsert = db.prepare(`
+  INSERT INTO cite_reason_daily (day, agent, reason, count) VALUES (?, ?, ?, ?)
+  ON CONFLICT(day, agent, reason) DO UPDATE SET count = count + excluded.count
+`);
+
+/**
+ * 답 하나의 집계를 **한 트랜잭션**으로 쓴다 — 답 개수(llm_activity_daily)와 사유 건수
+ * (cite_reason_daily)가 반쪽만 남는 자리를 없앤다. 반쪽이 남으면 화면이 「답 3개인데 사유 0건」
+ * 처럼 **말이 안 되는 두 숫자**를 사람에게 보여 준다(이 저장소의 「절반 수리」 계열).
+ */
+const 집계쓰기 = db.transaction((day: string, agent: string, kind: string,
+  calls: number, errors: number, latency: number, reasons: Record<string, number> | undefined) => {
+  dailyUpsert.run(day, agent, kind, calls, errors, latency);
+  if (reasons) {
+    for (const [reason, count] of Object.entries(reasons)) {
+      if (!(count > 0)) continue; // 0건 사유는 안 쌓는다 — 표에 「겹침없음 0」 줄이 늘어날 뿐이다
+      citeReasonUpsert.run(day, agent, reason, count);
+    }
+  }
+});
+
 export function emitLlmActivity(evt: Omit<LlmActivityEvent, "timestamp">): void {
   const full: LlmActivityEvent = { ...evt, timestamp: Date.now() };
   log.push(full);
@@ -57,9 +83,10 @@ export function emitLlmActivity(evt: Omit<LlmActivityEvent, "timestamp">): void 
   // 감독용 일 단위 영속 집계(2026-08-20 ②) — start는 안 세고 done/error만(이중 셈 방지).
   if (full.phase !== "start") {
     try {
-      dailyUpsert.run(todayLocal(), full.agent || "-", full.kind,
+      집계쓰기(todayLocal(), full.agent || "-", full.kind,
         full.phase === "done" ? 1 : 0, full.phase === "error" ? 1 : 0,
-        full.phase === "done" && full.latencyMs ? Math.round(full.latencyMs) : 0);
+        full.phase === "done" && full.latencyMs ? Math.round(full.latencyMs) : 0,
+        full.citeReasons);
     } catch { /* 집계는 부가 기능 — 방송 자체를 막지 않는다 */ }
   }
   wss?.clients.forEach((client) => {
@@ -87,6 +114,17 @@ export function activityDaily(days: number): { day: string; agent: string; kind:
     .all(from) as { day: string; agent: string; kind: string; calls: number; errors: number; latencyMsSum: number }[];
 }
 
+/**
+ * ✂ 사유 집계 — 최근 N일의 에이전트×사유 합(오늘 포함). 숫자는 전부 실측 이벤트의 합.
+ * ⚠ 날짜 계산은 `activityDaily`와 **같은 것**을 쓴다(todayLocal 로컬 달력) — UTC로 재면
+ *   0~9시에 하루가 밀려 **답 개수와 사유가 다른 날을 가리킨다**.
+ */
+export function citeReasonsDaily(days: number): { day: string; agent: string; reason: string; count: number }[] {
+  const from = todayLocal(new Date(Date.now() - Math.max(0, days - 1) * 86400000));
+  return db.prepare("SELECT day, agent, reason, count FROM cite_reason_daily WHERE day >= ? ORDER BY day")
+    .all(from) as { day: string; agent: string; reason: string; count: number }[];
+}
+
 /** 에이전트별 대화 호출 수 — llm_activity_daily(kind=chat)에서. chat_logs로 세지 않는다:
  *  그건 학습 자동수집 스위치·noLearn 계정에 좌우되어 「수집 끄면 전 팀원 0」이 되고(검토관
  *  중7 — 규칙 계산인 척 잘못된 결론), 기록 키도 라우팅 id라 실제 일한 전문가가 0으로 남는다. */
@@ -110,6 +148,8 @@ export function registerLlmActivityRoutes(app: Express): void {
     for (const e of log) {
       if (e.phase === "error" && e.agent) recentErrors[e.agent] = { detail: e.detail || "(내용 없음)", timestamp: e.timestamp };
     }
-    res.json({ days, calls: chatCallsByAgent(days), daily: activityDaily(days), recentErrors });
+    // ✂ 사유별 건수(2026-09-06) — **새 창구를 만들지 않는다**. 감독 화면은 지금도 이 한 API만
+    //   부르므로 칸을 여기 더한다. daily(답 개수)와 다른 잣대라 칸을 갈라 둔다(섞으면 거짓).
+    res.json({ days, calls: chatCallsByAgent(days), daily: activityDaily(days), recentErrors, citeReasons: citeReasonsDaily(days) });
   });
 }

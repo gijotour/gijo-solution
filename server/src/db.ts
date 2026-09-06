@@ -247,6 +247,22 @@ db.exec(`
     PRIMARY KEY (day, agent, kind)
   );
 
+  -- ✂ 인용 제거 **사유별** 일 집계(2026-09-06 · 승인 시안 mockups/cite-reasons).
+  -- ⚠ 위 llm_activity_daily(kind=cite)와 **다른 잣대**다: 저기는 「손댄 답의 개수」(답 하나에
+  --   이벤트 하나), 여기는 「뗀 인용 건수」(답 하나에서 세 군데를 뗄 수 있다). 서로 더하거나
+  --   나눌 수 없다 — 섞어 적으면 거짓이 된다(화면이 그 사실을 스스로 말한다).
+  -- reason은 citeguard의 뗀사유종류(블록없음·범위밖·겹침없음·자기인용·출처미확인·통째교체) +
+  --   경로 가드의 「내부 경로」·「내부 메타」 + 못 뗀 자리의 「못 뗌」. 세는 곳은
+  --   citeguard.사유별집계() **하나**다(두 벌이면 반드시 갈라진다).
+  -- ⚠ 인용 **원문은 안 담는다** — 사내 문서 본문이 감독 화면·WS로 새면 안 된다(개수만).
+  CREATE TABLE IF NOT EXISTS cite_reason_daily (
+    day TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, agent, reason)
+  );
+
   -- 장기기억(RAG/LanceDB) 문서 메타데이터. LanceDB 행에는 documentId·chunk·vector만 있어
   -- 업로드 시각·원본 경로를 담을 수 없다(새 필드 추가 시 스키마 드리프트로 테이블이 재생성됨).
   -- 문서 단위 메타데이터는 여기 SQLite에 둔다. chunks/scope의 진실 원천은 LanceDB이고 여기 값은

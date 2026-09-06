@@ -22,9 +22,9 @@ import { explainHardTerms, glossaryGroundingFor } from "./glossary";
 import { gateUserInput } from "./gateway";
 import { currentDocIds, currentAttachText } from "./ragscope";
 // 지어낸 인용 가드 — engine 잎 모듈(아무 엔진도 안 문다)이라 순환이 안 난다(llmhooks.test 정신).
-import { guardCitations, 뗀인용요약, 숫자가원천에있나 } from "./citeguard";
+import { guardCitations, 뗀인용요약, 사유별집계, 못뗌사유, 숫자가원천에있나, type CiteGuardResult } from "./citeguard";
 // 내부 메타 줄(근거 조각·교사 모델 경로) 단일 출처 — import가 없는 작은 잎 파일(2026-09-06).
-import { 메타줄걷기 } from "./metaleak";
+import { 메타줄걷기, type 메타걷기결과 } from "./metaleak";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -775,6 +775,26 @@ async function 스트림으로읽는다(res: Response, 싱크: 스트림싱크):
   return { choices: [{ message: { content } }], model, usage, timings };
 }
 
+/**
+ * ✂ 한 답의 **사유별 건수** — 인용 가드 + 경로 가드를 한 Record로 합친다
+ * (2026-09-06 · 승인 시안 mockups/cite-reasons).
+ *
+ * ★ 왜 함수인가: 감독 화면의 표와 실시간 한 줄(detail)이 **같은 판정**에서 나와야 한다.
+ *   「경로」와 「메타」를 가르는 판정(`경로.length > 0`)을 두 군데에 적으면 같은 답에 두 잣대가
+ *   생겨, 문장은 「내부 메타」인데 표는 「내부 경로」가 되는 날이 온다. 그래서 판정을 여기
+ *   **한 번만** 하고 이름을 함께 돌려준다 — 부르는 쪽이 그 이름을 문장에도 쓴다.
+ * ★ 인용 몫은 여기서 안 센다 — `사유별집계()`가 센다(사유를 세는 곳은 그 하나다).
+ * ⚠ `통째메타`는 **못 뗀 자리**(원문 유지)라 「못 뗌」으로 센다. 화면 배지 N에서는 빠진다 —
+ *   없던 제거를 있다고 세면 감독 숫자가 거짓이 된다.
+ */
+export function 가드사유(인용가드: CiteGuardResult, 경로가드: 메타걷기결과): { 사유: Record<string, number>; 경로이름: string } {
+  const 경로이름 = 경로가드.경로.length > 0 ? "내부 경로" : "내부 메타";
+  const 사유 = 사유별집계(인용가드.removed, 인용가드.보류);
+  if (경로가드.뗀줄수 > 0) 사유[경로이름] = (사유[경로이름] ?? 0) + 경로가드.뗀줄수;
+  if (경로가드.통째메타) 사유[못뗌사유] = (사유[못뗌사유] ?? 0) + 1;
+  return { 사유, 경로이름 };
+}
+
 export async function chat(args: ChatArgs): Promise<string> {
   // 단일 관문 — 사용자 입력이 LLM에 닿기 전 반드시 여기를 지난다(engine/gateway.ts 주석 참고).
   // trusted는 이미 관문을 지난 내부 재진입(dispatcher)만 쓴다.
@@ -1138,8 +1158,13 @@ export async function chat(args: ChatArgs): Promise<string> {
   const 경로가드 = 메타줄걷기(reply);
   reply = 경로가드.text;
 
+  // ✂ 계수기가 쌓는 두 잣대(2026-09-06 · 승인 시안 mockups/cite-reasons):
+  //   · **답 개수** = llm_activity_daily(kind=cite).calls — 답 하나에 이벤트 하나.
+  //   · **사유별 건수** = cite_reason_daily — 한 답에서 세 군데를 뗄 수 있다.
+  //   더하지도 나누지도 못하는 **다른 잣대**라 감독 화면이 그 사실을 스스로 말한다.
+  //   detail 한 줄은 종전대로 실시간 스트림(agent.html)용이다.
   if (인용가드.removed.length > 0 || 인용가드.보류.length > 0 || 경로가드.뗀줄수 > 0 || 경로가드.통째메타) {
-    // 계수기 — 원천은 llm_activity_daily 하나(kind=cite). 건수는 detail에, 답 수는 calls에 쌓인다.
+    // 계수기 — 답 수는 calls에, 사유별 건수는 cite_reason_daily에(위 주석 참고).
     //   ⚠ 인용 원문은 안 싣는다(사내 문서 본문이 감독 화면·WS로 새면 안 된다).
     //   ⚠ 보류 칸은 지금 늘 비어 있다(2026-09-05) — 「답이 통째로 인용」이면 예전엔 원답을
     //     되돌렸는데, 그때 지어낸 값이 그대로 나갔다. 이제 가드가 자료없음 안내로 **바꾸고**
@@ -1149,14 +1174,13 @@ export async function chat(args: ChatArgs): Promise<string> {
     //     경로가 없어도 뗀다. 그때까지 「내부 경로 N줄 제거」라 적으면 **없던 경로를 있다고 세는**
     //     거짓 계수다. 진짜 경로를 잡았을 때만 「경로」라 적는다.
     //   ⚠ 통째메타는 **못 뗀 자리**다(원문 유지) — 0줄로 조용히 지나가지 않게 따로 적는다.
+    const { 사유, 경로이름 } = 가드사유(인용가드, 경로가드);
     const 요약 = [
       뗀인용요약(인용가드.removed, 인용가드.보류),
-      경로가드.뗀줄수 > 0
-        ? `${경로가드.경로.length > 0 ? "내부 경로" : "내부 메타"} ${경로가드.뗀줄수}줄 제거`
-        : "",
+      경로가드.뗀줄수 > 0 ? `${경로이름} ${경로가드.뗀줄수}줄 제거` : "",
       경로가드.통째메타 ? "내부 메타뿐이라 원문 유지(못 뗌)" : "",
     ].filter(Boolean).join(" · ");
-    emitLlmActivity({ kind: "cite", phase: "done", agent: args.agentId ?? "-", agentName, detail: 요약 });
+    emitLlmActivity({ kind: "cite", phase: "done", agent: args.agentId ?? "-", agentName, detail: 요약, citeReasons: 사유 });
   }
 
   // 근거가 **멀 때는 멀다고 먼저 말한다.**

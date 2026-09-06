@@ -111,6 +111,7 @@ describe("★ 정리 대장이 새 표를 빠뜨리지 않는다", () => {
       cti_feeds: "⏳ 판단 대기 — 위협정보 구독처. 설정에 가깝다",
       learnloop_runs: "⏳ 판단 대기 — 학습 실행 이력",
       llm_activity_daily: "⏳ 판단 대기 — AI 팀 감독의 원천(현황판이 이 값을 센다)",
+      cite_reason_daily: "**일부러 안 넣는다**(2026-09-06 · 승인 시안 mockups/cite-reasons §⑤) — llm_activity_daily와 **같은 갈래**의 감독 지표다. 실사용 전환 리셋이 이 표를 지우면 「도입일부터 축적」이라는 감독 화면의 약속이 깨지고, 답 개수(llm_activity_daily)만 남아 **답 3개인데 사유 0건**이라는 말이 안 되는 두 숫자가 화면에 선다",
       ontology_triples: "⏳ 판단 대기 — 온톨로지 시드. 제품 자산에 가깝다",
       routine_feedback: "축적 자산 — 같은 결론(datacleanup.ts:24-27)",
 

@@ -20,7 +20,7 @@ import { screenForCloud } from "./cloudegress";
 import { emitCollaboration } from "./collaboration";
 // ⚠ citeguard는 engine 안의 **잎**(엔진 모듈을 하나도 안 문다)이라 여기서 정적 import해도
 //   순환이 안 생긴다 — llm.ts가 같은 이유로 그렇게 물고 있다.
-import { guardCitations, 뗀인용요약 } from "./citeguard";
+import { guardCitations, 뗀인용요약, 사유별집계 } from "./citeguard";
 import { emitLlmActivity } from "./llmactivity";
 import { ingestText, GLOBAL_SCOPE } from "./memory";
 import { koDateTimeString } from "../util/date";
@@ -384,6 +384,10 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
       emitLlmActivity({
         kind: "cite", phase: "done", agent: "-", agentName: `클라우드 ${PROVIDER_LABEL[provider]}`,
         detail: 뗀인용요약(인용가드.removed, 인용가드.보류),
+        // ✂ 사유별 건수(2026-09-06) — **여기를 빠뜨리면 클라우드 답만 사유가 비어** 「외부 두뇌는
+        //   가드가 안 도나」로 읽힌다. agent가 `-`라 감독 화면에서 「미지정」으로 모인다.
+        //   경로 가드는 이 경로에 없다(llm.ts chat() 출구에만 선다) — 그래서 인용 몫만 넘긴다.
+        citeReasons: 사유별집계(인용가드.removed, 인용가드.보류),
       });
     }
     recordCloudUsage(provider, model, r.inTokens, r.outTokens);
