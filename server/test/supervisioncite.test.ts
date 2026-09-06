@@ -60,7 +60,7 @@ type 그린것 = {
 };
 
 /** 화면을 **실제로 돌려** #sup HTML과 토글 부품을 돌려준다. */
-async function 그리기(sup: unknown, days = 1): Promise<그린것> {
+async function 그리기(sup: unknown, days = 1, 씨앗: Record<string, string> = {}): Promise<그린것> {
   const 본문 = supSrc.match(/<script>\r?\n([\s\S]*?)<\/script>/);
   expect(본문, "supervision.html에서 인라인 <script>를 못 떼어 왔다 — 이 시험이 헛돈다").not.toBeNull();
 
@@ -91,7 +91,9 @@ async function 그리기(sup: unknown, days = 1): Promise<그린것> {
       return 새버튼;
     },
   };
-  const 저장: Record<string, string> = {};
+  // 씨앗 = 그 PC에 **이미 저장돼 있던** 펼침 기억. 위험 신호(못 뗌·통째교체)가 그 기억을
+  //   이기는지 재려면 필요하다 — 기본은 빈 값이라 기존 시험은 그대로다.
+  const 저장: Record<string, string> = { ...씨앗 };
   const ls = { getItem: (k: string) => (k in 저장 ? 저장[k] : null), setItem: (k: string, v: string) => { 저장[k] = v; } };
   const win: Record<string, unknown> = {
     gijo: {
@@ -215,5 +217,68 @@ describe("✂ 감독 줄 — 그려지고 눌린다 (전-4 · 검토관 2026-09-
   it("ⓓ 「건수는 팀 활동 기록에만 있다」는 옛 주석이 남아 있지 않다", () => {
     expect(supSrc, "이 화면이 바로 그 건수를 그리는데 주석은 아직 딴 데 있다고 말한다")
       .not.toContain("detail)에만 있다");
+  });
+});
+
+/* ═══ 위험 신호는 접어서 가리지 않는다 — 「통째교체」도 저절로 펼친다 ═══════════════════
+ * 2026-09-06 사장님 승인(N5). 「못 뗌」과 **같은 규칙**이다: 통째교체는 답이 통째로
+ * 「자료 없음」 안내로 바뀐 **센 사건**이라, 접어 두면 사람이 그 일이 있었다는 것을 못 본다
+ * (fold.js 계약 — 위험 신호는 접어서 가리지 않는다).
+ * ⚠ 배지 N에 **안 넣는** 규약은 그대로다 — 「펼치는 조건」과 「세는 것」은 별개의 규약이라
+ *   한쪽을 고치며 다른 쪽을 같이 옮기면 조용히 숫자가 거짓이 된다. 그래서 ⓔ②가 둘을 함께 잰다.
+ * ⚠ 반증(실측): supervision.html 펼침 조건에서 `사유.통째 > 0`을 빼면 ⓔ②·ⓔ③·ⓔ④가 빨개진다.
+ */
+describe("✂ 감독 줄 — 「통째교체」도 저절로 펼친다 (전-4 · 2026-09-06 사장님 승인)", () => {
+  it("ⓔ① 대조군 — 보통 사유만 있으면 접힌 채로 시작한다", async () => {
+    const r = await 그리기({
+      days: 1, calls: {}, daily: [cite("2026-09-06", 2)], recentErrors: {},
+      citeReasons: [사유행("2026-09-06", "겹침없음", 2)],
+    });
+    expect(r.버튼, "토글을 못 찾았다 — 이 시험이 헛돈다").not.toBeNull();
+    expect(r.버튼!.getAttribute("aria-expanded"), "위험 신호가 없는데 저절로 펴졌다").toBe("false");
+    expect(r.상자!.style.display).toBe("none");
+    expect(r.sup, "접힘 화살표가 아니다").toContain("▸");
+  });
+
+  it("ⓔ② 「통째교체」가 섞이면 저절로 펴진다 — 세는 규약은 그대로다", async () => {
+    const r = await 그리기({
+      days: 1, calls: {}, daily: [cite("2026-09-06", 1)], recentErrors: {},
+      citeReasons: [사유행("2026-09-06", "겹침없음", 1), 사유행("2026-09-06", "통째교체", 1)],
+    });
+    expect(r.sup, "접힌 채로 그렸다 — 답이 통째로 바뀐 사실이 토글 뒤에 숨는다")
+      .not.toContain('<div class="cite-reasons" style="display:none">');
+    expect(r.버튼!.getAttribute("aria-expanded"), "통째교체가 있는데 접혀 있다").toBe("true");
+    expect(r.상자!.style.display, "상자가 숨어 있다").toBe("");
+    expect(r.sup, "화살표가 접힘 모양 그대로다").toContain("▾");
+    // 펼침 조건을 고치며 **세는 규약까지** 옮기지 않았는가 — 통째교체는 배지 N에 여전히 안 든다.
+    expect(r.sup, "통째교체가 배지 건수로 새어 들어갔다").toContain("사유 1건");
+    expect(r.sup).toContain("통째교체 1");
+  });
+
+  it("ⓔ③ 「통째교체」만 있어도 마찬가지다", async () => {
+    const r = await 그리기({
+      days: 1, calls: {}, daily: [cite("2026-09-06", 1)], recentErrors: {},
+      citeReasons: [사유행("2026-09-06", "통째교체", 1)],
+    });
+    expect(r.버튼, "토글을 못 찾았다").not.toBeNull();
+    expect(r.버튼!.getAttribute("aria-expanded"), "통째교체만 있으면 접어 버린다").toBe("true");
+    expect(r.상자!.style.display).toBe("");
+  });
+
+  it("ⓔ④ 저장된 「접힘」이 위험 신호를 못 이긴다", async () => {
+    const r = await 그리기({
+      days: 1, calls: {}, daily: [cite("2026-09-06", 1)], recentErrors: {},
+      citeReasons: [사유행("2026-09-06", "겹침없음", 1), 사유행("2026-09-06", "통째교체", 1)],
+    }, 1, { "gijo:cite-reasons-open": "0" });
+    expect(r.버튼!.getAttribute("aria-expanded"), "지난번에 접어 뒀다고 이번 위험 신호를 가린다").toBe("true");
+  });
+
+  it("ⓔ⑤ 「못 뗌」 자동 펼침은 그대로다 — 새 조건이 옛 계약을 안 지웠다", async () => {
+    const r = await 그리기({
+      days: 1, calls: {}, daily: [cite("2026-09-06", 1)], recentErrors: {},
+      citeReasons: [사유행("2026-09-06", "못 뗌", 1)],
+    }, 1, { "gijo:cite-reasons-open": "0" });
+    expect(r.버튼!.getAttribute("aria-expanded"), "못 뗌 자동 펼침이 사라졌다").toBe("true");
+    expect(r.상자!.style.display).toBe("");
   });
 });
