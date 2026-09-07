@@ -310,7 +310,6 @@ const 뿌리MD = [
   "GIJO_AS_AI팀_증류학습_계획서.md",
   "GIJO_AS_GA_판정표.md",
   "GIJO_AS_LLMOps_관측성_계획서.md",
-  "GIJO_AS_LLM_합성_안내.md",
   "GIJO_AS_Lite_설치안내서_2026-08-13.md",
   "GIJO_AS_MAC_M4_24GB_구성안.md",
   "GIJO_AS_MAC_올인원_배포_가이드.md",

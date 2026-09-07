@@ -243,29 +243,6 @@ export const hfModelsApi = {
   job: (id: string) => request<HfDownloadJob>(`/api/hfmodels/jobs/${encodeURIComponent(id)}`),
 };
 
-// ── 보안 LLM 합성(모델 병합) ──────────────────────────────────────────
-export interface MergePlan {
-  ok: boolean;
-  reason?: string;
-  modelA?: DexModel;
-  modelB?: DexModel;
-  outputModelId?: string;
-  config?: string;
-  configPath?: string;
-  commands?: string[];
-}
-export interface MergePreflightCheck {
-  key: string;
-  label: string;
-  ok: boolean;
-  required: boolean;
-  detail?: string;
-  hint?: string;
-}
-export const mergeApi = {
-  plan: (modelA: string, modelB: string) => request<MergePlan>("/api/merge/plan", { method: "POST", body: { modelA, modelB } }),
-  preflight: (a?: string, b?: string) =>
-    request<{ checks: MergePreflightCheck[]; ready: boolean }>(
-      `/api/merge/preflight${a && b ? `?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}` : ""}`
-    ),
-};
+// (보안 LLM 합성(모델 병합) API는 2026-09-07에 **통째로 내렸다** — 화면 merge.html이 유일한
+//  소비자였고, 기준 모델 하나 + 전문가 어댑터 구성이 그 자리를 대신한다. 화면만 지우고 API를
+//  남기면 아무도 안 부르는 인증 창구가 둘 남는다.)

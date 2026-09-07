@@ -1389,7 +1389,7 @@
    *   버튼이 없는 화면은 제목줄 <div>가 **빈 채로 margin-bottom 18~20px만 먹고** 남는다.
    *   상단버튼줄합치기()는 버튼이 있어야만 줄을 숨기므로(if (!묶음) return) 버튼 없는
    *   화면 9곳이 그 길에 영영 못 탄다 — 조치 승인·통합 관제에서 손으로 걷어낸 것과 같은
-   *   자리가 compliance·kpi·learnloop·memory·merge·products·redteam·settings·syslog에
+   *   자리가 compliance·kpi·learnloop·memory·products·redteam·settings·syslog에
    *   그대로 있었다(실측 18~20px = 목록 반 줄).
    * ⚠ 판정은 **실제 보임**으로 한다(offsetParent) — 마크업만 보면 부제(.page-sub)나
    *   화면 자체 요소가 살아 있는 화면(진짜 내용이 있는 줄)까지 숨겨 버린다.

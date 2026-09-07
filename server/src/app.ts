@@ -20,7 +20,6 @@ import { registerVulnScanRoutes } from "./engine/vulnscan";
 import { registerAutoUploadRoutes } from "./engine/autoupload";
 import { registerComplianceRoutes } from "./engine/compliance";
 import { registerModelDexRoutes } from "./engine/modeldex";
-import { registerMergeRoutes } from "./engine/merge";
 import { registerDispatcherRoutes, dispatchInstruction } from "./engine/dispatcher";
 import { registerRemRequestRoutes } from "./engine/remrequest";
 import { registerMemoryRoutes, 지식제공_배선 } from "./engine/memory"; // 화살 #14
@@ -175,7 +174,6 @@ export function createApp(): Express {
   registerAutoUploadRoutes(app);
   registerComplianceRoutes(app);
   registerModelDexRoutes(app);
-  registerMergeRoutes(app);
   registerDispatcherRoutes(app);
   registerRemRequestRoutes(app); // 조치·수정 요청 등록부(2026-08-21)
   registerMemoryRoutes(app);

@@ -369,8 +369,6 @@ const gijoApi = {
   computeWeightsHash: (id: string, filePath?: string) => api.assetsApi.weightsHash(id, filePath),
   importVulnScan: (content: string, format: "json" | "csv" | "html" | "nessus", source: string) => api.assetsApi.importVulnScan(content, format, source),
   listModelDex: () => api.modelDexApi.list(),
-  planMerge: (modelA: string, modelB: string) => api.mergeApi.plan(modelA, modelB),
-  mergePreflight: (a?: string, b?: string) => api.mergeApi.preflight(a, b),
   listLlmGuide: () => api.modelDexApi.guide(),
   listApprovals: () => api.approvalsApi.list(),
   // 「미배정」 판정 — **제품 전체에서 한 곳**이다(2026-09-07 승인 배지). 사이드바 ③ 조치 배지(nav.js

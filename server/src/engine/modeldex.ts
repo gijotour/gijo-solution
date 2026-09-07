@@ -28,6 +28,10 @@ export const SECURITY_LLM_DEX: DexModel[] = [
 ];
 
 // 같은 arch끼리 묶어 "합성 호환 그룹"을 만든다. 크기까지 같아야 실제 SLERP가 되므로 size도 표기.
+// ⚠ 2026-09-07 — **사람이 보는 소비자가 0이 됐다.** 유일한 소비자였던 merge.html(LLM 합성)을
+//   내리면서 이 그룹을 화면에 그리는 곳이 없어졌다. 값은 /api/modeldex 응답의 groups 칸으로
+//   여전히 나가고 modeldex.test가 그 꼴을 지킨다 — 그래서 지우지 않되, 「누가 보나」를 여기 적어
+//   둔다. 다음에 도감 화면을 손보는 사람이 이 칸을 살릴지 내릴지 판단할 근거다.
 export function synthesisGroups(): { arch: string; models: DexModel[] }[] {
   const byArch = new Map<string, DexModel[]>();
   for (const m of SECURITY_LLM_DEX) {

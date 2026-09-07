@@ -62,7 +62,6 @@ const 선택배선대장: Record<string, "부품" | "직접" | ["제외", string
   "dashboard.html": "부품",
   "terminal.html": ["제외", "CLI 화면 — 선택 개념 없음"],
   "settings.html": ["제외", "설정 화면 — 고를 업무 항목 없음"],
-  "merge.html": ["제외", "관리자 도구(모델 합성)"],
   // ── 셸·창·비화면 ──
   "pick.html": ["제외", "고르기 모드(승인 시안 stage-picker) — 행 클릭=gijo:pickdone 전용 신호(셸이 선택+무대 내림). 부품(gijo:select)을 안 쓰는 이유: 확인창 발신이 섞인 그 신호에 자동 내림을 붙이면 상1 재발"],
   "app.html": ["제외", "셸 자신(수신 쪽)"],

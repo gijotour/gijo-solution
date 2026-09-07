@@ -43,8 +43,8 @@ function 소스전체(): string {
 //
 // 제외하는 것 — **우리가 실을 수 있는 파일이 아니거나, 고객 설치본에서 안 도는 것**:
 //   · finetune_*·export_gguf — 학습 전용. 개발·학습 머신에서만 돌고 trainenv.ts가 별도 venv로 다룬다.
-//   · convert_*_to_gguf      — **llama.cpp 저장소 파일**이다(LLAMA_CPP_DIR 기준, learnloop.ts:651·
-//     merge.ts:93). 우리 저장소에 없으니 복사할 대상 자체가 아니고, 모델 합성·어댑터 굽기는
+//   · convert_*_to_gguf      — **llama.cpp 저장소 파일**이다(LLAMA_CPP_DIR 기준, learnloop.ts:651).
+//     우리 저장소에 없으니 복사할 대상 자체가 아니고, 어댑터 굽기는
 //     고객 설치본이 하는 일이 아니다. (이 시험이 처음 돌 때 실제로 이 둘을 잡았다 — 오탐이라 여기 적는다.)
 function 부르는파이썬(): string[] {
   const 학습전용 = /^(finetune_|export_gguf|convert_.*_to_gguf)/;

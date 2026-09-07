@@ -187,7 +187,7 @@ describe("셸 뼈대 — 상단·하단 고정 바", () => {
   it("화면 파일에 헤더 사본이 없다 — 상단 바는 titlebar.js 한 곳", () => {
     const pages = ["handover", "dashboard", "sessions", "sbom", "redteam", "learnloop", "threat",
       "syslog", "memory", "inventory", "analysis", "hardening", "vulnscan", "products", "report",
-      "approvals", "compliance", "audit", "agent", "merge", "kpi", "terminal", "settings"];
+      "approvals", "compliance", "audit", "agent", "kpi", "terminal", "settings"];
     for (const p of pages) {
       const html = fs.readFileSync(path.resolve(__dirname, `../../client/src/renderer/pages/${p}.html`), "utf-8");
       expect(html, `${p}.html에 헤더 사본이 되살아났다`).not.toContain('<div class="header">');

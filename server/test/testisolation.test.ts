@@ -32,7 +32,6 @@ const 표: Record<string, 격리> = {
   GIJO_INGEST_ROOT: { how: "config" },
   GIJO_ORCH_GOLD_PATH: { how: "config" },
   GIJO_REPORT_DIR: { how: "config" },
-  GIJO_OUTPUTS_DIR: { how: "config" }, // ④의 수리(2026-08-12)
   GIJO_LLAMA_SERVER_PATH: { how: "config" }, // 실 프로세스를 못 띄우게 없는 경로로 막는다
 
   GIJO_BACKUP_DIR: { how: "each", tests: ["backup.test.ts", "observability.test.ts"] },
@@ -151,9 +150,7 @@ describe("★ 시험 격리 — 경로 env는 전부 분류돼 있어야 한다"
   });
 });
 
-describe("★ merge 산출물 격리 — 2026-07-17 실사고의 재발 방지", () => {
-  it("시험이 도는 동안 outputs 기본값(cwd/outputs)을 쓰지 않는다", () => {
-    expect(process.env.GIJO_OUTPUTS_DIR, "격리가 안 걸렸다 — merge 시험이 운영 outputs/를 건드린다").toBeTruthy();
-    expect(process.env.GIJO_OUTPUTS_DIR).toContain("test-tmp");
-  });
-});
+// (「merge 산출물 격리」 시험은 2026-09-07에 지웠다 — 지키던 대상인 merge.ts를 제품에서 통째로
+//  내려 `GIJO_OUTPUTS_DIR`를 읽는 코드가 0이 됐다. 위 「표에만 있고 소스에 없는 항목은 남겨두지
+//  않는다」가 바로 이런 유령을 잡으라고 있는 검사라, 표·config·이 시험을 같은 커밋에서 함께 뺀다.
+//  ①의 교훈 자체는 이 파일 맨 위 계보에 그대로 남는다.)

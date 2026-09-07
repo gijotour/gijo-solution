@@ -274,8 +274,6 @@ async function main() {
     { page: "lawlookup.html", name: "29-법령판례" },
     { page: "redteam.html", name: "15-레드팀-가드레일" },
     { page: "memory.html", name: "17-기억학습-문서관리" },
-    // 18-LLM합성(merge.html)은 뺐다(2026-08-19) — 08-08 메뉴에서 내려간 고아 화면이라
-    // 자료용 사진을 계속 찍으면 없는 메뉴를 가리키는 자료가 재생산된다(shotlist 은퇴 목록 등재).
     // ★ 2026-08-04: logs.html은 **없어졌다**(2026-08-02에 syslog.html로 떼어냄).
     //   nav.js는 옛 주소를 새 화면으로 보내 주지만, 이 도구는 파일을 직접 열어서 못 찾는다.
     //   mcp.html도 2026-07-28에 설정으로 흡수돼 사라졌다 — 목록에서 뺀다.
