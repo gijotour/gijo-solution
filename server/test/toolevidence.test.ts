@@ -115,6 +115,50 @@ describe("★ 지목 판정은 hybridsearch.제목지목매치 한 곳", () => {
       .toContain("applyDocScopeBoost(applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds()), 제목지목문서(question))");
     expect(읽기("engine/agentloop.ts"), "라우팅 꼬리 갈래가 사라졌다").toContain("제목지목질문(instruction)");
   });
+
+  // ★★ 2026-09-08 검토관 [중] — **배관의 가운데 두 고리에 가드가 없었다.**
+  //   실측(격리 사본): ① dispatcher가 loop.sources를 싣는 3줄을 지워도 전체 시험 **초록**,
+  //   ② runAgentLoop의 수거 래퍼를 되돌려도 **초록**. 잎(도구근거보고)만 물려 있어서, 배선이
+  //   끊기면 배지가 조용히 옛 상태(sources=null)로 돌아가고 아무도 모른다 — 이 저장소가
+  //   이름 붙인 「생산자 없는 값」이 바로 이 꼴이고, agentloop 강제 경로 주석 자신이
+  //   「갈래 하나를 빠뜨리면 아무 일도 안 일어난다」고 적어 둔 자리다.
+  it("★★ 가운데 고리 ① — runAgentLoop이 근거를 **수거해서** 돌려준다", () => {
+    const src = 읽기("engine/agentloop.ts");
+    expect(src, "수거 래퍼가 사라지면 도구가 보고해도 위로 안 올라간다")
+      .toContain("const r = await 근거를수거하며(그릇, () => runAgentLoopCore(instruction, context, scope));");
+    expect(src, "수거한 값을 결과에 얹는 자리")
+      .toMatch(/return \{ \.\.\.r, sources, 근거세기, \.\.\.\(quotes\?\.length \? \{ quotes \} : \{\}\) \};/);
+    // 감싸는 자리는 **하나**여야 한다 — 갈래마다 붙이면 반드시 하나를 빠뜨린다(그 함수 머리글)
+    expect((src.match(/근거를수거하며\(/g) ?? []).length, "수거 래퍼가 여러 곳에 생겼다").toBe(1);
+  });
+
+  it("★★ 가운데 고리 ② — dispatcher가 루프의 근거를 **결과에 싣는다**", () => {
+    const src = 읽기("engine/dispatcher.ts");
+    expect(src, "싣는 자리가 사라지면 배지가 옛 상태(sources=null)로 조용히 돌아간다")
+      .toContain("...(loop.sources ? { sources: loop.sources } : {}),");
+    expect(src, "quotes까지 함께 실어야 담당자가 원문을 눈으로 검증한다")
+      .toContain("...(loop.quotes?.length ? { quotes: loop.quotes } : {}),");
+  });
+
+  // ★★ 2026-09-08 검토관 [중] — 「같은 세 칸을 같은 값으로」는 **값 계산까지** 같아야 한다.
+  //   재검색 블록에는 「답이 스스로 없다고 말하면 강함→약함」(없다는답인가)이 붙어 있는데,
+  //   새 생산자는 답이 쓰이기 전에 근거세기를 확정하고 sources를 실어 그 블록을 통째로 건너뛴다.
+  //   그대로 두면 explain이 조각을 가깝게 잡고 모델이 「사내 자료에 없습니다」로 답할 때
+  //   **전에는 배지가 없던 자리에 초록 「📄 근거」가 새로 뜬다**(2026-08-13 4-ⓑ ISMS 사고와 같은 꼴).
+  it("★★ 강등 규칙도 함께 온다 — 「없다」는 답에 초록 배지를 새로 만들지 않는다", async () => {
+    const { 근거재검색대상인가, 없다는답인가 } = await import("../src/engine/dispatcher");
+    const 없다는답 = "금융 취약점 평가기준 항목은 사내 지식 베이스에 포함되어 있지 않습니다.";
+    // 전제 — 이 경로는 재검색 블록(강등이 사는 곳)에 **원리상 못 간다**
+    expect(없다는답인가(없다는답)).toBe(true);
+    expect(
+      근거재검색대상인가({ steps: [], toolCalls: [{ tool: "explain", args: {}, result: "" }], output: 없다는답, sources: ["GIJO_지식_금융_취약점_평가기준.md"] } as never, "금융 취약점 평가기준 항목 알려줘"),
+      "sources가 실리면 재검색 블록은 건너뛴다 — 강등이 거기 있으면 안 돈다",
+    ).toBe(false);
+    // 그래서 **싣는 자리**에서 같은 함수로 강등한다(소스 감시 — 실행 경로가 LLM에 묶여 있어 여기가 유일한 자)
+    const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "dispatcher.ts"), "utf8");
+    expect(src, "루프 경로에 강등이 빠지면 「없습니다」에 초록 「📄 근거」가 뜬다")
+      .toContain('근거세기: loop.근거세기 === "강함" && 없다는답인가(String(loop.output ?? "")) ? "약함" : loop.근거세기');
+  });
 });
 
 // ── ★ 반쪽 수리 방어 — 문서로 보내 놓고 문서를 안 읽히면 소용없다 ──────────────

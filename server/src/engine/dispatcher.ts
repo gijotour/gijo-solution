@@ -1873,8 +1873,15 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       //   여기서 실으면 `result.sources !== undefined`가 먼저 false를 내므로 집계조회도구_RE도
       //   sourcebadge.test의 계약도 한 글자 안 건드린 채 배지가 정직해진다.
       //   ⚠ 셋을 **함께** 싣는다 — 근거세기가 비면 클라가 초록 「📄 근거」로 그린다.
+      //   ★★ 2026-09-08 검토관 [중] 수리 — **강등 규칙도 함께 온다.** 재검색 블록에는
+      //     「답이 스스로 없다고 말하면 강함→약함」(없다는답인가, 1092행)이 붙어 있는데, 이 경로는
+      //     답이 쓰이기 전에 근거세기를 확정하고 sources를 실어 그 블록을 통째로 건너뛴다.
+      //     그대로 두면 explain이 조각을 가깝게 잡고 모델이 「사내 자료에 없습니다」라고 답할 때
+      //     **전에는 배지가 없던 자리에 초록 「📄 근거」가 새로 뜬다**(2026-08-13 4-ⓑ ISMS 사고와 같은 꼴).
+      //     「같은 세 칸을 같은 값으로」라는 약속은 **값 계산까지** 같아야 지켜진다 — 생산자가 둘인데
+      //     규칙이 하나면 그것은 약속이 아니다. 강등 판정은 저기와 **같은 함수 하나**를 부른다.
       ...(loop.sources ? { sources: loop.sources } : {}),
-      ...(loop.근거세기 ? { 근거세기: loop.근거세기 } : {}),
+      ...(loop.근거세기 ? { 근거세기: loop.근거세기 === "강함" && 없다는답인가(String(loop.output ?? "")) ? "약함" : loop.근거세기 } : {}),
       ...(loop.quotes?.length ? { quotes: loop.quotes } : {}),
       ...(이어붙인대상 ? { 이어붙인대상 } : {}),
       ...(loop.approval ? { approval: loop.approval } : {}),
@@ -2093,8 +2100,18 @@ async function 체인훑기(
   본다(REPORT_CREATE_RE.test(t) && !REPORT_QUERY_EXCLUDE_RE.test(t), { 이름: "리포트 만들기", 층: "특수경로", 판별: "REPORT_CREATE_RE", 도착: "generateReport", 감시: "if (REPORT_CREATE_RE.test(instructionText) && !REPORT_QUERY_EXCLUDE_RE.test(instructionText))" });
 
   // ⑨ 강제 도구 — runAgentLoop이 맨 앞에서 보는 자리(제품 함수 forcedToolFor가 그대로 답한다)
+  // ⚠ 제목 지목 갈래(2026-09-08)는 **문서 목록을 조회해** 갈린다 — 그때만 `조건부`를 붙인다.
+  //   실측(검토관 [중]): route-explain은 `GIJO_DB_PATH=:memory:`로 도니 지목 후보가 0이라
+  //   「걸리는 규칙 없음」이라 답하고, 운영 DB로 재면 같은 말이 [37]로 간다. 어느 쪽도 단정이면 거짓이다.
+  //   ⚠ FORCED_INTENTS 배열에 걸린 것은 **글자만으로** 갈리므로 종전대로 조건부가 아니다
+  //     (아무 데나 붙이면 표시가 뜻을 잃는다 — routeexplain.route.test가 양쪽을 다 문다).
   const 강제 = forcedToolFor(t, 옵션?.역할 ? { role: 옵션.역할 } : undefined);
-  본다(!!강제, { 이름: "강제 도구", 층: "강제도구", 판별: "forcedToolFor", 도착: 강제?.tool ?? "FORCED_INTENTS가 못 박은 도구", 감시: "const loop = await runAgentLoop(실행문" });
+  본다(!!강제, {
+    이름: "강제 도구", 층: "강제도구", 판별: "forcedToolFor",
+    도착: 강제?.tool ?? "FORCED_INTENTS가 못 박은 도구",
+    ...(강제?.데이터의존 ? { 조건부: true as const } : {}),
+    감시: "const loop = await runAgentLoop(실행문",
+  });
 
   return 전체;
 }

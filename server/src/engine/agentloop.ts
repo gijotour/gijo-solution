@@ -2123,7 +2123,11 @@ export function 사내규정질문(instruction: string): boolean {
  *  강제 경로는 한 수로 끝나므로, 여기 있는 도구로 못 박히면 배정 단계에 영영 못 간다. */
 const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status"]);
 
-export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string>; argsByModel?: boolean } | null {
+/** 강제 결과 — `데이터의존`은 **글자만으로 안 갈리는 갈래**(제목 지목: 문서 목록을 조회한다)라는 표시다.
+ *  route-explain이 이 값을 보고 「간다」고 단정하지 않는다(dispatcher 결정적도착지의 `조건부`). */
+export interface 강제결과 { tool: string; args: Record<string, string>; argsByModel?: boolean; 데이터의존?: true }
+
+export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결과 | null {
   // ⚠ 강제 분기는 **화면 도메인 좁히기를 따르지 않는다**(검토 지적 2026-07-29).
   //   도메인 좁히기의 목적은 "LLM에게 보여 줄 도구 목록을 짧게 유지해 선택이 흔들리지 않게" 하는
   //   것인데, 강제 분기는 LLM을 아예 거치지 않는다 — 좁힐 이유가 없다. 그런데 좁힌 목록으로
@@ -2504,8 +2508,10 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
   //     (S01 데이터 포이즈닝…)를 「평가기준 항목」이라며 답했다. 지목한 문서와 아무 상관이 없다.
   //     ⚠ 이것은 compliance_status 규칙을 좁혀서는 못 고친다 — route-explain 실측이 「걸리는 규칙
   //       없음」이었다. 규칙이 채 간 게 아니라 **아무 규칙도 없어서** 모델 재량이 답했다.
+  //   ⚠ **데이터에 달린 갈래다**(문서 목록을 조회한다) — `데이터의존`을 붙여 route-explain이
+  //     빈 DB에서 「걸리는 규칙 없음」이라 단정하지 않게 한다(검토관 [중] · 결정적도착지의 조건부).
   if (available.has("explain") && 제목지목질문(instruction)) {
-    return { tool: "explain", args: { topic: instruction } };
+    return { tool: "explain", args: { topic: instruction }, 데이터의존: true };
   }
   return null;
 }

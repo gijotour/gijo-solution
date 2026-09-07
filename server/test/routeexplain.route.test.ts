@@ -194,7 +194,23 @@ describe("★ 데이터가 갈라 주는 갈래는 「간다」고 단정하지 
     expect(조건부들).toContain("내할일절차질문");
     // 반대로 글자만으로 갈리는 갈래는 조건부가 아니다 — 아무 데나 붙이면 표시가 뜻을 잃는다
     expect(체인.find((s) => s.판별 === "isFindingListAsk")?.조건부).toBeUndefined();
+    // ⑨ 강제 도구는 **둘 다** 될 수 있다: FORCED_INTENTS 배열에 걸리면 글자만으로 갈리고(조건부 아님),
+    //   꼬리의 제목 지목에 걸리면 문서 목록(DB)에 달렸다(조건부). 빈 말로 훑는 규칙표에서는 전자다.
     expect(체인.find((s) => s.판별 === "forcedToolFor")?.조건부).toBeUndefined();
+  });
+
+  // ★★ 2026-09-08 검토관 [중] — 제목 지목 갈래가 생기며 ⑨가 **데이터 의존**이 됐다.
+  //   route-explain은 `GIJO_DB_PATH=:memory:`로 도니 지목 후보가 늘 0이라 「걸리는 규칙 없음」이라
+  //   답하고, 운영 DB로 재면 같은 말이 [37]로 간다. 어느 쪽도 **단정하면 거짓**이다.
+  it("★ 제목 지목으로 결정된 ⑨는 조건부로 표시된다 — 「간다」고 단정하지 않는다", async () => {
+    const { db } = await import("../src/db");
+    db.prepare(
+      "INSERT OR REPLACE INTO memory_documents (documentId, scope, chunks, ingestedAt, origin) VALUES (?, 'global', 1, datetime('now'), 'builtin')",
+    ).run("GIJO_지식_금융_취약점_평가기준.md");
+    const 걸린것 = await 결정적도착지("금융 취약점 평가기준 항목 알려줘", { 역할: "admin" });
+    const 강제 = 걸린것.find((s) => s.판별 === "forcedToolFor");
+    expect(강제?.도착, "제목을 댔으면 explain으로 간다").toBe("explain");
+    expect(강제?.조건부, "문서 목록에 달린 갈래인데 단정하면 route-explain의 설명이 거짓이 된다").toBe(true);
   });
 });
 
