@@ -23,6 +23,9 @@ import { koDateTimeString } from "../util/date";
 // ⚠ SSH는 fetch가 아니라 execFile이라 봉인 관문(installAirgapGuard)을 원리상 안 지난다 —
 //   smtp·siem·redteam처럼 **연결 직전에 직접** 검사한다. 판정기는 airgap 한 곳만 쓴다.
 import { assertEgressAllowed } from "./airgap";
+// 금융권 담당자의 말(전자금융기반시설 취약점 평가기준)로도 결과가 읽히게 하는 대응표.
+// ⚠ 세는 것도 문장도 **그쪽 한 곳**이다 — 여기서 따로 세면 리포트와 축약 답이 다른 수를 말한다.
+import { fsiCoverageLine } from "./hardeningfsi";
 
 export type ScanStatus = "PASS" | "FAIL" | "WARN" | "NA";
 export type StandardId = "kisa" | "cis" | "kisa_pc" | "kisa_net";
@@ -704,6 +707,7 @@ export function formatHardeningReport(r: ScanReport): string {
   L.push(`- 준수율: **${r.summary.rate}%** (양호 ${r.summary.pass} / 채점대상 ${r.summary.scored})`);
   L.push(`- 결과: ✓ 양호 ${r.summary.pass} · ✗ 취약 ${r.summary.fail} · ⚠ 확인필요 ${r.summary.warn} · — 해당없음 ${r.summary.na} (총 ${r.summary.total}항목)`);
   L.push(`- 종합 판정: ${r.summary.verdict}`);
+  L.push(`- ${fsiCoverageLine(r)}`);
   L.push("");
   L.push(`## 항목별 결과`);
   L.push("");
@@ -732,6 +736,7 @@ export function scanSummaryText(r: ScanReport): string {
   );
   L.push(`준수율 ${r.summary.rate}% (양호 ${r.summary.pass}/${r.summary.scored}) · ${r.summary.verdict}`);
   L.push(`✓ 양호 ${r.summary.pass} · ✗ 취약 ${r.summary.fail} · ⚠ 확인필요 ${r.summary.warn} · — 해당없음 ${r.summary.na}`);
+  L.push(fsiCoverageLine(r));
   if (fails.length) {
     L.push("취약 항목:");
     for (const i of fails) L.push(`  - [${i.id}] ${i.title} — ${i.evidence}\n    → ${i.remediation}`);

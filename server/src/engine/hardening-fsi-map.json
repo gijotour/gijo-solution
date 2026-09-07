@@ -1,0 +1,55 @@
+{
+  "version": "2026-09-08.1",
+  "why": "하드닝 점검 결과를 금융권 담당자의 말(전자금융기반시설 취약점 평가기준의 부문·항목)로도 읽히게 하려고 만든 대응표다. 새 점검 엔진이 아니라 **이름표를 잇는 표 한 장**이다 — 점검은 종전대로 hardeningscan.ts가 한다.",
+  "disclaimer": "이 대응표는 GIJO AS가 만든 것이며 금융보안원의 공식 점검표도, 공식 대응표도 아니다. 평가기준의 항목 번호는 해마다 개정되고 공개 글마다 어긋나므로 **번호를 적지 않았다** — 그 해에 받은 안내서가 정본이다. 여기 없는 하드닝 항목은 「아직 대응을 못 지은 것」이지 「평가기준에 없는 것」이 아니다.",
+  "sourceDoc": "knowledge/GIJO_지식_금융_취약점_평가기준.md",
+  "degreeRule": "same = 국내 CCE 계열(U·PC·N) 항목 — 평가기준의 기술 항목과 뿌리가 같은 기준이라 같은 것을 본다. partial = CIS Benchmark 항목 — 국제 하드닝 기준이라 평가기준 항목의 일부만 덮는다. 이 규칙은 hardening-fsi.test.ts가 기계로 지킨다(손으로 예외를 두면 표가 곧 어긋난다).",
+  "sectors": {
+    "tech_server": "기술적 보안 — 서버·운영체제",
+    "tech_network": "기술적 보안 — 네트워크·보안장비",
+    "tech_endpoint": "기술적 보안 — 임직원 단말"
+  },
+  "entries": [
+    { "id": "U-01", "standard": "kisa", "sector": "tech_server", "criterion": "관리자 원격 접속 제한", "degree": "same" },
+    { "id": "U-02", "standard": "kisa", "sector": "tech_server", "criterion": "비밀번호 복잡성·길이·사용기간과 잠금 임계값", "degree": "same" },
+    { "id": "U-03", "standard": "kisa", "sector": "tech_server", "criterion": "비밀번호 복잡성·길이·사용기간과 잠금 임계값", "degree": "same" },
+    { "id": "U-46", "standard": "kisa", "sector": "tech_server", "criterion": "비밀번호 복잡성·길이·사용기간과 잠금 임계값", "degree": "same" },
+    { "id": "U-47", "standard": "kisa", "sector": "tech_server", "criterion": "비밀번호 복잡성·길이·사용기간과 잠금 임계값", "degree": "same" },
+    { "id": "U-48", "standard": "kisa", "sector": "tech_server", "criterion": "비밀번호 복잡성·길이·사용기간과 잠금 임계값", "degree": "same" },
+    { "id": "U-07", "standard": "kisa", "sector": "tech_server", "criterion": "계정 파일 권한·중복 관리자 금지", "degree": "same" },
+    { "id": "U-08", "standard": "kisa", "sector": "tech_server", "criterion": "계정 파일 권한·중복 관리자 금지", "degree": "same" },
+    { "id": "U-44", "standard": "kisa", "sector": "tech_server", "criterion": "계정 파일 권한·중복 관리자 금지", "degree": "same" },
+    { "id": "U-19", "standard": "kisa", "sector": "tech_server", "criterion": "취약한 원격 서비스 정지", "degree": "same" },
+    { "id": "U-21", "standard": "kisa", "sector": "tech_server", "criterion": "취약한 원격 서비스 정지", "degree": "same" },
+    { "id": "U-61", "standard": "kisa", "sector": "tech_server", "criterion": "취약한 원격 서비스 정지", "degree": "same" },
+    { "id": "U-54", "standard": "kisa", "sector": "tech_server", "criterion": "세션 자동 종료·파일 권한 기본값", "degree": "same" },
+    { "id": "U-56", "standard": "kisa", "sector": "tech_server", "criterion": "세션 자동 종료·파일 권한 기본값", "degree": "same" },
+    { "id": "U-72", "standard": "kisa", "sector": "tech_server", "criterion": "시스템 로깅 동작", "degree": "same" },
+
+    { "id": "SSH-01", "standard": "cis", "sector": "tech_server", "criterion": "관리자 원격 접속 제한", "degree": "partial" },
+    { "id": "ACCT-01", "standard": "cis", "sector": "tech_server", "criterion": "비밀번호 복잡성·길이·사용기간과 잠금 임계값", "degree": "partial" },
+    { "id": "LOG-01", "standard": "cis", "sector": "tech_server", "criterion": "시스템 로깅 동작", "degree": "partial" },
+    { "id": "TIME-01", "standard": "cis", "sector": "tech_server", "criterion": "시간 동기·방화벽·보안 갱신·열린 서비스 최소화", "degree": "partial" },
+    { "id": "FW-01", "standard": "cis", "sector": "tech_server", "criterion": "시간 동기·방화벽·보안 갱신·열린 서비스 최소화", "degree": "partial" },
+    { "id": "UPD-01", "standard": "cis", "sector": "tech_server", "criterion": "시간 동기·방화벽·보안 갱신·열린 서비스 최소화", "degree": "partial" },
+    { "id": "SVC-01", "standard": "cis", "sector": "tech_server", "criterion": "시간 동기·방화벽·보안 갱신·열린 서비스 최소화", "degree": "partial" },
+
+    { "id": "N-33", "standard": "kisa_net", "sector": "tech_network", "criterion": "대리 응답 기능 차단", "degree": "same" },
+    { "id": "N-34", "standard": "kisa_net", "sector": "tech_network", "criterion": "내부를 알려 주는 응답 차단", "degree": "same" },
+    { "id": "N-35", "standard": "kisa_net", "sector": "tech_network", "criterion": "내부를 알려 주는 응답 차단", "degree": "same" },
+    { "id": "N-38", "standard": "kisa_net", "sector": "tech_network", "criterion": "내부를 알려 주는 응답 차단", "degree": "same" },
+    { "id": "N-36", "standard": "kisa_net", "sector": "tech_network", "criterion": "이름 조회·구형 접속 차단", "degree": "same" },
+    { "id": "N-37", "standard": "kisa_net", "sector": "tech_network", "criterion": "이름 조회·구형 접속 차단", "degree": "same" },
+
+    { "id": "PC-01", "standard": "kisa_pc", "sector": "tech_endpoint", "criterion": "비밀번호 사용기간·길이와 계정 잠금", "degree": "same" },
+    { "id": "PC-02a", "standard": "kisa_pc", "sector": "tech_endpoint", "criterion": "비밀번호 사용기간·길이와 계정 잠금", "degree": "same", "docId": "PC-02", "note": "지식 문서는 KISA 원 번호 PC-02로 한 줄이지만, 제품은 길이(PC-02a)와 잠금 임계값(PC-02b)을 따로 잰다." },
+    { "id": "PC-02b", "standard": "kisa_pc", "sector": "tech_endpoint", "criterion": "비밀번호 사용기간·길이와 계정 잠금", "degree": "same", "docId": "PC-02", "note": "PC-02a의 짝 — 위 note 참조." },
+    { "id": "PC-03", "standard": "kisa_pc", "sector": "tech_endpoint", "criterion": "복구 콘솔 자동 로그온 금지", "degree": "same" },
+    { "id": "PC-04", "standard": "kisa_pc", "sector": "tech_endpoint", "criterion": "기본 공유·불필요 서비스 제거", "degree": "same" },
+    { "id": "PC-05", "standard": "kisa_pc", "sector": "tech_endpoint", "criterion": "기본 공유·불필요 서비스 제거", "degree": "same" }
+  ],
+  "unmappedWhy": {
+    "PC-06": "지식 문서 10절이 「사람이 본다」로 적은 자리다 — 제품은 알려진 상용 메신저 설치 여부만 찾고, 사내 승인 목록과의 대조는 하지 않는다. 대응표에 올리면 문서와 어긋난다.",
+    "PC-07": "고정 드라이브 NTFS 포맷 확인 — 지식 문서의 평가기준 표에 짝지을 행이 아직 없다. 확인 전에는 적지 않는다."
+  }
+}
