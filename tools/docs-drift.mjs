@@ -28,7 +28,7 @@
 
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { createHash } from "crypto";
 import { execFileSync } from "child_process";
 
@@ -77,80 +77,36 @@ export function 제외요약(제외) {
   return `  ℹ 사본 경고에서 제외한 시험 사본·보관함: ${제외.length}건 (${내역})`;
 }
 
-// ── 두 잣대 대조용 순수 함수 (2026-09-07) ─────────────────────────────────────
+// ── 두 잣대 대조 — **정의는 제품에 있다**(server/src/engine/docledger.ts) ──────────
 //
-// ■ 왜 두 숫자가 다른가 — **세는 대상이 다르다**
-//   · `memory_documents`(sqlite) = **반입 대장**. 문서 한 편당 한 줄이고, 조각 수는 그때 적어 둔 값이다.
-//   · docs-drift의 「문서 N건 인입됨」 = **지식 저장소(LanceDB)에 실제 조각이 남아 있는 문서 수**.
-//   그래서 대장에 줄은 남았는데 벡터가 사라진 문서가 있으면 대장이 하나 더 크다
-//   (2026-09-07 실측: 대장 3,921 · 저장소 3,920 — 차이는 `2025년 사이버 위협 전망.pdf` 21조각 한 편).
-//   ⚠ 이 도구는 **아무것도 지우지 않는다.** 무엇이 어긋났는지 이름을 대는 데까지가 일이다.
-
-/** 파일 경로에서 이름만(목록에는 knowledge/… 처럼 하위 폴더가 붙어 오는데 저장소 id는 이름뿐이다). */
-const 이름만 = (p) => String(p ?? "").replace(/^.*[/\\]/, "");
-
-/**
- * 반입 대장 ↔ 지식 저장소 대조.
- * @param {{documentId: string, chunks?: number, origin?: string}[]} 대장
- * @param {Record<string, number>} 저장조각  문서 id → 조각 수
- *
- * ⚠⚠ **이름만 맞으면 초록**이던 자리를 닫는다 (2026-09-07 실측).
- *   옛 판은 이름 집합 두 개만 견줘서 「유령(이름이 통째로 없다)」만 봤다. 그런데 운영에는
- *   **반쪽 유령**이 있었다 — 이름은 양쪽에 있는데 **판이 다른** 문서다:
- *     · CrowdStrike…  대장 101 / 저장소 99
- *     · Tenable IE…   대장 4 / 저장소 2
- *     · model-intake-policy… 대장 1 / 저장소 2
- *   대장에 적힌 조각 수는 **반입하던 그때** 적은 값이다. 저장소 쪽이 적으면 벡터가 부분적으로
- *   날아간 것이고, 많으면 옛 판 조각이 남아 **AI가 두 판을 섞어 읽는다.** 어느 쪽이든 이름만
- *   보는 눈에는 안 보인다 — 「있다」와 「같은 판이다」는 다른 말이다.
- * ⚠ 조각 수가 대장에 안 적힌 줄은 **대조에서 빼되 몇 건인지 말한다**(0으로 치면 전부 어긋남이 된다).
- */
-export function 잣대대조(대장, 저장조각) {
-  const 저장이름 = new Set(Object.keys(저장조각 ?? {}));
-  const 대장이름 = new Set((대장 ?? []).map((r) => String(r.documentId)));
-  // 유령 = 대장에는 있는데 저장소에 조각이 없다 → **AI가 근거로 못 쓴다**(반입됐다고 적혀만 있다).
-  const 유령 = (대장 ?? [])
-    .filter((r) => !저장이름.has(String(r.documentId)))
-    .map((r) => ({ 이름: String(r.documentId), 조각: Number(r.chunks) || 0 }));
-  // 대장밖 = 저장소에는 조각이 있는데 대장에 줄이 없다 → 지운 대장/직접 넣은 벡터.
-  const 대장밖 = [...저장이름].filter((n) => !대장이름.has(n)).sort();
-
-  // 반쪽 유령 = 이름은 양쪽에 있는데 **조각 수가 다르다**.
-  const 조각어긋남 = [];
-  const 조각미기재 = [];
-  for (const r of 대장 ?? []) {
-    const 이름 = String(r.documentId);
-    if (!저장이름.has(이름)) continue;               // 통째 유령은 위에서 따로 센다
-    const 적힌수 = Number(r.chunks);
-    if (!Number.isFinite(적힌수) || 적힌수 <= 0) { 조각미기재.push(이름); continue; }
-    const 저장수 = Number(저장조각[이름]) || 0;
-    if (적힌수 !== 저장수) 조각어긋남.push({ 이름, 대장: 적힌수, 저장: 저장수 });
+// ■ 왜 여기서 정의하지 않나 (2026-09-07 이 라운드)
+//   이 대조는 처음에 여기서 태어났는데, 제품(서버)도 같은 판정을 해야 했다 —
+//   「AI 지식」 목록·지식 현황·위생 점검이 전부 「조각이 없는 문서」를 알아야 한다.
+//   같은 잣대를 두 벌 적으면 어긋난다(이 저장소가 반복해 겪은 병)이므로 정의를
+//   `server/src/engine/docledger.ts` **한 곳으로 옮겼다**(복사가 아니다). 도구는 부르기만 한다.
+//   ⚠ 짝 시험이 이 파일에 정의가 **다시 생기지 않는지** 소스로 감시한다.
+//   선례: tools/route-explain.mjs·learn-candidate-review.mjs가 이미 dist를 부른다.
+//
+// ■ 없으면 **멈춘다**(exit 2) — 이 도구의 「빈 값 대신 멈춘다」와 같은 꼴
+//   빌드가 없다고 대조를 건너뛰면 「어긋남 0건」이라는 **거짓 초록**이 된다.
+async function 잣대모듈() {
+  const dist = path.join(뿌리, "server", "dist", "engine", "docledger.js");
+  if (!fs.existsSync(dist)) {
+    중단([
+      "  · 하려던 일: 반입 대장 ↔ 지식 저장소 대조(server/dist/engine/docledger.js)",
+      "  · 빌드된 제품 판이 없습니다 — 판정 정의는 제품(engine/docledger.ts)에 한 벌만 둡니다.",
+      "  → server 폴더에서 `npm run build` 후 다시 돌리세요.",
+    ]);
   }
-  // 차이가 큰 것부터 — 사람이 위에서 몇 줄만 봐도 심한 것을 먼저 만난다.
-  조각어긋남.sort((a, b) =>
-    Math.abs(b.대장 - b.저장) - Math.abs(a.대장 - a.저장) || a.이름.localeCompare(b.이름));
-  조각미기재.sort();
-
-  return { 대장수: 대장이름.size, 저장수: 저장이름.size, 유령, 대장밖, 조각어긋남, 조각미기재 };
-}
-
-/**
- * 목록(docs-manifest.json)에 없는데 저장소에 있는 문서를 갈래별로 가른다.
- * ⚠ built-in만 이름을 다 적는다 — 승인 문답이 3,700편이라 전부 찍으면 그 안에서 아무것도 안 보인다.
- *   나머지는 **출처별 건수**로 말한다(감춘 것과 요약한 것은 다르다 — 셈은 그대로 보인다).
- */
-export function 매니페스트밖(저장조각, 문서들, 대장) {
-  const 목록이름 = new Set((문서들 ?? []).map(이름만));
-  const 출처 = new Map((대장 ?? []).map((r) => [String(r.documentId), String(r.origin ?? "") || "(출처 없음)"]));
-  const 밖 = Object.keys(저장조각 ?? {}).filter((n) => !목록이름.has(n)).sort();
-  const builtin = 밖.filter((n) => 출처.get(n) === "builtin");
-  const 갈래별 = {};
-  for (const n of 밖) {
-    const k = 출처.get(n) ?? "(대장에 없음)";
-    if (k === "builtin") continue;
-    갈래별[k] = (갈래별[k] ?? 0) + 1;
+  const m = await import(pathToFileURL(dist).href);
+  const mod = typeof m.잣대대조 === "function" ? m : (m.default ?? m);
+  if (typeof mod.잣대대조 !== "function" || typeof mod.매니페스트밖 !== "function") {
+    중단([
+      "  · 빌드된 docledger가 `잣대대조`·`매니페스트밖`을 안 내보냅니다 — 빌드가 낡았습니다.",
+      "  → server 폴더에서 `npm run build` 후 다시 돌리세요.",
+    ]);
   }
-  return { 총: 밖.length, builtin, 갈래별 };
+  return mod;
 }
 
 // ⚠ 양쪽을 **같은 잣대로** 씻어서 비교한다. 처음엔 한쪽만 끝 공백을 자르는 바람에
@@ -217,7 +173,7 @@ function wsl(명령, { 이유 = "운영 값 조회", 빈값허용 = false } = {}
   return 출력;
 }
 
-function main() {
+async function main() {
   const 자세히 = process.argv.includes("--자세히") || process.argv.includes("--verbose");
 
   // ── ⓪ 실행 환경 관문 — wsl을 부르기 **전에** 막는다 ─────────────────────────
@@ -366,6 +322,8 @@ const l=require('@lancedb/lancedb');
     } catch { 대장못읽음 = "조회 결과가 JSON이 아닙니다: " + 대장json.split("\n").pop().slice(0, 120); }
   }
 
+  // 판정 정의는 제품 한 곳에서 빌려 온다(위 잣대모듈 머리말). 여기서 다시 적지 않는다.
+  const { 잣대대조, 매니페스트밖 } = await 잣대모듈();
   console.log(`\n■ 반입 대장 ↔ 지식 저장소 (두 잣대)`);
   if (!Array.isArray(대장)) {
     console.log("  ℹ 대장(memory_documents) 대조를 **건너뛰었습니다** — 운영 DB를 열지 못했습니다:");
@@ -423,4 +381,8 @@ const l=require('@lancedb/lancedb');
 }
 
 // 직접 실행할 때만 돈다 — 짝 시험은 위 순수 함수만 불러다 쓴다(WSL 없이 검산 가능).
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(이파일)) main();
+// ⚠ main이 비동기가 됐다(제품 판정을 dist에서 빌려 온다) — 실패를 삼키면 아무 말 없이 종료 0이라
+//   거짓 초록이 된다. 반드시 잡아서 exit 2로 멈춘다.
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(이파일)) {
+  main().catch((e) => 중단([`  · 예상 못 한 오류: ${e?.stack ?? e?.message ?? e}`]));
+}
