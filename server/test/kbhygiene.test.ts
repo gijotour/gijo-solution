@@ -84,6 +84,22 @@ describe("지식베이스 위생 — 모집단(누를 수 있는 문서만 점�
     expect(formatKbHygiene(r), "제외 사유에 개인 문서를 안 적으면 숫자와 설명이 어긋난다").toContain("개인 문서");
   });
 
+  // ★ 2026-09-07: 조각이 사라진 문서(유령)도 **같은 부류**다 — listDocuments가 이번 라운드부터
+  //   대장에만 남은 줄까지 담기 때문에 여기로 들어온다. 유령은 조각이 없어 **지문이 빈 문자열**이라
+  //   ②버전충돌(이름 기준)에 그대로 섞여 「이름은 같은 계열인데 내용이 다르다」는 거짓 지적을 만든다.
+  //   위생 점검은 그 문제를 못 고치는 자리다 — 되넣기는 doc_chunk_gaps·reingest_document의 영토다.
+  it("조각이 사라진 문서는 점검하지 않는다 — 빈 지문이 **거짓 버전충돌**을 만든다", async () => {
+    listDocuments.mockResolvedValue([
+      doc("MF2_차단로그_필드해설.txt", { docState: "ok" }),
+      doc("MF2_차단로그_필드해설_v2.txt", { docState: "missing", chunks: 0, ledgerChunks: 12 }),
+    ]);
+    const r = await scanKbHygiene();
+    expect(r.totalDocs, "유령을 모집단에 넣었다 — 없는 문제를 담당자가 쫓는다").toBe(1);
+    expect(r.excludedDocs).toBe(1);
+    expect(r.findings.filter((x) => x.type === "version_conflict"), "빈 지문이 버전충돌로 올라왔다").toEqual([]);
+    expect([...getChunksForDocuments.mock.calls[0][0]], "조각이 없는 문서의 조각을 뜨려 했다").toEqual(["MF2_차단로그_필드해설.txt"]);
+  });
+
   it("개인 문서끼리는 내용이 같아도 지적하지 않는다 — 남의 메모 이름이 리포트에 실리지 않는다", async () => {
     const 본문 = "이번 주 회의 메모: 방화벽 교체 일정과 담당자를 정리하고 다음 점검일을 잡는다.";
     listDocuments.mockResolvedValue([doc("personal:aaa11111"), doc("personal:bbb22222")]);

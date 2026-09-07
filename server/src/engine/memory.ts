@@ -14,6 +14,7 @@ import { embed } from "./embedding"; // 잎(화살 #12) — llm 전체를 물지
 import { chat, setRagProvider } from "./llm";
 import { isBinaryLikeChunk, stripLayoutControls } from "./ragsanitize";
 import { 메타걷은조각 } from "./metaleak"; // 잎(import 없는 작은 파일) — 화살이 늘지 않는다
+import { 조각상태, type DocState } from "./docledger"; // 대장↔저장소 판정 한 곳(잎 · import 0)
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
 import { 반입문서아님_제외SQL, 승인문답문서 } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — 화살이 늘지 않는다)
@@ -1618,6 +1619,13 @@ export interface MemoryDocument {
   // ★ 판정은 손으로 문자열을 비교하지 말고 engine/docorigin.ts 술어로(잣대가 다섯 벌로 갈렸던 그 병).
   origin: string | null;
   grade: string | null;    // 기밀 C·민감 S·공개 O (engine/grades.ts). 마이그레이션에서 기존 문서는 O로 넣었다.
+  // ── 대장(memory_documents) ↔ 저장소(LanceDB) 대조 두 칸 (2026-09-07) ──────────────
+  // ledgerChunks — **반입하던 그때** 대장에 적어 둔 조각 수. 대장에 줄이 없거나 안 적혔으면 null.
+  //   ⚠ 위 `chunks`와 헷갈리지 말 것: chunks는 **지금 저장소에 실제로 있는** 수다.
+  ledgerChunks: number | null;
+  // docState — 둘을 견준 결과(engine/docledger.ts 한 곳에서 판정). 화면·도구·위생 점검이 이 칸만 읽는다.
+  //   missing이면 **AI가 근거로 못 쓰는 문서**다 — 「지식 N건」에 넣어 말하면 안 된다.
+  docState: DocState;
 }
 
 // 장기기억에 저장된 문서 목록. 조각 수·scope의 진실 원천은 LanceDB(실제 임베딩),
@@ -1639,14 +1647,18 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
       agg.set(r.documentId, cur);
     }
   }
+  // ⚠ SELECT *는 원래부터 chunks·scope·origin을 함께 준다 — 타입에만 안 적혀 있어 「없는 값」처럼 보였다.
+  //   대장 잔여 줄(유령)을 담으려면 그 셋이 필요하다: chunks=대장에 적힌 조각 수, scope=검색 범위, origin=출처.
   const metaRows = db.prepare("SELECT * FROM memory_documents").all() as {
     documentId: string; embeddingModel: string | null; sourcePath: string | null; ingestedAt: string; docClass: string | null; uploadedBy: string | null; category: string | null; grade: string | null;
+    chunks: number | null; scope: string | null; origin: string | null;
   }[];
   const metaById = new Map(metaRows.map((m) => [m.documentId, m]));
   const out: MemoryDocument[] = [];
-  for (const [documentId, { scope, chunks }] of agg) {
-    const meta = metaById.get(documentId);
-    out.push({
+  // 대장 값을 한 곳에서 꺼낸다 — agg 줄과 대장 잔여 줄이 **같은 모양**으로 나가야 소비자가 안 갈린다.
+  const 줄만들기 = (documentId: string, scope: string, chunks: number, meta: (typeof metaRows)[number] | undefined): MemoryDocument => {
+    const ledgerChunks = Number.isFinite(Number(meta?.chunks)) ? Number(meta?.chunks) : null;
+    return {
       documentId,
       scope,
       chunks,
@@ -1656,9 +1668,39 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
       docClass: meta?.docClass ?? null,
       uploadedBy: meta?.uploadedBy ?? null,
       category: meta?.category ?? null,
-      origin: (meta as { origin?: string | null } | undefined)?.origin ?? null,
+      origin: meta?.origin ?? null,
       grade: meta?.grade ?? null,
-    });
+      ledgerChunks,
+      // ★ 손으로 비교하지 않는다 — 판정은 engine/docledger.ts 한 곳(잣대가 다섯 벌로 갈렸던 그 병).
+      docState: 조각상태(chunks, ledgerChunks),
+    };
+  };
+  for (const [documentId, { scope, chunks }] of agg) {
+    out.push(줄만들기(documentId, scope, chunks, metaById.get(documentId)));
+  }
+
+  // ── ★ 대장에만 남은 줄(유령)도 담는다 (2026-09-07 · db.ts 2026-09-07 개정 결정) ──────────
+  //
+  // ■ 무엇이 문제였나
+  //   여기는 오래 **agg(LanceDB 조각 집계)만** 순회했다. 그래서 「반입은 됐는데 벡터가 사라진 문서」는
+  //   목록에서 통째로 사라졌다 — 담당자 눈에는 **애초에 올린 적 없는 문서**로 보인다.
+  //   실측(2026-09-07 운영): 대장 3,921 · 저장소 3,920. 사라진 한 편은 「2025년 사이버 위협 전망.pdf」
+  //   (대장에 21조각이라 적혀 있는데 저장소에 0조각). 담당자는 「올렸는데 왜 답을 못 하지」만 겪는다.
+  //
+  // ■ 왜 이제 안전한가 (db.ts의 옛 금지를 뒤집은 근거)
+  //   db.ts가 「listDocuments를 고치면 조각 0 문서가 섞인다」고 막아 뒀는데, 그 걱정의 대상인
+  //   **취약점 스캔·SBOM은 upsertDocMetaStmt를 아예 안 탄다** — 대장에 줄 자체가 없어 여기 못 들어온다.
+  //   들어오는 것은 유령뿐이고, 유령은 잡음이 아니라 **알려야 할 결함**이다.
+  //
+  // ⚠ scope는 **메타에서** 온다(agg가 없으니 LanceDB에서 올 데가 없다). 이 값을 빠뜨리면
+  //   learncandidates의 `scope === "global"` 필터에서 undefined로 조용히 빠진다(검토 지적).
+  // ⚠ chunks는 **0**이다 — 대장에 적힌 21을 여기 쓰면 「조각 21개 있음」이라는 거짓이 된다.
+  //   대장이 적어 둔 값은 ledgerChunks 칸으로 따로 나간다(둘을 한 칸에 담지 않는다).
+  // ⚠ 등급 격리는 그대로 걸린다 — /api/memory/documents는 listVisibleDocuments/열람불가()를 지나므로
+  //   기밀 유령의 **이름**도 안 샌다(문서 제목도 정보다).
+  for (const meta of metaRows) {
+    if (agg.has(meta.documentId)) continue;
+    out.push(줄만들기(meta.documentId, meta.scope ?? GLOBAL_SCOPE, 0, meta));
   }
   out.sort((a, b) => (b.ingestedAt ?? "").localeCompare(a.ingestedAt ?? "") || b.chunks - a.chunks);
   return out;
@@ -1675,6 +1717,39 @@ export async function listVisibleDocuments(): Promise<MemoryDocument[]> {
   const all = await listDocuments();
   const 가림 = new Set(hiddenDocIds(currentViewer()));
   return 가림.size ? all.filter((d) => !가림.has(d.documentId)) : all;
+}
+
+/**
+ * 추출본(.md)으로 **조각을 다시 넣는다** — 조각이 사라진 문서를 되살리는 경로.
+ *
+ * ■ 왜 여기 있나 (2026-09-07)
+ *   재인입 파이프라인을 새로 만들지 않는다 — `/api/memory/document/markdown/save`가 이미
+ *   「추출본 .md → ingestText(멱등·옛 조각 선삭제·scope/sourcePath 유지)」를 한다.
+ *   대화 도구(reingest_document)도 **같은 자리**를 써야 두 경로가 안 갈린다.
+ *   ⚠ 원본 파일이 아니라 **추출본**에서 넣는 것이 요점이다 — 그러면 「그 사이 원본이 바뀌었으면
+ *     다른 문서가 들어간다」는 걱정이 원천에서 사라진다(들어가는 글자가 그때 그 글자다).
+ *   ⚠ INGEST_ROOT·getDocMetaStmt는 이 파일 밖으로 안 나간다 — 도구 쪽에서 경로를 다시 조립하면
+ *     `GIJO_INGEST_ROOT`를 쓰는 설치에서 **엉뚱한 자리를 뒤지고도 성공이라 보고**한다
+ *     (datacleanup가 실제로 그랬다 — db.ts·docattach·backup에 같은 상수가 이미 네 벌이다).
+ *
+ * @returns 넣은 조각 수. **추출본이 없으면 null** — 그때 「다시 넣었습니다」라고 말하면 거짓이 된다.
+ * @throws 대장에 그 문서가 없거나 이름이 basename이 아니면 던진다(쓰기 도구 계약).
+ */
+export async function reingestFromExtracted(documentId: string, actor?: string): Promise<{ chunks: number } | null> {
+  const id = String(documentId ?? "");
+  // ⚠ 이름=basename만 허용 — 경로가 섞인 id는 남의(기밀) .md를 가리킬 수 있다(위 두 라우트와 같은 관문).
+  if (!id || path.basename(id) !== id) throw new Error("잘못된 문서 이름입니다");
+  const meta = getDocMetaStmt.get(id) as { sourcePath?: string | null; scope?: string | null } | undefined;
+  if (!meta) throw new Error(`반입 대장에 「${id}」 줄이 없습니다 — 이름을 다시 확인해 주세요.`);
+  let text: string;
+  try {
+    text = await fs.readFile(assertWithinIngestRoot(path.join(INGEST_ROOT, "docs", "extracted", id + ".md")), "utf8");
+  } catch {
+    return null; // 추출본이 없다 — **성공이라 적지 않는다**(대장 chunks도 안 건드린다)
+  }
+  if (!text.trim()) return null; // 빈 추출본을 넣으면 0조각이 되고 「고쳤다」가 거짓이 된다
+  const r = await ingestText(id, text, meta.scope ?? GLOBAL_SCOPE, meta.sourcePath ?? undefined, false, actor);
+  return { chunks: r.chunks };
 }
 
 // 특정 문서의 조각(청크) 텍스트 미리보기 — "어떻게 학습됐는지" 확인용.

@@ -27,6 +27,7 @@ import { generateSbom } from "../sbom";
 import type { ComplianceStatus } from "../compliance";
 import { countTriples } from "../ontology";
 import { listVisibleDocuments, queryMemory, queryMemoryRelevant, queryMemoryScored, 문서지목질문 } from "../memory";
+import { 상태꼬리, 조각없음, type DocState } from "../docledger"; // 대장↔저장소 판정 한 곳(잎 · import 0)
 import { listFindings as listCtiFindings } from "../cti";
 import { matchCtiToAssets } from "../ctimatch";
 import { dailyBriefingText } from "../briefing";
@@ -114,6 +115,16 @@ export const TOOL_DOMAINS = [
   "threat", // 위협 인텔
 ] as const;
 export type ToolDomain = (typeof TOOL_DOMAINS)[number] | "cross";
+
+// ── 문서 한 줄에 붙는 꼬리표 (2026-09-07) ─────────────────────────────────────────
+// 「그 문서 있습니다」라고 답해 놓고 검색은 0건이던 자리를 닫는다 — 대장에는 줄이 있는데
+// 저장소에 조각이 없는 문서(유령)는 이름을 대되 **읽을 수 없다는 사실을 함께** 말한다.
+// ⚠ 판정도 문구도 여기 한 곳(engine/docledger.ts)에서 온다 — 도구마다 다른 말을 하면
+//   같은 문서가 화면마다 다르게 보인다.
+const 문서꼬리 = (d: { docState?: DocState; ledgerChunks?: number | null }): string => {
+  const t = 상태꼬리(d.docState, d.ledgerChunks);
+  return t ? ` ⚠ ${t}` : "";
+};
 
 export interface AgentTool {
   name: string;
@@ -518,7 +529,7 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
     if (docs.length) {
       out.push(
         `관련 사내 문서 ${docs.length}건:`,
-        ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""} (조각 ${d.chunks})`)
+        ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""} (조각 ${d.chunks})${문서꼬리(d)}`)
       );
     }
   } catch {
@@ -824,7 +835,7 @@ export async function searchOne(q: string): Promise<string[]> {
   try {
     const docs = (await listVisibleDocuments()).filter((d) => matches(d.documentId, q));
     if (docs.length) {
-      out.push(`사내 문서 ${docs.length}건:`, ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}`));
+      out.push(`사내 문서 ${docs.length}건:`, ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}${문서꼬리(d)}`));
       try {
         // ⚠ queryMemoryRelevant(거리 임계값)가 아니라 queryMemory를 쓴다.
         //   임계값 버전은 같은 질문에 4건 중 1건만 남겼고, 하필 남은 하나가 표지·목차
@@ -1076,7 +1087,7 @@ export async function runRemediation(args: Record<string, string>): Promise<stri
   }
   try {
     const docs = (await listVisibleDocuments()).filter((d) => matches(d.documentId, topic));
-    if (docs.length) out.push("참고할 사내 매뉴얼·문서(조치 절차 근거):", ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}`));
+    if (docs.length) out.push("참고할 사내 매뉴얼·문서(조치 절차 근거):", ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}${문서꼬리(d)}`));
   } catch {
     /* 임베딩 미기동 — 문서 근거 없이 계속 */
   }
@@ -2885,7 +2896,11 @@ export async function runAuditSearch(args: Record<string, string>): Promise<stri
 // 인수인계는 4단계 마법사인데 "어디까지 됐나"를 물어볼 길이 없었다.
 // 담은 문서는 담당자 브라우저에만 있어 서버가 모른다 — 지식베이스 쪽 사실만 정직하게 답한다.
 export async function runHandoverStatus(): Promise<string> {
-  const docs = (await listVisibleDocuments()).filter((d) => d.origin !== "approved-qa"); // 승인 문답은 「올린 문서」가 아니다
+  const 전부 = (await listVisibleDocuments()).filter((d) => d.origin !== "approved-qa"); // 승인 문답은 「올린 문서」가 아니다
+  // ★ 조각이 없는 문서는 **인수인계에 담을 수 없다**(2026-09-07). 대장에는 줄이 있어도 AI가 못 읽으니
+  //   「인계할 자료 N건」에 넣으면 받는 사람이 없는 자료를 믿는다. 빼되 **몇 건인지 말한다**.
+  const 유령 = 전부.filter((d) => 조각없음(d.docState));
+  const docs = 전부.filter((d) => !조각없음(d.docState));
   if (docs.length === 0) {
     return "아직 지식베이스에 올린 문서가 없습니다. 인수인계는 아래 대화 콘솔의 ＋로 문서를 올리는 것부터 시작합니다.";
   }
@@ -2909,6 +2924,7 @@ export async function runHandoverStatus(): Promise<string> {
     : ["", "아직 인수인계 검증을 한 번도 돌리지 않았습니다 — 설정 > 업무 넘기기에서 [▶ 검증 시작]을 누르면 여기에 기록이 쌓입니다."];
   return [
     `지식베이스에 문서 ${docs.length}건(조각 ${chunks}개)이 쌓여 있습니다 — 인수인계에 담을 수 있는 자료입니다.`,
+    ...(유령.length ? [`⚠ 조각 없음 ${유령.length}건은 뺐습니다 — 대장에는 남아 있으나 AI가 읽을 수 없어 인계 자료로 못 씁니다(「조각 없는 문서 알려줘」로 확인).`] : []),
     "",
     "최근 올린 문서:",
     ...recent,
@@ -2962,9 +2978,15 @@ export async function runOntologyQuery(args: Record<string, string>): Promise<st
 export async function runKnowledgeStatus(): Promise<string> {
   // 승인 문답(겹 1, origin=approved-qa)은 문서가 아니라 따로 센다 — 목록에도 안 섞는다(검토관 2026-09-03).
   const 전체 = await listVisibleDocuments(); // lancedb 조회라 비동기다
-  const docs = 전체.filter((d) => d.origin !== "approved-qa");
+  const 문서 = 전체.filter((d) => d.origin !== "approved-qa");
+  // ★ 조각이 없는 문서는 **세지 않는다**(2026-09-07). 대장에 줄만 남고 벡터가 사라진 문서를
+  //   「장기기억 문서 N건」에 넣으면 **AI가 못 읽는 것을 안다고 말하는** 셈이다(정직 규칙).
+  //   ⚠ 감추지는 않는다 — 아래에서 「⚠ 조각 없음 N건」으로 **따로** 말한다. 빼기만 하면
+  //     담당자는 자기가 올린 문서가 왜 사라졌는지 영영 모른다.
+  const 유령 = 문서.filter((d) => 조각없음(d.docState));
+  const docs = 문서.filter((d) => !조각없음(d.docState));
   const triples = countTriples();
-  if (docs.length === 0 && triples === 0) return "등록된 지식 자료가 없습니다. 문서를 먼저 인입하세요.";
+  if (docs.length === 0 && triples === 0 && 유령.length === 0) return "등록된 지식 자료가 없습니다. 문서를 먼저 인입하세요.";
 
   const chunks = docs.reduce((n, d) => n + (d.chunks ?? 0), 0);
   const byScope = docs.reduce<Record<string, number>>((acc, d) => {
@@ -2976,7 +2998,8 @@ export async function runKnowledgeStatus(): Promise<string> {
   // 승인 문답(겹 1 기억 성장, 2026-09-03)은 문서 수에 섞이면 「문서가 늘었다」로 읽힌다 — 따로 센다.
   const { countApprovedQaDocs } = await import("../learnmemory.js");
   const 승인문답 = countApprovedQaDocs();
-  const head = `장기기억 문서 ${docs.length}건 (조각 ${chunks}개)${승인문답 ? ` · 승인 문답 ${승인문답}건` : ""}, 온톨로지 트리플 ${triples}개`;
+  const head = `장기기억 문서 ${docs.length}건 (조각 ${chunks}개)${승인문답 ? ` · 승인 문답 ${승인문답}건` : ""}, 온톨로지 트리플 ${triples}개`
+    + (유령.length ? `\n⚠ 조각 없음 ${유령.length}건 — 대장에는 있으나 저장소에 조각이 없어 답변 근거로 못 씁니다(「조각 없는 문서 알려줘」로 이름 확인).` : "");
   const scopes = `범위별: ${Object.entries(byScope).map(([s, n]) => `${s} ${n}`).join(", ")}`;
   const recent = docs.slice(-5).map((d) => `- ${d.documentId}`).reverse();
   return `${head}\n${scopes}\n최근 인입:\n${recent.join("\n")}`;
@@ -3508,7 +3531,8 @@ export async function runDeleteDocument(args: Record<string, string>): Promise<s
   });
   if (!hits.length) return `"${name}"에 해당하는 문서가 검색되지 않았습니다 — "새로 들어온 문서 알려줘"로 이름을 확인해 주세요.`;
   if (hits.length > 1) {
-    const 목록 = hits.slice(0, 6).map((d) => `- ${(d as { documentId?: string }).documentId}`).join("\n");
+    // 조각이 없는 문서는 **지울 것도 없다** — 그 사실을 함께 보여 줘야 담당자가 엉뚱한 줄을 고르지 않는다.
+    const 목록 = hits.slice(0, 6).map((d) => `- ${(d as { documentId?: string }).documentId}${문서꼬리(d)}`).join("\n");
     return `"${name}"에 ${hits.length}건이 걸립니다 — 파일 이름을 더 구체적으로 지목해 주세요:\n${목록}`;
   }
   const id = String((hits[0] as { documentId?: string }).documentId);
@@ -4285,4 +4309,80 @@ export function runDeleteIncidentCase(args: Record<string, string>): string {
     + (row.origin === "builtin"
       ? "(내장 사례는 숨김 — 다음 기동에도 되살아나지 않습니다. 다시 보이려면 관리자가 되살려야 합니다)."
       : "(되돌리려면 같은 내용으로 다시 등록해야 합니다).");
+}
+
+// ── 📄 조각 없는 문서 (2026-09-07 · 계획서 전-4) ────────────────────────────────
+//
+// 「올렸는데 왜 답을 못 하지」의 답을 **제품이 직접** 한다.
+// 반입 대장(memory_documents)에는 줄이 남았는데 지식 저장소(LanceDB)에 조각이 없는 문서 —
+// 담당자 눈에는 그냥 **없는 문서**로 보였다(목록에도 안 떴다). 이제 이름을 대고, 왜 답에 못 쓰는지
+// 말하고, 어떻게 되돌리는지까지 한 줄로 알려 준다.
+// ⚠ **아무것도 지우지 않고 아무것도 다시 넣지 않는다** — 읽기 도구다(되넣기는 reingest_document).
+// ⚠ 판정은 engine/docledger.ts 한 곳. 여기서 조각 수를 손으로 비교하지 않는다.
+export async function runDocChunkGaps(): Promise<string> {
+  const 전체 = await listVisibleDocuments(); // 등급 밖 문서는 이름도 안 나온다(문서 제목도 정보다)
+  const 유령 = 전체.filter((d) => 조각없음(d.docState));
+  // 반쪽 유령(이름은 있는데 판이 다른 문서)도 함께 말한다 — 그쪽은 「섞어 읽는」 결함이라 성격이 다르다.
+  const 반쪽 = 전체.filter((d) => d.docState === "short" || d.docState === "extra");
+  if (!유령.length && !반쪽.length) {
+    // 「찾지 못했습니다」는 서랍 점검 FAIL_MARKS에 걸린다 — 정직한 0건에 실패 딱지가 붙지 않게 다른 말로 쓴다.
+    return `반입 대장의 문서 ${전체.length}건이 모두 지식 저장소에 조각을 갖고 있습니다 — 조각이 사라진 문서는 없습니다.`;
+  }
+  const out: string[] = [];
+  if (유령.length) {
+    out.push(
+      `조각이 없는 문서 ${유령.length}건 — 올린 기록은 남아 있으나 **답변 근거로 쓸 수 없습니다**:`,
+      ...유령.slice(0, 20).map((d) => `  - ${d.documentId} (대장에 적힌 조각 ${d.ledgerChunks ?? 0}개 · 지금 0개)${d.hasSource ? " · 원본 보관됨" : " · 원본 없음"}`),
+    );
+    if (유령.length > 20) out.push(`  … 그 밖 ${유령.length - 20}건`);
+  }
+  if (반쪽.length) {
+    out.push(
+      `조각 수가 어긋난 문서 ${반쪽.length}건 — 이름은 있는데 **판이 다릅니다**(적으면 일부 사라짐, 많으면 옛 판이 섞여 읽힘):`,
+      ...반쪽.slice(0, 10).map((d) => `  - ${d.documentId} · 대장 ${d.ledgerChunks ?? 0} / 지금 ${d.chunks}`),
+    );
+    if (반쪽.length > 10) out.push(`  … 그 밖 ${반쪽.length - 10}건`);
+  }
+  out.push(
+    "",
+    "되돌리는 법 — 원본이 보관된 문서는 「<문서이름> 다시 넣어줘」라고 말씀하시면 결재판을 거쳐 다시 넣습니다.",
+    "원본이 없으면 대화창 ＋로 그 파일을 다시 올려 주세요(업무영역·등급은 그대로 이어집니다).",
+    "⚠ 이 도구는 아무것도 지우거나 바꾸지 않습니다 — 이름을 대는 데까지가 일입니다.",
+  );
+  return out.join("\n").slice(0, 2500);
+}
+
+// ── ↩ 문서 다시 넣기 (쓰기 · 결재판 경유) ───────────────────────────────────────
+//
+// 새 파이프라인을 만들지 않는다 — memory.reingestFromExtracted가 `/api/memory/document/markdown/save`와
+// **같은 자리**(추출본 .md → ingestText 멱등)를 쓴다. 옛 조각은 먼저 지워지고 scope·원본 경로는 유지된다.
+// ⚠ **추출본이 없으면 성공이라 적지 않는다** — 「＋로 다시 올리기」를 안내하고 던진다.
+//   쓰기 도구의 실패는 문자열이 아니라 throw다(위 DUE_RE 문단의 계약) — 결재판이 400으로 돌려
+//   화면이 「실행 실패」로 표시한다. 「✅ 완료」로 보여 주면 담당자가 복구된 줄 오해한다.
+// ⚠ 기동·스케줄 어디에서도 이 함수를 부르지 않는다 — 되넣기는 **사람이 승인할 때만** 일어난다
+//   (자율이 사람을 건너뛰면 「내가 안 시킨 문서가 다시 들어왔다」가 된다). 짝 시험이 소스로 감시한다.
+export async function runReingestDocument(args: Record<string, string>): Promise<string> {
+  const name = String(args.document ?? "").trim();
+  if (name.length < 2) throw new Error("어느 문서인지 이름으로 지목해 주세요 — 「조각 없는 문서 알려줘」로 이름을 확인할 수 있습니다.");
+  const docs = await listVisibleDocuments(); // 등급 밖 문서는 지목도 되넣기도 안 된다
+  const hits = docs.filter((d) => d.documentId === name || d.documentId.toLowerCase().includes(name.toLowerCase()));
+  if (!hits.length) throw new Error(`「${name}」에 해당하는 문서가 반입 대장에 없습니다 — 「조각 없는 문서 알려줘」로 이름을 확인해 주세요.`);
+  if (hits.length > 1) {
+    throw new Error(`「${name}」에 ${hits.length}건이 걸립니다 — 파일 이름을 더 구체적으로 지목해 주세요: ${hits.slice(0, 6).map((d) => d.documentId).join(", ")}`);
+  }
+  const doc = hits[0];
+  const { reingestFromExtracted } = await import("../memory.js");
+  const actor = currentViewer()?.userId ? findUserById(currentViewer()!.userId!)?.displayName ?? undefined : undefined;
+  const r = await reingestFromExtracted(doc.documentId, actor);
+  if (!r) {
+    // 추출본이 없다 = 넣을 글자가 없다. **영수증을 남기지 않는다**(대장 chunks도 그대로).
+    throw new Error(`「${doc.documentId}」는 AI가 읽었던 글(추출본)이 서버에 남아 있지 않아 다시 넣을 수 없습니다 — 대화창 ＋로 그 파일을 다시 올려 주세요(업무영역·등급은 그대로 이어집니다). 조각 수는 그대로 ${doc.chunks}개입니다.`);
+  }
+  const { recordAudit } = await import("../audit.js");
+  recordAudit({
+    kind: "write", actor: actor ?? null,
+    action: "지식베이스 문서 재인입(대화)", target: doc.documentId,
+    detail: `조각 ${doc.chunks}개 → ${r.chunks}개 (추출본에서 다시 넣음 · 대장에 적혀 있던 값 ${doc.ledgerChunks ?? 0}개)`,
+  });
+  return `문서 「${doc.documentId}」를 추출본에서 다시 넣었습니다 — 조각 ${doc.chunks}개 → ${r.chunks}개. 이제 답변 근거로 쓰입니다.`;
 }

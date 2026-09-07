@@ -9,6 +9,7 @@
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { listDocuments, getChunksForDocuments, queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE, type MemoryDocument } from "./memory";
+import { 조각없음 } from "./docledger"; // 「AI가 근거로 못 쓰는 문서인가」 판정 한 곳(잎 · import 0)
 import { 제품이쌓은문서, 개인문서 } from "./docorigin";
 import { db } from "../db";
 
@@ -26,7 +27,7 @@ export interface HygieneReport {
   totalDocs: number;
   /** 지식 저장소 전체 문서 수(제외분 포함) — totalDocs의 뜻이 조용히 바뀌지 않게 함께 낸다. */
   storeDocs: number;
-  /** 점검에서 뺀 문서 수 = storeDocs - totalDocs(승인 문답·침해사고 사례·개인 문서). */
+  /** 점검에서 뺀 문서 수 = storeDocs - totalDocs(승인 문답·침해사고 사례·개인 문서·조각 없는 문서). */
   excludedDocs: number;
   findings: HygieneFinding[];
   clean: boolean;
@@ -66,7 +67,13 @@ export async function scanKbHygiene(): Promise<HygieneReport> {
   //   이미 빼는데(memory.html loadDocuments) 여기만 남아, 위생 점검이 「personal:9f3c-…가 중복입니다」라고
   //   말해도 그 줄을 누를 자리가 없었다. 게다가 이 점검은 **보는 사람을 모른다**(주기 실행·도구
   //   호출에 viewer가 없다) — 남의 개인 메모가 아무에게나 가는 옆문까지 된다.
-  const docs = 전체.filter((d) => !제품이쌓은문서(d.origin) && !개인문서(d.documentId));
+  // ★ 유령(대장에는 줄이 있는데 저장소에 조각이 0개)도 뺀다(2026-09-07).
+  //   왜: 유령은 조각이 없어 **지문이 빈 문자열**이다. 그러면 ②버전충돌(이름 기준)에 그대로 섞여
+  //   「이름은 같은 계열인데 내용이 다르다」는 **거짓 지적**이 올라온다 — 담당자가 없는 문제를 쫓는다.
+  //   ①중복은 fp<40 가드가 이미 걸러 주지만 ②는 지문을 안 본다(이름만 본다).
+  //   ⚠ 그렇다고 유령을 조용히 감추는 것이 아니다 — 유령은 「조각 없음」이라는 **자기 이름으로**
+  //     목록·지식 현황·doc_chunk_gaps에서 말한다. 위생 점검은 그 문제를 못 고치는 자리라 안 받는다.
+  const docs = 전체.filter((d) => !제품이쌓은문서(d.origin) && !개인문서(d.documentId) && !조각없음(d.docState));
   const findings: HygieneFinding[] = [];
 
   // ★ 조각은 **한 번에** 떠 온다(2026-09-04 실측 수리). 예전에는 문서마다 getDocumentChunks를 불렀는데
@@ -215,11 +222,11 @@ export function 점검시각문구(scannedAt: string): string {
   return `마지막 점검 ${경과}(${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())})`;
 }
 
-/** 「점검 대상 N건(제외 M건 — 승인 문답·사례 문서·개인 문서)」 — 숫자가 무엇을 센 것인지 함께 말한다. */
+/** 「점검 대상 N건(제외 M건 — 승인 문답·사례 문서·개인 문서·조각 없는 문서)」 — 숫자가 무엇을 센 것인지 함께 말한다. */
 function 모집단문구(r: HygieneReport): string {
   const 제외 = Number(r.excludedDocs ?? 0);
   // ⚠ 제외 사유를 적을 때 개인 문서를 빠뜨리면 숫자와 설명이 어긋난다 — 「무엇을 뺐나」가 곧 이 숫자의 뜻이다.
-  return `문서 ${r.totalDocs}건 점검` + (제외 > 0 ? ` · 제외 ${제외}건(승인 문답·사례 문서·개인 문서 — 이 목록에 없어 여기서 지울 수 없는 것)` : "");
+  return `문서 ${r.totalDocs}건 점검` + (제외 > 0 ? ` · 제외 ${제외}건(승인 문답·사례 문서·개인 문서·조각 없는 문서 — 이 목록에 없거나 여기서 고칠 수 없는 것)` : "");
 }
 
 // 챗봇/화면이 그대로 쓸 요약.

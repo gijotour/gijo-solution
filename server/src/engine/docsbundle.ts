@@ -17,6 +17,7 @@ import { createHash } from "crypto";
 
 import { db } from "../db";
 import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument, markDocumentsBuiltin, 추출필요 } from "./memory";
+import { 대장과같음 } from "./docledger"; // 「이미 같은 판이 들어가 있나」 판정 한 곳(잎 · import 0)
 
 // 프로젝트 관례(localengine의 MODELS_DIR, memory의 DB_PATH)대로 cwd 기준 상대경로 + 환경변수
 // 오버라이드. 다만 저 둘과 달리 모듈 로드 시점에 상수로 굳히지 않고 호출할 때마다 읽는다 —
@@ -121,7 +122,23 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
   if (!manifest?.files?.length) return result;
 
   const scope = manifest.scope ?? GLOBAL_SCOPE;
-  const existing = new Set((await listDocuments()).map((d) => d.documentId));
+  const 목록 = await listDocuments();
+  // existing = **이름이 목록에 있나**. 아래 _제외 삭제 루프가 이 집합을 쓴다 —
+  //   여기를 좁히면 「지워야 할 문서인데 판이 어긋나 있어서」 안 지워진다(2026-08-03 실사고의 되풀이).
+  const existing = new Set(목록.map((d) => d.documentId));
+  // ── ★ 건너뛰기 판정은 **따로** 둔다 (2026-09-07) ───────────────────────────────
+  //
+  // ■ 왜 나눴나 — 안 나누면 이 라운드가 **손해**가 된다
+  //   오늘까지 조각을 잃은 내장 문서는 listDocuments에 **아예 안 떠서** existing에 없었고,
+  //   그래서 기동 때마다 조용히 **다시 인입돼 스스로 나았다**(아무도 그 자가치유를 모르고 있었다).
+  //   그런데 이번에 listDocuments가 유령까지 담게 되면서 이름이 existing에 들어온다 —
+  //   해시가 같으면 `skipped`로 빠져 **영영 안 낫는다.** 유령을 보이게 하려다 유령을 고정시키는
+  //   되치기라, 「이름이 있다」와 「같은 판이 들어가 있다」를 여기서 갈라 둔다.
+  // ⚠ ok가 **아닌 것은 전부** 다시 넣는다. missing이면 되살리고, short/extra(반쪽 유령)면 판을 맞춘다.
+  //   `조각없음`으로 좁히면 조각 수가 어긋난 문서는 이름이 있으니 계속 건너뛴다.
+  // ⚠ 다시 넣어도 ingestText가 멱등이라(옛 조각 선삭제) 두 판이 겹치지 않고, 인입이 끝나면
+  //   대장 chunks가 실제 값으로 갱신돼 **다음 기동에는 ok**가 된다(무한 재인입이 아니다).
+  const 판이같음 = new Set(목록.filter((d) => 대장과같음(d.docState)).map((d) => d.documentId));
 
   // ── ① 제외 목록을 **실제로 지운다** ──────────────────────────────────────────
   // 실측(2026-08-03): `GIJO_AS_AIBOM_검토_가이드.md`를 2026-08-02에 _제외로 옮겼는데
@@ -136,6 +153,7 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
     try {
       await deleteDocument(docId);
       existing.delete(docId);
+      판이같음.delete(docId); // 두 집합을 함께 비운다 — 한쪽만 지우면 지운 문서가 아래 루프에서 되살아난다
       result.removed.push(docId);
       console.log(`[docs-bundle] 제외 목록에 있어 지식베이스에서 지움 — ${docId}${뺀것.why ? ` (${String(뺀것.why).slice(0, 60)}…)` : ""}`);
     } catch (e) {
@@ -166,7 +184,9 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
       continue;
     }
     const hash = hashOf(raw);
-    if (existing.has(docId)) {
+    // ⚠ existing이 아니라 **판이같음**을 본다(위 ★). 이름만 같고 조각이 없거나 판이 다르면
+    //   해시가 같아도 건너뛰지 않고 아래 재인입으로 내려간다.
+    if (판이같음.has(docId)) {
       const known = (getHashStmt.get(HASH_KEY(docId)) as { value?: string } | undefined)?.value;
       if (known === hash) {
         result.skipped.push(entry.file);

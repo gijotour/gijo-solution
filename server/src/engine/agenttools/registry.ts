@@ -218,6 +218,8 @@ import {
   runSetEventStatus,
   runDeleteProduct,
   runVexStatus,
+  runDocChunkGaps,
+  runReingestDocument,
   runSetAiBomField,
   runEolCheck,
 } from "./handlers";
@@ -2247,6 +2249,44 @@ const TOOLS: AgentTool[] = [
     ],
     directAnswer: true,
     run: runVexStatus,
+  },
+  {
+    // 📄 조각 없는 문서 — 「올렸는데 왜 답을 못 하지」에 제품이 답한다(계획서 전-4 · 2026-09-07).
+    //   반입 대장에는 줄이 남았는데 지식 저장소에 조각이 없는 문서를 이름으로 짚는다.
+    //   ⚠ 읽기 도구다 — 아무것도 지우거나 다시 넣지 않는다(되넣기는 아래 reingest_document).
+    //   ⚠ 자리는 배열 **끝**이다. 도구 배열은 routes.ts 번호와 무관하지만, 이 저장소의 관례는
+    //     「새 것은 끝에」다(중간 삽입이 표를 밀어 낸 사고가 FORCED_INTENTS에서 있었다).
+    name: "doc_chunk_gaps",
+    label: "조각 없는 문서",
+    domain: "knowledge",
+    write: false,
+    description:
+      '반입 대장에는 있는데 지식 저장소에 조각이 없는 문서를 이름으로 알려 준다(조각 수가 어긋난 문서도 함께). "조각 없는 문서 알려줘"·"올린 문서인데 답을 못 해"·"지식에서 사라진 문서 있어?"에 쓴다. 표시만 한다 — 다시 넣는 것은 reingest_document가 결재판을 거쳐 한다.',
+    params: [],
+    // 결과가 이미 사람이 읽기 좋은 결정적 목록이라 LLM 재작성을 생략한다(이름·숫자가 흔들리면 안 된다).
+    directAnswer: true,
+    run: runDocChunkGaps,
+  },
+  {
+    // ↩ 문서 다시 넣기 — 조각이 사라진 문서를 **추출본에서** 되살린다(쓰기 · 결재판 경유).
+    //   ⚠ 새 파이프라인이 아니다 — memory.reingestFromExtracted가 markdown/save와 같은 자리를 쓴다.
+    //   ⚠ requiredRole은 **안 건다**(2026-09-07 판단): 문서를 올린 담당자가 자기 문서를 되살리는 일이고,
+    //     쓰기 도구라 이미 결재판을 지나며, 등급 밖 문서는 listVisibleDocuments에서 이미 안 보인다.
+    //     admin 전용으로 묶으면 정작 문제를 겪는 사람이 못 고치고 관리자에게 부탁해야 한다.
+    name: "reingest_document",
+    label: "문서 다시 넣기",
+    domain: "knowledge",
+    write: true,
+    description:
+      '조각이 사라진 지식 문서를 서버에 남은 추출본으로 다시 넣는다. "<문서이름> 다시 넣어줘"·"그 문서 재인입해줘"에 쓴다. 추출본이 없으면 다시 넣지 못하고 ＋로 다시 올리라고 안내한다.',
+    params: [
+      { name: "document", label: "문서", description: "다시 넣을 문서 이름(파일 이름)", required: true },
+    ],
+    effect: (args) =>
+      `문서 「${args.document ?? ""}」의 옛 조각을 지우고 서버에 보관된 추출본으로 **다시 인입** · 업무영역·등급·검색 범위는 그대로 유지`
+      + " · 추출본이 없으면 아무것도 바꾸지 않고 실패로 끝납니다",
+    undo: "되돌릴 필요가 없습니다 — 넣는 글자는 그 문서에서 뽑아 뒀던 그 글자입니다. 그래도 빼고 싶으면 「<문서이름> 지워줘」로 삭제할 수 있습니다.",
+    run: runReingestDocument,
   },
 ];
 
