@@ -19,6 +19,18 @@
 #   「반쪽 삭제」라는 뜻이므로 **사람이 볼 자리**다.
 #   ⚠ 낱말 겹침을 조심한다 — `engine/foo`는 `engine/foobar`에도 들어 있다. 뒤에 이름 글자가
 #     아닌 것이 와야 진짜 참조다(`[^A-Za-z0-9_-]`).
+#   ⚠⚠ **부르는 꼴이 두 가지다**(2026-09-08 반증에서 드러남 — 처음엔 하나만 셌다).
+#     tsc가 낸 CommonJS는 부르는 자리에 따라 경로가 다르게 찍힌다:
+#       ① 딴 폴더에서    dist/app.js        → require("./engine/foo")   ← `engine/` 글자가 있다
+#       ② **같은 폴더에서** dist/engine/bar.js → require("./foo")        ← `engine/` 글자가 **없다**
+#     ①만 세면 ②가 통째로 사각지대가 되는데, 하필 **가장 많이 부르는 쪽이 ②**다
+#     (실측: dist/engine 안의 형제 호출 require("./audit") 58건·require("./assets") 31건).
+#     실제 재현: src/engine/live.ts가 **살아 있고** dist/engine/live.js가 require("./gone")를
+#     들고 있는데도 gone을 지웠다 — 다음 기동이 MODULE_NOT_FOUND로 죽는 자리다.
+#     그래서 둘을 **합쳐서** 센다. ②는 dist/engine 안에서만 본다(딴 폴더의 `./foo`는 그 폴더의
+#     foo를 가리키지 engine의 것이 아니다).
+#   ⚠ 참조 세기는 **덜 지우는 쪽으로 틀리는 것이 옳다.** REF는 사람이 볼 자리를 알리는 것뿐이라
+#     헛걸림은 손해가 작고, 못 본 참조는 배포 사고다.
 #
 # ■ 범위는 dist/engine/*.js 뿐이다
 #   · copy-assets.mjs가 넣는 자료는 .json이라 여기 안 걸린다(지워질 위험이 없다).
@@ -49,7 +61,11 @@ for f in dist/engine/*.js; do
   [ -e "$f" ] || continue                      # 하나도 없으면 glob 그대로 들어온다
   b=$(basename "$f" .js)
   [ -f "src/engine/$b.ts" ] && continue        # 소스가 있으면 고아가 아니다
-  n=$(grep -rlE "engine/$b[^A-Za-z0-9_-]" dist --include=*.js 2>/dev/null | grep -cv "^dist/engine/$b\.js$")
+  # 참조 세기 — ① 딴 폴더의 `engine/foo` 꼴 + ② dist/engine 안 형제의 `./foo` 꼴을 **합친다**.
+  #   sort -u 로 같은 파일이 두 번 세지는 것을 막고, 자기 자신은 뺀다.
+  n=$( { grep -rlE "engine/$b[^A-Za-z0-9_-]" dist --include=*.js 2>/dev/null
+         grep -rlE "\./$b[^A-Za-z0-9_-]" dist/engine --include=*.js 2>/dev/null
+       } | sort -u | grep -cv "^dist/engine/$b\.js$" )
   if [ "${n:-0}" -gt 0 ]; then
     echo "REF|$b|$n"
   elif [ "$mode" = "--dry-run" ]; then

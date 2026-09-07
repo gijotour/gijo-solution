@@ -349,6 +349,17 @@ describe("★ 배포 절차 — 운영 dist 고아 산출물을 치운다", () =
     //   engine/foo는 engine/foobar에도 들어 있으므로, 뒤에 이름 글자가 아닌 것이 와야 진짜 참조다.
     expect(sh, "참조 세는 줄이 없거나 이름 겹침을 안 막는다 — 부르는데 지우면 배포 사고고, 겹침을 안 막으면 foo가 foobar 때문에 안 지워진다")
       .toContain('grep -rlE "engine/$b[^A-Za-z0-9_-]"');
+    // ⑥ **형제 호출도 센다**(2026-09-08 반증에서 실제로 지워졌다).
+    //   tsc가 낸 dist/engine 안의 모듈끼리는 `require("./foo")`로 부른다 — 그 문자열엔 `engine/`이
+    //   없어서 ③의 잣대로는 **한 건도 안 잡힌다.** 그런데 실측상 그쪽이 다수다
+    //   (require("./audit") 58건·require("./assets") 31건). 재현: src/engine/live.ts가 살아 있고
+    //   dist/engine/live.js가 require("./gone")를 드는데도 gone이 DEL로 지워졌다.
+    expect(sh, "같은 폴더 형제 호출(`./foo`)을 안 센다 — 가장 많이 부르는 꼴이 사각지대가 되고, 살아 있는 모듈이 지워져 다음 기동이 MODULE_NOT_FOUND로 죽는다")
+      .toContain('grep -rlE "\\./$b[^A-Za-z0-9_-]" dist/engine');
+    // ⑦ 둘을 **합쳐서** 센다 — 하나가 다른 하나를 대체하면 반대쪽 사각지대가 새로 생긴다.
+    //   같은 파일이 두 꼴을 다 가질 수 있으므로 sort -u로 중복을 접는다.
+    expect(sh, "두 잣대를 합쳐 세지 않는다 — 한쪽만 쓰면 반대쪽 호출 꼴이 통째로 안 보인다")
+      .toMatch(/engine\/\$b\[\^A-Za-z0-9_-\][\s\S]{0,200}\\\.\/\$b\[\^A-Za-z0-9_-\][\s\S]{0,120}sort -u/);
     // ⑤ 없는 경로에 조용히 성공하지 않는다 — 그러면 「고아 0건」이 거짓말이 된다.
     expect(sh, "경로가 틀려도 0으로 끝난다 — 「없음」이 거짓 초록이 된다").toMatch(/dist\/engine[\s\S]{0,120}exit 3/);
   });
@@ -368,12 +379,31 @@ describe("★ 배포 절차 — 운영 dist 고아 산출물을 치운다", () =
     expect(자리, "종료코드가 0이 아닐 때의 갈래가 없다 — 못 돌아도 초록으로 보인다").toBeGreaterThan(0);
   });
 
-  it("절차 문서에도 적혀 있다 — 오류는 journalctl이 아니라 server.log에서 본다", () => {
+  // ★ 이 갈래는 **WSL 사본에서도 돈다** — 아래 문서 갈래가 못 도는 것을 메우는 자리다.
+  //   「오류를 어디서 보나」를 절차 문서에만 적어 두면 상시 게이트에 감시가 0이 된다(2026-09-08 적발).
+  //   배포 스크립트 자신이 실패할 때 볼 자리를 말하게 하고, 그것을 여기서 잡는다.
+  it("배포가 실패했을 때 **볼 자리**를 말한다 — journalctl이 아니라 server.log", () => {
+    const ps = fs.readFileSync(배포경로, "utf8");
+    // 유닛이 StandardOutput=append:…/server.log라 저널에는 앱 글이 한 줄도 없다.
+    // 「WSL 로그 확인 필요」처럼 자리를 안 짚으면 다음 사람이 저널을 보고 「오류 없음」이라 한다.
+    expect(ps, "health 실패 자리가 server.log를 안 가리킨다 — 저널만 보고 「오류 없음」이라 하면 거짓 초록이다")
+      .toContain("/home/gijo/gijo-as/server.log");
+    const 실패자리 = ps.indexOf("health 실패");
+    expect(실패자리, "health 실패 갈래가 없다 — 시험이 헛돈다").toBeGreaterThan(0);
+    expect(ps.slice(실패자리, 실패자리 + 400), "health 실패 문구가 로그 파일 자리를 안 짚는다")
+      .toContain("server.log");
+  });
+
+  it("절차 문서에도 적혀 있다 — 오류는 journalctl이 아니라 server.log에서 본다", (ctx) => {
     // ⚠ **이 갈래는 WSL 사본에서 안 돈다.** wsl-test.sh는 tools/·knowledge/·뿌리 md만 가져가고
     //   `.claude/`는 안 가져간다. 그래서 WSL에서 초록이라고 이 문서가 검증됐다는 뜻이 아니다 —
-    //   실제로 재는 것은 `win` 호스트에서 돌릴 때다. 조용히 건너뛰지 않게 여기 적어 둔다.
+    //   실제로 재는 것은 `win` 호스트에서 돌릴 때다.
+    // ⚠⚠ 예전엔 여기서 그냥 `return`했다 — 그러면 **아무것도 안 쟀는데 passed로 찍혀**
+    //   「14/14 초록」이 실제로는 13개만 잰 숫자가 된다(2026-09-08 적발). ctx.skip()으로 바꿔
+    //   건너뛴 사실이 출력에 드러나게 한다. 「잰 것이 없는데 초록」은 게이트가 가질 수 있는
+    //   가장 나쁜 성질이다.
     const md = path.join(서버루트, "..", ".claude", "commands", "GIJOAS배포.md");
-    if (!fs.existsSync(md)) return;
+    if (!fs.existsSync(md)) { ctx.skip(); return; }
     const 글 = fs.readFileSync(md, "utf8");
     // ① 고아 청소가 절차에 있다.
     expect(글, "배포 절차에 고아 청소가 없다 — 사람이 손으로 배포하는 길에서는 영영 안 치워진다")

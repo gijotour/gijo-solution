@@ -191,7 +191,12 @@ foreach ($i in 1..12) {
     if ($h.ok) { $ok = $true; Write-Output "HEALTH OK — schema $($h.schema.count) · latest $($h.schema.latest)"; break }
   } catch {}
 }
-if (-not $ok) { throw "health 실패 — 운영 서버가 60초 내에 응답하지 않음. WSL 로그 확인 필요." }
+# ⚠ 「로그 확인」이라고만 적으면 다음 사람이 journalctl을 본다 — 거기엔 앱 글이 **한 줄도 없다**
+#   (유닛이 StandardOutput=append:/home/gijo/gijo-as/server.log라 앱 출력이 통째로 파일로 간다.
+#    실측 2026-09-08: journalctl -u gijo-as.service는 Started/Deactivated/Scheduled restart뿐).
+#   저널만 보고 「오류 없음」이라 말하는 것이 이 자리에서 나올 수 있는 가장 나쁜 거짓 초록이라,
+#   볼 자리를 **명령 그대로** 적는다.
+if (-not $ok) { throw "health 실패 — 운영 서버가 60초 내에 응답하지 않음. 왜 죽었는지는 journalctl이 아니라 로그 파일에 있다: wsl -d $distro -- tail -n 80 /home/gijo/gijo-as/server.log" }
 
 $after_pid = Read-WslRaw @("systemctl","show","gijo-as.service","-p","MainPID","--value")
 if (-not $after_pid -or $after_pid -eq "0") { throw "재시작 확인 실패 — MainPID가 비어 있다(서비스가 안 떴다). health 200은 다른 프로세스가 답했을 수 있다." }
