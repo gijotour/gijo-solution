@@ -384,9 +384,14 @@ const gijoApi = {
   //   preload에 둔 이유: nav.js는 모든 화면이 싣고 grouppanels.js는 허브 화면만 싣는다 — 공용 .js를
   //   새로 만들면 그 script 태그를 한 화면에서 빠뜨려도 조용히 통과한다(부품 로드 누락 5화면 「거짓
   //   초록」 전례). preload는 모든 렌더러에 **먼저** 붙어 로드 순서 사고가 없다.
-  // ⚠ status를 `api.ApprovalStatus`로 받는다 — 느슨한 string이면 오타·없어진 상태와 비교해도
-  //   tsc가 통과시킨다(실제로 클라 타입에 accepted가 없던 채로 accepted와 비교하고 있었다).
-  isUnassignedApproval: (x: { assignee?: string | null; status?: api.ApprovalStatus }) =>
+  // ⚠ status를 `api.ApprovalStatus`로 **필수**로 받는다(서버 isUnassignedReview와 같은 서명).
+  //   · 느슨한 string이면 오타·없어진 상태와 비교해도 tsc가 통과시킨다(실제로 클라 타입에
+  //     accepted가 없는 채로 accepted와 비교하고 있었다).
+  //   · 물음표를 뺀 이유: 서버가 status를 **반드시** 채워 준다(approvals.ts에서 승인 대장에
+  //     줄이 없는 건도 `row?.status ?? "pending"`으로 pending을 넣는다). 물음표를 두면 「없을
+  //     수도 있다」는 거짓 여지가 생기고, 그 여지에서 옛 허용목록형과 답이 갈린다 —
+  //     status가 없을 때 허용목록형은 「배정됨」, 이 식은 「미배정」이라 답한다.
+  isUnassignedApproval: (x: { assignee?: string | null; status: api.ApprovalStatus }) =>
     !x.assignee && x.status !== "approved" && x.status !== "rejected" && x.status !== "accepted",
   // status·note·assignee·dueDate를 부분 갱신. status만 주면 기존 승인/반려 동작과 동일.
   setFindingReview: (assetId: string, key: string, patch: api.ReviewPatch) => api.approvalsApi.set(assetId, key, patch),
