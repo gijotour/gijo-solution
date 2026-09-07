@@ -1283,8 +1283,16 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     });
     await new Promise((x) => setTimeout(x, 300));
     꼬리.셈 = await 셸.evaluate(() => window.__gateFlag);
-    await 셸.evaluate(() => { document.querySelectorAll("#gateFlagRow").forEach((el) => el.remove()); delete window.__gateFlag; });
   }
+  // ★ 청소는 **if 밖**이다(2026-09-07 검토관 [낮] 수리). 안에 두면 flag()가 null을 돌려준 날
+  //   — chatparts.js:891 `if (!host || !ctx || !ctx.question) return null;` 갈래가 실재한다 —
+  //   심어 둔 상자(position:fixed · z-index 99999 · 520px)가 화면 왼쪽 아래에 **그대로 남아**
+  //   뒤 검사의 클릭과 ⑨ 전 화면 스크린샷을 가린다. 꼬리성립은 어차피 false지만, 그때 뒤 검사들이
+  //   함께 이상해지면 **원인을 못 찾는다**(관문이 자기가 만든 방해물을 결함으로 보고한다).
+  await 셸.evaluate(() => {
+    document.querySelectorAll("#gateFlagRow").forEach((el) => el.remove());
+    delete window.__gateFlag;
+  }).catch(() => {});
   const 꼬리성립 = !!준비 && 준비.단추 === true
     && 꼬리.접힘호버 === "inline-block"                 // 접힘: 호버하면 드러난다(기존 계약)
     && 꼬리.펼침호버 === "none"                          // ★ 펼친 채 호버해도 안 되살아난다(이번 수리)
@@ -1332,6 +1340,28 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
 
   // (다) 감독 「🗔 결재판에서 처리」 — 진짜로 결재판 탭이 열리는가(재렌더 뒤 다시 거는 배선).
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("supervision.html", "감독", { dock: true }));
+  // ★★ 2026-09-07 검토관 [상]·[중] 두 건 수리 — **누르기 전 상태를 먼저 적는다.**
+  //   ① 옛 판은 열린 탭을 `#tabBar [data-page], #tabBar button`으로 읽었는데 그런 요소가 **하나도
+  //      없다**(app.html:467 #tabBar의 자식은 renderTab이 만드는 div.tab뿐이고 dataset.page를 안
+  //      넣는다 — data-page 0건. 「모두 닫기」류 button 3개는 #tabBar **밖 형제** .tb-act에 있다).
+  //      그래서 열린탭이 늘 ""이 되어 /approvals\.html/가 영원히 거짓 → **감독에 🔧 줄이 서 있는
+  //      한 게시가 관문에 막힌다.** 이 절은 한 번도 안 돌아서 게시 당일에야 드러날 자리였다.
+  //      고침: 같은 파일 797줄이 이미 쓰는 관용구(gijoTabs.list())로 읽는다. 활성 탭은
+  //      activeScreen()이 준다(778줄 선례).
+  //   ② 앞선 (나)가 approvals.html 탭을 열어 두고 닫지 않으므로(표준 셸에서는 탭이 쌓인다)
+  //      「approvals 탭이 있다」는 **누르기 전에 이미 참**이었다 — 단추가 완전히 죽어 있어도 통과.
+  //      고침: 전·후를 견준다. 단추가 여는 주소는 `approvals.html?fix=open`(supervision.html:416)
+  //      이고 (나)가 연 것은 쿼리 없는 `approvals.html`이라, **?fix=open이 새로 생겼는가**가
+  //      클릭의 결과인지 아닌지를 가른다. 활성 화면까지 함께 본다(프로 셸은 도킹 슬롯이 1개라
+  //      탭이 교체되므로 목록만 보면 갈래가 갈린다 — 둘 중 하나면 성립).
+  const 탭상태 = () => 셸.evaluate(() => {
+    const T = window.gijoTabs;
+    return {
+      목록: T && T.list ? T.list().map((t) => String(t.page || t)).join("|") : "",
+      활성: (T && T.activeScreen && T.activeScreen()) || "",
+    };
+  }).catch(() => ({ 목록: "", 활성: "" }));
+  const 누르기전 = await 탭상태();
   const supFr = await 프레임찾기("supervision.html", 12);
   const 처리 = supFr ? await supFr.evaluate(async () => {
     for (let i = 0; i < 25; i++) { if (document.querySelector("#sup .sup-line")) break; await new Promise((x) => setTimeout(x, 400)); }
@@ -1343,15 +1373,20 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     return { 있음: true, 단추: !!단추, 라벨: 단추 ? 단추.textContent.trim() : "", 열림기준: /열림 기준\(0건도 그립니다\)/.test(글), 갈래: (글.match(/자료 부족|사내 규정|제품|미분류/g) || []).length, 글: 글.slice(0, 140) };
   }).catch(() => null) : null;
   await new Promise((x) => setTimeout(x, 1200));
-  const 열린탭 = await 셸.evaluate(() => [...document.querySelectorAll("#tabBar [data-page], #tabBar button")].map((b) => (b.dataset && b.dataset.page) || b.textContent.trim()).join("|"));
+  const 누른뒤 = await 탭상태();
+  // 판정 재료를 **한 문장으로** 만든다 — 「전에는 없었는데 지금은 있다」가 곧 클릭의 증거다.
+  const 열린탭 = (/approvals\.html\?fix=open/.test(누른뒤.목록) || /approvals\.html\?fix=open/.test(누른뒤.활성))
+    && !/approvals\.html\?fix=open/.test(누르기전.목록) && !/approvals\.html\?fix=open/.test(누르기전.활성)
+    ? "새로열림:approvals.html?fix=open"
+    : ("전=" + 누르기전.목록 + "/" + 누르기전.활성 + " 후=" + 누른뒤.목록 + "/" + 누른뒤.활성);
   // ⚠ 줄이 없을 수도 있다(옛 서버·fixboard 미탑재) — 그때는 **없는 것을 있다고 우기지 않고** 넘어간다.
   //   대신 「줄이 없다」를 그대로 적어 사람이 읽게 한다(⑧′의 「사유 0건」 조항과 같은 태도).
   const 처리성립 = !!처리 && (처리.줄없음 === true
     ? true
     : (처리.단추 === true && /🗔 결재판에서 처리/.test(처리.라벨) && 처리.열림기준 === true
-      && 처리.갈래 >= 4 && /approvals\.html/.test(열린탭)));
-  ok("감독 🔧 고칠 것: 갈래 4·「열림 기준(0건도 그립니다)」·「🗔 결재판에서 처리」가 결재판 탭을 연다",
-    처리성립, JSON.stringify(처리) + " · 탭=" + String(열린탭).slice(0, 160));
+      && 처리.갈래 >= 4 && /^새로열림:approvals\.html\?fix=open$/.test(열린탭)));
+  ok("감독 🔧 고칠 것: 갈래 4·「열림 기준(0건도 그립니다)」·「🗔 결재판에서 처리」가 **누른 뒤에** 결재판(?fix=open) 탭을 연다",
+    처리성립, JSON.stringify(처리) + " · 탭=" + String(열린탭).slice(0, 200));
 
   // (라) 내 문서 🏢 회사 지식 — 「조각 없음(대장 N개)」 칩과 「⚠ N」 배지.
   // ⚠ **양방향 계약**이다: 유령이 있으면 칩이 보이고, **0건이면 칩도 배지도 없어야** 한다

@@ -166,22 +166,98 @@ describe("③ 결재판 세그먼트 성립식 — 「0건」과 「못 읽음�
 });
 
 describe("④ 감독 성립식 — 줄이 없을 때와 있을 때", () => {
+  /* ★★ 2026-09-07 검토관 [중] 수리 — 옛 판은 열린탭에 `"supervision.html|approvals.html?fix=open"`
+     이라는 **실화면 DOM이 만들어 낼 수 없는 값**을 손으로 먹였다. 판정식은 떼어 왔는데 **그 식에
+     들어가는 값의 생산자는 아무도 안 쟀고**, 실제 생산자(관문의 evaluate)가 늘 ""을 내던 사실이
+     여기서는 초록으로 보였다 — 「시험이 있다」가 거짓 안심이 되는 자리다.
+     고침 ① 아래 ⑥에서 **생산자 쪽 소스 계약**을 따로 잰다(무엇으로 탭을 읽는가).
+     고침 ② 관문이 이제 전·후를 견줘 한 문장(`새로열림:…`)으로 만들므로, 여기 값도 그 문장이다. */
   const 좋음 = (p: Record<string, unknown> = {}) => ({
     처리: { 있음: true, 단추: true, 라벨: "🗔 결재판에서 처리", 열림기준: true, 갈래: 4, ...p },
-    열린탭: "supervision.html|approvals.html?fix=open",
+    열린탭: "새로열림:approvals.html?fix=open",
   });
-  it("줄이 있고 단추가 결재판을 열면 통과", () => expect(판정("처리성립", 좋음())).toBe(true));
+  it("줄이 있고 단추가 **누른 뒤에** 결재판을 열면 통과", () => expect(판정("처리성립", 좋음())).toBe(true));
   it("★ 옛 서버라 줄이 아예 없으면 넘어간다 — 없는 것을 있다고 우기지 않는다", () => {
     expect(판정("처리성립", { 처리: { 줄없음: true, 글: "" }, 열린탭: "" })).toBe(true);
   });
   it("★★ 단추를 눌렀는데 결재판 탭이 안 열리면 실패(죽은 단추 — 이 저장소 최악의 결함)", () => {
-    expect(판정("처리성립", { ...좋음(), 열린탭: "supervision.html" })).toBe(false);
+    expect(판정("처리성립", { ...좋음(), 열린탭: "전=supervision.html/supervision.html 후=supervision.html/supervision.html" })).toBe(false);
+  });
+  it("★★ **누르기 전에 이미 열려 있던** 결재판으로는 통과 못 한다(앞 검사 (나)가 열어 둔 탭)", () => {
+    // 옛 판정(/approvals\.html/ 부분일치)이라면 이 값도 초록이었다 — 단추가 죽어 있어도.
+    expect(판정("처리성립", { ...좋음(), 열린탭: "전=approvals.html?fix=open 후=approvals.html?fix=open" })).toBe(false);
+    expect(판정("처리성립", { ...좋음(), 열린탭: "전=approvals.html 후=approvals.html|supervision.html" })).toBe(false);
+  });
+  it("★ 옛 selector가 늘 내던 빈 문자열로는 통과 못 한다(관문이 자기 눈을 감고 있던 상태)", () => {
+    expect(판정("처리성립", { ...좋음(), 열린탭: "" })).toBe(false);
   });
   it("「열림 기준(0건도 그립니다)」 문구가 사라지면 실패", () => {
     expect(판정("처리성립", 좋음({ 열림기준: false }))).toBe(false);
   });
   it("갈래가 넷 미만이면 실패(0건 갈래를 숨겼다 — 부재와 무지가 같아 보인다)", () => {
     expect(판정("처리성립", 좋음({ 갈래: 3 }))).toBe(false);
+  });
+});
+
+/* ── ⑥ **생산자**를 잰다 — 판정식에 들어가는 값이 실화면에서 만들어질 수 있나 ─────────────
+   ■ 왜(2026-09-07 검토관 [상]): ⑧⁗ 검사 ③이 열린 탭을 `#tabBar [data-page], #tabBar button`으로
+     읽었는데 셸의 탭줄에는 그런 요소가 **하나도 없다** — app.html의 #tabBar 자식은 renderTab이
+     만드는 div.tab뿐이고(dataset.page 안 넣음, 파일 전체 data-page 0건), 「모두 닫기」류 button은
+     #tabBar **밖 형제**(.tb-act)다. 그래서 그 값은 늘 ""이었고 검사는 **실화면에서 절대 참이 될 수
+     없었다** — 🔧 줄이 서면 게시가 막힌다. 위 성립식 시험은 값을 손으로 먹여서 이것을 못 봤다.
+   ■ 여기서는 관문 소스가 **무엇으로 읽는가**를 잰다. 실화면 DOM은 vitest가 못 띄우므로, 대신
+     ① 금지된 읽기(그 selector)가 없고 ② 셸이 실제로 내놓는 API(gijoTabs.list/activeScreen)를
+     쓰며 ③ 그 API가 app.html에 정말 있는지를 함께 못 박는다(생산자-소비자 짝). */
+describe("⑥ 탭 읽기의 생산자 — 셸이 실제로 내놓는 것으로만 읽는다", () => {
+  const 셸 = fs.readFileSync(
+    path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "app.html"), "utf8");
+  // ⚠ **주석을 뺀 코드**만 본다 — 관문 주석에는 「옛 판은 이 selector로 읽었다」는 설명이 남아
+  //   있고(왜 고쳤는지는 남겨야 한다), 그것까지 세면 이 감시가 늘 빨개진다. 재는 것은 코드다.
+  const 절코드 = 절.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+
+  it("★★ 관문이 #tabBar의 data-page·button으로 탭을 읽지 않는다(그런 요소가 없다)", () => {
+    expect(절코드.length, "주석 빼기가 절을 통째로 지웠다 — 이 시험이 헛돈다").toBeGreaterThan(1500);
+    expect(절코드, "#tabBar [data-page] 읽기가 되살아났다 — 실화면에서 늘 빈 값이 된다")
+      .not.toMatch(/#tabBar\s*\[data-page\]/);
+    expect(절코드, "#tabBar button 읽기가 되살아났다 — 그 button은 #tabBar 밖 형제다")
+      .not.toMatch(/#tabBar\s+button/);
+  });
+
+  it("★ 없다는 근거 — app.html의 #tabBar는 data-page를 안 달고 button도 안 품는다", () => {
+    expect(셸, "탭줄 자체가 사라졌다 — 이 시험의 전제가 무너졌다").toContain('id="tabBar"');
+    expect(셸.includes("data-page"), "app.html에 data-page가 생겼다 — 옛 selector를 다시 볼 것").toBe(false);
+    // renderTab이 만드는 것은 div.tab + span들뿐이다(button 아님).
+    expect(셸, "renderTab이 더는 div.tab을 만들지 않는다").toMatch(/el\.className = "tab"/);
+  });
+
+  it("★ 관문이 gijoTabs.list()·activeScreen()으로 읽고, 셸이 그 둘을 정말 내놓는다", () => {
+    expect(절, "관문이 gijoTabs.list()를 안 쓴다").toMatch(/gijoTabs[\s\S]{0,40}\.list\(\)/);
+    expect(절, "관문이 activeScreen()을 안 쓴다").toMatch(/activeScreen\(\)/);
+    expect(셸, "셸이 list를 안 내놓는다 — 관문이 늘 빈 값을 읽게 된다").toMatch(/list: function \(\)/);
+    expect(셸, "셸이 activeScreen을 안 내놓는다").toMatch(/activeScreen: function \(\)/);
+  });
+
+  it("★★ 판정이 **누르기 전후**를 견준다 — 앞 검사가 열어 둔 탭으로는 못 통과한다", () => {
+    expect(절, "누르기 전 상태를 안 적는다 — 죽은 단추가 통과한다").toContain("누르기전");
+    expect(절, "누른 뒤 상태를 안 적는다").toContain("누른뒤");
+    expect(성립식("처리성립"), "판정이 아직 부분일치(/approvals\.html/)다 — 앞서 열린 탭도 통과한다")
+      .toContain("새로열림");
+  });
+
+  it("★ 심어 둔 상자 청소가 if 밖이다 — 부품이 null을 줘도 화면에 안 남는다", () => {
+    // `if (준비 && 준비.단추) {` 블록이 끝난 **뒤**에 gateFlagRow 지우기가 와야 한다.
+    const 블록시작 = 절.indexOf("if (준비 && 준비.단추)");
+    expect(블록시작, "if 블록을 못 찾았다 — 이 시험이 헛돈다").toBeGreaterThan(-1);
+    // 청소는 그 블록 **밖**에 한 번만 온다. 되돌아가면(if 안으로) 여기서 빨개진다.
+    const 안쪽마지막 = 절.indexOf("꼬리.셈 = await");
+    const 밖표식 = 절.indexOf("청소는 **if 밖**이다");
+    const 청소 = 절.indexOf("delete window.__gateFlag;");
+    expect(안쪽마지막, "if 블록 안 마지막 줄을 못 찾았다 — 이 시험이 헛돈다").toBeGreaterThan(블록시작);
+    expect(밖표식, "청소를 if 밖으로 뺀 표식이 없다").toBeGreaterThan(안쪽마지막);
+    expect(청소, "청소 한 곳을 못 찾았다").toBeGreaterThan(밖표식);
+    // if 블록 **안쪽**에는 지우기가 남아 있으면 안 된다(두 곳이 되면 하나가 늙는다).
+    expect(절.slice(블록시작, 안쪽마지막).includes('#gateFlagRow").forEach'),
+      "if 블록 안에 아직 지우기가 있다 — 청소가 두 곳이 됐다").toBe(false);
   });
 });
 
