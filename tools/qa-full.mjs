@@ -83,7 +83,12 @@ try {
   );
 } catch { /* 대장을 못 읽으면 아래 규칙만으로 판정한다(없는 것보다 낫다) */ }
 // ⚠ 정규식을 문자열로 짓는다 — 이 파일은 짝 시험이 소스를 읽어 대조하므로 형태를 단순하게 둔다.
-const DOCS_RE = new RegExp("^knowledge/|^server/docs-manifest[.]json$|^tools/docs-drift[.]mjs$");
+// ⚠ **판정 정의가 있는 자리**도 넣는다(2026-09-07 적발). 대조 잣대는 tools/docs-drift.mjs에서
+//   server/src/engine/docledger.ts로 **옮겨 갔는데** 이 규칙은 옛 자리만 알고 있었다 —
+//   그래서 정의만 고치는 커밋은 docs 계층을 한 번도 안 켰다(옮기기 전에는 반드시 켜졌던 것이
+//   조용히 꺼진 것이라, 이 파일이 위에서 경고하는 「만들어 놓고 안 도는 검사」와 같은 부류다).
+//   ⚠ 서버 파일을 넓게 잡지 말 것 — 늘 도는 계층은 아무도 결과를 안 보게 되어 없는 것과 같아진다.
+const DOCS_RE = new RegExp("^knowledge/|^server/docs-manifest[.]json$|^tools/docs-drift[.]mjs$|^server/src/engine/docledger[.]ts$");
 const 문서변경 = (f) => DOCS_RE.test(f) || 문서대장.has(f);
 
 const picks = new Set(["server"]); // 스모크는 항상
@@ -232,7 +237,11 @@ run("docprobe", "node", ["tools/doc-probe.mjs"]);
 //     0=같음 · 1=어긋남 · **2=판정 못 함**. 2를 실패로 세면 환경 문제가 문서 결함으로 둔갑한다.
 run("docs", "node", ["tools/docs-drift.mjs"], {
   판정못함코드: [2],
-  판정못함사유: "이 도구는 win 호스트 전용이다(운영 값을 wsl로 읽는다) — WSL·gb10 안에서 돌렸거나 운영 값을 못 읽었다",
+  // ⚠ 사유는 **원인을 좁혀 지목하지 않는다**(2026-09-07 적발). exit 2는 두 갈래다 —
+  //   ① win 호스트가 아니거나 운영 값을 못 읽음 ② server/dist가 없거나 소스보다 낡음
+  //   (이 도구가 2026-09-07부터 dist/engine/docledger.js를 부른다 · dist는 gitignore라 새 체크아웃에서 실제로 난다).
+  //   한 갈래만 적으면 「재지 못한 것을 정직하게 말한다」는 취지가 엉뚱한 곳을 가리켜 반쪽이 된다.
+  판정못함사유: "① win 호스트 전용이다(운영 값을 wsl로 읽는다) — WSL·gb10 안에서 돌렸거나 운영 값을 못 읽었다 · ② server/dist가 없거나 낡았다(server에서 `npm run build`) — 도구가 찍은 사유 줄을 볼 것",
 });
 
 // ── ④ 요약·마커·리포트 ──────────────────────────────────────────────────────────

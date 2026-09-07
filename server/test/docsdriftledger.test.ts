@@ -58,9 +58,17 @@ describe("docs-drift — 판정 정의는 제품 한 곳뿐이다(두 벌 금지
   });
 
   it("★ 빌드가 없으면 **멈춘다**(exit 2) — 건너뛰면 「어긋남 0건」이라는 거짓 초록이 된다", () => {
-    const 자리 = 소스.slice(소스.indexOf("async function 잣대모듈"), 소스.indexOf("async function 잣대모듈") + 1200);
+    const 자리 = 소스.slice(소스.indexOf("async function 잣대모듈"), 소스.indexOf("async function 잣대모듈") + 2200);
     expect(자리, "빌드가 없을 때 중단하지 않는다").toContain("중단([");
     expect(자리, "낡은 빌드(내보내기 없음)를 그냥 쓴다").toContain("npm run build");
+  });
+
+  it("★ 빌드가 **낡아도** 멈춘다 — 「없으면 멈춘다」만 지키면 옛 정의로 재고 초록을 준다", () => {
+    // 2026-09-07 적발: existsSync만 봐서 소스보다 낡은 dist를 그대로 썼다. 같은 dist를 부르는
+    // tools/route-explain.mjs는 같은 자리에서 mtime을 견줘 낡으면 다시 빌드한다 — 한쪽만 눈을 감고 있었다.
+    const 자리 = 소스.slice(소스.indexOf("async function 잣대모듈"), 소스.indexOf("async function 잣대모듈") + 2200);
+    expect(자리, "mtime을 안 견준다 — 낡은 dist로 재고 「어긋남 0건」을 준다").toContain("mtimeMs");
+    expect(자리, "낡았을 때 무엇을 하라는지 안 알려 준다").toContain("낡았습니다");
   });
 
   it("★ docledger.ts는 **순수**하다 — 도구가 dist를 불러도 DB가 안 열린다", () => {

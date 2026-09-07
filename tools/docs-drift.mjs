@@ -89,12 +89,26 @@ export function 제외요약(제외) {
 //
 // ■ 없으면 **멈춘다**(exit 2) — 이 도구의 「빈 값 대신 멈춘다」와 같은 꼴
 //   빌드가 없다고 대조를 건너뛰면 「어긋남 0건」이라는 **거짓 초록**이 된다.
+// ■ ⚠ **낡아도** 멈춘다 (2026-09-07 검토관 적발)
+//   처음 판은 `existsSync`만 봤다. 그러면 「없으면 멈춘다」는 지켜지지만 **「낡으면 옛 정의로 재고
+//   초록을 준다」**가 그대로 남는다 — 계약이 반쪽만 지켜진 것이다. 같은 dist를 부르는
+//   `tools/route-explain.mjs`는 같은 자리에서 mtime을 견줘 낡으면 다시 빌드한다.
+//   ⚠ 여기서는 **다시 빌드하지 않는다** — 이 도구는 운영 값을 읽는 조회 도구라 부작용을 안 만든다.
+//     대신 exit 2(판정 못 함)로 멈추고 무엇을 하라는지 말한다.
 async function 잣대모듈() {
   const dist = path.join(뿌리, "server", "dist", "engine", "docledger.js");
+  const src = path.join(뿌리, "server", "src", "engine", "docledger.ts");
   if (!fs.existsSync(dist)) {
     중단([
       "  · 하려던 일: 반입 대장 ↔ 지식 저장소 대조(server/dist/engine/docledger.js)",
       "  · 빌드된 제품 판이 없습니다 — 판정 정의는 제품(engine/docledger.ts)에 한 벌만 둡니다.",
+      "  → server 폴더에서 `npm run build` 후 다시 돌리세요.",
+    ]);
+  }
+  if (fs.existsSync(src) && fs.statSync(src).mtimeMs > fs.statSync(dist).mtimeMs) {
+    중단([
+      "  · 하려던 일: 반입 대장 ↔ 지식 저장소 대조(server/dist/engine/docledger.js)",
+      "  · 빌드가 소스보다 **낡았습니다** — 옛 잣대로 재면 「어긋남 0건」이라는 거짓 초록이 됩니다.",
       "  → server 폴더에서 `npm run build` 후 다시 돌리세요.",
     ]);
   }

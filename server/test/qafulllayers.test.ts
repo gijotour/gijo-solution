@@ -84,4 +84,19 @@ describe("QA 전수조사 — 고를 수 있는 계층과 실제로 도는 계�
     expect(소스, "대상 문서의 정본은 server/docs-manifest.json이다").toContain("docs-manifest.json");
     expect(소스, "지식 코퍼스 변경도 문서 표류 대상이다").toContain("^knowledge/");
   });
+
+  it("★ docs 계층은 **판정 정의**(engine/docledger.ts)가 바뀌어도 걸린다 — 정의를 옮기고 배선을 안 옮겼던 자리", () => {
+    // 2026-09-07 적발: 대조 정의가 tools/docs-drift.mjs → server/src/engine/docledger.ts로 **옮겨 갔는데**
+    //   DOCS_RE는 옛 자리만 알고 있었다. 그래서 정의만 고치는 커밋은 docs 계층을 한 번도 안 켰다 —
+    //   옮기기 전에는 반드시 켜졌던 것이 조용히 꺼진 것이라, 이 파일이 스스로 경고하는
+    //   「신설 이래 한 번도 안 돈 계층」과 같은 부류다.
+    const m = 소스.match(/const DOCS_RE = new RegExp\("([^"]+)"\)/);
+    expect(m, "DOCS_RE를 소스에서 못 읽었다 — 형태가 바뀌었으면 이 시험도 고쳐야 한다").toBeTruthy();
+    const re = new RegExp(m![1]);
+    for (const f of ["tools/docs-drift.mjs", "server/src/engine/docledger.ts"]) {
+      expect(re.test(f), `${f}를 고쳐도 docs 계층이 안 켜진다 — 대조 잣대가 바뀌었는데 대조를 안 돌린다`).toBe(true);
+    }
+    // 반증 — 아무 서버 파일이나 다 걸리면 docs는 늘 돌게 되고, 늘 도는 계층은 아무도 결과를 안 본다.
+    expect(re.test("server/src/engine/memory.ts"), "docs 계층이 서버 파일 전반에 걸린다 — 늘 돌면 없는 것과 같다").toBe(false);
+  });
 });
