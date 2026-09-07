@@ -12,6 +12,7 @@ import type { WebSocketServer } from "ws";
 import { authMiddleware } from "../auth/auth";
 import { db } from "../db";
 import { todayLocal } from "../util/date";
+import { 고칠것요약, 고칠것최근 } from "./fixboard";
 
 export interface LlmActivityEvent {
   // search=RAG 조회(hybridSearch — 4개 검색 경로 공용 지점) · guard=입구 검사(gateway.gateUserInput)
@@ -156,6 +157,16 @@ export function registerLlmActivityRoutes(app: Express): void {
     }
     // ✂ 사유별 건수(2026-09-06) — **새 창구를 만들지 않는다**. 감독 화면은 지금도 이 한 API만
     //   부르므로 칸을 여기 더한다. daily(답 개수)와 다른 잣대라 칸을 갈라 둔다(섞으면 거짓).
-    res.json({ days, calls: chatCallsByAgent(days), daily: activityDaily(days), recentErrors, citeReasons: citeReasonsDaily(days) });
+    // 🔧 고칠 것(2026-09-07) — citeReasons와 **같은 선례**로 칸만 더한다(새 API 안 만든다).
+    //   갈래별 열림·닫힘 수는 fixboard.고칠것요약 **한 함수**에서 온다 — 결재판·주간 요약·여기가
+    //   같은 숫자를 봐야 한다(세는 곳이 셋이 되면 화면끼리 어긋난다).
+    //   ⚠ LlmActivityEvent.kind 유니언은 안 건드린다 — 「고칠 것」은 실시간 이벤트가 아니라
+    //     사람이 누른 표라 애초에 그 스트림에 실을 것이 아니다(wiringcontract.test 글자 감시).
+    //   ⚠ 최근 5줄에는 답 본문·인용 조각을 안 싣는다 — 이 창구는 등급 게이트 밖이다.
+    res.json({
+      days, calls: chatCallsByAgent(days), daily: activityDaily(days), recentErrors,
+      citeReasons: citeReasonsDaily(days),
+      fixboard: { ...고칠것요약(days), recent: 고칠것최근(days, 5) },
+    });
   });
 }
