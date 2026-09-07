@@ -165,3 +165,42 @@ describe("문서 추출 — OOXML(docx·pptx·xlsx, 의존성 0)", () => {
     await expect(extractDocumentText("스캔.png", png1x1)).rejects.toThrow(/OCR|글자를 찾지 못/);
   });
 });
+
+// ★ 낱말 구분자가 제어문자로 뽑히는 PDF (2026-09-07 — 반입 400 실사고)
+//
+// 관공서 PDF 한 장이 「문서를 읽지 못했습니다 — 내용이 글자가 아닌 것 같습니다」로 거절됐다.
+// 그런데 추출은 성공했다 — 낱말 사이가 공백이 아니라 **BEL(U+0007)**이었을 뿐이다. 폰트의
+// ToUnicode CMap이 공백 글리프를 제어문자로 매핑하면 pdf.js가 그대로 뽑는다.
+// fixtures/ctrl-sep.pdf가 **진짜 PDF로** 그 꼴을 재현한다(1.3KB · 추출 306자 중 제어 45개·14.7%).
+// ⚠ 원본 관공서 PDF는 저장소에 넣지 않는다(외부 문서) — 같은 원리를 최소 PDF로 만든 것이다.
+describe("제어문자가 낱말을 가르는 PDF도 사람이 읽는 글로 만든다 (2026-09-07)", () => {
+  it("추출본에 제어문자가 남지 않고, 낱말이 서로 붙지도 않는다", async () => {
+    const t = await extractDocumentText("ctrl-sep.pdf", b64("ctrl-sep.pdf"));
+    expect(t.length, "픽스처가 안 읽혔다 — 시험이 헛돈다").toBeGreaterThan(100);
+    expect(
+      (t.match(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g) ?? []).length,
+      "제어문자가 그대로 남았다 — 조각·검색·추출본(.md)이 전부 오염된다",
+    ).toBe(0);
+    // ★ 지우면 낱말이 붙는다("Cyberfraud"). 공백으로 바꿔야 한다.
+    expect(t, "낱말이 붙었다 — 제어문자를 지우지 말고 공백으로 바꿔야 한다").toContain("Cyber fraud");
+    expect(t).toContain("The operator shall record every detection case within 6 hours");
+    // 공백이 둘로 벌어지지 않았다 = 정규화 순서가 맞다(제어문자 → 공백이 [ \t]+ 압축보다 **먼저**).
+    expect(t, "공백이 둘로 남았다 — 정규화 순서가 뒤집혔다").not.toMatch(/[^\n] {2,}/);
+  });
+
+  // ★ 「양쪽에 적고 서로 가리키는」 쌍 계약 — JS(dataset.ts)와 파이썬(extract_doc.py)의 꼬리
+  //   정규화는 **글자 하나까지 같은 동작**이어야 한다(검토관 2026-08-22 확정). 한쪽에만 넣으면
+  //   같은 문서가 「JS로 읽혔을 때」와 「OCR로 넘어갔을 때」 다른 글이 되어 조각이 갈린다.
+  it("제어문자 걷기가 JS·파이썬 **양쪽에** 있다 — 한쪽만 고치면 같은 문서가 갈린다", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "dataset.ts"), "utf8");
+    const py = fs.readFileSync(path.join(__dirname, "..", "scripts", "extract_doc.py"), "utf8");
+    // ⚠ 파이썬 소스에 **글자 그대로** 적힌 문자열을 찾는다(제어문자 자체가 아니라).
+    const 파이썬걷기 = String.raw`re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", " ", text)`;
+    const 파이썬공백 = String.raw`re.sub(r"[ \t]+", " ", text)`;
+    expect(js, "dataset.ts 꼬리 정규화에 제어문자 걷기가 없다").toMatch(/stripLayoutControls\(t\)/);
+    expect(py, "extract_doc.py 꼬리에 제어문자 걷기가 없다 — OCR·스캔 갈래가 갈린다").toContain(파이썬걷기);
+    // 순서 계약 — 제어문자→공백이 [ \t]+ 압축보다 **앞**이어야 공백 둘이 하나로 접힌다.
+    expect(py.indexOf(파이썬걷기), "파이썬에서 순서가 뒤집혔다 — 공백이 둘로 남는다")
+      .toBeLessThan(py.indexOf(파이썬공백));
+  });
+});

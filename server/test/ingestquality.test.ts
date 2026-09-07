@@ -65,3 +65,24 @@ describe("읽을 수 없는 문서는 인입에서 막는다", () => {
     expect(r.chunks).toBeGreaterThanOrEqual(0); // 막히지만 않으면 된다
   });
 });
+
+// ★ 2026-09-07 — 낱말 구분자가 제어문자인 PDF가 「읽지 못했습니다」로 거절되던 자리.
+//   추출은 성공했는데 판정기가 제어문자만 보고 통째로 바이너리라 했다. 실물 PDF로 끝까지 태운다.
+describe("낱말 구분자가 제어문자인 PDF도 반입된다 (2026-09-07 실사고)", () => {
+  it("추출 → 인입이 400 없이 통과하고 조각이 남는다", async () => {
+    const { extractDocumentText } = await import("../src/engine/dataset");
+    const b64 = fs.readFileSync(path.join(__dirname, "fixtures", "ctrl-sep.pdf")).toString("base64");
+    const 글 = await extractDocumentText("ctrl-sep.pdf", b64);
+    const r = await ingestText("제어문자구분자.pdf", 글);
+    expect(r.chunks, "조각이 0이면 예전 결함 그대로다").toBeGreaterThan(0);
+  });
+
+  // ★ 반증 — 이 수리가 **게이트를 열어 버리지 않았는가**. 위 표본은 손으로 적으면 제어 바이트가
+  //   빠져 시험이 헛돈다(실제로 한 번 그렇게 틀렸다). 그래서 **진짜 PDF 파일의 바이트**를
+  //   글자인 척 그대로 넣는다 — 2026-08-08에 저장소 73%를 채웠던 바로 그 꼴이다.
+  it("추출을 안 거친 **날것 PDF 바이트**는 여전히 막는다 — 이 수리가 게이트를 열지 않았다", async () => {
+    const 날것 = fs.readFileSync(path.join(__dirname, "fixtures", "has-text.pdf")).toString("utf8");
+    expect(날것.length, "표본이 너무 짧으면 품질 가드가 원리상 안 돈다").toBeGreaterThan(2400);
+    await expect(ingestText("여전히깨진문서.pdf", 날것)).rejects.toThrow(/읽지 못했습니다/);
+  });
+});

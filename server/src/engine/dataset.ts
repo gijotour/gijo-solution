@@ -13,6 +13,9 @@ import { recordProcessOutput } from "./logs";
 import { serverPython, serverScript } from "../util/pythonbin";
 // 학습 데이터가 디스크에 닿는 유일한 자리라, 위생을 여기서 건다(호출부마다 붙이면 또 빠뜨린다).
 import { cleanForTraining, 데이터종류들, type 데이터종류 } from "./datasethygiene";
+// 낱말 사이를 채운 제어문자를 공백으로 되돌린다 — **판정기(isBinaryLikeChunk) 옆에 두었다.**
+// 걷는 규칙과 판정하는 규칙이 갈리면 「어제는 들어오던 문서가 오늘은 안 들어오는」 회귀가 난다.
+import { stripLayoutControls } from "./ragsanitize";
 
 // 테스트가 실제 데이터셋(data/datasets/*.json)을 덮어쓰거나 지우지 않도록 경로를 env로 격리 가능하게 한다
 // (vitest.config.ts가 임시 디렉터리로 지정). 미설정 시 운영 경로.
@@ -96,12 +99,18 @@ function 태그걷기(xml: string): string {
  *    다르게 뽑으면 예전에 넣은 문서와 새로 넣는 문서의 조각이 갈려 검색 결과가 흔들린다.
  *    개선(예: docx 문단 경계 살리기)은 그 자체로 별도 판단거리다(아래 docx 주석 참조).
  */
-/** 파이썬 main()이 **모든 형식에** 마지막으로 거는 정규화 — extract_doc.py:236-238과 같은 세 줄.
+/** 파이썬 main()이 **모든 형식에** 마지막으로 거는 정규화 — extract_doc.py 꼬리(`# 낱말 사이를
+ *  채운 제어문자` 주석 아래 세 줄)와 같은 동작이어야 한다.
  *  ⚠ 이걸 빠뜨리면 「글자 하나까지 일치」가 성립하지 않는다(검토관 2026-08-22 확정).
  *    재현: Word가 앞뒤 공백 있는 런에 붙이는 `xml:space="preserve"` → 파이썬 「글자 다음」,
- *    이걸 안 걸면 「글자  다음」(공백 둘). 조각 본문·경계가 갈려 옛 문서와 어긋난다. */
+ *    이걸 안 걸면 「글자  다음」(공백 둘). 조각 본문·경계가 갈려 옛 문서와 어긋난다.
+ *  ⚠ **줄번호로 가리키지 않는다** — 2026-08-22에 적어 둔 「extract_doc.py:236-238」은 파일이
+ *    자라면서 이미 틀린 자리를 가리키고 있었다(실제 345~347). 사람이 찾을 수 있는 **표식**으로 가리킨다.
+ *
+ *  ★ 순서가 계약이다(2026-09-07): **제어문자 → 공백이 먼저**다. `[ \t]+` 압축보다 뒤에 두면
+ *    "1 /␇␇사이버"가 "1 /  사이버"(공백 둘)로 남는다 — 실측으로 확인한 순서다. */
 function 파이썬꼬리정규화(t: string): string {
-  return t.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return stripLayoutControls(t).replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 async function 오피스추출(ext: string, buf: Buffer): Promise<string> {

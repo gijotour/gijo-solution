@@ -8,7 +8,7 @@
 //   우리 고객 문서에는 "프롬프트 인젝션"이 정당하게 실린다(레드팀 보고서·사례집·제품 매뉴얼).
 //   그것까지 지우면 제품이 자기 도메인 문서를 못 읽는다.
 import { describe, it, expect, beforeEach } from "vitest";
-import { sanitizeChunk, sanitizeRagChunks, scanDocumentForInjection, isBinaryLikeChunk } from "../src/engine/ragsanitize";
+import { sanitizeChunk, sanitizeRagChunks, scanDocumentForInjection, isBinaryLikeChunk, stripLayoutControls } from "../src/engine/ragsanitize";
 import { resetAuditForTests, listAudit } from "../src/engine/audit";
 
 beforeEach(() => resetAuditForTests());
@@ -194,5 +194,70 @@ describe("날것 바이너리 — 저장소 73% 오염의 실제 꼴(2026-08-08 
     expect(isBinaryLikeChunk("SSL/TLS 인증서 유효기간이 47일로 단축되면 수작업 갱신은 한계에 부딪힙니다. 자동화가 필요합니다.")).toBe(false);
     expect(isBinaryLikeChunk("Keyfactor Command provides certificate lifecycle automation across any CA and any cloud.")).toBe(false);
     expect(isBinaryLikeChunk("항목\t값\n포트\t443\n프로토콜\tTLS 1.3\n갱신주기\t90일\n담당자\t보안운영팀\n비고\t자동 갱신")).toBe(false);
+  });
+});
+
+// ★ 낱말 사이를 제어문자로 채운 추출본은 **글이다** (2026-09-07 — 반입 400 실사고)
+//
+// 무슨 일이 있었나: 관공서 PDF 한 장을 콘솔＋로 올렸더니 「문서를 읽지 못했습니다 — 내용이
+// 글자가 아닌 것 같습니다」로 400이 났다. 그런데 그 PDF는 **정상적으로 읽힌 문서**였다 —
+// unpdf(pdf.js)가 13,834자를 제대로 뽑았고, 다만 낱말 사이가 공백이 아니라 **BEL(U+0007)**
+// 이었다. 폰트의 ToUnicode CMap이 공백 글리프를 제어문자로 매핑한 PDF에서 실제로 일어난다
+// (test/fixtures/ctrl-sep.pdf가 그 꼴을 진짜 PDF로 재현한다 — 306자 중 제어문자 45개·14.7%).
+//
+// 옛 판정기는 「제어문자 2% 초과 = 바이너리」 한 줄이라 이 문서를 통째로 거절했다. 그 규칙은
+// 2026-08-08 사고(저장소 조각 73%가 PDF 바이트)를 막으려고 만든 것이라 **없애면 안 된다.**
+// 그래서 없애는 대신 **가른다**: 제어문자를 걷어낸 나머지가 사람이 읽는 글이면 통과시킨다.
+//
+// ⚠ 걷어내기를 **판정보다 먼저** 하면 안 된다(실측): 진짜 PDF 바이트(아래 「날것 바이너리」)도
+//   제어문자만 걷으면 어느 규칙에도 안 걸려 **통과로 뒤집힌다.** 판정 안에서 갈라야 한다.
+describe("낱말 구분자가 제어문자인 추출본 (2026-09-07 — 반입 400 실사고)", () => {
+  const BEL = "\u0007";
+  const 한국어 =
+    ("1 /" + BEL + BEL + "사이버" + BEL + "사기로" + BEL + "인한" + BEL + "피해" + BEL + "예방" + BEL +
+     "및" + BEL + "구제에" + BEL + "관한" + BEL + "법률\n제1조(목적)" + BEL + "이" + BEL + "법은" + BEL +
+     "사이버" + BEL + "사기로" + BEL + "인한" + BEL + "피해를" + BEL + "예방하고" + BEL + "구제하기" + BEL +
+     "위하여" + BEL + "필요한" + BEL + "사항을" + BEL + "규정함을" + BEL + "목적으로" + BEL + "한다.\n").repeat(6);
+
+  it("BEL이 낱말 구분자로 쓰인 한국어 추출본은 글로 본다 — 이게 400의 원인이었다", () => {
+    expect(한국어.length).toBeGreaterThan(40);
+    // 제어문자 비율은 옛 문턱(2%)을 한참 넘는다 — 그래도 글이다.
+    const 제어율 = (한국어.match(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g) ?? []).length / 한국어.length;
+    expect(제어율, "표본이 옛 문턱을 안 넘으면 이 시험이 아무것도 안 지킨다").toBeGreaterThan(0.02);
+    expect(isBinaryLikeChunk(한국어)).toBe(false);
+  });
+
+  it("영어 추출본도 같다 — 한글만 살리고 영어를 버리면 반쪽 수리다", () => {
+    const 영어 = ("The" + BEL + "certificate" + BEL + "lifecycle" + BEL + "automation" + BEL + "platform" + BEL +
+      "renews" + BEL + "expiring" + BEL + "keys.\nAgents" + BEL + "report" + BEL + "status" + BEL + "every" + BEL +
+      "five" + BEL + "minutes" + BEL + "to" + BEL + "the" + BEL + "console.\n").repeat(5);
+    expect(isBinaryLikeChunk(영어)).toBe(false);
+  });
+
+  it("대체문자(U+FFFD)는 구분자가 아니라 **디코딩 실패**다 — 그건 그대로 막는다", () => {
+    // 제어문자를 걷고 글자율만 보면 이 표본은 87%라 「글」로 새어 나간다. FFFD는 따로 둔다.
+    const 깨짐 = "\uFFFD\uFFFDPK\uFFFD\uFFFD텍스트가 아닌 바이트가 글자로 읽힌 자리\uFFFD\uFFFD \uFFFD 압축된 내용이 그대로 흘러들어와 사람이 읽을 수 없는 상태로 남은 자리";
+    expect(isBinaryLikeChunk(깨짐)).toBe(true);
+  });
+
+  it("제어문자를 걷어내도 글이 아니면 그대로 막는다 — 2026-08-08 사고 표본", () => {
+    const 날것 = "\bzb~'}2rWjvzgh}-ft}-¢irfޮM>O\n-g*')ޞys#?]y}xƮ-m5C^z{bt^u(Wl杪x(67z%\fymƫxǝƥ\"wnjQ'z2EZTj{)Z*')";
+    expect(isBinaryLikeChunk(날것)).toBe(true);
+  });
+
+  it("stripLayoutControls는 제어문자를 **공백으로 바꾼다** — 지우면 낱말이 붙는다", () => {
+    // 실측 원문이 "1 /␇␇사이버␇사기로␇인한"이라 지우면 "1 /사이버사기로인한"이 된다.
+    const 정리 = stripLayoutControls("1 /" + BEL + BEL + "사이버" + BEL + "사기로" + BEL + "인한");
+    expect(정리).not.toContain(BEL);
+    expect(정리, "낱말이 붙었다 — 지우지 말고 공백으로 바꿔야 한다").toContain("사이버 사기로 인한");
+  });
+
+  it("탭·개행·복귀는 안 건드린다 — 표·목록 구조가 살아야 한다", () => {
+    const 표 = "항목\t값\n포트\t443\r\n프로토콜\tTLS 1.3";
+    expect(stripLayoutControls(표)).toBe(표);
+  });
+
+  it("U+FFFD는 걷지 않는다 — 걷으면 디코딩 실패의 증거가 사라진다", () => {
+    expect(stripLayoutControls("깨진\uFFFD자리")).toContain("\uFFFD");
   });
 });
