@@ -196,7 +196,12 @@ done
 # ⚠ 뿌리의 제품 문서(*.md)도 필요하다 — docs-manifest 정합성·코퍼스 감시·용어사전 시험이
 #   「매니페스트에 적힌 파일이 실제로 있는가」를 본다. 없으면 **감시가 헛돌지 않는지 보는
 #   시험**까지 빨간불이 난다(그게 이 사본에서 처음 6건이 실패한 이유였다).
-rsync -a --include='*.md' --exclude='*/' --exclude='*' "$SRC_ROOT/" "$DST_ROOT/" 2>/dev/null
+# ⚠ --delete 를 붙인다(2026-09-07 실측). 안 붙이면 **지운 md가 더운 공용 사본(--serial)에
+#   영영 남는다** — 오늘 mergeremoved.test의 「지운 파일이 실제로 없다」가 --serial에서만
+#   빨갛고 기본 사본에서는 초록이었다. 같은 커밋이 도구에 따라 다른 답을 내면 게이트를 못 믿는다.
+#   --exclude 로 걸러진 것(md 아닌 뿌리 파일)은 rsync가 기본으로 **보호**하므로 안 지워진다
+#   (--delete-excluded 를 안 쓴 이유). 지워지는 것은 "원본에 없는 뿌리 *.md" 뿐이다.
+rsync -a --delete --include='*.md' --exclude='*/' --exclude='*' "$SRC_ROOT/" "$DST_ROOT/" 2>/dev/null
 # ⚠ **실전 답 기록(.tmp-reports/ops-sim.json)도 옮긴다**(2026-08-31).
 #   말투 규범 감시(tone-realanswers)와 프롬프트 복창 누출 감시(promptleak-retry)는 「내가 고른
 #   표본이 아니라 **실전 답 전체**로 오탐 0을 증명한다」가 존재 이유인데, 이 사본에 기록이 안
