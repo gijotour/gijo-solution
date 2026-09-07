@@ -194,8 +194,14 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 /* 대장↔저장소가 어긋난 줄에만 붙는 칩 — **줄 안쪽 그리드**다(반입 탭 .ing-name 선례).
    ⚠ 행 높이(30px)·칸 폭 문자열은 손대지 않는다. 어긋난 줄에서만 이름이 잘리고
    칩은 절대 안 잘린다 — 정상 줄은 오늘과 한 글자도 다르지 않다. */
-.dk-name{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px;align-items:baseline;min-width:0}
-.dk-chip{white-space:nowrap;font-size:11px;font-weight:800;padding:0 5px;border-radius:999px;
+.dk-name{display:flex;gap:4px;align-items:baseline;min-width:0}
+.dk-name .trunc{flex:1 1 auto;min-width:0}
+/* ⚠ 칩도 **줄어들 수 있어야** 한다(2026-09-07 검토관 [낮음]). 종전엔 nowrap인 칩이 안 줄어,
+   판이 좁아지면(대화창 최대 = 판 420px) 칩이 이름 칸을 넘어 등급·조각·날짜 칸 위로 겹쳤다
+   — narrow-probe 판정 ①넘침·④겹침이 그 부류다. 줄어드는 순서는 **이름 먼저**(base가 커서
+   같은 비율이면 더 많이 줄어든다), 칩은 마지막에 말줄임된다. 전문은 title에 그대로 남는다. */
+.dk-chip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0;
+  font-size:11px;font-weight:800;padding:0 5px;border-radius:999px;
   border:1px solid currentColor;line-height:16px;display:inline-block}
 .dk-miss{color:var(--red)}      /* 조각 없음 — AI가 근거로 못 쓴다 */
 .dk-short{color:var(--amber)}   /* 조각 일부 사라짐 */
@@ -702,7 +708,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   // 침해사고 사례 문서(origin=incident-case)도 같은 이유로 뺀다(2026-09-03 결정 ① 「목록에서 뺀다」) — id가
   //   「incident-case:ic-…」라 사람이 못 읽고, 여기서 지우면 📚 히스토리 표와 기억이 어긋난다(관리 자리는 그 판).
   //   씨앗만 20건이라 안 빼면 문서 허브 목록이 사례로 밀린다 — 서버 소비처(docdigest·docdupe)와 같은 잣대.
-  var 회사문서만 = function () { return know.filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0 && d.origin !== "approved-qa" && d.origin !== "incident-case"; }); };
+  //   ⚠ 술어에 **이름을 준다**(2026-09-07 검토관 [중]): 같은 모집단을 memory.html·grouppanels.js·
+  //     dashboard.html도 각자 적는데, 글자가 달라 「⚠ 조각 없음 N」이 화면마다 다른 수를 냈다
+  //     (여기 1 · grouppanels 3 · dashboard 4). 이름이 있어야 짝 시험이 **네 벌을 같은 표본으로
+  //     돌려** 견준다(server/test/docstateui.test.ts ⑥).
+  var 회사문서만 = function () { return know.filter(function 회사지식인가(d) { return String(d.documentId).indexOf("personal:") !== 0 && d.origin !== "approved-qa" && d.origin !== "incident-case"; }); };
 
   // ── 대장(반입 기록) ↔ 저장소(지식 조각) 어긋남 — **판정은 서버가 이미 했다** ────────
   //   서버가 줄마다 docState(ok|missing|short|extra|unknown)와 ledgerChunks를 실어 준다
@@ -713,7 +723,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
   //   ⚠ ok·unknown은 빈 문자열이다 — unknown(대장이 조각 수를 안 적음)에 칩을 그리면
   //     멀쩡한 문서가 전부 「어긋남」이 되어 화면이 거짓말을 한다.
   function 조각꼬리(state, 대장조각) {
-    if (state === "missing") return "조각 없음" + (Number(대장조각) > 0 ? "(대장 " + Number(대장조각) + "개)" : "");
+    //   ⚠ Number.isFinite까지 **서버와 같아야** 한다(2026-09-07 검토관 [낮음]) — 이것 하나가 빠져
+    //     대장조각이 Infinity면 화면만 「조각 없음(대장 Infinity개)」이라 적었다. 지금은 원천
+    //     (engine/memory.ts)이 무한대를 null로 눌러 제품 경로로는 안 닿지만, 두 벌을 같게
+    //     두는 것이 이 함수의 존재 이유다(원천이 눌러 주는 것에 기대지 않는다).
+    if (state === "missing") return "조각 없음" + (Number.isFinite(Number(대장조각)) && Number(대장조각) > 0 ? "(대장 " + Number(대장조각) + "개)" : "");
     if (state === "short") return "조각 일부 사라짐";
     if (state === "extra") return "옛 판 조각 남음";
     return "";
@@ -1865,12 +1879,21 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
           // ★ 지시는 대화창에서만 — 화면이 직접 dispatch하지 않는다(결재판을 건너뛰게 된다).
           //   여기서 하는 일은 **문장을 얹는 것 하나뿐**이다. 보내는 것도 승인하는 것도 담당자가 한다.
           //   ⚠ 성공을 미리 그리지 않는다 — 추출본(.md)이 없으면 결재판 실행 단계에서 실패한다.
+          //   ⚠ 길은 두 갈래다(2026-09-07 검토관 [낮음]): 도킹이면 top으로 postMessage, **분리창**이면
+          //     window.top이 자기 자신이라 예외가 **안 난다** — 옛 catch 주석은 없는 길을 가리켰다.
+          //     분리창은 nav.js가 자기발신을 되받아 중계하지만, 그 다리(bridgeToShell)가 없으면
+          //     조용히 버려진다. 그때 「얹었습니다」라고 말하지 않는 데까지가 이 수리다
+          //     (같은 날 approvals.html이 먼저 고친 길과 **같은 모양**으로 맞춘다).
           var 글 = 선택.id + " 다시 넣어줘";
           var 얹힘 = false;
-          try { window.top.postMessage({ type: "gijo:prefill", text: 글 }, "*"); 얹힘 = true; } catch (e3) { /* 셸 밖(분리창) */ }
+          var 쪽지 = { type: "gijo:prefill", text: 글 };
+          try {
+            if (window.top !== window.self) { window.top.postMessage(쪽지, "*"); 얹힘 = true; }
+            else if (window.gijo && window.gijo.bridgeToShell) { window.gijo.bridgeToShell(쪽지); 얹힘 = true; }
+          } catch (e3) { 얹힘 = false; }
           if (window.gijoTell) window.gijoTell(얹힘
             ? "대화창에 「" + 글 + "」를 얹었습니다 — 보내기·승인은 담당자가 합니다."
-            : "대화창을 못 찾았습니다 — 대화창에 「" + 글 + "」라고 적어 보내 주세요.");
+            : "대화창에 얹지 못했습니다 — 이 창은 대화창과 이어져 있지 않습니다. 앱 대화창에 「" + 글 + "」라고 적어 보내 주세요.");
         }
       } catch (e) {
         if (act === "mdsave") { if (window.gijoTell) window.gijoTell("저장하지 못했습니다 — " + ((e && e.message) || "오류")); }
