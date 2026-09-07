@@ -26,6 +26,8 @@ const chatparts = 화면파일("chatparts.js");
 const approvals = 화면파일("approvals.html");
 const supervision = 화면파일("supervision.html");
 const mydocs = 화면파일("mydocs.html");
+const memoryHtml = 화면파일("memory.html");
+const handover = 화면파일("handover.html");
 
 const 구역 = (screen: string, name: string): string => {
   const p = getScreenGuide(screen).panels?.[name];
@@ -135,10 +137,22 @@ describe("④ 안내가 약속한 화면 글자가 실제로 화면에 있다(�
     ["결재판 열기", chatparts, "결재판 열기"],
     ["다시 넣기", mydocs, "↩ 다시 넣기"],
     ["얹지 못한 말", approvals, "대화창에 얹지 못했습니다"],
+    // 📚 AI 지식·업무 넘기기 — C-B가 같은 라운드에 세운 유령 표시(2026-09-07). 안내가 그 글자를 인용한다.
+    ["지식 화면 유령 꼬리", memoryHtml, "⚠ 조각 없음"],
+    ["인계 ② 고를 때", handover, "조각 없음 — 인계 자료로 못 씁니다"],
+    ["인계 ③ 검증에서 뺌", handover, "은 검증에서 뺐습니다"],
   ];
   for (const [이름, 소스, 글자] of 약속) {
     it(`${이름} — 「${글자}」`, () => expect(소스).toContain(글자));
   }
+
+  it("★ 지식·인계 안내가 화면에 실제로 선 글자를 인용한다(안내만 먼저 늙지 않게)", () => {
+    expect(구역("memory.html", "조각 없음 표시"), "머리줄 꼬리 표기를 안 적었다").toContain("(⚠ 조각 없음 N)");
+    const 인계 = 구역("handover.html", "인수인계");
+    expect(인계).toContain("조각 없음 — 인계 자료로 못 씁니다");
+    expect(인계, "검증에서 뺀다는 말이 빠졌다").toMatch(/검증에서 뺐습니다/);
+    expect(인계, "몰래 지우지 않는다는 계약이 빠졌다").toMatch(/몰래 지우지는 않습니다/);
+  });
 
   it("★ 지적 종류 셋의 이름이 안내와 화면에서 같다", () => {
     const 꼬리안내 = 공통구역("이 답 이상해요");
@@ -187,5 +201,51 @@ describe("⑥ 대화 도구 answer_feedback_status — 자물쇠와 상세는 **
     expect(i, "도구 정의를 못 찾았다 — 이 시험이 헛돈다").toBeGreaterThan(-1);
     const 덩어리 = src.slice(i, src.indexOf("\n  },", i));
     expect(덩어리, "run이 상세를 안 켰다 — admin인데 건수만 본다").toMatch(/feedbackSummaryText\(.*,\s*true\s*\)/);
+  });
+});
+
+/* ── ⑦ 라이트 한계 — 안내가 「없는 것」을 없다고 말하나 (2026-09-07) ────────────────────
+   ■ 왜: 라이트 셸은 대화창(lite-chat)을 **console.html로 자리 바꿈**해 들어가므로 chatparts.js가
+     그대로 실려 「▶ 이 답 이상해요」 꼬리가 **라이트에도 뜬다**(코드 확인 2026-09-07:
+     lite-chat.html이 location.replace("console.html?embed=1&edition=lite")). 그런데 라이트에는
+     결재판 화면이 없어(lite-screens.json) 「결재판 열기」로 갈 자리가 없고, 「다시 넣기」를 받을
+     쓰기 도구(reingest_document)도 lite-tools.json에서 **사유와 함께 빠져 있다.**
+   ■ 그래서 안내가 그 사실을 말해야 한다. 이 시험은 **양쪽을 묶는다** — 라이트에 그 화면·도구가
+     생기는 날 여기서 빨개져서 안내를 함께 고치게 한다(안 그러면 안내만 낡는다). */
+describe("⑦ 라이트 한계를 안내가 말한다(그 근거도 함께 잰다)", () => {
+  const liteScreens = JSON.parse(fs.readFileSync(
+    path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "lite-screens.json"), "utf8"));
+  const liteTools = JSON.parse(fs.readFileSync(
+    path.join(__dirname, "..", "src", "lite", "lite-tools.json"), "utf8"));
+  const 도구ids = JSON.stringify(liteTools);
+
+  it("근거 ① 라이트에 결재판 화면이 없다 — 생기면 이 줄이 먼저 빨개진다", () => {
+    const ids = (liteScreens.screens || []).map((s: { id: string }) => s.id);
+    expect(ids, "라이트에 결재판이 생겼다 — 꼬리 안내의 「갈 자리가 없습니다」를 고칠 것")
+      .not.toContain("lite-approvals");
+    expect(ids.length, "화면 목록을 못 읽었다 — 이 시험이 헛돈다").toBeGreaterThan(0);
+  });
+
+  it("근거 ② 라이트에 reingest_document가 없다 — 생기면 문서함 안내를 고칠 것", () => {
+    expect(도구ids).toContain("doc_chunk_gaps");          // 짝인 읽기 도구는 있다(모집단 감시)
+    expect(도구ids.includes('"id": "reingest_document"'),
+      "라이트에 재인입 도구가 생겼다 — 「다시 넣기를 받을 도구가 아직 없습니다」를 고칠 것").toBe(false);
+  });
+
+  it("★ 꼬리 안내가 라이트에 결재판이 없다고 말한다", () => {
+    expect(공통구역("이 답 이상해요")).toMatch(/라이트 에디션에는 결재판 화면이 없습니다/);
+  });
+
+  it("★ 문서함 안내가 라이트에서 「다시 넣기」가 안 된다고 말한다(＋로 다시 올리기로 넘긴다)", () => {
+    const 문서안내 = 구역("mydocs.html", "조각이 없는 문서(⚠)");
+    expect(문서안내).toMatch(/라이트 에디션/);
+    expect(문서안내, "라이트에서 할 수 있는 길을 안 적었다").toMatch(/＋로 파일을 다시 올려/);
+  });
+
+  it("근거 ③ 라이트 대화창이 console.html로 자리를 바꿔 들어간다(그래서 꼬리가 뜬다)", () => {
+    const liteChat = fs.readFileSync(
+      path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "lite-chat.html"), "utf8");
+    expect(liteChat, "라이트 대화창이 더는 console.html을 안 쓴다 — 꼬리 안내의 전제가 무너졌다")
+      .toContain('location.replace("console.html?"');
   });
 });
