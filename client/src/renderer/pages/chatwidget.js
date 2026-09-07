@@ -285,6 +285,22 @@
           if (P.dimEstimates) P.dimEstimates(typing, r.근거없음, r.근거범위);
           // sourceTitles — 배지에 찍을 **사람 제목**(2026-09-06). 두 입구가 **둘 다** 넘긴다.
           P.quotes(typing, r.quotes, r.output || "", r.sources, r.근거세기, r.sourceTitles);
+          // 「이 답 이상해요」 — 위젯에도 **같은 부품**으로 단다(2026-09-07 · 통합 설계관 V3).
+          //   ⚠ 안 달면 지적 모집단이 지휘소 답으로 기운다. 분리창(⧉ 창으로)에서는 여기가
+          //     유일한 창구고, 이 위젯은 **결재판 화면 위에도** 떠 있다.
+          //   ⚠ 「결재판 열기」는 창에서 탭을 직접 못 여니 본창에 부탁한다(P.open과 같은 통로).
+          if (P.flag) P.flag(typing, {
+            question: text, answer: r.output || "", quotes: r.quotes, sources: r.sources,
+            noev: r.근거없음, screen: here,
+          }, {
+            send: function (b) { return window.gijo.sendAnswerFeedback(b); },
+            remove: function (id) { return window.gijo.removeAnswerFeedback(id); },
+            openBoard: function () {
+              if (window.gijo && window.gijo.openTabInShell) return window.gijo.openTabInShell("approvals.html?fix=open", "결재판");
+              if (window.gijo && window.gijo.navigateTo) return window.gijo.navigateTo("approvals.html?fix=open");
+              return false;
+            },
+          });
           P.picks(typing, r.picklist, function (보낼글) { send(보낼글); });
           // 분리창은 탭을 직접 못 연다 — 본창에 부탁한다(지휘소와 다른 유일한 대목).
           P.open(typing, r.openScreen, {

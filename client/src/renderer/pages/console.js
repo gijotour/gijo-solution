@@ -489,95 +489,15 @@
   }
 
   // ── 「이 답 이상해요」 지적 (계획서 중-1) ─────────────────────────────
-  // 회귀 문항은 전부 우리가 상상한 질문이라, 실사용자가 겪는 오답은 거기 없다.
-  // 담당자의 지적 한 줄이 문항 하나보다 값지다 — 그래서 답변 옆에서 바로 남길 수 있게 한다.
-  //
-  // ⚠ 카드는 **화면 기준으로 띄운다**(position:fixed, document.body에 붙임).
-  //   대시보드에 붙은 콘솔은 대화 영역이 90px 남짓이라(콘솔 전체 190px 고정) 말풍선 안에
-  //   넣으면 스크롤 컨테이너에 잘려 보이지 않는다. 아래가 좁으면 위로 뒤집는다.
-  var FLAG_KINDS = [
-    { k: "wrong", label: "❌ 틀린 답", hint: "사실이 틀림" },
-    { k: "missing", label: "🔍 못 찾음", hint: "있는데 못 찾아 답함" },
-    { k: "style", label: "💬 말투", hint: "말투·형식이 어색함" },
-  ];
-  var flagCard = null;
-  function closeFlagCard() { if (flagCard) { flagCard.remove(); flagCard = null; } }
+  // 여기 있던 접수 카드 openFlagCard(64줄)를 **지웠다**(2026-09-07 · 통합 설계관 V2).
+  //   왜: 화면 위에 300px로 뜨는 카드라 대화를 덮었고, 보내고 나면 「✓ 지적 접수됨」에서 끝나
+  //   **어디로 갔는지 출구가 없었다**(결재판에 처리 화면이 생겼는데도 그리로 가는 길이 없었다).
+  //   지금 그리는 곳: chatparts.js의 P.flag — 꼬리 한 줄이고, 지휘소·위젯이 **같은 부품**을 쓴다.
+  //   ⚠ 되살리지 말 것. answerflagui.test가 「openFlagCard 정의 없음」·「꼬리 글자 사본 없음」을
+  //     감시한다(attachQuotes를 지운 자리와 같은 관례).
+  //   ⚠ .cs-flag CSS(:193~196)는 **남겨 둔다** — 부품이 그 클래스를 그대로 달아서, 접힘 상태의
+  //     호버 노출 규칙(.cs-row .cs-flag)이 지금과 똑같이 걸린다(세로 증감 0).
 
-  function openFlagCard(btn, question, answer) {
-    closeFlagCard();
-    var c = document.createElement("div");
-    c.style.cssText =
-      "position:fixed;z-index:9999;width:300px;max-width:calc(100vw - 24px);background:var(--panel,#151922);" +
-      "border:1px solid var(--border-strong,#2a3040);border-radius:10px;box-shadow:0 18px 44px rgba(0,0,0,.55);padding:12px 13px;";
-    c.innerHTML =
-      '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:9px">' +
-      '<div style="flex:1;min-width:0;font-size:12px;color:var(--muted-2,#a49d95);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-      esc(String(answer).slice(0, 40)) + "…</div>" +
-      '<span id="fbX" role="button" tabindex="0" style="cursor:pointer;color:var(--muted,#b3ada4);font-size:13px;line-height:1">✕</span></div>' +
-      '<div id="fbKinds" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>' +
-      '<div id="fbHint" style="font-size:11.75px;color:var(--muted-2,#a49d95);margin-bottom:9px;min-height:13px"></div>' +
-      '<textarea id="fbNote" rows="2" placeholder="무엇이 틀렸나요? (선택)" style="width:100%;box-sizing:border-box;background:var(--panel-2,#242322);border:1px solid var(--border,#3a3936);border-radius:7px;padding:7px 9px;color:var(--text,#e9e7e2);font-size:12.5px;resize:vertical;margin-bottom:7px"></textarea>' +
-      '<textarea id="fbExp" rows="2" placeholder="혹시 정답을 아신다면 (선택)" style="width:100%;box-sizing:border-box;background:var(--panel-2,#242322);border:1px solid var(--border,#3a3936);border-radius:7px;padding:7px 9px;color:var(--text,#e9e7e2);font-size:12.5px;resize:vertical"></textarea>' +
-      '<div style="font-size:11.5px;color:var(--muted-2,#a49d95);margin:5px 0 10px">적어 주시면 앞으로 이 질문을 검사 문항으로 씁니다.</div>' +
-      '<div style="display:flex;justify-content:flex-end;gap:7px">' +
-      '<button id="fbCancel" style="background:none;border:1px solid var(--border,#3a3936);border-radius:7px;padding:5px 12px;color:var(--muted,#b3ada4);font-size:12.5px;cursor:pointer">취소</button>' +
-      '<button id="fbSend" style="background:var(--g-blue-fill, var(--blue,#3b82f6));border:none;border-radius:7px;padding:5px 14px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer">전송</button></div>';
-    document.body.appendChild(c);
-    flagCard = c;
-
-    var picked = "wrong";
-    var kinds = c.querySelector("#fbKinds"), hint = c.querySelector("#fbHint");
-    FLAG_KINDS.forEach(function (k) {
-      var b = document.createElement("button");
-      b.textContent = k.label;
-      b.style.cssText = "background:none;border:1px solid var(--border,#3a3936);border-radius:999px;padding:4px 10px;color:var(--text,#e9e7e2);font-size:12.25px;cursor:pointer;min-height:24px;";
-      b.onclick = function () {
-        picked = k.k;
-        hint.textContent = k.hint;
-        [].forEach.call(kinds.children, function (x) { x.style.borderColor = "var(--border,#3a3936)"; x.style.color = "var(--text,#e9e7e2)"; });
-        b.style.borderColor = "var(--amber,#f59e0b)"; b.style.color = "var(--amber,#f59e0b)";
-      };
-      kinds.appendChild(b);
-      if (k.k === "wrong") b.onclick();
-    });
-
-    // 위치 — 버튼 아래에 붙이되 아래가 좁으면 위로 뒤집는다(도킹 콘솔은 아래 공간이 거의 없다).
-    var r = btn.getBoundingClientRect();
-    var h = c.offsetHeight || 300;
-    var top = r.bottom + 6;
-    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
-    c.style.top = top + "px";
-    c.style.left = Math.max(8, Math.min(r.left, window.innerWidth - c.offsetWidth - 8)) + "px";
-
-    var esc2 = function (ev) { if (ev.key === "Escape") { closeFlagCard(); document.removeEventListener("keydown", esc2); } };
-    document.addEventListener("keydown", esc2);
-    var outside = function (ev) { if (flagCard && !flagCard.contains(ev.target) && ev.target !== btn) { closeFlagCard(); document.removeEventListener("mousedown", outside); } };
-    setTimeout(function () { document.addEventListener("mousedown", outside); }, 0);
-
-    c.querySelector("#fbX").onclick = closeFlagCard;
-    c.querySelector("#fbCancel").onclick = closeFlagCard;
-    c.querySelector("#fbSend").onclick = async function () {
-      var note = c.querySelector("#fbNote").value.trim();
-      var exp = c.querySelector("#fbExp").value.trim();
-      try {
-        await window.gijo.sendAnswerFeedback({
-          kind: picked, question: question, answer: answer,
-          note: note || undefined, expected: exp || undefined, screen: ctx.screen || undefined,
-        });
-        closeFlagCard();
-        btn.textContent = "✓ 지적 접수됨";
-        btn.className = "cs-flag done";
-        btn.disabled = true;
-        // 과한 기대를 만들지 않는다 — 자동 반영이 아니라 사람이 검토한다.
-        append("event", { icon: "📝", name: "지적 접수", message: "접수했습니다. 사람이 검토 후 검사 문항으로 씁니다(자동 반영 아님)." });
-      } catch (e) {
-        hint.textContent = "보내지 못했습니다: " + ((e && e.message) || e);
-        hint.style.color = "var(--red-ink, #f5928a)";
-      }
-    };
-  }
-
-  // 답변 줄에 지적 버튼을 단다. 질문(직전 지시)과 답을 짝지어 보내야 문항이 될 수 있다.
   // ── "가서 하기" 답에 붙는 화면 열기 ─────────────────────────────────────
   // 서버가 순서를 안내하면서 openScreen(화면·자리)을 같이 준다(server/engine/howto.ts).
   // ⚠ 갈 화면이 없는 안내(백업 복원처럼)에는 openScreen이 아예 안 온다 — 버튼도 안 생긴다.
@@ -840,15 +760,31 @@
     if (cb2) cb2.appendChild(wrap);
   }
 
-  function attachFlag(el, question, answer) {
-    if (!question) return; // 무엇에 대한 지적인지 모르면 남길 수 없다
-    var b = document.createElement("button");
-    b.className = "cs-flag";
-    b.type = "button";
-    b.textContent = "▶ 이 답 이상해요";
-    b.onclick = function () { openFlagCard(b, question, answer); };
-    var cb = el.querySelector(".cb");
-    if (cb) cb.appendChild(b);
+  // 답변 줄에 지적 꼬리를 단다. 질문(직전 지시)과 답을 짝지어 보내야 문항이 될 수 있다.
+  // ⚠ **그리는 것은 부품이 한다**(chatparts.js P.flag) — 여기는 「보내는 방법」만 넘기는 껍데기다.
+  //   지우지 않고 남긴 이유: 호출부가 둘(새 답·이어보기)이고, 같은 파일에서 옆 함수를 잘라 먹은
+  //   전례(attachApproval)가 있어 삭제는 자체완결인 카드(openFlagCard)만 했다.
+  // @param r 서버 답 그대로 — 인용 조각(quotes)·근거없음(noev)이 초안 재료·갈래 판정의 원천이다.
+  function attachFlag(el, question, answer, r) {
+    var P = window.gijoChatParts;
+    if (!P || !P.flag || !question) return; // 무엇에 대한 지적인지 모르면 남길 수 없다
+    P.flag(el, {
+      question: question, answer: answer,
+      quotes: (r && r.quotes) || null, sources: (r && r.sources) || null,
+      noev: (r && r.근거없음) || null, screen: ctx.screen || undefined,
+    }, {
+      send: function (b) { return window.gijo.sendAnswerFeedback(b); },
+      remove: function (id) { return window.gijo.removeAnswerFeedback(id); },
+      openBoard: function () { 결재판열기(); },
+    });
+  }
+
+  // 결재판(답 지적 세그먼트)을 연다 — P.open의 navigate와 **같은 통로**를 쓴다.
+  //   창이면 본창에 부탁하고(분리창은 탭을 직접 못 연다), 셸 안이면 도킹으로 연다.
+  function 결재판열기() {
+    var page = "approvals.html?fix=open", leaf = "결재판";
+    if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) { window.gijo.openTabInShell(page, leaf); return; }
+    if (window.gijoTabs) window.gijoTabs.open(page, leaf, { dock: true });
   }
 
   // 📚 비슷한 사례 칩(2026-09-03, 승인 시안 mockups/normaltic-cases §6) — 스캔 해석 초안 답에 해설
@@ -1809,7 +1745,9 @@
         if (cmHost && cmHost.parentNode) cmHost.parentNode.insertBefore(parseEl, cmHost);
       }
       // 지적 버튼 — 방금 보낸 질문과 이 답을 짝지어 둔다(중-1 피드백 루프).
-      attachFlag(replyEl, text, (r && r.output) || "");
+      // ⚠ 서버 답(r)을 통째로 넘긴다 — 인용 조각·근거없음이 있어야 갈래가 「미분류」로 안 눌리고,
+      //   결재판의 🤖 초안이 **그 답이 인용한 조각 그대로**를 재료로 쓴다(재검색 금지).
+      attachFlag(replyEl, text, (r && r.output) || "", r);
       // 근거 원문 — 답의 숫자를 담당자가 눈으로 검증할 수 있게(2026-08-01).
       // ★ 아래 셋은 **분리창 위젯과 같은 부품**을 쓴다(chatparts.js) — 2026-08-01 사용자 지적
       //   "대화창 하나의 구조로 되어 있는 게 맞지?"에 대한 답이다.
@@ -1892,13 +1830,20 @@
       var turns = (r && r.turns) || [];
       if (!turns.length) return;
       var P = window.gijoChatParts;
+      var 앞질문 = "";
       turns.slice(-12).forEach(function (m) {
         var el = append(m.role === "user" ? "instr" : "reply",
           { icon: m.role === "user" ? "나" : "🧭", name: m.role === "user" ? "나 → AI 팀" : "AI 팀", message: m.content });
+        if (m.role === "user") { 앞질문 = m.content; return; }
         // 근거 없음 — 되살린 답도 **방금 받았을 때와 같게** 숫자를 옅게(2026-09-05 검토관).
         //   ⚠ 안 걸면 같은 답이 자리마다 달라 보인다: ⚠ 배너는 보이는데 숫자만 진하다.
         //   표식은 서버가 저장 본문에서 읽어 실어 준다(worksessions GET — 판정기 한 곳).
-        if (m.role !== "user" && P && P.dimEstimates) P.dimEstimates(el, m.근거없음, m.근거범위);
+        if (P && P.dimEstimates) P.dimEstimates(el, m.근거없음, m.근거범위);
+        // 지적 꼬리 — **어제 답도 오늘 짚을 수 있게**(2026-09-07). 없으면 대화를 이어 연 순간
+        //   같은 답에 지적을 못 남긴다(자리마다 기능이 다른 그 문제).
+        //   ⚠ 인용 조각은 세션에 안 남는다 — 초안 재료가 없어 결재판이 「초안 없음」이라 말한다.
+        //     없는 재료를 있는 척 만들지 않는다.
+        attachFlag(el, 앞질문, m.content, { 근거없음: m.근거없음 });
       });
     } catch (e) { /* 못 불러와도 새 대화는 된다 — 세션이 지워졌을 수 있다 */ }
   }

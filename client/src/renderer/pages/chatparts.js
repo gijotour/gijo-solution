@@ -115,6 +115,27 @@
       ".gcp-qd{font-size:11.5px;color:var(--muted-2,#a49d95);margin-bottom:3px;}",
       ".gcp-qt{font-size:12.25px;line-height:1.75;color:#cdd4e6;}",
       ".gcp-qt mark{background:rgba(240,160,32,.28);color:var(--amber, #ffd88a);padding:0 2px;border-radius:3px;}",
+      /* ── 「이 답 이상해요」 꼬리(2026-09-07 · 승인 시안 mockups/wrong-flag) ──────────
+         ⚠ 새 색을 만들지 않는다 — 값은 전부 이미 쓰던 var(…)와 rgba다.
+         ⚠ [hidden]을 **직접 적는다.** .wf-line{display:flex}는 작성자 스타일이라
+            브라우저 기본 [hidden]{display:none}을 이긴다 — 안 적으면 접힌 줄이 그냥 보인다. */
+      ".wf-flag{display:inline-block;margin-top:4px;font-size:11.75px;font-weight:700;color:var(--muted-2,#a49d95);background:none;border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:2px 8px;cursor:pointer;min-height:24px;font-family:inherit;}",
+      ".wf-flag:hover{color:var(--amber,#f0a020);border-color:rgba(245,158,11,.45);}",
+      ".wf-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;}",
+      ".wf-line[hidden],.wf-flag[hidden]{display:none;}",
+      ".wf-k{font-size:12px;color:var(--text,#e9e7e2);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:3px 10px;cursor:pointer;font-family:inherit;min-height:24px;}",
+      ".wf-k:hover{background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.4);}",
+      ".wf-k.on{background:rgba(240,160,32,.16);border-color:rgba(240,160,32,.5);color:var(--amber,#f0a020);font-weight:700;}",
+      ".wf-cand{font-size:11.5px;color:var(--muted-2,#a49d95);border:1px dashed rgba(255,255,255,.16);border-radius:14px;padding:2px 8px;cursor:help;}",
+      ".wf-memo{flex:1;min-width:120px;background:var(--panel-2,#1f1e1d);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:3px 9px;color:var(--text,#e9e7e2);font-size:12px;font-family:inherit;outline:none;height:24px;}",
+      ".wf-memo:focus{border-color:var(--blue,#3b82f6);}",
+      ".wf-go{font-size:12px;font-weight:700;color:var(--blue-light,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.30);border-radius:7px;padding:2px 9px;cursor:pointer;font-family:inherit;min-height:24px;}",
+      ".wf-go:hover:not(:disabled){background:rgba(59,130,246,.20);}",
+      ".wf-go:disabled{color:var(--muted-2,#a49d95);background:none;border-color:rgba(255,255,255,.08);cursor:default;}",
+      ".wf-undo,.wf-x{font-size:11.75px;font-weight:700;color:var(--muted,#b3ada4);background:none;border:none;text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-family:inherit;padding:0 2px;}",
+      ".wf-ok{font-size:11.75px;font-weight:700;color:var(--teal,#1eb980);}",
+      ".wf-hint{font-size:11.5px;color:var(--muted-2,#a49d95);}",
+      ".wf-err{font-size:11.5px;color:var(--red-ink, #f5928a);}",
     ].join("\n");
     document.head.appendChild(st);
   }
@@ -826,5 +847,174 @@
     return 센다;
   }
 
-  window.gijoChatParts = { quotes: quotes, picks: picks, open: open, dataCard: dataCard, nextChips: nextChips, dimEstimates: dimEstimates, 추정치조각: 추정치조각 };
+  /* ═══ 「이 답 이상해요」 꼬리 (2026-09-07 · 승인 시안 mockups/wrong-flag) ═══════════
+   *
+   * ■ 무엇이 문제였나: 지적을 받는 자리가 **지휘소에만** 있었고(화면 위젯·분리창엔 없었다),
+   *   보내고 나면 「✓ 지적 접수됨」에서 끝나 **어디로 갔는지 출구가 안 보였다.** 그리고 접수
+   *   카드가 화면 위에 300px로 떠서 대화를 덮었다.
+   *
+   * ■ 무엇을 하나: 답 꼬리 **한 줄**로 받는다. 접힘 상태에서는 지휘소의 기존 규칙(.cs-row .cs-flag —
+   *   호버·포커스에서만 드러남)이 그대로 걸려 세로가 안 는다. 펼치면 그 자리에 한 줄이 선다.
+   *   올린 뒤에는 「✓ 결재판에 올림 · 결재판 열기 · 취소」로 바뀌어 **출구를 보여 준다.**
+   *
+   * ■ 그리는 곳은 **여기 한 곳**이다(짝 시험 answerflagui.test ①). 지휘소·위젯이 같은 부품을
+   *   부르고, 다른 것은 **보내는 방법**(ops)뿐이다 — 창은 본창에 부탁해야 해서다.
+   *
+   * ■ 안 하는 것(정직하게)
+   *   · 갈래(fixkind)를 화면이 정하지 않는다 — **서버 fixboard가 정한다.** 여기서는 서버가
+   *     실제로 저장할 값 하나만 「표시」한다(noev가 있으면 자료 부족, 없으면 미분류).
+   *     kind로 후보를 찍어 주지 않는다 — 서버가 저장하지 않는 값을 보여 주면 화면이 거짓말한다.
+   *   · 「정답」 칸을 여기 두지 않는다 — 고친 최종문은 **닫을 때** 결재판에서 적는다(expected).
+   *   · 「똑똑해집니다」라고 적지 않는다 — 자동 반영이 아니라 사람이 검토한다.
+   *
+   * @param el   답 줄(.cs-row) 또는 말풍선
+   * @param ctx  {question, answer, quotes, sources, noev, screen} — 그 답이 쥐고 있던 값 그대로
+   * @param ops  {send(payload), remove(id), openBoard(id)} — 함수 하나만 주면 send로 본다
+   * @returns 꼬리 단추(없으면 null)
+   */
+  var FLAG_KINDS = [
+    { k: "wrong", label: "❌ 틀린 답", hint: "사실이 틀림" },
+    { k: "missing", label: "🔍 못 찾음", hint: "있는데 못 찾아 답함" },
+    { k: "style", label: "💬 말투", hint: "말투·형식이 어색함" },
+  ];
+  // 서버 answerfeedback.무르기시간_MS와 **같은 값**이다. 여기서 더 길게 두면 눌러도 403이 오고,
+  // 더 짧게 두면 무를 수 있는데 못 무른다. 어긋나면 짝 시험(⑥)이 빨개진다.
+  var 무르기_MS = 60000;
+  // 갈래 한글 이름 — 서버 fixboard.고칠것갈래라벨과 **글자가 같아야** 한다(결재판과 같은 말).
+  var 갈래라벨 = { doc: "자료 부족", rule: "사내 규정", prod: "제품", unclassified: "미분류" };
+
+  function flag(el, ctx, ops) {
+    var host = 붙일자리(el);
+    if (!host || !ctx || !ctx.question) return null;  // 무엇에 대한 지적인지 모르면 문항이 못 된다
+    var 부름 = typeof ops === "function" ? { send: ops } : (ops || {});
+    if (typeof 부름.send !== "function") return null;
+    ensureCss();
+
+    var 만들기 = function (tag, cls, 글) {
+      var e = document.createElement(tag);
+      e.className = cls;
+      if (글 != null) e.textContent = 글;
+      if (tag === "button") e.type = "button";
+      return e;
+    };
+
+    // ⚠ 감싸는 div를 두지 않는다 — 블록 하나가 더 생기면 접힘 상태의 세로가 는다.
+    //   접힘일 때 실제로 자리를 차지하는 것은 단추 하나뿐이고, 나머지 둘은 hidden이다.
+    var btn = 만들기("button", "cs-flag wf-flag", "▶ 이 답 이상해요");
+    var line = 만들기("div", "wf-line");
+    var done = 만들기("div", "wf-line wf-done");
+    line.hidden = true;
+    done.hidden = true;
+
+    var picked = "wrong";
+    var 칩들 = [];
+    FLAG_KINDS.forEach(function (k) {
+      var b = 만들기("button", "wf-k" + (k.k === "wrong" ? " on" : ""), k.label);
+      b.title = k.hint;
+      b.addEventListener("click", function () {
+        picked = k.k;
+        칩들.forEach(function (x) { x.el.className = "wf-k" + (x.k === picked ? " on" : ""); });
+      });
+      칩들.push({ k: k.k, el: b });
+      line.appendChild(b);
+    });
+
+    // 갈래 — **표시만** 한다. 서버가 접수 순간에 정하고, 사람이 결재판에서 바꾼다.
+    var 자동갈래 = ctx.noev ? "doc" : "unclassified";
+    var cand = 만들기("span", "wf-cand", "갈래 " + 갈래라벨[자동갈래]);
+    cand.title = ctx.noev
+      ? "이 답에 「사내 근거 없음」 표시가 있어 자료 부족으로 접수됩니다 — 최종 갈래는 결재판에서 사람이 정합니다."
+      : "지금은 미분류로 접수됩니다 — 자료 부족·사내 규정·제품 중 무엇인지는 결재판에서 사람이 정합니다.";
+    line.appendChild(cand);
+
+    var memo = document.createElement("input");
+    memo.className = "wf-memo";
+    memo.type = "text";
+    memo.placeholder = "한 줄 메모(선택) — 무엇이 틀렸나요";
+    line.appendChild(memo);
+
+    var go = 만들기("button", "wf-go", "올리기");
+    var close = 만들기("button", "wf-x", "닫기");   // ⚠ 클래스를 무르기(.wf-undo)와 가른다 — 같으면 「취소」를 눌렀는지 「닫기」를 눌렀는지 코드도 시험도 못 가린다
+    line.appendChild(go);
+    line.appendChild(close);
+
+    // 오류 한 줄 — 참조를 들고 있다가 갈아 낀다(같은 실패를 두 번 눌러도 줄이 쌓이지 않게).
+    var 오류줄 = null;
+    var 알림 = function (자리, 글) {
+      if (오류줄 && 오류줄.parentNode) 오류줄.parentNode.removeChild(오류줄);
+      오류줄 = 만들기("span", "wf-err", 글);
+      자리.appendChild(오류줄);
+    };
+
+    btn.addEventListener("click", function () { btn.hidden = true; line.hidden = false; if (memo.focus) memo.focus(); });
+    close.addEventListener("click", function () { line.hidden = true; btn.hidden = false; });
+
+    go.addEventListener("click", function () {
+      go.disabled = true;
+      var 옛글 = go.textContent;
+      go.textContent = "올리는 중…";
+      Promise.resolve(부름.send({
+        kind: picked,
+        question: String(ctx.question || ""),
+        answer: String(ctx.answer || ""),
+        note: (memo.value || "").trim() || undefined,
+        screen: ctx.screen || undefined,
+        // 접수 순간의 사실을 그대로 넘긴다 — 서버가 답 글자와 대조해 갈래를 정한다.
+        noev: ctx.noev || undefined,
+        // 인용 조각은 **본문 그대로** 얼려 보낸다(조각 id 포인터는 재인입에 끊긴다).
+        quotes: (Array.isArray(ctx.quotes) && ctx.quotes.length) ? ctx.quotes : undefined,
+      })).then(function (r) {
+        line.hidden = true;
+        올림그리기(r && r.id);
+      }, function (e) {
+        // ⚠ 실패했는데 「접수됨」이라 말하지 않는다 — 가짜 성공은 QA가 못 잡는다.
+        go.disabled = false;
+        go.textContent = 옛글;
+        알림(line, "보내지 못했습니다: " + ((e && e.message) || e));
+      });
+    });
+
+    function 올림그리기(id) {
+      done.hidden = false;
+      done.appendChild(만들기("span", "wf-ok", "✓ 결재판에 올림"));
+      if (typeof 부름.openBoard === "function") {
+        var 열기 = 만들기("button", "wf-go", "결재판 열기");
+        열기.addEventListener("click", function () { 부름.openBoard(id); });
+        done.appendChild(열기);
+      }
+      if (id && typeof 부름.remove === "function") {
+        var 무르기 = 만들기("button", "wf-undo", "취소");
+        무르기.title = "잘못 눌렀다면 1분 안에 무를 수 있습니다";
+        var 시계 = null;
+        무르기.addEventListener("click", function () {
+          무르기.disabled = true;
+          Promise.resolve(부름.remove(id)).then(function () {
+            if (시계) clearTimeout(시계);
+            while (done.childNodes && done.childNodes.length) done.removeChild(done.childNodes[0]);
+            done.appendChild(만들기("span", "wf-hint", "무른 지적입니다 — 기록에 남지 않았습니다."));
+            btn.hidden = false;   // 다시 지적할 수 있다
+          }, function (e) {
+            무르기.disabled = false;
+            알림(done, "무르지 못했습니다: " + ((e && e.message) || e));
+          });
+        });
+        done.appendChild(무르기);
+        // ⚠ 60초가 지나면 **조작을 없애되 자리는 남긴다** — 서버가 그 뒤로 403이라 단추만 두면
+        //   「됐다고 했는데 안 된다」가 되고, 소리 없이 지우면 왜 없어졌는지 아무도 모른다.
+        시계 = setTimeout(function () {
+          if (무르기.parentNode) 무르기.parentNode.removeChild(무르기);
+          done.appendChild(만들기("span", "wf-hint", "무르기(1분)는 지났습니다 — 결재판에서 「부적합」으로 닫습니다."));
+        }, 무르기_MS);
+      }
+      // 과한 약속을 하지 않는다 — 자동 반영이 아니라 사람이 검토한다.
+      done.appendChild(만들기("span", "wf-hint", "고쳐진 기록은 회귀 검사 문항 후보로 쌓입니다."));
+    }
+
+    host.appendChild(btn);
+    host.appendChild(line);
+    host.appendChild(done);
+    return btn;
+  }
+
+  window.gijoChatParts = { quotes: quotes, picks: picks, open: open, dataCard: dataCard, nextChips: nextChips, dimEstimates: dimEstimates, 추정치조각: 추정치조각, flag: flag };
 })();
