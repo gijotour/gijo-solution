@@ -1274,12 +1274,22 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     });
     await 셸.evaluate(() => document.querySelector("#gateFlagRow .wf-flag").click());
     // ★ 굳은 단추 감시 — **disabled를 읽고 끝내지 않고 실제로 눌러 본다**(가짜 DOM이 못 잡던 자리).
+    // ★★ 2026-09-07 게시 실측 수리 — **모습은 누르기 전에, 눌림은 누른 뒤에** 읽는다.
+    //   옛 판은 셋 다 `go.click()` **뒤에** 읽었다. 그런데 성한 제품의 go 리스너는 맨 첫 줄에서
+    //   동기로 `go.disabled = true; go.textContent = "올리는 중…"`을 한다(chatparts.js). 그래서
+    //   **고쳐진 제품에서도** 글자="올리는 중…"·disabled=true가 나와 이 절이 **늘 빨갰다** —
+    //   5.92.0 게시가 여기서 실제로 막혔다(눌림은 true였다: 클릭은 갔다는 뜻). 판정식은 옳고
+    //   틀린 것은 **생산자**였다(이 파일이 ⑥ 주석에서 경고한 바로 그 자리 — 두 번째다).
+    //   ⚠ 「굳었다」의 뜻은 **무른 뒤 다시 펼쳤을 때** 올리기가 「올리는 중…」·disabled로 남아
+    //   있는 것이다. 그러니 재는 순간은 누르기 **전**이다. 클릭이 실제로 갔는지(눌림)는 그대로
+    //   누른 뒤에 센다 — 굳어 있으면 브라우저가 disabled 단추에 click 이벤트를 안 보내 false가 된다.
     꼬리.다시올리기 = await 셸.evaluate(() => {
       const line = document.querySelector("#gateFlagRow .wf-line:not(.wf-done)");
       const go = [...line.querySelectorAll(".wf-go")][0];
+      const 글자 = go.textContent, disabled = go.disabled;   // ← 누르기 **전** 모습
       const 전 = window.__gateFlag.보냄;
       go.click();
-      return { 글자: go.textContent, disabled: go.disabled, 눌림: window.__gateFlag.보냄 > 전 };
+      return { 글자, disabled, 눌림: window.__gateFlag.보냄 > 전 };
     });
     await new Promise((x) => setTimeout(x, 300));
     꼬리.셈 = await 셸.evaluate(() => window.__gateFlag);
