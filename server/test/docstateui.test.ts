@@ -179,9 +179,12 @@ describe("⑤ 반증 — docState가 없는 옛 응답으로도 정상 줄은 �
     // ★ 좁은 폭 계약(2026-09-07 검토관 [낮음]) — 칩이 nowrap인데 줄일 수 없으면, 판이 좁아질 때
     //   이름 칸을 넘어 **등급·조각·날짜 칸 위로 겹친다**(narrow-probe 판정 ①넘침·④겹침).
     //   이름이 먼저 줄고 칩은 마지막에 말줄임되도록 둘 다 줄어들 수 있어야 한다.
-    const 칩규칙 = mydocs.slice(mydocs.indexOf(".dk-chip{"), mydocs.indexOf(".dk-chip{") + 400);
-    expect(칩규칙, "칩이 줄어들 수 없으면 좁은 판에서 옆 칸을 덮는다").toContain("text-overflow:ellipsis");
-    expect(칩규칙, "칩이 flex-shrink를 막으면 말줄임 규칙이 헛돈다").toMatch(/flex:0 1 auto/);
+    //   ⚠ 규칙이 걸리는 자리는 **목록 줄 안(.dk-name)** 이다 — 문서창 상세의 칩은 글 속
+    //     inline-block이라 overflow를 걸면 기준선이 바뀌어 옆 글자와 어긋난다(거기는 안 좁다).
+    const 칩규칙 = mydocs.slice(mydocs.indexOf(".dk-name{"), mydocs.indexOf(".dk-name{") + 900);
+    expect(칩규칙, "칩이 줄어들 수 없으면 좁은 판에서 옆 칸을 덮는다").toMatch(/\.dk-name \.dk-chip\{[^}]*text-overflow:ellipsis/);
+    expect(칩규칙, "칩이 flex-shrink를 막으면 말줄임 규칙이 헛돈다").toMatch(/\.dk-name \.dk-chip\{[^}]*flex:0 1 auto/);
+    expect(칩규칙, "이름 칸이 안 줄어들면 칩만 줄어든다 — 순서가 뒤집힌다").toMatch(/\.dk-name \.trunc\{[^}]*flex:1 1 auto/);
   });
 
   it("조각상태()가 내는 다섯 값 말고 다른 값을 화면이 지어내지 않는다", () => {

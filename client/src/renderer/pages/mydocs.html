@@ -200,9 +200,12 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
    판이 좁아지면(대화창 최대 = 판 420px) 칩이 이름 칸을 넘어 등급·조각·날짜 칸 위로 겹쳤다
    — narrow-probe 판정 ①넘침·④겹침이 그 부류다. 줄어드는 순서는 **이름 먼저**(base가 커서
    같은 비율이면 더 많이 줄어든다), 칩은 마지막에 말줄임된다. 전문은 title에 그대로 남는다. */
-.dk-chip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0;
-  font-size:11px;font-weight:800;padding:0 5px;border-radius:999px;
+.dk-chip{white-space:nowrap;font-size:11px;font-weight:800;padding:0 5px;border-radius:999px;
   border:1px solid currentColor;line-height:16px;display:inline-block}
+/* ⚠ 줄어드는 규칙은 **목록 줄 안에서만** 건다(.dk-name 안). 문서창 상세의 칩은 글 속에
+   inline-block으로 서 있어서, 거기에 overflow를 걸면 기준선이 아래 테두리로 바뀌어
+   **옆 글자와 아래위가 어긋난다** — 좁은 폭 문제가 없는 자리라 손대지 않는다. */
+.dk-name .dk-chip{overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
 .dk-miss{color:var(--red)}      /* 조각 없음 — AI가 근거로 못 쓴다 */
 .dk-short{color:var(--amber)}   /* 조각 일부 사라짐 */
 .dk-extra{color:var(--purple)}  /* 옛 판 조각 남음 */
