@@ -19,6 +19,7 @@ import {
   경고없는퍼센트단정, 퍼센트꼴, 마케팅조언인가,
   사내문답이근거를독점했나, 근거없는의무단정인가, 조건없는연2회의무인가,
   의무아님_RE, 의무부정_RE, 검증현황카드_RE, 의무라고못박았나, 규범단정인가, 제품꼬리걷기,
+  지목문서가근거에없나, 도구가답했는데근거가비었나,
 } from "../../tools/opssim-rules.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1001,5 +1002,51 @@ describe("★★★ 하네스는 모델의 말을 잰다 — 제품 꼬리를 �
     expect(src, "판정 입력에서 안 걷는다").toContain("const o = 제품꼬리걷기(o0);");
     // ⚠ 공통 금지(저장소 원문 누출)는 **날것**을 봐야 한다 — 걷은 답으로 재면 안 된다.
     expect(src, "공통 금지가 걷은 답을 본다").toContain("공통금지.filter((x) => x.re.test(o0))");
+  });
+});
+
+// ── ⑱ 이름을 댄 문서가 답의 근거인가 (2026-09-08) ─────────────────────────────
+describe("★★ ⑱ 지목 문서 판정 — 적발과 오탐을 **양쪽 다** 문다", () => {
+  it("이름을 댄 문서가 근거에 없으면 적발한다 — 라이브 실물(평가기준 → KISA 카탈로그)", () => {
+    expect(지목문서가근거에없나(["compliance-criteria", "GIJO_지식_ISMS-P_인증.md"], "금융_취약점_평가기준")).toBe(true);
+  });
+  it("그 문서가 근거에 있으면 통과 — 정답을 벌주지 않는다", () => {
+    expect(지목문서가근거에없나(["GIJO_지식_금융_취약점_평가기준.md"], "금융_취약점_평가기준")).toBe(false);
+    // 근거가 여럿이어도 그 안에 있으면 통과(1위여야 한다고 요구하지 않는다 — 부스트는 벽이 아니다)
+    expect(지목문서가근거에없나(["다른.md", "GIJO_지식_금융_취약점_평가기준.md"], "금융_취약점_평가기준")).toBe(false);
+  });
+  it("★ sources가 비면 **판정하지 않는다** — 그 공백은 아래 규칙이 따로 문다", () => {
+    expect(지목문서가근거에없나([], "금융_취약점_평가기준"), "두 가지를 한 규칙에 섞으면 뭐가 깨졌는지 못 읽는다").toBe(false);
+    expect(지목문서가근거에없나(undefined, "금융_취약점_평가기준")).toBe(false);
+    expect(지목문서가근거에없나(["아무거나.md"], ""), "지목이 없으면 잴 것이 없다").toBe(false);
+  });
+
+  it("문서로 답해 놓고 근거가 비면 적발한다 — 배지 생산자 공백(라이브: sources=null)", () => {
+    expect(도구가답했는데근거가비었나(null, ["explain"], undefined)).toBe(true);
+    expect(도구가답했는데근거가비었나([], ["search"], undefined)).toBe(true);
+    // ★ sources만 있고 근거세기가 없으면 클라가 초록 「📄 근거」로 그린다 — 그것도 적발이다.
+    expect(도구가답했는데근거가비었나(["a.md"], ["explain"], undefined), "근거세기 없는 sources는 거짓 배지다").toBe(true);
+  });
+  it("근거를 제대로 실으면 통과 — 셋이 함께 왔을 때만", () => {
+    expect(도구가답했는데근거가비었나(["a.md"], ["explain"], "강함")).toBe(false);
+    expect(도구가답했는데근거가비었나(["a.md"], ["explain"], "약함")).toBe(false);
+  });
+  it("★ 근거를 안 읽는 도구가 답한 자리는 안 본다 — 집계 답에 근거를 요구하면 거짓 빨강", () => {
+    expect(도구가답했는데근거가비었나(null, ["finding_status"], undefined)).toBe(false);
+    expect(도구가답했는데근거가비었나(null, [], undefined), "도구 없는 답은 재검색 블록이 채운다").toBe(false);
+  });
+
+  it("★★ 하네스가 **실제로 이 규칙을 부른다** — 배선이 사라지면 여기가 빨개진다", () => {
+    const src = readFileSync(join(__dirname, "../../tools/ops-sim.mjs"), "utf8");
+    expect(src).toMatch(/import\s*\{[^}]*지목문서가근거에없나[^}]*\}\s*from\s*["']\.\/opssim-rules\.mjs["']/);
+    expect(src, "⑱ 지목 판정을 안 부른다").toContain("지목문서가근거에없나(r.sources, e.지목문서)");
+    expect(src, "⑱ 근거 공백 판정을 안 부른다").toContain("도구가답했는데근거가비었나(r.sources, r.도구, r.근거세기)");
+    // ⚠ 열쇠는 마당의 물음과 **글자 하나까지** 같아야 걸린다(ops-sim 자기점검이 같은 것을 잰다).
+    for (const q of [
+      "금융 취약점 평가기준 항목 알려줘",
+      "AI 시대 소프트웨어 보안 점검표에서 출시 전 점검 항목 알려줘",
+    ]) {
+      expect(src.split(q).length - 1, `「${q}」가 마당·기대표 두 곳에 같은 글자로 있어야 한다`).toBeGreaterThanOrEqual(2);
+    }
   });
 });

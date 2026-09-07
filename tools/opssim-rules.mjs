@@ -358,3 +358,40 @@ export function 제품꼬리걷기(답) {
 // ⚠ 이 글자는 **제품 문구의 그림자**다(server/src/engine/datacard.ts). 짝 시험 opssimrules.test가
 //   제품 소스에 같은 글자가 있는지 문다 — 제품이 문구를 바꾸면 여기도 함께 바꾸라고 알려 준다.
 export const 검증현황카드_RE = /검증\(보안설정 점검\) 현황/;
+
+// ── ⑱ 마당 전용 — **이름을 댄 문서가 근거에 있나** (2026-09-08) ─────────────────
+//
+// 라이브 실측(운영 WSL 4000): 「금융 취약점 평가기준 항목 알려줘」에 제품이 compliance_status를
+//   골라 KISA 위협 카탈로그(S01 데이터 포이즈닝 · S02 모델 포이즈닝…)를 「평가기준 항목」이라며
+//   답했다. 지목한 문서와 아무 상관이 없다. 「AI 시대 소프트웨어 보안 점검표에서 …」는 explain을
+//   타고도 sources=null·근거세기=「-」였다 — 문서를 읽고 답해 놓고 무엇을 근거로 했는지 못 말했다.
+//
+// ★ 왜 답 글자가 아니라 **sources**를 보나: 답 글자로 재면 「모델이 그럴듯하게 썼나」를 재게 된다.
+//   여기서 물을 것은 **제품이 어느 문서를 근거로 삼았나**이고, 그것은 서버가 내려준 값에만 있다.
+//   ⑰ⓐ(사내문답이근거를독점했나)와 같은 자리·같은 이유다 — 막는 쪽과 보는 쪽이 같으면 같이 눈이 먼다.
+// ⚠ **sources가 비면 이 규칙은 판정하지 않는다**(아래 별도 규칙이 그 공백을 문다). 두 가지를
+//   한 규칙에 섞으면 「근거가 없다」와 「엉뚱한 근거다」가 한 덩어리가 되어 무엇이 깨졌는지 못 읽는다.
+
+/** 이름을 댄 문서가 근거 목록에 **없는가**. sources가 비었으면 판정 안 함(false). */
+export function 지목문서가근거에없나(sources, 문서이름조각) {
+  const 목록 = Array.isArray(sources) ? sources.filter(Boolean).map(String) : [];
+  if (!목록.length || !문서이름조각) return false;
+  return !목록.some((id) => id.includes(문서이름조각));
+}
+
+/**
+ * **도구가 답했는데 근거가 비었는가** — 근거 배지의 생산자 공백(2026-09-08 ⓑ).
+ *
+ * 라이브 그대로: explain·search·law_lookup은 dispatcher의 재검색 블록을 건너뛰는데(집계조회도구_RE)
+ * 정작 그 도구들이 result.sources를 안 채워, 문서로 답한 자리마다 배지가 통째로 비었다.
+ * ⚠ 도구를 안 쓴 답은 여기서 안 본다 — 그 자리는 재검색 블록이 종전대로 채운다.
+ * ⚠ 근거세기도 함께 본다: sources만 있고 근거세기가 없으면 클라가 초록 「📄 근거」로 그린다.
+ */
+const 근거를읽는도구_RE = /^(explain|search)$/;
+export function 도구가답했는데근거가비었나(sources, 도구, 근거세기) {
+  const 썼나 = (도구 ?? []).some((t) => 근거를읽는도구_RE.test(String(t)));
+  if (!썼나) return false;
+  const 목록 = Array.isArray(sources) ? sources.filter(Boolean) : [];
+  if (!목록.length) return true;
+  return 근거세기 !== "강함" && 근거세기 !== "약함";
+}

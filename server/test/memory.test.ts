@@ -28,7 +28,7 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-const { ingestDocument, ingestText, queryMemory, listDocuments, getDocumentChunks, getChunksForDocuments, getDocumentSample, deleteDocument, uploadedDocIds } = await import("../src/engine/memory");
+const { ingestDocument, ingestText, queryMemory, listDocuments, getDocumentChunks, getChunksForDocuments, getDocumentSample, deleteDocument, 지목후보Ids } = await import("../src/engine/memory");
 
 const DOC_A = path.join(tmpDb, "doc-a.txt");
 const DOC_B = path.join(tmpDb, "doc-b.txt");
@@ -158,15 +158,17 @@ describe("memory documents (올린 문서 목록·조각 미리보기·삭제)",
     expect(hits.join(" ")).not.toContain("ZZTOP");
   });
 
-  it("uploadedDocIds — 내장(builtin)은 빼고 업로드만 준다 (docScope 오발화 방지, 검토관 [중])", async () => {
-    // 내장은 주제명 그대로라(취약점관리_지침) 일반 질문 "취약점 관리는 어떻게"에 docScope가
-    // 최강 부스트로 오발화했다. 내장을 목록에서 빼야 그 문서명이 지목 대상이 안 된다.
+  // ★★ 2026-09-08 뒤집힘 — 옛 uploadedDocIds는 「내장을 뺀다」가 계약이었는데, 그 배제가
+  //   **지식 문서를 이름으로 못 집게 만든 뿌리**였다(라이브 재현 4문장). 이제 지목후보Ids는
+  //   내장을 **넣고**, 옛 주석이 걱정한 오발화(「취약점 관리는 어떻게」)는 목록이 아니라
+  //   토큰 규칙으로 막는다(hybridsearch.제목지목매치 성립 조건 — 짝 시험이 그 물음을 문다).
+  it("지목후보Ids — 내장·업로드는 넣고 제품이 쌓은 문서·개인 문서는 뺀다", async () => {
     embedDim = 3;
     await ingestText("seed-topic.md", "내장 지침 내용입니다.", "global", undefined, false, undefined, undefined, "builtin");
     await ingestText("uploaded-vendor.pdf", "업로드 매뉴얼 내용입니다.", "global");
-    const ids = uploadedDocIds();
+    const ids = 지목후보Ids();
     expect(ids).toContain("uploaded-vendor.pdf");
-    expect(ids, "내장 문서가 docScope 대상에 들면 일반 질문에 오발화한다").not.toContain("seed-topic.md");
+    expect(ids, "지식 문서를 빼면 이름을 정확히 대도 원리상 못 집는다").toContain("seed-topic.md");
   });
 
   // ★ 낱말 가로채기 수리(2026-08-21 라이브): 문서를 콕 집어 그 내용/존재를 물으면 문서 RAG로,
@@ -210,6 +212,68 @@ describe("memory documents (올린 문서 목록·조각 미리보기·삭제)",
     //   반대로 문서를 안 집은 자산 목록 질문은 여전히 목록 빠른 길(HIJACK 유지)
     expect(문서지목질문("미조치 취약점 뭐 있어?"), "자산 목록→문서 아님").toBe(false);
     expect(문서지목질문("고위험 취약점 목록 보여줘"), "자산 목록→문서 아님").toBe(false);
+  });
+
+  // ★★ 2026-09-08 — **제목으로 지목**하는 다섯 번째 잣대. 위 문서지목질문(언어패턴)과 뜻이 다르다:
+  //   저쪽은 「안내서에서/이 매뉴얼」처럼 *유형어*로 집는 말, 이쪽은 *실제 제목*을 댄 말.
+  //   라이브 재현(2026-09-08): 「금융 취약점 평가기준 항목 알려줘」가 아무 규칙에도 안 걸려
+  //   ⑨ 모델 선택으로 떨어졌고 compliance_status가 KISA 위협 카탈로그를 답했다.
+  describe("제목 지목 — 실제 문서 제목을 보고 잡는다", () => {
+    const 문서들 = [
+      ["GIJO_지식_금융_취약점_평가기준.md", "builtin"],
+      ["GIJO_지식_AI시대_소프트웨어_보안점검표.md", "builtin"],
+      ["GIJO_지식_금융_AI_보안_가이드라인.md", "builtin"],
+      ["GIJO_AS_취약점관리_지침.md", "builtin"],
+      ["solidstep_manual.pdf", null],
+      ["승인문답:dtmtl40khqg8uehk", "approved-qa"],
+      ["incident-case:ic-c37e91a2db580f43", "incident-case"],
+      ["personal:11111111-2222-3333-4444-555555555555", null],
+    ] as const;
+
+    beforeAll(async () => {
+      const { db } = await import("../src/db");
+      const ins = db.prepare(
+        "INSERT OR REPLACE INTO memory_documents (documentId, scope, chunks, ingestedAt, origin) VALUES (?, 'global', 1, datetime('now'), ?)",
+      );
+      for (const [id, origin] of 문서들) ins.run(id, origin);
+    });
+
+    it("★ 내장 지식 문서도 이름으로 잡힌다 — 옛 잣대는 업로드만 봐서 원리상 못 잡았다", async () => {
+      const { 제목지목문서 } = await import("../src/engine/memory");
+      expect(제목지목문서("금융 취약점 평가기준 항목 알려줘").has("GIJO_지식_금융_취약점_평가기준.md")).toBe(true);
+      expect(제목지목문서("AI 시대 소프트웨어 보안 점검표에서 출시 전 점검 항목 알려줘")
+        .has("GIJO_지식_AI시대_소프트웨어_보안점검표.md")).toBe(true);
+      expect(제목지목문서("금융 AI 보안 가이드라인에서 안전성 요건 알려줘")
+        .has("GIJO_지식_금융_AI_보안_가이드라인.md"), "「가이드라인에서」— 가이드 뒤가 '라'라 문서조사RE는 불성립").toBe(true);
+      // 업로드 문서도 그대로(회귀 없음)
+      expect(제목지목문서("SolidStep 매뉴얼에서 Windows 수동진단 알려줘").has("solidstep_manual.pdf")).toBe(true);
+    });
+
+    it("★ 승인 문답·사례·개인 문서는 후보에서 뺀다 — 잣대는 docorigin 한 곳", async () => {
+      const { 지목후보Ids } = await import("../src/engine/memory");
+      const 후보 = 지목후보Ids();
+      expect(후보).toContain("GIJO_지식_금융_취약점_평가기준.md");
+      expect(후보).toContain("solidstep_manual.pdf");
+      expect(후보, "승인 문답은 제목이 내부 ID라 사람이 이름으로 못 부른다").not.toContain("승인문답:dtmtl40khqg8uehk");
+      expect(후보).not.toContain("incident-case:ic-c37e91a2db580f43");
+      expect(후보).not.toContain("personal:11111111-2222-3333-4444-555555555555");
+    });
+
+    it("★ 일반 주제 질문은 지목이 아니다 — 오탐이 그 문서를 벽으로 만들지 않게", async () => {
+      const { 제목지목질문 } = await import("../src/engine/memory");
+      expect(제목지목질문("취약점 관리는 어떻게 해?"), "「취약점관리」 5자 한 토큰 → 미성립").toBe(false);
+      expect(제목지목질문("오늘 뭐부터 볼까?")).toBe(false);
+      expect(제목지목질문("우리 자산 몇 대야?")).toBe(false);
+    });
+
+    it("★ 법령·절차의도·추천·소재는 문서지목질문과 **같은 정규식으로** 앞에서 뺀다", async () => {
+      const { 제목지목질문 } = await import("../src/engine/memory");
+      expect(제목지목질문("금융 취약점 평가기준 항목 알려줘"), "증상 ② — 이 갈래가 없어 모델 재량으로 샜다").toBe(true);
+      expect(제목지목질문("개인정보 보호법에서 금융 취약점 평가기준이 뭐야?"), "법령→law_lookup").toBe(false);
+      expect(제목지목질문("금융 취약점 평가기준대로 대응하려면 뭐부터 해?"), "절차의도→플레이북").toBe(false);
+      expect(제목지목질문("금융 취약점 평가기준 어디 있어?"), "소재→search").toBe(false);
+      expect(제목지목질문("이럴 때 어떤 문서를 봐야 해?"), "추천→소재/플레이북").toBe(false);
+    });
   });
 });
 

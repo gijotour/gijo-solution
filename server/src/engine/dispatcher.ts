@@ -1867,6 +1867,15 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       route: { agentId: "orchestrator", action: "chat" },
       output: loop.output,
       toolCalls: loop.toolCalls,
+      // ★★ 도구가 **실제로 읽은** 근거를 그대로 싣는다(2026-09-08 · toolevidence.ts).
+      //   근거재검색대상인가()는 explain·search·law_lookup이 돌면 재검색 블록을 건너뛰는데,
+      //   그 도구들이 sources를 안 채워 **소비자만 있고 생산자가 없었다**(라이브: sources=null).
+      //   여기서 실으면 `result.sources !== undefined`가 먼저 false를 내므로 집계조회도구_RE도
+      //   sourcebadge.test의 계약도 한 글자 안 건드린 채 배지가 정직해진다.
+      //   ⚠ 셋을 **함께** 싣는다 — 근거세기가 비면 클라가 초록 「📄 근거」로 그린다.
+      ...(loop.sources ? { sources: loop.sources } : {}),
+      ...(loop.근거세기 ? { 근거세기: loop.근거세기 } : {}),
+      ...(loop.quotes?.length ? { quotes: loop.quotes } : {}),
       ...(이어붙인대상 ? { 이어붙인대상 } : {}),
       ...(loop.approval ? { approval: loop.approval } : {}),
       ...picksFor(loop.output, loop.toolCalls, loop.approval),

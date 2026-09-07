@@ -26,7 +26,8 @@ import { listCompliance, setComplianceStatus } from "../compliance";
 import { generateSbom } from "../sbom";
 import type { ComplianceStatus } from "../compliance";
 import { countTriples } from "../ontology";
-import { listVisibleDocuments, queryMemory, queryMemoryRelevant, queryMemoryScored, 문서지목질문 } from "../memory";
+import { listVisibleDocuments, queryMemory, queryMemoryScored, queryMemoryGraded, 문서지목질문, 제목지목문서 } from "../memory";
+import { 도구근거보고 } from "../toolevidence"; // 도구가 읽은 근거를 배지로 올려 보낸다(잎 모듈)
 import { 상태꼬리, 조각없음, 판이어긋남, 견줄수있음, type DocState } from "../docledger"; // 대장↔저장소 판정 한 곳(잎 · import 0)
 import { listFindings as listCtiFindings } from "../cti";
 import { matchCtiToAssets } from "../ctimatch";
@@ -489,7 +490,13 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   //   온톨로지보다 **앞에** 싣는다. 안 그러면 7B가 앞줄(온톨로지)을 답으로 삼아, 도메인 낱말(대상=스캔
   //   타깃)의 온톨로지 관계 덤프가 문서 내용을 덮는다(2026-08-21 코퍼스 QA 실측). topic이 지시문 전체인
   //   강제경로(문서지목질문 TRUE)에만 발동 — LLM이 짧게 뽑은 일반 explain(「대상이 뭐야?」)은 온톨로지 유지.
-  const 문서우선 = 문서지목질문(topic);
+  // ★★ 2026-09-08 — **제목으로 집은 경우도 문서 우선**이다. 안 그러면 이 라운드가 새로 살린 물음
+  //   (「금융 취약점 평가기준 항목 알려줘」 — 유형어가 없어 문서지목질문이 원리상 false)이 explain에
+  //   와서도 온톨로지를 앞줄로 받는다. 7B는 앞줄을 답으로 삼으므로, 라우팅만 고치고 여기를 두면
+  //   **문서로 보내 놓고 문서를 안 읽히는** 반쪽 수리가 된다.
+  //   ⚠ 지목 집합은 여기서 **한 번만** 구해 아래 「관련 사내 문서」와 함께 쓴다(SQLite 두 번 금지).
+  const 지목 = 제목지목문서(topic);
+  const 문서우선 = 문서지목질문(topic) || 지목.size > 0;
   const 온톨로지: string[] = [];
   const triples = ontologyLinesFor(topic, 12);
   if (triples.length) 온톨로지.push(`사내 온톨로지 관계 — "${topic}" 관련:`, ...triples);
@@ -505,16 +512,39 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   //   시그니처·백업·로그) 일반론으로 답했다. 근거 배지에는 그 문서가 떠서 더 헷갈렸다.
   //   제목만으로는 근거가 아니다 — 본문을 줘야 근거다.
   try {
-    const raw = await queryMemoryRelevant(topic, 4);
+    // ★★ 2026-09-08 — queryMemoryRelevant → queryMemoryGraded. **같은 검색 한 번**인데
+    //   documentId와 약한근거만을 함께 준다(Relevant는 text만 준다). 조각을 고르는 잣대는
+    //   두 함수가 같으므로(isRelevant · RAG_RELEVANCE_MAX_DISTANCE) 발췌 내용은 안 바뀐다.
+    //   ⚠ 지목 문서를 여기서 다시 올리지 않는다 — 순서는 hybridSearch의 제목지목문서 부스트가
+    //     이미 정했다(잣대 한 곳). 여기서 또 재정렬하면 「같은 것을 두 곳에서」가 된다.
+    const graded = await queryMemoryGraded(topic, 4);
     // 도구 결과도 그대로 프롬프트에 재주입된다 — 여기서도 문서에 숨은 지시문을 잘라낸다
     // (llm.ts ragContextFor와 같은 이유. 한 곳만 막으면 다른 경로로 그대로 들어온다).
     const { sanitizeRagChunks } = await import("../ragsanitize.js");
-    const chunks = sanitizeRagChunks(raw, { source: "tool:explain", question: topic }).chunks;
+    const 살균 = sanitizeRagChunks(graded.chunks, { source: "tool:explain", question: topic });
+    const chunks = 살균.chunks;
     if (chunks.length) {
       out.push(
         `사내 문서 근거(발췌) ${chunks.length}건:`,
         ...chunks.slice(0, 3).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
       );
+      // ★★ 근거 배지의 **생산자**(2026-09-08 · toolevidence.ts). 도구가 답한 자리에는 그동안
+      //   생산자가 없어 sources=null·근거세기=「-」였다 — 문서를 읽고 답해 놓고 무엇을 근거로
+      //   했는지 못 말한 것이다. dispatcher의 재검색 블록과 **같은 세 칸**을 같은 값으로 낸다.
+      //   ⚠ 살균에서 걸러진 조각은 자리가 밀리므로 keptIndexes로 documentId를 함께 거른다
+      //     (queryMemoryGraded의 titles가 지키는 계약과 같은 이유 — 자리를 맞춘다).
+      const 남은 = 살균.keptIndexes.map((i) => graded.scored[i]).filter(Boolean);
+      const sources = [...new Set(남은.map((c) => String(c.documentId ?? "")).filter(Boolean))];
+      if (sources.length) {
+        도구근거보고({
+          sources,
+          근거세기: graded.약한근거만 ? "약함" : "강함",
+          quotes: 남은.slice(0, 3).map((c) => ({
+            documentId: String(c.documentId ?? ""),
+            text: String(c.text ?? "").replace(/\s+/g, " ").trim().slice(0, 400),
+          })).filter((q) => q.text),
+        });
+      }
     }
   } catch {
     /* 임베딩 미기동 등 — 본문 근거 없이 계속 */
@@ -524,7 +554,12 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
 
   // 어느 문서에서 왔는지도 함께(담당자가 원문을 찾아갈 수 있게).
   try {
-    const docs = (await listVisibleDocuments()).filter((d) => matches(d.documentId, topic))
+    // ★★ 2026-09-08 — 죽어 있던 갈래를 살린다. matches(documentId, topic)는 **문서 ID가 질문을
+    //   통째로 포함해야** 참인데, 강제 경로에서 topic은 지시문 전체다(「금융 취약점 평가기준 항목
+    //   알려줘」) — 그런 파일 이름은 없으므로 이 블록은 그 경로에서 **원리상 늘 0건**이었다.
+    //   제목 지목(랭킹·라우팅과 **같은 한 함수**)을 함께 태워, 이름을 댄 문서가 실제로 뜨게 한다.
+    //   ⚠ matches는 남긴다 — 짧은 topic(모델이 뽑은 「제로트러스트」)에는 그쪽이 맞는 잣대다.
+    const docs = (await listVisibleDocuments()).filter((d) => 지목.has(d.documentId) || matches(d.documentId, topic))
       .filter((d) => !지정범위.length || 지정범위.includes(d.documentId)); // ☑ 지정 밖 문서명을 「관련 문서」로 싣지 않는다
     if (docs.length) {
       out.push(

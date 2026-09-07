@@ -12,6 +12,7 @@
 
 import { chat, 자료없음배너, 자료없음중복가드, 지정범위배너 } from "./llm";
 import { currentDocIds } from "./ragscope";
+import { 새근거수거, 근거를수거하며 } from "./toolevidence"; // 도구가 읽은 근거를 위로 나르는 꼬리표(잎 모듈)
 import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 되묻기표지, 지식근거없음표지 } from "./agenttools";
@@ -19,7 +20,7 @@ import type { AgentTool } from "./agenttools";
 import { 법령검색없음표지 } from "./lawinfo";
 import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
-import { 문서지목질문 } from "./memory";
+import { 문서지목질문, 제목지목질문 } from "./memory";
 import { recordWork, TOOL_WORK_KIND } from "./worklog";
 import { listTasks } from "./tasks";
 import { 자산표시이름, listAssets } from "./assets";
@@ -105,6 +106,12 @@ export interface AgentLoopResult {
   toolCalls: AgentToolCall[];
   // 쓰기 도구가 선택되면 실행 대신 결재판을 돌려준다 — 승인은 /api/agent/approve로만(시안 B).
   approval?: PendingApproval;
+  // ★ 도구가 **실제로 읽은** 사내 문서 근거(2026-09-08). 도구가 답한 자리에는 근거 배지의
+  //   생산자가 없어 sources가 늘 비어 있었다(toolevidence.ts 머리말). 셋은 **함께** 나른다 —
+  //   근거세기가 비면 클라가 초록 「📄 근거」로 그려 새 거짓 배지가 된다.
+  sources?: string[];
+  근거세기?: "강함" | "약함";
+  quotes?: { documentId: string; text: string }[];
 }
 
 interface Decision {
@@ -2485,6 +2492,21 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
       return { tool: f.tool, args: f.args, ...(f.argsByModel ? { argsByModel: true as const } : {}) };
     }
   }
+
+  // ★★ 제목으로 문서를 콕 집었는가 — **배열 뒤, return null 바로 앞**(2026-09-08).
+  //   ⚠ **자리가 이 규칙의 절반이다.** 앞머리에 두면 「랜섬웨어 대응」·「침해사고 대응절차」처럼
+  //     제목 토큰이 그대로 들어맞는 물음이 FORCED 134개와 침해·장애 특수경로를 통째로 뺏는다
+  //     (설계관 정정의 핵심 근거 — 실측에서 실제로 뺏었다). 꼬리에 두면 preempt가 0이고,
+  //     증상 ②가 새던 자리(⑨ 모델 선택) **바로 앞**만 정확히 막는다.
+  //   ⚠ 배열을 안 건드리므로 routes-renumber는 필요 없다(routes.test는 FORCED_INTENTS[n] 행만 센다).
+  //   왜 필요한가(2026-09-08 라이브 재현): 「금융 취약점 평가기준 항목 알려줘」가 아무 규칙에도
+  //     안 걸려 ⑨ 모델 선택으로 떨어졌고, 모델이 compliance_status를 골라 **KISA 위협 카탈로그**
+  //     (S01 데이터 포이즈닝…)를 「평가기준 항목」이라며 답했다. 지목한 문서와 아무 상관이 없다.
+  //     ⚠ 이것은 compliance_status 규칙을 좁혀서는 못 고친다 — route-explain 실측이 「걸리는 규칙
+  //       없음」이었다. 규칙이 채 간 게 아니라 **아무 규칙도 없어서** 모델 재량이 답했다.
+  if (available.has("explain") && 제목지목질문(instruction)) {
+    return { tool: "explain", args: { topic: instruction } };
+  }
   return null;
 }
 
@@ -2622,7 +2644,22 @@ function 범위를입힌다(args: Record<string, string>, tool: AgentTool | unde
   return args;
 }
 
+/**
+ * 루프를 돌리고, **도구가 읽은 근거**를 함께 실어 돌려준다(2026-09-08 · toolevidence.ts).
+ *
+ * ⚠ 감싸는 자리가 여기 하나여야 한다 — 루프 본체는 return 자리가 열 곳이 넘어서, 갈래마다
+ *   근거를 붙이면 반드시 하나를 빠뜨린다(「배관이 다 살아 있어도 갈래 하나를 빠뜨리면
+ *   아무 일도 안 일어난다」 — 바로 아래 강제 경로 주석이 같은 사고를 적어 두었다).
+ */
 export async function runAgentLoop(instruction: string, context = "", scope?: ToolScope): Promise<AgentLoopResult | null> {
+  const 그릇 = 새근거수거();
+  const r = await 근거를수거하며(그릇, () => runAgentLoopCore(instruction, context, scope));
+  if (!r || !그릇.값) return r;
+  const { sources, 근거세기, quotes } = 그릇.값;
+  return { ...r, sources, 근거세기, ...(quotes?.length ? { quotes } : {}) };
+}
+
+async function runAgentLoopCore(instruction: string, context = "", scope?: ToolScope): Promise<AgentLoopResult | null> {
   // 범위를 적용한 뒤 쓸 도구가 하나도 없으면 루프를 돌 이유가 없다(호출자가 채팅으로 폴백).
   if (listToolsFor(scope?.domains, scope?.role).length === 0) return null;
 

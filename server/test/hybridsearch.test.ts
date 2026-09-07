@@ -10,7 +10,7 @@ import {
   isRelevant,
   applyCategoryBoost,
   categoryForScreen,
-  docScopeMatch,
+  제목지목매치,
   applyDocScopeBoost,
   DOCSCOPE_BOOST,
   ROLE_BOOST,
@@ -273,27 +273,53 @@ describe("질의 변형 융합 — 재작성 랭킹 페널티(2026-08-17 실측 
 });
 
 // 문서 스코프 부스트 — 질문이 콕 집은 문서를 앞세운다(2026-08-21 SolidStep 실측으로 확정).
-describe("문서 스코프 — 지목 판별(docScopeMatch)", () => {
+describe("문서 스코프 — 지목 판별(제목지목매치)", () => {
   it("파일명 구별 토큰이 질문에 있으면 지목 — 영문·한글 파일명 둘 다", () => {
-    expect(docScopeMatch("SolidStep 매뉴얼에서 Windows 수동진단 알려줘", ["solidstep_manual.pdf", "other.pdf"]))
+    expect(제목지목매치("SolidStep 매뉴얼에서 Windows 수동진단 알려줘", ["solidstep_manual.pdf", "other.pdf"]))
       .toEqual(new Set(["solidstep_manual.pdf"]));
     // 한글 파일명: 방화벽설정_절차.pdf → 구별 토큰 "방화벽설정"(절차·pdf는 유형어/짧음)
-    expect(docScopeMatch("방화벽설정 절차 알려줘", ["방화벽설정_절차.pdf"]))
+    expect(제목지목매치("방화벽설정 절차 알려줘", ["방화벽설정_절차.pdf"]))
       .toEqual(new Set(["방화벽설정_절차.pdf"]));
   });
   it("문서 유형어만으로는 안 걸린다(오탐 방지) — '매뉴얼 보여줘'가 manual.pdf를 안 집는다", () => {
-    expect(docScopeMatch("매뉴얼 보여줘", ["manual.pdf"]).size).toBe(0);
-    expect(docScopeMatch("문서 목록 알려줘", ["report.pdf", "doc.txt"]).size).toBe(0);
+    expect(제목지목매치("매뉴얼 보여줘", ["manual.pdf"]).size).toBe(0);
+    expect(제목지목매치("문서 목록 알려줘", ["report.pdf", "doc.txt"]).size).toBe(0);
   });
   it("★숫자만·4자 미만 토큰은 지목 안 한다 — 연도·짧은 라틴어 오발화 방지(검토관 [중])", () => {
     // "2024"만으로 2024_보안감사를 집지 않는다(연도는 아무 질문에나 스친다)
-    expect(docScopeMatch("2024년에 무슨 일 있었어", ["2024_감사.pdf"]).size).toBe(0);
+    expect(제목지목매치("2024년에 무슨 일 있었어", ["2024_감사.pdf"]).size).toBe(0);
     // 3자 라틴 공통어(log·api·web)로 집지 않는다
-    expect(docScopeMatch("api 설정 어떻게 해", ["api_log.pdf"]).size).toBe(0);
+    expect(제목지목매치("api 설정 어떻게 해", ["api_log.pdf"]).size).toBe(0);
   });
   it("URL 지식화 문서·짧은 질문은 지목하지 않는다", () => {
-    expect(docScopeMatch("소만사 리포트 알려줘", ["https://www.somansa.com/x"]).size).toBe(0);
-    expect(docScopeMatch("아", ["solidstep_manual.pdf"]).size).toBe(0);
+    expect(제목지목매치("소만사 리포트 알려줘", ["https://www.somansa.com/x"]).size).toBe(0);
+    expect(제목지목매치("아", ["solidstep_manual.pdf"]).size).toBe(0);
+  });
+
+  // ★★ 2026-09-08 — **한글이 라틴 4자 규칙에서 죽던 것**을 고친 자리(라이브 재현 4문장의 뿌리).
+  //   옛 규칙(length>=4)에서는 금융(2)·보안(2)·취약점(3)·공급망(3)이 전부 탈락해, 내장 35편 중
+  //   5편은 남는 토큰이 「gijo」뿐이라 **이름을 정확히 대도 원리상 못 집었다.**
+  it("★ 한글은 2자↑ · 라틴은 4자↑ — 이름을 통째로 댄 지식 문서가 잡힌다", () => {
+    expect(제목지목매치("금융 취약점 평가기준 항목 알려줘", ["GIJO_지식_금융_취약점_평가기준.md"]))
+      .toEqual(new Set(["GIJO_지식_금융_취약점_평가기준.md"]));
+    expect(제목지목매치("AI 시대 소프트웨어 보안 점검표에서 출시 전 점검 항목 알려줘",
+      ["GIJO_지식_AI시대_소프트웨어_보안점검표.md"]).size, "옛 규칙에선 gijo만 남아 못 잡던 문서").toBe(1);
+    // 「SW 공급망」— sw(라틴 2자)는 여전히 탈락하지만 공급망(3)+보안(2)이 남아 잡힌다
+    expect(제목지목매치("SW 공급망 보안 뭐라고 나와 있어?", ["GIJO_지식_SW_공급망_보안.md"]).size).toBe(1);
+  });
+
+  it("★ 성립 조건 — 맞힌 토큰 2개↑ 또는 6자↑ 하나. 한 짧은 토큰만 스치면 지목 아니다", () => {
+    // 「취약점관리」는 5자 한 토큰 · 「지침」은 질문에 없다 → 미성립(옛 주석이 걱정하던 그 물음)
+    expect(제목지목매치("취약점 관리는 어떻게 해?", ["GIJO_AS_취약점관리_지침.md"]).size, "일반 주제 질문").toBe(0);
+    // 「보안」 두 글자만 스치는 것으로는 안 잡힌다
+    expect(제목지목매치("보안 뭐부터 해야 해?", ["보안_점검표.md"]).size).toBe(0);
+    // 6자 이상 한 토큰이면 하나로도 성립(solidstep=9 · 침해사고대응 계열)
+    expect(제목지목매치("제로트러스트가 뭐야", ["GIJO_지식_제로트러스트.md"]).size).toBe(1);
+  });
+
+  it("★ gijo·as·지식·kisa는 STOP — 접두만으로 내장 24편이 한꺼번에 잡히지 않는다", () => {
+    const 내장 = ["GIJO_지식_제로트러스트.md", "GIJO_AS_용어사전.md", "GIJO_지식_랜섬웨어_대응.md"];
+    expect(제목지목매치("gijo as 지식 알려줘", 내장).size, "접두만 스치면 0").toBe(0);
   });
 });
 

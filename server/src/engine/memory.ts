@@ -17,7 +17,7 @@ import { 메타걷은조각 } from "./metaleak"; // 잎(import 없는 작은 파
 import { 조각상태, type DocState } from "./docledger"; // 대장↔저장소 판정 한 곳(잎 · import 0)
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
-import { 반입문서아님_제외SQL, 승인문답문서 } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — 화살이 늘지 않는다)
+import { 반입문서아님_제외SQL, 승인문답문서, 제품이쌓은문서_제외SQL, 개인문서_제외SQL } from "./docorigin"; // origin 잣대 한 곳(잎 모듈 — 화살이 늘지 않는다)
 import { currentViewer } from "./viewerctx";
 import { currentDocIds } from "./ragscope";
 import { emitCollaboration } from "./collaboration";
@@ -31,7 +31,7 @@ import {
   isRelevant,
   applyCategoryBoost,
   applyOriginBoost,
-  docScopeMatch,
+  제목지목매치,
   applyDocScopeBoost,
   categoryForScreen,
   categoriesForRole,
@@ -129,15 +129,32 @@ export function builtinDocumentIds(): Set<string> {
     return new Set();
   }
 }
-// 문서 스코프 부스트용 — **업로드 문서**의 documentId(값싼 SQLite, builtinDocIds와 같은 패턴).
-//   ⚠ 내장(builtin)은 뺀다(검토관 [중] 지적): 내장은 주제명 그대로인 게 많아(취약점관리_지침 등)
-//     일반 질문에 최강 부스트로 오발화했다. 내장은 origin 부스트가 이미 있고, docScope가 겨냥할
-//     「밀려나는 문서」는 업로드다. ⚠ listDocuments()는 LanceDB 전수 스캔이라 안 쓴다.
-//     조회 실패해도 검색은 계속(빈 목록 = 지목 없음).
-const uploadedDocIdsStmt = db.prepare("SELECT documentId FROM memory_documents WHERE origin IS NULL OR origin <> 'builtin'");
-export function uploadedDocIds(): string[] {
+/**
+ * **제목으로 지목할 수 있는 문서**의 documentId — 내장(builtin)과 사람이 올린 문서 전부.
+ *
+ * ★★ 2026-09-08 — 옛 uploadedDocIds(내장을 뺀 목록)를 이것이 대체한다.
+ *   왜 내장을 넣나: 지식 문서는 전부 origin='builtin'이라 옛 목록에서 **원리상 빠져 있었다** —
+ *   「AI 시대 소프트웨어 보안 점검표에서 …」처럼 제목을 통째로 대도 지목 부스트를 못 받았고,
+ *   모든 내장이 똑같이 ORIGIN_BOOST를 받으므로 **내장끼리는 이름이 아무 힘도 없었다**.
+ *   옛 주석이 걱정한 「취약점 관리는 어떻게」류 오발화는 목록이 아니라 **토큰 규칙**으로 막는다
+ *   (hybridsearch.제목지목매치 ③ — 실측: 그 물음은 「취약점관리」 5자 한 토큰이라 미성립).
+ *
+ * ⚠ 승인 문답·침해사고 사례·개인 문서는 뺀다 — 잣대는 docorigin **한 곳**을 그대로 쓴다.
+ *   이 셋을 안 빼면 운영에서 3,858행을 매 질의 뜨는데(그 대부분이 승인 문답이고 제목이
+ *   「승인문답:<로그 id>」라 사람이 이름으로 부를 수 없다), 실제로 지목될 수 있는 문서는
+ *   123행뿐이다. 값을 30배 싸게 얻으면서 뜻도 정확해진다.
+ *
+ * ⚠ 캐시를 두지 않는다(설계관 계획에서 정정) — 이 조회는 자기가 대체한 uploadedDocIds보다
+ *   **30배 작다**. 캐시를 얹으면 문서 인입·삭제·등급 변경마다 무효화할 자리가 새 잣대로 늘고,
+ *   빠뜨리면 「올렸는데 왜 안 잡히지」가 난다(이 저장소가 반복해 겪은 꼴). 싼 조회를 그냥 한다.
+ * ⚠ listDocuments()는 LanceDB 전수 스캔이라 안 쓴다. 조회 실패해도 검색은 계속(빈 목록 = 지목 없음).
+ */
+const 지목후보Stmt = db.prepare(
+  `SELECT documentId FROM memory_documents WHERE ${제품이쌓은문서_제외SQL("origin")} AND ${개인문서_제외SQL("documentId")}`,
+);
+export function 지목후보Ids(): string[] {
   try {
-    return (uploadedDocIdsStmt.all() as { documentId: string }[]).map((r) => r.documentId);
+    return (지목후보Stmt.all() as { documentId: string }[]).map((r) => r.documentId);
   } catch {
     return [];
   }
@@ -183,6 +200,46 @@ export function 문서지목질문(instruction: string): boolean {
   if (소재RE.test(t)) return false;       // 문서 소재 → 문서소재 search
   if (!내용동사RE.test(t)) return false;  // 내용·존재를 묻는 말이어야
   return 문서조사RE.test(t) || 지시문서RE.test(t); // 문서를 콕 집었는가(조사 또는 지시어)
+}
+
+/**
+ * 질문이 **제목으로 콕 집은 문서**들 — 랭킹 부스트와 라우팅이 **함께 부르는 원천부**.
+ *
+ * ★★ 왜 생겼나(2026-09-08 라이브 재현): 「문서를 이름으로 지목했다」를 재는 기계가 두 층 모두
+ *   **실제 문서 제목을 몰랐다.** 위 문서지목질문은 언어 패턴만 보고(문서 목록을 인자로도 안 받는다),
+ *   랭킹의 옛 docScopeMatch는 업로드 문서만 봤다. 그래서 「AI 시대 소프트웨어 보안 점검표에서
+ *   출시 전 점검 항목 알려줘」가 그 문서를 못 집었고, 「금융 취약점 평가기준 항목 알려줘」는
+ *   ⑨ 모델 선택으로 떨어져 **compliance_status가 KISA 위협 카탈로그를 「평가기준 항목」이라며** 답했다.
+ *
+ * ⚠ 잣대는 hybridsearch.제목지목매치 **한 함수**뿐이다 — 여기서 정규식을 새로 적지 않는다.
+ *   이 파일이 하는 일은 「어느 문서 목록을 대느냐」(원천)뿐이다. 이 저장소는 같은 사실을 두 곳에
+ *   적으면 반드시 어긋난다(잣대 3중화가 이 라운드에서 실제로 낸 사고).
+ */
+export function 제목지목문서(question: string): Set<string> {
+  return 제목지목매치(question, 지목후보Ids());
+}
+
+/**
+ * **제목으로 문서를 콕 집어 물었는가** — forcedToolFor 꼬리에서 explain으로 못 박는 신호.
+ *
+ * 문서지목질문(언어패턴)과 **뜻이 다르다**: 저쪽은 「안내서에서/이 매뉴얼」처럼 *유형어*로 집는 말이고,
+ * 이쪽은 *실제 제목*을 댄 말이다. 유형어가 아예 없는 제목(「…평가기준」)이나 조사가 안 붙는 제목
+ * (「가이드라인에서」 — 가이드 뒤가 '라'라 문서조사RE 불성립)은 저쪽으로는 **원리상 못 잡는다**.
+ *
+ * ⚠ 앞에서 빼는 넷은 문서지목질문과 **같은 순서·같은 정규식**이다(제 주인이 있는 말):
+ *   법령 → law_lookup · 절차 의도 → 침해/장애 플레이북 · 추천/소재 → 문서소재 search.
+ *   싼 정규식을 먼저 태우고 SQLite 조회는 그 뒤에 한다.
+ * ⚠ 「내용동사」는 요구하지 **않는다** — 제목을 통째로 댄 것 자체가 이미 강한 지목 신호이고,
+ *   요구했다면 증상 ②(「금융 취약점 평가기준 항목 알려줘」)가 또 빠진다(「알려」는 있지만
+ *   이 갈래는 제목만으로도 서야 한다).
+ */
+export function 제목지목질문(instruction: string): boolean {
+  const t = String(instruction ?? "");
+  if (추천질문RE.test(t)) return false;   // 어느 문서를 볼지 → 문서소재 search·플레이북
+  if (절차의도RE.test(t)) return false;   // 절차를 하려는 요청 → 침해·장애 플레이북
+  if (법령질문RE.test(t)) return false;   // 법령 질문 → law_lookup
+  if (소재RE.test(t)) return false;       // 문서 소재 → 문서소재 search
+  return 제목지목문서(t).size > 0;
 }
 /** 소급 표시 — 이미 인입된 문서(다음 기동에 해시가 같아 skip되는 것)의 origin을 'builtin'으로 굳힌다.
  *  docsbundle이 매 기동에 매니페스트 전체로 부른다(idempotent). ⚠ 189행은 skip되면 안 돌아
@@ -1422,7 +1479,10 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //    역할·화면보다 먼저 걸어, 그 위에 역할/화면 부스트가 더해진다. 벽이 아니라 올리기만 한다.
   // ④ 문서 스코프(2026-08-21 SolidStep 실측): 질문이 등록 문서명을 콕 집으면 그 문서 조각을 올린다.
   //    벽이 아니라 올리기(rrf만) — 이름 안 대면 지목 0이라 무동작(회귀 없음).
-  const fused = applyDocScopeBoost(applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds()), docScopeMatch(question, uploadedDocIds()));
+  //    ★ 2026-09-08 — 지목 대상이 **내장 문서까지**로 넓어졌다(제목지목문서). 지목된 내장은
+  //      ORIGIN(0.012)+DOCSCOPE(0.02)=0.032, 다른 내장은 0.012이라 순증 +0.02 — RRF 1위 값
+  //      (≈0.0164)보다 커서 **내장끼리도 이름이 이긴다**. 세기는 안 건드린다(DOCSCOPE=ROLE 계약).
+  const fused = applyDocScopeBoost(applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds()), 제목지목문서(question));
   // 역할 영역이 여러 개면 전부 올린다(2026-08-20 ③ 장비운영 주인 — scan은 취약점+장비운영).
   // 부스트는 벽이 아니라 올리기라, 겹쳐 걸어도 다른 영역 자료가 사라지지 않는다.
   const 역할영역들 = categoriesForRole(agentId);

@@ -236,26 +236,50 @@ export function applyOriginBoost(chunks: FusedChunk[], builtinIds: Set<string>):
 export const DOCSCOPE_BOOST = 0.02;
 // 파일명에서 **문서 유형어**를 빼고 구별 토큰만 남긴다 — "매뉴얼.pdf"가 "매뉴얼"만 든 질문마다
 //   걸리지 않게(오탐 방지).
+// ★ 2026-09-08 추가된 넷: gijo·as·지식·kisa. 내장 문서를 목록에 넣으면서 생긴 자리다 —
+//   내장 35편 가운데 24편이 `GIJO_지식_…`·`GIJO_AS_…`로 시작해, 이 넷을 안 빼면
+//   「gijo」 한 낱말이 스치는 것만으로 24편이 한꺼번에 지목된다(그 반대편 실측: 안 빼면
+//   5편은 남는 토큰이 「gijo」뿐이라 **이름으로 집는 것이 원리상 불가능**했다).
 const DOCSCOPE_STOP = new Set(["매뉴얼", "manual", "가이드", "guide", "규정", "문서", "doc", "docs",
-  "파일", "file", "보고서", "report", "설명서", "안내", "pdf", "docx", "xlsx", "hwp", "hwpx", "txt", "md", "png", "jpg"]);
+  "파일", "file", "보고서", "report", "설명서", "안내", "pdf", "docx", "xlsx", "hwp", "hwpx", "txt", "md", "png", "jpg",
+  "gijo", "as", "지식", "kisa"]);
 
-/** 질문이 콕 집은 **업로드 문서**의 documentId 집합 — 파일명 stem(구별 토큰)이 질문에 들어 있으면 지목.
- *  ⚠ 좁게 잡는다(검토관 [중] 지적 반영):
- *   ① 내장(builtin) 문서는 **애초에 목록에서 뺀다**(memory.ts uploadedDocIds) — 내장은 주제명
- *      그대로인 게 많아(취약점관리_지침 등) 일반 질문 "취약점 관리는 어떻게"에 최강 부스트로 발화했다.
- *      내장은 이미 origin 부스트를 받고, docScope가 겨냥할 「밀려나는 문서」는 업로드다.
- *   ② 유형어(매뉴얼·pdf…)·**숫자만인 토큰(2024)**·**4자 미만 토큰**(log·api·web…)은 뺀다.
- *   ③ URL 지식화 문서는 제외(질문에 URL이 통째로 안 들어온다).
- *  부스트(올리기)라 오탐이 나도 잃진 않지만, 위로 좁혀 오탐 자체를 줄인다. 한글 파일명도 토큰이 맞으면 걸린다. */
-export function docScopeMatch(question: string, docIds: string[]): Set<string> {
+/**
+ * 질문이 **제목으로 콕 집은** 문서의 documentId 집합 — 파일명의 구별 토큰이 질문에 들어 있으면 지목.
+ *
+ * ★★ 2026-09-08 개정(옛 이름 docScopeMatch) — **잣대를 한 곳으로 모은다.** 이 함수는 순수부다:
+ *   문서 목록은 부르는 쪽이 넘기고(원천부는 memory.제목지목문서), 랭킹 부스트와 라우팅이
+ *   **같은 이 함수만** 부른다. 두 층이 서로 다른 잣대로 「지목」을 재던 것이 이 라운드의 뿌리다 —
+ *   라우팅은 언어패턴만 보고(memory.문서지목질문) 랭킹은 업로드 문서만 봐서, 지식 문서는
+ *   **이름을 정확히 대도 두 층 모두에서 지목이 아니었다**(2026-09-08 라이브 재현 4문장).
+ *
+ * 토큰 규칙(왜 이렇게):
+ *   ① 한글은 **2자↑**, 라틴은 **4자↑**. 옛 규칙은 라틴 기준 4자 하나였고 한글에서 죽었다 —
+ *      금융(2)·보안(2)·취약점(3)·공급망(3)이 전부 탈락해, 내장 35편 중 5편은 남는 토큰이
+ *      「gijo」뿐이었다(\b가 한글에서 죽던 것과 같은 계열: 라틴 기준을 한글에 그대로 대면 못 센다).
+ *   ② 숫자만인 토큰(2024)·유형어(매뉴얼·pdf…)는 뺀다. URL 지식화 문서는 통째로 제외한다.
+ *   ③ **성립 조건**: 맞힌 토큰이 2개 이상이거나, 6자 이상 토큰 하나를 맞혔을 때.
+ *      한 토큰만으로 성립시키면 「보안」 두 글자가 아무 질문에나 스친다. 실측(운영 코퍼스 48편 ·
+ *      물음 386개 = evalgate 186 + ops-sim 152 + doc-probe): 옛 규칙을 내장까지 켜면 32건(8.3%)이
+ *      지목이고, 이 규칙은 7건(1.8%)이며 그 7건은 전부 **그 문서가 실제로 답인** 물음이다
+ *      (제로트러스트 3 · 랜섬웨어 대응 · 침해사고 대응절차 · Tenable 제품 · 장비 콘솔 메뉴맵).
+ *
+ * ⚠ 이 판정은 **벽이 아니라 올리기**다(applyDocScopeBoost). 하드 필터는 사람이 ☑로 고른
+ *   currentDocIds뿐이라는 문서 스코프 계약을 그대로 지킨다 — 오탐이 나도 자료를 잃지 않는다.
+ */
+export function 제목지목매치(question: string, docIds: string[]): Set<string> {
   const q = String(question || "").toLowerCase().replace(/\s+/g, "");
   const out = new Set<string>();
   if (q.length < 3) return out;
   for (const id of docIds) {
     if (/^https?:/i.test(id)) continue;
     const base = id.replace(/^.*[\\/]/, "").replace(/\.[a-z0-9]{1,5}$/i, "").toLowerCase();
-    const tokens = base.split(/[ _\-.]+/).filter((t) => t.length >= 4 && !/^\d+$/.test(t) && !DOCSCOPE_STOP.has(t));
-    if (tokens.some((t) => q.includes(t))) out.add(id);
+    const tokens = base.split(/[ _\-.]+/).filter((t) => {
+      if (!t || /^\d+$/.test(t) || DOCSCOPE_STOP.has(t)) return false;
+      return t.length >= (/[가-힣]/.test(t) ? 2 : 4);
+    });
+    const 맞힌것 = tokens.filter((t) => q.includes(t));
+    if (맞힌것.length >= 2 || 맞힌것.some((t) => t.length >= 6)) out.add(id);
   }
   return out;
 }
