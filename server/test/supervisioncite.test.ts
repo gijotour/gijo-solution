@@ -448,4 +448,25 @@ describe("🔧 고칠 것 — 감독 화면 구역", () => {
       expect(supSrc, `감독 화면 라벨(${k})이 서버와 다르다`).toContain(`"${ko}"`);
     }
   });
+
+  it("★ 상태 글자가 결재판과 같다 — promoted를 「닫음」처럼 읽게 두지 않는다", () => {
+    // 2026-09-07 검토관 [낮음]: 결재판은 promoted를 「편입(아직 고칠 것)」·resolved를 「고쳐서 닫음」
+    //   으로 적는데 감독 화면은 「편입」·「닫음」이었다. promoted를 끝난 것처럼 읽게 두는 것이
+    //   이 라운드가 서버에서 고친 「자료 부족 1건(열림 0)」 거짓 안심의 뿌리인데, 줄에서 다시 사라졌다.
+    // ⚠ 서버에는 UI용 상태 라벨 단일 출처가 없다(FEEDBACK_STATUS_AUDIT는 감사기록 문구 전용).
+    //   그래서 **결재판을 정본으로 삼아** 두 화면을 맞댄다 — 셋째 사본이 생기면 여기서 빨개진다.
+    const 결재판 = fs.readFileSync(
+      path.join(__dirname, "../../client/src/renderer/pages/approvals.html"), "utf8");
+    const m = 결재판.match(/const FIX_STATUS = \{([^}]+)\}/);
+    expect(m, "결재판 FIX_STATUS를 못 읽었다 — 이 시험이 헛돈다").not.toBeNull();
+    const 정본: Record<string, string> = {};
+    for (const [, k, ko] of m![1].matchAll(/(\w+):\s*"([^"]+)"/g)) 정본[k] = ko;
+    expect(Object.keys(정본).sort(), "결재판 상태가 넷이 아니다")
+      .toEqual(["dismissed", "open", "promoted", "resolved"]);
+    for (const [k, ko] of Object.entries(정본)) {
+      expect(supSrc, `감독 화면 상태(${k})가 결재판과 다르다 — 같은 status를 두 말로 그린다`).toContain(`"${ko}"`);
+    }
+    expect(supSrc, "promoted를 「닫음」으로 그린다 — 아직 고칠 것인데 끝난 것처럼 읽힌다")
+      .not.toMatch(/"promoted"\s*\?\s*"편입"/);
+  });
 });

@@ -38,6 +38,17 @@ export interface SupervisionData {
   //   칸을 갈라 둔다 — 한 답에서 세 군데를 뗄 수 있어 더하지도 나누지도 못한다.
   //   ⚠ 옛 서버(2026-09-06 이전)에는 이 칸이 없다 — 화면이 없어도 도는 쪽으로 읽는다.
   citeReasons?: { day: string; agent: string; reason: string; count: number }[];
+  // 🔧 고칠 것(2026-09-07 · C-A V6) — 결재판 두 번째 원장의 **신호**다. 세는 곳은 서버
+  //   fixboard 하나(llmactivity.ts가 `고칠것요약` + `고칠것최근`을 이 칸에 싣는다).
+  //   ⚠ 옛 서버에는 이 칸이 없다 — citeReasons가 지킨 관례대로 **optional**이다.
+  //     화면(supervision.html)은 칸이 없으면 줄을 아예 안 그린다(0건과 「기능 없음」을 안 섞는다).
+  //   ⚠ q는 **서버 값 그대로**다 — 등급이 안 되는 사람에게는 서버가 자리표를 보낸다(fixboard.질문가림).
+  fixboard?: {
+    days: number; total: number; open: number; closed: number;
+    kinds: { fixkind: string; open: number; closed: number; total: number }[];
+    byKind: Record<string, number>;
+    recent: { id: number; at: number; kind: string; fixkind: string | null; status: string; q: string }[];
+  };
 }
 
 export const agentsApi = {

@@ -109,7 +109,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <span class="fchip" data-fx="rule">사내 규정 <b id="fxRule">0</b></span>
           <span class="fchip" data-fx="prod">제품 <b id="fxProd">0</b></span>
           <span class="fchip" data-fx="unclassified">미분류 <b id="fxNone">0</b></span>
-          <span class="muted-s" style="align-self:center">칩을 다시 누르면 전체</span>
+          <!-- ⚠ 숫자와 목록의 **모집단이 다르다**(2026-09-07 검토관 [낮음]): 숫자는 서버 fixboard의
+               **열림**(open+promoted)이고 목록은 최근 30일 **전 상태**다. 그래서 다 닫힌 갈래는
+               「제품 0」인데 눌러 보면 3줄이 뜬다 — 감독 화면은 같은 숫자에 「열림 기준」이라 적어
+               두는데 여기만 안 적어 두면 담당자는 숫자가 틀린 줄 안다. -->
+          <span class="muted-s" id="fixChipNote" style="align-self:center">숫자는 열림 기준(닫힌 것도 목록엔 보입니다) · 칩을 다시 누르면 전체</span>
         </div>
         <div class="rv-filt" id="rvFilt">
           <span class="fchip on" data-f="active">조치대상 <b id="fcActive">0</b></span>
@@ -305,6 +309,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const fmtDate = (ms) => ms ? new Date(ms).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
 
   let allReviews = [];
+  // 취약점 원장을 못 읽은 이유. **지적 목록을 덮지 않고 여기 담아 둔다**(2026-09-07 검토관 [중간]).
+  // 빈 문자열이면 정상 — 있으면 🔧 칸이 「—」가 되고, 🔧로 돌아올 때 이 글이 목록 자리에 선다.
+  let vulnError = "";
   let rvFilter = "active"; // active | in_progress | verifying | rejected | approved | pending | unassigned
   let currentKey = null;   // "assetId\0findingKey"
   const selected = new Set(); // 일괄 배정용 선택(키 = assetId\0findingKey)
@@ -347,10 +354,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   async function loadReviews(keepSelection = true) {
-    const list = document.getElementById("rvList");
+    // (#rvList를 여기서 안 잡는다 — 목록을 지우는 일은 취약점오류그리기() 한 곳으로 모았다.
+    //  잡아만 두고 안 쓰면 다음 사람이 「여기서도 지워도 되나 보다」로 읽는다.)
     try {
       const { reviews, summary } = await window.gijo.listApprovals();
       allReviews = reviews;
+      vulnError = "";
       // 자산으로 좁혀 보는 중이면 **위 요약 카드와 칩 숫자도 그 자산 것**이어야 한다.
       // 목록은 3건인데 위에 46이라고 적혀 있으면 담당자는 무엇을 믿어야 할지 모른다.
       const scoped = scopeAsset ? reviews.filter((r) => r.assetId === scopeAsset) : reviews;
@@ -399,13 +408,34 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         if (cur) renderDetail(cur); else clearDetail();
       }
     } catch (e) {
-      상세칸구하기(list); // ⚠ 여기서도 목록을 통째로 지운다 — 아래 renderList와 같은 파괴다
-      list.innerHTML = '<div class="rv-empty" style="color:var(--red-ink, #f5928a)">불러오지 못했습니다: ' + esc(e.message) + "</div>";
+      vulnError = (e && e.message) || String(e);
+      // ★ 답 지적을 보는 중이면 **딴 원장의 오류로 이 목록을 덮지 않는다**(2026-09-07 검토관 [중간]).
+      //   renderList에는 같은 가드를 넣어 두고 여기만 빠뜨렸다 — 위 주석이 「목록을 지우는 자리가
+      //   둘」이라고 경고한 바로 그 두 번째 자리다. ?fix= 딥링크(대화창 꼬리·감독 「🗔 결재판에서
+      //   처리」)로 들어오면 loadFix가 먼저 끝나 지적 목록이 그려진 뒤 이 실패가 오므로,
+      //   덮어쓰기는 예외가 아니라 **기본 경로**였다.
+      //   ⚠ 조용히 삼키지 않는다 — 🔧 세그먼트 숫자를 「—」로 바꿔 저쪽이 지금 안 읽힌다고 말하고,
+      //     🔧로 돌아올 때 아래 취약점오류그리기()가 이유를 그대로 보인다.
+      if (segMode === "fix") { 세그숫자(); return; }
+      취약점오류그리기();
       // ⚠ **여기서도 대화창의 보던 목록을 비운다**(2026-08-18 검토 지적). 위 주석이 「목록을 지우는
       //   자리가 둘」이라고 이미 적어 뒀는데 또 한 곳만 막았다. 안 비우면: 3건을 보다 서버 오류로
       //   재조회 실패 → 화면엔 "불러오지 못했습니다" → "이것들 전부 오탐" → **화면에 없는 옛 3건**에 걸린다.
       보는목록알림(null);
     }
+  }
+
+  /** 취약점 원장을 못 읽었다고 **목록 자리에** 적는다.
+   *
+   * 부르는 곳이 둘이다 — loadReviews의 catch(그때 🔧를 보고 있었을 때)와 setSeg(💬를 보다
+   * 🔧로 돌아왔을 때). 두 번째가 없으면 빈 allReviews로 renderList가 돌아
+   * 「아직 검토할 취약점이 없습니다」라는 **거짓 단언**이 된다(장애 ≠ 부재). */
+  function 취약점오류그리기() {
+    const list = document.getElementById("rvList");
+    if (!list) return;
+    상세칸구하기(list); // ⚠ 여기서 목록을 통째로 지운다 — renderList와 같은 파괴다
+    list.innerHTML = '<div class="rv-empty" style="color:var(--red-ink, #f5928a)">불러오지 못했습니다: ' +
+      esc(vulnError) + "</div>";
   }
 
   /** 목록을 `innerHTML`로 지우기 **전에** 자세히 칸을 원래 자리로 구해 낸다.
@@ -602,7 +632,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const v = document.getElementById("segVuln");
     const f = document.getElementById("segFix");
     // 두 숫자 다 「지금 열린 일감」이다 — 뜻이 달라지면 나란히 세울 수 없다.
-    if (v) v.textContent = allReviews.filter((r) => ["pending", "in_progress", "verifying"].includes(r.status)).length;
+    // ⚠ 🔧는 **자산 좁히기를 탄다**(2026-09-07 검토관 [중간]). 안 태우면 바로 아래 「조치대상」
+    //   알약(scoped로 셈)과 갈려, ?asset= 진입에서 세그먼트 3 / 알약 2가 한 화면에 선다 —
+    //   이 파일이 스스로 「목록은 3건인데 위에 46이면 무엇을 믿나」라고 못 박은 그 규칙이다.
+    // ⚠ 못 읽었으면 0이 아니라 「—」다. 0은 「없다」인데 사실은 「모른다」다(장애 ≠ 부재).
+    const 범위 = scopeAsset ? allReviews.filter((r) => r.assetId === scopeAsset) : allReviews;
+    if (v) v.textContent = vulnError ? "—" : 범위.filter((r) => ["pending", "in_progress", "verifying"].includes(r.status)).length;
     // ⚠ 「아직 고칠 것」은 **서버가 센다**(open+promoted). 화면이 다시 세면 감독 화면·주간 요약과
     //   숫자가 어긋나고, 목록은 200건에서 굳는다(「200 포화, 실제 1578」).
     if (f) f.textContent = fixError ? "—" : (fixBoard ? fixBoard.open : 0);
@@ -630,11 +665,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     보이기("vizFilter", segMode === "vuln" && !!심각도필터);
     const vex = document.querySelector(".vex-bar");
     if (vex) vex.style.display = segMode === "vuln" ? "" : "none";
+    // 자산 좁히기 띠도 취약점 원장의 말이다 — 판정은 renderScope 한 곳이 한다(위 함수 주석).
+    renderScope();
     selected.clear();
     renderBulkBar();
     // 원장이 바뀌면 대화창이 쥐고 있던 「이것들」은 뜻을 잃는다 — 안 비우면 없는 목록에 걸린다.
     보는목록알림(null);
     if (segMode === "fix") { clearDetail(); renderFixList(); return; }
+    // 💬를 보는 동안 취약점 쪽이 실패해 있었다면(위 catch가 목록을 안 덮었다) 이유를 여기서 보인다.
+    // 안 그러면 빈 allReviews로 renderList가 돌아 「아직 검토할 취약점이 없습니다」로 거짓말한다.
+    if (vulnError) { clearDetail(); 취약점오류그리기(); return; }
     renderList();
     const cur = currentKey ? allReviews.find((r) => keyOf(r) === currentKey) : null;
     if (cur) renderDetail(cur); else clearDetail();
@@ -692,9 +732,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       prod: '<button class="btn primary" id="fxPromote">🛠 회귀 문항·개발 목록으로 편입</button>',
     }[k] || "";
     const 닫는설명 = {
-      doc: "누르면 대화창에 문장만 **얹습니다**(보내지 않습니다) — 지시는 대화창에서 합니다. 자료를 올린 뒤 「승인」으로 닫습니다.",
+      doc: "누르면 대화창에 문장만 <b>얹습니다</b>(보내지 않습니다) — 지시는 대화창에서 합니다. 자료를 올린 뒤 「승인」으로 닫습니다.",
       rule: "아래 최종문을 함께 저장하고 이 지적을 닫습니다.",
-      prod: "편입하면 문항 후보 목록에서는 내려가고, 「아직 고칠 것」에는 **남습니다** — 옮겨 적은 것이지 고친 것이 아닙니다.",
+      prod: "편입하면 문항 후보 목록에서는 내려가고, 「아직 고칠 것」에는 <b>남습니다</b> — 옮겨 적은 것이지 고친 것이 아닙니다.",
     }[k] || "갈래를 먼저 골라 주세요 — 무엇을 해야 닫히는지가 정해져야 닫는 길이 생깁니다.";
     칸.innerHTML = `
       <div class="dt-top">
@@ -777,9 +817,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // 자료 부족 — **대화창에 문장만 얹는다**(보내지 않는다). 화면이 직접 지시하지 않는다.
     누르면("fxToChat", () => {
       const 글 = "문서 올리기: 「" + String(r.question || "").slice(0, 80) + "」에 답할 사내 자료를 넣으려고 합니다. ";
-      try { window.top.postMessage({ type: "gijo:prefill", text: 글 }, "*"); }
-      catch (e) { /* 셸 밖(분리창)이면 못 얹는다 — 아래 안내가 그 사실을 말한다 */ }
-      gijoTell("대화창에 문장을 얹었습니다 — 뒷말을 채워 보내시면 됩니다.");
+      const msg = { type: "gijo:prefill", text: 글 };
+      // ★ **보낼 곳이 있을 때만** 담았다고 말한다(2026-09-07 검토관 [낮음] — 가짜 성공 금지).
+      //   ⚠ 정직하게: 셸이 정말 **받아 얹었는지**까지는 여기서 못 안다(단방향이다). 아는 것은
+      //     「보낼 상대가 있었나」뿐이라, 없을 때 「얹었습니다」라고 하지 않는 데까지가 이 수리다.
+      //   분리창(openShellPopout)에서는 window.top이 **자기 자신**이라 예외도 안 나고 메시지도
+      //   안 닿는다 — 예전 코드는 catch에 「아래 안내가 말한다」고 적어 두고 그 안내를 안 만들어,
+      //   담당자는 「얹었습니다」를 읽고 대화창에 가서 **빈 입력칸**을 봤다.
+      //   길은 chatparts.js 문서열기신호()와 같다: 분리창=bridgeToShell(IPC) · 도킹=top으로 postMessage.
+      let 얹음 = false;
+      try {
+        if (window.top !== window.self) { window.top.postMessage(msg, "*"); 얹음 = true; }
+        else if (window.gijo && window.gijo.bridgeToShell) { window.gijo.bridgeToShell(msg); 얹음 = true; }
+      } catch (e) { 얹음 = false; }
+      gijoTell(얹음
+        ? "대화창에 문장을 얹었습니다 — 뒷말을 채워 보내시면 됩니다."
+        : "대화창에 얹지 못했습니다 — 이 창은 대화창과 이어져 있지 않습니다. 앱 대화창에서 「문서 올리기」로 시작해 주세요.");
     });
 
     누르면("fxResolve", async () => {
@@ -1092,7 +1145,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function renderScope() {
     const bar = document.getElementById("rvScope");
     if (!bar) return;
-    if (!scopeAsset) { bar.style.display = "none"; return; }
+    // ★ 이 띠는 **취약점 원장의 말**이다("…의 취약점만 보는 중"). 답 지적 목록 위에 세우면
+    //   자산과 무관한 줄들을 자산으로 좁힌 것처럼 가리킨다(2026-09-07 검토관 [중간]).
+    //   ⚠ 판정은 **여기 한 곳**이다 — setSeg에서 또 숨기면 표시 자리가 둘이 되고, 그때부터
+    //     한쪽만 고치는 반쪽 수리가 난다(이 화면이 catch/renderList로 이미 겪은 부류).
+    if (!scopeAsset || segMode !== "vuln") { bar.style.display = "none"; return; }
     const one = allReviews.find((r) => r.assetId === scopeAsset);
     const 이름 = one ? one.assetName : scopeAsset;
     const n = allReviews.filter((r) => r.assetId === scopeAsset).length;

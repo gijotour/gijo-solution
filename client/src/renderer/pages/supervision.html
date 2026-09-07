@@ -125,6 +125,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // 🔧 고칠 것의 갈래 한글 이름 — 서버 fixboard.고칠것갈래라벨과 **글자가 같아야** 한다.
   //   결재판(approvals.html)도 같은 글자를 쓴다. 어긋나면 같은 것이 화면마다 다른 이름이 된다.
   var FIX_LABEL = { doc: "자료 부족", rule: "사내 규정", prod: "제품", unclassified: "미분류" };
+  // 상태 넷 — **결재판과 글자가 같아야 한다**(같은 status를 두 말로 그리면 담당자가 다른 뜻으로 읽는다).
+  // resolved만 「고쳤다」다. promoted는 옮겨 적은 것이지 고친 것이 아니라 서버 고칠것열림이 **열림**으로 센다.
+  var FIX_STATUS = { open: "열림", promoted: "편입(아직 고칠 것)", dismissed: "부적합으로 닫음", resolved: "고쳐서 닫음" };
 
   /* ✂ 사유 줄 계산 — **순수 함수**다(짝 시험 server/test/citereasons.test.ts가 이 소스를
      그대로 떼어 잰다. 시험에 셈을 베껴 적으면 제품과 시험이 따로 늙는다).
@@ -385,7 +388,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       var 최근 = "";
       if ((fb.open || 0) > 0 && (fb.recent || []).length) {
         최근 = '<div class="fx-rows">' + fb.recent.map(function (x) {
-          var 상태 = x.status === "open" ? "열림" : x.status === "promoted" ? "편입" : x.status === "resolved" ? "닫음" : "부적합";
+          // 상태 글자는 **결재판(approvals.html FIX_STATUS)과 같은 말**이다(2026-09-07 검토관 [낮음]).
+          //   예전엔 여기서만 promoted를 「편입」·resolved를 「닫음」이라 적어, 아직 고칠 것인
+          //   promoted가 끝난 것처럼 읽혔다 — 이 라운드가 서버에서 고친 「자료 부족 1건(열림 0)」
+          //   거짓 안심의 뿌리가 줄에서 그대로 되살아난 꼴이었다. 짝 시험: supervisioncite.test.
+          var 상태 = FIX_STATUS[x.status] || esc(x.status);
           return '<div class="fx-row"><span class="dim">' + esc(FIX_LABEL[x.fixkind || "unclassified"] || "미분류") + "</span>" +
             '<span class="q">' + esc(x.q) + "</span>" +
             '<span class="dim">' + 상태 + "</span></div>";
