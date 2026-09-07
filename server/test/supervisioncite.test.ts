@@ -56,6 +56,7 @@ type 그린것 = {
   sup: string;                       // #sup에 박힌 HTML — **판정 대상**
   버튼: 요소 | null;                 // 사유 토글(있으면)
   상자: 요소 | null;                 // 펼침 상자(있으면)
+  처리: 요소 | null;                 // 🔧 고칠 것의 「결재판에서 처리」(있으면)
   저장: Record<string, string>;      // localStorage 흉내
 };
 
@@ -69,6 +70,7 @@ async function 그리기(sup: unknown, days = 1, 씨앗: Record<string, string> 
 
   let 버튼: 요소 | null = null;
   let 상자: 요소 | null = null;
+  let 처리: 요소 | null = null;
   const doc = {
     createElement: () => 글자요소(),
     getElementById: (id: string) => 칸.get(id) ?? null,
@@ -76,6 +78,12 @@ async function 그리기(sup: unknown, days = 1, 씨앗: Record<string, string> 
     // 화면은 #sup에 박은 HTML에서 버튼을 다시 **찾아** 클릭을 건다. 진짜 DOM은 그 HTML을
     // 파싱해 주므로, 여기서는 「HTML에 있으면 찾힌다」만 흉내 낸다(그 이상은 안 흉내 낸다).
     querySelector: (sel: string): 요소 | null => {
+      // 🔧 고칠 것의 처리 단추 — 「HTML에 있으면 찾힌다」만 흉내 낸다(위와 같은 규칙).
+      if (sel === "#sup .fx-go") {
+        if (!/class="fx-go"/.test(칸.get("sup")!.innerHTML)) return null;
+        처리 = 새요소();
+        return 처리;
+      }
       if (sel !== "#sup .cite-why") return null;
       const html = 칸.get("sup")!.innerHTML;
       const b = html.match(/<button class="cite-why" aria-expanded="(true|false)">([^<]*)<\/button>/);
@@ -113,7 +121,7 @@ async function 그리기(sup: unknown, days = 1, 씨앗: Record<string, string> 
     for (let i = 0; i < 8; i++) await Promise.resolve();
     await new Promise((r) => setTimeout(r, 0));
   }
-  return { sup: 칸.get("sup")!.innerHTML, 버튼, 상자, 저장 };
+  return { sup: 칸.get("sup")!.innerHTML, 버튼, 상자, 처리, 저장 };
 }
 
 const cite = (day: string, calls: number, agent = "orchestrator") =>
@@ -354,6 +362,90 @@ describe("✂ 감독 줄 — 한 줄이 스스로를 부정하지 않는다 (전
     }
     if (/그래서 이 줄은 저절로 펼쳐집니다/.test(안내)) {
       expect(펼침줄![1], "안내는 못 뗌이 저절로 펴진다는데 화면엔 그 조건이 없다").toContain("사유.못뗌 > 0");
+    }
+  });
+});
+
+/* ═══ 🔧 고칠 것 구역 — 감독 화면(2026-09-07 · 통합 설계관 C-A V6) ═══════════════════
+ *
+ * ■ 왜 여기서 재나: 이 구역도 「계산은 하는데 안 그린다」·「단추는 있는데 안 눌린다」가
+ *   그대로 가능하다 — 위 ✂ 줄이 값을 치르고 배운 자리다. 그래서 **그린 HTML**과
+ *   **클릭 등록**을 값으로 잰다.
+ * ■ fold.js를 안 싣는다(설계관 결정) — 32px 헤더가 더 생기면 밀도가 오히려 나빠진다.
+ */
+const 갈래 = (fixkind: string, open: number, closed = 0) => ({ fixkind, open, closed, total: open + closed });
+const 지적 = (id: number, fixkind: string | null, status: string, q: string) =>
+  ({ id, at: Date.now(), kind: "wrong", fixkind, status, q });
+const 판 = (kinds: ReturnType<typeof 갈래>[], recent: ReturnType<typeof 지적>[] = [], open = kinds.reduce((s, k) => s + k.open, 0)) =>
+  ({ days: 1, total: kinds.reduce((s, k) => s + k.total, 0), open, closed: 0, kinds, byKind: { wrong: 0, missing: 0, style: 0 }, recent });
+const 기본 = { days: 1, calls: {}, daily: [], recentErrors: {}, citeReasons: [] };
+
+describe("🔧 고칠 것 — 감독 화면 구역", () => {
+  it("헛돎 방지 — 집계 한 줄이 실제로 #sup에 박힌다", async () => {
+    const r = await 그리기({ ...기본, fixboard: 판([갈래("doc", 5, 12), 갈래("rule", 1), 갈래("prod", 2), 갈래("unclassified", 0)]) });
+    expect(r.sup, "고칠 것 줄 자체가 없다 — 계산만 하고 안 그렸다").toContain("🔧 고칠 것");
+    expect(r.sup).toContain("자료 부족 5");
+    expect(r.sup).toContain("사내 규정 1");
+    expect(r.sup).toContain("제품 2");
+  });
+
+  it("★ 0건인 갈래도 **회색으로 그린다** — 사라지는 조작은 아무도 못 찾는다", async () => {
+    const r = await 그리기({ ...기본, fixboard: 판([갈래("doc", 0), 갈래("rule", 0), 갈래("prod", 0), 갈래("unclassified", 0)]) });
+    expect(r.sup, "전부 0이면 줄을 통째로 숨겼다").toContain("🔧 고칠 것");
+    expect(r.sup, "0건 갈래를 빼 버렸다").toContain("미분류 0");
+    expect(r.sup, "0인데 진하게 그린다 — 있는 것처럼 보인다").toContain("var(--muted-2)");
+  });
+
+  it("열린 항목이 있으면 최근 줄이 붙고, 없으면 집계만 남는다", async () => {
+    const 있음 = await 그리기({
+      ...기본,
+      fixboard: 판([갈래("doc", 1), 갈래("rule", 0), 갈래("prod", 0), 갈래("unclassified", 0)],
+        [지적(41, "doc", "open", "백업 보관 기간 규정이 뭐야?")]),
+    });
+    expect(있음.sup, "열린 지적이 있는데 최근 줄이 없다").toContain("백업 보관 기간 규정이 뭐야?");
+    const 없음 = await 그리기({
+      ...기본,
+      fixboard: 판([갈래("doc", 0, 3), 갈래("rule", 0), 갈래("prod", 0), 갈래("unclassified", 0)],
+        [지적(41, "doc", "resolved", "이미 닫은 질문")], 0),
+    });
+    expect(없음.sup, "닫힌 것뿐인데 목록을 세운다 — 감독 화면은 목록이 아니라 신호다").not.toContain("이미 닫은 질문");
+    expect(없음.sup, "집계 줄까지 사라졌다").toContain("🔧 고칠 것");
+  });
+
+  it("★ 질문은 **서버 값 그대로** — 자리표가 오면 자리표를 그린다(가렸다는 사실을 숨기지 않는다)", async () => {
+    const 자리표 = "(질문 원문은 결재판에서 — 관리자 권한 필요)";
+    const r = await 그리기({
+      ...기본,
+      fixboard: 판([갈래("doc", 1), 갈래("rule", 0), 갈래("prod", 0), 갈래("unclassified", 0)], [지적(9, "doc", "open", 자리표)]),
+    });
+    expect(r.sup, "자리표를 화면이 제 말로 바꿔치기했다").toContain("결재판에서");
+    expect(r.sup, "빈 줄로 그려 「질문 없음」처럼 보인다").not.toMatch(/class="q"><\/span>/);
+  });
+
+  it("★ 「결재판에서 처리」가 그려지고 **실제로 눌린다**", async () => {
+    const r = await 그리기({ ...기본, fixboard: 판([갈래("doc", 2), 갈래("rule", 0), 갈래("prod", 0), 갈래("unclassified", 0)]) });
+    expect(r.sup, "처리로 가는 길이 없다 — 신호만 보고 아무 데도 못 간다").toContain("결재판에서 처리");
+    expect(r.처리, "#sup에서 처리 단추를 못 찾았다").not.toBeNull();
+    expect((r.처리!._on["click"] || []).length, "클릭을 안 걸었다 — 단추는 보이는데 눌러도 아무 일이 없다").toBeGreaterThan(0);
+  });
+
+  it("★ 반증 — 서버가 fixboard를 안 주면(옛 서버) 옛 출력이 **글자 하나** 안 바뀐다", async () => {
+    const 옛 = await 그리기({ days: 1, calls: {}, daily: [cite("2026-09-06", 2)], recentErrors: {}, citeReasons: [사유행("2026-09-06", "겹침없음", 3)] });
+    expect(옛.sup, "칸이 없는데 0건으로 그렸다 — 「지적이 없다」와 「이 기능이 없다」가 같아 보인다").not.toContain("🔧 고칠 것");
+    expect(옛.sup, "✂ 줄이 망가졌다").toContain("✂ 인용 제거");
+  });
+
+  it("fold.js를 안 싣는다 — 접기 헤더가 더 생기면 밀도가 나빠진다(설계관 결정)", () => {
+    // ⚠ 주석은 fold.js를 **언급한다**(왜 안 쓰는지 적어 뒀다) — 실제로 싣는 <script src>만 본다.
+    expect(supSrc, "fold.js를 실었다").not.toMatch(/<script[^>]*src="fold.js"/);
+    expect(supSrc, "fold 배지 계약을 쓴다 — 이 화면은 fold를 안 쓴다").not.toContain("data-gijo-fold");
+  });
+
+  it("갈래 라벨이 서버 fixboard.고칠것갈래라벨과 글자가 같다", () => {
+    const 서버 = fs.readFileSync(path.join(__dirname, "../src/engine/fixboard.ts"), "utf8");
+    for (const [k, ko] of [["doc", "자료 부족"], ["rule", "사내 규정"], ["prod", "제품"], ["unclassified", "미분류"]] as const) {
+      expect(서버, `서버 라벨(${k})을 못 읽었다 — 이 시험이 헛돈다`).toContain(`${k}: "${ko}"`);
+      expect(supSrc, `감독 화면 라벨(${k})이 서버와 다르다`).toContain(`"${ko}"`);
     }
   });
 });

@@ -72,6 +72,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .sup-line .cite-reasons{margin-top:3px;font-size:12px;color:var(--muted-2);}
 .sup-line .cite-reasons b{color:var(--text);font-weight:700;}
 .sup-line .dim{color:var(--muted-2);}
+/* 🔧 고칠 것(2026-09-07) — tag 4종과 같은 꼴. 새 색 토큰 없음(amber는 이 화면이 이미 쓴다). */
+.tag.fix{background:rgba(240,160,32,.16);color:var(--amber, #f0a020);}
+.sup-line .fx-go{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;
+  padding:1px 8px;margin-left:8px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;}
+.sup-line .fx-go:hover{color:var(--text);border-color:var(--blue, #3b82f6);}
+.sup-line .fx-rows{margin-top:3px;font-size:12px;}
+.sup-line .fx-row{display:flex;gap:8px;align-items:baseline;padding:1px 0;}
+.sup-line .fx-row .q{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
 .note{font-size:11.75px;color:var(--muted-2);margin-top:10px;}
 </style>
 </head>
@@ -113,6 +121,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   var 선택행 = null;
 
   function esc(s) { var d = document.createElement("i"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
+
+  // 🔧 고칠 것의 갈래 한글 이름 — 서버 fixboard.고칠것갈래라벨과 **글자가 같아야** 한다.
+  //   결재판(approvals.html)도 같은 글자를 쓴다. 어긋나면 같은 것이 화면마다 다른 이름이 된다.
+  var FIX_LABEL = { doc: "자료 부족", rule: "사내 규정", prod: "제품", unclassified: "미분류" };
 
   /* ✂ 사유 줄 계산 — **순수 함수**다(짝 시험 server/test/citereasons.test.ts가 이 소스를
      그대로 떼어 잰다. 시험에 셈을 베껴 적으면 제품과 시험이 따로 늙는다).
@@ -354,10 +366,49 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       (뗀답
         ? 인용문장(뗀답, 사유) + " — " + 누가 + 사유줄
         : "0개 — 이 기간에 뗀 인용이 없습니다") + "</span></div>");
+    // ── 🔧 고칠 것(2026-09-07 · 통합 설계관 C-A V6) ────────────────────────────────
+    //   결재판 두 번째 원장의 **신호**다. 목록이 아니다 — 처리는 결재판에서 한다.
+    //   ⚠ 숫자는 서버 fixboard 하나에서 온다. 여기서 다시 세면 결재판·주간 요약과 어긋난다.
+    //   ⚠ 서버가 fixboard를 안 실어 보내면(옛 서버) **줄을 안 그린다** — 0건으로 그리면
+    //     「지적이 없다」와 「이 기능이 없다」가 화면에서 같아 보인다(장애 ≠ 부재).
+    //   ⚠ 0건인 갈래는 **회색으로 그린다**(숨기지 않는다) — 위 ✂ 줄이 0에도 서 있는 것과 같은 이유.
+    //   ⚠ 질문은 **서버 값 그대로**다. 이 창구는 등급 게이트 밖이라 못 보는 사람에게는 서버가
+    //     자리표를 보낸다(fixboard.질문가림) — 화면이 그것을 제 말로 바꿔치기하지 않는다.
+    var fb = sup && sup.fixboard;
+    if (fb && fb.kinds && fb.kinds.length) {
+      var 갈래글 = fb.kinds.map(function (k) {
+        var n = k.open || 0;
+        return "<b" + (n === 0 ? ' style="color:var(--muted-2)"' : "") + ">" +
+          esc(FIX_LABEL[k.fixkind] || k.fixkind) + " " + n + "</b>";
+      }).join(" · ");
+      // 열린 항목이 있을 때만 최근 5줄 — 닫힌 것뿐인 기간에 목록을 세우면 신호가 소음이 된다.
+      var 최근 = "";
+      if ((fb.open || 0) > 0 && (fb.recent || []).length) {
+        최근 = '<div class="fx-rows">' + fb.recent.map(function (x) {
+          var 상태 = x.status === "open" ? "열림" : x.status === "promoted" ? "편입" : x.status === "resolved" ? "닫음" : "부적합";
+          return '<div class="fx-row"><span class="dim">' + esc(FIX_LABEL[x.fixkind || "unclassified"] || "미분류") + "</span>" +
+            '<span class="q">' + esc(x.q) + "</span>" +
+            '<span class="dim">' + 상태 + "</span></div>";
+        }).join("") + "</div>";
+      }
+      lines.push('<div class="sup-line"><span class="tag fix">🔧 고칠 것</span><span style="flex:1;min-width:0">' + 갈래글 +
+        ' <span class="dim">— 열림 기준(0건도 그립니다) · 기간은 위 오늘/7일/30일을 따릅니다</span>' +
+        '<button class="fx-go">🗔 결재판에서 처리</button>' + 최근 + "</span></div>");
+    }
     document.getElementById("sup").innerHTML = lines.join("");
 
     // 사유 토글 — 이 줄 하나의 상세만 여닫는다(구역 접기가 아니다. fold.js를 안 쓰는 이유는
     //   시안 ②의 경고 상자에 적혀 있다: 32px 헤더가 더 생겨 밀도가 오히려 나빠진다).
+    // 🔧 처리로 가는 길 — #sup은 innerHTML로 통째로 다시 그려지므로 **재렌더 뒤 다시 건다.**
+    //   ⚠ 없으면 조용히 넘어간다(그린 적이 없는 기간도 있다).
+    var 처리버튼 = document.querySelector("#sup .fx-go");
+    if (처리버튼) {
+      처리버튼.addEventListener("click", function () {
+        // 셸에 「답 지적」 세그먼트로 열어 달라고 부탁한다(화면이 직접 이동하지 않는다).
+        try { window.top.postMessage({ type: "gijo:openTab", page: "approvals.html?fix=open", label: "결재판" }, "*"); } catch (e) { }
+      });
+    }
+
     var 왜버튼 = document.querySelector("#sup .cite-why");
     if (왜버튼) {
       왜버튼.addEventListener("click", function () {
