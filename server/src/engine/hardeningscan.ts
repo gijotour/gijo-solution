@@ -25,7 +25,7 @@ import { koDateTimeString } from "../util/date";
 import { assertEgressAllowed } from "./airgap";
 // 금융권 담당자의 말(전자금융기반시설 취약점 평가기준)로도 결과가 읽히게 하는 대응표.
 // ⚠ 세는 것도 문장도 **그쪽 한 곳**이다 — 여기서 따로 세면 리포트와 축약 답이 다른 수를 말한다.
-import { fsiCoverageLine } from "./hardeningfsi";
+import { fsiCoverageLine, fsiSectionLines, fsiAttentionLine } from "./hardeningfsi";
 
 export type ScanStatus = "PASS" | "FAIL" | "WARN" | "NA";
 export type StandardId = "kisa" | "cis" | "kisa_pc" | "kisa_net";
@@ -714,6 +714,11 @@ export function formatHardeningReport(r: ScanReport): string {
   L.push(`| 항목 | 분류 | 점검 내용 | 결과 | 근거(실측) |`);
   L.push(`|---|---|---|---|---|`);
   for (const i of r.items) L.push(`| ${i.id} | ${i.cat} | ${i.title} | ${MARK[i.status]} | ${i.evidence} |`);
+  // 금융 평가기준의 **부문·항목 이름**으로 같은 결과를 한 번 더 적는다.
+  // ⚠ 계수 한 줄만 내던 판(2026-09-08 검토관 적발)에는 화면 안내가 「부문·항목으로 읽는 자리」라
+  //   말하는데 출력에 부문도 항목 이름도 없었다 — 표가 자료 파일 안에서만 살아 있었다.
+  L.push("");
+  L.push(...fsiSectionLines(r));
   const acts = r.items.filter((i) => i.status === "FAIL" || i.status === "WARN");
   if (acts.length) {
     L.push("");
@@ -737,6 +742,10 @@ export function scanSummaryText(r: ScanReport): string {
   L.push(`준수율 ${r.summary.rate}% (양호 ${r.summary.pass}/${r.summary.scored}) · ${r.summary.verdict}`);
   L.push(`✓ 양호 ${r.summary.pass} · ✗ 취약 ${r.summary.fail} · ⚠ 확인필요 ${r.summary.warn} · — 해당없음 ${r.summary.na}`);
   L.push(fsiCoverageLine(r));
+  // 계수 뒤에 **이름**을 부른다 — 손이 가야 할 평가기준 항목을 부문과 함께.
+  // (이 축약 답은 라이트 단독 모드에서 재요약 없이 그대로 최종 답이 된다.)
+  const attn = fsiAttentionLine(r);
+  if (attn) L.push(attn);
   if (fails.length) {
     L.push("취약 항목:");
     for (const i of fails) L.push(`  - [${i.id}] ${i.title} — ${i.evidence}\n    → ${i.remediation}`);
