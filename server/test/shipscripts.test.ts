@@ -386,3 +386,82 @@ describe("★ 배포 절차 — 운영 dist 고아 산출물을 치운다", () =
       .toContain("StandardOutput=append");
   });
 });
+
+// ── 실전 하네스 세션 반납 감시(2026-09-08) ─────────────────────────────────
+//
+// ■ 무엇이 새고 있었나 (실측)
+//   야간 회귀(03:00 KST · tools/nightly-ops-sim.ps1 → tools/ops-sim.mjs)가 `claude-deploy`로
+//   **force:true 로그인**해 152문항을 돌고 **그냥 끝났다.** 계정당 세션은 하나뿐이라, 그 뒤
+//   사람이 그 계정으로 붙으면 「이미 로그인 중」에 걸리고 게시는 409로 막힌다 —
+//   야간마다 유령 세션이 남아 있었다는 뜻이다(유휴 만료 30분까지).
+//   같은 부류를 2026-09-06에 게시 스크립트에서 한 번 고쳤는데(위 describe), **이 하네스는
+//   그때 같이 안 봤다.** 「세 번째면 소스 감시」라 여기도 붙인다.
+//
+// ■ 왜 소스 감시인가
+//   진짜로 재려면 운영 서버에 로그인해 152문항을 돌려야 한다 — 직렬 자원이고 야간 회귀와
+//   충돌한다. 그래서 **규약이 코드에 적혀 있는지**를 본다(게시 스크립트와 같은 방식).
+describe("★ 실전 하네스(ops-sim) — 끝나면 세션을 반납한다", () => {
+  const 하네스경로 = path.join(서버루트, "..", "tools", "ops-sim.mjs");
+
+  it("logout을 부른다 — 헤더 + 본문 refreshToken 둘 다", () => {
+    expect(fs.existsSync(하네스경로), `하네스를 못 찾았다(${하네스경로}) — 시험이 헛돈다`).toBe(true);
+    const src = fs.readFileSync(하네스경로, "utf8");
+
+    const 부름 = src.indexOf("/api/auth/logout");
+    expect(부름, "하네스가 로그아웃을 안 부른다 — force 로그인으로 잡은 세션이 30분 유령으로 남는다")
+      .toBeGreaterThan(-1);
+
+    // ⚠ 파일 전체에서 찾으면 안 된다 — `Authorization`은 다른 호출에도, `refreshToken`은 주석에도
+    //   있다(게시 스크립트에서 실제로 그 잣대가 헛돌았다). **logout fetch 한 덩어리만** 본다.
+    const 끝 = src.indexOf("});", 부름);
+    expect(끝, "logout fetch가 어디서 끝나는지 못 찾았다 — 코드 꼴이 바뀌었으면 여기부터 고친다")
+      .toBeGreaterThan(부름);
+    const 로그아웃호출 = src.slice(부름, 끝);
+
+    // 서버(server/src/auth/auth.ts의 POST /api/auth/logout)는 **본문의 refreshToken으로** 세션을
+    // 지운다. 헤더만 보내면 200 OK가 오는데 세션은 그대로 산다 — 「고쳤다」가 거짓이 되는 자리다.
+    expect(로그아웃호출, "logout 본문에 refreshToken이 없다 — 서버는 헤더만으로 세션을 못 지운다(200 OK인데 안 풀림)")
+      .toMatch(/body:[\s\S]*refreshToken/);
+    expect(로그아웃호출, "logout에 Authorization 헤더가 없다 — authMiddleware가 401로 막는다")
+      .toMatch(/Authorization/);
+  });
+
+  it("★ 반납할 표는 **마지막 로그인** 것이다 — 도중 재로그인이 있다", () => {
+    const src = fs.readFileSync(하네스경로, "utf8");
+    // 이 하네스는 401(접속표 15분 만료)이면 도중에 다시 로그인한다. 처음 표만 들고 있으면
+    // 반납할 때 **이미 죽은 표**를 내밀고, 살아 있는 세션은 그대로 남는다 — 조용한 반쪽 수리다.
+    expect(src, "물어보기()의 401 재로그인 갈래가 사라졌다 — 이 시험의 전제가 바뀌었으니 함께 볼 것")
+      .toContain("await 로그인()");
+    const 로그인정의 = src.indexOf("async function 로그인()");
+    expect(로그인정의, "로그인() 정의를 못 찾았다 — 시험이 헛돈다").toBeGreaterThan(-1);
+    const 로그인본문 = src.slice(로그인정의, src.indexOf("\n}", 로그인정의));
+    expect(로그인본문, "로그인()이 표를 안 갈무리한다 — 재로그인 뒤 반납이 죽은 표로 나간다")
+      .toMatch(/마지막표\s*=/);
+    expect(로그인본문, "로그인()이 refreshToken을 안 챙긴다 — 반납할 표가 없다")
+      .toContain("refreshToken");
+  });
+
+  it("반납은 finally에 있다 — 도중에 죽어도 세션은 돌려준다", () => {
+    const src = fs.readFileSync(하네스경로, "utf8");
+    const 자리 = src.indexOf("} finally {");
+    expect(자리, "finally가 없다 — 성공 경로에서만 반납하면 서버가 흔들린 날 유령이 남는다")
+      .toBeGreaterThan(-1);
+    // ⚠ 「logout 리터럴이 finally 뒤에 있나」로 보지 않는다 — 반납 함수를 위에 정의하고 finally에서
+    //   부르는 것이 정석이라 그 잣대는 **좋은 코드를 빨갛게 만든다**(게시 스크립트에서 겪었다).
+    //   finally가 **부르는 그 함수**를 따라간다.
+    const 뒷부분 = src.slice(자리);
+    const m = 뒷부분.match(/await\s+([A-Za-z0-9_가-힣$]+)\s*\(/);
+    expect(m, "finally에서 아무것도 부르지 않는다 — 껍데기 finally다").toBeTruthy();
+    const 이름 = m![1];
+    const 정의 = src.indexOf(`async function ${이름}(`);
+    expect(정의, `finally가 부르는 ${이름}의 정의를 못 찾았다 — 감시가 헛돈다`).toBeGreaterThan(-1);
+    expect(src.slice(정의, 정의 + 1600),
+      `finally가 부르는 ${이름}이 로그아웃을 안 한다 — 이름만 반납이고 아무것도 안 돌려준다`)
+      .toContain("/api/auth/logout");
+    // ★ 중단(Ctrl+C·kill)도 받는다 — 152문항은 몇 분이라 도중에 끊는 일이 흔하다.
+    expect(src, "SIGINT에서 반납하지 않는다 — 손으로 끊으면 유령이 남는다").toMatch(/SIGINT[\s\S]{0,80}세션반납/);
+    // ★ 표가 없으면 **완료라고 말하지 않는다** — 서버는 본문이 비어도 {ok:true} 200을 준다.
+    expect(src, "표가 없을 때도 「반납 완료」를 찍는다 — 자기 성공 문구가 거짓을 만든다")
+      .toMatch(/refreshToken[\s\S]{0,200}반납 못 함/);
+  });
+});
