@@ -373,6 +373,18 @@ const gijoApi = {
   mergePreflight: (a?: string, b?: string) => api.mergeApi.preflight(a, b),
   listLlmGuide: () => api.modelDexApi.guide(),
   listApprovals: () => api.approvalsApi.list(),
+  // 「미배정」 판정 — **제품 전체에서 한 곳**이다(2026-09-07 승인 배지). 사이드바 ③ 조치 배지(nav.js
+  //   refreshApvBadge)와 ③ 조치 허브의 ✅ 조치·승인 판 배지(grouppanels.js)가 **같은 수**를 말해야
+  //   하는데, 각자 식을 쓰면 한쪽만 고치는 날 두 숫자가 갈린다(grouppanels.js:98 주석의 계보 —
+  //   판 배지·하위 목록·실화면이 서로 다른 수를 가리키고 있었다).
+  //   원천은 서버 approvals.ts:253이고 실화면 approvals.html도 같은 식이다 — 완료·반려·**위험수용**은
+  //   담당자를 안 붙이는 것이 정상이라 세지 않는다.
+  // ⚠ 화면 스크립트가 이 식을 **다시 쓰지 않는다**(clientglobals.test가 소스로 감시한다).
+  //   preload에 둔 이유: nav.js는 모든 화면이 싣고 grouppanels.js는 허브 화면만 싣는다 — 공용 .js를
+  //   새로 만들면 그 script 태그를 한 화면에서 빠뜨려도 조용히 통과한다(부품 로드 누락 5화면 「거짓
+  //   초록」 전례). preload는 모든 렌더러에 **먼저** 붙어 로드 순서 사고가 없다.
+  isUnassignedApproval: (x: { assignee?: string | null; status?: string }) =>
+    !x.assignee && x.status !== "approved" && x.status !== "rejected" && x.status !== "accepted",
   // status·note·assignee·dueDate를 부분 갱신. status만 주면 기존 승인/반려 동작과 동일.
   setFindingReview: (assetId: string, key: string, patch: api.ReviewPatch) => api.approvalsApi.set(assetId, key, patch),
   notifyAssignee: (assetId: string, key: string, to: string) => api.approvalsApi.notify(assetId, key, to),

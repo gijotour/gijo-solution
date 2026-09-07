@@ -400,3 +400,59 @@ describe("★ 탭 이름 — 파일명을 사람에게 보이지 않는다", () 
     expect(없음, "이 화면들로 가면 탭에 파일명이 뜬다 — 사이드바에 이름을 두거나 리다이렉트를 고칠 것").toEqual([]);
   });
 });
+
+// ── ★ 미배정 승인 배지 (2026-09-07 승인 시안 menu-visibility · 사장님 B안) ─────────────
+//
+// 막는 것 둘 — 이 저장소가 **이미 겪은** 두 사고의 재발 방지다:
+//   ① 죽은 배지 — 부착 조건의 주소가 메뉴에서 사라지면 배지는 어디에도 안 그려진다. 새 버전 배지가
+//      실제로 3주를 그 상태로 지냈다(위 「새 버전 배지」 시험의 사연). 같은 꼴을 한 벌 더 만들었으니
+//      감시도 한 벌 더 붙인다.
+//   ② 잣대 두 벌 — 사이드바 「③ 조치」 배지와 ③ 조치 허브의 ✅ 조치·승인 판 배지가 각자 식을 쓰면,
+//      한쪽만 고치는 날 **같은 것을 두 숫자**로 말한다(판 배지·하위 목록·실화면이 어긋났던 그 사고).
+//
+// ⚠ 정규식을 안 쓴다 — 이 파일은 문자열 검사만으로 충분하고, 줄끝(CRLF)과 escape가 섞이면
+//   감시가 조용히 헛돈다.
+describe("★ 미배정 승인 배지 — 부착점이 실존하고, 판정은 한 곳이다", () => {
+  const nav = fs.readFileSync(new URL("../../client/src/renderer/pages/nav.js", import.meta.url), "utf8");
+  const 판 = fs.readFileSync(new URL("../../client/src/renderer/pages/grouppanels.js", import.meta.url), "utf8");
+  const 배지클래스 = "gn-apvbadge";
+
+  it("이 감시가 헛돌지 않는다 — 배지 자체를 실제로 읽어 온다", () => {
+    expect(nav.includes(배지클래스), "nav.js에 승인 배지가 없다 — 아래 검사가 통째로 헛돈다").toBe(true);
+    expect(nav.includes("refreshApvBadge"), "배지를 채우는 함수가 없다 — 배지가 늘 비어 있다").toBe(true);
+  });
+
+  it("부착점 주소가 메뉴 정의에 실존한다 — 아니면 배지는 유령이 된다", () => {
+    // 배지를 만드는 자리 바로 앞의 `it.page === "…"`가 부착 조건이다.
+    const 앞 = nav.slice(0, nav.indexOf(배지클래스));
+    const 열쇠 = 'it.page === "';
+    const s = 앞.lastIndexOf(열쇠);
+    expect(s, "배지 부착 조건(it.page === …)을 못 찾았다 — 코드가 바뀌었으면 이 시험도 같이 볼 것").toBeGreaterThan(0);
+    const 부착점 = 앞.slice(s + 열쇠.length, 앞.indexOf('"', s + 열쇠.length));
+    expect(부착점.length, "부착점 주소를 못 읽었다").toBeGreaterThan(3);
+    expect(nav.includes('{ page: "' + 부착점 + '"'),
+      `배지 부착점 ${부착점}이 메뉴 정의에 없다 — 배지가 어디에도 안 그려진다`).toBe(true);
+  });
+
+  it("★ 사이드바 배지와 ✅ 판 배지가 **같은 판정 함수**를 쓴다", () => {
+    expect(preloadSrc.includes("isUnassignedApproval:"),
+      "preload에 미배정 판정이 없다 — 두 화면이 각자 세게 된다").toBe(true);
+    expect(nav.includes("window.gijo.isUnassignedApproval"), "사이드바 배지가 공용 판정을 안 쓴다").toBe(true);
+    expect(판.includes("window.gijo.isUnassignedApproval"), "✅ 판 배지가 공용 판정을 안 쓴다").toBe(true);
+    // 식을 **다시 쓰지 않는다** — 두 벌이 되는 순간 같은 것을 두 숫자로 말한다.
+    const 다시쓴것: string[] = [];
+    for (const [이름, 글] of [["nav.js", nav], ["grouppanels.js", 판]] as [string, string][]) {
+      const j = 글.indexOf('status !== "approved"');
+      if (j >= 0 && 글.slice(j, j + 200).includes('status !== "accepted"')) 다시쓴것.push(이름);
+    }
+    expect(다시쓴것, "미배정 식을 직접 다시 썼다 — preload의 isUnassignedApproval을 쓸 것: " + 다시쓴것.join(", ")).toEqual([]);
+  });
+
+  it("배지의 **생산자**가 실재한다 — 소비자만 있고 생산자 없는 값을 만들지 않는다", () => {
+    expect(preloadSrc.includes("listApprovals:"), "listApprovals가 preload에 없다 — 배지가 영영 0이다").toBe(true);
+    const s = nav.indexOf("function refreshApvBadge()");
+    expect(s, "refreshApvBadge 본문을 못 찾았다").toBeGreaterThan(0);
+    expect(nav.slice(s, s + 900).includes("listApprovals()"),
+      "배지가 승인 목록 창구를 안 쓴다 — 다른 원천을 쓰면 ✅ 판과 수가 갈린다").toBe(true);
+  });
+});

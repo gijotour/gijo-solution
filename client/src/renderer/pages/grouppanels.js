@@ -95,9 +95,10 @@
   // 「미배정」 판정은 **한 곳에서만** 한다(병렬 검토 중2 — 판 배지·하위 목록·실화면이 서로
   // 다른 수를 가리키고 있었다). 원천은 서버 approvals.ts:253이고, 실화면 approvals.html:462도
   // 같은 식이다: 완료·반려·**위험수용**은 담당자를 안 붙이는 것이 정상이라 세지 않는다.
-  var 미배정인가 = function (x) {
-    return !x.assignee && x.status !== "approved" && x.status !== "rejected" && x.status !== "accepted";
-  };
+  // ★ 2026-09-07 — 식 자체는 **preload 한 곳**으로 올렸다(window.gijo.isUnassignedApproval).
+  //   사이드바 「③ 조치」 배지(nav.js refreshApvBadge)가 이 판과 같은 수를 말해야 하는데, 두 파일에
+  //   식을 두 벌 두면 한쪽만 고치는 날 갈린다. 여기서 식을 다시 쓰면 clientglobals.test가 잡는다.
+  var 미배정인가 = function (x) { return window.gijo.isUnassignedApproval(x); };
 
   var 그룹 = {
     // ① 발견·수집

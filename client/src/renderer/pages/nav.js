@@ -706,6 +706,23 @@
       dBadge.title = "오늘 새로 들어온 문서";
       el.appendChild(dBadge);
     }
+    // **담당자가 아직 안 정해진 승인 건수**를 「③ 조치」에 띄운다(2026-09-07 승인 시안
+    //   menu-visibility, 사장님 B안). 0이면 감춘다.
+    // ⚠ 왜 「미배정」인가: 남은 건수(pending)는 늘 많아 보고도 안 움직이고(위 gn-workbadge 주석과
+    //   같은 이유), 기한 초과는 대시보드가 이미 센다 — 같은 뜻의 숫자를 세 곳에 두지 않는다.
+    //   미배정은 ③ 조치 허브의 ✅ 판 배지와 **같은 판정 함수**를 써서 두 수가 어긋날 여지가 없다.
+    // ⚠ 새 메뉴 줄을 만들지 않았다(설계관 실측): fix.html의 기본 판이 이미 approvals라
+    //   `fix.html?panel=approvals` 줄을 더하면 **같은 화면**이 두 줄·두 탭이 된다. 값은 「길」이
+    //   아니라 「배지」였으므로 세로 증가 0으로 그 값만 취한다.
+    // ⚠ `fix.html` **정확히**만 — ④ 보안제품 관리의 `fix.html?panel=maintenance`는 문자열이
+    //   달라 안 붙는다(붙으면 배지가 두 곳에 뜬다).
+    if (it.page === "fix.html") {
+      var aBadge = document.createElement("span");
+      aBadge.className = "gn-upbadge gn-apvbadge";
+      aBadge.style.display = "none";
+      aBadge.title = "담당자가 아직 정해지지 않은 승인 건";
+      el.appendChild(aBadge);
+    }
 
     if (it.win) {
       // 별도 창 항목 — preload가 노출한 window.gijo.<win>()을 부른다.
@@ -1562,6 +1579,23 @@
     }).catch(function () {});
   }
 
+  // 미배정 승인 배지 — 담당자가 아직 안 정해진 건수. 0이면 감춘다(다 배정됐으면 알릴 일이 아니다).
+  //   판정은 **preload 한 곳**(window.gijo.isUnassignedApproval)에서 받는다 — ③ 조치 허브의
+  //   ✅ 조치·승인 판 배지(grouppanels.js)와 같은 함수라 두 수가 갈리지 않는다.
+  //   원천 목록도 같은 창구(listApprovals) 하나다 — 이 배지는 그 창구의 네 번째 소비자일 뿐이다.
+  function refreshApvBadge() {
+    if (!window.gijo || !window.gijo.listApprovals || !window.gijo.isUnassignedApproval) return;
+    window.gijo.listApprovals().then(function (r) {
+      var rows = (r && r.reviews) || r || [];
+      var n = rows.filter(function (x) { return window.gijo.isUnassignedApproval(x); }).length;
+      document.querySelectorAll(".gn-apvbadge").forEach(function (b) {
+        b.textContent = n > 99 ? "99+" : String(n);
+        b.setAttribute("aria-label", "담당자 미배정 승인 " + n + "건");
+        b.style.display = n > 0 ? "" : "none";
+      });
+    }).catch(function () {});
+  }
+
   // 분리창 — 왼쪽 메뉴를 지우고 내용이 창 폭을 다 쓰게 한다. 가장자리 토글도 두지 않는다:
   // 이 창에서 메뉴를 열 일이 없고(이동은 대시보드에서), 토글만 남으면 그게 또 하나의 조작이 된다.
   function applyPopout() {
@@ -1728,7 +1762,7 @@
     //   전이라 조회가 401로 떨어지는데, 실패를 조용히 삼키는 구조라 그대로 빈칸으로 굳었다
     //   — 기한 지난 업무가 6건인데 화면엔 아무 표시가 없었다. 두 배지가 같은 결함을 공유한다.
     //   그래서 ① 곧바로 ② 로그인이 끝날 즈음 한 번 더 ③ 그 뒤로는 주기적으로 새로 읽는다.
-    function 배지새로고침() { refreshSessionBadge(); refreshWorkBadge(); refreshDocBadge(); }
+    function 배지새로고침() { refreshSessionBadge(); refreshWorkBadge(); refreshDocBadge(); refreshApvBadge(); }
     배지새로고침();
     setTimeout(배지새로고침, 3000);
     setInterval(배지새로고침, 60000);
