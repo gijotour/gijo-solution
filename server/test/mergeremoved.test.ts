@@ -110,6 +110,71 @@ describe("★ merge(LLM 합성) 삭제 — 반쪽만 지워지지 않았다", ()
     }
   });
 
+  // ★ 2026-09-07 2차 — 위 검사들이 **원리상 못 보던 곳** 둘을 덮는다.
+  //
+  //   실측: 1차 감시가 초록 6,396개를 통과한 그 커밋에서 아래가 그대로 살아 있었다.
+  //     · GIJO_AS_제품소개.md:392 「(모델 합성은 고급 옵션으로 보존)」 — 매니페스트에 실려
+  //       RAG로 들어가는 문서다. 챗봇이 「LLM 합성 되나요」에 이 조각을 근거로 **된다고** 답한다.
+  //     · GIJO_AS_사용자_매뉴얼.md — 303줄은 「없앴습니다」로 고쳤는데 370줄은 「학습·모델 병합」을
+  //       현행 기능으로 열거했다. **한 문서 안에서 상반된 답**이 나온다.
+  //     · server/src/engine/airgap.ts 등 — 고객에게 내는 봉인 증명서의 통로 목록.
+  //   왜 못 봤나: 흔적이 영문 토큰 8개뿐이라 「모델 병합」 같은 우리말을 원리상 못 잡고,
+  //   볼곳이 소스 네 곳이라 매니페스트가 실어 보내는 md는 아예 감시 밖이었다.
+  //   「반쪽 삭제를 막는다」는 이 시험의 약속이 실제 잔재 앞에서 성립하지 않았다.
+  const 우리말흔적 = /LLM ?합성|모델 ?합성|모델 ?병합|학습·병합|SLERP|mergekit|합성 호환/;
+  // 묘비는 남긴다 — 「LLM 합성 되나요」에 **없앴다고** 답하려면 그 낱말이 문서에 있어야 한다.
+  // 살아 있는 기능처럼 적힌 것과 가르는 잣대가 이 표식이다(같은 줄에 있어야 한다).
+  const 묘비표식 = ["없앤 기능", "없앴습니다", "없앴다", "제공되지 않습니다", "내렸습니다", "내린 기능"];
+
+  it("★ 인입 문서(md)에 **살아 있는 기능처럼** 적힌 곳이 없다", () => {
+    const m = JSON.parse(fs.readFileSync(path.join(뿌리, "server", "docs-manifest.json"), "utf8")) as { files: { file: string }[] };
+    expect(m.files.length, "매니페스트를 못 읽었다 — 이 검사가 통째로 헛돈다").toBeGreaterThan(10);
+    let 읽은문서 = 0;
+    const 걸린것: string[] = [];
+    for (const e of m.files) {
+      const p = path.join(뿌리, String(e.file));
+      if (!fs.existsSync(p)) continue; // 존재 여부는 docsmanifest.test가 따로 본다
+      읽은문서++;
+      fs.readFileSync(p, "utf8").split(/\r?\n/).forEach((줄, i) => {
+        if (!우리말흔적.test(줄)) return;
+        if (묘비표식.some((t) => 줄.includes(t))) return; // 「없앴습니다」라고 적힌 묘비는 통과
+        걸린것.push(`${e.file}:${i + 1}: ${줄.trim().slice(0, 80)}`);
+      });
+    }
+    expect(읽은문서, "매니페스트 문서를 하나도 못 읽었다").toBeGreaterThan(10);
+    expect(걸린것,
+      "인입 문서가 없는 기능을 현행처럼 적는다 — 챗봇이 이 조각을 근거로 「됩니다」라고 답한다. 같은 줄에 「없앴습니다」 같은 표식을 넣어 묘비로 만들거나 문장을 지울 것").toEqual([]);
+  });
+
+  it("★ 제품이 **사람에게 내는 글**에 없는 기능이 남지 않았다", () => {
+    // 화면 안내·에어갭 봉인 증명서·대화 답변처럼 고객이 그대로 읽는 문자열을 본다(주석은 뗀다).
+    const 문자열예외: Record<string, string> = {
+      "server/src/engine/modellicense.ts":
+        "합성으로 **만들어진 모델 파일**의 라이선스 규칙이다 — 제품 기능 안내가 아니라 디스크에 남아 있을 수 있는 산출물의 출처 표기라, 지우면 그 모델을 받은 고객의 라이선스 조회가 「모름」이 된다.",
+    };
+    const 걸린것: string[] = [];
+    // ⚠ 제품 소스만 본다 — 시험 이름·도구 스크립트는 고객이 읽지 않는다. 넓게 잡으면
+    //   modellicense.test의 시험 제목까지 걸려(실제로 걸렸다) 예외가 늘고 감시가 무뎌진다.
+    const 제품소스 = 목록.filter((p) => /^(client|server)\/src\//.test(상대(p)));
+    expect(제품소스.length, "제품 소스를 하나도 못 찾았다 — 이 검사가 헛돈다").toBeGreaterThan(100);
+    for (const p of 제품소스) {
+      const 이름 = 상대(p);
+      if (이름 in 문자열예외) continue;
+      const 코드 = 주석뗀(fs.readFileSync(p, "utf8"));
+      코드.split(/\r?\n/).forEach((줄) => {
+        if (!우리말흔적.test(줄)) return;
+        if (묘비표식.some((t) => 줄.includes(t))) return;
+        걸린것.push(`${이름}: ${줄.trim().slice(0, 80)}`);
+      });
+    }
+    expect(걸린것,
+      "고객이 읽는 글에 없는 기능이 남았다 — 봉인 증명서·화면 안내가 없는 통로를 열거하면 그 증명서 전체를 못 믿게 된다").toEqual([]);
+    for (const [f, 사유] of Object.entries(문자열예외)) {
+      expect(사유.length, `${f}: 예외인데 이유가 없다`).toBeGreaterThan(30);
+      expect(fs.existsSync(path.join(뿌리, f)), `${f}: 표에 있는데 파일이 없다 — 낡은 표는 거짓 안심을 준다`).toBe(true);
+    }
+  });
+
   it("안내 문서는 목록에서 빼는 것으로 끝내지 않고 **_제외에 등재**한다", () => {
     // 실측(2026-08-03): files[]에서 빼기만 하면 이미 인입된 조각이 그대로 남아 검색 1위로 나온다.
     const m = JSON.parse(fs.readFileSync(path.join(뿌리, "server", "docs-manifest.json"), "utf8")) as {

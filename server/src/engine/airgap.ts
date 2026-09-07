@@ -50,7 +50,7 @@ export const EGRESS_POINTS: EgressPoint[] = [
   { id: "hardening-ssh", label: "장비 원격 점검(SSH)", host: "점검 대상 장비(설정값 · 내부망 IP만 등록 가능)", 대체: "이 서버 자신(local) 점검만 수행 · 원격 장비는 봉인" },
   // ⚠ 자식 프로세스는 우리 관문 **밖**이다(2026-08-05 검토 지적). 오프라인 환경변수로 눌러
   //   두지만 완전한 차단은 아니라, 카탈로그에 이렇게 **정직하게** 싣는다.
-  { id: "child", label: "학습·병합 도구(python·HF CLI)", host: "자식 프로세스(관문 밖)", 대체: "HF 오프라인 강제(HF_HUB_OFFLINE 등) · 사전 반입한 캐시·모델만 사용" },
+  { id: "child", label: "학습 도구(python·HF CLI)", host: "자식 프로세스(관문 밖)", 대체: "HF 오프라인 강제(HF_HUB_OFFLINE 등) · 사전 반입한 캐시·모델만 사용" },
 ];
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
@@ -203,7 +203,7 @@ export function installAirgapGuard(): void {
 }
 
 /**
- * 자식 프로세스(python 학습·병합, HF CLI)에 물릴 봉인 환경변수. 봉인이 아니면 **빈 객체**(무영향).
+ * 자식 프로세스(python 학습, HF CLI)에 물릴 봉인 환경변수. 봉인이 아니면 **빈 객체**(무영향).
  *
  * ⚠ 왜 별도인가(2026-08-05 검토 지적): fetch 관문도 소켓 관문도 **우리 프로세스 안**에서만 돈다.
  *   spawn한 python은 부모의 globalThis.fetch 패치를 물려받지 않아 그대로 밖으로 나갈 수 있다.
@@ -275,7 +275,7 @@ export function airgapCertificate(blocks: { at: number; target: string | null; d
   L.push("4. 이 증명의 한계 (정직하게 밝힙니다)");
   L.push("   · 관문은 **제품이 직접 여는 통로**(HTTP 요청·메일/SIEM 소켓)를 덮습니다.");
   L.push("   · 봉인 중에는 HTTP 리다이렉트(3xx)를 따라가지 않습니다 — 내부 주소가 외부로 넘겨주는 길을 막기 위해서이며, 내부 서버가 3xx를 쓰면 해당 요청은 실패로 드러납니다.");
-  L.push("   · 학습·모델 병합 등 **외부 프로그램(python)을 실행하는 기능은 제품 밖**에서 돌아 이 관문을 지나지 않습니다.");
+  L.push("   · 학습 등 **외부 프로그램(python)을 실행하는 기능은 제품 밖**에서 돌아 이 관문을 지나지 않습니다.");
   L.push("     봉인 시 오프라인 환경변수(HF_HUB_OFFLINE 등)로 누르지만 **완전한 차단은 아닙니다** —");
   L.push("     기밀 배치에서는 해당 기능을 쓰지 않거나 사전 반입 자료로만 쓰기를 권고합니다.");
   L.push("   · 이 문서는 **제품 자체 점검 결과**입니다. 망 분리 자체의 검증(방화벽·스위치)은 별도입니다.");

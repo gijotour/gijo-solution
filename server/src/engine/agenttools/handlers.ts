@@ -3159,11 +3159,11 @@ export async function runAirgapStatus(): Promise<string> {
   const s = airgapStatus();
   const lines: string[] = [];
   if (s.on) {
-    // ⚠ "전부 막혔다"고 말하지 않는다(2026-08-05 검토 지적) — 자식 프로세스(python 학습·병합)는
+    // ⚠ "전부 막혔다"고 말하지 않는다(2026-08-05 검토 지적) — 자식 프로세스(python 학습)는
     //   우리 관문 밖이라, 범위를 밝히지 않으면 v2가 없애려던 **거짓 안심**을 우리가 다시 만든다.
     lines.push("에어갭 봉인: 🔒 ON — 제품이 직접 여는 인터넷 통로는 전부 막혀 있습니다.");
     lines.push(`· 봉인한 외부 통로 ${s.points.length}종 · 봉인 후 차단된 시도 ${s.blockedCount}건`);
-    lines.push("⚠ 다만 학습·병합에 쓰는 외부 도구(python)는 제품 밖에서 도는 프로그램이라, 오프라인으로 눌러 두되 완전한 차단은 아닙니다 — 그 기능을 쓰지 않거나 사전 반입한 캐시로만 쓰세요.");
+    lines.push("⚠ 다만 학습에 쓰는 외부 도구(python)는 제품 밖에서 도는 프로그램이라, 오프라인으로 눌러 두되 완전한 차단은 아닙니다 — 그 기능을 쓰지 않거나 사전 반입한 캐시로만 쓰세요.");
   } else {
     lines.push("에어갭 봉인: 열림 — 외부 통로가 열려 있는 일반 배치입니다.");
     lines.push("(기밀·방산 폐쇄망은 서버를 GIJO_AIRGAP=1로 띄워 봉인합니다.)");
