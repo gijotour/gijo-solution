@@ -489,4 +489,37 @@ describe("★ 미배정 승인 배지 — 부착점이 실존하고, 판정은 �
     expect(nav.slice(s, s + 900).includes("listApprovals()"),
       "배지가 승인 목록 창구를 안 쓴다 — 다른 원천을 쓰면 ✅ 판과 수가 갈린다").toBe(true);
   });
+
+  // ★ 2026-09-08 — 자릿수 상한.
+  //   종전 상한이 99라, 실제로 나오는 값(오늘 반입 문서 182건 같은)이 전부 「99+」 한 덩어리로
+  //   보였다. 그러면 그 배지는 100건과 182건을 구분 못 하는, 「많다」만 말하는 장식이 된다.
+  //   상한을 999로 올려 세 자리까지 그대로 보인다.
+  //   ⚠ 그리고 **잣대를 한 곳으로 모았다** — 같은 식이 배지 넷에 복사돼 있었고, 그 꼴은 한쪽만
+  //     고치는 날 「같은 규칙인데 배지마다 다르게 보이는」 부류를 낳는다(이 파일이 미배정 판정에서
+  //     이미 한 번 막은 그것이다).
+  it("★ 배지 자릿수 — 상한은 999이고 **잣대는 한 곳**이다", () => {
+    // ① 잣대가 있다.
+    expect(/var 배지상한 = 999;/.test(nav),
+      "배지상한이 999가 아니다 — 182건이 「99+」로 뭉개지면 담당자는 100건과 구분 못 한다").toBe(true);
+    expect(nav.includes("function 배지숫자(n)"), "배지숫자()가 없다 — 잣대를 담을 자리가 없다").toBe(true);
+    // ② 배지 넷이 **모두** 그 잣대를 쓴다(하나라도 빠지면 그 배지만 옛 상한으로 남는다).
+    for (const 배지 of ["gn-sessbadge", "gn-workbadge", "gn-docbadge", "gn-apvbadge"]) {
+      const s = nav.indexOf(배지 + '")');
+      expect(s, `${배지}의 갱신부를 못 찾았다 — 이 검사가 헛돈다`).toBeGreaterThan(0);
+      expect(nav.slice(s, s + 260).includes("배지숫자(n)"),
+        `${배지}가 공용 배지숫자()를 안 쓴다 — 배지마다 상한이 갈린다`).toBe(true);
+    }
+    // ③ 옛 식이 어디에도 안 남았다 — 남으면 「고쳤다」가 반쪽이 된다.
+    expect(nav.includes('"99+"'), "99+ 리터럴이 아직 있다 — 잣대를 모으다 만 자리다").toBe(false);
+    // ④ 늘어난 자릿수를 **받아 주는 CSS 계약**이 살아 있다. 배지가 flex:0 0 auto가 아니거나
+    //    이름이 줄어들지 못하면, 폭이 늘 때 줄이 무너지거나 숫자가 잘려 19가 190처럼 보인다.
+    expect(/\.gn-item \.gn-upbadge\{flex:0 0 auto;/.test(nav),
+      "배지가 flex:0 0 auto가 아니다 — 폭이 늘면 숫자가 잘린다").toBe(true);
+    expect(nav.includes(".gn-item .gn-label{flex:1;overflow:hidden;text-overflow:ellipsis;}"),
+      "이름이 줄어들며 …로 잘리는 계약이 없다 — 배지가 넓어지면 줄이 밀린다").toBe(true);
+    expect(/\.gn-item\{[^}]*height:30px;/.test(nav),
+      "줄 높이 고정이 없다 — 배지가 넓어질 때 세로로 늘어난다").toBe(true);
+    expect(/\.gn-item\{[^}]*white-space:nowrap;/.test(nav),
+      "nowrap이 없다 — 배지가 넓어지면 이름이 접혀 두 줄이 된다").toBe(true);
+  });
 });

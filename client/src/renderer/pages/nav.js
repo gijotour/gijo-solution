@@ -581,6 +581,9 @@
       ".gn-item .gn-bot{flex:0 0 auto;font-size:12px;opacity:.7;cursor:pointer;border-radius:6px;padding:1px 5px;line-height:1.4;}" +
       ".gn-item .gn-bot:hover{opacity:1;background:rgba(59,130,246,.22);}" +
       // 업데이트 가능 배지(설정 항목).
+      // ⚠ `flex:0 0 auto`가 이 배지의 계약이다 — 글자가 늘어도(최대 "999+" 네 칸, 배지숫자() 참고)
+      //   줄이 무너지지 않고 옆의 `.gn-label`이 그만큼 줄며 …로 잘린다. 여길 `flex:1`이나 고정
+      //   너비로 바꾸면 숫자가 잘려 「19」가 190건처럼 보이는 부류가 난다.
       ".gn-item .gn-upbadge{flex:0 0 auto;background:var(--amber,#f0a020);color:#3a2a00;font-size:11.25px;font-weight:900;border-radius:20px;padding:1px 6px;}" +
       // 대시보드 — 다른 화면에서 돌아오는 '집' 자리다. 가장 자주 누르므로 한눈에 찾히게
       // 테두리를 준다(2026-07-27 사용자 요청). 지금 대시보드에 있으면 이미 .active가 있어
@@ -1532,6 +1535,22 @@
     document.head.appendChild(st);
   }
 
+  // 배지에 찍을 숫자 — **잣대 한 곳**. 배지가 넷이라 각자 적으면 한쪽만 고치는 날이 온다
+  //   (실제로 같은 식이 네 벌 복사돼 있었다 — 2026-09-08에 여기로 모았다).
+  //
+  // ⚠ 상한이 **999**다(2026-09-08). 종전 99는 세 자리부터 뭉개서, 실제로 나오는 값
+  //   (오늘 반입 문서 182건 같은)이 전부 「99+」 한 덩어리로 보였다 — 담당자는 100건과
+  //   182건을 구분 못 하고, 그러면 그 배지는 「많다」는 말밖에 못 하는 장식이 된다.
+  //   자릿수를 늘려도 **줄은 안 무너진다**(아래 CSS 근거):
+  //     · `.gn-item`은 `height:30px`·`white-space:nowrap`·`overflow:hidden` — 세로는 못 늘어난다.
+  //     · 배지는 `flex:0 0 auto`, 이름은 `.gn-label{flex:1;overflow:hidden;text-overflow:ellipsis}` —
+  //       배지가 넓어지면 **이름이 그만큼 줄며 …로 잘린다.** 밀려 내려가거나 잘려 사라지지 않는다.
+  //     · 늘어나는 폭은 글자 한 칸(11.25px·900 기준 6~7px)뿐이고, 가장 좁은 메뉴(프로 200px)에서도
+  //       이름에 90px 넘게 남는다. 실제 픽셀은 **게시 관문(좁은 폭 검사)**이 잰다 — 여기 숫자는 근거일 뿐.
+  //   ⚠ 999를 넘으면 그때는 정말 「많다」만 말한다(`999+`). 그 위를 세는 화면은 목록이 받는다.
+  var 배지상한 = 999;
+  function 배지숫자(n) { return n > 배지상한 ? 배지상한 + "+" : String(n); }
+
   // 작업 세션 배지 — 진행중 건수를 메뉴에 띄운다. 0이면 배지를 감춘다("진행중 0"은 알릴 일이 아니다).
   // 실패해도 조용히 넘어간다 — 배지가 없다고 메뉴가 망가지진 않는다.
   function refreshSessionBadge() {
@@ -1539,10 +1558,7 @@
     window.gijo.listWorkSessions().then(function (list) {
       var n = (list || []).filter(function (s) { return s.status === "active"; }).length;
       document.querySelectorAll(".gn-sessbadge").forEach(function (b) {
-        // 99를 넘으면 99+로 — 세 자리가 되면 배지가 늘어나 옆 글자를 밀어내고, 그쯤 되면
-        // 정확한 숫자는 의미가 없다(배지 설계 통례). QA·회귀가 세션을 만들어 실제로 60건을
-        // 넘긴 적이 있어 남의 일이 아니다.
-        b.textContent = n > 99 ? "99+" : String(n);
+        b.textContent = 배지숫자(n);
         // 색·숫자만으로는 읽어주는 도구가 뜻을 모른다 — 말로도 남긴다.
         b.setAttribute("aria-label", "진행중인 작업 " + n + "건");
         b.style.display = n > 0 ? "" : "none";
@@ -1556,7 +1572,7 @@
     window.gijo.myWork().then(function (w) {
       var n = (w && w.counts && w.counts.overdue) || 0;
       document.querySelectorAll(".gn-workbadge").forEach(function (b) {
-        b.textContent = n > 99 ? "99+" : String(n);
+        b.textContent = 배지숫자(n);
         b.setAttribute("aria-label", "기한이 지난 업무 " + n + "건");
         b.style.display = n > 0 ? "" : "none";
       });
@@ -1572,7 +1588,7 @@
     window.gijo.recentDocCount().then(function (r) {
       var n = (r && typeof r.count === "number") ? r.count : 0;
       document.querySelectorAll(".gn-docbadge").forEach(function (b) {
-        b.textContent = n > 99 ? "99+" : String(n);
+        b.textContent = 배지숫자(n);
         b.setAttribute("aria-label", "오늘 새로 들어온 문서 " + n + "건");
         b.style.display = n > 0 ? "" : "none";
       });
@@ -1589,7 +1605,7 @@
       var rows = (r && r.reviews) || r || [];
       var n = rows.filter(function (x) { return window.gijo.isUnassignedApproval(x); }).length;
       document.querySelectorAll(".gn-apvbadge").forEach(function (b) {
-        b.textContent = n > 99 ? "99+" : String(n);
+        b.textContent = 배지숫자(n);
         b.setAttribute("aria-label", "담당자 미배정 승인 " + n + "건");
         b.style.display = n > 0 ? "" : "none";
       });
