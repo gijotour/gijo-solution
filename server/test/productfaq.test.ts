@@ -186,3 +186,92 @@ describe("GPL과 AGPL의 경계 — 흔들리면 안 되는 한 문장", () => {
     expect(faqAnswerFor("MPL은 어디까지 공개해?")).toBeNull();
   });
 });
+
+
+// ── 「쓸수록 똑똑해진다」 (2026-09-07 사장님 지시로 신설) ──────────────────────
+//
+// ■ 왜 카드인가 — 이 말은 우리가 가장 많이 하는 약속인데 **제품이 못 답했다.**
+//   정본(GIJO_AS_제품소개.md §3-③ · INTENT.md 같은 절)에만 있고, 모델이 답하면
+//   「학습해서 좋아집니다」류로 얼버무린다 — 그건 거짓에 가깝다. 모델 가중치는
+//   2026-09 4회전 시험에서 전부 불채택이라 **지금 안 바뀐다.** 똑똑해지는 것은
+//   사내 기억(문서·승인 문답)과 잣대(지적→회귀 문항)다.
+//
+// ■ 이 시험이 지키는 것 셋
+//   ⓐ 판별이 좁다 — 원리를 묻는 말만 받고, 쓰기·화면·기존 카드 몫은 안 삼킨다.
+//   ⓑ **정본과 같은 말을 한다** — 카드·제품소개·INTENT 세 곳에 핵심 구절이 전부 있다.
+//      셋 중 하나만 고치면 빨강이 난다. 「같은 것을 여러 곳에 적으면 어긋난다」를 기계로 막는다.
+//   ⓒ 반증 — 카드를 빼면 ⓐ가 실제로 무너지는지 본다(이 시험이 헛돌지 않는다는 증거).
+describe("쓸수록 똑똑해진다 — 제품이 자기 약속을 설명한다", () => {
+  const 긍정 = [
+    "쓸수록 똑똑해져?",
+    "이 제품 쓰면 뭐가 좋아져?",
+    "AI가 어떻게 학습해?",
+    "쓰면 쓸수록 나아진다는 게 무슨 말이야?",
+    "사용할수록 똑똑해지나요?",
+    "어떻게 똑똑해지는 거야?",
+  ];
+
+  it("ⓐ 원리를 묻는 말은 이 카드가 받는다", () => {
+    for (const q of 긍정) expect(faqAnswerFor(q)?.id, q).toBe("smarter-with-use");
+  });
+
+  it("★★ ⓐ 좁게 — 쓰기·화면 열기·기존 카드 몫은 안 삼킨다", () => {
+    // 「학습」이라는 낱말 하나로 가로채면 이 저장소가 반복해 겪은 **낱말 가로채기**가 된다.
+    expect(faqAnswerFor("학습 시작해줘"), "쓰기").toBeNull();
+    expect(faqAnswerFor("어댑터 채택해줘"), "쓰기").toBeNull();
+    expect(faqAnswerFor("학습 루프 화면 열어줘"), "화면 열기").toBeNull();
+    expect(faqAnswerFor("학습 루프가 뭐야"), "개념 — 지식 문서 몫").toBeNull();
+    expect(faqAnswerFor("모델 학습 돌려줘"), "쓰기").toBeNull();
+    // 이건 **다른 카드**로 가야 한다 — null이 아니라 what-ai-learned다
+    expect(faqAnswerFor("AI가 뭘 학습했는지 볼 수 있어?")?.id, "기존 카드 몫").toBe("what-ai-learned");
+  });
+
+  it("★★ ⓑ 정본과 같은 말을 한다 — 카드·제품소개 §3-③·INTENT.md 세 곳", () => {
+    const 뿌리 = join(__dirname, "..", "..");
+    const 소개 = readFileSync(join(뿌리, "GIJO_AS_제품소개.md"), "utf8");
+    const 의도 = readFileSync(join(뿌리, "INTENT.md"), "utf8");
+
+    // 절만 도려낸다 — 문서 어딘가에 같은 낱말이 있다고 통과시키면 감시가 헛돈다.
+    const 절 = (본문: string, 머리: RegExp, 끝: RegExp) => {
+      const i = 본문.search(머리);
+      expect(i, `절을 못 찾았다: ${머리}`).toBeGreaterThanOrEqual(0);
+      const 뒤 = 본문.slice(i + 10);
+      const j = 뒤.search(끝);
+      return j >= 0 ? 뒤.slice(0, j) : 뒤;
+    };
+    const 소개절 = 절(소개, /^### ③ 쓸수록 똑똑해진다/m, /^(---|## )/m);
+    const 의도절 = 절(의도, /^## 쓸수록 똑똑해진다/m, /^## /m);
+    const 카드 = faqAnswerFor("쓸수록 똑똑해져?")!.answer;
+
+    // 다섯 갈래와 경계를 가리키는 **핵심 구절**. 하나라도 한 곳에서 사라지면 빨강.
+    const 핵심 = ["모델이 아니라", "자리", "이 답 이상해요", "회귀 검사 문항", "게이트", "불채택"];
+    const 빠진것: string[] = [];
+    for (const [이름, 본문] of [["카드", 카드], ["제품소개 §3-③", 소개절], ["INTENT.md", 의도절]] as const) {
+      for (const k of 핵심) if (!본문.includes(k)) 빠진것.push(`${이름}에 「${k}」 없음`);
+    }
+    expect(빠진것, "세 곳이 어긋났다 — 한 곳만 고치면 제품과 문서가 딴말을 한다:\n  " + 빠진것.join("\n  ")).toEqual([]);
+
+    // 절이 헛도는 도려내기가 아닌지 — 너무 짧으면 위 검사가 우연히 통과한다
+    expect(소개절.length, "제품소개 절이 너무 짧다 — 도려내기가 깨졌다").toBeGreaterThan(400);
+    expect(의도절.length, "INTENT 절이 너무 짧다 — 도려내기가 깨졌다").toBeGreaterThan(200);
+  });
+
+  it("★ ⓑ 안 똑똑해지는 것과 담당자가 할 일을 함께 말한다 — 「된다」만 하고 끝내지 않는다", () => {
+    const a = faqAnswerFor("쓸수록 똑똑해져?")!.answer;
+    expect(a, "모델 일반 지식·말투는 안 바뀐다는 경계").toContain("일반 지식과 말투는 바뀌지 않습니다");
+    expect(a, "담당자가 할 일 셋").toContain("담당자가 할 일 셋");
+    expect(a, "확인하는 곳으로 이어져야 한다").toContain("▸ 이어서");
+    expect(a.split("\n").length, "12줄 안쪽 — 길면 대화창에서 안 읽힌다").toBeLessThanOrEqual(12);
+  });
+
+  it("★★ ⓒ 반증 — 이 카드를 빼면 ⓐ가 무너진다(감시가 헛돌지 않는다는 증거)", () => {
+    // 다른 카드가 이미 이 물음들을 받고 있었다면 위 ⓐ는 카드 없이도 초록일 수 있다.
+    // 실제로 카드를 걷어내고 같은 물음을 돌려서, 이 카드가 **일하고 있음**을 증명한다.
+    const 카드빼고 = FAQ_CARDS.filter((c) => c.id !== "smarter-with-use");
+    expect(카드빼고.length, "카드가 실제로 등록돼 있어야 한다").toBe(FAQ_CARDS.length - 1);
+    const 남은답 = (q: string) => 카드빼고.find((c) => c.re.test(q))?.id ?? null;
+    for (const q of 긍정) {
+      expect(남은답(q), `${q} — 카드를 빼도 답이 나온다면 이 카드는 일하지 않는 것이다`).toBeNull();
+    }
+  });
+});
