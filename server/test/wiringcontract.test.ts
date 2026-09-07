@@ -45,11 +45,15 @@ const 선택배선대장: Record<string, "부품" | "직접" | ["제외", string
   "kpi.html": ["제외", "숫자 대시보드 — 고를 항목 없음"],
   "report.html": "부품",
   "reporting.html": ["제외", "허브 껍데기(무대는 report·kpi·compliance)"],
-  "discover.html": ["제외", "허브 껍데기(무대는 analysis·threat·inventory)"],
-  "triage.html": ["제외", "허브 껍데기(무대는 vulnscan·sbom)"],
+  // ⚠ 아래 「무대는 …」은 **판 id**를 grouppanels.js 순서 그대로 적는다 — 아래 「허브 껍데기의
+  //   무대 목록이 실제 판과 같다」 시험이 기계로 대조한다. 이 줄들은 2026-09-07까지 낡아 있었다
+  //   (discover에 없어진 inventory·verify에 빠진 verifying·aihub는 판 이름이 통째로 옛것).
+  //   사유 문자열이라 아무도 안 읽고 아무 시험도 안 걸어 **조용히 썩었다** — 그래서 시험을 붙인다.
+  "discover.html": ["제외", "허브 껍데기(무대는 analysis·threat)"],
+  "triage.html": ["제외", "허브 껍데기(무대는 vuln·sbom)"],
   "fix.html": ["제외", "허브 껍데기(무대는 approvals·maintenance·terminal)"],
-  "verify.html": ["제외", "허브 껍데기(무대는 hardening)"],
-  "aihub.html": ["제외", "허브 껍데기(무대는 agent·memory·learnloop·redteam)"],
+  "verify.html": ["제외", "허브 껍데기(무대는 verifying·hardening)"],
+  "aihub.html": ["제외", "허브 껍데기(무대는 team·knowledge·learning·safety·incidentcases)"],
   "inventory.html": "부품",
   "hardening.html": "부품",
   "memory.html": "부품",
@@ -701,5 +705,87 @@ describe("카드 언어 — 지식 창고 보기 전환(2026-08-31 사장님 「
     for (const 부품 of [".g-scard-k", ".g-seg", ".g-tiles", ".g-tile"]) {
       expect(css, `공용 카드 골격 ${부품}가 사라졌다`).toContain(부품);
     }
+  });
+});
+
+// ── ★ 허브 껍데기의 「무대는 …」 목록이 실제 판과 같은가 (2026-09-07) ─────────────────────
+//
+// ■ 왜: 위 대장의 「제외」 사유는 **사람이 손으로 적은 문자열**이라 아무 시험도 안 걸려 있었다.
+//   2026-09-07 실측에서 일곱 줄 중 **넷이 낡아** 있었다:
+//     · discover — 없어진 inventory를 아직 무대라고 적고 있었다(⓪ 자산으로 옮긴 지 오래다)
+//     · verify   — verifying(✅ 검증 대기) 판이 빠져 있었다
+//     · triage   — 판 id는 vuln인데 화면 이름 vulnscan을 적었다
+//     · aihub    — agent·memory·learnloop·redteam 넷 다 **옛 이름**이다(지금은 team·knowledge·
+//                  learning·safety·incidentcases 다섯이고, redteam은 판이 아니라 safety에 흡수됐다)
+//   낡은 사유는 조용히 거짓말을 한다 — 다음 사람이 그 화면 구조를 그대로 믿고 계획을 세운다
+//   (이번 시안도 실제로 그 낡은 줄을 근거로 「supervision을 aihub에 넣자」고 적을 뻔했다).
+//
+// ■ 규약: 「무대는 」 다음에 **판 id**를 grouppanels.js에 있는 **순서 그대로** 「·」로 잇는다.
+//   항목 뒤 괄호 주석은 허용한다(예: `audit(배선됨)`). 목록 뒤에 이어 쓰는 설명도 자유다.
+describe("★ 허브 껍데기의 무대 목록이 실제 판과 같다 — 손으로 적은 사유는 조용히 썩는다", () => {
+  const 판소스 = readFileSync(join(PAGES, "grouppanels.js"), "utf8");
+
+  /** grouppanels.js를 훑어 { 그룹이름: [판 id, …] }를 만든다(선언 순서 보존). */
+  function 그룹판(): Record<string, string[]> {
+    const out: Record<string, string[]> = {};
+    let 지금: string | null = null;
+    for (const l of 판소스.split(/\r?\n/)) {
+      const g = /^ {4}([a-z]+): \[\s*$/.exec(l);
+      if (g) { 지금 = g[1]; out[지금] = []; continue; }
+      if (!지금) continue;
+      const p = /^ {6}\{ id: "([a-z0-9_]+)"/.exec(l);
+      if (p) out[지금].push(p[1]);
+      if (/^ {4}\],?\s*$/.test(l)) 지금 = null;
+    }
+    return out;
+  }
+
+  /** 허브 화면이 어느 그룹을 여는지 — 화면 파일이 직접 말한다(gijoGroupPanels["<그룹>"]). */
+  function 화면의그룹(화면: string): string | null {
+    let s = "";
+    try { s = readFileSync(join(PAGES, 화면), "utf8"); } catch { return null; }
+    const m = /gijoGroupPanels[^\n]*\[\s*"([a-z]+)"\s*\]/.exec(s);
+    return m ? m[1] : null;
+  }
+
+  /** 사유 문자열에서 「무대는 a·b(주석)·c」의 id만 뽑는다. */
+  function 적힌무대(사유: string): string[] {
+    const i = 사유.indexOf("무대는 ");
+    if (i < 0) return [];
+    let 남은 = 사유.slice(i + "무대는 ".length);
+    const out: string[] = [];
+    for (;;) {
+      const m = /^([a-z][a-z0-9_]*)(\([^)]*\))?(·)?/.exec(남은);
+      if (!m) break;
+      out.push(m[1]);
+      남은 = 남은.slice(m[0].length);
+      if (!m[3]) break; // 「·」로 안 이어지면 목록 끝
+    }
+    return out;
+  }
+
+  it("이 감시가 헛돌지 않는다 — 판 정의와 무대 표기를 실제로 읽어 온다", () => {
+    const 판 = 그룹판();
+    expect(Object.keys(판).length, "grouppanels.js에서 그룹을 못 읽었다").toBeGreaterThanOrEqual(7);
+    expect(판.aiops ?? [], "aiops 판을 못 읽었다").toContain("incidentcases");
+    expect(적힌무대("허브 껍데기(무대는 a·b(주석)·c). 뒷말"), "사유 파서가 깨졌다").toEqual(["a", "b", "c"]);
+  });
+
+  it("★ 「무대는 …」에 적힌 판이 실제 판과 **순서까지** 같다", () => {
+    const 판 = 그룹판();
+    const 어긋남: string[] = [];
+    let 잰것 = 0;
+    for (const [화면, 값] of Object.entries(선택배선대장)) {
+      if (!Array.isArray(값)) continue;
+      const 적힌 = 적힌무대(값[1]);
+      if (!적힌.length) continue;
+      const 그룹 = 화면의그룹(화면);
+      expect(그룹, `${화면}: 「무대는 …」이라 적었는데 이 화면이 여는 그룹을 못 찾았다`).toBeTruthy();
+      잰것++;
+      const 실제 = 판[그룹!] ?? [];
+      if (적힌.join("·") !== 실제.join("·")) 어긋남.push(`${화면}: 적힌 ${적힌.join("·")} ≠ 실제 ${실제.join("·")}`);
+    }
+    expect(잰것, "「무대는 …」이라 적은 화면을 하나도 못 찾았다 — 이 시험이 통째로 헛돈다").toBeGreaterThanOrEqual(7);
+    expect(어긋남, "허브 사유의 무대 목록이 실제 판과 다르다 — 판을 늘리거나 지웠으면 이 줄도 함께 고칠 것:\n  " + 어긋남.join("\n  ")).toEqual([]);
   });
 });
