@@ -10,9 +10,10 @@
 import type { Express } from "express";
 import type { WebSocketServer } from "ws";
 import { authMiddleware } from "../auth/auth";
+import type { GijoUser } from "../auth/users";
 import { db } from "../db";
 import { todayLocal } from "../util/date";
-import { 고칠것요약, 고칠것최근 } from "./fixboard";
+import { 고칠것요약, 고칠것최근, 기간정리 } from "./fixboard";
 
 export interface LlmActivityEvent {
   // search=RAG 조회(hybridSearch — 4개 검색 경로 공용 지점) · guard=입구 검사(gateway.gateUserInput)
@@ -148,7 +149,9 @@ export function registerLlmActivityRoutes(app: Express): void {
   // AI 팀 감독(2026-08-20 ②) — 기간별 에이전트 일지표. 원천은 llm_activity_daily 하나
   // (도입일부터 축적 — 호출·응답·오류 전부. 원천이 하나라 숫자가 서로 어긋날 길이 없다).
   app.get("/api/aiteam/supervision", authMiddleware, (req, res) => {
-    const days = Math.min(90, Math.max(1, Number(req.query.days) || 1));
+    // ⚠ 기간 정리는 fixboard.기간정리 하나가 한다(결재판과 같은 잣대 — 두 창구가 다르게 자르면
+    //   같은 「7일」이 다른 기간을 가리킨다). 이 창구의 기본 1일·최대 90일은 그대로다.
+    const days = 기간정리(req.query.days, 1, 90);
     // 최근 오류 1줄(에이전트별) — 인메모리 최근 200건에서. 재시작하면 비는 것이 정직한 한계
     // (메시지 원문은 집계 테이블에 안 남긴다 — 개수는 daily가 영속으로 담당).
     const recentErrors: Record<string, { detail: string; timestamp: number }> = {};
@@ -163,10 +166,18 @@ export function registerLlmActivityRoutes(app: Express): void {
     //   ⚠ LlmActivityEvent.kind 유니언은 안 건드린다 — 「고칠 것」은 실시간 이벤트가 아니라
     //     사람이 누른 표라 애초에 그 스트림에 실을 것이 아니다(wiringcontract.test 글자 감시).
     //   ⚠ 최근 5줄에는 답 본문·인용 조각을 안 싣는다 — 이 창구는 등급 게이트 밖이다.
+    //   ⚠ **질문 원문도 결재판을 볼 수 있는 사람에게만** 나간다(2026-09-07 검토관 honesty·wiring
+    //     [중간]). 이 창구는 authMiddleware만이라, 결재판(GET /api/answer-feedback · admin)에서
+    //     403을 받은 담당자가 여기서 남의 질문 앞 40자를 그대로 읽고 있었다 — 같은 원장의 글을
+    //     옆문으로 내주는 반쪽 수리였다. 못 보는 사람에겐 자리표(fixboard.질문가림)가 간다:
+    //     **가렸다는 사실 자체는 숨기지 않는다.** 건수·갈래·상태는 내용이 아니라 신호라 그대로 간다.
+    //     (창구를 통째로 admin으로 닫지 않는 이유: 감독 화면은 담당자도 보는 화면이라, 여기서
+    //      admin을 걸면 「고칠 것」 칸이 아니라 감독 카드 전체가 담당자에게서 사라진다.)
+    const 결재판가능 = (req as typeof req & { user?: GijoUser }).user?.role === "admin";
     res.json({
       days, calls: chatCallsByAgent(days), daily: activityDaily(days), recentErrors,
       citeReasons: citeReasonsDaily(days),
-      fixboard: { ...고칠것요약(days), recent: 고칠것최근(days, 5) },
+      fixboard: { ...고칠것요약(days), recent: 고칠것최근(days, 5, 결재판가능) },
     });
   });
 }

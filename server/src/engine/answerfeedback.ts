@@ -24,7 +24,8 @@ import { recordAudit } from "./audit";
 import type { GijoUser } from "../auth/users";
 import {
   고칠것갈래, 고칠것갈래검증, 고칠것갈래라벨, 고칠것요약, 고칠것후보,
-  근거없음값검증, 인용정제, 인용읽기, type 고칠것갈래값, type 인용조각,
+  근거없음정하기, 기간시작, 기간정리, 인용정제, 인용읽기, 지적상태값들, 회귀문항후보상태,
+  type 고칠것갈래값, type 인용조각, type 지적상태값, type 지적종류값,
 } from "./fixboard";
 
 migrate(
@@ -63,7 +64,9 @@ migrate(
    ALTER TABLE answer_feedback ADD COLUMN draftModel TEXT;`
 );
 
-export type FeedbackKind = "wrong" | "missing" | "style";
+// ⚠ 종류·상태 값 집합은 **fixboard가 원천**이다(집계가 「0건인 종류도 칸을 그린다」를 지키려면
+//   잣대 쪽에 값 집합이 있어야 한다). 여기서는 이름만 다시 내보낸다 — 값을 다시 적으면 늙는다.
+export type FeedbackKind = 지적종류값;
 export const FEEDBACK_KIND_LABEL: Record<FeedbackKind, string> = {
   wrong: "틀린 답",
   missing: "못 찾음(있는데 못 찾았다)",
@@ -71,8 +74,8 @@ export const FEEDBACK_KIND_LABEL: Record<FeedbackKind, string> = {
 };
 
 /** 상태 넷. resolved = **고쳐서 닫았다**(문서를 올렸거나 답을 고쳤다) — promoted도 dismissed도 아니다. */
-export type FeedbackStatus = "open" | "promoted" | "dismissed" | "resolved";
-export const FEEDBACK_STATUSES: readonly FeedbackStatus[] = ["open", "promoted", "dismissed", "resolved"];
+export type FeedbackStatus = 지적상태값;
+export const FEEDBACK_STATUSES: readonly FeedbackStatus[] = 지적상태값들;
 
 /**
  * 감사 기록에 적을 문구 — **삼항이 아니라 표다.**
@@ -82,7 +85,8 @@ export const FEEDBACK_STATUSES: readonly FeedbackStatus[] = ["open", "promoted",
 export const FEEDBACK_STATUS_AUDIT: Record<FeedbackStatus, string> = {
   open: "미처리로 되돌림",
   promoted: "회귀 문항으로 편입",
-  dismissed: "문항 감으로는 부적합",
+  // ⚠ dismissed는 두 원장을 한꺼번에 닫는 유일한 값이다 — 문구도 그렇게 적는다(fixboard.고칠것열림).
+  dismissed: "문항 감으로는 부적합(고칠 것도 없음으로 닫음)",
   resolved: "고쳐서 닫음(처리 완료)",
 };
 
@@ -138,13 +142,17 @@ export function recordFeedback(e: {
   const q = e.question.trim();
   if (!q) throw new Error("어떤 질문에 대한 지적인지가 필요합니다");
   // ⚠ 클라가 보낸 값을 그대로 믿지 않는다 — 값 집합·상한 판정은 fixboard 한 곳이 한다.
-  const noev = 근거없음값검증(e.noev);
+  //   ★ 근거없음은 **답 글자와 대조**한다: 답에 배너가 있으면 그 값이 이긴다(클라 주장보다
+  //     서버가 본 사실이 앞선다). 배너가 없는 답에서만 클라 값을 받는다 — 배너억제 갈래는
+  //     저장된 글자에 흔적이 없어 원리상 대조할 수 없다(fixboard.근거없음정하기 주석).
+  const answer = (e.answer ?? "").slice(0, 4000);
+  const noev = 근거없음정하기(e.noev, answer);
   const quotes = 인용정제(e.quotes);
   const row = {
     at: Date.now(),
     kind: e.kind,
     question: q.slice(0, 2000),
-    answer: (e.answer ?? "").slice(0, 4000),
+    answer,
     note: e.note?.trim() || null,
     expected: e.expected?.trim() || null,
     screen: e.screen ?? null,
@@ -175,11 +183,19 @@ function 행풀기(r: FeedbackRow): AnswerFeedback {
  * 목록 — 화면이 보는 최근 200건. **세는 데는 쓰지 않는다**(LIMIT이 있어 201건째부터 숫자가 굳는다.
  * 「200 포화, 실제 1578」이 이 저장소에서 실제로 난 사고다). 집계는 fixboard.고칠것요약이 한다.
  */
-export function listFeedback(days = 7, status?: FeedbackStatus, fixkind?: 고칠것갈래값 | "unclassified"): AnswerFeedback[] {
-  const since = Date.now() - days * 86400000;
+export function listFeedback(
+  days = 7,
+  status?: FeedbackStatus | readonly FeedbackStatus[],
+  fixkind?: 고칠것갈래값 | "unclassified",
+): AnswerFeedback[] {
+  const since = 기간시작(days); // ⚠ 굴림 24시간이 아니다 — 감독 화면 daily와 같은 달력을 쓴다
   const 조건: string[] = ["at >= ?"];
   const 인자: unknown[] = [since];
-  if (status) { 조건.push("status = ?"); 인자.push(status); }
+  const 상태들 = typeof status === "string" ? [status] : status;
+  if (상태들?.length) {
+    조건.push(`status IN (${상태들.map(() => "?").join(",")})`);
+    인자.push(...상태들);
+  }
   if (fixkind === "unclassified") 조건.push("fixkind IS NULL");
   else if (fixkind) { 조건.push("fixkind = ?"); 인자.push(fixkind); }
   const rows = db
@@ -198,8 +214,11 @@ export function getFeedback(id: number): AnswerFeedback | null {
  * 답 글자로 GROUP BY 한다: 새 칸을 만들지 않고, 이 창에 든 전부를 센다(LIMIT 없음).
  */
 export function sameAnswerCounts(days = 7): Map<string, number> {
-  const since = Date.now() - days * 86400000;
-  const rows = db.prepare("SELECT answer, COUNT(*) AS n FROM answer_feedback WHERE at >= ? GROUP BY answer")
+  const since = 기간시작(days);
+  // ⚠ 답이 빈 지적은 **묶지 않는다.** 접수 라우트가 answer를 안 받아도 200이라, 빈 답들이
+  //   빈 문자열 하나로 묶여 서로 무관한 지적에 「같은 답 3건」이라는 거짓 숫자가 붙었다
+  //   (2026-09-07 검토관 wiring 실측: 질문 셋이 전부 sameAnswer=3).
+  const rows = db.prepare("SELECT answer, COUNT(*) AS n FROM answer_feedback WHERE at >= ? AND TRIM(answer) <> '' GROUP BY answer")
     .all(since) as { answer: string; n: number }[];
   return new Map(rows.map((r) => [r.answer, r.n]));
 }
@@ -271,8 +290,17 @@ export function deleteFeedback(id: number, actor: string | undefined): { ok: tru
   return { ok: true };
 }
 
-/** 주간 요약 — 계획서 중-1의 "주간 수집". 챗봇·보고에 그대로 쓴다. */
-export function feedbackSummaryText(days = 7): string {
+/**
+ * 주간 요약 — 계획서 중-1의 "주간 수집". 챗봇·보고에 그대로 쓴다.
+ *
+ * ⚠ 상세(남이 낸 질문·담당자 사유 8줄)는 **기본이 꺼짐**이다(2026-09-07 검토관 wiring).
+ *   같은 라운드가 결재판을 admin으로 닫았는데, 이 글을 그대로 내보내는 대화 도구
+ *   (answer_feedback_status)는 누구나 부를 수 있어 **한 원장에 자물쇠가 두 벌**이었다.
+ *   도구 쪽에 역할을 거는 것이 정석이나 그 파일(registry.ts)은 이 라운드의 소유가 아니라,
+ *   **기본값을 안전한 쪽으로** 돌린다 — 건수·갈래는 신호라 누구에게나 나간다.
+ *   (registry.ts에 requiredRole:"admin"을 다는 일은 인계 목록에 적었다.)
+ */
+export function feedbackSummaryText(days = 7, 상세 = false): string {
   // ★ 숫자는 전부 fixboard.고칠것요약에서 온다 — listFeedback으로 세면 201건째부터 굳는다.
   //   목록(아래 미처리 8줄)만 listFeedback에서 가져온다(그건 세는 게 아니라 보여 주는 것).
   const s = 고칠것요약(days);
@@ -282,17 +310,21 @@ export function feedbackSummaryText(days = 7): string {
       "답이 틀렸거나 못 찾았을 때 알려주시면 그 질문이 회귀 검사 문항 후보가 됩니다 — 같은 실수가 다시 나가지 않게 하는 가장 빠른 길입니다.",
     ].join("\n");
   }
-  const open = listFeedback(days, "open");
+  const open = 상세 ? listFeedback(days, "open") : [];
   const 갈래줄 = s.kinds
     .filter((k) => k.total > 0)
     .map((k) => `${고칠것갈래라벨[k.fixkind]} ${k.total}건(열림 ${k.open})`)
     .join(" · ");
   return [
-    `최근 ${days}일 답변 지적 ${s.total}건 (미처리 ${s.open}건)`,
+    // ⚠ 「미처리」가 아니라 「아직 고칠 것」이다 — 이 숫자는 open+promoted를 센다(회귀 문항으로
+    //   옮겨 적은 것은 처리했지만 **고친 것은 아니다**). 이름과 잣대를 맞춰 둔다.
+    `최근 ${days}일 답변 지적 ${s.total}건 (아직 고칠 것 ${s.open}건)`,
     `종류별: ${Object.entries(s.byKind).map(([k, n]) => `${FEEDBACK_KIND_LABEL[k as FeedbackKind] ?? k} ${n}`).join(" · ")}`,
     `고칠 것 갈래: ${갈래줄}`,
     "",
-    ...open.slice(0, 8).map((r) => `  · [${FEEDBACK_KIND_LABEL[r.kind]}] "${r.question.slice(0, 50)}" — ${r.note ?? "사유 미기재"}`),
+    ...(상세
+      ? open.slice(0, 8).map((r) => `  · [${FEEDBACK_KIND_LABEL[r.kind]}] "${r.question.slice(0, 50)}" — ${r.note ?? "사유 미기재"}`)
+      : ["질문·사유 원문은 결재판(관리자)에서 봅니다 — 여기서는 건수만 알려 드립니다."]),
     "",
     "이 지적들은 회귀 검사 문항 후보로 모아 둡니다(자동 편입은 하지 않습니다 — 사람이 검토합니다).",
   ].join("\n");
@@ -302,7 +334,11 @@ export function feedbackSummaryText(days = 7): string {
  * 평가 게이트 문항 초안 — 지적을 그대로 문항 꼴로 옮긴다.
  * expect는 담당자가 적어 준 정답에서만 만든다(없으면 비운다) — 우리가 지어내면 지적의 뜻이 바뀐다.
  * 편입은 사람이 tools/evalgate/cases/*.json에 옮기며 결정한다.
- * ⚠ open만이다 — 닫은 지적(resolved 포함)이 회귀 문항으로 되살아나면 안 된다.
+ * ⚠ 상태는 fixboard.회귀문항후보상태 하나가 정한다 — open(아직 고칠 것) + resolved(고쳤으니
+ *   지켜야 할 것). 2026-09-07에 뒤집었다: open만 내던 때는 **고친 지적일수록 회귀셋에서
+ *   사라졌고**, 그건 「지적은 회귀셋으로 흡수」(계획서 중-1)와 정반대였다. 정답(expected)은
+ *   보통 닫을 때 적히므로, 그때가 문항으로서 가장 쓸모 있는 순간이다.
+ *   promoted는 안 낸다(이미 옮겨 적었다) · dismissed도 안 낸다(문항 감이 아니라고 했다).
  */
 export function feedbackAsGateCases(days = 30): {
   id: string;
@@ -311,7 +347,7 @@ export function feedbackAsGateCases(days = 30): {
   screen?: string;
   _출처: string;
 }[] {
-  return listFeedback(days, "open")
+  return listFeedback(days, 회귀문항후보상태)
     .filter((r) => r.kind !== "style") // 말투 지적은 게이트 문항 감이 아니다(품질은 다른 축에서 본다)
     .map((r) => ({
       id: `feedback-${r.id}`,
@@ -356,28 +392,84 @@ export function 초안프롬프트(r: AnswerFeedback): string {
   ].filter(Boolean).join("\n");
 }
 
+/** 관문 한 번의 결과 중 **우리가 쓰는 세 칸**만 본다 — gateway를 정적으로 물지 않기 위해서다. */
+type 관문판정 = (text: string, source: "chat") => { allowed: boolean; text: string; message?: string };
+
+/**
+ * 초안 재료를 **관문(가드레일)에 태운다** — 개인정보를 가리고, 해로운 글이면 만들지 않는다.
+ *
+ * ⚠ 왜 필요한가(2026-09-07 검토관 wiring): 초안은 chat({trusted:true})로 부른다. 그런데 그
+ *   프롬프트의 재료(note·expected·인용)는 **접수 창구**(POST /api/answer-feedback ·
+ *   authMiddleware만 · 누구나)로 들어온 자유입력이라 게이트를 한 번도 안 지난 글이다.
+ *   llm.ts가 「사용자 입력을 처음 받는 경로에서는 trusted를 켜지 말라」고 못 박은 계약을
+ *   정면으로 어기고 있었다 — 실측: 사유에 적은 주민등록번호가 프롬프트에 원문 그대로 실렸다.
+ * ⚠ 접수 때가 아니라 **여기서** 태운다: 원장에는 담당자가 쓴 말이 그대로 남아야 하고
+ *   (expected는 회귀 문항의 정답이 된다 — 가리면 문항이 망가진다), 위험은 「LLM에 닿는 순간」에
+ *   생긴다. 그래서 저장은 원문, LLM에 넘기는 사본만 가린 것이다.
+ * ⚠ gateUserInput이 아니라 **Inner**를 쓴다: ① 이건 사람이 처음 말을 넣는 자리가 아니라
+ *   저장된 글을 LLM에 넘기기 직전의 검사라 guard 실동작 신호를 부풀리면 안 되고(dispatcher의
+ *   설명 도구가 같은 이유로 Inner를 쓴다 — gateway.ts 머리글) ② 관문 입구 등록부
+ *   (gatewaypii 「정확히 이 5곳」)는 **사용자 입구**의 목록이어야 한다. 이 경로가 관문을
+ *   빠져나가지 않는지는 이 파일의 짝 시험(answerfeedback.test ⓠ)이 소스로 지킨다.
+ */
+export function 초안재료가림(
+  r: AnswerFeedback,
+  태우기: 관문판정,
+): { 재료: AnswerFeedback } | { 막힘: string } {
+  let 막힘: string | null = null;
+  const 태워서 = <T extends string | null>(t: T): T => {
+    if (!t) return t;
+    const g = 태우기(t, "chat");
+    if (!g.allowed && !막힘) 막힘 = g.message || "입구 검사에 걸리는 글이 들어 있습니다";
+    return g.text as T;
+  };
+  const 재료: AnswerFeedback = {
+    ...r,
+    question: 태워서(r.question),
+    answer: 태워서(r.answer),
+    note: 태워서(r.note),
+    expected: 태워서(r.expected),
+    quotes: (r.quotes ?? []).map((q) => ({ ...q, text: 태워서(q.text) })),
+  };
+  return 막힘 ? { 막힘 } : { 재료 };
+}
+
 /**
  * 수정 초안 만들기 — **담당자가 누를 때만** 돈다(동기).
  *
  * ⚠ 인용 조각이 0개면 **만들지 않는다.** 재료 없이 쓰면 지어내는 것이고, 그건 이 표가 잡으려는
  *   바로 그 해악이다. 「초안 없음」이라 말하고 아무것도 저장하지 않는다.
  * ⚠ 출력은 falseclaim 출구(거짓완료차단)를 지난다 — 초안이 「수정했습니다」라 말하면 안 된다.
+ * ⚠ **누른 사람의 눈으로 열람 등급을 본다**(2026-09-07 검토관 honesty [높음]). 이 검사가 없으면
+ *   못 볼 등급의 문서를 인용한 지적에서 초안을 눌러 **그 문서 내용을 초안 칸으로 받아낼 수**
+ *   있었다 — 목록은 가리면서 초안은 만들어 주는 반쪽 게이트였다. req를 **필수 인자**로 둔 것이
+ *   그 방지책이다(빠뜨리면 컴파일이 안 된다).
  * ⚠ llm.ts는 **동적으로** 부른다(0줄 편집). 정적 import를 더하면 이 파일을 import하는 시험이
  *   전부 llm 목의 표면을 따라가야 한다(2026-09-05 noevidence 이관 때 66건이 그렇게 빨개졌다).
  */
-export async function buildFeedbackDraft(id: number): Promise<{ draft: string | null; reason?: string; draftModel?: string }> {
+export async function buildFeedbackDraft(id: number, req: Request): Promise<{ draft: string | null; reason?: string; draftModel?: string }> {
   const r = getFeedback(id);
   if (!r) return { draft: null, reason: "해당 지적을 찾지 못했습니다" };
   if (!r.quotes?.length) return { draft: null, reason: "초안 없음 — 이 답이 인용한 사내 자료가 없어 근거로 쓸 재료가 없습니다" };
+  const { 열람불가공용 } = await import("./memory.js");
+  if (r.quotes.some((q) => 열람불가공용(q.documentId, req))) {
+    return { draft: null, reason: "초안 없음 — 이 답이 인용한 사내 자료 중 열람 등급이 달라 보실 수 없는 것이 있습니다" };
+  }
+  const { gateUserInputInner } = await import("./gateway.js");
+  const 태운 = 초안재료가림(r, gateUserInputInner);
+  if ("막힘" in 태운) return { draft: null, reason: `초안 없음 — ${태운.막힘}` };
   const agentId = 초안팀원(r.fixkind, r.kind);
   const { chat } = await import("./llm.js");
   const { getAgentModel } = await import("./agents.js");
   const { 거짓완료차단 } = await import("./falseclaim.js");
   const raw = await chat({
     agentId,
-    message: 초안프롬프트(r),
+    // ★ 원문(r)이 아니라 **관문을 지난 사본**을 넘긴다 — 원문을 넘기면 위 가림이 장식이 된다.
+    message: 초안프롬프트(태운.재료),
     // remember:false(기본) — RAG·대화 이력을 켜지 않는다. **재검색 금지**가 이 한 줄이다.
-    trusted: true, // 이미 저장된 글로 우리가 조립한 내부 프롬프트다(자기차단 함정 방지)
+    // ★ 재료는 바로 위에서 **관문을 지났다**(초안재료가림) — 여기부터가 우리가 조립한 내부
+    //   프롬프트라 trusted가 옳다(자기차단 함정 방지). 관문을 빼면 이 줄이 계약 위반이 된다.
+    trusted: true,
     noLearn: true, // 초안 문답이 학습 후보함에 쌓이면 실사용 분포가 오염된다
     maxTokens: 700,
   });
@@ -395,19 +487,24 @@ export async function buildFeedbackDraft(id: number): Promise<{ draft: string | 
  * ⚠ admin으로 창구를 닫아도 끝이 아니다 — **개인 문서·기밀 등급은 admin 위가 아니다.**
  *   quotes에 사내 문서 원문이 실리므로, 그대로 내보내면 결재판이 새 「직접-열람 창구」가 된다.
  * ⚠ 잣대는 memory.열람불가공용 **하나**다(여기서 등급을 다시 계산하지 않는다).
- * ⚠ 못 볼 조각이 하나라도 있으면 **답 본문도 가린다** — 답은 그 조각을 근거로 쓴 글이라
- *   조각만 떼면 같은 내용이 답에 남는다. 모르면 감춘다(fail-closed).
+ * ⚠ 못 볼 조각이 하나라도 있으면 **답 본문도, 초안도 가린다** — 답은 그 조각을 근거로 쓴 글이고
+ *   초안은 그 조각만 근거로 쓰라고 시켜 만든 글이라(초안프롬프트 「조각 밖 사실 금지」),
+ *   조각만 떼면 같은 내용이 두 칸에 그대로 남는다. 모르면 감춘다(fail-closed).
+ *   ⚠ 초안을 빠뜨렸던 것이 2026-09-07 검토관 honesty [높음] 적발이다 — 가린 조각의 문장이
+ *     draft 칸으로 그대로 나갔다("대외비 임금표에 따르면 3년입니다").
  */
 async function 등급가림(rows: AnswerFeedback[], req: Request): Promise<AnswerFeedback[]> {
   if (!rows.length) return rows;
   const { 열람불가공용 } = await import("./memory.js");
   return rows.map((r) => {
-    const 막힘 = (r.quotes ?? []).filter((q) => 열람불가공용(q.documentId, req));
-    if (!막힘.length) return r;
+    const 볼수있는 = (r.quotes ?? []).filter((q) => !열람불가공용(q.documentId, req));
+    if (볼수있는.length === (r.quotes ?? []).length) return r;
     return {
       ...r,
       answer: "(열람 등급이 달라 이 답의 본문과 근거 조각을 가렸습니다)",
-      quotes: (r.quotes ?? []).filter((q) => !열람불가공용(q.documentId, req)),
+      quotes: 볼수있는,
+      draft: null,       // 초안은 그 조각들을 다시 쓴 글이다 — 함께 가린다
+      draftModel: null,  // 초안이 없는데 작성자만 남으면 화면이 「초안 있음」으로 읽는다
       redacted: true,
     };
   });
@@ -447,7 +544,9 @@ export function registerAnswerFeedbackRoutes(app: Express): void {
   // ★ 조회는 **admin**이다(2026-09-07). 응답에 답 4,000자·질문 2,000자에 더해 **사내 문서 원문
   //   조각**까지 실린다 — authMiddleware만으로는 등급 게이트 밖의 직접-열람 창구가 된다.
   app.get("/api/answer-feedback", authMiddleware, adminMiddleware, asyncRoute(async (req, res) => {
-    const days = Math.min(Math.max(Number(req.query.days ?? 7), 1), 365);
+    // ⚠ 기간 정리는 fixboard.기간정리 하나가 한다 — 손으로 Math.min/max를 쓰면 NaN이 새고,
+    //   그러면 200과 함께 「지적이 없습니다」라고 **거짓 단언**을 한다(2026-09-07 검토관 실측).
+    const days = 기간정리(req.query.days, 7);
     const status = FEEDBACK_STATUSES.includes(String(req.query.status ?? "") as FeedbackStatus)
       ? (String(req.query.status) as FeedbackStatus) : undefined;
     const q참 = String(req.query.fixkind ?? "");
@@ -457,7 +556,8 @@ export function registerAnswerFeedbackRoutes(app: Express): void {
       listFeedback(days, status, fixkind).map((r) => ({ ...r, sameAnswer: 셈.get(r.answer) ?? 1 })),
       req as Request
     );
-    res.json({ days, entries, summary: feedbackSummaryText(days), fixboard: 고칠것요약(days) });
+    // 상세(질문·사유 8줄)는 이 창구에서만 켠다 — admin이 지나온 문이다.
+    res.json({ days, entries, summary: feedbackSummaryText(days, true), fixboard: 고칠것요약(days) });
   }));
 
   // 상태 변경은 admin — 지적을 회귀 문항으로 편입할지 접을지는 품질 판단이다.
@@ -518,7 +618,7 @@ export function registerAnswerFeedbackRoutes(app: Express): void {
       res.status(404).json({ error: "해당 지적을 찾지 못했습니다" });
       return;
     }
-    res.json(await buildFeedbackDraft(id));
+    res.json(await buildFeedbackDraft(id, req as Request));
   }));
 
   // 무르기 — 접수 60초 안·본인만. 그 뒤로는 결재판에서 dismissed로 닫는다.
@@ -531,7 +631,6 @@ export function registerAnswerFeedbackRoutes(app: Express): void {
   // 게이트 문항 초안 내보내기 — 개발 쪽에서 tools/evalgate/cases에 옮길 때 쓴다.
   // ⚠ admin이다 — 질문·담당자 사유·정답이 그대로 실린다(위 목록과 같은 등급의 글).
   app.get("/api/answer-feedback/gate-cases", authMiddleware, adminMiddleware, (req, res) => {
-    const days = Math.min(Math.max(Number(req.query.days ?? 30), 1), 365);
-    res.json({ cases: feedbackAsGateCases(days) });
+    res.json({ cases: feedbackAsGateCases(기간정리(req.query.days, 30)) });
   });
 }
