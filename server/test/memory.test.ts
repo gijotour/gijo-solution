@@ -336,3 +336,48 @@ describe("categorizeDocument의 LLM 게이트 — 신호 0이면 묻지 않는�
     expect(categorizeByRules("회의메모.txt", "다음 회의는 8월 첫 주로 예정. 참석자 명단은 추후 공지.")).toBeNull();
   });
 });
+
+// ★ 판정을 통과한 조각에는 제어문자가 남지 않는다 (2026-09-07 검토관 적발 ④)
+//
+// 같은 날 오전 수리는 제어문자 걷기를 **추출기 꼬리 한 쌍**(dataset.ts 파이썬꼬리정규화 ·
+// extract_doc.py main())에만 걸었다. PDF·오피스는 그 길을 지나지만 **텍스트 계열**(.md·.txt·
+// .csv·.log·.json·.yaml)은 dataset.ts에서 base64를 utf8로 바로 풀어 **일부러 그 길을 안 지난다.**
+// 그런데 판정 완화는 그 경로에도 그대로 걸려서, 제어문자가 낱말 구분자인 텍스트 파일이
+// 예전엔 400으로 **거절**되던 것이 이제 **제어문자를 그대로 단 채 저장**된다 —
+// 시끄러운 실패가 조용한 오염으로 바뀐 것이라 더 나쁘다.
+//
+// 걷어내는 자리는 **판정 뒤**여야 한다(계약). 판정 전에 걷으면 2026-08-08 사고 표본(진짜 PDF
+// 바이트)이 어느 규칙에도 안 걸려 거절→통과로 뒤집힌다. 그래서 chunkText의 **필터 통과분**에 건다.
+describe("조각에 제어문자를 남기지 않는다 — 텍스트 계열 인입 경로 (2026-09-07)", () => {
+  const 제어 = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+  // ⚠ 줄마다 내용을 달리한다 — 같은 줄을 3번 이상 반복하면 cleanExtractedText가 「반복 머리글」로
+  //   보고 통째로 지운다(그러면 조각이 0이 되어 시험이 아무것도 안 지킨다. 실제로 한 번 그랬다).
+  const 줄 = (i: number) => `A-${String(i).padStart(4, "0")}\u001fweb-${i}\u001f김보안\u001fCVE-2026-${1000 + i}\u001f높음`;
+
+  it("제어문자가 필드 구분자인 CSV도 조각에는 제어문자가 없다", () => {
+    const csv = ["자산ID\u001f호스트명\u001f담당자\u001f취약점\u001f등급",
+      ...Array.from({ length: 40 }, (_, i) => 줄(i))].join("\n");
+    const chunks = chunkText(csv);
+    expect(chunks.length, "조각이 0이면 반입 자체가 막힌 것이라 이 시험이 헛돈다").toBeGreaterThan(0);
+    for (const c of chunks) expect(제어.test(c), `제어문자가 남았다: ${JSON.stringify(c.slice(0, 40))}`).toBe(false);
+    expect(chunks.join(" "), "낱말이 붙었다 — 지우지 말고 공백으로 바꿔야 한다").toContain("A-0000 web-0");
+  });
+
+  it("낱말 사이가 BEL인 추출본도 마찬가지 — 지우지 않고 공백으로 바꾼다", () => {
+    const BEL = "\u0007";
+    const doc = Array.from({ length: 24 }, (_, i) =>
+      "제" + (i + 1) + "조" + BEL + "사이버" + BEL + "사기로" + BEL + "인한" + BEL + "피해" + BEL + "예방" + BEL +
+      "및" + BEL + "구제에" + BEL + "관한" + BEL + "법률의" + BEL + "적용" + BEL + "범위를" + BEL + "정한다.").join("\n");
+    const chunks = chunkText(doc);
+    expect(chunks.length).toBeGreaterThan(0);
+    for (const c of chunks) expect(제어.test(c)).toBe(false);
+    expect(chunks.join(" ")).toContain("사이버 사기로 인한");
+  });
+
+  it("탭·개행은 그대로 둔다 — 표·목록 구조가 살아야 한다", () => {
+    const 표 = ["항목\t값", ...Array.from({ length: 30 }, (_, i) => `포트${i}\t${443 + i}`)].join("\n");
+    const chunks = chunkText(표);
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks.join("\n"), "탭이 공백으로 바뀌면 표가 무너진다").toContain("포트1\t444");
+  });
+});

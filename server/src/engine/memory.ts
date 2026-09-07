@@ -12,7 +12,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { embed } from "./embedding"; // 잎(화살 #12) — llm 전체를 물지 않는다
 import { chat, setRagProvider } from "./llm";
-import { isBinaryLikeChunk } from "./ragsanitize";
+import { isBinaryLikeChunk, stripLayoutControls } from "./ragsanitize";
 import { 메타걷은조각 } from "./metaleak"; // 잎(import 없는 작은 파일) — 화살이 늘지 않는다
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
@@ -732,8 +732,24 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   // 잡음만 남은 초단문 청크 제거 — 단, 문서 자체가 짧으면(전부 걸러지면) 원문을 보존한다.
   // 바이너리꼴 조각(PDF 압축 스트림 등)도 여기서 거른다(2026-08-09) — 인입돼 봤자 검색
   // 상위를 차지해 진짜 근거를 밀어낸다(실사고: WizCLM 비교 1순위가 base64 덩어리).
-  const filtered = chunks.map(stripLoneSurrogates).filter((c) => c.length >= 20 && !isBinaryLikeChunk(c));
-  if (filtered.length === 0 && cleaned.trim().length > 0 && !isBinaryLikeChunk(cleaned)) return [sliceSafe(cleaned.trim(), 0, size)];
+  //
+  // ★ 판정을 **통과한 뒤** 제어문자를 공백으로 되돌린다(2026-09-07 검토관 적발④).
+  //   추출기 꼬리(dataset.ts 파이썬꼬리정규화 · extract_doc.py main())가 이미 걷어 주지만,
+  //   **텍스트 계열**(.md·.txt·.csv·.log·.json·.yaml)은 dataset.ts가 base64를 utf8로 바로 풀어
+  //   그 길을 안 지난다. 그런데 판정기 완화는 그 경로에도 걸려서, 제어문자가 낱말 구분자인
+  //   텍스트 파일이 예전엔 400으로 **거절**되던 것이 이제 **제어문자를 그대로 단 채 저장**된다 —
+  //   시끄러운 실패가 조용한 오염으로 바뀐다. 여기가 모든 인입이 반드시 지나는 목이다.
+  // ⚠ **판정 앞이 아니라 뒤다.** 앞에서 걷으면 2026-08-08 사고 표본(진짜 PDF 바이트)이 어느
+  //   규칙에도 안 걸려 거절→통과로 뒤집힌다(실측). 순서가 계약이다.
+  // ⚠ 공백을 **압축하지는 않는다** — `[ \t]+ → " "`까지 하면 자리 맞춘 표가 통째로 무너진다.
+  //   압축은 추출기 꼬리의 몫이고, 여기서는 제어문자만 공백으로 되돌린다.
+  const filtered = chunks
+    .map(stripLoneSurrogates)
+    .filter((c) => c.length >= 20 && !isBinaryLikeChunk(c))
+    .map(stripLayoutControls);
+  if (filtered.length === 0 && cleaned.trim().length > 0 && !isBinaryLikeChunk(cleaned)) {
+    return [stripLayoutControls(sliceSafe(cleaned.trim(), 0, size))];
+  }
   return filtered;
 }
 

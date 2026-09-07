@@ -203,7 +203,7 @@ describe("날것 바이너리 — 저장소 73% 오염의 실제 꼴(2026-08-08 
 // 글자가 아닌 것 같습니다」로 400이 났다. 그런데 그 PDF는 **정상적으로 읽힌 문서**였다 —
 // unpdf(pdf.js)가 13,834자를 제대로 뽑았고, 다만 낱말 사이가 공백이 아니라 **BEL(U+0007)**
 // 이었다. 폰트의 ToUnicode CMap이 공백 글리프를 제어문자로 매핑한 PDF에서 실제로 일어난다
-// (test/fixtures/ctrl-sep.pdf가 그 꼴을 진짜 PDF로 재현한다 — 306자 중 제어문자 45개·14.7%).
+// (test/fixtures/ctrl-sep.pdf가 그 꼴을 진짜 PDF로 재현한다 — 5,631자 중 제어문자 891개·15.82%).
 //
 // 옛 판정기는 「제어문자 2% 초과 = 바이너리」 한 줄이라 이 문서를 통째로 거절했다. 그 규칙은
 // 2026-08-08 사고(저장소 조각 73%가 PDF 바이트)를 막으려고 만든 것이라 **없애면 안 된다.**
@@ -259,5 +259,90 @@ describe("낱말 구분자가 제어문자인 추출본 (2026-09-07 — 반입 4
 
   it("U+FFFD는 걷지 않는다 — 걷으면 디코딩 실패의 증거가 사라진다", () => {
     expect(stripLayoutControls("깨진\uFFFD자리")).toContain("\uFFFD");
+  });
+});
+
+// ★ 판정기 완화가 **열어 버린 문**을 닫는다 (2026-09-07 병렬 검토관 적발 ①②)
+//
+// 2026-09-07 오전에 「제어문자 2% 초과 = 바이너리」를 「걷어낸 나머지의 글자율 < 0.8」로 갈랐다.
+// 낱말 사이가 BEL인 관공서 PDF를 살리려는 수리였고 그건 맞았다. 그런데 **남은 몸통이 얼마나
+// 되는지에 하한이 없어서**, 글자 사이사이에 바이트가 낀 것까지 「글」이 됐다.
+//
+//   · UTF-16LE로 저장된 .txt(윈도우 이벤트 뷰어 「텍스트로 저장」의 기본 인코딩)를 utf8로 읽으면
+//     낱말이 아니라 **글자마다** NUL로 갈린다. 걷어내면 글자율 92%라 통과해 버린다.
+//   · base64 덩어리에 제어문자가 일정 간격으로 끼면 글자율 97%로 통과한다.
+//
+// 두 부류의 공통점은 「구분자가 낱말을 가르지 않는다」는 것이다. 그래서 잣대를 둘 더 둔다.
+describe("제어문자가 낱말이 아니라 **글자·부호**를 가르면 글이 아니다 (검토관 적발 ①②)", () => {
+  const 이벤트 = ["Log Name: Security", "Source: Microsoft-Windows-Security-Auditing", "Event ID: 4624",
+    "Task Category: Logon", "Level: Information", "Keywords: Audit Success",
+    "An account was successfully logged on.", "Logon Type: 3", "Account Name: gijo-svc",
+    "Workstation Name: DESKTOP-4QPLVNC", "Source Network Address: 10.8.0.11"].join("\r\n") + "\r\n";
+
+  it("UTF-16LE 이벤트 로그를 utf8로 읽은 것은 막는다 — 낱말이 아니라 글자가 갈린다", () => {
+    const 잘못읽음 = Buffer.from(이벤트.repeat(6), "utf16le").toString("utf8");
+    // 걷어낸 뒤 글자율만 보면 92%라 「글」로 새어 나간다 — 그게 적발①이었다.
+    expect(isBinaryLikeChunk(잘못읽음), "UTF-16LE 오독이 NUL을 단 채 지식이 된다").toBe(true);
+    // 같은 로그를 제대로(UTF-8) 주면 당연히 글이다 — 대조군이 없으면 「전부 막기」로도 초록이 된다.
+    expect(isBinaryLikeChunk(이벤트.repeat(6)), "대조군까지 막으면 그건 수리가 아니라 회귀다").toBe(false);
+  });
+
+  it("BOM이 없어도 같다 — BOM은 첫 조각에만 있고 나머지 조각엔 없다", () => {
+    const BOM있음 = Buffer.from("\uFEFF" + 이벤트.repeat(6), "utf16le").toString("utf8");
+    const BOM없음 = Buffer.from(이벤트.repeat(6), "utf16le").toString("utf8");
+    expect(isBinaryLikeChunk(BOM있음)).toBe(true);
+    expect(isBinaryLikeChunk(BOM없음), "둘째 조각부터 새어 나가면 막은 게 아니다").toBe(true);
+  });
+
+  it("UTF-16LE 한국어 보고서도 막는다", () => {
+    const 한글 = ("취약점 점검 결과 요약\r\n대상 자산 12대 중 3대에서 원격코드실행 취약점이 확인되었습니다.\r\n조치 기한은 2026-09-30 입니다.\r\n").repeat(8);
+    expect(isBinaryLikeChunk(Buffer.from(한글, "utf16le").toString("utf8"))).toBe(true);
+  });
+
+  it("제어문자를 사이사이 끼운 base64·hex 덩어리를 막는다 — 글자율 97%로 새던 자리", () => {
+    const 끼우기 = (원본: string, n: number) => {
+      let out = "";
+      for (let i = 0; i < 원본.length; i++) { out += 원본[i]; if ((i + 1) % n === 0) out += "\u0000"; }
+      return out;
+    };
+    // 실제 이진 파일의 base64를 흉내 내려면 바이트가 고르게 퍼져야 한다(같은 글자 반복은 base64도 규칙적이다).
+    const 무작위 = Buffer.from(Array.from({ length: 3000 }, (_, i) => (i * 2654435761) % 256)).toString("base64");
+    for (const 간격 of [5, 10, 20]) {
+      expect(isBinaryLikeChunk(끼우기(무작위, 간격)), `base64 1/${간격}이 새어 나갔다`).toBe(true);
+    }
+    const hex = Buffer.from(Array.from({ length: 2000 }, (_, i) => (i * 2654435761) % 256)).toString("hex");
+    expect(isBinaryLikeChunk(끼우기(hex, 8)), "hex 덩어리가 새어 나갔다").toBe(true);
+  });
+
+  it("낱말이 제대로 갈린 추출본은 여전히 글이다 — 새 잣대가 BEL 픽스처를 죽이지 않았다", () => {
+    const BEL = "\u0007";
+    const 한국어 = ("1 /" + BEL + BEL + "사이버" + BEL + "사기로" + BEL + "인한" + BEL + "피해" + BEL + "예방" + BEL +
+      "및" + BEL + "구제에" + BEL + "관한" + BEL + "법률\n제1조(목적)" + BEL + "이" + BEL + "법은" + BEL + "한다.\n").repeat(8);
+    const 영어 = ("The" + BEL + "certificate" + BEL + "lifecycle" + BEL + "automation" + BEL + "platform" + BEL +
+      "renews" + BEL + "expiring" + BEL + "keys.\n").repeat(8);
+    expect(isBinaryLikeChunk(한국어)).toBe(false);
+    expect(isBinaryLikeChunk(영어)).toBe(false);
+  });
+});
+
+// ★ 대체문자(U+FFFD) 한두 개로 **멀쩡한 조각을 통째로 버리지 않는다** (2026-09-07 실측 회귀)
+//
+// 같은 날 수리가 ⓐ-1을 「FFFD가 하나라도 있으면 바이너리」로 바꿨다. 그런데 PDF 추출본에는
+// 글머리 기호·특수 글리프가 FFFD로 떨어지는 일이 흔하다. 저장소 문서 317종 6,728조각을 훑어
+// 옛 판정기와 대조하니 **24조각이 새로 버려졌고**, 전부 사람이 읽는 한국어였다(FFFD 비율
+// 0.112~1.669%). 옛 판정기는 FFFD를 제어문자와 **함께 세어 2%**로 봤다 — 그 잣대를 되살린다.
+describe("대체문자는 **비율**로 본다 — 한두 개로 멀쩡한 문서를 버리지 않는다 (2026-09-07 회귀)", () => {
+  it("글머리 기호가 FFFD로 떨어진 정상 한국어 조각은 통과한다", () => {
+    const 조각 = ("\uFFFD 휘발성 데이터 수집 절차를 먼저 수행하고, 디스크 백업은 그 다음에 뜬다. " +
+      "피해 시스템의 모든 파일에 대해 시간·날짜 정보를 함께 수집한다. ").repeat(6);
+    const 비율 = (조각.match(/\uFFFD/g) ?? []).length / 조각.length;
+    expect(비율, "표본의 FFFD 비율이 문턱을 넘으면 이 시험이 아무것도 안 지킨다").toBeLessThan(0.02);
+    expect(isBinaryLikeChunk(조각), "FFFD 한두 개로 읽을 수 있는 조각이 버려진다").toBe(false);
+  });
+
+  it("FFFD가 흩뿌려진 깨진 인코딩은 그대로 막는다 — 문을 연 게 아니다", () => {
+    const 깨짐 = "\uFFFD\uFFFDPK\uFFFD\uFFFD텍스트가 아닌 바이트가 글자로 읽힌 자리\uFFFD\uFFFD \uFFFD 압축된 내용이 그대로 흘러들어와 사람이 읽을 수 없는 상태로 남은 자리";
+    expect((깨짐.match(/\uFFFD/g) ?? []).length / 깨짐.length).toBeGreaterThan(0.02);
+    expect(isBinaryLikeChunk(깨짐)).toBe(true);
   });
 });
