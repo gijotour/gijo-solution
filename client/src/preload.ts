@@ -452,7 +452,21 @@ const gijoApi = {
   kbHygiene: () => api.memoryApi.hygiene(),
   kbHygieneScan: () => api.memoryApi.hygieneScan(),
   knowledgeBundleStatus: () => api.memoryApi.knowledgeBundleStatus(),
-  sendAnswerFeedback: (b: { kind: string; question: string; answer: string; note?: string; expected?: string; screen?: string }) => api.answerFeedbackApi.send(b),
+  // 「이 답 이상해요」 접수 — noev·quotes를 **함께** 싣는다(2026-09-07). 빠지면 서버가 갈래를
+  //   정할 재료가 없어 전부 「미분류」로 눌리고, 결재판의 🤖 초안은 재료가 없어 못 만든다.
+  sendAnswerFeedback: (b: { kind: string; question: string; answer: string; note?: string; expected?: string; screen?: string; noev?: string; quotes?: import("./api/knowledge").AnswerFeedbackQuote[] }) => api.answerFeedbackApi.send(b),
+  // 「고칠 것」 원장(결재판 두 번째 원장) — **위치 인자 관례**(객체로 넘기면 500).
+  //   ⚠ 이 여섯 줄이 빠지면 결재판이 통째로 죽는데 화면은 **조용히 빈 목록**을 그린다.
+  //     짝 시험: server/test/answerflagui.test.ts ③.
+  listAnswerFeedback: (days?: number, status?: import("./api/knowledge").AnswerFeedbackStatus, fixkind?: import("./api/knowledge").AnswerFeedbackFixKind | "unclassified") =>
+    api.answerFeedbackApi.list(days, status, fixkind),
+  setAnswerFeedbackStatus: (id: number, status: import("./api/knowledge").AnswerFeedbackStatus, expected?: string) =>
+    api.answerFeedbackApi.setStatus(id, status, expected),
+  setAnswerFeedbackKind: (id: number, fixkind: import("./api/knowledge").AnswerFeedbackFixKind | null) =>
+    api.answerFeedbackApi.setKind(id, fixkind),
+  setAnswerFeedbackExpected: (id: number, expected: string | null) => api.answerFeedbackApi.setExpected(id, expected),
+  buildAnswerFeedbackDraft: (id: number) => api.answerFeedbackApi.draft(id),
+  removeAnswerFeedback: (id: number) => api.answerFeedbackApi.remove(id),
   timeSaved: (days?: number) => api.timeSavedApi.status(days),
   setTimeSavedBaseline: (kind: string, minutes: number) => api.timeSavedApi.setBaseline(kind, minutes),
   // 서버 보관 원본을 임시 파일로 받아 OS 기본 뷰어(PDF 등)로 연다.

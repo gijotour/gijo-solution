@@ -108,11 +108,83 @@ export const memoryApi = {
 };
 
 
-// 답변 지적(중-1) — "이 답 이상해요"를 회귀 문항 후보로 보낸다.
+// 답변 지적(중-1) — "이 답 이상해요"를 회귀 문항 후보로 보내고, 「고칠 것」 원장으로 처리한다.
+//
+// ⚠ 값 집합의 주인은 **서버**다(server/src/engine/fixboard.ts). 여기서는 타입 이름만 맞춰 둔다 —
+//   글자를 다시 적으면 그 사본이 늙는다. 화면에 쓰는 한글 라벨도 서버 고칠것갈래라벨과 같아야 한다.
+export type AnswerFeedbackFixKind = "doc" | "rule" | "prod";
+export type AnswerFeedbackStatus = "open" | "promoted" | "dismissed" | "resolved";
+/** 그 답이 인용한 조각 — 접수 때 **본문 그대로** 얼려 보낸다(조각 id 포인터는 재인입에 끊긴다). */
+export interface AnswerFeedbackQuote { documentId: string; text: string; title?: string }
+export interface AnswerFeedbackEntry {
+  id: number;
+  at: number;
+  kind: "wrong" | "missing" | "style";
+  question: string;
+  answer: string;
+  note: string | null;
+  expected: string | null;
+  screen: string | null;
+  actor: string | null;
+  status: AnswerFeedbackStatus;
+  /** NULL은 **미분류** — 모르는 것을 아는 척하지 않는다(사람이 결재판에서 고른다). */
+  fixkind: AnswerFeedbackFixKind | null;
+  noev: string | null;
+  quotes: AnswerFeedbackQuote[] | null;
+  draft: string | null;
+  draftModel: string | null;
+  /** 같은 답에 들어온 지적 수(묶지 않고 세기만 한다). */
+  sameAnswer?: number;
+  /** 열람 등급 때문에 답 본문·인용·초안을 가렸다 — 화면이 「가렸음」을 말할 수 있게. */
+  redacted?: boolean;
+}
+export interface AnswerFeedbackKindCount {
+  fixkind: AnswerFeedbackFixKind | "unclassified";
+  open: number;
+  closed: number;
+  total: number;
+}
+export interface AnswerFeedbackBoard {
+  days: number;
+  total: number;
+  open: number;
+  closed: number;
+  /** 네 갈래를 **늘 전부** 싣는다(0건이어도 회색으로 그린다). */
+  kinds: AnswerFeedbackKindCount[];
+  byKind: { wrong: number; missing: number; style: number };
+}
+export interface AnswerFeedbackList {
+  days: number;
+  entries: AnswerFeedbackEntry[];
+  summary: string;
+  fixboard: AnswerFeedbackBoard;
+}
 export const answerFeedbackApi = {
-  send: (b: { kind: string; question: string; answer: string; note?: string; expected?: string; screen?: string }) =>
-    request<{ id: number }>("/api/answer-feedback", { method: "POST", body: b }),
-  list: (days = 7) => request<{ entries: unknown[]; summary: string }>(`/api/answer-feedback?days=${days}`),
+  send: (b: {
+    kind: string; question: string; answer: string; note?: string; expected?: string; screen?: string;
+    noev?: string; quotes?: AnswerFeedbackQuote[];
+  }) => request<{ id: number }>("/api/answer-feedback", { method: "POST", body: b }),
+  // ⚠ **admin 전용**이다(2026-09-07) — 응답에 답 본문·질문·사내 문서 조각이 실린다.
+  //   담당자 계정은 403을 받는다. 화면은 그 사실을 말해야 한다(빈 목록으로 그리면 거짓이다).
+  list: (days = 7, status?: AnswerFeedbackStatus, fixkind?: AnswerFeedbackFixKind | "unclassified") => {
+    const q = new URLSearchParams({ days: String(days) });
+    if (status) q.set("status", status);
+    if (fixkind) q.set("fixkind", fixkind);
+    return request<AnswerFeedbackList>(`/api/answer-feedback?${q.toString()}`);
+  },
+  // 승인과 「고친 최종문」은 한 동작이다 — expected를 같은 몸에 실어 보낸다.
+  setStatus: (id: number, status: AnswerFeedbackStatus, expected?: string) =>
+    request<{ ok: true }>(`/api/answer-feedback/${id}/status`, { method: "POST", body: { status, ...(expected != null ? { expected } : {}) } }),
+  setKind: (id: number, fixkind: AnswerFeedbackFixKind | null) =>
+    request<{ ok: true; fixkind: AnswerFeedbackFixKind | null }>(`/api/answer-feedback/${id}/fixkind`, { method: "POST", body: { fixkind } }),
+  setExpected: (id: number, expected: string | null) =>
+    request<{ ok: true }>(`/api/answer-feedback/${id}/expected`, { method: "POST", body: { expected } }),
+  // ⚠ **동기라 몇 초 걸린다** — 부르는 화면이 대기 표시를 세워야 한다(비동기로 붙이면 언제
+  //   붙었는지 아무도 안 본다). 재료가 없으면 draft:null + reason(사람 말)이 온다.
+  draft: (id: number) =>
+    request<{ draft: string | null; reason?: string; draftModel?: string }>(`/api/answer-feedback/${id}/draft`, { method: "POST" }),
+  // 무르기 — 접수 60초 안·본인만. 그 뒤는 결재판에서 dismissed로 닫는다.
+  remove: (id: number) => request<{ ok: true }>(`/api/answer-feedback/${id}`, { method: "DELETE" }),
 };
 // "AI가 아낀 시간"(중-2) — 자동화 처리량을 시간으로 환산한 추정치.
 export const timeSavedApi = {
