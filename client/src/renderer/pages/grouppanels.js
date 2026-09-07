@@ -732,11 +732,19 @@
           // 계수가 요약에 그대로 남는다). 이 필터로 요약 수가 줄며 한 번 「바뀜」이 서는
           // 것은 기준선 재설정으로 정상이다.
           var docs = (r[0] || []).filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0; });
+          // ★ 조각이 없는 문서(유령)는 「올린 문서」에서 **뺀다**(2026-09-07). 대화 답
+          //   (runKnowledgeStatus)이 이미 빼고 세는데 이 판만 넣어 세면 같은 숫자를 두 잣대로 말한다.
+          //   ⚠ 감추지 않는다 — 「(⚠ 조각 없음 N)」을 값에 병기한다. 빼기만 하면 담당자는
+          //     자기가 올린 문서가 왜 줄었는지 모른다.
+          //   ⚠ 이 필터로 요약 수가 한 번 줄며 「바뀜」이 서는 것은 **기준선 재설정으로 정상**이다
+          //     (personal: 필터를 넣던 때와 같은 성질 — 다음 조회부터 다시 잠잠해진다).
+          var 못읽음 = docs.filter(function (d) { return d && d.docState === "missing"; }).length;
+          var 읽히는수 = docs.length - 못읽음;
           var 오늘 = new Date().toISOString().slice(0, 10);
-          var 오늘반입 = docs.filter(function (d) { return String(d.ingestedAt || "").slice(0, 10) === 오늘; }).length;
+          var 오늘반입 = docs.filter(function (d) { return String(d.ingestedAt || "").slice(0, 10) === 오늘 && d.docState !== "missing"; }).length;
           return {
             rows: [
-              ["올린 문서", docs.length.toLocaleString()],
+              ["올린 문서", 읽히는수.toLocaleString() + (못읽음 ? " (⚠ 조각 없음 " + 못읽음 + ")" : "")],
               ["표준 관계망(온톨로지)", r[1] && r[1].count != null ? r[1].count.toLocaleString() : "-"],
               ["오늘 반입", String(오늘반입)],
             ],

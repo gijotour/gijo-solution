@@ -229,10 +229,18 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
     box.innerHTML = '<span style="font-size:12.25px;color:var(--muted)">불러오는 중…</span>';
     try {
       const list = await window.gijo.listMemoryDocuments();
-      box.innerHTML = (list || []).slice(0, 60).map((d) =>
-        `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px;font-size:12.25px;border-bottom:1px solid var(--border)">
+      // ★ 조각이 없는 문서(유령)는 **담기 단추 대신 꼬리표**를 준다(2026-09-07).
+      //   서버는 같은 라운드에서 이 문서를 인계 자료 목록에서 뺐는데(runHandoverStatus),
+      //   **사람이 실제로 고르는 자리**인 여기는 그대로였다 — 담으면 3단계 검증이 근거 0건으로 떨어진다.
+      //   ⚠ 목록에서 지우지는 않는다: 담당자는 자기가 올린 문서가 왜 없는지 알아야 한다.
+      box.innerHTML = (list || []).slice(0, 60).map((d) => {
+        const 못읽음 = d && d.docState === "missing";   // 판정은 서버가 이미 했다(engine/docledger.ts)
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px;font-size:12.25px;border-bottom:1px solid var(--border)">
           <span style="color:var(--text,#cfd6ea);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">📄 ${esc(d.documentId)}</span>
-          <button class="btn" style="padding:2px 9px;font-size:11.75px" data-add="${esc(d.documentId)}">담기</button></div>`).join("") || '<span style="font-size:12.25px;color:var(--muted-2)">올린 문서가 없습니다</span>';
+          ${못읽음
+            ? `<span style="font-size:11.5px;font-weight:800;color:var(--red,#e2483d);white-space:nowrap" title="반입 대장에는 있으나 지식 저장소에 조각이 없습니다 — 문서함에서 다시 넣을 수 있습니다">조각 없음 — 인계 자료로 못 씁니다</span>`
+            : `<button class="btn" style="padding:2px 9px;font-size:11.75px" data-add="${esc(d.documentId)}">담기</button>`}</div>`;
+      }).join("") || '<span style="font-size:12.25px;color:var(--muted-2)">올린 문서가 없습니다</span>';
       box.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => addDoc(b.dataset.add)));
     } catch (e) { box.innerHTML = `<span style="font-size:12.25px;color:var(--red-ink, #f5928a)">목록 실패: ${esc(e.message)}</span>`; }
   }

@@ -647,15 +647,22 @@ tr:last-child td{border-bottom:none;}
       return;
     }
     const totalChunks = dmDocs.reduce((sum, d) => sum + (d.chunks || 0), 0);
-    const 등급매김 = dmDocs.filter((d) => d.grade).length;
+    // ★ 조각이 없는 문서(유령)는 「문서 N건」에서 **뺀다** — 대화 답(runKnowledgeStatus)이
+    //   이미 빼고 세는데 화면만 넣어 세면 같은 숫자를 두 잣대로 말하게 된다(2026-09-07).
+    //   ⚠ 감추지는 않는다 — 「(⚠ 조각 없음 N)」으로 **따로** 말한다. 빼기만 하면 담당자는
+    //     자기가 올린 문서가 왜 사라졌는지 영영 모른다(서버가 지키는 규칙과 같다).
+    const 읽히는문서 = dmDocs.filter((d) => d.docState !== "missing");
+    const 못읽음수 = dmDocs.length - 읽히는문서.length;
+    const 못읽음꼬리 = 못읽음수 ? ` (⚠ 조각 없음 ${못읽음수})` : "";
+    const 등급매김 = 읽히는문서.filter((d) => d.grade).length;
     const 칸 = (l, v, c) =>
       '<div><div class="g-scard-kl">' + dmEsc(l) + '</div><div class="g-scard-kv ' + (c || "") + '">' + dmEsc(String(v)) + "</div></div>";
     k.innerHTML =
-      칸("문서", dmDocs.length.toLocaleString()) +
+      칸("문서", 읽히는문서.length.toLocaleString() + 못읽음꼬리, 못읽음수 ? "warn" : "") +
       칸("조각", totalChunks.toLocaleString()) +
       '<div><div class="g-scard-kl">오늘 반입</div><div class="g-scard-kv muted" id="dmKpiToday">…</div></div>' +
-      칸("열람 등급 지정", 등급매김.toLocaleString() + " / " + dmDocs.length.toLocaleString(),
-        등급매김 < dmDocs.length ? "warn" : "ok");
+      칸("열람 등급 지정", 등급매김.toLocaleString() + " / " + 읽히는문서.length.toLocaleString(),
+        등급매김 < 읽히는문서.length ? "warn" : "ok");
     const 오늘칸 = () => document.getElementById("dmKpiToday");
     if (window.gijo && window.gijo.recentDocCount) {
       window.gijo.recentDocCount().then((r) => {
@@ -716,15 +723,19 @@ tr:last-child td{border-bottom:none;}
     //      「히트맵도 목록과 같은 것만」을 못박는다.
     //   ② **선택을 대화창에 알린다**(gijoSelectNotify) — 목록 행과 같은 계약. 안 부르면
     //      화면 상세는 B인데 대화창 선택은 앞 문서 A로 남아 「이 문서 지워줘」가 A를 지운다.
-    //   ③ **「조각 0 = 못 읽음」 규칙을 걷었다** — 원천(listDocuments)이 조각이 있는 문서만
-    //      주므로 그 분기는 **원리상 발화하지 않는 죽은 규칙**이었다(그런데 커밋은 규칙 3개를
-    //      약속했다 — 거짓 약속). 지금 규칙은 둘: 열람 등급 미지정=관리 필요(warn) · 지정=ok.
-    //      「못 읽은 문서」는 반입 영수증(ingested:false)이 원천이라 이 화면 몫이 아니다.
+    //   ③ ~~「조각 0 = 못 읽음」 규칙을 걷었다~~ — **2026-09-07에 되살렸다.** 그때 근거는
+    //      「원천(listDocuments)이 조각 있는 문서만 준다」였는데, 그 전제가 뒤집혔다:
+    //      이제 listDocuments는 **대장에만 남은 줄(유령·조각 0)도 담아 준다**(memory.ts 2026-09-07).
+    //      전제가 사라졌으니 규칙이 돌아와야 한다 — 안 그러면 서버는 같은 문서를 「답변 근거로
+    //      못 씁니다」라 말하는데 이 화면만 초록 「정상」이라 말한다.
+    //      지금 규칙은 셋: 조각 없음=못 읽음(bad) · 열람 등급 미지정=관리 필요(warn) · 지정=ok.
+    //      ⚠ 갈래는 서버 판정(docState)으로 가른다 — 조각 수를 손으로 세지 않는다.
     if (dmView === "heat") {
       const 대상 = groups.flatMap((g) => g.docs); // ← 필터를 지난 것만(①)
       const 타일 = 대상.map((d) => {
-        const cls = d.grade ? "ok" : "warn";
-        const 뜻 = d.grade ? "정상" : "등급 미지정";
+        const 못읽음 = d.docState === "missing";   // 서버 판정 그대로(engine/docledger.ts)
+        const cls = 못읽음 ? "bad" : d.grade ? "ok" : "warn";
+        const 뜻 = 못읽음 ? "못 읽음" : d.grade ? "정상" : "등급 미지정";
         return `<div class="g-tile ${cls}" data-id="${dmEsc(d.documentId)}" title="${dmEsc(d.documentId)} — ${뜻} · 조각 ${d.chunks}">` +
           `<div class="tv ${cls}">${d.chunks}</div>` +
           `<div class="tl">${dmEsc(d.documentId)}</div>` +
@@ -811,7 +822,10 @@ tr:last-child td{border-bottom:none;}
       return;
     }
     const totalChunks = dmDocs.reduce((s, d) => s + (d.chunks || 0), 0);
-    document.getElementById("dmSummary").textContent = `· ${dmDocs.length}개 문서 · ${totalChunks}조각 · bge-m3`;
+    // 머리 줄도 **같은 잣대**로 — 지표 칸과 머리 줄이 다른 수를 말하면 어느 쪽을 믿을지 모른다.
+    const 못읽음머리 = dmDocs.filter((d) => d.docState === "missing").length;
+    document.getElementById("dmSummary").textContent =
+      `· ${dmDocs.length - 못읽음머리}개 문서${못읽음머리 ? ` (⚠ 조각 없음 ${못읽음머리})` : ""} · ${totalChunks}조각 · bge-m3`;
     // 지표 줄(카드 언어) — 그리기는 renderDmKpis 하나가 맡는다(등급을 바꿔도 다시 그리게).
     // ⚠ 「오늘 반입」은 **직접 세지 않는다**(2026-08-31 검토관 [높음]): 처음엔 ingestedAt을
     //   UTC로 잘라 세어, 같은 화면 아래 목록의 반입 열(현지 시각)과 어긋나고 내장 문서까지

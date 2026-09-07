@@ -610,18 +610,25 @@
       var st2 = await g.knowledgeBundleStatus();
       ((st2 && st2.docs && st2.docs.fingerprints) || []).forEach(function (x) { 번들.add(String(x.file || "").split("/").pop()); });
     } catch (e) { }
-    var 제품수 = 번들.size ? docs.filter(function (d) { return 번들.has(String(d.documentId || "")); }).length : 0;
-    var 내것수 = 번들.size ? docs.length - 제품수 : docs.length;
-    var 청크 = docs.reduce(function (s2, d) { return s2 + (Number(d.chunks) || 0); }, 0);
+    // ★ 조각이 없는 문서(유령)는 **세지 않는다**(2026-09-07). 대화 답(runKnowledgeStatus)이
+    //   이미 빼고 세는데 이 카드만 넣어 세면 같은 숫자를 두 잣대로 말하게 된다.
+    //   ⚠ 감추지 않는다 — 아래 작은 줄에 「⚠ 조각 없음 N」으로 따로 말한다.
+    var 못읽음 = docs.filter(function (d) { return d && d.docState === "missing"; }).length;
+    var 읽히는 = docs.filter(function (d) { return !d || d.docState !== "missing"; });
+    var 제품수 = 번들.size ? 읽히는.filter(function (d) { return 번들.has(String(d.documentId || "")); }).length : 0;
+    var 내것수 = 번들.size ? 읽히는.length - 제품수 : 읽히는.length;
+    var 청크 = 읽히는.reduce(function (s2, d) { return s2 + (Number(d.chunks) || 0); }, 0);
     function kbKpi(v, l, sub) {
       return '<div><div class="kv">' + v + '</div><div class="kl">' + esc(l) + '</div>' + (sub ? '<div class="ks">' + esc(sub) + '</div>' : '') + '</div>';
     }
     $("kbKpi").innerHTML =
-      kbKpi(docs.length, "총 문서", 번들.size ? "제품 " + 제품수 + " · 내가 넣은 " + 내것수 : "") +
+      kbKpi(읽히는.length, "총 문서",
+        (번들.size ? "제품 " + 제품수 + " · 내가 넣은 " + 내것수 : "") +
+        (못읽음 ? (번들.size ? " · " : "") + "⚠ 조각 없음 " + 못읽음 : "")) +
       kbKpi(청크, "검색 조각(청크)", "AI가 찾아보는 단위") +
       kbKpi(내것수, "내가 넣은 문서", "내 지식");
     var cats = {};
-    docs.forEach(function (d) { var c = d.category || "미분류"; if (!cats[c]) cats[c] = { d: 0, k: 0 }; cats[c].d++; cats[c].k += (Number(d.chunks) || 0); });
+    읽히는.forEach(function (d) { var c = d.category || "미분류"; if (!cats[c]) cats[c] = { d: 0, k: 0 }; cats[c].d++; cats[c].k += (Number(d.chunks) || 0); });
     var rows = Object.keys(cats).map(function (c) { return { c: c, d: cats[c].d, k: cats[c].k }; }).sort(function (a, b) { return b.k - a.k; });
     var maxK = rows.reduce(function (m, r) { return r.k > m ? r.k : m; }, 1);
     $("kbBars").innerHTML = rows.length
