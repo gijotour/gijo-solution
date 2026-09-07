@@ -490,11 +490,22 @@ const TOOLS: AgentTool[] = [
     label: "답변 지적 현황",
     domain: "knowledge",
     write: false,
+    // ★ 2026-09-07 — **자물쇠가 한 원장에 두 벌이던 것을 맞춘다**(앞 라운드 인계 ⑥).
+    //   같은 원장의 정문(GET /api/answer-feedback)은 adminMiddleware로 닫았는데, 이 옆문은
+    //   담당자도 불렀다. 이 글에는 **남이 낸 질문 원문과 담당자가 적은 사유**가 실린다
+    //   (상세를 켜면 8줄). 서버는 그동안 `feedbackSummaryText`의 상세 기본값을 꺼서 유출만
+    //   막아 뒀는데, 그건 **호출자 쪽 임시방편**이었다 — 자물쇠는 도구에 건다.
+    //   ⚠ 자물쇠를 걸었으므로 run은 상세를 **되찾는다**(admin만 도달하므로 안전하다).
+    //     이 두 줄은 **짝**이다 — 하나만 되돌리면 유출이거나 반쪽 기능이 된다.
+    //   ⚠ 라이트에는 이 도구가 없다(server/src/lite/lite-tools.json에 id 없음 — 확인 2026-09-07).
+    //     라이트는 결재판 화면이 없어 처리할 자리가 없기 때문이고, 그래서 requiredRole은
+    //     라이트에서 뜻을 갖지 않는다(목록에 아예 안 실린다).
+    requiredRole: "admin",
     description:
       '담당자가 남긴 답변 지적(틀린 답·못 찾음·말투)을 모아 보여준다. "이번 주 지적 뭐 있었어?", "답변 피드백 현황 알려줘", "틀렸다고 한 거 뭐야"에 쓴다. 예: {} 또는 {"days":"30"}',
     directAnswer: true,
     params: [{ name: "days", label: "기간(일)", description: "며칠치인지 — 기본 7일", required: false }],
-    run: (a) => feedbackSummaryText(Math.min(Math.max(Number(a.days) || 7, 1), 365)),
+    run: (a) => feedbackSummaryText(Math.min(Math.max(Number(a.days) || 7, 1), 365), true),
   },
   {
     name: "model_adoption_status",
