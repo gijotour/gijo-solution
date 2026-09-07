@@ -212,10 +212,26 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
   }
 
   // ── 2단계: 업로드 + 기존 문서 선택 ──
+  //
+  // ★ 유령(조각 없음) 차단은 **고르는 순간에만 걸면 막은 게 아니다**(2026-09-07 검토관 [중]).
+  //   담긴 목록은 localStorage에 남고, 유령의 실제 방아쇠(지식 저장소에서 조각이 사라짐)는
+  //   담은 **뒤에** 일어난다 — 담을 때 멀쩡했던 문서가 3단계에서 근거 0건으로 떨어져
+  //   통과율만 깎이고, 담당자는 이유를 모른다. 그래서 상태를 **검증 직전에 다시 묻는다.**
+  //   ⚠ 담긴 목록에서 몰래 빼지는 않는다(사라지는 조작 금지) — 칩에 표시하고, 검증에서만 뺀다.
+  let 유령집합 = new Set();
+  async function 유령새로고침() {
+    try {
+      const list = await window.gijo.listMemoryDocuments();
+      유령집합 = new Set((list || []).filter((d) => d && d.docState === "missing").map((d) => String(d.documentId)));
+    } catch (e) { /* 못 물어봤으면 **아무도 유령이 아니라고 하지 않는다** — 옛 판정을 그대로 둔다 */ }
+  }
   function saveDocs() { try { localStorage.setItem(DOCS_KEY, JSON.stringify(docs)); } catch (e) {} refreshSteps(); }
   function renderDocs() {
     const box = document.getElementById("docList");
-    box.innerHTML = docs.map((d) => `<span class="docchip">📄 ${esc(d)} <span class="x" data-rm="${esc(d)}">✕</span></span>`).join("");
+    box.innerHTML = docs.map((d) => {
+      const 못읽음 = 유령집합.has(String(d));
+      return `<span class="docchip"${못읽음 ? ' style="border-color:var(--red,#e2483d)" title="지식 저장소에 조각이 없습니다 — 검증에서 빠집니다. 내 문서 › 🏢 회사 지식에서 다시 넣어 주세요."' : ""}>📄 ${esc(d)}${못읽음 ? ' <b style="color:var(--red-ink,#f5928a);font-size:11px">⚠ 조각 없음</b>' : ""} <span class="x" data-rm="${esc(d)}">✕</span></span>`;
+    }).join("");
     document.getElementById("docBadge").textContent = `${docs.length}개`;
     box.querySelectorAll("[data-rm]").forEach((x) => x.addEventListener("click", () => { docs = docs.filter((d) => d !== x.dataset.rm); saveDocs(); renderDocs(); }));
     refreshSteps();
@@ -295,6 +311,15 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
   async function runVerify(ids, merge) {
     if (!ids.length) { gijoTell("2단계에서 검증할 문서를 먼저 담아주세요."); return; }
     const st = document.getElementById("verifyStatus");
+    // 담긴 뒤에 조각을 잃은 문서를 여기서 잡는다 — 넘기면 근거 0건으로 떨어질 뿐이다.
+    await 유령새로고침();
+    renderDocs();
+    const 유령들 = ids.filter((d) => 유령집합.has(String(d)));
+    if (유령들.length) {
+      ids = ids.filter((d) => !유령집합.has(String(d)));
+      st.textContent = `⚠ 조각 없음 ${유령들.length}건은 검증에서 뺐습니다(${유령들.slice(0, 3).join(", ")}${유령들.length > 3 ? " 외" : ""}) — 담긴 목록에는 그대로 있습니다. 내 문서 › 🏢 회사 지식에서 다시 넣어 주세요.`;
+      if (!ids.length) { gijoTell("담긴 문서가 모두 조각을 잃었습니다 — 다시 넣은 뒤 검증해 주세요."); return; }
+    }
     const btn = document.getElementById("verifyBtn");
     btn.disabled = true;
     st.textContent = `⏳ ${ids.length}개 문서 검증 중 — 문서마다 AI가 질문을 만들어 실제로 물어봅니다(문서당 수십 초)…`;
@@ -338,6 +363,8 @@ td.doc{color:var(--text-strong,#dfe6ff);font-weight:700;max-width:220px;word-bre
     initChecklist();
     try { docs = JSON.parse(localStorage.getItem(DOCS_KEY) || "[]"); } catch (e) { docs = []; }
     renderDocs();
+    // 되읽은 목록은 **지난주에 담은 것**일 수 있다 — 지금 상태를 한 번 묻고 칩을 다시 그린다.
+    유령새로고침().then(renderDocs);
     // 파일 올리기는 대시보드 ＋로 통일(2026-07-27) — 여기서는 이미 올린 문서를 고르기만 한다.
     document.getElementById("pickExistingBtn").addEventListener("click", showExisting);
     document.getElementById("verifyBtn").addEventListener("click", () => runVerify(docs, false));
