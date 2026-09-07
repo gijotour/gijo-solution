@@ -1,45 +1,17 @@
-// engine/modeldex.ts — 보안 특화 LLM 도감 (보안 LLM 합성 화면용)
+// engine/modeldex.ts — 용도별 추천 LLM 가이드 + 에이전트별 모델 추천
 //
-// aicitybuilders.com/dex처럼 HuggingFace 공개 모델을 카탈로그로 보여주되, 범용이 아니라
-// "보안 특화 LLM"만 큐레이션한다. 각 모델의 base 아키텍처가 같아야 SLERP 등으로 합성 가능하므로
-// arch를 함께 제공한다(합성 호환 그룹핑용). 실재하는 모델만 담는다(HF에서 확인).
+// ⚠ 2026-09-07 — 이 파일에 있던 「보안 특화 LLM 도감」(DexModel·SECURITY_LLM_DEX·
+//   합성 호환 그룹·GET /api/modeldex)을 **통째로 내렸다.** 그 도감을 그리던 화면은 LLM 합성
+//   하나뿐이었고, 그 화면을 내린 것이 같은 날 커밋 9294fb20이다. 창구만 남기면 **아무도 안 부르는
+//   인증 창구**가 되는데, 그것이 바로 그 커밋이 스스로 적어 둔 삭제 사유였다(소비자 0인 API는
+//   공격면일 뿐이다). 도감 데이터가 다시 필요하면 그 커밋의 부모에서 꺼내 쓸 것.
+//   남은 것은 아래 둘이고, 둘 다 실소비자가 있다:
+//     · LLM_GUIDE — 용도별 추천 카탈로그(GET /api/llmguide)
+//     · AGENT_MODEL_RECOMMENDATIONS — 에이전트별 추천(GET /api/modeldex/agent-recommendations,
+//       agent.html이 실제로 부른다). 경로 이름만 옛 도감 시절 그대로다.
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
-
-export interface DexModel {
-  id: string; // HuggingFace repo id
-  name: string;
-  base: string;
-  arch: "mistral" | "llama" | "qwen2" | "other";
-  size: string;
-  focus: string; // 특화 분야
-  note?: string;
-  lang: "영어" | "중국어" | "다국어";
-}
-
-// 검증된 보안 특화 LLM 큐레이션 (HF에서 존재·base 확인, 2026-07). 합성은 arch가 같은 것끼리.
-export const SECURITY_LLM_DEX: DexModel[] = [
-  { id: "segolilylabs/Lily-Cybersecurity-7B-v0.2", name: "Lily Cybersecurity 7B", base: "Mistral-7B-Instruct-v0.2", arch: "mistral", size: "7B", focus: "일반 보안 Q&A · 사고대응 · 개념 설명", note: "채팅 모델 옵션 (합성 소스로도 사용)", lang: "영어" },
-  { id: "ZySec-AI/SecurityLLM", name: "ZySec 7B (SecurityLLM)", base: "Mistral-7B", arch: "mistral", size: "7B", focus: "보안 운영 · 정책 · 컴플라이언스 문서", lang: "영어" },
-  { id: "fdtn-ai/Foundation-Sec-8B", name: "Foundation-Sec 8B", base: "Llama-3.1-8B", arch: "llama", size: "8B", focus: "위협 분석 · 보안 추론 (범용 보안 파운데이션)", note: "Cisco Foundation AI", lang: "영어" },
-  { id: "clouditera/SecGPT-1.5B", name: "SecGPT 1.5B", base: "Qwen2-1.5B", arch: "qwen2", size: "1.5B", focus: "경량 보안 어시스턴트 (온디바이스)", note: "clouditera", lang: "중국어" },
-  { id: "AlicanKiraz0/Titus-CybersecurityLLM-v1.0", name: "Titus Cybersecurity LLM", base: "Qwen (추정)", arch: "other", size: "-", focus: "공격·방어 통합 보안 지식", lang: "영어" },
-];
-
-// 같은 arch끼리 묶어 "합성 호환 그룹"을 만든다. 크기까지 같아야 실제 SLERP가 되므로 size도 표기.
-// ⚠ 2026-09-07 — **사람이 보는 소비자가 0이 됐다.** 유일한 소비자였던 merge.html(LLM 합성)을
-//   내리면서 이 그룹을 화면에 그리는 곳이 없어졌다. 값은 /api/modeldex 응답의 groups 칸으로
-//   여전히 나가고 modeldex.test가 그 꼴을 지킨다 — 그래서 지우지 않되, 「누가 보나」를 여기 적어
-//   둔다. 다음에 도감 화면을 손보는 사람이 이 칸을 살릴지 내릴지 판단할 근거다.
-export function synthesisGroups(): { arch: string; models: DexModel[] }[] {
-  const byArch = new Map<string, DexModel[]>();
-  for (const m of SECURITY_LLM_DEX) {
-    if (!byArch.has(m.arch)) byArch.set(m.arch, []);
-    byArch.get(m.arch)!.push(m);
-  }
-  return [...byArch.entries()].map(([arch, models]) => ({ arch, models }));
-}
 
 // ── 추천 LLM 가이드 (용도별 카탈로그, 다운로드 페이지용) ──────────────────────
 // aicitybuilders.com/dex처럼 "우리가 써야 할" LLM을 용도별로 큐레이션한다. 다운로드가 실제로
@@ -179,9 +151,6 @@ export function getAgentModelRecommendations(): Record<string, AgentModelRecomme
 }
 
 export function registerModelDexRoutes(app: Express): void {
-  app.get("/api/modeldex", authMiddleware, (_req, res) => {
-    res.json({ models: SECURITY_LLM_DEX, groups: synthesisGroups() });
-  });
   app.get("/api/llmguide", authMiddleware, (_req, res) => {
     res.json(LLM_GUIDE);
   });

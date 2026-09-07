@@ -299,9 +299,6 @@ export interface ThreatCompliance {
   criteria: { impact: string; good: string; weak: string; diagnosis: string };
 }
 
-export interface DexModel {
-  id: string; name: string; base: string; arch: string; size: string; focus: string; note?: string; lang: string;
-}
 export interface AgentModelRecommendation {
   agentId: string;
   id: string;
@@ -313,8 +310,9 @@ export interface AgentModelRecommendation {
   reason: string;
 }
 
+// ⚠ 이름만 「도감(dex)」이다 — 도감 자체는 2026-09-07에 내렸고(유일한 화면이 LLM 합성이었다)
+//   지금 남은 것은 추천 가이드 둘뿐이다. 경로를 바꾸면 agent.html이 끊기므로 이름은 그대로 둔다.
 export const modelDexApi = {
-  list: () => request<{ models: DexModel[]; groups: { arch: string; models: DexModel[] }[] }>("/api/modeldex"),
   guide: () => request("/api/llmguide"),
   agentRecommendations: () => request<Record<string, AgentModelRecommendation>>("/api/modeldex/agent-recommendations"),
 };

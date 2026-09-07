@@ -3,6 +3,10 @@
 // 무엇을 내렸나: 화면 merge.html · 엔진 server/src/engine/merge.ts · 창구 /api/merge/plan·
 //   /api/merge/preflight · 클라 API(mergeApi·MergePlan) · preload(planMerge·mergePreflight) ·
 //   안내 문서 GIJO_AS_LLM_합성_안내.md · 화면 안내(GUIDES·screencontext) · 용어 별칭.
+//   ＋ 2026-09-07 2차: **그 화면이 유일한 소비자였던 것들** — 보안 특화 LLM 도감
+//   (SECURITY_LLM_DEX·합성 호환 그룹·GET /api/modeldex·클라 DexModel·preload listModelDex).
+//   1차에서 이것을 못 봤다: 화면을 지우면 화면이 **부르던 창구**도 고아가 되는데, 그 창구는
+//   merge라는 낱말을 하나도 안 갖고 있어 낱말 감시로는 원리상 안 잡힌다.
 //
 // 왜 감시가 필요한가 — 이 저장소가 반복해 겪은 「반쪽 수리」다:
 //   · 화면만 지우면 **아무도 안 부르는 인증 창구**가 둘 남는다(소비자 0인 API는 공격면일 뿐이다).
@@ -18,7 +22,13 @@ import path from "node:path";
 const 뿌리 = path.join(__dirname, "..", "..");
 
 // 코드에서 이 낱말이 하나라도 살아 있으면 반쪽 삭제다.
-const 흔적 = ["merge.html", "/api/merge", "planMerge", "mergePreflight", "registerMergeRoutes", "mergeApi", "MergePlan", "engine/merge"];
+const 흔적 = [
+  "merge.html", "/api/merge", "planMerge", "mergePreflight", "registerMergeRoutes", "mergeApi", "MergePlan", "engine/merge",
+  // 화면이 **부르던** 것들 — merge라는 낱말이 없어 위 목록으로는 안 잡힌다(2026-09-07 2차).
+  // ⚠ "/api/modeldex" 는 **닫는 따옴표까지** 넣는다 — 그래야 살아 있는
+  //   "/api/modeldex/agent-recommendations"(agent.html이 실제로 부른다)를 오폭하지 않는다.
+  "SECURITY_LLM_DEX", "synthesisGroups", "listModelDex", "\"/api/modeldex\"",
+];
 
 // 주석에 남는 것은 **기록**이라 막지 않는다 — 다만 어느 파일에 왜 남겼는지 여기 적어야 한다.
 // 표에 없는 파일이 주석으로 merge를 부르면 빨간불이 뜬다(새 주석은 사람이 판단할 자리다).
@@ -26,7 +36,9 @@ const 주석예외: Record<string, string> = {
   "server/src/engine/screenguide.ts":
     "화면위치안내()의 retired 분기가 왜 있는지를 적은 교훈 주석 — 「메뉴에서 내려갔습니다」와 「사이드바에서 찾으세요」가 한 답에서 모순됐던 실측이 merge.html이었다. 다음에 화면을 내릴 때 이 분기를 다시 쓴다.",
   "server/src/engine/modeldex.ts":
-    "synthesisGroups()의 사람 소비자가 0이 된 사연 — 유일한 소비자가 merge.html이었다. 값은 /api/modeldex로 여전히 나가므로 지우지 않되, 누가 보는지를 남긴다.",
+    "도감(SECURITY_LLM_DEX·합성 호환 그룹·GET /api/modeldex)을 왜 통째로 내렸는지를 적은 묘비 — 그리던 화면이 merge.html 하나뿐이었다. 파일 이름과 남은 경로(/api/modeldex/agent-recommendations)가 옛 이름 그대로라, 적어 두지 않으면 다음 사람이 도감이 아직 있는 줄 안다.",
+  "server/test/modeldex.test.ts":
+    "도감 시험 셋(카탈로그·합성 호환 그룹·GET /api/modeldex)을 왜 뺐는지를 적은 기록 — 아무도 안 쓰는 창구를 시험이 지켜 주면 초록이 거짓 안심을 준다.",
   "client/src/api/llm-engine.ts":
     "mergeApi가 있던 자리에 「왜 통째로 내렸나」를 남긴 묘비 — 화면만 지우고 API를 남기면 소비자 0인 인증 창구가 둘 남는다는 판단 기록.",
 };

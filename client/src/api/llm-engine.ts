@@ -1,7 +1,6 @@
 // GIJO AS 클라이언트 API — 모델·학습(로컬 엔진·파인튜닝·학습 루프·클라우드 하이브리드·합성)
 // 2026-08-06 apiClient.ts(2,141줄)에서 분리 — 구역 본문은 원문 그대로, 공통은 core.ts.
 import { request } from "./core";
-import type { DexModel } from "./assets";
 
 // ── 선택적 클라우드 LLM 하이브리드 (Gemini/Claude/OpenAI) ─────────────────
 export type CloudProvider = "gemini" | "claude" | "openai" | "custom";

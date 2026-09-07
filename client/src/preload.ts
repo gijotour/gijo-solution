@@ -368,7 +368,6 @@ const gijoApi = {
   setAssetCategory: (id: string, category: string | null) => api.assetsApi.setCategory(id, category),
   computeWeightsHash: (id: string, filePath?: string) => api.assetsApi.weightsHash(id, filePath),
   importVulnScan: (content: string, format: "json" | "csv" | "html" | "nessus", source: string) => api.assetsApi.importVulnScan(content, format, source),
-  listModelDex: () => api.modelDexApi.list(),
   listLlmGuide: () => api.modelDexApi.guide(),
   listApprovals: () => api.approvalsApi.list(),
   // 「미배정」 판정 — **화면 쪽 단일 창구**다(2026-09-07 승인 배지).
