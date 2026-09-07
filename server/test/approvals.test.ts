@@ -22,6 +22,7 @@ import { createApp } from "../src/app";
 import { resetAssetsForTests, recordFindings } from "../src/engine/assets";
 import { resetApprovalsForTests, findingKey, buildTriagePrompt, prioritizedReviews, approvalSummary } from "../src/engine/approvals";
 import { isRealVulnerability } from "../src/engine/agenttools";
+import { recordFeedback, setFeedbackKind, setFeedbackStatus, resetFeedbackForTests } from "../src/engine/answerfeedback";
 import type { StandardFinding } from "../src/engine/bridge";
 
 async function login(app: ReturnType<typeof createApp>) {
@@ -351,5 +352,54 @@ describe("위험수용(accepted) — 기한부 수용과 만료 부상", () => {
     const res = await request(app).get("/api/approvals").set(auth());
     expect(res.body.reviews[0].acceptUntil).toBeUndefined();
     expect(res.body.reviews[0].acceptedBy).toBeUndefined();
+  });
+});
+
+// ── ⓝ 오염 없음 (통합 설계관 S-A 반증, 2026-09-07) ─────────────────────────
+// 「고칠 것」은 answer_feedback이라는 **두 번째 원장**이다. 그 원장이 아무리 차도
+// 기존 결재판(finding_approvals)의 숫자·목록은 **한 칸도** 달라지면 안 된다.
+// 왜 시험으로 두나: 두 원장을 한 화면에 얹는 라운드라, 나중에 누군가 배열을 합치면
+// 심각도 셈·VEX 칩·isFindingRejected가 조용히 틀린다(그때 이 시험이 빨개진다).
+describe("ⓝ 답변 지적이 쌓여도 조치 결재판은 오염되지 않는다", () => {
+  let app: ReturnType<typeof createApp>;
+  let token: string;
+  const auth = () => ({ Authorization: `Bearer ${token}` });
+
+  beforeEach(async () => {
+    resetAssetsForTests();
+    resetApprovalsForTests();
+    resetFeedbackForTests();
+    app = createApp();
+    token = await login(app);
+    await request(app)
+      .post("/api/assets")
+      .set(auth())
+      .send({ id: "m1", name: "모델1", path: "models/m1.gguf", components: [{ name: "weights.bin", version: "1", license: "MIT" }] });
+    recordFindings("m1", [FINDING]);
+  });
+
+  it("★ 지적 30건(갈래·상태 섞어서)을 넣기 전후로 /api/approvals 응답이 글자 하나 안 바뀐다", async () => {
+    const 전 = await request(app).get("/api/approvals").set(auth());
+    const 전문 = JSON.stringify(전.body);
+
+    for (let i = 0; i < 30; i++) {
+      const f = recordFeedback({
+        kind: i % 3 === 0 ? "wrong" : i % 3 === 1 ? "missing" : "style",
+        question: `질문${i}`, answer: `답${i}`, note: "사유",
+        noev: i % 2 ? "자료없음" : undefined,
+        quotes: [{ documentId: "규정.pdf", text: "조각 본문" }],
+      });
+      if (i % 4 === 0) setFeedbackKind(f.id, "prod", "검토자");
+      if (i % 5 === 0) setFeedbackStatus(f.id, "resolved", "검토자");
+    }
+
+    const 후 = await request(app).get("/api/approvals").set(auth());
+    expect(JSON.stringify(후.body)).toBe(전문);
+    // 요약 넷도 이름을 대고 확인한다(전체 비교가 우연히 통과하는 일이 없게).
+    expect(후.body.summary).toEqual(전.body.summary);
+    expect(후.body.reviews).toHaveLength(전.body.reviews.length);
+    expect(후.body.reviews[0].status).toBe("pending");
+    // 우선순위 목록도 그대로 — 지적은 취약점 일감이 아니다.
+    expect(prioritizedReviews(10).map((r) => r.findingKey)).toEqual([findingKey("m1", FINDING)]);
   });
 });
