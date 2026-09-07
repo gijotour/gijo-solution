@@ -781,10 +781,18 @@
 
   // 결재판(답 지적 세그먼트)을 연다 — P.open의 navigate와 **같은 통로**를 쓴다.
   //   창이면 본창에 부탁하고(분리창은 탭을 직접 못 연다), 셸 안이면 도킹으로 연다.
+  //   ⚠ **셋째 단계(navigateTo)를 빠뜨리면 죽은 단추가 된다**(2026-09-07 검토관 [중간]).
+  //     window.gijoTabs는 app.html에만 있다 — console.html?embed=1(라이트 대화 lite-chat.html이
+  //     여기로 자리를 바꿔 들어온다)에서는 IS_WINDOW=false이고 gijoTabs도 없어 **두 분기가 다
+  //     거짓**이었다. 눌러도 아무 일이 없고 아무 신호도 안 났다.
+  //     navigateTo는 embed면 preload가 postMessage로 바꿔 셸이 받고, 없는 화면이면 셸이
+  //     「이 기능은 라이트 에디션에 없습니다」로 **정직하게** 답한다 — 침묵보다 낫다.
+  //     (2026-08-22 설계관이 같은 이유로 P.open·상태띠에 세 단계를 박아 뒀다. 새 함수만 둘이었다.)
   function 결재판열기() {
     var page = "approvals.html?fix=open", leaf = "결재판";
     if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) { window.gijo.openTabInShell(page, leaf); return; }
-    if (window.gijoTabs) window.gijoTabs.open(page, leaf, { dock: true });
+    if (window.gijoTabs) { window.gijoTabs.open(page, leaf, { dock: true }); return; }
+    if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page);
   }
 
   // 📚 비슷한 사례 칩(2026-09-03, 승인 시안 mockups/normaltic-cases §6) — 스캔 해석 초안 답에 해설

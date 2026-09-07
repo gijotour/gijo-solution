@@ -74,7 +74,14 @@ describe("② 호출부는 셋뿐 — 답이 아닌 줄에는 안 붙는다", ()
   });
 
   it("chatwidget(분리창·화면 위젯)도 같은 부품을 부른다 — 자리마다 다르면 담당자는 기능이 없어진 줄 안다", () => {
-    expect(widget, "위젯에 P.flag 배선이 없다").toMatch(/P\.flag\(/);
+    // ⚠ 예전엔 `toMatch(/P\.flag\(/)` 하나였다 — **소스에 글자가 있는지**만 봐서
+    //   `if (false) P.flag(typing, {`로 배선을 죽여도 25개가 전부 초록이었다
+    //   (2026-09-07 검토관 promise 갈래가 실제로 그 변이를 넣어 재현했다).
+    //   그래서 **가리는 조건까지 못 박는다** — 살아 있는 가드는 `if (P.flag)` 하나뿐이다.
+    //   ⚠ 한계는 정직하게 적는다: 이 호출을 감싸는 **바깥** 블록이 죽으면 여기서는 못 잡는다.
+    //     그 부류는 위젯을 통째로 돌리는 시험이라야 잡는데, 이 저장소엔 jsdom이 없다.
+    expect(widget, "위젯의 P.flag 호출이 `if (P.flag)` 말고 딴 조건에 가려졌다 — 글자만 남고 배선은 죽는다")
+      .toMatch(/\n\s*if \(P\.flag\) P\.flag\(typing, \{/);
     expect(widget, "위젯이 자기 카드를 따로 그린다").not.toContain("function openFlagCard");
   });
 });
@@ -195,7 +202,10 @@ class 가짜요소 {
   setAttribute() { /* 흉내 */ }
   /** 붙일자리()가 `.cb`를 찾는다 — 클래스 선택자만 흉내 낸다(그 이상은 안 흉내 낸다). */
   querySelector(sel: string): 가짜요소 | null { return sel.startsWith(".") ? this.찾기(sel.slice(1)) : null; }
-  누르기() { (this._on["click"] || []).forEach((f) => f()); }
+  /** ⚠ **disabled면 아무 일도 안 일어난다** — 진짜 브라우저가 그렇다.
+   *   이 한 줄이 없던 동안 「무른 뒤 다시 올리기」가 **굳은 단추**인 채로 초록이었다
+   *   (2026-09-07 검토관 contract 갈래 실측). 가짜 DOM은 흉내를 덜 내는 만큼 거짓말을 한다. */
+  누르기() { if (this.disabled) return; (this._on["click"] || []).forEach((f) => f()); }
   찾기(cls: string): 가짜요소 | null {
     for (const c of this.childNodes) {
       if (c.classList.contains(cls)) return c;
@@ -305,6 +315,36 @@ describe("⑥ 대화창 꼬리 — 접수·무르기 60초", () => {
     expect(el.찾기("wf-flag")!.hidden, "무른 뒤에는 다시 지적할 수 있어야 한다").toBe(false);
   });
 
+  it("★ 무른 뒤 **정말로 다시 올려진다** — 「올리는 중…」이 굳은 단추로 남지 않는다", async () => {
+    // 2026-09-07 검토관 contract: 꼬리 단추는 되살아나는데 올리기 단추가 disabled 그대로라
+    // 다시 펼쳐도 클릭이 안 갔다. 「다시 지적할 수 있다」는 주석이 절반만 참이었다.
+    const el = 자리();
+    const 보냄: Record<string, unknown>[] = [];
+    let 다음id = 20;
+    부품().flag(el, { question: "q", answer: "a" }, {
+      send: async (b: Record<string, unknown>) => { 보냄.push(b); return { id: 다음id++ }; },
+      remove: async () => ({ ok: true }),
+    });
+    el.찾기("wf-flag")!.누르기();
+    el.찾기("wf-go")!.누르기();
+    await new Promise((r) => setTimeout(r, 0));
+    el.찾기("wf-undo")!.누르기();
+    await new Promise((r) => setTimeout(r, 0));
+
+    el.찾기("wf-flag")!.누르기();                 // 다시 펼친다
+    const go = el.찾기("wf-go")!;
+    expect(go.disabled, "올리기가 굳어 있다 — 눌러도 아무 일이 없다").toBe(false);
+    expect(go.textContent, "「올리는 중…」이 그대로 남았다").toBe("올리기");
+    expect(el.찾기("wf-done")!.hidden, "무른 영수증이 입력 줄과 나란히 남았다 — 올렸는지 물렸는지 안 보인다").toBe(true);
+
+    go.누르기();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(보냄.length, "다시 올리기가 서버로 안 갔다").toBe(2);
+    expect(el.찾기("wf-done")!.글자(), "두 번째 접수의 올림 줄이 안 떴다").toContain("결재판에 올림");
+    expect((el.찾기("wf-done")!.글자().match(/무른 지적입니다/g) || []).length,
+      "옛 영수증이 새 영수증 옆에 쌓였다").toBe(0);
+  });
+
   it("보내기가 실패하면 「접수됨」이라 말하지 않는다(가짜 성공 금지)", async () => {
     const el = 자리();
     부품().flag(el, { question: "q", answer: "a" }, { send: async () => { throw new Error("서버 오류 500"); } });
@@ -313,5 +353,136 @@ describe("⑥ 대화창 꼬리 — 접수·무르기 60초", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(el.찾기("wf-done")!.hidden, "실패했는데 올림 줄을 띄웠다").toBe(true);
     expect(el.찾기("wf-line")!.글자()).toContain("보내지 못했습니다");
+  });
+});
+
+/* ═══ ⑦ 검토관 적발 수리(2026-09-07 · C-A 병렬 검토관 15건) ════════════════════════
+ *
+ * 아래 하나하나가 **실제로 재현된 결함**의 짝이다. 재현 방법이 시험마다 다른 이유:
+ * 화면 하나를 통째로 돌리는 시험은 이 파일 ⑥이 이미 하고 있고(부품), 나머지는 인라인
+ * <script>라 떼어 돌리는 값이 크지 않아 **약속과 코드가 어긋나는 자리**를 못 박는다.
+ */
+describe("⑦ 검토관 적발 — 두 원장이 화면 글자에서도 안 섞인다", () => {
+  /** 함수 몸에서 `} catch (e) {` 뒤만 자른다 — 「목록을 지우는 두 번째 자리」가 거기다.
+   *  ⚠ **주석 줄은 걷어 낸다**: 자리 순서를 재는 시험인데 주석에 같은 이름이 나오면
+   *    「지우고 나서 가드」로 잘못 읽는다(실제로 이 시험이 그렇게 한 번 헛짚었다). */
+  function catch몸(머리: string): string {
+    const 몸 = 함수몸(approvals, 머리).split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+    const i = 몸.indexOf("} catch (e) {");
+    expect(i, `${머리} 에 catch가 없다 — 이 시험이 헛돈다`).toBeGreaterThan(0);
+    return 몸.slice(i);
+  }
+
+  it("★ loadReviews의 catch가 지적 목록을 덮지 않는다(renderList와 **같은 가드**)", () => {
+    // 재현: ?fix=open으로 들어와 loadFix가 먼저 끝나 지적 목록이 그려진 뒤 listApprovals가
+    //   늦게 실패하면, 이미 그려진 지적 1건이 「불러오지 못했습니다: 서버 오류 500」으로 바뀌었다.
+    //   ⚠ 파일 자신의 주석이 「목록을 지우는 자리가 둘」이라 적어 두고 **또 한 곳만** 막았다.
+    const 몸 = catch몸("async function loadReviews(");
+    expect(몸, "catch에 segMode 가드가 없다 — 딴 원장의 오류가 지적 목록을 덮는다").toContain('segMode === "fix"');
+    // 목록을 지우는 손은 둘 다 가드 **뒤**에 와야 한다 — 지운 다음의 가드는 소용이 없다.
+    //   (지우는 일 자체는 취약점오류그리기()로 모았다. 이름이 바뀌면 아래 「헛돎 방지」가 빨개진다.)
+    const 가드 = 몸.indexOf('segMode === "fix"');
+    for (const 손 of ["취약점오류그리기()", "보는목록알림(null)"]) {
+      const i = 몸.indexOf(손);
+      expect(i, `catch에 ${손} 가 없다 — 이 시험이 헛돈다`).toBeGreaterThan(0);
+      expect(가드, `가드가 ${손} **뒤**에 있다 — 이미 덮은 다음이라 소용없다`).toBeLessThan(i);
+    }
+    expect(몸, "취약점 쪽이 왜 안 읽히는지 기록하지 않는다 — 세그먼트 숫자가 0으로 거짓말한다")
+      .toContain("vulnError");
+    // 💬를 보다 🔧로 돌아오면 이유가 보여야 한다 — 안 그리면 빈 목록이 「취약점이 없습니다」로 거짓말한다.
+    expect(함수몸(approvals, "function setSeg(mode) {"), "🔧로 돌아왔는데 실패를 안 알린다").toContain("vulnError");
+    expect(approvals, "취약점오류그리기가 없다 — 지우는 자리를 안 모았다").toContain("function 취약점오류그리기()");
+  });
+
+  it("★ 세그먼트 숫자도 자산 좁히기를 탄다 — 한 화면에 「열린 일감」이 둘이면 안 된다", () => {
+    // 재현: ?asset=A1(A1 2건·A2 1건)에서 🔧 세그먼트=3, 바로 아래 조치대상 알약=2였다.
+    //   이 파일 351~353행이 「목록은 3건인데 위에 46이라 적혀 있으면 무엇을 믿나」라고
+    //   스스로 못 박은 규칙을 새 숫자가 깼다.
+    const 몸 = 함수몸(approvals, "function 세그숫자() {");
+    expect(몸, "🔧 숫자가 scopeAsset을 안 본다 — 알약과 갈린다").toContain("scopeAsset");
+  });
+
+  it("★ 자산 좁히기 띠는 취약점 원장의 말이다 — 지적 목록 위에 서지 않는다", () => {
+    // 재현: ?asset=A1로 들어와 💬를 누르면 「🎯 web-01 의 취약점만 보는 중 — 2건」이 그대로 서고,
+    //   아래 목록은 자산과 무관한 답 지적이었다. rvFilt·vizStrip·vex는 숨겼는데 rvScope만 빠졌다.
+    //   판정을 **renderScope 한 곳**에 둔다 — setSeg에서 또 숨기면 표시 자리가 둘이 된다.
+    expect(함수몸(approvals, "function renderScope() {"), "띠가 segMode를 안 본다").toContain("segMode");
+    expect(함수몸(approvals, "function setSeg(mode) {"), "원장을 바꿔도 띠를 다시 안 그린다").toContain("renderScope()");
+  });
+
+  it("갈래 칩 숫자가 **열림 기준**임을 화면이 말한다(칩 0인데 목록 3줄이 뜬다)", () => {
+    // 감독 화면은 같은 숫자에 「열림 기준(0건도 그립니다)」이라 적는데 결재판 칩엔 그 말이 없었다.
+    // ⚠ **주석이 아니라 화면 글자**를 본다 — 처음엔 파일 아무 데나 「열림 기준」이 있으면 통과하게
+    //   짰더니, 안내 문구를 지우는 변이에도 초록이었다(수리 근거를 적어 둔 주석이 대신 걸렸다).
+    const 안내 = approvals.match(/<span class="muted-s" id="fixChipNote"[^>]*>([^<]*)</);
+    expect(안내, "칩 안내 문구(#fixChipNote)가 사라졌다").not.toBeNull();
+    expect(안내![1], "칩 숫자의 잣대를 화면이 말하지 않는다 — 0인데 3줄이 뜨면 숫자가 틀린 줄 안다")
+      .toContain("열림 기준");
+  });
+
+  it("담당자가 읽는 문구에 마크다운 별표가 남지 않는다(innerHTML은 마크다운을 안 그린다)", () => {
+    const 몸 = 함수몸(approvals, "function renderFixDetail(r) {")
+      .split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*|<!--)/.test(l)).join("\n");
+    expect(몸, "화면에 `**얹습니다**`처럼 별표가 그대로 보인다").not.toMatch(/\*\*[^*\n]+\*\*/);
+  });
+
+  it("★ 통로 타입에 fixboard 칸이 있다 — 화면이 읽는 값을 타입이 모르면 tsc가 못 지킨다", () => {
+    const 서버 = fs.readFileSync(path.join(__dirname, "../src/engine/llmactivity.ts"), "utf8");
+    expect(서버, "서버가 fixboard를 안 싣는다 — 이 시험이 헛돈다").toContain("fixboard:");
+    const i = consoleApi.indexOf("export interface SupervisionData {");
+    expect(i, "SupervisionData를 못 찾았다").toBeGreaterThan(0);
+    const 몸 = consoleApi.slice(i, consoleApi.indexOf("\n}", i));
+    expect(몸, "SupervisionData에 fixboard가 없다 — supervision.html이 타입 밖의 값을 읽는다").toContain("fixboard?:");
+    expect(몸, "옛 서버 대비 optional이 아니다 — citeReasons가 지킨 관례가 깨진다").toMatch(/fixboard\?:/);
+  });
+
+  it("★ 「결재판 열기」는 폴백이 **셋**이다 — embed 자리에서 죽은 단추가 되지 않는다", () => {
+    // 재현: 라이트 대화(lite-chat.html → console.html?embed=1&edition=lite)에서는
+    //   IS_WINDOW=false이고 window.gijoTabs도 없다(app.html에만 있다) — 두 분기가 다 거짓이라
+    //   눌러도 아무 일이 없었다. navigateTo는 embed면 preload가 셸로 postMessage하고,
+    //   없는 화면이면 셸이 「이 기능은 라이트 에디션에 없습니다」로 **정직하게** 답한다.
+    const 몸 = 함수몸(console_, "function 결재판열기() {");
+    expect(몸, "openTabInShell 분기가 없다").toContain("openTabInShell");
+    expect(몸, "gijoTabs 분기가 없다").toContain("gijoTabs");
+    expect(몸, "navigateTo 폴백이 없다 — 셸도 창도 아닌 자리에서 죽은 단추가 된다").toContain("navigateTo");
+  });
+
+  it("★ 대화창이 미리 보여 주는 갈래가 서버 판정과 **같다**(세 벌로 갈라진 라벨)", () => {
+    // 이 자리가 접수 **전에** 「무엇으로 저장될지」를 사람에게 알려 주는 유일한 문구다.
+    // 예전엔 chatparts의 라벨·규칙을 틀리게 바꿔도 25개가 전부 초록이었다(검토관 promise).
+    const 서버 = fs.readFileSync(path.join(__dirname, "../src/engine/fixboard.ts"), "utf8");
+    for (const [k, ko] of [["doc", "자료 부족"], ["rule", "사내 규정"], ["prod", "제품"], ["unclassified", "미분류"]] as const) {
+      expect(서버, `서버 라벨(${k})을 못 읽었다 — 이 시험이 헛돈다`).toContain(`${k}: "${ko}"`);
+      expect(chatparts, `대화창 라벨(${k})이 서버와 다르다 — 같은 것이 두 이름이 된다`).toContain(`${k}: "${ko}"`);
+    }
+    expect(서버, "서버 자동 갈래 규칙이 바뀌었다 — 아래 화면 규칙도 함께 고칠 것")
+      .toContain('return 근거없음값검증(입력.noev) ? "doc" : null;');
+    expect(chatparts, "화면이 서버와 다른 규칙으로 갈래를 미리 말한다")
+      .toContain('ctx.noev ? "doc" : "unclassified"');
+  });
+
+  it("★ 무르기 시간이 서버 상수와 **값이 같다**(주석이 약속한 그 어긋남을 실제로 잰다)", () => {
+    // 주석은 「어긋나면 짝 시험(⑥)이 빨개진다」고 적었는데, ⑥은 59초/61초 **리터럴**만 써서
+    //   서버가 30초로 바뀌면 클라는 60초로 남고 시험은 초록인 채 단추가 403을 받았다.
+    const 서버src = fs.readFileSync(path.join(__dirname, "../src/engine/answerfeedback.ts"), "utf8");
+    const 서버 = 서버src.match(/export const 무르기시간_MS = (\d+);/);
+    const 클라 = chatparts.match(/var 무르기_MS = (\d+);/);
+    expect(서버, "서버 상수를 못 읽었다 — 이 시험이 헛돈다").not.toBeNull();
+    expect(클라, "클라 상수를 못 읽었다").not.toBeNull();
+    expect(Number(클라![1]), "화면이 서버보다 길거나 짧게 무를 수 있다고 말한다").toBe(Number(서버![1]));
+  });
+
+  it("★ 「대화창에 담기」가 **닿았을 때만** 담았다고 말한다(가짜 성공 금지)", () => {
+    // 재현 아님(분리창 필요) — 코드가 그 사실을 **가릴 수 없게** 못 박는다.
+    //   분리창(openShellPopout)에서는 window.top이 자기 자신이라 예외도 안 나고 메시지도 안 닿아,
+    //   담당자는 대화창에 가서 빈 입력칸을 본다. 주석은 「아래 안내가 그 사실을 말한다」고 적었는데
+    //   그런 안내가 코드에 없었다(대화창 꼬리에는 지킨 규칙이 여기서만 깨졌다).
+    const i = approvals.indexOf('누르면("fxToChat"');
+    expect(i, "fxToChat 배선을 못 찾았다").toBeGreaterThan(0);
+    const 몸 = approvals.slice(i, approvals.indexOf('누르면("fxResolve"', i));
+    expect(몸, "분리창용 다리(bridgeToShell)를 안 쓴다 — 셸 밖에서는 메시지가 제자리에 떨어진다")
+      .toContain("bridgeToShell");
+    expect(몸, "성공 문구가 조건 없이 나간다 — 안 얹혔는데 얹었다고 말한다").toMatch(/\?\s*"|if \(/);
+    expect(몸, "못 얹었을 때 할 말이 없다").toContain("얹지 못했습니다");
   });
 });

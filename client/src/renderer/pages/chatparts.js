@@ -936,7 +936,8 @@
     memo.placeholder = "한 줄 메모(선택) — 무엇이 틀렸나요";
     line.appendChild(memo);
 
-    var go = 만들기("button", "wf-go", "올리기");
+    var GO_LABEL = "올리기";
+    var go = 만들기("button", "wf-go", GO_LABEL);
     var close = 만들기("button", "wf-x", "닫기");   // ⚠ 클래스를 무르기(.wf-undo)와 가른다 — 같으면 「취소」를 눌렀는지 「닫기」를 눌렀는지 코드도 시험도 못 가린다
     line.appendChild(go);
     line.appendChild(close);
@@ -949,12 +950,25 @@
       자리.appendChild(오류줄);
     };
 
-    btn.addEventListener("click", function () { btn.hidden = true; line.hidden = false; if (memo.focus) memo.focus(); });
+    // 펼치기 — **여기가 「처음부터 다시」의 단일 자리**다(2026-09-07 검토관 [중간]).
+    //   무른 뒤에도 이 단추로 돌아오는데, 예전엔 올리기가 disabled·「올리는 중…」인 채로 남아
+    //   **눌러도 클릭이 안 가는 굳은 단추**였다(가짜 DOM은 disabled를 안 흉내 내 초록이었다).
+    //   옛 영수증(done)도 같이 걷는다 — 안 걷으면 「무른 지적입니다」가 입력 줄과 나란히 서고,
+    //   다시 올리면 새 영수증이 그 아래 쌓여 무엇이 지금 일인지 못 읽는다.
+    btn.addEventListener("click", function () {
+      btn.hidden = true;
+      line.hidden = false;
+      done.hidden = true;
+      while (done.childNodes && done.childNodes.length) done.removeChild(done.childNodes[0]);
+      if (오류줄 && 오류줄.parentNode) { 오류줄.parentNode.removeChild(오류줄); 오류줄 = null; }
+      go.disabled = false;
+      go.textContent = GO_LABEL;
+      if (memo.focus) memo.focus();
+    });
     close.addEventListener("click", function () { line.hidden = true; btn.hidden = false; });
 
     go.addEventListener("click", function () {
       go.disabled = true;
-      var 옛글 = go.textContent;
       go.textContent = "올리는 중…";
       Promise.resolve(부름.send({
         kind: picked,
@@ -972,7 +986,7 @@
       }, function (e) {
         // ⚠ 실패했는데 「접수됨」이라 말하지 않는다 — 가짜 성공은 QA가 못 잡는다.
         go.disabled = false;
-        go.textContent = 옛글;
+        go.textContent = GO_LABEL;
         알림(line, "보내지 못했습니다: " + ((e && e.message) || e));
       });
     });
@@ -995,7 +1009,9 @@
             if (시계) clearTimeout(시계);
             while (done.childNodes && done.childNodes.length) done.removeChild(done.childNodes[0]);
             done.appendChild(만들기("span", "wf-hint", "무른 지적입니다 — 기록에 남지 않았습니다."));
-            btn.hidden = false;   // 다시 지적할 수 있다
+            // 다시 지적할 수 있다 — 되돌리기(올리기 단추·옛 영수증)는 **꼬리를 다시 펼칠 때**
+            // 한 곳에서 한다(위 btn 리스너). 여기서 또 되돌리면 되돌리는 자리가 둘이 된다.
+            btn.hidden = false;
           }, function (e) {
             무르기.disabled = false;
             알림(done, "무르지 못했습니다: " + ((e && e.message) || e));
