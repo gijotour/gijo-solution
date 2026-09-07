@@ -415,6 +415,7 @@ describe("★ 탭 이름 — 파일명을 사람에게 보이지 않는다", () 
 describe("★ 미배정 승인 배지 — 부착점이 실존하고, 판정은 한 곳이다", () => {
   const nav = fs.readFileSync(new URL("../../client/src/renderer/pages/nav.js", import.meta.url), "utf8");
   const 판 = fs.readFileSync(new URL("../../client/src/renderer/pages/grouppanels.js", import.meta.url), "utf8");
+  const 승인화면 = fs.readFileSync(new URL("../../client/src/renderer/pages/approvals.html", import.meta.url), "utf8");
   const 배지클래스 = "gn-apvbadge";
 
   it("이 감시가 헛돌지 않는다 — 배지 자체를 실제로 읽어 온다", () => {
@@ -439,13 +440,46 @@ describe("★ 미배정 승인 배지 — 부착점이 실존하고, 판정은 �
       "preload에 미배정 판정이 없다 — 두 화면이 각자 세게 된다").toBe(true);
     expect(nav.includes("window.gijo.isUnassignedApproval"), "사이드바 배지가 공용 판정을 안 쓴다").toBe(true);
     expect(판.includes("window.gijo.isUnassignedApproval"), "✅ 판 배지가 공용 판정을 안 쓴다").toBe(true);
+    // 실화면도 같은 창구를 쓴다 — 배지 둘만 맞추고 목록이 옛 잣대로 남으면 「배지 3, 목록 5」가 된다.
+    expect(승인화면.includes("window.gijo.isUnassignedApproval"),
+      "③ 조치 실화면(approvals.html)이 공용 판정을 안 쓴다 — 알약 숫자와 배지가 갈린다").toBe(true);
     // 식을 **다시 쓰지 않는다** — 두 벌이 되는 순간 같은 것을 두 숫자로 말한다.
+    // ⚠ 부정목록형(status !== …)만 보면 반쪽이다. approvals.html은 **허용목록형**
+    //   ["pending","in_progress","verifying"]으로 같은 판정을 하고 있었다 — 오늘은 답이
+    //   같지만 상태가 하나 늘면 조용히 갈린다. 두 꼴을 **함께** 잡는다.
     const 다시쓴것: string[] = [];
-    for (const [이름, 글] of [["nav.js", nav], ["grouppanels.js", 판]] as [string, string][]) {
+    for (const [이름, 글] of [["nav.js", nav], ["grouppanels.js", 판], ["approvals.html", 승인화면]] as [string, string][]) {
       const j = 글.indexOf('status !== "approved"');
-      if (j >= 0 && 글.slice(j, j + 200).includes('status !== "accepted"')) 다시쓴것.push(이름);
+      if (j >= 0 && 글.slice(j, j + 200).includes('status !== "accepted"')) 다시쓴것.push(이름 + "(부정목록형)");
+      if (/!\s*\w+\.assignee[\s\S]{0,120}\["pending"/.test(글)) 다시쓴것.push(이름 + "(허용목록형)");
     }
     expect(다시쓴것, "미배정 식을 직접 다시 썼다 — preload의 isUnassignedApproval을 쓸 것: " + 다시쓴것.join(", ")).toEqual([]);
+  });
+
+  // ★ 판정을 한 곳으로 모아도, **상태 목록**이 클라·서버에서 갈리면 그 한 곳이 거짓말을 한다.
+  //   실측(2026-09-07 검토): 서버는 accepted를 포함해 6종인데 클라 타입은 5종에 멈춰 있었다.
+  //   그래서 「위험수용은 세지 않는다」를 타입으로 쓸 수 없었고(없는 값과 비교하면 TS2367),
+  //   판정 함수가 status를 느슨한 string으로 받아 tsc를 통째로 비켜 갔다. 글자로 대조한다.
+  it("★ 클라 ApprovalStatus가 서버와 **같은 6종**이다 — 갈리면 타입이 규칙을 못 지킨다", () => {
+    const 뽑기 = (글: string, 어디: string) => {
+      const m = /export type ApprovalStatus\s*=\s*([^;]+);/.exec(글);
+      expect(m, `${어디}에서 ApprovalStatus를 못 찾았다 — 이 시험이 헛돈다`).toBeTruthy();
+      return m![1].split("|").map((x) => x.trim().replace(/^"|"$/g, "")).filter(Boolean);
+    };
+    const 서버 = 뽑기(fs.readFileSync(new URL("../src/engine/approvals.ts", import.meta.url), "utf8"), "서버 approvals.ts");
+    const 클라 = 뽑기(fs.readFileSync(new URL("../../client/src/api/security-ops.ts", import.meta.url), "utf8"), "클라 security-ops.ts");
+    expect(서버).toContain("accepted");
+    expect(클라, "클라 상태 목록이 서버와 다르다 — 서버가 원천이니 클라를 맞출 것").toEqual(서버);
+  });
+
+  // 판정 함수가 status를 **string으로 받으면** 위 대조가 있어도 소용없다 — 오타든 없어진
+  // 상태든 tsc가 통과시킨다. 타입으로 받는지를 소스로 못 박는다.
+  it("판정 함수가 status를 느슨한 string으로 받지 않는다", () => {
+    const i = preloadSrc.indexOf("isUnassignedApproval:");
+    expect(i, "isUnassignedApproval을 못 찾았다").toBeGreaterThan(0);
+    const 서명 = preloadSrc.slice(i, i + 200);
+    expect(서명.includes("api.ApprovalStatus"),
+      "status를 api.ApprovalStatus로 받을 것 — string이면 없는 상태와 비교해도 tsc가 못 잡는다").toBe(true);
   });
 
   it("배지의 **생산자**가 실재한다 — 소비자만 있고 생산자 없는 값을 만들지 않는다", () => {

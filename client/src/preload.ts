@@ -371,17 +371,23 @@ const gijoApi = {
   listModelDex: () => api.modelDexApi.list(),
   listLlmGuide: () => api.modelDexApi.guide(),
   listApprovals: () => api.approvalsApi.list(),
-  // 「미배정」 판정 — **제품 전체에서 한 곳**이다(2026-09-07 승인 배지). 사이드바 ③ 조치 배지(nav.js
-  //   refreshApvBadge)와 ③ 조치 허브의 ✅ 조치·승인 판 배지(grouppanels.js)가 **같은 수**를 말해야
-  //   하는데, 각자 식을 쓰면 한쪽만 고치는 날 두 숫자가 갈린다(grouppanels.js:98 주석의 계보 —
-  //   판 배지·하위 목록·실화면이 서로 다른 수를 가리키고 있었다).
-  //   원천은 서버 approvals.ts:253이고 실화면 approvals.html도 같은 식이다 — 완료·반려·**위험수용**은
-  //   담당자를 안 붙이는 것이 정상이라 세지 않는다.
-  // ⚠ 화면 스크립트가 이 식을 **다시 쓰지 않는다**(clientglobals.test가 소스로 감시한다).
+  // 「미배정」 판정 — **화면 쪽 단일 창구**다(2026-09-07 승인 배지).
+  //   원천은 서버 `approvals.ts`의 `isUnassignedReview`(같은 파일 안에서도 그 함수만 쓴다).
+  //   이 줄은 그 규칙을 렌더러에 옮겨 놓은 **한 벌**이고, 화면은 여기만 부른다:
+  //     · 사이드바 ③ 조치 배지(nav.js refreshApvBadge)
+  //     · ③ 조치 허브 ✅ 조치·승인 판 배지(grouppanels.js)
+  //     · ③ 조치 허브 실화면(approvals.html — 알약 「미배정」 거르개·건수·줄 꼬리표)
+  //   각자 식을 쓰면 한쪽만 고치는 날 **같은 것을 두 숫자**로 말한다. 실제로 approvals.html은
+  //   허용목록형 ["pending","in_progress","verifying"]을, 나머지는 부정목록형을 쓰고 있었다 —
+  //   오늘은 답이 같지만 상태가 하나 늘면 갈린다(accepted가 늘던 2026-08-20이 그 자리였다).
+  //   완료·반려·**위험수용**은 담당자를 안 붙이는 것이 정상이라 세지 않는다.
+  // ⚠ 화면 스크립트가 이 식을 **다시 쓰지 않는다**(clientglobals.test가 세 파일을 소스로 감시한다).
   //   preload에 둔 이유: nav.js는 모든 화면이 싣고 grouppanels.js는 허브 화면만 싣는다 — 공용 .js를
   //   새로 만들면 그 script 태그를 한 화면에서 빠뜨려도 조용히 통과한다(부품 로드 누락 5화면 「거짓
   //   초록」 전례). preload는 모든 렌더러에 **먼저** 붙어 로드 순서 사고가 없다.
-  isUnassignedApproval: (x: { assignee?: string | null; status?: string }) =>
+  // ⚠ status를 `api.ApprovalStatus`로 받는다 — 느슨한 string이면 오타·없어진 상태와 비교해도
+  //   tsc가 통과시킨다(실제로 클라 타입에 accepted가 없던 채로 accepted와 비교하고 있었다).
+  isUnassignedApproval: (x: { assignee?: string | null; status?: api.ApprovalStatus }) =>
     !x.assignee && x.status !== "approved" && x.status !== "rejected" && x.status !== "accepted",
   // status·note·assignee·dueDate를 부분 갱신. status만 주면 기존 승인/반려 동작과 동일.
   setFindingReview: (assetId: string, key: string, patch: api.ReviewPatch) => api.approvalsApi.set(assetId, key, patch),

@@ -318,8 +318,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   function keyOf(r) { return `${r.assetId}\0${r.findingKey}`; }
   // 미배정 = 실수행 담당자가 없는 조치 대상. 검증은 배정된 건에만 실행되므로 병목이다.
+  // ⚠ 식을 여기 다시 쓰지 않는다 — 사이드바 「③ 조치」 배지·✅ 판 배지·이 화면이 **같은 수**를
+  //   말해야 한다. 원천은 서버 approvals.ts isUnassignedReview이고, 화면 쪽 단일 창구가
+  //   preload의 isUnassignedApproval이다(clientglobals.test가 소스로 감시한다).
+  //   옛 식은 허용목록형 ["pending","in_progress","verifying"]이라 상태가 하나 늘면 조용히
+  //   빠뜨린다 — 실제로 accepted(위험수용)가 늘던 날 이 화면만 옛 잣대로 남을 뻔했다.
   function isUnassigned(r) {
-    return !r.assignee && ["pending", "in_progress", "verifying"].includes(r.status);
+    return window.gijo.isUnassignedApproval(r);
   }
   // 지연 = 기한이 지났는데 아직 안 끝난 건. ⚠ **서버 approvals.ts isOverdue와 같은 잣대**를
   // 쓴다 — 개수는 서버 요약(summary.overdue)이 주고 여기서는 「어느 줄이 그건가」만 고른다.
@@ -543,7 +548,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       }
       else if (r.overdue) bits.push("⚠지연");
       else if (r.dueDate) bits.push("📅" + esc(r.dueDate.slice(5)));
-      if (!r.assignee && r.status !== "rejected" && r.status !== "approved" && r.status !== "accepted") bits.push("미배정");
+      if (isUnassigned(r)) bits.push("미배정");
       // 구분자(\0)는 HTML 속성에서 유실되므로 assetId·findingKey를 별도 data 속성으로 싣는다.
       const ck = r.status === "rejected" || r.status === "approved" ? "" :
         `<input type="checkbox" class="rv-ck" data-ck="1"${selected.has(keyOf(r)) ? " checked" : ""}>`;

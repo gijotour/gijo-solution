@@ -409,7 +409,11 @@ export const hardeningApi = {
 };
 
 // ── 승인 워크플로우(스캔 finding 검토 → 승인/반려) ──────────────────────
-export type ApprovalStatus = "pending" | "in_progress" | "verifying" | "approved" | "rejected";
+// ⚠ 서버 approvals.ts의 ApprovalStatus와 **글자 그대로 같아야** 한다(clientglobals.test가 대조한다).
+//   2026-08-20에 서버가 accepted(위험수용)를 늘렸는데 이쪽은 5종에 멈춰 있었다 — 그래서
+//   「위험수용은 미배정으로 세지 않는다」는 규칙을 타입으로 쓸 수 없었고(존재하지 않는 값과
+//   비교하면 TS2367), 판정 함수가 status를 느슨한 string으로 받아 검사를 통째로 비켜 갔다.
+export type ApprovalStatus = "pending" | "in_progress" | "verifying" | "approved" | "rejected" | "accepted";
 export type RejectReason = "false_positive" | "compensating_control";
 
 export interface FindingReview {
@@ -430,6 +434,8 @@ export interface FindingReview {
   resolvedAt?: number;
   overdue?: boolean;
   gone?: boolean; // 재스캔에서 사라짐
+  acceptUntil?: string; // 위험수용 기한 'YYYY-MM-DD' — accepted일 때만 값이 있다
+  acceptedBy?: string; // 위험수용 처리자
 }
 
 export interface ReviewPatch {
@@ -443,6 +449,8 @@ export interface ReviewPatch {
 
 export interface ApprovalSummary {
   total: number; pending: number; in_progress: number; verifying: number; approved: number; rejected: number; overdue: number;
+  accepted: number; // 위험수용(기한부) — 일감은 아니지만 감춰지지 않는다
+  acceptExpired: number; // 수용 기한이 지난 건 — 재검토 대상으로 다시 부상한다
   // 스캔이 실패해 결과를 못 받은 건수 — 취약점이 아니라 **스캐너를 고칠 일**이라 따로 센다.
   // (2026-08-01: 605건 중 602건이 스캔 오류였는데 "미검토 602건"으로 보였다.)
   scanFailed?: number;

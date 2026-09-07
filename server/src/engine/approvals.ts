@@ -264,7 +264,7 @@ export function assetProgress(assetId: string): { inProgress: number; unassigned
       if (r.assetId !== assetId) continue;
       if (!isRealVulnerability(r.finding)) continue;   // 스캔 오류는 취약점이 아니다
       if (r.status === "in_progress") inProgress++;
-      if (!r.assignee && r.status !== "approved" && r.status !== "rejected" && r.status !== "accepted") unassigned++; // 수용 건은 담당자를 안 붙이는 게 정상(중3)
+      if (isUnassignedReview(r)) unassigned++; // 판정은 isUnassignedReview 한 곳(수용 건은 담당자를 안 붙이는 게 정상)
     }
   } catch { /* 대장을 못 읽으면 0 — 화면은 「—」로 그린다 */ }
   return { inProgress, unassigned };
