@@ -163,6 +163,7 @@
 - Phase 1(크로스플랫폼 분기: localengine·preflight·build-server-dist·package.json mac 타깃)은 완료 상태(2026-07-24).
 
 ## 주의·함정 (실사고 기반)
+- **공유 작업 트리에서 `git commit --amend` 금지**(2026-09-07 실사고). 실행자 둘이 같은 트리에서 일할 때 한쪽이 amend를 치는 사이 다른 쪽이 커밋해 HEAD가 옮겨 갔고, amend가 **남의 커밋 메시지를 덮어** main이 hub와 갈라졌다(복구: 부모를 원본 커밋으로 둔 같은 트리의 복구 커밋 + `update-ref`). 메시지를 고치려면 새 커밋으로 적는다. 같은 이유로 pull/rebase/stash/checkout/reset도 병렬 작업 중엔 금지.
 - ~~`client/server-dist/package.json`은 추적 산출물 — 빌드 후 `git checkout`으로 되돌려 clean 유지.~~ **2026-08-13 폐지** — 추적을 끊었다(`client/.gitignore`). `build-server-dist.mjs:39-40`이 `server/`의 같은 파일을 그대로 복사하는 **사본**이라 담는 정보가 0인데 실제로 어긋나 있었다(커밋 0.1.0 vs server 2.1.0). 이제 빌드해도 트리가 안 더러워지므로 **되돌릴 일이 없다.**
 - 한글 HTTP 검증에 curl 쓰지 말 것(깨짐) — Node fetch로. 한글 파일 조작은 perl 대신 Node. `PYTHONUTF8=1`.
 - 7B 모델에 프롬프트 규칙을 더해 행동 교정하려 하지 말 것 — 코드로 해결(반복 실패 사례 있음).
