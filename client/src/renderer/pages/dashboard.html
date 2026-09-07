@@ -601,8 +601,16 @@
   async function loadKnowledgeBox() {
     var g = window.gijo;
     if (!g || !g.listMemoryDocuments || !$("kbKpi")) return;
+    // 「내 지식창고」의 모집단 — **승인 문답·침해사고 사례는 문서가 아니다**(2026-09-07 검토관 [중]).
+    //   왜: 서버 runKnowledgeStatus도, 문서함(mydocs)도, 지식 창고(memory.html)도 이 둘을 문서에서
+    //   뺀다 — id가 「승인문답:…」·「incident-case:ic-…」라 사람이 못 읽고 관리 자리가 따로 있다.
+    //   이 카드만 넣어 세어, 같은 낱말 「⚠ 조각 없음 N」이 여기선 4·문서함에선 1이었다.
+    //   ★ 개인 문서(personal:)는 **일부러 넣는다** — 🏢 회사 지식은 「남과 나누는 문서」의 자리라
+    //     빼지만, 여기 「내 지식창고」는 내 개인 문서까지가 내 것이다. 짝 시험 ⑥이 이 한 가지
+    //     차이만 허용하고, 다른 데서 갈리면 빨개진다(server/test/docstateui.test.ts).
+    function 지식창고문서인가(d) { return !!d && d.origin !== "approved-qa" && d.origin !== "incident-case"; }
     var docs = [];
-    try { var dd = await g.listMemoryDocuments(); docs = Array.isArray(dd) ? dd : (dd && dd.documents) || []; }
+    try { var dd = await g.listMemoryDocuments(); docs = (Array.isArray(dd) ? dd : (dd && dd.documents) || []).filter(지식창고문서인가); }
     catch (e) { $("kbKpi").innerHTML = '<div class="kb-empty">지식창고를 불러오지 못했습니다</div>'; return; }
     // 제품이 넣은 것과 내가 넣은 것을 가른다(라이트 실측 교훈 — 첫날 「문서 19」가 전부 제품이었다)
     var 번들 = new Set();
@@ -627,15 +635,26 @@
         (못읽음 ? (번들.size ? " · " : "") + "⚠ 조각 없음 " + 못읽음 : "")) +
       kbKpi(청크, "검색 조각(청크)", "AI가 찾아보는 단위") +
       kbKpi(내것수, "내가 넣은 문서", "내 지식");
+    // ★ 영역 칸은 **유령이 있는 영역도 남긴다**(2026-09-07 검토관 [낮음]). 읽히는 것만으로 다시
+    //   세면, 그 영역의 문서가 전부 유령일 때 **영역 자체가 표에서 통째로 사라진다** —
+    //   「사라지는 조작 금지」의 데이터 판이고, 같은 유령을 히트맵(memory.html)은 붉게 **보여 준다**.
+    //   문서·조각 수는 읽히는 것만 세되(거짓 숫자 금지), 못 읽는 몫은 ⚠N으로 그 줄에 적는다.
     var cats = {};
-    읽히는.forEach(function (d) { var c = d.category || "미분류"; if (!cats[c]) cats[c] = { d: 0, k: 0 }; cats[c].d++; cats[c].k += (Number(d.chunks) || 0); });
-    var rows = Object.keys(cats).map(function (c) { return { c: c, d: cats[c].d, k: cats[c].k }; }).sort(function (a, b) { return b.k - a.k; });
+    docs.forEach(function (d) {
+      var c = d.category || "미분류";
+      if (!cats[c]) cats[c] = { d: 0, k: 0, g: 0 };
+      if (d && d.docState === "missing") { cats[c].g++; return; }
+      cats[c].d++; cats[c].k += (Number(d.chunks) || 0);
+    });
+    var rows = Object.keys(cats).map(function (c) { return { c: c, d: cats[c].d, k: cats[c].k, g: cats[c].g }; }).sort(function (a, b) { return b.k - a.k; });
     var maxK = rows.reduce(function (m, r) { return r.k > m ? r.k : m; }, 1);
     $("kbBars").innerHTML = rows.length
       ? '<div class="kb-bars-h">분류별 조각</div>' + rows.map(function (r) {
-          return '<div class="kb-bar"><span class="lbl" title="' + esc(r.c) + '">' + esc(r.c) + '</span>' +
+          return '<div class="kb-bar"><span class="lbl" title="' + esc(r.c) +
+            (r.g ? ' — 조각이 없어 AI가 못 읽는 문서 ' + r.g + '건(문서·조각 수에서 뺐습니다)' : '') + '">' + esc(r.c) + '</span>' +
             '<span class="track"><span class="fill" style="width:' + Math.round(r.k / maxK * 100) + '%"></span></span>' +
-            '<span class="num">' + r.k + ' <span class="u">조각 · ' + r.d + '문서</span></span></div>';
+            '<span class="num">' + r.k + ' <span class="u">조각 · ' + r.d + '문서' +
+            (r.g ? ' · ⚠' + r.g : '') + '</span></span></div>';
         }).join("")
       : '<div class="kb-empty"><b>아직 넣은 자료가 없습니다.</b> ＋로 문서를 넣으면 여기 쌓임이 보이고, AI가 그걸 근거로 답합니다.</div>';
     var emb = (docs.find(function (d) { return d.embeddingModel; }) || {}).embeddingModel || "";

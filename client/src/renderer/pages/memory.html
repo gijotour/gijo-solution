@@ -610,7 +610,13 @@ tr:last-child td{border-bottom:none;}
     if (!seg) return;
     const counts = {};
     for (const d of dmDocs) counts[dmCatOf(d)] = (counts[dmCatOf(d)] || 0) + 1;
-    const items = [`<span data-c="전체"${dmSegSel === "전체" ? ' class="on"' : ""}>전체 <b>${dmDocs.length}</b></span>`];
+    // ★ 여기의 수는 **목록에 보이는 줄 수**다(유령 포함) — 바로 위 머리줄의 「N개 문서」는
+    //   **AI가 근거로 쓸 수 있는 수**(유령 제외)다. 둘은 갈린 게 아니라 **다른 질문의 답**이고,
+    //   더하면 맞아떨어진다(요약 표시 + ⚠N = 여기 전체). 5줄 간격으로 두 수가 서는 자리라
+    //   말을 안 붙이면 다음 사람이 한쪽을 「고쳐」 버린다(2026-09-07 검토관 [중]).
+    //   짝 시험 ⑧이 이 관계를 지킨다.
+    const 전체설명 = "목록에 보이는 줄 수입니다 — 조각이 없어 AI가 못 읽는 문서도 줄로는 보입니다(위 머리줄의 문서 수는 그 문서를 뺀 수입니다).";
+    const items = [`<span data-c="전체" title="${dmEsc(전체설명)}"${dmSegSel === "전체" ? ' class="on"' : ""}>전체 <b>${dmDocs.length}</b></span>`];
     for (const g of DM_GROUPS) {
       if (!counts[g.c]) continue; // 문서가 없는 영역은 세그먼트에서 생략(빈 탭 잡음 방지)
       items.push(`<span data-c="${g.c}"${dmSegSel === g.c ? ' class="on"' : ""}>${g.icon} ${g.c} <b>${counts[g.c]}</b></span>`);
@@ -815,7 +821,10 @@ tr:last-child td{border-bottom:none;}
       //   씨앗만으로 20줄이 밀려 들어오는데, 문서명이 「incident-case:ic-…」라 사람이 못 읽고 여기서 지울 수도 없다
       //   (지우면 표와 기억이 어긋난다 — 관리 자리는 📚 침해사고 히스토리 판이다). 서버 소비처(docdigest·docdupe·
       //   recentDocCount)는 이미 빼는데 이 화면만 안 빼서, 「열람 등급 지정」 지표가 등급 없는 20줄에 warn으로 뒤집혔다.
-      dmDocs = dmAllDocs.filter((d) => String(d.documentId || "").indexOf("personal:") !== 0 && d.origin !== "approved-qa" && d.origin !== "incident-case");
+      // ⚠ 술어에 **이름을 준다**(2026-09-07 검토관 [중]) — 같은 모집단을 mydocs.html·grouppanels.js·
+      //   dashboard.html도 각자 적는데 글자가 갈려 「⚠ 조각 없음 N」이 화면마다 다른 수를 냈다.
+      //   이름이 있어야 짝 시험(server/test/docstateui.test.ts ⑥)이 네 벌을 **같은 표본으로 돌려** 견준다.
+      dmDocs = dmAllDocs.filter(function 회사지식인가(d) { return String(d.documentId || "").indexOf("personal:") !== 0 && d.origin !== "approved-qa" && d.origin !== "incident-case"; });
     } catch (e) {
       list.innerHTML = '<div class="dm-empty">불러오지 못했습니다: ' + dmEsc(e.message) + '</div>';
       renderDmKpis(true); // 지표도 사실대로 — 옛 숫자가 남으면 「실패」 옆에 거짓이 선다

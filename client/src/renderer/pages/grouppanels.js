@@ -63,6 +63,17 @@
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   };
 
+  // 📚 지식 판의 **모집단은 여기 한 곳**이다(2026-09-07 검토관 [중]).
+  //   왜: 이 판은 memory.html을 여는데, 종전엔 personal:만 빼서 실화면·mydocs보다
+  //   승인 문답·침해사고 사례만큼 컸다 — 같은 낱말 「⚠ 조각 없음 N」이 여기선 3, 문서함에선 1이었다.
+  //   승인 문답(approved-qa)·침해사고 사례(incident-case)를 빼는 이유는 mydocs와 같다:
+  //   id가 사람이 못 읽는 꼴이고 관리 자리가 따로 있다(학습 화면·📚 히스토리 판).
+  //   ⚠ 요약(load)과 목록(rows)이 **둘 다** 이것을 부른다 — 한쪽만 쓰면 「올린 문서 2」 옆 목록이 3줄이 된다.
+  function 회사지식인가(d) {
+    return !!d && String(d.documentId).indexOf("personal:") !== 0
+      && d.origin !== "approved-qa" && d.origin !== "incident-case";
+  }
+
   // 스캔 오류는 취약점이 아니다(서버 isRealVulnerability와 같은 잣대) — 세는 자리마다 지킨다.
   // ⚠ 서버 목록과 **같아야** 한다 — `scan_not_supported`가 빠져 있어 서버(handlers.ts:198)와
   //   취약점 수가 갈렸다(2026-08-20 설계관 적발). info는 severity 쪽 잣대라 함께 둔다.
@@ -705,18 +716,22 @@
       { id: "knowledge", title: "📚 지식", page: "memory.html", agents: ["사서"], scenario: "파일 반입·활용",
         // rows: 제목 필드가 원천에 없다 — documentId가 곧 이름(실화면 memory.html:703 동일).
         // 등급 한글은 memory.html:664 GRADE_LABEL과 동일.
-        // ⚠ 내 개인 문서(personal: 접두)는 뺀다(설계관 ③-3-1 — 서버는 남의 것만 거르고 내
-        //   것은 포함해, 신설 「내 문서」 판과 같은 문서가 두 판에 세어진다). 실화면
-        //   mydocs.html 회사문서만()과 같은 잣대 — load(요약)도 같은 필터를 쓴다.
+        // ⚠ 모집단은 회사지식인가() 하나 — 요약(load)과 **같은 술어**다(위 정의 참고).
         rows: function () {
           return window.gijo.listMemoryDocuments().then(function (docs) {
             var GL = { O: "공개", S: "민감", C: "기밀" };
-            var ds = (docs || []).filter(function (x) { return String(x.documentId).indexOf("personal:") !== 0; });
+            var ds = (docs || []).filter(회사지식인가);
             return {
               cols: ["문서", "영역", "등급", "반입"],
               grid: "1fr 84px 56px 44px",
               rows: ds.map(function (x) {
-                return [String(x.documentId || "-"), String(x.category || "일반"), 말(GL, x.grade, "미지정"), 날(x.ingestedAt)];
+                // ★ 조각이 없는 문서(유령)는 **줄에서 지우지 않고 표식을 붙인다**(2026-09-07 검토관 [중]).
+                //   이 표에는 조각 수 열이 없어, 표식이 없으면 「등급까지 잘 반입된 문서」와
+                //   글자 하나 안 달랐다 — 요약이 「(⚠ 조각 없음 1)」이라 말해도 어느 줄인지 알 수 없다.
+                //   맨 앞에 ⚠를 두는 이유: 1열은 좁아지면 뒤부터 잘린다(꼬리에 두면 그게 먼저 사라진다).
+                var 이름 = String(x.documentId || "-");
+                return [x.docState === "missing" ? "⚠ " + 이름 + " — 조각 없음(AI가 못 읽습니다)" : 이름,
+                  String(x.category || "일반"), 말(GL, x.grade, "미지정"), 날(x.ingestedAt)];
               }),
             };
           });
@@ -727,11 +742,10 @@
           window.gijo.listMemoryDocuments().catch(function () { 못함.push("문서 목록"); return []; }),
           window.gijo.ontologyStats().catch(function () { 못함.push("온톨로지 통계"); return null; }),
         ]).then(function (r) {
-          // rows와 같은 모집단 — 내 개인 문서(personal:) 제외(검토관 중5: 목록만 거르고
-          // 요약을 안 거르면 같은 판에서 요약과 줄 수가 어긋나고, 내 문서 판과의 이중
-          // 계수가 요약에 그대로 남는다). 이 필터로 요약 수가 줄며 한 번 「바뀜」이 서는
-          // 것은 기준선 재설정으로 정상이다.
-          var docs = (r[0] || []).filter(function (d) { return String(d.documentId).indexOf("personal:") !== 0; });
+          // rows와 **같은 술어**(회사지식인가) — 목록만 거르고 요약을 안 거르면 같은 판에서
+          // 요약과 줄 수가 어긋난다(검토관 중5). 이 필터로 요약 수가 한 번 줄며 「바뀜」이
+          // 서는 것은 기준선 재설정으로 정상이다.
+          var docs = (r[0] || []).filter(회사지식인가);
           // ★ 조각이 없는 문서(유령)는 「올린 문서」에서 **뺀다**(2026-09-07). 대화 답
           //   (runKnowledgeStatus)이 이미 빼고 세는데 이 판만 넣어 세면 같은 숫자를 두 잣대로 말한다.
           //   ⚠ 감추지 않는다 — 「(⚠ 조각 없음 N)」을 값에 병기한다. 빼기만 하면 담당자는
