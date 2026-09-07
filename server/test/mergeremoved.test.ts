@@ -30,6 +30,20 @@ const 흔적 = [
   "SECURITY_LLM_DEX", "synthesisGroups", "listModelDex", "\"/api/modeldex\"",
 ];
 
+// ★ 2026-09-08 — 지운 화면의 **이름 자체가 반드시 살아 있어야 하는 곳이 한 군데** 있다.
+//   셸(app.html)은 localStorage에 저장된 탭을 그대로 iframe에 무는데, 파일이 없으면
+//   ERR_FILE_NOT_FOUND라 그 탭을 켜 둔 채 업데이트한 담당자는 **영구 빈 탭**을 만난다.
+//   nav.js의 TAB_REDIRECT는 이걸 못 막는다 — 파일이 없으면 nav.js가 실리기도 전에 죽는다.
+//   그래서 셸의 「옛탭」 표만이 이 사고를 받을 수 있고, 그 표는 옛 파일명을 **적어야** 한다.
+//   ⇒ 아래 파일·낱말 쌍만 예외로 둔다. 「흔적 0건」을 곧이곧대로 지키면 이 안전망을 못 만든다.
+//   (아래 「셸의 옛탭 표」 시험이 이 예외가 **실제로 그 목적에 쓰였는지**까지 되짚는다.)
+const 코드예외: Record<string, { 낱말: string[]; 왜: string }> = {
+  "client/src/renderer/pages/app.html": {
+    낱말: ["merge.html"],
+    왜: "셸의 「옛탭」 표 — 지운 화면의 옛 탭을 닫고 알리려면 그 파일명을 표가 들고 있어야 한다. 여기서 지우면 merge.html 탭을 켜 둔 채 업데이트한 담당자는 영구 빈 탭을 본다(nav.js 리다이렉트로는 원리상 못 막는다).",
+  },
+};
+
 // 주석에 남는 것은 **기록**이라 막지 않는다 — 다만 어느 파일에 왜 남겼는지 여기 적어야 한다.
 // 표에 없는 파일이 주석으로 merge를 부르면 빨간불이 뜬다(새 주석은 사람이 판단할 자리다).
 const 주석예외: Record<string, string> = {
@@ -81,8 +95,9 @@ describe("★ merge(LLM 합성) 삭제 — 반쪽만 지워지지 않았다", ()
     for (const p of 목록) {
       const 이름 = 상대(p);
       if (이름 === "server/test/mergeremoved.test.ts") continue; // 이 시험 자신(낱말을 들고 있어야 한다)
+      const 허용 = 코드예외[이름]?.낱말 ?? [];
       const 코드 = 주석뗀(fs.readFileSync(p, "utf8"));
-      for (const t of 흔적) if (코드.includes(t)) 걸린것.push(`${이름}: ${t}`);
+      for (const t of 흔적) if (코드.includes(t) && !허용.includes(t)) 걸린것.push(`${이름}: ${t}`);
     }
     expect([...new Set(걸린것)],
       "merge를 내렸는데 코드에 아직 살아 있다 — 화면만 지우고 창구·표를 남기면 아무도 안 부르는 인증 창구가 남는다").toEqual([]);
@@ -101,13 +116,44 @@ describe("★ merge(LLM 합성) 삭제 — 반쪽만 지워지지 않았다", ()
       if (이름 === "server/test/mergeremoved.test.ts") continue;
       const 글 = fs.readFileSync(p, "utf8");
       if (!흔적.some((t) => 글.includes(t))) continue;
-      if (!(이름 in 주석예외)) 표밖.push(이름);
+      if (!(이름 in 주석예외) && !(이름 in 코드예외)) 표밖.push(이름);
     }
     expect(표밖, "merge를 언급하는 새 주석이 생겼다 — 기록으로 남길 이유를 mergeremoved.test.ts 주석예외 표에 적거나, 언급을 지울 것").toEqual([]);
     for (const [f, 사유] of Object.entries(주석예외)) {
       expect(사유.length, `${f}: 예외인데 이유가 없다 — 이유 없는 예외는 다음 사람이 그냥 늘린다`).toBeGreaterThan(30);
       expect(fs.existsSync(path.join(뿌리, f)), `${f}: 표에 있는데 파일이 없다 — 낡은 표는 거짓 안심을 준다`).toBe(true);
     }
+    for (const [f, e] of Object.entries(코드예외)) {
+      expect(e.왜.length, `${f}: 코드예외인데 이유가 없다 — 이유 없는 예외는 다음 사람이 그냥 늘린다`).toBeGreaterThan(30);
+      expect(e.낱말.length, `${f}: 허용 낱말이 비었다 — 그러면 예외가 파일 전체를 통째로 뚫는다`).toBeGreaterThan(0);
+      expect(fs.existsSync(path.join(뿌리, f)), `${f}: 표에 있는데 파일이 없다 — 낡은 표는 거짓 안심을 준다`).toBe(true);
+    }
+  });
+
+  // ★ 2026-09-08 — 위 「흔적 0건」이 **너무 잘 지켜지면 나는 사고**를 여기서 되짚는다.
+  //
+  //   실측한 사고 모양(intro.html, 2026-08-22 검토관 [높음]): 화면 파일을 지우면서 셸의 옛탭 표에
+  //   안 적으면, 그 탭을 켜 둔 채 업데이트한 담당자는 **영구 빈 탭**을 만난다 — 셸이 localStorage의
+  //   탭을 그대로 iframe에 무는데 파일이 없어 ERR_FILE_NOT_FOUND다. 오류 화면도 안 뜨고, 껐다 켜도
+  //   저장값이 그대로라 **영원히** 그 상태다. nav.js TAB_REDIRECT는 원리상 못 받는다(파일이 없으면
+  //   nav.js가 실리기도 전에 로드가 실패한다).
+  //   merge.html은 흡수처조차 없는 **폐지**라 도착지를 지어낼 수도 없다 ⇒ `버림`으로 적어
+  //   탭을 닫고 한 번 알린다. 그 약속이 코드에 실제로 있는지를 여기서 본다.
+  it("★ 지운 화면 이름이 셸의 「옛탭」 표에 살아 있다 — 빈 탭 대신 닫고 알린다", () => {
+    const 셸 = fs.readFileSync(path.join(뿌리, "client/src/renderer/pages/app.html"), "utf8");
+    // ① 표에 등재돼 있다(폐지 표시 `버림`과 사람이 읽을 이름까지).
+    const 줄 = /"merge\.html":\s*\{([^}]*)\}/.exec(셸);
+    expect(줄, "셸의 옛탭 표에 merge.html이 없다 — 그 탭을 켜 둔 담당자는 영구 빈 탭을 본다").toBeTruthy();
+    expect(줄![1], "merge.html 항목에 `버림`이 없다 — 흡수처가 없는 화면을 그럴듯한 곳으로 보내면 이름과 내용이 어긋난다").toContain("버림");
+    expect(/label\s*:\s*"[^"]+"/.test(줄![1]), "이름이 없다 — 못 찾으면 탭 이름이 파일명으로 뜬다(2026-08-18에 고친 결함)").toBe(true);
+    // ② 표만 있고 받는 코드가 없으면 아무 일도 안 일어난다 — 바로잡기가 `버림`을 실제로 읽는다.
+    expect(/if\s*\(m\s*&&\s*m\.버림\)\s*return null;/.test(셸),
+      "옛탭바로잡기가 `버림`을 안 읽는다 — 표에 적어도 탭이 그대로 열려 빈 탭이 된다").toBe(true);
+    // ③ 조용히 닫지 않는다 — 닫았으면 사람에게 말한다(사슬 꼬리에 붙였다).
+    expect(셸.includes("function 폐지된탭알리기()"), "닫기만 하고 안 알린다 — 담당자는 자기 탭이 왜 사라졌는지 모른다").toBe(true);
+    // ④ 저장값에서도 지운다 — 안 지우면 부팅마다 같은 알림이 되풀이된다.
+    expect(/save\(\); \/\/ 폐지된 탭을 저장값에서도 지운다/.test(셸),
+      "복원 뒤 save()가 없다 — 저장값에 남은 폐지 탭이 부팅마다 같은 알림을 다시 띄운다").toBe(true);
   });
 
   // ★ 2026-09-07 2차 — 위 검사들이 **원리상 못 보던 곳** 둘을 덮는다.
@@ -151,6 +197,12 @@ describe("★ merge(LLM 합성) 삭제 — 반쪽만 지워지지 않았다", ()
     const 문자열예외: Record<string, string> = {
       "server/src/engine/modellicense.ts":
         "합성으로 **만들어진 모델 파일**의 라이선스 규칙이다 — 제품 기능 안내가 아니라 디스크에 남아 있을 수 있는 산출물의 출처 표기라, 지우면 그 모델을 받은 고객의 라이선스 조회가 「모름」이 된다.",
+      // ★ 2026-09-08 — 셸의 옛탭 표에 적힌 「LLM 합성」은 **기능 안내가 아니라 닫은 탭의 이름**이다.
+      //   담당자에게 나가는 문장은 「제품에서 없어진 화면이라 닫았습니다」이고, 이 낱말은 어느 탭을
+      //   닫았는지 말하기 위해서만 쓰인다. 이름을 지우면 탭 이름이 파일명(merge.html)으로 나간다.
+      //   ⚠ 파일 통째 예외가 감시를 뚫지 않게, 바로 아래 검사에서 **그 한 줄뿐인지**까지 센다.
+      "client/src/renderer/pages/app.html":
+        "폐지된 화면의 옛 탭을 닫고 알릴 때 쓰는 **탭 이름**이다(기능 안내가 아니다) — 지우면 담당자에게 파일명 merge.html이 그대로 나간다. 쓰임이 그 한 줄뿐인지는 아래에서 센다.",
     };
     const 걸린것: string[] = [];
     // ⚠ 제품 소스만 본다 — 시험 이름·도구 스크립트는 고객이 읽지 않는다. 넓게 잡으면
@@ -173,6 +225,13 @@ describe("★ merge(LLM 합성) 삭제 — 반쪽만 지워지지 않았다", ()
       expect(사유.length, `${f}: 예외인데 이유가 없다`).toBeGreaterThan(30);
       expect(fs.existsSync(path.join(뿌리, f)), `${f}: 표에 있는데 파일이 없다 — 낡은 표는 거짓 안심을 준다`).toBe(true);
     }
+    // ⚠ **파일 통째 예외가 감시를 뚫지 않게 센다**(2026-09-08). app.html은 4,000줄 가까운 셸이라
+    //   「예외 파일」로 두면 그 안에서 새로 생기는 문장이 영영 안 보인다. 허용은 옛탭 표 한 줄뿐이다.
+    const 셸줄 = 주석뗀(fs.readFileSync(path.join(뿌리, "client/src/renderer/pages/app.html"), "utf8"))
+      .split(/\r?\n/).filter((줄) => 우리말흔적.test(줄) && !묘비표식.some((t) => 줄.includes(t)));
+    expect(셸줄.map((s) => s.trim().slice(0, 80)),
+      "셸에서 합성을 말하는 줄이 옛탭 표 한 줄을 넘었다 — 예외를 늘리기 전에 그 문장이 없는 기능을 파는지 볼 것")
+      .toEqual(['"merge.html": { 버림: true, label: "LLM 합성" },']);
   });
 
   it("안내 문서는 목록에서 빼는 것으로 끝내지 않고 **_제외에 등재**한다", () => {
