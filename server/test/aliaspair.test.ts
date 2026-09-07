@@ -47,7 +47,8 @@ describe("대화앞으로()가 기대는 두 심볼이 셸에 다 있다", () =>
    ⚠ 판정을 여기서 정규식으로 다시 짜지 않는다. 표 모양이 바뀌면 그 정규식이 조용히 눈을 감고,
      그러면 「시험이 있다」가 오히려 거짓 안심이 된다(guidance-check가 겪은 부류).
      판정은 제품 코드 한 곳(screenguide.죽은구역별칭)이 하고 여기서는 결과만 본다. */
-import { 죽은구역별칭, 안내화면열쇠들, isHelpIntent } from "../src/engine/screenguide";
+import { 죽은구역별칭, 구역별칭들, 안내화면열쇠들, isHelpIntent } from "../src/engine/screenguide";
+import { forcedToolFor } from "../src/engine/agentloop";
 
 describe("구역 별칭은 실재하는 구역을 가리켜야 산다", () => {
   it("★ 죽은 별칭이 0개다 — 값은 panels 열쇠와 **한 글자까지** 같아야 한다", () => {
@@ -72,6 +73,7 @@ describe("구역 별칭은 실재하는 구역을 가리켜야 산다", () => {
 describe("안내 별칭이 강제 도구의 말을 가로채지 않는다", () => {
   const 강제로가야하는말 = [
     "조각 없는 문서 알려줘",   // doc_chunk_gaps (FORCED_INTENTS, route-explain [37])
+    "조각이 없는 문서 알려줘", // ★ 조사 하나 다른 꼴 — 2026-09-07에 실제로 샜다(아래 전수 감시가 뿌리)
     "새 문서 뭐 들어왔어?",     // recent_documents
   ];
   for (const q of 강제로가야하는말) {
@@ -83,4 +85,67 @@ describe("안내 별칭이 강제 도구의 말을 가로채지 않는다", () =
       expect(isHelpIntent(q), "화면 없이도 새면 공통(OVERVIEW) 구역이 원인이다").toBe(false);
     });
   }
+});
+
+/* ── ★★ 별칭 **전수** 감시 (2026-09-07 검토관 [중] 수리) ─────────────────────────────
+   ■ 무엇이 틀렸었나: 바로 위 시험은 「가로채기 0」이라 초록이었는데, **모집단이 손으로 적은
+     문구 두 줄뿐**이라 손이 안 적은 것은 원리상 못 봤다. 그 사이 별칭 「조각이 없는 문서」가
+     강제 도구 doc_chunk_gaps를 화면 3곳에서 가로채고 있었다(실측). 시험은 초록, 제품은 결함.
+   ■ 그래서 모집단을 **표 전체**로 바꾼다: 별칭 하나하나에 사람이 실제로 붙이는 꼬리를 달아
+     ① 그 말이 강제 도구의 것인가(forcedToolFor) ② 그런데 안내가 먼저 채 가는가(isHelpIntent)
+     둘 다 참이면 가로채기다. dispatcher.ts가 isHelpIntent를 강제 도구보다 **앞**에 두기 때문에
+     (1568줄 vs runAgentLoop) 그 순간 도구는 멀쩡한 채로 말이 안 닿는다.
+   ■ 아직 안 고친 것은 **이름을 적어 둔다**(빈 배열이 아니라 대장). 이 라운드가 만들지 않은
+     9쌍이 남아 있는데, 별칭 하나를 걷어내면 그 화면의 안내 도달 경로가 함께 바뀌므로 마무리
+     라운드에서 손대지 않는다. 새로 하나가 늘면 여기서 **빨개진다** — 그것이 이 감시의 값이다.
+   ⚠ 구역 **이름**(별칭 아님)도 같은 부류로 37쌍이 걸리는데(실측), 그쪽은 「지켜보는 폴더(📂)
+     뭐야?」처럼 안내가 이기는 것이 옳은 경우가 섞여 있어 이 시험의 대상이 아니다. 그 정리는
+     별건이다(보고 open_issues). */
+describe("★ 별칭 전수 — 강제 도구의 말을 채 가는 별칭은 대장에 적힌 것뿐이다", () => {
+  const 꼬리 = ["알려줘", "보여줘", "뭐야?", "있어?"];
+  /** 2026-09-07 현재 남아 있는 가로채기 — `화면|별칭|도구`. 이 라운드가 만든 것은 없다. */
+  const 대장 = [
+    "hardening.html|준수율 구간|kpi_status",
+    "analysis.html|지금 급한 것|today",
+    "incidentcases.html|사고 사례|incident_cases",
+    "incidentcases.html|비슷한 사례|incident_cases",
+    "settings.html|어떤 모델|system_health",
+  ].sort();
+
+  const 실측 = (): string[] => {
+    const out = new Set<string>();
+    for (const a of 구역별칭들()) {
+      for (const t of 꼬리) {
+        const q = `${a.shown} ${t}`;
+        const f = forcedToolFor(q);
+        if (!f) continue;
+        const 화면들 = a.screen ? [a.screen] : 안내화면열쇠들();
+        for (const sc of 화면들) if (isHelpIntent(q, sc)) out.add(`${sc}|${a.shown}|${f.tool}`);
+      }
+    }
+    return [...out].sort();
+  };
+
+  it("모집단이 살아 있다 — 별칭 표를 실제로 읽었나", () => {
+    expect(구역별칭들().length, "별칭 표를 못 읽었다 — 아래가 전부 헛초록이 된다").toBeGreaterThan(80);
+  });
+
+  it("★★ 가로채는 별칭이 대장과 **정확히** 같다(늘어도 줄어도 빨강)", () => {
+    const 지금 = 실측();
+    expect(지금,
+      "대장에 없는 가로채기가 생겼거나(새 별칭이 강제 도구를 죽였다), 고쳤는데 대장을 안 지웠다. " +
+      "새 별칭을 더할 때는 forcedToolFor(별칭 + ' 알려줘')가 null인지 먼저 보라."
+    ).toEqual(대장);
+  });
+
+  it("★ 이 라운드가 만든 「조각 …」 별칭은 하나도 안 채 간다", () => {
+    expect(실측().filter((x) => /조각/.test(x)), "조각 계열 별칭이 doc_chunk_gaps를 다시 가로챈다").toEqual([]);
+  });
+
+  it("★ 판정이 헛돌지 않는다(반증) — 걷어낸 별칭을 되돌리면 잡힌다", () => {
+    // 「조각이 없는 문서」가 바로 그 걷어낸 별칭이다. 별칭 표에 없더라도 판정 두 마디는 그대로다.
+    const q = "조각이 없는 문서 알려줘";
+    expect(forcedToolFor(q)?.tool, "강제 규칙이 사라졌다 — 이 감시의 전제가 무너졌다").toBe("doc_chunk_gaps");
+    expect(안내화면열쇠들().filter((s) => isHelpIntent(q, s)), "별칭을 걷어냈는데 아직 샌다").toEqual([]);
+  });
 });

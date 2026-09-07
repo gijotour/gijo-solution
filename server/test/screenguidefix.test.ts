@@ -202,6 +202,28 @@ describe("⑥ 대화 도구 answer_feedback_status — 자물쇠와 상세는 **
     const 덩어리 = src.slice(i, src.indexOf("\n  },", i));
     expect(덩어리, "run이 상세를 안 켰다 — admin인데 건수만 본다").toMatch(/feedbackSummaryText\(.*,\s*true\s*\)/);
   });
+
+  /* ★★ 2026-09-07 검토관 [중] 수리 — 자물쇠를 걸면서 **그 도구를 약속한 화면 안내**를 안 고쳤다.
+     learnloop.html의 can 셋째 줄이 「"이번 주 답변 지적 뭐 있었어?"」를 누구에게나 권하는데,
+     담당자(security_officer)에게는 registry.listToolsFor가 그 도구를 **목록에서 숨기므로**
+     시킨 대로 쳐도 권한 안내조차 없이 답이 안 나온다. 그 화면은 담당자도 연다(카드에 role 분기
+     없음 · GET /api/learnloop/topics는 authMiddleware만).
+     ⚠ guidance-check가 이 어긋남을 못 본 이유는 도구 결함이다 — 수확식이 screenguide.ts의
+       이스케이프된 큰따옴표에 걸려 그 줄을 통째로 버린다(보고 open_issues).
+       그래서 **여기서 짝으로** 묶는다: 자물쇠와 문장은 함께 움직인다. */
+  it("★★ 자물쇠와 **화면 안내의 약속**이 짝이다 — admin 전용이면 안내도 그렇게 말한다", () => {
+    const 약속 = (getScreenGuide("learnloop.html").can || []).filter((c) => /답변 지적/.test(c));
+    expect(약속.length, "learnloop 안내에서 답변 지적 약속 줄이 사라졌다 — 이 시험이 헛돈다").toBe(1);
+    if (도구()?.requiredRole === "admin") {
+      expect(약속[0],
+        "도구는 관리자 전용인데 안내는 누구에게나 「이렇게 물어보세요」라고 말한다(담당자는 답을 못 받는다)"
+      ).toMatch(/관리자만/);
+    } else {
+      expect(약속[0],
+        "자물쇠를 풀었으면 안내의 「관리자만」도 함께 지워야 한다(없는 제한을 말하게 된다)"
+      ).not.toMatch(/관리자만/);
+    }
+  });
 });
 
 /* ── ⑦ 라이트 한계 — 안내가 「없는 것」을 없다고 말하나 (2026-09-07) ────────────────────
@@ -217,23 +239,77 @@ describe("⑦ 라이트 한계를 안내가 말한다(그 근거도 함께 잰�
     path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "lite-screens.json"), "utf8"));
   const liteTools = JSON.parse(fs.readFileSync(
     path.join(__dirname, "..", "src", "lite", "lite-tools.json"), "utf8"));
-  const 도구ids = JSON.stringify(liteTools);
+  // ★★ 2026-09-07 검토관 [낮] 수리 — 근거 ①②가 **이름 한 줄에 걸린 헐거운 판정**이었다.
+  //   ① `not.toContain("lite-approvals")`: 접두사 관례일 뿐 강제가 아니라 다른 이름
+  //      ("approvals"·"lite-fixboard")으로 들어오면 시험은 초록인 채 안내만 늙는다.
+  //   ② `JSON.stringify(liteTools).includes('"id": "reingest_document"')`: **원리상 늘 false**다
+  //      — JSON.stringify는 공백 없는 `"id":"reingest_document"`를 낸다(실측). 게다가 그 문자열은
+  //      **뺀 것 목록**(_뺀것_중_설명이_필요한_것)에도 실려 있어, 공백만 지워 고치면 이번엔
+  //      「없는데 있다」는 **거짓 빨강**이 된다. 판정은 실제 목록(tools[].id)에서 읽는다.
+  const 라이트화면 = (liteScreens.screens || []) as { id: string; 이름?: string; 파일?: string }[];
+  const 라이트도구ids = (liteTools.tools || []).map((t: { id: string }) => t.id) as string[];
 
-  it("근거 ① 라이트에 결재판 화면이 없다 — 생기면 이 줄이 먼저 빨개진다", () => {
-    const ids = (liteScreens.screens || []).map((s: { id: string }) => s.id);
-    expect(ids, "라이트에 결재판이 생겼다 — 꼬리 안내의 「갈 자리가 없습니다」를 고칠 것")
-      .not.toContain("lite-approvals");
-    expect(ids.length, "화면 목록을 못 읽었다 — 이 시험이 헛돈다").toBeGreaterThan(0);
+  it("근거 ① 라이트에 결재판 화면이 없다 — 생기면 이 줄이 먼저 빨개진다(이름을 안 가린다)", () => {
+    expect(라이트화면.length, "화면 목록을 못 읽었다 — 이 시험이 헛돈다").toBeGreaterThan(0);
+    // 이름이 아니라 **뜻**으로 찾는다 — id·표시 이름·파일명 어디에 결재/승인/approval이 있어도 잡는다.
+    const 결재비슷 = 라이트화면.filter((sc) =>
+      /approval|결재|승인/i.test([sc.id, sc.이름, sc.파일].filter(Boolean).join(" ")));
+    expect(결재비슷.map((sc) => sc.id),
+      "라이트에 결재판(비슷한 화면)이 생겼다 — 꼬리 안내의 「갈 자리가 없습니다」를 고칠 것").toEqual([]);
   });
 
-  it("근거 ② 라이트에 reingest_document가 없다 — 생기면 문서함 안내를 고칠 것", () => {
-    expect(도구ids).toContain("doc_chunk_gaps");          // 짝인 읽기 도구는 있다(모집단 감시)
-    expect(도구ids.includes('"id": "reingest_document"'),
-      "라이트에 재인입 도구가 생겼다 — 「다시 넣기를 받을 도구가 아직 없습니다」를 고칠 것").toBe(false);
+  it("근거 ② 라이트 도구 목록에 reingest_document가 없다 — 생기면 문서함 안내를 고칠 것", () => {
+    expect(라이트도구ids.length, "도구 목록을 못 읽었다 — 이 시험이 헛돈다").toBeGreaterThan(5);
+    expect(라이트도구ids, "짝인 읽기 도구가 사라졌다 — 라이트 안내의 전제가 무너졌다")
+      .toContain("doc_chunk_gaps");
+    expect(라이트도구ids,
+      "라이트에 재인입 도구가 생겼다 — 「다시 넣기를 받을 도구가 아직 없습니다」를 고칠 것")
+      .not.toContain("reingest_document");
+  });
+
+  it("★ 판정이 헛돌지 않는다(반증) — 없는 도구를 넣은 사본은 위 판정이 잡아낸다", () => {
+    // 위 두 시험은 「없다」를 재므로 **늘 초록일 수 있다**. 같은 판정식에 있는 값을 먹여
+    // 빨개지는지 여기서 확인한다(모집단 감시).
+    const 사본 = [...라이트도구ids, "reingest_document"];
+    expect(사본).toContain("reingest_document");
+    expect(라이트화면.some((sc) => /approval|결재|승인/i.test(String(sc.id))), "").toBe(false);
+    expect([{ id: "lite-approvals" }, { id: "fixboard" }]
+      .filter((sc) => /approval|결재|승인/i.test(sc.id)).map((sc) => sc.id)).toEqual(["lite-approvals"]);
   });
 
   it("★ 꼬리 안내가 라이트에 결재판이 없다고 말한다", () => {
     expect(공통구역("이 답 이상해요")).toMatch(/라이트 에디션에는 결재판 화면이 없습니다/);
+  });
+
+  /* ★★ 2026-09-07 검토관 [중] 수리 — 이 라운드 보고가 「라이트에서 결재판 열기를 누르면
+     담당자가 대화창에서 튕겨 나간다(안내 한 줄 없이)」고 적었는데, **코드로 성립하지 않는다.**
+     실제 경로를 끝까지 따라가면 화면 전환이 아니라 **알림 한 줄**이다:
+       console.js 결재판열기() → (IS_WINDOW 거짓·gijoTabs 없음) → gijo.navigateTo(page)
+       → preload.ts navigateTo: 부모가 있고 embed=1이면 **ipcRenderer 대신 parent로 postMessage**
+       → lite-app.html의 message 리스너 → gijoOpenScreen("approvals.html?fix=open")
+       → 화면목록에 없음 → 없는화면알림() = 「이 기능은 라이트 에디션에 없습니다」 4.2초
+     안내는 **본 대로** 적어야 하므로 문장을 그렇게 고쳤고, 그 경로의 네 마디를 여기 묶는다.
+     한 마디라도 사라지면 안내가 거짓이 되므로 이 시험이 먼저 빨개진다. */
+  it("근거 ④ 라이트에서 「결재판 열기」는 튕김이 아니라 **알림 한 줄**이다(경로 네 마디)", () => {
+    const 읽기 = (...seg: string[]) => fs.readFileSync(path.join(__dirname, "..", "..", ...seg), "utf8");
+    const preload = 읽기("client", "src", "preload.ts");
+    const consoleJs = 읽기("client", "src", "renderer", "pages", "console.js");
+    const liteApp = 읽기("client", "src", "renderer", "pages", "lite-app.html");
+    // ① 대화창의 마지막 갈래가 navigateTo다(이것이 없으면 죽은 단추로 되돌아간다)
+    expect(consoleJs, "결재판열기()의 navigateTo 갈래가 사라졌다 — 라이트에서 다시 죽은 단추가 된다")
+      .toMatch(/function 결재판열기\(\)[\s\S]{0,400}navigateTo\(page\)/);
+    // ② preload가 embed 안에서는 창을 갈아치우지 않고 부모에게 부탁한다(= 튕기지 않는 이유)
+    expect(preload, "navigateTo가 embed에서 postMessage로 안 바뀐다 — 그러면 정말로 창이 갈아치워진다")
+      .toMatch(/embed=1[\s\S]{0,400}postMessage\(\{ type: "gijo:openTab"/);
+    // ③ 라이트 셸이 그 부탁을 받는다
+    expect(liteApp, "라이트 셸이 gijo:openTab을 안 받는다 — 그러면 침묵 단추가 된다")
+      .toMatch(/d\.type === "gijo:openTab"/);
+    // ④ 없는 화면이면 **말한다**(안내가 약속한 바로 그 문장)
+    expect(liteApp, "「이 기능은 라이트 에디션에 없습니다」 문구가 사라졌다 — 안내가 거짓이 된다")
+      .toContain("이 기능은 라이트 에디션에 없습니다");
+    // 안내 문장도 그 사실을 그대로 적었나(약속 ↔ 코드)
+    expect(공통구역("이 답 이상해요"), "안내가 「알려 줍니다」를 안 적었다")
+      .toMatch(/이 기능은 라이트 에디션에 없습니다/);
   });
 
   it("★ 문서함 안내가 라이트에서 「다시 넣기」가 안 된다고 말한다(＋로 다시 올리기로 넘긴다)", () => {
