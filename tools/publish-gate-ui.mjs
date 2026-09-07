@@ -1205,6 +1205,180 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
   ok("감독 API 다리(contextBridge) 봉인 — 고정 자료 판정은 server/test/publishgatecitefixed.test.ts", 성립, JSON.stringify(r));
 }
 
+// ── ⑧⁗ 💬 답 지적(두 번째 원장, 2026-09-07 · 계획서 중-1) ────────────────────────
+// ⚠ 왜 관문에 더하나: 이 라운드가 고친 셋은 **가짜 DOM이 원리상 못 보는** 부류다 —
+//   ① CSS 특이도(`.cs-row:hover .cs-flag` 0,3,0 이 `.wf-flag[hidden]` 0,2,0 을 이겨 펼친 뒤에도
+//      마우스를 올리면 접힘 단추가 되살아났다) ② 굳은 단추(무른 뒤 「올리는 중…」·disabled로 남아
+//      **눌러도 클릭이 안 갔다** — 가짜 DOM은 disabled를 안 흉내 내 초록이었다) ③ 실제 호버.
+//   ★ 판정식은 server/test/publishgateflag.test.ts가 **이 파일의 성립식을 그대로 떼어** 가짜 DOM에서
+//     돌린다(⑧′↔publishgatecite와 같은 짝). 실화면 호버·CSS는 여기서, 논리는 거기서.
+//
+// ⚠⚠ **운영 원장에 실입력을 하지 않는다.** 지적을 진짜로 보내면 결재판에 관문이 만든 줄이 쌓이고,
+//    그건 담당자가 낸 지적이 아니다(측정이 데이터를 만들면 그 데이터로 잰 숫자를 못 믿는다).
+//    그래서 꼬리 부품(window.gijoChatParts.flag)을 **버릴 줄 하나에 우리 창구(ops)로** 붙여 돌린다 —
+//    보내기·무르기는 우리 함수가 받고 서버로는 한 바이트도 안 나간다. 그래도 **CSS·호버·굳은 단추는
+//    진짜**다(같은 페이지·같은 스타일시트·같은 부품). 안 재는 것: 서버 왕복·권한·DB(그건 vitest 몫).
+{
+  // (가) 대화창 꼬리 — 접힘 호버 → 펼침 → **펼친 채 호버** → 올림 → 무름 → 다시 펼치기.
+  const 준비 = await 셸.evaluate(() => {
+    if (!window.gijoChatParts || typeof window.gijoChatParts.flag !== "function") return { 부품없음: true };
+    document.querySelectorAll("#gateFlagRow").forEach((el) => el.remove());
+    const row = document.createElement("div");
+    row.className = "cs-row";
+    row.id = "gateFlagRow";
+    // 대화 목록 **밖**에 세운다 — 운영 대화 DOM을 건드리지 않는다(끝나면 지운다).
+    row.style.cssText = "position:fixed;left:12px;bottom:12px;z-index:99999;width:520px;padding:8px;background:#1e1e1c;border:1px solid rgba(255,255,255,.14);border-radius:8px";
+    const cb = document.createElement("div");
+    cb.className = "cb";
+    row.appendChild(cb);
+    document.body.appendChild(row);
+    window.__gateFlag = { 보냄: 0, 무름: 0, 결재판: 0 };
+    const btn = window.gijoChatParts.flag(row, { question: "관문 점검용 물음(보내지 않음)", answer: "관문 점검용 답", screen: "gate" }, {
+      // ★ 서버로 안 나간다 — 이 세 함수가 받는다.
+      send: () => { window.__gateFlag.보냄++; return Promise.resolve({ id: 987654321 }); },
+      remove: () => { window.__gateFlag.무름++; return Promise.resolve({ ok: true }); },
+      openBoard: () => { window.__gateFlag.결재판++; },
+    });
+    return { 부품없음: false, 단추: !!btn };
+  }).catch(() => null);
+
+  const 꼬리 = { 준비 };
+  if (준비 && 준비.단추) {
+    const 보임 = () => 셸.evaluate(() => {
+      const r = document.getElementById("gateFlagRow");
+      const b = r && r.querySelector(".wf-flag");
+      return b ? getComputedStyle(b).display : "없음";
+    });
+    await 셸.hover("#gateFlagRow").catch(() => {});
+    꼬리.접힘호버 = await 보임();                       // 접힘 상태: 호버하면 드러나야 한다
+    await 셸.evaluate(() => document.querySelector("#gateFlagRow .wf-flag").click());
+    await 셸.hover("#gateFlagRow .wf-memo").catch(() => {});  // **펼친 채** 줄 위에 마우스를 둔다
+    꼬리.펼침호버 = await 보임();                       // ★ 여기가 이번 수리다 — none이어야 한다
+    꼬리.입력줄 = await 셸.evaluate(() => {
+      const r = document.getElementById("gateFlagRow");
+      const line = r.querySelector(".wf-line:not(.wf-done)");
+      return { 보임: !line.hidden, 종류칩: r.querySelectorAll(".wf-k").length, 갈래: (r.querySelector(".wf-cand") || {}).textContent || "" };
+    });
+    // 올리기 → (우리 창구가 받는다) → 영수증 → 취소 → 다시 펼치기
+    await 셸.evaluate(() => [...document.querySelectorAll("#gateFlagRow .wf-line .wf-go")].find((b) => b.textContent === "올리기").click());
+    await new Promise((x) => setTimeout(x, 300));
+    꼬리.영수증 = await 셸.evaluate(() => {
+      const d = document.querySelector("#gateFlagRow .wf-done");
+      return { 글: (d.textContent || "").trim(), 열기: !![...d.querySelectorAll("button")].find((b) => b.textContent === "결재판 열기"), 취소: !!d.querySelector(".wf-undo") };
+    });
+    await 셸.evaluate(() => document.querySelector("#gateFlagRow .wf-undo").click());
+    await new Promise((x) => setTimeout(x, 300));
+    꼬리.무른뒤 = await 셸.evaluate(() => {
+      const r = document.getElementById("gateFlagRow");
+      return { 글: (r.querySelector(".wf-done").textContent || "").trim(), 단추돌아옴: r.querySelector(".wf-flag").hidden === false };
+    });
+    await 셸.evaluate(() => document.querySelector("#gateFlagRow .wf-flag").click());
+    // ★ 굳은 단추 감시 — **disabled를 읽고 끝내지 않고 실제로 눌러 본다**(가짜 DOM이 못 잡던 자리).
+    꼬리.다시올리기 = await 셸.evaluate(() => {
+      const line = document.querySelector("#gateFlagRow .wf-line:not(.wf-done)");
+      const go = [...line.querySelectorAll(".wf-go")][0];
+      const 전 = window.__gateFlag.보냄;
+      go.click();
+      return { 글자: go.textContent, disabled: go.disabled, 눌림: window.__gateFlag.보냄 > 전 };
+    });
+    await new Promise((x) => setTimeout(x, 300));
+    꼬리.셈 = await 셸.evaluate(() => window.__gateFlag);
+    await 셸.evaluate(() => { document.querySelectorAll("#gateFlagRow").forEach((el) => el.remove()); delete window.__gateFlag; });
+  }
+  const 꼬리성립 = !!준비 && 준비.단추 === true
+    && 꼬리.접힘호버 === "inline-block"                 // 접힘: 호버하면 드러난다(기존 계약)
+    && 꼬리.펼침호버 === "none"                          // ★ 펼친 채 호버해도 안 되살아난다(이번 수리)
+    && !!꼬리.입력줄 && 꼬리.입력줄.보임 === true && 꼬리.입력줄.종류칩 === 3
+    && /갈래 (자료 부족|미분류)/.test(꼬리.입력줄.갈래)   // 서버가 저장할 값 하나만 표시한다
+    && !!꼬리.영수증 && /✓ 결재판에 올림/.test(꼬리.영수증.글) && 꼬리.영수증.열기 === true && 꼬리.영수증.취소 === true
+    && !!꼬리.무른뒤 && /무른 지적입니다/.test(꼬리.무른뒤.글) && 꼬리.무른뒤.단추돌아옴 === true
+    && !!꼬리.다시올리기 && 꼬리.다시올리기.글자 === "올리기" && 꼬리.다시올리기.disabled === false
+    && 꼬리.다시올리기.눌림 === true;                    // ★ 굳지 않았다 — 클릭이 실제로 갔다
+  ok("답 지적 꼬리(펼친 채 호버해도 안 되살아남 · 무른 뒤 다시 올리기가 **눌린다** · 서버 전송 0)", 꼬리성립, JSON.stringify(꼬리));
+
+  // (나) 결재판 💬 세그먼트 — admin 목록이 뜨는가(읽기만 · 아무것도 안 바꾼다).
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("approvals.html", "결재판", { dock: true }));
+  const apFr = await 프레임찾기("approvals.html", 12);
+  const 세그 = apFr ? await apFr.evaluate(async () => {
+    const 뜸 = async (sel) => { for (let i = 0; i < 25; i++) { if (document.querySelector(sel)) return true; await new Promise((x) => setTimeout(x, 400)); } return false; };
+    if (!await 뜸("#rvSeg .seg")) return { 세그없음: true };
+    const 답지적 = [...document.querySelectorAll("#rvSeg .seg")].find((b) => b.dataset.seg === "fix");
+    if (!답지적) return { 칸없음: true };
+    답지적.click();
+    await new Promise((x) => setTimeout(x, 900));
+    const list = document.getElementById("rvList");
+    const 글 = (list.textContent || "").trim();
+    const 보임 = (el) => (el ? getComputedStyle(el).display : "없음");
+    return {
+      라벨: (답지적.textContent || "").trim(),
+      숫자: (document.getElementById("segFix") || {}).textContent || "",
+      갈래칸: ["fxDoc", "fxRule", "fxProd", "fxNone"].filter((id) => document.getElementById(id)).length,
+      막힘: /관리자/.test(글) && /볼 수 있습니다/.test(글),
+      줄수: list.querySelectorAll(".rv-row").length,
+      빈말: /접수된 답 지적이 없습니다/.test(글),
+      // 두 원장이 안 섞였나 — 💬에서는 취약점 원장의 띠·VEX가 내려가야 한다
+      그림띠: 보임(document.getElementById("vizStrip")),
+      vex: 보임(document.querySelector(".vex-bar")),
+      글: 글.slice(0, 120),
+    };
+  }).catch(() => null) : null;
+  const 세그성립 = !!세그 && !세그.세그없음 && !세그.칸없음
+    && /💬 답 지적/.test(세그.라벨)
+    && 세그.갈래칸 === 4                                  // 갈래 4칸이 늘 선다(0건이어도)
+    && 세그.막힘 === false                                // admin이라 403 안내가 아니어야 한다
+    && (세그.줄수 > 0 || 세그.빈말 === true)              // 목록이거나 **0건이라고 말하거나** — 빈 상자 금지
+    && 세그.그림띠 === "none" && 세그.vex === "none";     // 취약점 원장의 말이 지적 목록 위에 안 선다
+  ok("결재판 💬 답 지적: admin 목록(또는 「0건」 말) · 갈래 4칸 · 취약점 띠/VEX 내려감", 세그성립, JSON.stringify(세그));
+
+  // (다) 감독 「🗔 결재판에서 처리」 — 진짜로 결재판 탭이 열리는가(재렌더 뒤 다시 거는 배선).
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("supervision.html", "감독", { dock: true }));
+  const supFr = await 프레임찾기("supervision.html", 12);
+  const 처리 = supFr ? await supFr.evaluate(async () => {
+    for (let i = 0; i < 25; i++) { if (document.querySelector("#sup .sup-line")) break; await new Promise((x) => setTimeout(x, 400)); }
+    const 줄 = [...document.querySelectorAll("#sup .sup-line")].find((el) => el.textContent.includes("고칠 것"));
+    if (!줄) return { 줄없음: true, 글: ((document.getElementById("sup") || {}).textContent || "").slice(0, 100) };
+    const 단추 = 줄.querySelector(".fx-go");
+    const 글 = 줄.textContent.trim();
+    if (단추) 단추.click();
+    return { 있음: true, 단추: !!단추, 라벨: 단추 ? 단추.textContent.trim() : "", 열림기준: /열림 기준\(0건도 그립니다\)/.test(글), 갈래: (글.match(/자료 부족|사내 규정|제품|미분류/g) || []).length, 글: 글.slice(0, 140) };
+  }).catch(() => null) : null;
+  await new Promise((x) => setTimeout(x, 1200));
+  const 열린탭 = await 셸.evaluate(() => [...document.querySelectorAll("#tabBar [data-page], #tabBar button")].map((b) => (b.dataset && b.dataset.page) || b.textContent.trim()).join("|"));
+  // ⚠ 줄이 없을 수도 있다(옛 서버·fixboard 미탑재) — 그때는 **없는 것을 있다고 우기지 않고** 넘어간다.
+  //   대신 「줄이 없다」를 그대로 적어 사람이 읽게 한다(⑧′의 「사유 0건」 조항과 같은 태도).
+  const 처리성립 = !!처리 && (처리.줄없음 === true
+    ? true
+    : (처리.단추 === true && /🗔 결재판에서 처리/.test(처리.라벨) && 처리.열림기준 === true
+      && 처리.갈래 >= 4 && /approvals\.html/.test(열린탭)));
+  ok("감독 🔧 고칠 것: 갈래 4·「열림 기준(0건도 그립니다)」·「🗔 결재판에서 처리」가 결재판 탭을 연다",
+    처리성립, JSON.stringify(처리) + " · 탭=" + String(열린탭).slice(0, 160));
+
+  // (라) 내 문서 🏢 회사 지식 — 「조각 없음(대장 N개)」 칩과 「⚠ N」 배지.
+  // ⚠ **양방향 계약**이다: 유령이 있으면 칩이 보이고, **0건이면 칩도 배지도 없어야** 한다
+  //   (재인입하면 0이 된다 — 그때 이 검사가 빨개지면 관문이 「고친 것」을 결함이라 말하게 된다).
+  //   그래서 고정된 건수를 안 박고 **칩 수와 배지 수가 같은가**를 본다.
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("mydocs.html?tab=know", "내 문서", { dock: true }));
+  const mdFr = await 프레임찾기("mydocs.html", 12);
+  const 칩 = mdFr ? await mdFr.evaluate(async () => {
+    for (let i = 0; i < 30; i++) { if (document.querySelector(".g-rows-r")) break; await new Promise((x) => setTimeout(x, 400)); }
+    const 칩들 = [...document.querySelectorAll(".dk-chip")].map((e) => e.textContent.trim());
+    const 배지 = ((document.querySelector("#nKnow .alarm") || {}).textContent || "").trim();
+    const 배지수 = Number((배지.match(/\d+/) || [0])[0]);
+    const 없음칩 = 칩들.filter((t) => /^조각 없음/.test(t));
+    return {
+      행: document.querySelectorAll(".g-rows-r").length,
+      칩들: 칩들.slice(0, 6), 없음: 없음칩.length, 배지, 배지수,
+      꼴: 없음칩.every((t) => /^조각 없음(\(대장 \d+개\))?$/.test(t)),
+      딴칩: 칩들.filter((t) => !/^(조각 없음(\(대장 \d+개\))?|조각 일부 사라짐|옛 판 조각 남음)$/.test(t)),
+    };
+  }).catch(() => null) : null;
+  const 칩성립 = !!칩 && 칩.행 > 0
+    && 칩.꼴 === true                       // 문구가 서버 docledger.상태꼬리 꼴 그대로다
+    && 칩.딴칩.length === 0                 // 서버가 안 주는 문구를 화면이 지어내지 않았다
+    && 칩.배지수 === 칩.없음;               // ★ 배지 = 「조각 없음」 수. 0이면 배지도 없다(양방향)
+  ok("내 문서 🏢 회사 지식: 「조각 없음(대장 N개)」 칩 수 = ⚠ 배지 수(0건이면 칩·배지 둘 다 없음)", 칩성립, JSON.stringify(칩));
+}
+
 // ── ⑨ 전 화면 얕은 렌더(2026-08-21 — 사장님 승인 묶음 3번) ─────────────────────
 // ⚠ 왜: 위 검사들은 손으로 더한 목록이라 화면 43개 중 16개만 열어 봤다 — 나머지 27개는
 //   **렌더가 죽어도 게시됐다**(5.56.0이 고친 analysis·settings도 관문이 이름조차 안 불렀다).
