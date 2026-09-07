@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { 잣대대조, 매니페스트밖, 조각상태, 조각없음, 대장과같음, 상태꼬리 } from "../src/engine/docledger";
+import { 잣대대조, 매니페스트밖, 조각상태, 조각없음, 대장과같음, 판이어긋남, 견줄수있음, 상태꼬리 } from "../src/engine/docledger";
 
 const 대장 = [
   { documentId: "취약점관리_지침.md", origin: null, chunks: 12 },
@@ -153,6 +153,32 @@ describe("docledger — 상태 판정은 여기 한 곳", () => {
     for (const s of ["missing", "short", "extra", "unknown"] as const) {
       expect(대장과같음(s), `${s}를 「이미 같다」로 셌다 — 기동 자가치유가 멈춘다`).toBe(false);
     }
+  });
+
+  it("★ 판이어긋남은 short·extra **둘뿐**이다 — 소비자가 문자열을 손으로 견주지 않게 술어로 낸다", () => {
+    // 2026-09-07 적발: 술어가 둘(조각없음·대장과같음)뿐이라 셋째 갈래가 handlers로 새어 나가
+    // `d.docState === "short" || d.docState === "extra"`가 손으로 적혀 있었다. 상태를 하나 더
+    // 만들면 그 줄만 조용히 빠진다 — 판정은 이 파일 한 곳이어야 한다.
+    expect(판이어긋남("short")).toBe(true);
+    expect(판이어긋남("extra")).toBe(true);
+    for (const s of ["ok", "missing", "unknown"] as const) {
+      expect(판이어긋남(s), `${s}를 「판이 어긋남」으로 셌다`).toBe(false);
+    }
+    expect(판이어긋남(null), "모르는 값은 어긋남이 아니다").toBe(false);
+  });
+
+  it("★ 세 술어는 서로 겹치지 않고, 다섯 상태를 빠짐없이 덮는다", () => {
+    for (const s of ["ok", "missing", "short", "extra", "unknown"] as const) {
+      const 켜진것 = [조각없음(s), 대장과같음(s), 판이어긋남(s)].filter(Boolean).length;
+      // unknown만 셋 다 false다(견줄 수가 없어 할 말이 없는 상태) — 나머지는 정확히 하나여야 한다.
+      expect(켜진것, `${s}가 술어 ${켜진것}개에 걸린다 — 갈래가 겹치거나 샌다`).toBe(s === "unknown" ? 0 : 1);
+    }
+  });
+
+  it("★ 견줄수있음은 unknown **하나만** 뺀다 — 「N건을 다 봤다」의 모집단이 부풀지 않게", () => {
+    for (const s of ["ok", "missing", "short", "extra"] as const) expect(견줄수있음(s)).toBe(true);
+    expect(견줄수있음("unknown"), "대장이 조각 수를 안 적은 줄은 **견준 적이 없다**").toBe(false);
+    expect(견줄수있음(null)).toBe(false);
   });
 
   it("정상인 줄에는 꼬리표를 안 붙인다", () => {

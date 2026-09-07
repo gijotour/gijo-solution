@@ -192,10 +192,18 @@ describe("④ 계약(소스 감시)", () => {
 
   it("★ 기동·스케줄 어디에서도 되넣기를 **부르지 않는다** — 사람이 승인할 때만 돈다", () => {
     // 「내가 안 시킨 문서가 다시 들어왔다」를 막는다. 부르는 곳은 도구 하나(runReingestDocument)뿐이다.
-    const 후보 = ["index.ts", "engine/docsbundle.ts", "engine/scheduler.ts", "engine/kbhygiene.ts", "engine/watchfolder.ts"];
+    // ⚠⚠ 이 목록에 **없는 파일 이름을 적으면 감시가 0줄을 잰다**(2026-09-07 검토관 적발).
+    //   처음 판은 `engine/scheduler.ts`를 적어 뒀는데 이 저장소에 없는 파일이었고, 아래 루프가
+    //   `existsSync`로 조용히 건너뛰어 **실제 스케줄 파일 셋(alertschedule·reportschedule·tonewatch)은
+    //   한 줄도 감시되지 않았다.** 돌연변이로 실증했다 — reportschedule.ts에 호출을 심어도 초록이었다.
+    //   그래서 이제 **없으면 건너뛰지 않고 빨개진다**(이름이 바뀌었으면 목록을 고치라는 뜻이다).
+    const 후보 = [
+      "index.ts", "engine/docsbundle.ts", "engine/kbhygiene.ts", "engine/watchfolder.ts",
+      "engine/alertschedule.ts", "engine/reportschedule.ts", "engine/tonewatch.ts",
+    ];
     for (const f of 후보) {
       const p = path.join(뿌리, f);
-      if (!fs.existsSync(p)) continue;
+      expect(fs.existsSync(p), `감시 대상 ${f}가 없다 — 이름이 바뀌었으면 이 목록을 고쳐야 한다(조용히 건너뛰면 감시가 없는 것과 같다)`).toBe(true);
       expect(fs.readFileSync(p, "utf8"), `${f}가 되넣기를 스스로 부른다 — 사람 승인을 건너뛴다`).not.toContain("reingestFromExtracted");
     }
   });
@@ -215,6 +223,17 @@ describe("④ 계약(소스 감시)", () => {
       const src = 읽기(f);
       expect(src.includes(`from "./docledger"`) || src.includes(`from "../docledger"`),
         `${f}가 docledger를 안 쓴다 — 잣대가 두 벌이 된다`).toBe(true);
+    }
+  });
+
+  it("★ 「판이 어긋남」도 **술어로** 묻는다 — 소비자에서 상태 문자열을 손으로 견주지 않는다", () => {
+    // 2026-09-07 적발: docledger가 술어를 둘(조각없음·대장과같음)만 내보내서 셋째 갈래(short/extra)가
+    // 소비자로 샜다 — handlers에 `d.docState === "short" || d.docState === "extra"`가 손으로 적혀 있었다.
+    // 상태를 하나 더 만들면(예: stale) 그 줄만 조용히 빠진다. 판정은 docledger 한 곳이다.
+    for (const f of ["engine/agenttools/handlers.ts", "engine/docsbundle.ts", "engine/kbhygiene.ts"]) {
+      const src = 읽기(f);
+      const 손비교 = src.split("\n").filter((l) => /docState\s*[=!]==\s*"/.test(l));
+      expect(손비교, `${f}가 docState를 손으로 견준다:\n  ${손비교.join("\n  ")}`).toEqual([]);
     }
   });
 
@@ -256,6 +275,40 @@ describe("⑤ 말하는 자리 — 못 읽는 문서를 「지식 N건」에 넣
     expect(답, "조각 없는 문서를 인계 자료 수에 넣었다 — 받는 사람이 없는 자료를 믿는다").toContain("문서 1건");
     expect(답).toContain("조각 없음 1건");
   });
+
+  // ── 검토관 적발 (2026-09-07) — 「전부 유령」 갈래가 형제 함수마다 다르게 새고 있었다 ──────
+  it("★ 인수인계 — **전부 유령**이면 「올린 문서가 없습니다」라고 하지 않는다", async () => {
+    // 방아쇠: LanceDB 소실·재생성(이 저장소가 겪은 「lance optimize 깨짐→재생성」). 그때 대장은 그대로 남는다.
+    // 형제 함수 runKnowledgeStatus는 이 갈래를 막았는데 인계 쪽 조기 반환에는 같은 가드가 없었다 — 반쪽 수리.
+    대장에만넣기("사라진자료A.pdf", 7);
+    대장에만넣기("사라진자료B.pdf", 3);
+    const 답 = await runHandoverStatus();
+    expect(답, "대장에 줄이 남아 있는데 「올린 적 없다」고 말한다 — 이 라운드가 없애려던 바로 그 거짓말이다")
+      .not.toContain("아직 지식베이스에 올린 문서가 없습니다");
+    expect(답, "몇 건이 왜 빠졌는지 말하지 않는다").toContain("조각 없음 2건");
+  });
+
+  it("★ 지식 현황 — **전부 유령**이면 빈 「범위별」·「최근 인입」을 꼬리로 달지 않는다", async () => {
+    대장에만넣기("사라진문서.pdf", 21);
+    const 답 = await runKnowledgeStatus();
+    expect(답).toContain("조각 없음 1건");
+    expect(답, "값 없는 「범위별: 」이 붙는다 — 답은 맞는데 망가진 답으로 읽힌다").not.toMatch(/범위별:\s*$/m);
+    expect(답, "줄 없는 「최근 인입:」이 붙는다").not.toMatch(/최근 인입:\s*$/m);
+  });
+
+  it("★ 유령을 세는 **모집단이 세 자리에서 같다** — 배지와 목록이 다른 건수를 말하지 않는다", async () => {
+    // 지식 현황의 ⚠ 문구가 「조각 없는 문서 알려줘」로 보낸다 — 따라갔더니 건수가 다르면 둘 다 못 믿는다.
+    await ingestText("정상문서.md", "가나다라마바사 아자차카타파하. 정상적으로 반입된 문서입니다.", "global");
+    대장에만넣기("사라진문서.pdf", 21);
+    대장에만넣기("문답-2026-09-01.md", 1, "global", "approved-qa"); // 승인 문답도 유령이 될 수 있다
+    const k = await runKnowledgeStatus();
+    const h = await runHandoverStatus();
+    const g = await runDocChunkGaps();
+    expect(k).toContain("조각 없음 1건");
+    expect(h).toContain("조각 없음 1건");
+    expect(g, "지식 현황이 여기로 보내는데 건수가 다르다").toContain("조각이 없는 문서 1건");
+    expect(g, "승인 문답 유령을 감추지는 않는다 — 빼되 몇 건인지 말한다").toContain("승인 문답");
+  });
 });
 
 describe("⑥ 조각 없는 문서 도구 — 이름을 대고, 지우지 않는다", () => {
@@ -285,5 +338,39 @@ describe("⑥ 조각 없는 문서 도구 — 이름을 대고, 지우지 않는
     await expect(runReingestDocument({ document: "추출본없음.pdf" })).rejects.toThrow(/다시 올려/);
     const 그대로 = db.prepare("SELECT chunks FROM memory_documents WHERE documentId = ?").get("추출본없음.pdf") as { chunks: number };
     expect(그대로.chunks).toBe(21);
+  });
+
+  // ── 검토관 적발 (2026-09-07) ────────────────────────────────────────────────
+  it("★ 0건 문구가 **견준 모집단**을 정직하게 이름 붙인다 — 대장에 줄이 없는 문서를 「대장의 N건」이라 하지 않는다", async () => {
+    await ingestText("정상문서.md", "가나다라마바사 아자차카타파하. 정상적으로 반입된 문서입니다.", "global");
+    db.prepare("DELETE FROM memory_documents WHERE documentId = ?").run("정상문서.md"); // 대장 줄만 지운다
+    const 상태 = (await listDocuments()).find((d) => d.documentId === "정상문서.md")!;
+    expect(상태.docState, "대장에 줄이 없으면 견줄 수가 없다").toBe("unknown");
+    const 답 = await runDocChunkGaps();
+    expect(답, "대장에 줄이 없는 문서까지 「반입 대장의 문서 N건」으로 셌다 — 견준 적 없는 모집단이다")
+      .not.toMatch(/반입 대장의 문서 \d+건/);
+    expect(답).toContain("조각이 사라진 문서는 없습니다");
+  });
+
+  it("★ 라이트에서는 「결재판을 거쳐 다시 넣습니다」라고 **안내하지 않는다** — 그 도구가 없다", async () => {
+    // lite-tools.json이 reingest_document를 **사유와 함께** 뺐다("라이트에선 ＋로 다시 올리기까지만 안내").
+    // 코드가 그 약속을 지키는지 잰다 — 안 지키면 라이트 사용자는 아무 데도 안 닿는 말을 안내받는다.
+    대장에만넣기("2025년 사이버 위협 전망.pdf", 21);
+    const { setToolAllowlist } = await import("../src/engine/agenttools/registry");
+    const lite = JSON.parse(fs.readFileSync(path.join(__dirname, "../src/lite/lite-tools.json"), "utf8")) as { tools: { id: string }[] };
+    setToolAllowlist(lite.tools.map((t) => t.id));
+    try {
+      const 답 = await runDocChunkGaps();
+      expect(답, "라이트엔 reingest_document가 없다 — 시킨 대로 쳐도 도착지가 없다").not.toContain("결재판");
+      expect(답, "되돌리는 길 자체를 지우면 안 된다 — ＋로 다시 올리는 길은 라이트에도 있다").toContain("＋");
+    } finally {
+      setToolAllowlist(null); // ⚠ 되돌리지 않으면 뒤 시험들이 라이트 에디션으로 돈다
+    }
+  });
+
+  it("표준에서는 되넣기 길을 그대로 안내한다 — 라이트 분기가 표준까지 지우지 않았다(반증)", async () => {
+    대장에만넣기("2025년 사이버 위협 전망.pdf", 21);
+    const 답 = await runDocChunkGaps();
+    expect(답).toContain("결재판");
   });
 });

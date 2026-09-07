@@ -27,7 +27,7 @@ import { generateSbom } from "../sbom";
 import type { ComplianceStatus } from "../compliance";
 import { countTriples } from "../ontology";
 import { listVisibleDocuments, queryMemory, queryMemoryRelevant, queryMemoryScored, 문서지목질문 } from "../memory";
-import { 상태꼬리, 조각없음, type DocState } from "../docledger"; // 대장↔저장소 판정 한 곳(잎 · import 0)
+import { 상태꼬리, 조각없음, 판이어긋남, 견줄수있음, type DocState } from "../docledger"; // 대장↔저장소 판정 한 곳(잎 · import 0)
 import { listFindings as listCtiFindings } from "../cti";
 import { matchCtiToAssets } from "../ctimatch";
 import { dailyBriefingText } from "../briefing";
@@ -2901,8 +2901,18 @@ export async function runHandoverStatus(): Promise<string> {
   //   「인계할 자료 N건」에 넣으면 받는 사람이 없는 자료를 믿는다. 빼되 **몇 건인지 말한다**.
   const 유령 = 전부.filter((d) => 조각없음(d.docState));
   const docs = 전부.filter((d) => !조각없음(d.docState));
+  // ⚠⚠ **「전부 유령」 갈래**를 따로 받는다(2026-09-07 검토관 적발 — 반쪽 수리였다).
+  //   docs가 0이라고 「올린 적 없다」고 말하면, 대장에 줄이 남아 있는데 없다고 하는 셈이다 —
+  //   이 라운드가 없애려던 바로 그 거짓말이 인계 쪽 조기 반환에만 그대로 남아 있었다.
+  //   방아쇠는 LanceDB 소실·재생성(「lance optimize 깨짐→재생성」)이고 그때 SQLite 대장은 남는다.
   if (docs.length === 0) {
-    return "아직 지식베이스에 올린 문서가 없습니다. 인수인계는 아래 대화 콘솔의 ＋로 문서를 올리는 것부터 시작합니다.";
+    return 유령.length
+      ? [
+          `인계할 수 있는 자료가 지금은 0건입니다 — 올린 문서가 **모두 조각을 잃었습니다**(조각 없음 ${유령.length}건).`,
+          "대장에는 줄이 남아 있으나 AI가 읽을 수 없어 인계 자료로 못 씁니다(「조각 없는 문서 알려줘」로 이름 확인).",
+          "원본이 보관된 문서는 되살릴 수 있고, 없으면 대화 콘솔의 ＋로 다시 올려 주세요.",
+        ].join("\n")
+      : "아직 지식베이스에 올린 문서가 없습니다. 인수인계는 아래 대화 콘솔의 ＋로 문서를 올리는 것부터 시작합니다.";
   }
   const chunks = docs.reduce((n, d) => n + (d.chunks ?? 0), 0);
   const recent = docs.slice(-5).reverse().map((d) => `- ${d.documentId}`);
@@ -3000,6 +3010,10 @@ export async function runKnowledgeStatus(): Promise<string> {
   const 승인문답 = countApprovedQaDocs();
   const head = `장기기억 문서 ${docs.length}건 (조각 ${chunks}개)${승인문답 ? ` · 승인 문답 ${승인문답}건` : ""}, 온톨로지 트리플 ${triples}개`
     + (유령.length ? `\n⚠ 조각 없음 ${유령.length}건 — 대장에는 있으나 저장소에 조각이 없어 답변 근거로 못 씁니다(「조각 없는 문서 알려줘」로 이름 확인).` : "");
+  // ⚠ 읽을 수 있는 문서가 0건이면 **본문을 안 붙인다**(2026-09-07 검토관 적발). 「전부 유령」 갈래가
+  //   조기 반환을 비켜 가면서 값 없는 `범위별: `과 줄 없는 `최근 인입:`이 꼬리로 나갔다 —
+  //   답이 틀린 건 아니지만 대화창에 **망가진 답**으로 읽힌다.
+  if (docs.length === 0) return head;
   const scopes = `범위별: ${Object.entries(byScope).map(([s, n]) => `${s} ${n}`).join(", ")}`;
   const recent = docs.slice(-5).map((d) => `- ${d.documentId}`).reverse();
   return `${head}\n${scopes}\n최근 인입:\n${recent.join("\n")}`;
@@ -4321,12 +4335,27 @@ export function runDeleteIncidentCase(args: Record<string, string>): string {
 // ⚠ 판정은 engine/docledger.ts 한 곳. 여기서 조각 수를 손으로 비교하지 않는다.
 export async function runDocChunkGaps(): Promise<string> {
   const 전체 = await listVisibleDocuments(); // 등급 밖 문서는 이름도 안 나온다(문서 제목도 정보다)
-  const 유령 = 전체.filter((d) => 조각없음(d.docState));
+  // ⚠ 모집단을 지식 현황·인수인계와 **같게** 맞춘다(2026-09-07 검토관 적발).
+  //   지식 현황의 ⚠ 문구가 「조각 없는 문서 알려줘」로 사람을 여기로 보내는데, 세 자리가 서로 다른
+  //   것을 세면 배지와 목록이 **다른 건수**를 말한다(운영에선 우연히 1로 같았을 뿐이다).
+  //   승인 문답(origin=approved-qa)은 셋 다 「문서」에서 뺀다 — 빼되 아래에서 건수로 따로 말한다.
+  const 문서 = 전체.filter((d) => d.origin !== "approved-qa");
+  const 유령 = 문서.filter((d) => 조각없음(d.docState));
   // 반쪽 유령(이름은 있는데 판이 다른 문서)도 함께 말한다 — 그쪽은 「섞어 읽는」 결함이라 성격이 다르다.
-  const 반쪽 = 전체.filter((d) => d.docState === "short" || d.docState === "extra");
+  const 반쪽 = 문서.filter((d) => 판이어긋남(d.docState));
+  const 문답유령 = 전체.filter((d) => d.origin === "approved-qa" && 조각없음(d.docState));
   if (!유령.length && !반쪽.length) {
+    // ⚠ 모집단에 **정직한 이름**을 붙인다(2026-09-07 검토관 적발). 「반입 대장의 문서 N건」이라 하면
+    //   ㄱ) 대장에 줄이 없는 저장소-전용 문서(unknown)까지 세고 ㄴ) 등급·개인 격리로 **그 사람이 볼
+    //   수 있는 것만** 센 값이 「대장 전체를 봤다」로 읽힌다. 실제로 견준 것은 대장에 조각 수가 적힌 줄뿐이다.
     // 「찾지 못했습니다」는 서랍 점검 FAIL_MARKS에 걸린다 — 정직한 0건에 실패 딱지가 붙지 않게 다른 말로 쓴다.
-    return `반입 대장의 문서 ${전체.length}건이 모두 지식 저장소에 조각을 갖고 있습니다 — 조각이 사라진 문서는 없습니다.`;
+    const 견준것 = 문서.filter((d) => 견줄수있음(d.docState));
+    const 못견준수 = 문서.length - 견준것.length;
+    return [
+      `조각이 사라진 문서는 없습니다 — 볼 수 있는 문서 가운데 대장과 견줄 수 있는 ${견준것.length}건이 모두 적힌 대로 조각을 갖고 있습니다.`,
+      ...(못견준수 ? [`(${못견준수}건은 대장에 조각 수가 안 적혀 있어 견주지 않았습니다 — 모르는 것을 어긋남이라 하지 않습니다.)`] : []),
+      ...(문답유령.length ? [`⚠ 승인 문답 ${문답유령.length}건은 조각이 없습니다 — 문서가 아니라 쌓인 문답이라 위 셈과 따로 셉니다.`] : []),
+    ].join("\n");
   }
   const out: string[] = [];
   if (유령.length) {
@@ -4343,10 +4372,23 @@ export async function runDocChunkGaps(): Promise<string> {
     );
     if (반쪽.length > 10) out.push(`  … 그 밖 ${반쪽.length - 10}건`);
   }
+  if (문답유령.length) {
+    out.push(`(승인 문답 ${문답유령.length}건도 조각이 없습니다 — 문서가 아니라 쌓인 문답이라 위 셈과 따로 셉니다.)`);
+  }
+  // ⚠⚠ **에디션마다 갈 수 있는 곳이 다르다**(2026-09-07 검토관 적발). 라이트에는 결재판 화면이
+  //   없어 `reingest_document`를 허용목록에서 뺐다 — 그런데 이 안내는 분기 없이 늘 「결재판을 거쳐
+  //   다시 넣습니다」라고 말했다. 라이트 사용자는 **제품이 시킨 말을 그대로 했는데 아무 데도 안 닿는다**
+  //   (「안내한 말 점검」 계열). 라이트에서는 ＋로 다시 올리는 길만 말한다 — lite-tools.json의 제외 사유와 같은 말이다.
+  // ⚠ 순환 import를 만들지 않으려고 동적으로 받는다(registry가 이 파일을 끌어 쓴다).
+  const { 에디션제한중 } = await import("./registry.js");
   out.push(
     "",
-    "되돌리는 법 — 원본이 보관된 문서는 「<문서이름> 다시 넣어줘」라고 말씀하시면 결재판을 거쳐 다시 넣습니다.",
-    "원본이 없으면 대화창 ＋로 그 파일을 다시 올려 주세요(업무영역·등급은 그대로 이어집니다).",
+    ...(에디션제한중()
+      ? ["되돌리는 법 — 대화창 ＋로 그 파일을 다시 올려 주세요(업무영역·등급은 그대로 이어집니다)."]
+      : [
+          "되돌리는 법 — 원본이 보관된 문서는 「<문서이름> 다시 넣어줘」라고 말씀하시면 결재판을 거쳐 다시 넣습니다.",
+          "원본이 없으면 대화창 ＋로 그 파일을 다시 올려 주세요(업무영역·등급은 그대로 이어집니다).",
+        ]),
     "⚠ 이 도구는 아무것도 지우거나 바꾸지 않습니다 — 이름을 대는 데까지가 일입니다.",
   );
   return out.join("\n").slice(0, 2500);

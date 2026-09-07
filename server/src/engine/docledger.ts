@@ -66,6 +66,25 @@ export function 대장과같음(state: DocState | null | undefined): boolean {
   return state === "ok";
 }
 
+/**
+ * 「이름은 있는데 판이 다른가」 — 반쪽 유령(저장소가 적으면 일부 사라짐, 많으면 옛 판이 섞임).
+ * ⚠ 이 술어가 없어서 소비자(handlers)에 `docState === "short" || docState === "extra"`가
+ *   **손으로** 적혀 있었다(2026-09-07 검토관 적발). 상태를 하나 더 만들면 그 줄만 조용히 빠진다 —
+ *   갈래를 늘릴 일이 생기면 **여기만** 고치면 되도록 술어로 낸다.
+ */
+export function 판이어긋남(state: DocState | null | undefined): boolean {
+  return state === "short" || state === "extra";
+}
+
+/**
+ * 「대장과 견줄 수 있는 줄인가」 — 모집단을 정직하게 세는 자리에서 쓴다.
+ * unknown(대장이 조각 수를 안 적음)은 **견준 적이 없다**. 「N건을 다 봤다」에 넣으면
+ * 보지도 않은 것을 봤다고 말하는 셈이라, 0건 보고의 모집단이 부풀려진다.
+ */
+export function 견줄수있음(state: DocState | null | undefined): boolean {
+  return state === "ok" || state === "missing" || state === "short" || state === "extra";
+}
+
 /** 사람에게 보여 줄 꼬리표. ok면 빈 문자열 — 정상인 줄에 아무것도 안 붙인다. */
 export function 상태꼬리(state: DocState | null | undefined, 대장조각?: number | null): string {
   switch (state) {
