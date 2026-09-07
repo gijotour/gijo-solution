@@ -122,7 +122,10 @@
       ".wf-flag{display:inline-block;margin-top:4px;font-size:11.75px;font-weight:700;color:var(--muted-2,#a49d95);background:none;border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:2px 8px;cursor:pointer;min-height:24px;font-family:inherit;}",
       ".wf-flag:hover{color:var(--amber,#f0a020);border-color:rgba(245,158,11,.45);}",
       ".wf-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;}",
-      ".wf-line[hidden],.wf-flag[hidden]{display:none;}",
+      // ⚠ !important다. 지휘소의 `.cs-row:hover .cs-flag`(특이도 0,3,0)가 `.wf-flag[hidden]`(0,2,0)를
+      //   이겨서, 펼친 뒤에도 **마우스를 올리면 접힘 단추가 다시 나타났다**. 두 CSS는 다른 파일이
+      //   head에 넣는 것이라 순서로 이길 수도 없다 — 「숨김」은 어느 쪽이 먼저 들어가든 이겨야 한다.
+      ".wf-line[hidden],.wf-flag[hidden]{display:none!important;}",
       ".wf-k{font-size:12px;color:var(--text,#e9e7e2);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:3px 10px;cursor:pointer;font-family:inherit;min-height:24px;}",
       ".wf-k:hover{background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.4);}",
       ".wf-k.on{background:rgba(240,160,32,.16);border-color:rgba(240,160,32,.5);color:var(--amber,#f0a020);font-weight:700;}",
