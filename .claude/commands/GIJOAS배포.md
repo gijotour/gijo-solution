@@ -45,6 +45,19 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
      `npm run build`는 이 둘을 함께 돌리는데 **배포 절차만 앞의 하나를 부르고 있었다** —
      새 자료 파일을 더한 사람은 시험을 통과시키고도 운영에서 조용히 그 기능이 꺼진다.
      (`import`로 읽는 .json은 tsc가 알아서 옮긴다 — `lite-tools.json`·`onto-aliases-ko.json`.)
+4″. **운영 dist 고아 산출물 청소(필수)** — 위 rsync는 `--delete`로 `src/`를 저장소와 똑같이
+   맞추지만 **`dist/`는 tsc가 만들 뿐 지우지 않는다.** 그래서 화면·엔진을 통째로 내려도
+   운영 디스크에는 옛 `.js`가 계속 산다(2026-09-07 `merge.ts` 삭제가 그 예다).
+   `wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/clean-orphan-dist.sh" /home/gijo/gijo-as/server`
+   - 먼저 보고 싶으면 뒤에 `--dry-run`을 붙인다(지우지 않고 `DRY|이름`만 낸다).
+   - **참조 0을 확인한 것만 지운다.** 살아남은 dist가 아직 부르면 `REF|이름|수`로 알리고 **안 지운다**
+     — 부르는데 지우면 다음 기동이 MODULE_NOT_FOUND로 죽는다. `REF`가 나오면 그건 **반쪽 삭제**이니
+     사람이 봐야 할 자리다(소스에서 지웠는데 부르는 곳이 남았다는 뜻).
+   - ⚠ **출력이 0줄이면 「없음」이라고 말하지 말 것.** 스크립트가 없거나 경로가 틀려도 0줄이다 —
+     종료코드를 함께 본다(0이 아니면 청소가 안 돈 것이다). `deploy-prod.ps1`은 이걸 검사해 경고한다.
+   - ⚠ 왜 필요한가: 소스 감시(「흔적 0건」 시험)는 `src`만 본다 — **운영 dist의 잔재를 원리상 못 잡는다.**
+     아무도 안 부르는 옛 모듈이 남으면 다음 사람이 「아직 있는 기능」으로 읽고, 잘못 살아난 import
+     하나로 지웠다고 믿은 창구가 다시 열린다.
 4′. **제품 문서 동기화(필수)** — ⚠ 4단계는 `server/src/`만 옮긴다. **문서와 매니페스트는 안 간다.**
    - ⚠ `docs-drift.mjs`는 **win 호스트에서** 돌린다(WSL 안에서 돌리면 거짓 경보 — 2026-09-04 실사고:
      WSL엔 `wsl` 명령이 없어 「30건 어긋남 · 0건 인입」이 났지만 win에서는 30/30 초록이었다).
@@ -62,6 +75,16 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
 5. 재시작 (grep/awk 파이프 금지 — 인용 함정):
    `wsl -d Ubuntu-24.04 -- systemctl show gijo-as.service -p MainPID --value` 로 PID 얻고 `wsl -d Ubuntu-24.04 -- kill <PID>`
 6. health 확인: Node fetch로 http://localhost:4000/api/health 를 최대 60초 폴링 (curl은 한글 응답 검증에 쓰지 말 것).
+   - ⚠⚠ **오류를 볼 곳은 `journalctl`이 아니라 `/home/gijo/gijo-as/server.log`다.**
+     유닛이 `StandardOutput=append:/home/gijo/gijo-as/server.log`(StandardError도 같은 파일)라,
+     서버가 찍는 글은 **저널로 한 줄도 안 간다.** 실측(2026-09-08) `journalctl -u gijo-as.service`는
+     systemd 자신의 「Started/Deactivated/Scheduled restart」만 보여 준다 — 앱 오류는 하나도 없다.
+     그래서 저널만 보고 「오류 없음」이라고 하면 **거짓 초록**이다(기동 직후 죽는 부류가 여기 숨는다).
+   - 보는 법: `wsl -d Ubuntu-24.04 -- tail -n 80 /home/gijo/gijo-as/server.log`
+     (배포 뒤 새로 붙은 줄만 보려면 재시작 전에 `wc -l`을 재 두고 그 뒤부터 읽는다.
+     ⚠ `append:`라 파일은 **잘리지 않고 계속 쌓인다** — 맨 앞은 옛 기동의 글이다.)
+   - 저널이 쓸모없다는 뜻은 아니다: **프로세스가 몇 번 되살아났는지**(restart counter)와 기동·종료
+     시각은 저널에만 있다. 「죽고 살아났나」는 저널, 「왜 죽었나」는 server.log — 자리가 다르다.
 6′. **PID가 실제로 바뀌었는지 확인(필수)** — ⚠ **「health 200 = 새 코드」는 거짓이다.**
    `systemctl show gijo-as.service -p MainPID --value` 를 **다시** 읽어 **이전 PID와 다른지**,
    그리고 `ps -o lstart= -p <새PID>` 가 `stat -c '%y' .../dist/index.js` **보다 뒤인지** 본다.

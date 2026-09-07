@@ -314,3 +314,75 @@ describe("★ 클라 판 번호 — package.json과 package-lock.json이 같다"
       .toBe(pkg.version);
   });
 });
+
+// ── 배포 절차 감시(2026-09-08) ──────────────────────────────────────────────
+//
+// ■ 무엇이 새는가 — **소스에서 지운 파일이 운영 dist에 남는다**
+//   배포 3단계는 `rsync -a --delete`로 `src/`를 저장소와 똑같이 맞추지만, `dist/`는 tsc가
+//   **만들 뿐 지우지 않는다.** 2026-09-07에 merge(LLM 합성)를 통째로 내렸는데, 그 커밋의 소스
+//   감시(mergeremoved.test)는 `src`만 본다 — **운영 dist의 잔재는 원리상 못 잡는다.**
+//   실측(2026-09-08, 이 저장소의 dist): `dist/engine/mcp.js`가 소스 없이 남아 있었다.
+//   남으면 ① 다음 사람이 「아직 있는 기능」으로 읽고 ② 잘못 살아난 import 하나로 지웠다고 믿은
+//   창구가 다시 열린다.
+//
+// ■ 왜 bash 본문을 PowerShell 문자열로 안 적나 — **실측한 함정**
+//   PowerShell 5.1은 네이티브 명령에 넘기는 문자열의 큰따옴표를 먹는다. `echo "REF|$b|$n"`이
+//   따옴표를 잃고 `echo REF | $b | $n`(파이프!)이 되어 bash가 깨졌는데, **스크립트는 안 죽고
+//   「고아 산출물: 없음」이라는 거짓 초록**을 냈다. 그래서 로직은 .sh 파일에 두고 경로만 넘긴다.
+//
+// ■ 이 시험이 보는 것 — 절차가 **실제로 그 일을 부르는지**. 배포는 직렬 자원이라 돌려 볼 수 없다.
+describe("★ 배포 절차 — 운영 dist 고아 산출물을 치운다", () => {
+  const 배포경로 = path.join(서버루트, "..", "tools", "deploy-prod.ps1");
+  const 청소경로 = path.join(서버루트, "..", "tools", "clean-orphan-dist.sh");
+
+  it("청소 스크립트가 실재하고, 지우기 전에 **참조 0**을 확인한다", () => {
+    expect(fs.existsSync(청소경로), `청소 스크립트가 없다(${청소경로}) — 배포가 부를 것이 없다`).toBe(true);
+    const sh = fs.readFileSync(청소경로, "utf8");
+    // ① 범위 — dist/engine의 .js만 본다(copy-assets가 넣는 .json을 지우면 기능이 조용히 꺼진다).
+    expect(sh, "dist/engine/*.js 말고 다른 것을 훑는다 — 범위를 넓히면 자료 파일을 지울 수 있다")
+      .toContain("dist/engine/*.js");
+    // ② 잣대 — 같은 이름의 .ts가 src에 있으면 고아가 아니다.
+    expect(sh, "src에 짝이 있는지 안 본다 — 그러면 살아 있는 모듈을 지운다").toContain('src/engine/$b.ts');
+    // ③④ 참조 0 확인 + 낱말 겹침 방어를 **한 줄에서** 본다.
+    //   ⚠ 「어딘가에 [^A-Za-z0-9_-]가 있나」로 재면 안 된다 — 반증에서 실제로 드러났다:
+    //     그 글자가 주석에도 있어, **주석만 남고 코드에서 빠져도 초록**이었다. 감시는 코드를 봐야 한다.
+    //   engine/foo는 engine/foobar에도 들어 있으므로, 뒤에 이름 글자가 아닌 것이 와야 진짜 참조다.
+    expect(sh, "참조 세는 줄이 없거나 이름 겹침을 안 막는다 — 부르는데 지우면 배포 사고고, 겹침을 안 막으면 foo가 foobar 때문에 안 지워진다")
+      .toContain('grep -rlE "engine/$b[^A-Za-z0-9_-]"');
+    // ⑤ 없는 경로에 조용히 성공하지 않는다 — 그러면 「고아 0건」이 거짓말이 된다.
+    expect(sh, "경로가 틀려도 0으로 끝난다 — 「없음」이 거짓 초록이 된다").toMatch(/dist\/engine[\s\S]{0,120}exit 3/);
+  });
+
+  it("배포 스크립트가 그 청소를 **부르고**, 못 돌면 「없음」이라 말하지 않는다", () => {
+    expect(fs.existsSync(배포경로), `배포 스크립트를 못 찾았다(${배포경로}) — 시험이 헛돈다`).toBe(true);
+    const ps = fs.readFileSync(배포경로, "utf8");
+    expect(ps, "배포가 청소 스크립트를 안 부른다 — 파일만 만들어 두면 아무 일도 안 일어난다")
+      .toContain("clean-orphan-dist.sh");
+    // ⚠ bash 본문을 문자열로 넘기면 PowerShell이 따옴표를 먹는다(위 ■ 참고). 경로만 넘기는지 본다.
+    expect(/wsl -d \$distro -- bash \$청소스크립트 \$wslServer/.test(ps),
+      "청소를 파일 경로로 안 부른다 — bash 본문을 문자열로 넘기면 따옴표가 먹혀 조용히 깨진다").toBe(true);
+    // ★ 거짓 초록 방지 — 출력 0줄은 「고아 없음」이 아니라 「못 돌았다」일 수 있다.
+    expect(ps, "청소 종료코드를 안 본다 — 스크립트가 없거나 경로가 틀려도 0줄이라 「없음」이 된다")
+      .toContain("$청소코드");
+    const 자리 = ps.indexOf("$청소코드 -ne 0");
+    expect(자리, "종료코드가 0이 아닐 때의 갈래가 없다 — 못 돌아도 초록으로 보인다").toBeGreaterThan(0);
+  });
+
+  it("절차 문서에도 적혀 있다 — 오류는 journalctl이 아니라 server.log에서 본다", () => {
+    // ⚠ **이 갈래는 WSL 사본에서 안 돈다.** wsl-test.sh는 tools/·knowledge/·뿌리 md만 가져가고
+    //   `.claude/`는 안 가져간다. 그래서 WSL에서 초록이라고 이 문서가 검증됐다는 뜻이 아니다 —
+    //   실제로 재는 것은 `win` 호스트에서 돌릴 때다. 조용히 건너뛰지 않게 여기 적어 둔다.
+    const md = path.join(서버루트, "..", ".claude", "commands", "GIJOAS배포.md");
+    if (!fs.existsSync(md)) return;
+    const 글 = fs.readFileSync(md, "utf8");
+    // ① 고아 청소가 절차에 있다.
+    expect(글, "배포 절차에 고아 청소가 없다 — 사람이 손으로 배포하는 길에서는 영영 안 치워진다")
+      .toContain("clean-orphan-dist.sh");
+    // ② 오류를 볼 자리 — 유닛이 StandardOutput=append:…/server.log라 저널에는 앱 글이 한 줄도 없다.
+    //    실측(2026-09-08): journalctl -u gijo-as.service는 Started/Deactivated/Scheduled restart뿐이다.
+    expect(글, "server.log를 안 가리킨다 — 저널만 보고 「오류 없음」이라 하면 거짓 초록이다")
+      .toContain("/home/gijo/gijo-as/server.log");
+    expect(글, "저널과 로그 파일의 자리 차이를 안 적었다 — 다음 사람이 또 저널을 본다")
+      .toContain("StandardOutput=append");
+  });
+});
