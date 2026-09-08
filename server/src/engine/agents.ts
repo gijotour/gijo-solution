@@ -6,7 +6,11 @@ import { db } from "../db";
 import { isModelAvailable } from "./localengine";
 import { getAdapter } from "./adapters";
 import { recordAudit } from "./audit";
-import { screenTips } from "./screenguide"; // 맡은 메뉴 제목(단일 출처) — screenguide는 agents를 물지 않는다
+// 맡은 메뉴 제목(단일 출처). ⚠ screenguide는 2026-09-08부터 agentloop(forcedToolFor)도 문다 —
+// agents→screenguide→agentloop→llm→agents로 되돌아오는 고리다. 초기화 순환에는 안 걸린다
+// (아래 menuTitlesOf가 **함수 안에서만** 부른다 — 모듈 최상위에서 부르면 걸린다). 자세한 것은
+// 그 함수의 머리말. 「screenguide는 agents를 물지 않는다」던 옛 문장은 이제 거짓이라 지웠다.
+import { screenTips } from "./screenguide";
 
 export type AgentStatus = "idle" | "working" | "watching";
 

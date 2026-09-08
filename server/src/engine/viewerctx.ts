@@ -18,6 +18,11 @@ import { AsyncLocalStorage } from "node:async_hooks";
 export interface ViewerTag {
   userId?: string | null;
   clearance?: string | null;
+  /** 권한 — 지금까지 **런타임으로는 이미 실려 왔는데**(dispatcher가 {userId, clearance, role}을
+   *  그대로 넘긴다) 타입에만 없어서 아무도 못 집어 갔다. 2026-09-08에 screenguide가 이걸 쓴다:
+   *  강제 도구 판정(forcedToolFor)은 역할을 안 주면 admin 전용 도구를 후보에서 빼기 때문에,
+   *  역할 없이 재면 화면 안내가 admin 전용 도구의 말을 채 간다(검토관 [중] 실측). */
+  role?: string | null;
 }
 
 const store = new AsyncLocalStorage<ViewerTag>();

@@ -2100,7 +2100,9 @@ async function 체인훑기(
   본다(!!이름으로화면찾기(t), { 이름: "「○○ 어디서 해?」 자리 안내", 층: "화면안내", 판별: "이름으로화면찾기", 도착: "화면위치안내 + 화면 열기", 감시: "const 찾는화면 = 이름으로화면찾기(instructionText)" });
   const 방법화면 = 방법질문화면찾기(t);
   본다(!!방법화면 && !(방법화면.표준전용 && 에디션제한중()), { 이름: "「○○ 하려면?」 방법 안내", 층: "화면안내", 판별: "방법질문화면찾기", 도착: "formatScreenGuide + 화면 열기", 감시: "const 방법화면 = 방법질문화면찾기(instructionText)" });
-  본다(isHelpIntent(t, 옵션?.화면), { 이름: "화면 사용 안내", 층: "화면안내", 판별: "isHelpIntent", 도착: "formatScreenGuide(지금 화면)", 감시: "if (isHelpIntent(instructionText, screen))" });
+  // ⚠ 역할을 넘긴다(2026-09-08) — 실경로는 runWithViewer 꼬리표로 저절로 채워지는데 이 진단은
+  //   꼬리표 밖이라, 안 주면 admin 전용 강제 도구가 걸린 갈래를 **원리상 못 본다**.
+  본다(isHelpIntent(t, 옵션?.화면, 옵션?.역할), { 이름: "화면 사용 안내", 층: "화면안내", 판별: "isHelpIntent", 도착: "formatScreenGuide(지금 화면)", 감시: "if (isHelpIntent(instructionText, screen))" });
 
   본다(결재승인요청_RE.test(t), { 이름: "결재 승인 요청", 층: "특수경로", 판별: "결재승인요청_RE", 도착: "결재판 안내(대신 승인 안 함)", 감시: "if (결재승인요청_RE.test(instructionText))" });
   본다(KB_HYGIENE_INTENT_RE.test(t), { 이름: "지식베이스 정리", 층: "특수경로", 판별: "KB_HYGIENE_INTENT_RE", 도착: "kbhygiene 리포트", 감시: "if (KB_HYGIENE_INTENT_RE.test(instructionText))" });
