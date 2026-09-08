@@ -142,7 +142,9 @@ const AGENT_DEFS: AgentBase[] = [
   },
 ];
 
-/** 맡은 메뉴의 제목 — screenguide 한 곳에서 꺼낸다(등록부에 제목을 두 번 적지 않는다). screenguide는 auth·workflow만 물어 순환이 없다.
+/** 맡은 메뉴의 제목 — screenguide 한 곳에서 꺼낸다(등록부에 제목을 두 번 적지 않는다).
+ *  ⚠ screenguide는 2026-09-08부터 agentloop(forcedToolFor)도 문다 — agents→screenguide→agentloop이 한 덩어리다.
+ *    함수 안에서만 부르므로 초기화 순환에는 안 걸린다(모듈 최상위에서 부르면 걸린다).
  *  screenTips는 모르는 화면에도 개요 제목을 준다 — 폴백 제목과 같으면 파일명을 그대로 보여 오타·폐지 화면이 드러나게 한다(검토관 2026-09-03). */
 function menuTitlesOf(menus: string[]): string[] {
   const 폴백 = screenTips("__없는화면__.html").title;

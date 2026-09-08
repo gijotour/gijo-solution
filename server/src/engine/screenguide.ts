@@ -11,6 +11,10 @@ import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 // 단계 표는 서버 한 곳에서만 든다 — 사이드바·절차 띠·이 안내가 같은 것을 봐야 한다.
 import { stageOfScreen, workflowStages } from "./workflow";
+// 강제 도구 규칙(FORCED_INTENTS)의 판정 — 「이 말이 이미 제품 도구의 것인가」를 재는 곳은
+// agentloop 한 곳뿐이다(여기에 사본을 두면 두 곳이 어긋난다). ⚠ **함수 안에서만** 부른다 —
+// 모듈 최상위에서 부르면 순환 초기화(agents→screenguide→agentloop→…)에 걸린다.
+import { forcedToolFor } from "./agentloop";
 
 export interface ScreenGuide {
   title: string;
@@ -346,6 +350,47 @@ export function 안내화면열쇠들(): string[] {
   return Object.keys(GUIDES);
 }
 
+/**
+ * 구역 **이름** 전부 — 별칭이 아니라 안내에 실제로 적힌 구역 이름의 모집단.
+ *
+ * ■ 왜(2026-09-08): 가로채기 전수 감시(aliaspair.test)는 여태 **별칭 142개**만 모집단으로 삼았는데,
+ *   panelNameHit은 별칭뿐 아니라 **구역 이름 자체**도 질문에 맞춘다. 그래서 이름 쪽으로 새는
+ *   가로채기 20쌍(「오늘 브리핑 알려줘」→briefing 등)을 시험이 **원리상 못 봤다** — 별칭
+ *   「조각이 없는 문서」를 걷어내도 이름 「조각이 없는 문서(⚠)」가 그대로 남아 있던 이유다.
+ * ■ 화면 열쇠는 그대로 준다(가로채기는 화면마다 다르다). 공통 OVERVIEW는 screen="" 로 낸다 —
+ *   그 구역들은 **어느 화면에서 물어도** 걸린다(resolvePanelHit의 둘째 훑기).
+ * ■ 이름은 **죽을 수 없다**(GUIDES가 원천이라 열쇠가 곧 이름) — 별칭과 달리 죽은줄 감시가 필요 없다.
+ */
+export function 구역이름들(): { screen: string; name: string }[] {
+  const out: { screen: string; name: string }[] = [];
+  for (const [screen, g] of Object.entries(GUIDES)) {
+    for (const name of Object.keys(g.panels ?? {})) out.push({ screen, name });
+  }
+  for (const name of Object.keys(OVERVIEW.panels ?? {})) out.push({ screen: "", name });
+  return out;
+}
+
+
+// 구역 이름이 걸렸을 때 「이 말이 안내를 구하는 말인가」를 재는 잣대 — **여기 한 곳**이다.
+// 2026-09-08에 한 벌을 두 쪽으로 **나누기만** 했다(낱말은 하나도 더하거나 빼지 않았다).
+//  ① 홑물음(뭐·무엇·알려) — 안내를 구할 때도, 제품 데이터를 구할 때도 **똑같이** 쓴다.
+//     「오늘 브리핑 알려줘」·「견고성 점수 뭐야?」는 사용법이 아니라 그 값을 달라는 말이다.
+//  ② 안내낱말(사용·설명·방법·어떻게…) — 안내를 구할 때만 쓴다. 「오늘 브리핑 사용법 알려줘」.
+// panelNameHit의 게이트는 여전히 **둘의 합**이고(아래), isHelpIntent가 ②만 따로 쓴다.
+// 나눠 놓지 않고 정규식을 한 벌 더 적으면 낱말을 더할 때 한쪽만 고쳐져 반드시 어긋난다.
+const 홑물음_RE = /(뭐|무엇|알려)/;
+// 구역 **이름 자체가 설명**인 자리 — 「○○ 방법·절차·단계」는 「어떻게/무엇으로 이뤄지나」를
+// 적어 둔 구역이라, 그 이름을 부르는 것이 곧 설명을 구하는 것이다. 아래 isHelpIntent가
+// 「이름이 도구의 주제어」 판정에서 이 이름들을 비켜 준다.
+// 실측 근거(2026-09-08): 「등급 5단계 뭐야?」·「이관 절차 뭐야?」·「대응 절차 뭐야?」·
+//   「학습 루프 4단계 뭐야?」 넷은 강제 규칙 workflow_status(업무 절차 5단계 **현황**)로 간다.
+//   그런데 그 규칙을 물어온 것은 **이름이 아니라 꼬리**다 — 같은 이름에 「보여줘·알려줘·있어?」를
+//   붙이면 넷 다 강제 규칙이 **안 걸린다**(1/4). 도구 규칙 `(단계|절차)…(뭐|뭘|무엇|해야)`가
+//   넓어서 「무슨 절차든 뭐냐고 물으면」 자기 것이라 우긴 것이다(낱말 가로채기 계보).
+//   여기서 비켜 주지 않으면 「등급 5단계 뭐야?」에 **라이선스 등급 대신 업무 5단계 현황**이 나간다.
+// ⚠ 근본 수리는 그 도구 규칙을 좁히는 것이다(FORCED_INTENTS) — 이 갈래의 파일 밖이라 남겨 둔다.
+const 설명이름_RE = /(방법|절차|단계|사용법)/;
+const 안내낱말_RE = /(어떻게|어디|누가|언제|사용|설명|방법|바꿔|바꾸|변경|저장할|왜|가능|되나|하나요|좋아|좋을까|추천|해\?|돼\?|잃어버|분실|못\s*찾|안\s*보여|막혔|어떡)/;
 function panelNameHit(text: string, screen?: string): boolean {
   const q = text.replace(/\s/g, "");
   // 설명을 구하는 말투일 때만(단순히 패널명이 스친 지시는 도구가 처리해야 한다).
@@ -355,7 +400,7 @@ function panelNameHit(text: string, screen?: string): boolean {
   // "지원 센터에 문의하세요"라고 답했다(2026-07-30 실측). 폐쇄망 제품에 지원 센터는 없다.
   // 넓혀도 안전한 이유: 아래 resolvePanel이 **구역 이름 전체**가 질문에 들어 있을 때만 참이라,
   // "스캔 실패했어"처럼 이름이 안 걸리는 하소연은 여전히 도구·LLM이 맡는다.
-  if (!/(뭐|무엇|어떻게|어디|누가|언제|사용|설명|알려|방법|바꿔|바꾸|변경|저장할|왜|가능|되나|하나요|좋아|좋을까|추천|해\?|돼\?|잃어버|분실|못\s*찾|안\s*보여|막혔|어떡)/.test(text)) return false;
+  if (!홑물음_RE.test(text) && !안내낱말_RE.test(text)) return false;
   return resolvePanel(screen, q) !== null;
 }
 
@@ -384,6 +429,20 @@ export function isHelpIntent(text: string, screen?: string): boolean {
   if (WEAK_HELP_RE.test(t) && !hasSpecificSubject(t)) return true;
   const hit = resolvePanelHit(screen, t.replace(/\s/g, ""));
   if (hit && panelNameHit(t, screen)) {
+    // ★ 구역 **이름**이 제품 도구의 주제어와 같으면, 홑물음 꼬리는 제품 물음이다(2026-09-08 실측 20건).
+    //   실사고 계열: 별칭 「조각이 없는 문서」가 강제 도구 doc_chunk_gaps를 채 간 것과 같은 병인데,
+    //   그때는 별칭만 걷어내고 **이름**은 남겨 두어 「조각이 없는 문서(⚠) 알려줘」가 그대로 샜다.
+    //   같은 부류가 이름 쪽에 20쌍 있었다 — 「오늘 브리핑 알려줘」→briefing · 「견고성 점수 뭐야?」
+    //   →redteam_status · 「AI가 아낀 시간 알려줘」→time_saved · 「최근 탐지 내역 알려줘」→threats.
+    //   dispatcher가 화면 안내를 강제 도구보다 **먼저** 보기 때문에(차례 22 vs 37) 도구는 멀쩡한 채
+    //   말이 안 닿았다. 「보여줘」는 도구로 가고 「알려줘」는 안내로 가는 어긋남도 여기서 사라진다.
+    // ⚠ 안내낱말(②)이 **하나라도** 있으면 손대지 않는다 — 「오늘 브리핑 사용법 알려줘」·「견고성
+    //   점수 설명해줘」는 그대로 안내다. 이름 **자체**에 든 안내낱말도 센다(「점검 방법」) — 이름이
+    //   곧 「어떻게 하나」인 구역은 그 이름을 부르는 것이 설명을 구하는 것이기 때문이다.
+    // ⚠ 이름 자체가 설명인 자리(설명이름_RE — 「○○ 절차·단계·방법」)도 비켜 준다. 실측: 그 넷은
+    //   꼬리가 「뭐야?」일 때만 도구 규칙에 걸린다 — 이름이 아니라 **꼬리**가 물어온 도구다.
+    // ⚠ forcedToolFor는 뒤(regex)에 둔다 — 도구 목록을 만드는 비용이 있어 값싼 잣대를 먼저 본다.
+    if (!안내낱말_RE.test(t) && !설명이름_RE.test(hit.matched) && forcedToolFor(t)) return false;
     // ⚠ 구역 이름 자체에 영문이 들어 있으면(예: "구독 중인 CTI 피드", "이메일(SMTP) 설정")
     //   그 영문을 "특정 제품을 콕 집은 질문"으로 오해해 화면 안내를 막아 버렸다(2026-07-27 실측).
     //   질문에서 걸린 구역 이름을 지운 뒤 남는 말로 판단한다 — 그래야 진짜 제품명만 걸러진다.
