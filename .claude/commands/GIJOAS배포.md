@@ -79,6 +79,7 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
      운영의 지식 7종은 누군가 8월에 **손으로** 넣어 둔 것이었고 아무도 그 사실을 몰랐다.
    - ⚠ 문서를 바꿨으면 **재시작해야 재인입**된다(해시가 같으면 건너뛴다).
    - 끝나고 `node tools/docs-drift.mjs`를 **다시** 돌려 초록인지 본다.
+   - ⚠ **청커 판(CHUNKER_VERSION)이 오른 배포**(2026-09-08부터)는 재시작 직후 매니페스트 35편이 지우고 다시 넣기로 돈다(약 1,500조각·수 분). 그 창에서 docs-drift를 재면 「반쪽 유령」 헛빨강이 난다 — server.log에 `[docsbundle] … updated` 줄이 다 찍힌 **뒤에** 잰다. 판이 올랐는지는 memory.ts의 CHUNKER_VERSION과 직전 배포 커밋을 견줘 안다.
      「고쳤다」와 「AI가 안다」는 다른 말이다.
 5. 재시작 (grep/awk 파이프 금지 — 인용 함정):
    `wsl -d Ubuntu-24.04 -- systemctl show gijo-as.service -p MainPID --value` 로 PID 얻고 `wsl -d Ubuntu-24.04 -- kill <PID>`
