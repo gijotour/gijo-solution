@@ -16,9 +16,17 @@
 //   ② 꼬리 정규화가 파이프 줄을 안 깨뜨린다.
 //   ③ **표가 없는 문서는 종전과 글자 하나까지 같다**(골든 문자열 — 시험 안에서 전/후를 같이 못 잰다).
 //   ④ memory.ts 청커에 넣으면 표 조각이 머리글을 데리고 간다(추출기↔청커 접점).
+//   ⑤ **가드 하나하나가 실제로 갈래를 가른다** — 안 닫힌 표·빈 표·안쪽 표 gridSpan·열 폭주 상한.
 //
 // ⚠ 픽스처는 test/fixtures/make-table-fixtures.mjs가 굽는다 — 실물 3편에는 병합 셀이 **0개**라
 //   잘라 만들 수가 없었다(그 갈래는 여기 픽스처로만 검증된다. 실물로는 못 쟀다).
+//
+// ★ 「담고만 있는 픽스처」를 조심한다 (2026-09-08 검토관 적발④⑤ 수리)
+//   첫 판은 중첩·병합·빈 표·안 닫힌 표를 픽스처에 넣고 「못박았다」고 적었지만, 정작 제품에서
+//   그 가드 줄을 지워도 **전부 초록**이었다. 원인은 픽스처가 갈래를 안 가른 것이다 — 예를 들어
+//   table-broken.docx엔 닫힌 표가 하나도 없어 docx **빠른길**로 빠졌고, 그래서 「구간 나누기」의
+//   가드에는 시험이 아예 닿지 않았다. 아래 시험을 고치거나 새 가드를 넣을 때는
+//   **그 줄을 지우고 실제로 빨개지는지** 손으로 확인한다(그게 안 되면 그물이 아니다).
 import { describe, it, expect, vi } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
@@ -40,6 +48,8 @@ const b64 = (n: string) => fs.readFileSync(path.join(__dirname, "fixtures", n)).
 //   답하면 잣대가 틀렸을 때 시험도 함께 틀린다. 마크다운 규격을 여기 다시 적어 잰다.
 const 표줄 = (l: string) => l.trimStart().startsWith("|");
 const 구분선 = (l: string) => /^\s*\|(?:\s*:?-{2,}:?\s*\|)+\s*$/.test(l);
+/** 한 줄의 칸 수 — 양끝 파이프를 뺀 조각 수. (셀 안 파이프는 추출기가 이스케이프하므로 안 센다.) */
+const 칸수 = (l: string) => l.split(/(?<!\\)\|/).length - 2;
 
 describe("워드 표 — OOXML <w:tbl>을 파이프 표로 낸다", () => {
   it("표 세 개가 제자리에 파이프 표로 나오고, 표 밖 글은 순서 그대로다", async () => {
@@ -77,18 +87,52 @@ describe("워드 표 — OOXML <w:tbl>을 파이프 표로 낸다", () => {
     // 안쪽 표가 바깥 표를 끊었다면 `</w:tbl>` 뒤의 잔해가 별도 조각으로 새어 나온다.
     expect(t, "바깥 표가 끊겨 칸 하나가 표 밖으로 샜다").not.toMatch(/^바깥칸$/m);
   });
+
+  // ★ 적발⑤ — 「안쪽 표의 gridSpan을 바깥 칸 것으로 읽지 않는다」 가드를 **실제로** 가른다.
+  //   픽스처의 안쪽 칸에 gridSpan="3"이 달려 있다. 가드를 지우면 바깥 행이 4열로 부푼다.
+  it("안쪽 표의 gridSpan이 바깥 칸의 열 수를 부풀리지 않는다", async () => {
+    const t = await extractDocumentText("table.docx", b64("table.docx"));
+    const 행 = t.split("\n").find((l) => l.includes("바깥칸"));
+    expect(행, "바깥 표의 본문 행이 없다").toBeTruthy();
+    expect(칸수(행!), `안쪽 gridSpan이 바깥 칸으로 읽혔다: ${행}`).toBe(2);
+  });
+
+  // ★ 적발⑤ — 「글자 없는 표는 안 낸다」 가드. 픽스처에 빈 칸만 든 표가 하나 더 들어 있는데,
+  //   가드가 살아 있으면 아무것도 안 보태므로 위 골든이 그대로다. 지우면 구분선이 넷이 된다.
+  it("글자가 하나도 없는 표는 구분선조차 안 낸다 — 표는 셋뿐이다", async () => {
+    const t = await extractDocumentText("table.docx", b64("table.docx"));
+    expect(t.split("\n").filter(구분선).length, "빈 표가 구분선을 냈다").toBe(3);
+  });
 });
 
 // ★ 자체 검토(2026-09-08)에서 잡은 결함 — 표가 **끝내 안 닫히는** 문서에서 마지막 조각의
 //   시작 자리를 잘못 잡으면 표 앞 본문이 **두 번** 나온다. 같은 글이 조각으로 두 벌 들어가면
 //   검색 상위를 자기 사본이 차지한다(RAG 오염의 전형).
+//   ⚠ 픽스처에는 **닫힌 표가 먼저 하나** 들어 있다(2026-09-08 적발④). 안 닫힌 표만 있으면
+//     「표가 하나도 없다」로 읽혀 docx 빠른길로 빠지고, 그러면 이 시험이 가드를 **안 지난다** —
+//     첫 판이 실제로 그랬다(가드 한 줄을 지워도 전부 초록).
 describe("망가진 XML — 표가 안 닫혀도 같은 글을 두 번 내지 않는다", () => {
-  it("표 앞 문단이 정확히 한 번만 나온다", async () => {
+  it("표 앞 본문·표 사이 본문이 저마다 한 번만 나온다", async () => {
     const t = await extractDocumentText("table-broken.docx", b64("table-broken.docx"));
     expect((t.match(/앞 문단 한 번만/g) ?? []).length, `본문이 겹쳐 나왔다:\n${t}`).toBe(1);
+    // ★ 이 한 줄이 가드(`끝난자리 = m.index`)를 가른다 — 없으면 여기가 2가 된다.
+    expect((t.match(/표 사이 본문 한 번만/g) ?? []).length, `표 사이 본문이 두 벌 나왔다:\n${t}`).toBe(1);
     expect(t, "안 닫힌 표의 글자가 통째로 사라졌다").toContain("안 닫힌 칸");
-    // 표로 인정하지 않는다 — 닫히지 않은 구조를 표라고 우기면 열 수를 못 믿는다.
-    expect(t.split("\n").some(구분선), "안 닫힌 표를 표로 냈다").toBe(false);
+    // 안 닫힌 표는 표로 인정하지 않는다 — 열 수를 못 믿기 때문이다. 구분선은 **닫힌 표 몫 하나**뿐.
+    expect(t.split("\n").filter(구분선).length, "안 닫힌 표를 표로 냈다").toBe(1);
+    expect(t, "안 닫힌 칸이 표 행으로 나왔다").not.toMatch(/^\|.*안 닫힌 칸/m);
+  });
+});
+
+// ★ 적발⑤ — 열 폭주 상한(표_최대열). 픽스처는 칸 10개 × gridSpan 64 = **640열**을 요구한다.
+//   상한이 살아 있으면 512에서 멈춘다. 지우면 640이 되어 여기가 빨개진다.
+describe("열 폭주 — 병합 칸이 빈 칸을 곱해도 상한에서 멈춘다", () => {
+  it("640열을 요구해도 512열까지만 낸다", async () => {
+    const t = await extractDocumentText("table-wide.docx", b64("table-wide.docx"));
+    const 표 = t.split("\n").filter(표줄);
+    expect(표.length, "표가 안 나왔다").toBeGreaterThan(0);
+    for (const l of 표) expect(칸수(l), "열 수가 상한을 넘었다(빈 칸 폭주)").toBe(512);
+    expect(t, "첫 칸의 글이 사라졌다").toContain("칸0");
   });
 });
 
@@ -106,15 +150,29 @@ describe("pptx 표 — DrawingML <a:tbl>을 파이프 표로 낸다", () => {
       "표 뒤 설명 문장",
       "",
       "표가 없는 슬라이드",
+      "",
+      // 슬라이드 3 — 병합 뒤칸에 **글이 남아 있는** 표(적발③). 그 글을 버리면 여기가 빨개진다.
+      "| 가로 앞 | 가로뒤_남은글 |",
+      "| --- | --- |",
+      "| 세로 위 | 세로아래_남은글 |",
     ].join("\n"));
   });
 
   it("가로 병합에서 열 수가 안 늘어난다 — DrawingML은 병합된 뒤칸에도 <a:tc>를 둔다", async () => {
     const t = await extractDocumentText("table.pptx", b64("table.pptx"));
-    const 칸수 = (l: string) => l.split("|").length - 2; // 양끝 파이프를 뺀 칸 수
     const 표 = t.split("\n").filter(표줄);
-    expect(표.length, "표 줄이 없다").toBe(4);
-    for (const l of 표) expect(칸수(l), `열 수가 어긋났다: ${l}`).toBe(3);
+    expect(표.length, "표 줄 수가 달라졌다").toBe(7);
+    for (const l of 표.slice(0, 4)) expect(칸수(l), `슬라이드1 열 수가 어긋났다: ${l}`).toBe(3);
+    for (const l of 표.slice(4)) expect(칸수(l), `슬라이드3 열 수가 어긋났다: ${l}`).toBe(2);
+  });
+
+  // ★ 적발③ — 병합 표시가 붙은 뒤칸에 글이 남아 있으면 **그 글도 낸다**. 파워포인트가 만든
+  //   파일은 뒤칸이 비어 있어 결과가 같고, 다른 도구가 만든 파일에서만 차이가 난다.
+  //   버리면 이 라운드의 「낱말 손실 0」 계약이 이 갈래에서만 깨진다.
+  it("병합된 뒤칸에 남은 글을 버리지 않는다", async () => {
+    const t = await extractDocumentText("table.pptx", b64("table.pptx"));
+    expect(t, "hMerge 뒤칸의 글이 사라졌다").toContain("가로뒤_남은글");
+    expect(t, "vMerge 뒤칸의 글이 사라졌다").toContain("세로아래_남은글");
   });
 });
 

@@ -233,9 +233,14 @@ def main() -> None:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 text = f.read()
         else:
-            # ⚠ 안내 문구는 **제품 전체가 읽는 형식**을 적는다 — 오피스 4종은 서버가 읽으므로
-            #   여기 안 온다. 목록에서 빼면 담당자가 「docx는 안 되는구나」로 잘못 읽는다.
-            print(f"ERROR: 지원하지 않는 형식입니다: {ext} (지원: pdf, hwpx, docx, pptx, xlsx, txt, md, csv, log, 이미지 png/jpg/tiff/bmp/webp)", file=sys.stderr)
+            # ⚠ 한 문장이 「이 스크립트가 읽는 형식」과 「제품 전체가 읽는 형식」을 겸하면 안 된다
+            #   (2026-09-08 검토관 적발⑦). 종전 문구는 .docx를 거절하면서 같은 줄의 「지원:」
+            #   목록에 docx를 적어, **거절하면서 된다고 말하는** 자기모순이었다. 두 사실을
+            #   나눠 적는다 — 이 스크립트가 안 읽는다는 것과, 그럼 어디가 읽느냐는 것.
+            print(f"ERROR: 이 스크립트가 직접 읽지 않는 형식입니다: {ext} "
+                  f"(이 스크립트: pdf, txt, md, csv, log, json, 이미지 png/jpg/tiff/bmp/webp) "
+                  f"— 오피스 4종(hwpx/docx/pptx/xlsx)은 제품 서버가 직접 읽습니다"
+                  f"(server/src/engine/dataset.ts). 제품으로 올리면 정상 처리됩니다.", file=sys.stderr)
             sys.exit(2)
     except Exception as e:  # noqa
         print(f"ERROR: 추출 실패: {e}", file=sys.stderr)

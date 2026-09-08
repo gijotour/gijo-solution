@@ -52,6 +52,21 @@ describe("파이썬 추출기에 오피스 갈래가 되살아나지 않았다",
         .not.toContain(이름);
     }
   });
+
+  // ★ 함수 **이름**만 보면 이름을 바꾸거나 main() 안에 인라인으로 되살릴 때 그냥 통과한다
+  //   (2026-09-08 검토관 적발⑥). 되살아남의 진짜 신호 셋을 함께 본다 — 오피스는 전부 zip 안의
+  //   XML이라 ①zip을 여는 도구 ②OOXML 태그 ③오피스 확장자로 갈라지는 분기가 반드시 나타난다.
+  it("zip·OOXML·오피스 분기 자체가 없다 — 이름만 바꿔 되살려도 걸린다", () => {
+    for (const 신호 of ["zipfile", "ZipFile"]) {
+      expect(PY, `${신호}가 되살아났다 — 이 스크립트는 zip(오피스)을 열지 않는다`).not.toContain(신호);
+    }
+    for (const 태그 of ["<w:t", "<a:t", "<hp:t", "sharedStrings"]) {
+      expect(PY, `OOXML 태그(${태그})를 읽고 있다 — 오피스 추출이 인라인으로 되살아났다`).not.toContain(태그);
+    }
+    // `ext == ".docx"` · `ext in (".docx", …)` 꼴의 분기. (구형 `(".doc", ".hwp")`는 파이썬 몫이라 안 걸린다.)
+    const 분기 = /\bext\b\s*(?:==|in)\s*\(?[^\n]*?"\.(?:docx|pptx|xlsx|hwpx)"/.exec(PY);
+    expect(분기?.[0], `오피스 확장자 분기가 되살아났다: ${분기?.[0]}`).toBeUndefined();
+  });
   it("PDF·OCR·구형 거절은 그대로 파이썬 몫이다 — 지우면서 함께 날리지 않았다", () => {
     expect(PY, "PDF 추출이 사라졌다").toContain("def extract_pdf");
     expect(PY, "이미지 OCR이 사라졌다").toContain("def ocr_image");
