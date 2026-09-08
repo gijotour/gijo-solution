@@ -759,6 +759,27 @@ function 표머리글들(lines: string[]): Set<string> {
   for (let i = 0; i + 1 < lines.length; i += 1) if (표줄(lines[i]) && 구분선(lines[i + 1])) out.add(lines[i].trim());
   return out;
 }
+/** 표 **본문 행의 자리** — 「머리글 + 구분선」으로 시작한 표 덩어리 안에 있는 표줄.
+ *  (2026-09-08 검토관 [상] 적발 · 실행 재현) 추출기가 워드·pptx 표를 파이프 표로 내기 시작하자
+ *  본문 행이 60자 이하의 짧은 줄이 됐고, 그러자 아래 「3회 이상 반복되는 짧은 줄」 제거가
+ *  **본문 행을 지웠다** — 머리글+구분선만 남은 표가 되어, 이 라운드가 없애려던 증상이 그대로
+ *  재현됐다(같은 점검표 3벌짜리 docx에서 본문 행이 하나도 안 남는다).
+ *  ⚠ 위 두 예외와 달리 **글자가 아니라 자리로** 센다. 같은 글자가 어떤 데선 표 행이고 어떤 데선
+ *    바닥글일 수 있는데, 글자로 예외를 주면 바닥글 쪽까지 함께 살아난다.
+ *  ⚠ 예외는 **「머리글+구분선이 앞선」 표까지**다 — KISA 가이드의 바닥글 「| 한국인터넷진흥원 |」
+ *    429줄은 앞에 머리글도 구분선도 없는 홑 파이프 줄이라 여전히 지워진다(그 문서에 진짜 표는
+ *    0개다 — 2026-09-08 실측). */
+function 표본문행자리(lines: string[]): boolean[] {
+  const out = new Array<boolean>(lines.length).fill(false);
+  for (let i = 0; i + 1 < lines.length; i += 1) {
+    if (!표줄(lines[i]) || !구분선(lines[i + 1])) continue; // 제대로 선 표만 — 홑 파이프 줄은 표가 아니다
+    let k = i + 2;
+    while (k < lines.length && 표줄(lines[k])) { out[k] = true; k += 1; }
+    i = k - 1; // 이 덩어리는 다 봤다
+  }
+  return out;
+}
+
 /** 여기서 끊으면 **머리글만 든 조각**이 떨어지나 — 버퍼 끝의 표 덩어리에 본문 행이 하나도 없는 상태.
  *  (2026-09-08 검토관 적발④) 그런 조각은 이 라운드가 고치려던 증상의 이름 그 자체다.
  *  참이면 끊지 않고 다음 행까지 데려간다 — 한 행만 더 담으면 곧 거짓이 되므로 무한히 안 커진다. */
@@ -784,7 +805,7 @@ function 머리글만남나(buf: string, next: string, 머리: string, 구분: s
  *    소스 감시가 있고 올리는 쪽엔 아무 강제가 없었다. 그래서 짝 시험(test/tablechunk.test.ts)이
  *    아래 두 함수와 표 술어의 **소스 지문**을 세어, 규칙이 바뀌었는데 판이 그대로면 빨개진다.
  *    (지문은 주석·들여쓰기를 뺀 알맹이라, 위 「주석 수정엔 안 올린다」와 어긋나지 않는다.) */
-export const CHUNKER_VERSION = "2026-09-08-table-2";
+export const CHUNKER_VERSION = "2026-09-08-table-3";
 
 
 // PDF 추출물의 레이아웃 잡음을 지운다 — 페이지 번호 줄("- 134 -", "134"), 페이지마다 반복되는
@@ -811,18 +832,21 @@ export function cleanExtractedText(text: string): string {
   //   구분선은 열 수만 같으면 반드시 같은 글자라 **문서 쪽 규율로는 피할 수 없다**(「머리글을
   //   절마다 다르게 쓴다」로 머리글은 피해 왔지만 구분선은 못 피한다). 구분선이 사라지면
   //   그 표는 조각 안에서 머리글과 본문의 경계를 잃는다.
-  //   ⚠ 예외는 **구분선 + 진짜 머리글**까지다. 「표꼴 줄 전부」로 넓히면 KISA 가이드의 바닥글
-  //     「| 한국인터넷진흥원 |」 429줄이 되살아나 검색 상위를 잡음이 차지한다(실측).
+  //   ⚠ 예외는 **구분선 + 진짜 머리글 + 그 표의 본문 행**까지다. 「표꼴 줄 전부」로 넓히면
+  //     KISA 가이드의 바닥글 「| 한국인터넷진흥원 |」 429줄이 되살아나 검색 상위를 잡음이 차지한다.
+  //   ★ 본문 행 예외는 **자리로** 준다 (2026-09-08 검토관 [상]) — 추출기가 표를 파이프 표로 내면서
+  //     본문 행이 짧아져 이 제거에 걸리기 시작했다. 글자로 주면 바닥글까지 살아나므로 자리로 센다.
   const 머리글 = 표머리글들(lines);
+  const 표본문 = 표본문행자리(lines);
   const repeated = new Set([...freq.entries()]
     .filter(([t, n]) => n >= 3 && !/[.다요]$/.test(t))
     .filter(([t]) => !구분선(t) && !머리글.has(t))
     .map(([t]) => t));
-  const kept = lines.filter((l) => {
+  const kept = lines.filter((l, i) => {
     const t = l.trim();
     if (/^-?\s*\d{1,4}\s*-?$/.test(t)) return false; // 페이지 번호 줄
     if (/^(page|페이지)\s*\d+/i.test(t)) return false;
-    if (repeated.has(t)) return false;
+    if (repeated.has(t) && !표본문[i]) return false;
     return true;
   });
   return kept.join("\n").replace(/\n{3,}/g, "\n\n");
