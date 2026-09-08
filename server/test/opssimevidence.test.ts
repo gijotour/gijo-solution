@@ -15,10 +15,11 @@
 //
 // 계획서: 중-3(평가 게이트) 곁가지 — 야간 회귀 기록이 남기면 안 되는 것을 안 남기는가.
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { 근거기록할까, 근거칸, 건너뛸사유 } from "../../tools/opssim-evidence.mjs";
+import { 근거기록할까, 근거칸, 건너뛸사유, 끈회차에도남는것 } from "../../tools/opssim-evidence.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const 뿌리 = join(__dirname, "..", "..");
@@ -92,23 +93,100 @@ describe("★ 근거 칸 스위치 — 켜면 조각 본문이 기록에 안 남
   });
 });
 
-describe("★ 건너뛸 사유 — 왜 건너뛰는지가 로그에 남는다", () => {
-  it("재료가 없으면 **gb10은 일부러 안 옮긴다**는 사실까지 말한다", () => {
-    const 사유 = 건너뛸사유(false, 0);
-    expect(사유).toContain("재료 없음");
-    expect(사유, "설계인지 고장인지 못 가린다").toContain("gb10");
-    expect(사유, "왜 안 옮기는지 안 밝힌다").toMatch(/등급 C/);
+describe("★ 끈 회차에도 **남는 것** — 스위치를 「다 지웠다」로 읽지 않게", () => {
+  // ★ 2026-09-08 검토관 적발: 되돌리기 표가 `--no-evidence`와 `.tmp-reports 비우기`를
+  //   **대등한 두 갈래**로 적었다. 그런데 스위치는 근거 조각 본문만 뺄 뿐 질문(q)·답 본문(out)은
+  //   그대로 적는다 — 실측(같은 날, 기록 177행): out에 사내 IP가 **29행**, 사내 낱말이 **92행**.
+  //   출하 기계에서 싼 쪽을 고르면 「되돌렸다」가 반쪽이 된다. 그래서 **끄는 사람이 그 자리에서**
+  //   무엇이 남는지 듣게 한다(배너) — 끝나고 기록을 열어 보고 아는 것은 늦다.
+  it("스위치가 **안 빼는 것**(질문·답 본문)을 한 문장으로 말한다", () => {
+    expect(끈회차에도남는것, "무엇이 남는지 안 밝힌다").toMatch(/답 본문|out/);
+    expect(끈회차에도남는것, "완전히 안 남기는 길을 안 알려 준다").toContain(".tmp-reports");
   });
 
-  it("반쪽 기록이면 건수와 최소를 숫자로 말한다", () => {
-    const 사유 = 건너뛸사유(true, 11);
-    expect(사유).toContain("11건");
-    expect(사유).toContain("50건");
+  it("하네스가 **끈 회차 배너**에 그 문장을 실제로 찍는다", () => {
+    // ⚠ 처음엔 toContain("끈회차에도남는것")로 재다가 **거짓 초록**을 봤다(2026-09-08 반증):
+    //   console.log를 통째로 떼도 **import 줄에 이름이 남아** 초록이 났다. 이름이 있다는 것과
+    //   그 이름을 부른다는 것은 다르다 — 부르는 자리(console.log)를 본다.
+    expect(하네스, "끈 사람이 「다 지웠다」로 안다 — 배너가 반쪽만 말한다")
+      .toMatch(/console\.log\([^)\n]*끈회차에도남는것/);
+    expect(하네스, "켠 회차에도 찍으면 배너가 거짓말을 한다 — 끈 갈래에서만 찍는다")
+      .toMatch(/!근거기록/);
+  });});
+
+describe("★ 건너뛸 사유 — 원인은 **메타가 아는 만큼만** 말한다", () => {
+  // ★ 2026-09-08 검토관 적발: 옛 판은 **거른 뒤 건수 하나**만 보고 「--limit 실행이다」라고
+  //   원인을 단정했다. 완주 회차인데 응답 실패가 많아 쓸 수 있는 답이 적은 날에는 **틀린 진단**이
+  //   로그에 찍힌다 — citeguard가 2026-09-06에 없앤 「손으로 적은 숫자」와 같은 계보다.
+  //   → 완주 여부는 **하네스가 적는** ops-sim.meta.json에서 읽는다(잣대는 아는 쪽이 적는다).
+  const 임시로 = (fn: (기록: string) => void) => {
+    const d = mkdtempSync(join(tmpdir(), "opssim-"));
+    try { fn(join(d, "ops-sim.json")); } finally { rmSync(d, { recursive: true, force: true }); }
+  };
+  const 깔기 = (기록: string, 행수: number, 메타?: object) => {
+    writeFileSync(기록, JSON.stringify(Array.from({ length: 행수 }, () => ({ out: "x" }))), "utf8");
+    if (메타) writeFileSync(기록.replace(/.json$/, ".meta.json"), JSON.stringify(메타), "utf8");
+  };
+
+  it("재료가 없으면 **gb10은 일부러 안 옮긴다**는 사실까지 말한다", () => {
+    임시로((기록) => {
+      const 사유 = 건너뛸사유(기록, 0);
+      expect(사유).toContain("재료 없음");
+      expect(사유, "설계인지 고장인지 못 가린다").toContain("gb10");
+      expect(사유, "왜 안 옮기는지 안 밝힌다").toMatch(/등급 C/);
+    });
+  });
+
+  it("메타가 **미완주**라고 할 때만 --limit이라 말한다", () => {
+    임시로((기록) => {
+      깔기(기록, 5, { 총문항: 177, 기록: 5, 완주: false });
+      const 사유 = 건너뛸사유(기록, 5);
+      expect(사유).toContain("--limit");
+      expect(사유, "몇/몇 문항인지를 안 말한다").toContain("177");
+    });
+  });
+
+  it("★ 완주 회차인데 답이 적으면 **--limit이라 단정하지 않는다**", () => {
+    임시로((기록) => {
+      깔기(기록, 177, { 총문항: 177, 기록: 177, 완주: true });
+      const 사유 = 건너뛸사유(기록, 11);   // 응답이 비거나 실패해 쓸 수 있는 답만 11건
+      expect(사유, "잴 수 없는데 초록으로 지나간다").not.toBe("");
+      expect(사유, "완주 회차를 --limit 실행이라고 지어낸다").not.toContain("--limit");
+      expect(사유).toContain("11건");
+      expect(사유, "완주 회차라는 사실을 안 말한다").toContain("완주");
+    });
+  });
+
+  it("메타가 없으면 **모른다고 말한다** — 원인을 지어내지 않는다", () => {
+    임시로((기록) => {
+      깔기(기록, 11);
+      const 사유 = 건너뛸사유(기록, 11);
+      expect(사유).toContain("메타 없음");
+      expect(사유, "완주 여부를 모른다는 사실을 안 밝힌다").toContain("못 가린다");
+    });
+  });
+
+  it("깨진 메타는 **모른다**로 떨어진다 — 읽다 죽지 않는다", () => {
+    임시로((기록) => {
+      깔기(기록, 11);
+      writeFileSync(기록.replace(/.json$/, ".meta.json"), "{ 반쪽", "utf8");
+      expect(() => 건너뛸사유(기록, 11)).not.toThrow();
+      expect(건너뛸사유(기록, 11)).toContain("메타 없음");
+    });
   });
 
   it("잴 수 있으면 빈 문자열이다 — 사유가 있으면 로그가 찍힌다", () => {
-    expect(건너뛸사유(true, 162)).toBe("");
-    expect(건너뛸사유(true, 50)).toBe("");
+    임시로((기록) => {
+      깔기(기록, 177, { 총문항: 177, 기록: 177, 완주: true });
+      expect(건너뛸사유(기록, 162)).toBe("");
+      expect(건너뛸사유(기록, 50)).toBe("");
+    });
+  });
+
+  it("★ 옛 호출부(boolean)를 **소리 내어** 막는다", () => {
+    // 옛 판은 첫 인자가 boolean(있나)이었다. 조용히 받으면 메타를 못 읽는 판정이 되살아난다.
+    const f = 건너뛸사유 as unknown as (a: unknown, b: number) => string;
+    expect(() => f(true, 11)).toThrow(/경로/);
   });
 });
 
@@ -159,6 +237,21 @@ describe("★ 문서 감시 — 출하 전 되돌리기 목록에 등재돼 있�
     expect(절, "야간 하네스 기록 항목이 없다 — 이번에 등재한 것이 빠졌다").toContain("--no-evidence");
     expect(절, "무엇이 남는지(등급 C 조각 평문)를 안 밝힌다").toMatch(/등급 C/);
     expect(절, "지우는 길(.tmp-reports)을 안 알려 준다").toContain(".tmp-reports");
+  });
+
+  it("★ ③행이 **스위치는 반쪽**임을 그 칸에서 밝힌다 — 「끄면 다 지워진다」로 읽히지 않게", () => {
+    // ⚠ 이 시험을 처음엔 **절 전체**에 걸었는데, 절 밑에 붙인 설명 문단이 같은 낱말을 담고 있어
+    //   ③행을 옛 문구로 되돌려도 **초록이 났다**(2026-09-08 반증에서 걸렸다). 표를 읽는 사람은
+    //   행의 「되돌리는 법」 칸만 본다 — 그러니 **그 행에서** 재야 한다.
+    // 실측(2026-09-08 · 기록 177행): 스위치를 켜도 out에 사내 IP 29행 · 사내 낱말 92행이 남는다.
+    const m = 계획서.match(/^#{2,3} .*출하 전 되돌리기.*$/m);
+    const 절 = 계획서.slice(계획서.indexOf(m![0]));
+    const 행 = 절.match(/^\| \*\*③ .*$/m)?.[0] ?? "";
+    expect(행, "되돌리기 표에 ③(야간 하네스 기록) 행이 없다").not.toBe("");
+    expect(행, "스위치가 안 빼는 것(질문·답 본문)을 그 행에서 안 밝힌다").toMatch(/답 본문|out/);
+    expect(행, "두 길을 대등하게 적었다 — 싼 쪽을 고르면 반쪽 되돌리기가 된다")
+      .toMatch(/반쪽|부분/);
+    expect(행, "완전히 지우는 길을 안 가려 준다").toMatch(/완전/);
   });
 });
 

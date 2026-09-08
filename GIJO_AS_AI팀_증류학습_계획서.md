@@ -527,7 +527,7 @@
 |---|---|---|---|
 | **① 등급 게이트 꺼짐**<br>(2026-08-23 사장님 「개발 동안 제약은 다 풀고 하자」) | 운영 WSL `gijo-as.env`에 `GIJO_DEV_MODE=1` — 업무정보 등급(기밀·민감) 열람 제한이 통째로 꺼져 있다. 규칙 자체는 안 지웠다(`canReadStrict`로 원래 규칙이 살아 있다) | `sed -i '/GIJO_DEV_MODE=1/d' /home/gijo/gijo-as/gijo-as.env` 뒤 서버 재시작 | `server/test/devmode.test.ts` · `devmode-shipgate.test.ts`(자가 진단이 **fail**로 말한다) |
 | **② DB 암호화 꺼짐**<br>(같은 날) | 키가 `secrets/db.key.json.disabled-…`로 물러나 있다 — 운영 sqlite가 **평문**이다 | 서버 멈춘 상태에서 `cd /home/gijo/gijo-as/server && node scripts/encrypt-db.mjs` | 자가 진단 「저장 암호화」 warn |
-| **③ 야간 하네스 기록에 근거 조각 평문**<br>(2026-09-08 신설) | `.tmp-reports/ops-sim.json`에 가드가 본 **근거 조각 본문**이 평문으로 담긴다 — 하네스 계정이 claude-deploy(admin)라 **등급 C(기밀) 사내 문답 조각**까지 들어간다. 매일 덮어써도 **최신 회차 한 벌은 늘 남는다**(gitignore라 커밋은 안 된다) | 파일럿·출하 기계에서는 야간 하네스를 **`--no-evidence`**(또는 `GIJO_OPSSIM_EVIDENCE=0`)로 돌리거나 **`.tmp-reports`를 비운다** | `server/test/opssimevidence.test.ts`(스위치 반증 + 이 절 등재 감시) |
+| **③ 야간 하네스 기록에 사내 문답 평문**<br>(2026-09-08 신설) | `.tmp-reports/ops-sim.json`에 ⓐ 가드가 본 **근거 조각 본문**과 ⓑ **질문(q)·답 본문(out)**이 평문으로 담긴다 — 하네스 계정이 claude-deploy(admin)라 **등급 C(기밀) 사내 문답**까지 들어간다. 실측(2026-09-08 · 177행): out에 사내 IP **29행** · 사내 낱말 **92행**. 매일 덮어써도 **최신 회차 한 벌은 늘 남는다**(gitignore라 커밋은 안 된다) | **완전히**: `.tmp-reports/ops-sim*.json`을 지우고 그 기계에선 야간 하네스를 **안 돌린다**(`tools/nightly-ops-sim.ps1` 예약 해제).<br>**부분(⚠ 반쪽)**: **`--no-evidence`**(또는 `GIJO_OPSSIM_EVIDENCE=0`) — ⓐ 조각 본문만 빠지고 **ⓑ 질문·답 본문은 그대로 남는다**. 「껐으니 되돌렸다」로 닫지 말 것 | `server/test/opssimevidence.test.ts`(스위치 반증 + 이 절 등재·반쪽 표기 감시) |
 
 **③을 지우지 않기로 한 이유**(2026-09-08 사장님 결정): 이 칸이 citeguard 재생 41건을 잣대로 되돌린다 —
 되먹임 값어치가 커서 **개발 기계(`win`)에서는 계속 적는다**(그래서 `tools/nightly-ops-sim.ps1`은 일부러 이 플래그를 안 준다).
@@ -539,3 +539,7 @@
 
 ⚠ **이 표는 「지금 꺼라」가 아니다.** 끄는 시점은 사장님 결정이고(2026-09-05 「DEV_MODE 되돌리기=파일럿·출하 직전」),
 여기 있는 것은 **잊지 않기 위한 목록**이다. 항목은 실제로 되돌린 뒤에 지운다 — 미리 지우면 이 표가 거짓말을 한다.
+⚠ **③의 두 길은 대등하지 않다**(2026-09-08 검토관 적발): 처음 이 표는 「`--no-evidence`로 돌리거나 `.tmp-reports`를 비운다」를
+**나란히** 적었는데, 스위치는 **조각 본문만** 뺀다. 답 본문(`out`)은 그대로 적히고 그 답이 사내 문서를 인용하면 그 대목도 함께 남는다
+(실측 177행 중 out에 사내 IP 29행). 출하 기계에서 싼 쪽을 고르면 **되돌렸다가 반쪽**이 된다 — 이 저장소가 반복해 겪은 「반쪽 수리」다.
+그래서 하네스가 **끈 회차 시작 배너**에 무엇이 남는지 직접 말한다(문구는 `tools/opssim-evidence.mjs`의 `끈회차에도남는것` 한 곳).

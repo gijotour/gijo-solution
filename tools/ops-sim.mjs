@@ -54,7 +54,7 @@ import {
 import { 내용실패상세 } from "./opssim-report.mjs";
 // 근거 칸을 적을지 말지와 그 칸 만들기도 같은 이유로 저쪽에 산다(2026-09-08) — 스위치를 켰는데
 //   조각이 적히면 그것이 곧 사고인데, 여기 두면 시험이 부를 수가 없다.
-import { 근거기록할까, 근거칸 } from "./opssim-evidence.mjs";
+import { 근거기록할까, 근거칸, 끈회차에도남는것 } from "./opssim-evidence.mjs";
 
 const BASE = process.env.GIJO_SERVER_URL || "http://localhost:4000";
 const USER = process.env.QA_USER || "claude-deploy";
@@ -992,7 +992,12 @@ console.log(`■ 보안담당자 하루 실전 — ${마당.length}마당 · ${�
 console.log(`  결과 파일: ${파일이름}.json / .meta.json / .md`);
 console.log(`  ${BASE} · ${USER} · qa=true`);
 // 🔒 끈 회차는 **시작할 때 말한다** — 끝나고 기록을 열어 보고서야 아는 것은 늦다.
-console.log(`  근거 조각 기록: ${근거기록 ? "함(개발 기계 기본 — 등급 C 조각이 평문으로 남는다)" : "안 함(--no-evidence · 가드횟수만 남긴다)"}\n`);
+console.log(`  근거 조각 기록: ${근거기록 ? "함(개발 기계 기본 — 등급 C 조각이 평문으로 남는다)" : "안 함(--no-evidence · 가드횟수만 남긴다)"}`);
+// 🔒 끈 사람이 「다 지웠다」로 알면 출하 기계에서 **반쪽 되돌리기**가 된다(2026-09-08 검토관).
+//    스위치가 조각 본문만 뺀다는 사실을 **끄는 그 자리에서** 말한다 — 끝나고 기록을 열어 보고서야
+//    아는 것은 늦다. 문구는 opssim-evidence.mjs 한 곳에 산다(계획서 되돌리기 표와 같은 사실).
+if (!근거기록) console.log(`  ${끈회차에도남는것}`);
+console.log("");
 
 const t0 = Date.now();
 const 결과 = [];
