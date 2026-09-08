@@ -16,7 +16,7 @@ import * as path from "path";
 import { createHash } from "crypto";
 
 import { db } from "../db";
-import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument, markDocumentsBuiltin, 추출필요 } from "./memory";
+import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument, markDocumentsBuiltin, 추출필요, CHUNKER_VERSION } from "./memory";
 import { 대장과같음 } from "./docledger"; // 「이미 같은 판이 들어가 있나」 판정 한 곳(잎 · import 0)
 
 // 프로젝트 관례(localengine의 MODELS_DIR, memory의 DB_PATH)대로 cwd 기준 상대경로 + 환경변수
@@ -93,7 +93,17 @@ async function resolveDocPath(file: string): Promise<string | null> {
 //   예전에는 문서 id만 보고 건너뛰어서, 용어사전을 고쳐 올려도 AI는 영원히 옛 내용을 알았다.
 //   "서랍이 뭐야?"에 운영 AI가 "물리적인 도구"라고 지어냈다 — 문서는 새것인데 지식은 헌것이었다.
 //   문서를 고치는 일은 앞으로도 계속 있으므로, 사람이 기억해서 지웠다 넣는 절차로 두지 않는다.
-const hashOf = (raw: string) => createHash("sha256").update(raw, "utf8").digest("hex").slice(0, 16);
+//
+// ★ 해시에 **청커 판**을 섞는다 (2026-09-08, ⓐ3).
+//   같은 사고의 청커판이다 — 원문이 그대로여도 **자르는 규칙이 바뀌면 조각이 달라진다.**
+//   그런데 해시는 원문만 보므로 「그대로다」로 건너뛰고, 고친 청커는 영영 안 돈다
+//   (표 머리글을 되찾는 이번 수리가 배포돼도 지식은 옛 조각 그대로였을 것이다).
+//   판을 섞어 두면 판이 오른 다음 기동에서 매니페스트 문서가 자동으로 다시 들어간다.
+//   ⚠ 판이 안 바뀐 기동에서는 해시도 그대로라 종전처럼 skipped다(매번 갈아엎지 않는다).
+//   ⚠ 사용자가 올린 문서는 매니페스트 밖이라 여기 안 걸린다 — 다음 인입부터 새 청커를 쓴다.
+//   ⚠ 판을 넣는 자리는 **여기 하나**다. HASH_KEY(키 이름)에 넣으면 옛 키가 쓰레기로 남고,
+//     매니페스트에 넣으면 코드와 데이터 두 곳을 맞춰야 해서 어긋날 자리가 하나 는다.
+const hashOf = (raw: string) => createHash("sha256").update(`${raw}\n#chunker:${CHUNKER_VERSION}`, "utf8").digest("hex").slice(0, 16);
 const HASH_KEY = (docId: string) => `docsbundle:hash:${docId}`;
 
 // 추출필요(추출이 필요한 형식) — 2026-08-31 일원화(설계관): memory.ts의 정본을 import해 쓴다.

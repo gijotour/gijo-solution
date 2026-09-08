@@ -27,6 +27,8 @@ vi.mock("../src/engine/llm", () => ({
 }));
 
 const { bootstrapDocsBundle } = await import("../src/engine/docsbundle");
+const { db } = await import("../src/db");
+const { createHash } = await import("crypto");
 const { listDocuments, queryMemory } = await import("../src/engine/memory");
 
 function writeManifest(files: { file: string; why?: string }[]) {
@@ -176,5 +178,46 @@ describe("docs-manifest.json — 실제 매니페스트 정합성", () => {
     // 실측(2026-07-19): 개발용 가이드를 근거로 주자 답변이 server/src/engine/assets.ts 경로를
     // 최종 사용자에게 그대로 노출했다. 개발·배포·계획 문서는 이름 단위로 막는다.
     expect(names).not.toMatch(/개발자|로컬LLM_프로젝트|배포_가이드|PC세팅|IA_통합설계|WSL2|계획서|다음단계|세션_산출물|제품_확인|UX피드백/);
+  });
+});
+// ── 청커 판 재인입 (2026-09-08, ⓐ3) ─────────────────────────────────────────────
+// 왜 여기가 필요한가: 청킹 규칙을 고쳐도 **문서 원문은 그대로**라 해시가 같고, 운영은
+// 「그대로다」로 건너뛴다. 그러면 고친 청커가 영영 안 돈다 — 코드는 새것인데 지식은 옛 조각.
+// (2026-07-31 「문서는 새것인데 지식은 헌것」의 청커판 재발이라, 그때처럼 사람이 기억해서
+//  지웠다 넣는 절차로 두지 않는다.)
+describe("docsbundle — 청커 판이 오르면 내장 문서가 다시 들어간다", () => {
+  it("★★ 옛 판(청커 판이 안 섞인) 해시로 남아 있으면 skipped가 아니라 updated다", async () => {
+    const sub = path.join(DOCS_DIR, "knowledge");
+    fs.mkdirSync(sub, { recursive: true });
+    const 파일 = path.join(sub, "청커판.md");
+    const 원문 = "# 표가 있는 문서\n\n| 항목 | 값 |\n|---|---|\n| 가 | 1 |";
+    fs.writeFileSync(파일, 원문, "utf-8");
+    writeManifest([{ file: "knowledge/청커판.md" }]);
+
+    expect((await bootstrapDocsBundle()).ingested).toEqual(["knowledge/청커판.md"]);
+    // 판이 그대로면 종전처럼 건너뛴다 — 매 기동 갈아엎지 않는다는 계약(위 시험)과 같은 뜻.
+    expect((await bootstrapDocsBundle()).skipped).toEqual(["knowledge/청커판.md"]);
+
+    // 청커 판이 오르기 **전에** 기록된 해시 = 원문만 해싱한 값. 그 상태를 그대로 만들어 둔다.
+    const 옛해시 = createHash("sha256").update(원문, "utf8").digest("hex").slice(0, 16);
+    db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run("docsbundle:hash:청커판.md", 옛해시);
+
+    const r = await bootstrapDocsBundle();
+    expect(r.updated, "청커를 고쳐도 지식이 옛 조각 그대로면 이 라운드가 배포돼도 아무 일도 안 일어난다")
+      .toEqual(["knowledge/청커판.md"]);
+    expect((await listDocuments()).filter((d) => d.documentId === "청커판.md"), "재인입이 옛 조각을 안 지웠다")
+      .toHaveLength(1);
+  });
+
+  it("★ 판을 섞는 자리는 **해시 한 곳**이다 — 소스 감시", () => {
+    // 잣대가 둘이 되면(키 이름·매니페스트에도 판을 넣으면) 한쪽만 고쳐 어긋난다.
+    const src = fs.readFileSync(path.resolve("src/engine/docsbundle.ts"), "utf-8");
+    const 해시줄 = src.split("\n").filter((l) => l.startsWith("const hashOf = "));
+    expect(해시줄, "hashOf가 한 줄이 아니다 — 잣대가 갈렸다").toHaveLength(1);
+    expect(해시줄[0], "청커 판이 해시에서 빠졌다 — 청커를 고쳐도 내장 문서가 다시 안 들어간다")
+      .toContain("CHUNKER_VERSION");
+    expect(src.split("\n").filter((l) => l.startsWith("const HASH_KEY = "))[0],
+      "키 이름에도 판을 넣으면 옛 키가 쓰레기로 남는다 — 판은 해시에만").not.toContain("CHUNKER_VERSION");
   });
 });

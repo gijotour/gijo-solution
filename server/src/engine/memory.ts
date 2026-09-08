@@ -720,6 +720,33 @@ interface MemoryRow {
   category?: string; // 업무영역 5종. 컬럼 추가(2026-07-25) 이전에 만들어진 조각은 없을 수 있다.
 }
 
+// ── 표(마크다운 테이블) 인지 — **이 세 술어가 표에 관한 유일한 정의다** (2026-09-08, ⓐ3) ──
+//   ⚠ 사본을 만들지 말 것. 청킹과 반복줄 제거가 둘 다 여기를 본다 — 두 곳이 다른 잣대를 쓰면
+//     「지우는 쪽은 표로 보고 붙이는 쪽은 아니라고 보는」 어긋남이 조용히 생긴다.
+/** 표 행 — 마크다운 표는 줄이 파이프로 시작한다. */
+const 표줄 = (l: string) => l.trimStart().startsWith("|");
+/** 구분선 — |---|---| · |:---|---:| 꼴. 머리글과 본문을 가르는 줄이라 이게 없으면 표가 아니다. */
+const 구분선 = (l: string) => /^\s*\|(?:\s*:?-{2,}:?\s*\|)+\s*$/.test(l);
+/** 표 머리글 — **바로 다음 줄이 구분선인** 표 행. 「표꼴 줄」 전부가 아니라 여기까지가 예외다.
+ *  ⚠ 넓히면 KISA 가이드의 바닥글 「| 한국인터넷진흥원 |」 429줄이 지식으로 되살아난다(실측). */
+function 표머리글들(lines: string[]): Set<string> {
+  const out = new Set<string>();
+  for (let i = 0; i + 1 < lines.length; i += 1) if (표줄(lines[i]) && 구분선(lines[i + 1])) out.add(lines[i].trim());
+  return out;
+}
+
+/** 청커 판 — **자르는 규칙이 바뀌면 올린다.**
+ *
+ *  왜 있나(2026-09-08): 청킹을 고쳐도 문서 원문은 그대로라 docsbundle의 해시가 같고, 운영은
+ *  「그대로다」로 건너뛴다. 그러면 **고친 청커가 영영 안 도는** 상태가 된다 — 코드는 새것인데
+ *  지식은 옛 조각 그대로다(2026-07-31 「문서는 새것인데 지식은 헌것」의 청커판 재발).
+ *  docsbundle이 이 판을 해시에 섞어, 판이 오른 다음 기동에서 **내장 문서만** 다시 들어간다.
+ *  ⚠ 사용자가 올린 문서는 매니페스트 밖이라 안 건드린다 — 다음 인입부터 새 청커를 쓴다.
+ *  ⚠ 자를 결과가 안 바뀌는 수정(주석·이름)에는 올리지 않는다. 한 번 올릴 때마다 매니페스트
+ *    35편이 통째로 재임베딩된다(실측 약 1,500조각). */
+export const CHUNKER_VERSION = "2026-09-08-table";
+
+
 // PDF 추출물의 레이아웃 잡음을 지운다 — 페이지 번호 줄("- 134 -", "134"), 페이지마다 반복되는
 // 머리글/바닥글은 임베딩에 잡음이고 청크 앞머리를 차지해 검색 품질을 떨어뜨린다(FOCS 매뉴얼 실측).
 export function cleanExtractedText(text: string): string {
@@ -730,7 +757,18 @@ export function cleanExtractedText(text: string): string {
     const t = l.trim();
     if (t.length > 0 && t.length <= 60) freq.set(t, (freq.get(t) ?? 0) + 1);
   }
-  const repeated = new Set([...freq.entries()].filter(([t, n]) => n >= 3 && !/[.다요]$/.test(t)).map(([t]) => t));
+  // ★ 표 구분선·표 머리글은 **반복돼도 지우지 않는다** (2026-09-08, ⓐ3 뿌리 ②).
+  //   실측: ISMS-P·가명정보_처리·침해사고_대응절차 3편에서 구분선이 9줄 지워지고 있었다.
+  //   구분선은 열 수만 같으면 반드시 같은 글자라 **문서 쪽 규율로는 피할 수 없다**(「머리글을
+  //   절마다 다르게 쓴다」로 머리글은 피해 왔지만 구분선은 못 피한다). 구분선이 사라지면
+  //   그 표는 조각 안에서 머리글과 본문의 경계를 잃는다.
+  //   ⚠ 예외는 **구분선 + 진짜 머리글**까지다. 「표꼴 줄 전부」로 넓히면 KISA 가이드의 바닥글
+  //     「| 한국인터넷진흥원 |」 429줄이 되살아나 검색 상위를 잡음이 차지한다(실측).
+  const 머리글 = 표머리글들(lines);
+  const repeated = new Set([...freq.entries()]
+    .filter(([t, n]) => n >= 3 && !/[.다요]$/.test(t))
+    .filter(([t]) => !구분선(t) && !머리글.has(t))
+    .map(([t]) => t));
   const kept = lines.filter((l) => {
     const t = l.trim();
     if (/^-?\s*\d{1,4}\s*-?$/.test(t)) return false; // 페이지 번호 줄
@@ -783,17 +821,48 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   }
 
   // 2) 큰 블록은 문장 경계로 쪼갠다.
+  // ★ 표는 **머리글을 데리고 간다** (2026-09-08, ⓐ3 뿌리 ①).
+  //   표 행은 파이프로 끝나 문장 종결이 없으므로 여기서 **줄 단위로만** 갈린다 — 그래서 머리글은
+  //   앞 조각에, 본문 행은 뒤 조각에 남았다. 실측(점검표 5편): 머리글 잃은 표 조각 15개·26줄.
+  //   그런 조각을 근거로 받은 모델은 「양호=…」가 어느 열의 값인지 모른다.
+  //   → 표가 갈리는 자리에서 **머리글+구분선을 다음 조각 앞에 다시 붙인다**(실측 중앙 58자·최대
+  //     87자 = size 800의 11%). 재부착분도 buf 길이에 그대로 세므로 size 예산은 어긋나지 않는다.
   const units: string[] = [];
   for (const b of blocks) {
     if (b.length <= size) {
       units.push(b);
       continue;
     }
+    // 이 블록의 표 머리글(+구분선) — 갈린 뒤쪽 조각 앞에 다시 붙일 두 줄.
+    const bl = b.split("\n");
+    let 머리 = "", 구분 = "";
+    for (let i = 0; i + 1 < bl.length; i += 1) {
+      if (표줄(bl[i]) && 구분선(bl[i + 1])) { 머리 = bl[i].trim(); 구분 = bl[i + 1].trim(); break; }
+    }
+    // ⚠ **표 행은 문장 경계로 자르지 않는다** — 실측(2026-09-08): 표 칸 안에 「…없습니다. 」처럼
+    //   문장 종결이 들어 있어서 위 정규식이 **행 한가운데**를 갈랐고, 그 반쪽 조각으로 시작한
+    //   조각은 어느 열인지 알 수 없었다(오픈소스_라이선스_의무_등급.md 등). 표 행은 줄 끝까지
+    //   모아 **한 덩어리**로 다룬다 — 표가 아닌 글은 종전 그대로 문장 경계로 갈린다.
+    const 토막: string[] = [];
+    let 모음 = "";
+    for (const p of b.split(/(?<=[.!?다요]\s)|(?<=\n)/)) {
+      모음 += p;
+      if (모음.endsWith("\n") || !표줄(모음)) { 토막.push(모음); 모음 = ""; }
+    }
+    if (모음) 토막.push(모음);
     let buf = "";
-    for (const sent of b.split(/(?<=[.!?다요]\s)|(?<=\n)/)) {
+    for (const sent of 토막) {
       if (buf.length + sent.length > size && buf.trim()) {
         units.push(buf.trim());
         buf = "";
+        // ⚠ **중복 금지** — 이어지는 줄이 머리글/구분선 자신이면 다시 붙이지 않는다
+        //   (붙이면 같은 줄이 한 조각에 두 번 들어가 검색 잡음이 된다).
+        if (머리 && 표줄(sent)) {
+          const t = sent.trim();
+          if (t === 머리) buf = "";
+          else if (t === 구분) buf = 머리 + "\n";
+          else buf = 머리 + "\n" + 구분 + "\n";
+        }
       }
       buf += sent;
     }
@@ -806,7 +875,28 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   for (const u of units) {
     if (cur && cur.length + u.length + 2 > size) {
       chunks.push(cur.trim());
-      cur = sliceSafe(cur, -overlap) + "\n" + u; // 꼬리 겹침이 이모지 한가운데를 자르지 않게
+      // 꼬리 겹침이 이모지 한가운데를 자르지 않게(sliceSafe) + **표 행 한가운데도 자르지 않게**.
+      // ⚠ 실측(2026-09-08): 조각이 「…벤처기업부) | 회사가 스스로 답해 …」처럼 **반쪽 행**으로
+      //   시작하는 일이 있었다. 앞이 잘린 행은 어느 열인지 알 수 없어 잡음만 된다.
+      //   자른 자리가 줄 한가운데이고 그 반쪽에 파이프가 있으면 그 줄은 버리고 줄머리부터 잇는다
+      //   (표가 아닌 글은 종전 그대로 — 문장 중간에서 이어 붙는 편이 맥락에 낫다).
+      let 꼬리 = sliceSafe(cur, -overlap);
+      if (cur.length > overlap && cur[cur.length - overlap - 1] !== "\n") {
+        const 줄끝 = 꼬리.indexOf("\n");
+        const 반쪽 = 줄끝 >= 0 ? 꼬리.slice(0, 줄끝) : 꼬리;
+        if (반쪽.includes("|")) 꼬리 = 줄끝 >= 0 ? 꼬리.slice(줄끝 + 1) : "";
+      }
+      // ★ 남은 앞머리가 **머리글 없는 표 행**이면 통째로 버린다 (실측 8건, 2026-09-08).
+      //   그 행은 앞 조각에 온전히 들어 있고, 여기 남으면 어느 열의 값인지 모를 한 줄만 떠돈다
+      //   — 겹침의 목적은 맥락 잇기인데 열 뜻을 잃은 표 행은 맥락이 아니라 잡음이다.
+      //   ⚠ 구분선이 함께 딸려 왔으면(작은 표가 통째로 들어온 경우) 그대로 둔다.
+      {
+        const 꼬리줄 = 꼬리.replace(/^\n+/, "").split("\n");
+        let k = 0;
+        while (k < 꼬리줄.length && 표줄(꼬리줄[k])) k += 1;
+        if (k > 0 && !꼬리줄.slice(0, k).some(구분선)) 꼬리 = 꼬리줄.slice(k).join("\n");
+      }
+      cur = 꼬리 + "\n" + u;
     } else {
       cur = cur ? cur + "\n\n" + u : u;
     }
