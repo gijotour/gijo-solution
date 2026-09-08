@@ -16,8 +16,20 @@ import { matchCtiToAssets } from "./ctimatch";
 
 db.exec("CREATE TABLE IF NOT EXISTS briefing_snapshot (id INTEGER PRIMARY KEY AUTOINCREMENT, takenAt INTEGER NOT NULL, keysJson TEXT NOT NULL)");
 const insertSnap = db.prepare("INSERT INTO briefing_snapshot (takenAt, keysJson) VALUES (?, ?)");
-const latestSnap = db.prepare("SELECT keysJson FROM briefing_snapshot ORDER BY takenAt DESC LIMIT 1");
+// ★★ 기준점은 **오늘 것이 아니라 오늘 이전 것**이다(2026-09-08 검토관 [상] 수리 — 아래 머리글).
+const latestSnapBefore = db.prepare("SELECT keysJson FROM briefing_snapshot WHERE takenAt < ? ORDER BY takenAt DESC LIMIT 1");
 const pruneSnap = db.prepare("DELETE FROM briefing_snapshot WHERE id NOT IN (SELECT id FROM briefing_snapshot ORDER BY takenAt DESC LIMIT 30)");
+const snapCountSince = db.prepare("SELECT COUNT(*) AS c FROM briefing_snapshot WHERE takenAt >= ?");
+
+/** 시험용 — 스냅샷 표를 비운다(브리핑 시험끼리 서로의 기준점을 물려받지 않게). */
+export function resetBriefingSnapshotsForTests(): void {
+  db.exec("DELETE FROM briefing_snapshot");
+}
+
+/** 시험용 — 「어제 이 상태였다」를 심는다. 어제 기준점이 실제로 쓰이는지 재려면 필요하다. */
+export function saveBriefingSnapshotForTests(takenAt: number, keys: string[]): void {
+  insertSnap.run(takenAt, JSON.stringify(keys));
+}
 
 const today = todayLocal;
 const plusDays = plusDaysLocal;
@@ -48,13 +60,25 @@ export interface DailyBriefing {
 }
 
 // 브리핑 조립 + 오늘 스냅샷 저장(다음 비교용). save=false면 스냅샷을 남기지 않는다(미리보기).
+//
+// ★★ **기준점은 「오늘 이전 마지막 스냅샷」이고, 오늘 것은 하루 한 번만 남긴다**
+//   (2026-09-08 검토관 [상] 수리). 전에는 부를 때마다 먹고 **가장 최근 것**과 비교해서,
+//   **두 번째 물음부터 「지난 브리핑 이후 신규」 줄이 통째로 사라졌다** — 첫 답이 기준점을
+//   자기 자신으로 덮어썼기 때문이다. 실측(격리 사본): 1회차 「신규 2건」 → 2회차 그 줄 없음.
+//   같은 아침에 「간밤에 뭐 터진 거 있어?」 → 「오늘 브리핑 해줘」를 잇달아 치면 바로 겪고,
+//   야간 하네스 마당①이 정확히 그 차례라 **매 회차** 그랬다.
+//   ⚠ 함께 없어진 함정: 하네스가 03:04에 브리핑을 부르면 사람의 아침 답이 「03:04 이후」만
+//     세던 것도 이제 안 그렇다 — 03:04는 **오늘**이라 기준점이 되지 못한다(어제 것과 견준다).
+//   이 모듈 머리글이 처음부터 「**어제 대비** 신규 · **일일** 스냅샷 비교」라고 적어 둔 것이
+//   옳고, 코드가 그 약속을 안 지키고 있었다. 약속 쪽에 코드를 맞춘다.
 export async function buildDailyBriefing(opts: { save?: boolean } = {}): Promise<DailyBriefing> {
   const priorities = prioritizedReviews(5);
   const all = prioritizedReviews(2000);
 
-  // 지난 스냅샷 대비 신규 finding
+  // 지난 스냅샷 대비 신규 finding — **오늘 찍힌 것은 기준점으로 쓰지 않는다**(머리글).
+  const 오늘0시 = new Date(`${today()}T00:00:00`).getTime();
   let priorKeys = new Set<string>();
-  const snap = latestSnap.get() as { keysJson: string } | undefined;
+  const snap = latestSnapBefore.get(오늘0시) as { keysJson: string } | undefined;
   if (snap) {
     try {
       priorKeys = new Set(JSON.parse(snap.keysJson) as string[]);
@@ -97,7 +121,8 @@ export async function buildDailyBriefing(opts: { save?: boolean } = {}): Promise
   } catch { /* 등록부를 못 읽어도 브리핑은 나온다 */ }
   if (recommendations.length === 0) recommendations.push("긴급 항목 없음 — 정기 점검·자산 변경 반영을 권장");
 
-  if (opts.save !== false) {
+  // 오늘치 기준점은 **한 번만** 남긴다 — 내일 아침이 이것과 견준다.
+  if (opts.save !== false && (snapCountSince.get(오늘0시) as { c: number }).c === 0) {
     insertSnap.run(Date.now(), JSON.stringify(currentKeys));
     pruneSnap.run();
   }
@@ -125,6 +150,9 @@ export function registerBriefingRoutes(app: Express): void {
   // 대시보드용: 조립된 브리핑 데이터(스냅샷 저장은 GET에서 하지 않음 — 미리보기).
   app.get("/api/briefing/daily", authMiddleware, asyncRoute(async (_req, res) => res.json(await buildDailyBriefing({ save: false }))));
   // 브리핑 확인(스냅샷 갱신 — 다음 "신규" 기준점).
+  // ⚠ 「확인」을 눌러도 기준점이 **오늘 안에서는** 안 옮겨간다 — 하루 한 번만 남기고, 견주는
+  //   것은 어제 것이기 때문이다(buildDailyBriefing 머리글). 오늘 아침에 본 신규가 오후에
+  //   사라지지 않는 편이 담당자에게 맞다.
   app.post("/api/briefing/daily/ack", authMiddleware, asyncRoute(async (_req, res) => res.json(await buildDailyBriefing({ save: true }))));
   // SLA 알림만.
   app.get("/api/briefing/sla", authMiddleware, (_req, res) => res.json(slaAlerts()));
