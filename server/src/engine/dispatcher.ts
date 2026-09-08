@@ -20,6 +20,9 @@ import { setAgentStatus, resetAgentToDefault, getAgentById } from "./agents";
 import { emitCollaboration } from "./collaboration";
 import { 모델스캔, StandardFinding } from "./bridge";
 import { chat } from "./llm";
+// 🔎 인용 가드가 본 원천을 qa 응답에 싣기 위한 잎 통로. **llm에서 안 가져온다** —
+//   llm을 통째로 흉내 내는 목이 66파일이라 심볼을 하나만 더 가져와도 그것들이 죽는다(아래 경고).
+import { 새인용원천수거, 인용원천을수거하며 } from "./citesource";
 // ⚠ **llm이 아니라 noevidence에서 가져온다.** llm을 통째로 흉내 내는 시험이 76개라, llm에서
 //   심볼을 하나만 더 가져와도 그 시험들의 dispatchInstruction이 죽는다(2026-09-05 실측 9파일 66건).
 //   배너 문장의 주인은 그 파일 하나다 — 여기서 문구를 다시 적지 않는다.
@@ -243,6 +246,22 @@ export interface DispatchResult {
   // 답에 취약점 목록이 나왔으면 **그 목록을 체크해서 바로 조치**할 수 있게 같이 준다(2026-07-31).
   // 조건("critical 전부")은 말로 옮긴 범위라 어긋날 수 있지만, 눈으로 고른 것은 어긋나지 않는다.
   picklist?: PickList;
+  /**
+   * 🔎 **인용 가드가 실제로 본 원천** — `qa: true` 요청에만 실린다(사람 응답에는 없다).
+   *
+   * ★ 왜 칸을 뒀나(2026-09-08) — 회귀 하네스 기록(.tmp-reports/ops-sim.json)에는 근거의
+   *   **이름**만 있고 본문이 없어, citeguard.test의 재생 시험이 「챗 경로 + 조각 있었음」 41건을
+   *   통째로 건너뛰고 있었다. 재생이 `guardCitations(t, [])`로 도는데 라이브는 조각을 갖고
+   *   돌았으니, 재면 **없는 오탐**(거짓 빨강)이 난다. 이 칸이 그 41건을 잣대로 되돌린다.
+   * ⚠ **sources와 다른 값이다 — 서로 갈아 끼우지 말 것.** sources는 chat이 끝난 **뒤**
+   *   따로 재검색해 뽑은 후보(:203·:1093)이고, 이 칸은 llm.ts가 가드에게 **그때 넘긴 그 배열**이다.
+   * ⚠ `조각: null`은 **판정 보류**(RAG 미실행·검색 실패)로 `[]`(0건)과 뜻이 다르다. 뭉개면
+   *   「고장」을 「지어냄」으로 단정하게 된다(llm.ragContextFor 머리말과 같은 규율).
+   * ⚠ `보고횟수 > 1`이면 한 턴에 chat이 여러 번 돈 답이라 **이 기록은 답 전체의 근거가 아니다.**
+   * ⚠ 등급 누출이 아니다 — 조각은 검색 단계에서 이미 열람권(hiddenDocIds)으로 걸리고 살균을
+   *   지났으며, 이 답을 받은 **같은 사람**이 이미 근거로 본 글이다(quotes는 비-qa에도 나간다).
+   */
+  근거원천?: { 조각: string[] | null; 추가원천: string[]; 보고횟수: number };
 }
 
 // ── 복합 지시(오케스트레이션) ─────────────────────────────────────────
@@ -2246,11 +2265,23 @@ export function registerDispatcherRoutes(app: Express): void {
       // 리포트 저장+알림이 답을 깎는 게 아니다. 그 밖은 기존 30초 그대로.
       const limitMs = qa ? QA_LONG_ANSWER_MS : 보고서꼴(text) ? REPORT_HANDOFF_MS : LONG_ANSWER_MS;
       const t0 = Date.now(); // 느린 답 원장(관측성) — 담당자를 기다리게 한 질문을 제품이 스스로 적는다
-      const work = runWithRagScope({ docIds: 지정문서, attachText: 첨부글 }, () =>
+      // 🔎 **인용 가드가 본 원천을 받을 그릇** — qa 요청에만 놓는다(2026-09-08 · citesource.ts).
+      //   왜 필요한가: 회귀 하네스 기록에 근거의 **이름**만 있어서, citeguard.test의 재생이
+      //   「챗 경로 + 조각 있었음」 41건을 통째로 건너뛰고 있었다(재생이 라이브보다 사나워
+      //   거짓 빨강이 난다). 그릇에 담기는 값은 llm.ts가 가드에게 넘긴 **그 두 배열**이다.
+      //   ⚠ 왜 dispatchInstruction 안이 아니라 **라우트**인가: 이 칸의 소비자는 하네스 하나뿐이고
+      //     하네스는 /api/dispatch만 쓴다. 안쪽에 두면 같은 함수를 qa=true로 부르는 handover·
+      //     redteam에도 **소비자 없는 조각 본문**이 따라붙는다 — 노출면을 넓힐 이유가 없다
+      //     (qa 전용 칸 wouldHandoff가 앉은 자리와 같다, 아래).
+      //   ⚠ 그래서 /api/dispatch/stream은 안 덮인다. 「두 입구는 같은 계약」에서 갈리는 자리라
+      //     여기 적어 둔다 — 스트림에서도 재야 할 날이 오면 그때 안쪽으로 옮긴다.
+      const 근거그릇 = qa ? 새인용원천수거() : null;
+      const 태우기 = () => runWithRagScope({ docIds: 지정문서, attachText: 첨부글 }, () =>
         runWithProgress(progressId, user?.id ?? null, () =>
           dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id ?? user?.username, clearance: user?.clearance, role: user?.role }, 선택)
         )
       );
+      const work = 근거그릇 ? 인용원천을수거하며(근거그릇, 태우기) : 태우기();
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), limitMs));
       const first = await Promise.race([work, timer]);
@@ -2271,6 +2302,9 @@ export function registerDispatcherRoutes(app: Express): void {
         if (qa && 보고서꼴(text) && Date.now() - t0 > REPORT_HANDOFF_MS) {
           (first as { wouldHandoff?: boolean }).wouldHandoff = true;
         }
+        // 🔎 가드가 본 원천 — **담긴 것이 있을 때만** 싣는다. 비-qa는 그릇 자체가 없어
+        //   이 줄이 원리상 안 돈다(사람 응답에는 칸조차 생기지 않는다 — 짝 시험이 못박는다).
+        if (근거그릇?.값) first.근거원천 = 근거그릇.값;
         res.json(first);
         return;
       }

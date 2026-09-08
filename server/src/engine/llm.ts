@@ -25,6 +25,8 @@ import { currentDocIds, currentAttachText } from "./ragscope";
 import { guardCitations, 뗀인용요약, 사유별집계, 못뗌사유, 숫자가원천에있나, type CiteGuardResult } from "./citeguard";
 // 내부 메타 줄(근거 조각·교사 모델 경로) 단일 출처 — import가 없는 작은 잎 파일(2026-09-06).
 import { 메타줄걷기, type 메타걷기결과 } from "./metaleak";
+// 🔎 가드가 본 원천을 qa 응답까지 나르는 잎 통로(citesource.ts 머리말 — 왜 llm.ts 밖인지 포함).
+import { 인용원천보고 } from "./citesource";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -1151,7 +1153,17 @@ export async function chat(args: ChatArgs): Promise<string> {
   // ⚠ 대조 원천은 **번호 조각만이 아니다**(2026-09-05 검토관 지적) — 프롬프트 ⓐ가 온톨로지도
   //   인용 대상으로 안내하고, 확정 용어 정의·📎 첨부한 지난 작업도 **같은 프롬프트에 실려 나간다.**
   //   거기서 그대로 옮긴 문장은 지어낸 것이 아니므로 함께 견준다(번호 범위 판정은 조각만 쓴다).
-  const 인용가드 = guardCitations(reply, ragResult?.chunks ?? null, [...(ragResult?.추가원천 ?? []), grounding, 첨부]);
+  // ★ 대조 원천은 **여기 한 번만** 만든다(2026-09-08) — 가드가 견주는 값과 qa 응답에 실어
+  //   보내는 값이 **같은 두 변수**여야 재생이 라이브와 같은 조건이 된다. 따로 조립하면
+  //   「원천 두 벌」이 되고, 이 저장소가 이름 붙인 「같은 것을 여러 곳에 적으면 어긋난다」가
+  //   바로 이 자리에서 재발한다(배지 sources가 이미 그 꼴이다 — dispatcher.ts:203).
+  //   ⚠ null·빈 문자열은 guardCitations가 어차피 filter(Boolean)으로 버린다(citeguard.ts:930) —
+  //     거르는 자리를 앞으로 옮겼을 뿐 **판정은 한 글자도 안 바뀐다.**
+  const 가드조각 = ragResult?.chunks ?? null;
+  const 가드추가원천 = [...(ragResult?.추가원천 ?? []), grounding, 첨부].filter((c): c is string => !!c);
+  // 🔎 qa 요청에서만 놓인 그릇에 담는다 — 사람 응답에는 아무 일도 안 일어난다(위 머리말).
+  인용원천보고(가드조각, 가드추가원천);
+  const 인용가드 = guardCitations(reply, 가드조각, 가드추가원천);
   if (인용가드.removed.length > 0 || 인용가드.보류.length > 0 || 인용가드.통째교체) reply = 인용가드.text;
 
   // ── 내부 경로 출구 방어(2026-09-06 라이브 사고 · Fable 결정 Q1-ⓒ) ────────────────────
@@ -1289,7 +1301,10 @@ export async function chat(args: ChatArgs): Promise<string> {
     //     다음 턴에 조용히 근거로 승격되면 관문이 스스로를 무효로 만든다.
     const 본것 = [...history.map((h) => String(h.content ?? "")), args.message]
       .filter((c) => c && !c.includes(숫자무근거배너));
-    const 접지 = 숫자가원천에있나(reply, ragResult.chunks, [...(ragResult.추가원천 ?? []), grounding, 첨부, ...본것]);
+    //   ⚠ 앞의 인용 가드와 **같은 원천 묶음**을 쓴다(2026-09-08) — 전엔 같은 조립식을 두 번
+    //     적어 두어, 한쪽에 원천을 더하면 다른 쪽이 조용히 옛 잣대로 남았다. 여기는 「모델이 본 것」이
+    //     하나 더 붙는 것만 다르다(위 ④).
+    const 접지 = 숫자가원천에있나(reply, 가드조각, [...가드추가원천, ...본것]);
     // ⑤ **하나라도 없으면** 배너를 붙인다(2026-09-06 · 시안 mockups/dim-range 승인).
     //   여기가 「부분 접지」를 여는 유일한 문이다. 종전엔 판정==="없음"(전부 없을 때)만 붙여서,
     //   백분율 다섯 중 넷이 문서에 있고 **하나만 지어낸** 답에는 경고가 아예 안 붙었다.
