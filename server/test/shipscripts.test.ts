@@ -527,13 +527,23 @@ describe("★ 실전 답 기록 — gb10(원격)으로는 복사하지 않는다
       .join("\n");
   };
 
-  it("gb10-test.sh는 ops-sim 기록을 사본에 넣지 않는다", () => {
+  // ★ 잣대는 **낱말 하나(ops-sim)가 아니라 폴더 이름(.tmp-reports)**이다 — 2026-09-08 반증으로 고쳤다.
+  //   처음엔 `/ops-sim/`만 봤는데, 실제로 파일이 복사되는 되살림 6꼴 중 **5꼴이 초록으로 통과**했다
+  //   (실측): ①`for d in knowledge tools mockups .tmp-reports; do`(222행 기존 루프에 한 낱말만
+  //   더하는 꼴 — 가장 그럴듯하다) ②`rsync -a "$SRC_ROOT/.tmp-reports/" …` ③`cp -r` 통째
+  //   ④`cp "$SRC_ROOT/.tmp-reports/"*.json` ⑤경로를 변수에 담는 꼴. 전부 파일은 옮겨지는데
+  //   "ops-sim"이라는 글자만 안 보여서 감시가 못 봤다 — **막았다고 믿는 감시가 제일 위험하다.**
+  //   폴더 이름으로 넓히면 6꼴 모두 빨강이고, 지금 판에는 오탐이 0이다(실행줄에 그 낱말 0개).
+  //   ⚠ 한계는 정직하게: 경로를 조각내 만들면(`"$SRC_ROOT/.tmp"'-reports'`) 글자 감시는 원리상
+  //     못 본다. 이 시험은 **실수와 무심코**를 막는 것이지 작정한 우회를 막는 물건이 아니다.
+  it("gb10-test.sh는 .tmp-reports(실전 답 기록)를 사본에 넣지 않는다", () => {
     const 코드 = 실행되는줄(path.join(도구, "gb10-test.sh"));
     expect(코드,
-      "gb10-test.sh에 ops-sim 복사가 되살아났다 — 그 파일에는 등급 C 사내 문서 조각 본문이 실린다. " +
-      "시험 하나를 초록으로 만들자고 사내 문서를 원격 기계(gb10)에 복제할 수는 없다. " +
+      "gb10-test.sh에 .tmp-reports 복사가 되살아났다 — 그 안의 ops-sim.json에는 등급 C 사내 문서 " +
+      "조각 본문이 실린다. gb10 사본에 담는 것은 **git이 이미 gb10에 실어 나른 것**뿐이고, " +
+      "gitignore 대상은 담지 않는다(빈 mkdir도 마찬가지 — 자리를 만들면 이내 채워진다). " +
       "실전 답으로 재야 하는 시험은 win의 WSL에서 돌린다: bash tools/wsl-test.sh")
-      .not.toMatch(/ops-sim/);
+      .not.toMatch(/\.tmp-reports/);
   });
 
   it("★ 짝: wsl-test.sh는 **그대로 옮긴다** — 둘 다 지우면 그 시험들이 영영 안 돈다", () => {
