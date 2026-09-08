@@ -221,3 +221,64 @@ describe("docsbundle — 청커 판이 오르면 내장 문서가 다시 들어�
       "키 이름에도 판을 넣으면 옛 키가 쓰레기로 남는다 — 판은 해시에만").not.toContain("CHUNKER_VERSION");
   });
 });
+
+// ── 검토관(H갈래)이 잡은 자리 — 판 올림이 넓힌 폭발 반경 (2026-09-08) ──────────────
+// 청커 판을 해시에 섞은 뒤로 「지웠다 다시 넣기」가 **매니페스트 전편**에 한 번에 걸린다.
+// 종전엔 「글이 바뀐 1~2편」이 최대 피해였다 — 같은 결함이라도 반경이 다르면 다른 사고다.
+describe("docsbundle — 재인입이 지식을 지우거나 표찰을 잃지 않는다", () => {
+  it("★★ 임베딩이 죽어 있으면 **아무것도 지우지 않는다** (적발②)", async () => {
+    const { embed } = await import("../src/engine/embedding");
+    const sub = path.join(DOCS_DIR, "knowledge");
+    fs.mkdirSync(sub, { recursive: true });
+    const 파일 = path.join(sub, "지킴.md");
+    fs.writeFileSync(파일, "# 지켜야 할 지식\n침해사고는 신고 의무가 있습니다.", "utf-8");
+    writeManifest([{ file: "knowledge/지킴.md" }]);
+    await bootstrapDocsBundle();
+    const 전 = (await listDocuments()).find((d) => d.documentId === "지킴.md");
+    expect(전?.chunks, "재료가 안 들어갔다 — 이 시험은 아무것도 못 잰다").toBeGreaterThan(0);
+
+    // 글을 고쳐 재인입 상태로 만든 뒤, 임베딩 서버가 죽은 상태를 만든다.
+    fs.writeFileSync(파일, "# 지켜야 할 지식\n침해사고는 24시간 안에 신고합니다.", "utf-8");
+    const 원래 = vi.mocked(embed).getMockImplementation()!;
+    vi.mocked(embed).mockImplementation(async () => { throw new Error("connect ECONNREFUSED 127.0.0.1:8081"); });
+    try {
+      const r = await bootstrapDocsBundle();
+      expect(r.failed.length, "임베딩이 죽었는데 실패로 안 잡혔다").toBeGreaterThan(0);
+      const 후 = (await listDocuments()).find((d) => d.documentId === "지킴.md");
+      expect(후?.chunks, "임베딩이 죽은 사이 옛 조각을 지워 버렸다 — 판 올림 한 번에 내장 지식 전부가 이 길로 온다")
+        .toBe(전?.chunks);
+    } finally {
+      vi.mocked(embed).mockImplementation(원래);
+    }
+    // 임베딩이 돌아오면 스스로 낫는다(부팅 래퍼가 20초 뒤 다시 부르는 그 길).
+    expect((await bootstrapDocsBundle()).updated).toEqual(["knowledge/지킴.md"]);
+  });
+
+  it("★★ 다시 넣어도 **등급·올린이·업무영역**을 지킨다 — 기밀 C가 공개로 내려가지 않게 (적발⑤)", async () => {
+    const sub = path.join(DOCS_DIR, "knowledge");
+    fs.mkdirSync(sub, { recursive: true });
+    const 파일 = path.join(sub, "표찰.md");
+    const 원문 = "# 등급이 매겨진 내장 문서\n대외비 절차를 적어 둔다.";
+    fs.writeFileSync(파일, 원문, "utf-8");
+    writeManifest([{ file: "knowledge/표찰.md" }]);
+    await bootstrapDocsBundle();
+
+    // 사람이 매긴 표찰 — 등급 C(기밀)·올린이·업무영역.
+    db.prepare("UPDATE memory_documents SET grade = 'C', uploadedBy = '보안팀장', category = '위협대응' WHERE documentId = ?")
+      .run("표찰.md");
+
+    // 청커 판이 오른 상태를 만든다(옛 판 해시 = 원문만 해싱한 값).
+    db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run("docsbundle:hash:표찰.md", createHash("sha256").update(원문, "utf8").digest("hex").slice(0, 16));
+
+    expect((await bootstrapDocsBundle()).updated).toEqual(["knowledge/표찰.md"]);
+    const 후 = db.prepare("SELECT grade, uploadedBy, category FROM memory_documents WHERE documentId = ?")
+      .get("표찰.md") as { grade?: string; uploadedBy?: string; category?: string };
+    expect(후?.grade, "등급이 비면 gradeOf가 기본값 공개(O)로 읽는다 — 기밀 문서가 조용히 열린다").toBe("C");
+    expect(후?.uploadedBy, "올린이가 지워지면 감사에서 누가 넣은 문서인지 사라진다").toBe("보안팀장");
+    // ⚠ 업무영역은 **일부러 안 지킨다** — 재인입이면 규칙이 다시 정하는 것이 기존 계약이다
+    //   (memory.ts categorizeDocument 주석: 사람이 고쳐도 재인입이면 규칙이 덮는다).
+    //   시험을 처음 쓸 때 이것까지 지키려다 그 계약과 부딪혔다 — 지키는 것은 사람이 매긴 표찰뿐이다.
+    expect(후?.category, "업무영역까지 얼려 버리면 규칙 개선이 옛 문서에 영영 안 닿는다").toBe("일반");
+  });
+});

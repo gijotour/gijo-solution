@@ -13,7 +13,9 @@ import crypto from "node:crypto";
 import zlib from "node:zlib";
 
 // 문서 인입(임베딩)은 무겁다 — 반입의 온톨로지·상태 기록만 본다(멱등 자체는 각 모듈 시험 몫).
-const docsMock = vi.fn(async () => ({ ingested: [] as string[], skipped: [] as string[], missing: [], failed: [] }));
+// ⚠ 목의 모양은 **진짜 반환값을 따라간다**(2026-09-08 적발⑧) — updated·removed가 빠져 있어서
+// 갱신 편수를 세는 코드를 넣자 이 시험이 TypeError로 죽었다. 진짜 반환값이 바뀌면 여기도 따라온다.
+const docsMock = vi.fn(async () => ({ ingested: [] as string[], skipped: [] as string[], updated: [] as string[], missing: [], removed: [], failed: [] }));
 vi.mock("../src/engine/docsbundle", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/engine/docsbundle")>()),
   bootstrapDocsBundle: () => docsMock(),

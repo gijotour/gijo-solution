@@ -138,4 +138,114 @@ describe("cleanExtractedText — 반복 제거가 표를 무너뜨리지 않는�
     expect(남은.split("\n").filter((l) => l.trim() === "| 항목 | 값 |"), "절마다 반복된 표 머리글이 지워졌다").toHaveLength(3);
     expect(남은.split("\n").filter(구분선)).toHaveLength(3);
   });
+
+  it("★ 지움 예외를 **CRLF에서도** 똑같이 준다 — \\r가 붙으면 다른 글자로 세던 자리 (적발①)", () => {
+    const 줄 = ["| 항목 | 값 |", "|---|---|", "| 가 | 1 |", "",
+      "| 항목 | 값 |", "|---|---|", "| 나 | 2 |", "",
+      "| 항목 | 값 |", "|---|---|", "| 다 | 3 |"];
+    const 남은 = cleanExtractedText(줄.join("\r\n"));
+    expect(남은.split("\n").filter((l) => l.trim() === "| 항목 | 값 |"), "CRLF면 머리글 예외가 안 걸린다").toHaveLength(3);
+    expect(남은.split("\n").filter(구분선), "CRLF면 구분선 예외가 안 걸린다").toHaveLength(3);
+    expect(남은, "줄바꿈 꼴을 한 벌로 맞추지 않으면 아래 표 인지가 통째로 어긋난다").not.toContain("\r");
+  });
+});
+
+// ── 검토관(H갈래)이 잡은 자리 — 첫 수리가 놓친 곳 (2026-09-08) ────────────────────
+// 셋은 실물·재현으로 확인됐고 하나(두 표)는 오늘 실물에 없는 **잠복**이다.
+// 잠복도 시험으로 못박는 이유: 이번 수리가 **새로 만든** 실패 꼴이라, 사용자 업로드 문서가
+// 그 모양이면 모델이 「틀린 열 이름」을 자신 있게 읽는다 — 머리글이 없는 것보다 나쁘다.
+describe("표 청킹 — 검토관이 잡은 자리", () => {
+  it("★★ 줄바꿈이 CRLF여도 조각이 같다 — 윈도우에서 만든 .md가 이 수리를 통째로 비켜 가던 자리 (적발①)", () => {
+    for (const f of 대상) {
+      const lf원문 = fs.readFileSync(path.join(지식, f), "utf8").replace(/\r\n/g, "\n");
+      const lf = chunkText(lf원문);
+      const crlf = chunkText(lf원문.replace(/\n/g, "\r\n"));
+      const 고아 = (cs: string[]) => cs.reduce((n, c) => n + 머리글잃은표(c).개수, 0);
+      expect(고아(crlf), `${f}: CRLF로 주면 머리글 잃은 표 조각이 생긴다 — 겹침 꼬리 보호가 "\n"만 본다`).toBe(0);
+      expect(crlf, `${f}: 같은 글인데 줄바꿈 꼴에 따라 조각이 달라진다`).toEqual(lf);
+    }
+  });
+
+  it("★ 한 블록에 표가 둘이면 **뒤 표에 앞 표의 머리글**을 붙이지 않는다 (적발③ · 잠복)", () => {
+    const A머리 = "| 자산 구분 | 담당 부서 | 등급 |";
+    const B머리 = "| 취약점 코드 | 조치 기한 | 판정 |";
+    const 구분3 = "|---|---|---|";
+    const 줄 = ["## 한 문단 안에 표가 둘", A머리, 구분3];
+    for (let i = 1; i <= 12; i += 1) 줄.push(`| 자산-${i} | 정보보호팀 | 중요도 ${i}등급으로 관리한다 |`);
+    줄.push(B머리, 구분3);
+    for (let i = 1; i <= 12; i += 1) 줄.push(`| CVE-2026-10${i} | 30일 이내 | 조치 후 재검증이 필요하다 |`);
+
+    const 조각 = chunkText(줄.join("\n"));
+    expect(조각.length, "한 조각에 다 들어가면 이 시험은 아무것도 못 잰다 — 재료가 짧아졌다").toBeGreaterThan(1);
+    const 잘못: string[] = [];
+    for (const c of 조각) {
+      const L = c.split("\n");
+      for (let i = 1; i < L.length - 1; i += 1) {
+        if (!구분선(L[i]) || !표줄(L[i - 1])) continue;
+        const 머리 = L[i - 1].trim();
+        for (let j = i + 1; j < L.length && 표줄(L[j]); j += 1) {
+          const t = L[j].trim();
+          if (구분선(t) || t === A머리 || t === B머리) break; // 새 표가 시작됐다
+          const 제머리 = t.includes("CVE-") ? B머리 : A머리;
+          if (머리 !== 제머리) 잘못.push(`「${머리}」 아래에 「${t.slice(0, 26)}…」`);
+        }
+      }
+    }
+    expect(잘못, "틀린 머리글이 붙으면 모델은 **자신 있게 틀린 열**로 읽는다").toEqual([]);
+  });
+
+  it("★ 머리글만 든 조각을 만들지 않는다 · 넘침은 머리글 값까지 (적발④)", () => {
+    const 머리 = "| 점검 항목 | 판정 기준 | 담당 |";
+    const 구분3 = "|---|---|---|";
+    const 머리값 = 머리.length + 구분3.length + 2;
+    const 줄 = ["## 좁은 예산", 머리, 구분3];
+    // 한 행이 예산의 대부분을 먹게 만든다 — 「제목+머리글+구분선」만 남고 행이 다음 조각으로
+    // 밀리는 자리가 여기서 열린다(칸 안의 「…적는다. 」는 문장 경계 오분할 함정도 함께 잰다).
+    for (let i = 1; i <= 20; i += 1) 줄.push(`| 항목 ${i} | ${"판정 기준을 길게 적는다. ".repeat(11)} | 정보보호팀 |`);
+    const doc = 줄.join("\n");
+
+    for (const [size, overlap] of [[200, 40], [300, 50], [800, 100]] as const) {
+      for (const c of chunkText(doc, size, overlap)) {
+        const 본문행 = c.split("\n").filter((l) => 표줄(l) && !구분선(l) && l.trim() !== 머리);
+        expect(본문행.length, `size=${size}: **머리글만 든 조각**이 생겼다 — 신고된 증상 그 자체다\n「${c.slice(0, 80)}」`).toBeGreaterThan(0);
+        // 머리글 재부착은 예산을 그만큼 넘길 수 있다(한 행이 size에 가까우면 피할 수 없다).
+        // 넘김을 **머리글 값까지**로 못박는다 — 그보다 넘으면 다른 데서 새는 것이다.
+        expect(c.length, `size=${size}: 조각이 size+overlap+머리글(${size + overlap + 머리값})을 넘었다`)
+          .toBeLessThanOrEqual(size + overlap + 머리값);
+      }
+    }
+  });
+});
+
+// ── 생산자 강제 — 자르는 규칙을 고치면 판을 올려야 한다 (적발⑥) ────────────────────
+// 소비자(docsbundle의 hashOf)는 이미 소스 감시가 붙어 있다. 그런데 **판을 올리는 쪽**에는
+// 아무 강제가 없어서, 다음 사람이 청커를 고치고 판을 안 올리면 이 기계가 조용히 no-op이 된다
+// (=코드는 새것인데 지식은 옛 조각 — 2026-07-31 사고의 재발). 그 자리를 지문으로 막는다.
+describe("청커 판 — 규칙을 고치면 CHUNKER_VERSION을 올린다 (소스 감시)", () => {
+  const 시작표식 = "// ── 표(마크다운 테이블) 인지";
+  const 끝표식 = "/** 글자로 그냥 읽으면 안 되는(추출이 필요한) 형식";
+  /** 판 ↔ 그 판이 자르던 규칙의 지문. **둘은 언제나 함께 바뀐다.** */
+  const 청커지문: Record<string, string> = {
+    "2026-09-08-table-2": "4d7dfbeb4d40",
+  };
+
+  it("★★ chunkText·cleanExtractedText·표 술어의 지문이 지금 판과 짝이다", async () => {
+    const { createHash } = await import("crypto");
+    const { CHUNKER_VERSION } = await import("../src/engine/memory");
+    const src = fs.readFileSync(path.resolve("src/engine/memory.ts"), "utf8");
+    const 시작 = src.indexOf(시작표식), 끝 = src.indexOf(끝표식);
+    expect(시작, "표식이 사라졌다 — 감시가 헛돈다(지문을 빈 글자로 세고 있었다)").toBeGreaterThan(0);
+    expect(끝, "끝 표식이 사라졌다 — 감시 범위가 파일 끝까지 늘어난다").toBeGreaterThan(시작);
+    // 주석·이름·들여쓰기는 뺀다 — 「자를 결과가 안 바뀌는 수정에는 판을 올리지 않는다」는
+    // 코드 주석과 어긋나지 않게, **알맹이**만 센다.
+    const 알맹이 = src.slice(시작, 끝)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:/])\/\/[^\n]*/g, "$1")
+      .replace(/\s+/g, " ").trim();
+    const 지문 = createHash("sha256").update(알맹이, "utf8").digest("hex").slice(0, 12);
+    expect(청커지문[CHUNKER_VERSION],
+      `자르는 규칙이 바뀌었는데 판이 그대로다(또는 지문을 안 갱신했다).\n` +
+      `  → CHUNKER_VERSION을 올리고 이 표에 「"<새 판>": "${지문}"」를 적어라.\n` +
+      `  안 올리면 배포해도 내장 문서가 다시 안 들어가 **고친 청커가 영영 안 돈다.**`).toBe(지문);
+  });
 });

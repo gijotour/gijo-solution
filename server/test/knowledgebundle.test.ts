@@ -8,7 +8,9 @@ vi.mock("../src/engine/ontology-seed", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/engine/ontology-seed")>()),
   seedOntologyFromCatalog: () => seedMock(),
 }));
-const docsMock = vi.fn(async () => ({ ingested: ["a.md"], skipped: ["b.md", "c.md"], missing: [], failed: [] }));
+// ⚠ 목의 모양은 **진짜 반환값을 따라간다** — updated·removed가 빠져 있어서, 그것을 세는
+// 코드를 넣는 순간 시험이 TypeError로 죽었다(2026-09-08 적발⑧을 고치다 실제로 밟았다).
+const docsMock = vi.fn(async () => ({ ingested: ["a.md"], skipped: ["b.md", "c.md"], updated: ["u.md"], missing: [], removed: [], failed: [] }));
 vi.mock("../src/engine/docsbundle", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/engine/docsbundle")>()),
   bootstrapDocsBundle: () => docsMock(),
@@ -32,6 +34,9 @@ describe("기본 지식 번들", () => {
     expect(s.triples).toBe(1980);
     expect(s.docsIngested).toBe(1);
     expect(s.docsSkipped).toBe(2);
+    // ★ 갱신 편수를 센다(적발⑧) — 종전엔 docsbundle이 준 updated를 **버려서**, 문서를 고쳐
+    //   다시 넣은 기동이 감사에 「신규 0/유지 0」으로 남았다(아무 일도 안 한 것처럼).
+    expect(s.docsUpdated, "다시 넣은 편수를 안 세면 감사 기록이 거짓 숫자가 된다").toBe(1);
     expect(seedMock).toHaveBeenCalledTimes(1);
     expect(docsMock).toHaveBeenCalledTimes(1);
     expect(getAppliedBundle()?.version).toBe(KNOWLEDGE_BUNDLE_VERSION);

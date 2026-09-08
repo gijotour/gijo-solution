@@ -16,7 +16,8 @@ import * as path from "path";
 import { createHash } from "crypto";
 
 import { db } from "../db";
-import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument, markDocumentsBuiltin, 추출필요, CHUNKER_VERSION } from "./memory";
+import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument, markDocumentsBuiltin, 추출필요, CHUNKER_VERSION, 문서표찰읽기, 문서표찰되돌리기, type 문서표찰 } from "./memory";
+import { embed } from "./embedding"; // 지우기 전 생존 확인용(적발② — 잎 모듈이라 순환 없음)
 import { 대장과같음 } from "./docledger"; // 「이미 같은 판이 들어가 있나」 판정 한 곳(잎 · import 0)
 
 // 프로젝트 관례(localengine의 MODELS_DIR, memory의 DB_PATH)대로 cwd 기준 상대경로 + 환경변수
@@ -127,6 +128,14 @@ const getHashStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
 const setHashStmt = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
 
 export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
+  // 임베딩 생존 확인은 **한 번만** 한다(같은 기동 안에서 여러 문서가 재인입돼도 한 번).
+  // 확인에 쓰는 글은 아무 데도 저장하지 않는다 — 살아 있으면 벡터를 돌려주고 그것으로 끝이다.
+  let 임베딩확인함 = false;
+  const 임베딩살아있나 = async () => {
+    if (임베딩확인함) return;
+    await embed(["임베딩 생존 확인"]);
+    임베딩확인함 = true;
+  };
   const result: DocsBundleResult = { ingested: [], skipped: [], updated: [], missing: [], removed: [], failed: [] };
   const manifest = await readManifest();
   if (!manifest?.files?.length) return result;
@@ -176,6 +185,8 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
     // 접두를 남기면 안 된다(2026-07-29 실측 함정: 운영에 파일명 id로 이미 인입된 지식 문서가
     // 경로 id로 한 번 더 들어가 중복 문서 = 검색 경합이 될 뻔했다).
     const docId = path.basename(entry.file);
+    // 재인입일 때만 채워진다 — 처음 넣는 문서는 지킬 표찰이 없다(null).
+    let 표찰: 문서표찰 | null = null;
     const docPath = await resolveDocPath(entry.file);
     if (!docPath) {
       // 파일이 없으면 '없음'이다. 이미 인입돼 있다면 지우지 않는다 — 문서를 잠깐 못 찾은 것과
@@ -202,8 +213,23 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
         result.skipped.push(entry.file);
         continue;
       }
+      // ★ **지우기 전에 임베딩이 살아 있는지 먼저 본다** (2026-09-08 검토관 적발②).
+      //   재인입은 지우는 것이 먼저라, 임베딩 서버가 아직 안 떴으면 그 문서는 **지워진 채**
+      //   남는다. 종전엔 「글이 바뀐 1~2편」이 최대 피해였지만, 청커 판을 섞은 뒤로는 판이
+      //   오른 첫 기동에 35편이 전부 이 길로 들어온다 — 한 번의 실패로 **내장 지식이 통째로**
+      //   빌 수 있다(실측 약 1,500조각). 그래서 살아 있는지 먼저 묻고, 아니면 **아무것도 안
+      //   지우고 물러난다.** 부팅 래퍼가 20초 뒤 다시 부른다(bootstrapDocsBundleWithRetry).
+      try {
+        await 임베딩살아있나();
+      } catch (err) {
+        result.failed.push({ file: entry.file, reason: `임베딩이 아직 안 떠서 물러났다(옛 조각은 그대로 둔다): ${err instanceof Error ? err.message : String(err)}` });
+        break; // ⚠ continue가 아니라 break — 원인이 전역이라 다음 문서도 같은 자리에서 죽는다
+      }
       // 바뀌었다 → 옛 조각을 지우고 다시 넣는다. 지우지 않으면 옛 내용과 새 내용이 함께 검색돼
       // 서로 다른 답이 번갈아 나온다(중복 청크는 눈에 안 보여서 더 나쁘다).
+      // ⚠ 지우기 **전에** 표찰(등급·올린이·업무영역)을 뜬다 — 대장 행이 통째로 지워지므로
+      //   여기서 안 뜨면 되돌릴 원본이 사라진다(적발⑤).
+      표찰 = 문서표찰읽기(docId);
       try {
         await deleteDocument(docId);
       } catch (err) {
@@ -216,7 +242,11 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
       // classify=false로 넣는다. ① 분류는 LLM을 호출하는데 부팅 직후엔 아직 안 떠 있을 수 있고,
       // ② '매뉴얼'로 분류되면 보안제품 등록부에 자동 연결되는데(memory.linkManualToProduct)
       // GIJO 자체 매뉴얼이 남의 벤더 제품 매뉴얼로 붙는 건 등록부 오염이다.
-      await ingestText(docId, raw, scope, docPath, false, undefined, undefined, "builtin"); // origin=내장(①ⓑ)
+      // ⚠ 사람이 매긴 표찰(등급·올린이)은 **뜬 것을 그대로 돌려준다**(적발⑤). 안 넘기면 재인입한
+      //   내장 문서의 등급이 비어 기본값 공개(O)로 읽힌다 — 기밀 C가 조용히 공개로 내려간다.
+      //   ⚠ 업무영역(category)은 일부러 안 넘긴다 — 재인입이면 규칙이 다시 정하는 것이 계약이다.
+      await ingestText(docId, raw, scope, docPath, false, 표찰?.uploadedBy ?? undefined, undefined, "builtin"); // origin=내장(①ⓑ)
+      문서표찰되돌리기(docId, 표찰); // 등급은 인입이 모르는 표찰이라 넣은 뒤 되돌린다
       // 해시는 **인입에 성공한 뒤에만** 남긴다 — 실패했는데 기록해 두면 다음 기동에서
       // "그대로다"라고 판단해 영영 안 들어간다(조용한 지식 공백).
       setHashStmt.run(HASH_KEY(docId), hash);

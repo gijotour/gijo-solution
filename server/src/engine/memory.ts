@@ -60,6 +60,31 @@ const upsertDocMetaStmt = db.prepare(
      category=COALESCE(excluded.category, memory_documents.category),
      origin=COALESCE(excluded.origin, memory_documents.origin)`
 );
+// ── 재인입 동안 지켜야 할 **문서 표찰** (2026-09-08 검토관 적발⑤) ───────────────────
+// 왜 필요한가: 번들 재인입은 deleteDocument → ingestText 순서인데, deleteDocument가 대장 행을
+// **통째로** 지운다. 그러면 위 upsert의 COALESCE 보존은 지킬 것이 없어져 무력해지고(등급 grade는
+// 애초에 컬럼 목록에도 없다), 다시 넣은 문서는 grade=null·uploadedBy=null이 된다.
+// ⚠ 등급이 비면 gradeOf가 **기본값 공개(O)**로 읽는다(engine/grades.ts) — 기밀(C)로 매겨 둔
+//   내장 문서가 조용히 **공개로 내려가** 열람이 넓어지는 방향이다. 문서 글을 고칠 때마다 나던
+//   결함인데, 청커 판 올림이 그 방아쇠를 「다음 재시작 한 번에 35편 전부」로 넓혔다.
+// ⚠ **업무영역(category)은 여기 없다 — 일부러다.** 재인입이면 규칙이 다시 덮는 것이 기존
+//   계약이다(위 categorizeDocument 주석: 「사람이 고쳐도 재인입이면 규칙이 다시 덮으므로
+//   규칙에 둔다」 — 용어사전이 위협대응으로 잡히던 2026-09-03 실측이 그 근거). 지키는 것은
+//   **사람이 매긴 표찰**뿐이다: 등급(사람만 매긴다)·올린이(감사 귀속).
+export type 문서표찰 = { grade: string | null; uploadedBy: string | null };
+const 표찰읽기Stmt = db.prepare("SELECT grade, uploadedBy FROM memory_documents WHERE documentId = ?");
+const 표찰등급Stmt = db.prepare("UPDATE memory_documents SET grade = ? WHERE documentId = ?");
+/** 지우기 **전에** 표찰을 뜬다. 없는 문서면 null(처음 넣는 문서라 지킬 것이 없다). */
+export function 문서표찰읽기(documentId: string): 문서표찰 | null {
+  const r = 표찰읽기Stmt.get(documentId) as { grade?: string | null; uploadedBy?: string | null } | undefined;
+  return r ? { grade: r.grade ?? null, uploadedBy: r.uploadedBy ?? null } : null;
+}
+/** 다시 넣은 **뒤에** 등급을 되돌린다(올린이는 ingestText 인자로 함께 넘긴다).
+ *  ⚠ 등급을 여기서만 되돌리는 이유: 인입 자체는 등급을 모른다 — 등급은 사람이 매기는 표찰이다. */
+export function 문서표찰되돌리기(documentId: string, 표찰: 문서표찰 | null): void {
+  if (표찰?.grade) 표찰등급Stmt.run(표찰.grade, documentId);
+}
+
 /** 남의 개인 문서(personal:*)인가 — 목록·조각·파일 창구 공용 판별.
  *  공유된 것만 예외. 판별 불가(무기명)는 가리는 쪽 — 격리는 언제나 fail-closed. */
 export function 남의개인문서인가공용(documentId: string, req: import("express").Request): boolean {
@@ -734,6 +759,17 @@ function 표머리글들(lines: string[]): Set<string> {
   for (let i = 0; i + 1 < lines.length; i += 1) if (표줄(lines[i]) && 구분선(lines[i + 1])) out.add(lines[i].trim());
   return out;
 }
+/** 여기서 끊으면 **머리글만 든 조각**이 떨어지나 — 버퍼 끝의 표 덩어리에 본문 행이 하나도 없는 상태.
+ *  (2026-09-08 검토관 적발④) 그런 조각은 이 라운드가 고치려던 증상의 이름 그 자체다.
+ *  참이면 끊지 않고 다음 행까지 데려간다 — 한 행만 더 담으면 곧 거짓이 되므로 무한히 안 커진다. */
+function 머리글만남나(buf: string, next: string, 머리: string, 구분: string): boolean {
+  if (!머리 || !표줄(next)) return false;
+  const L = buf.split("\n").map((l) => l.trim()).filter(Boolean);
+  let k = L.length;
+  while (k > 0 && 표줄(L[k - 1])) k -= 1; // 뒤쪽에 붙어 있는 표 덩어리만 본다(앞의 제목·본문은 무관)
+  const 덩어리 = L.slice(k);
+  return 덩어리.length > 0 && 덩어리.every((l) => l === 머리 || l === 구분);
+}
 
 /** 청커 판 — **자르는 규칙이 바뀌면 올린다.**
  *
@@ -743,14 +779,27 @@ function 표머리글들(lines: string[]): Set<string> {
  *  docsbundle이 이 판을 해시에 섞어, 판이 오른 다음 기동에서 **내장 문서만** 다시 들어간다.
  *  ⚠ 사용자가 올린 문서는 매니페스트 밖이라 안 건드린다 — 다음 인입부터 새 청커를 쓴다.
  *  ⚠ 자를 결과가 안 바뀌는 수정(주석·이름)에는 올리지 않는다. 한 번 올릴 때마다 매니페스트
- *    35편이 통째로 재임베딩된다(실측 약 1,500조각). */
-export const CHUNKER_VERSION = "2026-09-08-table";
+ *    35편이 통째로 재임베딩된다(실측 약 1,500조각).
+ *  ⚠ **판을 올리는 것은 사람이 잊는다**(2026-09-08 검토관 적발⑥) — 소비자(docsbundle의 hashOf)에만
+ *    소스 감시가 있고 올리는 쪽엔 아무 강제가 없었다. 그래서 짝 시험(test/tablechunk.test.ts)이
+ *    아래 두 함수와 표 술어의 **소스 지문**을 세어, 규칙이 바뀌었는데 판이 그대로면 빨개진다.
+ *    (지문은 주석·들여쓰기를 뺀 알맹이라, 위 「주석 수정엔 안 올린다」와 어긋나지 않는다.) */
+export const CHUNKER_VERSION = "2026-09-08-table-2";
 
 
 // PDF 추출물의 레이아웃 잡음을 지운다 — 페이지 번호 줄("- 134 -", "134"), 페이지마다 반복되는
 // 머리글/바닥글은 임베딩에 잡음이고 청크 앞머리를 차지해 검색 품질을 떨어뜨린다(FOCS 매뉴얼 실측).
+// ⚠ **자르는 규칙을 고치면 CHUNKER_VERSION을 올린다**(바로 위 판 주석). 안 올리면 배포해도
+//   내장 문서가 다시 안 들어가 고친 규칙이 영영 안 돈다. 짝 시험이 지문으로 막고 있다
+//   (test/tablechunk.test.ts 「청커 판 — 규칙을 고치면 CHUNKER_VERSION을 올린다」).
 export function cleanExtractedText(text: string): string {
-  const lines = text.split("\n");
+  // ★ 줄바꿈 꼴을 **먼저 한 벌로** 맞춘다 (2026-09-08 검토관 적발①).
+  //   왜: 아래 표 인지와 청킹이 줄바꿈을 "\n"으로만 본다. 윈도우에서 만든 .md는 CRLF라
+  //   줄 끝에 "\r"가 남고, 그러면 겹침 꼬리 보호("앞 글자가 \n인가")도 「머리글 없는 표행
+  //   버리기」("^\n+" 지우기)도 **통째로 안 걸린다.** 실측: 매니페스트 35편 중 9편이 CRLF고,
+  //   그중 GIJO_AS_용어사전.md는 새 판에서도 머리글 잃은 표 조각이 남았다(LF로 주면 0).
+  //   ⚠ 여기서 한 번에 맞춘다 — 자리마다 "\r?"를 덧대면 한 곳을 빠뜨리는 날이 온다.
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
   // 3회 이상 반복되는 짧은 줄(머리글/바닥글 후보) 수집 — 문서 제목이 매 페이지 반복되는 패턴.
   const freq = new Map<string, number>();
   for (const l of lines) {
@@ -798,6 +847,8 @@ function sliceSafe(s: string, start: number, end?: number): string {
   return stripLoneSurrogates(s.slice(start, end));
 }
 
+// ⚠ **여기를 고치면 CHUNKER_VERSION을 올린다** — 안 올리면 이미 들어간 내장 문서는 옛 조각
+//   그대로라, 배포해도 고친 규칙이 안 돈다(짝 시험이 소스 지문으로 막는다).
 export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP): string[] {
   // HTML 주석(<!-- … -->)은 내용이 아니라 유지보수 메모다 — 색인에서 뺀다(2026-08-17, max 발견#3:
   // 문서의 '이 문서를 늘릴 때' 작성지침이 「유출 신고 며칠?」 답 상단으로 새어 나왔다). 주석으로
@@ -826,18 +877,17 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   //   앞 조각에, 본문 행은 뒤 조각에 남았다. 실측(점검표 5편): 머리글 잃은 표 조각 15개·26줄.
   //   그런 조각을 근거로 받은 모델은 「양호=…」가 어느 열의 값인지 모른다.
   //   → 표가 갈리는 자리에서 **머리글+구분선을 다음 조각 앞에 다시 붙인다**(실측 중앙 58자·최대
-  //     87자 = size 800의 11%). 재부착분도 buf 길이에 그대로 세므로 size 예산은 어긋나지 않는다.
+  //     87자 = size 800의 11%).
+  //   ★ 예산 계약(2026-09-08 검토관 적발④로 바로잡음) — 재부착은 size를 **머리글 값만큼 넘길 수
+  //     있다.** 한 행이 size에 가까우면 「머리글 + 그 행」이 size를 넘는 것을 피할 방법이 없기
+  //     때문이다(행을 쪼개거나 머리글을 버리는 수밖에 없는데 둘 다 더 나쁘다). 그래서 조각의
+  //     상한은 **size + overlap + 머리글값**이고, 짝 시험이 그 숫자를 못박는다.
+  //     기본값(800/100)에서는 회귀가 없다 — 실측 초과 조각 175→172, 최장 1,533자 불변.
   const units: string[] = [];
   for (const b of blocks) {
     if (b.length <= size) {
       units.push(b);
       continue;
-    }
-    // 이 블록의 표 머리글(+구분선) — 갈린 뒤쪽 조각 앞에 다시 붙일 두 줄.
-    const bl = b.split("\n");
-    let 머리 = "", 구분 = "";
-    for (let i = 0; i + 1 < bl.length; i += 1) {
-      if (표줄(bl[i]) && 구분선(bl[i + 1])) { 머리 = bl[i].trim(); 구분 = bl[i + 1].trim(); break; }
     }
     // ⚠ **표 행은 문장 경계로 자르지 않는다** — 실측(2026-09-08): 표 칸 안에 「…없습니다. 」처럼
     //   문장 종결이 들어 있어서 위 정규식이 **행 한가운데**를 갈랐고, 그 반쪽 조각으로 시작한
@@ -850,9 +900,33 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
       if (모음.endsWith("\n") || !표줄(모음)) { 토막.push(모음); 모음 = ""; }
     }
     if (모음) 토막.push(모음);
+
+    // ★ 머리글은 **줄마다 「그 줄이 속한 표」의 것**을 쓴다 (2026-09-08 검토관 적발③).
+    //   왜: 처음엔 블록의 **첫** 머리글 하나만 찾아 두고 갈릴 때마다 그걸 붙였다. 그러면 빈 줄
+    //   없이 표가 둘 이어진 블록에서 **뒤 표의 행에 앞 표의 머리글**이 붙는다 — 머리글이 없으면
+    //   모델은 모른다고 말할 수 있지만, 틀린 머리글이 붙으면 **자신 있게 틀린 열로 읽는다.**
+    //   (오늘 저장소 실물엔 그런 블록이 0건이지만 사용자 업로드 md에 잠복한다.)
+    //   → 앞에서부터 훑으며 「표줄 + 다음 줄이 구분선」을 만나면 머리글을 갈아 끼우고,
+    //     표가 아닌 줄을 만나면 지운다(표가 끝났으므로).
+    const 머리들: string[] = new Array(토막.length).fill("");
+    const 구분들: string[] = new Array(토막.length).fill("");
+    {
+      let h = "", s = "";
+      for (let i = 0; i < 토막.length; i += 1) {
+        const t = 토막[i].trim(), next = (토막[i + 1] ?? "").trim();
+        if (표줄(t) && 구분선(next)) { h = t; s = next; }
+        else if (t && !표줄(t)) { h = ""; s = ""; }
+        머리들[i] = h; 구분들[i] = s;
+      }
+    }
+
     let buf = "";
-    for (const sent of 토막) {
-      if (buf.length + sent.length > size && buf.trim()) {
+    for (let i = 0; i < 토막.length; i += 1) {
+      const sent = 토막[i], 머리 = 머리들[i], 구분 = 구분들[i];
+      // ⚠ **머리글만 든 조각을 만들지 않는다** (2026-09-08 검토관 적발④ · 판정은 머리글만남나 한 곳).
+      //   그럴 땐 끊지 말고 다음 행까지 데려간다 — 그 조각은 size를 머리글 값만큼 넘지만,
+      //   열 뜻을 잃은(또는 열 이름만 있는) 조각보다 낫다(위 예산 계약).
+      if (buf.length + sent.length > size && buf.trim() && !머리글만남나(buf, sent, 머리, 구분)) {
         units.push(buf.trim());
         buf = "";
         // ⚠ **중복 금지** — 이어지는 줄이 머리글/구분선 자신이면 다시 붙이지 않는다

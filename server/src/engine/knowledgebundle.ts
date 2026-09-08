@@ -94,6 +94,12 @@ interface AppliedState {
   triples: number;
   docsIngested: number;
   docsSkipped: number;
+  // ★ 갱신(지웠다 다시 넣은) 편수 — 2026-09-08 검토관 적발⑧으로 신설.
+  //   docsbundle은 진작 updated를 돌려줬는데 여기서 **버리고 있었다.** 그래서 문서를 고쳐
+  //   다시 넣은 기동이 감사에 「신규 0/유지 0」으로 남았다 — 아무 일도 안 한 것처럼 보인다.
+  //   청커 판을 해시에 섞은 뒤로는 판이 오르는 기동에서 매니페스트 전편이 updated로 떨어져
+  //   그 거짓 숫자가 **전부**가 된다. 옛 기록엔 없는 칸이라 선택 항목이다.
+  docsUpdated?: number;
 }
 
 export function getAppliedBundle(): AppliedState | null {
@@ -164,6 +170,7 @@ export async function applyKnowledgeBundle(actor?: string): Promise<AppliedState
     triples: onto.inserted,
     docsIngested: docs.ingested.length,
     docsSkipped: docs.skipped.length,
+    docsUpdated: docs.updated.length,
   };
   setStateStmt.run(STATE_KEY, JSON.stringify(state));
   recordAudit({
@@ -171,7 +178,7 @@ export async function applyKnowledgeBundle(actor?: string): Promise<AppliedState
     actor: actor ?? "시스템(부팅 자동)",
     action: "기본 지식 번들 적용",
     target: KNOWLEDGE_BUNDLE_VERSION,
-    detail: `트리플 ${onto.inserted} · 문서 신규 ${docs.ingested.length}/유지 ${docs.skipped.length}`,
+    detail: `트리플 ${onto.inserted} · 문서 신규 ${docs.ingested.length}/갱신 ${docs.updated.length}/유지 ${docs.skipped.length}`,
     result: "ok",
   });
   return state;
@@ -188,7 +195,7 @@ export async function ensureKnowledgeBundle(): Promise<void> {
     if (applied?.version === KNOWLEDGE_BUNDLE_VERSION) return;
     console.log(`[knowledge-bundle] ${applied?.version ?? "(미적용)"} → ${KNOWLEDGE_BUNDLE_VERSION} 적용 시작`);
     const s = await applyKnowledgeBundle();
-    console.log(`[knowledge-bundle] 적용 완료 — 트리플 ${s.triples} · 문서 신규 ${s.docsIngested}/유지 ${s.docsSkipped}`);
+    console.log(`[knowledge-bundle] 적용 완료 — 트리플 ${s.triples} · 문서 신규 ${s.docsIngested}/갱신 ${s.docsUpdated ?? 0}/유지 ${s.docsSkipped}`);
   } catch (e) {
     console.warn("[knowledge-bundle] 적용 실패(기동은 계속) —", e instanceof Error ? e.message : e);
   }
@@ -252,6 +259,7 @@ export async function importVerifiedBundle(
     triples: triplesAdded,
     docsIngested: docsResult.ingested.length,
     docsSkipped: docsResult.skipped.length,
+    docsUpdated: docsResult.updated.length,
   };
   setStateStmt.run(STATE_KEY, JSON.stringify(state));
 
