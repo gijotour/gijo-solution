@@ -29,11 +29,19 @@ describe("★ 구역 이름 전수 — 강제 도구의 말을 채 가는 이름
   /** 남아 있는 가로채기 — `화면|이름|도구|사유`. **사유는 제품 함수가 붙인 말**이라
    *  사람이 지어낼 수 없다. 두 부류뿐이고 둘 다 안내가 이기는 것이 옳다:
    *
-   *  · **정체물음**(19줄) — 「○○ 뭐야?」는 그 구역이 *무엇인지*를 묻는 말이다. 도구에 넘기면
+   *  · **정체물음**(15줄) — 「○○ 뭐야?」는 그 구역이 *무엇인지*를 묻는 말이다. 도구에 넘기면
    *    「AI-BOM 뭐야?」에 뜻풀이 대신 결손 집계가, 「견고성 점수 뭐야?」에 점수표가 나간다.
    *    2026-07-25에 이 경로를 만든 실측(「진행내역 리포트가 뭐야?」가 RAG로 새어 벤더 매뉴얼을
    *    근거로 답했다)과 2026-09-07 짝 시험의 판단(「지켜보는 폴더(📂) 뭐야?」는 안내가 옳다)이
    *    가리키는 쪽이고, 제품 원칙(용어 풀이는 screenguide)과도 같다.
+   *    ⚠ 2026-09-08에 **네 줄이 빠졌다**(이관 절차 · 대응 절차 · 학습 루프 4단계 · 등급 5단계).
+   *      화면 안내를 손댄 것이 아니라 **뿌리를 고쳤다** — workflow_status 규칙이 「무슨 절차든
+   *      뭐냐고 물으면 내 것」이라 남의 절차를 삼키던 것을 우리 업무 5단계 이름으로 좁혔다
+   *      (agentloop FORCED_INTENTS[28] · 짝 시험 test/workflow-stage-routing.test.ts).
+   *      이제 그 넷은 forcedToolFor가 null이라 **이 명부에 오를 일 자체가 없다** — 안내가
+   *      이기는 것이 아니라 애초에 다툼이 없다. 명부에 남겨 두는 것은 **그 화면 안에서만**
+   *      안전하다는 뜻이었다(화면 안내는 그 화면에서 물을 때만 이긴다) — 이제 대화창에서
+   *      물어도 업무 5단계 숫자가 안 나간다.
    *  · **안내낱말**(1줄 — 점검 방법) — 이름 자체에 「방법」이 들어 있다. 그 이름을 부르는 것이
    *    곧 설명을 구하는 것이다.
    *
@@ -42,13 +50,10 @@ describe("★ 구역 이름 전수 — 강제 도구의 말을 채 가는 이름
   const 대장 = [
     "approvals.html|VEX 내보내기|vex_status|정체물음",
     "dashboard.html|오늘 브리핑|briefing|정체물음",
-    "handover.html|이관 절차|workflow_status|정체물음",
     "hardening.html|점검 방법|explain|안내낱말",
     "incidentcases.html|비슷한 사례 칩|incident_cases|정체물음",
     "incidentcases.html|사례의 샘|incident_sources|정체물음",
     "kpi.html|AI가 아낀 시간|time_saved|정체물음",
-    "learnloop.html|학습 루프 4단계|workflow_status|정체물음",
-    "loganalysis.html|대응 절차|workflow_status|정체물음",
     "maintenance.html|점검 승인 · 올린 점검서|review_maintenance|정체물음",
     "memory.html|기본 지식 번들|knowledge_bundle_status|정체물음",
     "memory.html|지식 관계도(온톨로지)|ontology_query|정체물음",
@@ -58,7 +63,6 @@ describe("★ 구역 이름 전수 — 강제 도구의 말을 채 가는 이름
     "report.html|정기 리포트 스케줄|report_schedule_list|정체물음",
     "sbom.html|AI-BOM|aibom_status|정체물음",
     "settings.html|에어갭 봉인|airgap_status|정체물음",
-    "supplychain.html|등급 5단계|workflow_status|정체물음",
     "threat.html|최근 탐지 내역|threats|정체물음",
   ].sort();
 
