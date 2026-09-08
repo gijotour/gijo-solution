@@ -1,43 +1,60 @@
-// pptxextract.test.ts — pptx 추출의 **주제별 재료** 계약(2026-08-29).
+// pptxextract.test.ts — **pptx 추출은 dataset.ts가 한다**(2026-09-08 재조준).
 //
-// ★ 사장님 지시(2026-08-23) 「데이터 파일 파싱을 잘해야 하는 게 핵심, 문서함에 주제별로」.
-//   주제별로 자르려면 원문에 **경계**가 남아야 한다 — 「[슬라이드 N]」이 그 재료다.
-//   그리고 도해(SmartArt)·차트 글자를 놓치면 도해 많은 벤더 덱은 본문이 거의 빈다
-//   (2026-08-23 SafeBreach 실측으로 확인한 공백).
+// ■ 이 시험이 무엇을 잘못 재고 있었나 (설계관 실측 2026-09-08)
+//   2026-08-29에 이 시험은 `scripts/extract_doc.py`를 **소스로** 검사했다 — 「[슬라이드 N]」 표시·
+//   SmartArt/차트 회수·「(노트)」 표시가 파이썬 코드 안에 글자로 있는지만 봤다. 그런데 그 갈래는
+//   **한 번도 불리지 않는다**: dataset.ts:extractDocumentText가 오피스 4종을 파이썬보다 먼저
+//   가로챈다(2026-08-22 이관). 즉 **제품이 안 지키는 약속을 시험이 지킨다고 말하고 있었다.**
+//   (커밋 eeb118af의 「18,193→18,600자」도 제품 경로 밖에서 잰 값이다.)
+//   → 파이썬의 오피스 갈래를 지우고, 이 시험을 **살아 있는 갈래**로 겨눈다.
 //
-// ⚠ 파이썬 파일을 **소스로** 검사한다 — 실행 검증은 운영 환경(WSL venv)에서 별도로 했다.
-//   시험이 python을 부르면 개발 머신(0바이트 껍데기 python3)에서 헛돈다(2026-08-09 실사고).
+// ■ 아직 못 옮긴 약속 3종 (백로그 — 이번 라운드에 함께 옮기지 않은 이유)
+//   ① 「[슬라이드 N]」 경계 표시  ② SmartArt(ppt/diagrams)·차트(ppt/charts) 글자 회수
+//   ③ 「(노트)」 표시로 발표 노트 가르기
+//   셋 다 pptx 출력을 **통째로** 바꾼다. 이번 라운드는 「표가 없는 문서는 글자 하나까지 같다」를
+//   계약으로 걸고 표만 되살리는 것이라(test/tableextract.test.ts), 함께 하면 그 계약과 정면충돌한다.
+//   ⚠ 셋은 진짜 공백이다 — 특히 ②는 도해 많은 벤더 덱의 본문이 거의 비는 원인이다
+//     (2026-08-23 SafeBreach 실측). 다음 라운드에서 **회귀 계약을 새로 잡고** 옮긴다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const SRC = readFileSync(join(__dirname, "..", "scripts", "extract_doc.py"), "utf-8");
-const 추출 = SRC.slice(SRC.indexOf("def extract_pptx"), SRC.indexOf("def extract_xlsx"));
+const { extractDocumentText } = await import("../src/engine/dataset");
+const b64 = (n: string) => readFileSync(join(__dirname, "fixtures", n)).toString("base64");
 
-describe("pptx 추출 — 주제별로 자를 재료를 남긴다", () => {
-  it("★ 슬라이드 경계를 남긴다 — 없으면 주제 분해의 근거가 사라진다", () => {
-    expect(추출, "「[슬라이드 N]」 표시가 없다 — 목차·「N.」 소속으로 자를 기준이 없어진다")
-      .toContain("[슬라이드 %d]");
+describe("pptx 추출 — 살아 있는 갈래(dataset.ts)를 잰다", () => {
+  it("슬라이드가 번호순으로 나오고 발표자 노트도 담긴다", async () => {
+    const t = await extractDocumentText("tiny.pptx", b64("tiny.pptx"));
+    expect(t).toContain("1장 개요");
+    expect(t).toContain("2장 대응 절차");
+    expect(t, "발표자 노트가 빠졌다").toContain("발표자 메모입니다");
+    expect(t.indexOf("1장 개요"), "슬라이드 순서가 어긋났다").toBeLessThan(t.indexOf("2장 대응 절차"));
+    // 노트는 **슬라이드 뒤**에 온다(원본 파이썬과 같은 순서 — 본문 사이에 끼면 주제가 흐트러진다).
+    expect(t.indexOf("2장 대응 절차")).toBeLessThan(t.indexOf("발표자 메모입니다"));
   });
 
-  it("★ 도해(SmartArt)·차트 글자를 회수한다 — 도해 많은 덱이 빈 채로 들어오지 않게", () => {
-    expect(추출, "SmartArt(ppt/diagrams/data*.xml)를 안 읽는다").toContain("diagrams/data");
-    expect(추출, "차트(ppt/charts/chart*.xml)를 안 읽는다").toContain("charts/chart");
-    expect(추출, "차트 값 태그(<c:v>)를 안 읽는다").toContain("c:v");
+  it("표는 파이프 표로 나온다 — 칸이 공백으로 이어붙지 않는다", async () => {
+    // 자세한 규격·병합·중첩은 test/tableextract.test.ts가 잰다. 여기서는 **pptx 갈래가
+    // 실제로 표를 낸다**는 것만 확인한다(그게 이 파일의 주제다).
+    const t = await extractDocumentText("table.pptx", b64("table.pptx"));
+    expect(t.split("\n").some((l) => /^\s*\|(?:\s*:?-{2,}:?\s*\|)+\s*$/.test(l)),
+      "pptx 표가 파이프 표로 안 나온다").toBe(true);
   });
+});
 
-  it("★ 도해를 **그 슬라이드 자리**에 끼운다 — 순서가 흐트러지면 주제 분해가 무의미하다", () => {
-    // 관계 파일(slideN.xml.rels)로 소속을 알아낸다. 그냥 전부 뒤에 붙이면 어느 주제의
-    // 도해인지 알 수 없어져, 「주제별로」라는 목적 자체가 깨진다.
-    expect(추출, "관계 파일로 소속을 안 찾는다 — 도해가 어느 슬라이드 것인지 모르게 된다")
-      .toContain("_rels/slide%d.xml.rels");
+// ★ 「지워진 갈래가 되살아나면 두 곳이 같은 문서를 다르게 낸다」 — 소스 감시.
+//   되살리고 싶으면 **dataset.ts 쪽을 고치고 이 감시를 함께 지운다**(둘 중 하나만 하면 안 된다).
+describe("파이썬 추출기에 오피스 갈래가 되살아나지 않았다", () => {
+  const PY = readFileSync(join(__dirname, "..", "scripts", "extract_doc.py"), "utf-8");
+  it("extract_doc.py에 오피스 4종 함수가 없다", () => {
+    for (const 이름 of ["def extract_hwpx", "def extract_docx", "def extract_pptx", "def extract_xlsx"]) {
+      expect(PY, `${이름}가 되살아났다 — 오피스는 dataset.ts 한 곳에서만 읽는다(같은 문서가 갈린다)`)
+        .not.toContain(이름);
+    }
   });
-
-  it("노트는 표시를 달아 본문과 섞이지 않는다", () => {
-    expect(추출, "노트 표시가 없다 — 발표 노트가 본문인 척 섞인다").toContain("(노트)");
-  });
-
-  it("없는 파일에 관대하다 — 도해·노트가 없는 덱도 그대로 추출된다", () => {
-    expect(추출, "관계 파일 부재를 안 다룬다 — 도해 없는 덱에서 죽는다").toMatch(/rel not in 있는파일|KeyError/);
+  it("PDF·OCR·구형 거절은 그대로 파이썬 몫이다 — 지우면서 함께 날리지 않았다", () => {
+    expect(PY, "PDF 추출이 사라졌다").toContain("def extract_pdf");
+    expect(PY, "이미지 OCR이 사라졌다").toContain("def ocr_image");
+    expect(PY, "구형(.doc/.hwp) 변환 안내가 사라졌다").toContain('(".doc", ".hwp")');
   });
 });

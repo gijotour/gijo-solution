@@ -78,7 +78,9 @@ async function pdf추출(buf: Buffer): Promise<string> {
   }
 }
 
-/** XML 태그를 걷고 엔티티를 되돌린다 — extract_doc.py의 `_strip_tags`와 **같은 동작**.
+/** XML 태그를 걷고 엔티티를 되돌린다 — 2026-08-22에 extract_doc.py의 `_strip_tags`를 **1:1로**
+ *  옮겨 온 것이다. 그 파이썬 쪽은 2026-09-08에 **지웠다**(한 번도 안 불리는 죽은 갈래였다) —
+ *  이제 오피스 태그 걷기는 **여기가 유일한 구현**이다.
  *
  *  ⚠ 서버에 비슷한 함수가 이미 셋 있는데(urlingest 두 곳·vulnscan) **일부러 안 쓴다.**
  *    vulnscan의 것은 숫자 엔티티(`&#54620;` 같은 한글)를 **공백으로 지우는데** 파이썬은 그대로 둔다 —
@@ -93,11 +95,137 @@ function 태그걷기(xml: string): string {
   return t;
 }
 
-/** 오피스 4종(zip+xml)에서 글자를 뽑는다 — extract_doc.py의 형식별 함수를 **1:1로** 옮긴 것.
+/* ── 표(OOXML <w:tbl>·<a:tbl>)를 파이프 표로 되살린다 (2026-09-08, 갈래 T) ─────────────
+ *
+ * ■ 왜: 지식 조각 4,703개 중 파이프 표를 가진 것이 **0개**였다. 운영 추출본 21편에도 표
+ *   구분자가 아예 없다(탭 0줄·2칸 이상 정렬 0줄). 그런데 원본 오피스 파일에는 표 구조가
+ *   **무손실**로 들어 있다 — 제품소개_발표자료.pptx 표10·셀183, AI_보안제품_기획_v11.docx 표5·셀92,
+ *   GSTS_AICC_PoC_제안요약.pptx 표9·셀391. 아래 갈래가 <w:t>/<a:t>만 긁어서, 표 183칸이 공백으로
+ *   이어붙은 한 덩어리가 되고 「어느 칸이 무슨 열인가」가 통째로 사라지고 있었다.
+ *   (표 안 글자 비중 실측: 발표자료 22.3% · 기획 docx 26.4% · GSTS pptx 47.5%)
+ *
+ * ■ 무엇을 안 하나 — **표 밖 글은 종전과 글자 하나까지 같다.** 표가 없는 문서는 아예 옛 갈래로
+ *   지나가고(아래 `!구간.some(…표)`), 짝 시험(test/tableextract.test.ts)이 골든 문자열로 잰다.
+ * ■ 못 하는 것 — **도형으로 그린 「표처럼 보이는 것」은 복원 불가**다(운영에 보관된 유일한 pptx
+ *   원본 ASM 수지비가 그 꼴이다: OOXML 표 0개). 「표가 살아났다」는 **OOXML 표를 쓴 문서에 한해서**다.
+ */
+
+/** 같은 이름이 겹쳐 있어도 **깊이를 세어** 최상위 구간만 가른다 — 표·행·칸 자르기의 바탕.
+ *
+ *  ⚠ 비탐욕 정규식(`<w:tbl>[\s\S]*?</w:tbl>`)을 쓰면 **표 안의 표**에서 어긋난다: 안쪽 닫는
+ *    태그에서 끊겨 바깥 표의 뒷부분이 본문으로 샌다. 실물 3편은 중첩 깊이가 1이라 **실물로는
+ *    이 결함이 안 드러난다** — 그래서 픽스처(table.docx)에 중첩 표를 일부러 넣었다.
+ *  ⚠ 이름 뒤에 반드시 공백·`/`·`>`가 와야 센다. 안 그러면 `<w:tblPr>`·`<w:tblGrid>`·`<a:tcPr>`를
+ *    표·칸으로 세어 구조가 통째로 어긋난다.
+ *  ⚠ 닫는 태그가 모자라면(망가진 XML) 그 구간을 **표로 안 보고 본문으로** 돌린다 — 종전 동작이다.
+ */
+function 구간나누기(xml: string, tag: string): { 표: boolean; xml: string }[] {
+  const re = new RegExp(`<${tag}(?:\\s[^>]*?)?(/?)>|</${tag}\\s*>`, "g");
+  const out: { 표: boolean; xml: string }[] = [];
+  let 깊이 = 0;
+  let 끝난자리 = 0;
+  let 시작 = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) !== null) {
+    if (m[0].startsWith("</")) {
+      if (깊이 > 0) {
+        깊이 -= 1;
+        if (깊이 === 0) {
+          out.push({ 표: true, xml: xml.slice(시작, re.lastIndex) });
+          끝난자리 = re.lastIndex;
+        }
+      }
+    } else if (m[1] !== "/") {
+      if (깊이 === 0) {
+        out.push({ 표: false, xml: xml.slice(끝난자리, m.index) });
+        시작 = m.index;
+        // ★ 여는 태그 자리에서 **끝난자리도 함께 옮긴다**(자체 검토 2026-09-08에 잡은 결함).
+        //   안 옮기면 표가 끝내 안 닫히는 망가진 XML에서 마지막 push가 `slice(0)`이 되어
+        //   **표 앞 본문이 통째로 두 번** 나온다(같은 글이 조각으로 두 벌 들어간다).
+        //   지금은 안 닫히면 「표 시작부터 끝까지」가 본문으로 한 번만 나온다 = 종전 동작.
+        끝난자리 = m.index;
+      }
+      깊이 += 1;
+    }
+  }
+  out.push({ 표: false, xml: xml.slice(끝난자리) });
+  return out;
+}
+
+/** 최상위 자식(행·칸)만 순서대로 준다 — 중첩된 같은 이름은 바깥 것 **안에** 남는다. */
+const 최상위요소들 = (xml: string, tag: string) => 구간나누기(xml, tag).filter((s) => s.표).map((s) => s.xml);
+
+/** 칸 하나의 글 — **엔티티는 여기서 안 푼다.** 조립이 끝난 뒤 태그걷기()가 한 번에 푼다.
+ *  미리 풀면 `&lt;script&gt;`가 `<script>`가 되고, 마지막 태그걷기가 그것을 **태그로 보고 통째로
+ *  지운다**(칸 내용이 사라진다). 지금 파이프라인은 「조립 → 딱 한 번 푼다」가 계약이다.
+ *  ⚠ `|`는 열 구분자라 이스케이프한다 — 안 하면 열 수가 어긋나 구분선과 안 맞고 표 인지가 깨진다
+ *    (실측: AI_보안제품_기획_v11.docx 추출본에 파이프가 이미 2개 있다).
+ *  ⚠ 공백 압축은 `[ \t\r\n]+`만 — `\s`로 넓히면 줄바꿈아님공백(NBSP)까지 바꿔 종전 글과 갈린다. */
+const 칸글 = (raw: string) => raw.replace(/[ \t\r\n]+/g, " ").replace(/\|/g, "\\|").trim();
+
+/** 한 행의 열 수 상한 — 워드가 실제로 허용하는 열은 63개다. 512는 그 8배로 넉넉하고,
+ *  **자리 채우기가 폭주하는 것을 막는다**: 병합 칸(gridSpan 최대 64)을 잔뜩 넣은 파일 하나가
+ *  「빈 칸 수만 곱해」 원본의 수백 배짜리 글을 만들 수 있다(자체 검토 2026-09-08). */
+const 표_최대열 = 512;
+
+/** 행들을 마크다운 파이프 표로 낸다 — **memory.ts의 표 술어(표줄·구분선·표머리글들)가 읽는 규격**.
+ *  ⚠ 그 잣대를 여기 베끼지 않는다. 정의는 저쪽이 갖고, 추출기는 규격에 맞춰 **내기만** 한다.
+ *  ⚠ 자리 맞춤(패딩)은 안 넣는다 — 꼬리 정규화가 `[ \t]+`를 한 칸으로 접어 어차피 사라진다.
+ *  ⚠ 칸마다 공백을 넣는다 — `|a|b|`처럼 붙여 내면 라틴·숫자 표가 공백비율 0.05 관문
+ *    (ragsanitize.isBinaryLikeChunk)에 걸려 **바이너리로 몰릴** 수 있다. */
+function 파이프표(행들: string[][]): string {
+  const 열수 = Math.min(행들.reduce((a, r) => Math.max(a, r.length), 0), 표_최대열);
+  if (열수 === 0 || 행들.length === 0) return "";
+  // 글자가 하나도 없는 표(빈 격자·자리잡기용)는 지식이 아니다 — 구분선만 남기지 않는다.
+  if (!행들.some((r) => r.some((c) => c !== ""))) return "";
+  const 줄 = (칸들: string[]) => `| ${Array.from({ length: 열수 }, (_, i) => 칸들[i] ?? "").join(" | ")} |`;
+  const 구분 = `| ${Array.from({ length: 열수 }, () => "---").join(" | ")} |`;
+  return [줄(행들[0]), 구분, ...행들.slice(1).map(줄)].join("\n");
+}
+
+/** 워드 표 — `<w:tc>`는 **가로로 병합된 칸을 하나로 접는다**(`<w:gridSpan w:val="n"/>`). 그래서
+ *  뒤에 빈 칸 n-1개를 채워야 다른 행과 열 수가 맞는다. 세로 병합(`<w:vMerge/>`)은 이어지는 행에도
+ *  빈 `<w:tc>`가 그대로 있어 따로 채울 것이 없다.
+ *  ⚠ 병합은 **픽스처로만** 검증됐다 — 실물 3편에는 gridSpan·vMerge·hMerge가 0개다(2026-09-08 실측). */
+function 워드표(xml: string): string {
+  return 파이프표(최상위요소들(xml, "w:tr").map((tr) => {
+    const 칸들: string[] = [];
+    for (const tc of 최상위요소들(tr, "w:tc")) {
+      if (칸들.length >= 표_최대열) break;
+      칸들.push(칸글([...tc.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join(" ")));
+      for (let i = 1; i < 워드가로병합(tc) && 칸들.length < 표_최대열; i += 1) 칸들.push("");
+    }
+    return 칸들;
+  }));
+}
+/** 이 칸이 몇 열을 차지하나. ⚠ **안쪽 표의 gridSpan을 이 칸 것으로 읽지 않게** 안쪽 표 앞만 본다. */
+function 워드가로병합(tc: string): number {
+  const m = /<w:gridSpan\s[^>]*w:val="(\d+)"/.exec(tc);
+  if (!m) return 1;
+  const 안쪽표 = tc.search(/<w:tbl(?:\s[^>]*?)?>/);
+  if (안쪽표 >= 0 && m.index > 안쪽표) return 1;
+  return Math.min(Math.max(Number(m[1]) || 1, 1), 64); // 64열이면 이미 표가 아니다(폭주 방지)
+}
+
+/** pptx 표 — DrawingML은 **격자의 모든 칸에 `<a:tc>`를 둔다.** 병합된 뒤칸은 `hMerge`/`vMerge`
+ *  표시가 붙은 빈 칸이라, 워드와 달리 gridSpan으로 칸을 늘리면 **열이 두 배가 된다.** */
+function 피피티표(xml: string): string {
+  return 파이프표(최상위요소들(xml, "a:tr").map((tr) => 최상위요소들(tr, "a:tc").map((tc) => {
+    const 여는태그 = tc.slice(0, tc.indexOf(">") + 1);
+    if (/\s(?:hMerge|vMerge)="(?:1|true)"/.test(여는태그)) return "";
+    return 칸글([...tc.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]).join(" "));
+  })));
+}
+
+/** 오피스 4종(zip+xml)에서 글자를 뽑는다 — 2026-08-22에 extract_doc.py의 형식별 함수를 **1:1로**
+ *  옮긴 것이다(그 파이썬 갈래는 2026-09-08에 지웠다 — 여기가 유일한 오피스 추출기다).
  *
  *  ⚠ 「더 잘 뽑기」를 하지 않았다. 범위·정규식·엔티티 목록을 원본과 똑같이 맞춘다 —
  *    다르게 뽑으면 예전에 넣은 문서와 새로 넣는 문서의 조각이 갈려 검색 결과가 흔들린다.
  *    개선(예: docx 문단 경계 살리기)은 그 자체로 별도 판단거리다(아래 docx 주석 참조).
+ *  ★ 예외가 하나 생겼다(2026-09-08): **표는 표로 낸다**(위 표 갈래 주석). 표를 버리는 것은
+ *    「원본과 똑같이」가 아니라 원본에 있던 구조를 잃는 것이라, 이 원칙이 지키려던 것과 반대였다.
+ *    ⚠ 그래서 **표가 있는 문서만** 결과가 바뀐다 — 표가 없으면 위 원칙 그대로다.
  */
 /** 파이썬 main()이 **모든 형식에** 마지막으로 거는 정규화 — extract_doc.py 꼬리(`# 낱말 사이를
  *  채운 제어문자` 주석 아래 세 줄)와 같은 동작이어야 한다.
@@ -153,11 +281,23 @@ async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
     // ⚠ 원본은 </w:p>를 개행으로 바꾼 뒤 <w:t> 안쪽만 긁는다 — 그 개행은 태그 **밖**이라
     //   결과에 안 들어간다. 즉 주석의 「문단 경계를 살린다」는 실제로 동작하지 않는다.
     //   여기서도 **그대로 둔다**: 고치면 같은 문서가 예전과 다르게 쪼개진다(별도 판단거리).
+    const 본문글 = (x: string) => [...x.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join(" ");
     for (const n of 이름들) {
       const low = n.toLowerCase();
       if (low !== "word/document.xml" && !/^word\/(header|footer)\d*\.xml$/.test(low)) continue;
       const xml = (await 읽기(n)).replace(/<\/w:p>/g, "\n");
-      parts.push([...xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join(" "));
+      const 구간 = 구간나누기(xml, "w:tbl");
+      // 표가 하나도 없으면 **종전 코드 그대로 한 줄**로 지나간다 — 「표 없는 문서는 글자 하나까지
+      //   같다」를 주석이 아니라 **갈래**로 못박는 자리다(짝 시험이 골든 문자열로 잰다).
+      if (!구간.some((s2) => s2.표)) { parts.push(본문글(xml)); continue; }
+      const 블록: string[] = [];
+      for (const s of 구간) {
+        const 글 = s.표 ? 워드표(s.xml) : 본문글(s.xml).trim();
+        if (글) 블록.push(글);
+      }
+      // 표 앞뒤에 **빈 줄**을 둔다 — 붙여 놓으면 뒤 표의 머리글이 앞 표의 본문 행으로 읽히고
+      //   (마크다운 표는 빈 줄에서 끝난다), 청커도 두 표를 한 블록으로 뭉뚱그린다.
+      parts.push(블록.join("\n\n"));
     }
     return 파이썬꼬리정규화(태그걷기(parts.join("\n")));
   }
@@ -171,10 +311,21 @@ async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
         const 번호 = (n: string) => Number((n.match(/(\d+)\.xml$/) ?? ["", "0"])[1]);
         return 갈래(a) - 갈래(b) || 번호(a) - 번호(b);
       });
+    const 본문글 = (x: string) => [...x.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]);
     for (const n of 대상) {
       const xml = await 읽기(n);
-      const texts = [...xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]);
-      if (texts.length) parts.push(texts.join(" "));
+      const 구간 = 구간나누기(xml, "a:tbl");
+      if (!구간.some((s2) => s2.표)) {   // 표 없음 — 종전 그대로 지나간다(위 docx와 같은 이유)
+        const texts = 본문글(xml);
+        if (texts.length) parts.push(texts.join(" "));
+        continue;
+      }
+      const 블록: string[] = [];
+      for (const s of 구간) {
+        const 글 = s.표 ? 피피티표(s.xml) : 본문글(s.xml).join(" ").trim();
+        if (글) 블록.push(글);
+      }
+      if (블록.length) parts.push(블록.join("\n\n"));
     }
     return 파이썬꼬리정규화(태그걷기(parts.join("\n\n")));
   }

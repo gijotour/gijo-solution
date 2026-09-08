@@ -1,17 +1,16 @@
-# scripts/extract_doc.py — 문서(PDF/HWPX/DOCX/XLSX/PPTX/TXT 등)에서 학습용 텍스트를 추출한다.
+# scripts/extract_doc.py — **스캔 PDF·이미지(OCR)와 구형 포맷 거절**만 맡는다.
 #
-# dataset.ts의 /api/dataset/extract가 업로드된 문서를 임시 저장한 뒤 이 스크립트를 호출한다.
+# dataset.ts의 extractDocumentText가 여기로 못 넘기는 것만 보낸다. 오피스 4종(hwpx·docx·xlsx·
+# pptx)과 글자 있는 PDF는 **서버가 파이썬 없이 직접 읽는다**(dataset.ts 오피스추출·pdf추출).
 # stdout으로 순수 텍스트를 내보낸다(PYTHONUTF8=1로 실행 — 한국어 깨짐 방지).
-# 지원: .pdf(pypdf) · .hwpx/.docx/.xlsx/.pptx(전부 zip+xml — 의존성 0) · .txt/.md/.csv/.log.
-# ⚠ 2026-08-21 사장님 「들어오는 문서·파일부터 잘 동작하는 게 핵심」 — 접수 목록(memory.ts
-#   추출필요)은 docx·xlsx·pptx까지 받는데 여기가 「지원하지 않는 형식」으로 죽어 있었다.
-#   OOXML 계열은 HWPX와 같은 zip+xml이라 pypdf 같은 부품 없이 그대로 푼다(폐쇄망 이득).
-#   .doc/.hwp(구형 바이너리)는 정직하게 변환 안내를 낸다 — 어설픈 추출이 쓰레기 지식을 만든다.
+# 지원: .pdf(pypdf+OCR 폴백) · 이미지(OCR) · .txt/.md/.csv/.log/.json · .doc/.hwp는 변환 안내로 거절.
+# ⚠ 2026-09-08 — 오피스 4종 갈래를 지웠다. 2026-08-22에 서버로 옮긴 뒤 **한 번도 안 불렸는데**
+#   시험은 이 파일을 소스로 검사해 초록이었다(제품이 안 지키는 약속을 시험이 지킨다고 말했다).
+#   자세한 사정은 아래 「오피스 4종은 여기 없다」 주석에 적었다.
 
 import sys
 import os
 import re
-import zipfile
 
 
 def extract_pdf(path: str) -> str:
@@ -169,113 +168,18 @@ def _ocr_실패문구(e: BaseException) -> str:
     return OCR_BROKEN_MSG if 깨짐 else OCR_MISSING_MSG
 
 
-def extract_hwpx(path: str) -> str:
-    # HWPX는 OWPML 포맷의 zip. Contents/section*.xml 안의 <hp:t> 텍스트를 모은다.
-    z = zipfile.ZipFile(path)
-    parts = []
-    for name in z.namelist():
-        if "section" in name.lower() and name.endswith(".xml"):
-            xml = z.read(name).decode("utf-8", "ignore")
-            parts.append(" ".join(re.findall(r"<hp:t>(.*?)</hp:t>", xml, re.S)))
-    text = re.sub(r"<[^>]+>", "", " ".join(parts))
-    # HTML 엔티티 최소 복원
-    for a, b in [("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&"), ("&quot;", '"')]:
-        text = text.replace(a, b)
-    return text
-
-
-def _strip_tags(xml: str) -> str:
-    text = re.sub(r"<[^>]+>", "", xml)
-    for a, b in [("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&"), ("&quot;", '"'), ("&apos;", "'")]:
-        text = text.replace(a, b)
-    return text
-
-
-def extract_docx(path: str) -> str:
-    # DOCX = OOXML zip. 본문 word/document.xml + 머리말·꼬리말의 <w:t> 텍스트를 모은다.
-    # <w:p>(문단) 경계는 줄바꿈으로 살린다 — 다 이어붙이면 조각(chunk) 경계가 망가진다.
-    z = zipfile.ZipFile(path)
-    parts = []
-    for name in z.namelist():
-        low = name.lower()
-        if low == "word/document.xml" or re.match(r"word/(header|footer)\d*\.xml$", low):
-            xml = z.read(name).decode("utf-8", "ignore")
-            xml = re.sub(r"</w:p>", "\n", xml)
-            parts.append(" ".join(re.findall(r"<w:t(?:\s[^>]*)?>(.*?)</w:t>", xml, re.S)))
-    return _strip_tags("\n".join(parts))
-
-
-def extract_pptx(path: str) -> str:
-    # PPTX = zip. 슬라이드(ppt/slides/slideN.xml)와 노트의 <a:t> 텍스트를 슬라이드 순서대로.
-    #
-    # ★ 2026-08-29 확장 (사장님 「데이터 파일 파싱을 잘해야 하는 게 핵심, 문서함에 주제별로」)
-    #   ① **도해·차트 글자를 회수한다.** 그전엔 ppt/slides·notesSlides만 읽어 SmartArt
-    #      (ppt/diagrams/data*.xml)와 차트(ppt/charts/chart*.xml) 안 글자를 통째로 놓쳤다 —
-    #      도해가 많은 벤더 덱은 본문이 거의 비었다(2026-08-23 SafeBreach 실측으로 확인한 공백).
-    #      슬라이드와 도해를 잇는 관계 파일(slideN.xml.rels)로 **어느 슬라이드의 도해인지**를
-    #      알아내 그 슬라이드 자리에 끼운다 — 순서가 흐트러지면 주제 분해가 무의미해진다.
-    #   ② **슬라이드 경계를 남긴다.** 「[슬라이드 N]」 표시가 있어야 뒤에서 목차·「N.」 소속
-    #      표시를 근거로 주제별로 자를 수 있다. 사람이 읽어도 어디 슬라이드인지 보인다.
-    z = zipfile.ZipFile(path)
-    있는파일 = set(z.namelist())
-
-    def 글자(name: str) -> list:
-        try:
-            xml = z.read(name).decode("utf-8", "ignore")
-        except KeyError:
-            return []
-        # <a:t>는 슬라이드·도해 공통, <c:v>는 차트 축·계열 이름
-        return [t for t in re.findall(r"<a:t>(.*?)</a:t>|<c:v>(.*?)</c:v>", xml, re.S) for t in t if t]
-
-    # 슬라이드 → 딸린 도해·차트 파일 목록 (관계 파일에서 뽑는다)
-    def 딸린것(slide_no: int) -> list:
-        rel = "ppt/slides/_rels/slide%d.xml.rels" % slide_no
-        if rel not in 있는파일:
-            return []
-        xml = z.read(rel).decode("utf-8", "ignore")
-        out = []
-        for target in re.findall(r'Target="([^"]+)"', xml):
-            t = target.replace("../", "ppt/")
-            if re.match(r"ppt/(diagrams/data|charts/chart)\d+\.xml$", t) and t in 있는파일:
-                out.append(t)
-        return out
-
-    슬라이드번호 = sorted(
-        int(re.search(r"slide(\d+)\.xml$", n).group(1))
-        for n in 있는파일 if re.match(r"ppt/slides/slide\d+\.xml$", n)
-    )
-    parts = []
-    for no in 슬라이드번호:
-        조각 = 글자("ppt/slides/slide%d.xml" % no)
-        for 딸림 in 딸린것(no):
-            조각 += 글자(딸림)  # 도해·차트 글자를 그 슬라이드 자리에
-        노트 = 글자("ppt/notesSlides/notesSlide%d.xml" % no)
-        if 조각 or 노트:
-            본문 = " ".join(조각)
-            if 노트:
-                본문 += "\n(노트) " + " ".join(노트)
-            parts.append("[슬라이드 %d] %s" % (no, 본문))
-    return _strip_tags("\n\n".join(parts))
-
-
-def extract_xlsx(path: str) -> str:
-    # XLSX = zip. 글자 셀은 대부분 공유 문자열(xl/sharedStrings.xml)에 있다 — 그것을 주로 모으고,
-    # 시트 안 인라인 문자열(<is><t>)도 함께 줍는다. 숫자 격자는 지식 문장이 아니라 버린다
-    # (숫자만 뽑아 이어붙이면 검색을 오염시키는 무의미 조각이 된다 — PDF 바이트 사고와 같은 부류).
-    z = zipfile.ZipFile(path)
-    parts = []
-    for name in z.namelist():
-        low = name.lower()
-        if low == "xl/sharedstrings.xml":
-            xml = z.read(name).decode("utf-8", "ignore")
-            parts.append("\n".join(re.findall(r"<t(?:\s[^>]*)?>(.*?)</t>", xml, re.S)))
-        elif re.match(r"xl/worksheets/sheet\d+\.xml$", low):
-            xml = z.read(name).decode("utf-8", "ignore")
-            inline = re.findall(r"<is>\s*<t(?:\s[^>]*)?>(.*?)</t>\s*</is>", xml, re.S)
-            if inline:
-                parts.append("\n".join(inline))
-    return _strip_tags("\n".join(parts))
-
+# ── 오피스 4종(hwpx·docx·pptx·xlsx)은 **여기 없다** (2026-09-08 삭제) ───────────────
+#   2026-08-22에 서버(dataset.ts 오피스추출)가 zip+xml을 직접 읽게 옮긴 뒤로, 이 스크립트의
+#   오피스 갈래는 **한 번도 불린 적이 없다** — dataset.ts:extractDocumentText가 파이썬을 부르기
+#   전에 오피스 4종을 먼저 가로챈다(파이썬 없는 mac 설치본에서 한글 문서가 통째로 안 읽히던
+#   사고를 그때 그렇게 막았다).
+#   그런데 시험(test/pptxextract.test.ts)은 **이 파일을 소스로** 검사해 초록이었다 — 제품이
+#   안 지키는 약속(「[슬라이드 N]」·SmartArt/차트 회수·「(노트)」)을 시험이 지킨다고 말하는
+#   상태였다. 죽은 코드를 남겨 두면 언젠가 두 갈래가 **같은 문서를 다르게** 내고, 그때 옛 조각과
+#   새 조각이 갈린다. 그래서 지운다 — 못 옮긴 약속 3종은 백로그다(보고서 참조).
+#   ⚠ 되살리지 말 것. 오피스는 server/src/engine/dataset.ts 한 곳에서만 읽는다
+#     (짝 시험 test/pptxextract.test.ts가 이 파일에 오피스 갈래가 되살아나면 빨개진다).
+#   ⚠ .doc/.hwp(구형 바이너리) 거절은 **아래 main()에 그대로 있다** — 그건 파이썬이 맡는다.
 
 def main() -> None:
     if len(sys.argv) < 2:
@@ -318,14 +222,8 @@ def main() -> None:
                 print(f"ERROR: 이미지에서 글자를 찾지 못했습니다: {os.path.basename(path)} "
                       f"(글자가 없거나 너무 흐립니다)", file=sys.stderr)
                 sys.exit(2)
-        elif ext == ".hwpx":
-            text = extract_hwpx(path)
-        elif ext == ".docx":
-            text = extract_docx(path)
-        elif ext == ".pptx":
-            text = extract_pptx(path)
-        elif ext == ".xlsx":
-            text = extract_xlsx(path)
+        # ⚠ 오피스 4종(.hwpx/.docx/.pptx/.xlsx)은 **여기로 오지 않는다** — dataset.ts가 먼저
+        #   가로채 zip+xml로 직접 읽는다. 갈래를 되살리면 두 곳이 같은 문서를 다르게 낸다.
         elif ext in (".doc", ".hwp"):
             # 구형 바이너리 — 어설프게 뽑으면 깨진 조각이 지식이 된다(정직 원칙). 변환을 안내한다.
             새이름 = "docx" if ext == ".doc" else "hwpx"
@@ -335,6 +233,8 @@ def main() -> None:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 text = f.read()
         else:
+            # ⚠ 안내 문구는 **제품 전체가 읽는 형식**을 적는다 — 오피스 4종은 서버가 읽으므로
+            #   여기 안 온다. 목록에서 빼면 담당자가 「docx는 안 되는구나」로 잘못 읽는다.
             print(f"ERROR: 지원하지 않는 형식입니다: {ext} (지원: pdf, hwpx, docx, pptx, xlsx, txt, md, csv, log, 이미지 png/jpg/tiff/bmp/webp)", file=sys.stderr)
             sys.exit(2)
     except Exception as e:  # noqa
