@@ -9,6 +9,8 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { 말투위반 } from "../src/engine/tone";
+// 건너뛸 사유 문구는 **한 곳**에 산다 — 파일마다 따로 적으면 어긋난다(2026-09-08).
+import { 건너뛸사유 } from "../../tools/opssim-evidence.mjs";
 
 const 기록 = path.join(__dirname, "../../.tmp-reports/ops-sim.json");
 
@@ -29,6 +31,12 @@ const 답들: { q: string; out: string }[] = (() => {
 // 반쪽 기록으로는 "오탐 0"을 증명할 수 없다 — 그럴 땐 통과시키지 말고 **건너뛴다**.
 // ⚠ 건너뜀은 화면에 skipped로 보인다. 조용히 통과시키는 것과 다르다.
 const 잴수있음 = 답들.length >= 50;
+
+// ⏭ **왜 건너뛰는지를 로그에 찍는다**(2026-09-08). skipped 한 글자만 보이면 다음 사람은
+//   고장으로 읽고 재료를 옮기려 든다 — 그런데 gb10 사본에서 재료가 없는 것은 **일부러다**
+//   (이 기록에 등급 C 사내 문답 조각이 평문으로 담겨 원격으로 안 내보낸다). 그 사실을 여기서 말한다.
+const 사유 = 건너뛸사유(fs.existsSync(기록), 답들.length);
+if (사유) console.log(`⏭ 말투 감시 — 실전 답 대조를 건너뜁니다 · ${사유}`);
 
 describe.skipIf(!잴수있음)(`★ 말투 감시 — 실전 답변 ${답들.length}건으로 오탐 0`, () => {
 

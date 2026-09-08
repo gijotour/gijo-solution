@@ -19,7 +19,26 @@
 //   · 되물음·폴백               — 못 알아들었다
 //
 // ⚠ qa=true로 돌린다(학습·세션 오염 없음). 도는 동안 같은 계정으로 앱에 로그인하지 말 것.
-// 사용: QA_USER=claude-deploy QA_PASS=… node tools/ops-sim.mjs [--limit N]
+// 사용: QA_USER=claude-deploy QA_PASS=… node tools/ops-sim.mjs [--limit N] [--only "⑯"] [--out 이름] [--no-evidence]
+//
+// ── 🔒 `--no-evidence` (또는 `GIJO_OPSSIM_EVIDENCE=0`) — 근거 조각 **본문**을 안 적는다 ─────
+//
+// ★ 무엇이 걸려 있나(2026-09-08): 이 기록(.tmp-reports/ops-sim.json)에는 가드가 본
+//   **근거 조각 본문이 평문으로** 담긴다. 하네스 계정이 claude-deploy(admin)라
+//   **등급 C(기밀) 사내 문답 조각**까지 그대로 들어간다. 파일은 gitignore라 커밋되진 않지만
+//   기계에는 남고, 매일 덮어써도 **최신 회차 한 벌은 늘 남아 있다.**
+//
+// ★ 그래도 왜 안 지우나(사장님 결정): 이 칸이 citeguard 재생 41건을 잣대로 되돌린다 —
+//   되먹임 값어치가 크다. 그래서 「지우지 않는다 + **출하 전 되돌리기 목록에 등재** +
+//   **끄는 스위치**」로 정했다. 원격(gb10) 사본으로 나가는 길은 따로 막았다(tools/gb10-test.sh).
+//
+// ★ 어디서 끄나: 파일럿·출하·시연 기계. 개발 기계(win)는 **기록이 기본**이라
+//   tools/nightly-ops-sim.ps1은 이 플래그를 주지 않는다(일부러 그대로 둔다).
+//   되돌리기 목록: GIJO_AS_AI팀_증류학습_계획서.md 「출하 전 되돌리기」 절.
+//
+// ⚠ 껐어도 **가드횟수는 남긴다.** 칸이 통째로 사라지면 「옛 서버라 못 받았다」와 구별이 안 돼
+//   다음 사람이 설계를 고장으로 읽는다 — 「일부러 안 적었다」가 기록에 보여야 한다.
+//   판정과 칸 만들기는 tools/opssim-evidence.mjs 한 곳에 산다(시험이 물 수 있게).
 import fs from "node:fs";
 import path from "node:path";
 // ⚠ 내용 판정 규칙 가운데 **혼자서도 잴 수 있는 것**은 저쪽에 산다 — 이 파일은 불러들이는 순간
@@ -33,6 +52,9 @@ import {
 // 보고서의 **내용 실패 상세** 대목도 같은 이유로 저쪽에 산다(2026-09-06 D4) — 가짜 결과를 넣어
 //   md를 만들어 보는 시험이 있어야 「상세가 빠진 보고서」가 조용히 배포되지 않는다.
 import { 내용실패상세 } from "./opssim-report.mjs";
+// 근거 칸을 적을지 말지와 그 칸 만들기도 같은 이유로 저쪽에 산다(2026-09-08) — 스위치를 켰는데
+//   조각이 적히면 그것이 곧 사고인데, 여기 두면 시험이 부를 수가 없다.
+import { 근거기록할까, 근거칸 } from "./opssim-evidence.mjs";
 
 const BASE = process.env.GIJO_SERVER_URL || "http://localhost:4000";
 const USER = process.env.QA_USER || "claude-deploy";
@@ -105,6 +127,10 @@ const 결과파일 = path.join(OUT, 파일이름 + ".json");
 const 메타파일 = path.join(OUT, 파일이름 + ".meta.json");
 const 보고서파일 = path.join(OUT, 파일이름 + ".md");
 const 쓰는중파일 = 결과파일 + ".partial";
+
+// 🔒 근거 조각 본문을 이 회차 기록에 적을 것인가 — 판정은 opssim-evidence.mjs 한 곳(위 머리말).
+//   ⚠ 값을 받는 인자가 아니다 → 값인자()를 안 쓴다(`--no-evidence 5` 같은 꼴을 만들지 않는다).
+const 근거기록 = 근거기록할까();
 
 // ── 하루의 흐름 ─────────────────────────────────────────────────────
 // 각 마당(場)은 담당자가 실제로 앉아 있는 자리다. q는 그 자리에서 나오는 말.
@@ -940,9 +966,9 @@ async function 물어보기(H, text, screen, sessionId) {
       //   ⚠ **자르지 않는다** — 겹침 판정 창이 20자라 조각 꼬리를 자르면 라이브엔 없던 빨강이 난다.
       //   ⚠ 조각 `null`은 판정 보류(RAG 미실행·검색 실패)로 `[]`(0건)과 뜻이 다르다 — 뭉개지 말 것.
       //   ⚠ 서버가 옛 판이면 j.근거원천이 없다 → 칸이 통째로 안 생기고, 시험은 종전 갈래로 돈다.
-      ...(j.근거원천
-        ? { 근거조각: j.근거원천.조각, 추가원천: j.근거원천.추가원천, 가드횟수: j.근거원천.보고횟수 }
-        : {}),
+      //   🔒 --no-evidence면 본문(조각·추가원천)을 빼고 **가드횟수 + 근거기록끔**만 남긴다.
+      //      칸 이름을 여기서 직접 쓰지 않는다 — 쓰면 스위치를 우회하는 두 번째 잣대가 생긴다.
+      ...근거칸(j.근거원천, 근거기록),
     };
   } catch (e) {
     return { out: "", action: "ERROR", ms: Date.now() - t0, err: String(e).slice(0, 120) };
@@ -964,7 +990,9 @@ const 대상 = 제한 ? 고름.slice(0, 제한) : 고름;
 
 console.log(`■ 보안담당자 하루 실전 — ${마당.length}마당 · ${문항.length}상황${대상.length !== 문항.length ? ` (이번엔 ${대상.length}${고른마당 ? ` · --only "${고른마당}"` : ""})` : ""}`);
 console.log(`  결과 파일: ${파일이름}.json / .meta.json / .md`);
-console.log(`  ${BASE} · ${USER} · qa=true\n`);
+console.log(`  ${BASE} · ${USER} · qa=true`);
+// 🔒 끈 회차는 **시작할 때 말한다** — 끝나고 기록을 열어 보고서야 아는 것은 늦다.
+console.log(`  근거 조각 기록: ${근거기록 ? "함(개발 기계 기본 — 등급 C 조각이 평문으로 남는다)" : "안 함(--no-evidence · 가드횟수만 남긴다)"}\n`);
 
 const t0 = Date.now();
 const 결과 = [];
@@ -996,6 +1024,9 @@ try {
     총문항: 문항.length,        // 이 판본의 하네스가 가진 전 문항 수 — 늘어나면 여기가 같이 는다
     기록: 대상.length,          // 이번 회차가 실제로 물어본 수(--limit면 더 적다)
     완주: 대상.length === 문항.length,
+    // 🔒 이번 회차가 근거 조각 본문을 적었나 — 기록만 보고 「왜 조각이 없지」를 되짚지 않게
+    //   회차 메타가 먼저 말한다(false면 --no-evidence·GIJO_OPSSIM_EVIDENCE=0으로 돈 것이다).
+    근거기록: 근거기록,
     시각: new Date().toISOString(),
   }, null, 1), "utf8");
   fs.renameSync(쓰는중파일, 결과파일);

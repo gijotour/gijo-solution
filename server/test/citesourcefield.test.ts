@@ -26,6 +26,10 @@ const 잎소스 = 읽기("engine/citesource.ts");
 const llm소스 = 읽기("engine/llm.ts");
 const 하네스소스 = fs.readFileSync(path.join(__dirname, "..", "..", "tools", "ops-sim.mjs"), "utf8");
 const 재생시험소스 = fs.readFileSync(path.join(__dirname, "citeguard.test.ts"), "utf8");
+// 🔒 2026-09-08 — 칸 만들기가 하네스에서 **갈라져 나갔다**(--no-evidence 스위치를 시험이 물 수
+//   있게). 고리 ④는 그래서 두 파일을 함께 본다: 하네스가 그 함수를 부르는가 · 그 함수가
+//   세 칸을 자르지 않고 적는가. 스위치 자체의 반증은 opssimevidence.test.ts가 진다.
+const 근거모듈소스 = fs.readFileSync(path.join(__dirname, "..", "..", "tools", "opssim-evidence.mjs"), "utf8");
 
 describe("★ 잎 통로 — 그릇이 있을 때만 담는다(사람 응답에는 아무 일도 안 난다)", () => {
   it("그릇이 없으면 무동작이다 — 보고해도 아무 데도 안 쌓인다", () => {
@@ -163,10 +167,15 @@ describe("★ 가운데 고리 — 소스 감시(배선이 끊기면 조용히 �
   });
 
   it("★★ 고리 ④ 하네스가 그 칸을 **세 칸 그대로** 행에 적는다", () => {
+    // ① 하네스는 **공용 잣대를 통해** 적는다 — 인라인으로 되돌리면 --no-evidence를 우회한다.
     expect(하네스소스, "하네스가 근거원천을 안 받는다 — 서버가 실어 줘도 기록에 안 남는다")
-      .toContain("{ 근거조각: j.근거원천.조각, 추가원천: j.근거원천.추가원천, 가드횟수: j.근거원천.보고횟수 }");
+      .toContain("...근거칸(j.근거원천, 근거기록),");
+    expect(하네스소스, "공용 잣대를 안 가져온다").toContain('from "./opssim-evidence.mjs"');
+    // ② 그 잣대가 세 칸을 그대로 적는다.
+    expect(근거모듈소스, "근거칸이 세 칸을 안 적는다 — 서버가 실어 줘도 기록에 안 남는다")
+      .toMatch(/근거조각:\s*근거원천\.조각[\s\S]{0,120}추가원천:\s*근거원천\.추가원천[\s\S]{0,120}가드횟수:\s*근거원천\.보고횟수/);
     // ⚠ 자르지 않는다 — 겹침 판정 창이 20자라 조각 꼬리를 자르면 라이브엔 없던 빨강이 난다.
-    const 적는줄 = 하네스소스.slice(하네스소스.indexOf("j.근거원천.조각") - 200, 하네스소스.indexOf("j.근거원천.보고횟수") + 60);
+    const 적는줄 = 근거모듈소스.slice(근거모듈소스.indexOf("근거원천.조각") - 200, 근거모듈소스.indexOf("근거원천.보고횟수") + 60);
     expect(적는줄, "조각을 잘라 적는다 — 겹침 창(20자)이 깨져 없던 빨강이 난다").not.toMatch(/\.slice\(/);
   });
 

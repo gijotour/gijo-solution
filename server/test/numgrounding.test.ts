@@ -14,6 +14,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { 숫자가원천에있나, 실적수치뽑기, 실적수치제외_RE, guardCitations } from "../src/engine/citeguard";
 import { 숫자무근거배너, 근거없음종류판정 } from "../src/engine/noevidence";
+// 건너뛸 사유 문구는 **한 곳**에 산다 — 파일마다 따로 적으면 어긋난다(2026-09-08).
+import { 건너뛸사유 } from "../../tools/opssim-evidence.mjs";
 
 describe("★ 뽑기 — 무엇을 수치로 보나", () => {
   it("백분율을 뽑는다(사고 문장 그대로)", () => {
@@ -214,6 +216,12 @@ const 답들: { q: string; out: string; 도구: string[]; action: string }[] = (
       .filter((x: { out: string }) => x.out.trim().length > 0);
   } catch { return []; }
 })();
+
+// ⏭ **왜 건너뛰는지를 로그에 찍는다**(2026-09-08). skipped 한 글자만 보이면 다음 사람은
+//   고장으로 읽고 재료를 옮기려 든다 — 그런데 gb10 사본에서 재료가 없는 것은 **일부러다**
+//   (이 기록에 등급 C 사내 문답 조각이 평문으로 담겨 원격으로 안 내보낸다). 그 사실을 여기서 말한다.
+const 사유 = 건너뛸사유(fs.existsSync(기록), 답들.length);
+if (사유) console.log(`⏭ 숫자접지 — 실전 답 대조를 건너뜁니다 · ${사유}`);
 
 /**
  * **관문이 원리상 닿는 답**만 고른다 — 이 관문의 모집단은 「전부」가 아니다.
