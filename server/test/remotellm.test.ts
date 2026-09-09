@@ -90,7 +90,12 @@ describe("remoteLlmBaseUrl — 채팅이 실제로 볼 게터", () => {
   });
 });
 
-describe("★ 배선 — 게터가 실제로 채팅·재작성 경로에 물려 있다 (소스 감시)", () => {
+/** 그 파일이 원격 게터 모듈을 **실제로 무는가** — 주석에 이름만 적힌 것은 안 센다. */
+function 원격게터를문다(src: string): boolean {
+  return /(?:from|import\()\s*["'][^"']*remotellm/.test(src);
+}
+
+describe("★ 배선 — 게터가 실제로 채팅 경로에 물려 있다 (소스 감시)", () => {
   // 함수만 있고 안 부르면 「설계는 됐고 쓰인 적 없다」다 — 이 저장소의 반복 유형.
   it("llm.ts가 원격 게터를 ensureAgentModel **앞에서** 본다", () => {
     const src = fs.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
@@ -101,10 +106,31 @@ describe("★ 배선 — 게터가 실제로 채팅·재작성 경로에 물려 
     // 토큰 헤더가 실제로 fetch에 붙는다(토큰 인증의 배선).
     expect(src, "원격 토큰 헤더가 fetch에 안 붙는다").toMatch(/\.\.\.원격헤더/);
   });
-  it("searchrewrite.ts도 같은 게터를 본다 — 채팅만 원격이면 재작성이 로컬을 찾다 죽는다", () => {
-    const src = fs.readFileSync(new URL("../src/engine/searchrewrite.ts", import.meta.url), "utf8");
-    expect(src).toMatch(/remoteLlmTarget/);
-    expect(src, "통로가 아직 상수다").toMatch(/async function 통로\(\)/);
+  // ★ 2026-09-10 뒤집혔다. 예전 이 자리엔 「searchrewrite.ts도 같은 게터를 본다」가 있었다 —
+  //   그게 실결함이었다. 재작성은 `chat()`을 안 거쳐 **팀원별 두뇌 위치를 못 보고** 전역만 따랐고,
+  //   win 운영 실측(2026-09-10)에서 리포트·해설만 원격으로 배정했는데도 **로컬로 둔** 총괄·분석
+  //   경로의 물음이 5.4초 → 57초가 됐다(전역을 끄니 8.2초). 두 겹 관문(① 전역 ON ② 팀원 opt-in)의
+  //   뜻이 곁가지 하나 때문에 무너진 것이다. 그래서 재작성은 언제나 로컬로 못 박았다.
+  it("★ chat()을 안 거치고 원격 게터를 직접 무는 도우미가 없다 (engine 전수)", () => {
+    // 파일 목록을 손으로 적지 않는다 — 새로 생기는 곁가지를 잡는 것이 이 검사의 전부다.
+    // 원격을 쓰고 싶은 도우미는 llm.ts의 chat()을 거치게 한다(거기 두 겹 관문이 있다).
+    const 문것: string[] = [];
+    const 훑기 = (d: URL, prefix = "") => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (e.isDirectory()) 훑기(new URL(e.name + "/", d), prefix + e.name + "/");
+        else if (e.name.endsWith(".ts") && e.name !== "remotellm.ts" && e.name !== "llm.ts") {
+          if (원격게터를문다(fs.readFileSync(new URL(e.name, d), "utf8"))) 문것.push(prefix + e.name);
+        }
+      }
+    };
+    훑기(new URL("../src/engine/", import.meta.url));
+    expect(
+      문것.join(", "),
+      "이 파일들이 원격 게터를 직접 문다 — 팀원 두뇌 위치를 못 본 채 전역만 따라간다(5.4초→57초의 그 모양)",
+    ).toBe("");
+    // ⚠ 헛돎 방지: 정작 llm.ts가 안 물고 있으면 이 검사는 아무것도 안 지킨다.
+    const llm = fs.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
+    expect(원격게터를문다(llm), "llm.ts가 원격 게터를 안 문다 — 이 검사의 근거가 바뀐 것이다").toBe(true);
   });
   it("라우트 3개가 등록돼 있다(app.ts)", () => {
     const src = fs.readFileSync(new URL("../src/app.ts", import.meta.url), "utf8");

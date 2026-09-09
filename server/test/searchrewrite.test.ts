@@ -10,8 +10,11 @@
 // ■ ⚠ 이 시험이 지키는 것은 성능이 아니라 **안전**이다.
 //   모델이 없거나 느리거나 이상한 답을 줘도 **빈 문자열**을 돌려주고 검색은 원문으로 간다.
 //   시험 환경엔 모델이 없다 — 그래서 여기서 「없을 때 안 죽는가」가 그대로 검증된다.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import fs from "node:fs";
 import { rewriteForSearch } from "../src/engine/searchrewrite";
+import { db } from "../src/db";
+import { remoteLlmTarget } from "../src/engine/remotellm";
 
 describe("★ 질의 재작성 — 없으면 조용히 빠진다", () => {
   it("모델이 없어도 던지지 않고 빈 문자열을 준다", async () => {
@@ -43,5 +46,58 @@ describe("★ 질의 재작성 — 없으면 조용히 빠진다", () => {
     const a = await rewriteForSearch(q);
     const b = await rewriteForSearch(q);
     expect(a).toBe(b);
+  });
+});
+
+// ── ★ 두뇌 위치 — 재작성은 **언제나 로컬**이다 (2026-09-10 win 운영 실측 수리) ──────────────
+//
+// ■ 무엇이 있었나: 원격 두뇌(gb10)를 전역으로 켜고 **리포트·해설 팀원만** 원격으로 배정했는데,
+//   로컬로 둔 총괄·분석 경로의 물음 「Log4Shell 위험 분석해줘」가 **5.4초 → 57초**가 됐다.
+//   재작성이 `chat()`을 안 거쳐 팀원별 두뇌 위치 판정에 안 걸리고 **전역만** 따랐기 때문이다.
+//   짧고(40토큰) 지연에 민감하며(RAG 앞단) 한 물음당 한 번 더 도는 왕복이라, 원격 콜드 40초+를
+//   태울 자리가 아니다. 전역을 끄자 8.2초로 돌아왔다.
+// ■ 이 시험이 지키는 것: 「전역이 켜져 있어도 로컬로 간다」 — 행동으로 한 번, 소스로 한 번.
+describe("★ 재작성은 전역 원격이 켜져 있어도 로컬로 간다", () => {
+  const put = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+  const del = db.prepare("DELETE FROM app_state WHERE key = ?");
+
+  afterEach(() => {
+    del.run("remote_llm");
+    vi.unstubAllGlobals();
+  });
+
+  it("원격 목표가 살아 있어도 fetch는 로컬 통로로만 나간다", async () => {
+    put.run("remote_llm", JSON.stringify({ enabled: true, url: "http://10.8.0.12:8080/v1?token=시험토큰", lastCheck: null }));
+    // ⚠ 헛돎 방지 — 전역 스위치가 **정말** 켜졌는지 먼저 확인한다. 안 그러면 「원격을 안 불렀다」가
+    //   그저 원격이 꺼져 있어서일 수 있다(거짓 초록). 원격이 켜진 상태를 이 두 줄이 증명한다.
+    const 목표 = remoteLlmTarget();
+    expect(목표?.baseUrl, "전역 원격이 안 켜졌다 — 이 시험이 헛돈다").toBe("http://10.8.0.12:8080/v1");
+    expect(목표?.headers["x-gijo-serve-token"], "토큰이 헤더로 안 갈렸다").toBe("시험토큰");
+
+    const 부른곳: { url: string; headers: Record<string, string> }[] = [];
+    vi.stubGlobal("fetch", async (u: unknown, init: { headers?: Record<string, string> } = {}) => {
+      부른곳.push({ url: String(u), headers: { ...(init.headers ?? {}) } });
+      return { ok: true, json: async () => ({ choices: [{ message: { content: "Log4Shell 위험 분석" } }] }) };
+    });
+
+    const r = await rewriteForSearch("Log4Shell 위험 분석해줘 어디부터 봐야 하지?");
+    expect(부른곳.length, "재작성이 아예 안 불렸다 — 시험 전제가 깨졌다").toBe(1);
+    expect(부른곳[0].url, "재작성이 원격으로 나갔다 — 로컬로 둔 팀원의 물음까지 원격 왕복을 탄다").toBe(
+      "http://127.0.0.1:59999/v1/chat/completions",
+    );
+    expect(부른곳[0].headers["x-gijo-serve-token"], "로컬 호출에 원격 토큰이 붙었다").toBeUndefined();
+    expect(r, "로컬이 준 답이 채택되지 않았다").toBe("Log4Shell 위험 분석");
+  });
+
+  it("★ 소스 감시 — 원격 게터를 다시 물면 빨강", () => {
+    const src = fs.readFileSync(new URL("../src/engine/searchrewrite.ts", import.meta.url), "utf8");
+    const 문다 = (s: string) => /(?:from|import\()\s*["'][^"']*remotellm/.test(s);
+    expect(
+      문다(src),
+      "재작성이 원격 게터를 다시 문다 — 되살리려면 사서(curator)의 팀원 두뇌 위치를 보고, 접속 토큰 헤더·리다이렉트 금지도 함께 달아야 한다",
+    ).toBe(false);
+    expect(src, "로컬 통로 상수가 사라졌다 — 이 검사의 근거가 바뀐 것이다").toMatch(/GIJO_LOCAL_LLM_URL/);
+    // ⚠ 검사기 자체 확인(반증) — 되살린 모양을 만들어 정말 빨강이 나는지 본다.
+    expect(문다(`const 원격 = await import("./remotellm.js").then((m) => m.remoteLlmTarget());`), "검사기가 고장 났다").toBe(true);
   });
 });

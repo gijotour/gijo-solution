@@ -77,8 +77,11 @@ function saveConfig(c: 저장모양): void {
 /**
  * 채팅이 실제로 갈 원격 /v1 주소 — 꺼져 있거나 에어갭이면 null(로컬 경로 그대로).
  *
- * ⚠ llm.ts·searchrewrite.ts가 **이 게터 하나**를 본다. 상수 사본을 두 곳에 두면
+ * ⚠ 채팅 경로(`llm.ts chat()`)가 **이 게터 하나**를 본다. 상수 사본을 두 곳에 두면
  *   한쪽만 고쳐져 어긋난다 — 이 저장소가 반복해 겪은 유형이다.
+ * ⚠ `searchrewrite.ts`는 2026-09-10에 여기서 **떨어져 나갔다**(언제나 로컬). 팀원별 두뇌 위치를
+ *   못 보는 도우미가 전역만 따라 원격으로 가면, 로컬로 둔 팀원의 물음까지 원격 왕복을 타
+ *   5.4초 → 57초가 됐다(win 운영 실측). 짧고 지연에 민감한 곁가지는 이 게터를 안 쓴다.
  * ⚠ 에어갭 검사를 여기서도 한다(저장 시에만 막으면, 저장 뒤 에어갭을 켠 경우가 샌다).
  */
 // 사용 시점 차단을 감사에 남길 때 같은 주소로 도배되지 않게 — 주소당 첫 1회만(airgap.ts 관례).
@@ -113,7 +116,8 @@ export function remoteLlmBaseUrl(): string | null {
  * ⚠ 왜: 내주는 쪽이 토큰을 주소 뒤 `?token=…`으로 실어 준다(사람이 토큰을 따로 안 다루게).
  *   그런데 그대로 `${url}/chat/completions`를 부르면 쿼리가 경로 중간에 박혀 깨진다.
  *   그래서 여기서 **URL은 토큰을 뗀 깨끗한 것**으로, **토큰은 헤더(x-gijo-serve-token)**로 가른다.
- *   llm.ts·searchrewrite.ts가 이 하나를 쓴다 — 헤더 구성을 두 곳에 적으면 어긋난다.
+ *   llm.ts의 chat()이 이 하나를 쓴다 — 헤더 구성을 두 곳에 적으면 어긋난다.
+ *   (searchrewrite.ts는 2026-09-10부터 안 쓴다 — 위 remoteLlmBaseUrl 주석의 이유.)
  * ⚠ �trailing slash도 여기서 정리한다(`/v1/` → `/v1`) — 소비자가 `${base}/models`를 붙이므로.
  */
 export function remoteLlmTarget(): { baseUrl: string; headers: Record<string, string> } | null {

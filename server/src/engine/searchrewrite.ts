@@ -20,23 +20,37 @@
 //   · 타임아웃을 두고, 실패·빈 결과·이상한 결과는 **조용히 건너뛴다**(빈 문자열 반환).
 //   · 같은 질문은 캐시에서 준다 — 한 번의 답에 검색이 여러 번 돌아도 모델은 한 번만 부른다.
 //   · `GIJO_SEARCH_REWRITE=0`으로 끌 수 있다. 시험 환경엔 모델이 없어 자연히 건너뛴다.
+//   · **언제나 이 PC(로컬 엔진)에서 한다** — 원격 전역 스위치·팀원 두뇌 위치를 안 본다(아래 ★ 2026-09-10).
 
 import { emitLlmActivity } from "./llmactivity"; // llm.ts·embedding.ts와 같은 활동 신호 모듈(db를 문다 — 잎은 아니다)
 
 const 켜짐 = process.env.GIJO_SEARCH_REWRITE !== "0";
-// ⚠ 상수가 아니라 **매 호출 게터**다(2026-08-13 BridgeAI 1단계) — 원격 LLM이 켜져 있으면
-//   재작성도 그리로 간다. llm.ts와 같은 게터(remotellm.remoteLlmBaseUrl) 하나를 본다 —
-//   사본을 두면 채팅은 원격인데 재작성만 로컬을 찾다 죽는 어긋남이 생긴다.
-const 기본통로 = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
-async function 통로(): Promise<{ baseUrl: string; headers: Record<string, string>; 원격: boolean }> {
-  // 토큰까지 포함한 목표를 받는다(2026-08-16) — 토큰은 헤더로, URL은 깨끗하게.
-  const 원격 = await import("./remotellm.js").then((m) => m.remoteLlmTarget()).catch(() => null);
-  // ⚠ **「원격인가」를 함께 돌려준다**(2026-08-18 검토 지적). 예전엔 baseUrl·headers만 주고
-  //   그 사실을 버려서, 아래 호출이 `redirect: "error"`를 걸 근거가 없었다 —
-  //   그래서 `llm.ts`가 두 번이나 고친 방어(원격일 때 리다이렉트 금지)가 **여기만 빠져 있었다.**
-  //   나가는 본문이 담당자의 **질문 원문**이라 유출 경로다.
-  return 원격 ? { ...원격, 원격: true } : { baseUrl: 기본통로, headers: {}, 원격: false };
-}
+// ★ **재작성 도우미는 언제나 로컬 엔진을 쓴다**(2026-09-10 win 운영 실측으로 되돌림).
+//   2026-08-13(BridgeAI 1단계)부터 여기는 원격 게터를 **직접** 불러 전역 스위치를 그대로 따랐다.
+//   그 배선을 끊는다 — 아래 실측이 그것이 옳지 않았음을 말한다.
+//
+// ■ 무엇이 있었나 (2026-09-10 win 운영 실측)
+//   원격 두뇌(gb10)를 전역으로 켜고 **리포트·해설 팀원만** 원격으로 배정했더니,
+//   로컬로 남겨 둔 총괄·분석 경로의 물음 「Log4Shell 위험 분석해줘」가 **5.4초 → 57초**가 됐다.
+//   전역을 끄자 8.2초로 돌아왔다. 범인이 이 파일이었다 — 재작성은 `chat()`을 안 거치므로
+//   팀원별 두뇌 위치 판정(`agents.ts getAgentLocation`)에 **걸리지 않고** 전역만 따라
+//   매 물음마다 원격 왕복(큰 모델 콜드 40초+)을 탔다.
+//
+// ■ 왜 로컬로 못 박나 — 이 작업의 성질이 그렇다.
+//   ① **짧다**: 40토큰짜리 한 줄 변환이다. 큰 원격 모델의 값어치(긴 추론·깊은 분석)를 쓸 자리가 아니다.
+//   ② **지연에 민감하다**: RAG **앞단**이라 담당자가 답을 기다리는 시간에 통째로 얹힌다.
+//      제한이 1.5초인 까닭이 그것인데, 원격 콜드 스타트는 그 한도를 원리상 못 지킨다.
+//   ③ **한 물음당 한 번 더 도는 왕복이다**: 사람이 고른 두뇌로 가는 본 답 말고 보이지 않는 곳에서
+//      한 번 더 나간다. 그래서 「① 전역 ON + ② 팀원 opt-in」 **두 겹 관문**의 뜻이 무너진다 —
+//      아무도 원격을 고르지 않은 경로까지 원격 값을 치르기 때문이다.
+//
+// ⚠ 대가(정직하게): 로컬 엔진이 안 떠 있는 완전 원격 구성에서는 이 호출이 연결 실패로 떨어져
+//   재작성이 **조용히 빠진다**(빈 문자열 → 원문으로 검색). 위 안전 규칙 그대로다 —
+//   잃는 것은 검색 품질 개선분이고 검색 자체는 돈다. 57초짜리 답보다 그쪽이 낫다.
+// ⚠ 되살리려거든 전역만 보지 말 것 — 사서(curator)의 **두뇌 위치**를 먼저 물어야 한다.
+//   그때는 접속 토큰 헤더·리다이렉트 금지도 함께 달아야 한다(아래 fetch 주석).
+const 통로 = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
+
 /** 재작성에 줄 시간. 넘으면 포기하고 원문으로 검색한다 — 검색이 답보다 오래 걸리면 안 된다. */
 const 제한MS = Number(process.env.GIJO_SEARCH_REWRITE_TIMEOUT_MS ?? 1500);
 
@@ -73,13 +87,12 @@ export async function rewriteForSearch(question: string): Promise<string> {
   const 시작 = Date.now();
   // 사서(curator)의 부르는 문 — **짝 있는 신호**(start↔done/error)로 낸다. done만 내면 레일이 「일하는 중」 불을 꺼 버린다(검토관 2026-09-03).
   //   채택 여부와 무관하게 모델은 돌았으므로 done으로 세고 detail에 채택/미채택을 적는다. 질문 원문은 신호에 싣지 않는다(전 접속자에게 방송된다).
-  //   ⚠ 알려진 한계: 이 호출은 chat()이 아니라 통로()로 직접 간다 — 사서에게 전용 모델·어댑터를 배정해도 여기엔 쓰이지 않는다(계획서 §7·§10).
+  //   ⚠ 알려진 한계: 이 호출은 chat()을 안 거치고 **로컬 통로로 바로** 간다 — 사서에게 전용 모델·어댑터·두뇌 위치를 배정해도 여기엔 쓰이지 않는다(계획서 §7·§10).
   emitLlmActivity({ kind: "chat", phase: "start", agent: "curator", agentName: "Curator Agent", detail: "검색어 재작성" });
   try {
-    const t = await 통로();
-    const res = await fetch(`${t.baseUrl}/chat/completions`, {
+    const res = await fetch(`${통로}/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...t.headers },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: [{ role: "user", content: 지시 + q }],
         max_tokens: 40,
@@ -88,9 +101,10 @@ export async function rewriteForSearch(question: string): Promise<string> {
         cache_prompt: false,
       }),
       signal: AbortSignal.timeout(제한MS),
-      // ⚠ 원격일 때 리다이렉트 금지 — VPN 안 서버가 3xx로 밖을 가리키면 **질문 원문이 따라간다.**
-      //   `llm.ts:768`·`:883`과 같은 방어다(2026-08-18에 이 곁가지가 빠져 있던 것을 찾음).
-      redirect: t.원격 ? "error" : "follow",
+      // ⚠ 접속 토큰 헤더와 리다이렉트 금지가 여기 **없는 이유**: 이 호출은 이 PC 밖으로 안 나간다(위 ★).
+      //   밖으로 내보내는 날엔 그 방어 둘을 함께 달아야 한다 — `llm.ts`가 두 번 고친 그 방어다.
+      //   `remoteegressguard.test.ts`가 engine 전체를 훑어 「밖으로 갈 수 있는 /chat/completions」를
+      //   스스로 찾아 대조하므로, 되살리는 순간 그 시험이 방어 누락을 빨간불로 잡는다.
     });
     if (res.ok) {
       const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
