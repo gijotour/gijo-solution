@@ -302,6 +302,58 @@ function 관계부품들(relXml: string, 기준폴더: string): string[] {
     .map((r) => 부품경로(기준폴더, r.대상));
 }
 
+/** 차트 한 축이 담을 수 있는 점의 상한 — **문서가 주는 `idx`를 그대로 믿지 않는다.**
+ *  `<c:pt idx="N">`의 N은 파일이 적어 주는 32비트 정수라, 상한이 없으면 **1KB짜리 차트 부품
+ *  하나가 수백만 줄짜리 빈 표**를 만든다(2026-09-10 검토관 적발 · 실측: idx=2,000,000인
+ *  1,741바이트 입력 → 12,000,038자·2,000,004줄·2.7초. 입력 크기와 무관하게 idx에 **선형**이라
+ *  int32 상한이면 12GB를 만들려다 인입 프로세스가 죽는다).
+ *  더 나쁜 것은 그 빈 행들이 **청소에도 안 지워진다**는 점이다 — memory.ts의 반복줄 제거가
+ *  「구분선과 열 수가 같은 줄」을 표 본문 행으로 보고 **지키기** 때문이다.
+ *  ⚠ 열 상한(표_최대열)과 **따로** 둔다: 저쪽은 「한 행의 칸 수」고 이쪽은 「표의 행 수」다.
+ *    파이프표()의 행 수는 일부러 안 막는다 — 문서의 진짜 표는 수천 행이 정상이라 거기서 자르면
+ *    본문을 잃는다. 폭주는 **차트에서만** 나는 일이라(워드 표의 gridSpan 폭주를 표_최대열로 막은
+ *    것과 같은 부류) 여기서 막는 것이 맞다.
+ *  ⓘ 1024는 「사람이 읽을 차트」의 한참 위다. 여기 닿는 파일은 지식이 아니라 기계 데이터다. */
+const 차트_최대점 = 1024;
+
+/** `<*:pt idx="n">…` 를 자리대로 편다. 다단 범주(`<c:lvl>`·`<cx:lvl>`)는 같은 자리에 겹쳐 붙인다.
+ *  ⚠ 상한은 **넣을 때** 건다 — 자리만 큰 성긴 배열조차 만들지 않기 위해서다(위 차트_최대점).
+ *  ⚠ 걸림쇠는 부르는 쪽이 준다: c: 갈래는 `<c:v>` 껍질이 있고, cx: 갈래는 글이 **바로** 들어 있다. */
+function 점펴기(덩이: string, 걸림쇠: RegExp): string[] {
+  const out: string[] = [];
+  for (const m of 덩이.matchAll(걸림쇠)) {
+    const i = Number(m[1]);
+    if (!(i >= 0) || i >= 차트_최대점) continue;
+    const v = 칸글(m[2]);
+    out[i] = out[i] ? `${out[i]} ${v}` : v;
+  }
+  return out;
+}
+
+/** 「범주 × 계열」을 파이프 표로, 범주가 없으면 「계열 이름: 값, 값」 줄로 — c:·cx: 두 갈래 **공용**.
+ *  ⚠ 표의 행 수를 정하는 곳은 여기 **하나뿐**이라, 상한도 여기 둔다(점펴기가 이미 걸렀지만
+ *    새로 부르는 쪽이 생겨도 안 새게 잣대를 이 자리에 겹쳐 둔다 — 같은 상수를 본다). */
+function 차트표(이름들: string[], 값들: string[][], 범주: string[]): string[] {
+  const 자리수 = Math.min(Math.max(범주.length, 0, ...값들.map((v) => v.length)), 차트_최대점);
+  if (자리수 === 0) return [];
+  if (범주.length) {
+    // 머리글 첫 칸은 **비운다** — 없는 낱말(「항목」 따위)을 지어내지 않는다. 꼬리 정규화가
+    //   「|  |」의 겹공백을 한 칸으로 접으므로 표 규격도 안 깨진다.
+    const 표 = 파이프표([
+      ["", ...이름들],
+      ...Array.from({ length: 자리수 }, (_, i) => [범주[i] ?? "", ...값들.map((v) => v[i] ?? "")]),
+    ]);
+    return 표 ? [표] : [];
+  }
+  const out: string[] = [];
+  for (let i = 0; i < 이름들.length; i += 1) {
+    const 값 = (값들[i] ?? []).filter(Boolean).join(", ");
+    if (!값) continue;
+    out.push(이름들[i] ? `${이름들[i]}: ${값}` : 값);
+  }
+  return out;
+}
+
 /** 차트(ppt/charts/chartN.xml)에서 **사람이 읽을 것만** 뽑는다.
  *  · 제목·축 이름·직접 쓴 이름표 → rich text(`<a:t>`) · 계열 밖의 `<c:v>`(제목을 시트 참조로 둔 파일)
  *  · 계열 이름·범주·값 → 계열(`<c:ser>`) 안의 `<c:v>` → **파이프 표**로 낸다.
@@ -323,40 +375,65 @@ function 차트글(xml: string): string[] {
   ].map(줄글).filter(Boolean);
   if (머리.length) 블록.push(머리.join(" "));
 
-  /** `<c:pt idx="n"><c:v>…` 를 자리대로 편다. 다단 범주(`<c:lvl>`)는 같은 자리에 겹쳐 붙인다. */
-  const 점들 = (덩이: string) => {
-    const out: string[] = [];
-    for (const m of 덩이.matchAll(/<c:pt\b[^>]*\bidx="(\d+)"[^>]*>[\s\S]*?<c:v>([\s\S]*?)<\/c:v>/g)) {
-      const i = Number(m[1]);
-      const v = 칸글(m[2]);
-      out[i] = out[i] ? `${out[i]} ${v}` : v;
-    }
-    return out;
-  };
+  const 점들 = (덩이: string) => 점펴기(덩이, /<c:pt\b[^>]*\bidx="(\d+)"[^>]*>[\s\S]*?<c:v>([\s\S]*?)<\/c:v>/g);
   const 값덩이 = (ser: string, tag: string) => 최상위요소들(ser, tag).find((x) => x.includes("<c:pt")) ?? "";
   const 계열이름 = (ser: string) => 칸글((/<c:v>([\s\S]*?)<\/c:v>/.exec(최상위요소들(ser, "c:tx")[0] ?? "") ?? ["", ""])[1]);
 
-  const 이름들 = 계열들.map(계열이름);
-  const 값들 = 계열들.map((s) => 점들(값덩이(s, "c:val")));
-  const 범주 = 계열들.map((s) => 점들(값덩이(s, "c:cat"))).find((c) => c.length) ?? [];
-  const 자리수 = Math.max(범주.length, 0, ...값들.map((v) => v.length));
-  if (자리수 === 0) return 블록;
+  블록.push(...차트표(
+    계열들.map(계열이름),
+    계열들.map((s) => 점들(값덩이(s, "c:val"))),
+    계열들.map((s) => 점들(값덩이(s, "c:cat"))).find((c) => c.length) ?? [],
+  ));
+  return 블록;
+}
 
-  if (범주.length) {
-    // 머리글 첫 칸은 **비운다** — 없는 낱말(「항목」 따위)을 지어내지 않는다. 꼬리 정규화가
-    //   「|  |」의 겹공백을 한 칸으로 접으므로 표 규격도 안 깨진다.
-    const 표 = 파이프표([
-      ["", ...이름들],
-      ...Array.from({ length: 자리수 }, (_, i) => [범주[i] ?? "", ...값들.map((v) => v[i] ?? "")]),
-    ]);
-    if (표) 블록.push(표);
-    return 블록;
+/** 확장 차트(ppt/charts/chart**Ex**N.xml) — 파워포인트 2016+의 폭포·트리맵·깔때기·상자수염·
+ *  히스토그램이 여기 들어간다. **위 c: 갈래로는 원리상 못 읽는다**: 이름이 `cx:`고, 데이터는
+ *  `<cx:pt idx="0">40</cx:pt>`처럼 `<c:v>` 껍질 **없이** 글이 바로 들어 있다.
+ *  첫 판(2026-09-10)은 걸림쇠가 `chart\d+\.xml`뿐이라 이 부품을 **조용히 버렸다** — 회귀는
+ *  아니지만(종전엔 차트를 아예 안 읽었다) 「차트 글자를 회수한다」가 반쪽이었다.
+ *  · 제목·축 이름표(`<a:t>`)와 `<cx:data>`·`<cx:series>` **밖**의 `<cx:v>` → 줄글
+ *  · `<cx:data>` 안의 범주(`<cx:strDim type="cat">`) × 값(`<cx:numDim type="val">`) → 파이프 표.
+ *    계열 이름은 `<cx:series>`의 `<cx:dataId val="N"/>`가 가리키는 데이터 묶음의 머리글이 된다.
+ *  ⚠ 계열 이름은 줄글에 **안** 담는다 — 표 머리글로 한 번만 낸다(c: 갈래와 같은 규칙).
+ *    두 번 담으면 같은 낱말이 한 조각에 두 벌 들어간다.
+ *  ⚠ 히스토그램처럼 범주가 없는 갈래는 표가 아니라 「계열 이름: 값, 값」 줄이 된다(차트표 참조).
+ *  ⚠ **실물로 못 쟀다** — 저장소·운영 pptx 3편에 확장 차트가 0개다. 픽스처(deck.pptx)가 유일한 그물. */
+function 확장차트글(xml: string): string[] {
+  const 줄글 = (s: string) => s.replace(/[ \t\r\n]+/g, " ").trim();
+  const 점들 = (덩이: string) => 점펴기(덩이, /<cx:pt\b[^>]*\bidx="(\d+)"[^>]*>([\s\S]*?)<\/cx:pt>/g);
+  const 계열들 = 구간나누기(xml, "cx:series").filter((s) => s.표).map((s) => s.xml);
+  const 블록: string[] = [];
+
+  // 줄글 — `<cx:series>`·`<cx:data>` 밖의 글만. 안쪽은 계열 이름·데이터라 표로 낸다.
+  const 밖 = 구간나누기(xml, "cx:series").filter((s) => !s.표)
+    .flatMap((s) => 구간나누기(s.xml, "cx:data").filter((d) => !d.표).map((d) => d.xml));
+  const 머리 = [
+    ...[...xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]),
+    ...밖.flatMap((x) => [...x.matchAll(/<cx:v>([\s\S]*?)<\/cx:v>/g)].map((m) => m[1])),
+  ].map(줄글).filter(Boolean);
+  if (머리.length) 블록.push(머리.join(" "));
+
+  const 묶음 = new Map<string, string>();
+  for (const d of 구간나누기(xml, "cx:data").filter((s) => s.표)) {
+    묶음.set((/<cx:data\b[^>]*\bid="([^"]*)"/.exec(d.xml) ?? ["", ""])[1], d.xml);
   }
-  for (let i = 0; i < 계열들.length; i += 1) {
-    const 값 = 값들[i].filter(Boolean).join(", ");
-    if (!값) continue;
-    블록.push(이름들[i] ? `${이름들[i]}: ${값}` : 값);
+  /** 한 데이터 묶음의 축 하나 — `type`이 맞는 것을 고르고, 없으면 첫째를 쓴다. */
+  const 축 = (덩이: string, 이름: string, 갈래: string) => {
+    const 것들 = 최상위요소들(덩이, 이름);
+    return 것들.find((x) => new RegExp(`\\btype="${갈래}"`).test(x)) ?? 것들[0] ?? "";
+  };
+
+  const 이름들: string[] = [];
+  const 값들: string[][] = [];
+  let 범주: string[] = [];
+  for (const ser of 계열들) {
+    const d = 묶음.get((/<cx:dataId\b[^>]*\bval="([^"]*)"/.exec(ser) ?? ["", ""])[1]) ?? "";
+    이름들.push(칸글((/<cx:v>([\s\S]*?)<\/cx:v>/.exec(최상위요소들(ser, "cx:tx")[0] ?? "") ?? ["", ""])[1]));
+    값들.push(점들(축(d, "cx:numDim", "val")));
+    if (!범주.length) 범주 = 점들(축(d, "cx:strDim", "cat"));
   }
+  블록.push(...차트표(이름들, 값들, 범주));
   return 블록;
 }
 
@@ -499,15 +576,23 @@ async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
     차례.push(...슬라이드파일.filter((n) => !차례.includes(n)));
 
     // 슬라이드가 딸고 있는 부품(도해·차트·노트) — rId 번호순.
+    const 관계경로 = (n: string) => `ppt/slides/_rels/${n.slice("ppt/slides/".length)}.rels`;
     const 딸림표 = new Map<string, string[]>();
     for (const n of 차례) {
-      const rel = `ppt/slides/_rels/${n.slice("ppt/slides/".length)}.rels`;
+      const rel = 관계경로(n);
       딸림표.set(n, 있음.has(rel) ? 관계부품들(await 읽기(rel), "ppt/slides/") : []);
     }
     const 노트걸림쇠 = /^ppt\/notesSlides\/notesSlide\d+\.xml$/;
-    // ⚠ **관계로 예약된 노트는 번호 물러나기가 가로채지 못한다.** 관계 파일이 없는 pptx(픽스처·
-    //   일부 변환기 산출물)를 위해 「같은 번호」로 물러나되, 그 노트를 이미 다른 슬라이드가
-    //   관계로 가리키고 있으면 안 가져간다 — 안 그러면 한 노트를 두 곳이 다투다 한쪽이 잃는다.
+    // ⚠ **번호 물러나기는 「관계 파일이 아예 없는 장」에서만 쓴다**(2026-09-10 검토관 적발 수리).
+    //   첫 판은 관계 파일이 있어도 물러났다 — 그래서 노트 관계가 **없는** 장이 파일 번호가 같다는
+    //   이유만으로 **고아 노트**(지운 장의 잔해)를 끌어안았다. 종전 갈래는 고아를 문서 끝에 두어
+    //   오귀속이 없었으니, 이건 이번 변경이 새로 연 구멍이다. 게다가 「글자 없는 장은 표시도 안
+    //   낸다」 계약까지 깨져, 그림뿐인 장이 남의 노트를 안고 [슬라이드 N]으로 나타났다.
+    //   → 관계 파일이 있으면 **그 파일이 정본**이다. 거기 노트가 없으면 이 장엔 노트가 없다.
+    //     물러나기는 관계 파일 자체가 없는 pptx(픽스처·일부 변환기 산출물)만을 위한 것이다.
+    // ⚠ **관계로 예약된 노트는 번호 물러나기가 가로채지 못한다.** 관계 파일 없는 장이 「같은 번호」로
+    //   물러날 때, 그 노트를 이미 다른 슬라이드가 관계로 가리키고 있으면 안 가져간다 —
+    //   안 그러면 한 노트를 두 곳이 다투다 한쪽이 잃는다.
     const 예약된노트 = new Set([...딸림표.values()].flat().filter((p) => 노트걸림쇠.test(p)));
 
     const 쓴노트 = new Set<string>();
@@ -525,10 +610,15 @@ async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
           if (t) 블록.push(t);
         } else if (/^ppt\/charts\/chart\d+\.xml$/.test(p)) {
           블록.push(...차트글(await 읽기(p)));
+        } else if (/^ppt\/charts\/chartEx\d+\.xml$/.test(p)) {
+          // 파워포인트 2016+의 폭포·트리맵·깔때기·상자수염·히스토그램은 **딴 부품**이다.
+          //   위 걸림쇠(chart\d+)에는 원리상 안 걸린다("Ex"가 숫자가 아니다).
+          블록.push(...확장차트글(await 읽기(p)));
         }
       }
+      const 번호노트 = `ppt/notesSlides/notesSlide${번호(n)}.xml`;
       const 노트 = 딸림.find((p) => 노트걸림쇠.test(p) && 있음.has(p))
-        ?? (예약된노트.has(`ppt/notesSlides/notesSlide${번호(n)}.xml`) ? undefined : `ppt/notesSlides/notesSlide${번호(n)}.xml`);
+        ?? (있음.has(관계경로(n)) || 예약된노트.has(번호노트) ? undefined : 번호노트);
       if (노트 && 있음.has(노트) && !쓴노트.has(노트)) {
         쓴노트.add(노트);
         const 표시 = 노트표시(await 덩이들(노트));
