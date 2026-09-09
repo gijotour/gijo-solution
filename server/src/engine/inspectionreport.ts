@@ -30,7 +30,12 @@ import { THREAT_CATALOG, CATEGORY_LABEL, type ThreatEntry } from "./compliance";
 //   ㄹ 들여쓴 표행이 문단으로 떨어짐. 사용자가 쓴 md가 personaldocs.ts:156-175로 여기 그대로 오므로
 //   **잠복이 아니라 살아 있는 결함**이었다. ⚠ 넓히기만 하고 **안 조인다** — 「머리글+구분선 필수」로
 //   조이면 구분선을 안 쓴 사용자 표가 통째로 사라진다(종전대로 파이프 줄만 있어도 표를 만든다).
-import { 표줄, 구분선, 칸가르기 } from "./tabletext";
+//   ★ 같은 날 검토관이 그 수리가 **새로 연 자리 둘**을 잡았고 여기서 함께 닫았다:
+//     ㅁ GFM 정규 구분선 `|-|-|`(칸마다 대시 하나)이 본문 행으로 떨어져 `-` 행이 그대로 찍힘
+//        → 뿌리는 tabletext:구분선의 `-{2,}`. 「칸 안 공백」으로 ㄷ과 갈랐다.
+//     ㅂ 파이프로 **시작만** 한 줄이 열려 있는 표에 1칸 행으로 들어가 칸 수가 3,3,1,3으로 찌그러짐
+//        → 표를 다 모은 뒤 표행맞추기()로 폭을 맞춰 찍는다(HTML·DOCX 같은 잣대).
+import { 표줄, 구분선, 칸가르기, 표행맞추기 } from "./tabletext";
 import { THREAT_CRITERIA } from "./compliance-criteria";
 import { getLastRedTeamReport, type RedTeamReport, type AttackCategory } from "./redteam";
 import { renderPdf } from "./report";
@@ -275,16 +280,23 @@ function esc(s: string): string {
 /** Markdown → 간단 HTML(PDF용). 표·제목·목록만 다룬다 — 리포트가 쓰는 문법이 그것뿐이다. */
 export function inspectionHtml(md: string): string {
   const out: string[] = [];
-  let inTable = false;
+  // ⚠ 표는 **다 모은 뒤에 찍는다**(2026-09-10 검토관 적발 ②). 한 줄씩 바로 찍으면 뒤에 오는
+  //   행이 더 넓어도 앞 행을 못 늘려, 행마다 칸 수가 다른 표가 나간다. 폭 결정은 표행맞추기 한 곳.
+  let 표: string[][] = [];
+  const 표닫기 = () => {
+    if (!표.length) return;
+    out.push(`<table border="1" cellspacing="0" cellpadding="5">`);
+    for (const cells of 표행맞추기(표)) out.push(`<tr>${cells.map((c) => `<td>${강조(esc(c))}</td>`).join("")}</tr>`);
+    out.push("</table>");
+    표 = [];
+  };
   for (const raw of md.split("\n")) {
     const line = raw.trimEnd();
     const 표행 = 표줄(line);
-    if (inTable && !표행) { out.push("</table>"); inTable = false; }
+    if (!표행) 표닫기();
     if (표행) {
-      if (구분선(line)) continue; // 구분선은 표에 안 찍는다 — 정렬(:---)까지 여기서 알아본다
-      const cells = 칸가르기(line); // 칸 안 이스케이프를 되돌린다 — 안 풀면 칸이 하나 더 생긴다
-      if (!inTable) { out.push(`<table border="1" cellspacing="0" cellpadding="5">`); inTable = true; }
-      out.push(`<tr>${cells.map((c) => `<td>${강조(esc(c))}</td>`).join("")}</tr>`);
+      if (구분선(line)) continue; // 구분선은 표에 안 찍는다 — 정렬(:---)·꽉 꼴(|-|-|)까지 여기서 알아본다
+      표.push(칸가르기(line)); // 칸 안 이스케이프를 되돌린다 — 안 풀면 칸이 하나 더 생긴다
       continue;
     }
     const h = /^(#{1,3})\s+(.*)$/.exec(line);
@@ -295,7 +307,7 @@ export function inspectionHtml(md: string): string {
     if (!line.trim()) { out.push("<br>"); continue; }
     out.push(`<p>${강조(esc(line))}</p>`);
   }
-  if (inTable) out.push("</table>");
+  표닫기();
   return `<!doctype html><html lang="ko"><meta charset="utf-8"><style>
     body{font-family:'Malgun Gothic',sans-serif;font-size:11pt;line-height:1.6;color:#111}
     h1{font-size:20pt;border-bottom:2px solid #333;padding-bottom:6px}
@@ -332,7 +344,9 @@ export async function inspectionDocx(md: string): Promise<Buffer> {
   let 표행: string[][] = [];
   const 표닫기 = () => {
     if (!표행.length) return;
-    const rows = 표행.map((cells, i) =>
+    // ⚠ HTML 갈래와 **같은 잣대로** 폭을 맞춘다 — 안 맞추면 Word 표 한 행이 1칸으로 찌그러진다
+    //   (2026-09-10 검토관 적발 ②. PDF는 되는데 Word만 어긋나는 갈래를 만들지 않는다).
+    const rows = 표행맞추기(표행).map((cells, i) =>
       new TableRow({
         children: cells.map(
           (c) => new TableCell({ children: [new Paragraph({ children: docx조각(i === 0 ? `**${c}**` : c) })] }),

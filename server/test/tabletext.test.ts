@@ -21,9 +21,10 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
+import JSZip from "jszip";
 import {
   표줄, 구분선, 열수, 칸가르기, 표머리글들, 표본문행자리,
-  칸글, 파이프표, 표_최대열,
+  칸글, 파이프표, 표행맞추기, 표_최대열,
 } from "../src/engine/tabletext";
 import { inspectionHtml, inspectionDocx } from "../src/engine/inspectionreport";
 
@@ -57,12 +58,21 @@ describe("읽는 잣대", () => {
     expect(표줄("가 | 1")).toBe(false);
   });
 
-  it("구분선 — 정렬(:---)까지 알아보고, 대시 하나짜리 본문 행은 아니라고 본다", () => {
+  it("구분선 — 정렬(:---)과 GFM 꽉 꼴(`|-|-|`)까지 알아보되, 공백 두른 대시 하나는 본문 행이다", () => {
     expect(구분선("|---|---|")).toBe(true);
     expect(구분선("| --- | --- |")).toBe(true);
     expect(구분선("|:---|---:|")).toBe(true);
     expect(구분선("| :--: | :--: |")).toBe(true);
-    expect(구분선("| - | - |"), "대시 하나는 본문 행이다").toBe(false);
+    // ★ 2026-09-10 검토관 적발 — GFM 규격은 **칸마다 대시 1개**면 구분선이다. 오늘 아침 수리가
+    //   `-{2,}`로 적는 바람에 이 정규 꼴이 본문 행으로 떨어져, 되레 ㄴ(구분선이 Word/PDF에
+    //   그대로 찍힘)과 같은 증상을 새로 만들었다. **공백으로 가른다**(아래 짝을 함께 볼 것).
+    expect(구분선("|-|-|"), "GFM 정규 구분선(칸마다 대시 하나)이다").toBe(true);
+    expect(구분선("|:-|-:|"), "정렬까지 붙은 꽉 꼴").toBe(true);
+    expect(구분선("|-|"), "한 칸짜리 표의 구분선").toBe(true);
+    // ⚠ 짝 — 공백을 두른 대시 하나는 **「해당 없음」을 적은 본문 행**이다(ㄷ이 그 자리였다).
+    //   둘을 가르는 잣대가 「칸 안 공백」이라, 이 두 줄은 언제나 함께 본다.
+    expect(구분선("| - | - |"), "공백을 두른 대시 하나는 본문 행이다").toBe(false);
+    expect(구분선("| - |"), "한 칸짜리 「해당 없음」 행").toBe(false);
     expect(구분선("| 가 | 1 |")).toBe(false);
   });
 
@@ -100,6 +110,18 @@ describe("내는 잣대", () => {
     expect(파이프표([["가", "나"], ["1", "2"]])).toBe("| 가 | 나 |\n| --- | --- |\n| 1 | 2 |");
     expect(파이프표([["", ""]]), "글자가 없는 표는 지식이 아니다").toBe("");
     expect(파이프표([])).toBe("");
+  });
+
+  it("표행맞추기 — 짧은 행은 빈 칸으로 채우고 **긴 행은 안 자른다**(자르면 데이터 손실이다)", () => {
+    // ★ 2026-09-10 검토관 적발 ②의 뿌리 — 「한 표의 모든 행을 같은 열 수로」를 내는 쪽만 지키고
+    //   내보내기(inspection)는 안 지켰다. 잣대를 여기 한 곳에 두고 둘이 함께 부른다.
+    expect(표행맞추기([["가", "나"], ["1"]])).toEqual([["가", "나"], ["1", ""]]);
+    expect(표행맞추기([["가"], ["1", "2", "3"]]),
+      "GFM은 넘치는 칸을 버리지만 우리는 안 버린다 — 표가 찌그러지는 것보다 글이 사라지는 것이 나쁘다")
+      .toEqual([["가", "", ""], ["1", "2", "3"]]);
+    expect(표행맞추기([]).length).toBe(0);
+    // 상한은 표_최대열 하나 — 두 번째 상한을 만들지 않는다.
+    expect(표행맞추기([Array.from({ length: 640 }, () => "x")])[0].length).toBe(표_최대열);
   });
 
   it("★ 내고 → 읽기가 맞물린다 — 낸 표의 모든 본문 행이 표본문행자리로 보호된다", () => {
@@ -143,6 +165,37 @@ describe("★★ 점검보고서 내보내기가 표를 같은 잣대로 읽는�
     expect((html.match(/<tr>/g) ?? []).length).toBe(2);
   });
 
+  it("ㅁ GFM 정규 구분선(`|-|-|`)도 표에 찍히지 않는다 — 오늘 아침 ㄷ 수리가 되레 연 자리다", () => {
+    // 2026-09-10 검토관 적발 ①③. ㄷ(대시 본문 행 살리기)을 `-{2,}`로 적는 바람에 칸마다
+    // 대시 하나인 **정규 구분선**이 본문 행으로 떨어졌다 — 증상이 ㄴ과 똑같다(Word/PDF에 `-` 행).
+    const html = inspectionHtml("| 항목 | 값 |\n|-|-|\n| 가 | 1 |");
+    expect((html.match(/<tr>/g) ?? []).length, "구분선이 본문 행으로 찍혔다").toBe(2);
+    expect(html, "`-`만 든 행이 고객 문서에 그대로 나간다").not.toMatch(/<tr><td>-<\/td>/);
+    // ⚠ 짝 — ㄷ은 그대로 살아 있어야 한다(둘을 가르는 것이 「칸 안 공백」이다).
+    const ㄷ = inspectionHtml("| 항목 | 값 |\n|---|---|\n| - | - |\n| 가 | 1 |");
+    expect((ㄷ.match(/<tr>/g) ?? []).length, "ㄷ 수리가 되돌아갔다").toBe(3);
+  });
+
+  it("ㅂ 한 표의 모든 행이 같은 칸 수로 나간다 — 꼬리 파이프를 빠뜨린 줄이 표를 찌그러뜨리지 않는다", () => {
+    // 2026-09-10 검토관 적발 ②. 표줄()이 꼬리 파이프를 안 따지므로(그래야 ㄹ·GFM이 산다)
+    // 파이프로 **시작만** 한 문장이 열려 있는 표 안으로 들어온다. 옛 잣대는 그 줄에서 표를
+    // 닫아 문단으로 냈고, 오늘 아침 판은 **1칸짜리 행**으로 넣어 Word 표 한 행이 찌그러졌다.
+    // 고르는 답: GFM처럼 **행을 표 폭에 맞춘다**(글은 안 버린다 — 표행맞추기가 그 잣대다).
+    const html = inspectionHtml("| 항목 | 값 | 판정 |\n|---|---|---|\n| A | x | 취약 |\n| 이 줄은 파이프로만 시작한 문장\n| B | y | 양호 |");
+    const 칸수 = [...html.matchAll(/<tr>(.*?)<\/tr>/g)].map((m) => (m[1].match(/<td/g) ?? []).length);
+    expect(new Set(칸수).size, `한 표 안 행별 칸 수가 갈렸다: ${칸수.join(",")}`).toBe(1);
+    expect(칸수[0]).toBe(3);
+    expect(html, "삼킨 문장이 사라지면 안 된다").toContain("파이프로만 시작한 문장");
+  });
+
+  it("ㅂ 칸이 넘치는 행은 표를 넓힌다 — 잘라 버리면 데이터 손실이다", () => {
+    const html = inspectionHtml("| 항목 | 값 |\n|---|---|\n| A | x | 덤 |");
+    const 칸수 = [...html.matchAll(/<tr>(.*?)<\/tr>/g)].map((m) => (m[1].match(/<td/g) ?? []).length);
+    expect(new Set(칸수).size, `행별 칸 수가 갈렸다: ${칸수.join(",")}`).toBe(1);
+    expect(칸수[0], "넘친 칸을 버렸다").toBe(3);
+    expect(html).toContain("덤");
+  });
+
   it("표가 없는 글은 종전 그대로다 — 넓히기만 하고 안 조인다", () => {
     const html = inspectionHtml("# 제목\n\n- 항목\n\n> 경고");
     expect(html).toContain("<h1>제목</h1>");
@@ -151,6 +204,22 @@ describe("★★ 점검보고서 내보내기가 표를 같은 잣대로 읽는�
 
   it("DOCX도 같은 잣대다 — 브라우저 없이(에어갭) 나오는 길이 PDF와 안 갈린다", async () => {
     await expect(inspectionDocx("| 항목 | 값 |\n|:---|---:|\n| a\\|b | - |")).resolves.toBeInstanceOf(Buffer);
+  });
+
+  it("★★ DOCX를 **열어서 잰다** — Word 표의 행별 칸 수가 HTML과 같다(PDF만 되는 갈래를 안 만든다)", async () => {
+    // ⚠ 「Buffer가 나온다」는 증거가 못 된다 — ㅂ 증상은 예외 없이 파일이 나오면서 표만 찌그러졌다.
+    //   그래서 실제로 열어 `<w:tr>` 안 `<w:tc>` 수를 센다. jszip은 이미 있는 의존성이다.
+    const md = "| 항목 | 값 | 판정 |\n|-|-|-|\n| A | x | 취약 |\n| 이 줄은 파이프로만 시작한 문장\n| B | y | 양호 |";
+    const zip = await JSZip.loadAsync(await inspectionDocx(md));
+    const xml = await zip.file("word/document.xml")!.async("string");
+    const 칸수 = [...xml.matchAll(/<w:tr[ >][\s\S]*?<\/w:tr>/g)].map((m) => (m[0].match(/<w:tc[ >]/g) ?? []).length);
+    expect(칸수.length, "표가 통째로 안 나왔다").toBe(4);
+    expect(new Set(칸수).size, `Word 표의 행별 칸 수가 갈렸다: ${칸수.join(",")}`).toBe(1);
+    expect(칸수[0]).toBe(3);
+    expect(xml, "구분선이 Word 표에 본문 행으로 찍혔다").not.toMatch(/<w:t[ >][^<]*>-<\/w:t>/);
+    // HTML 갈래와 **같은 답**이어야 한다 — 두 길이 갈리면 「PDF는 되는데 Word만 이상하다」가 난다.
+    const html칸수 = [...inspectionHtml(md).matchAll(/<tr>(.*?)<\/tr>/g)].map((m) => (m[1].match(/<td/g) ?? []).length);
+    expect(html칸수).toEqual(칸수);
   });
 });
 
@@ -192,6 +261,10 @@ describe("★★ 표 술어 사본 감시 (server/src)", () => {
     expect(표줄사본이있나('const 표줄 = (l: string) => l.trimStart().startsWith("|");'), "표줄 사본을 못 잡는다").toBe(true);
     expect(표줄사본이있나("const t = (l) => l.trimStart().startsWith('|');"), "홑따옴표 사본을 못 잡는다").toBe(true);
     expect(구분선사본이있나("const 구분선 = (l) => /^\\s*\\|(?:\\s*:?-{2,}:?\\s*\\|)+\\s*$/.test(l);"), "구분선 사본을 못 잡는다").toBe(true);
+    // ★ 지금 트리에 실제로 들어 있는 꼴(GFM 꽉 꼴까지 받는 판)도 잡는지 함께 잰다 —
+    //   감시자를 **옛 글자로만** 반증하면, 술어가 바뀐 날 감시가 조용히 헛돌 수 있다.
+    expect(구분선사본이있나("const 구분선 = (l) => /^\\s*\\|(?:(?:\\s*:?-{2,}:?\\s*|:?-:?)\\|)+\\s*$/.test(l);"),
+      "지금 판 구분선의 사본을 못 잡는다").toBe(true);
     expect(열수사본이있나("const 열수 = (l) => (l.replace(/\\\\\\|/g, \"\").match(/\\|/g)?.length ?? 0) - 1;"), "열수 사본을 못 잡는다").toBe(true);
     expect(칸가르기사본이있나('return t.split(/(?<!\\\\)\\|/).map((c) => c.trim());'), "칸가르기 사본을 못 잡는다").toBe(true);
     // 애먼 글자에 안 샌다 — 주석에 이름으로 나오는 것까지 막지는 않는다.
