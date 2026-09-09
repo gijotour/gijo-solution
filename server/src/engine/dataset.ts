@@ -59,8 +59,16 @@ const 스캔판정_최소글자 = 20;
 
 async function pdf추출(buf: Buffer): Promise<string> {
   const { extractText, getDocumentProxy } = await import("unpdf");
+  // ⚠ 문서 객체는 **하나만** 만들어 끝까지 돌려 쓴다 — 같은 Uint8Array로 두 번 열면
+  //   pdf.js가 버퍼를 워커로 transfer해 detach시켜 **DataCloneError로 즉사한다**(설계관 실측).
   const doc = await getDocumentProxy(new Uint8Array(buf));
   try {
+    // ★ 그려진 표(테두리 격자)를 파이프 표로 되살린다 (2026-09-09, 갈래 T의 PDF 확장).
+    //   ⚠ **격자가 하나도 없으면 null**이 오고, 그러면 아래 종전 한 줄로 지나간다 — 「표 없는
+    //     PDF는 글자 하나까지 같다」를 주석이 아니라 **갈래**로 못박은 자리다(오피스 갈래와 같은 방식).
+    //     실측: 제안서.pdf(2.0MB·카드 위주)·has-text.pdf·ctrl-sep.pdf 전부 격자 0개 → 전후 동일.
+    const 표살린글 = await (await import("./pdftable.js")).pdf표복원(doc);
+    if (표살린글 !== null) return 표살린글;
     const { text } = await extractText(doc, { mergePages: true });
     // ⚠ mergePages:true면 문자열이다. 배열이 오면 **쉼표로 이어붙지 않게** 개행으로 잇는다
     //   (String([...])은 페이지 경계를 쉼표로 만든다 — 검토관 2026-08-22 지적).
@@ -161,7 +169,7 @@ const 최상위요소들 = (xml: string, tag: string) => 구간나누기(xml, ta
  *  ⚠ `|`는 열 구분자라 이스케이프한다 — 안 하면 열 수가 어긋나 구분선과 안 맞고 표 인지가 깨진다
  *    (실측: AI_보안제품_기획_v11.docx 추출본에 파이프가 이미 2개 있다).
  *  ⚠ 공백 압축은 `[ \t\r\n]+`만 — `\s`로 넓히면 줄바꿈아님공백(NBSP)까지 바꿔 종전 글과 갈린다. */
-const 칸글 = (raw: string) => raw.replace(/[ \t\r\n]+/g, " ").replace(/\|/g, "\\|").trim();
+export const 칸글 = (raw: string) => raw.replace(/[ \t\r\n]+/g, " ").replace(/\|/g, "\\|").trim();
 
 /** 한 행의 열 수 상한 — 워드가 실제로 허용하는 열은 63개다. 512는 그 8배로 넉넉하고,
  *  **자리 채우기가 폭주하는 것을 막는다**: 병합 칸(gridSpan 최대 64)을 잔뜩 넣은 파일 하나가
@@ -192,7 +200,7 @@ const 표_최대열 = 512;
  *    제품소개 pptx가 26→**24**로 준다 — 빈 줄로 한 블록에 뭉치면서 경계가 옮겨가기 때문이다.
  *    즉 「늘어난다」는 자를 크기에 딸린 말이라 계약으로 삼지 않는다. **내용 손실은 아니다**:
  *    같은 3편의 낱말 다중집합이 앞뒤로 똑같다(표 기호를 걷어낸 지문 7403·18076·10904 동일). */
-function 파이프표(행들: string[][]): string {
+export function 파이프표(행들: string[][]): string {
   const 열수 = Math.min(행들.reduce((a, r) => Math.max(a, r.length), 0), 표_최대열);
   if (열수 === 0 || 행들.length === 0) return "";
   // 글자가 하나도 없는 표(빈 격자·자리잡기용)는 지식이 아니다 — 구분선만 남기지 않는다.

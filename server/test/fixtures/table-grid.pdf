@@ -1,0 +1,69 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1249 >>
+stream
+BT /F1 9 Tf 50 780 Td (Intro paragraph before the table.) Tj ET
+BT /F1 9 Tf 50 740 Td (Second line of intro.) Tj ET
+50 600 m 50 700 l S
+150 600 m 150 700 l S
+250 600 m 250 700 l S
+350 600 m 350 700 l S
+50 599.75 300 0.5 re f
+50 633.25 300 0.5 re f
+50 666.75 300 0.5 re f
+50 699.75 300 0.5 re f
+BT /F1 9 Tf 55 676 Td (Item) Tj ET
+BT /F1 9 Tf 155 676 Td (Owner) Tj ET
+BT /F1 9 Tf 255 676 Td (Due) Tj ET
+BT /F1 9 Tf 55 643 Td (Patch|A) Tj ET
+BT /F1 9 Tf 11 TL 155 650 Td (two) Tj T* (lines) Tj ET
+BT /F1 9 Tf 255 643 Td (Sep 30) Tj ET
+BT /F1 9 Tf 55 610 Td (Scan) Tj ET
+BT /F1 9 Tf 155 610 Td (kim) Tj ET
+BT /F1 9 Tf 255 610 Td (Oct 1) Tj ET
+50 475 150 75 re f
+200 475 150 75 re f
+50 400 150 75 re f
+200 400 150 75 re f
+BT /F1 9 Tf 60 510 Td (Card A) Tj ET
+BT /F1 9 Tf 210 510 Td (Card B) Tj ET
+BT /F1 9 Tf 60 435 Td (Card C) Tj ET
+BT /F1 9 Tf 210 435 Td (Card D) Tj ET
+q 50 200 m 50 300 l W n Q
+q 200 200 m 200 300 l W n Q
+q 350 200 m 350 300 l W n Q
+q 50 200 m 350 200 l W n Q
+q 50 250 m 350 250 l W n Q
+q 50 300 m 350 300 l W n Q
+BT /F1 9 Tf 60 270 Td (Ghost A) Tj ET
+BT /F1 9 Tf 210 270 Td (Ghost B) Tj ET
+BT /F1 9 Tf 60 220 Td (Ghost C) Tj ET
+BT /F1 9 Tf 210 220 Td (Ghost D) Tj ET
+BT /F1 9 Tf 50 150 Td (Closing paragraph after everything.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001542 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1639
+%%EOF
