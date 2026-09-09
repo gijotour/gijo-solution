@@ -23,6 +23,14 @@ import { asyncRoute } from "../util/asyncRoute";
 import { todayLocal } from "../util/date";
 import { recordAudit } from "./audit";
 import { THREAT_CATALOG, CATEGORY_LABEL, type ThreatEntry } from "./compliance";
+// 표(마크다운 테이블)를 읽는 잣대 — **engine/tabletext.ts 한 곳**(잎 · import 0).
+//   2026-09-10 이전에는 여기 이름 없는 인라인 사본이 있었고 그것이 **딴 잣대**였다. 실측 4종:
+//   ㄱ 칸 안 파이프를 이스케이프한 행이 3칸(머리글보다 하나 많고 역슬래시가 남는다) ㄴ `|:---|---:|`를 구분선으로
+//   못 알아봐 Word/PDF에 그대로 찍힘 ㄷ `| - | - |`을 구분선으로 보고 **그 행을 버림**(데이터 손실)
+//   ㄹ 들여쓴 표행이 문단으로 떨어짐. 사용자가 쓴 md가 personaldocs.ts:156-175로 여기 그대로 오므로
+//   **잠복이 아니라 살아 있는 결함**이었다. ⚠ 넓히기만 하고 **안 조인다** — 「머리글+구분선 필수」로
+//   조이면 구분선을 안 쓴 사용자 표가 통째로 사라진다(종전대로 파이프 줄만 있어도 표를 만든다).
+import { 표줄, 구분선, 칸가르기 } from "./tabletext";
 import { THREAT_CRITERIA } from "./compliance-criteria";
 import { getLastRedTeamReport, type RedTeamReport, type AttackCategory } from "./redteam";
 import { renderPdf } from "./report";
@@ -270,11 +278,11 @@ export function inspectionHtml(md: string): string {
   let inTable = false;
   for (const raw of md.split("\n")) {
     const line = raw.trimEnd();
-    const 표행 = line.startsWith("|") && line.endsWith("|");
+    const 표행 = 표줄(line);
     if (inTable && !표행) { out.push("</table>"); inTable = false; }
     if (표행) {
-      const cells = line.slice(1, -1).split("|").map((c) => c.trim());
-      if (cells.every((c) => /^-+$/.test(c))) continue; // 구분선
+      if (구분선(line)) continue; // 구분선은 표에 안 찍는다 — 정렬(:---)까지 여기서 알아본다
+      const cells = 칸가르기(line); // 칸 안 이스케이프를 되돌린다 — 안 풀면 칸이 하나 더 생긴다
       if (!inTable) { out.push(`<table border="1" cellspacing="0" cellpadding="5">`); inTable = true; }
       out.push(`<tr>${cells.map((c) => `<td>${강조(esc(c))}</td>`).join("")}</tr>`);
       continue;
@@ -337,11 +345,10 @@ export async function inspectionDocx(md: string): Promise<Buffer> {
 
   for (const raw of md.split("\n")) {
     const line = raw.trimEnd();
-    const 표줄 = line.startsWith("|") && line.endsWith("|");
-    if (!표줄) 표닫기();
-    if (표줄) {
-      const cells = line.slice(1, -1).split("|").map((c) => c.trim());
-      if (!cells.every((c) => /^-+$/.test(c))) 표행.push(cells); // 구분선은 건너뛴다
+    const 이줄이표인가 = 표줄(line); // ⚠ 지역 이름을 달리 둔다 — `표줄`로 두면 import한 술어를 가린다
+    if (!이줄이표인가) 표닫기();
+    if (이줄이표인가) {
+      if (!구분선(line)) 표행.push(칸가르기(line)); // 구분선은 건너뛴다(PDF 갈래와 같은 잣대)
       continue;
     }
     const h = /^(#{1,3})\s+(.*)$/.exec(line);

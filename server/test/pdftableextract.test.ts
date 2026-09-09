@@ -211,7 +211,9 @@ describe("쪽조립 — 픽스처가 못 만드는 갈래", () => {
 //   **제품이 실제로 낸 표**를 제품의 되돌리기에 먹여 본다.
 describe("추출기가 낸 표를 웹취약점 파서가 되푼다", () => {
   it("파이프표() 출력 → 표풀기() = 종전 평문 줄", async () => {
-    const { 파이프표 } = await import("../src/engine/dataset");
+    // 2026-09-10: 파이프표()가 dataset → tabletext(잎)로 옮겨졌다. **계약은 사본이 아니라 결과다** —
+    // 사본을 없앤 뒤에도 이 짝 시험은 남는다(내는 쪽과 읽는 쪽이 갈리면 여기서 빨개진다).
+    const { 파이프표 } = await import("../src/engine/tabletext");
     const { 표풀기 } = await import("../src/engine/webreport");
     const 표 = 파이프표([
       ["구분", "취약점", "위험도"],

@@ -17,6 +17,8 @@
 // 그 잡음을 견디도록 공백 관용으로 작성했다.
 
 import type { ParsedVuln } from "./vulnscan";
+// 표 술어 단일 출처 — tabletext는 **잎**(import 0)이라 파서가 부담 없이 문다(사본을 만들 이유가 없다).
+import { 표줄, 구분선, 열수, 칸가르기 } from "./tabletext";
 
 export interface WebReportAsset {
   host: string; // 도메인(자산 키) — 없으면 IP
@@ -79,22 +81,12 @@ function normalizeSpaces(s: string): string {
  * ■ 계약
  *   ⚠ **표가 없는 글은 한 글자도 안 바뀐다.** 「머리글 + 구분선」으로 제대로 선 표만 푼다.
  *     홑 파이프 줄(KISA 가이드 바닥글 「| 한국인터넷진흥원 |」 같은 것)은 손대지 않는다.
- *   ⚠ **표의 정의(표줄·구분선·열수)는 memory.ts가 원본이다.** 여기 사본을 두는 이유는 그 모듈이
- *     DB·LanceDB를 물고 있어 파서가 import하면 통째로 딸려 오기 때문이다. 대신 짝 시험이
- *     **추출기 파이프표()의 실제 출력을 여기 먹여** 두 규격이 갈리면 빨개지게 했다
- *     (test/pdftableextract.test.ts 「추출기가 낸 표를 웹취약점 파서가 되푼다」).
+ *   ⚠ **표의 정의(표줄·구분선·열수·칸가르기)는 engine/tabletext.ts 한 곳이다** — 여기서 import한다.
+ *     2026-09-09에는 그 정의가 memory.ts에 있었고 그 모듈이 DB·LanceDB를 물어서, 파서가 import하면
+ *     통째로 딸려 오는 탓에 **여기 사본을 뒀다.** 2026-09-10에 정의를 잎 모듈로 옮겨 그 이유가 사라졌다.
+ *     짝 시험은 그대로 남는다 — **추출기 파이프표()의 실제 출력을 여기 먹여** 두 규격이 갈리면 빨개진다
+ *     (test/pdftableextract.test.ts 「추출기가 낸 표를 웹취약점 파서가 되푼다」). 계약은 사본이 아니라 결과다.
  */
-/** 표 행 — 마크다운 표는 줄이 파이프로 시작한다. (원본: memory.ts) */
-const 표줄 = (l: string) => l.trimStart().startsWith("|");
-/** 구분선 — |---|---| 꼴. 이게 없으면 표가 아니다. (원본: memory.ts) */
-const 구분선 = (l: string) => /^\s*\|(?:\s*:?-{2,}:?\s*\|)+\s*$/.test(l);
-/** 열 수 — 이스케이프된 `\|`는 칸 **안의 글자**라 안 센다. (원본: memory.ts) */
-const 열수 = (l: string) => (l.replace(/\\\|/g, "").match(/\|/g)?.length ?? 0) - 1;
-/** 한 줄을 칸으로 가른다 — 양끝 파이프를 벗기고 칸 안 이스케이프(`\|`)를 되돌린다. */
-function 칸가르기(l: string): string[] {
-  const t = l.trim().replace(/^\|/, "").replace(/\|$/, "");
-  return t.split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").trim());
-}
 /** 위험도 칸의 머리글 — 국내 보고서가 쓰는 이름들. */
 const RISK_HEAD_RE = /위험도|위험\s*등급|심각도|중요도|등급/;
 /** 위험도 칸의 값 — **이 넷일 때만** 위험도로 읽는다(딴 칸을 위험도로 오인하지 않게). */
