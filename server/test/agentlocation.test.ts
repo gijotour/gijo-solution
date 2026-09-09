@@ -8,10 +8,12 @@
 // ⚠ 무엇을 푸는가: 로컬 모델은 이미 팀원별로 갈리는데(`localengine.ts ensureAgentModel`)
 //   **원격은 전역 on/off 하나**였다. 켜면 전원 원격, 끄면 전원 로컬 — 그래서
 //   「총괄은 로컬 빠른 두뇌로 판단, 분석가는 원격 큰 두뇌로 깊게」가 불가능했다.
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import { db } from "../src/db";
 import { getAgentLocation, setAgentLocation, listAgents } from "../src/engine/agents";
+// ★ 판정을 **행동으로** 재려고 부른다 — 소스 문자열 대조는 「어느 팀원이 어디로 가는가」를 못 잰다.
+import { resolveRemoteTarget } from "../src/engine/llm";
 
 const 읽기 = (p: string) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
 
@@ -64,6 +66,8 @@ describe("팀원별 두뇌 위치 — 배관이 끝까지 이어졌다", () => {
     expect(s, "llm.ts가 팀원 위치를 안 읽는다 — 저장만 되고 호출은 안 갈린다").toContain("getAgentLocation");
     // "local"이면 전역 원격을 **타지 않아야** 한다.
     expect(s, "local일 때 원격을 건너뛰는 갈래가 없다").toMatch(/팀원위치 === "local"/);
+    // ★ 판정이 chat()에 **실제로 물려** 있어야 한다 — 도로 인라인하면 ⓪(총괄 고정)을 건너뛴다.
+    expect(s, "chat()이 판정 함수를 안 부른다 — 판정이 한 곳에 안 산다").toContain("await resolveRemoteTarget(args.agentId)");
   });
 
   it("② 라우트가 있고 admin 전용이다", () => {
@@ -103,5 +107,63 @@ describe("팀원별 두뇌 위치 — 배관이 끝까지 이어졌다", () => {
     // 전역 원격이 꺼진 상태에서 "remote"를 골라도 실제로는 이 PC로 간다 — 그 사실을 밝혀야 한다.
     expect(화면, "전역 원격 상태를 안 읽는다").toContain("remoteLlmWhere");
     expect(화면, "전역이 꺼졌을 때 안내가 없다").toMatch(/원격 GPU가 꺼져 있어/);
+  });
+});
+
+// ── ★ 실제 판정 — **행동으로** 잰다 (2026-09-10 검토관 적발) ─────────────────────────
+//
+// ■ 왜 생겼나: 위 「배관이 끝까지 이어졌다」는 전부 **소스 문자열 대조**다. 그것은 「갈래가 있다」
+//   까지만 말하고 「어느 팀원이 어디로 가는가」는 못 잰다. 실제로 그 틈으로 결함이 하나 지나갔다 —
+//   `setAgentLocation`은 총괄에 "remote"를 **저장**하는 것만 막는데 기본값은 null이고 null은
+//   전역을 따르므로, **아무도 총괄을 원격으로 고르지 않아도 전역 스위치 하나만 켜면 총괄이
+//   원격으로 갔다**(72B 89~90초 실측). 소스 대조는 그것을 원리상 못 본다.
+// ■ 그래서 판정을 한 곳(`llm.ts resolveRemoteTarget`)으로 모으고, 여기서 **값으로** 잰다.
+// ⚠ 대칭을 지킨다: 「로컬로 묶이는가」만 재면 어느 날 전부 로컬로 막아 놓고도 초록이 뜬다.
+//   원격으로 고른 팀원이 **정말 원격으로 가는지**도 같은 자리에서 잰다.
+describe("★ 두뇌 위치 — 실제 판정(행동으로 잰다)", () => {
+  const put = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+  const del = db.prepare("DELETE FROM app_state WHERE key = ?");
+  const 전역주소 = "http://10.8.0.12:8080/v1";
+  const 전역켜기 = () => put.run("remote_llm", JSON.stringify({ enabled: true, url: 전역주소 + "?token=시험토큰", lastCheck: null }));
+
+  afterEach(() => del.run("remote_llm"));
+
+  it("헛돎 방지 — 전역 원격이 정말 켜진 상태를 만든다", async () => {
+    // 이 줄이 없으면 아래 「원격으로 안 갔다」들이 그저 전역이 꺼져 있어서일 수 있다(거짓 초록).
+    전역켜기();
+    expect((await resolveRemoteTarget("analysis"))?.baseUrl, "전역이 안 켜졌다 — 이 묶음이 통째로 헛돈다").toBe(전역주소);
+  });
+
+  it("★ 총괄은 아무것도 안 골라도 이 PC — 전역만 켜도 끌려가지 않는다", async () => {
+    전역켜기();
+    expect(getAgentLocation("orchestrator"), "이 시험의 전제는 「아무것도 안 고른 상태」다").toBe(null);
+    expect(
+      await resolveRemoteTarget("orchestrator"),
+      "총괄이 원격으로 간다 — 지시마다 도구를 고르는 판단 앞에서 담당자가 90초를 기다리게 된다",
+    ).toBeNull();
+  });
+
+  it("원격으로 배정한 팀원은 실제로 원격으로 간다 — 토큰은 헤더로", async () => {
+    전역켜기();
+    setAgentLocation("report", "remote");
+    const t = await resolveRemoteTarget("report");
+    expect(t?.baseUrl, "원격으로 고른 팀원이 원격으로 안 간다 — 고르는 기능이 죽은 것이다").toBe(전역주소);
+    expect(t?.headers["x-gijo-serve-token"], "토큰이 헤더로 안 갈렸다").toBe("시험토큰");
+  });
+
+  it("local로 둔 팀원은 전역이 켜져 있어도 이 PC", async () => {
+    전역켜기();
+    setAgentLocation("report", "local");
+    expect(await resolveRemoteTarget("report")).toBeNull();
+  });
+
+  it("안 고른 팀원은 전역을 그대로 따른다 (무변경 보장)", async () => {
+    전역켜기();
+    expect((await resolveRemoteTarget("report"))?.baseUrl).toBe(전역주소);
+  });
+
+  it("전역이 꺼져 있으면 remote로 배정해도 이 PC — 관문은 두 겹이다", async () => {
+    setAgentLocation("report", "remote");
+    expect(await resolveRemoteTarget("report")).toBeNull();
   });
 });

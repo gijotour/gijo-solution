@@ -49,14 +49,15 @@ describe("★ 질의 재작성 — 없으면 조용히 빠진다", () => {
   });
 });
 
-// ── ★ 두뇌 위치 — 재작성은 **언제나 로컬**이다 (2026-09-10 win 운영 실측 수리) ──────────────
+// ── ★ 두뇌 위치 — 재작성은 **언제나 로컬**이다 (2026-09-10) ─────────────────────────
 //
-// ■ 무엇이 있었나: 원격 두뇌(gb10)를 전역으로 켜고 **리포트·해설 팀원만** 원격으로 배정했는데,
-//   로컬로 둔 총괄·분석 경로의 물음 「Log4Shell 위험 분석해줘」가 **5.4초 → 57초**가 됐다.
-//   재작성이 `chat()`을 안 거쳐 팀원별 두뇌 위치 판정에 안 걸리고 **전역만** 따랐기 때문이다.
-//   짧고(40토큰) 지연에 민감하며(RAG 앞단) 한 물음당 한 번 더 도는 왕복이라, 원격 콜드 40초+를
-//   태울 자리가 아니다. 전역을 끄자 8.2초로 돌아왔다.
-// ■ 이 시험이 지키는 것: 「전역이 켜져 있어도 로컬로 간다」 — 행동으로 한 번, 소스로 한 번.
+// ■ 무엇을 지키나: 「전역 원격이 켜져 있어도 재작성은 이 PC로 간다」 — 행동으로 한 번, 소스로 한 번.
+//   왜 그래야 하는지는 `searchrewrite.ts` 머리말 ★의 ①②③이다(짧다 · 지연에 민감하다 ·
+//   한 물음당 한 번 더 도는 보이지 않는 왕복이라 「전역 ON + 팀원 opt-in」 두 겹 관문을 무너뜨린다).
+// ⚠ 첫 커밋은 이 파일을 「5.4초 → 57초의 **범인**」이라 적었다 — 그 인과는 틀렸다.
+//   아래 「★ 상한」이 그 산수를 직접 잰다(한 질의당 최대 1.5초 · 실패값도 캐시라 두 번째는 0초).
+//   더 그럴듯한 원인은 총괄이 전역만 켜도 원격으로 가던 자리였고, 그쪽은
+//   `llm.ts resolveRemoteTarget` ⓪ + `agentlocation.test.ts`의 행동 시험이 맡는다.
 describe("★ 재작성은 전역 원격이 켜져 있어도 로컬로 간다", () => {
   const put = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
   const del = db.prepare("DELETE FROM app_state WHERE key = ?");
@@ -99,5 +100,41 @@ describe("★ 재작성은 전역 원격이 켜져 있어도 로컬로 간다", 
     expect(src, "로컬 통로 상수가 사라졌다 — 이 검사의 근거가 바뀐 것이다").toMatch(/GIJO_LOCAL_LLM_URL/);
     // ⚠ 검사기 자체 확인(반증) — 되살린 모양을 만들어 정말 빨강이 나는지 본다.
     expect(문다(`const 원격 = await import("./remotellm.js").then((m) => m.remoteLlmTarget());`), "검사기가 고장 났다").toBe(true);
+  });
+});
+
+
+// ── ★ 상한 — 재작성이 답을 붙잡고 있을 수 없다 (2026-09-10 검토관 적발) ────────────────
+//
+// ■ 왜 생겼나: 「재작성이 원격으로 가서 답이 5.4초 → 57초가 됐다」는 설명이 커밋에 실렸다.
+//   그런데 이 파일에는 **1.5초 상한**이 있고 그 env(GIJO_SEARCH_REWRITE_TIMEOUT_MS)를 올리는 곳이
+//   저장소에 하나도 없다 — 한 질의가 더할 수 있는 시간에 천장이 있으니 +51.6초는 원리상 안 나온다.
+//   말로만 적힌 상한은 조용히 사라진다(env 한 줄, signal 한 줄). 그래서 **숫자로 붙잡아 둔다.**
+//   이 시험이 초록인 한, 다음 사람이 느린 답을 다시 이 파일 탓으로 돌리는 일은 없다.
+describe("★ 상한 — 재작성은 답을 오래 붙잡을 수 없다", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("모델이 끝내 대답하지 않아도 제한 시간 안에 포기하고, 그 실패도 캐시된다", async () => {
+    let 부른횟수 = 0;
+    vi.stubGlobal("fetch", (_u: unknown, init: { signal?: AbortSignal } = {}) => {
+      부른횟수 += 1;
+      // 절대 대답하지 않는 상대 — 오직 AbortSignal만이 이 약속을 끝낼 수 있다.
+      return new Promise((_res, rej) => init.signal?.addEventListener("abort", () => rej(new Error("aborted"))));
+    });
+
+    const q = "대답하지 않는 상대에게 던지는 질문입니다 어디부터 봐야 하나요?";
+    const 시작 = Date.now();
+    expect(await rewriteForSearch(q), "포기했으면 빈 문자열이어야 한다").toBe("");
+    const 걸린 = Date.now() - 시작;
+
+    expect(부른횟수, "아예 안 불렀다 — 상한이 아니라 앞단 조건에 걸린 것이다(헛돎)").toBe(1);
+    expect(걸린, "붙잡은 시간이 " + 걸린 + "ms — 상한이 사라졌다").toBeLessThan(3000);
+    expect(걸린, "0초에 돌아왔다 — 기다렸다 포기한 게 아니다(헛돎)").toBeGreaterThan(500);
+
+    // 실패값도 캐시에 들어간다 — 같은 질문의 두 번째는 상대를 다시 부르지 않는다.
+    const 두번째 = Date.now();
+    expect(await rewriteForSearch(q)).toBe("");
+    expect(부른횟수, "실패한 질의를 다시 불렀다 — 같은 질문마다 상한만큼 또 붙잡는다").toBe(1);
+    expect(Date.now() - 두번째, "두 번째가 즉시가 아니다").toBeLessThan(200);
   });
 });

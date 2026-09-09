@@ -95,6 +95,25 @@ function 원격게터를문다(src: string): boolean {
   return /(?:from|import\()\s*["'][^"']*remotellm/.test(src);
 }
 
+/** 주석을 뗀 **코드만** 남긴다 — 설명으로 적어 둔 `STATE_KEY="remote_llm"`을 결함으로 세면 안 된다. */
+const 주석뗀것 = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+/**
+ * 그 파일이 원격 주소에 **스스로 손을 뻗는가**. 두 갈래를 본다 — 뻗으면 어떻게 뻗는지를 돌려준다.
+ *   ① 게터 모듈을 문다(import).
+ *   ② 게터를 건너뛰고 저장값(app_state STATE_KEY="remote_llm")을 **직접 읽는다**.
+ * ⚠ **이것으로도 못 잡는 것**(2026-09-10 검토관 적발 — 첫 판은 ①만 보고 「전수」라 적었다):
+ *   주소를 딴 이름으로 옮겨 적은 사본 · `src/engine/` **밖의** 도우미 · env로 주소를 따로 받는 곁가지.
+ *   그래서 이름을 「engine 안, 두 갈래」로 적는다 — 그물 이름이 그물보다 넓으면 안 잡힌 것을 잡혔다고 믿는다.
+ *   행동으로 재는 그물은 따로 있다: `searchrewrite.test.ts`가 실제 fetch URL을 잰다.
+ */
+function 원격주소에손을뻗는가(src: string): string {
+  const 코드 = 주석뗀것(src);
+  if (원격게터를문다(코드)) return "게터 import";
+  if (/["']remote_llm["']/.test(코드)) return "저장값 직접 읽기";
+  return "";
+}
+
 describe("★ 배선 — 게터가 실제로 채팅 경로에 물려 있다 (소스 감시)", () => {
   // 함수만 있고 안 부르면 「설계는 됐고 쓰인 적 없다」다 — 이 저장소의 반복 유형.
   it("llm.ts가 원격 게터를 ensureAgentModel **앞에서** 본다", () => {
@@ -107,30 +126,41 @@ describe("★ 배선 — 게터가 실제로 채팅 경로에 물려 있다 (소
     expect(src, "원격 토큰 헤더가 fetch에 안 붙는다").toMatch(/\.\.\.원격헤더/);
   });
   // ★ 2026-09-10 뒤집혔다. 예전 이 자리엔 「searchrewrite.ts도 같은 게터를 본다」가 있었다 —
-  //   그게 실결함이었다. 재작성은 `chat()`을 안 거쳐 **팀원별 두뇌 위치를 못 보고** 전역만 따랐고,
-  //   win 운영 실측(2026-09-10)에서 리포트·해설만 원격으로 배정했는데도 **로컬로 둔** 총괄·분석
-  //   경로의 물음이 5.4초 → 57초가 됐다(전역을 끄니 8.2초). 두 겹 관문(① 전역 ON ② 팀원 opt-in)의
-  //   뜻이 곁가지 하나 때문에 무너진 것이다. 그래서 재작성은 언제나 로컬로 못 박았다.
-  it("★ chat()을 안 거치고 원격 게터를 직접 무는 도우미가 없다 (engine 전수)", () => {
+  //   그게 결함이었다. 재작성은 `chat()`을 안 거쳐 **팀원별 두뇌 위치를 못 보고** 전역만 따랐다:
+  //   아무도 원격을 고르지 않은 경로까지 보이지 않는 왕복을 치르므로, 두 겹 관문(① 전역 ON
+  //   ② 팀원 opt-in)의 뜻이 곁가지 하나 때문에 무너진다. 그래서 재작성은 언제나 로컬로 못 박았다.
+  //   ⚠ 다만 그 파일이 「5.4초→57초」의 **범인**이라는 첫 설명은 틀렸다 — 상한이 1.5초다
+  //     (`searchrewrite.ts` 머리말 ★, 짝 시험 「★ 상한」이 행동으로 잰다). 더 그럴듯한 원인은
+  //     총괄이 전역만 켜도 원격으로 가던 자리였고 `llm.ts resolveRemoteTarget` ⓪에서 막았다
+  //     (`agentlocation.test.ts`의 행동 시험이 그것을 지킨다).
+  it("★ chat()을 안 거치고 원격 주소에 손을 뻗는 도우미가 없다 (engine 안, 두 갈래)", () => {
     // 파일 목록을 손으로 적지 않는다 — 새로 생기는 곁가지를 잡는 것이 이 검사의 전부다.
-    // 원격을 쓰고 싶은 도우미는 llm.ts의 chat()을 거치게 한다(거기 두 겹 관문이 있다).
+    // 원격을 쓰고 싶은 도우미는 llm.ts의 chat()을 거치게 한다(거기 관문이 있다).
     const 문것: string[] = [];
     const 훑기 = (d: URL, prefix = "") => {
       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         if (e.isDirectory()) 훑기(new URL(e.name + "/", d), prefix + e.name + "/");
         else if (e.name.endsWith(".ts") && e.name !== "remotellm.ts" && e.name !== "llm.ts") {
-          if (원격게터를문다(fs.readFileSync(new URL(e.name, d), "utf8"))) 문것.push(prefix + e.name);
+          const 어떻게 = 원격주소에손을뻗는가(fs.readFileSync(new URL(e.name, d), "utf8"));
+          if (어떻게) 문것.push(`${prefix}${e.name}(${어떻게})`);
         }
       }
     };
     훑기(new URL("../src/engine/", import.meta.url));
     expect(
       문것.join(", "),
-      "이 파일들이 원격 게터를 직접 문다 — 팀원 두뇌 위치를 못 본 채 전역만 따라간다(5.4초→57초의 그 모양)",
+      "이 파일들이 원격 주소에 직접 손을 뻗는다 — 팀원 두뇌 위치를 못 본 채 전역만 따라간다",
     ).toBe("");
-    // ⚠ 헛돎 방지: 정작 llm.ts가 안 물고 있으면 이 검사는 아무것도 안 지킨다.
+    // ⚠ 헛돎 방지 ①: 정작 llm.ts가 안 물고 있으면 이 검사는 아무것도 안 지킨다.
     const llm = fs.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
     expect(원격게터를문다(llm), "llm.ts가 원격 게터를 안 문다 — 이 검사의 근거가 바뀐 것이다").toBe(true);
+    // ⚠ 헛돎 방지 ②(반증): 두 갈래가 **정말** 빨강을 내는지, 그리고 주석은 안 세는지 만들어 본다.
+    expect(원격주소에손을뻗는가(`const t = await import("./remotellm.js").then((m) => m.remoteLlmTarget());`)).toBe("게터 import");
+    expect(원격주소에손을뻗는가(`const row = db.prepare("SELECT value FROM app_state WHERE key = ?").get("remote_llm");`)).toBe("저장값 직접 읽기");
+    expect(
+      원격주소에손을뻗는가(`// 주소·on/off는 전역 하나다(remotellm.ts STATE_KEY="remote_llm")`),
+      "설명으로 적힌 것을 결함으로 셌다 — 이러면 못 고칠 빨강이 나 감시를 꺼 버리게 된다",
+    ).toBe("");
   });
   it("라우트 3개가 등록돼 있다(app.ts)", () => {
     const src = fs.readFileSync(new URL("../src/app.ts", import.meta.url), "utf8");

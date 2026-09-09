@@ -808,6 +808,36 @@ export function 가드사유(인용가드: CiteGuardResult, 경로가드: 메타
   return { 사유, 경로이름 };
 }
 
+// ★ **팀원별 두뇌 위치 — 원격 목표를 정하는 단 하나의 자리**
+//   (2026-08-18 사장님 지시: "여러 개의 두뇌가 공동작업"). 원격은 그전까지 **전역 on/off 하나**였다 —
+//   켜면 전원 원격, 끄면 전원 로컬. 그래서 「총괄은 로컬 빠른 두뇌로 판단하고, 분석가는 원격 큰 두뇌로
+//   깊게」가 불가능했다. 관문은 **세 겹**이고, 적힌 순서가 곧 우선순위다.
+//
+//     ⓪ **총괄(orchestrator)은 언제나 이 PC** — 아무것도 안 골라도 그렇다(아래 ⚠).
+//     ① 이 팀원이 "local"이라 했나 — 전역이 켜져 있어도 이 PC에서 돈다.
+//     ② 전역이 켜졌나 — 주소·on/off는 여전히 하나다(`remotellm.ts` STATE_KEY="remote_llm").
+//        안 골랐으면(기본 null) 전역을 그대로 따른다 — 무변경 보장.
+//
+// ⚠ **⓪를 여기에 둔 까닭**(2026-09-10 검토관 적발). `agents.ts setAgentLocation`은 총괄에
+//   "remote"를 **저장**하는 것만 막는다. 그런데 기본값은 null이고 null은 전역을 따른다 — 즉
+//   아무도 총괄을 원격으로 고르지 않아도 **전역 스위치 하나만 켜면 총괄이 원격으로 갔다.**
+//   총괄은 지시마다 도구를 고르는 짧고 잦은 판단을 하고(`intent.ts`의 분류 · `agentloop.ts`의 매 단계)
+//   그 앞에서 담당자가 기다리는데, 같은 질문에 gb10이 14B 17.4초 / 32B 36.6초 / **72B 89~90초**였다
+//   (2026-08-18 실측). 「총괄은 이 PC 고정」이라는 약속이 **쓰는 자리에서는 안 지켜지고 있었다** —
+//   약속을 적은 곳과 지키는 곳이 갈리면 지키는 곳이 이긴다. 그래서 판정하는 여기서 못 박는다.
+// ⚠ `chat()`을 안 거치고 원격 게터를 직접 부르는 도우미를 만들지 말 것 — 관문이 여기 있다.
+//   팀원 개념이 없으면 로컬로 두고(`searchrewrite.ts`가 그 예), 붙일 수 있으면 이 함수를 지나가게 한다.
+// ⚠ **내보내는 까닭**: 시험이 행동으로 재야 한다. 소스 문자열 대조는 「갈래가 있다」까지만 말하고
+//   「어느 팀원이 어디로 가는가」는 못 잰다(`test/agentlocation.test.ts` 행동 시험).
+export async function resolveRemoteTarget(agentId: string): Promise<{ baseUrl: string; headers: Record<string, string> } | null> {
+  if (agentId === "orchestrator") return null; // ⓪ 총괄은 이 PC 고정 — 전역도 못 끌어간다
+  const 팀원위치 = await import("./agents.js")
+    .then((m) => m.getAgentLocation(agentId))
+    .catch(() => null);
+  if (팀원위치 === "local") return null; // ① 이 팀원은 이 PC 고정 — 전역 원격을 타지 않는다
+  return await import("./remotellm.js").then((m) => m.remoteLlmTarget()).catch(() => null); // ② 전역을 따른다
+}
+
 export async function chat(args: ChatArgs): Promise<string> {
   // 단일 관문 — 사용자 입력이 LLM에 닿기 전 반드시 여기를 지난다(engine/gateway.ts 주석 참고).
   // trusted는 이미 관문을 지난 내부 재진입(dispatcher)만 쓴다.
@@ -894,32 +924,9 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 「기계 교체 없이 더 크게」가 반쪽이 된다. 원격이면 표준 32K 예산을 쓴다.
   // ⚠ 토큰까지 포함한 목표를 받는다(2026-08-16) — baseUrl(토큰 뗀 것)과 headers(토큰)로 갈린다.
   //   `원격`은 아래 여러 곳이 「원격인가」 불리언으로 쓰므로 baseUrl만 뽑아 유지한다.
-  // ★ **팀원별 두뇌 위치**(2026-08-18 사장님 지시: "여러 개의 두뇌가 공동작업").
-  //   원격은 지금까지 **전역 on/off 하나**였다 — 켜면 전원 원격, 끄면 전원 로컬.
-  //   그래서 「총괄은 로컬 빠른 두뇌로 판단하고, 분석가는 원격 큰 두뇌로 깊게」가 불가능했다.
-  //
-  //   관문이 **두 겹**이다 (순서가 중요하다):
-  //     ① 전역이 켜졌나 — 주소·on/off는 여전히 하나다(`remotellm.ts` STATE_KEY="remote_llm")
-  //     ② 이 팀원이 쓰겠다 했나 — `agents.ts getAgentLocation(agentId)`
-  //   ②가 "local"이면 **전역이 켜져 있어도 이 PC에서 돈다.** 비었으면(기본) 전역을 그대로 따른다
-  //   — 지금까지와 한 글자도 다르지 않게 돈다(무변경 보장).
-  //
-  // ⚠ `agentId`는 ChatArgs의 **필수 인자**다(:29) — 늘 있다. 그리고 `chat()`을 안 거치고
-  //   원격 게터를 직접 부르는 내부 도우미는 **이제 없다**(2026-09-10 운영 실측 수리).
-  //   `searchrewrite.ts`가 그 하나였는데, 팀원 개념이 없다는 이유로 **전역만 따라** 원격으로 갔다.
-  //   결과(실측): 리포트·해설만 원격으로 배정하고 총괄·분석은 로컬로 뒀는데도 그 물음이
-  //   **5.4초 → 57초**가 됐다 — 아무도 원격을 고르지 않은 경로가 매 물음마다 원격 왕복을 탄 것이라
-  //   여기 두 겹 관문(① 전역 ON ② 팀원 opt-in)의 뜻이 통째로 무너졌다. 전역을 끄니 8.2초.
-  //   ⇒ 재작성은 **언제나 로컬 엔진**으로 못 박았다(`searchrewrite.ts` 머리말 ★, 짝 시험 있음).
-  //   ⇒ 새 도우미를 만들 때: 팀원 개념이 없으면 원격 게터를 부르지 말고 로컬로 둔다.
-  //      팀원 개념을 붙일 수 있으면 직접 부르지 말고 이 `chat()`을 거치게 한다.
-  const 팀원위치 = await import("./agents.js")
-    .then((m) => m.getAgentLocation(args.agentId))
-    .catch(() => null);
-  const 원격목표 =
-    팀원위치 === "local"
-      ? null // 이 팀원은 이 PC 고정 — 전역 원격을 타지 않는다
-      : await import("./remotellm.js").then((m) => m.remoteLlmTarget()).catch(() => null);
+  // ★ 팀원별 두뇌 위치 → 원격 목표. **판정은 한 곳에만 산다**(`resolveRemoteTarget` 머리말 ★).
+  //   `agentId`는 ChatArgs의 **필수 인자**다(:29) — 늘 있다.
+  const 원격목표 = await resolveRemoteTarget(args.agentId);
   const 원격 = 원격목표?.baseUrl ?? null;
   const 원격헤더 = 원격목표?.headers ?? {};
 
