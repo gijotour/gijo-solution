@@ -17,7 +17,7 @@ import { 말투현황줄 } from "./tonewatch";
 import fs from "fs";
 import path from "path";
 import { db, isDbEncrypted } from "../db";
-import { authMiddleware } from "../auth/auth";
+import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { verifyBackupSnapshot } from "./backup";
 import { auditRetentionDays } from "./audit";
@@ -26,6 +26,8 @@ import { getSiemConfig, getSiemStats } from "./siem";
 import { getLocalEngineStatus } from "./localengine";
 // 느린 답이 어느 경로로 갔는지를 **사람이 읽는 이름**으로 — 이름의 출처는 에이전트 등록부 하나다(llm.ts와 같다).
 import { getAgentById } from "./agents";
+// 그 이름이 담당자에게 내보내도 되는 글자인지 재는 자 — 말투 규범의 단일 출처(tone.ts) 그대로 쓴다.
+import { 말투위반 } from "./tone";
 
 export type CheckLevel = "ok" | "warn" | "fail" | "unknown";
 
@@ -327,8 +329,13 @@ function checkEmbedding(): HealthCheck {
 // ── 느린 답 원장 ─────────────────────────────────────────────────────────────
 // 왜(2026-08-07): 147상황에서 "이번 주 예정된 점검"이 30초, "KISA 대응 현황"이 31초 —
 // **매번 사후에 수동으로 추적**해야 어떤 질문이 왜 느렸는지 알 수 있었다. 온프렘에선
-// 우리가 그 자리에 없다. 담당자를 기다리게 한 질문을 제품이 스스로 적어 두고,
-// 자가 진단이 "요즘 어떤 질문이 느린가"를 한 줄로 답한다.
+// 우리가 그 자리에 없다. 담당자를 기다리게 한 질문을 제품이 스스로 적어 둔다.
+//
+// ⚠ **원장과 자가 진단은 보는 것이 다르다**(2026-09-10에 갈렸다 — 예전 머리말은 둘을 같은 것으로 적었다).
+//   · 원장(이 표)에는 질문 원문이 그대로 남는다 — 무엇이 왜 느렸는지 찾는 열쇠라 지우면 못 찾는다.
+//     대신 **admin만** 꺼내 본다(GET /api/slow-answers · tools/slow-report.mjs).
+//   · 자가 진단(checkSlowAnswers)은 **몇 건 · 얼마나 · 어느 경로**만 답한다. 질문 본문은 안 싣는다.
+//     까닭은 checkSlowAnswers 머리말에 적어 뒀다.
 db.exec(`CREATE TABLE IF NOT EXISTS slow_answers (
   at INTEGER NOT NULL,
   question TEXT NOT NULL,   -- 담당자가 친 문장(앞 200자) — 느린 이유를 찾는 열쇠다
@@ -361,8 +368,23 @@ const 느린시각 = (at: number) => new Date(at).toLocaleTimeString("ko-KR", { 
 /**
  * 어느 경로가 받았나 — **등록부의 사람 이름 하나**만 쓴다(llm.ts와 같은 출처).
  * ⚠ 등록부에 없는 id는 **그대로 내보내지 않는다** — 그것이 곧 내부 키다.
+ *
+ * ⚠⚠ 표시 이름은 **조직이 자유롭게 바꾼다**("우리 팀" 로스터 — agents.ts:setAgentName).
+ *   거기 걸린 자물쇠는 길이 30자뿐이라, 누가 팀원을 `vuln:10.0.0.99`나 `✅점검반`으로 바꾸면
+ *   질문 본문을 걷어낸 이 줄이 **다시 「내용에 따라 갈리는 빨강」**이 된다(검토관 적발, 2026-09-10).
+ *   그래서 내보내기 전에 말투 규범으로 한 번 재고, 걸리면 **우리가 지은 기본 이름**으로 돌아간다.
+ *   ⚠ 지우지 않는다 — 어느 경로가 받았는지는 그대로 남는다(정보를 버리는 게 아니라 글자만 바꾼다).
+ *   ⚠ 규범을 지키는 이름은 **그대로 쓴다** — 조직이 지은 이름을 함부로 덮으면 그것도 거짓말이다.
+ *   ⚠ 이 자물쇠는 **이 줄에만** 걸려 있다. 커스텀 이름을 답에 싣는 다른 자리(팀 현황·데이터 카드 등)는
+ *     그대로다 — 뿌리에서 막으려면 setAgentName이 규범을 재야 하고, 그건 관리자 화면 동작이 바뀌는 일이라
+ *     따로 결정할 몫이다(인계에 적어 둔다).
  */
-const 느린경로 = (agentId: string | null) => (agentId ? getAgentById(agentId)?.name ?? "경로 미상" : "경로 미상");
+const 느린경로 = (agentId: string | null): string => {
+  if (!agentId) return "경로 미상";
+  const a = getAgentById(agentId);
+  if (!a) return "경로 미상";
+  return 말투위반(a.name).length ? a.defaultName : a.name;
+};
 
 /**
  * 느린 답 항목 — **질문 본문은 싣지 않는다**(2026-09-10).
@@ -371,10 +393,14 @@ const 느린경로 = (agentId: string | null) => (agentId ? getAgentById(agentId
  *   ① 화면·하네스가 질문에 붙이는 **내부 표식 줄**(`#범위 vuln:10.0.0.12` · `#셸 pro`)이 답에 실려
  *      말투 감시 「내부 식별자」에 걸렸다 — 실전 답 대조 시험이 빨강이 되어 배포 게이트가 막혔다.
  *      ⚠ 전날 재료에서는 우연히 안 걸렸다. **답의 내용에 따라 갈리는 빨강**이라 문구를 다듬어서 될 일이 아니다.
- *   ② 자가 진단은 관리자가 보는 자리다. 거기에 **남이 친 질문 본문**이 되비치면
- *      「상태를 말하는 자리」가 「남의 대화를 보여 주는 자리」가 된다(사내 민감한 물음일 수 있다).
+ *   ② 거기에 **남이 친 질문 본문**이 되비치면 「상태를 말하는 자리」가 「남의 대화를 보여 주는 자리」가
+ *      된다(사내 민감한 물음일 수 있다).
+ *      ⚠ 처음엔 이 까닭을 「자가 진단은 관리자가 보는 자리라서」로 적었는데 **틀렸다**(검토관 적발, 2026-09-10).
+ *        자가 진단은 관리자 전용이 아니다 — GET /api/system-health는 authMiddleware고,
+ *        `system_health` 도구에도 requiredRole이 없어 **로그인한 담당자 누구나** 부른다.
+ *        그래서 「본문을 안 싣는 것」이 여기서는 **유일한 방어선**이다(권한으로 못 막는다).
  * 그래서 **언제 · 얼마나 · 어느 경로**만 싣는다. 질문 본문은 원장(slow_answers)에 그대로 남는다 —
- * 지우는 게 아니라 **답에서만 걷어낸다**. 원장을 읽는 쪽(/api/slow-answers · tools/slow-report.mjs)은 그대로다.
+ * 지우는 게 아니라 **답에서만 걷어낸다**. 원장을 꺼내 보는 쪽은 admin으로 닫았다(아래 라우트 참조).
  * 짝 시험: server/test/slowanswers.test.ts.
  */
 function checkSlowAnswers(): HealthCheck {
@@ -441,7 +467,17 @@ export function registerObservabilityRoutes(app: Express): void {
 
   // 느린 답 원장 — **반복 등장 질문**이 다음 즉답화(강제 라우팅) 후보다. 같은 질문을 띄어쓰기만
   // 다르게 쳐도 한 묶음으로 센다. 자가 진단(상위 3건)보다 넓게, 14일 전체를 묶어서 본다.
-  app.get("/api/slow-answers", authMiddleware, asyncRoute(async (_req, res) => {
+  //
+  // ★ **admin만**(2026-09-10 검토관 적발 — 앞 수리가 좁은 자리만 막았다).
+  //   이 창구가 내주는 것은 **남이 친 질문 원문**(각 200자·14일치 전부)이다. 자가 진단 답에서는
+  //   본문을 걷어냈는데 정문은 authMiddleware라 **로그인한 아무 담당자나 묶음으로 받아 갔다** —
+  //   좁은 문을 닫고 넓은 문을 열어 둔 꼴이었다.
+  //   같은 성질의 원장(답변 지적 — 남의 질문 원문과 사유가 실린다)은 이미 2026-09-07에
+  //   `GET /api/answer-feedback` · `answer_feedback_status` 둘 다 admin으로 닫았다. **자물쇠를 맞춘다.**
+  //   ⚠ 읽는 쪽은 `tools/slow-report.mjs` 하나뿐이고 admin 계정(GIJO_ADMIN_USER)으로 로그인한다 —
+  //     제품 화면 소비자는 없다(client/src 전수 확인 2026-09-10). 담당자 계정으로 그 도구를 돌리면
+  //     이제 403이 난다: 그때는 도구가 아니라 **계정을 admin으로** 쓰는 것이 맞다.
+  app.get("/api/slow-answers", authMiddleware, adminMiddleware, asyncRoute(async (_req, res) => {
     const rows = db.prepare("SELECT question, ms, at, agentId FROM slow_answers ORDER BY at DESC").all() as
       { question: string; ms: number; at: number; agentId: string | null }[];
     const 묶음 = new Map<string, { question: string; count: number; maxMs: number; lastAt: number }>();

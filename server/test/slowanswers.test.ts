@@ -105,3 +105,81 @@ describe("★ 자가 진단 답 — 남의 질문 본문이 되비치지 않는�
     expect(c.detail, "어느 경로가 받았는지가 사라졌다").toContain("Scan Agent");
   });
 });
+
+// ── 검토관 적발 3건(2026-09-10) — 같은 까닭이 남아 있던 자리들 ────────────────────
+//
+// 앞 수리는 「자가 진단 답에 남의 질문 본문을 싣지 않는다」였다. 검토관이 그 **까닭**을
+// 들고 파일을 다시 훑어 셋을 찾았다.
+//   ① 좁은 자리만 막고 **넓은 자리는 열려 있었다** — 원장 정문 GET /api/slow-answers가
+//      authMiddleware라 로그인한 아무 담당자나 남의 질문 원문(각 200자·14일치)을 받아 갔다.
+//      같은 성질의 원장(답변 지적)은 2026-09-07에 이미 admin으로 닫았다 — 자물쇠가 원장마다 달랐다.
+//   ② 「내용에 따라 갈리는 빨강」이 **구조적으로 닫히지 않았다** — 질문 대신 실은 값(팀원 표시
+//      이름)도 사람이 자유롭게 적는 글이라, 이름을 `vuln:10.0.0.99`로 바꾸면 같은 빨강이 다시 난다.
+//      (agents.ts:setAgentName은 길이 30자만 본다.)
+//   ③ 파일 안 머리말 하나가 이 변경으로 거짓이 됐다 — 아래 ③은 소스 대조로 못 박는다.
+import fs from "node:fs";
+import { setAgentName } from "../src/engine/agents";
+
+const 관측성소스 = fs.readFileSync(new URL("../src/engine/observability.ts", import.meta.url), "utf8");
+
+describe("★ 적발① 느린 답 원장 정문 — 남의 질문 원문은 admin만", () => {
+  it("GET /api/slow-answers가 adminMiddleware로 닫혀 있다", () => {
+    const 줄 = 관측성소스.split("\n").find((l) => /app\.get\(\s*"\/api\/slow-answers"/.test(l)) ?? "";
+    expect(줄, "/api/slow-answers 라우트를 못 찾았다 — 경로가 바뀌었으면 이 시험부터 고친다").not.toBe("");
+    expect(줄, `로그인한 아무 계정이 남의 질문 원문을 받아 간다: ${줄.trim()}`).toContain("adminMiddleware");
+  });
+
+  it("자가 진단(GET /api/system-health)은 admin 전용이 아니다 — 담당자도 상태는 본다", () => {
+    // ⚠ 이 짝을 함께 못 박는 이유: ①을 고치면서 자가 진단까지 admin으로 닫으면
+    //   담당자가 「지금 이상 있나」를 못 본다(system_health 도구도 requiredRole이 없다).
+    //   즉 **본문을 안 싣는 것**이 유일한 방어선이라, 위 「본문 안 싣기」 시험들이 더 중요해진다.
+    const 줄 = 관측성소스.split("\n").find((l) => /app\.get\(\s*"\/api\/system-health"/.test(l)) ?? "";
+    expect(줄).not.toBe("");
+    expect(줄, "자가 진단을 admin 전용으로 닫았다 — 담당자가 상태를 못 본다").not.toContain("adminMiddleware");
+  });
+});
+
+describe("★ 적발② 팀원 표시 이름이 자가 진단 답을 다시 빨갛게 만들지 않는다", () => {
+  const 되돌리기 = () => setAgentName("scan", null, "test");
+
+  it("★★ 이름에 내부 키가 들어가도 자가 진단 답은 말투 규범 0건", () => {
+    try {
+      setAgentName("scan", "vuln:10.0.0.99", "test");
+      recordAnswerTiming("아무 질문", SLOW_ANSWER_MS + 6000, false, "scan");
+      const 답 = systemHealthText();
+      const 걸린것 = 말투위반(답);
+      expect(걸린것.length, `팀원 이름이 말투 규범을 어겼다: ${걸린것.map((x) => x.이름).join(", ")}\n${답}`).toBe(0);
+      // 지우는 게 아니라 **우리가 지은 기본 이름으로 돌아간다** — 어느 경로였는지는 남는다.
+      expect(답, "경로가 통째로 사라졌다").toContain("Scan Agent");
+    } finally { 되돌리기(); }
+  });
+
+  it("겹치는 기호가 든 이름도 마찬가지다", () => {
+    try {
+      setAgentName("scan", "✅점검반", "test");
+      recordAnswerTiming("아무 질문", SLOW_ANSWER_MS + 6000, false, "scan");
+      const 답 = systemHealthText();
+      expect(말투위반(답).length, `기호 든 이름이 답에 그대로 실렸다:\n${답}`).toBe(0);
+    } finally { 되돌리기(); }
+  });
+
+  it("★ 규범을 지키는 커스텀 이름은 그대로 쓴다 — 과잉 차단이 아니다", () => {
+    try {
+      setAgentName("scan", "우리팀 점검반", "test");
+      recordAnswerTiming("아무 질문", SLOW_ANSWER_MS + 6000, false, "scan");
+      const c = systemHealth().checks.find((x) => x.id === "slow")!;
+      expect(c.detail, "조직이 지은 이름을 안 쓰고 기본 이름으로 덮었다").toContain("우리팀 점검반");
+    } finally { 되돌리기(); }
+  });
+});
+
+describe("★ 적발③ 원장 머리말이 이 변경 뒤에도 참인가", () => {
+  it("자가 진단이 「어떤 질문이 느린가」를 답한다고 적어 두지 않는다", () => {
+    // 이제 자가 진단은 어떤 질문이었는지 답하지 않는다(그것이 위 수리의 요지다).
+    // 한 파일이 정반대를 말하면 다음 사람은 틀린 쪽을 믿는다.
+    const 머리말 = 관측성소스.slice(0, 관측성소스.indexOf("export const SLOW_ANSWER_MS"));
+    expect(머리말, "원장 머리말이 아직 「자가 진단이 어떤 질문이 느린가를 답한다」고 적는다").not.toMatch(
+      /자가\s*진단이\s*"?요즘\s*어떤\s*질문이\s*느린가"?/,
+    );
+  });
+});
