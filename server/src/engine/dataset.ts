@@ -249,6 +249,117 @@ function 피피티표(xml: string): string {
     칸글([...tc.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]).join(" ")))));
 }
 
+/* ── pptx 백로그 3종 — 슬라이드 경계·도해/차트 회수·노트 표시 (2026-09-10, 갈래 P) ──────────
+ *
+ * ■ 왜 지금인가: 2026-09-08에 **파이썬 pptx 갈래를 지우면서 세 약속을 못 옮겼다**(그 커밋이
+ *   백로그로 적어 둔 것 — test/pptxextract.test.ts 머리말 「아직 못 옮긴 약속 3종」).
+ *   ⓐ 「[슬라이드 N]」 경계 — 없으면 32장짜리 덱이 한 덩어리로 이어져 「몇 장 이야기인가」가
+ *      사라진다. 주제별로 자르는 뒤 단계가 기댈 자리가 없다.
+ *   ⓑ SmartArt(ppt/diagrams/dataN.xml)·차트(ppt/charts/chartN.xml) 글자 — 도해로 그린 벤더
+ *      덱은 슬라이드 XML 본문이 거의 빈다(2026-08-23 SafeBreach 실측으로 확인한 공백).
+ *   ⓒ 「(노트)」 표시 — 종전엔 노트가 **전부 문서 끝에** 몰렸다(제품소개 덱 실측: 노트 32개가
+ *      본문 32장 뒤에 줄줄이). 어느 장의 메모인지 알 길이 없어 조각으로 잘리면 뜻을 잃는다.
+ *
+ * ■ 이것은 **pptx 출력을 바꾸는 변경**이다 — 그래서 「표 없는 문서는 글자 하나까지 같다」
+ *   회귀 골든(test/tableextract.test.ts)의 **pptx 몫을 새 계약으로 갈아 끼웠다.** 갈아 끼우면서
+ *   「무엇이 달라졌는가」를 시험에 남긴다: 표시를 걷어내면 **낱말 다중집합이 앞뒤로 같다**
+ *   (글자를 지어내지도 잃지도 않았다)와, 달라진 것은 「표시 2종 + 노트가 제 슬라이드로 간 자리」뿐.
+ *
+ * ■ ⚠ 실물로 못 잰 갈래 — **도해·차트는 픽스처로만 검증됐다.** 저장소·운영의 pptx 3편에
+ *   SmartArt·차트가 **0개**다(2026-09-10 실측: 제품소개 32장·GSTS 16장·ASM 수지비 24장 전부 0.
+ *   제품소개에 ppt/charts/ 폴더가 있지만 **빈 폴더**다). 즉 ⓑ가 실물에서 회수한 글자는 0자다 —
+ *   병합 셀과 같은 부류로, 「그물은 쳤지만 이 저장소의 실물로는 못 쟀다」가 정직한 말이다.
+ *   ASM의 「표처럼 보이는 것」은 도형이라 여기서도 복원 불가다(위 표 갈래 주석과 같은 한계).
+ */
+
+/** 관계 파일의 Target을 zip 안 이름으로 편다 — "../diagrams/data1.xml" → "ppt/diagrams/data1.xml".
+ *  ⚠ 절대형("/ppt/…")과 상대형이 둘 다 온다. 바깥 링크(http)는 부르는 쪽 걸림쇠가 걸러 낸다. */
+function 부품경로(기준폴더: string, target: string): string {
+  const t = target.replace(/\\/g, "/");
+  if (t.startsWith("/")) return t.slice(1);
+  const out: string[] = [];
+  for (const 조각 of (기준폴더 + t).split("/")) {
+    if (조각 === "" || 조각 === ".") continue;
+    if (조각 === "..") out.pop();
+    else out.push(조각);
+  }
+  return out.join("/");
+}
+
+/** 관계 파일(_rels/*.rels)이 가리키는 부품들 — **rId 번호순**으로 준다.
+ *  ⚠ 순서를 정해 두지 않으면 같은 파일이 실행마다 다르게 나올 수 있다(zip 항목 차례에 딸린다).
+ *    rId는 그 문서가 스스로 매긴 번호라 가장 싼 결정적 잣대다.
+ *  ⚠ TargetMode="External"(웹 링크)은 zip 안에 없다 — 걸러야 경로 해석이 헛돈다. */
+function 관계부품들(relXml: string, 기준폴더: string): string[] {
+  return [...relXml.matchAll(/<Relationship\b[^>]*>/g)]
+    .map((m) => ({
+      번호: Number((/\bId="rId(\d+)"/.exec(m[0]) ?? ["", "0"])[1]),
+      대상: (/\bTarget="([^"]*)"/.exec(m[0]) ?? ["", ""])[1],
+      바깥: /\bTargetMode="External"/.test(m[0]),
+    }))
+    .filter((r) => r.대상 && !r.바깥)
+    .sort((a, b) => a.번호 - b.번호)
+    .map((r) => 부품경로(기준폴더, r.대상));
+}
+
+/** 차트(ppt/charts/chartN.xml)에서 **사람이 읽을 것만** 뽑는다.
+ *  · 제목·축 이름·직접 쓴 이름표 → rich text(`<a:t>`) · 계열 밖의 `<c:v>`(제목을 시트 참조로 둔 파일)
+ *  · 계열 이름·범주·값 → 계열(`<c:ser>`) 안의 `<c:v>` → **파이프 표**로 낸다.
+ *    「범주 × 계열」이 표 그 자체라, 줄글로 이어붙이면 어느 숫자가 무슨 칸인지 사라진다
+ *    (표 갈래를 만든 이유와 같다). 범주가 없으면(분산형 등) 「계열 이름: 값, 값」 줄로 낸다.
+ *  ⚠ 오차막대 같은 부속 수치는 안 담는다 — 지식이 아니다(원래도 안 담겼다).
+ *  ⚠ 계열의 **첫** `<c:tx>`가 계열 이름이다(스키마 차례상 `<c:dLbls>`보다 앞이다).
+ *  ⚠ `<c:val>`은 `<c:pt>`를 가진 것만 고른다 — 오차막대의 `<c:val val="1"/>`(빈 요소)에
+ *    걸리면 값이 통째로 비어 표가 껍데기가 된다. */
+function 차트글(xml: string): string[] {
+  const 줄글 = (s: string) => s.replace(/[ \t\r\n]+/g, " ").trim();
+  const 구간 = 구간나누기(xml, "c:ser");
+  const 계열들 = 구간.filter((s) => s.표).map((s) => s.xml);
+  const 블록: string[] = [];
+
+  const 머리 = [
+    ...[...xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]),
+    ...구간.filter((s) => !s.표).flatMap((s) => [...s.xml.matchAll(/<c:v>([\s\S]*?)<\/c:v>/g)].map((m) => m[1])),
+  ].map(줄글).filter(Boolean);
+  if (머리.length) 블록.push(머리.join(" "));
+
+  /** `<c:pt idx="n"><c:v>…` 를 자리대로 편다. 다단 범주(`<c:lvl>`)는 같은 자리에 겹쳐 붙인다. */
+  const 점들 = (덩이: string) => {
+    const out: string[] = [];
+    for (const m of 덩이.matchAll(/<c:pt\b[^>]*\bidx="(\d+)"[^>]*>[\s\S]*?<c:v>([\s\S]*?)<\/c:v>/g)) {
+      const i = Number(m[1]);
+      const v = 칸글(m[2]);
+      out[i] = out[i] ? `${out[i]} ${v}` : v;
+    }
+    return out;
+  };
+  const 값덩이 = (ser: string, tag: string) => 최상위요소들(ser, tag).find((x) => x.includes("<c:pt")) ?? "";
+  const 계열이름 = (ser: string) => 칸글((/<c:v>([\s\S]*?)<\/c:v>/.exec(최상위요소들(ser, "c:tx")[0] ?? "") ?? ["", ""])[1]);
+
+  const 이름들 = 계열들.map(계열이름);
+  const 값들 = 계열들.map((s) => 점들(값덩이(s, "c:val")));
+  const 범주 = 계열들.map((s) => 점들(값덩이(s, "c:cat"))).find((c) => c.length) ?? [];
+  const 자리수 = Math.max(범주.length, 0, ...값들.map((v) => v.length));
+  if (자리수 === 0) return 블록;
+
+  if (범주.length) {
+    // 머리글 첫 칸은 **비운다** — 없는 낱말(「항목」 따위)을 지어내지 않는다. 꼬리 정규화가
+    //   「|  |」의 겹공백을 한 칸으로 접으므로 표 규격도 안 깨진다.
+    const 표 = 파이프표([
+      ["", ...이름들],
+      ...Array.from({ length: 자리수 }, (_, i) => [범주[i] ?? "", ...값들.map((v) => v[i] ?? "")]),
+    ]);
+    if (표) 블록.push(표);
+    return 블록;
+  }
+  for (let i = 0; i < 계열들.length; i += 1) {
+    const 값 = 값들[i].filter(Boolean).join(", ");
+    if (!값) continue;
+    블록.push(이름들[i] ? `${이름들[i]}: ${값}` : 값);
+  }
+  return 블록;
+}
+
 /** 오피스 4종(zip+xml)에서 글자를 뽑는다 — 2026-08-22에 extract_doc.py의 형식별 함수를 **1:1로**
  *  옮긴 것이다(그 파이썬 갈래는 2026-09-08에 지웠다 — 여기가 유일한 오피스 추출기다).
  *
@@ -335,29 +446,103 @@ async function 오피스추출(ext: string, buf: Buffer): Promise<string> {
   }
 
   if (ext === ".pptx") {
-    // 원본: 슬라이드 먼저·노트 나중, 각각 번호순. ⚠ <a:t>는 **속성 없는 것만** 잡는다(원본과 동일).
-    const 대상 = 이름들
-      .filter((n) => /^ppt\/(slides\/slide|notesSlides\/notesSlide)\d+\.xml$/.test(n))
-      .sort((a, b) => {
-        const 갈래 = (n: string) => (n.includes("/slides/") ? 0 : 1);
-        const 번호 = (n: string) => Number((n.match(/(\d+)\.xml$/) ?? ["", "0"])[1]);
-        return 갈래(a) - 갈래(b) || 번호(a) - 번호(b);
-      });
+    // 슬라이드마다 「[슬라이드 N] · 본문 · 도해/차트 · (노트)」 한 묶음. 위 「pptx 백로그 3종」 주석 참조.
+    // ⚠ <a:t>는 **속성 없는 것만** 잡는다(2026-08-22 파이썬 1:1 이관 때부터의 규격 — 안 바꾼다).
+    const 있음 = new Set(이름들);
+    const 번호 = (n: string) => Number((n.match(/(\d+)\.xml$/) ?? ["", "0"])[1]);
     const 본문글 = (x: string) => [...x.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]);
-    for (const n of 대상) {
+
+    /** 한 부품(슬라이드·노트)의 덩이들 — 표는 표로, 나머지는 줄글로. **종전 갈래 그대로다.** */
+    const 덩이들 = async (n: string): Promise<string[]> => {
       const xml = await 읽기(n);
       const 구간 = 구간나누기(xml, "a:tbl");
-      if (!구간.some((s2) => s2.표)) {   // 표 없음 — 종전 그대로 지나간다(위 docx와 같은 이유)
-        const texts = 본문글(xml);
-        if (texts.length) parts.push(texts.join(" "));
-        continue;
+      if (!구간.some((s2) => s2.표)) {   // 표 없음 — 종전 그대로 한 덩이(위 docx와 같은 이유)
+        const t = 본문글(xml).join(" ").trim();
+        return t ? [t] : [];
       }
-      const 블록: string[] = [];
+      const out: string[] = [];
       for (const s of 구간) {
         const 글 = s.표 ? 피피티표(s.xml) : 본문글(s.xml).join(" ").trim();
-        if (글) 블록.push(글);
+        if (글) out.push(글);
       }
-      if (블록.length) parts.push(블록.join("\n\n"));
+      return out;
+    };
+
+    /** 「(노트)」 표시 — 줄글이면 앞에 붙이고, **표면 위에 한 줄로** 둔다.
+     *  파이프 표는 줄 첫 글자가 `|`여야 표로 읽힌다(memory.ts 표머리글들) — 앞에 글을 붙이면
+     *  그 줄이 표에서 떨어져 나가 「머리글 없는 표」가 된다. */
+    const 노트표시 = (덩이: string[]) => {
+      if (!덩이.length) return "";
+      return 덩이[0].startsWith("|")
+        ? ["(노트)", ...덩이].join("\n\n")
+        : [`(노트) ${덩이[0]}`, ...덩이.slice(1)].join("\n\n");
+    };
+
+    const 슬라이드파일 = 이름들.filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => 번호(a) - 번호(b));
+    /** 화면에 보이는 차례 — `ppt/presentation.xml`의 `<p:sldIdLst>`가 정본이다. 파일 번호는
+     *  슬라이드를 지웠다 다시 넣으면 화면 차례와 어긋난다(그때 「[슬라이드 3]」이 거짓말이 된다).
+     *  ⚠ 차례에 없는 슬라이드 파일도 **버리지 않는다** — 뒤에 번호순으로 붙인다(글자 손실 0). */
+    const 차례: string[] = [];
+    if (있음.has("ppt/presentation.xml") && 있음.has("ppt/_rels/presentation.xml.rels")) {
+      const 관계 = new Map<string, string>();
+      for (const m of (await 읽기("ppt/_rels/presentation.xml.rels")).matchAll(/<Relationship\b[^>]*>/g)) {
+        const id = /\bId="([^"]+)"/.exec(m[0]);
+        const t = /\bTarget="([^"]*)"/.exec(m[0]);
+        if (id && t) 관계.set(id[1], 부품경로("ppt/", t[1]));
+      }
+      for (const m of (await 읽기("ppt/presentation.xml")).matchAll(/<p:sldId\b[^>]*>/g)) {
+        const r = /\br:id="([^"]+)"/.exec(m[0]);
+        const p = r ? 관계.get(r[1]) : undefined;
+        if (p && 슬라이드파일.includes(p) && !차례.includes(p)) 차례.push(p);
+      }
+    }
+    차례.push(...슬라이드파일.filter((n) => !차례.includes(n)));
+
+    // 슬라이드가 딸고 있는 부품(도해·차트·노트) — rId 번호순.
+    const 딸림표 = new Map<string, string[]>();
+    for (const n of 차례) {
+      const rel = `ppt/slides/_rels/${n.slice("ppt/slides/".length)}.rels`;
+      딸림표.set(n, 있음.has(rel) ? 관계부품들(await 읽기(rel), "ppt/slides/") : []);
+    }
+    const 노트걸림쇠 = /^ppt\/notesSlides\/notesSlide\d+\.xml$/;
+    // ⚠ **관계로 예약된 노트는 번호 물러나기가 가로채지 못한다.** 관계 파일이 없는 pptx(픽스처·
+    //   일부 변환기 산출물)를 위해 「같은 번호」로 물러나되, 그 노트를 이미 다른 슬라이드가
+    //   관계로 가리키고 있으면 안 가져간다 — 안 그러면 한 노트를 두 곳이 다투다 한쪽이 잃는다.
+    const 예약된노트 = new Set([...딸림표.values()].flat().filter((p) => 노트걸림쇠.test(p)));
+
+    const 쓴노트 = new Set<string>();
+    let 자리 = 0;
+    for (const n of 차례) {
+      자리 += 1;
+      const 블록 = await 덩이들(n);
+      const 딸림 = 딸림표.get(n) ?? [];
+      for (const p of 딸림) {
+        if (!있음.has(p)) continue;
+        // SmartArt는 **dataN.xml만** 읽는다 — 같은 도해의 layout/colors/quickStyle에는 사람이 쓴
+        //   글이 아니라 서식 이름이 들어 있어, 함께 읽으면 잡음이 지식이 된다.
+        if (/^ppt\/diagrams\/data\d+\.xml$/.test(p)) {
+          const t = 본문글(await 읽기(p)).join(" ").trim();
+          if (t) 블록.push(t);
+        } else if (/^ppt\/charts\/chart\d+\.xml$/.test(p)) {
+          블록.push(...차트글(await 읽기(p)));
+        }
+      }
+      const 노트 = 딸림.find((p) => 노트걸림쇠.test(p) && 있음.has(p))
+        ?? (예약된노트.has(`ppt/notesSlides/notesSlide${번호(n)}.xml`) ? undefined : `ppt/notesSlides/notesSlide${번호(n)}.xml`);
+      if (노트 && 있음.has(노트) && !쓴노트.has(노트)) {
+        쓴노트.add(노트);
+        const 표시 = 노트표시(await 덩이들(노트));
+        if (표시) 블록.push(표시);
+      }
+      // 글자가 하나도 없는 장(그림만)은 표시도 안 낸다 — 번호는 **건너뛴 자리**로 남아,
+      //   「[슬라이드 4] 다음이 [슬라이드 6]」이 곧 「5장엔 글자가 없었다」는 말이 된다.
+      if (블록.length) parts.push([`[슬라이드 ${자리}]`, 블록.join("\n\n")].join("\n"));
+    }
+    // 어느 슬라이드도 안 가리키는 노트(지운 장의 잔해 등)도 **버리지 않는다** — 종전엔 전부 냈다.
+    for (const n of 이름들.filter((x) => 노트걸림쇠.test(x)).sort((a, b) => 번호(a) - 번호(b))) {
+      if (쓴노트.has(n)) continue;
+      const 표시 = 노트표시(await 덩이들(n));
+      if (표시) parts.push(표시);
     }
     return 파이썬꼬리정규화(태그걷기(parts.join("\n\n")));
   }
