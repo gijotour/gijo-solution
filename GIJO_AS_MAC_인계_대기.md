@@ -445,3 +445,7 @@
        tabletext:표행맞추기() 하나로 HTML·DOCX가 함께 폭을 맞춘다(넘치는 칸은 안 버린다).
     CHUNKER_VERSION은 이번에도 **안 올렸다** — 홑대시 구분선이 매니페스트 35편·지식 24편에 0줄이라
     자를 결과가 안 바뀐다(코퍼스 1,226조각 동일로 재확인). 지문만 1613802d6cc0으로 갱신.
+- 2026-09-10 **dataset.ts pptx 갈래** — 「[슬라이드 N]」 경계(sldIdLst 차례)·SmartArt(ppt/diagrams data)·차트(chart·chartEx, 범주×계열 파이프 표, 차트_최대점 1024)·「(노트)」 제 장 뒤. pptx 골든이 새 계약으로 바뀜(tableextract 「pptx 새 계약」 절).
+- 2026-09-10 **새 잎 모듈 tabletext.ts** — 표 읽기·쓰기 잣대 단일 출처(import 0). memory.ts·dataset.ts·webreport.ts·inspectionreport.ts가 import. 사본 감시(server/src). 청커 판 불변(-table-4). ⚠ client gijomd.js는 아직 자기 잣대(게시 라운드 후보).
+- 2026-09-10 **llm.ts resolveRemoteTarget()** — 원격 두뇌 판정 한 곳: ⓪ 총괄은 항상 로컬 → ① 팀원 위치 local이면 로컬 → ② 전역 원격. searchrewrite.ts는 항상 로컬(remotellm 미참조). 운영에서 전역 원격 ON(gb10 4000 내주기 창구·토큰은 app_state) + report·normaltic 원격 배정 상태로 둠 — max 올인원에서는 전역 원격을 켜지 않는 한 무영향.
+- 2026-09-10 **observability.ts** — 자가 진단 느린 답은 시각·소요·경로만(질문 본문 없음) · GET /api/slow-answers admin 전용 · 팀원 표시 이름은 말투 규범 통과 때만 답에 실림.
