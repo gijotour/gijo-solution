@@ -59,9 +59,88 @@ function normalizeSpaces(s: string): string {
   return s.replace(/ /g, " ").replace(/[ \t]+/g, " ").trim();
 }
 
+/* ── 파이프 표를 **종전의 평평한 줄로 되돌린다** (2026-09-09, 검토관 적발③ · 실행 재현) ────────
+ *
+ * ■ 무엇이 문제였나
+ *   2026-09-09에 PDF 추출기가 「그려진 테두리」를 파이프 표로 살리기 시작했다(engine/pdftable.ts).
+ *   RAG·화면에는 그게 이득이지만, **이 파일의 정규식은 「표가 평평하게 풀린 글」을 전제로 쓰였다.**
+ *   같은 창구(autoupload.tryWebReport)가 같은 extractDocumentText를 쓰므로, 테두리를 그린
+ *   보고서가 오면 입력이 통째로 바뀐다. WSL(Node 20)에서 제품의 파이프표()로 표만 복원해 실측:
+ *     · 진단항목 사전 **5종 → 0종** — 위험도가 다른 칸으로 갈려 「… 위험도 하」가 한 줄에 안 남는다.
+ *       그러면 문서가 「하」라고 적어 놓은 취약점이 전부 medium으로 등록된다(문서가 준 근거를 잃는다).
+ *     · 자산 이름 "SafeKey 발급 웹 서버" → **"| SafeKey 발급 웹 서버"** — parseTargets가
+ *       `line.slice(0, dm.index)`로 도메인 앞을 이름으로 삼는데 줄머리 파이프가 거기 들어온다.
+ *       그 이름은 vulnscan.ts의 `dnsName`으로 **자산 등록에 그대로 실린다.**
+ *
+ * ■ 왜 추출기를 되돌리지 않나
+ *   표는 지식으로선 이득이고, 되돌리면 이번 라운드가 통째로 사라진다. **읽는 쪽이 표를 풀어서 본다.**
+ *   원문(RAG로 가는 글)은 표 그대로 남는다 — 여기서 푼 글은 이 파서 안에서만 산다.
+ *
+ * ■ 계약
+ *   ⚠ **표가 없는 글은 한 글자도 안 바뀐다.** 「머리글 + 구분선」으로 제대로 선 표만 푼다.
+ *     홑 파이프 줄(KISA 가이드 바닥글 「| 한국인터넷진흥원 |」 같은 것)은 손대지 않는다.
+ *   ⚠ **표의 정의(표줄·구분선·열수)는 memory.ts가 원본이다.** 여기 사본을 두는 이유는 그 모듈이
+ *     DB·LanceDB를 물고 있어 파서가 import하면 통째로 딸려 오기 때문이다. 대신 짝 시험이
+ *     **추출기 파이프표()의 실제 출력을 여기 먹여** 두 규격이 갈리면 빨개지게 했다
+ *     (test/pdftableextract.test.ts 「추출기가 낸 표를 웹취약점 파서가 되푼다」).
+ */
+/** 표 행 — 마크다운 표는 줄이 파이프로 시작한다. (원본: memory.ts) */
+const 표줄 = (l: string) => l.trimStart().startsWith("|");
+/** 구분선 — |---|---| 꼴. 이게 없으면 표가 아니다. (원본: memory.ts) */
+const 구분선 = (l: string) => /^\s*\|(?:\s*:?-{2,}:?\s*\|)+\s*$/.test(l);
+/** 열 수 — 이스케이프된 `\|`는 칸 **안의 글자**라 안 센다. (원본: memory.ts) */
+const 열수 = (l: string) => (l.replace(/\\\|/g, "").match(/\|/g)?.length ?? 0) - 1;
+/** 한 줄을 칸으로 가른다 — 양끝 파이프를 벗기고 칸 안 이스케이프(`\|`)를 되돌린다. */
+function 칸가르기(l: string): string[] {
+  const t = l.trim().replace(/^\|/, "").replace(/\|$/, "");
+  return t.split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").trim());
+}
+/** 위험도 칸의 머리글 — 국내 보고서가 쓰는 이름들. */
+const RISK_HEAD_RE = /위험도|위험\s*등급|심각도|중요도|등급/;
+/** 위험도 칸의 값 — **이 넷일 때만** 위험도로 읽는다(딴 칸을 위험도로 오인하지 않게). */
+const RISK_VAL_RE = /^(상|중|하|정보)$/;
+
+/**
+ * 제대로 선 표를 「한 행 = 한 줄」의 평평한 글로 되돌린다.
+ * ★ 위험도 칸은 값만 남기면 `위험도` 낱말이 사라져 사전 규칙(ITEM_RISK_RE)이 안 걸린다.
+ *   그래서 **코드([IW-20])가 든 칸 뒤에 「위험도 하」를 붙인다** — 그 자리가 종전 평문에서 그 말이
+ *   있던 자리이고, 이름 캡처(`[^\n]*?`)가 뒤 칸의 설명 문장까지 삼키지 않는 유일한 자리다.
+ *   코드가 없는 행이면 위험도 칸을 제자리에서 「위험도 하」로 적는다.
+ */
+export function 표풀기(text: string): string {
+  if (!text.includes("|")) return text; // 표가 없는 흔한 길 — 아무 일도 안 한다
+  const lines = text.split("\n");
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!표줄(lines[i]) || i + 1 >= lines.length || !구분선(lines[i + 1])) { out.push(lines[i]); continue; }
+    const 머리 = 칸가르기(lines[i]);
+    const 위험열 = 머리.findIndex((h) => RISK_HEAD_RE.test(h));
+    const 폭 = 열수(lines[i + 1]);
+    out.push(normalizeSpaces(머리.join(" ")));
+    let k = i + 2;
+    // 본문 행 — **구분선과 열 수가 같은 줄까지**가 이 표다(memory.ts의 본문 행 판정과 같은 잣대).
+    while (k < lines.length && 표줄(lines[k]) && 열수(lines[k]) === 폭) {
+      const 칸 = 칸가르기(lines[k]);
+      const 위험 = 위험열 >= 0 && RISK_VAL_RE.test(칸[위험열] ?? "") ? 칸[위험열] : "";
+      if (위험) {
+        const 코드칸 = 칸.findIndex((c, idx) => idx !== 위험열 && CODE_RE.test(c));
+        if (코드칸 >= 0) { 칸[코드칸] = `${칸[코드칸]} 위험도 ${위험}`; 칸[위험열] = ""; }
+        else 칸[위험열] = `위험도 ${위험}`;
+      }
+      out.push(normalizeSpaces(칸.join(" ")));
+      k += 1;
+    }
+    // k-1로 두면 for의 +1이 **멈춘 그 줄**을 다시 본다 — 열 수가 어긋나 멈춘 줄이 곧 다음 표의
+    // 머리글일 수 있어서다(memory.ts 표본문행자리와 같은 이유).
+    i = k - 1;
+  }
+  return out.join("\n");
+}
+
 /** 이 텍스트가 국내 웹취약점 점검 보고서인지 — 자동 판별용(자산·코드 신호를 함께 본다). */
-export function looksLikeWebVulnReport(text: string): boolean {
-  const head = text.slice(0, 20000);
+export function looksLikeWebVulnReport(raw: string): boolean {
+  // 표를 먼저 풀고 자른다 — 자르고 풀면 20,000자 경계에서 표가 반 토막 난다.
+  const head = 표풀기(raw).slice(0, 20000);
   const hasTitle = /웹\s*취약점\s*(진단|점검)|웹취약점|모의\s*해킹/.test(head);
   const hasCode = CODE_RE.test(head);
   const hasVulnWord = /취약점/.test(head);
@@ -217,7 +296,9 @@ function parseDetails(
 }
 
 /** 국내 웹취약점 보고서 텍스트를 파싱한다(규칙 기반). 0건이면 호출자가 LLM 폴백으로 넘어간다. */
-export function parseWebVulnReport(text: string): WebReportParseResult {
+export function parseWebVulnReport(raw: string): WebReportParseResult {
+  // ★ 표로 온 글을 평평하게 되돌린 뒤에 본다 — 아래 정규식들이 전부 그 꼴을 전제한다(위 표풀기 참조).
+  const text = 표풀기(raw);
   const dict = buildRiskDictionary(text);
   const targets = parseTargets(text);
   const { vulns, notes } = parseDetails(text, dict, targets);

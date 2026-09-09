@@ -41,6 +41,7 @@ vi.mock("../src/engine/llm", () => ({
 }));
 
 const { extractDocumentText } = await import("../src/engine/dataset");
+const { 쪽조립 } = await import("../src/engine/pdftable");
 const b64 = (n: string) => fs.readFileSync(path.join(__dirname, "fixtures", n)).toString("base64");
 
 // ── 표 인지 — **제품 잣대(memory.ts)를 일부러 안 부른다.** 제품이 자기 잣대로 「표다」라고
@@ -130,5 +131,99 @@ describe("청커 접점 — PDF 표가 조각으로 갈려도 머리글을 데�
     for (const c of 표든조각) {
       expect(c.split("\n").some(구분선), `머리글 없는 표 조각이 남았다:\n${c}`).toBe(true);
     }
+  });
+});
+
+// ═══ ★ 픽스처 PDF가 **못 가르는 갈래**를 여기서 가른다 (2026-09-09 검토관 적발④ · 실행 재현) ═══
+//   손으로 구운 픽스처는 pdf.js가 실제 PDF에서 만드는 **빈 글자 항목**(str="")을 안 낳는다.
+//   그래서 픽스처만으로는 아래 두 줄이 **아무 시험에도 안 걸렸다** — 실측으로 확인했다:
+//     · 제품에서 「빈 항목도 구간에 넣는다」를 빼면 → 픽스처 시험 7개가 **전부 초록인 채로**
+//       실제 PDF의 표가 전멸했다(제품소개 18→0 · 제품소개서_상세 14→0 · Imperva 2→0 · SBOM 4→0).
+//     · 회전 가드(transform[1]≠0)를 지워도 → 픽스처 시험 7개 전부 초록.
+//   즉 **표 복원 전체를 지탱하는 줄이 그물 밖에 있었다.** 커밋이 경계한 「담고만 있는 픽스처」가
+//   다른 자리에서 그대로 난 것이다. 여기서는 PDF 대신 **쪽조립()에 항목을 직접 먹여** 그 줄을 잰다.
+describe("쪽조립 — 픽스처가 못 만드는 갈래", () => {
+  /** 격자: 2열(x 0~50~100) × 2행(y 0~20~40). PDF 좌표라 ys는 아래에서 위로 간다. */
+  const 격자 = { xs: [0, 50, 100], ys: [0, 20, 40] };
+  const 항목 = (str: string, x: number, y: number, opts?: { eol?: boolean; w?: number; tr?: number[] }) => ({
+    str,
+    hasEOL: opts?.eol ?? false,
+    width: opts?.w ?? 0,
+    transform: opts?.tr ?? [1, 0, 0, 1, x, y],
+  });
+  /** 격자 밖 글 1개 → 격자 안 4칸 → 격자 밖 글 1개. 「구간이 연속인가」를 재는 최소 배치다. */
+  const 배치 = (가운데: ReturnType<typeof 항목>[]) => [
+    항목("앞글", 300, 300, { eol: true }),
+    ...가운데,
+    항목("뒷글", 300, 280),
+  ];
+  const 네칸 = [항목("A", 10, 30), 항목("B", 60, 30), 항목("C", 10, 10), 항목("D", 60, 10)];
+
+  it("기본 — 격자 안 네 칸이 파이프 표가 되고 밖의 글은 그대로다", () => {
+    const t = 쪽조립(배치(네칸), [격자]);
+    expect(t).toContain("| A | B |");
+    expect(t).toContain("| --- | --- |");
+    expect(t).toContain("| C | D |");
+    expect(t).toContain("앞글");
+    expect(t).toContain("뒷글");
+  });
+
+  it("★ 빈 항목(str=\"\")이 칸 사이에 끼어도 표가 선다 — 이 줄이 없으면 실제 PDF 표가 전멸한다", () => {
+    // pdf.js는 줄바꿈 자리에 폭 0짜리 빈 항목을 끼운다. 그것을 구간에서 빼면 색인이 띄엄띄엄해져
+    // 「연속 구간」 판정이 실패하고, 격자가 통째로 포기된다(실측: 저장소 PDF에서 표 0개).
+    const 가운데 = [항목("A", 10, 30), 항목("B", 60, 30), 항목("", 60, 30), 항목("C", 10, 10), 항목("D", 60, 10)];
+    const t = 쪽조립(배치(가운데), [격자]);
+    expect(t, "빈 항목을 구간에서 빼면 여기가 빨개진다").toContain("| A | B |");
+    expect(t).toContain("| C | D |");
+  });
+
+  it("★ 회전한 글자(transform[1]≠0)가 섞이면 표를 포기한다 — 좌표를 못 믿는다", () => {
+    const 가운데 = [...네칸.slice(0, 3), 항목("D", 60, 10, { tr: [0, 1, -1, 0, 60, 10] })];
+    const t = 쪽조립(배치(가운데), [격자]);
+    expect(t.split("\n").some((l) => l.trimStart().startsWith("|")), "회전 쪽에서 표를 냈다").toBe(false);
+    for (const w of ["A", "B", "C", "D", "앞글", "뒷글"]) expect(t).toContain(w); // 안 잡는 것과 버리는 것은 다르다
+  });
+
+  it("★ 기울임꼴(transform[2]≠0)은 막지 않는다 — 함께 막았더니 참 표 하나가 죽었다", () => {
+    // 실측 2026-09-09: 제품소개.pdf p4의 빈 기울임 항목 하나가 6행4열 참 표를 통째로 죽여 18→17이 됐다.
+    // 기울임은 가로 기울이기(shear)라 글줄 진행 방향이 그대로 가로다 — 확인한 것(회전)만 막는다.
+    const 가운데 = [...네칸.slice(0, 3), 항목("D", 60, 10, { tr: [1, 0, 0.21, 1, 60, 10] })];
+    const t = 쪽조립(배치(가운데), [격자]);
+    expect(t, "기울임까지 막으면 여기가 빨개진다").toContain("| C | D |");
+  });
+
+  it("격자 안에 글자가 하나도 없으면 표를 안 만든다 — 자리잡기용 테두리는 지식이 아니다", () => {
+    const t = 쪽조립(배치([항목("", 10, 30), 항목("", 60, 10)]), [격자]);
+    expect(t.split("\n").some((l) => l.trimStart().startsWith("|"))).toBe(false);
+  });
+
+  it("격자 안 항목이 연속 구간이 아니면 포기한다 — 글이 뒤섞이는 쪽이 더 나쁘다", () => {
+    const 가운데 = [항목("A", 10, 30), 항목("B", 60, 30), 항목("바깥", 300, 290), 항목("C", 10, 10), 항목("D", 60, 10)];
+    const t = 쪽조립(배치(가운데), [격자]);
+    expect(t.split("\n").some((l) => l.trimStart().startsWith("|"))).toBe(false);
+    expect(t).toContain("바깥");
+  });
+});
+
+// ═══ ★ 추출기(쓰는 쪽) ↔ 웹취약점 파서(읽는 쪽)의 규격 일치 ═════════════════════════════
+//   webreport.ts는 표를 **평평한 줄로 되돌려** 읽는다(표풀기). 그 되돌리기는 파이프표()가 내는
+//   규격을 전제로 하는데, 두 파일이 서로를 모른 채 갈리면 조용히 어긋난다 — 그래서 여기서
+//   **제품이 실제로 낸 표**를 제품의 되돌리기에 먹여 본다.
+describe("추출기가 낸 표를 웹취약점 파서가 되푼다", () => {
+  it("파이프표() 출력 → 표풀기() = 종전 평문 줄", async () => {
+    const { 파이프표 } = await import("../src/engine/dataset");
+    const { 표풀기 } = await import("../src/engine/webreport");
+    const 표 = 파이프표([
+      ["구분", "취약점", "위험도"],
+      ["보안 설정 오류", "[IW-20] 디렉토리 인덱싱", "하"],
+    ]);
+    expect(표풀기(표)).toBe("구분 취약점 위험도\n보안 설정 오류 [IW-20] 디렉토리 인덱싱 위험도 하");
+  });
+
+  it("픽스처 PDF의 표도 되풀린다 — 칸 안 파이프 이스케이프까지", async () => {
+    const { 표풀기 } = await import("../src/engine/webreport");
+    const 푼글 = 표풀기(await extractDocumentText("table-grid.pdf", b64("table-grid.pdf")));
+    expect(푼글).toContain("Patch|A two lines Sep 30");
+    expect(푼글.split("\n").some((l) => l.trimStart().startsWith("|")), "표가 안 풀렸다").toBe(false);
   });
 });
