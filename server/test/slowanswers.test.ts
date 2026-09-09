@@ -51,3 +51,57 @@ describe("자가 진단 연결", () => {
     expect(c.detail).toContain("건");
   });
 });
+
+// ── 자가 진단 답에 남의 질문이 되비치지 않는다 ──────────────────────────────────
+//
+// 왜(2026-09-10 야간 재료 실측): 「시스템 자가 진단 해줘」 답이 이렇게 나갔다 —
+//   ✓ 최근 24시간 느린 답: 8초 초과 3건 — "제품 소개해봐
+//   #범위 vuln:10.0.0.12
+//   #셸 pro"(14초) · "자산 중에 개인정보보호법에 해당되는것은? …
+// 문제가 셋이다.
+//   ① 질문에 붙은 **내부 표식 줄**(#범위 vuln:… · #셸 pro — 화면·하네스가 붙이는 메타)이
+//      그대로 나가 말투 감시 「내부 식별자」에 걸린다 → tone-realanswers 빨강 → 배포 게이트가 막힌다.
+//   ② 관리자 답에 **다른 사용자가 친 질문 본문**이 되비친다. 자가 진단은 상태를 말하는 자리지
+//      남의 대화를 보여 주는 자리가 아니다(사내 민감한 물음일 수 있다).
+//   ③ 어제 재료에서는 우연히 안 걸렸다 — **내용에 의존하는 빨강**이라 언제 다시 터질지 모른다.
+// 그래서 판정은 「질문 본문을 싣지 않는다」로 못 박는다. 원장(slow_answers)에는 그대로 남긴다 —
+// 걷어내는 자리는 **자가 진단 답 출력**뿐이다(원장은 /api/slow-answers·tools/slow-report.mjs가 쓴다).
+import { systemHealthText } from "../src/engine/observability";
+import { 말투위반 } from "../src/engine/tone";
+
+describe("★ 자가 진단 답 — 남의 질문 본문이 되비치지 않는다", () => {
+  const 민감한질문 = "우리 회사 대표 계좌 비밀번호 정책 어떻게 돼";
+  const 표식붙은질문 = "제품 소개해봐\n#범위 vuln:10.0.0.12\n#셸 pro";
+
+  it("★ 질문 본문이 자가 진단 항목에 실리지 않는다", () => {
+    recordAnswerTiming(민감한질문, SLOW_ANSWER_MS + 6000, false, "scan");
+    const c = systemHealth().checks.find((x) => x.id === "slow")!;
+    expect(c.detail, `느린 답 항목에 질문 본문이 그대로 실렸다: ${c.detail}`).not.toContain("대표 계좌");
+    expect(c.detail).not.toContain(민감한질문.slice(0, 10));
+  });
+
+  it("★★ 내부 표식 줄(#…)과 내부 키(vuln:…)가 자가 진단 답에 안 나온다", () => {
+    recordAnswerTiming(표식붙은질문, SLOW_ANSWER_MS + 6000, false, "scan");
+    const 답 = systemHealthText();
+    expect(답, "내부 키가 자가 진단 답에 샜다").not.toMatch(/\b(vuln|asset|finding|task):[\w.:-]+/);
+    for (const line of 답.split("\n")) {
+      expect(line.trimStart().startsWith("#"), `내부 표식 줄이 그대로 나갔다: ${line}`).toBe(false);
+    }
+  });
+
+  it("★★ 말투 규범을 자가 진단 답 전체에 걸어 0건", () => {
+    recordAnswerTiming(표식붙은질문, SLOW_ANSWER_MS + 6000, false, "scan");
+    recordAnswerTiming(민감한질문, SLOW_ANSWER_MS + 5000, false, null);
+    const 답 = systemHealthText();
+    const 걸린것 = 말투위반(답);
+    expect(걸린것.length, `자가 진단 답이 말투 규범을 어겼다: ${걸린것.map((x) => x.이름).join(", ")}\n${답}`).toBe(0);
+  });
+
+  it("본문을 뺐어도 건수·소요·경로는 남는다 — 통째로 지운 게 아니다", () => {
+    recordAnswerTiming(표식붙은질문, SLOW_ANSWER_MS + 6000, false, "scan");
+    const c = systemHealth().checks.find((x) => x.id === "slow")!;
+    expect(c.detail).toContain("1건");
+    expect(c.detail).toContain("14초");
+    expect(c.detail, "어느 경로가 받았는지가 사라졌다").toContain("Scan Agent");
+  });
+});

@@ -24,6 +24,8 @@ import { auditRetentionDays } from "./audit";
 import { dbCryptStatus } from "./dbcrypt";
 import { getSiemConfig, getSiemStats } from "./siem";
 import { getLocalEngineStatus } from "./localengine";
+// 느린 답이 어느 경로로 갔는지를 **사람이 읽는 이름**으로 — 이름의 출처는 에이전트 등록부 하나다(llm.ts와 같다).
+import { getAgentById } from "./agents";
 
 export type CheckLevel = "ok" | "warn" | "fail" | "unknown";
 
@@ -353,18 +355,41 @@ export function recordAnswerTiming(question: string, ms: number, qa: boolean, ag
   } catch { /* 원장 기록 실패가 답 전달을 막으면 안 된다 */ }
 }
 
+/** 느린 답이 일어난 시각 — 날짜는 24시간 창이라 필요 없다. */
+const 느린시각 = (at: number) => new Date(at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+/**
+ * 어느 경로가 받았나 — **등록부의 사람 이름 하나**만 쓴다(llm.ts와 같은 출처).
+ * ⚠ 등록부에 없는 id는 **그대로 내보내지 않는다** — 그것이 곧 내부 키다.
+ */
+const 느린경로 = (agentId: string | null) => (agentId ? getAgentById(agentId)?.name ?? "경로 미상" : "경로 미상");
+
+/**
+ * 느린 답 항목 — **질문 본문은 싣지 않는다**(2026-09-10).
+ *
+ * 예전에는 느린 질문을 그대로 옮겨 적었다. 그래서 두 가지가 터졌다.
+ *   ① 화면·하네스가 질문에 붙이는 **내부 표식 줄**(`#범위 vuln:10.0.0.12` · `#셸 pro`)이 답에 실려
+ *      말투 감시 「내부 식별자」에 걸렸다 — 실전 답 대조 시험이 빨강이 되어 배포 게이트가 막혔다.
+ *      ⚠ 전날 재료에서는 우연히 안 걸렸다. **답의 내용에 따라 갈리는 빨강**이라 문구를 다듬어서 될 일이 아니다.
+ *   ② 자가 진단은 관리자가 보는 자리다. 거기에 **남이 친 질문 본문**이 되비치면
+ *      「상태를 말하는 자리」가 「남의 대화를 보여 주는 자리」가 된다(사내 민감한 물음일 수 있다).
+ * 그래서 **언제 · 얼마나 · 어느 경로**만 싣는다. 질문 본문은 원장(slow_answers)에 그대로 남는다 —
+ * 지우는 게 아니라 **답에서만 걷어낸다**. 원장을 읽는 쪽(/api/slow-answers · tools/slow-report.mjs)은 그대로다.
+ * 짝 시험: server/test/slowanswers.test.ts.
+ */
 function checkSlowAnswers(): HealthCheck {
   const since = Date.now() - 24 * 3600000;
-  const rows = db.prepare("SELECT question, ms FROM slow_answers WHERE at >= ? ORDER BY ms DESC LIMIT 3").all(since) as { question: string; ms: number }[];
+  const rows = db.prepare("SELECT at, ms, agentId FROM slow_answers WHERE at >= ? ORDER BY ms DESC LIMIT 3").all(since) as { at: number; ms: number; agentId: string | null }[];
   const n = (db.prepare("SELECT COUNT(*) AS n FROM slow_answers WHERE at >= ?").get(since) as { n: number }).n;
   if (n === 0) return { id: "slow", label: "최근 24시간 느린 답", level: "ok", detail: `${SLOW_ANSWER_MS / 1000}초 넘게 걸린 답 없음` };
-  const 예 = rows.map((r) => `"${r.question.slice(0, 40)}"(${Math.round(r.ms / 1000)}초)`).join(" · ");
+  const 예 = rows.map((r) => `${느린시각(r.at)} ${Math.round(r.ms / 1000)}초(${느린경로(r.agentId)})`).join(" · ");
   return {
     id: "slow", label: "최근 24시간 느린 답",
     // 느린 답은 장애가 아니라 **경향**이다 — 몇 건 쌓여야 노랑을 든다.
     level: n >= 5 ? "warn" : "ok",
-    detail: `${SLOW_ANSWER_MS / 1000}초 초과 ${n}건 — ${예}`,
-    action: n >= 5 ? "같은 질문이 반복해서 느리면 그 문장을 그대로 지원 창구에 알려주세요 — 즉답 경로로 만들 수 있습니다." : undefined,
+    detail: `${SLOW_ANSWER_MS / 1000}초 초과 ${n}건 — 오래 걸린 순서로 ${예}`,
+    // ⚠ 여기서 「어떤 질문이었는지」를 되돌려 주지 않는다 — 위 머리말의 까닭 그대로다.
+    action: n >= 5 ? "질문 내용은 자가 진단에 싣지 않습니다(다른 담당자의 물음일 수 있습니다). 같은 질문이 반복해서 느리면 그 문장을 그대로 지원 창구에 알려주세요 — 즉답 경로로 만들 수 있습니다." : undefined,
   };
 }
 
