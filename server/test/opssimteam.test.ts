@@ -206,6 +206,23 @@ describe("⑲ 판정 — 도착·두뇌·지연", () => {
     expect(두뇌말(판.기록)).toBe("문만(반입 때 돎)");
   });
 
+  // ★★ M2(brainmark)의 계약: 표식은 **첫 chat**의 것이다. 한 답에 팀원이 여럿 도는 문항에서
+  //    그 표식으로 이 팀원을 견주면 **남의 두뇌로 벌주는** 없는 결함이 매일 밤 하나씩 난다.
+  it("여럿이 도는 답(복합 지시)은 도착만 잰다 — 표식·지연은 첫 chat 것이라 이 팀원 것이 아니다", () => {
+    const 복합행 = 팀원기대["전체 자산 스캔하고 우선순위 분석해줘"];
+    expect(복합행.표식주인, "복합 지시 행에 표식주인:false가 없다 — 남의 두뇌로 해설을 벌주게 된다").toBe(false);
+    const 판 = 팀원판정(
+      복합행,
+      // 분석(로컬·폴백)의 표식이 실리고 시간은 스캔+분석+해설 합계 — 해설은 원격 배정이다.
+      { 단계: [{ action: "scan" }, { action: "analyze" }, { action: "enrich" }], ms: 180000, 두뇌: { location: "local", fallback: true } },
+      배정표스냅샷([{ id: "normaltic", name: "GIJO Agent", abbr: "해설", assignedLocation: "remote", assignedModelId: "flash-next" }]),
+    );
+    expect(판.불편, "여럿이 도는 답에 위치·지연 판정을 걸었다").toEqual([]);
+    expect(판.기록.도착맞음).toBe(true);
+    expect(판.기록.상한).toBeNull();
+    expect(두뇌말(판.기록)).toBe("여럿이 돎(표식은 첫 것)");
+  });
+
   it("배정표를 못 읽은 회차(빈 표)에도 도착만은 잰다", () => {
     expect(팀원판정(리포트행, { 팀원: "report", ms: 90000 }, {}).불편).toEqual([]);
     expect(팀원판정(리포트행, { 팀원: "scan", ms: 900 }, {}).불편.map((x) => x.종류)).toContain("다른 팀원에게 감");
