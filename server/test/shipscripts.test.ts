@@ -575,3 +575,112 @@ describe("★ 실전 답 기록 — gb10(원격)으로는 복사하지 않는다
       .toMatch(/gb10 사본은 일부러 재료를 안 옮긴다/);
   });
 });
+
+// ── 2026-09-10 갈래 T — 도구가 느려서 버려지지 않게 · 창구가 닫혀서 죽지 않게 ───────────
+//
+// ■ 왜 여기냐: 이 파일은 이미 **tools/ 스크립트의 소스 감시**를 모아 두는 자리다
+//   (publish-release·deploy·ops-sim·gb10-test). 같은 성질이라 같은 자리에 둔다.
+//
+// ■ 무슨 일이 있었나 (둘 다 2026-09-10)
+//   ① tools/local-digest.mjs가 2,500줄급 파일에서 2분을 넘겨 **실행자들이 grep으로 갈아탔다.**
+//      「800줄 넘으면 gb10 먼저」 규율은 이 도구가 grep보다 빠를 때만 돈다 — 전제가 깨졌다.
+//   ② tools/slow-report.mjs가 GET /api/slow-answers의 admin 전환 뒤 **TypeError로 죽었다.**
+//      403 본문에 groups가 없는데 곧장 `j.groups.length`를 읽어서, 화면엔 권한 문제라는 말이
+//      한 글자도 안 나오고 「Cannot read properties of undefined」만 떴다.
+const 도구디렉터리 = path.join(서버루트, "..", "tools");
+/** 주석을 뺀 **실제로 도는 줄**만 — 사고 설명이 주석에 인용돼 있어 통째로 재면 헛걸린다. */
+function 도구코드(이름: string): string {
+  const 원문 = fs.readFileSync(path.join(도구디렉터리, 이름), "utf8");
+  return 원문.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+}
+
+describe("★ gb10 발췌 창구 — 동시 수는 **슬롯에서 나오고**, 큰 파일은 돌려보낸다", () => {
+  const 코드 = 도구코드("local-digest.mjs");
+
+  it("★ 동시 수를 코드에 박지 않는다 — 두뇌의 슬롯 수에서 나온다(잣대 한 곳)", () => {
+    // 상한이 슬롯 수라는 계약. 숫자를 박아 두면 교사의 --parallel이 바뀔 때 아무도 못 따라간다.
+    expect(코드).toMatch(/뇌\.슬롯수/);
+    expect(코드).toMatch(/병렬수\(두뇌, process\.env\)/);
+    // 동시 수를 정하는 자리는 **하나**여야 한다 — 두 곳에서 정하면 반드시 어긋난다.
+    expect((코드.match(/const 병렬 = /g) ?? []).length).toBe(1);
+  });
+
+  it("★ 슬롯당 문맥도 손으로 안 적는다 — 전체 ÷ 슬롯 수로 나온다", () => {
+    expect(코드).toMatch(/슬롯문맥: Math\.floor\(Number\(정의\.전체문맥\) \/ 슬롯수\)/);
+    // 옛 방식(슬롯문맥을 리터럴로 적기)이 되살아나면 여기서 걸린다.
+    expect(/슬롯문맥:\s*\d+/.test(코드), "슬롯문맥에 숫자를 직접 적었다").toBe(false);
+  });
+
+  it("★ 조각을 **동시에** 보낸다 — 한 줄로 세워 보내던 것이 느림의 한 갈래였다", () => {
+    expect(코드).toMatch(/동시실행\(조각들\.map/);
+    expect(코드).toMatch(/await 동시실행/);
+    // spawnSync로는 원리상 동시에 못 보낸다 — 왕복은 비동기 spawn이어야 한다.
+    expect(코드).toMatch(/function ssh왕복/);
+    expect(/spawnSync\([^)]*chat\/completions/.test(코드), "왕복이 다시 spawnSync로 돌아갔다").toBe(false);
+  });
+
+  it("★ 동시에 돌아도 출력 순서가 흔들리지 않는다 — 못 본 구간 머리글을 정렬한다", () => {
+    expect(코드).toMatch(/못본조각\.sort/);
+  });
+
+  it("★ 크기 관문이 있고, **stderr로** 말한다 — stdout에 적으면 꾸러미가 안내문을 발췌로 담는다", () => {
+    expect(코드).toMatch(/export function 크기관문/);
+    expect(코드).toMatch(/console\.error\(관문\.말\)/);
+    expect(코드).toMatch(/GIJO_DIGEST_MAX_LINES/);
+    // 안내가 stdout으로 새면 digest-pack이 그것을 파일 내용으로 담는다(조용한 거짓 발췌).
+    expect(/console\.log\(관문\.말\)/.test(코드), "관문 안내가 stdout으로 나간다").toBe(false);
+  });
+
+  it("★ 막기만 하지 않는다 — 대신 할 일(grep)과 빠져나갈 문(FORCE)이 안내에 들어 있다", () => {
+    const 원문 = fs.readFileSync(path.join(도구디렉터리, "local-digest.mjs"), "utf8");
+    expect(원문).toContain("GIJO_DIGEST_FORCE");
+    expect(원문).toMatch(/grep -n/);
+  });
+
+  it("★ 다시 걸 때 간격이 **지수**이고, 255에는 WireGuard 한 줄이 붙는다", () => {
+    expect(코드).toMatch(/export function 재시도대기ms/);
+    expect(코드).toMatch(/Math\.pow\(2/);
+    expect(코드).toMatch(/export function 왕복안내/);
+    expect(코드).toMatch(/WireGuard/);
+    // 옛 선형 간격(2000 * 시도)이 되살아나면 걸린다.
+    expect(/잠깐\(2000 \* 시도\)/.test(코드), "선형 재시도 간격이 돌아왔다").toBe(false);
+  });
+
+  it("★ 재시도 대기가 **스레드를 세우지 않는다** — 세우면 동시에 보낸 다른 조각까지 멈춘다", () => {
+    expect(/Atomics\.wait/.test(코드), "블로킹 대기가 돌아왔다(동시 처리를 통째로 막는다)").toBe(false);
+    expect(코드).toMatch(/const 잠깐 = \(ms\) => new Promise/);
+  });
+});
+
+describe("★ 느린 답 원장 도구 — 창구가 admin으로 닫힌 뒤에도 **이유를 말하고** 죽는다", () => {
+  const 코드 = 도구코드("slow-report.mjs");
+
+  it("★ 403을 알아보고 「관리자 계정으로」라고 말한다 — TypeError로 죽지 않는다", () => {
+    expect(코드).toMatch(/상태 === 403/);
+    expect(코드).toMatch(/관리자/);
+    expect(코드).toMatch(/종료: 2/);
+  });
+
+  it("★ **판정을 먼저, 읽기를 나중에** — 모양을 보기 전에 groups를 만지면 같은 사고가 난다", () => {
+    const 판정자리 = 코드.indexOf("원장응답판정(jr.status, j)");
+    const 첫읽기 = 코드.indexOf("j.groups");
+    expect(판정자리, "원장응답판정 호출이 없다").toBeGreaterThan(-1);
+    expect(첫읽기, "j.groups를 아예 안 읽는다면 이 감시가 헛돈다").toBeGreaterThan(-1);
+    expect(판정자리, "판정보다 먼저 j.groups를 읽는다").toBeLessThan(첫읽기);
+  });
+
+  it("200인데 모양이 다르면 **「비어 있음」으로 읽지 않는다**(창구 규격이 바뀐 것)", () => {
+    expect(코드).toMatch(/Array\.isArray\(본문\.groups\)/);
+    expect(코드).toMatch(/typeof 본문\.thresholdMs !== "number"/);
+  });
+
+  it("본문이 JSON이 아니어도 죽지 않는다 — 에러 페이지가 와도 이유가 남는다", () => {
+    expect(코드).toMatch(/async function 본문읽기/);
+    expect(코드).toMatch(/catch \{ return \{ error: 글\.slice/);
+  });
+
+  it("진입점 관문이 있다 — 시험이 import해도 운영 4000에 로그인하지 않는다", () => {
+    expect(코드).toMatch(/path\.resolve\(process\.argv\[1\]\) === path\.resolve\(이파일\)/);
+    expect(코드).toMatch(/export function 원장응답판정/);
+  });
+});
