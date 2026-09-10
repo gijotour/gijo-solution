@@ -46,9 +46,12 @@
 Description=GIJO AS 고객 QA 인스턴스 (포트 4100 · 운영 llama 공유)
 After=network-online.target gijo-as.service
 Wants=network-online.target
-# ExecStartPre가 계속 막으면(운영이 내려가 있는 등) 5초마다 영원히 재시도하지 않고 멈춘다.
-StartLimitIntervalSec=300
-StartLimitBurst=5
+# ExecStartPre가 계속 막으면(운영이 내려가 있는 등) 영원히 재시도하지 않고 멈춘다.
+# ⚠ 창을 넉넉히 잡는다 — 부팅 때는 운영(gijo-as)이 health를 내주기까지 시간이 걸린다.
+#   After=는 순서만 정할 뿐 「떴다」를 보장하지 않으므로, 우리 preflight가 그 사이 몇 번 막힌다.
+#   RestartSec=10 × 30회 ≈ 5분을 기다렸다가 그래도 안 되면 실패로 멈춘다(재시작 폭주 방지).
+StartLimitIntervalSec=900
+StartLimitBurst=30
 
 [Service]
 Type=simple
@@ -61,7 +64,7 @@ Environment=PATH=/home/gijo/gijo-as/venv/bin:/usr/local/cuda/bin:/usr/lib/wsl/li
 ExecStartPre=/usr/bin/bash /home/gijo/gijo-qa/tools/preflight.sh /home/gijo/gijo-qa/gijo-qa.env
 ExecStart=/usr/bin/node dist/index.js
 Restart=always
-RestartSec=5
+RestartSec=10
 StandardOutput=append:/home/gijo/gijo-qa/server.log
 StandardError=append:/home/gijo/gijo-qa/server.log
 KillSignal=SIGTERM
