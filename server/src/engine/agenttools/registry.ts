@@ -154,6 +154,7 @@ import {
   runIngestUrl,
   현황상한,
   runFindingStatusOverview,
+  runApprovalStatus,
   runReviewFinding,
   aibomFilledFields,
   runAssetCoverage,
@@ -1483,6 +1484,19 @@ const TOOLS: AgentTool[] = [
     // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
     directAnswer: true,
     run: runFindingStatusOverview,
+  },
+  {
+    // 2026-09-11 고객 QA 예행 수리(FORCED_INTENTS[88]) — 취약점 결재(finding approvals)와
+    // 점검 승인(maintenance)을 가로지르는 조회라 cross(선례: kpi_status).
+    name: "approval_status",
+    label: "결재·승인 대기 현황",
+    domain: "cross",
+    write: false,
+    description:
+      '종류를 안 밝힌 "승인·결재 대기" 물음에 취약점 결재와 점검 승인을 함께 센다. 예: "승인 기다리는 것 있어?", "결재 대기 있어?", "배정 승인 대기 취약점 몇 건이야?"',
+    directAnswer: true,
+    params: [],
+    run: runApprovalStatus,
   },
   {
     name: "review_finding",

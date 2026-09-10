@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { 결재승인요청_RE, 자기결재_RE } from "../src/engine/dispatcher";
+import { 실제도착, 가로챈규칙 } from "./helpers/routing";
 
 describe("결재 승인 요청 — 라우팅 차단", () => {
   it("자기 결재 승인 요청을 잡는다 (게이트 refuse-approve-own 문항)", () => {
@@ -40,5 +41,82 @@ describe("결재 승인 요청 — 라우팅 차단", () => {
     expect(src).toContain("오른쪽 결재판");
     expect(src).toContain("자기 결재 자기 승인 금지");
     expect(src).toContain('sources: []'); // 코드가 낸 안내라 근거 배지가 안 붙게(4-ⓑ)
+  });
+});
+
+// ── 결재·승인 대기 **조회** 라우팅 (2026-09-11, 고객 QA 예행 2026-09-10 밤 수리) ──────────
+//
+// 뿌리: 위 결재승인요청_RE는 **쓰기**(승인해줘)만 잡는다 — 조회 「결재 대기 있어?」는
+//   FORCED_INTENTS 어디에도 안 걸려(실측 null) 모델로 샜고, 업무 데이터 0인 서버에서
+//   GIJO_AS_제품소개.md의 시연 표(점검 6건 중 「프롬프트 가드레일 점검 | 승인 대기」)를
+//   RAG로 읽어 사실처럼 답했다(결함②). 「승인 기다리는 것 있어?」는 반대로 규칙([45])이
+//   있었는데 **점검 낱말 조건 없이** 유지보수 점검만 답해 취약점 결재판을 놓쳤다(결함①).
+//
+// ★ 판정은 **제품 함수**(forcedToolFor)로 한다 — helpers/routing.ts 머리글(정규식을 떼어
+//   혼자 재면 앞 규칙이 가로채는 것을 못 본다).
+describe("★★ 종류를 안 밝힌 승인·결재 물음은 둘 다 세는 도구로 간다", () => {
+  const 문장들 = [
+    "승인 기다리는 것 있어?",
+    "승인 기다리는 취약점 있어?",
+    "결재 대기 있어?",
+    "결재 대기 몇 건이야?",
+    "승인 대기 뭐 있어?",
+    "승인 대기 목록 보여줘",
+    "배정 승인 대기 취약점 몇 건이야?",
+    "판정 승인 대기 몇 건이야?",
+    "위험수용 승인 대기 있어?",
+  ];
+  for (const 문장 of 문장들) {
+    it(`「${문장}」 → approval_status`, () => {
+      const 도둑 = 가로챈규칙(문장, "approval_status");
+      expect(실제도착(문장), 도둑 ? `앞 규칙 [${도둑.차례}] ${도둑.도구}가 가로챘다` : "아무 규칙에도 안 걸린다").toBe("approval_status");
+    });
+  }
+});
+
+describe("★ 점검 승인 영토는 그대로", () => {
+  for (const 문장 of ["승인 대기 중인 점검 있어?", "점검 승인 대기 뭐 있어?", "점검서 승인 대기 목록 보여줘"]) {
+    it(`「${문장}」 → maintenance_status (종전 그대로)`, () => {
+      const 도둑 = 가로챈규칙(문장, "maintenance_status");
+      expect(실제도착(문장), 도둑 ? `앞 규칙 [${도둑.차례}] ${도둑.도구}가 가로챘다` : "아무 규칙에도 안 걸린다").toBe("maintenance_status");
+    });
+  }
+  it("「방화벽 정책 점검」 점검 승인해줘 → review_maintenance(관리자 쓰기)", () => {
+    expect(실제도착("「방화벽 정책 점검」 점검 승인해줘", "admin")).toBe("review_maintenance");
+  });
+});
+
+describe("★ 쓰기·지식은 안 삼킨다", () => {
+  for (const 문장 of [
+    "이 취약점 승인해줘",
+    "결재 승인해줘",
+    "승인 대기 있으면 승인해줘",
+    "승인 기준 알려줘",
+    "결재 대기 승인 절차 알려줘",
+  ]) {
+    it(`「${문장}」는 approval_status가 아니다`, () => {
+      expect(실제도착(문장), `${문장}는 쓰기 또는 지식 물음이라 조회 도구가 아니다`).not.toBe("approval_status");
+    });
+  }
+});
+
+describe("★ 옛 영토 회귀 — [14]의 배제구 앵커 함정 감시", () => {
+  it("「미조치 취약점 몇 건이야?」는 그대로 finding_status", () => {
+    expect(실제도착("미조치 취약점 몇 건이야?")).toBe("finding_status");
+  });
+  it("「미배정 취약점 몇 건이야?」는 그대로 finding_status", () => {
+    expect(실제도착("미배정 취약점 몇 건이야?")).toBe("finding_status");
+  });
+  it("「검토 안 한 항목 몇 건이야?」는 그대로 finding_status", () => {
+    expect(실제도착("검토 안 한 항목 몇 건이야?")).toBe("finding_status");
+  });
+  it("「KEV 몇 건이야?」는 그대로 finding_status", () => {
+    expect(실제도착("KEV 몇 건이야?")).toBe("finding_status");
+  });
+  it("「기한 지난 일 있어?」는 그대로 urgent_todo", () => {
+    expect(실제도착("기한 지난 일 있어?")).toBe("urgent_todo");
+  });
+  it("「이번 주 예정된 점검 있어?」는 그대로 maintenance_status", () => {
+    expect(실제도착("이번 주 예정된 점검 있어?")).toBe("maintenance_status");
   });
 });

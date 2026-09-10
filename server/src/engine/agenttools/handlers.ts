@@ -9,7 +9,7 @@ import { computeAssetCoverage, coverageSummaryText, sbomApplies, type GapKind } 
 import { listProductIntros, listIntroFields, setIntroField, INTRO_FIELD_SCHEMA } from "../productintro";
 import { expandOntology } from "../ontology";
 import { currentDocIds } from "../ragscope";
-import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, ReviewPatch, ApprovalStatus } from "../approvals";
+import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, ReviewPatch, ApprovalStatus, listFindingReviews, approvalSummary } from "../approvals";
 import type { StandardFinding } from "../bridge";
 import { 표식, 심각도한글, 심각도표식, 자산종류한글, cti심각도한글, epss표기 } from "../tone";
 import { 말조사 } from "../../util/josa";
@@ -36,7 +36,7 @@ import { dailyBriefingText } from "../briefing";
 import { runRedTeam, makeServedCaller, getLastRedTeamReport, getLastEffectiveReport } from "../redteam";
 import { runHardeningScan, scanSummaryText, isStandard } from "../hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "../reportschedule";
-import { reportActivity, listReportHistory } from "../report";
+import { reportActivity, listReportHistory, maintenanceSummary } from "../report";
 import { listSchedules as listHardeningSchedules } from "../hardeningtargets";
 import { timeSavedText } from "../timesaved";
 import { feedbackSummaryText } from "../answerfeedback";
@@ -1920,6 +1920,25 @@ export function runFindingStatusOverview(args: Record<string, string>): string {
     `${head}${섞임 ? `\n${섞임}` : ""}\n${lines.join("\n")}${more}` +
     `${시연데이터알림(matched.map((r) => r.finding))}${다음걸음(할말)}`
   );
+}
+
+// 결재·승인 대기 현황 — 취약점 결재와 점검 승인을 **함께** 센다.
+//   FORCED_INTENTS[88](agentloop.ts) → tool: "approval_status" — 「승인 기다리는 것 있어?」·
+//   「결재 대기 있어?」처럼 종류를 안 밝힌 물음이 여기로 온다(고객 QA 예행 2026-09-10 실측 결함 ①·② 수리).
+//   ⚠ **직접 세지 말 것** — approvalSummary(취약점 결재).pending · maintenanceSummary(점검
+//   승인).reported 두 곳이 이미 잣대다. 새로 filter를 쓰면 잣대가 넷째로 갈린다
+//   (approvals.ts:107 머리글이 그 사고 3건을 적어 두었다).
+export function runApprovalStatus(): string {
+  const reviews = listFindingReviews();
+  const fa = approvalSummary(reviews);
+  const ms = maintenanceSummary(listMaintenanceItems());
+  const 미배정 = reviews.filter(isUnassignedReview).length;
+  const head = `취약점 결재 대기 ${fa.pending}건(담당자 미배정 ${미배정}건) · 점검 승인 대기 ${ms.reported}건`;
+  const 할말 =
+    fa.pending || ms.reported
+      ? "취약점 결재는 ③ 조치 › 조치·승인 화면에서, 점검 승인은 유지보수 점검 화면에서 처리하세요."
+      : "지금은 결재·승인 둘 다 대기가 없습니다 — 생기면 다시 물어보세요.";
+  return `${예시데이터머리말()}${head}${다음걸음(할말)}`;
 }
 
 // 승인/반려 — 조치·승인 화면(approvals.html)의 setFindingReview에 해당하는 역량.
