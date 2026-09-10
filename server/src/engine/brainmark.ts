@@ -27,6 +27,18 @@
 //     역할 검사를 라우트에 따로 걸어야 한다. 새는 값이 모델 id 하나뿐이라(주소·토큰은 /where도
 //     안 준다) 지금은 담을 안 세운다. ★ 처음엔 이 자리에 「설정 권한의 몫」이라 적었는데 코드가
 //     그 말을 지키지 않았다 — 검토관이 잡았다(2026-09-10). **말을 코드에 맞춘다.**
+//
+// ■ 둘째 판 — **팀원별 두뇌기록**(qa 전용 칸, 2026-09-10 ⑲ 첫 실측 뒤)
+//   위 표식은 **답 하나에 하나**다(첫 chat · explain). 그런데 야간 회귀 마당 ⑲가 재려는 것은
+//   「팀원마다 다른 두뇌로 실제 도는가」(정의 A)라, 답 하나로는 **원리상** 못 잰다 —
+//   원격 배정 팀원 셋(report·normaltic·ti)의 chat은 explain 없이 돌아 표식이 안 생기고,
+//   ⑲ 첫 실측(23/27)은 그 셋을 「돎(표식 없음)」으로만 적었다. 「배정했다」는 말의 증거가 없었다.
+//   그래서 **표식은 그대로 두고**, 같은 자리·같은 값에서 **배열로도 쌓는다**(아래 두뇌기록쌓기).
+//   ⚠ 「모든 chat」이 아니라 **LLM에 실제로 요청이 나간 chat 전부**다 — 가드 차단·인사말·
+//     RAG 미배선·자료 없음으로 조기 반환한 chat은 애초에 여기까지 오지 않는다(llm.ts 앞머리).
+//   ⚠ 배열은 **qa 요청에만** 실린다(아래 두뇌기록실어보내기 한 곳이 가른다) — 사람 응답에는
+//     팀원 id도 모델 id도 한 글자도 안 나간다. 그릇은 비-qa에도 놓이므로(표식이 사람 몫이라)
+//     **가리는 잣대를 라우트에 적지 않는다**: 두 입구가 딴말을 한 전례가 이 저장소에 여럿이다.
 import { AsyncLocalStorage } from "node:async_hooks";
 
 /** 두뇌가 도는 자리 — 「이 PC」인가 「원격 GPU」인가. */
@@ -46,8 +58,51 @@ export interface 두뇌표식 {
   보고횟수: number;
 }
 
-/** 한 요청 동안 표식을 담아 두는 그릇. 부르는 쪽이 만들어 넘긴다(만든 사람이 읽는다). */
-export interface 두뇌표식수거 { 값?: 두뇌표식 }
+/**
+ * 한 요청에서 **LLM에 실제로 요청이 나간 chat 하나**. qa 전용 칸 `두뇌기록`의 원소다.
+ *
+ * ★ 표식(위)과 뜻이 다르다 — 표식은 「이 답을 쓴 두뇌 하나」이고, 이 항목은
+ *   「그 답을 만드는 동안 돈 chat 하나하나」다. 분류기·결정 호출도 **그대로 담는다**:
+ *   빼면 원격 팀원(report·ti·bom)이 통째로 안 보여 ⑲가 재려던 것을 못 잰다.
+ */
+export interface 두뇌기록항목 {
+  /** 이 chat을 부른 팀원 id(llm.ts args.agentId — ChatArgs의 필수 인자다). */
+  agentId: string;
+  location: 두뇌위치;
+  fallback: boolean;
+  model: string | null;
+  /**
+   * chat()이 **요청을 시작해 답(또는 실패)을 받기까지**의 밀리초.
+   *
+   * ⚠ **이름에 무엇을 쟀는지 박아 둔다** — 비슷한 숫자가 셋이고 서로 다르다:
+   *   · 이 칸(왕복ms)      = 모델 로드·원격 폴백 재시도 포함, **후처리 전**
+   *   · llm_activity latencyMs = 재작성·용어 풀이·인용 가드까지 **끝난 뒤**
+   *   · 하네스 r.ms        = /api/dispatch HTTP 왕복 전체(RAG·도구·여러 chat 합)
+   *   그냥 `ms`로 두면 ⑲ 표의 「평균 지연」과 섞여 「무엇을 쟀는지 모르는 숫자」가 된다.
+   */
+  왕복ms: number;
+  /** 도구 고르는 JSON 결정 호출인가(llm.ts args.responseSchema). */
+  결정호출: boolean;
+  /** 담당자가 그대로 읽는 답인가(llm.ts args.explain). 분류기·내부 프롬프트는 false. */
+  사람이읽는답: boolean;
+  /**
+   * 이 항목 **뒤로** 상한을 넘겨 안 담은 chat 수. 마지막 항목에만 0이 아닐 수 있다.
+   * ⚠ 잘린 사실을 안 적으면 「그 팀원 항목이 없다」와 「자리가 모자라 못 담았다」가 뒤섞인다.
+   */
+  생략?: number;
+}
+
+/**
+ * 한 답에 담는 기록의 상한. 오케스트레이션 한 답에도 chat은 스물을 잘 안 넘지만,
+ * 되풀이가 새면 응답이 무한정 커진다 — 막되 **잘렸다는 사실을 위 `생략`으로 적는다.**
+ */
+export const 두뇌기록상한 = 50;
+
+/**
+ * 한 요청 동안 표식을 담아 두는 그릇. 부르는 쪽이 만들어 넘긴다(만든 사람이 읽는다).
+ * ⚠ `값`(표식 하나)과 `기록`(chat 전부)은 **다른 잣대로 담긴다** — 아래 두뇌표식보고 참고.
+ */
+export interface 두뇌표식수거 { 값?: 두뇌표식; 기록?: 두뇌기록항목[] }
 
 const store = new AsyncLocalStorage<두뇌표식수거>();
 
@@ -95,9 +150,13 @@ export function 두뇌표식을수거하며<T>(그릇: 두뇌표식수거, fn: (
  * ⚠ 답을 만든 chat이 여러 번이면 **첫 것만 담고 횟수를 센다**(citesource와 같은 규칙).
  */
 export function 두뇌표식보고(보고: {
+  /** 이 chat을 부른 팀원 id. 기록(배열)이 「누구의 두뇌인가」를 가리는 유일한 열쇠다. */
+  agentId: string;
   location: 두뇌위치;
   fallback: boolean;
   model: string | null;
+  /** 요청 시작~답 도착(후처리 전). 기록에만 쓴다 — 위 두뇌기록항목.왕복ms 주석 참고. */
+  왕복ms: number;
   /** 도구 고르는 JSON 결정 호출인가(llm.ts args.responseSchema). */
   결정호출: boolean;
   /** 담당자가 그대로 읽는 답인가(llm.ts args.explain). 분류기·내부 프롬프트는 false. */
@@ -105,10 +164,38 @@ export function 두뇌표식보고(보고: {
 }): void {
   const 그릇 = store.getStore();
   if (!그릇) return;
+  // 🧠🧠 **기록은 게이트 위에서 쌓는다** (2026-09-10 둘째 판).
+  //   아래 한 줄은 「이 답을 쓴 두뇌 **하나**」를 고르는 잣대다. 기록을 그 아래 두면
+  //   결정 호출·분류기가 통째로 빠지고, explain 없이 도는 원격 팀원 셋(report·normaltic·ti)이
+  //   **한 항목도 안 남는다** — 이 판이 하려는 일(그 셋의 두뇌를 눈으로 보기)이 원리상 불가능해진다.
+  두뇌기록쌓기(그릇, 보고);
   // ★★ 잣대는 여기 한 줄 — 부르는 쪽은 사실만 넘긴다(위 머리말 ★★★).
   if (보고.결정호출 || !보고.사람이읽는답) return;
   if (그릇.값) { 그릇.값.보고횟수++; return; }
   그릇.값 = { location: 보고.location, fallback: 보고.fallback, model: 보고.model, 보고횟수: 1 };
+}
+
+/** 기록 배열에 한 항목을 쌓는다(상한을 넘기면 마지막 항목의 `생략`만 올린다). */
+function 두뇌기록쌓기(그릇: 두뇌표식수거, 보고: {
+  agentId: string; location: 두뇌위치; fallback: boolean; model: string | null;
+  왕복ms: number; 결정호출: boolean; 사람이읽는답: boolean;
+}): void {
+  const 기록 = (그릇.기록 ??= []);
+  if (기록.length >= 두뇌기록상한) {
+    // ⚠ 조용히 버리지 않는다 — 「그 팀원이 안 돌았다」와 「자리가 없어 못 담았다」는 다른 말이다.
+    const 마지막 = 기록[기록.length - 1];
+    마지막.생략 = (마지막.생략 ?? 0) + 1;
+    return;
+  }
+  기록.push({
+    agentId: 보고.agentId,
+    location: 보고.location,
+    fallback: 보고.fallback,
+    model: 보고.model,
+    왕복ms: 보고.왕복ms,
+    결정호출: 보고.결정호출,
+    사람이읽는답: 보고.사람이읽는답,
+  });
 }
 
 /**
@@ -124,4 +211,16 @@ export function 두뇌표식실어보내기(값: 두뇌표식, qa: boolean): { l
   const 실을것: { location: 두뇌위치; fallback: boolean; model?: string } = { location: 값.location, fallback: 값.fallback };
   if (qa && 값.model) 실을것.model = 값.model;
   return 실을것;
+}
+
+/**
+ * qa 응답에 실을 **팀원별 기록**. **qa가 아니면 아무것도 돌려주지 않는다.**
+ *
+ * ★ 가리는 잣대는 여기 한 곳이다 — 라우트에 `if (qa)`를 적으면 입구가 늘 때 한쪽만 고쳐져
+ *   **사람 응답에 팀원 id·모델 이름이 새는 날**이 온다(위 두뇌표식실어보내기와 같은 이유).
+ * ⚠ 담긴 것이 없으면 칸을 아예 안 만든다 — 「빈 배열」과 「LLM이 안 돈 답」이 뒤섞이지 않게.
+ */
+export function 두뇌기록실어보내기(그릇: 두뇌표식수거, qa: boolean): 두뇌기록항목[] | undefined {
+  if (!qa) return undefined;
+  return 그릇.기록 && 그릇.기록.length ? 그릇.기록 : undefined;
 }

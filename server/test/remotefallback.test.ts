@@ -258,8 +258,8 @@ describe("★ 두뇌 표식 — 누가 답했나", () => {
   it("답을 만든 chat이 여러 번이면 **첫 것**을 담고 횟수를 센다", () => {
     const 그릇 = 새두뇌표식수거();
     두뇌표식을수거하며(그릇, () => {
-      두뇌표식보고({ location: "remote", fallback: false, model: "큰두뇌", 결정호출: false, 사람이읽는답: true });
-      두뇌표식보고({ location: "local", fallback: false, model: "작은두뇌", 결정호출: false, 사람이읽는답: true });
+      두뇌표식보고({ agentId: "report", location: "remote", fallback: false, model: "큰두뇌", 왕복ms: 100, 결정호출: false, 사람이읽는답: true });
+      두뇌표식보고({ agentId: "orchestrator", location: "local", fallback: false, model: "작은두뇌", 왕복ms: 50, 결정호출: false, 사람이읽는답: true });
     });
     expect(그릇.값?.location).toBe("remote");
     expect(그릇.값?.보고횟수, "여러 번 돈 사실을 안 센다 — 표식이 답 전체의 두뇌인 척한다").toBe(2);
@@ -274,7 +274,83 @@ describe("★ 두뇌 표식 — 누가 답했나", () => {
   });
 
   it("수거 중이 아니면 조용히 아무 일도 안 한다 — 그릇 없는 경로가 안 깨진다", () => {
-    expect(() => 두뇌표식보고({ location: "local", fallback: false, model: null, 결정호출: false, 사람이읽는답: true })).not.toThrow();
+    expect(() => 두뇌표식보고({ agentId: "report", location: "local", fallback: false, model: null, 왕복ms: 1, 결정호출: false, 사람이읽는답: true })).not.toThrow();
+  });
+});
+
+// ── 🧠🧠 팀원별 두뇌기록 — **한 요청 안에서 팀원마다 갈리는가**(2026-09-10 둘째 판) ──────────
+//
+// ■ 왜 이 시험인가: 이것이 「정의 A(팀원마다 다른 두뇌로 실제 동작)」를 **진짜 chat으로** 증명하는
+//   유일한 자리다. 라우트 시험(brainmark.route)은 목이 보고하는 값을 재고, 잎 시험
+//   (brainlogfield)은 그릇을 잰다 — 「원격 배정 팀원이 정말 원격으로 갔고 총괄은 이 PC였다」는
+//   진짜 chat()이 원격 목표를 고르고 폴백하는 이 파일에서만 잴 수 있다.
+describe("★★ 두뇌기록 — 한 답 안에서 팀원마다 다른 두뇌가 그대로 남는다", () => {
+  /** 기록 그릇을 놓고 chat을 돌린다 — /api/dispatch가 qa 요청에서 하는 것과 같은 무늬. */
+  async function 기록과함께(fn: () => Promise<string>) {
+    const 그릇 = 새두뇌표식수거();
+    const 답 = await 두뇌표식을수거하며(그릇, fn);
+    return { 답, 그릇, 기록: 그릇.기록 ?? [] };
+  }
+
+  it("★ report=원격 · orchestrator=이 PC — 한 요청에서 **갈라져** 기록된다", async () => {
+    전역켜기();
+    setAgentLocation("report", "remote");
+    const 목 = vi.fn(async (url: unknown) => ({
+      ok: true,
+      json: async () =>
+        String(url).startsWith(원격주소)
+          ? { choices: [{ message: { content: "원격 큰 두뇌가 쓴 답입니다." } }], model: "qwen3.8-flash-next" }
+          : { choices: [{ message: { content: '{"action":"chat"}' } }], model: "qwen3-14b" },
+    }));
+    vi.stubGlobal("fetch", 목);
+
+    const { 답, 기록, 그릇 } = await 기록과함께(async () => {
+      await chat({ agentId: "orchestrator", message: "의도 분류: 취약점 조치 우선순위를 알려줘", trusted: true }); // 분류기
+      return chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }); // 답
+    });
+
+    expect(답, "헛돎 방지 — 답이 원격에서 안 왔다").toContain("원격 큰 두뇌");
+    expect(기록.map((x) => [x.agentId, x.location]), "팀원마다 두뇌가 갈린 사실이 기록에 없다")
+      .toEqual([["orchestrator", "local"], ["report", "remote"]]);
+    expect(기록[1].model, "원격 모델 id가 기록에 없다 — 하네스가 어느 두뇌였는지 못 적는다").toBe("qwen3.8-flash-next");
+    expect(기록.every((x) => typeof x.왕복ms === "number"), "왕복ms가 숫자가 아니다").toBe(true);
+    // ★★ **표식이 못 하던 일이 이것이다** — 표식은 답 하나뿐이라 분류기(총괄)가 기록에서 사라진다.
+    expect(기록[0].사람이읽는답, "분류기를 「사람이 읽는 답」으로 적었다").toBe(false);
+    expect(그릇.값?.location, "표식은 종전대로 답한 두뇌 하나다").toBe("remote");
+    expect(그릇.값?.보고횟수).toBe(1);
+  });
+
+  it("★ 원격이 죽어 되돌린 팀원은 기록도 **local·fallback:true**라 말한다", async () => {
+    전역켜기();
+    setAgentLocation("report", "remote");
+    원격은죽고로컬은산다({ 로컬답: "이 PC가 대신 만든 답입니다." });
+    const { 기록 } = await 기록과함께(() =>
+      chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }),
+    );
+    expect(기록).toHaveLength(1);
+    expect(기록[0], "되돌린 사실이 기록에서 사라졌다 — 강등을 사후에 못 가린다").toMatchObject({
+      agentId: "report", location: "local", fallback: true,
+    });
+  });
+
+  it("★★ **표식이 원리상 없는 갈래도 기록에는 남는다** — 이 판이 만들려던 바로 그 값이다", async () => {
+    // 리포트·위협 팀원의 chat은 explain이 없거나 결정 호출이라 표식이 안 생긴다(⑲ 계약 ④).
+    // 그 갈래가 기록에도 없으면 원격 배정 팀원 셋을 **영영** 눈으로 못 본다.
+    전역켜기();
+    setAgentLocation("ti", "remote");
+    vi.stubGlobal("fetch", vi.fn(async (url: unknown) => ({
+      ok: true,
+      json: async () =>
+        String(url).startsWith(원격주소)
+          ? { choices: [{ message: { content: '{"해석":"원격이 낸 결정"}' } }], model: "qwen3.8-flash-next" }
+          : { choices: [{ message: { content: "이 PC 답" } }], model: "qwen3-14b" },
+    })));
+    const { 그릇, 기록 } = await 기록과함께(() =>
+      chat({ agentId: "ti", message: "위협 해석", trusted: true, responseSchema: { type: "object" } as never }),
+    );
+    expect(그릇.값, "결정 호출이 표식을 가로챘다 — 종전 계약이 깨졌다").toBeUndefined();
+    expect(기록, "표식이 없는 갈래가 기록에도 없다 — 원격 팀원을 영영 못 본다").toHaveLength(1);
+    expect(기록[0]).toMatchObject({ agentId: "ti", location: "remote", 결정호출: true, 사람이읽는답: false });
   });
 });
 

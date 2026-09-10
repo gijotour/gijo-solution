@@ -1114,11 +1114,17 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   실을지 말지·모델 이름을 가릴지는 brainmark 한 곳이 가른다.
   //   ⚠ 여기서는 **사실만 넘긴다** — 「이 호출이 답한 두뇌인가」를 여기서 가르면 새 호출부가
   //     그 조건을 빼먹는다(brainmark 머리말 ★★★ · 2026-09-10 검토관이 잡은 자리가 그 반대였다).
+  //   ⚠ **팀원 기록(qa 전용 배열)도 같은 자리·같은 값에서 쌓인다**(2026-09-10 둘째 판) —
+  //     brainmark가 이 한 번의 보고로 표식과 기록을 함께 만든다. 두 벌로 부르면 그날부터
+  //     「표식은 원격인데 기록은 로컬」 같은 어긋남이 난다(같은 것을 여러 곳에 적으면 어긋난다).
   const 표식보고 = (model: string | null) =>
     두뇌표식보고({
+      agentId: args.agentId,
       location: 원격 ? "remote" : "local",
       fallback: 폴백,
       model,
+      // ⚠ 후처리(재작성·용어 풀이·인용 가드) **전**이다 — emitLlmActivity의 latencyMs와 다른 자다.
+      왕복ms: Date.now() - started,
       결정호출: !!args.responseSchema,
       사람이읽는답: args.explain === true,
     });

@@ -27,7 +27,7 @@ import { 결정적도착지, planInstruction } from "../src/engine/dispatcher";
 import { 실제도착 } from "./helpers/routing";
 import {
   팀원문항, 팀원기대, 팀원순서, 팀원판정, 팀원표, 배정표스냅샷, 두뇌말, 실패이유, 표식잴수있나,
-  상한MS, 지연상한MS, 마당이름, 마당화면,
+  두뇌기록고르기, 상한MS, 지연상한MS, 마당이름, 마당화면,
 } from "../../tools/opssim-team.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -361,6 +361,138 @@ describe("⑲ 판정 — 도착·두뇌·지연", () => {
   });
 });
 
+// ── ⑨ 팀원별 두뇌기록(계약 ⑦) — **표식이 못 보던 팀원을 눈으로 본다** ────────────────────
+//
+// ■ 왜 생겼나 (2026-09-10 · ⑲ 첫 실측 23/27)
+//   표식은 답 하나뿐이라 원격 배정 팀원 셋(report·normaltic·ti)의 두뇌를 **원리상** 못 봤다 —
+//   ⑲는 그 셋을 「돎(표식 없음)」으로만 적었고, 「원격에 배정했다」는 말의 증거가 없었다.
+//   이제 서버가 qa 응답에 `두뇌기록`(항목마다 팀원 이름표가 붙은 배열)을 싣는다.
+// ⚠ **기록이 없으면 종전 갈래 그대로**여야 한다 — 옛 서버·비-qa 회차에서 없는 결함이 나면 안 된다.
+describe("⑲ 두뇌기록 — 그 팀원의 항목으로 견준다", () => {
+  /** 서버가 싣는 기록 항목 한 개(기본값은 리포트 팀원이 원격에서 답한 꼴). */
+  const 항목 = (덧: Record<string, unknown> = {}) => ({
+    agentId: "report", location: "remote", fallback: false, model: "flash-next",
+    왕복ms: 19000, 결정호출: false, 사람이읽는답: false, ...덧,
+  });
+
+  it("★ 표식이 원리상 없는 갈래(리포트)도 기록이 있으면 **위치를 잰다**", () => {
+    const 판 = 팀원판정(리포트행, { 팀원: "report", ms: 21000, 두뇌기록: [항목()] }, 배정);
+    expect(판.불편, "배정(remote)과 같은 위치인데 불편이 났다").toEqual([]);
+    expect(판.기록.기록으로잼).toBe(true);
+    expect(판.기록.실제위치, "기록을 안 읽었다 — 원격 팀원을 여전히 못 본다").toBe("remote");
+    expect(판.기록.모델).toBe("flash-next");
+    expect(판.기록.왕복ms, "그 팀원 두뇌의 제 시간을 안 적었다").toBe(19000);
+    expect(판.기록.표식있음, "기록으로 본 줄을 「표식으로 봤다」고 적었다 — 무엇으로 쟀는지 사라진다").toBe(false);
+    expect(두뇌말(판.기록), "표식으로 본 것과 같은 말로 적으면 무엇으로 쟀는지 사라진다").toBe("원격(기록)");
+  });
+
+  it("★ 배정과 다른 두뇌·되돌림을 기록으로 잡는다 — 상세에 **무엇으로 쟀는지**가 적힌다", () => {
+    const 다름 = 팀원판정(리포트행, { 팀원: "report", ms: 9000, 두뇌기록: [항목({ location: "local" })] }, 배정);
+    expect(다름.불편.map((x: { 종류: string }) => x.종류)).toContain("배정과 다른 두뇌");
+    expect(다름.불편[0].상세, "표식으로 쟀는지 기록으로 쟀는지 안 적는다").toContain("(기록)");
+
+    const 폴백 = 팀원판정(리포트행, { 팀원: "report", ms: 9000, 두뇌기록: [항목({ location: "local", fallback: true })] }, 배정);
+    const 종류 = 폴백.불편.map((x: { 종류: string }) => x.종류);
+    expect(종류).toContain("원격이 안 닿아 이 PC로");
+    expect(두뇌말(폴백.기록)).toBe("폴백(local·기록)");
+  });
+
+  it("★★ 여럿이 도는 답(복합 지시)도 기록이 있으면 **그 팀원 것으로** 잰다 — 표식주인 잣대가 필요 없다", () => {
+    const 해설원격 = 배정표스냅샷([{ id: "normaltic", name: "GIJO Agent", abbr: "해설", assignedLocation: "remote", assignedModelId: "flash-next" }]);
+    const 단계 = [{ action: "analyze" }, { action: "enrich" }, { action: "report" }];
+    // 분석(로컬)·해설(원격)·리포트(원격)가 잇달아 돈 답 — 표식은 첫 것이라 해설을 못 가리킨다.
+    const 기록 = [
+      항목({ agentId: "analysis", location: "local", model: "qwen3-14b", 왕복ms: 4000 }),
+      항목({ agentId: "normaltic", location: "remote", 왕복ms: 22000 }),
+      항목({ agentId: "report", 왕복ms: 30000 }),
+    ];
+    const 판 = 팀원판정(복합행, { 단계, ms: 180000, 두뇌: { location: "local", fallback: true }, 두뇌기록: 기록 }, 해설원격);
+    expect(판.불편, "해설은 배정대로 원격이었는데 불편이 났다 — 남의 항목을 골랐다").toEqual([]);
+    expect(판.기록.실제위치, "복합 지시에서 해설 항목을 못 골랐다").toBe("remote");
+    expect(두뇌말(판.기록)).toBe("원격(기록)");
+
+    // 해설이 실제로는 이 PC에서 돌았다면 그때는 잡아야 한다(좋은 빨강).
+    const 갈림 = 팀원판정(
+      복합행,
+      { 단계, ms: 180000, 두뇌기록: [항목({ agentId: "normaltic", location: "local" }), 항목()] },
+      해설원격,
+    );
+    expect(갈림.불편.map((x: { 종류: string }) => x.종류), "여럿이 도는 답에서 위치 판정이 안 켜졌다").toContain("배정과 다른 두뇌");
+  });
+
+  it("★ 반증 — 기록이 없거나 **남의 항목뿐**이면 종전 갈래 그대로다", () => {
+    const 없음 = 팀원판정(리포트행, { 팀원: "report", ms: 21000, 두뇌: { location: "remote" } }, 배정);
+    expect(없음.기록.기록으로잼, "기록이 없는데 「기록으로 쟀다」고 적었다").toBe(false);
+    expect(두뇌말(없음.기록)).toBe("돎(표식 안 남는 갈래)");
+
+    const 남의것 = 팀원판정(리포트행, { 팀원: "report", ms: 21000, 두뇌기록: [항목({ agentId: "orchestrator", location: "local" })] }, 배정);
+    expect(남의것.기록.기록으로잼, "남의 팀원 항목으로 이 팀원을 견줬다").toBe(false);
+    expect(남의것.불편, "남의 항목으로 「배정과 다른 두뇌」를 붙였다").toEqual([]);
+    expect(두뇌말(남의것.기록)).toBe("돎(표식 안 남는 갈래)");
+
+    // 「문만」 행(반입 때 돎)은 기록이 와도 안 잰다 — 계약 ①은 그대로다.
+    const 문만 = 팀원판정(사서행, { 도구: ["knowledge_status"], ms: 1200, 두뇌기록: [항목({ agentId: "curator", location: "remote" })] }, 배정);
+    expect(문만.기록.기록으로잼, "「문만」 행에 두뇌 판정을 걸었다").toBe(false);
+    expect(두뇌말(문만.기록)).toBe("문만(반입 때 돎)");
+
+    // 실패한 줄은 기록이 와도 재지 않는다(계약 ⑤ 그대로 — 같은 실패를 두 번 세지 않는다).
+    const 실패 = 팀원판정(리포트행, { out: "", err: "HTTP 500", ms: 90, 두뇌기록: [항목()] }, 배정);
+    expect(실패.기록.기록으로잼).toBe(false);
+    expect(두뇌말(실패.기록)).toBe("실패(오류)");
+  });
+
+  it("★ 지연 잣대는 **안 바꾼다** — 왕복ms는 적기만 하고 벌주지 않는다", () => {
+    // 상한 숫자(로컬 10초·원격 30초)는 요청 왕복으로 정한 값이다. 다른 자로 잰 숫자를 같은
+    // 문턱에 대면 그 자체가 「무엇을 쟀는지 모르는 숫자」가 된다(계약 ⑦ ⚠).
+    const 판 = 팀원판정(리포트행, { 팀원: "report", ms: 95000, 두뇌기록: [항목({ 왕복ms: 90000 })] }, 배정);
+    expect(판.불편.map((x: { 종류: string }) => x.종류), "기록 갈래에 새 지연 잣대가 생겼다").not.toContain("두뇌 느림");
+    expect(판.기록.상한, "표식이 안 남는 줄에 상한이 걸렸다").toBeNull();
+    expect(판.기록.지연잼).toBe(false);
+    expect(판.기록.왕복ms).toBe(90000);
+  });
+
+  it("★ 고르는 규칙 — 「담당자가 읽는 답」이 먼저, 개수와 잘림도 함께 적는다", () => {
+    const 기록 = [
+      항목({ agentId: "orchestrator", location: "local", model: "분류기-14b", 사람이읽는답: false }),
+      항목({ agentId: "orchestrator", location: "local", model: "결정용-14b", 결정호출: true, 사람이읽는답: false }),
+      항목({ agentId: "orchestrator", location: "local", model: "qwen3-14b", 사람이읽는답: true, 생략: 2 }),
+    ];
+    const 고른것 = 두뇌기록고르기(기록, "orchestrator");
+    expect(고른것.항목.model, "첫 것을 골랐다 — 분류기가 답한 두뇌 행세를 한다(서버 brain과 어긋난다)").toBe("qwen3-14b");
+    expect(고른것.개수, "몇 번 돌았는지 안 세면 「어느 호출인지 모른 채 쟀다」가 된다").toBe(3);
+    expect(고른것.사람답).toBe(true);
+    expect(고른것.생략, "서버가 잘라 버린 사실을 안 옮겼다").toBe(2);
+
+    // 「담당자가 읽는 답」이 하나도 없으면 첫 것(리포트·위협 갈래가 그렇다).
+    const 답없음 = 두뇌기록고르기([항목({ 왕복ms: 1 }), 항목({ 왕복ms: 2 })], "report");
+    expect(답없음.항목.왕복ms).toBe(1);
+    expect(답없음.사람답).toBe(false);
+    expect(두뇌기록고르기([], "report"), "빈 배열에서 무언가를 골랐다").toBeNull();
+    expect(두뇌기록고르기(undefined, "report"), "옛 서버(칸 없음)에서 무언가를 골랐다").toBeNull();
+  });
+
+  it("★★ 표가 「원격을 못 봤다」를 더는 거짓으로 적지 않는다 — 본 회차는 본 대로 적는다", () => {
+    const 회차 = [
+      { q: 리포트행.q, 불편: [], 팀원기록: 팀원판정(리포트행, { 팀원: "report", ms: 21000, 두뇌기록: [항목()] }, 배정).기록 },
+      { q: 위협행.q, 불편: [], 팀원기록: 팀원판정(위협행, { 도구: ["threats"], ms: 8000, 두뇌기록: [항목({ agentId: "ti", 왕복ms: 5000 })] }, 배정).기록 },
+    ];
+    const md = 팀원표(회차, 배정).join("\n");
+    expect(md).toContain("원격(기록) 1");
+    expect(md, "원격 배정 둘을 다 봤는데 「확인 가능 0명」이라 적었다").toContain("원격 배정 2명 중 확인 가능 2명");
+    expect(md, "기록으로 본 문항 수를 안 적는다").toContain("팀원별 기록으로 확인한 문항 2건");
+    expect(md, "눈으로 본 회차에 「0건입니다」라는 거짓 경고가 찍혔다").not.toContain("원격 두뇌를 눈으로 확인한 문항은 0건입니다");
+    expect(md, "기록이 실린 회차에 「M2 미반영」이 찍혔다").not.toContain("M2 미반영");
+    // 팀원 두뇌의 제 시간은 **요청 왕복과 다른 자**라 괄호로 갈라 적는다.
+    expect(md).toContain("(두뇌 19.0s)");
+    // 이 회차의 둘은 다 봤으므로 「못 재는 팀원」 줄 자체가 없다 — 없는 한계를 지어내지 않는다.
+    expect(md, "다 본 회차에 「못 재는 팀원」이 남았다").not.toContain("못 재는 팀원:");
+  });
+
+  it("하네스가 그 칸을 받아 적는다 — 서버가 실어 줘도 기록에 안 남으면 없는 것과 같다", () => {
+    expect(읽기(join("tools", "ops-sim.mjs")), "두뇌기록을 안 받아 적는다").toContain("두뇌기록: j.두뇌기록,");
+  });
+});
+
 // ── ⑦ 실패한 줄 — 분모에 남는다 ───────────────────────────────────────────────────
 describe("⑲ 실패한 줄(오류·빈 답)도 분모에 남는다", () => {
   it("실패 잣대는 한 곳이다 — 답 본문이 아예 없는 가짜 그릇은 실패가 아니다", () => {
@@ -441,7 +573,9 @@ describe("⑲ 보고서 팀원별 표", () => {
   // ★ 검토관 적발 ② — 「원격 배정 팀원의 두뇌를 실제로는 한 번도 못 본다」를 표가 스스로 말해야 한다.
   it("★ 표가 「어디까지 증명했는지」를 밝힌다 — 못 재는 팀원과 그 이유를 적는다", () => {
     const md = 팀원표(회차, 배정).join("\n");
-    expect(md).toContain("두뇌 위치를 **표식으로 확인할 수 있는 팀원");
+    // ⚠ 2026-09-10 둘째 판에서 문구가 늘었다 — 이제 **표식이 아닌 길**(팀원별 기록)로도 확인한다.
+    expect(md).toContain("두뇌 위치를 **표식·기록으로 확인할 수 있는 팀원");
+    expect(md, "기록으로 몇 건을 봤는지 안 적는다 — 0건인 회차와 구별이 안 된다").toContain("팀원별 기록으로 확인한 문항 0건");
     expect(md).toContain("원격 배정 2명 중 확인 가능 0명");   // report·ti 둘 다 표식이 안 남는 갈래다
     expect(md).toContain("못 재는 팀원:");
     expect(md).toContain("report(표식 안 남는 갈래 1)");
