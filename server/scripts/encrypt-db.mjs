@@ -16,10 +16,10 @@ import { createRequire } from "module";
 
 const require2 = createRequire(import.meta.url);
 // dist가 있으면 dist를, 없으면 tsx 없이도 돌게 컴파일 산출물을 요구한다.
-let dbkey;
-try { dbkey = require2("../dist/dbkey.js"); }
+let dbkey, walgate;
+try { dbkey = require2("../dist/dbkey.js"); walgate = require2("../dist/util/walgate.js"); }
 catch {
-  console.error("dist/dbkey.js가 없습니다 — 먼저 빌드하세요: npm run build");
+  console.error("dist가 없습니다 — 먼저 빌드하세요: npm run build");
   process.exit(2);
 }
 
@@ -31,11 +31,16 @@ function fail(msg) { console.error("✗ " + msg); process.exit(1); }
 if (!fs.existsSync(DB_PATH)) fail(`DB가 없습니다: ${DB_PATH}`);
 if (dbkey.hasKeyFile(DB_PATH)) fail(`열쇠 파일이 이미 있습니다(${dbkey.keyFilePath(DB_PATH)}) — 이미 암호화된 DB로 보입니다.`);
 
-// 서버가 살아 있으면 WAL에 쓰는 중일 수 있다 — -wal 파일 크기로 흔적을 본다(완전한 감지는 아님).
-const walPath = DB_PATH + "-wal";
-if (fs.existsSync(walPath) && fs.statSync(walPath).size > 0) {
-  console.log("⚠ -wal 파일에 내용이 있습니다. 서버가 완전히 멈췄는지 다시 확인하세요.");
-}
+// ── ⓪ 관문: 서버가 멈췄나 — **경고가 아니라 중단이다**(2026-09-10 고객 QA 실사고) ──────────
+//   예전엔 「⚠ -wal 파일에 내용이 있습니다」라고 적고 **그대로 진행**했다. 서버가 살아 있었고,
+//   WAL을 합친 뒤에도 서버가 계속 써서 그 뒤의 2행이 rekey에 못 들어가고 흘렀다.
+//   판정은 util/walgate 한 곳에서 받는다(왜 「-wal 크기 다시 재기」로는 못 가르는지도 거기 적혀 있다).
+//   ⚠ 여기는 **백업보다 앞**이다 — 아무것도 안 바꾼 상태에서 멈춘다.
+//   ⚠ 올인원 「암호화 켜기」 단추도 이 스크립트를 그대로 부른다(서버를 죽이고 3초 기다린 뒤다) —
+//      그 정상 경로는 이 관문을 통과해야 한다. 과하면 고객이 암호화를 영영 못 켠다.
+const 조용한가 = walgate.데이터베이스가조용한가(DB_PATH);
+if (!조용한가.ok) fail(조용한가.이유);
+console.log(`⓪ ${조용한가.이유}`);
 
 // ── ① 전환 전 백업 ──────────────────────────────────────────────────────────
 const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
