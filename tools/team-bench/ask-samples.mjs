@@ -61,13 +61,24 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 
-/** 조건 네 가지 — 이름은 결과 행의 `mode`에 그대로 적힌다(나중에 파일만 보고 가릴 수 있게). */
-export const MODES = ["grounded", "distractor-only", "bare", "persona"];
+/**
+ * 조건 다섯 가지 — 이름은 결과 행의 `mode`에 그대로 적힌다(나중에 파일만 보고 가릴 수 있게).
+ *
+ * ★ knowledge(2026-09-10 · 회전 5 · 관문 ⑭): 팀원 프롬프트만 싣고 **근거를 안 준다**는 점에서
+ *   persona와 조건이 같지만, 목적이 정반대다 —
+ *     · persona   = 「근거가 없는데 인용을 **지어내는가**」(관문 ⑨)
+ *     · knowledge = 「근거가 없어도 **아는가**」(관문 ⑭ · 원격 없는 설치본의 바닥)
+ *   그래서 knowledge는 정답 조각(chunk)을 **프롬프트에는 안 싣고 파일에는 적는다** — 채점(overlap20)이
+ *   그 조각과 답을 견주기 때문이다. 두 조건을 한 이름으로 묶으면 ⑨의 모집단이 조용히 오염된다.
+ */
+export const MODES = ["grounded", "distractor-only", "bare", "persona", "knowledge"];
 
-/** system에 팀원 프롬프트가 실리는 조건 — bare만 아니다(persona는 프롬프트만, 근거 블록은 없다). */
+/** system에 팀원 프롬프트가 실리는 조건 — bare만 아니다(persona·knowledge는 프롬프트만, 근거 블록은 없다). */
 export const 프롬프트필요 = (mode) => mode !== "bare";
-/** 근거 조각(정답·방해)이 실리는 조건 — grounded·distractor-only 둘뿐이다. */
-export const 조각필요 = (mode) => mode !== "bare" && mode !== "persona";
+/** 근거 조각(정답·방해)이 **프롬프트에** 실리는 조건 — grounded·distractor-only 둘뿐이다. */
+export const 조각필요 = (mode) => mode !== "bare" && mode !== "persona" && mode !== "knowledge";
+/** 결과 파일에 정답 조각을 **적어 두는** 조건 — grounded(⑧⑫)와 knowledge(⑭)가 그것으로 채점된다. */
+export const 조각기록 = (mode) => mode === "grounded" || mode === "knowledge";
 
 /** 지문 12자 — 프롬프트 원문 대신 이것만 남긴다(원문은 관리자 전용 값이라 파일에 안 적는다). */
 export const sha12 = (s) => crypto.createHash("sha1").update(String(s ?? "")).digest("hex").slice(0, 12);
@@ -85,6 +96,9 @@ export function 조각들(문항, mode) {
   const dis = String(문항?.distractor ?? "");
   // bare·persona는 조각을 안 쓴다 — 둘의 차이는 **팀원 프롬프트가 실리느냐**이고, 그것은 system만들기가 가른다.
   if (mode === "bare" || mode === "persona") return [];
+  // knowledge는 조각을 **프롬프트에 안 싣는다**. 다만 조각이 없는 문항은 채점을 못 하므로 건너뛴다
+  // (아래 부르는 쪽이 null을 건너뜀으로 센다) — 못 채점할 문항을 0점으로 세면 재료 사정이 점수가 된다.
+  if (mode === "knowledge") return chunk ? [] : null;
   if (mode === "grounded") return chunk ? (dis ? [chunk, dis] : [chunk]) : null;
   if (mode === "distractor-only") return dis ? [dis] : null;
   throw new Error(`모르는 조건: ${mode}`);
@@ -99,7 +113,7 @@ export function 조각들(문항, mode) {
  *   bare(프롬프트조차 없음)는 제품이 열지 않는 조건이라 참고값으로 내렸다.
  */
 export function system만들기(팀원프롬프트, ragHeader, 조각, mode = "", 제목 = undefined) {
-  if (mode === "persona") return String(팀원프롬프트 ?? "");
+  if (mode === "persona" || mode === "knowledge") return String(팀원프롬프트 ?? "");
   if (!조각 || !조각.length) return "";
   return [팀원프롬프트, 참고자료블록(ragHeader, 조각, 제목)].join("\n\n");
 }
@@ -251,7 +265,7 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
     if (조각 === null) {
       // ⚠ 조용히 0으로 세지 않는다 — 왜 건너뛰었는지가 파일에 남아야 관문의 모집단을 사람이 읽을 수 있다.
       건너뜀 += 1;
-      out.push({ ...공통, skipped: MODE === "grounded" ? "정답 조각(chunk)이 비어 있다 — 근거 ref를 회수하지 못한 문항" : "방해 조각(distractor)이 비어 있다" });
+      out.push({ ...공통, skipped: 조각기록(MODE) ? "정답 조각(chunk)이 비어 있다 — 근거 ref를 회수하지 못한 문항" : "방해 조각(distractor)이 비어 있다" });
       console.log(`${i + 1}/${qs.length} 건너뜀(${MODE}: 조각 없음)`);
       continue;
     }
@@ -259,7 +273,7 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("team-bench/
     const a = await ask(system, 문항.question);
     out.push({
       ...공통,
-      chunk: MODE === "grounded" ? 문항.chunk : "",
+      chunk: 조각기록(MODE) ? 문항.chunk : "",
       distractor: 조각있음 ? 문항.distractor : "",
       // ⚠ bare 조건은 system이 **없다** — 그런데 sha12("")를 적으면 `da39a3ee5e6b`(빈 문자열의 sha1)이
       //   찍혀, 게이트 표(gates.mjs 표만들기)가 그것을 **진짜 프롬프트 지문처럼** 늘어놓는다.

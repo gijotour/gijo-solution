@@ -19,7 +19,7 @@ import {
   kev베이스대비, 근거인용률, 자료없음비율, 자료없음중복가드, 자료없음이라말함, 인용토막들, 창작인용, 창작인용찾기,
   kev대상행, 창작인용대상인가, 제품거절문장, 거절뒤남은말, 거절만한답, 거절나머지최소, 근거거절률,
   genTokens중앙값, 서술과제, 건너뜀수, 자료없음_최소비율, 길이_허용낙폭,
-  잘림대조, 베낀글자비율, 베낀비율, 베낀비율_상한,
+  잘림대조, 베낀글자비율, 베낀비율, 베낀비율_상한, 표본최소_grounded, 지식정답률,
 } from "../../tools/team-bench/gates.mjs";
 import { 스키마표시 } from "../../tools/ladder/export-prompt-spec.mjs";
 import { 절세기 } from "../../tools/team-bench/tasks.mjs";
@@ -77,6 +77,21 @@ const grounded좋음 = [
   표본행("grounded", "자료에는 「공격자에 의한 계정 및 비밀번호 추측 공격이 가능함」이라고 적혀 있습니다. 그래서 기본 계정명을 그대로 두면 로그인 시도가 표적이 되고, 담당자가 먼저 계정명을 바꾸는 것을 권합니다."),
   표본행("grounded", "근거 문장은 「기본 관리자 계정명을 변경하지 않고 사용할 경우」로 시작합니다. 뒷부분까지 읽으면 추측 공격이 성립한다는 뜻이라, 계정명 변경과 함께 잠금 정책을 같이 두는 편이 좋습니다."),
 ];
+/**
+ * ⑬·⑭의 **모집단 최소**(24건)를 채운다 — 회전 5부터 8건짜리 표본은 미측정이다(gates.mjs 표본최소_grounded).
+ * ★ 왜 늘렸나: 8건이면 한 건이 12.5%p라 흔들림이 합격·불합격을 뒤집는다(회전 3의 7/8과 회전 4의 4/8을
+ *   같은 잣대로 견주기 어려웠다). 시험도 그 최소를 지켜야 「관문이 실제로 재는 것」을 시험하게 된다.
+ */
+const 채우기 = <T,>(행: T[], n = 표본최소_grounded): T[] =>
+  Array.from({ length: Math.max(n, 행.length) }, (_, i) => 행[i % 행.length]);
+
+// ── 관문 ⑭(로컬 14B 단독 지식) 표본 — 근거 ref를 회수한 문항만 쓴다(정답 판정이 overlap20이라) ──
+const 지식행 = (text: string, i = 0) => ({ id: `k${i}`, question: "기본 관리자 계정명을 그대로 두면?", text, chunk: 정답조각 });
+/** 아는 답 — 정답 조각의 20자가 답에 남아 있다(⑧과 같은 잣대). */
+const 지식맞음 = 채우기([지식행("확인해 보면 「기본 관리자 계정명을 변경하지 않고 사용할 경우」 추측 공격이 가능합니다. 그래서 계정명을 먼저 바꿔야 합니다.")]);
+/** 잊은 답 — 겹치는 20자가 없다. 베이스 자리에 둬서 「무하락」이 성립하는지 보게 한다. */
+const 지식틀림 = 채우기([지식행("잘 모르겠습니다. 담당 부서에 문의하시기 바랍니다. 일반적인 보안 권고를 참고하세요.")]);
+
 /** 조각을 **통째로** 게워 낸 답 — ⑧은 만점(20자 창이 남는다)인데 ⑫가 100%로 잡는 자리다. */
 const grounded통째복사 = [표본행("grounded", 정답조각), 표본행("grounded", 정답조각.replace(/ /g, "  "))];
 /** 같은 뜻이지만 제 말로 바꿔 쓴 답 — 20자 창이 하나도 안 남는다(베이스 자리). */
@@ -164,12 +179,14 @@ describe("게이트 — 판정", () => {
   //   자리가 있으면 그 관문은 미측정이다(2026-09-04 개정 — 「베이스에 없는 자리」를 통과로 세지 않는다).
   const 기준 = () => ({
     easy: 기준easy(), hard: 기준hard(), kev: kev좋음,
-    표본grounded: grounded나쁨, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+    표본grounded: 채우기(grounded나쁨), 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+    지식: 지식틀림,
   });
   /** 열세 관문을 전부 재려면 입력이 이만큼 있어야 한다(하나라도 없으면 미측정=불합격이 맞다). */
   const 다갖춘입력 = (easy: unknown, hard: unknown) => ({
     easy, hard, kev: kev좋음,
-    표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
+    표본grounded: 채우기(grounded좋음), 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
+    지식: 지식맞음,
   });
 
   it("★ 자기 자신과 견주면 불합격이다 — avg13은 「이상」이 아니라 **초과**를 요구한다", () => {
@@ -183,7 +200,7 @@ describe("게이트 — 판정", () => {
     const r = 판정(다갖춘입력(기준easy(), 나아진()), 기준());
     const 못넘음 = r.검사.filter((c: { 통과: boolean }) => !c.통과).map((c: { 이름: string }) => c.이름);
     expect(못넘음, `못 넘은 관문: ${못넘음.join(", ")}`).toEqual([]);
-    expect(r.검사, "관문이 13개다 — 늘리거나 줄이면 여기가 먼저 말한다").toHaveLength(13);
+    expect(r.검사, "관문이 14개다 — 늘리거나 줄이면 여기가 먼저 말한다").toHaveLength(14);
     expect(r.합격).toBe(true);
   });
 
@@ -1074,11 +1091,13 @@ describe("관문 ⑤ — 잘린 답은 **베이스 대비**로 본다", () => {
   const 성한 = (mode: string) => 표본행(mode, "끝까지 답했습니다.");
   const 기준 = () => ({
     easy: 기준easy(), hard: 기준hard(), kev: kev좋음,
-    표본grounded: grounded나쁨, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+    표본grounded: 채우기(grounded나쁨), 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+    지식: 지식틀림,
   });
   const 다갖춘입력 = (easy: unknown, hard: unknown) => ({
     easy, hard, kev: kev좋음,
-    표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
+    표본grounded: 채우기(grounded좋음), 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
+    지식: 지식맞음,
   });
 
   it("자리 이름으로 짝을 지어 센다 — 이번과 베이스의 **같은 자리**만 견준다", () => {
@@ -1157,11 +1176,13 @@ describe("관문 ⑤ — 잘린 답은 **베이스 대비**로 본다", () => {
 describe("관문 ⑫ — 옮겨 적기와 통째 복사를 가른다", () => {
   const 기준 = () => ({
     easy: 기준easy(), hard: 기준hard(), kev: kev좋음,
-    표본grounded: grounded나쁨, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+    표본grounded: 채우기(grounded나쁨), 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+    지식: 지식틀림,
   });
   const 다갖춘입력 = (easy: unknown, hard: unknown) => ({
     easy, hard, kev: kev좋음,
-    표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
+    표본grounded: 채우기(grounded좋음), 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
+    지식: 지식맞음,
   });
 
   it("정의: 조각의 20자 창을 밀며 덮인 글자를 세어 답 길이로 나눈다", () => {
@@ -1214,11 +1235,13 @@ describe("관문 ⑫ — 옮겨 적기와 통째 복사를 가른다", () => {
 describe("관문 ⑬ — 근거를 준 자리에서 거절부터 하지 않는가", () => {
   const 기준 = () => ({
     easy: 기준easy(), hard: 기준hard(), kev: kev좋음,
-    표본grounded: grounded나쁨, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+    표본grounded: 채우기(grounded나쁨), 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗,
+    지식: 지식틀림,
   });
   const 다갖춘입력 = (easy: unknown, hard: unknown) => ({
     easy, hard, kev: kev좋음,
-    표본grounded: grounded좋음, 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
+    표본grounded: 채우기(grounded좋음), 표본방해만: 방해만좋음, 표본맨질문: 맨질문깨끗, 표본persona: persona깨끗,
+    지식: 지식맞음,
   });
   /**
    * 회전 3이 실제로 낸 꼴 — 거절 선언으로 **시작**하고, 그 뒤에 근거를 20자 이상 옮겨 적었다.
@@ -1238,7 +1261,7 @@ describe("관문 ⑬ — 근거를 준 자리에서 거절부터 하지 않는�
   it("★★ ⑧·⑫는 초록인데 ⑬만 빨강이다 — 그 사각지대가 이 관문의 존재 이유다", () => {
     expect(근거인용률(grounded거절시작)!.비율, "거절 뒤에 근거를 옮겨 적으면 ⑧은 만점이다").toBe(1);
     expect(베낀비율(grounded거절시작)!.통째, "통째 복사도 아니다").toBe(0);
-    const r = 판정({ ...다갖춘입력(기준easy(), 나아진()), 표본grounded: grounded거절시작 }, 기준());
+    const r = 판정({ ...다갖춘입력(기준easy(), 나아진()), 표본grounded: 채우기(grounded거절시작) }, 기준());
     const 칸 = (k: string) => r.검사.find((x: { 키: string }) => x.키 === k);
     expect(칸("grounded_cite").통과, "⑧만 보면 「나아졌다」로 읽힌다").toBe(true);
     expect(칸("copy_ratio").통과, "⑫도 안 걸린다").toBe(true);
@@ -1250,8 +1273,8 @@ describe("관문 ⑬ — 근거를 준 자리에서 거절부터 하지 않는�
     const r = 판정(다갖춘입력(기준easy(), 나아진()), 기준());
     expect(칸값(r, "grounded_no_refusal").통과).toBe(true);
     // 베이스가 이미 1건이면 이번 1건은 회귀가 아니다 — 늘 빨강인 관문은 회귀를 못 알린다.
-    const 베이스도거절 = { ...기준(), 표본grounded: grounded거절시작 };
-    const r2 = 판정({ ...다갖춘입력(기준easy(), 나아진()), 표본grounded: grounded거절시작 }, 베이스도거절);
+    const 베이스도거절 = { ...기준(), 표본grounded: 채우기(grounded거절시작) };
+    const r2 = 판정({ ...다갖춘입력(기준easy(), 나아진()), 표본grounded: 채우기(grounded거절시작) }, 베이스도거절);
     expect(칸값(r2, "grounded_no_refusal").통과, "같은 자리끼리 견준다").toBe(true);
   });
 
@@ -1286,7 +1309,7 @@ describe("관문 ⑩의 기준은 **실측에서** 나왔다(문서와 코드가
     const readme = readFileSync(join(__dirname, "..", "..", "tools", "ladder", "README.md"), "utf8");
     expect(readme).toContain("0.75");
     expect(readme, "베이스 실측(7/8)이 기준의 출처다").toContain("88%(7/8)");
-    expect(readme, "관문 표가 13개여야 한다").toContain("### 관문 13개");
+    expect(readme, "관문 표가 14개여야 한다").toContain("### 관문 14개");
   });
 });
 
@@ -1488,7 +1511,9 @@ describe("캘리브레이션 슬라이스 — 회전 1·2가 쓴 그 식 그대�
 describe("표본 하네스 — persona 조건(팀원 프롬프트만)", () => {
   it("★ 조각은 안 쓰고 **팀원 프롬프트는 쓴다** — bare와 갈리는 자리가 여기다", async () => {
     const h = await import("../../tools/team-bench/ask-samples.mjs");
-    expect(h.MODES).toEqual(["grounded", "distractor-only", "bare", "persona"]);
+    // ★ 2026-09-10 회전 5: knowledge가 늘었다(관문 ⑭ — 근거 없이 **아는가**). persona와 조건은 같고
+    //   목적이 반대라 이름을 갈랐다 — 한 이름으로 묶으면 ⑨의 모집단에 채점용 정답 조각이 섞인다.
+    expect(h.MODES).toEqual(["grounded", "distractor-only", "bare", "persona", "knowledge"]);
     expect(h.조각들({ chunk: "A", distractor: "B" }, "persona"), "근거 블록을 안 싣는다").toEqual([]);
     // 조각이 없어도 system은 있다 — 이 한 줄이 bare와 persona의 전부다.
     expect(h.system만들기("팀원 프롬프트", "머리말", [], "persona")).toBe("팀원 프롬프트");
@@ -1512,7 +1537,7 @@ describe("표본 하네스 — persona 조건(팀원 프롬프트만)", () => {
     expect(kev).toContain('label: "prompt"');
     expect(kev).toMatch(/\[\{ role: "system", content: SYS \}, \{ role: "user", content: q \}\]/);
     const ask = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "ask-samples.mjs"), "utf8");
-    expect(ask, "persona는 팀원 프롬프트만 싣는다").toMatch(/mode === "persona"\) return String\(팀원프롬프트/);
+    expect(ask, "persona는 팀원 프롬프트만 싣는다").toMatch(/mode === "persona" \|\| mode === "knowledge"\) return String\(팀원프롬프트/);
   });
 });
 

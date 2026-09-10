@@ -44,6 +44,19 @@ def 평가분리(질문들, n):
     return 고른것
 
 
+def lora_모듈(targets: str):
+    """LoRA를 걸 모듈 이름들 — **여기 한 곳**에서 정한다.
+
+    ★ 왜 함수로 빼나(2026-09-10 · 회전 5): 목록을 학습 코드 안에 인라인으로 두면 스모크가
+      「무엇에 걸리는지」를 말할 수 없고, 시험도 그 값을 못 본다 — 깃발을 주고도 안 켜진 채
+      몇 시간을 돌린 전례(warmup_ratio)가 그 자리였다. 이름을 부르는 곳과 찍는 곳이 같아야 한다.
+    · all  = 지금까지의 길(주의 4 + MLP 3)
+    · attn = 주의(q,k,v,o)만 — MLP는 사실이 사는 자리라 안 만진다(§12.12 뿌리 ②의 가설)
+    """
+    주의 = ["q_proj", "k_proj", "v_proj", "o_proj"]
+    return 주의 if targets == "attn" else 주의 + ["gate_proj", "up_proj", "down_proj"]
+
+
 def 평가파일읽기(경로):
     """평가용 행 파일을 읽는다 — **데이터셋과 같은 꼴**(question/answer/system 배열)이라야 한다.
 
@@ -90,6 +103,30 @@ def main() -> None:
                    help="평가용 행이 든 JSON 파일(데이터셋과 같은 꼴). --eval-holdout 과 **함께 못 쓴다**")
     # LoRA alpha = rank × 이 값. 지금까지 코드에 2가 박혀 있어 「세기」를 실험할 수 없었다.
     p.add_argument("--lora-alpha-mult", type=float, default=2.0)
+    # [2026-09-10 · 회전 5] 4회전 내내 **재료만** 바꾸고 학습 설정은 한 번도 안 바꿨다(계획서 §12.12).
+    #   그래서 아래 둘을 사람이 고를 수 있게 연다. **기본값은 옛 동작 그대로**라, 지금까지의 명령·
+    #   사슬·시험은 한 글자도 안 바뀐다(깃발을 안 주면 4bit NF4 + LoRA 7모듈이다).
+    #
+    #   --precision 4bit  : 지금까지의 길 — bitsandbytes NF4로 눌러 싣는다(3090 24GB 전제).
+    #               bf16  : 누르지 않고 싣는다. 왜 여는가 — **학습 격자와 서빙 격자가 달랐다.**
+    #                       학습은 NF4(4bit)인데 어댑터를 얹어 돌리는 쪽은 Q4_K_M이라, 눌린 자리가
+    #                       서로 다른 두 격자 사이에서 어댑터가 배운 보정이 어긋난다(§12.12 뿌리 ①).
+    #                       ⚠ 메모리가 는다 — 14B×2바이트 ≈ 28GB. gb10 가용 44GB에 드는지는
+    #                       **재 보고 나서** 말한다(그것이 100스텝 스모크의 목적이다).
+    p.add_argument("--precision", choices=["4bit", "bf16"], default="4bit",
+                   help="베이스를 어떤 격자로 싣나(기본 4bit = 지금까지와 같다)")
+    #   --lora-targets all  : 지금까지의 길 — q,k,v,o + gate,up,down(MLP까지).
+    #                  attn : q,k,v,o만. 왜 여는가 — MLP는 **사실이 사는 자리**로 알려져 있고,
+    #                       회전 1~4에서 KEV 같은 사실이 밀리는 회귀가 반복됐다(§12.12 뿌리 ②).
+    #                       주의를 거는 자리만 만지면 「어디를 보고 답하나」는 배우되 사실은 덜 밀린다는
+    #                       가설이고, 이 회전이 **그 가설을 시험한다**(r5b).
+    p.add_argument("--lora-targets", choices=["all", "attn"], default="all",
+                   help="LoRA를 어느 모듈에 거나(기본 all = 지금까지와 같다)")
+    #   --max-steps : 스모크용. 0이면 안 쓴다(에폭 수대로 돈다 = 지금까지와 같다).
+    #     왜 필요한가: bf16이 44GB에 드는지·교사(8080)를 안 미는지는 **몇 스텝만 돌려도** 답이 나오는데,
+    #     지금은 전 회차(3~5시간)를 돌리는 길밖에 없어 밤 한 번을 통째로 쓴다.
+    p.add_argument("--max-steps", type=int, default=0,
+                   help="N스텝만 돌고 멈춘다(기본 0 = 안 쓴다 · 에폭 수대로)")
     # --smoke: GPU·학습 의존성 없이 **파이프라인 계약만** 확인한다(시험·CI 전용).
     #   원클릭 루프가 이 스크립트를 부르게 되면서 필요해졌다 — 예전 스크립트에는 있고
     #   여기엔 없어, 배선을 바꾸면 스모크 시험이 통째로 죽는다(2026-08-08).
@@ -120,6 +157,9 @@ def main() -> None:
         # 새 인자가 **받아들여졌는지**를 스모크가 말한다 — 이름이 틀리면 argparse가 여기 오기 전에 죽고,
         # 조용히 무시되면 「켰다고 믿은 채」 안 켜진 학습을 몇 시간 돌린다(1회전의 warmup_ratio 사고 계보).
         log(f"[finetune] (smoke) save_epochs={int(args.save_epochs)} · eval_holdout={args.eval_holdout} · lora_alpha_mult={args.lora_alpha_mult} · eval_file={args.eval_file or '-'}")
+        # 회전 5의 두 변수도 스모크가 **말로** 확인한다 — 깃발을 주고도 안 켜진 채 몇 시간을 돌린
+        # 전례(warmup_ratio)가 있어, 「받았다」가 아니라 「이 값으로 돌겠다」를 찍는다.
+        log(f"[finetune] (smoke) precision={args.precision} · lora_targets={args.lora_targets}({'·'.join(lora_모듈(args.lora_targets))}) · max_steps={args.max_steps}")
         if args.eval_file:
             # ★ 스모크가 **진짜 파일**을 읽고 겹침까지 본다 — 실학습 경로는 GPU가 있어야 도는데,
             #   「홀드아웃이 데이터셋에서 빠졌나」는 값싸게 확인할 수 있다(빠지지 않았으면 그 손실은
@@ -264,17 +304,31 @@ def main() -> None:
             "attention_mask": torch.tensor([[1] * len(b["input_ids"]) + [0] * (mx - len(b["input_ids"])) for b in batch]),
         }
 
-    bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
-                             bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
-    log("[finetune] 베이스 로드(4bit NF4)…")
-    model = AutoModelForCausalLM.from_pretrained(args.base_model, quantization_config=bnb,
-                                                 dtype=torch.bfloat16, device_map={"": 0})
-    model = prepare_model_for_kbit_training(model)
+    if args.precision == "bf16":
+        # 누르지 않고 싣는다 — 학습 격자(bf16)와 서빙 격자(Q4_K_M) 사이의 어긋남을 없애려는 판이다.
+        # ⚠ prepare_model_for_kbit_training은 **k-bit 전용**이라 여기서 부르지 않는다. 대신 그 함수가
+        #   해 주던 일 중 이 경로에 필요한 것 하나(입력에 grad를 요구하게 하기)를 직접 켠다 —
+        #   gradient_checkpointing과 PEFT를 함께 쓰면 이게 없어 「grad가 필요한 입력이 없다」로 죽는다.
+        log("[finetune] 베이스 로드(bf16 · 누르지 않음)…")
+        model = AutoModelForCausalLM.from_pretrained(args.base_model, dtype=torch.bfloat16, device_map={"": 0})
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+    else:
+        bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
+                                 bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
+        log("[finetune] 베이스 로드(4bit NF4)…")
+        model = AutoModelForCausalLM.from_pretrained(args.base_model, quantization_config=bnb,
+                                                     dtype=torch.bfloat16, device_map={"": 0})
+        model = prepare_model_for_kbit_training(model)
     lora_alpha = max(1, int(round(args.rank * args.lora_alpha_mult)))
-    log(f"[finetune] LoRA r={args.rank} alpha={lora_alpha}(=r×{args.lora_alpha_mult})")
+    모듈들 = lora_모듈(args.lora_targets)
+    # ★ **실제로 무엇으로 도는지**를 한 줄에 찍는다 — 깃발이 조용히 무시되면 몇 시간을 헛돈다.
+    log(f"[finetune] 설정 — precision={args.precision} · lora_targets={args.lora_targets}({'·'.join(모듈들)})"
+        f" · max_steps={args.max_steps or '-'} · r={args.rank} alpha={lora_alpha}(=r×{args.lora_alpha_mult})"
+        f" · epochs={args.epochs} · lr={args.lr} · max_seq={args.max_seq}")
     model = get_peft_model(model, LoraConfig(
         r=args.rank, lora_alpha=lora_alpha, lora_dropout=0.05, bias="none", task_type="CAUSAL_LM",
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]))
+        target_modules=모듈들))
     model.print_trainable_parameters()
     model.config.use_cache = False
 
@@ -312,6 +366,11 @@ def main() -> None:
         bf16=True, gradient_checkpointing=True, optim="paged_adamw_8bit",
         save_strategy="epoch" if args.save_epochs else "no", report_to=[], seed=42,
     )
+    # 스모크(몇 스텝만) — max_steps는 num_train_epochs를 **덮는다**(transformers 계약).
+    # 0이면 아예 안 넣는다: 넣어 두고 0이면 「스텝 0으로 끝」이 되어 조용히 아무것도 안 배운다.
+    if args.max_steps and args.max_steps > 0:
+        ta_common["max_steps"] = args.max_steps
+        log(f"[finetune] ⚠ max_steps={args.max_steps} — 스모크입니다(에폭을 끝까지 돌지 않습니다)")
     if eval_data is not None:
         ta_common["per_device_eval_batch_size"] = 1
     ta = None
