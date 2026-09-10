@@ -13,15 +13,30 @@ import * as https from "https";
 import { emitLlmActivity } from "./llmactivity";
 
 const 기본임베딩주소 = "http://localhost:8081/v1";
-const EMBEDDING_SERVER_URL = process.env.GIJO_EMBEDDING_URL ?? 기본임베딩주소;
 
 /**
  * 지금 이 서버가 **어느 임베딩 두뇌를 보고 있나**. 기본값에 이미 `/v1`이 들어 있다 — 끝에 `/embeddings`만 붙인다.
- * ⚠ 진단은 **부를 때** 읽는다: 주소를 고친 뒤 서버를 안 내려도 진단이 지금 설정을 말해야 한다.
+ *
+ * ⚠ **부를 때** 읽는다(적재 때 상수로 굳히지 않는다). 2026-09-10 검토관 적발: 잠깐 상수와 함수가
+ *   함께 있었고, 제품(embed)은 상수를, 진단은 함수를 읽었다 — 같은 설정을 두 번 읽는 자리는
+ *   「진단은 초록인데 제품은 딴 주소를 본다」의 씨앗이다. 이 파일 머리말의 「값을 나눠 적지 않는다」
+ *   그대로, 주소를 아는 곳은 이 함수 **하나**다.
  */
 function 임베딩주소(): string {
   return process.env.GIJO_EMBEDDING_URL ?? 기본임베딩주소;
 }
+
+/**
+ * **임베딩을 나눠 쓰는 설치인가** — 주소를 설정으로 갈아 끼웠으면 참이다.
+ * 자가 진단이 「안 답할 때 무엇을 하라고 할지」를 가르는 데 쓴다(나눠 쓰는 설치의 모델 폴더는
+ * 일부러 비어 있다 — 거기에 대고 「모델 파일을 확인하세요」라고 하면 따라 할수록 나빠진다).
+ * ⚠ 설정을 **다시 읽지 않는다** — 위 임베딩주소()가 내놓은 값이 기본값과 다른지만 본다.
+ *   진단이 제 손으로 env를 읽으면 주소를 아는 곳이 또 둘이 된다(이 파일이 방금 고친 그 결함).
+ */
+export function 임베딩나눠쓰기(): boolean {
+  return 임베딩주소() !== 기본임베딩주소;
+}
+
 const LLM_TIMEOUT_MS = Number(process.env.GIJO_LLM_TIMEOUT_MS ?? 120_000);
 
 // 임베딩 서버로 보내는 POST — 매 요청 새 연결(keepAlive:false)로 한다.
@@ -60,13 +75,13 @@ function embedPost(url: string, bodyObj: unknown, timeoutMs: number): Promise<{ 
 
 export async function embed(texts: string[]): Promise<number[][]> {
   const started = Date.now();
-  // EMBEDDING_SERVER_URL에는 이미 /v1이 포함돼 있다(기본값 http://localhost:8081/v1).
+  // 임베딩주소()에는 이미 /v1이 포함돼 있다(기본값 http://localhost:8081/v1).
   // 따라서 여기서는 /embeddings만 붙여야 OpenAI 호환 경로가 된다 — /v1/embeddings를 붙이면
   // /v1/v1/embeddings가 되어 404가 나고, RAG가 조용히 죽는다(2026-07-19 실제 발생).
   // 짝 잃은 서로게이트(이모지를 반으로 자른 흔적)가 하나라도 있으면 llama.cpp가 요청 전체를 500으로 거절한다
   // (2026-09-03 실사고 — memory.chunkText도 고쳤지만 입구는 입구대로 막는다. 어느 호출자가 와도 여기가 마지막 문).
   const 정리 = texts.map((t) => String(t ?? "").replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, ""));
-  const res = await embedPost(`${EMBEDDING_SERVER_URL}/embeddings`, { model: "local", input: 정리 }, LLM_TIMEOUT_MS);
+  const res = await embedPost(`${임베딩주소()}/embeddings`, { model: "local", input: 정리 }, LLM_TIMEOUT_MS);
 
   if (!res.ok) {
     // 연결 실패(status 0)와 HTTP 거절(4xx/5xx)은 원인이 정반대다 — 전자는 서버가 없는 것,
@@ -77,7 +92,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
     //   (emptyanswer-guidance의 파일 전체 대조가 이 표시를 보고 이 줄을 건너뛴다. 정직한
     //    「없다」 답변과 실제 오류를 가르는 표시이니, 답변 문자열에는 절대 붙이지 말 것.)
     const 원인 = res.status === 0
-      ? "임베딩 서버에 연결할 수 없습니다. 별도 llama-server를 --embedding 플래그로 " + EMBEDDING_SERVER_URL + " 에 기동하세요."
+      ? "임베딩 서버에 연결할 수 없습니다. 별도 llama-server를 --embedding 플래그로 " + 임베딩주소() + " 에 기동하세요."
       : `임베딩 서버가 요청을 거절했습니다(HTTP ${res.status}) — 입력 형식(문자열 배열)·길이를 확인하세요. 응답: ${res.text.slice(0, 200)}`;
     emitLlmActivity({ kind: "embed", phase: "error", model: "임베딩", detail: res.status === 0 ? "임베딩 서버 연결 실패" : `임베딩 HTTP ${res.status}` });
     throw new Error(원인);
@@ -122,7 +137,7 @@ export async function 임베딩준비대기(timeoutMs = 60_000, 간격Ms = 2_000
   const 시작 = Date.now();
   const 기한 = 시작 + timeoutMs;
   for (let 시도 = 1; ; 시도 += 1) {
-    const res = await embedPost(`${EMBEDDING_SERVER_URL}/embeddings`, { model: "local", input: ["ready"] }, 5_000);
+    const res = await embedPost(`${임베딩주소()}/embeddings`, { model: "local", input: ["ready"] }, 5_000);
     if (res.ok) {
       const 걸린초 = Math.round((Date.now() - 시작) / 1000);
       // 첫 번에 떴으면 조용히 간다 — 평상시 부팅 로그를 한 줄도 안 늘린다.
@@ -146,7 +161,8 @@ export async function 임베딩준비대기(timeoutMs = 60_000, 간격Ms = 2_000
  * ■ 왜 생겼나(2026-09-10 고객 QA 인스턴스 실측): 고객 인스턴스는 제 모델 폴더가 비어 있고
  *   다른 기계에서 띄운 임베딩 서버를 **주소로 나눠 쓴다**. 문서 검색도 근거 인용도 멀쩡히
  *   도는데 자가 진단은 「임베딩 서버가 떠 있지 않습니다」라며 빨강을 냈다 — 「내 프로세스가
- *   있나」(!!embeddingProcess)만 봤기 때문이다. 고객은 첫 화면의 빨강을 **제품 고장**으로 읽는다.
+ *   있나」(!!embeddingProcess)만 봤기 때문이다. 그 빨강이 나가는 자리는 자가 진단 답(챗봇)·조치 요청서·
+ *   정기 알림 메일이고, AI 엔진 화면의 임베딩 배지도 같은 뿌리로 사라진다 — 어느 쪽이든 **제품 고장**으로 읽힌다.
  *   물어야 할 것은 프로세스의 존재가 아니라 **응답**이다.
  *
  * ⚠ /health·/v1/models로 재지 않는다 — 위 임베딩준비대기와 같은 까닭(모델이 안 올라와도 200).

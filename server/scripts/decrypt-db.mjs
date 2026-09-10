@@ -23,10 +23,10 @@ import * as path from "path";
 import { createRequire } from "module";
 
 const require2 = createRequire(import.meta.url);
-let dbkey;
-try { dbkey = require2("../dist/dbkey.js"); }
+let dbkey, walgate;
+try { dbkey = require2("../dist/dbkey.js"); walgate = require2("../dist/util/walgate.js"); }
 catch {
-  console.error("dist/dbkey.js가 없습니다 — 먼저 빌드하세요: npm run build");
+  console.error("dist가 없습니다 — 먼저 빌드하세요: npm run build");
   process.exit(2);
 }
 
@@ -38,10 +38,19 @@ function fail(msg) { console.error("✗ " + msg); process.exit(1); }
 if (!fs.existsSync(DB_PATH)) fail(`DB가 없습니다: ${DB_PATH}`);
 if (!dbkey.hasKeyFile(DB_PATH)) fail(`열쇠 파일이 없습니다(${dbkey.keyFilePath(DB_PATH)}) — 이미 평문 DB로 보입니다.`);
 
-const walPath = DB_PATH + "-wal";
-if (fs.existsSync(walPath) && fs.statSync(walPath).size > 0) {
-  console.log("⚠ -wal 파일에 내용이 있습니다. 서버가 완전히 멈췄는지 다시 확인하세요.");
-}
+// ── ⓪ 관문: 서버가 멈췄나 — **경고가 아니라 중단이다** ──────────────────────────
+//   짝 도구(encrypt-db.mjs)는 2026-09-10에 이 자리를 관문으로 바꿨는데 여기는 「경고만 하고 진행」이
+//   그대로 남아 있었다(같은 날 검토관 적발). 이 도구도 ②에서 `PRAGMA rekey=''`로 **그 자리에서**
+//   평문화하므로, 서버가 살아 있으면 rekey 뒤에 쓴 것이 똑같이 흘러 사라진다 — 사고 조건이 같다.
+//   ⚠ 여기 DB는 **암호화돼 있다.** 열쇠 없이 열면 SQLITE_NOTADB로 떨어져 관문이 늘 막는다 —
+//     그래서 봉인을 먼저 풀어 열쇠를 들고 잰다(그 순서 덕에 열쇠 문제도 백업 전에 드러난다).
+const dek = dbkey.unsealWithMachine(DB_PATH);
+if (!dek) fail("열쇠의 기계 봉인을 풀지 못했습니다 — 이 기계에서 만든 열쇠 파일이 맞는지 확인하세요.");
+const 열쇠hex = dbkey.toSqlcipherKey(dek);
+
+const 조용한가 = walgate.데이터베이스가조용한가(DB_PATH, 열쇠hex);
+if (!조용한가.ok) fail(조용한가.이유);
+console.log(`⓪ ${조용한가.이유}`);
 
 // ── ① 백업 ──────────────────────────────────────────────────────────────────
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -77,10 +86,7 @@ function 재고(열기) {
   return { names, counts };
 }
 
-const dek = dbkey.unsealWithMachine(DB_PATH);
-if (!dek) 복원("열쇠의 기계 봉인을 풀지 못했습니다");
-
-const 열쇠hex = dbkey.toSqlcipherKey(dek);
+// (봉인 해제·열쇠는 위 ⓪ 관문에서 이미 했다 — 백업보다 앞이라 실패해도 되돌릴 것이 없다.)
 const 암호화로열기 = () => {
   const d = new Database(DB_PATH);
   d.pragma("cipher='sqlcipher'");

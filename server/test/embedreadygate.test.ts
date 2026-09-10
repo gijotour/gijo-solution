@@ -48,7 +48,7 @@ function stub임베딩(실패횟수: number, 순서: string[]): Promise<{ port: 
   });
 }
 
-/** 주소는 모듈 로드 때 한 번 읽힌다(EMBEDDING_SERVER_URL) — stub을 가리키려면 다시 불러와야 한다.
+/** 주소는 이제 **부를 때** 읽는다(임베딩주소(), 2026-09-10) — 다시 불러오는 것은 다른 시험과 상태를 안 섞으려는 것뿐이다.
  *  ⚠ env를 덮어써 **제품이 아니라 시험을 검증**하는 함정을 피한다: 여기서 바꾸는 것은 주소뿐이고,
  *    준비 판정 방식·기다림·로그는 제품 코드 그대로다(아래 소스 감시가 그 사실을 따로 못박는다). */
 async function 대기함수(port: number) {
@@ -140,7 +140,10 @@ describe("★ 배선 — 부팅 사슬 맨 앞에 있어야 뜻이 있다(소스
     const emb = 읽기("src", "engine", "embedding.ts");
     expect(emb).toContain("export async function 임베딩준비대기");
     // 실제 임베딩을 한 번 돌려 본다 — /health·/v1/models는 모델이 안 올라와도 200을 준다.
-    expect(emb, "준비 판정이 embedPost(실제 임베딩)를 안 쓴다").toMatch(/임베딩준비대기[\s\S]{0,1600}embedPost\(`\$\{EMBEDDING_SERVER_URL\}\/embeddings`/);
+    // 2026-09-10: 주소를 아는 곳을 상수에서 **함수 하나**(임베딩주소)로 좁혔다 — 감시가 보는 이름도 그쪽으로 옮긴다.
+    //   지키는 것은 그대로다: 준비 판정이 **실제 임베딩**(embedPost)을 돌리고, 주소를 제 손으로 다시 적지 않는다.
+    expect(emb, "준비 판정이 embedPost(실제 임베딩)를 안 쓴다").toMatch(/임베딩준비대기[\s\S]{0,1600}embedPost\(`\$\{임베딩주소\(\)\}\/embeddings`/);
+    expect((emb.match(/process\.env\.GIJO_EMBEDDING_URL/g) ?? []).length, "주소를 읽는 자리가 늘었다 — 진단과 제품이 딴 주소를 볼 수 있다").toBe(1);
     const idx = 읽기("src", "index.ts");
     expect(idx.includes("localhost:8081"), "부팅 쪽에 주소를 다시 적었다").toBe(false);
   });

@@ -40,7 +40,7 @@ const STOP_TIMEOUT_MS = Number(process.env.GIJO_LOCAL_LLM_STOP_TIMEOUT_MS ?? 100
 // (옛 모델들은 modeldex 카탈로그에 남아 있어 언제든 선택 가능.)
 const DEFAULT_MODEL_ID = process.env.GIJO_DEFAULT_MODEL_ID ?? "qwen3-14b";
 
-// RAG 임베딩용 별도 llama-server (llm.ts의 EMBEDDING_SERVER_URL과 짝). 스왑/풀 대상이 아니라
+// RAG 임베딩용 별도 llama-server (embedding.ts의 임베딩주소()와 짝). 스왑/풀 대상이 아니라
 // 부팅 시 1회 자동 기동만 관리한다.
 const EMBEDDING_MODEL_ID = process.env.GIJO_EMBEDDING_MODEL_ID ?? "bge-m3";
 const EMBEDDING_PORT = Number(process.env.GIJO_EMBEDDING_PORT ?? 8081);
@@ -1151,6 +1151,49 @@ export function 기본채팅주소(): string {
   return `http://localhost:${Number(process.env.GIJO_LOCAL_LLM_PORT ?? PORT)}/v1`;
 }
 
+export interface 채팅두뇌응답 {
+  /** 그 자리에서 도는 채팅 서버가 있나 */
+  alive: boolean;
+  /** 서버는 있는데 **모델을 올리는 중**이라고 스스로 말했나(llama.cpp /health 503) */
+  적재중: boolean;
+  /** 사람에게 보여도 되게 다듬은 모델 이름(아래 모델이름다듬기) */
+  modelId: string | null;
+}
+
+/**
+ * 채팅 서버의 **뿌리** 주소 — `/v1` 아래가 아닌 창구(`/health`)를 부를 때 쓴다.
+ * 주소를 새로 조립하지 않고 기본채팅주소() 하나에서 깎아 쓴다(잣대를 둘로 적지 않는다).
+ */
+function 채팅서버뿌리(): string {
+  const 주소 = 기본채팅주소();
+  return 주소.endsWith("/v1") ? 주소.slice(0, -3) : 주소;
+}
+
+/**
+ * 밖에서 받은 **모델 이름**을 사람에게 보여도 되는 글자로 다듬는다.
+ *
+ * ⚠ 이 값은 **우리가 안 만든 서버**가 준 문자열이다(나눠 쓰는 두뇌). 그대로 실으면 그 기계의
+ *   절대경로가 챗봇 답과 **밖으로 나가는 문서**(조치 요청서 md — 자격증명까지 가리는 산출물)에
+ *   그대로 실릴 수 있다. llama-server는 `--alias` 없이 뜨므로 /v1/models의 id가 `-m` 경로
+ *   전체인 판본이 있고, 말투 규범의 「소스 경로」 규칙은 `server/src/…` 꼴만 잡아 모델 gguf
+ *   절대경로를 **못 거른다**(tone.ts).
+ * ⚠ 개행도 지운다 — 조치 요청서는 자가 진단의 앞 8줄만 싣는다(docrequest.ts). 이름에 줄바꿈이
+ *   섞이면 진단이 반쯤 잘려 나간다.
+ */
+export function 모델이름다듬기(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  // 제어문자(개행·탭 포함)는 공백으로 바꾼다 — 정규식 대신 코드포인트로 본다(눈에 안 보이는 글자라 정규식이 헷갈린다).
+  let 한줄 = "";
+  for (const 글자 of raw) {
+    const 코드 = 글자.codePointAt(0) ?? 0;
+    한줄 += 코드 < 0x20 || 코드 === 0x7f ? " " : 글자;
+  }
+  // 경로면 **파일 이름만** 남긴다 — 리눅스(/)·윈도우(역슬래시) 둘 다 자른다.
+  const 파일명 = (한줄.split("/").pop() ?? "").split("\\").pop()?.trim() ?? "";
+  if (!파일명) return null;
+  return 파일명.length > 60 ? 파일명.slice(0, 60) + "…" : 파일명;
+}
+
 /**
  * **지금 채팅 두뇌가 답하나** — 내 pool이 비어 있어도 그 자리에서 도는 두뇌가 있으면 참이다.
  *
@@ -1163,15 +1206,36 @@ export function 기본채팅주소(): string {
  * ⚠ 실추론 ping(probeChatAlive)을 쓰지 않는다 — 그건 담당자의 프롬프트 캐시를 밀어내 유휴 뒤
  *   첫 질문을 40초로 만든다(위 확인용칸 머리말의 실측). 진단은 호출 빈도가 훨씬 높다.
  */
-export async function 외부채팅응답확인(timeoutMs = 1_500): Promise<{ alive: boolean; modelId: string | null }> {
-  try {
-    const r = await fetch(`${기본채팅주소()}/models`, { signal: AbortSignal.timeout(timeoutMs) });
-    if (!r.ok) return { alive: false, modelId: null };
-    const j = (await r.json()) as { models?: { name?: string }[]; data?: { id?: string }[] };
-    return { alive: true, modelId: j.models?.[0]?.name || j.data?.[0]?.id || null };
-  } catch {
-    return { alive: false, modelId: null }; // 안 살아 있으면 그대로 둔다 — 진짜 멈춤이다
-  }
+export async function 외부채팅응답확인(timeoutMs = 1_500): Promise<채팅두뇌응답> {
+  const 멈춤: 채팅두뇌응답 = { alive: false, 적재중: false, modelId: null };
+  // 둘을 **동시에** 묻는다 — 줄줄이 물으면 진단 한 번에 상한이 두 배가 된다.
+  const [목록, 건강상태] = await Promise.all([
+    (async (): Promise<{ modelId: string | null } | null> => {
+      try {
+        const r = await fetch(`${기본채팅주소()}/models`, { signal: AbortSignal.timeout(timeoutMs) });
+        if (!r.ok) return null;
+        const j = (await r.json()) as { models?: { name?: string }[]; data?: { id?: string }[] };
+        return { modelId: 모델이름다듬기(j.models?.[0]?.name || j.data?.[0]?.id) };
+      } catch {
+        return null; // 안 살아 있으면 그대로 둔다 — 진짜 멈춤이다
+      }
+    })(),
+    (async (): Promise<number> => {
+      try {
+        const r = await fetch(`${채팅서버뿌리()}/health`, { signal: AbortSignal.timeout(timeoutMs) });
+        return r.status;
+      } catch {
+        return 0; // 창구가 없거나 못 닿았다 — 그것만으로 「멈춤」이라 하지 않는다
+      }
+    })(),
+  ]);
+  if (!목록) return 멈춤;
+  // ★ /v1/models 200 하나로 「답한다」고 말하지 않는다(2026-09-10 검토관 적발).
+  //   llama.cpp는 **모델을 올리는 중에도 이 창구만 열어 둔다** — 임베딩 쪽에서 「모델이 안 올라와도
+  //   200을 준다」며 /v1/models를 배격해 놓고 채팅에서 그 신호로 초록을 내면 잣대가 앞뒤로 다르다.
+  //   그 서버가 **스스로 「올리는 중」이라 말할 때만**(/health 503) 내려 본다 — /health가 아예 없는
+  //   서버(404·오류·시간초과)는 종전대로 본다. 없는 창구를 근거로 빨강을 내지는 않는다.
+  return { alive: true, 적재중: 건강상태 === 503, modelId: 목록.modelId };
 }
 
 // 채팅 진입점(llm.ts chat)에서 호출 — 에이전트에 할당된 모델(없으면 기본 모델)을 풀에 보장하고
@@ -1240,28 +1304,49 @@ function tierReason(gpu: GpuUsage, recommended: GijoTierSpec["id"] | null): stri
   return `총 VRAM ${gb}GB — ${desc}`;
 }
 
+/**
+ * 내 프로세스 목록에 **밖에서 도는 두뇌**를 채워 넣는다 — /api/localengine/status가 쓰는 몸통.
+ *
+ * ⚠ 라우트 안에 두지 않고 뽑아 둔 까닭: 화면(agent.html)이 이 값으로 배지와 🔎 임베딩 팀원 카드를
+ *   그리는데, 라우트 안에 있으면 시험이 **소스 문자열 대조**밖에 못 한다. 뽑아 두면 진짜 스텁 서버를
+ *   세워 「나눠 쓰는 설치에서 화면에 뭐가 보이나」를 행동으로 잰다(2026-09-10 검토관 적발의 짝 시험).
+ */
+export async function 외부두뇌를채운다(st: LocalEngineStatus): Promise<LocalEngineStatus> {
+  // ★ pool엔 없지만 PORT에서 **실제로 도는** 모델(수동 기동·외부 GPU·사내 vLLM)을 놓치지 않는다
+  //   (max 발견#2 2026-08-17: 손으로 띄운 llama가 8080에 사는데 앱 pool 밖이라 대시보드가 거짓
+  //   '멈춤'을 냈다). loaded가 pool만 봤던 게 뿌리. ready 항목이 하나도 없을 때만 포트를 짧게
+  //   두드려, 살아 있으면 그 모델을 채워 '돌고 있음'으로 정직하게 말한다.
+  if (!st.loaded.some((l) => l.ready)) {
+    // ★ 잣대는 한 곳(외부채팅응답확인) — 자가 진단·설치 진단도 같은 함수를 부른다.
+    //   예전엔 여기에만 이 판정이 있어 대시보드는 「돌고 있음」, 진단은 「멈춤」을 말했다(2026-09-10).
+    const 외부 = await 외부채팅응답확인(2500);
+    if (외부.alive) {
+      const mid = 외부.modelId ?? "외부 기동 모델";
+      st.running = true;
+      st.modelId = st.modelId ?? mid;
+      // 적재 중이면 ready=false로 둔다 — 화면이 「(로딩중)」이라 적는다. 「응답한다」와 「답할 수 있다」는 다르다.
+      st.loaded = [...st.loaded, { modelId: mid, port: PORT, ready: !외부.적재중 }];
+    }
+  }
+  // ★ 임베딩도 같은 잣대를 쓴다(2026-09-10 검토관 적발 — 채팅만 갈아 끼워 반쪽이었다).
+  //   안 하면 나눠 쓰는 설치에서 **자가 진단은 초록인데 AI 팀 화면엔 임베딩이 아예 없다**
+  //   (agent.html이 embedding.running으로 배지와 🔎 팀원 카드를 그린다) — 방향만 뒤집힌 같은 결함이다.
+  //   판정은 주인 파일(embedding.ts)에서 받는다. 내 프로세스가 있으면 찌르지 않는다.
+  if (!st.embedding.running) {
+    const { 임베딩응답확인 } = await import("./embedding.js");
+    if (await 임베딩응답확인()) {
+      st.embedding = { ...st.embedding, running: true, modelId: st.embedding.modelId ?? "외부 기동 임베딩" };
+    }
+  }
+  return st;
+}
+
 export function registerLocalEngineRoutes(app: Express): void {
   app.get(
     "/api/localengine/status",
     authMiddleware,
     asyncRoute(async (_req, res) => {
-      const st = getLocalEngineStatus();
-      // ★ pool엔 없지만 PORT에서 **실제로 도는** 모델(수동 기동·외부 GPU·사내 vLLM)을 놓치지 않는다
-      //   (max 발견#2 2026-08-17: 손으로 띄운 llama가 8080에 사는데 앱 pool 밖이라 대시보드가 거짓
-      //   '멈춤'을 냈다). loaded가 pool만 봤던 게 뿌리. ready 항목이 하나도 없을 때만 포트를 짧게
-      //   두드려, 살아 있으면 그 모델을 채워 '돌고 있음'으로 정직하게 말한다.
-      if (!st.loaded.some((l) => l.ready)) {
-        // ★ 잣대는 한 곳(외부채팅응답확인) — 자가 진단·설치 진단도 같은 함수를 부른다.
-        //   예전엔 여기에만 이 판정이 있어 대시보드는 「돌고 있음」, 진단은 「멈춤」을 말했다(2026-09-10).
-        const 외부 = await 외부채팅응답확인(2500);
-        if (외부.alive) {
-          const mid = 외부.modelId ?? "외부 기동 모델";
-          st.running = true;
-          st.modelId = st.modelId ?? mid;
-          st.loaded = [...st.loaded, { modelId: mid, port: PORT, ready: true }];
-        }
-      }
-      res.json(st);
+      res.json(await 외부두뇌를채운다(getLocalEngineStatus()));
     })
   );
   // GIJO 구동 티어 조회 — GPU 실측 + 현재 티어 + 권장 판정 + 티어 사양표. 설정 화면 "구동 티어" 구역용.

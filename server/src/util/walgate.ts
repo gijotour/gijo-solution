@@ -12,7 +12,12 @@
 //   확실한 판정은 **배타 잠금을 실제로 잡아 보는 것**이다. 같은 실측에서:
 //     ① 다른 연결이 열려만 있어도  → SQLITE_BUSY   ② 다른 연결이 쓰는 중 → SQLITE_BUSY
 //     ③ 아무도 없을 때만          → 성공
-//   그래서 판정의 마지막은 늘 ③이다. 잡아 본 잠금은 곧바로 되돌리고 연결도 닫는다(아무것도 안 바꾼다).
+//   그래서 판정의 마지막은 늘 ③이다. 잡아 본 잠금은 곧바로 되돌리고 연결도 닫는다.
+//
+// ■ ⚠ **「아무것도 안 바꾼다」는 아니다**(2026-09-10 검토관 적발 — 옛 머리말이 그렇게 적어 두었다).
+//   아래 ①의 `wal_checkpoint(TRUNCATE)`는 WAL에 있던 내용을 **본 DB 파일로 합치는 쓰기**다.
+//   합치기는 무손실이라 데이터가 사라지지 않지만, 「막고 멈춘 경우에도 파일은 이미 손댄 뒤」라는 사실은
+//   정직하게 적어 둔다. 되돌릴 것이 없다는 뜻이지 파일이 그대로라는 뜻이 아니다.
 import Database from "better-sqlite3-multiple-ciphers";
 import * as fs from "fs";
 
@@ -24,18 +29,32 @@ export interface 잠금검사 {
 
 /**
  * 이 DB 파일을 지금 다른 프로그램이 쓰고 있지 않은지 확인한다.
+ *
+ * @param dbPath 볼 DB 파일
+ * @param 열쇠hex **암호화된 DB**면 그 열쇠(sqlcipher hex). 안 주면 평문 DB로 연다 —
+ *   암호화 DB를 열쇠 없이 열면 `SQLITE_NOTADB`로 떨어져 **언제나 「붙잡혀 있다」**가 된다
+ *   (짝 도구 decrypt-db.mjs가 그래서 이 인자를 준다 — 2026-09-10 검토관 적발).
  * @returns ok=true면 전환을 진행해도 된다. false면 **멈춰야 한다**(이유를 그대로 보여줄 것).
  */
-export function 데이터베이스가조용한가(dbPath: string): 잠금검사 {
+export function 데이터베이스가조용한가(dbPath: string, 열쇠hex?: string | null): 잠금검사 {
   const 멈추라 = "먼저 GIJO AS 서버를 완전히 멈춘 뒤 다시 실행하세요.";
   let d: InstanceType<typeof Database> | null = null;
+  let 열렸나 = false;
   try {
     d = new Database(dbPath);
+    if (열쇠hex) {
+      d.pragma("cipher='sqlcipher'");
+      d.pragma(`key="x'${열쇠hex}'"`);
+    }
     // 오래 기다리지 않는다(기본 5초 → 0.3초). 여기서 바라는 답은 「지금 나 혼자냐」 하나이고,
     // 붙잡혀 있으면 기다릴 게 아니라 **서버를 멈추라고 말해야** 한다.
     d.pragma("busy_timeout = 300");
+    // 여기까지 왔으면 파일을 **읽을 수는 있다**(열쇠가 맞다) — 뒤에 나는 오류는 잠금 쪽 사연이다.
+    d.prepare("SELECT 1").get();
+    열렸나 = true;
 
     // ① WAL을 본 파일로 합친다. busy가 0이 아니면 **그 순간 쓰고 있는 쪽**이 있다.
+    //    ⚠ 이 한 줄은 **파일을 실제로 고친다**(무손실 합치기) — 머리말의 정정 참고.
     const rows = d.pragma("wal_checkpoint(TRUNCATE)") as Array<{ busy?: number }> | undefined;
     const busy = Array.isArray(rows) ? Number(rows[0]?.busy ?? 0) : 0;
     if (busy) return { ok: false, 이유: `다른 프로그램이 데이터베이스에 쓰고 있습니다. ${멈추라}` };
@@ -53,6 +72,12 @@ export function 데이터베이스가조용한가(dbPath: string): 잠금검사 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // ⚠ 못 쟀으면 **통과시키지 않는다.** 이 도구는 되돌리기 어렵다 — 모호하면 막는다.
+    // ⚠ 다만 **왜 못 쟀는지는 갈라서 말한다**(2026-09-10 검토관 적발): 파일을 아예 못 연 것과
+    //   열긴 열었는데 잠금을 못 잡은 것은 고객이 할 일이 정반대다. 열쇠가 안 맞아 못 연 것을
+    //   「서버를 멈추세요」라고 안내하면 아무리 멈춰도 안 된다.
+    if (!열렸나) {
+      return { ok: false, 이유: `데이터베이스 파일을 열지 못했습니다(${msg}) — 파일 경로와 열쇠가 맞는지 확인하세요.` };
+    }
     return { ok: false, 이유: `데이터베이스가 다른 프로그램에 붙잡혀 있습니다(${msg}). ${멈추라}` };
   } finally {
     try { d?.close(); } catch { /* 이미 닫혔으면 그만이다 */ }

@@ -56,7 +56,7 @@ export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready:
   // 「이 기계에 파일이 있나」로 판정하기 전에, **지금 두뇌가 답하는지**를 재 둔다.
   //   ⚠ 게으르게 부른다 — 파일이 다 있는 보통 설치에서는 한 번도 안 찌른다(진단이 느려질 이유가 없다).
   //   ★ 잣대는 localengine.외부채팅응답확인 하나다(자가 진단·대시보드도 같은 함수를 부른다). 여기서 새로 재지 않는다.
-  let 두뇌캐시: { alive: boolean; modelId: string | null } | null = null;
+  let 두뇌캐시: { alive: boolean; 적재중: boolean; modelId: string | null } | null = null;
   const 두뇌응답 = async () => {
     if (!두뇌캐시) {
       const { 외부채팅응답확인 } = await import("./localengine.js");
@@ -70,7 +70,14 @@ export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready:
   if (fs.existsSync(llamaPath)) {
     checks.push({ name: "llama-server", status: "pass", detail: llamaPath });
   } else if ((await 두뇌응답()).alive) {
-    checks.push({ name: "llama-server", status: "info", detail: "이 기계에는 없습니다 — 다른 기계에서 띄운 AI를 나눠 쓰고 있고, 지금 응답이 확인됩니다" });
+    // 적재 중이면 그렇게 적는다 — 「응답한다」와 「지금 답할 수 있다」는 다르다(2026-09-10 검토관 적발).
+    //   그렇다고 설치를 막지는 않는다: 곧 올라올 상태라 fail이 아니라 알려 줄 일이다.
+    checks.push({
+      name: "llama-server", status: "info",
+      detail: (await 두뇌응답()).적재중
+        ? "이 기계에는 없습니다 — 나눠 쓰는 AI가 지금 모델을 올리는 중입니다"
+        : "이 기계에는 없습니다 — 다른 기계에서 띄운 AI를 나눠 쓰고 있고, 지금 응답이 확인됩니다",
+    });
   } else {
     checks.push({ name: "llama-server", status: "fail", detail: `경로에 파일 없음: ${llamaPath}` });
   }
@@ -84,7 +91,13 @@ export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready:
       const 두뇌 = await 두뇌응답();
       checks.push(
         두뇌.alive
-          ? { name: "로컬 모델", status: "info" as const, detail: `이 기계에는 모델 파일이 없지만 나눠 쓰는 AI가 응답합니다${두뇌.modelId ? ` · ${두뇌.modelId}` : ""}` }
+          ? {
+              name: "로컬 모델", status: "info" as const,
+              detail: 두뇌.적재중
+                ? "이 기계에는 모델 파일이 없고, 나눠 쓰는 AI가 지금 모델을 올리는 중입니다"
+                // ⚠ modelId는 **밖에서 받은 글자**다 — 파일 이름만·한 줄·60자로 다듬어 온다(localengine.모델이름다듬기).
+                : `이 기계에는 모델 파일이 없지만 나눠 쓰는 AI가 응답합니다${두뇌.modelId ? ` · ${두뇌.modelId}` : ""}`,
+            }
           : { name: "로컬 모델", status: "fail" as const, detail: "models/ 에 채팅 모델(.gguf) 없음 — 최소 1개 필요(BYOM)" }
       );
     } else {

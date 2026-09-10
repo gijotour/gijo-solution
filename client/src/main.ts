@@ -287,10 +287,28 @@ ipcMain.handle("dbcrypt:enable", async () => {
   if (!번들서버 || !스크립트) return { ok: false, error: "이 설치에서는 켤 수 없습니다." };
 
   // ① 서버를 멈춘다 — DB를 쥔 채로 rekey하면 안 된다.
+  //
+  // ⚠ **끝났다는 신호를 기다린다**(2026-09-10 검토관 적발 — 예전엔 3초만 세고 갔다).
+  //   서버의 정상 종료는 최대 15초까지 간다(index.ts SHUTDOWN_DEADLINE_MS) — 그 안에서 모델마다
+  //   llama-server가 죽기를 최대 10초 기다린다. 3초 뒤에 전환 도구를 부르면 아직 살아 있는 서버가
+  //   DB를 쥐고 있어 새 관문(walgate)이 「먼저 서버를 완전히 멈춘 뒤 다시 실행하세요」로 막는다 —
+  //   그런데 **올인원 고객에게는 따로 멈출 서버가 없다**(앱이 곧 서버다). 2026-08-09에 이 단추를
+  //   만든 까닭이 바로 그 「따를 수 없는 안내」였는데, 관문이 그 자리로 되돌릴 뻔했다.
   if (bundledServerProcess) {
-    bundledServerProcess.kill();
+    const 죽는중 = bundledServerProcess;
     bundledServerProcess = null;
-    await new Promise((r) => setTimeout(r, 3000));
+    await new Promise<void>((resolve) => {
+      let 끝났나 = false;
+      const 끝 = () => { if (!끝났나) { 끝났나 = true; clearTimeout(상한); resolve(); } };
+      // 상한 20초 — 서버의 자기 기한(15초)보다 넉넉히. 그래도 안 죽으면 강제로 끊고 진행한다
+      // (관문이 다시 막으면 그때는 「정말로 못 멈춘 것」이라 막는 것이 맞다).
+      const 상한 = setTimeout(() => { try { 죽는중.kill("SIGKILL"); } catch { /* 이미 죽었으면 그만 */ } 끝(); }, 20_000);
+      죽는중.once("exit", 끝);
+      죽는중.once("error", 끝);
+      죽는중.kill();
+    });
+    // 파일 손잡이가 완전히 놓이기까지의 짧은 여유(Windows에서 특히).
+    await new Promise((r) => setTimeout(r, 500));
   }
 
   // ② 전환. DB 경로는 **서버가 쓰는 것과 같은 규칙**으로 정한다(어긋나면 딴 DB를 암호화한다).

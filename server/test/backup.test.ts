@@ -7,6 +7,11 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gijo-backup-"));
 process.env.GIJO_BACKUP_DIR = tmp;
 process.env.GIJO_BACKUP_KEEP = "3";
 process.env.GIJO_MEMORY_DB_PATH = path.join(tmp, "no-lance"); // 없음 → LanceDB 미포함 경로 확인
+// ⚠ 인입 뿌리도 **이 시험만의 임시 폴더**로 가른다(2026-09-10 검토관 적발 — 전체 시험 1회차 간헐 실패).
+//   performBackup은 `<GIJO_INGEST_ROOT>/docs`를 통째로 복사하는데, 기본값은 시험 전체가 함께 쓰는
+//   `data/test-tmp/ingest`다(vitest.config.ts). 다른 시험 파일이 그 폴더에 파일을 쓰는 중에 복사가
+//   걸리면 `fs.promises.cp`가 ENOENT로 죽는다 — 이 파일과 아무 상관 없는 이유로 관문이 빨개진다.
+process.env.GIJO_INGEST_ROOT = path.join(tmp, "ingest");
 
 const { performBackup, backupOverdue, verifyBackupSnapshot } = await import("../src/engine/backup");
 

@@ -98,7 +98,9 @@ describe("내부 프롬프트는 게이트를 다시 지나지 않는다", () =>
   //   예전에는 클라이언트가 {"trusted":true}를 보내면 관문을 그냥 지나갔다(2026-07-30 발견).
   it("/api/llm/chat은 요청이 주장하는 trusted를 무시하고 false로 덮어쓴다", () => {
     const src = fs.readFileSync(path.join(engineDir, "llm.ts"), "utf8");
-    const route = src.slice(src.indexOf('"/api/llm/chat"'), src.indexOf('"/api/llm/chat"') + 1600);
+    // ⚠ 창을 넉넉히 잡는다(2026-09-10: 1600자였다가 라우트 머리말이 길어지자 **코드를 못 보고**
+    //   「계약이 깨졌다」고 거짓 실패를 냈다). 재는 것은 주석이 아니라 아래 코드다.
+    const route = src.slice(src.indexOf('"/api/llm/chat"'), src.indexOf('"/api/llm/chat"') + 4000);
     expect(route).toMatch(/\.\.\.req\.body/); // 여전히 펼치고 있다면
     // **같은 객체 리터럴 안에서** 펼침 뒤에 trusted: false가 와야 효과가 있다.
     // (주석에 적힌 문구가 아니라 실제 코드를 봐야 한다 — 처음 쓴 시험은 내 주석을 매칭해

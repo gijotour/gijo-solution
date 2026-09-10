@@ -32,7 +32,8 @@ import { 두뇌표식보고 } from "./brainmark";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
-const EMBEDDING_SERVER_URL = process.env.GIJO_EMBEDDING_URL ?? "http://localhost:8081/v1";
+// ⚠ 임베딩 서버 **주소는 여기 없다** — embedding.ts의 임베딩주소() 하나가 정본이다(2026-09-10 검토관 적발).
+//   여기 있던 사본은 아무도 안 쓰는 죽은 줄이었는데, 값을 두 곳에 적어 두면 언젠가 한쪽만 고친다.
 
 export interface ChatArgs {
   agentId: string;
@@ -1514,8 +1515,12 @@ export async function chat(args: ChatArgs): Promise<string> {
     // ⚠ noLearn은 **여기에만** 건다 — 대화 이력(위 histories)은 그대로 둬야 배포 계정으로
     //   검증할 때도 사람이 쓰는 것과 똑같이 동작한다(학습에만 안 들어간다).
     // 대화 수집 — 등록된 수집기에게 알린다(화살 #15). llm은 누가 모으는지 모른다.
-    // ⚠ 삼키되 **말은 한다**(2026-09-10 고객 QA 실측): 아래 catch가 한 글자도 안 남기면 채팅은 200인데
-    //   대화가 한 건도 안 쌓이는 것을 아무도 모른다 — 고객 QA의 존재 이유가 그 수집이다.
+    // ⚠ 삼키되 **말은 한다**. 이 catch는 **새로 꽂힐 수집기**를 위한 안전망이다 —
+    //   지금 등록된 수집기(learnloop.대화수집_배선)는 recordChatLog 안에서 스스로 try/catch를 하고
+    //   `[learnloop] 대화 수집 실패` 한 줄을 남기므로(2026-07-16부터) 여기까지 오지 않는다.
+    //   ⚠ 정정(2026-09-10 검토관 적발): 앞 커밋이 「그 실패는 수집 쪽 catch가 **삼켰다**」고 적었는데
+    //     사실이 아니다. 그날 chat_logs가 0건이던 진짜 원인은 agentId가 undefined로 흐른 것 하나이고
+    //     (아래 라우트에서 고쳤다), 실패 자체는 learnloop가 이미 로그로 말하고 있었다.
     if (!args.noLearn) {
       for (const 수집 of chatLogListeners) {
         try { 수집(args.agentId, args.logQuestion?.trim() || args.message, 기록답); }
@@ -1571,6 +1576,15 @@ export function registerLlmRoutes(app: Express): void {
       //   ② resolveRemoteTarget의 「이 PC 고정」 갈래(orchestrator)를 비켜 전역 원격으로 샌다.
       //   2026-09-10 고객 QA 첫 검증이 정확히 그 모양이었다(채팅 200인데 대화 0건).
       //   기본값은 대화창 정문(dispatcher)의 폴백과 **같은 값**이다 — 두 입구가 다른 규칙을 갖지 않게.
+      // ★ 이 기본값에 딸려 오는 것 둘(2026-09-10 검토관 적발 — 앞 커밋이 안 적었다):
+      //   ① **대화 이력 통을 정문과 함께 쓴다.** histories는 agentId를 열쇠로 삼는데 예전 키는
+      //      `undefined`였다. 이제 대화창(dispatcher route.agentId="orchestrator")과 **같은 통**이라,
+      //      이 창구로 넣은 문답이 담당자의 대화 맥락에 이어 붙는다. 두 입구를 같은 규칙으로 두기로
+      //      한 이상 이게 맞는 동작이지만, 이 창구로 **탐침을 쏘면 그 문답도 함께 남는다**는 뜻이다.
+      //      (맥락을 안 남기고 싶으면 요청이 remember:false를 주면 된다 — 그 갈래는 그대로 있다.)
+      //   ② **배정 모델을 실제로 올린다.** 예전엔 undefined라 getAgentModel이 늘 null이어서 기본 포트로
+      //      갔는데, 이제 총괄에 배정 모델이 있으면 ensureAgentModel이 그 모델을 풀에 보장한다(스왑 포함).
+      //      이것도 정문과 같아진 것이지만, 「이 창구는 가볍다」는 예전 가정은 더는 맞지 않는다.
       const who = (req as Request & { user?: GijoUser }).user;
       const agentId = typeof req.body?.agentId === "string" && req.body.agentId.trim() ? req.body.agentId.trim() : "orchestrator";
       res.json({
