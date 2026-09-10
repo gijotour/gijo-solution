@@ -53,10 +53,14 @@ sudo systemctl start gijo-qa     # ③ 고객 인스턴스 재기동(preflight�
    고객 피어(client-ext-tester1~6 = 10.8.0.5~10)도 그 대역이라, 4100을 같은 대역으로 열면
    **고객이 운영 4000에도 닿는다**(운영 4000은 `/api/health`·`/api/auth/login`이 인증 전 창구다 — 실측 무인증 200).
    두 길 중 하나를 고르셔야 한다:
-   - ⓐ 운영 4000 규칙을 우리 피어로 좁힌다(권장):
-     `Set-NetFirewallRule -DisplayName "GIJO AS - 서버(VPN 전용)" -RemoteAddress 10.8.0.1,10.8.0.11,10.8.0.12`
-     그 뒤 4100만 대역 전체에 연다:
-     `New-NetFirewallRule -DisplayName "GIJO AS - 고객 QA(4100·VPN 전용)" -Direction Inbound -Protocol TCP -LocalPort 4100 -RemoteAddress 10.8.0.0/24 -Action Allow`
+   - ⓐ 운영 4000 규칙을 우리 피어로 좁힌다(권장 · **2026-09-10 사장님 「방화벽 직접 설정」으로 채택**):
+     **한 번에**: 관리자 PowerShell에서 `powershell -ExecutionPolicy Bypass -File "D:Connect AI	oolsqa-instanceadmin-network-once.ps1"`
+     (①방화벽 ②포워딩 ③재부팅 예약 ④확인 출력을 한 번에 한다 · `-WhatIf`면 점검만 · 되돌리기는 파일 머리에)
+     손으로 하면 — 운영 4000은 **우리 피어**(.2 담당자1 · .3 담당자2 · .4 예비 · .11 mac · .12 gb10)로:
+     `Set-NetFirewallRule -DisplayName "GIJO AS - 서버(VPN 전용)" -RemoteAddress 10.8.0.2,10.8.0.3,10.8.0.4,10.8.0.11,10.8.0.12`
+     4100은 **고객 피어(.5~.10) + 관찰용 우리 피어(.2 .3 .4 .11)** 로만(대역 전체 `/24`로 열면 고객끼리·운영 도구가 섞인다):
+     `New-NetFirewallRule -DisplayName "GIJO AS - 고객 QA(4100·VPN 전용)" -Direction Inbound -Protocol TCP -LocalPort 4100 -RemoteAddress 10.8.0.5,10.8.0.6,10.8.0.7,10.8.0.8,10.8.0.9,10.8.0.10,10.8.0.2,10.8.0.3,10.8.0.4,10.8.0.11 -Action Allow`
+     ⚠ 피어 주소의 단일 출처는 `D:GIJO-AS-vpnwg0-server.conf`의 [Peer] AllowedIPs 다 — 피어를 더하면 두 목록도 고친다.
    - ⓑ 고객을 다른 대역(예: 10.9.0.0/24)에 두고 4100만 그 대역에 연다(WireGuard 피어 재발급 필요).
 2. **포워딩**: `refresh-portproxy.ps1`을 한 번 실행 + 작업 스케줄러에 「부팅 시」로 등록(스크립트 머리에 명령 그대로 있음).
 3. **systemd 유닛**: `sudo cp tools/qa-instance/gijo-qa.service /etc/systemd/system/` → `daemon-reload` → `enable --now gijo-qa`.
