@@ -1,0 +1,44 @@
+# gijo-qa.service — 고객 QA 인스턴스(형태 ⓑ, 포트 4100) 시스템 유닛 **본보기**
+#
+# ■ 왜 시스템 유닛인가 (2026-09-10 실측)
+#   `systemctl --user`도 동작하지만 `loginctl show-user gijo -p Linger` = **Linger=no**라
+#   마지막 로그인 세션이 끊기면 서비스가 함께 죽는다. 고객이 붙는 상시 서비스를
+#   linger 없는 user 유닛에 얹으면 **조용히 죽는다** — 그래서 시스템 유닛으로 둔다.
+#
+# ■ 설치(관리자 권한 필요 — 실행자는 sudo가 없어 여기까지만 준비한다)
+#   sudo cp tools/qa-instance/gijo-qa.service /etc/systemd/system/gijo-qa.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now gijo-qa
+#   systemctl status gijo-qa
+#
+# ■ 운영 유닛(gijo-as.service)과 다른 곳은 넷뿐이다
+#   WorkingDirectory · EnvironmentFile · 로그 경로 · Description.
+#   PATH의 venv는 **운영 것을 그대로 쓴다** — QA 트리에 venv를 복사하지 않았고
+#   gijo-qa.env의 GIJO_PYTHON이 같은 절대경로를 가리킨다(읽기 전용 소비).
+#
+# ⚠ 이 유닛은 운영 llama-server(8080/8081)를 **공유**한다. 안전은 gijo-qa.env의
+#   자물쇠 3줄(GIJO_MODELS_DIR=빈 폴더 · GIJO_EMBEDDING_MODEL_ID=__none__ ·
+#   GIJO_DEFAULT_MODEL_ID=__none__)에 걸려 있다. models-empty/ 에 모델을 하나라도
+#   떨어뜨리면 임베딩 감시가 깨어나 **운영 8081을 SIGKILL한다**(localengine.ts:967).
+
+[Unit]
+Description=GIJO AS 고객 QA 인스턴스 (포트 4100 · 운영 llama 공유)
+After=network-online.target gijo-as.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gijo
+WorkingDirectory=/home/gijo/gijo-qa/server
+EnvironmentFile=/home/gijo/gijo-qa/gijo-qa.env
+Environment=PATH=/home/gijo/gijo-as/venv/bin:/usr/local/cuda/bin:/usr/lib/wsl/lib:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/gijo/gijo-qa/server.log
+StandardError=append:/home/gijo/gijo-qa/server.log
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
