@@ -87,6 +87,13 @@ describe("★ 하네스가 이 모듈을 실제로 부른다", () => {
     expect(src.includes("(?:%|퍼센트)"), "판정 식이 하네스에 다시 베껴졌다 — 두 곳이 어긋난다").toBe(false);
   });
 
+  // ★ 2026-09-10 편입 — 「자리표시자 답」도 같은 계보다. 만들 때 ops-sim.mjs 안에 인라인으로
+  //   넣어 시험이 원리상 못 물었다(그 규칙이 잡은 첫 실물이 dispatcher analyze 갈래의 빈칸 틀이다).
+  it("자리표시자 답 판정도 이 모듈에서 온다 — 인라인 사본이 없다", () => {
+    expect(src).toMatch(/import\s*\{[^}]*자리표시자[^}]*\}\s*from\s*["']\.\/opssim-rules\.mjs["']/);
+    expect(src.includes("(이름|명칭|값"), "자리표시자 식이 하네스에 다시 베껴졌다 — 두 곳이 어긋난다").toBe(false);
+  });
+
   it("⑯ 마케팅 판정도 이 모듈에서 온다 — 인라인 사본이 없다", () => {
     expect(src).toMatch(/import\s*\{[^}]*마케팅조언인가[^}]*\}\s*from\s*["']\.\/opssim-rules\.mjs["']/);
     expect(src.includes("랜딩\\s*페이지"), "마케팅 낱말 식이 하네스에 다시 베껴졌다").toBe(false);

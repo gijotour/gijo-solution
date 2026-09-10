@@ -42,7 +42,7 @@ import { runAgentLoop, forcedToolFor, AgentToolCall, 가리킬것없는대명사
 import { 스트림자리 } from "./streamsink";
 import { 장애질문인가, 장애초동절차, 침해사고질문인가, 침해사고초동절차 } from "./incidentsteps";
 import { 신고시한질문인가, 침해사고신고시한답 } from "./reportdeadline";
-import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval, 에디션제한중, 조건이좁히나 } from "./agenttools";
+import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval, 에디션제한중, 조건이좁히나, 다음걸음, 시연데이터알림 } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
 // ⚠ gateUserInputInner — 신호(llm_activity `guard`)를 안 쏘는 본문. **설명 도구가 쓰는 자리**다
@@ -58,7 +58,7 @@ import { recordFindings, getAsset, listAssets, 자산표시이름 } from "./asse
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { generateReport } from "./report";
-import { listFindingReviews } from "./approvals";
+import { listFindingReviews, prioritizedReviews } from "./approvals";
 import { listMaintenanceItems } from "./maintenance";
 import { ACTION_CHECK_RE, runActionCheck } from "./actioncheck";
 import { appendTurn, recentTurnsText, getSession, createSession, markSession, attachSessionText } from "./worksessions";
@@ -537,9 +537,23 @@ async function runGijoEnrichment(results: StepResult[], fromAgentId: string, qa?
   return { action: "enrich", label: "용어 해설·사례 부연", output };
 }
 
+/**
+ * 스캔 단계 없이 「우선순위 분석」만 왔을 때, 분석에 넣을 **등록 취약점 상한**.
+ *
+ * ⚠ 상한은 선택이 아니라 필수다. analyzeFindings는 finding 배열을 `JSON.stringify`해 LLM 프롬프트에
+ *   통째로 넣는다(analysis.ts buildPrompt). 개발 DB 실측이 **평균 274바이트/건**이라 운영의 2,854건은
+ *   약 78만 자 ≈ 20만 토큰인데, 슬롯당 문맥은 32768 / --parallel 2 = **16,384토큰**이다
+ *   (localengine.ts의 ctxSize·--parallel). 전량은 원리상 안 들어간다.
+ * ⚠ 30건이면 30×274바이트 ≈ 8,200자 ≈ 2,700토큰 + 프롬프트 600자라, 응답 몫 800토큰
+ *   (llm.ts DEFAULT_MAX_TOKENS)을 빼고도 넉넉하다.
+ * ★ 순서는 prioritizedReviews가 정한다(KEV→EPSS→VPR→심각도) — 상한이 잘라 내는 것은 **꼬리**다.
+ */
+const ANALYZE_TOP_N = 30;
+
 // 복합 지시를 순차 실행한다. 각 단계는 협업 로그로 실시간 브로드캐스트되고, 스캔 결과(findings)는
 // 다음 단계(분석·리포트)로 누적 전달된다.
-async function runOrchestration(instructionText: string, steps: OrchestrationStep[], task: TaskItem, qa?: boolean): Promise<StepResult[]> {
+// 범위자산: 대화창이 「🗂 지금 범위」를 걸어 놨으면 그 자산만 본다(안 넘기면 종전대로 전체).
+async function runOrchestration(instructionText: string, steps: OrchestrationStep[], task: TaskItem, qa?: boolean, 범위자산?: string[]): Promise<StepResult[]> {
   const results: StepResult[] = [];
   const accumulated: StandardFinding[] = [];
   const scannedAssetIds = new Set<string>();
@@ -586,10 +600,36 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
           ? `${assetIds.length}개 자산 스캔 완료 — 발견 ${count}건 (${assetIds.map(자산표시이름).join(", ")})`
           : "스캔 대상 자산이 없습니다.";
       } else if (step.action === "analyze") {
-        output = accumulated.length
-          ? (await analyzeFindings(accumulated)).summary
+        // ★ 스캔 단계가 없어도 **등록된 현재 취약점**으로 분석한다 (2026-09-10 ⑲ 팀원 축 첫 실측 수리).
+        //   실측 그대로: 「우선순위 분석하고 리포트 작성해줘」는 스캔 없이 analyze→report로 계획되는데,
+        //   같은 오케스트레이션의 스캔 결과(accumulated)가 비어 곧장 chat(지시문)으로 떨어졌고,
+        //   모델이 「[KEV 취약점 이름]」처럼 **대괄호 빈칸만 남은 틀**을 냈다(자리표시자 답).
+        //   ⚠ 같은 답의 3단계 리포트는 실데이터(자산 45·취약점 2,854·KEV 13)를 썼다 —
+        //     등록된 취약점이 있는데 **분석 단계만 그것을 안 보고 있었다.**
+        //   ⚠ 상한(ANALYZE_TOP_N)의 근거는 그 상수의 주석에 있다 — 전량은 문맥에 원리상 못 들어간다.
+        //   ⚠ 범위자산 — 「이 자산 기준으로 갑니다」라 해 놓고 전체를 세면 그게 거짓말이다.
+        const 등록 = accumulated.length ? [] : prioritizedReviews(ANALYZE_TOP_N, 범위자산);
+        if (accumulated.length || 등록.length) {
+          const 재료 = accumulated.length ? accumulated : 등록.map((r) => r.finding);
+          const summary = (await analyzeFindings(재료)).summary;
+          // 스캔으로 갓 찾은 건은 종전 그대로 요약만 낸다(그 단계가 이미 무엇을 봤는지 말했다).
+          // 등록 취약점으로 답할 때는 **무엇을 몇 건 봤는지**와 **다음 걸음**을 함께 밝힌다.
+          output = accumulated.length
+            ? summary
+            : [
+                `등록된 취약점 가운데 우선순위 상위 ${재료.length}건(KEV→EPSS→VPR 순)을 분석했습니다.`,
+                summary,
+                시연데이터알림(재료),
+                다음걸음("조치·승인 화면에서 담당자·기한을 배정하거나, 여기서 \"1번 담당자 배정해줘\"라고 말해도 됩니다."),
+              ].filter(Boolean).join("\n");
+        } else {
+          // 등록된 취약점이 **0건일 때만** 종전처럼 일반 안내로 떨어진다.
+          // ⚠ 그때는 그 사실을 답 머리에 밝힌다 — 근거 없이 쓴 글을 분석 결과처럼 내놓는 것이
+          //   자리표시자 답의 씨앗이다(정직 원칙).
           // noLearn:true — 수집은 dispatchInstructionScoped 출구 한 곳에서 한다(이중 기록 방지).
-          : await chat({ agentId: "analysis", message: instructionText, remember: true, trusted: true, qa, noLearn: true });
+          const 안내 = await chat({ agentId: "analysis", message: instructionText, remember: true, trusted: true, qa, noLearn: true });
+          output = `아직 등록된 취약점이 없습니다 — 스캔 결과 없이 일반 안내로 답합니다.\n${안내}`;
+        }
       } else {
         // report — 앞 단계에서 스캔한 자산이 있으면 그 범위로, 없으면 전체로 보고서를 만든다.
         const scoped = scannedAssetIds.size ? [...scannedAssetIds] : undefined;
@@ -1736,7 +1776,8 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P1" });
     setAgentStatus("orchestrator", "working");
     collab(qa, { from: "orchestrator", to: "orchestrator", message: `복합 지시 ${steps.length}단계 실행: ${steps.map((s) => s.label).join(" → ")}` });
-    const stepResults = await runOrchestration(instructionText, steps, task, qa);
+    // 🗂 지금 범위가 걸려 있으면 분석 단계도 그 자산만 본다(화면 표시와 값이 어긋나지 않게).
+    const stepResults = await runOrchestration(instructionText, steps, task, qa, 지금범위?.kind === "asset" ? [지금범위.id] : undefined);
     resetAgentToDefault("orchestrator");
     const updated = completeTask(task.id);
     const completedTask = updated.find((t) => t.id === task.id) ?? task;
