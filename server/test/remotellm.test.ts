@@ -121,7 +121,13 @@ describe("★ 배선 — 게터가 실제로 채팅 경로에 물려 있다 (소
     // 2026-08-16: 게터가 remoteLlmTarget(baseUrl+headers)로 바뀌었다 — 토큰을 헤더로 보내려고.
     expect(src, "원격 게터를 안 부른다").toMatch(/remoteLlmTarget\(\)/);
     // 원격이 있으면 로컬 로드를 아예 안 거쳐야 한다 — ?? 로 가른 자리.
-    expect(src, "원격이 로컬 로드를 우회하지 않는다").toMatch(/원격 \?\? \(await import\("\.\/localengine\.js"\)/);
+    // ★ 2026-09-10: 오른쪽이 `로컬주소()` 함수로 뽑혔다. **원격 폴백이 같은 방법으로 이 PC 주소를
+    //   얻어야 하기 때문**이다(두 벌로 적으면 폴백만 modelOverride 규칙을 빼먹는다). 재는 것은
+    //   그대로 「?? 로 갈라 원격이면 로컬 로드를 안 거친다」이므로 **두 조각으로** 못 박는다 —
+    //   ① 가르는 자리 ② 그 함수가 정말 localengine 로더인가(빈 함수로 바꿔치기하면 빨강).
+    expect(src, "원격이 로컬 로드를 우회하지 않는다").toMatch(/원격 \?\? \(await 로컬주소\(\)\)/);
+    expect(src, "로컬주소()가 localengine 로더가 아니다 — ?? 오른쪽이 껍데기면 검사가 헛돈다")
+      .toMatch(/const 로컬주소 = async \(\): Promise<string> => await import\("\.\/localengine\.js"\)/);
     // 토큰 헤더가 실제로 fetch에 붙는다(토큰 인증의 배선).
     expect(src, "원격 토큰 헤더가 fetch에 안 붙는다").toMatch(/\.\.\.원격헤더/);
   });

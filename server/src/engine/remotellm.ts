@@ -44,34 +44,89 @@ export interface RemoteLlmConfig {
   url: string;            // 예: http://10.8.0.12:8080/v1
   lastCheck: number | null; // 마지막 연결 테스트 성공 시각(ms) — 화면 표시용
   lastModel: string | null; // 그때 원격이 내놓은 모델 id — 「어느 두뇌가 답하나」를 화면이 말하게
+  /**
+   * 🧠 **마지막으로 원격에 못 닿은 시각(ms)** — 실제 채팅이 겪은 사실이다(2026-09-10).
+   *
+   * ⚠ lastCheck와 **다른 사실**이라 한 칸에 뭉개지 않는다. lastCheck는 admin이 설정 화면에서
+   *   누른 연결 시험이 성공한 시각이고, 이 칸은 **담당자의 질문이 실제로 나가다 죽은** 시각이다.
+   *   그 둘은 몇 시간씩 어긋난다 — 아침에 시험이 성공했고 낮에 WireGuard가 끊긴 날, lastCheck만
+   *   보는 화면은 「연결됨 · 3시간 전 확인」이라 말한다. 그게 거짓 초록이다.
+   */
+  lastFailAt: number | null;
+  /** 그때 사유 — 사람이 읽는 짧은 말(HTTP 상태·연결 실패·시간 초과). 주소·토큰은 안 적는다. */
+  failReason: string | null;
 }
 
 // ⚠ **주소가 바뀌면 지난 확인은 무효다.** 그래서 「어느 주소를 쟀는지」를 함께 적고,
 //   지금 주소와 다르면 lastCheck·lastModel을 null로 돌려준다.
 //   안 그러면 주소를 바꾼 뒤에도 **옛 기계의 모델 이름**이 화면에 남는다 — 그게 거짓 표시다.
-interface 저장모양 extends RemoteLlmConfig { lastCheckedUrl?: string | null }
+interface 저장모양 extends RemoteLlmConfig { lastCheckedUrl?: string | null; lastFailUrl?: string | null }
 
 export function remoteLlmConfig(): RemoteLlmConfig {
   try {
     const row = getStateStmt.get(STATE_KEY) as { value: string } | undefined;
-    if (!row) return { enabled: false, url: "", lastCheck: null, lastModel: null };
+    if (!row) return { enabled: false, url: "", lastCheck: null, lastModel: null, lastFailAt: null, failReason: null };
     const v = JSON.parse(row.value) as Partial<저장모양>;
     const url = String(v.url ?? "");
     // 잰 주소와 지금 주소가 다르면 「모른다」로 답한다(위 주석).
     const 유효 = !v.lastCheckedUrl || v.lastCheckedUrl === url;
+    // ⚠ 실패도 **같은 규율**로 무효화한다 — 주소를 바꿨으면 옛 주소에서 못 닿았던 사실은
+    //   지금 주소에 대해 아무 말도 하지 않는다. 안 그러면 새 주소가 멀쩡한데 화면이 계속 「끊김」이다.
+    const 실패유효 = !v.lastFailUrl || v.lastFailUrl === url;
     return {
       enabled: v.enabled === true,
       url,
       lastCheck: 유효 && typeof v.lastCheck === "number" ? v.lastCheck : null,
       lastModel: 유효 && typeof v.lastModel === "string" && v.lastModel ? v.lastModel : null,
+      lastFailAt: 실패유효 && typeof v.lastFailAt === "number" ? v.lastFailAt : null,
+      failReason: 실패유효 && typeof v.failReason === "string" && v.failReason ? v.failReason : null,
     };
   } catch {
-    return { enabled: false, url: "", lastCheck: null, lastModel: null };
+    return { enabled: false, url: "", lastCheck: null, lastModel: null, lastFailAt: null, failReason: null };
   }
 }
 
 function saveConfig(c: 저장모양): void {
   setStateStmt.run(STATE_KEY, JSON.stringify(c));
+}
+
+/** 지금 저장돼 있는 원문 그대로(무효화 규칙을 안 태운 값) — 실패/성공 기록이 덮어쓸 밑판. */
+function 저장원문(): 저장모양 {
+  try {
+    const row = getStateStmt.get(STATE_KEY) as { value: string } | undefined;
+    if (row) return JSON.parse(row.value) as 저장모양;
+  } catch { /* 깨진 값이면 아래 기본값 */ }
+  return { enabled: false, url: "", lastCheck: null, lastModel: null, lastFailAt: null, failReason: null };
+}
+
+/**
+ * 🧠 **채팅이 원격에 못 닿았다** — 그 사실을 상태에 남긴다(2026-09-10 · llm.ts 원격 폴백의 짝).
+ *
+ * ★ 왜 필요한가: 폴백만 있고 기록이 없으면 **아무도 모르게 강등된다.** 담당자는 그 한 답에
+ *   붙은 한 줄만 보고 지나가고, 로스터 명패는 계속 「🌐 외부지원」이라 말한다 — 원격이 며칠째
+ *   죽어 있어도 화면은 초록이다. 이 저장소가 「조용한 고장」이라 부르는 바로 그 꼴이다.
+ * ⚠ **주소·토큰은 안 적는다** — 사유는 사람이 읽는 짧은 말만(부르는 쪽이 그렇게 만든다).
+ * ⚠ 이 기록이 원격을 **끄지는 않는다.** 끄면 사람이 다시 켜기 전엔 원격이 영영 안 살아나고,
+ *   잠깐 끊긴 VPN 한 번에 설정이 뒤집힌다. 다음 질문은 그대로 다시 원격을 시도하고,
+ *   성공하면 아래 원격성공기록이 이 자국을 지운다.
+ */
+export function 원격실패기록(사유: string): void {
+  const prev = 저장원문();
+  const url = String(prev.url ?? "");
+  if (!url) return; // 주소가 없으면 적을 대상이 없다
+  saveConfig({ ...prev, lastFailAt: Date.now(), failReason: String(사유).slice(0, 200), lastFailUrl: url });
+}
+
+/**
+ * 🧠 원격이 다시 답했다 — 실패 자국을 지운다. **자국이 있을 때만** 쓴다(채팅마다 DB를 안 만진다).
+ *
+ * ⚠ lastCheck는 안 건드린다 — 그 칸의 생산자는 연결 시험 하나다(아래 /test의 ★). 「언제 확인했나」와
+ *   「지금 되나」를 한 칸에 뭉개면 화면이 어느 사실을 말하는지 알 수 없게 된다.
+ */
+export function 원격성공기록(): void {
+  const prev = 저장원문();
+  if (prev.lastFailAt == null && !prev.failReason) return;
+  saveConfig({ ...prev, lastFailAt: null, failReason: null, lastFailUrl: null });
 }
 
 /**
@@ -185,6 +240,14 @@ export function registerRemoteLlmRoutes(app: Express): void {
       airgap: isAirgapOn(),
       model: 켜짐 ? c.lastModel : null,
       checkedAt: 켜짐 ? c.lastCheck : null,
+      // 🧠 **실제 채팅이 못 닿은 사실**(2026-09-10). remote·checkedAt만으로는 「설정은 켜졌고
+      //   아침에 시험도 통과했는데 지금은 죽어 있다」를 화면이 말할 수 없다 — 그 상태가
+      //   로스터에 「🌐 외부지원」으로 초록이면 거짓이다.
+      // ⚠ **remote의 뜻은 안 바꾼다.** 그 칸은 여전히 「설정상 원격으로 간다」이고, 실패 한 번으로
+      //   false가 되면 설정 화면과 대화창 칩이 「꺼짐」이라 말하게 된다 — 아무도 안 껐는데.
+      //   판단은 읽는 쪽이 한다: lastFailAt이 checkedAt보다 나중이면 지금은 닿지 않는 것이다.
+      lastFailAt: 켜짐 ? c.lastFailAt : null,
+      failReason: 켜짐 ? c.failReason : null,
     });
   });
 
@@ -224,7 +287,9 @@ export function registerRemoteLlmRoutes(app: Express): void {
         //   /models를 이미 찌르고 있었는데 **개수만 쓰고 버렸다.**
         const 모델 = Array.isArray(j?.data) && typeof j.data[0]?.id === "string" ? String(j.data[0].id) : null;
         const prev = remoteLlmConfig();
-        saveConfig({ ...prev, lastCheck: Date.now(), lastModel: 모델, lastCheckedUrl: url });
+        // 🧠 성공했으니 **실패 자국을 지운다**(2026-09-10) — 안 지우면 사람이 시험을 통과시켜 놓고도
+        //   화면이 계속 「끊김」이라 말한다(회복을 못 알아보는 상태 = 또 다른 거짓 표시).
+        saveConfig({ ...prev, lastCheck: Date.now(), lastModel: 모델, lastCheckedUrl: url, lastFailAt: null, failReason: null, lastFailUrl: null });
         res.json({ ok: true, models: 개수, model: 모델 });
       } catch (e) {
         res.json({ ok: false, error: `원격에 닿지 못했습니다 — ${e instanceof Error ? e.message : String(e)}. VPN 연결과 주소를 확인하세요.` });
@@ -258,7 +323,9 @@ export function registerRemoteLlmRoutes(app: Express): void {
       } else if (url && remoteUrlProblem(url)) {
         저장url = prev.url; // 규칙 밖 새 주소는 안 받는다 — 끄기만 통과
       }
-      saveConfig({ enabled, url: 저장url, lastCheck: prev.lastCheck, lastModel: prev.lastModel, lastCheckedUrl: 저장url });
+      // 🧠 실패 자국은 여기서 지운다 — 사람이 설정을 다시 만졌으면 「다시 재 본다」가 맞다.
+      //   (주소를 안 바꾸고 껐다 켠 경우까지 포함 — 그게 담당자가 하는 첫 조치다.)
+      saveConfig({ enabled, url: 저장url, lastCheck: prev.lastCheck, lastModel: prev.lastModel, lastCheckedUrl: 저장url, lastFailAt: null, failReason: null, lastFailUrl: null });
       차단기록한주소.clear(); // 주소가 바뀌었으니 다음 차단은 다시 한 번 기록한다
       // 채팅이 어디로 가는지를 바꾸는 admin 설정 — 작업 기록에 남긴다(2026-08-19 검토 지적:
       // 이 파일에 감사가 한 줄도 없었다). ⚠ URL 전체를 적지 않는다 — ?token=이 평문으로 딸려 온다.

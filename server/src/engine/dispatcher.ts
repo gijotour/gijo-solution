@@ -23,6 +23,8 @@ import { chat } from "./llm";
 // 🔎 인용 가드가 본 원천을 qa 응답에 싣기 위한 잎 통로. **llm에서 안 가져온다** —
 //   llm을 통째로 흉내 내는 목이 66파일이라 심볼을 하나만 더 가져와도 그것들이 죽는다(아래 경고).
 import { 새인용원천수거, 인용원천을수거하며 } from "./citesource";
+// 🧠 「누가 답했나」를 응답에 싣는 잎 통로(brainmark.ts — citesource와 같은 무늬).
+import { 새두뇌표식수거, 두뇌표식을수거하며, 두뇌표식실어보내기 } from "./brainmark";
 // ⚠ **llm이 아니라 noevidence에서 가져온다.** llm을 통째로 흉내 내는 시험이 76개라, llm에서
 //   심볼을 하나만 더 가져와도 그 시험들의 dispatchInstruction이 죽는다(2026-09-05 실측 9파일 66건).
 //   배너 문장의 주인은 그 파일 하나다 — 여기서 문구를 다시 적지 않는다.
@@ -276,6 +278,24 @@ export interface DispatchResult {
    *     경계로 쓰려면 역할 검사를 따로 걸어야 하고, 그건 이 칸이 아니라 라우트가 할 일이다.
    */
   근거원천?: { 조각: string[]; 추가원천: string[]; 보고횟수: number };
+  /**
+   * 🧠 **어느 두뇌가 답했나** — 두 입구(/api/dispatch·/api/dispatch/stream) 모두에 실린다.
+   *
+   * ★ 왜 칸을 뒀나(2026-09-10) — 운영은 전역 원격이 켜진 채 팀원 셋이 gb10(125B)으로 간다.
+   *   그런데 답을 받는 쪽은 **누가 답했는지 알 길이 없었다.** 같은 질문이 어느 날은 125B,
+   *   어느 날은 이 PC 14B로 답하는데 하네스 기록에는 둘이 똑같이 남는다 — 성능이 떨어진 날의
+   *   원인을 사후에 못 가린다. 「무엇을 쟀는지 모르는 숫자」는 이 저장소가 가장 경계하는 부류다.
+   * ⚠ `model`은 **qa 요청에만** 실린다(brainmark 두뇌표식실어보내기 한 곳이 가른다).
+   *   담당자에게 필요한 것은 「지금 바깥으로 나갔나」이고, 어느 모델인지는 설정 권한의 몫이다 —
+   *   /api/llm/remote/where가 주소를 안 알려주는 것과 같은 자세다.
+   * ⚠ `fallback: true`면 원격으로 가려다 못 닿아 이 PC 두뇌가 답한 것이다(llm.ts 원격 폴백).
+   *   그 답 **본문 끝에도** 한 줄이 붙는다 — 이 칸은 기계가, 그 줄은 사람이 읽는다.
+   * ⚠ **LLM이 안 돈 답에는 칸이 없다.** 인사·잡담(smallTalkReply)·자료없음 조기 반환·도구만으로
+   *   끝난 지시는 chat()이 표식을 안 남긴다 — 「없으면 두뇌가 안 돌았다」는 뜻이지 결함이 아니다.
+   * ⚠ 답을 만든 chat이 여러 번인 답(오케스트레이션)은 **첫 것**의 표식이다 — brainmark가 횟수를
+   *   세어 두지만 지금은 응답에 안 싣는다(소비자가 없는 값을 계약에 넣지 않는다).
+   */
+  brain?: { location: "local" | "remote"; fallback: boolean; model?: string };
 }
 
 // ── 복합 지시(오케스트레이션) ─────────────────────────────────────────
@@ -2297,7 +2317,11 @@ export function registerDispatcherRoutes(app: Express): void {
           dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id ?? user?.username, clearance: user?.clearance, role: user?.role }, 선택)
         )
       );
-      const work = 근거그릇 ? 인용원천을수거하며(근거그릇, 태우기) : 태우기();
+      // 🧠 **두뇌 표식 그릇** — 근거 그릇과 달리 **qa가 아니어도 놓는다**(2026-09-10).
+      //   담기는 것이 「local/remote·폴백 여부」뿐이라 노출면이 안 넓어지고, 오히려 **정직**의
+      //   문제라 사람이 봐야 한다(모델 이름만 qa에 한정 — brainmark 한 곳이 가른다).
+      const 두뇌그릇 = 새두뇌표식수거();
+      const work = 두뇌표식을수거하며(두뇌그릇, () => (근거그릇 ? 인용원천을수거하며(근거그릇, 태우기) : 태우기()));
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), limitMs));
       const first = await Promise.race([work, timer]);
@@ -2321,6 +2345,8 @@ export function registerDispatcherRoutes(app: Express): void {
         // 🔎 가드가 본 원천 — **담긴 것이 있을 때만** 싣는다. 비-qa는 그릇 자체가 없어
         //   이 줄이 원리상 안 돈다(사람 응답에는 칸조차 생기지 않는다 — 짝 시험이 못박는다).
         if (근거그릇?.값) first.근거원천 = 근거그릇.값;
+        // 🧠 누가 답했나 — **담긴 것이 있을 때만**. LLM이 안 돈 답(인사·도구만)엔 칸이 안 생긴다.
+        if (두뇌그릇.값) first.brain = 두뇌표식실어보내기(두뇌그릇.값, qa);
         res.json(first);
         return;
       }
@@ -2391,18 +2417,24 @@ export function registerDispatcherRoutes(app: Express): void {
       const 싱크 = { 시작: () => 보냄({ t: "start" }), 토막: (t: string) => 보냄({ t: "delta", text: t }) };
 
       const t0 = Date.now();
+      // 🧠 두뇌 표식 — **두 입구가 같은 계약**이다(빈 지시 400·☑📎 처리와 같은 자리).
+      //   근거원천 칸이 여기 없는 것과는 다르다: 그건 조각 본문이라 소비자(하네스)가 쓰는
+      //   입구에만 뒀지만, 표식은 사람이 봐야 하는 정직 신호라 스트림에서 빠지면 그대로 샌다.
+      const 두뇌그릇 = 새두뇌표식수거();
       try {
-        const r = await runWithRagScope({ docIds: 지정문서, attachText: 첨부글 }, () =>
+        const r = await 두뇌표식을수거하며(두뇌그릇, () => runWithRagScope({ docIds: 지정문서, attachText: 첨부글 }, () =>
           스트림자리.run(싱크, () =>
             runWithProgress(progressId, user?.id ?? null, () =>
               dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id ?? user?.username, clearance: user?.clearance, role: user?.role }, 선택)
             )
           )
-        );
+        ));
         // 출구 손질은 기존 라우트와 같은 순서·같은 함수 — 여기만 다르면 두 입이 딴말을 한다.
         recordAnswerTiming(text, Date.now() - t0, qa, r.route?.agentId);
         if (typeof r.output === "string") r.output = 내부키치환(r.output, 자산표시이름);
         말투재기(text, String(r.output ?? ""));
+        // 🧠 done에 싣는다 — 흘린 토막이 아니라 **done의 result가 최종 답**이라는 계약 그대로다.
+        if (두뇌그릇.값) r.brain = 두뇌표식실어보내기(두뇌그릇.값, qa);
         보냄({ t: "done", result: r });
       } catch (err) {
         // 정직: 흘리다 죽었으면 죽었다고 말한다 — 잘린 답을 완성인 척 두지 않는다(시안 명시).

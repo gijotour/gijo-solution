@@ -27,6 +27,8 @@ import { guardCitations, 뗀인용요약, 사유별집계, 못뗌사유, 숫자�
 import { 메타줄걷기, type 메타걷기결과 } from "./metaleak";
 // 🔎 가드가 본 원천을 qa 응답까지 나르는 잎 통로(citesource.ts 머리말 — 왜 llm.ts 밖인지 포함).
 import { 인용원천보고 } from "./citesource";
+// 🧠 「어느 두뇌가 답했나」를 /api/dispatch까지 나르는 잎 통로(brainmark.ts — citesource와 같은 무늬·같은 이유).
+import { 두뇌표식보고 } from "./brainmark";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -701,6 +703,32 @@ const NO_HAN_GRAMMAR = "root ::= [^\\u4e00-\\u9fff]*";
 // 있다(실측 2026-07-17: 채팅 5분 행 후 실패). 상한을 두고 정직한 지연 안내로 떨어뜨린다.
 const LLM_TIMEOUT_MS = Number(process.env.GIJO_LLM_TIMEOUT_MS ?? 120_000);
 
+// ── 🧠 **원격 두뇌의 상한은 따로 둔다** (2026-09-10) ────────────────────────────────
+//
+// ■ 왜 가르나: 로컬 상한은 「GPU가 잡혀 무한 대기」를 끊는 자다. 원격은 **못 닿는 경우**가 하나
+//   더 있다 — WireGuard가 끊기면 패킷이 조용히 버려져 connect가 상한까지 매달린다(거절되지도
+//   않는다). 그 시간이 곧 **폴백이 시작되기까지 담당자가 버리는 시간**이고, 그 뒤에 이 PC 두뇌가
+//   다시 처음부터 답을 만든다. 두 상한을 한 값으로 묶으면 최악이 120초＋로컬 시간이 된다.
+//
+// ⚠ **이 값은 공짜가 아니다 — 느린 원격을 잘라낼 수 있다.** 실측(2026-08-18 gb10)에서 같은
+//   질문에 72B가 **89~90초**였다. 90초는 그 자리를 아슬아슬하게 지난다. 그래도 90초를 고른 근거:
+//     · 잘려도 **답은 나온다**(이 PC 두뇌로 되돌린 뒤 정직하게 밝힌다) — 종전엔 오류 문구뿐이었다.
+//     · 사람 경로는 어차피 30초에 리포트로 물러난다(dispatcher LONG_ANSWER_MS) — 90초를
+//       기다리는 사람은 없고, 90초가 지나 원격이 답해 봐야 그 답은 리포트로 간다.
+//   ⚠ 큰 두뇌를 끝까지 기다리게 하려면 `GIJO_REMOTE_LLM_TIMEOUT_MS`로 올린다. 이 숫자는
+//     **사장님이 값을 바꿀 수 있게** env로 열어 둔다(계획서 항목이 아니라 운영 선택이다).
+const REMOTE_LLM_TIMEOUT_MS = Number(process.env.GIJO_REMOTE_LLM_TIMEOUT_MS ?? 90_000);
+
+/**
+ * 🧠 **원격이 죽어 이 PC로 되돌린 답**임을 담당자에게 밝히는 한 줄.
+ *
+ * ⚠ **폴백 감지 목록과 겹치지 않는 말을 쓴다** — regress FALLBACK_RE(`모델이 아직 준비|실행 실패|
+ *   지연되고 있습니다|요청이 차단`)·drawer-audit FAIL_MARKS(「찾지 못했습니다」·「알 수 없습니다」…).
+ *   겹치면 **정직하게 답한 이 답에 실패 딱지**가 붙는다 — 2026-08-03 근거약함 배너가 겪은 그 함정이다.
+ * ⚠ 답 **끝**에 붙는다(아래 붙이는 자리 주석) — 앞머리에 두면 배너 판정(startsWith)이 죽는다.
+ */
+const 원격폴백안내 = "🧠 원격 두뇌가 닿지 않아 이 PC 두뇌로 답했습니다.";
+
 // ── 인사·잡담은 LLM에 보내지 않는다 ─────────────────────────────────────────
 // 실측(2026-07-19): "안녕"에 이 7B 보안 합성모델은 자기 시스템 프롬프트 규칙을 그대로 읊거나
 // ("인사말, 서두, 예고, 자기소개는 금지입니다…"), 근거가 없으니 학습 데이터에서 본 엉뚱한
@@ -838,6 +866,44 @@ export async function resolveRemoteTarget(agentId: string): Promise<{ baseUrl: s
   return await import("./remotellm.js").then((m) => m.remoteLlmTarget()).catch(() => null); // ② 전역을 따른다
 }
 
+/**
+ * 이력을 **글자 예산**에 맞춰 오래된 쪽부터 자른다 — ★ 자르는 잣대는 **이 한 곳**이다.
+ *
+ * ■ 왜 있나 (2026-08-13 — max 근본 규명 + win 로깅의 합작)
+ *   라이트(ctx 8192)에서 긴 문서를 다루면 그 뒤로 **긴 질문만 0초에** 죽었다(HTTP 400
+ *   "request (8861 tokens) exceeds … (8192)"). HISTORY_LIMIT=20은 **개수** 상한이지 크기 상한이
+ *   아니다 — 정리본이 긴 문서(1,500자+)를 연달아 보내면 이력이 조 단위로 부풀어 문맥을 다 먹는다.
+ *   max의 관찰이 전부 설명된다: 「~10분 뒤 저절로 나았다」=짧은 질문들이 긴 이력을 밀어냄 ·
+ *   「재시작하면 나았다」=histories.clear() · 「dispatch는 무사」=짧은 질문＋다른 에이전트 이력.
+ *
+ * ■ 예산: ctx 토큰의 절반을 이력에 준다. 나머지 절반이 시스템+RAG+이번 질문+생성분 몫이다.
+ *   한글 실측 환산 1.44자/토큰(max 로그: 12,773자=8,861토큰)에서 보수적으로 1.2자/토큰을 쓴다 —
+ *   영문·코드가 섞이면 토큰이 더 나오므로 낮게 잡아야 초과가 안 난다.
+ *   ⚠ 자르는 것은 **오래된 쪽부터**, user/assistant 쌍 경계를 지킨다(홀수로 자르면 Mistral류
+ *     채팅 템플릿이 "roles must alternate"로 거부한다).
+ *   ⚠ 개수 상한(HISTORY_LIMIT)은 그대로 둔다 — 이건 크기 상한이고 그건 개수 상한이다.
+ *   ⚠ 📎 첨부는 systemContent에 실리는데 이 예산은 이력만 잰다 — 첨부 몫(최대 ≈4,000자)을
+ *     미리 덜어내지 않으면 라이트(8K)에서 위 실패 모양이 재발한다(2026-08-13 검토관 적발).
+ *
+ * ★ **함수로 뽑은 까닭**(2026-09-10): 원격이 죽어 이 PC로 되돌릴 때 **다시 재야 한다.** 원격
+ *   32K 예산으로 자른 이력을 이 PC 티어(라이트 8K)에 그대로 보내면 0초에 400이 나 폴백이
+ *   반쪽이 된다 — 이 계산을 두 벌 적으면 그중 한 벌만 고쳐지는 날이 온다.
+ */
+function 예산맞춤이력(전체: ChatTurn[], ctx: number, 첨부길이: number): ChatTurn[] {
+  const 이력예산자 = Math.max(1000, Math.floor((ctx / 2) * 1.2) - 첨부길이);
+  let 합 = 0;
+  let 시작 = 전체.length;
+  for (let i = 전체.length - 1; i >= 0; i--) {
+    합 += String(전체[i]?.content ?? "").length;
+    if (합 > 이력예산자) break;
+    시작 = i;
+  }
+  if (시작 % 2 === 1) 시작 += 1; // 쌍 경계 — user부터 시작하게
+  if (시작 > 0 && 시작 < 전체.length) return 전체.slice(시작);
+  if (시작 >= 전체.length && 전체.length) return []; // 최신 한 턴조차 예산 초과면 다 버린다
+  return 전체;
+}
+
 export async function chat(args: ChatArgs): Promise<string> {
   // 단일 관문 — 사용자 입력이 LLM에 닿기 전 반드시 여기를 지난다(engine/gateway.ts 주석 참고).
   // trusted는 이미 관문을 지난 내부 재진입(dispatcher)만 쓴다.
@@ -926,44 +992,21 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   `원격`은 아래 여러 곳이 「원격인가」 불리언으로 쓰므로 baseUrl만 뽑아 유지한다.
   // ★ 팀원별 두뇌 위치 → 원격 목표. **판정은 한 곳에만 산다**(`resolveRemoteTarget` 머리말 ★).
   //   `agentId`는 ChatArgs의 **필수 인자**다(:29) — 늘 있다.
+  //   ⚠ **let인 까닭**(2026-09-10): 원격이 죽으면 이 PC로 되돌린다. 그 뒤로도 이 둘을 보는 자리가
+  //     여럿이라(재생성 경로의 redirect·토큰 헤더, 아래 두뇌 표식) 값이 안 바뀌면 폴백 뒤에도
+  //     **죽은 원격을 계속 가리킨다** — 재생성이 통째로 죽고 표식이 「remote」라 거짓말이 된다.
   const 원격목표 = await resolveRemoteTarget(args.agentId);
-  const 원격 = 원격목표?.baseUrl ?? null;
-  const 원격헤더 = 원격목표?.headers ?? {};
+  let 원격 = 원격목표?.baseUrl ?? null;
+  let 원격헤더 = 원격목표?.headers ?? {};
 
-  // ★ 이력을 **글자 예산**으로도 자른다 (2026-08-13 — max 근본 규명 + win 로깅의 합작).
-  //
-  // ■ 무엇이 있었나: 라이트(ctx 8192)에서 긴 문서를 다루면 그 뒤로 **긴 질문만 0초에** 죽었다.
-  //   진단 로그가 밝힌 원인: HTTP 400 "request (8861 tokens) exceeds … (8192)".
-  //   HISTORY_LIMIT=20은 **개수** 상한이지 크기 상한이 아니다 — 정리본이 긴 문서(1,500자+)를
-  //   연달아 보내면 이력이 조 단위로 부풀어 문맥을 다 먹는다. max의 관찰이 전부 설명된다:
-  //     · 「~10분 뒤 저절로 나았다」 = 그 사이 짧은 질문들이 긴 이력을 **밀어낸** 것
-  //     · 「재시작하면 나았다」     = histories.clear()
-  //     · 「dispatch는 무사」       = 짧은 질문 + 다른 에이전트 이력
-  //
-  // ■ 예산: ctx 토큰의 절반을 이력에 준다. 나머지 절반이 시스템+RAG+이번 질문+생성분 몫이다.
-  //   한글 실측 환산 1.44자/토큰(max 로그: 12,773자=8,861토큰)에서 보수적으로 1.2자/토큰을 쓴다 —
-  //   영문·코드가 섞이면 토큰이 더 나오므로 낮게 잡아야 초과가 안 난다.
-  //   ⚠ 자르는 것은 **오래된 쪽부터**, user/assistant 쌍 경계를 지킨다(홀수로 자르면 Mistral류
-  //     채팅 템플릿이 "roles must alternate"로 거부한다).
-  //   ⚠ 개수 상한(HISTORY_LIMIT)은 그대로 둔다 — 이건 크기 상한이고 그건 개수 상한이다.
-  {
-    const ctx = 원격 ? 32768 : ((await import("./localengine.js").then((m) => m.currentTierSettings().ctxSize).catch(() => 32768)) || 32768);
-    // 📎 첨부는 systemContent에 실리는데 이 예산은 이력만 잰다 — 첨부 몫(최대 ≈4,000자)을
-    // 이력에서 미리 덜어내지 않으면 라이트(8K)에서 「긴 요청만 0초에 400」이 재발한다
-    // (검토관 적발 — 2026-08-13 max가 사흘 걸려 규명한 그 실패 모양의 새 통로).
-    const 이력예산자 = Math.max(1000, Math.floor((ctx / 2) * 1.2) - (첨부 ? 첨부.length : 0));
-    let 합 = 0;
-    let 시작 = history.length;
-    for (let i = history.length - 1; i >= 0; i--) {
-      합 += String(history[i]?.content ?? "").length;
-      if (합 > 이력예산자) break;
-      시작 = i;
-    }
-    if (시작 % 2 === 1) 시작 += 1; // 쌍 경계 — user부터 시작하게
-    if (시작 > 0 && 시작 < history.length) history = history.slice(시작);
-    else if (시작 >= history.length && history.length) history = []; // 최신 한 턴조차 예산 초과면 다 버린다
-  }
-  const messages = [{ role: "system", content: systemContent }, ...history, { role: "user", content: args.message }];
+  // ★ 이력을 **글자 예산**으로도 자른다 — 계산과 그 근거는 `예산맞춤이력` 한 곳에 산다.
+  //   원격이면 표준 32K 예산, 아니면 이 PC 티어의 ctx.
+  const 첨부길이 = 첨부 ? 첨부.length : 0;
+  const 로컬ctx = async () =>
+    ((await import("./localengine.js").then((m) => m.currentTierSettings().ctxSize).catch(() => 32768)) || 32768);
+  history = 예산맞춤이력(history, 원격 ? 32768 : await 로컬ctx(), 첨부길이);
+  // ⚠ let — 원격이 죽어 이 PC로 되돌릴 때 **이 PC 예산으로 다시 만든다**(아래 폴백).
+  let messages = [{ role: "system", content: systemContent }, ...history, { role: "user", content: args.message }];
 
   // 실시간 스트림용: 어느 에이전트가 지금 로컬 LLM으로 추론하는지 눈에 보이게 한다.
   const agentName = getAgentById(args.agentId)?.name ?? args.agentId ?? "에이전트";
@@ -977,13 +1020,16 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   우회가 아니라 **앞에서** 가른다. 판정은 remotellm.ts의 게터 한 곳(VPN 전용·에어갭 차단 포함).
   // 원격은 위(예산 앞)에서 한 번 조회했다 — 두 번 재면 켜고 끄는 사이 값이 갈린다.
   // 호출별 모델 지정(modelOverride, 2026-09-03): 서식·추출 호출만 「서식 전용 보조 모델」로. 못 올리면 경고 남기고 팀원 경로로.
-  const baseUrl = 원격 ?? (await import("./localengine.js")
+  // ★ **이 PC 주소를 얻는 자리는 한 곳**(2026-09-10) — 원격 폴백도 같은 함수를 쓴다.
+  //   두 벌로 적으면 폴백만 modelOverride·어댑터 규칙을 빼먹는 날이 온다.
+  const 로컬주소 = async (): Promise<string> => await import("./localengine.js")
     .then((m) => (args.modelOverride ? m.ensureModelServed(args.modelOverride) : m.ensureAgentModel(args.agentId)))
     .catch(async (e) => {
       if (!args.modelOverride) return LOCAL_LLM_BASE_URL;
       console.warn(`[llm] 서식 전용 보조 모델을 못 올려 팀원 경로로 간다: ${args.modelOverride} — ${e instanceof Error ? e.message : String(e)}`);
       return import("./localengine.js").then((m) => m.ensureAgentModel(args.agentId)).catch(() => LOCAL_LLM_BASE_URL);
-    }));
+    });
+  let baseUrl = 원격 ?? (await 로컬주소());
   // 전문가 어댑터 선택(재설계 1단계) — 서빙 모델에 어댑터가 없으면 빈 객체라 기존과 동일.
   // 호출별 모델 지정일 때는 붙이지 않는다 — 어댑터는 배정 모델 기준이라 다른 모델에 오적용된다.
   const loraExtras = args.modelOverride
@@ -1001,18 +1047,79 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 답 스트리밍(전-7, 시안 정돈안) — 스트림 라우트가 싱크를 깔아 뒀고 **산문 호출일 때만** 흘린다.
   // 스키마(JSON 결정) 호출은 제외 — 도구 고르는 내부 결정문이라 담당자에게 보일 글이 아니다.
   const 싱크 = args.responseSchema ? undefined : 스트림자리.getStore();
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    // 원격일 때만 접속 토큰 헤더가 붙는다(로컬이면 원격헤더는 빈 객체라 기존과 동일).
-    headers: { "Content-Type": "application/json", ...원격헤더 },
-    body: JSON.stringify({ model: "local", messages, ...constrained, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS, ...(싱크 ? { stream: true } : {}) }),
-    signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-    // 원격일 때 리다이렉트 금지(검토관) — VPN 안 서버가 3xx로 밖을 가리키면 질문 본문이 따라간다.
-    redirect: 원격 ? "error" : "follow",
-  }).catch((err: unknown) => ((err as Error)?.name === "TimeoutError" ? ("timeout" as const) : null));
+  // ★ **한 번의 요청 = 이 함수 하나**(2026-09-10). 원격이 죽어 이 PC로 되돌릴 때 같은 함수로 다시
+  //   보낸다 — 본문·헤더·상한·redirect를 두 벌 적으면 한쪽만 고쳐진다. 이 파일은 그 사고를 이미
+  //   겪었다: 드리프트 재생성 경로에만 원격 헤더·redirect 금지가 **빠져 있었다**(아래 ⚠⚠).
+  // ⚠ **인자를 안 받는다 — 지금 목표를 그때그때 읽는다.** baseUrl·원격·원격헤더·messages는 전부
+  //   이 함수 바깥의 let이고, 아래 폴백이 그 넷을 **이 PC 것으로 바꾼 뒤** 이 함수를 다시 부른다.
+  //   값을 인자로 받아 두면 폴백이 하나를 안 넘겨 주는 날 **원격 토큰을 단 이 PC 요청**이나
+  //   **죽은 원격을 다시 찌르는 재시도**가 조용히 생긴다 — 이 파일이 이미 겪은 부류다(아래 ⚠⚠).
+  const 보내기 = async () =>
+    await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      // 원격일 때만 접속 토큰 헤더가 붙는다(로컬이면 원격헤더는 빈 객체라 기존과 동일).
+      headers: { "Content-Type": "application/json", ...원격헤더 },
+      body: JSON.stringify({ model: "local", messages, ...constrained, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS, ...(싱크 ? { stream: true } : {}) }),
+      // 상한이 갈린다 — 원격은 못 닿을 때 상한까지 매달린다(REMOTE_LLM_TIMEOUT_MS 머리말).
+      signal: AbortSignal.timeout(원격 ? REMOTE_LLM_TIMEOUT_MS : LLM_TIMEOUT_MS),
+      // 원격일 때 리다이렉트 금지(검토관) — VPN 안 서버가 3xx로 밖을 가리키면 질문 본문이 따라간다.
+      redirect: 원격 ? "error" : "follow",
+    }).catch((err: unknown) => ((err as Error)?.name === "TimeoutError" ? ("timeout" as const) : null));
+
+  let res = await 보내기();
+
+  // ── 🧠 **원격이 죽으면 이 PC 두뇌로 한 번 되돌린다** (2026-09-10 · 승인 「추천으로」) ─────────
+  //
+  // ■ 무엇이 있었나: 원격이 안 닿으면(gb10 꺼짐·WireGuard 끊김·시간 초과) 답이 **통째로 없었다.**
+  //   아래 두 갈래가 「⚠ AI 모델이 아직 준비되지 않았습니다 … 설정에서 서버 주소를 입력」이라는
+  //   안내를 돌려주는데, 원격을 이미 넣어 둔 사람에게 그 말은 **틀린 처방**이다. 이 PC에는 모델이
+  //   멀쩡히 떠 있는데도 아무 답이 안 나갔다 — 켜 두면 오히려 약해지는 기능이었다.
+  // ■ 한 번만 되돌린다. 두 번 이상 돌면 담당자가 기다리는 시간이 배로 늘고, 로컬까지 죽었다면
+  //   그건 원격 문제가 아니라 설치 문제라 아래 안내가 맞는 처방이 된다.
+  // ■ 조용히 하지 않는다 — ① 답 끝에 한 줄로 밝히고 ② 상태에 기록해 화면이 말할 수 있게 하고
+  //   ③ 감독 스트림에 남긴다. 「몰래 강등」은 이 저장소가 조용한 고장이라 부르는 부류다.
+  // ⚠ **스키마(JSON 결정) 호출도 되돌린다** — 총괄은 언제나 이 PC라 여기 잘 안 오지만,
+  //   원격 팀원의 도구 선택이 죽으면 그 지시가 통째로 멈춘다.
+  let 폴백 = false;
+  if (원격 && (res === "timeout" || !res || !res.ok)) {
+    const 사유 =
+      res === "timeout" ? `응답이 ${Math.round(REMOTE_LLM_TIMEOUT_MS / 1000)}초 안에 오지 않았습니다`
+      : !res ? "원격 주소에 닿지 못했습니다(연결 실패)"
+      : `원격이 거절했습니다(HTTP ${res.status})`;
+    // 거절 본문은 진단으로만 남기고 버린다(사람 문구에는 안 싣는다 — 주소·토큰이 섞일 수 있다).
+    const 본문 = res && res !== "timeout" ? await res.text().catch(() => "") : "";
+    console.warn(
+      `[llm] 원격 두뇌 실패 — ${사유} · agent=${args.agentId} · baseUrl=${baseUrl}` +
+        `${본문 ? ` · 본문 ${본문.slice(0, 200)}` : ""} · 이 PC 두뇌로 되돌린다`,
+    );
+    // 상태에 남긴다 — /api/llm/remote/where가 실어 보내고 화면이 「지금 닿지 않습니다」를 말한다.
+    //   ⚠ 기록 실패가 답을 막지 않는다(장식이 본업을 죽이지 않게).
+    await import("./remotellm.js").then((m) => m.원격실패기록(사유)).catch(() => { /* 기록 실패는 삼킨다 */ });
+    emitLlmActivity({ kind: "chat", phase: "start", agent: args.agentId ?? "-", agentName, detail: `원격 두뇌 실패 — 이 PC로 되돌림(${사유})` });
+    원격 = null;
+    원격헤더 = {};
+    폴백 = true;
+    baseUrl = await 로컬주소();
+    // ⚠ **예산을 다시 잰다.** 원격 32K로 자른 이력을 이 PC 티어(라이트 8K)에 그대로 보내면
+    //   0초에 HTTP 400이 나 폴백이 반쪽이 된다 — 2026-08-13에 사흘 걸려 규명한 그 실패 모양이다.
+    history = 예산맞춤이력(전체이력, await 로컬ctx(), 첨부길이);
+    messages = [{ role: "system", content: systemContent }, ...history, { role: "user", content: args.message }];
+    res = await 보내기(); // ↑ 넷을 다 바꾼 뒤라 같은 함수가 저절로 이 PC로 간다(위 ⚠)
+  } else if (원격 && res && res !== "timeout" && res.ok) {
+    // 다시 답했으면 실패 자국을 지운다 — 자국이 있을 때만 DB를 만진다(remotellm 원격성공기록).
+    await import("./remotellm.js").then((m) => m.원격성공기록()).catch(() => { /* 기록 실패는 삼킨다 */ });
+  }
+
+  // 🧠 **두뇌 표식 — 「누가 답했나」.** 위치를 정하는 잣대는 이 한 줄이고(폴백 뒤엔 원격이 null이다),
+  //   실을지 말지·모델 이름을 가릴지는 brainmark 한 곳이 가른다.
+  const 표식보고 = (model: string | null) =>
+    두뇌표식보고({ location: 원격 ? "remote" : "local", fallback: 폴백, model, 결정호출: !!args.responseSchema });
 
   if (res === "timeout") {
     // GPU가 학습·병렬 작업에 잡혀 요청이 무한 대기하는 것을 상한으로 끊는다(실측: 채팅 5분 행).
+    // 🧠 실패한 답에도 표식을 남긴다 — 「원격이 죽어 이 PC로 갔는데 그 이 PC도 죽었다」는
+    //   하네스가 알아야 할 사실이다(표식이 없으면 그냥 「답 없음」으로만 남는다).
+    표식보고(null);
     emitLlmActivity({ kind: "chat", phase: "error", agent: args.agentId ?? "-", agentName, detail: `응답 시간 초과(${Math.round(LLM_TIMEOUT_MS / 1000)}s)` });
     return `⚠ 로컬 LLM 응답이 제한 시간(${Math.round(LLM_TIMEOUT_MS / 1000)}초)을 초과했습니다. GPU가 학습이나 다른 작업을 처리 중일 수 있습니다 — 잠시 후 다시 시도하세요.`;
   }
@@ -1044,6 +1151,7 @@ export async function chat(args: ChatArgs): Promise<string> {
         ` · 스키마=${args.responseSchema ? "있음" : "없음"} · 스트림=${싱크 ? "예" : "아니오"}`,
     );
     emitLlmActivity({ kind: "chat", phase: "error", agent: args.agentId ?? "-", agentName, detail: `로컬 LLM 실패 — ${진단.slice(0, 120)}` });
+    표식보고(null); // 🧠 실패한 답에도 표식 — 위 시간 초과 갈래와 같은 이유
     // 최종 사용자용 안내(개발자용 원인 대신). 두 경로를 함께 제시한다:
     // ① 이 PC에서 완결 — 설정 > 서버·AI에서 모델 내려받아 로드  ② 사내 GPU 서버에 연결 — 설정에서 서버 주소 입력.
     return "⚠ AI 모델이 아직 준비되지 않았습니다. 다음 중 하나로 해결하세요 — ① 설정 > 서버·AI > 모델 검색·받기에서 모델을 내려받아 로드, 또는 ② 설정에서 모델이 있는 사내 GPU 서버 주소를 입력해 연결.";
@@ -1056,6 +1164,11 @@ export async function chat(args: ChatArgs): Promise<string> {
         usage?: { prompt_tokens?: number; completion_tokens?: number };
         timings?: { predicted_per_second?: number };
       });
+  // 🧠 **답이 실제로 온 자리** — 여기서 모델 이름까지 실어 표식을 남긴다(스키마 갈래보다 앞:
+  //   그쪽은 조기 반환이라 뒤에 두면 결정 호출이 표식을 아예 못 지난다 — 지금은 brainmark가
+  //   **값으로** 거르므로 지나가도 안 담긴다. 거르는 자리를 한 곳으로 모으는 것이 계약이다).
+  표식보고(modelBasename(data.model));
+
   // 생각 블록 안전망(modelquirks) — 기동 플래그(--reasoning off)가 정상이면 아예 안 나오지만,
   // 플래그 없이 떠 있던 모델·감지 못한 thinking 모델이 새면 여기서 걷어낸다.
   // ⚠ 스키마(JSON) 경로보다 먼저다 — <think>가 앞에 붙으면 JSON.parse가 통째로 깨진다.
@@ -1122,7 +1235,9 @@ export async function chat(args: ChatArgs): Promise<string> {
       //   ⚠ 원격을 쓰는 고객이 아직 없어 지금 아무도 안 겪는다 — 그래서 더 조용히 남아 있었다.
       headers: { "Content-Type": "application/json", ...원격헤더 },
       body: JSON.stringify({ model: "local", messages: retryMessages, grammar: NO_HAN_GRAMMAR, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS }),
-      signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+      // ⚠ 상한도 본 호출과 **같이 갈린다**(2026-09-10) — 여기만 로컬 상한이면 원격 재생성이
+      //   본 호출보다 30초를 더 매달린다. 이 재생성 경로는 방어를 빼먹은 전례가 이미 있다(위 ⚠⚠).
+      signal: AbortSignal.timeout(원격 ? REMOTE_LLM_TIMEOUT_MS : LLM_TIMEOUT_MS),
       redirect: 원격 ? "error" : "follow",
     }).catch(() => null); // 재작성 실패·시간 초과면 원래 답을 그대로 쓴다
     if (retryRes && retryRes.ok) {
@@ -1391,6 +1506,20 @@ export async function chat(args: ChatArgs): Promise<string> {
       }
     }
   }
+  // ── 🧠 **원격이 죽어 이 PC로 답했으면 그렇게 말한다** (2026-09-10) ──────────────────────
+  //
+  // ■ 왜 밝히나: 답의 질이 달라진다. 125B가 답할 자리를 14B가 답했는데 겉보기가 같으면,
+  //   담당자는 그날의 얕은 답을 **제품의 실력**으로 읽는다. 정직 원칙의 문제다.
+  // ■ 왜 **끝**인가(순서가 계약이다):
+  //   · 앞머리에 두면 배너 판정(noevidence 근거없음종류판정이 startsWith)이 이 줄을 먼저 읽어
+  //     **자료없음·근거약함 표식이 통째로 죽는다** — 근거 꼬리를 끝에 붙이는 이유와 같다.
+  //   · 이력·학습 기록(위 기록답)이 이미 확정된 **뒤**다 — 이 안내는 그 한 답의 사정이지
+  //     다음 턴의 맥락도, 학습 재료도 아니다.
+  //   · 인용·경로 가드 뒤라 우리가 붙인 글자를 가드가 자기인용으로 오판하지 않는다.
+  // ⚠ 스키마(JSON) 호출은 위에서 이미 반환됐다 — 결정문에 안내가 섞이면 JSON.parse가 깨진다.
+  // ⚠ 빈 답에는 안 붙인다 — 안내만 남은 답은 답이 아니다.
+  if (폴백 && reply) reply = `${reply}\n\n${원격폴백안내}`;
+
   // 사람이 읽는 답변(explain)에만 어려운 용어 쉬운 풀이를 붙인다. 히스토리·학습로그는 위에서 이미
   // 원문으로 저장됐다 — 맥락 오염·중복 방지.
   return args.explain ? explainHardTerms(reply) : reply;
