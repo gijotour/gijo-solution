@@ -2535,7 +2535,12 @@ export function registerMemoryRoutes(app: Express): void {
       if (path.basename(String(documentId)) !== String(documentId)) { res.status(400).json({ error: "잘못된 문서 이름입니다" }); return; }
       if (!getDocMetaStmt.get(String(documentId))) { res.status(404).json({ error: "그런 문서가 없습니다" }); return; }
       // 문서 본문도 LLM(임베딩)에 닿는 경로라 관문을 지난다(memory/query와 같은 이유 — 인젝션 차단).
-      const gate = gateUserInput(text.slice(0, 2000), "memory-query");
+      // ⚠ **source는 "content"다**(2026-09-10 검토관 적발 wiring·수리). 이건 사람의 지시가 아니라
+      //   **문서 본문**이다. "memory-query"로 태웠더니 가해 판정이 붙어, 침해사고 보고서를 저장하면
+      //   HTTP 400 + 「도와드릴 수 없습니다」가 돌아왔다 — 지식을 바로잡는 기능이 **보안 문서에서만**
+      //   죽는 모양이었다(실측: 우리 지식 문서 24개 중 2개가 머리 2000자에서 이미 저장 불가).
+      //   인젝션 검사(guardInput)와 개인정보 가림은 content에서도 그대로 지난다 — 빠지는 것은 가해 판정뿐이다.
+      const gate = gateUserInput(text.slice(0, 2000), "content");
       if (!gate.allowed) {
         res.status(400).json({ error: gate.message });
         return;

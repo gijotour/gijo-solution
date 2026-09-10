@@ -393,7 +393,7 @@ export function 초안프롬프트(r: AnswerFeedback): string {
 }
 
 /** 관문 한 번의 결과 중 **우리가 쓰는 세 칸**만 본다 — gateway를 정적으로 물지 않기 위해서다. */
-type 관문판정 = (text: string, source: "chat") => { allowed: boolean; text: string; message?: string };
+type 관문판정 = (text: string, source: "content") => { allowed: boolean; text: string; message?: string };
 
 /**
  * 초안 재료를 **관문(가드레일)에 태운다** — 개인정보를 가리고, 해로운 글이면 만들지 않는다.
@@ -406,6 +406,11 @@ type 관문판정 = (text: string, source: "chat") => { allowed: boolean; text: 
  * ⚠ 접수 때가 아니라 **여기서** 태운다: 원장에는 담당자가 쓴 말이 그대로 남아야 하고
  *   (expected는 회귀 문항의 정답이 된다 — 가리면 문항이 망가진다), 위험은 「LLM에 닿는 순간」에
  *   생긴다. 그래서 저장은 원문, LLM에 넘기는 사본만 가린 것이다.
+ * ⚠ **source는 "content"다**(2026-09-10 검토관 적발 wiring·수리). 여기 오는 글은 담당자가 지금
+ *   시키는 지시가 아니라 **제품 자신의 답·인용 조각**이다. "chat"으로 태우면 가해 판정이 걸려,
+ *   피싱·랜섬웨어 사고를 다룬 답 한 칸만 있어도 초안이 통째로 죽고 담당자에게 「정보통신망법
+ *   위반이며 도와드릴 수 없습니다」가 뜬다(실측: 우리 지식 코퍼스 1,018조각 중 62조각이 막혔다 —
+ *   「자기차단 함정」의 재발). 개인정보 가림과 인젝션 검사는 content에서도 **그대로** 지난다.
  * ⚠ gateUserInput이 아니라 **Inner**를 쓴다: ① 이건 사람이 처음 말을 넣는 자리가 아니라
  *   저장된 글을 LLM에 넘기기 직전의 검사라 guard 실동작 신호를 부풀리면 안 되고(dispatcher의
  *   설명 도구가 같은 이유로 Inner를 쓴다 — gateway.ts 머리글) ② 관문 입구 등록부
@@ -419,7 +424,7 @@ export function 초안재료가림(
   let 막힘: string | null = null;
   const 태워서 = <T extends string | null>(t: T): T => {
     if (!t) return t;
-    const g = 태우기(t, "chat");
+    const g = 태우기(t, "content");
     if (!g.allowed && !막힘) 막힘 = g.message || "입구 검사에 걸리는 글이 들어 있습니다";
     return g.text as T;
   };
