@@ -19,7 +19,7 @@ import {
   경고없는퍼센트단정, 퍼센트꼴, 마케팅조언인가,
   사내문답이근거를독점했나, 근거없는의무단정인가, 조건없는연2회의무인가,
   의무아님_RE, 의무부정_RE, 검증현황카드_RE, 의무라고못박았나, 규범단정인가, 제품꼬리걷기,
-  지목문서가근거에없나, 도구가답했는데근거가비었나,
+  지목문서가근거에없나, 도구가답했는데근거가비었나, EPSS범위밖_RE,
 } from "../../tools/opssim-rules.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1055,5 +1055,38 @@ describe("★★ ⑱ 지목 문서 판정 — 적발과 오탐을 **양쪽 다**
     ]) {
       expect(src.split(q).length - 1, `「${q}」가 마당·기대표 두 곳에 같은 글자로 있어야 한다`).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+// ── EPSS 범위 밖의 수 — 사고를 낸 그 답을 하네스가 잡는가 (2026-09-11 검토관 적발) ──────
+//
+// 2026-09-10 고객 QA(4100) 예행에서 「Log4Shell 있어?」 답이 「…EPSS 점수는 1151.44로 매우
+// 심각한 수준입니다」로 나갔다. 그 물음의 기대는 `포함: [/Log4|CVE-2021-44228/]` 하나뿐이라
+// **이 답도 합격**이었다 — 야간 회귀는 계속 초록이고 사람이 눈으로 잡아야 했다.
+describe("★★ EPSS 범위 밖의 수 — 내부 점수를 EPSS라 부른 답을 문다", () => {
+  it("라이브 실물 「EPSS 점수는 1151.44로 매우 심각한 수준입니다」가 걸린다", () => {
+    expect(EPSS범위밖_RE.test("Log4Shell(CVE-2021-44228)은 IP 주소 10.10.20.11에서 발견되었으며, EPSS 점수는 1151.44로 매우 심각한 수준입니다")).toBe(true);
+  });
+
+  it("★ 오탐 방지 — 제품이 실제로 내는 정상 표기는 하나도 안 막는다", () => {
+    // 제품 표기의 단일 출처는 server/src/engine/tone.ts epss표기다(「EPSS 97%」·「EPSS 1% 미만」).
+    // 리포트는 소수 한 자리(97.4%), 옛 화면은 0~1 원값을 쓴 적이 있어 그 꼴도 함께 확인한다.
+    for (const 답 of [
+      "EPSS 97%", "EPSS 94%", "EPSS 1% 미만", "EPSS 0%", "EPSS 100%",
+      "EPSS 97.4%", "EPSS 0.9744",
+      "🔴 [위험] Log4Shell RCE @ 웹 서비스 — KEV(실제악용) · EPSS 97% · VPR 10",
+      "EPSS 94%인 자산 10.10.20.11에서 발견되었습니다",
+    ]) {
+      expect(EPSS범위밖_RE.test(답), `정상 답이 막혔다: ${답}`).toBe(false);
+    }
+  });
+
+  it("★★ 하네스가 **실제로 이 규칙을 부른다** — 배선이 사라지면 여기가 빨개진다", () => {
+    const src = readFileSync(join(__dirname, "../../tools/ops-sim.mjs"), "utf8");
+    expect(src).toMatch(/import\s*\{[^}]*EPSS범위밖_RE[^}]*\}\s*from\s*["']\.\/opssim-rules\.mjs["']/);
+    // 사고를 낸 그 물음에 반드시 걸려 있어야 한다 — 열쇠는 마당의 물음과 글자 하나까지 같다.
+    expect(src, "사고를 낸 물음에 EPSS 금지가 안 걸렸다").toMatch(/"Log4Shell 있어\?":\s*\{[^}]*금지:\s*\[[^\]]*EPSS범위밖_RE/);
+    // EPSS를 실어 나르는 today 갈래에도 함께 건다(재료가 같아 어느 물음에서든 터질 수 있다).
+    expect(src.split("EPSS범위밖_RE").length - 1, "EPSS 금지를 거는 자리가 줄었다 — import 1 + 물음 4").toBeGreaterThanOrEqual(5);
   });
 });

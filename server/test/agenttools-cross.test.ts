@@ -68,6 +68,20 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
     expect(out).toContain("VPR 10");
   });
 
+  // ★ 2026-09-11 검토관 적발 — 반올림이 「값이 없다」고 단정하던 자리.
+  //   실제 스캐너 EPSS는 대다수 CVE가 0.01 미만이라(씨앗 키트는 전부 0.487 이상이라 예행에서
+  //   안 드러난다) `Math.round(0.004*100)`이 「EPSS 0%」를 만들었다 — 담당자는 「악용 확률 0」으로
+  //   읽는다. 이번 사고와 같은 부류(제품이 정한 값이 사람에게 틀린 뜻으로)의 반대 방향이다.
+  it("★ 아주 작은 EPSS를 「0%」로 단정하지 않는다 — 「1% 미만」(2026-09-11)", async () => {
+    registerAsset({ id: "web-02", name: "사내 포털", path: "p" });
+    recordFindings("web-02", [
+      { finding_type: "정보노출 취약점", severity: "medium", evidence: "banner", source_tool: "nessus", epss: 0.004 },
+    ]);
+    const out = await run("search", { query: "정보노출" });
+    expect(out).toContain("EPSS 1% 미만");
+    expect(out).not.toContain("EPSS 0%");
+  });
+
   // ★ 2026-09-10 사고 재현: 「…EPSS 점수는 1151.44로 매우 심각한 수준입니다」— 1151.44는
   //   approvals.priorityScore의 정렬 전용 내부 합성값이지 EPSS가 아니다. 손으로 적으면 가중치가
   //   바뀔 때 헛초록이 나므로 같은 함수로 계산해서 부재를 문다.
@@ -368,11 +382,17 @@ describe("★ 코드값 인자는 LLM이 맞혀도 비워지지 않는다 (2026-
 });
 
 // 전-4 · 2026-09-10 예행 수리 — EPSS 표기가 두 곳에서 따로 만들어지면 다시 어긋난다(문구 소스 감시).
-describe("★ EPSS 표기는 한 곳에서만 만든다 (2026-09-10)", () => {
-  it("우선순위태그 안에서만 만든다", () => {
+//
+// ⚠ 이름을 좁혔다(2026-09-11 검토관 적발). 예전 제목은 「EPSS 표기는 **한 곳에서만** 만든다」였는데
+//   이 감시가 읽는 것은 agenttools 3파일(toolsrc.FILES)뿐이라, approvals·report·analysishub의
+//   EPSS 조립은 처음부터 감시 밖이었다 — 그리고 실제로 그곳들이 어긋나 있었다. 제목만 보고
+//   「제품 전체가 단일 출처」라고 믿게 두면 그것이 「지키는 척하는 자리」다.
+//   제품 전체의 단일 출처는 tone.test.ts가 문다(그쪽이 엔진 전 파일을 읽는다).
+describe("★ agenttools는 EPSS 문구를 스스로 만들지 않는다 (2026-09-10 · 범위=agenttools 3파일)", () => {
+  it("EPSS 글자 조립이 agenttools 안에 한 자리도 없다 — tone.epss표기가 낸다", () => {
     const src = agenttoolsSource();
     expect(agenttoolsSourceSane(src), "감시가 헛돈다 — 합본이 실체를 안 담았다").toBe(true);
     const matches = src.match(/EPSS \$\{/g) || [];
-    expect(matches.length, "EPSS 문구 조립 자리가 하나가 아니면 search·today가 다시 어긋난다").toBe(1);
+    expect(matches.length, "agenttools가 EPSS 문구를 직접 조립하면 search·today가 다시 어긋난다").toBe(0);
   });
 });

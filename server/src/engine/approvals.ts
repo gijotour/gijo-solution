@@ -7,7 +7,7 @@
 
 import type { Express, Request } from "express";
 // 심각도 우리말은 원천 한 곳(tone.ts)에서만 만든다 — 자리마다 만들면 같은 것이 둘로 보인다.
-import { 심각도한글 } from "./tone";
+import { 심각도한글, epss표기 } from "./tone";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { todayLocal } from "../util/date";
@@ -276,7 +276,10 @@ export function assetProgress(assetId: string): { inProgress: number; unassigned
 export function buildTriagePrompt(top: PrioritizedFinding[], ontologyContext: string | null): string {
   const lines = top.map((r, i) => {
     const f = r.finding;
-    const flags = [f.kev ? "CISA KEV(실제 악용)" : "", f.epss != null ? `EPSS ${Math.round(f.epss * 100)}%` : "", f.vpr != null ? `VPR ${f.vpr}` : ""]
+    // ⚠ EPSS 글자는 tone.epss표기 한 곳에서 온다(2026-09-11 검토관 적발). 여기 있던
+    //   `Math.round(epss*100)%`는 0.004를 「EPSS 0%」로 만들었는데, 이 문자열은 **모델에게 주는
+    //   재료**라 모델이 그것을 읽고 「악용 가능성 없음」으로 서술한다 — 사람 답의 거짓이 된다.
+    const flags = [f.kev ? "CISA KEV(실제 악용)" : "", epss표기(f.epss), f.vpr != null ? `VPR ${f.vpr}` : ""]
       .filter(Boolean).join(", ");
     return `${i + 1}. [${심각도한글(f.severity)}] ${f.finding_type} — 자산 ${r.assetName}${flags ? ` (${flags})` : ""}`;
   });

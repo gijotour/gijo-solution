@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { 표식, 허용표식, 판정머리표, 금지말투, 말투위반, 소개서두 } from "../src/engine/tone";
+import { 표식, 허용표식, 판정머리표, 금지말투, 말투위반, 소개서두, epss표기 } from "../src/engine/tone";
 
 const 규범 = fs.readFileSync(path.join(__dirname, "../../GIJO_AS_대화창_말투규범.md"), "utf8");
 
@@ -146,5 +146,61 @@ describe("★ 사람 이름 사칭 — 없는 사람을 지어내지 않는다",
     ]) {
       expect(소개서두.test(답), `정상 답이 막혔다: ${답}`).toBe(false);
     }
+  });
+});
+
+// ── EPSS 표기 — 사람에게 나가는 글자의 단일 출처 (2026-09-11 검토관 적발 수리) ─────────
+//
+// 뿌리(2026-09-10 고객 QA 4100 예행): 「Log4Shell 있어?」 답이 「EPSS 점수는 1151.44로 매우
+// 심각한 수준입니다」로 나갔다. 그 수리(bf03e317)가 대화 답을 %로 바꾸자, 검토관이 **같은 값이
+// 자리마다 다른 글자**로 뜨는 것을 잡았다 — 관제 화면 「EPSS 0.97」 vs 대화 「EPSS 97%」.
+// 그리고 새 반올림이 EPSS 0.004를 「EPSS 0%」로 만들고 있었다(값이 있는데 없다고 단정).
+// 두 병의 뿌리가 같다: **표기를 여러 곳에서 따로 적었다.** 그래서 조립을 tone.epss표기 한 곳에 모은다.
+describe("★ EPSS 표기 — 한 곳에서 만들고, 크기를 거짓말하지 않는다 (2026-09-11)", () => {
+  it("0~1 확률을 사람이 읽는 %로 적는다", () => {
+    expect(epss표기(0.9744)).toBe("EPSS 97%");
+    expect(epss표기(0.94)).toBe("EPSS 94%");
+    expect(epss표기(0.5)).toBe("EPSS 50%");
+    expect(epss표기(1)).toBe("EPSS 100%");
+  });
+
+  it("★ 0.5% 미만을 「0%」로 단정하지 않는다 — 실제 스캐너에서 가장 흔한 크기다", () => {
+    // 실제 EPSS 분포는 대다수 CVE가 0.01 미만이다. 「0%」는 「악용 확률 없음」으로 읽힌다.
+    expect(epss표기(0.004)).toBe("EPSS 1% 미만");
+    expect(epss표기(0.0004)).toBe("EPSS 1% 미만");
+    // 경계가 이어져 있어야 한다 — 0.005부터는 반올림이 1%를 낸다(사이에 빈 구간이 없다).
+    expect(epss표기(0.005)).toBe("EPSS 1%");
+  });
+
+  it("파일에 정말 0이라 적힌 값만 「0%」다 — 없는 값과도 구분한다", () => {
+    expect(epss표기(0)).toBe("EPSS 0%");
+    expect(epss표기(undefined)).toBe("");
+    expect(epss표기(null)).toBe("");
+  });
+
+  it("★ 0~1 밖의 수는 안 싣는다 — 「EPSS 9744%」를 사람에게 내보내지 않는다", () => {
+    // 파서(vulnscan.pickNum)는 유한한 숫자면 그대로 받는다. EPSS를 백분율로 내보내는 산출물이
+    // 들어와도 **뜻을 못 읽는 숫자는 옮겨 적지 않는다**(100으로 나누는 정규화는 짐작이라 안 한다).
+    expect(epss표기(97.44)).toBe("");
+    expect(epss표기(-1)).toBe("");
+    expect(epss표기(NaN)).toBe("");
+  });
+
+  // ★ 소스 감시 — 「제품 전체가 단일 출처인가」는 여기서만 물을 수 있다.
+  //   agenttools-cross.test.ts의 감시는 agenttools 3파일만 읽어 approvals·analysishub를 못 본다
+  //   (그 제목을 좁힌 이유). 이 감시는 엔진 전 파일을 읽는다.
+  it("★ 엔진에서 EPSS 글자를 조립하는 파일은 tone.ts뿐이다 (예외는 이유와 함께)", () => {
+    // 예외 — 지우려면 이유부터 지운다.
+    const 예외: Record<string, string> = {
+      "report.ts": "격식 문서(DOCX·HTML 리포트)는 소수 한 자리(97.4%)와 SLA 근거의 정수(97%)를 따로 쓴다 — 대화 표기와 정밀도 규약이 다르다. 합치려면 리포트 산출물 회귀를 함께 봐야 해서 이번 라운드 밖으로 둔다(백로그).",
+    };
+    const ENGINE = path.join(__dirname, "..", "src", "engine");
+    const files = (fs.readdirSync(ENGINE, { recursive: true }) as string[]).filter((f) => f.endsWith(".ts"));
+    // 감시가 헛도는지 스스로 잰다 — 엔진을 실제로 읽고 있어야 한다.
+    expect(files.length, "엔진 파일을 못 읽었다 — 감시가 헛돈다").toBeGreaterThan(50);
+    const 조립한파일 = files.filter((f) => /EPSS \$\{/.test(fs.readFileSync(path.join(ENGINE, f), "utf8")));
+    const 뜻밖 = 조립한파일.filter((f) => path.basename(f) !== "tone.ts" && !예외[path.basename(f)]);
+    expect(뜻밖, `EPSS 글자를 따로 조립하는 자리가 늘었다 — tone.epss표기를 부르거나, 예외 목록에 **이유**를 적을 것:\n  ${뜻밖.join("\n  ")}`).toEqual([]);
+    expect(조립한파일.some((f) => path.basename(f) === "tone.ts"), "단일 출처가 사라졌다 — tone.ts가 EPSS 글자를 만들지 않는다").toBe(true);
   });
 });

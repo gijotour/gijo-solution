@@ -996,7 +996,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const f = r.finding;
     const a = esc(r.assetId), k = esc(r.findingKey);
     const flags = [f.kev ? '<span class="rv-kev">🚨 KEV</span>' : "", r.overdue ? `<span class="dt-over">⚠ 기한 초과</span>` : ""].filter(Boolean).join("");
-    const metaLine = [f.epss != null ? `EPSS ${Math.round(f.epss * 100)}%` : "", f.vpr != null ? `VPR ${f.vpr}` : "", esc(f.source_tool)].filter(Boolean).join(" · ");
+    // ⚠ EPSS 표기 규칙은 서버 tone.ts의 epss표기가 단일 출처다(2026-09-11 검토관 적발).
+    //   클라는 서버 코드를 못 불러 **규칙만 옮겨 적은 사본**이다 — 저쪽을 고치면 여기도 고친다.
+    //   0.5% 미만을 「0%」로 적으면 값이 실재하는데 없다고 단정하게 된다(실제 스캐너 EPSS는
+    //   대다수가 0.01 미만이라 이 꼴이 흔하다). 0~1 밖의 값은 뜻을 못 읽으므로 안 싣는다.
+    const epss칸 = (typeof f.epss === "number" && isFinite(f.epss) && f.epss >= 0 && f.epss <= 1)
+      ? `EPSS ${f.epss > 0 && f.epss < 0.005 ? "1% 미만" : Math.round(f.epss * 100) + "%"}`
+      : "";
+    const metaLine = [epss칸, f.vpr != null ? `VPR ${f.vpr}` : "", esc(f.source_tool)].filter(Boolean).join(" · ");
 
     // 배정 폼 — 반려/완료가 아닐 때만 편집 가능.
     // accepted도 제외 — 수용 건에 SLA 기한 입력칸이 열려 있으면 「수용인데 지연」 충돌을 키운다(검토관 하2).

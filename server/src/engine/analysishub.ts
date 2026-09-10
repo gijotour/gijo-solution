@@ -18,6 +18,7 @@ import { recordAudit } from "./audit";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { listAssets } from "./assets";
+import { epss표기 } from "./tone";
 // 스캔 실패 판정은 한 곳만 쓴다 — 호출부마다 제 규칙을 두면 화면마다 숫자가 달라진다.
 import { isRealVulnerability } from "./agenttools";
 import { chat } from "./llm";
@@ -207,7 +208,14 @@ export function rebuildVulnEvents(): number {
       if (!isRealVulnerability(f)) continue;
       const signals: string[] = [];
       if (f.kev) signals.push("KEV");
-      if (typeof f.epss === "number" && f.epss >= 0.5) signals.push(`EPSS ${f.epss.toFixed(2)}`);
+      // ⚠ EPSS 글자는 tone.epss표기 한 곳에서 온다(2026-09-11 검토관 적발). 여기만 `toFixed(2)`로
+      //   0~1 원값을 적어, 같은 Log4Shell 한 건이 관제 화면에선 「EPSS 0.97」·대화 답에선
+      //   「EPSS 97%」로 떴다. 이 signals는 analysis.html이 사람에게 그대로 그린다.
+      //   (0.5 미만은 관제 신호로 안 싣는다는 기준은 그대로 — 바꾼 것은 **글자**뿐이다.)
+      if (typeof f.epss === "number" && f.epss >= 0.5) {
+        const epss칸 = epss표기(f.epss);
+        if (epss칸) signals.push(epss칸);
+      }
       if (f.state === "resurfaced") signals.push("재발");
       const sev = (f.severity as Severity) ?? "medium";
       const key = f.key || crypto.createHash("md5").update(a.id + f.finding_type).digest("hex").slice(0, 10);
