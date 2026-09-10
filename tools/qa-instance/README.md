@@ -1,0 +1,83 @@
+# 고객 QA 인스턴스(형태 ⓑ · 포트 4100) — 도구와 규칙
+
+> 고객은 클라이언트만 설치하고 WireGuard로 **우리 쪽 고객 QA 인스턴스(4100)** 에 붙는다.
+> 운영 4000(사내 실데이터)은 고객에게 보이지 않는다 — 그 전제를 지키는 것이 이 폴더의 일이다.
+> 근거 문서: `GIJO_AS_AI팀_증류학습_계획서.md` §13.5 · §13.5.1 · §14.
+
+## 파일
+
+| 파일 | 무엇 |
+|---|---|
+| `preflight.sh` | **기동 전 자물쇠 검사** — 운영 노드 생존(cwd로 가름)·운영 health 200·모델 폴더 빔·DEV_MODE 없음. start.sh와 systemd 유닛이 **같은 이 파일**을 부른다 |
+| `start.sh` | sudo 없이 임시 기동(setsid nohup). 먼저 preflight를 지난다 |
+| `verify.sh` | 4100이 성한지 + **운영이 무사한지**. 기준선 파일을 주면 llama PID·4000 health를 문자열 비교 |
+| `chat-probe.mjs` | **고객이 쓰는 길**(POST /api/dispatch)로 한 문답 + 그 대화가 chat_logs에 쌓였는지 |
+| `gijo-qa.service` | 시스템 유닛 본보기(ExecStartPre로 preflight) — 등록은 관리자 |
+| `refresh-portproxy.ps1` | 재부팅으로 바뀐 WSL IP에 4000·4100 포워딩을 다시 맨다(관리자·작업 스케줄러) |
+
+### 스크립트 사본
+유닛은 `/home/gijo/gijo-qa/tools/preflight.sh`를 부른다 — 저장소 파일의 **사본**이다.
+저장소에서 고쳤으면 사본도 갱신할 것:
+
+```bash
+cp "/mnt/d/Connect AI/tools/qa-instance/"{preflight.sh,start.sh,verify.sh,chat-probe.mjs} /home/gijo/gijo-qa/tools/
+```
+
+## 검사 순서(실행자)
+
+```bash
+# 기동 전
+bash tools/qa-instance/verify.sh --baseline > /home/gijo/gijo-qa/tmp-review/baseline.txt
+bash tools/qa-instance/start.sh
+# 기동 후 — 기준선을 반드시 넘긴다(안 넘기면 PID 비교를 못 한다)
+bash tools/qa-instance/verify.sh /home/gijo/gijo-qa/tmp-review/baseline.txt
+QA_USER=… QA_PASS=… QA_ADMIN_USER=… QA_ADMIN_PASS=… node tools/qa-instance/chat-probe.mjs
+```
+
+## 운영 재시작 순서 — **먼저 4100을 내린다**
+
+운영의 고아 정리(`localengine.ts:749-759`)는 **살아 있는 형제 노드가 보이면 통째로 건너뛴다.**
+4100을 상주로 두면 앞으로 운영이 재시작할 때마다 그 정리가 영구히 꺼진다.
+포트를 쥔 고아가 남아 있으면 `allocPort`(530행)가 OS 바인딩 가능 여부를 안 보기 때문에
+운영의 새 llama가 못 뜨고 **화면은 멀쩡한데 챗봇만 조용히 죽는다**(735행 주석이 부르는 그 고장).
+
+```bash
+sudo systemctl stop gijo-qa      # ① 고객 인스턴스 정지
+sudo systemctl restart gijo-as   # ② 운영 재시작(고아 정리가 제대로 돈다)
+sudo systemctl start gijo-qa     # ③ 고객 인스턴스 재기동(preflight가 운영 health를 확인한다)
+```
+
+## 관리자 단계(사장님 · sudo/승격 필요)
+
+1. **방화벽 겹침 — 결정이 먼저다.** 지금 규칙 「GIJO AS - 서버(VPN 전용)」= TCP **4000** · 원격 **10.8.0.0/24** · Allow.
+   고객 피어(client-ext-tester1~6 = 10.8.0.5~10)도 그 대역이라, 4100을 같은 대역으로 열면
+   **고객이 운영 4000에도 닿는다**(운영 4000은 `/api/health`·`/api/auth/login`이 인증 전 창구다 — 실측 무인증 200).
+   두 길 중 하나를 고르셔야 한다:
+   - ⓐ 운영 4000 규칙을 우리 피어로 좁힌다(권장):
+     `Set-NetFirewallRule -DisplayName "GIJO AS - 서버(VPN 전용)" -RemoteAddress 10.8.0.1,10.8.0.11,10.8.0.12`
+     그 뒤 4100만 대역 전체에 연다:
+     `New-NetFirewallRule -DisplayName "GIJO AS - 고객 QA(4100·VPN 전용)" -Direction Inbound -Protocol TCP -LocalPort 4100 -RemoteAddress 10.8.0.0/24 -Action Allow`
+   - ⓑ 고객을 다른 대역(예: 10.9.0.0/24)에 두고 4100만 그 대역에 연다(WireGuard 피어 재발급 필요).
+2. **포워딩**: `refresh-portproxy.ps1`을 한 번 실행 + 작업 스케줄러에 「부팅 시」로 등록(스크립트 머리에 명령 그대로 있음).
+3. **systemd 유닛**: `sudo cp tools/qa-instance/gijo-qa.service /etc/systemd/system/` → `daemon-reload` → `enable --now gijo-qa`.
+   등록 전에 임시 기동본을 내린다: `pgrep -f 'dist/index.js' | xargs -r -I{} sh -c 'readlink -f /proc/{}/cwd | grep -q gijo-qa && kill {}'`
+   (PID를 적어 두지 말 것 — 며칠 뒤엔 남의 PID다.) 등록 뒤 `verify.sh`를 **다시** 돌린다.
+4. **node_modules 심볼릭 링크**: QA 트리의 `server/node_modules`가 운영 트리를 가리키고 **쓰기가 된다**.
+   QA에서 `npm ci`를 한 번만 잘못 돌려도 운영 의존성이 바뀐다. 읽기 전용 bind mount가 옳다:
+   `mount --bind -o ro /home/gijo/gijo-as/server/node_modules /home/gijo/gijo-qa/server/node_modules`
+   (그 전까지는 **QA 트리에서 npm 금지**가 유일한 방어다.)
+5. **비밀 인계**: `/home/gijo/gijo-qa/secrets/`(700)에 `db-복구열쇠.txt`·`계정-비밀번호.txt`가 있다.
+   종이에 옮긴 뒤 **지운다**. 두 값은 작업 기록에 한 번 노출됐으므로 인계 때
+   **계정 비밀번호 교체 + DB 복구 열쇠 재발급**(설정 > 관리자)이 필요하다.
+
+## 알아 둘 것(위험은 아니나 기록)
+
+- **8080 슬롯 공유**: 고객 질문과 사내 질문이 같은 llama-server 슬롯·프롬프트 캐시를 쓴다 —
+  서로의 응답 시간을 흔든다(유휴 뒤 첫 질문이 느려지는 계보와 같은 자리).
+- **모델 받기 창구는 QA에서 무의미**: `hfmodels.ts:142`가 `GIJO_MODELS_DIR`이 아니라 `<cwd>/models`에 받는다.
+  4100에서는 그 자리가 `server/models`라 자물쇠(`models-empty`)와 **다른 폴더**다 — 자물쇠는 안 풀리지만,
+  받아도 엔진이 못 본다.
+- **제품 문서 2건 재인입**: 재기동마다 `docsbundle`이 2건을 다시 넣는다(35 → 이후 2건씩).
+  숨은 지시문이 걸린 문서 수와 맞아, 정화본과 원본 해시가 어긋나는 것으로 보인다 — 서버 코드 갈래(별도 라운드).
+- **고객 인스턴스 env 원칙**: 출하 기본값을 쓰되, **수집이 목적인 두 줄만** 운영과 맞춘다
+  (`GIJO_CHATLOG_MAX`·`GIJO_KPI_SUBJECT_RULE`). 그 밖의 운영 전용 줄(특히 `GIJO_DEV_MODE`)은 넣지 않는다.

@@ -33,6 +33,13 @@ for (let i = 0; i < 18; i++) {
 if (!embedReady) { console.error("임베딩 서버 미가동 — 인입 중단(문서 보존)"); process.exit(3); }
 
 // ① RAG 인입 — 같은 파일명이 이미 있으면 지우고 다시 넣는다(멱등).
+//
+// ⚠ KNOWLEDGE_SKIP_DOCS=1 이면 이 갈래를 건너뛰고 **온톨로지 트리플만** 넣는다.
+//   왜: 고객 QA 인스턴스(4100)에는 이 6편이 이미 제품 문서 35편(docs-manifest)으로 들어가 있다.
+//   그런데 이 갈래는 문서를 지우고 **사용자 문서로 다시** 넣어서, 다음 부팅 때 docsbundle이
+//   같은 이름을 또 채워 **중복 문서**가 된다. 반면 트리플 74건(internet-research-2026-07·
+//   device-research-2026-07)은 knowledge-bundle payload에 **없어** 이 도구로만 들어간다
+//   (2026-09-10 실측: 4100 트리플 1,999건의 source 9종에 두 키가 없다).
 const docs = [
   "GIJO_지식_보안거버넌스_표준.md",
   "GIJO_지식_취약점_식별체계.md",
@@ -41,8 +48,10 @@ const docs = [
   "GIJO_지식_장비_콘솔_메뉴맵.md",
   "GIJO_지식_장비_릴리즈노트_장애처리노트.md",
 ];
-const existing = await api("/api/memory/documents").then((r) => r.json());
-for (const name of docs) {
+const SKIP_DOCS = process.env.KNOWLEDGE_SKIP_DOCS === "1";
+if (SKIP_DOCS) console.log(`⏭ 문서 ${docs.length}편 인입은 건너뛴다(KNOWLEDGE_SKIP_DOCS=1) — 온톨로지 트리플만 넣는다.`);
+const existing = SKIP_DOCS ? [] : await api("/api/memory/documents").then((r) => r.json());
+for (const name of SKIP_DOCS ? [] : docs) {
   const dup = (Array.isArray(existing) ? existing : existing.documents ?? []).find((d) => (d.documentId || d.id || "").includes(name) || d.filename === name);
   if (dup) {
     await api("/api/memory/document/delete", { documentId: dup.documentId || dup.id });

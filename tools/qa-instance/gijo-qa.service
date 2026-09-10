@@ -10,21 +10,45 @@
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now gijo-qa
 #   systemctl status gijo-qa
+#   ⚠ 등록 뒤 **반드시** verify.sh를 다시 돌린다 — 지금까지의 검증은 전부 start.sh로 띄운
+#     프로세스에서 났다. systemd의 EnvironmentFile 파싱 규칙은 셸 소싱과 달라(따옴표·#·$)
+#     같은 파일이 다른 값으로 읽힐 수 있다. (2026-09-10 실측: 이 env의 값에는 특수문자가
+#     0개라 지금은 두 파서가 같게 읽는다 — 값이 바뀌면 이 전제가 깨진다.)
 #
-# ■ 운영 유닛(gijo-as.service)과 다른 곳은 넷뿐이다
-#   WorkingDirectory · EnvironmentFile · 로그 경로 · Description.
+# ■ 운영 유닛(gijo-as.service)과 다른 곳
+#   WorkingDirectory · EnvironmentFile · 로그 경로 · Description · **ExecStartPre 자물쇠 검사**.
 #   PATH의 venv는 **운영 것을 그대로 쓴다** — QA 트리에 venv를 복사하지 않았고
 #   gijo-qa.env의 GIJO_PYTHON이 같은 절대경로를 가리킨다(읽기 전용 소비).
 #
-# ⚠ 이 유닛은 운영 llama-server(8080/8081)를 **공유**한다. 안전은 gijo-qa.env의
-#   자물쇠 3줄(GIJO_MODELS_DIR=빈 폴더 · GIJO_EMBEDDING_MODEL_ID=__none__ ·
-#   GIJO_DEFAULT_MODEL_ID=__none__)에 걸려 있다. models-empty/ 에 모델을 하나라도
-#   떨어뜨리면 임베딩 감시가 깨어나 **운영 8081을 SIGKILL한다**(localengine.ts:967).
+# ■ 이 유닛은 운영 llama-server(8080/8081)를 **공유**한다 — env 줄이 무슨 일을 하는지 한 표로
+#   (계획서·커밋 메시지·이 주석이 서로 다른 목록을 대던 것을 2026-09-10에 여기로 통일했다)
+#
+#   | env 줄                         | 하는 일                                   | 어기면                                  |
+#   |--------------------------------|-------------------------------------------|-----------------------------------------|
+#   | GIJO_MODELS_DIR=빈 폴더(555)   | **진짜 자물쇠**. 모델 파일이 없어야        | 파일이 생기면 임베딩 감시가 무장해       |
+#   |                                | 임베딩 감시가 무장하지 않는다(939행)       | 운영 8081을 SIGKILL(967행)               |
+#   | GIJO_EMBEDDING_PORT=8181       | **두 번째 자물쇠**. 감시가 **죽이는** 포트  | 없으면 8081(운영)이 죽이는 대상이 된다   |
+#   | GIJO_EMBEDDING_URL=…:8081/v1   | 임베딩을 **읽는** 곳(운영 공유·소비만)      | 없으면 RAG가 죽는다                      |
+#   | GIJO_LOCAL_LLM_PORT=8080       | 채팅 풀 포트(공유 대상)                    | —                                        |
+#   | GIJO_EMBEDDING_MODEL_ID=__none__| 임베딩 모델 이름을 없는 것으로            | 실제 모델 이름이면 위 자물쇠가 헐거워짐  |
+#   | GIJO_DEFAULT_MODEL_ID=__none__ | 부팅 자동 시작이 고를 모델 없음            | 자동 시작이 8080을 새로 물려 한다        |
+#   | GIJO_DEV_MODE (없어야 함)      | 등급 게이트(계획서 §14 ①)                  | 있으면 기밀·민감이 전부 보인다           |
+#
+# ⚠ QA 트리에서 **npm ci·npm install을 돌리지 말 것.** node_modules가 운영 트리를 가리키는
+#   심볼릭 링크라(같은 계정=쓰기 가능) 여기서 한 번 잘못 돌리면 **운영 의존성이 바뀐다.**
+#   읽기 전용 bind mount로 바꾸는 것이 옳고, 그것은 관리자 단계다(README 참고).
+#
+# ⚠ 운영을 재시작할 때는 **이 서비스를 먼저 내린다**(README 「운영 재시작 순서」).
+#   살아 있는 형제가 있으면 운영의 고아 정리가 통째로 건너뛰어져, 포트를 쥔 고아가 남으면
+#   운영의 새 llama가 못 뜨고 채팅이 조용히 죽는다.
 
 [Unit]
 Description=GIJO AS 고객 QA 인스턴스 (포트 4100 · 운영 llama 공유)
 After=network-online.target gijo-as.service
 Wants=network-online.target
+# ExecStartPre가 계속 막으면(운영이 내려가 있는 등) 5초마다 영원히 재시도하지 않고 멈춘다.
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -32,6 +56,9 @@ User=gijo
 WorkingDirectory=/home/gijo/gijo-qa/server
 EnvironmentFile=/home/gijo/gijo-qa/gijo-qa.env
 Environment=PATH=/home/gijo/gijo-as/venv/bin:/usr/local/cuda/bin:/usr/lib/wsl/lib:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# ★ 자물쇠 검사 — 실패하면 기동하지 않는다(운영 health 200 · 운영 노드 생존 · 빈 모델 폴더 · DEV_MODE 없음).
+#   스크립트는 저장소 tools/qa-instance/preflight.sh의 사본이다(README 「스크립트 사본」).
+ExecStartPre=/usr/bin/bash /home/gijo/gijo-qa/tools/preflight.sh /home/gijo/gijo-qa/gijo-qa.env
 ExecStart=/usr/bin/node dist/index.js
 Restart=always
 RestartSec=5

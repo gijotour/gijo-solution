@@ -15,30 +15,19 @@
 #   `dist/index.js`**다(localengine.ts:751). 꼴이 어긋나면 운영이 우리를 형제로 못 보고
 #   자기 llama-server를 고아로 오인해 죽인다.
 #
+# ⚠ 자물쇠 검사는 preflight.sh **한 곳**에 있다(2026-09-10 검토관 [상] 수리).
+#   유닛(gijo-qa.service)도 ExecStartPre로 같은 파일을 부른다 — 두 벌로 갈라 적지 않는다.
+#
 # 사용: bash tools/qa-instance/start.sh
 set -euo pipefail
 
-QA_ROOT=/home/gijo/gijo-qa
+QA_ROOT=${QA_ROOT:-/home/gijo/gijo-qa}
 ENV_FILE="$QA_ROOT/gijo-qa.env"
 LOG="$QA_ROOT/server.log"
-
-[ -f "$ENV_FILE" ] || { echo "✗ env 파일이 없다: $ENV_FILE"; exit 2; }
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # ── 자물쇠 확인 — 어기면 운영 llama가 죽는다. 기동보다 이 검사가 먼저다. ──
-MODELS_DIR=$(grep -E '^GIJO_MODELS_DIR=' "$ENV_FILE" | cut -d= -f2-)
-if [ -z "$MODELS_DIR" ]; then
-  echo "✗ GIJO_MODELS_DIR가 env에 없다 — 빈 모델 폴더를 못 박지 않으면 임베딩 감시가 깨어나 운영 8081을 죽인다."
-  exit 3
-fi
-if [ -n "$(ls -A "$MODELS_DIR" 2>/dev/null)" ]; then
-  echo "✗ 모델 폴더가 비어 있지 않다: $MODELS_DIR"
-  echo "  여기에 모델이 있으면 이 인스턴스가 운영 llama-server(8080/8081)를 죽인다. 기동을 멈춘다."
-  exit 3
-fi
-if grep -qE '^GIJO_DEV_MODE=' "$ENV_FILE"; then
-  echo "✗ GIJO_DEV_MODE가 env에 있다 — 고객 인스턴스는 등급 게이트를 켠 채로 돈다(계획서 §14 ①). 기동을 멈춘다."
-  exit 3
-fi
+bash "$HERE/preflight.sh" "$ENV_FILE"
 
 # ── 이미 떠 있으면 두 번 띄우지 않는다 ──
 if curl -sf http://localhost:4100/api/health >/dev/null 2>&1; then
