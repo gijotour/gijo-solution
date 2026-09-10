@@ -753,7 +753,9 @@ describe("★★ 실전 답 기록으로 잰 오탐 — 넓힌 잣대가 정상 
 
   /**
    * 답 본문에 **제품이** 외부 출처 링크를 찍는 도구 — 소스에서 확인한 것만 적는다(2026-09-08 grep).
-   *   · `incident_cases`  → handlers.runIncidentCases → incidentcases.ts:541 `출처: <이름> <URL>` 줄을 건마다 찍는다.
+   *   · `incident_cases`  → handlers.runIncidentCases → incidentcases.ts `출처: <이름> <URL>` 줄을 찍는다
+   *     (2026-09-10부터 **좁혀 물어 1~2건일 때만** — 3건 이상은 사례당 한 줄이라 출처 줄이 안 붙는다.
+   *      그래도 이 도구를 명단에 남긴다: 링크를 찍는 갈래가 살아 있고, 그 글은 여전히 모델이 아니라 코드가 쓴다).
    *   · `incident_sources` → handlers.runIncidentSources → incidentcases.ts:504 매체 이름 아래 **맨 URL 줄**을 찍는다
    *     (「출처:」 낱말은 안 붙는다 — 확인한 그대로 적는다). 오늘 재료엔 0건이라 지금은 (b)를 안 태운다.
    * ⚠ 새 도구를 여기 더할 때도 **소스에서 그 줄을 눈으로 확인하고** 파일·행을 함께 적는다.

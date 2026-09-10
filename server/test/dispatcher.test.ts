@@ -29,6 +29,8 @@ vi.mock("../src/engine/bridge", () => ({
 import { createApp } from "../src/app";
 import { resetAssetsForTests } from "../src/engine/assets";
 import { planInstruction } from "../src/engine/dispatcher";
+// 화면 자리의 **단일 출처** — 안내 문구를 시험에 베껴 적지 않는다(베끼면 두 벌이 되어 어긋난다).
+import { 화면자리한줄 } from "../src/engine/screenguide";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -217,6 +219,24 @@ describe("dispatcher + intent + assets integration", () => {
         expect(mockRunAdapter).not.toHaveBeenCalled(); // 스캔 파이프라인을 타지 않는다
       }
     );
+
+    // ⑲ 첫 실측(2026-09-10) — 이 답은 데이터셋·주제별 「N건」을 세어 놓고 **갈 곳이 없었다**.
+    //   데이터셋이 0개인 회차만 우연히 초록이었다(그때만 「화면」이라는 낱말이 들어갔다).
+    it("★ 확인 절차 안내 끝에 갈 곳 한 줄이 붙는다 — 없는 단추를 가리키지 않는다", async () => {
+      const res = await request(app)
+        .post("/api/dispatch")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ text: "학습 루프 돌려줘" });
+      const 답 = String(res.body.output);
+      // 잣대는 야간 하네스(tools/ops-sim.mjs)의 갈곳 낱말표와 같다.
+      expect(답, "숫자만 주고 갈 곳이 없다").toMatch(/화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보/);
+      // 화면 자리는 screenguide 흡수자리 표 한 곳에서 온다 — 여기에 베껴 적지 않는다.
+      expect(답).toContain(화면자리한줄("learnloop.html"));
+      // 🔁 확인 카드는 chatwidget.js에만 있고 프로 대화창(console.js)에는 없다 —
+      //   「아래에서 고르고 확인해 주세요」는 없는 단추를 가리키는 말이라 쓰지 않는다.
+      expect(답, "없는 단추를 가리킨다").not.toMatch(/아래에서.{0,20}(고르|확인)/);
+      expect(답, "관리자만 누를 수 있다는 사실을 안 적으면 눌러 보고 403을 만난다").toContain("관리자만");
+    });
 
     it("학습 루프를 언급만 한 지시(실행 동사 없음)는 확인 절차를 타지 않는다", async () => {
       const res = await request(app)

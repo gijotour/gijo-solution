@@ -49,7 +49,7 @@ import { undoSnapshot, undoCommit } from "./undo";
 //   (결정적도착지). 실동작 경로는 종전대로 gateUserInput을 쓴다(gateway.ts 머리글 참고).
 import { gateUserInput, gateUserInputInner } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
-import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 방법질문화면찾기, 화면위치안내 } from "./screenguide";
+import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 방법질문화면찾기, 화면위치안내, 화면자리한줄 } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
 import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, parseViewIds, stripViewMark, parseScopeMark, stripScopeMark, parseShellMark, stripShellMark, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer, 한낱말되묻기 } from "./scopeguard";
@@ -891,11 +891,20 @@ async function learnloopConfirmResult(instructionText: string, qa?: boolean): Pr
   }).join(" · ");
   const output = [
     "학습 루프(전문가 어댑터 학습)는 실 GPU 학습이 실행되고, 학습하는 동안 로컬 LLM 엔진이 일시 중단됩니다.",
-    "오발동 방지를 위해 지시만으로는 시작하지 않습니다 — 아래에서 데이터셋을 고르고 '학습 시작'을 직접 확인해 주세요.",
+    // ⚠ 「아래에서 … 확인해 주세요」라고 쓰지 않는다(2026-09-10 ⑲ 첫 실측) — 확인 카드는
+    //   chatwidget.js에만 있고 프로 대화창(console.js)에는 없다. 없는 단추를 가리키는 안내가 된다.
+    //   대신 **사람이 눌러야 시작된다**는 사실만 말하고, 어디서 누르는지는 아래 ▸ 줄이 말한다.
+    "오발동 방지를 위해 지시만으로는 시작하지 않습니다 — 사람이 「학습 시작」을 직접 눌러야 시작됩니다.",
     `주제별 재료(승인 문답): ${진척} — 목표에 찬 주제부터 전문가 학습을 시작할 수 있습니다.`,
     datasets.length
       ? `사용 가능한 데이터셋 ${datasets.length}개: ${datasets.map((d) => `${d.id}(${d.examples}건)`).join(", ")}`
-      : "사용 가능한 데이터셋이 없습니다 — 학습 루프 화면에서 대화 로그로 데이터셋을 먼저 만들어 주세요.",
+      : "사용 가능한 데이터셋이 없습니다 — 대화 로그로 데이터셋을 먼저 만들어야 합니다.",
+    // ⑲ 첫 실측(2026-09-10) — 이 답은 「N건」을 세어 놓고 **갈 곳이 없었다**(야간 하네스가
+    //   「숫자만 주고 갈 곳 없음」으로 셌다. 데이터셋이 0개인 회차만 우연히 초록이었다).
+    //   ⚠ 화면 자리는 **베끼지 않는다** — screenguide의 흡수자리 표가 단일 출처다(화면자리한줄).
+    //   ⚠ 관리자만 누를 수 있다(learnloop.html:574·594, 서버 재검증 learnloop.ts) — 안 적으면
+    //     담당자가 눌러 보고 403을 만난다.
+    `▸ 이어서 — ${화면자리한줄("learnloop.html")} 거기 「🔄 루프 실행 (원클릭)」 단추, 또는 주제별 띠의 「학습 시작」 칩으로 시작합니다(관리자만 누를 수 있습니다).`,
   ].join("\n");
   collab(qa, { from: "analysis", to: "orchestrator", message: "학습 루프 실행 대기 — 화면에서 확인 필요" });
   resetAgentToDefault("analysis");

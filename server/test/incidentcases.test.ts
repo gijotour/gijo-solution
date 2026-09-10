@@ -38,6 +38,8 @@ import {
 } from "../src/engine/incidentcases";
 import { listAudit } from "../src/engine/audit";
 import { findAgentTool, buildApproval } from "../src/engine/agenttools/registry";
+// 갈 곳 한 줄의 **단일 출처** — 문구를 시험에 베껴 적지 않는다(베끼면 두 벌이 되어 어긋난다).
+import { 이어서 } from "../src/engine/agentloop";
 import { TARGETS } from "../src/engine/datacleanup";
 import { createUser } from "../src/auth/users";
 import { createApp } from "../src/app";
@@ -336,11 +338,16 @@ describe("대화창 서식 — 숫자만 주고 끝내지 않는다", () => {
     expect(하나).toContain(wannacry.plainExplain);
     expect(하나).toContain("교훈: 패치 배포 지연이 곧 사고다");
     expect(하나).toContain("출처: NCSC https://www.ncsc.gov.uk/");
+    expect(하나).toContain("\n   CVE CVE-2017-0144 · 제품 Windows SMBv1"); // 좁혀 물으면 CVE/제품 꼬리도 붙는다
     const 전부 = formatIncidentCases(listIncidentCases());
-    expect(전부).not.toContain(wannacry.plainExplain); // 3건부터는 한 줄+교훈
+    // ⚠ 3건부터는 **사례당 한 줄만**이다(2026-09-10 ⑲ 첫 실측 — 5건 전문이 2,983자로 나갔다).
+    //   쉬운 설명·교훈·CVE 꼬리·출처 줄은 좁혀 물었을 때(1~2건)로 옮겼다.
+    expect(전부).not.toContain(wannacry.plainExplain);
     expect(전부).toContain("[2024 · 국내 · 제조] 국내 제조사 랜섬웨어 침해 — VPN 계정 유출로");
-    expect(전부).toContain("CVE CVE-2021-44228, CVE-2021-45046 · 제품 Apache Log4j · 기법 T1190");
-    expect(전부).toMatch(/📋 출처 링크에서 원문을 확인하세요/);
+    expect(전부).not.toContain("교훈: ");
+    expect(전부).not.toContain("출처: ");
+    expect(전부).not.toContain("CVE CVE-2021-44228");
+    expect(전부).toMatch(/📋 사례당 한 줄만 싣습니다 — 쉬운 설명·교훈·출처 링크는 제품·업종·CVE로 좁혀 물으면/);
   });
   it("★ 씨앗 20건을 그대로 실어도 머리의 「N건」·📋 안내가 살아 있고 「… 외 N건」으로 끝난다(3500 컷에 안 기댄다)", () => {
     // 예전엔 끝의 3500자 컷이 **안내 줄을 통째로 먹었다** — 실데이터(씨앗 20건)로 잰다(짧은 가짜 3건으로는 안 드러난다).
@@ -351,14 +358,36 @@ describe("대화창 서식 — 숫자만 주고 끝내지 않는다", () => {
     const 줄 = s.split("\n");
     expect(s.length, `답이 3500자 컷에 닿았다(${s.length}자) — 건당 상한을 다시 봐야 한다`).toBeLessThan(3500);
     expect(줄[0]).toBe("📚 침해사고 히스토리 — 20건");
-    expect(줄[1], "안내 줄이 머리 바로 아래에 있어야 컷에 안 먹힌다").toMatch(/^📋 출처 링크에서 원문을 확인하세요/);
+    expect(줄[1], "안내 줄이 머리 바로 아래에 있어야 컷에 안 먹힌다").toMatch(/^📋 사례당 한 줄만 싣습니다/);
     expect(줄.at(-1), "잘리지 않고 「외 N건」으로 끝난다").toMatch(/^… 외 15건 —/);
     // 다섯 건까지만 싣는다 — 번호 6은 없다
     expect(s).toContain("5. [");
     expect(s).not.toContain("\n6. [");
-    // 건당 상한 — 교훈은 200자까지, 출처 이름은 60자까지(넘으면 말줄임이 보인다)
-    for (const 줄하나 of 줄.filter((x) => x.startsWith("   교훈: "))) expect(줄하나.length).toBeLessThanOrEqual(3 + 4 + 201);
+    // 3건 이상은 사례당 한 줄 — 딸림 줄(들여쓴 세 칸)이 하나도 없다(2026-09-10 ⑲ 첫 실측)
+    expect(줄.filter((x) => x.startsWith("   ")), "딸림 줄이 남아 있다 — 한 줄 서식이 안 걸렸다").toEqual([]);
     expect(s, "잘린 자리는 말줄임으로 보인다").toContain("…");
+  });
+
+  // ★ ⑲ 첫 실측(2026-09-10)의 두 불편을 한 시험이 문다 — 「너무 긺(2,000자)」·「숫자만 주고 갈 곳 없음」.
+  //   목(mock)이 제품을 가리지 않게 **실제 도구 창구**(incident_cases.run)와 **실제 씨앗 20건**으로 잰다.
+  it("★ 「침해사고 히스토리 보여줘」 답 — 한 줄 5건 + 전체 건수 + 갈 곳 한 줄이 2,000자 안에 든다", async () => {
+    expect(seedBuiltinCases(씨앗파일).inserted).toBe(20);
+    // 도구가 실제로 도는 길 그대로 — limit 기본 5(handlers.runIncidentCases).
+    const 도구 = findAgentTool("incident_cases");
+    const 본문 = String(await 도구!.run({}));
+    const 줄 = 본문.split("\n");
+    expect(줄[0], "다섯 건만 실었어도 전체가 몇 건인지 밝힌다").toBe("📚 침해사고 히스토리 — 5건 · 전체 20건");
+    expect(줄.filter((x) => /^\d+\. \[/.test(x)).length, "사례는 다섯 줄").toBe(5);
+    expect(줄.filter((x) => x.startsWith("   ")), "사례당 한 줄 — 딸림 줄이 없다").toEqual([]);
+
+    // 갈 곳 한 줄은 **agentloop의 「이어서」 표 한 곳**에서 온다(문구를 여기에 또 적지 않는다).
+    //   붙는 꼴은 agentloop.ts 다음단계붙이기와 같다.
+    const 답 = `${본문}\n\n▸ 이어서 — ${이어서.incident_cases}`;
+    // 잣대는 야간 하네스와 **같은 숫자**다: tools/ops-sim.mjs의 산문 상한 2,000자,
+    //   갈곳 낱말표 /화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보/.
+    expect(답.length, `${답.length}자 — 하네스 상한 2,000자를 넘으면 담당자는 안 읽는다`).toBeLessThan(2000);
+    expect(답, "숫자만 주고 갈 곳이 없다").toMatch(/화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보/);
+    expect(답, "내부 식별자(ic-…)를 답에 찍으면 하네스가 새 불편으로 센다").not.toMatch(/[0-9a-f]{16,}/);
   });
   it("사례의 샘 — 파일이 없으면 없다고 말하고, 있으면 링크가 전부 http(s)다", () => {
     const all = listIncidentSources("all");

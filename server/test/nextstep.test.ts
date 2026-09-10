@@ -84,4 +84,12 @@ describe("절차 밖 도구의 「이어서」", () => {
   it("이 대조가 헛돌고 있지 않다", () => {
     expect(Object.keys(이어서).length).toBeGreaterThanOrEqual(8);
   });
+
+  // ⑲ 첫 실측(2026-09-10) — 「침해사고 히스토리 보여줘」가 사례 건수를 세어 놓고 갈 곳이 없었다.
+  //   빠지면 그날 그대로 돌아가므로 **이름을 못 박는다**(위 세 검사가 값의 품질을 함께 문다).
+  it("📚 침해사고 히스토리 조회에 갈 곳이 적혀 있다", () => {
+    expect(Object.keys(이어서)).toContain("incident_cases");
+    expect(이어서.incident_cases, "메뉴 항목이 아닌 화면이라 셸 중립어로 쓴다")
+      .not.toMatch(/사이드바|왼쪽 메뉴/);
+  });
 });

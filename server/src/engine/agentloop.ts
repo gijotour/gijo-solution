@@ -796,6 +796,10 @@ export const 이어서: Record<string, string> = {
   alert_schedule_status: "알림 규칙은 설정 > 연동에서 바꿉니다",
   routine_tasks: '내 목록에 담으려면 "할 일 추가: ○○"',
   briefing: '바로 시작하려면 "가장 급한 취약점에 담당자 배정해줘"',
+  // ⑲ 첫 실측(2026-09-10) — 「침해사고 히스토리 보여줘」 답이 사례 다섯 건을 세어 놓고 갈 곳이 없었다.
+  //   대화창은 이제 사례당 한 줄만 싣는다(incidentcases.ts) — 덜어 낸 전문이 어디에 있는지 여기서 말한다.
+  //   ⚠ 셸 중립어로 쓴다 — 이 화면은 메뉴 항목이 아니다(카드 단추·칩으로 열린다, screenguide 흡수자리).
+  incident_cases: "사례 전문·교훈·출처 링크는 📚 침해사고 히스토리 판에서 봅니다(해설 팀원 카드의 「📚 히스토리」 단추로도 열립니다)",
 };
 
 function 다음단계붙이기(answer: string, calls: AgentToolCall[]): string {
