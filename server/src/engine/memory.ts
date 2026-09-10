@@ -2001,6 +2001,20 @@ export type ReingestSource = "original" | "extracted";
  *     빈손인 경우 등) **종전대로 추출본**으로 넣고, 어느 길이었는지를 값으로 돌려준다. 「원본에서
  *     다시 뽑았습니다」를 폴백에도 붙이면 그 말이 거짓이 된다.
  *
+ * ■ 다시 넣기가 **건드리지 않는 것** (2026-09-10 검토관 적발 수리)
+ *   ⚠ **올린이(uploadedBy)를 안 바꾼다.** 첫 판은 actor를 ingestText의 uploadedBy 자리로 넘겨,
+ *     다시 넣기를 **승인한 사람**이 그 문서의 올린이가 됐다. 위 문서표찰 계약이 「지키는 것은
+ *     등급·올린이(감사 귀속)」라고 못 박은 값이고, 결재판도 「올린이 그대로 유지」라고 약속한다.
+ *     더 나쁜 갈래: 개인 문서는 uploadedBy에 **userId**가 들어 있고(personaldocs.ts) 격리 판정
+ *     (남의개인문서인가핵심)이 그 값을 viewerId와 견준다 — 표시이름으로 덮이는 순간 **주인이 자기
+ *     문서에서 잠긴다**(fail-closed라 조용히 안 보인다). 덤으로, uploadedBy가 있으면 인입이
+ *     「문서 반입 소식」을 띄우므로 되넣을 때마다 **새로 들어온 문서인 척** 알림이 났다.
+ *   ⚠ **추출본(.md)은 인입이 성공한 뒤에** 쓴다. 인입 전에 쓰면 임베딩이 죽어 있을 때 도구는
+ *     「실패」라 던지는데 「AI가 읽은 글」 화면만 새 글이 되고 조각은 옛 글로 남는다 — 화면과
+ *     지식이 갈린다(cleanupOldOriginal이 「수집이 끝난 뒤에」인 것과 같은 이유).
+ *
+ * @param actor 이 되넣기를 **승인한 사람**(로그용). ⚠ 문서의 「올린이」로 쓰지 않는다 — 위 참조.
+ *              감사 기록은 부르는 쪽(runReingestDocument)이 남긴다.
  * @returns 넣은 조각 수 + 어느 길이었나(+ 폴백했으면 그 사유). **넣을 글자가 없으면 null** —
  *          그때 「다시 넣었습니다」라고 말하면 거짓이 된다.
  * @throws 대장에 그 문서가 없거나 이름이 basename이 아니면 던진다(쓰기 도구 계약).
@@ -2018,10 +2032,16 @@ export async function reingestFromExtracted(
   let text: string | undefined;
   let source: ReingestSource = "extracted";
   let fallbackReason: string | undefined;
+  let 새추출본: string | undefined; // 인입이 **성공한 뒤에** 쓴다(아래 ③) — 실패하면 옛 글 그대로 둔다
 
   // ① 보관된 원본 + 추출이 필요한 형식이면 **오늘의 추출기로 다시 뽑는다**.
   //    (추출필요가 아닌 형식(.md·.txt …)은 원본과 추출본이 같은 글자라 다시 뽑을 값어치가 없다.)
-  const 원본 = meta.sourcePath ? String(meta.sourcePath) : "";
+  // ⚠ sourcePath가 **경로가 아니라 사람이 읽는 라벨**인 문서가 있다 — 개인 문서는 `내 문서 · <제목>`을
+  //   넣는다(personaldocs.ts: 근거 배지에 personal:<uuid>가 뜨지 않게 하려고). 제목이 「월간보고.docx」처럼
+  //   끝나면 extname이 걸려 원본 길로 들어가고, 관문이 던져 「원본 보관 경로가 허용 범위 밖입니다」라는
+  //   **있은 적도 없는 실패**를 사용자에게 말하게 된다(2026-09-10 검토관 적발). 보관 원본은 언제나
+  //   절대경로다(saveDocArtifacts가 그렇게 적는다) — 절대경로가 아니면 원본이 애초에 없는 것이다.
+  const 원본 = meta.sourcePath && path.isAbsolute(String(meta.sourcePath)) ? String(meta.sourcePath) : "";
   if (원본 && 추출필요.has(path.extname(원본).toLowerCase())) {
     let 원본경로: string | undefined;
     try {
@@ -2038,10 +2058,7 @@ export async function reingestFromExtracted(
         if (새글.trim()) {
           text = 새글;
           source = "original";
-          // 추출본(.md)도 새 글로 맞춘다 — 「내 문서」의 추출본 보기가 조각과 다른 글을 보여 주면
-          // 담당자가 무엇이 들어갔는지 못 믿는다. 쓰는 자리는 saveDocArtifacts 한 곳이다.
-          const { mdSaved } = await saveDocArtifacts({ documentId: id, text: 새글 });
-          if (!mdSaved) console.warn(`[memory] 다시 넣기 — 새 추출본 보관 실패(${id}): 조각은 새 글로 들어갑니다`);
+          새추출본 = 새글; // 쓰기는 인입 성공 뒤로 미룬다(③) — 먼저 쓰면 실패 때 화면만 새 글이 된다
         } else {
           fallbackReason = "원본에서 글자를 못 뽑았습니다(스캔 문서일 수 있습니다)";
         }
@@ -2060,7 +2077,16 @@ export async function reingestFromExtracted(
     }
   }
   if (!text.trim()) return null; // 빈 글을 넣으면 0조각이 되고 「고쳤다」가 거짓이 된다
-  const r = await ingestText(id, text, meta.scope ?? GLOBAL_SCOPE, meta.sourcePath ?? undefined, false, actor);
+  // ⚠ uploadedBy 자리에 actor를 넘기지 않는다(위 「건드리지 않는 것」) — 올린이는 사람이 매긴 표찰이다.
+  const r = await ingestText(id, text, meta.scope ?? GLOBAL_SCOPE, meta.sourcePath ?? undefined, false);
+  // ③ 추출본(.md)도 새 글로 맞춘다 — **인입이 성공한 뒤에.** 「내 문서」의 추출본 보기가 조각과
+  //    다른 글을 보여 주면 담당자가 무엇이 들어갔는지 못 믿는다. 쓰는 자리는 saveDocArtifacts 한 곳이다.
+  if (새추출본 !== undefined) {
+    const { mdSaved } = await saveDocArtifacts({ documentId: id, text: 새추출본 });
+    if (!mdSaved) {
+      console.warn(`[memory] 다시 넣기 — 새 추출본 보관 실패(${id}${actor ? ` · 요청 ${actor}` : ""}): 조각은 새 글로 들어갔지만 추출본 보기는 옛 글입니다`);
+    }
+  }
   return fallbackReason ? { chunks: r.chunks, source, fallbackReason } : { chunks: r.chunks, source };
 }
 

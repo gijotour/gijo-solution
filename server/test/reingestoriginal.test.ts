@@ -45,7 +45,8 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-const { reingestFromExtracted, listDocuments, deleteDocument, getDocumentChunks } = await import("../src/engine/memory");
+const { reingestFromExtracted, listDocuments, deleteDocument, getDocumentChunks, 남의개인문서인가핵심 } = await import("../src/engine/memory");
+const 임베딩 = await import("../src/engine/embedding");
 const { db } = await import("../src/db");
 const { runReingestDocument } = await import("../src/engine/agenttools/handlers");
 
@@ -59,7 +60,11 @@ const 원본없음 = "다시넣기시험_원본없음.docx";
 const 밖경로 = "다시넣기시험_밖경로.docx";
 const 깨진원본 = "다시넣기시험_깨진원본.docx";
 const 글자원본 = "다시넣기시험_글자원본.md";
-const 이름들 = [표문서, 원본없음, 밖경로, 깨진원본, 글자원본];
+/** sourcePath가 **경로가 아니라 사람이 읽는 라벨**인 문서(개인 문서 꼴) — 2026-09-10 검토관 적발③. */
+const 라벨경로 = "다시넣기시험_라벨경로.docx";
+const 이름들 = [표문서, 원본없음, 밖경로, 깨진원본, 글자원본, 라벨경로];
+/** 격리 인과를 재는 대장 전용 줄 — 파일을 안 만든다(documentId에 콜론이 있어 Windows에서 파일명이 못 된다). */
+const 격리줄 = "personal:다시넣기시험-격리";
 
 /** 옛 추출본 — 표가 **평문으로 뭉개진** 그 모양(2026-09-08 전 추출기가 내던 글). */
 const 옛추출본 = [
@@ -69,16 +74,16 @@ const 옛추출본 = [
 ].join("\n\n");
 
 /** 대장 한 줄 — 등급·업무영역까지 실어 둔다(보존되는지 재려면 값이 있어야 한다). */
-function 대장에넣기(documentId: string, opts: { sourcePath?: string | null; chunks?: number } = {}) {
+function 대장에넣기(documentId: string, opts: { sourcePath?: string | null; chunks?: number; uploadedBy?: string } = {}) {
   db.prepare(
-    `INSERT INTO memory_documents (documentId, scope, chunks, embeddingModel, sourcePath, ingestedAt, grade, category)
-     VALUES (?, 'global', ?, 'bge-m3', ?, ?, 'C', '보안관제')
-     ON CONFLICT(documentId) DO UPDATE SET chunks=excluded.chunks, sourcePath=excluded.sourcePath`,
-  ).run(documentId, opts.chunks ?? 1, opts.sourcePath ?? null, new Date().toISOString());
+    `INSERT INTO memory_documents (documentId, scope, chunks, embeddingModel, sourcePath, ingestedAt, grade, category, uploadedBy)
+     VALUES (?, 'global', ?, 'bge-m3', ?, ?, 'C', '보안관제', ?)
+     ON CONFLICT(documentId) DO UPDATE SET chunks=excluded.chunks, sourcePath=excluded.sourcePath, uploadedBy=excluded.uploadedBy`,
+  ).run(documentId, opts.chunks ?? 1, opts.sourcePath ?? null, new Date().toISOString(), opts.uploadedBy ?? "원래올린이");
 }
 const 대장읽기 = (id: string) =>
-  db.prepare("SELECT chunks, grade, category, scope, sourcePath FROM memory_documents WHERE documentId = ?").get(id) as
-    { chunks: number; grade: string | null; category: string | null; scope: string; sourcePath: string | null } | undefined;
+  db.prepare("SELECT chunks, grade, category, scope, sourcePath, uploadedBy FROM memory_documents WHERE documentId = ?").get(id) as
+    { chunks: number; grade: string | null; category: string | null; scope: string; sourcePath: string | null; uploadedBy: string | null } | undefined;
 
 const 추출본읽기 = (id: string) => fs.readFileSync(path.join(추출칸, id + ".md"), "utf8");
 
@@ -99,6 +104,7 @@ afterAll(async () => {
     fs.rmSync(path.join(추출칸, n + ".md"), { force: true });
   }
   db.prepare(`DELETE FROM memory_documents WHERE documentId IN (${이름들.map(() => "?").join(",")})`).run(...이름들);
+  db.prepare("DELETE FROM memory_documents WHERE documentId = ?").run(격리줄);
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -227,9 +233,20 @@ describe("④ 소스 감시 — 원본 길이 관문을 우회하지 않는다",
     const src = fs.readFileSync(path.join(__dirname, "../src/engine/memory.ts"), "utf8");
     const 시작 = src.indexOf("export async function reingestFromExtracted");
     expect(시작, "함수 이름이 바뀌었다 — 이 감시가 조용히 아무것도 안 보게 된다").toBeGreaterThan(0);
-    const 본문 = src.slice(시작, 시작 + 4000);
+    // 함수 끝까지 본다 — 글자 수로 자르면 함수가 길어졌을 때 감시가 조용히 반만 보게 된다.
+    const 끝 = src.indexOf("\nexport ", 시작 + 10);
+    const 본문 = src.slice(시작, 끝 > 시작 ? 끝 : 시작 + 6000);
     expect(본문, "보관 원본을 관문 없이 읽는다 — 임의 경로가 지식이 되는 길이 열린다").toContain("assertWithinIngestRoot(원본)");
     expect(본문, "추출본 쓰기를 손으로 다시 적었다 — 잣대는 saveDocArtifacts 한 곳이다").toContain("saveDocArtifacts(");
+    // ★ 순서까지 감시한다(2026-09-10 적발⑦) — 인입이 성공한 **뒤에** 추출본을 갱신해야
+    //   실패했을 때 화면(추출본)과 지식(조각)이 갈리지 않는다.
+    const 인입자리 = 본문.indexOf("await ingestText(");
+    expect(인입자리, "인입 호출을 못 찾았다 — 아래 순서 감시가 조용히 헛통과한다").toBeGreaterThan(0);
+    expect(본문.indexOf("saveDocArtifacts("), "추출본을 인입 전에 덮는다 — 인입이 실패하면 화면만 새 글이 된다")
+      .toBeGreaterThan(인입자리);
+    // ★ 올린이는 인입에 안 넘긴다(적발①④) — 넘기면 승인자가 그 문서의 올린이로 덮인다.
+    expect(본문, "actor를 uploadedBy 자리로 넘긴다 — 감사 귀속이 승인자에게 옮겨 간다")
+      .not.toMatch(/ingestText\([^)]*,\s*false,\s*actor\s*\)/);
   });
 
   it("★ 약속과 코드가 맞는가 — 결재판 문구가 **지켜지지 않는 보존**을 약속하지 않는다", () => {
@@ -249,5 +266,96 @@ describe("④ 소스 감시 — 원본 길이 관문을 우회하지 않는다",
     const 쓰는가 = /systemHealthText\s*\(/.test(src);
     const 들이는가 = /import\s*\{[^}]*systemHealthText[^}]*\}\s*from/.test(src);
     expect(들이는가 && !쓰는가, "안 쓰는 이름을 import한다 — 모듈이 통째로 딸려 들어와 로드 사슬만 길어진다").toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// ⑤ 검토관 적발 수리(2026-09-10) — **약속한 보존을 실제로 지킨다 · 없던 실패를 지어내지 않는다**
+//   첫 판이 새로 연 구멍 넷을 여기서 닫는다. 넷 다 「그럴듯한데 사람이 손해를 본다」 부류라
+//   시험이 없으면 다음 손질에서 조용히 되살아난다.
+// ══════════════════════════════════════════════════════════════════════════════════
+describe("⑤ 사람이 매긴 표찰과 정직 — 검토관 적발 수리", () => {
+  it("★★ 올린이(uploadedBy)가 **승인자로 덮이지 않는다** — 결재판이 약속한 보존이자 감사 귀속", async () => {
+    // 적발①④: 첫 판이 actor를 ingestText의 uploadedBy 자리로 넘겨, 다시 넣기를 승인한 사람이
+    // 그 문서의 「올린이」가 됐다. memory.ts 문서표찰 계약이 「지키는 것은 등급·올린이」라고
+    // 못 박은 바로 그 값이고, registry effect가 「올린이 그대로 유지」라고 **새로 약속**했다.
+    대장에넣기(표문서, { sourcePath: path.join(업로드칸, 표문서), uploadedBy: "원래올린이" });
+    const r = await reingestFromExtracted(표문서, "승인한사람");
+    expect(r!.source, "준비가 틀렸다 — 원본 길을 안 탔으면 이 시험이 아무것도 안 잰다").toBe("original");
+    expect(대장읽기(표문서)!.uploadedBy, "다시 넣기를 승인한 사람이 문서의 올린이로 덮였다 — 감사 귀속이 옮겨 간다").toBe("원래올린이");
+  });
+
+  it("★★ 왜 위험한가 — 개인 문서는 uploadedBy에 **userId**가 들어 있고 격리가 그 값을 본다", () => {
+    // personaldocs.ts:125가 ingestText에 userId를 uploadedBy로 넘긴다. 격리 판정(남의개인문서인가핵심)은
+    // 그 값을 viewerId와 견준다 — 승인자 **표시이름**으로 덮이는 순간 주인이 자기 문서에서 잠긴다
+    // (fail-closed라 조용히 안 보인다). 위 시험이 원인을 막고, 이 시험이 그 인과를 못 박는다.
+    const 이제 = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO memory_documents (documentId, scope, chunks, embeddingModel, ingestedAt, uploadedBy)
+       VALUES (?, 'global', 1, 'bge-m3', ?, ?)
+       ON CONFLICT(documentId) DO UPDATE SET uploadedBy=excluded.uploadedBy`,
+    ).run(격리줄, 이제, "7");
+    expect(남의개인문서인가핵심(격리줄, "7"), "준비가 틀렸다 — 주인이 애초에 못 보고 있다").toBe(false);
+    db.prepare("UPDATE memory_documents SET uploadedBy = ? WHERE documentId = ?").run("김철수", 격리줄);
+    expect(남의개인문서인가핵심(격리줄, "7"), "덮이면 주인이 잠긴다는 인과 — 이것이 올린이를 안 건드리는 이유다").toBe(true);
+  });
+
+  it("★ sourcePath가 **경로가 아니라 라벨**이면 없던 실패를 지어내지 않는다", async () => {
+    // 적발③: 개인 문서의 sourcePath는 `내 문서 · <제목>`이다(경로가 아니다). 제목이 .docx로 끝나면
+    // extname이 걸려 원본 길로 들어가고, 관문이 던져 「원본 보관 경로가 허용 범위 밖입니다」라는
+    // **있은 적도 없는 실패**를 사용자에게 말한다. 이 라운드의 정직 원칙과 정반대 방향의 거짓이다.
+    대장에넣기(라벨경로, { sourcePath: "내 문서 · 월간보고.docx" });
+    const r = await reingestFromExtracted(라벨경로);
+    expect(r!.source).toBe("extracted");
+    expect(r!.fallbackReason, "보관 원본이 있은 적도 없는데 「허용 범위 밖」이라는 실패를 지어냈다").toBeUndefined();
+  });
+
+  it("★ 인입이 실패하면 추출본(.md)을 **덮지 않는다** — 화면만 새 글이 되는 어긋남", async () => {
+    // 적발⑦: 첫 판은 ingestText **전에** .md를 덮었다. 임베딩이 죽어 있으면 도구는 「실패」라
+    // 던지는데 「AI가 읽은 글」 화면만 새 글로 바뀌고 조각은 옛 글로 남는다 — ①이 성공 방향에서
+    // 막으려던 「화면과 지식이 갈린다」가 실패 방향으로 열린 셈이다. 쓰기는 인입이 끝난 뒤에.
+    대장에넣기(표문서, { sourcePath: path.join(업로드칸, 표문서) });
+    const 원래 = (임베딩.embed as unknown as { getMockImplementation(): unknown }).getMockImplementation();
+    (임베딩.embed as unknown as { mockRejectedValue(e: Error): void }).mockRejectedValue(new Error("임베딩 서버가 꺼져 있습니다"));
+    try {
+      await expect(reingestFromExtracted(표문서)).rejects.toThrow();
+    } finally {
+      (임베딩.embed as unknown as { mockImplementation(f: unknown): void }).mockImplementation(원래);
+    }
+    expect(구분선있음(추출본읽기(표문서)), "인입이 실패했는데 추출본만 새 글로 바뀌었다 — 화면이 조각에 없는 글을 보여 준다").toBe(false);
+  });
+
+  it("★ 넣을 글이 없을 때의 안내가 **지켜지지 않는 보존**을 약속하지 않는다(반쪽 수리 방지)", async () => {
+    // 적발②⑥: registry effect에서는 「업무영역 유지」를 거짓이라고 뺐는데, 같은 함수의 실패 문장에는
+    // 「＋로 다시 올려 주세요(업무영역·등급은 그대로 이어집니다)」가 그대로 남아 있었다. ＋ 재업로드도
+    // 업무영역은 규칙이 다시 매긴다(위 ① 「업무영역은 규칙이 다시 매긴다」와 같은 계약).
+    fs.rmSync(path.join(추출칸, 원본없음 + ".md"), { force: true }); // 넣을 글자를 없앤다
+    대장에넣기(원본없음, { sourcePath: null, chunks: 1 });
+    await expect(runReingestDocument({ document: 원본없음 })).rejects.toThrow(/다시 넣을 수 없습니다/);
+    const 말 = await runReingestDocument({ document: 원본없음 }).catch((e: Error) => e.message);
+    expect(말, "지켜지지 않는 보존을 안내가 약속한다 — 업무영역은 ＋ 재업로드에서도 규칙이 다시 매긴다").not.toContain("업무영역·등급은 그대로 이어집니다");
+    expect(말, "등급이 이어진다는 사실까지 지우면 담당자가 기밀 재지정을 걱정한다").toContain("등급");
+  });
+
+  it("★ 같은 거짓을 **파일 어디에도** 다시 적지 않는다 — 한 곳만 고치는 반쪽 수리를 막는다", () => {
+    // 첫 판은 registry effect에서만 「업무영역 유지」를 뺐고 handlers에는 세 곳이 남아 있었다
+    // (runReingestDocument 1 · runDocChunkGaps 2). 문장 하나를 여러 곳에 적으면 반드시 한 곳이 남는다.
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine/agenttools/handlers.ts"), "utf8");
+    const 남은 = src.split("\n").filter((l) => !l.trim().startsWith("//") && l.includes("업무영역·등급은 그대로 이어집니다"));
+    expect(남은, `안내 ${남은.length}곳이 지켜지지 않는 보존을 약속한다 — 업무영역은 재인입·재업로드 둘 다에서 규칙이 다시 매긴다`).toEqual([]);
+  });
+
+  it("★ 화면 안내가 새 동작과 어긋나지 않는다 — 「추출본이 없으면 실패」는 이제 틀렸다", async () => {
+    // 적발⑤: screenguide가 「서버에 추출본(.md)이 없으면 승인 뒤 실행 단계에서 실패합니다」라고 적는데,
+    // 이제 **원본만 있으면** .md가 없어도 성공하고 .md도 새로 만들어진다. 담당자가 되살릴 수 있는
+    // 문서를 ＋로 다시 올리게 된다. 그 문장을 screenguidefix.test가 정규식으로 고정하고 있었다.
+    const guide = fs.readFileSync(path.join(__dirname, "../src/engine/screenguide.ts"), "utf8");
+    expect(guide, "틀린 안내가 그대로 있다").not.toContain("서버에 추출본(.md)이 없으면 승인 뒤 실행 단계에서 실패합니다");
+    // 실제로 되는지 잰다 — 문구만 고치고 코드가 안 되면 반대쪽 거짓이 된다.
+    대장에넣기(표문서, { sourcePath: path.join(업로드칸, 표문서) });
+    fs.rmSync(path.join(추출칸, 표문서 + ".md"), { force: true });
+    const r = await reingestFromExtracted(표문서);
+    expect(r!.source, "추출본이 없어도 원본만 있으면 되살아나야 한다").toBe("original");
+    expect(fs.existsSync(path.join(추출칸, 표문서 + ".md")), "새 추출본을 만들어 주지 않으면 화면이 글을 못 연다").toBe(true);
   });
 });
