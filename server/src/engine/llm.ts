@@ -1514,9 +1514,12 @@ export async function chat(args: ChatArgs): Promise<string> {
     // ⚠ noLearn은 **여기에만** 건다 — 대화 이력(위 histories)은 그대로 둬야 배포 계정으로
     //   검증할 때도 사람이 쓰는 것과 똑같이 동작한다(학습에만 안 들어간다).
     // 대화 수집 — 등록된 수집기에게 알린다(화살 #15). llm은 누가 모으는지 모른다.
+    // ⚠ 삼키되 **말은 한다**(2026-09-10 고객 QA 실측): 아래 catch가 한 글자도 안 남기면 채팅은 200인데
+    //   대화가 한 건도 안 쌓이는 것을 아무도 모른다 — 고객 QA의 존재 이유가 그 수집이다.
     if (!args.noLearn) {
       for (const 수집 of chatLogListeners) {
-        try { 수집(args.agentId, args.logQuestion?.trim() || args.message, 기록답); } catch { /* 수집 실패가 답을 막지 않는다 */ }
+        try { 수집(args.agentId, args.logQuestion?.trim() || args.message, 기록답); }
+        catch (err) { console.warn("[llm] 대화 수집 실패(답에는 영향 없음):", err instanceof Error ? err.message : err); }
       }
     }
   }
@@ -1563,9 +1566,15 @@ export function registerLlmRoutes(app: Express): void {
       //   지나갈 수 있었다(2026-07-30 발견). 신뢰 여부는 **서버가 정하는 것**이지 요청이
       //   주장할 수 있는 값이 아니다 — 여기는 사용자 입력을 처음 받는 입구이므로 항상 검사한다.
       // noLearn도 **서버가 정한다**(trusted와 같은 이유) — 요청이 주장할 값이 아니다.
+      // ⚠ agentId는 ChatArgs의 **필수 인자**인데(:1000 주석) 이 라우트는 req.body를 그대로 펼친다 —
+      //   안 실어 보내면 undefined가 그대로 흘러 ① 대화 수집이 chat_logs.agentId NOT NULL로 죽고
+      //   ② resolveRemoteTarget의 「이 PC 고정」 갈래(orchestrator)를 비켜 전역 원격으로 샌다.
+      //   2026-09-10 고객 QA 첫 검증이 정확히 그 모양이었다(채팅 200인데 대화 0건).
+      //   기본값은 대화창 정문(dispatcher)의 폴백과 **같은 값**이다 — 두 입구가 다른 규칙을 갖지 않게.
       const who = (req as Request & { user?: GijoUser }).user;
+      const agentId = typeof req.body?.agentId === "string" && req.body.agentId.trim() ? req.body.agentId.trim() : "orchestrator";
       res.json({
-        reply: await chat({ ...req.body, remember: true, explain: true, trusted: false, noLearn: isNonLearningAccount(who?.username), viewer: { userId: who?.id, clearance: who?.clearance } }),
+        reply: await chat({ ...req.body, agentId, remember: true, explain: true, trusted: false, noLearn: isNonLearningAccount(who?.username), viewer: { userId: who?.id, clearance: who?.clearance } }),
       });
     })
   );
