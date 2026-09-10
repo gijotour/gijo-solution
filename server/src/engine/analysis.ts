@@ -8,6 +8,15 @@ export interface FindingAnalysis {
   summary: string;
   prioritized: { index: number; severity: StandardFinding["severity"]; reason: string }[];
   plainExplanation: string;
+  /**
+   * 스키마 JSON을 **실제로 읽었나**(2026-09-10 검토관 상 — 부르는 쪽이 성공을 단정하고 있었다).
+   *
+   * ⚠ false면 summary는 **분석 결과가 아니다** — 모델이 준 원문이거나 「자동 분석에 실패했습니다」
+   *   폴백 문구다. 부르는 쪽이 이 값을 안 보면 「N건을 분석했습니다」 바로 뒤에 「분석에 실패했습니다」가
+   *   오는 자기모순 답이 나간다(폴백 문구를 정상 출력으로 취급 = 이 저장소 1원칙 위반).
+   * ⚠ 판정을 **문구 대조로 흉내 내지 말 것** — 실패 문장은 여기 한 곳에만 있다.
+   */
+  ok: boolean;
 }
 
 const FEW_SHOT_EXAMPLE = `예시 입력:
@@ -57,6 +66,7 @@ export function parseAnalysis(raw: string, findingCount: number): FindingAnalysi
       summary: parsed.summary.trim(),
       prioritized: list ?? [],
       plainExplanation: typeof parsed.plainExplanation === "string" ? parsed.plainExplanation : "",
+      ok: true,
     };
   }
   // JSON 파싱 실패 시: 원문 JSON 덩어리를 그대로 노출하지 않고 사람이 읽을 문장만 남긴다.
@@ -65,6 +75,7 @@ export function parseAnalysis(raw: string, findingCount: number): FindingAnalysi
     summary: fallback || `발견된 ${findingCount}개 항목의 자동 분석에 실패했습니다. 원본 finding을 직접 확인하세요.`,
     prioritized: [],
     plainExplanation: "",
+    ok: false, // ⚠ 원문 폴백도 false — 「형식대로 못 받았다」가 사실이고, 부르는 쪽이 그렇게 말해야 한다.
   };
 }
 
@@ -72,7 +83,7 @@ export function parseAnalysis(raw: string, findingCount: number): FindingAnalysi
 // 지금은 finding의 severity 필드만 근거로 LLM이 우선순위를 재정렬한다.
 export async function analyzeFindings(findings: StandardFinding[]): Promise<FindingAnalysis> {
   if (findings.length === 0) {
-    return { summary: "발견된 취약점이 없습니다.", prioritized: [], plainExplanation: "" };
+    return { summary: "발견된 취약점이 없습니다.", prioritized: [], plainExplanation: "", ok: true };
   }
   const raw = await chat({ agentId: "analysis", message: buildPrompt(findings), trusted: true });
   return parseAnalysis(raw, findings.length);

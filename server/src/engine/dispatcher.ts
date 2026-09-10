@@ -42,7 +42,7 @@ import { runAgentLoop, forcedToolFor, AgentToolCall, 가리킬것없는대명사
 import { 스트림자리 } from "./streamsink";
 import { 장애질문인가, 장애초동절차, 침해사고질문인가, 침해사고초동절차 } from "./incidentsteps";
 import { 신고시한질문인가, 침해사고신고시한답 } from "./reportdeadline";
-import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval, 에디션제한중, 조건이좁히나, 다음걸음, 시연데이터알림 } from "./agenttools";
+import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval, 에디션제한중, 조건이좁히나, 다음걸음, 시연데이터알림, isRealVulnerability, 현황상한 } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
 // ⚠ gateUserInputInner — 신호(llm_activity `guard`)를 안 쏘는 본문. **설명 도구가 쓰는 자리**다
@@ -541,14 +541,36 @@ async function runGijoEnrichment(results: StepResult[], fromAgentId: string, qa?
  * 스캔 단계 없이 「우선순위 분석」만 왔을 때, 분석에 넣을 **등록 취약점 상한**.
  *
  * ⚠ 상한은 선택이 아니라 필수다. analyzeFindings는 finding 배열을 `JSON.stringify`해 LLM 프롬프트에
- *   통째로 넣는다(analysis.ts buildPrompt). 개발 DB 실측이 **평균 274바이트/건**이라 운영의 2,854건은
- *   약 78만 자 ≈ 20만 토큰인데, 슬롯당 문맥은 32768 / --parallel 2 = **16,384토큰**이다
- *   (localengine.ts의 ctxSize·--parallel). 전량은 원리상 안 들어간다.
- * ⚠ 30건이면 30×274바이트 ≈ 8,200자 ≈ 2,700토큰 + 프롬프트 600자라, 응답 몫 800토큰
- *   (llm.ts DEFAULT_MAX_TOKENS)을 빼고도 넉넉하다.
+ *   통째로 넣는다(analysis.ts buildPrompt). 개발 DB 실측이 **평균 274바이트/건**(한글이면 약 91자)이라
+ *   운영의 2,854건은 약 78만 바이트 ≈ 20만 토큰인데, 슬롯당 문맥은 32768 / --parallel 2 =
+ *   **16,384토큰**이다(localengine.ts의 ctxSize·--parallel). 전량은 원리상 안 들어간다.
+ *
+ * ★ **30이 아니라 8인 까닭 — 입력이 아니라 「출력」이 좁은 문이다**(2026-09-10 검토관 상).
+ *   analysis.ts buildPrompt는 finding **하나마다** `{"index","severity","reason":"한 문장"}`을 요구하는데,
+ *   analyzeFindings는 maxTokens를 안 실어 응답이 **800토큰**에 묶인다(llm.ts DEFAULT_MAX_TOKENS).
+ *   30건이면 항목당 25~55토큰 × 30 = 750~1,650토큰 + summary·plainExplanation이라 JSON이 중간에
+ *   **잘린다.** 잘린 JSON은 parseAnalysis가 못 읽어 summary가 「자동 분석에 실패했습니다」가 되고,
+ *   그러면 이 갈래가 고치려던 자리에서 **실패 문구가 답으로** 나간다.
+ *   8건이면 출력이 200~440토큰 + 요약 몫이라 800 안이다. 선례도 8이다 —
+ *   report.ts의 `prioritizedReviews(8, req.assetIds)`, approvals.buildTriageDraft(limit 5).
  * ★ 순서는 prioritizedReviews가 정한다(KEV→EPSS→VPR→심각도) — 상한이 잘라 내는 것은 **꼬리**다.
+ * ★ 시험이 이 상수를 그대로 읽어 간다(orchanalyze.test) — 잣대를 베끼면 값이 바뀔 때 헛통과한다.
  */
-const ANALYZE_TOP_N = 30;
+export const ANALYZE_TOP_N = 8;
+
+/**
+ * 한 건의 evidence 글자 상한 — **건수만 세면 길이가 무제한**이라 상한이 헛돈다(2026-09-10 검토관 하).
+ *
+ * ⚠ 운영의 Nessus CSV 반입 경로는 description을 **안 자른다**(vulnscan.ts CSV 갈래 — 텍스트·XML
+ *   갈래만 `.slice(0, 400)`을 건다). `plugin_output`이 별칭에 들어 있어 한 건이 킬로바이트가 될 수
+ *   있고, 그 값이 evidence로 실린다. 그러면 8건이어도 문맥을 넘길 수 있다.
+ * ⚠ 잣대(400자)는 vulnscan.ts의 텍스트·XML 갈래와 **같은 수**를 쓴다 — 새 숫자를 만들지 않는다.
+ */
+const EVIDENCE_상한 = 400;
+function 증거줄이기(f: StandardFinding): StandardFinding {
+  const e = String(f.evidence ?? "");
+  return e.length > EVIDENCE_상한 ? { ...f, evidence: `${e.slice(0, EVIDENCE_상한)}…` } : f;
+}
 
 // 복합 지시를 순차 실행한다. 각 단계는 협업 로그로 실시간 브로드캐스트되고, 스캔 결과(findings)는
 // 다음 단계(분석·리포트)로 누적 전달된다.
@@ -557,6 +579,18 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
   const results: StepResult[] = [];
   const accumulated: StandardFinding[] = [];
   const scannedAssetIds = new Set<string>();
+  // 스캔 단계가 실제로 돌았나 — 「발견 0건」이어서 등록 취약점으로 갈아탄 것을 답에 밝히는 데 쓴다.
+  let 스캔돌았나 = false;
+  // 🗂 **이 오케스트레이션 전체의 범위.** 화면이 건 「지금 범위」가 우선이고, 없으면 지시문이 콕 집은 자산이다.
+  //   ⚠ 한 답 안에서 단계마다 모수가 다르면 그게 거짓말이다(2026-08-18 실측: 범위를 걸고 물었는데 3,008건).
+  //     분석 단계에만 범위를 걸고 리포트는 전사로 만들면 「【1. 분석】 그 자산 3건 … 【3. 리포트】 전사
+  //     2,854건」이 한 답에 나란히 실린다 — 같은 거짓말의 다른 얼굴이다(2026-09-10 검토관 중).
+  //   ⚠ planInstruction은 지시문 범위를 **scan 단계에만** 실어 준다(옛 계약, 내보낸 함수라 모양을 안 건드린다).
+  //     그래서 여기서 한 번 더 푼다 — 「10.10.20.41 우선순위 분석하고 리포트 만들어줘」가 스캔 없이 와도
+  //     전사를 세어 놓고 「분석했습니다」라고 말하지 않게(scope-resolve.test가 지키는 그 결함의 analyze 판).
+  const 지시범위 = resolveScopeFromText(instructionText);
+  const 오케범위 = 범위자산?.length ? 범위자산 : 지시범위.type === "asset" ? [지시범위.assetId] : undefined;
+  const 범위말 = 오케범위?.length ? `🗂 ${오케범위.map(자산표시이름).join(", ")} 기준 — ` : "";
   // CTI 영향 자산은 한 번만 계산(여러 단계가 참조할 수 있으므로).
   // CTI ↔ 자산 자동 매칭은 TI Agent 담당 — 위협 인텔 텍스트를 자산 인벤토리(자산명·컴포넌트·CVE·AI-BOM)와
   // 대조해 영향 자산을 찾고, 결과를 협업 피드로 알린다(매칭 자체는 규칙 엔진 ctimatch가 수행).
@@ -595,6 +629,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
           count += findings.length;
         }
         findingCount = count;
+        스캔돌았나 = true; // 0건이어도 「돌았다」 — 분석 단계가 원천이 갈렸음을 밝히는 데 쓴다.
         output = assetIds.length
           // ⚠ 내부 id를 그대로 내지 않는다 — 사람이 읽는 글자가 아니다(말투 규범).
           ? `${assetIds.length}개 자산 스캔 완료 — 발견 ${count}건 (${assetIds.map(자산표시이름).join(", ")})`
@@ -607,32 +642,67 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
         //   ⚠ 같은 답의 3단계 리포트는 실데이터(자산 45·취약점 2,854·KEV 13)를 썼다 —
         //     등록된 취약점이 있는데 **분석 단계만 그것을 안 보고 있었다.**
         //   ⚠ 상한(ANALYZE_TOP_N)의 근거는 그 상수의 주석에 있다 — 전량은 문맥에 원리상 못 들어간다.
-        //   ⚠ 범위자산 — 「이 자산 기준으로 갑니다」라 해 놓고 전체를 세면 그게 거짓말이다.
-        const 등록 = accumulated.length ? [] : prioritizedReviews(ANALYZE_TOP_N, 범위자산);
-        if (accumulated.length || 등록.length) {
-          const 재료 = accumulated.length ? accumulated : 등록.map((r) => r.finding);
-          const summary = (await analyzeFindings(재료)).summary;
+        //   ⚠ 범위는 오케범위 한 곳에서 푼다(위) — 「이 자산 기준으로 갑니다」라 해 놓고 전체를 세면 거짓말이고,
+        //     분석과 리포트가 서로 다른 모수를 세도 마찬가지다.
+        //   ⚠ **스캔 잡음은 스캔 결과가 아니다**(2026-09-10 검토관 중). `accumulated.length`만 보면
+        //     「스캔하고 분석해줘」에서 대상이 아닌 자산마다 한 건씩 쌓이는 `scan_not_supported`가
+        //     재료 행세를 해(bridge.모델스캔은 대상이 아니면 **반드시 한 건**을 돌려준다),
+        //     고치려던 결함이 형제 갈래에 그대로 남는다 — 잡음 45건을 분석하고 등록 2,854건은 또 안 본다.
+        //     거르개는 이미 한 곳에 있다(handlers.isRealVulnerability — 605건 중 602건이 이것이었다).
+        const 스캔재료 = accumulated.filter((f) => isRealVulnerability(f));
+        // 후보는 **전부** 세고(모수), 모델에 넣는 것만 상한으로 자른다 — 「상위 8건」을 총계인 척하지 않는다
+        // (handlers.runFindingStatusOverview의 현황상한 규율과 같다).
+        const 후보 = 스캔재료.length ? [] : prioritizedReviews(현황상한, 오케범위);
+        const 등록 = 후보.slice(0, ANALYZE_TOP_N);
+        if (스캔재료.length || 등록.length) {
+          const 재료 = 스캔재료.length ? 스캔재료 : 등록.map((r) => 증거줄이기(r.finding));
+          const 분석 = await analyzeFindings(재료);
           // 스캔으로 갓 찾은 건은 종전 그대로 요약만 낸다(그 단계가 이미 무엇을 봤는지 말했다).
           // 등록 취약점으로 답할 때는 **무엇을 몇 건 봤는지**와 **다음 걸음**을 함께 밝힌다.
-          output = accumulated.length
-            ? summary
-            : [
-                `등록된 취약점 가운데 우선순위 상위 ${재료.length}건(KEV→EPSS→VPR 순)을 분석했습니다.`,
-                summary,
-                시연데이터알림(재료),
-                다음걸음("조치·승인 화면에서 담당자·기한을 배정하거나, 여기서 \"1번 담당자 배정해줘\"라고 말해도 됩니다."),
-              ].filter(Boolean).join("\n");
+          const 머리 = 후보.length > 재료.length
+            ? `${범위말}조치 대상 ${후보.length}건 가운데 우선순위 상위 ${재료.length}건(KEV→EPSS→VPR 순)을 분석했습니다.`
+            : `${범위말}조치 대상 ${재료.length}건을 우선순위(KEV→EPSS→VPR) 순으로 분석했습니다.`;
+          // 스캔이 돌았는데 0건이라 갈아탄 것이면 그 사실을 밝힌다 — 안 밝히면 읽는 사람은
+          // 앞 단계의 「발견 0건」과 이 단계의 건수를 같은 원천으로 읽는다.
+          const 갈아탐 = 스캔돌았나 ? "이번 스캔에서는 새로 나온 것이 없어, 등록되어 있는 취약점으로 분석했습니다." : "";
+          output = 스캔재료.length
+            ? 분석.summary
+            // ⚠ **성공을 단정하지 않는다**(2026-09-10 검토관 상). analyzeFindings가 스키마를 못 읽으면
+            //   summary는 분석 결과가 아니라 폴백 문구인데, 그 앞에 「분석했습니다」를 붙이면
+            //   「…8건을 분석했습니다 / 자동 분석에 실패했습니다」라는 자기모순 답이 나간다.
+            : 분석.ok
+              ? [머리, 갈아탐, 분석.summary, 시연데이터알림(재료), 다음걸음("조치·승인 화면에서 담당자·기한을 배정하세요. 번호로 고르려면 \"오늘 뭐부터 해야 해?\"로 목록을 먼저 받으세요.")].filter(Boolean).join("\n")
+              : [
+                  `${범위말}조치 대상 ${후보.length}건 가운데 우선순위 상위 ${재료.length}건을 살펴봤지만, 분석 결과를 형식대로 받지 못했습니다.`,
+                  갈아탐,
+                  분석.summary,
+                  다음걸음("조치·승인 화면에서 우선순위 목록을 직접 확인하세요."),
+                ].filter(Boolean).join("\n");
         } else {
-          // 등록된 취약점이 **0건일 때만** 종전처럼 일반 안내로 떨어진다.
-          // ⚠ 그때는 그 사실을 답 머리에 밝힌다 — 근거 없이 쓴 글을 분석 결과처럼 내놓는 것이
-          //   자리표시자 답의 씨앗이다(정직 원칙).
+          // 지금 조치할 것이 **0건일 때만** 종전처럼 일반 안내로 떨어진다.
           // noLearn:true — 수집은 dispatchInstructionScoped 출구 한 곳에서 한다(이중 기록 방지).
           const 안내 = await chat({ agentId: "analysis", message: instructionText, remember: true, trusted: true, qa, noLearn: true });
-          output = `아직 등록된 취약점이 없습니다 — 스캔 결과 없이 일반 안내로 답합니다.\n${안내}`;
+          // ⚠ 정직 문구는 답 **끝**에 붙인다(2026-09-10 검토관 중). 앞머리에 두면 llm.ts가 붙인 배너
+          //   (자료없음·지정범위·자료요청·근거약함·숫자무근거)가 둘째 줄로 밀려
+          //   noevidence의 판정기가 표식을 못 읽는다 — 그쪽은 **단계 본문의 앞머리**만 startsWith로 본다.
+          //   ⚠ 여기 주석에 판정기 이름을 호출 꼴로 적지 말 것 — 출구보다 앞에 그 글자가 생기면
+          //     noevidence-mark의 소스 감시(「판정은 모든 거르개 뒤」)가 이 줄을 호출로 읽고 빨개진다.
+          //   **배너 글자는 보이는데 화면이 추정 숫자를 진하게 그린다.** 2026-09-06에 단계별 앞머리까지
+          //   좁혀 닫은 바로 그 자리라, 같은 함정을 새로 열지 않는다(legalbasis 근거 꼬리와 같은 규율).
+          // ⚠ 문구는 「등록된 취약점이 없다」가 **아니다.** prioritizedReviews는 등록분이 아니라
+          //   「지금 조치 대상」을 준다 — 오탐·조치완료·기한 안 위험수용·범위 밖을 이미 뺐다.
+          //   전체에 2,854건이 있어도 범위를 걸면 0건이 되므로 **범위도 함께** 밝힌다.
+          //   말은 새로 짓지 않고 handlers.runToday의 「지금 조치할 취약점이 없습니다. (오탐 판정·조치완료 제외)」에 맞춘다.
+          const 없음 = 오케범위?.length
+            ? `🗂 ${오케범위.map(자산표시이름).join(", ")}에는 지금 조치할 취약점이 없습니다.`
+            : "지금 조치할 취약점이 없습니다.";
+          output = `${안내}\n\n⚠ ${없음} (오탐 판정·조치완료·기한 안 위험수용 제외) — 위 답은 취약점 자료 없이 쓴 일반 안내입니다.`;
         }
       } else {
-        // report — 앞 단계에서 스캔한 자산이 있으면 그 범위로, 없으면 전체로 보고서를 만든다.
-        const scoped = scannedAssetIds.size ? [...scannedAssetIds] : undefined;
+        // report — 앞 단계에서 스캔한 자산이 있으면 그 범위로, 없으면 **이 오케스트레이션의 범위**로 만든다.
+        // ⚠ 종전엔 스캔이 없으면 undefined(=전사)였다. 그러면 분석 단계는 자산 하나를 세고 리포트는
+        //   전사를 세어, 한 답 안에서 모수가 갈렸다(2026-09-10 검토관 중). 범위가 아예 없으면 종전대로 전사다.
+        const scoped = scannedAssetIds.size ? [...scannedAssetIds] : 오케범위;
         const r = await generateReport({ type: "ondemand", assetIds: scoped, createdBy: "AI 팀(오케스트레이터)", qa });
         assetIds = scoped;
         output = `${r.executiveSummary}\n(리포트 파일: ${r.filePath})`;
