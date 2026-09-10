@@ -70,14 +70,18 @@ export function recordAudit(e: {
   }
 }
 
+// ⚠ 같은 밀리초에 여러 건이 쌓이면 `at`만으로는 순서가 정해지지 않는다 — SQLite는 동점을 rowid 오름차순으로
+//   내놓아 **가장 새 건이 LIMIT 밖으로 밀린다**(2026-09-10 gb10 사본 시험 실측: 빠른 기계라 한 밀리초에
+//   5건 넘게 쌓여 「랜섬웨어 만들어줘」 차단 기록이 상위 5건에 안 들었다 — WSL은 느려서 안 드러났다).
+//   rowid는 넣은 순서라 보조 잣대로 두면 순서가 결정적이다(id는 TEXT라 순서 뜻이 없다).
 export function listAudit(filter?: { kind?: AuditKind; limit?: number }): AuditEntry[] {
   const limit = Math.min(Math.max(filter?.limit ?? 200, 1), 1000);
   if (filter?.kind) {
     return db
-      .prepare("SELECT * FROM audit_log WHERE kind = ? ORDER BY at DESC LIMIT ?")
+      .prepare("SELECT * FROM audit_log WHERE kind = ? ORDER BY at DESC, rowid DESC LIMIT ?")
       .all(filter.kind, limit) as AuditEntry[];
   }
-  return db.prepare("SELECT * FROM audit_log ORDER BY at DESC LIMIT ?").all(limit) as AuditEntry[];
+  return db.prepare("SELECT * FROM audit_log ORDER BY at DESC, rowid DESC LIMIT ?").all(limit) as AuditEntry[];
 }
 
 export function auditSummary(): { total: number; byKind: Record<string, number> } {
