@@ -21,6 +21,51 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
+  // ── 표 규격 — server/src/engine/tabletext.ts의 **사본**이다 (2026-09-10, 갈래 C) ──────
+  //
+  // ■ 왜 사본을 두는가
+  //   서버는 「무엇이 표인가」를 engine/tabletext.ts 한 곳으로 모았는데(갈래 U), 사람이 실제로
+  //   보는 이 화면만 제 나름대로 읽고 있었다 — 구분선을 헐겁게 보고, 셀을 `split("|")`로 갈라
+  //   **칸 안 이스케이프 `\|`를 몰랐고**(칸이 하나 더 생기고 역슬래시가 남는다), 행마다 칸 수가
+  //   달라도 안 맞췄다. 내보내기(inspectionHtml/Docx)가 고친 바로 그 증상이 화면에만 남아 있었다.
+  //   이 파일은 preload 없이 도는 **순수 브라우저 스크립트**라 서버 TS를 import할 길이 원리상
+  //   없다(화면은 소스를 그대로 싣는다 — 번들러가 없다). 그래서 사본이 불가피하다.
+  //
+  // ■ 사본을 두는 대신 지키는 계약
+  //   ⚠ **원본은 저쪽이다.** 고칠 일이 생기면 언제나 tabletext.ts를 먼저 고치고 여기로 옮겨 적는다.
+  //   ⚠ 어긋나면 빨개진다 — server/test/gijomdtable.test.ts가 이 파일을 가짜 window로 **실제로
+  //     실행해서** 같은 입력을 양쪽에 먹이고 같은 답인지 잰다(소스 훑기가 아니라 돌려 보고 잰다).
+  //     그래서 아래 세 함수를 window.gijoMd.표규격으로 내놓는다 — **시험이 꺼내 보는 창구**이고
+  //     화면 코드는 여기 안에서만 쓴다.
+
+  /** tabletext.ts의 `구분선`의 사본 — |---|---| · |:---|---:| · |-|-| 꼴.
+   *  ⚠ 대시 2개 이상은 공백을 둘러도 구분선이지만, **대시 하나는 꽉 붙은 것만** 구분선이다.
+   *    `| - | - |`은 「해당 없음」을 적은 **본문 행**이라 구분선이 아니다 — 여기서 삼키면
+   *    서버가 살려 낸 그 행을 화면이 도로 먹는다. 두 갈래는 언제나 함께 고친다. */
+  function 구분선(l) { return /^\s*\|(?:(?:\s*:?-{2,}:?\s*|:?-:?)\|)+\s*$/.test(l); }
+
+  /** tabletext.ts의 `칸가르기`의 사본 — 양끝 파이프를 벗기고 칸 안 이스케이프(`\|`)를 되돌린다.
+   *  ⚠ 안 풀면 칸이 하나 더 생기고 역슬래시가 화면에 남는다. 추출기 칸글()이 실제로 내는 꼴이다. */
+  function 칸가르기(l) {
+    var t = String(l).trim().replace(/^\|/, "").replace(/\|$/, "");
+    return t.split(/(?<!\\)\|/).map(function (c) { return c.replace(/\\\|/g, "|").trim(); });
+  }
+
+  /** tabletext.ts의 `표_최대열`의 사본 — 자리 채우기가 폭주하는 것을 막는 **하나뿐인** 상한. */
+  var 표_최대열 = 512;
+
+  /** tabletext.ts의 `표행맞추기`의 사본 — 한 표의 모든 행을 같은 열 수로. 폭은 가장 넓은 행.
+   *  ⚠ **넘치는 칸을 자르지 않는다** — GFM은 버리지만 우리 제품에서 그 글은 고객이 쓴 점검
+   *    결과다. 표가 한 칸 넓어지는 것보다 글이 사라지는 것이 나쁘다. */
+  function 표행맞추기(행들) {
+    var 폭 = Math.min(행들.reduce(function (a, r) { return Math.max(a, r.length); }, 0), 표_최대열);
+    return 행들.map(function (r) {
+      var out = [];
+      for (var i = 0; i < 폭; i++) out.push(r[i] === undefined ? "" : r[i]);
+      return out;
+    });
+  }
+
   function inline(t) {
     return esc(t)
       .replace(/`([^`]+)`/g, "<code>$1</code>")
@@ -54,19 +99,19 @@
         out.push("<pre><code>" + esc(buf.join("\n")) + "</code></pre>");
         continue;
       }
-      // 표 — 다음 줄이 구분선이면 표로 본다
-      if (/\|/.test(L) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1])) {
-        var cells = function (row) {
-          return row.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map(function (c) { return c.trim(); });
-        };
-        var head = cells(L);
+      // 표 — 다음 줄이 구분선이면 표로 본다. 잣대는 위 「표 규격」(tabletext.ts 사본) 한 곳.
+      if (/\|/.test(L) && i + 1 < lines.length && 구분선(lines[i + 1])) {
+        var 행들 = [칸가르기(L)];
         i += 2;
-        var rows = [];
-        while (i < lines.length && /\|/.test(lines[i]) && lines[i].trim()) { rows.push(cells(lines[i])); i++; }
+        while (i < lines.length && /\|/.test(lines[i]) && lines[i].trim()) { 행들.push(칸가르기(lines[i])); i++; }
+        // 폭은 **다 모은 뒤** 한 번에 맞춘다 — 행마다 그리면 뒤에 나온 넓은 행이 앞 행을 못 늘려
+        // 칸 수가 갈린 표가 나간다(내보내기가 같은 자리에서 겪은 증상이다).
+        var 맞춘 = 표행맞추기(행들);
+        var 머리 = 맞춘[0] || [];
         out.push(
-          "<table><thead><tr>" + head.map(function (h) { return "<th>" + inline(h) + "</th>"; }).join("") +
+          "<table><thead><tr>" + 머리.map(function (h) { return "<th>" + inline(h) + "</th>"; }).join("") +
           "</tr></thead><tbody>" +
-          rows.map(function (r) { return "<tr>" + r.map(function (c) { return "<td>" + inline(c) + "</td>"; }).join("") + "</tr>"; }).join("") +
+          맞춘.slice(1).map(function (r) { return "<tr>" + r.map(function (c) { return "<td>" + inline(c) + "</td>"; }).join("") + "</tr>"; }).join("") +
           "</tbody></table>"
         );
         continue;
@@ -108,5 +153,10 @@
     return out.join("\n");
   }
 
-  window.gijoMd = { render: renderMd, inline: inline, esc: esc };
+  // 표규격 — server/test/gijomdtable.test.ts가 tabletext.ts 원본과 **동치인지** 재려고 꺼내 보는
+  //   창구다. 화면 코드는 이 창구로 부르지 않는다(위 renderMd가 클로저 안에서 직접 쓴다).
+  window.gijoMd = {
+    render: renderMd, inline: inline, esc: esc,
+    표규격: { 구분선: 구분선, 칸가르기: 칸가르기, 표행맞추기: 표행맞추기, 표_최대열: 표_최대열 },
+  };
 })();
