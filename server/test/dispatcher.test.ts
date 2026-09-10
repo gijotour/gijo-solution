@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// 서버 안내가 적은 클라 단추 이름을 **화면 파일과 대조**하려고 둔다(screen-where.test와 같은 방식).
+const 저장소 = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 
 // bridge.ts spawns a real python process for modelscan; stub it so tests don't depend on
 // python being installed and always exercise the same deterministic "no adapter" error path.
@@ -231,11 +237,31 @@ describe("dispatcher + intent + assets integration", () => {
       // 잣대는 야간 하네스(tools/ops-sim.mjs)의 갈곳 낱말표와 같다.
       expect(답, "숫자만 주고 갈 곳이 없다").toMatch(/화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보/);
       // 화면 자리는 screenguide 흡수자리 표 한 곳에서 온다 — 여기에 베껴 적지 않는다.
-      expect(답).toContain(화면자리한줄("learnloop.html"));
+      //   ⚠ 표에서 항목이 빠지면 **빈 문자열**이라 toContain("")은 언제나 참이다(2026-09-10 검토관 [중]
+      //     — 제품 문장이 깨져도 초록인 거짓 통과였다). 값이 있는지부터 묻는다.
+      const 자리 = 화면자리한줄("learnloop.html", { 이력없이: true });
+      expect(자리, "흡수자리 표에서 learnloop.html이 빠졌다 — 이 검사가 통째로 헛돈다").not.toBe("");
+      expect(답).toContain(자리);
+      expect(답, "내부 개편 이력이 사람 읽는 답에 섞인다").not.toMatch(/독립 메뉴는 [0-9]{4}-[0-9]{2}-[0-9]{2} 통합/);
       // 🔁 확인 카드는 chatwidget.js에만 있고 프로 대화창(console.js)에는 없다 —
       //   「아래에서 고르고 확인해 주세요」는 없는 단추를 가리키는 말이라 쓰지 않는다.
       expect(답, "없는 단추를 가리킨다").not.toMatch(/아래에서.{0,20}(고르|확인)/);
       expect(답, "관리자만 누를 수 있다는 사실을 안 적으면 눌러 보고 403을 만난다").toContain("관리자만");
+    });
+
+    // ★ 서버 안내가 적은 **클라 단추 이름**이 화면에 실제로 있는가(2026-09-10 검토관 [하]).
+    //   promise-check.mjs는 client/ 화면만 훑고 guidance-check.mjs는 따옴표 안 「○○해줘」만 거둬,
+    //   서버 문자열이 가리키는 단추를 무는 감시가 어디에도 없었다 — 이름이 바뀌면 담당자가 없는 단추를 찾는다.
+    it("★ 학습 루프 안내가 가리키는 단추가 learnloop.html에 실제로 있다", async () => {
+      const res = await request(app)
+        .post("/api/dispatch")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ text: "학습 루프 돌려줘" });
+      const 이름들 = [...String(res.body.output).matchAll(/「([^」]{2,30})」/g)].map((m) => m[1]);
+      expect(이름들.length, "단추 이름을 하나도 못 뽑았다 — 이 대조가 헛돈다").toBeGreaterThanOrEqual(2);
+      const 화면 = fs.readFileSync(path.join(저장소, "client/src/renderer/pages/learnloop.html"), "utf8");
+      const 없는것 = 이름들.filter((n) => !화면.includes(n));
+      expect(없는것, `화면에 없는 단추를 가리킨다: ${없는것.join(" · ")}`).toEqual([]);
     });
 
     it("학습 루프를 언급만 한 지시(실행 동사 없음)는 확인 절차를 타지 않는다", async () => {

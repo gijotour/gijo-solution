@@ -802,7 +802,16 @@ export const 이어서: Record<string, string> = {
   incident_cases: "사례 전문·교훈·출처 링크는 📚 침해사고 히스토리 판에서 봅니다(해설 팀원 카드의 「📚 히스토리」 단추로도 열립니다)",
 };
 
-function 다음단계붙이기(answer: string, calls: AgentToolCall[]): string {
+/**
+ * 답 끝에 「다음 걸음」 한 줄을 붙인다 — 사람에게 나가기 직전의 **조립 자리**다.
+ * ⚠ export는 시험을 위해서다(2026-09-10 검토관 [중]) — 시험이 ▸ 줄을 손으로 이어 붙이면
+ *   이 함수가 안 붙이게 바뀌어도(도구단계 우선 분기·조건) 초록이라, 갈 곳이 사라진 것을
+ *   아무도 못 본다. 시험은 이 함수를 **그대로 태워** 잰다.
+ * ⚠ 도구단계가 **먼저**다 — 한 회차에 절차 도구가 함께 걸리면 그쪽 안내가 이기고 「이어서」는 안 붙는다.
+ *   그것이 옳다(2026-09-10 검토관 [하] 확인): 그 회차에도 ▸ 다음 단계 줄이 나가므로 「갈 곳 없음」이
+ *   되지 않는다. 둘 다 붙이면 한 답에 갈 곳이 둘이라 어디로 갈지 되레 흐려진다.
+ */
+export function 다음단계붙이기(answer: string, calls: AgentToolCall[]): string {
   try {
     if (!answer || answer.length < 20) return answer;
     if (answer.includes("다음 단계")) return answer;   // 이미 말했으면 두 번 말하지 않는다

@@ -18,7 +18,9 @@ vi.mock("../src/engine/llm", () => ({
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { 이름으로화면찾기, 화면위치안내, getScreenGuide } from "../src/engine/screenguide";
+import { 이름으로화면찾기, 화면위치안내, getScreenGuide, 화면자리한줄 } from "../src/engine/screenguide";
+// 대화창 꼬리(「이어서」)가 아래 대조 시험의 반대쪽이다 — 두 벌이 어긋나는지 여기서 잰다.
+import { 이어서 } from "../src/engine/agentloop";
 
 describe("이름으로화면찾기 — 자리를 물을 때만, 우리 이름으로만", () => {
   it("★ 「설정은 어디서 해?」가 우리 설정 화면을 찾는다", () => {
@@ -310,5 +312,19 @@ describe("★ 허브 별칭 — 맞는 화면으로 가고, 남의 질문은 안
   it("헛돌이 방지 — 위 두 시험이 같은 잣대를 쓰는지(별칭표가 실제로 살아 있나)", () => {
     // 「전부 null」로 통과하는 거짓 초록을 막는다: 걸려야 할 것은 걸리는지 한 번 더 못박는다.
     expect(이름으로화면찾기("조치화면 어디야?"), "별칭표가 죽었다 — 위 삼킴 시험이 저절로 통과한다").not.toBeNull();
+  });
+});
+
+// 대화창 꼬리(agentloop 「이어서」)와 화면 자리 표(screenguide 흡수자리)는 **같은 자리**를 가리켜야 한다.
+//   2026-09-10 검토관 [중]: incident_cases의 갈 곳 문구가 흡수자리 문장의 **두 번째 사본**이라,
+//   판 이름이나 여는 단추가 바뀌면 screenguide만 고쳐지고 대화창 꼬리만 조용히 낡는다(둘을 잇는 감시가 없었다).
+describe("대화창 「이어서」와 화면 자리 표가 어긋나지 않는다", () => {
+  it("★ 📚 침해사고 히스토리 — 판 이름·여는 단추가 두 곳에서 같다", () => {
+    const 자리 = 화면자리한줄("incidentcases.html");
+    expect(자리, "흡수자리 표에서 incidentcases.html이 빠졌다 — 이 대조가 헛돈다").not.toBe("");
+    for (const 조각 of ["📚 침해사고 히스토리", "「📚 히스토리」"]) {
+      expect(자리, `흡수자리 문장에 「${조각}」이 없다`).toContain(조각);
+      expect(이어서.incident_cases, `대화창 꼬리에 「${조각}」이 없다 — 두 벌이 어긋났다`).toContain(조각);
+    }
   });
 });

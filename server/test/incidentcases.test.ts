@@ -39,7 +39,7 @@ import {
 import { listAudit } from "../src/engine/audit";
 import { findAgentTool, buildApproval } from "../src/engine/agenttools/registry";
 // 갈 곳 한 줄의 **단일 출처** — 문구를 시험에 베껴 적지 않는다(베끼면 두 벌이 되어 어긋난다).
-import { 이어서 } from "../src/engine/agentloop";
+import { 이어서, 다음단계붙이기 } from "../src/engine/agentloop";
 import { TARGETS } from "../src/engine/datacleanup";
 import { createUser } from "../src/auth/users";
 import { createApp } from "../src/app";
@@ -347,7 +347,7 @@ describe("대화창 서식 — 숫자만 주고 끝내지 않는다", () => {
     expect(전부).not.toContain("교훈: ");
     expect(전부).not.toContain("출처: ");
     expect(전부).not.toContain("CVE CVE-2021-44228");
-    expect(전부).toMatch(/📋 사례당 한 줄만 싣습니다 — 쉬운 설명·교훈·출처 링크는 제품·업종·CVE로 좁혀 물으면/);
+    expect(전부).toMatch(/📋 사례당 한 줄만 싣습니다 — 걸린 사례가 1~2건으로 좁혀지면/);
   });
   it("★ 씨앗 20건을 그대로 실어도 머리의 「N건」·📋 안내가 살아 있고 「… 외 N건」으로 끝난다(3500 컷에 안 기댄다)", () => {
     // 예전엔 끝의 3500자 컷이 **안내 줄을 통째로 먹었다** — 실데이터(씨앗 20건)로 잰다(짧은 가짜 3건으로는 안 드러난다).
@@ -380,12 +380,17 @@ describe("대화창 서식 — 숫자만 주고 끝내지 않는다", () => {
     expect(줄.filter((x) => /^\d+\. \[/.test(x)).length, "사례는 다섯 줄").toBe(5);
     expect(줄.filter((x) => x.startsWith("   ")), "사례당 한 줄 — 딸림 줄이 없다").toEqual([]);
 
-    // 갈 곳 한 줄은 **agentloop의 「이어서」 표 한 곳**에서 온다(문구를 여기에 또 적지 않는다).
-    //   붙는 꼴은 agentloop.ts 다음단계붙이기와 같다.
-    const 답 = `${본문}\n\n▸ 이어서 — ${이어서.incident_cases}`;
+    // 갈 곳 한 줄은 **제품이 붙인다** — 시험이 손으로 이어 붙이면(옛 판) 조립기가 안 붙이게 바뀌어도
+    //   초록이라 갈 곳이 사라진 것을 아무도 못 본다(2026-09-10 검토관 [중]). 그래서 agentloop의
+    //   다음단계붙이기를 **그대로 태운다** — 문구도 붙이는 판단도 제품 것이다.
+    const 답 = 다음단계붙이기(본문, [{ tool: "incident_cases", args: {}, result: 본문 }]);
+    expect(답, "제품이 갈 곳 한 줄을 안 붙였다 — 도구단계 우선 분기·붙임 조건을 다시 봐야 한다")
+      .toContain("▸ 이어서 — " + 이어서.incident_cases);
     // 잣대는 야간 하네스와 **같은 숫자**다: tools/ops-sim.mjs의 산문 상한 2,000자,
     //   갈곳 낱말표 /화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보/.
     expect(답.length, `${답.length}자 — 하네스 상한 2,000자를 넘으면 담당자는 안 읽는다`).toBeLessThan(2000);
+    // ⚠ 이 낱말표는 본문의 📋 줄(「물으면」)만으로도 참이 된다 — ▸ 줄이 통째로 없어도 통과한다.
+    //   그래서 **위에서 ▸ 줄 자체를** 따로 물었다(그쪽이 이 시험의 알맹이고, 이 줄은 하네스 잣대 대조다).
     expect(답, "숫자만 주고 갈 곳이 없다").toMatch(/화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보/);
     expect(답, "내부 식별자(ic-…)를 답에 찍으면 하네스가 새 불편으로 센다").not.toMatch(/[0-9a-f]{16,}/);
   });

@@ -449,3 +449,10 @@
 - 2026-09-10 **새 잎 모듈 tabletext.ts** — 표 읽기·쓰기 잣대 단일 출처(import 0). memory.ts·dataset.ts·webreport.ts·inspectionreport.ts가 import. 사본 감시(server/src). 청커 판 불변(-table-4). ⚠ client gijomd.js는 아직 자기 잣대(게시 라운드 후보).
 - 2026-09-10 **llm.ts resolveRemoteTarget()** — 원격 두뇌 판정 한 곳: ⓪ 총괄은 항상 로컬 → ① 팀원 위치 local이면 로컬 → ② 전역 원격. searchrewrite.ts는 항상 로컬(remotellm 미참조). 운영에서 전역 원격 ON(gb10 4000 내주기 창구·토큰은 app_state) + report·normaltic 원격 배정 상태로 둠 — max 올인원에서는 전역 원격을 켜지 않는 한 무영향.
 - 2026-09-10 **observability.ts** — 자가 진단 느린 답은 시각·소요·경로만(질문 본문 없음) · GET /api/slow-answers admin 전용 · 팀원 표시 이름은 말투 규범 통과 때만 답에 실림.
+- 2026-09-10 **공용 파일 screenguide.ts·agentloop.ts·dispatcher.ts**(⑲ 첫 실측 잔여 2건 + 사후 검토 수리) — 대화창 답의 **갈 곳 한 줄**을 화면 자리 표 한 곳에서 받아 쓴다.
+  · `screenguide.ts`: 흡수자리 표를 화면위치안내 밖으로 올려 **새 export `화면자리한줄(screen, { 이력없이 })`**로 연다(값은 그대로). `이력없이`는 「(독립 메뉴는 … 통합)」 괄호만 떼는 갈래 — 대화창 꼬리용이고, 화면 안내(ⓘ)는 종전대로 이력을 붙인 채 쓴다. 📚 침해사고 히스토리 안내의 can[] 한 줄을 **대화창 실제 열**(연도·지역·업종·제목·요지)로 정정.
+  · `agentloop.ts`: 「이어서」 표에 `incident_cases` 추가 + **`다음단계붙이기` export**(시험이 제품 조립 경로를 그대로 태우게 — 손으로 이어 붙이면 조립이 끊겨도 초록이었다).
+  · `dispatcher.ts`: 학습 루프 확인 안내 끝에 ▸ 갈 곳 한 줄. 자리가 빈 문자열이면 자리 말을 빼고 단추만 말한다. 「학습 시작」 칩은 **개시선에 닿은 주제에만** 그려지므로 조건을 함께 적는다.
+  · 침해사고 히스토리 대화창 답은 **3건 이상이면 사례당 한 줄**(2,983자 → 1,000자대). 📋 안내 문구는 실제 조건(1~2건으로 좁혀질 때 전문)으로 적혀 있다.
+  · 새 감시 3종: 제품 조립기로 재는 갈 곳 시험(incidentcases.test) · 서버 안내가 적은 **클라 단추 이름**이 learnloop.html에 실재하는지(dispatcher.test) · 「이어서」와 흡수자리가 같은 자리를 가리키는지(screen-where.test).
+  · max 실기 확인 사항: **없음**(서버 동작). 다만 `learnloop.html`의 단추 이름(「🔄 루프 실행 (원클릭)」·「학습 시작」)을 바꾸면 서버 시험이 빨개진다 — 화면과 안내를 함께 고쳐야 한다.
