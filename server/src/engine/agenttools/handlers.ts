@@ -10,6 +10,7 @@ import { listProductIntros, listIntroFields, setIntroField, INTRO_FIELD_SCHEMA }
 import { expandOntology } from "../ontology";
 import { currentDocIds } from "../ragscope";
 import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, ReviewPatch, ApprovalStatus } from "../approvals";
+import type { StandardFinding } from "../bridge";
 import { 표식, 심각도한글, 심각도표식, 자산종류한글, cti심각도한글 } from "../tone";
 import { 말조사 } from "../../util/josa";
 import { buildHub, sourceFileOf } from "../assethub";
@@ -851,10 +852,20 @@ export async function searchOne(q: string): Promise<string[]> {
     //   영문 심각도도 우리말로 바꾼다 — 한글 제품에서 못 읽는다.
     out.push(
       `취약점 ${vulns.length}건(우선순위순):`,
-      ...vulns.slice(0, 6).map((r) =>
-        `  ${심각도표식(r.finding.severity)} [${심각도한글(r.finding.severity)}] ${r.finding.finding_type} @ ${r.assetName || 자산표시이름(r.assetId)}` +
-        한줄풀이글(r.finding.finding_type) +
-        ` — 점수 ${r.score}${r.assignee ? `, 담당 ${r.assignee}` : ""}${r.overdue ? " ⚠지연" : ""}`)
+      ...vulns.slice(0, 6).map((r) => {
+        // ⚠ 2026-09-10 고객 QA(4100) — 예전엔 정렬용 내부 점수(r.score)를 맨몸 `점수 N`으로 실어
+        //   모델이 라벨만 "EPSS"로 갈아 끼워 내보냈다(1151.44 사고, 자세히는 우선순위태그 주석).
+        //   이제 라벨 붙은 값(KEV·EPSS %·VPR)만 싣는다 — 빈 finding이 대부분이라 꼬리를
+        //   배열로 모아 join한 뒤 비지 않았을 때만 " — "를 붙인다(쉼표로 시작하는 줄 방지).
+        const tail = [
+          우선순위태그(r.finding),
+          r.assignee ? `담당 ${r.assignee}` : "",
+          r.overdue ? "⚠지연" : "",
+        ].filter(Boolean).join(" · ");
+        return `  ${심각도표식(r.finding.severity)} [${심각도한글(r.finding.severity)}] ${r.finding.finding_type} @ ${r.assetName || 자산표시이름(r.assetId)}` +
+          한줄풀이글(r.finding.finding_type) +
+          (tail ? ` — ${tail}` : "");
+      })
     );
   }
 
@@ -996,6 +1007,20 @@ export async function runSearch(args: Record<string, string>): Promise<string> {
   return blocks.join("\n").slice(0, 3500);
 }
 
+// 취약점 한 줄에 실을 "라벨 붙은" 위협 지표 — KEV(실제악용) · EPSS %(0~1 확률→반올림 %) · VPR(0~10).
+// ⚠ 2026-09-10 고객 QA(4100): 답이 **"EPSS 점수는 1151.44"**로 나갔다. 1151.44는 approvals.priorityScore의
+//   합성값(KEV 1000 + EPSS 97.44 + VPR 50 + 심각도 4, 정렬 전용 내부 점수)인데 옛 코드가 `점수 ${r.score}`로
+//   맨몸 실었고, 모델이 서술하며 라벨만 "EPSS"로 갈아 끼웠다(값을 지어낸 게 아니라 제품이 정한 값을 다시 씀
+//   — adabdcdd와 같은 병). 사람에게 나가는 글에는 **라벨 붙은 원값만** 싣는다 — 내부 점수는 정렬에만 쓴다.
+//   EPSS 반올림은 approvals.ts:279(buildTriagePrompt)의 `Math.round(f.epss*100)`과 같은 자릿수로 맞춘다.
+export function 우선순위태그(f: StandardFinding): string {
+  return [
+    f.kev ? "KEV(실제악용)" : "",
+    f.epss != null ? `EPSS ${Math.round(f.epss * 100)}%` : "",
+    f.vpr != null ? `VPR ${f.vpr}` : "",
+  ].filter(Boolean).join(" · ");
+}
+
 // today — "오늘 뭐부터?" 한 방에. KEV/EPSS/VPR 점수로 전 자산을 가로질러 정렬한 조치 우선순위.
 export function runToday(args: Record<string, string>): string {
   const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 20);
@@ -1004,11 +1029,9 @@ export function runToday(args: Record<string, string>): string {
   if (top.length === 0) return ["지금 조치할 취약점이 없습니다. (오탐 판정·조치완료 제외)", 새문서한줄()].filter(Boolean).join("\n");
   const lines = top.map((r, i) => {
     const f = r.finding;
-    const tags = [
-      f.kev ? "KEV(실제악용)" : null,
-      f.epss != null ? `EPSS ${f.epss}` : null,
-      f.vpr != null ? `VPR ${f.vpr}` : null,
-    ].filter(Boolean).join(" · ");
+    // ⚠ EPSS 표기(0~1 확률→반올림 %)는 우선순위태그 한 곳에서만 만든다(2026-09-10, 자세히는
+    //   그 함수 주석) — 이 답과 search 답의 문구가 어긋나지 않도록.
+    const tags = 우선순위태그(f);
     // ⚠ **제품에서 가장 많이 쓰는 답**이다 — 여기 글자가 곧 담당자가 매일 보는 글자다.
     //   예전에는 `[critical] … @ 이름(id=vuln:10.10.20.41)`이었다: 영문 상태값과 내부 키 둘 다
     //   말투 규범이 금지한 것이고, 실제로 담당자 화면에 그대로 나갔다(2026-08-03 실측).

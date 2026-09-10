@@ -28,7 +28,7 @@ import { resetAnalysisHubForTests, rebuildVulnEvents } from "../src/engine/analy
 import { resetKpiForTests } from "../src/engine/kpi";
 import { createSession, appendTurn, setSessionStatus } from "../src/engine/worksessions";
 import { db } from "../src/db";
-import { agenttoolsSource } from "./util/toolsrc";
+import { agenttoolsSource, agenttoolsSourceSane } from "./util/toolsrc";
 
 const run = (name: string, args: Record<string, string> = {}) => Promise.resolve(findAgentTool(name)!.run(args)).then(String);
 
@@ -54,6 +54,31 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
     // ⚠ 화면에 나가는 글자는 내부 id가 아니라 **이름**이다(2026-08-03 말투 규범).
     expect(out, "내부 id가 사람에게 나간다").not.toContain("web-01");
     expect(out).toContain("Log4Shell");
+  });
+
+  // 전-4 · 2026-09-10 고객 QA(4100) 예행 수리: 취약점 줄에는 라벨 붙은 값만 싣는다.
+  it("취약점 줄에 KEV·EPSS %·VPR을 라벨 붙여 싣는다", async () => {
+    registerAsset({ id: "web-01", name: "웹 서비스", path: "p" });
+    recordFindings("web-01", [
+      { finding_type: "Log4Shell RCE", severity: "critical", evidence: "log4j 2.14", source_tool: "nessus", kev: true, epss: 0.9744, vpr: 10 },
+    ]);
+    const out = await run("search", { query: "Log4Shell" });
+    expect(out).toContain("EPSS 97%");
+    expect(out).toContain("KEV(실제악용)");
+    expect(out).toContain("VPR 10");
+  });
+
+  // ★ 2026-09-10 사고 재현: 「…EPSS 점수는 1151.44로 매우 심각한 수준입니다」— 1151.44는
+  //   approvals.priorityScore의 정렬 전용 내부 합성값이지 EPSS가 아니다. 손으로 적으면 가중치가
+  //   바뀔 때 헛초록이 나므로 같은 함수로 계산해서 부재를 문다.
+  it("★ 내부 합성 점수는 사람 답에 안 싣는다 — 「EPSS 1151.44」 사고(2026-09-10)", async () => {
+    registerAsset({ id: "web-01", name: "웹 서비스", path: "p" });
+    const f = { finding_type: "Log4Shell RCE", severity: "critical" as const, evidence: "log4j 2.14", source_tool: "nessus", kev: true, epss: 0.9744, vpr: 10 };
+    recordFindings("web-01", [f]);
+    const out = await run("search", { query: "Log4Shell" });
+    const { priorityScore } = await import("../src/engine/approvals");
+    expect(out).not.toContain(String(priorityScore(f)));
+    expect(out).not.toMatch(/점수\s*\d/);
   });
 
   it("온톨로지 관계도 함께 돌려준다(접착제)", async () => {
@@ -156,7 +181,7 @@ describe("today — 오늘 뭐부터 (전 자산 가로지름)", () => {
     const out = await run("today", { limit: "5" });
     expect(out).toContain("Log4Shell");
     expect(out).toContain("KEV(실제악용)");
-    expect(out).toContain("EPSS 0.94");
+    expect(out).toContain("EPSS 94%"); // 2026-09-10 수리: EPSS는 0~1 확률이라 사람 답엔 %로 반올림해 싣는다
     // KEV가 최상단이어야 한다(점수 정렬).
     expect(out.indexOf("Log4Shell")).toBeLessThan(out.indexOf("정보노출"));
   });
@@ -339,5 +364,15 @@ describe("★ 코드값 인자는 LLM이 맞혀도 비워지지 않는다 (2026-
     const 값 = Object.fromEntries(a.fields.map((f) => [f.key, f.value]));
     expect(값.hour).toBe("18");
     expect(값.kind).toBe("system_health");
+  });
+});
+
+// 전-4 · 2026-09-10 예행 수리 — EPSS 표기가 두 곳에서 따로 만들어지면 다시 어긋난다(문구 소스 감시).
+describe("★ EPSS 표기는 한 곳에서만 만든다 (2026-09-10)", () => {
+  it("우선순위태그 안에서만 만든다", () => {
+    const src = agenttoolsSource();
+    expect(agenttoolsSourceSane(src), "감시가 헛돈다 — 합본이 실체를 안 담았다").toBe(true);
+    const matches = src.match(/EPSS \$\{/g) || [];
+    expect(matches.length, "EPSS 문구 조립 자리가 하나가 아니면 search·today가 다시 어긋난다").toBe(1);
   });
 });
