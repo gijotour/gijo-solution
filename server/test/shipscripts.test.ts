@@ -625,10 +625,21 @@ describe("★ gb10 발췌 창구 — 동시 수는 **슬롯에서 나오고**, �
 
   it("★ 크기 관문이 있고, **stderr로** 말한다 — stdout에 적으면 꾸러미가 안내문을 발췌로 담는다", () => {
     expect(코드).toMatch(/export function 크기관문/);
-    expect(코드).toMatch(/console\.error\(관문\.말\)/);
+    expect(코드).toMatch(/console\.error\(사전\.말\)/);
     expect(코드).toMatch(/GIJO_DIGEST_MAX_LINES/);
     // 안내가 stdout으로 새면 digest-pack이 그것을 파일 내용으로 담는다(조용한 거짓 발췌).
-    expect(/console\.log\(관문\.말\)/.test(코드), "관문 안내가 stdout으로 나간다").toBe(false);
+    expect(/console\.log\((사전|관문)\.말\)/.test(코드), "관문 안내가 stdout으로 나간다").toBe(false);
+  });
+
+  it("★ 관문이 **gb10 왕복 앞에** 선다 — 교사가 죽어 있어도 grep 안내가 나온다", () => {
+    // 2026-09-10 검토관 적발 + 재현: 관문이 발췌() 안에 있어 서버확인(ssh+curl)을 통과해야 닿았다.
+    //   교사가 죽어 있으면 4,482줄 파일에도 「gb10이 응답하지 않는다」만 나왔다(0.75초 왕복 뒤에).
+    //   실측(수리 뒤): 교사 죽어 있어도 112ms에 grep 안내 · ssh 왕복 0회.
+    expect(코드).toMatch(/export function 사전관문/);
+    const 본문 = 코드.slice(코드.indexOf("async function main()"));
+    expect(본문.indexOf("사전관문("), "관문이 다시 왕복 뒤로 갔다").toBeLessThan(본문.indexOf("서버확인()"));
+    // 관문을 부르는 자리는 **하나**여야 한다 — 발췌() 안에 한 벌 더 두면 옛 순서가 되살아난다.
+    expect((코드.match(/(?<!function\s)크기관문\(/g) ?? []).length, "크기관문을 부르는 자리가 둘 이상이다").toBe(1);
   });
 
   it("★ 막기만 하지 않는다 — 대신 할 일(grep)과 빠져나갈 문(FORCE)이 안내에 들어 있다", () => {

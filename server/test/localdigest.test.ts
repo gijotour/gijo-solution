@@ -21,6 +21,7 @@ import path from "node:path";
 import {
   조각나누기, 조각글자수, 겹침줄, 실패설명, 다시해볼만한가,
   두뇌풀기, 두뇌목록, 병렬수, 재시도대기ms, 왕복안내, 동시실행, 크기관문, 최대줄수,
+  사전관문, 줄수읽기, 기본두뇌이름,
 } from "../../tools/local-digest.mjs";
 
 const 뿌리 = path.resolve(__dirname, "..", "..");
@@ -267,5 +268,81 @@ describe("local-digest — 다시 걸 때는 **지수로 벌리고 이유를 말
     expect(왕복안내(52)).not.toBe("");
     expect(왕복안내(0)).toBe("");
     expect(왕복안내(1)).toBe("");
+  });
+});
+
+
+// ── 검토관 적발 수리 (2026-09-10) ───────────────────────────────────────────
+// 두 건 다 「코드는 맞는데 **말이 틀렸거나 순서가 틀렸다**」는 부류라, 시험 3,000개도 못 잡던 자리다.
+describe("local-digest — 머리말이 두뇌 정의와 **어긋나지 않는다**(약속-코드 불일치)", () => {
+  const 머리말: string = 소스.slice(0, 소스.indexOf("\nimport "));
+
+  it("★ 머리말에 두뇌 정의와 다른 --parallel 숫자를 적지 않는다", () => {
+    // 실사고: 머리말이 「--parallel 1로 떠 있어야 한다」(coder30 시절)인데 기본 두뇌 qwen38은
+    // 슬롯수 2를 전제로 동시 2를 쓴다. 그 지시를 따라 한 슬롯으로 재기동하면 슬롯수:2가 거짓이 되어
+    // 조각이 반 크기로 잘리고 조각 수가 두 배 — 이 도구가 고친 느림이 그대로 돌아온다.
+    const 기본 = 두뇌풀기((두뇌목록 as Record<string, { 전체문맥: number; 슬롯수?: number }>)[기본두뇌이름]);
+    for (const m of 머리말.matchAll(/--parallel\s+(\d+)/g)) {
+      expect(Number(m[1]), `머리말 --parallel ${m[1]} ≠ 기본 두뇌 슬롯수 ${기본.슬롯수}`).toBe(기본.슬롯수);
+    }
+  });
+
+  it("숫자를 안 적는 대신 **어디를 봐야 하는지**는 적혀 있다(빈 계약 금지)", () => {
+    expect(머리말).toContain("두뇌들");
+    expect(머리말).toMatch(/슬롯수/);
+  });
+
+  it("★ 기본 두뇌 이름도 한 곳에서만 정한다 — 두 곳이면 시험이 대조할 자리가 없다", () => {
+    expect(Object.keys(두뇌목록)).toContain(기본두뇌이름);
+    expect(소스).toMatch(/export const 기본두뇌이름 = "/);
+    expect((소스.match(/기본두뇌이름 = /g) ?? []).length).toBe(1);
+  });
+});
+
+describe("local-digest — 크기 관문이 **gb10 왕복 앞에** 선다", () => {
+  // 실사고 재현(2026-09-10): 4,482줄 파일에 관문이 걸리는데도 0.89초가 걸렸다 — 그 0.89초가
+  // ssh+curl /health다. 교사가 죽어 있으면(코드 7) 받는 말이 「gb10:8082가 응답하지 않는다」뿐이라,
+  // 정작 답이 「이 파일은 grep으로」인데 실행자는 교사를 살리러 간다.
+  const 가짜읽기 = (줄수: number) => () => 줄수;
+
+  it("★ main이 서버확인보다 **먼저** 사전관문을 부른다", () => {
+    const 본문 = 소스.slice(소스.indexOf("async function main()"));
+    const 사전자리 = 본문.indexOf("사전관문(");
+    const 서버자리 = 본문.indexOf("서버확인()");
+    expect(사전자리).toBeGreaterThan(-1);
+    expect(서버자리).toBeGreaterThan(-1);
+    expect(사전자리, "관문이 다시 왕복 뒤로 갔다").toBeLessThan(서버자리);
+  });
+
+  it("★ 상한을 넘는 file은 막고, 안내에 grep이 들어 있다", () => {
+    const r = 사전관문("file", "큰파일.ts", {}, 가짜읽기(최대줄수 + 1));
+    expect(r.통과).toBe(false);
+    expect(r.말).toContain("grep");
+  });
+
+  it("log도 같은 관문을 쓴다 — 잣대가 갈리지 않는다", () => {
+    expect(사전관문("log", "큰로그.txt", {}, 가짜읽기(최대줄수 + 1)).통과).toBe(false);
+    expect(사전관문("log", "작은로그.txt", {}, 가짜읽기(10)).통과).toBe(true);
+  });
+
+  it("review·up·모르는 모드는 파일 관문 대상이 아니다(엉뚱한 것을 막지 않는다)", () => {
+    for (const m of ["review", "up", "", "몰라"]) {
+      expect(사전관문(m, "HEAD", {}, 가짜읽기(최대줄수 + 1)).통과, m).toBe(true);
+    }
+  });
+
+  it("FORCE는 여기서도 열려 있다 — 관문이 두 곳에서 다르게 굴지 않는다", () => {
+    const r = 사전관문("file", "큰파일.ts", { GIJO_DIGEST_FORCE: "1" }, 가짜읽기(최대줄수 + 1));
+    expect(r.통과).toBe(true);
+  });
+
+  it("대상이 없거나 못 읽는 파일은 **여기서 가로채지 않는다** — 발췌가 제 말로 말한다", () => {
+    expect(사전관문("file", undefined, {}, 가짜읽기(99999)).통과).toBe(true);
+    expect(사전관문("file", "없는파일.ts", {}).통과).toBe(true);
+  });
+
+  it("★ 줄수읽기는 저장소 뿌리 기준 상대경로를 읽고, 없는 파일엔 null을 준다", () => {
+    expect(줄수읽기("tools/local-digest.mjs")).toBeGreaterThan(300);
+    expect(줄수읽기("없는파일.ts")).toBe(null);
   });
 });

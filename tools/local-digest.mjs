@@ -15,9 +15,17 @@
 //     그대로 유효하고, 이 도구는 검토관을 **대체하지 않고 읽을 양을 줄인다.**
 //   · gb10이 죽어 있으면 **크고 시끄럽게** 실패한다(조용한 폴백 금지) — 그때는 그냥 원문을 읽는다.
 //
-// ■ 전송: win → ssh gb10 → localhost:$GIJO_DIGEST_PORT (llama-server는 루프백만 열려 있다 — WireGuard에
+// ■ 전송: win → ssh gb10 → localhost:<그 두뇌의 port> (llama-server는 루프백만 열려 있다 — WireGuard에
 //   포트를 더 열지 않는다). 요청 JSON은 stdin 파이프라 한글·따옴표 안전.
-//   ⚠ 서버는 --parallel 1로 떠 있어야 한다(2가 되면 ctx 반토막 — hybrid-probe.mjs 머리주석 실사고).
+//   ⚠ **교사의 슬롯 수와 아래 `두뇌들`의 `슬롯수`는 같은 수여야 한다** — 조각 예산이 슬롯당
+//     문맥(전체 ÷ 슬롯 수)이라, 어긋나면 조각이 슬롯을 넘어 400이 나거나(적게 적음) 조각이 반만
+//     차서 조각 수가 두 배가 된다(많게 적음 = 느림이 그대로 돌아온다). 그러니 **숫자는 여기 적지
+//     않는다** — `두뇌들`이 단일 출처이고, 시험이 머리말과 그 값을 대조한다.
+//     ⚠ 2026-09-10 수리: 옛 머리말은 「슬롯 하나로 띄워라(둘이면 ctx 반토막)」였는데 그건
+//       coder30(65,536 단일 슬롯) 시절 얘기다. 기본 두뇌 qwen38은 **제품이 두 슬롯으로 띄운다**
+//       (실측: /props total_slots=2 · 슬롯당 n_ctx=16384). 옛 지시대로 한 슬롯으로 재기동하면
+//       `슬롯수: 2`가 거짓이 되어 ① 동시 2가 한 슬롯 앞에 줄만 서고 ② 조각이 반 크기로 잘려
+//       조각 수가 두 배가 된다. 검토관이 「약속(주석)과 코드의 불일치」로 잡아 준 자리다.
 //
 // 사용:
 //   node tools/local-digest.mjs file <경로> "<질문>"     ← 관련 줄만 원문 발췌
@@ -79,7 +87,11 @@ export function 두뇌풀기(정의) {
   return { ...정의, 슬롯수, 슬롯문맥: Math.floor(Number(정의.전체문맥) / 슬롯수) };
 }
 export const 두뇌목록 = 두뇌들;
-const 두뇌 = 두뇌풀기(두뇌들[process.env.GIJO_DIGEST_BRAIN ?? "qwen38"] ?? 두뇌들.qwen38);
+/** 기본이 어느 두뇌인가 — **이름도 한 곳에서만** 적는다. 전엔 "qwen38"이 고르는 줄에 두 번
+ *  적혀 있어, 머리말이 어느 두뇌를 말하는지 시험이 대조할 자리가 없었다(머리말이 coder30 시절
+ *  지시를 그대로 달고 있어도 아무도 못 잡았다 — 2026-09-10 검토관 적발). */
+export const 기본두뇌이름 = "qwen38";
+const 두뇌 = 두뇌풀기(두뇌들[process.env.GIJO_DIGEST_BRAIN ?? 기본두뇌이름] ?? 두뇌들[기본두뇌이름]);
 const DIGEST_PORT = 두뇌.port;
 
 // ── 동시에 몇 조각을 보내나 ──────────────────────────────────────────────────
@@ -333,6 +345,29 @@ export function 크기관문(줄수, 경로, 상한 = 최대줄수, 강제 = fal
   };
 }
 
+/** 경로 → 줄 수. 없는 파일이면 **null**(그건 여기서 가로채지 않는다 — 발췌가 제 말로 말한다). */
+export function 줄수읽기(경로) {
+  try {
+    const abs = path.isAbsolute(경로) ? 경로 : path.join(ROOT, 경로);
+    return fs.readFileSync(abs, "utf8").split("\n").length;
+  } catch { return null; }
+}
+
+// ── gb10을 부르기 **전에** 로컬만 보고 판단하는 관문 ─────────────────────────
+// ⚠ 줄 수는 gb10에 물어볼 것이 아니다. 그런데 전엔 관문이 발췌() 안에 있어서 **서버확인(ssh+curl,
+//   실측 0.75~0.89초)을 통과해야** 거기까지 왔다. 그래서 교사가 죽어 있으면 4,482줄짜리 파일에도
+//   받는 말이 「gb10:8082가 응답하지 않는다 — 기동해라」뿐이었다(2026-09-10 재현). 정작 옳은 답은
+//   「이 파일은 grep으로 좁혀 와라」인데, 실행자는 그 말을 못 듣고 교사를 살리러 간다.
+// → 로컬 판단은 왕복 앞에 세운다. 잣대는 그대로 크기관문 하나다(여기서 다시 정하지 않는다).
+/** 왕복 전 관문. file·log만 대상이고, 나머지 모드·없는 파일은 그냥 통과시킨다. */
+export function 사전관문(mode, 대상, env = process.env, 읽기 = 줄수읽기) {
+  if (mode !== "file" && mode !== "log") return { 통과: true, 말: "" };
+  if (!대상) return { 통과: true, 말: "" };
+  const 줄수 = 읽기(대상);
+  if (줄수 === null) return { 통과: true, 말: "" };
+  return 크기관문(줄수, 대상, 최대줄수, env.GIJO_DIGEST_FORCE === "1");
+}
+
 const 최소조각줄 = Number(process.env.GIJO_DIGEST_MIN_LINES ?? 40); // 이 밑으로는 안 쪼갠다
 const 최대분할 = Number(process.env.GIJO_DIGEST_MAX_SPLIT ?? 3);    // 무한 분할 금지
 
@@ -340,10 +375,10 @@ async function 발췌(경로, 물음) {
   const abs = path.isAbsolute(경로) ? 경로 : path.join(ROOT, 경로);
   const src = fs.readFileSync(abs, "utf8");
   const lines = src.split("\n");
-  // ⚠ 관문은 **부르기 전에.** 넘겼다는 사실은 stderr로만 말한다 — stdout에 적으면 이 출력을
-  //   발췌로 받아 쓰는 쪽(digest-pack)이 안내문을 **파일 내용으로** 담는다.
-  const 관문 = 크기관문(lines.length, 경로, 최대줄수, process.env.GIJO_DIGEST_FORCE === "1");
-  if (!관문.통과) { console.error(관문.말); process.exitCode = 2; return; }
+  // ⚠ 크기 관문은 여기 없다 — **main()이 서버확인보다 먼저** 사전관문()으로 본다(왕복 앞에 세운다).
+  //   여기에도 한 벌 두면 잣대가 두 곳이 되고, 무엇보다 「ssh를 다녀와야 grep 안내가 나오는」
+  //   옛 순서가 되살아난다. 안내는 stdout이 아니라 stderr로 나간다(digest-pack이 안내문을
+  //   파일 내용으로 담지 않게).
   // ⚠ **못 본 조각을 세어 둔다.** 예전에는 실패를 stderr 경고로만 흘리고 종료코드 0을 냈다.
   //   그러면 이 발췌를 받아 쓰는 쪽(digest-pack·워크플로)은 **다 봤다고 믿는다** —
   //   실제로는 파일의 일부를 아예 안 본 발췌인데도. 2026-09-01 screenguide.ts에서 그랬고,
@@ -542,6 +577,9 @@ function 좁은스키마(최대) {
 // ⚠ **진입점 관문** — import(시험)로 들어오면 아무것도 돌지 않는다. 없으면 시험이 gb10을
 //   부르게 되고, 그 순간 시험이 「네트워크가 살아 있는가」를 재는 물건으로 바뀐다.
 async function main() {
+  // ★ **로컬 판단이 왕복 앞에 선다** — 줄 수는 gb10에 물어볼 것이 아니다(위 사전관문 주석 참고).
+  const 사전 = 사전관문(mode, 대상);
+  if (!사전.통과) { console.error(사전.말); process.exit(2); }
   if (!서버확인() && mode !== "up") {
     console.error(`✗ gb10:${DIGEST_PORT}가 응답하지 않는다 — 조용한 폴백은 하지 않는다.`);
     if (서버확인.마지막실패) console.error("  이유: " + 서버확인.마지막실패);
