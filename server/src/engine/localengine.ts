@@ -1141,6 +1141,39 @@ export async function resumeInferenceEngines(): Promise<void> {
   await autoStartLocalEngines();
 }
 
+/**
+ * 채팅 두뇌가 서빙되는 **기본 주소** — 폴백(아래 ensureAgentModel)과 진단이 한 식을 나눠 쓴다.
+ * ⚠ 호스트를 `localhost`로 적는다 — **소비자와 같게**. 진단만 127.0.0.1로 적으면 IPv6 해석 차이로
+ *   같은 서버를 놓고 「답한다/안 답한다」가 갈릴 수 있다.
+ */
+export function 기본채팅주소(): string {
+  // env를 부를 때 읽는다(없으면 부팅 때 잡은 PORT) — 진단은 「지금 어디를 보고 있나」를 답해야 한다.
+  return `http://localhost:${Number(process.env.GIJO_LOCAL_LLM_PORT ?? PORT)}/v1`;
+}
+
+/**
+ * **지금 채팅 두뇌가 답하나** — 내 pool이 비어 있어도 그 자리에서 도는 두뇌가 있으면 참이다.
+ *
+ * ■ 왜 한 함수인가: 같은 판정을 예전엔 /api/localengine/status만 했다(max 발견#2 2026-08-17 —
+ *   손으로 띄운 llama가 그 포트에 사는데 앱 pool 밖이라 대시보드가 **거짓 「멈춤」**을 냈다).
+ *   2026-09-10 고객 QA 인스턴스에서 같은 결함이 자가 진단·설치 진단에서 다시 나왔다 — 고객은
+ *   운영 기계의 두뇌를 나눠 쓰는데 두 진단이 「모델 없음」이라 빨강을 냈다. 세는 곳이 셋이면
+ *   대시보드는 「돌고 있음」, 진단은 「멈춤」을 **동시에** 말한다. 그래서 잣대를 여기 하나로 둔다.
+ *
+ * ⚠ 실추론 ping(probeChatAlive)을 쓰지 않는다 — 그건 담당자의 프롬프트 캐시를 밀어내 유휴 뒤
+ *   첫 질문을 40초로 만든다(위 확인용칸 머리말의 실측). 진단은 호출 빈도가 훨씬 높다.
+ */
+export async function 외부채팅응답확인(timeoutMs = 1_500): Promise<{ alive: boolean; modelId: string | null }> {
+  try {
+    const r = await fetch(`${기본채팅주소()}/models`, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!r.ok) return { alive: false, modelId: null };
+    const j = (await r.json()) as { models?: { name?: string }[]; data?: { id?: string }[] };
+    return { alive: true, modelId: j.models?.[0]?.name || j.data?.[0]?.id || null };
+  } catch {
+    return { alive: false, modelId: null }; // 안 살아 있으면 그대로 둔다 — 진짜 멈춤이다
+  }
+}
+
 // 채팅 진입점(llm.ts chat)에서 호출 — 에이전트에 할당된 모델(없으면 기본 모델)을 풀에 보장하고
 // 그 모델이 서빙되는 base URL을 돌려준다. 모델 파일 자체가 없으면 기본 포트 URL로 폴백한다.
 export async function ensureAgentModel(agentId: string): Promise<string> {
@@ -1150,7 +1183,7 @@ export async function ensureAgentModel(agentId: string): Promise<string> {
   // 쓴다 — 여기서 새 모델을 로드하지 않는다. 할당이 있을 때만 그 모델을 풀에 보장한다.
   if (!modelId || !isModelAvailable(modelId)) {
     if (modelId) console.warn(`[localengine] 에이전트 ${agentId}의 할당 모델 ${modelId} 파일이 없어 기본 모델을 씁니다`);
-    return `http://localhost:${PORT}/v1`;
+    return 기본채팅주소();
   }
   const model = await ensureModelLoaded(modelId);
   return `http://localhost:${model.port}/v1`;
@@ -1218,17 +1251,14 @@ export function registerLocalEngineRoutes(app: Express): void {
       //   '멈춤'을 냈다). loaded가 pool만 봤던 게 뿌리. ready 항목이 하나도 없을 때만 포트를 짧게
       //   두드려, 살아 있으면 그 모델을 채워 '돌고 있음'으로 정직하게 말한다.
       if (!st.loaded.some((l) => l.ready)) {
-        try {
-          const r = await fetch(`http://127.0.0.1:${PORT}/v1/models`, { signal: AbortSignal.timeout(2500) });
-          if (r.ok) {
-            const j = (await r.json()) as { models?: { name?: string }[]; data?: { id?: string }[] };
-            const mid = j.models?.[0]?.name || j.data?.[0]?.id || "외부 기동 모델";
-            st.running = true;
-            st.modelId = st.modelId ?? mid;
-            st.loaded = [...st.loaded, { modelId: mid, port: PORT, ready: true }];
-          }
-        } catch {
-          /* 포트가 안 살아 있으면 그대로 둔다 — 진짜 멈춤이다 */
+        // ★ 잣대는 한 곳(외부채팅응답확인) — 자가 진단·설치 진단도 같은 함수를 부른다.
+        //   예전엔 여기에만 이 판정이 있어 대시보드는 「돌고 있음」, 진단은 「멈춤」을 말했다(2026-09-10).
+        const 외부 = await 외부채팅응답확인(2500);
+        if (외부.alive) {
+          const mid = 외부.modelId ?? "외부 기동 모델";
+          st.running = true;
+          st.modelId = st.modelId ?? mid;
+          st.loaded = [...st.loaded, { modelId: mid, port: PORT, ready: true }];
         }
       }
       res.json(st);

@@ -15,7 +15,7 @@ beforeEach(() => { db.prepare("DELETE FROM slow_answers").run(); });
 const 건수 = () => (db.prepare("SELECT COUNT(*) AS n FROM slow_answers").get() as { n: number }).n;
 
 describe("느린 답 원장 — 기록 규칙", () => {
-  it("★ 문턱을 넘은 실사용 답만 적힌다", () => {
+  it("★ 문턱을 넘은 실사용 답만 적힌다", async () => {
     recordAnswerTiming("이번 주 예정된 점검 있어?", SLOW_ANSWER_MS + 2000, false);
     recordAnswerTiming("취약점", 100, false);
     expect(건수()).toBe(1);
@@ -23,12 +23,12 @@ describe("느린 답 원장 — 기록 규칙", () => {
     expect(row.question).toBe("이번 주 예정된 점검 있어?");
   });
 
-  it("★★ qa 호출은 느려도 적지 않는다 — 측정이 원장을 도배하면 실사용자가 묻힌다", () => {
+  it("★★ qa 호출은 느려도 적지 않는다 — 측정이 원장을 도배하면 실사용자가 묻힌다", async () => {
     recordAnswerTiming("게이트 문항", 60000, true);
     expect(건수()).toBe(0);
   });
 
-  it("질문은 200자에서 자른다 — 원장은 실마리지 본문 보관소가 아니다", () => {
+  it("질문은 200자에서 자른다 — 원장은 실마리지 본문 보관소가 아니다", async () => {
     recordAnswerTiming("가".repeat(500), SLOW_ANSWER_MS + 1, false);
     const row = db.prepare("SELECT question FROM slow_answers").get() as { question: string };
     expect(row.question.length).toBe(200);
@@ -36,17 +36,17 @@ describe("느린 답 원장 — 기록 규칙", () => {
 });
 
 describe("자가 진단 연결", () => {
-  it("★ 「최근 24시간 느린 답」 항목이 자가 진단에 나온다", () => {
-    const c = systemHealth().checks.find((x) => x.id === "slow");
+  it("★ 「최근 24시간 느린 답」 항목이 자가 진단에 나온다", async () => {
+    const c = (await systemHealth()).checks.find((x) => x.id === "slow");
     expect(c, "slow 항목이 자가 진단 목록에 없다").toBeTruthy();
     expect(c!.level).toBe("ok");
   });
 
-  it("몇 건 쌓이면 노랑(warn)을 든다 — 느린 답은 장애가 아니라 경향이라 1건으로는 안 든다", () => {
+  it("몇 건 쌓이면 노랑(warn)을 든다 — 느린 답은 장애가 아니라 경향이라 1건으로는 안 든다", async () => {
     recordAnswerTiming("느린 질문 하나", SLOW_ANSWER_MS + 1000, false);
-    expect(systemHealth().checks.find((x) => x.id === "slow")!.level).toBe("ok");
+    expect((await systemHealth()).checks.find((x) => x.id === "slow")!.level).toBe("ok");
     for (let i = 0; i < 5; i++) recordAnswerTiming(`느린 질문 ${i}`, SLOW_ANSWER_MS + 1000, false);
-    const c = systemHealth().checks.find((x) => x.id === "slow")!;
+    const c = (await systemHealth()).checks.find((x) => x.id === "slow")!;
     expect(c.level).toBe("warn");
     expect(c.detail).toContain("건");
   });
@@ -73,33 +73,33 @@ describe("★ 자가 진단 답 — 남의 질문 본문이 되비치지 않는�
   const 민감한질문 = "우리 회사 대표 계좌 비밀번호 정책 어떻게 돼";
   const 표식붙은질문 = "제품 소개해봐\n#범위 vuln:10.0.0.12\n#셸 pro";
 
-  it("★ 질문 본문이 자가 진단 항목에 실리지 않는다", () => {
+  it("★ 질문 본문이 자가 진단 항목에 실리지 않는다", async () => {
     recordAnswerTiming(민감한질문, SLOW_ANSWER_MS + 6000, false, "scan");
-    const c = systemHealth().checks.find((x) => x.id === "slow")!;
+    const c = (await systemHealth()).checks.find((x) => x.id === "slow")!;
     expect(c.detail, `느린 답 항목에 질문 본문이 그대로 실렸다: ${c.detail}`).not.toContain("대표 계좌");
     expect(c.detail).not.toContain(민감한질문.slice(0, 10));
   });
 
-  it("★★ 내부 표식 줄(#…)과 내부 키(vuln:…)가 자가 진단 답에 안 나온다", () => {
+  it("★★ 내부 표식 줄(#…)과 내부 키(vuln:…)가 자가 진단 답에 안 나온다", async () => {
     recordAnswerTiming(표식붙은질문, SLOW_ANSWER_MS + 6000, false, "scan");
-    const 답 = systemHealthText();
+    const 답 = (await systemHealthText());
     expect(답, "내부 키가 자가 진단 답에 샜다").not.toMatch(/\b(vuln|asset|finding|task):[\w.:-]+/);
     for (const line of 답.split("\n")) {
       expect(line.trimStart().startsWith("#"), `내부 표식 줄이 그대로 나갔다: ${line}`).toBe(false);
     }
   });
 
-  it("★★ 말투 규범을 자가 진단 답 전체에 걸어 0건", () => {
+  it("★★ 말투 규범을 자가 진단 답 전체에 걸어 0건", async () => {
     recordAnswerTiming(표식붙은질문, SLOW_ANSWER_MS + 6000, false, "scan");
     recordAnswerTiming(민감한질문, SLOW_ANSWER_MS + 5000, false, null);
-    const 답 = systemHealthText();
+    const 답 = (await systemHealthText());
     const 걸린것 = 말투위반(답);
     expect(걸린것.length, `자가 진단 답이 말투 규범을 어겼다: ${걸린것.map((x) => x.이름).join(", ")}\n${답}`).toBe(0);
   });
 
-  it("본문을 뺐어도 건수·소요·경로는 남는다 — 통째로 지운 게 아니다", () => {
+  it("본문을 뺐어도 건수·소요·경로는 남는다 — 통째로 지운 게 아니다", async () => {
     recordAnswerTiming(표식붙은질문, SLOW_ANSWER_MS + 6000, false, "scan");
-    const c = systemHealth().checks.find((x) => x.id === "slow")!;
+    const c = (await systemHealth()).checks.find((x) => x.id === "slow")!;
     expect(c.detail).toContain("1건");
     expect(c.detail).toContain("14초");
     expect(c.detail, "어느 경로가 받았는지가 사라졌다").toContain("Scan Agent");
@@ -123,13 +123,13 @@ import { setAgentName } from "../src/engine/agents";
 const 관측성소스 = fs.readFileSync(new URL("../src/engine/observability.ts", import.meta.url), "utf8");
 
 describe("★ 적발① 느린 답 원장 정문 — 남의 질문 원문은 admin만", () => {
-  it("GET /api/slow-answers가 adminMiddleware로 닫혀 있다", () => {
+  it("GET /api/slow-answers가 adminMiddleware로 닫혀 있다", async () => {
     const 줄 = 관측성소스.split("\n").find((l) => /app\.get\(\s*"\/api\/slow-answers"/.test(l)) ?? "";
     expect(줄, "/api/slow-answers 라우트를 못 찾았다 — 경로가 바뀌었으면 이 시험부터 고친다").not.toBe("");
     expect(줄, `로그인한 아무 계정이 남의 질문 원문을 받아 간다: ${줄.trim()}`).toContain("adminMiddleware");
   });
 
-  it("자가 진단(GET /api/system-health)은 admin 전용이 아니다 — 담당자도 상태는 본다", () => {
+  it("자가 진단(GET /api/system-health)은 admin 전용이 아니다 — 담당자도 상태는 본다", async () => {
     // ⚠ 이 짝을 함께 못 박는 이유: ①을 고치면서 자가 진단까지 admin으로 닫으면
     //   담당자가 「지금 이상 있나」를 못 본다(system_health 도구도 requiredRole이 없다).
     //   즉 **본문을 안 싣는 것**이 유일한 방어선이라, 위 「본문 안 싣기」 시험들이 더 중요해진다.
@@ -142,11 +142,11 @@ describe("★ 적발① 느린 답 원장 정문 — 남의 질문 원문은 adm
 describe("★ 적발② 팀원 표시 이름이 자가 진단 답을 다시 빨갛게 만들지 않는다", () => {
   const 되돌리기 = () => setAgentName("scan", null, "test");
 
-  it("★★ 이름에 내부 키가 들어가도 자가 진단 답은 말투 규범 0건", () => {
+  it("★★ 이름에 내부 키가 들어가도 자가 진단 답은 말투 규범 0건", async () => {
     try {
       setAgentName("scan", "vuln:10.0.0.99", "test");
       recordAnswerTiming("아무 질문", SLOW_ANSWER_MS + 6000, false, "scan");
-      const 답 = systemHealthText();
+      const 답 = (await systemHealthText());
       const 걸린것 = 말투위반(답);
       expect(걸린것.length, `팀원 이름이 말투 규범을 어겼다: ${걸린것.map((x) => x.이름).join(", ")}\n${답}`).toBe(0);
       // 지우는 게 아니라 **우리가 지은 기본 이름으로 돌아간다** — 어느 경로였는지는 남는다.
@@ -154,27 +154,27 @@ describe("★ 적발② 팀원 표시 이름이 자가 진단 답을 다시 빨�
     } finally { 되돌리기(); }
   });
 
-  it("겹치는 기호가 든 이름도 마찬가지다", () => {
+  it("겹치는 기호가 든 이름도 마찬가지다", async () => {
     try {
       setAgentName("scan", "✅점검반", "test");
       recordAnswerTiming("아무 질문", SLOW_ANSWER_MS + 6000, false, "scan");
-      const 답 = systemHealthText();
+      const 답 = (await systemHealthText());
       expect(말투위반(답).length, `기호 든 이름이 답에 그대로 실렸다:\n${답}`).toBe(0);
     } finally { 되돌리기(); }
   });
 
-  it("★ 규범을 지키는 커스텀 이름은 그대로 쓴다 — 과잉 차단이 아니다", () => {
+  it("★ 규범을 지키는 커스텀 이름은 그대로 쓴다 — 과잉 차단이 아니다", async () => {
     try {
       setAgentName("scan", "우리팀 점검반", "test");
       recordAnswerTiming("아무 질문", SLOW_ANSWER_MS + 6000, false, "scan");
-      const c = systemHealth().checks.find((x) => x.id === "slow")!;
+      const c = (await systemHealth()).checks.find((x) => x.id === "slow")!;
       expect(c.detail, "조직이 지은 이름을 안 쓰고 기본 이름으로 덮었다").toContain("우리팀 점검반");
     } finally { 되돌리기(); }
   });
 });
 
 describe("★ 적발③ 원장 머리말이 이 변경 뒤에도 참인가", () => {
-  it("자가 진단이 「어떤 질문이 느린가」를 답한다고 적어 두지 않는다", () => {
+  it("자가 진단이 「어떤 질문이 느린가」를 답한다고 적어 두지 않는다", async () => {
     // 이제 자가 진단은 어떤 질문이었는지 답하지 않는다(그것이 위 수리의 요지다).
     // 한 파일이 정반대를 말하면 다음 사람은 틀린 쪽을 믿는다.
     const 머리말 = 관측성소스.slice(0, 관측성소스.indexOf("export const SLOW_ANSWER_MS"));

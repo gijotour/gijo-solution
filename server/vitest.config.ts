@@ -16,6 +16,10 @@ export default defineConfig({
       GIJO_DB_PATH: ":memory:",
       GIJO_ENCRYPTION_KEY: "0".repeat(64),
       GIJO_LOCAL_LLM_URL: "http://127.0.0.1:59999/v1",
+      // ⚠ 포트도 함께 막는다(2026-09-10). 자가 진단이 「지금 두뇌가 답하나」를 실제로 찌르게 되면서,
+      //   이 값을 안 걸어 두면 시험이 개발·운영 머신의 진짜 llama-server(8080)에 요청을 보낸다 —
+      //   작업 규칙 위반이고, 「WSL에선 초록·Windows에선 노랑」이라는 환경 의존 시험이 된다.
+      GIJO_LOCAL_LLM_PORT: "59997",
       GIJO_EMBEDDING_URL: "http://127.0.0.1:59998/v1",
       // 겹 1 기억 성장(learnmemory)은 시험에서 끈다 — 승인 👍마다 임베딩(죽은 포트 → 50초 재시도)·LanceDB(data/)에
       // 닿는 것을 막는다(검토관 2026-09-03 중). memorygrowth.test는 사건 방송까지만 본다.

@@ -23,7 +23,10 @@ import { verifyBackupSnapshot } from "./backup";
 import { auditRetentionDays } from "./audit";
 import { dbCryptStatus } from "./dbcrypt";
 import { getSiemConfig, getSiemStats } from "./siem";
-import { getLocalEngineStatus } from "./localengine";
+// ★ 「지금 두뇌가 답하나」는 **주인 파일 하나**에서 받는다 — 여기서 새로 재지 않는다.
+//   (2026-09-10 고객 QA 인스턴스: 다른 기계의 두뇌를 나눠 쓰는 설치에서 진단만 빨강이었다. 아래 두 함수 머리말 참고.)
+import { getLocalEngineStatus, 외부채팅응답확인 } from "./localengine";
+import { 임베딩응답확인 } from "./embedding";
 // 느린 답이 어느 경로로 갔는지를 **사람이 읽는 이름**으로 — 이름의 출처는 에이전트 등록부 하나다(llm.ts와 같다).
 import { getAgentById } from "./agents";
 // 그 이름이 담당자에게 내보내도 되는 글자인지 재는 자 — 말투 규범의 단일 출처(tone.ts) 그대로 쓴다.
@@ -279,7 +282,7 @@ const WORST: CheckLevel[] = ["fail", "warn", "unknown", "ok"];
  *   진짜 고장은 **떠 있는데 준비가 안 된 것**(ready=false) — 실측된 WSL2 GPU 유휴 정지가
  *   이 모양이었다. 프로세스는 살아 있는데 응답을 못 한다.
  */
-function checkModel(): HealthCheck {
+async function checkModel(): Promise<HealthCheck> {
   try {
     const st = getLocalEngineStatus();
     const 상주 = st.loaded ?? [];
@@ -292,6 +295,15 @@ function checkModel(): HealthCheck {
       };
     }
     if (상주.length === 0) {
+      // ★ 내 프로세스가 없다고 두뇌가 없는 것은 아니다 — 그 자리에서 도는 두뇌를 한 번 찔러 본다.
+      //   (2026-09-10 고객 QA 인스턴스 실측: 다른 기계의 두뇌를 나눠 쓰는데 여기가 노랑을 냈다.)
+      const 외부 = await 외부채팅응답확인();
+      if (외부.alive) {
+        return {
+          id: "model", label: "AI 모델", level: "ok",
+          detail: `외부 기동 모델이 응답합니다${외부.modelId ? ` · ${외부.modelId}` : ""} — 이 기계가 아니라 나눠 쓰는 두뇌입니다`,
+        };
+      }
       return {
         id: "model", label: "AI 모델", level: "warn",
         detail: "지금 상주 중인 채팅 모델이 없습니다(필요할 때 올라옵니다)",
@@ -310,10 +322,18 @@ function checkModel(): HealthCheck {
  * ⚠ 실사고(2026-07-24): 512토큰 넘는 한글 입력에 500을 내며 인입이 통째로 실패했는데
  *   화면은 멀쩡했다. 채팅 모델과 달리 이건 **항상 떠 있어야** 하므로 없으면 fail이다.
  */
-function checkEmbedding(): HealthCheck {
+async function checkEmbedding(): Promise<HealthCheck> {
   try {
     const e = getLocalEngineStatus().embedding;
     if (!e || !e.running) {
+      // ★ 「내 프로세스가 있나」가 아니라 **「지금 답하나」**를 묻는다 — 2026-09-10 고객 QA 인스턴스는
+      //   다른 기계의 임베딩을 주소로 나눠 썼고, 문서 검색이 멀쩡한데 여기가 빨강을 냈다.
+      if (await 임베딩응답확인()) {
+        return {
+          id: "embedding", label: "문서 검색 엔진(임베딩)", level: "ok",
+          detail: "외부 기동 임베딩 서버가 응답합니다 — 이 기계가 아니라 나눠 쓰는 두뇌입니다",
+        };
+      }
       return {
         id: "embedding", label: "문서 검색 엔진(임베딩)", level: "fail",
         detail: "임베딩 서버가 떠 있지 않습니다 — 문서 올리기와 지식 검색이 동작하지 않습니다",
@@ -419,9 +439,11 @@ function checkSlowAnswers(): HealthCheck {
   };
 }
 
-export function systemHealth(): SystemHealth {
+export async function systemHealth(): Promise<SystemHealth> {
   // 가장 자주 죽는 것부터 본다 — 모델·임베딩이 앞이다.
-  const checks = [checkModel(), checkEmbedding(), checkBackup(), checkKnowledge(), checkDatabase(), checkRecentErrors(), checkSlowAnswers(), checkDisk(), checkSiem()].filter((c): c is HealthCheck => c !== null);
+  // ⚠ 앞의 둘은 **밖을 찔러 본다**(각 상한 1.5초) — 그래서 이 함수가 async다. 대신 「지금 답하나」를 정직하게 답한다.
+  //   배경 캐시로 동기를 유지하는 길은 버렸다: 첫 호출이 캐시가 비어 거짓 빨강을 내고, 「지금」을 묻는 항목이 과거를 말하게 된다.
+  const checks = [await checkModel(), await checkEmbedding(), checkBackup(), checkKnowledge(), checkDatabase(), checkRecentErrors(), checkSlowAnswers(), checkDisk(), checkSiem()].filter((c): c is HealthCheck => c !== null);
   // 전체 판정은 가장 나쁜 항목을 따른다 — 평균을 내면 문제 하나가 정상 넷에 묻힌다.
   const level = WORST.find((l) => checks.some((c) => c.level === l)) ?? "ok";
   const bad = checks.filter((c) => c.level === "fail" || c.level === "warn");
@@ -444,8 +466,8 @@ export function systemHealth(): SystemHealth {
 const LEVEL_MARK: Record<CheckLevel, string> = { ok: "✓", warn: "⚠", fail: "✗", unknown: "❔" };
 
 /** 챗봇·보고용 한국어 요약. 문제일 때 무엇을 하면 되는지까지 함께 낸다. */
-export function systemHealthText(): string {
-  const h = systemHealth();
+export async function systemHealthText(): Promise<string> {
+  const h = await systemHealth();
   const up = h.uptimeSec < 3600 ? `${Math.round(h.uptimeSec / 60)}분` : `${Math.round(h.uptimeSec / 3600)}시간`;
   const lines = [
     `시스템 자가 진단 — ${h.headline}`,
@@ -462,7 +484,7 @@ export function systemHealthText(): string {
 
 export function registerObservabilityRoutes(app: Express): void {
   app.get("/api/system-health", authMiddleware, asyncRoute(async (_req, res) => {
-    res.json(systemHealth());
+    res.json(await systemHealth());
   }));
 
   // 느린 답 원장 — **반복 등장 질문**이 다음 즉답화(강제 라우팅) 후보다. 같은 질문을 띄어쓰기만

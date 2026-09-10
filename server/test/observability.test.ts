@@ -48,8 +48,8 @@ async function makeBackup(ageHours: number) {
 }
 
 describe("자가 진단", () => {
-  it("백업이 없으면 실패로 잡고 무엇을 하면 되는지 알려준다", () => {
-    const h = systemHealth();
+  it("백업이 없으면 실패로 잡고 무엇을 하면 되는지 알려준다", async () => {
+    const h = (await systemHealth());
     const b = h.checks.find((c) => c.id === "backup")!;
     expect(b.level).toBe("fail");
     expect(b.action).toBeTruthy(); // 행동 없는 경고는 불안만 준다
@@ -58,20 +58,20 @@ describe("자가 진단", () => {
 
   it("최근 백업이 있으면 정상", async () => {
     await makeBackup(2);
-    expect(systemHealth().checks.find((c) => c.id === "backup")!.level).toBe("ok");
+    expect((await systemHealth()).checks.find((c) => c.id === "backup")!.level).toBe("ok");
   });
 
   it("백업이 이틀 넘게 안 돌면 경고, 사흘 넘으면 실패 — 자동 백업이 멈춘 것을 잡는다", async () => {
     await makeBackup(60);
-    expect(systemHealth().checks.find((c) => c.id === "backup")!.level).toBe("warn");
+    expect((await systemHealth()).checks.find((c) => c.id === "backup")!.level).toBe("warn");
     fs.rmSync(path.join(tmp, "backups"), { recursive: true, force: true });
     await makeBackup(80);
-    expect(systemHealth().checks.find((c) => c.id === "backup")!.level).toBe("fail");
+    expect((await systemHealth()).checks.find((c) => c.id === "backup")!.level).toBe("fail");
   });
 
   it("전체 판정은 가장 나쁜 항목을 따른다 — 문제 하나가 정상 넷에 묻히지 않는다", async () => {
     await makeBackup(2); // 백업은 정상
-    const h = systemHealth();
+    const h = (await systemHealth());
     // 지식베이스·DB 등 다른 항목 중 하나라도 나쁘면 전체가 그 등급이어야 한다
     const worst = h.checks.some((c) => c.level === "fail") ? "fail"
       : h.checks.some((c) => c.level === "warn") ? "warn"
@@ -84,14 +84,14 @@ describe("자가 진단", () => {
     const ins = db.prepare("INSERT INTO audit_log (id, at, kind, actor, action, target, detail, result) VALUES (?,?,?,?,?,?,?,?)");
     ins.run("e1", Date.now(), "write", "t", "실패한 작업", null, null, "error");
     ins.run("b1", Date.now(), "config", "t", "권한 차단", null, null, "blocked");
-    const e = systemHealth().checks.find((c) => c.id === "errors")!;
+    const e = (await systemHealth()).checks.find((c) => c.id === "errors")!;
     expect(e.level).toBe("warn");
     expect(e.detail).toContain("오류 1건");
     expect(e.action).toBeTruthy();
   });
 
-  it("요약문은 결론과 조치 안내를 함께 낸다", () => {
-    const t = systemHealthText();
+  it("요약문은 결론과 조치 안내를 함께 낸다", async () => {
+    const t = (await systemHealthText());
     expect(t).toContain("자가 진단");
     expect(t).toContain("백업");
     expect(t).toMatch(/→ /); // 문제 항목엔 조치 안내가 붙는다

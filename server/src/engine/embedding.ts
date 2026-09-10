@@ -12,7 +12,16 @@ import * as http from "http";
 import * as https from "https";
 import { emitLlmActivity } from "./llmactivity";
 
-const EMBEDDING_SERVER_URL = process.env.GIJO_EMBEDDING_URL ?? "http://localhost:8081/v1";
+const 기본임베딩주소 = "http://localhost:8081/v1";
+const EMBEDDING_SERVER_URL = process.env.GIJO_EMBEDDING_URL ?? 기본임베딩주소;
+
+/**
+ * 지금 이 서버가 **어느 임베딩 두뇌를 보고 있나**. 기본값에 이미 `/v1`이 들어 있다 — 끝에 `/embeddings`만 붙인다.
+ * ⚠ 진단은 **부를 때** 읽는다: 주소를 고친 뒤 서버를 안 내려도 진단이 지금 설정을 말해야 한다.
+ */
+function 임베딩주소(): string {
+  return process.env.GIJO_EMBEDDING_URL ?? 기본임베딩주소;
+}
 const LLM_TIMEOUT_MS = Number(process.env.GIJO_LLM_TIMEOUT_MS ?? 120_000);
 
 // 임베딩 서버로 보내는 POST — 매 요청 새 연결(keepAlive:false)로 한다.
@@ -129,4 +138,23 @@ export async function 임베딩준비대기(timeoutMs = 60_000, 간격Ms = 2_000
     }
     await new Promise((r) => setTimeout(r, 간격Ms));
   }
+}
+
+/**
+ * **지금 임베딩 두뇌가 답하나** — 자가 진단이 쓰는 하나의 잣대다.
+ *
+ * ■ 왜 생겼나(2026-09-10 고객 QA 인스턴스 실측): 고객 인스턴스는 제 모델 폴더가 비어 있고
+ *   다른 기계에서 띄운 임베딩 서버를 **주소로 나눠 쓴다**. 문서 검색도 근거 인용도 멀쩡히
+ *   도는데 자가 진단은 「임베딩 서버가 떠 있지 않습니다」라며 빨강을 냈다 — 「내 프로세스가
+ *   있나」(!!embeddingProcess)만 봤기 때문이다. 고객은 첫 화면의 빨강을 **제품 고장**으로 읽는다.
+ *   물어야 할 것은 프로세스의 존재가 아니라 **응답**이다.
+ *
+ * ⚠ /health·/v1/models로 재지 않는다 — 위 임베딩준비대기와 같은 까닭(모델이 안 올라와도 200).
+ *   재는 방식을 그 함수와 **똑같이** 맞춘다: 잣대를 둘로 적지 않는다.
+ * ⚠ 상한이 짧다(기본 1.5초). 진단은 자주 불린다 — 오래 잡고 있으면 화면이 멈춘 것처럼 보인다.
+ *   여기서 false가 나와도 그것은 「지금 이 순간 안 답한다」일 뿐, 인입 경로의 재시도와는 별개다.
+ */
+export async function 임베딩응답확인(timeoutMs = 1_500): Promise<boolean> {
+  const res = await embedPost(`${임베딩주소()}/embeddings`, { model: "local", input: ["ready"] }, timeoutMs);
+  return res.ok;
 }

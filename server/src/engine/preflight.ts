@@ -16,7 +16,10 @@ import { 개발모드 } from "../util/devmode";
 
 export interface PreflightCheck {
   name: string;
-  status: "pass" | "warn" | "fail";
+  // info = **막을 일이 아니라 알려 줄 일**(2026-09-10 신설). 이 기계에 llama-server·모델 파일이
+  //   없어도 다른 기계의 두뇌를 나눠 쓰면 제품은 멀쩡히 돈다 — 그때 fail로 두면 고객 첫 화면이
+  //   「준비 안 됨」이라 거짓말을 한다(고객 QA 인스턴스 실측). ready 계산은 종전대로 fail만 막는다.
+  status: "pass" | "warn" | "fail" | "info";
   detail: string;
 }
 
@@ -50,9 +53,27 @@ export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready:
   const gpu = gpuAvailable();
   checks.push({ name: process.platform === "darwin" ? "GPU (Metal)" : "GPU (nvidia-smi)", status: gpu.ok ? "pass" : "warn", detail: gpu.detail });
 
+  // 「이 기계에 파일이 있나」로 판정하기 전에, **지금 두뇌가 답하는지**를 재 둔다.
+  //   ⚠ 게으르게 부른다 — 파일이 다 있는 보통 설치에서는 한 번도 안 찌른다(진단이 느려질 이유가 없다).
+  //   ★ 잣대는 localengine.외부채팅응답확인 하나다(자가 진단·대시보드도 같은 함수를 부른다). 여기서 새로 재지 않는다.
+  let 두뇌캐시: { alive: boolean; modelId: string | null } | null = null;
+  const 두뇌응답 = async () => {
+    if (!두뇌캐시) {
+      const { 외부채팅응답확인 } = await import("./localengine.js");
+      두뇌캐시 = await 외부채팅응답확인();
+    }
+    return 두뇌캐시;
+  };
+
   // llama-server 바이너리 — env 미설정이면 플랫폼별 기본 경로(win: Release/*.exe, linux: */name)를 점검한다.
   const llamaPath = process.env.GIJO_LLAMA_SERVER_PATH ?? llamaBinPath("llama-server");
-  checks.push({ name: "llama-server", status: fs.existsSync(llamaPath) ? "pass" : "fail", detail: fs.existsSync(llamaPath) ? llamaPath : `경로에 파일 없음: ${llamaPath}` });
+  if (fs.existsSync(llamaPath)) {
+    checks.push({ name: "llama-server", status: "pass", detail: llamaPath });
+  } else if ((await 두뇌응답()).alive) {
+    checks.push({ name: "llama-server", status: "info", detail: "이 기계에는 없습니다 — 다른 기계에서 띄운 AI를 나눠 쓰고 있고, 지금 응답이 확인됩니다" });
+  } else {
+    checks.push({ name: "llama-server", status: "fail", detail: `경로에 파일 없음: ${llamaPath}` });
+  }
 
   // 모델 존재 + 상업 번들 안전 개수
   try {
@@ -60,7 +81,12 @@ export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready:
     const { classifyAvailableModels } = await import("./modellicense.js");
     const ids = listAvailableModels().map((m) => m.id);
     if (ids.length === 0) {
-      checks.push({ name: "로컬 모델", status: "fail", detail: "models/ 에 채팅 모델(.gguf) 없음 — 최소 1개 필요(BYOM)" });
+      const 두뇌 = await 두뇌응답();
+      checks.push(
+        두뇌.alive
+          ? { name: "로컬 모델", status: "info" as const, detail: `이 기계에는 모델 파일이 없지만 나눠 쓰는 AI가 응답합니다${두뇌.modelId ? ` · ${두뇌.modelId}` : ""}` }
+          : { name: "로컬 모델", status: "fail" as const, detail: "models/ 에 채팅 모델(.gguf) 없음 — 최소 1개 필요(BYOM)" }
+      );
     } else {
       const { summary } = classifyAvailableModels(ids);
       checks.push({ name: "로컬 모델", status: "pass", detail: `${ids.length}개 (상업번들 안전 ${summary.bundleSafe}, BYOM ${summary.byom})` });

@@ -96,7 +96,7 @@ function recentErrors(n = 5): string[] {
   }
 }
 
-export function buildRequestDocument(input: BuildRequestInput, actor: string | null): BuiltRequest {
+export async function buildRequestDocument(input: BuildRequestInput, actor: string | null): Promise<BuiltRequest> {
   const kind = (KIND_LABEL[input.kind] ? input.kind : "etc") as RequestKind;
   const title = (input.title || "").trim() || "(제목 없음)";
 
@@ -123,9 +123,10 @@ export function buildRequestDocument(input: BuildRequestInput, actor: string | n
   ].join("\n");
 
   const 오류 = recentErrors();
-  const 진단 = (() => {
+  // ⚠ 자가 진단은 이제 두뇌를 실제로 찔러 본다(2026-09-10) — 기다렸다 담는다.
+  const 진단 = await (async () => {
     try {
-      return systemHealthText().split("\n").slice(0, 8).join("\n");
+      return (await systemHealthText()).split("\n").slice(0, 8).join("\n");
     } catch {
       return "(자가 진단을 수집하지 못했습니다)";
     }
@@ -228,7 +229,7 @@ export function registerDocRequestRoutes(app: Express): void {
         res.status(400).json({ error: "제목이 필요합니다" });
         return;
       }
-      const built = buildRequestDocument(
+      const built = await buildRequestDocument(
         {
           kind: (body.kind ?? "etc") as RequestKind,
           title: String(body.title),

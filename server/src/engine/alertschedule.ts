@@ -83,13 +83,13 @@ export function deleteAlertSchedule(id: string): void {
  */
 export async function buildAlertBody(kind: AlertKind): Promise<{ subject: string; text: string } | null> {
   if (kind === "system_health") {
-    const h = systemHealth();
+    const h = await systemHealth();
     // 정상일 땐 보내지 않는다 — 매일 "이상 없음"이 오면 진짜 경고도 안 읽게 된다.
     // unknown(못 잰 항목)도 보내지 않는다: statfs 미지원 같은 환경에서는 매일 "점검 필요"가
     // 가서 같은 늑대소년이 된다(검토 지적 2026-07-29). 못 잰 것은 화면·챗봇에서 보면 된다.
     if (h.level === "ok" || h.level === "unknown") return null;
     const { systemHealthText } = await import("./observability.js");
-    return { subject: `[GIJO AS] 시스템 점검 필요 — ${h.headline}`, text: systemHealthText() };
+    return { subject: `[GIJO AS] 시스템 점검 필요 — ${h.headline}`, text: await systemHealthText() };
   }
 
   if (kind === "sla_due") {

@@ -30,8 +30,8 @@ async function login(app: ReturnType<typeof createApp>) {
 }
 
 describe("문서 조립", () => {
-  it("자동 기술 정보가 붙는다 — 담당자가 안 적어도 개발자가 재현할 수 있게", () => {
-    const r = buildRequestDocument(
+  it("자동 기술 정보가 붙는다 — 담당자가 안 적어도 개발자가 재현할 수 있게", async () => {
+    const r = await buildRequestDocument(
       { kind: "bug", title: "저장이 안 됨", tried: "저장을 눌렀다", happened: "아무 반응 없음", images: [],
         screen: "설정 > 관리자", clientVersion: "4.8.0", platform: "Windows 11 / Electron 31" },
       "김담당"
@@ -43,8 +43,8 @@ describe("문서 조립", () => {
     expect(r.markdown).toContain("자가 진단");
   });
 
-  it("제목·본문의 자격증명을 가린다 — 파일은 밖으로 나가는 산출물이다", () => {
-    const r = buildRequestDocument(
+  it("제목·본문의 자격증명을 가린다 — 파일은 밖으로 나가는 산출물이다", async () => {
+    const r = await buildRequestDocument(
       { kind: "bug", title: "로그인 실패", tried: "관리자 계정으로 접속",
         happened: "초기 비밀번호: P@ssw0rd-Init-2026 로 했는데 안 됩니다. API 연동 키: sk-live-QA7788TESTKEYONLY0000",
         images: [] },
@@ -58,8 +58,8 @@ describe("문서 조립", () => {
     expect(r.markdown).toContain("초기 비밀번호:");
   });
 
-  it("그림을 붙이면 '그림 속은 못 가린다'는 경고가 문서에 실린다", () => {
-    const r = buildRequestDocument(
+  it("그림을 붙이면 '그림 속은 못 가린다'는 경고가 문서에 실린다", async () => {
+    const r = await buildRequestDocument(
       { kind: "ui", title: "화면 깨짐", tried: "열었다", happened: "이상함", images: [PNG, PNG] },
       "김담당"
     );
@@ -68,14 +68,14 @@ describe("문서 조립", () => {
     expect(r.markdown).toContain("자동으로 가릴 수 없습니다");
   });
 
-  it("그림이 없으면 그 경고를 띄우지 않는다 — 늘 뜨면 아무도 안 읽는다", () => {
-    const r = buildRequestDocument({ kind: "etc", title: "건의", tried: "", happened: "", images: [] }, null);
+  it("그림이 없으면 그 경고를 띄우지 않는다 — 늘 뜨면 아무도 안 읽는다", async () => {
+    const r = await buildRequestDocument({ kind: "etc", title: "건의", tried: "", happened: "", images: [] }, null);
     expect(r.markdown).not.toContain("자동으로 가릴 수 없습니다");
     expect(r.markdown).toContain("첨부한 화면 캡처 없음");
   });
 
-  it("이미지가 아닌 것은 걸러낸다 — data:text/html 같은 것이 문서에 실리면 안 된다", () => {
-    const r = buildRequestDocument(
+  it("이미지가 아닌 것은 걸러낸다 — data:text/html 같은 것이 문서에 실리면 안 된다", async () => {
+    const r = await buildRequestDocument(
       { kind: "bug", title: "t", tried: "", happened: "", images: [PNG, "data:text/html,<script>x</script>", "javascript:alert(1)"] },
       null
     );
@@ -84,13 +84,13 @@ describe("문서 조립", () => {
     expect(r.markdown).not.toContain("javascript:");
   });
 
-  it("파일명이 유형·시각으로 자동으로 정해진다", () => {
-    const r = buildRequestDocument({ kind: "feature", title: "이런 게 있으면", tried: "", happened: "", images: [] }, null);
+  it("파일명이 유형·시각으로 자동으로 정해진다", async () => {
+    const r = await buildRequestDocument({ kind: "feature", title: "이런 게 있으면", tried: "", happened: "", images: [] }, null);
     expect(r.fileName).toMatch(/^GIJO요청_기능 요청_\d{8}-\d{4}\.md$/);
   });
 
-  it("유형이 이상하면 '기타'로 떨어진다 — 터지지 않는다", () => {
-    const r = buildRequestDocument({ kind: "없는유형" as never, title: "t", tried: "", happened: "", images: [] }, null);
+  it("유형이 이상하면 '기타'로 떨어진다 — 터지지 않는다", async () => {
+    const r = await buildRequestDocument({ kind: "없는유형" as never, title: "t", tried: "", happened: "", images: [] }, null);
     expect(r.markdown).toContain("[기타]");
   });
 });
