@@ -694,12 +694,19 @@ describe("재료 허용목록 — 허용만 적고 제외는 안 적는다", () 
 describe("표본 하네스가 저장소로 들어왔다 — 조건 셋이 파일로 갈린다", () => {
   const 문항들 = JSON.parse(readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "samples-questions.json"), "utf8"));
 
-  it("문항 12개는 gb10 원본 그대로이고, 근거 조각을 **회수한 것만** chunk가 차 있다", () => {
-    expect(문항들).toHaveLength(12);
-    const 찬것 = 문항들.filter((q: { chunk: string }) => q.chunk);
+  it("앞 12개는 gb10 원본 그대로이고, 근거 조각을 **회수한 것만** chunk가 차 있다", () => {
+    // ★ 2026-09-10(회전 5): 관문 ⑬·⑭의 모집단이 24 이상이어야 해서 **뒤에 덧붙였다**(등급 O 승인 문답 ·
+    //   holdout-vuln-o에서 뽑은 28건). 앞 12개는 **한 글자도 안 바꿨다** — 옛 회전 판정의 근거이기 때문이다.
+    //   그래서 여기서는 「앞 12개가 그대로인가」와 「전체가 24를 넘겼나」를 나눠서 못 박는다.
+    const 원본 = 문항들.slice(0, 12);
+    expect(원본).toHaveLength(12);
+    const 찬것 = 원본.filter((q: { chunk: string }) => q.chunk);
     // ⚠ 8/12만 찬다 — 나머지 4는 원천이 chat이라 근거 ref 자체가 없다. 「없다」를 빈칸으로 남기고
     //   하네스가 건너뛴다(0으로 세면 인용률이 거짓으로 낮아진다).
     expect(찬것.length, "store: ref가 있는 문항만 회수된다").toBe(8);
+    // 덧붙인 문항까지 세어 ⑬·⑭의 모집단(24)을 실제로 채웠는지 — 8건짜리 초록은 「통과」가 아니라 「못 잰 것」이다.
+    const 조각든전체 = 문항들.filter((q: { chunk?: string }) => String(q.chunk ?? "").length >= 20);
+    expect(조각든전체.length, "관문 ⑬·⑭의 모집단 24를 못 채웠다").toBeGreaterThanOrEqual(24);
     for (const q of 찬것) {
       expect(q.chunkRef, "어느 조각에서 왔는지 파일에 남는다").toMatch(/#[0-9a-f]{12}$/);
       expect(q.distractor.length, "방해 조각도 함께 회수한다").toBeGreaterThan(0);

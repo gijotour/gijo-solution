@@ -158,5 +158,425 @@
   "distractor": "",
   "distractorRef": "",
   "회수": "근거 ref 없음(chat 원천)"
+ },
+ {
+  "question": "Versa Director의 최신 버전에서는 이 문제를 어떻게 해결하나요?",
+  "answer": "최신 22.1.4 버전부터는 소프트웨어가 자동으로 접근을 제한하도록 개선되었습니다. 이제 Postgres와 HA 포트에 대한 접근은 로컬 및 피어 Versa Director로만 한정됩니다. 이전 릴리스를 사용 중이라면 HA 포트에 대한 수동 하드닝을 수행해야 합니다. 원문: \"Starting with the latest 22.1.4 version of Versa Director, the software will automatically restrict access to the Postgres and HA ports to only the local and peer Versa Directors.\"",
+  "cites": [
+   "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#0429202bb00d"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "hable from that origin. …\n참조: https://github.com/endojs/endo/security/advisories/GHSA-9c4h-3f7h-322r\n\nCVE-2024-42450 · 공개일 2024-11-19 · CVSS v3 기반점수 10.0 (CRITICAL) · CWE-798\n벡터(vectorString): CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H\n설명(NVD 영어 원문): The Versa Director uses PostgreSQL (Postgres) to store operational and configuration data. It is also needed for High Availability function of the Versa Director. The default configuration has a common password across all instances of Versa Director. By default, Versa Director configures Postgres to listen on all network interfaces. This combination allows an unauthenticated attacker to access and administer the database or read local filesystem contents to escalate privileges on the system. Exploitation Status: Versa Networks is not aware of this exploitation in any production systems. A proof of concept exists in the lab environment. Workarounds or Mitigation: Starting with the latest 22.1.4 version of Versa Director, the software will automatically restrict access to the Postgres and HA ports to only the local and peer Versa Directors. For older releases, Versa recommends performing manual hardening of HA ports. …\n참조: https://security-portal.versa-networks.com/emailbulletins/6735a300415abb89e9a8a9d3",
+  "chunkRef": "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#0429202bb00d",
+  "distractor": "new byte[IV_LEN]; RNG.nextBytes(iv);\n10.\nWeb Application(웹) 보안2026 주요정보통신기반시설 기술적 취약점 분석·평가 방법 상세가이드\n// AES-256-CBC 암호화 Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\"); cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(encKey, \"AES\"), new IvParameterSpec(iv)); byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8)); Mac mac = Mac.getInstance(\"HmacSHA256\"); mac.init(new SecretKeySpec(hmacKey, \"HmacSHA256\")); mac.update(iv); mac.update(ciphertext); byte[] hmac = mac.doFinal(); byte[] payload = new byte[iv.length + hmac.length + ciphertext.length]; System.arraycopy(iv, 0, payload, 0, iv.length); System.arraycopy(hmac, 0, payload, iv.length, hmac.length); System.arraycopy(ciphertext, 0, payload, iv.length + hmac.length, ciphertext.length); String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(payload); // HttpOnly, Secure 속성 설정 Cookie cookie = new Cookie(name, encoded); cookie.setHttpOnly(true); cookie.setSecure(true); cookie.setPath(\"/\"); cookie.setMaxAge(maxAgeSec); // SameSite 속성은 Cookie API로 직접 지정 불가 → 헤더로 세팅 String header = String.format( \"%s=%s; Max-Age=%d; Path=/; HttpOnly; Secure; SameSite=Strict\", name, encoded, maxAgeSec ); resp.addHeader(\"Set-Cookie\", header); } // 쿠키 읽기 (HMAC 검증 + 복호화) public String readSecureCookie(String value) throws Exception { if (value == null) return null; byte[] data; try { data = Base64.getUrlDecoder().decode(value); } catch (IllegalArgumentException e) { return null; } if (data.length < IV_LEN + HMAC_LEN + 1) return null;",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#7a7ce5e7bdaa",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "현재 랜섬웨어 캠페인과의 연관성 상태는 어떻게 파악되나요?",
+  "answer": "이 취약점이 실제 랜섬웨어 공격 캠페인에 악용된 사례가 있는지 확인하는 것은 중요합니다. 현재 데이터베이스에서는 해당 취약점의 랜섬웨어 활용 여부가 불분명한 상태로 등록되어 있습니다. 따라서 공격자의 실제 악용 정황이 포착될 가능성을 배제할 수 없습니다. 보안 팀은 최신 위협 정보를 지속적으로 모니터링하며 대응 태세를 유지해야 합니다. 원문: \"knownRansomwareCampaignUse: Unknown\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-08.md#243106211546"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "t if mitigations are unavailable.\nNVD 설명(영어 원문): Microsoft Word Information Disclosure Vulnerability\n\nCVE-2023-36802 · Microsoft Streaming Service Proxy · Microsoft Streaming Service Proxy Privilege Escalation Vulnerability\n등재일(dateAdded) 2023-09-12 · 조치기한(dueDate) 2023-10-03 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-416\n설명(CISA shortDescription): Microsoft Streaming Service Proxy contains an unspecified vulnerability that allows for privilege escalation.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Microsoft Streaming Service Proxy Elevation of Privilege Vulnerability",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-08.md#243106211546",
+  "distractor": "file in Windows NTFS allows an unauthorized attacker to disclose information with a physical attack.\n\nCVE-2025-24983 · Microsoft Windows · Microsoft Windows Win32k Use-After-Free Vulnerability\n등재일(dateAdded) 2025-03-11 · 조치기한(dueDate) 2025-04-01 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-416\n설명(CISA shortDescription): Microsoft Windows Win32 Kernel Subsystem contains a use-after-free vulnerability that allows an authorized attacker to elevate privileges locally.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Use after free in Windows Win32 Kernel Subsystem allows an authorized attacker to elevate privileges locally.",
+  "distractorRef": "server/data/ladder/material/day1/kev/kev-04.md#951abf63d90e",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "이 취약점이 랜섬웨어 공격에 악용될 가능성이 있는지에 대해 설명해 주세요.",
+  "answer": "해당 취약점은 이미 알려진 랜섬웨어 캠페인에서 악용된 이력이 있어 높은 위험도를 가지고 있습니다. 공격자들은 이 결함을 통해 시스템을 장악하고 악성 코드를 배포하는 통로로 사용할 수 있습니다. 「원문: \"Telerik UI for ASP.NET AJAX contains an insecure direct object reference vulnerability in RadAsyncUpload that can result in file uploads in a limited location and/or remote code execution.\"」 그러므로 이 취약점을 방치할 경우 조직 전체가 심각한 보안 위협에 노출될 수 있습니다.",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-09.md#383930481a04"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "d request can inject custom PHP code through the EmailTemplates because of missing input validation.\n\nCVE-2017-11357 · Telerik User Interface (UI) for ASP.NET AJAX · Telerik UI for ASP.NET AJAX Insecure Direct Object Reference Vulnerability\n등재일(dateAdded) 2023-01-26 · 조치기한(dueDate) 2023-02-16 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-20\n설명(CISA shortDescription): Telerik UI for ASP.NET AJAX contains an insecure direct object reference vulnerability in RadAsyncUpload that can result in file uploads in a limited location and/or remote code execution.\n요구 조치(requiredAction): Apply updates per vendor instructions.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-09.md#383930481a04",
+  "distractor": "ermissions ]; } }※장비 구성 변경 시 사용하는 superuser 클래스와 monitoring 용으로 사용하는 read-only 클래스를 분리하여 사용할 것을 권장함.\n장비 내 기본적으로 다음과 같은 클래스별 사용 권한 설정 및 세부 옵션 추가로 기능 제한을 할 수 있고, 특정 명령어 사용 제한을 계정마다 따로 설정할 수 있으므로 특정한 사용자 계정의 생성이 필요한 경우 사용 권한을 부여해야 함\nClass-nameAbilityOperatorclear, network, reset, trace, viewread-onlyviewSuperuserallunauthorizedNonelPiolink PLOS Step 1)슈퍼 유저(root)와 일반 유저로 권한을 부여하여 관리하는지 확인 Step 2)디폴트 계정인 슈퍼 유저(root)와 관리목적에 따라 신규로 등록할 수 있는 일반 유저, 2단계로 나누어져 있음. 슈퍼 유저는 모든 권한이 부여되어 있으나 일반 유저의 경우 장비의 설정을 변경할 수 있는 권한이 없음. 따라서 사용자의 업무 및 권한에 따라 계정을 부여하여 관리하는 것이 보안상 중요함\nN-06(상) 네트워크 장비 > 2.",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#4925a513bf16",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "벤더가 제공하는 해결책이 없을 경우 조직은 어떻게 대응해야 하나요?",
+  "answer": "벤더의 지침에 따라 완화 조치를 적용하는 것이 기본 요구사항입니다. 만약 적절한 완화 조치가 제공되지 않는다면 해당 제품의 사용을 중단해야 합니다. 원문: \"Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-07.md#2ade9015d8d8"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "r. Exploitation of this issue requires user interaction in that a victim must open a malicious file.\n\nCVE-2023-35674 · Android Framework · Android Framework Privilege Escalation Vulnerability\n등재일(dateAdded) 2023-09-13 · 조치기한(dueDate) 2023-10-04 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown\n설명(CISA shortDescription): Android Framework contains an unspecified vulnerability that allows for privilege escalation.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): In onCreate of WindowState.java, there is a possible way to launch a background activity due to a logic error in the code. This could lead to local escalation of privilege with no additional execution privileges needed. User interaction is not needed for exploitation.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-07.md#2ade9015d8d8",
+  "distractor": "니다.** GPL·AGPL은 「소스를 공개하면 쓸 수 있다」는 **조건부 허락**이지만, NC는 상용 제품에서 **아예 못 쓴다**는 뜻입니다 — 소스를 공개해도 풀리지 않습니다.\n실제로 겪은 일(2026-08-22): 공공기관 보안 가이드 7종을 PDF에서 마크다운으로 바꿔 제품 지식에 담아 **고객 설치본과 함께 배포**하고 있었습니다. 판권면을 실제로 열어 보니 CC BY-**NC**-**ND**, 공공누리 **제4유형**(상업적 이용금지·변경금지), 「허가 없이 무단전재 및 복사를 금하며」 등이었습니다. 우리 파일 머리말엔 「라이선스: **공개 배포**」라고만 적혀 있었는데, 그건 **「무료로 받을 수 있다」는 뜻이지 「재배포·변환해도 된다」가 아니었습니다.** 7종을 모두 걷어내고, 같은 주제를 **우리가 직접 써서** 채웠습니다(사실 자체는 저작권 대상이 아닙니다).\n\n### 고지 의무 — 「소스는 안 줘도 되지만 이름은 밝혀라」 (2026-08-22 신설)\nMIT·Apache·BSD 같은 허용적 라이선스에 붙는 **가장 흔한 의무**입니다. 소스 공개는 필요 없지만, 그 부품의 **저작권자와 라이선스를 제품에 함께 실어야** 합니다. 우리 제품은 `THIRD-PARTY-NOTICES.md`로 이것을 냅니다.",
+  "distractorRef": "store:GIJO_AS_용어사전.md#4568e7e187bc",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "CISA가 이 취약점에 대해 권장하는 구체적인 대응 방안은 무엇인가요?",
+  "answer": "보안 담당자는 제조사의 지침에 따라 즉각적인 완화 조치를 적용해야 합니다. 만약 제조사가 제공하는 해결책이 없다면, 해당 제품의 사용을 중단하는 것이 필수적입니다. 「원문: \"Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\"」 이 조치는 랜섬웨어 캠페인 활용 여부가 불명확한 상황에서도 선제적으로 취해야 할 기본 원칙입니다.",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-05.md#865668a14fda"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "at bears the Mark-of-the-Web, 7-Zip does not propagate the Mark-of-the-Web to the extracted files. …\n\nCVE-2024-53104 · Linux Kernel · Linux Kernel Out-of-Bounds Write Vulnerability\n등재일(dateAdded) 2025-02-05 · 조치기한(dueDate) 2025-02-26 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-787\n설명(CISA shortDescription): Linux kernel contains an out-of-bounds write vulnerability in the uvc_parse_streaming component of the USB Video Class (UVC) driver that could allow for physical escalation of privilege.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): In the Linux kernel, the following vulnerability has been resolved: media: uvcvideo: Skip parsing frames of type UVC_VS_UNDEFINED in uvc_parse_format This can lead to out of bounds writes since frames of this type were not taken into account when calculating the size of the frames buffer in uvc_parse_streaming.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-05.md#865668a14fda",
+  "distractor": "show logginglJuniper Junos Step 1)로그에 대한 정보 확인user@host> configure[edit]user@host# show log messages\nlCisco IOS, Juniper Junos Step 1)콘솔 로깅콘솔 로그 메시지는 오직 콘솔 포트에서만 보이므로 이 로그를 보기 위해서는 반드시 콘솔 포트에 연결해야 함 Step 2)Buffered 로깅Buffered 로깅은 로그를 라우터의 RAM에 저장하는데 이 버퍼가 가득 차게 되면 오래된 로그는 자동으로 새로운 로그에 의해 대체됨 Step 3)Terminal 로깅Terminal monitor 명령을 사용하여 로깅을 설정하면 라우터에서 발생하는 로그 메시지를 VTY terminal에 보냄 Step 4)Syslog시스코 라우터는 라우터의 로그 메시지가 외부의 syslog 서버에 저장되도록 설정할 수 있음 Step 5)SNMP trapsSNMP trap이 설정되면 SNMP는 특별한 상황을 외부의 SNMP 서버에 전송하도록 설정할 수 있음 Step 6)ACL 침입 로깅표준 또는, 확장된 액세스 리스트를 설정할 때 특정한 룰에 매칭하였을 경우 해당 패킷 정보를 로그에 남기도록 설정할 수 있는데, 이는 액세스 리스트 룰의 끝에 로그나 로그 인풋을 추가하면 됨로그 인풋은 로그와는 달리 인터페이스 정보도 함께 남기게 되므로 어떤 인터페이스를 통해 로그가 남았는지를 알 수 있음※라우터에 기본적으로 설정된 로그 파일 설정을 변경하지 않으면 로깅을 효율적으로 사용할 수 없으므로 크게 6가지로 이루어진 아래의 방법을 활용해야 함\nN-15(중) 네트워크 장비 > 4.",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#7e60d73404dd",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "벤더에서 제공하는 패치가 없는 경우 보안 담당자는 어떻게 대응해야 하나요?",
+  "answer": "공식적인 보안 권고사항에 따라 완화 조치를 적용하는 것이 최우선입니다. 만약 벤더가 제공하는 해결책이 존재하지 않는다면 제품 사용을 중단해야 합니다. 원문: \"Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-07.md#986758fa5c11"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "() and file_put_contents(). This is exploitable on sites using debug mode with Laravel before 8.4.2.\n\nCVE-2023-26369 · Adobe Acrobat and Reader · Adobe Acrobat and Reader Out-of-Bounds Write Vulnerability\n등재일(dateAdded) 2023-09-14 · 조치기한(dueDate) 2023-10-05 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-787\n설명(CISA shortDescription): Adobe Acrobat and Reader contains an out-of-bounds write vulnerability that allows for code execution.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Acrobat Reader versions 23.003.20284 (and earlier), 20.005.30516 (and earlier) and 20.005.30514 (and earlier) are affected by an out-of-bounds write vulnerability that could result in arbitrary code execution in the context of the current user. Exploitation of this issue requires user interaction in that a victim must open a malicious file.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-07.md#986758fa5c11",
+  "distractor": "t could lead to remote code execution.\n요구 조치(requiredAction): Apply updates per vendor instructions.\n\nCVE-2009-1862 · Adobe Acrobat and Reader, Flash Player · Adobe Acrobat and Reader, Flash Player Unspecified Vulnerability\n등재일(dateAdded) 2022-06-08 · 조치기한(dueDate) 2022-06-22 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-94\n설명(CISA shortDescription): Adobe Acrobat and Reader and Adobe Flash Player allows remote attackers to execute code or cause denial-of-service (DoS).\n요구 조치(requiredAction): For Adobe Acrobat and Reader, apply updates per vendor instructions. For Adobe Flash Player, the impacted product is end-of-life and should be disconnected if still in use.",
+  "distractorRef": "server/data/ladder/material/day1/kev/kev-10.md#2db228a25b52",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "해당 취약점이 영향을 미치는 웹 브라우저에는 구체적으로 어떤 것들이 있나요?",
+  "answer": "크로미움 엔진을 사용하는 여러 웹 브라우저가 이 취약점에 노출되어 있습니다. 구체적으로는 구글 크롬, 마이크로소프트 엣지, 오페라 등이 포함되지만 이에 한정되지 않습니다. 원문: \"This vulnerability could affect multiple web browsers that utilize Chromium, including, but not limited to, Google Chrome, Microsoft Edge, and Opera.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-10.md#9142ae44f8b0"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "gle Chrome, Microsoft Edge, and Opera.\n요구 조치(requiredAction): Apply updates per vendor instructions.\n\nCVE-2016-1646 · Google Chromium V8 · Google Chromium V8 Out-of-Bounds Read Vulnerability\n등재일(dateAdded) 2022-06-08 · 조치기한(dueDate) 2022-06-22 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-119\n설명(CISA shortDescription): Google Chromium V8 Engine contains an out-of-bounds read vulnerability that allows a remote attacker to cause a denial of service or possibly have another unspecified impact via crafted JavaScript code. This vulnerability could affect multiple web browsers that utilize Chromium, including, but not limited to, Google Chrome, Microsoft Edge, and Opera.\n요구 조치(requiredAction): Apply updates per vendor instructions.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-10.md#9142ae44f8b0",
+  "distractor": "on of privilege via network access.\n참조: https://explore.zoom.us/en/trust/security/security-bulletin/\n\nCVE-2023-39532 · 공개일 2023-08-08 · CVSS v3 기반점수 9.8 (CRITICAL) · CWE-20\n벡터(vectorString): CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\n설명(NVD 영어 원문): SES is a JavaScript environment that allows safe execution of arbitrary programs in Compartments. In version 0.18.0 prior to 0.18.7, 0.17.0 prior to 0.17.1, 0.16.0 prior to 0.16.1, 0.15.0 prior to 0.15.24, 0.14.0 prior to 0.14.5, an 0.13.0 prior to 0.13.5, there is a hole in the confinement of guest applications under SES that may manifest as either the ability to exfiltrate information or execute arbitrary code depending on the configuration and implementation of the surrounding host. Guest program running inside a Compartment with as few as no endowments can gain access to the surrounding host’s dynamic import by using dynamic import after the spread operator, like `{...import(arbitraryModuleSpecifier)}`. On the web or in web extensions, a Content-Security-Policy following ordinary best practices likely mitigates both the risk of exfiltration and execution of arbitrary code, at least limiting the modules that the attacker can import to those that are already part of the application. However, without a Content-Security-Policy, dynamic import can be used to issue HTTP requests for either communication through the URL or for the execution of code reachable from that origin. …\n참조: https://github.com/endojs/endo/security/advisories/GHSA-9c4h-3f7h-322r",
+  "distractorRef": "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#ad96e7c11ef1",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "Adobe ColdFusion의 이 취약점이 공격자에게 어떤 위협을 초래하며, 사용자가 별도로 조작할 필요가 있나요?",
+  "answer": "이 취약점은 신뢰할 수 없는 데이터 역직렬화 문제로 원격 코드 실행을 허용합니다. 공격자가 악성 데이터를 보내면 서버가 이를 처리하는 과정에서 임의의 코드가 실행될 수 있습니다. 이러한 공격은 사용자의 상호작용 없이도 성공할 수 있다는 점이 특히 위험합니다. 원문: \"Exploitation of this issue does not require user interaction.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-09.md#c07a5078ac6d"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "CVE-2023-26360 · Adobe ColdFusion · Adobe ColdFusion Deserialization of Untrusted Data Vulnerability\n등재일(dateAdded) 2023-03-15 · 조치기한(dueDate) 2023-04-05 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-284\n설명(CISA shortDescription): Adobe ColdFusion contains a deserialization of untrusted data vulnerability that allows for remote code execution.\n요구 조치(requiredAction): Apply updates per vendor instructions.\nNVD 설명(영어 원문): Adobe ColdFusion versions 2018 Update 15 (and earlier) and 2021 Update 5 (and earlier) are affected by an Improper Access Control vulnerability that could result in arbitrary code execution in the context of the current user. Exploitation of this issue does not require user interaction.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-09.md#c07a5078ac6d",
+  "distractor": "**분모가 두 갈래인 이유**: 모의훈련은 대상자 전원에게 한 통씩 보내므로 평소에는 **발송 통수 =\n대상 인원**이지만, 반송·휴직·퇴사자 정리로 둘이 어긋나는 순간이 온다.\n**어긋날 때의 정본은 위 표다.** 열람·클릭·전환·신고는 **발송 통수**를 분모로 쓴다(안 받은 사람은\n누를 기회 자체가 없었다). 응답·이수·참여는 **대상 인원**을 쓴다(과정을 한 번도 열지 않은 사람도\n대상이다). 이 문서와 제품의 📖 용어 풀이가 이 지표들을 「대상자 비율」이라 뭉뚱그려 적는 것은\n**둘이 같은 평소**를 말한 것이고, 어긋나는 회차에는 **이 표가 이긴다.** 그리고 어느 쪽을 썼는지\n결과 보고에 적는다 — 안 적으면 다음 회차와 비교할 수 없다.\n\n**꼭 갈라 두어야 할 짝**\n\n- **열람 ≠ 클릭.** 열람은 미리보기 창이나 이미지 자동 내려받기만으로도 잡히는 수라 **부풀기 쉽다.**\n  판단의 무게는 클릭 쪽에 둔다.\n- **클릭 ≠ 전환.** 누른 것과 **자격정보를 넘긴 것**은 피해 크기가 다르다. 하나만 본다면 전환이다.\n- **참여 ≠ 이수.** 참여는 시작, 이수는 완료다. 참여율만 보고하면 「다 들었다」로 읽히는데\n  실제로는 절반이 중간에 닫았을 수 있다.\n- **클릭률과 신고율은 반대 방향인데 함께 봐야 한다.** 둘 다 낮으면 좋아진 게 아니라\n  **아무도 반응하지 않은 것**일 수 있다 — 메일이 스팸함에 갇혔거나 훈련이 안 도달했다는 뜻이다.",
+  "distractorRef": "store:GIJO_지식_보안인식교육.md#de0c1c69473d",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "이 취약점이 특정 운영체제에만 영향을 미치는지, 그리고 어떤 조건에서 발생하는지 설명해 주세요.",
+  "answer": "해당 취약점은 윈도우 운영체제에서만 발생하며, 다른 운영체제에서는 영향을 받지 않습니다. 공격자는 손상된 콘텐츠 프로세스를 통해 `FilterNodeD2D1`에 악성 데이터를 전달하여 버퍼 경계를 초과하는 쓰기를 유발할 수 있습니다. 이는 특권 프로세스에서 악용 가능한 크래시로 이어질 수 있습니다. 원문: \"*This bug only affects Firefox on Windows. Other operating systems are unaffected.*\"",
+  "cites": [
+   "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#cc31e815d541"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "plaintext.\n참조: https://www.incibe.es/en/incibe-cert/notices/aviso/use-cleartext-credentials-sage-200\n\nCVE-2023-5168 · 공개일 2023-09-27 · CVSS v3 기반점수 9.8 (CRITICAL) · CWE-787\n벡터(vectorString): CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\n설명(NVD 영어 원문): A compromised content process could have provided malicious data to `FilterNodeD2D1` resulting in an out-of-bounds write, leading to a potentially exploitable crash in a privileged process. *This bug only affects Firefox on Windows. Other operating systems are unaffected.* This vulnerability affects Firefox < 118, Firefox ESR < 115.3, and Thunderbird < 115.3.\n참조: https://www.mozilla.org/security/advisories/mfsa2023-41/",
+  "chunkRef": "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#cc31e815d541",
+  "distractor": "indings Remediated`, `New Findings vs. Remediations` 추세 그래프,\n  자산 수/발견 수 20%↑ 변동 이벤트, Resurfaced 발생.\n→ **GIJO AS 채택(구현됨)**: 재스캔 결과를 올리면 이전과 비교해 \"고쳐진 비율·새로 생긴 것·재발\"을\n집계한다. KPI 화면에서 조치율·신규·고쳐짐·SLA 준수율을 숫자로, 열린 취약점이 재스캔마다 줄어드는\n모습을 「취약점 번다운」 그래프로 보여준다.\n\n## 7. 집계 규칙 (우리가 실데이터로 검증한 것)\n- **취약점 = 플러그인 단위로 센다.** 스캐너는 CVE마다·포트마다 행을 복제한다\n  (우리 실측: 1,171행 = 실제 282건). 그대로 세면 4배 부풀려진다. → Plugin ID 기준 병합(구현됨).\n- **플러그인당 지표는 \"최고값\"을 쓴다.** VPR/EPSS/Severity는 그 플러그인에 묶인 취약점 중 **가장\n  높은 값**으로 대표한다(Tenable 규정: \"highest value assigned or calculated\").\n- **포트는 조치 맥락으로 보존한다.** 같은 플러그인이 여러 포트에서 잡히면 1건으로 합치되 포트 목록은\n  남긴다(구현됨).",
+  "distractorRef": "store:GIJO_AS_취약점관리_지침.md#994d95877421",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "해당 취약점에 대한 랜섬웨어 캠페인 활용 여부는 어떻게 확인되나요?",
+  "answer": "현재 해당 취약점이 실제 랜섬웨어 공격 캠페인에 악용된 사례는 확인되지 않은 상태입니다. 하지만 확인되지 않았다고 해서 위험이 없는 것은 아니므로 주의가 필요합니다. 반드시 제조사의 지침에 따라 소프트웨어를 최신 상태로 유지해야 합니다. 원문: \"Apply updates per vendor instructions.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-09.md#a82870deb504"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "y test request to a rogue LDAP server.\n요구 조치(requiredAction): Apply updates per vendor instructions.\n\nCVE-2017-5521 · NETGEAR Multiple Devices · NETGEAR Multiple Devices Exposure of Sensitive Information Vulnerability\n등재일(dateAdded) 2022-09-08 · 조치기한(dueDate) 2022-09-29 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-200\n설명(CISA shortDescription): Multiple NETGEAR devices are prone to admin password disclosure via simple crafted requests to the web management server.\n요구 조치(requiredAction): Apply updates per vendor instructions. If the affected device has since entered end-of-life, it should be disconnected if still in use.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-09.md#a82870deb504",
+  "distractor": "· · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·580Ⅷ.\nDBMS· · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·593 1. 계정 관리· · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·596 2.",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#1765fc4995a8",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "관리자가 이 취약점을 완화하기 위해 직접 수행할 수 있는 조치는 무엇인가요?",
+  "answer": "관리자는 설정 파일에서 문제가 되는 하드코딩된 키를 수동으로 제거할 수 있습니다. 이를 통해 서버 측 역직렬화 공격 벡터를 차단하여 보안 위험을 줄일 수 있습니다. 원문: \"NOTE: a CentreStack admin can manually delete the machineKey defined in portal\\web.config.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-04.md#1aeecf3948b9"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "n Windows Common Log File System Driver allows an authorized attacker to elevate privileges locally.\n\nCVE-2025-30406 · Gladinet CentreStack · Gladinet CentreStack and Triofox Use of Hard-coded Cryptographic Key Vulnerability\n등재일(dateAdded) 2025-04-08 · 조치기한(dueDate) 2025-04-29 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-321\n설명(CISA shortDescription): Gladinet CentreStack and Triofox contains a use of hard-coded cryptographic key vulnerability in the way that the application manages keys used for ViewState integrity verification. Successful exploitation allows an attacker to forge ViewState payloads for server-side deserialization, allowing for remote code execution.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Gladinet CentreStack through 16.1.10296.56315 (fixed in 16.4.10315.56368) has a deserialization vulnerability due to the CentreStack portal's hardcoded machineKey use, as exploited in the wild in March 2025. This enables threat actors (who know the machineKey) to serialize a payload for server-side deserialization to achieve remote code execution. NOTE: a CentreStack admin can manually delete the machineKey defined in portal\\web.config.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-04.md#1aeecf3948b9",
+  "distractor": "제어시스템 운전원, 관리자, 유지보수 인력 등 제어시스템 운영과 관련된 모든 인력을 대상으로 하여 실시되는지 확인하고 그렇지 않은 경우 관련 인력을 모두 포함하여 실시하도록 조치\nPC1. 계정 관리· · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·5552. 서비스 관리· · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·5613. 패치 관리· · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·5774.",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#3ef410e8e855",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "이 취약점을 악용하기 위해 공격자가 갖추어야 하는 권한과 접근 방식은 어떻게 되나요?",
+  "answer": "공격은 원격이 아닌 시스템 내부의 로컬 환경에서 이루어지며 특정 권한이 필요합니다. 원문: \"Samsung mobile devices running Android 11, 12, and 13 contain an insertion of sensitive information into log file vulnerability that allows a privileged, local attacker to conduct an address space layout randomization (ASLR) bypass.\"\n권한이 없는 일반 사용자는 이 취약점을 직접 악용할 수 없으므로 내부 통제와 접근 관리가 중요합니다. 그러나 일단 권한을 탈취당하면 ASLR 우회로 더 큰 피해를 입을 수 있어 주의해야 합니다.",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-08.md#d2972933d1ee"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "ch can lead to information disclosure.\n요구 조치(requiredAction): Apply updates per vendor instructions.\n\nCVE-2023-21492 · Samsung Mobile Devices · Samsung Mobile Devices Insertion of Sensitive Information Into Log File Vulnerability\n등재일(dateAdded) 2023-05-19 · 조치기한(dueDate) 2023-06-09 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-532\n설명(CISA shortDescription): Samsung mobile devices running Android 11, 12, and 13 contain an insertion of sensitive information into log file vulnerability that allows a privileged, local attacker to conduct an address space layout randomization (ASLR) bypass.\n요구 조치(requiredAction): Apply updates per vendor instructions.\nNVD 설명(영어 원문): Kernel pointers are printed in the log file prior to SMR May-2023 Release 1 allows a privileged local attacker to bypass ASLR.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-08.md#d2972933d1ee",
+  "distractor": "가지 뜻으로 쓰입니다** — 취약점을 찾는 「취약점 스캔」과, 종이를 그림으로 뜨는 「문서 스캔」입니다. 헷갈릴 자리에서는 **「스캔 문서」·「스캔 PDF」**처럼 붙여 씁니다.\n언제 도나: 글자가 **거의 없는** PDF(20자 미만)와 이미지 파일(png·jpg·tiff 등)에서만 돕니다. 글자가 들어 있는 PDF·워드·한글은 OCR 없이 바로 읽으므로 더 빠릅니다.\n\n어디에 있나: **Windows 설치본에는 함께 들어 있습니다**(한국어 PP-OCRv5 모델 동봉, 폐쇄망에서도 바깥으로 안 나갑니다). mac 설치본과 사내 GPU 서버에는 관리자가 따로 깔아야 하며, 업로드 화면이 **서버에 물어보고** 되는지 안 되는지를 표시합니다 — 「들어 있습니다」라고 무조건 적지 않습니다.\n\n한계: 흐리거나 삐뚤어진 사진은 못 읽을 수 있고, 30쪽까지만 읽습니다(그보다 길면 앞 30쪽만 읽고 그렇게 알려 줍니다). 아주 오래 걸리면(10분) 멈추고 「쪽을 나눠 올리세요」라고 안내합니다.\n\n**못 읽었을 때는 정직하게 거절합니다** — 빈 내용을 「성공」으로 넣지 않습니다. 다만 기준이 갈래마다 다릅니다: 사진·이미지는 **한 글자도 못 읽으면** 거절하고, PDF는 **20자가 안 되면** 버립니다(부스러기 몇 자를 「읽었다」고 하면 그것이 지식이 되기 때문입니다).",
+  "distractorRef": "store:GIJO_AS_용어사전.md#c6e72ace32d7",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "PrinterLogic 바이너리가 호출될 때 어떤 보안 결함이 존재하나요?",
+  "answer": "설치자가 장치를 구성하기 위해 바이너리를 호출할 때 해당 창이 숨겨지지 않는 문제가 있습니다. 또한 이 과정은 높은 권한으로 실행되므로 일반 사용자도 악용할 수 있는 구조입니다. 원문: \"During client installation and repair, a PrinterLogic binary is called by the installer to configure the device.\"",
+  "cites": [
+   "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#eb05a1d3509e"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": " execution.\n참조: https://docs.printercloud.com/1-Printerlogic/Release_Notes/Security_Bulletin_CVE.htm\n\nCVE-2023-32232 · 공개일 2023-07-25 · CVSS v3 기반점수 9.9 (CRITICAL)\n벡터(vectorString): CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:H/A:H\n설명(NVD 영어 원문): An issue was discovered in Vasion PrinterLogic Client for Windows before 25.0.0.836. During client installation and repair, a PrinterLogic binary is called by the installer to configure the device. This window is not hidden, and is running with elevated privileges. A standard user can break out of this window, obtaining a full SYSTEM command prompt window. This results in complete compromise via arbitrary SYSTEM code execution (elevation of privileges).\n참조: https://docs.printercloud.com/1-Printerlogic/Release_Notes/Security_Bulletin_CVE.htm",
+  "chunkRef": "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#eb05a1d3509e",
+  "distractor": "정** — 설정 · AI(팀·지식·학습·안전장치) · 기록(감사·진단).\n- **지시는 대화창 한 곳에서만** 받습니다 — 화면은 보여 주는 일만 합니다(오조작·이중 입구 방지).\n### 4.16 🧾 로그 분석 · 보안제품 비교·소개 · 업무 넘기기 *(2026-08)*\n세 기능은 각각 **③ 취약점 업무 · ① 내 지식 · ② 내 문서** 메뉴 안에 들어 있습니다(예전의 「추가 기능」 묶음은 없어졌습니다).\n\n- **보안 로그 파일 분석:** 올린 로그 파일을 대장으로 쌓고, **그 로그에 등장한 내부 IP 중 아직 자산으로\n  등록되지 않은 것**을 골라 체크 한 번으로 등록합니다. 이벤트 유형(브루트포스·포트스캔·차단 폭주·웹공격)에는\n  KISA 기준의 **4단계 대응 절차**가 붙습니다(모르는 유형에는 절차를 지어내지 않습니다).\n- **보안제품 비교·소개(옛 제품 소개자료):** 벤더 제품 소개서를 분류해 목록으로 쌓고 **최대 3개까지 표로 비교**합니다.\n  보안제품 **매뉴얼과는 별도 대장**이며, 처음 올릴 때 결재판으로 확인합니다. 근거가 없는 칸은\n  지어내지 않고 「—」로 둡니다.\n- **업무 넘기기:** 인수인계 문서를 근거 배지와 함께 자동 구성합니다.",
+  "distractorRef": "store:GIJO_AS_제품소개.md#3a0a097b98b2",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "CVE-2026-68820 취약점의 근본적인 원인은 무엇이며 공격자가 이를 통해 어떤 영향을 미칠 수 있나요?",
+  "answer": "해당 취약점은 윈도우의 보조 기능 드라이버에서 발생하는 사용 후 해제 오류로 인해 발생합니다. 이는 인증된 공격자가 로컬 환경에서 권한을 상승시킬 수 있게 하는 보안 결함입니다. 원문: \"Microsoft Windows Ancillary Function Driver for WinSock contains a use-after-free vulnerability that allows an authorized attacker to elevate privileges locally.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-01.md#aecc43c99d65"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). …\n\nCVE-2026-68820 · Microsoft Windows Ancillary Function Driver for WinSock · Microsoft Windows Ancillary Function Driver for WinSock Use-After-Free Vulnerability\n등재일(dateAdded) 2026-08-11 · 조치기한(dueDate) 2026-08-25 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-416\n설명(CISA shortDescription): Microsoft Windows Ancillary Function Driver for WinSock contains a use-after-free vulnerability that allows an authorized attacker to elevate privileges locally.\n요구 조치(requiredAction): Apply mitigations in accordance with vendor instructions, ensuring compliance with CISA’s BOD 26-04 Prioritizing Security Updates Based on Risk (see URL in Notes) guidance and CISA’s “Forensics Triage Requirements” (see URL in Notes). …",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-01.md#aecc43c99d65",
+  "distractor": "thenticated OS Command Injection via shell metacharacters in ipAddr or dnsAddr /cgi/networkDiag.cgi.\n\nCVE-2024-21338 · Microsoft Windows · Microsoft Windows Kernel Exposed IOCTL with Insufficient Access Control Vulnerability\n등재일(dateAdded) 2024-03-04 · 조치기한(dueDate) 2024-03-25 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-822\n설명(CISA shortDescription): Microsoft Windows Kernel contains an exposed IOCTL with insufficient access control vulnerability within the IOCTL (input and output control) dispatcher in appid.sys that allows a local attacker to achieve privilege escalation.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Windows Kernel Elevation of Privilege Vulnerability",
+  "distractorRef": "server/data/ladder/material/day1/kev/kev-07.md#d1632798047e",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "Versa Director의 데이터베이스 보안 설정이 왜 위험한가요?",
+  "answer": "이 취약점은 기본 설정이 모든 인스턴스에서 공통 비밀번호를 사용한다는 점에 기인합니다. 또한 기본값으로 Postgres가 모든 네트워크 인터페이스에서 수신 대기하도록 구성되어 있어 공격 표면이 넓어집니다. 이러한 조건이 결합되면 인증되지 않은 공격자가 데이터베이스에 접근할 수 있게 됩니다. 원문: \"The default configuration has a common password across all instances of Versa Director. By default, Versa Director configures Postgres to listen on all network interfaces.\"",
+  "cites": [
+   "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#0429202bb00d"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "hable from that origin. …\n참조: https://github.com/endojs/endo/security/advisories/GHSA-9c4h-3f7h-322r\n\nCVE-2024-42450 · 공개일 2024-11-19 · CVSS v3 기반점수 10.0 (CRITICAL) · CWE-798\n벡터(vectorString): CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H\n설명(NVD 영어 원문): The Versa Director uses PostgreSQL (Postgres) to store operational and configuration data. It is also needed for High Availability function of the Versa Director. The default configuration has a common password across all instances of Versa Director. By default, Versa Director configures Postgres to listen on all network interfaces. This combination allows an unauthenticated attacker to access and administer the database or read local filesystem contents to escalate privileges on the system. Exploitation Status: Versa Networks is not aware of this exploitation in any production systems. A proof of concept exists in the lab environment. Workarounds or Mitigation: Starting with the latest 22.1.4 version of Versa Director, the software will automatically restrict access to the Postgres and HA ports to only the local and peer Versa Directors. For older releases, Versa recommends performing manual hardening of HA ports. …\n참조: https://security-portal.versa-networks.com/emailbulletins/6735a300415abb89e9a8a9d3",
+  "chunkRef": "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#0429202bb00d",
+  "distractor": "new byte[IV_LEN]; RNG.nextBytes(iv);\n10.\nWeb Application(웹) 보안2026 주요정보통신기반시설 기술적 취약점 분석·평가 방법 상세가이드\n// AES-256-CBC 암호화 Cipher cipher = Cipher.getInstance(\"AES/CBC/PKCS5Padding\"); cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(encKey, \"AES\"), new IvParameterSpec(iv)); byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8)); Mac mac = Mac.getInstance(\"HmacSHA256\"); mac.init(new SecretKeySpec(hmacKey, \"HmacSHA256\")); mac.update(iv); mac.update(ciphertext); byte[] hmac = mac.doFinal(); byte[] payload = new byte[iv.length + hmac.length + ciphertext.length]; System.arraycopy(iv, 0, payload, 0, iv.length); System.arraycopy(hmac, 0, payload, iv.length, hmac.length); System.arraycopy(ciphertext, 0, payload, iv.length + hmac.length, ciphertext.length); String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(payload); // HttpOnly, Secure 속성 설정 Cookie cookie = new Cookie(name, encoded); cookie.setHttpOnly(true); cookie.setSecure(true); cookie.setPath(\"/\"); cookie.setMaxAge(maxAgeSec); // SameSite 속성은 Cookie API로 직접 지정 불가 → 헤더로 세팅 String header = String.format( \"%s=%s; Max-Age=%d; Path=/; HttpOnly; Secure; SameSite=Strict\", name, encoded, maxAgeSec ); resp.addHeader(\"Set-Cookie\", header); } // 쿠키 읽기 (HMAC 검증 + 복호화) public String readSecureCookie(String value) throws Exception { if (value == null) return null; byte[] data; try { data = Base64.getUrlDecoder().decode(value); } catch (IllegalArgumentException e) { return null; } if (data.length < IV_LEN + HMAC_LEN + 1) return null;",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#7a7ce5e7bdaa",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "해당 취약점을 방치할 경우 공격자가 어떤 피해를 줄 수 있나요?",
+  "answer": "이 취약점은 로컬 환경에서 권한을 상승시킬 수 있는 문제를 포함하고 있습니다. 신뢰할 수 없는 입력 값에 의존하여 보안 결정을 내리는 구조적 결함이 원인입니다. 원문: \"Microsoft Office Word contains a reliance on untrusted inputs in a security decision vulnerability that could allow an authorized attacker to elevate privileges locally.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-02.md#9180fd5124df"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\n\nCVE-2026-21514 · Microsoft Office · Microsoft Office Word Reliance on Untrusted Inputs in a Security Decision Vulnerability\n등재일(dateAdded) 2026-02-10 · 조치기한(dueDate) 2026-03-03 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-807\n설명(CISA shortDescription): Microsoft Office Word contains a reliance on untrusted inputs in a security decision vulnerability that could allow an authorized attacker to elevate privileges locally.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-02.md#9180fd5124df",
+  "distractor": "d take control of the affected system.\n요구 조치(requiredAction): Apply updates per vendor instructions.\n\nCVE-2016-1010 · Adobe Flash Player and AIR · Adobe Flash Player and AIR Integer Overflow Vulnerability\n등재일(dateAdded) 2022-05-25 · 조치기한(dueDate) 2022-06-15 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-190\n설명(CISA shortDescription): Integer overflow vulnerability in Adobe Flash Player and AIR allows attackers to execute code.\n요구 조치(requiredAction): The impacted products are end-of-life and should be disconnected if still in use.",
+  "distractorRef": "server/data/ladder/material/day1/kev/kev-10.md#1fcac267934c",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "해당 취약점을 해결하기 위해 우리가 취해야 할 구체적인 조치는 무엇인가요?",
+  "answer": "벤더가 제공하는 지침에 따라 완화 조치를 적용하거나, 클라우드 서비스의 경우 관련 연방 지침을 따라야 합니다. 만약 마땅한 완화책이 없다면 해당 제품의 사용을 중단하는 것이 요구됩니다. 원문: \"Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-05.md#11edc92d53d7"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "CVE-2024-13161 · Ivanti Endpoint Manager (EPM) · Ivanti Endpoint Manager (EPM) Absolute Path Traversal Vulnerability\n등재일(dateAdded) 2025-03-10 · 조치기한(dueDate) 2025-03-31 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-36\n설명(CISA shortDescription): Ivanti Endpoint Manager (EPM) contains an absolute path traversal vulnerability that allows a remote unauthenticated attacker to leak sensitive information.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Absolute path traversal in Ivanti EPM before the 2024 January-2025 Security Update and 2022 SU6 January-2025 Security Update allows a remote unauthenticated attacker to leak sensitive information.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-05.md#11edc92d53d7",
+  "distractor": "22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\n\nCVE-2026-20700 · Apple Multiple Products · Apple Multiple Buffer Overflow Vulnerability\n등재일(dateAdded) 2026-02-12 · 조치기한(dueDate) 2026-03-05 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-119\n설명(CISA shortDescription): Apple iOS, macOS, tvOS, watchOS, and visionOS contain an improper restriction of operations within the bounds of a memory buffer vulnerability that could allow an attacker with memory write the capability to execute arbitrary code.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.",
+  "distractorRef": "server/data/ladder/material/day1/kev/kev-02.md#a9589f1dbc26",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "취약점의 근본 원인은 무엇이며 어떤 보안 영향을 미칩니까?",
+  "answer": "이 취약점은 윈도우 공통 로그 파일 시스템 드라이버에서 발생하는 사용 후 해제(Use-After-Free) 결함입니다. 메모리 관리 오류로 인해 이미 해제된 메모리 영역에 접근하려 시도할 때 시스템 불안정이나 코드 실행이 발생할 수 있습니다. 「원문: \"Microsoft Windows Common Log File System (CLFS) Driver contains a use-after-free vulnerability that allows an authorized attacker to elevate privileges locally.\"」 이러한 메모리 오류는 최종적으로 로컬 권한 상승으로 이어질 수 있으므로 드라이버 차원의 철저한 검증이 필요합니다.",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-04.md#c799a7b80d61"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "ating dev->config. This can lead to out-of-bounds accesses later, e.g. in usb_destroy_configuration.\n\nCVE-2025-29824 · Microsoft Windows · Microsoft Windows Common Log File System (CLFS) Driver Use-After-Free Vulnerability\n등재일(dateAdded) 2025-04-08 · 조치기한(dueDate) 2025-04-29 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-416\n설명(CISA shortDescription): Microsoft Windows Common Log File System (CLFS) Driver contains a use-after-free vulnerability that allows an authorized attacker to elevate privileges locally.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Use after free in Windows Common Log File System Driver allows an authorized attacker to elevate privileges locally.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-04.md#c799a7b80d61",
+  "distractor": "설)\nAI 답이 **맞는지**를 재는 잣대입니다. 그전에는 \"30초 안에 왔나 · 못 알아듣겠다고 했나\"\n같은 **형식만** 봐서, 내용이 틀려도 150개 전부 통과로 나왔습니다.\n이제 문항마다 **어느 기능으로 가야 하는지 · 반드시 들어가야 할 말 · 있으면 안 되는 말**을\n적어 두고 대조합니다. 다만 150개 전부에 정답을 적을 수는 없어(정답이 데이터에 따라 변합니다),\n**적힌 문항 수를 보고서에 함께 표시**합니다 — 덮어 두면 \"얼마나 검사했는지\"조차 모르게 됩니다.\n\n⚠ 기대는 **짐작이 아니라 제품을 보고** 적습니다. 첫 실행에서 「지금 제일 급한 게 뭐야?」의\n기대를 잘못 적어 멀쩡한 답을 틀렸다고 판정한 일이 있었습니다.\n\n### 껍데기(stub) — 「있는데 안 도는 것」 (2026-08-10 추가)\n프로그램인 척하는 **0바이트 파일**입니다. Windows가 「파이썬 설치하시겠어요?」를 안내하려고\n`python3`라는 이름으로 넣어 두는데, 명령줄에서 부르면 아무 일도 안 하고 멈춥니다.\n\n⚠ 이게 무서운 이유: **`which python3`으로는 「있다」고 나옵니다.** 그래서 「제품이 파이썬을\n못 찾는다」가 아니라 「찾았는데 안 돈다」가 되고, 원인을 엉뚱한 데서 찾게 됩니다.\n실제로 그것 때문에 「Windows 제품 결함」이라고 잘못 보고할 뻔했습니다(운영은 WSL이라 멀쩡).",
+  "distractorRef": "store:GIJO_AS_용어사전.md#69eadf6d4fd9",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "이 취약점이 랜섬웨어와 어떤 연관이 있나요?",
+  "answer": "해당 취약점은 이미 알려진 랜섬웨어 캠페인에서 악용된 것으로 확인되었습니다. 이는 단순한 이론적 위험이 아니라 실제 공격에 사용된 사례가 존재함을 의미합니다. 원문: \"knownRansomwareCampaignUse: Known\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-09.md#311e36cbf63f"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "er vendor instructions.\nNVD 설명(영어 원문): Windows Mark of the Web Security Feature Bypass Vulnerability\n\nCVE-2022-41073 · Microsoft Windows · Microsoft Windows Print Spooler Privilege Escalation Vulnerability\n등재일(dateAdded) 2022-11-08 · 조치기한(dueDate) 2022-12-09 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-787\n설명(CISA shortDescription): Microsoft Windows Print Spooler contains an unspecified vulnerability that allows an attacker to gain SYSTEM-level privileges.\n요구 조치(requiredAction): Apply updates per vendor instructions.\nNVD 설명(영어 원문): Windows Print Spooler Elevation of Privilege Vulnerability",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-09.md#311e36cbf63f",
+  "distractor": "M1017 User Training, M1040 Behavior Prevention on Endpoint, M1049 Antivirus/Antimalware, M1047 Audit\n\nT1029 · Scheduled Transfer · 전술(tactic): Exfiltration · 플랫폼: Linux, macOS, Windows\n설명(description): Adversaries may schedule data exfiltration to be performed only at certain times of day or at certain intervals. This could be done to blend traffic patterns with normal activity or availability. When scheduled exfiltration is used, other exfiltration techniques likely apply as well to transfer the information out of the network, such as Exfiltration Over C2 Channel or Exfiltration Over Alternative Protocol.\n관련 완화(mitigations): M1031 Network Intrusion Prevention",
+  "distractorRef": "server/data/ladder/material/day1/attack/attack-01.md#4e03927bb690",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "해당 취약점을 공격자가 악용하면 어떤 보안 위협이 발생하나요?",
+  "answer": "이 취약점은 인증되지 않은 사용자가 시스템에서 명령어를 실행할 수 있게 하는 심각한 결함을 포함하고 있습니다. 따라서 공격자는 서버 제어권을 탈취하여 내부 데이터를 유출하거나 악성 코드를 배포할 수 있습니다. 해당 위험성을 명확히 하는 원문은 다음과 같습니다. 원문: \"Synacor Zimbra Collaboration Suite (ZCS) contains an unspecified vulnerability in the postjournal service that may allow an unauthenticated user to execute commands.\" 보안 담당자는 이 취약점이 외부 공격자의 원격 코드 실행으로 이어질 수 있음을 인지해야 합니다.",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-06.md#947b4d661c97"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "ions are unavailable.\nNVD 설명(영어 원문): Memory corruption while maintaining memory maps of HLOS memory.\n\nCVE-2024-45519 · Synacor Zimbra Collaboration Suite (ZCS) · Synacor Zimbra Collaboration Suite (ZCS) Command Execution Vulnerability\n등재일(dateAdded) 2024-10-03 · 조치기한(dueDate) 2024-10-24 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-284\n설명(CISA shortDescription): Synacor Zimbra Collaboration Suite (ZCS) contains an unspecified vulnerability in the postjournal service that may allow an unauthenticated user to execute commands.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): The postjournal service in Zimbra Collaboration (ZCS) before 8.8.15 Patch 46, 9 before 9.0.0 Patch 41, 10 before 10.0.9, and 10.1 before 10.1.1 sometimes allows unauthenticated users to execute commands.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-06.md#947b4d661c97",
+  "distractor": " 15.8.7 and iPadOS 15.8.7. Processing maliciously crafted web content may lead to memory corruption.\n\nCVE-2021-30952 · Apple Multiple Products · Apple Multiple Products Integer Overflow or Wraparound Vulnerability\n등재일(dateAdded) 2026-03-05 · 조치기한(dueDate) 2026-03-26 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-190\n설명(CISA shortDescription): Apple tvOS, macOS, Safari, iPadOS and watchOS contain an integer overflow or wraparound vulnerability due to the processing of maliciously crafted web content that may lead to arbitrary code execution.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): An integer overflow was addressed with improved input validation. This issue is fixed in tvOS 15.2, macOS Monterey 12.1, Safari 15.2, iOS 15.2 and iPadOS 15.2, watchOS 8.3. Processing maliciously crafted web content may lead to arbitrary code execution.",
+  "distractorRef": "server/data/ladder/material/day1/kev/kev-02.md#4b7792379f46",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "아이반티 EPMM의 인증 우회 취약점으로 인해 공격자가 어떤 피해를 입힐 수 있나요?",
+  "answer": "이 취약점은 공격자가 정당한 인증 절차 없이도 애플리케이션의 제한된 기능이나 자원에 접근할 수 있게 합니다. 이는 시스템 보안의 핵심인 접근 통제 메커니즘이 무너진 상태를 의미합니다. 원문: \"An authentication bypass vulnerability in Ivanti EPMM 11.10 and older, allows unauthorized users to access restricted functionality or resources of the application without proper authentication.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-07.md#45c617564e4a"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "s to vCenter Server may trigger an out-of-bounds write potentially leading to remote code execution.\n\nCVE-2023-35082 · Ivanti Endpoint Manager Mobile (EPMM) and MobileIron Core · Ivanti Endpoint Manager Mobile (EPMM) and MobileIron Core Authentication Bypass Vulnerability\n등재일(dateAdded) 2024-01-18 · 조치기한(dueDate) 2024-02-08 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-287\n설명(CISA shortDescription): Ivanti Endpoint Manager Mobile (EPMM) and MobileIron Core contain an authentication bypass vulnerability that allows unauthorized users to access restricted functionality or resources of the application.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): An authentication bypass vulnerability in Ivanti EPMM 11.10 and older, allows unauthorized users to access restricted functionality or resources of the application without proper authentication. This vulnerability is unique to CVE-2023-35078 announced earlier.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-07.md#45c617564e4a",
+  "distractor": "“시스템 종료: 로그온하지 않고 시스템 종료 허용”을 “사용 안 함”으로 설정\n[ 로그온하지 않고 시스템 종료 허용 사용 안 함 설정 ]\nW-49(상) Windows 서버 > 5.\n보안 관리원격 시스템에서 강제로 시스템 종료개요점검 내용원격 시스템 종료 정책 적절성 점검점검 목적원격에서 네트워크를 통하여 운영체제를 종료할 수 있는 사용자나 그룹을 설정하여 특정 사용자만 시스템 종료를 허용하기 위함보안 위협원격 시스템 강제 종료 설정이 부적절한 경우 서비스 거부 공격 등에 악용될 위험이 존재함참고- 점검 대상 및 판단 기준대상Windows NT, 2000, 2003, 2008, 2012, 2016, 2019, 2022판단 기준양호 : “원격 시스템에서 강제로 시스템 종료” 정책에 “Administrators”만 존재하는 경우취약 : “원격 시스템에서 강제로 시스템 종료” 정책에 “Administrators” 외 다른 계정 및 그룹이 존재하는 경우조치 방법“원격 시스템에서 강제로 시스템 종료” 정책에 “Administrators” 외 다른 계정 및 그룹 제거조치 시 영향일반적인 경우 영향 없음점검 및 조치 사례lWindows NT, 2000, 2003, 2008, 2012, 2016, 2019, 2022Step 1)시작 > 제어판 > 관리 도구 > 로컬 보안 정책 > 로컬 정책 > 사용자 권한 할당Step 2)“원격 시스템에서 강제로 시스템 종료” 정책에 Administrators 외 다른 계정 및 그룹 제거\n[ 원격 시스템에서 강제 종료 ]\nW-50(상) Windows 서버 > 5.",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#ca880cc86905",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "ASUS 라우터에서 인증 우회 취약점이 발생할 때 공격자가 어떤 결과를 초래할 수 있나요?",
+  "answer": "해당 취약점은 공격자가 관리자 인터페이스에 무단으로 접근할 수 있게 합니다. 특히 인증되지 않은 사용자의 원격 입력을 처리할 때 인증 절차가 우회됩니다. 원문: \"The administrator application on ASUS GT-AC2900 devices before 3.0.0.4.386.42643 and Lyra Mini before 3.0.0.4_384_46630 allows authentication bypass when processing remote input from an unauthenticated user, leading to unauthorized access to the administrator interface.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-04.md#2de5b974bb80"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "lable.\nNVD 설명(영어 원문): Memory corruption while rendering graphics using Adreno GPU drivers in Chrome.\n\nCVE-2021-32030 · ASUS Routers · ASUS Routers Improper Authentication Vulnerability\n등재일(dateAdded) 2025-06-02 · 조치기한(dueDate) 2025-06-23 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-287\n설명(CISA shortDescription): ASUS Lyra Mini and ASUS GT-AC2900 devices contain an improper authentication vulnerability that allows an attacker to gain unauthorized access to the administrative interface. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): The administrator application on ASUS GT-AC2900 devices before 3.0.0.4.386.42643 and Lyra Mini before 3.0.0.4_384_46630 allows authentication bypass when processing remote input from an unauthenticated user, leading to unauthorized access to the administrator interface. This relates to handle_request in router/httpd/httpd.c and auth_check in web_hook.o. An attacker-supplied value of '\\0' matches the device's default value of '\\0' in some situations. …",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-04.md#2de5b974bb80",
+  "distractor": "분리 사용하고 있어야 함※제어시스템 기기에서는 계정 관리 기능에서 계정별 권한을 분리하여 할당할 수 있는 기능을 제공하고 있으며 이를 활용하여 용도별 권한을 분리하여 사용 가능함\n[ PLC의 계정 관리 화면 예시 ]점검 대상 및 판단 기준대상제어시스템 운영 환경에서 계정 접근이 요구되는 전체 구성요소판단 기준양호 : 계정에 따라 각 용도에 맞는 최소한의 권한을 부여하여 사용하고 있는 경우취약 : 계정에 따라 각 용도에 맞지 않는 권한이 부여되어 사용하고 있는 경우조치 방법계정의 용도에 따른 별도 권한 부여 설정조치 시 영향일부 제어시스템 설정에 따라 접속 오류 발생 가능점검 및 조치 사례l공통Step 1)용도별 계정으로 기기에 접근하는 경우, 용도에 맞도록 권한이 분리되고 있는지 확인§관리 용도의 계정, 운영 용도의 계정, 유지보수 용도의 계정에 따라 각각 권한을 다르게 부여하고 있어야 하며, 다만 점검 대상의 필요성, 또는 환경에 따라 용도별 구분이 없는 경우 예외로 허용 가능\n(예시: 관리자 1명이 운영을 동시에 하며 다른 사용자가 없는 경우) \nC-06(중) 제어시스템 > 1.",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#93eb42b5ff8b",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "공급망 보안과 관련하여 벤더 지시사항이 없는 경우 Windows DWM Core Library 취약점에 대해 어떻게 대응해야 하나요?",
+  "answer": "벤더의 완화 지침을 따르거나 클라우드 서비스의 경우 BOD 22-01 가이드라인을 준수해야 합니다. 만약 완화 조치가 전혀 제공되지 않는다면 해당 제품 사용을 중단하는 것이 요구됩니다. 원문: \"Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-04.md#be3ad340cebd"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "n Windows Common Log File System Driver allows an authorized attacker to elevate privileges locally.\n\nCVE-2025-30400 · Microsoft Windows · Microsoft Windows DWM Core Library Use-After-Free Vulnerability\n등재일(dateAdded) 2025-05-13 · 조치기한(dueDate) 2025-06-03 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-416\n설명(CISA shortDescription): Microsoft Windows DWM Core Library contains a use-after-free vulnerability that allows an authorized attacker to elevate privileges locally.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Use after free in Windows DWM allows an authorized attacker to elevate privileges locally.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-04.md#be3ad340cebd",
+  "distractor": ".005 TFTP Boot, T1552.007 Container API, T1133 External Remote Services, T1552 Unsecured Credentials\n\nM1036 · Account Use Policies · 유형: 완화 대책(mitigation)\n설명(description): Account Use Policies help mitigate unauthorized access by configuring and enforcing rules that govern how and when accounts can be used. These policies include enforcing account lockout mechanisms, restricting login times, and setting inactivity timeouts. Proper configuration of these policies reduces the risk of brute-force attacks, credential theft, and unauthorized access by limiting the opportunities for malicious actors to exploit accounts. This mitigation can be implemented through the following measures: Account Lockout Policies: - Implementation: Configure account lockout settings so that after a defined number of failed login attempts (e.g., 3-5 attempts), the account is locked for a specific time period (e.g., 15 minutes) or requires an administrator to unlock it. …\n이 완화가 막는 기법(11개 중 11개): T1648 Serverless Execution, T1550.001 Application Access Token, T1684 Social Engineering, T1110.004 Credential Stuffing, T1550 Use Alternate Authentication Material, T1110.001 Password Guessing, T1621 Multi-Factor Authentication Request Generation, T1078.004 Cloud Accounts, T1110 Brute Force, T1110.003 Password Spraying, T1078 Valid Accounts",
+  "distractorRef": "server/data/ladder/material/day1/attack/attack-03.md#6056adad1ed7",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "벤더로부터 적절한 보안 패치가 제공되지 않는다면 시스템 운영을 어떻게 이어가야 하나요?",
+  "answer": "만약 제조사로부터 해결책이나 완화 조치를 받을 수 없는 상황이라면 해당 제품의 사용을 즉시 중단해야 합니다. 이는 공격자가 취약점을 악용하여 시스템에 접근하는 것을 원천적으로 차단하기 위한 최후의 수단입니다. 「원문: \"Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\"」 클라우드 환경의 경우에는 관련 지침을 따르되, 근본적인 해결이 불가능할 경우 서비스 중단을 고려하십시오.",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-02.md#ef9e00fbdaed"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "ations are unavailable.\nNVD 설명(영어 원문): Microsoft Exchange Server Remote Code Execution Vulnerability\n\nCVE-2023-36424 · Microsoft Windows · Microsoft Windows Out-of-Bounds Read Vulnerability\n등재일(dateAdded) 2026-04-13 · 조치기한(dueDate) 2026-04-27 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-125\n설명(CISA shortDescription): Microsoft Windows Common Log File System Driver contains an out-of-bounds read vulnerability that could allow a threat actor for privileges escalation\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Windows Common Log File System Driver Elevation of Privilege Vulnerability",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-02.md#ef9e00fbdaed",
+  "distractor": "rough r29p0 before r30p0, Valhall r19p0 through r29p0 before r30p0, and Midgard r28p0 through r30p0.\n\nCVE-2019-17621 · D-Link DIR-859 Router · D-Link DIR-859 Router Command Execution Vulnerability\n등재일(dateAdded) 2023-06-29 · 조치기한(dueDate) 2023-07-20 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-78\n설명(CISA shortDescription): D-Link DIR-859 router contains a command execution vulnerability in the UPnP endpoint URL, /gena.cgi. Exploitation allows an unauthenticated remote attacker to execute system commands as root by sending a specially crafted HTTP SUBSCRIBE request to the UPnP service when connecting to the local network.\n요구 조치(requiredAction): Apply updates per vendor instructions or discontinue use of the product if updates are unavailable.",
+  "distractorRef": "server/data/ladder/material/day1/kev/kev-08.md#dc726b4594f3",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "이 취약점에 대한 현재 알려진 악용 상태나 랜섬웨어 연계 여부는 어떻게 되나요?",
+  "answer": "애플은 이 문제가 실제로 악용되고 있을 가능성이 있다는 보고를 인지하고 있는 상태입니다. 다만 랜섬웨어 캠페인과의 직접적인 연관성은 아직 불확실한 것으로 분류되었습니다. 「원문: \"Apple is aware of a report that this issue may have been actively exploited.\"」 이는 해당 취약점이 제로데이 공격 등으로 이미 사용되었을 가능성을 시사하므로 매우 높은 우선순위로 대응해야 합니다. 랜섬웨어 연계 여부가 Unknown인 상태에서도 실제 악용 가능성을 고려해 즉시 패치를 적용하는 것이 안전합니다.",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-09.md#fed3642c2618"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "bitrary code execution. Apple is aware of a report that this issue may have been actively exploited.\n\nCVE-2022-2856 · Google Chromium Intents · Google Chromium Intents Insufficient Input Validation Vulnerability\n등재일(dateAdded) 2022-08-18 · 조치기한(dueDate) 2022-09-08 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-20\n설명(CISA shortDescription): Google Chromium Intents contains an insufficient validation of untrusted input vulnerability that allows a remote attacker to browse to a malicious website via a crafted HTML page. This vulnerability could affect multiple web browsers that utilize Chromium, including, but not limited to, Google Chrome, Microsoft Edge, and Opera.\n요구 조치(requiredAction): Apply updates per vendor instructions.\nNVD 설명(영어 원문): Insufficient validation of untrusted input in Intents in Google Chrome on Android prior to 104.0.5112.101 allowed a remote attacker to arbitrarily browse to a malicious website via a crafted HTML page.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-09.md#fed3642c2618",
+  "distractor": "mmunity <변경 값> defaultrwcommunity <변경 값> defaultStep 2)설정 적용 및 SNMP 서비스 재시작# systemctl restart snmpd\nlAIXStep 1)/etc/snmpdv3.conf 파일 내의 Community String 설정 값 수정COMMUNITY <새로운 Community String> <새로운 Community String> noAuthNoPriv 0.0.0.0 0.0.0.0 -Step 2)SNMP 서비스 중지 및 실행# stopsrc -s snmpd# startsrc -s snmpdlHP-UXStep 1)/etc/snmpd.conf 파일 내의 Community String 설정 값 수정get-community-name : <변경 값>set-community-name : <변경 값>Step 2)SNMP 서비스 재시작\nU-61(상) UNIX > 3.",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#947d4bd2ead7",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "이 취약점이 랜섬웨어 공격에 악용된 사례가 있는지, 그리고 조치 기한은 어떻게 되나요?",
+  "answer": "이 취약점은 이미 알려진 랜섬웨어 캠페인에 악용된 것으로 확인되었습니다. 미국 사이버보안국(CISA)은 이 취약점을 KEV 목록에 등재하며 빠른 조치를 요구했습니다. 「원문: \"allow an attacker with existing administrative privileges to inject commands and run as a site user.\"」 관리 권한이 있는 공격자도 이를 악용할 수 있으므로, 즉시 사냥 활동과 복구 조치를 수행해야 합니다.",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-05.md#fc32edc3c501"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "allow an attacker with existing administrative privileges to inject commands and run as a site user.\n\nCVE-2025-0282 · Ivanti Connect Secure, Policy Secure, and ZTA Gateways · Ivanti Connect Secure, Policy Secure, and ZTA Gateways Stack-Based Buffer Overflow Vulnerability\n등재일(dateAdded) 2025-01-08 · 조치기한(dueDate) 2025-01-15 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known · CWE-121\n설명(CISA shortDescription): Ivanti Connect Secure, Policy Secure, and ZTA Gateways contain a stack-based buffer overflow which can lead to unauthenticated remote code execution.\n요구 조치(requiredAction): Apply mitigations as set forth in the CISA instructions linked below to include conducting hunt activities, taking remediation actions if applicable, and applying updates prior to returning a device to service.\nNVD 설명(영어 원문): A stack-based buffer overflow in Ivanti Connect Secure before version 22.7R2.5, Ivanti Policy Secure before version 22.7R1.2, and Ivanti Neurons for ZTA gateways before version 22.7R2.3 allows a remote unauthenticated attacker to achieve remote code execution.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-05.md#fc32edc3c501",
+  "distractor": "rs to access restricted functionality or resources of the application without proper authentication.\n\nCVE-2023-29298 · Adobe ColdFusion · Adobe ColdFusion Improper Access Control Vulnerability\n등재일(dateAdded) 2023-07-20 · 조치기한(dueDate) 2023-08-10 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-284\n설명(CISA shortDescription): Adobe ColdFusion contains an improper access control vulnerability that allows for a security feature bypass.\n요구 조치(requiredAction): Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Adobe ColdFusion versions 2018u16 (and earlier), 2021u6 (and earlier) and 2023.0.0.330468 (and earlier) are affected by an Improper Access Control vulnerability that could result in a Security feature bypass. An attacker could leverage this vulnerability to access the administration CFM and CFC endpoints. Exploitation of this issue does not require user interaction.",
+  "distractorRef": "server/data/ladder/material/day1/kev/kev-08.md#68e9bd1dde2a",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "이 취약점으로 인해 원격 공격자가 어떤 피해를 입힐 수 있나요?",
+  "answer": "삼성 모바일 기기의 특정 라이브러리에서 경계를 벗어난 쓰기 오류가 발생하여 원격 공격자가 임의의 코드를 실행할 수 있습니다. 이는 공격자가 시스템 내부로 침투해 악성 행위를 수행할 수 있음을 의미하므로 즉각적인 조치가 필요합니다. 원문: \"Samsung mobile devices contain an out-of-bounds write vulnerability in libimagecodec.quram.so which allows remote attackers to execute arbitrary code.\"",
+  "cites": [
+   "server/data/ladder/material/day1/kev/kev-03.md#cc08e8a07e87"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": "22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\n\nCVE-2025-21043 · Samsung Mobile Devices · Samsung Mobile Devices Out-of-Bounds Write Vulnerability\n등재일(dateAdded) 2025-10-02 · 조치기한(dueDate) 2025-10-23 · 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown · CWE-787\n설명(CISA shortDescription): Samsung mobile devices contain an out-of-bounds write vulnerability in libimagecodec.quram.so which allows remote attackers to execute arbitrary code.\n요구 조치(requiredAction): Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.\nNVD 설명(영어 원문): Out-of-bounds write in libimagecodec.quram.so prior to SMR Sep-2025 Release 1 allows remote attackers to execute arbitrary code.",
+  "chunkRef": "server/data/ladder/material/day1/kev/kev-03.md#cc08e8a07e87",
+  "distractor": "사용자 권한 확인 ]\n※일반적으로 시스템 로그는 C:\\Windows\\system32\\config 파일에 저장되지만, 서비스 로그 파일은 각각의 서비스마다 로그 저장 위치가 다름.\n웹 서버에 많이 사용하는 IIS 경우, C:\\Windows\\system32\\LogFiles에 저장됨.lJEUSStep 1)도메인별 logs 파일 권한 확인# ls –al /[JEUS 설치 디렉터리]/domains/jeus_domain/servers/sample/logsStep 2)로그 디렉터리 권한을 750으로 변경# chmod 750 /[JEUS 설치 디렉터리]/domains/jeus_domain/servers/sample/logsStep 3)로그 파일의 권한을 640으로 변경 (기본값: 644)# chmod 640 /[JEUS 설치 디렉터리]/domains/jeus_domain/servers/sample/logs/[로그 파일]※그 외 로그 파일의 권한도 동일하게 설정lWebtoBStep 1)logs 파일 권한 확인# ls –al /home/tmax/webtob/log/-rw------- 1 tmax tmax 674 8월 19 16:06 access.log_08192024Step 2)로그 디렉터리 권한을 750으로 변경# chmod 750 /[WebtoB 설치 디렉터리]/log/Step 3)로그 파일의 권한을 640으로 변경 (기본값: 644)# chmod 640 /[WebtoB 설치 디렉터리]/log/[로그 파일]※그 외 로그 파일의 권한도 동일하게 설정\n보안 장비1.",
+  "distractorRef": "store:KISA_취약점_분석평가_상세가이드.md#aeeb65b7c32f",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
+ },
+ {
+  "question": "Zoom 데스크톱 클라이언트의 해당 취약점이 인증되지 않은 사용자에게 어떤 영향을 미치는지 알려주세요.",
+  "answer": "해당 취약점은 네트워크 접근을 통해 인증되지 않은 사용자가 권한 상승을 발생시킬 수 있게 합니다. 이는 윈도우용 데스크톱 클라이언트와 VDI 클라이언트에서 특수 요소에 대한 적절한 중화가 이루어지지 않았기 때문입니다. 보안 담당자는 네트워크 기반의 공격 벡터를 고려하여 조속한 패치 적용을 검토해야 합니다. 원문: \"Improper neutralization of special elements in Zoom Desktop Client for Windows and Zoom VDI Client before 5.15.2 may allow an unauthenticated user to enable an escalation of privilege via network access.\"",
+  "cites": [
+   "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#c0141c8d422a"
+  ],
+  "origin": "distill",
+  "teacher": "models/qwen38-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf",
+  "chunk": " of Privilege Vulnerability\n참조: https://msrc.microsoft.com/update-guide/vulnerability/CVE-2023-38186\n\nCVE-2023-39213 · 공개일 2023-08-08 · CVSS v3 기반점수 9.8 (CRITICAL) · CWE-176, CWE-74\n벡터(vectorString): CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\n설명(NVD 영어 원문): Improper neutralization of special elements in Zoom Desktop Client for Windows and Zoom VDI Client before 5.15.2 may allow an unauthenticated user to enable an escalation of privilege via network access.\n참조: https://explore.zoom.us/en/trust/security/security-bulletin/",
+  "chunkRef": "server/data/ladder/material/day1/nvd-ours/nvd-ours-01.md#c0141c8d422a",
+  "distractor": "— 서버가 주기적으로 들여다보며 새 파일을 자동으로 들여옵니다\n- **조치 요청서 / 나만의 연락처 / 작업 내역** — 만들어 둔 요청서, 담당자 연락망, 지금까지 AI와 한 일\n## 3. ③ 🩹 취약점 업무 — 🔴🟠 핵심 업무\n발견 → 우선순위 → 조치 → 검증 → 보고. **담당자가 실제로 밟는 순서 그대로** 놓여 있습니다.\n- **⓪ 자산 고르기** 🔵 — 어떤 자산을 대상으로 일할지 범위를 먼저 정합니다\n- **① 발견·수집** 🟠 — 스캔 결과(CSV/JSON)를 올려 호스트별로 모읍니다. 이 안의 **🚨 통합 관제** 판이 장비 로그·리포트를 한데 모아 서로 대조하고, **🌐 위협 인텔** 판이 외부 위협 정보를 자산과 맞춰 「우리와 관련된 것」만 부각합니다\n- **② 우선순위** 🔴 — **CISA KEV(실제 악용이 확인된 것) → EPSS(악용 확률) → VPR → CVSS** 순으로 먼저 고칠 것을 고릅니다. **📦 AI-BOM·구성** 판에서 AI 모델·공급망 자산도 함께 봅니다\n- **③ 조치** 🔴 — 담당자·기한을 정해 승인 절차를 밟습니다. 기한은 심각도와 유형에 따라 자동으로 잡히고, KEV로 확인된 것은 기한이 절반으로 당겨집니다\n- **④ 검증** 🟠 — 재스캔으로 정말 닫혔는지 확인합니다. 상태(신규·진행·해결·재발)가 자동으로 판정됩니다\n- **⑤ 보고** 🟡 — 임원용 보고서(DOCX) 생성, **📈 보안 KPI**로 태세 점수·추세, **📋 컴플라이언스**로 규제 대응 현황\n- **보안 로그 파일 분석** ⚪ — 로그 파일 하나를 따로 뜯어보고 싶을 때",
+  "distractorRef": "store:GIJO_AS_보안담당자_활용가이드.md#4ebeea45e650",
+  "회수": "성공",
+  "출처": "holdout-vuln-o"
  }
 ]

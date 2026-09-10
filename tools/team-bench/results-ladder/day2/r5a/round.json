@@ -1,5 +1,5 @@
 {
-  "dataset": "raft-vuln-v5-final",
+  "dataset": "raft-vuln-v6",
   "agent": "normaltic",
   "topic": "취약점",
   "rank": 16,
@@ -16,13 +16,13 @@
   "noblockRatio": 0.1,
   "noevidenceFromUncited": true,
   "closedbookRatio": 0,
-  "longformDataset": "server/data/datasets/longform-vuln-v2-o.json",
+  "longformDataset": "server/data/datasets/longform-vuln-v3-o.json",
   "maxSeq": 4096,
   "saveEpochs": true,
-  "evalHoldoutFile": "tools/team-bench/holdout-vuln-100.json",
+  "evalHoldoutFile": "tools/team-bench/holdout-vuln-o.json",
   "loraAlphaMult": 1,
   "id": "r5a-bf16",
   "precision": "bf16",
   "loraTargets": "all",
-  "왜": "회전 5는 **재료가 아니라 학습 설정**을 바꾸는 첫 회전이다(4회전 내내 설정은 한 번도 안 바뀌었다 — 계획서 §12.12 뿌리 ①②). 바꾸는 변수는 **둘뿐**이고 판도 둘이다: r5a=격자(bf16) · r5b=격자+LoRA 자리(attn만). 나머지(rank 16·lr 1e-4·2에폭·distractors 2·pOracle 0.8·quoteStyle product·maxQuoteShare 0.35·maxCopyRatio 0.6·loraAlphaMult 1·홀드아웃 고정 파일)는 **회전 4 그대로** 둔다 — 함께 움직이면 무엇이 고쳤는지 못 가른다. ⚠ 재료는 등급 O만 남긴 raft-vuln-v5(-final)다(사장님 결정 ②ⓑ). 2026-09-10 실측(**정정** — 처음 적은 O 229행·72.9%·6행은 창걸음 10이던 옛 도구의 숫자였다. 걸음 1로 다시 재고 다시 구운 지금 판): v4 956행 → **O 124행** · 거절로 시작하는 행 44.5%→**87.1%** · 27B 되묻기 대상 7행 · 한국어 원천 87.9%. **이 판을 그대로 구우면 재료가 얇은 것(회전 4의 13%)과 설정이 나은 것이 뒤섞여 판정이 안 선다** — §12.13의 권고대로 **재료를 다시 구운 뒤** 이 설정으로 굽는다. 관문은 14개다(⑭ 로컬 14B 단독 지식 신설 · ⑬ 모집단 24 이상). 1차 성공 정의는 gates.mjs 머리주석에 굽기 전에 적어 뒀다. ⚠ **evalHoldoutFile(holdout-vuln-100.json)은 등급 O 판이 아니다** — 지금 잣대로 재면 100행 중 **97행이 C**다(질문 해시만 보면 67행). 이 파일은 학습이 아니라 **평가**에만 쓰여 순전파만 지나므로 가중치로 들어가지는 않지만, 도입 커밋 87593cd7부터 이미 hub·gb10 두 원격에 올라가 있다. 바꾸면 회전 4 이전과 견줄 수 없어져 **손대지 않았다** — 처리 방향은 사장님·메인 결정 사항이다(§12.13 ⑦-2). ⚠ tools/ladder/day2-train.sh는 아직 precision·loraTargets 칸을 **안 읽는다**(read_round 두 줄이 필요하다 — 메인이 넣는다). 그때까지는 학습기를 직접 부른다. **r5a**: 격자 하나만 바꾼다(4bit NF4 → bf16). 학습 격자와 서빙 격자(Q4_K_M)가 다른 데서 오는 어긋남이 진짜인지 먼저 본다."
+  "왜": "회전 5는 **재료가 아니라 학습 설정**을 바꾸는 첫 회전이다(4회전 내내 설정은 한 번도 안 바뀌었다 — 계획서 §12.12 뿌리 ①②). 바꾸는 변수는 **둘뿐**이고 판도 둘이다: r5a=격자(bf16) · r5b=격자+LoRA 자리(attn만). 나머지(rank 16·lr 1e-4·2에폭·distractors 2·quoteStyle product·maxQuoteShare 0.35·maxCopyRatio 0.6·loraAlphaMult 1)는 **회전 4 그대로** 둔다 — 함께 움직이면 무엇이 고쳤는지 못 가른다.  ★ **재료가 raft-vuln-v5 → raft-vuln-v6으로 갈렸다**(2026-09-10 저녁 · §12.15). v5는 회전 4 재료에서 등급 O만 골라낸 판이라 **124행**(회전 4의 13%)·거절 시작 87.1%였고, 그 판으로는 「bf16이 나았나 / 재료가 얇았나」를 못 가른다. v6는 **승인 문답 등급 O 2,181건에서 새로 구웠다**: 412행 · 한국어 원천 50.0% · 거절 시작 45.9%(회전 2~4의 40~50% 띠 안) · 등급 관문 초록. ⚠ 정직하게 — 412행은 회전 4(956행)의 **43%**다. 가장 큰 손실은 **라이선스**(893행, 그중 개인정보 안전성 확보조치 안내서 483행)이고 그 문서를 학습에 넣을지는 **사람이 정할 일**이다. ⚠ **주제 구성이 회전 4와 다르다** — v1~v5는 취약점 한 주제였고 v6는 다섯 주제다(회전 5의 목적이 「원격 없는 설치본의 14B 바닥 올리기」로 바뀌었다). 표를 나란히 읽을 때 이 칸을 함께 본다.  ★ **시험지도 갈렸다** — evalHoldoutFile = tools/team-bench/holdout-vuln-o.json(등급 O 취약점 문답 100행, v6를 굽기 **전에** 통째로 뗀 판). 옛 시험지(holdout-vuln-100.json)는 지금 잣대로 재면 100행 중 97행이 등급 C였다(§12.13 ⑦-2). 평가 전용이라 가중치로는 안 들어가지만, 「등급 O만 쓴다」(사장님 결정 ②ⓑ) 아래에서 시험지만 C로 두는 것은 앞뒤가 안 맞는다. ⚠ **그래서 eval_loss는 회전 4 이전과 비교 불가**다. 문항이 통째로 다르면 그 숫자는 다른 것을 뜻한다 — 새 시험지의 첫 값이 r5a의 기준선이 된다.  ★ **긴 형식도 갈렸다** — longformDataset = server/data/datasets/longform-vuln-v3-o.json(111행). v2(153행)는 교사가 지은 글이라 질문이 승인 문답에 없어 등급이 「미매칭」이고, 미매칭은 O가 아니다(§12.14). v3-o는 **같은 근거 조각을 인용한 승인 답 셋 이상을 절로 세워 모은** 판이라 문장이 전부 등급 O에서 온다. ⚠ 한계 — 절 이름이 **제품 서식(요청서 7절·요약 보고 5절)이 아니다**. 오늘은 gb10 GPU를 안 써서 교사를 못 불렀다. 제품 서식 판이 필요하면 그것은 교사가 있는 밤에 굽는다(§12.9 ⑤).  관문은 14개다(⑭ 로컬 14B 단독 지식 신설 · ⑬ 모집단 24 이상 — samples-questions.json을 12 → 40문항(조각 든 것 36)으로 채워 **미측정에서 벗어났다**). 1차 성공 정의는 gates.mjs 머리주석에 굽기 전에 적어 뒀다. ⚠ tools/ladder/day2-train.sh는 아직 precision·loraTargets 칸을 **안 읽는다**(read_round 두 줄이 필요하다 — 메인이 넣는다). 그때까지는 학습기를 직접 부른다. **r5a**: 격자 하나만 바꾼다(4bit NF4 → bf16). 학습 격자와 서빙 격자(Q4_K_M)가 다른 데서 오는 어긋남이 진짜인지 먼저 본다."
 }

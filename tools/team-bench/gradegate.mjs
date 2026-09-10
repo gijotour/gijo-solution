@@ -26,8 +26,17 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const inP = opt("--in", ""), cwinP = opt("--cwin", "");
 if (!inP) { console.error("쓰는 법: node tools/team-bench/gradegate.mjs --in <dataset.json> [--cwin <cwin.json>]"); process.exit(2); }
 
+/**
+ * 파일에서 행 배열을 꺼낸다 — **배열**이거나 **{ 행: [...] }** 꼴이다.
+ * ★ 왜 두 꼴인가(2026-09-10 · 회전 5): 평가용 시험지는 파일 머리에 「회전 4 이전과 비교 불가」 같은
+ *   경고를 이고 다녀야 한다. JSON에는 주석이 없으니 머리 칸을 둔 객체가 되고, 그 꼴을 학습기도
+ *   이미 읽는다(server/scripts/finetune_qlora14b.py 평가파일읽기: `raw.get("행", raw)`).
+ *   여기서 배열만 받으면 **학습기는 읽는 파일을 관문은 못 읽는** 어긋남이 생긴다 — 두 꼴을 같이 읽는다.
+ */
+export const 행꺼내기 = (raw) => (Array.isArray(raw) ? raw : (raw && Array.isArray(raw.행) ? raw.행 : raw));
+
 let rows, 창집합 = null;
-try { rows = JSON.parse(fs.readFileSync(inP, "utf8")); } catch (e) { console.error(`✗ 재료를 못 읽었다: ${inP} — ${e.message}`); process.exit(3); }
+try { rows = 행꺼내기(JSON.parse(fs.readFileSync(inP, "utf8"))); } catch (e) { console.error(`✗ 재료를 못 읽었다: ${inP} — ${e.message}`); process.exit(3); }
 if (cwinP) {
   try { 창집합 = new Set(JSON.parse(fs.readFileSync(cwinP, "utf8")).windows); }
   catch (e) { console.error(`✗ 창 집합을 못 읽었다: ${cwinP} — ${e.message}`); process.exit(3); }
