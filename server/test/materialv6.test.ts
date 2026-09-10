@@ -314,3 +314,35 @@ describe("★ 커밋된 산출물 — 말한 대로인가", () => {
     expect(보고서.보고.긴형식.재료겹침.쓴문답).toBeGreaterThan(0);
   });
 });
+
+describe("★ 회전 설정 — v6를 가리키되, **다시 굽지 말라**고 스스로 말한다", () => {
+  // ⚠ 2026-09-10 저녁에 발견한 자리: day2-train.sh 의 ① 단계는 build-raft-dataset.mjs 로 재료를 다시 굽고,
+  //   evalHoldoutFile 이 있으면 `--holdout-out` 으로 그 파일을 **덮어쓴다**(day2-train.sh:335).
+  //   그 빌더는 등급을 모른다 — 승인 문답 전부(C 1,597건 포함)로 v6를 새로 구워 놓고 새 시험지를 갈아 버린다.
+  //   스크립트를 고치는 것은 이 갈래의 파일 밖이라, **설정이 스스로 경고하게** 하고 여기서 그것을 못 박는다.
+  for (const id of ["r5a", "r5b"]) {
+    it(`${id} 는 v6·새 시험지·긴 형식 v3-o를 가리킨다`, () => {
+      const j = JSON.parse(src(`tools/team-bench/results-ladder/day2/${id}/round.json`));
+      expect(j.dataset).toBe("raft-vuln-v6");
+      expect(j.evalHoldoutFile).toBe("tools/team-bench/holdout-vuln-o.json");
+      expect(j.longformDataset).toBe("server/data/datasets/longform-vuln-v3-o.json");
+      // 시험지가 둘이면 어느 것으로 쟀는지 알 수 없다 — day2-train.sh 도 학습기도 같은 이유로 막는다.
+      expect(j.evalHoldout, "evalHoldoutFile 과 evalHoldout 을 함께 두면 시험지가 둘이 된다").toBeUndefined();
+    });
+
+    it(`★ ${id} 에 **빌드금지** 경고가 있고, 덮어쓰기 위험을 이름으로 말한다`, () => {
+      const j = JSON.parse(src(`tools/team-bench/results-ladder/day2/${id}/round.json`));
+      expect(j.빌드금지, "이 경고가 없으면 다음 사람이 day2-train.sh 를 그냥 돌린다").toBeTruthy();
+      expect(j.빌드금지).toContain("holdout-out");
+      expect(j.빌드금지).toContain("skip-build");
+    });
+  }
+
+  it("★ 그 위험이 **실제로 있는** 코드다 — 경고가 낡으면 여기가 먼저 말한다", () => {
+    // 경고가 「없는 위험」을 가리키게 되는 날(스크립트가 고쳐지는 날) 이 시험이 빨개져서,
+    // 경고를 지울 때가 됐음을 알린다. 고칠 수 없는 빨강이 아니라 **갱신을 부르는 빨강**이다.
+    const 스크립트 = src("tools/ladder/day2-train.sh");
+    expect(스크립트).toContain('--holdout-out "$REPO/$EVAL_HOLDOUT_FILE"');
+    expect(스크립트, "빌드금지를 읽는 줄이 생겼다면 round.json 의 경고를 갱신할 때다").not.toContain("빌드금지");
+  });
+});
