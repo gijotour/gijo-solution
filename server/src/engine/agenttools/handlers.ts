@@ -9,7 +9,7 @@ import { computeAssetCoverage, coverageSummaryText, sbomApplies, type GapKind } 
 import { listProductIntros, listIntroFields, setIntroField, INTRO_FIELD_SCHEMA } from "../productintro";
 import { expandOntology } from "../ontology";
 import { currentDocIds } from "../ragscope";
-import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, ReviewPatch, ApprovalStatus, listFindingReviews, approvalSummary } from "../approvals";
+import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, unassignedCount, ReviewPatch, ApprovalStatus, listFindingReviews, approvalSummary } from "../approvals";
 import type { StandardFinding } from "../bridge";
 import { 표식, 심각도한글, 심각도표식, 자산종류한글, cti심각도한글, epss표기 } from "../tone";
 import { 말조사 } from "../../util/josa";
@@ -1925,20 +1925,33 @@ export function runFindingStatusOverview(args: Record<string, string>): string {
 // 결재·승인 대기 현황 — 취약점 결재와 점검 승인을 **함께** 센다.
 //   FORCED_INTENTS[88](agentloop.ts) → tool: "approval_status" — 「승인 기다리는 것 있어?」·
 //   「결재 대기 있어?」처럼 종류를 안 밝힌 물음이 여기로 온다(고객 QA 예행 2026-09-10 실측 결함 ①·② 수리).
-//   ⚠ **직접 세지 말 것** — approvalSummary(취약점 결재).pending · maintenanceSummary(점검
-//   승인).reported 두 곳이 이미 잣대다. 새로 filter를 쓰면 잣대가 넷째로 갈린다
-//   (approvals.ts:107 머리글이 그 사고 3건을 적어 두었다).
+//   ⚠ **직접 세지 말 것** — approvalSummary(취약점 결재).pending · unassignedCount(담당자
+//   미배정) · maintenanceSummary(점검 승인).reported 세 곳이 이미 잣대다. 새로 filter를 쓰면
+//   잣대가 넷째로 갈린다(approvals.ts:107 머리글이 그 사고 3건을 적어 두었다).
+//   ★★ 2026-09-11 재수리(검토관 [상] 적발) — 첫 판이 바로 그 금지를 **바로 다음 줄에서** 어겼다:
+//     `reviews.filter(isUnassignedReview)`가 원본 전체를 세어 스캔 오류·조사 정보(info)까지
+//     미배정으로 셌다. 2026-08-01 실측 형상(605건 중 602건이 스캔 오류)이면 화면 배지는 3,
+//     대화창은 605를 말한다. 이제 approvals.ts의 `unassignedCount` 한 곳에서 받는다
+//     (모집단 isRealVulnerability + 판정 isUnassignedReview = `/api/approvals` 목록과 같은 수).
+//   ★ 괄호로 묶지 않는다 — 미배정은 pending(미검토)만이 아니라 진행중·검증까지 세므로
+//     `pending의 부분집합이 아니다`. 「대기 0건(미배정 100건)」 같은 거짓 포함관계를 안 만든다.
 export function runApprovalStatus(): string {
   const reviews = listFindingReviews();
   const fa = approvalSummary(reviews);
   const ms = maintenanceSummary(listMaintenanceItems());
-  const 미배정 = reviews.filter(isUnassignedReview).length;
-  const head = `취약점 결재 대기 ${fa.pending}건(담당자 미배정 ${미배정}건) · 점검 승인 대기 ${ms.reported}건`;
-  const 할말 =
-    fa.pending || ms.reported
-      ? "취약점 결재는 ③ 조치 › 조치·승인 화면에서, 점검 승인은 유지보수 점검 화면에서 처리하세요."
-      : "지금은 결재·승인 둘 다 대기가 없습니다 — 생기면 다시 물어보세요.";
-  return `${예시데이터머리말()}${head}${다음걸음(할말)}`;
+  const 미배정 = unassignedCount(reviews);
+  const head = `취약점 결재 대기 ${fa.pending}건 · 담당자 미배정 ${미배정}건 · 점검 승인 대기 ${ms.reported}건`;
+  // ⚠ 「다음 걸음」은 **정말 다음 행동이 있을 때만** 붙인다(검토관 [하] 적발 — agenttools-cross의
+  //   「현황 조회엔 안 붙인다」 계약). 0건이면 갈 화면이 없으므로 되풀이가 아니라 마침말을 낸다.
+  //   화면 이름은 screenguide.ts 화면위치 표가 출처다(「유지보수 점검 화면」은 제품에 없는 이름이었다).
+  return 대기있음(fa.pending, 미배정, ms.reported)
+    ? `${예시데이터머리말()}${head}${다음걸음("취약점 결재는 ③ 조치 › ✅ 조치·승인 판에서, 점검 승인은 ③ 조치 › 🛠 정기 점검 판에서 처리하세요.")}`
+    : `${예시데이터머리말()}${head}\n지금은 결재·승인 둘 다 대기가 없습니다 — 생기면 다시 물어보세요.`;
+}
+
+/** 결재·승인 대기가 하나라도 있나 — 미배정도 「손댈 것」이라 함께 본다(안 보면 「미배정 100건 … 대기 없습니다」가 나간다). */
+function 대기있음(pending: number, unassigned: number, reported: number): boolean {
+  return pending > 0 || unassigned > 0 || reported > 0;
 }
 
 // 승인/반려 — 조치·승인 화면(approvals.html)의 setFindingReview에 해당하는 역량.

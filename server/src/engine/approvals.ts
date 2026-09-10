@@ -128,6 +128,21 @@ export function isUnassignedReview(r: { assignee?: string | null; status: Approv
   return !r.assignee && r.status !== "approved" && r.status !== "rejected" && r.status !== "accepted";
 }
 
+/**
+ * 「담당자 미배정 N건」 — **화면 배지와 같은 수**를 서버에서 셀 때 부르는 한 곳(2026-09-11).
+ *
+ * ⚠ 왜 함수로 뺐나(검토관 [상] 적발): agenttools/handlers.ts가 `reviews.filter(isUnassignedReview)`를
+ *   **거르지 않고** 세어, 대화창이 화면 배지와 다른 수를 말할 수 있었다. 화면 쪽 잣대는
+ *   `/api/approvals`가 내보내는 **isRealVulnerability로 거른 목록** + preload.isUnassignedApproval이다
+ *   (nav.js 미배정 배지·grouppanels.js·assetProgress가 전부 그 잣대다).
+ *   2026-08-01 실측 형상(605건 중 602건이 스캔 오류)에 그대로 대입하면, 안 거른 쪽은
+ *   **「미배정 605건」**을 말하고 화면은 3건을 말한다 — 담당자가 무엇을 믿을지 모르게 된다.
+ *   판정(isUnassignedReview)과 모집단(isRealVulnerability) **둘 다** 여기 한 곳에서 받는다.
+ */
+export function unassignedCount(reviews: FindingReview[]): number {
+  return reviews.filter((r) => isRealVulnerability(r.finding) && isUnassignedReview(r)).length;
+}
+
 function rowToReview(row: FindingApprovalRow, finding: StandardFinding, assetName: string, gone: boolean): FindingReview {
   return {
     assetId: row.assetId,

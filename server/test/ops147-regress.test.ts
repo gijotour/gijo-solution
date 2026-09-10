@@ -162,9 +162,11 @@ describe("⑦ 「KEV 걸린 거 있어?」 40초 — 「몇 건」이 없으면 
   const loop = 읽기("engine/agentloop.ts");
   it("★ KEV 걸린/잡힌/뜬 + 있어/없어 꼴이 세는 질문으로 간다", () => {
     // ⚠ 2026-09-11 — 「배정 승인 대기 취약점 몇 건이야?」를 결재 잣대로 보내려 배제구를 앞에
-    //   더했다(agentloop.ts [14]). 정규식이 이제 `(미배정`이 아니라 `^(?!...)`로 시작해
-    //   패턴을 「(미배정으로 시작」에서 「finding_status 앞의 regex 리터럴 전체」로 넓힌다.
-    const m = loop.match(/re:\s*(\/.+?\/i),\s*\n\s*tool:\s*"finding_status"/);
+    //   더했다(agentloop.ts [14]). 정규식이 이제 `(미배정`이 아니라 `^(?!...)`로 시작한다.
+    //   ★★ 그렇다고 리터럴 전체(`/.+?/i`)로 넓히면 **자리로 집게 된다** — /i가 붙은
+    //   finding_status 규칙이 앞에 하나만 더 생기면 감시가 조용히 딴 규칙을 재고도 초록이다
+    //   (2026-09-11 검토관 [하] 적발). 신원은 본문 조각 「미배정」으로 다시 못 박는다.
+    const m = loop.match(/re:\s*(\/[^\n]*미배정[^\n]*\/i),\s*\n\s*tool:\s*"finding_status"/);
     expect(m, "finding_status 규칙을 못 찾았다").toBeTruthy();
     const re = eval(m![1]) as RegExp;
     expect(re.test("KEV 걸린 거 있어?")).toBe(true);
@@ -173,9 +175,11 @@ describe("⑦ 「KEV 걸린 거 있어?」 40초 — 「몇 건」이 없으면 
   });
   it("★★ 시연 대본을 가로채지 않는다 — 「KEV 등재 … 지침이 뭐야?」는 지식 질문이다", () => {
     // ⚠ 2026-09-11 — 「배정 승인 대기 취약점 몇 건이야?」를 결재 잣대로 보내려 배제구를 앞에
-    //   더했다(agentloop.ts [14]). 정규식이 이제 `(미배정`이 아니라 `^(?!...)`로 시작해
-    //   패턴을 「(미배정으로 시작」에서 「finding_status 앞의 regex 리터럴 전체」로 넓힌다.
-    const m = loop.match(/re:\s*(\/.+?\/i),\s*\n\s*tool:\s*"finding_status"/);
+    //   더했다(agentloop.ts [14]). 정규식이 이제 `(미배정`이 아니라 `^(?!...)`로 시작한다.
+    //   ★★ 그렇다고 리터럴 전체(`/.+?/i`)로 넓히면 **자리로 집게 된다** — /i가 붙은
+    //   finding_status 규칙이 앞에 하나만 더 생기면 감시가 조용히 딴 규칙을 재고도 초록이다
+    //   (2026-09-11 검토관 [하] 적발). 신원은 본문 조각 「미배정」으로 다시 못 박는다.
+    const m = loop.match(/re:\s*(\/[^\n]*미배정[^\n]*\/i),\s*\n\s*tool:\s*"finding_status"/);
     const re = eval(m![1]) as RegExp;
     expect(re.test("KEV 등재 취약점 조치 기한 근거 지침이 뭐야?"), "시연 ③ 대본 문항").toBe(false);
   });
