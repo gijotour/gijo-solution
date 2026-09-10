@@ -559,6 +559,21 @@
 - 목표: 기능 마감 9/24 · 기본 지식(회전 5) 첫 판정 10/6~10 · **고객 QA 시작 10/13 주**. 회전 5가 관문을 못 넘으면 검색 지식 + 원격 큰 두뇌로 시작(고객 QA를 학습에 묶지 않는다 — 고객 질문이 곧 학습 재료).
 - 고객 인스턴스에는 §14 되돌리기 3건을 **먼저** 적용(개발 모드 끔·DB 암호화 켬·하네스 기록 끔). 아낀 시간 KPI의 첫 실사용 측정이 여기서 시작된다(INTENT.md 핵심 잣대).
 
+### 13.5.1 고객 QA ⓑ 준비 목록(2026-09-10 설계관 실측)
+**인스턴스 위치 = win 격리(/home/gijo/gijo-qa, 포트 4100) 추천.** 근거: health 8ms(win) vs 74ms(gb10 릴레이 경유·편차 큼) · gb10 4000은 교사 Flash-Next를 자식으로 쥔 서버라 고객 채팅이 교사 풀에 들어가고 LRU가 교사를 내림(09-03 실측) · gb10 스키마 50(08-23판, 운영 60) · win 격리는 GPU를 새로 안 먹음(임베딩 8081 재사용·빈 모델 폴더면 채팅은 8080 공유).
+- ⚠ **운영 8080은 7.6B(gijo-main-orchestrator)** — 제품 표준 베이스(14B)와 다르다. 고객 두뇌 갈림(사장님 결정): ⓐ 7.6B 공유 / ⓑ 운영 기본 모델을 표준 14B로 올려 공유(3090 여유 15.2GB — 14B가 7.6B를 대체하면 안전; 평가 게이트 먼저) / ⓒ 고객만 원격 gb10 교사(스키마 올림 선행). 오케스트레이터 추천 ⓑ.
+- 인스턴스: 별도 트리·cwd(encryption.key·exports는 env 스위치 없음) · gijo-qa.env(4100·DB·MEMORY_DB·DOCS_DIR·CLIENT_RELEASE_DIR·BACKUP·REPORT·SESSION_ARCHIVE·INGEST_ROOT·새 JWT_SECRET·NODE_ENV=production — 운영 env 복사 금지: GIJO_DEV_MODE=1 딸려 옴) · LLM 공유 3줄(GIJO_MODELS_DIR=빈 폴더·GIJO_LOCAL_LLM_PORT=8080·GIJO_EMBEDDING_URL=…8081) · ⚠ 기동 순서: 운영 health 200 확인 뒤(reapOrphanEngines가 운영 llama를 SIGKILL하는 창) · systemd gijo-qa.service · 첫 관리자 비번은 부팅 로그 1회 · DB 암호화는 서버 멈춘 뒤 encrypt-db · **업데이트 창구는 인스턴스별** — 4100에도 publish-release --server 로 같은 exe 게시.
+- 네트워크: 피어는 이미 발급돼 있음(D:\GIJO-AS-vpn client-ext-tester1~6 = 10.8.0.5~10) · 고객 conf는 AllowedIPs 10.8.0.1/32 스플릿(gb10 직접 불가, 릴레이 14000) · **관리자 PowerShell 2건**: portproxy 4100(refresh-portproxy.ps1에 추가·예약) + 방화벽 4100 RemoteAddress 10.8.0.0/24(빼면 인터넷 공개) · WireGuard 미동봉 확정(공식본 + conf 임포트) · 첫 접속은 setup.html 「이미 GIJO 서버가 있어요」→ http://10.8.0.1:4100.
+- 데이터: 씨앗은 복사 말고 **소스에서 재인입**(운영 LanceDB 33GB에 사내 조각 섞임) — 자동 35편 + knowledge-ingest 32편 + 사례 20 · **승인 문답 3,778 전부 제외**(O 2,181도 사내 IP·낱말 노출 실측) · 업무 데이터 0 · app_state·secrets 복사 금지(gb10 토큰·DB 열쇠) · DOCS_DIR 전용 폴더.
+- 계정: 고객 1인 1계정 security_officer·clearance null · 우리 관찰 admin 별도 1개 · MFA 끔(자동화 충돌) · tools/create-qa-account.mjs(GIJO_SERVER_URL=…4100).
+- 되돌리기: GIJO_DEV_MODE 애초에 없음 · encrypt-db · 하네스 안 돌림(--no-evidence는 반쪽) · nightly 대상에 4100 넣지 않음 · 시연 재시드 안 걸리는지 · /api/health devMode·자가 진단으로 확인.
+- 하네스: 주소는 전부 env(qa-auto·ops-sim·knowledge-ingest·create-qa-account) · 첫인상 하네스는 번들 7446 전제라 **원격 로그인 갈래 새로** · 인수 전 전 코스 리허설(게시본 설치→conf→4100 로그인→지식 질문→업로드→조치·결재→보고서 1건).
+- 문항 30: 대장 47시나리오 배분(자산 4·발견 5·우선순위 5·조치 6·검증 4·보고 3·지식 3) · 마당 ①⑬⑮⑯⑰ 우선 · 끊김 93건의 안내 문구 선정 · 업종 5문항 교체 · 문항마다 정답 선기록.
+- 피드백: 접수는 고객 계정으로 됨(answer-feedback POST) · 조회·초안은 admin 전용 → 흐름 = 고객 지적 → 우리 분류·초안·수리 · admin 전용 도구가 걸리는 문항 사전 가름 · 고객 지적 원문의 사내 정보는 요약만 저장소로.
+- KPI: timesaved.ts 하나(work_events × 기준시간 9종) · 고객 인스턴스 0에서 시작 = **첫 실사용 측정** · 기준시간 3종을 고객과 첫 주에 조정 · 임원 보고서(report.ts timeSavedSection) 1건이 결과물 · 외부-3 4주 유지와 함께.
+- 일정: 9/10~16 인스턴스·포트·방화벽(관리자 승인) → 9/17~24 기능 마감+씨앗 → 9/25~30 되돌리기+전 코스 리허설 → 10/1~5 고객 측(계정 명단·규제 문서·VPN 설치 권한) → 10/6~10 회전 5 판정 → 10/10 인수 리허설(사람이 앉아 30문항) → **10/13 주 시작**(전달 4종: conf·설치본·계정·첫날 키트). 고정 병목: 관리자 권한 작업 · 3090 공유 · 고객 VPN 설치 승인.
+- 위험: reapOrphanEngines 창 · 임베딩 감시가 운영 8081 죽이는 함정(빈 모델 폴더 필수) · 8080 슬롯 공유 · setup 「새로 만들기」 오선택 · 인스턴스별 게시 누락 · 열쇠 기계 봉인 · 고객 지적 흡수 시 사내 정보 유입 · gb10 예비 전환은 스키마 올림 전엔 불가.
+
 ## 14. 출하 전 되돌리기 — 파일럿·출하 기계에서 반드시 되돌릴 것
 
 > **왜 여기 모아 두나**: 개발 동안 일부러 푼 것은 **되돌리는 것을 잊으면 통제 없는 제품이 나간다.**
