@@ -9,6 +9,9 @@
 #   export GIJO_ADMIN_USER=… GIJO_ADMIN_PASSWORD=…
 #   bash tools/ladder/day2-train.sh --round r1-base
 #        [--rounds tools/ladder/rounds.json] [--port 8093] [--skip-build] [--skip-train] [--only-gate]
+#
+# ★ 학습 직전에 **등급·인용·겹침 관문**(tools/team-bench/gradegate.mjs)이 돈다 — 빨강이면 안 굽는다.
+#   창 집합은 round.json 의 cwinFile 또는 환경변수 LADDER_CWIN 으로 준다(없으면 반쪽 관문이라고 말한다).
 #   잣대가 바뀌어 **같은 회전을 다시 재야** 할 때(학습·변환·13과제는 그대로 두고 표본·KEV만):
 #   bash tools/ladder/day2-train.sh --round r1-base --only-probe --probe-out probe-v2
 #        → results-ladder/day2/<회전>/probe-v2/{samples-*,kev,gate.md} — 옛 결과를 덮지 않는다.
@@ -279,6 +282,12 @@ SAVE_EPOCHS="$(read_round saveEpochs)"
 EVAL_HOLDOUT="$(read_round evalHoldout)"
 ALPHA_MULT="$(read_round loraAlphaMult)"
 DISCARDED="$(read_round 폐기)"
+# ★ 빌드금지 — 이 회전의 재료·시험지가 **이미 구워져 있고 다시 구우면 안 되는** 경우다(2026-09-10).
+#   ① 단계의 빌더(build-raft-dataset.mjs)는 등급을 모른다. 승인 문답 전부(등급 C 포함)로 재료를 새로
+#   굽고, --holdout-out 으로 **새 시험지까지 덮어쓴다**. 설정에 경고만 적어 두고 스크립트가 그것을
+#   안 읽으면 그 경고는 아무 것도 막지 못한다 — 그래서 여기서 읽어 SKIP_BUILD 로 바꾼다.
+BUILD_BAN="$(read_round 빌드금지)"
+CWIN_ROUND="$(read_round cwinFile)"
 
 # ★ 폐기 표시가 붙은 회전은 **돌리지 않는다**(2026-09-04). 표시만 해 두고 돌 수 있게 두면
 #   표시가 장식이 되고, 밤 하나가 「안 고쳐질 것이 확실한 설정」에 쓰인다.
@@ -309,6 +318,11 @@ TRAIN_LOG="$OUTDIR/train.log"
 DONE_MARK="$LORA_DIR/adapter_model.safetensors"
 
 # ── ① RAFT 데이터셋 만들기 ────────────────────────────────────────────
+if [ -n "$BUILD_BAN" ] && [ "$SKIP_BUILD" -eq 0 ]; then
+  SKIP_BUILD=1
+  ladder_log "① 데이터셋 만들기 **자동 건너뜀** — 이 회전의 round.json 에 빌드금지가 있다"
+  ladder_log "   $BUILD_BAN"
+fi
 if [ "$SKIP_BUILD" -eq 0 ]; then
   ladder_need_env GIJO_ADMIN_USER GIJO_ADMIN_PASSWORD
   if [ ! -s "$REPO/tools/build-raft-dataset.mjs" ]; then
@@ -359,6 +373,49 @@ if [ "$SKIP_TRAIN" -eq 0 ]; then
     # 밤/낮 전환은 **산출물 존재**로 가른다 — 이미 학습된 회전을 다시 태우지 않는다.
     ladder_log "② 학습 건너뜀 — 이미 어댑터가 있다($DONE_MARK). 다시 학습하려면 그 폴더를 치워라."
   else
+    # ── ①-b 등급·인용·겹침 관문 — **먹이기 직전에 다시 잰다** ─────────────
+    # ⚠ 왜 여기인가(2026-09-10 · 검토관 적발): 관문이 **빌더 안에만** 있었다. 이 스크립트는 빌더를
+    #   건너뛸 수 있고(--skip-build·빌드금지), 그러면 「거기 놓여 있던 파일」을 그대로 굽는다.
+    #   재료 파일은 저장소에 안 들어오므로(data/ 무시) 시험으로는 원리상 못 본다 — 재는 자리는
+    #   그 파일이 실제로 있는 여기다. 어댑터가 이미 있으면 위에서 건너뛰므로, 이 관문은
+    #   **정말로 먹이려는 순간에만** 돈다.
+    GATE_TOOL="$REPO/tools/team-bench/gradegate.mjs"
+    [ -s "$GATE_TOOL" ] || { echo "✗ 등급 관문 도구가 없다: $GATE_TOOL — **못 잰 것은 통과가 아니다**" >&2; exit 7; }
+    # 창 집합(등급 C 본문 창) — 회전 설정의 cwinFile · 없으면 LADDER_CWIN. 둘 다 없으면 **반쪽 관문**이다.
+    CWIN_FILE="${CWIN_ROUND:-}"
+    #   길 꼴 셋을 받는다 — 「~/…」(학습 기계의 홈) · 「/…」(절대) · 그 밖(저장소 기준).
+    if [ -n "$CWIN_FILE" ]; then
+      case "$CWIN_FILE" in
+        "~/"*) CWIN_FILE="$HOME/${CWIN_FILE#~/}" ;;
+        /*) : ;;
+        *) CWIN_FILE="$REPO/$CWIN_FILE" ;;
+      esac
+    fi
+    [ -n "$CWIN_FILE" ] || CWIN_FILE="${LADDER_CWIN:-}"
+    if [ -n "$CWIN_FILE" ] && [ ! -s "$CWIN_FILE" ]; then
+      echo "✗ 창 집합 파일이 없다: $CWIN_FILE (round.json cwinFile · LADDER_CWIN) — 못 잰 것은 통과가 아니다" >&2; exit 8
+    fi
+    [ -n "$CWIN_FILE" ] || ladder_log "   ⚠ 창 집합이 없다(cwinFile·LADDER_CWIN 둘 다 비었다) — **반쪽 관문**이다: 칸만 보고 「글에 실린 C 본문」은 원리상 못 본다"
+    SAMPLES_FILE="$REPO/tools/team-bench/samples-questions.json"
+    gate_one() {
+      # gate_one <재료파일> <이름> [추가 깃발...]
+      # ⚠ **변수명은 영문만** — bash는 한글 변수명을 못 읽는다(이 저장소가 이미 밟은 자리다).
+      local f="$1" name="$2"; shift 2
+      [ -s "$f" ] || { echo "✗ $name 파일이 없다: $f" >&2; exit 8; }
+      ladder_log "①-b 관문 — $name"
+      node "$GATE_TOOL" --in "$f" ${CWIN_FILE:+--cwin "$CWIN_FILE"} "$@" 2>&1 | tee -a "$OUTDIR/gate.log"
+      [ "${PIPESTATUS[0]}" -eq 0 ] || {
+        echo "✗ 관문 빨강 — 이 재료로는 **굽지 않는다**($name). 자세한 사유는 $OUTDIR/gate.log" >&2
+        exit 8
+      }
+    }
+    gate_one "$DS_FILE" "학습 재료 $DATASET" \
+      ${EVAL_HOLDOUT_FILE:+--holdout "$REPO/$EVAL_HOLDOUT_FILE"} \
+      ${SAMPLES_FILE:+--samples "$SAMPLES_FILE"}
+    # 긴 형식도 **가중치로 들어간다** — 재료와 같은 잣대로 잰다.
+    [ -z "$LONGFORM" ] || gate_one "$REPO/$LONGFORM" "긴 형식 $LONGFORM" \
+      ${EVAL_HOLDOUT_FILE:+--holdout "$REPO/$EVAL_HOLDOUT_FILE"}
+
     mkdir -p "$LORA_DIR"
     ladder_log "② 학습 시작(떼어 놓고 돈다) — 로그 $TRAIN_LOG"
     # ⚠ setsid nohup: ssh가 끊겨도 안 죽는다. 진행은 로그로만 본다.

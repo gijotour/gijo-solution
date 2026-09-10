@@ -46,7 +46,7 @@ const R5 = await import(pathToFileURL(잣대경로).href);
 const RAFT = await import(pathToFileURL(빌더경로).href);
 
 const {
-  등급관문, 잣대지문, 원천언어, 거절로시작하나, 사실주장인가, 창정규화, 창길이, 창적중수,
+  등급관문, 잣대지문, 원천언어, 거절로시작하나, 사실주장인가, 창정규화, 창길이, 창적중수, 인용관문,
 } = R5;
 const { 질문해시 } = R5;
 const {
@@ -55,6 +55,19 @@ const {
 } = RAFT;
 // 걷어내는 자도 **하나**다 — 여기서 「C면 뺀다」를 다시 적으면 그것이 곧 잣대 두 벌이다(2026-09-10).
 const { 걷어내기 } = await import(pathToFileURL(path.join(여기, "strip-c.mjs")).href);
+
+/**
+ * 구운 행에서 **인용이 제 번호의 블록에 없는 행을 걷어낸다**(2026-09-10 저녁 · 검토관 적발).
+ *
+ * 관문(인용관문)만 두면 「빨강이라고 말하고 그대로 굽는」 판이 된다 — 만든 자가 제 손으로 뺀다.
+ * ⚠ 뺄셈은 **창 걸러내기 다음, 언어 맞추기 앞**이다. 뒤에 걸면 한국어 비중을 50%로 맞춰 놓고
+ *   그 뒤에 행이 빠져 「≥50%」라 적은 줄이 거짓이 된다(창 걸러내기가 이미 밟은 자리다).
+ */
+export function 인용걸러내기(rows) {
+  const 목록 = Array.isArray(rows) ? rows : [];
+  const 걸린 = new Set(인용관문(목록).걸린행.map((x) => x.자리));
+  return { rows: 목록.filter((_, i) => !걸린.has(i)), 지운: 걸린.size };
+}
 
 /**
  * 구운 행에서 **창 해시에 걸린 행을 걷어낸다** — 판정도 걷어내기도 저장소의 그 함수 하나로 한다.
@@ -153,7 +166,7 @@ export function 뽑기(db, { 코퍼스조각들 = null, root = 저장소 } = {})
   const 문답들 = [];
   const 등급셈 = {};
   const C본문 = [], O본문 = [];
-  const 파일근거 = new Set();                          // 승인 문답이 가리킨 **저장소 파일** 근거(등급 O 원천)
+  const 파일근거 = new Set();                          // **등급 O** 문답이 가리킨 저장소 파일 근거(공개 원천)
   for (const r of q("SELECT id, question, answer, cites, topic, origin, teacher, createdAt FROM chat_logs WHERE rating = 1 ORDER BY createdAt ASC")) {
     let cites = [];
     try { cites = r.cites ? JSON.parse(r.cites) : []; } catch { cites = []; }
@@ -163,9 +176,15 @@ export function 뽑기(db, { 코퍼스조각들 = null, root = 저장소 } = {})
     };
     const g = 문답등급(문답, 문서등급표);
     등급셈[g] = (등급셈[g] ?? 0) + 1;
-    for (const ref of cites) { const p = refParse(ref); if (p?.kind === "file") 파일근거.add(p.id); }
-    if (g === "O") { 문답들.push(문답); O본문.push(r.answer); }
-    else if (g === "C") C본문.push(r.answer);
+    // ⚠ 파일 근거는 **등급 O 문답이 가리킨 것만** 모은다(2026-09-10 저녁 · 검토관 적발).
+    //   판정 전에 모으면 등급 C·? 문답이 가리킨 파일까지 「공개 원천」으로 읽어 창 집합에서 빼게 된다 —
+    //   그 파일이 사내 문서인 날 **C 본문이 통째로 감시 밖으로 나간다.** 실측(2026-09-10): 승인 문답 전체가
+    //   가리킨 파일 32개 · 등급 O만 29개였고, 차이 3개는 그날 마침 공개 knowledge 문서라 창 집합이 안 갈렸다.
+    //   안 갈렸다는 것은 **그날 운이 좋았다**는 뜻이지 잣대가 옳았다는 뜻이 아니다.
+    if (g === "O") {
+      문답들.push(문답); O본문.push(r.answer);
+      for (const ref of cites) { const p = refParse(ref); if (p?.kind === "file") 파일근거.add(p.id); }
+    } else if (g === "C") C본문.push(r.answer);
   }
   // 공통 창은 뺀다 — 두 갈래다.
   //  ① O 승인 답에도 있는 글(정형 문구) — 그 글로 C를 판정하면 멀쩡한 행을 지운다.
@@ -178,8 +197,13 @@ export function 뽑기(db, { 코퍼스조각들 = null, root = 저장소 } = {})
   //   ⚠ 뺄셈을 **해시 대 해시**로 하면 안 된다 — 만드는 걸음이 20이라 C 답의 창 격자와 코퍼스의 창
   //     격자가 어긋난다(실측: 해시로 빼니 9,895→9,751, 144개만 빠졌다. 자리 어긋남 함정의 재판이다).
   //     그래서 코퍼스 본문을 **한 줄로 이어 붙여** 창 글자가 그 안에 **아무 자리에서나** 있는지 본다.
-  //   ⚠ 이 집합은 §12.13이 gb10 재료를 지울 때 쓴 집합보다 **좁다.** 넓은 잣대로 「C 0」이었으면
-  //     좁은 잣대로도 0이므로 그때 판정은 그대로 유효하다 — 반대 방향(좁혔더니 새로 걸림)은 없다.
+  //   ⚠ **부분집합이 아니다**(2026-09-10 저녁 · 검토관 적발 — 여기 적혀 있던 「좁으니 그때 판정은 그대로
+  //     유효하다」는 거짓 논증이었다). 실측: 옛 집합 9,894 · 새 집합 6,386인데 **새 집합에만 있는 창이
+  //     41개**다. 모집단이 함께 움직였기 때문이다(cdocs 1,598→1,597 · owin 12,612→12,614) — 「좁혔다」에서
+  //     「새로 걸릴 것이 없다」가 따라 나오지 않는다.
+  //     그래서 §12.13의 「C 0」은 논증이 아니라 **재측정**으로 지켰다: gb10 datasets 13파일을 이 집합으로
+  //     다시 재서 「글에 C 본문 0」을 확인했다(~/bench/ladder/r5/lists/recheck-20260910-v6.tsv).
+  //     **창 집합을 새로 만들면 그때마다 다시 잰다.** 좁아졌다는 말로 재측정을 건너뛰지 않는다.
   const C창 = new Map();                              // 해시 → 창 글자(뺄셈에만 쓰고 밖으로 안 나간다)
   const owin = new Set();
   for (const t of C본문) for (const x of 창목록(t)) if (!C창.has(x.h)) C창.set(x.h, x.w);
@@ -577,10 +601,14 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("material-v6
     const 로그아웃 = async () => {
       if (!세션) return;
       const s = 세션; 세션 = null;
-      await fetch(s.server + "/api/auth/logout", {
+      // ⚠ **못 돌려준 것을 「완료」라 적지 않는다**(2026-09-10 저녁 · 검토관 적발). 앞선 판은 실패를
+      //   삼키고도(catch) 무조건 완료를 찍었다 — 계정당 1세션이라 반납이 실패하면 다음 사람이 막히는데
+      //   로그에는 반납된 것처럼 남는다. audit_log에 login/logout 기록이 없어 이 줄 말고 확인할 길도 없다.
+      const 답 = await fetch(s.server + "/api/auth/logout", {
         method: "POST", headers: s.auth, redirect: "error", body: JSON.stringify({ refreshToken: s.refreshToken }),
-      }).catch(() => {});
-      console.log("[corpus] 세션 반납(logout) 완료");
+      }).then((res) => ({ ok: res.ok, 상태: String(res.status) }), (e) => ({ ok: false, 상태: e.message }));
+      if (답.ok) console.log("[corpus] 세션 반납(logout) 완료");
+      else console.error("⚠ [corpus] 세션 반납 **실패**(" + 답.상태 + ") — 이 계정은 아직 로그인 상태일 수 있다. 다음 작업 전에 사람이 확인해라");
     };
     try {
       const lr = await fetch(SERVER + "/api/auth/login", {
@@ -681,7 +709,10 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("material-v6
     if (홀드행.length + 이번 < HOLD_N && 뗀질문.size % 5 !== 0) continue;   // 다섯 뭉치마다(또는 닿을 때) 굽는다
     홀드회차 += 1;
     홀드판 = 홀드굽기(qa.문답.filter((l) => 뗀질문.has(문항정규화(l.question))));
-    홀드행 = 창걸러내기(홀드판.rows.map((r) => ({ ...r, grade: "O" })), 창집합).rows;
+    // ⚠ 시험지도 인용을 잰다 — 근거가 반대말을 하는 행이 **기준선**이 되면 그 숫자가 뜻을 잃는다
+    //   (실측 2026-09-10: 첫 판 100행 중 2행이 그런 행이었다 — 「knownRansomwareCampaignUse: Known」인데
+    //   그 번호의 블록은 Unknown이었다).
+    홀드행 = 인용걸러내기(창걸러내기(홀드판.rows.map((r) => ({ ...r, grade: "O" })), 창집합).rows).rows;
     if (홀드행.length >= HOLD_N) break;
   }
   // ★ 행 하나도 못 낸 뭉치는 **재료로 돌려보낸다.** 시험지에 안 실린 질문을 재료에서까지 빼면
@@ -707,13 +738,15 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("material-v6
     // ★ 창에 걸린 행을 **언어를 맞추기 전에** 뺀다. 순서가 뒤바뀌면 한국어 비중을 50%로 맞춰 놓고
     //   그 뒤에 한국어 행이 빠져 **49.5%로 끝난다**(실측). 「≥50%」라 적어 놓고 밑돌면 그 줄이 거짓이 된다.
     const { rows: 걸른판, 지운: 창지움 } = 창걸러내기(딱지, 창집합);
-    const { rows, 보고: 언어보고 } = 언어맞추기(걸른판, { 머리말: ragHeader, 목표한글 });
-    return { rows, 통계: 판.통계, 종류들: 판.종류들, 언어보고, 창지움 };
+    const { rows: 인용판, 지운: 인용지움 } = 인용걸러내기(걸른판);
+    const { rows, 보고: 언어보고 } = 언어맞추기(인용판, { 머리말: ragHeader, 목표한글 });
+    return { rows, 통계: 판.통계, 종류들: 판.종류들, 언어보고, 창지움, 인용지움 };
   };
   const 맞춤 = 거절비율맞추기(굽기, { 띠 });
   const 재료 = 맞춤.판.rows;
 
-  const { rows: 긴행, 지운: 긴창지움 } = 창걸러내기(긴.rows, 창집합);
+  const { rows: 긴창판, 지운: 긴창지움 } = 창걸러내기(긴.rows, 창집합);
+  const { rows: 긴행, 지운: 긴인용지움 } = 인용걸러내기(긴창판);
 
   // ⑥ 표본 문항(⑬·⑭ 모집단) — 홀드아웃 문답에서
   const 표본 = 표본문항짓기(홀드.뗀문답, 색인, { 목표: Number(opt("--samples-n", "28")), 씨앗: 씨앗 + "|samples", 판정: 판정기.판정 });
@@ -729,7 +762,7 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("material-v6
     색인: { 조각: 색인.size, 코퍼스문서: cp.docs, 파일 },
     홀드아웃: { ...홀드.보고, 행: 홀드행.length, 질문: 홀드.뗀질문.size, 굽기회차: 홀드회차, 뽑은뭉치: 뗀질문.size, 되돌린뭉치, 통계: 홀드판.통계.제외 },
     긴형식: {
-      행: 긴행.length, 창지움: 긴창지움, ...긴.통계,
+      행: 긴행.length, 창지움: 긴창지움, 인용지움: 긴인용지움, ...긴.통계,
       // 길이는 이 갈래의 **존재 이유**다(관문 ⑪ 서술 길이). 행 수만 적고 길이를 안 적으면 「길게 쓰는 법」을
       // 가르친다는 말을 아무도 검산할 수 없다.
       길이: (() => {
@@ -756,7 +789,7 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("material-v6
       거절시작: 재료.filter(거절로시작하나).length,
       거절비중: 재료.length ? 재료.filter(거절로시작하나).length / 재료.length : 0,
       사실주장: 재료.filter(사실주장인가).length,
-      제외: 맞춤.판.통계.제외, 회수: 맞춤.판.통계.회수, 언어: 맞춤.판.언어보고,
+      제외: 맞춤.판.통계.제외, 회수: 맞춤.판.통계.회수, 언어: 맞춤.판.언어보고, 인용지움: 맞춤.판.인용지움,
       인용규칙: 맞춤.판.통계.인용규칙, 베낀비율제외: 맞춤.판.통계.베낀비율제외,
       라이선스제외: 맞춤.판.통계.라이선스제외, 무블록: 맞춤.판.통계.무블록, 창지움: 맞춤.판.창지움,
     },

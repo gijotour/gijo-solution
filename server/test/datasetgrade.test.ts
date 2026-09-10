@@ -29,6 +29,7 @@ import crypto from "node:crypto";
 import {
   질문해시, 창길이, 창걸음, 창최소적중, 창정규화, 창적중수,
   등급판정, 등급관문, 등급세기, 잣대지문, 한글비율, 원천언어, 복사상한, 베낀비율행, 사실주장인가, 거절로시작하나,
+  블록나누기, 제품인용들, 인용관문, 겹침관문,
   고르기, 구성표,
 } from "../../tools/team-bench/material-r5.mjs";
 import { 걷어내기 } from "../../tools/team-bench/strip-c.mjs";
@@ -461,5 +462,96 @@ describe("★ 관문 ⑬·⑭의 모집단 24 — 근거가 사실이고, 길이
   it("★ 미측정 사유가 **채우는 길**을 이름으로 말한다 — 고칠 수 없는 빨강은 관문이 아니라 벽이다", () => {
     expect(잣대).toContain("samples-questions.json에 조각(chunk)이 든 문항을");
     expect((잣대.match(/\*\*채우는 길\*\*/g) ?? []).length, "⑬·⑭ 둘 다에 적혀야 한다").toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("★ 인용 관문 — 「[n]에 따르면」이 **그 번호의 블록**을 가리키나", () => {
+  // ■ 왜 이 잣대가 생겼나 (2026-09-10 저녁 · 검토관 적발 → 실측)
+  //   번호를 매기는 자(build-raft-dataset.mjs 블록번호찾기)는 **20자 겹침**으로 블록을 고른다. 그래서
+  //   인용 전체가 그 블록에 없어도 20자만 겹치면 번호가 붙는다. 실측으로 값이 **정반대인** 인용이
+  //   통과했다 — 답은 "knownRansomwareCampaignUse: Known", 그 번호의 블록은 Unknown이었다.
+  //   제품 가드(citeguard)도 같은 20자 잣대라 이런 인용을 안 뗀다. 그래서 재료 쪽에서 막는다.
+  const 머리 = "팀원 프롬프트\n\n" + 머리말 + "\n";
+  const 두블록 = 머리 + "[1] 《a.md》 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Unknown 이라고 적혀 있다\n"
+    + "[2] 《b.md》 랜섬웨어 캠페인 활용(knownRansomwareCampaignUse): Known 이라고 적혀 있다";
+
+  it("제목이 있는 꼴·없는 꼴을 **둘 다** 읽는다(한 꼴만 읽으면 다른 판이 통째로 거짓 빨강이 된다)", () => {
+    expect([...블록나누기(두블록).keys()]).toEqual(["1", "2"]);
+    const 제목없음 = 머리 + "[1] 첫 조각 본문이다\n[2] 둘째 조각 본문이다";
+    const b = 블록나누기(제목없음);
+    expect([...b.keys()]).toEqual(["1", "2"]);
+    expect(b.get("1")).toContain("첫 조각");
+    expect(b.get("2")).toContain("둘째 조각");
+  });
+
+  it("인용이 제 번호의 블록에 그대로 있으면 통과", () => {
+    const r = 인용관문([{ system: 두블록, answer: `설명입니다. [2]에 따르면 "knownRansomwareCampaignUse): Known"`, grade: "O" }]);
+    expect(r.ok).toBe(true);
+    expect(r.인용).toBe(1);
+    expect(r.맞음).toBe(1);
+  });
+
+  it("★ 20자는 겹치는데 **값이 반대**인 인용을 잡는다(이 관문의 존재 이유)", () => {
+    const r = 인용관문([{ system: 두블록, answer: `설명입니다. [1]에 따르면 "knownRansomwareCampaignUse: Known"`, grade: "O" }]);
+    expect(r.ok, "20자 겹침만 보면 이 행은 통과한다 — 그래서 잣대를 「그대로 들어 있나」로 둔다").toBe(false);
+    expect(r.없음).toBe(1);
+    expect(r.사유.join(" ")).toContain("어디에도 그대로 없는");
+  });
+
+  it("인용이 **남의 번호**를 가리키면 잡는다", () => {
+    const r = 인용관문([{ system: 두블록, answer: `설명입니다. [1]에 따르면 "knownRansomwareCampaignUse): Known"`, grade: "O" }]);
+    expect(r.ok).toBe(false);
+    expect(r.번호틀림).toBe(1);
+    expect(r.걸린행[0].실제).toBe("2");
+  });
+
+  it("인용이 아예 없는 행은 이 관문이 건드리지 않는다(회전 1·2 꼴 「원문: \"…\"」 포함)", () => {
+    expect(제품인용들('설명입니다. 원문: "어떤 문장"')).toHaveLength(0);
+    expect(인용관문([{ system: 두블록, answer: '설명만 있는 답입니다', grade: "O" }]).ok).toBe(true);
+  });
+
+  it("★ 등급관문이 이 관문을 **부른다** — 따로 부르게 두면 부르는 것을 잊는 경로가 생긴다", () => {
+    const r = 등급관문([{ ...행(), grade: "O", system: 두블록, answer: `설명입니다. [1]에 따르면 "knownRansomwareCampaignUse: Known"` }]);
+    expect(r.ok).toBe(false);
+    expect(r.인용.없음).toBe(1);
+  });
+});
+
+describe("★ 겹침 관문 — 재료가 시험 문항을 물고 있나", () => {
+  // ⚠ 2026-09-10 저녁 · 검토관 적발: 겹침을 보는 시험이 **긴 형식만** 보고 있었고, 실제 학습 재료는
+  //   저장소에 안 들어와(data/ 무시) 어떤 시험도 읽지 못했다. 그래서 잣대를 여기 두고, 재는 자리는
+  //   파일이 실제로 있는 곳(먹이기 직전 gradegate)으로 옮겼다.
+  const 시험 = [{ question: "이 취약점이 랜섬웨어와 어떤 연관이 있나요?", answer: "…" }];
+
+  it("안 겹치면 통과", () => {
+    expect(겹침관문([행({ question: "다른 질문입니다" })], 시험).ok).toBe(true);
+  });
+
+  it("★ 공백·문장부호가 달라도 같은 문항이면 잡는다(열쇠가 원문자면 사소한 차이로 샌다)", () => {
+    const r = 겹침관문([행({ question: "이 취약점이  랜섬웨어와 어떤 연관이 있나요" })], 시험);
+    expect(r.ok).toBe(false);
+    expect(r.겹침).toBe(1);
+    expect(r.사유.join(" ")).toContain("외웠나");
+  });
+
+  it("시험지가 비어 있으면 **통과가 아니라 아무 것도 안 잰 것**이라고 셈이 말한다", () => {
+    const r = 겹침관문([행()], []);
+    expect(r.ok).toBe(true);
+    expect(r.시험문항, "0이면 부르는 쪽이 파일을 잘못 준 것이다").toBe(0);
+  });
+});
+
+describe("★ 먹이는 자리(gradegate)가 새 잣대를 **실제로** 부른다", () => {
+  const 관문도구 = src("tools/team-bench/gradegate.mjs");
+
+  it("겹침 잣대를 여기서 새로 안 적고 불러 쓴다", () => {
+    expect(관문도구).toContain("겹침관문");
+    expect(관문도구, "시험지·표본을 받는 길이 없으면 잴 수가 없다").toContain("--holdout");
+    expect(관문도구).toContain("--samples");
+  });
+
+  it("★ 잣대가 **낡은 사본**이면 그렇다고 말한다(못 잰 것을 통과로 세지 않는다)", () => {
+    expect(관문도구).toContain("못재는것");
+    expect(관문도구).toMatch(/겹침관문[\s\S]{0,200}exit\(3\)/);
   });
 });

@@ -21,7 +21,7 @@ import {
   창생성걸음, 창목록, 창들만들기, 문서등급, 문답등급, ref문서,
   홀드아웃뗀다, 질문뭉치, 절제목, 금지절썼나, 언어맞추기, 거절비율맞추기, 창걸러내기, 순서키,
 } from "../../tools/team-bench/material-v6.mjs";
-import { 창길이, 창걸음, 창최소적중, 창정규화, 창적중수, 잣대지문, 등급관문 } from "../../tools/team-bench/material-r5.mjs";
+import { 창길이, 창걸음, 창최소적중, 창정규화, 창적중수, 잣대지문, 등급관문, 인용관문, 겹침관문 } from "../../tools/team-bench/material-r5.mjs";
 import { 문항정규화 } from "../../tools/build-raft-dataset.mjs";
 import { 제품거절문장 } from "../../tools/team-bench/gates.mjs";
 
@@ -249,7 +249,9 @@ describe("★ 커밋된 산출물 — 말한 대로인가", () => {
     const 머리 = Object.keys(홀드).join(" ");
     expect(머리).toContain("비교 불가");
     expect(Array.isArray(홀드.행)).toBe(true);
-    expect(홀드.행.length).toBeGreaterThanOrEqual(100);
+    // ⚠ 98이다(100이 아니다) — 구운 뒤 인용이 제 근거와 어긋나는 2행을 뺐다(2026-09-10 저녁).
+    //   사연은 파일 머리와 빌드 보고서의 「굽고 나서 고친 것」에 있고, 아래 인용 묶음이 그것을 못 박는다.
+    expect(홀드.행.length).toBeGreaterThanOrEqual(98);
     expect(홀드.행.every((r: Record<string, unknown>) => r.grade === "O")).toBe(true);
     expect(홀드.행.every((r: Record<string, unknown>) => String(r.system ?? "").includes(머리말)), "시험지 행에 근거 블록이 없다").toBe(true);
   });
@@ -338,11 +340,102 @@ describe("★ 회전 설정 — v6를 가리키되, **다시 굽지 말라**고 
     });
   }
 
-  it("★ 그 위험이 **실제로 있는** 코드다 — 경고가 낡으면 여기가 먼저 말한다", () => {
-    // 경고가 「없는 위험」을 가리키게 되는 날(스크립트가 고쳐지는 날) 이 시험이 빨개져서,
-    // 경고를 지울 때가 됐음을 알린다. 고칠 수 없는 빨강이 아니라 **갱신을 부르는 빨강**이다.
+  it("★ 이제 경고가 **걸쇠**다 — 스크립트가 빌드금지를 읽어 다시 굽지 않는다", () => {
+    // 2026-09-10 저녁: 앞선 판은 「스크립트가 아직 이 칸을 안 읽는다」를 못 박고 있었다(갱신을 부르는 빨강).
+    // 그 갱신이 왔다 — 이제 못 박을 것은 **읽는다**는 사실이다.
     const 스크립트 = src("tools/ladder/day2-train.sh");
-    expect(스크립트).toContain('--holdout-out "$REPO/$EVAL_HOLDOUT_FILE"');
-    expect(스크립트, "빌드금지를 읽는 줄이 생겼다면 round.json 의 경고를 갱신할 때다").not.toContain("빌드금지");
+    expect(스크립트, "덮어쓰기 위험 자체는 그대로다 — 그래서 걸쇠가 필요하다").toContain('--holdout-out "$REPO/$EVAL_HOLDOUT_FILE"');
+    expect(스크립트, "빌드금지를 안 읽으면 round.json 의 경고는 아무 것도 막지 못한다").toContain('BUILD_BAN="$(read_round 빌드금지)"');
+    expect(스크립트, "읽고도 SKIP_BUILD로 안 바꾸면 읽으나 마나다").toMatch(/-n "\$BUILD_BAN"[\s\S]{0,80}SKIP_BUILD=1/);
   });
+});
+
+describe("★ 먹이는 자리의 관문 — 저장소에 **안 들어오는** 재료는 거기서 잰다", () => {
+  // ⚠ 2026-09-10 저녁 · 검토관 적발: 겹침 시험이 **긴 형식만** 보고 있었다. 실제 학습 재료
+  //   raft-vuln-v6.json 은 data/ 가 무시되어 저장소에 안 들어오므로, 시험이 그 파일을 읽는 길은
+  //   원리상 없다 — 그 재료가 시험 문항을 물어도 아무 것도 빨개지지 않았다.
+  //   그래서 재는 자리를 옮겼다: 파일이 **실제로 있는 곳**(먹이기 직전)에서 관문이 잰다.
+  //   여기서 못 박는 것은 「그 관문이 있고, 학습 경로가 그것을 부르고, 빨강이면 안 먹인다」이다.
+  const 관문도구 = () => src("tools/team-bench/gradegate.mjs");
+  const 학습스크립트 = () => src("tools/ladder/day2-train.sh");
+
+  it("관문이 겹침을 잴 줄 안다 — 시험지·표본 문항을 받는다", () => {
+    const s = 관문도구();
+    expect(s).toContain("--holdout");
+    expect(s).toContain("--samples");
+    expect(s, "잣대를 여기서 새로 적으면 그것이 곧 두 벌이다").toContain("겹침관문");
+  });
+
+  it("★ 학습 스크립트가 **먹이기 직전에** 그 관문을 부른다", () => {
+    const s = 학습스크립트();
+    expect(s).toContain("tools/team-bench/gradegate.mjs");
+    expect(s, "재료를 안 재면 관문이 아니다").toContain("gate_one \"$DS_FILE\"");
+    expect(s, "긴 형식도 가중치로 들어간다").toContain("gate_one \"$REPO/$LONGFORM\"");
+    expect(s, "시험지 겹침을 안 보면 「외웠나」를 재게 된다").toContain("--holdout \"$REPO/$EVAL_HOLDOUT_FILE\"");
+    expect(s, "표본 문항(관문 ⑬·⑭)도 재료에 섞이면 안 된다").toContain("--samples \"$SAMPLES_FILE\"");
+  });
+
+  it("★ 빨강이면 **안 굽는다**(fail-closed) — 관문 도구가 없어도 통과가 아니다", () => {
+    const s = 학습스크립트();
+    expect(s, "관문 결과를 안 보면 부르나 마나다").toContain('[ "${PIPESTATUS[0]}" -eq 0 ] || {');
+    expect(s).toMatch(/등급 관문 도구가 없다[\s\S]{0,120}exit 7/);
+  });
+
+  it("회전 설정이 창 집합 자리를 가리킨다 — 없으면 관문이 **반쪽**이라고 스스로 말한다", () => {
+    for (const id of ["r5a", "r5b"]) {
+      const j = JSON.parse(src(`tools/team-bench/results-ladder/day2/${id}/round.json`));
+      expect(j.cwinFile, "창 집합이 없으면 「칸은 O인데 글이 C」를 원리상 못 본다").toBeTruthy();
+    }
+    expect(학습스크립트()).toContain("CWIN_ROUND");
+    expect(학습스크립트()).toMatch(/반쪽 관문/);
+  });
+});
+
+describe("★ 인용은 **제 번호의 블록에 그대로** 있어야 한다", () => {
+  // ⚠ 2026-09-10 저녁 · 검토관 적발 → 실측으로 뿌리까지 갔다.
+  //   번호를 매기는 자(build-raft-dataset.mjs 블록번호찾기)의 잣대가 **20자 겹침**이라, 인용 전체가
+  //   그 블록에 없어도 번호가 붙는다. 실제로 승인 답의 「knownRansomwareCampaignUse: Known」이 [1]에
+  //   붙었는데 [1] 블록은 같은 항목을 **Unknown**이라 적고 있었다(시험지 2행 · raft-vuln-v4 4행).
+  //   제품 가드(citeguard)도 20자 겹침이 잣대라 이런 인용을 안 뗀다 — 그래서 재료 쪽에서 막는다.
+  const 홀드 = JSON.parse(src("tools/team-bench/holdout-vuln-o.json"));
+  const 긴형식 = JSON.parse(src("tools/team-bench/results-ladder/day2/build/longform-vuln-v3-o.json"));
+
+  it("커밋된 시험지·긴 형식에 어긋난 인용이 0건이다", () => {
+    for (const [이름, rows] of [["시험지", 홀드.행], ["긴 형식", 긴형식]] as [string, Record<string, unknown>[]][]) {
+      const r = 인용관문(rows);
+      expect(r.인용, `${이름}에 제품 인용이 하나도 없다 — 그러면 이 관문이 아무 것도 안 재고 있다`).toBeGreaterThan(0);
+      expect(r.걸린행, `${이름}: ${JSON.stringify(r.걸린행.slice(0, 3))}`).toHaveLength(0);
+    }
+  });
+
+  it("★ 빌더가 그런 행을 **걷어낸다**(관문만 두면 「빨강이라 말하고 그대로 굽는」 판이 된다)", () => {
+    const s = 빌더();
+    expect(s).toContain("export function 인용걸러내기");
+    expect(s, "시험지도 걸러야 한다 — 기준선이 제 근거와 어긋나면 그 손실 값은 뜻을 잃는다")
+      .toContain("홀드행 = 인용걸러내기(");
+    expect(s, "재료를 안 거르면 그 행이 가중치로 들어간다").toContain("인용걸러내기(걸른판)");
+    expect(s, "긴 형식도 가중치로 들어간다").toContain("인용걸러내기(긴창판)");
+  });
+
+  it("시험지가 **왜 98행인지**를 파일이 스스로 말한다", () => {
+    expect(홀드.행).toHaveLength(98);
+    const 왜 = 홀드["⚠ 100행이 아니라 98행인 이유"] as string;
+    expect(왜, "행 수만 줄이고 사연을 안 적으면 다음 사람이 100을 기대하고 센다").toBeTruthy();
+    expect(홀드["뺀 행"]).toHaveLength(2);
+  });
+});
+
+describe("★ 회전 설정의 숫자는 **구운 판의 숫자**다", () => {
+  // ⚠ 2026-09-10 저녁 · 검토관 적발: round.json 은 pOracle 0.8이라 적었는데 v6는 0.8731로 구워졌고,
+  //   「왜」 칸의 라이선스 손실은 893행이라 적었는데 실제는 905행이었다. 빌드금지 덕에 실해는 없었지만,
+  //   기록으로 읽히면 **틀린 숫자**다. 사람이 눈으로 맞추는 대신 여기서 맞춘다.
+  const 보고서 = JSON.parse(src("tools/team-bench/results-ladder/raft-vuln-v6/build-report.json"));
+  for (const id of ["r5a", "r5b"]) {
+    it(`${id} 의 pOracle·라이선스 숫자가 빌드 보고서와 같다`, () => {
+      const j = JSON.parse(src(`tools/team-bench/results-ladder/day2/${id}/round.json`));
+      expect(j.pOracle).toBe(보고서.보고.레시피.pOracle);
+      expect(j.왜).toContain(`라이선스**(${보고서.보고.재료.제외["라이선스"]}행`);
+      expect(j.dataset).toBe(보고서.산출물.재료.replace(/\.json$/, ""));
+    });
+  }
 });
