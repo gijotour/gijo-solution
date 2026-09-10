@@ -40,7 +40,6 @@ import { listSchedules as listHardeningSchedules } from "../hardeningtargets";
 import { timeSavedText } from "../timesaved";
 import { feedbackSummaryText } from "../answerfeedback";
 import { adoptionSummaryText } from "../modeladoption";
-import { systemHealthText } from "../observability";
 import { alertScheduleText, createAlertSchedule, ALERT_KIND_LABEL } from "../alertschedule";
 import type { AlertKind } from "../alertschedule";
 import { getSmtpConfig } from "../email";
@@ -4436,8 +4435,11 @@ export async function runDocChunkGaps(): Promise<string> {
 // ── ↩ 문서 다시 넣기 (쓰기 · 결재판 경유) ───────────────────────────────────────
 //
 // 새 파이프라인을 만들지 않는다 — memory.reingestFromExtracted가 `/api/memory/document/markdown/save`와
-// **같은 자리**(추출본 .md → ingestText 멱등)를 쓴다. 옛 조각은 먼저 지워지고 scope·원본 경로는 유지된다.
-// ⚠ **추출본이 없으면 성공이라 적지 않는다** — 「＋로 다시 올리기」를 안내하고 던진다.
+// **같은 자리**(글 → ingestText 멱등)를 쓴다. 옛 조각은 먼저 지워지고 scope·원본 경로는 유지된다.
+// ★ 2026-09-10부터 **원본 보관본이 있으면 오늘의 추출기로 다시 뽑는다**(갈래 D) — 그래야 표·슬라이드
+//   수리가 이미 반입된 문서에도 닿는다. 어느 길이었는지는 memory가 값(source)으로 알려 주고,
+//   **여기서 지어내지 않는다** — 「원본에서 다시 뽑았습니다」를 폴백에도 붙이면 그 말이 거짓이 된다.
+// ⚠ **넣을 글이 없으면 성공이라 적지 않는다** — 「＋로 다시 올리기」를 안내하고 던진다.
 //   쓰기 도구의 실패는 문자열이 아니라 throw다(위 DUE_RE 문단의 계약) — 결재판이 400으로 돌려
 //   화면이 「실행 실패」로 표시한다. 「✅ 완료」로 보여 주면 담당자가 복구된 줄 오해한다.
 // ⚠ 기동·스케줄 어디에서도 이 함수를 부르지 않는다 — 되넣기는 **사람이 승인할 때만** 일어난다
@@ -4459,11 +4461,18 @@ export async function runReingestDocument(args: Record<string, string>): Promise
     // 추출본이 없다 = 넣을 글자가 없다. **영수증을 남기지 않는다**(대장 chunks도 그대로).
     throw new Error(`「${doc.documentId}」는 AI가 읽었던 글(추출본)이 서버에 남아 있지 않아 다시 넣을 수 없습니다 — 대화창 ＋로 그 파일을 다시 올려 주세요(업무영역·등급은 그대로 이어집니다). 조각 수는 그대로 ${doc.chunks}개입니다.`);
   }
+  const 원본길 = r.source === "original";
   const { recordAudit } = await import("../audit.js");
   recordAudit({
     kind: "write", actor: actor ?? null,
     action: "지식베이스 문서 재인입(대화)", target: doc.documentId,
-    detail: `조각 ${doc.chunks}개 → ${r.chunks}개 (추출본에서 다시 넣음 · 대장에 적혀 있던 값 ${doc.ledgerChunks ?? 0}개)`,
+    detail: `조각 ${doc.chunks}개 → ${r.chunks}개 (${원본길 ? "보관 원본에서 다시 추출" : "추출본에서 다시 넣음"}${r.fallbackReason ? ` · 폴백 사유: ${r.fallbackReason}` : ""} · 대장에 적혀 있던 값 ${doc.ledgerChunks ?? 0}개)`,
   });
-  return `문서 「${doc.documentId}」를 추출본에서 다시 넣었습니다 — 조각 ${doc.chunks}개 → ${r.chunks}개. 이제 답변 근거로 쓰입니다.`;
+  if (원본길) {
+    return `문서 「${doc.documentId}」를 원본에서 다시 뽑아 넣었습니다 — 조각 ${doc.chunks}개 → ${r.chunks}개.`
+      + " 지금 추출기로 다시 읽었으니 표·슬라이드 같은 구조도 함께 들어갔습니다. 이제 답변 근거로 쓰입니다.";
+  }
+  return `문서 「${doc.documentId}」를 추출본에서 다시 넣었습니다 — 조각 ${doc.chunks}개 → ${r.chunks}개.`
+    + (r.fallbackReason ? ` (원본에서 다시 뽑으려 했으나 ${r.fallbackReason} — 예전에 뽑아 둔 글로 넣었습니다.)` : "")
+    + " 이제 답변 근거로 쓰입니다.";
 }

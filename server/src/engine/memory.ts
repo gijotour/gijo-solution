@@ -1973,37 +1973,95 @@ export async function listVisibleDocuments(): Promise<MemoryDocument[]> {
   return 가림.size ? all.filter((d) => !가림.has(d.documentId)) : all;
 }
 
+/** 다시 넣기가 **어느 글자를 넣었는지** — 도구 문장·감사 기록이 이 값으로 정직하게 말한다. */
+export type ReingestSource = "original" | "extracted";
+
 /**
- * 추출본(.md)으로 **조각을 다시 넣는다** — 조각이 사라진 문서를 되살리는 경로.
+ * 문서를 **조각으로 다시 넣는다** — 조각이 사라졌거나 옛 추출본으로 들어간 문서를 되살리는 경로.
  *
  * ■ 왜 여기 있나 (2026-09-07)
  *   재인입 파이프라인을 새로 만들지 않는다 — `/api/memory/document/markdown/save`가 이미
  *   「추출본 .md → ingestText(멱등·옛 조각 선삭제·scope/sourcePath 유지)」를 한다.
  *   대화 도구(reingest_document)도 **같은 자리**를 써야 두 경로가 안 갈린다.
- *   ⚠ 원본 파일이 아니라 **추출본**에서 넣는 것이 요점이다 — 그러면 「그 사이 원본이 바뀌었으면
- *     다른 문서가 들어간다」는 걱정이 원천에서 사라진다(들어가는 글자가 그때 그 글자다).
  *   ⚠ INGEST_ROOT·getDocMetaStmt는 이 파일 밖으로 안 나간다 — 도구 쪽에서 경로를 다시 조립하면
  *     `GIJO_INGEST_ROOT`를 쓰는 설치에서 **엉뚱한 자리를 뒤지고도 성공이라 보고**한다
  *     (datacleanup가 실제로 그랬다 — db.ts·docattach·backup에 같은 상수가 이미 네 벌이다).
  *
- * @returns 넣은 조각 수. **추출본이 없으면 null** — 그때 「다시 넣었습니다」라고 말하면 거짓이 된다.
+ * ■ 원본이 보관돼 있으면 **원본에서 다시 뽑는다** (2026-09-10, 갈래 D)
+ *   2026-09-08~10에 추출기가 워드·pptx·PDF의 표를 파이프 표로, pptx의 슬라이드 경계·도해·노트를
+ *   살리게 됐다. 그런데 **이미 반입된 문서는 옛 추출본 그대로**라, 새 추출기가 고친 것이 기존
+ *   문서에는 하나도 안 닿았다 — 사람이 그 파일을 손수 다시 올리는 길만 있었다.
+ *   ⚠ 첫 판(2026-09-07)은 「그 사이 원본이 바뀌었으면 다른 문서가 들어간다」를 걱정해 **추출본만**
+ *     읽었다. 그 걱정은 여기서 성립하지 않는다 — 우리가 읽는 원본은 사용자의 원래 자리가 아니라
+ *     **우리가 `docs/uploads/`에 넣어 둔 보관본**이고(saveDocArtifacts), 그 자리는 제품 말고는
+ *     아무도 안 쓴다. 그래서 「그때 그 파일 · 오늘의 추출기」가 된다.
+ *   ⚠ 원본 경로는 **INGEST_ROOT 안일 때만** 읽는다(assertWithinIngestRoot) — 대장의 sourcePath는
+ *     built-in 코퍼스처럼 다른 자리를 가리킬 수 있고, 임의 경로를 읽어 주면 그 관문이 무너진다.
+ *   ⚠ 원본이 없거나·형식이 글자 그대로 읽히는 것이거나·다시 뽑기가 실패하면(스캔 PDF에서 OCR이
+ *     빈손인 경우 등) **종전대로 추출본**으로 넣고, 어느 길이었는지를 값으로 돌려준다. 「원본에서
+ *     다시 뽑았습니다」를 폴백에도 붙이면 그 말이 거짓이 된다.
+ *
+ * @returns 넣은 조각 수 + 어느 길이었나(+ 폴백했으면 그 사유). **넣을 글자가 없으면 null** —
+ *          그때 「다시 넣었습니다」라고 말하면 거짓이 된다.
  * @throws 대장에 그 문서가 없거나 이름이 basename이 아니면 던진다(쓰기 도구 계약).
  */
-export async function reingestFromExtracted(documentId: string, actor?: string): Promise<{ chunks: number } | null> {
+export async function reingestFromExtracted(
+  documentId: string,
+  actor?: string
+): Promise<{ chunks: number; source: ReingestSource; fallbackReason?: string } | null> {
   const id = String(documentId ?? "");
   // ⚠ 이름=basename만 허용 — 경로가 섞인 id는 남의(기밀) .md를 가리킬 수 있다(위 두 라우트와 같은 관문).
   if (!id || path.basename(id) !== id) throw new Error("잘못된 문서 이름입니다");
   const meta = getDocMetaStmt.get(id) as { sourcePath?: string | null; scope?: string | null } | undefined;
   if (!meta) throw new Error(`반입 대장에 「${id}」 줄이 없습니다 — 이름을 다시 확인해 주세요.`);
-  let text: string;
-  try {
-    text = await fs.readFile(assertWithinIngestRoot(path.join(INGEST_ROOT, "docs", "extracted", id + ".md")), "utf8");
-  } catch {
-    return null; // 추출본이 없다 — **성공이라 적지 않는다**(대장 chunks도 안 건드린다)
+
+  let text: string | undefined;
+  let source: ReingestSource = "extracted";
+  let fallbackReason: string | undefined;
+
+  // ① 보관된 원본 + 추출이 필요한 형식이면 **오늘의 추출기로 다시 뽑는다**.
+  //    (추출필요가 아닌 형식(.md·.txt …)은 원본과 추출본이 같은 글자라 다시 뽑을 값어치가 없다.)
+  const 원본 = meta.sourcePath ? String(meta.sourcePath) : "";
+  if (원본 && 추출필요.has(path.extname(원본).toLowerCase())) {
+    let 원본경로: string | undefined;
+    try {
+      원본경로 = assertWithinIngestRoot(원본);
+    } catch {
+      // 경로를 문장에 싣지 않는다 — 서버 디렉터리 구조가 대화창으로 새어 나갈 이유가 없다.
+      fallbackReason = "원본 보관 경로가 허용 범위 밖입니다";
+    }
+    if (원본경로) {
+      try {
+        const buf = await fs.readFile(원본경로);
+        const { extractDocumentText } = await import("./dataset.js");
+        const 새글 = await extractDocumentText(path.basename(원본경로), buf.toString("base64"));
+        if (새글.trim()) {
+          text = 새글;
+          source = "original";
+          // 추출본(.md)도 새 글로 맞춘다 — 「내 문서」의 추출본 보기가 조각과 다른 글을 보여 주면
+          // 담당자가 무엇이 들어갔는지 못 믿는다. 쓰는 자리는 saveDocArtifacts 한 곳이다.
+          const { mdSaved } = await saveDocArtifacts({ documentId: id, text: 새글 });
+          if (!mdSaved) console.warn(`[memory] 다시 넣기 — 새 추출본 보관 실패(${id}): 조각은 새 글로 들어갑니다`);
+        } else {
+          fallbackReason = "원본에서 글자를 못 뽑았습니다(스캔 문서일 수 있습니다)";
+        }
+      } catch (err) {
+        fallbackReason = `원본을 다시 뽑지 못했습니다(${(err instanceof Error ? err.message : String(err)).slice(0, 80)})`;
+      }
+    }
   }
-  if (!text.trim()) return null; // 빈 추출본을 넣으면 0조각이 되고 「고쳤다」가 거짓이 된다
+
+  // ② 원본 길이 아니면 종전대로 추출본에서.
+  if (text === undefined) {
+    try {
+      text = await fs.readFile(assertWithinIngestRoot(path.join(INGEST_ROOT, "docs", "extracted", id + ".md")), "utf8");
+    } catch {
+      return null; // 추출본이 없다 — **성공이라 적지 않는다**(대장 chunks도 안 건드린다)
+    }
+  }
+  if (!text.trim()) return null; // 빈 글을 넣으면 0조각이 되고 「고쳤다」가 거짓이 된다
   const r = await ingestText(id, text, meta.scope ?? GLOBAL_SCOPE, meta.sourcePath ?? undefined, false, actor);
-  return { chunks: r.chunks };
+  return fallbackReason ? { chunks: r.chunks, source, fallbackReason } : { chunks: r.chunks, source };
 }
 
 // 특정 문서의 조각(청크) 텍스트 미리보기 — "어떻게 학습됐는지" 확인용.
