@@ -4,14 +4,18 @@
 //   하네스는 「무엇으로 알아들었나」(도구)만 재고 **「어느 팀원이 · 어느 두뇌로 답했나」**는
 //   원리상 못 쟀다. ⑲가 그 자리인데, ⑲의 문항표는 **「이 말은 그 팀원에게 간다」는 주장**이다.
 //   주장을 사람 기억에 맡기면 라우팅이 바뀌는 날 **거짓 초록**이 된다 — 그래서 여기서
-//   **제품 함수로 매번 다시 잰다**(`결정적도착지`·`forcedToolFor`).
+//   **제품 함수로 매번 다시 잰다**(`결정적도착지`·`forcedToolFor`·`planInstruction`).
 //
-// ■ 이 시험이 무는 것 다섯
+// ■ 이 시험이 무는 것 여덟
 //   ① 27문항이 각자 적힌 도착지로 가는가 (제품 함수 — 흉내 내지 않는다)
 //   ② 그 팀원의 **부르는 문**(chat({agentId})) 이 소스에 아직 있는가 (소스 감시)
 //   ③ 두뇌 표식이 없으면 **건너뛰고 빨강이 아니다**(옛 서버)
 //   ④ 배정과 다른 두뇌·상한 초과는 불편으로 잡히는가 (판정식)
 //   ⑤ 보고서 표가 실제로 렌더되는가 (안 실으면 안 만든 것과 같다)
+//   ⑥ ★ `표식남나`가 **소스와 맞는가** — 결정 호출(responseSchema)에는 표식이 원리상 안 남는다.
+//      이 칸이 소스와 어긋나면 M2가 제대로 실린 서버에도 매일 밤 「M2 미반영」 거짓 진단이 찍힌다.
+//   ⑦ ★ 실패한 줄(오류·빈 답)도 **분모에 남는가** — 빠지면 죽은 회차가 초록으로 읽힌다.
+//   ⑧ ★ ⑲ 문항이 **운영 데이터를 바꾸지 않는가** — 복합 지시에 scan 단계가 있으면 자산이 갈린다.
 //
 // ⚠ 실행 금지 원칙: ⑲는 **운영 서버를 부르지 않고** 여기서 검증된다. 라우팅은 격리 단위로,
 //   판정식은 가짜 답으로 잰다(이 파일은 fetch를 한 번도 하지 않는다).
@@ -19,15 +23,16 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { 결정적도착지 } from "../src/engine/dispatcher";
+import { 결정적도착지, planInstruction } from "../src/engine/dispatcher";
 import { 실제도착 } from "./helpers/routing";
 import {
-  팀원문항, 팀원기대, 팀원순서, 팀원판정, 팀원표, 배정표스냅샷, 두뇌말,
+  팀원문항, 팀원기대, 팀원순서, 팀원판정, 팀원표, 배정표스냅샷, 두뇌말, 실패이유, 표식잴수있나,
   상한MS, 지연상한MS, 마당이름, 마당화면,
 } from "../../tools/opssim-team.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const 뿌리 = join(__dirname, "..", "..");
+const 읽기 = (상대: string) => readFileSync(join(뿌리, 상대), "utf8");
 
 /** 제품이 말하는 도착지 — 첫 번째가 이긴다(빈 배열이면 ⑨ 모델 선택). route-explain과 같은 자다. */
 async function 첫도착(말: string): Promise<string | null> {
@@ -73,6 +78,25 @@ describe("⑲ 문항이 그 팀원의 문으로 간다 (제품 함수로 잰다)
     }
   });
 
+  // ★★ ⑧ 운영 데이터 — **야간 회귀는 재는 일이지 바꾸는 일이 아니다**(2026-09-10 검토관 적발).
+  //    「전체 자산 스캔하고 …」는 planInstruction이 scan 단계를 만들고, 그 단계가 자산마다
+  //    recordFindings로 스캔 이력 추가·findings 갈아끼움·자동배정 훅을 **결재판 없이** 돌렸다.
+  //    문항을 늘리다 보면 「스캔」이 또 들어오기 쉬우므로 **제품 함수로** 매 회 막는다.
+  it("★ ⑲ 문항은 운영 자산을 건드리지 않는다 — 복합 지시에 scan 단계가 없다 (planInstruction으로 잰다)", () => {
+    for (const r of 팀원문항) {
+      const steps = planInstruction(r.q).map((s: { action: string }) => s.action);
+      if (steps.length >= 2) {
+        expect(steps, `「${r.q}」가 복합 지시로 scan을 돌린다 — 매일 밤 운영 자산의 findings가 갈린다`).not.toContain("scan");
+      }
+    }
+    // 해설 팀원의 오케스트레이션 문은 살아 있어야 한다(막느라 문을 없애 버리면 ⑲가 잴 것이 없다).
+    const 복합행 = 팀원기대["우선순위 분석하고 리포트 작성해줘"];
+    expect(복합행, "복합 지시 문항이 사라졌다 — 해설 팀원의 enrich 문을 아무도 안 잰다").toBeTruthy();
+    expect(planInstruction(복합행.q).map((s: { action: string }) => s.action)).toEqual(["analyze", "report"]);
+    // 「스캔 해석 초안 보여줘」는 낱말만 스캔이다 — 1단계라 오케스트레이션에 못 든다.
+    expect(planInstruction("스캔 해석 초안 보여줘").length).toBeLessThan(2);
+  });
+
   // ★ 반증 — 기대를 틀리게 적으면 이 시험이 **정말로** 빨개지는가.
   //   («시험이 시험을 시험한다» — 판정이 늘 통과하는 자라면 초록도 못 믿는다.)
   it("반증: 기대 팀원·도착을 틀리게 적으면 판정이 어긋난다", async () => {
@@ -80,6 +104,8 @@ describe("⑲ 문항이 그 팀원의 문으로 간다 (제품 함수로 잰다)
     expect(await 첫도착(진짜.q)).toBe("threats");
     expect(await 첫도착(진짜.q)).not.toBe("generateReport"); // 리포트 팀원 것이라 적었다면 빨강
     expect(실제도착(진짜.q, "admin")).not.toBe("incident_cases");
+    // 옛 판의 스캔 문항을 되살리면 ⑧ 감시가 잡는다.
+    expect(planInstruction("전체 자산 스캔하고 우선순위 분석해줘").map((s: { action: string }) => s.action)).toContain("scan");
   });
 });
 
@@ -92,7 +118,7 @@ describe("⑲ 팀원의 부르는 문이 소스에 있다", () => {
   it.each(문목록)(
     "%s 에 %s 가 있다",
     (파일, 표식) => {
-      const 소스 = readFileSync(join(뿌리, 파일), "utf8");
+      const 소스 = 읽기(파일);
       expect(
         소스.includes(표식),
         `${파일}에서 「${표식}」이 사라졌다 — 그 팀원의 부르는 문이 없어졌거나 옮겨졌다. ` +
@@ -111,6 +137,71 @@ describe("⑲ 팀원의 부르는 문이 소스에 있다", () => {
   });
 });
 
+// ── ⑥ 표식남나 — **결정 호출에는 표식이 원리상 안 남는다**(2026-09-10 검토관 적발, 치명) ──────
+//    M2(brainmark)는 responseSchema 호출을 **값으로** 건너뛴다. 그런데 ti·analysis·bom의 그 팀원
+//    chat은 전부 스키마 호출이고 그 도구들은 directAnswer라 재작성 chat도 없다 → 표식이 영영 없다.
+//    이것을 「표식 없음 = 옛 서버」로 읽으면 **거짓 진단**이 매일 밤 보고서에 실린다.
+describe("⑲ 표식남나 칸이 소스와 맞는다 (M2의 약속을 그대로 읽는다)", () => {
+  /** `chat({ … })` 한 덩이씩 — 중괄호 짝으로 끊는다(정규식으로는 여러 줄 인자를 못 끊는다). */
+  function chat블록들(소스: string): string[] {
+    const 블록: string[] = [];
+    let i = 0;
+    for (;;) {
+      const s = 소스.indexOf("chat({", i);
+      if (s < 0) break;
+      let 깊이 = 0;
+      let j = s + "chat(".length;
+      for (; j < 소스.length; j++) {
+        const c = 소스[j];
+        if (c === "{") 깊이++;
+        else if (c === "}") { 깊이--; if (깊이 === 0) { j++; break; } }
+      }
+      블록.push(소스.slice(s, j));
+      i = j;
+    }
+    return 블록;
+  }
+
+  it("M2의 잣대가 아직 소스에 그대로 있다 — 바뀌면 이 마당의 칸도 바뀌어야 한다", () => {
+    // ⚠ 2026-09-10 M2가 잣대를 넓혔다(결정 호출만 → **explain이 아닌 호출 전부**). 그날 그대로
+    //   두었다면 ⑲는 리포트·해설 문항까지 「M2 미반영」이라 외쳤을 것이다.
+    expect(읽기("server/src/engine/brainmark.ts")).toContain("if (보고.결정호출 || !보고.사람이읽는답) return;");
+    expect(읽기("server/src/engine/llm.ts")).toContain("결정호출: !!args.responseSchema");
+    expect(읽기("server/src/engine/llm.ts")).toContain("사람이읽는답: args.explain === true");
+  });
+
+  /** M2의 잣대 그대로 — **비-스키마이면서 explain을 켠** chat만 표식을 남긴다. */
+  const 표식남기나 = (블록: string[]) =>
+    블록.some((b) => !b.includes("responseSchema") && b.includes("explain: true"));
+
+  const 돎행 = 팀원문항.filter((r) => r.두뇌돎);
+  it.each(돎행.map((r) => [r.팀원, r.q, r.표식남나 !== false] as const))(
+    "%s · 「%s」 표식남나=%s",
+    (_팀원, q, 남나) => {
+      const 행 = 팀원기대[q];
+      const 블록 = chat블록들(읽기(행.문파일)).filter((b) => b.includes(행.문표식));
+      expect(블록.length, `${행.문파일}에서 ${행.문표식} chat 블록을 못 찾았다 — 감시가 낡았다`).toBeGreaterThan(0);
+      expect(
+        표식남기나(블록),
+        남나
+          ? `${행.문파일}의 ${행.문표식} chat에서 표식이 사라졌다(스키마가 붙었거나 explain이 빠졌다). ` +
+            "문항표에 `표식남나: false`를 적어야 「M2 미반영」이라는 거짓 진단이 안 나간다."
+          : `${행.문파일}의 ${행.문표식}에 담당자용 답 chat(explain:true)이 생겼다 — 이제 표식이 남는다. ` +
+            "문항표의 `표식남나: false`를 지우고 위치·지연 판정을 켤 때다(좋은 빨강이다).",
+      ).toBe(남나);
+    },
+  );
+
+  it("★ 표식이 남는 갈래는 총괄 4문항뿐이다 — 나머지 열넷은 「돌지만 안 남는」 갈래다", () => {
+    const 안남 = 팀원문항.filter((r) => r.두뇌돎 && r.표식남나 === false);
+    expect(안남).toHaveLength(14); // report 5 · ti 4 · analysis 3 · bom 1 · normaltic(복합) 1
+    expect([...new Set(안남.map((r) => r.팀원))].sort()).toEqual(["analysis", "bom", "normaltic", "report", "ti"]);
+    // 표식으로 위치를 견줄 수 있는 갈래는 총괄뿐 — 그런데 총괄은 코드로 이 PC 고정이다.
+    expect([...new Set(팀원문항.filter(표식잴수있나).map((r) => r.팀원))]).toEqual(["orchestrator"]);
+    expect(팀원문항.filter(표식잴수있나)).toHaveLength(4);
+  });
+});
+
 // ── ③④ 판정식 ────────────────────────────────────────────────────────────────────
 const 배정 = 배정표스냅샷([
   { id: "orchestrator", name: "Security Orchestrator", abbr: "분배", assignedLocation: "local", assignedModelId: "qwen3-14b" },
@@ -123,6 +214,8 @@ const 리포트행 = 팀원기대["이번 달 보안 리포트 작성해줘"];
 const 위협행 = 팀원기대["요즘 위협 있어?"];
 const 사서행 = 팀원기대["지식 저장소 현황 알려줘"];
 const 분석행 = 팀원기대["테스트 장비에서 방화벽을 잠깐 꺼도 돼?"];
+const 총괄행 = 팀원기대["CVE-2014-0160이 뭐야?"];
+const 복합행 = 팀원기대["우선순위 분석하고 리포트 작성해줘"];
 
 describe("⑲ 판정 — 도착·두뇌·지연", () => {
   it("배정표 스냅샷은 assignedLocation=null을 「전역 따름」으로 남긴다 (모르는 것을 아는 척하지 않는다)", () => {
@@ -134,29 +227,34 @@ describe("⑲ 판정 — 도착·두뇌·지연", () => {
   });
 
   it("그 팀원의 문으로 가면 불편이 없다", () => {
-    const 판 = 팀원판정(리포트행, { 팀원: "report", 도구: [], ms: 20000, 두뇌: { location: "remote" } }, 배정);
+    // 표식이 실제로 남는 갈래(총괄의 최종 답)로 잰다 — 배정도 로컬이라 아무 불편이 없다.
+    const 판 = 팀원판정(총괄행, { 도구: ["explain"], ms: 4000, 두뇌: { location: "local" } }, 배정);
     expect(판.불편).toEqual([]);
     expect(판.기록.도착맞음).toBe(true);
-    expect(두뇌말(판.기록)).toBe("원격");
+    expect(두뇌말(판.기록)).toBe("로컬");
+    // 리포트는 문으로는 가지만 표식이 안 남는 갈래다 — 도착만 초록이다.
+    const 리 = 팀원판정(리포트행, { 팀원: "report", ms: 20000, 두뇌: { location: "remote" } }, 배정);
+    expect(리.불편).toEqual([]);
+    expect(리.기록.도착맞음).toBe(true);
+    expect(두뇌말(리.기록)).toBe("돎(표식 안 남는 갈래)");
   });
 
   it("다른 팀원에게 가면 불편으로 잡힌다 — 도구·팀원·단계 세 신호 모두", () => {
     const a = 팀원판정(리포트행, { 팀원: "orchestrator", ms: 900 }, 배정);
-    expect(a.불편.map((x) => x.종류)).toContain("다른 팀원에게 감");
+    expect(a.불편.map((x: { 종류: string }) => x.종류)).toContain("다른 팀원에게 감");
     expect(a.불편[0].상세).toContain("실제 orchestrator");
 
     const b = 팀원판정(위협행, { 도구: ["search"], ms: 900 }, 배정);
-    expect(b.불편.map((x) => x.종류)).toContain("다른 팀원에게 감");
+    expect(b.불편.map((x: { 종류: string }) => x.종류)).toContain("다른 팀원에게 감");
 
-    const 복합행 = 팀원기대["전체 자산 스캔하고 우선순위 분석해줘"];
-    const c = 팀원판정(복합행, { 단계: [{ action: "scan" }, { action: "analyze" }], ms: 900 }, 배정);
-    expect(c.불편.map((x) => x.종류)).toContain("다른 팀원에게 감"); // enrich 단계가 없다 = 해설 팀원이 안 불렸다
-    const d = 팀원판정(복합행, { 단계: [{ action: "scan" }, { action: "analyze" }, { action: "enrich" }], ms: 900 }, 배정);
+    const c = 팀원판정(복합행, { 단계: [{ action: "analyze" }, { action: "report" }], ms: 900 }, 배정);
+    expect(c.불편.map((x: { 종류: string }) => x.종류)).toContain("다른 팀원에게 감"); // enrich 단계가 없다 = 해설 팀원이 안 불렸다
+    const d = 팀원판정(복합행, { 단계: [{ action: "analyze" }, { action: "enrich" }, { action: "report" }], ms: 900 }, 배정);
     expect(d.불편).toEqual([]);
   });
 
   it("★ 두뇌 표식이 없으면 건너뛴다 — 옛 서버는 빨강이 아니다", () => {
-    const 판 = 팀원판정(리포트행, { 팀원: "report", ms: 20000 }, 배정); // j.brain 없음
+    const 판 = 팀원판정(총괄행, { 도구: ["explain"], ms: 8000 }, 배정); // j.brain 없음
     expect(판.불편).toEqual([]);
     expect(판.기록.표식있음).toBe(false);
     expect(판.기록.실제위치).toBeNull();
@@ -164,38 +262,43 @@ describe("⑲ 판정 — 도착·두뇌·지연", () => {
   });
 
   it("배정과 다른 두뇌·원격 폴백은 불편이다", () => {
-    const 판 = 팀원판정(리포트행, { 팀원: "report", ms: 9000, 두뇌: { location: "local", fallback: true } }, 배정);
-    const 종류 = 판.불편.map((x) => x.종류);
+    // 총괄은 로컬 배정인데 원격 표식이 왔다 + 폴백 자국이 있다.
+    const 판 = 팀원판정(총괄행, { 도구: ["explain"], ms: 9000, 두뇌: { location: "remote", fallback: true } }, 배정);
+    const 종류 = 판.불편.map((x: { 종류: string }) => x.종류);
     expect(종류).toContain("배정과 다른 두뇌");
     expect(종류).toContain("원격이 안 닿아 이 PC로");
-    expect(두뇌말(판.기록)).toBe("폴백(local)");
+    expect(두뇌말(판.기록)).toBe("폴백(remote)");
   });
 
   it("지연 상한 — 원격 30초·로컬 10초, 배정이 없으면 재지 않는다", () => {
-    // 원격 배정: 29초는 통과, 31초는 「두뇌 느림」
-    expect(팀원판정(리포트행, { 팀원: "report", ms: 29000, 두뇌: { location: "remote" } }, 배정).불편).toEqual([]);
-    const 느림 = 팀원판정(리포트행, { 팀원: "report", ms: 31000, 두뇌: { location: "remote" } }, 배정);
-    expect(느림.불편.map((x) => x.종류)).toContain("두뇌 느림");
-    expect(느림.불편.find((x) => x.종류 === "두뇌 느림")!.상세).toContain("30초");
-
-    // 로컬 배정(총괄): 11초면 느림
-    const 총괄행 = 팀원기대["CVE-2014-0160이 뭐야?"];
+    // 로컬 배정(총괄): 9초는 통과, 11초면 「두뇌 느림」
     expect(팀원판정(총괄행, { 도구: ["explain"], ms: 9000, 두뇌: { location: "local" } }, 배정).불편).toEqual([]);
     expect(
-      팀원판정(총괄행, { 도구: ["explain"], ms: 11000, 두뇌: { location: "local" } }, 배정).불편.map((x) => x.종류),
+      팀원판정(총괄행, { 도구: ["explain"], ms: 11000, 두뇌: { location: "local" } }, 배정).불편.map((x: { 종류: string }) => x.종류),
     ).toContain("두뇌 느림");
 
+    // 원격 배정이면 30초가 상한이다 — **판정식**을 재는 자리라 배정표를 그렇게 만들어 넣는다
+    //   (운영에서 총괄은 이 PC 고정이다. 그 사실과 판정식의 옳음은 다른 문제다).
+    const 배정원격 = 배정표스냅샷([{ id: "orchestrator", name: "Security Orchestrator", assignedLocation: "remote", assignedModelId: "flash-next" }]);
+    expect(팀원판정(총괄행, { 도구: ["explain"], ms: 29000, 두뇌: { location: "remote" } }, 배정원격).불편).toEqual([]);
+    const 느림 = 팀원판정(총괄행, { 도구: ["explain"], ms: 31000, 두뇌: { location: "remote" } }, 배정원격);
+    expect(느림.불편.map((x: { 종류: string }) => x.종류)).toContain("두뇌 느림");
+    expect(느림.불편.find((x: { 종류: string }) => x.종류 === "두뇌 느림")!.상세).toContain("30초");
+
     // 미배정(전역 따름)이면 상한이 없다 — 없는 약속으로 벌주지 않는다.
-    expect(팀원판정(분석행, { 팀원: "analysis", ms: 120000 }, 배정).불편).toEqual([]);
-    expect(팀원판정(분석행, { 팀원: "analysis", ms: 120000 }, 배정).기록.상한).toBeNull();
+    const 미배정총괄 = 팀원판정(총괄행, { 도구: ["explain"], ms: 120000, 두뇌: { location: "local" } }, {});
+    expect(미배정총괄.불편).toEqual([]);
+    expect(미배정총괄.기록.상한).toBeNull();
   });
 
   it("겹쳐 세지 않는다 — 기존 30초 규칙이 이미 셌으면 「두뇌 느림」을 또 붙이지 않는다", () => {
-    const 이미 = 팀원판정(리포트행, { 팀원: "report", ms: 45000, 두뇌: { location: "remote" } }, 배정, true);
-    expect(이미.불편.map((x) => x.종류)).not.toContain("두뇌 느림");
+    const 이미 = 팀원판정(총괄행, { 도구: ["explain"], ms: 45000, 두뇌: { location: "local" } }, 배정, true);
+    expect(이미.불편.map((x: { 종류: string }) => x.종류)).not.toContain("두뇌 느림");
+    expect(이미.기록.지연잼, "겹쳐 세지 않은 줄을 「쟀다」고 적으면 상한 칸이 거짓이 된다").toBe(false);
     // 리포트 전환(wouldHandoff)도 마찬가지 — 사람 경로는 3초에 물러난다.
-    const 전환 = 팀원판정(리포트행, { 팀원: "report", ms: 45000, wouldHandoff: true, 두뇌: { location: "remote" } }, 배정);
-    expect(전환.불편.map((x) => x.종류)).not.toContain("두뇌 느림");
+    const 전환 = 팀원판정(총괄행, { 도구: ["explain"], ms: 45000, wouldHandoff: true, 두뇌: { location: "local" } }, 배정);
+    expect(전환.불편.map((x: { 종류: string }) => x.종류)).not.toContain("두뇌 느림");
+    expect(전환.기록.지연잼).toBe(false);
   });
 
   it("「문만」 문항에는 두뇌·지연 판정을 걸지 않는다 — 반입 때 도는 팀원을 벌주면 정의 A가 거짓이 된다", () => {
@@ -206,15 +309,44 @@ describe("⑲ 판정 — 도착·두뇌·지연", () => {
     expect(두뇌말(판.기록)).toBe("문만(반입 때 돎)");
   });
 
+  // ★★ ⑥ 표식이 **원리상** 없는 줄을 「옛 서버」로 적으면 매일 밤 거짓 진단이 나간다.
+  it("★ 표식이 안 남는 갈래는 표식이 없어도 「옛 서버」라 하지 않는다 — 위치·폴백·지연도 안 잰다", () => {
+    const 판 = 팀원판정(위협행, { 도구: ["threats"], ms: 41000 }, 배정); // 표식 없음(원리상)
+    expect(판.불편).toEqual([]);
+    expect(판.기록.표식남나).toBe(false);
+    expect(판.기록.상한, "표식을 못 보는 줄에 상한을 걸면 배정과 무관한 시간으로 벌준다").toBeNull();
+    expect(두뇌말(판.기록)).toBe("조건부 돎(표식 안 남는 갈래)");
+
+    // 혹시 서버가 표식을 실어 보내도(다른 chat의 것) 그것으로 이 팀원을 견주지 않는다.
+    const 남의표식 = 팀원판정(위협행, { 도구: ["threats"], ms: 900, 두뇌: { location: "local", fallback: true } }, 배정);
+    expect(남의표식.불편, "표식 안 남는 줄에 남의 표식으로 「배정과 다른 두뇌」를 붙였다").toEqual([]);
+    expect(남의표식.기록.표식있음).toBe(false);
+
+    // 분석(결정 호출)·리포트(explain 없음) 둘 다 같은 갈래다.
+    expect(팀원판정(분석행, { 팀원: "analysis", ms: 900 }, 배정).기록.표식남나).toBe(false);
+    expect(두뇌말(팀원판정(분석행, { 팀원: "analysis", ms: 900 }, 배정).기록)).toBe("돎(표식 안 남는 갈래)");
+    expect(팀원판정(리포트행, { 팀원: "report", ms: 900 }, 배정).기록.상한).toBeNull();
+  });
+
+  // ★ ⑤ 「돎」이 **데이터에 달린** 문항 — 매칭이 0건인 밤에는 두뇌가 안 돈다(scandrafts.ts:441).
+  it("★ ti 문항은 「조건부 돎」이라 적혀 있다 — 매칭이 없던 밤에도 「돌았다」고 세면 거짓이다", () => {
+    for (const r of 팀원문항.filter((x) => x.팀원 === "ti")) {
+      expect(r.두뇌조건, `「${r.q}」에 두뇌조건이 없다`).toBeTruthy();
+    }
+    expect(읽기("server/src/engine/scandrafts.ts"))
+      .toContain('if (!items.length || process.env.GIJO_TI_INTERPRET === "0") return "";');
+    // 조건이 없는 문항(리포트)은 그냥 「돎」이다 — 조건부와 뭉개지 않는다.
+    expect(리포트행.두뇌조건 ?? null).toBeNull();
+  });
+
   // ★★ M2(brainmark)의 계약: 표식은 **첫 chat**의 것이다. 한 답에 팀원이 여럿 도는 문항에서
   //    그 표식으로 이 팀원을 견주면 **남의 두뇌로 벌주는** 없는 결함이 매일 밤 하나씩 난다.
   it("여럿이 도는 답(복합 지시)은 도착만 잰다 — 표식·지연은 첫 chat 것이라 이 팀원 것이 아니다", () => {
-    const 복합행 = 팀원기대["전체 자산 스캔하고 우선순위 분석해줘"];
     expect(복합행.표식주인, "복합 지시 행에 표식주인:false가 없다 — 남의 두뇌로 해설을 벌주게 된다").toBe(false);
     const 판 = 팀원판정(
       복합행,
-      // 분석(로컬·폴백)의 표식이 실리고 시간은 스캔+분석+해설 합계 — 해설은 원격 배정이다.
-      { 단계: [{ action: "scan" }, { action: "analyze" }, { action: "enrich" }], ms: 180000, 두뇌: { location: "local", fallback: true } },
+      // 분석(로컬·폴백)의 표식이 실리고 시간은 분석+해설+리포트 합계 — 해설은 원격 배정이다.
+      { 단계: [{ action: "analyze" }, { action: "enrich" }, { action: "report" }], ms: 180000, 두뇌: { location: "local", fallback: true } },
       배정표스냅샷([{ id: "normaltic", name: "GIJO Agent", abbr: "해설", assignedLocation: "remote", assignedModelId: "flash-next" }]),
     );
     expect(판.불편, "여럿이 도는 답에 위치·지연 판정을 걸었다").toEqual([]);
@@ -225,7 +357,44 @@ describe("⑲ 판정 — 도착·두뇌·지연", () => {
 
   it("배정표를 못 읽은 회차(빈 표)에도 도착만은 잰다", () => {
     expect(팀원판정(리포트행, { 팀원: "report", ms: 90000 }, {}).불편).toEqual([]);
-    expect(팀원판정(리포트행, { 팀원: "scan", ms: 900 }, {}).불편.map((x) => x.종류)).toContain("다른 팀원에게 감");
+    expect(팀원판정(리포트행, { 팀원: "scan", ms: 900 }, {}).불편.map((x: { 종류: string }) => x.종류)).toContain("다른 팀원에게 감");
+  });
+});
+
+// ── ⑦ 실패한 줄 — 분모에 남는다 ───────────────────────────────────────────────────
+describe("⑲ 실패한 줄(오류·빈 답)도 분모에 남는다", () => {
+  it("실패 잣대는 한 곳이다 — 답 본문이 아예 없는 가짜 그릇은 실패가 아니다", () => {
+    expect(실패이유({ out: "", err: "HTTP 500", ms: 12 })).toBe("오류");
+    expect(실패이유({ out: "   ", ms: 12 })).toBe("빈 답");
+    expect(실패이유({ out: "답이 있다", ms: 12 })).toBeNull();
+    // 판정식만 재는 가짜 답(out 칸이 없다)을 「빈 답」으로 세면 짝 시험이 통째로 딴것을 잰다.
+    expect(실패이유({ 팀원: "report", ms: 12 })).toBeNull();
+    expect(실패이유(null)).toBeNull();
+  });
+
+  it("★ 실패해도 기록은 남고, 도착·두뇌는 재지 않는다 — 같은 실패를 두 번 세지 않는다", () => {
+    const 판 = 팀원판정(리포트행, { out: "", err: "HTTP 500", ms: 120 }, 배정);
+    expect(판.불편, "하네스가 이미 「오류」로 셌는데 ⑲가 「다른 팀원에게 감」을 또 붙였다").toEqual([]);
+    expect(판.기록, "실패 줄에 기록이 없으면 팀원표에서 통째로 빠져 분모가 줄어든다").toBeTruthy();
+    expect(판.기록.실패).toBe("오류");
+    expect(판.기록.도착맞음).toBe(false);
+    expect(판.기록.상한).toBeNull();
+    expect(두뇌말(판.기록)).toBe("실패(오류)");
+    expect(팀원판정(위협행, { out: "" }, 배정).기록.실패).toBe("빈 답");
+  });
+
+  it("★ 실패가 섞인 회차는 분모가 안 줄어든다 — 살아남은 것만으로 100%가 되면 거짓 초록이다", () => {
+    const 회차 = [
+      { q: 리포트행.q, 불편: [], 팀원기록: 팀원판정(리포트행, { out: "잘 나온 답", 팀원: "report", ms: 12000, 두뇌: { location: "remote" } }, 배정).기록 },
+      { q: "경영진 보고서 만들어줘", 불편: [{ 종류: "오류" }], 팀원기록: 팀원판정(팀원기대["경영진 보고서 만들어줘"], { out: "", err: "HTTP 500", ms: 90 }, 배정).기록 },
+      { q: "주간 보안 리포트 만들어줘", 불편: [{ 종류: "빈 답" }], 팀원기록: 팀원판정(팀원기대["주간 보안 리포트 만들어줘"], { out: "" }, 배정).기록 },
+    ];
+    const md = 팀원표(회차, 배정).join("\n");
+    expect(md).toContain("| 3 | 1/3 |");            // 분모가 3 그대로 — 1/1이 아니다
+    expect(md).toContain("실패(오류) 1");
+    expect(md).toContain("실패(빈 답) 1");
+    expect(md).toContain("· 실패 2");
+    expect(md).toContain("분모에 남겨 둡니다");
   });
 });
 
@@ -233,8 +402,9 @@ describe("⑲ 판정 — 도착·두뇌·지연", () => {
 describe("⑲ 보고서 팀원별 표", () => {
   const 회차 = [
     { q: 리포트행.q, 불편: [], 팀원기록: 팀원판정(리포트행, { 팀원: "report", ms: 21000, 두뇌: { location: "remote", model: "flash-next" } }, 배정).기록 },
-    { q: 위협행.q, 불편: [{ 종류: "두뇌 느림" }], 팀원기록: 팀원판정(위협행, { 도구: ["threats"], ms: 41000, 두뇌: { location: "remote" } }, 배정).기록 },
+    { q: 위협행.q, 불편: [{ 종류: "다른 팀원에게 감" }], 팀원기록: 팀원판정(위협행, { 도구: ["threats"], ms: 41000 }, 배정).기록 },
     { q: 사서행.q, 불편: [], 팀원기록: 팀원판정(사서행, { 도구: ["knowledge_status"], ms: 1200 }, 배정).기록 },
+    { q: 총괄행.q, 불편: [], 팀원기록: 팀원판정(총괄행, { 도구: ["explain"], ms: 4000, 두뇌: { location: "local", model: "qwen3-14b" } }, 배정).기록 },
     { q: "이건 ⑲가 아니다", 불편: [] }, // 형제 마당 줄 — 표에 섞이면 안 된다
   ];
 
@@ -247,10 +417,39 @@ describe("⑲ 보고서 팀원별 표", () => {
     expect(md).toContain("flash-next");
     expect(md).toContain("21.0s");
     expect(md).toContain("문만(반입 때 돎)");
-    expect(md).toContain("30s");   // 원격 상한
+    expect(md).toContain("10s(잰 1)");   // 총괄(로컬) 상한 — **몇 번 쟀는지까지** 적는다
+    expect(md).toContain("| - |");       // 표식이 안 남는 갈래는 상한을 안 건다
     expect(md).not.toContain("이건 ⑲가 아니다");
-    // 합계 줄 — 「도착 맞음」과 「두뇌가 도는 문항」은 다른 수다.
-    expect(md).toMatch(/합계: 문항 3 · 도착 맞음 3 · 이 요청에서 두뇌가 도는 문항 2/);
+    // 합계 줄 — 「도착 맞음」·「두뇌가 도는 문항」·「조건부」는 서로 다른 수다.
+    expect(md).toMatch(/합계: 문항 4\/27 · 도착 맞음 4 · 이 요청에서 두뇌가 도는 문항 3\(그중 조건부 1/);
+    // 일부만 돈 회차라는 사실을 숨기지 않는다.
+    expect(md).toContain("27문항 중 **4개만**");
+  });
+
+  it("★ 표식 안 남는 줄만 있는 회차는 「M2 미반영」이라 하지 않는다 — 없는 결함을 만들지 않는다", () => {
+    const 안남회차 = 팀원문항
+      .filter((r) => r.표식남나 === false && r.신호.종류 !== "단계")
+      .map((r) => ({ q: r.q, 불편: [], 팀원기록: 팀원판정(r, { 도구: [r.신호.값], 팀원: r.신호.값, ms: 3000 }, 배정).기록 }));
+    const md = 팀원표(안남회차, 배정).join("\n");
+    expect(md, "표식이 원리상 없는 회차에 「M2 미반영」이 찍혔다 — 매일 밤 나가는 거짓 진단이다").not.toContain("M2 미반영");
+    expect(md).toContain("돎(표식 안 남는 갈래)");
+    // 그래도 **표식이 남는 갈래**(총괄)가 섞여 있고 그 줄에 표식이 없으면 그때는 밝힌다.
+    const 섞임 = [...안남회차, { q: 총괄행.q, 불편: [], 팀원기록: 팀원판정(총괄행, { 도구: ["explain"], ms: 9000 }, 배정).기록 }];
+    expect(팀원표(섞임, 배정).join("\n")).toContain("M2 미반영");
+  });
+
+  // ★ 검토관 적발 ② — 「원격 배정 팀원의 두뇌를 실제로는 한 번도 못 본다」를 표가 스스로 말해야 한다.
+  it("★ 표가 「어디까지 증명했는지」를 밝힌다 — 못 재는 팀원과 그 이유를 적는다", () => {
+    const md = 팀원표(회차, 배정).join("\n");
+    expect(md).toContain("두뇌 위치를 **표식으로 확인할 수 있는 팀원");
+    expect(md).toContain("원격 배정 2명 중 확인 가능 0명");   // report·ti 둘 다 표식이 안 남는 갈래다
+    expect(md).toContain("못 재는 팀원:");
+    expect(md).toContain("report(표식 안 남는 갈래 1)");
+    expect(md).toContain("ti(표식 안 남는 갈래 1)");
+    expect(md).toContain("curator(문만 1)");
+    expect(md).toContain("전부 증명되지 않습니다");
+    // ★★ 원격을 한 번도 못 본 회차는 그 사실을 **크게** 적는다 — 초록을 증명으로 읽으면 안 된다.
+    expect(md).toContain("원격 두뇌를 눈으로 확인한 문항은 0건입니다");
   });
 
   it("미배정 팀원이 있으면 표가 그것을 말한다 — 전원 미배정이면 초록이어도 팀은 안 갈라진 것이다", () => {
@@ -263,8 +462,9 @@ describe("⑲ 보고서 팀원별 표", () => {
   });
 
   it("두뇌 표식이 없는 회차는 보고서가 「옛 서버」라고 밝힌다", () => {
+    // 표식이 **남아야 하는** 갈래(총괄)에 표식이 없을 때만 그렇게 적는다.
     const md = 팀원표(
-      [{ q: 리포트행.q, 불편: [], 팀원기록: 팀원판정(리포트행, { 팀원: "report", ms: 9000 }, 배정).기록 }],
+      [{ q: 총괄행.q, 불편: [], 팀원기록: 팀원판정(총괄행, { 도구: ["explain"], ms: 9000 }, 배정).기록 }],
       배정,
     ).join("\n");
     expect(md).toContain("두뇌 표식이 없는 회차입니다");
@@ -278,11 +478,11 @@ describe("⑲ 보고서 팀원별 표", () => {
 
 // ── 하네스가 이 표를 **베끼지 않고 불러 쓰는가** ──────────────────────────────────
 describe("⑲ 하네스가 문항표를 사본으로 두지 않는다", () => {
-  const 하네스 = readFileSync(join(뿌리, "tools", "ops-sim.mjs"), "utf8");
+  const 하네스 = 읽기(join("tools", "ops-sim.mjs"));
 
   it("ops-sim.mjs가 opssim-team.mjs에서 문항·판정·표를 불러 쓴다", () => {
     expect(하네스).toContain('from "./opssim-team.mjs"');
-    for (const 이름 of ["팀원문항", "팀원기대", "팀원판정", "팀원표", "배정표스냅샷"]) {
+    for (const 이름 of ["팀원문항", "팀원기대", "팀원판정", "팀원표", "배정표스냅샷", "실패이유"]) {
       expect(하네스, `${이름}을 안 불러 쓴다 — 사본을 만들었다면 두 곳이 어긋난다`).toContain(이름);
     }
     // 마당은 문항표에서 만든다(물음을 손으로 다시 적으면 열쇠가 갈린다).
@@ -290,6 +490,17 @@ describe("⑲ 하네스가 문항표를 사본으로 두지 않는다", () => {
     // 배정표는 **회차마다** 읽는다 — 숫자를 박아 두지 않는다.
     expect(하네스).toContain('BASE + "/api/agents"');
     expect(하네스).toContain("팀원배정: 배정표"); // meta.json 스냅샷
+  });
+
+  // ★ 검토관 적발 ④ — ⑲ 배선이 조기 반환 **뒤**에 있으면 실패한 줄이 표에서 통째로 빠진다.
+  it("★ ⑲ 배선이 오류·빈 답 조기 반환 밖에 있다 — 안에 있으면 실패 줄이 분모에서 사라진다", () => {
+    const 시작 = 하네스.indexOf("function 불편찾기(q, r)");
+    const 끝 = 하네스.indexOf("function 불편본체(q, r)");
+    expect(시작, "불편찾기를 못 찾았다 — 이 감시가 낡았다").toBeGreaterThan(0);
+    expect(끝, "불편본체가 없다 — ⑲ 배선이 다시 조기 반환 안으로 들어갔는지 확인할 것").toBeGreaterThan(시작);
+    const 겉 = 하네스.slice(시작, 끝);
+    expect(겉).toContain("팀원판정(팀원행, r, 배정표");
+    expect(겉, "겉껍질에 조기 반환이 들어왔다 — 실패 줄이 다시 ⑲를 못 거친다").not.toContain("return [{ 종류:");
   });
 
   it("⑲ 물음이 다른 마당과 겹치지 않는다 — 겹치면 형제 마당의 답까지 ⑲ 잣대로 재게 된다", () => {
