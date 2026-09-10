@@ -3,7 +3,8 @@
 // ■ 왜 이 파일이 생겼나 (2026-09-10 · 실측)
 //   승인 문답 3,778건 중 **1,597건이 등급 C**다(2026-09-03 한 묶음 — 승인자를 못 되짚어 기밀로
 //   닫힌 폴백). 그런데 회전 1~4의 학습 재료는 그 등급을 **한 번도 안 봤고**, 구운 재료가 통째로
-//   gb10에 복제돼 있었다: raft-vuln-v4 956행 중 **577행(60%)**이 C에서 온 행이었다.
+//   gb10에 복제돼 있었다: raft-vuln-v4 956행 중 **706행(74%)**이 C에서 온 행이었다
+//   (처음 적은 577행은 창걸음 10이던 옛 도구의 숫자다 — 걸음 1로 다시 재면 706행이다).
 //   `server/src/engine/learncandidates.ts`가 「C는 무엇을 줘도 안 나간다」고 창구를 막아 둔 그 정책이,
 //   **도구로 만든 재료**에는 걸려 있지 않았다 — 정책이 한 창구에만 있으면 옆문은 그대로 열려 있다.
 //
@@ -13,15 +14,24 @@
 //   ③ 칸은 O인데 **글에 C 본문**이 실린 행도 빨강이다(칸만 보면, 칸을 잘못 적은 빌더를 통과시킨다).
 //   ④ 빌더는 파일을 쓰기 **전에** 그 감시를 스스로 통과해야 한다(소스 감시).
 //   ⑤ 잣대는 한 곳이다 — 거절 문장·복사 비율은 gates.mjs의 그 함수를 부른다(두 벌이면 갈린다).
+//
+// ■ 2026-09-10 검토관 적발로 더 못 박은 것 (아래 다섯 묶음)
+//   위 ①~⑤를 다 적어 놓고도 **잣대가 두 벌**이었다: 여기 JS는 창을 1자 걸음으로 훑는데, gb10의
+//   재료를 실제로 지운 파이썬 스크립트는 10자 걸음이었다. 그래서 「재검사 C 0행」이 제 잣대로 잰
+//   0이었고, 저장소 잣대로 다시 훑으니 1,957행 중 859행에 C 본문이 남아 있었다. 게다가 관문이
+//   **빌더 안에만** 있어, 이미 구운 파일을 집어 굽는 밤 경로에는 한 번도 안 걸렸다.
+//   → 구현을 하나로 모으고(strip-c.mjs·gradegate.mjs), 산출물이 **어느 잣대로 잰 판인지**를
+//     스스로 말하게 했다(잣대지문). 「잣대를 고쳤다」와 「그 잣대로 다시 잤다」는 다른 일이다.
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import {
   질문해시, 창길이, 창걸음, 창최소적중, 창정규화, 창적중수,
-  등급판정, 등급관문, 한글비율, 원천언어, 복사상한, 베낀비율행, 사실주장인가, 거절로시작하나,
+  등급판정, 등급관문, 등급세기, 잣대지문, 한글비율, 원천언어, 복사상한, 베낀비율행, 사실주장인가, 거절로시작하나,
   고르기, 구성표,
 } from "../../tools/team-bench/material-r5.mjs";
+import { 걷어내기 } from "../../tools/team-bench/strip-c.mjs";
 import { 제품거절문장, 베낀글자비율여럿 } from "../../tools/team-bench/gates.mjs";
 import { 문항정규화 } from "../../tools/build-raft-dataset.mjs";
 
@@ -260,5 +270,196 @@ describe("★ 소스 감시 — 빌더는 쓰기 **전에** 스스로 감시를 
 
   it("★ 등급이 O가 아닌 행을 싣는 길이 없다 — 판정이 O일 때만 후보에 담는다", () => {
     expect(빌더).toMatch(/if \(g !== "O"\)/);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// 2026-09-10 검토관 적발 수리 — 아래 다섯 묶음은 **그날 밟은 자리**를 못 박는다.
+// 하나로 요약하면: 「잣대를 고쳤다」와 「그 잣대로 다시 잤다」는 다른 일이다.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("★ 잣대 지문 — 산출물이 「어느 잣대로 잰 판인지」 스스로 말한다", () => {
+  it("지문에 창 규격과 열쇠 방식이 다 들어 있다", () => {
+    expect(잣대지문()).toEqual({ 창길이: 40, 창걸음: 1, 창최소적중: 2, 질문열쇠: "sha256/16", 창열쇠: "sha1/12" });
+  });
+
+  it("★ 커밋된 빌드 보고서는 **지금 잣대로 구운 판**이다 — 잣대가 바뀌면 여기가 먼저 빨강이다", () => {
+    // 왜: 회전 5의 첫 v5는 창걸음 10이던 옛 도구가 구웠는데 걸음을 1로 고친 뒤 **다시 굽지 않았다.**
+    //     보고서에는 「관문 통과 · 글이C 0」이 남아, 지금 잣대로 재면 105행이 빨강인 판을 초록이라 말했다.
+    //     시각 순서(도구가 산출물보다 나중)로만 드러나던 것을 **숫자로** 드러나게 한다.
+    const 보고서들 = fs.readdirSync(path.join(루트, "tools/team-bench/results-ladder"), { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => path.join(루트, "tools/team-bench/results-ladder", d.name, "build-report.json"))
+      .filter((p) => fs.existsSync(p));
+    expect(보고서들.length, "빌드 보고서가 하나도 없다 — 이 시험이 아무것도 안 지킨다").toBeGreaterThan(0);
+    // ⚠ 대상은 **등급 관문 판정을 적은 보고서**다. 옛 빌더(build-raft-dataset.mjs)의 보고서는 꼴이
+    //   아예 다르고 등급을 재지도 않는다 — 그것까지 걸면 고칠 수 없는 빨강(벽)이 된다.
+    const 등급말하는보고서 = 보고서들.filter((p) => JSON.parse(fs.readFileSync(p, "utf8")).관문 !== undefined);
+    expect(등급말하는보고서.length, "등급 관문을 말하는 보고서가 하나도 없다").toBeGreaterThan(0);
+    for (const p of 등급말하는보고서) {
+      const r = JSON.parse(fs.readFileSync(p, "utf8"));
+      expect(r.잣대, `${path.basename(path.dirname(p))}: 관문 판정을 적어 놓고 **어느 잣대로 쟀는지**를 안 적었다`).toBeDefined();
+      expect(r.잣대, `${path.basename(path.dirname(p))}: 옛 잣대로 구운 판이다 — 다시 구워야 한다(고치는 것과 다시 재는 것은 다른 일이다)`).toEqual(잣대지문());
+    }
+  });
+
+  it("빌더가 보고서에 잣대와 산출물 지문을 적는다(소스 감시)", () => {
+    const 빌더 = src("tools/team-bench/material-r5.mjs");
+    expect(빌더).toContain("잣대: 잣대지문()");
+    expect(빌더, "산출물 지문이 없으면 보고서만 남고 판이 갈려도 아무도 모른다").toContain("재료지문");
+  });
+});
+
+describe("★ 걷어내기 — 이미 구운 재료에서 C를 뺄 때도 **같은 잣대** 하나다", () => {
+  const 지도 = { [질문해시("O질문")]: "O", [질문해시("C질문")]: "C" };
+  const 집합 = 창집합만들기(긴C본문);
+  const rows = [
+    행({ question: "O질문" }),
+    행({ question: "C질문" }),
+    행({ question: "지도에없는질문" }),
+    행({ question: "O질문", system: "x\n\n" + 머리말 + "\n[1] " + 긴C본문 }),
+  ];
+
+  it("C로 판정된 행만 빠진다(질문 해시로 걸린 것 · 글로 걸린 것 둘 다)", () => {
+    const { 남긴, 지운 } = 걷어내기(rows, 지도, 집합);
+    expect(지운).toHaveLength(2);
+    expect(남긴).toHaveLength(2);
+  });
+
+  it("★ 남은 행에 **일괄 O를 찍지 않는다** — 판정한 등급을 그대로 적는다", () => {
+    // 왜: longform은 153행이 전부 미매칭·C였고 **O가 0행**이다(2026-09-10 실측). 일괄 O를 찍었다면
+    //     「등급을 본 적 없는 행」이 초록 딱지를 달고 학습에 들어갔을 것이다 — 감시가 감시를 속이는 꼴.
+    const { 남긴 } = 걷어내기(rows, 지도, 집합);
+    expect(남긴.map((r: { grade?: string }) => r.grade).sort()).toEqual(["O", "미매칭"]);
+  });
+
+  it("★ C를 다 걷어내도 미매칭이 남으면 반출 감시는 **빨강**이다 — 「C 0」이 「나가도 된다」가 아니다", () => {
+    const { 남긴 } = 걷어내기(rows, 지도, 집합);
+    expect(등급세기(남긴, 지도, 집합).C ?? 0, "C는 다 걷어냈어야 한다").toBe(0);
+    expect(등급관문(남긴, 집합).ok, "그래도 모르는 등급이 남았으면 통과가 아니다").toBe(false);
+  });
+
+  it("★ 걷어내는 도구가 **잣대를 새로 적지 않는다** — 판정은 빌더의 그 함수를 부른다(소스 감시)", () => {
+    // 이 결함의 뿌리: 같은 잣대가 JS(걸음 1)와 파이썬(걸음 10) 두 벌이었다. 값을 맞추는 것으로는
+    // 또 갈린다 — 구현이 하나여야 한다.
+    const 도구 = src("tools/team-bench/strip-c.mjs");
+    expect(도구).toContain("등급판정");
+    expect(도구, "창 규격을 여기 또 적으면 두 벌이 되어 갈린다").not.toMatch(/창길이\s*=\s*\d/);
+    expect(도구, "창 걸음을 여기 또 적으면 두 벌이 되어 갈린다").not.toMatch(/창걸음\s*=\s*\d/);
+    expect(도구).toMatch(/import\(pathToFileURL\(빌더\)/);
+  });
+});
+
+describe("★ 먹이는 자리의 관문 — 빌더가 안 도는 경로도 재고 나서 굽는다", () => {
+  const 관문도구 = src("tools/team-bench/gradegate.mjs");
+  const 밤 = src("tools/team-bench/night-r5-prep.sh");
+
+  it("관문 도구는 잣대를 새로 적지 않고 빌더의 등급관문을 부른다", () => {
+    expect(관문도구).toContain("등급관문");
+    expect(관문도구).toMatch(/import\(pathToFileURL\(빌더\)/);
+  });
+
+  it("못 읽은 파일은 **통과가 아니다**(나가는 코드 3) — 못 잰 것을 초록으로 세지 않는다", () => {
+    expect(관문도구).toMatch(/process\.exit\(3\)/);
+  });
+
+  it("★ 밤 스크립트가 학습기를 부르기 **전에** 관문을 건다", () => {
+    const 관문자리 = 밤.indexOf("gradegate.mjs");
+    const 학습자리 = 밤.indexOf('--precision bf16');
+    expect(관문자리, "밤 경로에 등급 관문 호출이 없다 — 빌더 안의 관문은 이 경로를 원리상 못 지킨다").toBeGreaterThan(0);
+    expect(관문자리).toBeLessThan(학습자리);
+  });
+
+  it("★ 관문이 빨강이면 굽지 않는다(폴백으로 그냥 복사해 굽던 길을 막는다)", () => {
+    expect(밤).toMatch(/GATE=red/);
+    expect(밤).toMatch(/\[ "\$GATE" != "ok" \]/);
+  });
+});
+
+describe("★ 밤 스모크의 안전장치 — 「교사를 안 내린다」가 커널 OOM으로 깨지지 않게", () => {
+  const 밤 = src("tools/team-bench/night-r5-prep.sh");
+
+  it("굽기 전에 가용 메모리를 잰다(27B 쪽에만 있던 관문을 스모크에도 둔다)", () => {
+    expect(밤).toContain("SMOKE_MIN_AVAIL");
+    expect(밤).toMatch(/AVAIL2.*-lt.*SMOKE_MIN_AVAIL/s);
+  });
+
+  it("★ 우리가 **먼저 죽게** 한다 — choom 으로 oom_score_adj 를 올린다(교사는 780이다)", () => {
+    expect(밤).toMatch(/choom -n 1000/);
+  });
+
+  it("cgroup 상한을 건다(최선의 노력이라고 코드가 스스로 밝힌다)", () => {
+    expect(밤).toContain("MemoryMax=$SMOKE_MEM_MAX");
+    expect(밤, "통합메모리에서 실릴지 안 쟀다는 사실을 안 적으면 「막았다」가 거짓이 된다").toContain("최선의 노력");
+  });
+
+  it("★ 교사 감시견이 있다 — 교사가 말을 멈추면 스모크를 내린다(cgroup 회계와 무관한 마지막 방어선)", () => {
+    expect(밤).toMatch(/pkill -f "finetune_qlora14b\.py"/);
+    expect(밤).toContain("8080/health");
+  });
+
+  it("교사·임베딩을 내리거나 다시 묶지 않는다(종전 계약 유지)", () => {
+    // ⚠ **주석을 뺀 실행 줄**에서 본다 — 스크립트 주석에는 「pkill llama-server 같은 건 교사까지
+    //   죽인다」가 경고로 적혀 있다. 주석까지 세면 경고문 때문에 시험이 빨강이 되어, 사람이
+    //   경고를 지우게 만든다(감시가 문서를 갉아먹는 꼴).
+    const 줄바꿈 = String.fromCharCode(10);
+    const 실행줄 = 밤.split(줄바꿈).filter((l) => !l.trim().startsWith("#")).join(줄바꿈);
+    expect(실행줄, "pkill llama-server 는 교사까지 죽인다").not.toMatch(/pkill\s+(-\w+\s+)*llama-server/);
+    // ⚠ 문구가 아니라 **부르는 자리**를 본다 — 스크립트는 로그로 「--host 없음 = 루프백만」이라
+    //   말하는데, 그 말까지 세면 「없다고 말한 것」 때문에 빨강이 된다.
+    const 라마부르는줄 = 실행줄.split(줄바꿈).filter((l) => l.includes("$LLAMA"));
+    expect(라마부르는줄.length, "llama-server 를 부르는 줄이 없다 — 시험이 아무것도 안 본다").toBeGreaterThan(0);
+    for (const l of 라마부르는줄) expect(l, "--host 는 루프백을 빼앗는다").not.toContain("--host");
+  });
+});
+
+describe("★ 홀드아웃 — 기본값이 말과 같고, 표가 어느 갈래인지 말한다", () => {
+  const 빌더 = src("tools/team-bench/material-r5.mjs");
+
+  it("--holdout-n 기본값은 0이다(주석은 「0이 기본」이라 적어 놓고 코드는 100이던 자리)", () => {
+    expect(빌더).toContain('opt("--holdout-n", "0")');
+  });
+
+  it("★ 새로 뗀 판에서는 표가 「기준은 하나다」라고 말하지 않는다 — 그 판은 두 갈래를 섞은 판이다", () => {
+    const 지도: Record<string, string> = {};
+    const rows = Array.from({ length: 6 }, (_, i) => {
+      const q = `질문${i}`;
+      지도[질문해시(q)] = "O";
+      return 행({ question: q });
+    });
+    const 뗀 = 고르기(rows, { 지도, 창집합: null, 머리말, 홀드아웃수: 3 });
+    expect(구성표(뗀.보고)).toContain("새 시험지를 뗐다");
+    expect(구성표(뗀.보고)).not.toContain("홀드아웃 제외 기준은 하나다");
+
+    const 안뗀 = 고르기(rows, { 지도, 창집합: null, 머리말, 홀드아웃수: 0 });
+    expect(구성표(안뗀.보고)).toContain("홀드아웃 제외 기준은 하나다");
+  });
+});
+
+describe("★ 관문 ⑬·⑭의 모집단 24 — 근거가 사실이고, 길이 이름으로 적혀 있다", () => {
+  const 잣대 = src("tools/team-bench/gates.mjs");
+
+  it("★ 「홀드아웃 100 중 회수 가능분」이 **근거로 서 있지 않다**(정정문 안의 인용은 옳다)", () => {
+    // 실측: holdout-vuln-100.json 은 키가 question/answer/system 뿐이라 chunk·cites가 0건이다.
+    // ⚠ 문구를 통째로 금지하지 않는다 — 「그때 이렇게 적었고 그것은 틀렸다」는 기록은 남겨야
+    //   같은 근거를 다시 짓지 않는다. 대신 그 문구 곁에 **틀렸다는 말**이 있어야 한다.
+    const 자리 = [...잣대.matchAll(/홀드아웃 100 중 회수 가능분/g)].map((m) => m.index as number);
+    expect(자리.length, "이 문구가 아예 없으면 정정 기록도 없는 것이다").toBeGreaterThan(0);
+    for (const i of 자리) {
+      expect(잣대.slice(Math.max(0, i - 300), i + 300), "근거로 서 있다 — 곁에 「사실이 아니다」가 없다")
+        .toContain("사실이 아니다");
+    }
+  });
+
+  it("홀드아웃 파일에는 정말로 조각이 없다(위 주장이 사실임을 파일로 확인한다)", () => {
+    const h = JSON.parse(src("tools/team-bench/holdout-vuln-100.json")) as Record<string, unknown>[];
+    expect(h.length).toBe(100);
+    expect(h.filter((r) => String(r.chunk ?? "").length >= 20)).toHaveLength(0);
+    expect(h.filter((r) => Array.isArray(r.cites) && r.cites.length)).toHaveLength(0);
+  });
+
+  it("★ 미측정 사유가 **채우는 길**을 이름으로 말한다 — 고칠 수 없는 빨강은 관문이 아니라 벽이다", () => {
+    expect(잣대).toContain("samples-questions.json에 조각(chunk)이 든 문항을");
+    expect((잣대.match(/\*\*채우는 길\*\*/g) ?? []).length, "⑬·⑭ 둘 다에 적혀야 한다").toBeGreaterThanOrEqual(2);
   });
 });
