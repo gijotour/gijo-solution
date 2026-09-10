@@ -1112,8 +1112,16 @@ export async function chat(args: ChatArgs): Promise<string> {
 
   // 🧠 **두뇌 표식 — 「누가 답했나」.** 위치를 정하는 잣대는 이 한 줄이고(폴백 뒤엔 원격이 null이다),
   //   실을지 말지·모델 이름을 가릴지는 brainmark 한 곳이 가른다.
+  //   ⚠ 여기서는 **사실만 넘긴다** — 「이 호출이 답한 두뇌인가」를 여기서 가르면 새 호출부가
+  //     그 조건을 빼먹는다(brainmark 머리말 ★★★ · 2026-09-10 검토관이 잡은 자리가 그 반대였다).
   const 표식보고 = (model: string | null) =>
-    두뇌표식보고({ location: 원격 ? "remote" : "local", fallback: 폴백, model, 결정호출: !!args.responseSchema });
+    두뇌표식보고({
+      location: 원격 ? "remote" : "local",
+      fallback: 폴백,
+      model,
+      결정호출: !!args.responseSchema,
+      사람이읽는답: args.explain === true,
+    });
 
   if (res === "timeout") {
     // GPU가 학습·병렬 작업에 잡혀 요청이 무한 대기하는 것을 상한으로 끊는다(실측: 채팅 5분 행).
@@ -1516,13 +1524,19 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   · 이력·학습 기록(위 기록답)이 이미 확정된 **뒤**다 — 이 안내는 그 한 답의 사정이지
   //     다음 턴의 맥락도, 학습 재료도 아니다.
   //   · 인용·경로 가드 뒤라 우리가 붙인 글자를 가드가 자기인용으로 오판하지 않는다.
+  //   · ★ **용어 풀이보다 뒤다**(2026-09-10 검토관). 앞에 두면 바로 아래 explainHardTerms가
+  //     「🔎 쉬운 용어 풀이」를 그 뒤에 더 붙여 **안내가 마지막이 아니게 된다** — explain은 담당자
+  //     답의 주 경로(dispatcher:489·503)라 「끝」이라는 약속이 정작 사람이 보는 자리에서만 깨졌다.
+  //     덤으로, 우리가 붙인 안내의 낱말(「원격 두뇌」)이 용어 풀이의 재료가 되는 일도 없어진다.
+  //
   // ⚠ 스키마(JSON) 호출은 위에서 이미 반환됐다 — 결정문에 안내가 섞이면 JSON.parse가 깨진다.
   // ⚠ 빈 답에는 안 붙인다 — 안내만 남은 답은 답이 아니다.
-  if (폴백 && reply) reply = `${reply}\n\n${원격폴백안내}`;
 
   // 사람이 읽는 답변(explain)에만 어려운 용어 쉬운 풀이를 붙인다. 히스토리·학습로그는 위에서 이미
   // 원문으로 저장됐다 — 맥락 오염·중복 방지.
-  return args.explain ? explainHardTerms(reply) : reply;
+  const 풀이붙인답 = args.explain ? explainHardTerms(reply) : reply;
+  // ⚠ 빈 답에는 안 붙인다 — 안내만 남은 답은 답이 아니다(위 ⚠).
+  return 폴백 && reply ? `${풀이붙인답}\n\n${원격폴백안내}` : 풀이붙인답;
 }
 
 // (embedPost·embed는 잎 모듈 embedding.ts로 내려갔다 — 2026-08-28 화살 #12: memory가

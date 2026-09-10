@@ -72,14 +72,14 @@ describe("★ 원격이 죽으면 이 PC로 되돌린다", () => {
     // 이 줄이 없으면 아래 「원격으로 갔다」들이 그저 전역이 꺼져 있어서일 수 있다(거짓 초록).
     전역켜기();
     const 목 = 원격은죽고로컬은산다();
-    await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     expect(String(목.mock.calls[0]?.[0]), "첫 요청이 원격으로 안 갔다 — 이 묶음이 통째로 헛돈다").toContain("10.8.0.12");
   });
 
   it("① 연결 실패 → 이 PC 두뇌가 답한다 (종전엔 답이 통째로 없었다)", async () => {
     전역켜기();
     const 목 = 원격은죽고로컬은산다({ 로컬답: "우선순위는 KEV 등재 여부부터 봅니다." });
-    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
 
     expect(답, "원격이 죽었는데 안내 문구만 돌아왔다 — 폴백이 안 돈다").toContain("KEV 등재 여부");
     expect(답, "⚠ 안내(모델 미준비)로 떨어졌다").not.toContain("AI 모델이 아직 준비되지 않았습니다");
@@ -92,18 +92,22 @@ describe("★ 원격이 죽으면 이 PC로 되돌린다", () => {
 
   it("② 답 끝에 그 사실을 한 줄로 밝힌다 — 몰래 강등하지 않는다", async () => {
     전역켜기();
-    원격은죽고로컬은산다();
-    const { 답 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    // ★ 2026-09-10 검토관(low) — **용어 풀이가 붙는 답**으로 잰다. 종전엔 풀이가 안 붙는 답만 재서
+    //   「끝」이라는 계약이 정작 사람이 보는 주 경로(explain:true → explainHardTerms)에서만 깨진 것을
+    //   원리상 못 봤다. KEV는 용어사전에 있는 낱말이라 아래 답에는 「🔎 쉬운 용어 풀이」가 딸려 붙는다.
+    원격은죽고로컬은산다({ 로컬답: "우선순위는 KEV 등재 자산부터 조치합니다." });
+    const { 답 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     expect(답, "폴백을 사람에게 안 밝힌다").toContain(폴백안내);
+    expect(답, "헛돎 방지 — 용어 풀이가 안 붙었다면 이 시험은 아무것도 안 잰다").toContain("🔎 쉬운 용어 풀이");
     // ⚠ **끝**에 붙어야 한다 — 앞머리에 두면 배너 판정(startsWith)이 죽는다(llm.ts 그 자리 주석).
-    expect(답.trimEnd().endsWith(폴백안내), "안내가 답 끝이 아니다 — 배너 판정을 가로챈다").toBe(true);
+    expect(답.trimEnd().endsWith(폴백안내), "안내가 답 끝이 아니다 — 용어 풀이가 뒤에 붙어 계약이 깨졌다").toBe(true);
   });
 
   it("③ 실패를 상태에 남긴다 — 화면이 「지금 닿지 않습니다」를 말할 수 있게", async () => {
     전역켜기();
     원격은죽고로컬은산다();
     expect(remoteLlmConfig().lastFailAt, "이 시험의 전제는 「자국 없음」이다").toBeNull();
-    await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     const c = remoteLlmConfig();
     expect(typeof c.lastFailAt, "실패가 기록되지 않는다 — 원격이 며칠 죽어도 화면은 초록이다").toBe("number");
     expect(c.failReason ?? "", "사유가 비어 있다").toContain("닿지 못했습니다");
@@ -114,7 +118,7 @@ describe("★ 원격이 죽으면 이 PC로 되돌린다", () => {
   it("시간 초과도 같은 길로 간다 — 원격 전용 상한이 사유에 적힌다", async () => {
     전역켜기();
     원격은죽고로컬은산다({ 원격실패: "시간초과" });
-    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     expect(답).toContain(폴백안내);
     expect(표식?.fallback).toBe(true);
     expect(remoteLlmConfig().failReason ?? "", "시간 초과 사유가 안 남았다").toContain("초 안에 오지 않았습니다");
@@ -123,7 +127,7 @@ describe("★ 원격이 죽으면 이 PC로 되돌린다", () => {
   it("원격이 거절(HTTP 401·500)해도 되돌린다 — 「닿았지만 답 못 받음」도 같은 사실이다", async () => {
     전역켜기();
     원격은죽고로컬은산다({ 원격실패: 401 });
-    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     expect(답).toContain(폴백안내);
     expect(표식?.location).toBe("local");
     expect(remoteLlmConfig().failReason ?? "").toContain("401");
@@ -132,7 +136,7 @@ describe("★ 원격이 죽으면 이 PC로 되돌린다", () => {
   it("★ 되돌린 요청에 원격 접속 토큰을 안 싣는다 — 이 PC로 남의 자격증명이 새면 안 된다", async () => {
     전역켜기();
     const 목 = 원격은죽고로컬은산다();
-    await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     const 첫헤더 = (목.mock.calls[0]?.[1] as { headers?: Record<string, string> })?.headers ?? {};
     const 둘째헤더 = (목.mock.calls[1]?.[1] as { headers?: Record<string, string> })?.headers ?? {};
     expect(첫헤더["x-gijo-serve-token"], "원격에 토큰이 안 갔다 — 전제가 깨졌다").toBe("시험토큰");
@@ -143,7 +147,7 @@ describe("★ 원격이 죽으면 이 PC로 되돌린다", () => {
     전역켜기();
     const 목 = vi.fn(async () => { throw new Error("fetch failed"); });
     vi.stubGlobal("fetch", 목);
-    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     expect(목.mock.calls.length, "두 번을 넘겼다 — 담당자가 기다리는 시간이 배로 는다").toBe(2);
     // ⚠ 이 문구는 regress FALLBACK_RE·drawer-audit이 보는 글자다 — 바꾸면 나쁜 답이 통과한다.
     expect(답).toContain("AI 모델이 아직 준비되지 않았습니다");
@@ -157,7 +161,7 @@ describe("★ 두뇌 표식 — 누가 답했나", () => {
     전역켜기();
     const 목 = vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "원격이 만든 답입니다." } }], model: "qwen3.8-flash-next" }) }));
     vi.stubGlobal("fetch", 목);
-    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    const { 답, 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     expect(표식?.location, "원격으로 갔는데 local이라 말한다").toBe("remote");
     expect(표식?.fallback).toBe(false);
     expect(표식?.model).toBe("qwen3.8-flash-next");
@@ -167,7 +171,7 @@ describe("★ 두뇌 표식 — 누가 답했나", () => {
   it("★ 총괄은 전역이 켜져 있어도 언제나 이 PC (llm.ts ⓪ — 표식으로도 잰다)", async () => {
     전역켜기();
     const 목 = 원격은죽고로컬은산다();
-    const { 표식 } = await 표식과함께(() => chat({ agentId: "orchestrator", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    const { 표식 } = await 표식과함께(() => chat({ agentId: "orchestrator", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     expect(표식?.location, "총괄이 원격으로 갔다").toBe("local");
     expect(표식?.fallback, "총괄은 애초에 원격을 안 타므로 폴백일 수 없다").toBe(false);
     expect(목.mock.calls.length, "총괄인데 두 번 보냈다 — 원격을 한 번 시도했다는 뜻이다").toBe(1);
@@ -177,7 +181,7 @@ describe("★ 두뇌 표식 — 누가 답했나", () => {
     전역켜기();
     setAgentLocation("report", "local");
     원격은죽고로컬은산다();
-    const { 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true }));
+    const { 표식 } = await 표식과함께(() => chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }));
     expect(표식?.location).toBe("local");
     expect(표식?.fallback).toBe(false);
   });
@@ -193,11 +197,69 @@ describe("★ 두뇌 표식 — 누가 답했나", () => {
     expect(표식, "결정 호출이 표식을 가로챘다 — 답한 두뇌가 영영 안 담긴다").toBeUndefined();
   });
 
+  it("★★ 총괄 분류기가 표식을 가로채지 않는다 — 원격이 답했으면 remote라 말한다 (2026-09-10 검토관 high)", async () => {
+    // ■ 무엇이 있었나: 잣대가 `결정호출(responseSchema)` 하나였는데 **정작 분류기를 못 걸렀다** —
+    //   intent.ts:106은 스키마 없이 산문으로 부른다. 그 호출이 dispatch의 **첫 chat**이고 총괄은
+    //   언제나 이 PC라(⓪), 원격 125B가 답한 날에도 brain이 `{local,false}`로 남았다.
+    // ⚠ 실제 순서 그대로 잰다 — ① 총괄 분류기(explain 없음) ② 답(explain:true).
+    전역켜기();
+    setAgentLocation("report", "remote");
+    const 목 = vi.fn(async (url: unknown) => ({
+      ok: true,
+      json: async () =>
+        String(url).startsWith(원격주소)
+          ? { choices: [{ message: { content: "원격 큰 두뇌가 쓴 답입니다." } }], model: "qwen3.8-flash-next" }
+          : { choices: [{ message: { content: '{"action":"chat"}' } }], model: "qwen3-14b" },
+    }));
+    vi.stubGlobal("fetch", 목);
+
+    const { 답, 표식 } = await 표식과함께(async () => {
+      await chat({ agentId: "orchestrator", message: "의도 분류: 취약점 조치 우선순위를 알려줘", trusted: true }); // ① 분류기
+      return chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true }); // ② 답
+    });
+
+    expect(답, "헛돎 방지 — 답이 원격에서 안 왔다").toContain("원격 큰 두뇌");
+    expect(표식?.location, "분류기가 표식을 가로챘다 — 원격이 답했는데 local이라 말한다").toBe("remote");
+    expect(표식?.model, "분류기 모델이 「답한 두뇌」로 기록됐다").toBe("qwen3.8-flash-next");
+    expect(표식?.보고횟수, "분류기까지 답으로 세었다 — 「여럿이 돎」이 거짓으로 뜬다").toBe(1);
+  });
+
+  it("★★ 사람이 읽는 줄과 기계가 읽는 칸이 어긋나지 않는다 — 폴백 답의 brain도 fallback:true", async () => {
+    // 실측 [H2]: 본문은 「🧠 원격 두뇌가 닿지 않아…」인데 같은 응답의 brain은 {local,false}였다.
+    전역켜기();
+    setAgentLocation("report", "remote");
+    원격은죽고로컬은산다({ 로컬답: "이 PC가 대신 만든 답입니다." });
+    const { 답, 표식 } = await 표식과함께(async () => {
+      await chat({ agentId: "orchestrator", message: "의도 분류", trusted: true }); // 총괄 분류기가 먼저 돈다
+      return chat({ agentId: "report", message: "취약점 조치 우선순위를 알려줘", trusted: true, explain: true });
+    });
+    expect(답, "폴백 안내가 본문에 없다").toContain(폴백안내);
+    expect(표식?.fallback, "본문은 「되돌렸다」인데 칸은 fallback:false다 — 한 응답 안에서 서로 반대").toBe(true);
+    expect(표식?.location).toBe("local");
+  });
+
+  it("★ 총괄이 **답을 쓰는** 자리는 그대로 담긴다 — 과잉 수리 방지(agentloop:906)", async () => {
+    // ⚠ agentId로 걸렀다면 도구 실행 뒤 최종 답(총괄이 explain:true로 쓴다)의 표식이 통째로
+    //   사라졌을 것이다. 잣대는 「누가」가 아니라 「사람이 그대로 읽는 답인가」다.
+    전역켜기();
+    원격은죽고로컬은산다();
+    const { 표식 } = await 표식과함께(() => chat({ agentId: "orchestrator", message: "도구 결과로 최종 답 쓰기", trusted: true, explain: true }));
+    expect(표식?.location, "총괄이 쓴 최종 답의 표식이 사라졌다").toBe("local");
+    expect(표식?.보고횟수).toBe(1);
+  });
+
+  it("★ 내부 호출만 돈 답에는 표식이 없다 — 「없음」은 결함이 아니라 사실이다", async () => {
+    전역켜기();
+    원격은죽고로컬은산다();
+    const { 표식 } = await 표식과함께(() => chat({ agentId: "orchestrator", message: "의도 분류", trusted: true }));
+    expect(표식, "내부 분류문이 「답한 두뇌」로 기록됐다").toBeUndefined();
+  });
+
   it("답을 만든 chat이 여러 번이면 **첫 것**을 담고 횟수를 센다", () => {
     const 그릇 = 새두뇌표식수거();
     두뇌표식을수거하며(그릇, () => {
-      두뇌표식보고({ location: "remote", fallback: false, model: "큰두뇌", 결정호출: false });
-      두뇌표식보고({ location: "local", fallback: false, model: "작은두뇌", 결정호출: false });
+      두뇌표식보고({ location: "remote", fallback: false, model: "큰두뇌", 결정호출: false, 사람이읽는답: true });
+      두뇌표식보고({ location: "local", fallback: false, model: "작은두뇌", 결정호출: false, 사람이읽는답: true });
     });
     expect(그릇.값?.location).toBe("remote");
     expect(그릇.값?.보고횟수, "여러 번 돈 사실을 안 센다 — 표식이 답 전체의 두뇌인 척한다").toBe(2);
@@ -212,7 +274,7 @@ describe("★ 두뇌 표식 — 누가 답했나", () => {
   });
 
   it("수거 중이 아니면 조용히 아무 일도 안 한다 — 그릇 없는 경로가 안 깨진다", () => {
-    expect(() => 두뇌표식보고({ location: "local", fallback: false, model: null, 결정호출: false })).not.toThrow();
+    expect(() => 두뇌표식보고({ location: "local", fallback: false, model: null, 결정호출: false, 사람이읽는답: true })).not.toThrow();
   });
 });
 
