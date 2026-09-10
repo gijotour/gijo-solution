@@ -51,5 +51,10 @@ MODELS_DIR=$(grep -E '^GIJO_MODELS_DIR=' "$ENV_FILE" | cut -d= -f2-)
 # ── ③ 개발 모드 ─────────────────────────────────────────────────────────────
 ! grep -qE '^GIJO_DEV_MODE=' "$ENV_FILE" || fail "GIJO_DEV_MODE가 env에 있다 — 고객 인스턴스는 등급 게이트를 켠 채로 돈다(계획서 §14 ①)."
 
-echo "✓ 자물쇠 통과 — 운영 노드 pid $PROD_PID · health ok · 모델 폴더 빔($MODELS_DIR) · DEV_MODE 없음"
+# ── ④ 자기 하드닝 점검 격리 (2026-09-10 고객 QA 예행 ㉔) ────────────────────
+#   대화창·검증 버튼이 「이 서버 자신」을 점검해 우리 호스트 OS 설정(준수율·U-02 등)을
+#   고객에게 그대로 낼 수 있다(형태 ⓑ 격리 전제 위반) — GIJO_NO_SELF_SCAN=1로 끈다.
+grep -qE '^GIJO_NO_SELF_SCAN=1$' "$ENV_FILE" || fail "GIJO_NO_SELF_SCAN=1이 env에 없다 — 고객 인스턴스에서 「이 서버 자신」 하드닝 점검이 살아 있으면 우리 호스트 설정이 고객에게 그대로 나간다."
+
+echo "✓ 자물쇠 통과 — 운영 노드 pid $PROD_PID · health ok · 모델 폴더 빔($MODELS_DIR) · DEV_MODE 없음 · 자기점검 꺼짐"
 exit 0

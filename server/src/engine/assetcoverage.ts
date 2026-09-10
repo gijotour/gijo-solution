@@ -110,7 +110,10 @@ const GAP_META: Record<GapKind, { severity: "high" | "mid"; title: (n: number) =
   owner: {
     severity: "high",
     title: (n) => `담당부서를 알 수 없는 자산 ${n}건`,
-    why: "사고가 났을 때 연락할 대상이 없습니다. 스캐너로 들여온 자산은 담당부서가 비어 있고, 예전 반입분에는 출처 파일명이 잘못 저장돼 있습니다.",
+    // ⚠ 2026-09-10 예행 결함 6 — 뒤 두 절(스캐너로 들여온…·출처 파일명…)은 예전엔 고정
+    //   문자열이었다. 업무 데이터 0에서 시작한 새 인스턴스(키트 1개)에는 거짓이 되는 문장이라
+    //   지웠다 — 데이터에 실제로 있을 때만 computeAssetCoverage가 ownerGapDetail()로 덧붙인다.
+    why: "사고가 났을 때 연락할 대상이 없습니다.",
     fixLabel: "담당부서 지정",
   },
   unscanned: {
@@ -135,15 +138,32 @@ const GAP_META: Record<GapKind, { severity: "high" | "mid"; title: (n: number) =
 
 const GAP_ORDER: GapKind[] = ["owner", "unscanned", "service", "sbom"];
 
+/**
+ * 담당부서 결손의 **왜**를 데이터로 가른다(2026-09-10 예행 결함 6, 검토관용 export).
+ * 빈칸 부류(owner.trim() === "")와 파일명 부류(FILENAME_LIKE, 43행 상수 재사용)를 각각
+ * 실제로 있을 때만 문장으로 덧붙인다 — 둘 다 없으면(있을 수 없다, isOwnerMissing이 이 둘만
+ * 결손으로 치므로) 빈 문자열.
+ * ⚠ 정규식을 베끼지 않는다 — 시험이 이 함수를 직접 불러 대조한다(계약 한 곳).
+ */
+export function ownerGapDetail(owners: (string | null | undefined)[]): string {
+  const trimmed = owners.map((o) => (o ?? "").trim());
+  const parts: string[] = [];
+  if (trimmed.some((o) => o === "")) parts.push("스캐너로 들여온 자산은 담당부서가 비어 있습니다.");
+  if (trimmed.some((o) => FILENAME_LIKE.test(o))) parts.push("예전 반입분에는 출처 파일명이 담당부서로 잘못 저장돼 있습니다.");
+  return parts.length ? " " + parts.join(" ") : "";
+}
+
 export function computeAssetCoverage(assets: Asset[]): AssetCoverage {
   const perAsset = assets.map((a) => ({ a, gaps: gapsOf(a) }));
 
   const gaps: AssetGap[] = [];
   for (const kind of GAP_ORDER) {
-    const ids = perAsset.filter((p) => p.gaps.includes(kind)).map((p) => p.a.id);
+    const matched = perAsset.filter((p) => p.gaps.includes(kind));
+    const ids = matched.map((p) => p.a.id);
     if (!ids.length) continue;
     const meta = GAP_META[kind];
-    gaps.push({ kind, severity: meta.severity, title: meta.title(ids.length), why: meta.why, fixLabel: meta.fixLabel, assetIds: ids });
+    const why = kind === "owner" ? meta.why + ownerGapDetail(matched.map((p) => p.a.owner)) : meta.why;
+    gaps.push({ kind, severity: meta.severity, title: meta.title(ids.length), why, fixLabel: meta.fixLabel, assetIds: ids });
   }
 
   const ranked: RankedAsset[] = perAsset

@@ -34,7 +34,7 @@ import { listFindings as listCtiFindings } from "../cti";
 import { matchCtiToAssets } from "../ctimatch";
 import { dailyBriefingText } from "../briefing";
 import { runRedTeam, makeServedCaller, getLastRedTeamReport, getLastEffectiveReport } from "../redteam";
-import { runHardeningScan, scanSummaryText, isStandard } from "../hardeningscan";
+import { runHardeningScan, scanSummaryText, isStandard, 자기점검꺼짐, 자기점검차단안내 } from "../hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "../reportschedule";
 import { reportActivity, listReportHistory, maintenanceSummary } from "../report";
 import { listSchedules as listHardeningSchedules } from "../hardeningtargets";
@@ -1254,6 +1254,9 @@ export async function runRunRedteam(args: Record<string, string>): Promise<strin
 // 보안장비 하드닝(보안설정) 점검 — 대상 장비 CLI에서 표준 기준 점검 명령을 실제 실행해 리포트한다.
 // 결과가 이미 사람이 읽기 좋은 요약이라 directAnswer로 LLM 재작성을 생략한다.
 export async function runHardeningScanTool(args: Record<string, string>): Promise<string> {
+  // ⚠ 이 창구는 **항상 self**다(target은 표시용 라벨일 뿐 등록 대상이 아니다 — remote는
+  //   hardeningtargets.runScanForTarget만 만든다). 고객 QA 인스턴스(4100) 격리(2026-09-10 예행 ㉔).
+  if (자기점검꺼짐()) return 자기점검차단안내;
   const raw = (args.standard ?? "").toLowerCase();
   const standard = isStandard(raw) ? raw
     : /cis|international|국제/.test(raw) ? "cis"

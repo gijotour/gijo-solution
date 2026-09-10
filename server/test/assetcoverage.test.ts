@@ -4,6 +4,7 @@ import {
   coverageSummaryText,
   gapsOf,
   isOwnerMissing,
+  ownerGapDetail,
   type AssetCoverage,
 } from "../src/engine/assetcoverage";
 import { emptyAiBom, isAiAsset, type Asset } from "../src/engine/assets";
@@ -115,6 +116,28 @@ describe("자산 커버리지 — 무엇을 모르는가", () => {
     expect(owner.severity).toBe("high");
     expect(owner.why.length).toBeGreaterThan(10);
     expect(owner.fixLabel).toBeTruthy();
+  });
+
+  // ★ 2026-09-10 고객 QA 예행 결함 6 — 뒤 두 절은 예전엔 고정 문자열이었다. 업무 데이터 0에서
+  //   시작한 새 인스턴스(키트 1개)에는 「출처 파일명이 잘못 저장돼 있습니다」가 거짓이 된다.
+  it("★ owner가 전부 빈칸이면 출처 파일명 절이 안 나온다", () => {
+    const cov = computeAssetCoverage([asset({ id: "a", owner: "" }), asset({ id: "b", owner: "   " })]);
+    const owner = cov.gaps.find((g) => g.kind === "owner")!;
+    expect(owner.why).not.toContain("출처 파일명");
+    expect(owner.why).toContain("스캐너로 들여온 자산은 담당부서가 비어 있습니다");
+  });
+
+  it("★ owner: \"scan.csv\"가 섞이면 출처 파일명 절이 나온다", () => {
+    const cov = computeAssetCoverage([asset({ id: "a", owner: "scan.csv" }), asset({ id: "b" })]);
+    const owner = cov.gaps.find((g) => g.kind === "owner")!;
+    expect(owner.why).toContain("출처 파일명");
+  });
+
+  it("ownerGapDetail — 데이터가 없으면 빈 문자열(정규식 베끼기 금지 계약, 시험이 직접 부른다)", () => {
+    expect(ownerGapDetail([])).toBe("");
+    expect(ownerGapDetail(["보안팀"])).toBe("");
+    expect(ownerGapDetail([""])).toContain("스캐너로 들여온");
+    expect(ownerGapDetail(["oracle_nl4mm9.html"])).toContain("출처 파일명");
   });
 
   it("담당부서 결손이 SBOM 결손보다 위에 온다", () => {

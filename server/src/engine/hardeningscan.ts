@@ -634,6 +634,17 @@ export function 감사대상글(r: Pick<ScanReport, "target" | "ranOn">): string
   return r.ranOn === "remote" ? r.target : `이 서버 자신(적힌 이름표: ${r.target})`;
 }
 
+/** 「이 서버 자신」 하드닝 점검이 꺼져 있나 — 고객 QA 인스턴스(4100) 격리 전제(2026-09-10 예행 ㉔).
+ *  기본은 **켜짐**(false) — 라이트는 자기 PC 점검이 제품 자체다(lite-tools.json·hardening-fsi.test.ts
+ *  가 전제로 붙들고 있다). env 한 줄로만 끈다 — 코드 기본값을 안 건드리면 기존 고객·라이트는
+ *  그대로 돈다. */
+export function 자기점검꺼짐(): boolean {
+  return process.env.GIJO_NO_SELF_SCAN === "1";
+}
+
+/** ⓒ 격리가 던지는 안내 — ㉑(0-대상 안내)과 같은 말을 재사용한다(FAIL_MARKS 회피 관례). */
+export const 자기점검차단안내 = "이 설치본에서는 이 서버 자신 점검을 하지 않습니다. 점검할 장비를 검증 화면에서 「+ 대상 등록」으로 등록해 주세요.";
+
 export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn; ranOn?: "self" | "remote"; skipWorkLog?: boolean }): Promise<ScanReport> {
   const std = STANDARDS[opts.standard];
   // ⚠⚠ **「러너를 받았는가」로는 못 가린다**(2026-09-01 검토관 [상]이 잡은 반쪽 수정).
@@ -642,6 +653,8 @@ export async function runHardeningScan(opts: { standard: StandardId; target?: st
   //   → 아는 쪽(부르는 곳)이 말한다. **안 말하면 self다** — 모호할 때 「장비에 붙어 실측했다」고
   //     말하는 것이 이 리포트에서 가장 나쁜 거짓이라, 모르면 **덜 주장하는 쪽**으로 떨어뜨린다.
   const ranOn: "self" | "remote" = opts.ranOn ?? "self";
+  // ⚠ ranOn을 정한 **바로 뒤**에서 막는다 — self로 확정된 뒤라 remote(등록 대상)는 그대로 돈다.
+  if (ranOn === "self" && 자기점검꺼짐()) throw new Error(자기점검차단안내);
   const run = opts.run ?? defaultRunnerFor(opts.standard);
   const target = opts.target || "localhost (this-appliance)";
   const t0 = Date.now();
@@ -767,6 +780,12 @@ export function registerHardeningRoutes(app: Express): void {
       const standard = String(req.body?.standard ?? "kisa").trim();
       if (!isStandard(standard)) {
         res.status(400).json({ error: "standard는 kisa·cis·kisa_pc·kisa_net 중 하나여야 합니다" });
+        return;
+      }
+      // ⚠ 이 창구도 **항상 self**다(등록 대상 점검은 hardeningtargets 라우트가 맡는다).
+      //   고객 QA 인스턴스(4100) 격리(2026-09-10 예행 ㉔).
+      if (자기점검꺼짐()) {
+        res.status(409).json({ error: 자기점검차단안내 });
         return;
       }
       // target은 표시용 라벨만으로 쓴다 — 절대 셸 명령에 넣지 않는다(인젝션 방지).

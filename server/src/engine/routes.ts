@@ -189,7 +189,7 @@ export const 길목록: 길[] = [
   {
     차례: 17, 이름: "검증(하드닝) 현황", 층: "특수경로", 파일: "dispatcher.ts", 판별: "isHardeningStatusAsk",
     도착: "hardeningStatusAnswer(카드)",
-    왜: "점검 결과 숫자는 세는 것이라 지어낼 이유가 없다. ⚠ 실측 2026-09-04 — 「정기점검 **절차**를 알려줘」까지 채 가 사내 매뉴얼(explain)을 밀어냈다(route-explain --겹침이 드러낸 실제 겹침 1건). 방법·절차 물음은 배제한다",
+    왜: "점검 결과 숫자는 세는 것이라 지어낼 이유가 없다. ⚠ 실측 2026-09-04 — 「정기점검 **절차**를 알려줘」까지 채 가 사내 매뉴얼(explain)을 밀어냈다(route-explain --겹침이 드러낸 실제 겹침 1건). 방법·절차 물음은 배제한다. ⚠ 2026-09-10 예행 ㉔ — 「점검 안 한 장비 있어?」 같은 미점검 조회도 여기로 온다 — screenguide verify.html can[]이 제품이 직접 약속한 말이다",
     감시: "isHardeningStatusAsk(instructionText) ? hardeningStatusAnswer()",
   },
   {
@@ -343,7 +343,7 @@ export const 길목록: 길[] = [
   { 이름: "스캔 안 된 자산", 층: "강제도구", 파일: "agentloop.ts", 판별: "FORCED_INTENTS[0]", 도착: "asset_coverage", 왜: "scan_status(무엇이 달라졌나)와 헷갈려 '스캔 안 된 자산이 없습니다'라고 틀리게 답했다" },
   { 이름: "가로지르는 검색", 층: "강제도구", 파일: "agentloop.ts", 판별: "FORCED_INTENTS[1]", 도착: "search", 왜: "메뉴를 가로지르는 단일 검색. 단 세는 질문·오늘류는 비켜선다. 「정리해줘」도 여기로 — 안 잡으면 모델이 우리 취약점 대신 남의 진단 방법론을 읊는다(2026-08-04 지적함)" },
   { 이름: "오늘 뭐부터", 층: "강제도구", 파일: "agentloop.ts", 판별: "FORCED_INTENTS[2]", 도착: "today", 왜: "제품에서 가장 많이 쓰는 답인데 LLM이 잡담으로 떨어뜨렸다(3/3 실측)" },
-  { 이름: "하드닝 점검 실행", 층: "강제도구", 파일: "agentloop.ts", 판별: "FORCED_INTENTS[3]", 도착: "run_hardening_scan", 왜: "장비에 실제로 접속하는 일이라 문구가 명백할 때만" },
+  { 이름: "하드닝 점검 실행", 층: "강제도구", 파일: "agentloop.ts", 판별: "FORCED_INTENTS[3]", 도착: "run_hardening_scan", 왜: "장비에 실제로 접속하는 일이라 문구가 명백할 때만. ⚠ 2026-09-10 예행 ㉔ 배제구 추가 — 안 한/된/했/하고·미점검·현황·상태·어때·결과·목록·어디·어느·누가·몇건개가 있으면 조회로 보고 여기서 안 잡는다(isHardeningStatusAsk[17]가 앞선 1차 방어, 이건 2차). 시험: server/test/hardening-unchecked-routing.test.ts" },
   { 이름: "리포트 일정", 층: "강제도구", 파일: "agentloop.ts", 판별: "FORCED_INTENTS[4]", 도착: "report_schedule_list", 왜: "언제 무엇이 자동으로 만들어지는지는 담당자가 알아야 할 약속이다. 지어내면 안 오는 리포트를 기다리게 된다" },
   { 이름: "통합 관제 현황(analysis_status)", 층: "강제도구", 파일: "agentloop.ts", 판별: "FORCED_INTENTS[5]", 도착: "analysis_status", 왜: "⚠ 앞 층의 현황 **카드**([19] isOpsStatusAsk)와 같은 이름의 영토다 — 카드가 먼저 물면 여기까지 안 온다(2026-09-04에 표를 채우다 이름이 겹쳐서 드러났다). 스캐너·보안로그·제품 리포트를 묶은 현황이라 숫자가 흔들리면 제품 1차 목표가 무너진다. 「오늘 로그에서 이상 징후」도 여기로 — 규칙이 없어 매번 다른 답이 나왔다(2026-08-04 지적함, 들쭉날쭉은 못 믿는 답이다)" },
   { 이름: "보안제품 현황", 층: "강제도구", 파일: "agentloop.ts", 판별: "FORCED_INTENTS[6]", 도착: "product_status", 왜: "제품 등록부와 매뉴얼 보유 현황 — 어느 장비에 운영문서가 없는지는 사고 때 바로 필요하다" },
