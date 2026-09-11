@@ -49,6 +49,62 @@ bash tools/qa-instance/verify.sh /home/gijo/gijo-qa/tmp-review/baseline.txt
 QA_USER=… QA_PASS=… QA_ADMIN_USER=… QA_ADMIN_PASS=… node tools/qa-instance/chat-probe.mjs
 ```
 
+## 야간 회귀 2차 패스 — 4100도 밤마다(2026-09-11 사장님 「권고순서대로」 ①)
+
+지금까지 야간 회귀(`tools/nightly-ops-sim.ps1`, 03:00 KST)는 운영(4000)에만 돌았다.
+이제 4000 패스가 **끝난 뒤** 같은 하네스(`tools/ops-sim.mjs`)를 4100에도 돌린다 —
+잣대는 하나다(하네스를 두 벌로 만들지 않는다). 근거 문서:
+`GIJO_AS_AI팀_증류학습_계획서.md` §13.5.1 「되돌리기」 줄(2026-09-11 변경 이력 참고).
+
+| 무엇 | 값 |
+|---|---|
+| 실행기 | `tools/nightly-ops-sim.ps1`의 2차 패스 블록(4000 패스 뒤) |
+| 실제로 도는 것 | `tools/qa-instance/nightly-4100.sh` → `GIJO_SERVER_URL=http://localhost:4100 QA_USER=qa-observer node tools/ops-sim.mjs --out ops-sim-4100` |
+| 결과 파일 | `.tmp-reports\ops-sim-4100-nightly-YYYYMMDD.log`(Windows 쪽 실행 로그) · `.tmp-reports/ops-sim-4100.json`·`.meta.json`·`.md`(WSL 쪽 하네스 자체 보고 — `--out` 이름을 따른다) |
+| 계정 | `qa-observer`(관찰용, README 「계정」절 — 등급 null) |
+| 4100이 내려가 있을 때 | Windows 쪽에서 `/api/health`를 먼저 보고, 200이 아니면 WSL을 부르지 않고 로그에 「건너뜀」만 남긴다 — **4000 패스에는 영향 0**(이미 끝나 있다) |
+
+### 비밀 규칙
+
+비밀번호는 `/home/gijo/gijo-qa/secrets/계정-비밀번호.txt`(700, gijo 소유)에**만** 있다.
+Windows 쪽(`nightly-ops-sim.ps1`·`.tmp-reports` 로그)에는 **새로 저장하지 않는다.**
+`nightly-4100.sh`가 그 파일에서 읽어 이 프로세스의 env로만 넘기고, `ops-sim.mjs`의
+표준출력은 `grep -v "$QA_PASS"`를 한 번 더 지나 로그에 평문이 찍히지 않게 막는다.
+파일 형식(라벨 뒤 몇 번째 낱말이 진짜 비밀번호인지)은 코드가 가정하지 않는다 — 라벨 뒤
+낱말을 전부 후보로 모아 `/api/auth/login`에 실제로 던져 **200이 나는 것만** 쓴다(판정은
+서버가 한다).
+
+### qa:true라 4100에 학습 후보·세션이 안 쌓인다 — 코드로 확인한 근거
+
+`ops-sim.mjs`는 `/api/dispatch`에 항상 `qa: true`를 싣는다(`tools/ops-sim.mjs:1039`).
+서버 쪽에서 그 플래그가 실제로 막는 지점 세 곳을 코드로 확인했다(2026-09-11):
+
+1. **학습 후보(chat_logs)** — `dispatcher.ts`의 `dispatchInstructionScoped`는
+   `if (qa) { … return … }`(약 1068행)로 **일찍 분기**한다. 세션 생성·`appendTurn`·
+   `recordChatLog`(학습 후보 수집의 유일한 호출 지점, 1119행)는 전부 그 **아래 else 블록**에만
+   있어서, `qa:true`면 애초에 그 코드를 지나지 않는다. 계정이 무엇이든(옛 설계 문서가 가정한
+   "노학습 계정 목록"과 무관하게) 막힌다 — 더 강한 보장이다.
+2. **작업 세션(work sessions)** — 같은 분기 이유로 `createSession`·`markSession`도
+   `qa:true`에서는 안 불린다. 4100 대화 목록에 4100 회귀 문항이 세션으로 안 쌓인다.
+3. **작업 원장(work_events)** — `worklog.ts`의 `recordWork()`가 단일 관문이다:
+   `if (e.qa) return;`(114행). `qa`를 실어 보내는 호출부(`actioncheck.ts`·
+   `agentloop.ts`의 도구 실행 기록)는 전부 이 관문을 지나 **기록 안 함**으로 떨어진다.
+   ⚠ 정직하게 적는다 — `recordWork` 호출부 중 `hardeningscan.ts`(스케줄 실행 경로)·
+   `memory.ts`(문서 인입 API)·`verifyroutes.ts`(장비 검증 API) 세 곳은 `qa` 인자를 아예
+   안 받는다. 다만 `ops-sim.mjs`는 `/api/auth/login`·`/api/auth/logout`·`/api/dispatch`·
+   `/api/agents`(GET)·`/api/llm/remote/where`(GET)만 두드리고 위 세 경로(문서 업로드·
+   장비 검증 API·스케줄 하드닝)는 호출하지 않으므로 **이번 회귀 트래픽으로는 닿지 않는다.**
+   채팅으로 하드닝 점검을 시키는 문항이 있다면 그 경로는 `agenttools/handlers.ts`가
+   `skipWorkLog:true`로 hardeningscan.ts 쪽 기록을 끄고, 대신 agentloop의
+   `recordToolWork`가 `scope.qa`를 그대로 실어 `recordWork`의 같은 관문을 지난다 — 이중
+   기록도 없다.
+
+### 되돌리기
+
+`tools/nightly-ops-sim.ps1`에서 위 「2차 패스 — 고객 QA 인스턴스(4100)」 블록만 지우면
+4000 패스만 남은 예전 상태로 돌아간다. `tools/qa-instance/nightly-4100.sh` 자체는 독립
+실행 가능한 도구라 지우지 않아도 된다(손으로 `bash tools/qa-instance/nightly-4100.sh`도 된다).
+
 ## 운영 재시작 순서 — **먼저 4100을 내린다**
 
 운영의 고아 정리(`localengine.ts:749-759`)는 **살아 있는 형제 노드가 보이면 통째로 건너뛴다.**

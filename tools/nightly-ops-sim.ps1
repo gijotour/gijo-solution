@@ -20,6 +20,12 @@
 #       schtasks /delete /tn "GIJO AS - 야간 회귀(152상황)" /f
 #     (지우기를 **나중에** 한다 — 새것을 먼저 만들어야 그 사이에 회차가 비지 않는다.
 #      순서를 뒤집으면 딱 하루 결석이 나고, 그 결석은 아무도 못 알아챈다.)
+#
+# 🆕 **2차 패스 — 고객 QA 인스턴스(4100)** (2026-09-11 22:55 사장님 「권고순서대로」 ① 결정)
+#   운영(4000) 패스가 **끝난 뒤에** 4100에도 같은 하네스를 돌린다. 별도 로그·별도 종료코드라
+#   4100이 죽어 있거나 실패해도 위 4000 패스의 결과·종료코드에는 영향이 없다(맨 아래 참고).
+#   비밀번호는 여기(Windows)에 새로 두지 않는다 — WSL 쪽 tools/qa-instance/nightly-4100.sh가
+#   /home/gijo/gijo-qa/secrets/에서 직접 읽는다. 되돌리려면 맨 아래 블록만 지우면 된다.
 
 $ErrorActionPreference = "Continue"
 # node의 utf8 출력을 PS 파이프가 OEM으로 읽어 로그가 깨졌다(첫 실행 실측 「醫낅즺肄붾뱶」) — 통일.
@@ -50,4 +56,33 @@ $코드 = $LASTEXITCODE
 # 이번 회차의 **진짜** 문항 수 — 하네스가 방금 적은 값이다(머리의 것은 지난 회차).
 "문항 수(이번 회차) — $(node tools/ops-sim-meta.mjs)" | Out-File $log -Append -Encoding utf8
 "끝 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') · 종료코드 $코드" | Out-File $log -Append -Encoding utf8
+
+# ══════════════════ 2차 패스 — 고객 QA 인스턴스(4100) ══════════════════
+# 사장님 결정(2026-09-11 22:55 「권고순서대로」 ①): 운영 4000에 이어 4100에도 밤마다 돌린다.
+# ⚠ 되돌리려면 이 블록만 지우면 된다 — tools/qa-instance/nightly-4100.sh 자체는 독립 도구라
+#   안 지워도 되고, 4000 패스(위)는 이 블록과 무관하게 그대로 돈다.
+# ⚠ 이 블록의 성패는 **위 $코드(4000 종료코드)에 섞지 않는다** — 스크립트 전체의 exit는
+#   여전히 4000 결과만 반영한다(맨 아래 `exit $코드`가 그대로다).
+$log4100 = ".tmp-reports\ops-sim-4100-nightly-$(Get-Date -Format yyyyMMdd).log"
+"시작 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File $log4100 -Encoding utf8
+
+# 4100이 내려가 있으면 WSL을 부르지 않고 건너뛴다 — health는 Windows 쪽에서 확인한다
+# (refresh-portproxy.ps1이 Windows localhost:4100 → WSL로 이미 잇고 있다).
+$살아있다 = $false
+try {
+  $응답4100 = Invoke-WebRequest -Uri "http://localhost:4100/api/health" -UseBasicParsing -TimeoutSec 5
+  if ($응답4100.StatusCode -eq 200) { $살아있다 = $true }
+} catch {
+  $살아있다 = $false
+}
+
+if (-not $살아있다) {
+  "4100 health가 200이 아니다 — 이번 회차는 건너뜁니다(4000 패스와 무관, 4000은 이미 끝났다)." | Out-File $log4100 -Append -Encoding utf8
+  "끝 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') · 건너뜀" | Out-File $log4100 -Append -Encoding utf8
+} else {
+  wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/qa-instance/nightly-4100.sh" ops-sim-4100 2>&1 | Out-File $log4100 -Append -Encoding utf8
+  $코드4100 = $LASTEXITCODE
+  "끝 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') · 종료코드 $코드4100" | Out-File $log4100 -Append -Encoding utf8
+}
+
 exit $코드
