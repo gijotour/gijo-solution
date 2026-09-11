@@ -17,6 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { 결정적도착지 } from "../src/engine/dispatcher";
 import { forcedToolFor, 비교개념질문 } from "../src/engine/agentloop";
+import { isHelpIntent } from "../src/engine/screenguide";
 import { 실제도착, 가로챈규칙 } from "./helpers/routing";
 
 describe("★ 「A랑 B 뭐가 달라?」류는 explain(topic=원문)으로 결정적으로 간다", () => {
@@ -103,6 +104,99 @@ describe("★★ 이웃 갈래를 안 뺏는다 — 착수 전 도착지가 글�
   it("「취약점 조치 우선순위를 정할 때 무엇을 먼저 봐?」 → topic은 고정 문자열 「취약점 우선순위」([90]이 잡은 것이지 새 규칙이 아니다)", () => {
     const 강제 = forcedToolFor("취약점 조치 우선순위를 정할 때 무엇을 먼저 봐?", { role: "admin" } as never);
     expect(강제?.args?.topic).toBe("취약점 우선순위");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ★★ 2026-09-12 검토관 수리 — 첫 판이 만든 구멍 넷
+//
+//  ■ 왜 한 벌을 더 두나: 착수 전 실측의 **음성 목록 36문장이 세 부류를 원리상 못 봤다.**
+//    쓰기 흐름의 다른 동사(승인·조치·할당·맡겨)·데이터 비교(건수·로그·스캔 결과·자산 이름)·
+//    동사 어미 「하고」가 그 목록에 아예 없었으니, 실측은 초록인데 제품은 샜다. 음성은
+//    **글자 하나만 바꾼 대조군**과 함께 못 박는다 — 「차이어를 빼면 ∅」이면 그 문장을 잡는
+//    주체가 이 규칙 하나라는 증거다(남이 잡는 것을 내 공으로 세지 않는다).
+// ═══════════════════════════════════════════════════════════════════════════════
+describe("★★ [상] 쓰기 흐름을 한 수로 삼키지 않는다 — 잣대(isAssign·isWriteOrder) 한 곳이 막는다", () => {
+  // 실측(수리 전, 전부 [37] explain 단독): explain으로 못 박히면 강제 경로는 도구 하나를
+  // 부르고 끝나므로 승인·조치·배정이 **영영 안 간다**(2026-08-09 파일럿에서 today가 배정
+  // 명령을 흡수한 사고와 같은 꼴). 첫 판은 쓰기 동사를 비교개념질문 배제어에 손으로 베꼈고,
+  // 베끼다 빠진 말(승인·조치·할당·맡겨)이 그대로 샜다.
+  const 쓰기흐름 = [
+    "EPSS랑 VPR 차이 알려주고 승인해줘",
+    "취약점이랑 위협 차이 알려주고 조치해줘",
+    "취약점이랑 위협 차이 알려주고 김보안한테 할당해줘",
+    "KEV랑 EPSS 차이 정리해서 김보안한테 할당해줘",
+    "EPSS랑 VPR 차이 알려주고 김보안한테 맡겨줘",
+    "VPN이랑 제로트러스트 차이 알려주고 김보안한테 배정해줘",
+  ];
+  for (const 문장 of 쓰기흐름) {
+    it(`「${문장}」 → explain으로 안 박힌다(승인·조치·배정이 살아 있다)`, () => {
+      expect(forcedToolFor(문장, { role: "admin" } as never)?.tool ?? null).not.toBe("explain");
+    });
+  }
+
+  // 「할당」은 잣대(isWriteOrder)에 **없던 말**이라 잣대 쪽에 더했다 — 그러면 이 규칙만이 아니라
+  // 같은 잣대를 쓰는 FORCED 루프(today·briefing·exec_brief·approval_status…)도 함께 닫힌다.
+  // 실측(더하기 전): 아래 넷이 전부 조회 도구 한 수로 끝났다.
+  const 할당흐름: [string, string][] = [
+    ["가장 급한 취약점 김보안한테 할당해줘", "today"],
+    ["기한 지난 점검 있으면 김보안한테 할당해줘", "maintenance_status"],
+    ["승인 대기 목록 보고 김보안한테 할당해줘", "approval_status"],
+    ["임원 보고용으로 세 줄 요약해서 김보안한테 할당해줘", "exec_brief"],
+  ];
+  for (const [문장, 도구] of 할당흐름) {
+    it(`「${문장}」 → ${도구} 아님(잣대 한 곳에 「할당」을 더했다)`, () => {
+      expect(forcedToolFor(문장, { role: "admin" } as never)?.tool ?? null).not.toBe(도구);
+    });
+  }
+});
+
+describe("★★ [상] 데이터 물음을 지식 답으로 못 박지 않는다 — 대조군과 함께 잰다", () => {
+  // explain은 topic으로 온톨로지·사내 문서만 뒤진다 — 자산별 취약점·스캔 델타·건수·로그는
+  // **원천 자체가 없다.** 착수 전엔 ∅이라 모델이 finding_status·scan_status를 고를 수 있었다.
+  // 짝(대조군)은 **차이어만 뺀 같은 문장**이다 — 둘 다 ∅이어야 「이 규칙이 잡던 것」이 맞다.
+  const 데이터비교: [string, string][] = [
+    ["sample-web01이랑 db-01 취약점 뭐가 달라?", "sample-web01이랑 db-01 취약점 알려줘"],
+    ["sample-web01이랑 sample-db01 뭐가 달라?", "sample-web01이랑 sample-db01 알려줘"],
+    ["KEV랑 EPSS 취약점 건수 차이 알려줘", "KEV랑 EPSS 취약점 건수 알려줘"],
+    ["방화벽이랑 IPS 로그 건수 차이 알려줘", "방화벽이랑 IPS 로그 건수 알려줘"],
+    ["지난 스캔과 이번 스캔 결과 차이 알려줘", "지난 스캔과 이번 스캔 결과 알려줘"],
+    ["지난번 스캔 결과랑 이번 스캔 결과 뭐가 달라?", "지난번 스캔 결과랑 이번 스캔 결과 알려줘"],
+    // 「…하고 나서 뭐가 달라졌어?」 — 연결어 「하고」가 **동사 어미**와 겹쳐 「스캔」+「나서」를
+    // 두 주제로 읽던 자리. 비교 대상이 아예 없는 문장이다(시간에 따른 변화 물음).
+    ["스캔하고 나서 뭐가 달라졌어?", "스캔하고 나서 어떻게 됐어?"],
+  ];
+  for (const [문장, 대조군] of 데이터비교) {
+    it(`「${문장}」 → explain 아님 (대조군 「${대조군}」도 ∅)`, () => {
+      expect(비교개념질문(문장), "비교 개념 물음으로 읽히면 안 된다(우리 데이터 물음이다)").toBe(false);
+      expect(forcedToolFor(문장, { role: "admin" } as never)?.tool ?? null).not.toBe("explain");
+      expect(forcedToolFor(대조군, { role: "admin" } as never), "대조군이 딴 규칙에 걸리면 이 짝은 증거가 못 된다").toBeNull();
+    });
+  }
+
+  it("★ 표준 이름 비교는 그대로 양성이다 — 자산 이름 꼴은 **하이픈 뒤 숫자**로만 본다", () => {
+    // /[A-Za-z][A-Za-z0-9]*\d{2,}/로 넓히면 「ISO27001」이 걸려 양성이 죽는다(실측으로 확인).
+    expect(비교개념질문("ISMS-P랑 ISO27001 차이가 뭐야?")).toBe(true);
+    expect(비교개념질문("sample-web01이랑 db-01 취약점 뭐가 달라?")).toBe(false);
+  });
+});
+
+describe("★★ [중] 화면 구역 이름은 안 뺏는다 — 그 뜻풀이는 screenguide에 글자 그대로 있다", () => {
+  // mydocs 구역 이름이 **「AI 포함과 공유의 차이」**라, 이 규칙이 그 이름을 통째로 삼켰다.
+  // 실측(수리 전): forcedToolFor=explain → screenguide.isHelpIntent가 **자기 안에서**
+  // forcedToolFor를 보고 값요구를 넘겨(screenguide.ts:495) 화면 안내가 죽었다 —
+  // 커밋 22142ca7의 「isHelpIntent가 앞이라 사용자 경험은 그대로」는 틀린 설명이었다.
+  const 구역이름물음들 = ["AI 포함과 공유의 차이 알려줘", "AI 포함과 공유의 차이 뭐야?", "AI 포함과 공유의 차이 보여줘"];
+  for (const 문장 of 구역이름물음들) {
+    it(`「${문장}」 → 강제 도구 없음(화면 안내에게 넘긴다)`, () => {
+      expect(forcedToolFor(문장, { role: "admin" } as never)).toBeNull();
+    });
+  }
+  it("mydocs 화면에서 「AI 포함과 공유의 차이 알려줘」는 화면 안내가 답한다(착수 전 그대로)", () => {
+    expect(isHelpIntent("AI 포함과 공유의 차이 알려줘", "mydocs.html", "admin")).toBe(true);
+  });
+  it("★ 구역 이름과 안 겹치는 비교 물음은 그대로 explain이다(막는 범위가 좁다)", () => {
+    expect(forcedToolFor("EPSS랑 VPR 뭐가 달라?", { role: "admin" } as never)?.tool).toBe("explain");
   });
 });
 

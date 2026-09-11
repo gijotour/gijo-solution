@@ -14,11 +14,14 @@
 //
 // ■ 판정은 제품 함수로 한다 — helpers/routing.ts 머리글(정규식을 떼어 혼자 재면 앞 규칙이
 //   가로채는 것을 못 본다). 결정적도착지(dispatcher.ts)를 그대로 부른다.
+// ⚠ 2026-09-12 검토관 [하] — forcedToolFor·실제도착 import를 지웠다. 한 번도 부르지 않는
+//   창구였는데, 이 저장소에서 시험의 import는 「무엇으로 쟀는가」의 증거로 읽힌다(안 쓰는
+//   창구를 적어 두면 다음 사람이 그 축까지 덮인 줄 알고 회귀를 따로 안 짠다). 여기 판정은
+//   결정적도착지·isFindingListAsk·오래미조치물음·findingListAnswer **네 제품 함수**가 한다.
 import { describe, it, expect } from "vitest";
 import { 결정적도착지 } from "../src/engine/dispatcher";
-import { forcedToolFor } from "../src/engine/agentloop";
 import { isFindingListAsk, findingListAnswer, 오래미조치물음, 오래된순없음단서 } from "../src/engine/picklist";
-import { 실제도착 } from "./helpers/routing";
+import { 물음속심각도 } from "../src/engine/tone";
 
 describe("★ 「오래된/패치 안 된 지 오래된」류는 findingListAnswer(목록+체크칸)로 결정적으로 간다", () => {
   const 양성 = [
@@ -86,6 +89,34 @@ describe("★★ 이웃 갈래를 안 뺏는다 — 착수 전 도착지가 그�
   }
 });
 
+describe("★★ [상] 등급·KEV가 붙은 말은 여기로 안 온다 — 조건이 조용히 사라지면 안 된다(2026-09-12 수리)", () => {
+  // ■ 무엇이 틀렸었나: findingListAnswer는 **물음속심각도(tone.ts)로만** 좁히는데 그 표에
+  //   「고위험」·「KEV」가 없다. 그래서 첫 판은 「오래된 고위험 취약점 알려줘」를 [14]로
+  //   확정하면서 **등급 조건을 통째로 잃었다** — 머리줄은 「조치할 취약점 N건」이라 담당자는
+  //   그 N을 고위험 건수로 읽는다. picklist.ts:150 머리글이 못 박아 둔 함정이 같은 파일에서
+  //   재발한 것이다(「상태어가 붙은 말은 여기가 아니다 … 가로채면 필터가 사라진다」).
+  // ■ 착수 전엔 ∅이었다(상태어취약점은 ^로 문장 머리를 요구해 「오래된 …」을 못 잡고,
+  //   LIST_VERB_RE에는 「알려」가 없다) — 즉 이 문장을 처음 확정한 것이 새 규칙이다.
+  const 못거르는조건 = ["오래된 고위험 취약점 알려줘", "오래된 KEV 취약점 알려줘", "오래 방치된 고위험 취약점 알려줘"];
+  for (const 문장 of 못거르는조건) {
+    it(`「${문장}」 → [14] 목록 아님(등급·KEV를 못 거르므로 비켜 준다)`, async () => {
+      expect(물음속심각도(문장), "이 시험의 전제 — 이 말은 좁히기 표에 없다").toBeNull();
+      expect(오래미조치물음(문장)).toBe(false);
+      const 걸림 = await 결정적도착지(문장, { 역할: "admin" });
+      expect(걸림[0]?.도착 ?? null).not.toBe("findingListAnswer(목록+체크칸)");
+    });
+  }
+  // ★ 반대쪽 — 표에 **있는** 등급말은 실제로 걸러지므로 그대로 받는다(배제를 넓히면 여기가 빨개진다).
+  const 거르는조건: [string, string][] = [["오래된 매우 심각한 취약점 알려줘", "critical"], ["오래된 critical 취약점 알려줘", "critical"]];
+  for (const [문장, 등급] of 거르는조건) {
+    it(`「${문장}」 → [14] 목록 그대로(물음속심각도=${등급}로 실제로 좁힌다)`, async () => {
+      expect(물음속심각도(문장)).toBe(등급);
+      const 걸림 = await 결정적도착지(문장, { 역할: "admin" });
+      expect(걸림[0]?.도착 ?? null).toBe("findingListAnswer(목록+체크칸)");
+    });
+  }
+});
+
 describe("★★★ 단서 — 「오래된 순」은 아직 없다고 정직하게 말한다", () => {
   it('findingListAnswer("패치 안 된 지 오래된 거 알려줘")는 단서를 포함한다', () => {
     const { output } = findingListAnswer("패치 안 된 지 오래된 거 알려줘");
@@ -94,6 +125,20 @@ describe("★★★ 단서 — 「오래된 순」은 아직 없다고 정직하
   it('findingListAnswer("미조치 취약점 뭐 있어?")는 단서를 포함하지 않는다(아무 목록에나 안 붙는다)', () => {
     const { output } = findingListAnswer("미조치 취약점 뭐 있어?");
     expect(output).not.toContain(오래된순없음단서);
+  });
+});
+
+describe("⚠ 아직 안 닫힌 자리 — 시간어 없는 같은 뜻(2026-09-12 검토관 [하]가 드러냄)", () => {
+  // B7 ② 보고서가 이웃으로 적어 둔 문장인데 이 라운드가 **안 닫았다**. 신호(오래·묵은·방치)가
+  // 없어 오래미조치물음에 안 걸리고, LIST_VERB_RE에 「알려」가 없어 기존 갈래도 못 받는다.
+  // 닫으려면 대상+「알려」 꼴을 LIST_VERB_RE 쪽에서 함께 봐야 하는데 agentloop 상태어취약점
+  // (finding_status) 영토와 겹치므로 **실측 먼저**다 — 다음 라운드 백로그.
+  // ⚠ 이 시험은 「이대로가 옳다」가 아니라 **지금 여기가 비어 있다**를 기록한다. 구멍을 닫으면
+  //   여기가 빨개지고, 그때 이 줄을 지우면서 닫힌 것을 위 양성 목록으로 옮긴다.
+  it('「패치 안 한 취약점 알려줘」는 아직 ∅(⑨ 모델 선택) — 닫으면 이 줄을 지운다', async () => {
+    expect(오래미조치물음("패치 안 한 취약점 알려줘"), "신호(시간어)가 없어 이 규칙은 안 받는다").toBe(false);
+    const 걸림 = await 결정적도착지("패치 안 한 취약점 알려줘", { 역할: "admin" });
+    expect(걸림[0]?.도착 ?? null).toBeNull();
   });
 });
 
