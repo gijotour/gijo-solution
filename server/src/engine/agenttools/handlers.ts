@@ -2804,6 +2804,17 @@ export async function runKpiStatus(q?: string): Promise<string> {
  *   등급어는 옮기지 않는다(옮기면 라벨이 두 곳이 되어 언젠가 어긋난다).
  * ⚠ 「이번 주」라고 물어도 이 스냅샷은 **오늘 기준**이다 — 7일 창을 세는 곳이 저장소에 없다.
  *   그래서 줄①에 기준일(s.date)을 반드시 찍는다 — 안 찍으면 그 자체가 새 거짓말이 된다.
+ *   ★ 2026-09-11 검토관 [하] 수리: 날짜만 찍으면 읽는 사람은 그것을 **「이번 주 집계의 산출일」**로
+ *     읽는다(주간이 아니라는 정보가 답 어디에도 없었다). 「주간 집계가 아니라 오늘 시점」이라고
+ *     한 마디로 못 박는다 — 임원 보고에 「이번 주 수치」로 인용되는 것이 실제 피해다.
+ * ⚠ **0은 「안전」이 아닐 수 있다**(2026-09-11 검토관 [중] 수리 · 전-6 정직).
+ *   0-자산 가드만으로는 반쪽이었다 — vulnerabilities.*는 kpi.ts vulnerabilityMetrics가
+ *   **infra-host 자산의 스캔 결과**에서만 세므로, AI 자산만 등록했거나 스캐너 연동 전이면
+ *   active·critical·kev가 전부 0이고 scanFailed도 0이라 「점검 실패 N건」 단서조차 안 붙는다.
+ *   remediation도 같다 — kpi.ts:187이 조치 항목 0건일 때 slaCompliance를 **표본 없이 100%**로 준다.
+ *   그대로 내보내면 파일럿 첫날에 「태세 85점 · 문제 0건 · 준수율 100%」가 임원에게 나간다
+ *   (2026-08-01 「602건이 전부 점검 실패인데 활성 46건」 사고의 거울상 — 그때는 실패를 취약점으로,
+ *   이번엔 **미측정을 0으로** 읽는다). 줄 수는 그대로 세 줄이고, 코드가 단서만 덧붙인다.
  */
 export async function runExecBrief(): Promise<string> {
   const s = await computeKpiSnapshot();
@@ -2814,13 +2825,22 @@ export async function runExecBrief(): Promise<string> {
   if (s.assets.total === 0) {
     return "아직 자산이 등록되지 않아 현황을 셀 수 없습니다 — 자산을 등록하면 이 자리에 숫자가 채워집니다.";
   }
+  // 세어 본 적이 없어서 0인가, 세어 봤는데 0인가 — 둘을 가른다(잣대는 스냅샷 필드 그대로).
+  //   호스트가 없으면 스캔이 원리상 안 돌고, 호스트는 있는데 취약점·고친 것·점검 실패가 모두
+  //   0이면 그 자산에 스캔 결과가 아직 한 건도 없는 것이다.
+  const 점검기록없음 =
+    s.vulnerabilities.hosts === 0 ||
+    s.vulnerabilities.active + s.vulnerabilities.newlyFixed + s.vulnerabilities.scanFailed === 0;
   const 줄들 = [
-    `① 종합 보안태세 ${s.posture.score}점/100점 (${s.date} 기준) · 자산 ${s.assets.total}대 중 고위험 ${s.assets.highRisk}대`,
+    `① 종합 보안태세 ${s.posture.score}점/100점 (${s.date} 기준 · 주간 집계가 아니라 오늘 시점입니다) · 자산 ${s.assets.total}대 중 고위험 ${s.assets.highRisk}대`,
     `② 미해결 취약점 ${s.vulnerabilities.active}건 — ${심각도한글("critical")} ${s.vulnerabilities.critical}건 · 실제 악용(KEV) ${s.vulnerabilities.kev}건` +
-      (s.vulnerabilities.scanFailed
-        ? ` · 점검 실패 ${s.vulnerabilities.scanFailed}건은 아직 못 본 것입니다`
-        : ""),
-    `③ 조치 기한 초과 ${s.remediation.overdue}건 · 마감 임박 ${s.remediation.dueSoon}건 · 기한 준수율 ${s.remediation.slaCompliance}%`,
+      (점검기록없음
+        ? ` · ${s.vulnerabilities.hosts === 0 ? "점검 대상 호스트가 아직 없어" : "점검 결과가 아직 없어"} 0입니다 — 안전하다는 뜻이 아닙니다`
+        : s.vulnerabilities.scanFailed
+          ? ` · 점검 실패 ${s.vulnerabilities.scanFailed}건은 아직 못 본 것입니다`
+          : ""),
+    `③ 조치 기한 초과 ${s.remediation.overdue}건 · 마감 임박 ${s.remediation.dueSoon}건 · 기한 준수율 ${s.remediation.slaCompliance}%` +
+      (s.remediation.tasks === 0 ? " — 조치 항목이 0건이라 아직 집계 전입니다" : ""),
   ];
   return `${예시데이터머리말()}${줄들.join("\n")}`;
 }

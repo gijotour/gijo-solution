@@ -6,24 +6,43 @@
 //   코드가 한글 세 줄을 만든다. 모델이 숫자를 다시 쓰지 않는다(directAnswer) — 가짜 요약
 //   위험을 원리상 막는 것이 이 시험들의 뜻이다.
 import { describe, it, expect, beforeEach } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { findAgentTool } from "../src/engine/agenttools";
 import { computeKpiSnapshot, resetKpiForTests } from "../src/engine/kpi";
-import { resetAssetsForTests, seedSampleAssetsIfEmpty } from "../src/engine/assets";
+import { resetAssetsForTests, seedSampleAssetsIfEmpty, seedSampleVulnHostIfEmpty } from "../src/engine/assets";
+import { resetTasksForTests } from "../src/engine/tasks";
 import { hangulRatio } from "../src/engine/llm";
 
 const run = () => Promise.resolve(findAgentTool("exec_brief")!.run({})).then(String);
 
-// 평가 게이트 forbid와 같은 정규식(tools/evalgate/cases/korean.json kr-report-tone) — 게이트
-// 기준 자체는 손대지 않고, 여기서는 **같은 잣대로** 우리 도구를 미리 잰다.
-const 영어연속_RE = /[A-Za-z][A-Za-z0-9 ,'-]{55,}/;
+// ★ 잣대를 여기 베껴 적지 않는다 — **원본 파일에서 읽는다**(2026-09-11 검토관 [하] 수리).
+//   첫 판은 게이트 forbid 정규식과 FAIL_MARKS 15개를 손으로 복사했다. 지금 값은 맞았지만
+//   원본이 늘면 이 시험만 **옛 목록으로 초록**이 되고(FAIL_MARKS는 2026-08-14·09-05에 실제로
+//   늘었다) 서랍 점검만 빨개진다 — 어느 쪽이 옳은지 사람이 못 읽는다.
+//   저장소 관례가 그 답이다: emptyanswer-guidance.test.ts가 drawer-audit.mjs를 읽어 대조하고
+//   helpers/routing.ts가 agentloop.ts 원문을 읽어 판정한다(「같은 것을 여러 곳에 적으면 어긋난다」).
+const 뿌리 = path.join(__dirname, "..", "..");
+// 평가 게이트 문항 그대로 — 게이트 기준을 손대지 않고 **같은 잣대로** 우리 도구를 미리 잰다.
+const 게이트문항 = (() => {
+  const cases = JSON.parse(fs.readFileSync(path.join(뿌리, "tools", "evalgate", "cases", "korean.json"), "utf8")) as {
+    cases: { id: string; q: string; expect?: string[]; forbid?: string[]; hangulMin?: number }[];
+  };
+  const c = cases.cases.find((x) => x.id === "kr-report-tone");
+  if (!c) throw new Error("kr-report-tone 문항이 korean.json에 없다 — 이 시험이 낡았다(문항이 바뀌었나)");
+  return c;
+})();
+const 영어연속_RE = new RegExp(게이트문항.forbid![0]);
 // tools/drawer-audit.mjs FAIL_MARKS — 폴백 문구 목록. 정직한 답이 이 낱말을 쓰면 서랍 점검이
 // 실패로 센다(citeguard.ts FAIL_MARKS-안전 관례와 같은 규율).
-const FAIL_MARKS = [
-  "구체적으로 질문", "명확히 알려주시면", "맥락을 더 알려", "정보를 제공해 주시면",
-  "이해하지 못", "알 수 없습니다", "지원하지 않", "할 수 없습니다", "죄송",
-  "그런 자산이 없", "찾지 못했습니다", "등록된 자산이 없", "해당하는 자산이 없",
-  "실행 실패", "오류가 발생",
-];
+const FAIL_MARKS = (() => {
+  const 소스 = fs.readFileSync(path.join(뿌리, "tools", "drawer-audit.mjs"), "utf8");
+  const m = 소스.match(/const FAIL_MARKS = \[([\s\S]*?)\];/);
+  if (!m) throw new Error("drawer-audit.mjs에서 FAIL_MARKS를 못 읽었다 — 목록이 옮겨 갔나");
+  const 목록 = [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+  if (목록.length === 0) throw new Error("FAIL_MARKS가 0개로 읽혔다 — 0개면 이 시험은 늘 초록이다");
+  return 목록;
+})();
 
 describe("★ exec_brief는 즉답이고 본문이 정확히 세 줄이다", () => {
   beforeEach(() => {
@@ -95,9 +114,9 @@ describe("★ 평가 게이트와 같은 잣대로 재도 초록이다 — 한�
     seedSampleAssetsIfEmpty();
   });
 
-  it("한글 비율 ≥ 0.5(kr-report-tone hangulMin)", async () => {
+  it("한글 비율 ≥ kr-report-tone hangulMin(게이트 문항에서 읽어 온 값)", async () => {
     const out = await run();
-    expect(hangulRatio(out)).toBeGreaterThanOrEqual(0.5);
+    expect(hangulRatio(out)).toBeGreaterThanOrEqual(게이트문항.hangulMin!);
   });
 
   it("영어가 55자 넘게 안 이어진다(kr-report-tone forbid)", async () => {
@@ -105,9 +124,29 @@ describe("★ 평가 게이트와 같은 잣대로 재도 초록이다 — 한�
     expect(영어연속_RE.test(out), out).toBe(false);
   });
 
-  it("kr-report-tone expect(취약점|자산|점검|조치|현황) 중 하나 이상을 담는다", async () => {
+  it("kr-report-tone expect 정규식(게이트 문항에서 읽어 온 값)을 담는다", async () => {
     const out = await run();
-    expect(out).toMatch(/취약점|자산|점검|조치|현황/);
+    expect(out).toMatch(new RegExp(게이트문항.expect![0]));
+  });
+});
+
+describe("★ 「이번 주」로 물어도 오늘 스냅샷이라는 것을 답이 스스로 밝힌다", () => {
+  // 2026-09-11 검토관 [하] — 날짜만 찍으면 「이번 주 집계의 산출일」로 읽힌다(주간이 아니라는
+  // 정보가 답 어디에도 없었다). 게이트 문항 자체가 「이번 주」를 물으므로 그 물음을 그대로 쓴다.
+  beforeEach(() => {
+    resetKpiForTests();
+    resetAssetsForTests();
+    seedSampleAssetsIfEmpty();
+  });
+
+  it("게이트 문항이 여전히 「이번 주」를 묻는다 — 이 계약의 전제다", () => {
+    expect(게이트문항.q).toContain("이번 주");
+  });
+
+  it("줄①이 「주간 집계가 아니라 오늘 시점」이라고 못 박는다", async () => {
+    const s = await computeKpiSnapshot();
+    const out = await run();
+    expect(out, `실제 답:\n${out}`).toContain(`${s.date} 기준 · 주간 집계가 아니라 오늘 시점입니다`);
   });
 });
 
@@ -129,6 +168,71 @@ describe("★ 데이터가 0일 때 「안전하다」로 안 읽힌다 (고객 
     const out = await run();
     const 걸린것 = FAIL_MARKS.find((m) => out.includes(m));
     expect(걸린것, `정직한 0건 답이 폴백 문구와 겹쳤다: "${걸린것}"`).toBeUndefined();
+  });
+});
+
+describe("★★ 자산은 있는데 **세어 본 적이 없어서** 0인 경우 — 「안전」으로 안 읽힌다", () => {
+  // 2026-09-11 검토관 [중] 수리. 첫 판의 0건 가드는 `assets.total === 0` 하나뿐이라 반쪽이었다.
+  //   파일럿 첫날(자산 등록은 했고 스캐너 연동 전)이 정확히 이 상태다 — kpi.ts는 취약점을
+  //   **infra-host 자산의 스캔 결과**에서만 세므로 AI 자산만 있으면 active·critical·kev·scanFailed가
+  //   전부 0이고, 조치 항목이 0건이면 slaCompliance가 표본 없이 100%다. 그대로 세 줄이 나가면
+  //   임원은 「태세 N점 · 문제 0건 · 준수율 100%」를 **문제가 없다**로 읽는다.
+  beforeEach(() => {
+    resetKpiForTests();
+    resetAssetsForTests();
+    seedSampleAssetsIfEmpty(); // 샘플 자산은 전부 AI 자산이다 — infra-host가 없다(= 스캔 기록 0)
+    // ⚠ 조치 항목도 비운다 — 안 비우면 다른 시험이 남긴 vuln: 태스크가 섞여 준수율이 67%로
+    //   나온다(실측 2026-09-11). 그러면 「표본 0인데 100%」라는 이 시험의 전제가 성립하지 않는다.
+    resetTasksForTests();
+  });
+
+  it("이 시험의 전제: 자산은 있고 점검 대상 호스트·조치 항목은 0이다", async () => {
+    const s = await computeKpiSnapshot();
+    expect(s.assets.total, "자산이 0이면 0-자산 갈래가 답해 이 시험의 뜻이 없다").toBeGreaterThan(0);
+    expect(s.vulnerabilities.hosts).toBe(0);
+    expect(s.remediation.tasks).toBe(0);
+    // ⚠ 이 둘이 그대로 나가면 안 되는 값 — 왜 단서가 필요한지 숫자로 남긴다.
+    expect(s.vulnerabilities.active).toBe(0);
+    expect(s.remediation.slaCompliance, "kpi.ts는 표본이 0건이면 100%를 준다 — 만점이 아니라 미집계다").toBe(100);
+  });
+
+  it("줄②가 「0 = 안전」이 아님을 말한다", async () => {
+    const out = await run();
+    expect(out, `실제 답:\n${out}`).toContain("안전하다는 뜻이 아닙니다");
+  });
+
+  it("줄③이 기한 준수율 100%를 표본 없는 값이라고 밝힌다", async () => {
+    const out = await run();
+    expect(out, `실제 답:\n${out}`).toContain("조치 항목이 0건이라 아직 집계 전입니다");
+  });
+
+  it("줄 수는 그대로 세 줄이다 — 단서를 붙여도 임원용 세 줄 계약을 안 깬다", async () => {
+    const out = await run();
+    const 줄 = out.replace(/^⚠[^\n]*\n/, "").split("\n").filter(Boolean);
+    expect(줄.length, `실제 답:\n${out}`).toBe(3);
+  });
+
+  it("FAIL_MARKS와 안 겹친다 — 정직한 단서에 실패 딱지가 붙으면 안 된다", async () => {
+    const out = await run();
+    const 걸린것 = FAIL_MARKS.find((m) => out.includes(m));
+    expect(걸린것, `단서가 폴백 문구와 겹쳤다: "${걸린것}"`).toBeUndefined();
+  });
+});
+
+describe("★ 반대로 **세어 봤는데** 0이 아닌 경우엔 그 단서를 안 붙인다(늘 붙는 장식이 아니다)", () => {
+  beforeEach(() => {
+    resetKpiForTests();
+    resetAssetsForTests();
+    seedSampleAssetsIfEmpty();
+    seedSampleVulnHostIfEmpty(); // 샘플 호스트 1대 + 스캔 결과 4건
+  });
+
+  it("스캔 결과가 있으면 「점검 결과가 아직 없어」 단서가 안 붙는다", async () => {
+    const s = await computeKpiSnapshot();
+    expect(s.vulnerabilities.hosts, "샘플 호스트가 안 심겼다 — 이 시험의 전제가 깨졌다").toBeGreaterThan(0);
+    expect(s.vulnerabilities.active + s.vulnerabilities.newlyFixed + s.vulnerabilities.scanFailed).toBeGreaterThan(0);
+    const out = await run();
+    expect(out, `실제 답:\n${out}`).not.toContain("안전하다는 뜻이 아닙니다");
   });
 });
 
