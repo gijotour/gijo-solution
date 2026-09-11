@@ -345,3 +345,25 @@ export function 말투위반(answer: string): { 이름: string; 왜: string; 대
   }
   return out;
 }
+
+/**
+ * 조치 SLA 준수율이 **표본 0에서 100%**로 나올 때 붙이는 단서 — 표기의 단일 출처.
+ *
+ * 왜 한 곳인가(2026-09-11 B6-② 설계관 지시서): kpi.ts computeKpiSnapshot()의
+ * slaCompliance는 조치 항목이 0건이면 `: 100`을 준다(표본이 없어 재는 게 아니라 세는 게
+ * 없어서다). handlers.ts runExecBrief(임원 세 줄)은 이 단서를 붙여 왔는데 같은 값을 찍는
+ * runKpiStatus(대화 KPI)에는 없어서, 같은 스냅샷을 두 도구가 다르게 말했다(4100 실측:
+ * 「SLA 준수율 100%(기한초과 0건 · 마감임박 0건)」 — 단서 없음).
+ *
+ * ⚠ **kpi.ts에 두지 않는다** — kpi.ts:15가 report.ts(maintenanceSummary)를 import하므로
+ *   report.ts가 kpi.ts를 다시 import하면 순환이 된다. tone.ts는 import가 0개인 잎
+ *   모듈이라 kpi.ts·report.ts·handlers.ts 셋 다 여기는 걸림 없이 쓸 수 있다(epss표기와
+ *   같은 표기 헬퍼 선례).
+ * ⚠ 문구는 handlers.ts runExecBrief의 옛 리터럴을 **글자 그대로** 옮긴 것이다 —
+ *   execbrief.test.ts:206이 이 글자를 붙들고 있다(달라지면 그 시험이 먼저 빨개진다).
+ *
+ * @returns 조치항목수가 0이면 집계 전이라는 단서 문장(맨 앞 " — " 포함), 아니면 빈 문자열.
+ */
+export function 준수율집계전단서(조치항목수: number): string {
+  return 조치항목수 === 0 ? " — 조치 항목이 0건이라 아직 집계 전입니다" : "";
+}

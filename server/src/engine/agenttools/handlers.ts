@@ -11,7 +11,7 @@ import { expandOntology } from "../ontology";
 import { currentDocIds } from "../ragscope";
 import { prioritizedReviews, updateFindingReview, findingKey, isOverdueReview, isUnassignedReview, unassignedCount, ReviewPatch, ApprovalStatus, listFindingReviews, approvalSummary } from "../approvals";
 import type { StandardFinding } from "../bridge";
-import { 표식, 심각도한글, 심각도표식, 자산종류한글, cti심각도한글, epss표기 } from "../tone";
+import { 표식, 심각도한글, 심각도표식, 자산종류한글, cti심각도한글, epss표기, 준수율집계전단서 } from "../tone";
 import { 말조사 } from "../../util/josa";
 import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
@@ -2769,7 +2769,11 @@ export async function runKpiStatus(q?: string): Promise<string> {
       (s.vulnerabilities.scanFailed
         ? ` ⚠ 점검 실패 ${s.vulnerabilities.scanFailed}건 — 스캐너가 결과를 못 받았습니다. 이만큼은 아직 안 본 것입니다`
         : ""),
-    `조치 SLA 준수율 ${s.remediation.slaCompliance}%(기한초과 ${s.remediation.overdue}건 · 마감임박 ${s.remediation.dueSoon}건)`,
+    `조치 SLA 준수율 ${s.remediation.slaCompliance}%(기한초과 ${s.remediation.overdue}건 · 마감임박 ${s.remediation.dueSoon}건)` +
+      // B6-②(2026-09-11 설계관 지시서) — 표본 0에서 100%가 나가는 것 자체는 kpi.ts 산식
+      // 그대로 두고, 「집계 전」 단서만 붙인다. 문구는 tone.ts 한 곳(준수율집계전단서) —
+      // runExecBrief와 같은 글자를 쓴다(전엔 여기에 없어 두 도구가 다르게 말했다).
+      준수율집계전단서(s.remediation.tasks),
     `점검 ${s.inspections.total}건(지연 ${s.inspections.overdue} · 승인대기 ${s.inspections.pendingApproval})`,
     `컴플라이언스 이행률 ${s.compliance.coverageRate}%(${s.compliance.covered}/${s.compliance.total})`,
   ];
@@ -2815,6 +2819,9 @@ export async function runKpiStatus(q?: string): Promise<string> {
  *   그대로 내보내면 파일럿 첫날에 「태세 85점 · 문제 0건 · 준수율 100%」가 임원에게 나간다
  *   (2026-08-01 「602건이 전부 점검 실패인데 활성 46건」 사고의 거울상 — 그때는 실패를 취약점으로,
  *   이번엔 **미측정을 0으로** 읽는다). 줄 수는 그대로 세 줄이고, 코드가 단서만 덧붙인다.
+ * ⚠ 2026-09-11(B6-②) — 줄③의 「집계 전」 단서 문구는 **tone.ts 한 곳**(준수율집계전단서)이다.
+ *   runKpiStatus(대화 KPI)도 같은 헬퍼를 쓴다 — 전엔 여기에만 인라인으로 있어 4100 실측에서
+ *   두 도구가 같은 스냅샷을 다르게 말했다(runKpiStatus는 단서 없이 「100%」만).
  */
 export async function runExecBrief(): Promise<string> {
   const s = await computeKpiSnapshot();
@@ -2840,7 +2847,7 @@ export async function runExecBrief(): Promise<string> {
           ? ` · 점검 실패 ${s.vulnerabilities.scanFailed}건은 아직 못 본 것입니다`
           : ""),
     `③ 조치 기한 초과 ${s.remediation.overdue}건 · 마감 임박 ${s.remediation.dueSoon}건 · 기한 준수율 ${s.remediation.slaCompliance}%` +
-      (s.remediation.tasks === 0 ? " — 조치 항목이 0건이라 아직 집계 전입니다" : ""),
+      준수율집계전단서(s.remediation.tasks),
   ];
   return `${예시데이터머리말()}${줄들.join("\n")}`;
 }

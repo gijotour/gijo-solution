@@ -18,7 +18,14 @@
 //   함께 고친 것 셋: (가) 이웃영토에 「조치」 — 「검증 안 된 조치 있어?」가 장비 표로 가던 것,
 //   (나) 조회말에 「몇」 — 세는 말투가 강제도구 list_assets로 새던 것,
 //   (다) 카드·글 답의 「미점검 N곳」 — 물음에 숫자로 답하지 않던 것.
-import { describe, it, expect, beforeEach, vi } from "vitest";
+//
+// ★★ B6-①(2026-09-11 설계관 지시서) — 「하드닝 점검 결과는?」류(현황말이 없는 **결과** 조회)가
+//   [17]에 안 걸려 ⑨ 모델 선택으로 떨어지면, 거기서 모델이 고를 수 있는 하드닝 도구가
+//   run_hardening_scan(실행) **하나뿐**이라 운영(자기점검 켜짐)에서 실 셸 점검이 돌던 결함.
+//   이중 방어: ① isHardeningStatusAsk에 결과꼴을 더해 [17]이 먼저 받는다(실행 지시·보고서
+//   만들기는 배제). ② agentloop.ts:3153 — [17]도 못 받는 영토어 없는 조회(「점검 결과 좀」)는
+//   ⑨에서 모델이 run_hardening_scan을 골라도 **실행하지 않는다**.
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -29,10 +36,28 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
+// ⚠ B6-① ★ 2차 방어 시험 전용 — runHardeningScanTool을 스파이로 감싼다(나머지 exports는
+//   실제 구현 그대로). 「⑨에서 골라도 점검은 안 돈다」가 **제품 경로**(runAgentLoop → tool.run)
+//   가 실제로 이 함수를 안 부르는지 재려면 정규식을 다시 확인하는 게 아니라 이 창구를 봐야 한다.
+vi.mock("../src/engine/agenttools/handlers", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/engine/agenttools/handlers")>();
+  return { ...actual, runHardeningScanTool: vi.fn(actual.runHardeningScanTool) };
+});
+
 import { isHardeningStatusAsk, hardeningStatusAnswer } from "../src/engine/datacard";
 import { createTarget, createSchedule, runDueSchedules, resetHardeningForTests } from "../src/engine/hardeningtargets";
 import type { RunFn } from "../src/engine/hardeningscan";
 import { 실제도착 } from "./helpers/routing";
+import { chat } from "../src/engine/llm";
+import { runAgentLoop } from "../src/engine/agentloop";
+import { runHardeningScanTool } from "../src/engine/agenttools/handlers";
+import { 결정적도착지 } from "../src/engine/dispatcher";
+
+/** 결정적 체인에서 이 말이 **첫 번째로** 닿는 도착지 — routeexplain.route.test.ts 「설명도착」과 같은 방식. */
+async function 첫도착(문장: string): Promise<string> {
+  const 걸림 = await 결정적도착지(문장, { 역할: "admin" });
+  return 걸림.length ? 걸림[0].도착 : "(모델 선택)";
+}
 
 /** 실 셸을 안 부르는 결정적 러너 — datacard.test.ts fakeRunner와 같은 뜻(점검 1회를 완주시킨다). */
 function 붙박이러너(): RunFn {
@@ -101,6 +126,38 @@ describe("① isHardeningStatusAsk — 미점검 조회 갈래", () => {
     }
   });
 
+  // ★★ B6-①(2026-09-11 설계관 지시서) — 「하드닝 점검 결과는?」류는 **현황말(현황·상태·
+  //   어때·보여줘·알려줘)이 하나도 없다.** 착수 전 route-explain 실측으로는 전부 ⑨(모델
+  //   재량)였고, 4100에서는 run_hardening_scan이 골라져 자기점검꺼짐 안내로 끝났다.
+  it("★★ B6-① 결과 조회 갈래 — 현황말이 없어도 받는다", () => {
+    for (const q of [
+      "하드닝 점검 결과는?",
+      "하드닝 점검 결과가 어떻게 돼?",
+      "보안설정 점검 결과 좀",
+      "하드닝 점검 결과",
+      "정기점검 결과는?",
+      "검증 결과는?",
+      "장비 점검 결과는?", // 영토어가 없다 — 80줄 (미점검조회||결과꼴) + 장비류 낱말로 받는다
+    ]) {
+      expect(isHardeningStatusAsk(q), q).toBe(true);
+    }
+  });
+
+  // ★★ B6-① 뺏김 0 — 결과꼴을 열어도 이웃 도착지(maintenance_status·redteam·generateReport 등)를
+  //   안 뺏는다. 전부 착수 전 route-explain으로 도착지를 확인해 둔 문장이다.
+  it("★★ B6-① 뺏김 0 — 결과꼴이 이웃 영토를 안 뺏는다", () => {
+    for (const q of [
+      "유지보수 점검 결과 알려줘",             // maintenance_status — 「유지보수」이웃영토
+      "레드팀 점검 결과 알려줘",               // 장비류 낱말이 없다 — redteam 영토
+      "스캔 결과는?",                          // 기존 「스캔결과」 배제(76줄)가 이미 막는다
+      "점검 결과를 개인 메일로 보내도 돼?",     // 장비류 낱말이 없다
+      "우리 회사 2019년 정보보호 감사 결과 알려줘", // 「점검」 낱말 자체가 없다
+      "sample-web01 스캔하고 결과 리포트까지 만들어줘", // 보고서만들기_RE 배제
+    ]) {
+      expect(isHardeningStatusAsk(q), q).toBe(false);
+    }
+  });
+
   // ★★ 2026-09-11 검토관 — **세는 말투**도 같은 물음이다. 조회말에 「몇」이 없던 동안
   //   「점검 안 한 장비 몇 대야?」는 강제도구 list_assets로 가서 **자산 목록**을 답했다
   //   (실측). 결함 3이 난 그 경로에 그대로 남아 있던 구멍이다.
@@ -151,6 +208,16 @@ describe("② 실제 도착 — 강제도구(FORCED_INTENTS[3])가 조회 꼴을
     ]) {
       expect(실제도착(q), q).toBe("run_hardening_scan");
     }
+  });
+
+  // ★★ B6-①(2026-09-11) — **결과꼴을 열어도** 실행 지시·보고서 만들기는 [17]에 안 뺏긴다.
+  //   ⚠ 이 셋은 `실제도착()`(forcedToolFor만 재는 진단)으로는 못 잰다 — [17]은 forcedToolFor
+  //   **앞**에 있는 특수경로라 원리상 안 보인다(helpers/routing.ts 머리글). `결정적도착지`로
+  //   전체 체인을 태워야 한다(routeexplain.route.test.ts:49 「설명도착」과 같은 방식).
+  it("★★ 결과가 붙어도 실행 지시·보고서는 [17](현황 카드)에 안 뺏긴다", async () => {
+    expect(await 첫도착("하드닝 점검 결과가 필요하니 지금 돌려줘")).toBe("run_hardening_scan");
+    expect(await 첫도착("하드닝 점검 결과 보고서 만들어줘")).toBe("generateReport");
+    expect(await 첫도착("하드닝 점검 결과 리포트로 만들어줘")).toBe("generateReport");
   });
 
   // ★ 반대쪽 못 — 「실행」이란 낱말이 있어도 **조회**면 안 돈다.
@@ -211,5 +278,66 @@ describe("④ 소스 감시 — 만들어 두고 안 부르는 것 방지", () =
   it("dispatcher.ts가 isHardeningStatusAsk(instructionText)를 실제로 부른다", () => {
     const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "dispatcher.ts"), "utf8");
     expect(src.includes("isHardeningStatusAsk(instructionText)"), "dispatcher.ts가 이 판별자를 안 부른다 — 표만 있고 실행이 없다").toBe(true);
+  });
+
+  // ★★ B6-①(2026-09-11) — 실행지시 리터럴은 agentloop.ts FORCED_INTENTS[3](run_hardening_scan,
+  //   1104줄)에서 **베낀 것**이다(import로 합칠 수 없다 — 그 배열은 test/helpers/routing.ts가
+  //   eval로 읽는다). 한쪽만 고치면 「실행」과 「조회」의 경계가 두 파일에서 어긋난다.
+  it("★★ 실행지시 리터럴이 agentloop.ts·datacard.ts 양쪽에 같은 글자로 있다", () => {
+    const 리터럴 = "(점검|진단|스캔|체크)\\s*(해|하자|하라|시켜)|돌려|수행|가동|실행(?!\\s*(이력|기록|결과|내역|현황))";
+    const agentloopSrc = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "agentloop.ts"), "utf8");
+    const datacardSrc = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "datacard.ts"), "utf8");
+    expect(agentloopSrc.includes(리터럴), "agentloop.ts에서 실행지시 리터럴을 못 찾았다").toBe(true);
+    expect(datacardSrc.includes(리터럴), "datacard.ts에서 실행지시 리터럴을 못 찾았다 — datacard.ts 실행지시_RE가 어긋났다").toBe(true);
+  });
+});
+
+// ★★ B6-① 2차 방어(2026-09-11 설계관 지시서) — [17] datacard 결과꼴은 영토어(하드닝·검증·
+//   보안설정점검…)나 장비류 낱말을 요구한다. 「점검 결과 좀」·「최근 점검 결과?」처럼 그
+//   어느 쪽도 없는 말은 [17]에 안 걸려 ⑨(모델 선택)에 남는다 — 거기서 모델이 그래도
+//   run_hardening_scan을 고를 수 있다. agentloop.ts:3153이 그 마지막 벽이다.
+describe("⑤ ⑨에서 골라도 점검은 안 돈다 — agentloop.ts:3153 2차 방어", () => {
+  // ⚠ 「대조」시험은 진짜 실행 지시라 tool.run까지 간다 — GIJO_NO_SELF_SCAN=1로 자기점검을
+  //   꺼서, runHardeningScanTool이 **불렸는지**는 재되 실 셸 명령(execFile)까지는 안 가게
+  //   막는다(hardening-selfscan-off.test.ts와 같은 안전장치 · env 없이 돌리면 시험 기계에서
+  //   진짜 점검 명령이 돈다).
+  const ENV = "GIJO_NO_SELF_SCAN";
+  const 원래값 = process.env[ENV];
+  beforeEach(() => {
+    vi.mocked(chat).mockReset();
+    vi.mocked(runHardeningScanTool).mockClear();
+    process.env[ENV] = "1";
+  });
+  afterEach(() => {
+    if (원래값 === undefined) delete process.env[ENV];
+    else process.env[ENV] = 원래값;
+  });
+
+  it("★ 「점검 결과 좀」·「최근 점검 결과?」 — 모델이 run_hardening_scan을 골라도 실행되지 않는다", async () => {
+    for (const q of ["점검 결과 좀", "최근 점검 결과?"]) {
+      vi.mocked(chat).mockReset();
+      vi.mocked(runHardeningScanTool).mockClear();
+      // 실 LLM을 안 띄운다 — 결정을 목으로 준다(다른 강제 규칙에 안 걸리는 문장인지는
+      // ②의 실제도착() 부재로 이미 확인돼 있다 — 이 말들은 ⑨까지 떨어진다).
+      vi.mocked(chat).mockResolvedValueOnce('{"action":"tool","tool":"run_hardening_scan","args":{}}');
+      const r = await runAgentLoop(q);
+      expect(runHardeningScanTool, `「${q}」에서 점검이 실제로 실행됐다`).not.toHaveBeenCalled();
+      // 첫 수에서 막히면(calls.length===0) 루프는 null을 돌려주고 RAG 폴백으로 넘어간다 —
+      // 점검 리포트 머리글이 나갈 자리 자체가 없다는 것을 답으로도 확인한다.
+      const 답 = r?.output ?? "";
+      expect(답, `「${q}」 답에 점검 리포트가 섞였다:\n${답}`).not.toContain("보안장비 하드닝 점검 리포트");
+      expect(답, `「${q}」 답에 점검 리포트가 섞였다:\n${답}`).not.toContain("점검한 곳");
+    }
+  });
+
+  it("대조 — B6-① 세 조건 중 어느 것도 아니면 ⑨에서 골랐을 때 여전히 실행된다", async () => {
+    // 「점검 대상 등록해줘」는 FORCED_INTENTS 어디에도 안 걸려(하드닝 topic 없음 · 등록류
+    // regex는 자산·장비·서버·모델만 받아 「대상」은 비켜난다) 결정 프롬프트(LLM 루프)까지
+    // 간다 — isHowtoNotCommand·isHardeningStatusAsk·결과조회꼴 셋 다 거짓인 문장으로
+    // 3153 분기 **자체**가 과하게 막지 않는지를 정확히 잰다(forcedToolFor 빠른 길이 아니다).
+    expect(실제도착("점검 대상 등록해줘"), "이 시험의 전제 — 강제 규칙에 안 걸려야 LLM 루프(3153)를 실제로 지난다").toBeNull();
+    vi.mocked(chat).mockResolvedValueOnce('{"action":"tool","tool":"run_hardening_scan","args":{"standard":"kisa"}}');
+    await runAgentLoop("점검 대상 등록해줘");
+    expect(runHardeningScanTool, "2차 방어가 아무 관계 없는 지시까지 실행을 막았다").toHaveBeenCalledTimes(1);
   });
 });

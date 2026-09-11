@@ -2468,6 +2468,24 @@ export function isHowtoNotCommand(instruction: string): boolean {
   return howto && !imperative;
 }
 
+/** B6-① 2차 방어(2026-09-11 설계관 지시서) — run_hardening_scan을 모델이 스스로 골랐을 때,
+ *  「점검 결과 좀」·「최근 점검 결과?」·「스캔 결과는?」처럼 **영토어가 없어 datacard.ts
+ *  isHardeningStatusAsk([17])가 못 받는** 결과 조회까지 여기서 막는다.
+ *  ⚠ 이 자리는 이미 `tool.name === "run_hardening_scan"` 분기 **안**이다 — 모델이 이미 그
+ *    도구를 골랐으므로 주제(하드닝·CCE 등) 게이트가 필요 없다. 실행 지시인지만 가르면 된다.
+ *  ⚠ 넓게 잡아도 안전하다 — 여기 걸리면 점검을 안 돌리고 지식(RAG·채팅)으로 넘길 뿐,
+ *    [17] 카드처럼 다른 도구의 영토를 뺏지 않는다(운영에서 셸 명령이 실제로 도는 쪽이
+ *    훨씬 나쁜 오답이다 — hardeningscan.ts hostRunner, 결재판 없이 즉시 실행).
+ *  ⚠ 실행지시_RE는 datacard.ts 실행지시_RE·agentloop.ts FORCED_INTENTS[3](run_hardening_scan,
+ *    1104줄)의 뒤 보기와 **같은 리터럴**이다 — 짝 감시: server/test/hardening-unchecked-
+ *    routing.test.ts 「④ 소스 감시」가 이 문자열이 datacard.ts에도 있는지 잰다. */
+function 결과조회꼴(instruction: string): boolean {
+  const t = String(instruction || "").replace(/\s+/g, "");
+  const 실행지시 = /(점검|진단|스캔|체크)\s*(해|하자|하라|시켜)|돌려|수행|가동|실행(?!\s*(이력|기록|결과|내역|현황))/.test(t);
+  const 보고서만들기 = /(보고서|리포트).{0,4}(만들|작성|생성|뽑아|써)/.test(t);
+  return /결과/.test(t) && !실행지시 && !보고서만들기;
+}
+
 /** 사내 규정·지침을 조회하는 말인가 — 법령(외부)·판정 이력·행동 대조와 갈라야 한다.
  *  ⚠ 제외어에 「기록」을 넣지 않는다 — 「접속**기록** 보관 규정」이 걸려 정작 시연 문장이
  *  새 나간다(첫 구현에서 실제로 그랬다). 이웃 보호는 이력·대조 + 규정낱말 요구로 충분하다. */
@@ -3155,6 +3173,15 @@ async function runAgentLoopCore(instruction: string, context = "", scope?: ToolS
       // 첫 수라면 루프를 접고 지식(RAG·채팅)으로 넘긴다 — 그쪽이 방법 설명을 잘한다.
       if (calls.length === 0) return null;
       result = "이 지시는 점검 '방법'을 묻는 질문이라 점검을 실행하지 않았다. 아는 지식으로 절차를 설명하라.";
+    } else if (
+      tool.name === "run_hardening_scan" &&
+      ((await import("./datacard.js")).isHardeningStatusAsk(instruction) || 결과조회꼴(instruction))
+    ) {
+      // B6-① 2차 방어(2026-09-11 설계관 지시서) — [17] datacard 결과꼴이 못 받는 영토어
+      // 없는 조회(「점검 결과 좀」 등)까지 여기서 막는다. 운영 4000은 자기점검이 켜져 있어
+      // (4100과 달리) 조회 한 번이 hostRunner로 실 셸 명령을 돌린다 — 이 분기가 그 벽이다.
+      if (calls.length === 0) return null;
+      result = "이 지시는 점검 결과를 묻는 조회라 점검을 실행하지 않았다. 등록 대상·최근 준수율을 아는 만큼 답하라.";
     } else if (
       tool.name === "verify_finding" &&
       지목없는검증대상(instruction, args.assetId, {
