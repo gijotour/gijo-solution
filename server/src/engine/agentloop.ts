@@ -709,12 +709,25 @@ export function 법령한계를밝힌다(answer: string, calls: AgentToolCall[])
 }
 
 // 최종 답 길이 상한 — 도구 결과를 프롬프트에 다시 실을 때 과도하게 커지지 않게 자른다(멈춤 방지).
-// ★ 2026-09-11 1800→3500 — handlers.ts:596(explain의 도구 출력 상한, 3500)과 **짝**이다.
-//   한쪽만 고치면 도구가 힘들게 만든 근거를 여기서 조용히 잘라낸다. 일반 질문은 온톨로지가
-//   발췌보다 앞에 실리므로(handlers.ts:504) 옛 1800컷은 **발췌 한가운데**에 떨어졌다
-//   ("EPSS랑 VPR 뭐가 달라?" 2026-09-11 라이브 재현 — 뿌리 ⓓ). maxTokens(응답 길이 상한)는
-//   그대로 둔다 — 이건 "프롬프트에 뭘 보여줄까"고 그건 "얼마나 답할까"라 서로 다른 자리다.
+// ★ 2026-09-11 1800→3500 — handlers.ts의 EXPLAIN_MAX_CHARS(explain 도구 출력 총 상한, 3500)와
+//   **같은 값**이다. 한쪽만 고치면 도구가 힘들게 만든 근거를 여기서 조용히 잘라낸다. 일반 질문은
+//   온톨로지가 발췌보다 앞에 실리므로(runExplain의 「일반 질문: 온톨로지 먼저」 줄) 옛 1800컷은
+//   **발췌 한가운데**에 떨어질 수 있었다. maxTokens(응답 길이 상한)는 그대로 둔다 — 이건
+//   "프롬프트에 뭘 보여줄까"고 그건 "얼마나 답할까"라 서로 다른 자리다.
+//   ⚠ 2026-09-11 검토관 정정 ① — 「explain 상한과 짝」은 explain **한 도구**에만 맞는 말이다.
+//     이 상수는 **모든 도구·최대 MAX_STEPS회**에 걸리므로 1800→3500은 최종 답 프롬프트의 최악치를
+//     9,000자 → 17,500자로 거의 두 배로 키운다(라이트 문맥 8192 칸에 걸린다). 그래서 아래 합계
+//     예산을 함께 둔다 — **한 도구가 많이 싣는 것**은 허용하되 **총량은 옛 최악치 그대로**다.
+//     이 줄만 고치고 합계를 안 두면 「멈춤 방지」라는 존재 이유가 빈다.
+//   ⚠ 2026-09-11 검토관 정정 ② — 이 값이 「EPSS랑 VPR 뭐가 달라?」의 **확정된 뿌리**라는 단정은
+//     근거가 없다. 그 문장이 explain을 탔는지 자체가 미확정이다(memory.제목지목질문은 그 말을
+//     안 잡는다 — 내용동사RE에 「뭐가」가, 제목물음RE에 「달라」가 없다). 라이브에서 그 문장의
+//     tools 배열을 한 번 찍어 확정하거나 정정할 것.
 const MAX_FACT_CHARS = 3500;
+// ★ 2026-09-11 검토관 [중] 수리 — **합계 예산.** 도구별 상한만으로는 총량이 안 잡힌다
+//   (도구 반환에는 상한 없는 것도 있고, 있어도 최대 MAX_STEPS벌이 이어 붙는다).
+//   9,000 = 옛 최악치(1800 × MAX_STEPS 5) — 새 천장을 만들지 않으려고 그 수를 그대로 쓴다.
+const MAX_FACTS_TOTAL = 9000;
 
 // LLM이 최종답에서 "없다"고 부정하는 문구. 도구가 실제 데이터를 돌려줬는데 이런 답이 나오면
 // 사용자에게는 "제품이 자기 데이터를 못 찾는다"로 보인다 — 실사용 신뢰를 직접 깨는 회귀다.
@@ -909,8 +922,13 @@ function extractQuotedEvidence(facts: string): string | null {
 
 async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], context = ""): Promise<string> {
   const usefulCalls = calls.filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result));
-  const facts = (usefulCalls.length ? usefulCalls : calls)
-    .map((c, i) => `[${i + 1}] ${c.tool}: ${c.result.slice(0, MAX_FACT_CHARS)}`)
+  // ★ 2026-09-11 — 도구별 상한(MAX_FACT_CHARS)과 **합계 예산**(MAX_FACTS_TOTAL)을 함께 건다.
+  //   몫은 도구 수로 고르게 나눈다: 1개면 3500(explain이 통째로 실린다), 5개면 1800이라
+  //   **옛 동작과 같은 수**가 된다. 앞 도구가 다 먹고 뒤가 0이 되는 굶김을 안 만들려는 것이다.
+  const 실은것 = usefulCalls.length ? usefulCalls : calls;
+  const 몫 = Math.min(MAX_FACT_CHARS, Math.floor(MAX_FACTS_TOTAL / Math.max(1, 실은것.length)));
+  const facts = 실은것
+    .map((c, i) => `[${i + 1}] ${c.tool}: ${c.result.slice(0, 몫)}`)
     .join("\n");
   // ⚠ 작성자 orchestrator 고정 유지 — 「도구 영역 전문가가 최종 답을 쓰게」는 만들었다가
   //   게시 전 검토에서 되돌렸다(2026-08-20 검토관 상4). 이 경로는 remember를 안 켜 RAG가

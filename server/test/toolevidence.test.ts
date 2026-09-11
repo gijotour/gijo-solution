@@ -91,7 +91,7 @@ describe("★★ explain이 자기 근거를 싣는다 (근거 배지의 생산�
     expect(그릇.값).toBeUndefined();
   });
 
-  // ★★ 2026-09-11 설계관 지시서 §6 R2 — handlers.ts:533의 발췌 슬라이스가 3이면 라벨(4건)·
+  // ★★ 2026-09-11 설계관 지시서 §6 R2 — runExplain의 발췌 슬라이스(발췌최대)가 3이면 라벨(4건)·
   //   sources(최대 4)보다 적게 실려 **배지엔 있는데 모델은 못 본 문서**가 생긴다
   //   (「EPSS랑 VPR 뭐가 달라?」 2026-09-11 라이브 재현 — 뿌리 ⓐ). 5편을 넣어 queryMemoryGraded의
   //   topK=4 상한에 실제로 걸리게 하고, sources에 실린 문서는 전부 발췌 본문에도 있어야 한다.
@@ -115,7 +115,14 @@ describe("★★ explain이 자기 근거를 싣는다 (근거 배지의 생산�
       근거를수거하며(그릇, () => runExplain({ topic: "병렬수리 근거 표지" })),
     );
     const sources = 그릇.값?.sources ?? [];
-    expect(sources.length, "5편 중 topK=4 상한에 걸려야 이 시험이 뜻을 갖는다").toBeGreaterThan(0);
+    // ★ 2026-09-11 검토관 [하] 수리 — 옛 단언은 `toBeGreaterThan(0)`이라 sources가 3 이하로
+    //   떨어지면 옛 slice(0,3)으로 되돌려도 초록이었다(수리를 못 지키는 감시). 상한에 실제로
+    //   걸렸음을 못 박고, 발췌 줄 수가 그 개수와 **같은지**도 함께 센다 — 이 시험의 불변식은
+    //   「배지에 실은 문서 수 = 발췌에 실린 줄 수」이지 「0보다 크다」가 아니다.
+    expect(sources.length, "5편 중 topK=4 상한에 걸려야 이 시험이 뜻을 갖는다").toBe(4);
+    const 발췌줄수 = out.split("\n").filter((l) => l.startsWith("  · ")).length;
+    expect(발췌줄수, "배지 개수와 발췌 줄 수가 다르면 모델이 못 본 문서를 근거라 부른 것이다")
+      .toBe(sources.length);
     for (const id of sources) {
       const 표지 = id.replace("GIJO_지식_병렬수리_", "").replace(".md", "");
       expect(out, `배지에 실은 ${id}의 본문이 발췌 줄에 없다 — 모델이 못 본 문서를 근거라 불렀다`)

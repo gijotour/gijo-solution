@@ -445,8 +445,8 @@ export async function runGetAsset(args: Record<string, string>): Promise<string>
       if (chunks.length) {
         return [
           "※ 자산 등록부에는 이 대상의 취약점이 아직 등록돼 있지 않습니다 — 아래 **사내 문서 근거**가 답입니다.",
-          `사내 문서 근거(발췌) ${chunks.length}건:`,
-          ...chunks.slice(0, 4).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`),
+          발췌라벨(chunks.length),
+          ...chunks.slice(0, 발췌최대).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`),
           "",
           "(참고) 자산 등록부 정보:",
           ...줄,
@@ -481,6 +481,17 @@ export function ontologyLinesFor(text: string, limit: number): string[] {
 // agentloop 지식없음을밝힌다가 (지정이면) 지정범위배너를 코드로 보장한다. 모델이 도구 문장을
 // 바꿔 말해도 배너는 남는다(이 기계의 존재 이유). explain-banner.test 소스 감시가 짝을 지킨다.
 export const 지식근거없음표지 = /(등록부에서 찾은 근거가 없습니다|매뉴얼 근거가 검색되지 않았습니다|지정하신 문서 범위.*찾은 근거가 없습니다)/;
+
+// ★★ 2026-09-11 검토관 [하] 수리 — **싣는 개수와 라벨 숫자를 한 값으로 묶는다.**
+//   발췌 블록은 세 군데(runExplain·get_asset·search)에 있는데 각자 topK와 slice가 달라
+//   라벨 「N건」이 실제 실린 줄 수보다 클 수 있었다(get_asset·search는 queryMemory topK 5 · slice 4).
+//   배지를 만드는 곳은 runExplain 하나라 거짓 배지는 아니지만, 모델은 라벨을 읽고 **없는 다섯째**를
+//   가리킬 수 있다 — 숫자를 지어내는 표면이다. 새 발췌 블록을 만들면 이 둘을 함께 쓸 것.
+export const 발췌최대 = 4;
+export const 발췌라벨 = (n: number) => `사내 문서 근거(발췌) ${Math.min(n, 발췌최대)}건:`;
+// explain 도구 출력의 총 상한. agentloop.MAX_FACT_CHARS와 **같은 값**이어야 한다 —
+// 작으면 근거를 덜 싣고, 크면 최종 답 프롬프트가 여기서 지킨 꼬리를 다시 자른다.
+const EXPLAIN_MAX_CHARS = 3500;
 
 export async function runExplain(args: Record<string, string>): Promise<string> {
   const topic = args.topic.trim();
@@ -529,11 +540,16 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
     const chunks = 살균.chunks;
     if (chunks.length) {
       out.push(
-        `사내 문서 근거(발췌) ${chunks.length}건:`,
-        // ★ 2026-09-11 3→4 — 형제 경로(위 :449 get_asset)와 맞춘다. 옛 3은 라벨의
+        발췌라벨(chunks.length),
+        // ★ 2026-09-11 3→4(발췌최대) — 형제 경로(get_asset·search)와 맞춘다. 옛 3은 라벨의
         //   "${chunks.length}건"(최대 4)과 어긋나 **배지(sources)엔 있는데 모델은 못 본 문서**가
-        //   생겼다("EPSS랑 VPR 뭐가 달라?" 2026-09-11 라이브 재현) — 이제 싣는 개수와 라벨 숫자가 같다.
-        ...chunks.slice(0, 4).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
+        //   생길 수 있었다 — 이제 싣는 개수와 라벨 숫자가 같다(발췌라벨).
+        //   ⚠ 2026-09-11 검토관 [중] 정정 — 이 자리가 「EPSS랑 VPR 뭐가 달라?」의 **확정된 뿌리라는
+        //     단정은 근거가 없다.** 그날 실측의 sources는 3건이고 epss_vs_vpr.md가 **첫째**였으니
+        //     옛 slice(0,3)에도 그 문서 조각은 실렸다. 조각별 documentId 분포를 안 찍어 둔 탓에
+        //     확정이 안 된다 — 라이브에서 explain 원문(발췌 줄 수·조각별 문서)을 한 번 찍어
+        //     확정하거나 정정할 것. 여기 3→4는 「라벨=실린 개수」라는 그 자체로 옳은 정합이다.
+        ...chunks.slice(0, 발췌최대).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
       );
       // ★★ 근거 배지의 **생산자**(2026-09-08 · toolevidence.ts). 도구가 답한 자리에는 그동안
       //   생산자가 없어 sources=null·근거세기=「-」였다 — 문서를 읽고 답해 놓고 무엇을 근거로
@@ -558,6 +574,21 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   }
 
   if (문서우선 && !지정범위.length) out.push(...온톨로지); // 문서 지목: 온톨로지를 발췌 **뒤로**(발췌가 권위)
+  // ⚠ 백로그 B2(2026-09-11 검토관 [하] — 이번 라운드 제외, 근거를 여기 남긴다):
+  //   발췌가 0건인데 온톨로지만 실리면 sources가 안 서고(도구근거보고는 발췌가 있을 때만 부른다),
+  //   out이 비지 않으니 지식근거없음표지도 안 선다 → agentloop의 「일반 지식 기준」 배너도 안 붙는다.
+  //   즉 **근거 없이 답했는데 아무 표시도 없는 자리**다. 제목지목이 늘면 그 표면도 함께 넓어진다
+  //   (2026-09-11 실측: 새로 explain이 못 박히는 문장 3개). 고치려면 「온톨로지 전용 답」을
+  //   표지로 구분해야 하는데, 그건 배너 문구·explain-banner 계약을 함께 건드리는 일이라 분리한다.
+
+  // ★★ 2026-09-11 검토관 [중] 수리 — 아래 두 블록은 **꼬리**로 따로 모아 자리를 먼저 준다.
+  //   왜: 같은 날 커밋(2b01e479)이 발췌를 3→4로 늘려 발췌 블록만 최대 2,456자(4×604+라벨)가 됐는데
+  //   총 상한은 3500 그대로였다. 발췌·온톨로지가 앞이고 이 둘이 뒤라, 실크기 문서(조각 800자)에서는
+  //   「관련 사내 문서」 — 담당자가 원문을 찾아가는 **유일한 줄** — 가 먼저 잘려 나간다.
+  //   전례: incidentcases.test.ts의 「예전엔 끝의 3500자 컷이 안내 줄을 통째로 먹었다」와 같은 부류다.
+  //   ⚠ 상한을 올려서 풀지 않는다 — agentloop.MAX_FACT_CHARS와 짝이 어긋나면 최종 답 프롬프트가
+  //     여기서 지킨 꼬리를 다시 자른다. 총량은 그대로 두고 **자리 배분**만 바꾼다.
+  const 꼬리: string[] = [];
 
   // 어느 문서에서 왔는지도 함께(담당자가 원문을 찾아갈 수 있게).
   try {
@@ -569,7 +600,7 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
     const docs = (await listVisibleDocuments()).filter((d) => 지목.has(d.documentId) || matches(d.documentId, topic))
       .filter((d) => !지정범위.length || 지정범위.includes(d.documentId)); // ☑ 지정 밖 문서명을 「관련 문서」로 싣지 않는다
     if (docs.length) {
-      out.push(
+      꼬리.push(
         `관련 사내 문서 ${docs.length}건:`,
         ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""} (조각 ${d.chunks})${문서꼬리(d)}`)
       );
@@ -581,13 +612,13 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   // 보유 보안제품 중 관련된 것(대응 수단 제시).
   const products = 지정범위.length ? [] : listProducts().filter((p) => matches(`${p.name} ${p.category} ${p.vendor ?? ""}`, topic));
   if (products.length) {
-    out.push(
+    꼬리.push(
       `보유 보안제품 ${products.length}건:`,
       ...products.slice(0, 5).map((p) => `  - ${p.name} (${p.category}${p.vendor ? `, ${p.vendor}` : ""})`)
     );
   }
 
-  if (out.length === 0) {
+  if (out.length === 0 && 꼬리.length === 0) {
     // ☑ 지정 범위가 걸린 0건은 「전체에 없다」가 아니다(검토관 [높음]) — 「업로드하라」는 권고도
     // 틀린 말이 된다(체크 안 한 문서에 답이 있을 수 있다). 표지 문장이 달라져 agentloop의
     // 자료없음배너도 안 붙는다 — 이 문장 자체가 정직한 최종 답이다.
@@ -596,7 +627,14 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
     }
     return `"${topic}"에 대해 사내 온톨로지·문서·보안제품 등록부에서 찾은 근거가 없습니다. 일반 지식으로만 답하거나, 관련 문서를 업로드하면 근거가 쌓입니다.`;
   }
-  return out.join("\n").slice(0, 3500); // 본문 발췌가 들어가 상한을 늘렸다(2500이면 근거가 잘렸다)
+  // 총량은 EXPLAIN_MAX_CHARS 그대로(본문 발췌가 들어가 2500에서 올린 값). 꼬리에 **먼저** 자리를
+  // 주고 남은 만큼만 앞(발췌·온톨로지)을 싣는다 — 잘려도 되는 쪽은 발췌의 끝자락이지, 담당자가
+  // 원문으로 찾아가는 문서 이름이 아니다.
+  const 꼬리글 = 꼬리.join("\n").slice(0, EXPLAIN_MAX_CHARS);
+  const 앞여유 = EXPLAIN_MAX_CHARS - (꼬리글 ? 꼬리글.length + 1 : 0);
+  const 앞글 = out.join("\n").slice(0, Math.max(0, 앞여유));
+  if (!꼬리글) return 앞글;
+  return 앞글 ? `${앞글}\n${꼬리글}` : 꼬리글;
 }
 
 /**
@@ -901,8 +939,8 @@ export async function searchOne(q: string): Promise<string[]> {
         const chunks = sanitizeRagChunks(rawChunks.map(String), { source: "tool:search", question: q }).chunks;
         if (chunks.length) {
           out.push(
-            `사내 문서 근거(발췌) ${chunks.length}건:`,
-            ...chunks.slice(0, 4).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
+            발췌라벨(chunks.length),
+            ...chunks.slice(0, 발췌최대).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
           );
         }
       } catch {
