@@ -104,19 +104,32 @@ describe("하네스 — knowledge 조건은 근거를 **안 싣고** 정답 조�
 //   이 시험 파일이 이제 그 사슬의 소스를 직접 읽는다.
 describe("사슬이 ⑭를 실제로 재고 넘긴다(day2-train.sh 소스 감시)", () => {
   const 셸 = readFileSync(join(__dirname, "..", "..", "tools", "ladder", "day2-train.sh"), "utf8");
+  const 게이트 = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "gates.mjs"), "utf8");
 
   it("① knowledge 표본을 실제로 던진다 — --mode knowledge 호출이 없으면 ⑭는 영영 미측정이다", () => {
-    expect(셸).toContain("--mode knowledge");
+    // ⚠ **부르는 줄 통째로** 본다. 낱말만 세면 주석 한 줄로도 초록이 된다(2026-09-11 검토관 적발 —
+    //   바로 아래 ②③이 그 꼴이었다: 배선을 지워도 주석이 남아 시험이 통과했다).
+    expect(셸, "ask-samples.mjs 를 --mode knowledge 로 부르는 줄이 없다")
+      .toMatch(/node "\$BENCH_SRC\/ask-samples\.mjs" "\$dir\/samples-knowledge\.json" --mode knowledge/);
   });
 
   it("② 이번 판의 knowledge 결과를 --local-knowledge 로 게이트에 넘긴다", () => {
     // ⚠ --samples-knowledge 로 넘기면 gates.mjs가 조용히 무시한다(그 인자를 모른다) — 관문이
     //   초록인데 아무것도 안 잰 상태가 된다. 반드시 --local-knowledge 라는 이름이어야 한다.
-    expect(셸).toContain("--local-knowledge");
+    expect(셸, "GATE_ARGS 배선 줄이 통째로 있어야 한다 — 낱말만 보면 주석으로 통과한다")
+      .toContain('GATE_ARGS+=(--local-knowledge "$probedir/samples-knowledge.json")');
   });
 
   it("③ 베이스의 knowledge 결과를 --baseline-local-knowledge 로 넘긴다 — 없으면 무엇과 견줄지 모른다", () => {
-    expect(셸).toContain("--baseline-local-knowledge");
+    expect(셸).toContain('GATE_ARGS+=(--baseline-local-knowledge "$BASELINE_DIR/samples-knowledge.json")');
+  });
+
+  it("★★③-2 게이트가 그 인자 이름을 **실제로 받는다** — 셸만 넘기고 게이트가 모르면 조용히 무시된다", () => {
+    // ⚠ 이 시험이 없으면 gates.mjs 쪽 이름만 바꿔도(예: --samples-knowledge 로 통일) 시험은 전부
+    //   초록인데 밤마다 ⑭은 「미측정」이 된다. 선례는 ladder.test.ts 의 persona 인자 감시다 —
+    //   거기도 셸·게이트 **양쪽**을 본다.
+    expect(게이트, "gates.mjs가 --local-knowledge 를 안 읽는다").toContain('opt("--local-knowledge"');
+    expect(게이트, "gates.mjs가 --baseline-local-knowledge 를 안 읽는다").toContain('opt("--baseline-local-knowledge"');
   });
 
   it("④ 「무슨 인자로 쟀는지」 기록(harness-args.json)의 표본 목록에도 knowledge가 있다", () => {
@@ -140,45 +153,88 @@ describe("사슬이 ⑭를 실제로 재고 넘긴다(day2-train.sh 소스 감�
 //   두 번 파지 않으려고 judge와 bake 둘 다 여기서 덮는다.
 describe("night-r5-judge.sh 소스 감시 — 판정은 굽지 않는다(fail-closed)", () => {
   const 밤 = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "night-r5-judge.sh"), "utf8");
+  // ★ **주석을 뺀 실행 줄**에서 본다(선례: datasetgrade.test.ts의 같은 감시).
+  //   왜: 이 파일의 머리주석에는 「pkill -f llama-server 는 교사까지 죽인다」가 **경고**로 적혀 있다.
+  //   주석까지 세면 그 경고문 때문에 시험이 빨강이 되어, 사람이 경고를 지우거나 문구를 약하게
+  //   고치게 된다 — 감시가 문서를 갉아먹는 꼴이다. 실제로 2026-09-11 구현자가 그 함정에 걸려
+  //   judge 주석에서 `pkill` 두 글자를 빼 통과시켰다(검토관 적발). 잣대를 바꿔 경고를 되살린다.
+  const 줄바꿈 = String.fromCharCode(10);
+  const 실행줄 = 밤.split(줄바꿈).filter((l) => !l.trim().startsWith("#")).join(줄바꿈);
 
   it("★ 교사(8080) 감시견이 있다 — 교사가 말을 멈추면 판정을 내린다", () => {
-    expect(밤).toContain("8080/health");
+    // ⚠ 「8080/health 라는 낱말이 있나」로는 못 본다 — 상태보고 함수 teacher()와 시작 상태 ①에도
+    //   같은 URL이 있어, 감시견을 통째로 지워도 초록이 된다(2026-09-11 검토관 적발 · 실측 확인).
+    //   그래서 **감시견 안에만 있는 것**을 본다: 켜짐 판단 · 연속 실패 셈 · 내리는 자.
+    expect(실행줄, "주석이 아니라 실제로 재는 줄이 있어야 한다").toContain("8080/health");
+    expect(실행줄, "교사 감시견의 켜짐 판단이 없다 — 시작 때 잰 값을 안 쓰는 것이다")
+      .toMatch(/\[ "\$TEACHER_WATCH" -eq 1 \] \|\| continue/);
+    expect(실행줄, "한 번 놓쳤다고 내리면 8080 재기동 몇 초에 판정 밤을 통째로 잃는다")
+      .toMatch(/\[ "\$fails" -lt 3 \] && continue/);
+    expect(실행줄, "감시견은 내리는 자를 불러야 한다 — 재고 아무것도 안 하면 감시견이 아니다")
+      .toMatch(/stop_child "\$pid"/);
   });
 
   it("★ 08:30 데드라인 감시견이 있다 — 낮 서빙을 지키는 마지막 방어선", () => {
-    expect(밤).toMatch(/DEADLINE/);
+    expect(실행줄).toMatch(/DEADLINE=\$\{DEADLINE:-/);
+    expect(실행줄, "데드라인을 견주는 줄이 없다").toMatch(/\[\[ "\$NOW" > "\$DEADLINE" \]\]/);
   });
 
   it("★★ 교사를 이름으로 죽이지 않는다 — pkill -f llama-server 는 교사(8080)까지 죽인다", () => {
-    expect(밤, "이 패턴이 있으면 교사·임베딩까지 함께 죽는다").not.toMatch(/pkill -f ['"]?llama-server/);
+    expect(실행줄, "이 패턴이 있으면 교사·임베딩까지 함께 죽는다").not.toMatch(/pkill\s+(-\w+\s+)*['"]?llama-server/);
+  });
+
+  it("★★ 신호는 셸과 **그 직계 자식**에 함께 준다 — 셸에만 쏘면 전경 명령이 끝날 때까지 안 듣는다", () => {
+    // bash는 전경 자식을 기다리는 동안 trap을 미룬다. 표본 한 벌(40문항)은 수 분~수십 분이라
+    // 그만큼 8093 두뇌가 더 산다 — 감시견이 막으려던 상황(낮 서빙 침범)이 연장된다.
+    // ⚠ -P(부모)로만 고른다: 교사(8080)·임베딩(8081)은 이 PID의 자식이 아니라 원리상 안 걸린다.
+    expect(실행줄).toMatch(/kill -TERM "\$pid"/);
+    expect(실행줄, "직계 자식에 TERM을 주는 줄이 없다").toMatch(/pkill -TERM -P "\$pid"/);
+  });
+
+  it("★ judge 자신이 TERM을 받으면 자식까지 내린다 — trap이 없으면 8093과 감시견이 따로 산다", () => {
+    expect(실행줄, "되돌리기 ①이 말하는 그 trap이 없다").toMatch(/trap 'judge_abort' INT TERM/);
   });
 
   it("★ 재학습 금지를 명시한다 — --skip-train 이 있다", () => {
-    // 어댑터 없이 --round r5a 를 부르면 day2-train.sh:372의 DONE_MARK 검사가 거짓이 되어
-    // 4bit 기본값으로 밤을 통째로 다시 굽는다(:427 학습 호출에 --precision이 없다).
-    expect(밤).toContain("--skip-train");
+    // 어댑터 없이 --round r5a 를 부르면 day2-train.sh의 `-s "$DONE_MARK"` 검사가 거짓이 되어
+    // 4bit 기본값으로 밤을 통째로 다시 굽는다(학습 호출에 --precision이 없다).
+    // ⚠ 줄 번호로 가리키지 않는다 — 그 파일은 자주 늘어나 번호가 밀린다(2026-09-11 실측).
+    expect(실행줄, "머리주석이 아니라 **부르는 줄**에 있어야 한다").toMatch(/--skip-build --skip-train/);
   });
 
   it("★ 어댑터 존재를 **먼저** 본다(fail-closed) — 없으면 판정 없이 끝낸다", () => {
-    expect(밤).toContain("adapter_model.safetensors");
-    expect(밤).toMatch(/checkpoint-26/);
-    expect(밤).toMatch(/checkpoint-52/);
+    expect(실행줄).toContain('DONE_MARK="$LORA_DIR/adapter_model.safetensors"');
+    expect(실행줄).toMatch(/\[ ! -s "\$DONE_MARK" \]/);
+  });
+
+  it("★★ 체크포인트는 **개수**로 본다 — 번호를 박으면 한 스텝만 달라져도 밤이 통째로 날아간다", () => {
+    // checkpoint-<N>의 N은 총 스텝이고, 총 스텝 = ceil(살아남은 행 수 / 16) × 에폭이다.
+    // 길이 초과 행은 finetune_qlora14b.py에서 **조용히** 빠지므로(10% 미만이면 경고도 없다),
+    // 412행이 400행이 되기만 해도 26/52가 25/50이 된다 — 그때 굽기는 완주했는데 판정만 멈추고
+    // 로그에는 「반쯤 구워졌다」는 **틀린 원인**이 남는다.
+    expect(실행줄, "체크포인트 번호를 손으로 박았다").not.toMatch(/checkpoint-(26|52)\b/);
+    expect(실행줄, "개수로 세는 줄이 없다").toMatch(/ls -1d "\$LORA_DIR"\/checkpoint-\*/);
+    expect(실행줄).toMatch(/\[ "\$CKPT_FOUND" -lt "\$EPOCHS_EXPECTED" \]/);
   });
 });
 
 describe("night-r5-bake.sh 소스 감시 — 2026-09-11까지 시험 0건이던 구멍을 메운다", () => {
   const 밤 = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "night-r5-bake.sh"), "utf8");
+  // ★ judge 쪽과 **같은 잣대**다 — 주석을 뺀 실행 줄에서 본다(경고문 때문에 빨강이 나면 사람이
+  //   경고를 지우게 된다). 이 파일 머리글에도 「pkill llama-server 는 교사까지 죽인다」가 적힐 자리다.
+  const 줄바꿈 = String.fromCharCode(10);
+  const 실행줄 = 밤.split(줄바꿈).filter((l) => !l.trim().startsWith("#")).join(줄바꿈);
 
   it("★ 교사(8080) 감시견이 있다", () => {
-    expect(밤).toContain("8080/health");
+    expect(실행줄).toContain("8080/health");
   });
 
   it("★ 08:30 데드라인 감시견이 있다", () => {
-    expect(밤).toContain("DEADLINE");
+    expect(실행줄).toContain("DEADLINE");
   });
 
   it("★★ 교사를 이름으로 죽이지 않는다", () => {
-    expect(밤).not.toMatch(/pkill -f ['"]?llama-server/);
+    expect(실행줄).not.toMatch(/pkill\s+(-\w+\s+)*['"]?llama-server/);
   });
 
   it("굽기 직전에 등급 관문을 다시 잰다 — 빨강이면 굽지 않는다", () => {

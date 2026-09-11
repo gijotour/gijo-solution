@@ -17,8 +17,9 @@
 #        → results-ladder/day2/<회전>/probe-v2/{samples-*,kev,gate.md} — 옛 결과를 덮지 않는다.
 #   베이스 대조(어댑터 없이 한 번만):
 #   bash tools/ladder/day2-train.sh --baseline-probe [--port 8093]
-#        → results-ladder/baseline/{samples-grounded,samples-distractor-only,samples-bare,samples-persona,kev}.json
-#          관문 ①(KEV 하락 0)·⑤(잘림 증가 0)·⑧(근거 인용)은 **이 파일들이 있어야** 잰다(없으면 미측정=불합격).
+#        → results-ladder/baseline/{samples-grounded,samples-distractor-only,samples-bare,samples-persona,samples-knowledge,kev}.json
+#          관문 ①(KEV 하락 0)·⑤(잘림 증가 0)·⑧(근거 인용)·⑭(로컬 14B 단독 지식)은 **이 파일들이
+#          있어야** 잰다(없으면 미측정=불합격). 베이스 폴더는 LADDER_BASELINE_DIR 로 바꿀 수 있다.
 #
 # ■ 에폭마다 재기 (회전 설정에 `saveEpochs: true` 가 있을 때)
 #   학습이 어댑터 폴더에 checkpoint-* 를 남기면, 이 사슬은 그 **하나하나를 판으로** 잰다:
@@ -221,9 +222,12 @@ run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
 }
 
 # ── 베이스 대조 한 번짜리 ────────────────────────────────────────────
-# 어댑터 **없이** 베이스 모델을 띄워 같은 4조건 + KEV를 돌린다. 관문 ①·⑧이 견줄 상대를 만드는 단계다.
+# 어댑터 **없이** 베이스 모델을 띄워 같은 5조건 + KEV를 돌린다. 관문 ①·⑧·⑭이 견줄 상대를 만드는 단계다.
+# ⚠ 조건 수는 run_probes 하나가 정한다(grounded·distractor-only·bare·persona + knowledge) —
+#   여기 숫자는 **로그 문구**다. 조건을 늘리면 이 문구도 함께 고친다(2026-09-11: knowledge를 넣고
+#   문구만 4조건으로 남아 「로그가 틀렸나 게이트가 지어냈나」를 아침 판독자에게 물리게 했다).
 if [ "$BASELINE_PROBE" -eq 1 ]; then
-  ladder_log "베이스 대조 — 어댑터 없이 4조건 + KEV (→ $BASELINE_DIR)"
+  ladder_log "베이스 대조 — 어댑터 없이 5조건 + KEV (→ $BASELINE_DIR)"
   # ★ env는 **두뇌를 띄우기 전에** 본다(2026-09-04 검토관 적발). ladder_need_env는 return이 아니라
   #   `exit 3` 으로 셸을 끝내므로, 서버를 먼저 띄우면 그 exit에서 8093에 두뇌가 그대로 남았다 —
   #   이 파일이 스스로 「8093에 두뇌를 남기지 않는다」고 적어 둔 바로 그 사고다. EXIT trap과 이중으로 막는다.
@@ -537,12 +541,12 @@ run_variant() {
     fi
   fi
 
-  # ── ④-2 표본 4조건 + KEV — **사슬이 직접 만든다** ──────────────────
+  # ── ④-2 표본 5조건 + KEV — **사슬이 직접 만든다** ──────────────────
   # ⚠ 2026-09-04 수리: 예전에는 「$OUTDIR/samples.json 이 있으면 게이트에 넘긴다」였다. 즉 남이 손으로
   #   만들어 둔 파일이 있을 때만 관문 ①(KEV)이 살아 있었고, 없으면 조용히 빠졌다. 관문이 「있을 때만」
   #   도는 것은 관문이 아니다 — 만드는 것까지 사슬 안으로 들여온다.
   if [ "$ONLY_GATE" -eq 0 ]; then
-    ladder_log "④-2 [$label] 표본 4조건 + KEV → $probedir"
+    ladder_log "④-2 [$label] 표본 5조건 + KEV → $probedir"
     # ★ ④의 run.mjs·run-r2.mjs는 **자기가 띄운 서버를 회차 끝에 죽인다**(run.mjs:106 finally).
     #   그래서 여기서 같은 어댑터를 얹어 **다시 띄운다** — 안 띄우면 하네스가 ECONNREFUSED로 죽고
     #   (exit 8), 관문 ⑧·⑩은 회전 갈래에서 영영 미측정이 된다(2026-09-04 검토관 적발).

@@ -5,13 +5,16 @@
 ```
 1일차  재료 확장(증류)        day1-distill.sh   → results-ladder/day1/<주제>-<회차>.json
 2일차  RAFT형 학습 → A/B      day2-train.sh     → results-ladder/day2/<회전>/
-       ↳ 표본 3조건 + KEV     team-bench/{ask-samples,kev-probe}.mjs → samples-*.json · kev.json
+       ↳ 표본 5조건 + KEV     team-bench/{ask-samples,kev-probe}.mjs → samples-*.json · kev.json
        ↳ 게이트               team-bench/gates.mjs → gate.json · gate.md
 3일차  판정(채택 여부)        사람이 한다 — 게이트는 「못 넘은 것을 막는」 자일 뿐이다
 ```
 
 한 번만 미리: `bash tools/ladder/day2-train.sh --baseline-probe` — 어댑터 **없는** 베이스로 같은
-표본 3조건 + KEV를 돌려 `results-ladder/baseline/`에 둔다. 관문 ①·⑤·⑧이 견줄 상대가 그 파일들이다.
+표본 5조건(grounded·distractor-only·bare·persona·knowledge) + KEV를 돌려 `results-ladder/baseline/`에
+둔다. 관문 ①·⑤·⑧·⑭이 견줄 상대가 그 파일들이다. 베이스 폴더는 `LADDER_BASELINE_DIR`로 바꿀 수
+있다 — 문항 파일이 바뀌면 **옛 베이스를 덮지 말고 새 폴더에** 쌓는다(모집단이 다르면 자리별로
+견주는 ⑤·⑬·⑭이 거짓 빨강을 낸다. 2026-09-11 40문항 전환에서 `baseline-q40/`을 그렇게 만들었다).
 
 ⚠ 표본·KEV는 **$PORT(기본 8093)의 두뇌에 직접** 던진다. A/B를 돌리는 `run.mjs`는 회차가 끝날 때마다
 자기가 띄운 서버를 내리므로(run.mjs:106 finally), 사슬은 표본 단계에서 **같은 어댑터를 얹어 다시 띄운다.**
@@ -229,10 +232,11 @@ bash tools/ladder/gb10-sync-results.sh r2-v2 --after-commit   # ③ gb10 청소 
 | `samples-distractor-only.json` | `ask-samples.mjs --mode distractor-only` | 관문 ⑩ — 「자료에 없다」고 말하는 비율 |
 | `samples-bare.json` | `ask-samples.mjs --mode bare` | 관문 ⑤(잘림) · (참고) 한글 · **⑨의 참고값**(제품이 안 쓰는 조건이라 모집단에서 뺐다) |
 | `samples-persona.json` | `ask-samples.mjs --mode persona` | 관문 ⑨ — 인용 창작(「원문:」·「[n]에 따르면」 둘 다). 팀원 프롬프트만 준 자리 = 제품에서 RAG가 빈 순간 |
+| `samples-knowledge.json` | `ask-samples.mjs --mode knowledge` | 관문 ⑭ — **로컬 14B 단독**(원격 없음·근거 블록 없음)에서 아는 것을 잃지 않았는가. 근거는 프롬프트에 **안 싣고** 정답 조각만 파일에 적어 overlap20으로 채점한다 |
 | `kev.json` | `kev-probe.mjs` | 관문 ① — 본문에서 CISA를 말하는가(베이스 대비) |
 | `harness-args.json` | day2-train.sh | **무슨 조건으로 던졌나** — 포트·서버·에이전트·명령줄 |
 
-베이스 대조(관문 ①·⑤·⑧이 견줄 상대)는 `results-ladder/baseline/`의 `kev.json`·`samples-*.json`이고(⑤가 자리별로 견준다),
+베이스 대조(관문 ①·⑤·⑧·⑭이 견줄 상대)는 `results-ladder/baseline/`의 `kev.json`·`samples-*.json`이고(⑤가 자리별로 견준다),
 ⑤가 보는 세 자리(grounded·distractor-only·bare)는 **베이스에도 있어야** 한다 — 없으면 미측정=불합격이다.
 ⚠ `samples-persona.json`은 베이스도 함께 만들지만 **관문이 견주지는 않는다** — ⑨의 기준이 「0건」이라 상대가 필요 없다.
 그래도 넘기는 이유(`--baseline-samples-persona`)는 표의 참고 줄에 「베이스도 같은 조건으로 쟀다」를 남기기 위해서다.
@@ -274,8 +278,12 @@ bash tools/ladder/gb10-sync-results.sh r2-v2 --after-commit   # ③ gb10 청소 
 | ⑩ no_evidence_says_so | **방해 조각만** 줬는데 「없다」고 말하지 않음(75% 미만) |
 | ⑪ len_drop | 점수는 그대로인데 서술 답만 40% 넘게 짧아짐 |
 | ⑫ copy_ratio | 근거를 **통째로 베껴** 답한다(베낀 글자 평균 60% 초과 · 또는 100%짜리가 한 건이라도) |
-| ⑬ grounded_no_refusal | **근거를 준** 자리에서 「자료에 없다」로 시작하는 답이 베이스보다 늘었다 (모집단 **24건 이상** — 8건이면 한 건이 12.5%p라 흔들림이 판정을 뒤집는다). ⚠ **오늘은 미측정이다** — 조각(chunk)이 든 문항이 `samples-questions.json`에 8건뿐이다. 채우는 길: 운영 4000 읽기 전용 창구로 cites를 회수해 24건 이상으로 늘린다(ask-samples.mjs 머리주석) |
-| ⑭ local_knowledge | **로컬 14B 단독**(원격 없음·근거 없음)에서 지식 문항 정답률이 베이스보다 떨어졌다 — 회전 5의 목적(원격 없는 설치본의 바닥)을 재는 유일한 자. 정답 판정은 ⑧과 **같은 자**(overlap20)다. ⚠ ⑬과 **같은 문항 파일**을 쓰므로 오늘은 함께 미측정이다 |
+| ⑬ grounded_no_refusal | **근거를 준** 자리에서 「자료에 없다」로 시작하는 답이 베이스보다 늘었다 (모집단 **24건 이상** — 8건이면 한 건이 12.5%p라 흔들림이 판정을 뒤집는다). 2026-09-11 40문항 전환으로 조각(chunk)이 든 문항이 36건이 되어 **모집단 조건을 넘었다** — 이제 잰다. 판정은 **건수**(베이스 이하)로 하고 표에는 건수·비율을 나란히 적는다 |
+| ⑭ local_knowledge | **로컬 14B 단독**(원격 없음·근거 없음)에서 지식 문항 정답률이 베이스보다 떨어졌다 — 회전 5의 목적(원격 없는 설치본의 바닥)을 재는 유일한 자. 정답 판정은 ⑧과 **같은 자**(overlap20)다. ⑬과 같은 문항 파일(36건)을 쓰므로 **⑬과 함께 잰다**(2026-09-11 배선 · `--local-knowledge`·`--baseline-local-knowledge`) |
+
+⚠ 이 표에 문항 파일의 **건수를 박아 두지 않는다.** 파일이 늘어도 문장은 안 늘어 거짓이 된다 —
+2026-09-11까지 ⑬⑭ 줄과 `gates.mjs`의 안내문이 「8건뿐」이라 말하고 있었고 실제는 36건이었다.
+지금 세는 법: `node -e` 로 `samples-questions.json`의 `chunk` 20자 이상을 센다.
 
 ⑧~⑪은 r1-base 회전을 뜯어 보고 뒤늦게 붙였다 — 그때까지 **RAFT의 목적(근거를 주면 인용한다)을
 재는 관문이 0개**였고, 실제로 난 회귀 두 가지(「원문:」 창작 · 서술 답 34~72% 축소)를 세는 코드도 없었다.
