@@ -1343,6 +1343,7 @@ export interface ScoredChunk {
   distance: number;
   documentId: string; // 근거(출처) 표시용 — 어느 문서의 조각인지
   lexicalHit?: boolean; // 질의의 코드(CVE·IW·U-01 등)가 이 조각에 글자 그대로 있었나
+  acronymHit?: boolean; // 질의의 약어가 이 조각에 낱말 그대로 있었나 — 코드 히트보다 약한 신호(B1)
 }
 
 // LanceDB 테이블에 category 컬럼을 보장한다(2026-07-25 업무영역 축 추가). 기존 조각의
@@ -1494,7 +1495,7 @@ async function refreshFtsIndex(table: lancedb.Table): Promise<void> {
  *   ⚠ 남은 위험(약하지만 관련은 있는 0.85~0.95 조각이 자리를 먹는 경우)은 **라이브 실측 전에는
  *     못 재는 값**이라 문턱을 지어내지 않았다 — 회귀 하네스 ⑰ 첫 실측 회차에서 함께 본다.
  */
-export function 문서를섞어자르기<T extends { documentId?: string; distance?: number; lexicalHit?: boolean }>(
+export function 문서를섞어자르기<T extends { documentId?: string; distance?: number; lexicalHit?: boolean; acronymHit?: boolean }>(
   목록: T[],
   topK: number,
   문서당 = 3,
@@ -1519,7 +1520,7 @@ export function 문서를섞어자르기<T extends { documentId?: string; distan
   const 관련있음 = (c: T): boolean => {
     const d = c.distance;
     if (d === undefined) return true;
-    return isRelevant({ distance: d, lexicalHit: c.lexicalHit === true } as FusedChunk, RAG_RELEVANCE_MAX_DISTANCE);
+    return isRelevant({ distance: d, lexicalHit: c.lexicalHit === true, acronymHit: c.acronymHit === true } as FusedChunk, RAG_RELEVANCE_MAX_DISTANCE);
   };
   const 셈 = new Map<string, number>();
   let 가족셈 = 0;
@@ -1676,7 +1677,7 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //    ★ 2026-09-08 — 지목 대상이 **내장 문서까지**로 넓어졌다(제목지목문서). 지목된 내장은
   //      ORIGIN(0.012)+DOCSCOPE(0.02)=0.032, 다른 내장은 0.012이라 순증 +0.02 — RRF 1위 값
   //      (≈0.0164)보다 커서 **내장끼리도 이름이 이긴다**. 세기는 안 건드린다(DOCSCOPE=ROLE 계약).
-  const fused = applyDocScopeBoost(applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds()), 제목지목문서(question));
+  const fused = applyDocScopeBoost(applyOriginBoost(fuseResults({ vector, lexical }, terms.codes, terms.acronyms), builtinDocumentIds()), 제목지목문서(question));
   // 역할 영역이 여러 개면 전부 올린다(2026-08-20 ③ 장비운영 주인 — scan은 취약점+장비운영).
   // 부스트는 벽이 아니라 올리기라, 겹쳐 걸어도 다른 영역 자료가 사라지지 않는다.
   const 역할영역들 = categoriesForRole(agentId);
@@ -1718,6 +1719,7 @@ export async function queryMemoryScored(question: string, topK = 5, agentId?: st
     distance: c.distance,
     documentId: c.documentId,
     lexicalHit: c.lexicalHit,
+    acronymHit: c.acronymHit,
   }));
 }
 
@@ -1821,6 +1823,9 @@ export async function queryMemoryGraded(
   const fused = await hybridSearch(question, topK, agentId, screen, viewer);
   const 쓸것 = fused.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE));
   // 코드가 글자 그대로 걸린 것(CVE·U-01 등)은 거리와 무관하게 **가까운 근거**로 본다.
+  // ⚠ 2026-09-11 — **약어 히트는 가까움이 아니다**(한 글자도 안 고친다). 거리가 1.0 언저리라
+  //   배지가 강함이 되면 근거세기가 거짓말을 한다. 약어로만 통과한 근거는 언제나 약함이고,
+  //   그래서 근거약함배너가 코드로 붙는다 — 이 한 줄이 B1 확장 전체의 정직 보증이다.
   const 가까움 = 쓸것.some((c) => c.lexicalHit || c.distance <= RAG_STRONG_MAX_DISTANCE);
   // ③ 배지 정확도(2026-08-10): scored(documentId 포함)도 돌려준다 — 답이 **실제 읽은** 문서를
   // 배지가 그대로 쓰게 한다. dispatcher가 배지용으로 이 함수를 **같은 agentId**로 부르면
@@ -1837,7 +1842,7 @@ export async function queryMemoryGraded(
   return {
     chunks: 쓸것.map((c) => c.text),
     titles: 쓸것.map((c) => 사람이읽는문서제목(c.documentId)),
-    scored: 쓸것.map((c) => ({ text: c.text, distance: c.distance, documentId: c.documentId, lexicalHit: c.lexicalHit })),
+    scored: 쓸것.map((c) => ({ text: c.text, distance: c.distance, documentId: c.documentId, lexicalHit: c.lexicalHit, acronymHit: c.acronymHit })),
     약한근거만: 쓸것.length > 0 && !가까움,
   };
 }

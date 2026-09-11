@@ -15,7 +15,7 @@ import { currentDocIds } from "./ragscope";
 import { 새근거수거, 근거를수거하며 } from "./toolevidence"; // 도구가 읽은 근거를 위로 나르는 꼬리표(잎 모듈)
 import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
-import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 되묻기표지, 지식근거없음표지 } from "./agenttools";
+import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 되묻기표지, 지식근거없음표지, 온톨로지전용알림, 온톨로지전용표지 } from "./agenttools";
 import type { AgentTool } from "./agenttools";
 import { 법령검색없음표지 } from "./lawinfo";
 import { emitCollaboration } from "./collaboration";
@@ -575,7 +575,14 @@ async function 사람에게내보낸다(
   reportProgress("review", "답변을 검수하고 있습니다");
   // ⚠ **조문근거를보탠다는 법령한계를밝힌다보다 안쪽**에 둔다 — 한계 문구(「원문 미확인」)와
   //   법제처 원문이 붙기 **전**에 조문을 답 본문 뒤에 붙여야, 조문이 원문 뒤로 밀려나지 않는다.
-  return 다음단계붙이기(지식없음을밝힌다(법령한계를밝힌다(조문근거를보탠다(guardAgainstDenial(composed, calls), calls), calls), calls), calls);
+  // ⚠ 온톨로지근거임을밝힌다는 지식없음을밝힌다 바깥쪽이다(2026-09-11 B2) — 둘은 배타적
+  //   조건이라 순서 자체가 정답을 가르지 않지만, 지식없음을밝힌다가 먼저 억제/배너를 정한
+  //   뒤 그 결과에 온톨로지 표지를 덧대는 편이 「도구가 아예 근거 없음」과 「도구가 온톨로지만
+  //   가져옴」을 같은 자리에서 겹쳐 읽기 쉽다.
+  return 다음단계붙이기(
+    온톨로지근거임을밝힌다(지식없음을밝힌다(법령한계를밝힌다(조문근거를보탠다(guardAgainstDenial(composed, calls), calls), calls), calls), calls),
+    calls,
+  );
 }
 
 /**
@@ -599,6 +606,26 @@ export function 지식없음을밝힌다(reply: string, calls: AgentToolCall[]):
   // 말투에서 나간다). llm.ts chat 경로와 같은 분기 — 두 출구가 같은 사실을 말해야 한다.
   if (currentDocIds().length) return `${지정범위배너}\n\n${reply}`;
   return `${자료없음배너}\n\n${reply}`;
+}
+
+/**
+ * ★★ B2 — **온톨로지 전용 답**의 정직 표지(2026-09-11 설계관 지시서 · B1 확장의 짝).
+ *
+ * 지식없음을밝힌다와 판박이 구조이되 자리가 다르다 — 전자는 out이 **통째로 빈** 경우
+ * (등록부에서 근거를 아예 못 찾음)를, 이 함수는 explain이 **온톨로지 관계만** 실은 경우
+ * (문서 발췌는 0건인데 사내 지식 그래프 덤프는 있는 경우)를 잡는다. 둘은 배타적이다 —
+ * runExplain이 온톨로지전용알림을 붙이는 조건 자체가 「온톨로지가 있을 때」라, out이
+ * 비어 지식근거없음표지가 걸리는 경로와는 겹치지 않는다.
+ *
+ * ⚠ 모든 유효 호출이 온톨로지 전용일 때만 — 다른 도구가 사내 데이터를 가져왔으면 「자료
+ *   있는」 대화다. ⚠ 답 머리가 이미 「없습니다」로 시작하면 겹쳐 붙이지 않는다(같은 가드).
+ */
+export function 온톨로지근거임을밝힌다(reply: string, calls: AgentToolCall[]): string {
+  if (!reply || !calls.length) return reply;
+  const useful = calls.filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result));
+  if (!useful.length || !useful.every((c) => 온톨로지전용표지.test(c.result))) return reply;
+  if (자료없음중복가드.test(reply.slice(0, 60))) return reply;
+  return `${온톨로지전용알림}\n\n${reply}`;
 }
 
 /** 부족하면 사내 지식을 한 번 더 뒤져 calls에 근거로 얹는다(제자리 수정). */

@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
 import { explainHardTerms, glossaryGroundingFor, GLOSSARY, DOMAIN_SENSE } from "../src/engine/glossary";
 
 describe("glossary — 어려운 용어 쉬운 풀이 후처리", () => {
@@ -125,5 +127,48 @@ describe("도메인 뜻 주입(DOMAIN_SENSE)", () => {
     process.env.GIJO_GLOSSARY_EXPLAIN = "0";
     expect(glossaryGroundingFor("클릭률 낮추는 법")).toBeNull();
     process.env.GIJO_GLOSSARY_EXPLAIN = prev;
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ B1 확장(2026-09-11 설계관 지시서) — VEX·VPR 확정 정의를 그라운딩에 싣는다.
+//   왜: 「VEX가 뭐야?」에 모델이 「Vulnerability Exploitation and Enumeration」을 지어냈다
+//   (실제는 Vulnerability Exploitability eXchange) — 온톨로지·GLOSSARY 양쪽에 원천이 0이라
+//   지어낼 수밖에 없었다. VPR은 온톨로지엔 있으나 GLOSSARY(chat 경로 그라운딩)에는 없었다.
+describe("VEX·VPR 확정 정의가 그라운딩에 실린다(중-3 · 약자 지어내기 차단)", () => {
+  it("「VEX가 뭐야?」에 정확한 원형이 실린다", () => {
+    const g = glossaryGroundingFor("VEX가 뭐야?") ?? "";
+    expect(g).toContain("Vulnerability Exploitability eXchange");
+  });
+
+  it("「VPR이 뭐야?」에 정확한 원형이 실린다", () => {
+    const g = glossaryGroundingFor("VPR이 뭐야?") ?? "";
+    expect(g).toContain("Vulnerability Priority Rating");
+  });
+
+  it("ASCII 낱말 경계 — 「convex가 뭐야?」에는 VEX가 안 실린다", () => {
+    const g = glossaryGroundingFor("convex가 뭐야?") ?? "";
+    expect(g).not.toContain("Vulnerability Exploitability eXchange");
+  });
+});
+
+// ★ 소스 감시 — GLOSSARY 정식명칭이 온톨로지 씨앗(ontology-seed.ts)과 **글자로 같다.**
+//   같은 사실(약자의 정식명칭)을 두 곳에 적으면 어긋난다(이 저장소 반복 유형). VPR·EPSS는
+//   ontology-seed.ts에도 t(약자, "정식명칭", 원형) 트리플이 있다 — 둘이 어긋나면 chat 경로
+//   (GLOSSARY)와 explain 경로(온톨로지)가 서로 다른 원형을 말하게 된다.
+describe("소스 감시 — GLOSSARY와 온톨로지 씨앗의 정식명칭이 어긋나지 않는다", () => {
+  it("ontology-seed.ts의 t(X,'정식명칭',Y) 행과 GLOSSARY[X]가 같은 Y로 시작한다", () => {
+    const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "ontology-seed.ts"), "utf8");
+    const 행들 = [...src.matchAll(/t\("([^"]+)",\s*"정식명칭",\s*"([^"]+)"\)/g)].map((m) => ({ 약자: m[1], 원형: m[2] }));
+    expect(행들.length, "ontology-seed.ts에서 정식명칭 트리플을 못 찾았다 — 꼴이 바뀌었으면 이 시험도 함께 볼 것").toBeGreaterThan(0);
+    let 대조수 = 0;
+    for (const { 약자, 원형 } of 행들) {
+      const 풀이 = GLOSSARY[약자];
+      if (풀이 === undefined) continue; // GLOSSARY에 없는 약자(온톨로지 전용)는 대조 대상이 아니다
+      대조수 += 1;
+      expect(풀이.startsWith(원형), `GLOSSARY["${약자}"]가 온톨로지 정식명칭("${원형}")으로 시작하지 않는다 — 어느 쪽이 옛것인지 확인할 것`).toBe(true);
+    }
+    // 대조 대상이 0이면 이 시험은 아무것도 안 지킨 것이다 — 모집단을 못 박는다.
+    expect(대조수, "GLOSSARY와 겹치는 정식명칭 트리플이 하나도 없다 — 이 시험이 헛돈다").toBeGreaterThanOrEqual(2); // 최소 EPSS·VPR
   });
 });

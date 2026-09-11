@@ -14,6 +14,8 @@ export const GLOSSARY: Record<string, string> = {
   "CVSS": "Common Vulnerability Scoring System — 취약점 위험도를 0~10점으로 매긴 국제 표준 점수(높을수록 위험).",
   "KEV": "Known Exploited Vulnerabilities — 실제 공격에 악용된 것으로 확인된 취약점 목록(미국 CISA가 관리).",
   "EPSS": "Exploit Prediction Scoring System — 그 취약점이 앞으로 실제 악용될 확률을 예측한 점수.",
+  "VPR": "Vulnerability Priority Rating — Tenable이 매기는 취약점 우선순위 점수(0.1~10.0). 악용 성숙도·EPSS·KEV 등재·언론 언급을 함께 본다.",
+  "VEX": "Vulnerability Exploitability eXchange — 그 취약점이 우리 제품·자산에 실제로 영향이 있는지(영향 있음/없음/조치 중)를 기계가 읽게 적은 국제 표준 문서. 제품 결재판이 내보내는 그 VEX다.",
   "제로데이": "아직 패치(수정)가 없는, 막 알려진 취약점.",
   "프롬프트 인젝션": "AI에게 악의적 지시를 몰래 끼워 넣어 원래 규칙을 무시하게 만드는 공격.",
   "RAG": "검색 증강 생성 — AI가 사내 문서를 찾아 참고한 뒤 답하는 방식.",

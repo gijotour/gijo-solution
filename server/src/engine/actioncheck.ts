@@ -13,6 +13,7 @@
 import { db } from "../db";
 import { chat } from "./llm";
 import { queryMemoryScored, listDocuments, RAG_RELEVANCE_MAX_DISTANCE } from "./memory";
+import { isRelevant } from "./hybridsearch";
 import { getLawConfig, searchLaw, LEGAL_DISCLAIMER, LawHit } from "./lawinfo";
 import { recordWork } from "./worklog";
 
@@ -165,7 +166,11 @@ export interface ActionCheckResult {
 export async function runActionCheck(question: string, qa?: boolean): Promise<ActionCheckResult> {
   // ── 1) 사내규정 근거 (결정적 검색 — 컴플라이언스 화면 부스트로 규정 문서 우선) ──
   const scored = await queryMemoryScored(question, 5, undefined, "compliance.html").catch(() => []);
-  const passed = scored.filter((c) => c.lexicalHit || c.distance <= RAG_RELEVANCE_MAX_DISTANCE);
+  // ⚠ 2026-09-11 — 손으로 적은 식 대신 hybridsearch.isRelevant 한 곳을 부른다(잣대 3중화 방지).
+  //   (A) 배포 뒤에도 여기를 안 고치면 같은 조각이 대화에서는 근거인데 조치 점검에서는
+  //   아니게 되어, 담당자가 화면마다 다른 답을 본다. 안전장치는 169행의 사내규정 카테고리
+  //   자격 게이트가 그대로 지킨다(벤더 매뉴얼이 회사의 허락이 되던 2026-07-29 사고 방어).
+  const passed = scored.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE));
 
   // ⚠ 판정 자격은 **사내규정 카테고리 문서**만이다(2026-07-29 실측 사고: 벤더 매뉴얼(Tenable
   //   가이드)을 근거로 "외부 공유 ○ 허용"이 나왔다 — 장비 사용법이 회사의 허락일 수 없다).

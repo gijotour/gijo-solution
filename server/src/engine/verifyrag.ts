@@ -16,6 +16,7 @@
 //   그 자체가 사고 경로가 된다.
 
 import { queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE, type ScoredChunk } from "./memory";
+import { isRelevant } from "./hybridsearch";
 import type { VerifyOutcome } from "./verifyengine";
 
 export interface RagBasis {
@@ -36,9 +37,10 @@ export interface VerifyBasis {
   hint?: MissingBasisHint;
 }
 
-/** 관련 있는 조각만 남긴다 — 임계값 밖은 근거가 아니라 소음이다(지어낸 근거 방지). */
+/** 관련 있는 조각만 남긴다 — 임계값 밖은 근거가 아니라 소음이다(지어낸 근거 방지).
+ *  ⚠ 2026-09-11 — hybridsearch.isRelevant 한 곳을 부른다(손으로 다시 적지 않는다). */
 function relevant(chunks: ScoredChunk[]): ScoredChunk[] {
-  return chunks.filter((c) => c.distance <= RAG_RELEVANCE_MAX_DISTANCE || c.lexicalHit);
+  return chunks.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE));
 }
 
 /**

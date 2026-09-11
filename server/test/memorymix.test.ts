@@ -124,7 +124,7 @@ describe("★★ 반증 — **가드를 빼면 다시 빨개진다**(안 그러�
 //   들어온다** — 문서당 3칸을 주는 PDF와 달리 이어지는 문맥이 필요 없다). 다만
 //   **관련성 게이트에서 어차피 버려질 조각**이 가족의 자리를 먹는 것은 **순수한 손해**라
 //   그것만 막았다. 아래가 그 계약이고, 감수하는 대목도 함께 못박는다(숨기지 않는다).
-type 점수조각 = { documentId: string; text: string; distance: number; lexicalHit?: boolean };
+type 점수조각 = { documentId: string; text: string; distance: number; lexicalHit?: boolean; acronymHit?: boolean };
 
 describe("★★ 버려질 조각으로는 가족을 못 밀어낸다 — 고치려다 근거를 줄이지 않는다", () => {
   const 구성 = (비가족거리: number): 점수조각[] => [
@@ -172,6 +172,21 @@ describe("★★ 버려질 조각으로는 가족을 못 밀어낸다 — 고치
   it("거리를 **모르는** 호출자는 오늘과 똑같이 돈다 — 다른 목록·시험이 조용히 안 바뀐다", () => {
     // distance 칸이 없는 목록(이 파일의 조각들)은 전부 「관련 있음」으로 본다.
     expect(가족수(문서를섞어자르기(조각들(5, 3), 4))).toBe(1);
+  });
+
+  // ★★ 2026-09-11 설계관 지시서(B1) — 약어 히트 조각(acronymHit)도 관련있음()의 잣대 안이다.
+  //   빠뜨리면 「VPR이 뭐야?」류가 가족(승인 문답)에 밀려 이 자리에서 다시 미룸무관으로 샌다.
+  it("★ 약어 히트 조각(acronymHit)은 무관으로 안 밀린다 — 미룸무관 게이트가 acronymHit도 본다", () => {
+    const 후보: 점수조각[] = [
+      ...Array.from({ length: 5 }, (_, i) => ({ documentId: approvedQaDocId(`fam${i}`), text: `승인 답 ${i}`, distance: 0.42 })),
+      { documentId: "epss_vs_vpr.md", text: "VPR은 …", distance: 1.0, acronymHit: true },
+      ...Array.from({ length: 20 }, (_, i) => ({ documentId: `잡음${i}.md`, text: `잡음 ${i}`, distance: 1.2 })),
+    ];
+    const 결과 = 문서를섞어자르기(후보, 4);
+    expect(
+      결과.some((c) => c.documentId === "epss_vs_vpr.md"),
+      "acronymHit을 안 보면 이 조각이 미룸무관(0.95 밖)으로 밀려 자리를 못 되찾는다",
+    ).toBe(true);
   });
 });
 

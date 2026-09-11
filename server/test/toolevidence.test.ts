@@ -150,8 +150,9 @@ describe("★ 지목 판정은 hybridsearch.제목지목매치 한 곳", () => {
 
   it("랭킹 부스트와 라우팅이 **같은 원천부**(memory.제목지목문서)를 부른다", () => {
     const mem = 읽기("engine/memory.ts");
+    // ★ 2026-09-11 B1 — fuseResults가 terms.acronyms(3번째 인자)를 받는다(약어 히트 게이트).
     expect(mem, "랭킹 부스트가 옛 목록(업로드 한정)으로 되돌아갔다")
-      .toContain("applyDocScopeBoost(applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds()), 제목지목문서(question))");
+      .toContain("applyDocScopeBoost(applyOriginBoost(fuseResults({ vector, lexical }, terms.codes, terms.acronyms), builtinDocumentIds()), 제목지목문서(question))");
     expect(읽기("engine/agentloop.ts"), "라우팅 꼬리 갈래가 사라졌다").toContain("제목지목질문(instruction)");
   });
 

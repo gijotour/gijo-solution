@@ -20,6 +20,9 @@ export interface LexicalTerms {
   codes: string[];
   /** 그 외 영숫자 낱말(제품명·명령어 등). 코드보다 약한 신호로 쓴다. */
   words: string[];
+  /** 질의에 대문자로 쓰인 3~6자 약어의 원형(VPR·KEV·EPSS 등). BM25 질의에는 안 들어간다
+   *  (이미 words로 들어가 있다) — 관련성 게이트 전용 신호다(B1 — 홑 약어 정의 물음). */
+  acronyms: string[];
 }
 
 // 보안 코드 패턴. 우리 제품이 다루는 체계를 실제 사례로 열거했다:
@@ -34,6 +37,24 @@ const STOP_WORDS = new Set([
   "what", "how", "why", "when", "where", "which", "who", "can", "does", "did", "was", "were",
   "gijo", "api", "http", "https", "www", "com",
 ]);
+
+// ── 약어 신호(B1 — 홑 약어 정의 물음, 2026-09-11 설계관 지시서) ─────────────────────────
+// 왜: 「VPR이 뭐야?」·「KEV가 뭐야?」류는 벡터로 원리상 못 가른다(실측: 정답 조각 0.946~1.036,
+//   무관 조각 1.03~1.2로 두 무리가 겹친다). 코드(CODE_RE)는 숫자를 요구해 VPR·KEV·EPSS·CVSS·
+//   VEX·SBOM처럼 숫자 없는 약어를 못 잡는다 — 그래서 words로만 BM25 순위에 갈 뿐 관련성
+//   게이트를 못 넘었다. 이 셋으로 약어를 게이트의 **세 번째 갈래**(hasExactAcronym·isRelevant)로 태운다.
+export const ACRONYM_RE = /(?<![A-Za-z0-9_])[A-Z]{3,6}(?![A-Za-z0-9_])/g;
+// 문서 **유형·형식**을 가리키는 약어 — 주제어가 아니라 매체라 근거 신호가 아니다.
+// ⚠ STOP_WORDS에 넣지 않는다(그러면 BM25 words에서도 빠져 이 결함과 무관한 회귀가 열린다) —
+//   여기는 약어 게이트 전용 제외 집합이다(DOCSCOPE_STOP과 같은 선례).
+const 약어제외 = new Set([
+  "pdf", "docx", "xlsx", "hwp", "hwpx", "csv", "txt", "ppt", "pptx", "zip", "json", "xml", "yaml", "html", "png", "jpg",
+]);
+// 약어 히트로 통과할 수 있는 거리 상한. 정답 조각 최대 1.036(VEX)에 여유를 둔 값이다.
+// 진짜 역할은 무관을 가르는 것이 아니라, fuseResults가 distance=Infinity로 남기는 BM25 전용
+// 조각을 원리상 배제하는 것이다(2026-07-19 잡음 주입 계약 유지 — 겹치는 1.03~1.10 구간은
+// 낱말 일치가 가른다).
+export const ACRONYM_MAX_DISTANCE = 1.10;
 
 /**
  * **담당자 말투를 검색용으로 다듬는다**(2026-08-12 신설).
@@ -85,7 +106,19 @@ export function extractLexicalTerms(question: string): LexicalTerms {
         .filter((w) => !codes.some((c) => c.toLowerCase().includes(w)))
     ),
   ];
-  return { codes, words };
+  // 대문자로 쓰인 3~6자 약어(B1) — 사람이 약어를 쓸 때 대문자로 쓴다(4100 실측 물음 전부
+  //   대문자). 소문자 "vpr"로 물으면 이 갈래는 안 걸린다(한계를 그대로 적는다 — 소문자까지
+  //   열면 영어 본문의 아무 낱말이나 약어가 되어 표면이 통째로 넓어진다).
+  const acronyms = [
+    ...new Set(
+      (question.match(ACRONYM_RE) ?? [])
+        .filter((a) => !STOP_WORDS.has(a.toLowerCase()))
+        .filter((a) => !약어제외.has(a.toLowerCase()))
+        // 코드로 이미 잡힌 약어는 중복 신호라 뺀다(CVE-2021-44228의 "CVE" 등)
+        .filter((a) => !codes.some((c) => c.toLowerCase().includes(a.toLowerCase())))
+    ),
+  ];
+  return { codes, words, acronyms };
 }
 
 /**
@@ -138,6 +171,21 @@ export function hasExactCode(text: string, codes: string[]): boolean {
   if (codes.length === 0) return false;
   const flat = text.toUpperCase().replace(/[-._\s]/g, "");
   return codes.some((c) => flat.includes(c.replace(/[-._\s]/g, "")));
+}
+
+/**
+ * 조각 안에 질의의 약어가 **낱말 그대로** 들어있는가(B1). hasExactCode처럼 구분자를 지우면
+ * "convex"·"vexing"이 "VEX"로 읽히는 함정이 있다(agentloop.ts의 VEX 규칙이 이미 같은 무늬로
+ * 막아 둔 자리 — `(?<![a-zA-Z])(?:VEX|vex)(?![a-zA-Z])`). 그래서 낱말 경계를 그대로 지킨다.
+ * 밑줄까지 경계에서 빼는 이유는 VPR_SCORE 같은 식별자에 걸리지 않게 하기 위함이다.
+ * 대소문자는 무시한다 — 문서 본문은 소문자로 쓰여 있을 수 있다.
+ */
+export function hasExactAcronym(text: string, acronyms: string[]): boolean {
+  if (acronyms.length === 0) return false;
+  return acronyms.some((a) => {
+    const esc = a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![A-Za-z0-9_])${esc}(?![A-Za-z0-9_])`, "i").test(text);
+  });
 }
 
 // ── 업무영역(category) — 문서 분류와 화면 맥락 검색의 공통 축 (2026-07-25 RAG 전면 검토) ──
@@ -378,6 +426,9 @@ export interface FusedChunk {
   rrf: number;
   /** 문서의 업무영역(취약점·장비운영·사내규정·위협대응·일반). 옛 조각은 없을 수 있다. */
   category?: string;
+  /** 질의의 약어가 이 조각에 낱말 그대로 있었나(B1) — 코드 히트(lexicalHit)보다 약한 신호다.
+   *  없으면(undefined) 아니다로 본다. */
+  acronymHit?: boolean;
 }
 
 // RRF(Reciprocal Rank Fusion) 상수. k=60은 원 논문(Cormack 2009)과 LanceDB·Elastic 기본값이다.
@@ -455,7 +506,7 @@ export function fuseVariantVectors(variants: { hits: VariantHit[]; penalty: numb
 }
 
 /** 같은 조각을 (documentId, text) 기준으로 합치고 RRF로 순위를 낸다. */
-export function fuseResults(input: FusionInput, codes: string[]): FusedChunk[] {
+export function fuseResults(input: FusionInput, codes: string[], acronyms: string[] = []): FusedChunk[] {
   const byKey = new Map<string, FusedChunk>();
   const keyOf = (documentId: string, text: string) => `${documentId}\u0000${text}`;
 
@@ -472,6 +523,7 @@ export function fuseResults(input: FusionInput, codes: string[]): FusedChunk[] {
         documentId: r.documentId,
         distance: r.distance,
         lexicalHit: hasExactCode(r.text, codes),
+        acronymHit: hasExactAcronym(r.text, acronyms),
         rrf,
         ...(r.category ? { category: r.category } : {}),
       });
@@ -489,6 +541,7 @@ export function fuseResults(input: FusionInput, codes: string[]): FusedChunk[] {
         documentId: r.documentId,
         distance: Number.POSITIVE_INFINITY, // 벡터 결과에 없던 조각 — 거리를 모른다
         lexicalHit: hasExactCode(r.text, codes),
+        acronymHit: hasExactAcronym(r.text, acronyms),
         rrf,
         ...(r.category ? { category: r.category } : {}),
       });
@@ -498,10 +551,26 @@ export function fuseResults(input: FusionInput, codes: string[]): FusedChunk[] {
 }
 
 /**
- * 관련성 게이트. 벡터 거리 임계값을 통과했거나, 질의의 코드가 조각에 실제로 있으면 통과.
- * 렉시컬로만 걸렸는데 코드도 없는 조각(영문 낱말만 스친 경우)은 근거로 쓰지 않는다 —
- * 벡터가 무관하다고 판정한 것을 BM25 순위만으로 되살리면 잡음 주입이 다시 열린다.
+ * 관련성 게이트. 잣대는 이 함수 한 곳 — 세 갈래(2026-09-11 B1 홑 약어 정의 물음 확장):
+ *   ① 벡터 거리 임계값을 통과했거나
+ *   ② 질의의 코드가 조각에 실제로 있거나(lexicalHit)
+ *   ③ 질의의 약어가 조각에 실제로 있고(acronymHit) 거리가 ACRONYM_MAX_DISTANCE 안일 때.
+ * ③이 거리 상한을 요구하는 이유 — fuseResults가 distance=Infinity로 남기는 BM25 전용 조각을
+ *   원리상 배제한다(2026-07-19 잡음 주입 계약 유지 — 벡터 후보에 없던 조각은 약어만으로 못 산다).
+ * 코드도 약어도 없이 렉시컬로만 걸린 조각(영문 낱말만 스친 경우)은 근거로 쓰지 않는다 —
+ *   벡터가 무관하다고 판정한 것을 BM25 순위만으로 되살리면 잡음 주입이 다시 열린다.
+ *
+ * ⚠ 인자 타입은 FusedChunk 전체가 아니라 **부분집합**이다 — actioncheck.ts·verifyrag.ts의
+ *   ScoredChunk(memory.ts)도 캐스트 없이 이 게이트를 그대로 써야, 잣대가 세 벌로 안 갈린다.
+ *   상한 상수를 인자로 받지 않는 이유도 같다 — 호출부마다 다른 값을 넣으면 잣대가 다시 갈라진다.
  */
-export function isRelevant(chunk: FusedChunk, maxDistance: number): boolean {
-  return chunk.distance <= maxDistance || chunk.lexicalHit;
+export function isRelevant(
+  chunk: { distance: number; lexicalHit?: boolean; acronymHit?: boolean },
+  maxDistance: number,
+): boolean {
+  return (
+    chunk.distance <= maxDistance ||
+    chunk.lexicalHit === true ||
+    (chunk.acronymHit === true && chunk.distance <= ACRONYM_MAX_DISTANCE)
+  );
 }

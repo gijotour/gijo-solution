@@ -1,13 +1,17 @@
 import { describe, it, expect } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
 import {
   extractLexicalTerms,
   buildFtsQuery,
   buildFtsPlan,
   shouldRunLexical,
   hasExactCode,
+  hasExactAcronym,
   fuseResults,
   fuseVariantVectors,
   isRelevant,
+  ACRONYM_MAX_DISTANCE,
   applyCategoryBoost,
   categoryForScreen,
   제목지목매치,
@@ -382,5 +386,106 @@ describe("문서 스코프 — 부스트(applyDocScopeBoost)", () => {
     expect(DOCSCOPE_BOOST).toBeGreaterThanOrEqual(ROLE_BOOST);
     expect(DOCSCOPE_BOOST).toBeLessThanOrEqual(ROLE_BOOST); // 대등(위로 안 올림) — 둘이 같다
     expect(ROLE_BOOST).toBeGreaterThan(CATEGORY_BOOST);
+  });
+});
+
+// ── B1 — 홑 약어 정의 물음("VPR이 뭐야?")이 사내 문서를 못 찾는다(2026-09-11 설계관 지시서) ──
+// 뿌리: 게이트의 어휘 신호가 코드(대문자+숫자)에만 열려 있었다 — 숫자 없는 약어(VPR·KEV·EPSS·
+// CVSS·VEX·SBOM)는 lexicalHit이 못 되고 words로만 BM25 순위에 갈 뿐 관련성 게이트를 못 넘었다.
+describe("★ 약어 낱말 신호(B1) — 대문자 3~6자 약어를 뽑는다(전-6 정직)", () => {
+  it("정의형 홑 약어 물음에서 약어를 뽑는다", () => {
+    const cases: [string, string][] = [
+      ["VPR이 뭐야?", "VPR"],
+      ["KEV가 뭐야?", "KEV"],
+      ["EPSS가 뭐야?", "EPSS"],
+      ["CVSS가 뭐야?", "CVSS"],
+      ["SBOM이 뭐야?", "SBOM"],
+      ["VEX가 뭐야?", "VEX"],
+    ];
+    for (const [q, a] of cases) expect(extractLexicalTerms(q).acronyms, q).toEqual([a]);
+  });
+
+  it("한글만인 질문은 빈 배열", () => {
+    expect(extractLexicalTerms("우리 회사 취약점 관리 절차 알려줘").acronyms).toEqual([]);
+  });
+
+  it("약어는 BM25 질의를 흔들지 않는다 — buildFtsQuery·buildFtsPlan 결과 불변", () => {
+    const terms = extractLexicalTerms("CVE-2021-44228 log4j");
+    expect(buildFtsQuery(terms)).toBe("CVE 2021 44228 log4j");
+    const plan = buildFtsPlan(extractLexicalTerms("VPR이 뭐야?"));
+    expect(plan.words.filter((w) => w === "vpr")).toHaveLength(1); // vpr이 words로 한 번만 들어간다(기존 경로)
+  });
+
+  it("코드로 이미 잡힌 약어는 중복 신호로 안 넣는다(CVE-2021-44228의 CVE)", () => {
+    expect(extractLexicalTerms("CVE-2021-44228").acronyms).not.toContain("CVE");
+  });
+
+  it("문서 유형·기술 잡낱말 약어는 근거 신호가 아니다 — PDF·CSV·API·HTTP", () => {
+    expect(extractLexicalTerms("PDF로 내보내줘").acronyms).toEqual([]);
+    expect(extractLexicalTerms("CSV 받고 싶어").acronyms).toEqual([]);
+    expect(extractLexicalTerms("API 응답이 이상해").acronyms).toEqual([]);
+  });
+});
+
+describe("★ 약어 낱말 경계 매칭(hasExactAcronym) — convex·vexing은 VEX가 아니다", () => {
+  it("낱말 경계 밖은 안 걸린다", () => {
+    expect(hasExactAcronym("convex hull과 vexing한 문제", ["VEX"])).toBe(false);
+  });
+  it("낱말 그대로면 대소문자 무관하게 걸린다", () => {
+    expect(hasExactAcronym("VEX 문서를 내보낸다", ["VEX"])).toBe(true);
+    expect(hasExactAcronym("vex 상태", ["VEX"])).toBe(true);
+  });
+  it("약어가 없으면 항상 false", () => {
+    expect(hasExactAcronym("아무 텍스트", [])).toBe(false);
+  });
+});
+
+describe("★ 관련성 게이트 — 약어 히트 갈래(B1 확장, 잡음 주입 계약은 그대로)", () => {
+  const chunk = (over: Partial<FusedChunk>): FusedChunk => ({
+    text: "t", documentId: "d", distance: 2, lexicalHit: false, rrf: 0.5, ...over,
+  });
+
+  it("★잡음 주입 차단 유지 — 벡터 후보 밖 조각(거리 모름)은 약어만으로 통과 못 한다(2026-07-19 계약)", () => {
+    const fused = fuseResults({ vector: [], lexical: [{ text: "VPR 어쩌구", documentId: "x" }] }, [], ["VPR"]);
+    expect(fused[0].distance).toBe(Number.POSITIVE_INFINITY);
+    expect(fused[0].acronymHit).toBe(true);
+    expect(isRelevant(fused[0], 0.95)).toBe(false);
+  });
+
+  it("약어 히트는 ACRONYM_MAX_DISTANCE까지만 — 그 안쪽은 통과, 밖은 불통과", () => {
+    expect(isRelevant(chunk({ acronymHit: true, distance: 1.05 }), 0.95)).toBe(true);
+    expect(isRelevant(chunk({ acronymHit: true, distance: 1.2 }), 0.95)).toBe(false);
+    expect(ACRONYM_MAX_DISTANCE).toBeLessThan(1.2);
+  });
+
+  it("lexicalHit은 거리 무관하게 통과(기존 동작 회귀 고정)", () => {
+    expect(isRelevant(chunk({ lexicalHit: true, distance: Number.POSITIVE_INFINITY }), 0.95)).toBe(true);
+  });
+
+  it("fuseResults가 세 번째 인자(acronyms) 없이도 호출된다 — 기존 2인자 호출부 회귀 없음", () => {
+    const fused = fuseResults({ vector: [{ text: "v", documentId: "d", distance: 0.5 }], lexical: [] }, []);
+    expect(fused[0].acronymHit).toBe(false);
+  });
+});
+
+// ── 소스 감시 — 「세 번째면 소스 감시」: 관련성 게이트 식을 isRelevant 밖에서 다시 적지 않는다 ──
+describe("소스 감시 — 관련성 게이트 잣대는 isRelevant 한 곳", () => {
+  it("server/src/engine 아래 .ts에 손으로 적은 사본이 없다(hybridsearch.ts 자기 자신은 제외)", () => {
+    const dir = path.join(__dirname, "..", "src", "engine");
+    const 사본_RE = /lexicalHit\s*\|\|\s*[\s\S]{0,40}RAG_RELEVANCE_MAX_DISTANCE|RAG_RELEVANCE_MAX_DISTANCE[\s\S]{0,40}\|\|\s*[\s\S]{0,10}lexicalHit/;
+    const 걸린파일: string[] = [];
+    const walk = (d: string) => {
+      for (const name of fs.readdirSync(d)) {
+        const p = path.join(d, name);
+        const st = fs.statSync(p);
+        if (st.isDirectory()) walk(p);
+        else if (name.endsWith(".ts") && name !== "hybridsearch.ts") {
+          const src = fs.readFileSync(p, "utf8");
+          if (사본_RE.test(src)) 걸린파일.push(name);
+        }
+      }
+    };
+    walk(dir);
+    expect(걸린파일, `관련성 게이트 사본이 발견됐다: ${걸린파일.join(", ")}`).toEqual([]);
   });
 });

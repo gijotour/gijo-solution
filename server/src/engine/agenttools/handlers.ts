@@ -482,6 +482,20 @@ export function ontologyLinesFor(text: string, limit: number): string[] {
 // 바꿔 말해도 배너는 남는다(이 기계의 존재 이유). explain-banner.test 소스 감시가 짝을 지킨다.
 export const 지식근거없음표지 = /(등록부에서 찾은 근거가 없습니다|매뉴얼 근거가 검색되지 않았습니다|지정하신 문서 범위.*찾은 근거가 없습니다)/;
 
+// ★★ 2026-09-11 설계관 지시서(B1 ④ / B2) — **온톨로지 전용 답의 정직 표지.**
+//   문서 발췌가 0건인데 온톨로지 관계만 실리면(예: 「VPR이 뭐야?」가 explain의 topic만으로
+//   검색해 문서를 못 찾고 온톨로지 덤프만 답이 될 때) 근거 없이 답한 것인데 지식근거없음표지도
+//   자료없음배너도 안 걸려 아무 표시가 없었다(이 파일 577행 옛 B2 백로그가 그 자리다).
+//   자료없음배너를 재사용하지 않는 이유 — 그 배너는 「아래는 일반 지식 기준」이라 말하는데
+//   여기는 온톨로지(제품 내장 지식 그래프)라는 근거가 실재한다. 재사용하면 정직 라운드에서
+//   새 거짓을 만드는 꼴이다. noevidence.ts 배너표에도 안 넣는다 — 근거없음종류판정이
+//   non-null을 내면 클라(chatparts.js dimEstimates)가 답 안의 숫자를 전부 모델 추정치로 옅게
+//   칠하는데, 온톨로지에서 온 숫자(VPR 범위 0.1–10.0 등)는 실제 원천이 있는 값이라 없던
+//   거짓말이 새로 생긴다. 그래서 문장의 주인을 여기 상수 하나로 두고, agentloop이 같은 상수를
+//   읽어 최종 답 머리에 코드로 붙인다(온톨로지근거임을밝힌다 참고).
+export const 온톨로지전용알림 = `${표식.주의} **사내 문서 근거는 없습니다 — 아래 정의·관계는 제품에 내장된 지식 그래프(온톨로지)가 원천입니다.**`;
+export const 온톨로지전용표지 = /사내 문서 근거는 없습니다 — 아래 정의·관계는/;
+
 // ★★ 2026-09-11 검토관 [하] 수리 — **싣는 개수와 라벨 숫자를 한 값으로 묶는다.**
 //   발췌 블록은 세 군데(runExplain·get_asset·search)에 있는데 각자 topK와 slice가 달라
 //   라벨 「N건」이 실제 실린 줄 수보다 클 수 있었다(get_asset·search는 queryMemory topK 5 · slice 4).
@@ -496,6 +510,8 @@ const EXPLAIN_MAX_CHARS = 3500;
 export async function runExplain(args: Record<string, string>): Promise<string> {
   const topic = args.topic.trim();
   const out: string[] = [];
+  // B2 — 온톨로지 전용 답 표지가 볼 신호. 발췌(사내 문서 본문)가 실제로 실렸는지만 본다.
+  let 발췌실림 = false;
 
   // ⚠ 문서를 콕 집은 질문(「이 영향평가 안내서에서 대상 기준…」)은 **그 문서가 권위**다 — 문서 발췌를
   //   온톨로지보다 **앞에** 싣는다. 안 그러면 7B가 앞줄(온톨로지)을 답으로 삼아, 도메인 낱말(대상=스캔
@@ -539,6 +555,7 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
     const 살균 = sanitizeRagChunks(graded.chunks, { source: "tool:explain", question: topic });
     const chunks = 살균.chunks;
     if (chunks.length) {
+      발췌실림 = true;
       out.push(
         발췌라벨(chunks.length),
         // ★ 2026-09-11 3→4(발췌최대) — 형제 경로(get_asset·search)와 맞춘다. 옛 3은 라벨의
@@ -574,12 +591,14 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   }
 
   if (문서우선 && !지정범위.length) out.push(...온톨로지); // 문서 지목: 온톨로지를 발췌 **뒤로**(발췌가 권위)
-  // ⚠ 백로그 B2(2026-09-11 검토관 [하] — 이번 라운드 제외, 근거를 여기 남긴다):
-  //   발췌가 0건인데 온톨로지만 실리면 sources가 안 서고(도구근거보고는 발췌가 있을 때만 부른다),
-  //   out이 비지 않으니 지식근거없음표지도 안 선다 → agentloop의 「일반 지식 기준」 배너도 안 붙는다.
-  //   즉 **근거 없이 답했는데 아무 표시도 없는 자리**다. 제목지목이 늘면 그 표면도 함께 넓어진다
-  //   (2026-09-11 실측: 새로 explain이 못 박히는 문장 3개). 고치려면 「온톨로지 전용 답」을
-  //   표지로 구분해야 하는데, 그건 배너 문구·explain-banner 계약을 함께 건드리는 일이라 분리한다.
+  // ★★ 백로그 B2 — **이 라운드에서 닫았다**(2026-09-11 설계관 지시서). 옛 주석은 「발췌가 0건인데
+  //   온톨로지만 실리면 근거 없이 답했는데 아무 표시도 없다」고 적어 뒀는데, 이제 발췌실림이
+  //   그 신호를 들고 있으므로 여기서 온톨로지 전용 표지를 맨 앞에 붙인다. out에 붙이면
+  //   agentloop의 온톨로지근거임을밝힌다(handlers.온톨로지전용표지를 본다)가 최종 답 머리에
+  //   같은 문장을 코드로 얹는다 — 모델 재작성 운에 정직을 맡기지 않는다.
+  //   ⚠ 지정범위가 걸린 경로는 제외한다 — 그 0건은 별개 사실(아래 「지정하신 문서 범위 …」
+  //   문장)이라 이미 정직한 최종 답이고, 여기서 또 표지를 얹으면 두 사실이 뒤섞인다.
+  if (!발췌실림 && 온톨로지.length && !지정범위.length) out.unshift(온톨로지전용알림);
 
   // ★★ 2026-09-11 검토관 [중] 수리 — 아래 두 블록은 **꼬리**로 따로 모아 자리를 먼저 준다.
   //   왜: 같은 날 커밋(2b01e479)이 발췌를 3→4로 늘려 발췌 블록만 최대 2,456자(4×604+라벨)가 됐는데
@@ -630,6 +649,8 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
   // 총량은 EXPLAIN_MAX_CHARS 그대로(본문 발췌가 들어가 2500에서 올린 값). 꼬리에 **먼저** 자리를
   // 주고 남은 만큼만 앞(발췌·온톨로지)을 싣는다 — 잘려도 되는 쪽은 발췌의 끝자락이지, 담당자가
   // 원문으로 찾아가는 문서 이름이 아니다.
+  // ⚠ 온톨로지전용알림은 out의 **맨 앞**(unshift)이라 이 슬라이스가 뒤를 잘라도 표지 자체는
+  //   남는다 — 잘리는 것은 항상 표지 다음에 온 온톨로지 관계 줄이지, 정직 표지가 아니다.
   const 꼬리글 = 꼬리.join("\n").slice(0, EXPLAIN_MAX_CHARS);
   const 앞여유 = EXPLAIN_MAX_CHARS - (꼬리글 ? 꼬리글.length + 1 : 0);
   const 앞글 = out.join("\n").slice(0, Math.max(0, 앞여유));

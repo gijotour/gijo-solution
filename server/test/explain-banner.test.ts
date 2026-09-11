@@ -5,11 +5,28 @@
 // explain 도구로 흘러 배너 없이 나갔다. 답이 정직했던 건 모델의 운이었다.
 // 수리: agentloop 지식없음을밝힌다 — explain·remediation의 0-근거 문장(결정적 표지)을 보고
 // **코드가** 배너를 붙인다.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { 지식없음을밝힌다 } from "../src/engine/agentloop";
-import { 지식근거없음표지 } from "../src/engine/agenttools";
+
+// ★ 「발췌가 실리면 온톨로지 표지는 안 선다」시험 전용 — queryMemoryGraded를 모킹해 runExplain의
+//   실제 출력을 잰다(소스가 아니라 출력으로 단언). 다른 시험(지식없음을밝힌다 단위 시험·소스 감시)은
+//   runExplain을 안 부르므로 이 모킹의 영향을 안 받는다.
+vi.mock("../src/engine/memory", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../src/engine/memory")>();
+  return {
+    ...orig,
+    queryMemoryGraded: vi.fn(async () => ({
+      chunks: ["VPR은 Tenable이 매기는 취약점 우선순위 점수다."],
+      titles: ["epss_vs_vpr.md"],
+      scored: [{ text: "VPR은 Tenable이 매기는 취약점 우선순위 점수다.", distance: 0.5, documentId: "epss_vs_vpr.md", lexicalHit: false }],
+      약한근거만: false,
+    })),
+  };
+});
+
+import { 지식없음을밝힌다, 온톨로지근거임을밝힌다 } from "../src/engine/agentloop";
+import { 지식근거없음표지, 온톨로지전용알림, 온톨로지전용표지, runExplain } from "../src/engine/agenttools";
 import { 자료없음배너 } from "../src/engine/llm";
 
 const call = (tool: string, result: string) => ({ tool, args: {}, result });
@@ -77,5 +94,81 @@ describe("소스 감시 — 표지와 실제 문장이 어긋나면 배너가 �
     expect((llmSrc.match(/이 PC의 사내 자료에는 이 내용이 없습니다/g) ?? []).length).toBe(1);
     expect(loopSrc).not.toContain("이 PC의 사내 자료에는 이 내용이 없습니다");
     expect(loopSrc).toContain("자료없음배너");
+  });
+});
+
+// ── B2 — 온톨로지 전용 답의 정직 표지 (2026-09-11 설계관 지시서 · 이 라운드에서 닫음) ──────
+//
+// 옛 백로그: explain이 문서 발췌 0건에 온톨로지 관계만 실으면 근거 없이 답한 것인데
+// 지식근거없음표지도 자료없음배너도 안 걸려 아무 표시가 없었다. 이제 handlers.ts가
+// 온톨로지전용알림을 out 맨 앞에 붙이고(발췌실림 조건), 이 함수가 그 표지를 보고 최종 답
+// 머리에 같은 문장을 코드로 얹는다.
+const 온톨로지결과 = `${온톨로지전용알림}\n사내 온톨로지 관계 — "VPR" 관련:\n  - VPR —[정식명칭]→ Vulnerability Priority Rating`;
+
+describe("B2 — 온톨로지 전용 답에는 코드가 표지를 붙인다(전-6 정직)", () => {
+  it("온톨로지만 실리면 답 머리에 표지가 선다", () => {
+    const out = 온톨로지근거임을밝힌다("VPR은 Tenable의 우선순위 점수입니다.", [call("explain", 온톨로지결과)]);
+    expect(out.startsWith(온톨로지전용알림)).toBe(true);
+    expect(out).toContain("VPR은 Tenable의 우선순위 점수입니다."); // 답을 버리지 않는다
+  });
+
+  it("다른 도구가 사내 데이터를 가져왔으면 안 붙는다 — 자료 있는 대화다", () => {
+    const reply = "VPR은 우선순위 점수입니다.";
+    const calls = [call("explain", 온톨로지결과), call("search", "자산 2건: web01, web02 …")];
+    expect(온톨로지근거임을밝힌다(reply, calls)).toBe(reply);
+  });
+
+  it("답 머리가 이미 정직하면 겹쳐 붙이지 않는다", () => {
+    const honest = "근거가 없습니다 — 온톨로지 관계로만 보면 VPR은 우선순위 점수입니다.";
+    expect(온톨로지근거임을밝힌다(honest, [call("explain", 온톨로지결과)])).toBe(honest);
+  });
+
+  it("도구를 안 썼거나 답이 비면 그대로 둔다", () => {
+    expect(온톨로지근거임을밝힌다("답", [])).toBe("답");
+    expect(온톨로지근거임을밝힌다("", [call("explain", 온톨로지결과)])).toBe("");
+  });
+});
+
+describe("소스 감시 — 온톨로지 전용 표지가 다른 계약과 안 부딪힌다", () => {
+  it("FAIL_MARKS 어느 것에도 안 걸린다 — 정직한 표지가 실패 딱지를 받으면 안 된다", () => {
+    const auditSrc = fs.readFileSync(path.join(__dirname, "..", "..", "tools", "drawer-audit.mjs"), "utf8");
+    const m = auditSrc.match(/const FAIL_MARKS = \[([\s\S]*?)\];/);
+    expect(m, "FAIL_MARKS 배열을 못 찾았다 — drawer-audit.mjs 꼴이 바뀌었으면 이 시험도 함께 볼 것").toBeTruthy();
+    const marks = [...m![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+    expect(marks.length).toBeGreaterThan(0);
+    for (const mark of marks) {
+      expect(온톨로지전용알림.includes(mark), `표지가 FAIL_MARKS "${mark}"에 걸린다`).toBe(false);
+    }
+  });
+
+  it("지식근거없음표지에는 안 걸린다 — 걸리면 자료없음 배너가 잘못 붙는다", () => {
+    expect(지식근거없음표지.test(온톨로지전용알림)).toBe(false);
+  });
+
+  it("evalgate 배너_RE가 이 표지를 채점 본문에서 뗀다", () => {
+    const evalSrc = fs.readFileSync(path.join(__dirname, "..", "..", "tools", "evalgate", "run.mjs"), "utf8");
+    const m = /const 배너_RE = \/(.+)\/([gimsuy]*);/.exec(evalSrc);
+    expect(m, "배너_RE 정의를 못 찾았다 — 꼴이 바뀌었으면 이 시험도 함께 볼 것").toBeTruthy();
+    const 배너_RE = new RegExp(m![1], m![2]);
+    // 배너는 늘 `${배너}\n\n${답}` 꼴로 실제 답 앞에 붙는다 — 그 모양 그대로 대조한다.
+    const 답 = `${온톨로지전용알림}\n\nVPR은 우선순위 점수입니다.`;
+    expect(답.replace(배너_RE, ""), "새 표지가 배너_RE에 안 걸린다 — 채점 본문에 섞인다").toBe("VPR은 우선순위 점수입니다.");
+  });
+});
+
+describe("발췌가 실리면 온톨로지 표지는 안 선다(반대 방향)", () => {
+  it("queryMemoryGraded가 발췌를 주면 runExplain 출력에 온톨로지전용표지가 안 선다", async () => {
+    const out = await runExplain({ topic: "VPR" });
+    expect(out, "발췌가 실려야 이 시험이 뜻을 갖는다").toContain("사내 문서 근거(발췌)");
+    expect(온톨로지전용표지.test(out), "발췌가 있는데 온톨로지 전용 표지가 섰다").toBe(false);
+  });
+
+  // ⚠ 위 실행 검사는 시험 DB에 온톨로지 씨앗이 없으면 온톨로지.length가 애초에 0이라
+  //   조용히 아무것도 안 잰다(toolevidence.test.ts의 같은 함정과 동형). 그래서 표지를 거는
+  //   조건 자체를 소스로 함께 문다 — 둘 중 하나만으로는 헛초록이 난다.
+  it("표지 조건이 발췌실림을 함께 본다 — 잣대가 빠지면 여기가 빨개진다", () => {
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine/agenttools/handlers.ts"), "utf8");
+    expect(src, "발췌실림 없이 온톨로지 유무만으로 표지를 걸면 발췌가 있어도 표지가 선다")
+      .toContain("if (!발췌실림 && 온톨로지.length && !지정범위.length) out.unshift(온톨로지전용알림);");
   });
 });

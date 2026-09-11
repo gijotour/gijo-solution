@@ -28,7 +28,21 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-const { ingestDocument, ingestText, queryMemory, listDocuments, getDocumentChunks, getChunksForDocuments, getDocumentSample, deleteDocument, 지목후보Ids } = await import("../src/engine/memory");
+// ★★ 2026-09-11 설계관 지시서(B1) — queryMemoryGraded를 **hybridsearch.fuseResults 모킹으로
+//   태워** 실측한다. fuseResults 하나만 갈아 끼우고 나머지(isRelevant·applyOriginBoost 등)는
+//   진짜를 쓴다 — 이 시험이 재는 것은 queryMemoryGraded 자신의 관련성 게이트·가까움 계산이지
+//   검색 자체가 아니다. override가 null이면(기본값) 진짜 fuseResults로 위임해 이 파일의
+//   다른 시험(ingestDocument·queryMemory 등 실제 검색 경로)에는 한 글자도 영향이 없다.
+const fuseOverride = vi.hoisted(() => ({ impl: null as null | ((...args: unknown[]) => unknown) }));
+vi.mock("../src/engine/hybridsearch", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../src/engine/hybridsearch")>();
+  return {
+    ...orig,
+    fuseResults: (...args: unknown[]) => (fuseOverride.impl ? fuseOverride.impl(...args) : orig.fuseResults(...(args as Parameters<typeof orig.fuseResults>))),
+  };
+});
+
+const { ingestDocument, ingestText, queryMemory, queryMemoryGraded, listDocuments, getDocumentChunks, getChunksForDocuments, getDocumentSample, deleteDocument, 지목후보Ids } = await import("../src/engine/memory");
 
 const DOC_A = path.join(tmpDb, "doc-a.txt");
 const DOC_B = path.join(tmpDb, "doc-b.txt");
@@ -443,5 +457,49 @@ describe("조각에 제어문자를 남기지 않는다 — 텍스트 계열 인
     const chunks = chunkText(표);
     expect(chunks.length).toBeGreaterThan(0);
     expect(chunks.join("\n"), "탭이 공백으로 바뀌면 표가 무너진다").toContain("포트1\t444");
+  });
+});
+
+// ★★ 2026-09-11 설계관 지시서(B1) — 약어로만 통과한 근거는 **가까움이 아니다**(근거세기 정직).
+//   fuseResults를 모킹해 조각을 직접 통제하고, isRelevant·가까움 계산은 진짜 queryMemoryGraded를
+//   그대로 지난다 — 게이트를 뚫었다고 배지까지 강함이 되면 안 된다는 계약을 실측으로 못 박는다.
+describe("★ 약어로만 통과한 근거는 가까움이 아니다 — 근거세기 약함(전-6 정직)", () => {
+  // ⚠ 앞선 「memory scope」 describe가 끝나며 tmpDb를 통째로 지운다(afterAll rmSync) — 그 뒤에
+  //   자리한 이 블록은 openDocsTable이 표를 못 찾아 hybridSearch가 조용히 []로 되돌아간다
+  //   (실측으로 잡음 — table=false·tableNames=[]). fuseResults를 모킹해도 그 앞에서 이미
+  //   빈 배열로 끝나면 모킹이 원리상 안 불린다. 그래서 이 describe가 **제 표를 스스로 만든다.**
+  beforeAll(async () => {
+    embedDim = 3;
+    fs.mkdirSync(tmpDb, { recursive: true });
+    await ingestText("★약어시험-배경.md", "이 시험이 표를 만들려고 넣는 배경 문서다.", "global");
+  });
+  afterAll(() => { fuseOverride.impl = null; });
+
+  it("acronymHit=true·distance=1.0 조각만 있을 때 약한근거만===true", async () => {
+    embedDim = 3;
+    fuseOverride.impl = () => [
+      { text: "VPR은 Tenable이 매기는 취약점 우선순위 점수다.", documentId: "epss_vs_vpr.md", distance: 1.0, lexicalHit: false, acronymHit: true, rrf: 0.5 },
+    ];
+    try {
+      const graded = await queryMemoryGraded("VPR이 뭐야?", 4);
+      expect(graded.chunks.length, "약어 히트 조각이 관련성 게이트를 못 넘었다").toBe(1);
+      expect(graded.약한근거만, "약어로만 통과한 근거인데 강함으로 나왔다 — 배지가 거짓말을 한다").toBe(true);
+    } finally {
+      fuseOverride.impl = null;
+    }
+  });
+
+  it("lexicalHit=true 조각이 섞이면 false(기존 동작)", async () => {
+    embedDim = 3;
+    fuseOverride.impl = () => [
+      { text: "VPR은 Tenable이 매기는 취약점 우선순위 점수다.", documentId: "epss_vs_vpr.md", distance: 1.0, lexicalHit: false, acronymHit: true, rrf: 0.5 },
+      { text: "CVE-2026-00001 관련 조치.", documentId: "cve.md", distance: Number.POSITIVE_INFINITY, lexicalHit: true, acronymHit: false, rrf: 0.4 },
+    ];
+    try {
+      const graded = await queryMemoryGraded("VPR이 뭐야?", 4);
+      expect(graded.약한근거만).toBe(false);
+    } finally {
+      fuseOverride.impl = null;
+    }
   });
 });
