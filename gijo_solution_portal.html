@@ -1,0 +1,2797 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>GIJO 취급 솔루션 - 통합 소개 및 스마트 아키텍처 에디터</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <!-- Mermaid.js Engine -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      min-height: 100vh;
+      line-height: 1.45;
+      background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+      background-size: 18px 18px;
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .portal-header {
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid #e2e8f0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    }
+
+    .portal-container {
+      max-width: 1800px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    .header-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 20px;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+      flex-shrink: 0;
+    }
+
+    .brand-badge {
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      color: #2563eb;
+      background: #eff6ff;
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid #bfdbfe;
+      display: inline-block;
+      margin-bottom: 2px;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+    }
+
+    .header-right-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-main-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: #ffffff;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    }
+
+    .header-count-box {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      background: #ffffff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Sub Navigation Container */
+    .sub-nav-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    @media (min-width: 1024px) {
+      .sub-nav-container {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+      }
+    }
+
+    .tabs-wrapper {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 2px 0;
+    }
+
+    .nav-tab-button {
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid #e2e8f0;
+      color: #64748b;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .nav-tab-button:hover {
+      color: #0f172a;
+      border-color: #2563eb;
+    }
+
+    .nav-tab-button.active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: transparent;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+      font-weight: 700;
+    }
+
+    .filter-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #ffffff;
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748b;
+      padding: 0 6px;
+    }
+
+    .filter-btn {
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      border: none;
+      background: transparent;
+      color: #64748b;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      font-weight: 800;
+    }
+
+    /* Solutions Grid */
+    .solutions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    @media (min-width: 1024px) {
+      .solutions-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+
+    @media (min-width: 1280px) {
+      .solutions-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 768px) {
+      .solutions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 480px) {
+      .solutions-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    }
+
+    /* Memo Paper Card */
+    .memo-paper-card {
+      background-color: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .memo-paper-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #06b6d4 100%);
+    }
+
+    .memo-paper-card:hover {
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+      transform: translateY(-3px);
+      border-color: #3b82f6;
+    }
+
+    .memo-paper-card.active-selected {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+      background-color: #eff6ff;
+    }
+
+    .card-title-text {
+      font-size: 14px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .diagram-badge-tag {
+      font-size: 10px;
+      font-weight: 800;
+      color: #16a34a;
+      background: #f0fdf4;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #bbf7d0;
+    }
+
+    .card-fields {
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .field-label {
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .field-val-category {
+      font-weight: 700;
+      color: #2563eb;
+    }
+
+    .field-val {
+      font-weight: 500;
+      color: #334155;
+    }
+
+    .action-bar {
+      padding-top: 8px;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      color: #2563eb;
+    }
+
+    /* Full-Width Detail Section */
+    .full-width-detail-container {
+      margin-top: 20px;
+      padding: 20px;
+      background: #ffffff;
+      border: 2px solid #2563eb;
+      border-radius: 16px;
+      box-shadow: 0 12px 32px rgba(37, 99, 235, 0.15);
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 14px;
+      border-bottom: 2px solid #e2e8f0;
+      margin-bottom: 18px;
+      gap: 12px;
+    }
+
+    .detail-sol-name {
+      font-size: 20px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .excel-full-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      border: 1px solid #cbd5e1;
+      margin-bottom: 20px;
+    }
+
+    .excel-full-table th {
+      background: #f1f5f9;
+      padding: 10px 14px;
+      font-weight: 800;
+      color: #1e293b;
+      border: 1px solid #cbd5e1;
+      width: 150px;
+      white-space: nowrap;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .excel-full-table td {
+      padding: 10px 14px;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+      vertical-align: top;
+      white-space: pre-wrap;
+      word-break: keep-all;
+      line-height: 1.6;
+    }
+
+    /* Architecture Visual Display Card inside Detail View */
+    .detail-arch-box {
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #ffffff;
+      margin-top: 16px;
+      margin-bottom: 16px;
+    }
+
+    .detail-arch-header {
+      background: #0f172a;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #ffffff;
+    }
+
+    /* Canvas Builder Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .builder-modal-card {
+      background: #ffffff;
+      border-radius: 16px;
+      width: 96vw;
+      max-width: 1650px;
+      height: 94vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+    }
+
+    .builder-layout {
+      display: flex;
+      flex: 1;
+      height: calc(94vh - 120px);
+      overflow: hidden;
+    }
+
+    .toolbox-sidebar {
+      width: 320px;
+      background: #f8fafc;
+      border-right: 1px solid #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .toolbox-header {
+      padding: 12px 14px;
+      background: #e2e8f0;
+      font-size: 13px;
+      font-weight: 900;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toolbox-search-input {
+      padding: 6px 10px;
+      font-size: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      width: calc(100% - 24px);
+      margin: 8px 12px;
+    }
+
+    .toolbox-body {
+      padding: 10px 12px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .toolbox-cat-title {
+      font-size: 11px;
+      font-weight: 900;
+      color: #2563eb;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .toolbox-items-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .toolbox-item-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #1e293b;
+      cursor: grab;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .toolbox-item-card:hover {
+      border-color: #2563eb;
+      background: #eff6ff;
+      transform: translateY(-2px);
+    }
+
+    .builder-canvas-area {
+      flex: 1;
+      background: #ffffff;
+      background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
+      background-size: 18px 18px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .builder-canvas-toolbar {
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+
+    .svg-wire-layer {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .wire-path {
+      stroke: #2563eb;
+      stroke-width: 2.5;
+      fill: none;
+      transition: stroke 0.2s;
+    }
+
+    .canvas-node {
+      position: absolute;
+      background: #ffffff;
+      border: 2px solid #2563eb;
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      cursor: move;
+      width: 190px;
+      user-select: none;
+      z-index: 5;
+    }
+
+    .canvas-node-header {
+      font-size: 13px;
+      font-weight: 900;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .canvas-node-zone {
+      font-size: 10px;
+      color: #64748b;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .anchor-port {
+      position: absolute;
+      width: 12px; height: 12px;
+      background: #2563eb;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      cursor: crosshair;
+      box-shadow: 0 0 6px rgba(37, 99, 235, 0.6);
+      z-index: 6;
+    }
+
+    .anchor-port:hover {
+      transform: scale(1.4);
+      background: #7c3aed;
+    }
+
+    .anchor-port.top { top: -6px; left: 50%; transform: translateX(-50%); }
+    .anchor-port.bottom { bottom: -6px; left: 50%; transform: translateX(-50%); }
+    .anchor-port.left { left: -6px; top: 50%; transform: translateY(-50%); }
+    .anchor-port.right { right: -6px; top: 50%; transform: translateY(-50%); }
+
+    .wire-label-badge {
+      position: absolute;
+      background: #ffffff;
+      border: 1px solid #2563eb;
+      color: #0f172a;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      z-index: 8;
+      white-space: nowrap;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .badge-port-tag {
+      background: #eff6ff;
+      color: #2563eb;
+      font-size: 10px;
+      font-weight: 900;
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid #bfdbfe;
+    }
+
+    .builder-code-sidebar {
+      width: 360px;
+      background: #0f172a;
+      border-left: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .code-preview-textarea {
+      width: 100%;
+      flex: 1;
+      background: #0f172a;
+      color: #38bdf8;
+      border: none;
+      padding: 14px;
+      font-family: monospace;
+      font-size: 11px;
+      resize: none;
+      outline: none;
+      line-height: 1.5;
+    }
+
+    .modal-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title { font-size: 16px; font-weight: 900; color: #0f172a; }
+
+    .modal-close-icon {
+      background: transparent; border: none; font-size: 20px; color: #64748b; cursor: pointer;
+    }
+
+    .modal-footer {
+      padding: 12px 20px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .btn-cancel {
+      padding: 8px 16px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+
+    .btn-submit {
+      padding: 8px 20px; border: none; background: #2563eb; color: #ffffff; border-radius: 8px; font-size: 13px; font-weight: 800; cursor: pointer;
+    }
+
+    .toast-container {
+      position: fixed; bottom: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .toast-message {
+      background: #0f172a; color: #ffffff; padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 700; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    .portal-footer {
+      background: #ffffff;
+      border-top: 1px solid #e2e8f0;
+      padding: 16px 0;
+      margin-top: 30px;
+      font-size: 12px;
+      color: #475569;
+    }
+
+    .footer-link {
+      color: #2563eb; font-weight: 700; text-decoration: underline; margin-left: 4px; word-break: break-all;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="portal-header">
+    <div class="portal-container" style="padding-top: 10px; padding-bottom: 10px;">
+      
+      <div class="header-top-row">
+        <div class="header-brand">
+          <div class="brand-logo">🛡️</div>
+          <div>
+            <div class="brand-badge">GIJO TECHNOLOGY & ARCHITECTURE</div>
+            <h1 class="header-title">GIJO 취급 솔루션 - 통합 소개 및 스마트 아키텍처 에디터</h1>
+          </div>
+        </div>
+
+        <!-- Navigation View Modes -->
+        <div style="display: flex; align-items: center; gap: 6px; background: #f1f5f9; padding: 4px; border-radius: 10px; border: 1px solid #cbd5e1;">
+          <button class="nav-tab-button active" id="viewBtnCatalog" onclick="setViewMode('catalog')">📌 솔루션 카탈로그</button>
+          <button class="nav-tab-button" id="viewBtnGallery" onclick="setViewMode('gallery')">🏗️ 아키텍처 모아보기</button>
+          <button class="btn-main-action" onclick="openBuilderModal('GLOBAL_COMMON')" style="padding: 5px 12px; font-size: 11px;">
+            <span>🎨</span>
+            <span>스마트 아키텍처 스튜디오</span>
+          </button>
+        </div>
+
+        <div class="header-right-actions">
+          <div class="header-count-box">
+            총 솔루션: <strong id="totalCount" style="color: #2563eb; font-weight: 900;">20</strong>개
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub Navigation Container -->
+      <div class="sub-nav-container">
+        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+          <div style="position: relative; width: 280px; flex-shrink: 0;">
+            <input type="text" id="globalProductSearch" placeholder="🔍 솔루션명, 키워드, 포트(443, 8834) 검색..." 
+                   oninput="onSearchInput(this.value)" 
+                   style="width: 100%; padding: 6px 12px 6px 30px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 800; color: #0f172a; outline: none; background: #ffffff;">
+            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: #64748b;">🔍</span>
+          </div>
+          <div class="tabs-wrapper" id="categoryTabs"></div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <!-- Arch Filter Box -->
+          <div class="filter-wrapper">
+            <span class="filter-label">아키텍처:</span>
+            <button class="filter-btn active" id="archFilterAll" onclick="setArchFilter('전체')">전체</button>
+            <button class="filter-btn" id="archFilterHas" onclick="setArchFilter('보유')">🔌 보유</button>
+            <button class="filter-btn" id="archFilterNeed" onclick="setArchFilter('미등록')">➕ 직접등록</button>
+          </div>
+
+          <!-- Vendor Filter Box -->
+          <div class="filter-wrapper">
+            <span class="filter-label">구분:</span>
+            <button class="filter-btn active" onclick="setVendorFilter('전체')">전체</button>
+            <button class="filter-btn" onclick="setVendorFilter('국산')">국산</button>
+            <button class="filter-btn" onclick="setVendorFilter('외산')">외산</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="portal-container" style="padding-top: 14px; padding-bottom: 20px;">
+    
+    <div style="background: #ffffff; padding: 12px 16px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); display: flex; align-items: center; justify-content: space-between; font-size: 12px; margin-bottom: 14px;">
+      <div>
+        <span style="font-weight: 800; color: #2563eb; background: #eff6ff; padding: 2px 8px; border-radius: 4px; border: 1px solid #bfdbfe;" id="categoryBadge">
+          📌 전체 카탈로그
+        </span>
+        <span style="margin-left: 8px; color: #475569; font-weight: 500;" id="categoryDesc">
+          GIJO TECHNOLOGY 취급 솔루션 전체 라인업 카탈로그입니다.
+        </span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #64748b; font-weight: 700;">
+        <span>💡 TIP: 원하는 솔루션의 [아키텍처 직접 넣기/수정] 버튼을 클릭해 나만의 아키텍처 구성도를 직접 작성하세요!</span>
+      </div>
+    </div>
+
+    <!-- Grid Container for Catalog Mode -->
+    <div class="solutions-grid" id="solutionsGrid"></div>
+
+    <!-- Gallery View Container (Hidden in Catalog Mode) -->
+    <div id="galleryViewContainer" style="display: none; flex-direction: column; gap: 20px;"></div>
+
+    <!-- Full-Width Detail Area Below Grid -->
+    <div id="fullWidthDetailSection"></div>
+
+  </main>
+
+  <!-- Footer with Notice Link -->
+  <footer class="portal-footer">
+    <div class="portal-container" style="display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: space-between;">
+      <div style="font-size: 13px; font-weight: 600; color: #1e293b; background: #eff6ff; padding: 10px 16px; border-radius: 8px; border: 1px solid #bfdbfe; text-align: center; width: 100%;">
+        📢 세부자료는 <a href="https://gijo.ai/gijohome/user/technology/solution" target="_blank" rel="noopener noreferrer" class="footer-link">https://gijo.ai/gijohome/user/technology/solution</a> 여기서 확인 가능
+      </div>
+      <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+        © 2026 GIJO Technology Corp. All rights reserved.
+      </div>
+    </div>
+  </footer>
+
+  <!-- Canvas Builder Modal -->
+  <div class="modal-overlay" id="builderModal">
+    <div class="builder-modal-card">
+      
+      <!-- Modal Header -->
+      <div class="modal-header" style="background: #ffffff; padding: 14px 20px; border-bottom: 1px solid #cbd5e1;">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">🎨</span>
+            <div>
+              <span class="modal-title" style="font-size: 16px; font-weight: 900; color: #0f172a;">스마트 아키텍처 표준 에디터</span>
+              <span style="font-size: 11px; color: #64748b; margin-left: 8px;">(화면 맞춤형 실시간 프리뷰 & 비주얼 포트 앵커 연동)</span>
+            </div>
+          </div>
+
+          <!-- Preset & Target Selector Area -->
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label style="font-size: 11px; font-weight: 800; color: #475569;">📐 표준 템플릿 불러오기:</label>
+              <select id="builderPresetSelect" onchange="loadPresetTemplate(this.value)" style="padding: 5px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 800; color: #0f172a; background: #ffffff;">
+                <option value="">-- 표준 아키텍처 템플릿 선택 --</option>
+                <option value="GIJO_AS">🛡️ GIJO AS - 온프레미스 AI & CTI 상관분석 표준 구성도</option>
+                <option value="WizCLM">📜 WizCLM - SSL/TLS 인증서 자동 갱신 & CA 연동 구성도</option>
+                <option value="SecureIM">🔐 SecureIM - 특권계정 & 서버 접근제어 구성도</option>
+                <option value="SafeSquare">🤖 SAFESQUARE - AI 공급망 & SBOM 취약점 검증 흐름도</option>
+                <option value="Zscaler">🔑 Zscaler Platform - ZTNA 클라우드 제로트러스트 흐름도</option>
+                <option value="ImpervaWAAP">🌐 Imperva WAAP - 웹/API/DDoS 디도스 방어 흐름도</option>
+                <option value="FalconEDR">💻 Falcon EDR - 클라우드 AI 엔드포인트 수집 흐름도</option>
+                <option value="Standard3Tier">🌐 표준 3-Tier Web/WAS/DB 구성도</option>
+                <option value="MCPGenAI">🔌 MCP Protocol / GenAI 서비스 흐름도</option>
+              </select>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 6px; background: #eff6ff; padding: 4px 10px; border-radius: 8px; border: 1px solid #bfdbfe;">
+              <label style="font-size: 11px; font-weight: 800; color: #2563eb;">🎯 대상 솔루션:</label>
+              <select id="builderTargetSelect" onchange="onBuilderTargetChange(this.value)" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #2563eb; font-size: 12px; font-weight: 900; color: #2563eb; background: #ffffff;">
+              </select>
+            </div>
+
+            <button class="modal-close-icon" onclick="closeBuilderModal()">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editor Mode Switcher Bar -->
+      <div style="background: #f8fafc; padding: 8px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <button class="nav-tab-button active" id="tabBtnCanvas" onclick="switchEditorTab('canvas')">🎨 캔버스 앤 포트 앵커</button>
+          <button class="nav-tab-button" id="tabBtnForm" onclick="switchEditorTab('form')">⚡ 표준 폼 에디터</button>
+          <button class="nav-tab-button" id="tabBtnPreview" onclick="switchEditorTab('preview')">👁️ 실시간 화면 완성본 프리뷰</button>
+          <button class="nav-tab-button" id="tabBtnCode" onclick="switchEditorTab('code')">💻 Mermaid 포트 코드</button>
+        </div>
+
+        <div style="font-size: 11px; color: #64748b; font-weight: 700;">
+          💡 TIP: 노드 간 포트 앵커를 끌거나 폼으로 편리하게 연결 정보를 수정할 수 있습니다.
+        </div>
+      </div>
+
+      <!-- Main Editor Container (Tabbed Content) -->
+      <div style="flex: 1; display: flex; overflow: hidden; position: relative;">
+        
+        <!-- Tab 1: Visual Canvas Editor -->
+        <div id="editorTabCanvas" class="builder-layout" style="width: 100%; height: 100%;">
+          <aside class="toolbox-sidebar">
+            <div class="toolbox-header">
+              <span>🧰 컴포넌트 툴박스</span>
+              <span style="font-size: 10px; background: #2563eb; color: #fff; padding: 2px 6px; border-radius: 4px;">Port & Protocol</span>
+            </div>
+            <input type="text" class="toolbox-search-input" id="toolboxSearch" placeholder="컴포넌트 검색 (예: MCP, FW, DB)" oninput="filterToolboxItems()">
+            <div class="toolbox-body" id="toolboxContainer"></div>
+          </aside>
+
+          <section class="builder-canvas-area" id="builderCanvas" ondragover="event.preventDefault()" ondrop="onCanvasDrop(event)">
+            <svg class="svg-wire-layer" id="svgWireLayer">
+              <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb" />
+                </marker>
+              </defs>
+            </svg>
+
+            <div id="wireBadgesContainer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:8;"></div>
+
+            <div class="builder-canvas-toolbar">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 12px; font-weight: 800; color: #475569;">선 스타일:</span>
+                <select id="wireStyleType" onchange="renderSvgWires()" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px;">
+                  <option value="curved">🌊 베지어 곡선 (Smooth)</option>
+                  <option value="ortho">📐 스마트 직각 (Orthogonal)</option>
+                  <option value="straight">📏 직선 (Straight)</option>
+                </select>
+
+                <span style="font-size: 12px; font-weight: 800; color: #475569; margin-left: 10px;">기본 영역(Zone):</span>
+                <select id="builderDefaultZone" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px;">
+                  <option value="외부망 / API Cloud">외부망 / API Cloud</option>
+                  <option value="DMZ 영역">DMZ 영역</option>
+                  <option value="기업 내부망 (Internal)">기업 내부망 (Internal)</option>
+                  <option value="보안 관리망 (Admin Seg)">보안 관리망 (Admin Seg)</option>
+                </select>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <button onclick="clearBuilderCanvas()" style="background:#ef4444; color:#fff; border:none; padding:5px 12px; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">캔버스 초기화</button>
+              </div>
+            </div>
+
+            <div id="nodesContainer" style="position: relative; flex: 1;"></div>
+
+            <div class="links-manager-panel" style="position: absolute; bottom: 0; left: 0; right: 0; height: 160px; background: rgba(255,255,255,0.98); border-top: 2px solid #cbd5e1; padding: 10px 14px; overflow-y: auto; z-index: 20;">
+              <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:900; color:#0f172a; margin-bottom:8px;">
+                <span>🔌 연결선별 포트(Port), 프로토콜(Protocol) 및 타이틀 관리</span>
+                <span id="linksCountTag" style="color:#64748b;">총 0개 연결선</span>
+              </div>
+              <div id="linksListContainer"></div>
+            </div>
+          </section>
+
+          <aside class="builder-code-sidebar">
+            <div style="padding: 10px 14px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 12px; font-weight: 800; color: #38bdf8;">⚡ Mermaid 포트 코드 동기화</span>
+            </div>
+            <textarea class="code-preview-textarea" id="builderMermaidOutput" oninput="onMermaidCodeChange()"></textarea>
+          </aside>
+        </div>
+
+        <!-- Tab 2: Simple Standard Form Builder -->
+        <div id="editorTabForm" style="display: none; width: 100%; height: 100%; padding: 20px; background: #ffffff; overflow-y: auto; flex-direction: column; gap: 20px;">
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px;">
+            <h3 style="font-size: 15px; font-weight: 900; color: #1e40af; margin-bottom: 6px;">⚡ 표준 폼 기반 1-클릭 아키텍처 생성기</h3>
+            <p style="font-size: 12px; color: #3b82f6;">드래그 앤 드롭이 번거로울 때 폼에 컴포넌트 이름과 포트만 입력하면 자동으로 아키텍처 다이어그램이 완성됩니다.</p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Form Card 1: Component Addition -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+              <h4 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 12px;">1️⃣ 신규 시스템 컴포넌트 추가</h4>
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div>
+                  <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 4px;">컴포넌트 이름 (예: Web Server, EDR Agent, WAF)</label>
+                  <input type="text" id="formNodeName" placeholder="예: GIJO AS 온프레미스 AI 분석 엔진" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 700;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <div>
+                    <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 4px;">배치 영역 (Zone)</label>
+                    <select id="formNodeZone" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 700;">
+                      <option value="외부망 / API Cloud">외부망 / API Cloud</option>
+                      <option value="DMZ 영역">DMZ 영역</option>
+                      <option value="기업 내부망 (Internal)">기업 내부망 (Internal)</option>
+                      <option value="보안 관리망 (Admin Seg)">보안 관리망 (Admin Seg)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 4px;">아이콘 선택</label>
+                    <select id="formNodeIcon" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 700;">
+                      <option value="🛡️">🛡️ 보안장비 / 방화벽</option>
+                      <option value="🤖">🤖 AI 에이전트 / MCP</option>
+                      <option value="🌐">🌐 웹 / API 서비스</option>
+                      <option value="🖥️">🖥️ 서버 Node</option>
+                      <option value="💻">💻 임직원 PC / EDR</option>
+                      <option value="🗄️">🗄️ 데이터베이스 (DB)</option>
+                      <option value="🔑">🔑 ZTNA / VPN Gateway</option>
+                    </select>
+                  </div>
+                </div>
+                <button onclick="addNodeFromForm()" style="margin-top: 6px; background: #2563eb; color: #fff; border: none; padding: 10px; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer;">
+                  ➕ 컴포넌트 추가
+                </button>
+              </div>
+            </div>
+
+            <!-- Form Card 2: Connection Addition -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+              <h4 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 12px;">2️⃣ 통신 포트 연결선 추가</h4>
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <div>
+                    <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 4px;">출발 노드 (From)</label>
+                    <select id="formLinkFrom" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 700;"></select>
+                  </div>
+                  <div>
+                    <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 4px;">도착 노드 (To)</label>
+                    <select id="formLinkTo" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 700;"></select>
+                  </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <div>
+                    <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 4px;">프로토콜:포트</label>
+                    <input type="text" id="formLinkProtoPort" placeholder="예: HTTPS:443, MCP:stdio, TCP:5432" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 700;">
+                  </div>
+                  <div>
+                    <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 4px;">상세 용도 (선택)</label>
+                    <input type="text" id="formLinkLabel" placeholder="예: 로그 수집, 암호화 통신" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px;">
+                  </div>
+                </div>
+                <button onclick="addLinkFromForm()" style="margin-top: 6px; background: #7c3aed; color: #fff; border: none; padding: 10px; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer;">
+                  🔌 포트 연결선 추가
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Current Component & Link Lists Table -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+            <h4 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 10px;">📋 현재 등록된 아키텍처 노드 및 포트 연결선 현황</h4>
+            <div id="formSummaryTableContainer"></div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Live Rendered Screen Preview -->
+        <div id="editorTabPreview" style="display: none; width: 100%; height: 100%; padding: 24px; background: #0f172a; overflow-y: auto; flex-direction: column; gap: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <span style="font-size: 16px; font-weight: 900; color: #38bdf8;">👁️ 실시간 화면 완성본 프리뷰</span>
+              <span style="font-size: 12px; color: #94a3b8; margin-left: 8px;">(솔루션 카탈로그 및 상세페이지에 최종 렌더링될 실제 시각화 모습입니다)</span>
+            </div>
+            <button onclick="refreshLivePreview()" style="background: #2563eb; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">
+              🔄 프리뷰 새로고침
+            </button>
+          </div>
+
+          <div class="detail-arch-box" style="margin-top: 0; background: #1e293b; border-color: #334155;">
+            <div class="detail-arch-header" style="background: #0f172a; border-bottom-color: #334155;">
+              <span style="font-size: 14px; font-weight: 900; color: #38bdf8;">📐 아키텍처 (시스템 구축 구성도 및 통신 흐름도)</span>
+              <span style="font-size: 11px; color: #22c55e; font-weight: 800;">✅ 포트 & 프로토콜 렌더링 정상</span>
+            </div>
+            <div style="padding: 30px; display: flex; justify-content: center; align-items: center; min-height: 380px; background: #0f172a;" id="livePreviewContainer">
+              <div id="livePreviewMermaidOutput" style="width: 100%; display: flex; justify-content: center;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Mermaid Code Direct Editor -->
+        <div id="editorTabCode" style="display: none; width: 100%; height: 100%; padding: 20px; background: #0f172a; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 14px; font-weight: 800; color: #38bdf8;">💻 Mermaid.js 코드 직접 편집 & 복사/붙여넣기</span>
+            <button onclick="copyMermaidCode()" style="background: #334155; color: #38bdf8; border: 1px solid #475569; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">
+              📋 코드 전체 복사
+            </button>
+          </div>
+          <textarea class="code-preview-textarea" id="builderMermaidOutputDirect" oninput="onDirectCodeInput(this.value)" style="flex: 1; border: 1px solid #334155; border-radius: 8px; font-size: 13px; padding: 16px; background: #1e293b; color: #38bdf8;"></textarea>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer" style="background: #ffffff; padding: 12px 20px; border-top: 1px solid #cbd5e1;">
+        <button type="button" class="btn-cancel" onclick="closeBuilderModal()">취소</button>
+        <button type="button" class="btn-submit" onclick="saveBuilderDiagram()" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 10px 24px; font-size: 14px; font-weight: 900; box-shadow: 0 4px 14px rgba(37,99,235,0.3);">
+          💾 이 솔루션에 아키텍처 적용 및 저장
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Smart Link Edit Modal (Protocol & Port Selection) -->
+  <div class="modal-overlay" id="linkEditModal" style="z-index: 1050;">
+    <div style="background: #ffffff; border-radius: 16px; width: 440px; max-width: 90vw; padding: 22px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); border: 1px solid #e2e8f0;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+        <span style="font-size: 15px; font-weight: 900; color: #0f172a;" id="linkEditModalTitle">포트 & 프로토콜 연결 설정</span>
+        <button onclick="closeLinkEditModal()" style="background:transparent; border:none; font-size:18px; color:#64748b; cursor:pointer;">✕</button>
+      </div>
+
+      <form id="linkEditForm" onsubmit="saveLinkEditForm(event)">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div>
+            <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">통신 프로토콜 (Protocol)</label>
+            <select id="modalLinkProtocol" onchange="onModalProtocolSelectChange(this.value)" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 800; font-size: 13px;">
+              <option value="HTTPS">HTTPS (보안 웹/API) - Port 443</option>
+              <option value="HTTP">HTTP (일반 웹) - Port 80</option>
+              <option value="gRPC">gRPC (고성능 RPC) - Port 8000</option>
+              <option value="MCP/stdio">MCP / stdio (JSON-RPC 로컬 파이프)</option>
+              <option value="MCP/SSE">MCP / SSE (HTTP 서버 이벤트) - Port 8080</option>
+              <option value="Agent Sync">Agent Sync (에이전트 통신) - Port 8834</option>
+              <option value="Syslog">Syslog / UDP (로그 전송) - Port 514</option>
+              <option value="REST API">REST API - Port 443</option>
+              <option value="TCP/SSL">TCP / TLS (암호화 소켓) - Port 8443</option>
+              <option value="SSH">SSH (원격 제어) - Port 22</option>
+              <option value="Custom">직접 입력 (Custom Protocol)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">통신 포트 번호 (Port)</label>
+            <input type="text" id="modalLinkPort" required placeholder="예: 443, 8834, 5432, stdio" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 800; font-size: 13px; color: #2563eb;">
+          </div>
+
+          <div>
+            <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">상세 용도 및 설명 (Description)</label>
+            <input type="text" id="modalLinkLabel" placeholder="예: EDR 에이전트 로그 수집, MCP 도구 연동" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px;">
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #e2e8f0;">
+          <button type="button" class="btn-cancel" onclick="closeLinkEditModal()">취소</button>
+          <button type="submit" class="btn-submit">확인 및 연결 반영</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Embedded Standalone Dataset -->
+  <script>
+    const SOLUTIONS_DATA = [
+  {
+    "id": "GIJO_TECHNOLOGY_특화_솔루션-C-GIJO_AS",
+    "sheetCategory": "GIJO Product",
+    "columnRef": "C",
+    "name": "GIJO AS",
+    "vendor": "지아이조테크놀로지 [국산]",
+    "vendorType": "국산",
+    "category": "보안운영 자동화 플랫폼(기업 설치형)",
+    "subCategory": "",
+    "target": "보안담당자의 리소스 절감",
+    "role": "보안담당자 업무 자동화",
+    "overview": "흩어진 보안 로그와 CTI 위협을 폐쇄망 AI 에이전트가 자동으로 상관분석해 주는 온프레미스 보안 운영 플랫폼",
+    "purpose": "분산된 보안 운영 정보 및 AI 자산 통합 통제\n- CTI 외부 위협 텍스트와 사내 자산 식별자 간 자동 대조 및 매칭\n- 취약점 장비 스캔 결과, 보안 로그, EDR/DLP 운영 리포트의 통합 정규화\n- 자사 운영 AI 자산 식별(AI-BOM) 및 실시간 가드레일/레드팀 점검\n- 보안장비 하드닝 및 원격 SSH 정기 점검 관리",
+    "regulation": "금융보안원 「인공지능 보안 안내서」\n- 개발·도입하는 AI 모델과 SW의 구성품(오픈소스 등) 목록을 식별하고 취약점을 상시 모니터링해야 함.\n\n금융·공공권 망분리 규제 및 개인정보보호법\n- 외부 AI 서비스 사용 시 사내 기밀 유출 금지 조항 준수",
+    "features": "AI툴 관리\n- AI자산을 구성하는 5개의 레이어(모델, 데이터, 프롬프트, 도구, 인프라)를 프로파일링하여 CycloneDX ML-BOM 표준으로 제공\n\n오케스트레이션(상관관계 분석)\n- AI-SBOM으로 AI자산 식별 뿐만아니라 취약점 스캔, 외부CTI위협정보, 보안로그, 점검기록 등 분산된 보안 데이터를 연결하여 상관관계 분석\n\n기반 취약점 생애주기 관리\n- 취약점 결과 XML데이터 중복 제거 및 CISA KEV/EPSS/VPR 기반 최우선 조치 수립",
+    "highlights": "폐쇄망에서 사용가능한 아키텍처\n-외부 API 호출 없이 폐쇄망환경에서 동작하여 로그 및 민감정보가 외부로 나가지 않는 구조\n\n가드레일\n- 쓰기 작업 시 결재판(Approval Board)을 통한 최종 승인 후 실행 및 위변조 불가 감사 로그(Audit Vault) 보존",
+    "effects": "보안담당자의 리소스 절감\n- 보유 자산과 CTI 위협/취약점을 수작업 대조하던 수십 시간의 분석 공수를 자동화하여 핵심 위험 요인만 즉시 조치",
+    "competitor": "",
+    "architectureDiagram": `flowchart TB
+ subgraph External_Zone["외부망 / CTI Cloud & LLM API"]
+    CTI_Feed["CTI 위협 인텔리전스 REST API"]
+    LLM_API["LLM API Gateway (Claude / OpenAI)"]
+  end
+ subgraph Enterprise_Internal["기업 내부망 (On-Premise)"]
+    direction TB
+    subgraph DMZ["DMZ 영역"]
+        FW["경계 방화벽 (Firewall)"]
+    end
+    subgraph Admin_Network["보안 관리망"]
+        GIJO_AS["GIJO AS 온프레미스 AI 분석 엔진\n(Port: 443 / MCP Server 8000)"]
+        MCP_Agent["MCP AI Agent Controller"]
+    end
+  end
+    CTI_Feed -- "HTTPS:443 (JSON CTI Feed)" --> FW
+    FW -- "TCP:443 (포트 전달)" --> GIJO_AS
+    GIJO_AS <--> MCP_Agent
+    MCP_Agent -- "MCP Protocol:stdio (JSON-RPC)" --> LLM_API`
+  },
+  {
+    "id": "GIJO_TECHNOLOGY_특화_솔루션-D-WizCLM",
+    "sheetCategory": "GIJO Product",
+    "columnRef": "D",
+    "name": "WizCLM",
+    "vendor": "지아이조테크놀로지 [단독 총판]",
+    "vendorType": "국산",
+    "category": "인증서 라이프사이클 자동 관리 솔루션 (CLM)",
+    "subCategory": "",
+    "target": "Web, WAS, DB, API, 로드밸런서, 웹방화벽(WAF) 등에 설치된 SSL/TLS 및 사설 인증서",
+    "role": "인증서 현황 탐지, 자동 발급/갱신, 배포 및 설치, 만료 모니터링/ MCP 연동지원 /무료인증서 제공",
+    "overview": "글로벌 보안 규정 변화로 단축되는 SSL/TLS 인증서의 유효기간에 대응하여, 사내 전체 인증서의 발급, 갱신, 배포 업무를 전면 자동화하여 만료 사고를 방어하는 시스템",
+    "purpose": "인증서 만료로 인한 서비스 중단 사고 차단\n- 운영 중인 모든 웹서버 및 인프라의 SSL/TLS 인증서  - 단축되는 유효기간에 맞춘 상시 자동 발급 및 갱신\n- 수동 관리에 따른 만료 임박 인적 오류(실수) 해소  - 사내 분산 배포된 인증서 사각지대 전수 파악",
+    "regulation": "전자금융거래 안전성 확보 지침 및 ISMS-P\n- 암호화 통신(SSL/TLS)의 유효성 유지 의무 준수\n- 2029년 전 세계 인증서 유효기간 47일 단축 정책 선제 대응",
+    "features": "인증서 발급 및 갱신 자동화\n- 기존 수작업 프로세스를 API 기반 스케줄링 자동화  유기적인 장애 알림 체계 연동\n- Slack, Teams, Jira와 직접 연동되어 만료 임박 시 알림  만료 사고 원천 차단 기능\n- 만료 발생 시 자동으로 무료 인증서 대체 가동  통합 대시보드 스캔 가시성\n- 사내 모든 웹 도메인의 유효기간 실시간 스캔 가시화",
+    "highlights": "예기치 못한 만료 시 서비스 중단 예비\n- 단순 갱신 예정일 알림 수준에 그치는 오픈소스 방식과 달리, 인적 실수로 만료 사고 발생 시 '임시 무료 인증서 자동 발급 및 대체 가동'을 통해 서비스 마비를 물리적으로 방어하는 독보적 차별성 보유",
+    "effects": "인적 오류 제로화를 통한 대고객 비즈니스 연속성 사수\n- 인증서 만료로 인해 금융 앱, 웹 서비스가 일시에 마비되고 기업 신뢰도가 실추되는 대형 무중단 장애 리스크 영구 소멸\n- 매달 반복되는 인증서 관리 공수를 자동화하여 보안팀 리소스 절감",
+    "competitor": "",
+    "architectureDiagram": `flowchart TB
+ subgraph External_CA["외부 인증기관 (CA Server)"]
+    CA_Service["Let's Encrypt / DigiCert API"]
+  end
+ subgraph Enterprise_Server["내부 인프라 영역"]
+    WizCLM_Server["WizCLM 자동 관리 콘솔"]
+    Web_WAS["Web / WAS Server Node"]
+  end
+    WizCLM_Server -- "HTTPS:443 (인증서 갱신)" --> CA_Service
+    WizCLM_Server -- "SSH/API:22 (자동 배포)" --> Web_WAS`
+  },
+  {
+    "id": "GIJO_TECHNOLOGY_특화_솔루션-E-SecureIM",
+    "sheetCategory": "엔드포인트보안",
+    "columnRef": "E",
+    "name": "SecureIM",
+    "vendor": "지코소프트 [국산]",
+    "vendorType": "국산",
+    "category": "통합 서버 접근제어 / 계정관리 솔루션",
+    "subCategory": "",
+    "target": "사내 사용자 PC(Windows, macOS), 개인정보 및 기업 핵심 기술 문서",
+    "role": "개인정보 및 민감 데이터 탐지, 매체 제어, 출력물 관리, 네트워크 유출 차단",
+    "overview": "사내 서버 및 인프라 시스템의 계정 생성·변경·삭제 전체 수명주기를 자동화하고, 공유/관리자(특권) 계정의 패스워드 자동 변경 및 접근 통제·감사를 수행하는 시스템",
+    "purpose": "특권 계정 통제 및 우회 접속 감사\n- 서버, 네트워크, 보안장비, DB 계정 관리\n- 관리자(어드민) 및 특권 계정 라이프사이클 자동화\n- 패스워드의 주기적·강제적 자동 무작위 변경\n- 서버 접근 권한 통제 및 실시간 작업 행위 감사",
+    "regulation": "전자금융감독규정, ISMS-P 및 내부통제 규정\n- 인프라 시스템 접근 통제, 권한 부여 관리 의무 준수\n- 관리자 특권 계정의 패스워드 복잡도 및 주기적 변경 지침 준수\n- 접근 행위 기록 상시 보존 및 규정 보고서 아웃풋",
+    "features": "계정 및 패스워드 자동화 관리 (Secure IM/PM)\n- 특권 계정 자동 생성·삭제 및 일괄 패스워드 변경  강력한 서버 접근제어 및 감사 (Secure Audit)\n- 비인가 접근 차단 및 세션별 명령어 통제·로깅  광범위한 인프라 연동 지원\n- 서버 외 네트워크 장비, 보안 장비, DB 일괄 연계  비용 절감형 모듈 라인업\n- 필요 시 패스워드 전용(Secure PM) 모듈 분리 공급 가능",
+    "highlights": "접근제어와 계정관리 통합제공\n  - 개별 도구로 쪼개어 사야 했던 접근제어와 계정관리(패스워드)를 단일 솔루션으로 통합 운영 가능해 비용 절감 우수\n- 국내 1위 제품(넷엔드)의 기능을 커버하면서 특정 보안 아키텍처 항목에서는 더욱 유연한 탐지력 증명",
+    "effects": "내부자 우회 위협 방어 및 컴플라이언스 인프라 확립\n- 공유/퇴사자 계정 오남용 및 불법적인 서버 명령어 실행을 원천 차단하여 인프라 무결성 유지\n- 조달청 등록 제품으로 신속하고 검증된 체계의 전사 내부 통제 아키텍처 이행",
+    "competitor": "",
+    "architectureDiagram": `flowchart TB
+ subgraph Admin_Zone["보안 관리망"]
+    SecureIM_Server["SecureIM 접근제어/계정 서버"]
+  end
+ subgraph Target_Servers["대상 서버 및 DB"]
+    Linux_App["Enterprise Linux / DB Server"]
+  end
+    SecureIM_Server -- "SSH/RDP:22 (세션 모니터링)" --> Linux_App`
+  },
+  {
+    "id": "AI_보안-C-SAFESQUARE_SBOM",
+    "sheetCategory": "AI 보안",
+    "columnRef": "C",
+    "name": "SAFESQUARE SBOM",
+    "vendor": "NSHC [국산]",
+    "vendorType": "국산",
+    "category": "SCA / SW Supply Chain Security",
+    "subCategory": "소프트웨어 공급망 보안(SBOM)\n- 컴포넌트 단위 추출 및 검증",
+    "target": "소스코드, 오픈소스 라이브러리, 3rd-party 모듈 및 바이너리",
+    "role": "SBOM (Software Bill of Materials) 자동 생성, 오픈소스 취약점(CVE) 탐지 및 라이선스 검증",
+    "overview": "오픈소스 및 AI 모델 내 구성품 목록(SBOM)을 추출하고 취약점을 상시 모니터링해주는 라이브러리 검증 시스템",
+    "purpose": "AI모델 및 SW(AI모델과 SW를 써도 안전한지 확인)\n- 오픈소스 AI모델 내에 숨겨진 백도어 탐지\n- 공급망 취약점 추적",
+    "regulation": "금융보안원 「인공지능 보안 안내서」\n개발·도입하는 AI 모델과 SW의 구성품(오픈소스 등) 목록을 식별하고 취약점을 상시 모니터링해야 함.\n\n-> AI 모델 및 탑재 SW 라이브러리의 컴포넌트를 쪼개어 풀스택 SBOM을 추출하고 취약점 자동 검증 및 명세서 보존.",
+    "features": "풀스택 SBOM 자동 생성 및 분석\n- AI 모델 파일, 컨테이너(Docker 이미지), 소스코드, 오픈소스 패키지의 의존성 구조를 명세서(SBOM)로 자동 추출\n\n그래프 분석\n- 발견된 CVE 취약점이 어떤 핵심 서비스와 연관되어 있는지 인프라(EC2, K8s Pod, DBMS 등) 레벨까지 연결하여 시각화\n\nAI 모델 무결성 정밀 점검\n- Hugging Face 등 외부에서 반입되는 AI 모델 파일 내의 숨겨진 백도어, 악성 코드, 포맷 위험 항목 정밀 진단\n\n감사 로그 수집\n- 감사로그 수집",
+    "highlights": "AI 모델 영역까지 확장된 무결성 검증\n- 일반적인 오픈소스 SW 진단(SCA) 툴은 AI 모델 파일 내부의 독성 코드나 백도어를 보지 못하지만, SAFESQUARE는 AI 모델 고유의 포맷 위험까지 검증 가능한 솔루션\n\n국내 컴플라이언스 최적화\n- 2026년 금융감독원 감독 프레임워크(위험 식별·통제·감시) 및 공급망 보안 가이드라인의 요구사항에 즉시 대응 가능한 맞춤형 증적 리포트 제공",
+    "effects": "공급망 보안 심의 자동화를 통한 리소스 절감\n- 수동으로 진행되던 SW/AI 반입 심의 프로세스를 자동화하여 감사 준비 작업 및 검토 시간을 획기적으로 단축\n\n결함 자재의 사전 차단\n- 오염되거나 취약한 외부 AI/SW 부품이 사내 시스템에 유입되기 전 단계에서 원천 차단하여 인프라 청정 상태 유지",
+    "competitor": "",
+    "architectureDiagram": `flowchart TB
+ subgraph CI_CD_Pipeline["개발 파이프라인"]
+    Git_Repo["GitHub / GitLab Repo"]
+    SafeSquare["SAFESQUARE SBOM Analyzer"]
+  end
+ subgraph Threat_DB["취약점 DB"]
+    CVE_DB["NVD / CVE Threat Database"]
+  end
+    Git_Repo -- "HTTPS:443 (코드 스캔)" --> SafeSquare
+    SafeSquare -- "REST:443 (CVE 매핑)" --> CVE_DB`
+  },
+  {
+    "id": "AI_보안-D-Tenable_AI_Exposure",
+    "sheetCategory": "AI 보안",
+    "columnRef": "D",
+    "name": "Tenable AI Exposure",
+    "vendor": "Tenable [외산]",
+    "vendorType": "외산",
+    "category": "AI SPM (AI Security Posture Management)",
+    "subCategory": "AI자산식별 및 AI설정 오류, 보안 태세 진단",
+    "target": "기업 AI 인프라 전체의 보안 태세/허점",
+    "role": "기업 내 AI 활용으로 인해 생기는 보안 허점(Exposure)을 \n식별하고 관리하는 도구",
+    "overview": "사내 인프라 및 클라우드 환경 내 흩어져 있는 승인/미승인 AI 모델, 데이터셋, AI API 현황을 전수 조사하는 AI 태세 관리 시스템",
+    "purpose": "AI인프라 및 클라우드 환경(AI 인프라 설정에 오류가 없는지 확인)\n- AI학습데이터 저장\n- 과도한 권한을 가진 AI Agent\n- AI모델 서버 및 API 취약점",
+    "regulation": "국정원 「AI 보안 가이드북」\n사내 AI 인프라, 학습 데이터 저장소의 비인가 접근을 막고 사용하지 않는 Shadow AI 자산을 전수조사해야 함.\n\n-> 클라우드 내 미인가 AI 자산(Shadow AI)을 식별하고, 학습 데이터 저장소(S3 등)의 잘못된 권한 설정을 자동 진단(AI-SPM).",
+    "features": "AI-SPM 기반 자산 식별\n- 사내 인프라 및 클라우드 환경 내에 흩어져 있는 승인/미승인 AI 모델, 데이터셋, AI API 연동 현황을 전수조사(Shadow AI 탐지)\n\nAI 에이전트(Agent) 권한 통제\n- 내부 시스템과 연동되어 작동하는 AI 봇/스크립트의 과도한 권한(Admin 권한, DB 접근 권한 등) 및 설정 오류 탐지\n\n공격 경로 시뮬레이션(Attack Path)\n- AI 시스템의 보안 Hole(오설정, 취약점)을 악용하여 해커가 내부 핵심 자산으로 침투할 수 있는 최적의 경로를 추적 및 시각화\n\n자산취약점 통합관리\n- AI자산에 대한 취약점 외, 자산의 CVE취약점에 대한 통합 분석 가능",
+    "highlights": "AI 자산 간의 Toxic Combinations 탐지\n- 기존의 클라우드 보안 툴(CSPM)은 단순 설정 오류만 보지만, 본 제품은 'AI 워크로드 + 학습 데이터 저장소(S3) + 에이전트 권한'이 복합적으로 얽혀 발생하는 AI 고유의 위험 경로를 해커 관점에서 찾아냄",
+    "effects": "내부 AI 서비스 환경의 보안 Hole보완\n- 사내 개발·운영 중인 AI 인프라의 설정 오류와 권한 과다 부여 문제를 선제적으로 해결하여 침해 사고 예방",
+    "competitor": ""
+  },
+  {
+    "id": "AI_보안-E-AI_Security_Suite_(Zscaler_AI_Protect)",
+    "sheetCategory": "AI 보안",
+    "columnRef": "E",
+    "name": "AI Security Suite (Zscaler AI Protect)",
+    "vendor": "Zscaler [외산]",
+    "vendorType": "외산",
+    "category": "AI SSE / AI Data Protection",
+    "subCategory": "네트워크 및 데이터 통제\n- 실시간 트래픽 통제 중심",
+    "target": "내부 임직원의 GenAI 서비스 이용",
+    "role": "AI 서비스(ChatGPT, Copilot, 자체 LLM 등)프롬프트/응답 실시간 \n차단 및 DLP",
+    "overview": "임직원 PC와 외부 생성형 AI(ChatGPT 등) 간의 프롬프트 및 응답을 인라인에서 감시하고 기밀 정보 유출을 차단하는 ZTNA 보안 서비스",
+    "purpose": "임직원의 웹 트래픽(LLM에 내부 기밀을 올리지 않는가 확인 및 차단)\n- LLM을 통한 기업 기밀 및 소스코드 유출차단\n- 우회 공격(프롬프트 인젝션 및 Jailbreak)차단",
+    "regulation": "금융보안원 「인공지능 보안 안내서」\nAI 사용자의 프롬프트 입력값과 AI의 답변을 실시간 감시하여 개인정보 유출 및 적대적 입력(Jailbreak)을 차단해야 함.\n\n-> 실시간 인라인 트래픽 분석을 통해 외부 AI(ChatGPT 등)로 향하는 기밀 데이터 전송을 즉각 차단 및 마스킹 처리.",
+    "features": "실시간 인라인(Inline) 프록시 통제\n- 사용자와 외부 AI 서비스(ChatGPT 등) 간의 모든 웹 트래픽을 실시간 감시하여 데이터 유출 전 단계에서 즉각 격리/차단\n\nAI 특화 DLP 및 마스킹\n- 프롬프트 입력창이나 첨부 파일 내 소스코드 패턴, 개인정보(PII)를 실시간 탐지하여 차단하거나 자동으로 비식별화 처리\n\n신종 LLM 우회 공격 방어\n- 탈옥(Jailbreak), 프롬프트 인젝션(Prompt Injection) 등 기존 방화벽이 탐지 못 하는 LLM 겨냥 적대적 입력값 차단\n\n정책 기반 AI 앱 제어\n- 조직·사용자별 권한에 따라 특정 외부 AI 서비스의 사용을 허가, 차단, 또는 읽기 전용(조회만 가능) 등으로 세분화 통제",
+    "highlights": "웹 암호화를 뚫는 프롬프트 레벨 검사\n- 기존 일반 DLP는 AI 대화창 내의 실시간 문맥이나 우회적인 데이터 전송 패턴을 읽지 못하지만, Zscaler는 AI 서비스로 향하는 인라인 트래픽의 세션 내용을 실시간 분석함\n\n네트워크 아키텍처 변경 없는 적용\n- 에이전트/클라우드 프록시 방식으로 기존 기업의 복잡한 네트워크 구성을 전혀 변경하지 않고도 수일 내 적용 가능",
+    "effects": "강력한 개인정보보호 규제 리스크 해소\n- 개인정보보호위원회 지침 및 금융권 AI 활용 지원방안에 따른 데이터 유출 방지 의무를  히 충족하여 과징금 리스크 원천 차단",
+    "competitor": ""
+  },
+  {
+    "id": "AI_보안-F-Imperva_AI_Application_Security",
+    "sheetCategory": "AI 보안",
+    "columnRef": "F",
+    "name": "Imperva AI Application Security",
+    "vendor": "Imperva [외산]",
+    "vendorType": "외산",
+    "category": "WAAP (Web Application & API Protection) 내의 GenAI 보안 모듈",
+    "subCategory": "애플리케이션 및 API 보안 (WAAP 확장형)\n- 자사 운영 AI(LLM) 서비스 보호 중심",
+    "target": "자사 서비스 앱(챗봇, API, LLM 연동 앱)",
+    "role": "외부 사용자의 Prompt Injection / Jailbreak 방어",
+    "overview": "자체 서비스 중인 LLM API 및 챗봇 앱으로 들어오는 악성 프롬프트 인젝션 및 과도한 토큰 유발 공격(DoW)을 전면 차단하는 모듈",
+    "purpose": "자체 개발 AI 서비스 (외부 연동 API 및 자체 LLM 챗봇 안전성 확보)\n- OWASP Top 10 for LLM 애플리케이션 위협 차단\n- 공격자의 악성 프롬프트 인젝션 및 시스템 프롬프트 우회 탈취 방어\n- AI 답변을 통한 사내 민감 데이터 유출 원천 방지",
+    "regulation": "금융보안원 「인공지능 보안 안내서」\nAI 사용자의 프롬프트 입력값과 AI의 답변을 실시간 감시하여 개인정보 유출 및 적대적 입력(Jailbreak)을 차단해야 함.\n\n-> 자체 운영 챗봇 API의 프롬프트와 LLM 출력 답변(Response)을 양방향 모니터링하여 가이드라인 내 'AI 안전성 검증 및 비정상 오작동 방지' 요건 충족.",
+    "features": "실시간 양방향 프롬프트 가드레일\n- 사용자의 질문(Prompt)과 AI의 답변(Response) 전체 트래픽을 실시간 감시·통제\n\n프롬프트 인젝션 및 Jailbreak 방어\n- AI 시스템의 권한을 무력화하거나 우회 지시를 내리는 악의적인 문자 패턴 탐지 및 전면 차단\n\n\n민감 정보 답변 유출 차단\n- AI가 오작동하여 기업 소스코드, 고객 정보(PII)를 답변에 포함할 경우 실시간 마스킹 및 차단\n\nDenial of Wallet\n- 무차별 대입 질문을 던져 사내 AI API 과금 비용(Token 비용)을 폭탄처럼 유발하는 공격을 제한(Rate Limit)",
+    "highlights": "양방향 실시간 컨텍스트 검사\n- 사용자 질문(Inbound)의 악의적 우회 패턴(프롬프트 인젝션, Jailbreak)뿐만 아니라, LLM이 생성한 답변(Outbound) 내 개인정보(PII)나 사내 핵심 소스코드 유출까지 양방향으로 실시간 마스킹 및 통제합니다.",
+    "effects": "대고객 AI 비즈니스의 안정적인 가동 보장\n\n- 해킹 공격으로 인한 AI 서비스 장애, 시스템 명령어 노출, 악성 우회 답변 생성 등의 비즈니스 신뢰도 실추 사고 사전 예방\n\n- 불필요하거나 반복적인 대량 API 호출(DoW 공격)을 방어하여 불필요하게 낭비되는 AI API 사용료(클라우드 비용) 절감",
+    "competitor": ""
+  },
+  {
+    "id": "AI_보안-G-NeoCISO",
+    "sheetCategory": "AI 보안",
+    "columnRef": "G",
+    "name": "NeoCISO",
+    "vendor": "NEOCISO [외산]",
+    "vendorType": "외산",
+    "category": "AI SOC / Agentic AI SecOps",
+    "subCategory": "Reasoning AI 기반 프로 에이전틱 플랫폼 (Pro-Agentic Platform)",
+    "target": "보안 관제센터(SOC), CISO 및 보안 운영팀",
+    "role": "사내 모든 보안 장비의 로그/이벤트를 통합해 24x365 분석",
+    "overview": "Splunk, QRadar, CrowdStrike 등 이기종 보안 장비 로그를 추론 AI(Reasoning AI) 엔진이 분석하여 킬체인 공격 서사로 자동 재구성하는 플랫폼",
+    "purpose": "보안 관제 의사결정 체계 효율화 및 위협 서사 재구성  \n- 수만 건의 알림 중에서 실제 즉시 조치 대상 선별\n- 공격 신호들을 연결하여 다단계 킬체인(Kill Chain) 공격 서사 재구성  \n- IT 환경뿐만 아니라 운영기술(OT) 영역의 안전 및 가용성 리스크 통합 관리",
+    "regulation": "주요 글로벌/국내 보안 표준 및 거버넌스 지침 \n- NIST CSF, ISO/IEC 27001, CIS, ISA/IEC 62443 가이드라인 충족 \n- 보안 탐지, 의사결정, 대응 결과를 주요 컴플라이언스 프레임워크에 실시간 매핑",
+    "features": "맥락 기반 위험 평가 (Context-driven Scoring)\n- 동일 취약점이라도 토폴로지 구조, 인터넷 노출도, 데이터 민감도를 결합해 크리티컬 여부 차등 판정\n\n에이전틱 워크플로우 통제\n- 초기 대응(Triage) -> 위협 판단 -> 조치 이관(ITSM 연동) -> 자동 검증 및 모니터링 전체 프로세스 자율 수행\n\n크로스 컨텍스트 연관분석\n- XDR/SIEM이 탐지한 단편적 활동을 시간 흐름 속에 숨겨진 전체 시나리오로 재구성\n\n대화형 분석가 인터페이스\n- 자연어 기반 프롬프트 및 코칭을 통해 주니어급 분석가의 역량을 시니어급으로 증강",
+    "highlights": "패턴 매칭을 넘어 '인지적 사고'를 통한 결과 제공\n- 단순 키워드 매칭이나 환각(Hallucination) 위험이 있는 일반 생성형 AI와 달리, 연역·귀납·계획 수립 등의 추론(Reasoning) AI 기술을 바탕으로 방어 가능한 명확한 판단 근거 도출\n- 레거시 시스템을 수정없이 API 연동만으로 기존에 도입된 Splunk, Qradar, CrowdStrike 등 기존 보안 인프라의 투자가치(ROI)를 극대화 제공",
+    "effects": "공격 체류 시간(Dwell Time) 최소화 및 지식 자산 자산화  \n- 야간·주말 근무 시 고경력자의 부재로 발생하는 위협 탐지 지연 및 누락 리스크를  하게 해소하고 MTTA/MTTR의 비약적 단축 실현  \n- 조직 내 흩어진 보안 정보, 자산 중요도, 분석가의 추론 과정을 플랫폼 내에 전산화하여 사람이 이직하더라도 기존 보안 노하우를 그대로 보존",
+    "competitor": ""
+  },
+  {
+    "id": "취약점_분석_및_관리-C-SooJi.Bee_(수지비)",
+    "sheetCategory": "취약점 분석 및 관리",
+    "columnRef": "C",
+    "name": "SooJi.Bee (수지비)",
+    "vendor": "인더포레스트 [국산]",
+    "vendorType": "국산",
+    "category": "ASM / AI-EASM (AI 기반 외부 공격 표면 관리)",
+    "subCategory": "공격 표면 관리 및 상시 보안 위협 검증 솔루션",
+    "target": "미관리 외부 IT 자산(Shadow IT), 노출 포트, 유출 계정, 외부 IP/도메인",
+    "role": "외부 자산 식별, 1-Day CVE 침투 가능성 자동 검증, 다크웹 TI 수집, 위협 우선순위화\nAutomated PenTesting (자동화된 침투 테스트/BAS)",
+    "overview": "외부 인터넷 및 다크웹에 노출된 미관리 자산과 유출 계정을 식별하고, 1Day CVE 자동 침투 시뮬레이션을 수행하는 공격 표면 검증 솔루션",
+    "purpose": "공격자 관점의 직접적인 위협 노출 검증  \n- OSINT, 딥웹, 다크웹 유출 임직원 계정 식별\n- 미관리/미승인 자산 및 외부 열린 Risky 포트 진단\n- 노출/유출 계정 기반의 자동 로그인 가능 여부 검증\n- 최신 1Day CVE 취약점에 대한 실질적 Exploit 자동 테스트",
+    "regulation": "과기정통부·KISA 공공 중소/중견기업 ASM 취약점 점검 지침 준수\n- 정부의 전사 IT 자산 인터넷 접점 식별 및 긴급 보안점검 요건 만족\n- 가트너 CTEM(지속적 위협 노출 관리) 프레임워크 준수",
+    "features": "양방향 위협 정보 수집 및 상시 검증\n- OSINT, 딥웹, 다크웹 통합 검색 및 평판 조회  자동화 침해 진단 (Validation)\n- 알려진 1Day CVE 자동 테스트 및 크레덴셜 스터핑 검증  원클릭 자동 이행 점검\n- 조치된 항목에 대한 자동 이행 점검 테스트 가동  전문가 수동 검증 서비스 연계\n- 수집된 위협 기반 침투 경로 분석 전문가 레포트 제공 (연 1회 등)",
+    "highlights": "EASM에 자동 '모의침투 검증'을 결합한 특허 기술\n  - 단순 자산 나열(Risks)을 넘어, 실제 질문/답변 데이터 및 우회 로그인 성공 여부(Issues)를 증적 화면 캡처로 입증하는 상시 실효성 검증 제공\n- 업무협업 Wiki/Git 내 소스코드 하드코딩 정보 노출 추적 탁월\n- 대한민국 우수 특허 대상(1위) 수상 및 검증된 Offensive Security 전문가 노하우 반영",
+    "effects": "사전·사후 침해 유입 경로   차단\n- 매년 수행하는 1회성 진단의 한계를 극복하고 연간 상시 가상 RED 팀 가동 효과 구현\n- 유출된 임직원 계정이 사내 2FA 미적용 구멍을 통해 실제 로그인되는 경로를 선제 제거하여 랜섬웨어 예방",
+    "competitor": ""
+  },
+  {
+    "id": "취약점_분석_및_관리-D-BAT_Insight_ASM",
+    "sheetCategory": "취약점 분석 및 관리",
+    "columnRef": "D",
+    "name": "BAT Insight ASM",
+    "vendor": "NSHC [국산]",
+    "vendorType": "국산",
+    "category": "ASM / AI-EASM (AI 기반 외부 공격 표면 관리)",
+    "subCategory": "외부 공격 표면 통합 관리 및 보안 모니터링 플랫폼",
+    "target": "인터넷에 노출된 기업의 IT 자산(IP, 서브도메인, 포트, Web/API, 미관리 Shadow IT 등)",
+    "role": "자산 자동 발굴, 위협/취약점 스캔, 위협 인텔리전스 연계 분석 및 선제적 대응",
+    "overview": "8단계 자동화 스캔 파이프라인을 가동하여 인터넷 노출 지점(IP, 서브도메인, SSL 등)을 탐지하고 CVSS+EPSS 기반 우선순위를 평정하는 시스템",
+    "purpose": "전사 외부 노출 자산의 통합 가시성 확보\n- 보안팀이 인지하지 못한 서버, 도메인, 클라우드 리소스 식별\n- 인터넷 연결 포트, 서비스, SSL/TLS 인증서 만료 추적  - 그림자 IT(Shadow IT), 오설정, 미인가 자산 통제\n- 실제 악용 가능성 기반 위협의 조치·보고 자동화",
+    "regulation": "ISMS-P 인증 항목 및 정부/금융권 내부통제 지침 준수\n- 정보통신망법에 따른 정기적 기술적 취약점 분석·평가 대응\n - SSL/TLS 인증서 만료 및 취약 설정 규제 수립 지침 준수",
+    "features": "- CVSS + EPSS 기반 정밀 위협 분석\n- 기술적 심각도와 향후 30일 내 실제 악용 확률(0~100%) 연동 우선순위화  Shadow IT 자산 통제 워크플로우\n- 미식별 후보 검토(Pending/Confirmed 등) 단계별 자산 전환 관리  멀티 LLM Security Advisor- OpenAI, Anthropic, 로컬 LLM 연동을 통한 자연어 조치 방안 생성",
+    "highlights": "엔터프라이즈급 독자적 스캔 및 위협 정량화\n- 타사처럼 외부 도구 단순 연동이 아닌, Rustscan, Nmap, Nuclei, Katana 등을 병렬 실행하여 대규모 스캔 성능 최적화 (Comprehensive 스캔 약 30분)  - 글로벌 Shodan, Censys API 연동 및 Tor 익명 네트워크 스캔, CVE 룰 생성기 등 독보적인 오펜시브 실험실 모듈 탑재",
+    "effects": "보안 사각지대 제로화 및 운영 비용 절감\n- 보안팀이 몰랐던 임시 개발 서버, 만료 도메인, 클라우드 오설정 자산을 자동으로 식별해 공격 표면 최소화\n- CVSS+EPSS 자동 매핑과 AI 자연어 조치 가이드로 보안 담당자의 위협 선별 및 대응 소요 시간 대폭 단축",
+    "competitor": ""
+  },
+  {
+    "id": "취약점_분석_및_관리-E-Tenable_ONE",
+    "sheetCategory": "취약점 분석 및 관리",
+    "columnRef": "E",
+    "name": "Tenable ONE",
+    "vendor": "Tenable [외산]",
+    "vendorType": "외산",
+    "category": "통합 Exposure Management 플랫폼",
+    "subCategory": "IT, OT 통합 취약점 및 사이버 위협 노출 관리 (Exposure Management)",
+    "target": "기업 전사의 레거시 IT 인프라, 클라우드(CNAPP), Active Directory(계정), 외부 노출 자산(ASM) 및 공장·제어시스템(OT) 환경",
+    "role": "공격 경로(Attack Path) 및 실제 비즈니스 영향도 분석\n사이버 리스크 지수화(Cyber Exposure Score) 및 경영진 보고서",
+    "overview": "전사 IT 인프라, 클라우드, Active Directory, OT 설비의 취약점을 단일 콘솔에서 원격/에이전트 방식으로 수집 분석하는 솔루션",
+    "purpose": "전사 사이버 공격 표면 및 내부 자산 취약점 통합 관리",
+    "regulation": "주요 정보통신기반시설 기술적 취약점 분석·평가 및 ISMS-P",
+    "features": "종합 자산 식별 및 전방위 취약점 스캔, VPR 점수 제공",
+    "highlights": "전체 IT자산의 취약점에 대한 통합 관리",
+    "effects": "사이버 침해 사고 선제 예방 및 우선순위 확립",
+    "competitor": "",
+    "architectureDiagram": `flowchart TB
+ subgraph DMZ_Zone["외부망 / DMZ"]
+    Scanner2["Nessus Scanner #2"]
+  end
+ subgraph Admin_Seg["관리망"]
+    TSC["Tenable Security Center (SC)\n(Port 443 / REST API)"]
+  end
+    TSC -- "TCP:8834 (스캔 명령)" --> Scanner2`
+  },
+  {
+    "id": "데이터_암호화_키관리-C-CipherTrust(구_Vormetric)",
+    "sheetCategory": "데이터 암호화 키관리",
+    "columnRef": "C",
+    "name": "CipherTrust(구 Vormetric)",
+    "vendor": "Thales [외산]",
+    "vendorType": "외산",
+    "category": "DSP (Data Security Platform)",
+    "subCategory": "",
+    "target": "온프레미스/클라우드 서버 내 데이터베이스(DB), 파일 시스템, 비정형 데이터, API 데이터",
+    "role": "데이터 발견 및 분류, 투명한 파일/DB 암호화, 토큰화(Tokenization), 암호화 키 관리",
+    "overview": "정형 DB, 비정형 이미지/녹취 파일, K8s 컨테이너 데이터를 커널 레벨에서 애플리케이션 수정 없이 암호화하는 통합 데이터 보호 플랫폼",
+    "purpose": "정형/비정형 데이터 및 암호키 보호\n- Oracle, MSSQL 등 정형 DB 암호화\n- 이미지, 녹취록 등 비정상 비정형 파일 암호화\n- K8s 및 컨테이너(POD) 환경의 데이터 보호\n- HSM을 통한 안전한 인증키 발급 및 보관",
+    "regulation": "개인정보보호법 및 전자금융감독규정\n- 개인정보(고유식별정보, 비밀번호, 바이오정보 등)의 암호화 저장 의무 준수\n- 금융권의 암호키 분리 보관 정책 대응",
+    "features": "정형/비정형 전방위 암호화\n- 정형 DB 및 이미지, 녹취 등 대용량 비정형 데이터 암·복호화  쿠버네티스(K8s) 암호화\n- 컨테이너 환경에서 POD 소스코드 수정 없는 암호화 지원",
+    "highlights": "운영 환경 수정 없는 암호화\n- 기존 복잡한 레거시 시스템이나 애플리케이션 소스코드의 수정 없이 신속하게 플러그인 형태로 암호화 구축 가능\n\n다수 레퍼런스\n- 전 세계 및 국내 약 1,000곳 이상의 엔터프라이즈 사이트에서 검증된 최고의 안정성과 초고속 성능 제공",
+    "effects": "컴플라이언스 준수 및 CISO 관리 공수 절감\n- 암호화 구축 이후 특별한 수동 관리나 마이그레이션 부담이 없어 운영 안정성 극대화  및 인프라 장애 리스크 최소화\n- 네트워크 장애나 마스터 서버 다운 시에도 로컬 에이전트 독립 구동으로 비즈니스 연속성 제공",
+    "competitor": ""
+  },
+  {
+    "id": "데이터_암호화_키관리-D-Imperva_DSF_(Data_Security_Fabric)_+_DAM_+_FAM_+_DRA",
+    "sheetCategory": "데이터 암호화 키관리",
+    "columnRef": "D",
+    "name": "Imperva DSF (Data Security Fabric) + DAM + FAM + DRA",
+    "vendor": "Imperva [외산]",
+    "vendorType": "외산",
+    "category": "DSP / DSPM / DAG",
+    "subCategory": "",
+    "target": "데이터베이스(DB)와 파일 시스템",
+    "role": "데이터베이스(DB)와 파일 시스템 전체를 대상으로 \"누가, 언제, 어떤 데이터에 접근하여 무슨 행위를 했는지\"를 실시간 감시하고, UEBA(사용자 행위 분석) 기반으로 데이터 오남용 및 유출 위협을 탐지·차단하는 데이터 중심 보안",
+    "overview": "정형 DB(DAM) 및 클라우드 S3/Blob(FAM)에 대한 사용자 접근 쿼리 및 파이프라인 접근을 머신러닝 UEBA로 실시간 감시 및 차단하는 데이터 센트릭 솔루션",
+    "purpose": "전사 하이브리드 데이터 인프라 및 리스크 제어\n- 정형 DB 데이터(AWS RDS, Oracle, MS-SQL 등) 활동 감시(DAM) \n- 비정형 파일 데이터(AWS S3, Azure Blob, NAS, Slack 등) 활동 감시(FAM)\n- 권한 오용, 우회 정상 로그인을 통한 대량 데이터 반출 사전 탐지\n- 데이터 자산의 무단 접근, 변경, 삭제 등 비정상 행위 모니터링",
+    "regulation": "개인정보보호법, 정보통신망법 및 글로벌 규제(GDPR, HIPAA 등)\n- 금융·공공권의 데이터 접근 이력에 대한 실시간 로깅 및 실시간 활동 모니터링 의무 충족\n- 고유식별정보 데이터의 자동 검색 및 중요도 분류 컴플라이언스 이행",
+    "features": "정형/비정형 통합 자산 식별 (DDC)\n- 멀티 클라우드 저장소와 DB 내 개인정보 탐지 및 분류\n데이터 활동 모니터링 (DAM/FAM)\n- SQL 쿼리, 파일 접근/변경/삭제 이력 실시간 감사 및 강제 차단\n데이터 리스크 분석 (DRA)\n- 데이터 컨텍스트 기반의 UEBA(행동분석) 엔진 가동 및 위험 스코어링\n단일 패브릭(DSF) 통합 가시성\n- 분산 데이터 소스를 허브 구조로 묶어 단일 대시보드로 통합",
+    "highlights": "정상 계정을 위장한 우회 유출을 잡는 머신러닝 UEBA \n- 단순 접근 권한 제어(DB 접근제어) 툴의 한계를 극복하여, 정상 로그인 사용자가 짧은 시간 동안 비정상적으로 많은 수의 DB에 접근하는 다중 쿼리 행위를 감지",
+    "effects": "내부자 위협 및 계정 탈취에 의한 대형 개인정보 유출 원천 차단",
+    "competitor": ""
+  },
+  {
+    "id": "데이터_암호화_키관리-E-COODOC",
+    "sheetCategory": "데이터 암호화 키관리",
+    "columnRef": "E",
+    "name": "COODOC",
+    "vendor": "COODOC [국산]",
+    "vendorType": "국산",
+    "category": "문서중앙화 (ECM) 솔루션",
+    "subCategory": "",
+    "target": "기업 내 생성되는 모든 문서, 도면(CAD), 연구자료, 인사/계약 데이터",
+    "role": "사내 문서 중앙 집적화, 문서 유출 및 무단 반출 통제, 협업 및 버전 관리, 랜섬웨어 차단/복구",
+    "overview": "사내 로컬 PC 문서 저장을 원천 차단하고 중앙 서버에 집적하여 유실 방지 및 랜섬웨어 복구를 제공하는 문서중앙화 플랫폼",
+    "purpose": "사내 임직원의 중요 업무 문서를 로컬 PC에 저장하는 것을 원천 차단하고 중앙 서버에 통합하여, 자산의 유실을 방지하고 체계적인 이력 관리 및 랜섬웨어 대응을 제공하는 문서중앙화 솔루션",
+    "regulation": "사내 중요 자산 및 개인정보 문서 보호\n- 로컬 PC 문서 저장 금지 및 중앙 집중 관리\n- 랜섬웨어의 비정상 파일 변조 시도 탐지 및 복구\n- 개인정보 및 민감 데이터 포함 문서의 검출 및 통제  \n- 부서/사용자별 세부적인 문서 접근 권한 제어",
+    "features": "개인정보보호법 및 내부통제 가이드라인\n\n- 사내 중요 도면, 기술 문서, 개인정보의 무단 유출 예방 및 유실 방지 대책 수립 의무 준수",
+    "highlights": "문서 중앙 통합 및 이력 관리\n- 로컬 PC 저장 차단 및 중앙 서버 내 버전별 이력 추적  AI 기반 자동 분류 및 검색\n- AI 모델을 통한 문서 자동 분류 및 자연어 기반 통합 검색 지원  랜섬웨어 실시간 탐지 및 차단\n- 프로세스 행위 분석을 통한 감염 차단 및 감염 전 상태 복구  다기종 OS 지원 및 보안 연계\n- Windows는 물론 macOS지원 및 다자간 협업 제어",
+    "effects": "DLP 기술이 결합된 하이브리드 중앙화\n- 단순 저장소 제공을 넘어, 강력한 정보유출방지(DLP) 원천 기술을 보유한 제조사의 제품으로 내년 매체제어 등 연계 업데이트 예정",
+    "competitor": ""
+  },
+  {
+    "id": "네트워크_보안-C-FOCS",
+    "sheetCategory": "네트워크 보안",
+    "columnRef": "C",
+    "name": "FOCS",
+    "vendor": "벨로크 [국산]",
+    "vendorType": "국산",
+    "category": "방화벽 정책관리 자동화 솔루션",
+    "subCategory": "",
+    "target": "이기종 L3/L4/L7 방화벽, 네트워크 토폴로지, 방화벽 정책 및 객체(Object)",
+    "role": "방화벽 정책 신청/결재 자동화, 미사용/중복/과다허용 정책 분석, 네트워크 경로 분석",
+    "overview": "이기종 방화벽 보안 정책의 신청부터 분석, 휴면/과다 허용 정책 회수까지 전체 수명주기를 자동화하는 지능형 관리 솔루션",
+    "purpose": "이기종 방화벽 정책의 상시 최적화\n- 복잡한 이기종 방화벽 정책 통합 관리\n- 실 트래픽 기반 휴면/과다 정책 정비\n- 보안 정책 적용 프로세스의 전산화 및 자동화\n- 방화벽 오설정으로 인한 인프라 보안 구멍 방지",
+    "regulation": "ISMS-P 및 금융권 내부통제 지침\n\n- 네트워크 접근 통제 및 이기종 방화벽 정책에 대한 정기적인 변경 심의·감사 이행 의무 조항 충족\n\n- 보안 장비 접근 권한 및 이력 보존 의무 준수",
+    "features": "정책 라이프사이클 자동화: 정책 신청부터 자동 분석 및 회수까지 프로세스 일원화\n\n- 토플로지 맵 자동 생성: 딥러닝 기반 기술로 사내 복잡한 망 구조 시각화 구현\n- 대용량 Syslog 실시간 처리: 대규모 엔터프라이즈 환경용 분석 성능 최적화\n- 이기종 방화벽 연동: Fortinet, Palo Alto 등 국내외 방화벽   연동",
+    "highlights": "자동/반자동 정책 회수 및 딥러닝 적용\n\n- 단순 정책 분석 보고서만 뿌려주는 기존 1, 2세대 제품들과 달리, 사용하지 않는 휴면 정책을 방화벽 장비에 자동/반자동으로 원클릭 적용 및 회수하는 지능형 기능 탑재",
+    "effects": "방화벽 보안 아키텍처 가시화 및 업무 효율성 강화",
+    "competitor": ""
+  },
+  {
+    "id": "네트워크_보안-D-Zscaler_Platform_(ZIA___ZPA___ZDX)",
+    "sheetCategory": "네트워크 보안",
+    "columnRef": "D",
+    "name": "Zscaler Platform (ZIA / ZPA / ZDX)",
+    "vendor": "Zscaler [외산]",
+    "vendorType": "외산",
+    "category": "클라우드 네이티브 제로 트러스트 보안 플랫폼",
+    "subCategory": "",
+    "target": "ZIA: SWG / CASB / FWaaS (외부 인터넷 및 SaaS 보안)\nZPA: ZTNA (내부망/사내 시스템 보안 접속, VPN 대체)\nZDX: DEM (디지털 사용자 경험 및 성능 모니터링)",
+    "role": "ZIA: 악성코드 차단, URL 필터링, DLP, SaaS 통제\nZPA: 네트워크 접속이 아닌 '특정 앱' 단위 격리 접속\nZDX: 원격근무자/지점의 통신 장애 및 성능 병목 지점 추적",
+    "overview": "전 세계 자체 데이터센터를 기반으로 사용자와 앱 간 경로를 인바운드 구멍 없이 연결해 주는 제로트러스트 SSE 플랫폼",
+    "purpose": "하이브리드 업무 환경 전체 통제\n- 위치 상관없는 안전한 SaaS/인터넷 액세스\n- 인바운드가 없는 안전한 내부 사설망 접속\n- GenAI 인라인 프롬프트 DLP 통제\n- 단말부터 클라우드까지 End-to-End 가시성",
+    "regulation": "망분리 완화 규제 가이드북 및 제로 트러스트 준수",
+    "features": "ZIA (Secure Internet/SaaS)\n- 데이터 병렬 처리(SSMA) 기반 인터넷 실시간 감시 및 유출 차단\nZPA (Zero Trust Private Access)\n- 인바운드 통로가 없는 사설망 Micro-Tunnel 연결 조율",
+    "highlights": "글로벌 1위 클라우드 제로트러스트 플랫폼",
+    "effects": "인프라 구축 비용 감소 및 하이브리드 생산성 극대화",
+    "competitor": "",
+    "architectureDiagram": `flowchart TB
+ subgraph Remote_Users["지사 / 재택 사용자"]
+    User_Client["ZCC 에이전트 단말"]
+  end
+ subgraph Zscaler_Cloud["Zscaler Cloud SSE"]
+    ZIA_Service["ZIA (Secure Internet Access)"]
+    ZPA_Service["ZPA (Zero Trust Private Access)"]
+  end
+ subgraph Corporate_DC["기업 데이터센터"]
+    App_Server["사내 업무 시스템 App"]
+  end
+    User_Client -- "UDP:4500 (ZTNA 터널)" --> ZPA_Service
+    ZPA_Service -- "Outbound Tunnel:443" --> App_Server`
+  },
+  {
+    "id": "네트워크_보안-E-Imperva_WAAP_(웹_API_DDoS)",
+    "sheetCategory": "네트워크 보안",
+    "columnRef": "E",
+    "name": "Imperva WAAP (웹/API/DDoS)",
+    "vendor": "Imperva [외산]",
+    "vendorType": "외산",
+    "category": "애플리케이션 및 API 통합 보호 플랫폼 (WAAP)",
+    "subCategory": "",
+    "target": "자사 운영 웹 서비스 및 인프라",
+    "role": "OWASP Top 10 공격및 애플리케이션 계층 위협 차단\nOpenAPI 스펙 기반 스키마 검증, shadow API 탐지, API 인가/인증 오남용 방어\nCredential Stuffing, 웹 스크래핑, 브루트 포스 등 악성 자동화 봇 트래픽 차단\n대용량 트래픽 공격 및 L7 애플리케이션 타깃 서비스 중단 공격 완화(Mitigation)",
+    "overview": "단일 스택 아키텍처 기반으로 웹 WAF, API 보호, 악성 봇 차단, 테라바이트급 DDoS 방어를 통합 제공하는 Cloud WAAP 솔루션",
+    "purpose": "자사 운영 웹 서비스 및 인프라 사수\n- 웹 애플리케이션 OWASP Top 10 공격 방어\n- 공개 API 엔드포인트 및 스키마 보호\n- 계정 탈취(ATO) 및 지능형 악성 봇 차단\n- 테라바이트급 회선 포화 DDoS 방어",
+    "regulation": "금융보안원 가이드라인 및 기반시설 보호 지침 준수",
+    "features": "Cloud WAF, API Security, Advanced Bot Protection, DDoS 3초 완화 SLA",
+    "highlights": "단일 스택 아키텍처 기반 글로벌 WAAP 최강자",
+    "effects": "핵심 비즈니스 서비스 가용성 보장 및 무중단 연속성",
+    "competitor": "",
+    "architectureDiagram": `flowchart TB
+ subgraph Web_Clients["외부 인터넷 브라우저/앱"]
+    Web_Traffic["사용자 / 봇 트래픽"]
+  end
+ subgraph Imperva_PoP["Imperva Global Cloud PoP"]
+    Cloud_WAF["Imperva WAAP (WAF / Bot / API Engine)"]
+  end
+ subgraph Origin_Server["기업 오리진 서버"]
+    Web_App["Origin Web Server (Port 80/443)"]
+  end
+    Web_Traffic -- "HTTPS:443 (DNS CNAME 변경)" --> Cloud_WAF
+    Cloud_WAF -- "HTTPS:443 (정상 트래픽 전달)" --> Web_App`
+  },
+  {
+    "id": "엔드포인트보안-C-Falcon_Insight_(EDR)",
+    "sheetCategory": "엔드포인트보안",
+    "columnRef": "C",
+    "name": "Falcon Insight (EDR)",
+    "vendor": "CrowdStrike [외산]",
+    "vendorType": "외산",
+    "category": "엔드포인트 탐지 및 대응 (EDR) / 클라우드 보안 플랫폼",
+    "subCategory": "",
+    "target": "PC, 서버, 가상화/클라우드 워크로드, 모바일 등 엔드포인트 전반",
+    "role": "실시간 이벤트 수집, AI 기반 위협 탐지, 레지스트리/프로세스 추적, 격리 및 즉각 대응",
+    "overview": "단일 경량 에이전트로 단말 행위를 실시간 수집하고 클라우드 AI 엔진이 랜섬웨어 및 파일리스 공격을 즉시 격리/대응하는 EDR 솔루션",
+    "purpose": "실시간 고도화 위협 및 비정상 행위 차단\n- 단말 내 랜섬웨어, 파일리스(Fileless) 공격 방어\n- 시그니처 없는 신종 및 변종 악성코드 탐지\n- 침해 발생 시 신속한 격리 및 실시간 사고 조사\n- 전문 위협 헌팅 연계를 통한 실시간 가시성 확보",
+    "regulation": "ISMS-P, 국가 사이버보안법 및 규제 대응",
+    "features": "단일 경량 에이전트, AI 위협 탐지, Falcon OverWatch 위협 헌팅 연동",
+    "highlights": "글로벌 1위 AI EDR 및 단말 부하 최소화",
+    "effects": "지능형 랜섬웨어 실행 전 차단 및 타 자산으로의 전이 방지",
+    "competitor": "",
+    "architectureDiagram": `flowchart TB
+ subgraph Endpoint_Zone["기업 엔드포인트 단말"]
+    Host_PC["Windows / Mac Workstation (Falcon Sensor)"]
+  end
+ subgraph Cloud_Control["CrowdStrike Cloud Platform"]
+    Falcon_Cloud["Falcon Threat Graph AI Analysis Engine"]
+  end
+    Host_PC -- "HTTPS:443 (Event Telemetry)" --> Falcon_Cloud`
+  },
+  {
+    "id": "엔드포인트보안-D-GRADIUS_DLP",
+    "sheetCategory": "엔드포인트보안",
+    "columnRef": "D",
+    "name": "GRADIUS DLP",
+    "vendor": "블루문소프트 [국산]",
+    "vendorType": "국산",
+    "category": "엔드포인트 정보유출방지 (eDLP)",
+    "subCategory": "",
+    "target": "사내 사용자 PC(Windows, macOS), 개인정보 및 기업 핵심 기술 문서",
+    "role": "개인정보 및 민감 데이터 탐지, 매체 제어, 출력물 관리, 네트워크 유출 차단",
+    "overview": "온·오프라인 매체 제어, 출력물 관리, 동영상 화면 녹화 증적 보존 및 원본 파일 역추적 기능을 탑재한 내부 감사 특화 eDLP",
+    "purpose": "엔드포인트 단말 기밀 유출 차단\n- USB 등 온·오프라인 매체 제어\n- 메일, 메신저, 웹하드 파일 전송 통제\n- 사내 중요 특허, 도면 및 영업 비밀 사수\n- 유출 의심 행위에 대한 강력한 기술적 증적 확보",
+    "regulation": "개인정보보호법 및 영업비밀보호법 준수",
+    "features": "실시간 유출 통제, PC 화면 동영상 녹화, 원본 파일 역추적, HTTPS 자체 복호화",
+    "highlights": "동영상 화면 녹화 및 원본 역추적 특허 기술 보유",
+    "effects": "악의적 내부 직원의 반출 시도 인라인 차단 및 법적 사후 증적 확립",
+    "competitor": ""
+  },
+  {
+    "id": "엔드포인트보안-E-Neurons_for_UEM_(Secure_UEM)",
+    "sheetCategory": "엔드포인트보안",
+    "columnRef": "E",
+    "name": "Neurons for UEM (Secure UEM)",
+    "vendor": "Ivanti [외산]",
+    "vendorType": "외산",
+    "category": "통합 엔드포인트 자산 관리 및 보안 자동화 (UEM)",
+    "subCategory": "",
+    "target": "이기종 엔드포인트 전체 (Windows, macOS, Linux, iOS, Android, Rugged Device, IoT)",
+    "role": "전 자산 자율 탐지(Discovery), 자산 생애주기 관리, 패치 관리, 자가 치유(Self-Healing) 자동화",
+    "overview": "Win, Mac, Linux, 모바일 디바이스 등 다기종 단말기의 등록부터 패치 배포, 보안 설정, 자가 치유까지 통합 제어하는 UEM 솔루션",
+    "purpose": "전사 단말기 자산 관리 및 구성 컴플라이언스 일원화\n- 사내 분산된 다기종 단말기의 전체 현황 실시간 식별\n- 전사 PC의 보안 패치 및 필수 S/W 자동 배포·관리\n- 단말기 하드웨어/소프트웨어 인벤토리 상시 업데이트\n- 원격 근무 단말의 Posture(단말 무결성) 자동 검증",
+    "regulation": "정보보호 준비도 평가 및 내부 자산 실사 규정 준수",
+    "features": "다기종 OS 통합, AI 자가 치료(Self-Healing), OS 및 서드파티 통합 패치",
+    "highlights": "단일 플랫폼에서 UEM, VPN, 자산관리, 패치 일괄 제공",
+    "effects": "원격/재택 근무자 단말의 보안 수준 본사와 동일 유지 및 관리 공수 자동화",
+    "competitor": ""
+  }
+];
+
+    let COMMON_COMPONENT_TOOLBOX = [
+      {
+        category: "📦 영역 & 그룹 박스 (Zone Containers)",
+        items: [
+          { id: "box_external", name: "외부망 / API Cloud 박스", icon: "📦", isBox: true, zone: "외부망 / API Cloud" },
+          { id: "box_dmz", name: "DMZ 경계 구역 박스", icon: "📦", isBox: true, zone: "DMZ 영역" },
+          { id: "box_internal", name: "기업 내부망 박스", icon: "📦", isBox: true, zone: "기업 내부망 (Internal)" },
+          { id: "box_admin", name: "보안 관리망 박스", icon: "📦", isBox: true, zone: "보안 관리망 (Admin Seg)" }
+        ]
+      },
+      {
+        category: "🔌 API & MCP (Model Context Protocol)",
+        items: [
+          { id: "mcp_host", name: "MCP Host / Client", icon: "🤖", port: "stdio / SSE", zone: "기업 내부망 (Internal)" },
+          { id: "mcp_server", name: "MCP Server Node", icon: "⚡", port: "JSON-RPC / SSE", zone: "보안 관리망 (Admin Seg)" },
+          { id: "llm_gateway", name: "LLM GenAI Gateway", icon: "🧠", port: "HTTPS 443", zone: "외부망 / API Cloud" },
+          { id: "rest_api", name: "REST API Endpoint", icon: "🌐", port: "HTTPS 443", zone: "외부망 / API Cloud" }
+        ]
+      },
+      {
+        category: "🛡️ 네트워크 & 보안 & ZTNA 장비",
+        items: [
+          { id: "fw", name: "방화벽 (Firewall)", icon: "🛡️", port: "TCP 443/80", zone: "DMZ 영역" },
+          { id: "waf", name: "웹방화벽 (WAF)", icon: "🌐", port: "TCP 80/443", zone: "DMZ 영역" },
+          { id: "vpn", name: "Zscaler / ZTNA Gateway", icon: "🔑", port: "UDP 500/4500", zone: "DMZ 영역" }
+        ]
+      },
+      {
+        category: "🖥️ 서버 & 엔드포인트 & DB",
+        items: [
+          { id: "web_server", name: "Web / App Server", icon: "🖥️", port: "TCP 8080", zone: "기업 내부망 (Internal)" },
+          { id: "user_pc", name: "사용자 PC / EDR Agent", icon: "💻", port: "Agent Telemetry", zone: "기업 내부망 (Internal)" },
+          { id: "db_postgres", name: "PostgreSQL DB", icon: "🗄️", port: "TCP 5432", zone: "기업 내부망 (Internal)" }
+        ]
+      }
+    ];
+
+    const CATEGORIES = [
+      '전체',
+      'GIJO Product',
+      'AI 보안',
+      '취약점 분석 및 관리',
+      '데이터 암호화 키관리',
+      '네트워크 보안',
+      '엔드포인트보안'
+    ];
+
+    let activeCategory = '전체';
+    let vendorFilter = '전체';
+    let archFilter = '전체';
+    let currentViewMode = 'catalog'; // 'catalog' | 'gallery'
+    let globalSearchQuery = '';
+    let selectedDetailId = null;
+
+    let currentBuilderTargetId = null;
+    let builderNodes = [];
+    let builderConnections = [];
+    let draggedPaletteData = null;
+
+    let wiringFromNodeId = null;
+    let wiringFromSide = 'right';
+
+    function getAddedProducts() {
+      const data = localStorage.getItem('gijo_custom_products_v1.1');
+      return data ? JSON.parse(data) : [];
+    }
+
+    function saveAddedProducts(data) {
+      localStorage.setItem('gijo_custom_products_v1.1', JSON.stringify(data));
+    }
+
+    function getAllProducts() {
+      return [...getAddedProducts(), ...SOLUTIONS_DATA];
+    }
+
+    function renderTabs() {
+      const tabsContainer = document.getElementById('categoryTabs');
+      tabsContainer.innerHTML = CATEGORIES.map(cat => `
+        <button class="nav-tab-button ${cat === activeCategory ? 'active' : ''}" onclick="setCategory('${cat}')">
+          ${cat}
+        </button>
+      `).join('');
+    }
+
+    function setCategory(cat) {
+      activeCategory = cat;
+      selectedDetailId = null;
+      renderTabs();
+      renderSolutions();
+    }
+
+    function setVendorFilter(filter) {
+      vendorFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.onclick && btn.onclick.toString().includes('setVendorFilter')) {
+          btn.classList.toggle('active', btn.innerText === filter);
+        }
+      });
+      renderSolutions();
+    }
+
+    function setArchFilter(filter) {
+      archFilter = filter;
+      document.getElementById('archFilterAll').classList.toggle('active', filter === '전체');
+      document.getElementById('archFilterHas').classList.toggle('active', filter === '보유');
+      document.getElementById('archFilterNeed').classList.toggle('active', filter === '미등록');
+      renderSolutions();
+    }
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      document.getElementById('viewBtnCatalog').classList.toggle('active', mode === 'catalog');
+      document.getElementById('viewBtnGallery').classList.toggle('active', mode === 'gallery');
+
+      const grid = document.getElementById('solutionsGrid');
+      const gallery = document.getElementById('galleryViewContainer');
+      const detail = document.getElementById('fullWidthDetailSection');
+
+      if (mode === 'catalog') {
+        grid.style.display = 'grid';
+        gallery.style.display = 'none';
+      } else {
+        grid.style.display = 'none';
+        gallery.style.display = 'flex';
+        detail.innerHTML = '';
+      }
+      renderSolutions();
+    }
+
+    function onSearchInput(query) {
+      globalSearchQuery = query.toLowerCase().trim();
+      renderSolutions();
+    }
+
+    function selectDetail(id, e) {
+      if (e) e.stopPropagation();
+      selectedDetailId = (selectedDetailId === id) ? null : id;
+      renderSolutions();
+
+      if (selectedDetailId) {
+        setTimeout(() => {
+          const detailSection = document.getElementById('fullWidthDetailSection');
+          if (detailSection) {
+            detailSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }, 100);
+      }
+    }
+
+    function closeDetail() {
+      selectedDetailId = null;
+      renderSolutions();
+    }
+
+    function renderSolutions() {
+      const grid = document.getElementById('solutionsGrid');
+      const gallery = document.getElementById('galleryViewContainer');
+      const detailSection = document.getElementById('fullWidthDetailSection');
+      const allData = getAllProducts();
+      
+      let filtered = allData.filter(item => {
+        if (activeCategory !== '전체' && item.sheetCategory !== activeCategory) return false;
+        if (vendorFilter !== '전체' && item.vendorType !== vendorFilter) return false;
+        
+        if (archFilter === '보유' && !item.architectureDiagram) return false;
+        if (archFilter === '미등록' && item.architectureDiagram) return false;
+
+        if (globalSearchQuery) {
+          const matchName = item.name.toLowerCase().includes(globalSearchQuery);
+          const matchVendor = item.vendor.toLowerCase().includes(globalSearchQuery);
+          const matchCat = item.category.toLowerCase().includes(globalSearchQuery);
+          const matchTarget = (item.target || '').toLowerCase().includes(globalSearchQuery);
+          return matchName || matchVendor || matchCat || matchTarget;
+        }
+        return true;
+      });
+
+      document.getElementById('totalCount').innerText = filtered.length;
+      document.getElementById('categoryBadge').innerText = (currentViewMode === 'catalog' ? '📌 ' : '🏗️ ') + activeCategory;
+      document.getElementById('categoryDesc').innerText = currentViewMode === 'catalog' 
+        ? 'GIJO TECHNOLOGY 취급 솔루션 전체 라인업 카탈로그입니다.'
+        : '등록된 아키텍처(시스템 구성도 및 통신 흐름도) 모아보기 갤러리입니다.';
+
+      if (filtered.length === 0) {
+        const emptyHtml = `
+          <div style="grid-column: 1 / -1; padding: 40px; text-align: center; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <p style="font-weight: 700; color: #64748b;">조건에 맞는 솔루션이 없습니다.</p>
+          </div>
+        `;
+        if (currentViewMode === 'catalog') grid.innerHTML = emptyHtml;
+        else gallery.innerHTML = emptyHtml;
+        detailSection.innerHTML = '';
+        return;
+      }
+
+      if (currentViewMode === 'catalog') {
+        grid.innerHTML = filtered.map(item => {
+          const isSelected = selectedDetailId === item.id;
+          const hasDiagram = !!item.architectureDiagram;
+
+          return `
+            <div class="memo-paper-card ${isSelected ? 'active-selected' : ''}" onclick="selectDetail('${item.id}', event)">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span class="card-title-text">${item.name}</span>
+                ${hasDiagram ? '<span class="diagram-badge-tag">🔌 아키텍처 보유</span>' : '<span style="font-size:10px; color:#ef4444; font-weight:800; background:#fef2f2; padding:2px 6px; border-radius:4px; border:1px solid #fecaca;">➕ 직접 넣기</span>'}
+              </div>
+              <div class="card-fields">
+                <div><span class="field-label">분류 : </span><span class="field-val-category">${item.category}</span></div>
+                <div><span class="field-label">보호대상 : </span><span class="field-val">${item.target}</span></div>
+                <div><span class="field-label">역할 : </span><span class="field-val">${item.role}</span></div>
+              </div>
+
+              <div class="action-bar">
+                <span>${isSelected ? '&lt;세부내용 접기&gt;' : '&lt;솔루션 소개 및 아키텍처 확인하기&gt;'}</span>
+                <span>${isSelected ? '▲' : '▼'}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        renderDetailView();
+      } else {
+        renderGalleryView(filtered);
+      }
+    }
+
+    function renderGalleryView(filtered) {
+      const gallery = document.getElementById('galleryViewContainer');
+      
+      gallery.innerHTML = filtered.map(item => {
+        const hasDiagram = !!item.architectureDiagram;
+
+        return `
+          <div style="background: #ffffff; border: 2px solid ${hasDiagram ? '#2563eb' : '#cbd5e1'}; border-radius: 16px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+              <div>
+                <span style="font-size: 18px; font-weight: 900; color: #0f172a;">${item.name}</span>
+                <span style="font-size: 13px; color: #2563eb; font-weight: 800; margin-left: 8px;">(${item.vendor})</span>
+                <span style="margin-left: 12px; font-size: 11px; background: #eff6ff; color: #2563eb; padding: 3px 8px; border-radius: 6px; font-weight: 800; border: 1px solid #bfdbfe;">${item.category}</span>
+              </div>
+              <button onclick="openBuilderModal('${item.id}')" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; border: none; padding: 8px 18px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25);">
+                ${hasDiagram ? '✏️ 이 솔루션 아키텍처 수정하기' : '➕ 이 솔루션에 아키텍처 직접 넣기'}
+              </button>
+            </div>
+
+            <div style="font-size: 13px; color: #475569; font-weight: 600;">
+              <strong>📌 주요 역할:</strong> ${item.role} &nbsp;|&nbsp; <strong>보호대상:</strong> ${item.target}
+            </div>
+
+            <div class="detail-arch-box" style="margin-top: 4px;">
+              <div class="detail-arch-header">
+                <span style="font-size: 13px; font-weight: 900; color: #38bdf8;">📐 아키텍처 구성도 및 통신 흐름도</span>
+                <span style="font-size: 11px; color: #94a3b8;">${hasDiagram ? '포트 & 프로토콜 연동 완료' : '아키텍처 미등록 상태'}</span>
+              </div>
+              <div style="padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 220px;" id="galleryMermaid_${item.id.replace(/[^a-zA-Z0-9]/g, '_')}">
+                ${hasDiagram ? `<div id="galleryOutput_${item.id.replace(/[^a-zA-Z0-9]/g, '_')}" style="width:100%; display:flex; justify-content:center;"></div>` : `
+                  <div style="text-align: center; color: #64748b; padding: 20px;">
+                    <p style="font-size: 14px; font-weight: 800; margin-bottom: 8px;">아직 등록된 아키텍처 구성도가 없습니다.</p>
+                    <button onclick="openBuilderModal('${item.id}')" style="background: #2563eb; color: #fff; border: none; padding: 8px 18px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer;">
+                      ➕ 아키텍처(구성도/흐름도) 직접 넣기
+                    </button>
+                  </div>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Render Mermaid diagrams for gallery view
+      setTimeout(async () => {
+        for (const item of filtered) {
+          if (item.architectureDiagram) {
+            const containerId = `galleryOutput_${item.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const targetEl = document.getElementById(containerId);
+            if (targetEl) {
+              try {
+                const uniqueId = 'svg_gal_' + Math.random().toString(36).substr(2, 6);
+                const { svg } = await mermaid.render(uniqueId, item.architectureDiagram);
+                targetEl.innerHTML = svg;
+              } catch (err) {
+                console.log('Gallery Mermaid render notice:', err);
+              }
+            }
+          }
+        }
+      }, 50);
+    }
+
+    function renderDetailView() {
+      const detailSection = document.getElementById('fullWidthDetailSection');
+      if (!selectedDetailId) {
+        detailSection.innerHTML = '';
+        return;
+      }
+
+      const allData = getAllProducts();
+      const item = allData.find(s => s.id === selectedDetailId);
+      if (!item) {
+        detailSection.innerHTML = '';
+        return;
+      }
+
+      const hasDiagram = !!item.architectureDiagram;
+
+      let excelRows = `
+        <tr><th>제조사</th><td style="font-weight: 800; color: #2563eb; font-size: 14px;">${item.vendor}</td></tr>
+        <tr><th>솔루션명</th><td style="font-weight: 900; font-size: 15px; color: #0f172a;">${item.name}</td></tr>
+        <tr><th>분류</th><td style="font-weight: 700;">${item.category}</td></tr>
+        <tr><th>주요 보호대상</th><td>${item.target}</td></tr>
+        <tr><th>주요 역할</th><td>${item.role}</td></tr>
+      `;
+
+      if (item.overview) excelRows += `<tr><th>개요</th><td>${item.overview}</td></tr>`;
+      if (item.purpose) excelRows += `<tr><th>보안대상 및 목적</th><td>${item.purpose}</td></tr>`;
+      if (item.regulation) excelRows += `<tr><th>관련 규정</th><td>${item.regulation}</td></tr>`;
+      if (item.features) excelRows += `<tr><th>주요 기능</th><td>${item.features}</td></tr>`;
+      if (item.highlights) excelRows += `<tr><th>특장점</th><td>${item.highlights}</td></tr>`;
+      if (item.effects) excelRows += `<tr><th>기대 효과</th><td>${item.effects}</td></tr>`;
+
+      detailSection.innerHTML = `
+        <div class="full-width-detail-container">
+          <div class="detail-header">
+            <h2 class="detail-sol-name">${item.name} &nbsp;<span style="font-size: 14px; color: #2563eb; font-weight: 700;">(${item.vendor})</span></h2>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button onclick="openBuilderModal('${item.id}')" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color:#fff; border:none; padding:7px 16px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; box-shadow: 0 4px 10px rgba(37,99,235,0.25);">
+                ✏️ 이 솔루션의 아키텍처(구성도/흐름도) 직접 넣기 & 수정하기
+              </button>
+              <button class="detail-close-btn" onclick="closeDetail()">✖️ 세부내용 접기 / 닫기</button>
+            </div>
+          </div>
+
+          <table class="excel-full-table">
+            <tbody>
+              ${excelRows}
+            </tbody>
+          </table>
+
+          <!-- Architecture Visual Card -->
+          <div class="detail-arch-box">
+            <div class="detail-arch-header">
+              <span style="font-size: 14px; font-weight: 900; color: #38bdf8;">📐 아키텍처 (시스템 구축 구성도 및 통신 흐름도)</span>
+              <button onclick="openBuilderModal('${item.id}')" style="background: #2563eb; color: #fff; border: none; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">
+                🎨 아키텍처 직접 작성/수정
+              </button>
+            </div>
+            <div style="padding: 24px; display: flex; justify-content: center; align-items: center; min-height: 260px;" id="detailMermaidCanvas">
+              ${hasDiagram ? `<div id="detailMermaidOutput" style="width: 100%; display: flex; justify-content: center;"></div>` : `
+                <div style="text-align: center; color: #64748b; padding: 20px;">
+                  <p style="font-size: 14px; font-weight: 800; margin-bottom: 8px;">등록된 아키텍처 구성도가 없습니다.</p>
+                  <button onclick="openBuilderModal('${item.id}')" style="background: #2563eb; color: #fff; border: none; padding: 8px 18px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer;">
+                    ➕ 아키텍처(구성도/흐름도) 직접 넣기
+                  </button>
+                </div>
+              `}
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (hasDiagram) {
+        setTimeout(async () => {
+          try {
+            const area = document.getElementById('detailMermaidOutput');
+            if (area) {
+              const uniqueId = 'svg_graph_' + Date.now();
+              const { svg } = await mermaid.render(uniqueId, item.architectureDiagram);
+              area.innerHTML = svg;
+            }
+          } catch (err) {
+            console.log('Mermaid render notice:', err);
+          }
+        }, 50);
+      }
+    }
+
+    /* Builder Canvas Parser & Modal Functions */
+    function parseMermaidToCanvas(code) {
+      builderNodes = [];
+      builderConnections = [];
+      if (!code) return;
+
+      const lines = code.split('\n');
+      let currentZone = '기업 내부망 (Internal Zone)';
+      let nodeIndex = 0;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('subgraph')) {
+          const matchZone = trimmed.match(/\["([^"]+)"\]/);
+          if (matchZone) currentZone = matchZone[1];
+        } else if (trimmed.includes('[') && trimmed.includes(']') && !trimmed.includes('-->') && !trimmed.includes('<-->')) {
+          const matchNode = trimmed.match(/([a-zA-Z0-9_]+)\["([^"]+)"\]/);
+          if (matchNode) {
+            const rawId = matchNode[1];
+            let labelText = matchNode[2].replace(/\\n/g, ' ');
+            let icon = '🛡️';
+
+            const row = Math.floor(nodeIndex / 3);
+            const col = nodeIndex % 3;
+
+            builderNodes.push({
+              id: rawId,
+              label: labelText,
+              icon: icon,
+              zone: currentZone,
+              x: 60 + col * 260,
+              y: 50 + row * 140
+            });
+            nodeIndex++;
+          }
+        } else if (trimmed.includes('-->') || trimmed.includes('<-->')) {
+          const parts = trimmed.split(/--|<-->/);
+          if (parts.length >= 2) {
+            const fromId = parts[0].trim().replace(/[^a-zA-Z0-9_]/g, '');
+            const rightPart = parts[parts.length - 1];
+            const toMatch = rightPart.match(/-->\s*([a-zA-Z0-9_]+)/) || rightPart.match(/([a-zA-Z0-9_]+)/);
+            const toId = toMatch ? toMatch[1] : '';
+
+            let proto = 'HTTPS';
+            let port = '443';
+            let label = '';
+
+            const quoteMatch = trimmed.match(/"([^"]+)"/);
+            if (quoteMatch) {
+              const fullText = quoteMatch[1];
+              const protoPortSplit = fullText.split(' ');
+              const firstPart = protoPortSplit[0] || 'HTTPS:443';
+              if (firstPart.includes(':')) {
+                const sub = firstPart.split(':');
+                proto = sub[0];
+                port = sub[1];
+              } else {
+                proto = firstPart;
+              }
+              if (protoPortSplit.length > 1) {
+                label = protoPortSplit.slice(1).join(' ').replace(/[()]/g, '');
+              }
+            }
+
+            if (fromId && toId) {
+              builderConnections.push({
+                id: 'link_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                from: fromId,
+                fromSide: 'right',
+                to: toId,
+                toSide: 'left',
+                protocol: proto,
+                port: port,
+                label: label
+              });
+            }
+          }
+        }
+      });
+    }
+
+    function populateBuilderTargetSelect(selectedId) {
+      const select = document.getElementById('builderTargetSelect');
+      if (!select) return;
+      const allData = getAllProducts();
+      
+      let html = `<option value="GLOBAL_COMMON">🌐 (공통 아키텍처 작성)</option>`;
+      allData.forEach(item => {
+        html += `<option value="${item.id}">${item.name} (${item.vendor})</option>`;
+      });
+
+      select.innerHTML = html;
+      select.value = selectedId || 'GLOBAL_COMMON';
+    }
+
+    function onBuilderTargetChange(productId) {
+      currentBuilderTargetId = productId;
+      const allData = getAllProducts();
+      const item = allData.find(s => s.id === productId);
+
+      const diagramCode = (item && item.architectureDiagram) ? item.architectureDiagram : '';
+      if (diagramCode) {
+        document.getElementById('builderMermaidOutput').value = diagramCode;
+        parseMermaidToCanvas(diagramCode);
+      } else {
+        loadMCPTemplate();
+      }
+
+      renderBuilderNodes();
+      renderLinksManager();
+    }
+
+    /* Standardized Editor Functions & View Switching */
+    let currentEditorTab = 'canvas';
+
+    function switchEditorTab(tabName) {
+      currentEditorTab = tabName;
+
+      document.getElementById('tabBtnCanvas').classList.toggle('active', tabName === 'canvas');
+      document.getElementById('tabBtnForm').classList.toggle('active', tabName === 'form');
+      document.getElementById('tabBtnPreview').classList.toggle('active', tabName === 'preview');
+      document.getElementById('tabBtnCode').classList.toggle('active', tabName === 'code');
+
+      document.getElementById('editorTabCanvas').style.display = (tabName === 'canvas') ? 'flex' : 'none';
+      document.getElementById('editorTabForm').style.display = (tabName === 'form') ? 'flex' : 'none';
+      document.getElementById('editorTabPreview').style.display = (tabName === 'preview') ? 'flex' : 'none';
+      document.getElementById('editorTabCode').style.display = (tabName === 'code') ? 'flex' : 'none';
+
+      if (tabName === 'preview') {
+        refreshLivePreview();
+      } else if (tabName === 'form') {
+        renderFormSummary();
+      } else if (tabName === 'code') {
+        document.getElementById('builderMermaidOutputDirect').value = document.getElementById('builderMermaidOutput').value;
+      }
+    }
+
+    function refreshLivePreview() {
+      const code = document.getElementById('builderMermaidOutput').value;
+      const targetEl = document.getElementById('livePreviewMermaidOutput');
+      if (!targetEl) return;
+
+      if (!code.trim()) {
+        targetEl.innerHTML = `<div style="color:#94a3b8; font-weight:700;">아키텍처 다이어그램 코드가 비어 있습니다.</div>`;
+        return;
+      }
+
+      setTimeout(async () => {
+        try {
+          const uniqueId = 'svg_live_' + Date.now();
+          const { svg } = await mermaid.render(uniqueId, code);
+          targetEl.innerHTML = svg;
+        } catch (err) {
+          targetEl.innerHTML = `<div style="color:#ef4444; font-weight:700; background:#fef2f2; padding:12px; border-radius:8px; border:1px solid #fecaca;">⚠️ Mermaid 렌더링 오류: 다이어그램 구문을 확인해주세요.<br><pre style="font-size:11px; margin-top:6px;">${err.message || err}</pre></div>`;
+        }
+      }, 50);
+    }
+
+    function onDirectCodeInput(newCode) {
+      document.getElementById('builderMermaidOutput').value = newCode;
+      parseMermaidToCanvas(newCode);
+      renderBuilderNodes();
+      renderLinksManager();
+    }
+
+    function onMermaidCodeChange() {
+      const code = document.getElementById('builderMermaidOutput').value;
+      parseMermaidToCanvas(code);
+      renderBuilderNodes();
+      renderLinksManager();
+    }
+
+    function copyMermaidCode() {
+      const code = document.getElementById('builderMermaidOutputDirect').value || document.getElementById('builderMermaidOutput').value;
+      navigator.clipboard.writeText(code);
+      showToast('Mermaid 포트 코드가 클립보드에 복사되었습니다.');
+    }
+
+    function loadPresetTemplate(presetKey) {
+      if (!presetKey) return;
+      const allData = getAllProducts();
+      let code = '';
+
+      const matchProduct = allData.find(s => s.id.includes(presetKey) || s.name.toLowerCase().includes(presetKey.toLowerCase()));
+      if (matchProduct && matchProduct.architectureDiagram) {
+        code = matchProduct.architectureDiagram;
+      } else {
+        if (presetKey === 'Standard3Tier') {
+          code = `flowchart TB
+ subgraph External_Internet["외부망 / Public Client"]
+    Web_User["사용자 웹 브라우저 (User Client)"]
+  end
+ subgraph DMZ_Zone["DMZ 경계 영역"]
+    FW_Appliance["경계 방화벽 (Firewall)"]
+    WAF_Node["웹방화벽 (WAF)"]
+  end
+ subgraph Enterprise_Internal["기업 내부망 (Internal Zone)"]
+    Web_Server["Web / App Server"]
+    DB_Postgres["PostgreSQL Database"]
+  end
+    Web_User -- "HTTPS:443 (보안 트래픽)" --> WAF_Node
+    WAF_Node -- "TCP:8080 (내부 전달)" --> Web_Server
+    Web_Server -- "TCP:5432 (DB 쿼리)" --> DB_Postgres`;
+        } else if (presetKey === 'MCPGenAI') {
+          code = `flowchart TB
+ subgraph External_Cloud["외부 API Cloud & LLM Engine"]
+    LLM_API["LLM Provider (Claude / OpenAI API)"]
+  end
+ subgraph Enterprise_Internal["기업 내부망 (Internal Zone)"]
+    direction TB
+    subgraph Client_App["사용자 / 개발 단말"]
+        MCP_Client["MCP Host / Client (Claude Desktop / IDE)"]
+    end
+    subgraph Admin_Seg["보안 관리망"]
+        MCP_Server["MCP Server Controller (Local Tools API)"]
+    end
+  end
+    MCP_Client -- "MCP:stdio (JSON-RPC Protocol)" --> MCP_Server
+    MCP_Server -- "HTTPS:443 (Tool Call API)" --> LLM_API`;
+        }
+      }
+
+      if (code) {
+        document.getElementById('builderMermaidOutput').value = code;
+        parseMermaidToCanvas(code);
+        renderBuilderNodes();
+        renderLinksManager();
+        if (currentEditorTab === 'preview') refreshLivePreview();
+        showToast('표준 아키텍처 템플릿을 성공적으로 불러왔습니다!');
+      }
+    }
+
+    /* Simple Standard Form Builder Logic */
+    function addNodeFromForm() {
+      const name = document.getElementById('formNodeName').value.trim();
+      const zone = document.getElementById('formNodeZone').value;
+      const icon = document.getElementById('formNodeIcon').value;
+
+      if (!name) {
+        alert('컴포넌트 이름을 입력해주세요.');
+        return;
+      }
+
+      const newNode = {
+        id: 'node_' + Date.now(),
+        label: name,
+        icon: icon || '🛡️',
+        zone: zone,
+        x: 60 + (builderNodes.length % 4) * 200,
+        y: 60 + Math.floor(builderNodes.length / 4) * 120
+      };
+
+      builderNodes.push(newNode);
+      document.getElementById('formNodeName').value = '';
+      updateMermaidFromNodes();
+      renderBuilderNodes();
+      renderFormSummary();
+      showToast(`컴포넌트 '${name}'가 추가되었습니다.`);
+    }
+
+    function addLinkFromForm() {
+      const fromId = document.getElementById('formLinkFrom').value;
+      const toId = document.getElementById('formLinkTo').value;
+      const protoPort = document.getElementById('formLinkProtoPort').value.trim();
+      const label = document.getElementById('formLinkLabel').value.trim();
+
+      if (!fromId || !toId) {
+        alert('출발 노드와 도착 노드를 모두 선택해주세요.');
+        return;
+      }
+
+      let proto = 'HTTPS';
+      let port = '443';
+      if (protoPort.includes(':')) {
+        const parts = protoPort.split(':');
+        proto = parts[0];
+        port = parts[1];
+      } else if (protoPort) {
+        proto = protoPort;
+      }
+
+      builderConnections.push({
+        id: 'link_' + Date.now(),
+        from: fromId,
+        fromSide: 'right',
+        to: toId,
+        toSide: 'left',
+        protocol: proto,
+        port: port,
+        label: label
+      });
+
+      document.getElementById('formLinkProtoPort').value = '';
+      document.getElementById('formLinkLabel').value = '';
+      updateMermaidFromNodes();
+      renderBuilderNodes();
+      renderFormSummary();
+      showToast('통신 포트 연결선이 추가되었습니다.');
+    }
+
+    function renderFormSummary() {
+      const fromSelect = document.getElementById('formLinkFrom');
+      const toSelect = document.getElementById('formLinkTo');
+
+      if (fromSelect && toSelect) {
+        let optionsHtml = builderNodes.map(n => `<option value="${n.id}">${n.icon || ''} ${n.label} (${n.zone})</option>`).join('');
+        fromSelect.innerHTML = optionsHtml || `<option value="">등록된 노드 없음</option>`;
+        toSelect.innerHTML = optionsHtml || `<option value="">등록된 노드 없음</option>`;
+      }
+
+      const tableContainer = document.getElementById('formSummaryTableContainer');
+      if (!tableContainer) return;
+
+      if (builderNodes.length === 0 && builderConnections.length === 0) {
+        tableContainer.innerHTML = `<div style="color:#94a3b8; font-size:12px;">등록된 아키텍처 노드가 없습니다. 위의 폼에서 컴포넌트를 추가하세요.</div>`;
+        return;
+      }
+
+      let html = `
+        <table class="excel-full-table" style="font-size:12px;">
+          <thead>
+            <tr style="background:#f1f5f9;">
+              <th style="width:120px;">구분</th>
+              <th>상세 명칭 및 설정</th>
+              <th style="width:70px;">작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${builderNodes.map(n => `
+              <tr>
+                <td style="font-weight:800; color:#2563eb;">컴포넌트 노드</td>
+                <td><strong>${n.icon || '🛡️'} ${n.label}</strong> <span style="font-size:10px; color:#64748b; margin-left:6px;">(Zone: ${n.zone})</span></td>
+                <td><button onclick="removeNode('${n.id}')" style="background:#ef4444; color:#fff; border:none; padding:2px 8px; border-radius:4px; font-size:11px; cursor:pointer;">삭제</button></td>
+              </tr>
+            `).join('')}
+            ${builderConnections.map(c => {
+              const fromN = builderNodes.find(n => n.id === c.from) || { label: '시작노드' };
+              const toN = builderNodes.find(n => n.id === c.to) || { label: '타겟노드' };
+              return `
+                <tr>
+                  <td style="font-weight:800; color:#7c3aed;">포트 연결선</td>
+                  <td><strong>${fromN.label}</strong> ➔ <span style="background:#eff6ff; color:#2563eb; padding:2px 6px; border-radius:4px; font-weight:800;">${c.protocol}:${c.port}</span> ➔ <strong>${toN.label}</strong> ${c.label ? `(${c.label})` : ''}</td>
+                  <td><button onclick="removeLink('${c.id}')" style="background:#ef4444; color:#fff; border:none; padding:2px 8px; border-radius:4px; font-size:11px; cursor:pointer;">삭제</button></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+
+      tableContainer.innerHTML = html;
+    }
+
+    function removeLink(linkId) {
+      builderConnections = builderConnections.filter(c => c.id !== linkId);
+      updateMermaidFromNodes();
+      renderBuilderNodes();
+      renderFormSummary();
+    }
+
+    function openBuilderModal(productId = 'GLOBAL_COMMON') {
+      currentBuilderTargetId = productId;
+      populateBuilderTargetSelect(productId);
+      switchEditorTab('canvas');
+
+      const allData = getAllProducts();
+      const item = allData.find(s => s.id === productId);
+
+      document.getElementById('builderModal').classList.add('active');
+      document.body.style.overflow = 'hidden';
+
+      renderToolboxItems();
+
+      const diagramCode = (item && item.architectureDiagram) ? item.architectureDiagram : '';
+      if (diagramCode) {
+        document.getElementById('builderMermaidOutput').value = diagramCode;
+        parseMermaidToCanvas(diagramCode);
+      } else {
+        loadMCPTemplate();
+      }
+
+      renderBuilderNodes();
+      renderLinksManager();
+    }
+
+    function closeBuilderModal() {
+      document.getElementById('builderModal').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function renderToolboxItems(filterText = '') {
+      const container = document.getElementById('toolboxContainer');
+      container.innerHTML = COMMON_COMPONENT_TOOLBOX.map(cat => `
+        <div>
+          <div class="toolbox-cat-title">${cat.category}</div>
+          <div class="toolbox-items-grid">
+            ${cat.items.map(item => `
+              <div class="toolbox-item-card" draggable="true" 
+                   ondragstart="onToolboxDragStart(event, '${item.id}')"
+                   onclick="addToolboxItemToCanvas('${item.id}')">
+                <span style="font-size:18px;">${item.icon}</span>
+                <span>${item.name}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function filterToolboxItems() {
+      const query = document.getElementById('toolboxSearch').value;
+      renderToolboxItems(query);
+    }
+
+    function onToolboxDragStart(e, itemId) {
+      let foundItem = null;
+      COMMON_COMPONENT_TOOLBOX.forEach(cat => {
+        const match = cat.items.find(i => i.id === itemId);
+        if (match) foundItem = match;
+      });
+      if (foundItem) draggedPaletteData = foundItem;
+    }
+
+    function onCanvasDrop(e) {
+      e.preventDefault();
+      if (!draggedPaletteData) return;
+
+      const rect = document.getElementById('builderCanvas').getBoundingClientRect();
+      const x = Math.max(20, e.clientX - rect.left - 90);
+      const y = Math.max(20, e.clientY - rect.top - 30);
+
+      const newNode = {
+        id: 'node_' + Date.now(),
+        label: draggedPaletteData.name,
+        icon: draggedPaletteData.icon,
+        port: draggedPaletteData.port || '443',
+        isBox: !!draggedPaletteData.isBox,
+        zone: draggedPaletteData.zone || document.getElementById('builderDefaultZone').value,
+        x: x,
+        y: y
+      };
+
+      builderNodes.push(newNode);
+      draggedPaletteData = null;
+      renderBuilderNodes();
+      updateMermaidFromNodes();
+    }
+
+    function addToolboxItemToCanvas(itemId) {
+      let foundItem = null;
+      COMMON_COMPONENT_TOOLBOX.forEach(cat => {
+        const match = cat.items.find(i => i.id === itemId);
+        if (match) foundItem = match;
+      });
+      if (!foundItem) return;
+
+      const offset = builderNodes.length * 30;
+      const newNode = {
+        id: 'node_' + Date.now(),
+        label: foundItem.name,
+        icon: foundItem.icon,
+        port: foundItem.port || '443',
+        isBox: !!foundItem.isBox,
+        zone: foundItem.zone || document.getElementById('builderDefaultZone').value,
+        x: 50 + (offset % 300),
+        y: 50 + (offset % 200)
+      };
+
+      builderNodes.push(newNode);
+      renderBuilderNodes();
+      updateMermaidFromNodes();
+    }
+
+    function renderBuilderNodes() {
+      const container = document.getElementById('nodesContainer');
+      let html = '';
+
+      builderNodes.forEach(node => {
+        html += `
+          <div class="canvas-node" id="dom_${node.id}" style="left: ${node.x}px; top: ${node.y}px;" 
+               onmousedown="startNodeDrag(event, '${node.id}')"
+               onmouseup="onNodeMouseUpWireTarget('${node.id}', event)">
+            <div class="anchor-port top" title="상단 앵커" onmousedown="startMouseWiring(event, '${node.id}', 'top')"></div>
+            <div class="anchor-port right" title="우측 앵커" onmousedown="startMouseWiring(event, '${node.id}', 'right')"></div>
+            <div class="anchor-port bottom" title="하단 앵커" onmousedown="startMouseWiring(event, '${node.id}', 'bottom')"></div>
+            <div class="anchor-port left" title="좌측 앵커" onmousedown="startMouseWiring(event, '${node.id}', 'left')"></div>
+
+            <div class="canvas-node-header">
+              <span>${node.icon || '🛡️'} ${node.label}</span>
+              <span style="cursor:pointer; color:#ef4444; font-size:11px;" onclick="removeNode('${node.id}', event)">✖</span>
+            </div>
+            <div class="canvas-node-zone">Zone: ${node.zone}</div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      renderSvgWires();
+      renderLinksManager();
+    }
+
+    function getAnchorPos(node, side) {
+      const domEl = document.getElementById(`dom_${node.id}`);
+      let w = 190;
+      let h = 68;
+      if (domEl) {
+        w = domEl.offsetWidth || 190;
+        h = domEl.offsetHeight || 68;
+      }
+
+      if (side === 'top') return { x: node.x + w / 2, y: node.y };
+      if (side === 'bottom') return { x: node.x + w / 2, y: node.y + h };
+      if (side === 'left') return { x: node.x, y: node.y + h / 2 };
+      return { x: node.x + w, y: node.y + h / 2 };
+    }
+
+    function startMouseWiring(e, fromId, side) {
+      e.stopPropagation();
+      wiringFromNodeId = fromId;
+      wiringFromSide = side;
+
+      window.addEventListener('mousemove', onMouseWireMove);
+      window.addEventListener('mouseup', onMouseWireUp);
+    }
+
+    function onMouseWireMove(e) {
+      if (!wiringFromNodeId) return;
+      renderSvgWires(e);
+    }
+
+    function onMouseWireUp(e) {
+      window.removeEventListener('mousemove', onMouseWireMove);
+      window.removeEventListener('mouseup', onMouseWireUp);
+      wiringFromNodeId = null;
+      renderSvgWires();
+    }
+
+    function onNodeMouseUpWireTarget(targetId, e) {
+      if (wiringFromNodeId && wiringFromNodeId !== targetId) {
+        e.stopPropagation();
+        const fromNode = builderNodes.find(n => n.id === wiringFromNodeId);
+        const toNode = builderNodes.find(n => n.id === targetId);
+
+        openLinkEditModal(null, fromNode.label, toNode.label);
+      }
+    }
+
+    function openLinkEditModal(linkId = null, fromLabel = '', toLabel = '') {
+      const modal = document.getElementById('linkEditModal');
+      modal.classList.add('active');
+    }
+
+    function closeLinkEditModal() {
+      document.getElementById('linkEditModal').classList.remove('active');
+    }
+
+    function onModalProtocolSelectChange(proto) {
+      const portInput = document.getElementById('modalLinkPort');
+      const defaultPorts = { 'HTTPS': '443', 'HTTP': '80', 'gRPC': '8000', 'MCP/stdio': 'stdio', 'Syslog': '514' };
+      if (defaultPorts[proto]) portInput.value = defaultPorts[proto];
+    }
+
+    function saveLinkEditForm(e) {
+      e.preventDefault();
+      const proto = document.getElementById('modalLinkProtocol').value;
+      const port = document.getElementById('modalLinkPort').value.trim();
+      const label = document.getElementById('modalLinkLabel').value.trim();
+
+      if (wiringFromNodeId) {
+        builderConnections.push({
+          id: 'link_' + Date.now(),
+          from: wiringFromNodeId,
+          fromSide: wiringFromSide,
+          to: 'target',
+          toSide: 'left',
+          protocol: proto || 'HTTPS',
+          port: port || '443',
+          label: label || ''
+        });
+      }
+
+      closeLinkEditModal();
+      renderBuilderNodes();
+      updateMermaidFromNodes();
+      showToast('포트 연결선이 업데이트되었습니다.');
+    }
+
+    function renderSvgWires(mouseEvent = null) {
+      const svg = document.getElementById('svgWireLayer');
+      const badgesContainer = document.getElementById('wireBadgesContainer');
+      let paths = '';
+      let badgesHtml = '';
+
+      builderConnections.forEach(conn => {
+        const fromNode = builderNodes.find(n => n.id === conn.from);
+        const toNode = builderNodes.find(n => n.id === conn.to);
+
+        if (fromNode && toNode) {
+          const p1 = getAnchorPos(fromNode, conn.fromSide || 'right');
+          const p2 = getAnchorPos(toNode, conn.toSide || 'left');
+          const midX = (p1.x + p2.x) / 2;
+          const midY = (p1.y + p2.y) / 2;
+
+          paths += `<path d="M ${p1.x} ${p1.y} C ${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}" class="wire-path" marker-end="url(#arrow)" />`;
+          badgesHtml += `
+            <div class="wire-label-badge" style="left: ${midX}px; top: ${midY}px;">
+              <span class="badge-port-tag">${conn.protocol || 'TCP'}:${conn.port || '443'}</span>
+              <span>${conn.label || ''}</span>
+            </div>
+          `;
+        }
+      });
+
+      svg.innerHTML = `
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb" />
+          </marker>
+        </defs>
+        ${paths}
+      `;
+      badgesContainer.innerHTML = badgesHtml;
+    }
+
+    let draggingNodeId = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    function startNodeDrag(e, id) {
+      if (wiringFromNodeId) return;
+      e.stopPropagation();
+      draggingNodeId = id;
+      const node = builderNodes.find(n => n.id === id);
+      dragOffsetX = e.clientX - node.x;
+      dragOffsetY = e.clientY - node.y;
+
+      window.addEventListener('mousemove', onNodeMouseMove);
+      window.addEventListener('mouseup', onNodeMouseUp);
+    }
+
+    function onNodeMouseMove(e) {
+      if (!draggingNodeId) return;
+      const node = builderNodes.find(n => n.id === draggingNodeId);
+      if (node) {
+        node.x = Math.max(0, e.clientX - dragOffsetX);
+        node.y = Math.max(0, e.clientY - dragOffsetY);
+        renderBuilderNodes();
+        updateMermaidFromNodes();
+      }
+    }
+
+    function onNodeMouseUp() {
+      draggingNodeId = null;
+      window.removeEventListener('mousemove', onNodeMouseMove);
+      window.removeEventListener('mouseup', onNodeMouseUp);
+    }
+
+    function removeNode(id, e) {
+      e.stopPropagation();
+      builderNodes = builderNodes.filter(n => n.id !== id);
+      builderConnections = builderConnections.filter(c => c.from !== id && c.to !== id);
+      renderBuilderNodes();
+      updateMermaidFromNodes();
+    }
+
+    function renderLinksManager() {
+      const container = document.getElementById('linksListContainer');
+      document.getElementById('linksCountTag').innerText = `총 ${builderConnections.length}개 포트 연결선`;
+
+      if (builderConnections.length === 0) {
+        container.innerHTML = `<div style="color: #94a3b8; font-size: 11px;">마우스로 노드 포트 앵커를 끌어서 프로토콜과 포트를 지정하세요.</div>`;
+        return;
+      }
+
+      container.innerHTML = builderConnections.map(conn => {
+        const fromNode = builderNodes.find(n => n.id === conn.from) || { label: '시작노드' };
+        const toNode = builderNodes.find(n => n.id === conn.to) || { label: '타겟노드' };
+
+        return `
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; background:#f8fafc; padding:4px 8px; border-radius:6px; border:1px solid #e2e8f0; font-size:12px;">
+            <span style="font-weight: 800; color: #0f172a; min-width: 140px;">${fromNode.label} ➔ ${toNode.label}</span>
+            <span style="background:#eff6ff; color:#2563eb; font-weight:800; padding:2px 6px; border-radius:4px;">${conn.protocol}:${conn.port}</span>
+            <span style="color:#64748b;">${conn.label || ''}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function clearBuilderCanvas() {
+      builderNodes = [];
+      builderConnections = [];
+      renderBuilderNodes();
+      document.getElementById('builderMermaidOutput').value = "flowchart TB\n  %% 캔버스가 초기화 되었습니다.";
+    }
+
+    function loadMCPTemplate() {
+      const code = `flowchart TB
+ subgraph External_Cloud["외부 API Cloud & LLM Engine"]
+    LLM_API["LLM Provider (Claude / OpenAI API)"]
+  end
+ subgraph Enterprise_Internal["기업 내부망 (Internal Zone)"]
+    direction TB
+    subgraph Client_App["사용자 / 개발 단말"]
+        MCP_Client["MCP Host / Client (Claude Desktop / IDE)"]
+    end
+    subgraph Admin_Seg["보안 관리망"]
+        MCP_Server["MCP Server Controller (Local Tools API)"]
+    end
+  end
+    MCP_Client -- "MCP:stdio (JSON-RPC Protocol)" --> MCP_Server
+    MCP_Server -- "HTTPS:443 (Tool Call API)" --> LLM_API`;
+
+      document.getElementById('builderMermaidOutput').value = code;
+      parseMermaidToCanvas(code);
+    }
+
+    function loadStandard3TierTemplate() {
+      const code = `flowchart TB
+ subgraph External_Internet["외부망 / Public Client"]
+    Web_User["사용자 웹 브라우저 (User Client)"]
+  end
+ subgraph DMZ_Zone["DMZ 경계 영역"]
+    FW_Appliance["경계 방화벽 (Firewall)"]
+    WAF_Node["웹방화벽 (WAF)"]
+  end
+ subgraph Enterprise_Internal["기업 내부망 (Internal Zone)"]
+    Web_Server["Web / App Server"]
+    DB_Postgres["PostgreSQL Database"]
+  end
+    Web_User -- "HTTPS:443 (보안 트래픽)" --> WAF_Node
+    WAF_Node -- "TCP:8080 (내부 전달)" --> Web_Server
+    Web_Server -- "TCP:5432 (DB 쿼리)" --> DB_Postgres`;
+
+      document.getElementById('builderMermaidOutput').value = code;
+      parseMermaidToCanvas(code);
+      renderBuilderNodes();
+      renderLinksManager();
+    }
+
+    function updateMermaidFromNodes() {
+      if (builderNodes.length === 0) return;
+      let code = "flowchart TB\n";
+      const zones = [...new Set(builderNodes.map(n => n.zone))];
+      zones.forEach(z => {
+        const zoneNodes = builderNodes.filter(n => n.zone === z);
+        code += `  subgraph Zone_${z.replace(/[^a-zA-Z0-9]/g, '_')}["${z}"]\n`;
+        zoneNodes.forEach(n => {
+          code += `    ${n.id}["${n.icon || ''} ${n.label}"]\n`;
+        });
+        code += `  end\n`;
+      });
+
+      builderConnections.forEach(c => {
+        const protoText = `${c.protocol || 'TCP'}:${c.port || '443'}`;
+        const descText = c.label ? ` (${c.label})` : '';
+        code += `  ${c.from} -- "${protoText}${descText}" --> ${c.to}\n`;
+      });
+
+      document.getElementById('builderMermaidOutput').value = code;
+    }
+
+    function saveBuilderDiagram() {
+      const diagramCode = document.getElementById('builderMermaidOutput').value.trim();
+
+      let added = getAddedProducts();
+      let foundIndex = added.findIndex(s => s.id === currentBuilderTargetId);
+
+      if (foundIndex !== -1) {
+        added[foundIndex].architectureDiagram = diagramCode;
+        saveAddedProducts(added);
+      } else {
+        let initialItem = SOLUTIONS_DATA.find(s => s.id === currentBuilderTargetId);
+        if (initialItem) {
+          initialItem.architectureDiagram = diagramCode;
+          let cloned = { ...initialItem, isCustom: true };
+          added.unshift(cloned);
+          saveAddedProducts(added);
+        }
+      }
+
+      closeBuilderModal();
+      renderSolutions();
+      showToast('아키텍처(구성도/흐름도)가 성공적으로 저장 및 적용되었습니다!');
+    }
+
+    function showToast(msg) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast-message';
+      toast.innerHTML = `<span>✅</span> <span>${msg}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeLinkEditModal();
+        closeBuilderModal();
+      }
+    });
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#ffffff',
+        primaryBorderColor: '#2563eb',
+        primaryTextColor: '#0f172a',
+        lineColor: '#2563eb',
+        textColor: '#0f172a',
+        mainBkg: '#ffffff',
+        nodeBorder: '#2563eb',
+        clusterBkg: '#f8fafc',
+        clusterBorder: '#cbd5e1',
+        edgeLabelBackground: '#eff6ff',
+        fontFamily: 'Pretendard, sans-serif',
+        fontSize: '13px'
+      }
+    });
+
+    renderTabs();
+    renderSolutions();
+  </script>
+</body>
+</html>
