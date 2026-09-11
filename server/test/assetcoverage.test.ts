@@ -121,10 +121,36 @@ describe("자산 커버리지 — 무엇을 모르는가", () => {
   // ★ 2026-09-10 고객 QA 예행 결함 6 — 뒤 두 절은 예전엔 고정 문자열이었다. 업무 데이터 0에서
   //   시작한 새 인스턴스(키트 1개)에는 「출처 파일명이 잘못 저장돼 있습니다」가 거짓이 된다.
   it("★ owner가 전부 빈칸이면 출처 파일명 절이 안 나온다", () => {
-    const cov = computeAssetCoverage([asset({ id: "a", owner: "" }), asset({ id: "b", owner: "   " })]);
+    const cov = computeAssetCoverage([
+      asset({ id: "a", owner: "", origin: "scanner" }),
+      asset({ id: "b", owner: "   ", origin: "scanner" }),
+    ]);
     const owner = cov.gaps.find((g) => g.kind === "owner")!;
     expect(owner.why).not.toContain("출처 파일명");
     expect(owner.why).toContain("스캐너로 들여온 자산은 담당부서가 비어 있습니다");
+  });
+
+  // ★★ 2026-09-11 검토관 적발 — 결함 6의 나머지 절반. 빈칸이기만 하면 「스캐너로 들여온
+  //   자산」이라고 **출처를 단정**하고 있었다. 손으로 등록한 자산의 담당부서가 비어 있을 때
+  //   그 사유는 거짓이다 — 출처(origin)를 봐야 한다.
+  it("★★ 손등록(registered) 자산의 빈칸에는 「스캐너로 들여온」 사유가 안 붙는다", () => {
+    const cov = computeAssetCoverage([
+      asset({ id: "a", owner: "", origin: "registered" }),
+      asset({ id: "b", owner: "   ", origin: "registered" }),
+    ]);
+    const owner = cov.gaps.find((g) => g.kind === "owner")!;
+    expect(owner.why, "출처를 모르면 사유를 지어내지 않는다").not.toContain("스캐너로 들여온");
+    expect(owner.why).not.toContain("출처 파일명");
+    expect(owner.why, "기본 사유는 그대로 남는다").toContain("연락할 대상이 없습니다");
+  });
+
+  it("★ 스캐너 빈칸이 섞여 있으면 그때는 그 사유를 붙인다", () => {
+    const cov = computeAssetCoverage([
+      asset({ id: "a", owner: "", origin: "registered" }),
+      asset({ id: "b", owner: "", origin: "scanner" }),
+    ]);
+    const owner = cov.gaps.find((g) => g.kind === "owner")!;
+    expect(owner.why).toContain("스캐너로 들여온");
   });
 
   it("★ owner: \"scan.csv\"가 섞이면 출처 파일명 절이 나온다", () => {
@@ -135,9 +161,12 @@ describe("자산 커버리지 — 무엇을 모르는가", () => {
 
   it("ownerGapDetail — 데이터가 없으면 빈 문자열(정규식 베끼기 금지 계약, 시험이 직접 부른다)", () => {
     expect(ownerGapDetail([])).toBe("");
-    expect(ownerGapDetail(["보안팀"])).toBe("");
-    expect(ownerGapDetail([""])).toContain("스캐너로 들여온");
-    expect(ownerGapDetail(["oracle_nl4mm9.html"])).toContain("출처 파일명");
+    expect(ownerGapDetail([{ owner: "보안팀", origin: "scanner" }])).toBe("");
+    expect(ownerGapDetail([{ owner: "", origin: "scanner" }])).toContain("스캐너로 들여온");
+    // ★ 같은 빈칸이라도 출처가 스캐너가 아니면 그 사유를 대지 않는다(2026-09-11).
+    expect(ownerGapDetail([{ owner: "", origin: "registered" }])).toBe("");
+    expect(ownerGapDetail([{ owner: "" }])).toBe("");
+    expect(ownerGapDetail([{ owner: "oracle_nl4mm9.html", origin: "registered" }])).toContain("출처 파일명");
   });
 
   it("담당부서 결손이 SBOM 결손보다 위에 온다", () => {

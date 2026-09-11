@@ -8,12 +8,27 @@
 
 | 파일 | 무엇 |
 |---|---|
-| `preflight.sh` | **기동 전 자물쇠 검사** — 운영 노드 생존(cwd로 가름)·운영 health 200·모델 폴더 빔·DEV_MODE 없음. start.sh와 systemd 유닛이 **같은 이 파일**을 부른다 |
+| `preflight.sh` | **기동 전 자물쇠 검사** — 운영 노드 생존(cwd로 가름)·운영 health 200·모델 폴더 빔·DEV_MODE 없음·**GIJO_NO_SELF_SCAN=1 있음**. start.sh와 systemd 유닛이 **같은 이 파일**을 부른다 |
 | `start.sh` | sudo 없이 임시 기동(setsid nohup). 먼저 preflight를 지난다 |
 | `verify.sh` | 4100이 성한지 + **운영이 무사한지**. 기준선 파일을 주면 llama PID·4000 health를 문자열 비교 |
 | `chat-probe.mjs` | **고객이 쓰는 길**(POST /api/dispatch)로 한 문답 + 그 대화가 chat_logs에 쌓였는지 |
 | `gijo-qa.service` | 시스템 유닛 본보기(ExecStartPre로 preflight) — 등록은 관리자 |
 | `refresh-portproxy.ps1` | 재부팅으로 바뀐 WSL IP에 4000·4100 포워딩을 다시 맨다(관리자·작업 스케줄러) |
+
+### env에 반드시 있어야 하는 줄 — `GIJO_NO_SELF_SCAN=1`
+
+```
+GIJO_NO_SELF_SCAN=1
+```
+
+`/home/gijo/gijo-qa/gijo-qa.env`에 이 한 줄이 없으면 **preflight가 막아 4100이 안 뜬다**
+(systemd는 `StartLimitBurst=30` 뒤 멈춘다). 하는 일은 「이 서버 자신」 하드닝 점검을 끄는 것이다 —
+없으면 「보안설정 점검 안 한 장비 있어?」 같은 물음에 **우리 호스트 OS의 설정 상태**(준수율·U-02 …)가
+고객 화면에 그대로 나간다(2026-09-10 예행 ㉔ · 형태 ⓑ 격리 전제 위반).
+env 줄의 전체 목록과 「어기면 무슨 일이 나는가」는 `gijo-qa.service` 머리글의 표가 단일 출처다.
+
+⚠ **env만 넣고 끝이 아니다** — preflight.sh는 아래 「스크립트 사본」대로 복사해 쓰는 사본이라,
+새 검사가 든 파일을 다시 복사하지 않으면 자물쇠가 아예 안 돈다.
 
 ### 스크립트 사본
 유닛은 `/home/gijo/gijo-qa/tools/preflight.sh`를 부른다 — 저장소 파일의 **사본**이다.

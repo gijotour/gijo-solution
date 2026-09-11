@@ -33,6 +33,9 @@
 #   | GIJO_EMBEDDING_MODEL_ID=__none__| 임베딩 모델 이름을 없는 것으로            | 실제 모델 이름이면 위 자물쇠가 헐거워짐  |
 #   | GIJO_DEFAULT_MODEL_ID=__none__ | 부팅 자동 시작이 고를 모델 없음            | 자동 시작이 8080을 새로 물려 한다        |
 #   | GIJO_DEV_MODE (없어야 함)      | 등급 게이트(계획서 §14 ①)                  | 있으면 기밀·민감이 전부 보인다           |
+#   | GIJO_NO_SELF_SCAN=1            | 「이 서버 자신」 하드닝 점검을 끈다         | 없으면 preflight가 막아 4100이 안 뜬다   |
+#   |                                | (2026-09-10 예행 ㉔ · 우리 호스트 OS       | · 뚫리면 우리 호스트 설정(준수율·U-02)   |
+#   |                                | 설정이 고객에게 나가는 것을 막는 자물쇠)   | 이 고객 화면에 그대로 나간다             |
 #
 # ⚠ QA 트리에서 **npm ci·npm install을 돌리지 말 것.** node_modules가 운영 트리를 가리키는
 #   심볼릭 링크라(같은 계정=쓰기 가능) 여기서 한 번 잘못 돌리면 **운영 의존성이 바뀐다.**
@@ -59,7 +62,8 @@ User=gijo
 WorkingDirectory=/home/gijo/gijo-qa/server
 EnvironmentFile=/home/gijo/gijo-qa/gijo-qa.env
 Environment=PATH=/home/gijo/gijo-as/venv/bin:/usr/local/cuda/bin:/usr/lib/wsl/lib:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-# ★ 자물쇠 검사 — 실패하면 기동하지 않는다(운영 health 200 · 운영 노드 생존 · 빈 모델 폴더 · DEV_MODE 없음).
+# ★ 자물쇠 검사 — 실패하면 기동하지 않는다(운영 health 200 · 운영 노드 생존 · 빈 모델 폴더 ·
+#   DEV_MODE 없음 · **GIJO_NO_SELF_SCAN=1 있음**).
 #   스크립트는 저장소 tools/qa-instance/preflight.sh의 사본이다(README 「스크립트 사본」).
 ExecStartPre=/usr/bin/bash /home/gijo/gijo-qa/tools/preflight.sh /home/gijo/gijo-qa/gijo-qa.env
 ExecStart=/usr/bin/node dist/index.js

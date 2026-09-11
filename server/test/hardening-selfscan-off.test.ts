@@ -4,10 +4,30 @@
 // 우리 호스트 자신을 점검하지 않는지, 준수율·항목 코드 같은 점검 결과 글자가 하나도
 // 안 섞이는지를 못 박는다. 반대 방향(기본값=env 없음)도 함께 확인해 라이트 전제
 // (자기 PC 점검이 제품 자체다)를 깨지 않았음을 남긴다.
-// hardeningtargets.ts(runScanForTarget·runDueSchedules)는 손대지 않았다 — 이미 try/catch로
-// lastResult='fail'을 정직하게 남긴다(이 파일이 시험하지 않는 이유).
+// ★★ 2026-09-11 검토관 수리 — hardeningtargets.ts도 고쳤다(앞 판은 「손대지 않았다 — 이미
+//   try/catch로 lastResult='fail'을 정직하게 남긴다」고 적었는데, **그 'fail'이 거짓이었다**).
+//   차단 안내가 사람을 「+ 대상 등록」으로 보내는데 거기엔 「로컬(서버 자신)」 선택지가 있어,
+//   그 대상을 만들면 ① 수동 점검이 500 ② 정기점검이 매 주기 「✕ 점검 실패」를 쌓았다 —
+//   관리자가 끈 것을 제품이 고장 난 것으로 보이게 하는 거짓이다. 세 곳을 한 판정
+//   (자기점검막힌대상인가)으로 묶어 등록 자체를 막고, 수동은 409, 스케줄은 건너뛴다.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
+
+// ⚠⚠ **기본 갈래(env 없음)는 진짜 점검 명령을 시험 기계에서 돌리고 있었다** — 2026-09-11 검토관 적발.
+//   runHardeningScanTool·POST /api/hardening/scan은 러너를 못 받는 창구라, 막히지 않으면
+//   defaultRunnerFor → hostRunner → execFile("bash", ["-lc", …])로 기준 하나에 14개 명령을
+//   **실제로 띄운다**(이 파일만 두 번 = 수십 회). 느려지고 기계에 따라 결과가 갈린다.
+//   → 이 파일에서만 execFile을 빈 출력으로 갈아 끼운다. 제품 경로(창구→엔진→러너)는 그대로
+//     다 지나가므로 **도달 잣대를 낮추지 않는다** — 밖으로 나가는 명령만 없앤다.
+vi.mock("node:child_process", async (importOriginal) => {
+  const 원본 = await importOriginal<typeof import("node:child_process")>();
+  const 가짜 = (...인자: unknown[]) => {
+    const 콜백 = 인자.find((a) => typeof a === "function") as ((e: unknown, o: string, r: string) => void) | undefined;
+    콜백?.(null, "", "");
+    return undefined;
+  };
+  return { ...원본, execFile: 가짜 as unknown as typeof 원본.execFile };
+});
 
 vi.mock("../src/engine/llm", () => ({
   setRagProvider: vi.fn(), hasRagProvider: vi.fn(() => false), onChatRecorded: vi.fn(), chatLogListenerCount: vi.fn(() => 0),
@@ -17,8 +37,11 @@ vi.mock("../src/engine/llm", () => ({
 }));
 
 import { createApp } from "../src/app";
-import { runHardeningScan, 자기점검꺼짐, 자기점검차단안내, type RunFn } from "../src/engine/hardeningscan";
+import { runHardeningScan, 자기점검꺼짐, 자기점검차단안내, 로컬대상차단안내, type RunFn } from "../src/engine/hardeningscan";
 import { runHardeningScanTool } from "../src/engine/agenttools/handlers";
+import {
+  createTarget, createSchedule, listSchedules, runDueSchedules, resetHardeningForTests,
+} from "../src/engine/hardeningtargets";
 
 function mkRunner(map: Array<[RegExp, string]> = []): RunFn {
   return async (cmd: string) => {
@@ -73,6 +96,56 @@ describe("켜짐 — self는 막히고 remote는 그대로 돈다", () => {
     for (const 새면안될것 of ["준수율", "U-0", "양호", "취약"]) {
       expect(out.includes(새면안될것), `안내에 점검 결과 글자가 섞였다: ${새면안될것}`).toBe(false);
     }
+  });
+
+  // ★★ 2026-09-11 검토관 — 차단 안내가 가리킨 「+ 대상 등록」이 **막다른 길**이면 안 된다.
+  it("POST /api/hardening/targets — 로컬(서버 자신) 등록을 409로 막는다", async () => {
+    const app = createApp();
+    const token = await login(app);
+    const res = await request(app)
+      .post("/api/hardening/targets")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ label: "이서버", host: "local", port: 22, authMethod: "local", standard: "kisa" });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe(로컬대상차단안내);
+  });
+
+  it("이미 있는 로컬 대상 — 수동 점검이 500이 아니라 409 + 안내다", async () => {
+    resetHardeningForTests();
+    // env를 끈 채로 만든다(등록 창구가 막기 전에 들어와 있던 대상을 흉내 낸다).
+    delete process.env[ENV];
+    const t = createTarget({ label: "옛로컬", host: "local", port: 22, authMethod: "local", standard: "kisa" });
+    process.env[ENV] = "1";
+    const app = createApp();
+    const token = await login(app);
+    const res = await request(app)
+      .post(`/api/hardening/targets/${t.id}/scan`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ standard: "kisa" });
+    expect(res.status, "throw가 그대로 새면 500이 된다 — 담당자는 원인을 알 길이 없다").toBe(409);
+    expect(res.body.error).toBe(자기점검차단안내);
+  });
+
+  it("★★ 정기점검이 거짓 「점검 실패」를 쌓지 않는다 — 건너뛴다", async () => {
+    resetHardeningForTests();
+    delete process.env[ENV];
+    const t = createTarget({ label: "옛로컬", host: "local", port: 22, authMethod: "local", standard: "kisa" });
+    createSchedule(t.id, "kisa", 24);
+    process.env[ENV] = "1";
+    const 돈것 = await runDueSchedules(Date.now());
+    expect(돈것, "막힌 대상은 돌지 않는다").toBe(0);
+    const sch = listSchedules().find((s) => s.targetId === t.id)!;
+    expect(sch.lastResult, "관리자가 끈 것을 「제품 고장」으로 적으면 거짓이다").not.toBe("fail");
+    expect(sch.nextRunAt, "하드루프를 막으려면 다음 주기로 미뤄야 한다").toBeGreaterThan(Date.now());
+  });
+
+  it("★ 원격 대상 스케줄은 그대로 돈다 — 격리가 원격까지 죽이지 않는다", async () => {
+    resetHardeningForTests();
+    const t = createTarget({ label: "원격-fw", host: "10.9.9.9", port: 22, username: "a", authMethod: "key", secret: "/k", standard: "kisa" });
+    createSchedule(t.id, "kisa", 24);
+    const 돈것 = await runDueSchedules(Date.now(), () => mkRunner());
+    expect(돈것).toBe(1);
+    expect(listSchedules().find((s) => s.targetId === t.id)!.lastResult).toBe("success");
   });
 
   it("POST /api/hardening/scan — 409 + 같은 안내, 점검을 실행하지 않는다", async () => {

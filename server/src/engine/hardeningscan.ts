@@ -645,6 +645,22 @@ export function 자기점검꺼짐(): boolean {
 /** ⓒ 격리가 던지는 안내 — ㉑(0-대상 안내)과 같은 말을 재사용한다(FAIL_MARKS 회피 관례). */
 export const 자기점검차단안내 = "이 설치본에서는 이 서버 자신 점검을 하지 않습니다. 점검할 장비를 검증 화면에서 「+ 대상 등록」으로 등록해 주세요.";
 
+/** 이 **등록 대상**이 자기점검 격리에 막히는가 — 2026-09-11 검토관 적발(막다른 길).
+ *  앞 판은 격리를 대화 도구·POST /api/hardening/scan 두 창구에만 걸었다. 그런데 차단 안내가
+ *  사람을 「+ 대상 등록」으로 보내는데, 등록 화면에는 「로컬(서버 자신)」 선택지가 그대로 있고
+ *  그 대상을 만들면 ① 수동 점검이 500으로 떨어지고 ② 정기점검이 매 주기 lastResult='fail'을
+ *  쌓아 「✕ 점검 실패」로 보였다 — **관리자가 끈 것인데 제품이 고장 난 것처럼** 보인다.
+ *  ⇒ 등록·수동 실행·스케줄 세 곳이 **이 판정 하나**를 본다(새 판정기를 만들지 않는다).
+ *  ⚠ 「로컬인가」를 여기서 다시 적지 않는다 — 원격점검인가()가 authMethod와 host를 **둘 다** 본다
+ *    (authMethod는 key인데 host가 "local"인 대상이 실제로 만들어질 수 있다). 등록 창구는 아직
+ *    id가 없는 값을 넘기므로 두 칸만 받는다. */
+export function 자기점검막힌대상인가(t: Pick<HardeningTarget, "authMethod" | "host">): boolean {
+  return 자기점검꺼짐() && !원격점검인가(t as HardeningTarget);
+}
+
+/** 대상 등록 단계에서 로컬(서버 자신)을 막을 때 쓰는 안내 — 위 차단 안내와 뜻이 같되 자리가 다르다. */
+export const 로컬대상차단안내 = "이 설치본에서는 이 서버 자신을 점검 대상으로 등록할 수 없습니다. 점검할 장비를 내부망(사설·VPN 대역) IP로 등록해 주세요.";
+
 export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn; ranOn?: "self" | "remote"; skipWorkLog?: boolean }): Promise<ScanReport> {
   const std = STANDARDS[opts.standard];
   // ⚠⚠ **「러너를 받았는가」로는 못 가린다**(2026-09-01 검토관 [상]이 잡은 반쪽 수정).

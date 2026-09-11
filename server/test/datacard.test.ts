@@ -112,10 +112,14 @@ describe("카드 내용 — 전부 DB에서 결정적으로", () => {
     createSchedule(t.id, "kisa", 24);
     await runDueSchedules(Date.now(), () => fakeRunner());
     const { dataCard } = hardeningStatusAnswer();
-    expect(dataCard.kpis[0].value).toBe("1"); // 등록 장비
-    expect(dataCard.kpis[1].value).toBe("1"); // 활성 스케줄
-    expect(dataCard.kpis[2].value).toMatch(/%$/); // 평균 준수율 — 측정값이 있어야 한다
-    expect(dataCard.kpis[3].value).toBe("0"); // 점검 실패
+    // ⚠ 자리 번호로 집지 않는다 — KPI가 하나 늘자(2026-09-11 「미점검」) 뒤 셋이 통째로 밀렸다.
+    //   이름표로 찾으면 **무엇을 재는지**가 시험에 적히고, 칸이 늘어도 안 깨진다.
+    const kpi = (라벨: string) => dataCard.kpis.find((k) => k.label === 라벨)!;
+    expect(kpi("등록 장비").value).toBe("1");
+    expect(kpi("활성 스케줄").value).toBe("1");
+    expect(kpi("평균 준수율").value).toMatch(/%$/); // 측정값이 있어야 한다
+    expect(kpi("점검 실패").value).toBe("0");
+    expect(kpi("미점검").value, "점검을 한 대상뿐이니 미점검은 0이다").toBe("0");
     const row = dataCard.table.shown[0];
     // ⚠ 이 픽스처는 host/authMethod가 "local"이다 — **장비에 붙지 않는다.**
     //   장비 이름만 적으면 「그 장비를 점검했다」는 거짓이 되므로 이름표로 밝힌다
@@ -136,6 +140,9 @@ describe("카드 내용 — 전부 DB에서 결정적으로", () => {
     expect(dataCard.table.shown[0].장비).toBe("미점검-장비"); // 급한 것 먼저
     expect(dataCard.table.shown[0].상태).toBe("미점검");
     expect(dataCard.table.shown[1].상태).toBe("정상");
+    // ★ 2026-09-11 — 「점검 안 한 장비 있어?」에 **숫자로** 답한다(검토관 적발: KPI 넷 어디에도
+    //   미점검 수가 없어, 물음에 답하지 않고 전체 표만 돌려주고 있었다).
+    expect(dataCard.kpis.find((k) => k.label === "미점검")!.value).toBe("1");
   });
 
   it("★ 표는 10줄로 자르되 totalCount는 진짜 총계다 — 잘못 자르면 숫자가 거짓말", () => {
@@ -157,8 +164,9 @@ describe("카드 내용 — 전부 DB에서 결정적으로", () => {
     const { deleteTarget } = await import("../src/engine/hardeningtargets");
     deleteTarget(t.id);
     const { dataCard } = hardeningStatusAnswer();
-    expect(dataCard.kpis[0].value).toBe("0");
-    expect(dataCard.kpis[2].value, "대상이 없으면 평균도 없어야 한다").toBe("—");
+    const kpi = (라벨: string) => dataCard.kpis.find((k) => k.label === 라벨)!;
+    expect(kpi("등록 장비").value).toBe("0");
+    expect(kpi("평균 준수율").value, "대상이 없으면 평균도 없어야 한다").toBe("—");
   });
 
   it("🗔 화면 연결·📌 선택 열쇠가 계약대로다", () => {

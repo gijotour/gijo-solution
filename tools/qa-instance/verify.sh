@@ -117,6 +117,13 @@ if grep -qE '^GIJO_DEV_MODE=' "$QA_ROOT/gijo-qa.env" 2>/dev/null; then
 else
   echo "  ✓ GIJO_DEV_MODE 없음(등급 게이트 켜짐)"
 fi
+# 자기 하드닝 점검 격리 — 없으면 우리 호스트 OS 설정이 고객에게 나간다(2026-09-10 예행 ㉔).
+#   preflight가 기동을 막는 자물쇠와 **같은 줄**을 본다(gijo-qa.service 머리글 표가 단일 출처).
+if grep -qE '^GIJO_NO_SELF_SCAN=1$' "$QA_ROOT/gijo-qa.env" 2>/dev/null; then
+  echo "  ✓ 자기 하드닝 점검 꺼짐(GIJO_NO_SELF_SCAN=1)"
+else
+  echo "  ✗ GIJO_NO_SELF_SCAN=1이 env에 없다 — 「이 서버 자신」 점검 결과가 고객에게 나갈 수 있다."; FAIL=1
+fi
 if grep -qE '^GIJO_INITIAL_ADMIN_PASSWORD=' "$QA_ROOT/gijo-qa.env" 2>/dev/null; then
   echo "  ✗ GIJO_INITIAL_ADMIN_PASSWORD가 env에 남아 있다 — 시딩이 끝나면 지운다(노출면만 넓어진다)."; FAIL=1
 else

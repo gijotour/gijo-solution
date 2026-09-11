@@ -24,6 +24,9 @@ import {
   runHardeningScan,
   runnerFor,
   원격점검인가,
+  자기점검막힌대상인가,
+  자기점검차단안내,
+  로컬대상차단안내,
   감사대상글,
   probeTarget,
   scanSummaryText,
@@ -234,6 +237,16 @@ export async function runDueSchedules(now = Date.now(), runnerFor?: (t: Hardenin
     const next = now + Math.max(1, sch.intervalHours) * 3600_000;
     if (!target) { db.prepare("UPDATE hardening_schedules SET nextRunAt = ? WHERE id = ?").run(next, sch.id); continue; }
     if (!isStandard(sch.standard)) { db.prepare("UPDATE hardening_schedules SET nextRunAt = ? WHERE id = ?").run(next, sch.id); continue; }
+    // ★★ 자기점검을 끈 설치본(GIJO_NO_SELF_SCAN=1)에 남아 있는 로컬 대상 — 2026-09-11 검토관 적발.
+    //   그냥 돌리면 runHardeningScan이 던지고 아래 catch가 lastResult='fail'·감사 「정기점검 실패」를
+    //   **매 주기** 쌓는다. 관리자가 끈 것을 「제품이 고장 났다」고 적는 것은 거짓이다.
+    //   → 실패로 적지 않는다. lastResult는 손대지 않고(점검 이력이 없으니 카드엔 「미점검」으로
+    //     정직하게 남는다) 왜 안 돌았는지만 감사에 ok로 남긴 뒤 다음 주기로 미룬다.
+    if (자기점검막힌대상인가(target)) {
+      recordAudit({ kind: "cli", actor: "scheduler", action: `하드닝 정기점검 건너뜀 (${sch.standard})`, target: `이 서버 자신(적힌 이름표: ${target.label})`, detail: 자기점검차단안내, result: "ok" });
+      db.prepare("UPDATE hardening_schedules SET nextRunAt = ? WHERE id = ?").run(next, sch.id);
+      continue;
+    }
     try {
       const report = await runScanForTarget(target, sch.standard, "scheduled", "scheduler", runnerFor ? runnerFor(target) : undefined);
       db.prepare("UPDATE hardening_schedules SET lastRunAt = ?, nextRunAt = ?, lastRate = ?, lastFail = ?, lastResult = 'success', lastError = NULL WHERE id = ?")
@@ -291,6 +304,12 @@ export function registerHardeningTargetRoutes(app: Express): void {
     const authMethod = String(b.authMethod ?? "").trim();
     if (!label || !host) { res.status(400).json({ error: "label·host가 필요합니다" }); return; }
     if (!["local", "key", "password"].includes(authMethod)) { res.status(400).json({ error: "authMethod는 local·key·password 중 하나" }); return; }
+    // ★★ 자기점검을 끈 설치본에서는 **로컬 대상 등록 자체를** 막는다 — 2026-09-11 검토관 적발.
+    //   안 막으면 차단 안내가 가리킨 「+ 대상 등록」이 **막다른 길**이 된다(등록은 되는데 점검은
+    //   500이고 정기점검은 거짓 「점검 실패」를 쌓는다). 창구에서 거절하고 왜인지 말한다.
+    //   ⚠ 판정은 아래 실행 창구와 **같은 함수**로 한다 — 여기서 authMethod만 보면 host="local"인
+    //     대상이 새어 들어와 그때 다시 막다른 길이 된다.
+    if (자기점검막힌대상인가({ authMethod: authMethod as HardeningTarget["authMethod"], host })) { res.status(409).json({ error: 로컬대상차단안내 }); return; }
     // ⚠ `local`(이 서버 자신)은 나가는 접속이 아니므로 대역 검사를 안 한다.
     //   원격이면 **사설·VPN 대역만** 받는다. 호스트명은 거부한다 — 이름은 어디로든 풀릴 수 있어
     //   「확실히 내부망」을 코드가 보증할 수 없다(remotellm과 같은 자세, airgap의 default-deny).
@@ -335,6 +354,10 @@ export function registerHardeningTargetRoutes(app: Express): void {
     // 기준 미지정 시 대상 등록 시 정한 기본 기준(장비 유형)으로 점검한다.
     const standard = String(req.body?.standard ?? t.standard ?? "kisa");
     if (!isStandard(standard)) { res.status(400).json({ error: "standard는 kisa·cis·kisa_pc·kisa_net 중 하나" }); return; }
+    // ★★ 막힌 자기점검은 여기서 **409로** 답한다 — 2026-09-11 검토관 적발.
+    //   안 잡으면 runHardeningScan의 throw가 asyncRoute를 타고 그대로 500이 된다 —
+    //   「서버 오류」로 보이지만 실제로는 **설정대로 막힌 것**이라 담당자가 원인을 알 길이 없다.
+    if (자기점검막힌대상인가(t)) { res.status(409).json({ error: 자기점검차단안내 }); return; }
     const report = await runScanForTarget(t, standard, "manual", actorOf(req));
     res.json({ report, summary: scanSummaryText(report) });
   }));

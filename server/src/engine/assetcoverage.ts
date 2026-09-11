@@ -3,7 +3,7 @@
 // 화면(inventory.html)과 챗봇(agenttools: asset_coverage)이 같은 계산을 본다.
 // 두 곳에서 따로 세면 반드시 어긋나고, 어긋나면 담당자는 둘 다 믿지 않게 된다.
 // 값이 아니라 타입만 가져온다 — assets.ts가 이 파일을 쓰므로 값 임포트는 순환이 된다.
-import type { Asset } from "./assets";
+import type { Asset, AssetOrigin } from "./assets";
 // 스캔 실패 판정은 한 곳만 쓴다 — 결손(무엇을 모르는가)과 취약점(무엇이 뚫렸나)은 다른 축이다.
 import { isRealVulnerability } from "./agenttools";
 
@@ -139,17 +139,23 @@ const GAP_META: Record<GapKind, { severity: "high" | "mid"; title: (n: number) =
 const GAP_ORDER: GapKind[] = ["owner", "unscanned", "service", "sbom"];
 
 /**
- * 담당부서 결손의 **왜**를 데이터로 가른다(2026-09-10 예행 결함 6, 검토관용 export).
- * 빈칸 부류(owner.trim() === "")와 파일명 부류(FILENAME_LIKE, 43행 상수 재사용)를 각각
- * 실제로 있을 때만 문장으로 덧붙인다 — 둘 다 없으면(있을 수 없다, isOwnerMissing이 이 둘만
- * 결손으로 치므로) 빈 문자열.
+ * 담당부서 결손의 **왜**를 데이터로 가른다(2026-09-10 예행 결함 6 · 2026-09-11 검토관 수리).
+ * 빈칸 부류(owner.trim() === "")와 파일명 부류(FILENAME_LIKE, 위 상수 재사용)를 각각
+ * 실제로 있을 때만 문장으로 덧붙인다.
+ * ⚠⚠ **빈칸 절은 출처(origin)까지 본다** — 2026-09-11 검토관 적발(결함 6의 나머지 절반).
+ *   앞 판은 판단 근거가 「owner가 빈칸인가」 하나뿐인데 문장은 **「스캐너로 들여온 자산」이라고
+ *   출처를 단정**했다. 손으로 등록했거나 담당부서 칸이 없는 CSV로 올린 자산의 담당부서를
+ *   비워 두면 같은 거짓 사유가 그대로 붙는다. 출처는 이미 제품이 안다 —
+ *   assets.ts assetOriginOf()가 Asset.origin("sample"·"scanner"·"registered")으로 넣어 준다.
+ *   ⇒ 스캐너 출처의 빈칸이 **실제로 있을 때만** 그 절을 붙이고, 아니면 아무 말도 안 한다
+ *     (모르면 덜 주장한다 — 없는 사유를 지어내는 것이 이 문장에서 가장 나쁜 거짓이다).
  * ⚠ 정규식을 베끼지 않는다 — 시험이 이 함수를 직접 불러 대조한다(계약 한 곳).
  */
-export function ownerGapDetail(owners: (string | null | undefined)[]): string {
-  const trimmed = owners.map((o) => (o ?? "").trim());
+export function ownerGapDetail(결손자산: Array<{ owner?: string | null; origin?: AssetOrigin }>): string {
+  const 값 = (a: { owner?: string | null }) => (a.owner ?? "").trim();
   const parts: string[] = [];
-  if (trimmed.some((o) => o === "")) parts.push("스캐너로 들여온 자산은 담당부서가 비어 있습니다.");
-  if (trimmed.some((o) => FILENAME_LIKE.test(o))) parts.push("예전 반입분에는 출처 파일명이 담당부서로 잘못 저장돼 있습니다.");
+  if (결손자산.some((a) => 값(a) === "" && a.origin === "scanner")) parts.push("스캐너로 들여온 자산은 담당부서가 비어 있습니다.");
+  if (결손자산.some((a) => FILENAME_LIKE.test(값(a)))) parts.push("예전 반입분에는 출처 파일명이 담당부서로 잘못 저장돼 있습니다.");
   return parts.length ? " " + parts.join(" ") : "";
 }
 
@@ -162,7 +168,7 @@ export function computeAssetCoverage(assets: Asset[]): AssetCoverage {
     const ids = matched.map((p) => p.a.id);
     if (!ids.length) continue;
     const meta = GAP_META[kind];
-    const why = kind === "owner" ? meta.why + ownerGapDetail(matched.map((p) => p.a.owner)) : meta.why;
+    const why = kind === "owner" ? meta.why + ownerGapDetail(matched.map((p) => p.a)) : meta.why;
     gaps.push({ kind, severity: meta.severity, title: meta.title(ids.length), why, fixLabel: meta.fixLabel, assetIds: ids });
   }
 
