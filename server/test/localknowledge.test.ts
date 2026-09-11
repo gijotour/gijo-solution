@@ -13,6 +13,8 @@
 //   ④ 하네스의 knowledge 조건은 근거를 **프롬프트에 안 싣고** 정답 조각은 **파일에 적는다**
 //      (persona와 조건은 같고 목적이 반대라, 한 이름으로 묶으면 관문 ⑨의 모집단이 오염된다)
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { 지식정답률, 문항최소_지식, 판정 } from "../../tools/team-bench/gates.mjs";
 import { MODES, 조각들, 조각기록, 조각필요, system만들기 } from "../../tools/team-bench/ask-samples.mjs";
 
@@ -92,5 +94,96 @@ describe("하네스 — knowledge 조건은 근거를 **안 싣고** 정답 조�
     expect(조각기록("knowledge")).toBe(true);
     expect(조각기록("grounded")).toBe(true);
     expect(조각기록("persona"), "⑨의 모집단에는 정답 조각이 없다").toBe(false);
+  });
+});
+
+// ── 사슬(day2-train.sh) 소스 감시 — 2026-09-11 회전5 r5a 판정 배선 ─────────
+// ★ 왜 여기 있나: 채점자(지식정답률)와 측정자(ask-samples MODES)는 이미 다 있었다(위 describe 둘).
+//   그런데 사슬이 그 조건을 **던지지도, 게이트에 넘기지도 않아** ⑭는 배선 공백으로 죽어 있었다
+//   (설계관 실측, 2026-09-11). 이 describe가 그 배선을 지킨다 — day2-train.sh는 한 줄도 안 보던
+//   이 시험 파일이 이제 그 사슬의 소스를 직접 읽는다.
+describe("사슬이 ⑭를 실제로 재고 넘긴다(day2-train.sh 소스 감시)", () => {
+  const 셸 = readFileSync(join(__dirname, "..", "..", "tools", "ladder", "day2-train.sh"), "utf8");
+
+  it("① knowledge 표본을 실제로 던진다 — --mode knowledge 호출이 없으면 ⑭는 영영 미측정이다", () => {
+    expect(셸).toContain("--mode knowledge");
+  });
+
+  it("② 이번 판의 knowledge 결과를 --local-knowledge 로 게이트에 넘긴다", () => {
+    // ⚠ --samples-knowledge 로 넘기면 gates.mjs가 조용히 무시한다(그 인자를 모른다) — 관문이
+    //   초록인데 아무것도 안 잰 상태가 된다. 반드시 --local-knowledge 라는 이름이어야 한다.
+    expect(셸).toContain("--local-knowledge");
+  });
+
+  it("③ 베이스의 knowledge 결과를 --baseline-local-knowledge 로 넘긴다 — 없으면 무엇과 견줄지 모른다", () => {
+    expect(셸).toContain("--baseline-local-knowledge");
+  });
+
+  it("④ 「무슨 인자로 쟀는지」 기록(harness-args.json)의 표본 목록에도 knowledge가 있다", () => {
+    expect(셸, "이 칸이 knowledge를 빼먹으면 결과 파일만 보고 무슨 조건으로 쟀는지 가릴 수 없다")
+      .toMatch(/\["grounded", "distractor-only", "bare", "persona", "knowledge"\]/);
+  });
+
+  it("★★⑤ 표본 만들기·게이트 넘기기 루프 문자열은 **그대로 남아 있다**", () => {
+    // 이 문자열은 server/test/ladder.test.ts:1598-1599가 이미 못 박아 둔 것이다 — knowledge를
+    // 저 루프 안에 끼워 넣으면 이 문자열이 깨지고 그 시험도 함께 죽는다. 이 시험이 곧
+    // 「knowledge는 루프에 끼우지 말고 별도 블록으로 두라」의 못이다.
+    const 루프문자열 = "for mode in grounded distractor-only bare persona; do";
+    const 개수 = 셸.split(루프문자열).length - 1;
+    expect(개수, "표본 만들기 루프 + 게이트 넘기기 루프 — 정확히 둘이어야 한다(늘어도 줄어도 이 계약이 깨진 것)").toBe(2);
+  });
+});
+
+// ── night-r5-judge.sh 소스 감시(2026-09-11 신설) ──────────────────────────
+// ⚠ 왜 필요한가: night-r5-bake.sh는 2026-09-11까지 이것을 보는 시험이 0건이었다(전수 grep).
+//   새 밤 스크립트를 감시 표에 안 올리면 「밤 스크립트는 시험이 없다」가 관례가 된다 — 같은 구멍을
+//   두 번 파지 않으려고 judge와 bake 둘 다 여기서 덮는다.
+describe("night-r5-judge.sh 소스 감시 — 판정은 굽지 않는다(fail-closed)", () => {
+  const 밤 = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "night-r5-judge.sh"), "utf8");
+
+  it("★ 교사(8080) 감시견이 있다 — 교사가 말을 멈추면 판정을 내린다", () => {
+    expect(밤).toContain("8080/health");
+  });
+
+  it("★ 08:30 데드라인 감시견이 있다 — 낮 서빙을 지키는 마지막 방어선", () => {
+    expect(밤).toMatch(/DEADLINE/);
+  });
+
+  it("★★ 교사를 이름으로 죽이지 않는다 — pkill -f llama-server 는 교사(8080)까지 죽인다", () => {
+    expect(밤, "이 패턴이 있으면 교사·임베딩까지 함께 죽는다").not.toMatch(/pkill -f ['"]?llama-server/);
+  });
+
+  it("★ 재학습 금지를 명시한다 — --skip-train 이 있다", () => {
+    // 어댑터 없이 --round r5a 를 부르면 day2-train.sh:372의 DONE_MARK 검사가 거짓이 되어
+    // 4bit 기본값으로 밤을 통째로 다시 굽는다(:427 학습 호출에 --precision이 없다).
+    expect(밤).toContain("--skip-train");
+  });
+
+  it("★ 어댑터 존재를 **먼저** 본다(fail-closed) — 없으면 판정 없이 끝낸다", () => {
+    expect(밤).toContain("adapter_model.safetensors");
+    expect(밤).toMatch(/checkpoint-26/);
+    expect(밤).toMatch(/checkpoint-52/);
+  });
+});
+
+describe("night-r5-bake.sh 소스 감시 — 2026-09-11까지 시험 0건이던 구멍을 메운다", () => {
+  const 밤 = readFileSync(join(__dirname, "..", "..", "tools", "team-bench", "night-r5-bake.sh"), "utf8");
+
+  it("★ 교사(8080) 감시견이 있다", () => {
+    expect(밤).toContain("8080/health");
+  });
+
+  it("★ 08:30 데드라인 감시견이 있다", () => {
+    expect(밤).toContain("DEADLINE");
+  });
+
+  it("★★ 교사를 이름으로 죽이지 않는다", () => {
+    expect(밤).not.toMatch(/pkill -f ['"]?llama-server/);
+  });
+
+  it("굽기 직전에 등급 관문을 다시 잰다 — 빨강이면 굽지 않는다", () => {
+    expect(밤).toContain("GRADEGATE");
+    expect(밤).toMatch(/GATE=red/);
+    expect(밤).toMatch(/\[ "\$GATE" != "ok" \]/);
   });
 });

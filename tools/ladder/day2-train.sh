@@ -82,7 +82,10 @@ while [ $# -gt 0 ]; do
 done
 
 BENCH_SRC="$REPO/tools/team-bench"
-BASELINE_DIR="$BENCH_SRC/results-ladder/baseline"
+# ★ ⓐ(2026-09-11 · 회전 5 r5a 판정 배선) — 40문항으로 다시 잴 베이스를 **새 폴더**에 두기 위한 자리.
+#   왜: 옛 베이스(results-ladder/baseline/)는 12문항 판이고 README에 sha256·측정 시각이 박혀 r1~r4의
+#   비교 근거를 증언한다. 덮으면 지난 표가 「무엇과 견줬는지」를 거짓으로 말하게 된다.
+BASELINE_DIR="${LADDER_BASELINE_DIR:-$BENCH_SRC/results-ladder/baseline}"
 # ★ 프롬프트 규격 파일(2026-09-04 · R3) — 근거 꼴을 **저장소에서** 읽는 길.
 #   왜: 이 사슬은 gb10에서 도는데, 거기서 관리자 4000(win 운영은 VPN 너머·계정당 1세션)에 닿는 길이
 #   마땅치 않아 「학습과 같은 꼴로 재는가」가 남의 기계 사정에 매여 있었다.
@@ -181,6 +184,17 @@ run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
       "${SPEC_ARGS[@]}" 2>&1 | tee "$dir/samples-$mode.log"
     [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ 표본[$mode] 실패 — $dir/samples-$mode.log" >&2; return 8; }
   done
+  # ★ knowledge(2026-09-11 · 회전 5 r5a 판정 배선 · 관문 ⑭) — 근거를 프롬프트에 안 싣고 원격도
+  #   안 쓰는 자리에서 아는 것을 잃지 않았는가(계획서 §12.12). ⚠ 위 for 루프 **안에 끼우지 않는다** —
+  #   그 문자열은 server/test/ladder.test.ts:1598-1599가 그대로 못 박아 둔 것이라, 끼우면 시험이 죽는다.
+  if ladder_have "$dir/samples-knowledge.json"; then
+    ladder_log "   표본[knowledge] 건너뜀 — 이미 있다"
+  else
+    ladder_log "   표본[knowledge] ($who) — 포트 $PORT"
+    PORT="$PORT" node "$BENCH_SRC/ask-samples.mjs" "$dir/samples-knowledge.json" --mode knowledge --server "$SERVER" --agent "${AGENT:-normaltic}" \
+      "${SPEC_ARGS[@]}" 2>&1 | tee "$dir/samples-knowledge.log"
+    [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "✗ 표본[knowledge] 실패 — $dir/samples-knowledge.log" >&2; return 8; }
+  fi
   if ladder_have "$dir/kev.json"; then
     ladder_log "   KEV 건너뜀 — 이미 있다"
   else
@@ -196,7 +210,7 @@ run_probes() {  # $1=출력 디렉터리 · $2=이 판의 이름(로그용)
     const spec = specPath ? ` --prompt-spec ${specPath}` : "";
     fs.writeFileSync(out, JSON.stringify({
       누구: who, 잰때: new Date().toISOString(), port: Number(port), server, agent,
-      표본: ["grounded", "distractor-only", "bare", "persona"].map((m) => `ask-samples.mjs samples-${m}.json --mode ${m} --server ${server} --agent ${agent}${spec}`),
+      표본: ["grounded", "distractor-only", "bare", "persona", "knowledge"].map((m) => `ask-samples.mjs samples-${m}.json --mode ${m} --server ${server} --agent ${agent}${spec}`),
       kev: `kev-probe.mjs kev.json --server ${server} --agent ${agent}${spec}`,
       // 근거 꼴을 어디서 받았나 — 규격 파일이면 그 사본이 이 폴더에 함께 있다(prompt-spec.json).
       근거꼴출처: spec ? "prompt-spec.json(이 폴더의 사본)" : "창구 GET /api/learnloop/raft/prompt",
@@ -552,6 +566,9 @@ run_variant() {
   for mode in grounded distractor-only bare persona; do
     [ -s "$probedir/samples-$mode.json" ] && GATE_ARGS+=("--samples-$mode" "$probedir/samples-$mode.json")
   done
+  # ★ ⑭ 로컬 14B 단독 지식(2026-09-11 · 회전 5 r5a) — gates.mjs는 **--local-knowledge만** 읽는다
+  #   (--samples-knowledge로 넘기면 조용히 무시되어 ⑭이 영영 미측정이 된다).
+  [ -s "$probedir/samples-knowledge.json" ] && GATE_ARGS+=(--local-knowledge "$probedir/samples-knowledge.json")
   # 옛 회전이 남긴 samples.json(맨 질문 한 벌)이 있으면 참고 표본으로 함께 넘긴다.
   # ⚠ 다시 재는 자리(--probe-out)에서는 **안 섞는다** — 옛 잣대의 파일이 새 표에 참고로 끼면
   #   「이 표가 어느 잣대의 것인가」가 흐려진다.
@@ -567,6 +584,8 @@ run_variant() {
   # ★ persona의 베이스는 관문이 **안 쓴다**(⑨는 절대 0건 기준이라 견줄 상대가 필요 없다).
   #   그래도 넘기는 이유: 표의 참고 줄에 「베이스도 같은 조건으로 쟀다」가 남아야 사람이 두 숫자를 나란히 읽는다.
   [ -s "$BASELINE_DIR/samples-persona.json" ] && GATE_ARGS+=(--baseline-samples-persona "$BASELINE_DIR/samples-persona.json")
+  # ★ ⑭의 베이스 — 없으면 「무엇과 견줄지 모른다」로 미측정이다(①·⑤·⑬과 같은 꼴).
+  [ -s "$BASELINE_DIR/samples-knowledge.json" ] && GATE_ARGS+=(--baseline-local-knowledge "$BASELINE_DIR/samples-knowledge.json")
   if [ ! -s "$BASELINE_DIR/kev.json" ] || [ ! -s "$BASELINE_DIR/samples-grounded.json" ]; then
     ladder_log "⚠ 베이스 대조 파일이 없다 — 먼저 bash tools/ladder/day2-train.sh --baseline-probe 를 한 번 돌려라(관문 ①⑤⑧이 미측정으로 막힌다)"
   fi
