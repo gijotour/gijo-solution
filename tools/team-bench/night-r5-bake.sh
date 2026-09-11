@@ -18,13 +18,33 @@
 #   · 27B를 올리지 않는다(이번 회전은 되묻기를 건너뛴다 — 위 결정 참조).
 #   · 운영 데이터를 쓰지 않는다.
 #
-# ■ night-r5-prep.sh와 다른 점 (그 외 안전장치는 문구까지 동일)
+# ■ night-r5-prep.sh와 다른 점 (2026-09-11 검토관 적발로 목록을 **실제 차이 전부**로 고침 —
+#   그전 머리글은 「그 외는 문구까지 동일」이라 적었는데 사실이 아니었다)
 #   ① 27B 되묻기 단계가 없다(결정으로 건너뜀) — 재료는 이미 확정된 raft-vuln-v6를 그대로 쓴다.
 #   ② 등급 관문의 --cwin은 **cwin-v6.json**(6,388)이다. 어젯밤의 cwin.json(9,894)을 쓰면
 #      「칸은 O인데 글은 C」를 옛 창 집합으로 재게 되어 새로 걸린 41개 창을 못 본다.
+#      또 prep에 없던 --holdout·--samples(겹침 관문)를 함께 준다 — 시험지를 물고 굽지 않기 위해서다.
 #   ③ 스모크(100스텝)가 아니라 **본 굽기**(--max-steps 안 줌 = 2에폭 52스텝 전부)다 — 몇 시간이 걸린다.
 #   ④ **08:30 데드라인 감시견**을 새로 둔다 — 그 시각까지 살아 있으면 학습만 죽인다(교사는 그대로 —
-#      낮에 gb10이 원격 팀원 셋을 섬겨야 한다. 예상 종료는 04:30경이라 여유가 크다).
+#      낮에 gb10이 원격 팀원 셋을 섬겨야 한다. 예상 종료는 04:45~05:00경이라 여유가 크다).
+#   ⑤ 등급 관문 도구의 **사본 폴백을 없앴다**(prep은 $R5/gradegate.mjs로 내려갔다) — 저장소 것이
+#      없으면 굽지 않는다. fail-closed 쪽이라 방향은 의도한 것이다.
+#   ⑥ GIJO_GATES·GIJO_RAFT_BUILDER·GIJO_MATERIAL_R5 export가 없다 — 관문이 $R5 사본이 아니라
+#      저장소 잣대를 쓴다(2026-09-11 gb10 md5 대조: 두 사본 동일 03e6ddc85cf0dfe62f977af5cfd49a7c).
+#   ⑦ 끝줄 발췌가 tail -5 / 400자다(prep은 tail -3 / 300자).
+#
+# ■ 되돌리기 — **순서가 중요하다**(2026-09-11 검토관 적발)
+#   학습은 서비스가 아니라 `systemd-run --scope`가 만든 **딴 유닛**에서 돈다(어젯밤 저널에서 확인:
+#   run-r2c4d2b898….scope). 그래서 서비스를 먼저 멈추면 **학습은 안 멈추고 감시견만 죽어**
+#   08:30 데드라인 보호가 사라진다. 반드시 이 순서로 한다.
+#     1) pkill -f finetune_qlora14b.py                     ← 학습을 먼저 내린다(필수)
+#     2) systemctl --user stop gijo-r5-night2.timer gijo-r5-night2.service
+#     3) rm -rf ~/gijo-as/server/data/lora/r5a             ← 반쯤 구워진 어댑터를 치운다
+#   교사(8080)·임베딩(8081)은 어느 단계에서도 건드리지 않는다.
+#
+# ■ 아침 판정의 첫 항목 — `ls ~/bench/ladder/r5/night2.log`
+#   타이머가 transient(Persistent=no)라 gb10이 재부팅되면 예약이 **소리 없이** 사라진다.
+#   로그 파일이 없으면 결과가 나쁜 게 아니라 **아예 안 구워진 것**이다.
 #
 # 쓰는 법(gb10):  bash ~/gijo-as/tools/team-bench/night-r5-bake.sh
 set -u
@@ -44,9 +64,14 @@ HOLDOUT=${HOLDOUT:-$REPO/tools/team-bench/holdout-vuln-o.json}
 SAMPLES=${SAMPLES:-$REPO/tools/team-bench/samples-questions.json}
 GRADEGATE=${GRADEGATE:-$REPO/tools/team-bench/gradegate.mjs}
 # 밤새 굽는다 — 사전 가용 관문은 prep과 같은 수(bf16 14B 가중치만 28G).
+# ⚠ 이 32G는 **실측 필요량보다 작다**(2026-09-11 검토관 적발). 어젯밤 실측: 시작 가용 44G →
+#   최대 사용 120G/121G(교사 77G 위에 우리가 약 43G). 32~43G 사이에서 시작하면 관문은 초록인데
+#   OOM으로 날아갈 여지가 있다. **잣대를 바꾸는 일은 메인/사장님 결정**이라 숫자는 그대로 두고,
+#   아래에서 실측 필요량(BAKE_MEASURED_NEED)과 견줘 **경고를 로그에 남긴다**.
 BAKE_MIN_AVAIL=${BAKE_MIN_AVAIL:-32}
+BAKE_MEASURED_NEED=${BAKE_MEASURED_NEED:-43}
 BAKE_MEM_MAX=${BAKE_MEM_MAX:-38G}
-# 08:30 데드라인 — 예상 종료 04:30경이라 여유가 크지만, 낮 서빙을 지키는 마지막 방어선이다.
+# 08:30 데드라인 — 예상 종료 04:45~05:00경이라 여유가 크지만, 낮 서빙을 지키는 마지막 방어선이다.
 DEADLINE=${DEADLINE:-08:30}
 
 mkdir -p "$R5"
@@ -80,9 +105,16 @@ fi
 
 # ── 본 굽기 ───────────────────────────────────────────────────────────────
 # 학습기는 **저장소 것**을 먼저 쓴다 — 사본은 저장소가 아직 새 깃발을 못 받았을 때만 쓴다.
+# ⚠ 판정은 **이번에 쓰는 깃발 전부**를 본다(2026-09-11 검토관 적발). --precision 하나만 보면
+#   나머지 셋이 없는 학습기를 골라 03:25에 argparse 오류로 즉사하고 아침까지 아무도 모른다.
 FT=$SERVER/scripts/finetune_qlora14b.py
-if ! grep -q -- "--precision" "$FT" 2>/dev/null; then
-  say "저장소 학습기에 --precision 이 없다(아직 push 전) — 사본을 쓴다: $R5/finetune_qlora14b.py"
+FTFLAGS="--precision --lora-alpha-mult --save-epochs --eval-file --lora-targets --max-seq"
+FTMISS=""
+for f in $FTFLAGS; do
+  grep -q -- "\"$f\"" "$FT" 2>/dev/null || FTMISS="$FTMISS $f"
+done
+if [ -n "$FTMISS" ]; then
+  say "저장소 학습기에 깃발이 없다($FTMISS · 아직 push 전) — 사본을 쓴다: $R5/finetune_qlora14b.py"
   FT=$R5/finetune_qlora14b.py
 fi
 AVAIL=$(free -g | awk '/^메모리|^Mem/ {print $7}')
@@ -94,9 +126,35 @@ elif [ "${AVAIL:-0}" -lt "$BAKE_MIN_AVAIL" ]; then
   say "굽기 건너뜀 — 가용 메모리 ${AVAIL}G < ${BAKE_MIN_AVAIL}G (bf16 14B는 가중치만 28G다). 교사를 밀 위험이 있다"
 else
   say "학습기: $FT"
-  say "굽기 시작 — bf16 · LoRA all · rank16 · lr1e-4 · 2에폭 · max_seq 4096 · lora-alpha-mult 1 · 가용 ${AVAIL}G · 상한 $BAKE_MEM_MAX · 우리가 먼저 죽게 oom_score_adj=1000"
-  say "예상 스텝 52(26/에폭) · 예상 55~80분 · 데드라인 $DEADLINE(그때까지 살아 있으면 학습만 죽인다)"
-  ( while true; do echo "[$(date '+%T')] $(mem)"; sleep 30; done ) > "$R5/bake-mem.log" 2>&1 &
+  # ── 실제로 걸리는 보호를 **먼저 계산하고 그 값을 적는다** ──────────────
+  # ⚠ 2026-09-11 검토관 적발: 예전엔 「상한 38G · oom_score_adj=1000」을 **단언**해 놓고
+  #   RUNNER 계산은 그 아래에서 했다. 상한이 실제로 걸렸는지가 로그에 한 글자도 안 남아,
+  #   아침 판정자가 「보호가 걸린 채 구워졌다」로 읽게 된다(폴백을 정상 출력처럼 다루는 부류).
+  # choom = oom_score_adj 를 올려 **커널이 우리를 먼저 고르게** 한다(교사는 780이다).
+  # systemd-run --scope MemoryMax = cgroup 상한. ⚠ 최선의 노력이다(어젯밤 실측: 상한 38G를
+  #   넘겨 약 43G를 쓰고도 종료 0 — 즉 **실효가 없었다.** 증거 부족으로 계속 걸되 단언하지 않는다).
+  RUNNER=""
+  if command -v systemd-run > /dev/null 2>&1; then
+    RUNNER="systemd-run --user --scope -q -p MemoryMax=$BAKE_MEM_MAX --"
+    GUARD="cgroup 상한 $BAKE_MEM_MAX 지정(실효는 미검증 — 어젯밤은 넘겼다)"
+  else
+    GUARD="cgroup 상한 **미적용**(systemd-run 없음)"
+  fi
+  if command -v choom > /dev/null 2>&1; then
+    RUNNER="$RUNNER choom -n 1000 --"
+    GUARD="$GUARD · oom_score_adj=1000(커널이 우리를 먼저 고른다)"
+  else
+    GUARD="$GUARD · oom_score_adj **미적용**(choom 없음)"
+  fi
+  [ -n "$RUNNER" ] || GUARD="상한·우선순위 **둘 다 미적용** — 가용 관문과 감시견만 걸린 상태"
+  say "굽기 시작 — bf16 · LoRA all · rank16 · lr1e-4 · 2에폭 · max_seq 4096 · lora-alpha-mult 1 · 가용 ${AVAIL}G"
+  say "걸린 보호: $GUARD"
+  if [ "${AVAIL:-0}" -lt "$BAKE_MEASURED_NEED" ]; then
+    say "⚠ 가용 ${AVAIL}G < 실측 필요량 ${BAKE_MEASURED_NEED}G — 관문(${BAKE_MIN_AVAIL}G)은 지났지만 OOM 여지가 있다"
+  fi
+  say "예상 스텝 52(26/에폭) · 예상 65~95분(어젯밤 0.362 샘플/초 × 824샘플 + 에폭마다 평가 98행) · 데드라인 $DEADLINE(그때까지 살아 있으면 학습만 죽인다)"
+  # 메모리 로거 주기는 prep과 같은 5초로 되돌린다(30초로 두면 짧은 최대치를 놓친다 — 검토관 적발).
+  ( while true; do echo "[$(date '+%T')] $(mem)"; sleep 5; done ) > "$R5/bake-mem.log" 2>&1 &
   MEMPID=$!
   # 교사 감시견 — 교사가 말을 멈추면 **굽기를 내린다.** cgroup 회계와 무관하게 도는 마지막 방어선이다.
   ( while true; do
@@ -121,13 +179,8 @@ else
     done ) > /dev/null 2>&1 &
   DEADLINEPID=$!
   cd "$SERVER" || exit 1
-  # choom = oom_score_adj 를 올려 **커널이 우리를 먼저 고르게** 한다(교사는 780이다).
-  # systemd-run --scope MemoryMax = cgroup 상한. ⚠ 최선의 노력이다(어젯밤 실측: 상한 넘김에도 종료 0 —
-  #   증거 부족으로 계속 건다. choom·감시견이 최후 방어선).
-  RUNNER=""
-  command -v systemd-run > /dev/null 2>&1 && RUNNER="systemd-run --user --scope -q -p MemoryMax=$BAKE_MEM_MAX --"
-  command -v choom > /dev/null 2>&1 && RUNNER="$RUNNER choom -n 1000 --"
-  [ -n "$RUNNER" ] || say "⚠ systemd-run·choom 이 없다 — 상한 없이 돈다(가용 관문·감시견만 걸린 상태)"
+  # ⚠ 아래 $RUNNER 는 위에서 이미 계산됐다(로그에 적힌 「걸린 보호」가 여기서 실제로 걸리는 것이다).
+  #   학습은 이 --scope 때문에 **서비스와 다른 유닛**에서 돈다 — 되돌릴 땐 머리글의 순서를 지킬 것.
   GIJO_FT_BASE_MODEL=${GIJO_FT_BASE_MODEL:-Qwen/Qwen3-14B} \
     $RUNNER "$VENV/bin/python" "$FT" --dataset "$DATASET" --output "$BAKE_OUT" \
     --base-model "${GIJO_FT_BASE_MODEL:-Qwen/Qwen3-14B}" \
@@ -144,5 +197,5 @@ fi
 # ── 끝 상태 ───────────────────────────────────────────────────────────────
 say "교사(8080) health: $(teacher)  ·  임베딩(8081): $(curl -s -m 5 http://127.0.0.1:8081/health || echo '(응답 없음)')"
 say "메모리: $(mem)"
-say "요약 — 등급관문=${GATE:-미실행} · 굽기종료코드=$BAKE · 재료=$DATASET · 어댑터=$BAKE_OUT"
+say "요약 — 등급관문=${GATE:-미실행} · 굽기종료코드=$BAKE · 재료=$DATASET · 어댑터=$BAKE_OUT · 걸린보호=${GUARD:-굽지 않음}"
 say "════ 회전 5 r5a 본 굽기 끝 ════"
