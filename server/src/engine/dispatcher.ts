@@ -68,6 +68,7 @@ import { LONG_ANSWER_MS, QA_LONG_ANSWER_MS, REPORT_HANDOFF_MS, 보고서꼴, sta
 import { runWithProgress, isValidProgressId, reportProgress, reportBigStep, registerProgressRoutes } from "./progress";
 import { recordAnswerTiming } from "./observability";
 import { 내부키치환 } from "./tone";
+import { REPORT_CREATE_RE, REPORT_QUERY_EXCLUDE_RE } from "./reportintent";
 
 // 협업 로그는 "무슨 일이 있었나"를 남기는 활동 기록이다 — 답변 전문을 그대로 실으면 화면에
 // 같은 글이 두 번 보인다(2026-07-26 사용자 지적: 같은 답이 연달아 두 번 나옴). 앞부분만 남긴다.
@@ -429,8 +430,11 @@ function reportClarification(): string {
 
 // ── 시연 실측(2026-07-29, 계획서 전-1)이 잡은 라우팅 결함용 결정적 분기 재료 ──────────
 // "보고서를 만들어 달라"는 의도 — 조회(스케줄·이력)와 갈라야 한다.
-export const REPORT_CREATE_RE = /(리포트|보고서)[^\n]{0,12}(만들|생성|작성|뽑|출력)|(만들|생성|작성)[^\n]{0,8}(리포트|보고서)/;
-export const REPORT_QUERY_EXCLUDE_RE = /스케줄|일정|예약|언제|이력|목록/;
+// ⚠ 2026-09-11 검토관 [상] — 이 둘은 이제 **잎 모듈 reportintent.ts**가 원본이다.
+//   datacard.ts가 같은 배제를 자기 정규식으로 베껴 두 곳이 어긋나 있었다(「…결과 리포트
+//   출력해줘」가 [36]을 못 갔다). 여기서는 그대로 재수출만 한다 — routingfixes.test.ts가
+//   dispatcher에서 가져다 쓰고, 순환 없이 datacard.ts도 같은 상수를 본다.
+export { REPORT_CREATE_RE, REPORT_QUERY_EXCLUDE_RE } from "./reportintent";
 
 // "반려 사유가 주로 뭐였어?" — 사내 이력 질문. 데이터는 취약점 검토·유지보수 점검 두 곳에 실재한다.
 // ⚠ 오탐 쪽 사이 글자 여유를 8 → 14로 넓혔다(2026-08-03 실전 147상황):

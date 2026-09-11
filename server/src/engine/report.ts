@@ -3,7 +3,7 @@
 
 import type { Express, Request } from "express";
 // 심각도 우리말은 원천 한 곳(tone.ts)에서만 만든다 — 자리마다 만들면 같은 것이 둘로 보인다.
-import { 심각도한글 } from "./tone";
+import { 심각도한글, 준수율집계전단서 } from "./tone";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { createRequire } from "module";
@@ -123,6 +123,10 @@ export function collectVulnReportData(scopeAssets?: Asset[]): VulnReportData {
   const done = tasks.filter((t) => t.done).length;
   const overdue = tasks.filter((t) => !t.done && t.dueAt != null && t.dueAt < now).length;
   const compliant = tasks.filter((t) => t.dueAt == null || t.done || t.dueAt >= now).length;
+  // ⚠ 이 산식은 kpi.ts remediationMetrics()와 **같은 값이어야 한다**(둘을 합칠 수 없다 —
+  //   kpi.ts가 이 파일을 import하므로 반대 방향은 순환이다). 어긋나면 같은 날 대화 KPI와
+  //   보고서가 다른 준수율을 말한다 — 짝 감시: server/test/slaclue.test.ts가 같은 데이터로
+  //   두 값을 실제로 계산해 대조한다(2026-09-11 검토관 [중]).
   const slaCompliance = tasks.length ? Math.round((compliant / tasks.length) * 100) : 100;
   const topOpen = tasks
     .filter((t) => !t.done)
@@ -325,7 +329,11 @@ async function buildDocx(
             children: [
               new TextRun(
                 `조치 항목 ${vuln.remediation.tasks}건 · 완료 ${vuln.remediation.done} · 진행 ${vuln.remediation.open}` +
-                  ` · 기한 초과 ${vuln.remediation.overdue} · SLA 준수율 ${vuln.remediation.slaCompliance}%`
+                  ` · 기한 초과 ${vuln.remediation.overdue} · SLA 준수율 ${vuln.remediation.slaCompliance}%` +
+                  // ★ 2026-09-11 검토관 [중] — B6-②가 대화 도구 둘(runKpiStatus·runExecBrief)에만
+                  //   단서를 붙여, **같은 스냅샷을 대화는 「집계 전」, 보고서는 「100%」**로 말했다.
+                  //   문구는 tone.ts 한 곳(준수율집계전단서) — 여기서 새로 짓지 않는다.
+                  준수율집계전단서(vuln.remediation.tasks)
               ),
             ],
           }),
@@ -333,9 +341,13 @@ async function buildDocx(
           new Paragraph({
             children: [
               new TextRun({
+                // ⚠ 표본 0에서 「÷ 0건 × 100」이라는 **말이 안 되는 산식**이 나가던 자리다
+                //   (2026-09-11 검토관 [중]). 조치대상이 0건이면 산식 대신 미집계라고 밝힌다.
                 text:
-                  `※ SLA 준수율 = (기한 내 조치 완료 건) ÷ (전체 조치대상 ${vuln.remediation.tasks}건) × 100. ` +
-                  `기한 초과 ${vuln.remediation.overdue}건은 미준수. 조치대상은 취약점 연결 조치 티켓(task.ref=vuln:) 기준.`,
+                  vuln.remediation.tasks === 0
+                    ? "※ 조치대상(취약점 연결 조치 티켓)이 0건이라 SLA 준수율은 아직 집계 전입니다 — 100%는 만점이 아니라 «잴 것이 없음»입니다."
+                    : `※ SLA 준수율 = (기한 내 조치 완료 건) ÷ (전체 조치대상 ${vuln.remediation.tasks}건) × 100. ` +
+                      `기한 초과 ${vuln.remediation.overdue}건은 미준수. 조치대상은 취약점 연결 조치 티켓(task.ref=vuln:) 기준.`,
                 italics: true,
                 size: 18,
               }),
@@ -584,7 +596,9 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
       //   한글 제품에서 영문 상태값은 담당자가 못 읽는다(말투 규범 금지 항목). **넣을 때부터 우리말로.**
       `심각도별 발견 건수: ${심각도별건수요약(counts)}. ` +
       `취약점 조치: 스캔 호스트 ${vuln.hosts}대, 열린 취약점 ${vuln.active}건(Critical ${vuln.critical}·High ${vuln.high}), ` +
-      `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%, 기한 초과 ${vuln.remediation.overdue}건. ` +
+      // ⚠ 임원 요약을 쓰는 **모델에게 주는 재료**다 — 여기에 단서가 없으면 모델이 「SLA 준수율
+      //   100%로 양호」라고 쓴다(2026-09-11 검토관 [중]). 문구는 tone.ts 한 곳에서 온다.
+      `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%${준수율집계전단서(vuln.remediation.tasks)}, 기한 초과 ${vuln.remediation.overdue}건. ` +
       `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건.${caseHint} ` +
       `KEV와 기한 초과, 그리고 EPSS가 높은 취약점을 우선순위로 강조해줘. ` +
       `중요: 위에 제시된 수치만 사용하고, 제시되지 않은 숫자(호스트 대수 등)를 새로 지어내지 마세요. 스캔 호스트는 정확히 ${vuln.hosts}대입니다.`,
@@ -1088,8 +1102,12 @@ function buildReportHtml(
     <h2>심각도별 분포</h2><p>${Object.entries(counts).map(([s, c]) => `${esc(s)}: ${c}건`).join(" · ")}</p>
     <h2>취약점 조치 현황</h2>
     <p>스캔 호스트 ${vuln.hosts}대 · 열린 취약점 ${vuln.active}건 (Critical ${vuln.critical}/High ${vuln.high}/Medium ${vuln.medium}/Low ${vuln.low}) · 실제 악용(KEV) ${vuln.kev}건</p>
-    <p>조치 항목 ${vuln.remediation.tasks}건 · 완료 ${vuln.remediation.done} · 진행 ${vuln.remediation.open} · 기한 초과 ${vuln.remediation.overdue} · SLA 준수율 ${vuln.remediation.slaCompliance}%</p>
-    <p class="muted">※ SLA 준수율 = (기한 내 조치 완료) ÷ (전체 조치대상 ${vuln.remediation.tasks}건) × 100. 기한 초과 ${vuln.remediation.overdue}건은 미준수.</p>
+    <p>조치 항목 ${vuln.remediation.tasks}건 · 완료 ${vuln.remediation.done} · 진행 ${vuln.remediation.open} · 기한 초과 ${vuln.remediation.overdue} · SLA 준수율 ${vuln.remediation.slaCompliance}%${준수율집계전단서(vuln.remediation.tasks)}</p>
+    <p class="muted">${
+      vuln.remediation.tasks === 0
+        ? "※ 조치대상(취약점 연결 조치 티켓)이 0건이라 SLA 준수율은 아직 집계 전입니다 — 100%는 만점이 아니라 «잴 것이 없음»입니다."
+        : `※ SLA 준수율 = (기한 내 조치 완료) ÷ (전체 조치대상 ${vuln.remediation.tasks}건) × 100. 기한 초과 ${vuln.remediation.overdue}건은 미준수.`
+    }</p>
     ${priorities.length ? `<h2>우선순위 조치 목록 (오늘의 조치 Top)</h2><table><tr><th>순위</th><th>심각도</th><th>취약점</th><th>자산</th><th>담당자</th><th>기한</th><th>상태</th></tr>${rows}</table>` : ""}
     ${triageHtml}
     ${casesHtml}

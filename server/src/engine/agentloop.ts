@@ -26,6 +26,9 @@ import { listTasks } from "./tasks";
 import { 자산표시이름, listAssets } from "./assets";
 import { extractLexicalTerms } from "./hybridsearch"; // CVE 뽑기는 CODE_RE 한 곳 — 새 CVE 정규식을 짓지 않는다(scandrafts와 같은 계약, 2026-09-03)
 import { 말조사 } from "../util/josa";
+// ⚠ 잎 모듈(import 0개) — 「보고서를 만들어 달라」 잣대는 dispatcher [36]과 **한 곳**에서 본다.
+//   dispatcher.ts를 직접 부르면 순환이 된다(그쪽이 agentloop을 쓴다).
+import { 리포트만들기지시 } from "./reportintent";
 
 const MAX_STEPS = 5;
 
@@ -2476,14 +2479,21 @@ export function isHowtoNotCommand(instruction: string): boolean {
  *  ⚠ 넓게 잡아도 안전하다 — 여기 걸리면 점검을 안 돌리고 지식(RAG·채팅)으로 넘길 뿐,
  *    [17] 카드처럼 다른 도구의 영토를 뺏지 않는다(운영에서 셸 명령이 실제로 도는 쪽이
  *    훨씬 나쁜 오답이다 — hardeningscan.ts hostRunner, 결재판 없이 즉시 실행).
- *  ⚠ 실행지시_RE는 datacard.ts 실행지시_RE·agentloop.ts FORCED_INTENTS[3](run_hardening_scan,
- *    1104줄)의 뒤 보기와 **같은 리터럴**이다 — 짝 감시: server/test/hardening-unchecked-
- *    routing.test.ts 「④ 소스 감시」가 이 문자열이 datacard.ts에도 있는지 잰다. */
-function 결과조회꼴(instruction: string): boolean {
+ *  ⚠⚠ 2026-09-11 검토관 [상]① 수리 — 실행지시 리터럴은 **datacard.ts 실행지시_RE와 같은
+ *    글자**지만, FORCED_INTENTS[3](run_hardening_scan, 1104줄)의 뒤 보기와는 **일부러
+ *    다르다.** 둘은 일이 다르다:
+ *    [3]은 **허용**(걸리면 결재판 없이 즉시 실행이라 좁아야 한다), 여기는 **배제**(넓어야
+ *    시킨 점검이 안 도는 사고를 막는다). 첫 판은 [3]의 리터럴을 그대로 베껴 「하고·(사이에
+ *    낱말이 낀)해서·실시·진행·착수」를 몰랐고, 그래서 「방화벽 점검하고 결과 알려줘」류가
+ *    **조용히 아무 일도 안 일어나는 말**이 됐다(첫 수면 아래 `return null` → RAG 폴백).
+ *    지킬 계약은 「글자가 같다」가 아니라 **「강제 실행으로 가는 말은 여기서 조회로 안 읽힌다」**
+ *    이고, 그건 hardening-unchecked-routing.test.ts ④가 **제품 함수로** 잰다.
+ *  ⚠ 보고서 만들기 배제는 [36]과 **같은 상수**(reportintent.ts)를 본다 — 베끼면 어긋난다.
+ * ★ export: 시험이 정규식을 베끼지 않고 **이 함수 그대로** 부른다. */
+export function 결과조회꼴(instruction: string): boolean {
   const t = String(instruction || "").replace(/\s+/g, "");
-  const 실행지시 = /(점검|진단|스캔|체크)\s*(해|하자|하라|시켜)|돌려|수행|가동|실행(?!\s*(이력|기록|결과|내역|현황))/.test(t);
-  const 보고서만들기 = /(보고서|리포트).{0,4}(만들|작성|생성|뽑아|써)/.test(t);
-  return /결과/.test(t) && !실행지시 && !보고서만들기;
+  const 실행지시 = /(점검|진단|스캔|체크)\s*(을|를)?\s*(다시|한\s*번|지금|좀|바로|새로)?\s*(해|하자|하라|하고(?!\s*(있|계|싶))|시켜|실시(?!\s*(했|한|된|됐|여부|주기|일|중|결과|내역|이력|현황|상황))|진행(?!\s*(했|한|된|됐|중|상황|률|율|도|현황|사항|경과|결과|내역|이력))|착수)|돌려|돌리|수행|가동|실행(?!\s*(이력|기록|결과|내역|현황))/.test(t);
+  return /결과/.test(t) && !실행지시 && !리포트만들기지시(String(instruction || ""));
 }
 
 /** 사내 규정·지침을 조회하는 말인가 — 법령(외부)·판정 이력·행동 대조와 갈라야 한다.

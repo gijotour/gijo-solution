@@ -15,6 +15,7 @@ import { runKpiStatus, runExecBrief } from "../src/engine/agenttools/handlers";
 import { computeKpiSnapshot, resetKpiForTests } from "../src/engine/kpi";
 import { resetAssetsForTests, seedSampleAssetsIfEmpty } from "../src/engine/assets";
 import { resetTasksForTests, createTask } from "../src/engine/tasks";
+import { collectVulnReportData } from "../src/engine/report";
 
 const 단서 = "조치 항목이 0건이라 아직 집계 전입니다";
 
@@ -73,5 +74,48 @@ describe("★ 단서 문구는 tone.ts 한 곳에서 온다 — handlers.ts는 �
 
     // 두 도구가 헬퍼를 실제로 부르는지도 소스 감시로 못 박는다(만들어 두고 안 부르는 함정).
     expect(handlersSrc, "runKpiStatus가 준수율집계전단서를 안 부른다").toContain("준수율집계전단서(s.remediation.tasks)");
+  });
+});
+
+// ★★★ 2026-09-11 검토관 [중] — **단서가 대화 도구 둘에만 붙었다.**
+//   report.ts는 같은 스냅샷을 Word 문단·임원 요약 LLM 프롬프트·HTML 세 곳에 찍는데 전부
+//   단서 없는 「SLA 준수율 100%」였다. 게다가 산식 주석이 표본 0에서
+//   「÷ (전체 조치대상 0건) × 100」이라는 **말이 안 되는 문장**으로 나갔다.
+//   B6-②의 목표가 「같은 사실을 한 문장으로」인데, 대화는 「집계 전」·보고서는 「100%」로
+//   말하면 이중 기재가 줄지 않고 갈래만 는 것이다(handlers.ts 주석이 경고한 바로 그 장면 —
+//   파일럿 첫날 임원에게 100%가 나간다).
+describe("★ 세 번째 소비자(report.ts) — 보고서도 같은 단서를 쓴다", () => {
+  const 소스 = (...조각: string[]) =>
+    fs.readFileSync(path.join(__dirname, "..", "src", "engine", ...조각), "utf8");
+
+  it("report.ts가 준수율을 찍는 세 자리에서 모두 헬퍼를 부른다(베낀 문구 0)", () => {
+    const src = 소스("report.ts");
+    const 호출수 = src.split("준수율집계전단서(vuln.remediation.tasks)").length - 1;
+    expect(호출수, "Word 문단·임원 요약 프롬프트·HTML 셋 다 붙어야 한다 — 하나라도 빠지면 그 경로만 100%를 말한다").toBe(3);
+    expect(src.includes("조치 항목이 0건이라 아직 집계 전입니다"), "report.ts가 문구를 베꼈다 — tone.ts 헬퍼를 쓸 것").toBe(false);
+  });
+
+  it("표본 0에서 산식 주석이 「÷ 0건 × 100」으로 안 나간다", () => {
+    const src = 소스("report.ts");
+    // 두 자리(Word·HTML) 모두 조치대상 0건이면 산식 대신 미집계라고 밝힌다.
+    const 갈래수 = src.split("vuln.remediation.tasks === 0").length - 1;
+    expect(갈래수, "Word·HTML 산식 주석 두 곳 모두 표본 0 갈래를 가져야 한다").toBe(2);
+  });
+
+  // ★ 산식 자체는 kpi.ts와 report.ts 두 곳에 있다(합칠 수 없다 — kpi.ts가 report.ts를
+  //   import하므로 반대 방향은 순환). **값이 같은지를 제품 함수로 잰다** — 글자 대조가 아니다.
+  it("★ 짝 감시 — 같은 데이터에서 kpi.ts와 report.ts의 준수율이 같은 값이다", async () => {
+    resetTasksForTests();
+    // 표본 0
+    expect((await computeKpiSnapshot()).remediation.slaCompliance).toBe(
+      collectVulnReportData().remediation.slaCompliance,
+    );
+    // 표본 있음(기한 넘긴 것 1 + 기한 전 1 → 50%)
+    createTask({ text: "[조치] 기한 지난 것", priority: "P1", dueAt: Date.now() - 86400000, ref: "vuln:slaclue-late" });
+    createTask({ text: "[조치] 아직 여유", priority: "P2", dueAt: Date.now() + 5 * 86400000, ref: "vuln:slaclue-ok" });
+    const k = (await computeKpiSnapshot()).remediation;
+    const r = collectVulnReportData().remediation;
+    expect(r.tasks, "조치 항목 수부터 같아야 같은 산식이라 할 수 있다").toBe(k.tasks);
+    expect(r.slaCompliance, "kpi.ts와 report.ts가 같은 날 다른 준수율을 말한다 — 산식이 어긋났다").toBe(k.slaCompliance);
   });
 });
