@@ -44,6 +44,15 @@ const LIST_TOOLS = new Set(["finding_status", "today", "briefing", "scan_status"
 
 const MAX_PICK = 20; // 스무 개가 넘으면 고르는 것보다 조건이 낫다
 
+/** B7 ② 정직 단서(2026-09-11) — 「오래된 순」 정렬은 제품에 없다(발견일·age 필드가 없어서다,
+ *  bridge.ts StandardFinding·approvals.ts FindingReview 전수 확인). 새 숫자·정렬을 지어내지
+ *  않고 모르는 것을 모른다고 말한다(전-6 정직). 상수 하나로 두어 findingListAnswer 한 곳에서만
+ *  쓴다(단서 문구 단일화 — B6 39cdade8과 같은 모양). FAIL_MARKS(drawer-audit.mjs)를 비켜
+ *  「알 수 없습니다·할 수 없습니다·지원하지 않」을 쓰지 않는다. */
+export const 오래된순없음단서 =
+  "⚠ 「오래된 순」으로 줄 세우는 잣대는 제품에 아직 없습니다 — 급한 순(KEV→EPSS→VPR)으로 보여드렸고, " +
+  "얼마나 밀렸는지는 위 「기한 초과 N건」으로 보세요.";
+
 /** 고른 뒤 누를 수 있는 조치. 화면이 이 목록으로 버튼을 그린다. */
 const PICK_ACTIONS: PickList["actions"] = [
   { key: "assign", label: "담당자 배정", needs: "assignee" },
@@ -105,6 +114,22 @@ const LIST_ASK_RE = /(취약점|미조치|조치\s*안|미해결)/;
 const LIST_VERB_RE = /(목록|리스트|보여|뭐\s*있|무엇이?\s*있|어떤\s*게?\s*있|현황|남았)/;
 const LIST_BLOCK_RE = /(배정|기한|처리해|조치해|오탐|완료로|잡아|스캔|보고서|리포트|방법|어떻게|절차)/;
 
+/** 「패치 안 된 지 오래된 거 알려줘」류 — 오래 방치된 취약점을 묻는 말인가(B7 ②, 2026-09-11).
+ *  ⚠ 새 도착지를 만들지 않는다 — isFindingListAsk에 OR로 더해 **이미 같은 뜻을 받고 있는**
+ *  [14] findingListAnswer로 모은다(묵은·조치 안 된 지 오래된 등 이웃 6문장이 이미 그리로 간다).
+ *  배제는 **LIST_BLOCK_RE(위)가 이미 막는 것(기한·배정·처리해·조치해·오탐·스캔·보고서·
+ *  리포트·방법·어떻게·절차)을 빼고**, 그 목록에 없는 이웃 영토만 더한다: 점검·일정·정비·
+ *  유지보수(maintenance_status) · 문서·자료·파일(kbhygiene·doc_chunk_gaps) · 백업
+ *  (system_health) · 로그(analysis_status) · 왜(지식 물음 — 「오래되면 왜 위험해」).
+ *  ★ export: 시험이 이 함수를 그대로 불러 이웃 문장 회귀를 못 박는다. */
+export function 오래미조치물음(text: string): boolean {
+  const 배제 = /(점검|일정|정비|유지보수|문서|자료|파일|백업|로그|왜|담아|추가해|등록해)/;
+  const 신호 = /(오래(된|됐|도록)?|오랫동안|한참|장기간|묵은|묵힌|방치)/;
+  const 대상 = /(취약점|미조치|조치\s*안|패치\s*안|패치\s*못|안\s*고친|안\s*고쳐|미해결|결함)/;
+  const 조회 = /(알려|보여|뭐\s*있|무엇|목록|리스트|현황|있어|있나|정리|남았)/;
+  return !배제.test(text) && 신호.test(text) && 대상.test(text) && 조회.test(text);
+}
+
 // ★ 대상 없이 뭉뚱그려 묻는 말 — 「취약점 알려주세여」(2026-09-04 야간 회귀 ⑪ 실위반).
 //
 // 무엇이 새고 있었나: 위 LIST_VERB_RE에 **「알려」가 없다.** 그래서 「취약점 알려줘」는
@@ -138,6 +163,7 @@ export function isFindingListAsk(text: string): boolean {
   const t = String(text ?? "");
   if (LIST_BLOCK_RE.test(t)) return false;
   if (BARE_LIST_ASK_RE.test(t.trim())) return true; // 대상 없는 「취약점 알려주세여」
+  if (오래미조치물음(t)) return true; // 「패치 안 된 지 오래된 거 알려줘」 — 이웃 문장은 이미 여기로 온다
   return LIST_ASK_RE.test(t) && LIST_VERB_RE.test(t);
 }
 
@@ -258,7 +284,7 @@ export function findingListAnswer(text = "", 걸린범위?: string | null): { ou
     (등급 ? ` (전체 ${전부.length}건 중)` : "") +
     ` — 담당자 미배정 ${미배정}건 · 기한 초과 ${초과}건`;
   const 꼬리 = rows.length > 보여줄.length ? `\n\n(급한 순으로 ${보여줄.length}건만 보여드립니다)` : "";
-  const output = `${머리}\n\n${lines.join("\n")}${꼬리}`;
+  const output = `${머리}\n\n${lines.join("\n")}${꼬리}` + (오래미조치물음(text) ? "\n\n" + 오래된순없음단서 : "");
   // 데이터 카드(2차, 2026-08-19) — **KPI만, 표는 없다.** 목록은 이미 두 벌이다:
   // 본문 텍스트(위 lines — picklist.test가 계약으로 잡음)와 체크칸(조치용).
   // 표까지 넣으면 같은 목록이 세 벌 — 「같은 것을 여러 곳에 적으면 어긋난다」가 화면에 생긴다.

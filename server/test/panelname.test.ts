@@ -57,6 +57,12 @@ describe("★ 구역 이름 전수 — 강제 도구의 말을 채 가는 이름
     "maintenance.html|점검 승인 · 올린 점검서|review_maintenance|정체물음",
     "memory.html|기본 지식 번들|knowledge_bundle_status|정체물음",
     "memory.html|지식 관계도(온톨로지)|ontology_query|정체물음",
+    // ⚠ 2026-09-11 B7 ① 추가 — agentloop.비교개념질문(FORCED 배열 뒤 explain 분기)이
+    //   「AI 포함과 공유의 차이 뭐야?」류(연결어 「과」+차이어 「차이」)를 새로 explain으로
+    //   채 가는데, mydocs 화면 안에서는 종전대로 isHelpIntent(화면 안내)가 이긴다(체인훑기
+    //   순서상 화면 안내가 forcedToolFor보다 앞이라 실사용자 경험은 그대로다) — 이 줄은
+    //   그 사실을 대장에 적어 둔 것이다(정체물음이라 값요구가 아니다).
+    "mydocs.html|AI 포함과 공유의 차이|explain|정체물음",
     "mydocs.html|조각이 없는 문서(⚠)|doc_chunk_gaps|정체물음",
     "mydocs.html|지켜보는 폴더(📂)|watch_folder_list|정체물음",
     "redteam.html|견고성 점수|redteam_status|정체물음",
