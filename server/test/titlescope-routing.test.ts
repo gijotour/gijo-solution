@@ -42,6 +42,9 @@ const 문서들: [string, string | null][] = [
   ["GIJO_AS_보안담당자_실무매뉴얼.md", "builtin"],
   ["GIJO_AS_모델_선택_가이드.md", "builtin"],
   ["EDR_임직원단말_로그분석_매뉴얼.txt", null],
+  // ★ 2026-09-11 설계관 지시서 — 라틴 4자↑→3자↑ 수리로 새로 지목되는 이름(rag-seed 참고 지식).
+  ["kev_bod_22-01_조치기한.md", "builtin"],
+  ["epss_vs_vpr.md", "builtin"],
 ];
 
 beforeAll(async () => {
@@ -74,6 +77,21 @@ describe("★★ 제목 지목 — 증상 문장이 explain(지목 문서)으로
     // ★ 2026-09-08 — `데이터의존`은 「문서 목록(DB)에 달린 갈래」라는 표시다. route-explain이
     //   이 값을 보고 「간다」고 단정하지 않는다(dispatcher 결정적도착지의 조건부 · 검토관 [중]).
     expect(forcedToolFor(문장)).toEqual({ tool: "explain", args: { topic: 문장 }, 데이터의존: true });
+  });
+
+  // ★★ 2026-09-11 설계관 지시서 §5·§6 R1 — 라틴 4자↑가 KEV(3)·BOD(3)를 버려 남는 토큰이
+  //   「조치기한」 하나뿐이라 지목이 안 서고(성립 조건 미달), 아무 규칙도 안 걸려 ⑨ 모델이
+  //   finding_status{filter:"KEV BOD 22-01"}를 골랐다(2026-09-11 라이브 4100 재현·실결함 ③).
+  //   3자↑로 내리면 kev·bod·조치기한 셋이 다 살아 지목이 서고, 이 갈래(explain)가 못 박는다.
+  it("「KEV BOD 22-01 조치 기한이 뭐야?」 → explain (finding_status로 새지 않는다)", () => {
+    const 문장 = "KEV BOD 22-01 조치 기한이 뭐야?";
+    const 도둑 = 가로챈규칙(문장, "explain");
+    const 도착 = 실제도착(문장);
+    expect(도착, "finding_status로 새면 ③ 사고가 되돌아온 것이다").not.toBe("finding_status");
+    expect(
+      도착,
+      도둑 ? `앞 규칙 [${도둑.차례}] ${도둑.도구}가 가로챘다` : "아무 규칙에도 안 걸린다 — ⑨ 모델이 엉뚱한 도구를 고른다",
+    ).toBe("explain");
   });
 });
 
@@ -110,6 +128,13 @@ describe("★ 반례 — 새 갈래가 남의 말을 삼키지 않는다", () =>
     //   실제로 뺏겼을** 문장이다(설계관 정정의 핵심 근거). 체인이 먼저 잡는지 확인한다.
     expect(침해사고질문인가("랜섬웨어 대응 절차 알려줘"), "체인 [33]이 먼저 잡아야 한다").toBe(true);
     expect(침해사고질문인가("침해사고 의심될 때 대응 절차 알려줘")).toBe(true);
+  });
+
+  // ★ 2026-09-11 — [55] 영토 회귀. 라틴 3자↑ 개정이 finding_status의 기존 몫(기한초과 필터)을
+  //   explain 쪽으로 뺏어 오면 안 된다 — 이 문장은 배열 규칙(FORCED_INTENTS, agentloop.ts:1657)이
+  //   제목지목 꼬리 갈래(:2728)보다 **먼저** 훑이므로 종전과 같은 길이어야 한다.
+  it("「기한 지난 취약점 있어?」는 종전대로 finding_status — [55] 영토 회귀", () => {
+    expect(실제도착("기한 지난 취약점 있어?")).toBe("finding_status");
   });
 
   it("일반 주제 질문은 강제하지 않는다 — 종전 길 그대로", () => {

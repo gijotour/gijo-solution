@@ -530,7 +530,10 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
     if (chunks.length) {
       out.push(
         `사내 문서 근거(발췌) ${chunks.length}건:`,
-        ...chunks.slice(0, 3).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
+        // ★ 2026-09-11 3→4 — 형제 경로(위 :449 get_asset)와 맞춘다. 옛 3은 라벨의
+        //   "${chunks.length}건"(최대 4)과 어긋나 **배지(sources)엔 있는데 모델은 못 본 문서**가
+        //   생겼다("EPSS랑 VPR 뭐가 달라?" 2026-09-11 라이브 재현) — 이제 싣는 개수와 라벨 숫자가 같다.
+        ...chunks.slice(0, 4).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
       );
       // ★★ 근거 배지의 **생산자**(2026-09-08 · toolevidence.ts). 도구가 답한 자리에는 그동안
       //   생산자가 없어 sources=null·근거세기=「-」였다 — 문서를 읽고 답해 놓고 무엇을 근거로

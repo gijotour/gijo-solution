@@ -90,6 +90,38 @@ describe("★★ explain이 자기 근거를 싣는다 (근거 배지의 생산�
     근거를수거하며(그릇, () => 도구근거보고({ sources: [], 근거세기: "약함" }));
     expect(그릇.값).toBeUndefined();
   });
+
+  // ★★ 2026-09-11 설계관 지시서 §6 R2 — handlers.ts:533의 발췌 슬라이스가 3이면 라벨(4건)·
+  //   sources(최대 4)보다 적게 실려 **배지엔 있는데 모델은 못 본 문서**가 생긴다
+  //   (「EPSS랑 VPR 뭐가 달라?」 2026-09-11 라이브 재현 — 뿌리 ⓐ). 5편을 넣어 queryMemoryGraded의
+  //   topK=4 상한에 실제로 걸리게 하고, sources에 실린 문서는 전부 발췌 본문에도 있어야 한다.
+  it("⑥ 배지에 실은 문서는 전부 발췌에도 있다 — 모델이 못 본 문서를 근거라 부르지 않는다", async () => {
+    const { ingestText } = await import("../src/engine/memory");
+    const { runWithRagScope } = await import("../src/engine/ragscope");
+    const { 새근거수거, 근거를수거하며 } = await import("../src/engine/toolevidence");
+    const { runExplain } = await import("../src/engine/agenttools/handlers");
+    const 표지들 = ["가", "나", "다", "라", "마"];
+    const ids = 표지들.map((표지) => `GIJO_지식_병렬수리_${표지}.md`);
+    for (const [i, id] of ids.entries()) {
+      await ingestText(
+        id, `병렬수리 근거 표지 ${표지들[i]} — 짧은 한 조각 문서다.`,
+        "global", undefined, false, undefined, undefined, "builtin",
+      );
+    }
+    const 그릇 = 새근거수거();
+    // ☑ 지정 범위(ragscope)로 검색 세계를 이 5편으로 좁힌다 — 안 좁히면 같은 tmp DB에
+    //   먼저 넣어 둔 ①번 문서(같은 목 벡터라 거리가 늘 0)가 섞여 들어와 뜻이 흐려진다.
+    const out = await runWithRagScope({ docIds: ids }, () =>
+      근거를수거하며(그릇, () => runExplain({ topic: "병렬수리 근거 표지" })),
+    );
+    const sources = 그릇.값?.sources ?? [];
+    expect(sources.length, "5편 중 topK=4 상한에 걸려야 이 시험이 뜻을 갖는다").toBeGreaterThan(0);
+    for (const id of sources) {
+      const 표지 = id.replace("GIJO_지식_병렬수리_", "").replace(".md", "");
+      expect(out, `배지에 실은 ${id}의 본문이 발췌 줄에 없다 — 모델이 못 본 문서를 근거라 불렀다`)
+        .toContain(`근거 표지 ${표지}`);
+    }
+  });
 });
 
 // ── 소스 감시 — **잣대는 한 함수뿐** ────────────────────────────────────────
@@ -98,7 +130,7 @@ describe("★★ explain이 자기 근거를 싣는다 (근거 배지의 생산�
 describe("★ 지목 판정은 hybridsearch.제목지목매치 한 곳", () => {
   const 읽기 = (p: string) => fs.readFileSync(path.join(__dirname, "..", "src", p), "utf8");
 
-  it("토큰 규칙(한글 2자↑/라틴 4자↑·성립 조건)이 hybridsearch.ts 밖에 사본으로 없다", () => {
+  it("토큰 규칙(한글 2자↑/라틴 3자↑·성립 조건)이 hybridsearch.ts 밖에 사본으로 없다", () => {
     const 사본금지 = [/\[가-힣\]/, /length >= \(/];
     for (const f of ["engine/memory.ts", "engine/agentloop.ts", "engine/agenttools/handlers.ts"]) {
       const src = 읽기(f);

@@ -254,9 +254,20 @@ const DOCSCOPE_STOP = new Set(["매뉴얼", "manual", "가이드", "guide", "규
  *   **이름을 정확히 대도 두 층 모두에서 지목이 아니었다**(2026-09-08 라이브 재현 4문장).
  *
  * 토큰 규칙(왜 이렇게):
- *   ① 한글은 **2자↑**, 라틴은 **4자↑**. 옛 규칙은 라틴 기준 4자 하나였고 한글에서 죽었다 —
- *      금융(2)·보안(2)·취약점(3)·공급망(3)이 전부 탈락해, 내장 35편 중 5편은 남는 토큰이
- *      「gijo」뿐이었다(\b가 한글에서 죽던 것과 같은 계열: 라틴 기준을 한글에 그대로 대면 못 센다).
+ *   ① 한글은 **2자↑**, 라틴은 **3자↑**(2026-09-11 4자↑→3자↑ — 아래 개정 참고). 옛 규칙은
+ *      라틴 기준 4자 하나였고 한글에서 죽었다 — 금융(2)·보안(2)·취약점(3)·공급망(3)이 전부
+ *      탈락해, 내장 35편 중 5편은 남는 토큰이 「gijo」뿐이었다(\b가 한글에서 죽던 것과 같은
+ *      계열: 라틴 기준을 한글에 그대로 대면 못 센다).
+ *      ★★ 2026-09-11 개정(설계관 지시서, ①③ 결함 뿌리) — 라틴 **4자↑→3자↑**. KEV·VPR·BOD 같은
+ *      3자 약어가 4자 규칙에서 전부 죽어 「EPSS랑 VPR 뭐가 달라?」·「KEV BOD 22-01 조치 기한이
+ *      뭐야?」가 지목 0이 됐다(전자는 랭킹 부스트 미탑승, 후자는 라우팅이 explain을 못 박지
+ *      못해 취약점 조건 검색으로 새 사고, 2026-09-11 라이브 4100 실측). 3자로 내리며
+ *      **토큰 중복 제거**(`[...new Set(tokens)]`)를 같이 넣었다 — 없으면 `방화벽_any_any_규칙`의
+ *      `any`가 두 번 세어져 "2개 이상"을 혼자 채운다(실측: 「IAM에서 any 설정은?」이 중복 허용이면
+ *      오지목). 실측(코퍼스 67편 × 물음 436개 = evalgate routing/korean/negative + ops-sim +
+ *      doc-probe + 시험지 151): 지목 17→25(+8), 잃은 지목 0, 오지목 0. 고객 QA 시험지
+ *      151문은 11→14(+3, EPSS/VPR·KEV BOD·SSH root 세 문항). 기존 고정값(정례 5·반례 4,
+ *      `hybridsearch.test.ts`·`titlescope-routing.test.ts`) 판정은 전부 그대로다.
  *   ② 숫자만인 토큰(2024)·유형어(매뉴얼·pdf…)는 뺀다. URL 지식화 문서는 통째로 제외한다.
  *   ③ **성립 조건**: 6자 이상 토큰 하나를 맞혔거나, 2개 이상을 맞히면서 **그중 3자 이상이
  *      하나라도 있거나 제목의 구별 토큰을 전부 맞혔을 때**.
@@ -285,10 +296,13 @@ export function 제목지목매치(question: string, docIds: string[]): Set<stri
   for (const id of docIds) {
     if (/^https?:/i.test(id)) continue;
     const base = id.replace(/^.*[\\/]/, "").replace(/\.[a-z0-9]{1,5}$/i, "").toLowerCase();
-    const tokens = base.split(/[ _\-.]+/).filter((t) => {
+    const tokensRaw = base.split(/[ _\-.]+/).filter((t) => {
       if (!t || /^\d+$/.test(t) || DOCSCOPE_STOP.has(t)) return false;
-      return t.length >= (/[가-힣]/.test(t) ? 2 : 4);
+      return t.length >= (/[가-힣]/.test(t) ? 2 : 3);
     });
+    // ★ 2026-09-11 중복 제거 — 아니면 "any_any" 같은 반복 토큰이 한 낱말 스침만으로
+    //   "2개 이상"을 혼자 채운다(아래 실측 IAM/any 반례).
+    const tokens = [...new Set(tokensRaw)];
     const 맞힌것 = tokens.filter((t) => q.includes(t));
     if (맞힌것.some((t) => t.length >= 6)) { out.add(id); continue; }
     // 2개 이상 + (3자↑ 하나 | 제목의 구별 토큰을 전부) — 머리글 ③
