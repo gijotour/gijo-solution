@@ -181,6 +181,35 @@ function hangulRatio(text) {
   return hangul + latin === 0 ? 1 : hangul / (hangul + latin);
 }
 
+// ⚠ 2026-09-11 kr-priority 빨강(한글 비율 46%, 재측정 0/3) 원인 규명 — 서버가 붙이는
+//   「🔎 쉬운 용어 풀이」 꼬리를 게이트가 모델 서술과 함께 재고 있었다. 근거:
+//   ⓐ 서버 자신의 드리프트 판정 hangulRatio(llm.ts:683·694, hasEnglishDrift:1234)는
+//      explainHardTerms를 붙이기 **이전의** reply를 잰다 — llm.ts:1551
+//      `args.explain ? explainHardTerms(reply) : reply`가 순서를 보여준다. 즉 서버가 "한글이
+//      새는가"를 잴 때는 이 꼬리를 애초에 보지 않는다.
+//   ⓑ 그런데 dispatcher.ts:515·529·agentloop.ts:976이 사람이 읽는 답에는 항상 explain:true를
+//      주므로, 게이트가 /api/dispatch로 받는 output에는 꼬리가 늘 붙어 있다. 꼬리는
+//      glossary.ts GLOSSARY 상수에서 코드가 결정적으로 만드는 용어 정의 문장이지 모델이 생성한
+//      문장이 아니다 — CVSS·KEV·EPSS·VPR처럼 약자 자체가 영문 표기라 4줄만으로도 라틴 글자
+//      수가 한글 본문을 넘어설 수 있다(모델 드리프트가 아니라 우리 제품 기능이 재는 값을 밀어낸
+//      것).
+//   ⓒ 실측(2026-09-11 22:04 실행분 kr-priority — .tmp-reports/evalgate-report.json에는 전체
+//      출력이 저장되지 않아, 지시문에 인용된 실제 모델 본문 그대로 + glossary.ts
+//      explainHardTerms의 실제 로직(LLM 출력이 아니라 GLOSSARY 상수 기반 결정적 함수)을 그대로
+//      재실행해 재구성 — 재구성값 46.3%가 리포트의 46%와 일치해 재구성이 맞음을 확인):
+//      꼬리 포함 46.3% (< 0.5, 빨강) · 꼬리 뗀 본문만 66.7% (≥ 0.5, 정상). 모델은 새지 않았고,
+//      게이트가 코드 후처리물을 모델 서술로 오채점했다.
+//   ⓓ 문턱 0.5는 그대로 둔다 — 기준을 낮춘 게 아니라 **재는 대상**을 서버 hangulRatio의 정의
+//      (explain 이전 reply)와 맞춘 것이다.
+//   ⚠ 이 정규식은 glossary.ts explainHardTerms가 쓰는 "🔎 쉬운 용어 풀이" 표식 문자열과 한
+//      몸이다(glossary.ts:184 `\n\n🔎 쉬운 용어 풀이\n${lines}`). 그 표식(문구·이모지)이 바뀌면
+//      여기도 같이 고칠 것 — 안 고치면 이 함수가 다시 조용히 무력화된다.
+//   ⚠ **한글 비율 계산에만** 쓴다 — expect/forbid 대조(아래 grade()의 채점본 = 본문만(out))는
+//      그대로 **전체 답**으로 둔다. 꼬리에만 있는 낱말(약어의 영문 풀네임 등)로 문항이
+//      통과하거나 실패하는 일이 없게 하려는 것이다.
+const 용어풀이꼬리_RE = /\n*🔎 쉬운 용어 풀이[\s\S]*$/;
+const 모델서술만 = (s) => String(s ?? "").replace(용어풀이꼬리_RE, "");
+
 // ⚠ 서버가 qa 요청을 기다리는 시간(GIJO_QA_LONG_ANSWER_MS, 기본 180초)**보다 길어야 한다.**
 //   같게 두었더니 서버가 답을 막 돌려주는 순간 이쪽이 끊어져 "aborted due to timeout"이 났다
 //   (2026-07-31 실측: multi-scan-report). 기다리는 쪽이 먼저 포기하면 잰 것도 못 쓴다.
@@ -269,7 +298,9 @@ function grade(c, r, axis) {
   // 한국어 축은 한글 비율을 기본 검사한다(문항별 hangulMin 재정의 가능, 0이면 생략).
   const minRatio = c.hangulMin ?? (axis === "korean" ? 0.5 : 0);
   if (minRatio > 0) {
-    const ratio = hangulRatio(out);
+    // 모델서술만(out) — 위 정의 참조. 「🔎 쉬운 용어 풀이」 꼬리(코드가 붙이는 용어사전 문장)를
+    // 떼고서 잰다. 서버 hangulRatio가 재는 대상(explain 이전 reply)과 맞추기 위함.
+    const ratio = hangulRatio(모델서술만(out));
     if (ratio < minRatio) why.push(`한글 비율 ${(ratio * 100).toFixed(0)}% (기대 ≥${minRatio * 100}%)`);
   }
   return { ok: why.length === 0, why, out };
