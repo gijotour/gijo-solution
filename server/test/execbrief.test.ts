@@ -13,6 +13,7 @@ import { computeKpiSnapshot, resetKpiForTests } from "../src/engine/kpi";
 import { resetAssetsForTests, seedSampleAssetsIfEmpty, seedSampleVulnHostIfEmpty } from "../src/engine/assets";
 import { resetTasksForTests } from "../src/engine/tasks";
 import { hangulRatio } from "../src/engine/llm";
+import { 도구단계, 다음단계붙이기 } from "../src/engine/agentloop";
 
 const run = () => Promise.resolve(findAgentTool("exec_brief")!.run({})).then(String);
 
@@ -254,5 +255,31 @@ describe("★ 「오늘 브리핑」 원문 경로는 그대로다 — 두 도�
     // briefing.ts의 원문 나열 표지("- 오늘의 조치 상위", "@", "/") — exec_brief는 이 형식을 안 쓴다.
     expect(out).not.toContain("오늘의 조치 상위");
     expect(out).not.toContain("지난 브리핑 이후 신규");
+  });
+});
+
+// ★ ops-sim 실측(2026-09-11 22:33, 운영 4000·204+1 상황): 「경영진 보고용으로 짧게
+//   요약해줘」가 exec_brief로 갔는데(도구 자체는 맞았다) 답 끝에 갈 곳이 없었다 — kpi_status는
+//   같은 「⑤ 보고」 묶음에 있어 붙는데 exec_brief만 도구단계 표에서 빠져 있었다(B4 신설 도구를
+//   표에 잊음). 시험이 손으로 "▸ 다음 단계 …"를 이어 붙이면(옛 판) 조립기가 안 붙이게 바뀌어도
+//   초록이라 갈 곳이 사라진 것을 아무도 못 본다 — incidentcases.test.ts와 같은 이유로
+//   agentloop의 다음단계붙이기를 **그대로 태운다**(문구도 붙이는 판단도 제품 것).
+describe("★ exec_brief 답에 「▸ 다음 단계」 갈 곳이 붙는다(B4 후속)", () => {
+  beforeEach(() => {
+    resetKpiForTests();
+    resetAssetsForTests();
+    seedSampleAssetsIfEmpty();
+  });
+
+  it("도구단계 표에 exec_brief가 kpi_status와 같은 ⑤ 보고로 올라 있다", () => {
+    expect(도구단계.exec_brief, "표에서 빠지면 이 안내는 영원히 안 나온다").toBeDefined();
+    expect(도구단계.exec_brief.다음).toBe(도구단계.kpi_status.다음);
+  });
+
+  it("exec_brief 실행 결과를 다음단계붙이기에 태우면 ▸ 다음 단계 ⑤ 보고 줄이 붙는다", async () => {
+    const 본문 = await run();
+    const 답 = 다음단계붙이기(본문, [{ tool: "exec_brief", args: {}, result: 본문 }]);
+    expect(답, "제품이 갈 곳 한 줄을 안 붙였다 — 도구단계에서 exec_brief가 다시 빠졌을 수 있다")
+      .toContain("▸ 다음 단계 " + 도구단계.exec_brief.다음 + " — " + 도구단계.exec_brief.말);
   });
 });
