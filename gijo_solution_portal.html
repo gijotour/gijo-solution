@@ -737,6 +737,10 @@
             <span>🎨</span>
             <span>스마트 아키텍처 스튜디오</span>
           </button>
+          <button class="btn-main-action" onclick="openAddProductModal()" style="padding: 5px 12px; font-size: 11px; background: linear-gradient(135deg, #059669 0%, #10b981 100%); box-shadow: 0 4px 10px rgba(16,185,129,0.25);">
+            <span>➕</span>
+            <span>신규 솔루션 등록</span>
+          </button>
         </div>
 
         <div class="header-right-actions">
@@ -1114,6 +1118,113 @@
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #e2e8f0;">
           <button type="button" class="btn-cancel" onclick="closeLinkEditModal()">취소</button>
           <button type="submit" class="btn-submit">확인 및 연결 반영</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add New Product Modal -->
+  <div class="modal-overlay" id="addProductModal" style="display: none;">
+    <div class="modal-card" style="max-width: 650px; width: 92%; max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">➕</span>
+          <h3 style="font-size: 16px; font-weight: 900; color: #0f172a;">신규 솔루션 (제품) 등록</h3>
+        </div>
+        <button type="button" onclick="closeAddProductModal()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #64748b;">✕</button>
+      </div>
+
+      <form id="addProductForm" onsubmit="saveNewProductForm(event)" style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">솔루션 카테고리 *</label>
+            <select id="newSheetCategory" required style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 800; font-size: 13px;">
+              <option value="GIJO Product">GIJO Product</option>
+              <option value="AI 보안">AI 보안</option>
+              <option value="취약점 분석 및 관리">취약점 분석 및 관리</option>
+              <option value="데이터 암호화 키관리">데이터 암호화 키관리</option>
+              <option value="네트워크 보안">네트워크 보안</option>
+              <option value="엔드포인트보안">엔드포인트보안</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">제조사 구분 *</label>
+            <select id="newVendorType" required style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 800; font-size: 13px;">
+              <option value="국산">국산</option>
+              <option value="외산">외산</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">솔루션명 (제품명) *</label>
+            <input type="text" id="newName" required placeholder="예: WizEDR, SecureGuard" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 800; font-size: 13px;">
+          </div>
+          <div>
+            <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">제조사 / 공급사 명 *</label>
+            <input type="text" id="newVendor" required placeholder="예: 지아이조테크놀로지 [국산]" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px;">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">세부 분류 / 기술 구분</label>
+          <input type="text" id="newCategory" placeholder="예: 지능형 엔드포인트 탐지 및 대응 솔루션 (EDR)" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">주요 보호대상</label>
+            <input type="text" id="newTarget" placeholder="예: Windows/Mac 단말, 서버, DB" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px;">
+          </div>
+          <div>
+            <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">주요 역할 요약</label>
+            <input type="text" id="newRole" placeholder="예: 실시간 악성 행위 탐지 및 격리" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px;">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">제품 개요 및 상세 설명 (Overview)</label>
+          <textarea id="newOverview" rows="2" placeholder="솔루션에 대한 전반적인 설명" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-family: inherit;"></textarea>
+        </div>
+
+        <div>
+          <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">보안대상 및 도입 목적 (Purpose)</label>
+          <textarea id="newPurpose" rows="2" placeholder="도입 목적 및 위협 요인" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-family: inherit;"></textarea>
+        </div>
+
+        <div>
+          <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">관련 규정 / 컴플라이언스 (Regulation)</label>
+          <input type="text" id="newRegulation" placeholder="예: ISMS-P, 금융보안원 안내서" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px;">
+        </div>
+
+        <div>
+          <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">주요 핵심 기능 (Features)</label>
+          <textarea id="newFeatures" rows="2" placeholder="주요 기능 항목 작성" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-family: inherit;"></textarea>
+        </div>
+
+        <div>
+          <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">차별화 요소 및 특장점 (Highlights)</label>
+          <textarea id="newHighlights" rows="2" placeholder="경쟁사 대비 강점 및 차별성" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-family: inherit;"></textarea>
+        </div>
+
+        <div>
+          <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">도입 기대 효과 (Effects)</label>
+          <textarea id="newEffects" rows="2" placeholder="도입 후 기대 효과" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-family: inherit;"></textarea>
+        </div>
+
+        <div>
+          <label style="font-weight: 800; font-size: 12px; color: #334155; margin-bottom: 4px; display: block;">초기 아키텍처 다이어그램 템플릿 선택</label>
+          <select id="newArchPreset" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 700; font-size: 12px;">
+            <option value="3tier">웹/DB 3-Tier 표준 아키텍처 구성도</option>
+            <option value="mcp">MCP / Agentic AI 연동 아키텍처 구성도</option>
+            <option value="empty">빈 구성도 (나중에 스튜디오에서 그리기)</option>
+          </select>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; padding-top: 12px; border-top: 1px solid #e2e8f0;">
+          <button type="button" class="btn-cancel" onclick="closeAddProductModal()">취소</button>
+          <button type="submit" class="btn-submit" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">✅ 신규 솔루션 저장하기</button>
         </div>
       </form>
     </div>
@@ -1665,8 +1776,137 @@
       localStorage.setItem('gijo_custom_products_v1.1', JSON.stringify(data));
     }
 
+    function getDeletedProductIds() {
+      const d = localStorage.getItem('gijo_deleted_product_ids');
+      return d ? JSON.parse(d) : [];
+    }
+
     function getAllProducts() {
-      return [...getAddedProducts(), ...SOLUTIONS_DATA];
+      const deleted = getDeletedProductIds();
+      const all = [...getAddedProducts(), ...SOLUTIONS_DATA];
+      return all.filter(item => !deleted.includes(item.id));
+    }
+
+    function openAddProductModal() {
+      const form = document.getElementById('addProductForm');
+      if (form) form.reset();
+      document.getElementById('addProductModal').style.display = 'flex';
+    }
+
+    function closeAddProductModal() {
+      document.getElementById('addProductModal').style.display = 'none';
+    }
+
+    function deleteProduct(productId, e) {
+      if (e) e.stopPropagation();
+      const allData = getAllProducts();
+      const item = allData.find(s => s.id === productId);
+      const name = item ? item.name : productId;
+
+      if (!confirm(`"${name}" 솔루션을 완전히 삭제하시겠습니까?`)) return;
+
+      let added = getAddedProducts();
+      added = added.filter(s => s.id !== productId);
+      saveAddedProducts(added);
+
+      let deletedIds = getDeletedProductIds();
+      if (!deletedIds.includes(productId)) {
+        deletedIds.push(productId);
+        localStorage.setItem('gijo_deleted_product_ids', JSON.stringify(deletedIds));
+      }
+
+      if (selectedDetailId === productId) selectedDetailId = null;
+      renderSolutions();
+      showToast(`"${name}" 솔루션이 삭제되었습니다.`);
+    }
+
+    function saveNewProductForm(e) {
+      e.preventDefault();
+      const sheetCategory = document.getElementById('newSheetCategory').value;
+      const vendorType = document.getElementById('newVendorType').value;
+      const name = document.getElementById('newName').value.trim();
+      const vendor = document.getElementById('newVendor').value.trim();
+      const category = document.getElementById('newCategory').value.trim() || '기타 보안 솔루션';
+      const target = document.getElementById('newTarget').value.trim() || '기업 내부 인프라';
+      const role = document.getElementById('newRole').value.trim() || '보안 위협 탐지 및 대응';
+      const overview = document.getElementById('newOverview').value.trim();
+      const purpose = document.getElementById('newPurpose').value.trim();
+      const regulation = document.getElementById('newRegulation').value.trim();
+      const features = document.getElementById('newFeatures').value.trim();
+      const highlights = document.getElementById('newHighlights').value.trim();
+      const effects = document.getElementById('newEffects').value.trim();
+      const preset = document.getElementById('newArchPreset').value;
+
+      let defaultArch = '';
+      if (preset === '3tier') {
+        defaultArch = `flowchart TB
+ subgraph External_Internet["외부망 / Public Client"]
+    Web_User["사용자 웹 브라우저"]
+  end
+ subgraph DMZ_Zone["DMZ 경계 영역"]
+    WAF_Node["웹방화벽 (WAF)"]
+  end
+ subgraph Enterprise_Internal["기업 내부망 (Internal Zone)"]
+    Web_Server["${name} 서비스 서버"]
+    DB_Postgres["데이터베이스 (DB)"]
+  end
+    Web_User -- "HTTPS:443 (보안 트래픽)" --> WAF_Node
+    WAF_Node -- "TCP:8080 (내부 전달)" --> Web_Server
+    Web_Server -- "TCP:5432 (DB 쿼리)" --> DB_Postgres`;
+      } else if (preset === 'mcp') {
+        defaultArch = `flowchart TB
+ subgraph External_Cloud["외부 API Cloud & LLM Engine"]
+    LLM_API["LLM Provider API"]
+  end
+ subgraph Enterprise_Internal["기업 내부망 (Internal Zone)"]
+    direction TB
+    subgraph Client_App["사용자 / 단말"]
+        MCP_Client["${name} Client"]
+    end
+    subgraph Admin_Seg["보안 관리망"]
+        MCP_Server["${name} Engine Node"]
+    end
+  end
+    MCP_Client -- "MCP:stdio (JSON-RPC Protocol)" --> MCP_Server
+    MCP_Server -- "HTTPS:443 (Tool Call API)" --> LLM_API`;
+      }
+
+      const newId = 'CUSTOM_' + sheetCategory.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now();
+      const newProduct = {
+        id: newId,
+        sheetCategory,
+        columnRef: 'NEW',
+        name,
+        vendor,
+        vendorType,
+        category,
+        subCategory: '',
+        target,
+        role,
+        overview,
+        purpose,
+        regulation,
+        features,
+        highlights,
+        effects,
+        architectureDiagram: defaultArch,
+        isCustom: true
+      };
+
+      const added = getAddedProducts();
+      added.unshift(newProduct);
+      saveAddedProducts(added);
+
+      closeAddProductModal();
+      activeCategory = sheetCategory;
+      renderTabs();
+      renderSolutions();
+
+      showToast(`신규 솔루션 "${name}"이(가) 성공적으로 등록되었습니다.`);
+
+      setTimeout(() => {
+        openBuilderModal(newId);
+      }, 400);
     }
 
     function renderTabs() {
@@ -1921,6 +2161,9 @@
             <div style="display: flex; align-items: center; gap: 8px;">
               <button onclick="openBuilderModal('${item.id}')" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color:#fff; border:none; padding:7px 16px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; box-shadow: 0 4px 10px rgba(37,99,235,0.25);">
                 ✏️ 이 솔루션의 아키텍처(구성도/흐름도) 직접 넣기 & 수정하기
+              </button>
+              <button onclick="deleteProduct('${item.id}', event)" style="background: #ef4444; color:#fff; border:none; padding:7px 14px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; box-shadow: 0 4px 10px rgba(239,68,68,0.25);">
+                🗑️ 솔루션 삭제
               </button>
               <button class="detail-close-btn" onclick="closeDetail()">✖️ 세부내용 접기 / 닫기</button>
             </div>
