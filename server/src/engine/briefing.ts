@@ -130,7 +130,9 @@ export async function buildDailyBriefing(opts: { save?: boolean } = {}): Promise
   return { date: today(), priorities, newFindings, overdue, dueSoon, threats, recommendations };
 }
 
-// 에이전트 도구·요약용 텍스트. (도구 결과는 composeFinalAnswer가 다시 서술한다.)
+// 에이전트 도구·요약용 텍스트. 이 텍스트가 **그대로** 사람에게 나간다(registry.ts briefing은
+// directAnswer — composeFinalAnswer를 거치지 않는다, 2026-09-08 수리). 「임원용 세 줄」은
+// exec_brief(handlers.ts runExecBrief)가 따로 답한다 — 이 함수의 원문 대장과는 다른 도구다.
 export async function dailyBriefingText(opts: { save?: boolean } = {}): Promise<string> {
   const b = await buildDailyBriefing(opts);
   const lines: string[] = [`📋 ${b.date} 보안 브리핑`];

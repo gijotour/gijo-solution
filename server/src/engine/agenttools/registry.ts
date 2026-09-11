@@ -179,6 +179,7 @@ import {
   runRedteamStatus,
   runUrgentTodo,
   runKpiStatus,
+  runExecBrief,
   열린할일찾기,
   제안담기,
   절차카드,
@@ -1678,6 +1679,22 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     // 아침에 가장 먼저 보는 답이다 — 읽고 나서 어디로 갈지가 없으면 화면을 헤맨다.
     run: async () => (await dailyBriefingText({ save: true })) + 다음걸음('급한 것부터 하시려면 "1번 담당자 배정해줘" 또는 조치·승인 화면으로 가세요.'),
+  },
+  {
+    name: "exec_brief",
+    label: "임원 보고용 세 줄 요약",
+    domain: "cross",
+    write: false,
+    description:
+      '보안 KPI 스냅샷을 **한글 세 줄**로 압축해 즉석 요약한다(태세 점수·취약점·조치 기한). "임원/경영진 보고용으로 세 줄 요약해줘", "이번 주 보안 현황 간단히"에 쓴다. "오늘 브리핑"은 briefing(원문 대장), "보고서/리포트 작성"은 리포트 생성이다. 예: {}',
+    params: [],
+    // ⚠ **즉답이다** — briefing/scan_status와 같은 이유(모델 재작성이 숫자를 다시 쓰면 가짜 요약
+    //   위험이 열린다). B4 수리(2026-09-11): computeKpiSnapshot() 한 번만 불러 그 필드를 그대로
+    //   인용해 코드가 세 줄을 만든다 — 판정·숫자는 코드가 붙인다(제품 원칙).
+    // ⚠ handlers.ts의 "다음 걸음" 안내 헬퍼를 붙이지 않는다 — 그 함수는 자리가 **네 곳뿐**인
+    //   계약이다(agenttools-cross.test.ts 소스 감시). 세 줄로 이미 담백하게 끝맺는다.
+    directAnswer: true,
+    run: runExecBrief,
   },
   {
     name: "run_redteam",

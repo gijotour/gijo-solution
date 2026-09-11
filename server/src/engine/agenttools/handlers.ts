@@ -2789,6 +2789,42 @@ export async function runKpiStatus(q?: string): Promise<string> {
     "\n(부르는 이름이 달라도 같은 값입니다 — 조치율=조치 완료율 · 조치 SLA 준수율=기한 준수율)";
 }
 
+/**
+ * 임원 보고용 세 줄 요약 — B4 수리(2026-09-11, 평가 게이트 kr-report-tone · 계획서 중-3·전-6 정직).
+ *
+ * 왜 생겼나: 「임원 보고용으로 이번 주 보안 현황을 세 줄로 요약해줘」가 **어느 결정적 갈래에도
+ *   안 걸려**(route-explain 실측 「걸리는 규칙 없음」) 회차마다 도구가 갈렸다 — 모델이 briefing을
+ *   고른 날은 그 도구가 directAnswer라 영어 취약점 이름·IP 목록 원문이 그대로 답으로 나갔다
+ *   (한글 비율 10%). 이 도구는 그 자리를 **결정적으로·코드가** 채운다.
+ *
+ * ⚠ 새 숫자를 만들지 않는다 — computeKpiSnapshot()을 **한 번만** 불러 그 필드를 그대로 인용한다.
+ *   자산·취약점·기한 숫자의 잣대는 이미 저 함수 하나다(routes.ts가 "임원 보고에 쓰는 숫자"로 선언).
+ * ⚠ 심각도 낱말은 tone.ts 심각도한글() 한 곳만 쓴다 — 영어 이름·새 등급어를 여기서 짓지 않는다.
+ * ⚠ 「양호/보통/취약」 같은 posture.band 한글 라벨은 client kpi.html에만 있다 — 점수만 인용하고
+ *   등급어는 옮기지 않는다(옮기면 라벨이 두 곳이 되어 언젠가 어긋난다).
+ * ⚠ 「이번 주」라고 물어도 이 스냅샷은 **오늘 기준**이다 — 7일 창을 세는 곳이 저장소에 없다.
+ *   그래서 줄①에 기준일(s.date)을 반드시 찍는다 — 안 찍으면 그 자체가 새 거짓말이 된다.
+ */
+export async function runExecBrief(): Promise<string> {
+  const s = await computeKpiSnapshot();
+  // 0건 정직 — "없습니다"로 끝내지 않는다(emptyanswer-guidance 계약과 같은 규율).
+  // ⚠ 「등록된 자산이 없」는 FAIL_MARKS(tools/drawer-audit.mjs)에 있는 폴백 문구다 — 그대로
+  //   쓰면 정직한 0건 답에 실패 딱지가 붙는다(citeguard.ts FAIL_MARKS-안전 관례와 같은 함정).
+  //   그래서 「자산이 등록되지 않아」로 어순을 바꿔 그 문자열과 겹치지 않게 한다.
+  if (s.assets.total === 0) {
+    return "아직 자산이 등록되지 않아 현황을 셀 수 없습니다 — 자산을 등록하면 이 자리에 숫자가 채워집니다.";
+  }
+  const 줄들 = [
+    `① 종합 보안태세 ${s.posture.score}점/100점 (${s.date} 기준) · 자산 ${s.assets.total}대 중 고위험 ${s.assets.highRisk}대`,
+    `② 미해결 취약점 ${s.vulnerabilities.active}건 — ${심각도한글("critical")} ${s.vulnerabilities.critical}건 · 실제 악용(KEV) ${s.vulnerabilities.kev}건` +
+      (s.vulnerabilities.scanFailed
+        ? ` · 점검 실패 ${s.vulnerabilities.scanFailed}건은 아직 못 본 것입니다`
+        : ""),
+    `③ 조치 기한 초과 ${s.remediation.overdue}건 · 마감 임박 ${s.remediation.dueSoon}건 · 기한 준수율 ${s.remediation.slaCompliance}%`,
+  ];
+  return `${예시데이터머리말()}${줄들.join("\n")}`;
+}
+
 // 작업 세션(대화 세션형, sessions.html) 현황 — 최근 대화 이력을 챗봇이 그대로 알 수 있게 한다.
 // ── 내 업무(할 일) — 화면을 없애고 대화창에서 한다 ─────────────────────────
 //

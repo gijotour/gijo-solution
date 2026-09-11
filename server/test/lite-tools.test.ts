@@ -65,7 +65,7 @@ describe("라이트 도구 목록", () => {
     // 인자 없이도 도는데 그 「전체」가 회사 원장인 것들(2026-08-12 78개 훑기).
     // 라이트에서 열려 있으면 **빈 답이 「없습니다」로 나가** 담당자가 잘못 판단한다.
     const 회사원장 = [
-      "today", "urgent_todo", "briefing", "list_assets", "get_asset", "finding_status",
+      "today", "urgent_todo", "briefing", "exec_brief", "list_assets", "get_asset", "finding_status",
       "exposed_assets", "asset_coverage", "scan_status", "kpi_status", "posture_impact",
       "analysis_status", "product_status", "maintenance_status", "report_list",
       "sbom_coverage", "aibom_status", "compliance_status", "workflow_status", "threats",
