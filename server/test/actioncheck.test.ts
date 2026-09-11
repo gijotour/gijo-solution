@@ -13,7 +13,7 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-let memoryHits: { text: string; distance: number; documentId?: string; lexicalHit?: boolean }[] = [];
+let memoryHits: { text: string; distance: number; documentId?: string; lexicalHit?: boolean; acronymHit?: boolean }[] = [];
 // 판정 자격 게이트용 문서 카테고리 — 기본으로 규정 문서 1개 + 벤더 매뉴얼 1개를 등록해 둔다.
 let docList: { documentId: string; category: string | null }[] = [];
 vi.mock("../src/engine/memory", async (importOriginal) => ({
@@ -110,6 +110,34 @@ describe("행동 대조 — 판정 자격 게이트 (2026-07-29 실측 사고 �
     expect(r.output).toContain("Tenable_User_Guide.pdf"); // 참고로는 보여준다(감추지 않음)
     expect(r.sources).toEqual([]);
     expect(chatMock).not.toHaveBeenCalled();
+  });
+
+  // ★ 2026-09-11 검토관 [중] — B1 약어 갈래가 게이트를 1.10까지 열었는데, 이 화면의 물음은
+  //   대부분 3자 대문자 약어를 문다(USB·VPN·AWS). 낱말 하나 스친 먼 조각이 「해도 되나」의
+  //   판정 근거가 되면, 대화 경로와 달리 여기엔 약함 표시가 원리상 없어 초록 📄 근거로 나간다.
+  it("약어만 스친 먼 조각은 규정 문서라도 판정 근거가 아니다 — 참고로 내려간다", async () => {
+    memoryHits = [{
+      text: "사무실 출입 절차와 USB 반입 대장 기록 방법을 설명한다.",
+      distance: 1.05, // 관련성 게이트를 **약어 갈래로만** 넘은 자리(0.95 밖 · 1.10 안)
+      documentId: "사내_개인정보_내부관리계획.pdf",
+      lexicalHit: false,
+      acronymHit: true,
+    }];
+    const r = await runActionCheck("USB로 고객 자료 반출해도 돼?");
+    expect(r.output).toContain("판단 불가"); // 스친 낱말을 회사의 허락으로 삼지 않는다
+    expect(r.output).toContain("사내_개인정보_내부관리계획.pdf"); // 참고로는 보여준다(감추지 않음)
+    expect(r.sources).toEqual([]);
+    expect(chatMock).not.toHaveBeenCalled();
+  });
+
+  it("같은 조각이라도 거리가 가까우면 종전대로 판정 근거다(좁힌 수리가 기능을 죽이지 않았다)", async () => {
+    memoryHits = [{
+      text: "USB 등 이동식 저장매체로 고객 자료를 반출하려면 부서장 승인을 받아야 한다.",
+      distance: 0.5, documentId: "사내_개인정보_내부관리계획.pdf", lexicalHit: false, acronymHit: true,
+    }];
+    const r = await runActionCheck("USB로 고객 자료 반출해도 돼?");
+    expect(r.output).toContain("【행동 대조】");
+    expect(r.sources).toEqual(["사내_개인정보_내부관리계획.pdf"]);
   });
 
   it("규정+비규정이 섞이면 규정만 판정 근거, 비규정은 참고로 분리된다", async () => {

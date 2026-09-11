@@ -25,9 +25,25 @@ vi.mock("../src/engine/memory", async (importOriginal) => {
   };
 });
 
+// ★ 온톨로지도 모킹한다 — 시험 DB에는 씨앗이 안 들어 있어(실측 2026-09-11) 진짜 DB로는
+//   「온톨로지만 실린 답」을 만들 수가 없다. 모킹 없이 쓰면 0건 문장으로 빠져 **아무것도 못 재는**
+//   시험이 된다(헛초록). 트리플 한 줄만 돌려주고, 나머지 함수는 원본 그대로 둔다.
+vi.mock("../src/engine/ontology", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../src/engine/ontology")>();
+  return {
+    ...orig,
+    expandOntology: vi.fn(() => [
+      { id: "t1", subject: "VPR", predicate: "정식명칭", object: "Vulnerability Priority Rating", scope: "global", source: null, createdAt: 0 },
+    ]),
+  };
+});
+
 import { 지식없음을밝힌다, 온톨로지근거임을밝힌다 } from "../src/engine/agentloop";
-import { 지식근거없음표지, 온톨로지전용알림, 온톨로지전용표지, runExplain } from "../src/engine/agenttools";
+import { 지식근거없음표지, 온톨로지전용알림, 목록전용알림, 본문근거없음표지, 본문근거없음표지고르기, runExplain } from "../src/engine/agenttools";
 import { 자료없음배너 } from "../src/engine/llm";
+import { 근거없음표지인가 } from "../src/engine/noevidence";
+import { NO_ANSWER } from "../src/engine/sessionpatterns";
+import { queryMemoryGraded } from "../src/engine/memory"; // 모킹된 함수 — 표지 갈래를 출력으로 재려고 부른다
 
 const call = (tool: string, result: string) => ({ tool, args: {}, result });
 
@@ -97,19 +113,32 @@ describe("소스 감시 — 표지와 실제 문장이 어긋나면 배너가 �
   });
 });
 
-// ── B2 — 온톨로지 전용 답의 정직 표지 (2026-09-11 설계관 지시서 · 이 라운드에서 닫음) ──────
+// ── B2 — **본문 근거 없이 답한 자리**의 정직 표지 (2026-09-11 · 검토관 수리 반영) ──────────
 //
 // 옛 백로그: explain이 문서 발췌 0건에 온톨로지 관계만 실으면 근거 없이 답한 것인데
-// 지식근거없음표지도 자료없음배너도 안 걸려 아무 표시가 없었다. 이제 handlers.ts가
-// 온톨로지전용알림을 out 맨 앞에 붙이고(발췌실림 조건), 이 함수가 그 표지를 보고 최종 답
-// 머리에 같은 문장을 코드로 얹는다.
-const 온톨로지결과 = `${온톨로지전용알림}\n사내 온톨로지 관계 — "VPR" 관련:\n  - VPR —[정식명칭]→ Vulnerability Priority Rating`;
+// 지식근거없음표지도 자료없음배너도 안 걸려 아무 표시가 없었다. 이제 handlers.ts가 표지를
+// 결과의 **끝줄**에 붙이고(발췌실림·검색실패 조건), 이 함수가 그 줄을 보고 최종 답 머리에
+// **도구가 낸 그 문장 그대로** 얹는다.
+//
+// ⚠ 왜 끝줄인가 — 7B는 도구 결과의 앞부분을 답으로 삼는다(handlers.orderForSmallModel 실사고).
+//   표지가 맨 앞이면 「사내 문서 본문 근거는 없습니다」만 복창한 **정의 없는 회피 답**이 나오고,
+//   그 답은 머리 60자가 「없습니다」라 자료없음중복가드에 걸려 코드 배너까지 억제된다.
+const 온톨로지본문 = `사내 온톨로지 관계 — "VPR" 관련:\n  - VPR —[정식명칭]→ Vulnerability Priority Rating`;
+const 온톨로지결과 = `${온톨로지본문}\n${온톨로지전용알림}`;
+const 목록결과 = `관련 사내 문서 2건:\n  - vpr_안내.md (조각 3)\n${목록전용알림}`;
 
-describe("B2 — 온톨로지 전용 답에는 코드가 표지를 붙인다(전-6 정직)", () => {
+describe("B2 — 본문 근거 없는 답에는 코드가 표지를 붙인다(전-6 정직)", () => {
   it("온톨로지만 실리면 답 머리에 표지가 선다", () => {
     const out = 온톨로지근거임을밝힌다("VPR은 Tenable의 우선순위 점수입니다.", [call("explain", 온톨로지결과)]);
     expect(out.startsWith(온톨로지전용알림)).toBe(true);
     expect(out).toContain("VPR은 Tenable의 우선순위 점수입니다."); // 답을 버리지 않는다
+  });
+
+  it("문서 이름·등록부 목록만 실린 답에는 **목록** 표지가 선다 — 온톨로지가 원천이라 말하지 않는다", () => {
+    // 2026-09-11 검토관 [하]: 옛 판은 온톨로지가 있어야만 표지를 걸어, 이 자리는 아무 표시도 없었다.
+    const out = 온톨로지근거임을밝힌다("관련 문서가 있습니다.", [call("explain", 목록결과)]);
+    expect(out.startsWith(목록전용알림)).toBe(true);
+    expect(out).not.toContain("지식 그래프(온톨로지)가 원천"); // 없던 원천을 지어 붙이지 않는다
   });
 
   it("다른 도구가 사내 데이터를 가져왔으면 안 붙는다 — 자료 있는 대화다", () => {
@@ -129,7 +158,37 @@ describe("B2 — 온톨로지 전용 답에는 코드가 표지를 붙인다(전
   });
 });
 
-describe("소스 감시 — 온톨로지 전용 표지가 다른 계약과 안 부딪힌다", () => {
+describe("표지 고르기 — 무엇을 실었나에 따라 문장이 갈린다(handlers 한 함수)", () => {
+  const 기본 = { 발췌실림: false, 검색실패: false, 지정범위: false, 온톨로지있음: false, 목록있음: false };
+
+  it("온톨로지가 있으면 온톨로지 표지, 목록뿐이면 목록 표지", () => {
+    expect(본문근거없음표지고르기({ ...기본, 온톨로지있음: true })).toBe(온톨로지전용알림);
+    expect(본문근거없음표지고르기({ ...기본, 목록있음: true })).toBe(목록전용알림);
+    // 둘 다면 정의·관계를 말하는 온톨로지 표지가 답의 성격을 더 정확히 가리킨다.
+    expect(본문근거없음표지고르기({ ...기본, 온톨로지있음: true, 목록있음: true })).toBe(온톨로지전용알림);
+  });
+
+  it("발췌가 실렸으면 표지가 없다 — 본문 근거로 답한 자리다", () => {
+    expect(본문근거없음표지고르기({ ...기본, 발췌실림: true, 온톨로지있음: true })).toBe("");
+  });
+
+  it("★ 검색이 **고장** 났으면 표지를 안 건다 — 「0건」과 「못 물어봤다」는 다른 사실이다", () => {
+    // 2026-09-11 검토관 [중]: 임베딩 미기동으로 조회가 죽은 동안 온톨로지에 걸리는 모든 답이
+    // 「사내 문서 본문 근거는 없습니다」를 달고 나갔다 — 문서는 실재하는데 담당자는 「없구나」로 읽는다.
+    expect(본문근거없음표지고르기({ ...기본, 검색실패: true, 온톨로지있음: true })).toBe("");
+    expect(본문근거없음표지고르기({ ...기본, 검색실패: true, 목록있음: true })).toBe("");
+  });
+
+  it("지정 범위가 걸린 0건도 안 건다 — 그 사실은 별도 문장이 말한다", () => {
+    expect(본문근거없음표지고르기({ ...기본, 지정범위: true, 온톨로지있음: true })).toBe("");
+  });
+
+  it("실을 것이 아무것도 없으면 표지도 없다(0건 문장이 최종 답이다)", () => {
+    expect(본문근거없음표지고르기(기본)).toBe("");
+  });
+});
+
+describe("소스 감시 — 본문근거없음 표지가 다른 계약과 안 부딪힌다", () => {
   it("FAIL_MARKS 어느 것에도 안 걸린다 — 정직한 표지가 실패 딱지를 받으면 안 된다", () => {
     const auditSrc = fs.readFileSync(path.join(__dirname, "..", "..", "tools", "drawer-audit.mjs"), "utf8");
     const m = auditSrc.match(/const FAIL_MARKS = \[([\s\S]*?)\];/);
@@ -138,11 +197,20 @@ describe("소스 감시 — 온톨로지 전용 표지가 다른 계약과 안 �
     expect(marks.length).toBeGreaterThan(0);
     for (const mark of marks) {
       expect(온톨로지전용알림.includes(mark), `표지가 FAIL_MARKS "${mark}"에 걸린다`).toBe(false);
+      expect(목록전용알림.includes(mark), `목록 표지가 FAIL_MARKS "${mark}"에 걸린다`).toBe(false);
     }
   });
 
   it("지식근거없음표지에는 안 걸린다 — 걸리면 자료없음 배너가 잘못 붙는다", () => {
     expect(지식근거없음표지.test(온톨로지전용알림)).toBe(false);
+    expect(지식근거없음표지.test(목록전용알림)).toBe(false);
+  });
+
+  it("정규식이 표지 두 종을 **줄 통째로** 잡는다 — agentloop이 그 줄을 그대로 옮겨 붙인다", () => {
+    for (const 알림 of [온톨로지전용알림, 목록전용알림]) {
+      expect(본문근거없음표지.test(알림), `표지 정규식이 "${알림.slice(0, 24)}…"를 못 잡는다`).toBe(true);
+      expect(`앞줄\n${알림}`.match(본문근거없음표지)?.[0]).toBe(알림);
+    }
   });
 
   it("evalgate 배너_RE가 이 표지를 채점 본문에서 뗀다", () => {
@@ -151,24 +219,58 @@ describe("소스 감시 — 온톨로지 전용 표지가 다른 계약과 안 �
     expect(m, "배너_RE 정의를 못 찾았다 — 꼴이 바뀌었으면 이 시험도 함께 볼 것").toBeTruthy();
     const 배너_RE = new RegExp(m![1], m![2]);
     // 배너는 늘 `${배너}\n\n${답}` 꼴로 실제 답 앞에 붙는다 — 그 모양 그대로 대조한다.
-    const 답 = `${온톨로지전용알림}\n\nVPR은 우선순위 점수입니다.`;
-    expect(답.replace(배너_RE, ""), "새 표지가 배너_RE에 안 걸린다 — 채점 본문에 섞인다").toBe("VPR은 우선순위 점수입니다.");
+    for (const 알림 of [온톨로지전용알림, 목록전용알림]) {
+      const 답 = `${알림}\n\nVPR은 우선순위 점수입니다.`;
+      expect(답.replace(배너_RE, ""), "새 표지가 배너_RE에 안 걸린다 — 채점 본문에 섞인다").toBe("VPR은 우선순위 점수입니다.");
+    }
+  });
+
+  it("★ 회귀 하네스(opssim-rules)도 같은 표지를 읽는다 — 안 읽으면 정직한 답이 「표식 없음」으로 세어진다", () => {
+    const rulesSrc = fs.readFileSync(path.join(__dirname, "..", "..", "tools", "opssim-rules.mjs"), "utf8");
+    const m = /export const 본문근거없음표지_RE = \/(.+)\/([gimsuy]*);/.exec(rulesSrc);
+    expect(m, "opssim-rules에 본문근거없음표지_RE가 없다 — 하네스가 이 표지를 못 센다").toBeTruthy();
+    const 하네스_RE = new RegExp(m![1], m![2]);
+    for (const 알림 of [온톨로지전용알림, 목록전용알림]) expect(하네스_RE.test(알림)).toBe(true);
+  });
+
+  it("★ 학습 후보함이 이 표지를 「근거 없다고 밝힌 답」으로 읽는다(인용 +3점 방지 · 3회째 재발)", () => {
+    // 2026-08-05(근거 약함)·2026-09-05(자료요청)과 같은 사고: 표지 문장의 「근거」가 CITE_RE에
+    // 걸려, 근거가 없다고 스스로 밝힌 답이 학습 후보 상위에 섰다.
+    for (const 알림 of [온톨로지전용알림, 목록전용알림]) {
+      expect(근거없음표지인가(`${알림}\n\nVPR은 우선순위 점수입니다.`)).toBe(true);
+    }
+    expect(근거없음표지인가("VPR은 우선순위 점수입니다."), "아무 표지도 없는 답을 근거없음으로 읽으면 안 된다").toBe(false);
+    const 후보src = fs.readFileSync(path.join(__dirname, "../src/engine/learncandidates.ts"), "utf8");
+    expect(후보src, "학습 후보함이 판정기를 안 부른다 — 문장을 거기 베끼지 말고 한 곳에 물을 것").toContain("근거없음표지인가(answer)");
+  });
+
+  it("★ 지식 구멍 신호(sessionpatterns)도 이 표지를 센다", () => {
+    const 걸린 = NO_ANSWER.find((p) => p.re.test(`${온톨로지전용알림}\n\nVPR은 우선순위 점수입니다.`));
+    expect(걸린?.이유, "표지를 단 답이 「못 찾음」 신호에서 빠진다 — 채울 문서를 알려 주는 신호를 잃는다")
+      .toBe("사내 자료에서 못 찾음");
   });
 });
 
-describe("발췌가 실리면 온톨로지 표지는 안 선다(반대 방향)", () => {
-  it("queryMemoryGraded가 발췌를 주면 runExplain 출력에 온톨로지전용표지가 안 선다", async () => {
+describe("runExplain 실행 — 표지가 어디에 서는가(출력으로 단언)", () => {
+  it("발췌가 실리면 표지가 안 선다(반대 방향)", async () => {
     const out = await runExplain({ topic: "VPR" });
     expect(out, "발췌가 실려야 이 시험이 뜻을 갖는다").toContain("사내 문서 근거(발췌)");
-    expect(온톨로지전용표지.test(out), "발췌가 있는데 온톨로지 전용 표지가 섰다").toBe(false);
+    expect(본문근거없음표지.test(out), "발췌가 있는데 본문근거없음 표지가 섰다").toBe(false);
   });
 
-  // ⚠ 위 실행 검사는 시험 DB에 온톨로지 씨앗이 없으면 온톨로지.length가 애초에 0이라
-  //   조용히 아무것도 안 잰다(toolevidence.test.ts의 같은 함정과 동형). 그래서 표지를 거는
-  //   조건 자체를 소스로 함께 문다 — 둘 중 하나만으로는 헛초록이 난다.
-  it("표지 조건이 발췌실림을 함께 본다 — 잣대가 빠지면 여기가 빨개진다", () => {
-    const src = fs.readFileSync(path.join(__dirname, "../src/engine/agenttools/handlers.ts"), "utf8");
-    expect(src, "발췌실림 없이 온톨로지 유무만으로 표지를 걸면 발췌가 있어도 표지가 선다")
-      .toContain("if (!발췌실림 && 온톨로지.length && !지정범위.length) out.unshift(온톨로지전용알림);");
+  it("★ 발췌가 0건이면 표지가 **마지막 줄**에 선다 — 앞줄은 읽을 것(온톨로지)이다", async () => {
+    vi.mocked(queryMemoryGraded).mockResolvedValueOnce({ chunks: [], titles: [], scored: [], 약한근거만: false });
+    const out = await runExplain({ topic: "VPR" });
+    expect(out, "온톨로지 씨앗이 없으면 이 시험은 아무것도 못 잰다 — 씨앗을 확인할 것").toContain("사내 온톨로지 관계");
+    const 줄 = out.split("\n");
+    expect(줄[줄.length - 1], "표지가 끝줄이 아니다").toMatch(본문근거없음표지);
+    expect(본문근거없음표지.test(줄[0]), "표지가 첫 줄에 섰다 — 7B가 이 줄만 복창한다").toBe(false);
+  });
+
+  it("★ 검색이 예외로 죽으면 표지를 안 건다 — 고장을 부재로 단정하지 않는다", async () => {
+    vi.mocked(queryMemoryGraded).mockRejectedValueOnce(new Error("임베딩 미기동"));
+    const out = await runExplain({ topic: "VPR" });
+    expect(out).toContain("사내 온톨로지 관계"); // 답 자체는 계속 나간다
+    expect(본문근거없음표지.test(out), "검색이 고장 났는데 「본문 근거 없음」이라 단정했다").toBe(false);
   });
 });

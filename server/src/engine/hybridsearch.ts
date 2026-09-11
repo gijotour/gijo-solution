@@ -574,3 +574,19 @@ export function isRelevant(
     (chunk.acronymHit === true && chunk.distance <= ACRONYM_MAX_DISTANCE)
   );
 }
+
+/**
+ * **약어 갈래(③) 하나만으로** 게이트를 넘은 조각인가 — 거리도 코드도 아니고, 낱말 하나가 스쳤을 뿐이다.
+ *
+ * 왜 따로 묻나(2026-09-11 검토관 [중]) — 게이트는 한 곳이어야 하지만(isRelevant), **무엇을 근거로
+ * 쓸 수 있나**는 화면마다 다르다. 대화 답은 약함 배지를 달고 이 조각을 인용해도 되지만,
+ * 「해도 되나」(actioncheck)는 담당자가 그대로 따르는 **판정**이라 거리 1.0짜리 스침을 회사의
+ * 허락으로 삼을 수 없다(2026-07-29 「벤더 매뉴얼이 회사의 허락이 되던」 사고의 같은 화면).
+ * 그런 자리는 이 함수로 갈라 **참고 자료**로 내린다 — 게이트를 다시 적지 않고 잣대를 쪼갠다.
+ */
+export function 약어로만통과(
+  chunk: { distance: number; lexicalHit?: boolean; acronymHit?: boolean },
+  maxDistance: number,
+): boolean {
+  return chunk.acronymHit === true && chunk.lexicalHit !== true && !(chunk.distance <= maxDistance);
+}

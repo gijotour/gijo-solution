@@ -11,6 +11,7 @@ import {
   fuseResults,
   fuseVariantVectors,
   isRelevant,
+  약어로만통과,
   ACRONYM_MAX_DISTANCE,
   applyCategoryBoost,
   categoryForScreen,
@@ -462,6 +463,21 @@ describe("★ 관련성 게이트 — 약어 히트 갈래(B1 확장, 잡음 주
     expect(isRelevant(chunk({ lexicalHit: true, distance: Number.POSITIVE_INFINITY }), 0.95)).toBe(true);
   });
 
+  // ★ 2026-09-11 검토관 [중] — 게이트는 한 곳이되, **무엇을 판정 근거로 쓸지**는 화면마다 다르다.
+  //   약어만 스친 조각을 가려내는 잣대도 hybridsearch 한 곳에 둔다(actioncheck가 이것을 부른다).
+  it("약어로만통과 — 약어 갈래 하나로만 넘은 조각을 가려낸다", () => {
+    expect(약어로만통과(chunk({ acronymHit: true, distance: 1.05 }), 0.95)).toBe(true);
+    expect(약어로만통과(chunk({ acronymHit: true, distance: 0.5 }), 0.95)).toBe(false); // 거리로도 통과
+    expect(약어로만통과(chunk({ acronymHit: true, lexicalHit: true, distance: 1.05 }), 0.95)).toBe(false); // 코드로도 통과
+    expect(약어로만통과(chunk({ acronymHit: false, distance: 0.5 }), 0.95)).toBe(false);
+  });
+
+  it("약어로만통과인 조각도 게이트(isRelevant)는 그대로 통과한다 — 대화 답의 근거는 계속 된다", () => {
+    const c = chunk({ acronymHit: true, distance: 1.05 });
+    expect(isRelevant(c, 0.95)).toBe(true);
+    expect(약어로만통과(c, 0.95)).toBe(true); // 둘은 서로 다른 물음이다(게이트 vs 판정 자격)
+  });
+
   it("fuseResults가 세 번째 인자(acronyms) 없이도 호출된다 — 기존 2인자 호출부 회귀 없음", () => {
     const fused = fuseResults({ vector: [{ text: "v", documentId: "d", distance: 0.5 }], lexical: [] }, []);
     expect(fused[0].acronymHit).toBe(false);
@@ -470,10 +486,18 @@ describe("★ 관련성 게이트 — 약어 히트 갈래(B1 확장, 잡음 주
 
 // ── 소스 감시 — 「세 번째면 소스 감시」: 관련성 게이트 식을 isRelevant 밖에서 다시 적지 않는다 ──
 describe("소스 감시 — 관련성 게이트 잣대는 isRelevant 한 곳", () => {
-  it("server/src/engine 아래 .ts에 손으로 적은 사본이 없다(hybridsearch.ts 자기 자신은 제외)", () => {
+  // ⚠ 2026-09-11 검토관 [중] — 옛 그물은 **lexicalHit이 함께 적힌 꼴만** 잡아, 거리만 손으로
+  //   비교하는 네 번째 사본(kbhygiene.ts)을 원리상 못 봤다. 시험 이름은 「사본이 없다」인데
+  //   있었다 — 헛초록이다. 그물을 「이 상수를 직접 견주는 꼴」로 넓히고, 의도적 예외는
+  //   **소스에 이유를 적게 강제**한다(이유 문구가 사라지면 이 시험이 빨개진다).
+  const 게이트예외 = new Map<string, RegExp>([["kbhygiene.ts", /관련성 게이트 예외/]]);
+  // 그물은 **한 벌**만 둔다 — 아래 두 시험이 같은 정규식을 본다(두 곳에 적으면 언젠가 어긋난다).
+  const 사본_RE =
+    /lexicalHit\s*\|\|\s*[\s\S]{0,40}RAG_RELEVANCE_MAX_DISTANCE|RAG_RELEVANCE_MAX_DISTANCE[\s\S]{0,40}\|\|\s*[\s\S]{0,10}lexicalHit|[<>]=?\s*RAG_RELEVANCE_MAX_DISTANCE/;
+  it("server/src/engine 아래 .ts에 손으로 적은 사본이 없다(hybridsearch.ts 자기 자신·이유를 적은 예외는 제외)", () => {
     const dir = path.join(__dirname, "..", "src", "engine");
-    const 사본_RE = /lexicalHit\s*\|\|\s*[\s\S]{0,40}RAG_RELEVANCE_MAX_DISTANCE|RAG_RELEVANCE_MAX_DISTANCE[\s\S]{0,40}\|\|\s*[\s\S]{0,10}lexicalHit/;
     const 걸린파일: string[] = [];
+    const 이유없는예외: string[] = [];
     const walk = (d: string) => {
       for (const name of fs.readdirSync(d)) {
         const p = path.join(d, name);
@@ -481,11 +505,21 @@ describe("소스 감시 — 관련성 게이트 잣대는 isRelevant 한 곳", (
         if (st.isDirectory()) walk(p);
         else if (name.endsWith(".ts") && name !== "hybridsearch.ts") {
           const src = fs.readFileSync(p, "utf8");
-          if (사본_RE.test(src)) 걸린파일.push(name);
+          if (!사본_RE.test(src)) continue;
+          const 예외이유 = 게이트예외.get(name);
+          if (!예외이유) 걸린파일.push(name);
+          else if (!예외이유.test(src)) 이유없는예외.push(name);
         }
       }
     };
     walk(dir);
     expect(걸린파일, `관련성 게이트 사본이 발견됐다: ${걸린파일.join(", ")}`).toEqual([]);
+    expect(이유없는예외, `예외로 적어 둔 파일에 이유 주석이 없다: ${이유없는예외.join(", ")}`).toEqual([]);
+  });
+
+  it("그물이 거리만 손으로 견주는 꼴도 잡는다 — 옛 그물이 못 보던 네 번째 사본", () => {
+    // 실제로 kbhygiene.ts가 이 꼴이었다. 그물이 이 모양을 못 잡으면 위 시험은 언제나 초록이다.
+    expect(사본_RE.test(`hits.filter((h) => h.distance <= RAG_RELEVANCE_MAX_DISTANCE)`)).toBe(true);
+    expect(사본_RE.test(`export const RAG_RELEVANCE_MAX_DISTANCE = 0.95;`)).toBe(false); // 정의 자체는 사본이 아니다
   });
 });

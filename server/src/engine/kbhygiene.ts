@@ -149,6 +149,12 @@ export async function scanKbHygiene(): Promise<HygieneReport> {
       const probe = (조각.get(d.documentId)?.[0]?.text ?? "").replace(/\s+/g, " ").slice(0, 300);
       if (probe.length < 30) continue;
       const hits = await queryMemoryScored(probe, 5);
+      // ⚠ **관련성 게이트 예외 — 여기는 일부러 거리만 본다**(2026-09-11 검토관 [하]에 답한다).
+      //   isRelevant를 부르면 코드·약어 갈래가 함께 열리는데, 이 탐침의 질의는 사람 질문이 아니라
+      //   **데모 문서 본문 300자**다. 본문에는 VPN·EDR 같은 약어가 흔해서, 주제가 안 겹치는 문서가
+      //   낱말 하나로 「경합」에 걸린다 — 그러면 담당자가 멀쩡한 문서를 지울지 검토하게 된다.
+      //   위생 점검은 **틀린 경보가 더 비싼** 자리라 잣대를 좁게 둔다(hybridsearch.test 소스 감시의
+      //   허용 목록에 이 파일이 이유와 함께 적혀 있다 — 새 사본을 만들 때는 그 감시가 막는다).
       const rivals = [...new Set(
         hits
           .filter((h) => h.distance <= RAG_RELEVANCE_MAX_DISTANCE)

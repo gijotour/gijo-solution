@@ -13,7 +13,7 @@
 import { db } from "../db";
 import { chat } from "./llm";
 import { queryMemoryScored, listDocuments, RAG_RELEVANCE_MAX_DISTANCE } from "./memory";
-import { isRelevant } from "./hybridsearch";
+import { isRelevant, 약어로만통과 } from "./hybridsearch";
 import { getLawConfig, searchLaw, LEGAL_DISCLAIMER, LawHit } from "./lawinfo";
 import { recordWork } from "./worklog";
 
@@ -168,8 +168,10 @@ export async function runActionCheck(question: string, qa?: boolean): Promise<Ac
   const scored = await queryMemoryScored(question, 5, undefined, "compliance.html").catch(() => []);
   // ⚠ 2026-09-11 — 손으로 적은 식 대신 hybridsearch.isRelevant 한 곳을 부른다(잣대 3중화 방지).
   //   (A) 배포 뒤에도 여기를 안 고치면 같은 조각이 대화에서는 근거인데 조치 점검에서는
-  //   아니게 되어, 담당자가 화면마다 다른 답을 본다. 안전장치는 169행의 사내규정 카테고리
-  //   자격 게이트가 그대로 지킨다(벤더 매뉴얼이 회사의 허락이 되던 2026-07-29 사고 방어).
+  //   아니게 되어, 담당자가 화면마다 다른 답을 본다. 안전장치는 아래 **사내규정 카테고리 자격
+  //   게이트**(relevant)가 그대로 지킨다(벤더 매뉴얼이 회사의 허락이 되던 2026-07-29 사고 방어).
+  //   ⚠ 줄 번호로 가리키지 않는다(2026-09-11 검토관 [하] — 옛 주석의 「169행」은 주석 자신을
+  //     가리켜, 안전장치를 확인하러 온 사람이 아무것도 못 찾았다). 식별자로 가리킨다.
   const passed = scored.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE));
 
   // ⚠ 판정 자격은 **사내규정 카테고리 문서**만이다(2026-07-29 실측 사고: 벤더 매뉴얼(Tenable
@@ -180,7 +182,16 @@ export async function runActionCheck(question: string, qa?: boolean): Promise<Ac
   try {
     for (const d of await listDocuments()) categoryOf.set(d.documentId, d.category ?? null);
   } catch { /* 목록 실패 시 아래에서 전부 '참고'로 강등 — 자격 없이는 판정하지 않는다 */ }
-  const relevant = passed.filter((c) => c.documentId && categoryOf.get(c.documentId) === "사내규정");
+  // ⚠ 2026-09-11 검토관 [중] — **약어 갈래로만 통과한 조각은 판정 근거에서 뺀다.**
+  //   B1 확장이 게이트를 거리 1.10까지 열었는데, 이 화면의 물음은 대부분 3자 대문자 약어를 문다
+  //   (「USB로 반출해도 돼?」·「VPN으로 붙어도 돼?」·「AWS에 올려도 돼?」). 그 낱말이 스친 먼 조각이
+  //   「해도 되나」의 근거가 되면, 대화 경로와 달리 여기에는 약함 표시가 **원리상 없어**(이 함수는
+  //   근거세기를 안 싣는다 — dispatcher가 sources만 받는다) 초록 📄 근거로 나간다.
+  //   → 게이트(isRelevant)는 한 곳 그대로 두고, 무엇을 **판정 근거**로 쓸지만 좁힌다.
+  //     빠진 조각은 아래 references(참고 자료)로 그대로 보인다 — 숨기지 않는다.
+  const relevant = passed.filter(
+    (c) => c.documentId && categoryOf.get(c.documentId) === "사내규정" && !약어로만통과(c, RAG_RELEVANCE_MAX_DISTANCE)
+  );
   const references = passed.filter((c) => !relevant.includes(c));
   const docs = [...new Set(relevant.map((c) => c.documentId).filter(Boolean))] as string[];
 

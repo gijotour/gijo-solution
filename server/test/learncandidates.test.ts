@@ -9,7 +9,7 @@ import { db } from "../src/db";
 import { listLearnCandidates, decideLearnCandidate, acceptStrongCandidates } from "../src/engine/learncandidates";
 import { recordChatLog, listChatLogs, putLearnloopConfig } from "../src/engine/learnloop";
 import { createSession, appendTurn } from "../src/engine/worksessions";
-import { 자료없음배너, 지정범위배너, 자료요청배너, 근거약함배너 } from "../src/engine/noevidence";
+import { 자료없음배너, 지정범위배너, 자료요청배너, 근거약함배너, 온톨로지전용알림, 목록전용알림 } from "../src/engine/noevidence";
 
 function wipe() {
   db.prepare("DELETE FROM chat_logs").run();
@@ -84,6 +84,29 @@ describe("학습 후보함 — 선별 규칙", () => {
     }
     // ⚠ 넷이 다 후보에서 빠지면 이 시험은 **아무것도 안 잰 채 초록**이 된다(헛시험 방지).
     expect(실제로잰것, "배너 답이 하나도 후보로 안 나왔다 — 표본이 낡았는지 보라").toBeGreaterThan(0);
+  });
+
+  // ★ 2026-09-11 검토관 — **세 번째 재발**. 배너가 아닌 정직 표지(B2, 온톨로지·목록 전용)가
+  //   생겼는데 배너표 밖이라 판정기가 null을 냈고, 표지 문장의 「근거」가 CITE_RE에 걸려
+  //   근거 없다고 스스로 밝힌 답이 다시 +3점을 받았다. 표지도 같은 판정기에 묻게 했다.
+  it("★ 배너가 아닌 정직 표지(본문 근거 없음)가 붙은 답은 후보에서 아예 빠진다 — 지식 구멍이다", () => {
+    // 잣대가 두 겹이다: ① 회피 답변(지식 구멍) 제외 — sessionpatterns.NO_ANSWER가 표지를 읽는다
+    //   ② 그래도 후보가 됐다면 인용 가점 없음 — learncandidates가 noevidence 판정기에 묻는다.
+    //   ①이 더 강한 차단이라 실제로는 여기서 걸린다(근거약함 배너와 같은 꼴). ②는 표지가
+    //   문장만 바뀌어도 남는 안전망이라 함께 둔다(explain-banner.test가 그쪽을 문다).
+    const 본문 = "VPR은 취약점의 실제 위험도를 0.1~10.0으로 매긴 점수입니다. 이론적 심각도만 보는 CVSS와 달리 악용 성숙도와 위협 정보를 함께 반영합니다. 자세한 기준은 담당 부서에 확인이 필요합니다.";
+    for (const [종류, 표지] of [["온톨로지전용", 온톨로지전용알림], ["목록전용", 목록전용알림]] as [string, string][]) {
+      wipe();
+      recordChatLog("orchestrator", `VPR이 뭐야? (${종류})`, `${표지}\n\n${본문}`);
+      const { candidates, kpis } = listLearnCandidates();
+      for (const c of candidates) expect(c.signals.cite, `${종류} 표지가 붙었는데 인용 가점을 받았다`).toBe(false);
+      expect(candidates.length, `${종류} 표지를 단 답이 학습 후보로 섰다`).toBe(0);
+      expect(kpis.excludedByReason["회피 답변(지식 구멍)"], `${종류} 표지가 지식 구멍 신호에서 빠졌다`).toBe(1);
+    }
+    // 표지가 없는 같은 본문은 **후보가 된다** — 위 0건이 「표본이 낡아서」가 아님을 못 박는다.
+    wipe();
+    recordChatLog("orchestrator", "VPR이 뭐야? (표지 없음)", 본문);
+    expect(listLearnCandidates().candidates.length, "표지 없는 표본까지 0이면 이 시험은 아무것도 안 잰다").toBe(1);
   });
 
   it("직후에 고쳐 물으면 수용 신호가 꺼진다(암묵 거부)", () => {

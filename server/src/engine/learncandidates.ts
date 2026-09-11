@@ -27,7 +27,7 @@ import { 학습재료가못되나 } from "./datasethygiene";
 // 아래 prepare가 "no such table"로 죽는다(테스트에서 실측). 소유 모듈을 명시적으로 실어 보장한다.
 import "./worksessions";
 // 「근거 없음」 배너 판정기 — 배너 문장의 주인은 noevidence.ts 하나다.
-import { 근거없음종류판정 } from "./noevidence";
+import { 근거없음종류판정, 근거없음표지인가 } from "./noevidence";
 import { recordAudit } from "./audit";
 import { isBinaryLikeChunk } from "./ragsanitize";
 import { 근거겹침, OVERLAP_CHARS } from "./citeguard";
@@ -82,7 +82,13 @@ const NO_GROUND_RE = /\(일반 지식 기준\)|근거 약함/;
 //   섞인 문답은 학습 재료로 더 나쁘다(그걸 배우면 모델이 그 숫자를 다시 만든다).
 //   ⚠ 다만 「반올림해 옮긴 값」이 오탐으로 배너를 받으면 **참인 답까지** 함께 빠진다 — 그래서
 //     그 오탐은 뿌리(citeguard 수로서있나의 반올림 허용)에서 닫았다. 여기서 예외를 파지 않는다.
-const 근거없다고밝힌답인가 = (answer: string) => 근거없음종류판정(answer) !== null || NO_GROUND_RE.test(answer);
+// ★ 2026-09-11 검토관 [중] — **세 번째 재발**. 배너가 아닌 정직 표지(「사내 문서 본문 근거는
+//   없습니다 …」)가 6종째로 생겼는데 배너표 밖이라 근거없음종류판정이 null을 냈고, 그 문장의
+//   「근거」가 CITE_RE에 걸려 **근거 없다고 스스로 밝힌 답이 인용 +3점**을 받았다(2026-08-05·
+//   2026-09-05과 글자 그대로 같은 사고). 여기 문장을 또 적지 않는다 — 판정기 한 곳
+//   (noevidence.근거없음표지인가)에 묻는다. 표지가 일곱째로 늘어도 여기는 안 고친다.
+const 근거없다고밝힌답인가 = (answer: string) =>
+  근거없음종류판정(answer) !== null || 근거없음표지인가(answer) || NO_GROUND_RE.test(answer);
 
 /** 같은 문답을 다시 후보로 내밀지 않기 위한 정규화 지문. */
 function fingerprint(question: string, answer: string): string {
