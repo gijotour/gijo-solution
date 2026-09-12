@@ -82,6 +82,10 @@ if (-not $살아있다) {
 } else {
   wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/qa-instance/nightly-4100.sh" ops-sim-4100 2>&1 | Out-File $log4100 -Append -Encoding utf8
   $코드4100 = $LASTEXITCODE
+  # 📏 2026-09-12 설계관 실측 ② — ops-sim-meta.mjs가 이름 인자를 받게 고쳐 1차와 같은 꼴의
+  #   문항 수 줄을 여기도 남긴다. nightly-4100.sh가 ops-sim.mjs --out ops-sim-4100으로 돌아
+  #   .tmp-reports\ops-sim-4100.meta.json을 이미 쓰고 있었는데, 그 메타를 읽는 자리가 없었다.
+  "문항 수(이번 회차) — $(node tools/ops-sim-meta.mjs ops-sim-4100)" | Out-File $log4100 -Append -Encoding utf8
   "끝 $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') · 종료코드 $코드4100" | Out-File $log4100 -Append -Encoding utf8
 }
 

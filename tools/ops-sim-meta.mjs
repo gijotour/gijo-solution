@@ -14,23 +14,42 @@
 //   `m.총문항`이 `m.珥앸Ц`으로 깨지고, 큰따옴표는 아예 사라진다(실측 둘 다 재현).
 //   그래서 인자로 넘기지 않고 **UTF-8 파일로 둔다.** 이 저장소가 반복해 밟은 자리다.
 //
-// 쓰임:  node tools/ops-sim-meta.mjs          → 사람이 읽는 한 줄
-//        node tools/ops-sim-meta.mjs --count  → 총문항 숫자만(스크립트가 받아쓸 때)
+// 쓰임:  node tools/ops-sim-meta.mjs                    → 사람이 읽는 한 줄(ops-sim.meta.json)
+//        node tools/ops-sim-meta.mjs --count             → 총문항 숫자만(스크립트가 받아쓸 때)
+//        node tools/ops-sim-meta.mjs ops-sim-4100         → 다른 회차(--out과 같은 이름)의 meta를 읽는다
+//        node tools/ops-sim-meta.mjs --out ops-sim-4100   → 위와 동일(둘 다 받는다)
 // 종료코드: 0=읽었다 · 3=아직 한 회차도 안 끝나 meta가 없다(**실패가 아니다** — 모르는 것이다)
+//
+// ■ 왜 이름을 받게 했나 (2026-09-12 설계관 실측 ②)
+//   야간 회귀 2차 패스(4100)가 ops-sim.mjs --out ops-sim-4100 으로 돌면서 이미
+//   .tmp-reports/ops-sim-4100.meta.json을 스스로 쓰고 있는데, 이 파일이 경로를
+//   ops-sim.meta.json으로 못박아 놔서 그 메타를 아무도 안 읽었다. 정본은 그대로
+//   ops-sim.mjs가 매 회차 직접 쓰는 <이름>.meta.json이다 — 이 파일은 "어느 이름을
+//   읽을지"만 인자로 늘렸을 뿐, 숫자를 또 다른 곳에 적지 않는다.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const 뿌리 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const 메타파일 = path.join(뿌리, ".tmp-reports", "ops-sim.meta.json");
-const 숫자만 = process.argv.includes("--count");
+
+const 인자 = process.argv.slice(2);
+const outIdx = 인자.indexOf("--out");
+const 이름 = (outIdx !== -1 && 인자[outIdx + 1])
+  ? 인자[outIdx + 1]
+  : (인자.find((a) => !a.startsWith("--")) || "ops-sim");
+if (!/^[A-Za-z0-9._-]+$/.test(이름)) {
+  console.error("✗ 회차 이름에 못 쓰는 글자가 있습니다: " + 이름 + " (영문·숫자·.-_만 — ops-sim.mjs --out과 같은 규칙)");
+  process.exit(2);
+}
+const 메타파일 = path.join(뿌리, ".tmp-reports", `${이름}.meta.json`);
+const 숫자만 = 인자.includes("--count");
 
 let m = null;
 try { m = JSON.parse(fs.readFileSync(메타파일, "utf8")); } catch { /* 없으면 아래에서 말한다 */ }
 
 if (!m || typeof m.총문항 !== "number") {
   // ⚠ 「모른다」를 0으로 말하지 않는다 — 0은 「문항이 없다」로 읽히고, 그건 거짓이다.
-  console.log(숫자만 ? "?" : "(ops-sim.meta.json 없음 — 아직 한 회차도 안 끝났다. 문항 수를 모른다)");
+  console.log(숫자만 ? "?" : `(${이름}.meta.json 없음 — 아직 한 회차도 안 끝났다. 문항 수를 모른다)`);
   process.exit(3);
 }
 
