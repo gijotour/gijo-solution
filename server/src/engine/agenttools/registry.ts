@@ -17,7 +17,7 @@ import { workflowStages } from "../workflow";
 import { runInspectionReport } from "../inspectionreport";
 import { 한줄풀이글, 섞임고지 } from "../findingplain";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "../packagescan";
-import { targetRunner, runnerFor } from "../hardeningscan";
+import { targetRunner, runnerFor, 원격점검인가 } from "../hardeningscan";
 import { listTargets } from "../hardeningtargets";
 import { 잃은취약점찾기, 잃은취약점현황글, 되살리기 } from "../findingsrestore";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "../securityproducts";
@@ -1754,6 +1754,15 @@ const TOOLS: AgentTool[] = [
       }
       const t = 대상찾기(말);
       if (!t) return `"${말}"에 해당하는 점검 대상이 검색되지 않았습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
+      // ⚠ **로컬로 등록된 대상에 「접속해」라고 말하지 않는다**(2026-09-13 검토관 [중] 수리).
+      //   사람은 칸이 아니라 **문장**을 읽고 승인한다(위 buildApproval의 ★와 같은 이유). 판정은
+      //   제품의 단일 원천 원격점검인가()에서 받는다 — 리포트(hardeningscan.ts:779 「점검한 곳:
+      //   이 서버 자신」)·감사(감사대상글)가 이미 그 판정을 따르는데, 결재판만 다른 말을 하면
+      //   2026-09-01에 [상]으로 고친 그 거짓(「접속조차 안 한 점검을 붙었다고 기록」)이 세 번째
+      //   자리에서 되살아난다.
+      if (!원격점검인가(t)) {
+        return `이 서버 자신을 점검합니다(등록된 이름표: ${t.label} · host=${t.host} · 로컬 등록이라 장비에 접속하지 않습니다). 읽기 전용 진단 명령만 보냅니다 — 바꾸지 않습니다.`;
+      }
       return `${t.label}(${t.host})에 접속해 하드닝(보안설정) 점검 명령을 **실제로 실행합니다.** 읽기 전용 진단 명령만 보냅니다 — 장비를 바꾸지 않습니다.`;
     },
     undo: "점검은 읽기 전용 진단 명령만 보내므로 장비는 바뀌지 않습니다 — 되돌릴 것이 없습니다.",

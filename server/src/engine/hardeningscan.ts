@@ -663,11 +663,15 @@ export const 로컬대상차단안내 = "이 설치본에서는 이 서버 자�
 
 export async function runHardeningScan(opts: {
   standard: StandardId; target?: string; run?: RunFn; ranOn?: "self" | "remote"; skipWorkLog?: boolean;
-  /** 작업 원장(work_events)의 source 칸 — 안 주면 종전대로 "schedule"(스케줄러·화면 수동 실행 전제).
+  /** 작업 원장(work_events)의 source 칸 — **부른 쪽이 안다.** 안 주면 "schedule"(스케줄러)이다.
    *  2026-09-12 설계관 지시서 「hardeningtargets 수동 실행 라우트」— 하드코딩이던 것을 옵션 인자로
-   *  정정한다. HTTP 수동 실행(hardeningtargets.ts:361)·대화 원격 실행(scan_hardening_target) 둘 다
+   *  정정한다. HTTP 수동 실행(hardeningtargets.ts:366)·대화 원격 실행(scan_hardening_target) 둘 다
    *  runScanForTarget을 거치는데 여긴 skipWorkLog를 안 주니(원장을 여기서 남겨야 하니) 하드코딩된
-   *  "schedule"이면 담당자가 대화·화면에서 돌린 점검이 전부 「스케줄러가 함」으로 적힌다. */
+   *  "schedule"이면 담당자가 대화·화면에서 돌린 점검이 전부 「스케줄러가 함」으로 적힌다.
+   *  ⚠ 2026-09-13 검토관 [중] 수리 — 앞 판 주석은 기본값을 「스케줄러·**화면 수동 실행** 전제」라
+   *    적었는데, 정작 화면 수동 self 점검(POST /api/hardening/scan, 아래 :823)은 이 함수를 **직접**
+   *    불러 기본값으로 떨어지고 있었다. 같은 파일 안에서 주석 둘이 반대로 말한 자리다 —
+   *    이제 그 창구도 "api"를 넘긴다. 기본값은 **스케줄러 하나만** 뜻한다. */
   workLogSource?: "chat" | "schedule" | "api";
 }): Promise<ScanReport> {
   const std = STANDARDS[opts.standard];
@@ -816,7 +820,10 @@ export function registerHardeningRoutes(app: Express): void {
       }
       // target은 표시용 라벨만으로 쓴다 — 절대 셸 명령에 넣지 않는다(인젝션 방지).
       const targetLabel = String(req.body?.target ?? "").trim().slice(0, 120) || undefined;
-      const report = await runHardeningScan({ standard, target: targetLabel });
+      // ⚠ 작업 원장 source는 "api"다 — **화면에서 사람이 누른 점검**이지 스케줄러가 아니다
+      //   (2026-09-13 검토관 [중] 수리: 앞 판이 runScanForTarget 경로만 고쳐 반쪽이었다.
+      //   이 창구의 소비자는 화면이다 — client/src/api/security-ops.ts:386 → lite-scan.html·terminal.html).
+      const report = await runHardeningScan({ standard, target: targetLabel, workLogSource: "api" });
       const actor = (req as unknown as { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
       recordAudit({
         kind: "cli",

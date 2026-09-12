@@ -2981,10 +2981,20 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
         // 스케줄·주기를 묻는 말은 조회다 — 배열 순서상 실행이 먼저 걸리므로 여기서 비켜 준다
         // ("하드닝 점검 스케줄 알려줘"가 실제 점검을 돌리던 것, 검토 지적 2026-07-29).
         if (/스케줄|일정|주기/.test(instruction) && !/돌려|실행해|지금\s*해/.test(instruction)) continue;
-        const standard = /\bcis\b|국제/i.test(instruction) ? "cis"
+        // ⚠ **문장이 기준을 말했는가**와 **그래서 무엇으로 도느냐**를 가른다(2026-09-13 검토관 [중] 수리).
+        //   self 점검(run_hardening_scan)에는 대상이 없으니 예전처럼 "kisa"로 채워야 한다.
+        //   그런데 **등록 대상**은 등록할 때 정한 기준(t.standard, hardeningtargets.ts:110)이 따로 있다 —
+        //   문장이 기준을 말하지 않았는데도 "kisa"를 실어 보내면 그 등록 기준이 **영영 안 쓰인다**
+        //   (handlers.ts의 `?? t.standard` 갈래가 원리상 도달 불가가 된다). 실측 사고: kisa_net(Cisco
+        //   N-시리즈)으로 등록한 스위치를 「SW-01 하드닝 점검 돌려줘」로 돌리면 UNIX U-시리즈 명령이
+        //   나가 전 항목이 FAIL/WARN이 되고, 그 준수율이 이력·상관 투영·악화 알림에 그대로 적힌다.
+        //   화면 [점검] 버튼(HTTP, hardeningtargets.ts:360 `?? t.standard`)은 제대로 도니 **두 창구가
+        //   다른 숫자**를 낸다. → 명시했을 때만 싣는다.
+        const 명시기준 = /\bcis\b|국제/i.test(instruction) ? "cis"
           : /\bpc\b|피시|윈도우|windows/i.test(instruction) ? "kisa_pc"
           : /네트워크\s*장비|스위치|라우터|cisco/i.test(instruction) ? "kisa_net"
-          : "kisa";
+          : null;
+        const standard = 명시기준 ?? "kisa";
         // ★★ 안C(2026-09-12 메인 결정 — 설계관 지시서 「hardeningtargets 수동 실행 라우트」).
         //   지금까지 이 자리는 **항상 self**를 돌려줬다(target 인자는 표시용 라벨일 뿐이라
         //   "FW-01 하드닝 점검 돌려줘"도 우리 서버 자신을 점검했다 — 대장 2026-08-19 :275
@@ -3011,7 +3021,16 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
             //   붙이면 실제 운영 DB에 그 장비가 등록돼 있어도 「확정적으로 self 점검」이라
             //   거짓 설명한다(evalgate 실측: 등록 대상 0건인 :memory:에서는 이 갈래가 늘
             //   self로 떨어진다 — 그래서 8문장의 [37] 도착 자체는 안 바뀐다).
-            if (t) return { tool: "scan_hardening_target", args: { target: t.id, standard }, 데이터의존: true };
+            // ⚠⚠ **id가 아니라 사람이 친 낱말을 넘긴다**(2026-09-13 검토관 [상] 수리).
+            //   앞 판은 `target: t.id`(tgt-3f2a9c11)를 넘겼는데, 그 글자는 지시문에 없으므로
+            //   buildApproval이 source="guess"로 보고 **필수칸을 비운다**(registry.ts:2601) —
+            //   결재판 「대상 장비」가 빈 채 missing=["target"]이 되어 **승인 단추가 잠겼고**
+            //   (chatwidget.js:204-206), 문장은 「어느 장비를 점검할지 정해 주세요」로 떨어졌다.
+            //   커밋이 연 길의 본선이 통째로 막힌 것이다(실측 2026-09-13: fields[0].value="").
+            //   낱말을 넘기면 said 배지가 붙고, 해석은 핸들러·effect의 **대상찾기 한 곳**이 맡는다
+            //   (collect_packages가 쓰는 바로 그 방식 — agentloop.ts:2906-2914).
+            // ⚠ standard는 **문장이 말했을 때만** 싣는다 — 안 실으면 핸들러가 t.standard(등록 기준)를 쓴다.
+            if (t) return { tool: "scan_hardening_target", args: 명시기준 ? { target: 후보, standard: 명시기준 } : { target: 후보 }, 데이터의존: true };
             return { tool: f.tool, args: { standard }, 데이터의존: true };
           }
         }

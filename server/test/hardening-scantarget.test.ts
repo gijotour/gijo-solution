@@ -13,6 +13,7 @@
 //   적는다). 새 도구는 write:true·requiredRole:"admin", 승인 뒤 runScanForTarget(…, "chatbot", …)
 //   로만 실행한다(runHardeningScan 직접 호출 금지 — 이력·감사·상관 투영·악화 알림이 한 곳에서 끝남).
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import request from "supertest";
 
 // ⚠ 실 셸/네트워크 없이 완주시킨다 — hardening-selfscan-off.test.ts와 같은 방식이다.
 //   execFile을 빈 출력으로 갈아 끼우면 hostRunner(로컬)·targetRunner(SSH) **둘 다** 이 하나로
@@ -48,9 +49,10 @@ vi.mock("../src/engine/agenttools/handlers", async (importOriginal) => {
 });
 
 import { forcedToolFor, runAgentLoop, resetContextForTests } from "../src/engine/agentloop";
-import { executeApprovedTool } from "../src/engine/agenttools";
+import { executeApprovedTool, findAgentTool } from "../src/engine/agenttools";
 import { runHardeningScanTool, runScanHardeningTargetTool } from "../src/engine/agenttools/handlers";
 import { createTarget, resetHardeningForTests, listRuns } from "../src/engine/hardeningtargets";
+import { 자기점검차단안내 } from "../src/engine/hardeningscan";
 import { listAudit, resetAuditForTests } from "../src/engine/audit";
 import { listWork, resetWorkForTests } from "../src/engine/worklog";
 import { 실제도착 } from "./helpers/routing";
@@ -106,33 +108,50 @@ describe("① 등록 대상 0건(기본 DB) — [37] 8문장 유지", () => {
 });
 
 describe("② 등록 대상이 맞으면 scan_hardening_target으로 갈아탄다(안C 핵심)", () => {
-  it("정확히 라벨이 맞으면 그 대상 id·기준으로 결재판 도구를 돌려준다", () => {
-    const t = createTarget({ label: "FW-01", host: "10.9.9.5", port: 22, username: "a", authMethod: "key", secret: "/k" });
+  // ⚠ 2026-09-13 검토관 [상] 수리 — 앞 판은 `target: t.id`를 넘겨 **결재판 필수칸이 잠겼다.**
+  //   id는 지시문에 없는 글자라 buildApproval이 guess로 보고 필수칸을 비운다(registry.ts:2601).
+  //   그래서 이제 **사람이 친 낱말**을 넘긴다 — 아래 ②-b가 그 결과(said 배지·missing 0)를 문다.
+  it("정확히 라벨이 맞으면 **사람이 친 낱말**을 target으로 돌려준다(id가 아니다 — 결재판이 잠긴다)", () => {
+    createTarget({ label: "FW-01", host: "10.9.9.5", port: 22, username: "a", authMethod: "key", secret: "/k" });
     const r = forcedToolFor("FW-01 하드닝 점검 돌려줘", { role: "admin" } as never);
     expect(r?.tool).toBe("scan_hardening_target");
-    expect(r?.args.target).toBe(t.id);
-    expect(r?.args.standard).toBe("kisa");
+    expect(r?.args.target).toBe("FW-01");
+    expect(r?.args.target, "id를 넘기면 지시문에 없는 글자라 결재판이 필수칸을 비운다").not.toMatch(/^tgt-/);
+    // 문장이 기준을 말하지 않았으면 **싣지 않는다** — 핸들러가 등록 기준(t.standard)을 쓴다.
+    expect(r?.args.standard).toBeUndefined();
     expect(r?.데이터의존).toBe(true);
   });
 
-  it("기준(CIS)도 함께 넘어간다 — 등록 대상을 맞혀도 기준 판정은 그대로다", () => {
+  it("기준(CIS)도 함께 넘어간다 — 문장이 기준을 **명시**했을 때만 싣는다", () => {
     createTarget({ label: "스위치-02", host: "10.9.9.6", port: 22, username: "a", authMethod: "key", secret: "/k" });
     const r = forcedToolFor("스위치-02 CIS 기준으로 점검해줘", { role: "admin" } as never);
     expect(r?.tool).toBe("scan_hardening_target");
     expect(r?.args.standard).toBe("cis");
   });
 
-  it("IP를 그대로 대면 host로 찾는다", () => {
-    const t = createTarget({ label: "웹서버", host: "10.8.0.11", port: 22, username: "a", authMethod: "key", secret: "/k" });
+  it("IP를 그대로 대면 host로 찾는다(넘기는 값은 친 낱말 그대로)", () => {
+    createTarget({ label: "웹서버", host: "10.8.0.11", port: 22, username: "a", authMethod: "key", secret: "/k" });
     const r = forcedToolFor("10.8.0.11 장비 하드닝 점검해줘", { role: "admin" } as never);
     expect(r?.tool).toBe("scan_hardening_target");
-    expect(r?.args.target).toBe(t.id);
+    expect(r?.args.target).toBe("10.8.0.11");
   });
 
   it("admin이 아니면(권한 문턱이 라우팅에도 반영) 등록 대상이 있어도 종전대로 self다", () => {
     createTarget({ label: "FW-01", host: "10.9.9.5", port: 22, username: "a", authMethod: "key", secret: "/k" });
     const r = forcedToolFor("FW-01 하드닝 점검 돌려줘", { role: "security_officer" } as never);
     expect(r?.tool).toBe("run_hardening_scan");
+  });
+
+  // ⚠ 2026-09-13 검토관 수리 — verify.html can[]이 「이렇게 치세요」라고 적어 준 말이 **담당자에겐
+  //   거짓**이었다(그 화면을 주로 보는 사람이 비-admin이다). 안내가 전제를 밝히는지 소스로 문다.
+  it("verify.html 안내가 전제(관리자)를 밝힌다 — 담당자가 그대로 치면 self로 떨어지기 때문", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine/screenguide.ts"), "utf8");
+    const 줄 = src.split("\n").find((l) => l.includes("FW-01 하드닝 점검 돌려줘") && !l.trimStart().startsWith("//"));
+    expect(줄, "verify.html can[]에서 이 안내가 사라졌다").toBeTruthy();
+    expect(줄!, "전제를 안 밝히면 담당자가 그대로 치고 self 점검을 받는다").toContain("관리자");
+    expect(줄!, "바깥을 작은따옴표로 — 이스케이프하면 guidance-check 수확 정규식이 원리상 못 읽는다").not.toContain('\\"');
   });
 
   it("등록 안 된 이름을 대면 못 맞혀 self로 남는다(오탐 아님)", () => {
@@ -180,9 +199,35 @@ describe("④ 승인 경로 — 결재판을 띄우고 승인 전에는 아무�
     const r = await runAgentLoop("FW-01 하드닝 점검 돌려줘", "", { role: "admin" });
     expect(r, "루프가 아무것도 안 돌려줬다").not.toBeNull();
     expect(r!.approval?.tool).toBe("scan_hardening_target");
-    expect(r!.approval?.args.target).toBe(t.id);
+    expect(r!.approval?.args.target).toBe("FW-01");
     expect(runScanHardeningTargetTool, "승인 전에 새 핸들러가 불렸다").not.toHaveBeenCalled();
     expect(listRuns(t.id), "승인 전인데 점검 이력이 남았다").toHaveLength(0);
+  });
+
+  // ★★ 2026-09-13 검토관 [상] 재발 감시 — **args만 보면 못 잡는다.**
+  //   앞 판 시험은 `approval?.args.target`(buildApproval이 안 건드리는 원 args)만 봐서 초록이었는데,
+  //   담당자가 보는 칸(fields)은 비어 있었고 missing=["target"]이라 **승인 단추가 잠겨** 있었다
+  //   (chatwidget.js:186·204-206). 그래서 칸·잠금·문장을 **셋 다** 문다.
+  it("결재판 「대상 장비」 칸이 채워지고 승인이 잠기지 않는다(said 배지)", async () => {
+    createTarget({ label: "FW-01", host: "10.9.9.5", port: 22, username: "a", authMethod: "key", secret: "/k" });
+    const r = await runAgentLoop("FW-01 하드닝 점검 돌려줘", "", { role: "admin" });
+    const ap = r!.approval!;
+    const 칸 = ap.fields.find((f) => f.key === "target")!;
+    expect(칸.value, "필수칸이 비면 화면이 승인을 막는다").toBe("FW-01");
+    expect(칸.source, "지시문에 있는 낱말이므로 근거는 said다").toBe("said");
+    expect(ap.missing, "필수칸이 비어 승인 단추가 잠겼다").toHaveLength(0);
+    expect(ap.effect, "칸은 찼는데 문장은 되묻고 있다").not.toContain("어느 장비를 점검할지");
+    expect(ap.effect).toContain("FW-01");
+  });
+
+  it("결재판 문장이 **접속 여부**를 정직하게 말한다 — 로컬 등록 대상엔 「접속해」라 안 한다", async () => {
+    const 원격 = createTarget({ label: "FW-01", host: "10.9.9.5", port: 22, username: "a", authMethod: "key", secret: "/k" });
+    const 로컬 = createTarget({ label: "옛로컬-01", host: "local", port: 22, authMethod: "local" });
+    const tool = findAgentTool("scan_hardening_target")!;
+    expect(tool.effect!({ target: 원격.label })).toContain("접속해");
+    const 로컬글 = tool.effect!({ target: 로컬.label });
+    expect(로컬글, "붙지도 않는 장비를 「접속해 실행합니다」로 적으면 안 된다").not.toContain("접속해");
+    expect(로컬글).toContain("이 서버 자신");
   });
 
   it("등록 대상이 없으면(자기점검) 결재판 없이 바로 실행된다 — 종전 동작 그대로", async () => {
@@ -230,21 +275,59 @@ describe("⑤ 권한 문턱 — requiredRole:admin이 실행 문턱에서도 막
 });
 
 describe("⑥ 자기점검 끈 설치본(4100 전제) — 등록 원격 대상은 그대로 돈다", () => {
+  // ⚠ 2026-09-13 검토관 [하] 수리 — 두 단언 모두 **제품 상수와 글자로 대조**한다.
+  //   앞 판 ⑥-1은 `not.toContain("점검을 지원하지 않")`이었는데 그 문자열은 **제품 어디에도 없다**
+  //   (실측: server/src 전체 grep 0건) — 어떤 코드에서도 못 나오니 늘 초록인 헛단언이었다.
+  //   앞 판 ⑥-2는 `out.length > 0`뿐이라 차단 안내인지 「검색되지 않았습니다」인지 못 갈랐다.
   it("GIJO_NO_SELF_SCAN=1이어도 원격(key) 대상 점검은 막히지 않는다", async () => {
     process.env[ENV] = "1";
     const t = createTarget({ label: "FW-01", host: "10.9.9.5", port: 22, username: "a", authMethod: "key", secret: "/k" });
     const out = await executeApprovedTool("scan_hardening_target", { target: t.id }, "admin");
-    expect(out).not.toContain("점검을 지원하지 않");
+    expect(out, "원격 대상인데 자기점검 차단에 걸렸다").not.toBe(자기점검차단안내);
+    expect(out, "점검 요약이 아니라 안내로 끝났다").toContain("준수율");
     expect(listRuns(t.id)).toHaveLength(1);
   });
 
-  it("등록됐지만 로컬(자기점검 끈 상태)이면 차단 안내를 그대로 돌려준다", async () => {
+  it("등록됐지만 로컬(자기점검 끈 상태)이면 차단 안내를 **글자 그대로** 돌려준다", async () => {
     delete process.env[ENV];
     const t = createTarget({ label: "옛로컬", host: "local", port: 22, authMethod: "local" });
     process.env[ENV] = "1";
     const out = await executeApprovedTool("scan_hardening_target", { target: t.id }, "admin");
     expect(listRuns(t.id)).toHaveLength(0);
-    expect(out.length).toBeGreaterThan(0);
+    expect(out, "차단 안내가 아니라 다른 말(대상 검색 실패 등)로 끝났다").toBe(자기점검차단안내);
+  });
+});
+
+describe("⑧ 등록 기준(t.standard) 존중 — 대화 경로가 kisa로 덮지 않는다", () => {
+  // ⚠ 2026-09-13 검토관 [중] 수리. 앞 판은 라우팅이 늘 standard를 실어 보내(문장에 낱말이 없으면
+  //   "kisa") 핸들러의 `?? t.standard` 갈래가 **원리상 도달 불가**였다. kisa_net(Cisco N-시리즈)으로
+  //   등록한 스위치에 UNIX U-시리즈 명령이 나가 준수율이 실제와 무관하게 기록되고, 화면 [점검]
+  //   버튼(HTTP, hardeningtargets.ts:360)과 **두 창구가 다른 숫자**를 냈다.
+  it("기준 낱말이 없으면 args에 standard를 안 싣는다", () => {
+    createTarget({ label: "SW-01", host: "10.9.9.7", port: 22, username: "a", authMethod: "key", secret: "/k", standard: "kisa_net" });
+    const r = forcedToolFor("SW-01 하드닝 점검 돌려줘", { role: "admin" } as never);
+    expect(r?.tool).toBe("scan_hardening_target");
+    expect(r?.args.standard, "값을 실으면 등록 기준이 영영 안 쓰인다").toBeUndefined();
+  });
+
+  it("승인 실행이 등록 기준(kisa_net)으로 돈다 — 이력에 그 기준이 적힌다", async () => {
+    const t = createTarget({ label: "SW-01", host: "10.9.9.7", port: 22, username: "a", authMethod: "key", secret: "/k", standard: "kisa_net" });
+    await executeApprovedTool("scan_hardening_target", { target: "SW-01" }, "admin");
+    const runs = listRuns(t.id);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].standard, "등록 기준을 무시하고 kisa로 돌았다").toBe("kisa_net");
+  });
+
+  it("빈 문자열이 와도(결재판이 빈 선택칸을 그렇게 넘긴다) 등록 기준으로 떨어진다", async () => {
+    const t = createTarget({ label: "SW-02", host: "10.9.9.8", port: 22, username: "a", authMethod: "key", secret: "/k", standard: "cis" });
+    await executeApprovedTool("scan_hardening_target", { target: "SW-02", standard: "" }, "admin");
+    expect(listRuns(t.id)[0].standard).toBe("cis");
+  });
+
+  it("문장이 기준을 명시하면 그 기준이 이긴다 — 등록 기준을 덮는다", async () => {
+    const t = createTarget({ label: "SW-03", host: "10.9.9.9", port: 22, username: "a", authMethod: "key", secret: "/k", standard: "kisa_net" });
+    await executeApprovedTool("scan_hardening_target", { target: "SW-03", standard: "cis" }, "admin");
+    expect(listRuns(t.id)[0].standard).toBe("cis");
   });
 });
 
@@ -264,5 +347,24 @@ describe("⑦ 작업 원장 source 옵션화 — HTTP 수동 실행(manual)도 �
     await runScanForTarget(t, "kisa", "scheduled", "scheduler");
     const 원장 = listWork(Date.now() - 60_000).filter((w) => w.kind === "hardening_scanned");
     expect(원장[원장.length - 1].source).toBe("schedule");
+  });
+
+  // ⚠ 2026-09-13 검토관 [중] 수리 — **정정이 반쪽이었다.** 화면 수동 self 점검
+  //   (POST /api/hardening/scan, 라이트 lite-scan.html·terminal.html이 쓰는 유일한 점검 길)은
+  //   runScanForTarget을 안 거치고 runHardeningScan을 직접 불러 기본값 "schedule"로 떨어졌다.
+  //   커밋 메시지는 「대화·화면에서 돌린 점검이 전부 스케줄러로 적히던 것이 함께 고쳐진다」고
+  //   약속했으므로 약속-코드 불일치이기도 하다.
+  it("POST /api/hardening/scan(화면 수동 self 점검)도 api로 남는다 — 스케줄러가 아니다", async () => {
+    const { createApp } = await import("../src/app");
+    const app = createApp();
+    const 로그인 = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
+    const res = await request(app)
+      .post("/api/hardening/scan")
+      .set("Authorization", `Bearer ${로그인.body.accessToken}`)
+      .send({ standard: "kisa" });
+    expect(res.status).toBe(200);
+    const 원장 = listWork(Date.now() - 60_000).filter((w) => w.kind === "hardening_scanned");
+    expect(원장.length, "화면 점검이 작업 원장에 안 남았다").toBeGreaterThan(0);
+    expect(원장[원장.length - 1].source, "사람이 화면에서 누른 점검이 스케줄러 것으로 적혔다").toBe("api");
   });
 });
