@@ -209,14 +209,25 @@ const putDigest = (
        model=excluded.model, failedReason=excluded.failedReason, madeAt=excluded.madeAt`
   ).run(id, summary, matches, summary ? "로컬 모델 자체 요약" : null, failedReason, new Date().toISOString());
 
+/** 분 단위로 벌려 넣는다 — ingestedAt DESC 정렬을 결정적으로 만든다(minutesAgo=0이 가장 최근).
+ *  ⚠ putDoc(daysAgo=0)을 67번 부르면 밀리초 동률이 생겨 순서가 실행마다 갈린다(검토관 2026-09-12 [중]). */
+const putDocAt = (id: string, minutesAgo: number, category = "일반", uploadedBy: string | null = "jyh") =>
+  db.prepare(
+    `INSERT INTO memory_documents (documentId, scope, chunks, ingestedAt, uploadedBy, category)
+     VALUES (?, 'global', 2, ?, ?, ?)
+     ON CONFLICT(documentId) DO UPDATE SET ingestedAt=excluded.ingestedAt`
+  ).run(id, new Date(Date.now() - minutesAgo * 60_000).toISOString(), uploadedBy, category);
+
 describe("★ B8 — 67편이 들어와도 읽히는 길이다", () => {
-  it("상한·「외 N건」·건수 합(제품 함수로 대조)", () => {
+  it("상한·「외 N건」·건수 합·요약 실림(제품 함수로 대조)", () => {
     const 총건수 = 67;
+    // 4100 실측 재현 — 맨 앞 두 편은 요약도 접점도 없는 builtin(용어사전·제품소개)이고,
+    // 요약은 그 **다음** 편부터 붙어 있었다. 자리로만 상세를 고르면 요약 8편 중 1편만 남는다.
     for (let i = 0; i < 총건수; i++) {
-      putDoc(`QA소식길이-${i}.pdf`, 0, i % 2 === 0 ? "위협대응" : "사내규정");
-    }
-    for (let i = 0; i < 상세최대; i++) {
-      putDigest(`QA소식길이-${i}.pdf`, "첫 줄 요약\n둘째 줄 요약\n셋째 줄 요약", "피싱공격 —[완화통제]→ 이메일게이트웨이");
+      putDocAt(`QA소식길이-${i}.pdf`, i, i % 2 === 0 ? "위협대응" : "사내규정", i < 2 ? null : "jyh");
+      if (i >= 2 && i < 10) {
+        putDigest(`QA소식길이-${i}.pdf`, `${i}편 요약 첫 줄\n${i}편 요약 둘째 줄\n${i}편 요약 셋째 줄`, "피싱공격 —[완화통제]→ 이메일게이트웨이");
+      }
     }
     const text = recentDocumentsText(7);
     expect(text.length, "산문 상한(1,800자, ops-sim.mjs 2,000의 90%)을 넘었다").toBeLessThanOrEqual(답글자상한);
@@ -235,6 +246,13 @@ describe("★ B8 — 67편이 들어와도 읽히는 길이다", () => {
     const 이름줄수 = (text.match(/^- /gm) || []).length;
     expect(이름줄수).toBe(목록최대);
     expect(text).toContain(`(외 ${total - 목록최대}건)`);
+
+    // ★ 계약(tools/ops-sim.mjs ⑨ 「새 문서 뭐 들어왔어?」 주석 — 요약·접점까지 즉답이어야 한다).
+    //   맨 앞 두 편에 소식이 없어도 요약이 `상세최대`편 실린다 — 길이 수리가 계약을 먹지 않는다.
+    expect(text, "요약이 한 줄도 안 실렸다 — 자리로만 상세를 골랐다").toContain("2편 요약 첫 줄");
+    expect((text.match(/편 요약 첫 줄/g) || []).length).toBe(상세최대);
+    expect((text.match(/편 요약 셋째 줄/g) || []).length, "편당 요약은 2줄까지다").toBe(0);
+    expect((text.match(/자체 요약/g) || []).length).toBe(1);
   });
 
   it("★ 최악치에서도 상한을 안 넘는다 — 옛 데이터는 120자 상한을 안 지났다", () => {
@@ -243,30 +261,38 @@ describe("★ B8 — 67편이 들어와도 읽히는 길이다", () => {
     const 긴줄 = "가".repeat(300);
     const 긴요약 = [긴줄, 긴줄, 긴줄].join("\n");
     const 긴접점 = [긴줄, 긴줄].join("\n");
-    for (let i = 0; i < 67; i++) {
-      const id = `QA소식길이-옛${"자".repeat(60)}-${i}`;
-      putDoc(id, 0, "일반");
-      putDigest(id, 긴요약, 긴접점);
+    const 총건수 = 67;
+    for (let i = 0; i < 총건수; i++) {
+      putDocAt(`QA소식길이-옛${"자".repeat(60)}-${i}`, i, "일반");
+      putDigest(`QA소식길이-옛${"자".repeat(60)}-${i}`, 긴요약, 긴접점);
     }
     const text = recentDocumentsText(7);
     expect(text.length).toBeLessThanOrEqual(답글자상한);
-    expect(text.endsWith("…"), "안전망이 걸렸는데도 잘린 자리에 말줄임이 없다 — 조용히 잘렸다").toBe(true);
+
+    // ★ 예산은 **본문에서만** 깎는다(검토관 2026-09-12 [중]) — 답 끝을 통째로 자르면
+    //   「67건」이라 말해 놓고 「(외 N건)」·표기·갈 곳이 사라져, 길이 불편이 「숫자만 주고
+    //   갈 곳 없음」(ops-sim.mjs) 불편으로 바뀔 뿐이다. 셋 다 살아 있어야 한다.
+    const 이름줄수 = (text.match(/^- /gm) || []).length;
+    const total = listRecentDocs(7).length;
+    expect(이름줄수, "예산에 걸렸는데도 본문이 안 깎였다").toBeLessThan(목록최대);
+    expect(text, "「(외 N건)」이 잘려 나갔다 — 목록이 왜 짧은지 아무도 모른다").toContain(`(외 ${total - 이름줄수}건)`);
+    expect(text, "「자체 요약」 표기가 잘려 나갔다(7B 오독 계약)").toContain("자체 요약");
+    expect(text, "갈 곳 한 줄이 잘려 나갔다").toContain("AI 지식");
+    expect(text).toMatch(/화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보/);
   });
 
-  it("상세는 앞 N편에만 붙는다 — 나머지는 이름만", () => {
+  it("상세는 소식 있는 앞 N편에만 붙는다 — 나머지는 이름만", () => {
     const 문서들 = Array.from({ length: 6 }, (_, i) => `QA소식길이-상세${i}.pdf`);
     // 정렬은 ingestedAt DESC — 분 단위로 벌려 순서를 결정적으로 만든다(i=0이 가장 최근).
     문서들.forEach((id, i) => {
-      db.prepare(
-        `INSERT INTO memory_documents (documentId, scope, chunks, ingestedAt, uploadedBy, category)
-         VALUES (?, 'global', 2, ?, 'jyh', '일반')
-         ON CONFLICT(documentId) DO UPDATE SET ingestedAt=excluded.ingestedAt`
-      ).run(id, new Date(Date.now() - i * 60_000).toISOString());
+      putDocAt(id, i);
       putDigest(id, "이 편의 요약 문장입니다.");
     });
     const text = recentDocumentsText(7);
-    const 넷째 = 문서들[상세최대]; // 0-based로 상세최대번째 = 상세 밖의 첫 문서
-    const idx = text.indexOf(넷째);
+    // 여섯 편 모두 소식이 있으므로 상세는 앞 `상세최대`편 — 그 다음 편이 상세 밖의 첫 문서다.
+    // ⚠ 이름을 「넷째」로 적지 않는다(검토관 2026-09-12 [하]) — 상세최대를 바꾸면 이름이 거짓말이 된다.
+    const 상세밖첫편 = 문서들[상세최대];
+    const idx = text.indexOf(상세밖첫편);
     expect(idx, "이름 줄 자체가 없다").toBeGreaterThan(-1);
     const 다음문서 = text.indexOf("\n- ", idx + 1);
     const 이줄 = text.slice(idx, 다음문서 === -1 ? text.length : 다음문서);
@@ -312,6 +338,13 @@ describe("★ B8 — 67편이 들어와도 읽히는 길이다", () => {
     const 내문서있음 = text.includes("내 문서");
     expect(AI지식있음 && 내문서있음, "한 답에서 두 화면을 가리킨다").toBe(false);
     expect(AI지식있음, "갈 곳 자체가 없다").toBe(true);
+    // ★ 한 번만 말한다(검토관 2026-09-12 [하]) — 같은 갈 곳을 두 줄로 적으면 글자 예산에서
+    //   상세 반 편 값을 잡아먹는다. 글자 아끼자는 수리 안에서 같은 말을 두 번 하지 않는다.
+    expect((text.match(/AI 지식/g) || []).length, "같은 갈 곳을 두 번 말한다").toBe(1);
+    // ★ 없는 것을 가리키지 않는다(검토관 2026-09-12 [상]) — 요약이 사는 doc_digests를 읽는
+    //   코드는 docdigest.ts 하나뿐이라 「AI 지식」 화면에 요약 전문은 없고(전수 grep),
+    //   원본 열기 단추도 hasSource인 문서에만 뜬다(memory.html). 전체 목록만 약속한다.
+    expect(text, "화면에 없는 것(요약 전문)을 약속한다").not.toContain("요약 전문");
     // ops-sim.mjs의 갈곳 정규식(화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보)이 걸려야 한다.
     expect(text).toMatch(/화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보/);
   });
