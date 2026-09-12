@@ -1,7 +1,7 @@
 {
-  "acceptedAt": "2026-08-20T11:27:49.253Z",
-  "gitRev": "f0c2207c",
-  "caseSetHash": "0addb04ad914bb07",
+  "acceptedAt": "2026-09-12T10:00:07.239Z",
+  "gitRev": "00b13f21",
+  "caseSetHash": "0e28f9b296f1d3d5",
   "axes": {
     "routing": {
       "total": 66,
@@ -22,8 +22,8 @@
       "unmeasured": false
     },
     "korean": {
-      "total": 24,
-      "pass": 24,
+      "total": 25,
+      "pass": 25,
       "passRate": 100,
       "canaryFail": 0,
       "flaky": 0,
@@ -66,5 +66,5 @@
     "total": 30,
     "error": null
   },
-  "note": "사람이 결과를 읽고 확정한 기준선 — 갱신은 --accept-baseline 명시 실행으로만"
+  "note": "리포트 기준 확정(재실행 없음) — 원 실행 2026-09-12T09:59:35.035Z"
 }
