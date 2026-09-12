@@ -2327,8 +2327,11 @@ async function 체인훑기(
   // ⚠ 제목 지목 갈래(2026-09-08)는 **문서 목록을 조회해** 갈린다 — 그때만 `조건부`를 붙인다.
   //   실측(검토관 [중]): route-explain은 `GIJO_DB_PATH=:memory:`로 도니 지목 후보가 0이라
   //   「걸리는 규칙 없음」이라 답하고, 운영 DB로 재면 같은 말이 [37]로 간다. 어느 쪽도 단정이면 거짓이다.
-  //   ⚠ FORCED_INTENTS 배열에 걸린 것은 **글자만으로** 갈리므로 종전대로 조건부가 아니다
+  //   ⚠ FORCED_INTENTS 배열에 걸린 것은 원칙적으로 **글자만으로** 갈리므로 조건부가 아니다
   //     (아무 데나 붙이면 표시가 뜻을 잃는다 — routeexplain.route.test가 양쪽을 다 문다).
+  //   예외 하나(2026-09-13 D 사슬): [3] 하드닝 점검 갈래는 배열 안에서 **등록 장비 이름이 맞으면**
+  //     scan_hardening_target(결재판), 아니면 run_hardening_scan(자기 점검)으로 갈리므로 그 갈래만
+  //     agentloop이 `데이터의존: true`를 돌려준다 — 빈 DB로 재는 route-explain은 뒤쪽으로 간다.
   const 강제 = forcedToolFor(t, 옵션?.역할 ? { role: 옵션.역할 } : undefined);
   본다(!!강제, {
     이름: "강제 도구", 층: "강제도구", 판별: "forcedToolFor",
