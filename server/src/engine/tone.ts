@@ -199,18 +199,26 @@ export function 심각도표식(severity: string): string {
  * ⚠ 규칙은 epss표기의 JSDoc에 적혀 있다(반올림이 크기를 거짓말하지 않게, 0~1 밖은 안 싣게).
  *   여기서 되풀이하지 않는다 — 규칙 문서도 한 곳이어야 두 곳이 어긋나지 않는다.
  *
+ * ⚠ **위쪽 경계도 크기를 거짓말하지 않는다**(2026-09-12 B13, B11 검토관 이관 ①). `Math.round`만
+ *   쓰면 0.995~1 미만이 `Math.round(99.5)=100`으로 「100%」가 된다 — 「반드시 악용된다」로 읽히는데
+ *   실제 값은 100%가 아니다(운영 실측: 오늘의 브리핑 Log4Shell 줄에 「EPSS 100%」가 실제로 찍혔다).
+ *   그래서 0.995 이상 1 미만은 「99% 초과」로 적고, **정확히 1인 값만** 「100%」다 — 아래쪽
+ *   「1% 미만」과 같은 이유(0을 거짓말하지 않는다)를 위쪽에서도 지킨다.
+ *
  * ⚠ **단일 출처는 서버 안에서만이다.** 렌더러는 서버 코드를 못 불러, 승인 화면
  *   (client/src/renderer/pages/approvals.html)에 같은 규칙을 **손으로 옮겨 적은 사본이 1벌** 있다.
  *   아래 문턱(0.005)이나 「1% 미만」 낱말을 바꾸면 **그 사본도 함께** 고친다 — 안 고치면 같은
  *   취약점 한 건이 대화와 승인 화면에서 다른 글자로 갈린다(2026-09-11이 잡았던 바로 그 병).
  *   짝이 맞는지는 tone.test.ts의 「클라 사본」 감시가 잰다.
  *
- * @returns 「97%」·「1% 미만」·「0%」 중 하나. 값이 없거나 뜻을 못 읽으면 빈 문자열.
+ * @returns 「97%」·「1% 미만」·「99% 초과」·「0%」 중 하나. 값이 없거나 뜻을 못 읽으면 빈 문자열.
  */
 export function epss값표기(epss: number | null | undefined): string {
   if (typeof epss !== "number" || !Number.isFinite(epss)) return "";
   if (epss < 0 || epss > 1) return "";
-  return epss > 0 && epss < 0.005 ? "1% 미만" : `${Math.round(epss * 100)}%`;
+  if (epss > 0 && epss < 0.005) return "1% 미만";
+  if (epss >= 0.995 && epss < 1) return "99% 초과";
+  return `${Math.round(epss * 100)}%`;
 }
 
 /**
@@ -243,6 +251,33 @@ export function epss값표기(epss: number | null | undefined): string {
 export function epss표기(epss: number | null | undefined): string {
   const 값 = epss값표기(epss);
   return 값 ? `EPSS ${값}` : "";
+}
+
+/**
+ * EPSS를 **소수 한 자리** 정밀도로 적는다(리포트 전용) — report.ts(DOCX·HTML) 값표기의 단일 출처.
+ *
+ * 왜 정수(epss값표기)와 따로인가: 리포트(격식 문서)는 소수 한 자리(예 "0.4%")로, 대화·화면은
+ * 정수(예 "0%")로 적는다는 정밀도 규약이 이미 있다(2026-09-11 결정 — 둘을 합치는 일은 리포트
+ * 산출물 회귀를 함께 봐야 해서 백로그. tone.test.ts 소스 감시의 report.ts 예외 항목 참고).
+ * 정밀도는 다르지만 **「값이 있으면 없다고 적지 않는다」는 같은 원칙**을 여기서도 지킨다 —
+ * 그래서 반올림 자리를 report.ts에 남기지 않고 epss값표기와 나란히 이 파일 한 곳에 둔다.
+ *
+ * ⚠ 2026-09-12 B13(2026-09-12 검토관 적발 → B11 이관 ②) — report.ts:380·1045가
+ *   `(epss*100).toFixed(1)`을 직접 계산해 EPSS 0.0004를 「EPSS 0.0%」로 적었다(값이 있는데
+ *   없다고 단정 — 격식 문서·경영진 산출물에 나가는 글자다). 위쪽도 뒤집힌 같은 병이 날 수 있다 —
+ *   0.9995 이상 1 미만을 그대로 `toFixed(1)`로 찍으면 부동소수 반올림이 「100.0%」를 내
+ *   「1(=100%)」이라 거짓 단정한다. 그래서 아래·위 경계를 여기서 함께 막고, report.ts는
+ *   두 자리(380·1045) 모두 이 함수만 부른다(계산은 여기 한 곳).
+ *
+ * @returns 「97.4%」·「0.1% 미만」·「99.9% 초과」·「0.0%」 중 하나(「EPSS 」 접두 없음 — report.ts가
+ *   자리마다 「 · EPSS 」를 붙인다). 값이 없거나 뜻을 못 읽으면(0~1 밖 포함) 빈 문자열.
+ */
+export function epss값표기소수1(epss: number | null | undefined): string {
+  if (typeof epss !== "number" || !Number.isFinite(epss)) return "";
+  if (epss < 0 || epss > 1) return "";
+  if (epss > 0 && epss < 0.0005) return "0.1% 미만";
+  if (epss >= 0.9995 && epss < 1) return "99.9% 초과";
+  return `${(epss * 100).toFixed(1)}%`;
 }
 
 /** 제품 판정 머리표 — 【 】는 이 이름들에만 쓴다(다른 【 】는 프롬프트 누출로 본다). */

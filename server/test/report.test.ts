@@ -3,6 +3,7 @@ import request from "supertest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import JSZip from "jszip";
 
 // REPORT_DIR은 report.ts 모듈 로드 시점에 읽히므로 import 전에 임시 디렉터리로 고정한다
 // (운영 data/reports에 테스트용 [mock] 리포트가 실제로 쌓여 리포트 이력 100건 상한 밖으로
@@ -105,6 +106,41 @@ describe("report", () => {
     const s = maintenanceSummary(items);
     expect(s).toEqual({ total: 6, scheduled: 2, overdue: 1, reported: 1, approved: 2, rejected: 1 });
     expect(maintenanceSummary([])).toEqual({ total: 0, scheduled: 0, overdue: 0, reported: 0, approved: 0, rejected: 0 });
+  });
+
+  // 전-6 정직 · B13(2026-09-12, B11 검토관 이관 ②) — report.ts:380·1045가 `(epss*100).toFixed(1)`을
+  // 직접 계산해 EPSS 0.0004를 「EPSS 0.0%」로 적던 병(값이 있는데 없다고 단정)을 tone.epss값표기소수1
+  // 단일 출처로 닫았다. 산출된 .docx를 실제로 열어(zip→document.xml) 그 병이 사라졌는지 본다 —
+  // API 200만 보는 시험은 「값이 맞다」를 증명하지 못한다(2026-08-22 「내 라이브 실측이 UI를 안
+  // 지난다」의 같은 함정).
+  it("★ B13 — 리포트 취약점 사례의 EPSS가 0.0004를 「0.0%」로, 0.9996을 「100.0%」로 거짓 단정하지 않는다", async () => {
+    resetKevForTests([]);
+    importVulnScan(
+      "Plugin ID,CVE,Risk,Host,Name,epss_score\n" +
+        "1,CVE-2099-0001,Medium,10.9.9.1,낮은EPSS취약점,0.0004\n" +
+        "2,CVE-2099-0002,Medium,10.9.9.2,높은EPSS취약점,0.9996\n",
+      "csv",
+      "nessus"
+    );
+
+    const res = await request(app)
+      .post("/api/report/generate")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ type: "ondemand" });
+    expect(res.status).toBe(200);
+
+    const bytes = fs.readFileSync(res.body.filePath);
+    const zip = await JSZip.loadAsync(bytes);
+    const docFile = zip.file("word/document.xml");
+    expect(docFile, "docx에 word/document.xml이 없다 — .docx 형식이 바뀌었다").toBeTruthy();
+    const xml = await docFile!.async("string");
+
+    // 아래쪽 — 0.0004는 「0.1% 미만」이어야 하고, 옛 병(「EPSS 0.0%」)이 없어야 한다.
+    expect(xml).toContain("EPSS 0.1% 미만");
+    expect(xml).not.toContain("EPSS 0.0%");
+    // 위쪽 — 0.9996을 반올림으로 「100.0%」라 단정하지 않고 「99.9% 초과」로 적는다.
+    expect(xml).toContain("EPSS 99.9% 초과");
+    expect(xml).not.toContain("EPSS 100.0%");
   });
 
   it("vulnCases maps an Oracle patch finding to priority + governance controls (거버넌스 매칭)", () => {

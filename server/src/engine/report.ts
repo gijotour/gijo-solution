@@ -3,7 +3,8 @@
 
 import type { Express, Request } from "express";
 // 심각도 우리말은 원천 한 곳(tone.ts)에서만 만든다 — 자리마다 만들면 같은 것이 둘로 보인다.
-import { 심각도한글, 준수율집계전단서 } from "./tone";
+// EPSS 리포트 표기(소수 한 자리)도 원천 한 곳 — 2026-09-12 B13, 직접 toFixed(1) 계산을 걷어냈다.
+import { 심각도한글, 준수율집계전단서, epss값표기소수1 } from "./tone";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { createRequire } from "module";
@@ -375,9 +376,12 @@ async function buildDocx(
                 new Paragraph({ children: [new TextRun({ text: "※ 거버넌스 매핑은 지침 기반 참고 매핑입니다. 조직의 통제 기준선(ISMS-P 인증 범위 등)에 맞춰 최종 확인하세요.", italics: true, size: 18 })] }),
                 ...cases.flatMap((c) => {
                   const f = c.finding;
+                  // 소수 한 자리 EPSS는 tone.epss값표기소수1 한 곳에서만 계산한다(2026-09-12 B13) —
+                  // 여기서 직접 toFixed(1)을 하면 0.0004 같은 값이 「0.0%」로 거짓 단정된다.
+                  const epssText = epss값표기소수1(f.epss);
                   const meta =
                     `자산 ${c.assetName} · 심각도 ${f.severity}` +
-                    (typeof f.epss === "number" ? ` · EPSS ${(f.epss * 100).toFixed(1)}%` : "") +
+                    (epssText ? ` · EPSS ${epssText}` : "") +
                     (f.vpr != null ? ` · VPR ${f.vpr}` : "") +
                     (f.kev ? " · KEV" : "") +
                     ` · 출처 ${f.source_tool}`;
@@ -1040,9 +1044,12 @@ function buildReportHtml(
       cases
         .map((c) => {
           const f = c.finding;
+          // 소수 한 자리 EPSS는 tone.epss값표기소수1 한 곳에서만 계산한다(2026-09-12 B13) —
+          // 여기서 직접 toFixed(1)을 하면 0.0004 같은 값이 「0.0%」로 거짓 단정된다.
+          const epssText = epss값표기소수1(f.epss);
           const meta =
             `자산 ${esc(c.assetName)} · 심각도 ${esc(f.severity)}` +
-            (typeof f.epss === "number" ? ` · EPSS ${(f.epss * 100).toFixed(1)}%` : "") +
+            (epssText ? ` · EPSS ${epssText}` : "") +
             (f.vpr != null ? ` · VPR ${f.vpr}` : "") +
             (f.kev ? " · KEV" : "") +
             ` · 출처 ${esc(f.source_tool)}`;

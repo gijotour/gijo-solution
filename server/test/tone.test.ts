@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { 표식, 허용표식, 판정머리표, 금지말투, 말투위반, 소개서두, epss표기, epss값표기, 화면요소인용, 인용구뺀사본 } from "../src/engine/tone";
+import { 표식, 허용표식, 판정머리표, 금지말투, 말투위반, 소개서두, epss표기, epss값표기, epss값표기소수1, 화면요소인용, 인용구뺀사본 } from "../src/engine/tone";
 
 const 규범 = fs.readFileSync(path.join(__dirname, "../../GIJO_AS_대화창_말투규범.md"), "utf8");
 
@@ -183,6 +183,16 @@ describe("★ EPSS 표기 — 한 곳에서 만들고, 크기를 거짓말하지
     expect(epss표기(0.005)).toBe("EPSS 1%");
   });
 
+  // ★ 위쪽 경계(2026-09-12 B13, B11 검토관 이관 ①) — Math.round만 쓰면 0.995 이상 1 미만이
+  //   반올림으로 100이 되어 「100%」(=반드시 악용된다)로 읽힌다. 실제 운영 사고(오늘의 브리핑
+  //   Log4Shell 줄 「EPSS 100%」)의 뿌리였다. 아래쪽 「1% 미만」과 대칭으로 위쪽도 막는다.
+  it("★ 0.995 이상 1 미만을 「100%」로 반올림해 단정하지 않는다 — 「99% 초과」로 적는다", () => {
+    expect(epss표기(0.9949)).toBe("EPSS 99%");        // 문턱 바로 아래 — 평범한 반올림 그대로
+    expect(epss표기(0.995)).toBe("EPSS 99% 초과");     // 문턱 — 여기부터 특별 취급
+    expect(epss표기(0.999)).toBe("EPSS 99% 초과");
+    expect(epss표기(1)).toBe("EPSS 100%");             // 정확히 1만 100%다(짐작이 아니라 값 그대로)
+  });
+
   it("파일에 정말 0이라 적힌 값만 「0%」다 — 없는 값과도 구분한다", () => {
     expect(epss표기(0)).toBe("EPSS 0%");
     expect(epss표기(undefined)).toBe("");
@@ -205,8 +215,9 @@ describe("★ EPSS 표기 — 한 곳에서 만들고, 크기를 거짓말하지
     const 예외: Record<string, string> = {
       "report.ts":
         "격식 문서(DOCX·HTML 리포트)는 소수 한 자리(97.4%)와 SLA 근거의 정수(97%)를 따로 쓴다 — 대화 표기와 정밀도 규약이 다르다. 합치려면 리포트 산출물 회귀를 함께 봐야 해서 이번 라운드 밖으로 둔다(백로그). " +
-        "⚠ 이 예외로 **남아 있는 병**을 적어 둔다(2026-09-12 검토관 적발): report.ts:380·1045의 `(epss*100).toFixed(1)`은 EPSS 0.0004를 「EPSS 0.0%」로 적는다 — 값이 있는데 **없다고 단정하는 글자**다(같은 계열이 client/src/renderer/pages/vulnscan.html에도 1벌). " +
-        "정밀도 규약 때문에 미룬 것이지 병이 없어서가 아니다.",
+        "★ 2026-09-12 B13에서 report.ts:380·1045(취약점 사례 메타 줄)는 **닫혔다** — 직접 `(epss*100).toFixed(1)` 계산을 걷어내고 tone.epss값표기소수1(단일 출처, 0.0004→「0.1% 미만」·0.9996→「99.9% 초과」)만 부른다. " +
+        "예외가 남는 것은 이 파일이 아직 예외이기 때문이 아니라 **감시 정규식이 `epss값표기소수1(`을 단일출처호출로 못 읽어서**다(위 detection이 좁다 — 실제로는 단일 출처를 부른다). " +
+        "⚠ **남아 있는 병**을 적어 둔다: classifyVulnPriority(약 192~204줄)의 SLA 근거 문구는 여전히 `epss >= 0.9 ? EPSS ${(epss*100).toFixed(0)}% : ...` 식으로 **직접 반올림한다** — 0.9~1 범위만 들어오므로 「0%」 거짓 단정은 없지만, 0.995~1 구간에서 위쪽 경계(반올림→100%)의 같은 병이 날 수 있다. 이번 B13은 380·1045만 지시받아 닫았고 이 자리는 **다음 라운드로 남긴다**(같은 계열이 client/src/renderer/pages/vulnscan.html:489에도 1벌 더 있다 — 클라 게시 묶음 별건).",
     };
     const ENGINE = path.join(__dirname, "..", "src", "engine");
     const files = (fs.readdirSync(ENGINE, { recursive: true }) as string[]).filter((f) => f.endsWith(".ts"));
@@ -220,8 +231,10 @@ describe("★ EPSS 표기 — 한 곳에서 만들고, 크기를 거짓말하지
     const 낱말 = /(?:EPSS|악용예측) \$\{/;
     // 그 줄에서 스스로 크기를 계산하면, 그 자리가 곧 두 번째 반올림 잣대다.
     const 스스로계산 = /Math\.round|toFixed|\*\s*100/;
-    // tone의 단일 출처를 거치는 파일인가(값만 받는 epss값표기 포함 — today.ts가 그 길이다).
-    const 단일출처호출 = /\bepss(?:값)?표기\s*\(/;
+    // tone의 단일 출처를 거치는 파일인가(값만 받는 epss값표기·리포트 소수 한 자리
+    // epss값표기소수1 포함 — today.ts는 앞의 길, report.ts는 뒤의 길이다. 2026-09-12 B13
+    // 이전엔 소수1 변형이 없어 이 정규식이 못 읽었다 — 그래서 report.ts가 예외였다).
+    const 단일출처호출 = /\bepss(?:값)?표기(?:소수1)?\s*\(/;
 
     const 조립한파일: string[] = [];
     const 뜻밖: string[] = [];
@@ -266,7 +279,7 @@ describe("★ EPSS 표기 — 한 곳에서 만들고, 크기를 거짓말하지
 // epss표기는 반드시 epss값표기를 감싼 것이어야 한다는 것 자체를 시험으로 고정한다.
 describe("★ epss값표기 — epss표기의 속살(값만, 낱말 없이)", () => {
   it("epss표기(x)는 언제나 「EPSS 」+epss값표기(x)다 — 반올림이 한 곳에서만 계산된다", () => {
-    for (const x of [0.9744, 0.94, 0.5, 1, 0.004, 0.0004, 0.005, 0, 97.44, -1, NaN, undefined, null]) {
+    for (const x of [0.9744, 0.94, 0.5, 1, 0.004, 0.0004, 0.005, 0.9949, 0.995, 0.999, 0, 97.44, -1, NaN, undefined, null]) {
       const 값 = epss값표기(x as number | null | undefined);
       const 기대 = 값 ? `EPSS ${값}` : "";
       expect(epss표기(x as number | null | undefined), `epss값표기(${x})=${JSON.stringify(값)}인데 epss표기가 어긋난다`).toBe(기대);
@@ -280,6 +293,45 @@ describe("★ epss값표기 — epss표기의 속살(값만, 낱말 없이)", ()
     expect(epss값표기(undefined)).toBe("");
     expect(epss값표기(null)).toBe("");
     expect(epss값표기(97.44)).toBe(""); // 0~1 밖은 안 싣는다 — epss표기와 같은 계약
+  });
+
+  // ★ 위쪽 경계(2026-09-12 B13) — epss값표기 자체에도 경계 표본을 고정한다(epss표기 짝
+  //   시험은 두 함수가 서로 어긋나지 않는지만 보고, 여기는 값 자체가 맞는지를 본다).
+  it("★ 위쪽 경계 표본 — 0.9949/0.995/0.999/1", () => {
+    expect(epss값표기(0.9949)).toBe("99%");
+    expect(epss값표기(0.995)).toBe("99% 초과");
+    expect(epss값표기(0.999)).toBe("99% 초과");
+    expect(epss값표기(1)).toBe("100%");
+  });
+});
+
+// ── epss값표기소수1 — 리포트 전용 소수 한 자리 값표기 (B13, 2026-09-12) ──────────────
+// report.ts:380·1045가 `(epss*100).toFixed(1)`을 직접 계산해 EPSS 0.0004를 「EPSS 0.0%」로
+// 적던 병(2026-09-12 검토관 적발, B11 이관 ②)을 tone.ts 단일 출처로 닫은 자리. 정수 함수
+// (epss값표기)와 경계 이유는 같다 — 「값이 있으면 없다고/다 있다고 적지 않는다」.
+describe("★ epss값표기소수1 — 리포트(소수 한 자리) 값표기, 0을 거짓말하지 않는다", () => {
+  it("아래쪽 경계 — 0.0004는 「0.1% 미만」, 0.0005부터 소수 한 자리 그대로", () => {
+    expect(epss값표기소수1(0.0004)).toBe("0.1% 미만");
+    expect(epss값표기소수1(0.0005)).toBe("0.1%");
+  });
+
+  it("위쪽 경계 — 0.9996은 「99.9% 초과」, 정확히 1만 100.0%", () => {
+    expect(epss값표기소수1(0.9996)).toBe("99.9% 초과");
+    expect(epss값표기소수1(0.9994)).toBe("99.9%"); // 문턱(0.9995) 바로 아래는 평범한 toFixed 그대로
+    expect(epss값표기소수1(1)).toBe("100.0%");
+  });
+
+  it("가운데 표본과 파일에 정말 0인 값", () => {
+    expect(epss값표기소수1(0.5)).toBe("50.0%");
+    expect(epss값표기소수1(0)).toBe("0.0%");
+  });
+
+  it("값이 없거나 0~1 밖이면 빈 문자열 — epss값표기와 같은 계약", () => {
+    expect(epss값표기소수1(undefined)).toBe("");
+    expect(epss값표기소수1(null)).toBe("");
+    expect(epss값표기소수1(NaN)).toBe("");
+    expect(epss값표기소수1(97.44)).toBe("");
+    expect(epss값표기소수1(-1)).toBe("");
   });
 });
 
