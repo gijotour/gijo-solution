@@ -947,7 +947,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     if (relevant && relevant.length === 0) {
       // ☑ 지정 범위가 걸린 0건은 별개 사실이다 — 전체에 없다고 말하면 거짓(노트북형 2026-08-30).
       if (currentDocIds().length) {
-        return "지정하신 문서 범위에는 관련 내용이 없습니다. 문서 지정(☑)을 풀면 전체 사내 자료에서 다시 확인합니다.";
+        return "지정하신 문서 범위에는 관련 내용이 없습니다. 문서 지정 체크를 풀면 전체 사내 자료에서 다시 확인합니다.";
       }
       return "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요.";
     }
