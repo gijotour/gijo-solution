@@ -3,8 +3,9 @@
 
 import type { Express, Request } from "express";
 // 심각도 우리말은 원천 한 곳(tone.ts)에서만 만든다 — 자리마다 만들면 같은 것이 둘로 보인다.
-// EPSS 리포트 표기(소수 한 자리)도 원천 한 곳 — 2026-09-12 B13, 직접 toFixed(1) 계산을 걷어냈다.
-import { 심각도한글, 준수율집계전단서, epss값표기소수1 } from "./tone";
+// EPSS 표기도 원천 한 곳 — 2026-09-12 B13, 이 파일의 직접 반올림을 **둘 다** 걷어냈다:
+// 사례 메타 줄의 toFixed(1)(→epss값표기소수1)과 SLA 근거 줄의 toFixed(0)(→epss표기).
+import { 심각도한글, 준수율집계전단서, epss값표기소수1, epss표기 } from "./tone";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { createRequire } from "module";
@@ -192,14 +193,27 @@ export interface VulnCase {
 // EPSS·KEV·심각도로 조치 우선순위와 SLA 기한을 산정(취약점 관리 지침 기준).
 function classifyVulnPriority(f: Finding): { code: string; sla: string; basis: string } {
   const epss = typeof f.epss === "number" ? f.epss : 0;
+  // ⚠ 우선순위 근거에 적는 EPSS 글자도 tone 한 곳에서 만든다(2026-09-12 B13 수리, 검토관 중).
+  //   예전엔 여기서 `(epss*100).toFixed(0)`을 직접 반올림해 **한 문서 안에서 값이 갈렸다** —
+  //   EPSS 0.9996짜리 한 건이 사례 메타 줄은 「EPSS 99.9% 초과」(epss값표기소수1), 굵게 적히는
+  //   근거 줄은 「EPSS 100%」였다(=반드시 악용된다는 거짓 단정). 0~1 밖(97.44 같은 백분율 산출물)
+  //   이면 tone이 빈 문자열을 주므로, 그때는 **숫자를 아예 안 싣는다**(뜻을 못 읽는 수는 옮겨
+  //   적지 않는다는 같은 계약). 판정(분기) 자체는 그대로 두고 **글자만** 한 잣대로 맞춘다.
+  const epss글자 = epss표기(epss); // 「EPSS 99% 초과」 꼴 · 0~1 밖이면 ""
   if (f.kev || epss >= 0.9 || f.severity === "critical")
     return {
       code: "P0",
       sla: "즉시 조치(7일 이내)",
-      basis: f.kev ? "KEV(실제 악용 확인)" : epss >= 0.9 ? `EPSS ${(epss * 100).toFixed(0)}%(악용 가능성 매우 높음)` : "Critical 심각도",
+      basis: f.kev
+        ? "KEV(실제 악용 확인)"
+        : epss >= 0.9 && epss글자
+          ? `${epss글자}(악용 가능성 매우 높음)`
+          : f.severity === "critical"
+            ? "Critical 심각도"
+            : "악용 가능성 매우 높음(EPSS 값이 0~1 밖이라 숫자는 싣지 않음 — 산출물 확인 필요)",
     };
   if (f.severity === "high" || epss >= 0.5)
-    return { code: "P1", sla: "30일 이내", basis: f.severity === "high" ? "High 심각도" : `EPSS ${(epss * 100).toFixed(0)}%` };
+    return { code: "P1", sla: "30일 이내", basis: f.severity === "high" ? "High 심각도" : epss글자 || "악용 가능성 높음" };
   if (f.severity === "medium") return { code: "P2", sla: "90일 이내", basis: "Medium 심각도" };
   return { code: "P3", sla: "정기 점검 시 조치", basis: "Low 심각도" };
 }

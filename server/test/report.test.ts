@@ -141,6 +141,39 @@ describe("report", () => {
     // 위쪽 — 0.9996을 반올림으로 「100.0%」라 단정하지 않고 「99.9% 초과」로 적는다.
     expect(xml).toContain("EPSS 99.9% 초과");
     expect(xml).not.toContain("EPSS 100.0%");
+    // ★ 2026-09-12 검토관 [중] — **한 문서 안에서 잣대가 갈리지 않는다.** 사례 메타 줄은 소수
+    //   한 자리(99.9% 초과), 굵게 적히는 SLA 근거 줄은 정수(99% 초과)로 정밀도는 다르되 둘 다
+    //   tone 한 곳에서 나온다. 예전엔 근거 줄만 `toFixed(0)`으로 직접 반올림해 같은 문단에
+    //   「EPSS 99.9% 초과」와 「EPSS 100%」가 나란히 찍혔다(읽는 사람은 굵은 100%를 본다).
+    expect(xml).toContain("EPSS 99% 초과(악용 가능성 매우 높음)");
+    expect(xml).not.toContain("EPSS 100%"); // 「100.0%」까지 함께 막는다(부분 문자열)
+  });
+
+  // 전-6 정직 · B13 검토관 [중] — 위 docx 시험은 산출물 전체를 보고, 여기서는 근거 문구를
+  // 만드는 자리(classifyVulnPriority → vulnCases)를 **직접** 잰다. 산출물 경로가 바뀌어도
+  // 근거 줄의 잣대는 남아 있어야 한다.
+  it("★ B13 — SLA 근거 문구의 EPSS도 tone 한 잣대다(0.9996→「99% 초과」·0~1 밖이면 숫자 없음)", () => {
+    resetKevForTests([]);
+    importVulnScan(
+      "Plugin ID,CVE,Risk,Host,Name,epss_score\n" +
+        "1,CVE-2099-0011,Medium,10.9.9.11,경계위EPSS취약점,0.9996\n" +
+        "2,CVE-2099-0012,Medium,10.9.9.12,백분율로온EPSS취약점,97.44\n",
+      "csv",
+      "nessus"
+    );
+    const cases = vulnCases(listAssets());
+
+    const 경계위 = cases.find((c) => /경계위EPSS/.test(c.finding.finding_type));
+    expect(경계위, "0.9996 표본을 못 찾았다 — 반입이 바뀌었으면 시험도 함께 고친다").toBeTruthy();
+    expect(경계위!.priority.code).toBe("P0");
+    expect(경계위!.priority.basis).toBe("EPSS 99% 초과(악용 가능성 매우 높음)");
+
+    // 0~1 밖(백분율로 내보낸 산출물)이면 tone이 빈 문자열을 준다 — 뜻을 못 읽는 수는
+    // 옮겨 적지 않는다. 옛 코드는 여기서 「EPSS 9744%」를 격식 문서에 실었다.
+    const 밖 = cases.find((c) => /백분율로온EPSS/.test(c.finding.finding_type));
+    expect(밖, "97.44 표본을 못 찾았다 — 반입이 바뀌었으면 시험도 함께 고친다").toBeTruthy();
+    expect(밖!.priority.basis).not.toMatch(/EPSS\s*\d/);
+    expect(밖!.priority.basis).not.toContain("9744");
   });
 
   it("vulnCases maps an Oracle patch finding to priority + governance controls (거버넌스 매칭)", () => {

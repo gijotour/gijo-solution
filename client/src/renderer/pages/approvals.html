@@ -1000,8 +1000,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     //   클라는 서버 코드를 못 불러 **규칙만 옮겨 적은 사본**이다 — 저쪽을 고치면 여기도 고친다.
     //   0.5% 미만을 「0%」로 적으면 값이 실재하는데 없다고 단정하게 된다(실제 스캐너 EPSS는
     //   대다수가 0.01 미만이라 이 꼴이 흔하다). 0~1 밖의 값은 뜻을 못 읽으므로 안 싣는다.
+    //   ⚠ 위쪽도 같다(2026-09-12 B13 검토관 상): Math.round만 쓰면 0.995~1 미만이 「100%」가 돼
+    //   「반드시 악용된다」로 읽힌다 — 0.995 이상 1 미만은 「99% 초과」, 정확히 1만 「100%」다.
+    //   서버(tone.epss값표기)가 위쪽 경계를 받은 날 이 사본이 안 따라와 같은 취약점이 대화에선
+    //   「99% 초과」, 이 화면에선 「100%」로 갈렸다 — 짝은 tone.test.ts 「클라 사본」 감시가 잰다.
     const epss칸 = (typeof f.epss === "number" && isFinite(f.epss) && f.epss >= 0 && f.epss <= 1)
-      ? `EPSS ${f.epss > 0 && f.epss < 0.005 ? "1% 미만" : Math.round(f.epss * 100) + "%"}`
+      ? `EPSS ${f.epss > 0 && f.epss < 0.005 ? "1% 미만" : (f.epss >= 0.995 && f.epss < 1 ? "99% 초과" : Math.round(f.epss * 100) + "%")}`
       : "";
     const metaLine = [epss칸, f.vpr != null ? `VPR ${f.vpr}` : "", esc(f.source_tool)].filter(Boolean).join(" · ");
 
