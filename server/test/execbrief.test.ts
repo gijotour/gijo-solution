@@ -69,6 +69,17 @@ describe("★ exec_brief는 즉답이고 본문이 정확히 세 줄이다", () 
     expect(줄.length, `실제 본문:\n${out}`).toBe(3);
   });
 
+  // ★ 2026-09-13 검토관 [하] 수리(설계관 지시서 tests ④) — 위 replace는 **머리말이 한 줄**이라는
+  //   것을 암묵 전제로 둔다. 두 줄이 되면 반쪽만 떼어져 「본문이 네 줄」이라는, 원인이 안 보이는
+  //   빨강이 난다. 그 전제를 **명시 단언**으로 못 박는다(예시데이터머리말 한 줄 계약, handlers.ts).
+  it("★ 예시데이터머리말은 한 줄이다 — 위 시험의 암묵 전제를 드러낸 단언", async () => {
+    const out = await run();
+    const 머리말줄 = out.split("\n").filter((l) => l.startsWith("⚠ 아래는")).length;
+    expect(머리말줄, `머리말이 한 줄이 아니다(${머리말줄}줄) — 위 「한 줄 떼기」가 깨진다:\n${out}`).toBeLessThanOrEqual(1);
+    // 한 줄을 뗀 뒤에는 머리말이 남지 않는다(두 줄이면 여기서 잡힌다).
+    expect(out.replace(/^⚠[^\n]*\n/, "").startsWith("⚠ 아래는"), "머리말이 두 줄로 늘었다").toBe(false);
+  });
+
   it("다음걸음()을 안 붙인다 — 그 함수는 자리가 네 곳뿐인 계약이다(agenttools-cross.test.ts)", async () => {
     const out = await run();
     // 다음걸음(handlers.ts)의 출력 표지는 "▸ 다음: " 고정이다 — 이게 있으면 자리가 다섯이 된다.

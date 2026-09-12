@@ -17,12 +17,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { runApprovalStatus, isRealVulnerability } from "../src/engine/agenttools/handlers";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
+import { agenttoolsSource } from "./util/toolsrc";
 import { 말투위반 } from "../src/engine/tone";
 import {
   resetApprovalsForTests, listFindingReviews, approvalSummary, isUnassignedReview,
   updateFindingReview, findingKey,
 } from "../src/engine/approvals";
-import { resetMaintenanceForTests, listMaintenanceItems } from "../src/engine/maintenance";
+import {
+  resetMaintenanceForTests, listMaintenanceItems, createMaintenanceItem, submitReport,
+} from "../src/engine/maintenance";
+import { resetTasksForTests } from "../src/engine/tasks";
+import { resetSecurityProductsForTests } from "../src/engine/securityproducts";
+import { resetFeedsForTests } from "../src/engine/cti";
 import { maintenanceSummary } from "../src/engine/report";
 import type { StandardFinding } from "../src/engine/bridge";
 
@@ -142,5 +148,52 @@ describe("결재·승인 대기 현황 — runApprovalStatus", () => {
         expect(안내, `screenguide에 없는 이름을 안내하고 있다: ${이름}`).toContain(이름);
       }
     });
+  });
+});
+
+// ★ 2026-09-13 검토관 [하] 수리 — 설계관 지시서 tests ③이 커밋에서 빠져 있었다.
+//   「점검 시드가 남은 상태에서 runApprovalStatus 답에 고지가 실리는가」를 **값으로** 재는 시험이
+//   하나도 없었다. 있던 것은 소스 감시(seeddisclosure.test.ts — 호출 자리 수)뿐이라, 머리말이
+//   붙은 채 **답 문자열이 실제로 어떻게 나가는지는 아무도 안 봤다**(예: 두 줄이 되지 않는가).
+describe("★ 시드가 남아 있으면 답 머리에 예시 고지가 실린다 — 값 시험(소스 감시의 짝)", () => {
+  // ⚠ 문구 **전체를 여기 베껴 적지 않는다** — handlers.ts의 예시데이터머리말()에서 원문을 읽어
+  //   앞부분을 그대로 쓴다(베끼면 문구를 고칠 때 두 곳이 어긋난다 — 위 FAIL_MARKS목록()과 같은 규율).
+  //   따옴표 안 원문은 끝에 줄바꿈 표기가 붙어 있어, 문장 첫 40자만 떼어 대조한다.
+  function 머리말앞부분(): string {
+    const src = agenttoolsSource();
+    const i = src.indexOf('"⚠ 아래는');
+    if (i < 0) throw new Error("예시데이터머리말의 문구를 못 읽었다 — 함수가 바뀌었나(이 시험을 고칠 것)");
+    return src.slice(i + 1, i + 41);
+  }
+
+  beforeEach(() => {
+    // 판정(예시데이터뿐인가)이 보는 다섯 표를 전부 비운다 — 하나라도 시드가 남으면 갈래가 섞인다.
+    resetAssetsForTests();
+    resetApprovalsForTests();
+    resetMaintenanceForTests();
+    resetTasksForTests();
+    resetSecurityProductsForTests();
+    resetFeedsForTests();
+  });
+
+  it("다섯 표가 비어 있으면 고지가 없다 — 이 시험이 늘 초록이 아님을 먼저 못 박는다", () => {
+    expect(runApprovalStatus(), "시드가 없는데 예시 고지가 붙었다").not.toContain(머리말앞부분());
+  });
+
+  it("★ 점검 시드 한 건(제목+제품명 그대로)이 승인 대기로 남아 있으면 답에 고지가 실린다", () => {
+    // maintenance.ts:412 seedSamplesIfEmpty()가 심는 여섯 쌍 중 3번(승인 대기)과 글자까지 같다.
+    const 항목 = createMaintenanceItem({ title: "프롬프트 가드레일 점검", productName: "보안 상담 챗봇", scheduleDate: "2026-01-01" });
+    submitReport(항목.id, { note: "시험용 점검 보고" }, "시험");
+
+    const 답 = runApprovalStatus();
+    expect(답, "점검 승인 대기 숫자를 말하면서 예시 고지가 없다").toContain(머리말앞부분());
+    expect(답.startsWith(머리말앞부분()), "고지는 답 맨 앞이다 — 중간에 있으면 못 읽는다").toBe(true);
+    expect(답, "잣대는 maintenanceSummary.reported 그대로다").toContain(
+      `점검 승인 대기 ${maintenanceSummary(listMaintenanceItems()).reported}건`
+    );
+    // ⚠ 한 줄 계약(설계관 negatives) — 두 줄이 되면 execbrief.test.ts의 「머리말 한 줄 떼기」가
+    //   반쪽만 떼어 원인이 안 보이는 빨강을 낸다.
+    const 머리말줄 = 답.split("\n").filter((l) => l.startsWith("⚠ 아래는")).length;
+    expect(머리말줄, "예시 고지는 한 줄이다").toBe(1);
   });
 });

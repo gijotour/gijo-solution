@@ -99,15 +99,39 @@ describe("② 그 여섯이 전부 판정(예시데이터뿐인가)의 소스에
 });
 
 describe("③ 머리말이 「숫자를 주장하는 도구」에서 실제로 불리는가 — agenttools 소스 감시", () => {
-  it("정의는 한 곳뿐이고, 부르는 자리는 정확히 9곳이다(7개 도구 — 결재·점검 두 곳은 갈래가 둘)", () => {
-    // 부르는 곳: today(1) · approval_status(취약점 결재/점검 승인 갈래 2) · product_status(1) ·
-    //   maintenance_status(미완료 있음/없음 갈래 2) · urgent_todo(1) · kpi_status(1) · exec_brief(1).
+  it("정의는 한 곳뿐이고, 부르는 자리는 정확히 11곳이다(7개 도구 — 결재·제품·점검은 갈래가 여럿)", () => {
+    // 부르는 곳: today(1) · approval_status(취약점 결재/점검 승인 갈래 2) ·
+    //   product_status(조건 불일치/본 갈래 2) · maintenance_status(조건 불일치/미완료 있음·없음 3) ·
+    //   urgent_todo(1) · kpi_status(1) · exec_brief(1).
     // ⚠ product_status·maintenance_status는 2026-09-13 이전엔 0곳이었다(이 항목이 고친 구멍).
+    // ⚠ 같은 날 검토관 [하] — 그 두 도구의 **「조건에 안 맞음」 갈래**(전체 N건을 말하는 줄)가
+    //   빠져 있어 9 → 11로 늘었다. 아래 「본문에 호출이 있다」 감시는 2,000자 창에 하나만 있어도
+    //   초록이라 이 갈래를 원리상 못 봤다 — 그래서 자리 수를 세는 이 시험이 짝으로 필요하다.
     const src = agenttoolsSource();
     const 정의 = (src.match(/function 예시데이터머리말\(\)/g) ?? []).length;
     const 전체 = (src.match(/예시데이터머리말\(/g) ?? []).length;
     expect(정의, "예시데이터머리말은 한 곳에만 정의한다").toBe(1);
-    expect(전체 - 정의, "부르는 자리 수가 바뀌었다 — 늘었으면 이 숫자를, 줄었으면 원인을 먼저 확인한다").toBe(9);
+    expect(전체 - 정의, "부르는 자리 수가 바뀌었다 — 늘었으면 이 숫자를, 줄었으면 원인을 먼저 확인한다").toBe(11);
+  });
+
+  // ★ 2026-09-13 검토관 [하] 수리의 짝 감시 — 이 두 도구의 「전체 N건 중 … 못 찾았습니다」 갈래가
+  //   **숫자를 말하면서** 고지 없이 나가던 자리다. 위 「본문 창 안에 호출이 하나라도」 감시는
+  //   2,000자 창에 다른 호출이 하나만 있어도 초록이라 이 갈래를 원리상 못 본다 — 그래서
+  //   **줄 단위**로 못 박는다.
+  // ⚠ 범위는 이 두 도구뿐이다. 같은 꼴의 줄이 취약점·할 일 도구에도 다섯 곳 더 있지만(handlers.ts
+  //   1984·2290·3016·3047·3084) 그 도구들은 애초에 머리말을 안 붙이는 자리다 — 다 붙이면 문구가
+  //   배경이 되어 아무도 안 읽는다(handlers.ts 예시데이터머리말 JSDoc 계약).
+  it("runProductStatus·runMaintenanceStatus의 「전체 N건 중 … 못 찾았습니다」 줄에 머리말이 붙어 있다", () => {
+    const src = agenttoolsSource();
+    for (const fn of ["export function runProductStatus", "export function runMaintenanceStatus"]) {
+      const i = src.indexOf(fn);
+      expect(i, `${fn}을 못 찾았다`).toBeGreaterThanOrEqual(0);
+      const 다음 = src.indexOf("\nexport ", i + fn.length);
+      const 본문 = src.slice(i, 다음 > 0 ? 다음 : undefined);
+      const 줄들 = 본문.split("\n").filter((l) => l.includes("전체 ${") && l.includes("못 찾았습니다"));
+      expect(줄들.length, `${fn}에서 그 꼴의 줄을 못 찾았다 — 감시가 헛돈다(문구가 바뀌었나)`).toBe(1);
+      expect(줄들[0], `${fn}이 전체 건수를 말하면서 예시 고지가 없다`).toContain("예시데이터머리말(");
+    }
   });
 
   it("runMaintenanceStatus·runProductStatus 본문에 머리말 호출이 있다 — 이 항목이 새로 붙인 두 곳", () => {

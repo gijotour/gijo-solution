@@ -287,6 +287,23 @@ describe("예시 데이터 판정", () => {
     expect(예시데이터뿐인가()).toBe(false);
   });
 
+  // ★★ 2026-09-13 검토관 [중] — 자산 갈래만 옛 AND(`rows.every`)로 남아 있었다. 다른 넷은 OR인데
+  //   자산만 「전부 시드여야 true」라, 진짜 자산이 하나 들어오는 순간 **시드 자산(샘플-웹서버의
+  //   가짜 KEV P0)이 그대로 남아도** 고지가 꺼졌다 — 이 함수가 2026-08-09에 태어난 바로 그 사고다.
+  //   위 네 갈래 시험은 전부 자산을 비운 뒤 진짜 자산만 넣어 재기 때문에 이 갈래를 원리상 못 봤다.
+  it("★★ 진짜 자산과 시드 자산이 함께 있으면 계속 true다 — 자산 갈래도 OR(하나라도 남았나)이다", async () => {
+    const { 예시데이터뿐인가, registerAsset, seedSampleAssetsIfEmpty, seedSampleVulnHostIfEmpty, listAssets } =
+      await import("../src/engine/assets");
+    seedSampleAssetsIfEmpty();
+    seedSampleVulnHostIfEmpty();
+    registerAsset({ id: "real-mixed-01", name: "진짜 자산(혼재)", path: "/srv/mixed", assetType: "LLM 서비스", owner: "보안팀" });
+    expect(listAssets().some((a) => a.id === "real-mixed-01"), "픽스처 전제 — 진짜 자산이 실제로 들어갔다").toBe(true);
+    expect(
+      예시데이터뿐인가(),
+      "진짜 자산이 들어왔다고 시드 자산(가짜 KEV P0)이 남은 채 고지가 꺼지면 안 된다"
+    ).toBe(true);
+  });
+
   it("★ 자산이 진짜여도 점검 시드 하나(제목+제품명)가 원본 그대로 남아 있으면 계속 true다 — 이 항목의 핵심", async () => {
     const { 예시데이터뿐인가, registerAsset } = await import("../src/engine/assets");
     registerAsset({ id: "real-one-02", name: "진짜 자산 2", path: "/srv/real2", assetType: "LLM 서비스", owner: "보안팀" });

@@ -2220,7 +2220,11 @@ export function runProductStatus(args: Record<string, string>): string {
   const matched = q
     ? all.filter((p) => 필터에맞나(`${p.name} ${p.category} ${p.vendor ?? ""} ${p.model ?? ""} ${p.note ?? ""}`, q))
     : all;
-  if (matched.length === 0) return `전체 ${all.length}건 중 "${args.query}"에 맞는 보안제품을 못 찾았습니다. 조건 없이 다시 물어보세요.`;
+  // ⚠ 2026-09-13 검토관 [하] — 이 갈래도 **전체 건수를 말한다**(그 안에 시드 제품 4건이 든다).
+  //   같은 커밋이 아래 본 갈래에만 머리말을 붙이고 여기를 빠뜨렸다 — 「숫자를 말하면 밝힌다」는
+  //   이 커밋 자신의 잣대를 이 자리에 안 댄 것이다. (「등록된 보안제품이 없습니다」 갈래는
+  //   숫자 주장이 아니라 그대로 둔다.)
+  if (matched.length === 0) return `${예시데이터머리말()}전체 ${all.length}건 중 "${args.query}"에 맞는 보안제품을 못 찾았습니다. 조건 없이 다시 물어보세요.`;
 
   const noDocs = matched.filter((p) => p.docs.length === 0);
   const byCat = new Map<string, number>();
@@ -2252,7 +2256,9 @@ export function runMaintenanceStatus(args: Record<string, string>): string {
   const matched = q
     ? items.filter((m) => 필터에맞나(`${m.title} ${m.productName} ${m.assetName ?? ""}`, q, m.status))
     : items;
-  if (matched.length === 0) return `전체 ${items.length}건 중 "${args.filter}"에 맞는 점검 일정을 못 찾았습니다. 조건 없이 다시 물어보세요.`;
+  // ⚠ 2026-09-13 검토관 [하] — 위 runProductStatus와 같은 자리. 전체 건수(시드 점검 6건 포함)를
+  //   말하는 갈래라 머리말을 붙인다. (「등록된 점검 일정이 없습니다」 갈래는 숫자 주장이 아니다.)
+  if (matched.length === 0) return `${예시데이터머리말()}전체 ${items.length}건 중 "${args.filter}"에 맞는 점검 일정을 못 찾았습니다. 조건 없이 다시 물어보세요.`;
 
   // approved(승인 완료)를 뺀 나머지가 아직 손이 필요한 것들이다.
   const open = matched.filter((m) => m.status !== "approved");
@@ -2706,10 +2712,15 @@ export function runAnalysisStatus(): string {
  * ⚠ 문구는 여기 한 곳에만 둔다. 여러 곳에 적으면 언젠가 어긋난다.
  * ⚠ 2026-09-13 문구를 고쳤다(계획서 §13.5.2 「예시데이터 머리말 점검 시드」) — 옛 문구
  *   「실제 자산을 등록하면 이 숫자는 사라집니다」는 **거짓 약속**이었다. 자산을 등록해도
- *   점검·조치·제품·위협 인텔리전스 시드는 안 사라지고, 그걸 지우는 화면 버튼도 없다
- *   (실제로 있는 유일한 길은 datacleanup.ts:253의 관리자 API "실사용 전환 리셋" —
- *   업무 데이터 전체를 지우고 재시드를 막는 일회성 조치이지, 설정 화면의 토글이 아니다).
- *   그래서 문구도 그 사실에 맞춘다: 무엇이 남을 수 있는지 밝히고, 실제로 빼는 방법을 정확히 적는다.
+ *   점검·조치·제품·위협 인텔리전스 시드는 안 사라진다. 실제로 있는 유일한 길은
+ *   datacleanup.ts:253의 관리자 API "실사용 전환 리셋"이다 — 업무 데이터 전체를 지우고
+ *   재시드를 막는 일회성 조치이지, 설정 화면의 토글이 아니다.
+ *   ⚠ 같은 날 검토관 [중] 정정 — 첫 판은 여기 「그걸 지우는 화면 버튼도 없다」라고 적었는데
+ *     **사실이 아니다.** 화면에서 하나씩 지우는 버튼은 있다(products.html:340 「✕ 제품 삭제」
+ *     → securityproducts DELETE, client/src/api/security-ops.ts:49 점검 DELETE 등).
+ *     그런데도 그 길로는 예시가 안 빠진다 — **표를 다 비우면 재기동 때 시드가 되살아나기**
+ *     때문이다(seedXIfEmpty 여섯 곳이 「비어 있으면 심는다」 · datacleanup.ts:75-88 실측 함정).
+ *     라이브 모드를 켜는 실사용 전환만이 재시드까지 막는다. 문구는 그 사실 그대로다.
  */
 function 예시데이터머리말(): string {
   return 예시데이터뿐인가()

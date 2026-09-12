@@ -609,6 +609,15 @@ const 점검시드_제목_제품명: readonly [string, string][] = [
   ["학습데이터 접근권한 점검", "샘플-문서 민감도 분류 AI"],
   ["오탐 룰 점검", "샘플-이상행위 탐지 엔진"],
 ]; // maintenance.ts:406-464 seedSamplesIfEmpty()의 여섯 쌍과 글자까지 맞춘다.
+// ⚠ 2026-09-13 검토관 [중] 검증 결과를 여기 적어 둔다(같은 지적이 두 번 오지 않게) — 반복 점검을
+//   승인하면 maintenance.ts:285-298 approveItem()이 **같은 제목+제품명**으로 다음 회차를 자동
+//   생성하므로 그 회차도 이 대조에 걸린다. 그래도 그대로 둔다:
+//   ① 승인해도 **원본 행이 approved 상태로 그 자리에 남아** 어차피 걸린다(id가 같다) — 자동
+//      회차 때문에 판정이 새로 켜지는 일은 없다.
+//   ② 그 회차는 시드의 제목과 **시드 제품 이름**(예: 「보안 상담 챗봇」=샘플 AI 자산)을 그대로
+//      물려받은 파생 기록이다. 「예시가 섞여 있을 수 있다」는 고지는 거짓이 아니다.
+//   ③ 어차피 표를 다 비워도 재기동 때 시드가 되살아난다(datacleanup.ts:75-88) — 고지를 끄는
+//      길은 처음부터 **실사용 전환(라이브 모드)** 하나뿐이고, 그것이 머리말이 안내하는 그 길이다.
 const 제품시드_이름: readonly string[] = [
   "경계 방화벽 (FW-01)", "임직원 단말 EDR", "정보유출 방지 (DLP)", "웹방화벽 (WAF-01)",
 ]; // securityproducts.ts:536-556 seedSampleProductsIfEmpty()의 네 이름(이름에 "샘플"이 없다).
@@ -639,6 +648,10 @@ const cti시드잔존Stmt = db.prepare("SELECT 1 FROM cti_findings WHERE source 
  *   그래서 **AND(자산까지 전부 시드뿐)가 아니라 OR(여섯 곳 중 하나라도 원본 그대로 남음)**로
  *   뒤집었다 — 진짜 자산이 들어와도 다른 시드가 남아 있으면 계속 밝힌다. 여섯 곳이 전부
  *   지워지거나 실제 값으로 바뀌어야 이 함수가 false가 되어 문구가 사라진다.
+ * ⚠ 같은 날 검토관 [중] 수리 — **자산 갈래만 옛 AND(`rows.every`)로 남아 있었다.** 뒤따르는 네
+ *   갈래는 OR인데 자산만 「전부 시드여야 true」라, 진짜 자산이 하나 들어오는 순간 시드 자산
+ *   (샘플-웹서버의 가짜 KEV P0)이 그대로 남아도 고지가 꺼졌다 — 이 함수가 태어난 2026-08-09
+ *   사고 그 자체다. `rows.some`으로 맞췄다(자산 0건이면 some이 false라 「아무것도 없음」도 그대로).
  * ⚠ 호출처 일곱 곳(handlers.ts: runToday·runApprovalStatus·runUrgentTodo·runKpiStatus·
  *   runExecBrief — 이 다섯은 그대로, runMaintenanceStatus·runProductStatus는 2026-09-13에
  *   이 판정을 새로 붙였다)은 전부 "예시 데이터가 섞여 있을 수 있다"는 **전역** 경고이지,
@@ -649,7 +662,7 @@ const cti시드잔존Stmt = db.prepare("SELECT 1 FROM cti_findings WHERE source 
 export function 예시데이터뿐인가(): boolean {
   const rows = listAssetRowsStmt.all() as AssetRow[];
   const 표본 = new Set<string>([...SAMPLE_ASSET_IDS, SAMPLE_VULN_HOST_ID]);
-  if (rows.length > 0 && rows.every((r) => 표본.has(r.id))) return true;
+  if (rows.some((r) => 표본.has(r.id))) return true;
   if (점검시드_제목_제품명.some(([title, productName]) => 점검시드잔존Stmt.get(title, productName))) return true;
   if (조치시드잔존Stmt.get(조치시드_담당자)) return true;
   if (제품시드잔존Stmt.get(...제품시드_이름)) return true;
