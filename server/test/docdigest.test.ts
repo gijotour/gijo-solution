@@ -14,10 +14,15 @@ vi.mock("../src/engine/llm", async (importOriginal) => {
   return { ...mod, chat: vi.fn() };
 });
 
+import fs from "node:fs";
+import path from "node:path";
 import { db } from "../src/db";
 import { chat } from "../src/engine/llm";
 import { addTriple, deleteTriplesBySource } from "../src/engine/ontology";
-import { makeDigest, listRecentDocs, recentDocumentsText, ontologyMatchesFor, 요약정리 } from "../src/engine/docdigest";
+import {
+  makeDigest, listRecentDocs, recentDocumentsText, ontologyMatchesFor, 요약정리,
+  목록최대, 상세최대, 답글자상한,
+} from "../src/engine/docdigest";
 import { forcedToolFor } from "../src/engine/agentloop";
 
 // memory.ts를 통째로 안 끌고 오려고(무거운 lancedb) 대장 테이블만 직접 보장한다 —
@@ -184,5 +189,130 @@ describe("★ 라우팅 — 안내한 말은 흔들리지 않는다", () => {
     // 이웃 영토 존중(겹침 0): 반영 확인·재고 목록은 knowledge_status가 계속 맡는다
     expect(도착("최근 올린 문서 알려줘")).toBe("knowledge_status");
     expect(도착("들어온 문서 목록 줘")).toBe("knowledge_status");
+  });
+});
+
+// ── B8 결함 — 「새 문서」 답이 읽히는 길이여야 한다(2026-09-12 설계관 지시서 · Sonnet 구현) ──
+// 실측: 67편 반입 시 답이 2,260자로 「너무 긺」(tools/ops-sim.mjs 산문 상한 2,000자)에 걸렸다.
+// 뿌리는 편수가 아니라 편당 상세였다 — 상세를 상위 `상세최대`편으로 좁히고 답 전체에 `답글자상한`
+// 안전망을 둔다. 새 스텁 접두는 `QA소식길이-`로 잡아 위 beforeEach가 그대로 지운다.
+const putDigest = (
+  id: string,
+  summary: string | null,
+  matches: string | null = null,
+  failedReason: string | null = null
+) =>
+  db.prepare(
+    `INSERT INTO doc_digests (documentId, summary, keywords, matches, model, failedReason, madeAt)
+     VALUES (?, ?, NULL, ?, ?, ?, ?)
+     ON CONFLICT(documentId) DO UPDATE SET summary=excluded.summary, matches=excluded.matches,
+       model=excluded.model, failedReason=excluded.failedReason, madeAt=excluded.madeAt`
+  ).run(id, summary, matches, summary ? "로컬 모델 자체 요약" : null, failedReason, new Date().toISOString());
+
+describe("★ B8 — 67편이 들어와도 읽히는 길이다", () => {
+  it("상한·「외 N건」·건수 합(제품 함수로 대조)", () => {
+    const 총건수 = 67;
+    for (let i = 0; i < 총건수; i++) {
+      putDoc(`QA소식길이-${i}.pdf`, 0, i % 2 === 0 ? "위협대응" : "사내규정");
+    }
+    for (let i = 0; i < 상세최대; i++) {
+      putDigest(`QA소식길이-${i}.pdf`, "첫 줄 요약\n둘째 줄 요약\n셋째 줄 요약", "피싱공격 —[완화통제]→ 이메일게이트웨이");
+    }
+    const text = recentDocumentsText(7);
+    expect(text.length, "산문 상한(1,800자, ops-sim.mjs 2,000의 90%)을 넘었다").toBeLessThanOrEqual(답글자상한);
+
+    const total = listRecentDocs(7).length; // 제품 함수로 대조 — 시험이 새 잣대를 만들지 않는다
+    const 머리매치 = text.match(/새 문서 (\d+)건/);
+    expect(Number(머리매치?.[1])).toBe(total);
+
+    const 갈래부분 = text.split(" — ")[1]?.split("\n")[0] ?? "";
+    const 갈래합 = 갈래부분.split(" · ").reduce((acc, seg) => {
+      const n = Number(seg.trim().split(/\s+/).pop());
+      return acc + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    expect(갈래합).toBe(total); // 머리의 갈래별 합 == listRecentDocs(days).length
+
+    const 이름줄수 = (text.match(/^- /gm) || []).length;
+    expect(이름줄수).toBe(목록최대);
+    expect(text).toContain(`(외 ${total - 목록최대}건)`);
+  });
+
+  it("★ 최악치에서도 상한을 안 넘는다 — 옛 데이터는 120자 상한을 안 지났다", () => {
+    // doc_digests에 직접 INSERT — 요약정리의 120자 상한은 **새로 만드는 요약에만** 걸리고
+    // 이미 저장된 옛 값에는 안 걸린다(옛 데이터 재현).
+    const 긴줄 = "가".repeat(300);
+    const 긴요약 = [긴줄, 긴줄, 긴줄].join("\n");
+    const 긴접점 = [긴줄, 긴줄].join("\n");
+    for (let i = 0; i < 67; i++) {
+      const id = `QA소식길이-옛${"자".repeat(60)}-${i}`;
+      putDoc(id, 0, "일반");
+      putDigest(id, 긴요약, 긴접점);
+    }
+    const text = recentDocumentsText(7);
+    expect(text.length).toBeLessThanOrEqual(답글자상한);
+    expect(text.endsWith("…"), "안전망이 걸렸는데도 잘린 자리에 말줄임이 없다 — 조용히 잘렸다").toBe(true);
+  });
+
+  it("상세는 앞 N편에만 붙는다 — 나머지는 이름만", () => {
+    const 문서들 = Array.from({ length: 6 }, (_, i) => `QA소식길이-상세${i}.pdf`);
+    // 정렬은 ingestedAt DESC — 분 단위로 벌려 순서를 결정적으로 만든다(i=0이 가장 최근).
+    문서들.forEach((id, i) => {
+      db.prepare(
+        `INSERT INTO memory_documents (documentId, scope, chunks, ingestedAt, uploadedBy, category)
+         VALUES (?, 'global', 2, ?, 'jyh', '일반')
+         ON CONFLICT(documentId) DO UPDATE SET ingestedAt=excluded.ingestedAt`
+      ).run(id, new Date(Date.now() - i * 60_000).toISOString());
+      putDigest(id, "이 편의 요약 문장입니다.");
+    });
+    const text = recentDocumentsText(7);
+    const 넷째 = 문서들[상세최대]; // 0-based로 상세최대번째 = 상세 밖의 첫 문서
+    const idx = text.indexOf(넷째);
+    expect(idx, "이름 줄 자체가 없다").toBeGreaterThan(-1);
+    const 다음문서 = text.indexOf("\n- ", idx + 1);
+    const 이줄 = text.slice(idx, 다음문서 === -1 ? text.length : 다음문서);
+    expect(이줄, "상세최대를 넘은 편에 요약이 붙었다").not.toContain("이 편의 요약 문장입니다");
+  });
+
+  it("「자체 요약」 표기는 답에 한 번만", () => {
+    for (let i = 0; i < 5; i++) {
+      putDoc(`QA소식길이-표기${i}.pdf`, 0, "일반");
+      putDigest(`QA소식길이-표기${i}.pdf`, "요약입니다.");
+    }
+    const text = recentDocumentsText(7);
+    const 등장 = (text.match(/자체 요약/g) || []).length;
+    expect(등장).toBe(1);
+  });
+
+  it("요약이 하나도 없으면 「자체 요약」 표기가 아예 없다", () => {
+    for (let i = 0; i < 3; i++) {
+      putDoc(`QA소식길이-실패${i}.pdf`, 0, "일반");
+      putDigest(`QA소식길이-실패${i}.pdf`, null, null, "모델 꺼짐");
+    }
+    const text = recentDocumentsText(7);
+    expect(text).not.toContain("자체 요약");
+    expect(text).toContain("요약 없음");
+  });
+
+  it("폴백 문구(FAIL_MARKS)가 안 섞인다 · 갈 곳이 한 곳이다", () => {
+    putDoc("QA소식길이-fail1.pdf", 0, "일반");
+    putDoc("QA소식길이-fail2.pdf", 1, "위협대응");
+    const text = recentDocumentsText(7);
+    // ⚠ FAIL_MARKS는 글자로 베끼지 않는다 — drawer-audit.mjs를 읽어 뽑는다(approvalstatustool.test.ts 계보).
+    const 경로 = path.join(__dirname, "..", "..", "tools", "drawer-audit.mjs");
+    const src = fs.readFileSync(경로, "utf8");
+    const 시작 = src.indexOf("const FAIL_MARKS = [");
+    if (시작 < 0) throw new Error("FAIL_MARKS를 못 찾았다 — drawer-audit.mjs가 낡았다(이 시험을 손볼 것)");
+    const 끝 = src.indexOf("];", 시작);
+    const marks = [...src.slice(시작, 끝).matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    if (marks.length === 0) throw new Error("FAIL_MARKS를 하나도 못 뽑았다 — 추출 정규식이 낡았다");
+    for (const m of marks) expect(text, `폴백 문구 "${m}"가 섞였다`).not.toContain(m);
+
+    // 갈 곳은 한 곳만 — 「AI 지식」과 「내 문서」가 동시에 나오면 두 화면을 가리키는 것이다.
+    const AI지식있음 = text.includes("AI 지식");
+    const 내문서있음 = text.includes("내 문서");
+    expect(AI지식있음 && 내문서있음, "한 답에서 두 화면을 가리킨다").toBe(false);
+    expect(AI지식있음, "갈 곳 자체가 없다").toBe(true);
+    // ops-sim.mjs의 갈곳 정규식(화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보)이 걸려야 한다.
+    expect(text).toMatch(/화면|메뉴|여기서|누르|열어|가서|＋|▸|물으면|물어보/);
   });
 });

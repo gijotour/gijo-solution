@@ -884,8 +884,8 @@ const TOOLS: AgentTool[] = [
     domain: "knowledge",
     write: false,
     description:
-      '최근 새로 들어온(반입된) 문서의 대장 — 무엇이, 언제, 누가, 어느 분류로 들어왔고 세 줄 요약과 ' +
-      '우리 지식과의 접점까지. "새 문서 뭐 들어왔어?", "새로 들어온 문서 알려줘" 같은 물음에 쓴다. ' +
+      '최근 새로 들어온(반입된) 문서의 대장 — 무엇이, 언제, 누가, 어느 분류로 들어왔는지와, ' +
+      '그중 최신 몇 편의 요약·우리 지식과의 접점까지. "새 문서 뭐 들어왔어?", "새로 들어온 문서 알려줘" 같은 물음에 쓴다. ' +
       "지식 재고 전체(knowledge_status)가 아니라 **최근 반입분**만 본다.",
     params: [{ name: "days", label: "기간(일)", description: "며칠 치를 볼지 — 기본 7, 최대 90", required: false }],
     directAnswer: true,

@@ -203,29 +203,79 @@ export function listRecentDocs(days = 7): RecentDoc[] {
   ).all(cutoff) as RecentDoc[];
 }
 
-/** 대화창 답변 본문 — 없으면 없다고 말한다(0건 재작성 금지 원칙과 같은 계열). */
+// ── 대화창 글자 예산 (B8 결함 수리, 2026-09-12 — 설계관 지시서 · Sonnet 구현) ─────
+// 실측(.tmp-reports/ops-sim-4100.json): 67편 반입 답이 2,260자였다. 분해하면 길이의
+// 77%가 편수가 아니라 **편당 상세**(요약·「자체 요약」 표기·접점)였다 — 편수를 줄이면
+// 「무엇이 들어왔나」가 사라지므로, 상세를 상위 몇 편으로만 좁히고 편당·전체 예산을 둔다.
+// 상수를 한 곳에 모으는 이유(incidentcases.ts:510·513 계보와 같은 꼴) — 다음 사람이
+// 어느 값이 진짜인지 흩어진 자리마다 찾지 않게. **이 예산은 docdigest와 그 시험만 쓴다**
+// (다른 파일이 가져다 쓰면 「길이 잣대」가 또 번진다 — 번지면 여기 주석부터 옮길 것).
+//
+// 근거:
+// ① 하네스 산문 상한 2,000자 = tools/ops-sim.mjs:935 `길이상한 = r.picklist ? 4000 : 2000`.
+//    recent_documents는 directAnswer 도구(registry.ts:891)라 picklist가 없어 산문 잣대를 받는다.
+// ② 대화창 폭은 기본 380px·최소 360px(client/src/renderer/pages/app.html — CONSOLE_W_DEFAULT·
+//    대화폭클램프). ⚠ 420px은 **화면 판**의 최소폭이지 대화창 폭이 아니다(같은 파일 「화면 판
+//    최소 420 보장」 주석과 혼동하지 말 것).
+// ③ 1,800은 2,000의 90% 여유.
+export const 목록최대 = 10; // 지금 slice(0,10)과 같은 값 — 새 잣대가 아니라 하드코딩을 이름 붙인 것
+export const 상세최대 = 3; // 요약·접점을 붙이는 편수 — 나머지는 이름 줄만
+export const 답글자상한 = 1800; // 안전망 — 평소엔 안 닿아야 한다(닿으면 그 자체가 결함, incidentcases.ts:527-529 계보)
+
+/** 글자 상한 — 넘으면 말줄임을 붙여 **잘렸음이 보이게** 한다(조용히 자르지 않는다, incidentcases.ts:510 계보). */
+const 컷 = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
+
+/** 대화창 답변 본문 — 없으면 없다고 말한다(0건 재작성 금지 원칙과 같은 계열).
+ *
+ *  상세(요약·접점)는 **상위 `상세최대`편에만** 붙인다 — 나머지는 이름 줄만 나가고,
+ *  `목록최대`를 넘는 편은 「(외 N건)」으로 밝힌다. 머리의 건수·갈래 집계는 **표시 여부와
+ *  무관하게 전체(rows)를 센다** — 숫자 잣대는 한 글자도 안 바꾼다.
+ */
 export function recentDocumentsText(days = 7): string {
   const rows = listRecentDocs(days);
   if (!rows.length) return `최근 ${days}일 사이 새로 들어온 문서가 없습니다.`;
   const byCat = new Map<string, number>();
   for (const r of rows) byCat.set(r.category ?? "일반", (byCat.get(r.category ?? "일반") ?? 0) + 1);
   const 머리 = `최근 ${days}일 새 문서 ${rows.length}건 — ${[...byCat].map(([c, n]) => `${c} ${n}`).join(" · ")}`;
-  const lines = rows.slice(0, 10).map((r) => {
+  const 보일것 = rows.slice(0, 목록최대);
+  let 자체요약있음 = false;
+  const lines = 보일것.map((r, i) => {
     const when = r.ingestedAt.slice(5, 10).replace("-", "/");
     const who = r.uploadedBy ? ` · ${r.uploadedBy}` : "";
     let 소식 = "";
-    // 「지식 화면」은 옛 이름이다(memory.html → AI 지식, aihub 패널로 흡수) — 지금 이름으로(검토관 중4).
-    if (r.summary) 소식 = `\n   ${r.summary.split("\n").join("\n   ")}\n   (로컬 모델 자체 요약 — 원문 확인은 AI 지식 화면에서)`;
-    else if (r.failedReason) 소식 = `\n   요약 없음(${r.failedReason.slice(0, 60)})`;
-    // 줄 맨 앞 아이콘 금지(말투 규범 — 그 자리는 상태 표식 자리다. 🔗도 사전 밖 기호다).
-    if (r.matches) 소식 += `\n   우리 지식과의 접점: ${r.matches.split("\n").slice(0, 2).join(" / ")}`;
-    return `- ${r.documentId} [${r.category ?? "일반"}] ${when}${who}${소식}`;
+    if (i < 상세최대) {
+      // 요약 줄 최대 2줄(원래 저장은 최대 3줄) · 접점 최대 1건(원래 최대 2건) — 상세 편수를
+      // 좁힌 대신 편당 상세는 줄여 예산을 지킨다. 「자체 요약」 표기는 편마다 안 붙이고
+      // 답 끝에 한 번만(아래 표기) — 같은 사실을 여덟 곳에 적던 것을 한 곳으로.
+      if (r.summary) {
+        소식 = `\n   ${r.summary.split("\n").slice(0, 2).map((s) => 컷(s, 120)).join("\n   ")}`;
+        자체요약있음 = true;
+      } else if (r.failedReason) {
+        소식 = `\n   요약 없음(${컷(r.failedReason, 60)})`;
+      }
+      // 줄 맨 앞 아이콘 금지(말투 규범 — 그 자리는 상태 표식 자리다. 🔗도 사전 밖 기호다).
+      if (r.matches) 소식 += `\n   우리 지식과의 접점: ${컷(r.matches.split("\n")[0], 120)}`;
+    }
+    return `- ${컷(r.documentId, 60)} [${r.category ?? "일반"}] ${when}${who}${소식}`;
   });
-  const tail = rows.length > 10 ? `\n(외 ${rows.length - 10}건)` : "";
+  const tail = rows.length > 목록최대 ? `\n(외 ${rows.length - 목록최대}건)` : "";
+  // 「지식 화면」은 옛 이름이다(memory.html → AI 지식, aihub 패널로 흡수) — 지금 이름으로(검토관 중4).
+  const 표기 = 자체요약있음 ? `\n(로컬 모델 자체 요약 — 원문 확인은 「AI 지식」 화면에서)` : "";
   // 갈 곳 한 줄(2026-08-21 야간 회귀 [97] — 「숫자만 주고 갈 곳 없음」이 실결함으로 판명).
   // ⚠ 갈 곳은 **한 곳만** 말한다(검토관 중4 — 처음엔 위 tail이 「지식 화면」, 이 줄이
-  //   「내 문서」로 한 답에서 두 화면을 가리켰다). 「"요약해줘"」 안내도 뺐다(검토관 중5 —
-  //   그 지시를 받는 결정 경로가 없어 회차마다 흔들린다. 안 되는 안내는 없느니만 못하다).
-  const 다음 = `\n\n전체 목록과 원문은 내 문서 화면의 🩹 반입에서 봅니다.`;
-  return `${머리}\n${lines.join("\n")}${tail}${다음}`;
+  //   「내 문서」로 한 답에서 두 화면을 가리켜 실제로 어긋났었다). ★ 2026-09-12 재검토(B8) —
+  //   그 「내 문서 화면의 🩹 반입」은 업로드 영수증(/api/upload/receipts)이 원천이라, 이 목록의
+  //   원천(memory_documents)과 다르다: builtin 문서(용어사전·제품소개 등)·2026-08-22 이전 반입은
+  //   영수증이 없어 「전체 목록」 약속이 거짓이 된다(screenguide.ts mydocs.html이 스스로 그렇게
+  //   설명한다). 이 목록을 실제로 보여 주는 화면은 「AI 지식」(agentloop.ts 이어서표 ontology_query
+  //   항목과 같은 셸 중립 표기)이라, 갈 곳을 그쪽 하나로 통일한다. 「"요약해줘"」 안내도 뺐다
+  //   (검토관 중5 — 그 지시를 받는 결정 경로가 없어 회차마다 흔들린다. 안 되는 안내는 없느니만 못하다).
+  const 다음 = `\n\n전체 목록·요약 전문은 「AI 지식」 화면에서 봅니다.`;
+  let 최종 = `${머리}\n${lines.join("\n")}${tail}${표기}${다음}`;
+  // 안전망 — 평소엔 안 닿아야 한다(위 편당 컷으로 정상 데이터는 예산 안에 든다). 닿으면 옛
+  // 저장 데이터(요약정리의 120자 상한이 새로 만드는 요약에만 걸리고 doc_digests의 옛 값에는
+  // 안 걸린 경우)거나 목록최대·상세최대가 낡았다는 뜻이다(incidentcases.ts:527-529 같은 사고
+  // — 안전망에 기대 꼬리째 잘리지 않도록, 잘리는 자리에 말줄임을 반드시 남긴다).
+  if (최종.length > 답글자상한) 최종 = `${최종.slice(0, 답글자상한 - 1)}…`;
+  return 최종;
 }
