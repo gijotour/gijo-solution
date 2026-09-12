@@ -14,6 +14,14 @@ vi.mock("../src/engine/llm", () => ({
 
 import { createApp } from "../src/app";
 import { resetAssetsForTests, setAssetRobustness, registerAsset, recordFindings, getAsset } from "../src/engine/assets";
+// 「예시 데이터 판정」 시험 전용 — 자산 밖 나머지 네 시드(점검·조치·제품·CTI)를 직접 비우거나
+// 채워 넣어 예시데이터뿐인가()의 다섯 갈래를 하나씩 격리해서 잰다. CTI만 삽입용 공개 API가
+// 없어(벤더 동기화 아니면 시드뿐) datacleanup.test.ts:40과 같은 방식으로 db에 직접 넣는다.
+import { resetMaintenanceForTests, createMaintenanceItem } from "../src/engine/maintenance";
+import { resetTasksForTests, createTask } from "../src/engine/tasks";
+import { resetSecurityProductsForTests, createProduct } from "../src/engine/securityproducts";
+import { resetFeedsForTests } from "../src/engine/cti";
+import { db } from "../src/db";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -243,22 +251,72 @@ describe("자산 목록은 스캔 이력을 싣지 않는다", () => {
 //   「[P0] 실제 악용(KEV) 1건 — 공격이 실제로 쓰이는 취약점, 이번 주 안에 막아야 합니다」
 // 였다. **가짜 P0로 시작하는 첫인상**이다. 데이터 자체는 정직하게 표시돼 있었는데
 // (source_tool="샘플" · owner="샘플(예시)") 답이 그 표시를 옮기지 않았다.
+//
+// ⚠ 2026-09-13 넓힘(계획서 §13.5.2 「예시데이터 머리말 점검 시드」) — 판정이 자산 표
+//   하나만 보다가, 첫 기동 시드 여섯 곳(자산 2·점검 6·조치 3·제품 4·CTI 5) 중 **하나라도**
+//   원본 그대로 남아 있으면 true인 OR 판정으로 뒤집혔다(datacleanup.ts:76 「seedXIfEmpty
+//   6곳」). 옛 첫 시험은 `typeof … toBe("boolean")`이라 무슨 일이 나도 초록이었다 — 이제
+//   값을 잰다. 다섯 갈래를 서로 오염 없이 재려고 이 describe만 다른 네 표까지 매번 비운다.
 describe("예시 데이터 판정", () => {
-  it("씨앗 자산만 있으면 예시뿐이라고 본다", async () => {
-    const { 예시데이터뿐인가 } = await import("../src/engine/assets");
-    // 첫 기동 시드가 그대로인 상태 — 실제 자산은 아직 하나도 없다.
-    expect(typeof 예시데이터뿐인가()).toBe("boolean");
+  beforeEach(() => {
+    // ⚠ 이 describe는 위 describe("assets")의 형제이지 자식이 아니다 — 그쪽 beforeEach(로그인 포함)는
+    //   여기 안 걸린다. 다섯 표를 전부 이 자리에서 직접 비워야 갈래가 서로 오염되지 않는다.
+    resetAssetsForTests();
+    resetMaintenanceForTests();
+    resetTasksForTests();
+    resetSecurityProductsForTests();
+    resetFeedsForTests(); // cti_findings까지 지운다 — cti.ts 모듈 로드시 자동 시드된 5건 제거
   });
 
-  it("★ 자산이 하나도 없으면 false — 「예시뿐」이 아니라 「아무것도 없음」이다", async () => {
+  it("다섯 표가 전부 비어 있고 자산도 없으면 false — 「예시뿐」이 아니라 「아무것도 없음」이다", async () => {
     const { 예시데이터뿐인가, listAssets } = await import("../src/engine/assets");
-    // 경고할 것이 없는 상태에까지 경고를 붙이면 문구가 값을 잃는다.
-    if (listAssets().length === 0) expect(예시데이터뿐인가()).toBe(false);
+    expect(listAssets().length, "이 시험은 자산도 0이어야 한다").toBe(0);
+    expect(예시데이터뿐인가()).toBe(false);
   });
 
-  it("실제 자산이 하나라도 들어오면 예시뿐이 아니다", async () => {
+  it("자산 시드만 새로 심으면 예시뿐이라고 본다", async () => {
+    const { 예시데이터뿐인가, seedSampleAssetsIfEmpty, seedSampleVulnHostIfEmpty } = await import("../src/engine/assets");
+    seedSampleAssetsIfEmpty();
+    seedSampleVulnHostIfEmpty();
+    expect(예시데이터뿐인가()).toBe(true);
+  });
+
+  it("실제 자산 1건만 들어오고 다른 시드가 전혀 없으면 false", async () => {
     const { 예시데이터뿐인가, registerAsset } = await import("../src/engine/assets");
     registerAsset({ id: "real-one-01", name: "진짜 자산", path: "/srv/real", assetType: "LLM 서비스", owner: "보안팀" });
     expect(예시데이터뿐인가()).toBe(false);
+  });
+
+  it("★ 자산이 진짜여도 점검 시드 하나(제목+제품명)가 원본 그대로 남아 있으면 계속 true다 — 이 항목의 핵심", async () => {
+    const { 예시데이터뿐인가, registerAsset } = await import("../src/engine/assets");
+    registerAsset({ id: "real-one-02", name: "진짜 자산 2", path: "/srv/real2", assetType: "LLM 서비스", owner: "보안팀" });
+    // maintenance.ts:420 seedSamplesIfEmpty()가 심는 여섯 쌍 중 하나와 글자까지 같다.
+    createMaintenanceItem({ title: "프롬프트 가드레일 점검", productName: "보안 상담 챗봇", scheduleDate: "2026-01-01" });
+    expect(예시데이터뿐인가(), "자산이 진짜여도 점검 시드가 남으면 예시 고지가 꺼지면 안 된다").toBe(true);
+  });
+
+  it("자산이 진짜여도 조치 시드(담당자=샘플담당)가 남아 있으면 계속 true다", async () => {
+    const { 예시데이터뿐인가, registerAsset } = await import("../src/engine/assets");
+    registerAsset({ id: "real-one-03", name: "진짜 자산 3", path: "/srv/real3", assetType: "LLM 서비스", owner: "보안팀" });
+    createTask({ text: "[조치] 시험용", priority: "P2", assignee: "샘플담당" }); // tasks.ts:252 seedSampleRemediationTasksIfEmpty() 공통 담당자
+    expect(예시데이터뿐인가()).toBe(true);
+  });
+
+  it("자산이 진짜여도 제품 시드(이름 4종 중 하나)가 남아 있으면 계속 true다", async () => {
+    const { 예시데이터뿐인가, registerAsset } = await import("../src/engine/assets");
+    registerAsset({ id: "real-one-04", name: "진짜 자산 4", path: "/srv/real4", assetType: "LLM 서비스", owner: "보안팀" });
+    createProduct({ name: "경계 방화벽 (FW-01)", category: "방화벽" }); // securityproducts.ts:536 seedSampleProductsIfEmpty() 이름 그대로
+    expect(예시데이터뿐인가()).toBe(true);
+  });
+
+  it("자산이 진짜여도 CTI 시드(출처=샘플(데모))가 남아 있으면 계속 true다", async () => {
+    const { 예시데이터뿐인가, registerAsset } = await import("../src/engine/assets");
+    registerAsset({ id: "real-one-05", name: "진짜 자산 5", path: "/srv/real5", assetType: "LLM 서비스", owner: "보안팀" });
+    // cti.ts는 finding 삽입 공개 API가 없다(벤더 동기화 아니면 시드뿐) — datacleanup.test.ts:40과
+    // 같은 방식으로 db에 직접 넣는다. source가 cti.ts:230 seedSampleFindingsIfEmpty()의 표식이다.
+    db.prepare(
+      "INSERT INTO cti_findings (id, feedId, detectedAt, type, target, source, severity, collectedAt) VALUES (?,?,?,?,?,?,?,?)"
+    ).run("test-cti-1", "test", "2026-01-01 00:00", "type", "target", "샘플(데모)", "info", Date.now());
+    expect(예시데이터뿐인가()).toBe(true);
   });
 });

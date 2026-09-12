@@ -592,22 +592,69 @@ seedSampleAssetsIfEmpty();
 // owner를 "샘플(예시)"로 표시해 진짜 스캔 결과와 구분한다.
 export const SAMPLE_VULN_HOST_ID = "vuln:sample-web01";
 
+// ── 첫 기동 시드 6곳 중 자산 밖의 넷(점검·조치·제품·CTI) — 예시데이터뿐인가()가 그 표들이
+// 원본 그대로인지 볼 때 쓰는 식별 표식. id가 난수인 것(점검)은 제목+제품명 글자로, 나머지는
+// 시드가 공통으로 심는 값(담당자·이름·출처)으로 알아본다.
+//
+// ⚠ maintenance.ts·tasks.ts·securityproducts.ts·cti.ts를 import하지 않는다 — 각각
+// auth·email·docgraph·cryptopack을 끌고 와서, assets.ts만 단독으로 물리는 시험 수십 개가
+// 그 모듈들의 import 부작용까지 짊어진다. 대신 db 원본 테이블·컬럼을 직접 읽는다(스키마는
+// db.ts 한 곳 — 여기서는 읽기 전용 SELECT뿐이고, db.ts가 이미 네 테이블을 포함한 전체 스키마를
+// 만들어 두므로 어느 모듈이 먼저 로드되든 존재한다).
+const 점검시드_제목_제품명: readonly [string, string][] = [
+  ["방화벽 정책 정기 점검", "경계 방화벽(FW-01)"],
+  ["VPN 게이트웨이 인증서 점검", "VPN 게이트웨이(VPN-03)"],
+  ["프롬프트 가드레일 점검", "보안 상담 챗봇"],
+  ["WAF 룰셋 점검", "웹방화벽(WAF-01)"],
+  ["학습데이터 접근권한 점검", "샘플-문서 민감도 분류 AI"],
+  ["오탐 룰 점검", "샘플-이상행위 탐지 엔진"],
+]; // maintenance.ts:406-464 seedSamplesIfEmpty()의 여섯 쌍과 글자까지 맞춘다.
+const 제품시드_이름: readonly string[] = [
+  "경계 방화벽 (FW-01)", "임직원 단말 EDR", "정보유출 방지 (DLP)", "웹방화벽 (WAF-01)",
+]; // securityproducts.ts:536-556 seedSampleProductsIfEmpty()의 네 이름(이름에 "샘플"이 없다).
+const 조치시드_담당자 = "샘플담당"; // tasks.ts:252 seedSampleRemediationTasksIfEmpty() 3건 공통 담당자.
+const cti시드_출처 = "샘플(데모)"; // cti.ts:230 seedSampleFindingsIfEmpty() 5건 공통 출처.
+
+const 점검시드잔존Stmt = db.prepare("SELECT 1 FROM maintenance_items WHERE title = ? AND productName = ? LIMIT 1");
+const 조치시드잔존Stmt = db.prepare("SELECT 1 FROM tasks WHERE assignee = ? LIMIT 1");
+const 제품시드잔존Stmt = db.prepare(
+  `SELECT 1 FROM security_products WHERE name IN (${제품시드_이름.map(() => "?").join(",")}) LIMIT 1`
+);
+const cti시드잔존Stmt = db.prepare("SELECT 1 FROM cti_findings WHERE source = ? LIMIT 1");
+
 /**
- * 지금 보이는 것이 **예시 데이터뿐인가** — 실제 자산이 하나도 등록되지 않은 상태인가.
+ * 지금 보이는 것이 **예시 데이터뿐인가** — 첫 기동 시드 여섯 곳(datacleanup.ts:76
+ * 「seedXIfEmpty 6곳」: 자산 2 · 점검 6건 · 조치 3건 · 제품 4건 · CTI 5건) 중
+ * **원본 그대로인 것이 하나라도 남아 있는가**.
  *
  * 왜 필요한가(2026-08-09 실측): 새로 설치한 앱에서 고객이 처음 던진 질문의 답이
  *   「[P0] 실제 악용(KEV) 1건 — 공격이 실제로 쓰이는 취약점, 이번 주 안에 막아야 합니다」
  * 였다. **가짜 P0로 시작하는 첫인상**이다. 데이터 자체는 정직하게 표시돼 있는데
  * (source_tool="샘플", owner="샘플(예시)") 답이 그 표시를 옮기지 않았다.
  *
- * ⚠ 자산이 하나도 없으면 false다 — 「예시뿐」이 아니라 「아무것도 없음」이고, 그때는
- *   경고할 것도 없다. 실제 자산이 하나라도 들어오면 그 순간 false가 되어 문구가 사라진다.
+ * ⚠ 2026-09-13 뜻을 넓혔다(계획서 §13.5.2 「예시데이터 머리말 점검 시드」, 정찰 2026-09-11 발견).
+ *   처음엔 **자산 표 하나만** 봤다 — 「등록된 자산이 전부 시드 id인가」(AND, 자산 단독).
+ *   그런데 고객이 실제 자산을 하나만 등록해도 이 함수는 그 순간 false가 되는데, 나머지 넷
+ *   (점검·조치·제품·CTI)은 시드가 그대로 남아 대화창·보고서에 고지 없이 숫자로 나갔다.
+ *   그래서 **AND(자산까지 전부 시드뿐)가 아니라 OR(여섯 곳 중 하나라도 원본 그대로 남음)**로
+ *   뒤집었다 — 진짜 자산이 들어와도 다른 시드가 남아 있으면 계속 밝힌다. 여섯 곳이 전부
+ *   지워지거나 실제 값으로 바뀌어야 이 함수가 false가 되어 문구가 사라진다.
+ * ⚠ 호출처 일곱 곳(handlers.ts: runToday·runApprovalStatus·runUrgentTodo·runKpiStatus·
+ *   runExecBrief — 이 다섯은 그대로, runMaintenanceStatus·runProductStatus는 2026-09-13에
+ *   이 판정을 새로 붙였다)은 전부 "예시 데이터가 섞여 있을 수 있다"는 **전역** 경고이지,
+ *   "지금 이 답의 숫자가 정확히 이 판정 때문에 예시다"라는 뜻이 아니었다 — 넓혀도 그대로 맞는다.
+ * ⚠ 자산이 하나도 없고 다른 시드도 전혀 없으면 false다 — 「예시뿐」이 아니라 「아무것도 없음」
+ *   이고, 그때는 경고할 것도 없다.
  */
 export function 예시데이터뿐인가(): boolean {
   const rows = listAssetRowsStmt.all() as AssetRow[];
-  if (!rows.length) return false;
   const 표본 = new Set<string>([...SAMPLE_ASSET_IDS, SAMPLE_VULN_HOST_ID]);
-  return rows.every((r) => 표본.has(r.id));
+  if (rows.length > 0 && rows.every((r) => 표본.has(r.id))) return true;
+  if (점검시드_제목_제품명.some(([title, productName]) => 점검시드잔존Stmt.get(title, productName))) return true;
+  if (조치시드잔존Stmt.get(조치시드_담당자)) return true;
+  if (제품시드잔존Stmt.get(...제품시드_이름)) return true;
+  if (cti시드잔존Stmt.get(cti시드_출처)) return true;
+  return false;
 }
 export function seedSampleVulnHostIfEmpty(): void {
   // 실사용 전환 뒤에는 샘플을 되살리지 않는다(2026-08-19 사장님 「진짜 빈 상태」 —
