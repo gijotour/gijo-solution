@@ -149,6 +149,24 @@ describe("★★ [상] 쓰기 흐름을 한 수로 삼키지 않는다 — 잣�
       expect(forcedToolFor(문장, { role: "admin" } as never)?.tool ?? null).not.toBe(도구);
     });
   }
+
+  // [B-2 · 2026-09-13 ⑦] list_assets·threats·suggest_command·knowledge_status·scan_status를
+  // 조회로못박지않을것 Set에 더한 짝 맞추기. N08·N09·N10·N11은 **착수 전부터 이미 새고 있던**
+  // 자리다(실측: 배정이 영영 안 갔다) — Set 추가 없이 FORCED 규칙만 넓혔다면 N01·N03·N04도
+  // 같은 구멍이 됐을 것이다.
+  const 조회로못박지않을것흐름: [string, string][] = [
+    ["자산 목록 보여주고 김보안한테 배정해줘", "list_assets"],
+    ["내부 자산에 영향 주는 위협 알려주고 김보안한테 할당해줘", "threats"],
+    ["점검 명령 추천해주고 맡겨줘", "suggest_command"],
+    ["우리 자산에 걸리는 위협 알려주고 김보안한테 할당해줘", "threats"],
+    ["고위험 자산 목록 보여주고 김보안한테 배정해줘", "list_assets"],
+    ["재스캔 상태 알려주고 맡겨줘", "scan_status"],
+  ];
+  for (const [문장, 도구] of 조회로못박지않을것흐름) {
+    it(`「${문장}」 → ${도구} 아님(B-2 ⑦ — 조회로못박지않을것 Set에 더했다)`, () => {
+      expect(forcedToolFor(문장, { role: "admin" } as never)?.tool ?? null).not.toBe(도구);
+    });
+  }
 });
 
 describe("★★ [상] 데이터 물음을 지식 답으로 못 박지 않는다 — 대조군과 함께 잰다", () => {

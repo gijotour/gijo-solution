@@ -57,7 +57,10 @@ describe("#8 대화 맥락 — '아까 그거' 후속 지시", () => {
     seedAsset();
     setLastTarget("fraud-detect-llm", "프롬프트 인젝션", "x");
     mockChat.mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}').mockResolvedValueOnce('{"action":"final"}').mockResolvedValueOnce("답");
-    await runAgentLoop("자산 목록 보여줘");
+    // ⚠ 2026-09-13 B-2 ⑧ — "자산 목록 보여줘"는 이제 FORCED 라우팅(list_assets)이라
+    //   mockChat이 아예 안 불린다(LLM 결정 경로를 시험하려는 목적과 어긋난다). 강제되지
+    //   않는 말로 바꿨다(route-explain 확인: ⑨).
+    await runAgentLoop("자산 정보 좀 줘");
     expect(mockChat.mock.calls[0][0].message as string).not.toContain("직전에 다룬 취약점");
   });
 });
@@ -138,6 +141,9 @@ describe("agenttools — 「AI 자산」 조회 도구", () => {
 // ⚠ 예시 질문으로 "자산 몇 개야?"를 쓰지 말 것 — 2026-08-03부터 **강제 라우팅**에 걸려
 //   LLM 결정 경로를 아예 안 탄다(FORCED_INTENTS 「자산 몇 개인가」). 이 묶음이 재는 것은
 //   **재작성 경로를 탔는가**이므로, 강제되지 않는 말을 써야 한다.
+// ⚠ 2026-09-13 B-2 ⑧ — 같은 이유로 "자산 목록 보여줘"도 못 쓴다. list_assets FORCED 규칙이
+//   목록·리스트 갈래를 새로 받아 이 말도 강제 라우팅으로 넘어갔다(route-explain 실측:
+//   ⑨ → list_assets). "자산 정보 좀 줘"로 바꿨다(route-explain 재확인: 여전히 ⑨).
 describe("runAgentLoop — 결정→실행→최종답변", () => {
   it("도구 호출 후 최종 답변을 일반 chat 경로로 재작성한다", async () => {
     seedAsset();
@@ -146,7 +152,7 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
       .mockResolvedValueOnce(`{"action":"tool","tool":"${도구}","args":{}}`) // 결정 1
       .mockResolvedValueOnce('{"action":"final"}') // 결정 2 — 결과로 충분
       .mockResolvedValueOnce("등록된 자산은 1개입니다: fraud-detect-llm"); // 최종 재작성(chat)
-    const r = await runAgentLoop("자산 목록 보여줘");
+    const r = await runAgentLoop("자산 정보 좀 줘");
     expect(r).not.toBeNull();
     // LLM이 다시 쓴 문장이 그대로 앞에 온다. 뒤에 붙는 「다음 단계」 한 줄은 규칙으로 만든
     // 고정 문장이라 재작성이 아니다 — 이 시험이 지키는 것은 **재작성 경로를 탔는가**이고,
@@ -254,8 +260,10 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
   });
 
   it("JSON이 아닌 응답(LLM 다운 안내 등)이면 null — 폴백", async () => {
+    // ⚠ 2026-09-13 B-2 ⑧ — "자산 목록 보여줘"는 FORCED 라우팅이라 mockChat을 거치지 않고
+    //   바로 실행돼 이 시험(비-JSON 응답 폴백)의 전제가 깨진다. 강제 안 되는 말로 바꿨다.
     mockChat.mockResolvedValueOnce("⚠ 로컬 LLM 응답이 제한 시간을 초과했습니다");
-    expect(await runAgentLoop("자산 목록 보여줘")).toBeNull();
+    expect(await runAgentLoop("자산 정보 좀 줘")).toBeNull();
   });
 
   it("존재하지 않는 도구 이름이면 실행하지 않고 관찰로 알려 재결정시킨다", async () => {

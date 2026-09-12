@@ -2999,7 +2999,12 @@ export async function runRoutineTasks(): Promise<string> {
 
 export async function runWorkSteps(args: Record<string, string>): Promise<string> {
   const 말 = (args.task ?? "").trim();
-  if (!말) return "어떤 일의 절차인지 알려주세요 — 예: \"방화벽 점검 어떻게 해?\"";
+  // ★ 2026-09-13 B-2 갈림 결정(가) — 예시를 「내 할 일 이름 + 절차 알려줘」 꼴로 바꾼다.
+  //   옛 예시 「방화벽 점검 어떻게 해?」는 agentloop.MAINT_PROCEDURE_RE가 같은 날 「어떻게 해」
+  //   꼴을 흡수하도록 넓어져, 이 되묻기가 권한 그대로 따라 치면 **일반 유지보수 절차(explain)로
+  //   가고 work_steps로 안 돌아온다**(안내가 자기 말을 못 지키는 꼴). 「점검|유지보수」 앵커가
+  //   없는 할 일 이름을 예시로 써서 두 약속을 하나로 만든다.
+  if (!말) return "어떤 일의 절차인지 알려주세요 — 예: \"야간 백업 로그 확인 절차 알려줘\"";
   const { hit, 열린것 } = 열린할일찾기(말);
   if (hit) return 절차카드(hit);
   const 담은것 = await 제안담기(말); // 아직 안 담은 AI 제안이면 담고 연다
