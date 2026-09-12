@@ -14,7 +14,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { getScreenGuide } from "../src/engine/screenguide";
+import { getScreenGuide, isHelpIntent, formatScreenGuide } from "../src/engine/screenguide";
 import { 고칠것갈래라벨, 질문가림 } from "../src/engine/fixboard";
 import { 상태꼬리 } from "../src/engine/docledger";
 import { 무르기시간_MS } from "../src/engine/answerfeedback";
@@ -327,5 +327,37 @@ describe("⑦ 라이트 한계를 안내가 말한다(그 근거도 함께 잰�
       path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "lite-chat.html"), "utf8");
     expect(liteChat, "라이트 대화창이 더는 console.html을 안 쓴다 — 꼬리 안내의 전제가 무너졌다")
       .toContain('location.replace("console.html?"');
+  });
+});
+
+/* ── ★ B12 화면 안내 「X 뭐야?」 도달 — 라이트 격리·본문 검증 (2026-09-12 · 설계관 지시서) ── */
+describe("★ B12 — 대화 홈 전역 훑기는 라이트에서 꺼진다(없는 기능을 안내하지 않는다)", () => {
+  // 라이트엔 mydocs.html이 없다(lite-screens.json — 라이트 화면은 전부 lite-* 이름이다).
+  // lite=true인데 전역 훑기가 켜진 채로 있으면 없는 화면의 구역을 안내하게 된다.
+  // ⚠ 「인용 제거」는 대화창구역들() 초기 5줄(mydocs.html 넷·「근거 지정」계열)에 **없다** —
+  //   supervision.html 전용 별칭이라 이번 라운드의 allowlist 밖이다(결정 대기 목록). 그래서
+  //   여기서는 실제로 올린 두 이름(「근거 지정」·「격리 원리」)으로 잰다.
+  it("lite=true면 전역 훑기가 꺼진다", () => {
+    expect(isHelpIntent("격리 원리 뭐야?", undefined, "admin", true)).toBe(false);
+    expect(isHelpIntent("근거 지정 뭐야?", undefined, "admin", true)).toBe(false);
+  });
+  it("lite=false(기본값)면 그대로 안내로 닿는다", () => {
+    expect(isHelpIntent("격리 원리 뭐야?", undefined, "admin", false)).toBe(true);
+    expect(isHelpIntent("근거 지정 뭐야?", undefined, "admin")).toBe(true);
+  });
+});
+
+describe("★ B12 — 걸렸다고만 하고 본문이 안 나오는 어긋남이 없다", () => {
+  it("「근거 지정 뭐야?」의 본문이 대화 홈에서도 실제로 나온다(폴백 문구 금지)", () => {
+    const 답 = formatScreenGuide(undefined, "근거 지정 뭐야?");
+    expect(답).toMatch(/^내 문서 › 근거 지정과 첨부\(📎\)/);
+    expect(답, "본문이 검색 범위를 좁히는 설명을 안 담았다").toContain("검색 범위를 좁히는 것");
+    expect(답, "폴백 문구(사이드바에서 찾으라)가 새로 섞였다").not.toMatch(/사이드바/);
+    expect(답, "폴백 문구(이 화면 사용 안내로 떨어졌다)가 섞였다").not.toContain("이 화면 사용 안내");
+  });
+  it("「격리 원리 뭐야?」도 같은 꼴로 나온다", () => {
+    const 답 = formatScreenGuide(undefined, "격리 원리 뭐야?");
+    expect(답).toMatch(/^내 문서 › 격리 원리/);
+    expect(답, "폴백 문구가 섞였다").not.toContain("이 화면 사용 안내");
   });
 });

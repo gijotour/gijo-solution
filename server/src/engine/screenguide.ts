@@ -15,6 +15,10 @@ import { stageOfScreen, workflowStages } from "./workflow";
 // agentloop 한 곳뿐이다(여기에 사본을 두면 두 곳이 어긋난다). ⚠ **함수 안에서만** 부른다 —
 // 모듈 최상위에서 부르면 순환 초기화(agents→screenguide→agentloop→…)에 걸린다.
 import { forcedToolFor } from "./agentloop";
+// 「조회 + 쓰기 지시」 판정의 유일한 권위 — 정규식을 여기 또 적지 않는다(B12 화면 안내 수리).
+// ⚠ writeflow.ts는 **아무것도 import하지 않는 잎 모듈**이라 순환이 원리상 안 생긴다
+//   (writeflow.ts:11 머리말) — agentloop처럼 「함수 안에서만 부른다」는 제약이 필요 없다.
+import { 쓰기흐름인가 } from "./writeflow";
 // 지금 묻고 있는 사람 — **역할(role)**을 집어 오는 자리(2026-09-08 검토관 [중] 수리).
 // ⚠ 왜: forcedToolFor는 역할을 안 주면 requiredRole:"admin" 도구를 후보에서 뺀다. 역할 없이
 //   물으면 admin 전용 강제 도구가 **없는 것처럼 보여** 아래 비켜주기가 안 타고 안내가 그대로
@@ -162,6 +166,10 @@ const PANEL_ALIASES: Record<string, Record<string, string>> = {
     "유령 문서": "조각이 없는 문서(⚠)",
     "다시 넣기": "조각이 없는 문서(⚠)",
     "근거 지정": "근거 지정과 첨부(📎)",
+    // 「지난 작업 첨부」(2026-09-12 B12) — 대화 홈에서도 닿아야 하는 이름이라
+    // 대화창에서도물을수있는구역(아래)이 이 값을 그대로 가리킨다. 화면 위에서도 같은 말로
+    // 닿게 하려면 여기 함께 있어야 한다 — 곁표에만 실으면 죽은 줄이 된다(aliaspair 머리말).
+    "지난 작업 첨부": "근거 지정과 첨부(📎)",
   },
   // 2026-08-30 이관분의 부를 말 — 화면에서 뺀 구역은 담당자가 부르던 이름으로 닿아야 한다.
   "handover.html": { "조각 없음 안내": "인수인계", "조각 없음 칩": "인수인계" },
@@ -276,26 +284,27 @@ const CONSOLE_PANEL_ALIASES: Record<string, string> = {
  */
 function resolvePanelHit(
   screen: string | undefined,
-  q: string
-): { panel: string; matched: string; source: ScreenGuide } | null {
+  q: string,
+  opts?: { 전역?: boolean }
+): { panel: string; matched: string; source: ScreenGuide; global?: boolean } | null {
   const nq = normalizeName(q);
   // ⚠ 가장 **긴**(구체적인) 이름이 이긴다. 선언 순서로 고르면 "2차 인증"이 "계정별 2차 인증"을
   //   가려, "담당자 2차 인증 해제하는 방법"에 내 계정 안내가 나왔다(2026-07-30 실측).
   //   이름이 포개지는 구역(계정 ⊂ 계정별 …)은 앞으로도 생기니 순서에 기대지 않는다.
-  let best: { panel: string; matched: string; source: ScreenGuide } | null = null;
-  const 훑기 = (g: ScreenGuide | undefined, alias?: Record<string, string>): void => {
+  let best: { panel: string; matched: string; source: ScreenGuide; global?: boolean } | null = null;
+  const 훑기 = (g: ScreenGuide | undefined, alias?: Record<string, string>, isGlobal = false): void => {
     if (!g?.panels) return;
     for (const name of Object.keys(g.panels)) {
       const n = normalizeName(name);
       if (nq.includes(n) && (!best || n.length > normalizeName(best.matched).length)) {
-        best = { panel: name, matched: name, source: g };
+        best = { panel: name, matched: name, source: g, global: isGlobal || undefined };
       }
     }
     if (!alias) return;
     for (const [shown, real] of Object.entries(alias)) {
       const n = normalizeName(shown);
       if (nq.includes(n) && g.panels[real] && (!best || n.length > normalizeName(best.matched).length)) {
-        best = { panel: real, matched: shown, source: g };
+        best = { panel: real, matched: shown, source: g, global: isGlobal || undefined };
       }
     }
   };
@@ -304,10 +313,25 @@ function resolvePanelHit(
   const 열쇠 = screen ? (screen.split(/[\\/]/).pop() ?? screen).split("?")[0] : undefined;
   훑기(열쇠 ? GUIDES[열쇠] : undefined, 열쇠 ? PANEL_ALIASES[열쇠] : undefined);
   훑기(OVERVIEW, CONSOLE_PANEL_ALIASES); // 공통 — 대화창 조작은 어느 화면에서 물어도 같다
+  // ⚠ 세 번째 훑기 — **명시 allowlist로만** 연다(B12 수리, 2026-09-12). 화면별 구역
+  //   (mydocs.html 등)은 원래 그 화면 위에서만 닿는데, 「근거 지정과 첨부(📎)」처럼 제품
+  //   기능의 뜻을 묻는 물음은 대화 홈에서도 닿아야 한다(전-7 「설명은 전부 챗봇으로」).
+  //   전역 순회(모든 구역을 다 여는 것)는 실측 7건을 뒤집는다(routes.ts:222 참고) — 그래서
+  //   손으로 고른 allowlist(대화창구역들)만 훑는다. `opts.전역=false`(라이트)면 아예 건너뛴다.
+  if (opts?.전역 !== false) {
+    for (const item of 대화창구역들()) {
+      const n = normalizeName(item.글자);
+      if (!nq.includes(n)) continue;
+      if (best && n.length <= normalizeName(best.matched).length) continue;
+      const g = GUIDES[item.screen];
+      if (!g?.panels?.[item.real]) continue; // 죽은 줄 — 값이 실재하지 않으면 조용히 건너뛴다
+      best = { panel: item.real, matched: item.글자, source: g, global: true };
+    }
+  }
   return best;
 }
-function resolvePanel(screen: string | undefined, q: string): string | null {
-  return resolvePanelHit(screen, q)?.panel ?? null;
+function resolvePanel(screen: string | undefined, q: string, opts?: { 전역?: boolean }): string | null {
+  return resolvePanelHit(screen, q, opts)?.panel ?? null;
 }
 
 /**
@@ -378,6 +402,42 @@ export function 구역이름들(): { screen: string; name: string }[] {
   return out;
 }
 
+/**
+ * 화면별 구역인데 **대화 홈(화면 없음)에서도 닿아야 하는 이름** — resolvePanelHit 셋째
+ * 훑기의 모집단(B12 화면 안내 수리, 2026-09-12 · 계획서 전-7).
+ *
+ * ■ 왜 있나: 「이 답 이상해요」·「옅은 숫자」는 공통 OVERVIEW 구역이라 어느 화면에서 물어도
+ *   닿는데, 「근거 지정과 첨부(📎)」는 mydocs.html 전용 구역이라 **그 화면 위에서만** 닿았다.
+ *   같은 「제품 기능 이름 + 뜻 물음」인데 자리마다 답이 갈린 것이 B12의 뿌리다.
+ * ■ 왜 **명시 allowlist**인가 — 전역 순회(모든 화면별 구역을 다 여는 것)는 실측으로 189문장
+ *   코퍼스 중 7건을 뒤집는다(incident_sources·aibom_status·[33] 침해사고초동절차 등이
+ *   구역 이름에 뺏긴다). allowlist는 같은 코퍼스에서 변동 0건이었다 — 그래서 손으로 고른다.
+ * ■ **글자를 새로 적지 않는다** — 값(real)은 이미 있는 표(PANEL_ALIASES 또는 GUIDES.panels
+ *   그 자신)를 가리킨다. 「같은 것을 여러 곳에 적으면 어긋난다」(이 저장소가 반복해 겪은 병)를
+ *   피하려는 것이다. 값은 GUIDES[screen].panels의 열쇠와 **한 글자까지** 같아야 한다
+ *   (짝 시험 aliaspair.test — 죽은 줄이면 resolvePanelHit이 조용히 건너뛴다).
+ * ⚠ **홑낱말·강제 도구가 있는 이름은 올리지 않는다** — 「첨부」·「문서 지정」은 실측으로
+ *   데이터 물음(N26·N30~N33)을 삼켰고, 강제 도구가 있는 이름(AI-BOM·견고성 점수 등)을
+ *   올리면 panelname.test 대장이 16×38로 폭발한다(설계관 지시서 risks 참고 — 결정 대기).
+ */
+export function 대화창구역들(): { 글자: string; screen: string; real: string }[] {
+  const mydocs = PANEL_ALIASES["mydocs.html"] ?? {};
+  // ⚠ 함수 안에서 만든다(모듈 최상위 const로 두면 GUIDES·PANEL_ALIASES 초기화 순서에
+  //   기대게 된다 — 함수는 호출 시점에만 평가되므로 그 걱정이 없다). routes.ts 차례 22의
+  //   「왜」 문장이 가리키는 표가 바로 이것이다.
+  const 대화창에서도물을수있는구역: { 글자: string; screen: string; real: string }[] = [
+    // 「근거 지정과 첨부(📎)」는 구역 이름 그 자신이다(가리킬 별도 표가 없다).
+    { 글자: "근거 지정과 첨부(📎)", screen: "mydocs.html", real: "근거 지정과 첨부(📎)" },
+    // 아래 둘은 **별칭 표를 그대로 가리킨다**(글자를 베끼지 않는다) — PANEL_ALIASES["mydocs.html"]
+    // 값이 바뀌면 이 표도 저절로 따라간다.
+    { 글자: "근거 지정", screen: "mydocs.html", real: mydocs["근거 지정"] },
+    { 글자: "지난 작업 첨부", screen: "mydocs.html", real: mydocs["지난 작업 첨부"] },
+    { 글자: "AI 포함과 공유의 차이", screen: "mydocs.html", real: "AI 포함과 공유의 차이" },
+    { 글자: "격리 원리", screen: "mydocs.html", real: "격리 원리" },
+  ];
+  return 대화창에서도물을수있는구역;
+}
+
 
 // 구역 이름이 걸렸을 때 「이 말이 안내를 구하는 말인가」를 재는 잣대 — **여기 한 곳**이다.
 // 2026-09-08에 한 벌을 **세 쪽으로 나누기만** 했다(낱말은 하나도 더하거나 빼지 않았다).
@@ -443,7 +503,7 @@ export function 안내가이기는이유(text: string): "안내낱말" | "정체
   if (정체물음_RE.test(t)) return "정체물음";   // 「○○ 뭐야?·뭔지」 — 무엇인지를 구하는 말
   return null;
 }
-function panelNameHit(text: string, screen?: string): boolean {
+function panelNameHit(text: string, screen?: string, 전역 = true): boolean {
   const q = text.replace(/\s/g, "");
   // 설명을 구하는 말투일 때만(단순히 패널명이 스친 지시는 도구가 처리해야 한다).
   // "좋아·좋을까·추천"은 고르는 질문의 말투다("어떤 모델 받으면 좋아?"). 구역 이름이 함께
@@ -453,7 +513,7 @@ function panelNameHit(text: string, screen?: string): boolean {
   // 넓혀도 안전한 이유: 아래 resolvePanel이 **구역 이름 전체**가 질문에 들어 있을 때만 참이라,
   // "스캔 실패했어"처럼 이름이 안 걸리는 하소연은 여전히 도구·LLM이 맡는다.
   if (!홑물음_RE.test(text) && !안내낱말_RE.test(text)) return false;
-  return resolvePanel(screen, q) !== null;
+  return resolvePanel(screen, q, { 전역 }) !== null;
 }
 
 // "기능 설명/안내/알려"는 화면 사용법일 수도, 특정 제품 질문일 수도 있는 약한 신호다.
@@ -479,13 +539,23 @@ function hasSpecificSubject(text: string): boolean {
 //   dispatcher의 실경로는 runWithViewer 안에서 도니 저절로 채워지고, 꼬리표 밖(배치·시험·
 //   route-explain)에서는 명시로 준다. 둘 다 없으면 종전대로 역할 없이 재고, 그때는 admin
 //   전용 강제 도구가 후보에서 빠져 **안내가 이긴다**(안전한 쪽으로 틀린다).
-export function isHelpIntent(text: string, screen?: string, role?: string): boolean {
+// ⚠ lite — 라이트에는 supervision·approvals 화면이 없다(LITE_OVERVIEW 머리말). 세 번째(전역)
+//   훑기가 켜진 채로 있으면 없는 화면의 구역을 안내하게 된다 — 이 파일 머리말이 스스로 못박은
+//   원칙(그라운딩)의 위반이다. lite=true면 resolvePanelHit·panelNameHit 모두 전역 훑기를 끈다.
+export function isHelpIntent(text: string, screen?: string, role?: string, lite = false): boolean {
   const t = text.trim();
+  // ★ 화면 안내는 **쓰기 흐름**을 삼키지 않는다(B12 수리 — 설계관 지시서는 이 가드를 구역
+  //   이름 갈래(아래 hit 분기) 안에만 걸라고 했으나, 그러면 HELP_RE 강한 가지가 먼저 채 간다
+  //   ("시작 가이드 알려주고 승인해줘"·"활용 가이드 알려주고 배정해줘" — `가이드\s*(줘|알려|보여)`
+  //   가 구역 이름과 무관하게 그 자리에서 이미 true를 반환한다). 실측(panelname.test 전수)으로
+  //   드러나 **맨 앞으로 옮겼다**(설계관 지시서 대비 편차 — 이유는 위와 같다). 판정은 그대로
+  //   writeflow.쓰기흐름인가 한 곳(단일 출처)이 한다.
+  if (쓰기흐름인가(t)) return false;
   const strong = HELP_RE.test(t) && !(WEAK_HELP_RE.test(t) && !/(이\s*화면|여기|이\s*메뉴|이\s*페이지|도움말|사용법|사용\s*방법)/.test(t));
   if (strong) return true;
   if (WEAK_HELP_RE.test(t) && !hasSpecificSubject(t)) return true;
-  const hit = resolvePanelHit(screen, t.replace(/\s/g, ""));
-  if (hit && panelNameHit(t, screen)) {
+  const hit = resolvePanelHit(screen, t.replace(/\s/g, ""), { 전역: !lite });
+  if (hit && panelNameHit(t, screen, !lite)) {
     // ★ 구역 **이름**이 제품 도구의 주제어와 같으면, **값요구** 꼬리는 제품 물음이다(2026-09-08 실측).
     //   실사고 계열: 별칭 「조각이 없는 문서」가 강제 도구 doc_chunk_gaps를 채 간 것과 같은 병인데,
     //   그때는 별칭만 걷어내고 **이름**은 남겨 두어 「조각이 없는 문서(⚠) 알려줘」가 그대로 샜다.
@@ -501,7 +571,14 @@ export function isHelpIntent(text: string, screen?: string, role?: string): bool
     //   (「점검 방법」) — 이름이 곧 「어떻게 하나」인 구역은 그 이름을 부르는 것이 설명을 구하는 것이다.
     // ⚠ forcedToolFor는 뒤(regex)에 둔다 — 도구 목록을 만드는 비용이 있어 값싼 잣대를 먼저 본다.
     const 역할 = role ?? currentViewer()?.role ?? undefined;
-    if (!안내가이기는이유(t) && forcedToolFor(t, 역할 ? { role: 역할 } : undefined)) return false;
+    const 강제 = forcedToolFor(t, 역할 ? { role: 역할 } : undefined);
+    // ★ 전역 히트(대화창구역들)는 **더 엄한 잣대**를 진다 — 강제 도구가 있으면 무조건 물러선다
+    //   (정체물음이어도). 같은 화면 위에 있을 때는 문맥이 있어 「○○ 뭐야?」가 안내를 이겨도
+    //   되지만, 대화 홈에는 문맥이 없다(B12 수리 2026-09-12). 이 한 줄이 N11「근거 지정 규정
+    //   뭐야?」(→explain)를 지킨다 — 정체물음이라 아래 완화 조건은 통과하지만 여기서 막힌다.
+    if (hit.global && 강제) return false;
+    if (!안내가이기는이유(t) && 강제) return false;
+    // ⚠ 쓰기 흐름 가드는 함수 맨 앞으로 옮겼다(위 주석 참고) — 여기 다시 걸지 않는다.
     // ⚠ 구역 이름 자체에 영문이 들어 있으면(예: "구독 중인 CTI 피드", "이메일(SMTP) 설정")
     //   그 영문을 "특정 제품을 콕 집은 질문"으로 오해해 화면 안내를 막아 버렸다(2026-07-27 실측).
     //   질문에서 걸린 구역 이름을 지운 뒤 남는 말로 판단한다 — 그래야 진짜 제품명만 걸러진다.
@@ -1962,7 +2039,9 @@ export function formatScreenGuide(screen?: string, question?: string, lite = fal
   // ⚠ 화면 안내에 구역이 없어도 본다 — 공통(대화창 조작) 구역이 걸릴 수 있다(2026-08-09).
   if (q) {
     // 화면에 적힌 이름으로 물어도 찾도록 별명표까지 본다(PANEL_ALIASES).
-    const hit = resolvePanelHit(screen, q);
+    // ⚠ lite면 전역(셋째) 훑기를 끈다 — isHelpIntent와 같은 눈으로 재야 「걸린다고 해 놓고
+    //   본문이 안 나오는」 어긋남이 안 난다(B12 수리).
+    const hit = resolvePanelHit(screen, q, { 전역: !lite });
     // ⚠ 화면 이름과 구역 이름이 같으면 **같은 말이 두 번** 나온다 — 실측(2026-08-01 챗봇 전수):
     //   "🤖 AI-BOM 구성 › AI-BOM 코드 의존성(SBOM)을 넘어…". 담당자에겐 앞머리가 군더더기고,
     //   점검에서는 "내부 규칙 누출"로 잡혔다. 겹치면 한 번만 적는다.

@@ -47,8 +47,9 @@ describe("대화앞으로()가 기대는 두 심볼이 셸에 다 있다", () =>
    ⚠ 판정을 여기서 정규식으로 다시 짜지 않는다. 표 모양이 바뀌면 그 정규식이 조용히 눈을 감고,
      그러면 「시험이 있다」가 오히려 거짓 안심이 된다(guidance-check가 겪은 부류).
      판정은 제품 코드 한 곳(screenguide.죽은구역별칭)이 하고 여기서는 결과만 본다. */
-import { 죽은구역별칭, 구역별칭들, 안내화면열쇠들, isHelpIntent, 안내가이기는이유 } from "../src/engine/screenguide";
+import { 죽은구역별칭, 구역별칭들, 대화창구역들, 안내화면열쇠들, isHelpIntent, 안내가이기는이유, getScreenGuide } from "../src/engine/screenguide";
 import { forcedToolFor } from "../src/engine/agentloop";
+import { 결정적도착지 } from "../src/engine/dispatcher";
 
 describe("구역 별칭은 실재하는 구역을 가리켜야 산다", () => {
   it("★ 죽은 별칭이 0개다 — 값은 panels 열쇠와 **한 글자까지** 같아야 한다", () => {
@@ -185,4 +186,84 @@ describe("★ 별칭 전수 — 강제 도구의 말을 채 가는 별칭은 대
     // ④ 두 말 다 어느 화면에서도 안내로 새지 않는다(합쳐서 본 결론).
     expect(안내화면열쇠들().filter((s) => isHelpIntent(값요구, s, "admin"))).toEqual([]);
   });
+});
+
+/* ── ★ B12 화면 안내 「X 뭐야?」 도달 — 전역표 값 검증 (2026-09-12 · 설계관 지시서) ──────
+   왜: 대화창구역들()도 죽은 줄이 생길 수 있다 — real이 오타거나 구역이 없어지면 resolvePanelHit
+   셋째 훑기가 조용히 건너뛴다(위 죽은구역별칭과 같은 병). 값은 GUIDES[screen].panels의
+   열쇠와 **한 글자까지** 같아야 한다. */
+describe("★ 전역표(대화창구역들)의 값은 실재하는 구역을 가리킨다", () => {
+  it("모집단이 살아 있다", () => {
+    expect(대화창구역들().length, "전역표를 못 읽었다").toBeGreaterThanOrEqual(5);
+  });
+
+  it("★ 값(real)이 전부 GUIDES[screen].panels의 열쇠와 한 글자까지 같다(죽은 줄 0)", () => {
+    const 죽은줄: string[] = [];
+    for (const item of 대화창구역들()) {
+      const panels = getScreenGuide(item.screen).panels;
+      if (!panels?.[item.real]) 죽은줄.push(`${item.screen} 「${item.글자}」→「${item.real}」`);
+    }
+    expect(죽은줄, "값이 실재하지 않는 구역을 가리킨다(셋째 훑기가 영영 안 걸린다): " + 죽은줄.join(" · ")).toEqual([]);
+  });
+});
+
+/* ── ★★ B12 — 전역 훑기가 강제 도구·특수경로를 채 가지 않는다 (음성 전수) ─────────────
+   설계관 지시서 routing_table ⓑ 음성 34문장을 결정적도착지(dispatcher)로 그대로 잰다.
+   착수 전 실측(2026-09-12, --no-build 재빌드 후)과 **글자까지** 같아야 한다 — 도착지가
+   한 자라도 바뀌면 이 라운드가 이웃 갈래를 뺏은 것이다. */
+describe("★★ 전역 훑기가 강제 도구·특수경로를 채 가지 않는다 — 음성 전수", () => {
+  // [문장, 기대 도착(null=⑨ LLM 선택)] — 기대값은 착수 전 route-explain 실측 그대로.
+  const 음성: [string, string | null][] = [
+    // 부류① 지식·개념·규정 물음 — RAG/explain 그대로
+    ["근거란 뭐야?", null],
+    ["EPSS가 뭐야?", null],
+    ["접속기록 보관 규정 뭐야?", "explain"],
+    ["개인정보 파기 기한 뭐야?", null],
+    ["망분리 의무 뭐야?", null],
+    ["제로트러스트가 뭐야?", null],
+    ["KEV가 뭐야?", null],
+    ["CVSS 점수 뭐가 달라?", null],
+    ["근거 약함이 뭐야?", null],
+    ["AI가 뭘 근거로 답했는지 볼 수 있어?", null],
+    ["근거 지정 규정 뭐야?", "explain"],   // ★★ 안 A가 가로챌 수 있는 유일한 실측 문장
+    // 부류② 데이터 물음 — 도구 그대로
+    ["자산 중에 AI-BOM 비어 있는 거 뭐야?", "aibom_status"],
+    ["미조치 취약점 몇 건이야?", "finding_status"],
+    ["오늘 브리핑 알려줘", "briefing"],
+    ["최근 탐지 내역 보여줘", "threats"],
+    ["조각이 없는 문서 알려줘", "doc_chunk_gaps"],
+    ["견고성 점수 알려줘", "redteam_status"],
+    ["지켜보는 폴더 알려줘", "watch_folder_list"],
+    ["근거 지정한 문서 목록 알려줘", "knowledge_status"],
+    ["해외 보안 유튜브 추천해줘", "incident_sources"],
+    // 부류③ 쓰기 흐름 결합 — 승인·배정·할당·맡김이 살아 있어야 한다
+    ["근거 지정하고 승인해줘", null],
+    ["근거 지정 알려주고 담당자 정해줘", null],
+    ["인용 제거 대상 알려주고 맡겨줘", null],
+    ["이 취약점 조치 절차 알려주고 할당해줘", "formatRemediation"],
+    ["답 지적 올라온 거 승인해줘", null],
+    ["문서 지정 안 된 거 알려줘", null],   // ★ 「문서 지정」을 전역표에 넣으면 이게 샌다 → 안 넣었다
+    ["첨부한 파일 분석해줘", null],
+    ["이 문서 첨부해줘", null],
+    // 부류④ 어미·연결 변형 / 화면·구역 이름과 글자가 겹치는 말
+    ["퇴사자 계정 언제까지 남겨둬야 해?", null],
+    ["증적 첨부 규정 뭐야?", "explain"],
+    ["메일에 첨부 어떻게 해?", "howto 순서 안내 + 화면 열기"],
+    ["첨부 파일 목록 알려줘", null],
+    ["보고서에 첨부 어떻게 해?", "howto 순서 안내 + 화면 열기"],
+    ["2차 인증 켜려면 어떻게 해?", "howto 순서 안내 + 화면 열기"],
+    ["장비에 접속해서 확인하려면?", "formatScreenGuide + 화면 열기"],
+    ["침해사고 의심될 때 대응 절차 알려줘", "침해사고초동절차"],
+    ["방화벽이 멈췄어", "장애초동절차"],
+    ["리포트 만들어줘", "generateReport"],
+    ["인용 제거 대상 리포트 만들어줘", "generateReport"],
+    ["격리 원리 관련 지식베이스 정리해줘", "kbhygiene 리포트"],
+    ["근거 지정 공격 경로 분석해줘", "formatAttackPaths"],
+  ];
+  for (const [문장, 기대] of 음성) {
+    it(`「${문장}」 → ${기대 ?? "∅(모델 선택, 전역표에게 안 뺏긴다)"}`, async () => {
+      const 걸림 = await 결정적도착지(문장, { 역할: "admin" });
+      expect(걸림[0]?.도착 ?? null).toBe(기대);
+    });
+  }
 });

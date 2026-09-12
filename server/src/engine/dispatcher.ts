@@ -1779,7 +1779,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
 
   // 도움말/사용법 의도는 화면별 가이드로 결정적으로 답한다(LLM·도구 없이). "이 화면 뭐 할 수 있어?"
   // 같은 질문이 예전엔 일반 대화로 떨어져 화면과 무관한 답을 냈다 — screenguide로 그라운딩한다.
-  if (isHelpIntent(instructionText, screen)) {
+  if (isHelpIntent(instructionText, screen, undefined, 에디션제한중())) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     // sources: [] — **코드가 낸 답이라 사내 문서를 본 적이 없다**(4-ⓑ, 2026-08-13).
@@ -1787,6 +1787,8 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     //   「📄 근거」로 붙는다. actioncheck가 이미 쓰는 계약을 그대로 쓴다(빈 배열 = 근거 없음 선언).
     // ⚠ 에디션을 함께 넘긴다(2026-08-18) — 라이트 챗은 screen을 안 보내는데(lite-chat.html),
     //   그러면 개요가 나가고 그 개요가 **표준 콘솔 설명**이라 라이트에 없는 기능을 가르쳤다.
+    //   ⚠ B12 수리(2026-09-12) — isHelpIntent에도 같은 에디션을 넘긴다. 안 넘기면 대화 홈
+    //   전역 훑기(대화창구역들)가 라이트에 없는 화면(supervision·approvals)의 구역까지 연다.
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText, 에디션제한중()), sources: [] };
   }
 
@@ -2284,7 +2286,9 @@ async function 체인훑기(
   본다(!!방법화면 && !(방법화면.표준전용 && 에디션제한중()), { 이름: "「○○ 하려면?」 방법 안내", 층: "화면안내", 판별: "방법질문화면찾기", 도착: "formatScreenGuide + 화면 열기", 감시: "const 방법화면 = 방법질문화면찾기(instructionText)" });
   // ⚠ 역할을 넘긴다(2026-09-08) — 실경로는 runWithViewer 꼬리표로 저절로 채워지는데 이 진단은
   //   꼬리표 밖이라, 안 주면 admin 전용 강제 도구가 걸린 갈래를 **원리상 못 본다**.
-  본다(isHelpIntent(t, 옵션?.화면, 옵션?.역할), { 이름: "화면 사용 안내", 층: "화면안내", 판별: "isHelpIntent", 도착: "formatScreenGuide(지금 화면)", 감시: "if (isHelpIntent(instructionText, screen))" });
+  // ⚠ 에디션도 함께 넘긴다(B12 수리, 2026-09-12) — 실경로(위 1782)와 **같은 눈**으로 재야 한다.
+  //   안 넘기면 이 도구는 lite=false로 재서, 라이트에서는 안 닿아야 할 곳까지 닿는다고 거짓 설명한다.
+  본다(isHelpIntent(t, 옵션?.화면, 옵션?.역할, 에디션제한중()), { 이름: "화면 사용 안내", 층: "화면안내", 판별: "isHelpIntent", 도착: "formatScreenGuide(지금 화면)", 감시: "if (isHelpIntent(instructionText, screen, undefined, 에디션제한중()))" });
 
   본다(결재승인요청_RE.test(t), { 이름: "결재 승인 요청", 층: "특수경로", 판별: "결재승인요청_RE", 도착: "결재판 안내(대신 승인 안 함)", 감시: "if (결재승인요청_RE.test(instructionText))" });
   본다(KB_HYGIENE_INTENT_RE.test(t), { 이름: "지식베이스 정리", 층: "특수경로", 판별: "KB_HYGIENE_INTENT_RE", 도착: "kbhygiene 리포트", 감시: "if (KB_HYGIENE_INTENT_RE.test(instructionText))" });

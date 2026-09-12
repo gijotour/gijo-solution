@@ -20,7 +20,7 @@
 //   이 시험도 못 본다 — 새 말투가 발견되면 여기 꼬리에 더한다. 「뭔데?」는 2026-09-08에
 //   더했다 — 정체물음_RE에 「뭔」을 넣었으니 그 말투를 재는 자리도 함께 있어야 한다.
 import { describe, it, expect } from "vitest";
-import { 구역이름들, 안내화면열쇠들, isHelpIntent, 안내가이기는이유 } from "../src/engine/screenguide";
+import { 구역이름들, 구역별칭들, 대화창구역들, 안내화면열쇠들, isHelpIntent, 안내가이기는이유 } from "../src/engine/screenguide";
 import { forcedToolFor } from "../src/engine/agentloop";
 
 describe("★ 구역 이름 전수 — 강제 도구의 말을 채 가는 이름은 대장에 적힌 것뿐이다", () => {
@@ -202,5 +202,92 @@ describe("★ 구역 이름 전수 — 강제 도구의 말을 채 가는 이름
       }
     }
     expect(갈림, "같은 뜻인데 답이 갈린다(알려줘 ↔ 보여줘): " + 갈림.join(" · ")).toEqual([]);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  ★★ B12 화면 안내 「X 뭐야?」 도달 (2026-09-12 · 설계관 지시서 · 계획서 전-7)
+  //
+  //  뿌리: resolvePanelHit이 **화면별**(:305, 지금)과 **공통**(:306, OVERVIEW) 두 곳만
+  //  훑어서, mydocs.html 전용 구역(「근거 지정과 첨부(📎)」 등)은 그 화면 위에서만 닿고
+  //  대화 홈에서는 안 닿았다. 셋째 훑기(대화창구역들 — 명시 allowlist)로 연다.
+  // ═══════════════════════════════════════════════════════════════════════════
+  it("★★ 대화창 전역 구역은 **어느 화면에서도** 같은 답을 낸다", () => {
+    const 전역 = 대화창구역들();
+    expect(전역.length, "전역표를 못 읽었다").toBeGreaterThanOrEqual(5);
+
+    // ① 전제 — 전역표의 글자는 강제 도구의 것이 아니다(있으면 allowlist 전제가 무너진다).
+    const 강제있음: string[] = [];
+    for (const item of 전역) {
+      for (const t of 꼬리) {
+        if (forcedToolFor(`${item.글자} ${t}`, { role: "admin" })) 강제있음.push(`${item.글자} ${t}`);
+      }
+    }
+    expect(강제있음, "전역표에 강제 도구가 있는 이름이 섞였다 — allowlist 전제가 무너졌다: " + 강제있음.join(" · ")).toEqual([]);
+
+    // ② 안내화면열쇠들() 전부에서 「○○ 뭐야?」가 안내로 닿는다.
+    const 화면들 = 안내화면열쇠들();
+    for (const item of 전역) {
+      for (const sc of 화면들) {
+        expect(isHelpIntent(`${item.글자} 뭐야?`, sc, "admin"), `${sc} 화면에서 「${item.글자} 뭐야?」가 안내로 안 닿는다`).toBe(true);
+      }
+      // ③ 화면 없이(대화 홈)도 닿는다 — 이것이 B12가 닫는 자리다.
+      expect(isHelpIntent(`${item.글자} 뭐야?`, undefined, "admin"), `대화 홈에서 「${item.글자} 뭐야?」가 안내로 안 닿는다`).toBe(true);
+    }
+
+    // ④ 전역표 도입으로 기존 이름 가로채기 대장이 늘지 않았다(한 줄도 안 늘어야 한다).
+    expect(실측("admin"), "전역표 도입으로 이름 가로채기 대장이 바뀌었다 — allowlist가 순진판처럼 새고 있다").toEqual(대장);
+  });
+
+  it("★★ 화면 안내는 쓰기 흐름을 삼키지 않는다 — 전수", () => {
+    // 승인·배정·할당·맡김이 붙은 말을 화면 안내가 한 수로 삼키면 그 지시는 영영 안 간다
+    // (B5·B7·B10이 배열 밖 explain 분기에 건 잣대와 같은 것을 이 층에도 건다).
+    const 쓰기꼬리 = ["알려주고 승인해줘", "알려주고 배정해줘", "알려주고 할당해줘", "알려주고 맡겨줘", "알려주고 담당자 정해줘", "알려주고 조치해줘"];
+    const 이름들: { screen: string; name: string }[] = [
+      ...구역이름들(),
+      ...구역별칭들().map((a) => ({ screen: a.screen, name: a.shown })),
+    ];
+    const 샌곳: string[] = [];
+    for (const a of 이름들) {
+      for (const t of 쓰기꼬리) {
+        const q = `${a.name} ${t}`;
+        for (const sc of a.screen ? [a.screen] : 안내화면열쇠들()) {
+          if (isHelpIntent(q, sc, "admin")) 샌곳.push(`${sc}|${q}`);
+        }
+      }
+    }
+    expect(샌곳, "화면 안내가 쓰기 흐름을 삼킨다(승인·배정·할당·맡김이 영영 안 간다): " + 샌곳.slice(0, 10).join(" · ")).toEqual([]);
+
+    // 반증 — 잣대(쓰기흐름인가)가 없던 수리 전에는 아래 넷이 전부 isHelpIntent=true였다.
+    const 반증문장: [string, string | undefined][] = [
+      ["현황판 알려주고 배정해줘", undefined],
+      ["옅은 숫자 알려주고 김보안한테 맡겨줘", undefined],
+      ["근거 지정 알려주고 담당자 정해줘", "mydocs.html"],
+      ["고칠 것 알려주고 할당해줘", "supervision.html"],
+    ];
+    for (const [q, sc] of 반증문장) {
+      expect(isHelpIntent(q, sc, "admin"), `${q}: 화면 안내가 쓰기 흐름을 삼킨다(수리 전 실측 true)`).toBe(false);
+    }
+  });
+
+  it("★ 「알려줘 ↔ 보여줘」 대칭이 전역 구역에서도 깨지지 않는다", () => {
+    // ⚠ 기존 위 시험과 **같은 잣대**다 — 강제 도구가 없는 이름은 게이트(홑물음_RE)가 원래부터
+    //   「알려」와 「보여」를 가른다(「보여」는 정체물음_RE·값요구_RE 어느 쪽에도 안 걸린다).
+    //   그건 이 다섯 이름에도 똑같이 적용되는 **기존 계약**이지 이 라운드가 만든 비대칭이
+    //   아니다 — 그래서 위와 똑같이 forcedToolFor가 **둘 다** 있을 때만 잰다(지금은 다섯
+    //   전부 강제 도구가 없어 이 시험은 비어 돈다 — 강제 도구가 생기면 그때부터 값을 낸다).
+    // ⚠ 「알려줘 ↔ 뭐야?」는 **일부러** 갈린다(값 vs 뜻) — 그쪽은 재지 않는다(위 시험들이 그 쪽).
+    const 갈림: string[] = [];
+    for (const item of 대화창구역들()) {
+      const fa = forcedToolFor(`${item.글자} 알려줘`, { role: "admin" });
+      const fb = forcedToolFor(`${item.글자} 보여줘`, { role: "admin" });
+      if (!fa || !fb) continue;
+      const 화면들 = [...안내화면열쇠들(), undefined] as (string | undefined)[];
+      for (const sc of 화면들) {
+        if (isHelpIntent(`${item.글자} 알려줘`, sc, "admin") !== isHelpIntent(`${item.글자} 보여줘`, sc, "admin")) {
+          갈림.push(`${sc ?? "(대화 홈)"}|${item.글자}`);
+        }
+      }
+    }
+    expect(갈림, "전역 구역에서도 같은 뜻인데 답이 갈린다(알려줘 ↔ 보여줘): " + 갈림.join(" · ")).toEqual([]);
   });
 });

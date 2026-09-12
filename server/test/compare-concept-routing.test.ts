@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { 결정적도착지 } from "../src/engine/dispatcher";
 import { forcedToolFor, 비교개념질문 } from "../src/engine/agentloop";
-import { isHelpIntent } from "../src/engine/screenguide";
+import { isHelpIntent, formatScreenGuide } from "../src/engine/screenguide";
 import { 실제도착, 가로챈규칙 } from "./helpers/routing";
 
 describe("★ 「A랑 B 뭐가 달라?」류는 explain(topic=원문)으로 결정적으로 간다", () => {
@@ -198,6 +198,27 @@ describe("★★ [중] 화면 구역 이름은 안 뺏는다 — 그 뜻풀이�
   it("★ 구역 이름과 안 겹치는 비교 물음은 그대로 explain이다(막는 범위가 좁다)", () => {
     expect(forcedToolFor("EPSS랑 VPR 뭐가 달라?", { role: "admin" } as never)?.tool).toBe("explain");
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ★ B12(2026-09-12) — B7이 「닫았다」고 적은 자리가 실은 「비켜만 주고 안 닿았다」였다.
+//  B7 ①은 agentloop.구역이름물음으로 비교 분기를 비켜 주었을 뿐이고, 그 뒤 isHelpIntent가
+//  자기 안에서 forcedToolFor를 다시 보느라 「알려줘」 꼬리는 여전히 화면 안내를 못 얻었다
+//  (「뭐야?」만 살아 있었다 — 위 195-197줄). resolvePanelHit 셋째 훑기(대화창구역들)가 열리며
+//  이제 대화 홈에서도 진짜로 닿는다.
+// ═══════════════════════════════════════════════════════════════════════════════
+describe("★ B12 — 「AI 포함과 공유의 차이」가 대화 홈에서도 화면 안내로 닿는다", () => {
+  it("결정적도착지가 [22] 화면 사용 안내를 고른다(화면 없이도)", async () => {
+    const 걸림 = await 결정적도착지("AI 포함과 공유의 차이 뭐야?", { 역할: "admin" });
+    expect(걸림[0]?.이름).toBe("화면 사용 안내");
+    expect(걸림[0]?.도착).toBe("formatScreenGuide(지금 화면)");
+  });
+  it("본문도 실제로 mydocs 구역 설명이다(폴백 문구 아님)", () => {
+    const 답 = formatScreenGuide(undefined, "AI 포함과 공유의 차이 뭐야?");
+    expect(답).toMatch(/^내 문서 › AI 포함과 공유의 차이/);
+    expect(답).toContain("팀 전체의 답변 근거");
+  });
+  // 기존 69개 기대값이 이 변경으로 안 흔들렸는지는 위 두 describe(양성 18·이웃 24)가 그대로 지킨다.
 });
 
 describe("★ 잎 함수 직접 — 차이어 없이는 안 걸린다", () => {

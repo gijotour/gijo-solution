@@ -87,4 +87,20 @@ describe("★ 소스 감시 — 배열 밖 분기는 전부 writeflow.쓰기흐�
     expect(pl.includes('from "./writeflow"'), "picklist가 잣대를 자기 낱말 목록으로 되돌렸다").toBe(true);
     expect(/isFindingListAsk[\s\S]{0,600}쓰기흐름인가\(/.test(pl), "isFindingListAsk 입구의 가드가 사라졌다").toBe(true);
   });
+
+  // ★★ 네 번째 이관(B12, 2026-09-12) — 층이 dispatcher/agentloop/picklist가 아니라
+  //   **screenguide.isHelpIntent**다. 화면 안내가 [22]에서 강제 도구보다 먼저 채 가므로
+  //   같은 구멍(「…알려주고 승인해줘」가 한 수로 끝난다)이 이 층에도 그대로 났었다.
+  it("screenguide.isHelpIntent도 같은 잣대를 부른다 — 소스 감시", () => {
+    const sg = fs.readFileSync(path.join(__dirname, "../src/engine/screenguide.ts"), "utf8").split(/\r?\n/);
+    const 전문 = sg.join("\n");
+    expect(전문.includes('from "./writeflow"'), "screenguide.ts가 writeflow의 잣대를 안 부른다").toBe(true);
+    const 시작 = sg.findIndex((l) => l.startsWith("export function isHelpIntent"));
+    expect(시작, "isHelpIntent를 못 찾았다 — 함수 이름이 바뀌었으면 이 시험도 함께 고친다").toBeGreaterThan(0);
+    let 끝 = -1;
+    for (let i = 시작 + 1; i < sg.length; i++) if (/^\}\s*$/.test(sg[i])) { 끝 = i; break; }
+    expect(끝, "isHelpIntent의 닫는 괄호를 못 찾았다").toBeGreaterThan(시작);
+    const 몸통 = sg.slice(시작, 끝 + 1).join("\n");
+    expect(몸통.includes("쓰기흐름인가("), "isHelpIntent 본문에 쓰기흐름인가 가드가 사라졌다").toBe(true);
+  });
 });

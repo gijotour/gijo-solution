@@ -222,8 +222,10 @@ describe("「○○ 하려면 어떻게 해?」는 그 화면 안내로 간다 �
   it("★ dispatcher가 실제로 이 갈래를 부른다 — 만들어 두고 안 부르면 없는 것과 같다", () => {
     expect(/const 방법화면 = 방법질문화면찾기\(instructionText\);/.test(dispatcherSrc)).toBe(true);
     // isHelpIntent보다 앞이어야 한다(다른 화면 이름을 대고 물을 때 엉뚱한 안내를 막는다).
+    // ⚠ B12 수리(2026-09-12)로 실호출에 넷째 인자(에디션)가 붙어 정확한 괄호닫힘 꼴이
+    //   바뀌었다 — 그 뒤 인자와 무관하게 앞뒤 순서만 재도록 접두어로 찾는다.
     expect(dispatcherSrc.indexOf("방법질문화면찾기(instructionText)")).toBeLessThan(
-      dispatcherSrc.indexOf("isHelpIntent(instructionText, screen)"),
+      dispatcherSrc.indexOf("isHelpIntent(instructionText, screen,"),
     );
   });
 });
