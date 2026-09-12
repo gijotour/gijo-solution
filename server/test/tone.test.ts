@@ -189,19 +189,63 @@ describe("★ EPSS 표기 — 한 곳에서 만들고, 크기를 거짓말하지
   // ★ 소스 감시 — 「제품 전체가 단일 출처인가」는 여기서만 물을 수 있다.
   //   agenttools-cross.test.ts의 감시는 agenttools 3파일만 읽어 approvals·analysishub를 못 본다
   //   (그 제목을 좁힌 이유). 이 감시는 엔진 전 파일을 읽는다.
-  it("★ 엔진에서 EPSS 글자를 조립하는 파일은 tone.ts뿐이다 (예외는 이유와 함께)", () => {
+  it("★ 엔진에서 EPSS(악용예측) 값을 글자로 만드는 파일은 tone.ts뿐이다 (예외는 이유와 함께)", () => {
     // 예외 — 지우려면 이유부터 지운다.
     const 예외: Record<string, string> = {
-      "report.ts": "격식 문서(DOCX·HTML 리포트)는 소수 한 자리(97.4%)와 SLA 근거의 정수(97%)를 따로 쓴다 — 대화 표기와 정밀도 규약이 다르다. 합치려면 리포트 산출물 회귀를 함께 봐야 해서 이번 라운드 밖으로 둔다(백로그).",
+      "report.ts":
+        "격식 문서(DOCX·HTML 리포트)는 소수 한 자리(97.4%)와 SLA 근거의 정수(97%)를 따로 쓴다 — 대화 표기와 정밀도 규약이 다르다. 합치려면 리포트 산출물 회귀를 함께 봐야 해서 이번 라운드 밖으로 둔다(백로그). " +
+        "⚠ 이 예외로 **남아 있는 병**을 적어 둔다(2026-09-12 검토관 적발): report.ts:380·1045의 `(epss*100).toFixed(1)`은 EPSS 0.0004를 「EPSS 0.0%」로 적는다 — 값이 있는데 **없다고 단정하는 글자**다(같은 계열이 client/src/renderer/pages/vulnscan.html에도 1벌). " +
+        "정밀도 규약 때문에 미룬 것이지 병이 없어서가 아니다.",
     };
     const ENGINE = path.join(__dirname, "..", "src", "engine");
     const files = (fs.readdirSync(ENGINE, { recursive: true }) as string[]).filter((f) => f.endsWith(".ts"));
     // 감시가 헛도는지 스스로 잰다 — 엔진을 실제로 읽고 있어야 한다.
     expect(files.length, "엔진 파일을 못 읽었다 — 감시가 헛돈다").toBeGreaterThan(50);
-    const 조립한파일 = files.filter((f) => /EPSS \$\{/.test(fs.readFileSync(path.join(ENGINE, f), "utf8")));
-    const 뜻밖 = 조립한파일.filter((f) => path.basename(f) !== "tone.ts" && !예외[path.basename(f)]);
-    expect(뜻밖, `EPSS 글자를 따로 조립하는 자리가 늘었다 — tone.epss표기를 부르거나, 예외 목록에 **이유**를 적을 것:\n  ${뜻밖.join("\n  ")}`).toEqual([]);
+
+    // ⚠ **낱말이 하나가 아니다**(2026-09-12 B11에서 밟음). 대화·화면은 「EPSS 」로 적지만
+    //   오늘의 브리핑은 쉬운 말 계약이라 「악용예측 」으로 적는다. 낱말 하나만 감시하면
+    //   **다른 낱말로 같은 병이 재발**한다 — 실제로 today.ts의 「악용예측 0%」가 이 감시를
+    //   원리상 안 지나간 채 한 달 뒤(2026-09-12) 두 번째로 났다.
+    const 낱말 = /(?:EPSS|악용예측) \$\{/;
+    // 그 줄에서 스스로 크기를 계산하면, 그 자리가 곧 두 번째 반올림 잣대다.
+    const 스스로계산 = /Math\.round|toFixed|\*\s*100/;
+    // tone의 단일 출처를 거치는 파일인가(값만 받는 epss값표기 포함 — today.ts가 그 길이다).
+    const 단일출처호출 = /\bepss(?:값)?표기\s*\(/;
+
+    const 조립한파일: string[] = [];
+    const 뜻밖: string[] = [];
+    for (const f of files) {
+      const src = fs.readFileSync(path.join(ENGINE, f), "utf8");
+      const 조립줄 = src.split("\n").filter((l) => 낱말.test(l));
+      if (!조립줄.length) continue;
+      조립한파일.push(f);
+      const base = path.basename(f);
+      if (base === "tone.ts" || 예외[base]) continue;
+      if (조립줄.some((l) => 스스로계산.test(l))) 뜻밖.push(`${f} — 글자를 만드는 줄에서 직접 반올림한다`);
+      else if (!단일출처호출.test(src)) 뜻밖.push(`${f} — tone.epss표기·epss값표기를 안 부른다`);
+    }
+    expect(
+      뜻밖,
+      `EPSS(악용예측) 값을 따로 글자로 만드는 자리가 늘었다 — tone.epss표기(낱말까지)나 tone.epss값표기(값만)를 부르거나, 예외 목록에 **이유**를 적을 것:\n  ${뜻밖.join("\n  ")}`,
+    ).toEqual([]);
     expect(조립한파일.some((f) => path.basename(f) === "tone.ts"), "단일 출처가 사라졌다 — tone.ts가 EPSS 글자를 만들지 않는다").toBe(true);
+  });
+
+  // ★ 클라 사본 감시 (2026-09-12 검토관 적발) — 단일 출처는 **서버 안에서만** 성립한다.
+  //   렌더러는 서버 코드를 못 불러 승인 화면이 규칙을 손으로 옮겨 적었다(1라운드가 알고 남긴 사본).
+  //   위 감시는 server/src/engine만 읽어 이 사본의 어긋남을 원리상 못 본다 — 그래서 짝을 따로 잰다.
+  //   글자를 베끼지 않고 **tone.ts 소스에서 문턱을 읽어** 맞춘다(여기 숫자를 또 적으면 잣대가 셋이 된다).
+  it("★ 승인 화면(클라 사본)의 「1% 미만」 문턱이 tone.ts와 같다", () => {
+    const tone소스 = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "tone.ts"), "utf8");
+    const 문턱 = /epss > 0 && epss < ([\d.]+)/.exec(tone소스)?.[1];
+    expect(문턱, "tone.ts에서 「1% 미만」 문턱을 못 찾았다 — 규칙이 바뀌었으면 이 감시도 함께 고친다").toBeTruthy();
+
+    const 사본 = path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "approvals.html");
+    expect(fs.existsSync(사본), `클라 사본이 여기 없다 — 화면을 옮겼으면 이 감시의 경로도 옮긴다: ${사본}`).toBe(true);
+    // ⚠ html 자체를 expect에 넣지 않는다 — 어긋났을 때 화면 파일 전체(1,000줄)가 게이트 출력에 쏟아진다.
+    const html = fs.readFileSync(사본, "utf8");
+    expect(html.includes(`< ${문턱}`), `승인 화면의 문턱이 tone.ts(${문턱})와 어긋난다 — 규칙을 옮겨 적은 사본이라 손으로 맞춰야 한다: ${사본}`).toBe(true);
+    expect(html.includes("1% 미만"), "승인 화면에서 「1% 미만」 표기가 사라졌다 — 0.5% 미만이 다시 「0%」로 나가고 있는지 본다").toBe(true);
   });
 });
 

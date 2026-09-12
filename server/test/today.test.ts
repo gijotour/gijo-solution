@@ -159,6 +159,29 @@ describe("오늘의 할일 — 가이드형 집계", () => {
       expect(item?.why).not.toContain("악용예측");
       expect(item?.epssLabel).toBeUndefined();
     });
+
+    // ★ 검토관 적발(2026-09-12): 호스트 정렬이 **표시 글자(why)**에서 정규식으로 %를 되팔고 있었다.
+    //   표기가 「1% 미만」을 내기 시작하자 EPSS 0.004가 「1」로 읽혀 0.012(「1%」)와 동점이 된다
+    //   — 표기를 바꿀 때마다 순서가 조용히 따라 바뀌는 구조다. 정렬은 원값으로 해야 한다.
+    it("★ 호스트 순서는 EPSS 원값으로 정한다 — 표기(「1% 미만」)를 되팔지 않는다", async () => {
+      registerAsset({ id: "srv-2", name: "web-01", path: "hosts/web-01" });
+      // 넣는 순서를 일부러 뒤집어 둔다: 낮은 EPSS 호스트가 우선순위 점수(VPR 가산)로 **먼저** 들어온다
+      // (approvals.priorityScore = kev*1000 + epss*100 + vpr*5 + 심각도 → 낮음 14.4 · 높음 5.2).
+      // 그래서 글자를 되파는 옛 정렬로는 동점이 되어 oracle.local이 앞에 남는다.
+      const 낮음 = { ...PLAIN_FINDING, severity: "critical", epss: 0.004, vpr: 2 } as StandardFinding;
+      const 높음 = { ...PLAIN_FINDING, severity: "critical", epss: 0.012 } as StandardFinding;
+      recordFindings("srv-1", [낮음]);
+      recordFindings("srv-2", [높음]);
+      // 둘 다 KEV가 아니라 기한이 걸려야 오늘 목록에 오른다.
+      updateFindingReview("srv-1", findingKey("srv-1", 낮음), { dueDate: ymd(-1) }, "tester");
+      updateFindingReview("srv-2", findingKey("srv-2", 높음), { dueDate: ymd(-1) }, "tester");
+
+      const t = await buildToday(false);
+      expect(t.items.filter((i) => i.axis === "vuln").map((i) => i.subtitle)).toEqual(["web-01", "oracle.local"]);
+      // 두 호스트의 글자는 정규식으로 되팔면 똑같이 「1」이다 — 그래서 글자로는 이 순서가 안 나온다.
+      expect(t.items.find((i) => i.subtitle === "oracle.local")?.why).toContain(`최고 악용예측 ${epss값표기(0.004)}`);
+      expect(t.items.find((i) => i.subtitle === "web-01")?.why).toContain(`최고 악용예측 ${epss값표기(0.012)}`);
+    });
   });
 
   it("기한이 안 걸린 일반 취약점은 오늘 목록에 넣지 않는다 — 화면을 백로그로 채우지 않는다", async () => {

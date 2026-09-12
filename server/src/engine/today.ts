@@ -156,7 +156,9 @@ function vulnItems(now: number): TodayItem[] {
     groups.set(key, g);
   }
 
-  const out: TodayItem[] = [];
+  // 정렬 키(KEV·EPSS 원값)를 항목과 함께 들고 다닌다 — 아래 정렬이 **표시 글자**에서 숫자를
+  // 되파지 않게 하려는 것이다(2026-09-12 검토관 적발, 자세한 이유는 정렬 주석에).
+  const rows: { item: TodayItem; kev: boolean; epss: number }[] = [];
   for (const g of groups.values()) {
     const due = g.earliestDue != null ? dueLabel(g.earliestDue, now) : null;
     const overdue = due != null && due.overdueDays > 0;
@@ -185,32 +187,40 @@ function vulnItems(now: number): TodayItem[] {
       due ? due.label : "",
     ].filter(Boolean);
 
-    out.push({
-      id: `vulnhost:${g.assetId}`,
-      axis: "vuln",
-      urgency: g.kev || overdue ? "now" : "today",
-      title: "취약점 점검",
-      subtitle: g.assetName, // 대상 호스트
-      why: facts.join(" · "),
-      action: g.assignee
-        ? `담당 ${g.assignee} 배정됨 — 조치 확인 필요`
-        : "이 호스트의 취약점을 AI 팀에 맡기거나 담당자를 지정하세요",
-      badges,
-      ref: g.assetId,
+    rows.push({
       kev: g.kev,
-      epssLabel: epssLabel || undefined,
+      // 정렬용 원값. 값이 없는 호스트는 종전대로 0과 같은 자리에 둔다(정렬 한정 — 표기에서는 위에서 뺀다).
+      epss: g.maxEpss ?? 0,
+      item: {
+        id: `vulnhost:${g.assetId}`,
+        axis: "vuln",
+        urgency: g.kev || overdue ? "now" : "today",
+        title: "취약점 점검",
+        subtitle: g.assetName, // 대상 호스트
+        why: facts.join(" · "),
+        action: g.assignee
+          ? `담당 ${g.assignee} 배정됨 — 조치 확인 필요`
+          : "이 호스트의 취약점을 AI 팀에 맡기거나 담당자를 지정하세요",
+        badges,
+        ref: g.assetId,
+        kev: g.kev,
+        epssLabel: epssLabel || undefined,
+      },
     });
   }
 
-  // 호스트 정렬: KEV → 악용예측 → 심각도 → 건수
-  out.sort((a, b) => {
-    const ak = a.badges.includes("KEV") ? 1 : 0;
-    const bk = b.badges.includes("KEV") ? 1 : 0;
-    if (ak !== bk) return bk - ak;
-    const num = (s: string) => Number(/(\d+)%/.exec(s)?.[1] ?? 0);
-    return num(b.why) - num(a.why);
+  // 호스트 정렬: KEV 먼저 → 악용예측(EPSS 원값) 내림차순. 동점은 넣은 순서를 그대로 둔다
+  // (넣은 순서 = approvals.prioritizedReviews의 우선순위 점수순이고, Array.sort는 안정 정렬이다).
+  //
+  // ⚠ **표시 글자에서 숫자를 되파지 않는다**(2026-09-12 검토관 적발). 여기 있던
+  //   `Number(/(\d+)%/.exec(why))`는 정렬 기준을 화면 문장에서 뽑고 있었다 — 표기를
+  //   「1% 미만」으로 바꾸자 EPSS 0.004가 1로 읽혀 0.012(「1%」)와 동점이 됐다(순서가 조용히 섞인다).
+  //   표기는 앞으로도 바뀐다(tone.epss값표기가 단일 출처다). 값은 원값 한 곳에서만 읽는다.
+  rows.sort((a, b) => {
+    if (a.kev !== b.kev) return a.kev ? -1 : 1;
+    return b.epss - a.epss;
   });
-  return out;
+  return rows.map((r) => r.item);
 }
 
 // ── 보안장비 운영 축(주기) ──────────────────────────────────────────────────
