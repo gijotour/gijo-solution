@@ -91,6 +91,11 @@ describe("★ 소스 감시 — 배열 밖 분기는 전부 writeflow.쓰기흐�
   // ★★ 네 번째 이관(B12, 2026-09-12) — 층이 dispatcher/agentloop/picklist가 아니라
   //   **screenguide.isHelpIntent**다. 화면 안내가 [22]에서 강제 도구보다 먼저 채 가므로
   //   같은 구멍(「…알려주고 승인해줘」가 한 수로 끝난다)이 이 층에도 그대로 났었다.
+  // ⚠ 이 층만은 **뒷가지**(쓰기명령꼴인가 = 문장 끝 명령꼴)를 부른다. 앞가지(isAssign)는 문장
+  //   끝 고정이 아니라 「배정」 낱말만 있으면 참이라, 안내 층에 그대로 걸었더니 시키는 말이
+  //   아닌 **사용법 물음**까지 죽었다(실측 대조쌍: 「배정 도움말」⑨ ↔ 「승인 도움말」[22] ·
+  //   「배정 사용법 알려줘」⑨ ↔ 「일괄 처리 사용법 알려줘」[22] — 2026-09-12 검토관 [상]).
+  //   삼킴을 막는 데는 뒷가지면 충분하다(삼켜서 문제가 된 말은 전부 문장 끝 명령꼴이다).
   it("screenguide.isHelpIntent도 같은 잣대를 부른다 — 소스 감시", () => {
     const sg = fs.readFileSync(path.join(__dirname, "../src/engine/screenguide.ts"), "utf8").split(/\r?\n/);
     const 전문 = sg.join("\n");
@@ -100,7 +105,20 @@ describe("★ 소스 감시 — 배열 밖 분기는 전부 writeflow.쓰기흐�
     let 끝 = -1;
     for (let i = 시작 + 1; i < sg.length; i++) if (/^\}\s*$/.test(sg[i])) { 끝 = i; break; }
     expect(끝, "isHelpIntent의 닫는 괄호를 못 찾았다").toBeGreaterThan(시작);
-    const 몸통 = sg.slice(시작, 끝 + 1).join("\n");
-    expect(몸통.includes("쓰기흐름인가("), "isHelpIntent 본문에 쓰기흐름인가 가드가 사라졌다").toBe(true);
+    // ⚠ **주석을 떼고 잰다** — 이 파일의 주석에는 두 이름이 설명으로 등장한다(실측: 안 떼면
+    //   「안 부른다」를 확인할 수 없어 아래 둘째 단언이 언제나 빨갛다). 재는 것은 **코드**다.
+    const 몸통 = sg.slice(시작, 끝 + 1)
+      .map((l) => l.replace(/\/\/.*$/, ""))
+      .join("\n")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(몸통.includes("쓰기명령꼴인가("), "isHelpIntent 본문에 쓰기 명령 가드가 사라졌다").toBe(true);
+    expect(몸통.includes("쓰기흐름인가("), "안내 층에 넓은 앞가지(isAssign 포함)를 다시 걸었다 — 배정 사용법 물음이 죽는다").toBe(false);
+  });
+
+  // ★ 잣대의 낱말은 **한 곳**에만 적혀 있다 — 쓰기흐름인가도 쓰기명령꼴인가를 부른다.
+  it("writeflow의 두 이름이 같은 정규식 하나를 쓴다(베낀 사본 0)", () => {
+    const wf = fs.readFileSync(path.join(__dirname, "../src/engine/writeflow.ts"), "utf8");
+    expect(/export function 쓰기명령꼴인가/.test(wf), "쓰기명령꼴인가가 없다").toBe(true);
+    expect(/return isAssign \|\| 쓰기명령꼴인가\(instruction\);/.test(wf), "쓰기흐름인가가 정규식을 따로 베껴 적었다").toBe(true);
   });
 });

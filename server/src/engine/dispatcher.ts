@@ -1788,7 +1788,10 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     // ⚠ 에디션을 함께 넘긴다(2026-08-18) — 라이트 챗은 screen을 안 보내는데(lite-chat.html),
     //   그러면 개요가 나가고 그 개요가 **표준 콘솔 설명**이라 라이트에 없는 기능을 가르쳤다.
     //   ⚠ B12 수리(2026-09-12) — isHelpIntent에도 같은 에디션을 넘긴다. 안 넘기면 대화 홈
-    //   전역 훑기(대화창구역들)가 라이트에 없는 화면(supervision·approvals)의 구역까지 연다.
+    //   전역 훑기(대화창구역들)가 **라이트 챗에 없는 기능**(☑ 근거 지정·📎 첨부)의 구역까지 연다.
+    //   ⚠ 첫 판은 여기에 「라이트에 없는 화면(supervision·approvals)」이라 적었는데 거짓이었다
+    //   (전역표에 그 화면은 한 줄도 없다) — 2026-09-12 검토관 [중] 정정. 근거는 screenguide.ts
+    //   isHelpIntent 머리말 한 곳에 적었다.
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText, 에디션제한중()), sources: [] };
   }
 

@@ -18,7 +18,7 @@ import { forcedToolFor } from "./agentloop";
 // 「조회 + 쓰기 지시」 판정의 유일한 권위 — 정규식을 여기 또 적지 않는다(B12 화면 안내 수리).
 // ⚠ writeflow.ts는 **아무것도 import하지 않는 잎 모듈**이라 순환이 원리상 안 생긴다
 //   (writeflow.ts:11 머리말) — agentloop처럼 「함수 안에서만 부른다」는 제약이 필요 없다.
-import { 쓰기흐름인가 } from "./writeflow";
+import { 쓰기명령꼴인가 } from "./writeflow";
 // 지금 묻고 있는 사람 — **역할(role)**을 집어 오는 자리(2026-09-08 검토관 [중] 수리).
 // ⚠ 왜: forcedToolFor는 역할을 안 주면 requiredRole:"admin" 도구를 후보에서 뺀다. 역할 없이
 //   물으면 admin 전용 강제 도구가 **없는 것처럼 보여** 아래 비켜주기가 안 타고 안내가 그대로
@@ -322,6 +322,10 @@ function resolvePanelHit(
     for (const item of 대화창구역들()) {
       const n = normalizeName(item.글자);
       if (!nq.includes(n)) continue;
+      // ⚠ 앞말 배제 — 이름이 **더 긴 말의 부분**으로 들어온 것이면 제품 기능이 아니다
+      //   (「개인정보 처리 법적 **근거 지정** 어떻게 해?」 · 2026-09-12 검토관 [상] 실측).
+      //   화면 위(첫째 훑기)에는 안 건다 — 거기는 문맥이 있어 사람이 그 화면을 보며 묻는다.
+      if (item.배제?.test(nq)) continue;
       if (best && n.length <= normalizeName(best.matched).length) continue;
       const g = GUIDES[item.screen];
       if (!g?.panels?.[item.real]) continue; // 죽은 줄 — 값이 실재하지 않으면 조용히 건너뛴다
@@ -354,6 +358,25 @@ export function 죽은구역별칭(): { screen: string; shown: string; real: str
   }
   for (const [shown, real] of Object.entries(CONSOLE_PANEL_ALIASES)) {
     if (!OVERVIEW.panels?.[real]) out.push({ screen: "(공통 OVERVIEW)", shown, real });
+  }
+  return out;
+}
+
+/**
+ * **전역표(대화창구역들)의 죽은 줄** — 값이 실재하지 않는 줄. 위 죽은구역별칭과 같은 병이다.
+ * **비어 있어야 정상.**
+ *
+ * ■ 왜 제품 쪽에 두나(2026-09-12 검토관 [하] 적발): 시험이 `getScreenGuide(screen).panels`로
+ *   재고 있었는데, 제품의 셋째 훑기는 `GUIDES[item.screen]`을 **직접** 본다. 둘은 다르다 —
+ *   getScreenGuide는 모르는 열쇠에 **OVERVIEW로 폴백**하므로, 화면 열쇠를 오타 내고 그 이름이
+ *   마침 공통 구역에 있으면 **시험은 초록·제품은 영영 안 걸리는** 죽은 줄이 생긴다. 이 파일이
+ *   막으려고 만들어진 바로 그 부류다(aliaspair.test 머리말). 판정은 제품 한 곳에서 한다.
+ * ■ 짝 시험: server/test/aliaspair.test.ts — 시험은 이 결과만 본다(소스를 다시 파싱하지 않는다).
+ */
+export function 죽은전역구역(): { screen: string; 글자: string; real: string }[] {
+  const out: { screen: string; 글자: string; real: string }[] = [];
+  for (const item of 대화창구역들()) {
+    if (!GUIDES[item.screen]?.panels?.[item.real]) out.push({ screen: item.screen, 글자: item.글자, real: item.real });
   }
   return out;
 }
@@ -419,21 +442,41 @@ export function 구역이름들(): { screen: string; name: string }[] {
  * ⚠ **홑낱말·강제 도구가 있는 이름은 올리지 않는다** — 「첨부」·「문서 지정」은 실측으로
  *   데이터 물음(N26·N30~N33)을 삼켰고, 강제 도구가 있는 이름(AI-BOM·견고성 점수 등)을
  *   올리면 panelname.test 대장이 16×38로 폭발한다(설계관 지시서 risks 참고 — 결정 대기).
+ * ⚠⚠ **제품 고유 이름만 올린다**(2026-09-12 검토관 [상] 수리 — 첫 판이 밟은 함정).
+ *   첫 판은 「격리 원리」를 올렸는데, 그것은 제품 고유명이 아니라 **일반 보안 용어**다. 화면
+ *   문맥 없이 글자만 보는 셋째 훑기에서 지식 물음이 통째로 걸렸다 — 실측 8문장 전부 [22]로
+ *   가서 「내 문서 › 격리 원리 / 격리는 … 검색 쿼리 단계의 하드 필터」라는 **확신 있는 오답**이
+ *   나갔다(sources=[] · ⚠근거 약함 표시도 없다 — B12 원증상보다 나쁘다):
+ *     「망 격리 원리 뭐야?」·「네트워크 격리 원리가 뭐야?」·「망분리 격리 원리 설명해줘」·
+ *     「샌드박스 격리 원리 뭐야?」·「컨테이너 격리 원리 어떻게 돼?」·「VM 격리 원리 뭐야?」·
+ *     「감염 PC 격리 원리 뭐야?」·「랜섬웨어 감염 장비 격리 원리 알려줘」.
+ *   앞말 배제어로는 못 막는다(망·네트워크·컨테이너·VM·샌드박스·감염 PC·프로세스·세션…이
+ *   끝없다) — **표에서 뺐다.** 이 구역은 mydocs.html 위에서는 그대로 닿는다.
+ *   왜 착수 전 실측이 통과했나: 189문장 코퍼스에 이 부류가 **한 문장도 없었다**
+ *   (routes.ts:443이 이미 적어 둔 「음성 목록이 모자라면 실측은 통과해도 제품은 샌다」의 재발).
+ * ⚠ **글자가 더 긴 말의 부분이 되는 이름엔 앞말 배제어를 단다**(같은 수리). 「근거 지정」은
+ *   개인정보보호법의 「법적 근거 지정」·「처리 근거 지정」과 글자가 겹친다 — 실측 「개인정보
+ *   처리 법적 근거 지정 어떻게 해?」가 [22]로 갔다. 배제어는 **법 낱말만** 든다(제품 물음
+ *   「근거 지정 뭐야?」에는 이 낱말들이 안 붙는다 — 양성 24문장 실측으로 확인).
  */
-export function 대화창구역들(): { 글자: string; screen: string; real: string }[] {
+export function 대화창구역들(): { 글자: string; screen: string; real: string; 배제?: RegExp }[] {
   const mydocs = PANEL_ALIASES["mydocs.html"] ?? {};
   // ⚠ 함수 안에서 만든다(모듈 최상위 const로 두면 GUIDES·PANEL_ALIASES 초기화 순서에
   //   기대게 된다 — 함수는 호출 시점에만 평가되므로 그 걱정이 없다). routes.ts 차례 22의
   //   「왜」 문장이 가리키는 표가 바로 이것이다.
-  const 대화창에서도물을수있는구역: { 글자: string; screen: string; real: string }[] = [
+  const 대화창에서도물을수있는구역: { 글자: string; screen: string; real: string; 배제?: RegExp }[] = [
     // 「근거 지정과 첨부(📎)」는 구역 이름 그 자신이다(가리킬 별도 표가 없다).
     { 글자: "근거 지정과 첨부(📎)", screen: "mydocs.html", real: "근거 지정과 첨부(📎)" },
     // 아래 둘은 **별칭 표를 그대로 가리킨다**(글자를 베끼지 않는다) — PANEL_ALIASES["mydocs.html"]
     // 값이 바뀌면 이 표도 저절로 따라간다.
-    { 글자: "근거 지정", screen: "mydocs.html", real: mydocs["근거 지정"] },
+    // ⚠ 배제어는 **띄어쓰기를 없앤 물음**에 대고 잰다(resolvePanelHit의 nq와 같은 자) —
+    //   「법적 근거 지정」·「처리 근거 지정」처럼 개인정보보호법에서 쓰는 말이면 제품 기능이
+    //   아니다. 낱말은 법 조문에 실제로 쓰이는 것만 든다(적법·처리·수집·이용·제공·동의·위탁).
+    { 글자: "근거 지정", screen: "mydocs.html", real: mydocs["근거 지정"], 배제: /(법적|법률|적법|처리|수집|이용|제공|동의|위탁)근거지정/ },
     { 글자: "지난 작업 첨부", screen: "mydocs.html", real: mydocs["지난 작업 첨부"] },
     { 글자: "AI 포함과 공유의 차이", screen: "mydocs.html", real: "AI 포함과 공유의 차이" },
-    { 글자: "격리 원리", screen: "mydocs.html", real: "격리 원리" },
+    // ⚠ 「격리 원리」는 **뺐다**(2026-09-12 검토관 [상] 수리) — 일반 보안 용어라 망·컨테이너·VM·
+    //   샌드박스 격리를 묻는 지식 물음 8문장이 전부 이 구역으로 끌려갔다. 머리말 참고.
   ];
   return 대화창에서도물을수있는구역;
 }
@@ -539,18 +582,36 @@ function hasSpecificSubject(text: string): boolean {
 //   dispatcher의 실경로는 runWithViewer 안에서 도니 저절로 채워지고, 꼬리표 밖(배치·시험·
 //   route-explain)에서는 명시로 준다. 둘 다 없으면 종전대로 역할 없이 재고, 그때는 admin
 //   전용 강제 도구가 후보에서 빠져 **안내가 이긴다**(안전한 쪽으로 틀린다).
-// ⚠ lite — 라이트에는 supervision·approvals 화면이 없다(LITE_OVERVIEW 머리말). 세 번째(전역)
-//   훑기가 켜진 채로 있으면 없는 화면의 구역을 안내하게 된다 — 이 파일 머리말이 스스로 못박은
-//   원칙(그라운딩)의 위반이다. lite=true면 resolvePanelHit·panelNameHit 모두 전역 훑기를 끈다.
+// ⚠ lite — **라이트 대화창(lite-chat.html)에 ☑ 근거 지정·📎 첨부가 없다**(실측 grep 0건).
+//   전역표 넷은 전부 그 기능을 설명하는 구역이라, 라이트 대화 홈에서 열면 **없는 기능**을
+//   안내하게 된다 — 이 파일 머리말이 스스로 못박은 원칙(그라운딩)의 위반이다.
+//   lite=true면 resolvePanelHit·panelNameHit 모두 전역 훑기를 끈다.
+// ⚠⚠ 2026-09-12 검토관 [중] 정정 — 첫 판은 근거를 「라이트엔 mydocs.html이 없다(supervision·
+//   approvals가 없다)」라고 적었는데 **둘 다 사실이 아니다.** 전역표에 supervision·approvals는
+//   한 줄도 없고, 라이트에도 「내 문서」가 있다 — client/src/renderer/pages/lite-mydocs.html은
+//   화면이 아니라 **이름표**라서 `location.replace`로 프로 mydocs.html로 넘긴다(lite-screens.json
+//   no.8 「프로의 「내 문서」를 **그대로** 쓴다」). 근거가 거짓이면 다음 사람이 「라이트에도 내
+//   문서가 있네」를 확인하는 순간 이 차단을 뒤집는다 — 그러면 라이트에 없는 ☑·📎 설명이
+//   그대로 나간다. 그래서 진짜 이유(라이트 챗에 그 UI가 없다)로 바꿔 적는다.
 export function isHelpIntent(text: string, screen?: string, role?: string, lite = false): boolean {
   const t = text.trim();
-  // ★ 화면 안내는 **쓰기 흐름**을 삼키지 않는다(B12 수리 — 설계관 지시서는 이 가드를 구역
+  // ★ 화면 안내는 **쓰기 명령**을 삼키지 않는다(B12 수리 — 설계관 지시서는 이 가드를 구역
   //   이름 갈래(아래 hit 분기) 안에만 걸라고 했으나, 그러면 HELP_RE 강한 가지가 먼저 채 간다
   //   ("시작 가이드 알려주고 승인해줘"·"활용 가이드 알려주고 배정해줘" — `가이드\s*(줘|알려|보여)`
   //   가 구역 이름과 무관하게 그 자리에서 이미 true를 반환한다). 실측(panelname.test 전수)으로
-  //   드러나 **맨 앞으로 옮겼다**(설계관 지시서 대비 편차 — 이유는 위와 같다). 판정은 그대로
-  //   writeflow.쓰기흐름인가 한 곳(단일 출처)이 한다.
-  if (쓰기흐름인가(t)) return false;
+  //   드러나 **맨 앞으로 옮겼다**(설계관 지시서 대비 편차 — 이유는 위와 같다).
+  // ★★ 2026-09-12 검토관 [상] 수리 — 잣대를 **문장 끝 명령꼴**(쓰기명령꼴인가)로 좁혔다.
+  //   처음에는 쓰기흐름인가(=isAssign ‖ 명령꼴)를 그대로 걸었는데, isAssign은 **문장 끝 고정이
+  //   아니라** 「배정」이라는 낱말만 있으면 참이다. 그래서 시키는 말이 아닌 **사용법 물음**까지
+  //   안내를 통째로 잃었다 — 낱말 하나만 바꾼 대조쌍 실측:
+  //     「배정 도움말」⑨ ↔ 「승인 도움말」[22] · 「배정 사용법 알려줘」⑨ ↔ 「일괄 처리 사용법
+  //     알려줘」[22] · 「이 화면에서 배정 어떻게 해?」⑨ ↔ 「이 화면에서 승인 어떻게 해?」[22] ·
+  //     「기한 설정 화면 사용법 알려줘」⑨ ↔ 「알림 설정 화면 사용법 알려줘」[22].
+  //   삼킴을 막는 데는 뒷가지만으로 충분하다 — 삼켜서 문제가 된 말은 전부 문장 끝 명령꼴이다
+  //   (「…알려주고 승인해줘/배정해줘/할당해줘/맡겨줘/담당자 정해줘/조치해줘」 · 전수 시험
+  //   panelname.test의 쓰기꼬리 여섯·반증문장 넷이 그대로 초록이다). 판정은 그대로
+  //   writeflow 한 곳(단일 출처)이 하고, 여기서는 **어느 가지를 쓸지만** 고른다.
+  if (쓰기명령꼴인가(t)) return false;
   const strong = HELP_RE.test(t) && !(WEAK_HELP_RE.test(t) && !/(이\s*화면|여기|이\s*메뉴|이\s*페이지|도움말|사용법|사용\s*방법)/.test(t));
   if (strong) return true;
   if (WEAK_HELP_RE.test(t) && !hasSpecificSubject(t)) return true;
@@ -576,7 +637,15 @@ export function isHelpIntent(text: string, screen?: string, role?: string, lite 
     //   (정체물음이어도). 같은 화면 위에 있을 때는 문맥이 있어 「○○ 뭐야?」가 안내를 이겨도
     //   되지만, 대화 홈에는 문맥이 없다(B12 수리 2026-09-12). 이 한 줄이 N11「근거 지정 규정
     //   뭐야?」(→explain)를 지킨다 — 정체물음이라 아래 완화 조건은 통과하지만 여기서 막힌다.
-    if (hit.global && 강제) return false;
+    // ★★ 2026-09-12 검토관 [중] 수리 — **값요구 꼬리도 전역에서는 진다.** 첫 판은 「강제 도구가
+    //   있을 때만」 물러섰는데, 전역표 이름 넷은 강제 도구가 **하나도 없어**(실측 forcedToolFor
+    //   전부 null) 「값을 달라는 말은 도구로 간다」는 이 파일의 계약이 전역에서만 꺼져 있었다.
+    //   실측(수리 전): 「근거 지정 목록 알려줘」·「근거 지정 현황 알려줘」·「지난 작업 첨부 목록
+    //   알려줘」가 목록 대신 사용 안내로 갔다 — 지정해 둔 문서를 물었는데 기능 설명문이 온다.
+    //   그래서 전역 히트는 **사유(정체물음·안내낱말)가 있을 때만** 이긴다. 「○○ 뭐야?」·
+    //   「○○ 어떻게 해?」는 그대로 안내이고(B12는 닫힌 채다), 「○○ 알려줘」·「○○ 보여줘」는
+    //   둘 다 ⑨로 간다 — 덤으로 「알려줘 ↔ 보여줘」 대칭이 전역에서도 성립한다(panelname.test).
+    if (hit.global && (강제 || !안내가이기는이유(t))) return false;
     if (!안내가이기는이유(t) && 강제) return false;
     // ⚠ 쓰기 흐름 가드는 함수 맨 앞으로 옮겼다(위 주석 참고) — 여기 다시 걸지 않는다.
     // ⚠ 구역 이름 자체에 영문이 들어 있으면(예: "구독 중인 CTI 피드", "이메일(SMTP) 설정")
