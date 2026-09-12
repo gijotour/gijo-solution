@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { 말투재기, 말투현황, 말투현황줄, resetToneWatchForTests } from "../src/engine/tonewatch";
+import { 말투위반 } from "../src/engine/tone";
 
 beforeEach(() => resetToneWatchForTests());
 
@@ -79,5 +80,20 @@ describe("기록이 쓸모 있는가", () => {
   it("이 시험이 헛돌고 있지 않다", () => {
     말투재기("q", "취약점 현황을 정리해 드리겠습니다.");
     expect(말투현황().위반, "감시가 아무것도 못 잡는다").toBe(1);
+  });
+
+  // B9(2026-09-12 야간 회귀 — 자기참조 적발): 이 자가 진단 줄이 「뜻이 겹치는 기호 ✅」를
+  // 그대로 이어붙여 "...규범을 벗어났습니다 (뜻이 겹치는 기호 ✅ 1)..."처럼 **위반을 인용하며
+  // 그 기호를 다시 써서** 스스로 규범에 걸렸다. 이름에서 기호만 떼고 건수는 그대로 낸다.
+  it("★ B9 — 자가 진단 줄이 위반 기호를 그대로 옮기지 않는다(자기참조 제거)", () => {
+    말투재기("q", "조치완료 처리했습니다 ✅ 확인.");
+    const 줄 = 말투현황줄()!;
+    expect(줄, "규칙 이름(어떤 항목인지)은 남아야 한다").toContain("뜻이 겹치는 기호");
+    expect(줄, "건수는 그대로 남아야 한다").toMatch(/뜻이 겹치는 기호\s*1/);
+    for (const 기호 of ["✅", "☑", "✔", "❌", "✖", "❎"]) {
+      expect(줄, `진단 줄이 위반 기호 ${기호}를 그대로 옮겼다`).not.toContain(기호);
+    }
+    // 진단 줄 자체를 다시 재도 규범을 어기지 않는다 — 감시가 감시 대상이 되면 안 된다.
+    expect(말투위반(줄), "진단 줄 자체가 다시 걸린다(자기참조가 안 없어졌다)").toEqual([]);
   });
 });

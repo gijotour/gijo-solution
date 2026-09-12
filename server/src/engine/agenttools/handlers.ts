@@ -654,6 +654,10 @@ export async function runExplain(args: Record<string, string>): Promise<string> 
     // 틀린 말이 된다(체크 안 한 문서에 답이 있을 수 있다). 표지 문장이 달라져 agentloop의
     // 자료없음배너도 안 붙는다 — 이 문장 자체가 정직한 최종 답이다.
     if (currentDocIds().length) {
+      // ⚠ 이 ☑는 「문서 지정」 체크박스를 **가리키는 이름표**다(llm.ts:950·noevidence.ts:35와 같은 관용구) —
+      //   tone.겹치는기호는 ✓와 뜻이 겹친다고 보지만, 여기 셋은 상태(좋음)가 아니라 **화면의 실제 조작 요소**를
+      //   가리킨다. 한 곳만 고치면 같은 기능을 자리마다 다른 기호로 말하게 되어 오히려 더 어긋난다 —
+      //   이번 수리(2026-09-12) 범위 밖으로 두고 별도 후속 과제로 남긴다(사전에 예외 장치가 없다).
       return `"${topic}"에 대해 지정하신 문서 범위(☑ ${currentDocIds().length}개)에서 찾은 근거가 없습니다. 문서 지정을 풀면 전체 사내 자료에서 다시 찾습니다.`;
     }
     return `"${topic}"에 대해 사내 온톨로지·문서·보안제품 등록부에서 찾은 근거가 없습니다. 일반 지식으로만 답하거나, 관련 문서를 업로드하면 근거가 쌓입니다.`;
@@ -2035,7 +2039,9 @@ export function runApprovalStatus(): string {
   //   「현황 조회엔 안 붙인다」 계약). 0건이면 갈 화면이 없으므로 되풀이가 아니라 마침말을 낸다.
   //   화면 이름은 screenguide.ts 화면위치 표가 출처다(「유지보수 점검 화면」은 제품에 없는 이름이었다).
   return 대기있음(fa.pending, 미배정, ms.reported)
-    ? `${예시데이터머리말()}${head}${다음걸음("취약점 결재는 ③ 조치 › ✅ 조치·승인 판에서, 점검 승인은 ③ 조치 › 🛠 정기 점검 판에서 처리하세요.")}`
+    // ⚠ 화면 메뉴 라벨의 ✅는 답 글에 그대로 옮기지 않는다(2026-09-12 야간 회귀 — 겹치는기호 ✓).
+    //   화면 이름은 낱말만 싣는다(dispatcher.ts:491 「③ 조치 › 「조치·승인」 화면」과 같은 꼴).
+    ? `${예시데이터머리말()}${head}${다음걸음("취약점 결재는 ③ 조치 › 조치·승인 판에서, 점검 승인은 ③ 조치 › 🛠 정기 점검 판에서 처리하세요.")}`
     : `${예시데이터머리말()}${head}\n지금은 결재·승인 둘 다 대기가 없습니다 — 생기면 다시 물어보세요.`;
 }
 
@@ -3759,7 +3765,8 @@ export async function runVerifyFinding(args: Record<string, string>): Promise<st
   const run = netmikoRunnerFor(target) ?? targetRunner(target);
   const raw = await runVerifyItems(items, run);
   const s = summarize(raw);
-  const lines = raw.slice(0, 8).map((r) => `- ${r.status === "PASS" ? "✅ 닫힘 확인" : r.status === "FAIL" ? "✕ 아직 열림" : "△ 확인 필요"} — ${r.title}`);
+  // ⚠ 상태 표식은 tone.ts 사전 상수로 — 글자 ✓를 새로 박지 않는다(2026-09-12 겹치는기호 수리).
+  const lines = raw.slice(0, 8).map((r) => `- ${r.status === "PASS" ? `${표식.좋음} 닫힘 확인` : r.status === "FAIL" ? "✕ 아직 열림" : "△ 확인 필요"} — ${r.title}`);
   return [
     `조치 검증(${asset.name} · 대상 ${target.label}) — 닫힘 확인 ${s.fixed} · 아직 열림 ${s.still} · 수동 확인 ${s.manual} (총 ${s.total})`,
     ...lines,
@@ -4308,7 +4315,8 @@ export async function runVexStatus(args: Record<string, string>): Promise<string
   return (
     `📄 VEX 현황 — ${범위글} · 실릴 취약점 **${doc.vulnerabilities.length}건**\n${줄}\n` +
     (CVE없음 > 0 ? `\n⚠ 대상 중 **${CVE없음}건은 CVE 번호가 없어 VEX에 안 실립니다**(표준이 CVE를 열쇠로 씁니다).\n` : "\n") +
-    `\n파일로 받으시려면 **③ 조치 › ✅ 조치·승인** 화면의 [VEX 내보내기]에서 받으세요 — 대화창은 파일을 건네지 못합니다.`
+    // ⚠ 화면 이름의 ✅를 답에 옮기지 않는다(2026-09-12 — 겹치는기호 ✓, 위 runApprovalStatus와 같은 수리).
+    `\n파일로 받으시려면 **③ 조치 › 조치·승인** 화면의 [VEX 내보내기]에서 받으세요 — 대화창은 파일을 건네지 못합니다.`
   );
 }
 
@@ -4408,7 +4416,8 @@ export async function runSetAiBomField(args: Record<string, string>): Promise<st
 
   // ⚠ 덮어쓴 사실을 **반드시 밝힌다** — 조용히 지우면 남이 적어 둔 명세가 사라진 걸 아무도 모른다.
   const 바뀜 = 이전 ? `이전 값이 있어 **덮어썼습니다** — 전: ${짧게(이전)}` : "(비어 있던 칸입니다)";
-  return `✅ "${asset.name}"의 AI-BOM **${칸.이름}**에 적었습니다.\n  · 후: ${짧게(값)}\n  · ${바뀜}${경고}\n\n전체 현황은 「AI-BOM 현황 알려줘」로 보실 수 있습니다.`;
+  // ⚠ 상태 표식은 tone.ts 사전 상수로(2026-09-12 겹치는기호 수리) — 위 runVerifyFinding과 같은 이유.
+  return `${표식.좋음} "${asset.name}"의 AI-BOM **${칸.이름}**에 적었습니다.\n  · 후: ${짧게(값)}\n  · ${바뀜}${경고}\n\n전체 현황은 「AI-BOM 현황 알려줘」로 보실 수 있습니다.`;
 }
 
 // ── 지원 종료(EOL) 점검 — 대화로 (2026-09-01 · 계획서 중-7 + 전-4) ─────────────────────

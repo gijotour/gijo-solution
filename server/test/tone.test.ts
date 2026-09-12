@@ -204,3 +204,53 @@ describe("★ EPSS 표기 — 한 곳에서 만들고, 크기를 거짓말하지
     expect(조립한파일.some((f) => path.basename(f) === "tone.ts"), "단일 출처가 사라졌다 — tone.ts가 EPSS 글자를 만들지 않는다").toBe(true);
   });
 });
+
+// ── B9 겹치는기호 소스 감시 (2026-09-12 야간 회귀) ──────────────────────────────────
+//
+// 왜: tone.겹치는기호가 「✅·☑·✔은 ✓와 뜻이 겹친다」고 이미 적어 뒀는데도, 실전 답 3건
+// (runApprovalStatus·VEX 안내·조치 검증·AI-BOM 기입 — 원천은 겹친다)이 화면 메뉴 라벨의
+// ✅를 그대로 옮기거나 글자 ✅를 새로 박아 걸렸다. 사전 상수(표식.좋음 ✓)를 두고도 코드가
+// 계속 글자를 새로 박으면 사전은 장식일 뿐이다 — 그래서 **박는 자리 자체가 없는지**를 소스에서 잰다.
+describe("★ B9 — 상태 기호 리터럴 소스 감시 (사전 상수로만 쓴다)", () => {
+  // ⚠ ☑·❌는 **일부러 뺀다.** screenguide.ts가 이 둘을 「문서 지정 체크박스」(541·543·732·749행)·
+  //   「이 답 이상해요 단추」(1447행) 이름표로 5곳 넘게 쓰고, llm.ts:950·noevidence.ts:35도 같은
+  //   관용구(문서 지정(☑))를 쓴다 — tone.표식이 이미 인정하는 "사물을 가리키는 아이콘" 예외와
+  //   같은 결이지만 겹치는기호 검사기에는 그 예외 장치가 없다. 이번 수리에서 한 곳만 고치면
+  //   같은 기능을 자리마다 다른 기호로 말하게 되어 더 어긋나므로, 범위 밖 후속 과제로 남긴다.
+  const 사전밖상태기호 = /[✅✔✖❎]/u; // ✅ ✔ ✖ ❎ (☑·❌ 제외 — 위 이유)
+  const ENGINE = path.join(__dirname, "..", "src", "engine");
+
+  /** 블록(/* *\/)·줄(//) 주석을 코드에서 걷어낸다. 줄 수가 안 밀리도록 지운 자리는 공백으로 채운다. */
+  function 코드만(src: string): string {
+    const 블록없음 = src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
+    return 블록없음
+      .split("\n")
+      .map((l) => {
+        if (l.trim().startsWith("//")) return "";
+        const m = /(?<!:)\/\//.exec(l);
+        return m ? l.slice(0, m.index) : l;
+      })
+      .join("\n");
+  }
+
+  it("엔진 전체를 훑고 있다 — 감시가 헛돌지 않는다", () => {
+    const files = (fs.readdirSync(ENGINE, { recursive: true }) as string[]).filter((f) => f.endsWith(".ts"));
+    expect(files.length, "엔진 파일을 못 읽었다 — 감시가 헛돈다").toBeGreaterThan(50);
+  });
+
+  it("답을 만드는 .ts 파일에 ✅·✔·✖·❎ 글자가 없다(주석·tone.ts 사전 제외)", () => {
+    const files = (fs.readdirSync(ENGINE, { recursive: true }) as string[]).filter((f) => f.endsWith(".ts"));
+    const 걸린것: string[] = [];
+    for (const f of files) {
+      if (path.basename(f) === "tone.ts") continue; // 사전 정의 자리
+      const 코드 = 코드만(fs.readFileSync(path.join(ENGINE, f), "utf8"));
+      코드.split("\n").forEach((line, i) => {
+        if (사전밖상태기호.test(line)) 걸린것.push(`${f}:${i + 1}: ${line.trim().slice(0, 90)}`);
+      });
+    }
+    expect(
+      걸린것,
+      `사전 상수(표식.좋음 ✓ · 표식.나쁨 ✗) 대신 글자를 새로 박은 자리 — tone.표식을 import해 쓸 것:\n  ${걸린것.join("\n  ")}`,
+    ).toEqual([]);
+  });
+});

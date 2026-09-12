@@ -18,6 +18,8 @@ import { sbom읽기, type 반입부품 } from "./sbomimport";
 import { 등급판정, 등급요약, 면책문구, type 라이선스등급 } from "./licenserisk";
 import { recordAudit } from "./audit";
 import { deleteBomDraftsForReview } from "./bomdrafts"; // 검수를 지우면 부품 팀원의 해석 초안도 함께(2026-09-03)
+// 상태 표식은 말투 규범의 단일 출처에서(2026-09-12) — 글자 ✓를 새로 박지 않는다.
+import { 표식 } from "./tone";
 
 export interface 검수요약 {
   id: string;
@@ -292,7 +294,7 @@ export function 검수요약문(id?: string): string {
     줄.push(`🔴 **소스 공개를 요구받을 수 있는 부품 ${무거움}개**` +
       (s.서비스도공개 ? ` — 그중 ${s.서비스도공개}개는 **네트워크로 서비스만 해도** 의무가 생깁니다` : ""));
   } else {
-    줄.push("✅ 소스 공개를 요구받는 부품은 없습니다.");
+    줄.push(`${표식.좋음} 소스 공개를 요구받는 부품은 없습니다.`);
   }
   if (진짜모름) 줄.push(`❓ 라이선스를 알 수 없는 부품 ${진짜모름}개 — **공급사에 확인이 필요합니다**(「없음」이 아닙니다).`);
   if (알아본) 줄.push(`⛔ 조건 때문에 등급을 매기지 않은 부품 ${알아본}개 — 비영리(NC)·변경금지(ND)·개별 라이선스(원문 확인). 라이선스는 알아봤습니다 — 조건이 문제입니다.`);

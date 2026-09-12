@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { runApprovalStatus, isRealVulnerability } from "../src/engine/agenttools/handlers";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
+import { 말투위반 } from "../src/engine/tone";
 import {
   resetApprovalsForTests, listFindingReviews, approvalSummary, isUnassignedReview,
   updateFindingReview, findingKey,
@@ -119,6 +120,15 @@ describe("결재·승인 대기 현황 — runApprovalStatus", () => {
       const 답 = runApprovalStatus();
       expect(답).toContain(`취약점 결재 대기 ${fa.pending}건`);
       expect(답).toContain(`점검 승인 대기 ${ms.reported}건`);
+    });
+
+    // B9(2026-09-12 야간 회귀) — 이 「다음 걸음」 문장이 화면 메뉴 라벨의 ✅를 그대로 옮겨
+    // tone-realanswers.test.ts를 빨갛게 만들었다(겹치는기호 ✓). 화면 이름은 낱말만 싣는다.
+    it("★ B9 — 대기가 있을 때 「다음 걸음」에 겹치는기호(✅ 등)가 없다", () => {
+      const 답 = runApprovalStatus();
+      expect(답, "이 시험은 대기 있음 분기를 밟아야 한다").toContain("▸ 다음:");
+      const 기호위반 = 말투위반(답).filter((x) => x.이름.startsWith("뜻이 겹치는 기호"));
+      expect(기호위반, `겹치는기호가 다시 샜다: ${기호위반.map((x) => x.이름).join(", ")}`).toEqual([]);
     });
 
     it("★ 갈 곳은 제품에 실재하는 화면 이름이다 — screenguide 화면위치 표가 출처", () => {

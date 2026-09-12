@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "../src/db";
 import { sbom검수, 검수목록, 검수상세, 검수삭제, 검수요약문 } from "../src/engine/sbomreview.js";
+import { 표식, 말투위반 } from "../src/engine/tone";
 
 function 비우기() {
   db.prepare("DELETE FROM sbom_review_components").run();
@@ -47,6 +48,20 @@ describe("검수 — 우리가 걸린 그 건이 목록에서 드러난다", () 
     const id = r.ok ? r.결과.id : "";
     expect(검수상세(id)?.면책).toContain("법률 자문이 아닙니다");
     expect(검수요약문()).toContain("법률 자문이 아닙니다");
+  });
+
+  // B9(2026-09-12 야간 회귀) — 「소스 공개를 요구받는 부품 없음」 줄이 사전 밖 ✅를 새로 박아
+  // tone-realanswers.test.ts를 빨갛게 만들었다. 무거운 라이선스가 0건인(=이 분기) 상태로
+  // 재현해 사전 상수(표식.좋음 ✓)로 나가는지 잰다.
+  it("★ B9 — 무거운 라이선스가 0건이면 사전 상수(표식.좋음)로 말한다(글자 ✅를 새로 안 박는다)", () => {
+    const r = sbom검수({ 파일이름: "가벼운것.json", 내용: 부품표([{ name: "a", license: "MIT" }]) });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const 요약 = 검수요약문(r.결과.id);
+    expect(요약, "무거운 부품이 없다는 줄이 안 보인다").toContain("소스 공개를 요구받는 부품은 없습니다");
+    expect(요약).toContain(`${표식.좋음} 소스 공개를 요구받는 부품은 없습니다`);
+    const 기호위반 = 말투위반(요약).filter((x) => x.이름.startsWith("뜻이 겹치는 기호"));
+    expect(기호위반, `겹치는기호가 다시 샜다: ${기호위반.map((x) => x.이름).join(", ")}`).toEqual([]);
   });
 });
 
