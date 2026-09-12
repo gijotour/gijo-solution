@@ -180,6 +180,8 @@ describe("★ ops-sim-meta.mjs — 회차 이름을 인자로 받는다(4100 메
   const 실제뿌리 = join(__dirname, "..", "..");
   const 임시이름 = `ops-sim-meta-selftest-${process.pid}`;
   const 임시메타 = join(실제뿌리, ".tmp-reports", `${임시이름}.meta.json`);
+  // ⚠ gb10 깨끗한 사본에는 .tmp-reports가 없다(tools/gb10-test.sh가 일부러 안 옮긴다 — 등급 C 재료). 폴더를 먼저 만든다(2026-09-12 gb10 게이트 실측 ENOENT).
+  mkdirSync(join(실제뿌리, ".tmp-reports"), { recursive: true });
 
   const 돌린다 = (인자: string[]) =>
     spawnSync(process.execPath, [스크립트, ...인자], { encoding: "utf8", timeout: 10_000 });
