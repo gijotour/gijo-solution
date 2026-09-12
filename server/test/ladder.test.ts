@@ -1358,6 +1358,27 @@ describe("2회전 설정(rounds.json) — 폐기는 남기고, 새 회전은 칸
     expect(String(r.왜), "왜 이 설정인지가 파일에 남아야 한다").toMatch(/pOracle|모른다|에폭/);
   });
 
+  it("★★ r5b의 「왜」가 **제 회전을 말한다** — r5a 글을 그대로 안고 있으면 판정 폴더에 거짓 기록이 남는다", () => {
+    // ⚠ 2026-09-13 검토관 적발: r5b 항목을 r5a에서 복사해 만들면서 「왜」까지 글자 그대로 왔다.
+    //   그 칸은 day2-train.sh가 results-ladder/day2/r5b/round.json 으로 **그대로 복사**하는 기록이라
+    //   (day2-train.sh: 「여기서 값을 바꾸지 않는다 … 그대로 복사해 둬야 …」), 몇 주 뒤 그 파일을 여는
+    //   사람이 r5b 폴더에서 「r5a: 격자 하나만 바꾼다」를 읽게 된다. 감시가 「비었는지」만 보면 못 잡는다.
+    const a = 회전("r5a");
+    const b = 회전("r5b");
+    expect(a, "r5a 항목이 없다").toBeTruthy();
+    expect(b, "r5b 항목이 없다").toBeTruthy();
+    expect(b.loraTargets, "r5b가 바꾸는 변수는 LoRA 자리 하나다").toBe("attn");
+    expect(b.precision, "격자는 r5a와 같아야 변수가 하나가 된다").toBe(a.precision);
+    expect(String(b.왜), "r5b의 「왜」가 r5a와 글자 그대로 같다 — 복사만 하고 안 고쳤다").not.toBe(String(a.왜));
+    expect(String(b.왜), "r5b 칸이 제 이름으로 제 변수를 말해야 한다").toMatch(/\*\*r5b\*\*/);
+    expect(String(b.왜), "무엇을 왜 attn으로 좁히는지가 없다").toMatch(/attn/);
+    expect(String(b.왜), "r5a 전용 끝문단(「r5a: 격자 하나만 바꾼다」)이 남아 있다")
+      .not.toContain("**r5a**: 격자 하나만 바꾼다");
+    // 미완 약속을 미래형으로 두면 자기 자신을 가리킨다 — 현재 상태로 적는다.
+    expect(String(b.왜), "read_round 배선을 아직도 「r5b 굽기 설계 때 넣는다」로 적고 있다")
+      .not.toContain("read_round 배선은 r5b 굽기 설계 때 넣는다");
+  });
+
   it("★ 회전 설정의 칸 이름이 **빌더·학습기가 실제로 받는 것**과 짝이 맞는다", () => {
     const 빌더 = readFileSync(join(__dirname, "..", "..", "tools", "build-raft-dataset.mjs"), "utf8");
     for (const f of ["--p-oracle", "--closedbook-ratio", "--quote-rule", "--longform-dataset", "--noevidence-from-uncited"]) {

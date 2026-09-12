@@ -45,8 +45,12 @@
 # ■ 아침 판정의 첫 항목 — `ls ~/bench/ladder/r5/night2.log`
 #   타이머가 transient(Persistent=no)라 gb10이 재부팅되면 예약이 **소리 없이** 사라진다.
 #   로그 파일이 없으면 결과가 나쁜 게 아니라 **아예 안 구워진 것**이다.
+#   ⚠ 굽기 산출 로그는 **회전 이름이 앞에 붙는다**(2026-09-13): `$ROUND-bake.log`·`$ROUND-bake-mem.log`.
+#     2026-09-12 r5a 밤이 남긴 옛 이름(bake.log·bake-mem.log)은 그 자리에 그대로 있다 — 덮이지 않는다.
 #
 # 쓰는 법(gb10):  bash ~/gijo-as/tools/team-bench/night-r5-bake.sh
+#   r5b(LoRA 자리만 좁힌 판):  ROUND=r5b LORA_TARGETS=attn bash ~/gijo-as/tools/team-bench/night-r5-bake.sh
+#   ⚠ ROUND를 주면 어댑터(data/lora/$ROUND)와 산출 로그가 **함께** 갈린다 — 하나만 갈리면 r5a 기록이 덮인다.
 set -u
 # ⚠ 비대화형 셸은 .bashrc를 안 읽는다 — node·PATH가 여기서 온다(gb10 규약).
 [ -f "$HOME/gijo-env.sh" ] && . "$HOME/gijo-env.sh"
@@ -59,6 +63,13 @@ VENV=${VENV:-$HOME/venv-train}
 DATASET=${DATASET:-raft-vuln-v6}
 ROUND=${ROUND:-r5a}
 BAKE_OUT=${BAKE_OUT:-data/lora/$ROUND}
+# [2026-09-13 · 검토관 적발] 굽기 산출 로그는 **회전에 묶는다.** 예전엔 bake.log·bake-mem.log가
+#   회전과 무관한 한 이름이라, `ROUND=r5b …`로 한 번 더 구우면 `>`가 r5a의 시계열 증거를 통째로
+#   잘라 덮었다(이번 대책의 뿌리를 확정한 773표본이 그 파일이다). night2.log는 그대로 둔다 —
+#   night-r5-judge.sh가 그 이름을 읽고(judge:109), `tee -a`라 덮이지 않는다. 대신 아래 배너·요약에
+#   $ROUND를 찍어 두 밤이 한 파일에 섞여도 **어느 회전인지** 읽히게 한다.
+BAKELOG=${BAKELOG:-$R5/$ROUND-bake.log}
+MEMLOG=${MEMLOG:-$R5/$ROUND-bake-mem.log}
 CWIN=${CWIN:-$R5/cwin-v6.json}
 HOLDOUT=${HOLDOUT:-$REPO/tools/team-bench/holdout-vuln-o.json}
 SAMPLES=${SAMPLES:-$REPO/tools/team-bench/samples-questions.json}
@@ -86,7 +97,13 @@ BAKE_MEM_MAX=${BAKE_MEM_MAX:-38G}
 # [2026-09-13 · r5b 메모리 대책] 스왑 증가 감시견의 문턱 — 가용(0~1G)은 정상 굽기에서도 나오므로
 #   문턱으로 못 쓴다(2026-09-12 실측: 정상 굽기가 표본의 81%를 가용 0~1G에서 보냈다). 대신 SwapFree가
 #   굽기 시작값 대비 이만큼(GiB) 줄면 「교사가 디스크로 밀려나는 중」으로 본다.
+# ⚠ **이 2GiB에는 실측 근거가 없다**(2026-09-13 검토관 적발 — 정직하게 적는다). r5a 굽기 동안
+#   스왑이 얼마나 늘었는지는 **아무도 안 쟀다**(옛 mem()이 스왑을 안 찍었다 — 위 mem() 병기가
+#   비로소 그것을 남긴다). 정상 굽기가 2GiB를 넘길 수도 있고(그러면 감시견이 밤을 죽인다) 한참
+#   못 미칠 수도 있다(그러면 장식이다). **첫 밤의 병기된 스왑 곡선을 보고 이 값을 정한다.**
+#   그때까지의 완충으로 한 표본이 아니라 **연속 SWAP_DOG_CONFIRM회**를 봐야 내린다(아래 감시견).
 SWAP_DROP_MAX_GB=${SWAP_DROP_MAX_GB:-2}
+SWAP_DOG_CONFIRM=${SWAP_DOG_CONFIRM:-3}
 # 08:30 데드라인 — 예상 종료 04:45~05:00경이라 여유가 크지만, 낮 서빙을 지키는 마지막 방어선이다.
 DEADLINE=${DEADLINE:-08:30}
 
@@ -106,7 +123,8 @@ mem() {
 }
 teacher() { curl -s -m 5 http://127.0.0.1:8080/health || echo "(응답 없음)"; }
 
-say "════ 회전 5 r5a 본 굽기 시작 ════"
+say "════ 회전 5 $ROUND 본 굽기 시작 ════"
+say "산출 로그: $BAKELOG · 메모리 로그: $MEMLOG · 어댑터: $BAKE_OUT"
 say "교사(8080) health: $(teacher)  ·  메모리: $(mem)"
 say "임베딩(8081): $(curl -s -m 5 http://127.0.0.1:8081/health || echo '(응답 없음)')"
 
@@ -135,24 +153,43 @@ fi
 # ⚠ 판정은 **이번에 쓰는 깃발 전부**를 본다(2026-09-11 검토관 적발). --precision 하나만 보면
 #   나머지 셋이 없는 학습기를 골라 03:25에 argparse 오류로 즉사하고 아침까지 아무도 모른다.
 FT=$SERVER/scripts/finetune_qlora14b.py
-FTFLAGS="--precision --lora-alpha-mult --save-epochs --eval-file --lora-targets --max-seq --gpu-mem-fraction"
+# ⚠ [2026-09-13 · 검토관 적발] 목록은 **이번에 실제로 넘기는 깃발만** 담는다. --gpu-mem-fraction을
+#   무조건 넣어 두면, 그 깃발을 안 쓰는 밤(기본값)에도 검사가 걸려 사본으로 내려간다 — 그 사본에는
+#   이번 대책의 GPU 계측이 없어서 「대책을 넣고 구웠다」로 읽히는데 계측은 0줄인 밤이 된다.
+FTFLAGS="--precision --lora-alpha-mult --save-epochs --eval-file --lora-targets --max-seq"
+[ -z "$GPUMEMFRAC" ] || FTFLAGS="$FTFLAGS --gpu-mem-fraction"
 FTMISS=""
+FTMISS2=""   # ⚠ set -u — 사본 검사를 안 탄 밤에도 이름이 있어야 한다
 for f in $FTFLAGS; do
   grep -q -- "\"$f\"" "$FT" 2>/dev/null || FTMISS="$FTMISS $f"
 done
 if [ -n "$FTMISS" ]; then
   say "저장소 학습기에 깃발이 없다($FTMISS · 아직 push 전) — 사본을 쓴다: $R5/finetune_qlora14b.py"
   FT=$R5/finetune_qlora14b.py
+  # ⚠ 사본에도 없으면 argparse가 **그 자리에서** 죽는다 — 새벽에 죽고 아침까지 아무도 모르는
+  #   그 실패다. 못 넘길 깃발을 들고 굽지 않는다(fail-closed).
+  FTMISS2=""
+  for f in $FTFLAGS; do
+    grep -q -- "\"$f\"" "$FT" 2>/dev/null || FTMISS2="$FTMISS2 $f"
+  done
+fi
+# 계측이 실제로 남는 학습기인지 **먼저 말한다**(폴백을 정상 출력처럼 다루지 않기 위해).
+if grep -q "def gpu_메모리_로그(" "$FT" 2>/dev/null; then
+  FTMEAS="있음"
+else
+  FTMEAS="**없음**(이 학습기는 아직 계측 전이다 — GPU 메모리 기록이 필요하면 push 뒤에 굽는다)"
 fi
 AVAIL=$(free -g | awk '/^메모리|^Mem/ {print $7}')
 BAKE=skip
 if [ "$GATE" != "ok" ]; then
   say "굽기 건너뜀 — 등급 관문이 $GATE 다(빨강 재료를 굽지 않는다)"
+elif [ -n "$FTMISS2" ]; then
+  say "굽기 건너뜀 — 저장소에도 사본에도 깃발이 없다($FTMISS2). 그대로 부르면 argparse가 그 자리에서 죽는다"
 elif [ "${AVAIL:-0}" -lt "$BAKE_MIN_AVAIL" ]; then
   # ⚠ 가용 관문 — 없으면 「교사를 안 내린다」가 커널 OOM으로 깨질 수 있다.
   say "굽기 건너뜀 — 가용 메모리 ${AVAIL}G < ${BAKE_MIN_AVAIL}G (bf16 14B는 가중치만 28G다). 교사를 밀 위험이 있다"
 else
-  say "학습기: $FT"
+  say "학습기: $FT · GPU 계측: $FTMEAS"
   # ── 실제로 걸리는 보호를 **먼저 계산하고 그 값을 적는다** ──────────────
   # ⚠ 2026-09-11 검토관 적발: 예전엔 「상한 38G · oom_score_adj=1000」을 **단언**해 놓고
   #   RUNNER 계산은 그 아래에서 했다. 상한이 실제로 걸렸는지가 로그에 한 글자도 안 남아,
@@ -180,6 +217,11 @@ else
     GUARD="$GUARD · oom_score_adj **미적용**(choom 없음)"
   fi
   [ -n "$RUNNER" ] || GUARD="상한·우선순위 **둘 다 미적용** — 가용 관문과 감시견만 걸린 상태"
+  # ⚠ [2026-09-13 · 검토관 적발] 이번에 생긴 보호 둘도 **같은 줄에 적는다.** 기본은 꺼짐이라
+  #   오늘은 안 붙지만, 계측 뒤 상한을 켜고 굽는 밤이 오면 「무엇이 걸린 채 구워졌나」가 다시
+  #   이 한 줄에서 빠진다 — 그 한 줄을 정직하게 만들려고 고친 자리다(2026-09-11).
+  [ -z "$GPUMEMFRAC" ] || GUARD="$GUARD · 토치 상한 $GPUMEMFRAC(--gpu-mem-fraction · 이 프로세스 몫)"
+  [ -z "$ALLOC_CONF" ] || GUARD="$GUARD · PYTORCH_CUDA_ALLOC_CONF=$ALLOC_CONF"
   say "굽기 시작 — precision=$PRECISION · lora_targets=$LORA_TARGETS · rank16 · lr1e-4 · 2에폭 · max_seq=$MAXSEQ · lora-alpha-mult 1 · 가용 ${AVAIL}G"
   say "걸린 보호: $GUARD"
   if [ "${AVAIL:-0}" -lt "$BAKE_MEASURED_NEED" ]; then
@@ -187,7 +229,7 @@ else
   fi
   say "예상 스텝 52(26/에폭) · 예상 65~95분(어젯밤 0.362 샘플/초 × 824샘플 + 에폭마다 평가 98행) · 데드라인 $DEADLINE(그때까지 살아 있으면 학습만 죽인다)"
   # 메모리 로거 주기는 prep과 같은 5초로 되돌린다(30초로 두면 짧은 최대치를 놓친다 — 검토관 적발).
-  ( while true; do echo "[$(date '+%T')] $(mem)"; sleep 5; done ) > "$R5/bake-mem.log" 2>&1 &
+  ( while true; do echo "[$(date '+%T')] $(mem)"; sleep 5; done ) > "$MEMLOG" 2>&1 &
   MEMPID=$!
   # 교사 감시견 — 교사가 말을 멈추면 **굽기를 내린다.** cgroup 회계와 무관하게 도는 마지막 방어선이다.
   ( while true; do
@@ -216,17 +258,29 @@ else
   #   81%를 가용 0~1G에서 보냈다). 대신 SwapFree가 시작 대비 SWAP_DROP_MAX_GB(GiB) 넘게 줄면
   #   「교사가 디스크로 밀려나는 중」으로 보고 **학습만** 내린다.
   #   ⚠ 이름으로 죽이지 않는다 — `pkill -f llama-server`는 교사(8080)·임베딩(8081)까지 함께 죽인다.
+  #   ⚠ [2026-09-13 · 검토관 적발] **한 표본으로 죽이지 않는다.** 문턱(2GiB)은 아직 실측 근거가
+  #     없는 수라, 순간 표본 하나로 내리면 정상 굽기가 밤째 날아가고 원인이 「대책으로 넣은
+  #     감시견」이 된다. 연속 $SWAP_DOG_CONFIRM회(15초 간격)를 봐야 내리고, 첫 걸림은 **로그에만**
+  #     남긴다 — 그 기록이 다음 밤에 문턱을 정하는 재료다.
   SWAP_BASE_KB=$(awk '/^SwapFree:/{print $2}' /proc/meminfo 2>/dev/null)
   SWAP_BASE_KB=${SWAP_BASE_KB:-0}
-  ( while true; do
+  ( SWAP_HITS=0
+    while true; do
       sleep 15
       SWAP_NOW_KB=$(awk '/^SwapFree:/{print $2}' /proc/meminfo 2>/dev/null)
       SWAP_NOW_KB=${SWAP_NOW_KB:-$SWAP_BASE_KB}
       DROP_GB=$(( (SWAP_BASE_KB - SWAP_NOW_KB) / 1024 / 1024 ))
       if [ "$DROP_GB" -ge "$SWAP_DROP_MAX_GB" ]; then
-        echo "[$(date '+%F %T %Z')] ⚠ 스왑 ${DROP_GB}G 증가(SwapFree 기준 · 시작 대비) — 교사가 디스크로 밀려나는 중으로 보고 학습만 내린다" >> "$LOG"
-        pkill -f "finetune_qlora14b.py" 2>/dev/null
-        break
+        SWAP_HITS=$((SWAP_HITS + 1))
+        if [ "$SWAP_HITS" -lt "$SWAP_DOG_CONFIRM" ]; then
+          echo "[$(date '+%F %T %Z')] ⚠ 스왑 ${DROP_GB}G 증가(SwapFree 기준 · 시작 대비) — ${SWAP_HITS}/${SWAP_DOG_CONFIRM}회째, 아직 안 내린다(연속이라야 내린다)" >> "$LOG"
+        else
+          echo "[$(date '+%F %T %Z')] ⚠ 스왑 ${DROP_GB}G 증가(SwapFree 기준 · 시작 대비)가 연속 ${SWAP_DOG_CONFIRM}회 — 교사가 디스크로 밀려나는 중으로 보고 학습만 내린다" >> "$LOG"
+          pkill -f "finetune_qlora14b.py" 2>/dev/null
+          break
+        fi
+      else
+        SWAP_HITS=0
       fi
       pgrep -f "finetune_qlora14b.py" > /dev/null 2>&1 || break
     done ) > /dev/null 2>&1 &
@@ -249,16 +303,18 @@ else
     --precision "$PRECISION" --lora-targets "$LORA_TARGETS" --rank 16 --lr 0.0001 --epochs 2 --max-seq "$MAXSEQ" \
     --lora-alpha-mult 1 --save-epochs --eval-file "$HOLDOUT" \
     ${GPUMEMFRAC:+--gpu-mem-fraction "$GPUMEMFRAC"} \
-    > "$R5/bake.log" 2>&1
+    > "$BAKELOG" 2>&1
   BAKE=$?
   kill "$MEMPID" "$DOGPID" "$DEADLINEPID" "$SWAPDOGPID" 2>/dev/null
-  say "굽기 종료코드 $BAKE · 마지막 줄: $(tail -5 "$R5/bake.log" | tr '\n' ' ' | cut -c1-400)"
-  say "굽기 중 최대 사용 메모리: $(awk '{for(i=1;i<=NF;i++) if($i=="사용") {gsub("G","",$(i+1)); if($(i+1)+0>m) m=$(i+1)+0}} END{print m"G"}' "$R5/bake-mem.log")"
+  say "굽기 종료코드 $BAKE · 마지막 줄: $(tail -5 "$BAKELOG" | tr '\n' ' ' | cut -c1-400)"
+  say "굽기 중 최대 사용 메모리: $(awk '{for(i=1;i<=NF;i++) if($i=="사용") {gsub("G","",$(i+1)); if($(i+1)+0>m) m=$(i+1)+0}} END{print m"G"}' "$MEMLOG")"
+  # 스왑 최대치도 나란히 적는다 — 「가용 32G/43G」가 스왑을 안 깎은 수라는 사실이 로그에 남는다.
+  say "굽기 중 최대 스왑: $(awk '{for(i=1;i<=NF;i++) if($i=="스왑") {gsub("G","",$(i+1)); if($(i+1)+0>m) m=$(i+1)+0}} END{print m"G"}' "$MEMLOG")"
   say "교사 health(굽기 직후): $(teacher)"
 fi
 
 # ── 끝 상태 ───────────────────────────────────────────────────────────────
 say "교사(8080) health: $(teacher)  ·  임베딩(8081): $(curl -s -m 5 http://127.0.0.1:8081/health || echo '(응답 없음)')"
 say "메모리: $(mem)"
-say "요약 — 등급관문=${GATE:-미실행} · 굽기종료코드=$BAKE · 재료=$DATASET · 어댑터=$BAKE_OUT · 걸린보호=${GUARD:-굽지 않음}"
-say "════ 회전 5 r5a 본 굽기 끝 ════"
+say "요약 — 회전=$ROUND · 등급관문=${GATE:-미실행} · 굽기종료코드=$BAKE · 재료=$DATASET · 어댑터=$BAKE_OUT · 걸린보호=${GUARD:-굽지 않음}"
+say "════ 회전 5 $ROUND 본 굽기 끝 ════"

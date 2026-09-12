@@ -299,13 +299,78 @@ describe("night-r5-bake.sh 소스 감시 — 2026-09-11까지 시험 0건이던 
     expect(블록).not.toMatch(/llama-server/);
   });
 
-  it("★ 잣대 단일화 — 메모리 로그에 스왑 사용량이 함께 찍힌다(32G/43G는 스왑을 안 깎은 수라서)", () => {
-    expect(실행줄, "mem() 함수가 스왑을 안 찍는다").toMatch(/스왑/);
+  it("★★ 한 표본으로 학습을 죽이지 않는다 — 연속 확인이 있어야 한다(문턱 2GiB는 아직 실측 근거가 없다)", () => {
+    // ⚠ 2026-09-13 검토관 적발: r5a 굽기 동안 **스왑 증가량을 아무도 안 쟀다**(옛 mem()이 스왑을
+    //   안 찍었다). 근거 없는 문턱을 15초 표본 하나로 방아쇠 삼으면, 정상 굽기가 밤째 날아가고
+    //   원인이 「대책으로 넣은 감시견」이 된다. 연속 확인이 그 완충이다.
+    expect(실행줄, "연속 확인 횟수가 변수로 없다").toContain("SWAP_DOG_CONFIRM=${SWAP_DOG_CONFIRM:-3}");
+    expect(실행줄, "걸린 횟수를 세는 자리가 없다").toMatch(/SWAP_HITS=\$\(\(SWAP_HITS \+ 1\)\)/);
+    expect(실행줄, "연속이 끊기면 0으로 되돌려야 「연속」이 된다").toMatch(/else[\s\S]{0,80}SWAP_HITS=0/);
+    expect(실행줄, "연속 횟수에 못 미치면 로그만 남기고 지나가야 한다")
+      .toMatch(/\[ "\$SWAP_HITS" -lt "\$SWAP_DOG_CONFIRM" \]/);
+    // pkill은 **연속 확인을 넘은 갈래 안에서만** 불린다 — 문턱을 넘자마자 부르는 꼴이면 빨강.
+    const 시작 = 실행줄.indexOf("SWAP_BASE_KB=");
+    const 블록 = 실행줄.slice(시작, 실행줄.indexOf("SWAPDOGPID=", 시작));
+    expect(블록.indexOf('pkill -f "finetune_qlora14b.py"'), "감시견 블록에 pkill이 없다").toBeGreaterThan(-1);
+    expect(블록.indexOf("SWAP_DOG_CONFIRM"), "연속 확인 없이 곧바로 죽인다")
+      .toBeLessThan(블록.indexOf('pkill -f "finetune_qlora14b.py"'));
+  });
+
+  it("★ 잣대 단일화 — mem() **함수 안에** 스왑 칸이 있다(32G/43G는 스왑을 안 깎은 수라서)", () => {
+    // ⚠ 2026-09-13 검토관 적발(상): 예전엔 파일 **전체**에서 낱말 「스왑」만 봤다. 그런데 스왑
+    //   감시견 로그 줄에도 그 낱말이 있어서, mem()에서 스왑 칸을 통째로 지워도 시험이 초록이었다
+    //   (실측: 돌연변이로 mem()을 옛 한 줄짜리로 되돌려도 통과). 그래서 **함수 본문만** 잘라서 본다.
+    const 시작 = 밤.indexOf("mem() {");
+    expect(시작, "mem() 함수를 못 찾았다").toBeGreaterThan(-1);
+    const 끝 = 밤.indexOf("\n}", 시작);
+    expect(끝, "mem() 함수의 닫는 줄을 못 찾았다 — 한 줄짜리 옛 mem()으로 되돌아갔을 수 있다").toBeGreaterThan(시작);
+    const 본문 = 밤.slice(시작, 끝);
+    expect(본문, "mem() 함수가 스왑을 안 찍는다").toMatch(/스왑 %sG|스왑 "/);
+    expect(본문, "free의 스왑 줄을 읽는 자리가 없다").toMatch(/\^스왑\|\^Swap/);
     // 굽기 중 최대치 집계가 "사용" 뒤 필드를 전부 최댓값 후보로 줍는다 — 스왑 칸에 같은 낱말을
     // 다시 쓰면 그 집계가 스왑 값과 메모리 값을 뒤섞는다(회귀 방지).
     expect(실행줄).not.toMatch(/스왑 사용/);
   });
 
+  it("★ 굽기 산출 로그가 **회전에 묶인다** — ROUND=r5b로 돌려도 r5a 증거를 안 덮는다", () => {
+    // ⚠ 2026-09-13 검토관 적발: bake.log·bake-mem.log가 회전과 무관한 한 이름이라, r5b 밤이
+    //   `>`로 r5a의 시계열 증거(773표본)를 잘라 덮고 배너는 「r5a」라고 말했다.
+    expect(실행줄).toContain("BAKELOG=${BAKELOG:-$R5/$ROUND-bake.log}");
+    expect(실행줄).toContain("MEMLOG=${MEMLOG:-$R5/$ROUND-bake-mem.log}");
+    expect(실행줄, "회전과 무관한 옛 이름으로 쓰는 자리가 남아 있다").not.toMatch(/> "\$R5\/bake(-mem)?\.log"/);
+    expect(실행줄, "배너가 회전 이름을 안 찍는다 — 아침에 어느 회전인지 못 읽는다")
+      .toMatch(/회전 5 \$ROUND 본 굽기 시작/);
+    expect(실행줄).toMatch(/회전 5 \$ROUND 본 굽기 끝/);
+    expect(실행줄, "요약 줄에도 회전이 있어야 한다").toMatch(/요약 — 회전=\$ROUND/);
+  });
+
+  it("★★ 깃발 검사 목록은 **이번에 넘기는 깃발만** 본다 — 안 쓰는 깃발로 사본 폴백을 넓히지 않는다", () => {
+    // ⚠ 2026-09-13 검토관 적발: --gpu-mem-fraction을 목록에 박아 두면, 그 깃발을 안 쓰는 밤에도
+    //   저장소 학습기가 「깃발 없음」으로 걸려 사본으로 내려간다 — 그 사본에는 이번 대책의 GPU
+    //   계측이 없어 「대책을 넣고 구웠다」로 읽히는데 계측은 0줄인 밤이 된다.
+    expect(실행줄, "안 쓰는 깃발이 기본 목록에 박혀 있다")
+      .toContain('FTFLAGS="--precision --lora-alpha-mult --save-epochs --eval-file --lora-targets --max-seq"');
+    expect(실행줄, "값을 줄 때만 목록에 더하는 자리가 없다")
+      .toMatch(/\[ -z "\$GPUMEMFRAC" \] \|\| FTFLAGS="\$FTFLAGS --gpu-mem-fraction"/);
+    expect(실행줄, "고른 학습기에 계측이 있는지를 로그가 말해야 한다(폴백을 정상 출력처럼 다루지 않는다)")
+      .toContain('grep -q "def gpu_메모리_로그(" "$FT"');
+    expect(실행줄).toMatch(/학습기: \$FT · GPU 계측: \$FTMEAS/);
+    // 사본에도 깃발이 없으면 굽지 않는다 — 그대로 부르면 새벽에 argparse로 즉사한다.
+    expect(실행줄).toMatch(/elif \[ -n "\$FTMISS2" \]; then/);
+  });
+
+  it("★ 「걸린 보호」 줄이 새 보호 둘도 말한다 — GPUMEMFRAC·ALLOC_CONF를 켜면 그 줄에 남는다", () => {
+    // ⚠ 2026-09-13 검토관 적발: 이 한 줄을 정직하게 만들려고 2026-09-11에 고친 자리인데,
+    //   이번에 생긴 보호 둘(토치 상한·ALLOC_CONF)이 그 줄에 한 글자도 안 남았다.
+    expect(실행줄).toMatch(/\[ -z "\$GPUMEMFRAC" \] \|\| GUARD="\$GUARD · 토치 상한 \$GPUMEMFRAC/);
+    expect(실행줄).toMatch(/\[ -z "\$ALLOC_CONF" \] \|\| GUARD="\$GUARD · PYTORCH_CUDA_ALLOC_CONF=\$ALLOC_CONF"/);
+    // ⚠ 순서가 중요하다 — RUNNER가 비었을 때 GUARD를 **통째로 갈아 쓰는** 줄보다 뒤에 붙어야 남는다.
+    expect(실행줄.indexOf('[ -n "$RUNNER" ] || GUARD='))
+      .toBeLessThan(실행줄.indexOf('[ -z "$GPUMEMFRAC" ] || GUARD='));
+  });
+
   // ★ 돌연변이로 실제로 잡히는지 확인(2026-09-13 구현 중 실측) — 스왑 감시견 줄을 지우면
   //   위 두 시험(SWAP_BASE_KB·pkill)이 실제로 빨개졌다(수동 확인, 되돌린 뒤 커밋).
+  //   ★ 2026-09-13 수리: mem()에서 스왑 칸을 지우는 돌연변이로 옛 시험(/스왑/)이 **초록**임을
+  //     실측해 확인한 뒤, 위 「mem() 함수 안에」 시험으로 바꿔 같은 돌연변이가 빨개지는 것을 확인했다.
 });
