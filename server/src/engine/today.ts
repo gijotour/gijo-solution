@@ -22,6 +22,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { prioritizedReviews } from "./approvals";
 import { listSchedules } from "./hardeningtargets";
 import { listMaintenanceItems } from "./maintenance";
+import { epss값표기 } from "./tone";
 
 // 한 건의 "오늘 할 일". 화면은 이걸 그대로 렌더한다(추가 판단 없이).
 export interface TodayItem {
@@ -36,7 +37,7 @@ export interface TodayItem {
   ref?: string; // 클릭 시 이동 대상(assetId 등)
   // 아래는 문장 조립용 구조화 값 — why(불릿)를 문장에 그대로 박으면 어색해서 따로 둔다.
   kev?: boolean;
-  epssPct?: number;
+  epssLabel?: string; // tone.epss값표기 산출물 그대로("97%"·"1% 미만"·"0%") — 반올림은 여기서 안 한다
 }
 
 export interface TodayBrief {
@@ -169,13 +170,18 @@ function vulnItems(now: number): TodayItem[] {
     badges.push(`${g.count}건`);
     if (due) badges.push(due.label);
 
+    // EPSS 표기는 tone.ts 한 곳(epss값표기)에서만 반올림한다 — 여기서 다시 Math.round를 적으면
+    // "0.5% 미만은 1% 미만" 규칙이 두 곳에 생겨 어긋난다(2026-09-11 today.ts:178/285 실사고).
+    // 낱말은 "EPSS"가 아니라 "악용예측"을 유지한다(브리핑은 쉬운 말 계약, 위 ①).
+    const epssLabel = g.maxEpss != null ? epss값표기(g.maxEpss) : "";
+
     // 근거는 계산된 사실만(호스트 요약) — 제품·취약점 이름은 넣지 않는다: "쉬운 내용"이 목표이고,
     // 이 문장이 LLM 브리핑 프롬프트로도 가므로 이름을 주면 모델이 목록을 복창한다(실측). 상세는 취약점 화면.
     const facts = [
       g.kev ? `실제 악용(KEV) ${g.kevCount}건` : "",
       `취약점 ${g.count}건`,
       g.worstSeverity ? `최고 심각도 ${g.worstSeverity}` : "",
-      g.maxEpss != null ? `최고 악용예측 ${Math.round(g.maxEpss * 100)}%` : "",
+      epssLabel ? `최고 악용예측 ${epssLabel}` : "",
       due ? due.label : "",
     ].filter(Boolean);
 
@@ -192,7 +198,7 @@ function vulnItems(now: number): TodayItem[] {
       badges,
       ref: g.assetId,
       kev: g.kev,
-      epssPct: g.maxEpss != null ? Math.round(g.maxEpss * 100) : undefined,
+      epssLabel: epssLabel || undefined,
     });
   }
 
@@ -282,7 +288,8 @@ export function ruleBrief(items: TodayItem[]): string {
 
     // 최우선 한 건은 근거를 문장으로 — why(불릿)를 그대로 박지 않는다.
     const top = now[0];
-    const reason = [top.kev ? "실제 악용이 확인" : "", top.epssPct != null ? `악용예측 ${top.epssPct}%` : ""]
+    // epssLabel은 이미 tone.epss값표기 산출물("1% 미만" 포함)이라 %를 다시 붙이지 않는다.
+    const reason = [top.kev ? "실제 악용이 확인" : "", top.epssLabel ? `악용예측 ${top.epssLabel}` : ""]
       .filter(Boolean)
       .join("·");
     parts.push(`먼저 ${top.subtitle}의 ${top.title}부터 처리하시길 권합니다${reason ? ` (${reason})` : ""}.`);

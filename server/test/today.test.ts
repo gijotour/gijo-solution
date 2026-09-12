@@ -16,6 +16,7 @@ import { resetAssetsForTests, recordFindings, registerAsset } from "../src/engin
 import { resetMaintenanceForTests } from "../src/engine/maintenance";
 import { resetHardeningForTests, createTarget, createSchedule } from "../src/engine/hardeningtargets";
 import { resetApprovalsForTests, updateFindingReview, findingKey } from "../src/engine/approvals";
+import { epss값표기 } from "../src/engine/tone";
 import type { StandardFinding } from "../src/engine/bridge";
 
 const KEV_FINDING: StandardFinding = {
@@ -115,6 +116,49 @@ describe("오늘의 할일 — 가이드형 집계", () => {
     // 근거는 계산된 사실만 — 모델이 지어낼 여지를 주지 않는다.
     expect(kev?.why).toContain("실제 악용(KEV)");
     expect(kev?.why).toContain("악용예측 94%");
+  });
+
+  // B11(전-6 정직): EPSS 0.5% 미만이 "최고 악용예측 0%"로 나가던 결함 — 값은 tone.epss값표기
+  // 한 곳(단일 출처)에서 만들고, today.ts는 낱말만 "악용예측"으로 바꿔 붙인다. 글자를 손으로
+  // 베끼면 tone.ts 반올림 규칙과 따로 놀 수 있어, 기대값도 그 함수를 불러 대조한다.
+  describe("★ B11: 최고 악용예측 — EPSS 낮은 값을 '0%'로 단정하지 않는다(2026-09-12)", () => {
+    function kevFindingWithEpss(epss: number | undefined): StandardFinding {
+      // kev:true로 고정해 기한 유무와 무관하게 오늘 목록에 뜨게 한다(테스트 편의).
+      return { ...KEV_FINDING, epss } as StandardFinding;
+    }
+
+    it("0.003(0.5% 미만)은 '최고 악용예측 1% 미만'이다", async () => {
+      recordFindings("srv-1", [kevFindingWithEpss(0.003)]);
+      const t = await buildToday(false);
+      const item = t.items.find((i) => i.axis === "vuln" && i.subtitle === "oracle.local");
+      expect(item?.why).toContain(`최고 악용예측 ${epss값표기(0.003)}`);
+      expect(item?.why).toContain("최고 악용예측 1% 미만");
+      expect(item?.epssLabel).toBe(epss값표기(0.003));
+    });
+
+    it("0.12는 그대로 반올림해 '최고 악용예측 12%'다", async () => {
+      recordFindings("srv-1", [kevFindingWithEpss(0.12)]);
+      const t = await buildToday(false);
+      const item = t.items.find((i) => i.axis === "vuln" && i.subtitle === "oracle.local");
+      expect(item?.why).toContain(`최고 악용예측 ${epss값표기(0.12)}`);
+      expect(item?.why).toContain("최고 악용예측 12%");
+    });
+
+    it("정말 0이면 '최고 악용예측 0%' 그대로다 — 없는 값과 구분한다", async () => {
+      recordFindings("srv-1", [kevFindingWithEpss(0)]);
+      const t = await buildToday(false);
+      const item = t.items.find((i) => i.axis === "vuln" && i.subtitle === "oracle.local");
+      expect(item?.why).toContain(`최고 악용예측 ${epss값표기(0)}`);
+      expect(item?.why).toContain("최고 악용예측 0%");
+    });
+
+    it("epss가 없으면(null) 최고 악용예측 항목 자체를 안 싣는다", async () => {
+      recordFindings("srv-1", [kevFindingWithEpss(undefined)]);
+      const t = await buildToday(false);
+      const item = t.items.find((i) => i.axis === "vuln" && i.subtitle === "oracle.local");
+      expect(item?.why).not.toContain("악용예측");
+      expect(item?.epssLabel).toBeUndefined();
+    });
   });
 
   it("기한이 안 걸린 일반 취약점은 오늘 목록에 넣지 않는다 — 화면을 백로그로 채우지 않는다", async () => {
@@ -273,8 +317,8 @@ describe("오늘의 할일 — 가이드형 집계", () => {
 
     it("규칙 문장은 건수·최우선 항목을 정확히 반영한다", () => {
       const brief = ruleBrief([
-        // kev/epssPct는 문장 조립용 구조화 값 — 실제 코드도 badges와 함께 채운다.
-        { id: "a", axis: "vuln", urgency: "now", title: "Log4Shell", subtitle: "oracle.local", why: "실제 악용 확인", action: "", badges: ["KEV"], kev: true, epssPct: 97 },
+        // kev/epssLabel은 문장 조립용 구조화 값(epssLabel=tone.epss값표기 산출물) — 실제 코드도 badges와 함께 채운다.
+        { id: "a", axis: "vuln", urgency: "now", title: "Log4Shell", subtitle: "oracle.local", why: "실제 악용 확인", action: "", badges: ["KEV"], kev: true, epssLabel: "97%" },
         { id: "b", axis: "device", urgency: "today", title: "FW-01 점검", subtitle: "방화벽", why: "주기 도래", action: "", badges: [] },
       ]);
       expect(brief).toContain("급한 건 1건");

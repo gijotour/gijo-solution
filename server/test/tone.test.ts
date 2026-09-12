@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { 표식, 허용표식, 판정머리표, 금지말투, 말투위반, 소개서두, epss표기 } from "../src/engine/tone";
+import { 표식, 허용표식, 판정머리표, 금지말투, 말투위반, 소개서두, epss표기, epss값표기 } from "../src/engine/tone";
 
 const 규범 = fs.readFileSync(path.join(__dirname, "../../GIJO_AS_대화창_말투규범.md"), "utf8");
 
@@ -202,6 +202,29 @@ describe("★ EPSS 표기 — 한 곳에서 만들고, 크기를 거짓말하지
     const 뜻밖 = 조립한파일.filter((f) => path.basename(f) !== "tone.ts" && !예외[path.basename(f)]);
     expect(뜻밖, `EPSS 글자를 따로 조립하는 자리가 늘었다 — tone.epss표기를 부르거나, 예외 목록에 **이유**를 적을 것:\n  ${뜻밖.join("\n  ")}`).toEqual([]);
     expect(조립한파일.some((f) => path.basename(f) === "tone.ts"), "단일 출처가 사라졌다 — tone.ts가 EPSS 글자를 만들지 않는다").toBe(true);
+  });
+});
+
+// ── epss값표기·epss표기 짝 시험 (B11, 2026-09-12) ────────────────────────────────
+// today.ts처럼 낱말이 "EPSS"가 아니라 "악용예측"이어야 하는 자리는 epss값표기(값만)를
+// 부르고 낱말을 직접 붙인다. 반올림 규칙이 두 함수에 따로 있으면 다시 어긋나므로,
+// epss표기는 반드시 epss값표기를 감싼 것이어야 한다는 것 자체를 시험으로 고정한다.
+describe("★ epss값표기 — epss표기의 속살(값만, 낱말 없이)", () => {
+  it("epss표기(x)는 언제나 「EPSS 」+epss값표기(x)다 — 반올림이 한 곳에서만 계산된다", () => {
+    for (const x of [0.9744, 0.94, 0.5, 1, 0.004, 0.0004, 0.005, 0, 97.44, -1, NaN, undefined, null]) {
+      const 값 = epss값표기(x as number | null | undefined);
+      const 기대 = 값 ? `EPSS ${값}` : "";
+      expect(epss표기(x as number | null | undefined), `epss값표기(${x})=${JSON.stringify(값)}인데 epss표기가 어긋난다`).toBe(기대);
+    }
+  });
+
+  it("epss값표기는 낱말(EPSS 접두) 없이 값만 낸다", () => {
+    expect(epss값표기(0.003)).toBe("1% 미만");
+    expect(epss값표기(0.12)).toBe("12%");
+    expect(epss값표기(0)).toBe("0%");
+    expect(epss값표기(undefined)).toBe("");
+    expect(epss값표기(null)).toBe("");
+    expect(epss값표기(97.44)).toBe(""); // 0~1 밖은 안 싣는다 — epss표기와 같은 계약
   });
 });
 

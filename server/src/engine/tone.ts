@@ -148,6 +148,24 @@ export function 심각도표식(severity: string): string {
 }
 
 /**
+ * EPSS(30일 내 실제 악용될 확률) 0~1을 **사람이 읽는 값만**으로 — 반올림 규칙의 단일 출처.
+ *
+ * `epss표기`(아래)의 「EPSS 」 접두를 뺀 속살이다. today.ts의 브리핑처럼 낱말이
+ * "EPSS"가 아니라 "악용예측"이어야 하는 자리(2026-09-11 B11)는 이 함수로 값만 받고
+ * 낱말은 부르는 쪽이 붙인다 — 반올림·「1% 미만」 경계가 두 곳에 따로 있지 않도록.
+ *
+ * ⚠ 규칙은 epss표기의 JSDoc에 적혀 있다(반올림이 크기를 거짓말하지 않게, 0~1 밖은 안 싣게).
+ *   여기서 되풀이하지 않는다 — 규칙 문서도 한 곳이어야 두 곳이 어긋나지 않는다.
+ *
+ * @returns 「97%」·「1% 미만」·「0%」 중 하나. 값이 없거나 뜻을 못 읽으면 빈 문자열.
+ */
+export function epss값표기(epss: number | null | undefined): string {
+  if (typeof epss !== "number" || !Number.isFinite(epss)) return "";
+  if (epss < 0 || epss > 1) return "";
+  return epss > 0 && epss < 0.005 ? "1% 미만" : `${Math.round(epss * 100)}%`;
+}
+
+/**
  * EPSS(30일 내 실제 악용될 확률)를 **사람에게 나가는 글자**로 — 표기의 단일 출처.
  *
  * 왜 한 곳인가(2026-09-11 검토관 적발): 같은 취약점 한 건이 자리마다 다른 글자로 떴다 —
@@ -170,13 +188,13 @@ export function 심각도표식(severity: string): string {
  *   ※ 그런 산출물을 이 저장소 안에서 실제로 찾지는 못했다. 함수가 **스스로 전제를 지키게**
  *     두는 것이고, 정렬(approvals.priorityScore)은 이 함수를 안 지나므로 그쪽은 그대로다.
  *
+ * ⚠ 반올림 규칙 자체는 여기 한 곳(epss값표기)에서만 계산한다 — 이 함수는 「EPSS 」만 붙인다.
+ *
  * @returns 「EPSS 97%」 꼴. 값이 없거나 뜻을 못 읽으면 빈 문자열 — 부르는 쪽이 filter(Boolean)로 뺀다.
  */
 export function epss표기(epss: number | null | undefined): string {
-  if (typeof epss !== "number" || !Number.isFinite(epss)) return "";
-  if (epss < 0 || epss > 1) return "";
-  const 값 = epss > 0 && epss < 0.005 ? "1% 미만" : `${Math.round(epss * 100)}%`;
-  return `EPSS ${값}`;
+  const 값 = epss값표기(epss);
+  return 값 ? `EPSS ${값}` : "";
 }
 
 /** 제품 판정 머리표 — 【 】는 이 이름들에만 쓴다(다른 【 】는 프롬프트 누출로 본다). */

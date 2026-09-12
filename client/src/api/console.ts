@@ -376,7 +376,7 @@ export const bridgeApi = {
 export interface TodayItem {
   id: string; axis: "vuln" | "device"; urgency: "now" | "today";
   title: string; subtitle: string; why: string; action: string; badges: string[];
-  ref?: string; kev?: boolean; epssPct?: number;
+  ref?: string; kev?: boolean; epssLabel?: string;
 }
 export interface TodayBrief {
   items: TodayItem[]; counts: { now: number; today: number; later: number };
