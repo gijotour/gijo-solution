@@ -2,7 +2,7 @@
 
 `node tools/test-map.mjs` 로 만듭니다. **손으로 고치지 마세요** — 다시 만들면 덮어씁니다.
 
-시험 파일 **492개**. 분류 근거는 파일 이름이 아니라 **그 시험이 실제로 import하는 소스**입니다.
+시험 파일 **493개**. 분류 근거는 파일 이름이 아니라 **그 시험이 실제로 import하는 소스**입니다.
 
 ```
 server/test/
@@ -320,7 +320,7 @@ server/test/
 │   ├── raftdataset.test.ts
 │   ├── tierhonesty.test.ts
 │   └── trainenv.test.ts
-├── 지식·RAG/  (52)
+├── 지식·RAG/  (53)
 │   ├── bundleimport.test.ts
 │   ├── bundleverify.test.ts
 │   ├── categoryreject.test.ts
@@ -369,6 +369,7 @@ server/test/
 │   ├── ragscope.test.ts
 │   ├── rolesearch.test.ts
 │   ├── searchnormalize.test.ts
+│   ├── seeddisclosure.test.ts
 │   ├── surrogatesafe.test.ts
 │   ├── terms.test.ts
 │   ├── topiccolors.test.ts
@@ -524,7 +525,7 @@ server/test/
 | 대화·라우팅 | 111 | `adapters` → src/engine/adapters · `adaptertools` → src/engine/agentloop |
 | 말투·표기 | 12 | `approvalstatustool` → src/engine/agenttools/handlers · `findingplain` → src/engine/findingplain |
 | 모델·엔진 | 30 | `adapterimport` → (제품 소스 import 없음) · `adoptgate` → src/engine/adapters |
-| 지식·RAG | 52 | `bundleimport` → src/engine/ontology · `bundleverify` → src/engine/bundleverify |
+| 지식·RAG | 53 | `bundleimport` → src/engine/ontology · `bundleverify` → src/engine/bundleverify |
 | 취약점·자산 | 41 | `aibomfield` → src/engine/agenttools/handlers · `assetbyname` → src/engine/assets |
 | 규정·법령 | 7 | `actioncheck` → src/engine/actioncheck · `actioncheck-verbs` → src/engine/actioncheck |
 | 점검·하드닝 | 13 | `hardening-selfscan-off` → src/app · `hardeningscan` → src/app |
