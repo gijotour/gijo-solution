@@ -62,6 +62,47 @@ describe("소스 감시 — 깃발과 기본값", () => {
     expect(소스).toMatch(/if args\.max_steps and args\.max_steps > 0:/);
   });
 
+  // ── r5b 메모리 대책(2026-09-13) ────────────────────────────────────────
+  // ⚠ 왜 이 블록이 생겼나: 2026-09-12 gb10 r5a 본 굽기가 가용 0~1G에서 밤새 돌았는데,
+  //   이 스크립트는 GPU 메모리를 **한 글자도 안 남겼다.** 계측 없이 상한값을 고르는 것은
+  //   추측이지 대책이 아니다 — 그래서 계측(gpu_메모리_로그)과 토치 수준 상한(--gpu-mem-fraction)을
+  //   먼저 연다. 기본은 **반드시 꺼져 있어야** r5a 재현(night-r5-bake.sh 기본값)이 안 깨진다.
+  it("★ --gpu-mem-fraction이 있고 기본은 0(안 걺)이다 — r5a 재현이 이 기본값에 걸려 있다", () => {
+    expect(소스, "학습기가 --gpu-mem-fraction을 안 받는다").toContain("--gpu-mem-fraction");
+    expect(소스).toMatch(/--gpu-mem-fraction[\s\S]{0,200}default=0\.0/);
+  });
+
+  it("★ 0이면 set_per_process_memory_fraction을 안 부른다 — 기본이 켜지면 조용히 다른 학습이 된다", () => {
+    expect(소스, "0보다 클 때만 거는 가드가 없다").toMatch(/if args\.gpu_mem_fraction and args\.gpu_mem_fraction > 0:/);
+    expect(소스).toContain("set_per_process_memory_fraction(args.gpu_mem_fraction, 0)");
+  });
+
+  it("★ GPU 메모리 계측 로그가 적재 직후·학습 종료 두 자리에 있다", () => {
+    expect(소스, "계측 함수가 없다").toContain("def gpu_메모리_로그(");
+    expect(소스, "적재 직후 계측 호출이 없다").toContain('gpu_메모리_로그("적재 직후")');
+    expect(소스, "학습 종료 계측 호출이 없다").toContain('gpu_메모리_로그("학습 종료")');
+    expect(소스).toContain("max_memory_allocated()");
+    expect(소스).toContain("max_memory_reserved()");
+  });
+
+  it("★ GPU 계측 로그는 `step N/M loss=` 꼴이 아니다 — 제품 진행률 파서(finetune.ts)를 오염시키지 않는다", () => {
+    // 계측 로그를 찍는 그 f-string 한 줄만 자른다(전체 소스에서 다른 곳의 "step ... loss="와 안 섞이게).
+    const 시작 = 소스.indexOf('log(f"[finetune] GPU 메모리(');
+    expect(시작, "계측 로그 문자열을 못 찾았다").toBeGreaterThan(-1);
+    const 끝 = 소스.indexOf("\n", 시작);
+    const 계측줄 = 소스.slice(시작, 끝);
+    expect(계측줄, "제품 파서 정규식(/step\\s+(\\d+)\\/(\\d+)\\s+loss=/)에 걸리면 진행률 막대가 이 값으로 튄다")
+      .not.toMatch(/step\s+\d+\/\d+\s+loss=/);
+  });
+
+  it("nvidia-smi로 재지 않는다 — GB10은 통합메모리라 [N/A]를 준다(CLAUDE.md·unifiedmem.ts 계약)", () => {
+    // ⚠ 문서화 주석(계측 함수 docstring)에는 「왜 안 쓰는지」를 설명하려고 이 낱말이 등장한다 —
+    //   그걸 그대로 세면 설명 자체가 시험을 빨갛게 만든다(judge.sh의 pkill 주석 함정과 같은 종류).
+    //   그래서 삼중따옴표 docstring을 뺀 **코드만** 본다.
+    const 코드만 = 소스.replace(/"""[\s\S]*?"""/g, "");
+    expect(코드만, "실제 코드에 nvidia-smi 호출이 있다").not.toContain("nvidia-smi");
+  });
+
   it("bf16 경로는 k-bit 준비 함수를 안 부르고, 대신 입력 grad를 켠다(그게 없으면 체크포인팅과 함께 죽는다)", () => {
     // ⚠ **bf16 갈래만** 자른다 — else(4bit)까지 함께 자르면 그쪽의 k-bit 준비 호출이 걸려
     //   「bf16이 부른다」는 거짓 빨강이 난다(2026-09-10에 이 시험 자신이 그렇게 틀렸다).
@@ -107,6 +148,11 @@ describe.runIf(PY)("진짜 파이썬 — 깃발이 argparse를 지나 값으로 
   it("모르는 값은 받지 않는다 — 오타를 조용히 기본값으로 떨어뜨리지 않는다", () => {
     const out = 돌리기(["--precision", "int8"]);
     expect(out).toMatch(/invalid choice|error/i);
+  });
+
+  it("★ --gpu-mem-fraction 값이 argparse를 지나 값으로 찍힌다(기본 0.0 · 지정 시 그 값)", () => {
+    expect(돌리기([])).toContain("gpu_mem_fraction=0.0");
+    expect(돌리기(["--gpu-mem-fraction", "0.9"])).toContain("gpu_mem_fraction=0.9");
   });
 
   afterAllCleanup();

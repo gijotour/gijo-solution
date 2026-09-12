@@ -127,6 +127,14 @@ def main() -> None:
     #     지금은 전 회차(3~5시간)를 돌리는 길밖에 없어 밤 한 번을 통째로 쓴다.
     p.add_argument("--max-steps", type=int, default=0,
                    help="N스텝만 돌고 멈춘다(기본 0 = 안 쓴다 · 에폭 수대로)")
+    # [2026-09-13 · r5b 메모리 대책] 회전 5 r5a 본 굽기 실측(gb10): cgroup 상한(MemoryMax)이
+    #   통합메모리 GPU 할당을 원리상 못 봐(memcg 밖) 아무 것도 못 막았다 — 밤새 가용 0~1G로
+    #   돌다 커널 OOM을 맞을 수 있었다. 이 깃발은 **토치 수준**에서 한도를 걸어, 넘는 순간 몇 분
+    #   안에 깨끗한 CUDA OOM으로 실패하게 한다(밤새 기다리는 대신 빨리 안다).
+    #   ⚠ 기본 0 = 안 걺 — 값을 얼마로 잡을지는 계측(GPU 메모리 로그) 없이 못 고른다(그래서 먼저 연다).
+    p.add_argument("--gpu-mem-fraction", type=float, default=0.0,
+                   help="CUDA per-process 메모리 상한 비율(0~1, 기본 0=안 걺). 0보다 크면 "
+                        "torch.cuda.set_per_process_memory_fraction으로 건다(계측 뒤 판단 · 기본은 안 켠다)")
     # --smoke: GPU·학습 의존성 없이 **파이프라인 계약만** 확인한다(시험·CI 전용).
     #   원클릭 루프가 이 스크립트를 부르게 되면서 필요해졌다 — 예전 스크립트에는 있고
     #   여기엔 없어, 배선을 바꾸면 스모크 시험이 통째로 죽는다(2026-08-08).
@@ -159,7 +167,7 @@ def main() -> None:
         log(f"[finetune] (smoke) save_epochs={int(args.save_epochs)} · eval_holdout={args.eval_holdout} · lora_alpha_mult={args.lora_alpha_mult} · eval_file={args.eval_file or '-'}")
         # 회전 5의 두 변수도 스모크가 **말로** 확인한다 — 깃발을 주고도 안 켜진 채 몇 시간을 돌린
         # 전례(warmup_ratio)가 있어, 「받았다」가 아니라 「이 값으로 돌겠다」를 찍는다.
-        log(f"[finetune] (smoke) precision={args.precision} · lora_targets={args.lora_targets}({'·'.join(lora_모듈(args.lora_targets))}) · max_steps={args.max_steps}")
+        log(f"[finetune] (smoke) precision={args.precision} · lora_targets={args.lora_targets}({'·'.join(lora_모듈(args.lora_targets))}) · max_steps={args.max_steps} · gpu_mem_fraction={args.gpu_mem_fraction}")
         if args.eval_file:
             # ★ 스모크가 **진짜 파일**을 읽고 겹침까지 본다 — 실학습 경로는 GPU가 있어야 도는데,
             #   「홀드아웃이 데이터셋에서 빠졌나」는 값싸게 확인할 수 있다(빠지지 않았으면 그 손실은
@@ -215,6 +223,25 @@ def main() -> None:
     from transformers import (AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig,
                               Trainer, TrainingArguments)
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+
+    def gpu_메모리_로그(단계: str) -> None:
+        r"""GPU 메모리 계측 — 적재 직후·학습 종료 두 자리에서 한 줄씩 찍는다(2026-09-13 · r5b 메모리 대책).
+
+        ★ 왜 필요한가(2026-09-12 gb10 실측): r5a 본 굽기 내내 가용 메모리가 0~1G에 붙어 있었는데,
+          이 스크립트는 GPU 메모리를 **한 글자도 안 남겼다**(bake.log에 0건). (3)(8) 같은 대책의
+          숫자를 고르려면 먼저 재야 한다 — 계측 없이 상한값을 고르는 것은 추측이지 대책이 아니다.
+        ⚠ `step N/M loss=` 꼴을 쓰지 않는다 — server/src/engine/finetune.ts:131의 진행률 파서가
+          그 정규식(`/step\s+(\d+)\/(\d+)\s+loss=([\d.]+)/`)만 읽는다. 여기에 걸리면 진행률 막대가
+          이 계측 값으로 튄다.
+        ⚠ nvidia-smi로 재지 않는다 — GB10은 통합메모리라 GPU 메모리를 `[N/A]`로 준다
+          (CLAUDE.md·server/src/util/unifiedmem.ts 계약). torch.cuda.max_memory_allocated/reserved는
+          CUDA 런타임 API라 정확히 준다.
+        """
+        if not torch.cuda.is_available():
+            return
+        allocated = torch.cuda.max_memory_allocated() / (1024 ** 3)
+        reserved = torch.cuda.max_memory_reserved() / (1024 ** 3)
+        log(f"[finetune] GPU 메모리({단계}) allocated={allocated:.2f}GiB reserved={reserved:.2f}GiB")
 
     tok = AutoTokenizer.from_pretrained(args.base_model)
     if tok.pad_token is None:
@@ -304,6 +331,16 @@ def main() -> None:
             "attention_mask": torch.tensor([[1] * len(b["input_ids"]) + [0] * (mx - len(b["input_ids"])) for b in batch]),
         }
 
+    # [2026-09-13 · r5b 메모리 대책] 모델 적재 **전에** 건다 — 적재 중간에 넘으면 늦다.
+    # 기본 0이면 아예 안 부른다: 부르고 0을 주면 라이브러리에 따라 「즉시 OOM」으로 읽힐 수 있어,
+    # 안 켠 것과 켰는데 0인 것을 코드가 갈라 둔다.
+    if args.gpu_mem_fraction and args.gpu_mem_fraction > 0:
+        if torch.cuda.is_available():
+            torch.cuda.set_per_process_memory_fraction(args.gpu_mem_fraction, 0)
+            log(f"[finetune] GPU 메모리 상한 설정 — set_per_process_memory_fraction({args.gpu_mem_fraction}, 0)")
+        else:
+            log("[finetune] --gpu-mem-fraction 은 CUDA가 있어야 걸린다 — 건너뜀(CUDA 없음)")
+
     if args.precision == "bf16":
         # 누르지 않고 싣는다 — 학습 격자(bf16)와 서빙 격자(Q4_K_M) 사이의 어긋남을 없애려는 판이다.
         # ⚠ prepare_model_for_kbit_training은 **k-bit 전용**이라 여기서 부르지 않는다. 대신 그 함수가
@@ -320,6 +357,7 @@ def main() -> None:
         model = AutoModelForCausalLM.from_pretrained(args.base_model, quantization_config=bnb,
                                                      dtype=torch.bfloat16, device_map={"": 0})
         model = prepare_model_for_kbit_training(model)
+    gpu_메모리_로그("적재 직후")
     lora_alpha = max(1, int(round(args.rank * args.lora_alpha_mult)))
     모듈들 = lora_모듈(args.lora_targets)
     # ★ **실제로 무엇으로 도는지**를 한 줄에 찍는다 — 깃발이 조용히 무시되면 몇 시간을 헛돈다.
@@ -393,6 +431,7 @@ def main() -> None:
         callbacks=[진행알림()], args=ta,
     )
     trainer.train()
+    gpu_메모리_로그("학습 종료")
     model.save_pretrained(args.output)
     tok.save_pretrained(args.output)
     log(f"[finetune] done output={args.output} ({round(time.time() - t0)}초)")

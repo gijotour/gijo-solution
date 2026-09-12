@@ -63,6 +63,18 @@ CWIN=${CWIN:-$R5/cwin-v6.json}
 HOLDOUT=${HOLDOUT:-$REPO/tools/team-bench/holdout-vuln-o.json}
 SAMPLES=${SAMPLES:-$REPO/tools/team-bench/samples-questions.json}
 GRADEGATE=${GRADEGATE:-$REPO/tools/team-bench/gradegate.mjs}
+# [2026-09-13 · r5b 메모리 대책] r5a를 스크립트에 **박아 두지 않고** 매개변수화한다 — prep→bake
+#   복사 때 「실제 차이 전부」를 다시 적어야 했던 값을 또 치르지 않으려는 것이다(머리글 참고).
+#   ⚠ 기본값은 r5a와 **바이트 단위로 같은 명령**을 낸다(아래 실행줄 참고 · bash -x dry로 대조할 것).
+LORA_TARGETS=${LORA_TARGETS:-all}
+PRECISION=${PRECISION:-bf16}
+MAXSEQ=${MAXSEQ:-4096}
+# [2026-09-13 · r5b 메모리 대책] 토치 수준 상한 — 기본은 안 걺(빈 문자열). 걸면 명령줄에
+#   --gpu-mem-fraction이 붙는다(finetune_qlora14b.py 신설 깃발). 값을 고르는 것은 계측 뒤다.
+GPUMEMFRAC=${GPUMEMFRAC:-}
+# [2026-09-13 · r5b 메모리 대책] PYTORCH_CUDA_ALLOC_CONF — 기본은 안 켠다(효과 미실측·계측 뒤 판단).
+#   켜려면 예: `ALLOC_CONF=expandable_segments:True bash night-r5-bake.sh`.
+ALLOC_CONF=${ALLOC_CONF:-}
 # 밤새 굽는다 — 사전 가용 관문은 prep과 같은 수(bf16 14B 가중치만 28G).
 # ⚠ 이 32G는 **실측 필요량보다 작다**(2026-09-11 검토관 적발). 어젯밤 실측: 시작 가용 44G →
 #   최대 사용 120G/121G(교사 77G 위에 우리가 약 43G). 32~43G 사이에서 시작하면 관문은 초록인데
@@ -71,12 +83,27 @@ GRADEGATE=${GRADEGATE:-$REPO/tools/team-bench/gradegate.mjs}
 BAKE_MIN_AVAIL=${BAKE_MIN_AVAIL:-32}
 BAKE_MEASURED_NEED=${BAKE_MEASURED_NEED:-43}
 BAKE_MEM_MAX=${BAKE_MEM_MAX:-38G}
+# [2026-09-13 · r5b 메모리 대책] 스왑 증가 감시견의 문턱 — 가용(0~1G)은 정상 굽기에서도 나오므로
+#   문턱으로 못 쓴다(2026-09-12 실측: 정상 굽기가 표본의 81%를 가용 0~1G에서 보냈다). 대신 SwapFree가
+#   굽기 시작값 대비 이만큼(GiB) 줄면 「교사가 디스크로 밀려나는 중」으로 본다.
+SWAP_DROP_MAX_GB=${SWAP_DROP_MAX_GB:-2}
 # 08:30 데드라인 — 예상 종료 04:45~05:00경이라 여유가 크지만, 낮 서빙을 지키는 마지막 방어선이다.
 DEADLINE=${DEADLINE:-08:30}
 
 mkdir -p "$R5"
 say() { echo "[$(date '+%F %T %Z')] $*" | tee -a "$LOG"; }
-mem() { free -g | awk '/^메모리|^Mem/ {print "총 "$2"G 사용 "$3"G 가용 "$7"G"}'; }
+# [2026-09-13 · r5b 메모리 대책] 스왑 사용량을 **함께 찍는다**(잣대 단일화) — 32G/43G(위)는 스왑을
+#   안 깎은 수라서, 스왑이 나가 있으면 「가용 32G」가 실제로는 그만큼 못한 값일 수 있다. 숫자
+#   자체(32→43 등)를 바꾸는 것은 메인/사장님 결정이라 여기서는 **로그에 병기만** 한다.
+#   ⚠ 스왑 칸에 "사용"을 다시 쓰지 않는다 — 아래 "굽기 중 최대 사용 메모리" 집계가 낱말 "사용"
+#     뒤 필드를 전부 최댓값 후보로 줍는데, 그러면 스왑 값과 뒤섞여 틀린 최댓값을 낼 수 있다.
+mem() {
+  free -g | awk '
+    /^메모리|^Mem/ { total=$2; used=$3; avail=$7 }
+    /^스왑|^Swap/ { swapused=$3 }
+    END { printf "총 %sG 사용 %sG 가용 %sG · 스왑 %sG", total, used, avail, swapused+0 }
+  '
+}
 teacher() { curl -s -m 5 http://127.0.0.1:8080/health || echo "(응답 없음)"; }
 
 say "════ 회전 5 r5a 본 굽기 시작 ════"
@@ -108,7 +135,7 @@ fi
 # ⚠ 판정은 **이번에 쓰는 깃발 전부**를 본다(2026-09-11 검토관 적발). --precision 하나만 보면
 #   나머지 셋이 없는 학습기를 골라 03:25에 argparse 오류로 즉사하고 아침까지 아무도 모른다.
 FT=$SERVER/scripts/finetune_qlora14b.py
-FTFLAGS="--precision --lora-alpha-mult --save-epochs --eval-file --lora-targets --max-seq"
+FTFLAGS="--precision --lora-alpha-mult --save-epochs --eval-file --lora-targets --max-seq --gpu-mem-fraction"
 FTMISS=""
 for f in $FTFLAGS; do
   grep -q -- "\"$f\"" "$FT" 2>/dev/null || FTMISS="$FTMISS $f"
@@ -131,14 +158,20 @@ else
   #   RUNNER 계산은 그 아래에서 했다. 상한이 실제로 걸렸는지가 로그에 한 글자도 안 남아,
   #   아침 판정자가 「보호가 걸린 채 구워졌다」로 읽게 된다(폴백을 정상 출력처럼 다루는 부류).
   # choom = oom_score_adj 를 올려 **커널이 우리를 먼저 고르게** 한다(교사는 780이다).
-  # systemd-run --scope MemoryMax = cgroup 상한. ⚠ 최선의 노력이다(어젯밤 실측: 상한 38G를
-  #   넘겨 약 43G를 쓰고도 종료 0 — 즉 **실효가 없었다.** 증거 부족으로 계속 걸되 단언하지 않는다).
+  # systemd-run --scope MemoryMax = cgroup 상한.
+  # ★ [2026-09-13 · r5b 메모리 대책] 「실효는 미검증」은 더 이상 맞는 말이 아니다 — **실측으로
+  #   확정됐다**(2026-09-12 gb10): 전체 프로세스 RSS 합 18.8GiB인데 `free`의 used는 77.2GiB —
+  #   약 58GiB가 어느 프로세스 RSS에도 안 잡히는 CUDA 드라이버(통합메모리) 할당이었다. 이 상한이
+  #   실제로 cgroup에 청구한 최대치는 user@1000.service memory.peak 26.3GiB로 38G 근처에도 못 갔다
+  #   (교사 llama-server VmRSS도 84GB 모델을 얹고 16.5GiB뿐이었다 — 같은 이유). 즉 **cgroup
+  #   MemoryMax는 통합메모리 GPU 할당을 원리상 못 본다(memcg 밖)** — 상한은 남겨 두되(해될 것은
+  #   없다) 효과가 있다고 적지 않는다. 최후 방어는 choom과 아래 감시견들이다.
   RUNNER=""
   if command -v systemd-run > /dev/null 2>&1; then
     RUNNER="systemd-run --user --scope -q -p MemoryMax=$BAKE_MEM_MAX --"
-    GUARD="cgroup 상한 $BAKE_MEM_MAX 지정(실효는 미검증 — 어젯밤은 넘겼다)"
+    GUARD="cgroup 상한 $BAKE_MEM_MAX 지정(실효 없음 — 통합메모리 GPU 할당은 memcg 밖이다. 2026-09-12 실측: 전체 RSS 18.8GiB vs used 77.2GiB · user@1000.service memory.peak 26.3GiB<38G — 최후 방어는 choom과 감시견이다)"
   else
-    GUARD="cgroup 상한 **미적용**(systemd-run 없음)"
+    GUARD="cgroup 상한 **미적용**(systemd-run 없음) — 최후 방어는 choom과 감시견이다"
   fi
   if command -v choom > /dev/null 2>&1; then
     RUNNER="$RUNNER choom -n 1000 --"
@@ -147,7 +180,7 @@ else
     GUARD="$GUARD · oom_score_adj **미적용**(choom 없음)"
   fi
   [ -n "$RUNNER" ] || GUARD="상한·우선순위 **둘 다 미적용** — 가용 관문과 감시견만 걸린 상태"
-  say "굽기 시작 — bf16 · LoRA all · rank16 · lr1e-4 · 2에폭 · max_seq 4096 · lora-alpha-mult 1 · 가용 ${AVAIL}G"
+  say "굽기 시작 — precision=$PRECISION · lora_targets=$LORA_TARGETS · rank16 · lr1e-4 · 2에폭 · max_seq=$MAXSEQ · lora-alpha-mult 1 · 가용 ${AVAIL}G"
   say "걸린 보호: $GUARD"
   if [ "${AVAIL:-0}" -lt "$BAKE_MEASURED_NEED" ]; then
     say "⚠ 가용 ${AVAIL}G < 실측 필요량 ${BAKE_MEASURED_NEED}G — 관문(${BAKE_MIN_AVAIL}G)은 지났지만 OOM 여지가 있다"
@@ -178,17 +211,47 @@ else
       pgrep -f "finetune_qlora14b.py" > /dev/null 2>&1 || break
     done ) > /dev/null 2>&1 &
   DEADLINEPID=$!
+  # [2026-09-13 · r5b 메모리 대책] 스왑 증가 감시견 — cgroup이 못 보는 것을 **유일하게 보는 자리**다.
+  #   가용(0~1G)은 정상 굽기에서도 나오므로 문턱으로 못 쓴다(2026-09-12 실측: 정상 굽기가 표본의
+  #   81%를 가용 0~1G에서 보냈다). 대신 SwapFree가 시작 대비 SWAP_DROP_MAX_GB(GiB) 넘게 줄면
+  #   「교사가 디스크로 밀려나는 중」으로 보고 **학습만** 내린다.
+  #   ⚠ 이름으로 죽이지 않는다 — `pkill -f llama-server`는 교사(8080)·임베딩(8081)까지 함께 죽인다.
+  SWAP_BASE_KB=$(awk '/^SwapFree:/{print $2}' /proc/meminfo 2>/dev/null)
+  SWAP_BASE_KB=${SWAP_BASE_KB:-0}
+  ( while true; do
+      sleep 15
+      SWAP_NOW_KB=$(awk '/^SwapFree:/{print $2}' /proc/meminfo 2>/dev/null)
+      SWAP_NOW_KB=${SWAP_NOW_KB:-$SWAP_BASE_KB}
+      DROP_GB=$(( (SWAP_BASE_KB - SWAP_NOW_KB) / 1024 / 1024 ))
+      if [ "$DROP_GB" -ge "$SWAP_DROP_MAX_GB" ]; then
+        echo "[$(date '+%F %T %Z')] ⚠ 스왑 ${DROP_GB}G 증가(SwapFree 기준 · 시작 대비) — 교사가 디스크로 밀려나는 중으로 보고 학습만 내린다" >> "$LOG"
+        pkill -f "finetune_qlora14b.py" 2>/dev/null
+        break
+      fi
+      pgrep -f "finetune_qlora14b.py" > /dev/null 2>&1 || break
+    done ) > /dev/null 2>&1 &
+  SWAPDOGPID=$!
   cd "$SERVER" || exit 1
   # ⚠ 아래 $RUNNER 는 위에서 이미 계산됐다(로그에 적힌 「걸린 보호」가 여기서 실제로 걸리는 것이다).
   #   학습은 이 --scope 때문에 **서비스와 다른 유닛**에서 돈다 — 되돌릴 땐 머리글의 순서를 지킬 것.
+  # ⚠ [2026-09-13 · r5b 메모리 대책] GPUMEMFRAC·ALLOC_CONF는 **기본이 비어 있다** — 그때는 아래
+  #   ${..:+..} 확장이 통째로 사라져 이 명령은 r5a가 낸 것과 **바이트 단위로 같다**(bash -x dry로
+  #   대조할 것). 값을 주면 그 한 줄만 늘어난다.
+  #   ⚠ `VAR="$X"`가 아니라 `env VAR="$X"`를 쓴다 — `${ALLOC_CONF:+VAR="$ALLOC_CONF"}`처럼 파라미터
+  #     확장으로 **만들어진** "NAME=value" 낱말은 쉘이 환경변수 대입으로 안 읽는다(그 인식은
+  #     문법상 리터럴 대입에서만 걸린다) — 대신 명령으로 취급해 "command not found"로 죽는다
+  #     (2026-09-13 실측: 더미 값으로 dry 대조하다 걸렸다). `env`는 그 낱말을 **제 인자로** 받아
+  #     스스로 자식 환경에 심으므로 쉘의 그 제약을 안 탄다.
   GIJO_FT_BASE_MODEL=${GIJO_FT_BASE_MODEL:-Qwen/Qwen3-14B} \
+    ${ALLOC_CONF:+env PYTORCH_CUDA_ALLOC_CONF="$ALLOC_CONF"} \
     $RUNNER "$VENV/bin/python" "$FT" --dataset "$DATASET" --output "$BAKE_OUT" \
     --base-model "${GIJO_FT_BASE_MODEL:-Qwen/Qwen3-14B}" \
-    --precision bf16 --lora-targets all --rank 16 --lr 0.0001 --epochs 2 --max-seq 4096 \
+    --precision "$PRECISION" --lora-targets "$LORA_TARGETS" --rank 16 --lr 0.0001 --epochs 2 --max-seq "$MAXSEQ" \
     --lora-alpha-mult 1 --save-epochs --eval-file "$HOLDOUT" \
+    ${GPUMEMFRAC:+--gpu-mem-fraction "$GPUMEMFRAC"} \
     > "$R5/bake.log" 2>&1
   BAKE=$?
-  kill "$MEMPID" "$DOGPID" "$DEADLINEPID" 2>/dev/null
+  kill "$MEMPID" "$DOGPID" "$DEADLINEPID" "$SWAPDOGPID" 2>/dev/null
   say "굽기 종료코드 $BAKE · 마지막 줄: $(tail -5 "$R5/bake.log" | tr '\n' ' ' | cut -c1-400)"
   say "굽기 중 최대 사용 메모리: $(awk '{for(i=1;i<=NF;i++) if($i=="사용") {gsub("G","",$(i+1)); if($(i+1)+0>m) m=$(i+1)+0}} END{print m"G"}' "$R5/bake-mem.log")"
   say "교사 health(굽기 직후): $(teacher)"

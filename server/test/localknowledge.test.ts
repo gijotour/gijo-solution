@@ -242,4 +242,70 @@ describe("night-r5-bake.sh 소스 감시 — 2026-09-11까지 시험 0건이던 
     expect(밤).toMatch(/GATE=red/);
     expect(밤).toMatch(/\[ "\$GATE" != "ok" \]/);
   });
+
+  // ── r5b 굽기 전 메모리 대책(2026-09-13) ──────────────────────────────────
+  // ⚠ 왜 필요한가: 2026-09-12 r5a 본 굽기 실측 — cgroup MemoryMax(38G) 상한이 통합메모리 GPU
+  //   할당을 원리상 못 봐 아무 것도 못 막았다(전체 RSS 18.8GiB vs used 77.2GiB). 대책은 ①계측
+  //   ②토치 상한 깃발 ③매개변수화 ④정직한 GUARD 문구 ⑤스왑 증가 감시견 ⑥잣대 병기 — 여기서
+  //   그 짝을 못 박는다. 코드 자리를 본다(주석만 지우면 지나가는 것은 감시가 아니다).
+  it("★ LORA_TARGETS·PRECISION·MAXSEQ가 매개변수화됐고 기본값이 r5a와 같다", () => {
+    expect(밤).toContain("LORA_TARGETS=${LORA_TARGETS:-all}");
+    expect(밤).toContain("PRECISION=${PRECISION:-bf16}");
+    expect(밤).toContain("MAXSEQ=${MAXSEQ:-4096}");
+    expect(실행줄, "하드코딩된 값이 아니라 변수를 넘겨야 매개변수화한 보람이 있다").toMatch(/--precision "\$PRECISION"/);
+    expect(실행줄).toMatch(/--lora-targets "\$LORA_TARGETS"/);
+    expect(실행줄).toMatch(/--max-seq "\$MAXSEQ"/);
+  });
+
+  it("가용 관문 숫자(32G/43G)는 그대로다 — 숫자를 바꾸는 것은 메인/사장님 결정이다", () => {
+    expect(밤).toContain("BAKE_MIN_AVAIL=${BAKE_MIN_AVAIL:-32}");
+    expect(밤).toContain("BAKE_MEASURED_NEED=${BAKE_MEASURED_NEED:-43}");
+  });
+
+  it("★ --gpu-mem-fraction은 기본 꺼짐이다 — 값이 없으면 명령줄에 아예 안 붙는다(r5a 재현 보존)", () => {
+    expect(밤).toContain("GPUMEMFRAC=${GPUMEMFRAC:-}");
+    expect(실행줄, "조건부로 붙는 자리가 없다").toMatch(/\$\{GPUMEMFRAC:\+--gpu-mem-fraction "\$GPUMEMFRAC"\}/);
+  });
+
+  it("★ PYTORCH_CUDA_ALLOC_CONF는 깃발/env로만 켜지고 기본은 안 켠다(효과 미실측)", () => {
+    expect(밤).toContain("ALLOC_CONF=${ALLOC_CONF:-}");
+    // ⚠ `${ALLOC_CONF:+VAR="$ALLOC_CONF"}`(env 없이)는 쉘이 대입으로 안 읽어 "command not found"로
+    //   죽는다(2026-09-13 dry 대조 중 실측) — 그래서 반드시 `env`를 거쳐야 한다.
+    expect(실행줄, "env 없이 대입만 쓰면 실행 시 command not found로 죽는다")
+      .toMatch(/\$\{ALLOC_CONF:\+env PYTORCH_CUDA_ALLOC_CONF="\$ALLOC_CONF"\}/);
+  });
+
+  it("★★ GUARD 문구가 실측 결론이다 — 「실효는 미검증」은 더는 맞는 말이 아니다(2026-09-12 실측 확정)", () => {
+    // ⚠ 주석이 아니라 **실제로 찍히는 GUARD 값**에서 본다 — 이 파일의 머리주석·설명 주석에는
+    //   "왜 문구를 바꿨는지"를 말하려고 옛 표현이 인용구로 남아 있을 수 있다(주석은 실행줄에서 뺀다).
+    expect(실행줄, "실효 미검증 문구가 실제 GUARD 값에 남아 있다").not.toContain("실효는 미검증");
+    expect(실행줄, "cgroup이 왜 못 보는지 실측 근거가 GUARD 값에 있어야 한다").toMatch(/memcg 밖|통합메모리 GPU 할당/);
+  });
+
+  it("★★ 스왑 증가 감시견이 있다 — 가용(0~1G)은 정상 굽기에서도 나오므로 문턱으로 못 쓴다(2026-09-12 실측 81%)", () => {
+    expect(실행줄, "SwapFree 기준선을 시작 때 재는 줄이 없다").toMatch(/SWAP_BASE_KB=.*SwapFree/);
+    expect(실행줄, "스왑 감소량을 견주는 줄이 없다").toMatch(/DROP_GB/);
+    expect(실행줄, "문턱과 견주는 조건이 없다").toMatch(/"\$DROP_GB"\s+-ge\s+"\$SWAP_DROP_MAX_GB"/);
+    expect(실행줄, "학습만 내려야 한다 — 여기도 이름으로 죽이면 교사까지 죽는다")
+      .toMatch(/pkill -f "finetune_qlora14b\.py"/);
+    expect(실행줄, "감시견 PID를 안 챙기면 굽기가 끝나도 안 죽고 남는다").toContain("SWAPDOGPID");
+  });
+
+  it("스왑 감시견이 학습 프로세스명으로만 죽인다 — llama-server 이름은 어디에도 안 쓴다", () => {
+    const 시작 = 실행줄.indexOf("SWAP_BASE_KB=");
+    expect(시작, "스왑 감시견 블록을 못 찾았다").toBeGreaterThan(-1);
+    const 끝 = 실행줄.indexOf("SWAPDOGPID=", 시작) + "SWAPDOGPID=$!".length;
+    const 블록 = 실행줄.slice(시작, 끝);
+    expect(블록).not.toMatch(/llama-server/);
+  });
+
+  it("★ 잣대 단일화 — 메모리 로그에 스왑 사용량이 함께 찍힌다(32G/43G는 스왑을 안 깎은 수라서)", () => {
+    expect(실행줄, "mem() 함수가 스왑을 안 찍는다").toMatch(/스왑/);
+    // 굽기 중 최대치 집계가 "사용" 뒤 필드를 전부 최댓값 후보로 줍는다 — 스왑 칸에 같은 낱말을
+    // 다시 쓰면 그 집계가 스왑 값과 메모리 값을 뒤섞는다(회귀 방지).
+    expect(실행줄).not.toMatch(/스왑 사용/);
+  });
+
+  // ★ 돌연변이로 실제로 잡히는지 확인(2026-09-13 구현 중 실측) — 스왑 감시견 줄을 지우면
+  //   위 두 시험(SWAP_BASE_KB·pkill)이 실제로 빨개졌다(수동 확인, 되돌린 뒤 커밋).
 });
