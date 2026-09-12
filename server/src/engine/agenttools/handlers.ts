@@ -19,7 +19,7 @@ import { 한줄풀이글, 섞임고지 } from "../findingplain";
 import { eol찾기, eol한줄확실도 } from "../eol-seed";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "../packagescan";
 import { targetRunner, runnerFor } from "../hardeningscan";
-import { listTargets } from "../hardeningtargets";
+import { listTargets, runScanForTarget } from "../hardeningtargets";
 import { 잃은취약점찾기, 잃은취약점현황글, 되살리기 } from "../findingsrestore";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "../securityproducts";
 import { listMaintenanceItems, createMaintenanceItem, submitReport, approveItem, rejectItem, type MaintenanceItem } from "../maintenance";
@@ -35,7 +35,7 @@ import { listFindings as listCtiFindings } from "../cti";
 import { matchCtiToAssets } from "../ctimatch";
 import { dailyBriefingText } from "../briefing";
 import { runRedTeam, makeServedCaller, getLastRedTeamReport, getLastEffectiveReport } from "../redteam";
-import { runHardeningScan, scanSummaryText, isStandard, 자기점검꺼짐, 자기점검차단안내 } from "../hardeningscan";
+import { runHardeningScan, scanSummaryText, isStandard, 자기점검꺼짐, 자기점검차단안내, 자기점검막힌대상인가 } from "../hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "../reportschedule";
 import { reportActivity, listReportHistory, maintenanceSummary } from "../report";
 import { listSchedules as listHardeningSchedules } from "../hardeningtargets";
@@ -1356,6 +1356,29 @@ export async function runHardeningScanTool(args: Record<string, string>): Promis
   const target = (args.target ?? "").trim() || undefined;
   // skipWorkLog: 이 경로는 agentloop이 원장에 남긴다(qa 판정까지 거기서 한다) — 중복 기록 방지.
   const report = await runHardeningScan({ standard, target, skipWorkLog: true });
+  return scanSummaryText(report);
+}
+
+// 보안장비 하드닝 점검(대화, **등록 대상 원격 실행**) — 2026-09-12 설계관 지시서 「hardeningtargets
+// 수동 실행 라우트」. 위 runHardeningScanTool(run_hardening_scan)은 항상 self인데, 대화에서
+// 「FW-01 하드닝 점검 돌려줘」처럼 **등록 장비**를 지목하면 그 장비에 실제로 붙어야 한다 — 그
+// 길이 지금까지 없었다(POST /api/hardening/targets/:id/scan만 있었다).
+// ⚠ runHardeningScan을 직접 부르지 않는다 — runScanForTarget이 이력·감사·상관 투영·악화
+//   알림을 한 곳에서 끝낸다(hardeningtargets.ts:361 HTTP 수동 실행과 같은 알맹이).
+export async function runScanHardeningTargetTool(args: Record<string, string>): Promise<string> {
+  const 말 = (args.target ?? "").trim();
+  if (!말) {
+    const 있는것 = listTargets().slice(0, 5).map((x) => x.label).join(", ");
+    return `어느 장비를 점검할지 정해 주세요. 등록된 점검 대상: ${있는것 || "(아직 없습니다 — 하드닝 점검 대상으로 먼저 등록해 주세요)"}`;
+  }
+  const t = 대상찾기(말);
+  if (!t) return `"${말}"에 해당하는 점검 대상이 검색되지 않았습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
+  // 등록됐지만 자기점검을 끈 설치본(GIJO_NO_SELF_SCAN=1)에서 로컬로 등록된 대상이면 여기서 막는다
+  // (원격 대상은 이 판정에 안 걸린다 — 자기점검막힌대상인가는 로컬 대상만 막는 함수다).
+  if (자기점검막힌대상인가(t)) return 자기점검차단안내;
+  const raw = (args.standard ?? "").toLowerCase();
+  const standard = isStandard(raw) ? raw : (t.standard ?? "kisa");
+  const report = await runScanForTarget(t, standard, "chatbot", 결재실행자());
   return scanSummaryText(report);
 }
 

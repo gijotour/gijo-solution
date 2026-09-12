@@ -661,7 +661,15 @@ export function 자기점검막힌대상인가(t: Pick<HardeningTarget, "authMet
 /** 대상 등록 단계에서 로컬(서버 자신)을 막을 때 쓰는 안내 — 위 차단 안내와 뜻이 같되 자리가 다르다. */
 export const 로컬대상차단안내 = "이 설치본에서는 이 서버 자신을 점검 대상으로 등록할 수 없습니다. 점검할 장비를 내부망(사설·VPN 대역) IP로 등록해 주세요.";
 
-export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn; ranOn?: "self" | "remote"; skipWorkLog?: boolean }): Promise<ScanReport> {
+export async function runHardeningScan(opts: {
+  standard: StandardId; target?: string; run?: RunFn; ranOn?: "self" | "remote"; skipWorkLog?: boolean;
+  /** 작업 원장(work_events)의 source 칸 — 안 주면 종전대로 "schedule"(스케줄러·화면 수동 실행 전제).
+   *  2026-09-12 설계관 지시서 「hardeningtargets 수동 실행 라우트」— 하드코딩이던 것을 옵션 인자로
+   *  정정한다. HTTP 수동 실행(hardeningtargets.ts:361)·대화 원격 실행(scan_hardening_target) 둘 다
+   *  runScanForTarget을 거치는데 여긴 skipWorkLog를 안 주니(원장을 여기서 남겨야 하니) 하드코딩된
+   *  "schedule"이면 담당자가 대화·화면에서 돌린 점검이 전부 「스케줄러가 함」으로 적힌다. */
+  workLogSource?: "chat" | "schedule" | "api";
+}): Promise<ScanReport> {
   const std = STANDARDS[opts.standard];
   // ⚠⚠ **「러너를 받았는가」로는 못 가린다**(2026-09-01 검토관 [상]이 잡은 반쪽 수정).
   //   runnerFor는 authMethod="local" 대상에도 **로컬 러너**를 돌려주므로 opts.run이 채워진다.
@@ -693,10 +701,12 @@ export async function runHardeningScan(opts: { standard: StandardId; target?: st
   const scored = total - na;
   const rate = scored ? Math.round((pass / scored) * 100) : 0;
   // 자동화 작업 원장(중-2) — 손으로 하면 항목마다 명령을 치고 결과를 표로 옮겨야 하는 일이다.
-  // 챗봇 경로는 agentloop이 이미 원장에 남긴다(TOOL_WORK_KIND) — 여기서 또 남기면 1회 점검이
-  // 2건으로 잡혀 절감 시간이 2배가 된다(검토 지적 2026-07-29). 그래서 도구 경로는 skipWorkLog로 끈다.
-  // 스케줄러·화면 실행은 agentloop을 안 타므로 여기서 남겨야 한다.
-  if (!opts.skipWorkLog) recordWork({ kind: "hardening_scanned", detail: `${opts.standard}/${ranOn === "remote" ? target : `self(${target})`}`, source: "schedule" });
+  // 챗봇 자기점검 경로(run_hardening_scan)는 agentloop이 이미 원장에 남긴다(TOOL_WORK_KIND) —
+  // 여기서 또 남기면 1회 점검이 2건으로 잡혀 절감 시간이 2배가 된다(검토 지적 2026-07-29).
+  // 그래서 그 도구 경로는 skipWorkLog로 끈다. 스케줄러·화면 수동 실행·대화 원격 점검
+  // (runScanForTarget)은 agentloop의 recordToolWork를 안 타므로(승인 경로는 그 함수를 안 부른다)
+  // 여기서 남겨야 하고, source는 **부른 쪽이 안다** — 안 주면 예전 그대로 "schedule"이다.
+  if (!opts.skipWorkLog) recordWork({ kind: "hardening_scanned", detail: `${opts.standard}/${ranOn === "remote" ? target : `self(${target})`}`, source: opts.workLogSource ?? "schedule" });
   return {
     standard: opts.standard,
     standardLabel: std.label,

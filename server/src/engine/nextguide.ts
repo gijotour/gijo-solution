@@ -70,6 +70,9 @@ const 표: Record<string, string[]> = {
   verify_finding: ["이거 조치완료 처리해줘", "미조치 취약점 뭐 있어?"], // 검증→확정 사슬(도구 설명 스스로가 지정)
   set_compliance_status: ["컴플라이언스 현황 알려줘", "보안 KPI 현황 알려줘"],
   collect_packages: ["AI-BOM 현황 알려줘", "SBOM 현황 알려줘"],
+  // 등록 장비 하드닝 점검(원격, 2026-09-12) — run_hardening_scan(자기 점검)과 같은 칩.
+  //   점검 대상이 무엇이든 다음 걸음은 같다(검증 현황·다음 정기점검 확인).
+  scan_hardening_target: ["검증 현황 보여줘", "하드닝 점검 스케줄 알려줘"],
   restore_lost_findings: ["미조치 취약점 뭐 있어?", "오늘 뭐부터 할까?"],
   alert_schedule_add: ["다음 정기 리포트 언제야?", "오늘 브리핑"],
   schedule_maintenance: ["유지보수 점검 일정 알려줘", "승인 기다리는 것 있어?"],

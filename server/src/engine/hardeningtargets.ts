@@ -137,11 +137,16 @@ export async function runScanForTarget(target: HardeningTarget, standard: Standa
   const prevFail = lastRunFail(target.id, standard); // 알림 판단용(이력 저장 전 값)
   // ⚠ 러너와 리포트 문구가 **같은 원천**(원격점검인가)을 쓴다 — 갈리면 안 붙은 장비를
   //   「붙어서 실측했다」고 적는다. run을 밖에서 넣어 준 경우(시험 등)는 그 뜻을 존중한다.
+  // ⚠ 작업 원장 source도 **이 함수의 source**(manual·scheduled·chatbot)에서 나온다 — 안 넘기면
+  //   runHardeningScan이 하드코딩된 "schedule"로 적어, HTTP 수동 실행·대화 원격 점검이 전부
+  //   「스케줄러가 함」이 된다(2026-09-12 설계관 지시서 「hardeningtargets 수동 실행 라우트」).
+  const workLogSource = source === "chatbot" ? "chat" : source === "manual" ? "api" : "schedule";
   const report = await runHardeningScan({
     standard,
     target: target.label,
     run: run ?? runnerFor(target, standard),
     ranOn: 원격점검인가(target) ? "remote" : "self",
+    workLogSource,
   });
   const s = report.summary;
   db.prepare(

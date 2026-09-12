@@ -224,6 +224,7 @@ import {
   runReingestDocument,
   runSetAiBomField,
   runEolCheck,
+  runScanHardeningTargetTool,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -1727,6 +1728,36 @@ const TOOLS: AgentTool[] = [
       { name: "target", label: "대상 장비", description: "점검 대상 표시용 라벨 (선택)", required: false },
     ],
     run: runHardeningScanTool,
+  },
+  {
+    // ⚠ **쓰기 + admin 전용**(2026-09-12, 설계관 지시서 「hardeningtargets 수동 실행 라우트」).
+    //   위 run_hardening_scan은 항상 self다(target은 표시용 라벨일 뿐) — 등록 대상(장비)에 실제로
+    //   붙어 점검을 돌리는 길은 지금까지 HTTP 수동 실행(POST /api/hardening/targets/:id/scan,
+    //   admin 전용)뿐이었다. 이 도구가 대화에 그 길을 연다 — 같은 급의 문턱(admin)을 맞춘다.
+    //   ⚠ collect_packages(같은 hardening_targets에 SSH로 붙는 write:true 도구)를 틀로 썼다.
+    name: "scan_hardening_target",
+    label: "등록 장비 하드닝 점검(원격)",
+    domain: "cross", // run_hardening_scan과 같은 자리 — 자산·보안제품·컴플라이언스를 가로지른다
+    write: true,
+    requiredRole: "admin",
+    description:
+      '**등록된** 점검 대상(장비)에 실제로 접속해 하드닝(보안설정) 점검을 실행한다. run_hardening_scan과 달리 이 서버 자신이 아니라 지목한 장비를 점검한다. "FW-01 하드닝 점검 돌려줘", "웹서버-01 보안설정 점검 실행해줘"에 쓴다. 대상은 하드닝 점검에 등록된 이름 또는 id. 예: {"target":"FW-01"}',
+    params: [
+      { name: "target", label: "대상 장비", description: "하드닝 점검에 등록된 대상 이름 또는 id", required: true },
+      { name: "standard", label: "점검 기준", description: "비우면 대상 등록 시 정한 기본 기준", required: false },
+    ],
+    effect: (args) => {
+      const 말 = (args.target ?? "").trim();
+      if (!말) {
+        const 있는것 = listTargets().slice(0, 5).map((x) => x.label).join(", ");
+        return `어느 장비를 점검할지 정해 주세요. 등록된 점검 대상: ${있는것 || "(아직 없습니다 — 하드닝 점검 대상으로 먼저 등록해 주세요)"}`;
+      }
+      const t = 대상찾기(말);
+      if (!t) return `"${말}"에 해당하는 점검 대상이 검색되지 않았습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
+      return `${t.label}(${t.host})에 접속해 하드닝(보안설정) 점검 명령을 **실제로 실행합니다.** 읽기 전용 진단 명령만 보냅니다 — 장비를 바꾸지 않습니다.`;
+    },
+    undo: "점검은 읽기 전용 진단 명령만 보내므로 장비는 바뀌지 않습니다 — 되돌릴 것이 없습니다.",
+    run: (args: Record<string, string>) => runScanHardeningTargetTool(args),
   },
   {
     name: "register_asset",

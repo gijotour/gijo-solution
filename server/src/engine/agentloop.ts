@@ -16,7 +16,7 @@ import { 쓰기흐름인가 } from "./writeflow"; // 「조회 + 쓰기 지시�
 import { 새근거수거, 근거를수거하며 } from "./toolevidence"; // 도구가 읽은 근거를 위로 나르는 꼬리표(잎 모듈)
 import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
-import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 되묻기표지, 지식근거없음표지, 본문근거없음표지 } from "./agenttools";
+import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 되묻기표지, 지식근거없음표지, 본문근거없음표지, 대상찾기 } from "./agenttools";
 import type { AgentTool } from "./agenttools";
 import { 법령검색없음표지 } from "./lawinfo";
 import { emitCollaboration } from "./collaboration";
@@ -2985,6 +2985,36 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
           : /\bpc\b|피시|윈도우|windows/i.test(instruction) ? "kisa_pc"
           : /네트워크\s*장비|스위치|라우터|cisco/i.test(instruction) ? "kisa_net"
           : "kisa";
+        // ★★ 안C(2026-09-12 메인 결정 — 설계관 지시서 「hardeningtargets 수동 실행 라우트」).
+        //   지금까지 이 자리는 **항상 self**를 돌려줬다(target 인자는 표시용 라벨일 뿐이라
+        //   "FW-01 하드닝 점검 돌려줘"도 우리 서버 자신을 점검했다 — 대장 2026-08-19 :275
+        //   「정직성 구멍」). 문장이 **등록 대상을 지목**하면 그 장비에 실제로 붙는 쓰기 도구
+        //   (scan_hardening_target)로, 못 맞히면 종전대로 self 점검을 돌려준다.
+        //   ⚠ 후보는 「장비 코드 꼴 낱말」(하이픈+식별자 또는 IPv4)만 본다 — 「고위험」·「등록」
+        //     같은 일반명사를 후보로 삼으면 아무 문자열이나 대상찾기에 넣어 오탐이 난다
+        //     (실측: 「고위험 장비만 하드닝 점검 돌려줘」·「등록 장비 전부 CCE 점검 돌려줘」는
+        //     후보가 없어 종전대로 self로 남는다 — 전체/조건부 일괄 점검은 이번 범위 밖이다).
+        //   ⚠ **대상찾기**(handlers.ts, 등록 표 id→라벨 정확일치→부분일치)를 그대로 부른다 —
+        //     같은 걸 재는 새 검색기를 만들지 않는다(collect_packages와 같은 판정기).
+        if (available.has("scan_hardening_target")) {
+          const 후보 = instruction
+            .split(/\s+/)
+            .map((w) => w
+              .replace(/^[「『"'([]+/, "")
+              .replace(/[」』"')\],.?!]+$/, "")
+              .replace(/(을|를|이|가|은|는|의|에서|에|로|으로)$/, ""))
+            .find((w) => /^\d{1,3}(?:\.\d{1,3}){3}$/.test(w) || /^[A-Za-z0-9가-힣]{1,20}-[A-Za-z0-9가-힣]{1,10}$/.test(w));
+          if (후보) {
+            const t = 대상찾기(후보);
+            // ⚠ **데이터의존**을 붙인다 — 장비 코드 꼴 낱말이 있으면 실제 도착은 등록 대상 표
+            //   (DB)에 달렸다. route-explain은 :memory: DB라 후보가 있어도 못 맞히는데, 안
+            //   붙이면 실제 운영 DB에 그 장비가 등록돼 있어도 「확정적으로 self 점검」이라
+            //   거짓 설명한다(evalgate 실측: 등록 대상 0건인 :memory:에서는 이 갈래가 늘
+            //   self로 떨어진다 — 그래서 8문장의 [37] 도착 자체는 안 바뀐다).
+            if (t) return { tool: "scan_hardening_target", args: { target: t.id, standard }, 데이터의존: true };
+            return { tool: f.tool, args: { standard }, 데이터의존: true };
+          }
+        }
         return { tool: f.tool, args: { standard } };
       }
       // 온톨로지 조회는 **검색어가 필수**다(agenttools: query required). 빈 인자로 부르면 도구가
