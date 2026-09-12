@@ -217,6 +217,35 @@ describe("★ ops-sim-meta.mjs — 회차 이름을 인자로 받는다(4100 메
     expect(r.status).toBe(2);
   });
 
+  // ★★ 2026-09-12 검토관 적발 수리 — meta에 「잰문항·건너뜀」을 넣어 놓고 **읽는 입이 없었다.**
+  //   사람이 아침에 먼저 보는 것은 밤 로그의 이 한 줄이라, 여기서 안 말하면 「총문항 205 ·
+  //   기록 205 · 완주 예」만 남고 **몇 문항을 안 물었다는 사실이 그 자리에 없다**.
+  it("★ 잰 문항·건너뜀·프로필도 한 줄에 말한다(프로필이 생겨 기록 ≠ 잰 문항이 됐다)", () => {
+    writeFileSync(임시메타, JSON.stringify({
+      총문항: 205, 기록: 205, 잰문항: 197, 건너뜀: 8,
+      건너뜀사유별: { "설정:법령": 5, "데이터:업무": 3 }, 프로필: "qa4100",
+      완주: true, 시각: "2026-09-12T00:00:00Z",
+    }));
+    try {
+      const r = 돌린다([임시이름]);
+      expect(r.status, `stderr: ${r.stderr}`).toBe(0);
+      expect(r.stdout, "잰 문항 수가 없다 — 205/205로만 읽힌다").toContain("잰 문항 197");
+      expect(r.stdout).toContain("건너뜀 8");
+      expect(r.stdout, "건너뜀 사유가 없다").toContain("설정:법령 5");
+      expect(r.stdout).toContain("qa4100");
+      expect(r.stdout).toContain("총문항 205");
+    } finally { rmSync(임시메타, { force: true }); }
+  });
+
+  it("그 칸이 없는 옛 회차는 종전 꼴 그대로 — 없는 숫자를 0으로 지어내지 않는다", () => {
+    writeFileSync(임시메타, JSON.stringify({ 총문항: 162, 기록: 162, 완주: true, 시각: "2026-09-05T18:10:00Z" }));
+    try {
+      const r = 돌린다([임시이름]);
+      expect(r.stdout).toContain("총문항 162 · 기록 162 · 완주 예");
+      expect(r.stdout, "안 적힌 칸을 지어내 적었다").not.toContain("건너뜀");
+    } finally { rmSync(임시메타, { force: true }); }
+  });
+
   it("인자가 없으면 기본값은 그대로 ops-sim이다(소스 감시 — 실제 ops-sim.meta.json은 안 건드린다)", () => {
     const src = readFileSync(스크립트, "utf8");
     expect(src, "기본 이름이 ops-sim이 아니게 바뀌었다").toMatch(/\|\|\s*"ops-sim"/);

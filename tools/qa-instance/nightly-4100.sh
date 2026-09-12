@@ -80,6 +80,8 @@ echo "▶ 4100 야간 회귀 시작 — ${QA_ACCOUNT}@${QA_BASE} · --out ${OUT_
 #   ops-sim.mjs가 회차마다 법령·CTI 설정은 자동 감지해 건너뜀을 함께 판정한다.
 # ⚠ --no-evidence(확정안 ⑥) — 고객 인스턴스 기록엔 근거 조각 **본문**을 남기지 않는다. 지금은
 #   씨앗 문서뿐이라 값(citeguard 재생)이 크지만, 고객 자료가 들어오면 같은 값이 위험으로 바뀐다.
+# ⚠⚠ **반쪽이다** — 조각 본문만 빠지고 **질문(q)·답 본문(out)은 .tmp-reports/ops-sim-4100.json에
+#   그대로 평문으로 남는다**(계획서 §14 ③). 「껐으니 되돌렸다」로 출하 점검을 닫지 말 것.
 GIJO_SERVER_URL="$QA_BASE" QA_USER="$QA_ACCOUNT" QA_PASS="$QA_PASS" \
   node tools/ops-sim.mjs --out "$OUT_NAME" --profile qa4100 --no-evidence 2>&1 | grep -v "$QA_PASS"
 CODE=${PIPESTATUS[0]}
