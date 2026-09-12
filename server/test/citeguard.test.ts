@@ -545,6 +545,70 @@ const 훑기 = (d: string, re: RegExp, out: string[] = []): string[] => {
   return out;
 };
 
+// ★★ 2026-09-13 gb10 사본 게이트 실측 — 「grounded=근거를 줬으니 정상 인용이다」라는 전제가
+//   **불합격 어댑터**에서는 깨진다. r5a(2026-09-13 새벽 night-r5-judge)는 gate.md 관문 ⑨
+//   (인용 창작 0건)이 ep1 1건·ep2 2건으로 빨강인 회전인데, 그 회전의 samples-grounded.json에도
+//   근거와 겹치지 않는(=지어낸) 인용이 섞여 있었다(gb10 실측: `/day2/r5a/ep1/samples-grounded.json#34`
+//   "ASUS Lyra Mini 및 ASUS GT-AC2900 …" — guardCitations가 "겹침없음"으로 뗐다). 가드가 그것을
+//   떼는 것은 옳은 동작이고, grounded 폴더를 통째로 믿는 이 시험 쪽이 오탐이었다.
+//   그래서 아래 그라운디드신뢰()로 모집단을 **「가드가 정상 인용을 안 떼야 하는 재료」**로 좁힌다:
+//     (a) baseline-q40/·baseline/ — 어댑터가 없는 자리라 늘 포함.
+//     (b) day2/<round>/<ep>/ — 같은 폴더의 판정 파일에서 관문 ⑨(키 "no_fake_quote")이 **통과**
+//         (0건)이거나 라운드 전체가 **합격**일 때만 포함.
+//   필드명 근거(지어내지 않았다 — grep으로 확인):
+//     · 검사 배열 원소의 "키"="no_fake_quote"·"통과"(불리언) — tools/team-bench/gates.mjs:906-926
+//       (통과: f.걸린행 === 0 / 미측정 헬퍼도 통과: false를 낸다 — gates.mjs:689).
+//     · 최상위 "합격"(불리언) — gates.mjs:1177이 쓰는 판정 객체 그대로 gate.json에 실린다
+//       (실측: day2/r3-v3/ep1/gate.json 최상위에 "합격": false).
+//     · gate.md는 같은 값을 사람이 읽는 표로 낸다 — 제목줄 "**합격**"/"**불합격**", 관문 행 앞의
+//       ✅/❌(예: day2/r4-v4/ep2/gate.md:17 "❌ | 인용 창작 0건(persona+KEV) | 1건 / 대상 15").
+//   ⚠ r2-v2는 2026-09-04 모집단 수정(bare→persona, gates.mjs 882-887 주석) **이전에** 구운
+//     gate.json이 남아 있다(그 파일의 이름표는 옛 "「원문:」 창작 0건" — 실측: ep1 11건/15).
+//     그 자리를 gate-persona.json이 새 모집단으로 **재측정**했다(커밋 "persona 조건 재측정",
+//     2026-09-05 00:30 — ep1 5건/15 그대로 빨강, ep2·ep3는 0건/15로 뒤집힘). 옛 계산을 참인 것처럼
+//     쓰면 이미 고쳐진 결함을 되살리는 꼴이라, 두 파일이 함께 있으면 재측정(persona) 쪽을 우선한다.
+//   판정 파일이 아예 없는 폴더(굽기만 되고 판정 전)는 **제외하고 로그에 사유를 남긴다**(조용히 빼지
+//   않는다 — feedback_source_watch_tests.md 「삼켜진 건너뜀은 없는 시험과 같다」).
+const 판정파일후보 = ["gate-persona.json", "gate.json", "gate-persona.md", "gate.md"];
+const 판정찾기 = (dir: string): string | null => {
+  for (const 이름 of 판정파일후보) {
+    const p = path.join(dir, 이름);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+};
+const md판정읽기 = (md: string): { 합격: boolean; 통과: boolean | null } => {
+  const 제목줄 = /^#\s.*\*\*(합격|불합격)\*\*/m.exec(md);
+  const 인용행 = /^\|\s*(✅|❌)\s*\|\s*(?:인용 창작 0건|「원문:」\s*창작 0건)/m.exec(md);
+  return { 합격: 제목줄?.[1] === "합격", 통과: 인용행 ? 인용행[1] === "✅" : null };
+};
+const 그라운디드신뢰 = (grounded파일: string): { 포함: boolean; 사유: string } => {
+  const 상대 = path.relative(재료뿌리, grounded파일);
+  const 첫세그먼트 = 상대.split(path.sep)[0];
+  if (첫세그먼트 === "baseline" || 첫세그먼트 === "baseline-q40") {
+    return { 포함: true, 사유: `${상대} — 어댑터 없음(${첫세그먼트})` };
+  }
+  const dir = path.dirname(grounded파일);
+  const 판정파일 = 판정찾기(dir);
+  if (!판정파일) {
+    return { 포함: false, 사유: `${상대} — 판정 파일 없음(gate.json·gate.md 둘 다 없다·판정 전으로 본다)` };
+  }
+  let 합격 = false, 통과: boolean | null = null;
+  if (판정파일.endsWith(".json")) {
+    const g = JSON.parse(fs.readFileSync(판정파일, "utf8")) as { 합격?: boolean; 검사?: { 키?: string; 통과?: boolean }[] };
+    합격 = g.합격 === true;
+    const 항목 = (g.검사 ?? []).find((x) => x.키 === "no_fake_quote");
+    통과 = 항목 ? 항목.통과 === true : null;
+  } else {
+    const r = md판정읽기(fs.readFileSync(판정파일, "utf8"));
+    합격 = r.합격;
+    통과 = r.통과;
+  }
+  if (합격) return { 포함: true, 사유: `${상대} — 라운드 합격(${path.basename(판정파일)})` };
+  if (통과 === true) return { 포함: true, 사유: `${상대} — 관문⑨ 인용 창작 0건(${path.basename(판정파일)})` };
+  return { 포함: false, 사유: `${상대} — 불합격·관문⑨ 창작 있음(${path.basename(판정파일)})` };
+};
+
 describe("★★ 실물 재료 실측 (tools/team-bench/results-ladder)", () => {
   it("재료를 실제로 읽었다(감시가 헛돌지 않는지)", () => {
     expect(표본("day2/r4-v4/ep2/samples-grounded.json").length).toBeGreaterThanOrEqual(10);
@@ -552,15 +616,25 @@ describe("★★ 실물 재료 실측 (tools/team-bench/results-ladder)", () => 
 
   it("★ 오탐 0 — grounded 표본의 정상 인용을 하나도 안 뗀다", () => {
     const 사례: string[] = [];
+    const 포함로그: string[] = [];
+    const 제외로그: string[] = [];
     let 총 = 0;
     for (const f of 훑기(재료뿌리, /^samples-grounded\.json$/)) {
+      const { 포함, 사유 } = 그라운디드신뢰(f);
+      (포함 ? 포함로그 : 제외로그).push(사유);
+      if (!포함) continue;
       for (const s of JSON.parse(fs.readFileSync(f, "utf8")) as Record<string, unknown>[]) {
         총++;
         const r = guardCitations(String(s.text ?? ""), [String(s.chunk ?? "")].filter(Boolean));
         for (const x of r.removed) 사례.push(`${f.replace(재료뿌리, "")}#${s.i} ${x.kind}: ${x.quote.slice(0, 40)}`);
       }
     }
-    expect(총, "표본을 못 읽었다").toBeGreaterThanOrEqual(24);
+    // ★ 조용히 좁히지 않는다 — 포함·제외 폴더 수와 각 사유를 로그에 남긴다(2026-09-13).
+    console.log(
+      `[citeguard 오탐0] 포함 ${포함로그.length}건 · 제외 ${제외로그.length}건\n` +
+      `  포함: ${포함로그.join(" / ") || "(없음)"}\n  제외: ${제외로그.join(" / ") || "(없음)"}`,
+    );
+    expect(총, `표본을 못 읽었다(포함 ${포함로그.length}폴더 · 제외 ${제외로그.length}폴더)`).toBeGreaterThanOrEqual(24);
     expect(사례, `정상 인용을 뗐다(오탐):\n${사례.join("\n")}`).toHaveLength(0);
   });
 
