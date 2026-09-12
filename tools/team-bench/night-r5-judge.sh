@@ -85,7 +85,7 @@ say() { echo "[$(date '+%F %T %Z')] $*" | tee -a "$LOG"; }
 mem() { free -g | awk '/^메모리|^Mem/ {print "총 "$2"G 사용 "$3"G 가용 "$7"G"}'; }
 teacher() { curl -s -m 5 http://127.0.0.1:8080/health || echo "(응답 없음)"; }
 
-say "════ 회전 5 r5a 아침 판정 시작 ════"
+say "════ 회전 5 $ROUND 아침 판정 시작 ════"
 
 # ── ① 시작 상태 ────────────────────────────────────────────────────────────
 say "교사(8080) health: $(teacher)  ·  메모리: $(mem)"
@@ -121,7 +121,7 @@ DONE_MARK="$LORA_DIR/adapter_model.safetensors"
 if [ ! -s "$DONE_MARK" ]; then
   say "✗ 어댑터가 없다 — 굽기가 없었다: $DONE_MARK"
   say "요약 — 전제=굽기없음 · 판정 안 함"
-  say "════ 회전 5 r5a 아침 판정 끝(코드 2) ════"
+  say "════ 회전 5 $ROUND 아침 판정 끝(코드 2) ════"
   exit 2
 fi
 # ★ 체크포인트는 **번호가 아니라 개수**로 본다(2026-09-11 검토관 적발).
@@ -142,7 +142,7 @@ if [ "$CKPT_FOUND" -lt "$EPOCHS_EXPECTED" ]; then
   # ⚠ 없는 번호를 지어내지 않는다 — **실제로 찾은 폴더 이름**을 그대로 적는다.
   say "✗ 반쯤 구워졌다 — 체크포인트 ${CKPT_FOUND}개(에폭 ${EPOCHS_EXPECTED}개 필요) · 찾은 것: ${CKPT_NAMES:-없음} ($LORA_DIR)"
   say "요약 — 전제=반쯤구워짐(체크포인트 ${CKPT_FOUND}/${EPOCHS_EXPECTED}) · 판정 안 함"
-  say "════ 회전 5 r5a 아침 판정 끝(코드 2) ════"
+  say "════ 회전 5 $ROUND 아침 판정 끝(코드 2) ════"
   exit 2
 fi
 say "전제 통과 — 어댑터 있음($DONE_MARK) · 체크포인트 ${CKPT_FOUND}개(에폭 ${EPOCHS_EXPECTED}개 필요): $CKPT_NAMES"
@@ -152,7 +152,7 @@ AVAIL=$(free -g | awk '/^메모리|^Mem/ {print $7}')
 if [ "${AVAIL:-0}" -lt "$JUDGE_MIN_AVAIL" ]; then
   say "✗ 가용 메모리 ${AVAIL}G < ${JUDGE_MIN_AVAIL}G — 교사를 밀 위험이 있어 **판정을 건너뛴다**"
   say "요약 — 전제=가용메모리부족(${AVAIL}G) · 판정 안 함"
-  say "════ 회전 5 r5a 아침 판정 끝(코드 2) ════"
+  say "════ 회전 5 $ROUND 아침 판정 끝(코드 2) ════"
   exit 2
 fi
 say "가용 메모리 ${AVAIL}G ≥ ${JUDGE_MIN_AVAIL}G — 진행"
@@ -277,10 +277,10 @@ fi
 #   더 올렸다 죽였다** — 감시견의 존재 이유(낮 서빙을 지킨다)와 정반대다.
 NOW=$(date '+%H:%M')
 if [[ "$NOW" > "$DEADLINE" ]]; then
-  say "⚠ 데드라인($DEADLINE)이 이미 지났다(지금 $NOW) — ⑥ r5a 갈래를 시작하지 않는다(낮에 gb10은 원격 팀원 셋의 두뇌다)"
+  say "⚠ 데드라인($DEADLINE)이 이미 지났다(지금 $NOW) — ⑥ $ROUND 갈래를 시작하지 않는다(낮에 gb10은 원격 팀원 셋의 두뇌다)"
   RC_ROUND=2
 else
-  run_guarded "r5a" -- bash "$DAY2" --round "$ROUND" --skip-build --skip-train --port "$PORT"
+  run_guarded "$ROUND" -- bash "$DAY2" --round "$ROUND" --skip-build --skip-train --port "$PORT"
   RC_ROUND=$?
 fi
 
@@ -297,12 +297,12 @@ GATEMD=""
 for f in "$R5A_OUT"/ep*/gate.md "$R5A_OUT/gate.md"; do
   [ -s "$f" ] && GATEMD="${GATEMD:+$GATEMD,}$f"
 done
-say "요약 — 베이스40코드=$RC_BASE · r5a판정코드=$RC_ROUND · gate.md=${GATEMD:-없음} · 교사health=$(teacher) · 판정중최대사용메모리=${MAXMEM:-미측정}"
+say "요약 — 베이스40코드=$RC_BASE · ${ROUND}판정코드=$RC_ROUND · gate.md=${GATEMD:-없음} · 교사health=$(teacher) · 판정중최대사용메모리=${MAXMEM:-미측정}"
 # ★ 나가는 코드에 **베이스도 싣는다** — 베이스가 실패하면 ①⑤⑬⑭이 견줄 상대를 잃는다.
 #   (r5a가 0인데 베이스가 8이면 「판정 완주」가 아니다.)
 RC_OUT="$RC_ROUND"
 [ "$RC_OUT" -eq 0 ] && RC_OUT="$RC_BASE"
-say "════ 회전 5 r5a 아침 판정 끝(코드 $RC_OUT · 베이스 $RC_BASE · r5a $RC_ROUND) ════"
+say "════ 회전 5 $ROUND 아침 판정 끝(코드 $RC_OUT · 베이스 $RC_BASE · $ROUND $RC_ROUND) ════"
 
 # ── ⑧ 어댑터 gguf 치우기 ────────────────────────────────────────────────────
 # ⚠ results-ladder/ 는 **커밋 대상**이다(.gitignore:26). adapter-epN.gguf에는 gguf 무시 규칙이
