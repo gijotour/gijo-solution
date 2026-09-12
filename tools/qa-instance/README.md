@@ -59,10 +59,32 @@ QA_USER=… QA_PASS=… QA_ADMIN_USER=… QA_ADMIN_PASS=… node tools/qa-instan
 | 무엇 | 값 |
 |---|---|
 | 실행기 | `tools/nightly-ops-sim.ps1`의 2차 패스 블록(4000 패스 뒤) |
-| 실제로 도는 것 | `tools/qa-instance/nightly-4100.sh` → `GIJO_SERVER_URL=http://localhost:4100 QA_USER=qa-observer node tools/ops-sim.mjs --out ops-sim-4100` |
+| 실제로 도는 것 | `tools/qa-instance/nightly-4100.sh` → `GIJO_SERVER_URL=http://localhost:4100 QA_USER=qa-observer node tools/ops-sim.mjs --out ops-sim-4100 --profile qa4100 --no-evidence` |
 | 결과 파일 | `.tmp-reports\ops-sim-4100-nightly-YYYYMMDD.log`(Windows 쪽 실행 로그) · `.tmp-reports/ops-sim-4100.json`·`.meta.json`·`.md`(WSL 쪽 하네스 자체 보고 — `--out` 이름을 따른다) |
 | 계정 | `qa-observer`(관찰용, README 「계정」절 — 등급 null) |
 | 4100이 내려가 있을 때 | Windows 쪽에서 `/api/health`를 먼저 보고, 200이 아니면 WSL을 부르지 않고 로그에 「건너뜀」만 남긴다 — **4000 패스에는 영향 0**(이미 끝나 있다) |
+
+### 프로필(`--profile qa4100`)과 `--no-evidence` — 2026-09-12 ② 설계관 · 사장님 「추천으로진행」
+
+4000과 4100에 같은 205문항을 그대로 돌려 보니, 두 기계에서 도구가 갈리는 자리가 있었다 —
+실체는 **데이터 유무**(자산·취약점 같은 업무 데이터, 지식 코퍼스 같은 씨앗 문서)와
+**설정 유무**(법령 조회 키 등록 여부)다. 잣대는 하나(`tools/ops-sim.mjs`)로 두고,
+`tools/opssim-profile.mjs`에 문항마다 **의존**을 적어(표식표) 기계마다 **무엇을 가졌는지**
+(프로필)를 선언하면, 그 조합으로 「이 회차엔 이 문항을 안 잰다(건너뜀)」를 기계가 판정한다.
+
+- `qa4100` 프로필 = 업무데이터 없음(자산·취약점·점검 0건) · 씨앗문서 있음(지식 코퍼스 반입됨).
+  법령·CTI 같은 **설정**은 프로필이 아니라 회차마다 `GET /api/law/config`·`GET /api/cti/feeds`로
+  **자동 감지**한다 — 프로필은 데이터만 선언하고, 설정은 그 밤에 실제로 켜져 있는지를 본다.
+- 건너뛴 문항은 **대상에서 빼지 않는다** — 결과 줄로 남고(`건너뜀` 사유가 찍힌다), 통과율
+  분모는 **잰 것만**(`■ 끝 — 194/194 불편 없음 · 건너뜀 11(...)` 꼴). 씨앗문서에 걸린 문항
+  (⑨ 새 문서·⑱ 지목 문서 넷 등)은 qa4100에 씨앗문서가 **있으므로** 건너뛰지 않는다 — 계속
+  재고, 제품 결함(B8 등)이 있으면 계속 빨개진다. 표식은 성격을 설명할 뿐 가리지 않는다.
+- `--no-evidence`(사장님 확정안 ⑥) — **고객 인스턴스 기록엔 근거 조각 본문을 남기지 않는다.**
+  `ops-sim.mjs` 자체 머리말(24-41행)이 적은 그대로 — 이 기록에는 가드가 본 근거 조각이
+  평문으로 담기고, `claude-deploy`/`qa-observer` 계정으로 돌면 등급 C(기밀) 조각까지 실릴 수
+  있다. 개발 기계(win)는 되먹임 값(citeguard 재생) 때문에 기록을 켜 두지만, 고객 인스턴스는
+  **가드횟수만** 남기고 조각·추가원천 본문은 뺀다 — 지금은 씨앗 문서뿐이라 위험이 낮지만,
+  고객 자료가 들어오는 순간 성격이 바뀐다.
 
 ### 비밀 규칙
 

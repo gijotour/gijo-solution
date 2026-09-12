@@ -74,9 +74,14 @@ fi
 
 cd "$REPO_DIR" || fail "저장소 경로를 못 찾음: $REPO_DIR"
 
-echo "▶ 4100 야간 회귀 시작 — ${QA_ACCOUNT}@${QA_BASE} · --out ${OUT_NAME}"
+echo "▶ 4100 야간 회귀 시작 — ${QA_ACCOUNT}@${QA_BASE} · --out ${OUT_NAME} · --profile qa4100 · --no-evidence"
+# ⚠ --profile qa4100(2026-09-12 · ② 설계관 · 사장님 「추천으로진행」 확정안 ⑦) — 4100은 업무
+#   데이터가 없다(씨앗문서는 있다). tools/opssim-profile.mjs 프로필들.qa4100이 그것을 선언하고,
+#   ops-sim.mjs가 회차마다 법령·CTI 설정은 자동 감지해 건너뜀을 함께 판정한다.
+# ⚠ --no-evidence(확정안 ⑥) — 고객 인스턴스 기록엔 근거 조각 **본문**을 남기지 않는다. 지금은
+#   씨앗 문서뿐이라 값(citeguard 재생)이 크지만, 고객 자료가 들어오면 같은 값이 위험으로 바뀐다.
 GIJO_SERVER_URL="$QA_BASE" QA_USER="$QA_ACCOUNT" QA_PASS="$QA_PASS" \
-  node tools/ops-sim.mjs --out "$OUT_NAME" 2>&1 | grep -v "$QA_PASS"
+  node tools/ops-sim.mjs --out "$OUT_NAME" --profile qa4100 --no-evidence 2>&1 | grep -v "$QA_PASS"
 CODE=${PIPESTATUS[0]}
 unset QA_PASS
 echo "◀ 4100 야간 회귀 종료 — 코드 $CODE"
