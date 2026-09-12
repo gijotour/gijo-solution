@@ -12,6 +12,7 @@
 
 import { chat, 자료없음배너, 자료없음중복가드, 지정범위배너 } from "./llm";
 import { currentDocIds } from "./ragscope";
+import { 쓰기흐름인가 } from "./writeflow"; // 「조회 + 쓰기 지시」 잣대(잎 모듈 단일 출처 — picklist도 같은 함수를 쓴다)
 import { 새근거수거, 근거를수거하며 } from "./toolevidence"; // 도구가 읽은 근거를 위로 나르는 꼬리표(잎 모듈)
 import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
@@ -2586,69 +2587,8 @@ function 구역이름물음(instruction: string): boolean {
   });
 }
 
-// export: 시험이 **실제 라우팅 함수**를 그대로 불러 대조한다(정규식을 베껴 쓰면 드리프트한다).
-/** 「…있으면 담당자한테 배정해줘」·「…알려주고 승인해줘」 같은 **쓰기 흐름**인가 —
- *  이 문장을 조회 도구(explain 등) 한 수로 못 박으면 배정·승인 단계에 영영 못 간다.
- *  **쓰기 흐름 판정의 유일한 권위**다 — 이 뜻의 정규식을 다른 곳에 또 적지 않는다.
- *
- *  ⚠ 왜 함수로 뽑았나(2026-09-12 B10-①): 원래 forcedToolFor 안의 지역 const 셋
- *    (isAssignQuery·isAssign·isWriteOrder)이었다. 배열 밖 손수 explain 분기 다섯 중
- *    제품설정질문·문서지목질문·사내규정질문은 forcedToolFor **머리**에 있어, 지역 const보다
- *    앞에서 이 잣대를 참조하면 TDZ(`ReferenceError: Cannot access before initialization`)로
- *    모든 지시가 죽는다. 함수로 뽑으면 위치 문제가 없고, 시험이 정규식을 베끼지 않고 이 함수를
- *    그대로 불러 검증할 수 있다(ⓔ 단일 출처). `instruction`은 forcedToolFor 안에서 한 번도
- *    재대입되지 않으므로(실측: grep 0건) 지역 변수를 그대로 함수 인자로 옮겨도 의미는 같다.
- *
- *  ⚠ memory.행동의도RE와 **서로 포함 관계가 아니다**(실측, 2026-09-12) — 둘 다 남긴다:
- *    이 함수만 잡는 말: 「…알려주고 김보안한테 **맡겨줘**」·「…담당자 **정해줘**」·
- *      「…항목 알려주고 **조치해줘**」·「…확인해서 김보안한테 배정 **부탁해요**」.
- *    행동의도RE만 잡는 말: 「…실무매뉴얼 새 버전으로 **올려줘**」(등록·업로드 계열 —
- *      이 함수는 「올려」를 모른다). 권위는 이 함수(쓰기 명령 자체), 행동의도RE는
- *      「문서 자체를 조작하라」는 명령을 막는 다른 성질의 belt다(memory.ts 머리글 참고). */
-export function 쓰기흐름인가(instruction: string): boolean {
-  // "가장 급한 취약점 담당자·기한 배정해줘"처럼 배정/지정 지시면 우선순위 조회(today)로 못박지 않는다
-  // — LLM이 assign_finding(쓰기)을 고르도록 둔다(실측: today 강제가 배정 명령까지 흡수했었음).
-  // ⚠ 사이에 **사람 이름이 들어간다**. 「담당자를 **김도희로** 지정해줘」처럼.
-  //   예전 규칙은 담당자 뒤 2글자까지만 봐서 이 말을 놓쳤고, 그러면 today가 흡수해
-  //   **쓰기 지시에 오늘 목록이 나왔다**(2026-08-09 파일럿 리허설 실측 — 대본 24~30분이
-  //   바로 이 문장이라 시연이 그 자리에서 깨진다).
-  // ⚠ 「미배정 몇 건?」 같은 **조회**는 뺀다 — 그건 세는 질문이지 시키는 말이 아니다.
-  // ⚠ 「배정 **현황**」도 조회다(2026-09-08 검토관 적발) — 홑낱말 「배정」만 보고 쓰기로 읽으면
-  //   「간밤에 터진 거 담당자 배정 현황 알려줘」가 강제에서 풀려 모델 재량으로 샌다(실측 ∅).
-  // ⚠ 「배정 승인 대기 몇 건?」도 조회다(2026-09-11 실측 — 새 approval_status가 조회로못박지않을것에
-  //   들어가면서 드러났다). 「배정」 낱말이 있으면 isAssign이 켜져 approval_status가 통째로
-  //   continue돼 null로 샜다 — 담당자가 「미배정 취약점이 몇 건 승인 대기 중이냐」를 물었는데
-  //   결재판 대신 모델 판단으로 갔다. 「배정+승인/결재+대기」는 배정 **명령**이 아니라 배정
-  //   **여부를 필터로 쓴** 결재 현황 물음이다.
-  const isAssignQuery = /미배정|배정\s*안\s*[된함]|배정\s*없|담당자?\s*없|배정\s*(현황|목록|상태|내역)|배정\s*(승인|결재)\s*대기/.test(instruction);
-  const isAssign =
-    !isAssignQuery &&
-    /배정|담당자[^\n]{0,12}(지정|정해|배치|맡|넣)|기한\s*(을|를)?\s*(지정|정해|설정|잡)|맡겨|배치해줘/.test(instruction);
-  // ★★ **배정만이 쓰기가 아니다**(2026-09-08 검토관 적발 · 실측 8꼴). 「…있으면 승인해줘」를
-  //   조회로 못 박으면 목록만 나가고 승인은 영영 안 된다 — isAssign과 **똑같은 사고**인데
-  //   막는 낱말이 배정 하나뿐이었다. 잣대는 아래 조회로못박지않을것 한 곳에서 함께 쓴다.
-  // ⚠ **문장 끝**에만 건다. 낱말만 보면 「오늘 조치해야 할 거 뭐야?」 같은 **조회**까지 삼킨다 —
-  //   그게 이 파일이 2026-08-01에 겪은 사고다(제외어 목록이 업무 이름을 잡아먹었다).
-  // ★★★ 2026-09-11 **배정도 여기 넣는다**(검토관 [중] 적발). 위 isAssignQuery가 「배정 승인
-  //   대기」를 조회로 읽으면서 **문장 전체에서 isAssign이 꺼진다** — 그런데 배정은 원래
-  //   isAssign만 막던 쓰기라, 「배정 승인 대기 목록 보여주고 김도희로 배정해줘」가
-  //   isAssign=false·isWriteOrder=false로 가드를 통과해 approval_status로 못 박혔다
-  //   (실측 2026-09-11: forcedToolFor → approval_status. 목록만 나가고 배정은 영영 안 된다 —
-  //    2026-08-09 파일럿 리허설에서 today가 배정 명령을 흡수한 것과 **같은 사고**다).
-  //   가드의 짝을 맞춘다: 조회로 읽는 쪽(isAssignQuery)을 넓혔으면 쓰기로 읽는 쪽도 넓힌다.
-  // ★★★ 2026-09-12 **「할당」도 여기 넣는다**(검토관 [상] 적발). 「…차이 알려주고 김보안한테
-  //   **할당해줘**」가 isAssign(배정·맡겨·담당자 지정…)에도, 여기에도 없어 **쓰기 명령이
-  //   조회로 못 박혔다**. 새 규칙에 낱말을 또 적지 않고 **잣대 한 곳**에 더한다 — 그래야 새
-  //   비교 분기와 FORCED 루프(today·briefing·exec_brief·explain…)가 같은 답을 낸다.
-  //   실측(더하기 전, 전부 「할당」 때문에 새던 것들): 「가장 급한 취약점 김보안한테 할당해줘」
-  //   →[37] today · 「기한 지난 점검 있으면 … 할당해줘」→maintenance_status · 「승인 대기 목록
-  //   보고 … 할당해줘」→approval_status · 「임원 보고용으로 세 줄 요약해서 … 할당해줘」→
-  //   exec_brief · 「우선순위 기준 알려주고 … 할당해줘」→explain. 2026-08-09 파일럿에서
-  //   today가 배정 명령을 흡수한 그 사고가 **낱말만 바꿔** 그대로 남아 있었다.
-  const isWriteOrder =
-    /(승인|반려|조치|처리|마감|종결|차단|삭제|제거|회수|배정|할당)\s*해\s*(줘|주세요|라|다오)?\s*[.!?？~]*\s*$|(지워|없애)\s*(줘|주세요)?\s*[.!?？~]*\s*$/.test(instruction);
-  return isAssign || isWriteOrder;
-}
+// 쓰기 흐름 잣대는 **잎 모듈 writeflow.ts** 한 곳에 산다(2026-09-12 B10 수리) —
+//   picklist(dispatcher 특수경로 [14])도 같은 함수를 불러야 해서 옮겼다. 그 파일 머리글 참고.
 
 /** 「…있으면 담당자한테 배정해줘」 같은 **쓰기 흐름**을 삼키면 안 되는 조회 도구들.
  *  강제 경로는 한 수로 끝나므로, 여기 있는 도구로 못 박히면 배정 단계에 영영 못 간다. */
@@ -2661,21 +2601,34 @@ export function 쓰기흐름인가(instruction: string): boolean {
 //   김보안한테 배정해줘」를 조회로 끝내면 배정이 영영 안 된다 — 위 exec_brief와 같은 구멍이다.
 // ⚠ explain을 2026-09-11에 더했다(B5 수리, 같은 날 두 번째 라운드). 「우선순위 기준 알려주고
 //   김보안한테 배정해줘」를 조회로 끝내면 배정이 영영 안 된다 — 위 exec_brief와 같은 구멍이다.
-// ★★ **이 가드는 FORCED_INTENTS 루프 안에서만 돈다**(아래 `조회로못박지않을것.has(f.tool)` 한 줄).
-//   배열 밖의 손수 explain 분기 다섯 — 제품설정질문·문서지목질문·사내규정질문(배열 **앞**) ·
-//   비교개념질문·제목지목질문(배열 **뒤**) — 은 이 Set을 원리상 안 지난다.
-//   ★★ 2026-09-12 B10-①로 **다섯 전부**가 위 `쓰기흐름인가()`(모듈 최상위 · 단일 출처)를
-//   손으로 걸어 닫았다(비교개념질문은 2026-09-11 B7 수리로 이미 닫혀 있었다 — 이번 라운드가
-//   나머지 넷을 마저 닫았다). 실측(착수 전): 「접속기록 보관 규정 알려주고 김보안한테
-//   배정해줘」는 forcedToolFor → explain(topic 「접속기록 보관 규정」) 한 수로 끝나 배정이
-//   안 갔다 — 사내규정질문이 루프 앞에서 잡기 때문이다. 지금은 ∅(⑨ 모델 선택)로 떨어져
-//   쓰기 도구를 모델이 고르고 결재판으로 간다.
-//   → 「explain으로 가는 길이 다 막혔다」는 여전히 아니다. **남은 구멍은 층이 다른 둘**이다:
+// ⚠ finding_status와 search를 2026-09-12에 더했다(B10 수리·검토관 [중]). 「미조치 취약점 규정
+//   알려주고 김보안한테 배정해줘」가 finding_status 한 수로 끝나 배정이 영영 안 됐다 — 위 셋과
+//   같은 구멍이다. ★ finding_status만 막고 재 보니 **바로 뒤 search가 그 문장을 그대로 삼켰다**
+//   (실측: 같은 문장 → [37] search · 「안전대부 웹서버 취약점 알려주고 김보안한테 배정해줘」도
+//   원래부터 search였다). 한 도구만 막으면 **다음 조회 도구로 옮겨 갈 뿐**이라 둘을 함께 넣는다.
+// ★★ **이 가드 한 줄(`조회로못박지않을것.has(f.tool)`)은 FORCED_INTENTS 루프 안에서만 돈다.**
+//   배열 **밖**에서 손수 조회 도구로 못 박는 분기는 이 Set을 원리상 안 지나므로, 그 분기들은
+//   조건에 `!쓰기흐름인가(instruction)`를 **손으로** 건다(같은 함수 하나를 부른다 — 잣대는 한 곳).
+//   2026-09-12 B10 수리로 **배열 밖 열 곳 전부**가 그 잣대를 지난다(위에서 아래 코드 순서):
+//     ① 제품 설명 질문(explain) ② EXPLAIN_VERB+제품명(explain) ③ CVE 설명(explain)
+//     ④ 유지보수 절차(explain) ⑤ 제품설정질문(explain) ⑥ 문서지목질문(explain)
+//     ⑦ 사내규정질문(explain) ⑧ 문서 소재 물음(search) ⑨ 상태어취약점(finding_status)
+//     ⑩ 제목지목질문(explain, 배열 뒤) — ⑪ 비교개념질문(explain, 배열 뒤)은 2026-09-11 B7 수리로
+//     먼저 닫혔다.
+//   ⚠ 첫 판(2026-09-12 B10-①)은 이 자리에 「배열 밖은 다섯 · 남은 구멍은 층이 다른 둘」이라
+//     적었는데 **실측과 달랐다** — ①②③④가 빠져 있었고 넷 다 실제로 쓰기 지시를 삼켰다
+//     (「Tenable이 무슨 제품이야? 김보안한테 배정해줘」·「CVE-2021-44228 뭐야? … 배정해줘」·
+//      「보안장비 유지보수절차 항목 알려주고 조치해줘」). 낡은 표는 없는 표보다 나쁘다 —
+//     다음 사람이 「explain 쪽은 다 닫혔다」고 믿고 지나간다(검토관 [상] 적발).
+//   ★ 새 분기를 여기 더할 때 **시험이 강제한다** — server/test/writeflow-guard-source.test.ts가
+//     이 파일을 글자로 훑어, 조회 도구를 돌려주는 배열 밖 분기에 잣대가 없으면 빨간불을 낸다
+//     (「세 번째면 소스 감시」 — 이 구멍은 B5·B7·B10 세 라운드에 걸쳐 이관됐다).
+//   → 그래도 **남은 구멍은 층이 다른 둘**이다(둘 다 이 Set 밖의 이야기):
 //     ⓐ [20] 화면안내 — 「IPS 시그니처 설정 어디서 보는지 알려주고 담당자 배정해줘」는
-//        화면안내 한 수로 끝난다(다른 층이라 이 라운드 범위 밖 — 백로그).
+//        화면안내 한 수로 끝난다(dispatcher 특수경로라 이 함수까지 오지도 않는다 — 백로그).
 //     ⓑ 어미 변형 — 「…규정 알려주고 승인 요청해줘」는 isWriteOrder가 아는 「승인해줘」 꼴이
 //        아니라 쓰기흐름인가()가 못 잡는다(2026-09-12 실측 — 알고 두는 구멍).
-const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status", "briefing", "approval_status", "exec_brief", "explain"]);
+const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status", "briefing", "approval_status", "exec_brief", "explain", "finding_status", "search"]);
 
 /** 강제 결과 — `데이터의존`은 **글자만으로 안 갈리는 갈래**(제목 지목: 문서 목록을 조회한다)라는 표시다.
  *  route-explain이 이 값을 보고 「간다」고 단정하지 않는다(dispatcher 결정적도착지의 `조건부`). */
@@ -2694,7 +2647,9 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
   //   평가게이트 explain-product 실측: 강제 규칙이 없어 ⑨ 모델 선택으로 떨어졌고, 소형 모델이
   //   자산 도구를 골라 「이 자산에서 발견된 1개 취약점 중 즉시 조치 없음」을 답했다(7/26 실사고
   //   재발 — 운영 리셋 후 자산 1대 상태에서 재현). 이름을 못 뽑으면 강제하지 않는다.
-  if (available.has("explain") && /(무슨|어떤)\s*제품|뭐\s*하는\s*(제품|솔루션|도구)/.test(instruction)) {
+  // ★★ 2026-09-12 B10 수리 — 배열 밖 분기는 **전부** 쓰기 흐름에 비켜선다(아래 Set 머리글).
+  //   실측(수리 전): 「Tenable이 무슨 제품이야? 김보안한테 배정해줘」가 explain 한 수로 끝났다.
+  if (available.has("explain") && !쓰기흐름인가(instruction) && /(무슨|어떤)\s*제품|뭐\s*하는\s*(제품|솔루션|도구)/.test(instruction)) {
     const m = /^\s*(.{2,60}?)\s*(?:이|가|은|는)?\s*(?:(?:무슨|어떤)\s*제품|뭐\s*하는\s*(?:제품|솔루션|도구))/.exec(instruction);
     const 이름 = (m?.[1] ?? "").trim();
     // 대명사·자기 지칭은 제외 — 「이건/우리 제품」은 선택 치환·제품 즉답 등 제 길이 있다.
@@ -2745,7 +2700,9 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
     }
   }
 
-  if (available.has("explain") && EXPLAIN_VERB_RE.test(instruction)) {
+  // ★★ 2026-09-12 B10 수리 — 쓰기 흐름이면 비켜선다(실측 전: 「Tenable이 무슨 제품인지
+  //   설명해주고 김보안한테 배정해줘」가 explain 한 수로 끝나 배정이 영영 안 갔다).
+  if (available.has("explain") && !쓰기흐름인가(instruction) && EXPLAIN_VERB_RE.test(instruction)) {
     const product = namedProductIn(instruction);
     if (product) return { tool: "explain", args: { topic: product } };
   }
@@ -2755,7 +2712,10 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
   //   식별자가 문장에 있으면 그 경로로 못 박는다. ⚠ 조치·절차·대응을 물으면 비켜 준다 —
   //   그건 플레이북(조치 절차)의 영토다.
   const cveId = /(CVE-\d{4}-\d{4,})/i.exec(instruction)?.[1];
-  if (available.has("explain") && cveId && /뭐야|뭔가요|무엇|설명/.test(instruction) && !/조치|절차|대응|패치/.test(instruction)) {
+  //   ★★ 2026-09-12 B10 수리 — 쓰기 흐름이면 비켜선다. 배제어(조치·절차·대응·패치)에
+  //     배정·승인·맡겨가 없어 「CVE-2021-44228 뭐야? 김보안한테 배정해줘」가 explain 한 수로
+  //     끝났다(실측). 배제어를 늘리지 않고 **잣대 한 곳**을 태운다.
+  if (available.has("explain") && !쓰기흐름인가(instruction) && cveId && /뭐야|뭔가요|무엇|설명/.test(instruction) && !/조치|절차|대응|패치/.test(instruction)) {
     return { tool: "explain", args: { topic: cveId.toUpperCase() } };
   }
 
@@ -2765,7 +2725,10 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
   // 담당자가 점검일 아침에 던지는 질문인데 두 번 다 엉뚱한 답이었다.
   // 7B에 프롬프트로 타이르지 않고(확립 원칙) 경로를 코드로 못박는다 —
   // 유지보수 절차는 지식베이스에 있고, explain이 그 문서를 근거로 모은다.
-  if (available.has("explain") && MAINT_PROCEDURE_RE.test(instruction)) {
+  // ★★ 2026-09-12 B10 수리 — 쓰기 흐름이면 비켜선다. 실측(수리 전): 「보안장비 유지보수절차
+  //   항목 알려주고 조치해줘」·「방화벽 월간 정기점검 절차 알려주고 김보안한테 배정해줘」가
+  //   explain 한 수로 끝나 조치·배정이 영영 안 갔다(ops-sim ④·⑤ 마당의 말투다).
+  if (available.has("explain") && !쓰기흐름인가(instruction) && MAINT_PROCEDURE_RE.test(instruction)) {
     return { tool: "explain", args: { topic: maintenanceTopicOf(instruction) } };
   }
 
@@ -2815,7 +2778,9 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
   //   ⚠ 법령·판례(법제처 영토)와 화면·메뉴(화면 안내 영토)가 낀 말은 비켜 준다.
   {
     const 문서소재 = /(매뉴얼|가이드|지침서?|문서|자료)\s*(가|이|은|는)?\s*어디(\s|에|서|\?|$|있|였|더라|지|야|냐)/.exec(instruction);
-    if (available.has("search") && 문서소재 && !/법령|법적|판례|화면|메뉴/.test(instruction)) {
+    // ★★ 2026-09-12 B10 수리 — 쓰기 흐름이면 비켜선다(배열 밖 분기라 Set을 안 지난다).
+    //   「방화벽 매뉴얼 어디 있어? 김보안한테 배정해줘」를 search 한 수로 끝내면 배정이 영영 안 간다.
+    if (available.has("search") && 문서소재 && !쓰기흐름인가(instruction) && !/법령|법적|판례|화면|메뉴/.test(instruction)) {
       const 대상 = instruction.slice(0, 문서소재.index + 문서소재[1].length).replace(/^.*?(?=[가-힣A-Za-z0-9])/, "").trim();
       if (대상) return { tool: "search", args: { query: 대상.slice(0, 60) } };
     }
@@ -2828,7 +2793,14 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
   //   배열이 아닌 여기서(정적 args 한계). ⚠ 파일럿 첫날 대본 4절의 문장이라 흔들리면 안 된다.
   {
     const 상태어취약점 = /^(미조치|미검토|미배정|열린|고위험|매우\s*심각한?|심각한|critical|high|kev|실제\s*악용)\s*(된|인)?\s*(상태\s*)?취약점[^.\n]{0,8}(알려|보여|뭐|현황|목록|있)/i.exec(instruction);
-    if (available.has("finding_status") && 상태어취약점) {
+    // ★★ 2026-09-12 B10 수리(검토관 [중] 적발) — **쓰기 흐름이면 비켜선다.** 이 분기도
+    //   FORCED_INTENTS 배열 **밖**이라 조회로못박지않을것 Set을 원리상 안 지났다. 실측(수리 전):
+    //   「미조치 취약점 규정 알려주고 김보안한테 배정해줘」·「고위험 취약점 지침 알려주고
+    //   승인해줘」·「미배정 취약점 목록 보여주고 김보안한테 맡겨줘」가 전부 finding_status
+    //   한 수로 끝나 배정·승인이 영영 안 갔다. ⚠ 여기서 **return null이 아니라 비켜서기**다 —
+    //   비켜서야 뒤의 bulk_update(「고위험 취약점 목록 보여주고 전부 담당자 김도희로 배정해줘」)가
+    //   제 차례를 얻는다(조건 일괄 배정은 조회가 아니라 쓰기다).
+    if (available.has("finding_status") && 상태어취약점 && !쓰기흐름인가(instruction)) {
       return { tool: "finding_status", args: { filter: 상태어취약점[1].replace(/\s+/g, "") } };
     }
   }
