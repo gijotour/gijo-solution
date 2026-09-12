@@ -25,7 +25,7 @@ import { listTasks, TaskItem } from "./tasks";
 // SLA 산식(조치대상 판정·준수율 집계·근거 문장)은 잎 모듈 한 곳(sla.ts)에서 온다 — kpi.ts와
 // 글자까지 같은 산식이 따로 있던 것을 2026-09-12에 합쳤다(kpi.ts가 이 파일을 import하므로
 // 반대 방향은 순환이라 잎 모듈로 피했다). server/test/slaclue.test.ts가 값이 같은지 대조한다.
-import { 조치대상인가, remediationSla, SLA산식설명 } from "./sla";
+import { 조치대상인가, remediationSla, SLA산식설명, SLA미집계설명 } from "./sla";
 import { prioritizedReviews, buildTriageDraft, type PrioritizedFinding } from "./approvals";
 import { aibomThreatMatches, type AiBomThreatReport } from "./compliance";
 import { recordAudit } from "./audit";
@@ -367,7 +367,7 @@ async function buildDocx(
                 // 2026-09-12 실결함 — 산식 표현은 sla.test.ts가 리터럴 0건으로 못 박는다).
                 text:
                   vuln.remediation.tasks === 0
-                    ? "※ 조치대상(취약점 연결 조치 티켓)이 0건이라 SLA 준수율은 아직 집계 전입니다 — 100%는 만점이 아니라 «잴 것이 없음»입니다."
+                    ? SLA미집계설명
                     : SLA산식설명(vuln.remediation.tasks, vuln.remediation.overdue),
                 italics: true,
                 size: 18,
@@ -1133,7 +1133,7 @@ function buildReportHtml(
     <p class="muted">${
       // 문장은 SLA산식설명() 한 곳(sla.ts)에서 온다 — Word 문단과 같은 문구(2026-09-12 통합).
       vuln.remediation.tasks === 0
-        ? "※ 조치대상(취약점 연결 조치 티켓)이 0건이라 SLA 준수율은 아직 집계 전입니다 — 100%는 만점이 아니라 «잴 것이 없음»입니다."
+        ? SLA미집계설명
         : SLA산식설명(vuln.remediation.tasks, vuln.remediation.overdue)
     }</p>
     ${priorities.length ? `<h2>우선순위 조치 목록 (오늘의 조치 Top)</h2><table><tr><th>순위</th><th>심각도</th><th>취약점</th><th>자산</th><th>담당자</th><th>기한</th><th>상태</th></tr>${rows}</table>` : ""}
