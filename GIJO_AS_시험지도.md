@@ -2,7 +2,7 @@
 
 `node tools/test-map.mjs` 로 만듭니다. **손으로 고치지 마세요** — 다시 만들면 덮어씁니다.
 
-시험 파일 **491개**. 분류 근거는 파일 이름이 아니라 **그 시험이 실제로 import하는 소스**입니다.
+시험 파일 **492개**. 분류 근거는 파일 이름이 아니라 **그 시험이 실제로 import하는 소스**입니다.
 
 ```
 server/test/
@@ -164,7 +164,7 @@ server/test/
 │   ├── users.test.ts
 │   ├── verifyaccess.test.ts
 │   └── viewmarkgates.test.ts
-├── 대화·라우팅/  (110)
+├── 대화·라우팅/  (111)
 │   ├── adapters.test.ts
 │   ├── adaptertools.test.ts
 │   ├── aged-finding-routing.test.ts
@@ -212,6 +212,7 @@ server/test/
 │   ├── gaptools.test.ts
 │   ├── guidance-destination.test.ts
 │   ├── hardening-fsi.test.ts
+│   ├── hardening-scantarget.test.ts
 │   ├── hardening-unchecked-routing.test.ts
 │   ├── intent.test.ts
 │   ├── interpretline.test.ts
@@ -520,7 +521,7 @@ server/test/
 | --- | ---: | --- |
 | ★ 감시 — 약속을 지키는지 본다 | 104 | `answerflagui` → 소스·문서를 직접 읽어 검사 · `answerlength` → 소스·문서를 직접 읽어 검사 |
 | 보안·인증 | 52 | `airgap` → src/engine/airgap · `answerfeedback` → src/app |
-| 대화·라우팅 | 110 | `adapters` → src/engine/adapters · `adaptertools` → src/engine/agentloop |
+| 대화·라우팅 | 111 | `adapters` → src/engine/adapters · `adaptertools` → src/engine/agentloop |
 | 말투·표기 | 12 | `approvalstatustool` → src/engine/agenttools/handlers · `findingplain` → src/engine/findingplain |
 | 모델·엔진 | 30 | `adapterimport` → (제품 소스 import 없음) · `adoptgate` → src/engine/adapters |
 | 지식·RAG | 52 | `bundleimport` → src/engine/ontology · `bundleverify` → src/engine/bundleverify |
