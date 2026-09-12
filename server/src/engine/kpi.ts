@@ -21,6 +21,7 @@ import { 표식 } from "./tone";
 import { listLearnloopRuns } from "./learnloop";
 import { listTasks } from "./tasks";
 import { buildHub } from "./assethub";
+import { 조치대상인가, remediationSla } from "./sla";
 // 점검 실패 기록(scan_error 등)을 취약점에서 걸러 내는 판정 — 승인함·KPI가 같은 것을 쓴다.
 import { isRealVulnerability } from "./agenttools";
 
@@ -175,23 +176,18 @@ export function vulnerabilityBurndown(): BurndownPoint[] {
 }
 
 // 취약점에서 등록된 조치 항목(task.ref가 "vuln:")의 SLA 준수 현황.
+// 산식 자체는 sla.ts(잎 모듈) 단일 출처 — report.ts collectVulnReportData()와 같은 함수를
+// 쓴다(2026-09-12: 전엔 두 곳에 글자까지 같은 산식이 따로 있었다 — kpi.ts가 report.ts를
+// import하는 순환 때문에 합치지 못했던 것을 잎 모듈로 피했다).
 function remediationMetrics(): KpiSnapshot["remediation"] {
-  const now = Date.now();
-  const tasks = listTasks().filter((t) => (t.ref ?? "").startsWith("vuln:"));
-  const done = tasks.filter((t) => t.done).length;
-  const open = tasks.length - done;
-  const overdue = tasks.filter((t) => !t.done && t.dueAt != null && t.dueAt < now).length;
-  const dueSoon = tasks.filter((t) => !t.done && t.dueAt != null && t.dueAt >= now && t.dueAt - now <= 3 * 86400000).length;
-  // SLA 준수 = 기한을 넘기지 않은 것(완료했거나 아직 기한 전) 비율.
-  const compliant = tasks.filter((t) => t.dueAt == null || t.done || t.dueAt >= now).length;
-  const slaCompliance = tasks.length ? Math.round((compliant / tasks.length) * 100) : 100;
-  return { tasks: tasks.length, open, done, overdue, dueSoon, slaCompliance };
+  const tasks = listTasks().filter(조치대상인가);
+  return remediationSla(tasks);
 }
 
 // MTTR(평균 조치 소요일) — 완료시각이 기록된 조치 태스크(vuln:)의 (완료−생성) 평균.
 // 표본이 3건 미만이면 신뢰할 수 없어 null(집계 중)로 둔다. 완료시각 컬럼 도입 전 완료건은 제외된다.
 function computeMttrDays(): number | null {
-  const done = listTasks().filter((t) => (t.ref ?? "").startsWith("vuln:") && t.done && t.completedAt && t.completedAt >= t.createdAt);
+  const done = listTasks().filter((t) => 조치대상인가(t) && t.done && t.completedAt && t.completedAt >= t.createdAt);
   if (done.length < 3) return null;
   const avgMs = done.reduce((s, t) => s + ((t.completedAt as number) - t.createdAt), 0) / done.length;
   return Math.round((avgMs / 86400000) * 10) / 10; // 소수 1자리 일

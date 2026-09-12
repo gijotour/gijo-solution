@@ -22,6 +22,10 @@ import { listAssets, getAsset, Asset } from "./assets";
 import { isRealVulnerability, isActiveVuln } from "./agenttools";
 import { listMaintenanceItems, MaintenanceItem } from "./maintenance";
 import { listTasks, TaskItem } from "./tasks";
+// SLA 산식(조치대상 판정·준수율 집계·근거 문장)은 잎 모듈 한 곳(sla.ts)에서 온다 — kpi.ts와
+// 글자까지 같은 산식이 따로 있던 것을 2026-09-12에 합쳤다(kpi.ts가 이 파일을 import하므로
+// 반대 방향은 순환이라 잎 모듈로 피했다). server/test/slaclue.test.ts가 값이 같은지 대조한다.
+import { 조치대상인가, remediationSla, SLA산식설명 } from "./sla";
 import { prioritizedReviews, buildTriageDraft, type PrioritizedFinding } from "./approvals";
 import { aibomThreatMatches, type AiBomThreatReport } from "./compliance";
 import { recordAudit } from "./audit";
@@ -121,20 +125,20 @@ export function collectVulnReportData(scopeAssets?: Asset[]): VulnReportData {
       }
     }
   }
-  const tasks = listTasks().filter((t) => (t.ref ?? "").startsWith("vuln:"));
-  const done = tasks.filter((t) => t.done).length;
-  const overdue = tasks.filter((t) => !t.done && t.dueAt != null && t.dueAt < now).length;
-  const compliant = tasks.filter((t) => t.dueAt == null || t.done || t.dueAt >= now).length;
-  // ⚠ 이 산식은 kpi.ts remediationMetrics()와 **같은 값이어야 한다**(둘을 합칠 수 없다 —
-  //   kpi.ts가 이 파일을 import하므로 반대 방향은 순환이다). 어긋나면 같은 날 대화 KPI와
-  //   보고서가 다른 준수율을 말한다 — 짝 감시: server/test/slaclue.test.ts가 같은 데이터로
-  //   두 값을 실제로 계산해 대조한다(2026-09-11 검토관 [중]).
-  const slaCompliance = tasks.length ? Math.round((compliant / tasks.length) * 100) : 100;
+  const tasks = listTasks().filter(조치대상인가);
+  // 산식 자체는 sla.ts(잎 모듈) 단일 출처 — kpi.ts remediationMetrics()와 같은 함수를 쓴다.
+  // ⚠ 값은 **같아야 한다**(둘을 한 함수 호출로 합쳤으니 어긋날 수 없다 — kpi.ts가 이 파일을
+  //   import하므로 반대 방향은 순환이라, 산식은 잎 모듈로 옮기고 이 파일과 kpi.ts는 그
+  //   잎을 각자 부른다). 짝 감시: server/test/slaclue.test.ts가 같은 데이터로 두 값을
+  //   실제로 계산해 대조한다(2026-09-11 검토관 [중] · 2026-09-12 sla.ts 통합).
+  const sla = remediationSla(tasks, now);
   const topOpen = tasks
     .filter((t) => !t.done)
     .sort((a, b) => (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9) || (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity))
     .slice(0, 10);
-  return { ...d, remediation: { tasks: tasks.length, done, open: tasks.length - done, overdue, slaCompliance, topOpen } };
+  // ⚠ VulnReportData.remediation은 필드 이름·개수를 바꾸지 않는다(client/src/api/reports-admin.ts:141이
+  //   이 형을 그대로 받는다) — sla.ts가 돌려주는 dueSoon은 여기 담지 않고 필요한 다섯 필드만 뽑는다.
+  return { ...d, remediation: { tasks: sla.tasks, done: sla.done, open: sla.open, overdue: sla.overdue, slaCompliance: sla.slaCompliance, topOpen } };
 }
 
 // 유지보수 점검 현황 요약(거버넌스 섹션용). scheduleDate가 오늘 이하인 scheduled는 "지연".
@@ -358,11 +362,13 @@ async function buildDocx(
               new TextRun({
                 // ⚠ 표본 0에서 「÷ 0건 × 100」이라는 **말이 안 되는 산식**이 나가던 자리다
                 //   (2026-09-11 검토관 [중]). 조치대상이 0건이면 산식 대신 미집계라고 밝힌다.
+                // 문장은 SLA산식설명() 한 곳(sla.ts)에서 온다 — 옛 문장은 분자를 「완료 건수」로만
+                // 적어 코드와 달랐다(코드는 미완료라도 기한 전이거나 기한이 없으면 준수로 센다,
+                // 2026-09-12 실결함 — 산식 표현은 sla.test.ts가 리터럴 0건으로 못 박는다).
                 text:
                   vuln.remediation.tasks === 0
                     ? "※ 조치대상(취약점 연결 조치 티켓)이 0건이라 SLA 준수율은 아직 집계 전입니다 — 100%는 만점이 아니라 «잴 것이 없음»입니다."
-                    : `※ SLA 준수율 = (기한 내 조치 완료 건) ÷ (전체 조치대상 ${vuln.remediation.tasks}건) × 100. ` +
-                      `기한 초과 ${vuln.remediation.overdue}건은 미준수. 조치대상은 취약점 연결 조치 티켓(task.ref=vuln:) 기준.`,
+                    : SLA산식설명(vuln.remediation.tasks, vuln.remediation.overdue),
                 italics: true,
                 size: 18,
               }),
@@ -1125,9 +1131,10 @@ function buildReportHtml(
     <p>스캔 호스트 ${vuln.hosts}대 · 열린 취약점 ${vuln.active}건 (Critical ${vuln.critical}/High ${vuln.high}/Medium ${vuln.medium}/Low ${vuln.low}) · 실제 악용(KEV) ${vuln.kev}건</p>
     <p>조치 항목 ${vuln.remediation.tasks}건 · 완료 ${vuln.remediation.done} · 진행 ${vuln.remediation.open} · 기한 초과 ${vuln.remediation.overdue} · SLA 준수율 ${vuln.remediation.slaCompliance}%${준수율집계전단서(vuln.remediation.tasks)}</p>
     <p class="muted">${
+      // 문장은 SLA산식설명() 한 곳(sla.ts)에서 온다 — Word 문단과 같은 문구(2026-09-12 통합).
       vuln.remediation.tasks === 0
         ? "※ 조치대상(취약점 연결 조치 티켓)이 0건이라 SLA 준수율은 아직 집계 전입니다 — 100%는 만점이 아니라 «잴 것이 없음»입니다."
-        : `※ SLA 준수율 = (기한 내 조치 완료) ÷ (전체 조치대상 ${vuln.remediation.tasks}건) × 100. 기한 초과 ${vuln.remediation.overdue}건은 미준수.`
+        : SLA산식설명(vuln.remediation.tasks, vuln.remediation.overdue)
     }</p>
     ${priorities.length ? `<h2>우선순위 조치 목록 (오늘의 조치 Top)</h2><table><tr><th>순위</th><th>심각도</th><th>취약점</th><th>자산</th><th>담당자</th><th>기한</th><th>상태</th></tr>${rows}</table>` : ""}
     ${triageHtml}
