@@ -86,6 +86,10 @@ function 안내명령들() {
       let s = m[1].trim();
       if (!끝맺음.test(s) && !(can안 && /\?$/.test(s))) continue;
       if (s.includes("${") || s.includes("<")) continue;  // 코드 조각·자리표시자는 그대로 못 친다
+      // ⚠ 화면이 변수를 따옴표 밖에서 이어 붙이면(코드 이음매) 정규식은 JS 문법을 모르므로
+      //   그 이음매까지 통째로 리터럴로 삼킨다(2026-09-12 실측 잡음: map-view.js:154·156의
+      //   `' + esc(이름) + ' 자산 취약점 알려줘`). `' + `나 `+ esc(` 꼴이 보이면 안내가 아니다.
+      if (s.includes("' + ") || s.includes("+ esc(")) continue;
       if (/^[a-z_]+$/i.test(s)) continue;           // 도구 이름
       // ⚠ 조각으로 시작하는 것은 안내가 아니다 — 화면이 앞에 대상 이름을 붙여 완성한다
       //   (「의 가장 급한 취약점…」처럼 조사로 시작하는 줄). 그대로 재면 거짓 실패가 난다.
@@ -154,6 +158,14 @@ const 안내 = 안내명령들();
 if (process.argv.includes("--목록")) {
   안내.forEach((x) => console.log("  " + x.원문 + (x.원문 !== x.질문 ? `   → 잴 때: ${x.질문}` : "")));
   console.log(`\n총 ${안내.length}개`);
+  process.exit(0);
+}
+
+// ⚠ 2026-09-12: 도착지 실측(guidance-destination.test.ts)이 이 목록을 그대로 수확해야
+//   한다 — 사람이 --목록의 텍스트를 손으로 다시 옮기면 그 순간 두 벌이 되어 어긋난다.
+//   소스만 읽으므로 dist가 없는 WSL·gb10 사본에서도 그대로 돈다.
+if (process.argv.includes("--json")) {
+  console.log(JSON.stringify(안내.map((x) => ({ 원문: x.원문, 질문: x.질문 }))));
   process.exit(0);
 }
 

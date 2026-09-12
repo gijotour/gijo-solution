@@ -2,110 +2,224 @@
 
 `node tools/test-map.mjs` 로 만듭니다. **손으로 고치지 마세요** — 다시 만들면 덮어씁니다.
 
-시험 파일 **275개**. 분류 근거는 파일 이름이 아니라 **그 시험이 실제로 import하는 소스**입니다.
+시험 파일 **491개**. 분류 근거는 파일 이름이 아니라 **그 시험이 실제로 import하는 소스**입니다.
 
 ```
 server/test/
-├── ★ 감시 — 약속을 지키는지 본다/  (33)
+├── ★ 감시 — 약속을 지키는지 본다/  (104)
+│   ├── answerflagui.test.ts
 │   ├── answerlength.test.ts
+│   ├── approvedistill.test.ts
+│   ├── artifactcheck.test.ts
 │   ├── auditactor.test.ts
 │   ├── backup.test.ts
+│   ├── bridgerelay.test.ts
 │   ├── clientglobals.test.ts
+│   ├── clientrelease.test.ts
+│   ├── cloudterms.test.ts
 │   ├── consoledrawer.test.ts
-│   ├── corpusleak.test.ts
+│   ├── ctxline.test.ts
+│   ├── datasetgrade.test.ts
 │   ├── deadelements.test.ts
 │   ├── dispatchentrances.test.ts
+│   ├── distilllongform.test.ts
+│   ├── docchunkgaps.test.ts
 │   ├── docs-exclusion.test.ts
 │   ├── docsbundle.test.ts
+│   ├── docsdrift.test.ts
+│   ├── docsdriftledger.test.ts
+│   ├── embedreadygate.test.ts
+│   ├── emptyanswer-guidance.test.ts
 │   ├── evalgateeffective.test.ts
+│   ├── extra-windows.test.ts
+│   ├── extractdoc.test.ts
 │   ├── findingcount.test.ts
+│   ├── finetuneflags.test.ts
+│   ├── firstrunroute.test.ts
 │   ├── ga-readiness.test.ts
 │   ├── guidance-routing.test.ts
 │   ├── guidecard.test.ts
+│   ├── hardening-ranon.test.ts
+│   ├── imecomposition.test.ts
+│   ├── ingestquality.test.ts
+│   ├── introfieldsui.test.ts
+│   ├── ladder.test.ts
+│   ├── lawinfo.test.ts
+│   ├── lawrouting-question.test.ts
 │   ├── learnhygiene.test.ts
 │   ├── listformat.test.ts
+│   ├── lite-edition-shell.test.ts
+│   ├── localdigest.test.ts
+│   ├── localknowledge.test.ts
+│   ├── loginassist.test.ts
+│   ├── loginchoice.test.ts
 │   ├── longanswer.test.ts
 │   ├── longnotice.test.ts
+│   ├── materialv6.test.ts
+│   ├── memoryfirsttable.test.ts
+│   ├── mergeremoved.test.ts
+│   ├── modeldefault.test.ts
 │   ├── modelscan-wrapper.test.ts
 │   ├── navwiring.test.ts
+│   ├── nightly4100.test.ts
+│   ├── nightlygap.test.ts
 │   ├── no-hardcoded-credentials.test.ts
+│   ├── opssimevidence.test.ts
+│   ├── opssimprofile.test.ts
+│   ├── opssimreport.test.ts
+│   ├── opssimrules.test.ts
+│   ├── packageddatapath.test.ts
+│   ├── pdftableextract.test.ts
+│   ├── pptxextract.test.ts
 │   ├── promptcache.test.ts
+│   ├── proshellmode.test.ts
+│   ├── publishgatecite.test.ts
+│   ├── publishgatecitefixed.test.ts
+│   ├── publishgateflag.test.ts
+│   ├── pythondeps.test.ts
+│   ├── qafulllayers.test.ts
+│   ├── qalayerresult.test.ts
+│   ├── reingestoriginal.test.ts
+│   ├── remoteegressguard.test.ts
+│   ├── remotemodel.test.ts
 │   ├── reportactivity.test.ts
+│   ├── requestshape.test.ts
+│   ├── rulerefs.test.ts
+│   ├── sbomapplies-pair.test.ts
+│   ├── scopefilter.test.ts
 │   ├── screencontextlink.test.ts
+│   ├── screenscriptparse.test.ts
 │   ├── seedintake.test.ts
 │   ├── sessionarchive.test.ts
+│   ├── sharedbrain.test.ts
 │   ├── shelllayout.test.ts
+│   ├── shipscripts.test.ts
 │   ├── shotlist.test.ts
 │   ├── silentbuttons.test.ts
 │   ├── streamdispatch.test.ts
+│   ├── supervisioncite.test.ts
+│   ├── tablechunk.test.ts
+│   ├── tableextract.test.ts
+│   ├── testenv.test.ts
+│   ├── testisolation.test.ts
+│   ├── themecolors.test.ts
+│   ├── toolevidence.test.ts
+│   ├── toolsdeps.test.ts
 │   ├── uireadability.test.ts
-│   └── vizpromise.test.ts
-├── 보안·인증/  (34)
+│   ├── uploadtypes.test.ts
+│   ├── vizpromise.test.ts
+│   ├── wiringcontract.test.ts
+│   ├── workflow-stage-routing.test.ts
+│   └── writeflow-guard-source.test.ts
+├── 보안·인증/  (52)
 │   ├── airgap.test.ts
+│   ├── answerfeedback.test.ts
 │   ├── auth.test.ts
 │   ├── auth-secret-guard.test.ts
+│   ├── citeguard.test.ts
 │   ├── cloudegress.test.ts
+│   ├── corpusleak.test.ts
 │   ├── cors.test.ts
 │   ├── cryptopack.test.ts
 │   ├── dbcrypt.test.ts
 │   ├── dbencrypt.test.ts
+│   ├── devmode.test.ts
+│   ├── domainsense.test.ts
 │   ├── effectiverobustness.test.ts
+│   ├── gate-indirect-gap.test.ts
 │   ├── gateway.test.ts
 │   ├── gatewaypii.test.ts
 │   ├── gradeblock.test.ts
 │   ├── guardrail.test.ts
 │   ├── hardening.test.ts
 │   ├── harmfulrequest.test.ts
+│   ├── incidentcases.test.ts
+│   ├── incidentcases.route.test.ts
 │   ├── injectionrules.test.ts
 │   ├── innerkeymask.test.ts
 │   ├── inputvalidation.test.ts
+│   ├── inspectionreport.test.ts
 │   ├── internalprompt.test.ts
+│   ├── m01m05payloads.test.ts
 │   ├── maintenance.test.ts
 │   ├── mfa.test.ts
+│   ├── nearmissleak.test.ts
+│   ├── pasteddata.test.ts
 │   ├── promptleak.test.ts
 │   ├── promptleak-overlap.test.ts
 │   ├── promptleak-retry.test.ts
 │   ├── ragsanitize.test.ts
+│   ├── ragsanitize-falsepositive.test.ts
 │   ├── redteam.test.ts
+│   ├── remotellm.test.ts
+│   ├── routeexplain.route.test.ts
 │   ├── routing-leak.test.ts
 │   ├── scopeguard.test.ts
 │   ├── secretscan.test.ts
+│   ├── securityboundary4.test.ts
 │   ├── selfinstall.test.ts
 │   ├── sessionmgmt.test.ts
+│   ├── supervisionfix.test.ts
 │   ├── totp.test.ts
 │   ├── users.test.ts
-│   └── verifyaccess.test.ts
-├── 대화·라우팅/  (63)
+│   ├── verifyaccess.test.ts
+│   └── viewmarkgates.test.ts
+├── 대화·라우팅/  (110)
 │   ├── adapters.test.ts
 │   ├── adaptertools.test.ts
+│   ├── aged-finding-routing.test.ts
 │   ├── agentapproval.test.ts
 │   ├── agentfinding.test.ts
+│   ├── agentlocation.test.ts
 │   ├── agentloop.test.ts
+│   ├── agentroster.test.ts
 │   ├── agents.test.ts
 │   ├── agenttools-cross.test.ts
+│   ├── aliaspair.test.ts
 │   ├── anaphora-reask.test.ts
+│   ├── approval-routing.test.ts
 │   ├── approvals.test.ts
 │   ├── asset-search-reason.test.ts
 │   ├── assetanaphora.test.ts
 │   ├── assetcoveragetool.test.ts
+│   ├── assetscope.test.ts
 │   ├── assignroute.test.ts
+│   ├── auditbulktarget.test.ts
+│   ├── bomdrafts.test.ts
+│   ├── bulkviewscope.test.ts
+│   ├── clausecite.test.ts
 │   ├── cmdsuggest.test.ts
+│   ├── compare-concept-routing.test.ts
 │   ├── consoleguide.test.ts
+│   ├── datacard.test.ts
 │   ├── demo-disclosure.test.ts
 │   ├── demoscript.test.ts
 │   ├── dispatchcollect.test.ts
 │   ├── dispatcher.test.ts
+│   ├── doc-location-routing.test.ts
 │   ├── docdigest.test.ts
 │   ├── docdupe.test.ts
 │   ├── domaintools.test.ts
+│   ├── execbrief.test.ts
+│   ├── execbrief-routing.test.ts
+│   ├── explain-banner.test.ts
 │   ├── exposed-assets.test.ts
 │   ├── falseclaim.test.ts
+│   ├── featureguide.test.ts
 │   ├── forced-write-approval.test.ts
+│   ├── formathelper.test.ts
 │   ├── fppattern.test.ts
 │   ├── gaptools.test.ts
+│   ├── guidance-destination.test.ts
+│   ├── hardening-fsi.test.ts
+│   ├── hardening-unchecked-routing.test.ts
 │   ├── intent.test.ts
 │   ├── interpretline.test.ts
 │   ├── knowledge-bundle-inbox.test.ts
+│   ├── kpiratio.test.ts
+│   ├── kpisubjectrule.test.ts
+│   ├── law-excerpt-length.test.ts
+│   ├── lawfallback.test.ts
 │   ├── lawlookup-screen.test.ts
 │   ├── listassets-filter.test.ts
 │   ├── map-view.test.ts
@@ -115,42 +229,70 @@ server/test/
 │   ├── mytasks.test.ts
 │   ├── nextstep.test.ts
 │   ├── ops147-regress.test.ts
+│   ├── opssimteam.test.ts
+│   ├── orchanalyze.test.ts
 │   ├── orchestrator-dataset.test.ts
 │   ├── orchestrator-fewshot.test.ts
+│   ├── overnight-routing.test.ts
+│   ├── panelname.test.ts
 │   ├── picklist.test.ts
+│   ├── picklistmarks.test.ts
 │   ├── policyroute.test.ts
+│   ├── priority-criteria-routing.test.ts
 │   ├── productintro.test.ts
+│   ├── proguidewording.test.ts
+│   ├── remotefallback.test.ts
+│   ├── remrequest.test.ts
 │   ├── reportactivity-tool.test.ts
+│   ├── reportdeadline.test.ts
 │   ├── routes.test.ts
 │   ├── routingfixes.test.ts
 │   ├── sbomtools.test.ts
+│   ├── scenariochips-dispatch.test.ts
 │   ├── scope-resolve.test.ts
 │   ├── screen-where.test.ts
 │   ├── screencontext.test.ts
 │   ├── screenguide.test.ts
+│   ├── screenguidefix.test.ts
+│   ├── selectionassign.test.ts
 │   ├── selectioncontext.test.ts
+│   ├── slowanswers.test.ts
 │   ├── smalltalk.test.ts
+│   ├── sourcebadge.test.ts
+│   ├── sourcetitles.test.ts
 │   ├── stepdisambiguate.test.ts
 │   ├── tooldomain.test.ts
 │   ├── tools.test.ts
+│   ├── topictag.test.ts
 │   ├── undo.test.ts
+│   ├── unpatched-finding-routing.test.ts
 │   ├── urgentroute.test.ts
+│   ├── verify-target-reask.test.ts
+│   ├── viewcontract.test.ts
 │   ├── vulntools.test.ts
+│   ├── wordboundary.test.ts
 │   ├── workflow.test.ts
 │   ├── worklockroute.test.ts
-│   └── worksteps.test.ts
-├── 말투·표기/  (8)
+│   ├── worksteps.test.ts
+│   └── writeflow-forced-explain.test.ts
+├── 말투·표기/  (12)
+│   ├── approvalstatustool.test.ts
 │   ├── findingplain.test.ts
 │   ├── report-preamble.test.ts
+│   ├── sbomreview.test.ts
 │   ├── severity-korean.test.ts
+│   ├── severity-narrow.test.ts
 │   ├── statuswords.test.ts
 │   ├── statuswords-attrs.test.ts
+│   ├── today.test.ts
 │   ├── tone.test.ts
 │   ├── tone-realanswers.test.ts
 │   └── tonewatch.test.ts
-├── 모델·엔진/  (22)
+├── 모델·엔진/  (30)
 │   ├── adapterimport.test.ts
+│   ├── adoptgate.test.ts
 │   ├── candidatehygiene.test.ts
+│   ├── citereasons.test.ts
 │   ├── dataset.test.ts
 │   ├── datasethygiene.test.ts
 │   ├── examquestions.test.ts
@@ -161,48 +303,77 @@ server/test/
 │   ├── llamabin.test.ts
 │   ├── llm.test.ts
 │   ├── llmactivity.test.ts
+│   ├── llmhooks.test.ts
+│   ├── llmserve.test.ts
 │   ├── localengine.test.ts
 │   ├── localengine-tier.test.ts
-│   ├── merge.test.ts
+│   ├── macmemory.test.ts
 │   ├── modeladoption.test.ts
 │   ├── modelauth.test.ts
+│   ├── modelcatalog.test.ts
 │   ├── modellicense.test.ts
 │   ├── modelquirks.test.ts
+│   ├── modelsplit.test.ts
 │   ├── observability-model.test.ts
 │   ├── pythonbin.test.ts
+│   ├── raftdataset.test.ts
+│   ├── tierhonesty.test.ts
 │   └── trainenv.test.ts
-├── 지식·RAG/  (30)
-│   ├── answerfeedback.test.ts
+├── 지식·RAG/  (52)
 │   ├── bundleimport.test.ts
 │   ├── bundleverify.test.ts
 │   ├── categoryreject.test.ts
+│   ├── chatagentdefault.test.ts
+│   ├── chatlogorigin.test.ts
+│   ├── distillcorpus.test.ts
+│   ├── distillintake.test.ts
+│   ├── distillprecheck.test.ts
+│   ├── docattach.test.ts
 │   ├── docbox.test.ts
 │   ├── docenrich.test.ts
 │   ├── docgraph.test.ts
+│   ├── docledger.test.ts
 │   ├── docrequest.test.ts
+│   ├── docslicense.test.ts
+│   ├── docstateui.test.ts
+│   ├── doctitle.test.ts
+│   ├── fixboard.test.ts
 │   ├── glossary.test.ts
 │   ├── grounding.test.ts
 │   ├── howto.test.ts
 │   ├── hybridsearch.test.ts
-│   ├── ingestquality.test.ts
 │   ├── kbhygiene.test.ts
 │   ├── kbhygiene-demo.test.ts
 │   ├── knowledgebundle.test.ts
 │   ├── learncandidates.test.ts
 │   ├── learnloop.test.ts
 │   ├── learnlooptopic.test.ts
+│   ├── learnmemoryresync.test.ts
 │   ├── learnpolicy.test.ts
+│   ├── legalbasis.test.ts
 │   ├── memory.test.ts
+│   ├── memorygrowth.test.ts
+│   ├── memoryhooks.test.ts
+│   ├── memorymix.test.ts
+│   ├── metaleak.test.ts
 │   ├── ontology.test.ts
+│   ├── ontology-aliases.test.ts
 │   ├── ontology-atlas.test.ts
 │   ├── ontology.routes.test.ts
+│   ├── personalisolation.test.ts
+│   ├── productcompare.test.ts
 │   ├── productfaq.test.ts
 │   ├── productmanualcleanup.test.ts
 │   ├── rag-weak-evidence.test.ts
+│   ├── ragscope.test.ts
 │   ├── rolesearch.test.ts
+│   ├── searchnormalize.test.ts
+│   ├── surrogatesafe.test.ts
 │   ├── terms.test.ts
-│   └── topictag.test.ts
-├── 취약점·자산/  (31)
+│   ├── topiccolors.test.ts
+│   └── uploadreceipt.test.ts
+├── 취약점·자산/  (41)
+│   ├── aibomfield.test.ts
 │   ├── assetbyname.test.ts
 │   ├── assetcoverage.test.ts
 │   ├── assetcoverage.routes.test.ts
@@ -221,28 +392,43 @@ server/test/
 │   ├── crosscorrelation.test.ts
 │   ├── ctimatch.test.ts
 │   ├── eol-seed.test.ts
+│   ├── eolcheck.test.ts
 │   ├── findingsrestore.test.ts
 │   ├── kpi.test.ts
+│   ├── nextguide.test.ts
 │   ├── packagescan.test.ts
 │   ├── reposcan.test.ts
+│   ├── resetlive.test.ts
 │   ├── sbom.test.ts
+│   ├── sbomimport.test.ts
+│   ├── sbomnested.test.ts
+│   ├── scandrafts.test.ts
 │   ├── scanoverwrite.test.ts
 │   ├── serviceimpact.test.ts
 │   ├── shadowai.test.ts
-│   ├── today.test.ts
+│   ├── sla.test.ts
+│   ├── slaclue.test.ts
+│   ├── undoaudit.test.ts
 │   ├── vexexport.test.ts
+│   ├── vextool.test.ts
 │   ├── vulnimport-owner.test.ts
 │   ├── vulnscan.test.ts
 │   └── webreport.test.ts
-├── 규정·법령/  (4)
+├── 규정·법령/  (7)
 │   ├── actioncheck.test.ts
 │   ├── actioncheck-verbs.test.ts
 │   ├── lawarticle.test.ts
-│   └── lawinfo.test.ts
-├── 점검·하드닝/  (10)
+│   ├── lawarticles.test.ts
+│   ├── licensedoc.test.ts
+│   ├── licenserisk.test.ts
+│   └── vendornotice.test.ts
+├── 점검·하드닝/  (13)
+│   ├── hardening-selfscan-off.test.ts
 │   ├── hardeningscan.test.ts
 │   ├── hardeningtargets.test.ts
 │   ├── incidentsteps.test.ts
+│   ├── incidentsteps.route.test.ts
+│   ├── maintenancetools.test.ts
 │   ├── netmikorunner.test.ts
 │   ├── playbook.test.ts
 │   ├── report.test.ts
@@ -250,30 +436,33 @@ server/test/
 │   ├── verifyengine.test.ts
 │   ├── verifyrag.test.ts
 │   └── verifyroutes.test.ts
-├── 로그·분석/  (13)
+├── 로그·분석/  (14)
 │   ├── activityaudit.test.ts
 │   ├── analysis.test.ts
 │   ├── analysishub.test.ts
 │   ├── clientdownloadlog.test.ts
 │   ├── cti.test.ts
 │   ├── eventlifecycle.test.ts
+│   ├── eventproducttools.test.ts
+│   ├── logdest.test.ts
 │   ├── logguide.test.ts
 │   ├── logs.test.ts
 │   ├── observability.test.ts
 │   ├── siem.test.ts
-│   ├── slowanswers.test.ts
 │   ├── threesourceingest.test.ts
 │   └── workprogress.test.ts
-├── 보고·리포트/  (6)
+├── 보고·리포트/  (7)
 │   ├── progress.test.ts
 │   ├── qalongwait.test.ts
 │   ├── reporthandoff.test.ts
 │   ├── reportschedule.test.ts
+│   ├── reportscheduletools.test.ts
 │   ├── timesaved.test.ts
 │   └── usage.test.ts
-├── 업무·세션/  (11)
+├── 업무·세션/  (13)
 │   ├── alertschedule.test.ts
 │   ├── collaboration.test.ts
+│   ├── contextturns.test.ts
 │   ├── datacleanup.test.ts
 │   ├── handover.test.ts
 │   ├── handoverhistory.test.ts
@@ -282,44 +471,73 @@ server/test/
 │   ├── task-dedupe.test.ts
 │   ├── tasks.test.ts
 │   ├── teamview.test.ts
+│   ├── worklogaxes.test.ts
 │   └── worksessions.test.ts
-├── 화면·클라이언트/  (4)
-│   ├── clientrelease.test.ts
+├── 화면·클라이언트/  (3)
 │   ├── personaldocs.test.ts
 │   ├── viewerctx.test.ts
 │   └── windowlayout.test.ts
-├── 기반(DB·유틸)/  (6)
+├── 기반(DB·유틸)/  (11)
+│   ├── answersamples.test.ts
 │   ├── date.test.ts
 │   ├── db.test.ts
 │   ├── dbkey.test.ts
+│   ├── dbwalgate.test.ts
 │   ├── email.test.ts
 │   ├── gracefulclose.test.ts
-│   └── versioncmp.test.ts
+│   ├── remotellm-live.test.ts
+│   ├── searchrewrite.test.ts
+│   ├── versioncmp.test.ts
+│   └── watchfolder.test.ts
+├── 분류 못 함/  (22)
+│   ├── brainlogfield.test.ts
+│   ├── brainmark.route.test.ts
+│   ├── citesourcefield.test.ts
+│   ├── corpusnumowner.test.ts
+│   ├── devmode-shipgate.test.ts
+│   ├── dimestimates-scope.test.ts
+│   ├── explain-tailbudget.test.ts
+│   ├── gijomdtable.test.ts
+│   ├── josa.test.ts
+│   ├── lite-tools.test.ts
+│   ├── noevidence-mark.test.ts
+│   ├── numgrounding.test.ts
+│   ├── overdue-routing.test.ts
+│   ├── rawleak.test.ts
+│   ├── reqlabels.test.ts
+│   ├── routing-order.test.ts
+│   ├── scenariochips.test.ts
+│   ├── tabletext.test.ts
+│   ├── titlescope-routing.test.ts
+│   ├── toolallowlist.test.ts
+│   ├── unifiedmem.test.ts
+│   └── urlingest.test.ts
 ```
 
 ## 영역별 근거
 
 | 영역 | 개수 | 대표 시험 → 무엇을 부르나 |
 | --- | ---: | --- |
-| ★ 감시 — 약속을 지키는지 본다 | 33 | `answerlength` → 소스·문서를 직접 읽어 검사 · `auditactor` → 소스·문서를 직접 읽어 검사 |
-| 보안·인증 | 34 | `airgap` → src/engine/airgap · `auth` → src/app |
-| 대화·라우팅 | 63 | `adapters` → src/engine/adapters · `adaptertools` → src/engine/agentloop |
-| 말투·표기 | 8 | `findingplain` → src/engine/findingplain · `report-preamble` → src/engine/llm |
-| 모델·엔진 | 22 | `adapterimport` → (제품 소스 import 없음) · `candidatehygiene` → src/engine/datasethygiene |
-| 지식·RAG | 30 | `answerfeedback` → src/engine/answerfeedback · `bundleimport` → src/engine/ontology |
-| 취약점·자산 | 31 | `assetbyname` → src/engine/assets · `assetcoverage` → src/engine/assetcoverage |
-| 규정·법령 | 4 | `actioncheck` → src/engine/actioncheck · `actioncheck-verbs` → src/engine/actioncheck |
-| 점검·하드닝 | 10 | `hardeningscan` → src/app · `hardeningtargets` → src/app |
-| 로그·분석 | 13 | `activityaudit` → src/engine/activityaudit · `analysis` → src/engine/analysis |
-| 보고·리포트 | 6 | `progress` → src/engine/progress · `qalongwait` → src/engine/longanswer |
-| 업무·세션 | 11 | `alertschedule` → src/db · `collaboration` → src/app |
-| 화면·클라이언트 | 4 | `clientrelease` → (제품 소스 import 없음) · `personaldocs` → src/db |
-| 기반(DB·유틸) | 6 | `date` → src/util/date · `db` → (제품 소스 import 없음) |
+| ★ 감시 — 약속을 지키는지 본다 | 104 | `answerflagui` → 소스·문서를 직접 읽어 검사 · `answerlength` → 소스·문서를 직접 읽어 검사 |
+| 보안·인증 | 52 | `airgap` → src/engine/airgap · `answerfeedback` → src/app |
+| 대화·라우팅 | 110 | `adapters` → src/engine/adapters · `adaptertools` → src/engine/agentloop |
+| 말투·표기 | 12 | `approvalstatustool` → src/engine/agenttools/handlers · `findingplain` → src/engine/findingplain |
+| 모델·엔진 | 30 | `adapterimport` → (제품 소스 import 없음) · `adoptgate` → src/engine/adapters |
+| 지식·RAG | 52 | `bundleimport` → src/engine/ontology · `bundleverify` → src/engine/bundleverify |
+| 취약점·자산 | 41 | `aibomfield` → src/engine/agenttools/handlers · `assetbyname` → src/engine/assets |
+| 규정·법령 | 7 | `actioncheck` → src/engine/actioncheck · `actioncheck-verbs` → src/engine/actioncheck |
+| 점검·하드닝 | 13 | `hardening-selfscan-off` → src/app · `hardeningscan` → src/app |
+| 로그·분석 | 14 | `activityaudit` → src/engine/activityaudit · `analysis` → src/engine/analysis |
+| 보고·리포트 | 7 | `progress` → src/engine/progress · `qalongwait` → src/engine/longanswer |
+| 업무·세션 | 13 | `alertschedule` → src/db · `collaboration` → src/app |
+| 화면·클라이언트 | 3 | `personaldocs` → src/db · `viewerctx` → src/engine/viewerctx |
+| 기반(DB·유틸) | 11 | `answersamples` → src/db · `date` → src/util/date |
+| 분류 못 함 | 22 | `brainlogfield` → src/engine/brainmark · `brainmark.route` → src/engine/brainmark |
 
-> 분류 못 한 시험은 없습니다.
+> ⚠ **분류 못 한 시험이 22개** 있습니다. 지도에 빈 곳이 있으면 그 사실이 보여야 하므로 감추지 않습니다. tools/test-map.mjs의 `영역들`에 규칙을 더하면 줄어듭니다.
 
 ## ★ 감시 시험이란
 
-제품 코드를 부르는 대신 **소스와 문서를 직접 읽어** 약속이 지켜지는지 보는 시험입니다(33개). 예: 제품이 "이렇게 물어보세요"라고 적어 준 말이 정말 그 기능으로 가는가(`guidance-routing`), 비밀번호가 코드에 적혀 있지 않은가(`no-hardcoded-credentials`), 눌러도 말없는 버튼이 없는가(`silentbuttons`).
+제품 코드를 부르는 대신 **소스와 문서를 직접 읽어** 약속이 지켜지는지 보는 시험입니다(104개). 예: 제품이 "이렇게 물어보세요"라고 적어 준 말이 정말 그 기능으로 가는가(`guidance-routing`), 비밀번호가 코드에 적혀 있지 않은가(`no-hardcoded-credentials`), 눌러도 말없는 버튼이 없는가(`silentbuttons`).
 
 > ⚠ **헛통과 주의.** 감시 시험은 대상을 하나도 못 읽으면 「0건 발견」으로 **항상 통과**합니다. 그래서 각 시험은 「대상을 실제로 읽었는가」를 함께 확인합니다. 그 확인을 지우지 마세요.
