@@ -484,9 +484,16 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     }
     list.innerHTML = items
       .map((f) => {
+        // ⚠ EPSS 표기는 서버 tone.epss값표기소수1 규칙을 **손으로 옮겨 적은 사본**이다(2026-09-12 B13 이관).
+        //   toFixed(1)만 쓰면 0.0004가 「0.0%」(=안전), 0.9996이 「100.0%」(=반드시 악용)로 읽히는 거짓 단정이 된다.
+        //   0.0005 미만은 「0.1% 미만」, 0.9995 이상 1 미만은 「99.9% 초과」, 정확히 1만 「100.0%」, 0~1 밖은 뜻을
+        //   못 읽으니 안 싣는다. 저쪽 규칙을 바꾸면 여기도 고친다 — 짝은 tone.test.ts 「클라 사본」 감시가 잰다.
+        const epss값 = (typeof f.epss === "number" && isFinite(f.epss) && f.epss >= 0 && f.epss <= 1)
+          ? (f.epss > 0 && f.epss < 0.0005 ? "0.1% 미만" : (f.epss >= 0.9995 && f.epss < 1 ? "99.9% 초과" : (f.epss * 100).toFixed(1) + "%"))
+          : "";
         const epss =
-          f.epss != null
-            ? `<span class="num vd-epss ${f.epss >= 0.5 ? "hot" : ""}" title="EPSS — 30일 내 실제 악용될 확률">EPSS ${(f.epss * 100).toFixed(1)}%</span>`
+          epss값
+            ? `<span class="num vd-epss ${f.epss >= 0.5 ? "hot" : ""}" title="EPSS — 30일 내 실제 악용될 확률">EPSS ${epss값}</span>`
             : "";
         const vpr = f.vpr != null ? `<span class="num vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR ${f.vpr}</span>` : "";
         const misfit = isMisfit(f) ? `<span class="vd-misfit" title="CVSS 등급은 낮지만 실제 악용확률이 높습니다 — 등급만 보면 놓치는 건">⚠ 등급↓ 악용↑</span>` : "";

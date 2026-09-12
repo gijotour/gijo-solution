@@ -285,6 +285,31 @@ describe("★ EPSS 표기 — 한 곳에서 만들고, 크기를 거짓말하지
   });
 });
 
+// ★ 취약점 화면(vulnscan.html) 사본 감시 (2026-09-12 B13 이관) — 승인 화면 감시와 같은 이유·같은 방식.
+//   이쪽은 소수 한 자리 규칙(epss값표기소수1)의 사본이라 문턱이 다르다(0.0005·0.9995) — 정수 규칙 함수가
+//   아니라 **소수1 함수 본문**에서 읽는다(함수 차례에 기대지 않는다).
+describe("★ 취약점 화면(클라 사본)의 EPSS 문턱·낱말이 tone.epss값표기소수1과 같다", () => {
+  it("아래(0.1% 미만)·위(99.9% 초과) 둘 다 — 0~1 밖은 안 싣는다", () => {
+    const tone소스 = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "tone.ts"), "utf8");
+    const 본문 = /export function epss값표기소수1\([\s\S]*?\n\}/.exec(tone소스)?.[0];
+    expect(본문, "tone.ts에서 epss값표기소수1 본문을 못 찾았다 — 함수 이름·모양이 바뀌었으면 이 감시도 함께 고친다").toBeTruthy();
+    const 아래문턱 = /epss > 0 && epss < ([\d.]+)/.exec(본문 ?? "")?.[1];
+    const 위문턱 = /epss >= ([\d.]+) && epss < 1/.exec(본문 ?? "")?.[1];
+    expect(아래문턱).toBeTruthy();
+    expect(위문턱).toBeTruthy();
+    const 사본 = path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "vulnscan.html");
+    expect(fs.existsSync(사본), `클라 사본이 여기 없다 — 화면을 옮겼으면 이 감시의 경로도 옮긴다: ${사본}`).toBe(true);
+    const html = fs.readFileSync(사본, "utf8");
+    expect(html.includes(`< ${아래문턱}`), `취약점 화면의 아래 문턱이 tone.ts(${아래문턱})와 어긋난다: ${사본}`).toBe(true);
+    expect(html.includes("0.1% 미만"), "취약점 화면에서 「0.1% 미만」 표기가 사라졌다 — 0.05% 미만이 다시 「0.0%」로 나가는지 본다").toBe(true);
+    expect(html.includes(`>= ${위문턱}`), `취약점 화면의 위 문턱이 tone.ts(${위문턱})와 어긋난다: ${사본}`).toBe(true);
+    expect(html.includes("99.9% 초과"), "취약점 화면에서 「99.9% 초과」 표기가 사라졌다 — 「100.0%」가 되살아났는지 본다").toBe(true);
+    // 스스로 반올림하는 옛 꼴(toFixed(1)만 있고 문턱 없음)이 EPSS 줄에 되살아나지 않는다.
+    const epss줄 = html.split(/\r?\n/).filter((l) => /EPSS \$\{/.test(l));
+    expect(epss줄.some((l) => /toFixed\(1\)/.test(l)), `EPSS 줄이 문턱 없이 스스로 반올림한다: ${epss줄.join(" | ").slice(0, 200)}`).toBe(false);
+  });
+});
+
 // ── epss값표기·epss표기 짝 시험 (B11, 2026-09-12) ────────────────────────────────
 // today.ts처럼 낱말이 "EPSS"가 아니라 "악용예측"이어야 하는 자리는 epss값표기(값만)를
 // 부르고 낱말을 직접 붙인다. 반올림 규칙이 두 함수에 따로 있으면 다시 어긋나므로,
