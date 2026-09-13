@@ -85,8 +85,10 @@
       }).join("") + "</div>";
     }
     if (d.rows && d.rows.length) {
+      // r[3](선택)=줄여 적은 표지(예: "기한 초과*")의 전체 문구 — title 툴팁으로 얹는다
+      // (panelsboard.js와 같은 계약, 2026-09-13 — 서버 라벨 원문을 화면 어딘가에 담는다).
       h += d.rows.map(function (r) {
-        return '<div class="gh-row"><span>' + esc(r[0]) + "</span><b" + (r[2] ? ' style="color:' + r[2] + '"' : "") + ">" + esc(r[1]) + "</b></div>";
+        return '<div class="gh-row"><span' + (r[3] ? ' title="' + esc(r[3]) + '"' : "") + ">" + esc(r[0]) + "</span><b" + (r[2] ? ' style="color:' + r[2] + '"' : "") + ">" + esc(r[1]) + "</b></div>";
       }).join("");
     }
     if (d.foot) h += '<div class="gh-foot">' + esc(d.foot) + "</div>";

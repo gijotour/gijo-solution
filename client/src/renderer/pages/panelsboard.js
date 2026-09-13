@@ -206,8 +206,10 @@
         // 잘렸음을 드러낸다 — 숫자는 「몇 개가 더 있다」, title은 그것이 무엇인지(조용히 자르지 않는다).
         조각.push('<span class="pv-more-seg" title="' + esc(숨은.map(function (s) { return s.label + " " + (s.value || 0); }).join(" · ")) + '">+' + 숨은.length + "</span>");
       }
+      // x[3](선택)=표시 글자가 줄여 적은 표지일 때의 전체 문구 — title 툴팁으로 얹는다
+      // (2026-09-13, kpi 판의 「기한 초과*」 — 서버 라벨 원문을 화면 어딘가에 그대로 담는 계약).
       var 줄 = (d.rows || []).slice(0, 3).map(function (x) {
-        return esc(x[0]) + " <b" + (x[2] ? ' style="color:' + x[2] + '"' : "") + ">" + esc(x[1]) + "</b>";
+        return "<span" + (x[3] ? ' title="' + esc(x[3]) + '"' : "") + ">" + esc(x[0]) + "</span> <b" + (x[2] ? ' style="color:' + x[2] + '"' : "") + ">" + esc(x[1]) + "</b>";
       });
       var 보임 = 조각.concat(줄);
       값 = 보임.length ? '<div class="pv-v">' + 보임.join("") + "</div>" : '<div class="pv-f">데이터 없음</div>';

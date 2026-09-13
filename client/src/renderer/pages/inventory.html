@@ -1364,7 +1364,10 @@
         if (!m.assetId) continue;
         const s = (map[m.assetId] = map[m.assetId] || { total: 0, overdue: 0 });
         s.total++;
-        if (m.status === "scheduled" && m.scheduleDate <= today) s.overdue++;
+        // 서버 sla.ts 점검지연인가()의 손사본 — 저쪽을 고치면 여기도 고친다.
+        // 오늘 마감은 지연이 아니라 예정(`<`, `<=` 아님) · 모집단은 승인(approved) 아님 전부
+        // (scheduled만 세면 승인 대기(reported)인 기한 지난 건을 놓친다 — 2026-09-13 통일).
+        if (m.status !== "approved" && m.scheduleDate && m.scheduleDate < today) s.overdue++;
       }
       maintByAsset = map;
     } catch (e) {

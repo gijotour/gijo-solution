@@ -289,8 +289,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // 정형정보 편집이 전부 산다(이 화면 자신의 경고 「화면에서 없애면서 기능을 같이 없애면
   // 등록할 길을 잃는다」·저작 행위는 입력칸 예외 — mydocs 편집기와 같은 지위).
   // ⚠ 시안 오류를 설계관이 정정: 정형정보는 14가 아니라 **9항목** · 점검 status에 done은
-  //   없는 값 · 지연 잣대는 현행 화면과 같은 A(scheduled && date<=today — 서버 due·리포트와
-  //   일치. maintenance 화면의 B와의 병존은 이 개편 밖의 숙제로 남는다).
+  //   없는 값 · 지연 잣대는 화면 자체 A(scheduled && date<=today)로 남아 있다 — 이제
+  //   **서버 sla.ts 점검지연인가()(status!==approved && date<today, 2026-09-13 통일)와
+  //   다르다**(예전엔 일치했지만 서버가 바뀌었다). inventory.html은 서버와 맞춰 놓았고,
+  //   여기(products.html)를 맞추는 일과 maintenance 화면의 B와의 병존 정리는 이 개편
+  //   밖의 숙제로 남는다.
   function 점검요약(p) {
     const mine = allMaints.filter((m) => m.productId === p.id || squashName(m.productName) === squashName(p.name));
     if (!mine.length) return { 글: "이력 없음", 색: "", 일자: "-", 문장: "점검 이력 없음" };

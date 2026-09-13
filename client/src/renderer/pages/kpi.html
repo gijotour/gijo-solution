@@ -207,10 +207,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(values.length - 1)}" cy="${y(values[values.length - 1])}" r="2.6" fill="${color}"/></svg>`;
   }
 
-  function trendCard(name, values, color, unit) {
+  // title(선택)=전체 글자 — 표시 이름이 서버 라벨보다 짧아야 할 때(공간 부족) 툴팁으로 온전한
+  // 문구를 담는다. 서버 글자를 화면 어딘가에 그대로 싣는 계약(2026-09-13, sla.ts 기한초과라벨).
+  function trendCard(name, values, color, unit, title) {
     const now = values.length ? values[values.length - 1] : 0;
     const note = values.length <= 1 ? "추세는 매일 스냅샷이 쌓이며 나타납니다 (현재 " + values.length + "일)" : `최근 ${values.length}일`;
-    return `<div class="trend-card"><div class="trend-head"><span class="trend-name">${name}</span><span class="trend-now" style="color:${color}">${now}${unit || ""}</span></div>${sparkline(values, color)}<div class="trend-note">${note}</div></div>`;
+    const titleAttr = title ? ` title="${String(title).replace(/"/g, "&quot;")}"` : "";
+    return `<div class="trend-card"><div class="trend-head"><span class="trend-name"${titleAttr}>${name}</span><span class="trend-now" style="color:${color}">${now}${unit || ""}</span></div>${sparkline(values, color)}<div class="trend-note">${note}</div></div>`;
   }
 
   const fmtD = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()}`; };
@@ -467,7 +470,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         trendCard("열린 취약점 (번다운 — 줄수록 좋음)", series("vulnerabilities.active"), "#f5928a", "건") +
         trendCard("실제 악용(KEV)", series("vulnerabilities.kev"), "#ff8a80", "건") +
         trendCard("SLA 준수율", series("remediation.slaCompliance"), "var(--teal)", "%") +
-        trendCard("조치 기한 초과", series("remediation.overdue"), "#f5928a", "건") +
+        // 표시는 짧게(공간 부족) · 전체 글자는 title 툴팁으로 — 서버 sla.ts 기한초과라벨과 같은
+        // 글자를 그대로 담는다("기한 초과(늦게 끝낸 건 포함)" — 완료했어도 늦게 끝난 건 포함).
+        trendCard("기한 초과*", series("remediation.overdue"), "#f5928a", "건", "기한 초과(늦게 끝낸 건 포함)") +
         `</div></div>`;
 
       const timeSaved = await window.gijo.timeSaved(30).catch(() => null);

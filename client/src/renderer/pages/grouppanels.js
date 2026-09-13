@@ -632,7 +632,10 @@
               // 라벨은 실화면 kpi.html:280 「열린 취약점」과 동일 — 「미조치」라 쓰면 ③ 조치의
               // 검토대장 숫자와 같은 것으로 읽힌다(잣대가 다르다: 이건 호스트 스캔 기준, 2026-08-21).
               ["열린 취약점", c.vulnerabilities ? n(c.vulnerabilities.active) : "-", R],
-              ["기한 지난 조치", c.remediation && c.remediation.overdue != null ? n(c.remediation.overdue) : "-", A],
+              // 표시는 짧게(공간 부족) · 4번째 자리(title)에 서버 sla.ts 기한초과라벨 글자를
+              // 그대로 담는다("기한 초과(늦게 끝낸 건 포함)" — 완료했어도 늦게 끝난 건 포함,
+              // 2026-09-13 통일). panelsboard.js가 x[3]을 title로 얹는다.
+              ["기한 초과*", c.remediation && c.remediation.overdue != null ? n(c.remediation.overdue) : "-", A, "기한 초과(늦게 끝낸 건 포함)"],
             ],
             foot: "지표는 서버가 한 곳에서 셉니다",
           };
