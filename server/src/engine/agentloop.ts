@@ -2783,15 +2783,21 @@ function 구역이름물음(instruction: string): boolean {
 //     배정해줘」처럼 **뒤에 다른 쓰기가 붙은 문장뿐**이다 — 그 경우 지금은 run_redteam
 //     한 수로 못 박혀 뒤의 배정이 **영영 안 간다**(다른 조회 도구 아홉 개가 이미 겪은 것과
 //     같은 누수). Set에 넣으면 그 문장만 continue해 ⑨로 넘어가 두 지시가 함께 처리된다.
-//   ⓑ scan_hardening_target은 FORCED_INTENTS 배열의 `f.tool`이 아니다(그 항목의 선언된
-//     tool은 run_hardening_scan — scan_hardening_target은 그 분기 **안**에서 등록 대상을
-//     맞혔을 때만 파생되는 도착지다, 아래 `available.has("scan_hardening_target")` 분기).
-//     그래서 이 Set에 넣어도 위 루프의 `.has(f.tool)` 줄은 이 이름을 보지 못한다 — 파생
-//     지점(위 분기 안, scan_hardening_target을 반환하기 직전)에서 **같은 Set을 손으로
-//     한 번 더 확인한다**(writeflow-guard-source.test.ts 예외 참고). run_hardening_scan
-//     (등록 대상을 못 맞혀 self로 떨어지는 갈래)은 이 라운드의 범위가 아니다 — self 점검엔
-//     같은 종류의 실측된 누수가 없다.
-const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status", "briefing", "approval_status", "exec_brief", "explain", "finding_status", "search", "list_assets", "threats", "suggest_command", "knowledge_status", "scan_status", "run_redteam", "scan_hardening_target"]);
+//   ⓑ 하드닝 쪽은 **run_hardening_scan을 넣는다**(scan_hardening_target이 아니다).
+//     ★★ 2026-09-13 검토관 [중]·[하] 수리 — 첫 판은 scan_hardening_target만 Set에 넣고
+//       파생 지점(아래 분기 안)에서 손으로 한 번 더 확인했는데, 그것은 **데이터에 기댄 반쪽
+//       수리**였다: 그 안쪽 가드는 `대상찾기(후보)`가 등록 대상을 **실제로 맞혔을 때만** 지난다.
+//       못 맞히면 같은 문장이 그대로 run_hardening_scan(self)으로 못 박혀 뒤의 배정이 영영
+//       안 갔다. 실측(수리 전, route-explain --no-build): 「FW-99 하드닝 점검 돌려주고 김보안한테
+//       배정해줘」 → [37] run_hardening_scan. 등록 대상 0건인 설치본(4100·새 고객)에서는 첫 판의
+//       수리가 **원리상 한 번도 발화하지 않았다.** 첫 판 주석이 근거로 댄 「self 점검엔 같은
+//       종류의 실측된 누수가 없다」는 **안 재 보고 적은 말**이었다.
+//     그래서 FORCED_INTENTS의 `f.tool`인 run_hardening_scan을 넣는다 — 루프 첫 줄의 가드
+//     한 곳이 그 규칙을 통째로 건너뛰므로 **두 도착지(self·scan_hardening_target)가 함께**
+//     닫힌다. 파생 지점의 손가드는 그래서 없앴다(닿지 않는 죽은 줄이 된다).
+//     단일 명령(「FW-01 하드닝 점검 돌려줘」·「하드닝 점검 돌려줘」)은 쓰기흐름인가가 거짓이라
+//     **그대로 결재판**이다(hardening-scantarget.test.ts의 18문장 계약이 그것을 못 박는다).
+const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status", "briefing", "approval_status", "exec_brief", "explain", "finding_status", "search", "list_assets", "threats", "suggest_command", "knowledge_status", "scan_status", "run_redteam", "run_hardening_scan"]);
 
 /** 강제 결과 — `데이터의존`은 **글자만으로 안 갈리는 갈래**(제목 지목: 문서 목록을 조회한다)라는 표시다.
  *  route-explain이 이 값을 보고 「간다」고 단정하지 않는다(dispatcher 결정적도착지의 `조건부`). */
@@ -3206,14 +3212,10 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
             //   (collect_packages가 쓰는 바로 그 방식 — agentloop.ts:2906-2914).
             // ⚠ standard는 **문장이 말했을 때만** 싣는다 — 안 실으면 핸들러가 t.standard(등록 기준)를 쓴다.
             if (t) {
-              // ★ 2026-09-13 SLA/라우팅 라운드 ③ — scan_hardening_target도 조회로못박지않을것
-              //   Set에 있다(위 정의부 ★★ 주석 ⓑ). 이 도구는 f.tool이 아니라 이 지점에서
-              //   파생되므로 루프 안쪽 `조회로못박지않을것.has(f.tool)` 한 줄이 못 보는 자리다
-              //   (writeflow-guard-source.test.ts 예외 참고) — 그래서 여기서 같은 Set을 손으로
-              //   한 번 더 본다. 「FW-01 하드닝 점검 돌려주고 담당자 정해줘」처럼 뒤에 다른
-              //   쓰기가 붙으면 못 박지 않고 continue해 ⑨로 넘긴다(배정이 영영 안 가던 누수).
-              //   단일 「FW-01 하드닝 점검 돌려줘」는 쓰기흐름인가가 거짓이라 그대로 결재판이다.
-              if (조회로못박지않을것.has("scan_hardening_target") && 쓰기흐름인가(instruction)) continue;
+              // ⚠ 쓰기 흐름(「…돌려주고 담당자 정해줘」) 가드는 **여기 없다** — 루프 첫 줄의
+              //   `조회로못박지않을것.has(f.tool) && 쓰기흐름인가(...)`가 f.tool=run_hardening_scan을
+              //   보고 규칙을 통째로 건너뛰므로, 이 지점은 그런 문장에서 아예 안 밟힌다(위 정의부
+              //   ★★ ⓑ). 여기에 손가드를 다시 적으면 닿지 않는 죽은 줄이 된다.
               return { tool: "scan_hardening_target", args: 명시기준 ? { target: 후보, standard: 명시기준 } : { target: 후보 }, 데이터의존: true };
             }
             return { tool: f.tool, args: { standard }, 데이터의존: true };

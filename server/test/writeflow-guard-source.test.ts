@@ -22,17 +22,16 @@ const 소스경로 = path.join(__dirname, "../src/engine/agentloop.ts");
 const 소스 = fs.readFileSync(소스경로, "utf8").split(/\r?\n/);
 
 /** 예외 — 「이 분기는 잣대를 안 태워도 된다」는 자리. **이유 없이 넣지 말 것.** */
-const 예외: { 표시: string; 이유: string }[] = [
-  {
-    표시: 'available.has("scan_hardening_target")',
-    이유:
-      "2026-09-13 SLA/라우팅 라운드 ③ — 이 줄은 장비 코드 꼴 후보 낱말을 찾는 바깥 조건일 " +
-      "뿐이다. 실제 쓰기흐름인가 가드는 그 안쪽, 후보가 등록 대상과 실제로 맞아떨어져 " +
-      "scan_hardening_target을 반환하기 바로 직전 줄(`if (조회로못박지않을것.has(\"scan_" +
-      "hardening_target\") && 쓰기흐름인가(instruction)) continue;`)에 있다 — 바깥 줄에 걸면 " +
-      "등록 안 된 후보(FW-99 등)가 self로 떨어지는 갈래까지 건드려 데이터의존 표시가 어긋난다.",
-  },
-];
+//
+// ★ 2026-09-13 검토관 [하] 수리로 **예외가 0개가 됐다.** 그날 하루만 있었던 예외
+//   (`available.has("scan_hardening_target")`)는 「진짜 가드는 그 안쪽 줄에 있다」를 이유로
+//   들었는데, **그 안쪽 줄의 존재를 재는 자기점검이 어디에도 없었다** — 그 줄을 지워도 이
+//   파일은 초록이었다(예외에 이유를 적게 한 장치의 취지가 이 항목에서만 말로 끝났다).
+//   수리는 예외를 지키는 쪽이 아니라 **예외가 필요 없게** 하는 쪽이었다: Set 원소를 파생지
+//   (scan_hardening_target)에서 뿌리(run_hardening_scan)로 옮겨 루프 첫 줄의 가드 한 곳이
+//   두 도착지를 함께 닫게 했다. 그래서 안쪽 손가드도, 이 예외도 사라졌다.
+// ⚠ 예외를 다시 넣게 되거든 **이유와 함께 그 이유를 재는 단언도 같이** 넣을 것.
+const 예외: { 표시: string; 이유: string }[] = [];
 
 function 본문범위(): [number, number] {
   const 시작 = 소스.findIndex((l) => l.startsWith("export function forcedToolFor"));
@@ -84,6 +83,19 @@ describe("★ 소스 감시 — 배열 밖 분기는 전부 writeflow.쓰기흐�
       if ([...l.matchAll(/available\.has\("([a-z_]+)"\)/g)].some((m) => 도구들.includes(m[1]))) 셈++;
     }
     expect(셈, "가드가 걸린 분기 수 — 줄었으면 누가 가드를 뗀 것이다").toBeGreaterThanOrEqual(10);
+  });
+
+  // ★ 2026-09-13 검토관 [중] 수리의 짝 — 하드닝 누수는 **Set 원소가 어느 이름이냐**로 갈린다.
+  //   파생지(scan_hardening_target)를 넣으면 등록 대상을 맞혔을 때만 닫히고, 뿌리
+  //   (run_hardening_scan = FORCED_INTENTS의 f.tool)를 넣어야 미등록·장비코드 없는 문장까지
+  //   루프 첫 줄에서 함께 닫힌다. 이름이 되돌아가면 여기가 먼저 운다.
+  it("하드닝은 **뿌리**(run_hardening_scan)가 Set에 있다 — 파생지만 넣으면 데이터 있는 기계에서만 닫힌다", () => {
+    const 도구들 = 조회도구목록();
+    expect(도구들, "f.tool이 아닌 이름만 Set에 있으면 루프 첫 줄의 가드가 이 규칙을 못 본다").toContain("run_hardening_scan");
+    expect(도구들, "파생지 이름은 Set에 둘 필요가 없다 — 두면 닿지 않는 죽은 검사를 부른다").not.toContain("scan_hardening_target");
+    const [시작, 끝] = 본문범위();
+    const 죽은가드 = 소스.slice(시작, 끝 + 1).some((l) => l.includes('조회로못박지않을것.has("scan_hardening_target")'));
+    expect(죽은가드, "루프 첫 줄이 이미 건너뛰므로 파생지 손가드는 영영 안 밟힌다 — 죽은 줄이다").toBe(false);
   });
 
   it("FORCED 루프 안의 Set 검사 한 줄이 그대로 있다(배열 안쪽 방어)", () => {
