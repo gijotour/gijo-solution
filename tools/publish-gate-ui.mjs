@@ -1424,6 +1424,7 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
   ok("내 문서 🏢 회사 지식: 「조각 없음(대장 N개)」 칩 수 = ⚠ 배지 수(0건이면 칩·배지 둘 다 없음)", 칩성립, JSON.stringify(칩));
 }
 
+
 // ── ⑨ 전 화면 얕은 렌더(2026-08-21 — 사장님 승인 묶음 3번) ─────────────────────
 // ⚠ 왜: 위 검사들은 손으로 더한 목록이라 화면 43개 중 16개만 열어 봤다 — 나머지 27개는
 //   **렌더가 죽어도 게시됐다**(5.56.0이 고친 analysis·settings도 관문이 이름조차 안 불렀다).
@@ -1468,6 +1469,119 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
   }
   ok("전 화면 얕은 렌더(" + 후보.length + "개 자동 열거 · 제외 " + Object.keys(제외).length + "개는 사유 명시)",
     죽은화면.length === 0, 죽은화면.length ? "죽음: " + 죽은화면.join(", ") : "전부 그려짐");
+}
+
+// ── ⑨′ UI 4개 묶음(2026-09-13 — 승인 시안 4종 · 이 파일 자체가 검토관·D 몫) ─────────
+// ⚠ **⑨ 다음, finally 앞**에 둔다 — ⑧′·⑧″·⑧⁗은 저마다 「⑧X ~ ⑨」 사이를 통째로 떼어
+//   자기 evaluate·성립식·ok( 개수를 세는 짝 시험이 있다(publishgatecite·publishgatecitefixed·
+//   publishgateflag.test.ts). 그 틈에 새 절을 끼우면 그 짝 시험들이 **내 새 ok(도 자기 것으로
+//   센다** — 실측: 여기 처음 끼웠을 때 publishgateflag.test.ts의 「⑧⁗ ok( 넷」이 8로 불어나
+//   빨간불이 났다(테스트가 지적한 그대로: 「새 절은 ⑨ 앞이 아니라 뒤에」).
+// 대상: A KPI 「집계 전」 단서 · C 자가 진단 판 · C 실사용 전환(데이터 정리) 판 · B 대상 종류 칩.
+// 넷 다 새 .html 파일이 아니라 기존 화면의 증축이라, 위 「⑨ 전 화면 얕은 렌더」(본문 길이만
+// 잰다)로는 안 잡힌다 — 새 부품이 실제로 켜지는지는 여기서 직접 잰다.
+{
+  // ① 자가 진단 판 렌더 — settings.html?s=ai. 로그인만 하면 누구나 보이므로(admin 전용 아님)
+  //   admin 신호와는 무관하다. SIEM 전달이 꺼진 설치본은 checkSiem이 null이라 8행이 정상이다
+  //   (observability.ts:467 — 9행으로 못 박지 않는다).
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("settings.html?s=ai", "설정", { dock: true }));
+  const scFr = await 프레임찾기("settings.html", 10);
+  const sc = scFr ? await scFr.evaluate(async () => {
+    for (let i = 0; i < 25; i++) {
+      if (document.querySelectorAll("#scRows .g-rows-r").length > 0) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    return {
+      행: document.querySelectorAll("#scRows .g-rows-r").length,
+      헤드라인: ((document.getElementById("scHeadline") || {}).textContent || "").trim(),
+    };
+  }).catch(() => null) : null;
+  ok("UI C — 자가 진단 판 렌더(행 ≥ 8 · 헤드라인 있음, 9행 고정 아님)",
+    !!sc && sc.행 >= 8 && !!sc.헤드라인, JSON.stringify(sc));
+}
+{
+  // ② 실사용 전환(데이터 정리) 판이 기본 접힘 + admin 숨김 — settings.html?s=admin.
+  // ⚠⚠ 절대 누르지 않는다 — 「전체 리셋 실행」·「선택한 항목 정리」는 잠김(disabled)만 본다.
+  // ⚠ 접힘 판정 함정: fold.js는 target(=liveResetPanel 자신)의 인라인 style.display를 admin
+  //   해제 줄과 **같은 속성**으로 쓴다 — 그래서 "본문 display:none"만으로는 「admin인데 접힘」과
+  //   「admin이 아니라서 아예 못 열림」을 못 가른다. #secAdminTab(관리자 탭 버튼, 판 표시와
+  //   완전히 별도인 요소)이 보이는가로 **이 세션이 진짜 admin인지**를 먼저 확인하고, 그 위에서
+  //   판 자체의 머리줄·접힘·잠금을 잰다(settings.html:277,1014 — 같은 admin 블록이 연다).
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("settings.html?s=admin", "설정", { dock: true }));
+  const dcFr = await 프레임찾기("settings.html", 10);
+  const dc = dcFr ? await dcFr.evaluate(async () => {
+    for (let i = 0; i < 25; i++) {
+      if (document.getElementById("liveResetPanel") && document.querySelectorAll("#dcGrid .dc-row").length > 0) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    const adminTab = document.getElementById("secAdminTab");
+    const panel = document.getElementById("liveResetPanel");
+    if (!panel) return { 판없음: true, adminTab보임: !!adminTab && getComputedStyle(adminTab).display !== "none" };
+    const head = panel.previousElementSibling;
+    const runBtn = document.getElementById("dcRunBtn");
+    const resetBtn = document.getElementById("dcResetBtn");
+    return {
+      adminTab보임: !!adminTab && getComputedStyle(adminTab).display !== "none",
+      머리줄있음: !!(head && head.classList && head.classList.contains("gjf-h") && head.querySelector(".nm") && head.querySelector(".nm").textContent === "실사용 전환(데이터 정리)"),
+      본문접힘: panel.style.display === "none",
+      대상행수: document.querySelectorAll("#dcGrid .dc-row").length,
+      정리버튼잠김: !!(runBtn && runBtn.disabled),
+      리셋버튼잠김: !!(resetBtn && resetBtn.disabled),
+    };
+  }).catch(() => null) : null;
+  ok("UI C — 실사용 전환(데이터 정리) 판: admin 탭 보임 · 머리줄 있음 · 기본 접힘 · 대상 16종 · 정리/리셋 버튼 잠김(절대 안 누름)",
+    !!dc && !dc.판없음 && dc.adminTab보임 && dc.머리줄있음 && dc.본문접힘 && dc.대상행수 === 16 && dc.정리버튼잠김 && dc.리셋버튼잠김,
+    JSON.stringify(dc));
+}
+{
+  // ③ KPI 「집계 전」 단서 — **조건부 검사**(publish-gate-ui.mjs:1074-1077과 같은 정직 패턴).
+  //   조치 항목(rem.tasks)이 0일 때만 「집계 전」·「.hd 없음」을 요구한다. 운영 데이터가 쌓여
+  //   tasks>0이면 이 조항은 판정하지 않는다(그때는 실비율 %가 정상이고, 100%면 그것도 정상이다
+  //   — 「100%면 실패」로 두면 정상 만점을 거짓 실패로 만든다).
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("kpi.html", "지표", { dock: true }));
+  const kFr = await 프레임찾기("kpi.html", 10);
+  const kpi = kFr ? await kFr.evaluate(async () => {
+    for (let i = 0; i < 25; i++) { if (document.querySelector(".hcard")) break; await new Promise((x) => setTimeout(x, 400)); }
+    let tasks = null;
+    try { const { current } = await window.gijo.getSecurityKpi(); tasks = (current && current.remediation && current.remediation.tasks) ?? null; } catch (e) {}
+    const slaCard = [...document.querySelectorAll(".hcard")].find((c) => ((c.querySelector(".hl") || {}).textContent || "").includes("SLA 준수율"));
+    return {
+      tasks,
+      찾음: !!slaCard,
+      hv: slaCard ? ((slaCard.querySelector(".hv") || {}).textContent || "").trim() : null,
+      hd있음: slaCard ? !!slaCard.querySelector(".hd") : null,
+    };
+  }).catch(() => null) : null;
+  const kpi조건부성립 = !!kpi && kpi.찾음 && (kpi.tasks !== 0 || (kpi.hv === "집계 전" && kpi.hd있음 === false));
+  ok("UI A — KPI 「집계 전」 단서(조치 항목 0건일 때만 판정 — 운영 데이터가 있으면 이 조항은 안 잰다)",
+    kpi조건부성립, JSON.stringify(kpi));
+}
+{
+  // ④ 하드닝 대상 종류 칩 — 「＋ 대상 등록」을 열어 확인하고 **모달을 닫고** 다음 검사로 넘어간다
+  //   (직전 검사 잔상이 뒤 판정을 오염시킨 전례 — publish-gate-ui.mjs:510-512).
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("hardening.html", "검증", { dock: true }));
+  const hFr = await 프레임찾기("hardening.html", 10);
+  const hd = hFr ? await hFr.evaluate(async () => {
+    for (let i = 0; i < 25; i++) { if (document.getElementById("addBtn")) break; await new Promise((x) => setTimeout(x, 400)); }
+    const btn = document.getElementById("addBtn");
+    if (!btn) return { 버튼없음: true };
+    if (btn.disabled) return { 버튼잠김: true }; // admin 아니면 여기서 멈춘다(관문 계정은 admin이라 정상은 false)
+    btn.click();
+    await new Promise((x) => setTimeout(x, 300));
+    const modal = document.getElementById("regModal");
+    const chips = [...document.querySelectorAll("#kindRow .g-chip")].map((c) => c.textContent.trim());
+    const authOpts = [...document.querySelectorAll("#rAuth option")].map((o) => o.value);
+    const 열림 = !!modal && modal.classList.contains("g-on");
+    const cancel = document.getElementById("rCancel");
+    if (cancel) cancel.click();
+    await new Promise((x) => setTimeout(x, 200));
+    const 닫힘 = !modal || !modal.classList.contains("g-on");
+    return { 열림, 닫힘, chips, authOpts };
+  }).catch(() => null) : null;
+  ok("UI B — 하드닝 대상 종류 칩 2개 · 인증 방식 2개(local 없음) · 검사 뒤 모달 닫음",
+    !!hd && hd.열림 && hd.닫힘 && Array.isArray(hd.chips) && hd.chips.length === 2
+      && Array.isArray(hd.authOpts) && hd.authOpts.length === 2 && !hd.authOpts.includes("local"),
+    JSON.stringify(hd));
 }
 
 

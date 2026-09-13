@@ -2,11 +2,11 @@
 
 `node tools/test-map.mjs` 로 만듭니다. **손으로 고치지 마세요** — 다시 만들면 덮어씁니다.
 
-시험 파일 **493개**. 분류 근거는 파일 이름이 아니라 **그 시험이 실제로 import하는 소스**입니다.
+시험 파일 **496개**. 분류 근거는 파일 이름이 아니라 **그 시험이 실제로 import하는 소스**입니다.
 
 ```
 server/test/
-├── ★ 감시 — 약속을 지키는지 본다/  (104)
+├── ★ 감시 — 약속을 지키는지 본다/  (105)
 │   ├── answerflagui.test.ts
 │   ├── answerlength.test.ts
 │   ├── approvedistill.test.ts
@@ -55,6 +55,7 @@ server/test/
 │   ├── loginchoice.test.ts
 │   ├── longanswer.test.ts
 │   ├── longnotice.test.ts
+│   ├── maintenance-overdue-copy.test.ts
 │   ├── materialv6.test.ts
 │   ├── memoryfirsttable.test.ts
 │   ├── mergeremoved.test.ts
@@ -164,7 +165,7 @@ server/test/
 │   ├── users.test.ts
 │   ├── verifyaccess.test.ts
 │   └── viewmarkgates.test.ts
-├── 대화·라우팅/  (111)
+├── 대화·라우팅/  (112)
 │   ├── adapters.test.ts
 │   ├── adaptertools.test.ts
 │   ├── aged-finding-routing.test.ts
@@ -185,6 +186,7 @@ server/test/
 │   ├── assetscope.test.ts
 │   ├── assignroute.test.ts
 │   ├── auditbulktarget.test.ts
+│   ├── b2-forced-routing.test.ts
 │   ├── bomdrafts.test.ts
 │   ├── bulkviewscope.test.ts
 │   ├── clausecite.test.ts
@@ -461,7 +463,7 @@ server/test/
 │   ├── reportscheduletools.test.ts
 │   ├── timesaved.test.ts
 │   └── usage.test.ts
-├── 업무·세션/  (13)
+├── 업무·세션/  (14)
 │   ├── alertschedule.test.ts
 │   ├── collaboration.test.ts
 │   ├── contextturns.test.ts
@@ -469,6 +471,7 @@ server/test/
 │   ├── handover.test.ts
 │   ├── handoverhistory.test.ts
 │   ├── mywork.test.ts
+│   ├── selfcheck-datacleanup-ui.test.ts
 │   ├── sessionpatterns.test.ts
 │   ├── task-dedupe.test.ts
 │   ├── tasks.test.ts
@@ -520,9 +523,9 @@ server/test/
 
 | 영역 | 개수 | 대표 시험 → 무엇을 부르나 |
 | --- | ---: | --- |
-| ★ 감시 — 약속을 지키는지 본다 | 104 | `answerflagui` → 소스·문서를 직접 읽어 검사 · `answerlength` → 소스·문서를 직접 읽어 검사 |
+| ★ 감시 — 약속을 지키는지 본다 | 105 | `answerflagui` → 소스·문서를 직접 읽어 검사 · `answerlength` → 소스·문서를 직접 읽어 검사 |
 | 보안·인증 | 52 | `airgap` → src/engine/airgap · `answerfeedback` → src/app |
-| 대화·라우팅 | 111 | `adapters` → src/engine/adapters · `adaptertools` → src/engine/agentloop |
+| 대화·라우팅 | 112 | `adapters` → src/engine/adapters · `adaptertools` → src/engine/agentloop |
 | 말투·표기 | 12 | `approvalstatustool` → src/engine/agenttools/handlers · `findingplain` → src/engine/findingplain |
 | 모델·엔진 | 30 | `adapterimport` → (제품 소스 import 없음) · `adoptgate` → src/engine/adapters |
 | 지식·RAG | 53 | `bundleimport` → src/engine/ontology · `bundleverify` → src/engine/bundleverify |
@@ -531,7 +534,7 @@ server/test/
 | 점검·하드닝 | 13 | `hardening-selfscan-off` → src/app · `hardeningscan` → src/app |
 | 로그·분석 | 14 | `activityaudit` → src/engine/activityaudit · `analysis` → src/engine/analysis |
 | 보고·리포트 | 7 | `progress` → src/engine/progress · `qalongwait` → src/engine/longanswer |
-| 업무·세션 | 13 | `alertschedule` → src/db · `collaboration` → src/app |
+| 업무·세션 | 14 | `alertschedule` → src/db · `collaboration` → src/app |
 | 화면·클라이언트 | 3 | `personaldocs` → src/db · `viewerctx` → src/engine/viewerctx |
 | 기반(DB·유틸) | 11 | `answersamples` → src/db · `date` → src/util/date |
 | 분류 못 함 | 22 | `brainlogfield` → src/engine/brainmark · `brainmark.route` → src/engine/brainmark |
@@ -540,6 +543,6 @@ server/test/
 
 ## ★ 감시 시험이란
 
-제품 코드를 부르는 대신 **소스와 문서를 직접 읽어** 약속이 지켜지는지 보는 시험입니다(104개). 예: 제품이 "이렇게 물어보세요"라고 적어 준 말이 정말 그 기능으로 가는가(`guidance-routing`), 비밀번호가 코드에 적혀 있지 않은가(`no-hardcoded-credentials`), 눌러도 말없는 버튼이 없는가(`silentbuttons`).
+제품 코드를 부르는 대신 **소스와 문서를 직접 읽어** 약속이 지켜지는지 보는 시험입니다(105개). 예: 제품이 "이렇게 물어보세요"라고 적어 준 말이 정말 그 기능으로 가는가(`guidance-routing`), 비밀번호가 코드에 적혀 있지 않은가(`no-hardcoded-credentials`), 눌러도 말없는 버튼이 없는가(`silentbuttons`).
 
 > ⚠ **헛통과 주의.** 감시 시험은 대상을 하나도 못 읽으면 「0건 발견」으로 **항상 통과**합니다. 그래서 각 시험은 「대상을 실제로 읽었는가」를 함께 확인합니다. 그 확인을 지우지 마세요.
