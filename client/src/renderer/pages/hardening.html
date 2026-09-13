@@ -374,10 +374,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (warn) { warn.textContent = selfScanDisabled ? "⚠ " + 로컬대상차단안내 : ""; warn.style.display = selfScanDisabled ? "block" : "none"; }
     if (selfScanDisabled && regKind === "local") pickKind("remote");
   }
-  function openReg() { $("rProbe").style.display = "none"; $("regModal").classList.add("g-on"); }
+  // ⚠ 열 때마다 **대상 종류를 처음 상태(원격)로 되돌린다**(2026-09-13 검토관 [하] 수리).
+  //   앞 판은 regKind를 안 되돌려, 「🏠 이 서버 자신」으로 한 번 등록하면 다음 「＋ 대상 등록」이
+  //   호스트·포트·계정 칸이 사라진 채로 열렸다 — 담당자는 왜 칸이 없는지 알 길이 없다.
+  //   pickKind는 잠긴 칩(selfScanDisabled)에서 아무 일도 안 하도록 이미 막혀 있고,
+  //   "remote"는 어느 설치본에서도 늘 고를 수 있는 값이라 그대로 부른다.
+  function openReg() { $("rProbe").style.display = "none"; pickKind("remote"); $("regModal").classList.add("g-on"); }
   async function submitReg() {
-    const authMethod = regKind === "local" ? "local" : $("rAuth").value;
-    const body = { label: $("rLabel").value.trim(), host: (authMethod === "local" ? "local" : $("rHost").value.trim()), port: Number($("rPort").value) || 22, username: $("rUser").value.trim(), authMethod, secret: $("rSecret").value, standard: $("rStd").value };
+    // ⚠ 로컬 대상에는 접속 정보가 **뜻이 없다** — 원격용으로 쳐 둔 계정·비밀 값이 칩만 바꿨다고
+    //   그대로 실려 가면, 로컬 대상에 쓸모없는 자격증명이 붙어 남는다(서버가 암호화 보관한다).
+    //   화면이 칸을 숨기는 것과 **보내는 값**을 한 잣대로 맞춘다(2026-09-13 검토관 [하] 수리).
+    const 로컬 = regKind === "local";
+    const authMethod = 로컬 ? "local" : $("rAuth").value;
+    const body = { label: $("rLabel").value.trim(), host: (로컬 ? "local" : $("rHost").value.trim()), port: 로컬 ? 22 : (Number($("rPort").value) || 22), username: 로컬 ? "" : $("rUser").value.trim(), authMethod, secret: 로컬 ? "" : $("rSecret").value, standard: $("rStd").value };
     if (!body.label || !body.host) { toast("장비 이름과 호스트를 입력하세요"); return; }
     $("rSubmit").disabled = true; $("rSubmit").textContent = "등록 중…";
     try {
@@ -456,7 +465,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll("#kindRow .g-chip").forEach((c) => c.addEventListener("click", () => pickKind(c.dataset.kind)));
     // ⓘ — 위젯이 있으면(단독·분리창) 열고, 탭 안(embed)에서는 셸 대화창에 묻는다(incidentcases.html 관례).
     $("icKindInfo").addEventListener("click", () => {
-      const 물음 = "대상 등록에서 이 서버 자신 점검이 뭐야";
+      // ⚠ 말투는 「<구역 이름> 사용법 알려줘」로 맞춘다(2026-09-13 검토관 [중] 수리).
+      //   제품이 직접 넣어 주는 말인데 앞 판의 「대상 등록에서 이 서버 자신 점검이 뭐야」는
+      //   guidance-check의 끝맺음 목록에도 can:[] 안에도 없어 **수확 밖**이었다 — 도착지를
+      //   어느 관문도 안 쟀다. 「대상 등록」 구역 안내가 두 칩(🖥 원격 / 🏠 이 서버 자신)을
+      //   그대로 설명한다(screenguide.ts:1526-1528).
+      const 물음 = "대상 등록 사용법 알려줘";
       if (window.gijoOpenChat) { window.gijoOpenChat(); return; }
       try { window.top.postMessage({ type: "gijo:ask", text: 물음 }, "*"); } catch (e) { /* 셸 밖이면 없던 일로 */ }
     });

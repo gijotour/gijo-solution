@@ -1502,11 +1502,17 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
 {
   // ② 실사용 전환(데이터 정리) 판이 기본 접힘 + admin 숨김 — settings.html?s=admin.
   // ⚠⚠ 절대 누르지 않는다 — 「전체 리셋 실행」·「선택한 항목 정리」는 잠김(disabled)만 본다.
-  // ⚠ 접힘 판정 함정: fold.js는 target(=liveResetPanel 자신)의 인라인 style.display를 admin
-  //   해제 줄과 **같은 속성**으로 쓴다 — 그래서 "본문 display:none"만으로는 「admin인데 접힘」과
-  //   「admin이 아니라서 아예 못 열림」을 못 가른다. #secAdminTab(관리자 탭 버튼, 판 표시와
-  //   완전히 별도인 요소)이 보이는가로 **이 세션이 진짜 admin인지**를 먼저 확인하고, 그 위에서
-  //   판 자체의 머리줄·접힘·잠금을 잰다(settings.html:277,1014 — 같은 admin 블록이 연다).
+  // ⚠ 접힘 판정 함정(앞 판): fold.js가 target의 인라인 style.display를 admin 해제 줄과 **같은
+  //   속성**으로 썼다. 그 겹침은 2026-09-13 검토관 [상] 수리로 화면에서 없앴다 — admin 게이트는
+  //   바깥 껍데기(#liveResetGate)가, 접힘은 판(#liveResetPanel)이 각자 쥔다.
+  // ⚠⚠ 그래도 **기본 접힘은 여기서 안 잰다**(같은 날 검토관 [중] 수리). 이 파일이 :690-691에
+  //   이미 못 박은 원칙이다 — 「기본값 자체는 소스 감시 몫, 여기는 동작을 잰다(설치본 프로필의
+  //   저장된 접힘 기억이 켜켜이 달라 기본값 실측은 비결정적이다)」. fold.js:33,176이 접힘을
+  //   localStorage에 적으므로, 관문 계정이 이 구역을 **한 번 펴는 순간** 그 뒤 모든 게시가
+  //   거짓 빨강이 된다. 기본 접힘(data-gijo-fold-closed)은
+  //   server/test/selfcheck-datacleanup-ui.test.ts ②가 소스로 잰다.
+  // ⇒ 여기서 잴 것: #secAdminTab(판 표시와 완전히 별도인 요소)으로 **이 세션이 진짜 admin인지**를
+  //   먼저 확인하고, 그 위에서 머리줄(접기가 실제로 걸렸다는 증거)·대상 행·버튼 잠금을 본다.
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("settings.html?s=admin", "설정", { dock: true }));
   const dcFr = await 프레임찾기("settings.html", 10);
   const dc = dcFr ? await dcFr.evaluate(async () => {
@@ -1523,14 +1529,19 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     return {
       adminTab보임: !!adminTab && getComputedStyle(adminTab).display !== "none",
       머리줄있음: !!(head && head.classList && head.classList.contains("gjf-h") && head.querySelector(".nm") && head.querySelector(".nm").textContent === "실사용 전환(데이터 정리)"),
-      본문접힘: panel.style.display === "none",
+      // 접힘은 **재기만 하고 판정에 쓰지 않는다**(위 주석) — 사람이 보고서에서 읽을 참고값이다.
+      지금접힘: panel.style.display === "none",
       대상행수: document.querySelectorAll("#dcGrid .dc-row").length,
       정리버튼잠김: !!(runBtn && runBtn.disabled),
       리셋버튼잠김: !!(resetBtn && resetBtn.disabled),
     };
   }).catch(() => null) : null;
-  ok("UI C — 실사용 전환(데이터 정리) 판: admin 탭 보임 · 머리줄 있음 · 기본 접힘 · 대상 16종 · 정리/리셋 버튼 잠김(절대 안 누름)",
-    !!dc && !dc.판없음 && dc.adminTab보임 && dc.머리줄있음 && dc.본문접힘 && dc.대상행수 === 16 && dc.정리버튼잠김 && dc.리셋버튼잠김,
+  // ⚠ 대상 행수는 **하한**으로 본다(2026-09-13 검토관 [중] 수리). `=== 16`은 개수 하드코딩인데
+  //   datacleanup.ts TARGETS는 실제로 늘어 왔다(2026-09-03에 sbom_reviews·scan_drafts·bom_drafts
+  //   셋). 표가 하나 늘 때마다 멀쩡한 제품이 게시에서 막히면, 사람은 「관문이 또 틀렸다」를 배운다.
+  //   같은 묶음의 소스 감시도 하한을 쓴다(selfcheck-datacleanup-ui.test.ts ④ toBeGreaterThanOrEqual(16)).
+  ok("UI C — 실사용 전환(데이터 정리) 판: admin 탭 보임 · 머리줄 있음 · 대상 16종 이상 · 정리/리셋 버튼 잠김(절대 안 누름)",
+    !!dc && !dc.판없음 && dc.adminTab보임 && dc.머리줄있음 && dc.대상행수 >= 16 && dc.정리버튼잠김 && dc.리셋버튼잠김,
     JSON.stringify(dc));
 }
 {

@@ -29,6 +29,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
 .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
 .btn-danger{background:transparent;border:1px solid rgba(226,72,61,0.5);color:var(--red-ink, #f5928a);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+/* 잠긴 파괴 버튼은 **잠긴 것처럼 보여야** 한다(2026-09-13 검토관 [중] 수리 · 시안 :115 값 그대로).
+   이 규칙이 없으면 「전체 리셋 실행」이 살아 있는 빨간 버튼으로 보이는데 눌러도 아무 일이 없다 —
+   이 저장소가 이미 겪은 「무반응 버튼」 부류다(.btn-primary는 :29에 같은 규칙을 갖고 있었다). */
+.btn-danger:disabled{opacity:.4;cursor:not-allowed;}
 /* 구역 탭줄(2026-08-09) — 사이드바가 「설정」 한 줄이 되면서 구역 전환이 화면 안으로 들어왔다. */
 .sec-tab{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;}
 .sec-tab:hover{border-color:var(--blue);color:var(--text-strong, #fff);}
@@ -225,6 +229,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .sc-meta{font-size:11.5px;color:var(--muted-2);font-weight:400;margin-left:6px;}
 /* 열 폭 한 줄만 새로 선언 — 머리 26px·행 30px 등 밀도값은 gijo-ui.css .g-rows가 정본(새로 안 만듦). */
 .g-rows--sc .g-rows-head,.g-rows--sc .g-rows-r{grid-template-columns:20px 130px 1fr 16px;gap:8px;}
+/* ⚠ 얼룩무늬(zebra) 되살리기 — 상세(.sc-det)를 행 사이에 끼우면 공용 규칙
+   `.g-rows-flat .g-rows-r:nth-child(even)`(gijo-ui.css:376)이 **하나도 안 걸린다**:
+   행이 전부 홀수 자리(1·3·5…)가 되고 짝수 자리는 상세가 차지하기 때문이다(2026-09-13 검토관 [하]).
+   행 i(0부터)는 nth-child 2i+1 → 두 줄에 한 번은 3·7·11…= 4n+3. 밀도값·색 토큰은 공용 그대로. */
+.g-rows--sc .g-rows-flat .g-rows-r:nth-child(4n+3){background:var(--g-zebra, rgba(255,255,255,.025));}
 .sc-det{display:none;background:var(--panel-2);border-radius:8px;padding:10px 12px;margin:2px 0 4px;font-size:11.5px;color:var(--muted);line-height:1.7;}
 .sc-det.on{display:block;}
 .sc-det .lb{color:var(--text);font-weight:700;}
@@ -465,7 +474,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
          "관리자가 실사용 전환(데이터 정리)을 해야 합니다"라고 사람을 이 길로 보내 왔다 — 그 길이
          실제로 없었다. 파괴적 조작이라 기본 접힘(data-gijo-fold-closed, fold.js:168 규칙 그대로
          "매일 볼 것이 아닌 구역"). 시안 mockups/settings-live-reset(GitLab "Type to confirm" 패턴). -->
-    <div data-sec="admin" class="panel" id="liveResetPanel" style="display:none" data-gijo-fold="실사용 전환(데이터 정리)" data-gijo-fold-closed>
+    <!-- ⚠⚠ **admin 게이트와 접기가 같은 속성을 쓰면 안 된다**(2026-09-13 검토관 [상] 수리).
+         첫 판은 판 하나에 `data-sec="admin" style="display:none"`(게이트)와 `data-gijo-fold-closed`
+         (접기)를 함께 달았다. 둘 다 **같은 요소의 인라인 style.display**를 쓴다 —
+         fold.js:99가 접으며 "none"을 적고, admin 해제 줄이 나중에 ""로 덮는다(loadUser의 HTTP
+         왕복이 fold.js 주입보다 늦다). 결과: **되돌릴 수 없는 「전체 리셋」 판이 펼쳐진 채로 뜨고**
+         머리 캐럿만 ▶(접힘)이라 한 번 누르면 오히려 닫혔다. 게시 검사 ⑨′②도 구조적으로 빨강이었다.
+         ⇒ **게이트를 바깥 껍데기로 뺀다** — 접기는 판(.panel) 하나만 쥐고, admin 해제는
+         #liveResetGate만 만진다. 두 쓰기가 **다른 요소**를 쓰므로 서로 덮을 수 없다.
+         (같은 뜻의 앞선 관례가 :371-374에 있다 — 거기는 접기를 안쪽으로 내렸다. 여기서 바깥으로
+          뺀 이유는 판 제목이 곧 구역 이름이라, 안쪽으로 내리면 제목 줄이 두 번 보이기 때문이다.)
+         ⚠ data-sec은 껍데기가 진다 — 구역 필터가 `[data-sec]:not(...)`라 껍데기째 숨으면
+           fold.js가 만든 머리줄(껍데기 안)도 함께 숨는다. -->
+    <div data-sec="admin" id="liveResetGate" style="display:none">
+    <div class="panel" id="liveResetPanel" data-gijo-fold="실사용 전환(데이터 정리)" data-gijo-fold-closed>
       <div class="panel-title">실사용 전환(데이터 정리)<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
       <div class="idline">시연·테스트로 쌓인 업무 데이터를 표 단위로 지웁니다. 자세한 것은 <button type="button" class="ic-info" id="dcIcInfo" title="실사용 전환·데이터 정리 안내 — 대화창이 답합니다">ⓘ</button> 를 눌러 확인하세요.</div>
 
@@ -476,7 +498,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
 
       <div class="dc-subhead">① 골라서 정리 — 선택한 항목만 비웁니다</div>
-      <div class="dc-selall"><label><input type="checkbox" id="dcSelAllCk"> 전체 선택</label> <span id="dcSelCount">종 중 0개 선택됨</span></div>
+      <div class="dc-selall"><label><input type="checkbox" id="dcSelAllCk"> 전체 선택</label> <span id="dcSelCount">불러오는 중…</span></div>
       <div class="dc-grid" id="dcGrid"></div>
       <button type="button" class="btn-danger" id="dcRunBtn" disabled>선택한 항목 정리 (0개 선택)</button>
       <div class="status-line" id="dcRunStatus" style="color:var(--muted-2)">지우기 전 파일로 스냅샷을 남깁니다 — 실패하면 지우지 않습니다.</div>
@@ -494,6 +516,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="dc-audit-note">이 실행은 실행자·시각·건수가 감사 기록에 남습니다 · 라이브 모드는 화면에서 다시 끌 수 없습니다(관리자만 실행할 수 있습니다).</div>
       </div>
     </div>
+    </div><!-- /#liveResetGate — admin 게이트 껍데기(접기와 속성을 나눈다) -->
 
     <div data-sec="admin" class="panel" id="adminPanel" style="display:none" data-gijo-fold="게시된 배포판">
       <div class="panel-title">게시된 배포판<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
@@ -1017,7 +1040,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         await loadMfaAdmin();
         document.getElementById("dbcryptPanel").style.display = "";
         await loadDbCrypt();
-        document.getElementById("liveResetPanel").style.display = "";
+        // ⚠ 판(#liveResetPanel)이 아니라 **껍데기**(#liveResetGate)를 푼다 — 판의 인라인
+        //   display는 접기(fold.js)의 것이다. 판을 여기서 만지면 기본 접힘이 덮여
+        //   「전체 리셋」이 펼쳐진 채로 뜬다(2026-09-13 검토관 [상]). 위 :463 주석 참고.
+        document.getElementById("liveResetGate").style.display = "";
         await loadDataCleanup().catch(function () {});
         document.getElementById("cloudLlmPanel").style.display = "";
         document.getElementById("smtpInboundPanel").style.display = "";
@@ -3028,6 +3054,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       headline.className = "sc-headline " + (h.level === "ok" ? "ok" : "bad");
       const bad = h.checks.filter(function (c) { return c.level === "warn" || c.level === "fail"; }).length;
       badge.textContent = String(bad);
+      // 접기 머리줄의 배지는 fold.js가 **이 글자를 읽어** 그린다 — 다시 읽으라고 알려야 한다.
+      //   watch()의 자동 재도색은 12틱(약 12초)에 멈추므로(fold.js:209-219), 그 뒤에 눌리는
+      //   「새로고침」은 이 한 줄이 없으면 옛 숫자를 머리줄에 그대로 남긴다(2026-09-13 검토관 [하]).
+      //   이 파일의 관례 그대로다(:1150 · :1449 · :1525 · 규약은 :336 주석).
+      if (window.gijoFold) window.gijoFold.refresh();
       scRenderRows(h.checks);
       status.textContent = "";
       status.className = "status-line";
@@ -3050,7 +3081,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   function dcOpenGuide() {
     if (window.gijoOpenChat) { window.gijoOpenChat(); return; }
-    try { window.top.postMessage({ type: "gijo:ask", text: "실사용 전환 어떻게 해?" }, "*"); } catch (e) { /* 셸 밖이면 없던 일로 */ }
+    // ⚠ 말투를 「… 사용법 알려줘」로 맞춘다(2026-09-13 검토관 [중] 수리). 이 글자는 **담당자가
+    //   친 게 아니라 제품이 직접 넣어 주는 말**이라 도착지가 회차마다 달라지면 버튼이 고장 난 것인데,
+    //   앞 판의 「실사용 전환 어떻게 해?」는 guidance-check의 끝맺음 목록에도 can:[] 안에도 없어
+    //   **수확 자체가 안 됐다** — 어느 관문도 이 약속을 세지 않았다. 도착 확정은
+    //   server/test/guidance-destination.test.ts의 기대도착 표가 제품 함수로 잰다.
+    try { window.top.postMessage({ type: "gijo:ask", text: "실사용 전환 사용법 알려줘" }, "*"); } catch (e) { /* 셸 밖이면 없던 일로 */ }
   }
   function dcSyncSelUi() {
     const n = dcSelected.size;
@@ -3087,6 +3123,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       dcRenderGrid(r.targets || []);
     } catch (e) {
       document.getElementById("dcGrid").innerHTML = "";
+      // ⚠ 숫자를 채우는 곳(dcSyncSelUi)은 dcRenderGrid 안에서만 불린다 — 실패 갈래에서 놔두면
+      //   「종 중 0개 선택됨」처럼 **앞 수가 빠진 문장**이 화면에 그대로 남는다(2026-09-13 검토관 [하]).
+      document.getElementById("dcSelCount").textContent = "목록을 불러오지 못했습니다";
       status.textContent = "✗ 목록을 불러오지 못했습니다: " + e.message;
       status.className = "status-line status-err";
     }

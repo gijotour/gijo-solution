@@ -226,3 +226,36 @@ describe("화면(hardening.html) — 대상 종류 칩이 서버 판정을 그�
     expect(rAuthBlock![0]).not.toContain('value="local"');
   });
 });
+
+// ★ [2026-09-13 검토관 [하] 수리] 모달이 **다음 번에 열릴 때**의 상태를 아무도 안 되돌렸다.
+//   ① openReg()가 regKind를 그대로 두어, 「🏠 이 서버 자신」으로 한 번 등록하면 다음
+//      「＋ 대상 등록」이 호스트·포트·계정 칸이 사라진 채로 열렸다(담당자는 이유를 알 수 없다).
+//   ② 원격 칸에 쳐 둔 계정·비밀 값이 칩만 로컬로 바꿔도 그대로 실려, 접속 정보가 뜻 없는
+//      로컬 대상에 자격증명이 붙어 남았다(서버가 암호화 보관한다 — 밖으로 새지는 않는다).
+//   화면을 안 열면 안 보이는 부류라 소스로 못 박는다.
+describe("화면(hardening.html) — 등록 모달은 열 때마다 처음 상태로 돌아간다", () => {
+  const HTML = fs.readFileSync(
+    path.join(__dirname, "../../client/src/renderer/pages/hardening.html"),
+    "utf8"
+  );
+
+  it("openReg()가 대상 종류를 원격으로 되돌린다", () => {
+    const m = HTML.match(/function openReg\(\)\s*\{[^}]*\}/);
+    expect(m, "openReg를 못 찾았다").not.toBeNull();
+    expect(
+      m![0],
+      "openReg가 regKind를 안 되돌린다 — 로컬로 한 번 등록하면 다음 모달이 로컬 상태로 열린다",
+    ).toMatch(/pickKind\(\s*"remote"\s*\)/);
+  });
+
+  it("submitReg()가 로컬 대상에는 계정·비밀 값을 싣지 않는다", () => {
+    const i = HTML.indexOf("async function submitReg()");
+    expect(i, "submitReg를 못 찾았다").toBeGreaterThan(-1);
+    const 본문 = HTML.slice(i, i + 900);
+    // username·secret 두 칸이 모두 「로컬이면 빈 값」 삼항을 거쳐야 한다.
+    expect(본문, "username이 로컬 갈래를 안 거친다").toMatch(/username:\s*로컬\s*\?/);
+    expect(본문, "secret이 로컬 갈래를 안 거친다").toMatch(/secret:\s*로컬\s*\?/);
+    // host="local" 고정은 서버 계약이라 그대로 남아 있어야 한다(빼면 400).
+    expect(본문).toMatch(/host:\s*\(?\s*로컬\s*\?\s*"local"/);
+  });
+});
