@@ -74,6 +74,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .posture .pf{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;}
 .pf-row{display:flex;align-items:center;gap:8px;font-size:12.25px;} .pf-row .l{width:120px;color:var(--muted);flex-shrink:0;}
 .pf-row .tr{flex:1;height:6px;background:var(--panel-2);border-radius:20px;overflow:hidden;} .pf-row .fl{height:100%;border-radius:20px;} .pf-row .vv{width:34px;text-align:right;font-weight:700;flex-shrink:0;}
+.pf-row .vv.wide{width:44px;} /* "집계전" 3글자가 34px 상자에서 줄바꿈나지 않도록(2026-09-13 kpi-sla-clue) */
 .headline{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
 .hcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;}
 .hcard .hl{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:5px;}
@@ -209,11 +210,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // title(선택)=전체 글자 — 표시 이름이 서버 라벨보다 짧아야 할 때(공간 부족) 툴팁으로 온전한
   // 문구를 담는다. 서버 글자를 화면 어딘가에 그대로 싣는 계약(2026-09-13, sla.ts 기한초과라벨).
-  function trendCard(name, values, color, unit, title) {
+  // opts(선택, 6번째 — title이 이미 5번째라 자리를 밀지 않는다) — 표본 0이라 값·선이
+  // 의미 없을 때 대체 표시를 넣는다(2026-09-13, kpi-sla-clue 시안). opts 없는 나머지
+  // 3장(열린 취약점·KEV·기한 초과*)은 예전과 한 글자도 다르지 않다.
+  function trendCard(name, values, color, unit, title, opts) {
     const now = values.length ? values[values.length - 1] : 0;
     const note = values.length <= 1 ? "추세는 매일 스냅샷이 쌓이며 나타납니다 (현재 " + values.length + "일)" : `최근 ${values.length}일`;
     const titleAttr = title ? ` title="${String(title).replace(/"/g, "&quot;")}"` : "";
-    return `<div class="trend-card"><div class="trend-head"><span class="trend-name"${titleAttr}>${name}</span><span class="trend-now" style="color:${color}">${now}${unit || ""}</span></div>${sparkline(values, color)}<div class="trend-note">${note}</div></div>`;
+    const nowHtml = (opts && opts.nowHtml != null) ? opts.nowHtml : `${now}${unit || ""}`;
+    const lineColor = (opts && opts.lineColor) ? opts.lineColor : color;
+    const noteHtml = (opts && opts.note) ? note + " · " + opts.note : note;
+    return `<div class="trend-card"><div class="trend-head"><span class="trend-name"${titleAttr}>${name}</span><span class="trend-now" style="color:${color}">${nowHtml}</span></div>${sparkline(values, lineColor)}<div class="trend-note">${noteHtml}</div></div>`;
   }
 
   const fmtD = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()}`; };
@@ -243,7 +250,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // 임원 헤드라인 카드 — 값 + 기간 대비 증감(delta). down=좋아짐(초록), up=나빠짐(빨강).
   // betterWhenDown: 값이 줄어드는 게 좋은 지표(취약점·KEV·기한초과)면 true.
-  function headlineCard(label, value, unit, series, betterWhenDown, sub) {
+  // opts(선택, 7번째) — 표본이 없어 값 자체가 의미 없을 때(예: SLA 준수율 표본 0)
+  // "전일 대비"·"추세 누적 중" 같은 비교 문구를 함께 지우기 위한 확장(2026-09-13,
+  // kpi-sla-clue 시안·설계관 지시서). opts를 안 넘기면 세 갈래·표시값 모두 예전과 한 글자도
+  // 다르지 않다 — 히어로 6장 중 5장이 이 함수를 공유하므로 하위호환이 계약이다.
+  function headlineCard(label, value, unit, series, betterWhenDown, sub, opts) {
     var arr = (series || []).filter(function (x) { return typeof x === "number"; });
     var delta = arr.length >= 2 ? arr[arr.length - 1] - arr[arr.length - 2] : null;
     var dHtml = "";
@@ -255,14 +266,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } else {
       dHtml = '<div class="hd flat">추세 누적 중</div>';
     }
-    return '<div class="hcard"><div class="hl">' + label + '</div><div class="hv">' + value + (unit || "") + "</div>" + dHtml + (sub ? '<div class="hsub">' + sub + "</div>" : "") + "</div>";
+    if (opts && opts.hide === "delta") dHtml = "";
+    var valHtml = (opts && opts.valueHtml != null) ? opts.valueHtml : (value + (unit || ""));
+    return '<div class="hcard"><div class="hl">' + label + '</div><div class="hv">' + valHtml + "</div>" + dHtml + (sub ? '<div class="hsub">' + sub + "</div>" : "") + "</div>";
   }
 
   function heroBlock(c, v, rem, series) {
     var p = c.posture || { score: 0, band: "poor", factors: [] };
+    // rem은 이 함수를 감싼 heroBlock(c, v, rem, series)의 인자라 이미 보인다(별도 배선 불필요 —
+    // 2026-09-13 검토관 지적: 시안이 말한 "한 단계 배선"은 사실 조건식 한 줄이었다).
     var pfBar = function (f) {
-      var col = f.value >= 80 ? "var(--teal)" : f.value >= 55 ? "var(--amber)" : "#f5928a";
-      return '<div class="pf-row"><span class="l">' + f.label + '</span><div class="tr"><div class="fl" style="width:' + Math.min(100, f.value) + "%;background:" + col + '"></div></div><span class="vv" style="color:' + col + '">' + f.value + "%</span></div>";
+      var 집계전 = f.label === "SLA 준수율" && rem.tasks === 0;
+      var col = 집계전 ? "var(--border-strong)" : (f.value >= 80 ? "var(--teal)" : f.value >= 55 ? "var(--amber)" : "#f5928a");
+      var valTxt = 집계전 ? "집계전" : f.value + "%";
+      var valCls = 집계전 ? "vv wide" : "vv";
+      var valCol = 집계전 ? "var(--muted-2)" : col;
+      return '<div class="pf-row"><span class="l">' + f.label + '</span><div class="tr"><div class="fl" style="width:' + Math.min(100, f.value) + "%;background:" + col + '"></div></div><span class="' + valCls + '" style="color:' + valCol + '">' + valTxt + "</span></div>";
     };
     var pcol = p.band === "good" ? "#6fdcb5" : p.band === "fair" ? "#f7c777" : "#f5928a";
     var bandTxt = p.band === "good" ? "양호" : p.band === "fair" ? "보통" : "취약";
@@ -284,7 +303,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         v.scanFailed ? `⚠ 점검 실패 ${v.scanFailed}건은 아직 안 본 것` : "fixed 제외 현재 노출") +
       headlineCard("🚨 실제 악용(KEV)", v.kev, "건", series("vulnerabilities.kev"), true, "CISA KEV 등재 — 최우선") +
       headlineCard("⏱ MTTR", mttr, "", null, true, mttrSub) +
-      headlineCard("📋 SLA 준수율", rem.slaCompliance, "%", series("remediation.slaCompliance"), false, "조치 기한 준수 비율") +
+      headlineCard("📋 SLA 준수율", rem.slaCompliance, "%", series("remediation.slaCompliance"), false,
+        rem.tasks === 0 ? "조치 항목이 0건이라 아직 집계 전입니다" : "조치 기한 준수 비율",
+        rem.tasks === 0 ? { hide: "delta", valueHtml: '<span style="color:var(--muted-2)">집계 전</span>' } : undefined) +
       headlineCard("✓ 취약점 조치율", v.remediationRate, "%", null, false, "고쳐짐/(열림+고쳐짐)") +
       headlineCard("📕 컴플라이언스 대응률", c.compliance.coverageRate, "%", series("compliance.coverageRate"), false, "KISA 위협 대응") +
       "</div></div>"
@@ -440,7 +461,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         krow("📋 조치 항목 · SLA",
           kv("항목", rem.tasks) + kv("기한 초과", rem.overdue, rem.overdue ? "#f5928a" : "var(--teal)") +
           kv("임박(3일↓)", rem.dueSoon, rem.dueSoon ? "var(--amber)" : "var(--muted)") +
-          kv("SLA 준수율", rem.slaCompliance + "%", rem.slaCompliance >= 90 ? "var(--teal)" : rem.slaCompliance >= 70 ? "var(--amber)" : "#f5928a")) +
+          kv("SLA 준수율", rem.tasks === 0 ? "집계 전" : rem.slaCompliance + "%",
+            rem.tasks === 0 ? "var(--muted-2)" : (rem.slaCompliance >= 90 ? "var(--teal)" : rem.slaCompliance >= 70 ? "var(--amber)" : "#f5928a"))) +
 
         krow("✓ 컴플라이언스 · 🔄 AI 학습",
           kv("KISA 위협", c.compliance.total) + kv("대응 완료", c.compliance.covered, "var(--teal)") +
@@ -469,7 +491,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         `<div class="cat" data-gijo-fold="📈 추세 · 조치 번다운 (일일 스냅샷)"><div class="trend-grid">` +
         trendCard("열린 취약점 (번다운 — 줄수록 좋음)", series("vulnerabilities.active"), "#f5928a", "건") +
         trendCard("실제 악용(KEV)", series("vulnerabilities.kev"), "#ff8a80", "건") +
-        trendCard("SLA 준수율", series("remediation.slaCompliance"), "var(--teal)", "%") +
+        trendCard("SLA 준수율", series("remediation.slaCompliance"), "var(--teal)", "%", undefined,
+          rem.tasks === 0 ? { nowHtml: '<span style="color:var(--muted-2)">집계 전</span>', lineColor: "var(--border-strong)", note: "조치 항목이 없어 궤적이 의미를 갖지 않습니다" } : undefined) +
         // 표시는 짧게(공간 부족) · 전체 글자는 title 툴팁으로 — 서버 sla.ts 기한초과라벨과 같은
         // 글자를 그대로 담는다("기한 초과(늦게 끝낸 건 포함)" — 완료했어도 늦게 끝난 건 포함).
         trendCard("기한 초과*", series("remediation.overdue"), "#f5928a", "건", "기한 초과(늦게 끝낸 건 포함)") +
