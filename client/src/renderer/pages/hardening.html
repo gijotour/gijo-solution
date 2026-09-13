@@ -57,6 +57,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .page-guide{background:var(--panel-2);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:var(--g-r-sm);padding:10px 14px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.7;margin:12px 0 16px;}
 .page-guide b{color:var(--text-strong, #fff);font-weight:700;}
 .page-guide .std{color:var(--blue-light);font-weight:700;}
+/* 대상 등록 모달 — 「대상 종류」 칩(2026-09-13, verify-local-self-target) */
+.kind-row{display:flex;gap:var(--g-s2);margin-bottom:var(--g-s3);}
+.g-chip.g-disabled{opacity:.45;cursor:not-allowed;}
+.self-warn{font-size:var(--g-t-xs);color:var(--amber);line-height:1.6;margin:-4px 0 var(--g-s3);}
+.ic-info{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;color:var(--blue-light);font-size:12px;font-weight:700;padding:2px 8px;cursor:pointer;font-family:inherit;vertical-align:middle;margin-left:8px;}
 </style>
 <script src="viz.js"></script>
 </head>
@@ -99,25 +104,38 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </div>
 
 <!-- 대상 등록 모달 -->
+<!-- 「대상 종류」가 인증 방식(rAuth) 안에 「로컬(서버 자신)」로 숨어 있던 것을 맨 위 칩으로
+     끌어올렸다(2026-09-13 시안 verify-local-self-target, 계획서 §756). 서버 판정(원격점검인가,
+     hardeningscan.ts:603-605)과 같은 이분법 — 화면이 셋 이상을 보여주지 않는다. -->
 <div class="g-modal-bg" id="regModal">
   <div class="g-modal" style="width:560px">
-    <div class="mt">점검 대상(장비) 등록</div>
-    <div class="reg-guide">연결 가능한 장비의 IP와 SSH 정보를 넣으면 그 장비에 접속해 점검합니다.</div>
+    <div class="mt">점검 대상(장비) 등록<button type="button" class="ic-info" id="icKindInfo" title="이 화면 안내 — 사용법·용어 풀이는 대화창이 답합니다">ⓘ</button></div>
+    <div class="kind-row" id="kindRow">
+      <div class="g-chip g-on" data-kind="remote">🖥 원격 장비 (SSH)</div>
+      <div class="g-chip" data-kind="local" id="chipLocal">🏠 이 서버 자신</div>
+    </div>
+    <div class="self-warn" id="offWarn" style="display:none"></div>
+    <div class="reg-guide" id="remoteGuide">연결 가능한 장비의 IP와 SSH 정보를 넣으면 그 장비에 접속해 점검합니다.</div>
+    <div class="reg-guide" id="localNote" style="display:none">🏠 이 서버 자신을 점검합니다 — <b>접속 정보가 필요 없습니다.</b></div>
     <div class="frow">
       <div class="g-field"><label>장비 이름</label><input class="g-input" id="rLabel" placeholder="경계 방화벽 (FW-01)"></div>
       <div class="g-field"><label>점검 기준(장비 유형)</label><select class="g-input" id="rStd"><option value="kisa">국내 CCE — 리눅스 서버 (U-시리즈)</option><option value="cis">CIS Benchmark (리눅스)</option><option value="kisa_pc">국내 CCE — Windows PC (PC-시리즈)</option><option value="kisa_net">국내 CCE — 네트워크 장비 (N-시리즈)</option></select></div>
     </div>
-    <div class="frow">
-      <div class="g-field"><label>인증 방식</label><select class="g-input" id="rAuth"><option value="key">SSH 키 (권장)</option><option value="password">비밀번호</option><option value="local">로컬(서버 자신)</option></select></div>
-      <div class="g-field"></div>
-    </div>
-    <div class="frow">
-      <div class="g-field"><label>호스트 / IP</label><input class="g-input" id="rHost" placeholder="10.10.1.5"></div>
-      <div class="g-field"><label>포트</label><input class="g-input" id="rPort" value="22"></div>
-    </div>
-    <div class="frow" id="rCredRow">
-      <div class="g-field"><label>계정</label><input class="g-input" id="rUser" placeholder="admin"></div>
-      <div class="g-field"><label id="rSecLbl">개인키 경로</label><input class="g-input" id="rSecret" placeholder="/keys/id_ed25519"></div>
+    <!-- 종류가 「이 서버 자신」이면 이 블록 전체가 사라진다 — 인증·호스트·계정 어느 것도 뜻이
+         없다(SSH가 아니라 이 서버 위에서 직접 진단 명령을 실행한다). -->
+    <div id="remoteRows">
+      <div class="frow">
+        <div class="g-field"><label>인증 방식</label><select class="g-input" id="rAuth"><option value="key">SSH 키 (권장)</option><option value="password">비밀번호</option></select></div>
+        <div class="g-field"></div>
+      </div>
+      <div class="frow">
+        <div class="g-field"><label>호스트 / IP</label><input class="g-input" id="rHost" placeholder="10.10.1.5"></div>
+        <div class="g-field"><label>포트</label><input class="g-input" id="rPort" value="22"></div>
+      </div>
+      <div class="frow" id="rCredRow">
+        <div class="g-field"><label>계정</label><input class="g-input" id="rUser" placeholder="admin"></div>
+        <div class="g-field"><label id="rSecLbl">개인키 경로</label><input class="g-input" id="rSecret" placeholder="/keys/id_ed25519"></div>
+      </div>
     </div>
     <div class="probe-res" id="rProbe" style="display:none"></div>
     <div class="macts">
@@ -298,6 +316,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   async function loadAll() {
     const [tg, sc, rn] = await Promise.all([window.gijo.hardeningTargets.list(), window.gijo.hardeningSchedules.list(), window.gijo.hardeningRuns()]);
     TARGETS = tg.targets || []; SCHEDULES = sc.schedules || []; RUNS = rn.runs || [];
+    // ⚠ 「이 서버 자신」 칩은 **미리** 잠근다 — 등록 버튼을 눌러 409를 받고서야 아는 것이 아니라
+    //   목록을 불러오는 이 시점에 안다(hardening.html:380-386이 관리자 권한에 쓰던 원칙과 같다).
+    selfScanDisabled = Boolean(tg.selfScanDisabled);
+    applySelfScanLock();
     renderKpis(); renderCards();
   }
 
@@ -317,18 +339,44 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     await window.gijo.hardeningTargets.remove(id); toast("대상 삭제됨"); await loadAll();
   }
 
-  // 등록 모달
-  function syncCred() {
-    const a = $("rAuth").value;
-    $("rCredRow").style.display = a === "local" ? "none" : "grid";
-    $("rSecLbl").textContent = a === "password" ? "비밀번호" : "개인키 경로";
-    $("rSecret").placeholder = a === "password" ? "••••••" : "/keys/id_ed25519";
-    $("rSecret").type = a === "password" ? "password" : "text";
-    if (a === "local") $("rHost").value = "local";
+  // 등록 모달 — 「대상 종류」(원격/이 서버 자신)가 먼저고, 인증 방식은 원격일 때만 뜻이 있다
+  // (2026-09-13 시안 verify-local-self-target — 서버 판정 원격점검인가()와 같은 이분법).
+  let regKind = "remote"; // "remote" | "local"
+  let selfScanDisabled = false;
+  // ⚠ 이 설치본에서 로컬 등록이 막히는 이유 — hardeningscan.ts:662 `로컬대상차단안내`와
+  //   **글자까지 같아야 한다**(서버 상수를 베끼면 어긋난다 — 이 저장소의 반복 결함). 화면은
+  //   서버 문자열을 그대로 부를 API가 없어 상수 하나로만 옮겨 적는다 — server/test/
+  //   hardening-selfscan-off.test.ts가 이 문자열과 서버 상수를 글자 대조한다.
+  const 로컬대상차단안내 = "이 설치본에서는 이 서버 자신을 점검 대상으로 등록할 수 없습니다. 점검할 장비를 내부망(사설·VPN 대역) IP로 등록해 주세요.";
+  function syncKind() {
+    const isLocal = regKind === "local";
+    $("remoteRows").style.display = isLocal ? "none" : "";
+    $("remoteGuide").style.display = isLocal ? "none" : "block";
+    $("localNote").style.display = isLocal ? "block" : "none";
+    if (!isLocal) {
+      const a = $("rAuth").value;
+      $("rSecLbl").textContent = a === "password" ? "비밀번호" : "개인키 경로";
+      $("rSecret").placeholder = a === "password" ? "••••••" : "/keys/id_ed25519";
+      $("rSecret").type = a === "password" ? "password" : "text";
+    }
+  }
+  function pickKind(kind) {
+    if (kind === "local" && selfScanDisabled) return; // 잠긴 칩 — 클릭해도 안 바뀐다(가짜 반응 없음)
+    regKind = kind;
+    document.querySelectorAll("#kindRow .g-chip").forEach((c) => c.classList.toggle("g-on", c.dataset.kind === kind));
+    syncKind();
+  }
+  // 목록을 불러올 때마다(30초 재조회 포함) 다시 적용 — 잠금 상태가 풀린 채로 보이면 안 된다.
+  function applySelfScanLock() {
+    const chip = $("chipLocal");
+    if (chip) chip.classList.toggle("g-disabled", selfScanDisabled);
+    const warn = $("offWarn");
+    if (warn) { warn.textContent = selfScanDisabled ? "⚠ " + 로컬대상차단안내 : ""; warn.style.display = selfScanDisabled ? "block" : "none"; }
+    if (selfScanDisabled && regKind === "local") pickKind("remote");
   }
   function openReg() { $("rProbe").style.display = "none"; $("regModal").classList.add("g-on"); }
   async function submitReg() {
-    const authMethod = $("rAuth").value;
+    const authMethod = regKind === "local" ? "local" : $("rAuth").value;
     const body = { label: $("rLabel").value.trim(), host: (authMethod === "local" ? "local" : $("rHost").value.trim()), port: Number($("rPort").value) || 22, username: $("rUser").value.trim(), authMethod, secret: $("rSecret").value, standard: $("rStd").value };
     if (!body.label || !body.host) { toast("장비 이름과 호스트를 입력하세요"); return; }
     $("rSubmit").disabled = true; $("rSubmit").textContent = "등록 중…";
@@ -404,7 +452,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     $("addBtn").addEventListener("click", openReg);
     $("rCancel").addEventListener("click", () => $("regModal").classList.remove("g-on"));
     $("rSubmit").addEventListener("click", submitReg);
-    $("rAuth").addEventListener("change", syncCred); syncCred();
+    $("rAuth").addEventListener("change", syncKind); syncKind();
+    document.querySelectorAll("#kindRow .g-chip").forEach((c) => c.addEventListener("click", () => pickKind(c.dataset.kind)));
+    // ⓘ — 위젯이 있으면(단독·분리창) 열고, 탭 안(embed)에서는 셸 대화창에 묻는다(incidentcases.html 관례).
+    $("icKindInfo").addEventListener("click", () => {
+      const 물음 = "대상 등록에서 이 서버 자신 점검이 뭐야";
+      if (window.gijoOpenChat) { window.gijoOpenChat(); return; }
+      try { window.top.postMessage({ type: "gijo:ask", text: 물음 }, "*"); } catch (e) { /* 셸 밖이면 없던 일로 */ }
+    });
     $("sCancel").addEventListener("click", () => $("schModal").classList.remove("g-on"));
     $("sSubmit").addEventListener("click", submitSched);
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => (window.gijoOpenScreen ? window.gijoOpenScreen(el.dataset.page) : window.gijo.navigateTo(el.dataset.page))));

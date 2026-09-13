@@ -25,6 +25,7 @@ import {
   runnerFor,
   원격점검인가,
   자기점검막힌대상인가,
+  자기점검꺼짐,
   자기점검차단안내,
   로컬대상차단안내,
   감사대상글,
@@ -293,8 +294,12 @@ export function registerHardeningTargetRoutes(app: Express): void {
   const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
 
   // 대상 목록·등록·삭제
+  // ⚠ selfScanDisabled — 화면(hardening.html)이 「이 서버 자신」 칩을 **미리** 잠그고 이유를
+  //   보여주려면 목록을 불러오는 이 시점에 자기점검 꺼짐 여부를 알아야 한다(등록 버튼을 눌러
+  //   409를 받고서야 아는 것이 아니라 — 2026-09-13 시안 verify-local-self-target).
+  //   새 라우트를 만들지 않고 이미 있는 판정 함수(자기점검꺼짐, hardeningscan.ts)를 그대로 싣는다.
   app.get("/api/hardening/targets", authMiddleware, (_req, res) => {
-    res.json({ targets: listTargets().map(publicTarget) });
+    res.json({ targets: listTargets().map(publicTarget), selfScanDisabled: 자기점검꺼짐() });
   });
   // ⚠⚠ **admin 전용 + 내부망만**(2026-08-18 조사에서 발견).
   //   예전엔 `authMiddleware`만 있어 **로그인한 아무 계정이 임의 공인 IP를 등록하고 곧바로

@@ -375,7 +375,7 @@ export interface HardeningChecklist { id: "kisa" | "cis"; label: string; count: 
 
 // 원격 SSH 정기점검 — 대상(장비)·스케줄·이력
 export type HardeningAuth = "local" | "key" | "password";
-export interface HardeningTargetPublic { id: string; label: string; host: string; port: number; username: string | null; authMethod: HardeningAuth; hasSecret: boolean }
+export interface HardeningTargetPublic { id: string; label: string; host: string; port: number; username: string | null; authMethod: HardeningAuth; hasSecret: boolean; standard: string }
 export interface HardeningScheduleRow { id: string; targetId: string; targetLabel: string; standard: "kisa" | "cis"; intervalHours: number; enabled: number; lastRunAt: number | null; nextRunAt: number; lastRate: number | null; lastFail: number | null; lastResult: "success" | "fail" | null; lastError: string | null; createdAt: number }
 export interface HardeningRun { id: string; targetId: string; targetLabel: string; standard: string; at: number; rate: number; pass: number; fail: number; warn: number; na: number; source: string; summary: string | null }
 export interface NewTarget { label: string; host: string; port?: number; username?: string; authMethod: HardeningAuth; secret?: string }
@@ -385,7 +385,10 @@ export const hardeningApi = {
   scan: (standard: "kisa" | "cis", target?: string) =>
     request<{ report: HardeningReport; markdown: string; summary: string }>("/api/hardening/scan", { method: "POST", body: { standard, target } }),
   // 대상(장비)
-  listTargets: () => request<{ targets: HardeningTargetPublic[] }>("/api/hardening/targets"),
+  // selfScanDisabled — 이 설치본이 자기점검을 껐는지(GIJO_NO_SELF_SCAN=1). 화면이 목록을
+  // 불러오는 시점에 「이 서버 자신」 칩을 미리 잠그기 위해 쓴다(등록 눌러 409를 보고서야
+  // 아는 것이 아니라 — 2026-09-13 시안 verify-local-self-target).
+  listTargets: () => request<{ targets: HardeningTargetPublic[]; selfScanDisabled: boolean }>("/api/hardening/targets"),
   createTarget: (t: NewTarget) => request<{ target: HardeningTargetPublic }>("/api/hardening/targets", { method: "POST", body: t }),
   deleteTarget: (id: string) => request<{ ok: boolean }>(`/api/hardening/targets/${id}`, { method: "DELETE" }),
   probeTarget: (id: string) => request<{ ok: boolean; detail: string }>(`/api/hardening/targets/${id}/probe`, { method: "POST", body: {} }),

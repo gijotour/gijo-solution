@@ -12,6 +12,8 @@
 //   (자기점검막힌대상인가)으로 묶어 등록 자체를 막고, 수동은 409, 스케줄은 건너뛴다.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
+import fs from "node:fs";
+import path from "node:path";
 
 // ⚠⚠ **기본 갈래(env 없음)는 진짜 점검 명령을 시험 기계에서 돌리고 있었다** — 2026-09-11 검토관 적발.
 //   runHardeningScanTool·POST /api/hardening/scan은 러너를 못 받는 창구라, 막히지 않으면
@@ -158,6 +160,16 @@ describe("켜짐 — self는 막히고 remote는 그대로 돈다", () => {
     expect(res.status).toBe(409);
     expect(res.body.error).toBe(자기점검차단안내);
   });
+
+  // ★ 2026-09-13 — 화면(hardening.html)이 「이 서버 자신」 칩을 **미리** 잠그려면 목록을
+  //   불러오는 시점에 이 값을 알아야 한다(등록 버튼을 눌러 409를 받고서야 아는 것이 아니라).
+  it("GET /api/hardening/targets — selfScanDisabled:true를 준다", async () => {
+    const app = createApp();
+    const token = await login(app);
+    const res = await request(app).get("/api/hardening/targets").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.selfScanDisabled).toBe(true);
+  });
 });
 
 describe("기본(env 없음) — 종전대로 self 점검이 돈다(라이트 전제 보호, 반대 방향 못 박기)", () => {
@@ -183,5 +195,34 @@ describe("기본(env 없음) — 종전대로 self 점검이 돈다(라이트 �
       .set("Authorization", `Bearer ${token}`)
       .send({ standard: "kisa" });
     expect(res.status).not.toBe(409);
+  });
+
+  // 반대 방향도 못 박는다 — 라이트(자기 PC 점검이 제품 자체)는 이 칸이 false여야 칩이 안 잠긴다.
+  it("GET /api/hardening/targets — selfScanDisabled:false를 준다", async () => {
+    const app = createApp();
+    const token = await login(app);
+    const res = await request(app).get("/api/hardening/targets").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.selfScanDisabled).toBe(false);
+  });
+});
+
+// ★ 2026-09-13 시안 verify-local-self-target — 「이 서버 자신」을 인증 방식이 아니라 대상
+//   종류로 끌어올렸다. 화면이 하드코딩한 차단 안내가 서버 상수와 글자까지 같은지, 대상
+//   종류가 rAuth select 안에 되살아나지 않았는지를 소스로 못 박는다.
+describe("화면(hardening.html) — 대상 종류 칩이 서버 판정을 그대로 옮긴다", () => {
+  const HARDENING_HTML = fs.readFileSync(
+    path.join(__dirname, "../../client/src/renderer/pages/hardening.html"),
+    "utf8"
+  );
+
+  it("차단 안내 문구가 hardeningscan.ts의 로컬대상차단안내와 글자까지 같다", () => {
+    expect(HARDENING_HTML.includes(로컬대상차단안내), "화면 문구를 손으로 베끼면 서버 문구가 바뀔 때 어긋난다").toBe(true);
+  });
+
+  it('rAuth select에 value="local"이 없다 — 대상 종류가 두 곳(인증 방식+대상 종류)이 되면 안 된다', () => {
+    const rAuthBlock = HARDENING_HTML.match(/<select class="g-input" id="rAuth">[\s\S]*?<\/select>/);
+    expect(rAuthBlock, "rAuth select를 못 찾았다 — 화면 구조가 바뀌었다").not.toBeNull();
+    expect(rAuthBlock![0]).not.toContain('value="local"');
   });
 });
