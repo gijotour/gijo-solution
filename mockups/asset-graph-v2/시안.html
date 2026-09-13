@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>시안 — 자산 지형도 2단계: 「자산을 누르면 보안 서비스」</title>
+<style>
+/* ════════════════════════════════════════════════════════════════════════
+   색 토큰 — client/src/renderer/pages/inventory.html:8-12 그대로 복사(글자 그대로).
+   글꼴 — "Pretendard","Malgun Gothic","Segoe UI",sans-serif (제품 규칙).
+   ⚠ 이 파일은 브라우저에서 단독으로 열립니다 — Pretendard가 시스템에 없으면 대체 글꼴로
+     렌더되어, 실측 px(설치본 5.94.0)와 이 문서 안 렌더 px가 **미세하게 다를 수 있습니다**.
+     그래서 이 시안의 「지금 N px」는 전부 §1의 설치본 실측표를 근거로 적었고, 이 문서 자체가
+     스스로 잰 값을 근거로 쓰지 않습니다(2026-09-06 규칙 — 31px→35px 사고 재발 방지).
+   ════════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);
+     font-size:13px;line-height:1.7;padding:22px 26px 90px;}
+h1{font-size:19px;font-weight:800;letter-spacing:-.3px;margin-bottom:4px;}
+h2{font-size:14.5px;font-weight:800;color:#fff;margin:30px 0 10px;padding-top:16px;border-top:1px solid var(--border);}
+h3{font-size:12.75px;font-weight:800;color:var(--text);margin:14px 0 6px;}
+p{margin:0 0 8px;color:var(--muted);}
+b,strong{color:#fff;font-weight:800;}
+code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11.5px;color:var(--blue-light);font-family:Consolas,monospace;}
+ul,ol{margin:4px 0 10px 18px;color:var(--muted);}
+li{margin:3px 0;}
+a{color:var(--blue-light);}
+.lede{color:var(--muted-2);font-size:12.5px;margin-bottom:16px;}
+.tag{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:1px 7px;margin-right:5px;vertical-align:2px;}
+.tag.plan{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.tag.new{background:rgba(30,185,128,.14);color:var(--teal);}
+.tag.warn{background:rgba(240,160,32,.14);color:var(--amber);}
+.box{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin:10px 0;color:var(--muted);font-size:12.5px;}
+.box.warn{border-left:3px solid var(--amber);}
+.box.ok{border-left:3px solid var(--teal);}
+.box.bad{border-left:3px solid var(--red);}
+table.t{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:12px;display:block;overflow-x:auto;}
+table.t th,table.t td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top;}
+table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-space:nowrap;}
+.num{font-variant-numeric:tabular-nums;}
+.o{color:var(--teal)!important;font-weight:700;}
+.x{color:var(--red)!important;font-weight:700;}
+.warnc{color:var(--amber)!important;font-weight:700;}
+.file{font-family:Consolas,monospace;font-size:11.5px;color:var(--blue-light);}
+.foot{margin-top:10px;font-size:11.5px;color:var(--muted-2);}
+.cite{font-size:11.5px;color:var(--muted-2);}
+.cite b{color:var(--text);font-weight:700;}
+
+/* ════════════════════════════════════════════════════════════════════════
+   ⬇ 아래부터 client/src/renderer/pages/inventory.html:189-242 「🗺 지도 탭」 CSS 기반.
+   ⚠ 검토관 [하] 수리 — "글자 그대로 복사"는 거짓이었다. 실제로 이 시안이 새로 더한 줄 2개가
+   있다(원본 inventory.html:190,197엔 없음): ① 아래 .mv-chips의 flex-wrap:wrap(칩이 늘어도
+   안 넘치게) ② .mv-zone h4의 cursor:pointer;user-select:none;display:flex;align-items:center;
+   gap:5px(구획 접기 클릭 UI 때문에 필요). §8②의 "h4 높이 불변" 추정은 이 flex 전환을 전제로
+   한 것이고, 구현 시 재실측이 필요하다는 것을 여기서도 밝힌다.
+   ════════════════════════════════════════════════════════════════════════ */
+.mv-chips{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:12px;flex-wrap:wrap;/* +신규(원본엔 없음) */}
+.mv-chip{border:1px solid var(--border);border-radius:12px;padding:3px 11px;color:var(--muted);cursor:pointer;}
+.mv-chip.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:var(--blue-light);}
+.mv-legend{margin-left:auto;color:var(--muted-2);font-size:11px;}
+.mv-stage{display:flex;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel);min-height:420px;}
+.mv-map{flex:1;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;position:relative;}
+.mv-zone{border:1px solid var(--border);border-radius:8px;padding:6px 8px 8px;background:rgba(255,255,255,0.02);}
+.mv-zone h4{margin:0 0 6px;font-size:11.5px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px;/* cursor~gap: +신규(원본엔 없음) — 구획 접기 클릭 UI */}
+.mv-zone h4 b{color:var(--text);}
+.mv-tiles{display:flex;flex-wrap:wrap;gap:5px;}
+.mv-tile{border-radius:5px;padding:4px 8px;font-size:11.5px;cursor:pointer;border:1px solid transparent;
+         display:flex;flex-direction:column;justify-content:space-between;min-width:72px;position:relative;}
+.mv-tile:hover{border-color:rgba(255,255,255,0.35);}
+.mv-tile.mv-sel{border-color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,0.55);}
+.mv-nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
+.mv-ct{font-size:11px;opacity:.85;}
+.mv-kev{position:absolute;top:-6px;right:-6px;background:#e5484d;color:#fff;border-radius:8px;font-size:11px;padding:1px 5px;font-weight:800;}
+.mv-high{background:rgba(229,72,77,.30);color:#ffd7d8;}
+.mv-mid{background:rgba(240,160,32,.26);color:#ffe9c4;}
+.mv-low{background:rgba(70,167,88,.22);color:#d2f2da;}
+.mv-ai{outline:1px dashed rgba(139,124,240,.55);}
+.mv-overlay{position:absolute;inset:0;pointer-events:none;z-index:5;}
+.mv-edge{fill:none;stroke-width:2;opacity:.9;}
+.mv-edge-entry{stroke:#f5928a;}
+.mv-edge-lateral{stroke:#8fb8ff;}
+.mv-tile.mv-foothold{box-shadow:0 0 0 2px rgba(245,146,138,.8);}
+.mv-path-toggle.on{background:rgba(245,146,138,.18);border-color:#f5928a;color:#ffd7d8;}
+.mv-side{width:320px;border-left:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;}
+.mv-side h3{margin:0;font-size:13.5px;}
+.mv-rk{font-size:11.5px;padding:2px 8px;border-radius:4px;display:inline-block;margin-right:6px;}
+.mv-row{border-bottom:1px solid var(--border);padding:6px 0;}
+.mv-lbl{color:var(--muted);font-size:11px;}
+.mv-item{margin-bottom:5px;}
+.mv-item:last-child{margin-bottom:0;}
+.mv-plain{font-size:12.5px;line-height:1.6;color:var(--muted);margin:4px 0 0;}
+.mv-plain b{color:var(--text);font-weight:700;}
+.mv-ask{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.5);color:#8fb8ff;border-radius:6px;
+        padding:7px 10px;cursor:pointer;font-size:12px;text-align:left;font-family:inherit;white-space:normal;word-break:keep-all;}
+.mv-ask:hover{background:rgba(59,130,246,.26);}
+.mv-hint{color:var(--muted-2);font-size:11px;margin-top:auto;}
+@media (max-width: 720px){
+  .mv-stage{flex-direction:column;min-height:0;}
+  .mv-side{width:auto;border-left:0;border-top:1px solid var(--border);}
+  .mv-chips{flex-wrap:wrap;row-gap:4px;}
+  .mv-legend{margin-left:0;flex-basis:100%;}
+}
+.gapbox{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:12px;padding:16px 18px;margin-bottom:12px;}
+
+/* ════════════════════════════════════════════════════════════════════════
+   ⬇ 여기부터 신규(2단계 시안) — 기존 클래스는 손대지 않고 **더하기만** 한다.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* 보안장비 타일 — "다른 모양"(방패). clip-path로 오각형(방패) 실루엣을 내되,
+   글자는 안전 영역(padding)에만 둬 잘림을 막는다. 절대배치 배지는 안 쓴다
+   (clip-path가 박스 밖으로 나가는 자손도 함께 잘라내는 렌더가 있어 안전하게 인라인으로만 표기). */
+.mv-shield{
+  clip-path:polygon(10% 0%, 90% 0%, 100% 32%, 100% 74%, 50% 100%, 0% 74%, 0% 32%);
+  padding:9px 11px 15px;min-width:96px;max-width:150px;
+  border:2px solid var(--teal);background:rgba(30,185,128,.10);color:#d2f2da;
+  display:flex;flex-direction:column;gap:2px;cursor:pointer;font-size:11px;position:relative;
+}
+.mv-shield:hover{background:rgba(30,185,128,.20);}
+.mv-shield.mv-sel{box-shadow:0 0 0 1px #fff inset;}
+.mv-shield.mv-hard{border-color:var(--blue);background:rgba(59,130,246,.10);color:#cfe1ff;}
+.mv-shield.mv-hard:hover{background:rgba(59,130,246,.20);}
+.mv-shield .mv-snm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:126px;}
+.mv-shield .mv-sct{font-size:11px;opacity:.9;}
+.mv-shield .mv-sreg{font-size:11px;font-weight:800;opacity:.95;}
+/* ⚠ 검토관 [상] 수리 — 위 두 줄 10.25px/10px는 server/test/uireadability.test.ts:70-73(11px 미만 전수 실패)
+   위반이었다. 11px로 올림 — clip-path 방패 폭(96~150px)에서 글자가 더 빡빡해질 수 있어 §7 given_up에
+   이미 적힌 "방패 타일 각도·여백 육안 조정 필요"에 이 재조정도 포함시킨다. */
+
+/* 구획 접기 — 3개 넘으면 급한 것 하나만 펴고 나머지는 접는다(조사 근거 [3][1]) */
+.mv-zone.folded .mv-tiles{display:none;}
+.mv-zone .fold-ic{font-size:11px;color:var(--muted-2);}
+.mv-zone .fold-cnt{margin-left:auto;font-size:11px;color:var(--muted-2);font-weight:600;}
+
+/* 미연결 보안장비 구획 — 커버리지 탭의 결손 상자와 같은 시각 언어(gapbox, 왼쪽 호박색 띠) 재사용 */
+.mv-zone.mv-zone-gap{border-left:3px solid var(--amber);}
+.mv-zone.mv-zone-gap h4{color:#ffe9c4;}
+
+/* 등록/추정 간선 라벨 배지(SVG 위에 얹는 HTML 배지 — SVG text보다 한글 렌더가 안정적) */
+.mv-edgelabel{position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:800;
+  padding:1px 6px;border-radius:9px;pointer-events:none;white-space:nowrap;z-index:6;}
+.mv-edgelabel.reg{background:rgba(30,185,128,.85);color:#06281c;}
+.mv-edgelabel.est{background:rgba(240,160,32,.85);color:#2a1c00;}
+.mv-edge-reg{stroke:var(--teal);stroke-width:2;}
+.mv-edge-est{stroke:var(--amber);stroke-width:2;stroke-dasharray:5 4;}
+.mv-edge-entry-est{stroke:#f5928a;stroke-dasharray:5 4;}
+.mv-edge-lateral-est{stroke:#8fb8ff;stroke-dasharray:5 4;}
+
+/* 보호 관계 — 못 그리는 것의 빈 자리(ATT&CK Navigator 규칙: 모르는 것은 칠하지 않는다[6]) */
+.mv-noedge{font-size:11px;color:var(--muted-2);border:1px dashed var(--border-strong);border-radius:6px;
+  padding:2px 6px;display:inline-block;margin-top:2px;}
+
+/* 군집 타일(노드 과다 시) */
+.mv-cluster{border:1px dashed var(--border-strong);border-radius:5px;padding:4px 9px;font-size:11px;
+  color:var(--muted);cursor:pointer;min-width:96px;display:flex;flex-direction:column;justify-content:center;}
+.mv-cluster:hover{border-color:var(--blue);color:var(--text);}
+.mv-cluster b{color:var(--text);}
+
+/* 상세판 — 연결 자산/보안장비 미니 목록, 선택 로그 */
+.mv-sub{font-size:11.75px;color:var(--muted);margin:2px 0;}
+.mv-sub b{color:var(--text);}
+.mv-selectlog{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;
+  font-size:11px;color:var(--muted-2);font-family:Consolas,monospace;white-space:pre-wrap;max-height:120px;overflow:auto;}
+/* ⚠ 검토관 [중] 수리 — .mv-asknote(구 10.75px, 화면 안 사용법·검토자용 해설 문장)는 통째로 뺐다.
+   그 문장은 screenguide panels["지도"] 초안(§10)으로 옮겼다 — 화면엔 정체성·경고만 둔다는 원칙 때문. */
+.chiprow{display:flex;flex-direction:column;gap:6px;}
+.chiptag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:9px;margin-left:6px;vertical-align:1px;}
+.chiptag.appr{background:rgba(240,160,32,.22);color:#ffe9c4;}
+.chiptag.maybe{background:rgba(240,160,32,.08);color:#ffe9c4;border:1px dashed rgba(240,160,32,.55);}
+.chiptag.noappr{background:rgba(255,255,255,.08);color:var(--muted);}
+
+.ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 10px;}
+.btn{font-size:12px;font-weight:700;color:var(--text);background:var(--panel);border:1px solid var(--border-strong);
+     border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}
+.btn:hover{border-color:var(--blue);color:#fff;}
+.btn.on{background:rgba(59,130,246,.18);border-color:var(--blue);color:#fff;}
+.hint{font-size:11.5px;color:var(--muted-2);}
+</style>
+</head>
+<body>
+
+<h1>시안 — 자산 지형도 2단계: 「자산을 누르면 보안 서비스」</h1>
+<p class="lede">
+  <span class="tag plan">전-7 (보여 주기 · 관제)</span>
+  <span class="tag new">추천안 1개</span>
+  <span class="tag warn">제품 코드 미수정 · 승인 후 구현</span><br>
+  1단계 지도(대역·타일·색)에 <b>보안장비(방패 타일)</b>를 얹고, 클릭 한 번에 <b>간선의 확신도(확정/등록/추정)</b>를 정직하게 밝힌다.
+  새 메뉴·새 화면 없음 — <span class="file">inventory.html</span> 🗺 지도 탭에서 커진다. <b>범위는 이 화면 하나가 아니다</b> —
+  같은 렌더 부품(<code>map-view.js</code>)을 <span class="file">vulnscan.html</span>의 「히트맵 보기」도 그대로 쓰므로 <b>두 화면 모두</b>가
+  이번 변경의 영향범위다(§11 영향범위 참조, 검토관 [상] 적발로 명시).
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>0. 조사 근거 — 무엇을 따랐고 왜(각주)</h2>
+<p>업계 그래프 화면(MS Exposure Map · Axonius · runZero · BloodHound · MITRE ATT&amp;CK Navigator · Attack Flow) 조사에서 이 시안에 실제로 반영한 것만 추린다.</p>
+<table class="t">
+  <tr><th>번호</th><th>패턴</th><th>이 시안 반영</th></tr>
+  <tr><td>[1]</td><td><b>진입점은 항상 고른 노드 하나부터.</b> 그래프를 새 메뉴로 만들지 말고 자산/취약점 <b>행에서 열기</b>.</td><td>새 메뉴 0개 — 기존 🗺 지도 탭 그대로. 자산 목록·취약점 화면 <b>둘 다 지금 이미 이 탭이 있고</b>, 같은 코드를 공유해 자동으로 함께 커진다(§11 영향범위). 다른 화면에서 그래프로 <b>새로 진입</b>하는 것은 §7에서 다음 단계로 미룬다</td></tr>
+  <tr><td>[3][1]</td><td><b>기본은 접힘, `+`로만 펼침.</b> 묶음 노드는 접어 두고 필요한 것만 편다(runZero: 개수만 보이다 더블클릭).</td><td>§4 「구획 3개 초과면 급한 것 하나만 편다」 — 실측(40자산→화살표 125개, 못 읽음)이 정확히 이 처방을 요구</td></tr>
+  <tr><td>[2]</td><td><b>관계 종류를 골라서 편다.</b> "이웃 전부"가 아니라 종류별 온/오프.</td><td>기존 🎯 공격경로 칩(온/오프)을 그대로 쓰고, <b>새 종류(등록·보호)를 추가하지 않는다</b> — §6에서 이유</td></tr>
+  <tr><td>[4]</td><td><b>간선에 이름을 붙인다</b> + <b>화살표 방향=공격/권한의 방향</b>.</td><td>등록·추정 간선에 라벨을 얹는다(§3). 진입→거점→인접 방향은 기존 그대로 보존</td></tr>
+  <tr><td>[5]</td><td><b>확신도를 숫자 대신 말로.</b> Attack Flow: 추정·가능성 높음·관측 확인.</td><td>서버 <code>reachability</code>(확인됨/높음/보통)가 <b>이미 이 어휘</b>다 — 새 말을 안 짓고 그대로 간선에 내린다(§3)</td></tr>
+  <tr><td>[6][7]</td><td><b>모르는 것은 칠하지 않는다.</b> 색 없음 + 「자료 없음」 글자. 색만으로 뜻을 나르지 않는다.</td><td>「보호 관계」는 회색 선을 긋지 <b>않고</b> 점선 테두리의 빈 자리 문구로 둔다(§3). 확정/등록/추정은 색+점선유무 이중 표기</td></tr>
+  <tr><td>[8]</td><td><b>병목(choke point)을 한 노드로 가리킨다.</b></td><td>기존 <code>analysishub.ts:776-778</code> "거점을 막으면 끊어집니다" 문장을 그대로 재사용 — 그래프가 새로 판단하지 않는다</td></tr>
+  <tr><td>[9][2]</td><td><b>노드 클릭 → 옆 판 → 조치는 대화창.</b></td><td>기존 <code>.mv-ask</code>+<code>askConsole</code> 패턴을 그대로 확장 — 자산 칩 2→최대 6개(§2 ①②④⑤⑥⑦, route-explain 실측), 방패 칩 0→1개씩(③ 하드닝 대상 · ⑧ 보안제품). 새 상호작용 문법을 안 만든다</td></tr>
+</table>
+<p class="cite">[1] <a href="https://learn.microsoft.com/en-us/security-exposure-management/enterprise-exposure-map" target="_blank">MS Enterprise Exposure Map</a> · [2] <a href="https://docs.axonius.com/docs/exploring-connections-and-asset-relationships" target="_blank">Axonius Exploring Connections</a> · [3] <a href="https://help.runzero.com/docs/switch-topology-report/" target="_blank">runZero Switch Topology</a> · [4] <a href="https://bloodhound.specterops.io/resources/edges/overview" target="_blank">BloodHound Edges</a> · [5] <a href="https://center-for-threat-informed-defense.github.io/attack-flow/language/" target="_blank">Attack Flow Language</a> · [6] <a href="https://github.com/mitre-attack/attack-navigator/blob/master/layers/spec/v4.5/layerformat.md" target="_blank">ATT&amp;CK Navigator Layer Format</a> · [7] <a href="https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html" target="_blank">WCAG 2.2 Use of Color</a> · [8] <a href="https://learn.microsoft.com/en-us/security-exposure-management/work-attack-paths-overview" target="_blank">MS Work with Attack Paths</a> · [9] <a href="https://docs.axonius.com/docs/asset-profile-page" target="_blank">Axonius Asset Profile Page</a></p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>1. 지금 화면 실측 — 설치본 5.94.0 (CDP 9227)</h2>
+<div class="box ok">
+  실측 방법: 사람이 쓰는 GIJO AS 프로세스 <b>없음을 두 번 확인</b> 후 <span class="file">client/release/win-unpacked</span>을
+  별도 <code>--user-data-dir</code>+<code>--remote-debugging-port=9227</code>로 띄우고, <code>claude-deploy</code>로 로그인해
+  <code>inventory.html?full=1</code> → 🗺 지도 탭 → 타일 클릭까지 실제로 수행해 <code>getBoundingClientRect</code>로 쟀다.
+  종료 시 세션을 <code>logout()</code>으로 반납한 뒤 자기 프로세스만 종료했고, 운영 데이터는 읽기만 했다(등록·수정·삭제 없음).
+</div>
+<table class="t">
+  <tr><th>항목</th><th>값</th><th>근거</th></tr>
+  <tr><td>자산 45건 · 구획 4개</td><td class="num">45 / 4</td><td>목록 탭 배지=지도 타일 수 일치</td></tr>
+  <tr><td>구획 머리(h4) 렌더 높이</td><td class="num">19.6px</td><td>map-view.js:97-98</td></tr>
+  <tr><td>가장 큰 구획 상자(40자산) 크기</td><td class="num">498.4×657.4px</td><td>실제 대역 구획 1개</td></tr>
+  <tr><td>타일 1개(진짜취약 다수) 크기</td><td class="num">302×79.7px</td><td>flexBasis 70+√n·7, minHeight 30+√n·1.5</td></tr>
+  <tr><td>상세판(.mv-side) 전체 폭·높이</td><td class="num">320 × 974.3px</td><td>부모 .mv-stage stretch — 클릭 전후 안 바뀜</td></tr>
+  <tr><td>상세판 h3(자산명)</td><td class="num">width 291.2 · height 23.0px</td><td>map-view.js:144</td></tr>
+  <tr><td><b>칩(.mv-ask) — 지금 2개</b></td><td class="num"><b>각 33px · 합 66px</b></td><td><b>이 시안 밀도표(§7)의 기준값</b> — map-view.js:154,156</td></tr>
+  <tr><td>좁히기 칩 줄(.mv-chip×5)</td><td class="num">높이 28px</td><td>inventory.html:190-193, 429-436</td></tr>
+  <tr><td>공격경로 겹층 — 기본 상태</td><td class="num">0개 그려짐(꺼짐 상태 아님, 경로 자체가 없던 순간)</td><td>실측 당시 데이터 상태 — 아래 §5 데모는 경로 있는 상태를 <b>구성 데이터</b>로 재현</td></tr>
+</table>
+<p class="hint">⚠ 이 표 아래 §5 라이브 데모는 <b>가상 데이터</b>다 — 위 실측 px 값을 CSS로 그대로 재사용하되, 이 문서 자체가 렌더한 px를 새 증거로 쓰지 않는다(머리말 폰트 대체 경고 참조).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>2. 칩 8종 — route-explain 실측으로 확정(⑨는 전부 버림, 새 예외표 줄 0개)</h2>
+<div class="box bad">
+  <b>검토관 [상] 적발 — 이전 판은 4줄 중 3줄이 거짓이었다.</b> "담당부서 지정"·"SBOM 생성" 칩을 각각 "자산 정보 수정"·"AI-BOM 생성"이라 적고 결재판 "있음"으로 단정했지만,
+  오늘 실측(<code>node tools/route-explain.mjs --no-build</code>, dist 16:04 &gt; src 00:31 — 낡지 않음)은 셋 다 <b>⑨(모델이 도구를 고름 — 결재판이 뜬다는 보장이 없다)</b>였다.
+  <span class="file">screenguide.ts</span>의 <code>can:</code> 문장은 <b>제품이 한 약속</b>이지 도착 실측이 아니다(게다가 <code>\"</code> 이스케이프라 guidance-check 수확 정규식에 안 걸려 어느 관문도 재 본 적이 없다).
+  이번 판은 약속이 아니라 <b>route-explain 실측만</b> 썼다.
+</div>
+<p>
+  아래 8개 후보 문장을 <code>route-explain --no-build</code>로 <b>전부 두 번씩</b> 쟀다 — 자리 1개짜리 ○○ 치환 열쇠(<code>guidance-check.mjs:71-72</code>) 그대로인
+  "GIJO AS 서버"와, 실제 이름꼴 "sample-web01" 둘 다. <b>여덟 문장 모두 두 치환에서 같은 도착</b>이 나왔고, <b>⑨로 떨어진 것은 하나도 없었다</b> —
+  그래서 8개 전부 채택했다(예외표 상한 44 소진과 무관하게 전부 <b>기대도착</b> 자리다). 노드 종류에 따라 붙는 위치는 다르다(③⑧은 자산이 아니라 방패 노드 전용).
+</p>
+<table class="t">
+  <tr><th>#</th><th>문장(치환 전 → 치환 후)</th><th>붙는 노드</th><th>route-explain 실측 도착(글자 그대로)</th><th>결재판</th></tr>
+  <tr><td>①</td><td>"GIJO AS 서버 취약점만 보여줘" → "sample-web01 취약점만 보여줘"</td><td>자산</td><td class="file">[14] 특수경로 → findingListAnswer(목록+체크칸)</td><td class="x">없음(읽기)</td></tr>
+  <tr><td>②<br><span class="hint">기존·문구 불변</span></td><td>"GIJO AS 서버 취약점 담당자 배정해줘"</td><td>자산<br><span class="hint">(미조치 있고 담당 없을 때만)</span></td><td class="file">⑨ 모델 선택 — <span class="file">guidance-destination.test.ts:185</span>(예외표 기존 줄 재사용, 새 줄 아님)</td><td class="warnc">승인 창이 뜰 수 있습니다</td></tr>
+  <tr><td>③</td><td>"GIJO AS 서버 하드닝 점검 돌려줘" → "sample-web01 하드닝 점검 돌려줘"</td><td>보안장비<br>(하드닝 대상)<b>만</b></td><td class="file">[37] 강제도구 → run_hardening_scan(self, write:false) — 장비명이 <b>등록된 점검 대상과 실제로 맞을 때만</b> scan_hardening_target(write:true·admin 결재판)로 갈아탐(agentloop.ts 주석 "2026-09-12 안C")</td><td class="warnc">승인 창이 뜰 수 있습니다<br><span class="hint">(데이터 의존)</span></td></tr>
+  <tr><td>④</td><td>"GIJO AS 서버 재스캔 상태 알려줘" → "sample-web01 재스캔 상태 알려줘"</td><td>자산</td><td class="file">[37] 강제도구 → scan_status(write:false, registry.ts:1652)</td><td class="x">없음(읽기)</td></tr>
+  <tr><td>⑤</td><td>"GIJO AS 서버 공격 경로 보여줘" → "sample-web01 공격 경로 보여줘"</td><td>자산</td><td class="file">[25] 특수경로 → formatAttackPaths(analysishub.ts:760, <b>무인자·상위 6건</b> — 자산 이름은 무시된다)</td><td class="x">없음(읽기)</td></tr>
+  <tr><td>⑥</td><td>"GIJO AS 서버 조치 요청서 만들어줘" → "sample-web01 조치 요청서 만들어줘"</td><td>자산</td><td class="file">[37] 강제도구 → create_request_doc(write:true, registry.ts:2079)</td><td class="o">있음<br><span class="hint">(실측 근거: write:true)</span></td></tr>
+  <tr><td>⑦</td><td>"GIJO AS 서버 취약점 리포트 만들어줘" → "sample-web01 취약점 리포트 만들어줘"</td><td>자산</td><td class="file">[36] 특수경로 → generateReport(dispatcher.ts:2015-2024, <b>자산 이름이 assetIds로 실제 반영됨</b> — 승인 절차 없이 즉시 파일 생성)</td><td class="x">없음(승인 없이 즉시 생성)</td></tr>
+  <tr><td>⑧</td><td>"GIJO AS 서버 점검 일정 알려줘" → "sample-web01 점검 일정 알려줘"</td><td>보안제품<b>만</b></td><td class="file">[37] 강제도구 → maintenance_status(write:false, registry.ts:1145)</td><td class="x">없음(읽기)</td></tr>
+</table>
+<div class="box warn">
+  <b>뺀 것 — 실측 근거.</b> "○○ 자산 담당부서를 보안팀으로 지정해줘"·"○○ 자산 SBOM 생성해줘"는 오늘 실측에서 <b>⑨</b>로 떨어졌다 —
+  <span class="file">guidance-destination.test.ts:175,178,193</span>이 같은 자리를 이미 예외표(⑨)로 적어 두었다. 새 예외표 줄을 만들면
+  상한 44줄(<span class="file">guidance-destination.test.ts:437</span> — 오늘 <b>실제로 44/44, 빈자리 0</b>)을 넘어 게시 관문이 즉시 빨강이 된다.
+  그래서 이 두 문장은 <b>화면에서 뺐다</b>(제거, 대체 문구 없음 — 담당부서·SBOM은 다른 화면의 기존 문장으로 하게 둔다).
+</div>
+<p class="hint">
+  ⚠ ①행은 이전 판까지 화면에 있던 "○○ 자산 취약점 알려줘"(→ <code>search</code>, RAG 문서 검색)를 대체한다 — 옛 문장은 뜻(취약점 목록을 보고 싶다)과
+  실제 도착(문서 검색)이 어긋났다(<code>search</code>는 메뉴를 가로지르는 RAG 문서 검색이지 목록이 아니다). 새 문장 "취약점만 보여줘"가 [14] 목록 고르기로
+  정확히 떨어져 그것으로 바꿨다.
+</p>
+<div class="box">
+  <b>구현 시 할 일(이 시안은 테스트 파일을 건드리지 않는다).</b> 새 문장 6개(①③④⑤⑥⑦ — ②는 기존 줄 재사용이라 제외)는
+  <span class="file">tools/guidance-check.mjs</span>가 화면에서 그대로 수확한다(:37-43, .html/.js 전수) — 구현 커밋에서
+  <span class="file">server/test/guidance-destination.test.ts</span>의 <b>기대도착</b> 표(예외표가 아니라 이쪽 — 상한 44와 무관)에 6줄을
+  추가해야 게시 관문(:577)이 통과한다.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>3. 간선 3종 표시 규약</h2>
+<table class="t">
+  <tr><th>등급</th><th>표시</th><th>이번에 그리는 것</th><th>원천</th></tr>
+  <tr><td class="o">확정</td><td>실선(배지 없음)</td><td>공격경로 — <code>reachability==="확인됨"</code>(실제 공격 로그 관측)</td><td class="file">analysishub.ts:717,722</td></tr>
+  <tr><td class="o">등록</td><td>실선 + 「등록」 배지 — <b>방패가 보이면 항상</b>(🎯 공격경로 온/오프와 무관)</td><td>① 보안제품↔자산 (assetId 있음) ② 하드닝 대상 노드 자체의 「등록됨」 표기</td><td class="file">securityproducts.ts:66 / hardeningtargets.ts:89-92</td></tr>
+  <tr><td class="warnc">추정</td><td>점선 + 「추정·N」 배지</td><td>공격경로 — <code>reachability==="높음"|"보통"</code>(점수 기반, 관측 아님)</td><td class="file">analysishub.ts:722</td></tr>
+  <tr><td class="x">못 그림</td><td>점선 테두리 빈 자리 문구</td><td><b>보호 관계</b> — "이 방화벽이 어느 자산들을 지키나" · "이 하드닝 대상이 어느 자산인가"</td><td>등록 칸 없음 — <span class="file">securityproducts.ts</span>에 assetId는 <b>1개 자산 연결</b>뿐, 보호 범위 필드 없음. <span class="file">hardeningtargets.ts</span>는 assetId 필드 자체가 없음(publicTarget: id·label·host·port·username·authMethod·hasSecret·standard)</td></tr>
+</table>
+<div class="box bad">
+  <b>왜 하드닝→특정 자산 선을 안 긋나(포기 아니라 판단).</b> 하드닝 대상은 <code>host</code>(IP)만 있고 <code>assetId</code>가 없다.
+  이름·IP <b>부분 일치</b>로 자산을 찾는 함수(<span class="file">map-view.js:166-174 자산타일찾기</span>)가 이미 있지만, 그건 <b>서버가 이미 확정한 공격경로</b>를
+  화면에 <i>얹기만</i> 하는 용도로 승인된 것이다(경로 데이터 자체가 관측 신호 기반). 그 함수를 새로 끌어와 "이 하드닝 대상=이 자산이다"라고
+  <b>화면이 스스로 판단</b>하면, 그래프가 사람 대신 결론을 내리는 것이 되어 [6]의 "모르는 것은 칠하지 않는다"에 정면으로 어긋난다.
+  그래서 하드닝 방패는 <b>대역(자기 host의 IP 대역)에 놓기만</b> 하고, 특정 자산으로의 선은 긋지 않는다.
+</div>
+<div class="box warn">
+  <b>검토관 [중] 적발 2건 — 코드가 약속과 어긋나 있었다, 지금은 고쳤다.</b><br>
+  ① <b>등록 간선이 🎯 공격경로를 끄면 함께 사라졌다.</b> 위 표는 "방패가 보이면 항상"이라 적어 놓고, 실제 데모 코드는 등록 간선 그리기를
+  <code>drawPaths()</code> 안에 넣어 두어 <code>pathsOn===false</code>일 때 <b>한 번도 안 그려졌다</b>(초기 상태 포함). §4 데모를 <code>drawOverlay()</code>로
+  재구성해 등록 간선·배지는 <code>mode==="all"</code>(방패가 보이는 조건)이면 <b>공격경로 토글과 무관하게 항상</b> 그리고, 확정/추정 간선만 <code>pathsOn</code>을
+  따르게 갈랐다 — 범례도 두 조건을 따로 반영한다.<br>
+  ② <b>호스트구획열쇠(하드닝 대상을 IP 대역에 배치)가 자가점검 "새 판정 함수는 군집 임계값 하나뿐"과 어긋났다.</b> 이 함수도 새 판정이다.
+  다만 위 ①의 "하드닝→자산 선"(어느 자산인지 화면이 추측하는 것)과는 <b>다른 층</b>이다 — 여기서 쓰는 값(<code>hardeningtargets.ts</code>의
+  <code>host</code>)은 <b>그 하드닝 대상 자신이 등록할 때 이미 확정한 값</b>이고, 화면은 그 값의 앞 3옥텟으로 <b>구획 이름표만</b> 만든다
+  (자산의 <code>구획열쇠()</code>가 <code>ip</code>로 하는 것과 <b>같은 셈법</b>). "이 하드닝 대상=이 자산이다"라고 관계를 추측하는 것이 아니라
+  "이 값은 이 대역에 속한다"는 확정 데이터 그대로의 표시라 [6]과 안 부딪힌다 — §9에서 이 구분을 "렌더 배치 규칙"과 "위험·관계 판정"으로 갈라 적었다.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>4. 라이브 데모 — 자산을 누르면 보안 서비스</h2>
+<p>아래는 <b>전부 가상 데이터</b>다. 실제 자산명·IP를 시안에 옮기지 않으려고 RFC 5737 예시 대역(<code>192.0.2.0/24</code>·<code>198.51.100.0/24</code>·<code>203.0.113.0/24</code>)을 썼다.
+자산 34개·보안제품 7개·하드닝 대상 5개 — 실제 운영 수치(45)와 다르다(의도적).</p>
+<div class="ctl">
+  <button class="btn on" id="btnAll" data-mode="all">전체</button>
+  <button class="btn" id="btnKev" data-mode="kev">🔴 실제 악용만</button>
+  <button class="btn" id="btnHigh" data-mode="high">고위험만</button>
+  <button class="btn" id="btnNobody" data-mode="nobody">담당 없는 곳</button>
+  <button class="btn" id="btnPath">🎯 공격경로</button>
+  <span class="hint">|</span>
+  <button class="btn" id="btnStress">🧪 노드 240개로 채우기(군집 규칙 시연)</button>
+  <button class="btn" id="btnReset" style="display:none">데모 되돌리기</button>
+</div>
+<div class="mv-chips">
+  <span class="mv-legend" id="demoLegend">색=위험 등급 · 타일 크기=미조치 취약점 수 · 구획=네트워크 대역 · 🛡=보안장비(방패)</span>
+</div>
+<div class="mv-stage">
+  <div class="mv-map" id="mapZones"></div>
+  <div class="mv-side" id="mapSide"></div>
+</div>
+<div class="box">
+  <b>selectnotify 전송 로그(시뮬레이션)</b> — 클릭할 때마다 실제 <code>window.gijoSelectNotify</code> 계약(허용 키·60/200자 컷)과 <b>같은 규격</b>으로
+  무엇이 나갈지 그대로 보여준다. 실제로 대화창에 전송하지는 않는다(이 파일은 단독 실행이라 <code>window.top</code>이 없다).
+  <div class="mv-selectlog" id="selectLog">(아직 없음 — 타일을 눌러 보세요)</div>
+</div>
+<div class="box" id="askPreview" style="display:none">
+  <b>💬 대화창 프리필 미리보기(시뮬레이션)</b> — 실제로는 <code>window.gijo.askConsole(text)</code>가 이 문장을 대화창 입력칸에 채웁니다(전송은 사람이 함).
+  <div class="mv-selectlog" id="askPreviewText"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>5. 규모 대응 — 접기·좁히기·군집</h2>
+<table class="t">
+  <tr><th>규칙</th><th>조건</th><th>동작</th><th>근거</th></tr>
+  <tr><td>구획 접기(신규)</td><td>구획이 3개 초과</td><td>미조치 합이 가장 큰 구획 1개만 펴고 나머지는 접는다(머리글 클릭으로 펴짐)</td><td>[3][1] "기본은 접힘" — 오늘 화면(4구획)에서도 즉시 적용되는 <b>행동 변화</b>임을 밝힌다</td></tr>
+  <tr><td>좁히기 칩(기존 4종 유지)</td><td>항상</td><td>전체/🔴실제악용만/고위험만/담당없는곳 — 그대로. 활성화 시 <b>방패는 숨긴다</b>(방패는 위험등급이 없어 이 칩들과 결이 다름)</td><td>inventory.html:429-436 그대로</td></tr>
+  <tr><td>군집(신규)</td><td>전체 노드(자산+방패) &gt; 200</td><td>구획 안 타일이 40개 넘으면 위험 큰 순 40개만 개별 타일, 나머지는 "+N개 더(고/중/저)" 군집 타일 1개로 묶는다. 클릭하면 상세판에 전체 스크롤 목록</td><td>오늘(45자산·최대구획40)엔 총노드조건(&gt;200)이 안 걸려 <b>트리거 안 됨</b> — 위 🧪 버튼으로 재현</td></tr>
+</table>
+<div class="box warn">
+  ⚠ <b>구획 안 임계값 40이 오늘 실측 최대 구획(40자산, §1)과 우연히 같다 — 「한 건 차이」다.</b> 총노드 200 조건이 함께 안 걸려 오늘은 안 트리거되지만,
+  같은 구획에 자산이 <b>41번째로 하나만 늘어도</b>(그리고 전체가 200을 넘는 날) 그 구획은 즉시 잘린다. "오늘은 안 바뀐다"가 아니라
+  "오늘 숫자와 경계값이 우연히 같다"는 것을 밝힌다 — 경계값 자체(40 vs 50 등)는 §7에 이미 "구현 때 재확인" 숙제로 적혀 있다.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>6. 왜 이 안인가 — 기각한 3가지</h2>
+<h3 class="x">✗ 그래프 라이브러리 신설(D3·Cytoscape 등)</h3>
+<p>폐쇄망 자체완결 원칙과 정면충돌 — 외부 라이브러리를 동봉하면 라이선스·CVE 추적 대상이 하나 늘고, 지금 지도는 <b>순수 DOM+CSS flex</b>로 이미 잘 돌아간다(map-view.js:16 "폐쇄망 안전 — 외부 라이브러리 없음"). 45개 정도 규모에서 물리 시뮬레이션형 그래프는 <b>과한 기술</b>이고, §5 군집 규칙으로 이미 대응된다.</p>
+<h3 class="x">✗ 전용 화면 신설("자산 그래프.html")</h3>
+<p>[1]의 핵심과 반대 방향이다 — 그래프는 "고른 자산 하나에서 시작"해야 하는데, 새 화면은 다시 "무엇부터 볼까"를 담당자에게 떠넘긴다. 또 제품 원칙("메뉴는 보기용")과 화면 26개 관리 비용이 하나 더 는다. 지금 있는 지도 탭을 키우는 편이 학습 비용 0이다.</p>
+<h3 class="x">✗ 목록에 "보안장비 보기" 버튼 추가</h3>
+<p>목록(표)은 이미 자산 45줄로 꽉 차 있다. 버튼을 누르면 결국 또 다른 목록(보안제품 표)으로 튀는데, 그건 지금 <span class="file">products.html</span>이 이미 하고 있다. 이 시안이 값어치를 내는 지점은 "<b>같은 지도 한 장 안에서</b> 자산 옆에 방패가 보이는 것"이지, 화면을 오가며 대조하는 것이 아니다.</p>
+<h3 class="o">✓ 고른 길 — 있는 지도 탭에 방패 타일 + 간선 확신도 표기를 얹는다</h3>
+<p>새 화면 0개·새 메뉴 0개·새 상호작용 문법 0개(기존 클릭→선택, 기존 .mv-ask→대화창 패턴 재사용). 늘어나는 것은 방패 타일 종류 2개 + 자산 칩 최대 4개 순증(§2, ②는 기존 유지) + 방패 칩 2개(③⑧) + 접기 토글뿐이다.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>7. 무엇을 포기했나(정직하게)</h2>
+<ul>
+  <li><b>③ 시작점 승격(다른 화면·다른 목록 행에서 그래프로 "새로" 진입하는 길)은 다음 단계로 미룬다.</b> — 여기서 미루는 것은
+  <i>새 진입로를 만드는 일</i>이지, "기존 지도 탭이 어느 화면에서 자동으로 함께 커지는가"가 아니다. 후자는 이번 범위이고 이미 벌어진다 —
+  <span class="file">inventory.html</span>과 <span class="file">vulnscan.html</span>이 <code>map-view.js</code>를 공유해서 한쪽을 고치면 다른 쪽도
+  같이 바뀐다(§11 영향범위). 그래서 lede·§0[1]도 "둘 다 범위"로 고쳐 적었다 — 미루는 것과 이미 일어나는 것을 한 줄로 뭉뚱그리면 안 된다는
+  검토관 [하] 지적을 반영한다.</li>
+  <li><b>관제 모드(실시간 갱신·경보 배너와 그래프 결합)는 다음 단계.</b> — 이번은 정적 스냅샷(버튼 눌러야 새로 계산)이다.</li>
+  <li><b>하드닝 대상 → 특정 자산 선은 안 긋는다(§3에서 이유).</b> 필요하면 사람이 직접 물어 확인하게 한다.</li>
+  <li><b>방패 타일의 최종 각도·여백은 육안 조정이 필요하다.</b> clip-path 오각형은 폰트·글자 길이에 따라 텍스트가 아슬아슬할 수 있어 구현 때 실제 이름 길이로 재확인해야 한다.</li>
+  <li><b>하드닝 방패의 준수율 색(양호/보통/위험/미점검)은 이번 데모에 안 넣었다.</b> 실제로 하려면 <code>/api/hardening/runs</code>에서 최근 lastRate를 끌어와야 하는데, 이번 시안 범위(지도 레이아웃)를 넘는 API 연동이라 다음 라운드로 미룬다 — 지금은 방패에 <code>standard</code>만 표기한다.</li>
+  <li><b>군집 타일의 "고/중/저" 세부 분해는 근사치다.</b> 정확한 경계값(예: 40 vs 50)은 구현 때 담당자 화면 크기 실측으로 다시 정해야 한다.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>8. 밀도 숫자</h2>
+<div class="box warn">
+  ⚠ 아래 「지금」 값은 전부 <b>설치본 5.94.0 실측</b>(§1)이고, 「제안」 값은 <b>구현 전 추정</b>이다 — 이 문서 자체가 스스로 렌더한 px는 근거로 쓰지 않는다
+  (Pretendard 미설치 시 대체 글꼴 렌더 차이 — 2026-09-06 규칙: 목업 안 31px이 설치본에서 35px이었다).
+</div>
+<h3>① 상세판 칩 블록(자산 상세 — 칩 2개(배지 없음) → 최대 6개(배지 있음), 재계산)</h3>
+<div class="box bad">
+  <b>검토관 [중] 적발 — 이전 계산의 재료가 둘 빠져 있었다.</b> ⓐ <code>.mv-ask</code>는 <code>white-space:normal</code>로 <b>두 줄이 설계</b>인데
+  (<span class="file">inventory.html:231</span>) 이전 판은 4칩을 전부 1줄 33px로 놓았다. ⓑ 칩마다 붙는 <code>.chiptag</code> 배지("결재판 있음"/"결재판 없음"/
+  "승인 창이 뜰 수 있습니다")가 계산에 아예 없었다. 이번엔 실측 칩 안쪽 폭(<b>269px</b> — §1 h3 291.2px에서 버튼 padding 20px을 뺀 값)에
+  ○○=<code>sample-web01</code>(12자)을 넣은 실제 문장 길이를 대입해 다시 쟀다.
+</div>
+<table class="t">
+  <tr><th>#</th><th>문장(💬"…")추정 폭</th><th>1줄에 들어가나</th><th>배지가 같은 줄에 들어가나(여유 대비)</th><th>추정 행 높이</th></tr>
+  <tr><td>①</td><td class="num">≈212px</td><td class="o">그렇다</td><td class="x">아니다(배지 ≈76px &gt; 여유 57.5px)</td><td class="num">50px</td></tr>
+  <tr><td>②<span class="hint">(owner 없을 때만)</span></td><td class="num">≈253px</td><td class="o">그렇다</td><td class="x">아니다(배지 ≈145px &gt; 여유 16px)</td><td class="num">50px</td></tr>
+  <tr><td>④</td><td class="num">≈228px</td><td class="o">그렇다</td><td class="x">아니다(배지 ≈76px &gt; 여유 41px)</td><td class="num">50px</td></tr>
+  <tr><td>⑤</td><td class="num">≈216px</td><td class="o">그렇다</td><td class="x">아니다(배지 ≈76px &gt; 여유 53.5px)</td><td class="num">50px</td></tr>
+  <tr><td>⑥</td><td class="num">≈241px</td><td class="o">그렇다</td><td class="x">아니다(배지 ≈76px &gt; 여유 28.5px)</td><td class="num">50px</td></tr>
+  <tr><td>⑦</td><td class="num">≈253px</td><td class="o">그렇다</td><td class="x">아니다(배지 ≈76px &gt; 여유 16px)</td><td class="num">50px</td></tr>
+</table>
+<div class="box warn">
+  ⚠ 위 표는 <b>전부 추정</b>이다(가정: 한글 12.5px/자·영숫자 7px/자·공백 4px/자·💬+따옴표 32px, 배지는 11px 글자로 같은 방식 재계산).
+  Pretendard 실제 자간·커닝은 이 가정과 다를 수 있어 <b>구현 후 반드시 재실측</b>해야 한다(이 시안이 스스로 렌더한 px를 증거로 안 쓰는 것과 같은 이유).
+  공교롭게도 8개 전부 "배지가 안 들어가 아래로 밀림" 결과가 나왔다 — 즉 사실상 <b>칩마다 2줄(문장 1줄+배지 1줄)</b>이 된다.
+</div>
+<table class="t">
+  <tr><th>상태</th><th>칩 개수</th><th>버튼+배지 행 높이 합</th><th>gap 합(8px×(n-1))</th><th>총점유</th><th>태그</th></tr>
+  <tr><td>지금</td><td class="num">2</td><td class="num">66px</td><td class="num">8px</td><td class="num"><b>74px</b></td><td>실측(5.94.0) — 배지 없음, map-view.js:154,156</td></tr>
+  <tr><td>제안(담당 있음 — ②숨김, 5개)</td><td class="num">5</td><td class="num">250px</td><td class="num">32px</td><td class="num"><b>282px</b></td><td>추정·구현후재실측</td></tr>
+  <tr><td>제안(담당 없음 — ②표시, 6개)</td><td class="num">6</td><td class="num">300px</td><td class="num">40px</td><td class="num"><b>340px</b></td><td>추정·구현후재실측 — <b>최악 사례</b></td></tr>
+  <tr><td>증감(최악 사례 기준)</td><td class="num">+4</td><td class="num">+234px</td><td class="num">+32px</td><td class="num warnc"><b>+266px(+360%)</b></td><td>산식 = 340−74. 이전 판의 "+82px(+111%)"는 배지·2줄 설계를 안 셌던 <b>과소 추정</b>이었다(검토관 [중] 적발)</td></tr>
+</table>
+<h3>② 방패 상세판 칩(신규 — 하드닝 대상엔 ③, 보안제품엔 ⑧ 1개씩)</h3>
+<table class="t">
+  <tr><th>노드</th><th>지금</th><th>제안</th><th>태그</th></tr>
+  <tr><td>하드닝 대상(③)</td><td class="num">0px(칩 없음)</td><td class="num">≈50px(문장 1줄+배지 1줄 — 배지 "승인 창이 뜰 수 있습니다" 145px가 여유 41px에 안 들어감)</td><td>신규·구현후재실측</td></tr>
+  <tr><td>보안제품(⑧)</td><td class="num">0px(칩 없음)</td><td class="num">≈50px(배지 "결재판 없음" 76px가 여유 67.5px에 근소하게 안 들어감)</td><td>신규·구현후재실측</td></tr>
+</table>
+<h3>③ 구획 머리(접기 아이콘 추가)</h3>
+<table class="t">
+  <tr><th>항목</th><th>지금</th><th>제안</th><th>태그</th></tr>
+  <tr><td>h4 높이</td><td class="num">19.6px</td><td class="num">19.6px(+0)</td><td>지금=실측(5.94.0, map-view.js:97-98) · 제안=추정(아이콘만 추가, 글자크기·줄높이 불변이라 높이 불변으로 추정 — 다만 <code>display:flex</code> 전환도 함께 있어(머리말 CSS 주석 참조) 구현 후 재확인 필요)</td></tr>
+</table>
+<h3>④ 신규 — 방패 타일 크기(전부 추정, 구현 전이라 실측 불가)</h3>
+<table class="t">
+  <tr><th>항목</th><th>추정값</th><th>근거</th></tr>
+  <tr><td>flexBasis(폭)</td><td class="num">≈70px</td><td>기존 식 70+√(진짜취약)·7 재사용 시 방패는 취약점 개념이 없어 n=0 → 70px 고정에 수렴할 것으로 추정</td></tr>
+  <tr><td>minHeight</td><td class="num">≈50~60px(2~3줄 텍스트)</td><td>기존 식은 30+√n·1.5=30px이 되지만, 방패는 이름+종류+등록표기 3줄이 들어가 텍스트 높이가 더 필요 — <b>선형 추정 아님, 육안 조정 필요</b>(11px로 올린 §7 폰트 조정도 겹친다)</td></tr>
+  <tr><td>보호 관계 빈 자리 줄(.mv-noedge)</td><td class="num">≈18.7px/방패</td><td>기존 .mv-hint 실측(18.7px)과 같은 스타일 재사용 예정이라 유사할 것으로 추정</td></tr>
+</table>
+<h3>⑤ 상세판 전체 여유 확인(정성적 — 최악 사례로 다시 봄)</h3>
+<p>
+  상세판(.mv-side) 바깥 높이는 974.3px로 고정(부모 stretch, §1). 최악 사례(칩 340px)로 다시 합산하면 h3(23)+등급줄(≈35)+row 3개(≈35×3=105)+
+  item 3개(≈20×3=60)+칩 블록(340)+연결장비·보호범위 줄(≈40)+안내줄(≈19) ≈ <b>622px</b> — 이것도 <b>정밀 합계가 아니라 구성요소를 대충 더한 값</b>이다.
+  974.3px 안에는 들어갈 것으로 보이지만 예전 "+82px"보다 여유가 훨씬 얇아졌다. 더 근본적인 문제 — <span class="file">.mv-side</span>엔
+  <code>overflow</code> 선언이 아예 없다(<span class="file">inventory.html:218</span>). 미조치 취약점이 많아 "먼저 볼 것" 항목이나 plain 설명이
+  길어지는 실제 상황에서는 지금도 잠재적으로 넘칠 수 있는 자리였는데, 칩 블록이 4배 넘게 커지면 그 위험이 커진다 —
+  <b>구현 시 <code>.mv-side{overflow-y:auto}</code>를 방어적으로 추가하는 것을 §12 구현 후보에 넣는다.</b>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>9. 제품 원칙 자가점검</h2>
+<div class="box bad">
+  <b>검토관 [중] 적발 2건 — 이 표 자체가 두 곳 거짓이었다.</b> ① "안내는 ⓘ·screenguide로 · 지킴"이라 적어 놓고 §4 데모 안(보안제품·하드닝 상세판)에
+  "이거 쉽게 설명해줘"처럼 이어 물으라는 <b>사용법 문장</b>과 "(products.html:769-777의 실제 selectnotify 계약 그대로 — 새 문법 아님)"이라는
+  <b>검토자용 해설</b>이 화면 안에 그대로 렌더되고 있었다 — 지금은 둘 다 뺐고(§4 JS), 그 안내는 §10 screenguide 초안으로만 옮겼다.
+  ② "새 판정 함수는 군집 임계값(40/200) 하나뿐"도 거짓이었다 — <code>호스트구획열쇠()</code>(하드닝 방패 배치)·방패 숨김 규칙·구획 자동 접기 규칙도
+  전부 이 시안이 새로 만든 렌더링 규칙이다. 숫자를 고쳐 적는다.
+</div>
+<table class="t">
+  <tr><th>원칙</th><th>판정</th><th>근거</th></tr>
+  <tr><td>입력칸 0개(화면은 보기용)</td><td class="o">지킴</td><td>클릭·토글만 있다. 텍스트 입력 요소 0개</td></tr>
+  <tr><td>안내는 ⓘ·screenguide로</td><td class="o">지킴(수리 후)</td><td>화면 안 사용법·검토자용 해설 문장 2곳을 뺐다(위 적발 ①) — 화면엔 정체성·경고·선택 로그만, 사용법은 §10 <code>screenguide.ts</code> panels["지도"] 확장 초안으로</td></tr>
+  <tr><td>지시는 대화창(칩=selectnotify 규격)</td><td class="o">지킴</td><td>방패 클릭은 <b>기존 코드와 같은 selectnotify 호출 규격</b>(products.html:769, hardening.html:308 — 다만 <code>fields.status</code> 값은 지도에 재료가 없어 항상 빈 문자열이다, 아래 참조). 자산 칩은 기존 .mv-ask+askConsole 패턴 확장</td></tr>
+  <tr><td>정직성 — 추정 표시</td><td class="o">강화</td><td>확정/등록/추정 3단 표기 신설(§3) + 칩 결재판 배지를 <b>실측 근거(write:true·registry.ts)가 있을 때만</b> "있음"으로 적고, 나머지는 "승인 창이 뜰 수 있습니다"로 낮췄다(§2 route-explain 실측 — 이전 판은 ⑨인 것도 "있음"이라 단정했었다)</td></tr>
+  <tr><td>단일 출처 — 위험 판정 0개 신설, 렌더 배치 규칙 4개 신설</td><td class="o">지킴(표현 정정)</td><td>riskOf·activeFindings·reachability·assetId 등 <b>위험·관계 판정은 전부 그대로 재사용</b>했다. 다만 <b>렌더 배치 규칙은 4개</b> 새로 만들었다 — 군집 임계값(40/200)·구획 자동 접기(3개 초과)·방패 숨김(필터 칩 켜지면)·호스트구획열쇠(하드닝 대상을 자기 <code>host</code> 값의 대역에 배치). 넷 다 "이미 있는 값을 어떻게 늘어놓을까"이지 "무엇이 위험한가·무엇이 무엇과 관계있는가"를 새로 판단하지 않는다(§3 박스에서 호스트구획열쇠의 이 구분을 자세히 적었다)</td></tr>
+  <tr><td>가짜 UI 금지</td><td class="o">지킴</td><td>§4 데모는 "가상 데이터" 배너를 달았고, 대화창 전송은 시뮬레이션 로그로만 보여준다(실제 전송인 척 안 함)</td></tr>
+  <tr><td>제품 코드 미수정</td><td class="o">지킴</td><td>이 파일 하나만 썼다. client/·server/ 전부 읽기만 했다</td></tr>
+</table>
+<div class="box warn">
+  <b>selectnotify fields.status 정직 고지.</b> §4 JS의 <code>mockSelectNotify</code>가 보안제품 선택 시 <code>fields.status:""</code>를 보낸다 —
+  제품 <span class="file">products.html:767,774</span>는 같은 자리에 <code>점검요약(p).문장 || "점검 이력 없음"</code>을 채운다. <b>규격(허용 키·컷)은 같지만
+  내용이 얇다</b> — 지도에는 점검 이력 재료가 없어서다. "기존 코드 그대로"는 <i>전송 규격</i> 얘기이지 <i>담기는 값</i> 얘기가 아니라는 것을 여기서 밝힌다.
+  구현 시 이 값을 어디서 채울지(안 채울지) 정해야 한다.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>10. screenguide.ts panels["지도"] 확장 초안(구현 시 이 문장을 이어 붙인다)</h2>
+<div class="box">
+  현재(<span class="file">screenguide.ts:1066-1067</span>) 문장 끝에 <b>이어 붙일</b> 초안 — <b>검토관 [중] 수리</b>로 §4 화면 안에 있던
+  사용법 문장("이거 쉽게 설명해줘"처럼 이어 물으세요)을 여기로 옮겨 붙였다:
+</div>
+<div class="box" style="font-family:Consolas,monospace;font-size:12px;line-height:1.8;color:var(--text);white-space:pre-wrap;">
+" 2단계(2026-09)부터 지도에 **방패 타일**(🛡)이 함께 보입니다 — 보안제품·하드닝 점검 대상입니다. 자산 타일과 다른 오각형 모양이고, 위험 등급 색이 아니라 등록 여부만 나타냅니다.
+방패를 클릭하면 이름이 대화창에 선택으로 담깁니다 — 이어서 궁금한 것을 물어보세요(예: 보안제품이면 "점검 일정 알려줘", 하드닝 대상이면 "하드닝 점검 돌려줘").
+간선은 세 가지입니다 — **확정**(실선, 실제 공격 신호가 관측된 경로) · **등록**(실선+등록 배지, 보안제품이 특정 자산에 연결 등록된 관계 — 방패가 보이면 공격경로 표시와 무관하게 항상 그려집니다) · **추정**(점선+추정 배지, 점수로 계산된 경로로 실제 관측은 아닙니다).
+⚠ **못 그리는 것도 있습니다** — "이 방화벽이 정확히 어느 자산들을 지키는가"는 등록 칸이 없어 지도가 모릅니다. 방패 옆 점선 빈 자리가 그 뜻입니다. 하드닝 점검 대상도 같은 이유로 특정 자산과 선으로 잇지 않습니다(대역만 같습니다 — 배치는 그 대상 자신의 등록된 host 값 기준입니다).
+⚠ 하드닝 점검 대상에서 "하드닝 점검 돌려줘"를 물으면, 등록된 원격 장비와 이름이 실제로 맞을 때만 그 장비에 접속합니다 — 못 맞히면 우리 서버 자신을 점검합니다(승인 창이 뜨는지 여부도 그때 갈립니다)."
+</div>
+<p class="hint">PANEL_ALIASES(screenguide.ts:154) 후보: <code>{"보안장비":"지도","방패":"지도","보호 관계":"지도"}</code> — 구현 시 함께 검토.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>11. 영향범위 — 자산 화면 지도 탭 + 취약점 화면 히트맵 보기, 둘 다</h2>
+<div class="box bad">
+  <b>검토관 [상] 적발.</b> <code>map-view.js</code>는 <span class="file">inventory.html</span> 전용이 아니다 —
+  <span class="file">vulnscan.html:351,363</span>이 같은 <code>gijoMapView.render()</code>·<code>gijoMapView.detailHtml()</code>을
+  「히트맵 보기」에서 그대로 쓴다(<span class="file">analysis.html:448-450</span>은 <code>heatmapData</code>만 써서 무관하다).
+  범위를 한 곳으로 확정한다 — <b>자산 화면 지도 탭 + 취약점 화면 히트맵 보기, 둘 다</b>가 이번 변경의 영향범위다.
+</div>
+<table class="t">
+  <tr><th>퍼지는 것</th><th>vulnscan.html "히트맵 보기"에서 실제로 일어나는 일</th><th>구현 시 처리</th></tr>
+  <tr><td>새 칩 6개(§2 ①③④⑤⑥⑦)</td><td><code>detailHtml()</code> 확장을 그대로 물려받아 <b>히트맵 상세판에도 뜬다.</b> 이 화면 대상은 등록 자산이 아니라 <code>hostCache</code>의 스캔 호스트다 — 새로운 위험은 아니다(기존 칩 2개도 이미 이 화면에 붙어 있었다, <span class="file">vulnscan.html:632</span>) — 다만 폭이 2→최대 6개로 는다</td><td><code>ctx.products</code>·<code>ctx.hardening</code>이 없을 때 <code>||[]</code>로 방어 필수(가드 없으면 <code>DATA.products.forEach</code> 부류가 자바스크립트 에러를 던져 화면이 통째로 깨진다)</td></tr>
+  <tr><td>구획 자동 접기(3개 초과 시 1개만)</td><td>vulnscan 히트맵은 지금 접기 기능이 <b>0건</b>이다 — 이번 변경으로 처음 생긴다. 구획이 많은 스캔 결과에서 화면 대부분이 접힌 채로 시작된다</td><td>vulnscan.html에서 구획 3개를 넘는 실제 스캔 결과가 있는지 구현 전 실측 필요(설계관 확인 항목에 추가)</td></tr>
+  <tr><td>방패(보안장비) 타일 + 등록 간선</td><td><code>ctx</code>에 products/hardening을 안 주므로(위 가드 전제) <b>안 뜬다</b> — 두 화면이 이 지점에서는 다른 그림이 된다</td><td>의도된 차이로 문서화(스캔 결과는 등록 자산이 아니라 "등록된 보안장비"와 엮을 근거가 약하다)</td></tr>
+</table>
+<p class="hint">
+  ⚠ "두 화면에서 같은 그림이 나오는가"는 <b>부분적으로만 그렇다</b> — 칩·접기 규칙은 같은 코드라 같지만, 방패·등록 간선은 vulnscan에
+  주입이 없어 <b>안 나온다</b>. 정확한 서술은 "칩·접기는 공유, 방패·간선은 자산 화면 전용"이다. 이번 §1 실측은 inventory.html만 쟀고
+  vulnscan.html의 실제 렌더는 <b>미실측</b>이다(구현 전이라 잴 화면이 없다) — 구현 뒤 두 화면을 CDP로 나란히 재는 것을 §12 설계관
+  확인 항목에 넣는다.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>12. 구현 시 참고 — 파일:줄 후보(설계관 확인 필요, 이 시안은 수정하지 않음)</h2>
+<table class="t">
+  <tr><th>파일</th><th>줄</th><th>지금</th><th>할 일(제안)</th></tr>
+  <tr><td class="file">client/src/renderer/pages/map-view.js</td><td>133-160</td><td><code>detailHtml()</code> — 칩 2개(배지 없음)</td><td>칩 최대 4개 순증(§2 ①④⑤⑥⑦ 신설, ②는 기존 유지) + 결재판 배지(있음/없음/승인 창이 뜰 수 있습니다). "담당부서 지정"·"SBOM 생성"은 ⑨라서 <b>뺐다</b>(§2)</td></tr>
+  <tr><td class="file">client/src/renderer/pages/map-view.js</td><td>44-70</td><td>구획열쇠·타일()</td><td>방패용 <code>방패타일()</code> 신설(진짜취약 없음 대응), 기존 함수는 안 건드림. 방패 상세판엔 ③(하드닝 대상)·⑧(보안제품) 칩 1개씩</td></tr>
+  <tr><td class="file">client/src/renderer/pages/inventory.html</td><td>1316-1342</td><td><code>renderMap()</code> — assets만 주입</td><td>securityProducts·hardeningTargets를 함께 불러 ctx에 추가 주입(새 API 호출 2개: listSecurityProducts, GET /api/hardening/targets)</td></tr>
+  <tr><td class="file">client/src/renderer/pages/vulnscan.html</td><td>334-363</td><td><code>render(flat)</code>·<code>detailHtml</code> 호출 — products/hardening 미주입</td><td>§11 가드(<code>||[]</code>) 적용 확인 — 방패·등록 간선은 이 화면에 <b>의도적으로</b> 안 뜨게 둔다</td></tr>
+  <tr><td class="file">server/src/engine/screenguide.ts</td><td>1066-1067</td><td>panels["지도"] 문장</td><td>§10 초안 이어 붙이기</td></tr>
+  <tr><td class="file">server/test/guidance-destination.test.ts</td><td>기대도착 표</td><td>새 문장 미등록</td><td>§2 새 문장 6개(①③④⑤⑥⑦)를 기대도착에 추가(예외표 아님·상한 44 무관)</td></tr>
+</table>
+<div class="box bad">
+  <b>⚠ 설계관에 먼저 물을 것(3건).</b><br>
+  ① <span class="file">hardeningtargets.ts:301</span>의 <code>GET /api/hardening/targets</code>는 <code>adminMiddleware</code>가
+  아니라 <code>authMiddleware</code>만 걸려 있어 일반 사용자도 읽을 수 있는지, 지도 탭(전체 사용자용)에서 <code>hasSecret</code> 등 민감 필드가
+  섞여 나가는지 <b>실제 응답을 뜯어 확인</b>한 뒤 착수해야 한다 — 이번 정찰에서 응답 바디 전체를 실측하지 않았다.<br>
+  ② §11의 vulnscan.html 영향(구획 자동 접기가 처음 생기는 것)이 그 화면 실사용자에게 <b>부작용 있는 행동 변화</b>인지 확인.<br>
+  ③ §8⑤에서 제안한 <code>.mv-side{overflow-y:auto}</code> 방어 추가가 기존 어느 화면 스타일과도 안 부딪히는지 확인.
+</div>
+
+<div class="foot">시안 파일: <code>mockups/asset-graph-v2/시안.html</code> · 제품 코드 미수정 · 승인 후 <code>gijo-architect</code> 설계관 검토를 거쳐 구현</div>
+
+<script>
+(function(){
+  "use strict";
+  var esc = function(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); };
+  var boldify = function(s){ return String(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>"); };
+
+  // ── 진짜취약(map-view.js:30-37과 같은 잣대) ─────────────────────────
+  var SCAN_NOISE = ["scan_error","scan_not_supported"];
+  function 진짜취약(f){
+    if (f.state === "fixed") return false;
+    if (SCAN_NOISE.indexOf(f.finding_type) >= 0) return false;
+    if (String(f.severity||"").toLowerCase()==="info") return false;
+    return true;
+  }
+  function riskOf(a){
+    var real = (a.findings||[]).filter(진짜취약);
+    var kev = real.some(function(f){ return f.kev; });
+    var worst = real.reduce(function(w,f){
+      var rank = {critical:4,high:3,medium:2,low:1}[f.severity]||0;
+      return rank > w.r ? {r:rank, sev:f.severity} : w;
+    }, {r:0, sev:null});
+    var level = worst.r>=3 ? "high" : worst.r>=1 ? "mid" : "none";
+    return { level: level, kev: kev, label: real.length ? "미조치 "+real.length+"건" : "이상 없음" };
+  }
+  function activeFindings(a){ return a.findings||[]; }
+
+  // 구획열쇠 — map-view.js:44-52와 같은 규칙, IP만 RFC5737 예시 대역으로.
+  function 구획열쇠(a){
+    if (a.assetType && /llm|ai|모델|agent/i.test(a.assetType)) return "AI 자산 — 우리 모델";
+    var ip = String(a.ip||"").trim();
+    var m = ip.match(/^(\d+\.\d+\.\d+)\.\d+$/);
+    if (m) return m[1]+".x 대역";
+    var host = String(a.hostname||a.name||"");
+    if (/\.(kr|com|net|org|io)\b/i.test(host)) return "외부 노출 — 도메인"; // map-view.js:50과 정확히 같은 정규식(.local/.internal은 포함 안 함 — 그건 외부노출이 아니다)
+    return "기타 — 대역 미상";
+  }
+  function 호스트구획열쇠(host, knownZones){
+    var m = String(host||"").match(/^(\d+\.\d+\.\d+)\.\d+$/);
+    if (!m) return "기타 — 대역 미상";
+    var key = m[1]+".x 대역";
+    return key; // 자산 존재 여부와 무관하게 자기 IP 대역으로 — 없으면 새 구획이 생긴다(정직한 공백 표시)
+  }
+
+  // ── 가상 데이터(RFC 5737 예시 대역 — 실제 운영 데이터 아님) ─────────────
+  function baseData(){
+    var A = "192.0.2", B = "198.51.100";
+    function f(type, sev, state, kev, plain){ return {finding_type:type, severity:sev, state:state||"active", kev:!!kev, plain:plain}; }
+    var assets = [
+      {id:"a1", name:A+".11", displayName:"web-edge-01", ip:A+".11", assetType:"server", owner:null,
+       findings:[f("rce","critical","active",true,"외부에서 **원격코드실행**이 가능한 취약점입니다"), f("xss","medium")]},
+      {id:"a2", name:A+".12", displayName:"web-edge-02", ip:A+".12", assetType:"server", owner:"보안팀",
+       findings:[f("tls","high")]},
+      {id:"a3", name:A+".15", displayName:"db-core-01", ip:A+".15", assetType:"server", owner:null,
+       findings:[f("sqlinj","high"), f("weak-auth","medium")]},
+      {id:"a4", name:A+".20", displayName:"file-srv-01", ip:A+".20", assetType:"server", owner:"인프라팀",
+       findings:[f("critical-patch","critical")]},
+      {id:"a5", name:A+".21", displayName:"file-srv-02", ip:A+".21", assetType:"server", owner:"인프라팀", findings:[]},
+      {id:"a6", name:A+".30", displayName:"vpn-gw-01", ip:A+".30", assetType:"network", owner:null,
+       findings:[f("weak-cipher","medium")]},
+    ];
+    for (var i=7;i<=16;i++){
+      assets.push({id:"a"+i, name:A+"."+(40+i), displayName:"host-"+(40+i), ip:A+"."+(40+i), assetType:"server",
+        owner: i%3===0?null:"운영팀", findings: i%4===0?[f("info-leak","low")]:[]});
+    }
+    var bAssets = [
+      {id:"b1", name:B+".10", displayName:"dev-ci-01", ip:B+".10", assetType:"server", owner:null,
+       findings:[f("rce","critical","active",true,"CI 서버에 **알려진 악용 사례(KEV)**가 있는 취약점입니다")]},
+      {id:"b2", name:B+".11", displayName:"dev-build-02", ip:B+".11", assetType:"server", owner:"개발팀",
+       findings:[f("outdated-lib","high")]},
+    ];
+    for (var j=3;j<=9;j++){
+      bAssets.push({id:"b"+j, name:B+".2"+j, displayName:"dev-"+j, ip:B+".2"+j, assetType:"server",
+        owner:"개발팀", findings: j%3===0?[f("misconfig","medium")]:[]});
+    }
+    var ai = [
+      {id:"ai1", name:"llm-inference-01", displayName:"llm-inference-01", ip:"", assetType:"llm", owner:"AI팀",
+       findings:[f("prompt-injection","high")]},
+      {id:"ai2", name:"rag-embedder-01", displayName:"rag-embedder-01", ip:"", assetType:"llm", owner:"AI팀", findings:[]},
+      {id:"ai3", name:"agent-orchestrator-01", displayName:"agent-orchestrator-01", ip:"", assetType:"agent", owner:null,
+       findings:[f("excess-agency","medium")]},
+      {id:"ai4", name:"finetune-node-01", displayName:"finetune-node-01", ip:"", assetType:"llm", owner:"AI팀", findings:[]},
+      {id:"ai5", name:"vector-db-01", displayName:"vector-db-01", ip:"", assetType:"llm", owner:"AI팀", findings:[]},
+    ];
+    var misc = [
+      {id:"m1", name:"legacy-fileserver.local", displayName:"legacy-fileserver.local", ip:"", assetType:"server", owner:null,
+       findings:[f("eol-os","high")]},
+      {id:"m2", name:"partner-api.example.kr", displayName:"partner-api.example.kr", ip:"", assetType:"server", owner:"제휴팀", findings:[]},
+      {id:"m3", name:"backup-nas.internal", displayName:"backup-nas.internal", ip:"", assetType:"server", owner:"인프라팀", findings:[]},
+      {id:"m4", name:"print-server.local", displayName:"print-server.local", ip:"", assetType:"server", owner:null, findings:[]},
+    ];
+    var products = [
+      {id:"p1", name:"FW-EDGE-01", category:"방화벽", vendor:"SECUI", model:"MF2", assetId:"a1", assetName:"web-edge-01", docs:[]},
+      {id:"p2", name:"EDR-AGENT-01", category:"EDR", vendor:"CrowdStrike", model:"Falcon", assetId:"ai5", assetName:"vector-db-01", docs:[1]},
+      {id:"p3", name:"WAF-01", category:"WAF", vendor:"Imperva", model:"", assetId:"a2", assetName:"web-edge-02", docs:[]},
+      {id:"p4", name:"DLP-01", category:"DLP", vendor:"", model:"", assetId:null, assetName:null, docs:[]},
+      {id:"p5", name:"SIEM-01", category:"SIEM", vendor:"Splunk", model:"", assetId:null, assetName:null, docs:[1,2]},
+      {id:"p6", name:"VPN-GW", category:"VPN", vendor:"", model:"", assetId:"a6", assetName:"vpn-gw-01", docs:[]},
+      {id:"p7", name:"NAC-01", category:"NAC", vendor:"", model:"", assetId:null, assetName:null, docs:[]},
+    ];
+    var hardening = [
+      {id:"h1", label:"코어 스위치", host:A+".1", standard:"cis"},
+      {id:"h2", label:"개발 CI 서버", host:B+".10", standard:"kisa"},
+      {id:"h3", label:"이 서버 자신", host:"127.0.0.1", standard:"kisa_pc"},
+      {id:"h4", label:"지사 라우터", host:"203.0.113.5", standard:"kisa_net"},
+      {id:"h5", label:"지사 방화벽", host:"203.0.113.1", standard:"cis"},
+    ];
+    var paths = [
+      {id:"p:a1", entity:"web-edge-01", reachability:"확인됨", reachScore:90,
+        steps:[{kind:"entry",label:"브루트포스 탐지"},{kind:"foothold",label:"원격코드실행(KEV)"},{kind:"lateral",entity:"db-core-01",label:"인접 자산 db-core-01"}]},
+      {id:"p:b1", entity:"dev-ci-01", reachability:"높음", reachScore:50,
+        steps:[{kind:"foothold",label:"원격코드실행(KEV)"},{kind:"lateral",entity:"dev-build-02",label:"인접 자산 dev-build-02"}]},
+      {id:"p:m1", entity:"legacy-fileserver.local", reachability:"보통", reachScore:10,
+        steps:[{kind:"foothold",label:"EOL 운영체제"}]},
+    ];
+    return { assets: assets.concat(bAssets).concat(ai).concat(misc), products: products, hardening: hardening, paths: paths };
+  }
+
+  function stressData(){
+    // 결정적 의사난수(고정 시드) — 열 때마다 같은 모양이 나오게.
+    var s = 20260913>>>0;
+    function rnd(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }
+    var A="192.0.2";
+    var assets=[];
+    for (var i=0;i<210;i++){
+      var sev = rnd()<0.06?"critical":rnd()<0.3?"high":rnd()<0.6?"medium":"low";
+      var kev = sev==="critical" && rnd()<0.3;
+      assets.push({id:"s"+i, name:A+".x"+i, displayName:"srv-"+String(i).padStart(3,"0"), ip:A+"."+(i%250), assetType:"server",
+        owner: rnd()<0.4?null:"운영팀"+(i%3+1),
+        findings: rnd()<0.7 ? [{finding_type:"vuln", severity:sev, state:"active", kev:kev}] : []});
+    }
+    var base = baseData();
+    return { assets: assets.concat(base.assets.slice(16)), products: base.products, hardening: base.hardening, paths: base.paths };
+  }
+
+  // ── 상태 ─────────────────────────────────────────────────────────
+  var DATA = baseData();
+  var mode = "all";
+  var pathsOn = false;
+  var expanded = null;   // Set<zoneKey> — null이면 "규칙대로"(3개 초과시 1개만)
+  var focusEntity = null;
+  var selectedKey = null;
+  var lastEntries = [];  // renderZones()가 매번 갱신 — ensureZoneExpandedFor가 "지금 자동규칙이 편 것"을 알아야 하기 때문
+
+  function log(obj){
+    var el = document.getElementById("selectLog");
+    var line = "[gijo:select] " + JSON.stringify(obj);
+    el.textContent = (el.textContent==="(아직 없음 — 타일을 눌러 보세요)" ? "" : el.textContent + "\n") + line;
+    el.scrollTop = el.scrollHeight;
+  }
+  function mockSelectNotify(sel){
+    // 실제 selectnotify.js:22,39 규격 그대로(허용 키·60자/200자 컷)
+    var 허용키 = ["asset","title","severity","status","owner","due","plain","kev","assetId","findingKey"];
+    var f = null;
+    if (sel.fields){ f={}; 허용키.forEach(function(k){ if (sel.fields[k]!=null){ var v=String(sel.fields[k]).replace(/\s+/g," ").trim(); if(v) f[k]=v.slice(0,200); } }); }
+    log({type:"gijo:select", label:String(sel.label).slice(0,60), text:sel.text, fields:f});
+  }
+  function askPreview(text){
+    document.getElementById("askPreview").style.display = "";
+    document.getElementById("askPreviewText").textContent = "askConsole(\"" + text + "\")";
+  }
+
+  function findingsOf(a){ return activeFindings(a); }
+  function realCount(a){ return findingsOf(a).filter(진짜취약).length; }
+
+  function tileHtml(a){
+    var real = realCount(a);
+    var rk = riskOf(a);
+    var level = rk.level==="none" ? "low" : rk.level;
+    var d = document.createElement("div");
+    d.className = "mv-tile mv-"+level + (/AI 자산/.test(구획열쇠(a)) ? " mv-ai" : "");
+    d.style.flexBasis = (70 + Math.sqrt(real)*7) + "px";
+    d.style.minHeight = (30 + Math.sqrt(real)*1.5) + "px";
+    d.dataset.kind = "asset"; d.dataset.id = a.id;
+    d.innerHTML = '<div class="mv-nm">'+esc(a.displayName||a.name)+'</div>'
+      + '<div class="mv-ct">'+(real? "미조치 "+real+"건" : rk.label)+(a.owner?" · "+esc(a.owner):"")+'</div>'
+      + (rk.kev ? '<span class="mv-kev">KEV</span>' : "");
+    return d;
+  }
+  function shieldHtml(kind, item){
+    var d = document.createElement("div");
+    d.className = "mv-shield" + (kind==="hardening" ? " mv-hard" : "");
+    d.dataset.kind = kind; d.dataset.id = item.id;
+    if (kind==="product"){
+      d.innerHTML = '<div class="mv-snm">🛡 '+esc(item.name)+'</div>'
+        + '<div class="mv-sct">'+esc(item.category)+'</div>'
+        + '<div class="mv-sreg">등록됨'+(item.assetName?(' · 🔗 '+esc(item.assetName)):' · 미연결')+'</div>';
+    } else {
+      d.innerHTML = '<div class="mv-snm">🛡 '+esc(item.label)+'</div>'
+        + '<div class="mv-sct">'+esc((item.standard||"").toUpperCase())+'</div>'
+        + '<div class="mv-sreg">점검 대상 등록됨</div>';
+    }
+    return d;
+  }
+  function clusterHtml(list){
+    var byLevel = {high:0, mid:0, low:0};
+    list.forEach(function(a){ var lv=riskOf(a).level; byLevel[lv==="none"?"low":lv]++; });
+    var d = document.createElement("div");
+    d.className = "mv-cluster";
+    d.dataset.kind = "cluster";
+    d.innerHTML = '<b>+'+list.length+'개 더</b><span>고 '+byLevel.high+' · 중 '+byLevel.mid+' · 저 '+byLevel.low+'</span>';
+    d._list = list;
+    return d;
+  }
+
+  function applyModeFilter(list){
+    if (mode==="kev") return list.filter(function(a){ return riskOf(a).kev; });
+    if (mode==="high") return list.filter(function(a){ return riskOf(a).level==="high"; });
+    if (mode==="nobody") return list.filter(function(a){ return !a.owner && realCount(a)>0; });
+    return list;
+  }
+
+  function renderZones(){
+    var zones = new Map();
+    var shownAssets = applyModeFilter(DATA.assets);
+    shownAssets.forEach(function(a){
+      var k = 구획열쇠(a);
+      if (!zones.has(k)) zones.set(k, {assets:[], shields:[]});
+      zones.get(k).assets.push(a);
+    });
+    var showShields = (mode==="all"); // 좁히기 칩이 켜지면 방패는 숨긴다(§5 규칙)
+    var gapProducts = [];
+    if (showShields){
+      DATA.products.forEach(function(p){
+        if (p.assetId){
+          var owner = DATA.assets.find(function(a){ return a.id===p.assetId; });
+          var k = owner ? 구획열쇠(owner) : "기타 — 대역 미상";
+          if (!zones.has(k)) zones.set(k, {assets:[], shields:[]});
+          zones.get(k).shields.push({type:"product", item:p});
+        } else {
+          gapProducts.push(p);
+        }
+      });
+      DATA.hardening.forEach(function(t){
+        var k = 호스트구획열쇠(t.host);
+        if (!zones.has(k)) zones.set(k, {assets:[], shields:[]});
+        zones.get(k).shields.push({type:"hardening", item:t});
+      });
+    }
+
+    var totalNodes = shownAssets.length + (showShields ? DATA.products.length + DATA.hardening.length : 0);
+    var clusterOn = totalNodes > 200;
+
+    var entries = Array.from(zones.entries()).map(function(kv){
+      var 합 = kv[1].assets.reduce(function(s,a){ return s+realCount(a); }, 0);
+      return {k:kv[0], v:kv[1], 합:합};
+    }).sort(function(x,y){ return y.합 - x.합; });
+    lastEntries = entries; // ensureZoneExpandedFor가 "지금 자동규칙이 편 것"을 알 수 있게 저장
+
+    // 구획 3개 초과면 1개만 편다(신규 규칙) — expanded가 null일 때만 자동 규칙 적용.
+    var autoExpand = null;
+    if (expanded===null && entries.length>3) autoExpand = entries[0] ? entries[0].k : null;
+
+    var zoneEl = document.getElementById("mapZones");
+    zoneEl.innerHTML = "";
+    var oldOverlay = zoneEl.querySelector(".mv-overlay"); if (oldOverlay) oldOverlay.remove();
+    document.querySelectorAll(".mv-edgelabel").forEach(function(n){ n.remove(); });
+
+    entries.forEach(function(e){
+      var isGapZoneLike = false;
+      var z = document.createElement("div");
+      var isFolded = expanded ? !expanded.has(e.k) : (autoExpand!==null && e.k!==autoExpand);
+      z.className = "mv-zone" + (isFolded?" folded":"");
+      var h4 = document.createElement("h4");
+      h4.innerHTML = '<span class="fold-ic">'+(isFolded?"▸":"▾")+'</span> '+esc(e.k)+' — 자산 <b>'+e.v.assets.length+'</b> · 미조치 <b>'+e.합.toLocaleString()+'</b>'
+        + (e.v.shields.length ? ' · 🛡 <b>'+e.v.shields.length+'</b>' : '')
+        + '<span class="fold-cnt">'+(isFolded?"펼치려면 클릭":"")+'</span>';
+      h4.addEventListener("click", function(){
+        if (expanded===null) expanded = new Set(autoExpand ? [autoExpand] : entries.map(function(x){return x.k;}));
+        if (expanded.has(e.k)) expanded.delete(e.k); else expanded.add(e.k);
+        render();
+      });
+      z.appendChild(h4);
+      var t = document.createElement("div");
+      t.className = "mv-tiles";
+      if (!isFolded){
+        var sortedAssets = e.v.assets.slice().sort(function(x,y){ return realCount(y)-realCount(x); });
+        var visible = sortedAssets, overflow = [];
+        if (clusterOn && sortedAssets.length>40){ visible = sortedAssets.slice(0,40); overflow = sortedAssets.slice(40); }
+        visible.forEach(function(a){ t.appendChild(tileHtml(a)); });
+        if (overflow.length) t.appendChild(clusterHtml(overflow));
+        e.v.shields.forEach(function(s){ t.appendChild(shieldHtml(s.type, s.item)); });
+      }
+      z.appendChild(t);
+      zoneEl.appendChild(z);
+    });
+
+    if (showShields && gapProducts.length){
+      var gz = document.createElement("div");
+      gz.className = "mv-zone mv-zone-gap";
+      gz.innerHTML = '<h4>🛡 보안장비 — 자산 미연결 · <b>'+gapProducts.length+'</b>건</h4>';
+      var gt = document.createElement("div"); gt.className="mv-tiles";
+      gapProducts.forEach(function(p){ gt.appendChild(shieldHtml("product", p)); });
+      gz.appendChild(gt);
+      zoneEl.appendChild(gz);
+    }
+
+    if (!entries.length && !(showShields && gapProducts.length)){
+      zoneEl.innerHTML = '<div style="color:var(--muted);padding:20px">조건에 맞는 자산이 없습니다</div>';
+    }
+
+    zoneEl.querySelectorAll('.mv-tile[data-kind="asset"]').forEach(function(el){
+      el.addEventListener("click", function(){
+        zoneEl.querySelectorAll(".mv-sel").forEach(function(x){ x.classList.remove("mv-sel"); });
+        el.classList.add("mv-sel");
+        var a = DATA.assets.find(function(x){ return x.id===el.dataset.id; });
+        selectedKey = a.id;
+        showAssetDetail(a);
+        focusEntity = (a.displayName||a.name);
+        mockSelectNotify({label:a.displayName||a.name, text:"자산 "+(a.displayName||a.name)});
+        drawOverlay(); // 등록 간선은 항상, 공격경로 강조(isFocus)만 pathsOn을 따름 — drawOverlay 내부에서 가른다
+      });
+    });
+    zoneEl.querySelectorAll('.mv-shield').forEach(function(el){
+      el.addEventListener("click", function(){
+        zoneEl.querySelectorAll(".mv-sel").forEach(function(x){ x.classList.remove("mv-sel"); });
+        el.classList.add("mv-sel");
+        if (el.dataset.kind==="product"){
+          var p = DATA.products.find(function(x){ return x.id===el.dataset.id; });
+          showProductDetail(p);
+          mockSelectNotify({label:p.name, text:"보안제품 "+p.name, fields:{title:p.name+(p.vendor?" · "+p.vendor:""), asset:p.assetName||"", status:""}});
+        } else {
+          var h = DATA.hardening.find(function(x){ return x.id===el.dataset.id; });
+          showHardeningDetail(h);
+          mockSelectNotify({label:h.label, text:"점검 대상 "+h.label, fields:{asset:h.label}});
+        }
+      });
+    });
+    zoneEl.querySelectorAll('.mv-cluster').forEach(function(el){
+      el.addEventListener("click", function(){ showClusterDetail(el._list); });
+    });
+  }
+
+  /** 공개 진입점 — 항상 이것을 부른다(renderZones를 직접 부르지 않는다).
+   *  왜 나눴나: drawOverlay()가 경로가 걸린 구획을 펴야 할 수 있는데(ensureZoneExpandedFor),
+   *  그러면 DOM을 다시 그려야 한다 — renderZones 안에서 drawOverlay를 부르면 그 되먹임이
+   *  무한루프가 될 수 있어 "DOM 그리기"와 "겹층 그리기"를 분리했다.
+   *  ⚠ 검토관 [중] 수리(2026-09-13) — 예전엔 pathsOn일 때만 drawOverlay를 불렀다. 등록 간선(§3)은
+   *  방패가 보이면(mode==="all") 공격경로 토글과 무관하게 항상 그려야 한다는 약속(주석)과 코드가
+   *  어긋나 있었다 — 이제 drawOverlay는 항상 부르고, 그 안에서 pathsOn/mode를 따로 본다. */
+  function render(){
+    renderZones();
+    drawOverlay();
+  }
+
+  // 결재판 등급 → 배지 클래스·문구(§2 route-explain 실측 근거를 그대로 옮김. "yes"만 write:true 실측 근거가 있다).
+  var BADGE = {
+    none:  {cls:"noappr", label:"결재판 없음"},
+    yes:   {cls:"appr",   label:"결재판 있음"},
+    maybe: {cls:"maybe",  label:"승인 창이 뜰 수 있습니다"}
+  };
+  function chipsForAsset(a){
+    var real = realCount(a);
+    var 이름 = a.displayName||a.name;
+    var rows = [];
+    // ①④⑤⑥⑦ — 2026-09-13 route-explain --no-build 실측(§2). ②는 기존 문구 그대로(예외표 재사용, 새 줄 아님).
+    rows.push({text:이름+" 취약점만 보여줘", badge:"none",
+      note:"[14] findingListAnswer(목록+체크칸)"});
+    if (real>0 && !a.owner) rows.push({text:이름+" 취약점 담당자 배정해줘", badge:"maybe",
+      note:"⑨ 모델 선택 — guidance-destination.test.ts:185(기존 줄)"});
+    rows.push({text:이름+" 재스캔 상태 알려줘", badge:"none",
+      note:"[37] scan_status(write:false)"});
+    rows.push({text:이름+" 공격 경로 보여줘", badge:"none",
+      note:"[25] formatAttackPaths — 무인자·상위 6건, 이름은 무시됨"});
+    rows.push({text:이름+" 조치 요청서 만들어줘", badge:"yes",
+      note:"[37] create_request_doc(write:true, registry.ts:2079)"});
+    rows.push({text:이름+" 취약점 리포트 만들어줘", badge:"none",
+      note:"[36] generateReport — 이름이 assetIds로 반영됨, 승인 없이 즉시 생성"});
+    return rows;
+  }
+
+  function showAssetDetail(a){
+    var real = findingsOf(a).filter(진짜취약);
+    var rk = riskOf(a);
+    var 등급 = rk.level==="high" ? ["고위험","rgba(229,72,77,.3)","#ffd7d8"]
+      : rk.level==="mid" ? ["중위험","rgba(240,160,32,.26)","#ffe9c4"]
+      : ["저위험","rgba(70,167,88,.22)","#d2f2da"];
+    var RANK={critical:4,high:3,medium:2,low:1};
+    var top = real.slice().sort(function(x,y){ return (RANK[y.severity]||0)-(RANK[x.severity]||0); }).slice(0,3);
+    var 이름 = a.displayName||a.name;
+    var linked = DATA.products.filter(function(p){ return p.assetId===a.id; });
+    var html = "<h3>"+esc(이름)+"</h3>"
+      + '<div><span class="mv-rk" style="background:'+등급[1]+';color:'+등급[2]+'">'+등급[0]+'</span>'
+      + (rk.kev ? '<span class="mv-rk" style="background:rgba(229,72,77,.4);color:#ffd7d8">🔴 실제 악용 확인</span>' : '') + '</div>'
+      + '<div class="mv-row"><div class="mv-lbl">미조치 취약점</div><b style="font-size:16px">'+real.length+'건</b></div>'
+      + '<div class="mv-row"><div class="mv-lbl">담당</div>'+(a.owner?esc(a.owner):'<span style="color:var(--amber)">미지정</span>')+'</div>';
+    if (top.length){
+      html += '<div class="mv-row"><div class="mv-lbl">먼저 볼 것</div>'+top.map(function(f){
+        return '<div class="mv-item">· '+esc(f.finding_type)+(f.plain?'<div class="mv-plain">→ '+boldify(esc(f.plain))+'</div>':'')+'</div>';
+      }).join('')+'</div>';
+    }
+    html += '<div class="mv-row"><div class="mv-lbl">🔗 연결된 보안장비</div>'
+      + (linked.length ? linked.map(function(p){ return '<div class="mv-sub">🛡 '+esc(p.name)+' <span class="chiptag noappr">등록</span></div>'; }).join("")
+                        : '<span class="mv-noedge">등록하면 나타납니다</span>') + '</div>';
+    html += '<div class="mv-row"><div class="mv-lbl">🛡 보호 범위(이 자산을 지키는 장비들이 지도 전체에서 어떤 다른 자산까지 지키는가)</div><span class="mv-noedge">등록 칸 없음 — 등록하면 나타납니다</span></div>';
+    html += '<div class="chiprow">' + chipsForAsset(a).map(function(c){
+      var b = BADGE[c.badge];
+      return '<div><button class="mv-ask" data-text="'+esc(c.text)+'" title="'+esc(c.note)+'">💬 "'+esc(c.text)+'"</button>'
+        + '<span class="chiptag '+b.cls+'" title="'+esc(c.note)+'">'+b.label+'</span></div>';
+    }).join('') + '</div>';
+    html += '<div class="mv-hint">지시는 전부 대화창을 거칩니다 — 지도는 보기 전용입니다.</div>';
+    var side = document.getElementById("mapSide");
+    side.innerHTML = html;
+    side.querySelectorAll(".mv-ask").forEach(function(b){ b.addEventListener("click", function(){ askPreview(b.dataset.text); }); });
+  }
+
+  // ⚠ 검토관 [중] 수리 — 아래 두 함수에 있던 화면 안 사용법 문장("이거 쉽게 설명해줘"처럼 이어 물으세요)과
+  // 검토자용 해설("...의 실제 selectnotify 계약 그대로 — 새 문법 아님")을 뺐다. 그 내용은 §10 screenguide
+  // 초안으로 옮겼다 — 화면엔 정체성·경고·칩만 둔다는 원칙 때문이다.
+  function showProductDetail(p){
+    var side = document.getElementById("mapSide");
+    var b8 = BADGE.none; // ⑧ maintenance_status는 write:false — 결재판 없음(§2 실측)
+    var html = "<h3>🛡 "+esc(p.name)+"</h3>"
+      + '<div class="mv-row"><div class="mv-lbl">종류 · 제조사/모델</div>'+esc(p.category)+(p.vendor?(' · '+esc(p.vendor)+(p.model?" "+esc(p.model):"")):'')+'</div>'
+      + '<div class="mv-row"><div class="mv-lbl">연결 자산</div>'+(p.assetName?('🔗 '+esc(p.assetName)+' <span class="chiptag noappr">등록</span>'):'<span class="mv-noedge">등록하면 나타납니다</span>')+'</div>'
+      + '<div class="mv-row"><div class="mv-lbl">매뉴얼 문서</div>'+(p.docs.length? p.docs.length+"건" : "없음")+'</div>'
+      + '<div class="mv-row"><div class="mv-lbl">🛡 보호 범위(이 제품이 지키는 자산 <b>전체</b> 목록)</div><span class="mv-noedge">등록 칸 없음 — 등록하면 나타납니다</span></div>';
+    html += '<div class="chiprow"><div><button class="mv-ask" data-text="'+esc(p.name+" 점검 일정 알려줘")+'" title="[37] maintenance_status(write:false)">💬 "'+esc(p.name+" 점검 일정 알려줘")+'"</button>'
+      + '<span class="chiptag '+b8.cls+'">'+b8.label+'</span></div></div>';
+    html += '<div class="mv-hint">지시는 전부 대화창을 거칩니다 — 지도는 보기 전용입니다.</div>';
+    side.innerHTML = html;
+    side.querySelectorAll(".mv-ask").forEach(function(b){ b.addEventListener("click", function(){ askPreview(b.dataset.text); }); });
+  }
+  function showHardeningDetail(h){
+    var side = document.getElementById("mapSide");
+    var b3 = BADGE.maybe; // ③은 데이터 의존(self=write:false vs scan_hardening_target=write:true·admin) — §2 실측
+    var html = "<h3>🛡 "+esc(h.label)+"</h3>"
+      + '<div class="mv-row"><div class="mv-lbl">기준</div>'+esc((h.standard||"").toUpperCase())+'</div>'
+      + '<div class="mv-row"><div class="mv-lbl">등록 상태</div>등록됨 <span class="chiptag noappr">등록</span></div>'
+      + '<div class="mv-row"><div class="mv-lbl">어느 자산인가(assetId 필드 자체 없음)</div><span class="mv-noedge">이름 일치로 추정하지 않음 — §3 참조</span></div>';
+    html += '<div class="chiprow"><div><button class="mv-ask" data-text="'+esc(h.label+" 하드닝 점검 돌려줘")+'" title="[37] run_hardening_scan(self) 또는 등록 대상 일치 시 scan_hardening_target(admin) — 데이터 의존">💬 "'+esc(h.label+" 하드닝 점검 돌려줘")+'"</button>'
+      + '<span class="chiptag '+b3.cls+'">'+b3.label+'</span></div></div>';
+    html += '<div class="mv-hint">지시는 전부 대화창을 거칩니다 — 지도는 보기 전용입니다.</div>';
+    side.innerHTML = html;
+    side.querySelectorAll(".mv-ask").forEach(function(b){ b.addEventListener("click", function(){ askPreview(b.dataset.text); }); });
+  }
+  function showClusterDetail(list){
+    var side = document.getElementById("mapSide");
+    var rows = list.slice().sort(function(x,y){ return realCount(y)-realCount(x); }).map(function(a){
+      var rk = riskOf(a);
+      return '<div class="mv-row" style="padding:4px 0"><b>'+esc(a.displayName||a.name)+'</b> · '+rk.label+(a.owner?(' · '+esc(a.owner)):' · 담당없음')+'</div>';
+    }).join('');
+    side.innerHTML = '<h3>+'+list.length+'개 — 군집 펼침</h3>'
+      + '<div style="overflow:auto;max-height:800px">'+rows+'</div>'
+      + '<div class="mv-hint">40개를 넘는 나머지를 여기서 스크롤로 봅니다 — runZero식 details-on-demand[3].</div>';
+  }
+
+  // ── 공격경로 겹층(확정/추정 구분 — §3) ─────────────────────────────
+  function findTile(container, name){
+    var t = String(name||"").toLowerCase();
+    var els = container.querySelectorAll('.mv-tile[data-kind="asset"]');
+    for (var i=0;i<els.length;i++){
+      var a = DATA.assets.find(function(x){ return x.id===els[i].dataset.id; });
+      if (!a) continue;
+      var cand = [a.name, a.displayName, a.ip].filter(Boolean).map(function(s){return String(s).toLowerCase();});
+      if (cand.some(function(s){ return s.indexOf(t)>=0 || t.indexOf(s)>=0; })) return els[i];
+    }
+    return null;
+  }
+  /** 경로가 걸린 자산의 구획을 편다. expanded===null(자동규칙 상태)이면 **먼저 자동규칙 결과를
+   *  실제 Set으로 굳힌 뒤** 더한다 — 안 그러면 "자동으로 펴진 1순위 구획"이 사라지고
+   *  "경로가 걸린 구획만" 남아, 경로 없는 급한 구획이 도로 접히는 되먹임 결함이 생긴다. */
+  function ensureZoneExpandedFor(entityName){
+    var a = DATA.assets.find(function(x){ return (x.displayName||x.name)===entityName || x.name===entityName; });
+    if (!a) return false;
+    var k = 구획열쇠(a);
+    if (expanded===null){
+      expanded = (lastEntries.length>3 && lastEntries[0]) ? new Set([lastEntries[0].k]) : new Set(lastEntries.map(function(e){return e.k;}));
+    }
+    if (expanded.has(k)) return false;
+    expanded.add(k);
+    return true;
+  }
+  /** 겹층(SVG) — 확정/추정(공격경로, §3) + 등록(보안제품↔자산, §3) 간선을 함께 그린다.
+   *  ⚠ 검토관 [중] 수리(2026-09-13) — 예전 drawPaths()는 pathsOn일 때만 불렸다. 그러면 §3 표의
+   *  "등록 간선은 방패가 보이면 항상 그린다(경로 온오프와 무관)"이라는 약속이 코드와 어긋난다
+   *  (🎯 공격경로를 끄면 등록 간선까지 함께 지워졌다). 이제 이 함수는 render()에서 **항상** 불리고,
+   *  등록 간선은 mode==="all"(방패가 보이는 조건)만 보고, 확정/추정 간선은 pathsOn만 본다 — 두 조건은
+   *  서로 독립이다. */
+  function drawOverlay(){
+    var showReg = (mode === "all"); // §5 규칙과 같은 조건 — 방패가 보일 때만
+    if (pathsOn){
+      var changed = false;
+      DATA.paths.forEach(function(p){ if (ensureZoneExpandedFor(p.entity)) changed = true; });
+      if (changed) renderZones(); // 새로 펼 구획이 생겼으면 DOM부터 다시 그린다(좌표를 재려면 타일이 실재해야 한다)
+    }
+    var zoneEl = document.getElementById("mapZones");
+    requestAnimationFrame(function(){
+      var old = zoneEl.querySelector(".mv-overlay"); if (old) old.remove();
+      document.querySelectorAll(".mv-edgelabel").forEach(function(n){ n.remove(); });
+      if (!pathsOn && !showReg){ updateLegend(); return; } // 그릴 것이 없으면 여기서 끝(기본 범례만)
+      var box = zoneEl.getBoundingClientRect();
+      var svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
+      svg.setAttribute("class","mv-overlay"); svg.setAttribute("width",box.width); svg.setAttribute("height",box.height);
+      svg.innerHTML = '<defs>'
+        + '<marker id="mA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#f5928a"/></marker>'
+        + '<marker id="mB" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8fb8ff"/></marker>'
+        + '</defs>';
+      var labels = [];
+      function pt(el){ var r=el.getBoundingClientRect(); return {x:r.left-box.left+r.width/2, y:r.top-box.top+r.height/2}; }
+      if (pathsOn){
+        DATA.paths.forEach(function(p){
+          var 확정 = p.reachability==="확인됨";
+          var foot = findTile(zoneEl, p.entity);
+          if (!foot) return;
+          foot.classList.add("mv-foothold");
+          var isFocus = focusEntity && String(p.entity).toLowerCase().indexOf(String(focusEntity).toLowerCase())>=0;
+          var c = pt(foot);
+          p.steps.forEach(function(s){
+            if (s.kind==="entry"){
+              var path = document.createElementNS("http://www.w3.org/2000/svg","path");
+              var d = "M "+(c.x-34)+" "+Math.max(4,c.y-46)+" Q "+(c.x-10)+" "+(c.y-28)+" "+c.x+" "+(c.y-12);
+              path.setAttribute("d", d);
+              path.setAttribute("class", "mv-edge " + (확정 ? "mv-edge-entry" : "mv-edge-entry-est"));
+              path.setAttribute("marker-end","url(#mA)");
+              svg.appendChild(path);
+              if (!확정) labels.push({x:c.x-20, y:c.y-30, cls:"est", text:"추정·"+p.reachability});
+            } else if (s.kind==="lateral" && isFocus){
+              var nb = findTile(zoneEl, s.entity);
+              if (!nb || nb===foot) return;
+              var d2 = pt(nb);
+              var mx=(c.x+d2.x)/2, my=(c.y+d2.y)/2-26;
+              var path2 = document.createElementNS("http://www.w3.org/2000/svg","path");
+              path2.setAttribute("d","M "+c.x+" "+c.y+" Q "+mx+" "+my+" "+d2.x+" "+d2.y);
+              path2.setAttribute("class","mv-edge " + (확정 ? "mv-edge-lateral" : "mv-edge-lateral-est"));
+              path2.setAttribute("marker-end","url(#mB)");
+              svg.appendChild(path2);
+              if (!확정) labels.push({x:mx, y:my, cls:"est", text:"추정·"+p.reachability});
+            }
+          });
+        });
+      }
+      // 등록 간선(보안제품 assetId 연결) — 방패가 보이면(showReg) 공격경로 토글과 무관하게 항상 그린다.
+      if (showReg){
+        DATA.products.forEach(function(p){
+          if (!p.assetId) return;
+          var assetTile = zoneEl.querySelector('.mv-tile[data-kind="asset"][data-id="'+p.assetId+'"]');
+          var shieldTile = zoneEl.querySelector('.mv-shield[data-kind="product"][data-id="'+p.id+'"]');
+          if (!assetTile || !shieldTile) return;
+          var a1 = pt(assetTile), a2 = pt(shieldTile);
+          var path3 = document.createElementNS("http://www.w3.org/2000/svg","path");
+          path3.setAttribute("d","M "+a1.x+" "+a1.y+" L "+a2.x+" "+a2.y);
+          path3.setAttribute("class","mv-edge-reg");
+          svg.appendChild(path3);
+          labels.push({x:(a1.x+a2.x)/2, y:(a1.y+a2.y)/2, cls:"reg", text:"등록"});
+        });
+      }
+      zoneEl.appendChild(svg);
+      labels.forEach(function(l){
+        var el = document.createElement("div");
+        el.className = "mv-edgelabel " + l.cls;
+        el.style.left = l.x+"px"; el.style.top = l.y+"px";
+        el.textContent = l.text;
+        zoneEl.appendChild(el);
+      });
+      updateLegend();
+    });
+    function updateLegend(){
+      var parts = ["색=위험 등급","타일 크기=미조치 취약점 수","구획=네트워크 대역","🛡=보안장비(방패)"];
+      if (showReg) parts.push('<span style="color:var(--teal)">━</span> 등록(보안제품↔자산) · 🛡 옆 점선 빈칸=보호 관계(등록 칸 없음)');
+      if (pathsOn) parts.push('<span style="color:#f5928a">━</span> 확정(관측됨) · <span style="color:var(--amber)">┈</span> 추정(점수)');
+      document.getElementById("demoLegend").innerHTML = parts.join(" · ");
+    }
+  }
+
+  // ── 버튼 배선 ─────────────────────────────────────────────────────
+  function setMode(m){
+    mode = m;
+    ["btnAll","btnKev","btnHigh","btnNobody"].forEach(function(id){ document.getElementById(id).classList.remove("on"); });
+    document.getElementById({all:"btnAll",kev:"btnKev",high:"btnHigh",nobody:"btnNobody"}[m]).classList.add("on");
+    render();
+  }
+  document.getElementById("btnAll").addEventListener("click", function(){ setMode("all"); });
+  document.getElementById("btnKev").addEventListener("click", function(){ setMode("kev"); });
+  document.getElementById("btnHigh").addEventListener("click", function(){ setMode("high"); });
+  document.getElementById("btnNobody").addEventListener("click", function(){ setMode("nobody"); });
+  document.getElementById("btnPath").addEventListener("click", function(){
+    // ⚠ 검토관 [중] 수리 — 예전엔 끌 때 overlay·edgelabel을 통째로 지웠다(등록 간선까지 함께 사라짐).
+    // 이제 drawOverlay()가 pathsOn/mode를 각각 보고 다시 그리므로 항상 render()만 부르면 된다.
+    pathsOn = !pathsOn;
+    document.getElementById("btnPath").classList.toggle("on", pathsOn);
+    render();
+  });
+  document.getElementById("btnStress").addEventListener("click", function(){
+    DATA = stressData(); expanded=null; document.getElementById("btnReset").style.display="";
+    document.getElementById("btnStress").classList.add("on");
+    render();
+  });
+  document.getElementById("btnReset").addEventListener("click", function(){
+    DATA = baseData(); expanded=null;
+    document.getElementById("btnStress").classList.remove("on");
+    document.getElementById("btnReset").style.display="none";
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
