@@ -11,6 +11,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { todayLocal } from "../util/date";
 import { listAssets, Asset } from "./assets";
 import { listMaintenanceItems } from "./maintenance";
+import { 점검지연인가 } from "./sla"; // 점검 「지연」 잣대(날짜·모집단) 단일 출처
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 // 스캔 실패 판정은 한 곳만 쓴다 — 두 벌 두면 하나는 반드시 낡는다.
@@ -104,12 +105,18 @@ export function computeServiceImpact(
 
 const today = todayLocal;
 
-// 지연(오늘 이하·미완료) 점검을 자산별로 집계한다.
+// 지연 점검을 자산별로 집계한다 — 판정은 sla.ts 점검지연인가() 한 곳에서 받는다.
+//
+// ★ 2026-09-13 검토관 [중] 수리 — 여기만 `scheduleDate <= today`였다. **오늘 마감인 점검 하나로
+//   서비스가 「영향도 높음」**이 됐다(아래 computeServiceImpact가 overdueInspections > 0 한 줄로
+//   high를 만든다). 같은 날 같은 데이터로 리포트·챗봇은 「예정」이라 말하는데 이 화면만 「지연」이라
+//   말하던 것 — SLA②가 없애려던 어긋남이 세 번째 자리에 그대로 남아 있었다. 모집단도 함께
+//   맞춘다(scheduled만 → approved 아님 전부).
 function overdueInspectionsByAsset(): Map<string, number> {
   const t = today();
   const map = new Map<string, number>();
   for (const m of listMaintenanceItems()) {
-    if (m.status === "scheduled" && m.scheduleDate <= t && m.assetId) {
+    if (점검지연인가(m, t) && m.assetId) {
       map.set(m.assetId, (map.get(m.assetId) ?? 0) + 1);
     }
   }

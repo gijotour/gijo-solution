@@ -61,6 +61,9 @@ export interface KpiSnapshot {
     open: number;
     done: number;
     overdue: number; // 기한 초과 — 미완료(기한 지남) + 완료했어도 늦게 끝난 것(SLA①, sla.ts)
+    // 그중 **아직 안 끝난** 것. 점수 감점·행동 목록은 이 값만 쓴다 — overdue는 늦게 끝낸 완료 건을
+    // 품고 있어 영원히 안 줄어드는 값이라, 그것으로 감점하면 다 닫아도 점수가 안 돌아온다.
+    openOverdue: number;
     dueSoon: number; // 3일 내 마감(미완료)
     slaCompliance: number; // 기한 초과 안 한 비율 %
   };
@@ -205,7 +208,11 @@ function computePosture(
   // 100에서 시작해 위험 요인만큼 감점 — 각 요인은 상한이 있어 한 요인이 점수를 독식하지 않는다.
   let score = 100;
   score -= Math.min(25, v.kev * 8 + v.critical * 4); // 실제 악용·치명 취약점
-  score -= Math.min(15, rem.overdue * 5); // SLA 기한 초과
+  // ⚠ **openOverdue**(아직 안 끝난 초과)로 깎는다 — overdue는 늦게 끝낸 완료 건을 품어 영원히
+  //   안 줄어드는 값이다(sla.ts 열린기한초과인가 머리글). 그걸로 깎으면 밀린 일을 전부 닫아도
+  //   −15가 그대로 남아, 아래 231-234행이 스스로 경고한 「고치고 확인하다 제품을 안 믿게 된다」가
+  //   그대로 재현된다. 늦게 끝낸 사실은 바로 아래 slaCompliance 감점이 이미 반영한다(이중 계산 방지).
+  score -= Math.min(15, rem.openOverdue * 5); // SLA 기한 초과(아직 안 끝난 것)
   score -= Math.min(15, Math.round(highRiskRatio * 30)); // 고위험 자산 비중
   score -= Math.min(15, Math.round((100 - rem.slaCompliance) * 0.15)); // SLA 미준수
   score -= Math.min(15, Math.round((100 - compRate) * 0.15)); // 컴플라이언스 미대응
@@ -238,7 +245,7 @@ export function 점수영향글(snap: KpiSnapshot): string {
   const rem = snap.remediation;
   const 감점 = [
     { 이름: "실제 악용(KEV)·치명 취약점", 값: Math.min(25, v.kev * 8 + v.critical * 4), 상한: 25, 원값: v.kev * 8 + v.critical * 4 },
-    { 이름: "기한 초과", 값: Math.min(15, rem.overdue * 5), 상한: 15, 원값: rem.overdue * 5 },
+    { 이름: "기한 초과(아직 안 끝난 것)", 값: Math.min(15, rem.openOverdue * 5), 상한: 15, 원값: rem.openOverdue * 5 },
     { 이름: "SLA 미준수", 값: Math.min(15, Math.round((100 - rem.slaCompliance) * 0.15)), 상한: 15, 원값: Math.round((100 - rem.slaCompliance) * 0.15) },
   ];
   const 줄 = 감점.map((d) => {
@@ -257,8 +264,11 @@ export function 점수영향글(snap: KpiSnapshot): string {
   const 할일 =
     v.kev > 0
       ? `${표식.다음} 지금 할 일 — KEV ${v.kev}건이 가장 큽니다. "KEV 취약점 몇 건이야?"로 목록을 보고 담당자를 배정하세요.`
-      : rem.overdue > 0
-        ? `${표식.다음} 지금 할 일 — 기한 초과 ${rem.overdue}건부터 닫으세요. "기한 초과 뭐 있어?"라고 하시면 목록이 나옵니다.`
+      : rem.openOverdue > 0
+        ? // ⚠ **openOverdue**로 묻는다 — 늦게 끝낸 완료 건은 mywork·briefing·picklist 어느 목록에도
+          //   안 뜬다(전부 미완료만 싣는다). overdue로 안내하면 「N건부터 닫으세요」라 해 놓고 열어
+          //   보면 닫을 것이 없는 거짓 행동 지시가 된다(2026-09-13 검토관 [상]).
+          `${표식.다음} 지금 할 일 — 기한 초과 ${rem.openOverdue}건부터 닫으세요. "기한 초과 뭐 있어?"라고 하시면 목록이 나옵니다.`
         : `${표식.다음} 지금 할 일 — "오늘 뭐부터 해야 해?"로 우선순위를 받으세요.`;
   return [
     `종합 보안태세 **${snap.posture.score}점** (100점 만점) — 규칙으로 계산한 값입니다.`,

@@ -9,7 +9,8 @@
 //   그래서 여기서 등록→점검서→승인/반려 전 구간을 돈다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "../src/db";
-import { createMaintenanceItem, listMaintenanceItems } from "../src/engine/maintenance";
+import { createMaintenanceItem, listMaintenanceItems, submitReport, approveItem, rejectItem } from "../src/engine/maintenance";
+import { 점검지연인가 } from "../src/engine/sla";
 import { runSubmitMaintenanceReport, runReviewMaintenance, runMaintenanceStatus } from "../src/engine/agenttools/handlers";
 import { maintenanceSummary } from "../src/engine/report";
 import { todayLocal, plusDaysLocal } from "../src/util/date";
@@ -127,6 +128,49 @@ describe("지연 잣대 통일 — report.ts와 대화 도구(runMaintenanceStat
     expect(m, `대화 도구 답에서 기한 초과 건수를 못 뽑았다: ${답}`).not.toBeNull();
     expect(Number(m![1]), "대화 도구 잣대 — 오늘 마감을 지연으로 세면 안 된다").toBe(1);
     expect(Number(m![1]), "report.ts와 대화 도구의 지연 건수가 같아야 한다").toBe(ms.overdue);
+  });
+});
+
+// ★★ 2026-09-13 검토관 [중] 수리 — 위 짝 시험은 **날짜 차원만** 쟀다(표본이 scheduled 셋뿐).
+//   실제로 갈려 있던 두 번째 차원은 **모집단**이다: report.ts는 `scheduled`만, 대화 도구·데이터
+//   카드는 `approved 아님` 전부를 셌다. 제품 자신의 시드(maintenance.ts 「오탐 룰 점검」 = 3일 전
+//   **반려**)만으로 같은 DB에서 리포트 1건 vs 대화 도구 2건이 나왔다. 상태를 섞어 다시 잰다.
+describe("지연 모집단 통일 — 승인 대기·반려로 기한이 지난 건도 두 소비자가 똑같이 센다(SLA②)", () => {
+  it("scheduled·reported·rejected·approved를 섞어도 report·대화 도구·잎 함수가 같은 수를 말한다", () => {
+    createMaintenanceItem({ title: "오늘예정", productName: "FW-01", scheduleDate: todayLocal() });
+    createMaintenanceItem({ title: "어제예정", productName: "FW-02", scheduleDate: plusDaysLocal(-1) });
+    createMaintenanceItem({ title: "내일예정", productName: "FW-03", scheduleDate: plusDaysLocal(1) });
+
+    // 승인 대기(reported)인데 예정일이 3일 지난 것 — 화면에선 지연으로 보인다.
+    const 대기 = createMaintenanceItem({ title: "승인대기지남", productName: "FW-04", scheduleDate: plusDaysLocal(-3) });
+    submitReport(대기.id, { note: "점검함" }, "정요한");
+
+    // 반려(rejected)인데 예정일이 2일 지난 것 — 제품 시드가 실제로 가진 모양이다.
+    const 반려 = createMaintenanceItem({ title: "반려지남", productName: "FW-05", scheduleDate: plusDaysLocal(-2) });
+    submitReport(반려.id, { note: "대충 봄" }, "정요한");
+    rejectItem(반려.id, "정요한", "증적 부족");
+
+    // 승인 완료(approved)는 예정일이 지났어도 지연이 아니다.
+    const 완료 = createMaintenanceItem({ title: "완료지남", productName: "FW-06", scheduleDate: plusDaysLocal(-5) });
+    submitReport(완료.id, { note: "점검함" }, "정요한");
+    approveItem(완료.id, "정요한");
+
+    const items = listMaintenanceItems();
+    const 잎 = items.filter((m) => 점검지연인가(m, todayLocal())).length;
+    expect(잎, "어제예정 + 승인대기지남 + 반려지남 = 3건").toBe(3);
+
+    const ms = maintenanceSummary(items);
+    expect(ms.overdue, "report.ts가 scheduled만 세면 1이 나온다 — 모집단이 갈린 자리").toBe(3);
+    expect(ms.overdue).toBe(잎);
+
+    const 답 = runMaintenanceStatus({});
+    const m = /기한 초과 (\d+)건/.exec(답);
+    expect(m, `대화 도구 답에서 기한 초과 건수를 못 뽑았다: ${답}`).not.toBeNull();
+    expect(Number(m![1]), "리포트와 대화 도구가 같은 수를 말해야 한다").toBe(ms.overdue);
+
+    // ⚠ 지연은 **예정(scheduled)의 부분집합이 아니다** — 보고서 문장이 「예정 N건(지연 M)」처럼
+    //   품어 적으면 거짓 포함관계가 된다(이 값이 그 증거다: 예정 3건인데 지연 3건 중 2건은 밖이다).
+    expect(ms.scheduled, "scheduled는 오늘·어제·내일 셋").toBe(3);
   });
 });
 

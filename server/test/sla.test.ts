@@ -16,8 +16,9 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { 조치대상인가, 기한초과인가, 준수건인가, remediationSla, SLA산식설명, SLA미집계설명 } from "../src/engine/sla";
-import { computeKpiSnapshot, resetKpiForTests } from "../src/engine/kpi";
+import { 조치대상인가, 기한초과인가, 열린기한초과인가, 준수건인가, remediationSla, SLA산식설명, SLA미집계설명 } from "../src/engine/sla";
+import { computeKpiSnapshot, resetKpiForTests, 점수영향글 } from "../src/engine/kpi";
+import { runUrgentTodo } from "../src/engine/agenttools/handlers";
 import { resetAssetsForTests, seedSampleAssetsIfEmpty } from "../src/engine/assets";
 import { resetTasksForTests, createTask } from "../src/engine/tasks";
 import { collectVulnReportData } from "../src/engine/report";
@@ -96,8 +97,11 @@ describe("★ 소스 감시 — 조치 SLA 판정을 sla.ts 밖에서 다시 짜
       "alertschedule.ts — 바로 위 알림 모집단의 초과분. 같은 이유로 SLA 준수율과 모집단이 다르다",
     "overdue: !t.done && t.dueAt != null && t.dueAt < now,":
       "mywork.ts — 내 업무 목록 **한 줄마다 붙는 표시용 깃발**이고 모집단이 vuln: 조치가 아니라 내 업무 전체다. " +
-      "⚠ 다만 판정식 자체는 sla.ts 기한초과인가와 글자까지 같다 — mywork.ts가 그 함수를 부르게 하는 것은 " +
-      "이번 묶음 범위 밖(다른 실행자 파일)이라 메인 결정 사안으로 올려 두고 예외로 둔다",
+      "⚠ 2026-09-13 정정(검토관 [하]) — 첫 판은 이유를 「판정식이 sla.ts 기한초과인가와 **글자까지 같다**」로 " +
+      "적었는데 SLA① 뒤로는 거짓이다: 기한초과인가는 세 갈래(기한 없음 / 미완료 / 완료·completedAt 비교)가 " +
+      "됐고 이 줄은 미완료만 본다. 지금 글자가 같은 것은 sla.ts **열린기한초과인가**(행동 목록·점수 감점용)다 — " +
+      "mywork.ts가 그 함수를 부르게 하는 것은 이번 묶음 범위 밖(다른 실행자 파일)이라 메인 결정 사안으로 " +
+      "올려 두고 예외로 둔다. 예외의 이유가 낡으면 그 예외는 영원히 안 걷힌다.",
     "open.filter((t) => t.dueAt != null && t.dueAt <= todayEnd)":
       "mywork.ts — 오늘 안에 마감인 것을 묶는 자리(하루 끝 기준). SLA 준수율·기한초과 집계가 아니다",
   };
@@ -127,6 +131,12 @@ describe("★ 소스 감시 — 조치 SLA 판정을 sla.ts 밖에서 다시 짜
     if (/^\s*(\/\/|\*|\/\*)/.test(l)) return false;
     if (!/\bdueAt\b/.test(l)) return false;
     if (!/[<>]=?/.test(l)) return false;
+    // ★ 2026-09-13 검토관 [중] 수리 — SLA①이 만든 **새 판정 꼴**을 이 감시가 원리상 못 잡았다:
+    //   `t.completedAt != null && t.completedAt > t.dueAt`에는 now·today가 없어 아래 한 줄에서
+    //   통째로 빠져나갔다. 다음 사람이 다른 파일에 `const 늦음 = t.completedAt > t.dueAt;`를 적고
+    //   그 값으로 세도 감시는 초록이었다 — 이 감시가 막으려던 「sla.ts 밖에서 다시 짜기」가
+    //   SLA①이 만든 형태로 다시 열려 있었다.
+    if (/\bcompletedAt\b/.test(l)) return true;
     return /\b(now|soon|Date\.now|today)\b/.test(l);
   }
 
@@ -198,7 +208,10 @@ describe("★ 소스 감시 — 조치 SLA 판정을 sla.ts 밖에서 다시 짜
     const 원본걸린줄 = 소스("sla.ts")
       .split("\n")
       .filter((l) => 조치대상줄인가(l) || SLA판정줄인가(l));
-    expect(원본걸린줄.length, "sla.ts의 판정식조차 못 잡는다 — 잣대가 죽었다").toBeGreaterThanOrEqual(3);
+    // ⚠ 하한을 **실제 줄 수에 붙여** 둔다(2026-09-13 검토관 [중]) — 3은 수리 직전 값과 정확히
+    //   같아 「완료(completedAt) 판정 줄이 통째로 빠져도 초록」이었다. 실측 4줄: 조치대상인가 ·
+    //   완료(completedAt) 판정 · 열린기한초과인가 · remediationSla의 dueSoon.
+    expect(원본걸린줄.length, "sla.ts의 판정식조차 못 잡는다 — 잣대가 죽었다").toBeGreaterThanOrEqual(4);
   });
 });
 
@@ -408,5 +421,139 @@ describe("SLA① — 기한을 넘겨 완료한 조치는 미준수로 센다(20
     const now = Date.now();
     expect(기한초과인가({ done: false, dueAt: now - 1000 }, now)).toBe(true);
     expect(기한초과인가({ done: false, dueAt: now + 1000 }, now)).toBe(false);
+  });
+});
+
+// ★★ SLA① 소비자 갈래(2026-09-13 검토관 [상] 수리) — 「닫을 수 없는 건」을 닫으라 하지 않는다.
+//
+// 무엇이 문제였나: 기한초과인가가 늦게 끝낸 완료 건을 품으면서 그 값(overdue)이 **영원히 참**이
+// 됐는데, 그 값을 ① 보안태세 감점(kpi.ts computePosture) ② 「기한 초과 N건부터 닫으세요」
+// (점수영향글) ③ 「지금 손댈 일 [P0] 기한 지난 조치 N건」(runUrgentTodo)이 그대로 썼다.
+// 늦게 끝낸 건은 mywork·briefing·picklist 어느 목록에도 안 뜨므로, 담당자는 열어 봐도 닫을 것이
+// 없고 점수는 영영 안 돌아온다. 이제 그 셋은 openOverdue(아직 안 끝난 초과)만 센다.
+describe("★ SLA① — 늦게 끝낸 완료 건은 «준수율»만 깎고 «지금 할 일»엔 안 들어간다", () => {
+  it("열린기한초과인가는 미완료만 참이다 — 늦게 끝낸 완료 건은 거짓(단위)", () => {
+    const now = Date.now();
+    expect(기한초과인가({ done: true, dueAt: now - 86400000, completedAt: now }, now), "준수율 쪽 잣대").toBe(true);
+    expect(열린기한초과인가({ done: true, dueAt: now - 86400000, completedAt: now }, now), "행동 목록 쪽 잣대").toBe(false);
+    expect(열린기한초과인가({ done: false, dueAt: now - 86400000 }, now)).toBe(true);
+    expect(열린기한초과인가({ done: false, dueAt: now + 86400000 }, now)).toBe(false);
+    expect(열린기한초과인가({ done: false }, now), "기한이 없으면 초과를 논할 수 없다").toBe(false);
+  });
+
+  it("remediationSla가 둘을 따로 낸다 — overdue 2 · openOverdue 1", () => {
+    const now = Date.now();
+    const 어제 = now - 86400000;
+    const sla = remediationSla(
+      [
+        { done: true, dueAt: 어제, completedAt: now }, // 늦게 끝냄 — 미준수지만 닫을 것 없음
+        { done: false, dueAt: 어제 }, // 아직 안 끝난 초과 — 지금 손댈 일
+        { done: true, dueAt: now + 86400000, completedAt: now }, // 제때 끝냄
+      ],
+      now,
+    );
+    expect(sla.overdue, "준수율 분자에서 빠지는 수").toBe(2);
+    expect(sla.openOverdue, "지금 닫을 수 있는 수").toBe(1);
+  });
+
+  it("★ 늦게 끝낸 건 하나뿐이면 감점 0 · 「닫으세요」 안내 없음 · 「지금 손댈 일」에 줄 없음(돌연변이 감시)", async () => {
+    resetKpiForTests();
+    resetAssetsForTests(); // ⚠ 시드를 **안 심는다** — KEV가 있으면 「지금 할 일」이 KEV 갈래로 가서
+    //   이 시험이 overdue/openOverdue 어느 쪽을 쓰든 초록이 된다(헛도는 시험 방지).
+    resetTasksForTests();
+
+    createTask({ text: "[조치] 늦게 끝냄", priority: "P1", dueAt: Date.now() - 86400000, ref: "vuln:sla-late-only" });
+    const { setTaskDone, listTasks } = await import("../src/engine/tasks");
+    setTaskDone(listTasks().find((t) => t.ref === "vuln:sla-late-only")!.id, true);
+
+    const snap = await computeKpiSnapshot();
+    expect(snap.remediation.overdue, "준수율 쪽은 1건을 센다").toBe(1);
+    expect(snap.remediation.openOverdue, "지금 닫을 수 있는 건은 0이다").toBe(0);
+
+    const 글 = 점수영향글(snap);
+    expect(글, "감점표가 overdue로 되돌아가면 −5점이 찍힌다").toContain("기한 초과(아직 안 끝난 것): −0점");
+    expect(글, "닫을 것이 없는데 「닫으세요」라고 하면 안 된다").not.toContain("건부터 닫으세요");
+
+    // ★ **점수 자체**도 잰다(computePosture) — 위 글은 점수영향글의 감점표라 다른 자리다.
+    //   첫 판은 글만 재서 computePosture를 overdue로 되돌려도 초록이었다(돌연변이 실측 MISSED).
+    //   같은 티켓이 «열려 있을 때»와 «늦게 끝냈을 때»의 점수 차이가 정확히 5점이어야 한다 —
+    //   닫으면 −5가 풀린다는 뜻이다. overdue로 깎으면 둘이 같아져(영영 안 풀려) 여기가 운다.
+    resetKpiForTests();
+    resetTasksForTests();
+    createTask({ text: "[조치] 열린 초과", priority: "P1", dueAt: Date.now() - 86400000, ref: "vuln:sla-open-late" });
+    const 열린점수 = (await computeKpiSnapshot()).posture.score;
+    resetKpiForTests();
+    setTaskDone(listTasks().find((t) => t.ref === "vuln:sla-open-late")!.id, true);
+    const 닫은점수 = (await computeKpiSnapshot()).posture.score;
+    expect(닫은점수 - 열린점수, "늦게라도 닫으면 「기한 초과」 감점 5점이 풀려야 한다(준수율 감점은 그대로)").toBe(5);
+
+    const 할일 = await runUrgentTodo();
+    // ⚠ 꼬리말의 예시 문구(「"기한 지난 조치 마무리를 할 일로 담아줘"」)에도 같은 낱말이 있다 —
+    //   **목록 줄의 꼴([P0] …)**로 재야 시험이 헛돌지 않는다(첫 판 실측).
+    expect(할일, "이미 끝낸 일이 [P0] 「지금 손댈 일」로 남으면 안 된다").not.toContain("[P0] 기한 지난 조치");
+  });
+});
+
+// ★★ 점검 「지연」 잣대 소스 감시(2026-09-13 검토관 [중] 수리) — 날짜도 모집단도 한 곳에서만.
+//
+// 왜 소스를 글자로 보나: 같은 「지연」을 세는 자리가 넷인데 **넷이 다 달랐다**(report=scheduled만,
+// 챗봇·데이터카드=approved 아님, serviceimpact=scheduled만 + `<=`). 값 시험은 네 소비자를 전부
+// 불러야 겨우 잡는데, 다섯 번째 창구가 생기면 그 시험은 원리상 못 본다.
+describe("★ 소스 감시 — 점검 지연 판정을 sla.ts 밖에서 다시 짜는 자리가 없다", () => {
+  /** 점검 예정일을 오늘과 견주는 줄인가(주석 제외). */
+  function 점검지연줄인가(l: string): boolean {
+    if (/^\s*(\/\/|\*|\/\*)/.test(l)) return false;
+    // ⚠ **화살표(=>)를 먼저 지운다** — 안 지우면 `.filter((m) => …scheduleDate…)`의 `>`가 견줌으로
+    //   읽혀, 점검지연인가()를 제대로 부르는 줄까지 빨갛게 만든다(첫 판 실측 오탐 3건).
+    const 화살표뺀 = l.replace(/=>/g, "");
+    if (!/\bscheduleDate\b/.test(화살표뺀)) return false;
+    return /[<>]/.test(화살표뺀);
+  }
+
+  /** 엔진 .ts 전수(하위 폴더 포함) — 위 describe의 같은 뜻 함수는 그 블록 안에만 산다. */
+  function 엔진파일들(rel = ""): string[] {
+    const out: string[] = [];
+    for (const e of fs.readdirSync(path.join(ENGINE, rel), { withFileTypes: true })) {
+      if (e.name.startsWith("__")) continue;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) out.push(...엔진파일들(r));
+      else if (e.name.endsWith(".ts")) out.push(r);
+    }
+    return out;
+  }
+
+  /** 예외 — **이유 없이 넣지 말 것.** */
+  const 예외줄: Record<string, string> = {
+    "scheduleDate <= ?":
+      "maintenance.ts listDueMaintenance — **메일 알림용 「due」**다. 오늘 마감도 알림 대상은 맞으므로 " +
+      "`<=`가 옳고, 「지연」과는 다른 개념이다(report.ts SLA② 주석이 같은 말을 적어 두었다)",
+    "const upcoming = open.filter((m) => m.scheduleDate >= today);":
+      "handlers.ts runMaintenanceStatus — 「지연」이 아니라 그 **반대편(예정)**을 묶는 줄이다. " +
+      "지연은 바로 윗줄에서 점검지연인가()가 판정한다",
+  };
+
+  it("engine 어디에도 scheduleDate를 손으로 오늘과 견주는 줄이 없다(sla.ts·예외 제외)", () => {
+    const 파일들 = 엔진파일들();
+    expect(파일들.length, "엔진 .ts를 이만큼도 못 찾았다 — 재귀가 망가졌다").toBeGreaterThan(50);
+    expect(파일들, "하위 폴더를 안 훑고 있다").toContain("agenttools/handlers.ts");
+    const 걸린것: string[] = [];
+    for (const f of 파일들) {
+      if (f === "sla.ts") continue; // 원본
+      for (const l of 소스(f).split("\n")) {
+        if (!점검지연줄인가(l)) continue;
+        if (Object.keys(예외줄).some((조각) => l.includes(조각))) continue;
+        걸린것.push(`${f} — ${l.trim().slice(0, 110)}`);
+      }
+    }
+    expect(
+      걸린것,
+      "점검 「지연」 판정이 sla.ts 밖에서 다시 만들어졌다 — 점검지연인가(m, today)를 부르거나, " +
+        "정말 다른 개념이면 예외줄에 **이유와 함께** 적을 것:\n  " + 걸린것.join("\n  "),
+    ).toEqual([]);
+  });
+
+  it("원본(sla.ts)의 판정 줄은 실제로 걸린다 — 정규식이 죽으면 여기가 먼저 운다", () => {
+    const 원본 = 소스("sla.ts").split("\n").filter(점검지연줄인가);
+    expect(원본.length, "sla.ts 점검지연인가의 판정식조차 못 잡는다").toBeGreaterThanOrEqual(1);
   });
 });

@@ -13,6 +13,8 @@ import { computeKpiSnapshot, resetKpiForTests } from "../src/engine/kpi";
 import { resetAssetsForTests, seedSampleAssetsIfEmpty, seedSampleVulnHostIfEmpty } from "../src/engine/assets";
 import { resetTasksForTests } from "../src/engine/tasks";
 import { hangulRatio } from "../src/engine/llm";
+// 「기한 초과」 칸 이름은 sla.ts 한 곳에서 온다 — 여기에 글자를 베끼면 이름이 바뀌는 날 어긋난다.
+import { 기한초과라벨 } from "../src/engine/sla";
 import { 도구단계, 다음단계붙이기 } from "../src/engine/agentloop";
 
 const run = () => Promise.resolve(findAgentTool("exec_brief")!.run({})).then(String);
@@ -104,7 +106,9 @@ describe("★ 세 줄의 숫자는 KPI 스냅샷을 그대로 인용한다 — �
     expect(out).toContain(`취약점 ${s.vulnerabilities.active}건`);
     expect(out).toContain(`${s.vulnerabilities.critical}건`);
     expect(out).toContain(`KEV) ${s.vulnerabilities.kev}건`);
-    expect(out).toContain(`기한 초과 ${s.remediation.overdue}건`);
+    // ★ 2026-09-13 — 칸 이름이 「기한 초과(늦게 끝낸 건 포함)」로 바뀌었다(SLA①로 이 값에
+    //   기한을 넘겨 «완료»한 건이 섞이므로, 완료·진행과 나란히 읽는 사람이 오해하지 않게).
+    expect(out).toContain(`${기한초과라벨} ${s.remediation.overdue}건`);
     expect(out).toContain(`마감 임박 ${s.remediation.dueSoon}건`);
     expect(out).toContain(`기한 준수율 ${s.remediation.slaCompliance}%`);
     // 기준일 — 「이번 주」로 물어도 오늘 기준 스냅샷이라는 것을 답이 스스로 밝힌다.

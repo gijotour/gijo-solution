@@ -25,7 +25,7 @@ import { listTasks, TaskItem } from "./tasks";
 // SLA 산식(조치대상 판정·준수율 집계·근거 문장)은 잎 모듈 한 곳(sla.ts)에서 온다 — kpi.ts와
 // 글자까지 같은 산식이 따로 있던 것을 2026-09-12에 합쳤다(kpi.ts가 이 파일을 import하므로
 // 반대 방향은 순환이라 잎 모듈로 피했다). server/test/slaclue.test.ts가 값이 같은지 대조한다.
-import { 조치대상인가, remediationSla, SLA산식설명, SLA미집계설명 } from "./sla";
+import { 조치대상인가, remediationSla, SLA산식설명, SLA미집계설명, 점검지연인가, 기한초과라벨 } from "./sla";
 import { prioritizedReviews, buildTriageDraft, type PrioritizedFinding } from "./approvals";
 import { aibomThreatMatches, type AiBomThreatReport } from "./compliance";
 import { recordAudit } from "./audit";
@@ -141,14 +141,20 @@ export function collectVulnReportData(scopeAssets?: Asset[]): VulnReportData {
   return { ...d, remediation: { tasks: sla.tasks, done: sla.done, open: sla.open, overdue: sla.overdue, slaCompliance: sla.slaCompliance, topOpen } };
 }
 
-// 유지보수 점검 현황 요약(거버넌스 섹션용). scheduleDate가 오늘보다 이른 scheduled는 "지연".
+// 유지보수 점검 현황 요약(거버넌스 섹션용).
 //
 // ★ SLA②(2026-09-13 사장님 결정 — 「오늘 마감은 지연이 아니다(예정)」) — 예전엔
 //   `scheduleDate <= today`라 **오늘 마감인 것까지 지연으로 셌다.** 대화 도구
 //   handlers.ts runMaintenanceStatus는 처음부터 `scheduleDate < today`(오늘은 예정)였다 —
-//   같은 사실을 리포트는 "지연", 챗봇은 "예정"이라 다르게 말하던 잣대를 여기서 통일한다.
+//   같은 사실을 리포트는 "지연", 챗봇은 "예정"이라 다르게 말하던 잣대를 통일한다.
 //   ⚠ maintenance.ts의 listDueMaintenance(`scheduleDate <= today`, 메일 알림용 "due")는
 //   다른 개념이다(오늘 마감된 것도 알림 대상은 맞다) — 이 통일은 "지연" 판정에만 적용한다.
+// ★★ 2026-09-13 검토관 [중] 수리 — 날짜만 맞추고 **모집단을 안 맞춰** 여전히 갈렸다:
+//   여기는 `scheduled`만 셌고 대화 도구·데이터 카드는 `approved 아님` 전부를 센다. 제품 시드의
+//   반려(rejected)된 3일 전 점검 하나 때문에 같은 DB에서 리포트 1건 vs 대화 도구 2건이 나왔다.
+//   이제 날짜·모집단 둘 다 sla.ts 점검지연인가() **한 곳**에서 받는다.
+// ⚠ 그래서 overdue는 **scheduled의 부분집합이 아니다**(승인 대기·반려 중 기한 지난 건 포함).
+//   아래 문서·HTML 문장이 「예정 N건(지연 M)」처럼 품어 적으면 거짓 포함관계가 된다 — 나란히 적는다.
 export interface MaintenanceSummary {
   total: number;
   scheduled: number;
@@ -162,9 +168,9 @@ export function maintenanceSummary(items: MaintenanceItem[]): MaintenanceSummary
   const today = todayLocal();
   const s: MaintenanceSummary = { total: items.length, scheduled: 0, overdue: 0, reported: 0, approved: 0, rejected: 0 };
   for (const m of items) {
+    if (점검지연인가(m, today)) s.overdue++; // 모집단은 approved 아님 전부(위 ★★)
     if (m.status === "scheduled") {
       s.scheduled++;
-      if (m.scheduleDate < today) s.overdue++;
     } else if (m.status === "reported") s.reported++;
     else if (m.status === "approved") s.approved++;
     else if (m.status === "rejected") s.rejected++;
@@ -355,7 +361,7 @@ async function buildDocx(
             children: [
               new TextRun(
                 `조치 항목 ${vuln.remediation.tasks}건 · 완료 ${vuln.remediation.done} · 진행 ${vuln.remediation.open}` +
-                  ` · 기한 초과 ${vuln.remediation.overdue} · SLA 준수율 ${vuln.remediation.slaCompliance}%` +
+                  ` · ${기한초과라벨} ${vuln.remediation.overdue} · SLA 준수율 ${vuln.remediation.slaCompliance}%` +
                   // ★ 2026-09-11 검토관 [중] — B6-②가 대화 도구 둘(runKpiStatus·runExecBrief)에만
                   //   단서를 붙여, **같은 스냅샷을 대화는 「집계 전」, 보고서는 「100%」**로 말했다.
                   //   문구는 tone.ts 한 곳(준수율집계전단서) — 여기서 새로 짓지 않는다.
@@ -469,7 +475,7 @@ async function buildDocx(
           new Paragraph({
             children: [
               new TextRun(
-                `전체 ${ms.total}건 · 예정 ${ms.scheduled}건(지연 ${ms.overdue}) · 승인 대기 ${ms.reported}건 · 승인됨 ${ms.approved}건 · 반려 ${ms.rejected}건`
+                `전체 ${ms.total}건 · 예정 ${ms.scheduled}건 · 승인 대기 ${ms.reported}건 · 승인됨 ${ms.approved}건 · 반려 ${ms.rejected}건 · 이 가운데 지연(승인 전인데 예정일이 지난 것) ${ms.overdue}건`
               ),
             ],
           }),
@@ -629,7 +635,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
       `취약점 조치: 스캔 호스트 ${vuln.hosts}대, 열린 취약점 ${vuln.active}건(Critical ${vuln.critical}·High ${vuln.high}), ` +
       // ⚠ 임원 요약을 쓰는 **모델에게 주는 재료**다 — 여기에 단서가 없으면 모델이 「SLA 준수율
       //   100%로 양호」라고 쓴다(2026-09-11 검토관 [중]). 문구는 tone.ts 한 곳에서 온다.
-      `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%${준수율집계전단서(vuln.remediation.tasks)}, 기한 초과 ${vuln.remediation.overdue}건. ` +
+      `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%${준수율집계전단서(vuln.remediation.tasks)}, ${기한초과라벨} ${vuln.remediation.overdue}건. ` +
       `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건.${caseHint} ` +
       `KEV와 기한 초과, 그리고 EPSS가 높은 취약점을 우선순위로 강조해줘. ` +
       `중요: 위에 제시된 수치만 사용하고, 제시되지 않은 숫자(호스트 대수 등)를 새로 지어내지 마세요. 스캔 호스트는 정확히 ${vuln.hosts}대입니다.`,
@@ -1136,7 +1142,7 @@ function buildReportHtml(
     <h2>심각도별 분포</h2><p>${Object.entries(counts).map(([s, c]) => `${esc(s)}: ${c}건`).join(" · ")}</p>
     <h2>취약점 조치 현황</h2>
     <p>스캔 호스트 ${vuln.hosts}대 · 열린 취약점 ${vuln.active}건 (Critical ${vuln.critical}/High ${vuln.high}/Medium ${vuln.medium}/Low ${vuln.low}) · 실제 악용(KEV) ${vuln.kev}건</p>
-    <p>조치 항목 ${vuln.remediation.tasks}건 · 완료 ${vuln.remediation.done} · 진행 ${vuln.remediation.open} · 기한 초과 ${vuln.remediation.overdue} · SLA 준수율 ${vuln.remediation.slaCompliance}%${준수율집계전단서(vuln.remediation.tasks)}</p>
+    <p>조치 항목 ${vuln.remediation.tasks}건 · 완료 ${vuln.remediation.done} · 진행 ${vuln.remediation.open} · ${기한초과라벨} ${vuln.remediation.overdue} · SLA 준수율 ${vuln.remediation.slaCompliance}%${준수율집계전단서(vuln.remediation.tasks)}</p>
     <p class="muted">${
       // 문장은 SLA산식설명() 한 곳(sla.ts)에서 온다 — Word 문단과 같은 문구(2026-09-12 통합).
       vuln.remediation.tasks === 0
@@ -1148,7 +1154,7 @@ function buildReportHtml(
     ${casesHtml}
     ${aiThreatsHtml}
     <h2>유지보수 점검 거버넌스</h2>
-    <p>전체 ${ms.total}건 · 예정 ${ms.scheduled}건(지연 ${ms.overdue}) · 승인 대기 ${ms.reported}건 · 승인됨 ${ms.approved}건 · 반려 ${ms.rejected}건</p>
+    <p>전체 ${ms.total}건 · 예정 ${ms.scheduled}건 · 승인 대기 ${ms.reported}건 · 승인됨 ${ms.approved}건 · 반려 ${ms.rejected}건 · 이 가운데 지연(승인 전인데 예정일이 지난 것) ${ms.overdue}건</p>
   </body></html>`;
 }
 

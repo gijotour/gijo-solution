@@ -38,6 +38,8 @@ import { runRedTeam, makeServedCaller, getLastRedTeamReport, getLastEffectiveRep
 import { runHardeningScan, scanSummaryText, isStandard, 자기점검꺼짐, 자기점검차단안내, 자기점검막힌대상인가 } from "../hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "../reportschedule";
 import { reportActivity, listReportHistory, maintenanceSummary } from "../report";
+// 기한 판정은 잎 모듈 한 곳에서 받는다(점검 지연 날짜·모집단 · 「기한 초과」 칸 이름).
+import { 점검지연인가, 기한초과라벨 } from "../sla";
 import { listSchedules as listHardeningSchedules } from "../hardeningtargets";
 import { timeSavedText } from "../timesaved";
 import { feedbackSummaryText } from "../answerfeedback";
@@ -2262,12 +2264,12 @@ export function runMaintenanceStatus(args: Record<string, string>): string {
 
   // approved(승인 완료)를 뺀 나머지가 아직 손이 필요한 것들이다.
   const open = matched.filter((m) => m.status !== "approved");
-  const overdue = open.filter((m) => m.scheduleDate < today);
+  const overdue = open.filter((m) => 점검지연인가(m, today)); // 잣대는 sla.ts 한 곳(날짜·모집단)
   const upcoming = open.filter((m) => m.scheduleDate >= today);
 
   const head = `점검 일정 ${matched.length}건 — 기한 초과 ${overdue.length}건, 예정 ${upcoming.length}건, 완료 ${matched.length - open.length}건`;
   const list = [...overdue, ...upcoming].slice(0, 10).map((m) => {
-    const late = m.scheduleDate < today ? " ⚠기한초과" : "";
+    const late = 점검지연인가(m, today) ? " ⚠기한초과" : "";
     return `- ${m.title} · ${m.productName} (${m.scheduleDate}, ${m.status})${late}`;
   });
   // ⚠ 2026-09-13까지 이 도구는 숫자(기한 초과·예정·완료 건수)를 말하면서도 예시데이터머리말이
@@ -2734,8 +2736,11 @@ export async function runUrgentTodo(): Promise<string> {
   const 후보 = [
     { n: s.vulnerabilities.kev, p: "P0", 무엇: `실제 악용(KEV) ${s.vulnerabilities.kev}건`,
       왜: "공격이 실제로 쓰이는 취약점 — 이번 주 안에 막아야 합니다", 어디: "취약점" },
-    { n: s.remediation.overdue, p: "P0", 무엇: `기한 지난 조치 ${s.remediation.overdue}건`,
-      왜: "약속한 날짜를 넘긴 일 — SLA 준수율을 깎고 있습니다", 어디: "조치·승인" },
+    // ⚠ **openOverdue**(아직 안 끝난 초과)로 센다 — overdue는 SLA①로 「기한을 넘겨 완료한 건」을
+    //   품어 **영원히 안 줄어든다**. 그 값으로 이 줄을 만들면 담당자가 다 끝내도 [P0]가 안 사라지고,
+    //   가리키는 「조치·승인」 화면엔 닫을 것이 없다(2026-09-13 검토관 [상] — 있지도 않은 일을 P0로 부름).
+    { n: s.remediation.openOverdue, p: "P0", 무엇: `기한 지난 조치 ${s.remediation.openOverdue}건`,
+      왜: "약속한 날짜를 넘겼는데 아직 안 끝난 일 — SLA 준수율을 깎고 있습니다", 어디: "조치·승인" },
     { n: s.findings.pending, p: "P1", 무엇: `검토 대기 항목 ${s.findings.pending}건`,
       왜: "맞는지 오탐인지 아직 아무도 안 본 것(스캐너가 올린 낱개 기준)", 어디: "조치·승인" },
     { n: s.assets.highRisk, p: "P1", 무엇: `고위험 자산 ${s.assets.highRisk}대`,
@@ -2820,7 +2825,7 @@ export async function runKpiStatus(q?: string): Promise<string> {
       (s.vulnerabilities.scanFailed
         ? ` ⚠ 점검 실패 ${s.vulnerabilities.scanFailed}건 — 스캐너가 결과를 못 받았습니다. 이만큼은 아직 안 본 것입니다`
         : ""),
-    `조치 SLA 준수율 ${s.remediation.slaCompliance}%(기한초과 ${s.remediation.overdue}건 · 마감임박 ${s.remediation.dueSoon}건)` +
+    `조치 SLA 준수율 ${s.remediation.slaCompliance}%(${기한초과라벨} ${s.remediation.overdue}건 · 마감임박 ${s.remediation.dueSoon}건)` +
       // B6-②(2026-09-11 설계관 지시서) — 표본 0에서 100%가 나가는 것 자체는 kpi.ts 산식
       // 그대로 두고, 「집계 전」 단서만 붙인다. 문구는 tone.ts 한 곳(준수율집계전단서) —
       // runExecBrief와 같은 글자를 쓴다(전엔 여기에 없어 두 도구가 다르게 말했다).
@@ -2897,7 +2902,7 @@ export async function runExecBrief(): Promise<string> {
         : s.vulnerabilities.scanFailed
           ? ` · 점검 실패 ${s.vulnerabilities.scanFailed}건은 아직 못 본 것입니다`
           : ""),
-    `③ 조치 기한 초과 ${s.remediation.overdue}건 · 마감 임박 ${s.remediation.dueSoon}건 · 기한 준수율 ${s.remediation.slaCompliance}%` +
+    `③ 조치 ${기한초과라벨} ${s.remediation.overdue}건 · 마감 임박 ${s.remediation.dueSoon}건 · 기한 준수율 ${s.remediation.slaCompliance}%` +
       준수율집계전단서(s.remediation.tasks),
   ];
   return `${예시데이터머리말()}${줄들.join("\n")}`;

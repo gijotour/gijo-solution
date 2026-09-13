@@ -13,6 +13,7 @@
 import { listTargets, listSchedules, listRuns } from "./hardeningtargets";
 import { 원격점검인가 } from "./hardeningscan";
 import { todayLocal } from "../util/date";
+import { 점검지연인가 } from "./sla"; // 점검 「지연」 잣대(날짜·모집단) 단일 출처
 import { listAssets, getAsset } from "./assets";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
@@ -655,7 +656,9 @@ export function fixStatusAnswer(): { output: string; dataCard: DataCard } {
   //   오늘 할 일이 빨간 「지연」으로 시작한다). 모집단은 화면(maintenance)과 동일하게
   //   「완료(approved) 아님」 전부 — scheduled만 세면 승인 대기(reported)인 기한 지난 건이
   //   화면에선 지연, 카드에선 아님으로 갈라진다(검토관 백로그 하8).
-  const 지연 = mt.filter((m) => String((m as { status?: string }).status) !== "approved" && String((m as { scheduleDate?: string }).scheduleDate || "") !== "" && String((m as { scheduleDate?: string }).scheduleDate) < today).length;
+  // 잣대(오늘은 예정 · 모집단은 approved 아님 전부)는 sla.ts 점검지연인가 한 곳 — 아래 주석이 적은
+  // 두 규칙을 손으로 다시 쓰면 네 창구 중 하나가 또 갈린다(2026-09-13 검토관 [중] 실측).
+  const 지연 = mt.filter((m) => 점검지연인가(m as { status: string; scheduleDate?: string }, today)).length;
   const 예정 = mt.filter((m) => String((m as { status?: string }).status) === "scheduled").length;
   const dataCard: DataCard = {
     title: "조치 — 승인·점검 현황",
