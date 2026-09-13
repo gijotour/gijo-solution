@@ -141,7 +141,14 @@ export function collectVulnReportData(scopeAssets?: Asset[]): VulnReportData {
   return { ...d, remediation: { tasks: sla.tasks, done: sla.done, open: sla.open, overdue: sla.overdue, slaCompliance: sla.slaCompliance, topOpen } };
 }
 
-// 유지보수 점검 현황 요약(거버넌스 섹션용). scheduleDate가 오늘 이하인 scheduled는 "지연".
+// 유지보수 점검 현황 요약(거버넌스 섹션용). scheduleDate가 오늘보다 이른 scheduled는 "지연".
+//
+// ★ SLA②(2026-09-13 사장님 결정 — 「오늘 마감은 지연이 아니다(예정)」) — 예전엔
+//   `scheduleDate <= today`라 **오늘 마감인 것까지 지연으로 셌다.** 대화 도구
+//   handlers.ts runMaintenanceStatus는 처음부터 `scheduleDate < today`(오늘은 예정)였다 —
+//   같은 사실을 리포트는 "지연", 챗봇은 "예정"이라 다르게 말하던 잣대를 여기서 통일한다.
+//   ⚠ maintenance.ts의 listDueMaintenance(`scheduleDate <= today`, 메일 알림용 "due")는
+//   다른 개념이다(오늘 마감된 것도 알림 대상은 맞다) — 이 통일은 "지연" 판정에만 적용한다.
 export interface MaintenanceSummary {
   total: number;
   scheduled: number;
@@ -157,7 +164,7 @@ export function maintenanceSummary(items: MaintenanceItem[]): MaintenanceSummary
   for (const m of items) {
     if (m.status === "scheduled") {
       s.scheduled++;
-      if (m.scheduleDate <= today) s.overdue++;
+      if (m.scheduleDate < today) s.overdue++;
     } else if (m.status === "reported") s.reported++;
     else if (m.status === "approved") s.approved++;
     else if (m.status === "rejected") s.rejected++;

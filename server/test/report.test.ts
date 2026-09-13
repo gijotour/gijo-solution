@@ -26,7 +26,7 @@ const { maintenanceSummary, collectVulnReportData, vulnCases, stripMetaPreamble,
 const { importVulnScan } = await import("../src/engine/vulnscan");
 const { resetKevForTests } = await import("../src/engine/kev");
 const { createTask, resetTasksForTests } = await import("../src/engine/tasks");
-const { todayLocal } = await import("../src/util/date");
+const { todayLocal, plusDaysLocal } = await import("../src/util/date");
 const { listAudit } = await import("../src/engine/audit");
 import type { MaintenanceItem } from "../src/engine/maintenance";
 
@@ -91,12 +91,16 @@ describe("report", () => {
 
   it("maintenanceSummary counts by status and flags overdue scheduled items", () => {
     const today = todayLocal();
+    const yesterday = plusDaysLocal(-1);
     const mk = (over: Partial<MaintenanceItem>): MaintenanceItem => ({
       id: "x", title: "t", productName: "p", scheduleDate: "2099-01-01", status: "scheduled",
       createdAt: 0, updatedAt: 0, ...over,
     });
+    // ★ SLA②(2026-09-13 사장님 결정 — 「오늘 마감은 지연이 아니다」) — 오늘 마감은 예정으로 센다.
+    //   전엔 `scheduleDate <= today`라 이 표의 "오늘마감" 항목도 지연 1건에 들어갔다.
     const items = [
-      mk({ status: "scheduled", scheduleDate: today }), // 지연
+      mk({ status: "scheduled", scheduleDate: today }), // 오늘 마감 — 예정(지연 아님, SLA②)
+      mk({ status: "scheduled", scheduleDate: yesterday }), // 지연(어제가 마감이었다)
       mk({ status: "scheduled", scheduleDate: "2099-01-01" }), // 예정(미래)
       mk({ status: "reported" }),
       mk({ status: "approved" }),
@@ -104,7 +108,7 @@ describe("report", () => {
       mk({ status: "rejected" }),
     ];
     const s = maintenanceSummary(items);
-    expect(s).toEqual({ total: 6, scheduled: 2, overdue: 1, reported: 1, approved: 2, rejected: 1 });
+    expect(s).toEqual({ total: 7, scheduled: 3, overdue: 1, reported: 1, approved: 2, rejected: 1 });
     expect(maintenanceSummary([])).toEqual({ total: 0, scheduled: 0, overdue: 0, reported: 0, approved: 0, rejected: 0 });
   });
 

@@ -401,10 +401,14 @@ function seedSamplesIfEmpty(): void {
   if (listStmt.all().length > 0) return;
   const now = Date.now();
 
-  // 1) 방화벽(어플라이언스, 미연결) — 예정·오늘 마감(지연)
+  // 1) 방화벽(어플라이언스, 미연결) — 예정·기한 지남(지연)
+  // ★ SLA②(2026-09-13 사장님 결정 — 「오늘 마감은 지연이 아니다」) — 예전엔 scheduleDate를
+  //   오늘로 둬 「오늘 마감」을 지연 예시로 보여줬는데, 그 잣대(`<=`) 자체가 병이었다(report.ts
+  //   maintenanceSummary 참고). 이제는 기한이 실제로 지난 어제 날짜로 둔다 — 안 그러면 이
+  //   시드가 지연 예시를 하나도 못 보여준다(kpi.test.ts가 잡은 자리).
   const fw = save({
     id: newId(), title: "방화벽 정책 정기 점검", productName: "경계 방화벽(FW-01)",
-    scheduleDate: today(), intervalDays: 90, status: "scheduled", createdAt: now, updatedAt: now,
+    scheduleDate: dstr(now - 1 * DAY), intervalDays: 90, status: "scheduled", createdAt: now, updatedAt: now,
   });
   seedEvent(fw.id, "created", "정요한", now - 7 * DAY);
 

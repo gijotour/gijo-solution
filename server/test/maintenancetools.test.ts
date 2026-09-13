@@ -10,7 +10,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "../src/db";
 import { createMaintenanceItem, listMaintenanceItems } from "../src/engine/maintenance";
-import { runSubmitMaintenanceReport, runReviewMaintenance } from "../src/engine/agenttools/handlers";
+import { runSubmitMaintenanceReport, runReviewMaintenance, runMaintenanceStatus } from "../src/engine/agenttools/handlers";
+import { maintenanceSummary } from "../src/engine/report";
+import { todayLocal, plusDaysLocal } from "../src/util/date";
 
 beforeEach(() => {
   // ⚠ 이벤트를 **먼저** 지운다 — maintenance_events가 items를 참조해서, 반대로 하면
@@ -104,6 +106,27 @@ describe("점검 승인·반려", () => {
     const 답 = runReviewMaintenance({ item: "방화벽 정책 점검", decision: "승인" });
     expect(답, "승인 대기가 없다고 말해야 한다").toContain("승인 대기");
     expect(listMaintenanceItems()[0].status, "대기 아닌 것이 승인됐다").toBe("scheduled");
+  });
+});
+
+// ★ SLA②(2026-09-13 사장님 결정 — 「오늘 마감은 지연이 아니다」) — report.ts의 거버넌스
+//   지연 잣대(maintenanceSummary)와 대화 도구(runMaintenanceStatus)의 지연 잣대가 전엔
+//   각각 `scheduleDate <= today`·`scheduleDate < today`로 갈려 있었다. 같은 데이터를
+//   두 소비자에게 같이 물어 같은 지연 건수가 나오는지 짝으로 잰다(slaclue.test.ts와 같은 자세).
+describe("지연 잣대 통일 — report.ts와 대화 도구(runMaintenanceStatus)가 같은 수를 말한다(SLA②)", () => {
+  it("오늘·어제·내일 마감을 섞어도 두 소비자의 지연 건수가 같다 — 오늘 마감은 지연이 아니다", () => {
+    createMaintenanceItem({ title: "오늘마감", productName: "FW-01", scheduleDate: todayLocal() });
+    createMaintenanceItem({ title: "어제마감", productName: "FW-02", scheduleDate: plusDaysLocal(-1) });
+    createMaintenanceItem({ title: "내일마감", productName: "FW-03", scheduleDate: plusDaysLocal(1) });
+
+    const ms = maintenanceSummary(listMaintenanceItems());
+    expect(ms.overdue, "report.ts 잣대 — 어제 마감 1건만 지연이다").toBe(1);
+
+    const 답 = runMaintenanceStatus({});
+    const m = /기한 초과 (\d+)건/.exec(답);
+    expect(m, `대화 도구 답에서 기한 초과 건수를 못 뽑았다: ${답}`).not.toBeNull();
+    expect(Number(m![1]), "대화 도구 잣대 — 오늘 마감을 지연으로 세면 안 된다").toBe(1);
+    expect(Number(m![1]), "report.ts와 대화 도구의 지연 건수가 같아야 한다").toBe(ms.overdue);
   });
 });
 

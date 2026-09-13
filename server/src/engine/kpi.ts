@@ -60,7 +60,7 @@ export interface KpiSnapshot {
     tasks: number; // 조치 항목 수
     open: number;
     done: number;
-    overdue: number; // 기한 초과 미완료
+    overdue: number; // 기한 초과 — 미완료(기한 지남) + 완료했어도 늦게 끝난 것(SLA①, sla.ts)
     dueSoon: number; // 3일 내 마감(미완료)
     slaCompliance: number; // 기한 초과 안 한 비율 %
   };

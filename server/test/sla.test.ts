@@ -205,14 +205,20 @@ describe("★ 소스 감시 — 조치 SLA 판정을 sla.ts 밖에서 다시 짜
 describe("★ 짝 감시 사각지대 메움 — kpi.ts와 report.ts가 done·dueAt==null 항에서도 같은 값을 낸다", () => {
   // 기존 slaclue.test.ts:107-120은 「기한 지난 미완료」·「기한 전 미완료」만 표본에 넣어
   // t.done·t.dueAt==null 두 항이 한쪽에서만 바뀌어도 안 걸렸다(설계관 지시서 root_cause ②).
-  it("완료했는데 기한이 지난 건 + 기한 없는 건 + 완료·기한없음 셋을 섞어도 kpi·report가 같다", async () => {
+  //
+  // ★ SLA①(2026-09-13 사장님 결정) — 「완료·기한지남」 건은 방금 만든 걸 곧바로 완료 처리하므로
+  //   completedAt(지금)이 dueAt(1일 전)보다 늦다 — **늦게 끝낸 것**이라 이제 기한초과로 센다.
+  //   전엔 done만 보고 무조건 준수로 쳤다(그 병이 이 라운드가 고친 것 — B 사슬 수리 2800abe6이
+  //   사장님 결정 사안으로 보류해 뒀던 자리).
+  it("완료했는데 늦게 끝낸 건 + 기한 없는 건 + 완료·기한없음 셋을 섞어도 kpi·report가 같다", async () => {
     resetKpiForTests();
     resetAssetsForTests();
     seedSampleAssetsIfEmpty();
     resetTasksForTests();
 
     createTask({ text: "[조치] 완료·기한지남", priority: "P1", dueAt: Date.now() - 86400000, ref: "vuln:sla-done-late" });
-    // 완료 표시(생성 시점엔 done을 못 주므로 방금 만든 걸 완료 처리)
+    // 완료 표시(생성 시점엔 done을 못 주므로 방금 만든 걸 완료 처리) — completedAt은 지금이라
+    // dueAt(1일 전)보다 늦다. 즉 **늦게 끝낸 완료 건**이다.
     const { setTaskDone, listTasks } = await import("../src/engine/tasks");
     const 완료지남 = listTasks().find((t) => t.ref === "vuln:sla-done-late")!;
     setTaskDone(완료지남.id, true);
@@ -228,10 +234,10 @@ describe("★ 짝 감시 사각지대 메움 — kpi.ts와 report.ts가 done·du
     expect(r.tasks, "이 시험의 전제 — 표본 3건").toBe(3);
     expect(r.done, "완료 건수 — 2건(완료·기한지남 + 완료·기한없음)").toBe(2);
     expect(r.done).toBe(k.done);
-    expect(r.overdue, "완료된 건은 기한이 지났어도 기한초과로 안 센다 — 0건").toBe(0);
+    expect(r.overdue, "SLA① — 늦게 끝낸 완료 건도 기한초과로 센다(완료·기한지남 1건)").toBe(1);
     expect(r.overdue).toBe(k.overdue);
-    // 준수 = 완료(2) + 기한없음&미완료(1) = 3/3 = 100%
-    expect(r.slaCompliance, "완료했거나 기한이 없으면 전부 준수 — 100%").toBe(100);
+    // 준수 = 완료·기한없음(1) + 기한없음&미완료(1) = 2/3 ≈ 67%(완료·기한지남은 미준수)
+    expect(r.slaCompliance, "늦게 끝낸 1건은 미준수 — 2/3 ≈ 67%").toBe(67);
     expect(r.slaCompliance).toBe(k.slaCompliance);
   });
 });
@@ -367,5 +373,40 @@ describe("sla.ts 판정 함수 — 단위 시험", () => {
   it("remediationSla — 표본 0이면 100%(잴 것이 없다는 뜻)", () => {
     expect(remediationSla([]).slaCompliance).toBe(100);
     expect(remediationSla([]).tasks).toBe(0);
+  });
+});
+
+// ★★ SLA①(2026-09-13 사장님 결정 — 「기한을 넘겨 완료한 조치는 미준수로 센다」) — 단위 시험.
+// 예전 판정(`!t.done`)으로 되돌리면 이 블록의 첫 두 시험이 즉시 빨개진다(돌연변이 방지).
+describe("SLA① — 기한을 넘겨 완료한 조치는 미준수로 센다(2026-09-13 결정)", () => {
+  it("완료했어도 완료 시각이 기한보다 늦으면 기한초과다", () => {
+    const now = Date.now();
+    const 늦은완료 = { done: true, dueAt: now - 86400000, completedAt: now };
+    expect(기한초과인가(늦은완료, now), "예전 판정(!done)으로 되돌리면 이 값이 false가 된다").toBe(true);
+    expect(준수건인가(늦은완료, now)).toBe(false);
+  });
+
+  it("완료 시각이 기한 이전이면(제때 끝냄) 준수다 — 지금 시각이 기한을 지났어도 무관하다", () => {
+    const now = Date.now();
+    const 제때완료 = { done: true, dueAt: now - 86400000, completedAt: now - 2 * 86400000 };
+    expect(기한초과인가(제때완료, now)).toBe(false);
+  });
+
+  it("완료 시각이 기한과 정확히 같으면 준수다 — '넘겼을' 때만 초과다(경계값)", () => {
+    const now = Date.now();
+    const 경계 = { done: true, dueAt: now - 86400000, completedAt: now - 86400000 };
+    expect(기한초과인가(경계, now)).toBe(false);
+  });
+
+  it("완료 시각이 없는 완료 건(옛 기록)은 판정 불가 — 거짓 미준수를 지어내지 않고 준수로 둔다", () => {
+    const now = Date.now();
+    const 옛건 = { done: true, dueAt: now - 86400000 }; // completedAt 없음
+    expect(기한초과인가(옛건, now), "없는 값으로 미준수를 지어내면 안 된다").toBe(false);
+  });
+
+  it("미완료는 여전히 지금 기준으로 판정한다 — SLA①은 완료 건에만 영향을 준다", () => {
+    const now = Date.now();
+    expect(기한초과인가({ done: false, dueAt: now - 1000 }, now)).toBe(true);
+    expect(기한초과인가({ done: false, dueAt: now + 1000 }, now)).toBe(false);
   });
 });

@@ -27,6 +27,10 @@ export interface RemediationTaskLike {
   ref?: string;
   done: boolean;
   dueAt?: number;
+  completedAt?: number; // 완료 처리 시각(ms). tasks.ts의 completeStmt·setDoneStmt가 done=true로
+  // 바꿀 때 항상 함께 채운다(2026-07-22 마이그레이션 이후 두 쓰기 경로뿐 — 실측: grep으로
+  // done을 바꾸는 UPDATE문이 그 둘뿐임을 확인). SLA①(기한을 넘겨 완료한 조치는 미준수)의
+  // 판정에 쓴다.
 }
 
 /** t가 취약점에서 등록된 조치 항목(SLA 추적 대상)인가. */
@@ -34,24 +38,36 @@ export function 조치대상인가(t: RemediationTaskLike): boolean {
   return (t.ref ?? "").startsWith("vuln:");
 }
 
-/** t가 기한을 넘긴 미완료 항목인가(now 시각 기준). */
+/**
+ * t가 기한을 넘긴 항목인가.
+ *
+ * ★ SLA①(2026-09-13 사장님 결정 — 「기한을 넘겨 완료한 조치는 미준수로 센다」, B 사슬 수리
+ *   2800abe6이 보류해 둔 사안) — 예전엔 `!t.done`을 요구해 **늦게 끝낸 건이 준수로 들어갔다**
+ *   (기한을 3일 넘겨 완료해도 done=true라 그 순간 기한초과가 아니게 됐다). 이제 완료 건도
+ *   완료 시각(completedAt)과 기한을 견줘 판정한다.
+ * ⚠ 완료 시각이 없는 완료 건(옛 기록 등, `completedAt == null`)은 **판정 불가로 준수 쪽에
+ *   둔다** — 없는 값으로 미준수를 지어내지 않는다(거짓 미준수 방지). tasks.ts의 두 쓰기 경로가
+ *   done=true를 만들 때 항상 completedAt을 함께 채우므로(위 RemediationTaskLike 주석), 이
+ *   갈래는 완료 시각 컬럼이 생기기 전(2026-07-22 이전)에 완료된 옛 기록에만 해당한다.
+ */
 export function 기한초과인가(t: RemediationTaskLike, now: number): boolean {
-  return !t.done && t.dueAt != null && t.dueAt < now;
+  if (t.dueAt == null) return false; // 기한 자체가 없으면 초과를 논할 수 없다
+  if (!t.done) return t.dueAt < now; // 미완료 — 지금 기준으로 기한이 지났는가
+  return t.completedAt != null && t.completedAt > t.dueAt; // 완료 — 늦게 끝냈는가
 }
 
 /**
- * t가 SLA를 지킨 것으로 세는 항목인가 — 기한초과인가의 정확한 여집합(완료했거나,
- * 기한이 아직 안 지났거나, 기한 자체가 없는 것).
+ * t가 SLA를 지킨 것으로 세는 항목인가 — 기한초과인가의 정확한 여집합.
  */
 export function 준수건인가(t: RemediationTaskLike, now: number): boolean {
-  return t.dueAt == null || t.done || t.dueAt >= now;
+  return !기한초과인가(t, now);
 }
 
 export interface RemediationSla {
   tasks: number;
   open: number;
   done: number;
-  overdue: number; // 기한 초과 미완료
+  overdue: number; // 기한 초과 — 미완료 중 기한이 지났거나, 완료했어도 기한을 넘겨 끝난 것(SLA①)
   dueSoon: number; // 3일 내 마감(미완료)
   slaCompliance: number; // 기한 초과 안 한 비율 %. 표본 0이면 100(잴 것이 없다는 뜻 — 만점 아님)
 }
