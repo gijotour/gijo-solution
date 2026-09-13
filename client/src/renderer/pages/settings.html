@@ -212,6 +212,46 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .usage-kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
 .usage-kpi .l{font-size:12px;color:var(--muted-2);font-weight:700;}
 .usage-kpi .v{font-size:16px;font-weight:800;color:var(--text-strong, #fff);margin-top:3px;}
+
+/* ── 자가 진단 · 실사용 전환(데이터 정리) — UI C, 2026-09-13
+     시안 mockups/selfcheck-no-consumer·mockups/settings-live-reset · 승인 「사장님 2026-09-13 『승인 계속진행』」
+     정체성 한 줄 + ⓘ 관례는 incidentcases.html:41-43,92-93,299-302를 그대로 옮겼다. ── */
+.scr-id{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px;}
+.ic-info{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;color:var(--blue-light);
+  font-size:12px;font-weight:700;padding:2px 8px;cursor:pointer;font-family:inherit;vertical-align:middle;margin-left:6px;}
+.sc-headline{font-size:12.5px;font-weight:700;padding:6px 10px;border-radius:7px;margin-bottom:10px;border-left:3px solid var(--border-strong);background:var(--panel-2);}
+.sc-headline.ok{border-left-color:var(--teal);color:var(--teal);}
+.sc-headline.bad{border-left-color:var(--red-ink, #f5928a);color:var(--red-ink, #f5928a);}
+.sc-meta{font-size:11.5px;color:var(--muted-2);font-weight:400;margin-left:6px;}
+/* 열 폭 한 줄만 새로 선언 — 머리 26px·행 30px 등 밀도값은 gijo-ui.css .g-rows가 정본(새로 안 만듦). */
+.g-rows--sc .g-rows-head,.g-rows--sc .g-rows-r{grid-template-columns:20px 130px 1fr 16px;gap:8px;}
+.sc-det{display:none;background:var(--panel-2);border-radius:8px;padding:10px 12px;margin:2px 0 4px;font-size:11.5px;color:var(--muted);line-height:1.7;}
+.sc-det.on{display:block;}
+.sc-det .lb{color:var(--text);font-weight:700;}
+.sc-det .ac{color:var(--amber);margin-top:6px;}
+.sc-note{font-size:11.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.mk{font-weight:800;text-align:center;}
+.mk.ok{color:var(--teal);}
+.mk.warn{color:var(--amber);}
+.mk.fail{color:var(--red-ink, #f5928a);}
+.mk.unknown{color:var(--muted-2);}
+.chev{color:var(--muted-2);font-size:11px;text-align:center;transition:transform .12s;}
+.chev.on{transform:rotate(90deg);}
+
+.idline{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
+.dc-warnbox{font-size:12.25px;line-height:1.6;color:var(--muted);background:rgba(224,164,74,.08);
+  border:1px solid rgba(224,164,74,.35);border-radius:8px;padding:8px 11px;margin:0 0 10px;}
+.dc-subhead{font-size:12px;font-weight:800;color:var(--text-strong,#fff);margin:2px 0 8px;}
+.dc-selall{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:4px 8px;border-bottom:1px solid var(--border-strong);margin-bottom:2px;}
+/* 새 부품(2열 격자) — 이 화면 최초, 기존 .g-rows(엑셀형 목록)와는 다른 결의 「선택 그리드」다. */
+.dc-grid{display:grid;grid-template-columns:1fr 1fr;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;margin-bottom:10px;}
+.dc-row{display:flex;align-items:center;gap:7px;padding:4px 8px;font-size:12.25px;border-bottom:1px solid var(--border);min-width:0;}
+.dc-row input[type=checkbox]{width:auto;margin:0;flex:0 0 auto;}
+.dc-row .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+.dc-row .cnt{font-variant-numeric:tabular-nums;color:var(--muted-2);font-weight:700;flex:0 0 auto;font-size:11.5px;}
+.dc-divider{border-top:1px dashed var(--border-strong);padding-top:12px;margin-top:2px;}
+.dc-resetdesc{font-size:12.25px;line-height:1.6;color:var(--muted);margin-bottom:10px;}
+.dc-audit-note{font-size:11.5px;color:var(--muted-2);margin-top:6px;}
 </style>
 </head>
 <!-- data-screen: 공용 CSS가 "이 화면은 폼이다"를 알아보는 표식(2026-08-01). 없으면 폭 규칙이 안 걸린다. -->
@@ -239,6 +279,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 「화면 크기」 구역은 제거(2026-08-09 사용자 지시) — 상단 바 ⚙ 설정 팝오버(배율 6단·확대/축소·단축키)가
          같은 일을 하며, 같은 조절이 두 곳이면 어느 쪽이 진짜인지 헷갈린다. 배율 프리셋은 메인 프로세스가 계속 가진다. -->
+
+    <!-- 자가 진단 — GET /api/system-health(observability.ts) 화면 소비자 신설(2026-09-13).
+         화면 소비자 0건이었다 — titlebar.js:1020 주석이 "자가 진단·설정 › 서버에서 확인한다"고
+         사람을 이미 이 자리로 보내고 있었다(막다른 안내). 로그인 담당자 누구나 볼 수 있다(admin 전용 아님) —
+         authMiddleware만 걸려 있어 data-sec="ai"(서버·AI 탭)에 둔다. 시안 mockups/selfcheck-no-consumer. -->
+    <div data-sec="ai" class="panel" data-gijo-fold="자가 진단" data-gijo-fold-badges="selfCheckBadge:확인:hot">
+      <div class="panel-title">자가 진단<span id="selfCheckBadge" style="display:none">0</span></div>
+      <div class="scr-id">시스템 상태를 확인합니다 — 문제가 있으면 무엇을 하면 되는지도 함께 보여줍니다.<button type="button" class="ic-info" id="scIcInfo" title="이 화면 안내 — 사용법·용어 풀이는 대화창이 답합니다">ⓘ</button></div>
+      <div class="sc-headline" id="scHeadline">불러오는 중…</div>
+      <div class="g-rows g-rows--sc">
+        <div class="g-rows-head"><span></span><span>항목</span><span>상태</span><span></span></div>
+        <div class="g-rows-flat" id="scRows"></div>
+      </div>
+      <div class="sc-note">⚠ SIEM 연동이 꺼져 있으면 이 목록에는 항목이 하나 적게 보입니다(정상입니다). 행을 누르면 전체 문장과(있으면) 할 일을 펼쳐 봅니다.</div>
+      <div class="status-line" id="scStatusLine"></div>
+      <button type="button" class="btn-ghost" id="scRefreshBtn" style="margin-top:6px">새로고침</button>
+    </div>
 
     <div data-sec="ai" class="panel" data-gijo-fold="서버 연결">
       <div class="panel-title">서버 연결</div>
@@ -400,6 +457,41 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
         <div class="progress-label" id="progressLabel">다운로드 중… 0%</div>
         <div class="status-line" id="installStatus"></div>
+      </div>
+    </div>
+
+    <!-- 실사용 전환(데이터 정리) — datacleanup.ts의 admin API 3종(GET/POST data-cleanup·
+         POST reset-live-data) 화면 소비자 신설(2026-09-13). handlers.ts가 이미 대화 답 머리말에서
+         "관리자가 실사용 전환(데이터 정리)을 해야 합니다"라고 사람을 이 길로 보내 왔다 — 그 길이
+         실제로 없었다. 파괴적 조작이라 기본 접힘(data-gijo-fold-closed, fold.js:168 규칙 그대로
+         "매일 볼 것이 아닌 구역"). 시안 mockups/settings-live-reset(GitLab "Type to confirm" 패턴). -->
+    <div data-sec="admin" class="panel" id="liveResetPanel" style="display:none" data-gijo-fold="실사용 전환(데이터 정리)" data-gijo-fold-closed>
+      <div class="panel-title">실사용 전환(데이터 정리)<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
+      <div class="idline">시연·테스트로 쌓인 업무 데이터를 표 단위로 지웁니다. 자세한 것은 <button type="button" class="ic-info" id="dcIcInfo" title="실사용 전환·데이터 정리 안내 — 대화창이 답합니다">ⓘ</button> 를 눌러 확인하세요.</div>
+
+      <div class="dc-warnbox">
+        ⚠ 아래 <b>① 골라서 정리</b>만 하면 서버를 다시 켤 때 <b>자산·위협 인텔·유지보수·보안제품·할일</b>은
+        예시 데이터로 되살아날 수 있습니다(재기동 시드). <b>재기동해도 다시 안 채워지게 하려면
+        반드시 아래 ② 전체 리셋</b>을 쓰세요 — 이 스위치는 화면에서 다시 끌 수 없습니다.
+      </div>
+
+      <div class="dc-subhead">① 골라서 정리 — 선택한 항목만 비웁니다</div>
+      <div class="dc-selall"><label><input type="checkbox" id="dcSelAllCk"> 전체 선택</label> <span id="dcSelCount">종 중 0개 선택됨</span></div>
+      <div class="dc-grid" id="dcGrid"></div>
+      <button type="button" class="btn-danger" id="dcRunBtn" disabled>선택한 항목 정리 (0개 선택)</button>
+      <div class="status-line" id="dcRunStatus" style="color:var(--muted-2)">지우기 전 파일로 스냅샷을 남깁니다 — 실패하면 지우지 않습니다.</div>
+
+      <div class="dc-divider">
+        <div class="dc-subhead" style="color:var(--red-ink, #f5928a)">② 전체 리셋 — 완전히 뺍니다 (되돌릴 수 없음)</div>
+        <div class="dc-resetdesc">위 목록 전부 삭제 + 보고서·SBOM 내보내기·세션 아카이브·업로드 원본/추출본/첨부 파일까지 이동 +
+          <b>라이브 모드 켜기</b>(재기동해도 다시 안 채워짐). 감사·지식(RAG)·설정·계정·판단 기록은 대상이 아니라 지워지지 않습니다.</div>
+        <div class="field" style="max-width:220px">
+          <label for="dcResetConfirm">확인을 위해 대문자로 RESET 입력</label>
+          <input id="dcResetConfirm" placeholder="RESET">
+        </div>
+        <button type="button" class="btn-danger" id="dcResetBtn" disabled>전체 리셋 실행</button>
+        <div class="status-line" id="dcResetStatus"></div>
+        <div class="dc-audit-note">이 실행은 실행자·시각·건수가 감사 기록에 남습니다 · 라이브 모드는 화면에서 다시 끌 수 없습니다(관리자만 실행할 수 있습니다).</div>
       </div>
     </div>
 
@@ -925,6 +1017,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         await loadMfaAdmin();
         document.getElementById("dbcryptPanel").style.display = "";
         await loadDbCrypt();
+        document.getElementById("liveResetPanel").style.display = "";
+        await loadDataCleanup().catch(function () {});
         document.getElementById("cloudLlmPanel").style.display = "";
         document.getElementById("smtpInboundPanel").style.display = "";
         document.getElementById("siemPanel").style.display = "";
@@ -2885,13 +2979,194 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } catch (e) { box.innerHTML = ""; }
   }
 
+  // ── 자가 진단(system-health) — GET /api/system-health, 로그인 담당자 누구나(admin 전용 아님).
+  //    데이터 계약은 observability.ts의 SystemHealth 그대로(at·uptimeSec·memoryMb·level·headline·checks[]).
+  //    checks 개수는 SIEM 연동 여부로 8개/9개가 갈린다 — 이 화면은 그 수를 전제하지 않는다.
+  const SC_MARK = { ok: "✓", warn: "⚠", fail: "✗", unknown: "❔" };
+  function scAgo(sec) {
+    return sec < 3600 ? Math.round(sec / 60) + "분" : Math.round(sec / 3600) + "시간";
+  }
+  function scOpenGuide() {
+    if (window.gijoOpenChat) { window.gijoOpenChat(); return; }
+    try { window.top.postMessage({ type: "gijo:ask", text: "자가 진단 사용법 알려줘" }, "*"); } catch (e) { /* 셸 밖이면 없던 일로 */ }
+  }
+  function scRenderRows(checks) {
+    const rows = document.getElementById("scRows");
+    rows.innerHTML = "";
+    checks.forEach(function (c, i) {
+      const row = document.createElement("div");
+      row.className = "g-rows-r";
+      row.innerHTML =
+        '<span class="mk ' + esc(c.level) + '">' + (SC_MARK[c.level] || "?") + '</span>' +
+        '<span class="trunc">' + esc(c.label) + '</span>' +
+        '<span class="trunc gm2" title="' + esc(c.detail) + '">' + esc(c.detail) + '</span>' +
+        '<span class="chev" id="scChev' + i + '">▸</span>';
+      const det = document.createElement("div");
+      det.className = "sc-det";
+      det.innerHTML =
+        '<div><span class="lb">' + esc(c.label) + '</span> — ' + esc(c.detail) + '</div>' +
+        (c.action ? '<div class="ac">→ ' + esc(c.action) + '</div>' : '<div style="color:var(--muted-2)">(따로 할 일 없음)</div>');
+      row.addEventListener("click", function () {
+        det.classList.toggle("on");
+        document.getElementById("scChev" + i).classList.toggle("on");
+      });
+      rows.appendChild(row);
+      rows.appendChild(det);
+    });
+  }
+  async function loadSystemHealth() {
+    const headline = document.getElementById("scHeadline");
+    const badge = document.getElementById("selfCheckBadge");
+    const status = document.getElementById("scStatusLine");
+    try {
+      const h = await window.gijo.systemHealth();
+      headline.textContent = h.headline;
+      const meta = document.createElement("span");
+      meta.className = "sc-meta";
+      meta.textContent = "(가동 " + scAgo(h.uptimeSec) + " · 메모리 " + h.memoryMb + "MB)";
+      headline.appendChild(meta);
+      headline.className = "sc-headline " + (h.level === "ok" ? "ok" : "bad");
+      const bad = h.checks.filter(function (c) { return c.level === "warn" || c.level === "fail"; }).length;
+      badge.textContent = String(bad);
+      scRenderRows(h.checks);
+      status.textContent = "";
+      status.className = "status-line";
+    } catch (e) {
+      headline.textContent = "불러오지 못했습니다.";
+      headline.className = "sc-headline bad";
+      status.textContent = "✗ " + e.message;
+      status.className = "status-line status-err";
+    }
+  }
+
+  // ── 실사용 전환(데이터 정리) — admin 전용 파괴적 조작 3종(datacleanup.ts).
+  //    목록·건수는 서버가 그때그때 주는 값을 그대로 그린다(cleanupTargets() 라벨을 화면이
+  //    줄여 적지 않는다 — 단일 출처가 깨지면 화면과 실제 삭제 대상이 어긋나 보인다).
+  //    ⚠ 재시드 5종(자산·위협 인텔·유지보수·보안제품·할일)의 근거는 시드 가드 호출부 6곳
+  //    (assets.ts:552,675 · cti.ts:231 · maintenance.ts:400 · securityproducts.ts:532 · tasks.ts:255)이다.
+  //    API가 이 사실을 칸으로 안 주므로(생산자 없음) 위 경고 문구로만 알린다 — 항목별 배지는 안 단다.
+  let dcTargets = [];
+  const dcSelected = new Set();
+
+  function dcOpenGuide() {
+    if (window.gijoOpenChat) { window.gijoOpenChat(); return; }
+    try { window.top.postMessage({ type: "gijo:ask", text: "실사용 전환 어떻게 해?" }, "*"); } catch (e) { /* 셸 밖이면 없던 일로 */ }
+  }
+  function dcSyncSelUi() {
+    const n = dcSelected.size;
+    const total = dcTargets.length;
+    document.getElementById("dcSelCount").textContent = total + "종 중 " + n + "개 선택됨";
+    const runBtn = document.getElementById("dcRunBtn");
+    runBtn.textContent = "선택한 항목 정리 (" + n + "개 선택)";
+    runBtn.disabled = n === 0;
+    const all = document.getElementById("dcSelAllCk");
+    all.checked = total > 0 && n === total;
+    all.indeterminate = n > 0 && n < total;
+  }
+  function dcRenderGrid(targets) {
+    dcTargets = targets;
+    dcSelected.clear();
+    const grid = document.getElementById("dcGrid");
+    grid.innerHTML = targets.map(function (t, i) {
+      return '<div class="dc-row"><input type="checkbox" id="dcCk' + i + '" data-id="' + esc(t.id) + '">' +
+        '<span class="lbl" title="' + esc(t.label) + '">' + esc(t.label) + '</span>' +
+        '<span class="cnt">' + Number(t.rows || 0).toLocaleString("ko-KR") + '건</span></div>';
+    }).join("");
+    grid.querySelectorAll("input[type=checkbox]").forEach(function (ck) {
+      ck.addEventListener("change", function () {
+        if (ck.checked) dcSelected.add(ck.dataset.id); else dcSelected.delete(ck.dataset.id);
+        dcSyncSelUi();
+      });
+    });
+    dcSyncSelUi();
+  }
+  async function loadDataCleanup() {
+    const status = document.getElementById("dcRunStatus");
+    try {
+      const r = await window.gijo.dataCleanup.list();
+      dcRenderGrid(r.targets || []);
+    } catch (e) {
+      document.getElementById("dcGrid").innerHTML = "";
+      status.textContent = "✗ 목록을 불러오지 못했습니다: " + e.message;
+      status.className = "status-line status-err";
+    }
+  }
+  async function dcRunCleanup() {
+    const status = document.getElementById("dcRunStatus");
+    if (dcSelected.size === 0) {
+      status.textContent = "먼저 정리할 항목을 최소 1개 골라 주세요.";
+      status.className = "status-line status-err";
+      return;
+    }
+    const btn = document.getElementById("dcRunBtn");
+    btn.disabled = true;
+    status.textContent = "정리하는 중…";
+    status.className = "status-line";
+    try {
+      const r = await window.gijo.dataCleanup.run(Array.from(dcSelected));
+      const 요약 = r.results.map(function (row) {
+        const t = dcTargets.find(function (x) { return x.id === row.id; });
+        return (t ? t.label : row.id) + " " + row.deleted + "건";
+      }).join(" · ");
+      status.textContent = "✓ 정리했습니다 — " + 요약;
+      status.className = "status-line status-ok";
+      await loadDataCleanup();
+    } catch (e) {
+      status.textContent = "✗ 정리 실패: " + e.message;
+      status.className = "status-line status-err";
+      dcSyncSelUi();
+    }
+  }
+  async function dcRunReset() {
+    const input = document.getElementById("dcResetConfirm");
+    const status = document.getElementById("dcResetStatus");
+    if (input.value !== "RESET") {
+      status.textContent = "확인을 위해 대문자로 RESET을 정확히 입력해야 합니다.";
+      status.className = "status-line status-err";
+      return;
+    }
+    const btn = document.getElementById("dcResetBtn");
+    btn.disabled = true;
+    status.textContent = "전체를 비우는 중입니다 — 잠시 기다려 주세요…";
+    status.className = "status-line";
+    try {
+      const r = await window.gijo.dataCleanup.resetLive(input.value);
+      const 삭제합 = r.tables.reduce(function (n, t) { return n + t.deleted; }, 0);
+      const 이동합 = r.files.reduce(function (n, f) { return n + f.moved; }, 0);
+      status.textContent = "✓ 전체 리셋을 마쳤습니다 — 표 " + 삭제합 + "건 삭제 · 파일 " + 이동합 + "개 이동 · 라이브 모드를 켰습니다.";
+      status.className = "status-line status-ok";
+      input.value = "";
+      await loadDataCleanup();
+    } catch (e) {
+      status.textContent = "✗ 리셋 실패: " + e.message;
+      status.className = "status-line status-err";
+      btn.disabled = input.value !== "RESET";
+    }
+  }
+
   async function init() {
     serverUrlInput.value = window.gijo.getServerUrl();
     await loadUser();
-    await Promise.all([loadEngineStatus(), loadSmtpConfig(), loadTier(), loadAdapterRegistry()]);
+    await Promise.all([loadEngineStatus(), loadSmtpConfig(), loadTier(), loadAdapterRegistry(), loadSystemHealth()]);
 
     document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
     document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
+    document.getElementById("scRefreshBtn").addEventListener("click", loadSystemHealth);
+    document.getElementById("scIcInfo").addEventListener("click", scOpenGuide);
+    document.getElementById("dcIcInfo").addEventListener("click", dcOpenGuide);
+    document.getElementById("dcRunBtn").addEventListener("click", dcRunCleanup);
+    document.getElementById("dcResetBtn").addEventListener("click", dcRunReset);
+    document.getElementById("dcResetConfirm").addEventListener("input", function (e) {
+      document.getElementById("dcResetBtn").disabled = e.target.value !== "RESET";
+    });
+    document.getElementById("dcSelAllCk").addEventListener("change", function (e) {
+      const checked = e.target.checked;
+      document.querySelectorAll("#dcGrid input[type=checkbox]").forEach(function (ck) {
+        ck.checked = checked;
+        if (checked) dcSelected.add(ck.dataset.id); else dcSelected.delete(ck.dataset.id);
+      });
+      dcSyncSelUi();
+    });
     mcpWire();
     document.getElementById("checkBtn").addEventListener("click", checkUpdate);
     document.getElementById("installBtn").addEventListener("click", installUpdate);

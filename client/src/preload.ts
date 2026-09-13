@@ -67,6 +67,14 @@ const gijoApi = {
   // 그 서버를 띄운 것이 이 앱이기 때문이다(main.ts의 dbcrypt:enable 주석 참고).
   dbCryptCanEnableInApp: () => ipcRenderer.invoke("dbcrypt:canEnableInApp"),
   dbCryptEnable: () => ipcRenderer.invoke("dbcrypt:enable"),
+  // 자가 진단(설정 › 서버·AI) — GET /api/system-health, 로그인 담당자 누구나(admin 전용 아님).
+  systemHealth: () => api.systemHealthApi.get(),
+  // 실사용 전환(데이터 정리, 설정 › 관리자) — admin 전용 파괴적 조작 3종(datacleanup.ts).
+  dataCleanup: {
+    list: () => api.dataCleanupApi.list(),
+    run: (targets: string[]) => api.dataCleanupApi.run(targets),
+    resetLive: (confirm: string) => api.dataCleanupApi.resetLive(confirm),
+  },
   // 첫 설치 — 관리자 계정을 고객이 정한다(setup.html). 서버는 이 값을 받아 계정을 만든다.
   setupNeeded: () => ipcRenderer.invoke("setup:needed"),
   setupCreateAdmin: (username: string, password: string) => ipcRenderer.invoke("setup:createAdmin", username, password),

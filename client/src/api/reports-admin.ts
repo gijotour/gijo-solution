@@ -256,6 +256,55 @@ export const usageApi = {
     request<UsageSummary[]>(`/api/usage/summary${sinceMs ? `?sinceMs=${sinceMs}` : ""}`),
 };
 
+// ── 자가 진단(system-health) ────────────────────────────────────────────
+// observability.ts의 systemHealth() 계약을 그대로 옮긴다 — 화면 소비자 신설(2026-09-13, UI C).
+// GET /api/system-health는 authMiddleware만(admin 아님) — 로그인 담당자 누구나 본다.
+// ⚠ healthApi.check()(아래, GET /api/health)와 값이 다르다 — 그건 「서버가 떠 있나」만 답한다.
+export interface HealthCheck {
+  id: string;
+  label: string;
+  level: "ok" | "warn" | "fail" | "unknown";
+  detail: string;
+  action?: string;
+}
+export interface SystemHealth {
+  at: number;
+  uptimeSec: number;
+  memoryMb: number;
+  level: "ok" | "warn" | "fail" | "unknown";
+  headline: string;
+  checks: HealthCheck[];
+}
+export const systemHealthApi = {
+  get: () => request<SystemHealth>("/api/system-health"),
+};
+
+// ── 실사용 전환(데이터 정리) ──────────────────────────────────────────────
+// datacleanup.ts의 admin 전용 API 3종 — 화면 소비자 신설(2026-09-13, UI C). 라벨·건수는
+// 서버가 그때그때 주는 값을 그대로 쓴다(cleanupTargets() 단일 출처, 화면이 줄여 적지 않는다).
+export interface CleanupTarget {
+  id: string;
+  label: string;
+  rows: number;
+}
+export interface CleanupRunResult {
+  id: string;
+  deleted: number;
+  snapshot: string;
+}
+export interface LiveResetResult {
+  tables: CleanupRunResult[];
+  files: { label: string; moved: number }[];
+}
+export const dataCleanupApi = {
+  list: () => request<{ targets: CleanupTarget[] }>("/api/admin/data-cleanup"),
+  run: (targets: string[]) =>
+    request<{ results: CleanupRunResult[] }>("/api/admin/data-cleanup", { method: "POST", body: { targets } }),
+  // confirm은 화면이 "RESET" 정확 일치를 이미 확인한 값을 그대로 넘긴다 — 서버가 다시 검사한다(datacleanup.ts:257-259).
+  resetLive: (confirm: string) =>
+    request<LiveResetResult>("/api/admin/reset-live-data", { method: "POST", body: { confirm } }),
+};
+
 // ── 서버 헬스체크 ─────────────────────────────────────────────────────
 export const healthApi = {
   // serverTime: 2차 인증 6자리는 시계로 만들어진다 — 로그인 화면이 인증 전에 시각 차이를
