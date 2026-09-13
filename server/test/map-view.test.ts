@@ -198,13 +198,175 @@ describe("★★ chipsForAsset — ⑥⑦은 ctx.registered 게이팅 + 문장�
   });
 });
 
-// [전-7 2단계 · 시안 §11] vulnscan.html(B 소유)은 registered:false를 **명시**해야 한다 —
-// 지우면 ⑥⑦ 칩이 미등록 화면에서도 떠 승인 없는 전사 리포트 구멍이 재현된다. A는 이 파일을
-// 소유하지 않으므로 여기서는 소스 감시(문자열 존재)만 잰다 — 파일 소유는 넘어가지 않는다.
-describe("★ 소스 감시 — vulnscan.html의 vheatCtx()가 registered:false를 명시한다(B의 파일)", () => {
-  it("vulnscan.html에 registered: false가 있다", () => {
-    const src = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "vulnscan.html"), "utf8");
-    expect(src, "vheatCtx()에 registered:false가 없으면 ⑥⑦ 쓰기 칩이 미등록 화면에서도 뜬다(시안 §11)")
+const 화면 = (이름: string) =>
+  readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", 이름), "utf8");
+
+/**
+ * 함수 **본문만** 잘라 내고 주석을 걷는다 — 소스 감시가 「주석에 남은 글자」로 초록이 나는 것을
+ * 막는다(2026-09-14 검토관 [하] 적발: `registered:false`를 본문에서 지우고 주석에만 남겨도
+ * 통과하던 자리. 이 한 줄이 지키는 것이 「승인 없는 전사 리포트 구멍」의 뚜껑이라 감시 강도가
+ * 곧 그 구멍의 뚜껑 두께다).
+ */
+function 함수본문(src: string, 머리: string, 길이 = 2000): string {
+  const i = src.indexOf(머리);
+  if (i < 0) return "";
+  return src.slice(i, i + 길이)
+    .replace(/\/\*[\s\S]*?\*\//g, "")          // 블록 주석
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");      // 줄 주석(「http://」를 안 건드리게 앞 글자를 본다)
+}
+
+// [전-7 2단계 · 시안 §11] vulnscan.html의 vheatCtx()는 registered:false를 **명시**해야 한다 —
+// 지우면 ⑥⑦ 칩이 미등록 화면에서도 떠 승인 없는 전사 리포트 구멍이 재현된다.
+describe("★ 소스 감시 — vulnscan.html vheatCtx()의 주입 계약(주석은 걷고 본문만 잰다)", () => {
+  const src = 화면("vulnscan.html");
+  const 본문 = 함수본문(src, "function vheatCtx()");
+
+  it("vheatCtx() **본문**에 registered: false가 있다 — 주석에만 남기면 실패한다", () => {
+    expect(본문, "function vheatCtx()를 못 찾았다 — 이름이 바뀌었으면 이 감시도 고쳐라").not.toBe("");
+    expect(본문, "vheatCtx()에 registered:false가 없으면 ⑥⑦ 쓰기 칩이 미등록 화면에서도 뜬다(시안 §11)")
       .toMatch(/registered\s*:\s*false/);
+  });
+
+  // [2026-09-14 검토관 [중] 적발] flat 모드는 구획이 1개뿐이라 취약점 있는 자산이 200을 넘으면
+  // 군집이 **반드시** 걸린다(군집규칙: 총노드>200 && 구획타일수>40). onClusterDetail이 없으면
+  // 「+N개 더」 타일이 무반응이 되어 상위 40개 밖 자산이 지도에서 도달 불가가 된다.
+  it("vheatCtx() 본문에 onClusterDetail이 있다 — 없으면 「+N개 더」가 무반응이다", () => {
+    expect(본문, "flat 모드도 총노드 200을 넘으면 군집이 걸린다 — 고리가 없으면 눌러도 아무 일이 없다")
+      // ⚠ 열쇠 이름까지 잰다 — /onClusterDetail/만 쓰면 onClusterDetailXX 같은 오타도 통과한다
+      //   (2026-09-14 돌연변이 검증에서 실제로 안 잡혀 좁혔다).
+      .toMatch(/onClusterDetail\s*:/);
+  });
+});
+
+// [2026-09-14 검토관 [중] 적발] 같은 DOM 계약 클래스가 두 화면에서 **다른 색**으로 갈렸다.
+// vulnscan은 :root에 --amber:#f0a020을 실제로 정의하므로 var(--amber, #ffe9c4)는 폴백이 안 쓰이고
+// #f0a020이 나온다 → 칩 배경 위 대비 4.04로 AA(4.5) 미달. inventory는 --amber-ink 미정의라
+// #ffe9c4(7.39)가 나온다. themecolors(토큰+폴백 꼴만 본다)·uireadability(font-size만 본다)
+// 어느 쪽도 이 부류를 원리상 못 잡아 사람이 안 보면 그대로 게시된다.
+describe("★ DOM 계약 사본 — vulnscan.html의 .mv-* CSS가 inventory.html과 같은 토큰을 쓴다", () => {
+  const v = 화면("vulnscan.html");
+  const inv = 화면("inventory.html");
+
+  it("칩 배지(.chiptag.appr/.maybe) 글자색이 두 화면 모두 --amber-ink다", () => {
+    for (const 파일 of [["vulnscan.html", v], ["inventory.html", inv]] as const) {
+      const 줄 = 파일[1].split(/\r?\n/).filter((l) => /^\s*\.chiptag\.(appr|maybe)\s*\{/.test(l));
+      expect(줄.length, `${파일[0]}에서 .chiptag.appr/.maybe 두 줄을 못 찾았다`).toBe(2);
+      for (const l of 줄) {
+        expect(l, `${파일[0]}: 칩 배지 글자색은 --amber-ink여야 한다(--amber는 이 파일이 #f0a020으로 정의해 대비 4.04로 떨어진다)`)
+          .toMatch(/color:\s*var\(--amber-ink,/);
+      }
+    }
+  });
+
+  // map-view.js:215-218이 **화면 구분 없이** 모든 h4에 접기 토글을 붙인다 — flat 모드는 자동
+  // 접기만 원리상 안 걸릴 뿐, 사람이 제목을 누르면 그 한 구획(=히트맵 전체)이 접힌다.
+  it("구획 머리글(.mv-zone h4)이 두 화면 모두 누를 수 있는 자리로 보인다(cursor:pointer + flex)", () => {
+    for (const 파일 of [["vulnscan.html", v], ["inventory.html", inv]] as const) {
+      const 머리 = 파일[1].split(/\r?\n/).filter((l) => /^\s*\.mv-zone h4\s*\{/.test(l)).join("\n");
+      expect(머리, `${파일[0]}: 접기 토글이 붙는 자리인데 cursor:pointer가 없다 — 왜 사라졌는지 알 수 없다`)
+        .toMatch(/cursor:\s*pointer/);
+      expect(머리, `${파일[0]}: display:flex가 없으면 .fold-cnt{margin-left:auto}가 안 먹어 「펼치려면 클릭」이 제목에 붙어 읽힌다`)
+        .toMatch(/display:\s*flex/);
+    }
+  });
+});
+
+// [2026-09-14 검토관 [상]·[중] 적발] 화면 안내(screenguide 「지도」)가 **화면에 없는 표기**를
+// 설명하고 실제 점선의 뜻을 반대로 알려주고 있었다. 지도에서 유일한 점선은 관측된 진입 경로다.
+// guidance-check·publish-gate 어느 관문도 안내 문장과 SVG 표기를 대조하지 않아 원리상 못 잡는다.
+describe("★★ 안내 ↔ 화면 표기 대조 — screenguide 「지도」가 없는 것을 있다고 말하지 않는다", () => {
+  const guide = readFileSync(join(__dirname, "..", "src", "engine", "screenguide.ts"), "utf8");
+  const 지도안내 = 함수본문(guide, '"지도":', 4000);
+  const mvSrc = 화면("map-view.js");
+  const inv = 화면("inventory.html");
+
+  it("지도 안내를 찾는다(이 감시의 모집단)", () => {
+    expect(지도안내, 'screenguide.ts panels["지도"]를 못 찾았다 — 열쇠가 바뀌었으면 이 감시도 고쳐라').not.toBe("");
+    expect(지도안내).toMatch(/보안 지형도/);
+  });
+
+  it("간선 배지를 약속하지 않는다 — drawRegisteredEdges는 path 하나만 그리고 배지 글자를 안 만든다", () => {
+    // 실제로 그리는 것: path 하나 + class="mv-edge mv-edge-reg". SVG text 요소 0개.
+    expect(mvSrc, "등록 간선이 배지를 만들기 시작했으면 이 감시를 고치고 안내를 되살려라")
+      .not.toMatch(/createElementNS\([^)]*,\s*"text"\)/);
+    expect(지도안내, "화면에 없는 「등록 배지」·「추정 배지」를 안내가 약속하면, 담당자는 배지가 안 뜬 것을 결함으로 읽는다")
+      .not.toMatch(/등록 배지|추정 배지/);
+  });
+
+  it("붉은 점선을 「관측된 진입」으로 적는다 — 「추정」으로 적으면 실제 공격 신호를 무시하게 된다", () => {
+    // 화면 사실: .mv-edge-entry만 stroke-dasharray를 쓴다(= 지도에서 유일한 점선 = 진입).
+    expect(inv).toMatch(/\.mv-edge-entry\{[^}]*stroke-dasharray/);
+    expect(inv, "등록 간선이 점선이 되면 안내를 다시 쓰고 이 감시도 고쳐라").toMatch(/\.mv-edge-reg\{(?![^}]*dasharray)[^}]*\}/);
+    expect(지도안내, "점선의 뜻이 안내에 「진입·관측」으로 적혀 있어야 한다").toMatch(/붉은 점선[^·]*진입|점선 화살표=진입/);
+    expect(지도안내, "지도는 점수로 추정해 선을 긋지 않는다 — 그렇게 적으면 거짓 안내다")
+      .toMatch(/추정해 그리는 선은 없습니다/);
+  });
+
+  // 바로 위 :1066-1068 주석이 「접은 구역은 **어디서 여는지** 반드시 안내한다」를 못 박아 뒀다.
+  it("구획 자동 접기가 코드에 있으면 안내도 그것을 적는다(기본 동작 변화는 반드시 안내)", () => {
+    const 자동접기있음 = /폴드상태 === null && 정렬\.length > 3/.test(mvSrc);
+    expect(자동접기있음, "자동 접기 규칙이 사라졌으면 이 감시와 안내를 함께 고쳐라").toBe(true);
+    expect(지도안내, "첫 화면에 동네가 하나만 보이는 이유를 ⓘ가 답하지 못하면 담당자는 기능이 사라진 줄 안다")
+      .toMatch(/구획 제목을 누르면/);
+  });
+});
+
+// [2026-09-14 검토관 [하]·[중] 적발] 방패 타일과 방패 상세판이 「연결」을 서로 다른 조건으로
+// 말하던 자리 + 시안 §4 참조코드 1045·1075의 「보호 범위」 빈 자리 줄이 빠져 있던 자리.
+describe("★ 방패 상세판 — 「연결」 잣대는 assetId 하나 · 못 그리는 것은 빈 자리로 밝힌다", () => {
+  it("assetId는 있는데 assetName이 비면(연결된 자산이 지워짐) 「등록하면 나타납니다」가 아니다", () => {
+    const html = mv.shieldDetailHtml("product", { id: "p1", name: "방화벽-A", category: "방화벽", assetId: "a9", docs: [] });
+    // 「연결 자산」 칸만 잘라 본다 — 아래 「보호 범위」 칸에도 같은 문구가 있어 파일 전체로 재면 헛돈다.
+    const 연결칸 = (html.match(/연결 자산<\/div>([\s\S]*?)<\/div>/) || [])[1] || "";
+    expect(연결칸, "타일은 assetId로 「연결됨」이라 말하는데 상세판이 「연결 안 됨」이라 말하면 정반대다")
+      .not.toMatch(/등록하면 나타납니다/);
+    expect(연결칸).toMatch(/연결된 자산을 찾을 수 없습니다/);
+  });
+
+  it("assetId가 아예 없으면 「등록하면 나타납니다」", () => {
+    const html = mv.shieldDetailHtml("product", { id: "p2", name: "IPS-B", category: "IPS", docs: [] });
+    const 연결칸 = (html.match(/연결 자산<\/div>([\s\S]*?)<\/div>/) || [])[1] || "";
+    expect(연결칸).toMatch(/등록하면 나타납니다/);
+    expect(연결칸).not.toMatch(/연결된 자산을 찾을 수 없습니다/);
+  });
+
+  it("보안제품 상세판에 「보호 범위」 빈 자리(.mv-noedge)가 **연결이 있을 때도** 있다(시안 §4:1075)", () => {
+    const 연결됨 = mv.shieldDetailHtml("product", { id: "p3", name: "방화벽-C", category: "방화벽", assetId: "a1", assetName: "web-01", docs: [] });
+    expect(연결됨, "이 줄이 없으면 담당자는 그 한 자산이 이 제품이 지키는 전부라고 읽는다 — 안내도 이 자리를 가리킨다")
+      .toMatch(/보호 범위[^<]*<\/div><span class="mv-noedge">/);
+  });
+
+  it("자산 상세판에도 「보호 범위」 빈 자리가 있다(시안 §4:1045) — ctx.products가 주입됐을 때", () => {
+    const ctx = {
+      activeFindings: () => [],
+      riskOf: () => ({ level: "low", label: "양호", kev: false }),
+      products: [{ id: "p1", name: "방화벽-A", assetId: "a1" }],
+      registered: true,
+    };
+    const html = mv.detailHtml({ id: "a1", name: "web-01", owner: "보안팀", findings: [] }, ctx);
+    expect(html).toMatch(/보호 범위[^<]*<\/div><span class="mv-noedge">/);
+  });
+});
+
+// [2026-09-14 검토관 [중] 적발] 구획 접기 토글이 공격경로 오버레이를 조용히 지웠다 —
+// renderZones의 container.innerHTML=""가 .mv-overlay까지 지우는데 render()는 등록 간선만
+// 되살린다(호출자의 drawPaths는 안 불린다). 시안 §3이 막으려던 사고의 거울상.
+describe("★ 접기 재렌더가 호출자 층(공격경로·선택 테두리)을 되살릴 길을 준다", () => {
+  const mvSrc = 화면("map-view.js");
+  const inv = 화면("inventory.html");
+  const 토글 = 함수본문(mvSrc, 'h4.addEventListener("click"', 1400);
+
+  it("map-view는 접기 재렌더 뒤 ctx.onRerender()를 부른다", () => {
+    expect(토글, "고리가 없으면 🎯를 켠 채 구획을 접었다 펴면 화살표가 사라지고 토글을 두 번 눌러야 돌아온다")
+      .toMatch(/ctx\.onRerender/);
+  });
+
+  it("같은 재렌더에서 선택 테두리(.mv-sel)를 되찾는다 — 상세판과 어긋나지 않게", () => {
+    expect(토글).toMatch(/mv-sel/);
+  });
+
+  it("inventory가 그 고리로 공격경로를 다시 그린다", () => {
+    expect(inv, "onRerender를 안 주면 map-view가 부를 곳이 없다")
+      .toMatch(/onRerender\(\)\s*\{[^}]*mapPathsOn[^}]*drawPaths/);
   });
 });

@@ -11,6 +11,13 @@
 .mv-map{flex:1;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;position:relative;}
 .mv-zone{border:1px solid var(--border);border-radius:8px;padding:6px 8px 8px;background:rgba(255,255,255,0.02);}
 .mv-zone h4{margin:0 0 6px;font-size:11.5px;color:var(--muted);font-weight:600;}
+/* 구획 접기(inventory.html:200-202와 같은 값) — ⚠ flat 모드라도 **사람이 머리글을 누르면**
+   map-view.js:215-218이 그 구획을 접는다(자동 접기만 원리상 안 걸린다, 2026-09-14 검토관 [중]
+   적발). 이 사본에 cursor:pointer가 없으면 「누를 수 있는 자리」인 줄 모른 채 히트맵이 통째로
+   사라지고, display:flex가 없으면 .fold-cnt의 margin-left:auto가 안 먹어 「펼치려면 클릭」이
+   제목에 붙어 읽힌다. */
+.mv-zone h4{cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px;}
+.mv-zone.folded .mv-tiles{display:none;}
 .mv-zone h4 b{color:var(--text-strong, #fff);}
 .mv-tiles{display:flex;flex-wrap:wrap;gap:5px;}
 .mv-tile{border-radius:5px;padding:4px 8px;font-size:11.5px;cursor:pointer;border:1px solid transparent;display:flex;flex-direction:column;justify-content:space-between;min-width:72px;max-width:100%;position:relative;}/* max-width: 세로에서 6px 넘침(2026-08-19 QA) */
@@ -32,17 +39,20 @@
    .mv-shield·.mv-edge-reg는 이 화면엔 없다 — products/hardening을 안 주입해 방패가 안 뜨기 때문. */
 .chiprow{display:flex;flex-direction:column;gap:6px;}
 .chiptag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:9px;margin-left:6px;vertical-align:1px;}
-.chiptag.appr{background:rgba(240,160,32,.22);color:var(--amber, #ffe9c4);}
-.chiptag.maybe{background:rgba(240,160,32,.08);color:var(--amber, #ffe9c4);border:1px dashed rgba(240,160,32,.55);}
+/* ⚠ 잉크 토큰은 --amber-ink다(inventory.html:263-264와 **글자까지 같게**). 이 파일 :root가
+   --amber:#f0a020을 정의하므로 var(--amber, …)로 적으면 폴백이 안 쓰여 #f0a020이 나오고,
+   칩 배경 위 대비가 4.04로 AA(4.5) 미달이 된다(2026-09-14 검토관 [중] 적발·계산 실측). */
+.chiptag.appr{background:rgba(240,160,32,.22);color:var(--amber-ink, #ffe9c4);}
+.chiptag.maybe{background:rgba(240,160,32,.08);color:var(--amber-ink, #ffe9c4);border:1px dashed rgba(240,160,32,.55);}
 .chiptag.noappr{background:rgba(255,255,255,.08);color:var(--muted);}
 .mv-sub{font-size:11.75px;color:var(--muted);margin:2px 0;}
-.mv-sub b{color:var(--text-strong, #fff);}
+.mv-sub b{color:var(--text);}   /* inventory.html:234와 같은 토큰 */
 .mv-noedge{font-size:11px;color:var(--muted-2);border:1px dashed var(--border-strong);border-radius:6px;
   padding:2px 6px;display:inline-block;margin-top:2px;}
 .mv-cluster{border:1px dashed var(--border-strong);border-radius:5px;padding:4px 9px;font-size:11px;
   color:var(--muted);cursor:pointer;min-width:96px;display:flex;flex-direction:column;justify-content:center;}
 .mv-cluster:hover{border-color:var(--blue);color:var(--text);}
-.mv-cluster b{color:var(--text-strong, #fff);}
+.mv-cluster b{color:var(--text);}   /* inventory.html:242와 같은 토큰 */
 /* 구획 접기 아이콘 — flat 모드(이 화면)는 구획이 항상 1개뿐이라 원리상 발화하지 않는다
    (map-view.js:77-81, 시안 §11 검토관 [중] 재적발로 확인됨). 그래도 사본 CSS는 갖춰 둔다 —
    군집(.mv-cluster, 총노드>200)은 이 화면에서 실제로 걸릴 수 있어 두 규칙을 갈라 두면 안 된다. */
@@ -378,6 +388,13 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       // ⚠ products/hardening은 일부러 안 준다(ctx.products=[] 같은 명시적 빈 배열도 넣지 않는다) —
       // 방패·등록 간선은 이 화면에 안 뜨는 것이 설계고, map-view.js 쪽 || [] 가드가 그 전제다.
       registered: false,
+      // 군집("+N개 더") 클릭 — ⚠ 이 화면은 flat이라 구획이 1개뿐이고, 취약점 있는 자산이
+      // 200개를 넘으면 군집이 **반드시** 걸린다(map-view.js 군집규칙: 총노드>200 && 구획타일수>40).
+      // 이 고리가 없으면 상위 40개 밖 자산이 눌러도 아무 일이 없어 지도에서 도달 불가가 된다
+      // (2026-09-14 검토관 [중] 적발 — inventory.html:1393-1395는 이미 배선돼 있었다).
+      onClusterDetail: (list) => {
+        document.getElementById("vheatSide").innerHTML = window.gijoMapView.clusterDetailHtml(list, vheatCtx());
+      },
     };
   }
   function renderVHeat() {

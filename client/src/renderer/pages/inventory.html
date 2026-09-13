@@ -1393,6 +1393,11 @@
       onClusterDetail(list) {
         document.getElementById("mapSide").innerHTML = window.gijoMapView.clusterDetailHtml(list, ctx);
       },
+      // 구획 접기/펴기로 map-view가 **스스로 다시 그린 뒤** 불린다 — 그 재렌더가 container를
+      // 비우면서 공격경로 겹층(.mv-overlay)까지 지운다. 등록 간선은 render()가 되살리지만
+      // 공격경로는 이 화면 소관이라 여기서 다시 그린다(2026-09-14 검토관 [중] 적발: 🎯를 켜 둔
+      // 채 구획 하나를 접었다 펴면 화살표·거점 강조가 사라지고 토글을 두 번 눌러야 돌아왔다).
+      onRerender() { if (mapPathsOn) drawPaths(); },
     };
     let shown = applyFilters(allAssets);
     if (mapMode === "kev") shown = shown.filter((a) => riskOf(a).kev);

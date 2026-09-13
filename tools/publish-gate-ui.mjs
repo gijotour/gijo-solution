@@ -1610,39 +1610,90 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
       if (document.querySelector(".mv-zone")) break;
       await new Promise((x) => setTimeout(x, 400));
     }
+    // ★ 모집단을 **제품 창구에서 직접 받아** 조건부 판정의 근거로 삼는다(2026-09-14 검토관 [중]
+    //   적발: ⓐⓒⓓ가 운영 데이터 양에 무조건 매여 있어, 보안제품 0건이거나 자산이 200을 넘으면
+    //   코드가 멀쩡한데 게시가 막혔다. 같은 파일 :1566-1567이 이미 쓰는 「데이터가 없으면 이
+    //   조항은 안 잰다」 관례를 그대로 따른다).
+    let 제품 = null, 대상 = null;
+    try { 제품 = await window.gijo.listSecurityProducts(); } catch (e) {}
+    try { const r = await window.gijo.hardeningTargets.list(); 대상 = (r && r.targets) || null; } catch (e) {}
+    const 제품수 = Array.isArray(제품) ? 제품.length : -1;
+    const 연결제품수 = Array.isArray(제품) ? 제품.filter((p) => p.assetId).length : -1;
+    const 대상수 = Array.isArray(대상) ? 대상.length : -1;
+    // ★ 방패는 **비동기로 늦게** 온다 — inventory.html renderMap()이 loadShields().then(renderMap)
+    //   으로 한 번 더 그린다. .mv-zone이 뜨자마자 세면 첫 렌더(방패 0)를 재게 된다.
+    if (제품수 + 대상수 > 0) {
+      for (let i = 0; i < 25; i++) {
+        if (document.querySelector(".mv-shield")) break;
+        await new Promise((x) => setTimeout(x, 400));
+      }
+    }
+    // ★ 구획 자동 접기(구획 4개 이상이면 미조치 1위만 편다) — 접힌 구획은 타일이 **아예 안
+    //   그려져** 방패·등록 간선을 못 센다(map-view.js drawRegisteredEdges가 스스로 그렇게 적어
+    //   뒀다: "필터로 가려졌으면(구획 접힘 포함) 못 긋는다"). 재기 전에 사람이 하는 것과 같은
+    //   조작(머리글 클릭)으로 전부 펼친다.
+    let 펼친구획 = 0;
+    for (let i = 0; i < 20; i++) {
+      const 접힌 = document.querySelector(".mv-zone.folded h4");
+      if (!접힌) break;
+      접힌.click();
+      펼친구획++;
+      await new Promise((x) => setTimeout(x, 150));
+    }
+    await new Promise((x) => setTimeout(x, 300)); // 등록 간선은 requestAnimationFrame 뒤에 붙는다
     // ⓐ 방패(보안제품·하드닝 대상) 타일이 실제로 주입돼 그려지는가.
     const 방패수 = document.querySelectorAll(".mv-shield").length;
-    // ⓔ 구획 머리의 "자산 N" 합 — 방패를 그 숫자에 섞지 않기로 한 계약이 실제로 지켜졌는지,
-    //   목록 배지(#tabCountList)와 대조한다.
+    // ⓔ 구획 머리의 "자산 N" 합 — 방패를 그 숫자에 섞지 않기로 한 계약이 지켜졌는지 본다.
+    //   ⚠ 목록 배지(#tabCountList = allAssets.length, 필터 **전** 전체)와 견주면 안 된다 —
+    //   지도 쪽 모집단은 applyFilters(샘플 origin 제외·검색·카테고리·좁히기 칩) × mapMode라서,
+    //   샘플 origin 자산이 하나만 있어도 방패와 무관하게 빨강이 났다(2026-09-14 검토관 [중]
+    //   적발: 「방패 혼입」을 재려던 잣대가 「필터가 하나도 안 걸렸는가」를 같이 재고 있었다).
+    //   지도가 실제로 그린 목록(window.__mapShown, inventory.html renderMap이 세운다)과 견준다.
     let 구획자산합 = 0;
     document.querySelectorAll(".mv-zone h4").forEach((h) => {
       const m = (h.textContent || "").match(/자산\s*(\d+)/);
       if (m) 구획자산합 += Number(m[1]);
     });
+    const 지도모집단 = Array.isArray(window.__mapShown) ? window.__mapShown.length : -1;
     const 목록배지 = Number((document.getElementById("tabCountList") || {}).textContent || "-1");
-    // ⓑ 자산 타일 하나를 실제로 클릭해 상세판 칩·배지가 그려지는지 본다(방패 타일은 dataset이
-    //   달라 이 선택자에 안 걸린다 — data-shield-id/data-shield-kind, 위 방패수가 그쪽을 잰다).
+    const 총노드 = (지도모집단 >= 0 && 제품수 >= 0 && 대상수 >= 0) ? 지도모집단 + 제품수 + 대상수 : -1;
+    // ⓑ 자산 타일 **클릭 배선**을 잰다 — ⚠ 상세판을 먼저 비운다. renderMap()이 첫 화면에서
+    //   ctx.onDetail(급한)으로 **이미** 칩 6개·배지를 그려 두기 때문에, 안 비우면 타일 클릭
+    //   리스너를 통째로 지워도 이 검사가 초록이다(2026-09-14 검토관 [상] 적발 — 관문이 이름
+    //   붙인 대상을 원리상 못 보던 자리). 선택 테두리(.mv-sel)와 상세판 제목까지 함께 잰다.
+    const side = document.getElementById("mapSide");
+    if (side) side.innerHTML = "";
+    const 비운뒤칩수 = document.querySelectorAll(".mv-ask").length;
     const assetTile = document.querySelector(".mv-tile[data-asset-id]");
     if (assetTile) assetTile.click();
     await new Promise((x) => setTimeout(x, 300));
     const 칩수 = document.querySelectorAll(".mv-ask").length;
     const 배지수 = document.querySelectorAll(".chiptag").length;
+    const 선택테두리 = document.querySelectorAll(".mv-tile.mv-sel[data-asset-id]").length;
+    const 상세제목 = ((document.querySelector("#mapSide h3") || {}).textContent || "").trim();
     // ⓒ 등록 간선 — 🎯 공격경로 토글은 손대지 않는다(기본 꺼짐 그대로 둔다, mapPathsOn=false).
     //   방패가 보이면 그 토글과 무관하게 항상 그려져야 한다는 것이 §3의 약속이다.
     const 등록간선수 = document.querySelectorAll(".mv-edge-reg").length;
-    // ⓓ 군집 — 오늘 자산 수는 총노드 200 조건에 안 걸려 트리거되면 안 된다.
+    // ⓓ 군집 — 총노드가 200을 넘지 **않을 때만** 0을 요구한다(넘으면 군집이 나는 것이 설계다).
     const 군집수 = document.querySelectorAll(".mv-cluster").length;
-    return { 방패수, 구획자산합, 목록배지, 칩수, 배지수, 등록간선수, 군집수 };
+    return { 방패수, 구획자산합, 지도모집단, 목록배지, 비운뒤칩수, 칩수, 배지수, 선택테두리,
+      상세제목, 등록간선수, 군집수, 제품수, 연결제품수, 대상수, 총노드, 펼친구획 };
   }).catch((e) => ({ 던짐: String(e).slice(0, 200) })) : null;
-  ok("UI 지도 ⓐ — 방패 타일(.mv-shield) ≥ 1", !!map && !map.탭없음 && !map.던짐 && map.방패수 >= 1, JSON.stringify(map));
-  ok("UI 지도 ⓑ — 자산 타일 클릭 시 칩(.mv-ask) 4~6개 · 배지(.chiptag) ≥ 1",
-    !!map && map.칩수 >= 4 && map.칩수 <= 6 && map.배지수 >= 1, JSON.stringify(map));
-  ok("UI 지도 ⓒ — 등록 간선(.mv-edge-reg) ≥ 1(🎯 공격경로 토글이 꺼진 기본 상태에서도)",
-    !!map && map.등록간선수 >= 1, JSON.stringify(map));
-  ok("UI 지도 ⓓ — 군집 타일(.mv-cluster) 0(오늘 자산 수는 총노드 200 조건에 안 걸린다)",
-    !!map && map.군집수 === 0, JSON.stringify(map));
-  ok("UI 지도 ⓔ — 구획 머리 자산 수 합 == 목록 배지(방패가 그 숫자에 안 섞였는지)",
-    !!map && map.구획자산합 === map.목록배지, JSON.stringify(map));
+  // ★ 새 5종은 **조건부 판정**이다 — 운영 데이터 양(보안제품 0건·자산 200 초과)에 무조건
+  //   매여 있으면 코드가 멀쩡한데 게시가 막히고, 그러면 다음 사람이 검사를 느슨하게 만든다
+  //   (2026-09-14 검토관 [중] 적발). 안 잰 조항은 부가 JSON에 그 이유가 되는 숫자가 남는다.
+  const 지도성립 = !!map && !map.탭없음 && !map.던짐;
+  ok("UI 지도 ⓐ — 방패 타일(.mv-shield) ≥ 1(보안제품·하드닝 대상 0건이면 이 조항은 안 잰다)",
+    지도성립 && (map.제품수 + map.대상수 <= 0 ? true : map.방패수 >= 1), JSON.stringify(map));
+  ok("UI 지도 ⓑ — 상세판을 비우고 자산 타일을 눌렀을 때 칩 4~6개 · 배지 ≥ 1 · 선택 테두리 1 · 상세 제목",
+    지도성립 && map.비운뒤칩수 === 0 && map.칩수 >= 4 && map.칩수 <= 6 && map.배지수 >= 1
+      && map.선택테두리 === 1 && !!map.상세제목, JSON.stringify(map));
+  ok("UI 지도 ⓒ — 등록 간선(.mv-edge-reg) ≥ 1(🎯 토글 꺼진 상태에서도 · 연결된 보안제품 0건이면 안 잰다)",
+    지도성립 && (map.연결제품수 <= 0 ? true : map.등록간선수 >= 1), JSON.stringify(map));
+  ok("UI 지도 ⓓ — 군집 타일(.mv-cluster) 0(총노드가 200을 넘으면 이 조항은 안 잰다)",
+    지도성립 && ((map.총노드 < 0 || map.총노드 > 200) ? true : map.군집수 === 0), JSON.stringify(map));
+  ok("UI 지도 ⓔ — 구획 머리 자산 수 합 == 지도가 그린 자산 수(방패가 그 숫자에 안 섞였는지)",
+    지도성립 && map.지도모집단 >= 0 && map.구획자산합 === map.지도모집단, JSON.stringify(map));
 }
 
 } finally {

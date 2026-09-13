@@ -31,6 +31,11 @@
 //     숨긴다(방패엔 위험등급이 없어 그 칩들과 결이 다르다). 생략하면 "all"로 본다.
 //   · ctx.onShieldDetail(kind, item) · ctx.onClusterDetail(list) — 방패/군집 타일 클릭 콜백.
 //     방패·군집이 뜨려면(products/hardening 주입) 이 둘도 함께 있어야 한다.
+//     ⚠ 군집은 flat 모드(vulnscan)에서도 걸린다 — 구획이 1개뿐이라 총노드 200을 넘으면
+//       **반드시** 군집이 생긴다. onClusterDetail을 안 주면 그 타일이 무반응이 된다.
+//   · ctx.onRerender() — 구획 머리글 접기/펴기로 **이 파일이 스스로 다시 그린 뒤** 부른다.
+//     재렌더는 container를 비우므로 호출자가 얹어 둔 층(공격경로 .mv-overlay)이 함께 지워진다 —
+//     그 층을 되살리는 일은 호출자 소관이라 이 고리로 알린다.
 (function () {
   "use strict";
 
@@ -215,7 +220,21 @@
       h4.addEventListener("click", () => {
         if (폴드상태 === null) 폴드상태 = new Set(자동확장 !== null ? [자동확장] : 정렬.map((e) => e.k));
         if (폴드상태.has(k)) 폴드상태.delete(k); else 폴드상태.add(k);
+        // ⚠ 다시 그리기 전에 **지금 고른 타일**을 기억한다 — renderZones가 container를 통째로
+        //   비우므로 .mv-sel이 사라지는데, 오른쪽 상세판은 그 자산을 계속 보여준다. 두 자리가
+        //   어긋나면 「무엇을 고른 상태인가」를 알 수 없다(2026-09-14 검토관 [중] 적발).
+        const 고른 = container.querySelector(".mv-tile.mv-sel");
+        const 고른선택자 = !고른 ? null
+          : 고른.dataset.assetId ? '.mv-tile[data-asset-id="' + CSS.escape(고른.dataset.assetId) + '"]'
+          : 고른.dataset.shieldId ? '.mv-shield[data-shield-id="' + CSS.escape(고른.dataset.shieldId) + '"]'
+          : null;
         render(container, assets, ctx);
+        if (고른선택자) { const 되찾음 = container.querySelector(고른선택자); if (되찾음) 되찾음.classList.add("mv-sel"); }
+        // ⚠ 공격경로 겹층(.mv-overlay)은 **호출자 소관**이다 — 이 재렌더가 그것까지 지웠는데
+        //   render()는 등록 간선만 되살린다. 고리를 주지 않으면 🎯를 켜 둔 채 구획 하나를
+        //   접었다 펴면 화살표·거점 강조가 사라지고 토글을 두 번 눌러야 돌아온다
+        //   (시안 §3이 막으려던 사고의 거울상 — 2026-09-14 검토관 [중] 적발).
+        if (ctx.onRerender) ctx.onRerender();
       });
       z.appendChild(h4);
 
@@ -406,6 +425,10 @@
         (linked.length
           ? linked.map((p) => '<div class="mv-sub">🛡 ' + esc(p.name) + ' <span class="chiptag noappr">등록</span></div>').join("")
           : '<span class="mv-noedge">등록하면 나타납니다</span>') + "</div>";
+      // 시안 §4 참조코드 1045 — 「이 자산을 지키는 장비가 지도 전체에서 어떤 다른 자산까지
+      // 지키는가」는 등록 칸이 없어 모른다. 정직한 공백 표시([6][7] "모르는 것은 칠하지 않는다").
+      html += '<div class="mv-row"><div class="mv-lbl">🛡 보호 범위(이 자산을 지키는 장비들이 지도 전체에서 어떤 다른 자산까지 지키는가)</div>' +
+        '<span class="mv-noedge">등록 칸 없음 — 등록하면 나타납니다</span></div>';
     }
     html += '<div class="chiprow">' + chipsForAsset(a, ctx).map((c) => {
       const b = BADGE[c.badge] || BADGE.none;
@@ -439,9 +462,22 @@
       "<h3>🛡 " + esc(item.name) + "</h3>" +
       '<div class="mv-row"><div class="mv-lbl">종류</div>' + esc(item.category || "") +
       (item.vendor ? (" · " + esc(item.vendor) + (item.model ? " " + esc(item.model) : "")) : "") + "</div>" +
+      // ⚠ 조건은 **assetId**다 — 방패 타일(위 방패타일())과 같은 잣대여야 한다. assetName은
+      //   서버가 읽을 때 자산 표에서 조회하는 값이라(securityproducts.ts) 연결된 자산이 지워지면
+      //   비는데, 이름으로 갈래를 타면 타일은 「연결됨」·상세판은 「연결 안 됨」으로 정반대로
+      //   말한다(2026-09-14 검토관 [하] 적발). 이름이 없을 때는 그 사실을 따로 적는다.
       '<div class="mv-row"><div class="mv-lbl">연결 자산</div>' +
-      (item.assetName ? ("🔗 " + esc(item.assetName) + ' <span class="chiptag noappr">등록</span>') : '<span class="mv-noedge">등록하면 나타납니다</span>') + "</div>" +
+      (item.assetId
+        ? (item.assetName
+            ? ("🔗 " + esc(item.assetName) + ' <span class="chiptag noappr">등록</span>')
+            : '<span class="mv-noedge">연결된 자산을 찾을 수 없습니다 — 등록은 돼 있으나 그 자산이 지워졌습니다</span>')
+        : '<span class="mv-noedge">등록하면 나타납니다</span>') + "</div>" +
       '<div class="mv-row"><div class="mv-lbl">매뉴얼 문서</div>' + ((item.docs && item.docs.length) ? item.docs.length + "건" : "없음") + "</div>" +
+      // 🛡 보호 범위 — 시안 §4 참조코드 1075의 .mv-noedge 빈 자리 줄(구현에서 빠져 있었다,
+      // 2026-09-14 검토관 [중] 적발). 화면 안내(screenguide 「지도」)가 **이 자리를 가리킨다** —
+      // 연결 자산이 있을 때 이 줄이 없으면 담당자는 그 한 자산이 이 제품이 지키는 전부라고 읽는다.
+      '<div class="mv-row"><div class="mv-lbl">🛡 보호 범위(이 제품이 지키는 자산 전체 목록)</div>' +
+      '<span class="mv-noedge">등록 칸 없음 — 등록하면 나타납니다</span></div>' +
       '<div class="chiprow"><div><button class="mv-ask" data-ask="' + esc(문장) + '">💬 "' + esc(문장) + '"</button>' +
       '<span class="chiptag noappr">결재판 없음</span></div></div>' +
       '<div class="mv-hint">지시는 전부 대화창을 거칩니다 — 지도는 보기 전용입니다.</div>'

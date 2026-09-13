@@ -413,6 +413,15 @@ const 기대도착: Record<string, string> = {
   //   기대도착 :395 줄과 겹쳐 harvest Set에 한 번만 잡힌다 — 새 줄 아님. 옛 ①(「GIJO AS 서버
   //   자산 취약점 알려줘」→ search)은 지우지 않는다 — map-view.js 밖에도 생산자가 있다(위 :390).
   "GIJO AS 서버 취약점만 보여줘": "findingListAnswer(목록+체크칸)",
+  // ⚠ [2026-09-14 검토관 [중] 적발에 대한 정정 기록] 이 줄이 재는 것은 **자기 점검 갈래뿐**이다.
+  //   제품 칩(map-view.js 방패 상세판)은 h.host(IPv4)를 실어 보내는데, agentloop의 대상찾기
+  //   후보 정규식은 IPv4/하이픈꼴만 받으므로 공백 있는 대표값 「GIJO AS 서버」는 후보가 안 잡혀
+  //   **늘** run_hardening_scan으로 떨어진다(route-explain --no-build 실측: 「여기로 갑니다」,
+  //   조건부 아님 — 그래서 이 표에 두는 것이 맞다. 같은 갈래의 「FW-01 …」은 조건부라 위
+  //   데이터에달려도봐줌이 받는다). **원격 갈래(scan_hardening_target)는 이 표가 안 잰다** —
+  //   그쪽은 server/test/hardening-scantarget.test.ts·hardening-unchecked-routing.test.ts가 진다.
+  //   수확 대표값에 IP 꼴 자리를 더해 실제 칩 문장으로 재게 하는 것은 guidance-check.mjs 변경이라
+  //   별건(B-2)이다. 이 주석이 없으면 다음 사람이 「칩이 커버된다」고 읽는다.
   "GIJO AS 서버 하드닝 점검 돌려줘": "run_hardening_scan",
   "GIJO AS 서버 재스캔 상태 알려줘": "scan_status",
   "GIJO AS 서버 공격 경로 보여줘": "formatAttackPaths",
