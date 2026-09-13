@@ -165,7 +165,7 @@ server/test/
 │   ├── users.test.ts
 │   ├── verifyaccess.test.ts
 │   └── viewmarkgates.test.ts
-├── 대화·라우팅/  (112)
+├── 대화·라우팅/  (113)
 │   ├── adapters.test.ts
 │   ├── adaptertools.test.ts
 │   ├── aged-finding-routing.test.ts
@@ -259,6 +259,7 @@ server/test/
 │   ├── screenguidefix.test.ts
 │   ├── selectionassign.test.ts
 │   ├── selectioncontext.test.ts
+│   ├── selfcheck-datacleanup-ui.test.ts
 │   ├── slowanswers.test.ts
 │   ├── smalltalk.test.ts
 │   ├── sourcebadge.test.ts
@@ -463,7 +464,7 @@ server/test/
 │   ├── reportscheduletools.test.ts
 │   ├── timesaved.test.ts
 │   └── usage.test.ts
-├── 업무·세션/  (14)
+├── 업무·세션/  (13)
 │   ├── alertschedule.test.ts
 │   ├── collaboration.test.ts
 │   ├── contextturns.test.ts
@@ -471,7 +472,6 @@ server/test/
 │   ├── handover.test.ts
 │   ├── handoverhistory.test.ts
 │   ├── mywork.test.ts
-│   ├── selfcheck-datacleanup-ui.test.ts
 │   ├── sessionpatterns.test.ts
 │   ├── task-dedupe.test.ts
 │   ├── tasks.test.ts
@@ -525,7 +525,7 @@ server/test/
 | --- | ---: | --- |
 | ★ 감시 — 약속을 지키는지 본다 | 105 | `answerflagui` → 소스·문서를 직접 읽어 검사 · `answerlength` → 소스·문서를 직접 읽어 검사 |
 | 보안·인증 | 52 | `airgap` → src/engine/airgap · `answerfeedback` → src/app |
-| 대화·라우팅 | 112 | `adapters` → src/engine/adapters · `adaptertools` → src/engine/agentloop |
+| 대화·라우팅 | 113 | `adapters` → src/engine/adapters · `adaptertools` → src/engine/agentloop |
 | 말투·표기 | 12 | `approvalstatustool` → src/engine/agenttools/handlers · `findingplain` → src/engine/findingplain |
 | 모델·엔진 | 30 | `adapterimport` → (제품 소스 import 없음) · `adoptgate` → src/engine/adapters |
 | 지식·RAG | 53 | `bundleimport` → src/engine/ontology · `bundleverify` → src/engine/bundleverify |
@@ -534,7 +534,7 @@ server/test/
 | 점검·하드닝 | 13 | `hardening-selfscan-off` → src/app · `hardeningscan` → src/app |
 | 로그·분석 | 14 | `activityaudit` → src/engine/activityaudit · `analysis` → src/engine/analysis |
 | 보고·리포트 | 7 | `progress` → src/engine/progress · `qalongwait` → src/engine/longanswer |
-| 업무·세션 | 14 | `alertschedule` → src/db · `collaboration` → src/app |
+| 업무·세션 | 13 | `alertschedule` → src/db · `collaboration` → src/app |
 | 화면·클라이언트 | 3 | `personaldocs` → src/db · `viewerctx` → src/engine/viewerctx |
 | 기반(DB·유틸) | 11 | `answersamples` → src/db · `date` → src/util/date |
 | 분류 못 함 | 22 | `brainlogfield` → src/engine/brainmark · `brainmark.route` → src/engine/brainmark |

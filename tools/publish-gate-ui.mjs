@@ -1595,6 +1595,55 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     JSON.stringify(hd));
 }
 
+// ── ⑨″ 지도(자산 지형도 2단계 — 승인 시안 mockups/asset-graph-v2, 2026-09-14) ─────
+// ⚠ inventory.html은 위 :283-285 경고 그대로 **?full=1 없이 열면 assets.html로 흡수**돼
+//   프레임이 없다(nav.js TAB_REDIRECT). 지도는 그 안 세 번째 탭이라 여기서만 잰다.
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("inventory.html?full=1", "자산 관리 (전체)", { dock: true }));
+  const mapFr = await 프레임찾기("inventory.html", 10);
+  const map = mapFr ? await mapFr.evaluate(async () => {
+    // 목록 탭이 기본이라 🗺 지도 탭을 직접 눌러야 renderMap()이 돈다.
+    const tab = document.querySelector('.cov-tab[data-tab="map"]');
+    if (!tab) return { 탭없음: true };
+    tab.click();
+    for (let i = 0; i < 25; i++) {
+      if (document.querySelector(".mv-zone")) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    // ⓐ 방패(보안제품·하드닝 대상) 타일이 실제로 주입돼 그려지는가.
+    const 방패수 = document.querySelectorAll(".mv-shield").length;
+    // ⓔ 구획 머리의 "자산 N" 합 — 방패를 그 숫자에 섞지 않기로 한 계약이 실제로 지켜졌는지,
+    //   목록 배지(#tabCountList)와 대조한다.
+    let 구획자산합 = 0;
+    document.querySelectorAll(".mv-zone h4").forEach((h) => {
+      const m = (h.textContent || "").match(/자산\s*(\d+)/);
+      if (m) 구획자산합 += Number(m[1]);
+    });
+    const 목록배지 = Number((document.getElementById("tabCountList") || {}).textContent || "-1");
+    // ⓑ 자산 타일 하나를 실제로 클릭해 상세판 칩·배지가 그려지는지 본다(방패 타일은 dataset이
+    //   달라 이 선택자에 안 걸린다 — data-shield-id/data-shield-kind, 위 방패수가 그쪽을 잰다).
+    const assetTile = document.querySelector(".mv-tile[data-asset-id]");
+    if (assetTile) assetTile.click();
+    await new Promise((x) => setTimeout(x, 300));
+    const 칩수 = document.querySelectorAll(".mv-ask").length;
+    const 배지수 = document.querySelectorAll(".chiptag").length;
+    // ⓒ 등록 간선 — 🎯 공격경로 토글은 손대지 않는다(기본 꺼짐 그대로 둔다, mapPathsOn=false).
+    //   방패가 보이면 그 토글과 무관하게 항상 그려져야 한다는 것이 §3의 약속이다.
+    const 등록간선수 = document.querySelectorAll(".mv-edge-reg").length;
+    // ⓓ 군집 — 오늘 자산 수는 총노드 200 조건에 안 걸려 트리거되면 안 된다.
+    const 군집수 = document.querySelectorAll(".mv-cluster").length;
+    return { 방패수, 구획자산합, 목록배지, 칩수, 배지수, 등록간선수, 군집수 };
+  }).catch((e) => ({ 던짐: String(e).slice(0, 200) })) : null;
+  ok("UI 지도 ⓐ — 방패 타일(.mv-shield) ≥ 1", !!map && !map.탭없음 && !map.던짐 && map.방패수 >= 1, JSON.stringify(map));
+  ok("UI 지도 ⓑ — 자산 타일 클릭 시 칩(.mv-ask) 4~6개 · 배지(.chiptag) ≥ 1",
+    !!map && map.칩수 >= 4 && map.칩수 <= 6 && map.배지수 >= 1, JSON.stringify(map));
+  ok("UI 지도 ⓒ — 등록 간선(.mv-edge-reg) ≥ 1(🎯 공격경로 토글이 꺼진 기본 상태에서도)",
+    !!map && map.등록간선수 >= 1, JSON.stringify(map));
+  ok("UI 지도 ⓓ — 군집 타일(.mv-cluster) 0(오늘 자산 수는 총노드 200 조건에 안 걸린다)",
+    !!map && map.군집수 === 0, JSON.stringify(map));
+  ok("UI 지도 ⓔ — 구획 머리 자산 수 합 == 목록 배지(방패가 그 숫자에 안 섞였는지)",
+    !!map && map.구획자산합 === map.목록배지, JSON.stringify(map));
+}
 
 } finally {
   // ⚠ finally다 — 위에서 무엇이 터지든 **세션은 반납하고** 죽는다(K5-2).

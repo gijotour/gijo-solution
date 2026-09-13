@@ -118,3 +118,93 @@ describe("구획 열쇠 — 네트워크 대역으로 묶는다", () => {
     expect(mv.구획열쇠({ name: "이름만 있는 자산" })).toMatch(/대역 미상/);
   });
 });
+
+// [전-7 2단계 · 2026-09-14 · 시안 mockups/asset-graph-v2/시안.html §3] 하드닝 대상(host만
+// 있고 assetId가 없다)을 자산과 같은 대역 셈법으로 놓는다. 두 함수가 갈리면 같은 /24인데
+// 구획이 두 개로 쪼개진다.
+describe("★ 호스트구획열쇠 — 자산 구획열쇠와 정확히 같은 셈법(시안 §3)", () => {
+  it("호스트구획열쇠(IP) === 구획열쇠({ip:IP}) — 갈리면 안 된다", () => {
+    expect(mv.호스트구획열쇠("192.0.2.10")).toBe(mv.구획열쇠({ ip: "192.0.2.10" }));
+    expect(mv.호스트구획열쇠("203.0.113.5")).toBe(mv.구획열쇠({ ip: "203.0.113.5" }));
+    expect(mv.호스트구획열쇠("192.0.2.10")).toBe("192.0.2.x 대역");
+  });
+
+  it("IP 꼴이 아니면(한글 라벨·빈 값) 기타 — 대역 미상", () => {
+    expect(mv.호스트구획열쇠("코어 스위치")).toMatch(/대역 미상/);
+    expect(mv.호스트구획열쇠("")).toMatch(/대역 미상/);
+    expect(mv.호스트구획열쇠(undefined)).toMatch(/대역 미상/);
+  });
+});
+
+// [전-7 2단계 · 시안 §5] 총노드(자산+방패)>200 && 구획 안 타일수>40이면 그 구획을 군집한다.
+// 렌더 배치 규칙 하나 — 무엇이 위험한지는 안 바꾸고 몇 개를 개별 타일로 그릴지만 정한다.
+describe("★ 군집규칙 — 총노드>200 && 구획타일수>40 (경계 3점, 시안 §5)", () => {
+  it("경계값 — 199/201 · 40/41", () => {
+    expect(mv.군집규칙(199, 41), "총노드가 200을 못 넘으면 타일이 많아도 군집 안 함").toBe(false);
+    expect(mv.군집규칙(201, 41), "둘 다 넘으면 군집").toBe(true);
+    expect(mv.군집규칙(201, 40), "총노드는 넘어도 구획 타일이 40을 안 넘으면 군집 안 함").toBe(false);
+  });
+});
+
+// [전-7 2단계 · 시안 §2·§11] 자산 상세판 칩 6종 — ①③④⑤⑥⑦(②는 예외표 재사용, 새 줄 아님).
+// ⑥⑦(쓰기 칩)은 ctx.registered일 때만 뜬다 — 미등록 화면(vulnscan)에서 승인 없는 전사
+// 리포트가 생기는 구멍을 막는 스위치(시안 §11 검토관 [상] 3차 적발).
+describe("★★ chipsForAsset — ⑥⑦은 ctx.registered 게이팅 + 문장은 등록 이름(a.name)", () => {
+  const ctxOf = (registered: boolean) => ({ registered, activeFindings: (x: any) => x.findings || [] });
+  const asset = { id: "a1", name: "192.0.2.11", displayName: "web-edge-01", owner: "보안팀", findings: [] };
+
+  it("registered:false — ⑥(조치 요청서)·⑦(취약점 리포트)이 없다", () => {
+    const rows = mv.chipsForAsset(asset, ctxOf(false));
+    expect(rows.some((r: any) => r.text.includes("조치 요청서 만들어줘"))).toBe(false);
+    expect(rows.some((r: any) => r.text.includes("취약점 리포트 만들어줘"))).toBe(false);
+    // ①④⑤는 registered 여부와 무관하게 항상 있다(읽기전용이라 위험이 안 바뀐다).
+    expect(rows.some((r: any) => r.text.includes("취약점만 보여줘"))).toBe(true);
+    expect(rows.some((r: any) => r.text.includes("재스캔 상태 알려줘"))).toBe(true);
+    expect(rows.some((r: any) => r.text.includes("공격 경로 보여줘"))).toBe(true);
+  });
+
+  it("registered:true — ⑥⑦이 있다", () => {
+    const rows = mv.chipsForAsset(asset, ctxOf(true));
+    expect(rows.some((r: any) => r.text.includes("조치 요청서 만들어줘"))).toBe(true);
+    expect(rows.some((r: any) => r.text.includes("취약점 리포트 만들어줘"))).toBe(true);
+  });
+
+  it("★★★ 표시 이름(displayName)이 등록 이름(name)과 달라도 ⑥⑦ 문장은 a.name이다 — " +
+    "dispatcher.ts:2024 listAssets().find가 a.name/a.id만 보기 때문(시안 §11)", () => {
+    const rows = mv.chipsForAsset(asset, ctxOf(true));
+    const 요청서 = rows.find((r: any) => r.text.includes("조치 요청서 만들어줘"));
+    const 리포트 = rows.find((r: any) => r.text.includes("취약점 리포트 만들어줘"));
+    expect(요청서, "⑥ 칩이 있어야 한다").toBeTruthy();
+    expect(리포트, "⑦ 칩이 있어야 한다").toBeTruthy();
+    // asset.name="192.0.2.11" · asset.displayName="web-edge-01" — 표시 이름을 썼다면
+    // "web-edge-01 조치 요청서 만들어줘"가 됐을 것이다. 등록 이름이어야 한다.
+    expect(요청서!.text).toBe("192.0.2.11 조치 요청서 만들어줘");
+    expect(리포트!.text).toBe("192.0.2.11 취약점 리포트 만들어줘");
+    // ⚠ 구현 중 수기 돌연변이 검증: chipsForAsset의 등록이름을 표시이름(a.displayName||a.name)
+    // 으로 되돌려 이 시험을 실행하면 위 두 expect가 "web-edge-01 …"을 받아 빨강이 됨을 확인했다
+    // (검증 후 원복). CI가 소스를 자동으로 변형하지는 않는다 — stash 없이 손으로 확인한 절차다.
+  });
+
+  it("② 칩(담당자 배정)은 미조치>0 && 담당없음일 때만, 문구는 예전 그대로(예외표 재사용)", () => {
+    const 미배정 = { id: "a2", name: "192.0.2.12", displayName: "db-01", owner: null, findings: [{ severity: "high", state: "active" }] };
+    const rows = mv.chipsForAsset(미배정, ctxOf(false));
+    const 담당자 = rows.find((r: any) => r.text.includes("취약점 담당자 배정해줘"));
+    expect(담당자, "미조치가 있고 담당이 없으면 ② 칩이 있어야 한다").toBeTruthy();
+    expect(담당자!.text).toBe("db-01 취약점 담당자 배정해줘"); // 표시 이름 그대로(예전과 같다)
+    expect(담당자!.badge).toBe("maybe");
+    // 담당이 있으면 ②는 안 뜬다(기존 조건 불변).
+    const rows2 = mv.chipsForAsset(asset, ctxOf(false)); // asset.owner = "보안팀"
+    expect(rows2.some((r: any) => r.text.includes("담당자 배정해줘"))).toBe(false);
+  });
+});
+
+// [전-7 2단계 · 시안 §11] vulnscan.html(B 소유)은 registered:false를 **명시**해야 한다 —
+// 지우면 ⑥⑦ 칩이 미등록 화면에서도 떠 승인 없는 전사 리포트 구멍이 재현된다. A는 이 파일을
+// 소유하지 않으므로 여기서는 소스 감시(문자열 존재)만 잰다 — 파일 소유는 넘어가지 않는다.
+describe("★ 소스 감시 — vulnscan.html의 vheatCtx()가 registered:false를 명시한다(B의 파일)", () => {
+  it("vulnscan.html에 registered: false가 있다", () => {
+    const src = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "vulnscan.html"), "utf8");
+    expect(src, "vheatCtx()에 registered:false가 없으면 ⑥⑦ 쓰기 칩이 미등록 화면에서도 뜬다(시안 §11)")
+      .toMatch(/registered\s*:\s*false/);
+  });
+});

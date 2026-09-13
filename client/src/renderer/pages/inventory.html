@@ -196,6 +196,11 @@
   .mv-zone{border:1px solid var(--border);border-radius:8px;padding:6px 8px 8px;background:rgba(255,255,255,0.02);}
   .mv-zone h4{margin:0 0 6px;font-size:11.5px;color:var(--muted);font-weight:600;}
   .mv-zone h4 b{color:var(--text);}
+  /* 구획 접기(2단계, 시안 §5) — 머리글 클릭으로 펴고 접는다. */
+  .mv-zone h4{cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px;}
+  .mv-zone.folded .mv-tiles{display:none;}
+  .mv-zone .fold-ic{font-size:11px;color:var(--muted-2);}
+  .mv-zone .fold-cnt{margin-left:auto;font-size:11px;color:var(--muted-2);font-weight:600;}
   .mv-tiles{display:flex;flex-wrap:wrap;gap:5px;}
   .mv-tile{border-radius:5px;padding:4px 8px;font-size:11.5px;cursor:pointer;border:1px solid transparent;
            display:flex;flex-direction:column;justify-content:space-between;min-width:72px;position:relative;}
@@ -208,14 +213,35 @@
   .mv-mid{background:rgba(240,160,32,.26);color:var(--amber, #ffe9c4);}
   .mv-low{background:rgba(70,167,88,.22);color:var(--teal-ink, #d2f2da);}
   .mv-ai{outline:1px dashed rgba(139,124,240,.55);}
+  /* 방패 타일(보안제품·하드닝 대상, 2단계 시안 §4) — 자산 타일과 다른 오각형 모양, 위험
+     등급 색 대신 등록 여부만(방패는 위험 개념이 없다 — [6][7] "모르는 것은 칠하지 않는다"). */
+  .mv-tile.mv-shield{
+    clip-path:polygon(10% 0%, 90% 0%, 100% 32%, 100% 74%, 50% 100%, 0% 74%, 0% 32%);
+    padding:9px 11px 15px;min-width:96px;max-width:150px;justify-content:flex-start;gap:2px;
+    border:2px solid var(--teal);background:rgba(30,185,128,.10);color:var(--teal-ink, #d2f2da);
+  }
+  .mv-tile.mv-shield:hover{background:rgba(30,185,128,.20);}
+  .mv-tile.mv-shield.mv-sel{box-shadow:0 0 0 1px #fff inset;}
+  .mv-tile.mv-shield.mv-hard{border-color:var(--blue);background:rgba(59,130,246,.10);color:var(--blue-ink, #cfe1ff);}
+  .mv-tile.mv-shield.mv-hard:hover{background:rgba(59,130,246,.20);}
+  .mv-tile.mv-shield .mv-snm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:126px;font-size:11px;}
+  .mv-tile.mv-shield .mv-sct{font-size:11px;opacity:.9;}
+  .mv-tile.mv-shield .mv-sreg{font-size:11px;font-weight:800;opacity:.95;}
+  /* 군집 타일(노드 과다 시, 시안 §5) — "+N개 더". .mv-tile이 아니다(위험등급 색이 없다). */
+  .mv-cluster{border:1px dashed var(--border-strong);border-radius:5px;padding:4px 9px;font-size:11px;
+    color:var(--muted);cursor:pointer;min-width:96px;display:flex;flex-direction:column;justify-content:center;}
+  .mv-cluster:hover{border-color:var(--blue);color:var(--text);}
+  .mv-cluster b{color:var(--text);}
   .mv-map{position:relative;} /* 오버레이 SVG 기준 */
   .mv-overlay{position:absolute;inset:0;pointer-events:none;z-index:5;}
   .mv-edge{fill:none;stroke-width:2;opacity:.85;}
   .mv-edge-entry{stroke:#f5928a;stroke-dasharray:4 3;}
   .mv-edge-lateral{stroke:#8fb8ff;}
+  /* 등록 간선(보안제품↔자산, 2단계 시안 §3) — 🎯 공격경로 토글과 무관하게 방패가 보이면 항상. */
+  .mv-edge-reg{stroke:var(--teal);stroke-width:2;}
   .mv-tile.mv-foothold{box-shadow:0 0 0 2px rgba(245,146,138,.8);}
   .mv-path-toggle.on{background:rgba(245,146,138,.18);border-color:var(--red-ink, #f5928a);color:var(--red-ink, #ffd7d8);}
-  .mv-side{width:320px;border-left:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;}
+  .mv-side{width:320px;border-left:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;overflow-y:auto;}
   .mv-side h3{margin:0;font-size:13.5px;}
   .mv-rk{font-size:11.5px;padding:2px 8px;border-radius:4px;display:inline-block;margin-right:6px;}
   .mv-row{border-bottom:1px solid var(--border);padding:6px 0;}
@@ -230,6 +256,19 @@
   .mv-ask:hover{background:rgba(59,130,246,.26);}
   .mv-ask{white-space:normal;word-break:keep-all;} /* 문장형 질문 칩 — 두 줄이 설계(좁은 폭 계약 ② 예외) */
   .mv-hint{color:var(--muted-2);font-size:11px;margin-top:auto;}
+  /* 상세판 칩 6종(2단계, 시안 §2·§9) — 버튼(.mv-ask)과 결재판 배지(.chiptag)는 형제, 전체를
+     .chiprow로 감싼다(배지는 버튼 안이 아니다). */
+  .chiprow{display:flex;flex-direction:column;gap:6px;}
+  .chiptag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:9px;margin-left:6px;vertical-align:1px;}
+  .chiptag.appr{background:rgba(240,160,32,.22);color:var(--amber-ink, #ffe9c4);}
+  .chiptag.maybe{background:rgba(240,160,32,.08);color:var(--amber-ink, #ffe9c4);border:1px dashed rgba(240,160,32,.55);}
+  .chiptag.noappr{background:rgba(255,255,255,.08);color:var(--muted);}
+  /* 연결된 보안장비 미니 목록(상세판) */
+  .mv-sub{font-size:11.75px;color:var(--muted);margin:2px 0;}
+  .mv-sub b{color:var(--text);}
+  /* 보호 관계 — 못 그리는 것의 빈 자리([6][7] "모르는 것은 칠하지 않는다") */
+  .mv-noedge{font-size:11px;color:var(--muted-2);border:1px dashed var(--border-strong);border-radius:6px;
+    padding:2px 6px;display:inline-block;margin-top:2px;}
   /* 🗺 반응형(2026-08-31 사장님 「히트맵·지도 등이 있는 데는 반응형으로」) — 대화창을 최대로
      키우면 화면 판이 420px까지 좁아지는데, 사이드(320px 고정)가 지도 영역을 28px로 눌러
      IP·구역 이름이 세로로 뭉개졌다(실측). 좁은 폭에서는 위(지도)/아래(사이드)로 적층한다.
@@ -1313,15 +1352,46 @@
     catch (e) { mapPaths = []; }
     return mapPaths;
   }
+
+  // 방패(보안제품·하드닝 대상) 재료 — 2026-09 2단계(시안 mockups/asset-graph-v2/시안.html).
+  // 실패해도 지도는 계속 뜬다(loadPaths와 같은 결 — []로 두고 방패만 안 보인다).
+  let mapProducts = null;   // null=아직 안 불렀다(로딩 중과 "0건" 구분)
+  let mapHardening = null;
+  let mapShieldsPromise = null;
+  function loadShields() {
+    if (mapShieldsPromise) return mapShieldsPromise;
+    mapShieldsPromise = Promise.all([
+      window.gijo.listSecurityProducts().catch(() => []),
+      window.gijo.hardeningTargets.list().catch(() => ({ targets: [] })),
+    ]).then(([products, hRes]) => {
+      mapProducts = Array.isArray(products) ? products : [];
+      mapHardening = (hRes && Array.isArray(hRes.targets)) ? hRes.targets : [];
+    }).catch(() => {
+      mapProducts = mapProducts || [];
+      mapHardening = mapHardening || [];
+    });
+    return mapShieldsPromise;
+  }
+
   function renderMap() {
     if (!window.gijoMapView) return; // 스크립트를 못 불렀으면 조용히 목록만 남긴다
+    if (mapProducts === null || mapHardening === null) loadShields().then(renderMap); // 로드되면 다시 그린다
     const ctx = {
       riskOf, activeFindings,
+      // 방패 재료 — 자산 화면은 **등록된 Asset**을 다룬다(registered:true). ⑥⑦ 쓰기 칩·방패·
+      // 등록 간선이 이 스위치를 본다(시안 §11).
+      products: mapProducts || [], hardening: mapHardening || [], registered: true, mode: mapMode,
       onDetail(a) {
         document.getElementById("mapSide").innerHTML = window.gijoMapView.detailHtml(a, ctx);
         // 공격경로가 켜져 있으면, 고른 자산의 **인접 경로만** 펼친다(거미줄 대신 details-on-demand).
         mapFocus = a.hostname || a.ip || a.name;
         if (mapPathsOn) drawPaths();
+      },
+      onShieldDetail(kind, item) {
+        document.getElementById("mapSide").innerHTML = window.gijoMapView.shieldDetailHtml(kind, item);
+      },
+      onClusterDetail(list) {
+        document.getElementById("mapSide").innerHTML = window.gijoMapView.clusterDetailHtml(list, ctx);
       },
     };
     let shown = applyFilters(allAssets);
@@ -1337,8 +1407,10 @@
     if (급한) ctx.onDetail(급한);
     else document.getElementById("mapSide").innerHTML = '<div style="color:var(--muted)">표시할 자산이 없습니다</div>';
     // 공격경로가 켜져 있으면 타일 배치가 끝난 **다음 프레임**에 겹친다(배치 전엔 좌표가 0이다).
+    // ⚠ 등록 간선(.mv-overlay-reg)은 별개 층 — gijoMapView.render()가 스스로 그린다(위 호출 안에서
+    //   처리됨). 여기서 지우는 것은 확정/추정 공격경로 오버레이(.mv-overlay:not(.mv-overlay-reg))뿐.
     if (mapPathsOn) drawPaths();
-    else { const ov = document.getElementById("mapZones").querySelector(".mv-overlay"); if (ov) ov.remove(); }
+    else { const ov = document.getElementById("mapZones").querySelector(".mv-overlay:not(.mv-overlay-reg)"); if (ov) ov.remove(); }
   }
 
   async function drawPaths() {
