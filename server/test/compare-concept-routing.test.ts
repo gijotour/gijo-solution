@@ -14,10 +14,11 @@
 //   가로채는 것을 못 본다). 「이웃 갈래」는 forcedToolFor보다 앞선 dispatcher 특수경로·
 //   가드레일까지 함께 재야 하므로 결정적도착지(dispatcher.ts)를 그대로 부른다
 //   (priority-criteria-routing.test.ts·execbrief-routing.test.ts와 같은 방식).
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { 결정적도착지 } from "../src/engine/dispatcher";
 import { forcedToolFor, 비교개념질문 } from "../src/engine/agentloop";
 import { isHelpIntent, formatScreenGuide } from "../src/engine/screenguide";
+import { createTarget, resetHardeningForTests } from "../src/engine/hardeningtargets";
 import { 실제도착, 가로챈규칙 } from "./helpers/routing";
 
 describe("★ 「A랑 B 뭐가 달라?」류는 explain(topic=원문)으로 결정적으로 간다", () => {
@@ -117,6 +118,15 @@ describe("★★ 이웃 갈래를 안 뺏는다 — 착수 전 도착지가 글�
 //    주체가 이 규칙 하나라는 증거다(남이 잡는 것을 내 공으로 세지 않는다).
 // ═══════════════════════════════════════════════════════════════════════════════
 describe("★★ [상] 쓰기 흐름을 한 수로 삼키지 않는다 — 잣대(writeflow.쓰기흐름인가) 한 곳이 막는다", () => {
+  // scan_hardening_target 짝(아래 조회로못박지않을것흐름 마지막 항)이 실제로 그 도구로 파생되게
+  // 등록 대상을 하나 둔다 — 미등록이면 애초에 self로 떨어져 이 시험이 아무것도 증명하지 못한다
+  // (hardening-scantarget.test.ts와 같은 등록 방식). 다른 문장(쓰기흐름·할당흐름)은 하드닝과
+  // 무관해 이 등록에 영향받지 않는다.
+  beforeEach(() => {
+    resetHardeningForTests();
+    createTarget({ label: "FW-01", host: "10.9.9.5", port: 22, username: "a", authMethod: "key", secret: "/k" });
+  });
+
   // 실측(수리 전, 전부 [37] explain 단독): explain으로 못 박히면 강제 경로는 도구 하나를
   // 부르고 끝나므로 승인·조치·배정이 **영영 안 간다**(2026-08-09 파일럿에서 today가 배정
   // 명령을 흡수한 사고와 같은 꼴). 첫 판은 쓰기 동사를 비교개념질문 배제어에 손으로 베꼈고,
@@ -166,6 +176,12 @@ describe("★★ [상] 쓰기 흐름을 한 수로 삼키지 않는다 — 잣�
     //   배정이 영영 안 감)이 저장소 전체 시험에 한 줄도 없어, Set 원소 하나를 지워도 빨간불이
     //   안 났다(「세 번째면 소스 감시」가 겨냥한 부류 — 반쪽 수리는 다음 라운드에 조용히 되살아난다).
     ["문서 목록 보여주고 김보안한테 배정해줘", "knowledge_status"],
+    // ★ 2026-09-13 SLA/라우팅 라운드 ③ — run_redteam·scan_hardening_target을 더한다. 예전
+    //   결론(위 N09/N11 옆 커밋)은 「쓰기 도구는 못 넣는다」였는데, 실제로 풀리는 조건은
+    //   `쓰기흐름인가(instruction)`가 참일 때뿐이라 단일 명령(레드팀 점검해줘)은 그대로
+    //   결재판으로 간다 — 뒤에 다른 쓰기가 붙을 때만 못 박지 않고 ⑨로 넘긴다.
+    ["레드팀 점검해주고 김보안한테 배정해줘", "run_redteam"],
+    ["FW-01 하드닝 점검 돌려주고 담당자 정해줘", "scan_hardening_target"],
   ];
   for (const [문장, 도구] of 조회로못박지않을것흐름) {
     it(`「${문장}」 → ${도구} 아님(B-2 ⑦ — 조회로못박지않을것 Set에 더했다)`, () => {

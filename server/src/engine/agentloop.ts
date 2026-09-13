@@ -2439,8 +2439,10 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string>; 
   //   `"이 자산 레드팀 점검해줘"` · registry.ts:1711 도구 설명 예시. write:true → **결재판이
   //   받쳐 준다**(대상 assetId를 못 뽑아도 승인 창에서 사람이 채운다). 인자는 argsByModel.
   //   ⚠ 「결과|현황|이력」은 배제한다 — redteam_status(지난 결과 조회) 영토를 안 뺏는다(N45).
-  //   ⚠ 이 도구는 **쓰기라 조회로못박지않을것 Set에 넣지 않는다**(위 ⑦ 주석) — 쓰기 명령이
-  //   자기 도구에서 풀리면 안 된다.
+  //   ⚠ 2026-09-13 SLA/라우팅 라운드 ③부터 이 도구는 조회로못박지않을것 Set에 **있다**(위 정의부
+  //   ★★ 주석). 단일 명령(「레드팀 점검해줘」)은 쓰기흐름인가가 거짓이라 여전히 그대로 이
+  //   결재판으로 간다 — 풀리는 것은 「…레드팀 점검해주고 배정해줘」처럼 뒤에 다른 쓰기가
+  //   붙었을 때뿐이다(그때만 continue해 ⑨로 넘어가 배정까지 처리되게 한다).
   {
   // ⚠ 2026-09-13 B-2 검토관 수리(적발 ⑧) — 홑글자 `해`가 **판단 물음**까지 받았다. 실측
   //   (수리 전): 「레드팀 점검 해야 해?」→run_redteam(write:true → 결재판). 할지 말지를 묻는
@@ -2769,9 +2771,27 @@ function 구역이름물음(instruction: string): boolean {
 //   suggest_command는 이번 라운드에서 FORCED 규칙을 넓히므로 짝을 맞추지 않으면 그 순간부터
 //   조회 한 수로 배정이 삼켜진다. knowledge_status·scan_status는 규칙을 넓히지 않지만 착수 전부터
 //   이미 새고 있던 자리다(실측 N09 「문서 목록 보여주고 김보안한테 배정해줘」→knowledge_status,
-//   N11 「재스캔 상태 알려주고 맡겨줘」→scan_status — 배정이 영영 안 감). run_redteam은 **쓰기
-//   도구라 넣지 않는다** — 넣으면 쓰기 명령이 자기 도구에서 풀려 버린다.
-const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status", "briefing", "approval_status", "exec_brief", "explain", "finding_status", "search", "list_assets", "threats", "suggest_command", "knowledge_status", "scan_status"]);
+//   N11 「재스캔 상태 알려주고 맡겨줘」→scan_status — 배정이 영영 안 감).
+// ★★ 2026-09-13 SLA/라우팅 라운드 ③ — **run_redteam·scan_hardening_target도 더한다**(사장님
+//   결정, 아래 「쓰기 도구도 넣나」 문답을 뒤집는다).
+//   ⓐ 예전 결론(2026-09-13 B-2 ⑦ 커밋)은 「run_redteam은 쓰기 도구라 넣지 않는다 — 넣으면
+//     쓰기 명령이 자기 도구에서 풀려 버린다」였다. **그 결론은 절반만 맞았다** — 이 가드는
+//     `쓰기흐름인가(instruction)`가 **참일 때만** 도구를 풀어 준다(줄 아래 `조회로못박지않을것
+//     .has(f.tool) && 쓰기흐름인가(instruction)`). 단일 명령 「레드팀 점검해줘」는
+//     쓰기흐름인가가 **거짓**이다(배정·승인 등 뒤따르는 쓰기 낱말이 없다) — 그래서 Set에
+//     넣어도 **그대로 결재판으로 간다.** 실제로 풀리는 것은 「레드팀 점검해주고 김보안한테
+//     배정해줘」처럼 **뒤에 다른 쓰기가 붙은 문장뿐**이다 — 그 경우 지금은 run_redteam
+//     한 수로 못 박혀 뒤의 배정이 **영영 안 간다**(다른 조회 도구 아홉 개가 이미 겪은 것과
+//     같은 누수). Set에 넣으면 그 문장만 continue해 ⑨로 넘어가 두 지시가 함께 처리된다.
+//   ⓑ scan_hardening_target은 FORCED_INTENTS 배열의 `f.tool`이 아니다(그 항목의 선언된
+//     tool은 run_hardening_scan — scan_hardening_target은 그 분기 **안**에서 등록 대상을
+//     맞혔을 때만 파생되는 도착지다, 아래 `available.has("scan_hardening_target")` 분기).
+//     그래서 이 Set에 넣어도 위 루프의 `.has(f.tool)` 줄은 이 이름을 보지 못한다 — 파생
+//     지점(위 분기 안, scan_hardening_target을 반환하기 직전)에서 **같은 Set을 손으로
+//     한 번 더 확인한다**(writeflow-guard-source.test.ts 예외 참고). run_hardening_scan
+//     (등록 대상을 못 맞혀 self로 떨어지는 갈래)은 이 라운드의 범위가 아니다 — self 점검엔
+//     같은 종류의 실측된 누수가 없다.
+const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status", "briefing", "approval_status", "exec_brief", "explain", "finding_status", "search", "list_assets", "threats", "suggest_command", "knowledge_status", "scan_status", "run_redteam", "scan_hardening_target"]);
 
 /** 강제 결과 — `데이터의존`은 **글자만으로 안 갈리는 갈래**(제목 지목: 문서 목록을 조회한다)라는 표시다.
  *  route-explain이 이 값을 보고 「간다」고 단정하지 않는다(dispatcher 결정적도착지의 `조건부`). */
@@ -3185,7 +3205,17 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
             //   낱말을 넘기면 said 배지가 붙고, 해석은 핸들러·effect의 **대상찾기 한 곳**이 맡는다
             //   (collect_packages가 쓰는 바로 그 방식 — agentloop.ts:2906-2914).
             // ⚠ standard는 **문장이 말했을 때만** 싣는다 — 안 실으면 핸들러가 t.standard(등록 기준)를 쓴다.
-            if (t) return { tool: "scan_hardening_target", args: 명시기준 ? { target: 후보, standard: 명시기준 } : { target: 후보 }, 데이터의존: true };
+            if (t) {
+              // ★ 2026-09-13 SLA/라우팅 라운드 ③ — scan_hardening_target도 조회로못박지않을것
+              //   Set에 있다(위 정의부 ★★ 주석 ⓑ). 이 도구는 f.tool이 아니라 이 지점에서
+              //   파생되므로 루프 안쪽 `조회로못박지않을것.has(f.tool)` 한 줄이 못 보는 자리다
+              //   (writeflow-guard-source.test.ts 예외 참고) — 그래서 여기서 같은 Set을 손으로
+              //   한 번 더 본다. 「FW-01 하드닝 점검 돌려주고 담당자 정해줘」처럼 뒤에 다른
+              //   쓰기가 붙으면 못 박지 않고 continue해 ⑨로 넘긴다(배정이 영영 안 가던 누수).
+              //   단일 「FW-01 하드닝 점검 돌려줘」는 쓰기흐름인가가 거짓이라 그대로 결재판이다.
+              if (조회로못박지않을것.has("scan_hardening_target") && 쓰기흐름인가(instruction)) continue;
+              return { tool: "scan_hardening_target", args: 명시기준 ? { target: 후보, standard: 명시기준 } : { target: 후보 }, 데이터의존: true };
+            }
             return { tool: f.tool, args: { standard }, 데이터의존: true };
           }
         }

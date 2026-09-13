@@ -22,7 +22,17 @@ const 소스경로 = path.join(__dirname, "../src/engine/agentloop.ts");
 const 소스 = fs.readFileSync(소스경로, "utf8").split(/\r?\n/);
 
 /** 예외 — 「이 분기는 잣대를 안 태워도 된다」는 자리. **이유 없이 넣지 말 것.** */
-const 예외: { 표시: string; 이유: string }[] = [];
+const 예외: { 표시: string; 이유: string }[] = [
+  {
+    표시: 'available.has("scan_hardening_target")',
+    이유:
+      "2026-09-13 SLA/라우팅 라운드 ③ — 이 줄은 장비 코드 꼴 후보 낱말을 찾는 바깥 조건일 " +
+      "뿐이다. 실제 쓰기흐름인가 가드는 그 안쪽, 후보가 등록 대상과 실제로 맞아떨어져 " +
+      "scan_hardening_target을 반환하기 바로 직전 줄(`if (조회로못박지않을것.has(\"scan_" +
+      "hardening_target\") && 쓰기흐름인가(instruction)) continue;`)에 있다 — 바깥 줄에 걸면 " +
+      "등록 안 된 후보(FW-99 등)가 self로 떨어지는 갈래까지 건드려 데이터의존 표시가 어긋난다.",
+  },
+];
 
 function 본문범위(): [number, number] {
   const 시작 = 소스.findIndex((l) => l.startsWith("export function forcedToolFor"));
