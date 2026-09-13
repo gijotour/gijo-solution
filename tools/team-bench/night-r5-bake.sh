@@ -123,13 +123,20 @@ say() { echo "[$(date '+%F %T %Z')] $*" | tee -a "$LOG"; }
 #   ⚠ 스왑 칸에 "사용"을 다시 쓰지 않는다 — 아래 "굽기 중 최대 사용 메모리" 집계가 낱말 "사용"
 #     뒤 필드를 전부 최댓값 후보로 줍는데, 그러면 스왑 값과 뒤섞여 틀린 최댓값을 낼 수 있다.
 # [2026-09-14 · r5b 첫 굽기 실측 적발] gb10의 free는 **한국어 로케일**이라 행 이름이
-#   「메모리:」·「스  왑:」(스와 왑 사이에 공백 둘 — procps가 CJK 표시폭을 잘못 재 안쪽에 패딩을
-#   넣는다)로 나온다. /^스왑|^Swap/ 이 그 행에 안 걸려 swapused가 시종 0으로 찍혔다(2026-09-14
-#   03:25 r5b: night4.log는 스왑 증가를 봤는데 같은 시간 r5b-bake-mem.log의 스왑 칸은 매 표본
-#   0G, 끝 요약도 값이 비었다). **행 이름을 로케일에 안 매이게 고정**한다 — `LC_ALL=C free -g`는
-#   항상 "Mem:"·"Swap:"으로 나온다(아래 awk 패턴은 그대로 둔다 — Swap 쪽 alternation이 걸린다).
+#   「메모리:」·「스  왑:」(스와 왑 사이에 공백 둘)로 나온다. /^스왑|^Swap/ 이 그 행에 안 걸려
+#   swapused가 시종 0으로 찍혔다(2026-09-14 03:25 r5b: night4.log는 스왑 증가를 봤는데 같은
+#   시간 r5b-bake-mem.log의 스왑 칸은 매 표본 0G, 끝 요약도 값이 비었다). **행 이름을 로케일에
+#   안 매이게 고정**한다 — `LC_ALL=C free -g`는 항상 "Mem:"·"Swap:"으로 나온다(아래 awk 패턴은
+#   그대로 둔다 — Swap 쪽 alternation이 걸린다).
 #   출력 형식("총 %sG 사용 %sG 가용 %sG · 스왑 %sG")도 바꾸지 않는다 — 끝 요약의 "굽기 중 최대
 #   스왑" awk(낱말 "스왑" 뒤 필드)가 이 형식 그대로에 걸린다.
+#   [2026-09-14 검토관 적발·하 — 정정] 위 "공백 둘" 원인을 "procps가 CJK 표시폭을 잘못 재
+#   안쪽에 패딩을 넣는다"로 적었던 것은 **틀렸다**. 실측(translationproject.org procps-ng
+#   ko.po): msgid "Mem:" → msgstr "메모리:"(패딩 없음), msgid "Swap:" → msgstr "스  왑:",
+#   msgid "Total:" → msgstr "총  계:" — 공백은 procps 계산이 아니라 **번역 문자열 자체**에
+#   번역가가 열 맞춤용으로 박아 둔 것이다(그래서 패딩이 필요 없는 "메모리:"에는 공백이 없다).
+#   수리(LC_ALL=C) 자체는 그대로 옳다 — LC_ALL=C에서는 LANGUAGE=ko를 줘도 항상 Mem:/Swap:다
+#   (gettext는 LC_ALL=C일 때 LANGUAGE를 무시한다).
 mem() {
   LC_ALL=C free -g | awk '
     /^메모리|^Mem/ { total=$2; used=$3; avail=$7 }
@@ -195,7 +202,11 @@ if grep -q "def gpu_메모리_로그(" "$FT" 2>/dev/null; then
 else
   FTMEAS="**없음**(이 학습기는 아직 계측 전이다 — GPU 메모리 기록이 필요하면 push 뒤에 굽는다)"
 fi
-AVAIL=$(free -g | awk '/^메모리|^Mem/ {print $7}')
+# [2026-09-14 검토관 적발·하] mem()만 LC_ALL=C로 고치고 이 관문은 로케일 의존인 채 남아
+#   있었다(지금은 ko.po "메모리:"가 패딩 없어 /^메모리/가 걸려 오작동은 아니지만, 번역이
+#   "메 모 리:" 식으로 바뀌면 AVAIL이 비어 `${AVAIL:-0} -lt 32`가 항상 참이 되어 굽기를
+#   "가용 부족"이라는 틀린 사유로 건너뛴다). 통일한다.
+AVAIL=$(LC_ALL=C free -g | awk '/^Mem:/ {print $7}')
 BAKE=skip
 if [ "$GATE" != "ok" ]; then
   say "굽기 건너뜀 — 등급 관문이 $GATE 다(빨강 재료를 굽지 않는다)"
@@ -283,7 +294,23 @@ else
   #   정수 GiB 최대치가 갱신될 때만 로그 한 줄(매 표본 안 찍는다). 두 값(최대 증가·SwapFree
   #   최저)은 $SWAPDOG_STATE에 갱신해 둔다 — 이 감시견은 서브셸이라 그 안 변수를 끝 요약(밖)이
   #   못 읽기 때문이다.
+  # [2026-09-14 검토관 적발·중 — 수리] 절대 문턱에서는 「못 읽으면 폴백」이 옛 규칙(시작 대비
+  #   증가)처럼 안전한 쪽으로 안 떨어진다 — 폴백값이 그대로 SwapFree로 읽혀 "0G < 2G"가 되고,
+  #   연속 SWAP_DOG_CONFIRM회(45초) 뒤 정상 굽기를 죽인다. 격리 시뮬레이션 실측(이 블록을 그대로
+  #   옮겨 존재하지 않는 meminfo 경로로 돌림): 표본 0 0 0 → 1/3 · 2/3 · KILL. 스왑이 꺼진 기계
+  #   (SwapTotal 0 → SwapFree도 늘 0)도 같은 경로를 탄다. gb10엔 /swap.img 16G가 있어 오늘 밤은
+  #   안 걸리지만, 문턱 판정 자체가 이 취약을 안고 있으면 다른 기계·읽기 실패에서 매 밤 재발한다.
+  #   대책: 시작 때 SwapTotal도 재서 0이거나 SwapFree를 못 읽으면 SWAP_MONITOR=0으로 두고
+  #   **문턱 판정(pkill 갈래)만** 건너뛴다(증가 기록·상태 파일은 그대로 남긴다). 루프 안에서도
+  #   그 표본의 SWAP_NOW_KB가 비면(일시적 읽기 실패) 그 표본은 기록·판정 둘 다에서 뺀다 —
+  #   `${SWAP_NOW_KB:-$SWAP_BASE_KB}` 폴백을 절대 문턱 갈래에 다시 쓰지 않는다.
+  SWAP_TOTAL_KB=$(awk '/^SwapTotal:/{print $2}' /proc/meminfo 2>/dev/null)
   SWAP_BASE_KB=$(awk '/^SwapFree:/{print $2}' /proc/meminfo 2>/dev/null)
+  SWAP_MONITOR=1
+  if [ -z "$SWAP_TOTAL_KB" ] || [ "$SWAP_TOTAL_KB" -eq 0 ] || [ -z "$SWAP_BASE_KB" ]; then
+    SWAP_MONITOR=0
+    say "⚠ 스왑 감시 못 함(SwapTotal 0/읽기 실패) — 기록만, 문턱 판정은 건너뛴다"
+  fi
   SWAP_BASE_KB=${SWAP_BASE_KB:-0}
   ( SWAP_HITS=0
     DROP_MAX_GB=0
@@ -291,7 +318,11 @@ else
     while true; do
       sleep 15
       SWAP_NOW_KB=$(awk '/^SwapFree:/{print $2}' /proc/meminfo 2>/dev/null)
-      SWAP_NOW_KB=${SWAP_NOW_KB:-$SWAP_BASE_KB}
+      if [ -z "$SWAP_NOW_KB" ]; then
+        # 이번 표본은 못 쟀다 — 폴백으로 메우지 않고 기록·판정 둘 다에서 뺀다(SWAP_HITS 불변).
+        pgrep -f "finetune_qlora14b.py" > /dev/null 2>&1 || break
+        continue
+      fi
       FREE_NOW_GB=$(( SWAP_NOW_KB / 1024 / 1024 ))
       DROP_GB=$(( (SWAP_BASE_KB - SWAP_NOW_KB) / 1024 / 1024 ))
       [ "$DROP_GB" -lt 0 ] && DROP_GB=0
@@ -303,17 +334,19 @@ else
         FREE_MIN_GB=$FREE_NOW_GB
       fi
       { echo "swap_drop_max_gb=$DROP_MAX_GB"; echo "swap_free_min_gb=$FREE_MIN_GB"; } > "$SWAPDOG_STATE"
-      if [ "$FREE_NOW_GB" -lt "$SWAP_FREE_MIN_GB" ]; then
-        SWAP_HITS=$((SWAP_HITS + 1))
-        if [ "$SWAP_HITS" -lt "$SWAP_DOG_CONFIRM" ]; then
-          echo "[$(date '+%F %T %Z')] ⚠ SwapFree ${FREE_NOW_GB}G < ${SWAP_FREE_MIN_GB}G — ${SWAP_HITS}/${SWAP_DOG_CONFIRM}회째, 아직 안 내린다(연속이라야 내린다)" >> "$LOG"
+      if [ "$SWAP_MONITOR" -eq 1 ]; then
+        if [ "$FREE_NOW_GB" -lt "$SWAP_FREE_MIN_GB" ]; then
+          SWAP_HITS=$((SWAP_HITS + 1))
+          if [ "$SWAP_HITS" -lt "$SWAP_DOG_CONFIRM" ]; then
+            echo "[$(date '+%F %T %Z')] ⚠ SwapFree ${FREE_NOW_GB}G < ${SWAP_FREE_MIN_GB}G — ${SWAP_HITS}/${SWAP_DOG_CONFIRM}회째, 아직 안 내린다(연속이라야 내린다)" >> "$LOG"
+          else
+            echo "[$(date '+%F %T %Z')] ⚠ SwapFree ${FREE_NOW_GB}G < ${SWAP_FREE_MIN_GB}G가 연속 ${SWAP_DOG_CONFIRM}회 — 스왑 고갈 임박(OOM 위험)으로 보고 학습만 내린다" >> "$LOG"
+            pkill -f "finetune_qlora14b.py" 2>/dev/null
+            break
+          fi
         else
-          echo "[$(date '+%F %T %Z')] ⚠ SwapFree ${FREE_NOW_GB}G < ${SWAP_FREE_MIN_GB}G가 연속 ${SWAP_DOG_CONFIRM}회 — 스왑 고갈 임박(OOM 위험)으로 보고 학습만 내린다" >> "$LOG"
-          pkill -f "finetune_qlora14b.py" 2>/dev/null
-          break
+          SWAP_HITS=0
         fi
-      else
-        SWAP_HITS=0
       fi
       pgrep -f "finetune_qlora14b.py" > /dev/null 2>&1 || break
     done ) > /dev/null 2>&1 &

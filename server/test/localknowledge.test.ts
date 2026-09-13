@@ -216,6 +216,13 @@ describe("night-r5-judge.sh 소스 감시 — 판정은 굽지 않는다(fail-cl
     expect(실행줄, "개수로 세는 줄이 없다").toMatch(/ls -1d "\$LORA_DIR"\/checkpoint-\*/);
     expect(실행줄).toMatch(/\[ "\$CKPT_FOUND" -lt "\$EPOCHS_EXPECTED" \]/);
   });
+
+  it("★ free 호출은 전부 LC_ALL=C다 — night-r5-bake.sh와 같은 부류(2026-09-14 검토관 적발·하)", () => {
+    // ⚠ bake.sh의 mem()이 로케일 의존이라 gb10 한국어 로케일에서 스왑 칸이 시종 0으로 찍힌
+    //   결함이 있었다(2026-09-14 실측) — 같은 파일 꼴이 이 스크립트에도 있어 함께 통일한다.
+    const 로케일의존 = 실행줄.match(/(?<!LC_ALL=C )free -g/g);
+    expect(로케일의존, `LC_ALL=C 없이 free -g를 부르는 곳이 있다: ${JSON.stringify(로케일의존)}`).toBeNull();
+  });
 });
 
 describe("night-r5-bake.sh 소스 감시 — 2026-09-11까지 시험 0건이던 구멍을 메운다", () => {
@@ -297,6 +304,23 @@ describe("night-r5-bake.sh 소스 감시 — 2026-09-11까지 시험 0건이던 
     expect(실행줄, "감시견 PID를 안 챙기면 굽기가 끝나도 안 죽고 남는다").toContain("SWAPDOGPID");
   });
 
+  it("★★ 스왑 감시견 — SwapTotal 0(스왑 없음)이거나 못 읽으면 문턱 판정을 건너뛴다(2026-09-14 검토관 적발·중)", () => {
+    // ⚠ 격리 시뮬레이션 실측: 절대 문턱 아래서 `${SWAP_NOW_KB:-$SWAP_BASE_KB}` 폴백을 그대로
+    //   두면(옛 「시작 대비 증가」 규칙에선 안전했던 그 폴백) /proc/meminfo를 못 읽는 경우와
+    //   스왑이 꺼진 기계(SwapFree 늘 0) 둘 다 표본 0 0 0 → 연속 3회(45초) 만에 정상 굽기를
+    //   죽였다. 시작 때 SwapTotal도 재서 0/읽기실패면 문턱 판정만 건너뛰고 기록은 계속한다.
+    expect(실행줄, "SwapTotal을 시작 때 재는 줄이 없다").toMatch(/SWAP_TOTAL_KB=.*SwapTotal/);
+    expect(실행줄, "감시 가능 여부 플래그(SWAP_MONITOR)가 없다").toContain("SWAP_MONITOR=1");
+    expect(실행줄, "SwapTotal 0/읽기실패에서 SWAP_MONITOR를 0으로 내리는 조건이 없다")
+      .toMatch(/SWAP_TOTAL_KB"\s+-eq\s+0[\s\S]{0,120}SWAP_MONITOR=0/);
+    expect(실행줄, "루프 안 SWAP_NOW_KB를 SWAP_BASE_KB로 메우는 옛 폴백이 아직 있다 — 절대 문턱에선 위험하다")
+      .not.toMatch(/SWAP_NOW_KB=\$\{SWAP_NOW_KB:-\$SWAP_BASE_KB\}/);
+    // 문턱 판정(FREE_NOW_GB 비교)이 SWAP_MONITOR 안에 갇혀 있어야 한다 — 안 그러면 스왑 없는
+    // 기계에서 매 표본이 곧바로 "0G < 2G"가 되어 문턱 판정 자체가 다시 걸린다.
+    expect(실행줄, "문턱 판정이 SWAP_MONITOR 안에 갇혀 있지 않다")
+      .toMatch(/SWAP_MONITOR"\s+-eq\s+1[\s\S]{0,200}"\$FREE_NOW_GB"\s+-lt\s+"\$SWAP_FREE_MIN_GB"/);
+  });
+
   it("스왑 감시견이 학습 프로세스명으로만 죽인다 — llama-server 이름은 어디에도 안 쓴다", () => {
     const 시작 = 실행줄.indexOf("SWAP_BASE_KB=");
     expect(시작, "스왑 감시견 블록을 못 찾았다").toBeGreaterThan(-1);
@@ -338,6 +362,14 @@ describe("night-r5-bake.sh 소스 감시 — 2026-09-11까지 시험 0건이던 
     // 굽기 중 최대치 집계가 "사용" 뒤 필드를 전부 최댓값 후보로 줍는다 — 스왑 칸에 같은 낱말을
     // 다시 쓰면 그 집계가 스왑 값과 메모리 값을 뒤섞는다(회귀 방지).
     expect(실행줄).not.toMatch(/스왑 사용/);
+  });
+
+  it("★ free 호출은 전부 LC_ALL=C다 — 로케일 의존 행이름 결함 재발 방지(2026-09-14 검토관 적발·하)", () => {
+    // ⚠ 2026-09-14 실측: mem()만 LC_ALL=C로 고치고 AVAIL 관문(가용 메모리 판단)은 로케일
+    //   의존인 채 남아 있었다. 지금은 ko.po "메모리:"가 패딩 없어 오작동은 아니지만(일관성
+    //   지적), 번역 문자열이 바뀌면 AVAIL이 비어 가용 관문을 틀린 사유로 건너뛰게 된다.
+    const 로케일의존 = 실행줄.match(/(?<!LC_ALL=C )free -g/g);
+    expect(로케일의존, `LC_ALL=C 없이 free -g를 부르는 곳이 있다: ${JSON.stringify(로케일의존)}`).toBeNull();
   });
 
   it("★ 굽기 산출 로그가 **회전에 묶인다** — ROUND=r5b로 돌려도 r5a 증거를 안 덮는다", () => {

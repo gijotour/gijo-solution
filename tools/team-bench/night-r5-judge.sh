@@ -82,7 +82,10 @@ DEADLINE=${DEADLINE:-08:30}
 
 mkdir -p "$R5"
 say() { echo "[$(date '+%F %T %Z')] $*" | tee -a "$LOG"; }
-mem() { free -g | awk '/^메모리|^Mem/ {print "총 "$2"G 사용 "$3"G 가용 "$7"G"}'; }
+# [2026-09-14 검토관 적발·하] bake.sh의 mem()은 LC_ALL=C로 고쳤는데(2026-09-14 실측:
+#   gb10의 free는 한국어 로케일이라 행 이름이 "메모리:"·"스  왑:"로 나와 옛 awk 패턴이 안 걸렸다)
+#   같은 파일·같은 부류인 이 호출은 로케일 의존인 채 남아 있었다. 통일한다.
+mem() { LC_ALL=C free -g | awk '/^Mem:/ {print "총 "$2"G 사용 "$3"G 가용 "$7"G"}'; }
 teacher() { curl -s -m 5 http://127.0.0.1:8080/health || echo "(응답 없음)"; }
 
 say "════ 회전 5 $ROUND 아침 판정 시작 ════"
@@ -148,7 +151,8 @@ fi
 say "전제 통과 — 어댑터 있음($DONE_MARK) · 체크포인트 ${CKPT_FOUND}개(에폭 ${EPOCHS_EXPECTED}개 필요): $CKPT_NAMES"
 
 # ── ③ 가용 메모리 하한 ──────────────────────────────────────────────────────
-AVAIL=$(free -g | awk '/^메모리|^Mem/ {print $7}')
+# [2026-09-14 검토관 적발·하] 같은 부류(로케일 의존) — 통일한다.
+AVAIL=$(LC_ALL=C free -g | awk '/^Mem:/ {print $7}')
 if [ "${AVAIL:-0}" -lt "$JUDGE_MIN_AVAIL" ]; then
   say "✗ 가용 메모리 ${AVAIL}G < ${JUDGE_MIN_AVAIL}G — 교사를 밀 위험이 있어 **판정을 건너뛴다**"
   say "요약 — 전제=가용메모리부족(${AVAIL}G) · 판정 안 함"
