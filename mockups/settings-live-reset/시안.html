@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 「실사용 전환(데이터 정리)」 관리자 판 시안 (추천 1개)</title>
+<!--
+  ══ 시안 개요 ═══════════════════════════════════════════════════════════════
+  대상: server/src/engine/datacleanup.ts의 관리자 API 3종(GET/POST data-cleanup,
+        POST reset-live-data) — 소비 화면이 0건이다. 그런데 대화 답 머리말(handlers.ts:2725-2728)이
+        "관리자가 실사용 전환(데이터 정리)을 해야 합니다"라며 사람을 이 길로 보낸다. 이 시안은
+        settings.html 관리자 구역에 그 길을 실제로 놓는다.
+
+  ⚠ 이 파일은 정지 화면입니다 — 체크박스·입력칸·버튼이 눌려도 아무 일도 일어나지 않습니다
+    (설계 의도만 봅니다). 숫자(건수)는 전부 데모값입니다.
+
+  ══ 설계 전 조사(근거) ═══════════════════════════════════════════════════════
+  1) "Type to confirm" 파괴적 조작 패턴 — GitLab Pajamas Design System
+     "Destructive actions"(design.gitlab.com/patterns/destructive-actions/): 삭제가 추가
+     자원까지 함께 없앨 때는 대상 이름/문구를 그대로 입력해야 버튼이 풀리게 하라 — 사고로
+     누르는 것은 막되(버튼 오클릭) 사고로 타이핑하는 것은 못 만든다(의식적 결정 강제).
+     서버가 이미 confirm:"RESET" 문자열을 요구한다(datacleanup.ts:257-259) — 화면은 그
+     계약을 그대로 따라간다(새 규칙을 만드는 게 아니라 이미 있는 백엔드 계약을 화면에 옮긴다).
+     이 패턴은 "가장 위험한 조작 한 종류에만" 쓰라고 권한다 — 남용하면 무뎌진다
+     (nngroup.com "Dangerous UX: Consequential Options Close to Benign Options"도 같은 결).
+  2) 칸 낭비 줄이기 — 이 제품 자체의 기존 원칙(settings.html:46-49 주석, 2026-08-02
+     사용자 지시 "좁힐 수 있으면 좁혀 달라") — 짧은 값(체크박스+라벨+건수)을 1열 표로
+     세로로 쌓지 않고 2열 격자로 배치해 세로를 줄인다. model-grid(:116)와 같은 결의 재사용.
+  3) 접기 기본값 — fold.js:168-174 "나중에 참고할 자료처럼 매일 볼 것이 아닌 구역"에만
+     data-gijo-fold-closed를 쓴다는 이 제품의 기존 규칙. 실사용 전환은 제품 수명 중 한두 번
+     쓰는 일회성 관리자 조작이라 이 규칙에 정확히 해당한다 — 기본 접힘으로 둔다.
+  근거 URL: design.gitlab.com/patterns/destructive-actions/ ·
+            nngroup.com/articles/proximity-consequential-options
+
+  ══ ⚠ 이번 조사에서 바로잡은 것 ═══════════════════════════════════════════════
+  과업 설명(evidence)은 "TARGETS 19종 · RESET_TARGETS 16종"이라 적었으나, 2026-09-13 오늘
+  server/src/engine/datacleanup.ts:20-73을 직접 읽어 세어 보니 **TARGETS·RESET_TARGETS
+  둘 다 16개, 그것도 완전히 같은 16개 id 집합**이다(순서만 다름). "부분 정리로 지울 수
+  있는데 전체 리셋 대상엔 없는 3종"은 지금 코드엔 없다 — 있다면 파일이 그 사이 바뀐 것이다.
+  이 시안은 실제로 읽은 16종을 그대로 쓴다. (구현 착수 전 datacleanup.ts를 다시 한 번
+  확인할 것 — 설계관 몫.)
+
+  ══ ⚠ 범위 밖으로 남긴 공백(발견만 하고 이 시안엔 안 담음) ═════════════════════════
+  라이브 모드를 다시 끄는 API가 코드에 없다(grep "라이브모드끔" 0건 — 켜는 함수만 있고
+  끄는 함수가 없다, datacleanup.ts:86-88). 지금은 app_state에서 키를 사람이 DB로 직접
+  지우고 재시작해야 시연 데이터가 돌아온다(주석 원문: "값 하나가 스위치다"). 이 시안이
+  "되돌리기" 버튼을 만들면 **존재하지 않는 API를 부르는 거짓 버튼**이 된다(가짜 UI 금지
+  원칙) — 만들지 않는다. 이 API가 필요한지는 별도 결정 사항으로 남긴다.
+
+  ══ px 실측 고지 ═════════════════════════════════════════════════════════════
+  이 세션에는 Bash/CDP 도구가 없어 스스로 설치본을 열어 재지 못했다. 아래 "지금 N px"는
+  이번 작업을 맡긴 실행자가 win-unpacked(5.93.4)를 CDP 9227로 직접 재서 넘겨준 실측값을
+  그대로 인용한다(출처: div[data-sec=admin].panel 각각의 getBoundingClientRect().height).
+  "제안 M px"는 **아직 없는 화면**이라 실측이 원리상 불가능하다 — 실제 제품에 쓰이는
+  선언값(padding·font-size·line-height)을 부품별로 그대로 이어 붙인 추정치다. 구현 후
+  반드시 재실측한다. 두 숫자를 같은 잣대로 읽으면 안 된다는 점을 아래 밀도표에도 다시 적는다.
+
+  ══ ⚠ 검토관 적발 수리 이력(2026-09-13, gijo-mockup 재수리 라운드) ═══════════════════
+  검토관 적발 5건 중 4건 실결함으로 확인·수리, 1건은 이미 옳았던 판단(반증) — 상세는
+  각 자리(③·④·⑤)에 "[검토관 [등급] 수리]" 표로 남긴다.
+  1) [상] 배지 2곳("라이브 모드: 꺼짐")이 생산자 없는 값이었다 — datacleanup.ts를 직접 읽어
+     라이브모드()가 HTTP로 안 나가는 것을 확인, 배지를 뺐다(③·⑤).
+  2) [상] 밀도표 "제안 660px"이 자기 내역 합(683)과 23px 어긋났다 — 산수를 다시 하고 683으로,
+     파생 백분율(5판·6판 합계)도 683 기준으로 다시 계산했다(④).
+  3) [중] 설계관이 요구한 두 대안(ⓐ 대화창 실행/ⓑ 화면 2단 확인) 중 ⓑ 논의가 빠져 있었다 —
+     실은 ①골라서 정리가 이미 ⓑ(체크+단추, 서버가 confirm을 요구 안 함)이고 ②전체 리셋만
+     RESET 타이핑이라는 걸 이번에 글로 명시했다(③).
+  4) [하] 목록 라벨 3개가 서버 label보다 짧게 적혀 있었다 — cleanupTargets()의 원문으로
+     되돌렸다(①표·⑤).
+  5) [참고·오탐 아님] "TARGETS 19종→16종" 정정은 이미 옳았다 — datacleanup.ts:20-73을 다시
+     세어도 TARGETS 16개·RESET_TARGETS 16개로 완전히 같은 집합이었다(수정 없음).
+-->
+<style>
+  /* 토큰 — client/src/renderer/pages/settings.html:8-14 :root 그대로 복사 */
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+    --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);
+       font-size:13px;line-height:1.6;padding:24px 26px 90px;}
+  h1{font-size:18px;font-weight:800;margin-bottom:4px;}
+  .lede{color:var(--muted-2);font-size:12.25px;margin-bottom:18px;}
+  h2{font-size:13.5px;font-weight:800;color:#fff;margin:28px 0 10px;padding-top:16px;border-top:1px solid var(--border);}
+  h2:first-of-type{border-top:none;padding-top:0;margin-top:0;}
+  p{margin:0 0 8px;color:var(--muted);}
+  b,strong{color:#fff;font-weight:800;}
+  code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11.5px;color:var(--blue-light);font-family:Consolas,monospace;}
+  ul,ol{margin:4px 0 10px 18px;color:var(--muted);}
+  li{margin-bottom:4px;}
+  .tag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:5px;padding:1px 7px;margin-right:5px;vertical-align:1px;}
+  .tag.mock{background:rgba(139,147,171,.16);color:var(--muted);}
+  .tag.frozen{background:rgba(240,160,32,.16);color:var(--amber);}
+
+  /* ── 실제 화면 부품 재현 — settings.html 그대로 복사한 규칙 ────────────────── */
+  .demo-frame{background:#1c1c1a;border:1px solid var(--border-strong);border-radius:12px;padding:16px 18px 10px;margin:10px 0 6px;max-width:700px;}
+  .demo-cap{font-size:11px;color:var(--muted-2);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+
+  .sec-tab{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:700;font-family:inherit;display:inline-block;margin-right:7px;}
+  .sec-tab.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:#fff;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12.25px;font-weight:700;}
+  .b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
+  .b-grey{background:rgba(139,147,171,0.15);color:var(--muted);}
+  .b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;max-width:860px;} /* 재검토 [중] 수리 — 실효 상한은 640이 아니라 860(아래 ④ 설명) */
+  .panel-title{font-size:12.75px;font-weight:800;color:#fff;margin:-14px -16px 10px;padding:7px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .status-line{font-size:12.5px;margin-top:10px;}
+  .status-ok{color:var(--teal);}
+  .status-err{color:#f5928a;}
+  .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;}
+  .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;}
+  .btn-danger{background:transparent;border:1px solid rgba(226,72,61,0.5);color:#f5928a;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;}
+  .btn-danger.dis{opacity:.4;cursor:not-allowed;}
+  .field{margin-bottom:10px;max-width:220px;}
+  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+  .field input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;}
+
+  /* 접기 머리 — fold.js:36-56 injectCss 그대로 복사(색·수치 동일) */
+  .gjf-h{display:flex;align-items:center;gap:9px;padding:5px 12px;margin-bottom:5px;cursor:pointer;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);user-select:none;max-width:860px;}
+  .gjf-h .car{color:var(--muted-2);font-size:11.75px;width:11px;flex:0 0 auto;}
+  .gjf-h.on .car{transform:rotate(90deg);display:inline-block;}
+  .gjf-h .nm{font-size:12.5px;font-weight:700;color:#dfe6ff;flex:1;}
+  .gjf-b{font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--muted);flex:0 0 auto;}
+
+  /* 이웃 판 — 흐리게, 자리만 보여준다(실측 대상 그 자체가 아니라 "어디 끼우는지"만 보여줌) */
+  .neighbor{opacity:.55;}
+  .neighbor .panel-title{color:var(--muted);}
+
+  /* ── 새 판 전용 부품 ──────────────────────────────────────────────────── */
+  .idline{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
+  .warnbox{font-size:12.25px;line-height:1.6;color:var(--muted);background:rgba(224,164,74,.08);
+    border:1px solid rgba(224,164,74,.35);border-radius:8px;padding:8px 11px;margin:0 0 10px;}
+  .subhead{font-size:12px;font-weight:800;color:#fff;margin:2px 0 8px;}
+  .selall{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:4px 8px;border-bottom:1px solid var(--border-strong);margin-bottom:2px;}
+  .tgt-grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(8,auto);
+    background:#1a1a19;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;margin-bottom:10px;}
+  .tgt-row{display:flex;align-items:center;gap:7px;padding:4px 8px;font-size:12.25px;border-bottom:1px solid rgba(255,255,255,.05);min-width:0;}
+  .tgt-row:nth-last-child(-n+1),.tgt-row:nth-last-child(-n+2){/* 각 열의 마지막 줄 근사 표시(정지 화면 근사) */}
+  .tgt-row input[type=checkbox]{width:auto;margin:0;flex:0 0 auto;}
+  .tgt-row .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+  .tgt-row .cnt{font-variant-numeric:tabular-nums;color:var(--muted-2);font-weight:700;flex:0 0 auto;font-size:11.75px;}
+  .tgt-row .re{flex:0 0 auto;font-size:9.5px;font-weight:800;color:var(--amber);background:rgba(240,160,32,.14);padding:1px 4px;border-radius:4px;margin-right:2px;}
+  .divider{border-top:1px dashed var(--border-strong);padding-top:12px;margin-top:2px;}
+  .resetdesc{font-size:12.25px;line-height:1.6;color:var(--muted);margin-bottom:10px;}
+  .audit-note{font-size:11.5px;color:var(--muted-2);margin-top:6px;}
+
+  .why{border:1px dashed var(--border-strong);border-radius:10px;padding:14px 16px;font-size:12.25px;color:var(--muted);line-height:1.75;margin-top:10px;}
+  .why h3{font-size:12.5px;color:#fff;margin-bottom:7px;}
+  table.density{border-collapse:collapse;width:100%;max-width:700px;font-size:12px;margin:8px 0 14px;}
+  table.density th,table.density td{border:1px solid var(--border);padding:6px 9px;text-align:left;}
+  table.density th{background:var(--panel-2);color:var(--muted);font-weight:800;white-space:nowrap;}
+  table.density td.now{color:var(--teal);font-weight:700;white-space:nowrap;}
+  table.density td.est{color:var(--blue-light);font-weight:700;white-space:nowrap;}
+  .chk{display:flex;gap:8px;align-items:flex-start;font-size:12.25px;color:var(--muted);margin-bottom:6px;}
+  .chk .ok{color:var(--teal);flex:0 0 auto;font-weight:800;}
+</style>
+</head>
+<body>
+
+<h1>「실사용 전환(데이터 정리)」 관리자 판 — 추천 시안 1개</h1>
+<div class="lede">settings.html 관리자 구역 · 저장 암호화(dbcryptPanel) 바로 다음, 게시된 배포판(adminPanel) 바로 앞에 끼운다.
+  <span class="tag mock">정지 화면</span><span class="tag frozen">숫자는 데모값</span></div>
+
+<h2>① 어디에 끼우나 — 관리자 탭 안 위치</h2>
+<p>관리자 탭(admin)의 DOM 순서 그대로: 계정 관리 → 계정별 2차 인증 → <b>저장 암호화</b> → <b style="color:var(--blue-light)">［새 판］실사용 전환(데이터 정리)</b> → 게시된 배포판 → 누가 받았나 → … → 제품 구성. "업데이트" 판은 data-sec="my"라 이 탭엔 안 보인다.</p>
+
+<div class="demo-frame">
+  <div class="demo-cap"><span>관리자 탭 — 구역 탭줄 실물 재현</span><span class="tag mock">안 눌림</span></div>
+  <div style="margin-bottom:14px">
+    <span class="sec-tab">내 설정</span><span class="sec-tab">서버·AI</span><span class="sec-tab">연동</span>
+    <span class="sec-tab on">관리자 <span class="badge b-teal" style="margin-left:2px;padding:1px 6px;font-size:11.75px">admin</span></span>
+  </div>
+
+  <!-- 이웃 판 1 — 저장 암호화(실물 그대로, 축약 없음: 이번 라운드 밀도 잣대) -->
+  <div class="panel neighbor">
+    <div class="panel-title">저장 암호화<span class="badge b-teal" style="margin-left:8px;padding:1px 6px;font-size:11.5px">admin 전용</span></div>
+    <div style="font-size:12.5px;color:var(--muted)">DB 파일이 밖으로 나가도 열 수 없게 잠급니다 — 열쇠는 이 서버 기계에만 있습니다.</div>
+  </div>
+  <div style="text-align:right;max-width:860px;font-size:10.5px;color:var(--muted-2);margin:-6px 0 10px">↑ 이 판 실측 186.2px(2026-09-13, 설치본 5.93.4) — 아래 새 판의 밀도 잣대</div>
+
+  <!-- 새 판 — 접힘(기본 상태) -->
+  <!-- ⚠ 검토관 [상] 수리(2026-09-13): 접힘 배지에 "라이브 모드 꺼짐"을 찍었었다 — 그러나
+       라이브모드()는 서버 내부 전용 함수라 HTTP로 안 나간다(grep "라이브모드\(\)" 결과
+       assets.ts:554,675·cti.ts:233·maintenance.ts:400·securityproducts.ts:532·tasks.ts:255뿐,
+       datacleanup.ts:221-223 GET 응답은 targets 배열만 줌). 생산자 없는 값을 배지로 그리던 것 —
+       뺐다. 상태를 보이려면 서버 변경(승인 대상, 아래 ③ 참고)이 전제다. -->
+  <div class="gjf-h">
+    <span class="car">▶</span><span class="nm">실사용 전환(데이터 정리)</span>
+  </div>
+  <div style="text-align:right;max-width:860px;font-size:10.5px;color:var(--blue-light);margin:-2px 0 10px">↑ 기본 상태(접힘) — 추정 32px 추가(코드주석 근거, 이번 세션 미실측). 관리자가 열기 전까진 이만큼만 차지</div>
+
+  <!-- 새 판 — 펼침 상태(실제 내용) -->
+  <div class="panel" id="liveResetPanel" style="border-color:var(--blue)">
+    <div class="panel-title">
+      실사용 전환(데이터 정리)
+      <span class="badge b-teal" style="padding:1px 6px;font-size:11.5px">admin 전용</span>
+    </div>
+    <!-- ⚠ 검토관 [상] 수리: "라이브 모드: 꺼짐" 배지를 여기서도 뺐다(위 접힘 배지와 같은 이유 —
+         읽는 API가 없다). 서버 변경 전제 없이는 이 화면이 지금 라이브 모드인지 스스로 말할 수 없다. -->
+
+    <div class="idline">시연·테스트로 쌓인 업무 데이터를 표 단위로 지웁니다. 자세한 것은 ⓘ 를 눌러 확인하세요.</div>
+
+    <div class="warnbox">
+      ⚠ 아래 <b>①에서 표만 골라 지우면</b> 서버를 다시 켤 때 <b>자산·위협 인텔·유지보수·보안제품·할일</b>은
+      예시 데이터로 되살아날 수 있습니다(재기동 시드). <b>재기동해도 다시 안 채워지게 하려면
+      반드시 아래 ②전체 리셋</b>을 쓰세요 — 이 스위치는 화면에서 다시 끌 수 없습니다.
+    </div>
+
+    <!-- ① 부분 정리 -->
+    <div class="subhead">① 골라서 정리 — 선택한 항목만 비웁니다</div>
+    <div class="selall"><input type="checkbox" disabled> 전체 선택 · 16종 중 0개 선택됨</div>
+    <div class="tgt-grid">
+      <div class="tgt-row"><input type="checkbox" disabled><span class="re">↻</span><span class="lbl">위협 인텔 항목(CTI findings)</span><span class="cnt">42건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">보안 분석 이벤트(분석허브)</span><span class="cnt">913건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="re">↻</span><span class="lbl">자산·스캔 이력·취약점 검토대장</span><span class="cnt">4,911건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="re">↻</span><span class="lbl">할 일·조치 항목</span><span class="cnt">168건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="re">↻</span><span class="lbl">보안제품 등록부·매뉴얼 대장</span><span class="cnt">37건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="re">↻</span><span class="lbl">유지보수 일정·이력</span><span class="cnt">205건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">검증(하드닝) 대상·스케줄·이력</span><span class="cnt">96건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">KPI 일일 스냅샷(파생)</span><span class="cnt">62건</span></div>
+
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">제품 소개자료 대장</span><span class="cnt">5건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">작업 내역(대화 세션)</span><span class="cnt">341건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">개인 문서함</span><span class="cnt">19건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">반입 영수증(올린 파일 기록)</span><span class="cnt">88건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">브리핑 스냅샷·느린 답 원장·답 표본(파생)</span><span class="cnt">1,204건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">타사 SBOM 검수 대장</span><span class="cnt">6건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">스캔 해석 초안(스캔 팀원 산출)</span><span class="cnt">14건</span></div>
+      <div class="tgt-row"><input type="checkbox" disabled><span class="lbl">부품표 해석 초안(부품 팀원 산출)</span><span class="cnt">9건</span></div>
+    </div>
+    <div style="font-size:10.5px;color:var(--muted-2);margin:-6px 0 8px">
+      ↑ 검토관 [하] 수리(2026-09-13): 3개 라벨을 화면이 줄여 적었었다 — "브리핑·느린 답·답 표본" →
+      "브리핑 스냅샷·느린 답 원장·답 표본"(파생), "스캔 해석 초안"·"부품표 해석 초안" →
+      각각 "(스캔 팀원 산출)"·"(부품 팀원 산출)" 복원. 라벨은 cleanupTargets()가 주는
+      <code>t.label</code>을 <b>그대로</b> 그린다(datacleanup.ts:20-58) — 화면이 새로 짓지 않는다.
+    </div>
+    <button class="btn-danger dis">선택한 항목 정리 (0개 선택)</button>
+    <div class="status-line" style="color:var(--muted-2)">지우기 전 파일로 스냅샷을 남깁니다 — 실패하면 지우지 않습니다.</div>
+
+    <!-- ② 전체 리셋 -->
+    <div class="divider">
+      <div class="subhead" style="color:#f5928a">② 전체 리셋 — 완전히 뺍니다 (되돌릴 수 없음)</div>
+      <div class="resetdesc">
+        위 16종 <b>전부</b> 삭제 + 보고서·SBOM 내보내기·세션 아카이브·업로드 원본/추출본/첨부 파일까지
+        <code>backups/cleanup/</code>로 이동 + <b>라이브 모드 켜기</b>(재기동해도 다시 안 채워짐).
+        감사·지식(RAG)·설정·계정·판단 기록은 대상이 아니라 지워지지 않습니다.
+      </div>
+      <div class="field">
+        <label for="mockResetConfirm">확인을 위해 대문자로 RESET 입력</label>
+        <input id="mockResetConfirm" placeholder="RESET" disabled>
+      </div>
+      <button class="btn-danger dis">전체 리셋 실행</button>
+      <div class="audit-note">이 실행은 실행자·시각·건수가 감사 기록에 남습니다 · 라이브 모드는 화면에서 다시 끌 수 없습니다(개발팀 조치 필요).</div>
+    </div>
+  </div>
+
+  <div class="panel neighbor">
+    <div class="panel-title">게시된 배포판<span class="badge b-teal" style="margin-left:8px;padding:1px 6px;font-size:11.5px">admin 전용</span></div>
+    <div style="font-size:12px;color:var(--muted)">(표 — 이 시안 범위 밖, 자리만 표시)</div>
+  </div>
+</div>
+
+<h2>② 왜 이 안인가 — 다른 길을 왜 안 골랐나</h2>
+<ul>
+  <li><b>새 화면(cleanup.html 등)을 새로 만들지 않는다</b> — 이미 admin 게이트로 격리된 이 탭 안에
+    저장 암호화·제품 구성 같은 같은 위험군 조작이 모여 있다. 새 화면은 nav.js(공용 파일) 등록이
+    필요해 손댈 범위가 커지고, "관리자만 보는 곳"이라는 이미 있는 격리를 화면 하나로 또 나눈다.</li>
+  <li><b>대화창(콘솔) 지시로 실행하게 하지 않는다</b> — "지시는 대화창에서" 원칙은 조회·분석 같은
+    업무 지시에 해당한다. 되돌릴 수 없는 파괴적 조작은 자유 문장("리셋해줘")이 아니라 화면에서
+    보이는 표+타이핑 확인이 사고를 막는 데 낫다(조사 근거 1 — GitLab 패턴도 모달/화면 기반).</li>
+  <li><b>"부분 정리"만 만들고 "전체 리셋"은 화면에 안 놓지 않는다</b> — handlers.ts가 이미 "완전히
+    빼려면 실사용 전환을 해야 한다"고 사람에게 말해 왔다. 부분 정리만 놓으면 그 약속을 화면이
+    여전히 못 지킨다(재시드 5종은 부분 정리로는 안 막힘).</li>
+  <li><b>16개 행마다 개별 "지금 삭제" 버튼을 놓지 않는다</b> — 실수 기회가 16번으로 늘고, "한 번에
+    훑어보고 결정" 흐름이 깨진다. 다중 선택 + 단일 실행 버튼으로 묶는다.</li>
+  <li><b>1열 표 대신 2열 격자</b> — 16행을 세로로 쌓으면(≈391px) 이 판 하나가 admin 탭의 절반을
+    먹는다. 이 파일 자신의 기존 원칙("칸 낭비 줄이기", settings.html:46-49)을 그대로 적용해
+    8행×2열로 절반 이하로 줄인다.</li>
+</ul>
+
+<h2>③ 무엇을 포기했나 (범위 밖으로 뺀 것)</h2>
+<ul>
+  <li><b>라이브 모드 끄기 버튼</b> — 서버에 그 API 자체가 없다(라이브모드켬만 있고 대응하는
+    끔 함수가 없음, grep 0건). 없는 API를 부르는 버튼을 그리면 가짜 UI다. <b>안 만든다</b> —
+    필요한지는 별도 결정 사항.</li>
+  <li><b>[검토관 [상] 수리] 라이브 모드 "지금 상태" 배지</b> — 처음 그림엔 접힘 배지·판 제목에
+    "라이브 모드: 꺼짐"을 찍었으나, 이 값을 HTTP로 내보내는 API가 없다(라이브모드()는
+    server/src/engine/datacleanup.ts:80-84의 서버 내부 전용 함수 — 호출부 6곳(assets.ts:554,675·
+    cti.ts:233·maintenance.ts:400·securityproducts.ts:532·tasks.ts:255)이 전부 시드 가드고,
+    GET /api/admin/data-cleanup 응답(datacleanup.ts:221-223)은 targets 배열만 준다).
+    <b>생산자 없는 값이라 뺐다</b> — 이 배지를 넣으려면 <b>서버 변경이 전제</b>다(예: 그 GET 응답에
+    liveMode:boolean 칸 추가). <b>승인 범위에 포함할지는 사장님 결정 사항으로 남긴다</b> — 이번
+    시안은 배지 없이 간다.</li>
+  <li><b>스냅샷 파일 찾아보기·복구 실행 UI</b> — 상태줄에 파일명만 텍스트로 보여준다(runCleanup이
+    돌려주는 snapshot 경로). 탐색기 열기·자동 복구는 이 시안 범위 밖(백업 폴더 직접 쓰기 금지
+    원칙과도 맞닿아 별도 설계가 필요하다).</li>
+  <li><b>16종 각각의 상세 설명 3줄씩</b> — 화면엔 라벨 한 줄 + 건수만. "무엇이 왜 지워지는지"는
+    ⓘ(screenguide)로 뺀다(제품 원칙 — 화면엔 정체성 한 줄과 경고만).</li>
+  <li><b>진행률 바</b> — 두 POST 모두 동기 응답이라 서버가 진행률을 스트리밍하지 않는다. 화면은
+    "처리 중…" 한 줄만 두고 가짜 퍼센트를 그리지 않는다.</li>
+  <li><b>[검토관 [중] 수리] ⓑ안 — 화면 2단 확인(체크 + 단추, 타이핑 없음)</b> — 설계관 정의가
+    제시한 두 대안 중 하나다(ⓐ 대화창 실행은 "왜 이 안인가" 두 번째 줄에서 이미 기각했다).
+    이 그림은 사실 <b>둘 다 쓴다</b>는 걸 이번에 다시 확인하고 명시적으로 적는다 —
+    ①골라서 정리는 서버가 confirm 문자열을 요구하지 않아(POST /api/admin/data-cleanup,
+    datacleanup.ts:225-249에 confirm 검사 없음) <b>ⓑ 그대로</b>(체크박스+"선택한 항목 정리"
+    단추, 타이핑 없음)이고, ②전체 리셋만 서버가 confirm:"RESET"을 요구해(:257-259)
+    <b>ⓑ보다 강한 GitLab 타이핑 패턴</b>을 쓴다. 근거: ①은 재기동+스냅샷으로 되돌릴 길이
+    남지만(재시드 5종은 사실상 자동 복구) ②는 감사 기록 외엔 되돌릴 길이 없다 — 위험도가
+    다른 두 조작에 같은 확인 강도를 쓰지 않는다는 뜻을 <b>이 문단에서 처음으로 명시</b>한다
+    (첫 그림엔 이 대응관계가 그림에만 있고 글로 설명되지 않아 검토관이 "ⓑ 논의가 아예 없다"로
+    읽었다).</li>
+</ul>
+
+<h2>④ 밀도 숫자 — 지금 N px(실측) → 제안 M px(추정)</h2>
+<p>⚠ 두 숫자는 <b>같은 잣대가 아니다.</b> "지금"은 설치본 5.93.4를 CDP 9227로 연 실측값(이번 작업
+  실행자가 재서 전달), "제안"은 <b>아직 없는 화면이라 실측이 원리상 불가능</b>해 부품별 선언값
+  (padding·font-size)을 그대로 이어 붙인 추정치다. 구현 후 같은 방법(CDP·getBoundingClientRect)으로
+  반드시 재실측한다.</p>
+<table class="density">
+  <thead><tr><th>항목</th><th>지금</th><th>제안(추정)</th><th>비고</th></tr></thead>
+  <tbody>
+    <tr><td>이웃 dbcryptPanel(밀도 잣대)</td><td class="now">186.2px 실측</td><td>—</td><td>새 판이 넘지 않아야 할 "보통 크기" 기준</td></tr>
+    <tr><td>새 판 · 접힘(기본 상태)</td><td>—</td><td class="est">+32px 추정</td><td>fold.js:41-45 과거 실측(53→32px, 이번 라운드 대상 아님) 재사용</td></tr>
+    <tr><td>새 판 · 펼침(관리자가 열 때만)</td><td>—</td><td class="est">≈683px 추정</td><td>제목42+정체성30+경고65+①표 248+버튼42+구분15+②설명116+RESET입력69+버튼42+여백14 = <b>683</b>(검토관 [중] 수리: 이전 판은 같은 내역을 660으로 잘못 더했다 — 42+30+65+248+42+15+116+69+42+14=683)</td></tr>
+    <tr><td>관리자 구역 "보통 크기" 5판 합계<br><span style="color:var(--muted-2);font-size:11px">(userManagement 745·mfaAdmin 395.8·dbcrypt 186.2·downloadLog 78.3·edition 221.5, outlier adminPanel 10225.7 제외)</span></td>
+      <td class="now">1,626.8px 실측</td>
+      <td class="est">접힘 1,658.8px(+2.0%)<br>펼침 2,309.8px(+42.0%, 드물게)</td>
+      <td>outlier를 빼야 착시가 안 생긴다(과업 실측 데이터의 경고 그대로)</td></tr>
+    <tr><td>관리자 구역 전체 6판 합계(outlier 포함)</td><td class="now">11,852.5px 실측</td>
+      <td class="est">접힘 11,884.5px(+0.27%)<br>펼침 12,535.5px(+5.8%)</td>
+      <td>adminPanel(게시 이력) 10,225.7px이 86%를 차지 — 이 잣대는 반례로만 인용</td></tr>
+  </tbody>
+</table>
+<p>⚠ 검토관 [중] 수리(2026-09-13): 이전 판은 펼침 내역 합(683px)과 표에 적은 값(660px)이
+  23px 어긋나 있었다 — 내역 합과 표 숫자가 같아야 한다는 원칙 위반. 이 판부터 683px로
+  통일했고, 5판·6판 합계의 파생 백분율도 683 기준으로 다시 계산했다.</p>
+<p>⚠ <b>재검토 [중] 적발 수리 — 이전 판의 거짓 사실 정정.</b> 이전 판은 "다만 settings.html은
+  이 상한(gijo-ui.css:292 <code>body[data-screen="settings"].g-ui .panel { max-width: 860px; }</code>)을
+  실제로 안 쓴다"고 적었는데 이것은 <b>사실이 아니다</b>. 실제 경로는: <code>settings.html:3176</code>이
+  <code>&lt;script src="nav.js"&gt;</code>를 싣고 → nav.js의 <code>loadDesignSystem()</code>
+  (nav.js:1363, applyEmbed 등 여러 진입점에서 호출)이 <code>gijo-ui.css</code>를
+  <code>&lt;head&gt;</code>에 주입하고 <code>document.body.classList.add("g-ui")</code>를
+  실행 → 그 결과 <code>body[data-screen="settings"].g-ui .panel</code> 규칙(속성+클래스
+  선택자, 상세도가 settings.html 자체의 <code>.panel{ max-width:640px; }</code>(settings.html:38)
+  보다 높다)이 <b>이긴다</b>. 즉 <b>settings.html은 860px 상한을 실제로 쓴다</b> — 640px는
+  gijo-ui.css가 아직 안 실렸을 찰나에나 보일 값이지 최종 렌더 값이 아니다. 이전 판이
+  틀렸던 것은 목업 자체가 640px로 선언돼 있어 "제품도 640이겠거니" 하고 넘겨짚은 것으로
+  보인다(다른 실행자가 목업 파일을 860px 렌더로 재구성해 755.5px을 얻었다고 보고한 것이
+  오히려 맞는 방향이었다). 아래 밀도표·CSS는 이번 수리로 <b>640→860px</b>로 맞췄다.</p>
+<p>⚠ <b>683px 추정치의 전제도 함께 고친다.</b> 위 표의 "≈683px 추정" 내역(제목42+정체성30+경고65+
+  ①표 248+버튼42+구분15+②설명116+RESET입력69+버튼42+여백14)은 폭이 <b>640px일 때</b> 각 부품이
+  줄바꿈되는 줄 수를 전제로 부품별 선언값을 더한 것이다. 실효 폭이 860px로 넓어지면
+  <code>.idline</code>·<code>.warnbox</code>·<code>.resetdesc</code>처럼 문장이 긴 자리는
+  <b>줄바꿈이 줄거나 그대로</b>일 뿐 늘지 않는다(체크박스 목록 16행은 <code>.lbl</code>이
+  <code>text-overflow:ellipsis</code>로 말줄임되므로 폭이 늘어도 줄 수가 안 바뀐다) — 그래서
+  683px는 <b>같거나 작은 쪽으로만</b> 움직이는 상한 추정이지, 폭을 넓혔다고 세로가 커지는
+  방향은 아니다. 다만 이것도 방향성 판단일 뿐이고 정확한 px는 <b>구현 후 win-unpacked를
+  860px 폭으로 재실측</b>해야 나온다 — 목업 안에서 잰 값이 설치본과 다를 수 있다는 원칙
+  (CLAUDE.md 2026-09-06)이 여기도 그대로 적용된다.</p>
+<p>기본 상태(접힘)는 이웃 dbcryptPanel(186.2px)의 <b>1/6도 안 되는 32px</b>만 더한다 — 일회성
+  관리자 조작이라 매일 보는 판보다 얇아야 한다는 판단(근거 3). 관리자가 실제로 열었을 때만
+  683px 안팎으로 커지고, 그때도 admin 탭 전체(outlier 포함 11,852.5px) 대비 5.8%다.</p>
+
+<h2>⑤ 제품 원칙 자가점검</h2>
+<div class="chk"><span class="ok">✓</span> 입력칸: 체크박스 16개 + RESET 확인 칸 1개는 "화면에서 업무를
+  직접 지시"(콘솔 우회)가 아니라 <b>관리자 설정 조작 그 자체</b>다 — 이 화면에 이미 있는 비밀번호
+  변경 칸·서버 주소 칸과 같은 부류. 서버가 이미 요구하는 confirm:"RESET" 계약을 화면이 그대로
+  반영했을 뿐, 새 입력 경로를 만든 게 아니다.</div>
+<div class="chk"><span class="ok">✓</span> 안내는 ⓘ로(rev.2 — 재검토 [하] 적발 수리): 16종이 각각 무엇인지, 스냅샷이 어디 남는지,
+  재시드가 무슨 뜻인지는 패널에 안 적었다 — "자세한 것은 ⓘ 를 눌러 확인하세요"(기존 문구
+  그대로, settings.html:856과 동일 표현) 한 줄로 뺀다. ⚠ 처음 판은 이 약속만 하고 ⓘ가 실제로
+  무엇을 답할지는 한 글자도 안 적어 뒀었다 — 아래 "⑤-보충 screenguide.ts 초안"에 실제 판
+  이름·문장을 적었다(구현 시 그대로 옮겨 붙일 초안).</div>
+<div class="chk"><span class="ok">✓</span> 화면엔 정체성 한 줄 + ⚠경고만: 판 본문 첫 줄이 정체성,
+  그다음이 경고 박스, 나머지는 표·버튼·감사 고지뿐이다. 설명 산문이 없다.</div>
+<div class="chk"><span class="ok">✓</span> 자체완결: 외부 CDN·웹폰트·이미지 0, 색 토큰·클래스는 전부
+  settings.html에서 그대로 복사했다.</div>
+<div class="chk"><span class="ok">✓</span> 정직한 표기: 동작 안 하는 체크박스·버튼엔 disabled 속성을
+  실제로 걸었다(정지 화면임을 커서로도 알 수 있게) · 숫자는 전부 "데모값" 표기 · 라이브 모드를
+  끄는 버튼처럼 없는 API를 부르는 가짜 버튼은 만들지 않았다.</div>
+<div class="chk"><span class="ok">✓</span> 생산자 없는 값 금지(검토관 [상] 수리): "라이브 모드:
+  꺼짐" 배지 2곳(접힘 머리·판 제목)을 뺐다 — 그 값을 HTTP로 내보내는 API가 없다(라이브모드()는
+  서버 내부 전용, datacleanup.ts:80-84). 배지가 필요하면 <b>서버 변경(승인 대상)</b>이 먼저다 —
+  이 시안은 화면만으로 그 값을 지어내지 않는다.</div>
+<div class="chk"><span class="ok">✓</span> 라벨 단일 출처(검토관 [하] 수리): 목록 16행의 라벨
+  3개가 서버 label(cleanupTargets())보다 짧게 적혀 있던 것을 원문 그대로로 되돌렸다 — 화면은
+  줄여 적지 않는다.</div>
+<div class="chk" style="color:var(--amber)">△ 미해결: 이 판의 최종 확정은 사장님 승인 후,
+  구현 착수 전 gijo-architect가 ①TARGETS/RESET_TARGETS 최신 상태(16개 재확인) ②confirm 문자열
+  대소문자 정책(현재 서버는 정확히 "RESET" 대문자만 통과) ③감사 로그 화면(audit.html) 쪽에
+  이 기록이 어떻게 보이는지 ④<b>라이브 모드 상태 배지를 넣을지</b>(넣으려면 GET
+  /api/admin/data-cleanup 응답에 liveMode 칸을 더하는 서버 변경이 전제 — 이 시안은 배지 없이
+  간다) ⑤<b>①에도 RESET급 타이핑 확인을 요구할지</b>(지금은 ①=체크+단추, ②=RESET 타이핑으로
+  위험도에 따라 다르게 갔다 — 사장님이 ①도 강하게 원하면 서버 confirm 계약을 ①에도 추가해야
+  한다) 를 점검·결정해야 한다.</div>
+
+<h2>⑤-보충 screenguide.ts 초안 — 판 이름 · 문장(제품 코드는 안 고침 · 구현 시 그대로 옮겨 붙일 초안)</h2>
+<p>⚠ 재검토 [하] 적발 수리 — "안내는 ⓘ"가 위 ⑤에서 약속만 있었다. <code>server/src/engine/screenguide.ts</code>의
+  <code>GUIDES["settings.html"].panels</code>(:1336-1370, 관리자 판들이 모인 자리 — 예:
+  :1369 "저장 암호화")에는 아직 이 판 키가 없다. 새 키를 만든다 — <b>화면 판 제목과 한 글자까지
+  같게</b> "실사용 전환(데이터 정리)"(위 ①panel-title·gjf-h .nm 그대로, 이모지 없음이라 그대로
+  옮긴다). 문체는 같은 파일의 기존 판(:1369 "저장 암호화")을 본떴다.</p>
+<table class="density">
+  <thead><tr><th style="width:230px">판 이름</th><th>문장 초안</th></tr></thead>
+  <tbody>
+    <tr><td><code>"실사용 전환(데이터 정리)"</code>(신규 키)</td>
+      <td style="white-space:pre-wrap">"시연·테스트로 쌓인 업무 데이터를 표 단위로 지웁니다. 화면의 16종 목록은 서버가 그때그때
+주는 이름·건수를 <b>그대로</b> 보여줍니다(이 문장이 항목을 하나하나 나열하지 않는 것은
+일부러입니다 — 목록이 바뀌면 이 설명과 화면이 서로 어긋나기 때문입니다).
+
+**① 골라서 정리**는 고른 표만 비웁니다. 다만 **자산·위협 인텔·유지보수·보안제품·할일**
+5종은 서버를 다시 켤 때 예시 데이터로 **되살아날 수 있습니다**(재시드) — 시연용 서버가
+빈 화면으로 뜨지 않도록 최소한의 예시를 다시 채워 두는 장치입니다. 완전히 빼서 다시 안
+채워지게 하려면 **② 전체 리셋**을 쓰세요.
+
+**② 전체 리셋**은 16종 전부를 지우고 **라이브 모드**를 켭니다 — 이후로는 재기동해도
+예시 데이터가 다시 채워지지 않습니다(이 스위치는 화면에서 다시 끌 수 없습니다). 지우기
+전에는 항상 **`backups/cleanup/`에 스냅샷 파일**을 먼저 남기고, 저장에 실패하면 아무 것도
+지우지 않습니다. 확인을 위해 **대문자로 RESET**을 입력해야 버튼이 풀립니다 — 실수로 누르는
+것은 막아도 실수로 타이핑하는 것은 사실상 안 생기기 때문입니다(GitLab 등 파괴적 조작의
+표준 패턴). 실행자·시각·건수는 감사 기록에 남습니다."</td></tr>
+  </tbody>
+</table>
+<p><b>"can" 문항 초안</b>(대화창 예시 질문에 추가): "실사용 전환 어떻게 해?" · "데이터 정리 뭐야?" ·
+  "재시드가 뭐야?"</p>
+<p style="font-size:11.5px">⚠ 이 문장은 <b>초안</b>이다 — 구현 시 datacleanup.ts의 실제 라벨·
+  동작과 다시 대조해 고친다(이 시안은 위 evidence의 문구를 옮긴 것이지 최종본이 아니다).
+  이 시안 자체는 <code>screenguide.ts</code>(제품 코드)를 손대지 않았다.</p>
+
+<div class="why">
+  <h3>요약 (3줄)</h3>
+  <ul>
+    <li>저장 암호화 판 바로 다음에 새 판 하나 — 기본은 <b>접힘(+32px 추정)</b>, 열면 <b>①골라서
+      정리</b>(2열 격자 16종)와 <b>②전체 리셋</b>(RESET 타이핑 확인, GitLab 패턴)을 한 판에 담는다.</li>
+    <li>부분 정리만으론 재시드 5종(자산·CTI·유지보수·보안제품·할일)이 재기동 때 되살아난다는
+      사실을 경고 박스에 명시 — "완전히 빼려면 ②"를 화면이 직접 말한다.</li>
+    <li>과업 근거의 "TARGETS 19종"은 오늘 코드 재확인 결과 <b>16종</b>이었다(RESET_TARGETS와
+      완전히 같은 집합) — 이 시안은 실제로 읽은 16종을 썼다.</li>
+  </ul>
+</div>
+
+</body>
+</html>

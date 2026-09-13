@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 자가 진단 화면 소비자 신설(설정 › 서버·AI)</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  시안: 자가 진단(system-health) 화면 소비자 0건 → 설정 › 서버·AI에 판 신설
+  대상 파일: mockups/selfcheck-no-consumer/시안.html   (2026-09-13, gijo-mockup)
+  제품 코드는 손대지 않았음 — 이 파일 하나만 씀. 실행 도구(Bash) 미보유로 CDP 실측은
+  직접 수행하지 못했다. 아래 "실측"은 작업 지시에 함께 전달된 값 그대로다(주체:
+  client/release/win-unpacked 5.93.4, CDP 9227, settings.html?s=ai 9개 판).
+  이 파일 안에서 "실측"이라 적은 숫자는 전부 그 출처이며, 이 세션이 새로 잰 것이 아니다.
+  새로 만드는 판(자가 진단) 자체는 제품에 없으므로 그 높이는 "추정"이지 "실측"이 아니다
+  — 화면이 없는 것을 잴 수는 없다(정직 규칙, CLAUDE.md 2026-09-06).
+
+  ■ 문제 정의(evidence 요약, 각 파일:줄)
+    · server/src/engine/observability.ts:463-485  systemHealth() — 9개 항목(model·embedding·
+      backup·knowledge·database·errors·slow·disk·siem) + 전체 판정(level/headline/uptime/memory)
+    · server/src/engine/observability.ts:507-509  GET /api/system-health — authMiddleware만
+      (adminMiddleware 아님, 로그인 담당자 누구나)
+    · server/src/engine/observability.ts:440-442  "본문을 안 싣는 것이 유일한 방어선"
+      (권한이 아니라 내용 자체를 낮춰서 지킨다 — 아래 목록 설계도 이 규칙을 물려받는다)
+    · client 전수 grep(system-health|systemHealth|자가 진단) → 코드 0건.
+      주석 2건만: mydocs.html:2522, titlebar.js:1020("자가 진단·설정 › 서버에서 확인한다")
+      → titlebar.js가 이미 사람을 이 화면으로 보내고 있는데 그 화면이 없다(막다른 안내).
+    · client/src/api/reports-admin.ts:260-263 healthApi.check() = GET /api/health는
+      **다른 값**(ok/service/serverTime)이다 — 자가 진단 9항목과 무관, 혼동 금지.
+    · 서버 안쪽 소비자 3곳(대화 도구·문서요청·메일 경보)만 있고 화면 소비자는 없다는
+      원 항목 정의 그대로 — 이 시안은 "화면 소비자 1곳"을 만드는 결정을 그린다.
+
+  ■ 설계 전 표준 조사(요청 규칙 — 설계 전 인터넷 조사 후 근거 제시)
+    · Atlassian Statuspage "컴포넌트별 상태 + 전체 요약" 패턴 — 항목마다 초록/노랑/빨강 점 +
+      "?" 아이콘으로 설명(호버) → 우리 ⓘ(screenguide) 관례와 같은 자리.
+      https://support.atlassian.com/statuspage/docs/show-service-status-with-components/
+      https://support.atlassian.com/statuspage/docs/what-is-a-component/
+    · 대시보드 설계 원칙 — "한 문장 헤드라인이 가장 먼저 읽힌다, 신호등(초록/노랑/빨강)이
+      표준, 노이즈를 줄이고 위계를 분명히" → observability.ts의 headline 필드가 이미 이
+      패턴대로 설계돼 있다(사람이 읽는 결론 문장 + 항목별 상세). 화면이 그 계약을 그대로
+      옮기면 되고 새 판단 체계를 발명할 필요가 없다.
+      https://www.uxpin.com/studio/blog/dashboard-design-principles/
+    · 결론: 서버가 이미 "헤드라인 한 줄 + 항목별 상태·설명·조치"라는, 조사한 표준과 같은
+      모양으로 데이터를 준다. 화면이 할 일은 그 계약을 그대로 그리는 것뿐 — 새 UI 언어를
+      만들지 않는다(아래 "무엇을 포기했나" ⑤).
+
+  ■ 제품 안에서 그대로 가져온 것(지어내지 않음)
+    · 색 토큰 :root — client/src/renderer/pages/settings.html:8-12 그대로
+    · 판 껍데기 .panel/.panel-title — settings.html:38-39(패딩 14/16, 제목 바 -14/-16/10)
+    · 정체성 한 줄+ⓘ 관례 — client/src/renderer/pages/incidentcases.html:41-43,92-93,299-302
+      (.scr-id + .ic-info 버튼 → gijoOpenChat() 또는 top.postMessage("이 화면 사용법 알려줘"))
+    · 접혀도 상태가 보이는 관례 — client/src/renderer/pages/fold.js 전체, 특히:
+      - :41-55 접기 머리줄 CSS(.gjf-h, 높이 "실측 53px → 32px 남짓"로 이미 한 번 줄어든 값)
+      - :59-95 data-gijo-fold-badges="아이디:라벨:kind" — 값이 "0"/빈 값이면 배지를 숨긴다
+        (badgeValue, :68-77) → "이상 없음"일 때 배지가 저절로 사라지는 이 메커니즘을 그대로
+        쓴다(새 배지 규칙을 안 만든다). kind="hot"이면 위험 시 접혀 있어도 자동으로 펼친다(:173).
+      - settings.html:365-370 저장 암호화 판이 같은 관례(dbcryptBadge)로 이미 쓰고 있다
+    · 엑셀형 목록 표준 — client/src/renderer/pages/gijo-ui.css:367-384
+      (.g-rows 계열: 머리 26px·행 30px·짝수행 옅은 줄무늬·hover·선택 표시. 2026-08-20 사장님
+      승인 시안 mockups/knowledge-rows의 정본값, incidentcases.html:307-320이 실제 사용례)
+    · 행 클릭→상세 펼침 — incidentcases.html의 .det 패턴(파일 내 .det 규칙, 클릭 시 아래
+      행에 전체 문장을 펼친다) — 우리 9항목도 detail/action이 길 수 있어 그대로 가져왔다.
+
+  ■ 데이터 계약(지어내지 않음 — observability.ts 타입 그대로)
+    HealthCheck = { id, label, level: ok|warn|fail|unknown, detail(문장), action?(문장) }
+    SystemHealth = { at, uptimeSec, memoryMb, level, headline, checks: HealthCheck[] }
+    LEVEL_MARK: ok=✓ warn=⚠ fail=✗ unknown=❔ (observability.ts:487 그대로)
+    ⚠ SIEM 항목은 SIEM 연동이 꺼져 있으면 **아예 안 실린다**(checkSiem은 그때 null을 돌려주고
+      systemHealth()의 .filter가 걸러낸다, observability.ts:194-201,467) — 그래서 목록이
+      9개가 아니라 8개로 보이는 조직이 있는 것이 정상이다. 화면은 "9개 고정"을 전제하면 안 된다.
+
+  ■ 실측(제공값 그대로 — 이 세션이 잰 것 아님. 방법: client/release/win-unpacked 5.93.4를
+    CDP 9227로 띄우고 settings.html?s=ai에서 getBoundingClientRect)
+    형제 판 9개(펼친 상태) 높이 · 세로 총합 2720.6px
+      서버 연결(settings.html:243-254) 78.1px
+      구동 티어(:424-447) 442.2px
+      전문가 어댑터(:451-455) 138.5px
+      모델 받기·인증(:461-490) 212.5px
+      모델 받기(:497-515) 570.1px
+      (무명판 — 모델 안내, :522-530, data-gijo-fold 없음) 50.9px
+      AI팀 구성(:536-548) 665.9px
+      로컬 LLM 엔진(:550-561) 115.8px
+      이메일(SMTP) 설정(:568-) 446.6px
+    형제 "한 줄 상태" 잣대: #engineStatusLine 23.8px(margin-bottom 14px, 실 문구
+      "기동중 · 모델: qwen3-14b · 포트 8080" 표시 중) — 살아있는 한 줄 상태값의 실측 밀도라
+      이 시안의 "헤드라인 줄" 잣대로 그대로 쓴다.
+      ⚠ #serverStatusLine은 측정 시점 0px(문구 없음) — "연결 성공 시 문구를 비운다"는 사양인지
+      코드 재확인이 필요하다고 원 실측 메모에 남아 있다(이 시안의 판단에는 안 씀).
+    #alertSchedList 22.5px/행(font 12.5px) — 설정 화면 안에 이미 있는 "여러 줄 목록"의
+      실측 밀도. 아래에서 이 값 대신 .g-rows 30px(제품 전역 표준, 선언값)을 택한 이유는
+      "무엇을 포기했나" ②에 적는다.
+    #mfaUserListBox 0px(등록 0명 — 빈 상태 참고용, 이 시안과 직접 관련 없음)
+
+  ■ 이 시안에서 "선언값(미실측)"이라 적은 것 — 화면이 아직 없어 잴 수 없는 것들
+    · .gjf-h ≈32px — ⚠검토관 2026-09-13 [하] 적발 수리: fold.js:41-45는 "53px→32px 남짓"이라는
+      *주석 서술*이지 CSS 선언이 아니다. 실 CSS 선언은 padding 5px 12px + margin-bottom 5px뿐
+      (fold.js:45-46, 고정 height 없음) — 32px는 그 선언값(패딩10+마진5+테두리2+글줄~15)을 직접
+      더해 낸 추정이다. 이 시안 파일 자체를 브라우저로 열어 잰 값은 29px였다
+      (목업 측정 — 제품 실측 아님, 설치본 재실측 필요).
+    · .g-rows-head 26px / .g-rows-r 30px — gijo-ui.css:369,374 선언(제품 전역 표준, 새로
+      밀도값을 안 만들고 그대로 가져다 쓰는 것이 이 시안의 요점)
+    · 새 "자가 진단" 판 전체 높이 — ⚠검토관 2026-09-13 [상] 적발 수리: 처음 적은 "약 360~390px"는
+      바로 옆 내역 합(495px)과 어긋나 있었다(산수 오류). 내역 그대로 합하면 **495px**
+      (패딩28+제목33+식별줄24+데모토글24+헤드라인30+목록26+270+안내줄20+새로고침버튼40,
+      마진 포함 근사) — 이 중 데모 전환 버튼(24px, "예시: 이상 없음/확인 필요 3건" — 이 시안
+      전용 데모 UI이며 실제 기능에는 없다)을 빼면 실제 구현판은 **약 471px**. 이 시안 파일
+      자체를 렌더링해 잰 값은 #scPanel ≈579px(데모토글 제외 ≈551px, 목업 측정 — 제품 실측
+      아님)로 위 선언값 합보다 크다 — 확정은 구현 후 설치본 CDP 재실측 몫이다(이 "추정" 칸이
+      잣대가 되면 안 된다, CLAUDE.md 2026-09-06).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --red-ink:#f5928a;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);font-size:12.5px;color:var(--muted-2);}
+.sidebar .tag{font-size:11px;font-weight:800;letter-spacing:1px;color:var(--muted-2);margin-bottom:10px;}
+.sidebar .fake-item{padding:8px 10px;border-radius:8px;margin-bottom:2px;color:var(--muted);}
+.sidebar .fake-item.on{background:rgba(59,130,246,.12);color:#fff;}
+.main{padding:28px 32px 60px;max-width:1000px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.sec-tab{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:700;cursor:default;font-family:inherit;}
+.sec-tab.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:#fff;}
+#secNav{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0 18px;}
+
+/* ── 판 껍데기 — settings.html:38-39 그대로, max-width만 예외 ───────────────
+   ⚠검토관 재검토 [하] 수리 — settings.html:38 자체는 max-width:640px지만, 실제로
+   화면에 걸리는 값은 nav.js:1363 loadDesignSystem()이 주입하는 gijo-ui.css:292
+   `body[data-screen="settings"].g-ui .panel { max-width: 860px; }`다(속성+클래스
+   선택자라 상세도가 settings.html의 `.panel`보다 높아 이 규칙이 이긴다). 이전 판은
+   목업 안에서 640px로 재고 "지금 640 → 제안 683"처럼 적었는데, 목업 안에서 잰 값이
+   설치본과 다를 수 있다는 원칙(CLAUDE.md 2026-09-06 "31px가 35px였다")이 여기서도
+   그대로 맞아떨어졌다 — 목업 값 자체가 제품과 다른 상한을 쓰고 있었다. ───────────*/
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;max-width:860px;}
+.panel-title{font-size:12.75px;font-weight:800;color:#fff;margin:-14px -16px 10px;padding:7px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12.25px;font-weight:700;}
+.b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
+.status-line{font-size:12.5px;margin-top:10px;}
+.status-ok{color:var(--teal);}
+.status-err{color:var(--red-ink);}
+.field-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.field{flex:1 1 220px;min-width:0;margin-bottom:10px;}
+.field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+.field input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
+.field.inline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+.field.inline>label{display:inline;margin-bottom:0;flex:0 0 auto;white-space:nowrap;}
+.field.inline>.field-row{flex:1 1 300px;min-width:0;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+
+/* ── 정체성 한 줄 + ⓘ — incidentcases.html:41-43 그대로 ─────────────────── */
+.scr-id{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px;}
+.ic-info{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;color:var(--blue-light);
+  font-size:12px;font-weight:700;padding:2px 8px;cursor:pointer;font-family:inherit;vertical-align:middle;margin-left:6px;}
+.ic-info[disabled]{opacity:.55;cursor:not-allowed;}
+
+/* ── 접기 머리줄 — fold.js:41-55 CSS 원문 그대로 옮김(값 하나도 새로 안 만듦) ───── */
+.gjf-h{display:flex;align-items:center;gap:9px;padding:5px 12px;margin-bottom:5px;cursor:pointer;
+  border:1px solid var(--border);border-radius:9px;background:var(--panel-2);user-select:none;}
+.gjf-h:hover{border-color:var(--blue);background:rgba(59,130,246,.05);}
+.gjf-h .car{color:var(--muted-2);font-size:11.75px;width:11px;flex:0 0 auto;transition:transform .15s;}
+.gjf-h.on .car{transform:rotate(90deg);}
+.gjf-h .nm{font-size:12.5px;font-weight:700;color:#dfe6ff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.gjf-b{font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--muted);flex:0 0 auto;}
+.gjf-b.hot{background:rgba(226,72,61,.16);color:var(--red-ink);}
+.gjf-b.ok{background:rgba(45,212,191,.14);color:var(--teal);}
+
+/* ── 9행 목록 — gijo-ui.css:367-384 .g-rows 계열 그대로(값 재사용, 새 밀도 0) ──── */
+.g-rows{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--panel);}
+.g-rows-head{display:grid;align-items:center;height:26px;padding:0 10px;font-size:11px;font-weight:800;color:var(--muted-2);letter-spacing:.4px;background:var(--panel-2);border-bottom:1px solid var(--border-strong);}
+.g-rows-r{display:grid;align-items:center;height:30px;padding:0 10px;font-size:12.5px;color:var(--text);cursor:pointer;}
+.g-rows-flat .g-rows-r:nth-child(even){background:rgba(255,255,255,.025);}
+.g-rows-r:hover{background:rgba(59,130,246,.07);}
+.g-rows--sc .g-rows-head,.g-rows--sc .g-rows-r{grid-template-columns:20px 128px 1fr 16px;gap:8px;}
+.g-rows .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.g-rows .gm2{color:var(--muted-2);}
+.mk{font-weight:800;text-align:center;}
+.mk.ok{color:var(--teal);}
+.mk.warn{color:var(--amber);}
+.mk.fail{color:var(--red-ink);}
+.mk.unknown{color:var(--muted-2);}
+.chev{color:var(--muted-2);font-size:11px;text-align:center;transition:transform .12s;}
+.chev.on{transform:rotate(90deg);}
+
+/* ── 행 상세 펼침 — incidentcases.html .det 패턴 그대로 ─────────────────── */
+.sc-det{display:none;background:var(--panel-2);border-radius:8px;padding:10px 12px;margin:2px 0 4px;font-size:11.75px;color:var(--muted);line-height:1.7;}
+.sc-det.on{display:block;}
+.sc-det .lb{color:var(--text);font-weight:700;}
+.sc-det .ac{color:var(--amber);margin-top:6px;}
+
+/* ── 헤드라인 줄 — #engineStatusLine 밀도(23.8px) 그대로 재사용 ────────────── */
+.sc-headline{font-size:12.5px;font-weight:700;padding:6px 10px;border-radius:7px;margin-bottom:10px;border-left:3px solid var(--border-strong);background:var(--panel-2);}
+.sc-headline.ok{border-left-color:var(--teal);color:var(--teal);}
+.sc-headline.bad{border-left-color:var(--red-ink);color:var(--red-ink);}
+.sc-meta{font-size:11.5px;color:var(--muted-2);font-weight:400;margin-left:6px;}
+.sc-note{font-size:11.25px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.demo-toggle{display:flex;gap:6px;margin-bottom:10px;}
+.demo-toggle button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:5px 10px;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+.demo-toggle button.on{border-color:var(--blue);color:#fff;background:rgba(59,130,246,.14);}
+.demo-label{font-size:10.5px;color:var(--muted-2);align-self:center;}
+
+/* ── 판단 근거 문서 블록 ─────────────────────────────────────────────── */
+.doc{max-width:920px;margin-top:36px;border-top:2px dashed var(--border-strong);padding-top:22px;}
+.doc h2{font-size:16px;color:#fff;margin:26px 0 10px;}
+.doc h2:first-child{margin-top:0;}
+.doc h3{font-size:13px;color:var(--blue-light);margin:16px 0 6px;}
+.doc p,.doc li{font-size:12.75px;color:var(--muted);line-height:1.75;}
+.doc ul{margin:4px 0 4px 18px;padding:0;}
+.doc table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:12px;}
+.doc th,.doc td{border:1px solid var(--border);padding:6px 9px;text-align:left;color:var(--muted);}
+.doc th{background:var(--panel-2);color:var(--text);font-weight:700;}
+.doc td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--text);}
+.doc .tag-live{color:var(--teal);font-weight:700;}
+.doc .tag-decl{color:var(--blue-light);font-weight:700;}
+.doc .tag-est{color:var(--amber);font-weight:700;}
+.doc .chk{list-style:none;margin-left:0;padding-left:0;}
+.doc .chk li{padding-left:20px;position:relative;margin-bottom:4px;}
+.doc .chk li::before{content:"✓";position:absolute;left:0;color:var(--teal);font-weight:800;}
+.doc .chk li.no::before{content:"—";color:var(--muted-2);}
+.doc a{color:var(--blue-light);}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="tag">GIJO AS</div>
+    <div class="fake-item">홈</div>
+    <div class="fake-item">취약점 스캔</div>
+    <div class="fake-item on">설정</div>
+    <div class="fake-item">문서함</div>
+    <!-- 사이드바는 nav.js 공용 부품(실제 배선) — 시안이라 정적 텍스트로만 자리를 보여준다. -->
+  </div>
+
+  <div class="main">
+    <div class="page-title">설정</div>
+    <div id="secNav">
+      <div class="sec-tab">내 설정</div>
+      <div class="sec-tab on">서버·AI</div>
+      <div class="sec-tab">연동</div>
+    </div>
+
+    <!-- ══════════════ 신설 판: 자가 진단(NEW) — 서버·AI 탭 맨 위 ══════════════ -->
+    <!-- 접기 머리줄 — fold.js가 실제로 삽입하는 것과 같은 모양(정적 재현, 실 구현은
+         제품 공용 fold.js를 그대로 쓴다 — 여기서 새로 안 만든다). -->
+    <div class="gjf-h on" id="foldHead">
+      <span class="car">▶</span>
+      <span class="nm">🩺 자가 진단</span>
+      <span class="gjf-b hot" id="foldBadge" style="display:none"></span>
+    </div>
+    <div class="panel" id="scPanel" style="margin-top:0">
+      <div class="panel-title">
+        🩺 자가 진단
+        <!-- ⓘ — incidentcases.html:299-302와 같은 자리·같은 뜻. 시안이라 실제 대화창을
+             열지 않는다(제품 코드를 부르지 않는다) — 그래서 disabled + 안내 title로 정직 표기. -->
+        <button type="button" class="ic-info" id="icInfo" disabled title="시안에서는 동작하지 않습니다 — 실제 화면에서는 대화창이 열려 '자가 진단 사용법 알려줘'로 답합니다(문장 초안은 이 문서 하단 'screenguide.ts 초안' 절 참고, 제품 코드 미수정)">ⓘ</button>
+      </div>
+      <div class="scr-id">시스템 9개 항목(모델·문서 검색·백업·지식베이스·DB·오류·느린 답·디스크·SIEM)의 지금 상태를 확인합니다. 문제가 있으면 무엇을 하면 되는지도 함께 보여줍니다.</div>
+
+      <div class="demo-toggle">
+        <button type="button" class="on" id="btnOk">예시: 이상 없음</button>
+        <button type="button" id="btnBad">예시: 확인 필요 3건</button>
+        <span class="demo-label">← 시안 데모 전환(실제로는 서버 값을 그대로 보여줍니다·입력칸 아님)</span>
+      </div>
+
+      <div class="sc-headline ok" id="scHeadline">지금은 이상 없습니다.<span class="sc-meta" id="scMeta">(가동 3시간 · 메모리 512MB — 예시값)</span></div>
+
+      <div class="g-rows g-rows--sc">
+        <div class="g-rows-head"><span>상태</span><span>항목</span><span>설명</span><span></span></div>
+        <div class="g-rows-flat" id="scRows"></div>
+      </div>
+      <div class="sc-note">⚠ SIEM 연동이 꺼져 있으면 이 목록에는 8개만 보입니다(SIEM 전달 항목 자체가 안 실립니다 — observability.ts:194-201). 행을 누르면 전체 문장과(있으면) 조치를 펼쳐 봅니다.</div>
+      <button type="button" class="btn-ghost" disabled title="시안에는 서버 연결이 없어 동작하지 않습니다 — 실제 화면에서는 GET /api/system-health를 다시 부릅니다(부작용 없는 조회)" style="margin-top:10px">새로고침</button>
+    </div>
+    <!-- ══════════════ 신설 판 끝 ══════════════ -->
+
+    <!-- 형제 판(기존, 제품 코드 그대로 옮김) — 자가 진단 바로 아래 이웃임을 보여준다. -->
+    <div class="panel" data-gijo-fold="서버 연결">
+      <div class="panel-title">서버 연결</div>
+      <div class="field inline">
+        <label for="serverUrlInput">서버 주소</label>
+        <div class="field-row">
+          <input id="serverUrlInput" placeholder="http://localhost:4000" disabled>
+          <button class="btn-ghost" disabled>연결 테스트</button>
+          <button class="btn-primary" disabled>저장</button>
+        </div>
+      </div>
+      <div class="status-line status-ok">✓ 연결됨 — http://localhost:4000</div>
+    </div>
+
+    <div style="font-size:12px;color:var(--muted-2);padding:8px 4px;border-top:1px dashed var(--border);margin-top:4px">
+      ⋯ 이하 기존 판 7개는 그대로(실측, 펼친 상태) — 구동 티어 442.2px · 전문가 어댑터 138.5px ·
+      모델 받기·인증 212.5px · 모델 받기 570.1px · (무명판/모델 안내) 50.9px · AI팀 구성 665.9px ·
+      로컬 LLM 엔진 115.8px · 이메일(SMTP) 설정 446.6px — 이 시안은 이 판들을 하나도 옮기거나 줄이지 않는다.
+    </div>
+
+    <!-- ══════════════════════ 판단 근거 문서 블록(시안 필수 항목) ══════════════════════ -->
+    <div class="doc">
+      <h2>왜 이 안인가</h2>
+      <p>서버는 이미 표준적인 "헤드라인 한 줄 + 항목별 상태·설명·조치"(<code>systemHealth()</code>,
+        observability.ts:463-485)를 만들어 두고 있다. 화면 소비자가 0건인 것은 <b>표현할 UI 언어가
+        없어서가 아니라</b> — 이미 조사한 상태 대시보드 표준(Statuspage 컴포넌트 패턴, 헤드라인
+        우선 원칙)과 같은 모양의 데이터가 서버에 있는데 그것을 그리는 화면이 하나도 없기 때문이다.
+        그래서 이 시안은 새 UI 언어를 발명하지 않고, <b>제품에 이미 있는 부품 3개</b>
+        (판 껍데기 · 접기+배지 · 엑셀형 목록)를 그대로 이어 붙였다. 새로 만든 것은
+        <code>.g-rows--sc</code> 열 폭 한 줄과 <code>.sc-headline</code>·<code>.sc-det</code>
+        (헤드라인 강조선·행 펼침) 뿐이다.</p>
+      <p>자리는 <b>설정 › 서버·AI 탭의 첫 판</b>으로 제안한다 — "서버 연결"·"로컬 LLM 엔진"·
+        "이메일(SMTP)"과 형제이면서, 그 형제들이 다루는 것(연결·모델·메일)을 <b>종합해서</b> 답하는
+        판이라 탭 맨 위(다른 판들보다 먼저 보이는 자리)가 맞다고 봤다. 다만 이 배치는 표에 적힌
+        대로 <b>최종 자리는 메인·사장님 결정 몫</b>이다 — 이 시안은 후보를 좁혀 그리는 것까지다.</p>
+
+      <h2>무엇을 포기했나</h2>
+      <ol>
+        <li><b>전용 사이드바 화면 신설</b> — 포기. 계획서에 없는 규모 확대이고, 프로 셸은
+          "메뉴는 보기용·카드 우선" 원칙(2026-08-19 프로 기준 결정)이라 상태 하나 보자고
+          사이드바 항목을 늘릴 이유가 약하다. 이미 형제 판 자리가 있다.</li>
+        <li><b>대화창(챗봇)에만 노출하고 화면은 안 만드는 안</b> — 포기. <code>titlebar.js:1020</code>이
+          이미 "자가 진단·설정 › 서버에서 확인한다"고 사람을 화면으로 보내고 있다 — 화면이 없으면
+          그 안내 문장이 거짓이 된다. system_health 대화 도구는 그대로 병행 유지(이미 동작 중).</li>
+        <li><b>현황판(status board) 카드 하나로 요약만 얹는 안</b> — 포기(이번 범위에서는). 9항목의
+          문장형 detail·action까지 카드 한 칸에 담기엔 부족하고, 현황판 통합은 더 큰 로드맵
+          항목이다. 다만 "칩 → 이 판으로 딥링크"는 자연스러운 후속이라 막지 않는다(지금은 안 함).</li>
+        <li><b>"서버 연결" 판에 항목을 합치는 안</b> — 포기. 서버 연결 판은 <b>입력+저장</b>(설정
+          변경) 판이고 자가 진단은 <b>읽기 전용 보고</b>다. 한 판에 섞으면 "메뉴는 보기용" 원칙과
+          "입력칸 0" 원칙이 한 판 안에서 충돌한다(어디까지가 설정이고 어디부터가 보고인지 흐려짐).</li>
+        <li><b>목록 형식을 새로 디자인하는 안</b> — 포기. .g-rows(엑셀형, 머리 26px·행 30px)가
+          2026-08-20에 이미 승인된 표준이라 새 밀도 숫자를 만들지 않고 그대로 가져다 썼다
+          (이 화면이 늘리는 새 밀도값은 0개).</li>
+        <li><b>9개 항목을 항상 다 펼쳐서 detail+action을 전부 보여주는 안</b> — 포기. 정상(ok)
+          항목까지 이유를 늘어놓으면 "안내는 ⓘ로·군더더기 없음" 원칙에 어긋나고 세로가 커진다.
+          기본은 한 줄(마크+라벨+요약), 문제 있는 항목만 눈에 띄고 클릭하면 누구나 펼쳐 전체
+          문장·조치를 본다.</li>
+      </ol>
+
+      <h2>밀도 숫자 — 지금 → 제안 · 세로 총합 증감</h2>
+      <table>
+        <tr><th>대상</th><th>지금(형제 요소)</th><th>구분</th><th>제안(새 판 구성)</th></tr>
+        <tr><td>상태 헤드라인 한 줄</td><td class="num">#engineStatusLine 23.8px<br>(margin-bottom 14px)</td><td><span class="tag-live">실측</span></td><td class="num">동일 패턴 재사용 — 23.8px + 14px<br>(새 밀도값 0)</td></tr>
+        <tr><td>목록 머리줄</td><td class="num">.g-rows-head 26px<br>(gijo-ui.css:369)</td><td><span class="tag-decl">선언값·제품 전역 표준</span></td><td class="num">그대로 재사용 26px</td></tr>
+        <tr><td>목록 행(9개)</td><td class="num">.g-rows-r 30px × 9<br>(gijo-ui.css:374)</td><td><span class="tag-decl">선언값·제품 전역 표준</span></td><td class="num">그대로 재사용 30px × 9 = 270px</td></tr>
+        <tr><td>접기 머리줄</td><td class="num">.gjf-h ≈32px(선언값 합: 패딩10+마진5+테두리2+글줄~15)<br>fold.js:45-46 실 선언은 padding 5px 12px + margin-bottom 5px뿐(고정 height 없음, :41-45는 주석 서술)<br>⚠목업 자체 렌더 29px(목업 측정 — 설치본 재실측 필요)</td><td><span class="tag-est">추정(선언값 합) — 주석 서술 아님</span></td><td class="num">그대로 재사용(새로 안 만듦, 아래 판 본문 471px와는 별도로 더해짐)</td></tr>
+        <tr><td>판 뼈대 참고(형제 실측 1건)</td><td class="num">로컬 LLM 엔진 판 전체 115.8px<br>(상태줄+필드로우+버튼)</td><td><span class="tag-live">실측</span></td><td class="num">같은 뼈대에서 필드로우(버튼줄,
+          약 34~44px 추정)를 9행 목록(26+270=296px)으로 치환</td></tr>
+        <tr><td><b>자가 진단 판 전체 높이</b></td><td class="num">(해당 판 자체가 제품에 없음)</td><td><span class="tag-est">추정(부품별 선언값 합)</span></td><td class="num"><b>약 495px</b><br>(패딩28+제목~33+식별줄~24+데모토글~24+헤드라인~30+목록26+270+안내줄~20+새로고침버튼~40=495, 마진 포함 근사)<br>⚠데모토글 24px(이 시안 전용 예시 전환 UI, 실제 기능엔 없음)을 빼면 <b>약 471px</b><br>⚠목업 자체 렌더 실측 #scPanel ≈579px(데모토글 제외 ≈551px, 목업 측정 — 설치본 재실측 필요)로 이보다 더 큼</td></tr>
+        <tr><td><b>서버·AI 구역 세로 총합</b></td><td class="num"><b>2720.6px</b>(9판, 실측)</td><td><span class="tag-live">실측</span> + <span class="tag-est">추정 합산</span></td><td class="num"><b>약 3215.6px</b>(2720.6 + 새 판 추정 495, 데모토글 포함)<br>데모토글 제외 시 약 3191.6px<br>증가 약 <b>+17~18%</b>(목업 자체 렌더 기준이면 최대 +21% 안팎까지 — 확정은 구현 후 설치본 재실측)</td></tr>
+      </table>
+      <p style="font-size:11.5px">⚠ "자가 진단 판 전체 높이"와 "세로 총합"은 <b>추정</b>이다 — 이
+        판이 제품에 아직 없어 실제로 잴 수 없다(잴 수 없는 것을 잰 척하지 않는다, CLAUDE.md
+        2026-09-06 원칙). 실측은 <b>구현 뒤 win-unpacked를 CDP로 다시 열어</b> 확정해야 하고,
+        그때 이 표의 "추정" 칸을 실측값으로 바꿔야 한다 — 이 시안이 잣대가 되면 안 된다.
+        <b>2026-09-13 검토관 [상] 적발 수리</b>: 처음 판은 "약 360~390px"라 적었는데 바로 옆
+        내역 합은 495px였다(산수가 스스로 어긋났다) — 내역 그대로 495px로 고쳤다. 데모 전환
+        버튼(이 시안 전용, 실제 기능엔 없음)을 빼면 약 471px이고, 이 시안 파일을 직접 렌더링해
+        잰 값(#scPanel ≈579px, 데모토글 제외 ≈551px)은 그보다 더 크다 — 셋 다 <b>목업/선언값
+        추정이지 제품 실측이 아니다.</b> 승인 시 참고할 안전한 범위는 "471~579px(총합 증가
+        약 +17~+21%)"이고, 확정 숫자는 구현 뒤 설치본 재실측 몫이다.</p>
+      <p style="font-size:11.5px">⚠ <b>재검토 [하] 추가 정정</b> — 위 471~579px 범위는 전부
+        <code>.panel</code> 폭을 <b>640px 전제</b>로 잰 값이다(목업이 처음에 640px로 선언돼
+        있었다). 실제 제품 상한은 위 "판 껍데기" 절에서 확인했듯 <b>860px</b>다(gijo-ui.css:292).
+        이 판 안에서 세로 높이를 늘리는 것은 <code>.scr-id</code>(정체성 한 줄)·<code>.sc-note</code>
+        (SIEM 안내 문장) 같은 긴 문장이 줄바꿈되는 만큼이고, 목록 행(<code>.g-rows-r</code>)은
+        <code>.trunc</code>(overflow:hidden 말줄임)라 폭이 늘어도 줄바꿈이 안 생긴다 — 즉 폭이
+        640→860px로 넓어지면 <b>글줄 감김이 줄어(또는 그대로) 판 전체 높이는 같거나 작아지는
+        방향</b>이지 커지는 방향이 아니다. 다만 이것도 <b>추정 방향성</b>일 뿐 정확한 px는
+        말할 수 없다 — 목업 안에서 잰 px가 설치본과 다를 수 있다는 원칙(CLAUDE.md 2026-09-06)
+        그대로, <b>확정 숫자는 구현 후 win-unpacked를 860px 폭으로 재실측</b>해야 나온다.</p>
+
+      <h2>제품 원칙 자가점검</h2>
+      <ul class="chk">
+        <li>입력칸 0 — 서버 주소·모델 ID 같은 텍스트 입력칸 없음. 새로고침 버튼은 값을 받는
+          입력이 아니라 부작용 없는 재조회 트리거(GET)뿐이고, 시안에서는 disabled로 정직 표기.</li>
+        <li>안내는 ⓘ로 — 패널 제목의 ⓘ가 그 자리(incidentcases.html 관례 그대로). 단, 시안에서는
+          제품 코드를 부르지 못하므로 disabled + title 안내로 "동작 안 함"을 밝혔다.</li>
+        <li>정체성 한 줄 + ⚠만 — <code>.scr-id</code> 한 줄만 두고, 그 외 설명 문단을 안 늘렸다.
+          "⚠"에 해당하는 것은 헤드라인 줄 자체(문제 있으면 빨강 테두리로 스스로 경고)로 대신한다
+          — 별도 경고 박스를 더 안 만든 것도 "무엇을 포기했나" ⑥의 연장.</li>
+        <li>메뉴는 보기용 — 행 클릭은 이미 렌더된 문장을 펼치는 것뿐, 서버에 아무 것도 안 씀.</li>
+        <li>가짜 상호작용 없음 — ⓘ·새로고침은 disabled+title로 "시안에서 동작 안 함"을 밝혔고,
+          데모 전환·행 펼침은 실제로 동작(순수 화면 표시 전환, 서버 호출 없음)한다.</li>
+        <li>screenguide 콘텐츠(대화창이 "자가 진단 사용법" 질문에 답할 내용) — ⚠검토관
+          2026-09-13 [중] 적발 수리: 처음 판은 "구현 단계 숙제"로만 적고 실제 문장을 하나도
+          안 썼다. 아래 "screenguide.ts 초안" 절에 <b>판 이름과 문장 초안</b>을 실제로 적었다 —
+          server/src/engine/screenguide.ts(제품 코드)는 이 시안이 손대지 않았고, 그 초안을
+          구현자가 대조 후 그대로 옮겨 붙이면 된다.</li>
+      </ul>
+
+      <h2>실제 화면 부품 느낌 — 엑셀처럼 촘촘, 디자인은 나중</h2>
+      <p>이 판은 색·그림자·둥근 정도를 새로 정하지 않았다 — 전부 위 "제품 안에서 그대로 가져온 것"
+        표에 적힌 기존 규칙값이다. 9개 항목이 한 화면에 세로로 전부 들어오도록 목록은 30px/행으로
+        촘촘히 두고, 정상 항목은 클릭하기 전까지 한 줄 이상을 안 쓴다. 배지·아이콘 색은 이미
+        product 전역에서 쓰는 teal(ok)/amber(warn)/red-ink(fail)/muted-2(unknown) 네 가지 그대로다.</p>
+
+      <h2>screenguide.ts 초안 — 판 이름 · 문장(제품 코드는 안 고침 · 구현 시 그대로 옮겨 붙일 초안)</h2>
+      <p>⚠검토관 2026-09-13 [중] 적발 수리(재검토 2바퀴째) — "안내는 ⓘ" 원칙대로, 사용법·뜻·조치법
+        문장은 이 화면이 아니라 <code>server/src/engine/screenguide.ts</code>의
+        <code>"settings.html"</code> 판(panels, :1336-)에 들어가야 한다. 그 파일은 손대지 않았고,
+        아래는 구현자가 대조 후 그대로 복사해 넣을 수 있는 <b>초안</b>이다(문체는 같은 파일의
+        기존 판, 예: :1355 "SIEM 전달" 문단을 그대로 본떴다).</p>
+      <p style="background:rgba(226,72,61,.10);border-left:3px solid var(--red-ink);padding:8px 12px;border-radius:6px">
+        ⚠ <b>1바퀴 시안의 결함(재검토 적발 [중], 수리함)</b> — 이전 판은 panels 키를
+        <code>"시스템 자가 진단"</code>이라 적었는데, 이 화면의 실제 글자(접기 머리줄 <code>.nm</code>과
+        <code>.panel-title</code>, :247·:252)는 <b>"🩺 자가 진단"</b>이다. 서버의 구역 찾기
+        <code>resolvePanelHit()</code>(screenguide.ts:290,298-299)는 <code>normalizeName()</code>으로
+        공백·가운뎃점만 지우고 <b>글자는 그대로 비교</b>한다 — 담당자가 "자가 진단 뭐야"라고
+        물으면 <code>nq.includes(n)</code>은 <code>"자가진단뭐야".includes("시스템자가진단")</code>을
+        묻는 것이 되어 <b>거짓(false)</b>이 나온다. 화면 글자와 panels 키가 다르면 챗봇이 그 판을
+        영영 못 찾는다 — 이 시안 항목이 고치려던 "화면 소비자 0건"과 같은 모양의 결함을 안내
+        경로에 그대로 새로 심을 뻔했다.</p>
+      <table>
+        <tr><th colspan="2">판 이름(확정)</th></tr>
+        <tr><td colspan="2"><b>"자가 진단"</b>(이모지 제외 — 화면 글자와 한 글자까지 동일) —
+          panels 키를 이 화면의 <code>.nm</code>·<code>.panel-title</code> 글자와 정확히
+          맞췄다(이모지 🩺는 표시용일 뿐 키에는 안 들어간다 — 다른 판 이름도 전부 이모지
+          없이 등록돼 있다, 예: screenguide.ts:1349 "2차 인증"·:1351 "구동 티어").<br><br>
+          <b>기존 인용과의 관계</b> — <code>screenguide.ts:1355</code>(SIEM 전달 문단)는 이미
+          "설정 &gt; <b>시스템 자가 진단</b>"이라는 글로 이 자리를 가리키고 있다("시스템" 접두어가
+          붙어 있어 위에서 고른 판 키 "자가 진단"과 <b>한 글자가 다르다</b>). 이 문장은 panels의
+          <b>키가 아니라 본문 산문</b>이라 resolvePanelHit의 매칭 자체를 깨지는 않지만, 사람이
+          읽었을 때 "시스템 자가 진단"과 "자가 진단"이 같은 자리를 가리키는지 헷갈릴 수 있다.
+          그래서 구현 시 그 SIEM 전달 문단의 인용도 <b>"설정 &gt; 자가 진단"</b>으로 함께 고쳐
+          한 문서 안에서 이름이 두 갈래로 안 갈라지게 하기를 권한다(아래 "남은 구현 과제"에
+          그 한 줄 수정도 넣었다 — 이 시안이 새로 만드는 판 키만 고치고 기존 문단을 그대로
+          두면 결함이 반만 고쳐진다).</td></tr>
+      </table>
+      <p><b>문장 초안</b>(<code>panels["자가 진단"]</code> 값으로 그대로 넣을 문장):</p>
+      <p style="background:var(--panel-2);border-radius:8px;padding:10px 12px;font-size:12px;white-space:pre-wrap">"GET /api/system-health(9항목: AI 모델 · 문서 검색 엔진(임베딩) · 백업 · 지식베이스 ·
+데이터베이스 · 최근 24시간 오류 · 최근 24시간 느린 답 · 디스크 · SIEM 전달)의 지금 상태를
+보여줍니다. **로그인한 담당자 누구나** 볼 수 있습니다(관리자 전용이 아닙니다) — 그래서
+**느린 답 항목에는 질문 내용을 절대 싣지 않습니다**, 시각 · 걸린 시간 · 경로만 보여줍니다
+(다른 담당자의 질문일 수 있기 때문입니다). SIEM 연동이 꺼져 있으면 그 항목 자체가 목록에서
+빠집니다(9개가 아니라 8개로 보이는 것이 정상입니다). 항목을 누르면 전체 문장과(있으면)
+다음에 할 일이 펼쳐집니다. '새로고침'은 서버 값을 다시 물어보는 것뿐 — 아무 것도 바꾸지
+않습니다."</p>
+      <p><b>"can" 문항 초안</b>(대화창 예시 질문에 추가): "자가 진단 사용법 알려줘"</p>
+      <p style="font-size:11.5px">⚠ 이 문장은 <b>초안</b>이다 — observability.ts의 실제 라벨·문구와
+        어긋나는 곳이 있으면 구현자가 코드를 다시 대조해 고친다(이 시안은 항목 정의 단계
+        evidence의 문구를 옮긴 것이지 최종본이 아니다). 위 판 안 ic-info 버튼의 title 안내
+        (:255 부근)도 이 초안이 실제로 붙을 자리를 가리키도록 문구를 맞췄다.</p>
+
+      <h2>남은 구현 과제(이 시안 범위 밖 — 메인 구현자 몫)</h2>
+      <ul>
+        <li>GET /api/system-health를 부르는 preload 다리 추가(현재 0건 — 이 자체가 원 결함).</li>
+        <li>screenguide.ts "settings.html" panels에 <code>"자가 진단"</code> 키로 문구 추가 —
+          초안은 바로 위 "screenguide.ts 초안" 절에 있음(코드 재대조 후 그대로 옮겨 붙이면 됨).
+          ⚠ 키는 반드시 화면 글자(<code>.nm</code>·<code>.panel-title</code>, 이모지 제외)와
+          한 글자까지 같아야 <code>resolvePanelHit()</code>의 <code>nq.includes(n)</code>이
+          걸린다 — 다르면 챗봇이 이 판을 못 찾는다(위 "1바퀴 시안의 결함" 참고).</li>
+        <li>screenguide.ts:1355 "SIEM 전달" 문단의 "설정 &gt; 시스템 자가 진단" 인용을
+          "설정 &gt; 자가 진단"으로 함께 맞추기(새 판 키와 한 글자까지 같게 — 위 "기존 인용과의
+          관계" 참고. 이 한 줄을 안 고치면 문서 안에서 같은 자리를 가리키는 이름이 두 갈래로
+          남는다).</li>
+        <li>data-gijo-fold-badges를 실제 fold.js와 연결(이 시안은 정적 재현만 — 실 구현은
+          fold.js를 그대로 불러 쓰면 된다, 새 JS를 안 만든다).</li>
+        <li>구현 뒤 win-unpacked CDP 재실측으로 위 "추정" 칸을 실측으로 갱신(아래 640→860px
+          폭 변경 반영분 포함).</li>
+      </ul>
+
+      <h2>참고(설계 전 조사 출처)</h2>
+      <ul>
+        <li><a href="https://support.atlassian.com/statuspage/docs/show-service-status-with-components/" target="_blank" rel="noopener">Atlassian Statuspage — Show service status with components</a></li>
+        <li><a href="https://support.atlassian.com/statuspage/docs/what-is-a-component/" target="_blank" rel="noopener">Atlassian Statuspage — What is a component?</a></li>
+        <li><a href="https://www.uxpin.com/studio/blog/dashboard-design-principles/" target="_blank" rel="noopener">UXPin — Dashboard Design Principles</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // ── 두 데모 상태(정상/문제) — observability.ts 함수 본문의 실제 문장 템플릿을
+  //    그대로 흉내 낸 예시 문자열이다(서버 호출 없음, 순수 정적 데이터). ──
+  var DATA_OK = {
+    level: "ok",
+    headline: "지금은 이상 없습니다.",
+    meta: "(가동 3시간 · 메모리 512MB — 예시값)",
+    checks: [
+      { label: "AI 모델", level: "ok", detail: "상주 1개 · qwen3-14b" },
+      { label: "문서 검색 엔진(임베딩)", level: "ok", detail: "가동 중 · bge-m3 (포트 8081)" },
+      { label: "백업", level: "ok", detail: "최근 백업 6시간 전 (보관 7개) · 복원 점검 통과(자산 4,911건·계정 4건, 지식베이스 동반)" },
+      { label: "지식베이스", level: "ok", detail: "문서 128건" },
+      { label: "데이터베이스", level: "ok", detail: "42.3MB · 스키마 이력 37건 · 저장 암호화 켬" },
+      { label: "최근 24시간 오류", level: "ok", detail: "오류 0건 (차단 3건 — 차단은 정상 동작입니다)" },
+      { label: "최근 24시간 느린 답", level: "ok", detail: "8초 넘게 걸린 답 없음" },
+      { label: "디스크", level: "ok", detail: "여유 312GB / 전체 953GB (33%)" },
+      { label: "SIEM 전달", level: "ok", detail: "10.0.0.50:514 (UDP·CEF) · 보냄 4,820건 · ⚠ UDP는 도착 여부를 확인할 수 없습니다", action: "도착까지 확인하려면 TCP·TLS·Splunk HEC로 바꾸세요(설정 > 연동 > SIEM)." }
+    ]
+  };
+  var DATA_BAD = {
+    level: "fail",
+    headline: "3가지를 봐야 합니다: 백업 · 최근 24시간 느린 답 · SIEM 전달",
+    meta: "(가동 11시간 · 메모리 780MB — 예시값)",
+    checks: [
+      { label: "AI 모델", level: "ok", detail: "상주 1개 · qwen3-14b" },
+      { label: "문서 검색 엔진(임베딩)", level: "ok", detail: "가동 중 · bge-m3 (포트 8081)" },
+      { label: "백업", level: "warn", detail: "최근 백업 51시간 전 (보관 6개) · 복원 점검 통과(자산 4,911건·계정 4건, 지식베이스 동반)", action: "자동 백업이 멈췄을 수 있습니다 — 서버 재시작 후에도 갱신되지 않으면 디스크 여유와 GIJO_AUTO_BACKUP 설정을 확인하세요." },
+      { label: "지식베이스", level: "ok", detail: "문서 128건" },
+      { label: "데이터베이스", level: "ok", detail: "42.3MB · 스키마 이력 37건 · 저장 암호화 켬" },
+      { label: "최근 24시간 오류", level: "ok", detail: "오류 0건 (차단 3건 — 차단은 정상 동작입니다)" },
+      { label: "최근 24시간 느린 답", level: "warn", detail: "8초 초과 5건 — 오래 걸린 순서로 14:32 12초(해설 팀원) · 09:11 10초(문서요약) · 08:40 9초(경로 미상)", action: "질문 내용은 자가 진단에 싣지 않습니다(다른 담당자의 물음일 수 있습니다). 같은 질문이 반복해서 느리면 그 문장을 그대로 지원 창구에 알려주세요 — 즉답 경로로 만들 수 있습니다." },
+      { label: "디스크", level: "ok", detail: "여유 312GB / 전체 953GB (33%)" },
+      { label: "SIEM 전달", level: "fail", detail: "10.0.0.50:514 (UDP·CEF) · 보냄 1,204건 · ⚠ 유실 37건 · 대기 12건 · ECONNREFUSED", action: "SIEM이 오래 받지 못해 이벤트가 버려졌습니다 — 수집 서버 상태와 주소·포트를 확인하세요. 연결이 되살아나면 대기 중인 것부터 다시 나갑니다." }
+    ]
+  };
+  var MARK = { ok: "✓", warn: "⚠", fail: "✗", unknown: "❔" };
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
+  }
+
+  var rowsEl = document.getElementById("scRows");
+  var headlineEl = document.getElementById("scHeadline");
+  var badgeEl = document.getElementById("foldBadge");
+
+  function render(data) {
+    headlineEl.textContent = data.headline;
+    var meta = document.createElement("span");
+    meta.className = "sc-meta";
+    meta.textContent = data.meta;
+    headlineEl.appendChild(meta);
+    headlineEl.className = "sc-headline " + (data.level === "ok" ? "ok" : "bad");
+
+    var badCount = data.checks.filter(function (c) { return c.level === "warn" || c.level === "fail"; }).length;
+    if (badCount > 0) {
+      badgeEl.textContent = "확인 " + badCount;
+      badgeEl.style.display = "";
+    } else {
+      badgeEl.style.display = "none"; // 0이면 배지를 숨긴다 — fold.js badgeValue()와 같은 규칙(mfaBadge·dbcryptBadge 관례)
+    }
+
+    rowsEl.innerHTML = "";
+    data.checks.forEach(function (c, i) {
+      var row = document.createElement("div");
+      row.className = "g-rows-r";
+      row.innerHTML =
+        '<span class="mk ' + c.level + '">' + MARK[c.level] + '</span>' +
+        '<span class="trunc">' + esc(c.label) + '</span>' +
+        '<span class="trunc gm2" title="' + esc(c.detail) + '">' + esc(c.detail) + '</span>' +
+        '<span class="chev" id="chev' + i + '">▸</span>';
+      var det = document.createElement("div");
+      det.className = "sc-det";
+      det.id = "det" + i;
+      det.innerHTML =
+        '<div><span class="lb">' + esc(c.label) + '</span> — ' + esc(c.detail) + '</div>' +
+        (c.action ? '<div class="ac">→ ' + esc(c.action) + '</div>' : '<div style="color:var(--muted-2)">(따로 할 일 없음)</div>');
+      row.addEventListener("click", function () {
+        det.classList.toggle("on");
+        document.getElementById("chev" + i).classList.toggle("on");
+      });
+      rowsEl.appendChild(row);
+      rowsEl.appendChild(det);
+    });
+  }
+
+  // 접기 머리줄 — 정적 재현(실 구현은 fold.js를 그대로 쓴다). 순수 표시 토글, 서버 호출 없음.
+  document.getElementById("foldHead").addEventListener("click", function () {
+    var on = this.classList.toggle("on");
+    document.getElementById("scPanel").style.display = on ? "" : "none";
+  });
+
+  // 데모 전환 — 실제 서버 데이터를 대신하는 예시 두 벌 사이를 오가는 것뿐, 입력칸이 아니다.
+  document.getElementById("btnOk").addEventListener("click", function () {
+    this.classList.add("on"); document.getElementById("btnBad").classList.remove("on");
+    render(DATA_OK);
+  });
+  document.getElementById("btnBad").addEventListener("click", function () {
+    this.classList.add("on"); document.getElementById("btnOk").classList.remove("on");
+    render(DATA_BAD);
+  });
+
+  render(DATA_OK);
+})();
+</script>
+</body>
+</html>
