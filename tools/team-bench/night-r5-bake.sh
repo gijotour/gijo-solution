@@ -70,6 +70,11 @@ BAKE_OUT=${BAKE_OUT:-data/lora/$ROUND}
 #   $ROUND를 찍어 두 밤이 한 파일에 섞여도 **어느 회전인지** 읽히게 한다.
 BAKELOG=${BAKELOG:-$R5/$ROUND-bake.log}
 MEMLOG=${MEMLOG:-$R5/$ROUND-bake-mem.log}
+# [2026-09-14 · r5b 첫 굽기] 스왑 감시견 상태 파일 — 감시견은 별도 서브셸에서 도므로 그 안
+#   변수를 끝 요약(밖)이 못 읽는다. 여기 두 값(최대 스왑 증가·SwapFree 최저)을 갱신해 두고
+#   요약이 이 파일을 읽는다. 매 실행 시작 때 지운다(아래) — 지우지 않으면 이번에 굽지 않은
+#   밤이 지난 밤의 값을 자기 것인 양 보고하게 된다.
+SWAPDOG_STATE=${SWAPDOG_STATE:-$R5/$ROUND-swapdog.txt}
 CWIN=${CWIN:-$R5/cwin-v6.json}
 HOLDOUT=${HOLDOUT:-$REPO/tools/team-bench/holdout-vuln-o.json}
 SAMPLES=${SAMPLES:-$REPO/tools/team-bench/samples-questions.json}
@@ -94,28 +99,39 @@ ALLOC_CONF=${ALLOC_CONF:-}
 BAKE_MIN_AVAIL=${BAKE_MIN_AVAIL:-32}
 BAKE_MEASURED_NEED=${BAKE_MEASURED_NEED:-43}
 BAKE_MEM_MAX=${BAKE_MEM_MAX:-38G}
-# [2026-09-13 · r5b 메모리 대책] 스왑 증가 감시견의 문턱 — 가용(0~1G)은 정상 굽기에서도 나오므로
-#   문턱으로 못 쓴다(2026-09-12 실측: 정상 굽기가 표본의 81%를 가용 0~1G에서 보냈다). 대신 SwapFree가
-#   굽기 시작값 대비 이만큼(GiB) 줄면 「교사가 디스크로 밀려나는 중」으로 본다.
-# ⚠ **이 2GiB에는 실측 근거가 없다**(2026-09-13 검토관 적발 — 정직하게 적는다). r5a 굽기 동안
-#   스왑이 얼마나 늘었는지는 **아무도 안 쟀다**(옛 mem()이 스왑을 안 찍었다 — 위 mem() 병기가
-#   비로소 그것을 남긴다). 정상 굽기가 2GiB를 넘길 수도 있고(그러면 감시견이 밤을 죽인다) 한참
-#   못 미칠 수도 있다(그러면 장식이다). **첫 밤의 병기된 스왑 곡선을 보고 이 값을 정한다.**
-#   그때까지의 완충으로 한 표본이 아니라 **연속 SWAP_DOG_CONFIRM회**를 봐야 내린다(아래 감시견).
-SWAP_DROP_MAX_GB=${SWAP_DROP_MAX_GB:-2}
+# [2026-09-14 · r5b 첫 굽기 실측으로 규칙 교체] 「시작 대비 증가 ≥2GiB 연속 3회 → 죽임」이던
+#   옛 규칙은 **폐기한다**(2026-09-13 검토관이 「이 2GiB엔 실측 근거가 없다」고 적었던 그 문단은
+#   여기서 정리한다). 첫 굽기(2026-09-14 03:25 회전 r5b)가 그 문턱으로 **정상 진행 중(베이스
+#   가중치 로드, 시작 75초 경과)인 굽기를 죽였다** — night4.log: 스왑 4G→5G→8G 연속 3회
+#   (03:25:54~03:26:24) · 굽기 종료코드 143. r5a(09-12)는 같은 메모리 조건에서 완주했으므로
+#   「시작 대비 증가」 자체는 나쁜 신호가 아니다 — 진짜 위험은 **SwapFree가 바닥나 OOM 킬러가
+#   교사를 고를 수 있게 되는 것**이다. 그래서 문턱을 절대량으로 바꾼다: SwapFree가
+#   SWAP_FREE_MIN_GB(GiB) 밑으로 연속 SWAP_DOG_CONFIRM회면 학습만 내린다.
+#   증가량(시작 대비)은 더 이상 죽이는 근거가 아니라 **곡선 기록용**으로만 남긴다(아래 감시견 —
+#   정수 GiB 최대치가 갱신될 때만 로그 한 줄, 매 표본 찍지 않는다).
+SWAP_FREE_MIN_GB=${SWAP_FREE_MIN_GB:-2}
 SWAP_DOG_CONFIRM=${SWAP_DOG_CONFIRM:-3}
 # 08:30 데드라인 — 예상 종료 04:45~05:00경이라 여유가 크지만, 낮 서빙을 지키는 마지막 방어선이다.
 DEADLINE=${DEADLINE:-08:30}
 
 mkdir -p "$R5"
+rm -f "$SWAPDOG_STATE" 2>/dev/null   # 이번 실행 몫만 남긴다(위 SWAPDOG_STATE 주석 참고)
 say() { echo "[$(date '+%F %T %Z')] $*" | tee -a "$LOG"; }
 # [2026-09-13 · r5b 메모리 대책] 스왑 사용량을 **함께 찍는다**(잣대 단일화) — 32G/43G(위)는 스왑을
 #   안 깎은 수라서, 스왑이 나가 있으면 「가용 32G」가 실제로는 그만큼 못한 값일 수 있다. 숫자
 #   자체(32→43 등)를 바꾸는 것은 메인/사장님 결정이라 여기서는 **로그에 병기만** 한다.
 #   ⚠ 스왑 칸에 "사용"을 다시 쓰지 않는다 — 아래 "굽기 중 최대 사용 메모리" 집계가 낱말 "사용"
 #     뒤 필드를 전부 최댓값 후보로 줍는데, 그러면 스왑 값과 뒤섞여 틀린 최댓값을 낼 수 있다.
+# [2026-09-14 · r5b 첫 굽기 실측 적발] gb10의 free는 **한국어 로케일**이라 행 이름이
+#   「메모리:」·「스  왑:」(스와 왑 사이에 공백 둘 — procps가 CJK 표시폭을 잘못 재 안쪽에 패딩을
+#   넣는다)로 나온다. /^스왑|^Swap/ 이 그 행에 안 걸려 swapused가 시종 0으로 찍혔다(2026-09-14
+#   03:25 r5b: night4.log는 스왑 증가를 봤는데 같은 시간 r5b-bake-mem.log의 스왑 칸은 매 표본
+#   0G, 끝 요약도 값이 비었다). **행 이름을 로케일에 안 매이게 고정**한다 — `LC_ALL=C free -g`는
+#   항상 "Mem:"·"Swap:"으로 나온다(아래 awk 패턴은 그대로 둔다 — Swap 쪽 alternation이 걸린다).
+#   출력 형식("총 %sG 사용 %sG 가용 %sG · 스왑 %sG")도 바꾸지 않는다 — 끝 요약의 "굽기 중 최대
+#   스왑" awk(낱말 "스왑" 뒤 필드)가 이 형식 그대로에 걸린다.
 mem() {
-  free -g | awk '
+  LC_ALL=C free -g | awk '
     /^메모리|^Mem/ { total=$2; used=$3; avail=$7 }
     /^스왑|^Swap/ { swapused=$3 }
     END { printf "총 %sG 사용 %sG 가용 %sG · 스왑 %sG", total, used, avail, swapused+0 }
@@ -253,29 +269,46 @@ else
       pgrep -f "finetune_qlora14b.py" > /dev/null 2>&1 || break
     done ) > /dev/null 2>&1 &
   DEADLINEPID=$!
-  # [2026-09-13 · r5b 메모리 대책] 스왑 증가 감시견 — cgroup이 못 보는 것을 **유일하게 보는 자리**다.
-  #   가용(0~1G)은 정상 굽기에서도 나오므로 문턱으로 못 쓴다(2026-09-12 실측: 정상 굽기가 표본의
-  #   81%를 가용 0~1G에서 보냈다). 대신 SwapFree가 시작 대비 SWAP_DROP_MAX_GB(GiB) 넘게 줄면
-  #   「교사가 디스크로 밀려나는 중」으로 보고 **학습만** 내린다.
+  # [2026-09-14 · r5b 첫 굽기 실측으로 규칙 교체] 스왑 감시견 — cgroup이 못 보는 것을 **유일하게
+  #   보는 자리**다. 옛 규칙(시작 대비 증가 ≥2GiB 연속 3회 → 죽임)은 **가중치 로드 중이던 정상
+  #   굽기를 시작 75초 만에 죽였다**(2026-09-14 03:25 회전 r5b: night4.log 「스왑 4G→5G→8G
+  #   연속 3회」·굽기 종료코드 143 — 같은 시간 r5b-bake-mem.log는 스왑 0G만 찍어 원인을 못
+  #   남겼다, 그 원인이 위 mem() 로케일 수리다). r5a는 같은 메모리 조건에서 완주했으니 증가량
+  #   자체는 위험 신호가 아니다. 새 문턱은 **SwapFree 절대 수준**이다 — SwapFree가
+  #   SWAP_FREE_MIN_GB(GiB) 밑으로 연속 SWAP_DOG_CONFIRM회면(OOM 킬러가 교사를 고를 수 있는
+  #   진짜 위험) **학습만** 내린다.
   #   ⚠ 이름으로 죽이지 않는다 — `pkill -f llama-server`는 교사(8080)·임베딩(8081)까지 함께 죽인다.
-  #   ⚠ [2026-09-13 · 검토관 적발] **한 표본으로 죽이지 않는다.** 문턱(2GiB)은 아직 실측 근거가
-  #     없는 수라, 순간 표본 하나로 내리면 정상 굽기가 밤째 날아가고 원인이 「대책으로 넣은
-  #     감시견」이 된다. 연속 $SWAP_DOG_CONFIRM회(15초 간격)를 봐야 내리고, 첫 걸림은 **로그에만**
-  #     남긴다 — 그 기록이 다음 밤에 문턱을 정하는 재료다.
+  #   ⚠ 한 표본으로 죽이지 않는다 — 연속 $SWAP_DOG_CONFIRM회(15초 간격)를 봐야 내린다.
+  #   증가량(시작 대비 DROP)은 더 이상 죽이는 근거가 아니라 **곡선 기록용**으로만 남긴다 —
+  #   정수 GiB 최대치가 갱신될 때만 로그 한 줄(매 표본 안 찍는다). 두 값(최대 증가·SwapFree
+  #   최저)은 $SWAPDOG_STATE에 갱신해 둔다 — 이 감시견은 서브셸이라 그 안 변수를 끝 요약(밖)이
+  #   못 읽기 때문이다.
   SWAP_BASE_KB=$(awk '/^SwapFree:/{print $2}' /proc/meminfo 2>/dev/null)
   SWAP_BASE_KB=${SWAP_BASE_KB:-0}
   ( SWAP_HITS=0
+    DROP_MAX_GB=0
+    FREE_MIN_GB=
     while true; do
       sleep 15
       SWAP_NOW_KB=$(awk '/^SwapFree:/{print $2}' /proc/meminfo 2>/dev/null)
       SWAP_NOW_KB=${SWAP_NOW_KB:-$SWAP_BASE_KB}
+      FREE_NOW_GB=$(( SWAP_NOW_KB / 1024 / 1024 ))
       DROP_GB=$(( (SWAP_BASE_KB - SWAP_NOW_KB) / 1024 / 1024 ))
-      if [ "$DROP_GB" -ge "$SWAP_DROP_MAX_GB" ]; then
+      [ "$DROP_GB" -lt 0 ] && DROP_GB=0
+      if [ "$DROP_GB" -gt "$DROP_MAX_GB" ]; then
+        DROP_MAX_GB=$DROP_GB
+        echo "[$(date '+%F %T %Z')] 스왑 증가 최대 ${DROP_MAX_GB}G(시작 대비, SwapFree 기준) — 기록만" >> "$LOG"
+      fi
+      if [ -z "$FREE_MIN_GB" ] || [ "$FREE_NOW_GB" -lt "$FREE_MIN_GB" ]; then
+        FREE_MIN_GB=$FREE_NOW_GB
+      fi
+      { echo "swap_drop_max_gb=$DROP_MAX_GB"; echo "swap_free_min_gb=$FREE_MIN_GB"; } > "$SWAPDOG_STATE"
+      if [ "$FREE_NOW_GB" -lt "$SWAP_FREE_MIN_GB" ]; then
         SWAP_HITS=$((SWAP_HITS + 1))
         if [ "$SWAP_HITS" -lt "$SWAP_DOG_CONFIRM" ]; then
-          echo "[$(date '+%F %T %Z')] ⚠ 스왑 ${DROP_GB}G 증가(SwapFree 기준 · 시작 대비) — ${SWAP_HITS}/${SWAP_DOG_CONFIRM}회째, 아직 안 내린다(연속이라야 내린다)" >> "$LOG"
+          echo "[$(date '+%F %T %Z')] ⚠ SwapFree ${FREE_NOW_GB}G < ${SWAP_FREE_MIN_GB}G — ${SWAP_HITS}/${SWAP_DOG_CONFIRM}회째, 아직 안 내린다(연속이라야 내린다)" >> "$LOG"
         else
-          echo "[$(date '+%F %T %Z')] ⚠ 스왑 ${DROP_GB}G 증가(SwapFree 기준 · 시작 대비)가 연속 ${SWAP_DOG_CONFIRM}회 — 교사가 디스크로 밀려나는 중으로 보고 학습만 내린다" >> "$LOG"
+          echo "[$(date '+%F %T %Z')] ⚠ SwapFree ${FREE_NOW_GB}G < ${SWAP_FREE_MIN_GB}G가 연속 ${SWAP_DOG_CONFIRM}회 — 스왑 고갈 임박(OOM 위험)으로 보고 학습만 내린다" >> "$LOG"
           pkill -f "finetune_qlora14b.py" 2>/dev/null
           break
         fi
@@ -316,5 +349,14 @@ fi
 # ── 끝 상태 ───────────────────────────────────────────────────────────────
 say "교사(8080) health: $(teacher)  ·  임베딩(8081): $(curl -s -m 5 http://127.0.0.1:8081/health || echo '(응답 없음)')"
 say "메모리: $(mem)"
-say "요약 — 회전=$ROUND · 등급관문=${GATE:-미실행} · 굽기종료코드=$BAKE · 재료=$DATASET · 어댑터=$BAKE_OUT · 걸린보호=${GUARD:-굽지 않음}"
+# [2026-09-14 · r5b 첫 굽기] 스왑 감시견의 두 값을 상태 파일에서 읽는다(감시견은 서브셸이라
+#   그 안 변수를 여기서 직접 못 읽는다 — 위 SWAPDOG_STATE 주석 참고). 파일이 없으면(굽지 않은
+#   밤, 또는 감시견이 한 번도 못 돈 밤) 「?」로 적는다 — 못 잰 것을 0으로 적으면 거짓이다.
+if [ -f "$SWAPDOG_STATE" ]; then
+  SWAPDROP=$(awk -F= '/^swap_drop_max_gb=/{print $2}' "$SWAPDOG_STATE")
+  SWAPFREEMIN=$(awk -F= '/^swap_free_min_gb=/{print $2}' "$SWAPDOG_STATE")
+fi
+SWAPDROP=${SWAPDROP:-?}
+SWAPFREEMIN=${SWAPFREEMIN:-?}
+say "요약 — 회전=$ROUND · 등급관문=${GATE:-미실행} · 굽기종료코드=$BAKE · 재료=$DATASET · 어댑터=$BAKE_OUT · 걸린보호=${GUARD:-굽지 않음} · 최대 스왑 증가 ${SWAPDROP}G · SwapFree 최저 ${SWAPFREEMIN}G"
 say "════ 회전 5 $ROUND 본 굽기 끝 ════"
