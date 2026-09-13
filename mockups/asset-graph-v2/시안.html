@@ -227,22 +227,34 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
   <tr><td>상세판 h3(자산명)</td><td class="num">width 291.2 · height 23.0px</td><td>map-view.js:144</td></tr>
   <tr><td><b>칩(.mv-ask) — 지금 2개</b></td><td class="num"><b>각 33px · 합 66px</b></td><td><b>이 시안 밀도표(§7)의 기준값</b> — map-view.js:154,156</td></tr>
   <tr><td>좁히기 칩 줄(.mv-chip×5)</td><td class="num">높이 28px</td><td>inventory.html:190-193, 429-436</td></tr>
-  <tr><td>공격경로 겹층 — 기본 상태</td><td class="num">0개 그려짐(꺼짐 상태 아님, 경로 자체가 없던 순간)</td><td>실측 당시 데이터 상태 — 아래 §5 데모는 경로 있는 상태를 <b>구성 데이터</b>로 재현</td></tr>
+  <tr><td>공격경로 겹층 — 기본 상태</td><td class="num warnc">미실측(토글 기본 꺼짐 — 켜고 재지 않음)</td><td><b>검토관 [중] 재적발</b> — 이전 판 "경로 자체가 없던 순간"은 실측 원문을 뒤집어 적은 거짓이었다. <span class="file">inventory.html:1307</span> <code>let mapPathsOn = false; // 기본 꺼짐</code> — 겹층은 <code>if (mapPathsOn) drawPaths()</code>로만 그려진다(:1324,1340). 0개는 <b>토글이 꺼져 있어서</b>이지 경로 데이터 유무의 증거가 아니다 — 켠 뒤 다시 재는 절차는 이번 실측 범위 밖(수행 안 함, 추정도 없음). 아래 §5 데모는 경로 있는 상태를 <b>구성 데이터</b>로 재현</td></tr>
 </table>
 <p class="hint">⚠ 이 표 아래 §5 라이브 데모는 <b>가상 데이터</b>다 — 위 실측 px 값을 CSS로 그대로 재사용하되, 이 문서 자체가 렌더한 px를 새 증거로 쓰지 않는다(머리말 폰트 대체 경고 참조).</p>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-<h2>2. 칩 8종 — route-explain 실측으로 확정(⑨는 전부 버림, 새 예외표 줄 0개)</h2>
+<h2>2. 칩 8종 — route-explain 실측으로 확정(신설 6개는 결정적·기대도착 / 기존 ② 담당자 배정은 예외표 ⑨ 그대로, 새 줄 0개)</h2>
 <div class="box bad">
   <b>검토관 [상] 적발 — 이전 판은 4줄 중 3줄이 거짓이었다.</b> "담당부서 지정"·"SBOM 생성" 칩을 각각 "자산 정보 수정"·"AI-BOM 생성"이라 적고 결재판 "있음"으로 단정했지만,
   오늘 실측(<code>node tools/route-explain.mjs --no-build</code>, dist 16:04 &gt; src 00:31 — 낡지 않음)은 셋 다 <b>⑨(모델이 도구를 고름 — 결재판이 뜬다는 보장이 없다)</b>였다.
   <span class="file">screenguide.ts</span>의 <code>can:</code> 문장은 <b>제품이 한 약속</b>이지 도착 실측이 아니다(게다가 <code>\"</code> 이스케이프라 guidance-check 수확 정규식에 안 걸려 어느 관문도 재 본 적이 없다).
   이번 판은 약속이 아니라 <b>route-explain 실측만</b> 썼다.
 </div>
+<div class="box bad">
+  <b>검토관 [상] 재적발 — 표 밖 요약 문장이 표 안 ②행과 정면으로 어긋나 있었다.</b> 이 제목과 아래 문단은 "⑨는 전부 버림"·"여덟 문장 모두 두 치환에서 같은
+  도착이 나왔고 ⑨로 떨어진 것은 하나도 없었다"·"8개 전부 채택(전부 기대도착)"이라 적었지만, 바로 아래 표 ②행은 스스로 <b>"⑨ 모델 선택"</b>이라 적고 있고
+  그 칩은 <code>chipsForAsset</code>(미조치&gt;0 &amp;&amp; 담당없음일 때)이 실제로 화면에 그린다. 직접 재실측도 같다 —
+  <code>route-explain --no-build "GIJO AS 서버 취약점 담당자 배정해줘"</code> / "sample-web01 …" <b>둘 다 「걸리는 규칙 없음 → ⑨ 모델 선택」</b>이다.
+  "전부 기대도착"도 거짓이다 — ②는 <span class="file">guidance-destination.test.ts:185</span>의 <b>예외표(⑨)</b> 줄이지 기대도착표 줄이 아니다
+  (§12 :509는 새 문장 <b>6개</b>만 기대도착에 올린다고 맞게 적어, 이 절과 서로 어긋난 상태였다). 아래로 제목·문단을 표와 같게 고쳤다 — <b>⑨로 떨어지지
+  않은 6개(①③④⑤⑥⑦)만 기대도착</b>이고, <b>②는 ⑨인 채로 예외표 기존 줄을 그대로 쓴 것</b>이다(⑨가 아니라서 채택한 게 아니라, 이미 있는 줄이라 새로
+  안 늘려도 돼서 그대로 둔 것 — 상한 44/44와 무관하게 아무것도 안 늘었다는 점은 이전 판과 같다).
+</div>
 <p>
   아래 8개 후보 문장을 <code>route-explain --no-build</code>로 <b>전부 두 번씩</b> 쟀다 — 자리 1개짜리 ○○ 치환 열쇠(<code>guidance-check.mjs:71-72</code>) 그대로인
-  "GIJO AS 서버"와, 실제 이름꼴 "sample-web01" 둘 다. <b>여덟 문장 모두 두 치환에서 같은 도착</b>이 나왔고, <b>⑨로 떨어진 것은 하나도 없었다</b> —
-  그래서 8개 전부 채택했다(예외표 상한 44 소진과 무관하게 전부 <b>기대도착</b> 자리다). 노드 종류에 따라 붙는 위치는 다르다(③⑧은 자산이 아니라 방패 노드 전용).
+  "GIJO AS 서버"와, 실제 이름꼴 "sample-web01" 둘 다. <b>신설 6문장(①③④⑤⑥⑦)</b>은 두 치환 모두 같은 도착으로 확정됐고 <b>⑨로 떨어진 곳이 하나도 없다</b> —
+  그래서 이 6개는 예외표 상한 44와 무관한 <b>기대도착</b> 자리로 채택했다. <b>②는 기존 문구를 그대로 쓴 것</b>이라 새로 잰 것이 아니라 재확인이다 —
+  route-explain 실측도 두 치환 모두 <b>⑨(모델 선택)</b>로 나온다(<span class="file">guidance-destination.test.ts:185</span> 예외표의 기존 줄, 새 줄 아님).
+  노드 종류에 따라 붙는 위치는 다르다(③⑧은 자산이 아니라 방패 노드 전용).
 </p>
 <table class="t">
   <tr><th>#</th><th>문장(치환 전 → 치환 후)</th><th>붙는 노드</th><th>route-explain 실측 도착(글자 그대로)</th><th>결재판</th></tr>
@@ -255,6 +267,18 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
   <tr><td>⑦</td><td>"GIJO AS 서버 취약점 리포트 만들어줘" → "sample-web01 취약점 리포트 만들어줘"</td><td>자산</td><td class="file">[36] 특수경로 → generateReport(dispatcher.ts:2015-2024, <b>자산 이름이 assetIds로 실제 반영됨</b> — 승인 절차 없이 즉시 파일 생성)</td><td class="x">없음(승인 없이 즉시 생성)</td></tr>
   <tr><td>⑧</td><td>"GIJO AS 서버 점검 일정 알려줘" → "sample-web01 점검 일정 알려줘"</td><td>보안제품<b>만</b></td><td class="file">[37] 강제도구 → maintenance_status(write:false, registry.ts:1145)</td><td class="x">없음(읽기)</td></tr>
 </table>
+<div class="box bad">
+  <b>검토관 [중] 재적발 — ③ 배지 "데이터 의존"은 칩 문장이 <code>h.label</code>(한글 라벨)일 때는 성립하지 않는다, 그 칩은 늘 우리 서버 자신을 점검한다.</b>
+  안C 분기(<span class="file">agentloop.ts:3196-3198</span>)는 후보를 <b>「하이픈+식별자 또는 IPv4」 꼴 낱말</b>로만 뽑는다 — 공백으로 나뉜 한글 라벨
+  ("코어 스위치"·"지사 라우터")은 토큰이 갈라져 원리상 후보가 안 된다. 직접 재실측: <code>route-explain --no-build "코어 스위치 하드닝 점검 돌려줘"</code>
+  / "지사 라우터 하드닝 점검 돌려줘" → <b>[37] run_hardening_scan, 「여기로 갑니다」(확정, 데이터 의존 아님)</b> — 후보가 없으니
+  <span class="file">handlers.ts:2511 대상찾기()</span>(id 정확일치→label 정확일치→label/host 부분일치, 셋 다 본다)까지 가지도 못한다.
+  이 표 ③행의 "sample-web01"은 하이픈이 있어 후보가 되므로(<code>route-explain --no-build "192.0.2.1 하드닝 점검 돌려줘"</code>도 같은 이유로
+  「데이터가 겹치면 여기로」) <b>이 표의 측정 자체는 맞다</b> — 문제는 §4 데모 칩이 <code>h.label</code>로 문장을 만들고 있었다는 것이다. 그러면 지사
+  라우터를 눌러도 후보가 안 잡혀 <b>항상 우리 서버 자신을 점검</b>하게 된다(§10 안내의 "못 맞히면 자기 점검"이 예외가 아니라 유일한 결과가 됨). 고쳤다 —
+  §4 <code>showHardeningDetail</code>의 칩 문장을 <code>h.host</code>(IP, 후보 정규식에 걸리는 필드)로 바꿨다. h3 제목·타일 이름표는 사람이 읽을
+  <code>h.label</code>을 그대로 쓴다.
+</div>
 <div class="box warn">
   <b>뺀 것 — 실측 근거.</b> "○○ 자산 담당부서를 보안팀으로 지정해줘"·"○○ 자산 SBOM 생성해줘"는 오늘 실측에서 <b>⑨</b>로 떨어졌다 —
   <span class="file">guidance-destination.test.ts:175,178,193</span>이 같은 자리를 이미 예외표(⑨)로 적어 두었다. 새 예외표 줄을 만들면
@@ -266,6 +290,14 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
   실제 도착(문서 검색)이 어긋났다(<code>search</code>는 메뉴를 가로지르는 RAG 문서 검색이지 목록이 아니다). 새 문장 "취약점만 보여줘"가 [14] 목록 고르기로
   정확히 떨어져 그것으로 바꿨다.
 </p>
+<div class="box warn">
+  <b>검토관 [중] 재적발 — ⑤ 공격경로 칩도 같은 종류의 뜻-도착 어긋남인데, ①에 적용한 잣대가 그대로 안 옮겨졌다.</b> ①은 "옛 문장의 뜻과 실제 도착이
+  어긋난다"는 이유로 문장 자체를 바꿔 고쳤다. ⑤("{자산명} 공격 경로 보여줘")도 똑같다 — 도착 <code>formatAttackPaths()</code>
+  (<span class="file">analysishub.ts:760</span>)는 <b>인자가 아예 없고</b> 전체 이벤트로 계산해 상위 6건만 준다. 즉 <b>sample-web01의 칩을 눌러도
+  그 자산과 무관한 전사 상위 6건</b>이 온다. 이번엔 ①처럼 문장을 갈아엎지 않고 <b>§10 screenguide 초안(아래)에 한 줄을 더해</b> 정직화했다 — 자산
+  칩 목록에 자산 이름이 들어간 문장을 남겨 두는 편이 "노드 클릭 → 관련 칩" UX([9][2], §0)에 맞고, 대신 클릭했을 때 무엇이 오는지 미리 알리는 쪽을
+  택했다(문장을 "공격 경로 전체 보여줘"로 바꾸는 대안도 있었으나, 그러면 자산 상세판 안에 이름 없는 칩이 떠 있는 게 더 어색하다는 판단).
+</div>
 <div class="box">
   <b>구현 시 할 일(이 시안은 테스트 파일을 건드리지 않는다).</b> 새 문장 6개(①③④⑤⑥⑦ — ②는 기존 줄 재사용이라 제외)는
   <span class="file">tools/guidance-check.mjs</span>가 화면에서 그대로 수확한다(:37-43, .html/.js 전수) — 구현 커밋에서
@@ -278,10 +310,18 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
 <table class="t">
   <tr><th>등급</th><th>표시</th><th>이번에 그리는 것</th><th>원천</th></tr>
   <tr><td class="o">확정</td><td>실선(배지 없음)</td><td>공격경로 — <code>reachability==="확인됨"</code>(실제 공격 로그 관측)</td><td class="file">analysishub.ts:717,722</td></tr>
-  <tr><td class="o">등록</td><td>실선 + 「등록」 배지 — <b>방패가 보이면 항상</b>(🎯 공격경로 온/오프와 무관)</td><td>① 보안제품↔자산 (assetId 있음) ② 하드닝 대상 노드 자체의 「등록됨」 표기</td><td class="file">securityproducts.ts:66 / hardeningtargets.ts:89-92</td></tr>
+  <tr><td class="o">등록</td><td>실선 + 「등록」 배지 — <b>방패가 보이면 항상</b>(🎯 공격경로 온/오프와 무관)</td><td>보안제품↔자산 간선(assetId 있음)</td><td class="file">securityproducts.ts:66</td></tr>
   <tr><td class="warnc">추정</td><td>점선 + 「추정·N」 배지</td><td>공격경로 — <code>reachability==="높음"|"보통"</code>(점수 기반, 관측 아님)</td><td class="file">analysishub.ts:722</td></tr>
   <tr><td class="x">못 그림</td><td>점선 테두리 빈 자리 문구</td><td><b>보호 관계</b> — "이 방화벽이 어느 자산들을 지키나" · "이 하드닝 대상이 어느 자산인가"</td><td>등록 칸 없음 — <span class="file">securityproducts.ts</span>에 assetId는 <b>1개 자산 연결</b>뿐, 보호 범위 필드 없음. <span class="file">hardeningtargets.ts</span>는 assetId 필드 자체가 없음(publicTarget: id·label·host·port·username·authMethod·hasSecret·standard)</td></tr>
 </table>
+<div class="box warn">
+  <b>검토관 [하] 재적발 — 위 표는 <i>간선(선)</i>만 다룬다.</b> 이전 판은 "등록" 행에 하드닝 대상 타일 안 「점검 대상 등록됨」 표기
+  (시안.html:711 <code>&lt;div class="mv-sreg"&gt;점검 대상 등록됨&lt;/div&gt;</code>)를 <b>선과 나란히</b> 적어 두었는데, 그건 선이 아니라
+  <b>타일 안 글자 라벨</b>이다 — <code>drawOverlay()</code>의 등록 간선 루프(:1054-1066)는 <code>DATA.products</code>만 돌고 하드닝 타일까지는
+  선을 긋지 않는다. 같은 칸에 "선의 등급"과 "타일 라벨"을 함께 두면 §10 안내("등록: 실선+등록 배지")를 읽은 담당자가 하드닝 방패에서도 실선을
+  찾게 된다 — 표에서 뺐다. 하드닝 방패의 「점검 대상 등록됨」은 그 방패가 <b>스스로 등록돼 있다는 뜻</b>일 뿐, 어떤 자산과도 선으로 안 잇는다(위
+  "왜 하드닝→특정 자산 선을 안 긋나" 참조).
+</div>
 <div class="box bad">
   <b>왜 하드닝→특정 자산 선을 안 긋나(포기 아니라 판단).</b> 하드닝 대상은 <code>host</code>(IP)만 있고 <code>assetId</code>가 없다.
   이름·IP <b>부분 일치</b>로 자산을 찾는 함수(<span class="file">map-view.js:166-174 자산타일찾기</span>)가 이미 있지만, 그건 <b>서버가 이미 확정한 공격경로</b>를
@@ -383,7 +423,9 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
 <div class="box bad">
   <b>검토관 [중] 적발 — 이전 계산의 재료가 둘 빠져 있었다.</b> ⓐ <code>.mv-ask</code>는 <code>white-space:normal</code>로 <b>두 줄이 설계</b>인데
   (<span class="file">inventory.html:231</span>) 이전 판은 4칩을 전부 1줄 33px로 놓았다. ⓑ 칩마다 붙는 <code>.chiptag</code> 배지("결재판 있음"/"결재판 없음"/
-  "승인 창이 뜰 수 있습니다")가 계산에 아예 없었다. 이번엔 실측 칩 안쪽 폭(<b>269px</b> — §1 h3 291.2px에서 버튼 padding 20px을 뺀 값)에
+  "승인 창이 뜰 수 있습니다")가 계산에 아예 없었다. 이번엔 실측 칩 안쪽 폭(<b>269px</b> — §1 h3 291.2px에서 버튼 padding 20px과 테두리 1px×2를
+  뺀 값[291.2−20−2=269.2, 반올림 269. <b>검토관 [하] 재적발</b> — 이전 판은 "padding 20px을 뺀 값"이라 적었는데 291.2−20=271.2이지 269가
+  아니다. 숫자(269)는 맞았고 <b>유도 설명이 테두리를 빠뜨려 틀렸다</b>, 이번에 바로잡았다])에
   ○○=<code>sample-web01</code>(12자)을 넣은 실제 문장 길이를 대입해 다시 쟀다.
 </div>
 <table class="t">
@@ -400,12 +442,19 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
   Pretendard 실제 자간·커닝은 이 가정과 다를 수 있어 <b>구현 후 반드시 재실측</b>해야 한다(이 시안이 스스로 렌더한 px를 증거로 안 쓰는 것과 같은 이유).
   공교롭게도 8개 전부 "배지가 안 들어가 아래로 밀림" 결과가 나왔다 — 즉 사실상 <b>칩마다 2줄(문장 1줄+배지 1줄)</b>이 된다.
 </div>
+<div class="box bad">
+  <b>검토관 [하] 재적발 — 아래 표의 gap이 전부 제품 <code>.mv-side{gap:8px}</code> 기준이었는데, "제안" 상태는 그 gap을 안 쓴다.</b>
+  "지금"(칩 2개)은 실제로 <code>.mv-side</code>의 <b>직접 자식</b>이라 그 gap:8px가 맞다. 하지만 "제안"은 칩을 전부 <code>.chiprow</code>로
+  <b>한 번에 감싸</b>(시안.html:169 <code>.chiprow{gap:6px}</code>) 그 감싼 블록 하나가 <code>.mv-side</code>의 자식이 된다 — 칩과 칩 사이 간격을
+  내는 것은 <code>.mv-side</code>의 8px이 아니라 <code>.chiprow</code>의 <b>6px</b>이다. 아래는 6px로 다시 계산한 값이다(이전 판의 282px/340px/
+  +266px(+360%)는 8px로 계산한 과대 추정이었다).
+</div>
 <table class="t">
-  <tr><th>상태</th><th>칩 개수</th><th>버튼+배지 행 높이 합</th><th>gap 합(8px×(n-1))</th><th>총점유</th><th>태그</th></tr>
-  <tr><td>지금</td><td class="num">2</td><td class="num">66px</td><td class="num">8px</td><td class="num"><b>74px</b></td><td>실측(5.94.0) — 배지 없음, map-view.js:154,156</td></tr>
-  <tr><td>제안(담당 있음 — ②숨김, 5개)</td><td class="num">5</td><td class="num">250px</td><td class="num">32px</td><td class="num"><b>282px</b></td><td>추정·구현후재실측</td></tr>
-  <tr><td>제안(담당 없음 — ②표시, 6개)</td><td class="num">6</td><td class="num">300px</td><td class="num">40px</td><td class="num"><b>340px</b></td><td>추정·구현후재실측 — <b>최악 사례</b></td></tr>
-  <tr><td>증감(최악 사례 기준)</td><td class="num">+4</td><td class="num">+234px</td><td class="num">+32px</td><td class="num warnc"><b>+266px(+360%)</b></td><td>산식 = 340−74. 이전 판의 "+82px(+111%)"는 배지·2줄 설계를 안 셌던 <b>과소 추정</b>이었다(검토관 [중] 적발)</td></tr>
+  <tr><th>상태</th><th>칩 개수</th><th>버튼+배지 행 높이 합</th><th>gap 합</th><th>총점유</th><th>태그</th></tr>
+  <tr><td>지금</td><td class="num">2</td><td class="num">66px</td><td class="num">8px(.mv-side, n=2)</td><td class="num"><b>74px</b></td><td>실측(5.94.0) — 배지 없음, map-view.js:154,156</td></tr>
+  <tr><td>제안(담당 있음 — ②숨김, 5개)</td><td class="num">5</td><td class="num">250px</td><td class="num">24px(.chiprow 6px×4)</td><td class="num"><b>274px</b></td><td>추정·구현후재실측</td></tr>
+  <tr><td>제안(담당 없음 — ②표시, 6개)</td><td class="num">6</td><td class="num">300px</td><td class="num">30px(.chiprow 6px×5)</td><td class="num"><b>330px</b></td><td>추정·구현후재실측 — <b>최악 사례</b></td></tr>
+  <tr><td>증감(최악 사례 기준)</td><td class="num">+4</td><td class="num">+234px</td><td class="num">+22px</td><td class="num warnc"><b>+256px(+346%)</b></td><td>산식 = 330−74. 검토관 [하] 재적발로 gap을 6px(.chiprow)로 다시 계산 — 이전 판 "+266px(+360%)"는 gap을 8px(.mv-side)로 잘못 계산한 값이었다</td></tr>
 </table>
 <h3>② 방패 상세판 칩(신규 — 하드닝 대상엔 ③, 보안제품엔 ⑧ 1개씩)</h3>
 <table class="t">
@@ -427,8 +476,9 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
 </table>
 <h3>⑤ 상세판 전체 여유 확인(정성적 — 최악 사례로 다시 봄)</h3>
 <p>
-  상세판(.mv-side) 바깥 높이는 974.3px로 고정(부모 stretch, §1). 최악 사례(칩 340px)로 다시 합산하면 h3(23)+등급줄(≈35)+row 3개(≈35×3=105)+
-  item 3개(≈20×3=60)+칩 블록(340)+연결장비·보호범위 줄(≈40)+안내줄(≈19) ≈ <b>622px</b> — 이것도 <b>정밀 합계가 아니라 구성요소를 대충 더한 값</b>이다.
+  상세판(.mv-side) 바깥 높이는 974.3px로 고정(부모 stretch, §1). 최악 사례(칩 330px — 검토관 [하] 재적발로 340→330 정정)로 다시 합산하면
+  h3(23)+등급줄(≈35)+row 3개(≈35×3=105)+item 3개(≈20×3=60)+칩 블록(330)+연결장비·보호범위 줄(≈40)+안내줄(≈19) ≈ <b>612px</b> — 이것도
+  <b>정밀 합계가 아니라 구성요소를 대충 더한 값</b>이다.
   974.3px 안에는 들어갈 것으로 보이지만 예전 "+82px"보다 여유가 훨씬 얇아졌다. 더 근본적인 문제 — <span class="file">.mv-side</span>엔
   <code>overflow</code> 선언이 아예 없다(<span class="file">inventory.html:218</span>). 미조치 취약점이 많아 "먼저 볼 것" 항목이나 plain 설명이
   길어지는 실제 상황에서는 지금도 잠재적으로 넘칠 수 있는 자리였는데, 칩 블록이 4배 넘게 커지면 그 위험이 커진다 —
@@ -443,11 +493,16 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
   <b>검토자용 해설</b>이 화면 안에 그대로 렌더되고 있었다 — 지금은 둘 다 뺐고(§4 JS), 그 안내는 §10 screenguide 초안으로만 옮겼다.
   ② "새 판정 함수는 군집 임계값(40/200) 하나뿐"도 거짓이었다 — <code>호스트구획열쇠()</code>(하드닝 방패 배치)·방패 숨김 규칙·구획 자동 접기 규칙도
   전부 이 시안이 새로 만든 렌더링 규칙이다. 숫자를 고쳐 적는다.
+  ③ <b>재적발 — ①의 이관이 반쪽이었다.</b> "지킴(수리 후)"이라 적어 놓고도 <code>showAssetDetail</code>·<code>showProductDetail</code>·
+  <code>showHardeningDetail</code>의 칩·배지가 <code>title="[14] findingListAnswer(...)"</code>·<code>title="⑨ 모델 선택 — guidance-destination.test.ts:185"</code>류
+  <b>시험 파일 경로·줄 번호</b>를 그대로 달고 있었고, <code>showHardeningDetail</code>은 "어느 자산인가(assetId 필드 자체 없음)"·"§3 참조"로
+  <b>스키마 용어·문서 절 번호</b>를 화면에 노출했고, <code>showClusterDetail</code>은 "runZero식 details-on-demand[3]"로 <b>조사 각주</b>를 화면에
+  남겨 뒀다 — 담당자가 칩에 마우스를 올리면 시험 경로가 뜨는 꼴이었다. 전부 뺐다(§4 JS).
 </div>
 <table class="t">
   <tr><th>원칙</th><th>판정</th><th>근거</th></tr>
   <tr><td>입력칸 0개(화면은 보기용)</td><td class="o">지킴</td><td>클릭·토글만 있다. 텍스트 입력 요소 0개</td></tr>
-  <tr><td>안내는 ⓘ·screenguide로</td><td class="o">지킴(수리 후)</td><td>화면 안 사용법·검토자용 해설 문장 2곳을 뺐다(위 적발 ①) — 화면엔 정체성·경고·선택 로그만, 사용법은 §10 <code>screenguide.ts</code> panels["지도"] 확장 초안으로</td></tr>
+  <tr><td>안내는 ⓘ·screenguide로</td><td class="o">지킴(2차 수리 후)</td><td>화면 안 사용법·검토자용 해설 문장 2곳(위 적발 ①)에 이어, title= 툴팁의 시험 파일 경로·"assetId 필드 자체 없음"·"§3 참조"·"runZero식[3]" 각주(위 적발 ③, 검토관 재적발)까지 전부 뺐다 — 화면엔 정체성·경고·선택 로그만, 사용법·근거는 §10 <code>screenguide.ts</code> panels["지도"] 확장 초안과 이 문서 §2 표로만</td></tr>
   <tr><td>지시는 대화창(칩=selectnotify 규격)</td><td class="o">지킴</td><td>방패 클릭은 <b>기존 코드와 같은 selectnotify 호출 규격</b>(products.html:769, hardening.html:308 — 다만 <code>fields.status</code> 값은 지도에 재료가 없어 항상 빈 문자열이다, 아래 참조). 자산 칩은 기존 .mv-ask+askConsole 패턴 확장</td></tr>
   <tr><td>정직성 — 추정 표시</td><td class="o">강화</td><td>확정/등록/추정 3단 표기 신설(§3) + 칩 결재판 배지를 <b>실측 근거(write:true·registry.ts)가 있을 때만</b> "있음"으로 적고, 나머지는 "승인 창이 뜰 수 있습니다"로 낮췄다(§2 route-explain 실측 — 이전 판은 ⑨인 것도 "있음"이라 단정했었다)</td></tr>
   <tr><td>단일 출처 — 위험 판정 0개 신설, 렌더 배치 규칙 4개 신설</td><td class="o">지킴(표현 정정)</td><td>riskOf·activeFindings·reachability·assetId 등 <b>위험·관계 판정은 전부 그대로 재사용</b>했다. 다만 <b>렌더 배치 규칙은 4개</b> 새로 만들었다 — 군집 임계값(40/200)·구획 자동 접기(3개 초과)·방패 숨김(필터 칩 켜지면)·호스트구획열쇠(하드닝 대상을 자기 <code>host</code> 값의 대역에 배치). 넷 다 "이미 있는 값을 어떻게 늘어놓을까"이지 "무엇이 위험한가·무엇이 무엇과 관계있는가"를 새로 판단하지 않는다(§3 박스에서 호스트구획열쇠의 이 구분을 자세히 적었다)</td></tr>
@@ -472,7 +527,8 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
 방패를 클릭하면 이름이 대화창에 선택으로 담깁니다 — 이어서 궁금한 것을 물어보세요(예: 보안제품이면 "점검 일정 알려줘", 하드닝 대상이면 "하드닝 점검 돌려줘").
 간선은 세 가지입니다 — **확정**(실선, 실제 공격 신호가 관측된 경로) · **등록**(실선+등록 배지, 보안제품이 특정 자산에 연결 등록된 관계 — 방패가 보이면 공격경로 표시와 무관하게 항상 그려집니다) · **추정**(점선+추정 배지, 점수로 계산된 경로로 실제 관측은 아닙니다).
 ⚠ **못 그리는 것도 있습니다** — "이 방화벽이 정확히 어느 자산들을 지키는가"는 등록 칸이 없어 지도가 모릅니다. 방패 옆 점선 빈 자리가 그 뜻입니다. 하드닝 점검 대상도 같은 이유로 특정 자산과 선으로 잇지 않습니다(대역만 같습니다 — 배치는 그 대상 자신의 등록된 host 값 기준입니다).
-⚠ 하드닝 점검 대상에서 "하드닝 점검 돌려줘"를 물으면, 등록된 원격 장비와 이름이 실제로 맞을 때만 그 장비에 접속합니다 — 못 맞히면 우리 서버 자신을 점검합니다(승인 창이 뜨는지 여부도 그때 갈립니다)."
+⚠ 하드닝 점검 대상에서 "하드닝 점검 돌려줘"를 물으면, 등록된 원격 장비와 이름이 실제로 맞을 때만 그 장비에 접속합니다 — 못 맞히면 우리 서버 자신을 점검합니다(승인 창이 뜨는지 여부도 그때 갈립니다).
+⚠ "공격 경로 보여줘"는 **그 자산만의 경로가 아니라 전체에서 가장 급한 상위 6건**입니다 — 자산 상세판에서 물어도 답은 회사 전체 기준입니다."
 </div>
 <p class="hint">PANEL_ALIASES(screenguide.ts:154) 후보: <code>{"보안장비":"지도","방패":"지도","보호 관계":"지도"}</code> — 구현 시 함께 검토.</p>
 
@@ -484,37 +540,57 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
   「히트맵 보기」에서 그대로 쓴다(<span class="file">analysis.html:448-450</span>은 <code>heatmapData</code>만 써서 무관하다).
   범위를 한 곳으로 확정한다 — <b>자산 화면 지도 탭 + 취약점 화면 히트맵 보기, 둘 다</b>가 이번 변경의 영향범위다.
 </div>
+<div class="box bad">
+  <b>검토관 [상] 재적발 — ⑥⑦ 리포트/조치 요청서 칩은 "새로운 위험은 아니다"가 거짓이다, 이 화면에서 승인 없이 전사(全社) 리포트를 만들 수 있다.</b>
+  ⑦(취약점 리포트 만들어줘)의 도착 <code>generateReport</code>는 <span class="file">dispatcher.ts:2023-2024</span>에서
+  <code>listAssets().find(a =&gt; instructionText.includes(a.name) || instructionText.includes(a.id))</code>로 지목한 이름을 찾고,
+  못 찾으면 <code>assetIds: undefined</code> — <b>범위 없는 전체 리포트가 결재판 없이 즉시 생성</b>된다. 되묻기 관문(<code>needsReportDetail</code>,
+  <span class="file">dispatcher.ts:410-414</span>)도 칩 문장에 "취약점"이 있어 항상 통과해 못 막는다. 담당자는 "이 호스트 리포트"를 눌렀는데
+  전사 리포트 파일이 결재판 없이, 되돌리기도 없이 생긴다. ⑥(조치 요청서, <code>create_request_doc</code>)은 admin 결재판(write:true)이 받쳐
+  주므로 승인 없이 실행되지는 않지만, 애초에 존재하지 않거나 이름이 안 맞는 자산을 향해 요청서를 만드는 것 자체가 잘못이라 <b>같은 이유로 함께 가린다</b>
+  (①③④⑤는 read-only라 위험 성격이 안 바뀐다).
+</div>
 <table class="t">
   <tr><th>퍼지는 것</th><th>vulnscan.html "히트맵 보기"에서 실제로 일어나는 일</th><th>구현 시 처리</th></tr>
-  <tr><td>새 칩 6개(§2 ①③④⑤⑥⑦)</td><td><code>detailHtml()</code> 확장을 그대로 물려받아 <b>히트맵 상세판에도 뜬다.</b> 이 화면 대상은 등록 자산이 아니라 <code>hostCache</code>의 스캔 호스트다 — 새로운 위험은 아니다(기존 칩 2개도 이미 이 화면에 붙어 있었다, <span class="file">vulnscan.html:632</span>) — 다만 폭이 2→최대 6개로 는다</td><td><code>ctx.products</code>·<code>ctx.hardening</code>이 없을 때 <code>||[]</code>로 방어 필수(가드 없으면 <code>DATA.products.forEach</code> 부류가 자바스크립트 에러를 던져 화면이 통째로 깨진다)</td></tr>
-  <tr><td>구획 자동 접기(3개 초과 시 1개만)</td><td>vulnscan 히트맵은 지금 접기 기능이 <b>0건</b>이다 — 이번 변경으로 처음 생긴다. 구획이 많은 스캔 결과에서 화면 대부분이 접힌 채로 시작된다</td><td>vulnscan.html에서 구획 3개를 넘는 실제 스캔 결과가 있는지 구현 전 실측 필요(설계관 확인 항목에 추가)</td></tr>
-  <tr><td>방패(보안장비) 타일 + 등록 간선</td><td><code>ctx</code>에 products/hardening을 안 주므로(위 가드 전제) <b>안 뜬다</b> — 두 화면이 이 지점에서는 다른 그림이 된다</td><td>의도된 차이로 문서화(스캔 결과는 등록 자산이 아니라 "등록된 보안장비"와 엮을 근거가 약하다)</td></tr>
+  <tr><td>새 칩 3개(§2 ①④⑤ — 읽기전용)</td><td><code>detailHtml()</code> 확장을 그대로 물려받아 <b>히트맵 상세판에도 뜬다.</b> 전부 read-only(결재판 없음)라 위험 성격이 안 바뀐다(기존 칩 2개도 이미 이 화면에 붙어 있었다, <span class="file">vulnscan.html:632</span>) — 폭만 2→최대 4개(②까지 포함 시)로 는다. ③⑧(방패 칩)은 애초에 못 뜬다 — 아래 「방패 타일」 행 참조</td><td><code>ctx.products</code>·<code>ctx.hardening</code>이 없을 때 <code>||[]</code>로 방어 필수(가드 없으면 <code>DATA.products.forEach</code> 부류가 자바스크립트 에러를 던져 화면이 통째로 깨진다)</td></tr>
+  <tr><td class="x">새 칩 2개(§2 ⑥⑦ — 쓰기) · <b>새로운 위험</b></td><td>위 박스 참조 — ⑦은 미등록/이름불일치 호스트에서 승인 없는 전사 리포트, ⑥은 그런 자산을 향한 요청서 생성</td><td><b>구현 규칙 — 칩 ⑥⑦은 <code>ctx.registered</code>(등록 자산 id가 확실한 컨텍스트)일 때만 보인다.</b> <span class="file">inventory.html</span>의 <code>renderMap()</code>은 <code>ctx.registered=true</code>, <span class="file">vulnscan.html</span>의 히트맵 렌더는 <code>ctx.registered=false</code>로 주입해 화면째로 가른다(개별 호스트 단위 판정이 아니라 화면 단위 — 이름 매칭 성공 여부에 기대지 않는다)</td></tr>
+  <tr><td>구획 자동 접기(3개 초과 시 1개만)</td><td class="o"><b>검토관 [중] 재적발 — 원리상 발화하지 않는다(구 판이 틀렸다).</b> <span class="file">map-view.js:77-81</span>의 flat 모드는 구획을 <code>Map</code>에 <b>"취약점 있는 자산 — 심각도 순" 한 개로만</b> 채운다 — 3개는커녕 2개가 될 수도 없다. 없는 위험을 §12 설계관 확인 항목으로 올렸던 것도 함께 뺀다</td><td>해당 없음(트리거 불가능) — 아래 「군집」 행이 실제로 걸리는 규칙이다</td></tr>
+  <tr><td>군집(총노드&gt;200 &amp; 구획 타일&gt;40) — <b>신규 위험(빠져 있었다)</b></td><td>vulnscan은 flat이라 <b>호스트 전부가 구획 1개에 몰린다</b> — 자산 화면과 달리 대역별로 안 나뉘어 40개 문턱을 훨씬 쉽게 넘는다. 스캔 대상이 45개만 넘어도(오늘 실측 자산 수 §1) 절반 가까이가 "+N개 더" 군집으로 접혀, 지금 있는 대로 다 펼쳐 보이던 vulnscan 화면의 행동이 바뀐다</td><td>vulnscan에서 40개 넘는 실제 스캔 결과가 흔한지 구현 전 실측 필요(설계관 확인 항목에 추가 — 아래)</td></tr>
+  <tr><td>방패(보안장비) 타일 + 등록 간선</td><td><code>ctx</code>에 products/hardening을 안 주므로(위 가드 전제) <b>안 뜬다</b> — 두 화면이 이 지점에서는 다른 그림이 된다. ③⑧ 방패 칩도 방패 타일이 없으니 함께 안 뜬다</td><td>의도된 차이로 문서화(스캔 결과는 등록 자산이 아니라 "등록된 보안장비"와 엮을 근거가 약하다)</td></tr>
+  <tr><td>CSS 사본 — <b>빠져 있던 위험</b></td><td><span class="file">vulnscan.html:10-28</span>은 <code>.mv-*</code> CSS를 <b>따로 복사해</b> 갖고 있다 — 새 클래스(<code>.chiptag</code>·<code>.chiprow</code>·<code>.mv-sub</code>·<code>.mv-noedge</code>·<code>.mv-cluster</code>·<code>.fold-ic</code>/<code>.fold-cnt</code>)가 이 사본엔 <b>하나도 없다</b>(게다가 <code>.mv-ask</code>에 :231의 <code>white-space:normal</code>도 없다). 안 채우면 "결재판 없음" 배지가 민무늬 글자로, 칩 문장이 잘려 뜬다</td><td>새 클래스를 <span class="file">vulnscan.html</span> CSS 사본에도 똑같이 추가 — §12 구현표에 이 행을 새로 넣는다(아래)</td></tr>
 </table>
 <p class="hint">
   ⚠ "두 화면에서 같은 그림이 나오는가"는 <b>부분적으로만 그렇다</b> — 칩·접기 규칙은 같은 코드라 같지만, 방패·등록 간선은 vulnscan에
-  주입이 없어 <b>안 나온다</b>. 정확한 서술은 "칩·접기는 공유, 방패·간선은 자산 화면 전용"이다. 이번 §1 실측은 inventory.html만 쟀고
-  vulnscan.html의 실제 렌더는 <b>미실측</b>이다(구현 전이라 잴 화면이 없다) — 구현 뒤 두 화면을 CDP로 나란히 재는 것을 §12 설계관
-  확인 항목에 넣는다.
+  주입이 없어 <b>안 나온다</b>. 정확한 서술은 "읽기전용 칩·군집은 공유, ⑥⑦ 쓰기 칩·방패·간선은 자산 화면 전용"이다. 이번 §1 실측은
+  inventory.html만 쟀고 vulnscan.html의 실제 렌더는 <b>미실측</b>이다(구현 전이라 잴 화면이 없다) — 구현 뒤 두 화면을 CDP로 나란히
+  재는 것을 §12 설계관 확인 항목에 넣는다. 밀도도 그대로 옮겨 쓸 수 없다 — vulnscan의 <code>.mv-side</code>는 <b>300px</b>
+  (<span class="file">vulnscan.html:24</span>)로 §8의 320px 기준보다 좁아 칩이 더 빡빡하게 밀린다(§8 재실측은 inventory.html 기준값이라
+  vulnscan엔 별도 재실측이 필요하다).
 </p>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2>12. 구현 시 참고 — 파일:줄 후보(설계관 확인 필요, 이 시안은 수정하지 않음)</h2>
 <table class="t">
   <tr><th>파일</th><th>줄</th><th>지금</th><th>할 일(제안)</th></tr>
-  <tr><td class="file">client/src/renderer/pages/map-view.js</td><td>133-160</td><td><code>detailHtml()</code> — 칩 2개(배지 없음)</td><td>칩 최대 4개 순증(§2 ①④⑤⑥⑦ 신설, ②는 기존 유지) + 결재판 배지(있음/없음/승인 창이 뜰 수 있습니다). "담당부서 지정"·"SBOM 생성"은 ⑨라서 <b>뺐다</b>(§2)</td></tr>
-  <tr><td class="file">client/src/renderer/pages/map-view.js</td><td>44-70</td><td>구획열쇠·타일()</td><td>방패용 <code>방패타일()</code> 신설(진짜취약 없음 대응), 기존 함수는 안 건드림. 방패 상세판엔 ③(하드닝 대상)·⑧(보안제품) 칩 1개씩</td></tr>
-  <tr><td class="file">client/src/renderer/pages/inventory.html</td><td>1316-1342</td><td><code>renderMap()</code> — assets만 주입</td><td>securityProducts·hardeningTargets를 함께 불러 ctx에 추가 주입(새 API 호출 2개: listSecurityProducts, GET /api/hardening/targets)</td></tr>
-  <tr><td class="file">client/src/renderer/pages/vulnscan.html</td><td>334-363</td><td><code>render(flat)</code>·<code>detailHtml</code> 호출 — products/hardening 미주입</td><td>§11 가드(<code>||[]</code>) 적용 확인 — 방패·등록 간선은 이 화면에 <b>의도적으로</b> 안 뜨게 둔다</td></tr>
+  <tr><td class="file">client/src/renderer/pages/map-view.js</td><td>133-160</td><td><code>detailHtml()</code> — 칩 2개(배지 없음)</td><td>칩 최대 4개 순증(§2 ①④⑤⑥⑦ 신설, ②는 기존 유지) + 결재판 배지(있음/없음/승인 창이 뜰 수 있습니다). "담당부서 지정"·"SBOM 생성"은 ⑨라서 <b>뺐다</b>(§2). <b>⑥⑦은 <code>ctx.registered</code>일 때만</b> 렌더 — 미주입(또는 false)이면 이 두 칩은 배열에서 통째로 뺀다(§11)</td></tr>
+  <tr><td class="file">client/src/renderer/pages/map-view.js</td><td>44-70</td><td>구획열쇠·타일()</td><td>방패용 <code>방패타일()</code> 신설(진짜취약 없음 대응), 기존 함수는 안 건드림. 방패 상세판엔 ③(하드닝 대상)·⑧(보안제품) 칩 1개씩 — ③ 칩 문장은 <code>h.label</code>이 아니라 <code>h.host</code>로(§2 재적발 — 후보 정규식은 IPv4/하이픈꼴만 본다)</td></tr>
+  <tr><td class="file">client/src/renderer/pages/inventory.html</td><td>1316-1342</td><td><code>renderMap()</code> — assets만 주입</td><td>securityProducts·hardeningTargets를 함께 불러 ctx에 추가 주입(새 API 호출 2개: listSecurityProducts, GET /api/hardening/targets) + <code>ctx.registered = true</code></td></tr>
+  <tr><td class="file">client/src/renderer/pages/vulnscan.html</td><td>334-363</td><td><code>render(flat)</code>·<code>detailHtml</code> 호출 — products/hardening 미주입</td><td>§11 가드(<code>||[]</code>) 적용 확인 — 방패·등록 간선은 이 화면에 <b>의도적으로</b> 안 뜨게 둔다. <code>ctx.registered = false</code> 명시 주입(⑥⑦ 칩을 이 화면에서 가리는 스위치, §11)</td></tr>
+  <tr><td class="file">client/src/renderer/pages/vulnscan.html</td><td>10-28</td><td><code>.mv-*</code> CSS <b>사본</b> — 새 클래스 0개(§11 재적발)</td><td><code>.chiptag</code>·<code>.chiprow</code>·<code>.mv-sub</code>·<code>.mv-noedge</code>·<code>.mv-cluster</code>·<code>.fold-ic</code>/<code>.fold-cnt</code>·<code>.mv-ask{white-space:normal}</code>을 이 사본에도 추가(안 하면 배지·칩 문장이 민무늬로 뜬다)</td></tr>
   <tr><td class="file">server/src/engine/screenguide.ts</td><td>1066-1067</td><td>panels["지도"] 문장</td><td>§10 초안 이어 붙이기</td></tr>
   <tr><td class="file">server/test/guidance-destination.test.ts</td><td>기대도착 표</td><td>새 문장 미등록</td><td>§2 새 문장 6개(①③④⑤⑥⑦)를 기대도착에 추가(예외표 아님·상한 44 무관)</td></tr>
 </table>
 <div class="box bad">
-  <b>⚠ 설계관에 먼저 물을 것(3건).</b><br>
+  <b>⚠ 설계관에 먼저 물을 것(4건 — ②는 이번 재검토로 교체됐다).</b><br>
   ① <span class="file">hardeningtargets.ts:301</span>의 <code>GET /api/hardening/targets</code>는 <code>adminMiddleware</code>가
   아니라 <code>authMiddleware</code>만 걸려 있어 일반 사용자도 읽을 수 있는지, 지도 탭(전체 사용자용)에서 <code>hasSecret</code> 등 민감 필드가
   섞여 나가는지 <b>실제 응답을 뜯어 확인</b>한 뒤 착수해야 한다 — 이번 정찰에서 응답 바디 전체를 실측하지 않았다.<br>
-  ② §11의 vulnscan.html 영향(구획 자동 접기가 처음 생기는 것)이 그 화면 실사용자에게 <b>부작용 있는 행동 변화</b>인지 확인.<br>
-  ③ §8⑤에서 제안한 <code>.mv-side{overflow-y:auto}</code> 방어 추가가 기존 어느 화면 스타일과도 안 부딪히는지 확인.
+  ② <s>구획 자동 접기가 vulnscan에 처음 생기는 것 확인</s> — 삭제(검토관 재적발: flat 모드는 구획이 항상 1개뿐이라 원리상 발화 안 함, §11).
+  대신 <b>군집 규칙(총노드&gt;200 &amp; 타일&gt;40)이 vulnscan 대량 스캔에서 실제로 얼마나 자주 걸리는지</b>, 걸렸을 때 "40개 이후 스크롤" UX가
+  그 상황(수백 건 스캔 결과)에 맞는지 확인.<br>
+  ③ §8⑤에서 제안한 <code>.mv-side{overflow-y:auto}</code> 방어 추가가 기존 어느 화면 스타일과도 안 부딪히는지 확인.<br>
+  ④ <b>⑥⑦ 칩의 <code>ctx.registered</code> 게이팅이 화면 단위로 충분한지</b>(vulnscan은 항상 false) — inventory.html 쪽에서도 담당자가
+  ○○ 이름을 잘못 입력해 <code>listAssets().find</code>가 실패하는 경우까지 막을지, 아니면 화면 단위 게이팅으로 충분하다고 볼지 확인.
 </div>
 
 <div class="foot">시안 파일: <code>mockups/asset-graph-v2/시안.html</code> · 제품 코드 미수정 · 승인 후 <code>gijo-architect</code> 설계관 검토를 거쳐 구현</div>
@@ -915,8 +991,9 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
     html += '<div class="mv-row"><div class="mv-lbl">🛡 보호 범위(이 자산을 지키는 장비들이 지도 전체에서 어떤 다른 자산까지 지키는가)</div><span class="mv-noedge">등록 칸 없음 — 등록하면 나타납니다</span></div>';
     html += '<div class="chiprow">' + chipsForAsset(a).map(function(c){
       var b = BADGE[c.badge];
-      return '<div><button class="mv-ask" data-text="'+esc(c.text)+'" title="'+esc(c.note)+'">💬 "'+esc(c.text)+'"</button>'
-        + '<span class="chiptag '+b.cls+'" title="'+esc(c.note)+'">'+b.label+'</span></div>';
+      // note(route-explain 근거)는 §2 표에만 쓴다 — 여기서 title=로 다시 노출하지 않는다(검토관 재적발).
+      return '<div><button class="mv-ask" data-text="'+esc(c.text)+'">💬 "'+esc(c.text)+'"</button>'
+        + '<span class="chiptag '+b.cls+'">'+b.label+'</span></div>';
     }).join('') + '</div>';
     html += '<div class="mv-hint">지시는 전부 대화창을 거칩니다 — 지도는 보기 전용입니다.</div>';
     var side = document.getElementById("mapSide");
@@ -927,6 +1004,13 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
   // ⚠ 검토관 [중] 수리 — 아래 두 함수에 있던 화면 안 사용법 문장("이거 쉽게 설명해줘"처럼 이어 물으세요)과
   // 검토자용 해설("...의 실제 selectnotify 계약 그대로 — 새 문법 아님")을 뺐다. 그 내용은 §10 screenguide
   // 초안으로 옮겼다 — 화면엔 정체성·경고·칩만 둔다는 원칙 때문이다.
+  // ⚠⚠ 검토관 [중] 재적발(같은 원칙, 다른 자리) — 이관이 반쪽이었다. showAssetDetail·showProductDetail·
+  // showHardeningDetail의 title= 툴팁("[14] findingListAnswer(...)"·"⑨ 모델 선택 —
+  // guidance-destination.test.ts:185" 등 시험 파일 경로·줄 번호)과 showHardeningDetail의 "assetId 필드
+  // 자체 없음"·"§3 참조", showClusterDetail의 "runZero식 details-on-demand[3]" 각주가 화면에 그대로
+  // 남아 있었다 — 담당자가 칩에 마우스를 올리면 시험 파일 경로가 뜨는 꼴이다. 전부 뺐다. route-explain
+  // 근거는 이 문서 §2 표에만 남기고, 화면엔 title 자체를 안 붙인다(note 필드는 이 코드를 읽는 사람을
+  // 위한 주석 값으로만 남긴다 — DOM에는 다시 렌더하지 않는다).
   function showProductDetail(p){
     var side = document.getElementById("mapSide");
     var b8 = BADGE.none; // ⑧ maintenance_status는 write:false — 결재판 없음(§2 실측)
@@ -935,7 +1019,7 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
       + '<div class="mv-row"><div class="mv-lbl">연결 자산</div>'+(p.assetName?('🔗 '+esc(p.assetName)+' <span class="chiptag noappr">등록</span>'):'<span class="mv-noedge">등록하면 나타납니다</span>')+'</div>'
       + '<div class="mv-row"><div class="mv-lbl">매뉴얼 문서</div>'+(p.docs.length? p.docs.length+"건" : "없음")+'</div>'
       + '<div class="mv-row"><div class="mv-lbl">🛡 보호 범위(이 제품이 지키는 자산 <b>전체</b> 목록)</div><span class="mv-noedge">등록 칸 없음 — 등록하면 나타납니다</span></div>';
-    html += '<div class="chiprow"><div><button class="mv-ask" data-text="'+esc(p.name+" 점검 일정 알려줘")+'" title="[37] maintenance_status(write:false)">💬 "'+esc(p.name+" 점검 일정 알려줘")+'"</button>'
+    html += '<div class="chiprow"><div><button class="mv-ask" data-text="'+esc(p.name+" 점검 일정 알려줘")+'">💬 "'+esc(p.name+" 점검 일정 알려줘")+'"</button>'
       + '<span class="chiptag '+b8.cls+'">'+b8.label+'</span></div></div>';
     html += '<div class="mv-hint">지시는 전부 대화창을 거칩니다 — 지도는 보기 전용입니다.</div>';
     side.innerHTML = html;
@@ -944,11 +1028,16 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
   function showHardeningDetail(h){
     var side = document.getElementById("mapSide");
     var b3 = BADGE.maybe; // ③은 데이터 의존(self=write:false vs scan_hardening_target=write:true·admin) — §2 실측
+    // ⚠ 검토관 [중] 재적발 — 칩 문장은 h.label(한글 라벨, "코어 스위치" 등)이 아니라 h.host(IP)로
+    //   만든다. 안C 후보 정규식(agentloop.ts:3196-3198, 하이픈+식별자 또는 IPv4)은 공백 섞인 한글
+    //   라벨을 후보로 뽑지 못해 h.label을 쓰면 늘 self 점검으로 확정된다(실측: "코어 스위치 하드닝
+    //   점검 돌려줘" → [37] 확정. "192.0.2.1 하드닝 점검 돌려줘" → 데이터 의존). h3 제목·타일 이름표는
+    //   사람이 읽을 h.label을 그대로 쓰고, 칩 문장만 h.host를 쓴다.
     var html = "<h3>🛡 "+esc(h.label)+"</h3>"
       + '<div class="mv-row"><div class="mv-lbl">기준</div>'+esc((h.standard||"").toUpperCase())+'</div>'
       + '<div class="mv-row"><div class="mv-lbl">등록 상태</div>등록됨 <span class="chiptag noappr">등록</span></div>'
-      + '<div class="mv-row"><div class="mv-lbl">어느 자산인가(assetId 필드 자체 없음)</div><span class="mv-noedge">이름 일치로 추정하지 않음 — §3 참조</span></div>';
-    html += '<div class="chiprow"><div><button class="mv-ask" data-text="'+esc(h.label+" 하드닝 점검 돌려줘")+'" title="[37] run_hardening_scan(self) 또는 등록 대상 일치 시 scan_hardening_target(admin) — 데이터 의존">💬 "'+esc(h.label+" 하드닝 점검 돌려줘")+'"</button>'
+      + '<div class="mv-row"><div class="mv-lbl">연결된 자산</div><span class="mv-noedge">특정 자산과 연결하지 않습니다 — 대역(네트워크)에만 놓입니다</span></div>';
+    html += '<div class="chiprow"><div><button class="mv-ask" data-text="'+esc(h.host+" 하드닝 점검 돌려줘")+'">💬 "'+esc(h.host+" 하드닝 점검 돌려줘")+'"</button>'
       + '<span class="chiptag '+b3.cls+'">'+b3.label+'</span></div></div>';
     html += '<div class="mv-hint">지시는 전부 대화창을 거칩니다 — 지도는 보기 전용입니다.</div>';
     side.innerHTML = html;
@@ -962,7 +1051,7 @@ table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-sp
     }).join('');
     side.innerHTML = '<h3>+'+list.length+'개 — 군집 펼침</h3>'
       + '<div style="overflow:auto;max-height:800px">'+rows+'</div>'
-      + '<div class="mv-hint">40개를 넘는 나머지를 여기서 스크롤로 봅니다 — runZero식 details-on-demand[3].</div>';
+      + '<div class="mv-hint">40개를 넘는 나머지를 여기서 스크롤로 봅니다.</div>';
   }
 
   // ── 공격경로 겹층(확정/추정 구분 — §3) ─────────────────────────────
