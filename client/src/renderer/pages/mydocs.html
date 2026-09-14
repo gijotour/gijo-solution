@@ -348,6 +348,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
 .wline .act{flex:0 0 auto;}
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn:disabled:hover{border-color:var(--border-strong);}
+/* ⚠ 불투명도는 **곱해진다**(2026-09-14 검토관 [하]) — .wline.disabled(.55) 안의 .btn:disabled(.55)는
+   실효 0.55×0.55≈0.30이라 「쓰기」 글자가 거의 안 보인다. 그러면 「숨김 → 흐리게+이유」 결정의
+   절반이 사실상 숨김으로 되돌아간다. 줄 쪽 .55만 남기고 단추 쪽 곱은 끊는다. */
+.wline.disabled .btn:disabled{opacity:1;}
 </style>
 </head>
 <body class="g-ui">
@@ -1167,7 +1171,10 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       //     redteam.html:313과 같은 관례 — mydocs.html이 「숨기고 안내문」 쪽 유일한 예외였다).
       var 잠금이유 = "관리자만 쓸 수 있습니다 — 회사 지식은 모두가 검색하는 자리라 쓰기는 관리자에게만 엽니다.";
       var 줄 = function (표식, 아이콘, 제목, 설명, 칩class, 칩글, 단추, 잠김) {
-        var 타이틀 = 잠김 ? 잠금이유 : (제목 + " — " + 설명);
+        // ⚠ 잠긴 줄이라고 설명을 **빼앗지 않는다**(2026-09-14 검토관 [하]) — .ds는 nowrap+ellipsis라
+        //   목록 폭 399px에서 잘린다. 잠금이유로 **대체**하면 일반 담당자(다수)는 🩹·📄 두 줄의
+        //   설명을 제품 어디서도 못 읽는다(승인 시안 §3이 「title에 설명을 그대로 채운다」고 약속한 자리).
+        var 타이틀 = 제목 + " — " + 설명 + (잠김 ? " · " + 잠금이유 : "");
         return '<div class="wline' + (잠김 ? " disabled" : "") + '" data-w="' + 표식 + '" title="' + esc(타이틀) + '">' +
           '<span class="ic">' + 아이콘 + '</span>' +
           '<span class="tx"><span class="tt">' + esc(제목) + '</span><span class="ds">' + esc(설명) + '</span></span>' +
@@ -1175,7 +1182,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
           '<span class="act">' + 단추 + '</span></div>';
       };
       list.innerHTML = '<div class="g-rows-flat">' +
-        줄("new", "📝", "새 문서 쓰기", "업무 템플릿 8종 · 캡처 붙여넣기 · 판 이력", "mine", "내 문서",
+        // ⚠ 「8종」이라 쓰지 않는다(2026-09-14 검토관 [하]) — 원천은 TEMPLATES(:878, 7개)이고
+        //   빈 문서(TEMPLATE_BLANK)는 업무 템플릿이 아니다. 서랍 칩이 8개인 것은 빈 문서를
+        //   더한 수라 게시 관문(publish-gate-ui.mjs:453,456)이 8로 세는 것과 어긋나지 않는다.
+        //   화면 :406 title·안내(screenguide.ts:938)가 모두 「7종」이라 여기만 8이면 잣대가 둘이 된다.
+        줄("new", "📝", "새 문서 쓰기", "업무 템플릿 7종 + 빈 문서 · 캡처 붙여넣기 · 판 이력", "mine", "내 문서",
            '<button class="btn primary" id="goNewDoc">＋ 새 문서</button>', false) +
         줄("fix", "🩹", "장애노트 작성", "제품이 멈췄던 일과 해결 방법을 그대로 저장 (관리자)", "know", "회사 지식",
            '<button class="btn" id="goEnrichFix"' + (관리자인가 ? "" : " disabled") + '>쓰기</button>', !관리자인가) +
@@ -1243,7 +1254,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
         : '<div class="empty">' + (오래된서버
           ? "이 서버는 아직 <b>내 것만 골라 주는 기능</b>이 없습니다.<br><br>남의 요청서까지 보일 수 있어 <b>아무것도 표시하지 않았습니다.</b><br>서버를 최신으로 올린 뒤 다시 열어 주세요 — 그때까지 팀 전체 현황은 대화창에 「" + 요청현황예시 + "」라고 물으시면 됩니다."
           : 요청서.length ? "검색과 맞는 요청서가 없습니다."
-          : "<b>내가</b> 만든 조치 요청서가 없습니다.<br><br>대화창에서 <b>「" + 요청생성예시 + "」</b>처럼 말하면 초안이 만들어지고, 그 초안은 <b>👤 내 것</b>에 문서로 들어옵니다.<br>여기서는 <b>내가 만든</b> 요청서의 상태(초안·보냄·회신)를 봅니다 — 팀 전체 현황은 대화창에 「" + 요청현황예시 + "」라고 물으세요.") + "</div>");
+          : "<b>내가</b> 만든 조치 요청서가 없습니다.<br><br>대화창에서 <b>「" + 요청생성예시 + "」</b>처럼 말하면 초안이 만들어지고, 그 초안은 <b>👤 내 문서 목록</b>에 문서로 들어옵니다.<br>여기서는 <b>내가 만든</b> 요청서의 상태(초안·보냄·회신)를 봅니다 — 팀 전체 현황은 대화창에 「" + 요청현황예시 + "」라고 물으세요.") + "</div>");
     } else if (탭 === "learn") {
       var lr = learn.filter(function (g) { return 걸림(g.question || ""); });
       var 총 = (learnKpis && learnKpis.total) || learn.length;
@@ -1433,7 +1444,11 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
     // ★ 📦 보안제품 자료(2026-08-22 2라운드 검토관 [낮음]) — 행을 눌러 상세가 열리게 만들었으면
     //   **초기 안내도 있어야** 한다. 없으면 이 탭만 빈 문서창이라 「고장인가?」로 읽힌다.
     else if (탭 === "vendor") d.innerHTML = '<div class="dm">행을 누르면 그 제품의 자료(제조사·분류·요약)를 봅니다.<br>도입을 <b>검토 중인 타사 제품</b> 카탈로그입니다 — 우리가 쓰는 제품은 「우리 보안제품」 화면입니다.<div class="dbt"><button class="go" data-go="securityproducts.html" data-lb="우리 보안제품">🗔 우리 보안제품</button></div></div>';
-    else if (탭 === "write") d.innerHTML = '<div class="dm">줄을 누르면 오른쪽에서 바로 씁니다 — <b>저장되는 곳</b>은 각 줄의 칩을 보세요. 자세한 설명은 오른쪽 위 ⓘ.</div>';
+    // ⚠ 각주가 **자리**를 박지 않는다(2026-09-14 검토관 [중]) — 이 화면의 ⓘ는 두 곳뿐이고 둘 다
+    //   「오른쪽 위」가 아니다: #noteInfo(:545)는 화면 **아래** 왼쪽, 셸의 ⓘ는 대화창 칩(console.js:1449).
+    //   정작 문서창 오른쪽 위에 있는 것은 ✕(#v4close, :463)이라, 시키는 대로 찾다 문서창을 닫는다.
+    //   ⧉ 별도 창으로 빼면 셸 콘솔도 없다. 그래서 **단추 이름으로만** 가리킨다(F4-11 계보).
+    else if (탭 === "write") d.innerHTML = '<div class="dm">줄을 누르면 오른쪽에서 바로 씁니다 — <b>저장되는 곳</b>은 각 줄의 칩을 보세요. 자세한 설명은 <b>ⓘ 이 화면 안내</b>에 있습니다.</div>';
     else if (탭 === "req") d.innerHTML = '<div class="dm">대화창에서 만든 조치 요청서 목록입니다. 상태(초안·보냄·회신)를 여기서 봅니다.<br><br>만들기·상태 변경은 <b>대화창</b>에서 합니다 — 「…조치 요청서 만들어줘」.</div>';
     else if (탭 === "watch") d.innerHTML = '<div class="dm">행을 누르면 그 폴더의 최근 확인 결과(새로 들어온 문서·건너뜀·충돌)를 봅니다.<br><br>지정·해제는 <b>대화창</b>에서 합니다 — 「D:\\경로 폴더 지켜봐 줘」(관리자).</div>';
     // 📞 연락처는 목록이 **전폭**이라 문서창을 안 쓴다(학습과 같은 결) — 문구를 남기지 않는다.
@@ -1831,7 +1846,7 @@ table.mx td .cnt{font-size:11px;color:var(--muted-2);font-weight:600;}
       var vd = vendor.find(function (x) { return String(x.id) === String(id); });
       if (!vd) return;
       선택 = { 탭: "vendor", id: id };
-      알림(vd.name, "보안제품 자료 「" + vd.name + "」 · " + (vd.vendor || "제조사 미상") + " · " + (vd.category || "분류 미정"));
+      알림(vd.name, "보안제품 비교·소개 「" + vd.name + "」 · " + (vd.vendor || "제조사 미상") + " · " + (vd.category || "분류 미정"));
       d.innerHTML = '<div class="dn">' + esc(vd.name) + "</div>" +
         '<div class="dm">📦 도입 <b>검토 중인 타사 제품</b> 자료 — 우리가 쓰는 제품은 「우리 보안제품」 화면입니다.' +
         "<br>제조사 " + esc(vd.vendor || "-") + " · 분류 " + esc(vd.category || "-") + "</div>" +

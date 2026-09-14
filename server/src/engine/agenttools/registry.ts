@@ -2225,7 +2225,7 @@ const TOOLS: AgentTool[] = [
     run: runAdapterImport,
   },
   {
-    // 제품 소개자료 등록(쓰기·결재판) — 보안제품 등록부와 별도 대장. 화면은 「내 문서 > 📦 보안제품 자료」이고 보기 전용(2026-08-22 흡수 — 옛 intro.html은 삭제).
+    // 제품 소개자료 등록(쓰기·결재판) — 보안제품 등록부와 별도 대장. 화면은 「내 문서 > 📦 보안제품 비교·소개」이고 보기 전용(2026-08-22 흡수 — 옛 intro.html은 삭제).
     name: "register_product_intro",
     label: "제품 소개자료 등록",
     domain: "cross",
@@ -2241,8 +2241,11 @@ const TOOLS: AgentTool[] = [
       { name: "summary", label: "한 줄 소개", description: "자료에 적힌 한 줄 소개(선택)", required: false },
       { name: "doc", label: "소개서 문서명", description: "대화창 ＋로 올린 소개서 문서명(선택)", required: false },
     ],
-    effect: (args) => "제품 소개자료 대장에 \"" + args.name + "\"" + 조사(String(args.name ?? ""), "을") + " 등록합니다 — 「내 문서 > 📦 보안제품 자료」 목록·비교에 나타납니다.",
-    undo: "「내 문서 > 📦 보안제품 자료」에서 확인 후, 삭제 지시로 되돌릴 수 있습니다.",
+    // ⚠ 2026-09-14 검토관 [상] 수리 — 화면 이름이 「보안제품 비교·소개」로 바뀌었는데(mydocs.html:383)
+    //   **결재판에 뜨는 이 두 문구**가 옛 이름 그대로였다. 승인 화면이 없는 자리를 가리키면
+    //   담당자는 등록해 놓고 그 물건을 못 찾는다(2026-08-22에도 같은 짝에서 한 번 났다).
+    effect: (args) => "제품 소개자료 대장에 \"" + args.name + "\"" + 조사(String(args.name ?? ""), "을") + " 등록합니다 — 「내 문서 > 📦 보안제품 비교·소개」 목록·비교에 나타납니다.",
+    undo: "「내 문서 > 📦 보안제품 비교·소개」에서 확인 후, 삭제 지시로 되돌릴 수 있습니다.",
     run: runProductIntroAdd,
   },
   {
