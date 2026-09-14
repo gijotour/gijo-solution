@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS — 「소프트웨어 자산 + 보안장비」 협력사·EOS/EOL·구독 기간·(영구) 유지보수 기간 관리 시안(추천 1개)
+  경로: mockups/asset-lifecycle/시안.html · gijo-mockup(mockups/ 전용 쓰기) · 제품 코드는 한 글자도 안 건드렸다.
+  다크 배색 기본 + 우측 상단 ☀/🌙로 프로 셸 밝은 배색(theme-light) 전환 · 외부 CDN·웹폰트·원격 이미지 0.
+  더블클릭으로 바로 열린다.
+
+  ── 지시 원문(2026-09-14, verbatim) ──────────────────────────────────────────
+  사장님: 「소프트웨어 자산 기준의 협력사 정보 EOS/L 정보 구독라이센스 기간 영구라이센스경우
+    유지보수 기간 등을 관리할수 있는 기능이 있어?」 → (없다고 답함) →
+    「소프트웨어 뿐만 아니라 보안장비도 포함이야」.
+  해석(메인): 대상 = 소프트웨어 자산(inventory.html) + 보안장비(products.html 등록분), **한 잣대**로
+    협력사·EOS·EOL·구독기간·(영구시)유지보수기간을 관리한다.
+
+  ── px는 제품에서 잰다(2026-09-14 CLAUDE.md 원칙) ─────────────────────────────
+  아래 「지금」 숫자는 이 목업 안에서 잰 값이 아니다 — 설치본(win-unpacked 5.95.0, 별도 데이터
+  폴더)을 CDP로 열어 실제 형제 줄과 함께 getBoundingClientRect로 잰 값이다(측정 시각
+  2026-09-14 11:23, 창 912px — 작업 지시서에 실려 온 실측치를 그대로 인용, 이 시안 파일이
+  다시 측정하지 않았다). 「제안」 숫자는 아직 없는 화면이라 제품에서 잴 수 없다 — 이 시안 CSS의
+  **explicit height 합**이다(§11에 산식 전부 표기). 구현 뒤 설치본에서 다시 재는 것이 최종
+  확인이다 — 그때 숫자가 다르면 이 시안이 아니라 그 실측이 이긴다.
+  ⚠ 가로 폭(콘텐츠 영역 너비)은 이번 라운드에서 실측하지 않았다 — 이 시안의 핵심은 **세로 높이**
+  (판을 열었을 때 얼마나 늘어나는가)이므로, 시뮬레이션 프레임의 가로 폭은 912px 창 안에서의
+  근사치(사이드바 232px 뺀 값 근처)로만 그렸다. 정확한 콘텐츠 폭이 필요해지면 별도로 잰다.
+
+  ── 확인한 실코드(읽기만, 이번 라운드) ────────────────────────────────────────
+  · server/src/engine/securityproducts.ts:41-52 — PRODUCT_FIELD_SCHEMA 9칸(펌웨어/버전 …
+    **eolDate「지원 종료일(EOL)」·supplierContact「공급업체/담당자 연락처」**). 이 두 칸이 이번
+    새 기록으로 **흡수**된다(§6·§13). 값은 온톨로지 트리플(subject=제품id)로 저장(:567-590
+    getProductFields/saveProductFields) — DB 전용 컬럼이 아니라 자유 문자열 값이다.
+  · client/src/renderer/pages/products.html:330-345 prodDetailHtml — 상세판 몸통 순서
+    prod-note → maintLineHtml → docs → 🧬 정형 정보 접기(fields-toggle/fields-panel, 기본 접힘)
+    → 📨 조치 요청 이력 접기(기본 접힘) → acts. 새 접기는 **정형 정보 바로 아래**에 끼운다
+    (요청 원문 그대로 — 관리 대상이 겹치는 두 판을 붙여 놓아야 "EOL 칸이 왜 두 곳이냐"는
+    혼란이 안 생긴다).
+  · :354-363 fieldRowHtml / :365-379 fieldsPanelHtml — 1열 field-row(라벨 168px 고정 + input
+    + 배지) 9개 실측 44.5px/개. 새 판은 이 CSS 클래스를 그대로 재사용하되 **2열 grid**로
+    감싼다(§3·§9).
+  · client/src/renderer/pages/inventory.html:445-451 표 골격(<table><thead id="assetHead">
+    <tbody id="assetRows">) · :586-603 ALL_COLS(15개, 폭 지정 없음 — **자동 레이아웃**, 고정
+    px 컬럼이 아니다) · :617-619 DEFAULT_COLS 6개 + 주석("9개면 폭이 눌려 머리글이 세로로
+    쪼개졌다(실측)" — 2026-07-26). 이 주석이 **"만료"를 기본열에 바로 넣으면 안 되는 이유**다
+    (§8-e, 새로 발견한 함정).
+  · :864 cellHtml risk 케이스 · :882-888 renderHead — 새 "expiry" 컬럼은 같은 switch문에
+    케이스 하나 추가로 끝난다(구조는 이미 있다).
+  · :359-368 kpi-strip(8개 kpi-mini, id kpiTotal…kpiOpenVuln) — 새 카드는 이 배열에 9번째로
+    추가.
+  · server/src/engine/eol-seed.ts 전체 — EolRow(제품/버전/종료일/출처/확인필요/확인일/
+    **유상연장**{이름·종료일·조건}) + eol한줄()의 우선순위(연장종료일 > EOL > 「모른다」).
+    새 잣대(§7)는 이 우선순위를 그대로 계승한다(같은 축 잣대는 두 벌 두지 않는다,
+    guessCategory export 주석의 원칙과 동일).
+  · server/src/engine/agenttools/handlers.ts:4494 runEolCheck — SBOM **부품**(components) ×
+    eol-seed 9줄 대조. **자산·제품 자체의 계약 정보는 다루지 않는다** — 이번 신설 기록과 다른
+    질문(부품 하나하나 vs 자산/장비 전체 계약).
+  · server/src/engine/agentloop.ts:2009-2017 FORCED_INTENTS eol_check 정규식
+    `/(EOL|EOS)\b|지원\s*(종료|끝난|끝났|만료)|(단종|수명\s*(종료|끝))/i` — ⚠⚠ 사장님 예시
+    문장 「지원 끝나는 장비 있어?」가 **이 정규식에도 이미 걸린다**(§6에 충돌로 명시, 그냥
+    넘어가면 새 도구를 만들어도 옛 도구가 먼저 가로챈다).
+  · server/src/engine/today.ts:28-41 TodayItem(axis:"vuln"|"device" · title·subtitle·why·
+    action·badges) · :229-283 deviceItems() — 하드닝 정기점검·유지보수 점검과 **같은 축(device)**
+    에 만료 항목을 얹는다(새 axis를 만들지 않는다 — 이미 있는 것에 없는 것만 보탠다는 원칙,
+    "3소스 정규화"와 같은 결).
+  · server/src/db.ts:323-349 security_products/product_docs CREATE TABLE — 새 테이블
+    asset_lifecycle의 정의 자리·문체 그대로 참고(§13).
+  · client/src/renderer/pages/map-view.js:444-485 shieldDetailHtml — 보안제품 방패 상세판
+    (mv-row 5줄 + chiprow + mv-hint). :465-468 주석("조건은 assetId다 — 이름으로 갈래를 타면
+    타일·상세판이 정반대로 말한다", 2026-09-14 검토관 [하] 적발 기록) — 새 mv-row를 넣을 때도
+    **같은 판정 축(assetId 유무)**을 따라야 같은 사고가 재발하지 않는다.
+  · server/src/engine/screenguide.ts:1214-1237 products.html panels · :1061-1096
+    inventory.html panels — 새 안내 문단 자리(§14).
+
+  ── 설계 전 조사 ──────────────────────────────────────────────────────────────
+  [외부1] ISO/IEC 19770-1:2012(Software Asset Management, iso.org/standard/56000.html) —
+    SAM 프로세스 27개 영역에 라이선스 권리·**유지보수 계약**·엔타이틀먼트 추적이 포함된다.
+    보완: ISO/IEC 19770-3(entitlement schema)이 "사용권" 자체를 다루는 하위 표준이다.
+    → ① 기록 스키마의 근거: 라이선스 종류·기간·유지보수 종료일을 **1급 데이터**로 다뤄야
+    한다는 표준의 요구를 그대로 옮겼다.
+  [외부2] CIS Controls v8, Safeguard 2.1·2.2(cisecurity.org/controls/cis-controls-list) —
+    "소프트웨어 인벤토리는 제목·게시자·버전과 함께 **decommission date**를 포함해야 한다"(2.1)
+    + "인벤토리에는 **현재 지원되는 소프트웨어만** 승인 상태로 둔다"(2.2, EOL 인지 요구).
+    → ③ "만료" 배지·오늘의 할 일 항목의 근거: 표준이 요구하는 것은 "목록에 있다"가 아니라
+    "지원 상태를 계속 확인한다"는 능동적 감시다.
+  [외부3] ISMS-P 2.1.3 정보자산 관리(개인정보보호위원회/KISA, privacy.go.kr·isms.kisa.or.kr) —
+    "정보자산별 책임자·관리자를 지정"하고 "자산의 도입·변경·폐기 등으로 현황이 변경되면 자산
+    목록에 반영"할 것을 요구한다. → ① 「협력사·담당자 연락처」 칸의 근거(국내 인증기준이 요구하는
+    담당자 지정)이자, 시간이 지나면 값이 달라지는 계약 정보를 **현행화 대상**으로 다뤄야 한다는
+    근거.
+  (참고, 이미 코드 주석에 있던 근거 — securityproducts.ts:38) NIST SP 800-53 CM-8은 자산목록
+    필수항목으로 버전·시리얼·네트워크주소·물리위치·**공급업체**를 이미 요구하고 있었다 — 이번
+    신설 기록의 "협력사" 칸은 그 요구의 연장이지 새 발명이 아니다.
+
+  ── 이 파일이 하는 일 / 안 하는 일 ──────────────────────────────────────────
+  한다: §3의 계약·생애주기 판은 실제 CSS 그대로 열고 닫히며, 입력·저장 버튼을 누르면 "이 시안
+    안에서만 반영됨(서버 호출 없음)" 토스트가 뜬다. §5의 "만료" 컬럼 켜기/끄기, §9의 좁은 폭
+    1열 접힘도 실제로 동작한다. 전부 이 문서 안 상태 전환이다.
+  안 한다: DB·API·FORCED_INTENTS는 새로 만들지 않는다(§13에 파일:줄로 설계만 남긴다). 지도의
+    공격경로·리포트 표 반영은 2단계로 미룬다(§17). 부품(SBOM component) 단위 계약 추적은
+    하지 않는다(§8-d에서 기각 이유 설명).
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 협력사·EOS/EOL·구독·유지보수 관리 시안</title>
+<style>
+:root{
+  /* 다크(기본) — products.html/inventory.html :root 그대로 */
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+html.theme-light{
+  /* 밝음 — pro-white.css :15-28 그대로(게시 관문이 실제로 검사하는 값) */
+  --bg:#faf8f5;--panel:#ffffff;--panel-2:#f2efe9;--border:rgba(43,38,33,0.12);
+  --border-strong:rgba(43,38,33,0.22);--text:#2b2621;--muted:#6b6259;--muted-2:#726960;
+  --blue:#1d4f91;--blue-light:#1d4f91;--teal:#086b43;--amber:#8f4d02;--red:#b3241a;--purple:#5b21b6;--white:#1f1b14;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;color:var(--text);font-size:13px;line-height:1.7;transition:background .15s,color .15s;}
+.docwrap{max-width:1280px;margin:0 auto;padding:26px 24px 100px;}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;}
+h1{font-size:19px;font-weight:800;color:var(--white);}
+.themebtn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+  padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+.themebtn:hover{border-color:var(--blue);}
+h2{font-size:15px;font-weight:800;color:var(--white);margin:26px 0 10px;padding-top:14px;border-top:1px solid var(--border);}
+h2 .num{color:var(--blue-light);margin-right:6px;}
+h3{font-size:12.75px;font-weight:800;color:var(--blue-light);margin:14px 0 6px;}
+p{font-size:12.75px;color:var(--text);margin-bottom:8px;max-width:980px;}
+.lead{font-size:13px;color:var(--muted);max-width:980px;}
+.quote{margin:10px 0;font-size:12.5px;color:var(--text);border-left:3px solid var(--blue);background:rgba(59,130,246,.07);
+  padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.quote b{color:var(--blue-light);}
+.warnbox{margin:10px 0;font-size:12.25px;color:var(--text);border-left:3px solid var(--amber);background:rgba(240,160,32,.08);
+  padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.warnbox b{color:var(--amber);}
+.okbox{margin:10px 0;font-size:12.25px;color:var(--text);border-left:3px solid var(--teal);background:rgba(30,185,128,.08);
+  padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.okbox b{color:var(--teal);}
+code{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:4px;padding:1px 6px;
+  font:11.5px Consolas,"Cascadia Mono",monospace;color:#3b82f6;}
+html.theme-light code{color:#1d4f91;}
+a{color:var(--blue-light);}
+ul.doc,ol.doc{margin:6px 0 10px 22px;font-size:12.5px;color:var(--text);}
+ul.doc li,ol.doc li{margin-bottom:5px;line-height:1.65;}
+table.doc{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:12.25px;}
+table.doc th{background:var(--panel-2);color:var(--muted);text-align:left;padding:7px 10px;border:1px solid var(--border-strong);font-weight:800;}
+table.doc td{padding:7px 10px;border:1px solid var(--border);color:var(--text);vertical-align:top;}
+table.doc td.num,table.doc th.num{text-align:right;font-variant-numeric:tabular-nums;}
+.tag{display:inline-block;font-size:11px;font-weight:800;padding:1px 8px;border-radius:10px;margin-right:4px;}
+.tag.take{background:rgba(30,185,128,.15);color:var(--teal);}
+.tag.drop{background:rgba(226,72,61,.15);color:#e2483d;}
+.tag.limit{background:rgba(240,160,32,.15);color:var(--amber);}
+.tag.q{background:rgba(91,124,240,.15);color:var(--blue-light);}
+.src{font-size:11px;color:var(--muted-2);}
+.checklist{list-style:none;margin:8px 0 14px;padding:0;}
+.checklist li{font-size:12.5px;padding:6px 0 6px 26px;position:relative;border-bottom:1px solid var(--border);line-height:1.6;}
+.checklist li:before{content:"✓";position:absolute;left:2px;color:var(--teal);font-weight:800;}
+.checklist li.warn:before{content:"⚠";color:var(--amber);}
+.checklist li.q:before{content:"?";color:var(--blue-light);}
+
+.framewrap{margin:14px 0 24px;}
+.framecap{font-size:12px;color:var(--muted-2);margin-bottom:6px;}
+.framecap b{color:var(--text);}
+.measurebox{display:inline-block;background:var(--panel-2);border:1px solid var(--blue);border-radius:8px;
+  padding:7px 12px;font-size:11.75px;color:var(--text);margin-bottom:10px;font-variant-numeric:tabular-nums;}
+.measurebox b{color:var(--blue-light);}
+
+/* ══════════ 시뮬레이션 프레임 — products.html/inventory.html 실제 클래스·치수 재사용 ══════════ */
+.simframe{width:680px;max-width:100%;border:1px solid var(--border-strong);border-radius:10px;
+  background:var(--panel);color:var(--text);overflow:hidden;font-size:13px;}
+.simhead{height:26px;background:var(--panel-2);border-bottom:1px solid var(--border-strong);
+  display:flex;align-items:center;padding:0 12px;font-size:11px;color:var(--muted-2);}
+.simbody{padding:14px 16px;}
+
+/* 자산/제품 목록 행 — products.html g-rows-r 실측 30px 재현 */
+.g-rows-r{display:grid;grid-template-columns:1fr 110px 84px 52px 22px;gap:8px;align-items:center;
+  height:30px;padding:0 10px;border-bottom:1px solid var(--border);font-size:12.5px;}
+.g-rows-head{display:grid;grid-template-columns:1fr 110px 84px 52px 22px;gap:8px;align-items:center;
+  height:24px;padding:0 10px;font-size:11px;font-weight:800;color:var(--muted-2);background:var(--panel-2);
+  border-bottom:1px solid var(--border-strong);}
+.row-chev{justify-self:end;width:20px;text-align:center;color:var(--muted-2);font-size:11px;cursor:pointer;}
+.gm2{color:var(--muted-2);}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ta-r{text-align:right;}
+
+/* 상세판(.gj-detail 재현) — products.html 실제 클래스 그대로 */
+.gj-detail{background:var(--panel-2);border-bottom:1px solid var(--border);padding:12px 14px;}
+.prod-note{font-size:12.5px;color:var(--muted);margin-top:0;}
+.prod-maint{font-size:12.5px;color:var(--muted);margin-top:8px;padding:6px 10px;background:var(--panel);border:1px solid var(--border);border-radius:7px;}
+.docs{margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.doc-col-title{font-size:12.5px;font-weight:800;color:var(--blue-light);margin-bottom:6px;}
+.doc-item{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;}
+.doc-searchable{font-size:11px;font-weight:800;color:var(--teal);background:rgba(30,185,128,0.14);padding:1px 6px;border-radius:5px;}
+
+.fields-toggle{margin-top:10px;padding:8px 10px;background:var(--panel);border:1px solid var(--border);border-radius:7px;
+  font-size:12.5px;font-weight:700;color:var(--blue-light);cursor:pointer;display:flex;align-items:center;gap:6px;height:37.6px;}
+.fields-toggle:hover{border-color:var(--border-strong);}
+.fields-toggle .car{margin-left:auto;color:var(--muted-2);font-size:11.75px;transition:transform .15s;}
+.fields-toggle.open .car{transform:rotate(90deg);}
+.fields-toggle.new{border-color:rgba(59,130,246,.4);}
+.fields-panel{margin-top:8px;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:9px;}
+.fields-draft-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;height:31.4px;}
+.fbtn{background:transparent;border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 11px;font-size:12.25px;font-weight:700;cursor:pointer;}
+.fbtn.ai{background:var(--blue);color:#fff;border-color:var(--blue);}
+.fbtn.save{background:var(--teal);color:#06281c;border-color:var(--teal);}
+.field-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);height:44.5px;}
+.field-row:last-child{border-bottom:none;}
+.field-label{flex:0 0 168px;font-size:12.25px;color:var(--muted);}
+.field-input{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;color:var(--text);font:12px/1.5 inherit;padding:6px 9px;}
+.f-badge{flex:0 0 auto;font-size:11.25px;font-weight:800;padding:2px 6px;border-radius:5px;}
+.f-badge.saved{background:rgba(30,185,128,.16);color:var(--teal);}
+.f-badge.empty{background:rgba(226,72,61,.16);color:#f5928a;}
+.fields-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;height:33.2px;align-items:center;}
+.acts{margin-top:12px;height:26.6px;display:flex;align-items:center;}
+.acts button{background:transparent;border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer;}
+
+/* ── 새 판: 계약·생애주기 2열 grid(§3) ── */
+.lc-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;}
+.lc-grid .lc-cell{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);height:44.5px;}
+.lc-grid .lc-cell:nth-last-child(1),.lc-grid .lc-cell:nth-last-child(2){border-bottom:none;}
+.lc-grid .lc-cell.full{grid-column:1 / -1;}
+.lc-label{flex:0 0 148px;font-size:12px;color:var(--muted);}
+.lc-input{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;color:var(--text);font:12px/1.5 inherit;padding:5px 8px;}
+.lc-pair{flex:1;display:flex;gap:6px;min-width:0;}
+.lc-pair input{flex:1;min-width:0;}
+@media(max-width:560px){.lc-grid{grid-template-columns:1fr;}}
+.narrowdemo{width:340px;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
+
+/* ── 배지 칩(만료) ── */
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+.chip.now{background:rgba(226,72,61,.16);color:#f5928a;border:1px solid rgba(226,72,61,.4);}
+.chip.soon{background:rgba(240,160,32,.16);color:var(--amber);border:1px solid rgba(240,160,32,.4);}
+.chip.done{background:rgba(163,163,163,.16);color:var(--muted-2);border:1px solid var(--border-strong);}
+.chip.ok{background:rgba(30,185,128,.14);color:var(--teal);border:1px solid rgba(30,185,128,.35);}
+.chip.warn{background:rgba(139,124,240,.14);color:var(--purple);border:1px solid rgba(139,124,240,.35);}
+
+/* 자산 표(inventory.html) 재현 */
+.inv-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.inv-table th{text-align:left;font-size:11px;font-weight:800;padding:7px 8px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.inv-table td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.inv-table td.trunc{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.inv-colbtn{margin-top:8px;font-size:11.5px;}
+.inv-colbtn label{margin-right:10px;color:var(--muted);cursor:pointer;}
+
+/* kpi-mini(inventory.html 재현) */
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:10px 0;}
+.kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.kpi-mini.new{border-color:rgba(240,160,32,.4);}
+.kpi-mini-label{font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:5px;}
+.kpi-mini-value{font-size:18px;font-weight:800;color:var(--white);}
+
+/* 오늘의 할 일 줄 재현 */
+.today-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;margin-bottom:8px;background:var(--panel);}
+.today-row.new{border-color:rgba(240,160,32,.4);background:rgba(240,160,32,.06);}
+.today-ic{font-size:15px;}
+.today-tt{font-size:12.5px;font-weight:800;}
+.today-sub{font-size:11.5px;color:var(--muted-2);}
+
+/* 지도 mv-row 재현 */
+.mv-panel{width:320px;border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;background:var(--panel);font-size:12.5px;}
+.mv-row{padding:6px 0;border-bottom:1px dashed var(--border);}
+.mv-lbl{font-size:11px;color:var(--muted-2);margin-bottom:2px;}
+.mv-noedge{color:var(--muted-2);font-style:italic;}
+.chiprow{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}
+.mv-ask{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:7px;padding:5px 10px;font-size:11.5px;cursor:pointer;}
+.chiptag{font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:8px;background:var(--panel-2);color:var(--muted-2);border:1px solid var(--border-strong);}
+.mv-hint{font-size:11px;color:var(--muted-2);margin-top:8px;}
+
+.toast{margin-top:10px;font-size:12px;color:var(--teal);border-left:3px solid var(--teal);background:rgba(30,185,128,.08);
+  padding:8px 10px;border-radius:0 6px 6px 0;}
+pre.code{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:12px 14px;
+  font:11.5px/1.6 Consolas,"Cascadia Mono",monospace;color:var(--text);overflow-x:auto;margin:8px 0 14px;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+  <div class="topbar">
+    <h1>협력사·EOS/EOL·구독·유지보수 관리 — 📅 계약·생애주기 시안</h1>
+    <button class="themebtn" id="themeBtn">🌙 어두운 배색 (누르면 ☀ 밝은 배색)</button>
+  </div>
+  <p class="lead">사장님 지시: <b>「소프트웨어 자산 기준의 협력사 정보 EOS/L 정보 구독라이센스 기간
+    영구라이센스경우 유지보수 기간 등을 관리할수 있는 기능이 있어?」</b> → 없다고 답함 →
+    <b>「소프트웨어 뿐만 아니라 보안장비도 포함이야」</b>. 대상 = 소프트웨어 자산(inventory.html) +
+    보안장비(products.html 등록분), <b>한 잣대</b>로 협력사·EOS·EOL·구독기간·유지보수기간을 관리한다.
+    아래는 실제 이 시안 CSS 그대로 그린 살아있는 데모다(서버 호출 없음).</p>
+
+  <h2><span class="num">§1</span>추천 1개 — 기록 하나 「📅 계약·생애주기」(자산·보안장비 공용)</h2>
+  <p>같은 값(협력사·EOS·EOL·구독·유지보수)을 두 곳(자산용·제품용)에 따로 만들면 이 저장소가
+    반복해 겪은 <b>사본 어긋남</b>이 또 생긴다. 그래서 표 하나를 <code>대상 종류(asset|product)
+    + 대상 id</code>로 구분해 자산과 보안제품이 <b>같은 스키마</b>를 쓴다 — securityproducts.ts의
+    정형 정보(온톨로지 트리플)와 다른 점은, 이번엔 <b>날짜 계산</b>(만료 임박 배지)이 걸려 있어서
+    자유 문자열이 아니라 <b>구조화된 날짜 칸</b>을 쓴다는 것이다(§7에서 왜인지 설명).</p>
+  <table class="doc">
+    <tr><th style="width:140px">대상</th><th>기록이 붙는 자리</th><th style="width:160px">기존에 있던 것과 관계</th></tr>
+    <tr><td>보안장비(제품)</td><td>products.html 상세 — 🧬 정형 정보 접기 <b>바로 아래</b> 새 접기</td>
+      <td>정형 정보의 eolDate·supplierContact 2칸을 <b>흡수</b>(§13)</td></tr>
+    <tr><td>소프트웨어 자산</td><td>inventory.html 자산 상세 펼침 + 🗺 지도 상세판 공통</td>
+      <td>지금은 계약 정보 칸이 아예 없음(신설)</td></tr>
+  </table>
+
+  <h2><span class="num">§2</span>지금(재현) — 보안제품 상세판, 실제 값 그대로</h2>
+  <p>아래는 <code>products.html:330-345</code>의 실제 순서·클래스를 그대로 옮긴 정적 재현이다.
+    🧬 정형 정보를 펼치면 9칸이 <b>1열</b>로 나열되고, 그 안에 <code>eolDate</code>(지원 종료일)와
+    <code>supplierContact</code>(공급업체/담당자 연락처)가 다른 7칸과 <b>구분 없이</b> 섞여 있다 —
+    "이 제품이 언제까지 지원되나"를 보려면 9칸을 다 읽어야 한다.</p>
+  <div class="framewrap">
+    <div class="framecap"><b>지금 — 보안제품 상세(정형 정보 펼침)</b>(실측 2026-09-14 11:23,
+      win-unpacked 5.95.0, 창 912px)</div>
+    <div class="measurebox">상세판 접힘 합계 <b>359.8px</b>(prod-note 20 + prod-maint 33.6 + docs 130.5
+      + 정형정보토글 37.6 + 조치요청토글 37.6 + acts 26.6) · 정형 정보 판(펼침) <b>527.9px</b>
+      = 초안줄 31.4 + 칸 9×44.5(400.5) + 단추줄 33.2(합 465.1, 나머지 62.8px은 패널 패딩·
+      field-hint줄 등 세부 오차 — <b>총합 527.9가 정본</b>)</div>
+    <div class="simframe">
+      <div class="simhead">products.html › 방화벽 FW-01 상세 — 이 파일 밖, 고정</div>
+      <div class="simbody" style="padding:0">
+        <div class="g-rows-r"><span class="trunc">경계 방화벽 (FW-01)</span><span class="gm2 trunc">SECUI · MF2</span>
+          <span style="color:var(--teal);font-weight:800">점검 완료</span><span class="gm2 ta-r">-</span>
+          <span class="row-chev">▾</span></div>
+        <div class="gj-detail">
+          <div class="prod-maint">🔧 점검 3건 · 다음 2026-10-05 <span style="color:var(--blue-light)">→</span></div>
+          <div class="docs">
+            <div><div class="doc-col-title">📘 제품 매뉴얼</div><div class="doc-item">MF2 관리자 매뉴얼 v3.2 <span class="doc-searchable">검색됨</span></div></div>
+            <div><div class="doc-col-title">📗 로그 매뉴얼</div><div class="doc-item">방화벽 로그 필드 해설 <span class="doc-searchable">검색됨</span></div></div>
+          </div>
+          <div class="fields-toggle open" id="oldFieldsToggle"><span>🧬 정형 정보 (온톨로지)</span><span class="car">▸</span></div>
+          <div class="fields-panel" id="oldFieldsPanel"></div>
+          <div class="fields-toggle"><span>📨 조치 요청 이력</span><span class="car">▸</span></div>
+          <div class="acts"><button>✕ 제품 삭제</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="num">§3</span>제안 — 정형 정보 바로 아래 새 접기 「📅 계약·생애주기」</h2>
+  <p>eolDate·supplierContact 2칸은 정형 정보에서 <b>빠지고</b>(7칸으로 줄어든다), 새 접기 하나가
+    그 아래 생긴다. 2열 grid로 <b>9칸</b>을 담는다 — 날짜가 필요한 칸(구독 종료·유지보수 종료·EOS·
+    EOL·유상연장 종료)은 <b>각각 독립된 날짜값</b>으로 저장한다(구독 기간·유상연장은 한 칸 안에
+    입력 2개를 나란히 둬 "칸 수"는 9로 유지하면서 계산 가능한 값은 살린다 — §7 참고). 아래는 실제
+    동작하는 데모다: 토글을 눌러 열고 닫아 보라.</p>
+  <div class="framewrap">
+    <div class="framecap"><b>제안 — 보안제품 상세(계약·생애주기 판 포함)</b></div>
+    <div class="measurebox" id="lcMeasure">측정 중…</div>
+    <div class="simframe">
+      <div class="simhead">products.html › 방화벽 FW-01 상세 — 새 접기 추가</div>
+      <div class="simbody" style="padding:0">
+        <div class="g-rows-r"><span class="trunc">경계 방화벽 (FW-01)</span><span class="gm2 trunc">SECUI · MF2</span>
+          <span style="color:var(--teal);font-weight:800">점검 완료</span><span class="gm2 ta-r">-</span>
+          <span class="row-chev">▾</span></div>
+        <div class="gj-detail">
+          <div class="prod-maint">🔧 점검 3건 · 다음 2026-10-05 <span style="color:var(--blue-light)">→</span></div>
+          <div class="docs">
+            <div><div class="doc-col-title">📘 제품 매뉴얼</div><div class="doc-item">MF2 관리자 매뉴얼 v3.2 <span class="doc-searchable">검색됨</span></div></div>
+            <div><div class="doc-col-title">📗 로그 매뉴얼</div><div class="doc-item">방화벽 로그 필드 해설 <span class="doc-searchable">검색됨</span></div></div>
+          </div>
+          <div class="fields-toggle"><span>🧬 정형 정보 (온톨로지) — 7칸(EOL·연락처는 아래로 이동)</span><span class="car">▸</span></div>
+          <div class="fields-toggle new" id="lcToggle"><span>📅 계약·생애주기</span><span class="chip soon" style="margin-left:8px" id="lcRowBadge">D-29</span><span class="car">▸</span></div>
+          <div class="fields-panel" id="lcPanel" style="display:none"></div>
+          <div class="fields-toggle"><span>📨 조치 요청 이력</span><span class="car">▸</span></div>
+          <div class="acts"><button>✕ 제품 삭제</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="src">토글 줄 오른쪽의 <code>D-29</code> 배지는 접힌 채로도 "얼마 안 남았다"를 알 수
+    있게 한다(§8 GOV.UK 상태 배지 관례와 같은 결 — 눌러야만 보이는 정보는 놓친다).</p>
+
+  <h2><span class="num">§4</span>제안 — 자산 쪽 입력·표시 자리(소프트웨어 자산도 같은 판)</h2>
+  <p>자산은 두 군데서 이 정보를 <b>보고 고칠 수 있어야</b> 한다 — ⓐ 자산 목록 행을 펼친 상세
+    (inventory.html <code>자산상세HTML</code>) ⓑ 🗺 지도 상세판(map-view.js). 잣대는 하나이므로
+    ⓐⓑ는 같은 표를 읽는다.</p>
+  <h3>ⓐ 자산 목록 — 행 펼침 상세에 칸 추가</h3>
+  <div class="framewrap">
+    <div class="simframe" style="width:560px">
+      <div class="simhead">inventory.html › 웹서버-01 펼침 상세(발췌)</div>
+      <div class="simbody">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;font-size:12px">
+          <div><div style="color:var(--muted-2);font-size:11px">유형 / ID</div>호스트 · asset-042</div>
+          <div><div style="color:var(--muted-2);font-size:11px">소유부서</div>정보보안팀</div>
+          <div><div style="color:var(--muted-2);font-size:11px">등록 출처</div>🖐 직접 등록</div>
+          <div style="border:1px solid rgba(240,160,32,.4);border-radius:7px;padding:6px 9px;background:rgba(240,160,32,.06)">
+            <div style="color:var(--amber);font-size:11px;font-weight:800">📅 계약·생애주기(신규)</div>
+            <span class="chip soon">⚠ 유지보수 D-29</span> <span style="color:var(--muted-2)">Red Hat ELS · 2026-10-13</span>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:11.5px;color:var(--muted-2)">바꾸는 일은 대화창에서 합니다 —
+          <code>웹서버-01 유지보수 계약 2027-03-31까지 등록해줘</code></div>
+      </div>
+    </div>
+  </div>
+  <h3>ⓑ 🗺 지도 상세판 — mv-row 한 줄 + 대화창 유도 칩</h3>
+  <p><code>map-view.js:444-485 shieldDetailHtml</code>(보안제품 방패)에 mv-row 하나를 추가한다.
+    ⚠ 앞줄의 「연결 자산」 판정이 <b>assetId 유무</b>를 축으로 쓰는 것과 같은 축으로 만든다 —
+    이름으로 갈래를 타면 2026-09-14 검토관이 잡은 것과 같은 종류의 사고(타일·상세판이 서로
+    다르게 말함)가 재발한다.</p>
+  <div class="framewrap">
+    <div class="mv-panel">
+      <h3 style="margin-top:0">🛡 경계 방화벽 (FW-01)</h3>
+      <div class="mv-row"><div class="mv-lbl">종류</div>방화벽 · SECUI MF2</div>
+      <div class="mv-row"><div class="mv-lbl">연결 자산</div>🔗 웹서버-01 <span class="chiptag">등록</span></div>
+      <div class="mv-row"><div class="mv-lbl">매뉴얼 문서</div>2건</div>
+      <div class="mv-row" style="border-color:rgba(240,160,32,.4)"><div class="mv-lbl">📅 만료(신규)</div>
+        <span class="chip soon">⚠ 유지보수 D-29</span> · Red Hat ELS 2026-10-13</div>
+      <div class="mv-row"><div class="mv-lbl">🛡 보호 범위</div><span class="mv-noedge">등록 칸 없음 — 등록하면 나타납니다</span></div>
+      <div class="chiprow"><button class="mv-ask">💬 "이 제품 계약 만료 확인해줘"</button><span class="chiptag">결재판 없음(조회)</span></div>
+      <div class="mv-hint">지시는 전부 대화창을 거칩니다 — 지도는 보기 전용입니다.</div>
+    </div>
+  </div>
+
+  <h2><span class="num">§5</span>제안 — 보기 자리(목록 열 · KPI · 오늘의 할 일)</h2>
+  <h3>ⓐ 자산 목록 새 열 「만료」 — 기본열 아님, ＋로 추가(이유는 §8-e)</h3>
+  <p><code>inventory.html:617-619</code> 주석: "기본 컬럼은 6개로 — 9개면 폭이 눌려 머리글이
+    세로로 쪼개졌다(실측, 2026-07-26)". 지금 기본 6열도 이미 그 한도다 — "만료"를 기본에 그냥
+    보태면 같은 사고가 재발한다. 그래서 <b>ALL_COLS에는 추가하되 DEFAULT_COLS에는 안 넣는다</b>
+    (표시 항목 ＋에서 켜는 선택 열). 대신 놓치지 않게 KPI·오늘의 할 일에 이중으로 노출한다(ⓒⓓ).
+    아래는 실제 켜고 끌 수 있는 데모다.</p>
+  <div class="framewrap">
+    <div class="inv-colbtn"><label><input type="checkbox" id="expColToggle"> "만료" 열 표시 항목에 추가(데모)</label></div>
+    <table class="inv-table" style="width:560px">
+      <thead><tr id="invHead"></tr></thead>
+      <tbody id="invBody"></tbody>
+    </table>
+  </div>
+  <div class="warnbox"><b>폭 예산(근사치 — 자동 레이아웃이라 강제 px 아님).</b> 표 전체 실측 802px,
+    지금 8열(체크·자산명·호스트명·소유부서·카테고리·위험도·SBOM·조작) 근사 배분 — 체크 34 ·
+    자산명 ~180(<code>trunc max-width:220</code>로 이미 잘림 허용) · 호스트명 ~130
+    (<code>max-width:180</code>) · 소유부서 ~90 · 카테고리 ~90 · 위험도 ~90 · SBOM ~100 ·
+    조작 ~30. "만료"(~90px, 배지 1개+짧은 날짜)를 켜면 이미 <code>text-overflow:ellipsis</code>가
+    걸려 있는 자산명·호스트명 여백에서 흡수된다 — <b>표를 넓히지 않는다.</b> 정확한 px는 실화면
+    실측이 정본이다(이 표는 자동 레이아웃).</div>
+  <h3>ⓑ 보안제품 목록 행 — 오른쪽 배지 칩</h3>
+  <div class="g-rows-r" style="width:560px"><span class="trunc">경계 방화벽 (FW-01)</span><span class="gm2 trunc">SECUI · MF2</span>
+    <span style="color:var(--teal);font-weight:800">점검 완료</span><span class="chip soon" style="justify-self:end">D-29</span>
+    <span class="row-chev">▾</span></div>
+  <p class="src">지금 4번째 칸(<code>ta-r gm2</code>, 점검 다음 일자)은 그대로 두고 <b>5번째(row-chev
+    앞)</b>에 배지를 끼운다 — 열 정의(<code>g-rows--products</code> grid-template-columns)에
+    칸 하나 추가가 필요하다(§13).</p>
+  <h3>ⓒ 자산 KPI 미니 카드 — 9번째로 추가</h3>
+  <div class="kpi-strip" style="grid-template-columns:repeat(9,1fr)">
+    <div class="kpi-mini"><div class="kpi-mini-label">전체 자산</div><div class="kpi-mini-value">312</div></div>
+    <div class="kpi-mini"><div class="kpi-mini-label">고위험</div><div class="kpi-mini-value" style="color:#f5928a">18</div></div>
+    <div class="kpi-mini"><div class="kpi-mini-label">중위험</div><div class="kpi-mini-value" style="color:#f7c777">64</div></div>
+    <div class="kpi-mini"><div class="kpi-mini-label">저위험</div><div class="kpi-mini-value" style="color:#6fdcb5">230</div></div>
+    <div class="kpi-mini"><div class="kpi-mini-label">SBOM 미생성</div><div class="kpi-mini-value" style="color:var(--amber)">12</div></div>
+    <div class="kpi-mini new"><div class="kpi-mini-label">📅 만료 임박(신규)</div><div class="kpi-mini-value" style="color:var(--amber)">3</div></div>
+    <div class="kpi-mini"><div class="kpi-mini-label">종합 노출도</div><div class="kpi-mini-value">27</div></div>
+    <div class="kpi-mini"><div class="kpi-mini-label">AI 위험(미대응)</div><div class="kpi-mini-value" style="color:var(--purple)">5</div></div>
+    <div class="kpi-mini"><div class="kpi-mini-label">미조치 취약점</div><div class="kpi-mini-value">41</div></div>
+  </div>
+  <h3>ⓓ 오늘의 할 일 — device 축에 항목 추가(새 axis 만들지 않음)</h3>
+  <div class="today-row"><span class="today-ic">🔧</span><div><div class="today-tt">이 서버(이름표: 웹서버-01) 하드닝 점검</div>
+    <div class="today-sub">CIS 기준 · 점검 주기 3일 초과</div></div></div>
+  <div class="today-row new"><span class="today-ic">📅</span><div><div class="today-tt">계약·생애주기 — 만료 임박 3건</div>
+    <div class="today-sub">가장 이른 것: 웹서버-01 유지보수(Red Hat ELS) D-29</div></div></div>
+  <p class="src"><code>today.ts:229-283 deviceItems()</code>에 세 번째 원천으로 추가 — ①하드닝
+    ②유지보수 점검에 이어 ③계약 만료. <code>TodayItem</code> 인터페이스(:28-41)는 그대로 재사용
+    (title/subtitle/why/action/badges) — 새 필드를 안 늘린다.</p>
+
+  <h2><span class="num">§6</span>대화창 — 조회 · 등록(쓰기는 결재판)</h2>
+  <table class="doc">
+    <tr><th style="width:110px">동작</th><th>예문</th><th style="width:150px">도구(제안 이름)</th></tr>
+    <tr><td>등록(쓰기)</td><td><code>"웹서버-01 유지보수 2027-03-31까지 등록해줘"</code> ·
+      <code>"FW-01 협력사 SECUI, 담당자 010-1234-5678로 등록해줘"</code></td>
+      <td><code>set_lifecycle</code> — 결재판 필수</td></tr>
+    <tr><td>조회</td><td><code>"만료 임박 계약 알려줘"</code></td>
+      <td><code>lifecycle_status</code> — 읽기</td></tr>
+    <tr><td>조회(충돌 위험)</td><td><code>"지원 끝나는 장비 있어?"</code> ⚠ 아래 참고</td>
+      <td>충돌 — 결정 필요</td></tr>
+  </table>
+  <div class="warnbox"><b>⚠⚠ 라우팅 충돌 — 설계관 확인 필수(이 시안이 새로 찾은 함정).</b>
+    사장님이 예로 드신 <code>"지원 끝나는 장비 있어?"</code> 문장은 <b>이미 있는</b>
+    <code>agentloop.ts:2014</code> eol_check 정규식 <code>/…|지원\s*(종료|끝난|끝났|만료)|…/i</code>에
+    그대로 걸린다. 새 <code>lifecycle_status</code>를 별개 도구로 만들면, FORCED_INTENTS는
+    배열 순서로 먼저 매칭되는 규칙이 이기므로(routes.ts 표와 같은 구조) <b>어느 것이 먼저 오느냐에
+    따라 답이 갈린다</b> — eol_check는 "SBOM 부품 대 지원종료표 9줄" 대조라 자산·제품 자체의
+    계약(구독·유지보수)은 모른다. 사람이 "장비"라고 물었을 때 두 도구 중 하나만 답하면 절반은
+    말 안 한 것이 된다. 제안 두 갈래(결정은 설계관):<br>
+    <b>A안(합침)</b> — eol_check 답변 끝에 lifecycle_status 결과를 이어 붙인다("SBOM 부품
+    대조 결과는 이렇고, 등록된 계약 중에도 이런 게 있습니다"). 새 정규식 충돌이 안 생긴다.<br>
+    <b>B안(가름)</b> — lifecycle_status 정규식에 <b>계약/구독/유지보수/협력사/라이선스</b> 중
+    하나가 반드시 있게 해서 "지원 끝나는 장비"류 애매한 문장은 그대로 eol_check로 두고,
+    "유지보수 계약 끝나는 장비 있어?"처럼 명시적일 때만 새 도구로 간다.<br>
+    이 시안은 <b>A안을 권장</b>한다 — 담당자가 "장비"라고만 말했을 때 두 가지 다른 종류의
+    "지원 종료"(부품 패치 vs 계약)를 한 번에 다 듣는 편이 안전하다(정보를 숨기는 쪽보다).</div>
+
+  <h2><span class="num">§7</span>잣대(판정 알고리즘) — eol-seed 우선순위를 그대로 계승</h2>
+  <p>eol-seed.ts의 <code>eol한줄()</code>이 이미 "유상연장 종료일 &gt; EOL &gt; 모른다"는
+    우선순위를 정해 뒀다(§ 위 인용). 새 잣대는 <b>같은 순서</b>를 쓰고, 여기에 계약 쪽 날짜
+    (구독 종료·유지보수 종료)를 더한다 — "얼마나 급한가"는 등록된 날짜 중 <b>가장 이른 것</b>이다.</p>
+  <pre class="code">effective지원종료 = 유상연장.종료일 ?? EOL ?? (EOL 없으면 EOS, 그 사실을 답에 함께 적음)
+후보들 = [구독종료일, 유지보수종료일, effective지원종료].filter(값 있음)
+만료판정 = 후보들.length === 0
+  ? "등록된 계약이 없습니다"          // ⚠ 0건을 "괜찮다"로 읽지 않는다(eol표상태 관례)
+  : min(후보들)                        // 가장 이른 날짜
+배지 = 만료판정이 지났으면 "지원 종료"(회색)
+     : 만료판정 - 오늘 <= 30일 ? "임박"(빨강)
+     : 만료판정 - 오늘 <= 90일 ? "주의"(주황)
+     : 표시 안 함(당장 급하지 않음)
+근거 없음(모든 칸이 비어 있음) → "⚠ 확인 필요"를 답에 함께 적는다(계산엔 안 넣되 단서로)</pre>
+  <p class="src">30/90일은 사장님 지시문의 잣대를 그대로 썼다 — <code>server/src/config.ts</code>류
+    한 곳에 상수로 두고 나중에 설정 화면에서 바꿀 수 있게 여지를 남긴다(2단계, §17).</p>
+
+  <h2><span class="num">§8</span>포기한 길</h2>
+  <table class="doc">
+    <tr><th style="width:190px">후보</th><th style="width:90px">판정</th><th>왜 안 골랐나</th></tr>
+    <tr><td>(a) eol-seed 표만 넓히기</td><td><span class="tag drop">기각</span></td>
+      <td>벤더 공지 자동 수집은 폐쇄망이라 불가능하고, 구독·유지보수 기간은 <b>고객만 아는 값</b>
+        (우리가 알 방법이 없다 — eol-seed.ts의 유상연장 칸이 이미 같은 이유로 "괜찮다는 뜻이
+        아니다"라고 밝혀 둔 것과 같은 한계).</td></tr>
+    <tr><td>(b) 보안제품 정형 정보 칸만 늘리기</td><td><span class="tag drop">기각</span></td>
+      <td>소프트웨어 자산(inventory.html)엔 그 판 자체가 없어 <b>반쪽</b>이 된다 — 사장님이
+        명시적으로 "소프트웨어도 포함"이라 하셨다.</td></tr>
+    <tr><td>(c) 별도 「계약 관리」 5대 메뉴 신설</td><td><span class="tag drop">기각</span></td>
+      <td>「메뉴는 보기용」·2026-08-31 5대 메뉴 밀도 재편과 반대다. 계약 정보는 <b>자산 하나하나에
+        딸린 값</b>이지 독립된 업무 흐름이 아니다 — "자산에서 시작"(지형도 원칙)에도 어긋난다.</td></tr>
+    <tr><td>(d) SBOM 부품(component)마다 계약 기록</td><td><span class="tag drop">기각</span></td>
+      <td>한 자산에 부품이 수십~수백 개다 — 입력 불가능한 규모. 부품 단위 "지원 종료 여부"는
+        이미 <code>eol_check</code>(부품 이름 대 eol-seed 표)가 맡고 있다 — 그 영토를 침범하지
+        않는다.</td></tr>
+    <tr><td>(e) "만료" 열을 기본 6열에 바로 추가</td><td><span class="tag drop">기각</span></td>
+      <td><code>inventory.html:617-619</code> 주석이 못박은 <b>실측 사고</b>(9열이면 머리글이
+        세로로 쪼개짐, 2026-07-26)를 이 라운드가 그대로 재현할 뻔했다 — ALL_COLS엔 넣되
+        DEFAULT_COLS엔 안 넣는 것으로 피한다(§5-a).</td></tr>
+    <tr><td>(f) 계약 정보를 자유 문자열(트리플)로만 저장</td><td><span class="tag limit">부분 채택</span></td>
+      <td>협력사·근거·비고는 자유 문자열(정형 정보와 같은 방식)로 두지만, <b>날짜 5칸</b>은
+        구조화된 값이어야 만료 배지·KPI·오늘의 할 일이 계산할 수 있다(§7) — 정형 정보 전체를
+        그대로 베끼면 "만료 임박 3건"이라는 숫자를 아무도 계산할 수 없다.</td></tr>
+  </table>
+
+  <h2><span class="num">§9</span>좁은 폭 — 계약·생애주기 판, 1열로 접힘(실측 아님, 설계 확인)</h2>
+  <div class="warnbox">이 값은 제품 실측이 아니다. 560px 미만(미디어쿼리 <code>max-width:560px</code>)
+    에서 2열 grid가 1열로 접히는지 <b>설계 확인</b>만 한다.</div>
+  <div class="narrowdemo">
+    <div class="fields-toggle new open" style="margin-top:0"><span>📅 계약·생애주기</span><span class="car">▾</span></div>
+    <div class="fields-panel" id="lcPanelNarrow"></div>
+  </div>
+  <p class="stressnote src">1열일 때 9칸 × 44.5px = 400.5px(§11에서 "1열이면 400px"로 표기한
+    값과 같다) — 2열(약 200px)의 정확히 2배에 가깝다.</p>
+
+  <h2><span class="num">§10</span>설계 전 조사 — 표준 근거 요약</h2>
+  <table class="doc">
+    <tr><th style="width:230px">표준</th><th>요구하는 것</th><th style="width:200px">이 시안에 반영</th></tr>
+    <tr><td>ISO/IEC 19770-1(SAM)</td><td>라이선스 권리·유지보수 계약을 1급 데이터로 추적</td>
+      <td>라이선스 종류·유지보수 종료일 칸</td></tr>
+    <tr><td>CIS Controls v8 · 2.1/2.2</td><td>소프트웨어 인벤토리에 decommission date 포함,
+      "현재 지원되는 소프트웨어만" 인지</td><td>EOS/EOL 칸 + 만료 배지·KPI</td></tr>
+    <tr><td>ISMS-P 2.1.3 정보자산 관리</td><td>자산별 담당자 지정 + 도입/변경/폐기 시 목록 현행화</td>
+      <td>협력사·담당자 연락처 칸 + "확인일"로 현행화 시점 기록</td></tr>
+    <tr><td>NIST SP 800-53 CM-8(기존 코드 근거)</td><td>공급업체 정보를 자산목록 필수 항목으로</td>
+      <td>이미 있던 근거의 연장 — 새 발명 아님</td></tr>
+  </table>
+  <p class="src">근거 링크는 이 시안 상단 주석 「설계 전 조사」에 원문 인용과 함께 있다.</p>
+
+  <h2><span class="num">§11</span>밀도 숫자 — 지금(실측) → 제안(설계값)</h2>
+  <table class="doc">
+    <tr><th></th><th class="num" style="width:110px">지금(실측)</th><th class="num" style="width:150px">제안(설계값)</th><th class="num" style="width:130px">증감</th></tr>
+    <tr><td>보안제품 목록 행</td><td class="num">30px</td><td class="num">30px(칩만 추가, 높이 불변)</td><td class="num">0</td></tr>
+    <tr><td>제품 상세판 접힘 합계</td><td class="num">359.8px</td><td class="num">397.4px<br><span class="src">+37.6(새 토글 1줄, fields-toggle 그대로 재사용)</span></td>
+      <td class="num">+37.6px(+10.4%)</td></tr>
+    <tr><td>정형 정보 판(펼침)</td><td class="num">527.9px</td><td class="num">전체합 465.1 중 2칸(EOL·연락처) 이동<br>≈465.1-89=376.1px<br><span class="src">9→7칸, 초안·단추줄 불변</span></td>
+      <td class="num">-89px(-2칸)</td></tr>
+    <tr><td><b>계약·생애주기 판(신규, 펼침)</b></td><td class="num">없음</td>
+      <td class="num"><b>≈255.7px</b><br><span class="src">2열 5행×44.5(222.5, AI초안줄 없음) + 단추줄 33.2</span></td>
+      <td class="num">신규</td></tr>
+    <tr><td>계약·생애주기 판(좁은 폭 1열)</td><td class="num">해당없음</td>
+      <td class="num">≈433.7px<br><span class="src">9행×44.5(400.5) + 단추줄 33.2</span></td>
+      <td class="num">§9 설계 확인용</td></tr>
+    <tr><td>자산 표 폭</td><td class="num">802px</td><td class="num">802px(기본열 불변)</td><td class="num">0(열 추가는 선택)</td></tr>
+    <tr><td>자산 KPI 미니 카드 수</td><td class="num">8개</td><td class="num">9개</td><td class="num">+1</td></tr>
+    <tr><td>지도 상세판(보안제품 방패) 총합</td><td class="num">928px</td><td class="num">≈986.7px<br><span class="src">+58.7(새 mv-row 1줄, 기존 mv-row 평균 재사용)</span></td>
+      <td class="num">+58.7px(+6.3%)</td></tr>
+  </table>
+  <p class="src">제안 값은 이 시안 CSS의 explicit height 합이다(폰트 렌더링에 안 흔들리는 값) —
+    아직 없는 화면이라 제품에서 잴 수 없다. <b>구현 뒤 설치본 재실측이 최종 확인</b>이다 — 그때
+    다르면 실측이 이긴다.</p>
+
+  <h2><span class="num">§12</span>제품 원칙 자가점검</h2>
+  <ul class="checklist">
+    <li>추천 시안 1개(2026-08-09 확정) — 복수안 아님</li>
+    <li>자체완결 HTML — 외부 CDN·폰트·이미지 0, 더블클릭으로 열림</li>
+    <li>설계 전 조사 — ISO 19770-1 · CIS Controls v8 2.1/2.2 · ISMS-P 2.1.3(§10)</li>
+    <li>사본 금지 — eolDate·supplierContact 2칸을 새 기록이 <b>흡수</b>(§13), 자산·보안장비가
+      같은 표를 씀(§1)</li>
+    <li>지시는 대화창·화면은 보기 전용 — 등록(set_lifecycle)은 결재판을 거친다(§6)</li>
+    <li>메뉴는 보기용 — 새 5대 메뉴를 만들지 않는다(§8-c)</li>
+    <li>화면 설명은 ⓘ로 — 제목·부제 대신 배지 + screenguide 문단(§14)</li>
+    <li>0건 정직 표기 — "등록된 계약이 없습니다"(eol표상태·falseclaim 관례와 같은 결, §7)</li>
+    <li>날짜 근거 없으면 확인 필요 표식 — eol-seed 「확인필요」 관례 계승(§7)</li>
+    <li class="q">라우팅 충돌(A/B안) — <b>설계관·사장님 결정 필요.</b> §6의 실측 충돌
+      (「지원 끝나는 장비 있어?」가 eol_check에도 걸림)은 이 시안이 이번 라운드에 새로 찾은
+      것이다 — 구현 전에 반드시 확정해야 한다.</li>
+    <li class="q">기본열 승격 여부 — 지금은 "만료"를 선택 열로만 뒀다(§8-e). 사장님이 기본
+      노출을 원하시면 어느 기존 열을 뺄지 별도 결정이 필요하다.</li>
+    <li>11px 미만 금지 — 이 파일 전체 최소 폰트 11px</li>
+    <li>한글 표기 — 전부 한글</li>
+  </ul>
+
+  <h2><span class="num">§13</span>구현표 — 설계관·구현자를 위한 파일:줄</h2>
+  <table class="doc">
+    <tr><th style="width:230px">자리</th><th>지금</th><th>바뀔 것</th></tr>
+    <tr><td><code>server/src/db.ts:323-349</code><br>테이블 정의 자리</td>
+      <td>security_products/product_docs 정의(참고용 문체)</td>
+      <td>새 테이블 추가:<br><code>CREATE TABLE IF NOT EXISTS asset_lifecycle (
+        id TEXT PRIMARY KEY, targetType TEXT NOT NULL, targetId TEXT NOT NULL,
+        vendorContact TEXT, licenseType TEXT, subStart TEXT, subEnd TEXT,
+        maintenanceEnd TEXT, eos TEXT, eol TEXT, extName TEXT, extEnd TEXT,
+        evidence TEXT, note TEXT, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL);
+        CREATE UNIQUE INDEX idx_lifecycle_target ON asset_lifecycle(targetType, targetId);</code>
+        (v1 = 대상당 1행, 이력은 감사로그가 대신함 — §17 2단계에서 이력 테이블 재검토)</td></tr>
+    <tr><td>새 파일<br><code>server/src/engine/assetlifecycle.ts</code></td>
+      <td>없음</td>
+      <td>CRUD(get/set) + §7 잣대 계산 함수(<code>lifecycleBadge(row, 오늘)</code>) + LIFECYCLE_FIELD
+        _SCHEMA(9칸 라벨, securityproducts.ts:41-52 문체 계승) + <code>listLifecycleDueSoon
+        (days)</code>(KPI·오늘의 할 일·목록 열이 전부 이 함수 하나를 부른다 — 잣대 두 벌 방지,
+        eol-seed guessCategory export 주석과 같은 원칙)</td></tr>
+    <tr><td><code>server/src/engine/securityproducts.ts:41-52</code><br>PRODUCT_FIELD_SCHEMA</td>
+      <td>9칸(eolDate·supplierContact 포함)</td>
+      <td>7칸으로 축소(두 칸 제거) — <b>마이그레이션 필요</b>: 기존 트리플에 값이 있으면
+        asset_lifecycle로 1회 이관하는 스크립트(빈 값은 이관 안 함, "그 값을 누가 넣는가" 원칙—
+        옮기는 쪽이 생산자가 된다).</td></tr>
+    <tr><td><code>client/.../products.html:338-342</code><br>prodDetailHtml</td>
+      <td>fields-toggle(정형정보) → fields-panel → fields-toggle(조치요청) → acts</td>
+      <td>정형정보 토글과 조치요청 토글 <b>사이</b>에 새 토글+패널 삽입(§3). 접힌 채로 배지
+        (D-N/지원종료/확인필요)를 토글 줄에 표기 — §3 그대로.</td></tr>
+    <tr><td><code>client/.../products.html:60-61</code><br><code>.g-rows--products</code>
+      grid-template-columns</td>
+      <td><code>1fr 110px 84px 52px 22px</code>(5칸)</td>
+      <td>6칸으로: <code>1fr 110px 84px 60px 52px 22px</code>(배지 칸 60px 추가, §5-b) —
+        검토관 중4 주석("같은 화면의 .notice·.cat-summary와 같은 폭")을 재확인할 것.</td></tr>
+    <tr><td><code>client/.../inventory.html:586-603</code> ALL_COLS ·
+      <code>:617-619</code> DEFAULT_COLS</td>
+      <td>15개 중 6개 기본</td>
+      <td>ALL_COLS에 <code>{id:"expiry",label:"만료"}</code> 추가, <b>DEFAULT_COLS엔 추가 안 함</b>
+        (§8-e). <code>:864</code> cellHtml switch문에 case 추가(다른 case와 같은 패턴 —
+        <code>listLifecycleDueSoon</code> 결과를 자산 목록 응답에 조인).</td></tr>
+    <tr><td><code>client/.../inventory.html:359-368</code> kpi-strip</td>
+      <td>8개 kpi-mini</td>
+      <td>9번째 <code>kpiLifecycle</code> 추가(SBOM 미생성 카드와 같은 패턴, 색=amber)</td></tr>
+    <tr><td><code>server/src/engine/today.ts:229-283</code> deviceItems()</td>
+      <td>①하드닝 ②유지보수점검 2원천</td>
+      <td>③ <code>listLifecycleDueSoon(30)</code> 결과를 세 번째 원천으로 — TodayItem 인터페이스
+        불변(§5-d)</td></tr>
+    <tr><td><code>client/.../map-view.js:462-484</code> shieldDetailHtml(제품)</td>
+      <td>종류/연결자산/매뉴얼/보호범위 mv-row 4줄</td>
+      <td>「연결 자산」 줄 <b>바로 아래</b>에 만료 mv-row 추가 — 판정 축은 <b>assetId 유무와
+        같은 축</b>(item.assetId 있을 때만 lifecycle 조회, 2026-09-14 검토관 [하] 사고와 같은
+        함정 재발 방지). inventory.html 자산 쪽 상세(§4-a)에도 대칭으로 추가.</td></tr>
+    <tr><td><code>server/src/engine/agentloop.ts:2009-2017</code> FORCED_INTENTS</td>
+      <td>eol_check 정규식 1개</td>
+      <td>§6 A안(권장) 채택 시 — <b>새 정규식 없이</b> eol_check 핸들러 안에서
+        <code>listLifecycleDueSoon</code>을 이어 붙임(라우팅 충돌 자체가 안 생김). B안 채택 시
+        — 새 FORCED_INTENTS 항목 삽입 후 반드시 <code>node tools/routes-renumber.mjs --write</code>
+        (자리 번호로 가리키는 표라 손으로 세면 밀린다, CLAUDE.md 실사고 그대로).</td></tr>
+    <tr><td><code>server/src/engine/agenttools/registry.ts:226,294</code></td>
+      <td>eol_check 등록</td>
+      <td>B안 채택 시 <code>lifecycle_status</code>·<code>set_lifecycle</code> 핸들러 등록
+        (같은 파일 같은 패턴)</td></tr>
+    <tr><td><code>server/src/engine/screenguide.ts:1214-1237</code> products.html panels ·
+      <code>:1061-1096</code> inventory.html panels</td>
+      <td>정형 정보·자산 상세 안내 있음, 계약·생애주기 안내 없음</td>
+      <td>§14 문단 추가(두 화면 모두)</td></tr>
+    <tr><td>시험(신규)</td><td>없음</td>
+      <td><code>server/test/</code>에 ① asset_lifecycle CRUD ② lifecycleBadge 30/90일 경계값
+        ③ eolDate·supplierContact 제거 후 소스 감시(다른 곳에서 그 키를 안 쓰는지) ④
+        FORCED_INTENTS 충돌 검사(§15-3) ⑤ wiringcontract류 — 새 toggle이 실제로 열리는지.</td></tr>
+  </table>
+
+  <h2><span class="num">§14</span>안내(screenguide) 초안</h2>
+  <div class="quote">"계약·생애주기(협력사·EOS/EOL·구독·유지보수)": "보안장비(보안제품 관리)와
+    소프트웨어 자산 양쪽에서 <b>같은 판</b>으로 협력사 연락처·라이선스 종류·구독 기간·(영구
+    라이선스일 때) 유지보수 종료일·EOS(판매종료)·EOL(지원종료)·유상 연장을 관리합니다. 등록은
+    대화창에서 합니다 — 예: <b>"○○ 유지보수 2027-03-31까지 등록해줘"</b>. 날짜 중 <b>가장 이른
+    것</b>이 30일 이내면 🔴 임박, 90일 이내면 🟡 주의로 자산 목록·오늘의 할 일에 나타납니다.
+    ⚠ 값이 비어 있으면 "모른다"이지 "괜찮다"가 아닙니다 — 등록된 계약이 없으면 그렇다고
+    정직하게 말합니다. 옛 정형 정보의 '지원 종료일'과 '공급업체 연락처' 칸은 이 판으로
+    옮겨졌습니다."</div>
+  <p class="src">화면엔 배지 한 줄과 ⚠만 두고, 자세한 설명은 위 문단처럼 ⓘ가 여는 screenguide로
+    — 전-7 "설명은 전부 챗봇으로" 원칙 그대로다.</p>
+
+  <h2><span class="num">§15</span>게시 관문 후보 3개(구현 뒤 추가)</h2>
+  <ol class="doc">
+    <li><b>칸 수 검사</b> — <code>.fields-panel</code>(계약·생애주기) 안 그리는 칸이 정확히
+      9개인가(LIFECYCLE_FIELD_SCHEMA 길이와 화면 렌더 개수 일치) — 스키마에 항목을 더하거나
+      뺐는데 화면이 안 따라가는 사고 방지(FORCED_INTENTS 표 밀림과 같은 종류의 함정).</li>
+    <li><b>흡수 검사(소스 감시)</b> — <code>PRODUCT_FIELD_SCHEMA</code>에 <code>eolDate</code>·
+      <code>supplierContact</code> 키가 더 이상 없는가, 그리고 두 문자열이 코드베이스 다른
+      곳(화면·문서·screenguide)에 살아 있는 사본으로 안 남아 있는가.</li>
+    <li><b>라우팅 배타성 검사</b> — 대표 문장("지원 끝나는 장비 있어?" 등 §6 표의 예문)을
+      FORCED_INTENTS 정규식 전체에 돌려 <b>정확히 하나</b>(A안이면 eol_check 하나, B안이면
+      의도한 도구 하나)에만 걸리는지 — 둘 다 걸리거나 둘 다 안 걸리면 FAIL.</li>
+  </ol>
+  <p class="src">정확한 구현 위치(단위 테스트 vs 게시 시 9227 CDP 실화면 관문)는 설계관이
+    정한다 — 이 시안은 "무엇을 세어야 하는가"까지만 못박는다.</p>
+
+  <h2><span class="num">§16</span>밝은/어두운 배색 — 쓰는 변수, 새로 안 만듦</h2>
+  <p>이 시안이 쓰는 색은 전부 products.html/inventory.html이 이미 쓰는 토큰이다 — <b>새 변수
+    이름을 만들지 않는다.</b> 우측 상단 ☀/🌙을 눌러 실제로 뒤집어 보라.</p>
+  <table class="doc">
+    <tr><th>토큰</th><th>다크(기본)</th><th>밝음(pro-white.css)</th><th>이 시안에서 쓰는 곳</th></tr>
+    <tr><td><code>--bg</code></td><td>#262624</td><td>#faf8f5</td><td>배경</td></tr>
+    <tr><td><code>--panel / --panel-2</code></td><td>#30302e / #1f1e1d</td><td>#ffffff / #f2efe9</td><td>토글·패널·input 배경</td></tr>
+    <tr><td><code>--border / --border-strong</code></td><td>8%/16% 흰색</td><td>12%/22% 짙은색</td><td>구분선</td></tr>
+    <tr><td><code>--text / --muted / --muted-2</code></td><td>#e9e7e2 / #b3ada4 / #a49d95</td><td>#2b2621 / #6b6259 / #726960</td><td>본문·라벨</td></tr>
+    <tr><td><code>--blue / --blue-light</code></td><td>#3b82f6 / #5fa1ff</td><td>#1d4f91(동일)</td><td>토글 강조·링크</td></tr>
+    <tr><td><code>--amber</code></td><td>#f0a020</td><td>#8f4d02</td><td>"임박" 배지·새 KPI 카드</td></tr>
+    <tr><td><code>--teal</code></td><td>#1eb980</td><td>#086b43</td><td>"완료" 상태</td></tr>
+    <tr><td><code>--red</code></td><td>#e2483d</td><td>#b3241a</td><td>배지(직접 정의 안 하고 하드코딩 #f5928a는
+      기존 화면의 --red-ink 관례를 그대로 옮김)</td></tr>
+    <tr><td><code>--purple</code></td><td>#8b7cf0</td><td>#5b21b6</td><td>AI 위험 KPI</td></tr>
+  </table>
+  <div class="okbox">자가점검: 이 파일에 <code>#3b82f6</code> 같은 하드코딩 색이 몇 곳(배지 등)
+    있지만 전부 <b>기존 화면이 이미 쓰는 하드코딩과 같은 값</b>이다(예: inventory.html의
+    <code>--red-ink, #f5928a</code> 폴백 패턴) — 이 시안이 새로 지어낸 색은 없다.</div>
+
+  <h2><span class="num">§17</span>1단계 범위 · 이 시안이 안 한 일(2단계로 미룸)</h2>
+  <ul class="doc">
+    <li><b>1단계(이번 요청 범위)</b>: asset_lifecycle 표 + products.html/inventory.html 입력
+      자리(§3·§4) + 대화창 조회·등록(§6) + 자산 목록 열(§5-a) + 오늘의 할 일 줄(§5-d).</li>
+    <li><b>2단계</b>: 지도 방패·자산 타일의 <b>지도 배지</b>(색·아이콘) · 임원 리포트 「갱신 예정
+      계약」 표 · 엑셀 반입 열 추가(대량 등록) · 30/90일 잣대를 설정 화면에서 바꾸는 UI ·
+      라이선스 종류별 동적 표시(구독이면 구독기간 강조, 영구면 유지보수 강조) · 계약 이력
+      (지금은 대상당 1행 — 갱신 이력이 필요해지면 별도 history 테이블).</li>
+    <li>실서버 연동 없음 — 위 모든 데모는 이 문서 안 상태 전환이다(저장 버튼은 토스트만 띄운다).</li>
+    <li>§6 라우팅 A/B안 중 <b>결정하지 않았다</b> — 사장님·설계관 확인 후 결정.</li>
+  </ul>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  // ── §2 지금(재현) — 9칸 1열, eolDate·supplierContact 포함 ──
+  var OLD_FIELDS = [
+    { label: "펌웨어/버전", value: "7.2.1" },
+    { label: "시리얼 번호", value: "SN-88213" },
+    { label: "관리 IP·포트·접근 프로토콜", value: "192.168.10.1:443 HTTPS" },
+    { label: "로그 형식", value: "Syslog RFC5424" },
+    { label: "로그 전송 방식", value: "" },
+    { label: "인증/접근 방식", value: "RADIUS" },
+    { label: "설치 위치/네트워크 구간", value: "IDC 3F 랙-12" },
+    { label: "지원 종료일(EOL)", value: "" },
+    { label: "공급업체/담당자 연락처", value: "" },
+  ];
+  function oldFieldRow(f) {
+    var badge = f.value ? '<span class="f-badge saved">저장됨</span>' : '<span class="f-badge empty">미입력</span>';
+    return '<div class="field-row"><span class="field-label">' + esc(f.label) + '</span>' +
+      '<input class="field-input" value="' + esc(f.value) + '" readonly>' + badge + '</div>';
+  }
+  document.getElementById("oldFieldsPanel").innerHTML =
+    '<div class="fields-draft-row"><input type="file" disabled style="font-size:11px;color:var(--muted-2)"><button class="fbtn ai" disabled>✨ AI로 초안 채우기</button></div>' +
+    OLD_FIELDS.map(oldFieldRow).join("") +
+    '<div class="fields-actions"><button class="fbtn" disabled>⬇ 초안 다운로드</button><button class="fbtn save" disabled>✓ 정형 정보 저장</button></div>';
+
+  // ── §3 제안 — 계약·생애주기 9칸 2열(살아있는 데모) ──
+  function lcPanelHtml() {
+    return (
+      '<div class="lc-grid">' +
+      '<div class="lc-cell"><span class="lc-label">협력사·담당자 연락처</span><input class="lc-input" placeholder="예: ㈜SECUI / 홍길동 010-…" value="㈜SECUI / 김보안 010-1234-5678"></div>' +
+      '<div class="lc-cell"><span class="lc-label">라이선스 종류</span><select class="lc-input"><option>영구</option><option>구독</option><option>오픈소스·번들</option><option>기타</option></select></div>' +
+      '<div class="lc-cell"><span class="lc-label">구독 기간</span><span class="lc-pair"><input type="date" value=""><input type="date" value=""></span></div>' +
+      '<div class="lc-cell"><span class="lc-label">유지보수 종료일(영구)</span><input class="lc-input" type="date" value="2026-10-13"></div>' +
+      '<div class="lc-cell"><span class="lc-label">EOS(판매 종료일)</span><input class="lc-input" type="date" value=""></div>' +
+      '<div class="lc-cell"><span class="lc-label">EOL(지원 종료일)</span><input class="lc-input" type="date" value="2024-06-30"></div>' +
+      '<div class="lc-cell"><span class="lc-label">유상 연장</span><span class="lc-pair"><input placeholder="이름(예: Red Hat ELS)" value="Red Hat ELS"><input type="date" value="2026-10-13"></span></div>' +
+      '<div class="lc-cell"><span class="lc-label">근거·확인일</span><input class="lc-input" value="Red Hat 수명주기 공지 · 2026-09-02 대조"></div>' +
+      '<div class="lc-cell full"><span class="lc-label">비고</span><input class="lc-input" placeholder="예: 갱신 담당은 구매팀"></div>' +
+      '</div>' +
+      '<div class="fields-actions"><button class="fbtn save" id="lcSaveBtn">✓ 계약·생애주기 저장</button><span id="lcSaveHint" style="font-size:11.5px;color:var(--muted-2)"></span></div>'
+    );
+  }
+  var lcToggle = document.getElementById("lcToggle");
+  var lcPanel = document.getElementById("lcPanel");
+  lcPanel.innerHTML = lcPanelHtml();
+  lcToggle.addEventListener("click", function () {
+    var opening = lcPanel.style.display === "none";
+    lcPanel.style.display = opening ? "block" : "none";
+    lcToggle.classList.toggle("open", opening);
+    measureLc();
+  });
+  document.addEventListener("click", function (e) {
+    if (e.target && e.target.id === "lcSaveBtn") {
+      document.getElementById("lcSaveHint").textContent = "이 시안 안에서만 반영됨 — 서버 호출 없음(가짜 상호작용 금지 원칙에 따라 실제로 저장하지 않습니다).";
+    }
+  });
+  // 좁은 폭(§9) — 같은 패널을 1열 강제 폭 안에 재사용
+  document.getElementById("lcPanelNarrow").innerHTML = lcPanelHtml();
+
+  function measureLc() {
+    var box = document.getElementById("lcMeasure");
+    if (lcPanel.style.display === "none") {
+      box.innerHTML = "지금 접혀 있습니다(37.6px 토글 1줄만) — 토글을 눌러 펼쳐 보세요.";
+      return;
+    }
+    var h = lcPanel.getBoundingClientRect().height;
+    box.innerHTML = "이 문서를 지금 여신 브라우저가 직접 잰 값 — 판 높이 <b>" + Math.round(h) +
+      "px</b>(CSS 명시값 5행×44.5+단추줄 33.2≈255.7px와 비교해 보세요. 다르면 폰트 렌더링 차이입니다).";
+  }
+  measureLc();
+  window.addEventListener("resize", measureLc);
+
+  // ── §5-a 자산 목록 "만료" 열 켜기/끄기(살아있는 데모) ──
+  var INV_ROWS = [
+    { name: "웹서버-01", host: "192.168.1.10", owner: "정보보안팀", cat: "인프라", risk: "고위험", riskColor: "#f5928a", expiry: { label: "임박", cls: "soon", text: "D-29 · 유지보수" } },
+    { name: "DB서버-02", host: "192.168.1.20", owner: "DB팀", cat: "인프라", risk: "중위험", riskColor: "#f7c777", expiry: { label: "지원 종료", cls: "done", text: "EOL 2024-06-30" } },
+    { name: "fraud-detect-llm", host: "-", owner: "AI팀", cat: "AI 서비스", risk: "저위험", riskColor: "#6fdcb5", expiry: null },
+  ];
+  var expColOn = false;
+  function renderInv() {
+    var head = document.getElementById("invHead");
+    var body = document.getElementById("invBody");
+    var cols = ["자산명", "호스트명", "소유부서", "카테고리", "위험도"];
+    if (expColOn) cols.push("만료");
+    head.innerHTML = '<th style="width:24px"></th>' + cols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "<th></th>";
+    body.innerHTML = INV_ROWS.map(function (r) {
+      var tds = '<td class="trunc">' + esc(r.name) + "</td><td class=\"trunc\">" + esc(r.host) + "</td><td class=\"trunc\">" + esc(r.owner) + "</td><td class=\"trunc\">" + esc(r.cat) + '</td>' +
+        '<td><span style="color:' + r.riskColor + ';font-weight:800">' + esc(r.risk) + "</span></td>";
+      if (expColOn) {
+        tds += r.expiry
+          ? '<td><span class="chip ' + r.expiry.cls + '">' + esc(r.expiry.label) + '</span> <span style="color:var(--muted-2);font-size:11px">' + esc(r.expiry.text) + "</span></td>"
+          : '<td><span style="color:var(--muted-2)">등록된 계약 없음</span></td>';
+      }
+      return "<tr><td><input type=\"checkbox\"></td>" + tds + "<td>▸</td></tr>";
+    }).join("");
+  }
+  document.getElementById("expColToggle").addEventListener("change", function (e) {
+    expColOn = e.target.checked;
+    renderInv();
+  });
+  renderInv();
+
+  // 밝기 토글 — 실제 제품(app.html)과 같은 방식.
+  document.getElementById("themeBtn").addEventListener("click", function () {
+    var on = document.documentElement.classList.toggle("theme-light");
+    this.textContent = on ? "☀ 밝은 배색 (누르면 🌙 어두운 배색)" : "🌙 어두운 배색 (누르면 ☀ 밝은 배색)";
+  });
+})();
+</script>
+</body>
+</html>
