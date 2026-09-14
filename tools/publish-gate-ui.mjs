@@ -1577,9 +1577,15 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     const btn = document.getElementById("addBtn");
     if (!btn) return { 버튼없음: true };
     if (btn.disabled) return { 버튼잠김: true }; // admin 아니면 여기서 멈춘다(관문 계정은 admin이라 정상은 false)
-    btn.click();
-    await new Promise((x) => setTimeout(x, 300));
+    // ⚠ 2026-09-14 16:03 실측: #addBtn 리스너는 화면 init 뒤에 붙는데 단추가 보이자마자 한 번만 눌러
+    //   모달이 안 열린 채 판정했다(거짓 빨강 — 5.97.0 두 번째 게시가 여기서 막혔다; 「만료」 검사와 같은
+    //   부류). 모달이 실제로 열릴 때까지(#regModal.g-on) 300ms마다 다시 누른다(최대 4초).
     const modal = document.getElementById("regModal");
+    for (let i = 0; i < 14; i++) {
+      if (modal && modal.classList.contains("g-on")) break;
+      btn.click();
+      await new Promise((x) => setTimeout(x, 300));
+    }
     const chips = [...document.querySelectorAll("#kindRow .g-chip")].map((c) => c.textContent.trim());
     const authOpts = [...document.querySelectorAll("#rAuth option")].map((o) => o.value);
     const 열림 = !!modal && modal.classList.contains("g-on");
