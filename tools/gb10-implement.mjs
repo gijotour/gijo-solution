@@ -22,7 +22,8 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 && args[i + 1] 
 const has = (k) => args.includes(k);
 const NAME = opt("--name", "impl");
 const SPEC = opt("--spec", "");
-const FILES = (opt("--files", "") || "").split(",").map((s) => s.trim()).filter(Boolean);
+const FILE_SPECS = (opt("--files", "") || "").split(",").map((s) => s.trim()).filter(Boolean).map((s) => { const m = s.match(/^(.*?):(\d+)-(\d+)$/); return m ? { f: m[1], a: Number(m[2]), b: Number(m[3]) } : { f: s }; });
+const FILES = FILE_SPECS.map((x) => x.f);
 const MAX = Number(opt("--max-tokens", 4000));
 const MODE = opt("--mode", "diff"); // diff | append
 const TAIL = Number(opt("--tail", 120));
@@ -30,8 +31,8 @@ const 뿌리 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 if (!SPEC || !FILES.length) { console.error("사용: --spec <지시서> --files <a,b> [--name n] [--mode diff|append]"); process.exit(1); }
 
 const 지시 = fs.readFileSync(path.resolve(뿌리, SPEC), "utf8");
-const 파일들 = FILES.map((f) => ({ f, 글: fs.readFileSync(path.resolve(뿌리, f), "utf8") }));
-const 큰파일 = MODE === "append" ? [] : 파일들.filter((x) => x.글.length > 120000);
+const 파일들 = FILE_SPECS.map((x) => ({ ...x, 글: fs.readFileSync(path.resolve(뿌리, x.f), "utf8") }));
+const 큰파일 = MODE === "append" ? [] : 파일들.filter((x) => !x.a && x.글.length > 120000);
 if (큰파일.length) { console.error("⚠ 120KB 넘는 파일은 통째로 못 보낸다 — --mode append 나 발췌가 필요: " + 큰파일.map((x) => x.f).join(", ")); process.exit(1); }
 
 const 줄들 = (글) => 글.split(/\r?\n/);
@@ -47,7 +48,7 @@ const prompt = MODE === "append"
     "너는 GIJO AS 저장소의 구현자다. 아래 지시서대로 **대상 파일만** 고치고, 결과를 `git apply`가 그대로 먹는 unified diff(--- a/경로 / +++ b/경로, @@ 헝크 줄 번호 정확히)로만 답하라.",
     "규칙: 지시서 밖의 변경 금지 · 대상 파일 밖 변경 금지 · 설명 문장 금지(diff만) · 한글 문장은 지시서의 어투(경어체·「」)를 따른다 · 줄 끝(CRLF/LF)은 원문 그대로.",
     "", "[지시서]", 지시, "",
-    ...파일들.flatMap((x) => ["[대상 파일: " + x.f + "] (줄 번호는 1부터, 아래는 원문 그대로)", 줄들(x.글).map((l, i) => String(i + 1).padStart(5) + "  " + l).join("\n"), ""]),
+    ...파일들.flatMap((x) => { const L = 줄들(x.글); const a = x.a || 1, b = x.b || L.length; return ["[대상 파일: " + x.f + "] (총 " + L.length + "줄 · 아래는 " + a + "~" + b + "줄 구간 원문 그대로 · diff 헝크의 줄 번호는 이 번호를 그대로 쓴다 · 구간 밖은 고치지 않는다)", L.slice(a - 1, b).map((l, i) => String(a + i).padStart(5) + "  " + l).join("\n"), ""]; }),
     "이제 diff만 출력하라. ```diff 로 감싸도 된다.",
   ].join("\n");
 
