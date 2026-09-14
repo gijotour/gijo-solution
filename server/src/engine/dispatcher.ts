@@ -348,6 +348,15 @@ const ACTION_PATTERNS: { action: OrchestrationStep["action"]; re: RegExp }[] = [
   { action: "report", re: /리포트|보고서|report/i },
 ];
 
+// planInstruction의 접속사 판정 — 연이은 동작 낱말 **사이의 글**에 이것이 있을 때만 다음 단계로
+// 센다. 없으면 뒤 낱말(문장 끝 동작)만 남긴다. 2026-09-14 사장님 승인.
+// ⚠ 왜 필요한가 (실측 2026-09-14) — 낱말 공출현만으로 단계를 세면 「우선순위 리포트 작성해줘」·
+//   「스캔 결과 리포트 만들어줘」·「재스캔 리포트 보여줘」·「취약점 분석 리포트 작성해줘」·
+//   「분석 보고서 뽑아줘」가 전부 2단계 오케스트레이션으로 갔다 — 스캔 낱말이 있으면
+//   시키지 않은 전 자산 스캔이 결재판 없이 돌았다(2026-08-03 실측 190초 부류). 접속사가
+//   실제로 있는 「스캔하고 리포트까지」·「우선순위 분석하고 리포트 작성해줘」류는 그대로 2단계.
+export const STEP_JOIN_RE = /하고|해서|한\s*(?:뒤|다음|후)|후에?\s|그리고|,|·|및|→|다음에|끝나면|되면/;
+
 // 지시문에서 스캔 대상 범위를 해석한다.
 function resolveScopeFromText(text: string): StepScope {
   if (/cti/i.test(text) && /영향|관련|매칭|affected/i.test(text)) return { type: "cti-affected" };
@@ -365,12 +374,28 @@ function resolveScopeFromText(text: string): StepScope {
 }
 
 // 규칙 기반 계획: 지시문에 나타난 액션 키워드를 등장 순서대로 단계로 만든다(결정적 — 테스트 용이).
+// ⚠ 2026-09-14 접속사 규칙 — 낱말이 나타난 자리(시작~끝)를 exec로 잡고, 연이은 두 낱말
+//   **사이의 글**에 STEP_JOIN_RE가 있을 때만 다음 단계로 쌓는다. 없으면 앞 낱말을 버리고
+//   뒤 낱말(문장 끝 동작)로 교체한다 — text.search는 끝 자리를 안 줘서 사이 글을 못 자르므로
+//   반드시 exec를 쓴다.
 export function planInstruction(text: string): OrchestrationStep[] {
-  const hits = ACTION_PATTERNS.map(({ action, re }) => ({ action, pos: text.search(re) })).filter((h) => h.pos >= 0);
-  hits.sort((a, b) => a.pos - b.pos);
+  const hits = ACTION_PATTERNS
+    .map(({ action, re }) => {
+      const m = re.exec(text);
+      return m ? { action, 시작: m.index, 끝: m.index + m[0].length } : null;
+    })
+    .filter((h): h is { action: OrchestrationStep["action"]; 시작: number; 끝: number } => h !== null);
+  hits.sort((a, b) => a.시작 - b.시작);
+  const 뽑힘: typeof hits = hits.length ? [hits[0]] : [];
+  for (let i = 1; i < hits.length; i++) {
+    const 마지막 = 뽑힘[뽑힘.length - 1];
+    const 사이 = text.slice(마지막.끝, hits[i].시작);
+    if (STEP_JOIN_RE.test(사이)) 뽑힘.push(hits[i]);
+    else 뽑힘[뽑힘.length - 1] = hits[i]; // 접속 없음 — 뒤 낱말(문장 끝 동작)만 남긴다
+  }
   const scope = resolveScopeFromText(text);
   const LABELS: Record<OrchestrationStep["action"], string> = { scan: "스캔", analyze: "우선순위 분석", report: "리포트 작성" };
-  return hits.map((h) => ({
+  return 뽑힘.map((h) => ({
     action: h.action,
     scope: h.action === "scan" ? scope : undefined,
     label: LABELS[h.action],

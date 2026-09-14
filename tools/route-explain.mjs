@@ -337,7 +337,7 @@ export const 승인된겹침 = [
           "2단계 리포트가 **같은 모수**로 이어진다(88dddbec·1d9ee2e5, orchanalyze.test.ts·opssimteam.test.ts가 이 문장을 그 모양으로 잰다 · " +
           "야간 팀원 축 ⑲ 문항). generateReport 한 장으로 보내면 담당자가 시킨 분석 단계가 사라진다. " +
           "⚠ 승인 범위는 **접속사(하고)로 이어진 이 꼴**뿐이다 — 「우선순위 리포트 작성해줘」·「스캔 결과 리포트 만들어줘」처럼 " +
-          "낱말만 나란한 한 동작 지시까지 2단계로 가는 것은 planInstruction의 낱말 공출현 판정(ACTION_PATTERNS) 결함이며 별건으로 다룬다(2026-09-14 실측).",
+          "낱말만 나란한 한 동작 지시까지 2단계로 가는 것은 2026-09-14 접속사 규칙(dispatcher.STEP_JOIN_RE · plan-conjunction.test.ts)으로 닫았다.",
     승인일: "2026-09-14",
     승인자: "사장님(판단·처리 위임) · 판단 Claude",
   },
