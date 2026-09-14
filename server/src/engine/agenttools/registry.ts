@@ -21,6 +21,7 @@ import { targetRunner, runnerFor, 원격점검인가 } from "../hardeningscan";
 import { listTargets } from "../hardeningtargets";
 import { 잃은취약점찾기, 잃은취약점현황글, 되살리기 } from "../findingsrestore";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "../securityproducts";
+import { resolveLifecycleField } from "../lifecycle"; // 📅 계약·생애주기(2026-09-14) — validate/effect 잣대 하나
 import { listMaintenanceItems, createMaintenanceItem } from "../maintenance";
 import { listCompliance, setComplianceStatus } from "../compliance";
 import { generateSbom } from "../sbom";
@@ -225,6 +226,8 @@ import {
   runSetAiBomField,
   runEolCheck,
   runScanHardeningTargetTool,
+  runLifecycleStatus,
+  runSetLifecycle,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -292,6 +295,60 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [{ name: "asset", label: "자산", description: "특정 자산만 볼 때 (비우면 전체)", required: false }],
     run: runEolCheck,
+  },
+  {
+    // 📅 계약·생애주기(2026-09-14, 계획서 중-7 + 전-4) — 협력사·라이선스·구독/유지보수 기간·
+    //   EOS/EOL을 자산·보안제품 공용으로 본다. eol_check(SBOM 부품 대조)와는 다른 물음이다
+    //   (그쪽은 부품 하나하나, 이쪽은 자산·제품 자체에 딸린 계약). domain은 "lifecycle" —
+    //   "assets"로 두면 products.html 화면의 available 게이트에 막혀 강제 규칙이 조용히
+    //   안 걸린다(screencontext.ts 주석과 같은 실측).
+    name: "lifecycle_status",
+    label: "계약·생애주기 현황",
+    domain: "lifecycle",
+    write: false,
+    description:
+      '자산·보안제품에 등록된 협력사·라이선스·구독/유지보수 기간·EOS/EOL을 본다. "만료 임박 계약 알려줘", "계약 현황 알려줘"에 쓴다. ⚠ 등록된 것이 없으면 "등록된 계약이 없습니다"라고 말한다 — 없다는 것은 「모른다」이지 「괜찮다」가 아니다. 예: {} 또는 {"target":"FW-01"}',
+    directAnswer: true,
+    params: [{ name: "target", label: "대상", description: "특정 자산·보안제품만 볼 때 (비우면 전체)", required: false }],
+    run: runLifecycleStatus,
+  },
+  {
+    // 📅 계약·생애주기 **등록**(쓰기) — 결재판 필수. ⚠ ⓛ 필수칸 계약: args에 넘기는 값은
+    //   지시문에 글자 그대로 있는 것이어야 한다(내부 id 금지) — 이름→id 해석은 handler
+    //   안(resolveLifecycleTarget)에서 한다.
+    name: "set_lifecycle",
+    label: "계약·생애주기 등록",
+    domain: "lifecycle",
+    write: true,
+    description:
+      '자산·보안제품의 계약·생애주기 한 칸을 등록한다. "FW-01 유지보수 2027-03-31까지 등록해줘"에 쓴다. 대상은 화면에 보이는 **이름**으로 준다(내부 id 금지). 예: {"target":"FW-01","field":"유지보수 종료일","value":"2027-03-31"}',
+    params: [
+      { name: "target", label: "대상 장비·제품", description: "자산 이름 또는 보안제품 이름", required: true },
+      { name: "field", label: "항목", description: "협력사·라이선스 종류·구독 기간·유지보수 종료일·EOS·EOL·유상 연장·근거·비고 중 하나", required: true },
+      { name: "value", label: "값", description: "날짜는 YYYY-MM-DD", required: true },
+    ],
+    validate: (args) => {
+      const 사유들: string[] = [];
+      const field = (args.field ?? "").trim();
+      const match = field ? resolveLifecycleField(field) : null;
+      if (field && !match) {
+        사유들.push(
+          `항목 이름을 못 알아봤습니다: ${field} (협력사·라이선스 종류·구독 기간·유지보수 종료일·EOS·EOL·유상 연장·근거·비고)`
+        );
+      }
+      const value = (args.value ?? "").trim();
+      if (match?.isDate && value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        사유들.push(`날짜는 YYYY-MM-DD 꼴로 적어 주세요 — 값: ${value}`);
+      }
+      return 사유들;
+    },
+    effect: (args) => {
+      const field = (args.field ?? "").trim();
+      const 라벨 = (resolveLifecycleField(field)?.label) ?? field;
+      return `${args.target || "(대상 없음)"}의 ${라벨}${조사(라벨, "을")} ${args.value}로 등록합니다`;
+    },
+    undo: "같은 항목을 다시 등록하면 덮어씁니다(이력은 작업 기록에 남습니다)",
+    run: runSetLifecycle,
   },
   {
     // ⚠ **쓰기다.** 고객 장비에 원격 접속해 명령을 돌린다 — 결재판을 반드시 거친다.

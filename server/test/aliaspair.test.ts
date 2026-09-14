@@ -123,6 +123,14 @@ describe("★ 별칭 전수 — 강제 도구의 말을 채 가는 별칭은 대
     "incidentcases.html|비슷한 사례|incident_cases|정체물음",
     "incidentcases.html|사고 사례|incident_cases|정체물음",
     "settings.html|어떤 모델|system_health|정체물음",
+    // 2026-09-14 계약·생애주기(중-7+전-4) — inventory.html·products.html 화면별칭에 "EOS"가
+    // 새로 등록됐다(screenguide.ts, "계약·생애주기" 안내로 연다). 그런데 "EOS"는 이미
+    // agentloop.ts의 eol_check 정규식 `/(EOL|EOS)\b|.../i`이 낱말 하나로 걸고 있어(2026-08-04
+    // 신설, 이 라운드가 안 건드림), "EOS 뭐야?" 류가 안내보다 먼저 eol_check로 간다.
+    // eol_check 정규식은 이 라운드의 범위 밖(넓히든 좁히든 전수 diff가 선행 조건 — 되돌려보낼
+    // 조건 ②)이라 정규식은 안 고치고, 이 겹침을 알려진 것으로 등록만 한다.
+    "inventory.html|EOS|eol_check|정체물음",
+    "products.html|EOS|eol_check|정체물음",
   ].sort();
 
   /** ⚠ 역할을 넘긴다 — forcedToolFor는 역할을 안 주면 admin 전용 도구를 후보에서 뺀다.

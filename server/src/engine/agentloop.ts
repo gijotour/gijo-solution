@@ -2453,6 +2453,43 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string>; 
     args: {},
     argsByModel: true,
   },
+  // ★★ 2026-09-14 계약·생애주기(계획서 중-7 + 전-4) — 배열 **끝**에 새 규칙 2건(자리 번호는
+  //   손으로 세지 않는다, node tools/routes-renumber.mjs --write). 시안 mockups/asset-lifecycle/
+  //   시안.html §6·§13 승인분 + 설계관 차단 반영(A안 — eol_check가 이미 이 답을 이어 붙인다,
+  //   이 두 규칙은 "협력사·라이선스·구독·유지보수" 같은 계약 낱말이 **명시적으로 있을 때만** 걸린다).
+  //
+  //   [lifecycle_status] 앞자리가 방어: `maintenance_status` 규칙(agentloop.ts 1263행 근처)이
+  //   「유지보수 …알려/현황/보여」를 먼저 먹는다(실측 3문장: 「유지보수 계약 만료 알려줘」·
+  //   「유지보수 계약 현황 알려줘」·「유지보수 종료일 알려줘」 — 전부 maintenance_status로 간다,
+  //   FORCED 중간 삽입 금지라 그 규칙에 낱말을 더 넣는 대신 **이 규칙이 "유지보수·정비"를
+  //   배제어로 갖는다**). `knowledge_bundle_status`가 「지식 번들 구독 현황 알려줘」를 먼저
+  //   먹는다(실측) · `list_assets`(1415행 근처 "위험도 높은 …자산")가 「고위험 자산 계약 만료
+  //   알려줘」를 먼저 먹는다(실측 — "위험" 배제어로도 갈린다).
+  //   ⚠ 배제어가 유일한 방어인 자리: 「라이선스 위험」(licenserisk 영토)·「모델 라이선스」·
+  //   「계약서」(문서)·「만료 임박한 취약점」 — 넷 다 지금 ⑨(모델 선택)라 앞자리 방어가 없다.
+  //   그래서 정규식 자체에 취약점·모델·위험·계약서·번들 등을 배제어로 넣는다.
+  //   ⚠ 2026-09-14 실측(route-explain --겹침) — 「협력사에 자산 목록 줘도 되나?」가 dispatcher의
+  //   [30] 행동 대조(ACTION_CHECK_RE, "해도 되나"류 정책 문답)와 새로 겹쳤다. [30]은 FORCED_INTENTS
+  //   **루프보다 앞서** 도는 특수경로라 이 규칙을 손대도 순서를 못 바꾼다 — 그래서 "해도 되나"류
+  //   허가 물음은 애초에 이 규칙의 영토가 아니라고 배제어로 못 박는다(정책 문답과 계약 조회는
+  //   다른 질문이다).
+  //   ⚠ 2026-09-14 실측(server/test/aliaspair.test.ts) — sbom.html의 기존 별칭 "라이선스가 왜"
+  //   (2026-08-05 등록, "라이선스 미상" 안내로 간다)를 이 규칙이 새로 채 갔다("라이선스가 왜
+  //   알려줘"류). "왜"(이유 물음)는 계약 조회가 아니라 설명·안내의 영토라 배제어로 넣는다.
+  {
+    re: /^(?![\s\S]*(취약점|CVE-|오픈소스|모델|위험|계약서|번들|절차|방법|규정|지침|정책|기준|차이|뭐가\s*달|뭐야|뭔가|무엇|설명|이란|란\s*뭐|왜|해도|줘도|되나|될까|허용))(?![\s\S]*(유지\s*보수|정비))(?![\s\S]*(등록|기록|적어|설정)\s*해)(?=[\s\S]*(계약|구독|라이선스|라이센스|협력사|공급\s*업체|만료))(?=[\s\S]*(알려|보여|있어|있나|있는|현황|목록|임박|언제))/,
+    tool: "lifecycle_status",
+    args: {},
+  },
+  // [set_lifecycle] 쓰기 — write:true라 결재판이 받쳐 준다(대상·항목 해석이 틀려도 사람이
+  //   승인 창에서 확인한다). "문서|파일|매뉴얼|자료|번들|점검"을 배제해 문서 등록·점검 등록
+  //   요청을 안 삼킨다.
+  {
+    re: /^(?![\s\S]*(문서|파일|매뉴얼|자료|번들|점검))(?=[\s\S]*(계약|구독|라이선스|라이센스|유지\s*보수|협력사|공급\s*업체|EOS|EOL|만료|종료일))[\s\S]*(등록|기록|설정|적어)\s*해\s*(줘|주세요|라|다오)?\s*[.!?~]*$/i,
+    tool: "set_lifecycle",
+    args: {},
+    argsByModel: true,
+  },
 ];
 
 // ── [83] 사내 지표율 — **주체어 규칙**(게이트, 기본 꺼짐) ────────────────────────
@@ -2797,7 +2834,13 @@ function 구역이름물음(instruction: string): boolean {
 //     닫힌다. 파생 지점의 손가드는 그래서 없앴다(닿지 않는 죽은 줄이 된다).
 //     단일 명령(「FW-01 하드닝 점검 돌려줘」·「하드닝 점검 돌려줘」)은 쓰기흐름인가가 거짓이라
 //     **그대로 결재판**이다(hardening-scantarget.test.ts의 18문장 계약이 그것을 못 박는다).
-const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status", "briefing", "approval_status", "exec_brief", "explain", "finding_status", "search", "list_assets", "threats", "suggest_command", "knowledge_status", "scan_status", "run_redteam", "run_hardening_scan"]);
+// ★ 2026-09-14 계약·생애주기 — lifecycle_status를 더한다. 이 도구는 **배열 안** 규칙이라
+//   이 Set 하나로 "조회 → 배정" 2수 흐름이 풀린다 — 실측 3문장(「만료 임박 계약 알려주고
+//   김보안한테 배정해줘」·「계약 현황 알려주고 승인해줘」·「라이선스 현황 알려주고 담당자
+//   정해줘」)에서 `쓰기흐름인가()`가 true다. set_lifecycle은 **쓰기라 넣지 않는다**(그 자체가
+//   결재판을 거친다 — run_redteam·run_hardening_scan과 달리 뒤에 다른 쓰기가 안 붙어도 항상
+//   결재판이므로 이 Set에 넣을 이유가 없다).
+const 조회로못박지않을것 = new Set(["today", "urgent_todo", "maintenance_status", "briefing", "approval_status", "exec_brief", "explain", "finding_status", "search", "list_assets", "threats", "suggest_command", "knowledge_status", "scan_status", "run_redteam", "run_hardening_scan", "lifecycle_status"]);
 
 /** 강제 결과 — `데이터의존`은 **글자만으로 안 갈리는 갈래**(제목 지목: 문서 목록을 조회한다)라는 표시다.
  *  route-explain이 이 값을 보고 「간다」고 단정하지 않는다(dispatcher 결정적도착지의 `조건부`). */

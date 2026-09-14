@@ -70,6 +70,18 @@ import { getAdaptation, setThinkingOverride } from "../modelquirks";
 import { runSmoke } from "../modelsmoke";
 import { currentViewer } from "../viewerctx";
 import { findUserById } from "../../auth/users";
+// 📅 계약·생애주기(2026-09-14, 계획서 중-7+전-4) — 자산·보안제품 공용 잣대.
+import {
+  resolveLifecycleField,
+  getLifecycle,
+  saveLifecycle,
+  listLifecycleDueSoon,
+  listAllLifecycle,
+  생애주기배지,
+  주의일,
+  type LifecycleRow,
+  type LifecycleTargetType,
+} from "../lifecycle";
 
 /** 화면 파일명 → 담당자가 메뉴에서 보는 한글 이름. 못 찾으면 파일명 대신 빈 값을 쓰지 않고
  *  그대로 두되, screenguide에 제목이 있으면 그것을 쓴다(안내 문구와 메뉴 이름이 같아야 한다). */
@@ -117,6 +129,9 @@ export const TOOL_DOMAINS = [
   "report", // 보고서
   "knowledge", // 장기기억·온톨로지
   "threat", // 위협 인텔
+  // 📅 계약·생애주기(2026-09-14, 중-7+전-4) — 자산·보안제품 두 화면이 함께 쓰는 도구다.
+  // "assets"에만 달면 products.html의 available 게이트가 강제 규칙을 조용히 막는다(§screencontext.ts).
+  "lifecycle",
 ] as const;
 export type ToolDomain = (typeof TOOL_DOMAINS)[number] | "cross";
 
@@ -4498,6 +4513,15 @@ export async function runEolCheck(args: Record<string, string>): Promise<string>
   const { EOL_SEED, eol찾기, eol한줄확실도, 이름이정확한가, eol표상태 } = await import("../eol-seed.js");
   const 대상글 = (args.asset ?? args.assetId ?? "").trim();
 
+  // 📅 A안(2026-09-14 설계관 확정) — eol_check가 실제로 걸리는 말(「지원 끝난 장비 있어?」·
+  //   「EOL 확인해줘」)에서 SBOM 부품 대조 + 등록 계약 만료를 **함께** 듣게 한다.
+  //   ⚠ 이 합침은 「지원 끝나는 장비 있어?」 충돌을 푸는 것이 **아니다** — 그 문장은
+  //   2026-09-14 실측(route-explain --no-build)에서 이 정규식에 **안 걸린다**(agentloop.ts
+  //   FORCED_INTENTS eol_check는 「끝난·끝났」만 알고 「끝나는」을 모른다 — ⑨ 모델 선택으로 간다).
+  //   여기 붙이는 이유는 오직 "이 도구가 실제로 불릴 때 두 가지 다른 종류의 '지원 종료'
+  //   (부품 패치 vs 계약)를 한 번에 다 듣게" 하려는 것이다.
+  const 계약꼬리 = 등록계약만료꼬리();
+
   let 자산들 = listAssets();
   let 범위글 = "전체 자산";
   if (대상글) {
@@ -4537,12 +4561,12 @@ export async function runEolCheck(args: Record<string, string>): Promise<string>
   const 범위줄 = `📋 ${범위글} 부품 ${부품수}개를 지원종료 표(${EOL_SEED.length}줄)와 맞춰 봤습니다.`;
 
   if (!부품수) {
-    return `${범위줄}\n\n부품 목록이 비어 있습니다 — 먼저 "SBOM 만들어줘" 또는 "패키지 목록 읽어줘"로 부품을 채우셔야 합니다.`;
+    return `${범위줄}\n\n부품 목록이 비어 있습니다 — 먼저 "SBOM 만들어줘" 또는 "패키지 목록 읽어줘"로 부품을 채우셔야 합니다.\n\n${계약꼬리}`;
   }
   if (!걸린.length) {
     return (
       `${범위줄}\n\n표에 걸리는 부품이 **없습니다.**\n` +
-      `⚠ 다만 이 표는 널리 알려진 ${EOL_SEED.length}줄만 담고 있습니다 — **표에 없다는 것은 「모른다」이지 「지원 중」이 아닙니다.**\n\n${eol표상태()}`
+      `⚠ 다만 이 표는 널리 알려진 ${EOL_SEED.length}줄만 담고 있습니다 — **표에 없다는 것은 「모른다」이지 「지원 중」이 아닙니다.**\n\n${eol표상태()}\n\n${계약꼬리}`
     );
   }
 
@@ -4564,8 +4588,113 @@ export async function runEolCheck(args: Record<string, string>): Promise<string>
       ? `⚠ **종료일이 이미 지났지만 같은 제품인지 확인이 필요한 부품 ${이름확인.length}건** (이름이 표와 겹치기만 할 수 있습니다)\n${그리기(이름확인)}\n\n`
       : "") +
     (예정.length ? `⏳ 지원 종료가 예정된 부품 ${예정.length}건\n${그리기(예정)}\n\n` : "") +
-    `⚠ 표에 걸리지 않은 나머지 ${부품수 - 걸린.length}개는 **「지원 중」이 아니라 「모른다」**입니다 — 표가 ${EOL_SEED.length}줄뿐입니다.\n\n${eol표상태()}`
+    `⚠ 표에 걸리지 않은 나머지 ${부품수 - 걸린.length}개는 **「지원 중」이 아니라 「모른다」**입니다 — 표가 ${EOL_SEED.length}줄뿐입니다.\n\n${eol표상태()}\n\n${계약꼬리}`
   );
+}
+
+/** eol_check A안 꼬리 — SBOM 부품 대조와는 다른 물음(등록 계약의 만료)을 한 번에 듣게 한다. */
+function 등록계약만료꼬리(): string {
+  const items = listLifecycleDueSoon(주의일);
+  if (!items.length) return "📅 등록된 계약이 없습니다 — 이 답은 SBOM 부품만 본 것입니다.";
+  const 줄 = items
+    .slice(0, 8)
+    .map((i) => `- ${i.이름} — ${i.종류} ${i.날짜} (${i.상태 === "종료" ? "지원 종료" : `D-${i.dday}`})`)
+    .join("\n");
+  return `📅 등록된 계약 중 90일 안에 만료: ${items.length}건\n${줄}${items.length > 8 ? `\n… 외 ${items.length - 8}건` : ""}`;
+}
+
+// ── 📅 계약·생애주기(2026-09-14) — lifecycle_status(조회) · set_lifecycle(등록) ──────────────
+// 대상 이름(화면에 보이는 이름) → {targetType, targetId}를 여기서 해석한다(잎 모듈 lifecycle.ts는
+// securityproducts·assets를 못 부르므로 — 순환 금지 원칙). 결재판 필수칸 계약(ⓛ)의 요구대로
+// **내부 id는 여기서만 만든다** — 모델·args에는 절대 넘기지 않는다(registry.ts:2596-2615).
+function resolveLifecycleTarget(raw: string): { targetType: LifecycleTargetType; targetId: string; name: string } | null {
+  const t = (raw ?? "").trim();
+  if (!t) return null;
+  const products = listProducts();
+  const exact = products.find((p) => p.name === t);
+  if (exact) return { targetType: "product", targetId: exact.id, name: exact.name };
+  const partial = products.filter((p) => p.name.includes(t));
+  if (partial.length === 1) return { targetType: "product", targetId: partial[0].id, name: partial[0].name };
+  const asset = resolveAsset(t);
+  if (asset) return { targetType: "asset", targetId: asset.id, name: asset.name };
+  return null;
+}
+
+function 등록후보이름들(): string {
+  const 제품 = listProducts().map((p) => p.name);
+  const 자산 = listAssets().map((a) => a.name);
+  return [...제품, ...자산].slice(0, 6).join(", ") || "(없음)";
+}
+
+/** 조회 — target이 있으면 그 하나, 없으면 전체(계획서 중-7 + 전-4). */
+export function runLifecycleStatus(args: Record<string, string>): string {
+  const targetRaw = (args.target ?? "").trim();
+
+  if (targetRaw) {
+    const hit = resolveLifecycleTarget(targetRaw);
+    if (!hit) return `"${targetRaw}"에 맞는 자산·보안제품을 못 찾았습니다. 등록된 것: ${등록후보이름들()}`;
+    const row = getLifecycle(hit.targetType, hit.targetId);
+    const badge = 생애주기배지(row);
+    if (!row) {
+      return (
+        `📅 ${hit.name}에는 등록된 계약이 없습니다 — 협력사·구독·유지보수 기간은 담당자가 등록해야 우리가 압니다.\n` +
+        `대화창에서 이렇게 등록합니다: "${hit.name} 유지보수 2027-03-31까지 등록해줘"`
+      );
+    }
+    const 줄들 = [
+      `- 협력사·담당자: ${row.vendorContact || "(미등록)"}`,
+      `- 라이선스 종류: ${row.licenseType || "(미등록)"}`,
+      `- 구독 기간: ${row.subStart || "?"} ~ ${row.subEnd || "?"}`,
+      `- 유지보수 종료일(영구): ${row.maintenanceEnd || "(미등록)"}`,
+      `- EOS(판매 종료일): ${row.eos || "(미등록)"} · EOL(지원 종료일): ${row.eol || "(미등록)"}`,
+      `- 유상 연장: ${row.extName || "(미등록)"}${row.extEnd ? ` · ${row.extEnd}` : ""}`,
+      `- 근거·확인일: ${row.evidence || "(미등록)"}`,
+    ].join("\n");
+    return `📅 ${hit.name}의 계약·생애주기 — 판정: ${badge.글 || "여유"}\n${줄들}`;
+  }
+
+  const 전체 = listAllLifecycle();
+  if (!전체.length) {
+    return (
+      "📅 등록된 계약이 없습니다 — 협력사·구독·유지보수 기간은 담당자가 등록해야 우리가 압니다.\n" +
+      '대화창에서 이렇게 등록합니다: "FW-01 유지보수 2027-03-31까지 등록해줘"'
+    );
+  }
+  const 임박목록 = listLifecycleDueSoon(주의일);
+  const 확인필요건 = 전체.filter((r) => 생애주기배지(r).상태 === "확인필요").length;
+  const 머리줄 = `📅 등록된 계약 ${전체.length}건 중 90일 안에 만료되는 것 ${임박목록.length}건`;
+  const 그리기 = 임박목록
+    .slice(0, 12)
+    .map((i) => `- ${i.이름} — ${i.종류} ${i.날짜} (${i.상태 === "종료" ? "지원 종료" : `D-${i.dday}`})`)
+    .join("\n");
+  const 넘침 = 임박목록.length > 12 ? `\n… 외 ${임박목록.length - 12}건` : "";
+  const 확인필요줄 = 확인필요건 > 0 ? `\n\n⚠ 날짜를 못 읽어 확인이 필요한 것 ${확인필요건}건` : "";
+  return `${머리줄}${그리기 ? `\n${그리기}${넘침}` : ""}${확인필요줄}`;
+}
+
+/** 등록(쓰기) — 대상·항목·값 셋 다 필요. 결재판이 확인한 뒤에만 실행된다. */
+export function runSetLifecycle(args: Record<string, string>): string {
+  const targetRaw = (args.target ?? "").trim();
+  const fieldRaw = (args.field ?? "").trim();
+  const value = (args.value ?? "").trim();
+
+  const hit = resolveLifecycleTarget(targetRaw);
+  if (!hit) return `"${targetRaw}"에 맞는 자산·보안제품을 못 찾았습니다. 등록된 것: ${등록후보이름들()}`;
+
+  const match = resolveLifecycleField(fieldRaw);
+  if (!match) {
+    return `항목 이름을 못 알아봤습니다: ${fieldRaw} (협력사·라이선스 종류·구독 기간·유지보수 종료일·EOS·EOL·유상 연장·근거·비고)`;
+  }
+  if (match.isDate && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return `날짜는 YYYY-MM-DD 꼴로 적어 주세요 — 값: ${value}`;
+  }
+
+  const patch: Partial<LifecycleRow> = {};
+  (patch as Record<string, string>)[match.column] = value;
+  const row = saveLifecycle(hit.targetType, hit.targetId, patch, 결재실행자());
+  if (!row) return `${hit.name}의 ${match.label} 저장에 실패했습니다.`; // saveLifecycle은 항상 값을 돌려주지만, 거짓 완료를 말하지 않는 관례를 지킨다.
+  const badge = 생애주기배지(row);
+  return `${표식.좋음} ${hit.name}의 ${match.label}${조사(match.label, "을")} ${value}로 등록했습니다. 지금 만료 판정: ${badge.글 || "여유"}`;
 }
 
 // ── 📚 침해사고 히스토리(2026-09-03) — 조회·등록·삭제·사례의 샘 ─────────────────────────

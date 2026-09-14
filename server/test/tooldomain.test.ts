@@ -71,7 +71,8 @@ describe("권한 게이팅 (requiredRole)", () => {
 describe("화면 → 도구 영역 연결", () => {
   it("업무 화면은 자기 영역을 준다", () => {
     expect(toolDomainsForScreen("vulnscan.html")).toEqual(["vuln", "assets"]);
-    expect(toolDomainsForScreen("products.html")).toEqual(["products"]);
+    // 2026-09-14 계약·생애주기(중-7+전-4) — products.html도 lifecycle 도구를 쓴다(screencontext.ts).
+    expect(toolDomainsForScreen("products.html")).toEqual(["products", "lifecycle"]);
     expect(toolDomainsForScreen("maintenance.html")).toEqual(["maintenance"]);
   });
 

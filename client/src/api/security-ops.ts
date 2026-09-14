@@ -157,6 +157,74 @@ export const securityProductsApi = {
     }>("/api/security-products/import-doc", { method: "POST", body: { filename, content } }),
 };
 
+// ── 📅 계약·생애주기(협력사·EOS/EOL·구독·유지보수) — 2026-09-14 신설(계획서 중-7+전-4) ──────
+// 자산(assets)·보안제품(security_products)이 같은 표(server/src/engine/lifecycle.ts)를 쓴다.
+export type LifecycleTargetType = "asset" | "product";
+
+export interface LifecycleRow {
+  id: string;
+  targetType: LifecycleTargetType;
+  targetId: string;
+  vendorContact: string | null;
+  licenseType: string | null;
+  subStart: string | null;
+  subEnd: string | null;
+  maintenanceEnd: string | null;
+  eos: string | null;
+  eol: string | null;
+  extName: string | null;
+  extEnd: string | null;
+  evidence: string | null;
+  note: string | null;
+  updatedBy: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface LifecycleFieldValue {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export interface LifecycleBadge {
+  상태: "없음" | "확인필요" | "종료" | "임박" | "주의" | "여유";
+  글: string;
+  날짜: string | null;
+  종류: string | null;
+  dday: number | null;
+}
+
+export interface LifecycleDue {
+  targetType: LifecycleTargetType;
+  targetId: string;
+  이름: string;
+  날짜: string;
+  종류: string;
+  dday: number;
+  상태: "종료" | "임박" | "주의";
+}
+
+export interface LifecycleGetResult {
+  row: LifecycleRow | null;
+  fields: LifecycleFieldValue[];
+  badge: LifecycleBadge;
+}
+
+export const lifecycleApi = {
+  get: (targetType: LifecycleTargetType, targetId: string) =>
+    request<LifecycleGetResult>(`/api/lifecycle/${encodeURIComponent(targetType)}/${encodeURIComponent(targetId)}`),
+  save: (targetType: LifecycleTargetType, targetId: string, fields: { key: string; value: string }[]) =>
+    request<LifecycleGetResult>(`/api/lifecycle/${encodeURIComponent(targetType)}/${encodeURIComponent(targetId)}`, {
+      method: "POST",
+      body: { fields },
+    }),
+  due: (days?: number) =>
+    request<{ items: LifecycleDue[]; counts: { 임박: number; 주의: number } }>(
+      `/api/lifecycle/due${days ? `?days=${encodeURIComponent(String(days))}` : ""}`
+    ),
+};
+
 // ── AI 견고성: 레드팀(사후 실측) + 가드레일(실시간 방어) ────────────────
 export interface RedTeamResult {
   id: string;

@@ -202,11 +202,11 @@ describe("securityproducts (보안제품 종류별 관리 + 매뉴얼)", () => {
       const p = createProduct({ name: "방화벽", category: "방화벽" });
       saveProductFields(p.id, [
         { key: "firmwareVersion", value: "v9.2.1" },
-        { key: "eolDate", value: "" }, // 빈 값 — 저장 안 됨
+        { key: "logForwarding", value: "" }, // 빈 값 — 저장 안 됨
       ]);
       const fields = getProductFields(p.id);
       expect(fields.find((f) => f.key === "firmwareVersion")!.value).toBe("v9.2.1");
-      expect(fields.find((f) => f.key === "eolDate")!.value).toBe("");
+      expect(fields.find((f) => f.key === "logForwarding")!.value).toBe("");
     });
 
     it("saveProductFields를 다시 부르면 기존 값을 대체한다(중복 트리플 없음)", () => {
@@ -239,8 +239,6 @@ describe("securityproducts (보안제품 종류별 관리 + 매뉴얼)", () => {
           logForwarding: "",
           authMethod: "",
           location: "",
-          eolDate: "",
-          supplierContact: "",
         })
       );
       const draft = await draftProductFields("FortiGate 600F", "펌웨어 v9.2.1, 관리 포트 10.0.4.1:443, 로그는 CEF 형식");
@@ -282,7 +280,7 @@ describe("securityproducts (보안제품 종류별 관리 + 매뉴얼)", () => {
       chatSpy.mockResolvedValueOnce(
         JSON.stringify({
           firmwareVersion: "v9.2.1", serialNumber: "", managementAccess: "", logFormat: "",
-          logForwarding: "", authMethod: "", location: "", eolDate: "", supplierContact: "",
+          logForwarding: "", authMethod: "", location: "",
         })
       );
       const content = Buffer.from("본 장비의 펌웨어 버전은 v9.2.1 입니다.", "utf8").toString("base64");

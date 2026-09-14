@@ -11,12 +11,13 @@ import { 라이브모드 } from "./datacleanup";
 import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { db } from "../db";
+import { db, migrate } from "../db";
 import type { GijoUser } from "../auth/users";
 import { chat } from "./llm";
 import { getFormatHelperModel } from "./agents"; // 서식 전용 보조 모델(호출별 지정, 2026-09-03)
 import { recordAudit } from "./audit";
 import { addTriple, listTriples, deleteTriple } from "./ontology";
+import { saveLifecycle } from "./lifecycle"; // 2026-09-14 흡수 이관 전용(순환 없음 — lifecycle.ts는 잎 모듈)
 import { syncDocTriples, manualTriples } from "./docgraph";
 // ★ 정적 import (2026-08-27 화살 #6) — 옛 주석은 「무거운 모듈이라·순환이라 동적」이라 적었지만
 //   실측(의존 지도 v2)으로 둘 다 아니었다: 이 방향(보안제품→지식)은 층을 따르는 정방향이고,
@@ -38,6 +39,12 @@ const DOC_KIND_IDS = new Set<string>(DOC_KINDS.map((k) => k.id));
 // 근거: NIST SP 800-53 CM-8(자산목록 필수 항목: 버전·시리얼·네트워크주소·물리위치·공급업체) +
 // ServiceNow/BMC 계열 CMDB의 보안장비 스키마(펌웨어·포트·인증) + EOL 메타데이터 관리 관행.
 // 로그 형식·전송방식은 GIJO AS 특화 — 이 제품의 핵심 가치가 보안로그 분석이라 실제 파서 연결에 쓰인다.
+//
+// ⚠ 지원 종료일(eolDate)·공급업체 연락처(supplierContact)는 2026-09-14에 **계약·생애주기**
+//   (engine/lifecycle.ts · asset_lifecycle 표)로 옮겼다 — 같은 값을 두 곳(여기 온톨로지 트리플 +
+//   새 표)에 두지 않는다. 소프트웨어 자산(inventory.html)엔 이 정형 정보 판 자체가 없어
+//   "지원 종료일"을 자산에는 못 적었는데, 계약·생애주기는 자산·보안제품이 **같은 표**를 쓴다.
+//   기존 값은 이 파일 아래 1회 이관 마이그레이션이 asset_lifecycle로 옮기고 트리플에서 지운다.
 export const PRODUCT_FIELD_SCHEMA = [
   { key: "firmwareVersion", label: "펌웨어/버전" },
   { key: "serialNumber", label: "시리얼 번호" },
@@ -46,8 +53,6 @@ export const PRODUCT_FIELD_SCHEMA = [
   { key: "logForwarding", label: "로그 전송 방식" },
   { key: "authMethod", label: "인증/접근 방식" },
   { key: "location", label: "설치 위치/네트워크 구간" },
-  { key: "eolDate", label: "지원 종료일(EOL)" },
-  { key: "supplierContact", label: "공급업체/담당자 연락처" },
 ] as const;
 const FIELD_KEYS = new Set<string>(PRODUCT_FIELD_SCHEMA.map((f) => f.key));
 
@@ -563,7 +568,8 @@ export function seedSampleProductsIfEmpty(): void {
 seedSampleProductsIfEmpty();
 
 // 저장된 정형 정보를 온톨로지 트리플에서 읽어 고정 스키마 순서로 돌려준다 — 값이 없는 항목도
-// 빈 문자열로 채워서 화면이 항상 9개 행을 그린다(사람이 뭘 더 채워야 하는지 한눈에 보이게).
+// 빈 문자열로 채워서 화면이 항상 7개 행을 그린다(사람이 뭘 더 채워야 하는지 한눈에 보이게).
+// (2026-09-14: eolDate·supplierContact를 계약·생애주기로 옮겨 9개→7개로 줄었다.)
 export function getProductFields(productId: string): ProductFieldValue[] {
   const byKey = new Map<string, string>();
   for (const t of listTriples({ subject: productId })) {
@@ -589,11 +595,51 @@ export function saveProductFields(productId: string, fields: { key: string; valu
   return getProductFields(productId);
 }
 
+// ── 1회 이관 — eolDate·supplierContact 트리플 → asset_lifecycle (2026-09-14) ────────────────
+//
+// PRODUCT_FIELD_SCHEMA에서 두 키를 뺐으므로, 기존에 값이 있던 트리플은 이제 FIELD_KEYS에
+// 없어 **읽히지도 지워지지도 않는 고아**가 된다("그 값을 누가 넣는가" 원칙 — 옮기는 쪽이
+// 생산자가 된다). 이 모듈이 로드될 때(서버 기동 1회) 딱 한 번 옮긴다.
+//
+// ⚠ `migrate(id, sql)`는 SQL 한 줄만 실행하는 도구라 이 코드 이관(JS 루프 + saveLifecycle
+//   호출)을 그 안에 넣을 수 없다 — 그래서 `migrate(id, "SELECT 1")`은 **실행 기록만** 남기는
+//   용도로 쓰고, "이미 이관했는가"는 schema_migrations 테이블을 직접 조회해 앞에서 막는다.
+// ⚠ 날짜 꼴이 아닌 자유 문자열(예: "2026년 말")은 asset_lifecycle.eol에 넣지 않는다 — 넣으면
+//   배지 계산(lifecycle.남은일수)이 조용히 null을 반환해 "확인 필요"로 숨죽어 버린다. 대신
+//   evidence 칸으로 옮기고 그 사실을 적는다(아래 EOL_DATE_RE 분기).
+(function 이관_eolDate_supplierContact(): void {
+  const 이미했나 = db.prepare("SELECT 1 FROM schema_migrations WHERE id = ?").get("lifecycle-absorb-productfields-2026-09-14");
+  if (이미했나) return;
+  const EOL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const 대상들 = db
+    .prepare(`SELECT id, subject, predicate, object FROM ontology_triples WHERE predicate IN ('eolDate', 'supplierContact')`)
+    .all() as { id: string; subject: string; predicate: string; object: string }[];
+  let 이관건수 = 0;
+  for (const t of 대상들) {
+    const value = (t.object ?? "").trim();
+    if (value) {
+      if (t.predicate === "eolDate") {
+        if (EOL_DATE_RE.test(value)) saveLifecycle("product", t.subject, { eol: value }, "migration:2026-09-14");
+        else saveLifecycle("product", t.subject, { evidence: `옛 정형 정보 값: ${value}` }, "migration:2026-09-14");
+      } else if (t.predicate === "supplierContact") {
+        saveLifecycle("product", t.subject, { vendorContact: value }, "migration:2026-09-14");
+      }
+      이관건수++;
+    }
+    deleteTriple(t.id); // 빈 값이었어도 트리플 자체는 고아이므로 지운다(FIELD_KEYS에서 이미 빠졌다).
+  }
+  migrate("lifecycle-absorb-productfields-2026-09-14", "SELECT 1");
+  if (이관건수 > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[securityproducts] eolDate·supplierContact ${이관건수}건을 계약·생애주기(asset_lifecycle)로 이관했습니다.`);
+  }
+})();
+
 function buildFieldDraftPrompt(productName: string, text: string): string {
   const fieldLines = PRODUCT_FIELD_SCHEMA.map((f) => `- ${f.key}: ${f.label}`).join("\n");
   return [
     `다음은 보안제품 "${productName}" 매뉴얼에서 발췌한 텍스트입니다.`,
-    "아래 9개 항목의 값을 문서에서 찾아 JSON으로 채우세요.",
+    "아래 7개 항목의 값을 문서에서 찾아 JSON으로 채우세요.",
     "문서에 명시적으로 나오지 않는 항목은 반드시 빈 문자열(\"\")로 두세요 — 절대 추측하거나 지어내지 마세요.",
     fieldLines,
     "",

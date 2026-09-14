@@ -832,3 +832,44 @@ migrate(
   `ALTER TABLE upload_receipts ADD COLUMN uploadedById TEXT;
    CREATE INDEX IF NOT EXISTS idx_upload_receipts_by ON upload_receipts(uploadedById);`
 );
+
+// ── 계약·생애주기(협력사·EOS/EOL·구독·유지보수) — engine/lifecycle.ts (2026-09-14 신설) ─────
+//
+// ■ 무엇을 담나 — 소프트웨어 자산(assets)과 보안제품(security_products)이 **같은 표**를 쓴다.
+//   대상 종류(targetType)+대상 id로 가른다.
+//
+// ■ 왜 자산·보안제품을 한 표에 담나(사본 어긋남 방지) — 계획서 지시서 원문: "같은 값
+//   (협력사·EOS·EOL·구독·유지보수)을 두 곳(자산용·제품용)에 따로 만들면 이 저장소가 반복해
+//   겪은 사본 어긋남이 또 생긴다." 표를 둘로 나누면 같은 수리를 두 벌 해야 하고, 하나만
+//   고치면 그 환경에서만 나는 결함이 생긴다(이 저장소가 반복해 겪은 실패 패턴 — 위쪽
+//   ★★ "저장소를 환경별로 나누지 않는다" 항목과 같은 원리).
+//
+// ■ targetType은 **"asset"|"product" 둘뿐**이다 — 그 밖의 값을 받는 코드는 없다(REST 계층이
+//   400으로 막는다, lifecycle.ts registerLifecycleRoutes 참고).
+//
+// ⚠ 새 표는 위쪽 db.exec(CREATE TABLE …) 블록이 아니라 여기 **migrate로** 추가한다 — 운영
+//   DB에는 그 블록이 이미 돌았으므로 새 표는 이 방식이 관례다(바로 위 "스키마 마이그레이션
+//   추적" 절 · baseline-2026-07 이후 새 표는 전부 이렇게 들어왔다).
+migrate(
+  "asset-lifecycle-2026-09-14",
+  `CREATE TABLE IF NOT EXISTS asset_lifecycle (
+     id TEXT PRIMARY KEY,
+     targetType TEXT NOT NULL,
+     targetId TEXT NOT NULL,
+     vendorContact TEXT,
+     licenseType TEXT,
+     subStart TEXT,
+     subEnd TEXT,
+     maintenanceEnd TEXT,
+     eos TEXT,
+     eol TEXT,
+     extName TEXT,
+     extEnd TEXT,
+     evidence TEXT,
+     note TEXT,
+     updatedBy TEXT,
+     createdAt INTEGER NOT NULL,
+     updatedAt INTEGER NOT NULL
+   );
+   CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_lifecycle_target ON asset_lifecycle(targetType, targetId);`
+);

@@ -349,6 +349,11 @@ const gijoApi = {
   getProductFields: (id: string) => api.securityProductsApi.getFields(id),
   saveProductFields: (id: string, fields: { key: string; value: string }[]) => api.securityProductsApi.saveFields(id, fields),
   draftProductFields: (id: string, filename: string, content: string) => api.securityProductsApi.draftFields(id, filename, content),
+  // 📅 계약·생애주기(2026-09-14, 중-7+전-4) — 자산·보안제품 공용. 위치 인자로 넘긴다(객체면 500).
+  getLifecycle: (targetType: string, id: string) => api.lifecycleApi.get(targetType as "asset" | "product", id),
+  saveLifecycle: (targetType: string, id: string, fields: { key: string; value: string }[]) =>
+    api.lifecycleApi.save(targetType as "asset" | "product", id, fields),
+  lifecycleDueSoon: (days?: number) => api.lifecycleApi.due(days),
 
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),

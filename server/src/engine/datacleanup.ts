@@ -56,6 +56,10 @@ export const TARGETS: Record<string, { label: string; tables: string[] }> = {
   scan_drafts: { label: "스캔 해석 초안(스캔 팀원 산출)", tables: ["scan_drafts"] },
   // 부품표 해석 초안(2026-09-03) — 타사 SBOM 검수(업무 데이터)의 파생물
   bom_drafts: { label: "부품표 해석 초안(부품 팀원 산출)", tables: ["bom_drafts"] },
+  // 📅 계약·생애주기(2026-09-14, 중-7+전-4) — 자산·보안제품이 같은 표를 쓰므로 group을 하나만
+  // 둔다(어느 한쪽만 지워도 asset_lifecycle이 통째로 비므로, products·assets에 나눠 걸면
+  // "이 그룹을 지우면 저 그룹 데이터도 같이 지워진다"는 숨은 부작용이 생긴다).
+  lifecycle: { label: "계약·생애주기(협력사·EOS/EOL·구독·유지보수) 대장", tables: ["asset_lifecycle"] },
 };
 
 // 실사용 전환 리셋이 지우는 전체 목록 — TARGETS의 부분집합(감사·지식·설정은 애초에 목록에 없다).
@@ -70,6 +74,8 @@ export const RESET_TARGETS = [
   "scan_drafts",
   // 부품표 해석 초안 — 검수에서 파생된 업무 데이터(2026-09-03)
   "bom_drafts",
+  // 계약·생애주기 — 협력사·구독·유지보수 정보는 시연 데이터라 실사용 전환에서 함께 지운다.
+  "lifecycle",
 ] as const;
 
 // ── 라이브 모드(실사용 전환) 스위치 ─────────────────────────────────────────

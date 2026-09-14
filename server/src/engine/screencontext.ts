@@ -44,7 +44,11 @@ const SCREENS: Record<string, ScreenContext> = {
   "mydocs.html": { label: "내 문서", domain: "개인 메모 — 내 질문에만 근거로 나오는 개인 지식" },
 
   // 자산과 취약점은 붙어 다닌다 — 자산 목록에서 "이 자산 취약점 담당자 배정해줘"가 자연스럽다.
-  "inventory.html": { label: "자산 목록", domain: "AI·IT 자산 인벤토리", defaultAction: "scan", toolDomains: ["assets", "vuln"] },
+  // toolDomains에 "lifecycle"을 더한다(2026-09-14) — 계약·생애주기 도구는 자산·보안제품
+  // 두 화면에서 함께 쓴다. domain을 assets로만 두면 보안제품 화면(products.html)에서
+  // available 게이트에 막혀 강제 규칙이 **조용히** 안 걸린다(agentloop.ts 3025행 근처
+  // `available.has(f.tool)` — 2026-09-14 실측으로 확인한 함정).
+  "inventory.html": { label: "자산 목록", domain: "AI·IT 자산 인벤토리", defaultAction: "scan", toolDomains: ["assets", "vuln", "lifecycle"] },
   // ⓪ 자산 — **고르는 화면**이다(관리는 inventory.html). 범위를 걸고 나면 그 자산의 취약점을
   // 곧바로 묻는 흐름이 자연스러워, 자산 목록과 같은 도구 묶음을 준다.
   // ⚠ 이 줄이 없으면 `getScreenContext("assets.html")`이 undefined라 **화면 맥락도 도구
@@ -61,7 +65,8 @@ const SCREENS: Record<string, ScreenContext> = {
   "approvals.html": { label: "조치·승인", domain: "탐지 항목 승인·반려", toolDomains: ["vuln"] },
 
   "threat.html": { label: "위협 인텔리전스", domain: "외부 위협 인텔·CTI 피드", toolDomains: ["threat"] },
-  "products.html": { label: "보안제품", domain: "보안제품 등록부·매뉴얼", toolDomains: ["products"] },
+  // toolDomains에 "lifecycle"을 더한다(2026-09-14, inventory.html과 같은 이유 — 위 주석 참고).
+  "products.html": { label: "보안제품", domain: "보안제품 등록부·매뉴얼", toolDomains: ["products", "lifecycle"] },
   "maintenance.html": { label: "정기 점검", domain: "정기 점검 일정·이력", toolDomains: ["maintenance"] },
 
   "report.html": { label: "내부 리포트", domain: "보고서 작성·배포", defaultAction: "report", toolDomains: ["report"] },

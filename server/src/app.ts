@@ -80,6 +80,7 @@ import { registerPersonalDocsRoutes } from "./engine/personaldocs";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
 import { registerTodayRoutes } from "./engine/today";
 import { registerSecurityProductRoutes, 매뉴얼연결_배선 } from "./engine/securityproducts"; // 화살 #13 — 지식 층에 업무 층을 꽂는다
+import { registerLifecycleRoutes } from "./engine/lifecycle"; // 📅 계약·생애주기(2026-09-14, 중-7+전-4)
 import { registerEmailRoutes } from "./engine/email";
 import { registerSmtpInboundRoutes } from "./engine/smtpinbound";
 import { registerCloudLlmRoutes } from "./engine/cloudllm";
@@ -234,6 +235,7 @@ export function createApp(): Express {
   registerMaintenanceRoutes(app);
   registerTodayRoutes(app);
   registerSecurityProductRoutes(app);
+  registerLifecycleRoutes(app); // 📅 계약·생애주기(2026-09-14, 중-7+전-4)
   registerEmailRoutes(app);
   registerSmtpInboundRoutes(app);
   registerCloudLlmRoutes(app);
