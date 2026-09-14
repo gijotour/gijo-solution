@@ -445,13 +445,46 @@
   function 만료칩HTML(item) {
     var cls = LC_CHIP_CLASS[item.상태] || "soon";
     var label = item.상태 === "확인필요" ? "⚠ 확인 필요" : item.상태 === "종료" ? "지원 종료" : "D-" + item.dday;
-    return '<span class="chip ' + cls + '">' + esc(label) + '</span> <span style="color:var(--muted-2);font-size:11px">' +
+    // EOL이 없어 EOS로 봤으면 그 사실을 툴팁에 싣는다(용어사전이 약속한 문장).
+    var 툴팁 = item.안내 ? ' title="' + esc(item.안내) + '"' : "";
+    return '<span class="chip ' + cls + '"' + 툴팁 + ">" + esc(label) + '</span> <span style="color:var(--muted-2);font-size:11px">' +
       esc(item.종류 || "") + " " + esc(item.날짜 || "") + "</span>";
+  }
+
+  /** 등록 배지 한 항목 → 사람이 읽는 글. 여유는 칩 없이 날짜만(급하지 않다는 뜻). */
+  function 만료표시HTML(e) {
+    if (e.상태 === "여유") {
+      var 툴팁 = e.안내 ? ' title="' + esc(e.안내) + '"' : "";
+      return '<span style="color:var(--muted-2);font-size:11px"' + 툴팁 + ">" + esc(e.종류 || "") + " " + esc(e.날짜 || "") + "</span>";
+    }
+    return 만료칩HTML(e);
+  }
+
+  /**
+   * 🛡 방패(보안제품) 상세판의 「📅 만료」 — **이 제품 자신의 계약**이 먼저다.
+   *
+   * ⚠ 2026-09-14 검토관 [중] 수리 — 주입 맵이 자산(asset)만 담고 있어, FW-01에 유지보수 계약을
+   *   등록해도 방패 판은 영원히 그 값을 못 보여 주고(「등록된 계약이 없습니다」로 거짓),
+   *   연결 자산의 계약이 있으면 **다른 대상의 날짜**를 FW-01 밑에 붙여 줬다. 판 제목이
+   *   「🛡 FW-01」인데 값의 주어가 자산이면 담당자는 그것을 제품 계약으로 읽는다.
+   *   이제 맵이 "product:<id>"·"asset:<id>" 두 갈래라 주어를 갈라 적는다.
+   */
+  function 방패만료HTML(item, ctx) {
+    if (!ctx.생애주기맵 || !ctx.생애주기로드됨) return '<span class="mv-noedge">계약 정보를 아직 못 받았습니다</span>';
+    var 내것 = ctx.생애주기맵.get("product:" + item.id);
+    if (내것 && 내것.상태 !== "없음") return 만료표시HTML(내것);
+    var 연결 = item.assetId ? ctx.생애주기맵.get("asset:" + item.assetId) : null;
+    if (연결 && 연결.상태 !== "없음") {
+      // 주어를 반드시 밝힌다 — 이 줄의 날짜는 **제품이 아니라 연결 자산**의 것이다.
+      return '<span class="mv-noedge">이 제품에 등록된 계약이 없습니다</span><div style="margin-top:4px;font-size:11px">연결 자산' +
+        (item.assetName ? " " + esc(item.assetName) : "") + ": " + 만료표시HTML(연결) + "</div>";
+    }
+    return '<span class="mv-noedge">등록된 계약이 없습니다</span>';
   }
 
   /** 방패(보안제품·하드닝 대상) 상세판 — ③(하드닝)·⑧(보안제품) 칩 1개씩(시안 §2·§8).
    *  보호 관계는 선을 긋지 않고 .mv-noedge 빈 자리 문구로 정직하게 밝힌다(시안 §3).
-   *  ctx(선택) — 📅 계약·생애주기 만료맵 주입(이 파일은 스스로 API를 부르지 않는다, 계약). */
+   *  ctx(선택) — 📅 계약·생애주기 생애주기맵 주입(이 파일은 스스로 API를 부르지 않는다, 계약). */
   function shieldDetailHtml(kind, item, ctx) {
     ctx = ctx || {};
     if (kind === "hardening") {
@@ -484,15 +517,10 @@
             ? ("🔗 " + esc(item.assetName) + ' <span class="chiptag noappr">등록</span>')
             : '<span class="mv-noedge">연결된 자산을 찾을 수 없습니다 — 등록은 돼 있으나 그 자산이 지워졌습니다</span>')
         : '<span class="mv-noedge">등록하면 나타납니다</span>') + "</div>" +
-      // 📅 만료(2026-09-14 시안 승인) — 판정 축은 위 「연결 자산」과 **같은 축(item.assetId 유무)**
-      // 이다(2026-09-14 검토관 [하] 적발과 같은 함정 재발 방지 — 이름으로 갈래를 타지 않는다).
-      // 데이터는 이 화면이 스스로 부르지 않는다 — inventory.html이 만료맵을 ctx로 주입한다.
-      '<div class="mv-row"><div class="mv-lbl">📅 만료</div>' +
-      (item.assetId
-        ? (ctx.만료맵 && ctx.만료맵.get(item.assetId)
-            ? 만료칩HTML(ctx.만료맵.get(item.assetId))
-            : '<span class="mv-noedge">등록된 계약이 없습니다</span>')
-        : '<span class="mv-noedge">연결된 자산이 없어 계약을 잇지 못합니다</span>') + "</div>" +
+      // 📅 만료(2026-09-14 시안 승인 · 같은 날 검토관 [중] 수리) — 주어는 **이 제품 자신**이다.
+      // 판정 축은 이름이 아니라 id다(위 「연결 자산」과 같은 원칙). 데이터는 이 화면이 스스로
+      // 부르지 않는다 — inventory.html이 생애주기맵(두 갈래 키)을 ctx로 주입한다.
+      '<div class="mv-row"><div class="mv-lbl">📅 만료</div>' + 방패만료HTML(item, ctx) + "</div>" +
       '<div class="mv-row"><div class="mv-lbl">매뉴얼 문서</div>' + ((item.docs && item.docs.length) ? item.docs.length + "건" : "없음") + "</div>" +
       // 🛡 보호 범위 — 시안 §4 참조코드 1075의 .mv-noedge 빈 자리 줄(구현에서 빠져 있었다,
       // 2026-09-14 검토관 [중] 적발). 화면 안내(screenguide 「지도」)가 **이 자리를 가리킨다** —

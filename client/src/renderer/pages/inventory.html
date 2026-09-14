@@ -713,20 +713,30 @@
   // 협력사·라이선스·구독·유지보수·EOS/EOL 만료 임박. 잣대(30·90일)는 서버(lifecycle.ts) 한 곳
   // 것을 그대로 쓴다 — 이 화면은 badge.상태·dday만 표시로 옮길 뿐, 문턱 숫자를 갖지 않는다.
   // loadShields()와 같은 무늬: 한 번만 불러 캐시, 실패해도 화면은 계속 뜬다.
-  let 만료맵 = new Map();     // assetId -> LifecycleDue
-  let 만료맵로드됨 = false;    // 성공적으로 받았는지 — 못 받으면 "모름"(-)과 "없음"을 뭉치지 않는다
-  let 만료맵Promise = null;
-  function loadLifecycleDue() {
-    if (만료맵Promise) return 만료맵Promise;
-    만료맵Promise = window.gijo.lifecycleDueSoon(90).then((r) => {
-      const items = (r && r.items) || [];
-      만료맵 = new Map(items.filter((x) => x.targetType === "asset").map((x) => [x.targetId, x]));
-      만료맵로드됨 = true;
+  // ⚠ 2026-09-14 검토관 [상] 수리 — 원천을 **만료 임박 목록**에서 **등록 대상 전부**로 바꿨다.
+  //   임박 목록(items)은 90일 안에 만료되는 것만 담아서, ① 90일 밖 계약(여유)과 ② 날짜를 못
+  //   읽는 계약(확인필요)이 전부 「등록된 계약이 없습니다」로 표시됐다 — 방금 등록한 담당자에게
+  //   제품이 스스로를 부정한 셈이다. 이제 서버가 주는 `등록`(대상 전부 + 상태)을 쓴다.
+  // ⚠ 잣대 숫자(30·90)는 인자로도 적지 않는다 — 서버 기본값이 유일한 출처다(검토관 [중]).
+  let 생애주기맵 = new Map();   // "asset:<id>" | "product:<id>" -> 등록 배지 항목
+  let 생애주기로드됨 = false;   // 못 받으면 "모름"(-)과 "없음"을 뭉치지 않는다
+  let 만료임박수 = null;        // counts.임박 — KPI가 쓰는 값. 화면이 따로 세지 않는다.
+  let 생애주기Promise = null;
+  const lcKey = (t, id) => t + ":" + id;
+  function loadLifecycleDue(다시받기) {
+    if (다시받기) 생애주기Promise = null; // refresh()에서 다시 받는다(계약을 등록하면 바로 반영)
+    if (생애주기Promise) return 생애주기Promise;
+    생애주기Promise = window.gijo.lifecycleDueSoon().then((r) => {
+      생애주기맵 = new Map(((r && r.등록) || []).map((x) => [lcKey(x.targetType, x.targetId), x]));
+      만료임박수 = r && r.counts ? r.counts.임박 : null;
+      생애주기로드됨 = true;
     }).catch(() => {
-      만료맵 = new Map();
-      만료맵로드됨 = false;
+      생애주기맵 = new Map();
+      만료임박수 = null;
+      생애주기로드됨 = false;
+      생애주기Promise = null; // ⚠ 실패는 캐시하지 않는다 — 캐시하면 그 세션 내내 "-"였다(검토관 [하])
     });
-    return 만료맵Promise;
+    return 생애주기Promise;
   }
   // 상태(서버 lifecycle.ts 생애주기배지 그대로) → 칩 class·글자. 문턱 숫자는 여기 없다 —
   // dday·상태는 이미 서버가 계산해 준 값을 그대로 옮겨 적을 뿐이다.
@@ -734,7 +744,23 @@
   function 만료칩HTML(item) {
     const cls = LC_CHIP_CLASS[item.상태] || "soon";
     const label = item.상태 === "확인필요" ? "⚠ 확인 필요" : item.상태 === "종료" ? "지원 종료" : "D-" + item.dday;
-    return `<span class="chip ${cls}">${esc(label)}</span> <span style="color:var(--muted-2);font-size:11px">${esc(item.종류 || "")} ${esc(item.날짜 || "")}</span>`;
+    // EOL이 없어 EOS로 봤으면 그 사실을 툴팁에 싣는다(용어사전이 약속한 문장 — 검토관 [중]).
+    const 툴팁 = item.안내 ? ` title="${esc(item.안내)}"` : "";
+    return `<span class="chip ${cls}"${툴팁}>${esc(label)}</span> <span style="color:var(--muted-2);font-size:11px">${esc(item.종류 || "")} ${esc(item.날짜 || "")}</span>`;
+  }
+
+  // 📅 한 대상의 계약 표시 — **네 가지를 갈라서** 그린다(계약 표 ⓜ·⑩).
+  //   ① 못 받음 → "-"(모름)  ② 미등록 → "등록된 계약이 없습니다"  ③ 여유(임박 아님) → 날짜만
+  //   ④ 임박·주의·종료·확인필요 → 칩. ②③④를 뭉치면 "모른다"가 "괜찮다"로 읽힌다.
+  function 생애주기표시HTML(targetType, id) {
+    if (!생애주기로드됨) return `<span class="mut">-</span>`;
+    const e = 생애주기맵.get(lcKey(targetType, id));
+    if (!e || e.상태 === "없음") return `<span class="mut">등록된 계약이 없습니다</span>`;
+    if (e.상태 === "여유") {
+      const 툴팁 = e.안내 ? ` title="${esc(e.안내)}"` : "";
+      return `<span class="mut"${툴팁}>${esc(e.종류 || "")} ${esc(e.날짜 || "")}</span>`;
+    }
+    return 만료칩HTML(e);
   }
 
   // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
@@ -884,10 +910,8 @@
       ownerCell: (rk && rk.gaps.includes("owner"))
         ? `<span class="sbom-pending" style="cursor:pointer" data-fix-owner="${a.id}" title="담당부서 지정">지정하기</span>`
         : esc(a.owner),
-      // 📅 계약·생애주기(선택 열) — 만료맵을 못 받았으면 "없음"이 아니라 "모름"(-)으로 둔다.
-      expiryCell: 만료맵.has(a.id)
-        ? 만료칩HTML(만료맵.get(a.id))
-        : (만료맵로드됨 ? `<span class="mut">등록된 계약 없음</span>` : `<span class="mut">-</span>`),
+      // 📅 계약·생애주기(선택 열) — 못 받았으면 "없음"이 아니라 "모름"(-), 여유는 날짜만.
+      expiryCell: 생애주기표시HTML("asset", a.id),
     };
   }
   // ⑥ 컬럼 id → 셀 내부 HTML.
@@ -988,9 +1012,7 @@
       칸("지원 서비스", 없으면(r.service)) +
       // 📅 계약·생애주기(2026-09-14 시안 승인) — 보기 전용, 입력칸·저장 버튼은 두지 않는다.
       // 바꾸는 일은 아래 대화창 예문으로(제품 핵심 원칙 — 자산 쪽 화면은 입력칸 금지).
-      칸("📅 계약·생애주기", 만료맵.has(r.id)
-        ? 만료칩HTML(만료맵.get(r.id))
-        : (만료맵로드됨 ? '<span style="color:var(--muted-2)">등록된 계약이 없습니다</span>' : '<span style="color:var(--muted-2)">-</span>')) +
+      칸("📅 계약·생애주기", 생애주기표시HTML("asset", r.id)) +
       `</div>`;
 
     // 취약점 — 없으면 없다고 쓴다(빈칸으로 두면 못 본 것인지 없는 것인지 모른다).
@@ -1052,14 +1074,13 @@
     } catch (e) { /* 못 받으면 "-" 그대로 둔다 */ }
   }
 
-  // 📅 만료 임박 KPI(30일 이내) — listLifecycleDueSoon 하나가 세는 값을 그대로 옮겨 적는다
-  // (화면이 따로 세지 않는다 — 잣대 두 벌 금지). 못 받으면 "-" 그대로 둔다(0=없다는 거짓말).
+  // 📅 만료 임박 KPI — 목록·상세가 이미 받아 둔 **같은 응답의 counts.임박**을 옮겨 적는다.
+  // 화면이 따로 세지도, 날짜 수(30)를 적지도 않는다 — 잣대는 서버 상수 하나뿐이다(검토관 [중]).
+  // 못 받으면 "-" 그대로 둔다(0으로 채우면 "없다"는 거짓말이 된다).
   async function 만료KPI불러오기() {
-    try {
-      const r = await window.gijo.lifecycleDueSoon(30);
-      const el = document.getElementById("kpiLifecycle");
-      if (el && r && r.counts) el.textContent = r.counts.임박 != null ? r.counts.임박 : "-";
-    } catch (e) { /* 못 받으면 "-" 그대로 둔다 */ }
+    await loadLifecycleDue();
+    const el = document.getElementById("kpiLifecycle");
+    if (el) el.textContent = 생애주기로드됨 && 만료임박수 != null ? 만료임박수 : "-";
   }
 
   function render() {
@@ -1445,8 +1466,10 @@
       // 등록 간선이 이 스위치를 본다(시안 §11).
       products: mapProducts || [], hardening: mapHardening || [], registered: true, mode: mapMode,
       // 📅 계약·생애주기(2026-09-14 시안 승인) — map-view.js는 스스로 API를 부르지 않는다(계약).
-      // 이 화면이 이미 불러 둔 만료맵을 그대로 주입한다 — 자산 목록·상세와 같은 데이터·같은 잣대.
-      만료맵,
+      // 이 화면이 이미 불러 둔 것을 그대로 주입한다 — 자산 목록·상세와 같은 데이터·같은 잣대.
+      // ⚠ 키가 "asset:<id>"·"product:<id>" 두 갈래다 — 방패(보안제품)는 **자기 계약**을 봐야
+      //   하는데 자산만 담아 주면 남의 날짜를 자기 것처럼 그린다(2026-09-14 검토관 [중]).
+      생애주기맵, 생애주기로드됨,
       onDetail(a) {
         document.getElementById("mapSide").innerHTML = window.gijoMapView.detailHtml(a, ctx);
         // 공격경로가 켜져 있으면, 고른 자산의 **인접 경로만** 펼친다(거미줄 대신 details-on-demand).
@@ -1593,14 +1616,16 @@
   }
 
   async function refresh() {
-    [allAssets] = await Promise.all([window.gijo.listAssets(), loadMaintCounts(), loadLifecycleDue()]);
+    // ⚠ 계약은 **다시 받는다**(true) — 대화창으로 등록한 직후에도 목록·상세가 옛 값을 보이면
+    //   안 된다. 첫 호출이 실패했을 때도 이 자리에서 재시도된다(2026-09-14 검토관 [하]).
+    [allAssets] = await Promise.all([window.gijo.listAssets(), loadMaintCounts(), loadLifecycleDue(true)]);
     await loadCoverage();
     render();
     // 접혀 있으면 **패널은 그리지 않되 배지 숫자는 센다** — 접힌 것이 있는 줄도 모르면 안 된다.
     if (document.getElementById("extraPanels").style.display !== "none") loadServiceImpact();
     else loadImpactBadge();
     통합요약불러오기();   // 「자산 통합 뷰」에서 옮겨 온 3지표(2026-08-02 화면 통합)
-    만료KPI불러오기();    // 📅 계약·생애주기 — 30일 이내 만료(2026-09-14 시안 승인)
+    만료KPI불러오기();    // 📅 계약·생애주기 — 만료 임박(잣대는 서버 상수 하나, 2026-09-14)
   }
 
   // 서버가 스캔 완료 · SBOM 생성 · 자산 등록 시점마다 WebSocket으로 밀어주는 asset:updated를

@@ -56,6 +56,27 @@ export interface LifecycleDue {
   종류: string;
   dday: number;
   상태: "종료" | "임박" | "주의";
+  안내: string | null;
+}
+
+/**
+ * 등록된 대상 **전부**의 배지 — "만료 임박"만 담는 LifecycleDue와 달리 여유·확인필요도 담는다.
+ *
+ * ⚠ 2026-09-14 검토관 [상] — 화면(자산 목록 「만료」 열·자산 상세·지도 상세판)이 만료 임박
+ *   목록 하나만 보고 그렸더니, **90일 밖(여유)·날짜를 못 읽는 행(확인필요)이 전부
+ *   「등록된 계약이 없습니다」**가 됐다. 방금 등록한 담당자에게 제품이 스스로를 부정한 것이다.
+ *   「모른다」·「여유 있다」·「등록 안 했다」는 서로 다른 셋이라 **원천에서 갈라 내보낸다.**
+ */
+export interface LifecycleBadgeEntry {
+  targetType: LifecycleTargetType;
+  targetId: string;
+  이름: string;
+  상태: 생애주기배지결과["상태"];
+  글: string;
+  날짜: string | null;
+  종류: string | null;
+  dday: number | null;
+  안내: string | null;
 }
 
 export type LifecycleFieldKind = "text" | "select" | "date" | "daterange" | "namedate";
@@ -152,7 +173,19 @@ export interface 생애주기배지결과 {
   날짜: string | null;
   종류: string | null;
   dday: number | null;
+  /** EOL이 없어 EOS로 대체했을 때만 채워진다 — 답·툴팁에 그대로 적는다(아래 상수 참조). */
+  안내: string | null;
 }
+
+/**
+ * EOL이 없어 EOS(판매 종료일)로 대신 판정했을 때 **사람에게 반드시 함께 말하는 문장**.
+ *
+ * ⚠ 2026-09-14 검토관 [중] — 이 문장은 GIJO_AS_용어사전.md가 「답에 함께 적습니다」라고
+ *   약속해 놓고 실제로는 **어느 답에도 안 나왔다**(주석 한 줄에만 있었다). 용어사전은 RAG
+ *   코퍼스에 실려 고객 답변 근거로 인용되므로, 없는 동작이 근거로 나가는 부류였다.
+ *   판매 종료일과 지원 종료일은 뜻이 다른 날짜다 — 말없이 섞으면 담당자가 오해한다.
+ */
+export const EOS대체안내 = "EOL이 없어 EOS로 봤습니다";
 
 /**
  * 계약·생애주기 배지 — 등록된 날짜 중 **가장 이른 것**을 "얼마나 급한가"로 본다.
@@ -165,7 +198,7 @@ export interface 생애주기배지결과 {
  *   "확인필요"("⚠ 확인 필요") — **절대 0일·종료로 치지 않는다.**
  */
 export function 생애주기배지(row: LifecycleRow | null, 오늘: string = 오늘글()): 생애주기배지결과 {
-  if (!row) return { 상태: "없음", 글: "등록된 계약이 없습니다", 날짜: null, 종류: null, dday: null };
+  if (!row) return { 상태: "없음", 글: "등록된 계약이 없습니다", 날짜: null, 종류: null, dday: null, 안내: null };
 
   const 후보: { 날짜: string; 종류: string; dday: number }[] = [];
   const 담기 = (날짜: string | null, 종류: string) => {
@@ -179,14 +212,17 @@ export function 생애주기배지(row: LifecycleRow | null, 오늘: string = �
   else if (남은일수(row.eol ?? "", 오늘) !== null) 담기(row.eol, "지원종료");
   else if (남은일수(row.eos ?? "", 오늘) !== null) 담기(row.eos, "EOS");
 
-  if (후보.length === 0) return { 상태: "확인필요", 글: "⚠ 확인 필요", 날짜: null, 종류: null, dday: null };
+  if (후보.length === 0) return { 상태: "확인필요", 글: "⚠ 확인 필요", 날짜: null, 종류: null, dday: null, 안내: null };
 
   후보.sort((a, b) => a.dday - b.dday);
   const 이른것 = 후보[0];
-  if (이른것.dday < 0) return { 상태: "종료", 글: "지원 종료", 날짜: 이른것.날짜, 종류: 이른것.종류, dday: 이른것.dday };
-  if (이른것.dday <= 임박일) return { 상태: "임박", 글: `D-${이른것.dday}`, 날짜: 이른것.날짜, 종류: 이른것.종류, dday: 이른것.dday };
-  if (이른것.dday <= 주의일) return { 상태: "주의", 글: `D-${이른것.dday}`, 날짜: 이른것.날짜, 종류: 이른것.종류, dday: 이른것.dday };
-  return { 상태: "여유", 글: "", 날짜: 이른것.날짜, 종류: 이른것.종류, dday: 이른것.dday };
+  // EOS로 대체해 판정했으면 **그 사실을 답에 실어 보낸다**(2026-09-14 검토관 [중] 수리).
+  const 안내 = 이른것.종류 === "EOS" ? EOS대체안내 : null;
+  const 공통 = { 날짜: 이른것.날짜, 종류: 이른것.종류, dday: 이른것.dday, 안내 };
+  if (이른것.dday < 0) return { 상태: "종료", 글: "지원 종료", ...공통 };
+  if (이른것.dday <= 임박일) return { 상태: "임박", 글: `D-${이른것.dday}`, ...공통 };
+  if (이른것.dday <= 주의일) return { 상태: "주의", 글: `D-${이른것.dday}`, ...공통 };
+  return { 상태: "여유", 글: "", ...공통 };
 }
 
 const ROW_COLUMNS = [
@@ -288,15 +324,7 @@ export function listLifecycleDueSoon(days: number = 주의일): LifecycleDue[] {
   const rows = dueRowsStmt.all() as DueRawRow[];
   const out: LifecycleDue[] = [];
   for (const r of rows) {
-    const badge = 생애주기배지(
-      {
-        id: "", targetType: r.targetType, targetId: r.targetId,
-        vendorContact: null, licenseType: null, subStart: null, subEnd: r.subEnd,
-        maintenanceEnd: r.maintenanceEnd, eos: r.eos, eol: r.eol, extName: null, extEnd: r.extEnd,
-        evidence: null, note: null, updatedBy: null, createdAt: 0, updatedAt: 0,
-      },
-      오늘
-    );
+    const badge = 생애주기배지(배지용행(r), 오늘);
     if (badge.dday === null || badge.날짜 === null || badge.종류 === null) continue; // 확인필요·없음은 이 목록엔 안 낸다(dday가 없어 정렬·비교가 안 된다)
     if (badge.상태 !== "종료" && badge.상태 !== "임박" && badge.상태 !== "주의") continue; // "여유"는 이 목록엔 안 낸다(days를 크게 준 호출도 방어)
     if (badge.dday > days) continue;
@@ -308,10 +336,44 @@ export function listLifecycleDueSoon(days: number = 주의일): LifecycleDue[] {
       종류: badge.종류,
       dday: badge.dday,
       상태: badge.상태 as "종료" | "임박" | "주의",
+      안내: badge.안내,
     });
   }
   out.sort((a, b) => a.dday - b.dday);
   return out;
+}
+
+/** DueRawRow(날짜 칸만 뽑은 행) → 배지 계산용 LifecycleRow. 두 목록 함수가 같은 잣대를 쓴다. */
+function 배지용행(r: DueRawRow): LifecycleRow {
+  return {
+    id: "", targetType: r.targetType, targetId: r.targetId,
+    vendorContact: null, licenseType: null, subStart: null, subEnd: r.subEnd,
+    maintenanceEnd: r.maintenanceEnd, eos: r.eos, eol: r.eol, extName: null, extEnd: r.extEnd,
+    evidence: null, note: null, updatedBy: null, createdAt: 0, updatedAt: 0,
+  };
+}
+
+/**
+ * 등록된 대상 **전부**의 배지(여유·확인필요 포함) — 화면이 「없음·확인필요·여유·임박」을
+ * 갈라 그리는 유일한 원천이다(2026-09-14 검토관 [상] 수리).
+ * ⚠ 판정 자체는 `생애주기배지` 하나가 한다 — 여기서 30·90을 다시 세지 않는다.
+ */
+export function listLifecycleBadges(): LifecycleBadgeEntry[] {
+  const 오늘 = 오늘글();
+  return (dueRowsStmt.all() as DueRawRow[]).map((r) => {
+    const badge = 생애주기배지(배지용행(r), 오늘);
+    return {
+      targetType: r.targetType,
+      targetId: r.targetId,
+      이름: r.이름 ?? r.targetId,
+      상태: badge.상태,
+      글: badge.글,
+      날짜: badge.날짜,
+      종류: badge.종류,
+      dday: badge.dday,
+      안내: badge.안내,
+    };
+  });
 }
 
 // ── REST 경로 (계약 표 ③) ────────────────────────────────────────────────────
@@ -338,6 +400,21 @@ function fieldsFromRow(row: LifecycleRow | null): { key: string; label: string; 
   });
 }
 
+// 대상 이름 조회 — 없으면 null(=그런 대상이 없다). POST 방어와 감사 로그 두 곳이 쓴다.
+const 제품이름Stmt = db.prepare("SELECT name FROM security_products WHERE id = ?");
+const 자산이름Stmt = db.prepare("SELECT COALESCE(displayName, name) AS name FROM assets WHERE id = ?");
+
+/**
+ * ⚠ 2026-09-14 검토관 [하] 수리 — 형제 창구(securityproducts.ts 정형 정보)는 없는 id면 404로
+ *   막는데 여기는 안 막아, 오타·삭제된 id로도 행이 생겼다. 그 고아 행은 이름을 못 찾아
+ *   `이름 ?? targetId`로 살아남아 **오늘의 할 일·KPI·도구 답에 내부 id를 그대로 노출**했다.
+ */
+function 대상이름(targetType: LifecycleTargetType, targetId: string): string | null {
+  const stmt = targetType === "product" ? 제품이름Stmt : 자산이름Stmt;
+  const row = stmt.get(targetId) as { name?: string | null } | undefined;
+  return row?.name ?? null;
+}
+
 export function registerLifecycleRoutes(app: Express): void {
   app.get("/api/lifecycle/:targetType/:targetId", authMiddleware, (req: Request, res: Response) => {
     const targetType = req.params.targetType;
@@ -356,6 +433,11 @@ export function registerLifecycleRoutes(app: Express): void {
       return;
     }
     const targetId = String(req.params.targetId);
+    const 이름 = 대상이름(targetType, targetId);
+    if (!이름) {
+      res.status(404).json({ error: `그런 ${targetType === "product" ? "보안제품" : "자산"}이 없습니다: ${targetId}` });
+      return;
+    }
     const fields = Array.isArray(req.body?.fields) ? (req.body.fields as { key: string; value: string }[]) : [];
     const patch: Partial<LifecycleRow> = {};
     for (const f of fields) {
@@ -375,7 +457,10 @@ export function registerLifecycleRoutes(app: Express): void {
     }
     const actor = (req as Request & { user?: { displayName?: string; username?: string } }).user;
     const row = saveLifecycle(targetType, targetId, patch, actor?.displayName ?? actor?.username);
-    recordAudit({ kind: "write", action: "계약·생애주기 저장", actor: actor?.displayName ?? actor?.username ?? null, target: `${targetType}:${targetId}` });
+    // ⚠ target은 **사람이 읽는 이름**이다(계약 표 ③). 내부 id로 남기면 작업 기록에서
+    //   「product:9f3c-…의 계약·생애주기 저장」이 돼 무엇을 고쳤는지 추적이 안 된다
+    //   (2026-09-14 검토관 [하]). 이름을 못 찾는 경우는 위에서 404로 이미 막았다.
+    recordAudit({ kind: "write", action: "계약·생애주기 저장", actor: actor?.displayName ?? actor?.username ?? null, target: 이름 });
     res.json({ row, fields: fieldsFromRow(row), badge: 생애주기배지(row) });
   });
 
@@ -386,6 +471,8 @@ export function registerLifecycleRoutes(app: Express): void {
       임박: items.filter((i) => i.상태 === "임박" || i.상태 === "종료").length,
       주의: items.filter((i) => i.상태 === "주의").length,
     };
-    res.json({ items, counts });
+    // ⚠ `등록`은 **등록된 대상 전부**(여유·확인필요 포함)다 — 화면이 items만 보고 그리면
+    //   90일 밖·날짜 못 읽는 계약을 「등록된 계약이 없습니다」로 말한다(검토관 [상] 수리).
+    res.json({ items, counts, 등록: listLifecycleBadges() });
   });
 }

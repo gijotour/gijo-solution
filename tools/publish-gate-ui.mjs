@@ -1777,14 +1777,19 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     const 열림 = !!panel && panel.style.display !== "none";
     return { 제품수, 토글있음: true, 열림, 칸수 };
   }).catch((e) => ({ 던짐: String(e).slice(0, 200) })) : null;
-  // 조건부 판정(:1566-1567·:1613-1616 관례) — 보안제품 0건이면 이 조항은 안 잰다.
+  // 조건부 판정(:1566-1567·:1613-1616 관례) — 보안제품 **0건**이면 이 조항은 안 잰다.
+  // ⚠ 2026-09-14 검토관 [하] — `제품수 <= 0`으로 묶으면 `listSecurityProducts()`가 **던졌을 때
+  //   들어오는 -1**까지 통과가 된다(0건이면 안 잰다 → 호출 실패면 안 잰다로 번짐). 이 조항은
+  //   새 판(칸 9개)을 재는 **유일한 자리**라, 못 재면 통과가 아니라 빨강이다.
   const lc성립 = !!lc && !lc.던짐;
+  const lc안잼 = lc성립 && lc.제품수 === 0; // 정말 0건일 때만 면제
   ok("UI — 계약·생애주기 판: 토글 있음 · 펼치면 칸 9개(보안제품 0건이면 이 조항은 안 잰다)",
-    lc성립 && (lc.제품수 <= 0 ? true : (lc.토글있음 && lc.열림 && lc.칸수 === 9)), JSON.stringify(lc));
+    lc성립 && (lc안잼 || (lc.제품수 > 0 && lc.토글있음 && lc.열림 && lc.칸수 === 9)), JSON.stringify(lc));
 
   // ② inventory.html?full=1 — 표시 항목 목록에 "만료"가 있는가(기본 열 여부는 소스 감시로 —
-  //    lifecycle.test.ts가 DEFAULT_COLS를 재고, 이 관문 계정이 열을 한 번 켜면 그다음 게시가
-  //    거짓 빨강이 되는 것을 막는다, :1508-1513 접힘 감시와 같은 이유).
+  //    lifecycle.test.ts의 ⓗ-2가 DEFAULT_COLS를 직접 읽어 6개·expiry 없음을 재고, 이 관문
+  //    계정이 열을 한 번 켜면 그다음 게시가 거짓 빨강이 되는 것을 막는다, :1508-1513 접힘
+  //    감시와 같은 이유). ⚠ 2026-09-14까지 이 주석은 사실이 아니었다 — 그런 감시가 없었다.
   await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("inventory.html?full=1", "자산 관리 (전체)", { dock: true }));
   const invFr = await 프레임찾기("inventory.html", 10);
   const inv = invFr ? await invFr.evaluate(async () => {

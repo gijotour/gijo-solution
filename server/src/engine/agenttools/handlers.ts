@@ -2264,9 +2264,33 @@ export function runProductStatus(args: Record<string, string>): string {
 
 // ── 「유지보수」 도메인 도구 ─────────────────────────────────────────────
 // 정기 점검은 "기한이 지났는가"가 전부다. 지연된 것부터 보여준다.
+/**
+ * 📅 유지보수 점검 답에 붙는 계약 꼬리(2026-09-14 검토관 [중] 수리 — eol_check A안과 같은 합침).
+ *
+ * ⚠ 왜 — 「유지보수 계약 만료 알려줘」·「유지보수 종료일 알려줘」류는 앞자리 `maintenance_status`
+ *   규칙이 먼저 먹어 `lifecycle_status`에 **영영 안 닿는다**(그래서 [93] 규칙이 「유지보수」를
+ *   배제어로 갖는다). 그런데 이 답에는 계약이 한 글자도 없어, 방금 등록한 유지보수 **계약**을
+ *   담당자가 못 들었다. 정규식을 넓히면 종전 점검 갈래가 깨지므로, 답을 합쳐서 푼다.
+ * ⚠ 등록이 0건이면 아무것도 안 붙인다 — 이 도구의 물음은 「점검 일정」이라 "계약 0건"은
+ *   군더더기다(계약 자체를 묻는 eol_check·lifecycle_status에서는 0건도 그대로 말한다).
+ */
+function 유지보수계약꼬리(): string {
+  const 전체 = listAllLifecycle();
+  if (!전체.length) return "";
+  const 임박 = listLifecycleDueSoon(주의일);
+  const 머리 = 임박.length
+    ? `📅 등록된 계약 ${전체.length}건 중 90일 안에 만료: ${임박.length}건`
+    : `📅 등록된 계약 ${전체.length}건 — 90일 안에 만료되는 것은 없습니다`;
+  const 줄 = 임박.slice(0, 5).map(만료줄).join("\n");
+  const 넘침 = 임박.length > 5 ? `\n… 외 ${임박.length - 5}건` : "";
+  return `\n\n${머리}${줄 ? `\n${줄}` : ""}${넘침}`;
+}
+
 export function runMaintenanceStatus(args: Record<string, string>): string {
   const items = listMaintenanceItems();
-  if (items.length === 0) return "등록된 점검 일정이 없습니다. — 아직 등록 전이라는 뜻입니다. 일정을 넣으면 기한 임박·지연을 여기서 알려 드립니다.";
+  // 점검 일정과 계약 만료는 다른 물음이라 섞지 않고 **꼬리로 잇는다**(위 주석).
+  const 계약꼬리 = 유지보수계약꼬리();
+  if (items.length === 0) return `등록된 점검 일정이 없습니다. — 아직 등록 전이라는 뜻입니다. 일정을 넣으면 기한 임박·지연을 여기서 알려 드립니다.${계약꼬리}`;
 
   const today = dateOnlyLocal(new Date());
   const q = (args.filter ?? "").trim().toLowerCase();
@@ -2290,7 +2314,9 @@ export function runMaintenanceStatus(args: Record<string, string>): string {
   // ⚠ 2026-09-13까지 이 도구는 숫자(기한 초과·예정·완료 건수)를 말하면서도 예시데이터머리말이
   //   안 붙어 있었다 — 이 항목이 애초에 문제 삼은 자리다(계획서 §13.5.2 「예시데이터 머리말
   //   점검 시드」). 시드 점검 6건 중 승인 대기 1건이 그대로 섞여도 고지가 없었다.
-  return list.length ? `${예시데이터머리말()}${head}\n${list.join("\n")}` : `${예시데이터머리말()}${head}\n미완료 항목이 없습니다.`;
+  return list.length
+    ? `${예시데이터머리말()}${head}\n${list.join("\n")}${계약꼬리}`
+    : `${예시데이터머리말()}${head}\n미완료 항목이 없습니다.${계약꼬리}`;
 }
 
 // ── 「리포트·컴플라이언스」 도메인 도구 ──────────────────────────────────
@@ -4592,15 +4618,27 @@ export async function runEolCheck(args: Record<string, string>): Promise<string>
   );
 }
 
-/** eol_check A안 꼬리 — SBOM 부품 대조와는 다른 물음(등록 계약의 만료)을 한 번에 듣게 한다. */
+/** 만료 임박 목록 한 줄 — EOS로 대신 판정했으면 그 사실을 그 줄에 함께 적는다(문구 사본 금지). */
+function 만료줄(i: { 이름: string; 종류: string; 날짜: string; 상태: string; dday: number; 안내: string | null }): string {
+  const 판정 = i.상태 === "종료" ? "지원 종료" : `D-${i.dday}`;
+  return `- ${i.이름} — ${i.종류} ${i.날짜} (${판정})${i.안내 ? ` · ${i.안내}` : ""}`;
+}
+
+/**
+ * eol_check A안 꼬리 — SBOM 부품 대조와는 다른 물음(등록 계약의 만료)을 한 번에 듣게 한다.
+ *
+ * ⚠ 2026-09-14 검토관 [중] 수리 — 0건 판정을 `listLifecycleDueSoon`(=90일 안에 만료)으로
+ *   했더니, 계약이 50건 등록돼 있어도 전부 90일 밖이면 **「등록된 계약이 없습니다」**가
+ *   나갔다. 등록 여부는 `listAllLifecycle`이, 임박 여부는 그다음이 가른다 — 같은 파일의
+ *   runLifecycleStatus는 이미 그렇게 갈라 놓아 **두 답이 서로 다른 잣대**를 쓰고 있었다.
+ */
 function 등록계약만료꼬리(): string {
+  const 전체 = listAllLifecycle();
+  if (!전체.length) return "📅 등록된 계약이 없습니다 — 이 답은 SBOM 부품만 본 것입니다.";
   const items = listLifecycleDueSoon(주의일);
-  if (!items.length) return "📅 등록된 계약이 없습니다 — 이 답은 SBOM 부품만 본 것입니다.";
-  const 줄 = items
-    .slice(0, 8)
-    .map((i) => `- ${i.이름} — ${i.종류} ${i.날짜} (${i.상태 === "종료" ? "지원 종료" : `D-${i.dday}`})`)
-    .join("\n");
-  return `📅 등록된 계약 중 90일 안에 만료: ${items.length}건\n${줄}${items.length > 8 ? `\n… 외 ${items.length - 8}건` : ""}`;
+  if (!items.length) return `📅 등록된 계약 ${전체.length}건 — 90일 안에 만료되는 것은 없습니다(이 답은 SBOM 부품만 본 것입니다).`;
+  const 줄 = items.slice(0, 8).map(만료줄).join("\n");
+  return `📅 등록된 계약 ${전체.length}건 중 90일 안에 만료: ${items.length}건\n${줄}${items.length > 8 ? `\n… 외 ${items.length - 8}건` : ""}`;
 }
 
 // ── 📅 계약·생애주기(2026-09-14) — lifecycle_status(조회) · set_lifecycle(등록) ──────────────
@@ -4650,7 +4688,10 @@ export function runLifecycleStatus(args: Record<string, string>): string {
       `- 유상 연장: ${row.extName || "(미등록)"}${row.extEnd ? ` · ${row.extEnd}` : ""}`,
       `- 근거·확인일: ${row.evidence || "(미등록)"}`,
     ].join("\n");
-    return `📅 ${hit.name}의 계약·생애주기 — 판정: ${badge.글 || "여유"}\n${줄들}`;
+    // EOL이 없어 EOS로 판정했으면 **그 사실을 함께 적는다** — 판매 종료일과 지원 종료일은
+    // 뜻이 다른 날짜라 말없이 섞으면 담당자가 오해한다(용어사전이 약속한 문장, 검토관 [중] 수리).
+    const 안내줄 = badge.안내 ? `\n⚠ ${badge.안내}` : "";
+    return `📅 ${hit.name}의 계약·생애주기 — 판정: ${badge.글 || "여유"}${안내줄}\n${줄들}`;
   }
 
   const 전체 = listAllLifecycle();
@@ -4663,10 +4704,7 @@ export function runLifecycleStatus(args: Record<string, string>): string {
   const 임박목록 = listLifecycleDueSoon(주의일);
   const 확인필요건 = 전체.filter((r) => 생애주기배지(r).상태 === "확인필요").length;
   const 머리줄 = `📅 등록된 계약 ${전체.length}건 중 90일 안에 만료되는 것 ${임박목록.length}건`;
-  const 그리기 = 임박목록
-    .slice(0, 12)
-    .map((i) => `- ${i.이름} — ${i.종류} ${i.날짜} (${i.상태 === "종료" ? "지원 종료" : `D-${i.dday}`})`)
-    .join("\n");
+  const 그리기 = 임박목록.slice(0, 12).map(만료줄).join("\n");
   const 넘침 = 임박목록.length > 12 ? `\n… 외 ${임박목록.length - 12}건` : "";
   const 확인필요줄 = 확인필요건 > 0 ? `\n\n⚠ 날짜를 못 읽어 확인이 필요한 것 ${확인필요건}건` : "";
   return `${머리줄}${그리기 ? `\n${그리기}${넘침}` : ""}${확인필요줄}`;
@@ -4694,7 +4732,8 @@ export function runSetLifecycle(args: Record<string, string>): string {
   const row = saveLifecycle(hit.targetType, hit.targetId, patch, 결재실행자());
   if (!row) return `${hit.name}의 ${match.label} 저장에 실패했습니다.`; // saveLifecycle은 항상 값을 돌려주지만, 거짓 완료를 말하지 않는 관례를 지킨다.
   const badge = 생애주기배지(row);
-  return `${표식.좋음} ${hit.name}의 ${match.label}${조사(match.label, "을")} ${value}로 등록했습니다. 지금 만료 판정: ${badge.글 || "여유"}`;
+  const 안내꼬리 = badge.안내 ? ` (⚠ ${badge.안내})` : "";
+  return `${표식.좋음} ${hit.name}의 ${match.label}${조사(match.label, "을")} ${value}로 등록했습니다. 지금 만료 판정: ${badge.글 || "여유"}${안내꼬리}`;
 }
 
 // ── 📚 침해사고 히스토리(2026-09-03) — 조회·등록·삭제·사례의 샘 ─────────────────────────

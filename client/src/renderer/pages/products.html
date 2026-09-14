@@ -434,9 +434,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   function paintLcBadge(el, badge) {
     if (!el) return;
-    if (!badge || badge.상태 === "여유" || badge.상태 === "없음") { el.className = "lc-badge"; el.textContent = ""; return; }
+    if (!badge || badge.상태 === "여유" || badge.상태 === "없음") { el.className = "lc-badge"; el.textContent = ""; el.removeAttribute("title"); return; }
     el.className = "lc-badge chip " + (LC_BADGE_CLASS[badge.상태] || "warn");
     el.textContent = badge.글 || "";
+    // EOL이 없어 EOS로 봤으면 그 사실을 툴팁에 싣는다 — 판매 종료일과 지원 종료일은 뜻이 다른
+    // 날짜라 말없이 섞으면 오해한다(용어사전이 약속한 문장, 2026-09-14 검토관 [중] 수리).
+    if (badge.안내) el.title = badge.안내; else el.removeAttribute("title");
   }
 
   // 배지는 접힌 채로도 보여야 한다(눌러야만 보이는 정보는 놓친다) — 상세를 열 때 항상 부른다.
@@ -486,13 +489,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const opening = panel.style.display === "none";
     panel.style.display = opening ? "block" : "none";
     toggle.classList.toggle("open", opening);
-    if (opening && !lcState[pid]) {
+    // ⚠ 가드는 「캐시가 있나」가 아니라 **「이 판을 그렸나」**다(2026-09-14 검토관 [상] 수리).
+    //   상세를 열 때 생애주기배지채우기(pid)가 GET 응답을 lcState에 **미리 채워** 두므로,
+    //   `!lcState[pid]`로 막으면 사람이 토글을 누를 때는 이미 거짓이라 **빈 판**이 열렸다
+    //   (배지 GET은 ms, 사람 클릭은 초 — 실사용에서는 거의 항상 비어 있었다).
+    //   깃발은 panel 요소에 단다 — 상세를 다시 그리면 요소째 새로 나므로 같이 초기화된다.
+    if (opening && panel.dataset.lcDrawn !== "1") {
+      if (lcState[pid]) { panel.innerHTML = lcPanelHtml(pid, lcState[pid]); panel.dataset.lcDrawn = "1"; return; }
       panel.innerHTML = `<div style="color:var(--muted);font-size:12.25px">불러오는 중...</div>`;
       try {
         const data = await window.gijo.getLifecycle("product", pid);
         lcState[pid] = data;
         panel.innerHTML = lcPanelHtml(pid, data);
+        panel.dataset.lcDrawn = "1";
       } catch (e) {
+        // 실패는 삼키지 않고 그 자리에 적는다. 깃발은 안 세운다 — 다시 누르면 재시도한다.
         panel.innerHTML = `<div style="color:var(--red-ink, #f5928a);font-size:12.25px">불러오기 실패: ${esc((e && e.message) || e)}</div>`;
       }
     }

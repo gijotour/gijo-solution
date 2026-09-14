@@ -193,6 +193,8 @@ export interface LifecycleBadge {
   날짜: string | null;
   종류: string | null;
   dday: number | null;
+  /** EOL이 없어 EOS로 대신 판정했을 때만 채워진다 — 그대로 사람에게 보인다. */
+  안내: string | null;
 }
 
 export interface LifecycleDue {
@@ -203,6 +205,24 @@ export interface LifecycleDue {
   종류: string;
   dday: number;
   상태: "종료" | "임박" | "주의";
+  안내: string | null;
+}
+
+/**
+ * 등록된 대상 **전부**의 배지(여유·확인필요 포함) — 화면이 「등록 안 함 / 모른다 / 여유 /
+ * 임박」을 갈라 그리는 원천이다. 만료 임박 목록(LifecycleDue)만 보고 그리면 90일 밖 계약과
+ * 날짜를 못 읽는 계약이 전부 「등록된 계약이 없습니다」가 된다(2026-09-14 검토관 [상]).
+ */
+export interface LifecycleBadgeEntry {
+  targetType: LifecycleTargetType;
+  targetId: string;
+  이름: string;
+  상태: LifecycleBadge["상태"];
+  글: string;
+  날짜: string | null;
+  종류: string | null;
+  dday: number | null;
+  안내: string | null;
 }
 
 export interface LifecycleGetResult {
@@ -220,7 +240,7 @@ export const lifecycleApi = {
       body: { fields },
     }),
   due: (days?: number) =>
-    request<{ items: LifecycleDue[]; counts: { 임박: number; 주의: number } }>(
+    request<{ items: LifecycleDue[]; counts: { 임박: number; 주의: number }; 등록: LifecycleBadgeEntry[] }>(
       `/api/lifecycle/due${days ? `?days=${encodeURIComponent(String(days))}` : ""}`
     ),
 };
