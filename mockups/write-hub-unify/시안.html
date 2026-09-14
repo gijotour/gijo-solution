@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS — 「내 문서 › 📝 문서작성」판 통합(문 4개 = 한 줄에 하나) + 메뉴 이름 통일 시안 (추천 1개)
+  경로: mockups/write-hub-unify/시안.html · gijo-mockup(mockups/ 전용 쓰기) · 제품 코드는 한 글자도 안 건드렸다.
+  다크 배색 기본 + 우측 상단 ☀/🌙로 프로 셸 밝은 배색(theme-light) 전환 · 외부 CDN·웹폰트·원격 이미지 0.
+  더블클릭으로 바로 열린다.
+
+  ── 지시 원문(2026-09-14, verbatim) ──────────────────────────────────────────
+  사장님: 「새문서 쓰기 → 문서작성 메뉴로 들어가고 / 장애노트 작성 / 메뉴얼보강 / AI-BOM 기입 /
+    메뉴로 이동 사용자가 사용하게 편하게 작성하게 해줘」 + 「메뉴겹치는 부분 통일화도 필요해」.
+  해석(메인): 문서작성 판의 네 항목이 **각각 누르면 바로 그 글을 쓰는 자리로 들어가야** 한다.
+    같은 것이 두 곳에 다른 이름으로 있는 겹침도 하나로 통일한다.
+
+  ── px는 제품에서 잰다(2026-09-14 CLAUDE.md 원칙) ─────────────────────────────
+  아래 「지금」 숫자는 이 목업 안에서 잰 값이 **아니다** — 설치본(win-unpacked 5.95.0)을 CDP로 열어
+  실제 형제 줄과 함께 getBoundingClientRect로 잰 값이다(측정 시각 2026-09-14 10:31, 창 860×783,
+  작업 지시서에 실려 온 실측치를 그대로 인용 — 이 시안 파일이 다시 측정하지 않았다. 원칙이 금지하는
+  것은 "목업 안에서 잰 값을 지금 값으로 속이는 것"이지, "이미 제품에서 잰 값을 인용하는 것"이 아니다).
+  「제안」 숫자는 아직 없는 화면이라 제품에서 잴 수 없다 — 이 시안 CSS의 **explicit height 합**이다
+  (폰트 렌더링에 안 흔들리는 값). 구현 뒤 설치본에서 다시 재는 것이 최종 확인이다 — 그때 숫자가
+  다르면 이 시안이 아니라 그 실측이 이긴다.
+
+  ── 확인한 실코드(읽기만, 이번 라운드) ────────────────────────────────────────
+  · client/src/renderer/pages/mydocs.html:1137-1185 — 탭==="write" 렌더. 3개 g-rows-head(78px)
+    + 줄() 헬퍼(제 높이를 갖는 flex 블록, .g-rows-r 30px 고정을 일부러 피함 — 주석: "표 줄을 쓰지
+    않는다(2026-09-01 실측). 두 줄짜리 카드가 넘쳐 좁은 폭에서 글자끼리 겹친다") · :1152-1160
+    관리자 아니면 ②③ 줄 전체를 **숨기고** 안내문 한 줄로 대체(관리자만 쓸 수 있어 안 보인다).
+  · :406-443 — #enrichStage. data-gijo-fold="문서 보강 인입"(옛 memory.html 메뉴 이름이 남음) 아래
+    grid 1fr 1fr로 **두 폼이 항상 나란히** 그려진다 — 어느 [쓰기]를 눌러도 st.style.display=""로
+    #enrichStage 전체가 열려 둘 다 보인다(회사지식쓰기열기 함수가 「어느것」 인자로 포커스만 옮긴다).
+  · :2006-2019 — 회사지식쓰기열기(어느것)/회사지식쓰기닫기() — 로직은 "한 글자도 안 바꿨다"는
+    주석과 함께 memory.html에서 옮겨온 배선(2026-09-01). 인자 "doc"|"fix"로 첫 칸 포커스만 분기.
+  · :1568 — document.addEventListener("click", …) data-go 공용 배선. :1404-1434 — 이미 있는
+    "다른 화면으로 이동" 단추 관례, 예: `<button class="go" data-go="triage.html?panel=sbom"
+    data-lb="…">🗔 …</button>`(vendor 탭 "우리 보안제품" 이동 등과 같은 꼴 — sbom.html은
+    nav.js:270에서 triage.html?panel=sbom으로 이미 리다이렉트된다).
+  · :1411 — 탭==="write" 기본 안내(각주, "직접 쓰는 자리를 모았습니다 …저장되는 곳이 다릅니다…").
+  · client/src/renderer/pages/nav.js:122-130(① 🧠 내 지식 — "GIJO AS 안내 (옛 문서함·제품
+    안내)"·"보안제품 비교·소개 (옛 제품 소개자료)") · :137-163(② 📓 내 문서 — "업로드·반입"·
+    "문서작성"·"내 문서 목록"·"나만의 연락처"·"업무 넘기기"·"작업 내역"·"지켜보는 폴더"·
+    "조치 요청서") · :214("window.gijoNavGroups = GROUPS" — 셸이 이미 읽기 전용으로 내주는 단일
+    표, 새 이름 통일의 자연스러운 원천 후보).
+  · server/src/engine/screenguide.ts:913-960 — mydocs.html 안내. panels 키에 "쓰기·고치기(업무
+    템플릿)"는 있지만 **문서작성 판 자체(문 4개 구조)를 설명하는 키는 없다** — ④에서 초안 제시.
+  · server/test/wiringcontract.test.ts:447-467 — nav.js 탭 메뉴 vs mydocs.html data-t 존재만
+    대조한다(탭이 있는지). **판 내부 줄 개수·단추 개수·폼 동시노출은 이 시험의 범위 밖**이다 —
+    ⑨에서 새 게이트 후보 3개를 제안.
+  · client/src/renderer/pages/sbom.html:206(#aibomPanel display:none으로 시작) · :347(자산관리
+    카드에서 열 때 display 해제) · :793(AI 자산 카드 클릭 → renderAiBom + scrollIntoView) — **자산을
+    먼저 고르지 않으면 열리지 않는다**, `?asset=` 깊은 링크는 아직 없다(확인, 지어내지 않음).
+  · client/src/renderer/pages/hardening.html:451,454 · learnloop.html:586-587 · memory.html:1187 ·
+    redteam.html:313 — 제품 전역에서 이미 쓰는 "관리자 전용 = **보이되 disabled+title로 이유를
+    말한다**" 관례(등록 5곳). mydocs.html:1160(문서작성 판)만 "숨기고 안내문으로 대체"하는
+    **유일한 예외**다 — ⑤에서 이 불일치를 근거로 "숨김→흐리게" 전환을 제안한다.
+
+  ── 설계 전 조사 ──────────────────────────────────────────────────────────────
+  [외부1] Nielsen Norman Group, "The Same Link Twice on the Same Page: Do Duplicates Help or
+    Hurt?"(nngroup.com/articles/duplicate-links) — "추가 링크 하나마다 사람이 처리할 선택지가
+    늘어 처리 시간이 늦어지고, 같은 곳으로 가는 링크인지 다른 곳인지 기억해야 하는 부담이 생긴다
+    … 중복을 여러 곳에 늘어놓기보다 예상되는 한 자리에 눈에 띄게 두는 편이 낫다." → ③ 메뉴 이름
+    통일의 근거: 겹치는 8개 항목이 서로 다른 이름(예: "업로드·반입" vs "반입")으로 두 곳에 있으면
+    같은 곳인지 판단하는 부담이 그대로 사용자에게 전가된다.
+  [외부2] GOV.UK Design System, Task List 패턴 갱신 노트(designnotes.blog.gov.uk, 2023) —
+    "사람들이 링크 글자 대신 상태 태그를 클릭하려 했다 … 그래서 줄 전체를 클릭 가능하게 만들었다."
+    → ① "줄 전체 = 행동 하나"(문서작성 판 4줄 각각이 통짜로 눌린다)의 근거. 상태/저장위치를
+    별도 배지(칩)로 붙이되 그 배지를 누르는 실수가 나도 같은 결과가 되도록 줄 전체에 핸들러를 건다.
+
+  ── 이 파일이 하는 일 / 안 하는 일 ──────────────────────────────────────────
+  한다: §2의 "제안" 프레임은 실제 CSS 치수로 4줄을 그리고, 줄 클릭·관리자 토글·밝기 전환이 실제로
+    동작한다(전부 이 문서 안 상태 전환 — 서버 호출 없음). "지금" 프레임은 실제 코드 값을 그대로
+    복제한 정적 재현이다(비교용, 조작 불필요). §3의 좁은 폭 프레임은 260px으로 **오늘 실측한
+    399px보다 더 좁힌 가상 스트레스 시나리오**다 — 이건 실측이 아니라 설계 확인이라고 명시한다.
+  안 한다: 서버·IPC 새 설계는 안 한다(§8에서 보듯 이미 있는 라우트·계약만 재사용). AI-BOM 5영역
+    폼을 이 화면에 복제하지 않는다(§4 (b)). 두 폼을 나란히 유지하지 않는다(§4 (c)). `?asset=`
+    깊은 링크는 만들지 않는다(§8에서 범위 밖으로 명시).
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 문서작성 판 통합(문 4개) 시안</title>
+<style>
+:root{
+  /* 다크(기본) — mydocs.html :root 그대로(client/src/renderer/pages/mydocs.html:68-71) */
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+html.theme-light{
+  /* 밝음 — pro-white.css :15-26 그대로(게시 관문이 실제로 검사하는 값) */
+  --bg:#faf8f5;--panel:#ffffff;--panel-2:#f2efe9;--border:rgba(43,38,33,0.12);
+  --border-strong:rgba(43,38,33,0.22);--text:#2b2621;--muted:#6b6259;--muted-2:#726960;
+  --blue:#1d4f91;--blue-light:#1d4f91;--teal:#086b43;--amber:#8f4d02;--purple:#6b4fb0;--white:#1f1b14;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;color:var(--text);font-size:13px;line-height:1.7;transition:background .15s,color .15s;}
+.docwrap{max-width:1280px;margin:0 auto;padding:26px 24px 100px;}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;}
+h1{font-size:20px;font-weight:800;color:var(--white);}
+.themebtn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+  padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+.themebtn:hover{border-color:var(--blue);}
+h2{font-size:15px;font-weight:800;color:var(--white);margin:26px 0 10px;padding-top:14px;border-top:1px solid var(--border);}
+h2 .num{color:var(--blue-light);margin-right:6px;}
+h3{font-size:12.75px;font-weight:800;color:var(--blue-light);margin:14px 0 6px;}
+p{font-size:12.75px;color:var(--text);margin-bottom:8px;max-width:980px;}
+.lead{font-size:13px;color:var(--muted);max-width:980px;}
+.quote{margin:10px 0;font-size:12.5px;color:var(--text);border-left:3px solid var(--blue);background:rgba(59,130,246,.07);
+  padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.quote b{color:var(--blue-light);}
+.warnbox{margin:10px 0;font-size:12.25px;color:var(--text);border-left:3px solid var(--amber);background:rgba(240,160,32,.08);
+  padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.warnbox b{color:var(--amber);}
+.okbox{margin:10px 0;font-size:12.25px;color:var(--text);border-left:3px solid var(--teal);background:rgba(30,185,128,.08);
+  padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.okbox b{color:var(--teal);}
+code{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:4px;padding:1px 6px;
+  font:11.5px Consolas,"Cascadia Mono",monospace;color:#3b82f6;}
+html.theme-light code{color:#1d4f91;}
+a{color:var(--blue-light);}
+ul.doc,ol.doc{margin:6px 0 10px 22px;font-size:12.5px;color:var(--text);}
+ul.doc li,ol.doc li{margin-bottom:5px;line-height:1.65;}
+table.doc{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:12.25px;}
+table.doc th{background:var(--panel-2);color:var(--muted);text-align:left;padding:7px 10px;border:1px solid var(--border-strong);font-weight:800;}
+table.doc td{padding:7px 10px;border:1px solid var(--border);color:var(--text);vertical-align:top;}
+table.doc td.num,table.doc th.num{text-align:right;font-variant-numeric:tabular-nums;}
+.tag{display:inline-block;font-size:11px;font-weight:800;padding:1px 8px;border-radius:10px;margin-right:4px;}
+.tag.take{background:rgba(30,185,128,.15);color:var(--teal);}
+.tag.drop{background:rgba(226,72,61,.15);color:#e2483d;}
+.tag.limit{background:rgba(240,160,32,.15);color:var(--amber);}
+.src{font-size:11px;color:var(--muted-2);}
+.checklist{list-style:none;margin:8px 0 14px;padding:0;}
+.checklist li{font-size:12.5px;padding:6px 0 6px 26px;position:relative;border-bottom:1px solid var(--border);line-height:1.6;}
+.checklist li:before{content:"✓";position:absolute;left:2px;color:var(--teal);font-weight:800;}
+.checklist li.warn:before{content:"⚠";color:var(--amber);}
+.checklist li.q:before{content:"?";color:var(--blue-light);}
+
+.framewrap{margin:14px 0 24px;}
+.framecap{font-size:12px;color:var(--muted-2);margin-bottom:6px;}
+.framecap b{color:var(--text);}
+.measurebox{display:inline-block;background:var(--panel-2);border:1px solid var(--blue);border-radius:8px;
+  padding:7px 12px;font-size:11.75px;color:var(--text);margin-bottom:10px;font-variant-numeric:tabular-nums;}
+.measurebox b{color:var(--blue-light);}
+
+/* ══════════ 시뮬레이션 프레임 — 실제 다크/라이트 토큰 그대로 ══════════ */
+.simframe{width:862px;max-width:100%;border:1px solid var(--border-strong);border-radius:10px;
+  background:var(--bg);display:flex;flex-direction:column;font-size:13px;color:var(--text);overflow:hidden;}
+.simshell{flex:0 0 26px;height:26px;background:var(--panel-2);border-bottom:1px solid var(--border-strong);
+  display:flex;align-items:center;padding:0 12px;font-size:11px;color:var(--muted-2);}
+.simroot{display:flex;height:560px;}
+.side{flex:0 0 44px;width:44px;background:var(--panel-2);border-right:1px solid var(--border-strong);
+  display:flex;flex-direction:column;align-items:center;padding-top:10px;gap:8px;font-size:15px;color:var(--muted);}
+.side .on{color:var(--blue-light);}
+.side .lbl44{writing-mode:vertical-rl;font-size:10px;color:var(--muted-2);margin-top:auto;margin-bottom:10px;}
+
+/* 목록(가운데) — 실측 폭 399px */
+.midlist{flex:0 0 399px;width:399px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.ghead{height:26px;display:flex;align-items:center;padding:0 12px;font-size:11px;font-weight:800;color:var(--muted-2);
+  background:var(--panel-2);border-bottom:1px solid var(--border-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* ── 지금(v6) 카드 — 실제 줄() 헬퍼 그대로(2줄 wrap 허용, gap 8 10, padding 10 12) ── */
+.oldcard{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid var(--border);}
+.oldcard .ic{font-size:16px;flex:0 0 auto;line-height:1.5;}
+.oldcard .body{flex:1 1 200px;min-width:0;}
+.oldcard b{font-size:12.5px;}
+.oldcard .ds{font-size:12px;color:var(--muted-2);line-height:1.6;margin-top:3px;}
+.oldcard .badge{font-size:11.5px;color:var(--muted-2);}
+.oldcard .btn{flex:0 0 auto;align-self:center;}
+.btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;
+  padding:5px 11px;font-size:11.75px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;}
+.btn:hover{border-color:var(--blue);}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+.btn:disabled{opacity:.55;cursor:not-allowed;}
+.btn:disabled:hover{border-color:var(--border-strong);}
+
+/* ── 제안(v7) — 줄 하나 = 행동 하나, 56px 명시 ── */
+.wline{display:flex;align-items:center;gap:10px;height:56px;padding:0 12px;border-bottom:1px solid var(--border);cursor:pointer;}
+.wline:hover{background:rgba(59,130,246,.07);}
+.wline.disabled{cursor:not-allowed;opacity:.5;}
+.wline.sel{background:rgba(59,130,246,.12);box-shadow:inset 3px 0 0 var(--blue);}
+.wline .ic{flex:0 0 auto;font-size:16px;width:18px;text-align:center;}
+.wline .tx{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px;overflow:hidden;}
+.wline .tt{font-size:12.5px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wline .ds{font-size:12px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chip{flex:0 0 auto;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+.chip.mine{background:rgba(59,130,246,.14);color:var(--blue-light);border:1px solid rgba(59,130,246,.35);}
+.chip.know{background:rgba(240,160,32,.14);color:var(--amber);border:1px solid rgba(240,160,32,.4);}
+.chip.asset{background:rgba(139,124,240,.16);color:var(--purple);border:1px solid rgba(139,124,240,.4);}
+.wline .act{flex:0 0 auto;}
+
+/* 문서창(오른쪽) */
+.docpane{flex:1 1 auto;min-width:0;overflow-y:auto;padding:14px 16px;}
+.ph{color:var(--muted-2);font-size:12.25px;padding:18px 4px;}
+.formbox{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--panel-2);}
+.formhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.formhead b{font-size:12.5px;}
+.tagpill{font-size:11px;font-weight:800;color:var(--amber);border:1px solid rgba(240,160,32,.4);border-radius:20px;padding:0 7px;}
+.switchlink{font-size:11.5px;color:var(--blue-light);cursor:pointer;background:none;border:none;font-family:inherit;}
+.formbox input,.formbox textarea,.formbox select{width:100%;background:var(--panel);border:1px solid var(--border-strong);
+  border-radius:6px;color:var(--text);font:12px/1.5 inherit;padding:6px 9px;margin-bottom:7px;}
+.formbox input::placeholder,.formbox textarea::placeholder{color:var(--muted-2);}
+
+/* ── 옛(지금) 두 폼 나란히(1fr 1fr, 185px 각) — 실제 enrichStage grid 그대로 ── */
+.oldform2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.oldform2 .fb{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--panel-2);min-width:0;}
+.oldform2 .fb input,.oldform2 .fb textarea,.oldform2 .fb select{width:100%;background:var(--panel);border:1px solid var(--border-strong);
+  border-radius:6px;color:var(--text);font:12px/1.5 inherit;padding:6px 9px;margin-bottom:6px;}
+
+/* 좁은 폭 스트레스 프레임 */
+.narrowdemo{width:260px;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
+.stressnote{font-size:11px;color:var(--amber);margin-top:8px;}
+.toast{margin-top:10px;font-size:12px;color:var(--teal);border-left:3px solid var(--teal);background:rgba(30,185,128,.08);
+  padding:8px 10px;border-radius:0 6px 6px 0;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+  <div class="topbar">
+    <h1>내 문서 › 📝 문서작성 판 — 문 4개(줄 하나 = 행동 하나) 시안</h1>
+    <button class="themebtn" id="themeBtn">🌙 어두운 배색 (누르면 ☀ 밝은 배색)</button>
+  </div>
+  <p class="lead">사장님 지시: <b>「새문서 쓰기 → 문서작성 메뉴로 들어가고 / 장애노트 작성 / 매뉴얼보강 /
+    AI-BOM 기입 / 메뉴로 이동 사용자가 사용하게 편하게 작성하게 해줘」</b> + <b>「메뉴겹치는 부분
+    통일화도 필요해」</b>. 문서작성 판의 네 문(門)이 각각 누르면 바로 그 글을 쓰는 자리로 들어가게
+    한 줄씩 다시 짜고(§1~§4), 메뉴 이름이 두 곳에서 다르게 불리는 8곳을 하나로 통일한다(§5).</p>
+
+  <h2><span class="num">§1</span>추천 1개 — 문 4개, 줄 하나 = 행동 하나</h2>
+  <p>지금은 머리 3개(78px) + 카드 4개(높이 제각각, 최대 122.8px)로 「무엇을 쓸 수 있는지」를
+    나열만 한다. 추천안은 <b>줄 하나 = 문 하나 = 누르면 바로 그 자리</b>로 바꾼다 — [외부2] GOV.UK
+    task list의 "줄 전체를 클릭 가능하게" 원칙 그대로다. 저장 위치는 오른쪽 <b>칩</b> 하나로 대신하고,
+    "저장되는 곳이 다릅니다" 각주(160px)는 칩 + ⓘ로 흡수한다.</p>
+  <table class="doc">
+    <tr><th style="width:150px">문</th><th>누르면</th><th style="width:130px">저장 위치 칩</th><th style="width:90px">기본 접근</th></tr>
+    <tr><td>📝 새 문서 쓰기</td><td>편집기가 열린다(지금과 같음 — 템플릿 서랍 자동 오픈)</td>
+      <td><span class="chip mine">내 문서</span></td><td>전원</td></tr>
+    <tr><td>🩹 장애노트 작성</td><td>문서창에 <b>장애노트 폼 하나만</b>(문서창 폭 416px 그대로)</td>
+      <td><span class="chip know">회사 지식 · 관리자</span></td><td>관리자만(비관리자는 줄이 흐리게)</td></tr>
+    <tr><td>📄 매뉴얼 보강</td><td>문서창에 <b>매뉴얼 보강 폼 하나만</b></td>
+      <td><span class="chip know">회사 지식 · 관리자</span></td><td>관리자만(비관리자는 줄이 흐리게)</td></tr>
+    <tr><td>🤖 AI-BOM 기입</td><td>이 화면에서 열지 않는다 — <b>③ 취약점 업무 › 우선순위</b>의
+      AI-BOM 판으로 이동 안내</td><td><span class="chip asset">자산</span></td><td>전원(이동하는 판은
+      누구나 본다)</td></tr>
+  </table>
+  <p>아래는 실제 이 시안 CSS 그대로 그린 살아있는 데모다 — 줄을 눌러 보고, 관리자 토글로 접근 상태
+    변화를, 우측 상단 ☀/🌙로 밝은 배색을 확인할 수 있다(전부 이 문서 안 상태 전환, 서버 호출 없음).</p>
+
+  <div class="framewrap">
+    <div class="framecap"><b>제안 — 문서작성 판</b>(사이드바 접힘 44 + 목록 399 + 문서창 416 = 오늘
+      실측한 창 폭 860px과 같은 예산으로 그렸다)
+      &nbsp;·&nbsp; <label style="font-size:11.5px;color:var(--muted-2);cursor:pointer">
+      <input type="checkbox" id="adminChk" checked style="vertical-align:middle"> 관리자로 보기</label></div>
+    <div class="measurebox" id="v7measure">측정 중…</div>
+    <div class="simframe">
+      <div class="simshell">제품 셸(탭줄·상단바) — 이 파일 밖, 고정</div>
+      <div class="simroot">
+        <div class="side"><span class="on" title="② 📓 내 문서">📓</span><span title="① 🧠 내 지식">🧠</span>
+          <span title="③ 🩹 취약점 업무">🩹</span><span class="lbl44">사이드바 접힘 44px</span></div>
+        <div class="midlist" id="v7list"></div>
+        <div class="docpane" id="v7doc"><div class="ph">줄을 누르면 여기서 바로 씁니다.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="num">§2</span>지금(재현) — 실제 코드 값 그대로</h2>
+  <p>아래는 <code>mydocs.html:1137-1185</code>·<code>:406-443</code>의 실제 값(패딩·gap·grid)을 그대로
+    옮긴 정적 재현이다 — 손으로 어림한 수치가 아니다. 카드가 <code>flex-wrap:wrap</code>이라 설명이
+    두 줄로 넘치고, 관리자가 아니면 ②③ 줄 자체가 사라진다(아래는 관리자 시점).</p>
+  <div class="framewrap">
+    <div class="framecap"><b>지금 — 문서작성 판</b>(실측 2026-09-14 10:31, win-unpacked 5.95.0,
+      창 860×783)</div>
+    <div class="measurebox">목록 총높이 <b>501px</b> = 머리 3×26 + 카드(122.8+84.5+84.5+103.7)
+      · 문서창 폭 <b>416px</b> · 각주(기본 안내) <b>160px</b> · 보강판 <b>338.5px</b>(두 폼 각
+      <b>185px</b> 폭)</div>
+    <div class="simframe">
+      <div class="simshell">제품 셸(탭줄·상단바) — 이 파일 밖, 고정</div>
+      <div class="simroot">
+        <div class="side"><span class="on">📓</span><span>🧠</span><span>🩹</span><span class="lbl44">사이드바 접힘 44px</span></div>
+        <div class="midlist" style="overflow-y:visible">
+          <div class="ghead">내 문서로 들어가는 작성 — 나만 봅니다</div>
+          <div class="oldcard"><span class="ic">📝</span><span class="body"><b>새 문서 쓰기</b>
+            <div class="ds">업무 템플릿 8종(침해사고 1차 보고·유출 신고서·주간 보고·인수인계 메모·조치
+              계획·위험수용 신청·장비 점검·빈 문서)이 있습니다. 화면을 캡처해 Ctrl+V로 붙일 수 있고,
+              고친 이력이 남습니다.</div></span><span class="btn primary" style="align-self:center">＋ 새 문서</span></div>
+          <div class="ghead" style="margin-top:0">회사 지식으로 들어가는 작성 — 모두가 검색해서 보게 됩니다</div>
+          <div class="oldcard"><span class="ic">🩹</span><span class="body"><b>장애노트 작성</b>
+            <span class="badge">관리자 · 회사 지식</span><div class="ds">제품이 멈췄던 일과 해결
+              방법을 적습니다. AI를 안 쓰고 적은 그대로 저장합니다.</div></span>
+            <span class="btn" style="align-self:center">쓰기</span></div>
+          <div class="oldcard"><span class="ic">📄</span><span class="body"><b>매뉴얼 보강</b>
+            <span class="badge">관리자 · 회사 지식</span><div class="ds">매뉴얼 한 섹션을 붙여넣으면
+              AI가 번역·구조화해서 지식으로 넣습니다.</div></span>
+            <span class="btn" style="align-self:center">쓰기</span></div>
+          <div class="ghead" style="margin-top:0">자산에 딸린 작성</div>
+          <div class="oldcard"><span class="ic">🤖</span><span class="body"><b>AI-BOM 기입</b>
+            <div class="ds">AI 자산의 시스템 프롬프트·가드레일 등을 적습니다. 자산을 먼저 고른 뒤
+              쓰는 자리라 여기서 바로 열지 않습니다 — 「③ 취약점 업무 › ② 우선순위」의 📦 AI-BOM
+              판에서 자산을 고르세요.</div></span></div>
+        </div>
+        <div class="docpane">
+          <div class="oldform2">
+            <div class="fb"><b style="font-size:12.5px">🩹 장애노트 작성</b>
+              <span class="tagpill" style="margin-left:6px">AI 미사용 · 즉시 저장</span>
+              <div style="margin-top:8px">
+                <input placeholder="제품/대상 (예: Tenable Se…" readonly>
+                <input placeholder="제목 (예: 예약 스캔 진행 …" readonly>
+                <input placeholder="증상 — 무엇이 잘못됐나" readonly>
+                <textarea rows="2" placeholder="해결 방법 — 명령어…" readonly></textarea>
+                <span class="btn">💾 저장</span>
+              </div></div>
+            <div class="fb"><b style="font-size:12.5px">📄 매뉴얼 보강</b>
+              <div style="margin-top:8px">
+                <input placeholder="제품/대상" readonly>
+                <input placeholder="섹션 이름 (예: 진단 파일…" readonly>
+                <textarea rows="3" placeholder="매뉴얼 한 섹션 붙여…" readonly></textarea>
+                <select disabled><option>⚙ 자동 — 클라우드 되면…</option></select>
+                <span class="btn primary">▶ 저장</span>
+              </div></div>
+          </div>
+          <p class="src" style="margin-top:8px">↑ 폭 185px에서 placeholder가 눈으로도 잘린다("Tenable Se…",
+            "예약 스캔 진행 …") — 실제 <code>readonly</code>가 아니라 진짜 입력칸이지만, 이 시안에서는
+            비교용으로 입력을 막아 뒀다(가짜 상호작용 금지).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="num">§3</span>좁은 폭 — 겹침 없이 말줄임(스트레스 확인, 실측 아님)</h2>
+  <div class="warnbox"><b>이 값은 제품 실측이 아니다.</b> 오늘 실측한 목록 폭은 399px다. 아래는 그보다
+    더 좁힌 260px 가상 시나리오로, <code>flex-wrap</code> 없이 <code>white-space:nowrap +
+    text-overflow:ellipsis</code>만으로 제목·설명이 겹치지 않는지 <b>설계 확인</b>하려는 것이다 —
+    지금 코드의 실측 결함(<code>mydocs.html:1141-1144</code> 주석: "표 줄을 안 쓴다 — 두 줄짜리
+    카드가 넘쳐 좁은 폭에서 글자끼리 겹친다, 1차 수리로 되레 5→7건 늘었다")과 같은 종류의 실패가
+    이 설계에서도 나는지 미리 본다.</div>
+  <div class="narrowdemo" id="v7narrow"></div>
+  <p class="stressnote">※ 마우스를 올리면(title) 잘린 설명 전체를 볼 수 있다 — 실제 배선에서도 각
+    <code>.wline .ds</code>에 title 속성을 그대로 채운다.</p>
+
+  <h2><span class="num">§4</span>포기한 길</h2>
+  <table class="doc">
+    <tr><th style="width:190px">후보</th><th style="width:110px">판정</th><th>왜 안 골랐나</th></tr>
+    <tr><td>(a) 5대 메뉴 「② 📓 내 문서」 아래에<br>4항목을 하위 메뉴로 늘리기</td>
+      <td><span class="tag drop">기각</span></td>
+      <td>프로 원칙 "메뉴는 보기용·카드가 전부"와 2026-08-31 5대 메뉴 밀도 재편(12개 그룹→5개로
+        줄인 그날)에 정면으로 역행한다. 지금도 nav.js "② 📓 내 문서"엔 이미 8항목이 있다 — 여기
+        더 늘리면 그 재편을 이 라운드가 스스로 뒤집는 꼴이다. 한 화면 안 4줄로 충분하다.</td></tr>
+    <tr><td>(b) AI-BOM 5영역 폼을<br>이 화면에 복제</td><td><span class="tag drop">기각</span></td>
+      <td><code>sbom.html:793</code>의 <code>renderAiBom(full)</code>은 고른 자산 객체 전체를
+        받는다 — 자산을 안 고른 채로 복제하면 어느 자산 것을 적는지가 없다. 복제하면 "같은 폼
+        두 벌" 계보(이 저장소가 반복 겪은 사본 어긋남)가 하나 더 생긴다.</td></tr>
+    <tr><td>(c) 두 폼(장애노트·매뉴얼)<br>나란히 유지</td><td><span class="tag drop">기각</span></td>
+      <td>§2에서 실물로 확인했듯 185px 칸은 placeholder가 잘리고, "쓰기"를 눌러도 항상 <b>둘 다</b>
+        열리는 것 자체가 "줄 하나 = 행동 하나" 원칙과 반대다 — 장애노트를 쓰려고 눌렀는데 매뉴얼
+        보강 폼도 같이 뜨는 것은 사용자가 요청하지 않은 화면이 함께 열리는 것이다.</td></tr>
+  </table>
+
+  <h2><span class="num">§5</span>메뉴 이름 통일(사장님 지시 두 번째 절)</h2>
+  <p>nav.js 5대 메뉴 「② 📓 내 문서」·「① 🧠 내 지식」 하위 이름과 mydocs.html 사이드바(v4node)
+    이름이 <b>8곳에서 다르게</b> 불린다. [외부1] NN/g "중복 링크 부담"과 같은 문제 — 이름이 다르면
+    같은 곳인지 사용자가 매번 판단해야 한다.</p>
+  <table class="doc">
+    <tr><th>#</th><th>지금 nav.js(② 내 문서 / ① 내 지식)</th><th>지금 사이드바(mydocs v4node)</th><th>제안(통일 이름)</th></tr>
+    <tr><td>1</td><td><code>업로드·반입</code></td><td><code>반입</code> 🩹</td><td><b>업로드·반입</b></td></tr>
+    <tr><td>2</td><td><code>문서작성</code></td><td><code>문서작성</code> 📝</td><td><b>문서작성</b>(이미 같음)</td></tr>
+    <tr><td>3</td><td><code>내 문서 목록</code></td><td><code>내 것</code> 👤</td><td><b>내 문서 목록</b></td></tr>
+    <tr><td>4</td><td><code>나만의 연락처</code></td><td><code>연락처</code> 📞</td><td><b>연락처</b></td></tr>
+    <tr><td>5</td><td><code>GIJO AS 안내 (옛 문서함·제품 안내)</code></td><td><code>GIJO AS 안내</code> 📘</td><td><b>GIJO AS 안내</b>(nav의 "(옛 …)" 꼬리는 뗀다)</td></tr>
+    <tr><td>6</td><td><code>보안제품 비교·소개 (옛 제품 소개자료)</code></td><td><code>보안제품 자료</code> 📦</td><td><b>보안제품 자료</b>(꼬리 뗌)</td></tr>
+    <tr><td>7</td><td><code>지켜보는 폴더</code></td><td><code>지켜보는 폴더</code> 📂</td><td><b>지켜보는 폴더</b>(이미 같음)</td></tr>
+    <tr><td>8</td><td><code>조치 요청서</code></td><td><code>조치 요청서</code> 📨</td><td><b>조치 요청서</b>(이미 같음)</td></tr>
+  </table>
+  <p class="src">차이가 실제로 나는 것은 4곳(1·3·4·5·6, 옛 이름 꼬리 포함 사실상 5곳) — 나머지 3곳은
+    이미 같다. "8곳 전부 다르다"고 하면 과장이다.</p>
+  <div class="okbox"><b>구현 메모</b> — 이름의 원천을 한 곳에 두는 두 방법이 있다: ① <code>nav.js:214</code>
+    <code>window.gijoNavGroups = GROUPS</code>를 <code>mydocs.html</code>이 읽어 사이드바 라벨을
+    거기서 뽑는다(nav의 "(옛 …)" 꼬리는 렌더 시 정규식으로 떼거나, GROUPS 쪽 라벨에서 꼬리 자체를
+    없앤다) — 원천이 하나면 이후 이름이 또 갈릴 일이 없다. ② 각자 문자열을 유지하되
+    <code>server/test/wiringcontract.test.ts</code>(이미 두 파일을 동시에 읽는 시험이다, :447-467
+    참고)에 "짝이 같은 이름인가"를 대조하는 줄을 추가한다. <b>어느 쪽인지는 설계관이 정한다</b> —
+    ①은 코드가 한 번 더 줄지만 nav.js 로드 시점 의존이 생기고, ②는 사본이 남지만 즉시 적용된다.</div>
+
+  <h2><span class="num">§6</span>안내(screenguide) 초안</h2>
+  <p><code>server/src/engine/screenguide.ts</code> <code>"mydocs.html"</code>의 <code>panels</code>에
+    새 키를 더하거나(제안) 기존 <code>"쓰기·고치기(업무 템플릿)"</code>(:934)를 고쳐 넣는다:</p>
+  <div class="quote">"문서작성 판(4개 문)": "직접 쓰는 문 4개를 한 줄씩 모았습니다. <b>📝 새 문서</b>는
+    나만 보는 내 문서에 업무 템플릿과 함께 열립니다. <b>🩹 장애노트</b>·<b>📄 매뉴얼 보강</b>은 모두가
+    검색하는 회사 지식에 들어가며 관리자만 쓸 수 있습니다 — 일반 사용자에게는 줄이 흐리게 보이고
+    이유가 붙습니다(숨기지 않습니다). <b>🤖 AI-BOM 기입</b>은 자산을 먼저 고르는 자리라 이 판에서
+    바로 열리지 않고, 누르면 「③ 취약점 업무 › 우선순위」의 AI-BOM 판으로 이동합니다 — 거기서 AI
+    자산 카드를 고르면 5영역 명세 칸이 열립니다. 각 줄 오른쪽 <b>칩</b>이 저장되는 곳을 알려 줍니다."</div>
+  <p class="src">화면엔 정체성 한 줄과 칩만 두고, 자세한 설명은 위 문단처럼 ⓘ가 여는 screenguide로
+    — 전-7 "설명은 전부 챗봇으로" 원칙 그대로다.</p>
+
+  <h2><span class="num">§7</span>밀도 숫자 — 지금 → 제안</h2>
+  <table class="doc">
+    <tr><th></th><th class="num" style="width:110px">지금(실측)</th><th class="num" style="width:110px">제안(설계값)</th><th class="num" style="width:110px">증감</th></tr>
+    <tr><td>머리(g-rows-head) 3개</td><td class="num">78px</td><td class="num">0px</td><td class="num">-78px(칩으로 흡수)</td></tr>
+    <tr><td>카드/줄 4개 합</td><td class="num">395.5px<br><span class="src">122.8+84.5+84.5+103.7</span></td>
+      <td class="num">224px<br><span class="src">56×4</span></td><td class="num">-171.5px(-43%)</td></tr>
+    <tr><td><b>목록 총높이</b></td><td class="num"><b>501px</b></td><td class="num"><b>224px</b></td>
+      <td class="num"><b>-277px(-55%)</b></td></tr>
+    <tr><td>문서창 기본 안내(각주)</td><td class="num">160px</td><td class="num">~24px<br><span class="src">"줄을 누르면 여기서 씁니다" 1줄 + ⓘ</span></td>
+      <td class="num">-136px(-85%)</td></tr>
+    <tr><td>동시에 그려지는 보강 폼 수</td><td class="num">2개(항상 둘 다)</td><td class="num">1개(고른 것만)</td>
+      <td class="num">혼선 제거</td></tr>
+    <tr><td>보강 폼 입력칸 폭</td><td class="num">185px</td><td class="num">416px<br><span class="src">문서창 실폭 그대로</span></td>
+      <td class="num">+125%(placeholder 안 잘림)</td></tr>
+  </table>
+  <p class="src">지금 값의 합(78+395.5=473.5)과 실측 총합(501) 사이 27.5px 차이는 border-bottom
+    4줄(4px)+g-rows-head/카드 사이 여백 등 세부 오차다 — 총합은 실측치(501)를 정본으로 쓴다.
+    제안 값(224·24px 등)은 이 시안 CSS의 explicit height 합이며, 아직 없는 화면이라 제품에서 잴 수
+    없다 — <b>구현 뒤 설치본 재실측이 최종 확인</b>이다.</p>
+
+  <h2><span class="num">§8</span>제품 원칙 자가점검</h2>
+  <ul class="checklist">
+    <li>추천 시안 1개(2026-08-09 확정) — 복수안 아님</li>
+    <li>자체완결 HTML — 외부 CDN·폰트·이미지 0, 더블클릭으로 열림</li>
+    <li>설계 전 조사 — [외부1] NN/g 중복 링크, [외부2] GOV.UK task list(§0 조사 참고)</li>
+    <li>메뉴는 보기용·지시는 대화창 — 단 "직접 쓰는 자리"는 2026-09-01 사장님이 이미 허용한 예외
+      (문서 편집·장애노트·매뉴얼 보강은 저작 행위, mydocs.html:35 계열과 같은 지위). 이 시안이 새로
+      만드는 입력칸은 0개 — 있는 폼 배치만 바꾼다.</li>
+    <li>화면 설명은 ⓘ로 — 제목·부제·각주 대신 칩 + screenguide 문단(§6)</li>
+    <li>사본 금지 — AI-BOM 폼을 복제하지 않고 원본 판(sbom.html)으로 이동(§4-b)</li>
+    <li class="q">관리자 가림 방식 전환(숨김→흐리게+이유) — <b>결정 필요 항목.</b> 이 저장소의
+      "보이지 않는 자리를 가리키지 않는다"(F4-11, sbom.html:766-772) 원칙은 "안 뜨는 길을 안내하지
+      말라"는 뜻이었다. 이번은 안내가 아니라 <b>버튼 자체를 disabled로 보이게</b> 하는 것이라
+      hardening.html·learnloop.html·memory.html·redteam.html 4곳의 기존 관례(§근거)와 같은 결이고,
+      mydocs.html:1160(지금의 "숨기고 안내문") 쪽이 오히려 이 제품의 유일한 예외다. 그래도 "숨김이
+      곧 죽은 입구 방지"라는 반대 해석이 가능해 사용자 승인을 명시로 받는다.</li>
+    <li>가로 예산 계산 — 사이드바 44+목록 399+문서창 416=오늘 실측 창폭(860)과 같은 예산 안에서 그림(§1)</li>
+    <li>11px 미만 금지 — 이 파일 전체 최소 폰트 11px</li>
+    <li>한글 표기 — 전부 한글</li>
+  </ul>
+
+  <h2><span class="num">§9</span>구현표 — 설계관·구현자를 위한 파일:줄</h2>
+  <table class="doc">
+    <tr><th style="width:230px">자리</th><th>지금</th><th>바뀔 것</th></tr>
+    <tr><td><code>mydocs.html:1137-1185</code><br>탭==="write" 렌더</td>
+      <td>3×g-rows-head(78px) + 줄() 헬퍼 카드 4개(flex-wrap 허용, 관리자 아니면 ②③ 통째로 숨김)</td>
+      <td>헤더 제거, <code>.wline</code> 4줄(56px 고정, no-wrap+ellipsis)로 교체. 관리자 아닐 때
+        ②③은 <code>disabled</code>+<code>title="관리자만 쓸 수 있습니다"</code>로 <b>보이게</b>
+        바꾼다(§8 결정 필요 항목 승인 후).</td></tr>
+    <tr><td><code>mydocs.html:406-443</code><br>#enrichStage</td>
+      <td>data-gijo-fold "문서 보강 인입"(옛 이름) 아래 grid 1fr 1fr로 두 폼 항상 동시 노출</td>
+      <td>고른 폼 하나만 문서창 실폭(416px)으로. 폼 머리에 "↔ 매뉴얼 보강/장애노트 작성" 전환 링크.
+        <code>enrichResList</code>(이번 세션 인입 줄)는 그대로 둔다.</td></tr>
+    <tr><td><code>mydocs.html:2006-2019</code><br>회사지식쓰기열기/닫기</td>
+      <td>인자로 첫 칸 포커스만 분기, 폼 둘 다 보임</td>
+      <td>인자로 <b>어느 폼을 그릴지</b>까지 분기(로직 "한 글자도 안 바꾼다"던 2026-09-01 원칙은
+        이번엔 깨진다 — 옮긴 게 아니라 통합이 목적이므로 정직하게 "바꿨다"고 적는다).</td></tr>
+    <tr><td><code>mydocs.html:1568</code><br>data-go 공용 배선</td>
+      <td>이미 있음(예: vendor 탭 "우리 보안제품" 이동)</td>
+      <td>AI-BOM 줄에 그대로 재사용: <code>&lt;button class="go" data-go="triage.html?panel=sbom"
+        data-lb="AI-BOM"&gt;🗔 AI-BOM 판으로 이동&lt;/button&gt;</code> — 새 배선 불필요.</td></tr>
+    <tr><td><code>mydocs.html:1411</code><br>탭==="write" 기본 안내(각주)</td>
+      <td>"직접 쓰는 자리를 모았습니다 … 저장되는 곳이 다릅니다" 160px 문단</td>
+      <td>1줄 placeholder로 축약("줄을 누르면 여기서 씁니다 — 저장 위치는 칩을 보세요"), 자세한 설명은
+        §6 screenguide로 이관.</td></tr>
+    <tr><td><code>nav.js:122-163</code></td>
+      <td>8개 라벨 중 5곳이 사이드바와 다른 문자열(§5)</td>
+      <td>§5 표대로 통일 — 원천 단일화 방식은 설계관이 결정(§5 구현 메모).</td></tr>
+    <tr><td><code>server/src/engine/screenguide.ts:913-960</code></td>
+      <td>"쓰기·고치기(업무 템플릿)" 키만 있고 "문서작성 판" 자체 설명 없음</td>
+      <td>§6 문단 추가/교체.</td></tr>
+    <tr><td><code>server/test/wiringcontract.test.ts:447-467</code></td>
+      <td>탭 존재(data-t)만 대조</td>
+      <td>§5 이름 통일 짝 검사 추가 후보(원천 방식에 따라) + §9 아래 게이트 3종.</td></tr>
+    <tr><td><code>sbom.html:206,347,793</code></td>
+      <td>자산 카드를 골라야만 <code>#aibomPanel</code>이 열림, <code>?asset=</code> 딥링크 없음</td>
+      <td><b>이번 범위 밖</b> — AI-BOM 판으로 "이동"만 하고 자산 선택은 그 판에서 그대로 한다.
+        딥링크(예: <code>?panel=sbom&asset=…</code>로 특정 자산 카드 자동 오픈)는 서버·클라 신규
+        계약이 드는 별도 작업이라 이 시안엔 안 담았다 — 필요하면 별도로 요청.</td></tr>
+  </table>
+
+  <h3>게시 관문 후보 검사 3개(구현 뒤 추가)</h3>
+  <ol class="doc">
+    <li><b>4줄 검사</b> — <code>[data-t="write"]</code> 활성 시 <code>.wline</code>이 정확히 4개인가
+      (많아도 적어도 FAIL — "언제부턴가 줄이 하나 늘었다/사라졌다"를 조용히 넘기지 않는다).</li>
+    <li><b>단추(행동) 4개 검사</b> — 각 줄이 클릭 가능한 행동을 정확히 하나씩 갖는가(＋새문서·쓰기·
+      쓰기·이동 각 1개). 0개(죽은 줄)나 2개 이상(중복 행동)이면 FAIL.</li>
+    <li><b>폼 단일 노출 검사</b> — <code>#enrichStage</code> 표시 상태에서 장애노트 폼 컨테이너와
+      매뉴얼 보강 폼 컨테이너 중 <code>display:none</code>이 아닌 것이 정확히 1개인가. 0개(빈 문서창)
+      또는 2개(옛 결함 재발)면 FAIL.</li>
+  </ol>
+  <p class="src">정확한 구현 위치(클라이언트 정적 검사 vs 게시 시 9227 CDP 실화면 관문)는 설계관이
+    정한다 — 이 시안은 "무엇을 세어야 하는가"까지만 못박는다.</p>
+
+  <h2><span class="num">§10</span>이 시안이 안 한 일</h2>
+  <ul class="doc">
+    <li>실서버 연동 없음 — 위 프레임의 모든 동작은 이 문서 안 상태 전환이다.</li>
+    <li><code>?asset=</code> 딥링크 설계 없음(§9에서 범위 밖으로 명시).</li>
+    <li>업무 넘기기·작업 내역(nav에는 있지만 사이드바 write 탭엔 없는 항목)은 이 라운드에서 안
+      건드림 — §5 표는 "둘 다에 있는 8곳"만 다룬다.</li>
+    <li>관리자 가림 방식 전환(§8 결정 필요 항목)은 <b>제안만</b> 하고 구현은 승인 후.</li>
+  </ul>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var isAdmin = true;
+
+  var ROWS = [
+    { ic: "📝", tt: "새 문서 쓰기", ds: "업무 템플릿 8종 · 캡처 붙여넣기 · 판 이력", chip: "mine", chipTxt: "내 문서", act: "＋ 새 문서", actCls: "primary", always: true },
+    { ic: "🩹", tt: "장애노트 작성", ds: "제품이 멈췄던 일과 해결 방법을 그대로 저장", chip: "know", chipTxt: "회사 지식 · 관리자", act: "쓰기", key: "fix" },
+    { ic: "📄", tt: "매뉴얼 보강", ds: "매뉴얼 한 섹션을 붙이면 AI가 구조화해 지식으로", chip: "know", chipTxt: "회사 지식 · 관리자", act: "쓰기", key: "doc" },
+    { ic: "🤖", tt: "AI-BOM 기입", ds: "자산을 먼저 고른 뒤 5영역 명세를 적는 자리", chip: "asset", chipTxt: "자산", act: "🗔 이동", key: "aibom" }
+  ];
+
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  function buildList(container, opts) {
+    opts = opts || {};
+    container.innerHTML = ROWS.map(function (r, i) {
+      var locked = !r.always && !isAdmin;
+      return '<div class="wline' + (locked ? " disabled" : "") + '" data-i="' + i + '" title="' +
+        (locked ? "관리자만 쓸 수 있습니다" : esc(r.tt) + " — " + esc(r.ds)) + '">' +
+        '<span class="ic">' + r.ic + '</span>' +
+        '<span class="tx"><span class="tt">' + esc(r.tt) + '</span><span class="ds">' + esc(r.ds) + '</span></span>' +
+        '<span class="chip ' + r.chip + '">' + esc(r.chipTxt) + (locked ? " · 관리자만" : "") + '</span>' +
+        '<span class="act"><button class="btn' + (r.actCls ? " " + r.actCls : "") + '"' + (locked ? " disabled" : "") + '>' + esc(r.act) + '</button></span>' +
+        '</div>';
+    }).join("");
+    if (!opts.static) {
+      Array.prototype.forEach.call(container.querySelectorAll(".wline"), function (el) {
+        el.addEventListener("click", function () {
+          var i = Number(el.getAttribute("data-i"));
+          var r = ROWS[i];
+          if (!r.always && !isAdmin) return; // disabled — 지금은 아무 반응 없음(가짜 상호작용 금지)
+          Array.prototype.forEach.call(container.querySelectorAll(".wline"), function (x) { x.classList.remove("sel"); });
+          el.classList.add("sel");
+          renderDoc(r.key);
+        });
+      });
+    }
+  }
+
+  function renderDoc(key) {
+    var doc = document.getElementById("v7doc");
+    if (!key) { doc.innerHTML = '<div class="ph">줄을 누르면 여기서 바로 씁니다.</div>'; return; }
+    if (key === "aibom") {
+      doc.innerHTML = '<div class="ph">이 판에서 열지 않습니다.</div>' +
+        '<div class="toast">→ ③ 취약점 업무 › 우선순위의 AI-BOM 판으로 이동합니다' +
+        '(<code>triage.html?panel=sbom</code>) — 이 시안에서는 실제로 이동하지 않습니다.<br>' +
+        '거기서 AI 자산 카드를 고르면 5영역 명세 칸이 열립니다(자산을 먼저 고르는 자리라 여기서 바로 열 수 없습니다).</div>';
+      return;
+    }
+    var isFix = key === "fix";
+    doc.innerHTML = '<div class="formbox"><div class="formhead">' +
+      '<b>' + (isFix ? "🩹 장애노트 작성" : "📄 매뉴얼 보강") + '</b>' +
+      (isFix ? '<span class="tagpill">AI 미사용 · 즉시 저장</span>' : '') +
+      '<button class="switchlink" id="v7switch">↔ ' + (isFix ? "매뉴얼 보강" : "장애노트 작성") + '</button></div>' +
+      (isFix
+        ? '<input placeholder="제품/대상 (예: Tenable Security Center)">' +
+          '<input placeholder="제목 (예: 예약 스캔 진행 중 멈춤)">' +
+          '<input placeholder="증상 — 무엇이 잘못됐나">' +
+          '<input placeholder="원인 (선택)">' +
+          '<textarea rows="3" placeholder="해결 방법 — 명령어·경로는 원문 그대로"></textarea>' +
+          '<button class="btn primary">💾 장애노트 저장</button>'
+        : '<input placeholder="제품/대상">' +
+          '<input placeholder="섹션 이름 (예: 진단 파일 로그 옵션)">' +
+          '<textarea rows="5" placeholder="매뉴얼 한 섹션 붙여넣기 (한 번에 ~6,000자)"></textarea>' +
+          '<select><option>⚙ 자동 — 클라우드 되면 쓰고, 내부정보·비활성이면 로컬</option>' +
+          '<option>☁ 클라우드 — 품질↑ (벤더 공개자료만)</option><option>💻 로컬 — 무료·폐쇄망 (온프렘 7B)</option></select>' +
+          '<button class="btn primary">▶ 보강해서 저장</button>') +
+      '<p class="src" style="margin-top:6px">폭 416px(문서창 실폭 그대로) — 지금(§2) 185px과 달리 placeholder가 안 잘린다.</p>' +
+      '</div>';
+    var sw = document.getElementById("v7switch");
+    if (sw) sw.addEventListener("click", function () { renderDoc(isFix ? "doc" : "fix"); });
+  }
+
+  var listEl = document.getElementById("v7list");
+  buildList(listEl, {});
+  document.getElementById("adminChk").addEventListener("change", function (e) {
+    isAdmin = e.target.checked;
+    buildList(listEl, {});
+    renderDoc(null);
+  });
+
+  // 좁은 폭 스트레스(260px, 실측 아님 — §3)
+  var narrow = document.getElementById("v7narrow");
+  buildList(narrow, { static: true });
+
+  // 측정(제안 프레임) — v3측 measurebox와 같은 관례: 이 문서를 연 브라우저가 지금 직접 잰다.
+  function measure() {
+    var rows = listEl.querySelectorAll(".wline");
+    var h = 0; rows.forEach(function (r) { h += r.getBoundingClientRect().height; });
+    document.getElementById("v7measure").innerHTML = "이 문서를 지금 여신 브라우저가 직접 잰 값 — 줄 " +
+      rows.length + "개 합 <b>" + Math.round(h) + "px</b>(CSS 명시값 56×4=224px와 비교해 보세요. 다르면 폰트 렌더링 차이입니다).";
+  }
+  measure();
+  window.addEventListener("resize", measure);
+
+  // 밝기 토글 — 실제 제품(app.html)과 같은 방식: documentElement에 theme-light를 단다.
+  document.getElementById("themeBtn").addEventListener("click", function () {
+    var on = document.documentElement.classList.toggle("theme-light");
+    this.textContent = on ? "☀ 밝은 배색 (누르면 🌙 어두운 배색)" : "🌙 어두운 배색 (누르면 ☀ 밝은 배색)";
+  });
+})();
+</script>
+</body>
+</html>
