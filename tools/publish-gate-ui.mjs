@@ -1796,16 +1796,24 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     for (let i = 0; i < 25; i++) { if (document.getElementById("colBtn")) break; await new Promise((x) => setTimeout(x, 400)); }
     const btn = document.getElementById("colBtn");
     if (!btn) return { 버튼없음: true };
-    btn.click();
-    await new Promise((x) => setTimeout(x, 200));
-    const 만료행있음 = !!document.querySelector('#colList [data-col="expiry"]');
+    // ⚠ 2026-09-14 15:58 실측: #colBtn은 화면 초기화(init)가 끝나야 리스너가 붙는데 관문은 단추가
+    //   **보이자마자** 한 번 눌러 드로어가 안 열린 채 목록을 세었다(거짓 빨강 — 5.97.0 첫 게시가 여기서
+    //   막혔다). 드로어가 실제로 열릴 때까지(#colDrawer.open) 300ms마다 다시 누른다(최대 4초).
+    let 드로어열림 = false;
+    for (let i = 0; i < 14 && !드로어열림; i++) {
+      btn.click();
+      await new Promise((x) => setTimeout(x, 300));
+      드로어열림 = !!(document.getElementById("colDrawer") || {}).classList?.contains("open");
+    }
+    const 드로어행수 = document.querySelectorAll("#colList [data-col]").length;
+    const 만료행있음 = 드로어열림 && !!document.querySelector('#colList [data-col="expiry"]');
     const kpiEl = document.getElementById("kpiLifecycle");
     // 검사 뒤 드로어를 닫는다(:1587 「반드시 열었으면 닫고 다음으로」와 같은 위생 — 적용 단추는
     // 누르지 않는다, 체크박스도 안 건드린다 — localStorage에 아무 자국도 안 남긴다).
     const closeBtn = document.getElementById("colDrawerClose");
     if (closeBtn) closeBtn.click();
     await new Promise((x) => setTimeout(x, 150));
-    return { 만료행있음, kpi텍스트: kpiEl ? kpiEl.textContent.trim() : null };
+    return { 만료행있음, 드로어열림, 드로어행수, kpi텍스트: kpiEl ? kpiEl.textContent.trim() : null };
   }).catch((e) => ({ 던짐: String(e).slice(0, 200) })) : null;
   const inv성립 = !!inv && !inv.던짐 && !inv.버튼없음;
   ok("UI — 「만료」는 표시 항목 목록에 있다(기본 6열 여부는 lifecycle.test.ts 소스 감시가 잰다)",
