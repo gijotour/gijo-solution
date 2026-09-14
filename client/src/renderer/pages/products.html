@@ -117,6 +117,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .fields-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
 .fields-actions label.fbtn{display:inline-flex;align-items:center;}
 
+/* 📅 계약·생애주기(2026-09-14 시안 mockups/asset-lifecycle 승인) — 정형 정보 바로 아래 새 접기.
+   9칸 2열 grid. 30·90일 잣대는 이 화면에 안 적는다 — 서버가 준 badge.상태·badge.글을 그대로 그린다. */
+.lc-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;}
+.lc-cell{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);}
+.lc-cell.full{grid-column:1 / -1;}
+.lc-label{flex:0 0 148px;font-size:12px;color:var(--muted);}
+.lc-input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;color:var(--text);font:12px/1.5 inherit;padding:6px 9px;}
+.lc-pair{flex:1;display:flex;gap:6px;min-width:0;}
+.lc-pair input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;color:var(--text);font:12px/1.5 inherit;padding:6px 9px;}
+.lc-badge{margin-left:8px;font-size:11px;}
+@media(max-width:560px){.lc-grid{grid-template-columns:1fr;}}
+/* 만료 배지 칩 — inventory.html·map-view.js와 같은 클래스 이름(사본 아님, 각 파일이 독립 HTML/JS라
+   같은 규칙을 각자 정의한다). 시안 원안은 10.5px였으나 11px 미만 금지(uireadability.test.ts)로 올렸다. */
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+.chip.now{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);border:1px solid rgba(226,72,61,.4);}
+.chip.soon{background:rgba(240,160,32,.16);color:var(--amber);border:1px solid rgba(240,160,32,.4);}
+.chip.done{background:rgba(163,163,163,.16);color:var(--muted-2);border:1px solid var(--border-strong);}
+.chip.warn{background:rgba(139,124,240,.14);color:var(--purple);border:1px solid rgba(139,124,240,.35);}
+
 .footer{margin-top:22px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);max-width:1040px;}
 .footer img{height:16px;opacity:0.6;}
 .empty-all{color:var(--muted);font-size:13px;padding:30px 0;}
@@ -256,7 +275,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (!열린상세pid) return;
     const row = document.querySelector(`.g-rows-r[data-pid="${열린상세pid}"]`);
     const p = 제품목록.find((x) => String(x.id) === 열린상세pid);
-    if (row && p && window.gijoRowDetail) { delete fieldsState[p.id]; window.gijoRowDetail(row, prodDetailHtml(p)); }
+    if (row && p && window.gijoRowDetail) {
+      delete fieldsState[p.id];
+      delete lcState[p.id];
+      window.gijoRowDetail(row, prodDetailHtml(p));
+      생애주기배지채우기(p.id); // 재렌더로 새로 생긴 배지 span도 접힌 채로 값을 보여야 한다
+    }
   }
 
   // 이 제품의 유지보수 점검 현황 — productId 연결(신규)과 제품명 스쿼시 매칭(과거 자유텍스트 등록분)
@@ -337,6 +361,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `</div>` +
       `<div class="fields-toggle" data-fields-toggle="${p.id}" data-name="${esc(p.name)}"><span>🧬 정형 정보 (온톨로지)</span><span class="car">▸</span></div>` +
       `<div class="fields-panel" id="fp-${p.id}" style="display:none"></div>` +
+      // 📅 계약·생애주기(2026-09-14 시안 승인) — 정형 정보 바로 아래. eolDate·supplierContact
+      // 2칸은 여기로 흡수된다(server/src/engine/securityproducts.ts PRODUCT_FIELD_SCHEMA 이관).
+      `<div class="fields-toggle" data-lc-toggle="${p.id}"><span>📅 계약·생애주기</span><span class="lc-badge" data-lc-badge="${p.id}"></span><span class="car">▸</span></div>` +
+      `<div class="fields-panel" id="lc-${p.id}" style="display:none"></div>` +
       // 조치·수정 요청 이력(2026-08-21) — 이 제품으로 보낸 요청의 상태(초안→보냄→회신). 기본 접힘.
       `<div class="fields-toggle" data-req-toggle="${p.id}"><span>📨 조치 요청 이력</span><span class="car">▸</span></div>` +
       `<div class="fields-panel" id="rq-${p.id}" style="display:none"></div>` +
@@ -394,6 +422,101 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       } catch (e) {
         panel.innerHTML = `<div style="color:var(--red-ink, #f5928a);font-size:12.25px">불러오기 실패: ${esc((e && e.message) || e)}</div>`;
       }
+    }
+  }
+
+  // ── 📅 계약·생애주기(2026-09-14 시안 mockups/asset-lifecycle 승인, 계획서 중-7 + 전-4) ─────
+  // 협력사·라이선스·구독·유지보수·EOS·EOL·유상연장을 자산·보안제품 공용 표(asset_lifecycle,
+  // server/src/engine/lifecycle.ts)에서 관리한다. 서버가 준 badge.상태·badge.글을 그대로
+  // 그린다 — 30·90일 잣대는 이 화면에 안 적는다(잣대 두 벌 금지).
+  const lcState = {}; // productId -> 마지막 GET 응답({row,fields,badge}) — 열 때마다 다시 받지 않는다
+  const LC_BADGE_CLASS = { 임박: "now", 주의: "soon", 종료: "done", 확인필요: "warn" };
+
+  function paintLcBadge(el, badge) {
+    if (!el) return;
+    if (!badge || badge.상태 === "여유" || badge.상태 === "없음") { el.className = "lc-badge"; el.textContent = ""; return; }
+    el.className = "lc-badge chip " + (LC_BADGE_CLASS[badge.상태] || "warn");
+    el.textContent = badge.글 || "";
+  }
+
+  // 배지는 접힌 채로도 보여야 한다(눌러야만 보이는 정보는 놓친다) — 상세를 열 때 항상 부른다.
+  async function 생애주기배지채우기(pid) {
+    const el = document.querySelector(`[data-lc-badge="${pid}"]`);
+    if (!el) return;
+    try {
+      const data = await window.gijo.getLifecycle("product", pid);
+      lcState[pid] = data;
+      paintLcBadge(el, data.badge);
+    } catch (e) { /* 배지 실패는 조용히 넘어간다 — 접힌 요약일 뿐, 판을 열면 다시 시도한다 */ }
+  }
+
+  function lcCellHtml(label, inner, full) {
+    return `<div class="lc-cell${full ? " full" : ""}"><span class="lc-label">${esc(label)}</span>${inner}</div>`;
+  }
+  const LICENSE_TYPES = ["", "영구", "구독", "오픈소스·번들", "기타"];
+  function lcLicenseSelect(value) {
+    return `<select class="lc-input" data-lc-key="licenseType">` +
+      LICENSE_TYPES.map((t) => `<option value="${esc(t)}"${t === (value || "") ? " selected" : ""}>${esc(t || "선택 안 함")}</option>`).join("") +
+      `</select>`;
+  }
+  function lcPanelHtml(pid, data) {
+    const row = (data && data.row) || {};
+    const v = (k) => esc(row[k] == null ? "" : row[k]);
+    return (
+      `<div class="lc-grid">` +
+      lcCellHtml("협력사·담당자 연락처", `<input class="lc-input" data-lc-key="vendorContact" value="${v("vendorContact")}" placeholder="예: ㈜SECUI / 홍길동 010-1234-5678">`) +
+      lcCellHtml("라이선스 종류", lcLicenseSelect(row.licenseType)) +
+      lcCellHtml("구독 기간", `<span class="lc-pair"><input type="date" data-lc-key="subStart" value="${v("subStart")}"><input type="date" data-lc-key="subEnd" value="${v("subEnd")}"></span>`) +
+      lcCellHtml("유지보수 종료일(영구)", `<input class="lc-input" type="date" data-lc-key="maintenanceEnd" value="${v("maintenanceEnd")}">`) +
+      lcCellHtml("EOS(판매 종료일)", `<input class="lc-input" type="date" data-lc-key="eos" value="${v("eos")}">`) +
+      lcCellHtml("EOL(지원 종료일)", `<input class="lc-input" type="date" data-lc-key="eol" value="${v("eol")}">`) +
+      lcCellHtml("유상 연장", `<span class="lc-pair"><input data-lc-key="extName" placeholder="이름(예: Red Hat ELS)" value="${v("extName")}"><input type="date" data-lc-key="extEnd" value="${v("extEnd")}"></span>`) +
+      lcCellHtml("근거·확인일", `<input class="lc-input" data-lc-key="evidence" value="${v("evidence")}" placeholder="예: Red Hat 수명주기 공지 · 2026-09-02 대조">`) +
+      lcCellHtml("비고", `<input class="lc-input" data-lc-key="note" value="${v("note")}">`, true) +
+      `</div>` +
+      `<div class="fields-actions"><button class="fbtn save" data-lc-save="${pid}">✓ 계약·생애주기 저장</button>` +
+      `<span class="field-hint" data-lc-hint="${pid}"></span></div>`
+    );
+  }
+
+  async function toggleLifecycle(pid) {
+    const toggle = document.querySelector(`[data-lc-toggle="${pid}"]`);
+    const panel = document.getElementById(`lc-${pid}`);
+    if (!toggle || !panel) return;
+    const opening = panel.style.display === "none";
+    panel.style.display = opening ? "block" : "none";
+    toggle.classList.toggle("open", opening);
+    if (opening && !lcState[pid]) {
+      panel.innerHTML = `<div style="color:var(--muted);font-size:12.25px">불러오는 중...</div>`;
+      try {
+        const data = await window.gijo.getLifecycle("product", pid);
+        lcState[pid] = data;
+        panel.innerHTML = lcPanelHtml(pid, data);
+      } catch (e) {
+        panel.innerHTML = `<div style="color:var(--red-ink, #f5928a);font-size:12.25px">불러오기 실패: ${esc((e && e.message) || e)}</div>`;
+      }
+    }
+  }
+
+  async function saveLifecycleFor(pid) {
+    const panel = document.getElementById(`lc-${pid}`);
+    if (!panel) return;
+    const btn = panel.querySelector(`[data-lc-save="${pid}"]`);
+    const hint = panel.querySelector(`[data-lc-hint="${pid}"]`);
+    btn.disabled = true;
+    btn.textContent = "저장 중...";
+    try {
+      const fields = [...panel.querySelectorAll("[data-lc-key]")].map((inp) => ({ key: inp.dataset.lcKey, value: inp.value }));
+      const data = await window.gijo.saveLifecycle("product", pid, fields);
+      lcState[pid] = data;
+      paintLcBadge(document.querySelector(`[data-lc-badge="${pid}"]`), data.badge);
+      if (hint) hint.textContent = "저장했습니다 · 지금 만료 판정: " + ((data.badge && data.badge.글) || "등록된 계약이 없습니다");
+      btn.textContent = "✓ 계약·생애주기 저장";
+    } catch (e) {
+      if (hint) hint.textContent = "저장 실패: " + ((e && e.message) || e);
+      btn.textContent = "✓ 계약·생애주기 저장";
+    } finally {
+      btn.disabled = false;
     }
   }
 
@@ -690,7 +813,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         // 정형정보 캐시를 비운다(검토관 상1) — 상세 DOM은 매번 새로 만드는데 캐시가 남아
         // 두 번째 열람부터 🧬가 빈 상자였다.
         delete fieldsState[p.id];
+        delete lcState[p.id]; // 계약·생애주기도 같은 이유로 비운다 — 배지가 두 번째부터 빈 채로 남지 않게
         window.gijoRowDetail(row, prodDetailHtml(p));
+        // 배지는 접힌 채로도 보여야 한다(눌러야만 보이는 정보는 놓친다) — 열 때만 채운다.
+        if (!내것) 생애주기배지채우기(p.id);
         열린상세pid = 내것 ? null : String(p.id);
       }
       return;
@@ -727,6 +853,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
     const fieldsToggle = e.target.closest("[data-fields-toggle]");
     if (fieldsToggle) { toggleFields(fieldsToggle.dataset.fieldsToggle); return; }
+    const lcToggle = e.target.closest("[data-lc-toggle]");
+    if (lcToggle) { toggleLifecycle(lcToggle.dataset.lcToggle); return; }
+    const lcSave = e.target.closest("[data-lc-save]");
+    if (lcSave) { saveLifecycleFor(lcSave.dataset.lcSave); return; }
     const reqToggle = e.target.closest("[data-req-toggle]");
     if (reqToggle) { toggleReqHistory(reqToggle.dataset.reqToggle); return; }
     const reqSet = e.target.closest("[data-req-set]");

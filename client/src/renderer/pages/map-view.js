@@ -439,9 +439,21 @@
     return html;
   }
 
+  // 📅 계약·생애주기 만료 배지(2026-09-14 시안 mockups/asset-lifecycle 승인, 계획서 중-7+전-4).
+  // 상태(서버 lifecycle.ts 생애주기배지 그대로) → 칩 class·글자 — 30·90일 문턱은 여기 없다.
+  var LC_CHIP_CLASS = { 임박: "now", 주의: "soon", 종료: "done", 확인필요: "warn" };
+  function 만료칩HTML(item) {
+    var cls = LC_CHIP_CLASS[item.상태] || "soon";
+    var label = item.상태 === "확인필요" ? "⚠ 확인 필요" : item.상태 === "종료" ? "지원 종료" : "D-" + item.dday;
+    return '<span class="chip ' + cls + '">' + esc(label) + '</span> <span style="color:var(--muted-2);font-size:11px">' +
+      esc(item.종류 || "") + " " + esc(item.날짜 || "") + "</span>";
+  }
+
   /** 방패(보안제품·하드닝 대상) 상세판 — ③(하드닝)·⑧(보안제품) 칩 1개씩(시안 §2·§8).
-   *  보호 관계는 선을 긋지 않고 .mv-noedge 빈 자리 문구로 정직하게 밝힌다(시안 §3). */
-  function shieldDetailHtml(kind, item) {
+   *  보호 관계는 선을 긋지 않고 .mv-noedge 빈 자리 문구로 정직하게 밝힌다(시안 §3).
+   *  ctx(선택) — 📅 계약·생애주기 만료맵 주입(이 파일은 스스로 API를 부르지 않는다, 계약). */
+  function shieldDetailHtml(kind, item, ctx) {
+    ctx = ctx || {};
     if (kind === "hardening") {
       // ⚠ 칩 문장은 item.label(한글 라벨)이 아니라 item.host(IP)로 만든다 — 하드닝 대상 찾기
       // 후보 정규식(agentloop.ts:3191-3197)은 IPv4/하이픈꼴만 후보로 뽑는다. 공백 섞인 한글
@@ -472,6 +484,15 @@
             ? ("🔗 " + esc(item.assetName) + ' <span class="chiptag noappr">등록</span>')
             : '<span class="mv-noedge">연결된 자산을 찾을 수 없습니다 — 등록은 돼 있으나 그 자산이 지워졌습니다</span>')
         : '<span class="mv-noedge">등록하면 나타납니다</span>') + "</div>" +
+      // 📅 만료(2026-09-14 시안 승인) — 판정 축은 위 「연결 자산」과 **같은 축(item.assetId 유무)**
+      // 이다(2026-09-14 검토관 [하] 적발과 같은 함정 재발 방지 — 이름으로 갈래를 타지 않는다).
+      // 데이터는 이 화면이 스스로 부르지 않는다 — inventory.html이 만료맵을 ctx로 주입한다.
+      '<div class="mv-row"><div class="mv-lbl">📅 만료</div>' +
+      (item.assetId
+        ? (ctx.만료맵 && ctx.만료맵.get(item.assetId)
+            ? 만료칩HTML(ctx.만료맵.get(item.assetId))
+            : '<span class="mv-noedge">등록된 계약이 없습니다</span>')
+        : '<span class="mv-noedge">연결된 자산이 없어 계약을 잇지 못합니다</span>') + "</div>" +
       '<div class="mv-row"><div class="mv-lbl">매뉴얼 문서</div>' + ((item.docs && item.docs.length) ? item.docs.length + "건" : "없음") + "</div>" +
       // 🛡 보호 범위 — 시안 §4 참조코드 1075의 .mv-noedge 빈 자리 줄(구현에서 빠져 있었다,
       // 2026-09-14 검토관 [중] 적발). 화면 안내(screenguide 「지도」)가 **이 자리를 가리킨다** —
