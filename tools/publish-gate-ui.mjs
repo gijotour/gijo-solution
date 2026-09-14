@@ -1024,6 +1024,10 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     // ⚠ 압축과 같은 이유로 **여러 판을 차례로** 눌러 본다 — 0건이 정상인 판이 첫 자리에
     //   오면 제품이 멀쩡한데 게시가 막힌다(2026-08-20 실제로 밟았다).
     let 목록행 = 0, 첫열있음 = false;
+    // ⚠ 2026-09-14 16:07 실측: 판(압축 6)은 그려졌는데 「목록」 단추가 아직 0개인 순간에 세어 거짓 빨강
+    //   (5.97.0 세 번째 게시 — 서버가 재시작 직후 재인입으로 바빠 판 채우기가 늦었다). 단추가 그려질
+    //   때까지 300ms씩 최대 6초 기다린다(0개가 정상인 상태는 없다 — 판이 있으면 단추도 있다).
+    for (let i = 0; i < 20 && !document.querySelector('#cePanels button[data-act="rows"]'); i++) await new Promise((x) => setTimeout(x, 300));
     for (const 펴기 of [...document.querySelectorAll('#cePanels button[data-act="rows"]')]) {
       펴기.click();
       for (let i = 0; i < 15; i++) {
