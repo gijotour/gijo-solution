@@ -469,6 +469,59 @@ describe("프로 확정 계약 — 메뉴 클릭 = 화면+카드 나란히(2026-
     //    새지 않게 gijoScreenList가 같은 주소+이름을 거른다.
     expect(nv, "gijoScreenList가 중복을 안 거른다(작업 내역 두 줄)").toContain("본것[k]");
   });
+  it("📓 내 문서 — 메뉴 이름 짝이 한 글자까지 같다(nav.js가 정본 · 「(옛 …)」 꼬리 제외, 2026-09-14 승인 시안 write-hub-unify §5)", () => {
+    // 결정 ②(설계관, 2026-09-14): 이름 원천은 두 벌 유지 + 이 짝 대조 시험. nav.js가
+    // 정본(소비자 넷: 셸 탭 이름 app.html:622·🔍 화면찾기 titlebar.js:766·홈 히어로 칩
+    // console.js:2134·게시 QA 기대값 qa-auto.mjs:696-701), mydocs.html 사이드바(v4node)가
+    // 따라간다(소비자는 mydocs.html 자신뿐). 「(옛 …)」 꼬리는 이름이 아니라 검색용 주석이라
+    // 사이드바 대조에서는 뗀다(titlebar.js:766 부분문자열 찾기가 살아 있어야 하므로 nav.js
+    // 원문 자체의 꼬리는 안 뗀다 — B5 차단 사유).
+    const nv = 코드만(join(PAGES, "nav.js"));
+    const md = 코드만(join(PAGES, "mydocs.html"));
+    const 꼬리떼기 = (s: string) => s.replace(/\s*\(옛[^)]*\)\s*$/, "").trim();
+    const 정규식이스케이프 = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const 짝들: Array<[string, string]> = [
+      ["ingest", "업로드·반입"],
+      ["write", "문서작성"],
+      ["mine", "내 문서 목록"],
+      ["contacts", "나만의 연락처"],
+      ["guide", "GIJO AS 안내 (옛 문서함·제품 안내)"],
+      ["vendor", "보안제품 비교·소개 (옛 제품 소개자료)"],
+      ["watch", "지켜보는 폴더"],
+      ["req", "조치 요청서"],
+    ];
+    for (const [tab, navLabel] of 짝들) {
+      expect(nv, `nav.js의 ${tab} 라벨이 바뀌었다 — 이름의 주인은 nav다(셸 탭 이름 app.html:622 · 🔍 화면찾기 titlebar.js:766 · qa-auto.mjs:696-701이 이 글자를 읽는다)`)
+        .toContain(`page: "mydocs.html?tab=${tab}", label: "${navLabel}" }`);
+      const 이름 = 꼬리떼기(navLabel);
+      const re = new RegExp(`data-t="${tab}"[^>]*>[^<]*<span class="txt">${정규식이스케이프(이름)}</span>`);
+      expect(md, `사이드바 ${tab} 이름이 nav와 다르다 — 같은 자리가 두 이름으로 불린다(기대: ${이름})`).toMatch(re);
+    }
+  });
+  it("📝 문서작성 판 — 문 4개 · 줄 하나=행동 하나 · 비관리자는 숨기지 말고 흐리게(2026-09-14 결정)", () => {
+    // 승인 시안 mockups/write-hub-unify(2026-09-14 「승인 계속진행」) §1·§9. 차단 사유
+    // B2(설계관): 두 폼은 정적 DOM에 그대로 두고 래퍼 두 개의 display만 토글한다 — 동적
+    // 렌더로 바꾸면 mSave·dRun이 그 시점에 없어 저장이 조용히 죽는다(없는 함수 버튼 계보).
+    const md = 코드만(join(PAGES, "mydocs.html"));
+    // ⚠ 실코드가 줄 하나를 만드는 공용 헬퍼(줄(표식, 아이콘, …))를 쓴다 — data-w 속성이
+    // `'" data-w="' + 표식 + '"'`로 **동적 조립**되어 소스에 `data-w="new"` 리터럴이 없다
+    // (2026-09-14 이 세션 실측). 헬퍼 호출부(`줄("new"`)도 함께 인정해야 실제 구현을 잰다.
+    for (const w of ["new", "fix", "doc", "aibom"]) {
+      const wRe = new RegExp(`data-w="${w}"|줄\\(\\s*"${w}"`);
+      expect(md, `문서작성 판에 data-w="${w}" 표식이 없다(줄 헬퍼 호출부도 인정)`).toMatch(wRe);
+    }
+    expect(md, "옛 숨김 안내문이 남아 있다 — 결정은 「숨김 → 흐리게+이유」다").not.toContain("쓸 수 있어 여기 보이지 않습니다");
+    expect(md, "비관리자 줄에 이유를 붙이는 title이 없다").toContain("관리자만 쓸 수 있습니다 — 회사 지식은 모두가 검색하는 자리라 쓰기는 관리자에게만 엽니다.");
+    // 정적 DOM 유지(blockers B2) — initEnrich(:2021~)가 로드 때 한 번만 배선한다.
+    for (const id of ["mSave", "dRun", "enrichFix", "enrichDoc", "enrichSwitch", "enrichResList"]) {
+      expect(md, `#${id}이 정적 DOM에 없다 — initEnrich(:2021~)가 로드 때 한 번만 배선하므로 동적으로 그리면 저장이 조용히 죽는다`).toContain(`id="${id}"`);
+    }
+    expect(md, "보강 폼이 아직 1fr 1fr로 나란히 그려진다").not.toContain("grid-template-columns:1fr 1fr;gap:14px");
+    // 이동이지 복제가 아님(blockers B7 참고 결정 · §4-b 기각 근거) — AI-BOM 판은 원본(sbom.html)으로 이동만.
+    expect(md, "AI-BOM 줄이 원본 판으로 안 보낸다").toContain('data-go="triage.html?panel=sbom"');
+    expect(md, "AI-BOM 5영역 폼을 이 화면에 복제했다 — 사본 어긋남 계보").not.toContain("aibomAreas");
+    expect(md, "이동 라벨이 nav.js:171과 다르다 — 탭에 딴 이름이 실린다").toContain('data-lb="② 우선순위"');
+  });
   it("💬 대화창 온디맨드(2026-08-31 사장님 「필요할 때만 불러서 보고」) — 접힘 축·손잡이·강제 오픈", () => {
     const s = 코드만(join(PAGES, "app.html"));
     expect(s, "접힘 축(console-folded)이 없다").toContain("console-folded");

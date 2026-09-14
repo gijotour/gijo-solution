@@ -1696,6 +1696,56 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
     지도성립 && map.지도모집단 >= 0 && map.구획자산합 === map.지도모집단, JSON.stringify(map));
 }
 
+// ── ⑨‴ 📝 문서작성 판(승인 시안 mockups/write-hub-unify §9, 2026-09-14) ───────────
+// ⚠ 여기는 운영 데이터 양에 안 매인 검사다(⑨″ 지도의 조건부 판정 예외가 적용되지 않는다) —
+//   4줄은 언제나 4줄이다. 관문 계정은 claude-deploy(admin)이라 ⓒ가 성립한다. 비관리자
+//   disabled(흐리게+title)는 관문이 원리상 못 본다 — 그건 wiringcontract.test.ts의 소스
+//   감시가 맡는다(두 층을 겹치지 않게 갈라 둔다, blockers B2·B3).
+{
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("mydocs.html?tab=write", "문서작성", { dock: true }));
+  const wFr = await 프레임찾기("mydocs.html", 10);
+  const w = wFr ? await wFr.evaluate(async () => {
+    // 1) 클릭 전에 치수부터 잰다 — data-w="aibom" 줄이 뜰 때까지 최대 20×400ms.
+    for (let i = 0; i < 20; i++) {
+      if (document.querySelector('#list .wline[data-w="aibom"]')) break;
+      await new Promise((x) => setTimeout(x, 400));
+    }
+    const 줄들 = Array.from(document.querySelectorAll("#list .wline"));
+    const 줄수 = 줄들.length;
+    const 표식 = 줄들.map((r) => r.getAttribute("data-w"));
+    const 높이 = 줄들.map((r) => Math.round(r.getBoundingClientRect().height));
+    const 행동수 = 줄들.map((r) => r.querySelectorAll(".act button").length);
+    // 3) 겹침 — 옛 「좁은 폭 글자 겹침」 재발 감시(mydocs.html:1141-1144 계보).
+    let 겹침 = 0;
+    for (const r of 줄들) {
+      const tt = r.querySelector(".tt");
+      const ds = r.querySelector(".ds");
+      if (tt && ds && tt.getBoundingClientRect().bottom > ds.getBoundingClientRect().top + 1) 겹침++;
+    }
+    // 4) AI-BOM 이동 주소 — 속성만 읽는다, 절대 클릭하지 않는다(새 탭이 열려 뒤 검사의
+    //    활성 화면이 바뀐다, blockers B8).
+    const aibomGo = document.querySelector('#list .wline[data-w="aibom"] [data-go]');
+    const 이동주소 = aibomGo.getAttribute("data-go");
+    const 보임 = (id) => { const e = document.getElementById(id); return !!e && e.offsetParent !== null; };
+    // 5) 🩹를 클릭 → 보강판 상태.
+    const fixLine = document.querySelector('#list .wline[data-w="fix"]');
+    fixLine.click();
+    await new Promise((x) => setTimeout(x, 500));
+    const 상태1 = { stage: 보임("enrichStage"), fix: 보임("enrichFix"), doc: 보임("enrichDoc") };
+    // 6) ↔ 전환 → 상태 재확인.
+    const sw = document.getElementById("enrichSwitch");
+    sw.click();
+    await new Promise((x) => setTimeout(x, 400));
+    const 상태2 = { fix: 보임("enrichFix"), doc: 보임("enrichDoc") };
+    return { 줄수, 표식, 높이, 행동수, 겹침, 이동주소, 상태1, 상태2 };
+  }).catch((e) => ({ 던짐: String(e).slice(0, 200) })) : null;
+  const 성립 = !!w && !w.던짐;
+  ok("📝 문서작성 ⓐ — 문이 정확히 4개(new·fix·doc·aibom) · 줄 높이 56px", 성립 && w.줄수 === 4 && ["new","fix","doc","aibom"].every((k,i) => w.표식[i] === k) && w.높이.every(h => Math.abs(h - 56) <= 1), JSON.stringify(w));
+  ok("📝 문서작성 ⓑ — 줄마다 행동 단추가 정확히 1개(죽은 줄 0 · 중복 행동 0) · 제목↔설명 겹침 0", 성립 && w.행동수.length === 4 && w.행동수.every(n => n === 1) && w.겹침 === 0, JSON.stringify(w));
+  ok("📝 문서작성 ⓒ — 🩹를 누르면 보강판이 열리고 폼은 하나만, ↔로 바뀐다(둘 다 뜨던 옛 결함 재발 감시)", 성립 && w.상태1.stage && w.상태1.fix && !w.상태1.doc && w.상태2.doc && !w.상태2.fix, JSON.stringify(w));
+  ok("📝 문서작성 ⓓ — 🤖 AI-BOM은 복제가 아니라 원본 판으로 이동(triage.html?panel=sbom)", 성립 && w.이동주소 === "triage.html?panel=sbom", JSON.stringify(w));
+}
+
 } finally {
   // ⚠ finally다 — 위에서 무엇이 터지든 **세션은 반납하고** 죽는다(K5-2).
   await 반납보장("관문 종료");
