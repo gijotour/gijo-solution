@@ -1746,6 +1746,69 @@ ok("💬 새 세션: 대화 초기화+홈 복원", !!새세션.초기화 && !!�
   ok("📝 문서작성 ⓓ — 🤖 AI-BOM은 복제가 아니라 원본 판으로 이동(triage.html?panel=sbom)", 성립 && w.이동주소 === "triage.html?panel=sbom", JSON.stringify(w));
 }
 
+// ── ⑨⁗ 📅 계약·생애주기(승인 시안 mockups/asset-lifecycle, 2026-09-14 · 계획서 중-7+전-4) ──
+// ⚠ 지시서 원문은 이 절 이름을 "⑨‴"로 적었으나 같은 날 문서작성 판(위)이 이미 그 이름을 썼다
+//   (두 라운드가 같은 날 나란히 승인됐다) — 겹치는 절 이름은 grep으로 찾을 때 헷갈리므로
+//   프라임 하나를 더 붙여 ⑨⁗로 둔다(⑨→⑨′→⑨″→⑨‴→⑨⁗ 순서 그대로).
+{
+  // ① products.html — 첫 행 상세를 펴고 📅 계약·생애주기 토글 존재 · 펼치면 .lc-cell 9개.
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("products.html", "보안제품", { dock: true }));
+  const pFr = await 프레임찾기("products.html", 10);
+  const lc = pFr ? await pFr.evaluate(async () => {
+    for (let i = 0; i < 25; i++) { if (document.querySelector(".g-rows-r[data-pid]")) break; await new Promise((x) => setTimeout(x, 400)); }
+    let 제품 = null;
+    try { 제품 = await window.gijo.listSecurityProducts(); } catch (e) {}
+    const 제품수 = Array.isArray(제품) ? 제품.length : -1;
+    const chev = document.querySelector(".g-rows-r[data-pid] [data-detail]");
+    if (!chev) return { 제품수, 토글없음: true };
+    chev.click();
+    await new Promise((x) => setTimeout(x, 300));
+    const toggle = document.querySelector("[data-lc-toggle]");
+    if (!toggle) return { 제품수, 토글없음: true };
+    toggle.click();
+    for (let i = 0; i < 20; i++) {
+      const panel = toggle.parentElement.querySelector('[id^="lc-"]') || document.querySelector(`#lc-${CSS.escape(toggle.getAttribute("data-lc-toggle"))}`);
+      if (panel && panel.style.display !== "none" && panel.querySelector(".lc-cell")) break;
+      await new Promise((x) => setTimeout(x, 300));
+    }
+    const pid = toggle.getAttribute("data-lc-toggle");
+    const panel = document.getElementById("lc-" + pid);
+    const 칸수 = panel ? panel.querySelectorAll(".lc-cell").length : -1;
+    const 열림 = !!panel && panel.style.display !== "none";
+    return { 제품수, 토글있음: true, 열림, 칸수 };
+  }).catch((e) => ({ 던짐: String(e).slice(0, 200) })) : null;
+  // 조건부 판정(:1566-1567·:1613-1616 관례) — 보안제품 0건이면 이 조항은 안 잰다.
+  const lc성립 = !!lc && !lc.던짐;
+  ok("UI — 계약·생애주기 판: 토글 있음 · 펼치면 칸 9개(보안제품 0건이면 이 조항은 안 잰다)",
+    lc성립 && (lc.제품수 <= 0 ? true : (lc.토글있음 && lc.열림 && lc.칸수 === 9)), JSON.stringify(lc));
+
+  // ② inventory.html?full=1 — 표시 항목 목록에 "만료"가 있는가(기본 열 여부는 소스 감시로 —
+  //    lifecycle.test.ts가 DEFAULT_COLS를 재고, 이 관문 계정이 열을 한 번 켜면 그다음 게시가
+  //    거짓 빨강이 되는 것을 막는다, :1508-1513 접힘 감시와 같은 이유).
+  await 셸.evaluate(() => window.gijoTabs && window.gijoTabs.open("inventory.html?full=1", "자산 관리 (전체)", { dock: true }));
+  const invFr = await 프레임찾기("inventory.html", 10);
+  const inv = invFr ? await invFr.evaluate(async () => {
+    for (let i = 0; i < 25; i++) { if (document.getElementById("colBtn")) break; await new Promise((x) => setTimeout(x, 400)); }
+    const btn = document.getElementById("colBtn");
+    if (!btn) return { 버튼없음: true };
+    btn.click();
+    await new Promise((x) => setTimeout(x, 200));
+    const 만료행있음 = !!document.querySelector('#colList [data-col="expiry"]');
+    const kpiEl = document.getElementById("kpiLifecycle");
+    // 검사 뒤 드로어를 닫는다(:1587 「반드시 열었으면 닫고 다음으로」와 같은 위생 — 적용 단추는
+    // 누르지 않는다, 체크박스도 안 건드린다 — localStorage에 아무 자국도 안 남긴다).
+    const closeBtn = document.getElementById("colDrawerClose");
+    if (closeBtn) closeBtn.click();
+    await new Promise((x) => setTimeout(x, 150));
+    return { 만료행있음, kpi텍스트: kpiEl ? kpiEl.textContent.trim() : null };
+  }).catch((e) => ({ 던짐: String(e).slice(0, 200) })) : null;
+  const inv성립 = !!inv && !inv.던짐 && !inv.버튼없음;
+  ok("UI — 「만료」는 표시 항목 목록에 있다(기본 6열 여부는 lifecycle.test.ts 소스 감시가 잰다)",
+    inv성립 && inv.만료행있음, JSON.stringify(inv));
+  ok("UI — 자산 KPI 「📅 만료 임박」 카드 존재(값이 \"-\"여도 통과 — 못 받으면 비운다가 계약)",
+    inv성립 && inv.kpi텍스트 !== null && inv.kpi텍스트 !== "", JSON.stringify(inv));
+}
+
 } finally {
   // ⚠ finally다 — 위에서 무엇이 터지든 **세션은 반납하고** 죽는다(K5-2).
   await 반납보장("관문 종료");

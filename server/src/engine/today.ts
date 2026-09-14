@@ -23,6 +23,9 @@ import { prioritizedReviews } from "./approvals";
 import { listSchedules } from "./hardeningtargets";
 import { listMaintenanceItems } from "./maintenance";
 import { epss값표기 } from "./tone";
+// 📅 계약·생애주기(승인 시안 mockups/asset-lifecycle, 2026-09-14 · 계획서 중-7+전-4) — device 축
+// 세 번째 원천. 30/90일 잣대·만료 임박 수를 세는 유일한 자리는 lifecycle.ts 하나다(사본 금지).
+import { listLifecycleDueSoon, 임박일 } from "./lifecycle";
 
 // 한 건의 "오늘 할 일". 화면은 이걸 그대로 렌더한다(추가 판단 없이).
 export interface TodayItem {
@@ -279,6 +282,26 @@ function deviceItems(now: number): TodayItem[] {
       });
     }
   }
+
+  // ③ 계약·생애주기 — 만료 임박(30일 잣대는 lifecycle.ts 상수 하나가 유일한 출처). 개별 계약을
+  //   한 건씩 올리면 화면이 길어지니(①②와 같은 이유) **묶음 한 줄**로 낸다(시안 §5-d).
+  //   0건이면 항목을 만들지 않는다(:16-17 "데이터가 없는 축은 조용히 생략한다" 계약).
+  const 만료임박 = listLifecycleDueSoon(임박일);
+  if (만료임박.length > 0) {
+    const 가장이른것 = 만료임박[0]; // listLifecycleDueSoon이 이미 dday 오름차순으로 정렬해 돌려준다.
+    const 배지글 = 가장이른것.상태 === "종료" ? "지원 종료" : `D-${가장이른것.dday}`;
+    out.push({
+      id: "lifecycle",
+      axis: "device",
+      urgency: "today",
+      title: `계약·생애주기 — 만료 임박 ${만료임박.length}건`,
+      subtitle: `가장 이른 것: ${가장이른것.이름} ${가장이른것.종류} ${배지글}`,
+      why: `등록된 계약 중 30일 안에 만료되는 것이 ${만료임박.length}건입니다`,
+      action: `대화창에서 "만료 임박 계약 알려줘"로 전부 봅니다`,
+      badges: [배지글],
+    });
+  }
+
   return out;
 }
 

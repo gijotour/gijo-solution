@@ -83,6 +83,22 @@
 //   않는다 — **87 → 93**. 93 + 44 + 4 = **141**(map-view.js가 그 칩들을 실제로 그리게 된
 //   뒤의 harvest 예상값 — ㉠ 하한 132는 **재측정 전엔 그대로 둔다**, 아래 ㉠ 참고).
 //
+// ■ [계약·생애주기 · 2026-09-14] L1(server/src/engine/lifecycle.ts·agentloop.ts FORCED_INTENTS
+//   [93][94]·agenttools/handlers.ts·agenttools/registry.ts)·L2(products.html·inventory.html·
+//   map-view.js)·L3(screenguide.ts) 커밋 뒤 재수확: **141 → 143(+2)**.
+//   ⚠ 첫 실측은 **141 → 142(+1)**이었다 — L3(screenguide.ts products.html·inventory.html
+//   panels)가 심은 두 예문(⑩ 계약 표 고정 문구) 중 「만료 임박 계약 알려줘」가 수확에
+//   안 잡혔다: 큰 따옴표로 감싼 문단 안에서 `\"…\"`로 이스케이프돼 있어, guidance-check.mjs의
+//   따옴표 짝 맞추기(`"([^"\n]*)"`)가 이스케이프를 모르고 앞뒤의 다른 `"` 문자와 잘못
+//   짝지어(끝에 역슬래시가 붙은 채로 잘려) `끝맺음` 검사를 통과하지 못했다(실측 확인 — node로
+//   그 줄만 떼어 정규식을 직접 돌려 실증). 반면 handlers.ts의 0건 안내(runLifecycleStatus
+//   폴백)는 처음부터 홑따옴표 바깥 + 이스케이프 없는 곧은따옴표(`'…"FW-01 유지보수
+//   2027-03-31까지 등록해줘"…'`)를 써서 그 한 줄만 정직하게 걸렸다. **수리**: 두 panels 문자열의
+//   바깥 따옴표를 큰따옴표→홑따옴표로 바꿔 안쪽 곧은따옴표를 이스케이프 없이 뒀다(같은 커밋,
+//   screenguide.ts). 재수확 141 → **143**(+2, 새로 둘 다 걸림 — 서로 다른 문자열이라 겹침
+//   없음, 실측: harvest 두 실행의 diff가 정확히 그 한 줄뿐임을 확인했다). ㉠ 하한은 재측정값
+//   에서 여유 3을 뺀 **140**으로 올린다(먼저 낮춰 두지 않는다 원칙 — 실측 뒤에 못 박는다).
+//
 // ■ 근거 칸은 **파일:줄이 아니라 grep 되는 원문 조각**으로 적는다(2026-09-13 검토관 적발 ⑦).
 //   첫 판은 줄 번호로 적었는데 **같은 날 안에 네 줄이 어긋났다** — 이 저장소는 실행자 여럿이
 //   한 트리에서 동시에 커밋해서, 줄 번호는 몇 시간이면 낡는다. 낡은 근거는 「눈감기 목록」을
@@ -427,6 +443,11 @@ const 기대도착: Record<string, string> = {
   "GIJO AS 서버 공격 경로 보여줘": "formatAttackPaths",
   "GIJO AS 서버 조치 요청서 만들어줘": "create_request_doc",
   "GIJO AS 서버 취약점 리포트 만들어줘": "generateReport",
+  // [계약·생애주기 · 2026-09-14] handlers.ts runLifecycleStatus 0건 폴백 안내(위 머리글 참고) —
+  // route-explain --no-build 실측값 그대로. [93]·[94] FORCED_INTENTS 신설로 새로 걸린 두 줄.
+  "FW-01 유지보수 2027-03-31까지 등록해줘": "set_lifecycle",
+  // screenguide.ts products.html panels["계약·생애주기"] 안내 예문(홑따옴표 수리 뒤 harvest).
+  "만료 임박 계약 알려줘": "lifecycle_status",
 };
 
 describe("★★ guidance-check 관문의 느슨한 잣대 — 도착지는 제품 함수로만 잰다", () => {
@@ -443,10 +464,13 @@ describe("★★ guidance-check 관문의 느슨한 잣대 — 도착지는 제�
     //   손실이 초록으로 지나간다). 이 값은 2026-09-13 수리 뒤 실측 132에서 잡은 것이다.
     //   [UI D + 검토관 수리 · 2026-09-13] 132 → 133(자가 진단 ⓘ) → **135**(실사용 전환 ⓘ ·
     //   대상 등록 ⓘ를 수확되는 말투로 맞춤). 여유 3 그대로 → 132.
+    //   [지형도 C · 2026-09-14] 135 → **141**(map-view.js 칩 실장, 위 머리글 참고).
+    //   [계약·생애주기 · 2026-09-14] 141 → **143**(handlers.ts 0건 안내 + screenguide.ts 판
+    //   안내, 위 머리글 참고). 여유 3 → 재고 나서 올린 값 **140**.
     expect(
       안내.length,
-      `안내 문구를 ${안내.length}개밖에 못 읽었다 — guidance-check.mjs 수확 로직이 눈을 감았을 수 있다(2026-09-13 실측 135)`,
-    ).toBeGreaterThanOrEqual(132);
+      `안내 문구를 ${안내.length}개밖에 못 읽었다 — guidance-check.mjs 수확 로직이 눈을 감았을 수 있다(2026-09-14 실측 143)`,
+    ).toBeGreaterThanOrEqual(140);
   });
 
   it("㉢ 예외표가 새 「눈감기 목록」이 되지 않는다 — 상한 44줄", () => {
