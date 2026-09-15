@@ -15,6 +15,7 @@ import { currentDocIds } from "./ragscope";
 import { 쓰기흐름인가 } from "./writeflow"; // 「조회 + 쓰기 지시」 잣대(잎 모듈 단일 출처 — picklist도 같은 함수를 쓴다)
 import { 새근거수거, 근거를수거하며 } from "./toolevidence"; // 도구가 읽은 근거를 위로 나르는 꼬리표(잎 모듈)
 import { 표식 } from "./tone";
+import { 취약점이름조건 } from "./vulnalias";
 import { reportProgress } from "./progress";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 되묻기표지, 지식근거없음표지, 본문근거없음표지, 대상찾기 } from "./agenttools";
 import type { AgentTool } from "./agenttools";
@@ -3101,6 +3102,13 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): 강제결
       //   답했다 — 규칙을 넓힌 목적(제품 이름이 앞에 붙은 꼴을 받자)이 반쪽이 된 자리다.
       //   ⚠ **지어내지 않는다**: 뜻 없는 수식어(유지보수·이번 달·기한 지난·전체…)는 filter로 넘기지
       //     않는다 — 넘기면 「"이번 달"에 맞는 점검 일정을 못 찾았습니다」가 나간다. 이름 꼴만 받는다.
+      // ★ 「Log4Shell 있어?」·「CVE-2021-44228 있어?」(FORCED [95], 2026-09-15 고객 QA 예행 ⑬) — 조건을 넘긴다.
+      //   finding_status는 write:false라 registry의 autoFill이 안 돈다(verify_finding과 같은 자리) — 여기서 안 하면
+      //   아무도 안 하고, 실측(배포 52 직후 4100)에선 14건 전부가 나왔다. 조건 낱말은 engine/vulnalias.ts 한 곳.
+      if (f.tool === "finding_status") {
+        const 조건 = 취약점이름조건(instruction);
+        if (조건) return { tool: f.tool, args: { filter: 조건 } };
+      }
       if (f.tool === "maintenance_status") {
         const 앞말 = /^(.{2,25}?)\s*점검\s*일정/.exec(instruction)?.[1]?.trim() ?? "";
         const 뜻없는수식어 = /유지\s*보수|유지보수|정비|이번|다음|지난|오늘|내일|이달|금주|올해|작년|전체|모든|모두|우리|사내|기한|밀린|남은|다가온|앞으로|예정|최근|새로/;

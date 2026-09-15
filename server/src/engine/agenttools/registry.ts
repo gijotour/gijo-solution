@@ -1548,18 +1548,9 @@ const TOOLS: AgentTool[] = [
       //   화면은 「이 자산 기준으로 갑니다」라고 적혀 있는데(2026-08-18 실측 3,008건).
       { name: "assetId", label: "지금 범위", description: "🗂 지금 범위로 걸린 자산(자동으로 채워짐)", required: false, 기계전용: true },
     ],
-    // 2026-09-15 고객 QA 예행 ⑬ — FORCED [95]가 args 없이 부르므로 지시문에서 CVE 번호나 유명 취약점 이름을 조건으로 채운다.
-    //   이름은 등록 취약점의 유형·근거 글에 실제로 들어 있는 낱말로 바꿔 준다(Log4Shell → log4j).
-    autoFill: (args, instruction): Record<string, string> => {
-      if (String(args.filter ?? "").trim()) return {};
-      const 글 = String(instruction ?? "");
-      const cve = /CVE-\d{4}-\d{4,7}/i.exec(글);
-      if (cve) return { filter: cve[0].toUpperCase() };
-      const 별칭: Record<string, string> = { log4shell: "log4j", log4j: "log4j", heartbleed: "heartbleed", shellshock: "bash", bluekeep: "rdp", eternalblue: "smb", printnightmare: "print spooler", zerologon: "netlogon", spring4shell: "spring", proxylogon: "exchange", proxyshell: "exchange", "citrix bleed": "citrix", regresshion: "openssh", "dirty pipe": "kernel", follina: "msdt", "looney tunables": "glibc" };
-      const 이름 = /(log4shell|log4j|heartbleed|shellshock|bluekeep|eternalblue|printnightmare|zerologon|spring4shell|proxylogon|proxyshell|citrix\s*bleed|regresshion|dirty\s*pipe|follina|looney\s*tunables)/i.exec(글);
-      if (이름) { const k = 이름[1].toLowerCase().replace(/\s+/g, " "); return { filter: 별칭[k] ?? k }; }
-      return {};
-    },
+    // 2026-09-15 고객 QA 예행 ⑬ — FORCED [95]「Log4Shell 있어?」의 조건(filter)은 **agentloop이** engine/vulnalias.ts의
+    //   취약점이름조건()으로 채운다. 이 도구는 write:false라 autoFill이 안 돈다(autoFill은 buildApproval 안에서만) —
+    //   여기 autoFill을 두면 죽은 코드다(첫 판이 그렇게 넣었다가 4100 실측에서 14건 전부가 나왔다).
     // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
     directAnswer: true,
     run: runFindingStatusOverview,
