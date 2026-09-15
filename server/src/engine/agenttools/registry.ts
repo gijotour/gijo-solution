@@ -1008,11 +1008,19 @@ const TOOLS: AgentTool[] = [
       '보안 점검·조회용 CLI(PowerShell) 명령 한 줄을 만들어 준다. "포트 스캔 명령 알려줘", ' +
       '"디스크 사용량 보는 명령", "nmap으로 10.0.0.5 훑는 명령" 같은 물음에 쓴다. 실행은 하지 않는다.',
     params: [{ name: "request", label: "무엇을 하고 싶은가", description: "만들고 싶은 명령을 우리말로 (예: 10.0.0.5 열린 포트 확인)", required: true }],
+    // 2026-09-15 고객 QA 예행 ⑲ — request 빈 채로 불려 explanation만 나가 「Setup.bat 실행합니다」 단정
+    autoFill: (args, instruction): Record<string, string> => (String(args.request ?? "").trim() ? {} : { request: String(instruction ?? "").trim() }),
     directAnswer: true,
     run: async (args) => {
+      const req = String(args.request ?? "").trim();
+      if (!/\d{1,3}(\.\d{1,3}){3}|포트|디스크|로그|프로세스|서비스|계정|사용자|방화벽|nmap|netstat|ping|dns|인증서|패치|업데이트|점검할|확인할|메모리|cpu|네트워크|파일|권한|레지스트리|이벤트/i.test(req)) {
+        return `무엇을 점검할지 알려주시면 명령 한 줄을 만들어 드립니다 — 예: "10.0.0.5 열린 포트 확인 명령", "디스크 사용량 보는 명령", "최근 로그인 실패 로그 보는 명령".\n실행은 하지 않습니다 — 만든 명령은 ③ 조치 › 터미널 화면에서 직접 실행하세요.`;
+      }
       const { suggestCommand } = await import("../cmdsuggest.js");
-      const r = await suggestCommand(String(args.request ?? ""));
-      if (!r.command) return r.explanation;
+      const r = await suggestCommand(req);
+      if (!r.command) {
+        return `명령을 만들지 못했습니다 — ${r.explanation || "요청을 더 구체적으로 말씀해 주세요"}\n실행은 하지 않습니다 — ③ 조치 › 터미널 화면에서 직접 실행하세요.`;
+      }
       return [
         `제안 명령: \`${r.command}\``,
         r.explanation,
@@ -1540,6 +1548,18 @@ const TOOLS: AgentTool[] = [
       //   화면은 「이 자산 기준으로 갑니다」라고 적혀 있는데(2026-08-18 실측 3,008건).
       { name: "assetId", label: "지금 범위", description: "🗂 지금 범위로 걸린 자산(자동으로 채워짐)", required: false, 기계전용: true },
     ],
+    // 2026-09-15 고객 QA 예행 ⑬ — FORCED [95]가 args 없이 부르므로 지시문에서 CVE 번호나 유명 취약점 이름을 조건으로 채운다.
+    //   이름은 등록 취약점의 유형·근거 글에 실제로 들어 있는 낱말로 바꿔 준다(Log4Shell → log4j).
+    autoFill: (args, instruction): Record<string, string> => {
+      if (String(args.filter ?? "").trim()) return {};
+      const 글 = String(instruction ?? "");
+      const cve = /CVE-\d{4}-\d{4,7}/i.exec(글);
+      if (cve) return { filter: cve[0].toUpperCase() };
+      const 별칭: Record<string, string> = { log4shell: "log4j", log4j: "log4j", heartbleed: "heartbleed", shellshock: "bash", bluekeep: "rdp", eternalblue: "smb", printnightmare: "print spooler", zerologon: "netlogon", spring4shell: "spring", proxylogon: "exchange", proxyshell: "exchange", "citrix bleed": "citrix", regresshion: "openssh", "dirty pipe": "kernel", follina: "msdt", "looney tunables": "glibc" };
+      const 이름 = /(log4shell|log4j|heartbleed|shellshock|bluekeep|eternalblue|printnightmare|zerologon|spring4shell|proxylogon|proxyshell|citrix\s*bleed|regresshion|dirty\s*pipe|follina|looney\s*tunables)/i.exec(글);
+      if (이름) { const k = 이름[1].toLowerCase().replace(/\s+/g, " "); return { filter: 별칭[k] ?? k }; }
+      return {};
+    },
     // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
     directAnswer: true,
     run: runFindingStatusOverview,

@@ -757,8 +757,60 @@ export function computeAttackPaths(events: AnalysisEvent[]): AttackPath[] {
 /** 화면·대화창에 한 번에 보여 주는 경로 수. 넘으면 **잘랐다고 밝힌다.** */
 const 보여줄경로 = 6;
 
-export function formatAttackPaths(): string {
+// 2026-09-15 고객 QA 예행 ⑧ — 자산을 콕 집어도 이벤트만 봐서 등록 취약점을 한 마디도 안 했다
+export function formatAttackPaths(text?: string): string {
+  const 납작 = (s: unknown) => String(s ?? "").trim().toLowerCase();
+  const 글 = 납작(text);
+  const 지목 = 글 ? listAssets().find((a) => [a.name, a.id, (a as any).hostname, (a as any).ip].map(납작).filter(Boolean).some((k) => k.length >= 3 && 글.includes(k))) : undefined;
+
   const paths = computeAttackPaths(listAnalysisEvents());
+
+  if (지목) {
+    const mine = paths.filter((p) => {
+      const e = 납작(p.entity);
+      return [지목.name, 지목.id, (지목 as any).hostname].map(납작).filter(Boolean).includes(e);
+    });
+
+    if (mine.length > 0) {
+      const 자름 = mine.length > 보여줄경로;
+      const L: string[] = [
+        `🧭 공격 경로 분석 — ${지목.name} 기준 도달성 순 ${mine.length}건 (관측 신호 기반 추정)` +
+          (자름 ? ` · 아래는 위험한 순 ${보여줄경로}건입니다` : ""),
+      ];
+      for (const p of mine.slice(0, 보여줄경로)) {
+        L.push(`\n[도달성 ${p.reachability}·${p.reachScore}점] ${p.entity}`);
+        L.push("  " + p.steps.map((s) => `${s.kind === "entry" ? "진입" : s.kind === "foothold" ? "거점" : "인접"}:${s.label}`).join(" → "));
+      }
+      L.push(
+        "",
+        '▸ 이어서 — 경로는 거점을 막으면 끊어집니다. "' +
+          (mine[0]?.entity ?? "가장 위험한 자산") +
+          ' 취약점 담당자 배정해줘"라고 말하면 바로 시작합니다.'
+      );
+      return L.join("\n");
+    } else {
+      const 활성 = ((지목.findings ?? []) as any[]).filter((f) => isRealVulnerability(f) && f.state !== "fixed");
+      const 순위: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+      활성.sort((a, b) => (순위[납작(a.severity)] ?? 9) - (순위[납작(b.severity)] ?? 9));
+
+      if (활성.length === 0) {
+        return `🧭 공격 경로 분석 — ${지목.name}: 지금까지 수집된 보안 이벤트 기준으로 구성 가능한 공격 경로가 없고, 등록된 미조치 취약점도 없습니다 ✓ (로그·스캔이 쌓이면 다시 구성됩니다)`;
+      } else {
+        const L: string[] = [
+          `🧭 공격 경로 분석 — ${지목.name}: 관측된 보안 이벤트가 없어 경로를 구성하지 못했습니다(경로 분석의 모집단은 수집된 보안 이벤트입니다 — 취약점 자체가 안전하다는 뜻은 아닙니다).`,
+          `등록된 미조치 취약점 ${활성.length}건 기준 잠재 진입점(심각한 순 ${Math.min(3, 활성.length)}건):`,
+        ];
+        for (const f of 활성.slice(0, 3)) {
+          const sev = 납작(f.severity);
+          const 심각도한글 = sev === "critical" ? "매우 심각" : sev === "high" ? "높음" : sev === "medium" ? "보통" : sev === "low" ? "낮음" : f.severity;
+          L.push(`  · [${심각도한글}] ${f.finding_type}${f.evidence ? " — " + String(f.evidence).slice(0, 80) : ""}`);
+        }
+        L.push("", `▸ 이어서 — "${지목.name} 취약점 담당자 배정해줘"라고 말하면 바로 시작합니다.`);
+        return L.join("\n");
+      }
+    }
+  }
+
   // ⚠ 「없습니다 ✓」로 끝내면 「이 취약점은 뚫릴 길이 없다」로 읽힌다(검토관 B중3) — 이 분석의
   //   모집단은 **지금까지 수집된 보안 이벤트**이지 취약점 자체가 아니다. 범위를 함께 말한다.
   if (paths.length === 0) return "🧭 공격 경로 분석 — 지금까지 수집된 보안 이벤트 기준으로 구성 가능한 공격 경로가 없습니다 ✓ (로그·스캔이 쌓이면 다시 구성됩니다 — 취약점 자체가 안전하다는 뜻은 아닙니다)";

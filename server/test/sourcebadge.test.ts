@@ -170,7 +170,7 @@ describe("★ ⓐ 남은 코드 템플릿 전부가 sources를 선언한다 (정
     ["화면 위치안내", "output: 화면위치안내(찾는화면.screen"],
     ["방법질문 화면안내", "output: formatScreenGuide(방법화면.screen"],
     ["지식 정리(kbhygiene)", "output: formatKbHygiene"],
-    ["공격 경로", "output: formatAttackPaths()"],
+    ["공격 경로", "output: formatAttackPaths(instructionText)"], // 2026-09-15 ⑧ — 지시문에서 자산을 찾도록 인자를 받는다
     ["Shadow AI", "output: formatShadowAi()"],
     ["장애 초동절차", "output: 장애초동절차(instructionText)"],
     ["순서 안내(howto)", "output: howToMarkdown(howTo)"],

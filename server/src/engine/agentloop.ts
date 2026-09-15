@@ -2490,6 +2490,16 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string>; 
     args: {},
     argsByModel: true,
   },
+  // [95] 취약점 이름·CVE 번호 + 있어? — 등록 취약점 조회(finding_status)로 못 박는다(2026-09-15 고객 QA 예행 ⑬).
+  //   「Log4Shell 있어?」가 ⑨ 모델 선택으로 가 일반 지식(CVSS·조치법)을 답했다 — 담당자가 묻는 건 「우리 망에 있나」다.
+  //   ⚠ 이름은 닫힌 목록(유명 취약점)과 CVE 번호만 — 일반 낱말(「자산 있어?」)을 삼키지 않는다.
+  //   ⚠ 지식 물음(뭐야·설명·이란·조치법)·배정·리포트 요청은 배제어로 비켜 준다. 조건(filter)은
+  //     registry.ts finding_status의 autoFill이 지시문에서 CVE 번호·별칭(log4shell→log4j)으로 채운다.
+  {
+    re: /^(?![\s\S]*(뭐야|뭔가|무엇|설명|이란|란\s*뭐|뜻|조치법|패치법|어떻게|담당자|배정|리포트|보고서|대응\s*절차))\s*(우리\s*(망|자산|장비|서버)(에|에서)?\s*)?((CVE-\d{4}-\d{4,7})|(log4shell|log4j|heartbleed|shellshock|bluekeep|eternalblue|printnightmare|zerologon|spring4shell|proxylogon|proxyshell|citrix\s*bleed|regresshion|dirty\s*pipe|follina|looney\s*tunables))\s*(취약점)?\s*(이|가)?\s*(걸린\s*(거|것|자산|장비|서버)?\s*)?(있어|있나|있니|있습니까|있냐|있는지|걸렸어|걸렸나|해당돼|해당\s*되나|있는\s*거야)\s*\??\s*$/i,
+    tool: "finding_status",
+    args: {},
+  },
 ];
 
 // ── [83] 사내 지표율 — **주체어 규칙**(게이트, 기본 꺼짐) ────────────────────────

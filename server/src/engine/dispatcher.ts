@@ -1858,7 +1858,8 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     completeTask(task.id);
     // nextChips — 「취약점 이해」 4걸음(배정) 사슬(검토관 B중1: 3걸음의 답이 4걸음을 이어 줘야
     // 「그다음은 각 답이 이어 줍니다」 약속이 성립한다). 문구는 시나리오 걸음과 글자 동일.
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatAttackPaths(), sources: [], nextChips: ["이거 담당자 배정해줘", "미조치 취약점 뭐 있어?"] };
+    // 2026-09-15 고객 QA 예행 ⑧ — 자산을 콕 집은 말이면 그 자산 기준으로 답한다(formatAttackPaths가 지시문에서 자산을 찾는다).
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatAttackPaths(instructionText), sources: [], nextChips: ["이거 담당자 배정해줘", "미조치 취약점 뭐 있어?"] };
   }
 
   // "Shadow AI 점검해줘 / 미등록 AI 있어?" — 시스템 관측 신호로 미등록 모델을 결정적으로 찾는다.
