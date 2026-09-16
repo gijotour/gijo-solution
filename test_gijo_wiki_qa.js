@@ -3,14 +3,16 @@ const fs = require('fs');
 const htmlPath = 'd:/Connect AI/GIJO_Security_ERP_Suite.html';
 const html = fs.readFileSync(htmlPath, 'utf8');
 
-console.log('=== GIJO WIKI v5.2.0 QA & Integrity Test ===');
+console.log('=== GIJO AS Lite (GIJO WIKI Edition) v5.2.0 QA & Integrity Test ===');
 console.log('File size:', (html.length / 1024).toFixed(1), 'KB');
 
-// 1. Theme check
+// 1. Theme and Branding check
 const hasWhiteBg = html.includes('--bg-main: #f8fafc;');
 const hasWhitePanel = html.includes('--bg-panel: #ffffff;');
 const hasDarkText = html.includes('--text-main: #0f172a;');
+const hasLiteBrand = html.includes('GIJO AS Lite') && html.includes('WIKI v5.2');
 console.log('[Theme Check] White & Slate Light theme applied:', hasWhiteBg && hasWhitePanel && hasDarkText);
+console.log('[Branding Check] GIJO AS Lite (WIKI Edition) header verified:', hasLiteBrand);
 
 // 2. Extract defaultWikiDocs
 const matchDocs = html.match(/const defaultWikiDocs = (\[[\s\S]*?\]);\s*const quickQuestions/);

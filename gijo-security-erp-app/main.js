@@ -10,7 +10,7 @@ function createWindow() {
     height: 950,
     minWidth: 1100,
     minHeight: 700,
-    title: "GIJO WIKI - 보안 솔루션 통합 ERP & 스마트 아키텍처 스튜디오",
+    title: "GIJO AS Lite — GIJO WIKI Edition (초경량 올인원 에어갭 보안 워크스페이스)",
     icon: path.join(__dirname, 'icon.png'),
     backgroundColor: '#ffffff',
     webPreferences: {

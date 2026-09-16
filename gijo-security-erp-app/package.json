@@ -1,7 +1,7 @@
 {
   "name": "gijo-wiki",
   "version": "5.2.0",
-  "description": "GIJO WIKI - 통합 보안 ERP & 스마트 아키텍처 스튜디오 & 로컬 LLM 위키",
+  "description": "GIJO AS Lite (GIJO WIKI Edition) - 초경량 올인원 에어갭 보안 실무 워크스페이스",
   "main": "main.js",
   "author": "GIJO TECHNOLOGY",
   "license": "Commercial",
@@ -16,9 +16,9 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.gijo.wiki",
-    "productName": "GIJO WIKI",
-    "artifactName": "GIJO-WIKI-Setup-v${version}.${ext}",
+    "appId": "com.gijo.aslite",
+    "productName": "GIJO AS Lite",
+    "artifactName": "GIJO-AS-Lite-Setup-v${version}.${ext}",
     "directories": {
       "output": "dist"
     },
@@ -41,7 +41,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "GIJO WIKI"
+      "shortcutName": "GIJO AS Lite"
     }
   }
 }
