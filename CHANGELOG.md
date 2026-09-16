@@ -1,5 +1,32 @@
 # GIJO AS Lite / GIJO WIKI 버전 관리 대장 (Changelog)
 
+## [v5.2.1] - 2026-09-16
+### 🧭 주요 메뉴 3대 도메인 그룹핑 왼쪽 사이드바 & 접기/펴기 (Collapse/Expand) 엔진 탑재
+- **화면 왼쪽 사이드바(Left Navigation Sidebar) 전면 전환**:
+  - 기존 상단 가로 나열 탭에서 세로형 왼쪽 사이드바로 레이아웃을 전면 개편하여, 9대 핵심 메뉴를 직관적인 아이콘과 함께 일목요연하게 배치.
+  - 가로 폭이 제한되던 상단 바 대비, 와이드 모니터에서 본문 작업 영역(초고밀도 엑셀 대장, 네트워크 토폴로지, RAG 3분할 뷰)을 100% 꽉 찬 화면으로 확장 활용 가능.
+- **3대 업무 도메인별 논리적 그룹핑 (3-Tier Domain Grouping)**:
+  1. **🏢 총괄 관제 & 거버넌스 (`Executive & Governance`)**:
+     - 🌅 관제 브리핑 (`tabBtn-dashboard`, 뱃지: 1건 조치중)
+     - 📑 ISMS-P 수검 바인더 (`tabBtn-compliance`, 뱃지: 80개 완비)
+     - 📋 일일 보안점검 (`tabBtn-checklist`, 뱃지: 완료)
+  2. **🛡️ 자산 & 공급망 보안 (`Asset & Supply Chain`)**:
+     - 📦 IT 자산 & SBOM (`tabBtn-sbom`)
+     - 🛡️ 솔루션 ERP & 매뉴얼 (`tabBtn-portal`)
+     - 📐 아키텍처 스튜디오 (`tabBtn-studio`)
+  3. **🧠 인텔리전스 & 재무 (`Intelligence & FinOps`)**:
+     - 📚 사내 지식고 & Synapse RAG (`tabBtn-wiki`)
+     - 💰 실시간 TCO & FinOps & DLP 게이트 (`tabBtn-bom`)
+     - 🔍 ISMS-P 진단기 (`tabBtn-audit`)
+- **원클릭 부드러운 접기/펴기 (Collapse / Expand) 인터랙션**:
+  - **펼침 모드(Expanded, 240px)**: 그룹 소제목, 메뉴명, 상태 뱃지 표시.
+  - **접힘 모드(Collapsed, 68px)**: 아이콘 중심 미니멀 모드, 툴팁 표시, 본문 가로 작업 영역 극대화.
+  - **3-Way 직관적 토글 제어**:
+    1. 상단 헤더 사이드바 토글 버튼 (`[☰] / [⮜]`)
+    2. 사이드바 하단 축소 트리거 버튼 (`[« 사이드바 축소]`)
+    3. 키보드 단축키 (`Ctrl + [`)
+  - **사용자 선호 상태 로컬 영구 보존 (`localStorage`)**: 접힘/펼침 상태가 브라우저 및 일렉트론 로컬 스토리지에 영구 보존되어 재접속 시에도 사용자 설정 유지.
+
 ## [v5.2.0] - 2026-09-16
 ### 🛡️ 4대 차세대 엔터프라이즈 보안 엔진 (4 Next-Gen Enterprise Security Pillars) 전수 탑재
 - **[엔진 1] 🚨 침해사고 긴급 격리 & KISA 표준 5단계 대응 런북 엔진 (`openIncidentQuarantineModal`)**:

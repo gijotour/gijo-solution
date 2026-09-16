@@ -51,14 +51,12 @@ const htmlContent = `<!DOCTYPE html>
     body {
       background-color: var(--bg-main);
       color: var(--text-main);
-      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      min-height: 100vh;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
-    /* App Header */
     .app-header {
       background: rgba(255, 255, 255, 0.96);
       backdrop-filter: blur(12px);
@@ -66,29 +64,55 @@ const htmlContent = `<!DOCTYPE html>
       position: sticky;
       top: 0;
       z-index: 1000;
-      padding: 0.65rem 1.5rem;
+      padding: 0.55rem 1.25rem;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+      flex-shrink: 0;
     }
 
     .header-inner {
-      max-width: 1800px;
+      width: 100%;
       margin: 0 auto;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1.5rem;
+      gap: 1rem;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .btn-toggle-sidebar {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-toggle-sidebar:hover {
+      background: #eff6ff;
+      color: var(--primary);
+      border-color: #bfdbfe;
     }
 
     .brand-section {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.65rem;
       user-select: none;
     }
 
     .brand-logo {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       background: #eff6ff;
       border: 1px solid #bfdbfe;
       border-radius: var(--radius);
@@ -96,12 +120,12 @@ const htmlContent = `<!DOCTYPE html>
       align-items: center;
       justify-content: center;
       font-weight: 800;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       color: var(--primary);
     }
 
     .brand-text {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 800;
       letter-spacing: -0.3px;
       color: var(--text-main);
@@ -120,40 +144,178 @@ const htmlContent = `<!DOCTYPE html>
       border: 1px solid #dbeafe;
     }
 
-    .nav-tabs {
+    /* App Body Layout: Sidebar + Main Content */
+    .app-body {
       display: flex;
-      gap: 0.25rem;
-      background: #f1f5f9;
-      padding: 0.25rem;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
+      flex: 1;
+      overflow: hidden;
+      position: relative;
     }
 
+    /* Left Sidebar */
+    .app-sidebar {
+      width: 240px;
+      background: #ffffff;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      flex-shrink: 0;
+      user-select: none;
+      z-index: 50;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    .app-sidebar.collapsed {
+      width: 68px;
+    }
+
+    .sidebar-nav-container {
+      padding: 0.75rem 0.55rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .menu-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .menu-group-header {
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      padding: 0.3rem 0.55rem;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: opacity 0.2s ease;
+    }
+
+    .app-sidebar.collapsed .menu-group-header {
+      opacity: 0;
+      pointer-events: none;
+      height: 4px;
+      padding: 0;
+      margin-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Tab Button transformed to Nav Item */
     .tab-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-sub);
-      padding: 0.4rem 0.85rem;
+      width: 100%;
+      height: 38px;
+      padding: 0 0.65rem;
       border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-sub);
       font-size: 0.82rem;
       font-weight: 600;
       cursor: pointer;
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.65rem;
+      text-align: left;
+      white-space: nowrap;
       transition: all 0.15s ease;
+      position: relative;
     }
 
     .tab-btn:hover {
+      background: #f1f5f9;
       color: var(--text-main);
-      background: rgba(255, 255, 255, 0.6);
     }
 
     .tab-btn.active {
-      background: #ffffff;
+      background: #eff6ff;
+      border-color: #bfdbfe;
       color: var(--primary);
-      border: 1px solid #cbd5e1;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      font-weight: 700;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .tab-btn i, .tab-btn svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .tab-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity 0.2s ease;
+    }
+
+    .app-sidebar.collapsed .tab-btn {
+      justify-content: center;
+      padding: 0;
+    }
+
+    .app-sidebar.collapsed .tab-text {
+      opacity: 0;
+      pointer-events: none;
+      width: 0;
+      display: none;
+    }
+
+    .nav-badge {
+      font-size: 0.65rem;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: opacity 0.2s ease;
+    }
+    .nav-badge.danger { background: #fee2e2; color: #dc2626; }
+    .nav-badge.success { background: #ecfdf5; color: #059669; }
+    .nav-badge.purple { background: #f3e8ff; color: #7c3aed; }
+
+    .app-sidebar.collapsed .nav-badge {
+      display: none;
+    }
+
+    /* Sidebar Footer */
+    .sidebar-footer {
+      padding: 0.65rem 0.55rem;
+      border-top: 1px solid var(--border);
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .btn-collapse-trigger {
+      width: 100%;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text-sub);
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-collapse-trigger:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+    }
+
+    .app-sidebar.collapsed .collapse-text {
+      display: none;
     }
 
     .header-tools {
@@ -207,10 +369,11 @@ const htmlContent = `<!DOCTYPE html>
 
     /* Main Container */
     .main-viewport {
-      max-width: 1800px;
-      margin: 0 auto;
+      flex: 1;
+      height: 100%;
+      overflow-y: auto;
       padding: 1rem 1.5rem;
-      height: calc(100vh - 58px);
+      background: var(--bg-main);
     }
 
     .view-page {
@@ -900,45 +1063,23 @@ const htmlContent = `<!DOCTYPE html>
   <!-- App Header -->
   <header class="app-header">
     <div class="header-inner">
-      <div class="brand-section">
-        <div class="brand-logo">AL</div>
-        <div class="brand-text">
-          GIJO AS Lite <span class="version-tag">WIKI & ERP v5.2</span>
-        </div>
-        <span style="font-size:0.68rem; color:#2563eb; background:#eff6ff; padding:2px 8px; border-radius:12px; border:1px solid #bfdbfe; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
-          <i data-lucide="shield" style="width:10px; height:10px;"></i> 에어갭 워크스페이스
-        </span>
-      </div>
+      <div class="header-left">
+        <!-- Sidebar Collapse / Expand Toggle Button -->
+        <button class="btn-toggle-sidebar" id="btnToggleSidebar" onclick="toggleSidebar()" title="사이드바 접기/펴기 (단축키: Ctrl + [)">
+          <i data-lucide="panel-left-close" id="sidebarToggleIcon" style="width:16px; height:16px;"></i>
+        </button>
 
-      <nav class="nav-tabs">
-        <button id="tabBtn-dashboard" class="tab-btn active" onclick="switchView('dashboard')">
-          <i data-lucide="layout-dashboard" style="width:14px; height:14px;"></i> 관제 브리핑
-        </button>
-        <button id="tabBtn-compliance" class="tab-btn" onclick="switchView('compliance')">
-          <i data-lucide="clipboard-check" style="width:14px; height:14px;"></i> 📑 ISMS-P 바인더
-        </button>
-        <button id="tabBtn-wiki" class="tab-btn" onclick="switchView('wiki')">
-          <i data-lucide="book-open" style="width:14px; height:14px;"></i> 사내 지식고 & RAG
-        </button>
-        <button id="tabBtn-portal" class="tab-btn" onclick="switchView('portal')">
-          <i data-lucide="shield-check" style="width:14px; height:14px;"></i> 솔루션 ERP & 매뉴얼
-        </button>
-        <button id="tabBtn-studio" class="tab-btn" onclick="switchView('studio')">
-          <i data-lucide="cpu" style="width:14px; height:14px;"></i> 아키텍처 스튜디오
-        </button>
-        <button id="tabBtn-bom" class="tab-btn" onclick="switchView('bom')">
-          <i data-lucide="calculator" style="width:14px; height:14px;"></i> 실시간 TCO
-        </button>
-        <button id="tabBtn-audit" class="tab-btn" onclick="switchView('audit')">
-          <i data-lucide="file-check-2" style="width:14px; height:14px;"></i> ISMS-P 진단기
-        </button>
-        <button id="tabBtn-checklist" class="tab-btn" onclick="switchView('checklist')">
-          <i data-lucide="clipboard-check" style="width:14px; height:14px;"></i> 일일 보안점검
-        </button>
-        <button id="tabBtn-sbom" class="tab-btn" onclick="switchView('sbom')">
-          <i data-lucide="boxes" style="width:14px; height:14px;"></i> IT 자산 & SBOM
-        </button>
-      </nav>
+        <!-- Brand Identity -->
+        <div class="brand-section">
+          <div class="brand-logo">AL</div>
+          <div class="brand-text">
+            GIJO AS Lite <span class="version-tag">WIKI & ERP v5.2</span>
+          </div>
+          <span style="font-size:0.68rem; color:#2563eb; background:#eff6ff; padding:2px 8px; border-radius:12px; border:1px solid #bfdbfe; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
+            <i data-lucide="shield" style="width:10px; height:10px;"></i> 에어갭 워크스페이스
+          </span>
+        </div>
+      </div>
 
       <div class="header-tools">
         <button class="btn btn-sm" style="background:#f3e8ff; color:#7c3aed; border-color:#d8b4fe; font-weight:700;" onclick="printBoardroomAnnualReport()" title="경영진 및 이사회 제출용 연간 정보보호 성과평가 보고서 A4 출력">
@@ -966,8 +1107,89 @@ const htmlContent = `<!DOCTYPE html>
     </div>
   </header>
 
-  <!-- Main View Area -->
-  <main class="main-viewport">
+  <!-- App Body Layout (Left Sidebar + Main Content) -->
+  <div class="app-body">
+    
+    <!-- LEFT SIDEBAR WITH 3-TIER DOMAIN GROUPING -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-nav-container">
+        
+        <!-- GROUP 1: 총괄 관제 & 거버넌스 -->
+        <div class="menu-group">
+          <div class="menu-group-header">
+            <span>총괄 관제 & 거버넌스</span>
+            <i data-lucide="gauge" style="width:12px; height:12px;"></i>
+          </div>
+          <button id="tabBtn-dashboard" class="tab-btn active" onclick="switchView('dashboard')" title="관제 브리핑 (출근 데일리 미션 & 4대 거버넌스 KPI)">
+            <i data-lucide="layout-dashboard" style="width:15px; height:15px;"></i>
+            <span class="tab-text">관제 브리핑</span>
+            <span class="nav-badge danger">1건</span>
+          </button>
+          <button id="tabBtn-compliance" class="tab-btn" onclick="switchView('compliance')" title="ISMS-P 바인더 (80개 법정 통제항목 실시간 증적 매핑)">
+            <i data-lucide="clipboard-check" style="width:15px; height:15px;"></i>
+            <span class="tab-text">ISMS-P 바인더</span>
+            <span class="nav-badge purple">80개</span>
+          </button>
+          <button id="tabBtn-checklist" class="tab-btn" onclick="switchView('checklist')" title="일일 보안점검 (20종 솔루션 가동 상태 점검 일지)">
+            <i data-lucide="calendar-check" style="width:15px; height:15px;"></i>
+            <span class="tab-text">일일 보안점검</span>
+            <span class="nav-badge success">완료</span>
+          </button>
+        </div>
+
+        <!-- GROUP 2: 자산 & 공급망 보안 -->
+        <div class="menu-group">
+          <div class="menu-group-header">
+            <span>자산 & 공급망 보안</span>
+            <i data-lucide="shield-alert" style="width:12px; height:12px;"></i>
+          </div>
+          <button id="tabBtn-sbom" class="tab-btn" onclick="switchView('sbom')" title="IT 자산 & SBOM (전사 자산 대장, CycloneDX 부품, CVE 상관분석)">
+            <i data-lucide="boxes" style="width:15px; height:15px;"></i>
+            <span class="tab-text">IT 자산 & SBOM</span>
+          </button>
+          <button id="tabBtn-portal" class="tab-btn" onclick="switchView('portal')" title="솔루션 ERP & 매뉴얼 (20종 보안 제품군 카탈로그 & 실무 가이드)">
+            <i data-lucide="shield-check" style="width:15px; height:15px;"></i>
+            <span class="tab-text">솔루션 ERP & 매뉴얼</span>
+          </button>
+          <button id="tabBtn-studio" class="tab-btn" onclick="switchView('studio')" title="아키텍처 스튜디오 (보안망 토폴로지 드래그앤드롭 다이어그램)">
+            <i data-lucide="cpu" style="width:15px; height:15px;"></i>
+            <span class="tab-text">아키텍처 스튜디오</span>
+          </button>
+        </div>
+
+        <!-- GROUP 3: 인텔리전스 & 재무 -->
+        <div class="menu-group">
+          <div class="menu-group-header">
+            <span>인텔리전스 & 재무</span>
+            <i data-lucide="brain-circuit" style="width:12px; height:12px;"></i>
+          </div>
+          <button id="tabBtn-wiki" class="tab-btn" onclick="switchView('wiki')" title="사내 지식고 & RAG (Synapse RAG 2.0 및 30종 실물 지침/교차검증)">
+            <i data-lucide="book-open" style="width:15px; height:15px;"></i>
+            <span class="tab-text">사내 지식고 & RAG</span>
+          </button>
+          <button id="tabBtn-bom" class="tab-btn" onclick="switchView('bom')" title="실시간 TCO & FinOps (보안 TCO, 생성형 AI FinOps, DLP 감사, D-Day)">
+            <i data-lucide="calculator" style="width:15px; height:15px;"></i>
+            <span class="tab-text">실시간 TCO & FinOps</span>
+          </button>
+          <button id="tabBtn-audit" class="tab-btn" onclick="switchView('audit')" title="ISMS-P 진단기 (관리체계 16개 통제분야 정밀 자가진단)">
+            <i data-lucide="file-check-2" style="width:15px; height:15px;"></i>
+            <span class="tab-text">ISMS-P 진단기</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Sidebar Footer with Collapse Trigger -->
+      <div class="sidebar-footer">
+        <button class="btn-collapse-trigger" onclick="toggleSidebar()" title="사이드바 접기/펼치기 (Ctrl + [)">
+          <i data-lucide="chevrons-left" id="footerToggleIcon" style="width:14px; height:14px;"></i>
+          <span class="collapse-text">사이드바 축소</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main View Area -->
+    <main class="main-viewport">
 
     <!-- 0. MORNING MISSION CONTROL HUB VIEW -->
     <section id="view-dashboard" class="view-page active">
@@ -2066,6 +2288,7 @@ const htmlContent = `<!DOCTYPE html>
     </section>
 
   </main>
+  </div> <!-- app-body end -->
 
   <!-- Comprehensive A4 Print Report Modal -->
   <div class="modal-overlay" id="reportModal">
@@ -3596,6 +3819,51 @@ const htmlContent = `<!DOCTYPE html>
       }
       lucide.createIcons();
     }
+
+    // --- 4.1 LEFT SIDEBAR COLLAPSE & EXPAND ENGINE ---
+    let isSidebarCollapsed = false;
+
+    function toggleSidebar() {
+      isSidebarCollapsed = !isSidebarCollapsed;
+      const sidebar = document.getElementById('appSidebar');
+      const toggleIcon = document.getElementById('sidebarToggleIcon');
+      const footerIcon = document.getElementById('footerToggleIcon');
+      const footerText = document.querySelector('.collapse-text');
+
+      if (!sidebar) return;
+
+      if (isSidebarCollapsed) {
+        sidebar.classList.add('collapsed');
+        if (toggleIcon) toggleIcon.setAttribute('data-lucide', 'panel-left-open');
+        if (footerIcon) footerIcon.setAttribute('data-lucide', 'chevrons-right');
+        if (footerText) footerText.textContent = '';
+      } else {
+        sidebar.classList.remove('collapsed');
+        if (toggleIcon) toggleIcon.setAttribute('data-lucide', 'panel-left-close');
+        if (footerIcon) footerIcon.setAttribute('data-lucide', 'chevrons-left');
+        if (footerText) footerText.textContent = '사이드바 축소';
+      }
+      try {
+        localStorage.setItem('gijo_sidebar_collapsed', isSidebarCollapsed ? 'true' : 'false');
+      } catch (e) {}
+      lucide.createIcons();
+    }
+
+    function initSidebarState() {
+      try {
+        const saved = localStorage.getItem('gijo_sidebar_collapsed');
+        if (saved === 'true') {
+          toggleSidebar();
+        }
+      } catch (e) {}
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '[') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    });
 
     // --- 4.2 FOUR NEXT-GEN ENTERPRISE SECURITY ENGINES ---
     
@@ -8889,6 +9157,7 @@ initPdfDropZone();
       updateAssetKpis();
       renderAssetTopologyGraph();
 
+      initSidebarState();
       lucide.createIcons();
     });
   </script>

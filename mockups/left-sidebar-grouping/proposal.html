@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIJO AS Lite — 왼쪽 그룹핑 사이드바 & 접기/펴기 추천 시안 (v5.2.1)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --bg-main: #f8fafc;
+      --bg-panel: #ffffff;
+      --sidebar-bg: #ffffff;
+      --sidebar-width: 240px;
+      --sidebar-collapsed-width: 68px;
+      --border: #e2e8f0;
+      --border-sub: #cbd5e1;
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --text-dim: #94a3b8;
+      --radius: 8px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08);
+      --transition-speed: 0.22s;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top App Header */
+    .app-header {
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.25rem;
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    /* Sidebar Toggle Button */
+    .btn-toggle-sidebar {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-toggle-sidebar:hover {
+      background: var(--primary-light);
+      color: var(--primary);
+      border-color: #bfdbfe;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      user-select: none;
+    }
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: var(--primary);
+    }
+    .brand-title {
+      font-size: 0.98rem;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .badge-airgap {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 9999px;
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .btn-header-tool {
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text-sub);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s;
+    }
+    .btn-header-tool:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+    }
+    .btn-header-tool.primary {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: var(--primary);
+    }
+    .btn-header-tool.primary:hover {
+      background: #dbeafe;
+    }
+
+    /* Main App Layout (Sidebar + Content Viewport) */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Sidebar */
+    .app-sidebar {
+      width: var(--sidebar-width);
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: width var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+      flex-shrink: 0;
+      user-select: none;
+      z-index: 50;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    /* Collapsed Sidebar State */
+    .app-sidebar.collapsed {
+      width: var(--sidebar-collapsed-width);
+    }
+
+    .sidebar-nav-container {
+      padding: 0.85rem 0.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+
+    /* Menu Group Section */
+    .menu-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .menu-group-header {
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      padding: 0.3rem 0.6rem;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: opacity var(--transition-speed);
+    }
+
+    .app-sidebar.collapsed .menu-group-header {
+      opacity: 0;
+      pointer-events: none;
+      height: 6px;
+      padding: 0;
+      margin-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Nav Item Button */
+    .nav-item-btn {
+      width: 100%;
+      height: 38px;
+      padding: 0 0.65rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-sub);
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      cursor: pointer;
+      text-align: left;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .nav-item-btn:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+    }
+
+    .nav-item-btn.active {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .nav-item-btn i, .nav-item-btn svg {
+      width: 17px;
+      height: 17px;
+      flex-shrink: 0;
+    }
+
+    .nav-item-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity var(--transition-speed);
+    }
+
+    .app-sidebar.collapsed .nav-item-text {
+      opacity: 0;
+      pointer-events: none;
+      width: 0;
+    }
+
+    .nav-badge {
+      font-size: 0.65rem;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: opacity var(--transition-speed);
+    }
+    .nav-badge.danger { background: #fee2e2; color: #dc2626; }
+    .nav-badge.success { background: #ecfdf5; color: #059669; }
+    .nav-badge.purple { background: #f3e8ff; color: #7c3aed; }
+
+    .app-sidebar.collapsed .nav-badge {
+      display: none;
+    }
+
+    /* Tooltip on Collapsed State */
+    .app-sidebar.collapsed .nav-item-btn {
+      justify-content: center;
+      padding: 0;
+    }
+
+    /* Sidebar Footer */
+    .sidebar-footer {
+      padding: 0.75rem 0.6rem;
+      border-top: 1px solid var(--border);
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .btn-collapse-trigger {
+      width: 100%;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text-sub);
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-collapse-trigger:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+    }
+
+    .app-sidebar.collapsed .collapse-text {
+      display: none;
+    }
+
+    /* Main Content Viewport */
+    .main-viewport {
+      flex: 1;
+      height: 100%;
+      overflow-y: auto;
+      padding: 1.25rem 1.5rem;
+      background: var(--bg-main);
+    }
+
+    .view-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Active View Switching */
+    .demo-view { display: none; }
+    .demo-view.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <!-- Sidebar Toggle Hamburger / Collapse Icon -->
+      <button class="btn-toggle-sidebar" id="btnToggleSidebar" onclick="toggleSidebar()" title="사이드바 접기/펴기 (단축키: Ctrl + [)">
+        <i data-lucide="panel-left-close" id="sidebarToggleIcon" style="width:17px; height:17px;"></i>
+      </button>
+
+      <!-- Brand Identity -->
+      <div class="brand-section">
+        <div class="brand-logo">G</div>
+        <div class="brand-title">
+          GIJO AS Lite
+          <span style="font-size:0.75rem; color:var(--text-sub); font-weight:600;">| GIJO WIKI & ERP</span>
+        </div>
+        <span class="badge-airgap">
+          <i data-lucide="shield" style="width:10px; height:10px;"></i> 에어갭 폐쇄망 워크스페이스
+        </span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="btn-header-tool" style="background:#f3e8ff; color:#7c3aed; border-color:#d8b4fe;" onclick="alert('📊 CISO 이사회 연간 성과보고서 A4 인쇄 프리뷰')">
+        <i data-lucide="presentation" style="width:13px; height:13px;"></i> CISO 이사회 보고서
+      </button>
+      <button class="btn-header-tool" style="background:#fee2e2; color:#dc2626; border-color:#fca5a5;" onclick="alert('🚨 금융 코어 WAS 긴급 격리 프로토콜 가동 모달')">
+        <i data-lucide="power" style="width:13px; height:13px;"></i> 긴급 격리
+      </button>
+      <button class="btn-header-tool primary" onclick="alert('📋 스마트 전자결재 기안판 열기')">
+        <i data-lucide="pen-tool" style="width:13px; height:13px;"></i> 스마트 전자결재
+      </button>
+      <button class="btn-header-tool" onclick="alert('💾 실물 지식고 백업')">
+        <i data-lucide="download" style="width:13px; height:13px;"></i> 백업
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Body Layout -->
+  <div class="app-body">
+    
+    <!-- LEFT SIDEBAR WITH GROUPED NAVIGATION -->
+    <aside class="app-sidebar" id="appSidebar">
+      
+      <div class="sidebar-nav-container">
+        
+        <!-- GROUP 1: 총괄 관제 & 거버넌스 -->
+        <div class="menu-group">
+          <div class="menu-group-header">
+            <span>총괄 관제 & 거버넌스</span>
+            <i data-lucide="gauge" style="width:12px; height:12px;"></i>
+          </div>
+          
+          <button id="navBtn-dashboard" class="nav-item-btn active" onclick="switchSidebarView('dashboard')" title="관제 브리핑 (출근 데일리 미션 & 4대 거버넌스 KPI)">
+            <i data-lucide="layout-dashboard"></i>
+            <span class="nav-item-text">관제 브리핑</span>
+            <span class="nav-badge danger">1건</span>
+          </button>
+
+          <button id="navBtn-compliance" class="nav-item-btn" onclick="switchSidebarView('compliance')" title="ISMS-P 바인더 (80개 법정 통제항목 실시간 증적 매핑)">
+            <i data-lucide="clipboard-check"></i>
+            <span class="nav-item-text">ISMS-P 바인더</span>
+            <span class="nav-badge purple">80개</span>
+          </button>
+
+          <button id="navBtn-checklist" class="nav-item-btn" onclick="switchSidebarView('checklist')" title="일일 보안점검 (20종 솔루션 가동 상태 점검 일지)">
+            <i data-lucide="calendar-check"></i>
+            <span class="nav-item-text">일일 보안점검</span>
+            <span class="nav-badge success">완료</span>
+          </button>
+        </div>
+
+        <!-- GROUP 2: 자산 & 공급망 보안 -->
+        <div class="menu-group">
+          <div class="menu-group-header">
+            <span>자산 & 공급망 보안</span>
+            <i data-lucide="shield-alert" style="width:12px; height:12px;"></i>
+          </div>
+
+          <button id="navBtn-sbom" class="nav-item-btn" onclick="switchSidebarView('sbom')" title="IT 자산 & SBOM (전사 자산 대장, CycloneDX 부품, CVE 상관분석)">
+            <i data-lucide="boxes"></i>
+            <span class="nav-item-text">IT 자산 & SBOM</span>
+          </button>
+
+          <button id="navBtn-portal" class="nav-item-btn" onclick="switchSidebarView('portal')" title="솔루션 ERP & 매뉴얼 (20종 보안 제품군 카탈로그 & 실무 가이드)">
+            <i data-lucide="shield-check"></i>
+            <span class="nav-item-text">솔루션 ERP & 매뉴얼</span>
+          </button>
+
+          <button id="navBtn-studio" class="nav-item-btn" onclick="switchSidebarView('studio')" title="아키텍처 스튜디오 (보안망 토폴로지 드래그앤드롭 다이어그램)">
+            <i data-lucide="cpu"></i>
+            <span class="nav-item-text">아키텍처 스튜디오</span>
+          </button>
+        </div>
+
+        <!-- GROUP 3: 인텔리전스 & 재무 -->
+        <div class="menu-group">
+          <div class="menu-group-header">
+            <span>인텔리전스 & 재무</span>
+            <i data-lucide="brain-circuit" style="width:12px; height:12px;"></i>
+          </div>
+
+          <button id="navBtn-wiki" class="nav-item-btn" onclick="switchSidebarView('wiki')" title="사내 지식고 & RAG (Synapse RAG 2.0 및 30종 실물 지침/교차검증)">
+            <i data-lucide="book-open"></i>
+            <span class="nav-item-text">사내 지식고 & RAG</span>
+          </button>
+
+          <button id="navBtn-bom" class="nav-item-btn" onclick="switchSidebarView('bom')" title="실시간 TCO & FinOps (보안 TCO, 생성형 AI FinOps, DLP 감사, D-Day)">
+            <i data-lucide="calculator"></i>
+            <span class="nav-item-text">실시간 TCO & FinOps</span>
+          </button>
+
+          <button id="navBtn-audit" class="nav-item-btn" onclick="switchSidebarView('audit')" title="ISMS-P 진단기 (관리체계 16개 통제분야 정밀 자가진단)">
+            <i data-lucide="file-check-2"></i>
+            <span class="nav-item-text">ISMS-P 진단기</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Sidebar Bottom Trigger -->
+      <div class="sidebar-footer">
+        <button class="btn-collapse-trigger" onclick="toggleSidebar()" title="사이드바 접기/펼치기 (Ctrl + [)">
+          <i data-lucide="chevrons-left" id="footerToggleIcon" style="width:14px; height:14px;"></i>
+          <span class="collapse-text">사이드바 축소</span>
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- CONTENT VIEWPORT -->
+    <main class="main-viewport">
+      
+      <!-- View 1: 관제 브리핑 (기본) -->
+      <div id="demoView-dashboard" class="demo-view active">
+        <div class="view-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div>
+              <h2 style="font-size:1.3rem; font-weight:800; color:var(--text-main);">🌅 데일리 통합 관제 브리핑 (Morning Mission Control Hub)</h2>
+              <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0.25rem;">
+                왼쪽 사이드바를 접으면 화면 너비가 확장되어 초고밀도 엑셀 대장 및 관제 지표를 더 넓게 조망할 수 있습니다.
+              </p>
+            </div>
+            <span class="badge-airgap" style="font-size:0.75rem;">100% 정상 가동 중</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem; margin-bottom:1.5rem;">
+            <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:1rem;">
+              <div style="font-size:0.75rem; color:var(--text-dim); font-weight:700;">법정 거버넌스 준수율</div>
+              <div style="font-size:1.4rem; font-weight:800; color:#059669; margin-top:4px;">100%</div>
+            </div>
+            <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:1rem;">
+              <div style="font-size:0.75rem; color:var(--text-dim); font-weight:700;">고위험 CVE 취약점 통제</div>
+              <div style="font-size:1.4rem; font-weight:800; color:#dc2626; margin-top:4px;">1건 경고</div>
+            </div>
+            <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:1rem;">
+              <div style="font-size:0.75rem; color:var(--text-dim); font-weight:700;">계약 갱신 도래 솔루션</div>
+              <div style="font-size:1.4rem; font-weight:800; color:#b45309; margin-top:4px;">WizCLM D-28</div>
+            </div>
+            <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:1rem;">
+              <div style="font-size:0.75rem; color:var(--text-dim); font-weight:700;">금일 보안 점검 수검율</div>
+              <div style="font-size:1.4rem; font-weight:800; color:var(--primary); margin-top:4px;">100% (20/20)</div>
+            </div>
+          </div>
+
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:1rem; font-size:0.85rem; color:#1e40af;">
+            💡 <b>왼쪽 사이드바 기능 안내:</b><br>
+            - 상단 토글 버튼 <code>[☰ / ⮜]</code> 또는 하단 <code>[사이드바 축소]</code> 버튼을 클릭하면 사이드바가 68px로 부드럽게 축소되며 아이콘 모드로 전환됩니다.<br>
+            - 단축키 <b>Ctrl + [</b> 로 키보드만으로 언제든 접고 펼 수 있습니다.<br>
+            - 업무 성격에 맞추어 <b>3대 그룹 (총괄 관제 & 거버넌스 / 자산 & 공급망 보안 / 인텔리전스 & 재무)</b>으로 일목요연하게 묶여 직관성이 극대화되었습니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- Other Demo Views -->
+      <div id="demoView-compliance" class="demo-view">
+        <div class="view-card">
+          <h2>📑 ISMS-P 상시 증적 수검 바인더</h2>
+          <p style="margin-top:0.5rem; color:var(--text-sub);">80개 법정 통제항목 실시간 자동 매핑 대장 뷰 데모입니다.</p>
+        </div>
+      </div>
+
+      <div id="demoView-checklist" class="demo-view">
+        <div class="view-card">
+          <h2>📋 일일 보안점검 일지</h2>
+          <p style="margin-top:0.5rem; color:var(--text-sub);">20종 보안 제품군 일일 가동 점검 대장 뷰 데모입니다.</p>
+        </div>
+      </div>
+
+      <div id="demoView-sbom" class="demo-view">
+        <div class="view-card">
+          <h2>📦 IT 자산 & CycloneDX SBOM</h2>
+          <p style="margin-top:0.5rem; color:var(--text-sub);">사내 5대 핵심 자산 및 7대 SBOM 부품 명세 대장 뷰 데모입니다.</p>
+        </div>
+      </div>
+
+      <div id="demoView-portal" class="demo-view">
+        <div class="view-card">
+          <h2>🛡️ 보안 솔루션 ERP & 매뉴얼</h2>
+          <p style="margin-top:0.5rem; color:var(--text-sub);">20종 카탈로그 및 실무 매뉴얼 뷰 데모입니다.</p>
+        </div>
+      </div>
+
+      <div id="demoView-studio" class="demo-view">
+        <div class="view-card">
+          <h2>📐 아키텍처 스튜디오</h2>
+          <p style="margin-top:0.5rem; color:var(--text-sub);">계층형 인프라 토폴로지 다이어그램 뷰 데모입니다.</p>
+        </div>
+      </div>
+
+      <div id="demoView-wiki" class="demo-view">
+        <div class="view-card">
+          <h2>🧠 사내 지식고 & Synapse RAG 2.0</h2>
+          <p style="margin-top:0.5rem; color:var(--text-sub);">사내 30종 실물 지침 및 교차 검증 질의응답 뷰 데모입니다.</p>
+        </div>
+      </div>
+
+      <div id="demoView-bom" class="demo-view">
+        <div class="view-card">
+          <h2>💰 실시간 TCO & 생성형 AI FinOps & DLP 게이트</h2>
+          <p style="margin-top:0.5rem; color:var(--text-sub);">솔루션 TCO, AI 토큰 FinOps, DLP 기밀 차단 대장 뷰 데모입니다.</p>
+        </div>
+      </div>
+
+      <div id="demoView-audit" class="demo-view">
+        <div class="view-card">
+          <h2>🔍 ISMS-P 정밀 진단기</h2>
+          <p style="margin-top:0.5rem; color:var(--text-sub);">관리체계 수립 및 보호대책 16대 통제항목 자가진단 뷰 데모입니다.</p>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    let isSidebarCollapsed = false;
+
+    function toggleSidebar() {
+      isSidebarCollapsed = !isSidebarCollapsed;
+      const sidebar = document.getElementById('appSidebar');
+      const toggleIcon = document.getElementById('sidebarToggleIcon');
+      const footerIcon = document.getElementById('footerToggleIcon');
+      const footerText = document.querySelector('.collapse-text');
+
+      if (isSidebarCollapsed) {
+        sidebar.classList.add('collapsed');
+        if (toggleIcon) toggleIcon.setAttribute('data-lucide', 'panel-left-open');
+        if (footerIcon) footerIcon.setAttribute('data-lucide', 'chevrons-right');
+        if (footerText) footerText.textContent = '';
+      } else {
+        sidebar.classList.remove('collapsed');
+        if (toggleIcon) toggleIcon.setAttribute('data-lucide', 'panel-left-close');
+        if (footerIcon) footerIcon.setAttribute('data-lucide', 'chevrons-left');
+        if (footerText) footerText.textContent = '사이드바 축소';
+      }
+      lucide.createIcons();
+    }
+
+    function switchSidebarView(viewId) {
+      // Update nav button active states
+      document.querySelectorAll('.nav-item-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById('navBtn-' + viewId);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Update view container
+      document.querySelectorAll('.demo-view').forEach(v => v.classList.remove('active'));
+      const targetView = document.getElementById('demoView-' + viewId);
+      if (targetView) targetView.classList.add('active');
+    }
+
+    // Keyboard shortcut (Ctrl + [)
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '[') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    });
+  </script>
+</body>
+</html>

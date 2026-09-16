@@ -310,5 +310,28 @@ fourPillarsTokens.forEach(token => {
   }
 });
 
+// 15. Check Left Grouped Sidebar & Collapse/Expand Engine
+const sidebarTokens = [
+  'id="appSidebar"',
+  'id="btnToggleSidebar"',
+  'class="sidebar-nav-container"',
+  'class="menu-group"',
+  'function toggleSidebar',
+  'function initSidebarState',
+  '총괄 관제 & 거버넌스',
+  '자산 & 공급망 보안',
+  '인텔리전스 & 재무',
+  'class="sidebar-footer"'
+];
+
+sidebarTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Left Grouped Sidebar Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing Sidebar Token: ' + token);
+    process.exit(1);
+  }
+});
+
 console.log('================================================================');
-console.log('🎉 ALL 112 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+console.log('🎉 ALL 122 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
