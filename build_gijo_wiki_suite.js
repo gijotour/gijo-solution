@@ -5615,14 +5615,16 @@ const htmlContent = `<!DOCTYPE html>
       // 3. Index FinOps AI Models & TCO Models
       currentAiApiList.forEach(item => {
         const calc = calculateAiApiCost(item);
+        const tco5Year = calc.annual * 5;
+        const isGb10 = (item.vendor || '').includes('온프레미스') || (item.name || '').includes('GB10');
         chunks.push({
           sourceType: 'FINOPS_AI',
           docId: 991,
-          docTitle: '생성형 AI FinOps 사용량 대장: ' + item.model,
+          docTitle: '생성형 AI FinOps 사용량 대장: ' + item.name,
           category: 'FinOps',
-          sectionTitle: item.model + ' 비용 및 토큰 예산 분석',
-          text: '모델명: ' + item.model + ' | 벤더: ' + item.vendor + ' | 부서: ' + item.dept + ' | 월간 토큰: ' + (item.monthlyInputTokens + item.monthlyOutputTokens).toLocaleString() + ' | 연간비용: ₩' + calc.annual.toLocaleString() + ' | 5년TCO: ₩' + calc.tco5Year.toLocaleString() + (item.isGb10Saved ? ' (온프레미스 GB10 경유 90% 예산 절감 적용 모델)' : ''),
-          tags: ['FinOps', 'TCO', item.model, item.vendor, item.dept]
+          sectionTitle: item.name + ' 비용 및 토큰 예산 분석',
+          text: '모델명: ' + item.name + ' | 벤더: ' + item.vendor + ' | 부서: ' + item.dept + ' | 월간 사용량: ' + item.monthlyUsage + ' | 연간비용: ₩' + calc.annual.toLocaleString() + ' | 5개년 누적 TCO: ₩' + tco5Year.toLocaleString() + (isGb10 ? ' (온프레미스 GB10 경유 90% 예산 절감 적용 모델)' : ''),
+          tags: ['FinOps', 'TCO', item.name, item.vendor, item.dept]
         });
       });
 
