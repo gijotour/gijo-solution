@@ -264,8 +264,29 @@ imageEngineTokens.forEach(token => {
   }
 });
 
+// 13. Check KISA ISMS-P Compliance Evidence Binder Engine
+const ismsTokens = [
+  'id="tabBtn-compliance"',
+  'id="view-compliance"',
+  'function renderComplianceBinder',
+  'function filterIsmsDomain',
+  'function syncIsmsEvidence',
+  'function printSingleIsmsItem',
+  'function printIsmsEvidenceBinder',
+  'id="ismsTableBody"'
+];
+
+ismsTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] ISMS-P Compliance Binder Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing ISMS-P Binder Token: ' + token);
+    process.exit(1);
+  }
+});
+
 console.log('================================================================');
-console.log('🎉 ALL 92 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+console.log('🎉 ALL 100 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
 
 
 

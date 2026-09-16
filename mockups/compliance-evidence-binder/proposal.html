@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KISA ISMS-P 상시 증적 수검 바인더 시안 (Compliance Evidence Binder)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --sub: #475569;
+      --dim: #94a3b8;
+      --primary: #2563eb;
+      --success: #059669;
+      --warn: #d97706;
+      --danger: #dc2626;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Pretendard', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 1.5rem;
+      line-height: 1.5;
+    }
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+      background: #fff;
+      padding: 1.1rem 1.4rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+    }
+    .kpi-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .kpi-val {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 1.2rem;
+    }
+    .tree-panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .tree-item {
+      padding: 0.45rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--sub);
+      transition: all 0.15s;
+    }
+    .tree-item:hover { background: #f1f5f9; color: var(--text); }
+    .tree-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 700; border-left: 3px solid var(--primary); }
+    
+    .excel-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.76rem;
+      background: #fff;
+      border: 1px solid var(--border);
+    }
+    .excel-table th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      text-align: left;
+      position: sticky;
+      top: 0;
+    }
+    .excel-table td {
+      padding: 5px 8px;
+      border: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+    .excel-table tr:nth-child(even) td { background: #f8fafc; }
+    .excel-table tr:hover td { background: #f1f5f9; }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
+    .badge-pass { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+    .badge-action { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .btn {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .evidence-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      margin: 1px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header-bar">
+    <div>
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.2rem;">
+        <span class="badge" style="background:#eff6ff; color:#1d4ed8; font-weight:800;">KISA ISMS-P 2.3 표준 호환</span>
+        <span style="font-size:0.75rem; color:var(--dim);">마지막 수검 감사일: 2026-09-16</span>
+      </div>
+      <h1 style="font-size:1.3rem; font-weight:800;">📑 KISA ISMS-P 상시 증적 수검 바인더 & 법정 80개 통제항목 자동 매핑</h1>
+      <p style="font-size:0.8rem; color:var(--sub);">사내 31종 지침, IT 자산 5대, SBOM 부품 7종, 20종 일일점검 일지, FinOps 예산 품의서를 법정 인증기준에 1초 만에 자동 바인딩합니다.</p>
+    </div>
+    <div style="display:flex; gap:0.5rem;">
+      <button class="btn" onclick="alert('80개 전 항목의 사내 실물 증적이 즉시 검증되었습니다.')">
+        <i data-lucide="refresh-cw" style="width:13px; height:13px;"></i> 증적 자동 매핑 동기화
+      </button>
+      <button class="btn btn-primary" onclick="alert('KISA 심사관 제출용 80개 통제항목 종합 증적 바인더 (A4 양식) 인쇄창을 엽니다.')">
+        <i data-lucide="printer" style="width:13px; height:13px;"></i> KISA 수검용 증적 바인더 A4 일괄 인쇄
+      </button>
+    </div>
+  </div>
+
+  <!-- 4 KPIs -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <span style="font-size:0.75rem; color:var(--sub); font-weight:700;">전체 법정 통제항목</span>
+      <div class="kpi-val" style="color:var(--primary);">80 / 80<span style="font-size:0.9rem; font-weight:600; color:var(--sub);"> 항목</span></div>
+      <span style="font-size:0.7rem; color:var(--dim);">관리체계(16) + 보호대책(64)</span>
+    </div>
+    <div class="kpi-card">
+      <span style="font-size:0.75rem; color:var(--sub); font-weight:700;">실물 1차 증적 확보율</span>
+      <div class="kpi-val" style="color:var(--success);">100%<span style="font-size:0.9rem; font-weight:600; color:var(--sub);"> (80개 완비)</span></div>
+      <span style="font-size:0.7rem; color:var(--success);">✅ 규정·일지·자산 실물 1:1 매핑 완료</span>
+    </div>
+    <div class="kpi-card">
+      <span style="font-size:0.75rem; color:var(--sub); font-weight:700;">긴급 조치 요구 항목</span>
+      <div class="kpi-val" style="color:var(--warn);">1<span style="font-size:0.9rem; font-weight:600; color:var(--sub);"> 건 (조치중)</span></div>
+      <span style="font-size:0.7rem; color:var(--warn);">⚠️ 2.10.1 JEUS 8.5 가상패치 이행 증적</span>
+    </div>
+    <div class="kpi-card">
+      <span style="font-size:0.75rem; color:var(--sub); font-weight:700;">차기 갱신 심사 D-Day</span>
+      <div class="kpi-val" style="color:#7c3aed;">D-74<span style="font-size:0.9rem; font-weight:600; color:var(--sub);"> 일</span></div>
+      <span style="font-size:0.7rem; color:var(--dim);">2026년 정기 사후관리 심사 예정</span>
+    </div>
+  </div>
+
+  <!-- Main View -->
+  <div class="main-grid">
+    <!-- Left: 3 Domain Tree -->
+    <div class="tree-panel">
+      <div style="font-size:0.75rem; font-weight:800; color:var(--dim); text-transform:uppercase; margin-bottom:0.4rem;">ISMS-P 법정 인증 영역</div>
+      
+      <div class="tree-item active">
+        <span>1. 관리체계 수립 및 운영</span>
+        <span class="badge badge-pass">16/16</span>
+      </div>
+      <div style="padding-left:1rem; display:flex; flex-direction:column; gap:0.2rem; font-size:0.75rem; color:var(--sub);">
+        <div>1.1 관리체계 기반 마련 (6)</div>
+        <div>1.2 위험 관리 (3)</div>
+        <div>1.3 관리체계 운영 (3)</div>
+        <div>1.4 관리체계 점검 및 개선 (4)</div>
+      </div>
+
+      <div class="tree-item" style="margin-top:0.6rem;">
+        <span>2. 보호대책 요구사항</span>
+        <span class="badge badge-action">63/64</span>
+      </div>
+      <div style="padding-left:1rem; display:flex; flex-direction:column; gap:0.2rem; font-size:0.75rem; color:var(--sub);">
+        <div>2.1 정책, 조직, 자산 관리 (4)</div>
+        <div>2.2 인적 보안 (4)</div>
+        <div>2.4 접근 통제 (11)</div>
+        <div>2.5 암호화 적용 (3)</div>
+        <div>2.8 시스템 및 서비스 보안 (6)</div>
+        <div style="color:var(--warn); font-weight:700;">2.10 취약점 점검 및 조치 (4) ⚠️</div>
+      </div>
+
+      <div class="tree-item" style="margin-top:0.6rem;">
+        <span>3. 개인정보 처리단계별</span>
+        <span class="badge badge-pass">22/22</span>
+      </div>
+    </div>
+
+    <!-- Right: Excel Evidence Grid -->
+    <div>
+      <div style="background:#fff; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;">
+        <div style="padding:0.75rem 1rem; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:800; font-size:0.85rem;">📋 제 2 장. 보호대책 요구사항 통제항목 및 실물 증적 매핑 대장 (2.10 취약점 및 악성코드)</span>
+          <span style="font-size:0.72rem; color:var(--dim);">실물 문서 31종 & IT자산 5대 실시간 자동 연동</span>
+        </div>
+        <table class="excel-table">
+          <thead>
+            <tr>
+              <th style="width:70px;">항목코드</th>
+              <th style="width:160px;">통제항목 명칭</th>
+              <th>KISA 주요 수검 확인 요구사항</th>
+              <th style="width:90px; text-align:center;">이행 상태</th>
+              <th style="width:280px;">사내 실물 증적 매핑 (클릭 시 원본 열람)</th>
+              <th style="width:75px; text-align:center;">증적철 A4</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>2.10.1</b></td>
+              <td><b>취약점 점검 및 조치</b></td>
+              <td>서버, 네트워크, WAS, 웹 애플리케이션 취약점을 정기 분석하고 조치 계획 수립</td>
+              <td style="text-align:center;"><span class="badge badge-action">가상패치 조치중</span></td>
+              <td>
+                <span class="evidence-tag">📜 GIJO AS 취약점 관리 지침 (CVSS v3.1)</span>
+                <span class="evidence-tag">📦 ASSET-05 JEUS 8.5 (CVE-2016-1000027)</span>
+                <span class="evidence-tag">📋 WAAP 가상패치 전자결재 품의서 #888</span>
+              </td>
+              <td style="text-align:center;"><button class="btn" style="padding:1px 5px; font-size:0.68rem;">출력</button></td>
+            </tr>
+            <tr>
+              <td><b>2.10.2</b></td>
+              <td><b>악성코드 통제</b></td>
+              <td>서버 및 PC 백신 실시간 감시, 엔진 최신화, 정기 바이러스 검사 이행</td>
+              <td style="text-align:center;"><span class="badge badge-pass">이행 양호</span></td>
+              <td>
+                <span class="evidence-tag">📜 사내 정보보안 기본지침 (악성코드 방제)</span>
+                <span class="evidence-tag">📋 일일 점검 일지 (20종 데몬/로그 정상)</span>
+                <span class="evidence-tag">🛡️ EDR 솔루션 (EDR-01 V3)</span>
+              </td>
+              <td style="text-align:center;"><button class="btn" style="padding:1px 5px; font-size:0.68rem;">출력</button></td>
+            </tr>
+            <tr>
+              <td><b>2.4.1</b></td>
+              <td><b>접근 통제</b></td>
+              <td>네트워크 경계 및 서버 OS/WAS 접근 권한 최소화 및 비인가 포트 차단</td>
+              <td style="text-align:center;"><span class="badge badge-pass">이행 양호</span></td>
+              <td>
+                <span class="evidence-tag">📜 GIJO AS 보안제품관리 지침</span>
+                <span class="evidence-tag">🛡️ FOCS 방화벽 정책 자동화</span>
+                <span class="evidence-tag">📦 인프라 망분리 토폴로지 구성도</span>
+              </td>
+              <td style="text-align:center;"><button class="btn" style="padding:1px 5px; font-size:0.68rem;">출력</button></td>
+            </tr>
+            <tr>
+              <td><b>2.5.1</b></td>
+              <td><b>암호화 적용</b></td>
+              <td>고유식별정보 및 비밀번호 안전한 일방향/양방향 암호화 및 KMS 키 수명주기 통제</td>
+              <td style="text-align:center;"><span class="badge badge-pass">이행 양호</span></td>
+              <td>
+                <span class="evidence-tag">📜 개인정보 암호화 및 키관리 지침</span>
+                <span class="evidence-tag">🛡️ CipherTrust KMS 암호화</span>
+                <span class="evidence-tag">💰 FinOps 라이프사이클 D-Day</span>
+              </td>
+              <td style="text-align:center;"><button class="btn" style="padding:1px 5px; font-size:0.68rem;">출력</button></td>
+            </tr>
+            <tr>
+              <td><b>2.1.4</b></td>
+              <td><b>소프트웨어 공급망 보안 (SBOM)</b></td>
+              <td>오픈소스 라이브러리 취약점 관리 및 납품 소프트웨어 부품 명세서(SBOM) 징구</td>
+              <td style="text-align:center;"><span class="badge badge-pass">이행 양호</span></td>
+              <td>
+                <span class="evidence-tag">📜 KISA 표준 SBOM 추출 및 제출 실무 매뉴얼</span>
+                <span class="evidence-tag">📦 CycloneDX v1.6 부품 명세 7종</span>
+                <span class="evidence-tag">🛡️ SAFESQUARE SBOM 솔루션</span>
+              </td>
+              <td style="text-align:center;"><button class="btn" style="padding:1px 5px; font-size:0.68rem;">출력</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
