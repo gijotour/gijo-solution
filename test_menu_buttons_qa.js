@@ -245,8 +245,27 @@ excelTokens.forEach(token => {
   }
 });
 
+// 12. Check Wiki Inline Image Attachment & Markdown File Download Engine
+const imageEngineTokens = [
+  'id="wikiImageFileInput"',
+  'function attachImageToWikiDoc',
+  'function handleWikiImageFileSelect',
+  'function viewFullWikiImage',
+  'function downloadCurrentDocMd',
+  'initWikiEditorImageDropAndPaste'
+];
+
+imageEngineTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Wiki Image & MD Engine Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing Wiki Image Engine Token: ' + token);
+    process.exit(1);
+  }
+});
+
 console.log('================================================================');
-console.log('🎉 ALL 86 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+console.log('🎉 ALL 92 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
 
 
 

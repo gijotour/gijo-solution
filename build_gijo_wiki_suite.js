@@ -1167,6 +1167,9 @@ const htmlContent = `<!DOCTYPE html>
               <span id="wikiBreadcrumbCat" style="color:var(--primary); font-weight:600;">보안규정</span> &gt; <b id="wikiBreadcrumbTitle" style="color:var(--text-main);">문서 제목</b>
             </div>
             <div style="display:flex; gap:0.35rem;">
+              <button class="btn btn-sm" onclick="downloadCurrentDocMd()" title="이미지가 내장된 자체완결 .md 마크다운 파일로 PC에 다운로드">
+                <i data-lucide="download" style="width:12px; height:12px;"></i> .md 다운로드
+              </button>
               <button id="btnToggleEdit" class="btn btn-sm" onclick="toggleEditMode()">
                 <i data-lucide="edit-3" style="width:13px; height:13px;"></i> 편집
               </button>
@@ -1192,9 +1195,15 @@ const htmlContent = `<!DOCTYPE html>
                   <button type="button" class="btn btn-sm" style="font-size:0.72rem; padding:0.15rem 0.45rem;" onclick="applyDocTemplate('VULN_MGMT')">🔍 취약점조치계획</button>
                   <button type="button" class="btn btn-sm" style="font-size:0.72rem; padding:0.15rem 0.45rem;" onclick="applyDocTemplate('SECURITY_FAQ')">❓ 보안실무FAQ</button>
                 </div>
-                <button type="button" class="btn btn-sm" style="font-size:0.7rem; color:var(--primary);" onclick="openNewDocTemplateModal()">
-                  <i data-lucide="layout-grid" style="width:11px; height:11px;"></i> 양식 상세 선택
-                </button>
+                <div style="display:flex; gap:0.35rem; align-items:center;">
+                  <input type="file" id="wikiImageFileInput" accept="image/*" style="display:none;" onchange="handleWikiImageFileSelect(event)">
+                  <button type="button" class="btn btn-sm" style="font-size:0.72rem; background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; font-weight:700;" onclick="document.getElementById('wikiImageFileInput').click()" title="PC의 이미지를 Base64 마크다운으로 인라인 삽입">
+                    <i data-lucide="image" style="width:12px; height:12px;"></i> 🖼️ 이미지 첨부
+                  </button>
+                  <button type="button" class="btn btn-sm" style="font-size:0.7rem; color:var(--primary);" onclick="openNewDocTemplateModal()">
+                    <i data-lucide="layout-grid" style="width:11px; height:11px;"></i> 양식 상세 선택
+                  </button>
+                </div>
               </div>
 
               <input type="text" id="editDocTitle" class="search-input" style="font-size:1.1rem; font-weight:700; background:#fff;" placeholder="문서 제목">
@@ -1215,7 +1224,7 @@ const htmlContent = `<!DOCTYPE html>
               </div>
               <textarea id="editDocContent" class="code-editor" style="flex:1; height:auto; min-height:380px;" placeholder="마크다운 내용 작성..."></textarea>
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:0.72rem; color:var(--text-dim);">💡 마크다운 표, 체크박스, Mermaid 다이어그램 작성 지원</span>
+                <span style="font-size:0.72rem; color:var(--text-dim);">💡 마크다운 표, 이미지 첨부(파일선택/Ctrl+V 붙여넣기/드래그앤드롭), Mermaid 지원</span>
                 <div style="display:flex; gap:0.5rem;">
                   <button class="btn" onclick="cancelDocEdit()">취소</button>
                   <button class="btn btn-primary" onclick="saveDocEdit()">저장</button>
@@ -5366,12 +5375,147 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     // Markdown Parser
+    // --- 3.5 WIKI INLINE IMAGE & MARKDOWN DOWNLOAD ENGINE ---
+    function attachImageToWikiDoc(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        alert('이미지 파일(PNG, JPG, WebP, GIF 등)만 첨부할 수 있습니다.');
+        return;
+      }
+
+      // Max 5MB check to keep memory reasonable
+      if (file.size > 5 * 1024 * 1024) {
+        alert('이미지 용량이 너무 큽니다 (최대 5MB 지원).');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result;
+        const textarea = document.getElementById('editDocContent');
+        if (!textarea) return;
+
+        const fileName = (file.name || '첨부이미지').replace(/[\[\]\(\)]/g, '');
+        const imageMarkdown = String.fromCharCode(10) + String.fromCharCode(10) + '![' + fileName + '](' + base64Data + ')' + String.fromCharCode(10) + String.fromCharCode(10);
+
+        // Insert at cursor position or append
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+
+        if (typeof start === 'number') {
+          textarea.value = text.substring(0, start) + imageMarkdown + text.substring(end);
+          textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
+        } else {
+          textarea.value += imageMarkdown;
+        }
+        textarea.focus();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleWikiImageFileSelect(event) {
+      const file = event.target.files && event.target.files[0];
+      if (file) {
+        attachImageToWikiDoc(file);
+      }
+      event.target.value = ''; // Reset input
+    }
+
+    function initWikiEditorImageDropAndPaste() {
+      const textarea = document.getElementById('editDocContent');
+      if (!textarea) return;
+
+      // 1. Clipboard Paste (Ctrl+V) handler
+      textarea.addEventListener('paste', function(e) {
+        const clipboardData = e.clipboardData || window.clipboardData;
+        if (!clipboardData || !clipboardData.items) return;
+
+        for (let i = 0; i < clipboardData.items.length; i++) {
+          const item = clipboardData.items[i];
+          if (item.type.indexOf('image') !== -1) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (file) {
+              attachImageToWikiDoc(file);
+            }
+            break;
+          }
+        }
+      });
+
+      // 2. Drag and Drop handler
+      textarea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        textarea.style.border = '2px dashed var(--primary)';
+      });
+
+      textarea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        textarea.style.border = '';
+      });
+
+      textarea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        textarea.style.border = '';
+
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const file = e.dataTransfer.files[0];
+          if (file.type.startsWith('image/')) {
+            attachImageToWikiDoc(file);
+          }
+        }
+      });
+    }
+
+    // Modal to view full size image
+    function viewFullWikiImage(src, alt) {
+      let modal = document.getElementById('wikiImageModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'wikiImageModal';
+        modal.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:99999; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:pointer; padding:20px;';
+        modal.onclick = function() { modal.style.display = 'none'; };
+        document.body.appendChild(modal);
+      }
+      modal.innerHTML = 
+        '<div style="position:relative; max-width:92vw; max-height:90vh; display:flex; flex-direction:column; align-items:center;">' +
+          '<img src="' + src + '" style="max-width:100%; max-height:85vh; border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.5); object-fit:contain;" />' +
+          '<div style="color:#fff; font-size:0.85rem; margin-top:8px; font-weight:700;">' + (alt || '이미지 확대 보기 (화면 클릭 시 닫힘)') + '</div>' +
+        '</div>';
+      modal.style.display = 'flex';
+    }
+
+    // Download current wiki document as self-contained .md file
+    function downloadCurrentDocMd() {
+      const doc = currentDocs.find(d => d.id === currentActiveDocId) || currentDocs[0];
+      if (!doc) return;
+
+      const safeTitle = (doc.title || 'GIJO_WIKI_문서').replace(/[/\\?%*:|"<>]/g, '_');
+      const blob = new Blob([doc.content], { type: 'text/markdown;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = safeTitle + '.md';
+      a.click();
+    }
+
     function parseMarkdownToHtml(md) {
       if (!md) return '';
       let html = md
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
+
+      // Markdown Images: ![alt](url)
+      html = html.replace(new RegExp('!\\\\[([^\\\\]]*)\\\\]\\\\(([^)]+)\\\\)', 'g'), (match, alt, url) => {
+        const altText = sanitizeHtml(alt || '이미지');
+        return '<div style="margin:0.8rem 0; text-align:center;">' +
+          '<img src="' + url + '" alt="' + altText + '" style="max-width:100%; max-height:460px; object-fit:contain; border-radius:6px; border:1px solid var(--border); box-shadow:var(--shadow-sm); cursor:pointer; transition:transform 0.15s ease;" onclick="viewFullWikiImage(this.src, &apos;' + altText + '&apos;)" title="클릭 시 원본 크기로 확대 보기" />' +
+          '<div style="font-size:0.72rem; color:var(--text-dim); margin-top:4px;">🖼️ ' + altText + '</div>' +
+        '</div>';
+      });
 
       // Code blocks
       html = html.replace(new RegExp('\\x60\\x60\\x60([^\\x60\\r\\n]*)\\n([\\s\\S]*?)\\x60\\x60\\x60', 'g'), (match, lang, code) => {
@@ -7802,6 +7946,7 @@ const htmlContent = `<!DOCTYPE html>
       loadLifecycleData();
       updateAiApiKpis();
 initPdfDropZone();
+      initWikiEditorImageDropAndPaste();
 
       // Initialize IT Assets & SBOM
       loadItAssets();
