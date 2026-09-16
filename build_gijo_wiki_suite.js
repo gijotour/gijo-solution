@@ -20,9 +20,6 @@ const htmlContent = `<!DOCTYPE html>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    /* =========================================================================
-       CLEAN WHITE & SLATE LIGHT DESIGN SYSTEM (v5.2.0)
-       ========================================================================= */
     :root {
       --bg-main: #f8fafc;
       --bg-panel: #ffffff;
@@ -57,7 +54,6 @@ const htmlContent = `<!DOCTYPE html>
       overflow-x: hidden;
     }
 
-    /* Top Navigation Header */
     .app-header {
       background: rgba(255, 255, 255, 0.96);
       backdrop-filter: blur(12px);
@@ -119,7 +115,6 @@ const htmlContent = `<!DOCTYPE html>
       border: 1px solid #dbeafe;
     }
 
-    /* Nav Tabs */
     .nav-tabs {
       display: flex;
       gap: 0.25rem;
@@ -156,7 +151,6 @@ const htmlContent = `<!DOCTYPE html>
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
 
-    /* Action Buttons */
     .header-tools {
       display: flex;
       align-items: center;
@@ -195,7 +189,6 @@ const htmlContent = `<!DOCTYPE html>
       border-color: var(--primary-hover);
     }
 
-    /* Main Container */
     .main-viewport {
       max-width: 1800px;
       margin: 0 auto;
@@ -212,10 +205,9 @@ const htmlContent = `<!DOCTYPE html>
       display: block;
     }
 
-    /* GIJO WIKI 3-Column Grid */
     .wiki-grid {
       display: grid;
-      grid-template-columns: 320px 1fr 440px;
+      grid-template-columns: 330px 1fr 440px;
       gap: 1rem;
       height: 100%;
     }
@@ -293,7 +285,7 @@ const htmlContent = `<!DOCTYPE html>
       transition: all 0.15s;
     }
 
-    .pill-cat:hover {
+    .pill-cat:hover, .pill-cat.active {
       background: #eff6ff;
       color: var(--primary);
       border-color: #bfdbfe;
@@ -354,7 +346,6 @@ const htmlContent = `<!DOCTYPE html>
       font-weight: 600;
     }
 
-    /* Content Area */
     .wiki-content-panel {
       background: var(--bg-panel);
       border: 1px solid var(--border);
@@ -372,18 +363,23 @@ const htmlContent = `<!DOCTYPE html>
       background: #ffffff;
     }
 
-    /* Clean Markdown View in White Mode */
+    /* Robust Markdown Render */
     .markdown-render {
-      line-height: 1.75;
+      line-height: 1.8;
       color: #334155;
     }
-    .markdown-render h1 { font-size: 1.45rem; font-weight: 800; color: #0f172a; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; margin-bottom: 1rem; }
-    .markdown-render h2 { font-size: 1.2rem; font-weight: 700; color: #1e293b; margin: 1.4rem 0 0.5rem 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.3rem; }
-    .markdown-render h3 { font-size: 1.02rem; font-weight: 700; color: #334155; margin: 1.1rem 0 0.4rem 0; }
-    .markdown-render p { margin-bottom: 0.95rem; font-size: 0.9rem; }
-    .markdown-render ul, .markdown-render ol { margin-left: 1.4rem; margin-bottom: 1.1rem; font-size: 0.9rem; }
-    .markdown-render code { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.82rem; color: #2563eb; }
-    .markdown-render pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; margin-bottom: 1rem; }
+    .markdown-render h1 { font-size: 1.5rem; font-weight: 800; color: #0f172a; border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; margin-bottom: 1.2rem; }
+    .markdown-render h2 { font-size: 1.25rem; font-weight: 700; color: #1e293b; margin: 1.5rem 0 0.6rem 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.3rem; }
+    .markdown-render h3 { font-size: 1.05rem; font-weight: 700; color: #334155; margin: 1.2rem 0 0.5rem 0; }
+    .markdown-render p { margin-bottom: 1rem; font-size: 0.92rem; }
+    .markdown-render blockquote { border-left: 4px solid #3b82f6; background: #eff6ff; padding: 0.6rem 1rem; margin: 1rem 0; color: #1e40af; border-radius: 0 4px 4px 0; font-size: 0.88rem; }
+    .markdown-render ul, .markdown-render ol { margin-left: 1.5rem; margin-bottom: 1.2rem; font-size: 0.92rem; }
+    .markdown-render li { margin-bottom: 0.3rem; }
+    .markdown-render code { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem; color: #2563eb; font-family: monospace; }
+    .markdown-render pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; margin-bottom: 1.2rem; }
+    .markdown-render table { width: 100%; border-collapse: collapse; margin-bottom: 1.2rem; font-size: 0.85rem; }
+    .markdown-render th, .markdown-render td { border: 1px solid var(--border); padding: 0.55rem 0.75rem; text-align: left; }
+    .markdown-render th { background: #f8fafc; font-weight: 700; color: #0f172a; }
 
     /* RAG Chat */
     .rag-chip-row {
@@ -472,7 +468,6 @@ const htmlContent = `<!DOCTYPE html>
       gap: 0.4rem;
     }
 
-    /* Modal */
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px);
       z-index: 2000; display: none; align-items: center; justify-content: center;
@@ -487,7 +482,6 @@ const htmlContent = `<!DOCTYPE html>
     .modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; background: #ffffff; }
     .modal-foot { padding: 0.85rem 1.25rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.5rem; background: #f8fafc; }
 
-    /* Studio Stage in Light Mode */
     .studio-layout {
       display: grid;
       grid-template-columns: 260px 1fr 340px;
@@ -532,7 +526,6 @@ const htmlContent = `<!DOCTYPE html>
     .edgePath.animated path { stroke-dasharray: 6, 6; animation: dashFlow 1s linear infinite; }
     @keyframes dashFlow { to { stroke-dashoffset: -40; } }
 
-    /* Clean Light Table */
     .clean-table {
       width: 100%;
       border-collapse: collapse;
@@ -579,6 +572,9 @@ const htmlContent = `<!DOCTYPE html>
       </nav>
 
       <div class="header-tools">
+        <button class="btn" onclick="resetToRealDocs()" title="초기 원본 문서 9종 강제 동기화">
+          <i data-lucide="refresh-cw" style="width:13px; height:13px;"></i> 원본 새로고침
+        </button>
         <button class="btn" onclick="openLlmSettingsModal()">
           <i data-lucide="settings" style="width:14px; height:14px;"></i> LLM 설정
         </button>
@@ -599,7 +595,7 @@ const htmlContent = `<!DOCTYPE html>
         <!-- Left: My Docs Vault -->
         <aside class="white-panel">
           <div class="panel-head">
-            <span class="panel-head-title"><i data-lucide="folder" style="width:14px; height:14px; color:var(--primary);"></i> GIJO AS 원본 지식고 (<span id="totalDocCount">0</span>)</span>
+            <span class="panel-head-title"><i data-lucide="folder" style="width:14px; height:14px; color:var(--primary);"></i> GIJO AS 공식 지식고 (<span id="totalDocCount">0</span>)</span>
             <button class="btn" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="createNewWikiDoc()">
               <i data-lucide="plus" style="width:12px; height:12px;"></i> 추가
             </button>
@@ -610,13 +606,13 @@ const htmlContent = `<!DOCTYPE html>
           </div>
 
           <div class="category-filter-strip">
-            <button class="pill-cat" onclick="filterByCat('ALL')">전체</button>
-            <button class="pill-cat" onclick="filterByCat('보안규정')">보안규정</button>
-            <button class="pill-cat" onclick="filterByCat('취약점관리')">취약점</button>
-            <button class="pill-cat" onclick="filterByCat('AI보안')">AI보안</button>
-            <button class="pill-cat" onclick="filterByCat('아키텍처설계')">아키텍처</button>
-            <button class="pill-cat" onclick="filterByCat('솔루션매뉴얼')">매뉴얼</button>
-            <button class="pill-cat" onclick="filterByCat('QA문답집')">QA문답</button>
+            <button class="pill-cat active" id="pill-ALL" onclick="filterByCat('ALL')">전체</button>
+            <button class="pill-cat" id="pill-보안규정" onclick="filterByCat('보안규정')">보안규정</button>
+            <button class="pill-cat" id="pill-취약점관리" onclick="filterByCat('취약점관리')">취약점</button>
+            <button class="pill-cat" id="pill-AI보안" onclick="filterByCat('AI보안')">AI보안</button>
+            <button class="pill-cat" id="pill-아키텍처설계" onclick="filterByCat('아키텍처설계')">아키텍처</button>
+            <button class="pill-cat" id="pill-솔루션매뉴얼" onclick="filterByCat('솔루션매뉴얼')">매뉴얼</button>
+            <button class="pill-cat" id="pill-QA문답집" onclick="filterByCat('QA문답집')">QA문답</button>
           </div>
 
           <ul id="wikiDocList" class="doc-list-clean"></ul>
@@ -673,7 +669,7 @@ const htmlContent = `<!DOCTYPE html>
         <!-- Right: Local RAG Assistant -->
         <aside class="white-panel">
           <div class="panel-head">
-            <span class="panel-head-title"><i data-lucide="bot" style="width:14px; height:14px; color:var(--primary);"></i> GIJO AS RAG 비서</span>
+            <span class="panel-head-title"><i data-lucide="bot" style="width:14px; height:14px; color:var(--primary);"></i> 사내 지식 RAG 비서</span>
             <span style="font-size:0.68rem; color:var(--success); background:#ecfdf5; padding:0.1rem 0.35rem; border-radius:4px; border:1px solid #a7f3d0; font-weight:600;">GB10 / 에어갭</span>
           </div>
 
@@ -878,7 +874,6 @@ const htmlContent = `<!DOCTYPE html>
   </div>
 
   <script>
-    // Initialize Mermaid with Light Theme
     mermaid.initialize({
       startOnLoad: false,
       theme: 'default',
@@ -997,13 +992,33 @@ const htmlContent = `<!DOCTYPE html>
   PolicyEngine -.-> ZTX\`
     };
 
-    // Use dedicated key for clean real data load
+    // Load docs: Guarantee defaultWikiDocs are ALWAYS present
     function loadStoredDocs() {
       try {
-        const stored = localStorage.getItem('gijo_wiki_docs_real_v52');
-        if (stored) return JSON.parse(stored);
-      } catch(e) {}
+        const storedStr = localStorage.getItem('gijo_wiki_docs_real_v52');
+        if (storedStr) {
+          const parsed = JSON.parse(storedStr);
+          if (Array.isArray(parsed) && parsed.length >= 8) {
+            return parsed;
+          }
+        }
+      } catch(e) {
+        console.warn('Storage read warning, falling back to real defaults:', e);
+      }
+      // Force save real defaults to storage
+      localStorage.setItem('gijo_wiki_docs_real_v52', JSON.stringify(defaultWikiDocs));
       return defaultWikiDocs;
+    }
+
+    function resetToRealDocs() {
+      if (confirm('사내 공식 원본 문서 9종으로 지식고를 초기화하시겠습니까?')) {
+        localStorage.removeItem('gijo_wiki_docs_real_v52');
+        currentDocs = defaultWikiDocs;
+        saveDocsToStorage(currentDocs);
+        currentActiveDocId = currentDocs[0].id;
+        renderWikiDocList();
+        alert('✅ GIJO AS 공식 원본 문서 9종이 성공적으로 로드되었습니다.');
+      }
     }
 
     function saveDocsToStorage(docs) {
@@ -1069,6 +1084,11 @@ const htmlContent = `<!DOCTYPE html>
       });
 
       document.getElementById('totalDocCount').innerText = currentDocs.length;
+
+      // Update active category pill
+      document.querySelectorAll('.pill-cat').forEach(p => p.classList.remove('active'));
+      const activePill = document.getElementById('pill-' + currentFilterCat);
+      if (activePill) activePill.classList.add('active');
 
       filtered.forEach(doc => {
         const li = document.createElement('li');
@@ -1171,19 +1191,76 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     function filterWikiDocs() { renderWikiDocList(); }
-    function filterByCat(cat) { currentFilterCat = cat; renderWikiDocList(); }
+    function filterByCat(cat) { 
+      currentFilterCat = cat; 
+      renderWikiDocList(); 
+    }
 
+    // Full Markdown to HTML Parser with Table & Blockquote Support
     function parseMarkdownToHtml(md) {
       if (!md) return '';
-      return md
-        .replace(/^### (.*$)/gim, (_, text) => '<h3>' + sanitizeHtml(text) + '</h3>')
-        .replace(/^## (.*$)/gim, (_, text) => '<h2>' + sanitizeHtml(text) + '</h2>')
-        .replace(/^# (.*$)/gim, (_, text) => '<h1>' + sanitizeHtml(text) + '</h1>')
-        .replace(/\\*\\*(.*?)\\*\\*/gim, (_, text) => '<b>' + sanitizeHtml(text) + '</b>')
-        .replace(/\\*(.*?)\\*/gim, (_, text) => '<i>' + sanitizeHtml(text) + '</i>')
-        .replace(/^\\- (.*$)/gim, (_, text) => '<li>' + sanitizeHtml(text) + '</li>')
-        .replace(/^\\d+\\. (.*$)/gim, (_, text) => '<li>' + sanitizeHtml(text) + '</li>')
-        .replace(/\\n/g, '<br />');
+      const lines = md.split('\\n');
+      let inTable = false;
+      let tableHtml = '';
+      let result = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        // Table check
+        if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+          const cells = line.split('|').map(c => c.trim()).slice(1, -1);
+          if (!inTable) {
+            inTable = true;
+            tableHtml = '<table><thead><tr>' + cells.map(c => '<th>' + sanitizeHtml(c) + '</th>').join('') + '</tr></thead><tbody>';
+          } else if (line.includes('---')) {
+            // separator, ignore
+          } else {
+            tableHtml += '<tr>' + cells.map(c => '<td>' + sanitizeHtml(c) + '</td>').join('') + '</tr>';
+          }
+          continue;
+        } else {
+          if (inTable) {
+            inTable = false;
+            tableHtml += '</tbody></table>';
+            result.push(tableHtml);
+            tableHtml = '';
+          }
+        }
+
+        // Headers
+        if (line.startsWith('### ')) {
+          result.push('<h3>' + sanitizeHtml(line.slice(4)) + '</h3>');
+        } else if (line.startsWith('## ')) {
+          result.push('<h2>' + sanitizeHtml(line.slice(3)) + '</h2>');
+        } else if (line.startsWith('# ')) {
+          result.push('<h1>' + sanitizeHtml(line.slice(2)) + '</h1>');
+        } else if (line.startsWith('> ')) {
+          result.push('<blockquote>' + sanitizeHtml(line.slice(2)) + '</blockquote>');
+        } else if (line.startsWith('- ') || line.startsWith('* ')) {
+          result.push('<li>' + sanitizeHtml(line.slice(2)) + '</li>');
+        } else if (/^\\d+\\.\\s/.test(line)) {
+          result.push('<li>' + sanitizeHtml(line.replace(/^\\d+\\.\\s/, '')) + '</li>');
+        } else if (line.trim() === '---') {
+          result.push('<hr style="border:none; border-top:1px solid var(--border); margin:1.2rem 0;" />');
+        } else if (line.trim().length > 0) {
+          let p = sanitizeHtml(line)
+            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+            .replace(/\*(.*?)\*/g, '<i>$1</i>');
+          const bt = String.fromCharCode(96);
+          if (p.includes(bt)) {
+            p = p.split(bt).map((part, idx) => idx % 2 === 1 ? '<code>' + part + '</code>' : part).join('');
+          }
+          result.push('<p>' + p + '</p>');
+        }
+      }
+
+      if (inTable) {
+        tableHtml += '</tbody></table>';
+        result.push(tableHtml);
+      }
+
+      return result.join('');
     }
 
     async function executeRagQuery() {
@@ -1232,7 +1309,7 @@ const htmlContent = `<!DOCTYPE html>
       let answerText = '';
       if (topDoc) {
         let summary = topDoc.content.slice(0, 280).replace(/#/g, '');
-        answerText = '사내 원본 지식에 따른 분석 결과입니다:<br><br>' + sanitizeHtml(summary) + '...';
+        answerText = '사내 공식 원본 지식에 따른 분석 결과입니다:<br><br>' + sanitizeHtml(summary) + '...';
       } else {
         answerText = '일치하는 특정 규정을 찾지 못했으나, 보안 원칙상 <b>경계 방화벽 통제</b> 및 <b>최소 권한 부여</b> 기준을 준수해야 합니다.';
       }
@@ -1554,9 +1631,8 @@ const htmlContent = `<!DOCTYPE html>
 </html>`;
 
 fs.writeFileSync(targetHtmlPath, htmlContent, 'utf8');
-// Do not touch any GIJO AS files (strict isolation)
 if (fs.existsSync(path.dirname(electronIndexPath))) {
   fs.writeFileSync(electronIndexPath, htmlContent, 'utf8');
 }
 
-console.log('✅ GIJO WIKI v5.2.0 Clean White Theme & Real Data successfully deployed (GIJO AS untouched)!');
+console.log('✅ GIJO WIKI v5.2.0 White Theme & Robust Markdown & Guaranteed Real Docs deployed!');
