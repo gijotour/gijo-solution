@@ -841,6 +841,9 @@ const htmlContent = `<!DOCTYPE html>
         <button id="tabBtn-checklist" class="tab-btn" onclick="switchView('checklist')">
           <i data-lucide="clipboard-check" style="width:14px; height:14px;"></i> 일일 보안점검
         </button>
+        <button id="tabBtn-sbom" class="tab-btn" onclick="switchView('sbom')">
+          <i data-lucide="boxes" style="width:14px; height:14px;"></i> IT 자산 & SBOM
+        </button>
       </nav>
 
       <div class="header-tools">
@@ -1044,6 +1047,7 @@ const htmlContent = `<!DOCTYPE html>
             <div style="display:flex; gap:0.35rem;">
               <select id="studioPresetSelect" class="search-input" style="width:180px; padding:0.25rem 0.45rem; font-size:0.75rem;" onchange="loadStudioPreset(this.value)">
                 <option value="">-- 솔루션 권장 프리셋 --</option>
+                <option value="MY_ASSETS">🏢 사내 IT 자산 & SBOM 연동 다이어그램</option>
                 <option value="GIJO_AS">GIJO AS 폐쇄망 에이전트</option>
                 <option value="WizCLM">WizCLM 인증서 자동화</option>
                 <option value="SecureIM">SecureIM 서버 접근제어</option>
@@ -1252,6 +1256,91 @@ const htmlContent = `<!DOCTYPE html>
         </div>
 
         <div id="checklistGridContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:1rem;"></div>
+      </div>
+    </section>
+
+    <!-- 7. SBOM & IT ASSET INVENTORY VIEW -->
+    <section id="view-sbom" class="view-page">
+      <div style="display:flex; flex-direction:column; gap:1rem;">
+        
+        <!-- Header & Action Bar -->
+        <div class="portal-filter-bar">
+          <div>
+            <h2 style="font-size:1.15rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
+              <i data-lucide="boxes" style="width:20px; height:20px; color:var(--primary);"></i>
+              전사 IT 자산 & 소프트웨어 공급망(SBOM) 형상 관리
+            </h2>
+            <p style="color:var(--text-sub); font-size:0.78rem;">
+              KISA 소프트웨어 공급망 가이드라인 준수 · 사내 IT 자산 등록 및 아키텍처 스튜디오 구성도 자동 생성 · CycloneDX v1.5 표준 연동
+            </p>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+            <button class="btn btn-sm btn-primary" onclick="openAddAssetModal()">
+              <i data-lucide="plus" style="width:13px; height:13px;"></i> 자산 직접 등록
+            </button>
+            <button class="btn btn-sm" style="background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; font-weight:700;" onclick="syncAssetsToStudio()">
+              <i data-lucide="share-2" style="width:13px; height:13px;"></i> 아키텍처 스튜디오 반영
+            </button>
+            <button class="btn btn-sm" onclick="exportCycloneDxJson()" title="KISA 표준 규격 CycloneDX v1.5 JSON 파일로 내보내기">
+              <i data-lucide="download" style="width:13px; height:13px;"></i> CycloneDX 내보내기
+            </button>
+            <button class="btn btn-sm" onclick="document.getElementById('cycloneDxFileInput').click()" title="CycloneDX JSON 파일 가져오기">
+              <i data-lucide="upload" style="width:13px; height:13px;"></i> 가져오기
+            </button>
+            <input type="file" id="cycloneDxFileInput" accept=".json" style="display:none;" onchange="importCycloneDxJson(event)">
+            <button class="btn btn-sm" onclick="printAssetSbomReport()" title="KISA 수검용 전사 자산 & SBOM 대장 A4 인쇄">
+              <i data-lucide="printer" style="width:13px; height:13px;"></i> 수검 대장 (A4)
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 KPI Summary Cards -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:0.75rem;">
+          <div style="background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:0.85rem 1rem; box-shadow:var(--shadow-sm);">
+            <div style="font-size:0.72rem; color:var(--text-dim); font-weight:700;">총 관리 IT 자산</div>
+            <div style="font-size:1.4rem; font-weight:800; color:var(--primary); margin-top:0.2rem;" id="statTotalAssets">0대</div>
+            <div style="font-size:0.68rem; color:var(--text-sub); margin-top:0.2rem;">웹, WAS, DB, 보안장비 포함</div>
+          </div>
+          <div style="background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:0.85rem 1rem; box-shadow:var(--shadow-sm);">
+            <div style="font-size:0.72rem; color:var(--text-dim); font-weight:700;">식별된 SBOM 컴포넌트</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#059669; margin-top:0.2rem;" id="statTotalComponents">0개</div>
+            <div style="font-size:0.68rem; color:var(--text-sub); margin-top:0.2rem;">오픈소스 라이브러리 및 엔진</div>
+          </div>
+          <div style="background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:0.85rem 1rem; box-shadow:var(--shadow-sm);">
+            <div style="font-size:0.72rem; color:var(--text-dim); font-weight:700;">망분리 구역 분포</div>
+            <div style="font-size:1rem; font-weight:800; color:#475569; margin-top:0.4rem;" id="statZoneDist">DMZ 0 / 업무 0 / DB 0</div>
+            <div style="font-size:0.68rem; color:var(--text-sub); margin-top:0.2rem;">계층별 논리적 망분리</div>
+          </div>
+          <div style="background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:0.85rem 1rem; box-shadow:var(--shadow-sm);">
+            <div style="font-size:0.72rem; color:var(--text-dim); font-weight:700;">취약점(CVE) 및 라이선스 상태</div>
+            <div style="font-size:1.2rem; font-weight:800; color:#2563eb; margin-top:0.3rem;">🟢 정상 통제</div>
+            <div style="font-size:0.68rem; color:var(--text-sub); margin-top:0.2rem;">주요 고위험 취약점 조치 완료</div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:0.6rem 0.85rem;">
+          <div style="display:flex; gap:0.35rem; align-items:center;" id="assetFilterTabs">
+            <button class="pill-cat active" onclick="filterAssetZone('ALL')">전체 자산</button>
+            <button class="pill-cat" onclick="filterAssetZone('DMZ')">DMZ 구간</button>
+            <button class="pill-cat" onclick="filterAssetZone('TRUST')">내부 업무망</button>
+            <button class="pill-cat" onclick="filterAssetZone('SECURE_DB')">DB 안전구역</button>
+            <button class="pill-cat" onclick="filterAssetZone('PERIMETER')">경계/보안장비</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <input type="text" id="assetSearchInput" class="search-input" style="width:240px; background:#fff;" placeholder="자산명, IP, OS, 컴포넌트 검색..." oninput="renderAssetTable()">
+            <button class="btn btn-sm" onclick="resetToDefaultAssets()" title="표준 4대 실물 자산으로 초기화">
+              <i data-lucide="rotate-ccw" style="width:12px; height:12px;"></i> 자산 초기화
+            </button>
+          </div>
+        </div>
+
+        <!-- Asset & Component Cards List Container -->
+        <div id="assetCardsContainer" style="display:flex; flex-direction:column; gap:0.75rem;">
+          <!-- Dynamically populated -->
+        </div>
+
       </div>
     </section>
 
@@ -1537,6 +1626,134 @@ const htmlContent = `<!DOCTYPE html>
           <button class="btn btn-sm" onclick="selectNewDocTemplate('BLANK')">
             <i data-lucide="file" style="width:12px; height:12px;"></i> 서식 없이 빈 문서로 시작
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit IT Asset Modal -->
+  <div class="modal-overlay" id="itAssetModal">
+    <div class="modal-box" style="max-width:620px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="itAssetModalTitle" style="font-size:1.05rem; font-weight:800; color:var(--text-main);">IT 자산 직접 등록</h3>
+          <p style="font-size:0.75rem; color:var(--text-dim); margin-top:0.2rem;">등록된 자산은 아키텍처 스튜디오와 SBOM 명세서, 사내 지식고에 실시간 연계됩니다.</p>
+        </div>
+        <button class="btn btn-sm" onclick="closeItAssetModal()"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:0.85rem; padding:1.25rem;">
+        <input type="hidden" id="assetModalId" value="">
+        
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">자산명 *</label>
+          <input type="text" id="assetModalName" class="search-input" placeholder="예: 대고객 포털 웹서버 #1, 고객원장 DB..." style="background:#fff; margin-top:0.25rem;">
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">망분리 배치 구역 *</label>
+            <select id="assetModalZone" class="search-input" style="background:#fff; margin-top:0.25rem;">
+              <option value="DMZ">DMZ 구간 (대외 공개 서비스)</option>
+              <option value="TRUST">내부 업무망 (Trusted Zone)</option>
+              <option value="SECURE_DB">DB 안전구역 (Secure DB Vault)</option>
+              <option value="PERIMETER">경계 보안 계층 (Firewall/IPS)</option>
+              <option value="CLOUD">클라우드 인프라 (AWS/GCP/NCP)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">자산 분류 *</label>
+            <select id="assetModalCategory" class="search-input" style="background:#fff; margin-top:0.25rem;">
+              <option value="웹서버(WEB)">웹서버 (WEB / 리버스 프록시)</option>
+              <option value="애플리케이션(WAS)">애플리케이션 서버 (WAS)</option>
+              <option value="데이터베이스(DB)">데이터베이스 (RDBMS / NoSQL)</option>
+              <option value="보안장비(FW/IPS)">네트워크 / 보안장비 (FW/IPS/WAF)</option>
+              <option value="인프라/스토리지">인프라 / 스토리지 / 가상화</option>
+              <option value="업무PC/단말">업무용 단말 / 관리자 PC</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">IP 주소 / 도메인</label>
+            <input type="text" id="assetModalIp" class="search-input" placeholder="예: 192.168.10.25, 10.10.30.15" style="background:#fff; margin-top:0.25rem;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">운영체제 (OS)</label>
+            <input type="text" id="assetModalOs" class="search-input" placeholder="예: Rocky Linux 9.2, RHEL 8.8" style="background:#fff; margin-top:0.25rem;">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">관리 부서 및 담당자</label>
+          <input type="text" id="assetModalManager" class="search-input" placeholder="예: 인프라운영팀 홍길동 책임" style="background:#fff; margin-top:0.25rem;">
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px solid var(--border); padding-top:0.75rem; margin-top:0.25rem;">
+          <button class="btn" onclick="closeItAssetModal()">취소</button>
+          <button class="btn btn-primary" onclick="saveItAsset()"><i data-lucide="check" style="width:13px; height:13px;"></i> 자산 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Component (SBOM) Modal -->
+  <div class="modal-overlay" id="itComponentModal">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="font-size:1.05rem; font-weight:800; color:var(--text-main);">SBOM 소프트웨어 컴포넌트 등록</h3>
+          <p style="font-size:0.75rem; color:var(--text-dim); margin-top:0.2rem;">자산에 탑재된 오픈소스 및 상용 소프트웨어 형상을 명세화합니다.</p>
+        </div>
+        <button class="btn btn-sm" onclick="closeItComponentModal()"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:0.85rem; padding:1.25rem;">
+        <input type="hidden" id="compTargetAssetId" value="">
+        <input type="hidden" id="compTargetIndex" value="-1">
+
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">소프트웨어 / 라이브러리명 *</label>
+            <input type="text" id="compModalName" class="search-input" placeholder="예: Nginx, Spring Boot, OpenSSL..." style="background:#fff; margin-top:0.25rem;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">버전 *</label>
+            <input type="text" id="compModalVersion" class="search-input" placeholder="예: 1.24.0, 3.2.2" style="background:#fff; margin-top:0.25rem;">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">오픈소스 라이선스 *</label>
+            <select id="compModalLicense" class="search-input" style="background:#fff; margin-top:0.25rem;">
+              <option value="Apache-2.0">Apache-2.0 (허용)</option>
+              <option value="MIT">MIT License (허용)</option>
+              <option value="BSD-2-Clause">BSD-2-Clause / BSD-3 (허용)</option>
+              <option value="GPL-2.0 / 3.0">GPL-2.0 / 3.0 (카피레프트 주의)</option>
+              <option value="LGPL-2.1 / 3.0">LGPL-2.1 / 3.0 (동적링크 권장)</option>
+              <option value="EPL-2.0">EPL-2.0 (Eclipse Public)</option>
+              <option value="Proprietary">상용 라이선스 (Commercial)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">취약점(CVE) 상태</label>
+            <select id="compModalCve" class="search-input" style="background:#fff; margin-top:0.25rem;">
+              <option value="양호">🟢 양호 (알려진 CVE 없음)</option>
+              <option value="조치완료">🔵 조치완료 (패치 적용됨)</option>
+              <option value="주의(Medium)">🟡 주의 (Medium 위험도 완화책 적용)</option>
+              <option value="위험(High)">🔴 위험 (High/Critical 긴급 패치 대상)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">패키지 식별자 (PURL, 선택사항)</label>
+          <input type="text" id="compModalPurl" class="search-input" placeholder="예: pkg:maven/org.springframework.boot/spring-boot@3.2.2" style="background:#fff; margin-top:0.25rem;">
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px solid var(--border); padding-top:0.75rem; margin-top:0.25rem;">
+          <button class="btn" onclick="closeItComponentModal()">취소</button>
+          <button class="btn btn-primary" onclick="saveItComponent()"><i data-lucide="check" style="width:13px; height:13px;"></i> 컴포넌트 추가</button>
         </div>
       </div>
     </div>
@@ -2244,6 +2461,9 @@ const htmlContent = `<!DOCTYPE html>
         renderAuditGrid();
       } else if (viewName === 'checklist') {
         renderChecklistGrid();
+      } else if (viewName === 'sbom') {
+        renderAssetTable();
+        updateAssetKpis();
       }
       lucide.createIcons();
     }
@@ -2455,6 +2675,656 @@ const htmlContent = `<!DOCTYPE html>
         '</body></html>'
       );
       printWin.document.close();
+    }
+
+    // --- 4.7 IT ASSET & SBOM INVENTORY MODULE ---
+    const ASSET_STORAGE_KEY = 'GIJO_IT_ASSETS_V5_2';
+    let currentItAssets = [];
+    let currentAssetFilterZone = 'ALL';
+
+    const defaultItAssets = [
+      {
+        id: 'ASSET-01',
+        name: '대고객 포털 웹서버 #1',
+        category: '웹서버(WEB)',
+        zone: 'DMZ',
+        ip: '192.168.10.25',
+        os: 'Rocky Linux 9.2 (64-bit)',
+        manager: '인프라운영팀 홍길동 책임',
+        updatedAt: '2026-09-16',
+        components: [
+          { name: 'Nginx', version: '1.24.0', license: 'BSD-2-Clause', purl: 'pkg:generic/nginx@1.24.0', cve: '양호' },
+          { name: 'OpenSSL', version: '3.0.7', license: 'Apache-2.0', purl: 'pkg:generic/openssl@3.0.7', cve: '양호' }
+        ]
+      },
+      {
+        id: 'ASSET-02',
+        name: '코어 비즈니스 WAS #1',
+        category: '애플리케이션(WAS)',
+        zone: 'TRUST',
+        ip: '10.10.30.15',
+        os: 'Red Hat Enterprise Linux 8.8',
+        manager: '서비스개발팀 김철수 수석',
+        updatedAt: '2026-09-16',
+        components: [
+          { name: 'OpenJDK', version: '17.0.8', license: 'GPL-2.0 / 3.0', purl: 'pkg:generic/openjdk@17.0.8', cve: '양호' },
+          { name: 'Spring Boot', version: '3.2.2', license: 'Apache-2.0', purl: 'pkg:maven/org.springframework.boot/spring-boot@3.2.2', cve: '양호' },
+          { name: 'Logback', version: '1.4.14', license: 'LGPL-2.1 / 3.0', purl: 'pkg:maven/ch.qos.logback/logback-classic@1.4.14', cve: '양호' }
+        ]
+      },
+      {
+        id: 'ASSET-03',
+        name: '고객원장 마스터 DB',
+        category: '데이터베이스(DB)',
+        zone: 'SECURE_DB',
+        ip: '10.10.80.50',
+        os: 'Oracle Linux 8.6',
+        manager: '데이터관리팀 박영희 팀장',
+        updatedAt: '2026-09-16',
+        components: [
+          { name: 'PostgreSQL', version: '15.4', license: 'BSD-2-Clause', purl: 'pkg:generic/postgresql@15.4', cve: '양호' },
+          { name: 'CipherTrust Agent', version: '7.3.0', license: 'Proprietary', purl: 'pkg:generic/ciphertrust@7.3.0', cve: '양호' }
+        ]
+      },
+      {
+        id: 'ASSET-04',
+        name: '경계 차세대 방화벽 어플라이언스',
+        category: '보안장비(FW/IPS)',
+        zone: 'PERIMETER',
+        ip: '192.168.1.1',
+        os: 'FortiOS 7.2.5',
+        manager: '정보보호팀 최보안 책임',
+        updatedAt: '2026-09-16',
+        components: [
+          { name: 'FortiOS Kernel', version: '7.2.5', license: 'Proprietary', purl: 'pkg:generic/fortios@7.2.5', cve: '양호' },
+          { name: 'IPS Signature Engine', version: '2026.09-v2', license: 'Proprietary', purl: 'pkg:generic/ips-sig@2026.09', cve: '양호' }
+        ]
+      }
+    ];
+
+    function loadItAssets() {
+      try {
+        const stored = localStorage.getItem(ASSET_STORAGE_KEY);
+        if (stored) {
+          currentItAssets = JSON.parse(stored);
+        } else {
+          currentItAssets = JSON.parse(JSON.stringify(defaultItAssets));
+          saveItAssetsToStorage();
+        }
+      } catch (e) {
+        currentItAssets = JSON.parse(JSON.stringify(defaultItAssets));
+      }
+    }
+
+    function saveItAssetsToStorage() {
+      try {
+        localStorage.setItem(ASSET_STORAGE_KEY, JSON.stringify(currentItAssets));
+      } catch (e) {}
+      updateAssetKpis();
+      syncAssetsToWikiDocs();
+    }
+
+    function resetToDefaultAssets() {
+      if (confirm('전사 IT 자산 목록을 표준 4대 실물 자산으로 초기화하시겠습니까?')) {
+        currentItAssets = JSON.parse(JSON.stringify(defaultItAssets));
+        saveItAssetsToStorage();
+        renderAssetTable();
+        alert('✅ IT 자산 목록이 초기화되었습니다.');
+      }
+    }
+
+    function updateAssetKpis() {
+      const elTotalAssets = document.getElementById('statTotalAssets');
+      const elTotalComps = document.getElementById('statTotalComponents');
+      const elZoneDist = document.getElementById('statZoneDist');
+
+      if (!elTotalAssets) return;
+
+      const totalAssets = currentItAssets.length;
+      let totalComps = 0;
+      let dmzCount = 0;
+      let trustCount = 0;
+      let dbCount = 0;
+
+      currentItAssets.forEach(a => {
+        totalComps += (a.components || []).length;
+        if (a.zone === 'DMZ') dmzCount++;
+        else if (a.zone === 'TRUST') trustCount++;
+        else if (a.zone === 'SECURE_DB') dbCount++;
+      });
+
+      elTotalAssets.innerText = totalAssets + '대';
+      elTotalComps.innerText = totalComps + '개';
+      elZoneDist.innerText = 'DMZ ' + dmzCount + ' / 업무 ' + trustCount + ' / DB ' + dbCount;
+    }
+
+    function filterAssetZone(zone) {
+      currentAssetFilterZone = zone;
+      const tabs = document.getElementById('assetFilterTabs');
+      if (tabs) {
+        tabs.querySelectorAll('.pill-cat').forEach(btn => btn.classList.remove('active'));
+      }
+      if (event && event.target) event.target.classList.add('active');
+      renderAssetTable();
+    }
+
+    function renderAssetTable() {
+      const container = document.getElementById('assetCardsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const query = (document.getElementById('assetSearchInput')?.value || '').toLowerCase().trim();
+
+      const filtered = currentItAssets.filter(asset => {
+        if (currentAssetFilterZone !== 'ALL' && asset.zone !== currentAssetFilterZone) return false;
+        if (!query) return true;
+
+        const matchName = (asset.name || '').toLowerCase().includes(query);
+        const matchIp = (asset.ip || '').toLowerCase().includes(query);
+        const matchOs = (asset.os || '').toLowerCase().includes(query);
+        const matchComp = (asset.components || []).some(c => (c.name || '').toLowerCase().includes(query) || (c.version || '').toLowerCase().includes(query));
+        return matchName || matchIp || matchOs || matchComp;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:3rem; text-align:center; color:var(--text-dim); font-size:0.85rem;">검색된 IT 자산이 없습니다. 상단의 [+ 자산 직접 등록] 버튼을 눌러 추가하세요.</div>';
+        return;
+      }
+
+      filtered.forEach((asset, aIdx) => {
+        const zoneBadgeClass = asset.zone === 'DMZ' ? 'badge-global' : (asset.zone === 'SECURE_DB' ? 'badge-custom' : 'badge-kr');
+        const zoneNameKo = asset.zone === 'DMZ' ? '🌐 DMZ 구간' : (asset.zone === 'SECURE_DB' ? '🔒 DB 안전구역' : (asset.zone === 'PERIMETER' ? '🔥 경계/보안' : '🏢 내부 업무망'));
+
+        const card = document.createElement('div');
+        card.style.cssText = 'background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:1.1rem; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:0.75rem;';
+
+        let compRows = '';
+        (asset.components || []).forEach((c, cIdx) => {
+          const cveBadgeColor = c.cve.includes('위험') ? '#dc2626' : (c.cve.includes('주의') ? '#d97706' : '#059669');
+          const cveBadgeBg = c.cve.includes('위험') ? '#fef2f2' : (c.cve.includes('주의') ? '#fffbeb' : '#ecfdf5');
+
+          compRows += 
+            '<tr style="border-bottom:1px solid #f1f5f9; font-size:0.78rem;">' +
+              '<td style="padding:0.4rem 0.6rem; font-weight:700; color:var(--text-main);">' + sanitizeHtml(c.name) + '</td>' +
+              '<td style="padding:0.4rem 0.6rem; color:var(--text-sub);"><span style="background:#f1f5f9; padding:1px 6px; border-radius:4px; font-family:monospace;">v' + sanitizeHtml(c.version) + '</span></td>' +
+              '<td style="padding:0.4rem 0.6rem; color:var(--text-sub);">' + sanitizeHtml(c.license || '상용') + '</td>' +
+              '<td style="padding:0.4rem 0.6rem;"><span style="background:' + cveBadgeBg + '; color:' + cveBadgeColor + '; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;">' + sanitizeHtml(c.cve || '양호') + '</span></td>' +
+              '<td style="padding:0.4rem 0.6rem; color:var(--text-dim); font-size:0.72rem; font-family:monospace; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + sanitizeHtml(c.purl || '-') + '</td>' +
+              '<td style="padding:0.4rem 0.6rem; text-align:right;">' +
+                '<button class="btn btn-sm" style="padding:1px 5px; font-size:0.68rem; color:var(--danger);" onclick="deleteItComponent(\'' + asset.id + '\', ' + cIdx + ')">삭제</button>' +
+              '</td>' +
+            '</tr>';
+        });
+
+        if (!compRows) {
+          compRows = '<tr><td colspan="6" style="padding:0.8rem; text-align:center; color:var(--text-dim); font-size:0.75rem;">등록된 소프트웨어 컴포넌트(SBOM)가 없습니다. [+ 컴포넌트 추가]를 눌러 등록하세요.</td></tr>';
+        }
+
+        card.innerHTML = 
+          '<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">' +
+            '<div>' +
+              '<div style="display:flex; align-items:center; gap:0.45rem; margin-bottom:0.25rem;">' +
+                '<span class="meta-badge ' + zoneBadgeClass + '" style="font-size:0.7rem;">' + zoneNameKo + '</span>' +
+                '<span class="meta-badge" style="font-size:0.7rem; background:#f8fafc;">' + sanitizeHtml(asset.category || '서버') + '</span>' +
+                '<span style="font-size:0.75rem; color:var(--text-dim); font-family:monospace;">ID: ' + asset.id + '</span>' +
+              '</div>' +
+              '<h3 style="font-size:1.05rem; font-weight:800; color:var(--text-main);">' + sanitizeHtml(asset.name) + '</h3>' +
+              '<div style="display:flex; gap:1rem; margin-top:0.3rem; font-size:0.76rem; color:var(--text-sub);">' +
+                '<span><b>IP</b>: ' + sanitizeHtml(asset.ip || '미지정') + '</span>' +
+                '<span><b>OS</b>: ' + sanitizeHtml(asset.os || 'Linux') + '</span>' +
+                '<span><b>담당자</b>: ' + sanitizeHtml(asset.manager || '미지정') + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div style="display:flex; gap:0.35rem;">' +
+              '<button class="btn btn-sm" style="background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; font-weight:700;" onclick="openAddComponentModal(\'' + asset.id + '\')">' +
+                '<i data-lucide="plus-circle" style="width:12px; height:12px;"></i> 컴포넌트 추가' +
+              '</button>' +
+              '<button class="btn btn-sm" onclick="openEditAssetModal(\'' + asset.id + '\')">수정</button>' +
+              '<button class="btn btn-sm" style="color:var(--danger);" onclick="deleteItAsset(\'' + asset.id + '\')">삭제</button>' +
+            '</div>' +
+          '</div>' +
+
+          '<div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-top:0.3rem;">' +
+            '<div style="padding:0.4rem 0.65rem; background:#f1f5f9; border-bottom:1px solid var(--border); font-size:0.74rem; font-weight:700; color:var(--text-sub); display:flex; justify-content:space-between; align-items:center;">' +
+              '<span>📦 SBOM 소프트웨어 컴포넌트 & 오픈소스 라이선스 명세 (' + (asset.components || []).length + '개)</span>' +
+              '<span style="font-size:0.68rem; color:var(--text-dim);">CycloneDX v1.5 호환</span>' +
+            '</div>' +
+            '<table style="width:100%; border-collapse:collapse;">' +
+              '<thead>' +
+                '<tr style="background:#fafafa; border-bottom:1px solid var(--border); font-size:0.72rem; color:var(--text-dim); text-align:left;">' +
+                  '<th style="padding:0.35rem 0.6rem;">패키지/소프트웨어명</th>' +
+                  '<th style="padding:0.35rem 0.6rem;">버전</th>' +
+                  '<th style="padding:0.35rem 0.6rem;">라이선스</th>' +
+                  '<th style="padding:0.35rem 0.6rem;">CVE 상태</th>' +
+                  '<th style="padding:0.35rem 0.6rem;">패키지 URL (PURL)</th>' +
+                  '<th style="padding:0.35rem 0.6rem; text-align:right;">관리</th>' +
+                '</tr>' +
+              '</thead>' +
+              '<tbody>' + compRows + '</tbody>' +
+            '</table>' +
+          '</div>';
+
+        container.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    function openAddAssetModal() {
+      document.getElementById('itAssetModalTitle').innerText = 'IT 자산 직접 등록';
+      document.getElementById('assetModalId').value = '';
+      document.getElementById('assetModalName').value = '';
+      document.getElementById('assetModalZone').value = 'DMZ';
+      document.getElementById('assetModalCategory').value = '웹서버(WEB)';
+      document.getElementById('assetModalIp').value = '';
+      document.getElementById('assetModalOs').value = '';
+      document.getElementById('assetModalManager').value = '';
+      document.getElementById('itAssetModal').style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function openEditAssetModal(assetId) {
+      const asset = currentItAssets.find(a => a.id === assetId);
+      if (!asset) return;
+
+      document.getElementById('itAssetModalTitle').innerText = 'IT 자산 스펙 수정';
+      document.getElementById('assetModalId').value = asset.id;
+      document.getElementById('assetModalName').value = asset.name;
+      document.getElementById('assetModalZone').value = asset.zone;
+      document.getElementById('assetModalCategory').value = asset.category;
+      document.getElementById('assetModalIp').value = asset.ip || '';
+      document.getElementById('assetModalOs').value = asset.os || '';
+      document.getElementById('assetModalManager').value = asset.manager || '';
+      document.getElementById('itAssetModal').style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function closeItAssetModal() {
+      document.getElementById('itAssetModal').style.display = 'none';
+    }
+
+    function saveItAsset() {
+      const id = document.getElementById('assetModalId').value;
+      const name = document.getElementById('assetModalName').value.trim();
+      const zone = document.getElementById('assetModalZone').value;
+      const category = document.getElementById('assetModalCategory').value;
+      const ip = document.getElementById('assetModalIp').value.trim();
+      const os = document.getElementById('assetModalOs').value.trim();
+      const manager = document.getElementById('assetModalManager').value.trim();
+
+      if (!name) {
+        alert('자산명을 입력해주세요.');
+        return;
+      }
+
+      if (id) {
+        // Edit existing
+        const asset = currentItAssets.find(a => a.id === id);
+        if (asset) {
+          asset.name = name;
+          asset.zone = zone;
+          asset.category = category;
+          asset.ip = ip;
+          asset.os = os;
+          asset.manager = manager;
+          asset.updatedAt = new Date().toISOString().slice(0, 10);
+        }
+      } else {
+        // Create new
+        const newId = 'ASSET-' + String(currentItAssets.length + 1).padStart(2, '0');
+        currentItAssets.push({
+          id: newId,
+          name: name,
+          zone: zone,
+          category: category,
+          ip: ip,
+          os: os,
+          manager: manager,
+          updatedAt: new Date().toISOString().slice(0, 10),
+          components: []
+        });
+      }
+
+      saveItAssetsToStorage();
+      closeItAssetModal();
+      renderAssetTable();
+      alert('✅ IT 자산 정보가 저장되었습니다.');
+    }
+
+    function deleteItAsset(assetId) {
+      if (confirm('선택한 자산과 등록된 모든 SBOM 컴포넌트를 삭제하시겠습니까?')) {
+        currentItAssets = currentItAssets.filter(a => a.id !== assetId);
+        saveItAssetsToStorage();
+        renderAssetTable();
+      }
+    }
+
+    function openAddComponentModal(assetId) {
+      const asset = currentItAssets.find(a => a.id === assetId);
+      if (!asset) return;
+
+      document.getElementById('compTargetAssetId').value = assetId;
+      document.getElementById('compModalName').value = '';
+      document.getElementById('compModalVersion').value = '';
+      document.getElementById('compModalLicense').value = 'Apache-2.0';
+      document.getElementById('compModalCve').value = '양호';
+      document.getElementById('compModalPurl').value = '';
+      document.getElementById('itComponentModal').style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function closeItComponentModal() {
+      document.getElementById('itComponentModal').style.display = 'none';
+    }
+
+    function saveItComponent() {
+      const assetId = document.getElementById('compTargetAssetId').value;
+      const asset = currentItAssets.find(a => a.id === assetId);
+      if (!asset) return;
+
+      const name = document.getElementById('compModalName').value.trim();
+      const version = document.getElementById('compModalVersion').value.trim();
+      const license = document.getElementById('compModalLicense').value;
+      const cve = document.getElementById('compModalCve').value;
+      const purl = document.getElementById('compModalPurl').value.trim();
+
+      if (!name || !version) {
+        alert('소프트웨어/라이브러리명과 버전을 입력해주세요.');
+        return;
+      }
+
+      if (!asset.components) asset.components = [];
+      asset.components.push({
+        name: name,
+        version: version,
+        license: license,
+        cve: cve,
+        purl: purl || ('pkg:generic/' + name.toLowerCase() + '@' + version)
+      });
+
+      saveItAssetsToStorage();
+      closeItComponentModal();
+      renderAssetTable();
+      alert('✅ [' + name + ' v' + version + '] 컴포넌트가 자산에 등록되었습니다.');
+    }
+
+    function deleteItComponent(assetId, compIdx) {
+      const asset = currentItAssets.find(a => a.id === assetId);
+      if (!asset || !asset.components) return;
+
+      if (confirm('해당 소프트웨어 컴포넌트를 SBOM 명세에서 제외하시겠습니까?')) {
+        asset.components.splice(compIdx, 1);
+        saveItAssetsToStorage();
+        renderAssetTable();
+      }
+    }
+
+    function syncAssetsToStudio() {
+      if (currentItAssets.length === 0) {
+        alert('등록된 IT 자산이 없습니다. 자산을 먼저 등록해주세요.');
+        return;
+      }
+
+      const perimeterAssets = currentItAssets.filter(a => a.zone === 'PERIMETER');
+      const dmzAssets = currentItAssets.filter(a => a.zone === 'DMZ');
+      const trustAssets = currentItAssets.filter(a => a.zone === 'TRUST');
+      const dbAssets = currentItAssets.filter(a => a.zone === 'SECURE_DB');
+      const cloudAssets = currentItAssets.filter(a => a.zone === 'CLOUD');
+
+      let code = 'flowchart TB\n';
+      code += '  subgraph External["🌐 외부 인터넷망 (Untrusted Client)"]\n';
+      code += '    User["👤 웹 / 모바일 클라이언트 (HTTPS 443)"]\n';
+      code += '  end\n\n';
+
+      if (perimeterAssets.length > 0) {
+        code += '  subgraph Boundary["🛡️ 경계 보안 구역 (Perimeter Zone)"]\n';
+        perimeterAssets.forEach((a, i) => {
+          const compNames = (a.components || []).map(c => c.name).join(', ') || '보안 엔진';
+          code += '    P_' + i + '["🔥 ' + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + '"]\n';
+        });
+        code += '  end\n\n';
+      }
+
+      if (dmzAssets.length > 0) {
+        code += '  subgraph DMZ["🏢 DMZ 구역 (Semi-Trusted / Public Web)"]\n';
+        dmzAssets.forEach((a, i) => {
+          const compNames = (a.components || []).map(c => c.name + ' v' + c.version).join(', ') || 'Nginx';
+          code += '    D_' + i + '["🌐 ' + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + '"]\n';
+        });
+        code += '  end\n\n';
+      }
+
+      if (trustAssets.length > 0) {
+        code += '  subgraph Trust["🏢 내부 업무망 (Trusted Zone / Core App)"]\n';
+        trustAssets.forEach((a, i) => {
+          const compNames = (a.components || []).map(c => c.name + ' v' + c.version).join(', ') || 'App';
+          code += '    T_' + i + '["⚙️ ' + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + '"]\n';
+        });
+        code += '  end\n\n';
+      }
+
+      if (dbAssets.length > 0) {
+        code += '  subgraph SecureDB["🔒 데이터베이스 안전구역 (Secure DB Vault)"]\n';
+        dbAssets.forEach((a, i) => {
+          const compNames = (a.components || []).map(c => c.name + ' v' + c.version).join(', ') || 'DB';
+          code += '    DB_' + i + '["🗄️ ' + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + '"]\n';
+        });
+        code += '  end\n\n';
+      }
+
+      if (perimeterAssets.length > 0) code += '  External -->|HTTPS 443| Boundary\n';
+      if (perimeterAssets.length > 0 && dmzAssets.length > 0) code += '  Boundary -->|검증된 트래픽| DMZ\n';
+      else if (dmzAssets.length > 0) code += '  External -->|HTTPS 443| DMZ\n';
+
+      if (dmzAssets.length > 0 && trustAssets.length > 0) code += '  DMZ -->|API 호출 8443| Trust\n';
+      if (trustAssets.length > 0 && dbAssets.length > 0) code += '  Trust -->|SQL 쿼리 & 암호화| SecureDB\n';
+
+      document.getElementById('studioMermaidCode').value = code;
+      renderMermaidFromEditor();
+      switchView('studio');
+      alert('✅ 사내 IT 자산 ' + currentItAssets.length + '대를 기반으로 아키텍처 다이어그램이 자동 구성되었습니다!');
+    }
+
+    function exportCycloneDxJson() {
+      const bom = {
+        bomFormat: 'CycloneDX',
+        specVersion: '1.5',
+        serialNumber: 'urn:uuid:' + crypto.randomUUID(),
+        version: 1,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          tools: [{ vendor: 'GIJO TECHNOLOGY', name: 'GIJO AS Lite', version: '5.2.0' }],
+          component: {
+            type: 'operating-system',
+            name: customerOrgName + ' 전사 IT 자산 인프라',
+            version: '2026.09'
+          }
+        },
+        components: []
+      };
+
+      currentItAssets.forEach(asset => {
+        (asset.components || []).forEach(comp => {
+          bom.components.push({
+            type: 'library',
+            name: comp.name,
+            version: comp.version,
+            purl: comp.purl || ('pkg:generic/' + comp.name.toLowerCase() + '@' + comp.version),
+            licenses: [{ license: { id: comp.license } }],
+            properties: [
+              { name: 'gijo:asset:id', value: asset.id },
+              { name: 'gijo:asset:name', value: asset.name },
+              { name: 'gijo:asset:zone', value: asset.zone },
+              { name: 'gijo:asset:ip', value: asset.ip || '' },
+              { name: 'gijo:cve:status', value: comp.cve || '양호' }
+            ]
+          });
+        });
+      });
+
+      const blob = new Blob([JSON.stringify(bom, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'CycloneDX_IT_Assets_SBOM_' + new Date().toISOString().slice(0, 10) + '.json';
+      a.click();
+    }
+
+    function importCycloneDxJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const bom = JSON.parse(e.target.result);
+          if (!bom.components || !Array.isArray(bom.components)) {
+            alert('유효한 CycloneDX JSON 형식이 아닙니다.');
+            return;
+          }
+
+          let addedCount = 0;
+          bom.components.forEach((c, idx) => {
+            const assetProp = (c.properties || []).find(p => p.name === 'gijo:asset:name');
+            const zoneProp = (c.properties || []).find(p => p.name === 'gijo:asset:zone');
+            const targetAssetName = assetProp ? assetProp.value : ('가져온 자산 (' + (c.name || 'Package') + ')');
+            const targetZone = zoneProp ? zoneProp.value : 'TRUST';
+
+            let targetAsset = currentItAssets.find(a => a.name === targetAssetName);
+            if (!targetAsset) {
+              targetAsset = {
+                id: 'ASSET-' + String(currentItAssets.length + 1).padStart(2, '0'),
+                name: targetAssetName,
+                zone: targetZone,
+                category: '애플리케이션(WAS)',
+                ip: '10.10.x.x',
+                os: 'Linux',
+                manager: 'SBOM Import 자동생성',
+                updatedAt: new Date().toISOString().slice(0, 10),
+                components: []
+              };
+              currentItAssets.push(targetAsset);
+            }
+
+            const licenseId = (c.licenses && c.licenses[0] && c.licenses[0].license) ? (c.licenses[0].license.id || 'Apache-2.0') : 'Apache-2.0';
+            targetAsset.components.push({
+              name: c.name,
+              version: c.version || '1.0',
+              license: licenseId,
+              purl: c.purl || '',
+              cve: '양호'
+            });
+            addedCount++;
+          });
+
+          saveItAssetsToStorage();
+          renderAssetTable();
+          alert('✅ CycloneDX 명세에서 ' + addedCount + '개의 컴포넌트가 자산 등록부에 성공적으로 반영되었습니다.');
+        } catch (err) {
+          alert('CycloneDX JSON 파싱 오류: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function printAssetSbomReport() {
+      const printWin = window.open('', '_blank');
+      let assetRows = '';
+      currentItAssets.forEach((a, i) => {
+        const compList = (a.components || []).map(c => c.name + ' (v' + c.version + ', ' + c.license + ', ' + c.cve + ')').join('<br/>') || '-';
+        assetRows += 
+          '<tr>' +
+            '<td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">' + (i + 1) + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1; font-weight:700;">' + sanitizeHtml(a.name) + '</td>' +
+            '<td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">' + sanitizeHtml(a.zone) + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1;">' + sanitizeHtml(a.ip || '-') + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1;">' + sanitizeHtml(a.os || '-') + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1; font-size:0.75rem;">' + compList + '</td>' +
+            '<td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">' + sanitizeHtml(a.manager || '-') + '</td>' +
+          '</tr>';
+      });
+
+      printWin.document.write(
+        '<!DOCTYPE html><html><head><title>전사 IT 자산 및 소프트웨어 공급망(SBOM) 관리대장</title>' +
+        '<style>' +
+        'body { font-family: Pretendard, sans-serif; padding: 25px; color:#0f172a; line-height: 1.4; }' +
+        'table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.8rem; }' +
+        'th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px; font-weight:700; }' +
+        '@media print { body { padding: 0; } }' +
+        '</style></head><body>' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #0f172a; padding-bottom:10px;">' +
+          '<div>' +
+            '<h1 style="font-size:1.35rem; margin:0;">전사 IT 자산 및 소프트웨어 공급망(SBOM) 관리대장</h1>' +
+            '<p style="font-size:0.8rem; color:#475569; margin:4px 0 0 0;">발행일자: ' + new Date().toISOString().slice(0, 10) + ' | 대상기관: ' + sanitizeHtml(customerOrgName) + ' | 규격: KISA SBOM 1.0/2.0</p>' +
+          '</div>' +
+          '<table style="width:240px; margin:0; border:1px solid #0f172a; text-align:center; font-size:0.75rem;">' +
+            '<tr><th style="width:80px; padding:3px;">작성자</th><th style="width:80px; padding:3px;">보안팀장</th><th style="width:80px; padding:3px;">CISO</th></tr>' +
+            '<tr style="height:40px;"><td>보안운영담당 (인)</td><td>(인)</td><td>(인)</td></tr>' +
+          '</table>' +
+        '</div>' +
+        '<table>' +
+          '<thead>' +
+            '<tr>' +
+              '<th style="width:35px;">No</th>' +
+              '<th>자산명</th>' +
+              '<th style="width:75px;">배치구역</th>' +
+              '<th style="width:105px;">IP 주소</th>' +
+              '<th style="width:120px;">운영체제(OS)</th>' +
+              '<th>SBOM 컴포넌트 & 오픈소스 라이선스</th>' +
+              '<th style="width:90px;">관리담당</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' + assetRows + '</tbody>' +
+        '</table>' +
+        '<div style="margin-top:20px; font-size:0.75rem; color:#64748b; text-align:right;">' +
+          'GIJO AS Enterprise Security Operations &copy; 2026 GIJO TECHNOLOGY' +
+        '</div>' +
+        '<script>window.onload = function(){ window.print(); };<\\/script>' +
+        '</body></html>'
+      );
+      printWin.document.close();
+    }
+
+    function syncAssetsToWikiDocs() {
+      const docId = 999;
+      let md = '# 전사 IT 자산 및 소프트웨어 공급망(SBOM) 구성 명세서\\n\\n' +
+        '> **주관부서**: ' + customerOrgName + ' | **갱신일자**: ' + new Date().toISOString().slice(0, 10) + ' | **총 관리 자산**: ' + currentItAssets.length + '대\\n\\n' +
+        '---\\n\\n' +
+        '## 1. 망분리 구역별 자산 배치 현황\\n' +
+        '| 자산 ID | 자산명 | 배치 구역 | IP 주소 | OS | 관리 담당자 |\\n' +
+        '|:---|:---|:---:|:---|:---|:---|\\n';
+
+      currentItAssets.forEach(a => {
+        md += '| **' + a.id + '** | ' + a.name + ' | ' + a.zone + ' | ' + a.ip + ' | ' + a.os + ' | ' + a.manager + ' |\\n';
+      });
+
+      md += '\\n## 2. 소프트웨어 컴포넌트(SBOM) 및 오픈소스 라이선스 명세\\n' +
+        '| 대상 자산 | 소프트웨어/패키지명 | 버전 | 라이선스 | CVE 취약점 상태 |\\n' +
+        '|:---|:---|:---|:---|:---:|\\n';
+
+      currentItAssets.forEach(a => {
+        (a.components || []).forEach(c => {
+          md += '| ' + a.name + ' | **' + c.name + '** | ' + c.version + ' | ' + c.license + ' | ' + c.cve + ' |\\n';
+        });
+      });
+
+      const existingIdx = currentDocs.findIndex(d => d.id === docId);
+      const assetDoc = {
+        id: docId,
+        title: '[IT자산/SBOM] 전사 IT 자산 및 소프트웨어 형상 명세서',
+        category: '사내솔루션',
+        tags: ['자산관리', 'SBOM', 'CycloneDX', '라이선스', '망분리', '인프라'],
+        updatedAt: new Date().toISOString().slice(0, 10),
+        content: md
+      };
+
+      if (existingIdx >= 0) {
+        currentDocs[existingIdx] = assetDoc;
+      } else {
+        currentDocs.unshift(assetDoc);
+      }
+      saveDocsToStorage();
+      renderWikiDocList();
     }
 
     // --- 4.6 ROI & ECONOMIC IMPACT MODEL ---
@@ -3479,6 +4349,10 @@ const htmlContent = `<!DOCTYPE html>
 
     function loadStudioPreset(presetKey) {
       if (!presetKey) return;
+      if (presetKey === 'MY_ASSETS') {
+        syncAssetsToStudio();
+        return;
+      }
       if (studioPresets[presetKey]) {
         document.getElementById('studioMermaidCode').value = studioPresets[presetKey].trim();
         renderMermaidFromEditor();
@@ -4006,6 +4880,11 @@ const htmlContent = `<!DOCTYPE html>
 
       // Initialize PDF drag and drop zone
       initPdfDropZone();
+
+      // Initialize IT Assets & SBOM
+      loadItAssets();
+      renderAssetTable();
+      updateAssetKpis();
 
       lucide.createIcons();
     });
