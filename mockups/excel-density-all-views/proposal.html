@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>전사 엑셀급 고밀도 데이터 그리드 (Excel-Grade High Density Grid) 단일 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<style>
+  :root {
+    --bg-main: #f8fafc;
+    --border: #cbd5e1;
+    --border-light: #e2e8f0;
+    --text-main: #0f172a;
+    --text-sub: #475569;
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --success: #059669;
+    --success-light: #ecfdf5;
+    --warning: #d97706;
+    --warning-light: #fffbeb;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+    --zebra: #f8fafc;
+    --hover: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Pretendard, -apple-system, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-main);
+    padding: 20px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .header-bar {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-bar h1 {
+    font-size: 1.15rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sub-text {
+    font-size: 0.78rem;
+    color: var(--text-sub);
+    margin-top: 2px;
+  }
+  .view-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .view-tab {
+    font-size: 0.75rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text-sub);
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .view-tab.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+
+  /* Universal Excel Table Standard */
+  .excel-wrapper {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow-x: auto;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    max-height: 620px;
+    position: relative;
+  }
+  table.excel-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  table.excel-table th {
+    background: #f1f5f9;
+    color: #334155;
+    font-weight: 800;
+    font-size: 11.5px;
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    text-align: left;
+    user-select: none;
+  }
+  table.excel-table td {
+    border: 1px solid var(--border-light);
+    padding: 5px 8px;
+    vertical-align: middle;
+    color: var(--text-main);
+  }
+  table.excel-table tr:nth-child(even) td {
+    background: var(--zebra);
+  }
+  table.excel-table tr:hover td {
+    background: var(--primary-light);
+  }
+  table.excel-table td.num, table.excel-table th.num {
+    text-align: right;
+    font-family: Consolas, 'D2Coding', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  table.excel-table td.center, table.excel-table th.center {
+    text-align: center;
+  }
+  
+  /* Badges inside Excel Table */
+  .x-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+  .x-badge.danger { background: var(--danger-light); color: var(--danger); border: 1px solid #fecaca; }
+  .x-badge.warning { background: var(--warning-light); color: var(--warning); border: 1px solid #fde68a; }
+  .x-badge.success { background: var(--success-light); color: var(--success); border: 1px solid #a7f3d0; }
+  .x-badge.info { background: var(--primary-light); color: var(--primary); border: 1px solid #bfdbfe; }
+  .x-badge.neutral { background: #f1f5f9; color: var(--text-sub); border: 1px solid #e2e8f0; }
+
+  /* Compact Action Buttons */
+  .x-btn {
+    padding: 1px 6px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .x-btn:hover {
+    background: #f1f5f9;
+  }
+  .x-input {
+    width: 100%;
+    padding: 2px 4px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    outline: none;
+  }
+  .x-input:focus {
+    border-color: var(--primary);
+  }
+</style>
+</head>
+<body>
+
+<div class="header-bar">
+  <div>
+    <h1>📊 전사 엑셀급 고밀도 데이터 그리드 (Excel-Grade High Density Grid)</h1>
+    <div class="sub-text">행 높이 26~28px 최적화 · 얼룩말 줄무늬 · 고정 헤더 · 1화면에 3배 많은 데이터 즉시 조망</div>
+  </div>
+  <div style="font-size:0.75rem; background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; padding:4px 10px; border-radius:6px; font-weight:700;">
+    ⚡ 엑셀 대장 뷰 표준 적용
+  </div>
+</div>
+
+<div class="view-tabs">
+  <button class="view-tab active" onclick="switchDemoTab('sbom')">📦 IT 자산 & SBOM 대장 (5대 자산 + 15종 컴포넌트)</button>
+  <button class="view-tab" onclick="switchDemoTab('checklist')">✍️ 일일 보안점검 일지 대장 (20종 솔루션 동시 확인)</button>
+  <button class="view-tab" onclick="switchDemoTab('bom')">💰 실시간 TCO & FinOps 대장 (5개년 견적 & 감가상각)</button>
+</div>
+
+<!-- DEMO 1: IT 자산 & SBOM Excel Sheet -->
+<div id="demo-sbom" class="excel-wrapper">
+  <table class="excel-table">
+    <thead>
+      <tr>
+        <th class="center" style="width:40px;">No</th>
+        <th style="width:85px;">자산 ID</th>
+        <th>자산명 / 역할</th>
+        <th class="center" style="width:90px;">망분리 구역</th>
+        <th style="width:110px;">IP 주소</th>
+        <th style="width:110px;">운영체제</th>
+        <th style="width:80px;">관리자</th>
+        <th>설치 컴포넌트 (SBOM 부품)</th>
+        <th class="center" style="width:120px;">CVE 취약점 상태</th>
+        <th class="center" style="width:100px;">작업</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="center">1</td>
+        <td><b>ASSET-05</b></td>
+        <td><b>금융 코어 WAS (TmaxSoft JEUS 8.5)</b></td>
+        <td class="center"><span class="x-badge danger">DMZ</span></td>
+        <td style="font-family:monospace;">10.10.20.15</td>
+        <td>RedHat Enterprise 8.6</td>
+        <td>김서버 과장</td>
+        <td>spring-framework (5.3.39), apache-tomcat (5.5.36), jackson-databind (2.17.1) 외 4종</td>
+        <td class="center"><span class="x-badge danger">🚨 CVE-2025-24813 (위험)</span></td>
+        <td class="center">
+          <button class="x-btn">컴포넌트</button>
+          <button class="x-btn">수정</button>
+        </td>
+      </tr>
+      <tr>
+        <td class="center">2</td>
+        <td><b>ASSET-01</b></td>
+        <td>고객 대고객 웹 포털 (Nginx Web)</td>
+        <td class="center"><span class="x-badge danger">DMZ</span></td>
+        <td style="font-family:monospace;">10.10.20.11</td>
+        <td>Ubuntu 22.04 LTS</td>
+        <td>이웹 대리</td>
+        <td>nginx (1.24.0), openssl (3.0.2), pcre2 (10.40)</td>
+        <td class="center"><span class="x-badge success">✅ CVE 통제양호</span></td>
+        <td class="center">
+          <button class="x-btn">컴포넌트</button>
+          <button class="x-btn">수정</button>
+        </td>
+      </tr>
+      <tr>
+        <td class="center">3</td>
+        <td><b>ASSET-02</b></td>
+        <td>고객원장 마스터 DB (PostgreSQL)</td>
+        <td class="center"><span class="x-badge warning">DB안전구역</span></td>
+        <td style="font-family:monospace;">10.10.40.21</td>
+        <td>Rocky Linux 9.2</td>
+        <td>박디비 차장</td>
+        <td>postgresql (15.4), postgis (3.3), pgvector (0.5.0)</td>
+        <td class="center"><span class="x-badge success">✅ CVE 통제양호</span></td>
+        <td class="center">
+          <button class="x-btn">컴포넌트</button>
+          <button class="x-btn">수정</button>
+        </td>
+      </tr>
+      <tr>
+        <td class="center">4</td>
+        <td><b>ASSET-03</b></td>
+        <td>사내 통합 포털 & 그룹웨어 WAS</td>
+        <td class="center"><span class="x-badge info">내부업무망</span></td>
+        <td style="font-family:monospace;">10.10.30.15</td>
+        <td>CentOS Stream 9</td>
+        <td>최업무 대리</td>
+        <td>tomcat (9.0.82), openjdk (17.0.8), spring-boot (2.7.17)</td>
+        <td class="center"><span class="x-badge warning">⚠️ 주의 CVE (2건)</span></td>
+        <td class="center">
+          <button class="x-btn">컴포넌트</button>
+          <button class="x-btn">수정</button>
+        </td>
+      </tr>
+      <tr>
+        <td class="center">5</td>
+        <td><b>ASSET-04</b></td>
+        <td>인터넷 경계 방화벽 (FortiGate NGFW)</td>
+        <td class="center"><span class="x-badge neutral">경계보안</span></td>
+        <td style="font-family:monospace;">192.168.1.1</td>
+        <td>FortiOS 7.2.5</td>
+        <td>정방화 부장</td>
+        <td>fortios-core (7.2.5), ips-engine (7.00185), av-engine (6.00284)</td>
+        <td class="center"><span class="x-badge success">✅ CVE 통제양호</span></td>
+        <td class="center">
+          <button class="x-btn">컴포넌트</button>
+          <button class="x-btn">수정</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- DEMO 2: 일일 점검 일지 Excel Sheet -->
+<div id="demo-checklist" class="excel-wrapper" style="display:none;">
+  <table class="excel-table">
+    <thead>
+      <tr>
+        <th class="center" style="width:40px;">No</th>
+        <th style="width:160px;">솔루션명</th>
+        <th style="width:110px;">제조사</th>
+        <th class="center" style="width:70px;">구분</th>
+        <th class="center" style="width:130px;">1. 데몬/에이전트 서비스</th>
+        <th class="center" style="width:130px;">2. 차단/감사 로그</th>
+        <th class="center" style="width:130px;">3. 라이선스/백업</th>
+        <th>점검 메모 및 당일 특이사항</th>
+        <th class="center" style="width:60px;">매뉴얼</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="center">1</td>
+        <td><b>Imperva WAAP</b></td>
+        <td>Imperva</td>
+        <td class="center"><span class="x-badge info">외산</span></td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td><input type="text" class="x-input" value="JEUS 8.5 대상 가상패치 Rule #4501 배포 정상 가동 중"></td>
+        <td class="center"><button class="x-btn">열기</button></td>
+      </tr>
+      <tr>
+        <td class="center">2</td>
+        <td><b>WizCLM 인증서 관리</b></td>
+        <td>위즈코리아</td>
+        <td class="center"><span class="x-badge success">국산</span></td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td class="center">
+          <button class="x-btn">정상</button>
+          <button class="x-btn" style="background:#d97706; color:#fff;">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td><input type="text" class="x-input" value="연간 라이선스 만료 D-28 도래 (갱신 품의 상정 준비)"></td>
+        <td class="center"><button class="x-btn">열기</button></td>
+      </tr>
+      <tr>
+        <td class="center">3</td>
+        <td><b>SAFESQUARE SBOM</b></td>
+        <td>안랩</td>
+        <td class="center"><span class="x-badge success">국산</span></td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td><input type="text" class="x-input" value="CycloneDX v1.6 SBOM 분석 엔진 정상 점검 완료"></td>
+        <td class="center"><button class="x-btn">열기</button></td>
+      </tr>
+      <tr>
+        <td class="center">4</td>
+        <td><b>CipherTrust 투명암호화</b></td>
+        <td>Thales</td>
+        <td class="center"><span class="x-badge info">외산</span></td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td class="center">
+          <button class="x-btn" style="background:#059669; color:#fff;">정상</button>
+          <button class="x-btn">주의</button>
+          <button class="x-btn">이상</button>
+        </td>
+        <td><input type="text" class="x-input" value="DB 컬럼 암호화 및 KMS 마스터키 생애주기 정상 가동"></td>
+        <td class="center"><button class="x-btn">열기</button></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- DEMO 3: TCO & FinOps Excel Sheet -->
+<div id="demo-bom" class="excel-wrapper" style="display:none;">
+  <table class="excel-table">
+    <thead>
+      <tr>
+        <th class="center" style="width:40px;">No</th>
+        <th>솔루션 / 모델명</th>
+        <th style="width:120px;">제조사</th>
+        <th style="width:90px;">계약구분</th>
+        <th class="num" style="width:100px;">단가(Capex)</th>
+        <th class="center" style="width:60px;">수량</th>
+        <th class="num" style="width:105px;">총 Capex</th>
+        <th class="num" style="width:105px;">연간 Opex</th>
+        <th class="num" style="width:115px;">5개년 누적 TCO</th>
+        <th style="width:110px;">ISMS-P 통제항목</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="center">1</td>
+        <td><b>Imperva WAAP (웹/API 방화벽)</b></td>
+        <td>Imperva</td>
+        <td>연간구독</td>
+        <td class="num">₩45,000,000</td>
+        <td class="center">1</td>
+        <td class="num">₩45,000,000</td>
+        <td class="num" style="color:#d97706;">₩5,400,000</td>
+        <td class="num" style="font-weight:800;">₩72,000,000</td>
+        <td>2.4 네트워크 접근통제</td>
+      </tr>
+      <tr>
+        <td class="center">2</td>
+        <td><b>WizCLM 인증서 수명주기</b></td>
+        <td>위즈코리아</td>
+        <td>연간구독</td>
+        <td class="num">₩32,000,000</td>
+        <td class="center">1</td>
+        <td class="num">₩32,000,000</td>
+        <td class="num" style="color:#d97706;">₩3,840,000</td>
+        <td class="num" style="font-weight:800;">₩51,200,000</td>
+        <td>2.8 암호통제</td>
+      </tr>
+      <tr>
+        <td class="center">3</td>
+        <td><b>SAFESQUARE SBOM 공급망</b></td>
+        <td>안랩</td>
+        <td>라이선스</td>
+        <td class="num">₩28,000,000</td>
+        <td class="center">1</td>
+        <td class="num">₩28,000,000</td>
+        <td class="num" style="color:#d97706;">₩3,360,000</td>
+        <td class="num" style="font-weight:800;">₩44,800,000</td>
+        <td>2.10 공급망 보안</td>
+      </tr>
+      <tr>
+        <td class="center">4</td>
+        <td><b>온프레미스 GB10 (Qwen 177B MoE)</b></td>
+        <td>NVIDIA DGX</td>
+        <td>자체구축</td>
+        <td class="num">₩0</td>
+        <td class="center">1</td>
+        <td class="num">₩0</td>
+        <td class="num" style="color:#059669;">₩0 (90% 절감)</td>
+        <td class="num" style="font-weight:800; color:#059669;">₩0</td>
+        <td>2.12 신기술(AI) 보안</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  function switchDemoTab(tab) {
+    document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('demo-sbom').style.display = tab === 'sbom' ? 'block' : 'none';
+    document.getElementById('demo-checklist').style.display = tab === 'checklist' ? 'block' : 'none';
+    document.getElementById('demo-bom').style.display = tab === 'bom' ? 'block' : 'none';
+  }
+</script>
+
+</body>
+</html>

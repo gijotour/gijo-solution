@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>통합 관제 브리핑 (Morning Mission Control Hub) 단일 추천 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<style>
+  :root {
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text-main: #0f172a;
+    --text-sub: #64748b;
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --success: #059669;
+    --success-light: #ecfdf5;
+    --warning: #d97706;
+    --warning-light: #fffbeb;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+    --radius: 10px;
+    --shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Pretendard, -apple-system, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-main);
+    padding: 24px;
+    line-height: 1.5;
+  }
+  .header-hub {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-hub h1 {
+    font-size: 1.3rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header-meta {
+    font-size: 0.8rem;
+    color: var(--text-sub);
+    margin-top: 4px;
+  }
+  .btn-group {
+    display: flex;
+    gap: 8px;
+  }
+  .btn {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .btn:hover {
+    filter: brightness(0.96);
+  }
+
+  /* Executive Score Banner */
+  .score-banner {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .score-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .score-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-sub);
+    margin-bottom: 6px;
+  }
+  .score-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-main);
+  }
+  .score-sub {
+    font-size: 0.72rem;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* 4-Card Mission Grid */
+  .mission-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+  .mission-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+  .mission-card.urgent {
+    border-left: 5px solid var(--danger);
+  }
+  .mission-card.warning {
+    border-left: 5px solid var(--warning);
+  }
+  .mission-card.info {
+    border-left: 5px solid var(--primary);
+  }
+  .mission-card.success {
+    border-left: 5px solid var(--success);
+  }
+  .mission-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .mission-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge {
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+  .badge-danger { background: var(--danger-light); color: var(--danger); }
+  .badge-warning { background: var(--warning-light); color: var(--warning); }
+  .badge-primary { background: var(--primary-light); color: var(--primary); }
+  .badge-success { background: var(--success-light); color: var(--success); }
+
+  .mission-body {
+    font-size: 0.82rem;
+    color: #334155;
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+  .mission-action-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .impact-text {
+    font-size: 0.72rem;
+    color: var(--text-sub);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header Area -->
+<div class="header-hub">
+  <div>
+    <h1>🌅 통합 관제 브리핑 (Morning Mission Control Hub)</h1>
+    <div class="header-meta">
+      기준일시: 2026-09-16 09:00 KST | 총괄 운영 조직: 한국수력원자력 정보보호본부 | 전사 보안 규정 100% 준수 가동
+    </div>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-primary" onclick="alert('🗂️ 2026 정기 종합 보안감사 증적철(표지+자산구성도+SBOM+점검일지+TCO)이 A4 규격으로 인쇄됩니다!')">
+      🗂️ 종합 감사철 A4 인쇄
+    </button>
+    <button class="btn" onclick="alert('📦 전사 IT 자산, SBOM, 전자결재, 일지 데이터가 .gijo-bundle 파일로 안전 백업되었습니다!')">
+      📦 전사 데이터 백업 (.gijo-bundle)
+    </button>
+  </div>
+</div>
+
+<!-- Score Banner -->
+<div class="score-banner">
+  <div class="score-card">
+    <div class="score-title">🛡️ 전사 보안 거버넌스 지수</div>
+    <div class="score-value" style="color:var(--success);">94.2점</div>
+    <div class="score-sub" style="color:var(--success);">▲ KISA ISMS-P 및 SBOM 수검 적합</div>
+  </div>
+  <div class="score-card">
+    <div class="score-title">🚨 고위험 취약점 (CVE)</div>
+    <div class="score-value" style="color:var(--danger);">1건</div>
+    <div class="score-sub" style="color:var(--danger);">JEUS 8.5 (CVE-2025-24813) 긴급</div>
+  </div>
+  <div class="score-card">
+    <div class="score-title">⏳ 30일 이내 계약 갱신</div>
+    <div class="score-value" style="color:var(--warning);">1건 (D-28)</div>
+    <div class="score-sub" style="color:var(--warning);">WizCLM 인증서 솔루션 (₩3,200만)</div>
+  </div>
+  <div class="score-card">
+    <div class="score-title">✍️ 일일 보안점검 일지</div>
+    <div class="score-value" style="color:var(--primary);">오늘 미작성</div>
+    <div class="score-sub" style="color:var(--text-sub);">14대 점검항목 작성 필요</div>
+  </div>
+</div>
+
+<!-- Mission Grid -->
+<div class="mission-grid">
+  <!-- Card 1: CVE Incident Response -->
+  <div class="mission-card urgent">
+    <div>
+      <div class="mission-head">
+        <span class="mission-title">🚨 긴급 보안 위험: 금융 코어 WAS 취약점</span>
+        <span class="badge badge-danger">심각도 Critical 9.8</span>
+      </div>
+      <div class="mission-body">
+        사내 등록된 IT 자산 <b>TmaxSoft JEUS 8.5 (DMZ 내부, IP: 10.10.20.15)</b>에서 Tomcat AJP RCE(<code>CVE-2025-24813</code>)가 탐지되었습니다. 벤더 패치 적용 전 Imperva WAAP 가상패치 룰셋 긴급 활성화가 필요합니다.
+      </div>
+    </div>
+    <div class="mission-action-row">
+      <span class="impact-text">파급도: 웹 서비스 원격 코드 실행 차단</span>
+      <button class="btn btn-primary" onclick="alert('✅ [긴급 조치 체인 가동]\n1. 아키텍처 스튜디오에 취약 노드 배치\n2. 전자결재판에 긴급 가상패치 품의서 자동 완성\n3. 일일 점검 일지에 조치 내역 연계!')">
+        긴급 조치 플레이북 가동 ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- Card 2: Contract Lifecycle D-Day -->
+  <div class="mission-card warning">
+    <div>
+      <div class="mission-head">
+        <span class="mission-title">⏳ 계약 만료 임박: WizCLM 인증서 솔루션</span>
+        <span class="badge badge-warning">만료 D-28</span>
+      </div>
+      <div class="mission-body">
+        인증서 수명주기 자동화 솔루션 <b>WizCLM 연간 라이선스</b>가 2026-10-14 만료 도래합니다. 불시 만료로 인한 SSL/TLS 인증서 장애를 방지하기 위해 차기 연간 예산 <b>₩32,000,000</b>에 대한 갱신 품의가 필요합니다.
+      </div>
+    </div>
+    <div class="mission-action-row">
+      <span class="impact-text">영향도: 전자금융거래 인증서 중단 방지</span>
+      <button class="btn" onclick="alert('✅ [스마트 전자결재판 연동]\n계약 갱신 품의서에 소요예산 ₩32,000,000 및 솔루션 정보가 자동 주입되었습니다!')">
+        계약 갱신 품의서 작성 ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- Card 3: Smart Approval Board Pending -->
+  <div class="mission-card info">
+    <div>
+      <div class="mission-head">
+        <span class="mission-title">📋 전자결재 진행 현황</span>
+        <span class="badge badge-primary">결재 대기 1건</span>
+      </div>
+      <div class="mission-body">
+        <b>[품의] 2026년 차세대 보안 솔루션 및 생성형 AI 인프라 도입의 건</b><br>
+        - 소요예산: ₩185,000,000 (GB10 온프렘 절감 모델 연동 완료)<br>
+        - 결재선: 기안자(완료) ➔ 검토자(완료) ➔ 보안팀장(완료) ➔ <b>CISO(서명 대기)</b>
+      </div>
+    </div>
+    <div class="mission-action-row">
+      <span class="impact-text">최종 승인 시 지식고 정식 공문서 등재</span>
+      <button class="btn" onclick="alert('✅ [전자결재 기안판 호출]\nCISO 최종 승인 직인을 날인할 수 있습니다.')">
+        결재판 열기 & 최종 승인 ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- Card 4: Daily Checklist Status -->
+  <div class="mission-card success">
+    <div>
+      <div class="mission-head">
+        <span class="mission-title">✍️ 오늘 자 일일 보안 점검 일지</span>
+        <span class="badge badge-success">오늘 자 09/16</span>
+      </div>
+      <div class="mission-body">
+        방화벽 정책 감사, 서버 계정 잠금, 백업 정상 수행, 취약점 조치 상태 등 <b>14대 법정 필수 일일 점검 항목</b>을 확인하고 오늘 자 결재 날인을 완료하십시오.
+      </div>
+    </div>
+    <div class="mission-action-row">
+      <span class="impact-text">ISMS-P 2.3 일일 보안점검 증적 보존</span>
+      <button class="btn btn-primary" onclick="alert('✅ [일일 점검 일지 탭으로 이동]\n오늘 자 14대 항목 점검을 시작합니다.')">
+        오늘 점검 일지 작성 ➔
+      </button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

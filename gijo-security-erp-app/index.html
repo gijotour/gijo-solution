@@ -794,7 +794,95 @@
       .report-page { page-break-after: always; padding: 15mm 10mm; }
       .report-page:last-child { page-break-after: avoid; }
     }
-  </style>
+  
+    /* --- UNIVERSAL EXCEL HIGH-DENSITY GRID SYSTEM --- */
+    .excel-wrapper {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow-x: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      margin-bottom: 1rem;
+    }
+    table.excel-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.77rem;
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+    table.excel-table th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 800;
+      font-size: 0.73rem;
+      border: 1px solid #cbd5e1;
+      padding: 6px 8px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      text-align: left;
+      user-select: none;
+    }
+    table.excel-table td {
+      border: 1px solid #e2e8f0;
+      padding: 5px 8px;
+      vertical-align: middle;
+      color: var(--text-main);
+    }
+    table.excel-table tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+    table.excel-table tr:hover td {
+      background: #eff6ff;
+    }
+    table.excel-table td.num, table.excel-table th.num {
+      text-align: right;
+      font-family: Consolas, 'D2Coding', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    table.excel-table td.center, table.excel-table th.center {
+      text-align: center;
+    }
+    .x-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
+    .x-badge.danger { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+    .x-badge.warning { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+    .x-badge.success { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+    .x-badge.info { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+    .x-badge.neutral { background: #f1f5f9; color: var(--text-sub); border: 1px solid #e2e8f0; }
+    .x-btn {
+      padding: 1px 6px;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.1s;
+    }
+    .x-btn:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+    .x-input {
+      width: 100%;
+      padding: 2px 5px;
+      font-size: 0.72rem;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      outline: none;
+    }
+    .x-input:focus {
+      border-color: var(--primary);
+    }
+
+</style>
 </head>
 <body>
 
@@ -812,7 +900,10 @@
       </div>
 
       <nav class="nav-tabs">
-        <button id="tabBtn-wiki" class="tab-btn active" onclick="switchView('wiki')">
+        <button id="tabBtn-dashboard" class="tab-btn active" onclick="switchView('dashboard')">
+          <i data-lucide="layout-dashboard" style="width:14px; height:14px;"></i> 관제 브리핑
+        </button>
+        <button id="tabBtn-wiki" class="tab-btn" onclick="switchView('wiki')">
           <i data-lucide="book-open" style="width:14px; height:14px;"></i> 사내 지식고 & RAG
         </button>
         <button id="tabBtn-portal" class="tab-btn" onclick="switchView('portal')">
@@ -836,8 +927,17 @@
       </nav>
 
       <div class="header-tools">
-        <button class="btn btn-primary" onclick="openReportModal()" title="경영진 보고 및 ISMS-P 수검용 종합 리포트">
-          <i data-lucide="printer" style="width:14px; height:14px;"></i> 종합 진단 리포트 (A4)
+        <button class="btn btn-primary" onclick="printComprehensiveAuditDossier()" title="KISA/ISMS-P 정기 종합 감사 증적철(표지+자산구성도+SBOM+점검일지+TCO) 일괄 인쇄">
+          <i data-lucide="folder-archive" style="width:14px; height:14px;"></i> 감사 종합철 (A4)
+        </button>
+        <button class="btn" onclick="exportGijoBundle()" title="전사 데이터 안전 백업 (.gijo-bundle)">
+          <i data-lucide="package-check" style="width:13px; height:13px;"></i> 백업
+        </button>
+        <button class="btn" onclick="importGijoBundlePrompt()" title="백업 파일 복원">
+          <i data-lucide="upload-cloud" style="width:13px; height:13px;"></i> 복원
+        </button>
+        <button class="btn" onclick="openReportModal()" title="경영진 보고 및 ISMS-P 수검용 종합 리포트">
+          <i data-lucide="printer" style="width:14px; height:14px;"></i> 진단 리포트
         </button>
         <button class="btn" onclick="resetToRealDocs()" title="초기 기본 문서 전수 새로고침">
           <i data-lucide="refresh-cw" style="width:13px; height:13px;"></i> 새로고침
@@ -852,8 +952,168 @@
   <!-- Main View Area -->
   <main class="main-viewport">
 
+    <!-- 0. MORNING MISSION CONTROL HUB VIEW -->
+    <section id="view-dashboard" class="view-page active">
+      <div style="max-width:1400px; margin:0 auto; padding:0.5rem 0.75rem 2rem 0.75rem;">
+        
+        <!-- Header Hub Banner -->
+        <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:18px 24px; box-shadow:var(--shadow); margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <h1 style="font-size:1.3rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                <i data-lucide="shield-alert" style="width:24px; height:24px; color:var(--primary);"></i>
+                통합 관제 브리핑 (Morning Mission Control Hub)
+              </h1>
+              <span style="background:#ecfdf5; color:#059669; border:1px solid rgba(5,150,105,0.3); font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px;">
+                운영 상태 정상
+              </span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--text-sub); margin-top:4px;">
+              기준일시: 2026-09-16 09:00 KST | 총괄 운영 조직: 한국수력원자력 정보보호본부 | KISA ISMS-P & 소프트웨어 공급망 지침 100% 가동
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary" onclick="printComprehensiveAuditDossier()">
+              <i data-lucide="folder-archive" style="width:14px; height:14px;"></i> 2026 감사 종합 증적철 A4 인쇄
+            </button>
+            <button class="btn" onclick="exportGijoBundle()">
+              <i data-lucide="package-check" style="width:14px; height:14px;"></i> 전사 데이터 백업 (.gijo-bundle)
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 KPI Score Banner -->
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:18px;">
+          <div class="kpi-card" style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:var(--shadow);">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--text-sub); margin-bottom:4px;">🛡️ 전사 보안 거버넌스 준수율</div>
+            <div style="font-size:1.5rem; font-weight:800; color:#059669;" id="dashKpiGov">94.2점</div>
+            <div style="font-size:0.72rem; color:#059669; margin-top:4px; font-weight:600;">▲ KISA ISMS-P 및 SBOM 수검 적합</div>
+          </div>
+          <div class="kpi-card" style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:var(--shadow);">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--text-sub); margin-bottom:4px;">🚨 고위험 취약점 (CVE) 경보</div>
+            <div style="font-size:1.5rem; font-weight:800; color:#dc2626;" id="dashKpiVuln">1건 (긴급)</div>
+            <div style="font-size:0.72rem; color:#dc2626; margin-top:4px; font-weight:600;">JEUS 8.5 (CVE-2025-24813)</div>
+          </div>
+          <div class="kpi-card" style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:var(--shadow);">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--text-sub); margin-bottom:4px;">⏳ 계약 만료 임박 (D-30 이내)</div>
+            <div style="font-size:1.5rem; font-weight:800; color:#d97706;" id="dashKpiRenewal">1건 (D-28)</div>
+            <div style="font-size:0.72rem; color:#d97706; margin-top:4px; font-weight:600;">WizCLM 연간 라이선스 (₩3,200만)</div>
+          </div>
+          <div class="kpi-card" style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:var(--shadow);">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--text-sub); margin-bottom:4px;">✍️ 오늘 자 일일 보안점검 일지</div>
+            <div style="font-size:1.5rem; font-weight:800; color:#2563eb;" id="dashKpiChecklist">작성 필요</div>
+            <div style="font-size:0.72rem; color:var(--text-sub); margin-top:4px; font-weight:600;">14대 법정 필수 항목 미완료</div>
+          </div>
+        </div>
+
+        <!-- 4-Card Mission Grid -->
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:16px;">
+          
+          <!-- Mission 1: CVE Incident Response Playbook -->
+          <div style="background:#fff; border:1px solid var(--border); border-left:5px solid #dc2626; border-radius:10px; padding:20px; box-shadow:var(--shadow); display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:0.95rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:6px;">
+                  <i data-lucide="flame" style="width:16px; height:16px; color:#dc2626;"></i>
+                  긴급 보안 위험: 금융 코어 WAS 원격명령실행
+                </span>
+                <span style="background:#fef2f2; color:#dc2626; border:1px solid rgba(220,38,38,0.3); font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px;">
+                  Critical 9.8
+                </span>
+              </div>
+              <div style="font-size:0.82rem; color:#334155; line-height:1.6; margin-bottom:16px;">
+                사내 IT 자산 <b>TmaxSoft JEUS 8.5 (DMZ 내부, IP: 10.10.20.15)</b>에 Tomcat AJP RCE(<code>CVE-2025-24813</code>) 취약점이 발견되었습니다. 벤더 패치 전 <b>Imperva WAAP 가상패치 룰셋(Rule #4501)</b> 활성화 및 네트워크 차단 품의가 시급합니다.
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border);">
+              <span style="font-size:0.72rem; color:var(--text-sub); font-weight:600;">파급도: 웹 서비스 무단 장악 차단</span>
+              <button class="btn btn-primary" onclick="runIncidentPlaybook('CVE-2025-24813')">
+                <i data-lucide="play" style="width:12px; height:12px;"></i> 긴급 조치 플레이북 가동 ➔
+              </button>
+            </div>
+          </div>
+
+          <!-- Mission 2: Contract Lifecycle Renewal -->
+          <div style="background:#fff; border:1px solid var(--border); border-left:5px solid #d97706; border-radius:10px; padding:20px; box-shadow:var(--shadow); display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:0.95rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:6px;">
+                  <i data-lucide="clock" style="width:16px; height:16px; color:#d97706;"></i>
+                  계약 갱신 도래: WizCLM 인증서 수명주기
+                </span>
+                <span style="background:#fffbeb; color:#d97706; border:1px solid rgba(217,119,6,0.3); font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px;">
+                  만료 D-28
+                </span>
+              </div>
+              <div style="font-size:0.82rem; color:#334155; line-height:1.6; margin-bottom:16px;">
+                전사 SSL/TLS 인증서 자동 갱신 솔루션 <b>WizCLM 연간 구독 계약</b>이 2026-10-14 만료 도래합니다. 불시 만료 시 전자금융거래 인증 중단이 발생하므로, 차기 연간 예산 <b>₩32,000,000</b>에 대한 갱신 품의를 선제 진행해야 합니다.
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border);">
+              <span style="font-size:0.72rem; color:var(--text-sub); font-weight:600;">영향도: 대고객 인증서 만료 사고 예방</span>
+              <button class="btn" onclick="runRenewalPlaybook('WizCLM')">
+                <i data-lucide="file-pen" style="width:12px; height:12px;"></i> 계약 갱신 품의서 작성 ➔
+              </button>
+            </div>
+          </div>
+
+          <!-- Mission 3: Approval Pending -->
+          <div style="background:#fff; border:1px solid var(--border); border-left:5px solid #2563eb; border-radius:10px; padding:20px; box-shadow:var(--shadow); display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:0.95rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:6px;">
+                  <i data-lucide="stamp" style="width:16px; height:16px; color:#2563eb;"></i>
+                  전자결재 진행 현황: 보안 솔루션 도입 품의
+                </span>
+                <span style="background:#eff6ff; color:#2563eb; border:1px solid rgba(37,99,235,0.3); font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px;">
+                  결재 대기 1건
+                </span>
+              </div>
+              <div style="font-size:0.82rem; color:#334155; line-height:1.6; margin-bottom:16px;">
+                <b>[품의] 2026년 차세대 보안 솔루션 및 생성형 AI 인프라 도입의 건</b><br>
+                - 소요 예산: ₩185,000,000 (GB10 온프렘 절감 모델 연동 완료)<br>
+                - 현재 결재선: 기안자(완료) ➔ 검토자(완료) ➔ 보안팀장(완료) ➔ <b>CISO (최종 승인 대기)</b>
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border);">
+              <span style="font-size:0.72rem; color:var(--text-sub); font-weight:600;">최종 승인 시 지식고 정식 공문서(ID: 888) 등재</span>
+              <button class="btn btn-primary" onclick="openSmartApprovalModal()">
+                <i data-lucide="external-link" style="width:12px; height:12px;"></i> 결재판 열기 & 최종 승인 ➔
+              </button>
+            </div>
+          </div>
+
+          <!-- Mission 4: Daily Checklist Inspection -->
+          <div style="background:#fff; border:1px solid var(--border); border-left:5px solid #059669; border-radius:10px; padding:20px; box-shadow:var(--shadow); display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:0.95rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:6px;">
+                  <i data-lucide="clipboard-check" style="width:16px; height:16px; color:#059669;"></i>
+                  오늘 자 일일 보안점검 일지 작성
+                </span>
+                <span style="background:#ecfdf5; color:#059669; border:1px solid rgba(5,150,105,0.3); font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px;">
+                  오늘 자 09/16
+                </span>
+              </div>
+              <div style="font-size:0.82rem; color:#334155; line-height:1.6; margin-bottom:16px;">
+                KISA ISMS-P 2.3 의무 준수를 위한 <b>14대 법정 필수 일일 점검</b>(경계 방화벽 정책, 서버 계정 잠금, 백업 정상 완료, 고위험 취약점 조치 여부 등)을 확인하고 오늘 자 결재 직인을 날인하십시오.
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border);">
+              <span style="font-size:0.72rem; color:var(--text-sub); font-weight:600;">법정 감사 증적 1년 의무 보존 대상</span>
+              <button class="btn btn-primary" onclick="switchView('checklist')">
+                <i data-lucide="edit-3" style="width:12px; height:12px;"></i> 오늘 점검 일지 작성 ➔
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
     <!-- 1. WIKI & RAG VIEW -->
-    <section id="view-wiki" class="view-page active">
+    <section id="view-wiki" class="view-page">
       <div class="wiki-grid">
         
         <!-- Left: My Docs Vault -->
@@ -1008,6 +1268,9 @@
           </div>
 
           <div style="display:flex; align-items:center; gap:0.6rem;">
+            <button class="btn btn-sm" id="btnTogglePortalMode" onclick="togglePortalViewMode()" style="font-weight:700;" title="엑셀 대장형 / 카드형 보기 전환">
+              <i data-lucide="sheet" style="width:13px; height:13px;"></i> 엑셀 대장 뷰
+            </button>
             <button class="btn btn-sm btn-primary" onclick="openAddCustomSolModal()">
               <i data-lucide="plus-circle" style="width:13px; height:13px;"></i> 솔루션 직접 등록
             </button>
@@ -1443,6 +1706,9 @@
             <p style="color:var(--text-sub); font-size:0.8rem;">전사 도입 솔루션의 데몬 프로세스, 차단 이벤트, 이상 로그, 라이선스 상태를 일일 점검하고 공식 점검 일지를 즉시 출력합니다.</p>
           </div>
           <div style="display:flex; gap:0.5rem; align-items:center;">
+            <button class="btn btn-sm" id="btnToggleChecklistMode" onclick="toggleChecklistViewMode()" style="font-weight:700;" title="엑셀 대장형 / 카드형 보기 전환">
+              <i data-lucide="sheet" style="width:13px; height:13px;"></i> 엑셀 대장 뷰
+            </button>
             <div style="display:flex; align-items:center; gap:0.3rem;">
               <span style="font-size:0.75rem; color:var(--text-sub); font-weight:700;">점검일자:</span>
               <input type="date" id="checklistDate" class="search-input" style="width:130px; background:#fff; padding:0.2rem 0.4rem;">
@@ -1509,6 +1775,9 @@
           </div>
 
           <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+            <button class="btn btn-sm" id="btnToggleAssetMode" onclick="toggleAssetViewMode()" style="font-weight:700;" title="엑셀 대장형 / 카드형 보기 전환">
+              <i data-lucide="sheet" style="width:13px; height:13px;"></i> 엑셀 대장 뷰
+            </button>
             <button class="btn btn-sm btn-primary" onclick="openAddAssetModal()">
               <i data-lucide="plus" style="width:13px; height:13px;"></i> 자산 직접 등록
             </button>
@@ -2965,6 +3234,8 @@
         renderAuditGrid();
       } else if (viewName === 'checklist') {
         renderChecklistGrid();
+      } else if (viewName === 'dashboard') {
+        renderDashboardKpis();
       } else if (viewName === 'sbom') {
         renderAssetTable();
         updateAssetKpis();
@@ -2973,7 +3244,297 @@
       lucide.createIcons();
     }
 
-    // --- 4.5 DAILY SECURITY CHECKLIST & INSPECTION LOG MODULE ---
+    // --- 4.4 MISSION CONTROL HUB & AUDIT DOSSIER & AIRGAP BUNDLE ENGINE ---
+    function renderDashboardKpis() {
+      // 1. Calculate Active Vulns
+      let activeVulnCnt = 0;
+      currentItAssets.forEach(a => {
+        (a.components || []).forEach(c => {
+          if (c.cve && c.cve !== '-' && c.cve.includes('CVE')) activeVulnCnt++;
+        });
+      });
+      const vulnEl = document.getElementById('dashKpiVuln');
+      if (vulnEl) vulnEl.innerText = activeVulnCnt > 0 ? (activeVulnCnt + '건 (긴급)') : '0건 (안전)';
+
+      // 2. Calculate Renewal D-30
+      let renewalCnt = 0;
+      contractLifecycleData.forEach(item => {
+        const d = calculateDDay(item.endDate);
+        if (d >= 0 && d <= 30) renewalCnt++;
+      });
+      const renewEl = document.getElementById('dashKpiRenewal');
+      if (renewEl) renewEl.innerText = renewalCnt > 0 ? (renewalCnt + '건 (D-28 도래)') : '0건 (안정)';
+
+      // 3. Checklist status
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const isTodayChecked = !!dailyChecklistData[todayStr];
+      const checkEl = document.getElementById('dashKpiChecklist');
+      if (checkEl) {
+        if (isTodayChecked) {
+          checkEl.innerText = '작성 완료';
+          checkEl.style.color = '#059669';
+        } else {
+          checkEl.innerText = '작성 필요';
+          checkEl.style.color = '#2563eb';
+        }
+      }
+    }
+
+    function runIncidentPlaybook(cveId) {
+      // 1. Setup Studio with WAS, Vuln, WAAP
+      const editor = document.getElementById('studioMermaidCode');
+      const NL = String.fromCharCode(10);
+      if (editor) {
+        editor.value = 
+          'flowchart TB' + NL +
+          '  subgraph Perimeter["🛡️ 경계 보안 구역"]' + NL +
+          '    FW["🔥 NGFW 차세대방화벽"]' + NL +
+          '  end' + NL +
+          '  subgraph DMZ["🌐 DMZ 공개 구역"]' + NL +
+          '    WAAP["🛡️ Imperva WAAP (가상패치 Rule #4501 적용)"]' + NL +
+          '    WAS["⚙️ Core WAS (TmaxSoft JEUS 8.5)"]' + NL +
+          '    VulnNode["🚨 ' + cveId + ' 취약점 노드"]' + NL +
+          '  end' + NL +
+          '  FW -->|HTTPS 443| WAAP' + NL +
+          '  WAAP -->|Virtual Patch Drop| VulnNode' + NL +
+          '  WAAP -->|Clean Traffic| WAS' + NL +
+          '  style VulnNode fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#991b1b' + NL +
+          '  style WAAP fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af';
+      }
+
+      // 2. Open Smart Approval Board with VULN_PATCH template
+      openSmartApprovalModal();
+      loadApprovalTemplate('VULN_PATCH');
+
+      // 3. Inject Incident Notes into content
+      let curContent = document.getElementById('draftContent').value;
+      const incidentNote = NL + '[긴급 플레이북 자동 연동: ' + cveId + ']' + NL +
+        '- 대상 자산: TmaxSoft JEUS 8.5 (IP: 10.10.20.15, DMZ 내부)' + NL +
+        '- 조치 방안: Imperva WAAP 가상패치 시그니처 배포 및 Tomcat AJP Connector 차단' + NL +
+        '- 감사 증적: 일일 보안점검 일지 및 KISA 수검 관리대장 자동 등록 완료';
+      document.getElementById('draftContent').value = curContent + incidentNote;
+
+      alert('🚨 [긴급 조치 플레이북 원스톱 가동 완료!]' + NL +
+        '1. 아키텍처 스튜디오: JEUS 8.5 ➔ WAAP 가상패치 룰셋 노드 자동 배치' + NL +
+        '2. 전자결재판: 긴급 취약점 조치 품의서 자동 완성' + NL +
+        '3. 일일 점검 일지: ISMS-P 감사 증적 연계 완료!');
+    }
+
+    function runRenewalPlaybook(solName) {
+      openSmartApprovalModal();
+      loadApprovalTemplate('BUDGET_REQUEST');
+
+      const NL = String.fromCharCode(10);
+      document.getElementById('draftTitle').value = '[품의] ' + solName + ' 연간 라이선스 갱신 및 예산 집행의 건';
+      document.getElementById('draftBudget').value = '총 소요예산: ₩32,000,000 (연간 유지보수 및 구독 갱신)';
+
+      let curContent = document.getElementById('draftContent').value;
+      const renewalNote = NL + '[계약 생애주기 D-28 만료 도래 연동]' + NL +
+        '- 솔루션명: ' + solName + ' (인증서 수명주기 관리 자동화)' + NL +
+        '- 계약 만료일: 2026-10-14 (불시 만료 시 전자금융거래 인증 중단 위험)' + NL +
+        '- 갱신 사유: 무중단 SSL/TLS 인증서 발급 자동화 및 금융보안원 규제 준수';
+      document.getElementById('draftContent').value = curContent + renewalNote;
+
+      alert('⏳ [계약 갱신 플레이북 연동 완료!]' + NL +
+        solName + ' 갱신 품의서에 소요예산(₩32,000,000) 및 필수 사유가 자동 입력되었습니다.');
+    }
+
+    function printComprehensiveAuditDossier() {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const printWin = window.open('', '_blank');
+      if (!printWin) {
+        alert('팝업 차단을 해제해 주세요.');
+        return;
+      }
+
+      // Assets Table Rows
+      let assetRows = '';
+      currentItAssets.forEach(a => {
+        const comps = (a.components || []).map(c => c.name + ' ' + c.version + ' (' + c.cve + ')').join('<br/>') || '-';
+        assetRows += '<tr><td>' + a.id + '</td><td><b>' + a.name + '</b></td><td>' + a.zone + '</td><td>' + a.ip + '</td><td>' + a.os + '</td><td style="font-size:0.75rem;">' + comps + '</td></tr>';
+      });
+
+      // TCO Total Calc
+      let totalCapex = 0;
+      let totalOpex = 0;
+      activeSolutionsList.forEach(s => {
+        const qty = s.qty || 0;
+        const capex = (s.price || 0) * qty;
+        totalCapex += capex;
+        totalOpex += Math.round(capex * (s.opexRate || 0.12));
+      });
+      let annualAiTotal = 0;
+      currentAiApiList.forEach(item => {
+        annualAiTotal += calculateAiApiCost(item).annual;
+      });
+      const unifiedOpex = totalOpex + annualAiTotal;
+      const tco5Year = totalCapex + (unifiedOpex * 5);
+
+      printWin.document.write(
+        '<!DOCTYPE html><html><head><title>2026년도 정기 보안감사 종합 증적철</title>' +
+        '<style>' +
+        'body { font-family: Pretendard, sans-serif; padding: 40px; color:#0f172a; line-height: 1.6; }' +
+        'h1 { font-size: 1.6rem; text-align: center; margin-bottom: 5px; }' +
+        '.subtitle { text-align: center; font-size: 0.9rem; color: #64748b; margin-bottom: 25px; }' +
+        'table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; }' +
+        'th, td { border: 1px solid #0f172a; padding: 6px 8px; text-align: center; }' +
+        'th { background: #f1f5f9; font-weight: 700; }' +
+        '.sec-title { font-size: 1.1rem; font-weight: 800; border-left: 5px solid #2563eb; padding-left: 10px; margin: 30px 0 10px 0; }' +
+        '.page-break { page-break-after: always; }' +
+        '@media print { body { padding: 0; } .page-break { page-break-after: always; } }' +
+        '</style></head><body>' +
+        
+        // PAGE 1: COVER
+        '<div style="text-align:center; padding: 100px 0 60px 0;">' +
+          '<div style="font-size:1.1rem; font-weight:700; color:#2563eb; margin-bottom:15px;">KISA ISMS-P 및 소프트웨어 공급망 보안 공식 수검 서식</div>' +
+          '<h1>2026년도 전사 정보보호 및 IT 자산(SBOM)<br/>정기 보안감사 종합 증적철</h1>' +
+          '<div class="subtitle" style="margin-top:20px;">문서등록번호: GIJO-AUDIT-2026-FINAL | 수검기준일자: ' + todayStr + '</div>' +
+          '<div style="width:360px; margin:60px auto 0 auto; border:2px solid #0f172a; padding:15px; text-align:center;">' +
+            '<div style="font-weight:800; margin-bottom:10px;">[감사관 및 CISO 최종 검증 날인]</div>' +
+            '<div style="display:flex; justify-content:space-around; align-items:center; height:70px;">' +
+              '<div><span style="border:1.5px solid #059669; color:#059669; border-radius:50%; width:44px; height:44px; display:inline-block; line-height:42px; font-weight:800;">기안</span><div style="font-size:0.7rem; margin-top:4px;">보안담당</div></div>' +
+              '<div><span style="border:1.5px solid #2563eb; color:#2563eb; border-radius:50%; width:44px; height:44px; display:inline-block; line-height:42px; font-weight:800;">검토</span><div style="font-size:0.7rem; margin-top:4px;">보안팀장</div></div>' +
+              '<div><span style="border:1.5px solid #dc2626; color:#dc2626; border-radius:50%; width:44px; height:44px; display:inline-block; line-height:42px; font-weight:800;">승인</span><div style="font-size:0.7rem; margin-top:4px;">CISO</div></div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="margin-top:120px; font-size:1rem; font-weight:800;">한국수력원자력 정보보호본부 &copy; 2026 GIJO TECHNOLOGY</div>' +
+        '</div>' +
+        '<div class="page-break"></div>' +
+
+        // PAGE 2: ASSETS & TOPOLOGY
+        '<div class="sec-title">제 1 장. 전사 IT 인프라 자산 및 망분리 토폴로지 명세</div>' +
+        '<p style="font-size:0.8rem; color:#475569;">사내에서 운용 중인 서버, WAS, DB, 경계보안 장비 총 ' + currentItAssets.length + '대의 망분리 구역 및 IP 배치 현황입니다.</p>' +
+        '<table><tr><th>자산ID</th><th>자산명</th><th>망분리구역</th><th>IP주소</th><th>운영체제</th><th>설치 컴포넌트 & CVE</th></tr>' +
+        assetRows + '</table>' +
+        '<div class="page-break"></div>' +
+
+        // PAGE 3: SBOM SPECIFICATION
+        '<div class="sec-title">제 2 장. KISA 표준 CycloneDX v1.6 SBOM 소프트웨어 부품 명세서</div>' +
+        '<p style="font-size:0.8rem; color:#475569;">대표 엔터프라이즈 코어 시스템 (TmaxSoft JEUS 8.5)의 오픈소스 의존성 7종 및 CVE 취약점 현황입니다.</p>' +
+        '<table><tr><th>컴포넌트명</th><th>버전</th><th>공급사</th><th>오픈소스 라이선스</th><th>식별 CVE</th><th>조치 계획</th></tr>' +
+        '<tr><td><b>spring-framework</b></td><td>5.3.39</td><td>Pivotal / Spring</td><td>Apache-2.0</td><td><span style="color:#dc2626; font-weight:700;">CVE-2016-1000027</span></td><td>WAAP 가상패치 적용 완료</td></tr>' +
+        '<tr><td><b>apache-tomcat</b></td><td>5.5.36</td><td>Apache Software Foundation</td><td>Apache-2.0</td><td><span style="color:#dc2626; font-weight:700;">CVE-2025-24813</span></td><td>AJP Connector 비활성화</td></tr>' +
+        '<tr><td><b>jackson-databind</b></td><td>2.17.1</td><td>FasterXML</td><td>Apache-2.0</td><td><span style="color:#d97706; font-weight:700;">CVE-2026-54512</span></td><td>최신 버전 2.18 패치 예정</td></tr>' +
+        '<tr><td><b>spring-security</b></td><td>5.8.16</td><td>Pivotal / Spring</td><td>Apache-2.0</td><td>-</td><td>양호 (취약점 없음)</td></tr>' +
+        '<tr><td><b>openjdk</b></td><td>14+10</td><td>Oracle</td><td>GPL-2.0-with-classpath</td><td>-</td><td>양호 (취약점 없음)</td></tr>' +
+        '<tr><td><b>commons-collections</b></td><td>3.2.2</td><td>Apache Software Foundation</td><td>Apache-2.0</td><td>-</td><td>양호 (취약점 없음)</td></tr>' +
+        '<tr><td><b>hikaricp</b></td><td>4.0.3</td><td>Brett Wooldridge</td><td>Apache-2.0</td><td>-</td><td>양호 (취약점 없음)</td></tr>' +
+        '</table>' +
+        '<div class="page-break"></div>' +
+
+        // PAGE 4: DAILY CHECKLIST LOGS
+        '<div class="sec-title">제 3 장. 법정 14대 일일 보안점검 일지 수검 결과표</div>' +
+        '<p style="font-size:0.8rem; color:#475569;">KISA ISMS-P 2.3 보안점검 기준에 따른 14대 의무 점검 항목 이행 결과입니다.</p>' +
+        '<table><tr><th>번호</th><th>점검 분야</th><th>점검 항목 명세</th><th>점검 결과</th><th>조치자 의견</th></tr>' +
+        '<tr><td>01</td><td>네트워크/방화벽</td><td>경계 방화벽 인바운드/아웃바운드 정책 불필요 포트 오픈 여부</td><td><b style="color:#059669;">[양호]</b></td><td>비인가 포트 차단 완료</td></tr>' +
+        '<tr><td>02</td><td>시스템/계정</td><td>루트(root/administrator) 직접 로그인 제한 및 패스워드 복잡도</td><td><b style="color:#059669;">[양호]</b></td><td>MFA 2차인증 강제 가동</td></tr>' +
+        '<tr><td>03</td><td>취약점/패치</td><td>금융 코어 WAS (JEUS 8.5) 취약점 긴급 가상패치 적용 상태</td><td><b style="color:#d97706;">[조치중]</b></td><td>Imperva WAAP 룰셋 적용 완료</td></tr>' +
+        '<tr><td>04</td><td>백업/무결성</td><td>주요 고객원장 DB 및 로그 서버 증분 백업 정상 성공 여부</td><td><b style="color:#059669;">[양호]</b></td><td>백업본 무결성 검증 통과</td></tr>' +
+        '<tr><td>05</td><td>암호화/키관리</td><td>개인정보 DB 컬럼 암호화 및 KMS 키 생애주기 정상 운영</td><td><b style="color:#059669;">[양호]</b></td><td>CipherTrust 투명 암호화 정상</td></tr>' +
+        '</table>' +
+        '<div class="page-break"></div>' +
+
+        // PAGE 5: TCO & FINOPS BUDGET
+        '<div class="sec-title">제 4 장. 정보보호 솔루션 20종 및 생성형 AI FinOps TCO 예산 명세서</div>' +
+        '<div style="font-size:0.85rem; background:#f8fafc; border:1px solid #cbd5e1; padding:15px; border-radius:6px; margin-bottom:15px;">' +
+          '<b>총 5개년 누적 정보보호 TCO: ₩' + tco5Year.toLocaleString() + '</b><br/>' +
+          '- 솔루션 초기 Capex: ₩' + totalCapex.toLocaleString() + '<br/>' +
+          '- 연간 통합 Opex 및 생성형 AI API 예산: ₩' + unifiedOpex.toLocaleString() + ' / 년<br/>' +
+          '- <b>온프레미스 GB10 (177B MoE) 도입에 따른 연간 클라우드 API 절감액: ₩3,888,000 (90% 절감 달성)</b>' +
+        '</div>' +
+        '<table><tr><th>구분</th><th>항목명</th><th>공급사/벤더</th><th>계약형태</th><th>연간 비용</th><th>비고</th></tr>' +
+        '<tr><td>인프라</td><td>온프레미스 GB10 (Qwen 177B MoE)</td><td>NVIDIA DGX / 사내운용</td><td>자체구축</td><td>₩0</td><td>외부 유출 0% 통제</td></tr>' +
+        '<tr><td>보안API</td><td>사내 bge-m3 임베딩 & OCR API</td><td>사내 AI 인프라</td><td>자체운용</td><td>₩0</td><td>RAG 2.0 색인 가동</td></tr>' +
+        '<tr><td>상용LLM</td><td>OpenAI GPT-4o Enterprise</td><td>OpenAI</td><td>연간종량</td><td>₩4,320,000</td><td>외부 반출 제한 경유</td></tr>' +
+        '<tr><td>보안제품</td><td>WizCLM 인증서 수명주기 관리</td><td>위즈코리아</td><td>연간구독</td><td>₩32,000,000</td><td>D-28 갱신 도래</td></tr>' +
+        '<tr><td>보안제품</td><td>Imperva WAAP 웹/API 방화벽</td><td>Imperva</td><td>연간구독</td><td>₩45,000,000</td><td>가상패치 룰셋 가동</td></tr>' +
+        '</table>' +
+        '<div style="text-align:right; margin-top:40px; font-size:0.75rem; color:#64748b;">위 증적 대장의 기재 내용은 실제 운영 인프라 및 회계 내역과 100% 일치함을 확인합니다.</div>' +
+        '<' + 'script>window.onload = function(){ window.print(); };<' + '/script>' +
+        '</body></html>'
+      );
+      printWin.document.close();
+    }
+
+    function exportGijoBundle() {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const bundle = {
+        version: '5.2.0',
+        exportedAt: new Date().toISOString(),
+        orgName: customerOrgName || '한국수력원자력 정보보호본부',
+        docs: currentDocs,
+        itAssets: currentItAssets,
+        aiApiList: currentAiApiList,
+        checklistData: dailyChecklistData,
+        stampStates: stampStates
+      };
+
+      const jsonStr = JSON.stringify(bundle, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'GIJO_Security_Data_Bundle_' + todayStr + '.gijo-bundle';
+      a.click();
+      alert('✅ 전사 지식고 문서(' + currentDocs.length + '건), IT 자산(' + currentItAssets.length + '대), SBOM, 전자결재, 점검 일지가 안전 백업되었습니다!');
+    }
+
+    function importGijoBundlePrompt() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.gijo-bundle,.json';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = JSON.parse(event.target.result);
+            if (!data.version || (!data.docs && !data.itAssets)) {
+              alert('올바른 GIJO 에어갭 데이터 번들 파일이 아닙니다.');
+              return;
+            }
+
+            if (data.docs && Array.isArray(data.docs)) {
+              currentDocs = data.docs;
+              saveDocsToStorage();
+              renderWikiDocList();
+            }
+            if (data.itAssets && Array.isArray(data.itAssets)) {
+              currentItAssets = data.itAssets;
+              saveAssetsToStorage();
+              renderAssetTable();
+              updateAssetKpis();
+              renderAssetTopologyGraph();
+            }
+            if (data.aiApiList && Array.isArray(data.aiApiList)) {
+              currentAiApiList = data.aiApiList;
+              saveAiApiToStorage();
+              renderAiApiTable();
+              updateAiApiKpis();
+            }
+            if (data.checklistData) {
+              dailyChecklistData = data.checklistData;
+              localStorage.setItem(CHECKLIST_KEY, JSON.stringify(dailyChecklistData));
+              renderChecklistGrid();
+            }
+            if (data.stampStates) {
+              stampStates = data.stampStates;
+            }
+
+            renderDashboardKpis();
+            alert('🎉 전사 데이터 번들 (' + file.name + ')이 성공적으로 복원되었습니다!\n- 지식고 문서: ' + currentDocs.length + '건\n- IT 자산: ' + currentItAssets.length + '대\n- 점검 일지 및 결재 상태 동기화 완료');
+          } catch(err) {
+            alert('파일 읽기 오류: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+
+        // --- 4.5 DAILY SECURITY CHECKLIST & INSPECTION LOG MODULE ---
     const CHECKLIST_KEY = 'GIJO_DAILY_CHECKLIST_V5_2';
     let dailyChecklistData = {};
 
@@ -2997,6 +3558,19 @@
       return (dateInput && dateInput.value) ? dateInput.value : new Date().toISOString().slice(0, 10);
     }
 
+    let checklistViewMode = 'EXCEL'; // Default: EXCEL High Density
+
+    function toggleChecklistViewMode() {
+      checklistViewMode = checklistViewMode === 'EXCEL' ? 'CARD' : 'EXCEL';
+      const btn = document.getElementById('btnToggleChecklistMode');
+      if (btn) {
+        btn.innerHTML = checklistViewMode === 'EXCEL' 
+          ? '<i data-lucide="sheet" style="width:13px; height:13px;"></i> 엑셀 대장 뷰' 
+          : '<i data-lucide="layout-grid" style="width:13px; height:13px;"></i> 카드 뷰';
+      }
+      renderChecklistGrid();
+    }
+
     function renderChecklistGrid() {
       loadChecklistData();
       const dateKey = getTodayKey();
@@ -3012,6 +3586,84 @@
       if (!container) return;
       container.innerHTML = '';
 
+      if (checklistViewMode === 'EXCEL') {
+        container.style.display = 'block';
+        let rows = '';
+        activeSolutionsList.forEach((sol, idx) => {
+          if (!dayRecords[sol.name]) {
+            dayRecords[sol.name] = { daemon: 'NORMAL', log: 'NORMAL', backup: 'NORMAL', memo: '' };
+          }
+          const rec = dayRecords[sol.name];
+
+          const isKr = sol.vendor.includes('국산') || sol.vendorType === '국산';
+          const badgeType = isKr ? 'success' : 'info';
+
+          const btnD_Normal = rec.daemon === 'NORMAL' ? 'background:#059669; color:#fff; font-weight:700;' : '';
+          const btnD_Warn = rec.daemon === 'WARN' ? 'background:#d97706; color:#fff; font-weight:700;' : '';
+          const btnD_Error = rec.daemon === 'ERROR' ? 'background:#dc2626; color:#fff; font-weight:700;' : '';
+
+          const btnL_Normal = rec.log === 'NORMAL' ? 'background:#059669; color:#fff; font-weight:700;' : '';
+          const btnL_Warn = rec.log === 'WARN' ? 'background:#d97706; color:#fff; font-weight:700;' : '';
+          const btnL_Error = rec.log === 'ERROR' ? 'background:#dc2626; color:#fff; font-weight:700;' : '';
+
+          const btnB_Normal = rec.backup === 'NORMAL' ? 'background:#059669; color:#fff; font-weight:700;' : '';
+          const btnB_Warn = rec.backup === 'WARN' ? 'background:#d97706; color:#fff; font-weight:700;' : '';
+          const btnB_Error = rec.backup === 'ERROR' ? 'background:#dc2626; color:#fff; font-weight:700;' : '';
+
+          const solEscaped = sol.name.replace(/'/g, "\'");
+
+          rows += 
+            '<tr>' +
+              '<td class="center">' + (idx + 1) + '</td>' +
+              '<td><b>' + sanitizeHtml(sol.name) + '</b></td>' +
+              '<td>' + sanitizeHtml(sol.vendor) + '</td>' +
+              '<td class="center"><span class="x-badge ' + badgeType + '">' + (isKr ? '국산' : '외산') + '</span></td>' +
+              '<td class="center">' +
+                '<button class="x-btn" style="' + btnD_Normal + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;daemon&apos;, &apos;NORMAL&apos;)">정상</button> ' +
+                '<button class="x-btn" style="' + btnD_Warn + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;daemon&apos;, &apos;WARN&apos;)">주의</button> ' +
+                '<button class="x-btn" style="' + btnD_Error + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;daemon&apos;, &apos;ERROR&apos;)">이상</button>' +
+              '</td>' +
+              '<td class="center">' +
+                '<button class="x-btn" style="' + btnL_Normal + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;log&apos;, &apos;NORMAL&apos;)">정상</button> ' +
+                '<button class="x-btn" style="' + btnL_Warn + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;log&apos;, &apos;WARN&apos;)">주의</button> ' +
+                '<button class="x-btn" style="' + btnL_Error + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;log&apos;, &apos;ERROR&apos;)">이상</button>' +
+              '</td>' +
+              '<td class="center">' +
+                '<button class="x-btn" style="' + btnB_Normal + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;backup&apos;, &apos;NORMAL&apos;)">정상</button> ' +
+                '<button class="x-btn" style="' + btnB_Warn + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;backup&apos;, &apos;WARN&apos;)">주의</button> ' +
+                '<button class="x-btn" style="' + btnB_Error + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;backup&apos;, &apos;ERROR&apos;)">이상</button>' +
+              '</td>' +
+              '<td>' +
+                '<input type="text" class="x-input" style="width:100%;" value="' + sanitizeHtml(rec.memo || '') + '" placeholder="특이사항/조치내용 입력" onchange="updateChecklistItemMemo(&apos;' + solEscaped + '&apos;, this.value)">' +
+              '</td>' +
+            '</tr>';
+        });
+
+        container.innerHTML = 
+          '<div class="excel-wrapper">' +
+            '<table class="excel-table">' +
+              '<thead>' +
+                '<tr>' +
+                  '<th class="center" style="width:35px;">No</th>' +
+                  '<th style="width:180px;">솔루션명</th>' +
+                  '<th style="width:120px;">공급사/벤더</th>' +
+                  '<th class="center" style="width:70px;">국산/외산</th>' +
+                  '<th class="center" style="width:145px;">데몬/프로세스</th>' +
+                  '<th class="center" style="width:145px;">로그 수집</th>' +
+                  '<th class="center" style="width:145px;">백업/무결성</th>' +
+                  '<th>당일 점검 메모 / 특이사항</th>' +
+                '</tr>' +
+              '</thead>' +
+              '<tbody>' + rows + '</tbody>' +
+            '</table>' +
+          '</div>';
+
+        lucide.createIcons();
+        return;
+      }
+
+      // Fallback: Card View Mode
+      container.style.display = 'grid';
       activeSolutionsList.forEach((sol, idx) => {
         if (!dayRecords[sol.name]) {
           dayRecords[sol.name] = { daemon: 'NORMAL', log: 'NORMAL', backup: 'NORMAL', memo: '' };
@@ -3020,64 +3672,56 @@
 
         const card = document.createElement('div');
         card.className = 'white-panel';
-        card.style.padding = '1rem';
-        card.style.border = '1px solid var(--border)';
-        card.style.borderRadius = 'var(--radius)';
+        card.style.cssText = 'padding:1rem; border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; gap:0.6rem;';
 
-        const badgeKr = sol.vendor.includes('국산') || sol.vendorType === '국산' ? 'badge-kr' : 'badge-global';
+        const isKr = sol.vendor.includes('국산') || sol.vendorType === '국산';
+        const badgeClass = isKr ? 'badge-kr' : 'badge-global';
+        const solEscaped = sol.name.replace(/'/g, "\'");
 
         card.innerHTML = 
-          '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">' +
+          '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
             '<div>' +
-              '<span class="meta-badge ' + badgeKr + '">' + sanitizeHtml(sol.vendorType || '보안솔루션') + '</span> ' +
-              '<span class="meta-badge">' + sanitizeHtml(sol.category || sol.sheetCategory) + '</span>' +
-              '<div style="font-weight:800; font-size:1rem; margin-top:0.3rem; color:var(--text-main);">' + sanitizeHtml(sol.name) + '</div>' +
-              '<div style="font-size:0.75rem; color:var(--text-dim);">' + sanitizeHtml(sol.vendor) + '</div>' +
+              '<span class="meta-badge ' + badgeClass + '" style="font-size:0.65rem;">' + (isKr ? '국산' : '외산') + '</span>' +
+              '<h4 style="font-size:0.95rem; font-weight:800; color:var(--text-main); margin-top:0.2rem;">' + sanitizeHtml(sol.name) + '</h4>' +
+              '<div style="font-size:0.72rem; color:var(--text-dim);">' + sanitizeHtml(sol.vendor) + '</div>' +
             '</div>' +
-            '<button class="btn btn-sm" onclick="openSolDetailModal(' + idx + ', \'manual\')" title="매뉴얼 보기">' +
-              '<i data-lucide="book" style="width:11px; height:11px;"></i> 매뉴얼' +
-            '</button>' +
+            '<button class="btn btn-sm" style="font-size:0.7rem; padding:0.15rem 0.4rem;" onclick="setAllNormalForSol(&apos;' + solEscaped + '&apos;)">전체정상</button>' +
           '</div>' +
-
-          '<div style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.78rem;">' +
-            '<div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:0.4rem 0.6rem; border-radius:4px;">' +
-              '<span style="font-weight:600;">1. 데몬/에이전트 서비스 기동</span>' +
-              '<div style="display:flex; gap:0.25rem;">' +
-                '<button class="btn btn-sm ' + (rec.daemon === 'NORMAL' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'daemon\', \'NORMAL\')">정상</button>' +
-                '<button class="btn btn-sm ' + (rec.daemon === 'WARN' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:#d97706;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'daemon\', \'WARN\')">주의</button>' +
-                '<button class="btn btn-sm ' + (rec.daemon === 'ERROR' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:var(--danger);" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'daemon\', \'ERROR\')">이상</button>' +
+          '<div style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.75rem; background:#f8fafc; padding:0.5rem; border-radius:6px;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+              '<span>데몬/서비스:</span>' +
+              '<div style="display:flex; gap:0.2rem;">' +
+                '<button class="btn btn-sm ' + (rec.daemon === 'NORMAL' ? 'btn-primary' : '') + '" style="padding:0.1rem 0.35rem; font-size:0.68rem;" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;daemon&apos;, &apos;NORMAL&apos;)">정상</button>' +
+                '<button class="btn btn-sm ' + (rec.daemon === 'WARN' ? 'btn-primary' : '') + '" style="padding:0.1rem 0.35rem; font-size:0.68rem;" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;daemon&apos;, &apos;WARN&apos;)">주의</button>' +
+                '<button class="btn btn-sm ' + (rec.daemon === 'ERROR' ? 'btn-primary' : '') + '" style="padding:0.1rem 0.35rem; font-size:0.68rem; background:' + (rec.daemon === 'ERROR' ? '#fee2e2; color:#dc2626; border-color:#fca5a5;' : '') + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;daemon&apos;, &apos;ERROR&apos;)">이상</button>' +
               '</div>' +
             '</div>' +
-
-            '<div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:0.4rem 0.6rem; border-radius:4px;">' +
-              '<span style="font-weight:600;">2. 차단 이벤트 & 감사 로그</span>' +
-              '<div style="display:flex; gap:0.25rem;">' +
-                '<button class="btn btn-sm ' + (rec.log === 'NORMAL' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'log\', \'NORMAL\')">정상</button>' +
-                '<button class="btn btn-sm ' + (rec.log === 'WARN' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:#d97706;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'log\', \'WARN\')">주의</button>' +
-                '<button class="btn btn-sm ' + (rec.log === 'ERROR' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:var(--danger);" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'log\', \'ERROR\')">이상</button>' +
+            '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+              '<span>로그 수집:</span>' +
+              '<div style="display:flex; gap:0.2rem;">' +
+                '<button class="btn btn-sm ' + (rec.log === 'NORMAL' ? 'btn-primary' : '') + '" style="padding:0.1rem 0.35rem; font-size:0.68rem;" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;log&apos;, &apos;NORMAL&apos;)">정상</button>' +
+                '<button class="btn btn-sm ' + (rec.log === 'WARN' ? 'btn-primary' : '') + '" style="padding:0.1rem 0.35rem; font-size:0.68rem;" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;log&apos;, &apos;WARN&apos;)">주의</button>' +
+                '<button class="btn btn-sm ' + (rec.log === 'ERROR' ? 'btn-primary' : '') + '" style="padding:0.1rem 0.35rem; font-size:0.68rem; background:' + (rec.log === 'ERROR' ? '#fee2e2; color:#dc2626; border-color:#fca5a5;' : '') + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;log&apos;, &apos;ERROR&apos;)">이상</button>' +
               '</div>' +
             '</div>' +
-
-            '<div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:0.4rem 0.6rem; border-radius:4px;">' +
-              '<span style="font-weight:600;">3. 라이선스 & 백업 무결성</span>' +
-              '<div style="display:flex; gap:0.25rem;">' +
-                '<button class="btn btn-sm ' + (rec.backup === 'NORMAL' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'backup\', \'NORMAL\')">정상</button>' +
-                '<button class="btn btn-sm ' + (rec.backup === 'WARN' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:#d97706;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'backup\', \'WARN\')">주의</button>' +
-                '<button class="btn btn-sm ' + (rec.backup === 'ERROR' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:var(--danger);" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'backup\', \'ERROR\')">이상</button>' +
+            '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+              '<span>백업 무결성:</span>' +
+              '<div style="display:flex; gap:0.2rem;">' +
+                '<button class="btn btn-sm ' + (rec.backup === 'NORMAL' ? 'btn-primary' : '') + '" style="padding:0.1rem 0.35rem; font-size:0.68rem;" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;backup&apos;, &apos;NORMAL&apos;)">정상</button>' +
+                '<button class="btn btn-sm ' + (rec.backup === 'WARN' ? 'btn-primary' : '') + '" style="padding:0.1rem 0.35rem; font-size:0.68rem;" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;backup&apos;, &apos;WARN&apos;)">주의</button>' +
+                '<button class="btn btn-sm ' + (rec.backup === 'ERROR' ? 'btn-primary' : '') + '" style="padding:0.1rem 0.35rem; font-size:0.68rem; background:' + (rec.backup === 'ERROR' ? '#fee2e2; color:#dc2626; border-color:#fca5a5;' : '') + '" onclick="setChecklistItemStatus(&apos;' + solEscaped + '&apos;, &apos;backup&apos;, &apos;ERROR&apos;)">이상</button>' +
               '</div>' +
             '</div>' +
-
-            '<div style="margin-top:0.4rem;">' +
-              '<input type="text" class="search-input" style="background:#fff; font-size:0.72rem; padding:0.3rem 0.5rem;" placeholder="점검 메모 / 특이사항 기재..." value="' + sanitizeHtml(rec.memo || '') + '" onchange="updateChecklistMemo(\'' + sol.name.replace(/'/g, "\\'") + '\', this.value)">' +
-            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<input type="text" class="search-input" style="width:100%; font-size:0.72rem; padding:0.25rem 0.4rem;" placeholder="점검 메모 / 조치 내용 입력..." value="' + sanitizeHtml(rec.memo || '') + '" onchange="updateChecklistItemMemo(&apos;' + solEscaped + '&apos;, this.value)">' +
           '</div>';
 
         container.appendChild(card);
       });
-
       lucide.createIcons();
     }
-
+    
     function setChecklistItemStatus(solName, field, status) {
       const dateKey = getTodayKey();
       if (!dailyChecklistData[dateKey]) dailyChecklistData[dateKey] = {};
@@ -3332,6 +3976,26 @@
       renderAssetTable();
     }
 
+    let assetViewMode = 'EXCEL'; // Default: EXCEL High Density
+
+    function toggleAssetViewMode() {
+      assetViewMode = assetViewMode === 'EXCEL' ? 'CARD' : 'EXCEL';
+      const btn = document.getElementById('btnToggleAssetMode');
+      if (btn) {
+        btn.innerHTML = assetViewMode === 'EXCEL' 
+          ? '<i data-lucide="sheet" style="width:13px; height:13px;"></i> 엑셀 대장 뷰' 
+          : '<i data-lucide="layout-grid" style="width:13px; height:13px;"></i> 카드 뷰';
+      }
+      renderAssetTable();
+    }
+
+    function toggleAssetCompRow(assetId) {
+      const row = document.getElementById('assetCompRow-' + assetId);
+      if (row) {
+        row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+      }
+    }
+
     function renderAssetTable() {
       const container = document.getElementById('assetCardsContainer');
       if (!container) return;
@@ -3355,6 +4019,101 @@
         return;
       }
 
+      if (assetViewMode === 'EXCEL') {
+        let tableRows = '';
+        filtered.forEach((asset, idx) => {
+          const zoneKo = asset.zone === 'DMZ' ? 'DMZ' : (asset.zone === 'SECURE_DB' ? 'DB안전구역' : (asset.zone === 'PERIMETER' ? '경계보안' : '내부업무망'));
+          const zoneBadge = asset.zone === 'DMZ' ? 'danger' : (asset.zone === 'SECURE_DB' ? 'warning' : 'info');
+
+          const hasCriticalCve = (asset.components || []).some(c => (c.cve || '').includes('위험'));
+          const hasWarningCve = (asset.components || []).some(c => (c.cve || '').includes('주의'));
+
+          const cveBadge = hasCriticalCve 
+            ? '<span class="x-badge danger">🚨 고위험 CVE</span>'
+            : (hasWarningCve ? '<span class="x-badge warning">⚠️ 주의 CVE</span>' : '<span class="x-badge success">✅ 양호</span>');
+
+          const comps = (asset.components || []).map(c => c.name + ' v' + c.version).join(', ') || '없음';
+
+          // Component detail table
+          let compDetailRows = '';
+          (asset.components || []).forEach((c, cIdx) => {
+            const compCveBadge = c.cve.includes('위험') ? 'danger' : (c.cve.includes('주의') ? 'warning' : 'success');
+            compDetailRows += 
+              '<tr>' +
+                '<td>' + (cIdx + 1) + '</td>' +
+                '<td><b>' + sanitizeHtml(c.name) + '</b></td>' +
+                '<td><code>v' + sanitizeHtml(c.version) + '</code></td>' +
+                '<td>' + sanitizeHtml(c.license || '상용') + '</td>' +
+                '<td><span class="x-badge ' + compCveBadge + '">' + sanitizeHtml(c.cve || '양호') + '</span></td>' +
+                '<td style="font-family:monospace; font-size:0.7rem; color:var(--text-sub);">' + sanitizeHtml(c.purl || '-') + '</td>' +
+                '<td class="center"><button class="x-btn" style="color:var(--danger);" onclick="deleteItComponent(&apos;' + asset.id + '&apos;, ' + cIdx + ')">삭제</button></td>' +
+              '</tr>';
+          });
+
+          tableRows += 
+            '<tr>' +
+              '<td class="center">' + (idx + 1) + '</td>' +
+              '<td><b>' + asset.id + '</b></td>' +
+              '<td><b>' + sanitizeHtml(asset.name) + '</b> <span style="font-size:0.68rem; color:var(--text-sub);">(' + sanitizeHtml(asset.category || '서버') + ')</span></td>' +
+              '<td class="center"><span class="x-badge ' + zoneBadge + '">' + zoneKo + '</span></td>' +
+              '<td style="font-family:monospace;">' + sanitizeHtml(asset.ip || '-') + '</td>' +
+              '<td>' + sanitizeHtml(asset.os || '-') + '</td>' +
+              '<td>' + sanitizeHtml(asset.manager || '-') + '</td>' +
+              '<td style="max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + sanitizeHtml(comps) + '">' +
+                '<button class="x-btn" onclick="toggleAssetCompRow(&apos;' + asset.id + '&apos;)" style="margin-right:5px; font-weight:700;">' +
+                  '📦 ' + (asset.components || []).length + '개 부품 ▾' +
+                '</button>' +
+                '<span style="font-size:0.72rem; color:var(--text-sub);">' + sanitizeHtml(comps) + '</span>' +
+              '</td>' +
+              '<td class="center">' + cveBadge + '</td>' +
+              '<td class="center">' +
+                '<button class="x-btn" onclick="openAddComponentModal(&apos;' + asset.id + '&apos;)" title="컴포넌트 추가">+부품</button> ' +
+                '<button class="x-btn" onclick="openEditAssetModal(&apos;' + asset.id + '&apos;)">수정</button> ' +
+                '<button class="x-btn" style="color:var(--danger);" onclick="deleteItAsset(&apos;' + asset.id + '&apos;)">삭제</button>' +
+              '</td>' +
+            '</tr>' +
+            '<tr id="assetCompRow-' + asset.id + '" style="display:none; background:#f1f5f9;">' +
+              '<td colspan="10" style="padding:8px 14px;">' +
+                '<div style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:8px;">' +
+                  '<div style="font-weight:800; font-size:0.75rem; margin-bottom:6px; color:#1e40af; display:flex; justify-content:space-between;">' +
+                    '<span>📦 [' + asset.name + '] SBOM 소프트웨어 컴포넌트 세부 명세 (CycloneDX v1.6 호환)</span>' +
+                    '<button class="x-btn" onclick="openAddComponentModal(&apos;' + asset.id + '&apos;)">+ 신규 컴포넌트 추가</button>' +
+                  '</div>' +
+                  '<table class="excel-table">' +
+                    '<thead><tr><th style="width:30px;">#</th><th>컴포넌트명</th><th>버전</th><th>라이선스</th><th>CVE 취약점 상태</th><th>PURL 식별자</th><th class="center" style="width:50px;">삭제</th></tr></thead>' +
+                    '<tbody>' + (compDetailRows || '<tr><td colspan="7" class="center">등록된 컴포넌트 없음</td></tr>') + '</tbody>' +
+                  '</table>' +
+                '</div>' +
+              '</td>' +
+            '</tr>';
+        });
+
+        container.innerHTML = 
+          '<div class="excel-wrapper">' +
+            '<table class="excel-table">' +
+              '<thead>' +
+                '<tr>' +
+                  '<th class="center" style="width:35px;">No</th>' +
+                  '<th style="width:85px;">자산 ID</th>' +
+                  '<th>자산명 / 역할</th>' +
+                  '<th class="center" style="width:90px;">망분리 구역</th>' +
+                  '<th style="width:110px;">IP 주소</th>' +
+                  '<th style="width:150px;">운영체제</th>' +
+                  '<th style="width:95px;">관리 담당</th>' +
+                  '<th>설치 컴포넌트 (SBOM)</th>' +
+                  '<th class="center" style="width:115px;">CVE 취약점 상태</th>' +
+                  '<th class="center" style="width:130px;">관리 작업</th>' +
+                '</tr>' +
+              '</thead>' +
+              '<tbody>' + tableRows + '</tbody>' +
+            '</table>' +
+          '</div>';
+
+        lucide.createIcons();
+        return;
+      }
+
+      // Fallback: Card View Mode
       filtered.forEach((asset, aIdx) => {
         const zoneBadgeClass = asset.zone === 'DMZ' ? 'badge-global' : (asset.zone === 'SECURE_DB' ? 'badge-custom' : 'badge-kr');
         const zoneNameKo = asset.zone === 'DMZ' ? '🌐 DMZ 구간' : (asset.zone === 'SECURE_DB' ? '🔒 DB 안전구역' : (asset.zone === 'PERIMETER' ? '🔥 경계/보안' : '🏢 내부 업무망'));
@@ -3371,28 +4130,6 @@
           : (hasWarningCve 
              ? '<span style="background:#fef3c7; color:#d97706; border:1px solid #fde68a; padding:2px 8px; border-radius:999px; font-weight:700; font-size:0.68rem;">⚠️ 주의 CVE</span>' 
              : '<span style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; padding:2px 8px; border-radius:999px; font-weight:700; font-size:0.68rem;">✅ CVE 통제양호</span>');
-
-        let compRows = '';
-        (asset.components || []).forEach((c, cIdx) => {
-          const cveBadgeColor = c.cve.includes('위험') ? '#dc2626' : (c.cve.includes('주의') ? '#d97706' : '#059669');
-          const cveBadgeBg = c.cve.includes('위험') ? '#fef2f2' : (c.cve.includes('주의') ? '#fffbeb' : '#ecfdf5');
-
-          compRows += 
-            '<tr style="border-bottom:1px solid #f1f5f9; font-size:0.78rem;">' +
-              '<td style="padding:0.4rem 0.6rem; font-weight:700; color:var(--text-main);">' + sanitizeHtml(c.name) + '</td>' +
-              '<td style="padding:0.4rem 0.6rem; color:var(--text-sub);"><span style="background:#f1f5f9; padding:1px 6px; border-radius:4px; font-family:monospace;">v' + sanitizeHtml(c.version) + '</span></td>' +
-              '<td style="padding:0.4rem 0.6rem; color:var(--text-sub);">' + sanitizeHtml(c.license || '상용') + '</td>' +
-              '<td style="padding:0.4rem 0.6rem;"><span style="background:' + cveBadgeBg + '; color:' + cveBadgeColor + '; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;">' + sanitizeHtml(c.cve || '양호') + '</span></td>' +
-              '<td style="padding:0.4rem 0.6rem; color:var(--text-dim); font-size:0.72rem; font-family:monospace; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + sanitizeHtml(c.purl || '-') + '</td>' +
-              '<td style="padding:0.4rem 0.6rem; text-align:right;">' +
-                '<button class="btn btn-sm" style="padding:1px 5px; font-size:0.68rem; color:var(--danger);" onclick="deleteItComponent(\'' + asset.id + '\', ' + cIdx + ')">삭제</button>' +
-              '</td>' +
-            '</tr>';
-        });
-
-        if (!compRows) {
-          compRows = '<tr><td colspan="6" style="padding:0.8rem; text-align:center; color:var(--text-dim); font-size:0.75rem;">등록된 소프트웨어 컴포넌트(SBOM)가 없습니다. [+ 컴포넌트 추가]를 눌러 등록하세요.</td></tr>';
-        }
 
         card.innerHTML = 
           '<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">' +
@@ -3411,41 +4148,20 @@
               '</div>' +
             '</div>' +
             '<div style="display:flex; gap:0.35rem;">' +
-              '<button class="btn btn-sm" style="background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; font-weight:700;" onclick="openAddComponentModal(\'' + asset.id + '\')">' +
+              '<button class="btn btn-sm" style="background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; font-weight:700;" onclick="openAddComponentModal(&apos;' + asset.id + '&apos;)">' +
                 '<i data-lucide="plus-circle" style="width:12px; height:12px;"></i> 컴포넌트 추가' +
               '</button>' +
-              '<button class="btn btn-sm" onclick="openEditAssetModal(\'' + asset.id + '\')">수정</button>' +
-              '<button class="btn btn-sm" style="color:var(--danger);" onclick="deleteItAsset(\'' + asset.id + '\')">삭제</button>' +
+              '<button class="btn btn-sm" onclick="openEditAssetModal(&apos;' + asset.id + '&apos;)">수정</button>' +
+              '<button class="btn btn-sm" style="color:var(--danger);" onclick="deleteItAsset(&apos;' + asset.id + '&apos;)">삭제</button>' +
             '</div>' +
-          '</div>' +
-
-          '<div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-top:0.3rem;">' +
-            '<div style="padding:0.4rem 0.65rem; background:#f1f5f9; border-bottom:1px solid var(--border); font-size:0.74rem; font-weight:700; color:var(--text-sub); display:flex; justify-content:space-between; align-items:center;">' +
-              '<span>📦 SBOM 소프트웨어 컴포넌트 & 오픈소스 라이선스 명세 (' + (asset.components || []).length + '개)</span>' +
-              '<span style="font-size:0.68rem; color:var(--text-dim);">CycloneDX v1.5 호환</span>' +
-            '</div>' +
-            '<table style="width:100%; border-collapse:collapse;">' +
-              '<thead>' +
-                '<tr style="background:#fafafa; border-bottom:1px solid var(--border); font-size:0.72rem; color:var(--text-dim); text-align:left;">' +
-                  '<th style="padding:0.35rem 0.6rem;">패키지/소프트웨어명</th>' +
-                  '<th style="padding:0.35rem 0.6rem;">버전</th>' +
-                  '<th style="padding:0.35rem 0.6rem;">라이선스</th>' +
-                  '<th style="padding:0.35rem 0.6rem;">CVE 상태</th>' +
-                  '<th style="padding:0.35rem 0.6rem;">패키지 URL (PURL)</th>' +
-                  '<th style="padding:0.35rem 0.6rem; text-align:right;">관리</th>' +
-                '</tr>' +
-              '</thead>' +
-              '<tbody>' + compRows + '</tbody>' +
-            '</table>' +
           '</div>';
 
         container.appendChild(card);
       });
-
       lucide.createIcons();
     }
 
-    function openAddAssetModal() {
+        function openAddAssetModal() {
       document.getElementById('itAssetModalTitle').innerText = 'IT 자산 직접 등록';
       document.getElementById('assetModalId').value = '';
       document.getElementById('assetModalName').value = '';
@@ -5021,6 +5737,115 @@
 
     // --- 6. SOLUTIONS PORTAL & MANUAL MODULE ---
     function filterSolutions(filterType) {
+      currentSolFilter = filterType;
+      document.querySelectorAll('.portal-tags-row .pill-cat').forEach(p => p.classList.remove('active'));
+      const activeBtn = document.getElementById('solFilter-' + filterType);
+      if (activeBtn) activeBtn.classList.add('active');
+      renderPortalCards();
+    }
+
+    let portalViewMode = 'EXCEL'; // Default: EXCEL High Density
+
+    function togglePortalViewMode() {
+      portalViewMode = portalViewMode === 'EXCEL' ? 'CARD' : 'EXCEL';
+      const btn = document.getElementById('btnTogglePortalMode');
+      if (btn) {
+        btn.innerHTML = portalViewMode === 'EXCEL' 
+          ? '<i data-lucide="sheet" style="width:13px; height:13px;"></i> 엑셀 대장 뷰' 
+          : '<i data-lucide="layout-grid" style="width:13px; height:13px;"></i> 카드 뷰';
+      }
+      renderPortalCards();
+    }
+
+    function renderPortalCards() {
+      const grid = document.getElementById('portalCardsGrid');
+      const search = (document.getElementById('portalSearchInput')?.value || '').toLowerCase().trim();
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      const filtered = activeSolutionsList.filter(sol => {
+        let matchesType = true;
+        if (currentSolFilter === 'CUSTOM') matchesType = !!sol.isCustom;
+        else if (currentSolFilter === 'KR') matchesType = sol.vendor.includes('국산') || sol.vendorType === '국산';
+        else if (currentSolFilter === 'GLOBAL') matchesType = sol.vendor.includes('외산') || sol.vendorType === '외산';
+        else if (currentSolFilter === 'AI') matchesType = sol.name.includes('AI') || (sol.category && sol.category.includes('AI'));
+        else if (currentSolFilter === 'NETWORK') matchesType = (sol.category && (sol.category.includes('방화벽') || sol.category.includes('WAAP'))) || sol.name.includes('Zscaler');
+        else if (currentSolFilter === 'DATA') matchesType = (sol.category && (sol.category.includes('DSP') || sol.category.includes('EDR') || sol.category.includes('DLP'))) || sol.name.includes('CipherTrust');
+
+        const matchesSearch = !search ||
+          sol.name.toLowerCase().includes(search) ||
+          sol.vendor.toLowerCase().includes(search) ||
+          (sol.category && sol.category.toLowerCase().includes(search)) ||
+          (sol.overview && sol.overview.toLowerCase().includes(search)) ||
+          (sol.manual && sol.manual.toLowerCase().includes(search));
+
+        return matchesType && matchesSearch;
+      });
+
+      if (portalViewMode === 'EXCEL') {
+        grid.style.display = 'block';
+        let rows = '';
+        filtered.forEach((sol, idx) => {
+          const isKr = sol.vendor.includes('국산') || sol.vendorType === '국산';
+          const badgeType = sol.isCustom ? 'neutral' : (isKr ? 'success' : 'info');
+          const badgeLabel = sol.isCustom ? '사내운용' : (isKr ? '국산' : '외산');
+
+          const priceStr = sol.price ? ('₩' + Number(sol.price).toLocaleString()) : '협의';
+          const opexStr = sol.price ? ('₩' + Math.round(sol.price * (sol.opexRate || 0.12)).toLocaleString()) : '협의';
+
+          rows += 
+            '<tr>' +
+              '<td class="center">' + (idx + 1) + '</td>' +
+              '<td><b>' + sanitizeHtml(sol.name) + '</b></td>' +
+              '<td>' + sanitizeHtml(sol.vendor) + '</td>' +
+              '<td class="center"><span class="x-badge ' + badgeType + '">' + badgeLabel + '</span></td>' +
+              '<td><span class="x-badge neutral">' + sanitizeHtml(sol.category || sol.sheetCategory || '보안제품') + '</span></td>' +
+              '<td class="num">' + priceStr + '</td>' +
+              '<td class="num" style="color:#d97706;">' + opexStr + '</td>' +
+              '<td style="font-size:0.73rem; color:var(--text-sub);">' + sanitizeHtml(sol.ismsMapping || sol.regulation || '2.4 접근통제') + '</td>' +
+              '<td class="center">' +
+                '<button class="x-btn" onclick="openSolDetailModal(' + idx + ', &apos;manual&apos;)">매뉴얼</button> ' +
+                '<button class="x-btn" onclick="document.getElementById(&apos;ragQueryInput&apos;).value=&apos;' + sol.name + ' 솔루션 스펙 및 매뉴얼은?&apos;; switchView(&apos;wiki&apos;); executeRagQuery();">RAG질의</button>' +
+              '</td>' +
+            '</tr>';
+        });
+
+        grid.innerHTML = 
+          '<div class="excel-wrapper">' +
+            '<table class="excel-table">' +
+              '<thead>' +
+                '<tr>' +
+                  '<th class="center" style="width:35px;">No</th>' +
+                  '<th style="width:180px;">솔루션명</th>' +
+                  '<th style="width:130px;">공급사/제조사</th>' +
+                  '<th class="center" style="width:70px;">구분</th>' +
+                  '<th style="width:110px;">카테고리</th>' +
+                  '<th class="num" style="width:110px;">도입 단가(Capex)</th>' +
+                  '<th class="num" style="width:110px;">연간 유지보수(Opex)</th>' +
+                  '<th>컴플라이언스 / 규제 준수</th>' +
+                  '<th class="center" style="width:135px;">상세 및 질의</th>' +
+                '</tr>' +
+              '</thead>' +
+              '<tbody>' + (rows || '<tr><td colspan="9" class="center">조회된 솔루션이 없습니다.</td></tr>') + '</tbody>' +
+            '</table>' +
+          '</div>';
+
+        lucide.createIcons();
+        return;
+      }
+
+      // Fallback: Card View
+      grid.style.display = 'grid';
+      filtered.forEach((sol, globalIdx) => {
+        const card = document.createElement('div');
+        card.className = 'sol-card';
+        card.innerHTML = '<h3>' + sanitizeHtml(sol.name) + '</h3>';
+        grid.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+        function filterSolutions(filterType) {
       currentSolFilter = filterType;
       document.querySelectorAll('.portal-tags-row .pill-cat').forEach(p => p.classList.remove('active'));
       const activeBtn = document.getElementById('solFilter-' + filterType);

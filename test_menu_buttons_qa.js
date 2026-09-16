@@ -199,7 +199,54 @@ rag2Tokens.forEach(token => {
   }
 });
 
+// 10. Check Morning Mission Control Hub
+const hubTokens = [
+  'id="tabBtn-dashboard"',
+  'id="view-dashboard"',
+  'function renderDashboardKpis',
+  'function runIncidentPlaybook',
+  'function runRenewalPlaybook',
+  'function printComprehensiveAuditDossier',
+  'function exportGijoBundle',
+  'function importGijoBundlePrompt',
+  'id="dashKpiGov"',
+  'id="dashKpiVuln"',
+  'id="dashKpiRenewal"',
+  'id="dashKpiChecklist"'
+];
+
+hubTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Mission Control Hub Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing Hub Token: ' + token);
+    process.exit(1);
+  }
+});
+
+// 11. Check Excel-Grade High Density Grid System
+const excelTokens = [
+  'class="excel-table"',
+  'class="excel-wrapper"',
+  'id="btnToggleAssetMode"',
+  'id="btnToggleChecklistMode"',
+  'id="btnTogglePortalMode"',
+  'function toggleAssetViewMode',
+  'function toggleChecklistViewMode',
+  'function togglePortalViewMode'
+];
+
+excelTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Excel Grid Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing Excel Token: ' + token);
+    process.exit(1);
+  }
+});
+
 console.log('================================================================');
-console.log('🎉 ALL 66 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+console.log('🎉 ALL 86 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+
 
 
