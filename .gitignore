@@ -89,3 +89,9 @@ testdata/
 
 # 서드파티 고지 — 빌드 때 gen-sbom-self.mjs가 만든다(손으로 고치지 말 것, 두 벌이 된다).
 THIRD-PARTY-NOTICES.md
+
+# Desktop app installer binaries
+GIJO-Security-ERP-Setup-*.exe
+gijo-security-erp-app/dist/
+gijo-security-erp-app/build/
+
