@@ -12,7 +12,7 @@ function createWindow() {
     minHeight: 700,
     title: "GIJO WIKI - 보안 솔루션 통합 ERP & 스마트 아키텍처 스튜디오",
     icon: path.join(__dirname, 'icon.png'),
-    backgroundColor: '#090d16',
+    backgroundColor: '#ffffff',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

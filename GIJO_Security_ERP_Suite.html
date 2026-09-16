@@ -904,82 +904,82 @@
   User["👤 인터넷 사용자"] -->|HTTPS 443| WAF["🛡️ WAF (Active-Standby)"]
   WAF -->|검증된 트래픽| NGFW["🔥 차세대 방화벽 (HA)"]
   
-  subgraph DMZ ["🌐 DMZ 존"]
+  subgraph DMZ["🌐 DMZ 존"]
     NGFW --> WEB1["💻 Web Server 01"]
     NGFW --> WEB2["💻 Web Server 02"]
   end
   
-  subgraph InternalTrust ["🏢 내부 신뢰망 (Trust Zone)"]
+  subgraph InternalTrust["🏢 내부 신뢰망 Trust Zone"]
     WEB1 --> WAS["⚙️ AP/WAS Cluster"]
     WEB2 --> WAS
     WAS --> DB["🗄️ Secure DB (AES-256)"]
   end
   
-  subgraph SecOps ["🛡️ 보안관제 센터 (SecOps)"]
+  subgraph SecOps["🛡️ 보안관제 센터 SecOps"]
     SIEM["📊 SIEM / SOAR"]
     EDR["🔎 EDR Server"]
   end
   
-  WEB1 -.->|Syslog| SIEM
-  DB -.->|Audit Log| SIEM
-  WAS -.->|Agent| EDR`,
+  WEB1 -. Syslog .-> SIEM
+  DB -. Audit Log .-> SIEM
+  WAS -. Agent .-> EDR`,
   
       public: `graph TD
   GovUser["🏛️ 공공기관 / 대민 접속"] --> CSAP_GW["🔒 CSAP 보안 게이트웨이"]
   CSAP_GW --> CC_FW["🛡️ CC인증 차세대 방화벽"]
   
-  subgraph CloudZone ["☁️ 공공 클라우드 보안영역"]
+  subgraph CloudZone["☁️ 공공 클라우드 보안영역"]
     CC_FW --> WebCluster["🖥️ 웹 서버 클러스터"]
     WebCluster --> AppCluster["⚙️ 연계 중계 서버"]
     AppCluster --> KMS["🔑 국가용 암호모듈 (KMS)"]
     AppCluster --> GovDB["🗄️ 공공 데이터베이스"]
   end
   
-  subgraph AuditZone ["📋 감사 및 모니터링"]
+  subgraph AuditZone["📋 감사 및 모니터링"]
     LogServer["📑 통합 로그 서버"]
     DLP["🛑 개인정보 필터링 (DLP)"]
   end
   
-  GovDB -.-> KMS
-  WebCluster -.-> DLP
-  AppCluster -.-> LogServer`,
+  GovDB -. 암호화통신 .-> KMS
+  WebCluster -. 개인정보감사 .-> DLP
+  AppCluster -. 로그전송 .-> LogServer`,
 
       ai: `graph TD
   Client["💻 사내 개발/업무 단말"] --> AuthGW["🔐 ZTNA 접근통제 게이트웨이"]
   AuthGW --> DLPGW["🛑 프롬프트 DLP 검사기"]
   
-  subgraph AirGapZone ["🔒 에어갭 온프레미스 AI 보안존"]
+  subgraph AirGapZone["🔒 에어갭 온프레미스 AI 보안존"]
     DLPGW --> GB10["🧠 GB10 AI Engine (177B Cluster)"]
     GB10 --> VectorDB["📚 사내 지식고 벡터 DB (KMS 암호화)"]
     GB10 --> RAGCache["⚡ RAG Semantic Cache"]
   end
   
-  subgraph SecurityMonitor ["🛡️ 실시간 AI 보안 감사"]
+  subgraph SecurityMonitor["🛡️ 실시간 AI 보안 감사"]
     AuditLogger["📝 프롬프트/응답 감사로그"]
     Sanitizer["🛡️ 환각/취약점 필터"]
   end
   
-  GB10 -.-> AuditLogger
-  DLPGW -.-> Sanitizer`,
+  GB10 -. 감사로그 .-> AuditLogger
+  DLPGW -. 위험차단 .-> Sanitizer`,
 
       zerotrust: `graph TD
   RemoteWorker["🏠 재택/외부 근무자"] --> MFA["🔑 멀티팩터 인증 (MFA)"]
   MFA --> ZTX["🌐 제로트러스트 SASE 게이트웨이"]
   
-  subgraph MicroSegmentation ["🛡️ 마이크로 세그멘테이션 보안존"]
+  subgraph MicroSegmentation["🛡️ 마이크로 세그멘테이션 보안존"]
     ZTX -->|최소권한 정책| App1["📊 사내 ERP"]
     ZTX -->|최소권한 정책| App2["🏗️ 스마트 스튜디오"]
     ZTX -->|최소권한 정책| App3["📚 GIJO WIKI"]
   end
   
-  subgraph ContinuousTrust ["🔍 지속적 신뢰 검증"]
+  subgraph ContinuousTrust["🔍 지속적 신뢰 검증"]
     EDR_Agent["🔎 단말 상태 검증 (EDR)"]
     PolicyEngine["⚙️ 동적 권한 정책 엔진"]
   end
   
-  RemoteWorker -.-> EDR_Agent
-  EDR_Agent -.-> PolicyEngine
-  PolicyEngine -.-> ZTX`
+  RemoteWorker -. 단말검증 .-> EDR_Agent
+  EDR_Agent -. 상태전송 .-> PolicyEngine
+  PolicyEngine -. 정책적용 .-> ZTX`
     };
 
     // Load docs: Guarantee defaultWikiDocs are ALWAYS present
