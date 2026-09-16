@@ -1297,18 +1297,44 @@ const htmlContent = `<!DOCTYPE html>
           </div>
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.6rem;">
+        <div style="display:grid; grid-template-columns: 1.4fr 1fr 1.6fr; gap:0.6rem;">
           <div>
-            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">카테고리</label>
-            <input type="text" id="custSolCategory" class="search-input" placeholder="예: 방화벽, EDR, DLP, 접근제어..." style="background:#fff; margin-top:0.25rem;">
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">카테고리 (선택) *</label>
+            <select id="custSolCategory" class="search-input" style="background:#fff; margin-top:0.25rem;">
+              <option value="네트워크/경계보안 (방화벽/IPS/VPN)">네트워크/경계보안 (방화벽/IPS/VPN)</option>
+              <option value="엔드포인트 보안 (EDR/안티바이러스/매체제어)">엔드포인트 보안 (EDR/안티바이러스/매체제어)</option>
+              <option value="데이터 보안 & DLP (DB암호화/DLP/문서중앙화)">데이터 보안 & DLP (DB암호화/DLP/문서중앙화)</option>
+              <option value="접근통제 & 계정관리 (서버접근제어/IAM/PAM/MFA)">접근통제 & 계정관리 (서버접근제어/IAM/PAM/MFA)</option>
+              <option value="애플리케이션 & 웹 보안 (WAAP/WAF/API보안)">애플리케이션 & 웹 보안 (WAAP/WAF/API보안)</option>
+              <option value="AI & 공급망 보안 (AI SPM/AI-BOM/SBOM/SCA)">AI & 공급망 보안 (AI SPM/AI-BOM/SBOM/SCA)</option>
+              <option value="보안관제 & SIEM/SOAR (SIEM/SOAR/ASM/EASM)">보안관제 & SIEM/SOAR (SIEM/SOAR/ASM/EASM)</option>
+              <option value="취약점 점검 & 노출관리 (Vulnerability/Exposure)">취약점 점검 & 노출관리 (Vulnerability/Exposure)</option>
+              <option value="보안인프라 & 인증서관리 (CLM/PKI/HSM/KMS)">보안인프라 & 인증서관리 (CLM/PKI/HSM/KMS)</option>
+              <option value="엔드포인트 자산관리 (UEM/MDM)">엔드포인트 자산관리 (UEM/MDM)</option>
+              <option value="보안운영 자동화 플랫폼">보안운영 자동화 플랫폼</option>
+              <option value="기타 맞춤형 솔루션">기타 맞춤형 솔루션</option>
+            </select>
           </div>
           <div>
             <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">표준 도입단가 (원)</label>
             <input type="number" id="custSolPrice" class="search-input" placeholder="예: 30000000" style="background:#fff; margin-top:0.25rem;" value="25000000">
           </div>
           <div>
-            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">ISMS-P 인증 매핑</label>
-            <input type="text" id="custSolIsms" class="search-input" placeholder="예: 2.4 네트워크 접근통제" style="background:#fff; margin-top:0.25rem;" value="2.4 네트워크 접근통제">
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">ISMS-P 인증 매핑 (선택) *</label>
+            <select id="custSolIsms" class="search-input" style="background:#fff; margin-top:0.25rem;">
+              <option value="2.1 정책, 조직, 자산 관리 (2.1.2 자산 식별/SW 라이선스)">2.1 자산관리 (자산 식별/SW 라이선스)</option>
+              <option value="2.3 취약점 점검 및 조치 (2.3.1 취약점 스캔 및 패치)">2.3 취약점 점검 및 조치 (스캔/패치)</option>
+              <option value="2.4 물리 보안 (2.4.1 출입통제/보호구역)">2.4 물리 보안 (출입통제/보호구역)</option>
+              <option value="2.5 인증 및 권한 관리 (2.5.1 계정식별, 2.5.4 권한부여)">2.5 인증 및 권한 관리 (식별/MFA/권한)</option>
+              <option value="2.6 접근통제 (2.6.1 네트워크 접근통제, 2.6.7 서버통제)">2.6 접근통제 (망분리/방화벽/서버통제)</option>
+              <option value="2.7 암호화 적용 (2.7.2 전송구간, 2.7.3 저장데이터 암호화)">2.7 암호화 적용 (DB암호화/전송암호화)</option>
+              <option value="2.8 정보시스템 도입/개발 (2.8.6 오픈소스/SBOM 공급망)">2.8 개발보안 (오픈소스/SBOM 공급망)</option>
+              <option value="2.9 시스템 및 서비스 운영관리 (2.9.1 변경관리, 2.9.3 백업)">2.9 시스템 운영관리 (변경관리/백업)</option>
+              <option value="2.10 보안 시스템 운영 (2.10.1 보안장비 설치 및 룰 관리)">2.10 보안시스템 운영 (룰 관리/오탐튜닝)</option>
+              <option value="2.11 로그 및 접속기록 관리 (2.11.1 접속기록 보관 및 위변조 방지)">2.11 로그/접속기록 관리 (위변조방지)</option>
+              <option value="2.12 사고 예방 및 대응 (2.12.1 침해사고 대응 런북)">2.12 침해사고 예방 및 대응 (런북)</option>
+              <option value="2.13 재해 복구 (2.13.1 비상대응체계)">2.13 재해 복구 (비상대응체계)</option>
+            </select>
           </div>
         </div>
 
@@ -1318,11 +1344,26 @@ const htmlContent = `<!DOCTYPE html>
         </div>
 
         <div>
-          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub); display:flex; justify-content:space-between;">
-            <span>📖 실무 운영 매뉴얼 & 점검 절차 (담당자가 쉽게 확인하는 가이드) *</span>
-            <span style="font-weight:400; color:var(--text-dim);">콘솔 접속 경로, 일일 점검 항목, 장애 런북 등</span>
-          </label>
-          <textarea id="custSolManual" class="code-editor" style="height:120px; margin-top:0.25rem;" placeholder="- 관리 콘솔 접속: https://sec-admin.internal:8443&#10;- 일일 점검: 데몬 상태 및 이상 경보 로그 확인&#10;- 장애 발생 시: 1차 데몬 재기동 후 비상 연락망(내선 112) 인계&#10;- 정기 유지보수: 매월 마지막 주 금요일 정기 점검"></textarea>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">
+              📖 실무 운영 매뉴얼 & 지식 베이스 (담당자 확인 가이드) *
+            </label>
+            <span style="font-size:0.7rem; color:var(--text-dim);">원하는 양식을 선택하면 자동으로 채워집니다.</span>
+          </div>
+
+          <!-- Template Selection Bar -->
+          <div style="display:flex; align-items:center; gap:0.35rem; margin-top:0.35rem; margin-bottom:0.25rem; flex-wrap:wrap; background:#f1f5f9; padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--border);">
+            <span style="font-size:0.72rem; color:var(--text-sub); font-weight:800; display:flex; align-items:center; gap:0.25rem;">
+              <i data-lucide="layout-template" style="width:13px; height:13px; color:var(--primary);"></i> 템플릿 양식:
+            </span>
+            <button type="button" class="btn btn-sm" style="font-size:0.7rem; padding:2px 8px; background:#fff;" onclick="applyManualTemplate('RUNBOOK')">① 실무 운영 & 런북</button>
+            <button type="button" class="btn btn-sm" style="font-size:0.7rem; padding:2px 8px; background:#fff;" onclick="applyManualTemplate('ISMS_AUDIT')">② ISMS-P 수검 증적</button>
+            <button type="button" class="btn btn-sm" style="font-size:0.7rem; padding:2px 8px; background:#fff;" onclick="applyManualTemplate('INCIDENT')">③ 침해사고 긴급대응</button>
+            <button type="button" class="btn btn-sm" style="font-size:0.7rem; padding:2px 8px; background:#fff;" onclick="applyManualTemplate('SPEC_SHEET')">④ 기술규격 & 아키텍처</button>
+            <button type="button" class="btn btn-sm" style="font-size:0.7rem; padding:2px 8px; background:#fff;" onclick="applyManualTemplate('ACCESS_POLICY')">⑤ 계정/권한 정책</button>
+          </div>
+
+          <textarea id="custSolManual" class="code-editor" style="height:140px; margin-top:0.25rem;" placeholder="위의 [템플릿 양식]을 클릭하거나, PDF를 업로드하면 자동으로 채워집니다."></textarea>
         </div>
 
         <div>
@@ -1809,6 +1850,100 @@ const htmlContent = `<!DOCTYPE html>
       }, false);
     }
 
+    // --- 2.9 KNOWLEDGE MANUAL TEMPLATES MODULE ---
+    const manualTemplates = {
+      RUNBOOK: 
+        '# [솔루션명] 실무 운영 매뉴얼 & 일일 런북\\n\\n' +
+        '## 1. 관리 콘솔 접속 및 인증\\n' +
+        '- 웹 콘솔 URL: https://sec-console.internal:8443\\n' +
+        '- 접속 방식: 2차 인증(OTP / FIDO2) 필수 연동\\n' +
+        '- 기본 관리자 역할: SecOps-Admin / Read-Only Auditor\\n\\n' +
+        '## 2. 정기 점검 체크리스트\\n' +
+        '- **일일 점검**: 엔진 데몬 상태(\\x60systemctl status [데몬명]\\x60) 확인, 이상 Alert 및 차단 이벤트 확인\\n' +
+        '- **주간 점검**: 오탐/과탐 룰 정책 튜닝, 에이전트 버전 무결성 및 통신 상태 전수 스캔\\n' +
+        '- **월간 점검**: 관리자 접속 감사기록 WORM 스토리지 영구 보관, 정기 Config 오프사이트 백업\\n\\n' +
+        '## 3. 긴급 장애 및 비상 대응 절차\\n' +
+        '1. **서비스 응답 지연 시**: 프로세스 1차 재기동 (\\x60systemctl restart [데몬명]\\x60)\\n' +
+        '2. **패킷 드롭/통신 장애 시**: 게이트웨이 하드웨어/소프트웨어 Bypass 모드 즉시 전환\\n' +
+        '3. **비상 연락망**: 기술지원 핫라인 (1588-XXXX, 비상 내선 112)',
+
+      ISMS_AUDIT:
+        '# [솔루션명] ISMS-P 인증 수검 및 감사 증적 대응서\\n\\n' +
+        '## 1. 관련 인증 통제항목\\n' +
+        '- 통제 기준: ISMS-P 2.6 접근통제 / 2.10 보안시스템 운영 / 2.11 로그 관리\\n' +
+        '- 사내 규정 매핑: 정보보호 관리지침 제15조(시스템 접근통제 및 권한 관리)\\n\\n' +
+        '## 2. 기술적 보호조치 구현 현황\\n' +
+        '- **접근 권한 통제**: 최소 권한의 원칙(Least Privilege)에 따른 관리자 IP 화이트리스트 적용\\n' +
+        '- **데이터 암호화**: 저장 데이터(AES-256) 및 전송 구간(TLS 1.3) 전수 암호화 적용\\n' +
+        '- **세션 타임아웃**: 관리자 콘솔 15분 미사용 시 자동 로그아웃 및 활성 세션 강제 만료\\n\\n' +
+        '## 3. 감사 증적(Audit Evidence) 추출 방법\\n' +
+        '- **접속 기록 증적**: 콘솔 > 로그 관리 > 관리자 감사 로그 > 최근 1년 치 원본 CSV/PDF 추출\\n' +
+        '- **정책 변경 이력**: 정책 관리 > 변경 대장 > 결재 문서 번호 대조 확인\\n' +
+        '- **무결성 검증**: SHA-256 해시값 대조를 통한 로그 위변조 부재 증명',
+
+      INCIDENT:
+        '# [솔루션명] 침해사고 긴급 대응 및 격리 런북\\n\\n' +
+        '## 1. 침해사고 판단 기준 (Trigger)\\n' +
+        '- 대량의 비정상 아웃바운드 트래픽 감지 (C2 통신 및 대외 데이터 유출 의심)\\n' +
+        '- 동일 계정의 다수 자산 브루트포스(Brute Force) 로그인 실패 및 권한 상승 시도\\n' +
+        '- 랜섬웨어 암호화 행위 및 비인가 파일 대량 변조 감지\\n\\n' +
+        '## 2. 초동 조치 및 긴급 격리 (Isolation)\\n' +
+        '1. **호스트 네트워크 격리**: 관리 콘솔에서 해당 자산 [Network Isolation] 즉시 가동\\n' +
+        '2. **악성 프로세스 차단**: C2 IP/도메인 경계 방화벽 긴급 Drop 룰 즉시 등록\\n' +
+        '3. **세션 강제 종료**: 감염 자산의 활성 토큰 및 관리자 세션 강제 무효화(Revoke)\\n\\n' +
+        '## 3. 포렌식 로그 수집 및 증거 보존\\n' +
+        '- 활성 메모리 덤프 수집: \\x60winpmem\\x60 / \\x60LiME\\x60 활용 메모리 보존\\n' +
+        '- 이벤트 로그 백업: 보안 이벤트 로그(Security.evtx / syslog) WORM 스토리지 복사\\n' +
+        '- 침해사고 신고: 사고 발생 인지 후 24시간 이내 KISA 및 유관기관 비상 보고 (118)',
+
+      SPEC_SHEET:
+        '# [솔루션명] 시스템 기술 규격서 & 아키텍처\\n\\n' +
+        '## 1. 권장 하드웨어 사양\\n' +
+        '- CPU: 최소 8 Core (권장 16 Core 이상)\\n' +
+        '- RAM: 최소 32 GB (권장 64 GB ECC RAM)\\n' +
+        '- Storage: NVMe SSD 1 TB 이상 (IOPS 50,000+ 권장)\\n' +
+        '- 지원 OS: Red Hat Enterprise Linux 8.x/9.x, Rocky Linux, Ubuntu 22.04 LTS\\n\\n' +
+        '## 2. 네트워크 및 포트 구성\\n' +
+        '- 관리 콘솔: TCP 8443 (HTTPS)\\n' +
+        '- 에이전트 통신: TCP 443 (gRPC / TLS 1.3)\\n' +
+        '- 데이터베이스/클러스터: TCP 5432 / 9000\\n' +
+        '- Syslog 연동: UDP/TCP 514 (CEF/LEEF 포맷)\\n\\n' +
+        '## 3. 고가용성(HA) 구성 방식\\n' +
+        '- Active-Standby / Active-Active 클러스터 지원\\n' +
+        '- VIP(Virtual IP) 및 Keepalived를 통한 3초 이내 자동 Failover 무중단 서비스',
+
+      ACCESS_POLICY:
+        '# [솔루션명] 계정 권한 및 접근 정책 관리 지침\\n\\n' +
+        '## 1. 역할 기반 접근통제 (RBAC) 매트릭스\\n' +
+        '- **Super-Admin (CISO/보안총괄)**: 전사 정책 등록, 감사로그 조회, 라이선스 관리\\n' +
+        '- **SecOps-Engineer (운영자)**: 일일 점검, 임시 룰 신청, 장애 1차 복구\\n' +
+        '- **Auditor (감사자)**: 읽기 전용(Read-Only), 보고서 및 증적 추출 전용\\n\\n' +
+        '## 2. 계정 보안 정책 기준\\n' +
+        '- 비밀번호 복잡도: 영문 대/소문자, 숫자, 특수문자 조합 10자리 이상\\n' +
+        '- 변경 주기: 90일 주기 강제 변경 및 직전 3회 비밀번호 재사용 금지\\n' +
+        '- 2차 인증(MFA): FIDO2 보안키 또는 모바일 OTP 필수 적용\\n' +
+        '- 계정 잠금: 5회 연속 인증 실패 시 계정 30분 잠금\\n\\n' +
+        '## 3. 예외 및 임시 권한 승인 절차\\n' +
+        '- 긴급 점검 시 임시 권한 신청서 전자결재 득한 후 최대 24시간 한시 부여\\n' +
+        '- 작업 완료 후 즉시 권한 자동 회수 및 작업 감사 보고서 제출 의무'
+    };
+
+    function applyManualTemplate(type) {
+      const template = manualTemplates[type];
+      if (!template) return;
+
+      const manualEl = document.getElementById('custSolManual');
+      const solName = document.getElementById('custSolName').value.trim() || '보안솔루션';
+
+      if (manualEl.value.trim().length > 40) {
+        if (!confirm('현재 작성 중인 매뉴얼 내용이 선택한 템플릿 양식으로 대체됩니다. 계속하시겠습니까?')) {
+          return;
+        }
+      }
+
+      manualEl.value = template.replace(/\\[솔루션명\\]/g, solName);
+    }
+
     // --- 3. CUSTOM SOLUTION MANAGEMENT MODULE ---
     function openAddCustomSolModal() {
       document.getElementById('customSolEditIndex').value = '-1';
@@ -1816,11 +1951,11 @@ const htmlContent = `<!DOCTYPE html>
       document.getElementById('custSolName').value = '';
       document.getElementById('custSolVendor').value = '';
       document.getElementById('custSolVendorType').value = '국산';
-      document.getElementById('custSolCategory').value = '';
+      document.getElementById('custSolCategory').value = '네트워크/경계보안 (방화벽/IPS/VPN)';
       document.getElementById('custSolPrice').value = '25000000';
-      document.getElementById('custSolIsms').value = '2.4 네트워크 접근통제';
+      document.getElementById('custSolIsms').value = '2.6 접근통제 (2.6.1 네트워크 접근통제, 2.6.7 서버통제)';
       document.getElementById('custSolPurpose').value = '';
-      document.getElementById('custSolManual').value = '- 콘솔 접속: https://sec-admin.internal:8443\\n- 일일 점검: 데몬 정상 동작 및 이벤트 로그 확인\\n- 장애 런북: 데몬 재기동(systemctl restart sec-agent) 후 비상 연락';
+      document.getElementById('custSolManual').value = manualTemplates.RUNBOOK.replace(/\\[솔루션명\\]/g, '사내 신규 솔루션');
       document.getElementById('custSolDiagram').value = 'graph LR\\n  User --> SecurityGateway --> InternalServer';
 
       const statusEl = document.getElementById('pdfUploadStatus');
@@ -1841,11 +1976,43 @@ const htmlContent = `<!DOCTYPE html>
       document.getElementById('custSolName').value = sol.name;
       document.getElementById('custSolVendor').value = (sol.vendor || '').replace(/\\s*\\[(국산|외산|자체구축|단독 총판)\\]/g, '').trim();
       document.getElementById('custSolVendorType').value = sol.vendorType || (sol.vendor.includes('외산') ? '외산' : '국산');
-      document.getElementById('custSolCategory').value = sol.category || sol.sheetCategory || '';
+
+      // Category select matching
+      const catSelect = document.getElementById('custSolCategory');
+      const targetCat = sol.category || sol.sheetCategory || '';
+      let catFound = false;
+      for (let i = 0; i < catSelect.options.length; i++) {
+        const val = catSelect.options[i].value;
+        if (val === targetCat || val.includes(targetCat) || targetCat.includes(val.split(' ')[0])) {
+          catSelect.selectedIndex = i;
+          catFound = true;
+          break;
+        }
+      }
+      if (!catFound && targetCat) {
+        catSelect.add(new Option(targetCat, targetCat, true, true));
+      }
+
       document.getElementById('custSolPrice').value = sol.price || 0;
-      document.getElementById('custSolIsms').value = sol.ismsMapping || '';
+
+      // ISMS-P select matching
+      const ismsSelect = document.getElementById('custSolIsms');
+      const targetIsms = sol.ismsMapping || '';
+      let ismsFound = false;
+      for (let i = 0; i < ismsSelect.options.length; i++) {
+        const val = ismsSelect.options[i].value;
+        if (val.includes(targetIsms.slice(0, 3)) || val.includes(targetIsms) || targetIsms.includes(val.slice(0, 3))) {
+          ismsSelect.selectedIndex = i;
+          ismsFound = true;
+          break;
+        }
+      }
+      if (!ismsFound && targetIsms) {
+        ismsSelect.add(new Option(targetIsms, targetIsms, true, true));
+      }
+
       document.getElementById('custSolPurpose').value = sol.purpose || sol.overview || '';
-      document.getElementById('custSolManual').value = sol.manual || '';
+      document.getElementById('custSolManual').value = sol.manual || manualTemplates.RUNBOOK.replace(/\\[솔루션명\\]/g, sol.name);
       document.getElementById('custSolDiagram').value = sol.architectureDiagram || '';
 
       const statusEl = document.getElementById('pdfUploadStatus');
