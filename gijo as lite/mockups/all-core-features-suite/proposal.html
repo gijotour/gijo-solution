@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIJO AS Lite — GIJO AS 코어 5대 엔터프라이즈 기능 전수 이식 추천 시안</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --bg-main: #f8fafc;
+      --bg-panel: #ffffff;
+      --border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --text-dim: #94a3b8;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
+    body { background: var(--bg-main); color: var(--text-main); padding: 1.5rem; }
+    
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    
+    .feature-nav {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1.5px solid var(--border);
+      padding-bottom: 0.75rem;
+      margin-bottom: 1.25rem;
+      overflow-x: auto;
+    }
+    .feature-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text-sub);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .feature-btn:hover { background: #f1f5f9; color: var(--text-main); }
+    .feature-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .feature-pane { display: none; }
+    .feature-pane.active { display: block; }
+
+    .excel-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+    .excel-table th, .excel-table td { border: 1px solid var(--border); padding: 6px 10px; }
+    .excel-table th { background: #f8fafc; font-weight: 700; color: var(--text-sub); text-align: left; }
+    .excel-table tr:hover { background: #f8fafc; }
+    
+    .badge { padding: 2px 7px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; display: inline-block; }
+    .badge.success { background: #ecfdf5; color: #059669; }
+    .badge.warning { background: #fffbeb; color: #b45309; }
+    .badge.danger { background: #fee2e2; color: #dc2626; }
+    .badge.purple { background: #f3e8ff; color: #7c3aed; }
+    .badge.info { background: #eff6ff; color: #2563eb; }
+
+    .btn {
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  </style>
+</head>
+<body>
+
+  <div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <div>
+        <span class="badge purple" style="margin-bottom:4px;">GIJO AS Core to Lite Fusion Suite</span>
+        <h2 style="font-size:1.3rem; font-weight:800;">🚀 GIJO AS 원본 5대 핵심 엔터프라이즈 기능 전수 이식 시안</h2>
+        <p style="font-size:0.8rem; color:var(--text-sub); margin-top:3px;">
+          원본 코어의 실물 위협 인텔리전스, CISA KEV/VEX, 섀도우 AI 통제, 3대 법령 DB, SLA/인수인계서를 단일 스위트로 통합합니다.
+        </p>
+      </div>
+      <span class="badge success" style="font-size:0.75rem;">엔터프라이즈 완결형</span>
+    </div>
+
+    <!-- 5 Core Features Navigation -->
+    <div class="feature-nav">
+      <button class="feature-btn active" onclick="switchFeature('threat')">
+        <i data-lucide="crosshair" style="width:14px; height:14px;"></i> 🎯 MITRE ATT&CK & CTI
+      </button>
+      <button class="feature-btn" onclick="switchFeature('vex')">
+        <i data-lucide="shield-check" style="width:14px; height:14px;"></i> 🔍 CISA KEV & VEX 취약점 선언
+      </button>
+      <button class="feature-btn" onclick="switchFeature('aigov')">
+        <i data-lucide="bot" style="width:14px; height:14px;"></i> 🛡️ 섀도우 AI & OWASP LLM
+      </button>
+      <button class="feature-btn" onclick="switchFeature('law')">
+        <i data-lucide="scale" style="width:14px; height:14px;"></i> ⚖️ 3대 보안 법령 & EOL 대장
+      </button>
+      <button class="feature-btn" onclick="switchFeature('handover')">
+        <i data-lucide="clock" style="width:14px; height:14px;"></i> ⏱️ 보안 SLA & 인수인계서
+      </button>
+    </div>
+
+    <!-- PANE 1: MITRE ATT&CK & CTI & 침해사고 60선 -->
+    <div id="pane-threat" class="feature-pane active">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <span style="font-weight:800; font-size:0.85rem;">🎯 MITRE ATT&CK 14대 공격 전술 매핑 & 사내 침해사고 60선</span>
+        <span class="badge info">ATT&CK v15 / ATLAS 호환</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:0.5rem; margin-bottom:1rem;">
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:0.6rem; font-size:0.72rem;">
+          <b style="color:var(--primary);">TA0001 정찰</b><br>T1595 능동 스캔
+        </div>
+        <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:6px; padding:0.6rem; font-size:0.72rem;">
+          <b style="color:#dc2626;">TA0002 초기접근</b><br>T1190 취약점 악용
+        </div>
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:0.6rem; font-size:0.72rem;">
+          <b style="color:var(--primary);">TA0003 실행</b><br>T1059 명령/쉘
+        </div>
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:0.6rem; font-size:0.72rem;">
+          <b style="color:var(--primary);">TA0004 지속성</b><br>T1505 웹셸 설치
+        </div>
+        <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:6px; padding:0.6rem; font-size:0.72rem;">
+          <b style="color:#dc2626;">TA0008 횡적이동</b><br>T1021 원격 서비스
+        </div>
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:0.6rem; font-size:0.72rem;">
+          <b style="color:var(--primary);">TA0010 유출</b><br>T1041 C2 채널
+        </div>
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:0.6rem; font-size:0.72rem;">
+          <b style="color:var(--primary);">TA0040 파괴/영향</b><br>T1486 데이터 암호화
+        </div>
+      </div>
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th>사고 No</th>
+            <th>실물 침해사고 유형</th>
+            <th>타겟 시스템</th>
+            <th>악용 CVE / TTPs</th>
+            <th>피해 영향도</th>
+            <th>방어 및 조치 결과</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>INC-2026-01</td>
+            <td><b>금융망 WAS Spring 역직렬화 RCE 침투 시도</b></td>
+            <td>금융 코어 WAS (10.10.40.20)</td>
+            <td><span class="badge danger">CVE-2016-1000027</span> / T1190</td>
+            <td>임의 코드 실행 및 내부 횡적이동 위험</td>
+            <td><span class="badge success">WAAP 룰셋 차단 + 호스트 긴급 격리</span></td>
+          </tr>
+          <tr>
+            <td>INC-2026-02</td>
+            <td><b>대외계 톰캣 대용량 요청 DoS 공격</b></td>
+            <td>금융 대외계 AP (192.168.10.5)</td>
+            <td><span class="badge warning">CVE-2025-24813</span> / T1499</td>
+            <td>결제 API 응답 지연 (5초 이상)</td>
+            <td><span class="badge success">커넥터 바디 2MB 제한 가상패치</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- PANE 2: CISA KEV & VEX 취약점 선언 -->
+    <div id="pane-vex" class="feature-pane">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <span style="font-weight:800; font-size:0.85rem;">🔍 CISA KEV 실시간 악용 대조 & CycloneDX VEX 공식 선언문 출력</span>
+        <button class="btn primary" onclick="alert('CycloneDX 1.5 규격 VEX JSON 파일이 출력되었습니다.')">
+          <i data-lucide="download" style="width:13px; height:13px;"></i> 공인 VEX JSON/A4 출력
+        </button>
+      </div>
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th>CVE 코드</th>
+            <th>SBOM 부품명</th>
+            <th>CISA KEV 등재 여부</th>
+            <th>실제 악용 랜섬웨어</th>
+            <th>VEX 조치 상태 (Status)</th>
+            <th>정당화 사유 (Justification)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>CVE-2016-1000027</b></td>
+            <td>spring-framework 5.3.39</td>
+            <td><span class="badge danger">CISA KEV 등재 (Known Exploited)</span></td>
+            <td>LockBit 3.0, Clop</td>
+            <td><span class="badge success">not_affected (영향 없음)</span></td>
+            <td>Imperva WAAP 역직렬화 차단 가상패치 가동 완료</td>
+          </tr>
+          <tr>
+            <td><b>CVE-2025-24813</b></td>
+            <td>apache-tomcat 10.1.34</td>
+            <td><span class="badge warning">KISA 긴급 권고</span></td>
+            <td>Mirai Variant DoS</td>
+            <td><span class="badge success">fixed (조치 완료)</span></td>
+            <td>요청 바디 크기 제한 룰 적용 완료</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- PANE 3: 섀도우 AI & OWASP LLM 톱10 -->
+    <div id="pane-aigov" class="feature-pane">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <span style="font-weight:800; font-size:0.85rem;">🛡️ 사내 섀도우 AI(비인가 LLM) 탐지 대장 & OWASP LLM 10대 점검</span>
+        <span class="badge info">NIST AI RMF 1.0 연동</span>
+      </div>
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th>탐지 일시</th>
+            <th>부서 / 임직원</th>
+            <th>비인가 AI 서비스 (Shadow AI)</th>
+            <th>전송 시도 데이터</th>
+            <th>위험 등급</th>
+            <th>DLP 게이트 조치</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2026-09-17 00:10</td>
+            <td>마케팅팀 / 김OO</td>
+            <td>무료 웹 번역 AI (DeepL Free)</td>
+            <td>신규 금융상품 약관 초안 (고객 주민번호 포함)</td>
+            <td><span class="badge danger">고위험 기밀유출</span></td>
+            <td><span class="badge danger">실시간 전송 차단 (HTTP 403)</span></td>
+          </tr>
+          <tr>
+            <td>2026-09-16 19:40</td>
+            <td>개발팀 / 박OO</td>
+            <td>외부 오픈소스 코딩 AI</td>
+            <td>DB 커넥션 패스워드 및 엔드포인트</td>
+            <td><span class="badge danger">인증정보 유출</span></td>
+            <td><span class="badge danger">자동 마스킹 후 차단</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- PANE 4: 3대 보안 법령 & EOL 대장 -->
+    <div id="pane-law" class="feature-pane">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <span style="font-weight:800; font-size:0.85rem;">⚖️ 전자금융감독규정 · 개인정보보호법 · 정보통신망법 3대 법령 & 단종(EOL) 대장</span>
+        <span class="badge purple">법정 벌칙 및 과태료 매핑</span>
+      </div>
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th>법령 구분</th>
+            <th>조항 및 명칭</th>
+            <th>법적 요구사항</th>
+            <th>위반 시 법정 제재 / 벌칙</th>
+            <th>사내 1차 증적 연동</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>전자금융감독규정</b></td>
+            <td>제15조 (해킹방지대책 / 망분리)</td>
+            <td>내부업무망과 외부망 분리 및 인바운드 차단</td>
+            <td>기관경고 및 최고 5천만원 과태료</td>
+            <td><span class="badge success">FOCS 경계방화벽 룰셋 연동</span></td>
+          </tr>
+          <tr>
+            <td><b>개인정보보호법</b></td>
+            <td>제29조 (안전조치의무)</td>
+            <td>개인정보 DB 암호화 및 접근통제 기록 보관</td>
+            <td>전체 매출액의 3% 이하 과징금</td>
+            <td><span class="badge success">CipherTrust KMS 암호화 연동</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- PANE 5: 보안 SLA & 인수인계서 -->
+    <div id="pane-handover" class="feature-pane">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <span style="font-weight:800; font-size:0.85rem;">⏱️ 취약점 조치 SLA 만료 타이머 & 담당자 인수인계서(Handover) A4 일괄 출력</span>
+        <button class="btn primary" onclick="alert('전사 20종 솔루션 계약 및 관리자 계정이 포함된 공식 보안 업무 인수인계서 A4가 출력되었습니다.')">
+          <i data-lucide="printer" style="width:13px; height:13px;"></i> 인수인계서 A4 인쇄
+        </button>
+      </div>
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th>취약점 / 조치 과업</th>
+            <th>심각도</th>
+            <th>법정 SLA 기한</th>
+            <th>경과 시간 / 잔여일</th>
+            <th>담당자</th>
+            <th>SLA 준수 상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>JEUS 8.5 Spring 취약점 가상패치</b></td>
+            <td><span class="badge danger">Critical (9.8)</span></td>
+            <td>식별 후 7일 이내</td>
+            <td><b style="color:#dc2626;">D-2일 잔여</b> (경과: 5일)</td>
+            <td>인프라보안팀 홍길동</td>
+            <td><span class="badge warning">SLA 임박 (조치중)</span></td>
+          </tr>
+          <tr>
+            <td><b>WizCLM 인증서 갱신 품의</b></td>
+            <td><span class="badge warning">High</span></td>
+            <td>만료 30일 이전</td>
+            <td><b>D-28일 잔여</b></td>
+            <td>보안기획팀 이순신</td>
+            <td><span class="badge success">SLA 정상 이행</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    function switchFeature(featureId) {
+      document.querySelectorAll('.feature-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.feature-pane').forEach(p => p.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      const target = document.getElementById('pane-' + featureId);
+      if (target) target.classList.add('active');
+      lucide.createIcons();
+    }
+  </script>
+</body>
+</html>

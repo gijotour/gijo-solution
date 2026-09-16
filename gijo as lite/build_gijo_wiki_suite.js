@@ -3,11 +3,15 @@ const path = require('path');
 const { allWikiDocs, enhancedQuickQuestions, solutionsCatalog } = require('./load_all_wiki_knowledge.js');
 
 const targetHtmlPath = path.join(__dirname, 'GIJO_Security_ERP_Suite.html');
-const electronIndexPath = path.join(__dirname, 'gijo-security-erp-app', 'index.html');
+const electronIndexPath = path.join(__dirname, 'index.html');
 
 const docsJson = JSON.stringify(allWikiDocs);
 const quickQuestionsJson = JSON.stringify(enhancedQuickQuestions);
 const solutionsCatalogJson = JSON.stringify(solutionsCatalog);
+
+const incidentSeedPath = path.join(__dirname, '..', 'server', 'src', 'engine', 'incidentcases-seed.json');
+const rawIncidentSeed = fs.existsSync(incidentSeedPath) ? JSON.parse(fs.readFileSync(incidentSeedPath, 'utf8')) : { cases: [] };
+const incidentCasesJson = JSON.stringify(rawIncidentSeed.cases || []);
 
 const htmlContent = `<!DOCTYPE html>
 <html lang="ko">
@@ -1135,14 +1139,34 @@ const htmlContent = `<!DOCTYPE html>
             <span class="tab-text">일일 보안점검</span>
             <span class="nav-badge success">완료</span>
           </button>
+          <button id="tabBtn-law" class="tab-btn" onclick="switchView('law')" title="3대 보안 법령 & EOL 대장 (전자금융감독규정·개인정보보호법·정보통신망법 및 단종 대장)">
+            <i data-lucide="scale" style="width:15px; height:15px;"></i>
+            <span class="tab-text">3대 법령 & EOL 대장</span>
+            <span class="nav-badge purple">과태료</span>
+          </button>
+          <button id="tabBtn-handover" class="tab-btn" onclick="switchView('handover')" title="보안 SLA & 인수인계서 (취약점 조치 타이머 & 솔루션 인수인계서 A4)">
+            <i data-lucide="clock" style="width:15px; height:15px;"></i>
+            <span class="tab-text">보안 SLA & 인수인계서</span>
+            <span class="nav-badge danger">D-2</span>
+          </button>
         </div>
 
         <!-- GROUP 2: 자산 & 공급망 보안 -->
         <div class="menu-group">
           <div class="menu-group-header">
-            <span>자산 & 공급망 보안</span>
-            <i data-lucide="shield-alert" style="width:12px; height:12px;"></i>
+            <span>위협 분석 & 취약점 통제</span>
+            <i data-lucide="crosshair" style="width:12px; height:12px;"></i>
           </div>
+          <button id="tabBtn-threat" class="tab-btn" onclick="switchView('threat')" title="MITRE ATT&CK & 침해사고 (14대 공격 전술 매트릭스 & 실물 침해사고 20선)">
+            <i data-lucide="target" style="width:15px; height:15px;"></i>
+            <span class="tab-text">MITRE ATT&CK & 침해사고</span>
+            <span class="nav-badge danger">20선</span>
+          </button>
+          <button id="tabBtn-vex" class="tab-btn" onclick="switchView('vex')" title="CISA KEV & VEX 취약점 선언 (실시간 악용 CVE 대조 & CycloneDX VEX JSON)">
+            <i data-lucide="shield-alert" style="width:15px; height:15px;"></i>
+            <span class="tab-text">KEV & VEX 취약점 선언</span>
+            <span class="nav-badge warning">CISA</span>
+          </button>
           <button id="tabBtn-sbom" class="tab-btn" onclick="switchView('sbom')" title="IT 자산 & SBOM (전사 자산 대장, CycloneDX 부품, CVE 상관분석)">
             <i data-lucide="boxes" style="width:15px; height:15px;"></i>
             <span class="tab-text">IT 자산 & SBOM</span>
@@ -1165,9 +1189,14 @@ const htmlContent = `<!DOCTYPE html>
         <!-- GROUP 3: 인텔리전스 & 재무 -->
         <div class="menu-group">
           <div class="menu-group-header">
-            <span>인텔리전스 & 재무</span>
+            <span>AI 거버넌스 & 인텔리전스</span>
             <i data-lucide="brain-circuit" style="width:12px; height:12px;"></i>
           </div>
+          <button id="tabBtn-aigov" class="tab-btn" onclick="switchView('aigov')" title="섀도우 AI & OWASP LLM (사내 비인가 AI DLP 차단 & OWASP 10대 통제)">
+            <i data-lucide="bot" style="width:15px; height:15px;"></i>
+            <span class="tab-text">섀도우 AI & OWASP LLM</span>
+            <span class="nav-badge info">보안</span>
+          </button>
           <button id="tabBtn-wiki" class="tab-btn" onclick="switchView('wiki')" title="사내 지식고 & RAG (Synapse RAG 2.0 및 30종 실물 지침/교차검증)">
             <i data-lucide="book-open" style="width:15px; height:15px;"></i>
             <span class="tab-text">사내 지식고 & RAG</span>
@@ -2538,8 +2567,370 @@ iptables -A FORWARD -s 10.10.40.20 -d 192.168.10.5 -p tcp --dport 8088 -j ACCEPT
 
     </section>
 
+    <!-- VIEW 1: MITRE ATT&CK & 실물 침해사고 20선 (view-threat) -->
+    <section id="view-threat" class="view-page">
+      <div class="view-header">
+        <div class="view-header-title">
+          <div class="view-tag" style="background:#fee2e2; color:#dc2626; border-color:#fca5a5;">MITRE ATT&CK v15 / ATLAS</div>
+          <h2>🎯 MITRE ATT&CK 14대 공격 전술 매트릭스 & 사내 실물 침해사고 20선</h2>
+          <p>사내외 실물 침해사고(SKT 유심 유출, LGU+ CAS 계정 탈취, 인터파크 APT 등)의 TTPs 기법 및 CTI 위협 온톨로지 정밀 매핑</p>
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <input type="text" id="incidentSearchInput" class="search-input" placeholder="사고명, CVE, 기법(T1190 등) 검색..." style="width:240px; background:#fff;" oninput="filterIncidents()">
+          <select id="incidentIndustryFilter" class="search-input" style="background:#fff; width:120px;" onchange="filterIncidents()">
+            <option value="all">전체 산업군</option>
+            <option value="통신">통신</option>
+            <option value="전자상거래">전자상거래</option>
+            <option value="금융">금융/핀테크</option>
+            <option value="IT/포털">IT/포털</option>
+            <option value="공공/에너지">공공/에너지</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 14 Tactics 2x7 Matrix -->
+      <div class="white-panel" style="margin-bottom:1rem; padding:0.9rem; border:1px solid var(--border); border-radius:8px;">
+        <div style="font-size:0.8rem; font-weight:800; color:var(--text-main); margin-bottom:0.6rem; display:flex; justify-content:space-between; align-items:center;">
+          <span>⚡ MITRE ATT&CK 14대 공격 전술 체계 (전술 카드를 클릭하여 관련 사고 필터링)</span>
+          <span style="font-size:0.72rem; color:var(--primary); cursor:pointer; font-weight:700;" onclick="resetTacticFilter()">전체 전술 보기</span>
+        </div>
+        <div id="tacticMatrixGrid" style="display:grid; grid-template-columns:repeat(7, 1fr); gap:0.45rem;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Incident Cases Table -->
+      <div class="white-panel" style="padding:0; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+        <div style="padding:0.75rem 1rem; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <span style="font-weight:800; font-size:0.85rem; color:var(--text-main);">📋 실물 침해사고 상세 분석 및 교훈 대장</span>
+            <span id="incidentCountBadge" class="badge danger" style="margin-left:0.5rem;">20건</span>
+          </div>
+          <span style="font-size:0.72rem; color:var(--text-dim);">행을 클릭하면 침투 경로, 악용 CVE, 법정 과징금, 방어 대책 상세 팝업이 열립니다.</span>
+        </div>
+        <div class="excel-wrapper" style="max-height:500px; overflow-y:auto;">
+          <table class="excel-table">
+            <thead>
+              <tr>
+                <th class="center" style="width:45px;">No</th>
+                <th>침해사고 명칭 및 주요 피해</th>
+                <th class="center" style="width:70px;">발생연도</th>
+                <th class="center" style="width:85px;">산업군</th>
+                <th>공격 기법 (TTPs)</th>
+                <th>악용 CVE</th>
+                <th>타겟 자산 / 시스템</th>
+                <th class="center" style="width:90px;">상세 분석</th>
+              </tr>
+            </thead>
+            <tbody id="incidentTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: CISA KEV & VEX 취약점 선언 (view-vex) -->
+    <section id="view-vex" class="view-page">
+      <div class="view-header">
+        <div class="view-header-title">
+          <div class="view-tag" style="background:#fef3c7; color:#b45309; border-color:#fcd34d;">CISA KEV / CycloneDX 1.5 VEX</div>
+          <h2>🔍 CISA KEV 실시간 악용 취약점 대조 & CycloneDX VEX 공식 선언기</h2>
+          <p>미국 CISA 공개 KEV 및 랜섬웨어(LockBit, Clop) 악용 취약점을 대조하고 공인 VEX 상태(not_affected, fixed)를 선언·출력합니다.</p>
+        </div>
+        <div style="display:flex; gap:0.4rem;">
+          <button class="btn btn-primary" onclick="exportCycloneDxVexJson()">
+            <i data-lucide="download" style="width:13px; height:13px;"></i> CycloneDX 1.5 VEX JSON 다운로드
+          </button>
+          <button class="btn" style="background:#059669; color:#fff; border-color:#059669;" onclick="printVexDeclarationA4()">
+            <i data-lucide="printer" style="width:13px; height:13px;"></i> 공인 VEX 선언문 A4 인쇄
+          </button>
+        </div>
+      </div>
+
+      <!-- VEX Metrics -->
+      <div class="kpi-grid" style="grid-template-columns:repeat(4, 1fr); margin-bottom:1rem;">
+        <div class="kpi-card">
+          <div class="kpi-title">CISA KEV 등재 고위험군</div>
+          <div class="kpi-value" style="color:#dc2626;">5건</div>
+          <div class="kpi-sub">실제 악용 공격 확인됨</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">영향 없음 선언 (not_affected)</div>
+          <div class="kpi-value" style="color:#059669;">3건</div>
+          <div class="kpi-sub">보상통제/가상패치 완료</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">패치 조치 완료 (fixed)</div>
+          <div class="kpi-value" style="color:#2563eb;">2건</div>
+          <div class="kpi-sub">최신 정식 패치 적용</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">랜섬웨어 연계 비율</div>
+          <div class="kpi-value" style="color:#7c3aed;">60%</div>
+          <div class="kpi-sub">LockBit 3.0 / Clop 타겟</div>
+        </div>
+      </div>
+
+      <!-- VEX Catalog Table -->
+      <div class="white-panel" style="padding:0; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+        <div style="padding:0.75rem 1rem; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:800; font-size:0.85rem; color:var(--text-main);">📋 사내 부품 취약점 VEX 상태 및 정당화 사유 대장</span>
+          <span class="badge info">CycloneDX VEX 호환 규격</span>
+        </div>
+        <div class="excel-wrapper" style="max-height:480px; overflow-y:auto;">
+          <table class="excel-table">
+            <thead>
+              <tr>
+                <th class="center" style="width:40px;">No</th>
+                <th style="width:130px;">CVE ID</th>
+                <th>대상 SBOM 부품명 / 버전</th>
+                <th class="center" style="width:120px;">CISA KEV 상태</th>
+                <th>악용 위협 (랜섬웨어)</th>
+                <th class="center" style="width:120px;">VEX 조치 상태</th>
+                <th>정당화 사유 (Justification)</th>
+                <th>사내 방어 대책 및 기술적 근거</th>
+              </tr>
+            </thead>
+            <tbody id="vexTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: 섀도우 AI & OWASP LLM 톱10 (view-aigov) -->
+    <section id="view-aigov" class="view-page">
+      <div class="view-header">
+        <div class="view-header-title">
+          <div class="view-tag" style="background:#eff6ff; color:#2563eb; border-color:#bfdbfe;">AI SPM / OWASP Top 10 for LLM</div>
+          <h2>🛡️ 사내 섀도우 AI(비인가 LLM) 탐지 대장 & OWASP Top 10 점검</h2>
+          <p>임직원 비인가 AI 도구 접속 차단, 프롬프트 기밀유출 방지, 사내 오픈소스 LLM 모델 라이선스 통제</p>
+        </div>
+        <div style="display:flex; gap:0.4rem;">
+          <button class="btn btn-primary" onclick="simulateShadowAiBlock()">
+            <i data-lucide="shield-ban" style="width:13px; height:13px;"></i> 비인가 AI 접속 차단 테스트
+          </button>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.2rem;">
+        <!-- Left: Shadow AI DLP Detection Logs -->
+        <div class="white-panel" style="padding:0; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+          <div style="padding:0.75rem 1rem; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span style="font-weight:800; font-size:0.85rem; color:var(--text-main);">🚫 사내 섀도우 AI 접속 및 데이터 전송 차단 로그</span>
+              <p style="font-size:0.7rem; color:var(--text-dim); margin-top:2px;">사내 게이트웨이 및 엔드포인트 DLP 연동 실시간 탐지</p>
+            </div>
+            <span class="badge danger">차단율 100%</span>
+          </div>
+          <div class="excel-wrapper" style="max-height:450px; overflow-y:auto;">
+            <table class="excel-table">
+              <thead>
+                <tr>
+                  <th style="width:110px;">탐지 일시</th>
+                  <th style="width:90px;">부서/사용자</th>
+                  <th>비인가 AI 서비스</th>
+                  <th>전송 시도 데이터</th>
+                  <th class="center" style="width:75px;">위험도</th>
+                  <th class="center" style="width:90px;">조치 상태</th>
+                </tr>
+              </thead>
+              <tbody id="shadowAiTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Right: OWASP Top 10 for LLM Checklist -->
+        <div class="white-panel" style="padding:0; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+          <div style="padding:0.75rem 1rem; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span style="font-weight:800; font-size:0.85rem; color:var(--text-main);">✅ OWASP Top 10 for LLM Applications 자가진단</span>
+              <p style="font-size:0.7rem; color:var(--text-dim); margin-top:2px;">생성형 AI 및 에이전트 구축 시 필수 보안 통제 점검표</p>
+            </div>
+            <span class="badge success" id="owaspPassedBadge">10/10 충족</span>
+          </div>
+          <div class="excel-wrapper" style="max-height:450px; overflow-y:auto;">
+            <table class="excel-table">
+              <thead>
+                <tr>
+                  <th class="center" style="width:65px;">항목</th>
+                  <th>위협 유형 및 취약점</th>
+                  <th>핵심 완화 대책 (Mitigation)</th>
+                  <th class="center" style="width:75px;">점검 결과</th>
+                </tr>
+              </thead>
+              <tbody id="owaspTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: 3대 보안 법령 & EOL 대장 (view-law) -->
+    <section id="view-law" class="view-page">
+      <div class="view-header">
+        <div class="view-header-title">
+          <div class="view-tag" style="background:#f3e8ff; color:#7c3aed; border-color:#d8b4fe;">3대 보안 법령 / 단종(EOL) 관리</div>
+          <h2>⚖️ 전자금융감독규정 · 개인정보보호법 · 정보통신망법 3대 법령 & 단종(EOL) 대장</h2>
+          <p>법정 의무 조항 위반 시 제재(매출액 3% 과징금 등)와 1차 증적을 대조하고 인프라 단종(EOL)을 선제 통제합니다.</p>
+        </div>
+        <div style="display:flex; gap:0.4rem;">
+          <button class="btn btn-primary" onclick="printLawAuditReport()">
+            <i data-lucide="printer" style="width:13px; height:13px;"></i> 법령 준수 감사서 A4 인쇄
+          </button>
+        </div>
+      </div>
+
+      <!-- Law Filter Navigation -->
+      <div style="display:flex; gap:0.4rem; margin-bottom:0.85rem;">
+        <button class="btn btn-sm btn-primary" id="lawFilterBtn-all" onclick="filterLawTable('all')">전체 법령 (24개 조항)</button>
+        <button class="btn btn-sm" id="lawFilterBtn-fsc" onclick="filterLawTable('전자금융감독규정')">전자금융감독규정</button>
+        <button class="btn btn-sm" id="lawFilterBtn-pipa" onclick="filterLawTable('개인정보보호법')">개인정보보호법</button>
+        <button class="btn btn-sm" id="lawFilterBtn-itnet" onclick="filterLawTable('정보통신망법')">정보통신망법</button>
+        <button class="btn btn-sm" id="lawFilterBtn-eol" onclick="filterLawTable('eol')">단종(EOL) 대장 (9종)</button>
+      </div>
+
+      <!-- Law Table -->
+      <div id="lawTableContainer" class="white-panel" style="padding:0; border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:1rem;">
+        <div class="excel-wrapper" style="max-height:480px; overflow-y:auto;">
+          <table class="excel-table">
+            <thead>
+              <tr>
+                <th class="center" style="width:40px;">No</th>
+                <th style="width:130px;">법령 명칭</th>
+                <th style="width:120px;">관련 조항</th>
+                <th>법적 요구사항 및 통제 기준</th>
+                <th style="width:200px;">위반 시 법정 제재 / 벌칙</th>
+                <th>사내 1차 증적 및 운영 솔루션 연동</th>
+                <th class="center" style="width:75px;">준수 상태</th>
+              </tr>
+            </thead>
+            <tbody id="lawTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- EOL Table (Hidden by default, shown when filtered) -->
+      <div id="eolTableContainer" class="white-panel" style="display:none; padding:0; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+        <div style="padding:0.75rem 1rem; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:800; font-size:0.85rem; color:var(--text-main);">⌛ 전사 OS / 미들웨어 기술지원 종료(EOL) 대장</span>
+          <span class="badge danger">패치 미제공 위험</span>
+        </div>
+        <div class="excel-wrapper" style="max-height:480px; overflow-y:auto;">
+          <table class="excel-table">
+            <thead>
+              <tr>
+                <th class="center" style="width:40px;">No</th>
+                <th>제품명</th>
+                <th class="center" style="width:90px;">버전</th>
+                <th class="center" style="width:110px;">공식 종료일</th>
+                <th class="center" style="width:90px;">지원 상태</th>
+                <th>유상 연장 지원 (ESM / ELS / ESU) 계약 여부</th>
+                <th>공식 출처 및 대응 권고사항</th>
+              </tr>
+            </thead>
+            <tbody id="eolTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 5: 보안 SLA & 인수인계서 (view-handover) -->
+    <section id="view-handover" class="view-page">
+      <div class="view-header">
+        <div class="view-header-title">
+          <div class="view-tag" style="background:#ecfdf5; color:#059669; border-color:#a7f3d0;">보안 SLA / 인수인계 바인더</div>
+          <h2>⏱️ 취약점 조치 SLA 만료 타이머 & 담당자 인수인계서(Handover) A4</h2>
+          <p>Critical 7일 / High 14일 법정 조치 SLA를 실시간 추적하고, 퇴사/부서이동 시 전사 보안 인수인계서를 일괄 인쇄합니다.</p>
+        </div>
+        <div style="display:flex; gap:0.4rem;">
+          <button class="btn btn-primary" onclick="printSecurityHandoverA4()">
+            <i data-lucide="printer" style="width:13px; height:13px;"></i> 전사 보안 인수인계서 A4 일괄 출력
+          </button>
+        </div>
+      </div>
+
+      <!-- SLA Metric Cards -->
+      <div class="kpi-grid" style="grid-template-columns:repeat(4, 1fr); margin-bottom:1rem;">
+        <div class="kpi-card">
+          <div class="kpi-title">조치 SLA 준수율</div>
+          <div class="kpi-value" style="color:#059669;">94.2%</div>
+          <div class="kpi-sub">총 38건 중 36건 준수</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">SLA 만료 임박 (D-3 이내)</div>
+          <div class="kpi-value" style="color:#dc2626;">2건</div>
+          <div class="kpi-sub">JEUS 8.5, OpenSSL 긴급</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">온프렘 자동화 절감 시간</div>
+          <div class="kpi-value" style="color:#2563eb;">1,420시간</div>
+          <div class="kpi-sub">연간 수작업 분석 대체</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">연간 보안 비용 절감액 (ROI)</div>
+          <div class="kpi-value" style="color:#7c3aed;">1억 2,800만</div>
+          <div class="kpi-sub">클라우드 API 및 외주 절감</div>
+        </div>
+      </div>
+
+      <!-- SLA Timer Table -->
+      <div class="white-panel" style="padding:0; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+        <div style="padding:0.75rem 1rem; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:800; font-size:0.85rem; color:var(--text-main);">📋 실시간 취약점 조치 SLA 카운트다운 타이머</span>
+          <span class="badge warning">SLA 기준: Critical 7일 / High 14일</span>
+        </div>
+        <div class="excel-wrapper" style="max-height:480px; overflow-y:auto;">
+          <table class="excel-table">
+            <thead>
+              <tr>
+                <th class="center" style="width:40px;">No</th>
+                <th>조치 대상 과업 / 취약점 명칭</th>
+                <th class="center" style="width:90px;">심각도</th>
+                <th class="center" style="width:110px;">법정 SLA 기한</th>
+                <th class="center" style="width:110px;">접수 일시</th>
+                <th class="center" style="width:105px;">잔여 D-Day</th>
+                <th style="width:110px;">담당자 / 부서</th>
+                <th class="center" style="width:90px;">조치 상태</th>
+                <th class="center" style="width:80px;">SLA 판정</th>
+              </tr>
+            </thead>
+            <tbody id="slaTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
   </div> <!-- app-body end -->
+
+  <!-- Real Incident Detail Analysis Modal -->
+  <div class="modal-overlay" id="incidentDetailModal">
+    <div class="modal-box" style="max-width:850px; height:85vh;">
+      <div class="modal-header">
+        <div>
+          <h3 id="incModalTitle" style="font-size:1.1rem; font-weight:800; color:var(--text-main);">침해사고 상세 분석</h3>
+          <p id="incModalSub" style="font-size:0.75rem; color:var(--text-dim); margin-top:0.2rem;">공격 TTPs, 원인 규명 및 법정 제재 결과</p>
+        </div>
+        <button class="btn btn-sm" onclick="closeIncidentModal()"><i data-lucide="x" style="width:14px; height:14px;"></i> 닫기</button>
+      </div>
+      <div class="modal-body" id="incModalBody" style="display:flex; flex-direction:column; gap:0.85rem; font-size:0.82rem; line-height:1.6;">
+        <!-- Dynamically filled -->
+      </div>
+    </div>
+  </div>
 
   <!-- Comprehensive A4 Print Report Modal -->
   <div class="modal-overlay" id="reportModal">
@@ -4037,6 +4428,656 @@ iptables -A FORWARD -s 10.10.40.20 -d 192.168.10.5 -p tcp --dport 8088 -j ACCEPT
       });
     }
 
+
+    const incidentCases = ${incidentCasesJson};
+    // ==========================================
+    // GIJO AS CORE 5 ENTERPRISE ENGINES DATA & LOGIC
+    // ==========================================
+
+    const mitreTactics = [
+      { id: 'TA0001', name: '정찰', eng: 'Reconnaissance', tech: 'T1595 능동 스캔' },
+      { id: 'TA0002', name: '자원개발', eng: 'Resource Dev', tech: 'T1588 취약점 도구' },
+      { id: 'TA0003', name: '초기접근', eng: 'Initial Access', tech: 'T1190 취약점 악용' },
+      { id: 'TA0004', name: '실행', eng: 'Execution', tech: 'T1059 커맨드/스크립트' },
+      { id: 'TA0005', name: '지속성', eng: 'Persistence', tech: 'T1505 웹셸 설치' },
+      { id: 'TA0006', name: '권한상승', eng: 'Priv Escalation', tech: 'T1068 취약점 권한' },
+      { id: 'TA0007', name: '방어우회', eng: 'Defense Evasion', tech: 'T1027 난독화/우회' },
+      { id: 'TA0008', name: '인증정보 접근', eng: 'Credential Access', tech: 'T1003 계정 덤프' },
+      { id: 'TA0009', name: '탐색', eng: 'Discovery', tech: 'T1082 시스템 정보' },
+      { id: 'TA0010', name: '횡적이동', eng: 'Lateral Movement', tech: 'T1021 원격 서비스' },
+      { id: 'TA0011', name: '수집', eng: 'Collection', tech: 'T1005 로컬 데이터' },
+      { id: 'TA0012', name: 'C2 제어', eng: 'Command & Control', tech: 'T1071 C2 프로토콜' },
+      { id: 'TA0013', name: '유출', eng: 'Exfiltration', tech: 'T1041 C2 유출' },
+      { id: 'TA0014', name: '파괴/영향', eng: 'Impact', tech: 'T1486 데이터 암호화' }
+    ];
+
+    let selectedTacticId = null;
+
+    function renderThreatMatrix() {
+      const grid = document.getElementById('tacticMatrixGrid');
+      if (!grid) return;
+      grid.innerHTML = mitreTactics.map(t => {
+        const isSelected = selectedTacticId === t.id;
+        const bg = isSelected ? '#eff6ff' : '#f8fafc';
+        const border = isSelected ? '#2563eb' : 'var(--border)';
+        const textColor = isSelected ? '#2563eb' : 'var(--text-main)';
+        return '<div onclick="selectTactic(' + JSON.stringify(t.id) + ')" style="cursor:pointer; background:' + bg + '; border:1.5px solid ' + border + '; border-radius:6px; padding:0.55rem; font-size:0.71rem; transition:all 0.15s;">' +
+          '<div style="font-weight:800; color:' + textColor + '; font-size:0.73rem;">' + t.id + ' ' + t.name + '</div>' +
+          '<div style="color:var(--text-dim); font-size:0.65rem;">' + t.eng + '</div>' +
+          '<div style="margin-top:3px; color:var(--text-sub); font-size:0.68rem;">' + t.tech + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function selectTactic(tacticId) {
+      if (selectedTacticId === tacticId) {
+        selectedTacticId = null;
+      } else {
+        selectedTacticId = tacticId;
+      }
+      renderThreatMatrix();
+      filterIncidents();
+    }
+
+    function resetTacticFilter() {
+      selectedTacticId = null;
+      renderThreatMatrix();
+      filterIncidents();
+    }
+
+    function filterIncidents() {
+      const q = (document.getElementById('incidentSearchInput')?.value || '').toLowerCase().trim();
+      const ind = document.getElementById('incidentIndustryFilter')?.value || 'all';
+
+      const filtered = incidentCases.filter(c => {
+        if (ind !== 'all' && c.industry !== ind) return false;
+        if (selectedTacticId) {
+          const hasTactic = (c.techniques || []).some(tech => tech.includes(selectedTacticId));
+        }
+        if (!q) return true;
+        const text = (c.title + ' ' + c.oneLiner + ' ' + (c.cves || []).join(' ') + ' ' + (c.techniques || []).join(' ') + ' ' + (c.products || []).join(' ')).toLowerCase();
+        return text.includes(q);
+      });
+
+      renderIncidentTable(filtered);
+    }
+
+    function renderIncidentTable(list = incidentCases) {
+      const tbody = document.getElementById('incidentTableBody');
+      const badge = document.getElementById('incidentCountBadge');
+      if (badge) badge.innerText = list.length + '건';
+      if (!tbody) return;
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="center" style="padding:2rem; color:var(--text-dim);">검색 조건에 일치하는 침해사고가 없습니다.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map((c, idx) => {
+        const cvesBadge = (c.cves || []).map(cve => '<span class="badge danger" style="margin:1px;">' + cve + '</span>').join('') || '<span style="color:var(--text-dim);">-</span>';
+        const techsBadge = (c.techniques || []).map(t => '<span class="badge purple" style="margin:1px;">' + t + '</span>').join('');
+        const prods = (c.products || []).join(', ') || '-';
+
+        return '<tr onclick="openIncidentDetail(' + JSON.stringify(c.id) + ')" style="cursor:pointer;">' +
+          '<td class="center" style="font-weight:700; color:var(--text-dim);">' + (idx + 1) + '</td>' +
+          '<td>' +
+            '<div style="font-weight:800; color:var(--text-main); font-size:0.79rem;">' + c.title + '</div>' +
+            '<div style="font-size:0.71rem; color:var(--text-sub); margin-top:2px; line-height:1.3;">' + c.oneLiner + '</div>' +
+          '</td>' +
+          '<td class="center" style="font-weight:700;">' + c.year + '년</td>' +
+          '<td class="center"><span class="badge info">' + c.industry + '</span></td>' +
+          '<td>' + techsBadge + '</td>' +
+          '<td>' + cvesBadge + '</td>' +
+          '<td style="font-size:0.72rem; color:var(--text-sub);">' + prods + '</td>' +
+          '<td class="center">' +
+            '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openIncidentDetail(' + JSON.stringify(c.id) + ')">분석</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function openIncidentDetail(id) {
+      const c = incidentCases.find(item => item.id === id);
+      if (!c) return;
+      const modal = document.getElementById('incidentDetailModal');
+      const title = document.getElementById('incModalTitle');
+      const sub = document.getElementById('incModalSub');
+      const body = document.getElementById('incModalBody');
+
+      title.innerText = c.title;
+      sub.innerText = '발생: ' + c.year + '년 | 산업군: ' + c.industry + ' (' + c.region + ') | 침해사고 ID: ' + c.id;
+
+      const techBadges = (c.techniques || []).map(t => '<span class="badge purple" style="margin:2px;">' + t + '</span>').join('');
+      const cveBadges = (c.cves || []).map(cve => '<span class="badge danger" style="margin:2px;">' + cve + '</span>').join('');
+      const prodText = (c.products || []).join(', ') || '내부 전산망 서버';
+
+      body.innerHTML = 
+        '<div style="background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:0.85rem;">' +
+          '<strong style="color:#dc2626; font-size:0.84rem;">🚨 사건 개요 및 피해 내역</strong>' +
+          '<p style="margin-top:4px; color:#991b1b; font-size:0.78rem;">' + c.oneLiner + '</p>' +
+        '</div>' +
+        '<div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:0.85rem;">' +
+          '<strong style="color:var(--text-main); font-size:0.84rem;">🔍 상세 침투 경로 및 조사 결과</strong>' +
+          '<p style="margin-top:4px; color:var(--text-sub); font-size:0.78rem; white-space:pre-wrap; line-height:1.5;">' + c.plainExplain + '</p>' +
+        '</div>' +
+        '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">' +
+          '<div style="background:#fff; border:1px solid var(--border); border-radius:6px; padding:0.75rem;">' +
+            '<strong style="color:var(--text-sub); font-size:0.75rem;">악용 TTPs & CVE</strong>' +
+            '<div style="margin-top:4px;">' + techBadges + cveBadges + '</div>' +
+          '</div>' +
+          '<div style="background:#fff; border:1px solid var(--border); border-radius:6px; padding:0.75rem;">' +
+            '<strong style="color:var(--text-sub); font-size:0.75rem;">타겟 시스템 및 피해 자산</strong>' +
+            '<div style="margin-top:4px; font-size:0.75rem; color:var(--text-main); font-weight:700;">' + prodText + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; padding:0.85rem;">' +
+          '<strong style="color:#059669; font-size:0.84rem;">🛡️ 재발 방지 교훈 및 보안 실무 수칙 (GIJO Lesson)</strong>' +
+          '<p style="margin-top:4px; color:#065f46; font-size:0.78rem; line-height:1.5;">' + c.lesson + '</p>' +
+        '</div>' +
+        '<div style="font-size:0.7rem; color:var(--text-dim); margin-top:4px;">' +
+          '출처: ' + (c.sourceName || '-') + ' | <a href="' + c.sourceUrl + '" target="_blank" style="color:var(--primary);">공식 발표문 링크</a>' +
+        '</div>';
+
+      modal.classList.add('active');
+      lucide.createIcons();
+    }
+
+    function closeIncidentModal() {
+      document.getElementById('incidentDetailModal')?.classList.remove('active');
+    }
+
+    // --- VEX ENGINE & DECLARATION ---
+    const vexCatalogData = [
+      {
+        cve: 'CVE-2016-1000027',
+        component: 'spring-web 5.3.39 (JEUS 8.5 금융 WAS)',
+        cvss: 9.8,
+        kev: true,
+        threat: 'LockBit 3.0, Clop 랜섬웨어 RCE 악용',
+        state: 'not_affected',
+        justification: 'protected_by_mitigating_control',
+        defense: 'Imperva WAAP에 Spring HttpInvokerServiceExporter 역직렬화 차단 룰(Rule-7741) 적용 및 금융망 mTLS 상호인증 강제'
+      },
+      {
+        cve: 'CVE-2025-24813',
+        component: 'apache-tomcat 10.1.34 (대외계 결제 AP)',
+        cvss: 7.5,
+        kev: false,
+        threat: 'Mirai DoS 대용량 Body 고갈',
+        state: 'fixed',
+        justification: 'vulnerable_code_not_present',
+        defense: 'Tomcat Connector maxPostSize 2MB 제한 및 파라미터 유효성 검증 필터 패치 배포 완료 (2026-09-15)'
+      },
+      {
+        cve: 'CVE-2024-21413',
+        component: 'microsoft-outlook 16.0 (업무 PC)',
+        cvss: 9.8,
+        kev: true,
+        threat: 'MonikerLink NTLM 해시 유출 익스플로잇',
+        state: 'not_affected',
+        justification: 'protected_by_mitigating_control',
+        defense: 'FOCS 경계방화벽 아웃바운드 SMB(TCP 445) 전면 차단 및 BitLocker TPM 2.0 강제'
+      },
+      {
+        cve: 'CVE-2023-38606',
+        component: 'apple-ios / macos 커널',
+        cvss: 8.8,
+        kev: true,
+        threat: 'Operation Triangulation 스파이웨어',
+        state: 'fixed',
+        justification: 'vulnerable_code_not_present',
+        defense: '사내 MDM을 통한 iOS 17.5 / macOS 14.5 강제 업데이트 및 비인가 프로파일 삭제'
+      },
+      {
+        cve: 'CVE-2021-44228',
+        component: 'log4j-core 2.14.1 (레거시 배치)',
+        cvss: 10.0,
+        kev: true,
+        threat: '전 세계 APT 그룹 JNDI 인젝션',
+        state: 'not_affected',
+        justification: 'protected_by_mitigating_control',
+        defense: 'JVM 옵션 -Dlog4j2.formatMsgNoLookups=true 주입 및 log4j 2.17.1 모듈로 격리 교체'
+      }
+    ];
+
+    function renderVexTable() {
+      const tbody = document.getElementById('vexTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = vexCatalogData.map((v, idx) => {
+        const kevBadge = v.kev ? '<span class="badge danger">CISA KEV 등재</span>' : '<span class="badge info">KISA 권고</span>';
+        const stateBadge = v.state === 'not_affected'
+          ? '<span class="badge success">not_affected (영향 없음)</span>'
+          : '<span class="badge info">fixed (조치 완료)</span>';
+
+        return '<tr>' +
+          '<td class="center" style="font-weight:700; color:var(--text-dim);">' + (idx + 1) + '</td>' +
+          '<td><b style="color:#dc2626;">' + v.cve + '</b><br><span style="font-size:0.68rem; color:var(--text-dim);">CVSS ' + v.cvss + '</span></td>' +
+          '<td>' + v.component + '</td>' +
+          '<td class="center">' + kevBadge + '</td>' +
+          '<td style="color:#b45309; font-weight:700;">' + v.threat + '</td>' +
+          '<td class="center">' + stateBadge + '</td>' +
+          '<td><code>' + v.justification + '</code></td>' +
+          '<td style="font-size:0.73rem; color:var(--text-sub);">' + v.defense + '</td>' +
+        '</tr>';
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function exportCycloneDxVexJson() {
+      const vexDoc = {
+        bomFormat: 'CycloneDX',
+        specVersion: '1.5',
+        version: 1,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          tools: [{ vendor: 'GIJO Technology', name: 'GIJO AS Lite Fusion Suite', version: '5.2.0' }]
+        },
+        vulnerabilities: vexCatalogData.map(v => ({
+          id: v.cve,
+          source: { name: 'NVD / CISA KEV' },
+          analysis: {
+            state: v.state,
+            justification: v.justification,
+            detail: v.defense
+          },
+          affects: [{ ref: v.component }]
+        }))
+      };
+
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(vexDoc, null, 2));
+      const a = document.createElement('a');
+      a.setAttribute('href', dataStr);
+      a.setAttribute('download', 'GIJO_CycloneDX_VEX_Declaration_' + new Date().toISOString().slice(0, 10) + '.json');
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      alert('CycloneDX 1.5 공인 규격 VEX JSON 선언서가 안전하게 추출되었습니다.');
+    }
+
+    function printVexDeclarationA4() {
+      const printWin = window.open('', '_blank');
+      const rows = vexCatalogData.map((v, i) => 
+        '<tr>' +
+          '<td style="text-align:center;">' + (i + 1) + '</td>' +
+          '<td><b>' + v.cve + '</b></td>' +
+          '<td>' + v.component + '</td>' +
+          '<td>' + v.state + '</td>' +
+          '<td>' + v.justification + '</td>' +
+          '<td>' + v.defense + '</td>' +
+        '</tr>'
+      ).join('');
+
+      printWin.document.write(
+        '<!DOCTYPE html>' +
+        '<html>' +
+        '<head>' +
+          '<title>취약점 영향도 분석 선언서 (VEX Official Statement)</title>' +
+          '<style>' +
+            'body { font-family: Pretendard, sans-serif; padding: 2rem; color: #111; }' +
+            'h1 { font-size: 1.5rem; border-bottom: 2px solid #2563eb; padding-bottom: 0.5rem; }' +
+            'table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }' +
+            'th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }' +
+            'th { background: #f1f5f9; }' +
+            '.footer { margin-top: 2rem; text-align: right; font-size: 0.85rem; }' +
+          '</style>' +
+        '</head>' +
+        '<body>' +
+          '<h1>📄 공인 취약점 활용 가능성 선언서 (VEX Statement)</h1>' +
+          '<p>문서번호: GIJO-VEX-2026-09 | 발행처: 주식회사 기조 정보보안본부 | 규격: CycloneDX 1.5 VEX</p>' +
+          '<p>본 선언서는 당사 전산 인프라 및 운영 소프트웨어의 CVE 취약점에 대한 영향도 조사 및 보상 통제 결과를 보증합니다.</p>' +
+          '<table>' +
+            '<thead>' +
+              '<tr>' +
+                '<th style="width:35px;">No</th>' +
+                '<th style="width:130px;">취약점 번호</th>' +
+                '<th>대상 소프트웨어</th>' +
+                '<th style="width:90px;">VEX 상태</th>' +
+                '<th style="width:180px;">정당화 사유</th>' +
+                '<th>방어 대책 및 기술적 근거</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+          '<div class="footer">' +
+            '<p>발행일: ' + new Date().toLocaleDateString('ko-KR') + '</p>' +
+            '<p><b>정보보호최고책임자 (CISO) : (인)</b></p>' +
+          '</div>' +
+        '</body>' +
+        '</html>'
+      );
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => { printWin.print(); }, 500);
+    }
+
+    // --- SHADOW AI & OWASP LLM ENGINE ---
+    const shadowAiData = [
+      { time: '2026-09-17 00:10', user: '마케팅팀 김OO', app: '무료 웹 번역 AI (DeepL Free)', data: '신규 결제 약관 초안 (고객 주민번호 포함)', sev: 'high', act: '실시간 차단 (HTTP 403)' },
+      { time: '2026-09-16 19:40', user: '개발팀 박OO', app: '외부 퍼블릭 코딩 봇', data: 'DB 커넥션 패스워드 및 엔드포인트 URL', sev: 'high', act: '자동 마스킹 후 전송 격리' },
+      { time: '2026-09-16 15:20', user: '기획팀 이OO', app: '클라우드 생성형 챗봇 (ChatGPT)', data: '2026년 3분기 비공개 재무 실적 보고서', sev: 'high', act: 'DLP 엔드포인트 차단' },
+      { time: '2026-09-16 11:05', user: '영업팀 최OO', app: '외부 PDF 요약 AI 사이트', data: '주요 고객사 납품 견적서 및 원가 내역', sev: 'medium', act: '경고 팝업 후 관리자 보고' },
+      { time: '2026-09-15 14:30', user: '인사팀 정OO', app: '온라인 이력서 교정 AI', data: '임직원 급여 계약서 및 평가 점수', sev: 'high', act: '파일 업로드 차단' }
+    ];
+
+    const owaspLlmData = [
+      { id: 'LLM01', name: 'Prompt Injection (프롬프트 인젝션)', threat: '탈옥(Jailbreak) 및 간접 인젝션으로 보안 가드레일 무력화', mit: 'Synapse RAG 프롬프트 격리 파서 및 입력 유효성 검증 탑재', pass: true },
+      { id: 'LLM02', name: 'Insecure Output Handling (불안전한 출력 처리)', threat: 'LLM 출력을 XSS나 시스템 명령어로 무검증 실행', mit: '모든 마크다운 및 HTML 렌더러 strict 이스케이프 적용', pass: true },
+      { id: 'LLM03', name: 'Training Data Poisoning (학습 데이터 오염)', threat: '조작된 지식 조각으로 악의적 백도어 유도', mit: '실물 사내 문서 SHA-256 무결성 검증 및 승인 게이트 연동', pass: true },
+      { id: 'LLM04', name: 'Model Denial of Service (모델 DoS)', threat: '대용량 토큰 폭탄으로 GPU 메모리 고갈 및 중단', mit: '사용자 쿼리당 최대 1,024 토큰 상한 및 세션 쓰로틀링', pass: true },
+      { id: 'LLM05', name: 'Supply Chain Vulnerabilities (공급망 취약점)', threat: 'GGUF 및 허깅페이스 악성 모델 다운로드', mit: '오프라인 폐쇄망 번들 모델 및 라이선스 사전 검증', pass: true },
+      { id: 'LLM06', name: 'Sensitive Information Disclosure (기밀 누출)', threat: '학습 데이터에 포함된 PII 및 비밀키 역추출', mit: '인라인 개인정보 마스킹 필터 및 RAG 접근 권한 통제', pass: true },
+      { id: 'LLM07', name: 'Insecure Plugin Design (불안전한 플러그인)', threat: '에이전트 권한 남용으로 사내 DB 무단 조작', mit: '읽기 전용 인터페이스 원칙 및 쓰기 시 2차 승인 강제', pass: true },
+      { id: 'LLM08', name: 'Excessive Agency (과도한 에이전트 자율성)', threat: '사람 개입 없이 파괴적 액션 자율 수행', mit: 'Human-in-the-loop 결재 승인 허브 연동', pass: true },
+      { id: 'LLM09', name: 'Overreliance (환각 과잉의존)', threat: 'LLM 거짓말(Hallucination)을 무비판 수용', mit: 'Zero-Fake Guarantee 원칙 및 실물 원본 조각 교차 검증', pass: true },
+      { id: 'LLM10', name: 'Model Theft (모델 탈취)', threat: '사내 파인튜닝 모델 가중치 불법 반출', mit: '에어갭 격리 저장소 및 프로세스 메모리 보호', pass: true }
+    ];
+
+    function renderShadowAiTable() {
+      const tbody = document.getElementById('shadowAiTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = shadowAiData.map(s => '<tr>' +
+        '<td style="font-size:0.71rem; color:var(--text-dim);">' + s.time + '</td>' +
+        '<td><b>' + s.user + '</b></td>' +
+        '<td style="color:var(--text-main); font-weight:700;">' + s.app + '</td>' +
+        '<td style="color:#b45309; font-size:0.73rem;">' + s.data + '</td>' +
+        '<td class="center">' + (s.sev === 'high' ? '<span class="badge danger">고위험</span>' : '<span class="badge warning">중위험</span>') + '</td>' +
+        '<td class="center"><span class="badge danger">' + s.act + '</span></td>' +
+      '</tr>').join('');
+      lucide.createIcons();
+    }
+
+    function renderOwaspGrid() {
+      const tbody = document.getElementById('owaspTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = owaspLlmData.map(o => '<tr>' +
+        '<td class="center"><b>' + o.id + '</b></td>' +
+        '<td><strong style="color:var(--text-main);">' + o.name + '</strong><br><span style="font-size:0.7rem; color:var(--text-sub);">' + o.threat + '</span></td>' +
+        '<td style="font-size:0.73rem; color:#059669; font-weight:600;">' + o.mit + '</td>' +
+        '<td class="center">' + (o.pass ? '<span class="badge success">충족 (PASS)</span>' : '<span class="badge danger">미흡</span>') + '</td>' +
+      '</tr>').join('');
+      lucide.createIcons();
+    }
+
+    function simulateShadowAiBlock() {
+      alert('🔒 [DLP 게이트 차단 완료]\\n\\n탐지 대상: 웹 브라우저 외부 생성형 AI 전송 시도\\n전송 데이터: 사내 금융망 DB 비밀번호\\n조치 결과: HTTP 403 즉시 차단 및 감사 로그에 영구 기록되었습니다.');
+    }
+
+    // --- 3 CORE SECURITY LAWS & EOL ENGINE ---
+    const lawComplianceData = [
+      {
+        law: '전자금융감독규정',
+        clause: '제15조 (해킹방지대책)',
+        req: '내부통신망과 외부통신망 분리(망분리), 업무용 단말기 인터넷 접속 차단',
+        penalty: '기관경고, 임직원 문책 및 최고 5천만원 과태료 부과',
+        proof: 'FOCS 경계방화벽 룰셋 및 물리적/논리적 망분리 환경 구성 증적',
+        status: 'pass'
+      },
+      {
+        law: '전자금융감독규정',
+        clause: '제8조 (비밀번호 관리)',
+        req: '비밀번호 복호화 불가능한 일방향 암호화(SHA-256 이상) 및 쿼터별 변경',
+        penalty: '금융감독원 경영유의 조치 및 시정명령',
+        proof: 'CipherTrust DB 암호화 및 유닉스 섀도우 패스워드 정책 증적',
+        status: 'pass'
+      },
+      {
+        law: '개인정보보호법',
+        clause: '제29조 (안전조치의무)',
+        req: '개인정보 DB 암호화, 접근기록 최소 1년(5만명 이상 2년) 이상 위변조 방지 보관',
+        penalty: '전체 매출액의 3% 이하 과징금, 5년 이하 징역 또는 5천만원 벌금',
+        proof: 'DB 접근제어 솔루션 감사 로그 및 WORM 스토리지 보관 증적',
+        status: 'pass'
+      },
+      {
+        law: '개인정보보호법',
+        clause: '제34조 (유출 통지·신고)',
+        req: '개인정보 유출 인지 후 72시간 이내 정보주체 통지 및 개인정보보호위원회 신고',
+        penalty: '3천만원 이하 과태료 및 대표자 징계 권고',
+        proof: '사내 침해사고 대응 지침서(GIJO_AS_침해사고대응_지침.md) 연동',
+        status: 'pass'
+      },
+      {
+        law: '정보통신망법',
+        clause: '제45조의3 (정보보호 최고책임자)',
+        req: '자산 및 매출 일정 규모 이상 기업의 CISO 지정 및 과기정통부 신고 의무',
+        penalty: '3천만원 이하 과태료',
+        proof: 'CISO 지정 신고서 및 이사회 보고 증적',
+        status: 'pass'
+      },
+      {
+        law: '정보통신망법',
+        clause: '제48조 (침해행위 등의 금지)',
+        req: '정당한 권한 없이 정보통신망 침입 금지 및 악성프로그램 전달 통제',
+        penalty: '5년 이하 징역 또는 5천만원 이하 벌금',
+        proof: '네트워크 IPS 및 침입탐지시스템 24시간 관제 일지',
+        status: 'pass'
+      }
+    ];
+
+    const eolSeedData = [
+      { product: 'CentOS', version: '7', date: '2024-06-30', status: '종료됨', contract: 'Red Hat ELS 유상 지원 검토 필요', note: '공식 프로젝트 공지 종료. Rocky/Alma Linux 전환 권고' },
+      { product: 'CentOS', version: '8', date: '2021-12-31', status: '종료됨', contract: '조기 종료됨 (대체 경로 필요)', note: 'CentOS Stream 전환 결정으로 지원 종료' },
+      { product: 'Red Hat Enterprise Linux', version: '7', date: '2024-06-30', status: '종료됨', contract: 'Red Hat ELS (2029-05-31까지 연장)', note: '유상 add-on 구독 고객만 보안 패치 제공' },
+      { product: 'Ubuntu Linux', version: '18.04 LTS', date: '2023-05-31', status: '종료됨', contract: 'Ubuntu Pro ESM (2028-05까지 연장)', note: '무상 패치 종료. Canonical 유상 구독 시 패치' },
+      { product: 'Ubuntu Linux', version: '20.04 LTS', date: '2025-05-29', status: '종료됨', contract: 'Ubuntu Pro ESM (2030-05까지 연장)', note: '표준 지원 종료. 22.04 또는 24.04 LTS 업그레이드 권고' },
+      { product: 'Windows Server', version: '2012 / R2', date: '2023-10-10', status: '종료됨', contract: 'Windows ESU Year 3 (2026-10-13까지)', note: 'Azure Arc 또는 ESU 라이선스 보유 고객만 패치' },
+      { product: 'Python', version: '2.7', date: '2020-01-01', status: '종료됨', contract: '공식 지원 완전 중단', note: '보안 취약점 발생 시 수정 불가. Python 3.11 즉시 전환' },
+      { product: 'OpenSSL', version: '1.0.2', date: '2019-12-31', status: '종료됨', contract: 'OpenSSL 프리미엄 계약만 패치', note: 'OpenSSL 3.0 이상으로 라이브러리 교체' },
+      { product: 'OpenSSL', version: '1.1.1', date: '2023-09-11', status: '종료됨', contract: '프리미엄 계약만 패치', note: '공식 EOL. 최신 버전 판올림 필수' }
+    ];
+
+    function renderLawTable(filter = 'all') {
+      const container = document.getElementById('lawTableContainer');
+      const eolContainer = document.getElementById('eolTableContainer');
+      const tbody = document.getElementById('lawTableBody');
+
+      ['all', 'fsc', 'pipa', 'itnet', 'eol'].forEach(k => {
+        document.getElementById('lawFilterBtn-' + k)?.classList.remove('btn-primary');
+      });
+
+      if (filter === 'eol') {
+        document.getElementById('lawFilterBtn-eol')?.classList.add('btn-primary');
+        if (container) container.style.display = 'none';
+        if (eolContainer) eolContainer.style.display = 'block';
+        return;
+      }
+
+      if (filter === 'all') document.getElementById('lawFilterBtn-all')?.classList.add('btn-primary');
+      if (filter === '전자금융감독규정') document.getElementById('lawFilterBtn-fsc')?.classList.add('btn-primary');
+      if (filter === '개인정보보호법') document.getElementById('lawFilterBtn-pipa')?.classList.add('btn-primary');
+      if (filter === '정보통신망법') document.getElementById('lawFilterBtn-itnet')?.classList.add('btn-primary');
+
+      if (container) container.style.display = 'block';
+      if (eolContainer) eolContainer.style.display = 'none';
+
+      if (!tbody) return;
+      const filtered = filter === 'all' ? lawComplianceData : lawComplianceData.filter(l => l.law === filter);
+
+      tbody.innerHTML = filtered.map((l, i) => '<tr>' +
+        '<td class="center" style="font-weight:700; color:var(--text-dim);">' + (i + 1) + '</td>' +
+        '<td><b>' + l.law + '</b></td>' +
+        '<td style="color:var(--primary); font-weight:700;">' + l.clause + '</td>' +
+        '<td style="font-size:0.75rem;">' + l.req + '</td>' +
+        '<td style="color:#dc2626; font-size:0.73rem; font-weight:700;">' + l.penalty + '</td>' +
+        '<td style="font-size:0.73rem; color:var(--text-sub);">' + l.proof + '</td>' +
+        '<td class="center"><span class="badge success">준수</span></td>' +
+      '</tr>').join('');
+      lucide.createIcons();
+    }
+
+    function renderEolTable() {
+      const tbody = document.getElementById('eolTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = eolSeedData.map((e, idx) => '<tr>' +
+        '<td class="center" style="font-weight:700; color:var(--text-dim);">' + (idx + 1) + '</td>' +
+        '<td><b>' + e.product + '</b></td>' +
+        '<td class="center"><span class="badge info">' + e.version + '</span></td>' +
+        '<td class="center" style="color:#dc2626; font-weight:700;">' + e.date + '</td>' +
+        '<td class="center"><span class="badge danger">' + e.status + '</span></td>' +
+        '<td style="font-size:0.73rem; color:#b45309; font-weight:600;">' + e.contract + '</td>' +
+        '<td style="font-size:0.73rem; color:var(--text-sub);">' + e.note + '</td>' +
+      '</tr>').join('');
+      lucide.createIcons();
+    }
+
+    function filterLawTable(filter) {
+      renderLawTable(filter);
+    }
+
+    function printLawAuditReport() {
+      window.print();
+    }
+
+    // --- SECURITY SLA & HANDOVER ENGINE ---
+    const slaTasksData = [
+      {
+        id: 'SLA-2026-001',
+        title: 'JEUS 8.5 금융 WAS Spring 역직렬화 가상패치',
+        sev: 'Critical',
+        slaDays: '7일 이내',
+        registered: '2026-09-12',
+        remain: 'D-2일',
+        owner: '인프라보안팀 홍길동',
+        status: '조치중',
+        judgement: '임박 (주의)'
+      },
+      {
+        id: 'SLA-2026-002',
+        title: 'OpenSSL 1.1.1 EOL 취약 라이브러리 교체',
+        sev: 'High',
+        slaDays: '14일 이내',
+        registered: '2026-09-08',
+        remain: 'D-5일',
+        owner: '플랫폼개발팀 이순신',
+        status: '조치중',
+        judgement: '준수 진행'
+      },
+      {
+        id: 'SLA-2026-003',
+        title: '대외계 결제 톰캣 10.1 DoS 룰셋 적용',
+        sev: 'High',
+        slaDays: '14일 이내',
+        registered: '2026-09-02',
+        remain: '완료',
+        owner: '네트워크보안팀 강감찬',
+        status: '완료 (9/15)',
+        judgement: '정상 준수'
+      },
+      {
+        id: 'SLA-2026-004',
+        title: '사내 관리자 계정 초기 비밀번호 전수 변경',
+        sev: 'Medium',
+        slaDays: '30일 이내',
+        registered: '2026-09-01',
+        remain: '완료',
+        owner: '보안운영팀 유관순',
+        status: '완료 (9/05)',
+        judgement: '정상 준수'
+      }
+    ];
+
+    function renderSlaTable() {
+      const tbody = document.getElementById('slaTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = slaTasksData.map((s, idx) => {
+        const sevBadge = s.sev === 'Critical' ? '<span class="badge danger">Critical (9.8)</span>' : '<span class="badge warning">High (7.5)</span>';
+        const judgeBadge = s.judgement.includes('정상')
+          ? '<span class="badge success">SLA 준수</span>'
+          : '<span class="badge warning">SLA 임박</span>';
+
+        return '<tr>' +
+          '<td class="center" style="font-weight:700; color:var(--text-dim);">' + (idx + 1) + '</td>' +
+          '<td><b>' + s.title + '</b><br><span style="font-size:0.68rem; color:var(--text-dim);">과업코드: ' + s.id + '</span></td>' +
+          '<td class="center">' + sevBadge + '</td>' +
+          '<td class="center">' + s.slaDays + '</td>' +
+          '<td class="center">' + s.registered + '</td>' +
+          '<td class="center"><b style="color:' + (s.remain.includes('D-') ? '#dc2626' : '#059669') + ';">' + s.remain + '</b></td>' +
+          '<td>' + s.owner + '</td>' +
+          '<td class="center">' + s.status + '</td>' +
+          '<td class="center">' + judgeBadge + '</td>' +
+        '</tr>';
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function printSecurityHandoverA4() {
+      const printWin = window.open('', '_blank');
+      const solRows = solutionsCatalog.map((s, i) => 
+        '<tr>' +
+          '<td style="text-align:center;">' + (i + 1) + '</td>' +
+          '<td><b>' + s.name + '</b></td>' +
+          '<td>' + s.vendor + '</td>' +
+          '<td>' + s.category + '</td>' +
+          '<td>보안운영팀 관리자 (admin)</td>' +
+          '<td>정상 가동 중</td>' +
+        '</tr>'
+      ).join('');
+
+      printWin.document.write(
+        '<!DOCTYPE html>' +
+        '<html>' +
+        '<head>' +
+          '<title>보안 업무 및 전산 인프라 인수인계서 (Security Handover)</title>' +
+          '<style>' +
+            'body { font-family: Pretendard, sans-serif; padding: 2.5rem; color: #0f172a; line-height: 1.6; }' +
+            'h1 { font-size: 1.6rem; border-bottom: 3px solid #059669; padding-bottom: 0.5rem; }' +
+            'h2 { font-size: 1.1rem; margin-top: 1.5rem; color: #1e293b; border-left: 4px solid #059669; padding-left: 0.5rem; }' +
+            'table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.78rem; }' +
+            'th, td { border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; }' +
+            'th { background: #f8fafc; font-weight: 700; }' +
+            '.box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-top: 0.5rem; font-size: 0.8rem; }' +
+            '.sign { margin-top: 3rem; display: flex; justify-content: space-between; font-size: 0.9rem; }' +
+          '</style>' +
+        '</head>' +
+        '<body>' +
+          '<h1>📋 전사 정보보안 솔루션 및 업무 인수인계서</h1>' +
+          '<div class="box">' +
+            '<p><b>인수인계 대상 부서</b> : 정보보안본부 보안운영팀</p>' +
+            '<p><b>인도자 (퇴사/이동)</b> : 홍길동 책임 (사번: SEC-104)</p>' +
+            '<p><b>인수자</b> : 이순신 선임 (사번: SEC-208)</p>' +
+            '<p><b>인수인계 일자</b> : ' + new Date().toLocaleDateString('ko-KR') + '</p>' +
+          '</div>' +
+          '<h2>1. 전사 20종 핵심 보안 솔루션 관리 권한 및 가동 현황</h2>' +
+          '<table>' +
+            '<thead>' +
+              '<tr>' +
+                '<th style="width:35px;">No</th>' +
+                '<th>솔루션 제품명</th>' +
+                '<th>공급사</th>' +
+                '<th>보안 영역</th>' +
+                '<th>관리자 계정</th>' +
+                '<th>현재 상태</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>' + solRows + '</tbody>' +
+          '</table>' +
+          '<h2>2. 진행 중인 긴급 보안 과업 및 SLA 조치 잔여 현황</h2>' +
+          '<div class="box">' +
+            '<p>· JEUS 8.5 Spring 취약점(CVE-2016-1000027) WAAP 가상패치 검증 진행 (SLA 기한: D-2일)</p>' +
+            '<p>· OpenSSL 1.1.1 EOL 라이브러리 교체 품의 상신 완료 (SLA 기한: D-5일)</p>' +
+            '<p>· 2026년 하반기 ISMS-P 인증 수검 준비 (바인더 80개 항목 증적 최신화 완료)</p>' +
+          '</div>' +
+          '<h2>3. 비상 상황 대응 연락망 및 공급사 기술지원 창구</h2>' +
+          '<div class="box">' +
+            '<p>· 경계방화벽 (FOCS): 시큐아이 24시간 관제센터 (02-1234-5678)</p>' +
+            '<p>· DB 암호화 (CipherTrust): 탈레스 기술지원 (02-9876-5432)</p>' +
+            '<p>· 비인가 침해사고 긴급 격리: KISA 인터넷침해대응센터 (국번없이 118)</p>' +
+          '</div>' +
+          '<div class="sign">' +
+            '<div><b>인도자</b> : 홍 길 동 (서명 / 인)</div>' +
+            '<div><b>인수자</b> : 이 순 신 (서명 / 인)</div>' +
+            '<div><b>부서장 (CISO)</b> : 김 기 조 (서명 / 인)</div>' +
+          '</div>' +
+        '</body>' +
+        '</html>'
+      );
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => { printWin.print(); }, 500);
+    }
+
+
     // --- 4. VIEW SWITCHER ---
     function switchView(viewName) {
       document.querySelectorAll('.view-page').forEach(sec => sec.classList.remove('active'));
@@ -4069,6 +5110,19 @@ iptables -A FORWARD -s 10.10.40.20 -d 192.168.10.5 -p tcp --dport 8088 -j ACCEPT
         renderAssetTable();
         updateAssetKpis();
         renderAssetTopologyGraph();
+      } else if (viewName === 'threat') {
+        renderThreatMatrix();
+        renderIncidentTable();
+      } else if (viewName === 'vex') {
+        renderVexTable();
+      } else if (viewName === 'aigov') {
+        renderShadowAiTable();
+        renderOwaspGrid();
+      } else if (viewName === 'law') {
+        renderLawTable('all');
+        renderEolTable();
+      } else if (viewName === 'handover') {
+        renderSlaTable();
       }
       lucide.createIcons();
     }

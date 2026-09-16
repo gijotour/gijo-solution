@@ -7,9 +7,13 @@
   "license": "Commercial",
   "scripts": {
     "start": "electron .",
+    "build:suite": "node build_gijo_wiki_suite.js",
+    "test:qa": "node test_menu_buttons_qa.js",
+    "deploy": "node deploy_desktop.js",
     "build:win": "electron-builder --win nsis portable --publish never",
     "build:installer": "electron-builder --win nsis --publish never",
-    "build:portable": "electron-builder --win portable --publish never"
+    "build:portable": "electron-builder --win portable --publish never",
+    "build:all": "node build_gijo_wiki_suite.js && node test_menu_buttons_qa.js && npm run build:installer && node deploy_desktop.js"
   },
   "devDependencies": {
     "electron": "^33.4.11",

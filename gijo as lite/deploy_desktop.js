@@ -3,7 +3,7 @@ const path = require('path');
 const os = require('os');
 
 const desktop = path.join(os.homedir(), 'Desktop');
-const distDir = path.join(__dirname, 'gijo-security-erp-app', 'dist');
+const distDir = path.join(__dirname, 'dist');
 
 console.log('Deploying to desktop:', desktop);
 

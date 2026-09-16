@@ -86,5 +86,5 @@ graph LR
 
 - **GIJO AS 코어 보존**:
   - 기존 `GIJO AS` 제품 파일(`GIJO_AS_*.md`, `server/src/`, `tools/`, `GIJO_AS_*.html`)은 고객사 납품 및 운영 서버에 직접 닿아 있으므로 **절대 무단 수정하거나 덮어쓰지 않는다.**
-- **GIJO WIKI 독립성 유지**:
-  - WIKI 및 ERP 스위트 기능 추가/개선은 `GIJO_Security_ERP_Suite.html`, `gijo-security-erp-app/`, `build_gijo_wiki_suite.js` 내부에서 완결되도록 격리 배포한다.
+- **GIJO WIKI & AS Lite 독립성 유지 (전담 작업 폴더 원칙)**:
+  - WIKI, ERP 스위트 및 AS Lite의 모든 기능 추가/개선/빌드/테스트 작업은 **`gijo as lite/` 디렉토리 내부에서만 완결**되도록 작업하고 격리 배포한다. 루트 디렉토리의 운영 코어는 절대 침범하지 않는다.

@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const baseDir = path.join(__dirname);
+const baseDir = fs.existsSync(path.join(__dirname, 'GIJO_AS_보안제품관리_지침.md'))
+  ? __dirname
+  : path.join(__dirname, '..');
 
 // Real markdown file mapping
 const realDocDefinitions = [
