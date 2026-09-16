@@ -2880,7 +2880,7 @@ const htmlContent = `<!DOCTYPE html>
               '<td style="padding:0.4rem 0.6rem;"><span style="background:' + cveBadgeBg + '; color:' + cveBadgeColor + '; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;">' + sanitizeHtml(c.cve || '양호') + '</span></td>' +
               '<td style="padding:0.4rem 0.6rem; color:var(--text-dim); font-size:0.72rem; font-family:monospace; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + sanitizeHtml(c.purl || '-') + '</td>' +
               '<td style="padding:0.4rem 0.6rem; text-align:right;">' +
-                '<button class="btn btn-sm" style="padding:1px 5px; font-size:0.68rem; color:var(--danger);" onclick="deleteItComponent(\'' + asset.id + '\', ' + cIdx + ')">삭제</button>' +
+                '<button class="btn btn-sm" style="padding:1px 5px; font-size:0.68rem; color:var(--danger);" onclick="deleteItComponent(\\'' + asset.id + '\\', ' + cIdx + ')">삭제</button>' +
               '</td>' +
             '</tr>';
         });
@@ -2906,11 +2906,11 @@ const htmlContent = `<!DOCTYPE html>
               '</div>' +
             '</div>' +
             '<div style="display:flex; gap:0.35rem;">' +
-              '<button class="btn btn-sm" style="background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; font-weight:700;" onclick="openAddComponentModal(\'' + asset.id + '\')">' +
+              '<button class="btn btn-sm" style="background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; font-weight:700;" onclick="openAddComponentModal(\\'' + asset.id + '\\')">' +
                 '<i data-lucide="plus-circle" style="width:12px; height:12px;"></i> 컴포넌트 추가' +
               '</button>' +
-              '<button class="btn btn-sm" onclick="openEditAssetModal(\'' + asset.id + '\')">수정</button>' +
-              '<button class="btn btn-sm" style="color:var(--danger);" onclick="deleteItAsset(\'' + asset.id + '\')">삭제</button>' +
+              '<button class="btn btn-sm" onclick="openEditAssetModal(\\'' + asset.id + '\\')">수정</button>' +
+              '<button class="btn btn-sm" style="color:var(--danger);" onclick="deleteItAsset(\\'' + asset.id + '\\')">삭제</button>' +
             '</div>' +
           '</div>' +
 
@@ -3101,74 +3101,74 @@ const htmlContent = `<!DOCTYPE html>
       const dbAssets = currentItAssets.filter(a => a.zone === 'SECURE_DB');
       const cloudAssets = currentItAssets.filter(a => a.zone === 'CLOUD');
 
-      let code = 'flowchart TB\n';
-      code += '  subgraph External["🌐 외부 인터넷망 (Untrusted Client)"]\n';
-      code += '    User["👤 웹 / 모바일 클라이언트 (HTTPS 443)"]\n';
-      code += '  end\n\n';
+      let code = 'flowchart TB\\n';
+      code += '  subgraph External["🌐 외부 인터넷망 (Untrusted Client)"]\\n';
+      code += '    User["👤 웹 / 모바일 클라이언트 (HTTPS 443)"]\\n';
+      code += '  end\\n\\n';
 
       let styleSnippets = '';
 
       if (perimeterAssets.length > 0) {
-        code += '  subgraph Boundary["🛡️ 경계 보안 구역 (Perimeter Zone)"]\n';
+        code += '  subgraph Boundary["🛡️ 경계 보안 구역 (Perimeter Zone)"]\\n';
         perimeterAssets.forEach((a, i) => {
           const compNames = (a.components || []).map(c => c.name).join(', ') || '보안 엔진';
           const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
           const nodeIcon = hasCrit ? '🚨 ' : '🔥 ';
           const vulnText = hasCrit ? '<br/><b>[🚨 취약점 탐지]</b>' : '';
-          code += '    P_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\n';
-          if (hasCrit) styleSnippets += '  style P_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
+          code += '    P_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\\n';
+          if (hasCrit) styleSnippets += '  style P_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\\n';
         });
-        code += '  end\n\n';
+        code += '  end\\n\\n';
       }
 
       if (dmzAssets.length > 0) {
-        code += '  subgraph DMZ["🏢 DMZ 구역 (Semi-Trusted / Public Web)"]\n';
+        code += '  subgraph DMZ["🏢 DMZ 구역 (Semi-Trusted / Public Web)"]\\n';
         dmzAssets.forEach((a, i) => {
           const compNames = (a.components || []).map(c => c.name + ' v' + c.version).join(', ') || 'Nginx';
           const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
           const nodeIcon = hasCrit ? '🚨 ' : '🌐 ';
           const vulnText = hasCrit ? '<br/><b>[🚨 취약점 탐지]</b>' : '';
-          code += '    D_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\n';
-          if (hasCrit) styleSnippets += '  style D_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
+          code += '    D_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\\n';
+          if (hasCrit) styleSnippets += '  style D_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\\n';
         });
-        code += '  end\n\n';
+        code += '  end\\n\\n';
       }
 
       if (trustAssets.length > 0) {
-        code += '  subgraph Trust["🏢 내부 업무망 (Trusted Zone / Core App)"]\n';
+        code += '  subgraph Trust["🏢 내부 업무망 (Trusted Zone / Core App)"]\\n';
         trustAssets.forEach((a, i) => {
           const compNames = (a.components || []).map(c => c.name + ' v' + c.version).join(', ') || 'App';
           const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
           const nodeIcon = hasCrit ? '🚨 ' : '⚙️ ';
           const vulnText = hasCrit ? '<br/><b>[🚨 취약점 탐지]</b>' : '';
-          code += '    T_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\n';
-          if (hasCrit) styleSnippets += '  style T_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
+          code += '    T_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\\n';
+          if (hasCrit) styleSnippets += '  style T_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\\n';
         });
-        code += '  end\n\n';
+        code += '  end\\n\\n';
       }
 
       if (dbAssets.length > 0) {
-        code += '  subgraph SecureDB["🔒 데이터베이스 안전구역 (Secure DB Vault)"]\n';
+        code += '  subgraph SecureDB["🔒 데이터베이스 안전구역 (Secure DB Vault)"]\\n';
         dbAssets.forEach((a, i) => {
           const compNames = (a.components || []).map(c => c.name + ' v' + c.version).join(', ') || 'DB';
           const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
           const nodeIcon = hasCrit ? '🚨 ' : '🗄️ ';
           const vulnText = hasCrit ? '<br/><b>[🚨 취약점 탐지]</b>' : '';
-          code += '    DB_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\n';
-          if (hasCrit) styleSnippets += '  style DB_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
+          code += '    DB_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\\n';
+          if (hasCrit) styleSnippets += '  style DB_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\\n';
         });
-        code += '  end\n\n';
+        code += '  end\\n\\n';
       }
 
-      if (perimeterAssets.length > 0) code += '  External -->|HTTPS 443| Boundary\n';
-      if (perimeterAssets.length > 0 && dmzAssets.length > 0) code += '  Boundary -->|검증된 트래픽| DMZ\n';
-      else if (dmzAssets.length > 0) code += '  External -->|HTTPS 443| DMZ\n';
+      if (perimeterAssets.length > 0) code += '  External -->|HTTPS 443| Boundary\\n';
+      if (perimeterAssets.length > 0 && dmzAssets.length > 0) code += '  Boundary -->|검증된 트래픽| DMZ\\n';
+      else if (dmzAssets.length > 0) code += '  External -->|HTTPS 443| DMZ\\n';
 
-      if (dmzAssets.length > 0 && trustAssets.length > 0) code += '  DMZ -->|API 호출 8443| Trust\n';
-      if (trustAssets.length > 0 && dbAssets.length > 0) code += '  Trust -->|SQL 쿼리 & 암호화| SecureDB\n';
+      if (dmzAssets.length > 0 && trustAssets.length > 0) code += '  DMZ -->|API 호출 8443| Trust\\n';
+      if (trustAssets.length > 0 && dbAssets.length > 0) code += '  Trust -->|SQL 쿼리 & 암호화| SecureDB\\n';
 
       if (styleSnippets) {
-        code += '\n  %% Vulnerable Node Alerts\n' + styleSnippets;
+        code += '\\n  %% Vulnerable Node Alerts\\n' + styleSnippets;
       }
 
       document.getElementById('studioMermaidCode').value = code;
@@ -3852,7 +3852,7 @@ const htmlContent = `<!DOCTYPE html>
       const grid = document.getElementById('docTemplateCardsGrid');
       if (grid) {
         grid.innerHTML = Object.entries(wikiDocTemplates).map(([key, tpl]) => 
-          '<div onclick="selectNewDocTemplate(\'' + key + '\')" style="background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:1rem; cursor:pointer; transition:all 0.15s ease; display:flex; flex-direction:column; justify-content:space-between; gap:0.5rem;" onmouseover="this.style.borderColor=\'var(--primary)\'; this.style.boxShadow=\'var(--shadow-md)\'; this.style.transform=\'translateY(-2px)\';" onmouseout="this.style.borderColor=\'var(--border)\'; this.style.boxShadow=\'none\'; this.style.transform=\'none\';">' +
+          '<div class="doc-tpl-card" onclick="selectNewDocTemplate(\\'' + key + '\\')" style="background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:1rem; cursor:pointer; transition:all 0.15s ease; display:flex; flex-direction:column; justify-content:space-between; gap:0.5rem;">' +
             '<div>' +
               '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">' +
                 '<span class="meta-badge badge-kr" style="font-size:0.68rem;">' + tpl.badge + '</span>' +
