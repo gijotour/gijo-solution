@@ -1,6 +1,40 @@
 # GIJO AS Lite / GIJO WIKI 버전 관리 대장 (Changelog)
 
 ## [v5.2.0] - 2026-09-16
+### 🛡️ 4대 차세대 엔터프라이즈 보안 엔진 (4 Next-Gen Enterprise Security Pillars) 전수 탑재
+- **[엔진 1] 🚨 침해사고 긴급 격리 & KISA 표준 5단계 대응 런북 엔진 (`openIncidentQuarantineModal`)**:
+  - **원클릭 네트워크 긴급 격리 프로토콜 (`toggleHostQuarantine`)**: 타겟 호스트(금융 코어 WAS `ASSET-05`, 10.10.40.20) 감염 또는 제로데이 공격 탐지 시 FOCS 경계방화벽 및 WAAP 연동 인바운드/아웃바운드 전체 트래픽을 즉시 차단(SSH mTLS 포렌식 채널만 유지).
+  - **KISA 침해대응 표준 5단계 플레이북 추적**:
+    1. 공격 탐지 및 최초 전파 (침해 지표 IOC 식별)
+    2. 네트워크 즉각 격리 및 전파 차단 (FOCS 방화벽 격리)
+    3. 메모리 덤프 & 아티팩트 보존 (디지털 포렌식 증거 채취)
+    4. 침입 경로 분석 & 가상 패치 (WAAP RCE 차단 룰셋 배포)
+    5. CISO 및 경영진 보고 (사고 결과 보고서 결재 품의 자동 주입)
+  - **스마트 전자결재 기안판 100% 자동 연동 (`createIncidentApprovalDraft`)**: 침해사고 조치 결과 및 포렌식 채취 내역이 전자결재 기안판 서식으로 즉각 주입되어 CISO 결재 관인 날인 및 사내 지식고 영구 보존.
+
+- **[엔진 2] 🔍 실물 IT 자산-SBOM 취약점(CVE) 상관분석 & 벤더 패치 디스패처 (`openCvePatchModal`)**:
+  - **실물 5대 자산 / 7대 SBOM 부품 1:1 대조 매트릭스 (`realCveCorrelations`)**:
+    - `CVE-2016-1000027` (Spring 5.3.39 / JEUS 8.5, CVSS 9.8 Critical RCE): WAAP 가상패치 룰셋 가동 완료.
+    - `CVE-2025-24813` (Apache Tomcat 10.1.34 / 금융 대외계 AP, CVSS 8.1 High DoS): 커넥터 타임아웃 및 요청 바디 2MB 제한 가상패치 적용.
+    - `CVE-2026-54512` (Oracle WebLogic 14.1.2 / 내부 포털 WAS, CVSS 7.5 High Auth Bypass): T3 프로토콜 차단 및 WAF IP 화이트리스트 조치.
+  - **CVSS 3.1 위험도 등급화 및 벤더 공식 보안 권고문 원클릭 열람**:
+    - Pivotal/Spring, Apache Software Foundation, Oracle 공식 권고문 및 기술 완화책(Mitigation) 전문 지원.
+    - 조치 보고서 인쇄 및 전자결재 원클릭 연동.
+
+- **[엔진 3] 📊 전사 연간 정보보호 성과 & CISO 이사회 보고서 생성기 (`printBoardroomAnnualReport`)**:
+  - **경영진 및 이사회(Board of Directors) 제출용 공식 A4 감사 보고서 일괄 생성**:
+    - 정보보호 예산 집행율(92.4%), 보안 인프라 가동률(99.98%), 고위험 취약점 가상패치 완결율(100%), KISA ISMS-P 상시 증적 확보율(100%).
+    - 전사 5개 망분리 구역(외부망, DMZ, 내부업무망, 금융데이터센터, 모바일망) 및 사내 20종 보안 솔루션 종합 가동 현황.
+    - 침해사고 대응 및 제로데이 통제 성과, 정보보호최고책임자(CISO) 종합 평가의견 및 이사회 승인 서명란 완비.
+
+- **[엔진 4] 🛡️ 생성형 AI 프롬프트 보안 감사 & 실시간 DLP 게이트 (`bomSubView-dlp`)**:
+  - **상용 LLM(OpenAI GPT-4o, Claude 3.5, Gemini 등) 전송 트래픽 실시간 검사 (`inspectDlpPrompt`)**:
+    - 주민등록번호(앞 6자리 보존, 뒤 7자리 `******` 자동 마스킹 및 전송 차단 경고).
+    - 클라우드 인증키(AWS Access Key `AKIA...` 등 즉시 탐지 및 유출 차단).
+    - 데이터베이스 접속 비밀번호(`pwd=`, `password=` 등 인증 정보 원천 차단).
+  - **프롬프트 실시간 검사 시뮬레이터**: 사용자가 텍스트를 입력하면 정규식 패턴 분석 및 차단/마스킹 결과를 화면에서 즉각 시각화.
+  - **초고밀도 엑셀형 DLP 위반 감사 대장 (`renderDlpAuditTable`)**: 일시, 부서, 대상 모델, 마스킹된 프롬프트, 위반 유형, 조치 결과(차단/통과)를 실시간 엑셀 그리드로 감사 기록 관리.
+
 ### 📑 KISA ISMS-P 상시 증적 수검 바인더 & 80개 법정 통제항목 실시간 자동 매핑 탑재
 - **KISA ISMS-P 2.3 법정 3대 분야 80개 통제항목 실시간 자동 매핑 (Auto-Correlation)**:
   - 분산되어 있던 사내 실물 지침 31종, IT 자산 5대, SBOM 부품 7종, 20종 일일점검 일지, 전자결재 품의서를 KISA 80개 통제항목에 1초 만에 자동 바인딩.

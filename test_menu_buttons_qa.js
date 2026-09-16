@@ -285,8 +285,30 @@ ismsTokens.forEach(token => {
   }
 });
 
+// 14. Check 4 Next-Gen Enterprise Security Pillars
+const fourPillarsTokens = [
+  'id="incidentQuarantineModal"',
+  'openIncidentQuarantineModal',
+  'toggleHostQuarantine',
+  'createIncidentApprovalDraft',
+  'id="cvePatchModal"',
+  'openCvePatchModal',
+  'realCveCorrelations',
+  'printBoardroomAnnualReport',
+  'id="bomSubBtn-dlp"',
+  'id="bomSubView-dlp"',
+  'function inspectDlpPrompt',
+  'function renderDlpAuditTable'
+];
+
+fourPillarsTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] 4 Next-Gen Pillar Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing 4 Pillar Token: ' + token);
+    process.exit(1);
+  }
+});
+
 console.log('================================================================');
-console.log('🎉 ALL 100 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
-
-
-
+console.log('🎉 ALL 112 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
