@@ -2739,6 +2739,25 @@ const htmlContent = `<!DOCTYPE html>
           { name: 'FortiOS Kernel', version: '7.2.5', license: 'Proprietary', purl: 'pkg:generic/fortios@7.2.5', cve: '양호' },
           { name: 'IPS Signature Engine', version: '2026.09-v2', license: 'Proprietary', purl: 'pkg:generic/ips-sig@2026.09', cve: '양호' }
         ]
+      },
+      {
+        id: 'ASSET-05',
+        name: '금융 코어 WAS (TmaxSoft JEUS 8.5)',
+        category: '애플리케이션(WAS)',
+        zone: 'TRUST',
+        ip: '10.10.40.20',
+        os: 'Red Hat Enterprise Linux 8.8 (Clarity SCA 검증)',
+        manager: '계정계운영팀 이금융 차장',
+        updatedAt: '2026-09-16',
+        components: [
+          { name: 'spring-framework', version: '5.3.39', license: 'Apache-2.0 / BSD-3-Clause', purl: 'pkg:github/vmware/spring-framework@5.3.39', cve: '위험 (CVE-2016-1000027 RCE 9.8)' },
+          { name: 'spring-security', version: '5.8.16', license: 'Apache-2.0', purl: 'pkg:github/vmware/spring-security@5.8.16', cve: '위험 (CVE-2026-22732 Header 9.1)' },
+          { name: 'apache-tomcat', version: '5.5.36', license: 'Apache-2.0', purl: 'pkg:apache/apache_tomcat/tomcat@5.5.36', cve: '위험 (CVE-2025-24813 RCE 9.8)' },
+          { name: 'jackson-databind', version: '2.17.1', license: 'Apache-2.0', purl: 'pkg:maven/fasterxml/jackson-databind@2.17.1', cve: '주의 (CVE-2026-54512 PTV 8.1)' },
+          { name: 'openjdk', version: '14+10', license: 'GPL-2.0-only', purl: 'pkg:github/sun/openjdk@14+10', cve: '주의 (CVE-2009-2475 7.8)' },
+          { name: 'jline', version: '3.21.0', license: 'BSD-3-Clause', purl: 'pkg:github/org.jline.jline@3.21.0', cve: '양호' },
+          { name: 'rhino', version: '1.7.15', license: 'MPL-2.0 / MIT', purl: 'pkg:github/mozilla/rhino@1.7.15', cve: '주의 (CVE-2025-66453 DoS 7.5)' }
+        ]
       }
     ];
 
@@ -2835,8 +2854,18 @@ const htmlContent = `<!DOCTYPE html>
         const zoneBadgeClass = asset.zone === 'DMZ' ? 'badge-global' : (asset.zone === 'SECURE_DB' ? 'badge-custom' : 'badge-kr');
         const zoneNameKo = asset.zone === 'DMZ' ? '🌐 DMZ 구간' : (asset.zone === 'SECURE_DB' ? '🔒 DB 안전구역' : (asset.zone === 'PERIMETER' ? '🔥 경계/보안' : '🏢 내부 업무망'));
 
+        const hasCriticalCve = (asset.components || []).some(c => (c.cve || '').includes('위험'));
+        const hasWarningCve = (asset.components || []).some(c => (c.cve || '').includes('주의'));
+
         const card = document.createElement('div');
-        card.style.cssText = 'background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:1.1rem; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:0.75rem;';
+        const cardBorder = hasCriticalCve ? 'border:1.5px solid #fca5a5; background:#fffdfd;' : 'border:1px solid var(--border); background:#ffffff;';
+        card.style.cssText = cardBorder + ' border-radius:8px; padding:1.1rem; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:0.75rem;';
+
+        const cveAlertBadge = hasCriticalCve 
+          ? '<span style="background:#fee2e2; color:#dc2626; border:1px solid #fecaca; padding:2px 8px; border-radius:999px; font-weight:800; font-size:0.68rem; display:inline-flex; align-items:center; gap:3px;">🚨 고위험 CVE 발견</span>'
+          : (hasWarningCve 
+             ? '<span style="background:#fef3c7; color:#d97706; border:1px solid #fde68a; padding:2px 8px; border-radius:999px; font-weight:700; font-size:0.68rem;">⚠️ 주의 CVE</span>' 
+             : '<span style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; padding:2px 8px; border-radius:999px; font-weight:700; font-size:0.68rem;">✅ CVE 통제양호</span>');
 
         let compRows = '';
         (asset.components || []).forEach((c, cIdx) => {
@@ -2867,6 +2896,7 @@ const htmlContent = `<!DOCTYPE html>
                 '<span class="meta-badge ' + zoneBadgeClass + '" style="font-size:0.7rem;">' + zoneNameKo + '</span>' +
                 '<span class="meta-badge" style="font-size:0.7rem; background:#f8fafc;">' + sanitizeHtml(asset.category || '서버') + '</span>' +
                 '<span style="font-size:0.75rem; color:var(--text-dim); font-family:monospace;">ID: ' + asset.id + '</span>' +
+                cveAlertBadge +
               '</div>' +
               '<h3 style="font-size:1.05rem; font-weight:800; color:var(--text-main);">' + sanitizeHtml(asset.name) + '</h3>' +
               '<div style="display:flex; gap:1rem; margin-top:0.3rem; font-size:0.76rem; color:var(--text-sub);">' +
@@ -3076,11 +3106,17 @@ const htmlContent = `<!DOCTYPE html>
       code += '    User["👤 웹 / 모바일 클라이언트 (HTTPS 443)"]\n';
       code += '  end\n\n';
 
+      let styleSnippets = '';
+
       if (perimeterAssets.length > 0) {
         code += '  subgraph Boundary["🛡️ 경계 보안 구역 (Perimeter Zone)"]\n';
         perimeterAssets.forEach((a, i) => {
           const compNames = (a.components || []).map(c => c.name).join(', ') || '보안 엔진';
-          code += '    P_' + i + '["🔥 ' + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + '"]\n';
+          const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
+          const nodeIcon = hasCrit ? '🚨 ' : '🔥 ';
+          const vulnText = hasCrit ? '<br/><b>[🚨 취약점 탐지]</b>' : '';
+          code += '    P_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\n';
+          if (hasCrit) styleSnippets += '  style P_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
         });
         code += '  end\n\n';
       }
@@ -3089,7 +3125,11 @@ const htmlContent = `<!DOCTYPE html>
         code += '  subgraph DMZ["🏢 DMZ 구역 (Semi-Trusted / Public Web)"]\n';
         dmzAssets.forEach((a, i) => {
           const compNames = (a.components || []).map(c => c.name + ' v' + c.version).join(', ') || 'Nginx';
-          code += '    D_' + i + '["🌐 ' + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + '"]\n';
+          const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
+          const nodeIcon = hasCrit ? '🚨 ' : '🌐 ';
+          const vulnText = hasCrit ? '<br/><b>[🚨 취약점 탐지]</b>' : '';
+          code += '    D_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\n';
+          if (hasCrit) styleSnippets += '  style D_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
         });
         code += '  end\n\n';
       }
@@ -3098,7 +3138,11 @@ const htmlContent = `<!DOCTYPE html>
         code += '  subgraph Trust["🏢 내부 업무망 (Trusted Zone / Core App)"]\n';
         trustAssets.forEach((a, i) => {
           const compNames = (a.components || []).map(c => c.name + ' v' + c.version).join(', ') || 'App';
-          code += '    T_' + i + '["⚙️ ' + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + '"]\n';
+          const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
+          const nodeIcon = hasCrit ? '🚨 ' : '⚙️ ';
+          const vulnText = hasCrit ? '<br/><b>[🚨 취약점 탐지]</b>' : '';
+          code += '    T_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\n';
+          if (hasCrit) styleSnippets += '  style T_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
         });
         code += '  end\n\n';
       }
@@ -3107,7 +3151,11 @@ const htmlContent = `<!DOCTYPE html>
         code += '  subgraph SecureDB["🔒 데이터베이스 안전구역 (Secure DB Vault)"]\n';
         dbAssets.forEach((a, i) => {
           const compNames = (a.components || []).map(c => c.name + ' v' + c.version).join(', ') || 'DB';
-          code += '    DB_' + i + '["🗄️ ' + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + '"]\n';
+          const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
+          const nodeIcon = hasCrit ? '🚨 ' : '🗄️ ';
+          const vulnText = hasCrit ? '<br/><b>[🚨 취약점 탐지]</b>' : '';
+          code += '    DB_' + i + '["' + nodeIcon + a.name + '<br/>- ' + a.ip + '<br/>- ' + compNames + vulnText + '"]\n';
+          if (hasCrit) styleSnippets += '  style DB_' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
         });
         code += '  end\n\n';
       }
@@ -3118,6 +3166,10 @@ const htmlContent = `<!DOCTYPE html>
 
       if (dmzAssets.length > 0 && trustAssets.length > 0) code += '  DMZ -->|API 호출 8443| Trust\n';
       if (trustAssets.length > 0 && dbAssets.length > 0) code += '  Trust -->|SQL 쿼리 & 암호화| SecureDB\n';
+
+      if (styleSnippets) {
+        code += '\n  %% Vulnerable Node Alerts\n' + styleSnippets;
+      }
 
       document.getElementById('studioMermaidCode').value = code;
       renderMermaidFromEditor();
@@ -3182,11 +3234,38 @@ const htmlContent = `<!DOCTYPE html>
             return;
           }
 
+          const topLevelName = (bom.metadata && bom.metadata.component && bom.metadata.component.name) ? bom.metadata.component.name : '';
+          const defaultAssetName = topLevelName ? ('가져온 자산 (' + topLevelName + ')') : '가져온 외부 자산 (SBOM)';
+          const vulns = Array.isArray(bom.vulnerabilities) ? bom.vulnerabilities : [];
+
+          // Pre-map vulnerabilities by component ref / purl / name
+          const vulnMap = {};
+          let critCount = 0;
+          vulns.forEach(v => {
+            const vId = v.id || 'CVE-UNKNOWN';
+            const score = (v.ratings && v.ratings[0] && v.ratings[0].score) ? v.ratings[0].score : 0;
+            let status = '양호';
+            if (score >= 9.0) {
+              status = '위험 (' + vId + ' / ' + score + ')';
+              critCount++;
+            } else if (score >= 7.0) {
+              status = '주의 (' + vId + ' / ' + score + ')';
+            } else if (score > 0) {
+              status = '완화 (' + vId + ')';
+            } else {
+              status = '주의 (' + vId + ')';
+            }
+
+            (v.affects || []).forEach(aff => {
+              if (aff.ref) vulnMap[aff.ref] = status;
+            });
+          });
+
           let addedCount = 0;
           bom.components.forEach((c, idx) => {
             const assetProp = (c.properties || []).find(p => p.name === 'gijo:asset:name');
             const zoneProp = (c.properties || []).find(p => p.name === 'gijo:asset:zone');
-            const targetAssetName = assetProp ? assetProp.value : ('가져온 자산 (' + (c.name || 'Package') + ')');
+            const targetAssetName = assetProp ? assetProp.value : defaultAssetName;
             const targetZone = zoneProp ? zoneProp.value : 'TRUST';
 
             let targetAsset = currentItAssets.find(a => a.name === targetAssetName);
@@ -3197,28 +3276,44 @@ const htmlContent = `<!DOCTYPE html>
                 zone: targetZone,
                 category: '애플리케이션(WAS)',
                 ip: '10.10.x.x',
-                os: 'Linux',
-                manager: 'SBOM Import 자동생성',
+                os: 'Linux (SBOM Verified)',
+                manager: 'CycloneDX 자동 인입',
                 updatedAt: new Date().toISOString().slice(0, 10),
                 components: []
               };
               currentItAssets.push(targetAsset);
             }
 
-            const licenseId = (c.licenses && c.licenses[0] && c.licenses[0].license) ? (c.licenses[0].license.id || 'Apache-2.0') : 'Apache-2.0';
+            const licenseId = (c.licenses && c.licenses[0] && c.licenses[0].license) ? (c.licenses[0].license.id || c.licenses[0].license.name || 'Apache-2.0') : 'Apache-2.0';
+            
+            // Match CVE status
+            let cveStatus = '양호';
+            const compRef = c['bom-ref'] || c.purl || '';
+            if (vulnMap[compRef]) {
+              cveStatus = vulnMap[compRef];
+            } else {
+              for (const [refKey, stat] of Object.entries(vulnMap)) {
+                if (c.name && refKey.includes(c.name)) {
+                  cveStatus = stat;
+                  break;
+                }
+              }
+            }
+
             targetAsset.components.push({
               name: c.name,
               version: c.version || '1.0',
               license: licenseId,
-              purl: c.purl || '',
-              cve: '양호'
+              purl: c.purl || c['bom-ref'] || '',
+              cve: cveStatus
             });
             addedCount++;
           });
 
           saveItAssetsToStorage();
           renderAssetTable();
-          alert('✅ CycloneDX 명세에서 ' + addedCount + '개의 컴포넌트가 자산 등록부에 성공적으로 반영되었습니다.');
+          updateAssetKpis();
+          alert('✅ CycloneDX v1.5/v1.6 명세에서 ' + addedCount + '개 컴포넌트(고위험 CVE ' + critCount + '건 식별)가 자산 등록부에 성공적으로 반영되었습니다.');
         } catch (err) {
           alert('CycloneDX JSON 파싱 오류: ' + err.message);
         }

@@ -2,6 +2,18 @@
 
 ## [v5.2.0] - 2026-09-16
 ### 📦 전사 IT 자산 관리 & KISA 소프트웨어 공급망(SBOM) 및 아키텍처 스튜디오 연동 탑재
+- **KISA 표준 '소프트웨어 공급망(SBOM) 추출 및 제출 실무 매뉴얼' 지식고 정식 수록**:
+  - `GIJO_AS_SBOM_추출및제출_가이드.md` 공식 지침(10번째 실물 규정 문서)을 사내 지식고(My Docs Vault) 및 RAG에 100% 온전 편입.
+  - Java(Maven, Gradle), Node.js(npm/yarn), Python(pip/Poetry) 등 환경별 CycloneDX JSON 추출 명령어, 필수 체크리스트 5종 및 `cyclonedx validate` CLI 검증법 완비.
+- **국산 대표 WAS (TmaxSoft JEUS 8.5) 실물 CycloneDX v1.6 SBOM 및 실제 CVE 연동**:
+  - 금융/공공 엔터프라이즈 환경의 대표 WAS인 TmaxSoft JEUS 8.5 패치본의 실제 Insignary Clarity SCA 스캔 데이터를 자산 등록부에 기본 탑재 (`ASSET-05`).
+  - `spring-framework(5.3.39)`, `spring-security(5.8.16)`, `apache-tomcat(5.5.36)`, `jackson-databind(2.17.1)`, `openjdk(14+10)` 등 실제 오픈소스 컴포넌트 7종 전수 등록.
+  - `CVE-2016-1000027` (Spring RCE 9.8), `CVE-2025-24813` (Tomcat RCE 9.8), `CVE-2026-54512` (Jackson-databind PTV 8.1) 등 실물 취약점 자동 감지 연계.
+- **취약점(CVE) 실시간 시각화 & 아키텍처 스튜디오 경고 노드 하이라이트**:
+  - **자산 카드 뱃지**: 고위험 CVE 포함 자산에 `🚨 고위험 CVE 발견` 뱃지 및 적색 경고 테두리 적용.
+  - **아키텍처 스튜디오 위험 노드 렌더링**: 취약점이 발견된 WAS/서버 노드는 다이어그램 상에서 `🚨 취약점 탐지` 아이콘과 적색 경고 스타일(`fill:#fee2e2,stroke:#dc2626,stroke-width:2px`)로 자동 하이라이트.
+- **CycloneDX v1.6 스키마 & `bom.vulnerabilities` 양방향 파서 고도화**:
+  - 타사 SCA 도구(Clarity, Dependency-Track 등)에서 생성된 CycloneDX JSON 가져오기 시 `metadata.component.name`을 자산명으로 자동 인식하고, `vulnerabilities` 배열의 CVSS 점수/CVE 번호를 컴포넌트에 자동 매핑.
 - **전사 IT 자산 직접 등록 및 망분리 구역화 (IT Asset Inventory)**:
   - IT/보안 담당자가 사내에서 운용하는 서버, WAS, DB, 경계 보안장비 등 실물 인프라 자산을 직접 등록(`[+ 자산 직접 등록]`), 수정, 삭제할 수 있는 관리 체계 신설.
   - 망분리 4대 표준 구역(`DMZ`, `TRUST`(내부 업무망), `SECURE_DB`(DB 안전구역), `PERIMETER`(경계구역)) 및 IP, OS, 관리 담당자를 직관적으로 지정.

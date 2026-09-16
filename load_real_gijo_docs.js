@@ -67,6 +67,13 @@ const realDocDefinitions = [
     title: 'GIJO AS 3머신 개발환경 및 온프레미스 분산 운영 가이드',
     category: '솔루션매뉴얼',
     tags: ['개발환경', '3머신', '분산환경', '온프레미스', '배포가이드']
+  },
+  {
+    id: 10,
+    file: 'GIJO_AS_SBOM_추출및제출_가이드.md',
+    title: 'KISA 표준 소프트웨어 공급망(SBOM) 추출 및 제출 실무 매뉴얼 (CycloneDX JSON)',
+    category: '보안규정',
+    tags: ['SBOM', 'CycloneDX', 'KISA', '공급망보안', 'CVE', '오픈소스', '라이선스', '점검가이드']
   }
 ];
 

@@ -7,7 +7,7 @@ const allWikiDocs = [...gijoDocs];
 
 // Convert each solution into a full Markdown Wiki document
 solutionsCatalog.forEach((sol, idx) => {
-  const docId = 10 + idx; // IDs 10 through 29
+  const docId = 20 + idx; // IDs 20 through 39
   
   const markdownContent = [
     `# ${sol.name} (${sol.vendor})`,
