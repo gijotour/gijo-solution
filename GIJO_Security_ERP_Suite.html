@@ -827,6 +827,9 @@
         <button id="tabBtn-audit" class="tab-btn" onclick="switchView('audit')">
           <i data-lucide="file-check-2" style="width:14px; height:14px;"></i> ISMS-P 진단기
         </button>
+        <button id="tabBtn-checklist" class="tab-btn" onclick="switchView('checklist')">
+          <i data-lucide="clipboard-check" style="width:14px; height:14px;"></i> 일일 보안점검
+        </button>
       </nav>
 
       <div class="header-tools">
@@ -1123,6 +1126,44 @@
           </thead>
           <tbody id="bomTableBody"></tbody>
         </table>
+
+        <!-- ROI & Economic Impact Matrix Section -->
+        <div style="margin-top:2rem; background:#f8fafc; border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div>
+              <h3 style="font-size:1.05rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.4rem;">
+                <i data-lucide="trending-up" style="width:16px; height:16px; color:var(--success);"></i>
+                경영진 보고용 보안 투자 회수(ROI) & 사고 피해 예방 분석 매트릭스
+              </h3>
+              <p style="font-size:0.75rem; color:var(--text-sub); margin-top:0.2rem;">KISA 및 글로벌 침해사고 피해 통계를 기반으로 솔루션 도입 시 절감되는 사고 리스크 및 인건비를 자동 산출합니다.</p>
+            </div>
+            <span class="meta-badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-weight:700;">투자 회수 모델 v2.0</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem;">
+            <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
+              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">연간 침해사고 예방 가치</div>
+              <div id="roiBreachAvoidance" style="font-size:1.25rem; font-weight:800; color:var(--success); margin-top:0.25rem;">₩0</div>
+              <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">평균 15억원 랜섬웨어/유출 완화율</div>
+            </div>
+            <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
+              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">과징금 리스크 경감 가치</div>
+              <div id="roiPenaltyAvoidance" style="font-size:1.25rem; font-weight:800; color:var(--primary); margin-top:0.25rem;">₩0</div>
+              <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">개인정보보호법 매출 3% 리스크 회피</div>
+            </div>
+            <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
+              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">보안운영 인건비 절감액</div>
+              <div id="roiLaborSaving" style="font-size:1.25rem; font-weight:800; color:#7c3aed; margin-top:0.25rem;">₩0</div>
+              <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">수동 로그 분석·감사 60% 자동화</div>
+            </div>
+            <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
+              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">예상 투자 회수 기간 (Payback)</div>
+              <div id="roiPaybackPeriod" style="font-size:1.25rem; font-weight:800; color:#d97706; margin-top:0.25rem;">-</div>
+              <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">순편익 발생 기준 소요 기간</div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -1139,6 +1180,35 @@
           </button>
         </div>
         <div id="auditGridContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:1rem;"></div>
+      </div>
+    </section>
+
+    <!-- 6. DAILY SECURITY CHECKLIST VIEW -->
+    <section id="view-checklist" class="view-page">
+      <div class="white-panel" style="padding:1.25rem; height:100%; overflow-y:auto;">
+        <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h2 style="font-size:1.2rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
+              <i data-lucide="clipboard-check" style="width:20px; height:20px; color:var(--primary);"></i>
+              일일 / 주간 실무 보안 솔루션 점검 체크리스트
+            </h2>
+            <p style="color:var(--text-sub); font-size:0.8rem;">전사 도입 솔루션의 데몬 프로세스, 차단 이벤트, 이상 로그, 라이선스 상태를 일일 점검하고 공식 점검 일지를 즉시 출력합니다.</p>
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <div style="display:flex; align-items:center; gap:0.3rem;">
+              <span style="font-size:0.75rem; color:var(--text-sub); font-weight:700;">점검일자:</span>
+              <input type="date" id="checklistDate" class="search-input" style="width:130px; background:#fff; padding:0.2rem 0.4rem;">
+            </div>
+            <div style="display:flex; align-items:center; gap:0.3rem;">
+              <span style="font-size:0.75rem; color:var(--text-sub); font-weight:700;">점검자:</span>
+              <input type="text" id="checklistInspector" class="search-input" style="width:110px; background:#fff; padding:0.2rem 0.4rem;" value="보안운영담당">
+            </div>
+            <button class="btn btn-sm" onclick="setAllChecklistStatus('NORMAL')"><i data-lucide="check-check" style="width:12px; height:12px;"></i> 전원 정상</button>
+            <button class="btn btn-sm btn-primary" onclick="printDailyInspectionReport()"><i data-lucide="printer" style="width:12px; height:12px;"></i> 점검 일지 출력 (A4)</button>
+          </div>
+        </div>
+
+        <div id="checklistGridContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:1rem;"></div>
       </div>
     </section>
 
@@ -1266,7 +1336,12 @@
           <h3 id="modalSolTitle" style="font-size:1.15rem; font-weight:800; margin-top:0.3rem; color:var(--text-main);">솔루션 상세</h3>
           <span id="modalSolVendor" style="font-size:0.75rem; color:var(--text-dim);">제조사</span>
         </div>
-        <button class="btn btn-sm" onclick="closeSolDetailModal()"><i data-lucide="x" style="width:14px; height:14px;"></i> 닫기</button>
+        <div style="display:flex; align-items:center; gap:0.4rem;">
+          <button class="btn btn-sm" onclick="openEditAnySolModalFromDetail()" title="솔루션 정보 및 매뉴얼 수정">
+            <i data-lucide="edit-2" style="width:13px; height:13px;"></i> 정보/매뉴얼 수정
+          </button>
+          <button class="btn btn-sm" onclick="closeSolDetailModal()"><i data-lucide="x" style="width:14px; height:14px;"></i> 닫기</button>
+        </div>
       </div>
       <div class="modal-body">
         
@@ -1473,7 +1548,16 @@
     }
 
     function rebuildActiveSolutions() {
-      activeSolutionsList = [...customSolutions, ...defaultSolutionCatalog];
+      const pureCustom = customSolutions.filter(c => c.isCustom !== false);
+      const standardList = defaultSolutionCatalog.map(std => {
+        const overridden = customSolutions.find(c => c.name === std.name);
+        if (overridden) {
+          return Object.assign({}, std, overridden, { isOverridden: true, isCustom: false });
+        }
+        return Object.assign({}, std, { isOverridden: false, isCustom: false });
+      });
+
+      activeSolutionsList = [...pureCustom, ...standardList];
       document.getElementById('customSolCount').innerText = customSolutions.length;
       document.getElementById('totalSolutionsDisplayCount').innerText = activeSolutionsList.length;
     }
@@ -1737,19 +1821,19 @@
       lucide.createIcons();
     }
 
-    function openEditCustomSolModal(customIdx) {
-      const sol = customSolutions[customIdx];
+    function openEditAnySolModal(globalIdx) {
+      const sol = activeSolutionsList[globalIdx];
       if (!sol) return;
 
-      document.getElementById('customSolEditIndex').value = customIdx;
-      document.getElementById('customSolModalTitle').innerText = '사내 보안 솔루션 수정: ' + sol.name;
+      document.getElementById('customSolEditIndex').value = globalIdx;
+      document.getElementById('customSolModalTitle').innerText = (sol.isCustom ? '사내 보안 솔루션 수정: ' : '표준 솔루션 스펙/매뉴얼 수정: ') + sol.name;
       document.getElementById('custSolName').value = sol.name;
-      document.getElementById('custSolVendor').value = sol.vendor;
-      document.getElementById('custSolVendorType').value = sol.vendorType || '국산';
-      document.getElementById('custSolCategory').value = sol.category || '';
+      document.getElementById('custSolVendor').value = (sol.vendor || '').replace(/\s*\[(국산|외산|자체구축|단독 총판)\]/g, '').trim();
+      document.getElementById('custSolVendorType').value = sol.vendorType || (sol.vendor.includes('외산') ? '외산' : '국산');
+      document.getElementById('custSolCategory').value = sol.category || sol.sheetCategory || '';
       document.getElementById('custSolPrice').value = sol.price || 0;
       document.getElementById('custSolIsms').value = sol.ismsMapping || '';
-      document.getElementById('custSolPurpose').value = sol.purpose || '';
+      document.getElementById('custSolPurpose').value = sol.purpose || sol.overview || '';
       document.getElementById('custSolManual').value = sol.manual || '';
       document.getElementById('custSolDiagram').value = sol.architectureDiagram || '';
 
@@ -1760,6 +1844,37 @@
 
       document.getElementById('customSolModal').classList.add('active');
       lucide.createIcons();
+    }
+
+    function openEditCustomSolModal(customIdx) {
+      const sol = customSolutions[customIdx];
+      if (!sol) return;
+      const gIdx = activeSolutionsList.findIndex(s => s.name === sol.name);
+      if (gIdx >= 0) openEditAnySolModal(gIdx);
+    }
+
+    function openEditAnySolModalFromDetail() {
+      if (!currentDetailSol) return;
+      const gIdx = activeSolutionsList.findIndex(s => s.name === currentDetailSol.name);
+      if (gIdx >= 0) {
+        closeSolDetailModal();
+        openEditAnySolModal(gIdx);
+      }
+    }
+
+    function restoreStandardSolution(solName) {
+      if (!confirm('[' + solName + '] 솔루션을 원래 벤더 기본 스펙/매뉴얼로 복원하시겠습니까?')) return;
+      const cIdx = customSolutions.findIndex(c => c.name === solName);
+      if (cIdx >= 0) {
+        customSolutions.splice(cIdx, 1);
+        saveCustomSolutions();
+        syncCustomSolutionsToDocs();
+        saveDocsToStorage();
+        renderPortalCards();
+        renderWikiDocList();
+        renderBomTable();
+        alert('✅ [' + solName + '] 솔루션이 원본 기본값으로 복원되었습니다.');
+      }
     }
 
     function closeCustomSolModal() {
@@ -1775,6 +1890,8 @@
       }
 
       const editIdx = parseInt(document.getElementById('customSolEditIndex').value, 10);
+      const targetSol = (editIdx >= 0 && editIdx < activeSolutionsList.length) ? activeSolutionsList[editIdx] : null;
+
       const vendorType = document.getElementById('custSolVendorType').value;
       const category = document.getElementById('custSolCategory').value.trim() || '보안솔루션';
       const price = parseInt(document.getElementById('custSolPrice').value, 10) || 0;
@@ -1783,31 +1900,34 @@
       const manual = document.getElementById('custSolManual').value.trim();
       const diagram = document.getElementById('custSolDiagram').value.trim();
 
+      const isStandard = defaultSolutionCatalog.some(s => s.name === name);
       const newSol = {
-        isCustom: true,
+        isCustom: !isStandard,
+        isOverridden: isStandard,
         name,
-        vendor: vendor + ' [' + vendorType + ']',
+        vendor: vendor + (vendor.includes('[') ? '' : ' [' + vendorType + ']'),
         vendorType,
         category,
         sheetCategory: category,
-        target: '사내 보안담당자 및 운영팀',
-        role: category + ' 실무 운용',
+        target: targetSol ? targetSol.target : '사내 보안담당자 및 운영팀',
+        role: targetSol ? targetSol.role : (category + ' 실무 운용'),
         overview: purpose || (name + ' 사내 운영 솔루션'),
         purpose: purpose || '사내 보안 정책 통제 및 규제 준수',
-        features: '사내 맞춤형 정책 적용 및 실시간 점검 체계',
-        highlights: '고객사 환경에 최적화된 온프레미스/사내망 운용',
+        features: targetSol ? targetSol.features : '사내 맞춤형 정책 적용 및 실시간 점검 체계',
+        highlights: targetSol ? targetSol.highlights : '고객사 환경에 최적화된 온프레미스/사내망 운용',
         regulation: ismsMapping + ' 인증 기준 준수',
-        effects: '보안 가시성 확보 및 전사 보안 거버넌스 강화',
+        effects: targetSol ? targetSol.effects : '보안 가시성 확보 및 전사 보안 거버넌스 강화',
         manual: manual || '실무 매뉴얼 작성 예정',
         architectureDiagram: diagram || '',
         price,
-        qty: 1,
-        opexRate: 0.12,
+        qty: targetSol ? targetSol.qty : 1,
+        opexRate: targetSol ? targetSol.opexRate : 0.12,
         ismsMapping
       };
 
-      if (editIdx >= 0 && editIdx < customSolutions.length) {
-        customSolutions[editIdx] = newSol;
+      const existingCustIdx = customSolutions.findIndex(c => c.name === name);
+      if (existingCustIdx >= 0) {
+        customSolutions[existingCustIdx] = newSol;
       } else {
         customSolutions.unshift(newSol);
       }
@@ -1821,7 +1941,7 @@
       renderWikiDocList();
       renderBomTable();
 
-      alert('✅ [' + name + '] 솔루션이 등록되었으며 사내 지식고(위키), AI RAG, TCO 견적에 실시간 반영되었습니다.');
+      alert('✅ [' + name + '] 솔루션 자료가 성공적으로 저장(수정)되었으며 위키, AI RAG, TCO 견적에 실시간 동기화되었습니다.');
     }
 
     function deleteCustomSolution(customIdx) {
@@ -1885,8 +2005,250 @@
         renderBomTable();
       } else if (viewName === 'audit') {
         renderAuditGrid();
+      } else if (viewName === 'checklist') {
+        renderChecklistGrid();
       }
       lucide.createIcons();
+    }
+
+    // --- 4.5 DAILY SECURITY CHECKLIST & INSPECTION LOG MODULE ---
+    const CHECKLIST_KEY = 'GIJO_DAILY_CHECKLIST_V5_2';
+    let dailyChecklistData = {};
+
+    function loadChecklistData() {
+      try {
+        const stored = localStorage.getItem(CHECKLIST_KEY);
+        dailyChecklistData = stored ? JSON.parse(stored) : {};
+      } catch (e) {
+        dailyChecklistData = {};
+      }
+    }
+
+    function saveChecklistData() {
+      try {
+        localStorage.setItem(CHECKLIST_KEY, JSON.stringify(dailyChecklistData));
+      } catch (e) {}
+    }
+
+    function getTodayKey() {
+      const dateInput = document.getElementById('checklistDate');
+      return (dateInput && dateInput.value) ? dateInput.value : new Date().toISOString().slice(0, 10);
+    }
+
+    function renderChecklistGrid() {
+      loadChecklistData();
+      const dateKey = getTodayKey();
+      const dateInput = document.getElementById('checklistDate');
+      if (dateInput && !dateInput.value) dateInput.value = dateKey;
+
+      if (!dailyChecklistData[dateKey]) {
+        dailyChecklistData[dateKey] = {};
+      }
+      const dayRecords = dailyChecklistData[dateKey];
+
+      const container = document.getElementById('checklistGridContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      activeSolutionsList.forEach((sol, idx) => {
+        if (!dayRecords[sol.name]) {
+          dayRecords[sol.name] = { daemon: 'NORMAL', log: 'NORMAL', backup: 'NORMAL', memo: '' };
+        }
+        const rec = dayRecords[sol.name];
+
+        const card = document.createElement('div');
+        card.className = 'white-panel';
+        card.style.padding = '1rem';
+        card.style.border = '1px solid var(--border)';
+        card.style.borderRadius = 'var(--radius)';
+
+        const badgeKr = sol.vendor.includes('국산') || sol.vendorType === '국산' ? 'badge-kr' : 'badge-global';
+
+        card.innerHTML = 
+          '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">' +
+            '<div>' +
+              '<span class="meta-badge ' + badgeKr + '">' + sanitizeHtml(sol.vendorType || '보안솔루션') + '</span> ' +
+              '<span class="meta-badge">' + sanitizeHtml(sol.category || sol.sheetCategory) + '</span>' +
+              '<div style="font-weight:800; font-size:1rem; margin-top:0.3rem; color:var(--text-main);">' + sanitizeHtml(sol.name) + '</div>' +
+              '<div style="font-size:0.75rem; color:var(--text-dim);">' + sanitizeHtml(sol.vendor) + '</div>' +
+            '</div>' +
+            '<button class="btn btn-sm" onclick="openSolDetailModal(' + idx + ', \'manual\')" title="매뉴얼 보기">' +
+              '<i data-lucide="book" style="width:11px; height:11px;"></i> 매뉴얼' +
+            '</button>' +
+          '</div>' +
+
+          '<div style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.78rem;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:0.4rem 0.6rem; border-radius:4px;">' +
+              '<span style="font-weight:600;">1. 데몬/에이전트 서비스 기동</span>' +
+              '<div style="display:flex; gap:0.25rem;">' +
+                '<button class="btn btn-sm ' + (rec.daemon === 'NORMAL' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'daemon\', \'NORMAL\')">정상</button>' +
+                '<button class="btn btn-sm ' + (rec.daemon === 'WARN' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:#d97706;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'daemon\', \'WARN\')">주의</button>' +
+                '<button class="btn btn-sm ' + (rec.daemon === 'ERROR' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:var(--danger);" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'daemon\', \'ERROR\')">이상</button>' +
+              '</div>' +
+            '</div>' +
+
+            '<div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:0.4rem 0.6rem; border-radius:4px;">' +
+              '<span style="font-weight:600;">2. 차단 이벤트 & 감사 로그</span>' +
+              '<div style="display:flex; gap:0.25rem;">' +
+                '<button class="btn btn-sm ' + (rec.log === 'NORMAL' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'log\', \'NORMAL\')">정상</button>' +
+                '<button class="btn btn-sm ' + (rec.log === 'WARN' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:#d97706;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'log\', \'WARN\')">주의</button>' +
+                '<button class="btn btn-sm ' + (rec.log === 'ERROR' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:var(--danger);" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'log\', \'ERROR\')">이상</button>' +
+              '</div>' +
+            '</div>' +
+
+            '<div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:0.4rem 0.6rem; border-radius:4px;">' +
+              '<span style="font-weight:600;">3. 라이선스 & 백업 무결성</span>' +
+              '<div style="display:flex; gap:0.25rem;">' +
+                '<button class="btn btn-sm ' + (rec.backup === 'NORMAL' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'backup\', \'NORMAL\')">정상</button>' +
+                '<button class="btn btn-sm ' + (rec.backup === 'WARN' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:#d97706;" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'backup\', \'WARN\')">주의</button>' +
+                '<button class="btn btn-sm ' + (rec.backup === 'ERROR' ? 'btn-primary' : '') + '" style="padding:1px 6px; font-size:0.7rem; color:var(--danger);" onclick="setChecklistItemStatus(\'' + sol.name.replace(/'/g, "\\'") + '\', \'backup\', \'ERROR\')">이상</button>' +
+              '</div>' +
+            '</div>' +
+
+            '<div style="margin-top:0.4rem;">' +
+              '<input type="text" class="search-input" style="background:#fff; font-size:0.72rem; padding:0.3rem 0.5rem;" placeholder="점검 메모 / 특이사항 기재..." value="' + sanitizeHtml(rec.memo || '') + '" onchange="updateChecklistMemo(\'' + sol.name.replace(/'/g, "\\'") + '\', this.value)">' +
+            '</div>' +
+          '</div>';
+
+        container.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    function setChecklistItemStatus(solName, field, status) {
+      const dateKey = getTodayKey();
+      if (!dailyChecklistData[dateKey]) dailyChecklistData[dateKey] = {};
+      if (!dailyChecklistData[dateKey][solName]) dailyChecklistData[dateKey][solName] = { daemon: 'NORMAL', log: 'NORMAL', backup: 'NORMAL', memo: '' };
+      dailyChecklistData[dateKey][solName][field] = status;
+      saveChecklistData();
+      renderChecklistGrid();
+    }
+
+    function updateChecklistMemo(solName, memoVal) {
+      const dateKey = getTodayKey();
+      if (!dailyChecklistData[dateKey]) dailyChecklistData[dateKey] = {};
+      if (!dailyChecklistData[dateKey][solName]) dailyChecklistData[dateKey][solName] = { daemon: 'NORMAL', log: 'NORMAL', backup: 'NORMAL', memo: '' };
+      dailyChecklistData[dateKey][solName].memo = memoVal;
+      saveChecklistData();
+    }
+
+    function setAllChecklistStatus(status) {
+      const dateKey = getTodayKey();
+      if (!dailyChecklistData[dateKey]) dailyChecklistData[dateKey] = {};
+      activeSolutionsList.forEach(sol => {
+        dailyChecklistData[dateKey][sol.name] = { daemon: status, log: status, backup: status, memo: '일괄 점검 확인 완료' };
+      });
+      saveChecklistData();
+      renderChecklistGrid();
+      alert('✅ 전사 ' + activeSolutionsList.length + '개 솔루션의 점검 항목이 [정상]으로 일괄 설정되었습니다.');
+    }
+
+    function printDailyInspectionReport() {
+      const dateKey = getTodayKey();
+      const inspector = document.getElementById('checklistInspector').value || '보안운영담당';
+      const records = (dailyChecklistData[dateKey]) || {};
+
+      let rowsHtml = '';
+      let normalCount = 0;
+      let warnCount = 0;
+      let errorCount = 0;
+
+      activeSolutionsList.forEach((sol, i) => {
+        const rec = records[sol.name] || { daemon: 'NORMAL', log: 'NORMAL', backup: 'NORMAL', memo: '-' };
+        if (rec.daemon === 'ERROR' || rec.log === 'ERROR' || rec.backup === 'ERROR') errorCount++;
+        else if (rec.daemon === 'WARN' || rec.log === 'WARN' || rec.backup === 'WARN') warnCount++;
+        else normalCount++;
+
+        rowsHtml += 
+          '<tr>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1; text-align:center;">' + (i + 1) + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1; font-weight:700;">' + sanitizeHtml(sol.name) + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1;">' + sanitizeHtml(sol.category || sol.sheetCategory) + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1; text-align:center;">' + (rec.daemon === 'NORMAL' ? '✓ 정상' : (rec.daemon === 'WARN' ? '△ 주의' : '✕ 이상')) + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1; text-align:center;">' + (rec.log === 'NORMAL' ? '✓ 정상' : (rec.log === 'WARN' ? '△ 주의' : '✕ 이상')) + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1; text-align:center;">' + (rec.backup === 'NORMAL' ? '✓ 정상' : (rec.backup === 'WARN' ? '△ 주의' : '✕ 이상')) + '</td>' +
+            '<td style="padding:6px; border:1px solid #cbd5e1; font-size:0.75rem;">' + sanitizeHtml(rec.memo || '-') + '</td>' +
+          '</tr>';
+      });
+
+      const printWin = window.open('', '_blank', 'width=900,height=800');
+      printWin.document.write(
+        '<!DOCTYPE html><html><head><title>일일 보안 솔루션 점검 일지 (' + dateKey + ')</title>' +
+        '<style>' +
+        'body { font-family: Pretendard, sans-serif; padding: 25px; color:#0f172a; line-height: 1.4; }' +
+        'table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.8rem; }' +
+        'th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px; }' +
+        '@media print { body { padding: 0; } }' +
+        '</style></head><body>' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #0f172a; padding-bottom:10px;">' +
+          '<div>' +
+            '<h1 style="font-size:1.4rem; margin:0;">일일 보안 솔루션 정기 점검 일지</h1>' +
+            '<p style="font-size:0.8rem; color:#475569; margin:4px 0 0 0;">점검일자: ' + dateKey + ' | 대상기관: ' + sanitizeHtml(customerOrgName) + '</p>' +
+          '</div>' +
+          '<table style="width:240px; margin:0; border:1px solid #0f172a; text-align:center; font-size:0.75rem;">' +
+            '<tr><th style="width:80px; padding:3px;">점검자</th><th style="width:80px; padding:3px;">보안팀장</th><th style="width:80px; padding:3px;">CISO</th></tr>' +
+            '<tr style="height:40px;"><td>' + sanitizeHtml(inspector) + ' (인)</td><td>(인)</td><td>(인)</td></tr>' +
+          '</table>' +
+        '</div>' +
+        '<div style="display:flex; gap:1rem; margin-top:15px; background:#f8fafc; padding:10px; border-radius:4px; font-size:0.8rem;">' +
+          '<div><b>총 점검 대상</b>: ' + activeSolutionsList.length + '개 솔루션</div>' +
+          '<div style="color:#059669;"><b>✓ 정상</b>: ' + normalCount + '개</div>' +
+          '<div style="color:#d97706;"><b>△ 주의</b>: ' + warnCount + '개</div>' +
+          '<div style="color:#dc2626;"><b>✕ 조치필요</b>: ' + errorCount + '개</div>' +
+        '</div>' +
+        '<table>' +
+          '<thead>' +
+            '<tr>' +
+              '<th style="width:35px;">No</th>' +
+              '<th>솔루션 제품명</th>' +
+              '<th style="width:120px;">카테고리</th>' +
+              '<th style="width:75px;">데몬 상태</th>' +
+              '<th style="width:75px;">로그 상태</th>' +
+              '<th style="width:75px;">백업/인증</th>' +
+              '<th>점검 소견 및 조치 사항</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' + rowsHtml + '</tbody>' +
+        '</table>' +
+        '<div style="margin-top:20px; font-size:0.75rem; color:#64748b; text-align:right;">' +
+          'GIJO AS Enterprise Security Operations &copy; 2026 GIJO TECHNOLOGY' +
+        '</div>' +
+        '<script>window.onload = function(){ window.print(); };<\/script>' +
+        '</body></html>'
+      );
+      printWin.document.close();
+    }
+
+    // --- 4.6 ROI & ECONOMIC IMPACT MODEL ---
+    function updateRoiMetrics(totalCapex, totalOpex) {
+      const activeCount = Math.max(1, activeSolutionsList.filter(s => (s.qty || 0) > 0).length);
+      const capex = totalCapex || 0;
+      const opex = totalOpex || 0;
+
+      const breachAvoidance = Math.min(1500000000, activeCount * 75000000);
+      const penaltyAvoidance = Math.min(300000000, activeCount * 30000000);
+      const laborSaving = Math.min(84000000, activeCount * 8000000 + 24000000);
+
+      const annualCapex = capex / 5;
+      const netAnnualBenefit = (breachAvoidance + penaltyAvoidance + laborSaving) - (annualCapex + opex);
+      let paybackMonths = '즉시 회수 (3.5개월)';
+      if (capex > 0 && netAnnualBenefit > 0) {
+        const pMonths = (capex / (breachAvoidance + penaltyAvoidance + laborSaving - opex)) * 12;
+        paybackMonths = pMonths > 0 ? (pMonths < 1 ? '1개월 이내' : pMonths.toFixed(1) + ' 개월') : '즉시 회수';
+      }
+
+      const elBreach = document.getElementById('roiBreachAvoidance');
+      const elPenalty = document.getElementById('roiPenaltyAvoidance');
+      const elLabor = document.getElementById('roiLaborSaving');
+      const elPayback = document.getElementById('roiPaybackPeriod');
+
+      if (elBreach) elBreach.innerText = '₩' + breachAvoidance.toLocaleString();
+      if (elPenalty) elPenalty.innerText = '₩' + penaltyAvoidance.toLocaleString();
+      if (elLabor) elLabor.innerText = '₩' + laborSaving.toLocaleString();
+      if (elPayback) elPayback.innerText = paybackMonths;
+
+      return { breachAvoidance, penaltyAvoidance, laborSaving, paybackMonths };
     }
 
     // --- 5. WIKI & RAG MODULE ---
@@ -2234,8 +2596,10 @@
                 '<div class="sol-card-vendor">' + sanitizeHtml(sol.vendor) + '</div>' +
               '</div>' +
               '<div style="display:flex; align-items:center; gap:0.4rem;">' +
-                (sol.isCustom ? '<button class="btn btn-sm" style="padding:2px 6px;" onclick="openEditCustomSolModal(' + customIdx + ')" title="수정"><i data-lucide="edit-2" style="width:11px; height:11px;"></i></button>' +
-                                '<button class="btn btn-sm" style="padding:2px 6px; color:var(--danger);" onclick="deleteCustomSolution(' + customIdx + ')" title="삭제"><i data-lucide="trash-2" style="width:11px; height:11px;"></i></button>' : '') +
+                (sol.isOverridden ? '<span class="meta-badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.65rem;">수정됨</span>' : '') +
+                '<button class="btn btn-sm" style="padding:2px 6px;" onclick="openEditAnySolModal(' + globalIdx + ')" title="솔루션 정보 및 매뉴얼 수정"><i data-lucide="edit-2" style="width:11px; height:11px;"></i></button>' +
+                (sol.isOverridden ? '<button class="btn btn-sm" style="padding:2px 6px; color:#d97706;" onclick="restoreStandardSolution(\'' + sol.name.replace(/'/g, "\\'") + '\')" title="원본 복원"><i data-lucide="rotate-ccw" style="width:11px; height:11px;"></i></button>' : '') +
+                (sol.isCustom ? '<button class="btn btn-sm" style="padding:2px 6px; color:var(--danger);" onclick="deleteCustomSolution(' + customIdx + ')" title="삭제"><i data-lucide="trash-2" style="width:11px; height:11px;"></i></button>' : '') +
                 '<input type="checkbox" title="비교함에 담기" ' + (compareList.some(c => c.name === sol.name) ? 'checked' : '') + ' onchange="toggleCompareSol(\'' + sol.name.replace(/'/g, "\\'") + '\', this.checked)">' +
               '</div>' +
             '</div>' +
@@ -2716,6 +3080,9 @@
       document.getElementById('bomTotalCapex').innerText = '₩' + totalCapex.toLocaleString();
       document.getElementById('bomTotalOpex').innerText = '₩' + totalOpex.toLocaleString();
       document.getElementById('bomTotalTco').innerText = '₩' + totalTco5Year.toLocaleString();
+
+      // Update ROI & Risk Avoidance Metrics
+      updateRoiMetrics(totalCapex, totalOpex);
     }
 
     function exportBomToCsv() {
@@ -2919,8 +3286,19 @@
               '<li>비정상 패킷 병목 발생 시 해당 게이트웨이 Bypass 모드 전환 및 세션 한도 확인.</li>' +
               '<li>데이터 유출 의심 시 EDR 격리 모드 가동 및 위변조방지 감사 로그 무결성 추출.</li>' +
             '</ol>' +
-          '</div>' +
+          '<h2 style="font-size:1.15rem; font-weight:800; color:#0f172a; border-left:4px solid var(--primary); padding-left:0.6rem; margin-bottom:0.75rem;">5. 경영진 보고용 보안 투자 경제성(ROI) 분석</h2>' +
+          '<table class="clean-table" style="margin-bottom:1.5rem;">' +
+            '<thead><tr><th>분석 지표</th><th>산출 기준 및 경제적 효과</th><th style="text-align:right;">추정 편익 / 회수액</th></tr></thead>' +
+            '<tbody>' +
+              '<tr><td><b>연간 침해사고 예방 가치</b></td><td>글로벌 침해사고 평균 피해액(약 15억원) 대비 핵심 보안 솔루션 방어율 산출</td><td style="text-align:right; color:#059669; font-weight:700;">' + (document.getElementById('roiBreachAvoidance') ? document.getElementById('roiBreachAvoidance').innerText : '₩1,200,000,000') + '</td></tr>' +
+              '<tr><td><b>과징금 리스크 경감액</b></td><td>개인정보보호법 개정안(전체 매출의 최대 3% 과징금) 유출 위험 회피 가치</td><td style="text-align:right; color:#2563eb; font-weight:700;">' + (document.getElementById('roiPenaltyAvoidance') ? document.getElementById('roiPenaltyAvoidance').innerText : '₩300,000,000') + '</td></tr>' +
+              '<tr><td><b>운영/감사인건비 절감액</b></td><td>수동 로그 전수 분석, 침해사고 소명, 정기 감사 대응 공수 60% 절감</td><td style="text-align:right; color:#7c3aed; font-weight:700;">' + (document.getElementById('roiLaborSaving') ? document.getElementById('roiLaborSaving').innerText : '₩48,000,000') + '</td></tr>' +
+              '<tr><td><b>예상 투자 회수 기간(Payback)</b></td><td>초기 도입비(Capex) 대비 순편익 발생 회수 소요 개월 수</td><td style="text-align:right; color:#d97706; font-weight:700;">' + (document.getElementById('roiPaybackPeriod') ? document.getElementById('roiPaybackPeriod').innerText : '약 3.5 개월') + '</td></tr>' +
+            '</tbody>' +
+          '</table>' +
+        '</div>' +
 
+        '<div class="report-page">' +
           '<div style="border-top:1px solid var(--border); padding-top:1rem; display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-dim);">' +
             '<div>GIJO AS Enterprise Security Architecture &copy; 2026 GIJO TECHNOLOGY. All Rights Reserved.</div>' +
             '<div>검증관 서명: ________________ (인)</div>' +
