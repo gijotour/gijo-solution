@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'server/**'
+      - 'client/**'
   pull_request:
     branches: [main]
+    paths:
+      - 'server/**'
+      - 'client/**'
 
 # 배포 대상(온프레미스, 한국)과 같은 타임존으로 고정한다. GitHub Actions 기본 러너는 UTC라
 # "오늘" 날짜 계산이 로컬(KST)과 항상 일치해버려, 자정~오전9시(KST) 구간에서만 터지는
