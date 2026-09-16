@@ -1,4 +1,14 @@
-<!DOCTYPE html>
+const fs = require('fs');
+const path = require('path');
+
+const targetHtmlPath = path.join(__dirname, 'GIJO_Security_ERP_Suite.html');
+const copyV3Path = path.join(__dirname, 'GIJO_AS_스마트아키텍처_v3.html');
+const electronIndexPath = path.join(__dirname, 'gijo-security-erp-app', 'index.html');
+
+const template = fs.readFileSync(path.join(__dirname, 'GIJO_Security_ERP_Suite.html'), 'utf8');
+
+// Write cleaner script that doesn't suffer from nested template string escaping
+const htmlContent = `<!DOCTYPE html>
 <html lang="ko" data-theme="dark">
 <head>
   <meta charset="UTF-8">
@@ -1040,7 +1050,7 @@
         category: "보안규정",
         tags: ["ISMS-P", "망분리", "금융보안원", "접근통제"],
         updatedAt: "2026-09-16",
-        content: "# 금융권 ISMS-P 인증기준 및 망분리 구현 지침\n\n## 1. 개요 및 목적\n본 지침은 금융보안원 및 KISA ISMS-P 인증 기준(2.4 망분리 및 접근통제)을 준수하기 위한 사내 표준 아키텍처 및 통제 규정을 정의합니다.\n\n## 2. 핵심 보안 요구사항\n1. **물리적/논리적 망분리**: 인터넷망과 사내 업무망, 데이터베이스(DB) 보안망의 트래픽을 엄격히 차단합니다.\n2. **차세대 방화벽(NGFW) 이중화**: 주/보조 방화벽 간 Active-Standby 동기화를 유지하며 단일 장애점(SPOF)을 제거합니다.\n3. **웹 방화벽(WAF) 필수 배치**: DMZ 웹 서버 전면에 WAF를 인라인으로 배치하여 OWASP Top 10 및 SQL Injection 공격을 1차 차단합니다.\n4. **EDR 및 사내 에이전트 통제**: 모든 내부망 엔드포인트 단말에 EDR 및 DLP 에이전트 설치를 의무화합니다.\n\n## 3. 침해사고 대응 런북 연계\n- 외부 이상 트래픽 감지 시 WAF 정책 즉시 차단 및 SIEM 알람 발행.\n- 내부 단말 악성코드 감염 시 EDR 네트워크 격리 기능 발동."
+        content: "# 금융권 ISMS-P 인증기준 및 망분리 구현 지침\\n\\n## 1. 개요 및 목적\\n본 지침은 금융보안원 및 KISA ISMS-P 인증 기준(2.4 망분리 및 접근통제)을 준수하기 위한 사내 표준 아키텍처 및 통제 규정을 정의합니다.\\n\\n## 2. 핵심 보안 요구사항\\n1. **물리적/논리적 망분리**: 인터넷망과 사내 업무망, 데이터베이스(DB) 보안망의 트래픽을 엄격히 차단합니다.\\n2. **차세대 방화벽(NGFW) 이중화**: 주/보조 방화벽 간 Active-Standby 동기화를 유지하며 단일 장애점(SPOF)을 제거합니다.\\n3. **웹 방화벽(WAF) 필수 배치**: DMZ 웹 서버 전면에 WAF를 인라인으로 배치하여 OWASP Top 10 및 SQL Injection 공격을 1차 차단합니다.\\n4. **EDR 및 사내 에이전트 통제**: 모든 내부망 엔드포인트 단말에 EDR 및 DLP 에이전트 설치를 의무화합니다.\\n\\n## 3. 침해사고 대응 런북 연계\\n- 외부 이상 트래픽 감지 시 WAF 정책 즉시 차단 및 SIEM 알람 발행.\\n- 내부 단말 악성코드 감염 시 EDR 네트워크 격리 기능 발동."
       },
       {
         id: 2,
@@ -1048,7 +1058,7 @@
         category: "솔루션매뉴얼",
         tags: ["WAF", "NGFW", "HA이중화", "VRRP"],
         updatedAt: "2026-09-15",
-        content: "# WAF & NGFW 하드웨어 이중화(HA) 표준 매뉴얼\n\n## 1. 장비 구성 사양\n- **주 장비 (Active)**: Primary Appliance (포트 eth0/eth1 트래픽 인라인 인입)\n- **보조 장비 (Standby)**: Secondary Appliance (동기화 링크 eth2 전용 케이블 직결)\n\n## 2. 상태 점검 및 페일오버(Failover) 절차\n1. VRRP 헬스체크 주기는 1초로 설정 (3회 연속 응답 실패 시 3초 이내 자동 절체).\n2. 세션 동기화(State Sync) 확인: Active 장비의 실시간 연결 테이블이 Standby 장비에 실시간 복제되는지 모니터링합니다.\n3. 정기 점검 주기: 매월 3째주 토요일 새벽 02:00 수동 페일오버 모의훈련 실시."
+        content: "# WAF & NGFW 하드웨어 이중화(HA) 표준 매뉴얼\\n\\n## 1. 장비 구성 사양\\n- **주 장비 (Active)**: Primary Appliance (포트 eth0/eth1 트래픽 인라인 인입)\\n- **보조 장비 (Standby)**: Secondary Appliance (동기화 링크 eth2 전용 케이블 직결)\\n\\n## 2. 상태 점검 및 페일오버(Failover) 절차\\n1. VRRP 헬스체크 주기는 1초로 설정 (3회 연속 응답 실패 시 3초 이내 자동 절체).\\n2. 세션 동기화(State Sync) 확인: Active 장비의 실시간 연결 테이블이 Standby 장비에 실시간 복제되는지 모니터링합니다.\\n3. 정기 점검 주기: 매월 3째주 토요일 새벽 02:00 수동 페일오버 모의훈련 실시."
       },
       {
         id: 3,
@@ -1056,7 +1066,7 @@
         category: "아키텍처설계",
         tags: ["생성형AI", "GB10", "AirGap", "DLP", "KMS"],
         updatedAt: "2026-09-14",
-        content: "# 온프레미스 생성형 AI 보안존 아키텍처 설계서\n\n## 1. 아키텍처 개요\n사내 민감정보 및 고객 데이터의 외부 유출을 원천 방지하기 위해 에어갭(Air-Gap) 기반 온프레미스 GB10 (177B) 전용 GPU 클러스터를 구축합니다.\n\n## 2. 다계층 방어선 (Defense in Depth)\n- **1계층 (경계 보안)**: AI 전용 WAF 및 API Gateway를 통한 토큰 기반 인증 및 Rate Limiting.\n- **2계층 (데이터 필터링)**: 프롬프트 인입 시 사내 DLP 엔진을 통해 주민등록번호/계좌번호 마스킹 처리.\n- **3계층 (저장 암호화)**: 지식고 벡터 DB 및 모델 가중치 파일은 HSM/KMS 연동 AES-256 암호화 적용."
+        content: "# 온프레미스 생성형 AI 보안존 아키텍처 설계서\\n\\n## 1. 아키텍처 개요\\n사내 민감정보 및 고객 데이터의 외부 유출을 원천 방지하기 위해 에어갭(Air-Gap) 기반 온프레미스 GB10 (177B) 전용 GPU 클러스터를 구축합니다.\\n\\n## 2. 다계층 방어선 (Defense in Depth)\\n- **1계층 (경계 보안)**: AI 전용 WAF 및 API Gateway를 통한 토큰 기반 인증 및 Rate Limiting.\\n- **2계층 (데이터 필터링)**: 프롬프트 인입 시 사내 DLP 엔진을 통해 주민등록번호/계좌번호 마스킹 처리.\\n- **3계층 (저장 암호화)**: 지식고 벡터 DB 및 모델 가중치 파일은 HSM/KMS 연동 AES-256 암호화 적용."
       },
       {
         id: 4,
@@ -1064,7 +1074,7 @@
         category: "장애런북",
         tags: ["DDoS", "랜섬웨어", "긴급대응", "SOAR"],
         updatedAt: "2026-09-12",
-        content: "# DDoS 및 랜섬웨어 침해사고 긴급대응 런북\n\n## 1. 초기 인지 및 전파 (10분 이내)\n- SIEM 알람 발생 또는 서비스 지연 감지 즉시 보안관제팀 및 인프라팀 비상 연락망 가동.\n- 트래픽 임계치 초과 여부 확인 (평시 대비 300% 이상 인입 시 DDoS 의심).\n\n## 2. 긴급 조치 단계\n1. **DDoS 대피소 전환**: DNS 레코드 CNAME을 안티DDoS 스크러빙 센터로 우회.\n2. **EDR 단말 일괄 격리**: 랜섬웨어 확산 징후 발견 시 감염 대역 단말 네트워크 격리.\n3. **포렌식 증거 수집**: 침해 서버 메모리 덤프 및 방화벽 세션 로그 즉시 영구보존 스토리지로 복제."
+        content: "# DDoS 및 랜섬웨어 침해사고 긴급대응 런북\\n\\n## 1. 초기 인지 및 전파 (10분 이내)\\n- SIEM 알람 발생 또는 서비스 지연 감지 즉시 보안관제팀 및 인프라팀 비상 연락망 가동.\\n- 트래픽 임계치 초과 여부 확인 (평시 대비 300% 이상 인입 시 DDoS 의심).\\n\\n## 2. 긴급 조치 단계\\n1. **DDoS 대피소 전환**: DNS 레코드 CNAME을 안티DDoS 스크러빙 센터로 우회.\\n2. **EDR 단말 일괄 격리**: 랜섬웨어 확산 징후 발견 시 감염 대역 단말 네트워크 격리.\\n3. **포렌식 증거 수집**: 침해 서버 메모리 덤프 및 방화벽 세션 로그 즉시 영구보존 스토리지로 복제."
       }
     ];
 
@@ -1078,7 +1088,7 @@
     ];
 
     const studioPresets = {
-      finance: `graph TD
+      finance: \`graph TD
   User["👤 인터넷 사용자"] -->|HTTPS 443| WAF["🛡️ WAF (Active-Standby)"]
   WAF -->|검증된 트래픽| NGFW["🔥 차세대 방화벽 (HA)"]
   
@@ -1100,9 +1110,9 @@
   
   WEB1 -.->|Syslog| SIEM
   DB -.->|Audit Log| SIEM
-  WAS -.->|Agent| EDR`,
+  WAS -.->|Agent| EDR\`,
   
-      public: `graph TD
+      public: \`graph TD
   GovUser["🏛️ 공공기관 / 대민 접속"] --> CSAP_GW["🔒 CSAP 보안 게이트웨이"]
   CSAP_GW --> CC_FW["🛡️ CC인증 차세대 방화벽"]
   
@@ -1120,9 +1130,9 @@
   
   GovDB -.-> KMS
   WebCluster -.-> DLP
-  AppCluster -.-> LogServer`,
+  AppCluster -.-> LogServer\`,
 
-      ai: `graph TD
+      ai: \`graph TD
   Client["💻 사내 개발/업무 단말"] --> AuthGW["🔐 ZTNA 접근통제 게이트웨이"]
   AuthGW --> DLPGW["🛑 프롬프트 DLP 검사기"]
   
@@ -1138,9 +1148,9 @@
   end
   
   GB10 -.-> AuditLogger
-  DLPGW -.-> Sanitizer`,
+  DLPGW -.-> Sanitizer\`,
 
-      zerotrust: `graph TD
+      zerotrust: \`graph TD
   RemoteWorker["🏠 재택/외부 근무자"] --> MFA["🔑 멀티팩터 인증 (MFA)"]
   MFA --> ZTX["🌐 제로트러스트 SASE 게이트웨이"]
   
@@ -1157,7 +1167,7 @@
   
   RemoteWorker -.-> EDR_Agent
   EDR_Agent -.-> PolicyEngine
-  PolicyEngine -.-> ZTX`
+  PolicyEngine -.-> ZTX\`
     };
 
     function loadStoredDocs() {
@@ -1297,7 +1307,7 @@
         category: "보안규정",
         tags: ["신규"],
         updatedAt: new Date().toISOString().slice(0, 10),
-        content: "# 새 보안 문서\n\n여기에 사내 규정 또는 솔루션 가이드를 작성하세요."
+        content: "# 새 보안 문서\\n\\n여기에 사내 규정 또는 솔루션 가이드를 작성하세요."
       };
       currentDocs.unshift(newDoc);
       currentActiveDocId = newDoc.id;
@@ -1334,11 +1344,11 @@
         .replace(/^### (.*$)/gim, '<h3>$1</h3>')
         .replace(/^## (.*$)/gim, '<h2>$1</h2>')
         .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        .replace(/\*\*(.*?)\*\*/gim, '<b>$1</b>')
-        .replace(/\*(.*?)\*/gim, '<i>$1</i>')
-        .replace(/^\- (.*$)/gim, '<li>$1</li>')
-        .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
-        .replace(/\n/g, '<br />');
+        .replace(/\\*\\*(.*?)\\*\\*/gim, '<b>$1</b>')
+        .replace(/\\*(.*?)\\*/gim, '<i>$1</i>')
+        .replace(/^\\- (.*$)/gim, '<li>$1</li>')
+        .replace(/^\\d+\\. (.*$)/gim, '<li>$1</li>')
+        .replace(/\\n/g, '<br />');
       return html;
     }
 
@@ -1380,7 +1390,7 @@
           const topDoc = matchedDocs[0].doc;
           let summary = topDoc.content.slice(0, 200).replace(/#/g, '');
           aiBubble.innerHTML = '<div><b>[로컬 지식 분석 결과]</b><br>' +
-            '질의하신 \'<b>' + query + '</b>\'에 대한 사내 규정 및 아키텍처 지침입니다:<br><br>' +
+            '질의하신 \\'<b>' + query + '</b>\\'에 대한 사내 규정 및 아키텍처 지침입니다:<br><br>' +
             summary + '...<br></div>' +
             '<div class="citation-tag" onclick="selectWikiDoc(' + topDoc.id + ')">' +
             '<i data-lucide="file-text" style="width:12px; height:12px;"></i> 출처: [' + topDoc.category + '] ' + topDoc.title +
@@ -1407,7 +1417,7 @@
         loadStudioPreset('finance');
       }
       switchView('studio');
-      alert('✅ \'' + doc.title + '\' 지침을 기반으로 스마트 아키텍처 캔버스가 동기화되었습니다.');
+      alert('✅ \\'' + doc.title + '\\' 지침을 기반으로 스마트 아키텍처 캔버스가 동기화되었습니다.');
     }
 
     function loadStudioPreset(key) {
@@ -1433,10 +1443,10 @@
 
     function insertNodeToCode(type, desc) {
       const editor = document.getElementById('mermaidCodeEditor');
-      const lines = editor.value.split('\n');
+      const lines = editor.value.split('\\n');
       const newNodeLine = '  Node_' + Date.now().toString().slice(-4) + '["🛡️ ' + desc + '"]';
       lines.push(newNodeLine);
-      editor.value = lines.join('\n');
+      editor.value = lines.join('\\n');
       renderMermaidFromEditor();
     }
 
@@ -1499,7 +1509,7 @@
                   '<div style="font-size:0.7rem; color:var(--text-muted);">도입 단가</div>' +
                   '<b style="color:#38bdf8;">₩ ' + sol.price.toLocaleString() + '</b>' +
                 '</div>' +
-                '<button class="btn-action" style="font-size:0.75rem;" onclick="insertNodeToCode(\'' + sol.category + '\', \'' + sol.name + '\')">' +
+                '<button class="btn-action" style="font-size:0.75rem;" onclick="insertNodeToCode(\\'' + sol.category + '\\', \\'' + sol.name + '\\')">' +
                   '<i data-lucide="plus"></i> 스튜디오 추가' +
                 '</button>' +
               '</div>' +
@@ -1646,4 +1656,12 @@
     });
   </script>
 </body>
-</html>
+</html>`;
+
+fs.writeFileSync(targetHtmlPath, htmlContent, 'utf8');
+fs.writeFileSync(copyV3Path, htmlContent, 'utf8');
+if (fs.existsSync(path.dirname(electronIndexPath))) {
+  fs.writeFileSync(electronIndexPath, htmlContent, 'utf8');
+}
+
+console.log('✅ GIJO WIKI files generated successfully!');

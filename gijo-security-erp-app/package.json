@@ -1,7 +1,7 @@
 {
-  "name": "gijo-security-erp-suite",
-  "version": "4.5.0",
-  "description": "GIJO TECHNOLOGY 보안 솔루션 통합 ERP & 스마트 스튜디오 Desktop Application",
+  "name": "gijo-wiki",
+  "version": "5.0.0",
+  "description": "GIJO WIKI - 통합 보안 ERP & 스마트 아키텍처 스튜디오 & 로컬 LLM 위키",
   "main": "main.js",
   "author": "GIJO TECHNOLOGY",
   "license": "Commercial",
@@ -16,9 +16,9 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.gijo.securityerp",
-    "productName": "GIJO 보안솔루션 통합 ERP",
-    "artifactName": "GIJO-Security-ERP-Setup-${version}.${ext}",
+    "appId": "com.gijo.wiki",
+    "productName": "GIJO WIKI",
+    "artifactName": "GIJO-WIKI-Setup-v${version}.${ext}",
     "directories": {
       "output": "dist"
     },
@@ -41,7 +41,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "GIJO 보안 솔루션 ERP"
+      "shortcutName": "GIJO WIKI"
     }
   }
 }

@@ -10,9 +10,9 @@ function createWindow() {
     height: 950,
     minWidth: 1100,
     minHeight: 700,
-    title: "GIJO TECHNOLOGY 보안 솔루션 통합 ERP & 스마트 스튜디오",
+    title: "GIJO WIKI - 보안 솔루션 통합 ERP & 스마트 아키텍처 스튜디오",
     icon: path.join(__dirname, 'icon.png'),
-    backgroundColor: '#0f172a',
+    backgroundColor: '#090d16',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -23,7 +23,6 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
-  // Custom Desktop Native Menu
   const sendCommand = (cmd, payload) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('app:command', { cmd, payload });
@@ -34,14 +33,13 @@ function createWindow() {
     {
       label: '파일 (File)',
       submenu: [
-        { label: '🛡️ 솔루션 카탈로그', accelerator: 'CmdOrCtrl+1', click: () => sendCommand('view-catalog') },
-        { label: '📐 아키텍처 스튜디오', accelerator: 'CmdOrCtrl+2', click: () => sendCommand('view-studio') },
-        { label: '💼 딜 & 견적 산출', accelerator: 'CmdOrCtrl+3', click: () => sendCommand('view-dealquote') },
-        { label: '🔑 라이선스 & MA 관리', accelerator: 'CmdOrCtrl+4', click: () => sendCommand('view-licensema') },
-        { label: '🏢 고객/제조사/파트너 360', accelerator: 'CmdOrCtrl+5', click: () => sendCommand('view-companycrm') },
-        { label: '📝 스마트 MD 스튜디오', accelerator: 'CmdOrCtrl+6', click: () => sendCommand('view-mdstudio') },
+        { label: '📚 GIJO WIKI (내문서·로컬LLM)', accelerator: 'CmdOrCtrl+1', click: () => sendCommand('view-wiki') },
+        { label: '🏗️ 스마트 아키텍처 Pro 스튜디오', accelerator: 'CmdOrCtrl+2', click: () => sendCommand('view-studio') },
+        { label: '📊 ERP 솔루션 포털', accelerator: 'CmdOrCtrl+3', click: () => sendCommand('view-portal') },
+        { label: '💰 실시간 TCO & BOM', accelerator: 'CmdOrCtrl+4', click: () => sendCommand('view-bom') },
+        { label: '🛡️ ISMS-P 진단기', accelerator: 'CmdOrCtrl+5', click: () => sendCommand('view-audit') },
         { type: 'separator' },
-        { label: '💾 전체 데이터 백업 (JSON)', accelerator: 'CmdOrCtrl+B', click: () => sendCommand('backup-all') },
+        { label: '💾 전체 프로젝트 백업 (JSON)', accelerator: 'CmdOrCtrl+B', click: () => sendCommand('backup-all') },
         { type: 'separator' },
         { label: '종료 (Exit)', role: 'quit' }
       ]
@@ -76,9 +74,9 @@ function createWindow() {
       label: '도움말 (Help)',
       submenu: [
         {
-          label: 'GIJO 기술지원 웹사이트',
+          label: 'GIJO 기술지원 저장소',
           click: async () => {
-            await shell.openExternal('https://github.com/gijotour');
+            await shell.openExternal('https://github.com/gijotour/gijo-solution');
           }
         },
         { type: 'separator' },
@@ -87,9 +85,9 @@ function createWindow() {
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
-              title: 'GIJO Security ERP Suite',
-              message: 'GIJO TECHNOLOGY 보안 솔루션 통합 ERP & 스마트 스튜디오',
-              detail: '버전: v4.5.0 (Electron Desktop Standalone Edition)\n제조사: (주)GIJO TECHNOLOGY\nAGY & GB10 On-Premise Engine Powered'
+              title: 'GIJO WIKI Suite Pro',
+              message: 'GIJO WIKI - 통합 보안 ERP & 스마트 아키텍처 스튜디오 & 로컬 LLM 위키',
+              detail: '버전: v5.0.0 Pro (Desktop Standalone Edition)\n제조사: (주)GIJO TECHNOLOGY\nAGY Architecture & GB10 On-Premise Engine Powered'
             });
           }
         }
@@ -117,10 +115,9 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// IPC Handlers
 ipcMain.handle('dialog:saveJson', async (event, { defaultName, content }) => {
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    defaultPath: defaultName || 'GIJO_Backup.json',
+    defaultPath: defaultName || 'GIJO_WIKI_Backup.json',
     filters: [{ name: 'JSON Files', extensions: ['json'] }]
   });
   if (canceled || !filePath) return false;
