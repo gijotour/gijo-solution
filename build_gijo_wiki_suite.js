@@ -868,7 +868,7 @@ const htmlContent = `<!DOCTYPE html>
         <aside class="white-panel">
           <div class="panel-head">
             <span class="panel-head-title"><i data-lucide="folder" style="width:14px; height:14px; color:var(--primary);"></i> 실물 지식고 (<span id="totalDocCount">0</span>)</span>
-            <button class="btn btn-sm" onclick="createNewWikiDoc()">
+            <button class="btn btn-sm btn-primary" onclick="openNewDocTemplateModal()" title="다양한 전문 서식 템플릿으로 신규 문서 추가">
               <i data-lucide="plus" style="width:12px; height:12px;"></i> 추가
             </button>
           </div>
@@ -882,9 +882,11 @@ const htmlContent = `<!DOCTYPE html>
             <button class="pill-cat" id="pill-사내솔루션" onclick="filterByCat('사내솔루션')">사내운용(자사)</button>
             <button class="pill-cat" id="pill-보안솔루션" onclick="filterByCat('보안솔루션')">표준솔루션(20)</button>
             <button class="pill-cat" id="pill-보안규정" onclick="filterByCat('보안규정')">보안규정</button>
+            <button class="pill-cat" id="pill-침해사고" onclick="filterByCat('침해사고')">침해사고</button>
+            <button class="pill-cat" id="pill-ISMS-P" onclick="filterByCat('ISMS-P')">ISMS-P</button>
             <button class="pill-cat" id="pill-취약점관리" onclick="filterByCat('취약점관리')">취약점</button>
-            <button class="pill-cat" id="pill-AI보안" onclick="filterByCat('AI보안')">AI보안</button>
             <button class="pill-cat" id="pill-아키텍처설계" onclick="filterByCat('아키텍처설계')">아키텍처</button>
+            <button class="pill-cat" id="pill-보안FAQ" onclick="filterByCat('보안FAQ')">실무FAQ</button>
           </div>
 
           <ul id="wikiDocList" class="doc-list-clean"></ul>
@@ -916,15 +918,45 @@ const htmlContent = `<!DOCTYPE html>
             <div id="wikiReadView" class="markdown-render"></div>
 
             <div id="wikiEditView" style="display: none; height: 100%; flex-direction: column; gap: 0.65rem;">
+              <!-- Quick Document Templates Bar -->
+              <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:0.45rem 0.65rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.4rem;">
+                <div style="display:flex; align-items:center; gap:0.35rem; font-size:0.74rem; font-weight:700; color:var(--text-sub);">
+                  <span>📋 전문 서식 주입:</span>
+                  <button type="button" class="btn btn-sm" style="font-size:0.72rem; padding:0.15rem 0.45rem;" onclick="applyDocTemplate('SEC_POLICY')">📜 보안운영규정</button>
+                  <button type="button" class="btn btn-sm" style="font-size:0.72rem; padding:0.15rem 0.45rem;" onclick="applyDocTemplate('INCIDENT_REPORT')">🚨 침해사고보고(RCA)</button>
+                  <button type="button" class="btn btn-sm" style="font-size:0.72rem; padding:0.15rem 0.45rem;" onclick="applyDocTemplate('ISMS_AUDIT')">📋 ISMS-P수검증적</button>
+                  <button type="button" class="btn btn-sm" style="font-size:0.72rem; padding:0.15rem 0.45rem;" onclick="applyDocTemplate('ARCHITECTURE')">🏗️ 보안아키텍처설계</button>
+                  <button type="button" class="btn btn-sm" style="font-size:0.72rem; padding:0.15rem 0.45rem;" onclick="applyDocTemplate('VULN_MGMT')">🔍 취약점조치계획</button>
+                  <button type="button" class="btn btn-sm" style="font-size:0.72rem; padding:0.15rem 0.45rem;" onclick="applyDocTemplate('SECURITY_FAQ')">❓ 보안실무FAQ</button>
+                </div>
+                <button type="button" class="btn btn-sm" style="font-size:0.7rem; color:var(--primary);" onclick="openNewDocTemplateModal()">
+                  <i data-lucide="layout-grid" style="width:11px; height:11px;"></i> 양식 상세 선택
+                </button>
+              </div>
+
               <input type="text" id="editDocTitle" class="search-input" style="font-size:1.1rem; font-weight:700; background:#fff;" placeholder="문서 제목">
               <div style="display:flex; gap:0.5rem;">
-                <input type="text" id="editDocCat" class="search-input" style="width:140px; background:#fff;" placeholder="카테고리">
+                <input type="text" id="editDocCat" list="wikiCatOptions" class="search-input" style="width:180px; background:#fff;" placeholder="카테고리 선택/입력">
+                <datalist id="wikiCatOptions">
+                  <option value="보안규정">
+                  <option value="침해사고">
+                  <option value="ISMS-P">
+                  <option value="취약점관리">
+                  <option value="아키텍처설계">
+                  <option value="AI보안">
+                  <option value="보안FAQ">
+                  <option value="사내솔루션">
+                  <option value="감사증적">
+                </datalist>
                 <input type="text" id="editDocTags" class="search-input" style="flex:1; background:#fff;" placeholder="태그 (쉼표로 구분)">
               </div>
-              <textarea id="editDocContent" class="code-editor" style="flex:1; height:auto;" placeholder="마크다운 내용 작성..."></textarea>
-              <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
-                <button class="btn" onclick="cancelDocEdit()">취소</button>
-                <button class="btn btn-primary" onclick="saveDocEdit()">저장</button>
+              <textarea id="editDocContent" class="code-editor" style="flex:1; height:auto; min-height:380px;" placeholder="마크다운 내용 작성..."></textarea>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.72rem; color:var(--text-dim);">💡 마크다운 표, 체크박스, Mermaid 다이어그램 작성 지원</span>
+                <div style="display:flex; gap:0.5rem;">
+                  <button class="btn" onclick="cancelDocEdit()">취소</button>
+                  <button class="btn btn-primary" onclick="saveDocEdit()">저장</button>
+                </div>
               </div>
             </div>
           </div>
@@ -1478,6 +1510,33 @@ const htmlContent = `<!DOCTYPE html>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
           <button class="btn btn-sm" onclick="testLlmConnection()">연결 테스트</button>
           <button class="btn btn-sm btn-primary" onclick="saveLlmSettings()">설정 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Wiki Doc Template Selection Modal -->
+  <div class="modal-overlay" id="newDocTemplateModal">
+    <div class="modal-box" style="max-width:880px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:0.55rem;">
+          <span style="background:#eff6ff; color:#2563eb; width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; border:1px solid #bfdbfe;">📚</span>
+          <div>
+            <h3 style="font-size:1.1rem; font-weight:800; color:var(--text-main);">실물 지식고 신규 문서 양식 선택</h3>
+            <p style="font-size:0.75rem; color:var(--text-sub); margin-top:2px;">사내 보안 실무 및 KISA 규정에 맞춘 전문 표준 서식을 선택하여 즉시 작성합니다.</p>
+          </div>
+        </div>
+        <button class="btn btn-sm" onclick="closeNewDocTemplateModal()"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+      </div>
+      <div class="modal-body" style="padding:1.25rem;">
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:1rem;" id="docTemplateCardsGrid">
+          <!-- Populated dynamically or static cards -->
+        </div>
+        <div style="margin-top:1.25rem; padding-top:0.75rem; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.75rem; color:var(--text-dim);">💡 선택한 양식은 에디터에서 자유롭게 수정하거나 다른 양식으로 재주입할 수 있습니다.</span>
+          <button class="btn btn-sm" onclick="selectNewDocTemplate('BLANK')">
+            <i data-lucide="file" style="width:12px; height:12px;"></i> 서식 없이 빈 문서로 시작
+          </button>
         </div>
       </div>
     </div>
@@ -2545,22 +2604,368 @@ const htmlContent = `<!DOCTYPE html>
       toggleEditMode();
     }
 
-    function createNewWikiDoc() {
+    // --- 전문 실무 지식고 문서 템플릿 6종 ---
+    const wikiDocTemplates = {
+      SEC_POLICY: {
+        name: '사내 정보보안 운영규정 및 지침 표준안',
+        badge: '📜 규정/지침',
+        category: '보안규정',
+        tags: ['보안규정', '운영지침', '관리체계', 'KISA', '내부통제'],
+        desc: '조직 구성원 및 관리자가 준수해야 할 사내 보안 의무, 비밀번호/계정 통제, 위반 조치 기준',
+        title: '사내 정보시스템 보안 운영 및 관리 지침서',
+        content: 
+          '# 사내 정보시스템 보안 운영 및 관리 지침서\\n\\n' +
+          '> **문서분류**: 사내 보안규정 | **제정/개정일**: 2026-09-16 | **적용대상**: 전사 임직원 및 외주 협력사 | **보안등급**: 사내 한정(Internal)\\n\\n' +
+          '---\\n\\n' +
+          '## 제1조 (목적)\\n' +
+          '본 지침은 정보통신망 이용촉진 및 정보보호 등에 관한 법률 및 개인정보보호법에 의거하여, 사내 정보시스템 및 정보자산을 외부 침해위협으로부터 안전하게 보호하고 업무 연속성을 보장함을 목적으로 한다.\\n\\n' +
+          '## 제2조 (적용 범위)\\n' +
+          '1. 본 지침은 사내 모든 부서, 임직원, 파견직 및 전산 시스템을 위탁 운영하는 외주 협력업체 직원에게 적용된다.\\n' +
+          '2. 적용 자산은 사내 네트워크(유·무선), 서버, 데이터베이스, 보안 솔루션, PC/노트북 및 클라우드 자산을 포함한다.\\n\\n' +
+          '## 제3조 (보안 관리 조직 및 역할)\\n' +
+          '| 구분 | 직책/역할 | 주요 임무 및 책임 |\\n' +
+          '|:---|:---|:---|\\n' +
+          '| **CISO** | 정보보호최고책임자 | 정보보호 종합계획 수립, 예산 편성 및 최종 보안 결재 |\\n' +
+          '| **보안담당자** | 정보보호 실무자 | 보안 솔루션 일일 점검, 위협 탐지 모니터링, 접근통제 승인 |\\n' +
+          '| **시스템관리자** | 인프라/서버 운영자 | OS/미들웨어 보안 패치 적용, 정기 백업 수행 및 무결성 검증 |\\n' +
+          '| **일반 임직원** | 정보자산 이용자 | 비밀번호 복잡도 준수, 의심 메일 신고, 클린데스크 준수 |\\n\\n' +
+          '## 제4조 (계정 및 비밀번호 통제 기준)\\n' +
+          '1. **패스워드 조합 규칙**: 영문 대/소문자, 숫자, 특수문자 중 3종 이상 조합 시 8자리 이상, 2종 조합 시 10자리 이상.\\n' +
+          '2. **비밀번호 변경 주기**: 분기별 1회(90일 주기) 의무 변경하며, 최근 3회 사용한 비밀번호는 재사용할 수 없다.\\n' +
+          '3. **접근 잠금 정책**: 연속 5회 인증 실패 시 해당 계정은 자동 잠금 조치하며, 본인 인증 후 관리자가 해제한다.\\n' +
+          '4. **유휴 세션 타임아웃**: 관리자 콘솔 및 주요 업무 시스템은 15분 이상 입력이 없을 경우 자동 로그아웃된다.\\n\\n' +
+          '## 제5조 (정기 점검 및 증적 보존)\\n' +
+          '1. 보안담당자는 매일 시스템 데몬 상태, 방화벽/IPS/WAF 차단 로그 및 침해시도를 점검하고 일일 점검표를 작성한다.\\n' +
+          '2. 접속기록 및 감사로그는 위·변조 방지 처리를 거쳐 최소 1년(개인정보 취급 시스템은 2년) 이상 안전하게 보존한다.\\n\\n' +
+          '## 제6조 (위반 시 제재 및 조치)\\n' +
+          '본 지침을 고의 또는 중대한 과실로 위반하여 회사에 보안 사고를 야기한 자는 사규에 따라 인사위원회에 회부되며, 민·형사상 법적 책임을 물을 수 있다.'
+      },
+
+      INCIDENT_REPORT: {
+        name: '침해사고 긴급대응 및 근본원인 분석(RCA) 보고서',
+        badge: '🚨 침해/사고',
+        category: '침해사고',
+        tags: ['침해사고', '사후보고서', 'RCA', '포렌식', '대응일지'],
+        desc: '악성코드/랜섬웨어/C2 감염 등 침해 발생 시 타임라인, 공격벡터, 근본원인 분석 및 재발방지책',
+        title: '보안 침해사고 긴급대응 및 근본원인 분석(RCA) 보고서',
+        content: 
+          '# 보안 침해사고 긴급대응 및 근본원인 분석(RCA) 보고서\\n\\n' +
+          '> **사고번호**: INC-2026-0916-01 | **최초 인지일시**: 2026-09-16 14:20:00 | **보고자**: 정보보호팀 비상대응조 | **심각도**: 🔴 Critical\\n\\n' +
+          '---\\n\\n' +
+          '## 1. 사고 개요 (Executive Summary)\\n' +
+          '* **사고 유형**: C2 악성 비인가 통신 감지 및 내부 래터럴 무브먼트(Lateral Movement) 시도\\n' +
+          '* **영향 자산**: DMZ 웹서버 1대 (192.168.10.25), 내부 관리자 PC 1대 (10.10.50.41)\\n' +
+          '* **피해 현황**: 고객 DB 및 주요 기밀 유출 흔적 없음 (EDR 및 방화벽으로 3차 C2 연결 차단 완료)\\n\\n' +
+          '## 2. 사고 대응 타임라인 (Incident Timeline)\\n' +
+          '| 일시 (Timestamp) | 주체 | 수행 내용 및 탐지 징후 |\\n' +
+          '|:---|:---|:---|\\n' +
+          '| **14:15:32** | 공격자 | 외부 IP(203.0.113.45)로부터 DMZ 웹서버 취약점을 이용한 웹쉘 업로드 시도 |\\n' +
+          '| **14:20:10** | WAF/EDR | 웹쉘 생성 감지 및 탐지 알람 발생, 비인가 외향(Outbound) 8443 포트 연결 시도 |\\n' +
+          '| **14:22:45** | 보안팀 | **[1단계]** 해당 호스트 네트워크 즉시 논리적 격리(Host Isolation) 조치 |\\n' +
+          '| **14:35:00** | 포렌식조 | **[2단계]** \\x60winpmem\\x60 및 \\x60LiME\\x60을 통한 휘발성 메모리 덤프 및 프로세스 트리 확보 |\\n' +
+          '| **15:10:00** | 인프라팀 | **[3단계]** 방화벽 경계에서 공격자 C2 IP/도메인 전면 블랙리스트 등록 및 차단 |\\n' +
+          '| **16:00:00** | 보안팀 | 백신 풀스캔 및 웹서버 최신 보안 패치 적용 후 격리 해제 및 모니터링 전환 |\\n\\n' +
+          '## 3. 근본 원인 분석 (Root Cause Analysis - RCA)\\n' +
+          '1. **초기 침투 경로(Initial Access)**:\\n' +
+          '   * DMZ 웹서버 내 구버전 아파치 웹서버의 미패치 취약점(CVE-2024-XXXXX)을 통해 임의 파일 업로드 허용.\\n' +
+          '2. **권한 상승 및 확산 시도(Privilege Escalation)**:\\n' +
+          '   * 서비스 계정 권한으로 웹쉘을 구동 후 로컬 서비스 취약점을 통해 SYSTEM 권한 획득 시도.\\n' +
+          '3. **방어 기제 동작 평가**:\\n' +
+          '   * Falcon EDR의 행위 기반 탐지로 메모리 인젝션 단계에서 즉각 프로세스가 킬(Kill)되어 실질적 데이터 암호화 및 유출 차단 성공.\\n\\n' +
+          '## 4. 긴급 조치 및 보완 대책\\n' +
+          '* **단기 조치 (24시간 내)**:\\n' +
+          '  * 전사 DMZ 웹서버 취약점 전수 스캔 및 최신 보안 패치 적용\\n' +
+          '  * 공격자 IP 대역 및 관련 IoC(SHA-256 해시, 도메인) 방화벽/EDR 룰셋 반영\\n' +
+          '* **중장기 조치 (30일 내)**:\\n' +
+          '  * 웹 애플리케이션 방화벽(WAF) 시그니처 자동 업데이트 주기 단축 (일 1회 -> 실시간)\\n' +
+          '  * 외부 공개 서버에 대한 모의해킹 및 코드 시큐어코딩 진단 실시\\n\\n' +
+          '## 5. 법적 조치 및 KISA 보고 여부\\n' +
+          '* 개인정보 유출 및 대규모 서비스 마비가 발생하지 않았으나, KISA 종합상황실(118)에 침해사고 예방 공유를 위해 IoC 정보 자진 공유 완료.'
+      },
+
+      ISMS_AUDIT: {
+        name: 'KISA ISMS-P 인증 통제항목 이행 현황 및 수검 증적표',
+        badge: '📋 ISMS-P',
+        category: 'ISMS-P',
+        tags: ['ISMS-P', '인증수검', '통제항목', '증적목록', '감사대응'],
+        desc: 'KISA ISMS-P 80개 통제항목 대비 사내 통제 현황, 필수 증적 제출 목록 및 점검 체크포인트',
+        title: 'KISA ISMS-P 인증 통제항목 이행 현황 및 수검 증적 관리표',
+        content: 
+          '# KISA ISMS-P 인증 통제항목 이행 현황 및 수검 증적 관리표\\n\\n' +
+          '> **수검 기준**: KISA ISMS-P 인증기준 (관리체계 16개, 보호대책 64개) | **수검 연도**: 2026년도 정기심사 | **주관부서**: 정보보호팀\\n\\n' +
+          '---\\n\\n' +
+          '## 1. 대상 통제영역 명세\\n' +
+          '* **통제영역**: \\x602.6 접근통제\\x60, \\x602.7 암호화 적용\\x60, \\x602.10 로그 관리 및 이상징후 모니터링\\x60\\n' +
+          '* **요구사항 개요**: 사용자 및 관리자의 식별·인증, 비인가 접근 방지, 데이터 저장·전송 암호화, 감사로그의 1년 이상 보존 및 무결성 보장.\\n\\n' +
+          '## 2. 사내 보호대책 이행 현황 매트릭스\\n' +
+          '| 통제번호 | 세부 통제항목명 | 사내 이행 방안 및 적용 솔루션 | 적합성 판정 |\\n' +
+          '|:---|:---|:---|:---:|\\n' +
+          '| **2.6.1** | 업무망 및 인터넷망 분리 | 논리적 망분리(VDI) 및 망간자료전송(FOCS/망연계 솔루션) 통제 | ✅ 적합 |\\n' +
+          '| **2.6.2** | 사용자 인증 및 식별 | 사내 ERP 및 포털 FIDO2 / OTP 2차 인증(MFA) 전면 강제화 | ✅ 적합 |\\n' +
+          '| **2.6.5** | 특권 권한 관리 | 서버 접근제어(SecureIM)를 통한 Root/Admin 직접 로그인 차단 및 세션 녹화 | ✅ 적합 |\\n' +
+          '| **2.7.1** | 암호화 적용 기준 | 주민등록번호, 계좌번호 등 고유식별정보 AES-256 DB 암호화(CipherTrust) | ✅ 적합 |\\n' +
+          '| **2.7.2** | 전송구간 암호화 | 전사 웹서비스 HTTPS(TLS 1.3) 강제 및 사외 원격접속 IPSec VPN 적용 | ✅ 적합 |\\n' +
+          '| **2.10.1** | 로그 생성 및 보존 | OS, DB, 웹, 보안장비 로그 1년 이상 중앙 SIEM 서버 보존 및 백업 | ✅ 적합 |\\n' +
+          '| **2.10.3** | 이상징후 모니터링 | 실시간 이상징후 탐지 룰셋 가동 및 관리자 알림(SMS/메신저) 연동 | ✅ 적합 |\\n\\n' +
+          '## 3. 심사원 제출 필수 증적(Evidence) 목록\\n' +
+          '1. **접근통제 증적**:\\n' +
+          '   * 서버 접근제어(SecureIM) 사용자 권한 승인 결재문서 사본 (PDF)\\n' +
+          '   * 관리자 계정의 유휴 세션 타임아웃(15분) 설정 화면 캡처\\n' +
+          '2. **암호화 증적**:\\n' +
+          '   * 데이터베이스 암호화 적용 컬럼 리스트 및 암호화 키 관리 지침\\n' +
+          '   * SSL/TLS 인증서 갱신 대장 및 공개키 암호화 알고리즘 검증서 (WizCLM)\\n' +
+          '3. **로그 관리 증적**:\\n' +
+          '   * 최근 1년간의 중앙 로그 서버(SIEM) 용량 현황 및 백업 테이프 보관증\\n' +
+          '   * 월간 이상징후 모니터링 분석 보고서 및 소명 일지\\n\\n' +
+          '## 4. 내부 사전 점검 체크리스트\\n' +
+          '- [ ] 퇴사자 발생 시 24시간 이내 계정 삭제/비활성화 완료 여부 전수 검증\\n' +
+          '- [ ] 개발서버와 운영서버 간 패스워드 상이성 확인\\n' +
+          '- [ ] 공용 계정 사용 금지 및 개별 계정 발급 상태 확인'
+      },
+
+      ARCHITECTURE: {
+        name: '보안 시스템 아키텍처 및 망분리 구성 설계서',
+        badge: '🏗️ 아키텍처',
+        category: '아키텍처설계',
+        tags: ['아키텍처', '망분리', '네트워크', 'DMZ', 'Mermaid', '설계서'],
+        desc: '인터넷망/DMZ/업무망/DB망 보안 계층도, 방화벽 포트맵, 암호화 구간 및 Mermaid 다이어그램',
+        title: '기업 엔터프라이즈 보안 시스템 아키텍처 및 망분리 구성 설계서',
+        content: 
+          '# 기업 엔터프라이즈 보안 시스템 아키텍처 및 망분리 구성 설계서\\n\\n' +
+          '> **문서버전**: v2.1 | **작성일**: 2026-09-16 | **작성자**: 인프라보안 아키텍트 | **망 구성**: 인터넷 - DMZ - Trust 망분리 체계\\n\\n' +
+          '---\\n\\n' +
+          '## 1. 아키텍처 설계 개요\\n' +
+          '본 설계서는 사내 정보자산 및 고객 데이터를 외부 침해 공격으로부터 다계층으로 방어(Defense in Depth)하기 위하여, 물리적·논리적 망분리 구역을 설정하고 각 구간별 보안 솔루션을 배치한 표준 아키텍처 규격이다.\\n\\n' +
+          '## 2. 망분리 구역 정의 (Security Zones)\\n' +
+          '* **인터넷 구간 (Untrusted Zone)**: 외부 일반 사용자의 웹/모바일 트래픽이 유입되는 공개 영역.\\n' +
+          '* **DMZ 구간 (Semi-Trusted Zone)**: 대외 서비스를 직접 제공하는 WAAP, 리버스 프록시, 웹서버(WEB) 배치 구간.\\n' +
+          '* **내부 업무망 (Trusted Zone)**: 임직원 PC, 업무용 인트라넷, 인증 서버(AD/LDAP) 배치 구간.\\n' +
+          '* **데이터베이스망 (Secure DB Zone)**: 핵심 고객 원장 및 DB 서버 배치 구간 (DMZ 직접 통신 원천 차단).\\n\\n' +
+          '## 3. 표준 권장 아키텍처 다이어그램 (Mermaid)\\n' +
+          '\\x60\\x60\\x60mermaid\\n' +
+          'flowchart TB\\n' +
+          '  subgraph External[\"🌐 외부 인터넷망 (Untrusted)\"]\\n' +
+          '    User[\"👤 외부 클라이언트 / 모바일\"]\\n' +
+          '  end\\n' +
+          '  subgraph Boundary[\"🛡️ 경계 보안 계층 (Perimeter)\"]\\n' +
+          '    FW_Ext[\"🔥 1차 차세대 방화벽 (NGFW)\"]\\n' +
+          '    WAAP[\"🛡️ 웹 애플리케이션 방화벽 (WAAP)\"]\\n' +
+          '  end\\n' +
+          '  subgraph DMZ[\"🏢 DMZ 구역 (Semi-Trusted)\"]\\n' +
+          '    direction TB\\n' +
+          '    WebCluster[\"🌐 Web Server Cluster (Active-Standby)\"]\\n' +
+          '    APIGW[\"🚪 API Gateway\"]\\n' +
+          '  end\\n' +
+          '  subgraph Internal_Firewall[\"🔥 2차 내부 방화벽 (Internal FW)\"]\\n' +
+          '    direction TB\\n' +
+          '    FOCS[\"⚙️ 방화벽 정책 통제기 (FOCS)\"]\\n' +
+          '    FOCS --- FW_Int[\"내부 차단 룰셋\"]\\n' +
+          '  end\\n' +
+          '  subgraph Trust[\"🏢 내부 안전구역 (Trusted Zone)\"]\\n' +
+          '    direction TB\\n' +
+          '    WAS[\"⚙️ Core WAS Cluster\"]\\n' +
+          '    EDR[\"🛡️ 엔드포인트 EDR 매니저\"]\\n' +
+          '    SIEM[\"📊 통합보안관제 SIEM\"]\\n' +
+          '  end\\n' +
+          '  subgraph SecureDB[\"🔒 데이터베이스 안전구역 (Vault)\"]\\n' +
+          '    DBServer[\"🗄️ 고객원장 DB Server (AES-256 암호화)\"]\\n' +
+          '    KeyMgr[\"🔑 암호키 관리 서버 (KMS)\"]\\n' +
+          '  end\\n' +
+          '  External -->|HTTPS 443| Boundary\\n' +
+          '  Boundary -->|검증된 트래픽| DMZ\\n' +
+          '  DMZ -->|API 호출 8443| Internal_Firewall\\n' +
+          '  Internal_Firewall -->|인가된 트래픽| Trust\\n' +
+          '  Trust -->|SQL 1521 / 암호키 교환| SecureDB\\n' +
+          '\\x60\\x60\\x60\\n\\n' +
+          '## 4. 네트워크 방화벽 오픈 포트맵 (Port Matrix)\\n' +
+          '| 출발지 (Source) | 목적지 (Destination) | 포트 / 프로토콜 | 용도 및 통신 목적 | 보안 통제 |\\n' +
+          '|:---|:---|:---|:---|:---|\\n' +
+          '| Any (외부) | WAAP / DMZ Web | TCP 443 (HTTPS) | 웹 서비스 대고객 인터페이스 | WAF 인라인 검사 |\\n' +
+          '| DMZ Web | Trust Core WAS | TCP 8443 | WAS 백엔드 비즈니스 로직 호출 | 내부 방화벽 IP 바인딩 |\\n' +
+          '| Trust Core WAS | DB Server | TCP 1521 (Oracle) | 데이터 트랜잭션 쿼리 | 접근제어(SecureIM) 경유 |\\n' +
+          '| 전 시스템 | SIEM Server | UDP 514 (Syslog) | 통합 보안 이벤트 실시간 수집 | 단방향 로그 전송 |\\n\\n' +
+          '## 5. 가용성 및 이중화(HA) 구성 지침\\n' +
+          '* 모든 보안 장비(방화벽, WAF, IPS)는 Active-Standby 또는 Active-Active 고가용성 클러스터로 구성한다.\\n' +
+          '* 주 장비 장애 발생 시 1초 이내에 보조 장비로 자동 페일오버(Failover)되어 세션 단절을 최소화한다.'
+      },
+
+      VULN_MGMT: {
+        name: '취약점 진단 및 모의해킹 조치 계획서',
+        badge: '🔍 취약점조치',
+        category: '취약점관리',
+        tags: ['취약점', 'CVE', 'CVSS', '모의해킹', '보안패치', '이행계획'],
+        desc: '인프라/웹 취약점 진단 결과에 따른 심각도 분류, 공격 시나리오 및 긴급 완화/영구 패치 계획',
+        title: '정보시스템 정기 취약점 분석·평가 및 조치 이행 계획서',
+        content: 
+          '# 정보시스템 정기 취약점 분석·평가 및 조치 이행 계획서\\n\\n' +
+          '> **진단 기간**: 2026-09-01 ~ 2026-09-10 | **진단 대상**: 대외 웹 포털 및 내부 인프라 서버 30대 | **수행 기관**: 정보보호팀 자체 진단\\n\\n' +
+          '---\\n\\n' +
+          '## 1. 진단 개요\\n' +
+          '* **목적**: 주요 정보시스템에 잠재된 기술적 취약점을 사전 식별하고 조치함으로써 침해사고를 미연에 방지.\\n' +
+          '* **진단 기준**: KISA 주요정보통신기반시설 기술적 취약점 분석·평가 기준 및 OWASP Top 10.\\n\\n' +
+          '## 2. 취약점 종합 진단 현황 요약\\n' +
+          '* 총 진단 항목: 72개 항목\\n' +
+          '* 결과: 🟢 양호 64건, 🟡 주의(Medium) 6건, 🔴 취약(High/Critical) 2건\\n\\n' +
+          '| 구분 | 취약점 항목 (CVE / CWE) | 심각도 | 영향 시스템 | 담당자 | 조치 목표일 |\\n' +
+          '|:---|:---|:---:|:---|:---|:---:|\\n' +
+          '| **SEC-01** | Spring Framework 원격코드실행 취약점 (CVE-2024-XXXX) | 🔴 High | 대외 웹 WAS #1, #2 | 인프라팀 | 즉시 (24h 내) |\\n' +
+          '| **SEC-02** | 데이터베이스 계정 취약 패스워드 설정 | 🔴 High | 개발 스테이징 DB | DB관리자 | 3일 이내 |\\n' +
+          '| **SEC-03** | 불필요한 HTTP 메서드 (TRACE/OPTIONS) 활성화 | 🟡 Medium | 웹서버 Nginx | 웹개발팀 | 7일 이내 |\\n' +
+          '| **SEC-04** | 웹서버 디렉토리 리스팅(Directory Indexing) 허용 | 🟡 Medium | 첨부파일 서버 | 웹개발팀 | 7일 이내 |\\n\\n' +
+          '## 3. 주요 취약점 세부 분석 및 재현 시나리오\\n' +
+          '### 1) [SEC-01] Spring Framework RCE 취약점\\n' +
+          '* **취약점 개요**: 비인가 원격 공격자가 조작된 HTTP 요청 헤더를 통해 임의의 클래스로더를 조작하고 웹쉘을 실행할 수 있음.\\n' +
+          '* **CVSS 점수**: 8.8 (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H)\\n' +
+          '* **임시 완화 조치**: 웹방화벽(WAAP)에 해당 헤더 패턴 필터링 룰셋 긴급 배포 (적용 완료).\\n' +
+          '* **근본 조치 방안**: Spring Boot 및 의존성 라이브러리 보안 패치 버전(\\x60v3.2.5\\x60 이상)으로 일괄 업그레이드.\\n\\n' +
+          '## 4. 조치 일정 및 이행 로드맵\\n' +
+          '\\x60\\x60\\x60mermaid\\n' +
+          'gantt\\n' +
+          '  title 취약점 조치 이행 로드맵\\n' +
+          '  dateFormat  YYYY-MM-DD\\n' +
+          '  section 긴급 조치\\n' +
+          '  WAF 가상 패치 및 IP 차단        :done, 2026-09-11, 1d\\n' +
+          '  DB 기본 패스워드 변경 및 MFA 강제  :done, 2026-09-12, 1d\\n' +
+          '  section 영구 조치\\n' +
+          '  스테이징 라이브러리 빌드 테스트    :active, 2026-09-13, 3d\\n' +
+          '  운영 서버 정기점검 시간 배포      : 2026-09-16, 2d\\n' +
+          '  재점검 및 조치 완료 확인         : 2026-09-18, 1d\\n' +
+          '\\x60\\x60\\x60\\n\\n' +
+          '## 5. 조치 결과 검증 및 완료 서명\\n' +
+          '* 본 조치 이행 계획서에 따라 패치를 완료한 후 취약점 스캐너를 통해 재진단을 수행하고, 잔여 취약점이 없음을 CISO에게 최종 보고한다.'
+      },
+
+      SECURITY_FAQ: {
+        name: '임직원 보안 실무 FAQ 및 비상 행동요령 질의집',
+        badge: '❓ 실무FAQ',
+        category: '보안FAQ',
+        tags: ['FAQ', '임직원가이드', '계정신청', '예외승인', '피싱대응', 'Q&A'],
+        desc: '임직원이 자주 묻는 보안 질문, VPN/USB 신청, 피싱 메일 대처법, 사내 AI(LLM) 활용 수칙',
+        title: '임직원을 위한 정보보안 실무 가이드 및 자주 묻는 질문(FAQ)',
+        content: 
+          '# 임직원을 위한 정보보안 실무 가이드 및 자주 묻는 질문(FAQ)\\n\\n' +
+          '> **안내 대상**: 전사 임직원 및 상주 협력사원 | **담당 부서**: 정보보호팀 (내선: 8000) | **최종 갱신**: 2026-09-16\\n\\n' +
+          '---\\n\\n' +
+          '## 📌 주요 카테고리별 FAQ\\n\\n' +
+          '### Q1. 사외에서 재택/출장 근무 시 사내망 접속(VPN)은 어떻게 신청하나요?\\n' +
+          '* **답변**:\\n' +
+          '  1. 사내 그룹웨어 \\x60[전자결재] -> [보안신청] -> [SSL-VPN 사용 신청서]\\x60를 작성합니다.\\n' +
+          '  2. 부서장 승인 후 정보보호팀에서 계정을 인가합니다.\\n' +
+          '  3. 스마트폰에 \\x60OTP 앱(Google Authenticator)\\x60을 설치한 후 2차 인증을 등록해야 접속이 가능합니다.\\n' +
+          '  * ⚠️ 공용 PC(PC방, 호텔 로비 등)에서는 사내망 접속이 엄격히 금지됩니다.\\n\\n' +
+          '### Q2. 업무상 USB 메모리나 외장하드를 사용해야 할 때는 어떻게 하나요?\\n' +
+          '* **답변**:\\n' +
+          '  1. 사내 등록되지 않은 일반 개인 USB는 PC 연결 시 DLP(GRADIUS)에 의해 자동 차단됩니다.\\n' +
+          '  2. 보안 USB가 필요한 경우 \\x60보안 전산자산 신청\\x60을 통해 전용 암호화 보안 USB를 불출받아 사용하십시오.\\n' +
+          '  3. 부득이한 대용량 파일 외부 반출은 \\x60망연계 결재 시스템\\x60을 통해 사전 승인 후 반출하십시오.\\n\\n' +
+          '### Q3. 랜섬웨어나 해킹 의심 메일을 열람했을 때 어떻게 해야 하나요?\\n' +
+          '* **답변 (골든타임 3분 행동요령)**:\\n' +
+          '  1. **[즉시 조치]** PC 본체 뒤편의 **LAN선(랜선)을 즉시 뽑거나 Wi-Fi를 끕니다.** (전원은 끄지 마십시오 - 포렌식 메모리 보존 필요)\\n' +
+          '  2. 메일 본문의 첨부파일이나 인터넷 링크를 절대 추가 클릭하지 마십시오.\\n' +
+          '  3. 스마트폰이나 사내 메신저로 즉시 **정보보호팀 비상 핫라인(내선 8000 / 010-XXXX-XXXX)**으로 신고하십시오.\\n\\n' +
+          '### Q4. 업무에 ChatGPT, Claude 등 생성형 AI를 사용해도 되나요?\\n' +
+          '* **답변 (사내 AI 활용 보안 가이드라인)**:\\n' +
+          '  * **허용**: 일반적인 외국어 번역, 공개 소프트웨어 코드 문법 검토, 비즈니스 문서 윤문\\n' +
+          '  * **절대 금지 (위반 시 징계)**:\\n' +
+          '    - 회사의 소스코드 원본, 인프라 IP/비밀번호 등 시스템 설정 정보 입력 금지\\n' +
+          '    - 고객의 이름, 주민등록번호, 계좌번호 등 개인정보 입력 금지\\n' +
+          '    - 대외비(Confidential) 사업 기획서 및 미공개 실적 보고서 업로드 금지\\n' +
+          '  * 사내 안전한 AI 도구를 사용하려면 \\x60GIJO AS 사내 온프레미스 에어갭 AI\\x60를 활용하십시오.\\n\\n' +
+          '### Q5. PC 화면보호기 설정 및 비밀번호 변경 주기는 어떻게 되나요?\\n' +
+          '* **답변**:\\n' +
+          '  * 10분 이상 자리를 비울 때는 \\x60Win + L\\x60 키를 눌러 화면을 잠금 상태로 전환해야 합니다.\\n' +
+          '  * 15분 이상 유휴 시 중앙 정책(GPO)에 의해 화면보호기가 자동 실행됩니다.\\n' +
+          '  * Windows 로그인 및 사내 포털 비밀번호는 90일(분기 1회)마다 변경해야 합니다.\\n\\n' +
+          '---\\n\\n' +
+          '## 📞 정보보호팀 긴급 연락망\\n' +
+          '* **정보보호 통합 핫라인**: 내선 8000 / security@company.com\\n' +
+          '* **CERT 침해대응 센터**: 내선 8001 (야간/주말 비상 대응)'
+      }
+    };
+
+    function openNewDocTemplateModal() {
+      const grid = document.getElementById('docTemplateCardsGrid');
+      if (grid) {
+        grid.innerHTML = Object.entries(wikiDocTemplates).map(([key, tpl]) => 
+          '<div onclick="selectNewDocTemplate(\'' + key + '\')" style="background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:1rem; cursor:pointer; transition:all 0.15s ease; display:flex; flex-direction:column; justify-content:space-between; gap:0.5rem;" onmouseover="this.style.borderColor=\'var(--primary)\'; this.style.boxShadow=\'var(--shadow-md)\'; this.style.transform=\'translateY(-2px)\';" onmouseout="this.style.borderColor=\'var(--border)\'; this.style.boxShadow=\'none\'; this.style.transform=\'none\';">' +
+            '<div>' +
+              '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">' +
+                '<span class="meta-badge badge-kr" style="font-size:0.68rem;">' + tpl.badge + '</span>' +
+                '<span style="font-size:0.7rem; color:var(--text-dim);">' + tpl.category + '</span>' +
+              '</div>' +
+              '<h4 style="font-size:0.92rem; font-weight:800; color:var(--text-main); line-height:1.4; margin-bottom:0.35rem;">' + tpl.name + '</h4>' +
+              '<p style="font-size:0.75rem; color:var(--text-sub); line-height:1.5;">' + tpl.desc + '</p>' +
+            '</div>' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed var(--border); font-size:0.72rem; color:var(--primary); font-weight:700;">' +
+              '<span>선택하여 작성 ➔</span>' +
+              '<span style="color:var(--text-dim); font-size:0.68rem;">태그 ' + tpl.tags.length + '개</span>' +
+            '</div>' +
+          '</div>'
+        ).join('');
+      }
+      document.getElementById('newDocTemplateModal').style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function closeNewDocTemplateModal() {
+      document.getElementById('newDocTemplateModal').style.display = 'none';
+    }
+
+    function selectNewDocTemplate(type) {
+      closeNewDocTemplateModal();
       const newId = Date.now();
+      let tpl = wikiDocTemplates[type];
+
+      if (!tpl || type === 'BLANK') {
+        tpl = {
+          title: '새 보안 문서',
+          category: '보안규정',
+          tags: ['신규', '보안'],
+          content: '# 새 보안 지침\\n\\n내용을 작성하세요.'
+        };
+      }
+
       const newDoc = {
         id: newId,
-        title: '새 보안 지침 문서',
-        category: '보안규정',
-        tags: ['신규', '보안'],
+        title: tpl.title,
+        category: tpl.category,
+        tags: [...tpl.tags],
         updatedAt: new Date().toISOString().slice(0, 10),
-        content: '# 새 보안 지침\\n\\n내용을 작성하세요.'
+        content: tpl.content
       };
+
       currentDocs.unshift(newDoc);
       saveDocsToStorage();
       currentActiveDocId = newId;
       renderWikiDocList();
       if (!isEditingMode) toggleEditMode();
-      displayCurrentDoc();
+      else displayCurrentDoc();
+
+      alert('✅ [' + tpl.title + '] 양식으로 새 문서가 생성되었습니다.\\n에디터에서 내용을 확인 및 수정한 뒤 [저장]을 눌러주세요.');
+    }
+
+    function applyDocTemplate(type) {
+      const tpl = wikiDocTemplates[type];
+      if (!tpl) return;
+
+      const currentContent = document.getElementById('editDocContent').value.trim();
+      if (currentContent && currentContent.length > 30) {
+        if (!confirm('현재 작성 중인 본문이 [' + tpl.name + '] 전문 양식으로 교체됩니다.\\n계속 진행하시겠습니까?')) {
+          return;
+        }
+      }
+
+      document.getElementById('editDocTitle').value = tpl.title;
+      document.getElementById('editDocCat').value = tpl.category;
+      document.getElementById('editDocTags').value = tpl.tags.join(', ');
+      document.getElementById('editDocContent').value = tpl.content;
+
+      document.getElementById('wikiBreadcrumbCat').innerText = tpl.category;
+      document.getElementById('wikiBreadcrumbTitle').innerText = tpl.title;
+    }
+
+    function createNewWikiDoc() {
+      openNewDocTemplateModal();
     }
 
     function deleteCurrentDoc() {
