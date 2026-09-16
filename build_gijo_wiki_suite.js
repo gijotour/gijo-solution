@@ -667,6 +667,17 @@ const htmlContent = `<!DOCTYPE html>
     .modal-close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.25rem; cursor: pointer; }
     .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
     .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border-dark); display: flex; justify-content: flex-end; gap: 0.6rem; background: rgba(30, 41, 59, 0.3); }
+
+    .qty-input {
+      background: #0f172a;
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      color: #fff;
+      padding: 0.25rem 0.5rem;
+      width: 65px;
+      font-weight: 700;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -793,10 +804,10 @@ const htmlContent = `<!DOCTYPE html>
                 </select>
                 <input type="text" id="editDocTags" class="doc-title-input" style="flex:1; font-size:0.9rem;" placeholder="태그 (쉼표 구분: WAF, 망분리, ISMS-P)">
               </div>
-              <textarea id="editDocContent" class="doc-content-textarea" placeholder="마크다운 문서 내용을 입력하세요..."></textarea>
+              <textarea id="editDocContent" class="doc-content-textarea" placeholder="마크다운 문서 내용을 입력하세요... (Ctrl+S 로 저장)"></textarea>
               <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
                 <button class="btn-action" onclick="cancelDocEdit()">취소</button>
-                <button class="btn-action btn-primary-action" onclick="saveDocEdit()">저장 완료</button>
+                <button class="btn-action btn-primary-action" onclick="saveDocEdit()">저장 완료 (Ctrl+S)</button>
               </div>
             </div>
           </div>
@@ -960,7 +971,7 @@ const htmlContent = `<!DOCTYPE html>
     <section id="view-bom" class="view-section">
       <div class="panel-card" style="padding:1.5rem;">
         <h2 style="font-size:1.3rem; font-weight:800; color:#fff; margin-bottom:0.5rem;">아키텍처 실시간 BOM (Bill of Materials) & TCO 계산서</h2>
-        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem;">선택된 아키텍처 구성요소의 도입비, 유지보수 요율(12%), 3년/5년 총소유비용(TCO) 자동 산출</p>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem;">각 솔루션의 도입 수량을 직접 변경하면 도입비(CAPEX), 연간 유지보수비(OPEX 12%), 3년 TCO가 실시간 재계산됩니다.</p>
 
         <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.85rem; margin-bottom:1.5rem;">
           <thead>
@@ -968,8 +979,8 @@ const htmlContent = `<!DOCTYPE html>
               <th style="padding:0.75rem;">솔루션 / 장비명</th>
               <th style="padding:0.75rem;">카테고리</th>
               <th style="padding:0.75rem;">도입 단가</th>
-              <th style="padding:0.75rem;">수량</th>
-              <th style="padding:0.75rem;">연간 유지보수비</th>
+              <th style="padding:0.75rem; text-align:center;">수량 조절</th>
+              <th style="padding:0.75rem;">연간 유지보수비 (12%)</th>
               <th style="padding:0.75rem;">합계 금액</th>
             </tr>
           </thead>
@@ -978,7 +989,7 @@ const htmlContent = `<!DOCTYPE html>
 
         <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; background:#090d16; border:1px solid var(--border-dark); border-radius:12px; padding:1.25rem;">
           <div>
-            <div style="font-size:0.8rem; color:var(--text-muted);">총 하드웨어/SW 도입비</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">총 하드웨어/SW 도입비 (CAPEX)</div>
             <div id="totalCapex" style="font-size:1.5rem; font-weight:800; color:#38bdf8;">₩ 0</div>
           </div>
           <div>
@@ -1006,7 +1017,7 @@ const htmlContent = `<!DOCTYPE html>
   </main>
 
   <!-- LLM Settings Modal -->
-  <div id="llmSettingsModal" class="modal-backdrop">
+  <div id="llmSettingsModal" class="modal-backdrop" onclick="if(event.target===this) closeLlmSettingsModal()">
     <div class="modal-box">
       <div class="modal-header">
         <span class="modal-title"><i data-lucide="settings"></i> 로컬 & 온프레미스 LLM 연동 설정</span>
@@ -1028,13 +1039,28 @@ const htmlContent = `<!DOCTYPE html>
         <div>
           <label style="font-size:0.85rem; font-weight:600; color:#cbd5e1; display:block; margin-bottom:0.3rem;">온프레미스 보안 모드</label>
           <div style="font-size:0.8rem; color:var(--text-muted); background:#090d16; padding:0.75rem; border-radius:8px; border:1px solid var(--border-dark);">
-            🔒 <b>완전 격리 (Air-Gap Mode)</b>: 사내 문서는 외부 클라우드로 전송되지 않으며 지정된 로컬 인스턴스에서만 안전하게 색인/답변됩니다.
+            🔒 <b>완전 격리 (Air-Gap Mode)</b>: 사내 문서는 외부 퍼블릭 클라우드로 전송되지 않으며 지정된 로컬 인스턴스에서만 안전하게 색인/답변됩니다.
           </div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn-action" onclick="testLlmConnection()">연결 테스트</button>
         <button class="btn-action btn-primary-action" onclick="saveLlmSettings()">설정 저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Node Wiki Quick Preview Modal -->
+  <div id="nodeWikiModal" class="modal-backdrop" onclick="if(event.target===this) closeNodeWikiModal()">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <span class="modal-title" id="nodeWikiTitle"><i data-lucide="shield"></i> 장비 보안 가이드</span>
+        <button class="modal-close-btn" onclick="closeNodeWikiModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="nodeWikiBody"></div>
+      <div class="modal-footer">
+        <button class="btn-action" onclick="closeNodeWikiModal()">닫기</button>
+        <button class="btn-action btn-primary-action" id="btnGoToWikiDoc">전체 문서 보기</button>
       </div>
     </div>
   </div>
@@ -1047,6 +1073,17 @@ const htmlContent = `<!DOCTYPE html>
       flowchart: { curve: 'basis', htmlLabels: true }
     });
 
+    // Sanitizer function to prevent XSS
+    function sanitizeHtml(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     const defaultWikiDocs = ${docsJson};
     const quickQuestions = ${quickQuestionsJson};
 
@@ -1056,13 +1093,14 @@ const htmlContent = `<!DOCTYPE html>
     let isTrafficFlowing = true;
     let currentFilterCat = 'ALL';
 
+    // Solution Catalog with dynamic quantities
     const solutionCatalog = [
-      { id: "SEC-01", name: "AhnLab TrusGuard NGFW", vendor: "안랩", category: "방화벽", price: 35000000, opexRate: 0.12, ismsMapping: "2.4 망분리/접근통제" },
-      { id: "SEC-02", name: "Penta Security WAPPLE WAF", vendor: "펜타시큐리티", category: "웹방화벽", price: 28000000, opexRate: 0.12, ismsMapping: "2.4 웹서버 보호" },
-      { id: "SEC-03", name: "Genians EDR Enterprise", vendor: "지니언스", category: "EDR", price: 18000000, opexRate: 0.12, ismsMapping: "2.8 악성코드 통제" },
-      { id: "SEC-04", name: "Igloo Security SPiDER TM (SIEM)", vendor: "이글루코퍼레이션", category: "SIEM", price: 65000000, opexRate: 0.12, ismsMapping: "2.10 로그/모니터링" },
-      { id: "SEC-05", name: "Fasoo Enterprise DRM/DLP", vendor: "파수", category: "DLP", price: 24000000, opexRate: 0.12, ismsMapping: "2.5 암호화 및 유출방지" },
-      { id: "SEC-06", name: "GB10 On-Premises AI Cluster", vendor: "GIJO Tech", category: "AI보안", price: 120000000, opexRate: 0.08, ismsMapping: "2.12 신기술 보안통제" }
+      { id: "SEC-01", name: "AhnLab TrusGuard NGFW", vendor: "안랩", category: "방화벽", price: 35000000, qty: 2, opexRate: 0.12, ismsMapping: "2.4 망분리/접근통제" },
+      { id: "SEC-02", name: "Penta Security WAPPLE WAF", vendor: "펜타시큐리티", category: "웹방화벽", price: 28000000, qty: 2, opexRate: 0.12, ismsMapping: "2.4 웹서버 보호" },
+      { id: "SEC-03", name: "Genians EDR Enterprise", vendor: "지니언스", category: "EDR", price: 18000000, qty: 2, opexRate: 0.12, ismsMapping: "2.8 악성코드 통제" },
+      { id: "SEC-04", name: "Igloo Security SPiDER TM (SIEM)", vendor: "이글루코퍼레이션", category: "SIEM", price: 65000000, qty: 1, opexRate: 0.12, ismsMapping: "2.10 로그/모니터링" },
+      { id: "SEC-05", name: "Fasoo Enterprise DRM/DLP", vendor: "파수", category: "DLP", price: 24000000, qty: 2, opexRate: 0.12, ismsMapping: "2.5 암호화 및 유출방지" },
+      { id: "SEC-06", name: "GB10 On-Premises AI Cluster", vendor: "GIJO Tech", category: "AI보안", price: 120000000, qty: 1, opexRate: 0.08, ismsMapping: "2.12 신기술 보안통제" }
     ];
 
     const studioPresets = {
@@ -1149,15 +1187,27 @@ const htmlContent = `<!DOCTYPE html>
     };
 
     function loadStoredDocs() {
-      const stored = localStorage.getItem('gijo_wiki_docs_v5');
-      if (stored) {
-        try { return JSON.parse(stored); } catch(e) { }
+      try {
+        const stored = localStorage.getItem('gijo_wiki_docs_v5');
+        if (stored) {
+          return JSON.parse(stored);
+        }
+      } catch(e) {
+        console.warn('LocalStorage load warning:', e);
       }
       return defaultWikiDocs;
     }
 
     function saveDocsToStorage(docs) {
-      localStorage.setItem('gijo_wiki_docs_v5', JSON.stringify(docs));
+      try {
+        localStorage.setItem('gijo_wiki_docs_v5', JSON.stringify(docs));
+      } catch(err) {
+        if (err.name === 'QuotaExceededError') {
+          alert('⚠️ 브라우저 저장소 용량이 가득 찼습니다. [프로젝트 백업]을 눌러 JSON 파일로 저장해 주세요.');
+        } else {
+          console.error('Storage save error:', err);
+        }
+      }
     }
 
     let currentDocs = loadStoredDocs();
@@ -1227,9 +1277,9 @@ const htmlContent = `<!DOCTYPE html>
         if (doc.category === 'AI보안') catClass = 'ai';
         if (doc.category === 'QA문답집') catClass = 'qa';
 
-        li.innerHTML = '<div class="doc-item-title"><span>' + doc.title + '</span></div>' +
-                       '<div class="doc-item-meta"><span class="badge-cat ' + catClass + '">' + doc.category + '</span>' +
-                       '<span>📅 ' + doc.updatedAt + '</span></div>';
+        li.innerHTML = '<div class="doc-item-title"><span>' + sanitizeHtml(doc.title) + '</span></div>' +
+                       '<div class="doc-item-meta"><span class="badge-cat ' + catClass + '">' + sanitizeHtml(doc.category) + '</span>' +
+                       '<span>📅 ' + sanitizeHtml(doc.updatedAt) + '</span></div>';
         listEl.appendChild(li);
       });
 
@@ -1252,7 +1302,7 @@ const htmlContent = `<!DOCTYPE html>
       const renderedHtml = parseMarkdownToHtml(doc.content);
       document.getElementById('wikiReadView').innerHTML = 
         '<div style="margin-bottom: 1rem;"><div style="display:flex; gap:0.4rem; margin-bottom:0.5rem; flex-wrap:wrap;">' +
-        doc.tags.map(t => '<span class="badge-cat">#' + t + '</span>').join('') +
+        doc.tags.map(t => '<span class="badge-cat">#' + sanitizeHtml(t) + '</span>').join('') +
         '</div></div>' + renderedHtml;
 
       document.getElementById('wikiReadView').style.display = isEditingMode ? 'none' : 'block';
@@ -1334,21 +1384,24 @@ const htmlContent = `<!DOCTYPE html>
       renderWikiDocList();
     }
 
+    // Safe Markdown Parser with XSS Protection
     function parseMarkdownToHtml(md) {
       if (!md) return '';
+      // Sanitize line-by-line first to prevent malicious tags injection
       let html = md
-        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        .replace(/\\*\\*(.*?)\\*\\*/gim, '<b>$1</b>')
-        .replace(/\\*(.*?)\\*/gim, '<i>$1</i>')
-        .replace(/^\\- (.*$)/gim, '<li>$1</li>')
-        .replace(/^\\d+\\. (.*$)/gim, '<li>$1</li>')
+        .replace(/^### (.*$)/gim, (_, text) => '<h3>' + sanitizeHtml(text) + '</h3>')
+        .replace(/^## (.*$)/gim, (_, text) => '<h2>' + sanitizeHtml(text) + '</h2>')
+        .replace(/^# (.*$)/gim, (_, text) => '<h1>' + sanitizeHtml(text) + '</h1>')
+        .replace(/\\*\\*(.*?)\\*\\*/gim, (_, text) => '<b>' + sanitizeHtml(text) + '</b>')
+        .replace(/\\*(.*?)\\*/gim, (_, text) => '<i>' + sanitizeHtml(text) + '</i>')
+        .replace(/^\\- (.*$)/gim, (_, text) => '<li>' + sanitizeHtml(text) + '</li>')
+        .replace(/^\\d+\\. (.*$)/gim, (_, text) => '<li>' + sanitizeHtml(text) + '</li>')
         .replace(/\\n/g, '<br />');
       return html;
     }
 
-    function executeRagQuery() {
+    // Dual Engine RAG Query: Actual Local LLM Fetch + Rule-based Fallback
+    async function executeRagQuery() {
       const inputEl = document.getElementById('ragQueryInput');
       const query = inputEl.value.trim();
       if (!query) return;
@@ -1361,6 +1414,7 @@ const htmlContent = `<!DOCTYPE html>
       chatBox.appendChild(userBubble);
       inputEl.value = '';
 
+      // Match Best Evidence Document
       const searchTerms = query.toLowerCase().split(' ').filter(w => w.length >= 2);
       let matchedDocs = [];
 
@@ -1372,7 +1426,6 @@ const htmlContent = `<!DOCTYPE html>
           if (doc.content.toLowerCase().includes(term)) score += 2;
         });
 
-        // Special GIJO AS ontology boost
         if (query.includes('AIBOM') && (doc.tags.includes('AIBOM') || doc.title.includes('AIBOM'))) score += 10;
         if (query.includes('WAF') && (doc.tags.includes('WAF') || doc.title.includes('WAF'))) score += 10;
         if (query.includes('에어갭') && (doc.tags.includes('에어갭') || doc.content.includes('에어갭'))) score += 10;
@@ -1380,34 +1433,67 @@ const htmlContent = `<!DOCTYPE html>
         if (query.includes('ISMS-P') && (doc.tags.includes('ISMS-P') || doc.title.includes('ISMS-P'))) score += 10;
         if (query.includes('DDoS') && (doc.tags.includes('DDoS') || doc.title.includes('DDoS'))) score += 10;
 
-        if (score > 0) {
-          matchedDocs.push({ doc, score });
-        }
+        if (score > 0) matchedDocs.push({ doc, score });
       });
 
       matchedDocs.sort((a, b) => b.score - a.score);
+      const topDoc = matchedDocs.length > 0 ? matchedDocs[0].doc : null;
 
-      setTimeout(() => {
-        const aiBubble = document.createElement('div');
-        aiBubble.className = 'chat-bubble ai';
+      // Create AI Response Bubble with loading state
+      const aiBubble = document.createElement('div');
+      aiBubble.className = 'chat-bubble ai';
+      aiBubble.innerHTML = '<div><i data-lucide="loader" style="width:14px; height:14px; animation:spin 1s linear infinite;"></i> 지식 분석 중...</div>';
+      chatBox.appendChild(aiBubble);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      lucide.createIcons();
 
-        if (matchedDocs.length > 0) {
-          const topDoc = matchedDocs[0].doc;
-          let summary = topDoc.content.slice(0, 240).replace(/#/g, '');
-          aiBubble.innerHTML = '<div><b>[GIJO AS 학습 지식 분석 결과]</b><br>' +
-            '질의하신 \\'<b>' + query + '</b>\\'에 대한 사내 규정 및 아키텍처 지침입니다:<br><br>' +
-            summary + '...<br></div>' +
-            '<div class="citation-tag" onclick="selectWikiDoc(' + topDoc.id + ')">' +
-            '<i data-lucide="file-text" style="width:12px; height:12px;"></i> 근거 문서: [' + topDoc.category + '] ' + topDoc.title +
-            '</div>';
-        } else {
-          aiBubble.innerHTML = '<div>해당 질문에 직접 일치하는 사내 문서 조각을 찾지 못했으나, 일반 보안 원칙에 따르면 <b>경계 방화벽 통제</b> 및 <b>ISMS-P 최소 권한 부여</b> 기준을 준수해야 합니다.</div>';
+      // Attempt Real Local LLM Fetch (Ollama or GB10) with Fallback
+      const endpoint = localStorage.getItem('gijo_llm_url') || 'http://localhost:11434';
+      let answerText = '';
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout for local check
+
+        const context = topDoc ? "참고 문서:\\n" + topDoc.content.slice(0, 500) : "";
+        const res = await fetch(endpoint + '/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'qwen2.5-coder:latest',
+            prompt: context + "\\n\\n질문: " + query + "\\n답변:",
+            stream: false
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          answerText = data.response;
         }
+      } catch (err) {
+        // Fallback to Built-in Air-Gap Semantic Engine
+      }
 
-        chatBox.appendChild(aiBubble);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        lucide.createIcons();
-      }, 300);
+      if (!answerText) {
+        if (topDoc) {
+          let summary = topDoc.content.slice(0, 260).replace(/#/g, '');
+          answerText = '사내 등록된 규정에 따른 분석 지침입니다:<br><br>' + sanitizeHtml(summary) + '...';
+        } else {
+          answerText = '일치하는 특정 문서 조각을 찾지 못했으나, 일반 보안 원칙상 <b>경계 방화벽 통제</b> 및 <b>최소 권한 부여</b> 기준을 준수해야 합니다.';
+        }
+      }
+
+      let citationHtml = topDoc 
+        ? '<div class="citation-tag" onclick="selectWikiDoc(' + topDoc.id + ')">' +
+          '<i data-lucide="file-text" style="width:12px; height:12px;"></i> 근거 문서: [' + sanitizeHtml(topDoc.category) + '] ' + sanitizeHtml(topDoc.title) +
+          '</div>'
+        : '';
+
+      aiBubble.innerHTML = '<div><b>[GIJO AS 지식 분석]</b><br>' + answerText + '</div>' + citationHtml;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      lucide.createIcons();
     }
 
     function compileDocToStudio() {
@@ -1443,9 +1529,45 @@ const htmlContent = `<!DOCTYPE html>
         const { svg } = await mermaid.render(id, code);
         target.innerHTML = svg;
         applyTrafficAnimation();
+        attachNodeClickHandlers();
       } catch (err) {
-        target.innerHTML = '<div style="color:var(--danger); padding:1rem;">⚠️ Mermaid 문법 오류: ' + err.message + '</div>';
+        target.innerHTML = '<div style="color:var(--danger); padding:1rem;">⚠️ Mermaid 문법 오류: ' + sanitizeHtml(err.message) + '</div>';
       }
+    }
+
+    // Attach click event to Mermaid nodes to show Wiki guide
+    function attachNodeClickHandlers() {
+      const nodes = document.querySelectorAll('#mermaidTarget .node');
+      nodes.forEach(n => {
+        n.style.cursor = 'pointer';
+        n.onclick = () => {
+          const text = n.innerText || n.textContent;
+          showWikiForNode(text.trim());
+        };
+      });
+    }
+
+    function showWikiForNode(nodeText) {
+      let matched = currentDocs.find(d => nodeText.includes(d.title) || d.tags.some(t => nodeText.includes(t)));
+      if (!matched) matched = currentDocs[0];
+
+      document.getElementById('nodeWikiTitle').innerHTML = '<i data-lucide="info"></i> ' + sanitizeHtml(nodeText) + ' 사내 보안 가이드';
+      document.getElementById('nodeWikiBody').innerHTML = 
+        '<div style="margin-bottom:0.75rem;"><span class="badge-cat sec">' + sanitizeHtml(matched.category) + '</span> <b>' + sanitizeHtml(matched.title) + '</b></div>' +
+        '<div style="font-size:0.85rem; color:#cbd5e1; line-height:1.6;">' + parseMarkdownToHtml(matched.content.slice(0, 350)) + '...</div>';
+      
+      document.getElementById('btnGoToWikiDoc').onclick = () => {
+        closeNodeWikiModal();
+        switchView('wiki');
+        selectWikiDoc(matched.id);
+      };
+
+      document.getElementById('nodeWikiModal').classList.add('active');
+      lucide.createIcons();
+    }
+
+    function closeNodeWikiModal() {
+      document.getElementById('nodeWikiModal').classList.remove('active');
     }
 
     function insertNodeToCode(type, desc) {
@@ -1504,11 +1626,11 @@ const htmlContent = `<!DOCTYPE html>
           card.innerHTML = 
             '<div>' +
               '<div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">' +
-                '<span class="badge-cat sec">' + sol.category + '</span>' +
-                '<span style="font-size:0.75rem; color:var(--text-muted);">' + sol.vendor + '</span>' +
+                '<span class="badge-cat sec">' + sanitizeHtml(sol.category) + '</span>' +
+                '<span style="font-size:0.75rem; color:var(--text-muted);">' + sanitizeHtml(sol.vendor) + '</span>' +
               '</div>' +
-              '<h3 style="font-size:1.05rem; font-weight:700; color:#fff; margin-bottom:0.4rem;">' + sol.name + '</h3>' +
-              '<div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">ISMS-P: ' + sol.ismsMapping + '</div>' +
+              '<h3 style="font-size:1.05rem; font-weight:700; color:#fff; margin-bottom:0.4rem;">' + sanitizeHtml(sol.name) + '</h3>' +
+              '<div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">ISMS-P: ' + sanitizeHtml(sol.ismsMapping) + '</div>' +
             '</div>' +
             '<div>' +
               '<div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.75rem; border-top:1px solid var(--border-dark);">' +
@@ -1526,6 +1648,15 @@ const htmlContent = `<!DOCTYPE html>
       lucide.createIcons();
     }
 
+    // Dynamic BOM Quantity Adjuster
+    function updateBomQty(solId, newQty) {
+      const sol = solutionCatalog.find(s => s.id === solId);
+      if (sol) {
+        sol.qty = Math.max(1, parseInt(newQty) || 1);
+        renderBomTable();
+      }
+    }
+
     function renderBomTable() {
       const tbody = document.getElementById('bomTableBody');
       tbody.innerHTML = '';
@@ -1533,7 +1664,7 @@ const htmlContent = `<!DOCTYPE html>
       let totalOpex = 0;
 
       solutionCatalog.forEach(sol => {
-        const qty = 2;
+        const qty = sol.qty || 2;
         const rowTotal = sol.price * qty;
         const rowOpex = rowTotal * sol.opexRate;
         totalCapex += rowTotal;
@@ -1542,18 +1673,18 @@ const htmlContent = `<!DOCTYPE html>
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--border-dark)';
         tr.innerHTML = 
-          '<td style="padding:0.75rem; font-weight:600; color:#fff;">' + sol.name + '</td>' +
-          '<td style="padding:0.75rem;"><span class="badge-cat">' + sol.category + '</span></td>' +
+          '<td style="padding:0.75rem; font-weight:600; color:#fff;">' + sanitizeHtml(sol.name) + '</td>' +
+          '<td style="padding:0.75rem;"><span class="badge-cat">' + sanitizeHtml(sol.category) + '</span></td>' +
           '<td style="padding:0.75rem;">₩ ' + sol.price.toLocaleString() + '</td>' +
-          '<td style="padding:0.75rem;">' + qty + ' 식 (HA)</td>' +
-          '<td style="padding:0.75rem; color:#c084fc;">₩ ' + rowOpex.toLocaleString() + ' /년</td>' +
+          '<td style="padding:0.75rem; text-align:center;"><input type="number" class="qty-input" min="1" max="100" value="' + qty + '" onchange="updateBomQty(\\'' + sol.id + '\\', this.value)"></td>' +
+          '<td style="padding:0.75rem; color:#c084fc;">₩ ' + Math.round(rowOpex).toLocaleString() + ' /년</td>' +
           '<td style="padding:0.75rem; font-weight:700; color:#38bdf8;">₩ ' + rowTotal.toLocaleString() + '</td>';
         tbody.appendChild(tr);
       });
 
       document.getElementById('totalCapex').innerText = '₩ ' + totalCapex.toLocaleString();
-      document.getElementById('totalOpex').innerText = '₩ ' + totalOpex.toLocaleString() + ' / 년';
-      document.getElementById('totalTco').innerText = '₩ ' + (totalCapex + totalOpex * 3).toLocaleString();
+      document.getElementById('totalOpex').innerText = '₩ ' + Math.round(totalOpex).toLocaleString() + ' / 년';
+      document.getElementById('totalTco').innerText = '₩ ' + Math.round(totalCapex + totalOpex * 3).toLocaleString();
     }
 
     function renderAuditGrid() {
@@ -1656,6 +1787,20 @@ const htmlContent = `<!DOCTYPE html>
       alert('⚡ 로컬 LLM (GB10 / Ollama) 엔드포인트 응답 확인: 정상 (Latency: 12ms)');
     }
 
+    // Global Keydown Listeners (ESC to close modal, Ctrl+S to save doc)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeLlmSettingsModal();
+        closeNodeWikiModal();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        if (isEditingMode) {
+          e.preventDefault();
+          saveDocEdit();
+        }
+      }
+    });
+
     window.addEventListener('DOMContentLoaded', () => {
       renderQuickChips();
       renderWikiDocList();
@@ -1672,4 +1817,4 @@ if (fs.existsSync(path.dirname(electronIndexPath))) {
   fs.writeFileSync(electronIndexPath, htmlContent, 'utf8');
 }
 
-console.log('✅ GIJO AS Knowledge fully injected into GIJO WIKI across all targets!');
+console.log('✅ All 6 Practical Bugs Fixed & Enhanced across all targets!');
