@@ -8,11 +8,11 @@ const distDir = path.join(__dirname, 'gijo-security-erp-app', 'dist');
 console.log('Deploying to desktop:', desktop);
 
 // 1. Installer
-const installerSrc = path.join(distDir, 'GIJO-WIKI-Setup-v5.1.0.exe');
+const installerSrc = path.join(distDir, 'GIJO-WIKI-Setup-v5.2.0.exe');
 if (fs.existsSync(installerSrc)) {
-  fs.copyFileSync(installerSrc, path.join(desktop, 'GIJO_WIKI_설치파일_v5.1.0.exe'));
-  fs.copyFileSync(installerSrc, path.join(desktop, 'GIJO-WIKI-Setup-v5.1.0.exe'));
-  console.log('✅ Installer copied:', path.join(desktop, 'GIJO_WIKI_설치파일_v5.1.0.exe'));
+  fs.copyFileSync(installerSrc, path.join(desktop, 'GIJO_WIKI_설치파일_v5.2.0.exe'));
+  fs.copyFileSync(installerSrc, path.join(desktop, 'GIJO-WIKI-Setup-v5.2.0.exe'));
+  console.log('✅ Installer copied:', path.join(desktop, 'GIJO_WIKI_설치파일_v5.2.0.exe'));
 } else {
   console.log('⚠️ Installer not found:', installerSrc);
 }

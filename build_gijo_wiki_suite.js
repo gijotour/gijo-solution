@@ -1,12 +1,11 @@
 const fs = require('fs');
 const path = require('path');
-const { gijoAsKnowledgeDocs, quickQuestions } = require('./gijo_as_knowledge_pack.js');
+const { loadedRealDocs, quickQuestions } = require('./load_real_gijo_docs.js');
 
 const targetHtmlPath = path.join(__dirname, 'GIJO_Security_ERP_Suite.html');
-const copyV3Path = path.join(__dirname, 'GIJO_AS_스마트아키텍처_v3.html');
 const electronIndexPath = path.join(__dirname, 'gijo-security-erp-app', 'index.html');
 
-const docsJson = JSON.stringify(gijoAsKnowledgeDocs);
+const docsJson = JSON.stringify(loadedRealDocs);
 const quickQuestionsJson = JSON.stringify(quickQuestions);
 
 const htmlContent = `<!DOCTYPE html>
@@ -14,7 +13,7 @@ const htmlContent = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>GIJO WIKI v5.1.0 - 통합 보안 ERP & 스마트 아키텍처 스튜디오</title>
+  <title>GIJO WIKI v5.2.0 - 통합 보안 ERP & 스마트 아키텍처 스튜디오</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
   <!-- Mermaid.js Engine -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -22,25 +21,28 @@ const htmlContent = `<!DOCTYPE html>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     /* =========================================================================
-       CLEAN & MINIMALIST SLATE DESIGN SYSTEM (v5.1.0)
+       CLEAN WHITE & SLATE LIGHT DESIGN SYSTEM (v5.2.0)
        ========================================================================= */
     :root {
-      --bg-main: #090a0f;
-      --bg-panel: #111318;
-      --bg-card: #181b22;
-      --bg-subtle: #1f232c;
-      --border: #272c38;
-      --border-focus: #3b82f6;
-      --text-main: #f1f5f9;
-      --text-sub: #94a3b8;
-      --text-dim: #64748b;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
-      --accent: #8b5cf6;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
+      --bg-main: #f8fafc;
+      --bg-panel: #ffffff;
+      --bg-card: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --border: #e2e8f0;
+      --border-hover: #cbd5e1;
+      --border-focus: #2563eb;
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --text-dim: #94a3b8;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --accent: #7c3aed;
+      --success: #059669;
+      --warning: #d97706;
+      --danger: #dc2626;
       --radius: 8px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -50,20 +52,21 @@ const htmlContent = `<!DOCTYPE html>
       color: var(--text-main);
       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       min-height: 100vh;
-      line-height: 1.55;
+      line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
     }
 
-    /* Header Bar */
+    /* Top Navigation Header */
     .app-header {
-      background: rgba(17, 19, 24, 0.95);
+      background: rgba(255, 255, 255, 0.96);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
       z-index: 1000;
       padding: 0.65rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     }
 
     .header-inner {
@@ -85,8 +88,8 @@ const htmlContent = `<!DOCTYPE html>
     .brand-logo {
       width: 32px;
       height: 32px;
-      background: #1e293b;
-      border: 1px solid var(--border);
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
       border-radius: var(--radius);
       display: flex;
       align-items: center;
@@ -98,9 +101,9 @@ const htmlContent = `<!DOCTYPE html>
 
     .brand-text {
       font-size: 1.1rem;
-      font-weight: 700;
+      font-weight: 800;
       letter-spacing: -0.3px;
-      color: #fff;
+      color: var(--text-main);
       display: flex;
       align-items: center;
       gap: 0.45rem;
@@ -109,18 +112,18 @@ const htmlContent = `<!DOCTYPE html>
     .version-tag {
       font-size: 0.7rem;
       font-weight: 600;
-      padding: 0.1rem 0.4rem;
+      padding: 0.1rem 0.45rem;
       border-radius: 4px;
-      background: rgba(59, 130, 246, 0.15);
-      color: #60a5fa;
-      border: 1px solid rgba(59, 130, 246, 0.3);
+      background: #eff6ff;
+      color: #2563eb;
+      border: 1px solid #dbeafe;
     }
 
     /* Nav Tabs */
     .nav-tabs {
       display: flex;
       gap: 0.25rem;
-      background: var(--bg-panel);
+      background: #f1f5f9;
       padding: 0.25rem;
       border-radius: var(--radius);
       border: 1px solid var(--border);
@@ -142,18 +145,18 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     .tab-btn:hover {
-      color: #fff;
-      background: var(--bg-card);
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.6);
     }
 
     .tab-btn.active {
-      background: var(--bg-card);
-      color: #fff;
-      border: 1px solid var(--border);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      background: #ffffff;
+      color: var(--primary);
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
 
-    /* Header Actions */
+    /* Action Buttons */
     .header-tools {
       display: flex;
       align-items: center;
@@ -171,14 +174,14 @@ const htmlContent = `<!DOCTYPE html>
       gap: 0.35rem;
       transition: all 0.15s ease;
       border: 1px solid var(--border);
-      background: var(--bg-card);
+      background: #ffffff;
       color: var(--text-main);
+      box-shadow: var(--shadow-sm);
     }
 
     .btn:hover {
       background: var(--bg-subtle);
-      border-color: #3f4756;
-      color: #fff;
+      border-color: var(--border-hover);
     }
 
     .btn-primary {
@@ -209,21 +212,22 @@ const htmlContent = `<!DOCTYPE html>
       display: block;
     }
 
-    /* GIJO WIKI 3-Column Layout */
+    /* GIJO WIKI 3-Column Grid */
     .wiki-grid {
       display: grid;
-      grid-template-columns: 310px 1fr 420px;
+      grid-template-columns: 320px 1fr 440px;
       gap: 1rem;
       height: 100%;
     }
 
-    .clean-panel {
+    .white-panel {
       background: var(--bg-panel);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      box-shadow: var(--shadow-sm);
     }
 
     .panel-head {
@@ -232,7 +236,7 @@ const htmlContent = `<!DOCTYPE html>
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: rgba(24, 27, 34, 0.4);
+      background: #fafafa;
     }
 
     .panel-head-title {
@@ -247,27 +251,32 @@ const htmlContent = `<!DOCTYPE html>
     .search-input-wrap {
       padding: 0.5rem 0.75rem;
       border-bottom: 1px solid var(--border);
+      background: #ffffff;
     }
 
     .search-input {
       width: 100%;
-      background: var(--bg-main);
+      background: #f8fafc;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 0.45rem 0.65rem;
-      color: #fff;
-      font-size: 0.8rem;
+      color: var(--text-main);
+      font-size: 0.82rem;
       outline: none;
-      transition: border 0.15s ease;
+      transition: all 0.15s ease;
     }
-    .search-input:focus { border-color: var(--border-focus); }
+    .search-input:focus {
+      background: #ffffff;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
 
     .category-filter-strip {
       padding: 0.4rem 0.75rem;
       display: flex;
       gap: 0.3rem;
       overflow-x: auto;
-      background: var(--bg-panel);
+      background: #fafafa;
       border-bottom: 1px solid var(--border);
     }
 
@@ -276,7 +285,7 @@ const htmlContent = `<!DOCTYPE html>
       border-radius: 4px;
       font-size: 0.68rem;
       font-weight: 600;
-      background: var(--bg-card);
+      background: #ffffff;
       color: var(--text-sub);
       border: 1px solid var(--border);
       cursor: pointer;
@@ -285,8 +294,9 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     .pill-cat:hover {
-      background: var(--bg-subtle);
-      color: #fff;
+      background: #eff6ff;
+      color: var(--primary);
+      border-color: #bfdbfe;
     }
 
     .doc-list-clean {
@@ -297,32 +307,34 @@ const htmlContent = `<!DOCTYPE html>
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
+      background: #ffffff;
     }
 
     .doc-entry {
-      padding: 0.6rem 0.75rem;
+      padding: 0.65rem 0.8rem;
       border-radius: 6px;
       cursor: pointer;
-      background: transparent;
+      background: #ffffff;
       border: 1px solid transparent;
       transition: all 0.15s ease;
     }
 
     .doc-entry:hover {
-      background: var(--bg-card);
+      background: #f8fafc;
       border-color: var(--border);
     }
 
     .doc-entry.active {
-      background: rgba(59, 130, 246, 0.12);
-      border-color: rgba(59, 130, 246, 0.35);
+      background: #eff6ff;
+      border-color: #bfdbfe;
     }
 
     .doc-entry-title {
-      font-weight: 600;
-      font-size: 0.82rem;
-      color: #e2e8f0;
-      margin-bottom: 0.2rem;
+      font-weight: 700;
+      font-size: 0.83rem;
+      color: var(--text-main);
+      margin-bottom: 0.25rem;
+      line-height: 1.4;
     }
 
     .doc-entry-meta {
@@ -336,9 +348,10 @@ const htmlContent = `<!DOCTYPE html>
     .meta-badge {
       padding: 0.1rem 0.35rem;
       border-radius: 3px;
-      background: var(--bg-card);
+      background: #f1f5f9;
       border: 1px solid var(--border);
       color: var(--text-sub);
+      font-weight: 600;
     }
 
     /* Content Area */
@@ -349,56 +362,55 @@ const htmlContent = `<!DOCTYPE html>
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      box-shadow: var(--shadow-sm);
     }
 
     .content-body {
       flex: 1;
-      padding: 1.5rem;
+      padding: 1.75rem 2rem;
       overflow-y: auto;
+      background: #ffffff;
     }
 
+    /* Clean Markdown View in White Mode */
     .markdown-render {
-      line-height: 1.7;
-      color: #cbd5e1;
+      line-height: 1.75;
+      color: #334155;
     }
-    .markdown-render h1 { font-size: 1.4rem; font-weight: 700; color: #fff; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; margin-bottom: 1rem; }
-    .markdown-render h2 { font-size: 1.15rem; font-weight: 700; color: #93c5fd; margin: 1.25rem 0 0.5rem 0; }
-    .markdown-render h3 { font-size: 0.98rem; font-weight: 600; color: #e2e8f0; margin: 1rem 0 0.4rem 0; }
-    .markdown-render p { margin-bottom: 0.85rem; font-size: 0.88rem; }
-    .markdown-render ul, .markdown-render ol { margin-left: 1.25rem; margin-bottom: 1rem; font-size: 0.88rem; }
-    .markdown-render code { background: #090a0f; border: 1px solid var(--border); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.8rem; color: #38bdf8; }
+    .markdown-render h1 { font-size: 1.45rem; font-weight: 800; color: #0f172a; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; margin-bottom: 1rem; }
+    .markdown-render h2 { font-size: 1.2rem; font-weight: 700; color: #1e293b; margin: 1.4rem 0 0.5rem 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.3rem; }
+    .markdown-render h3 { font-size: 1.02rem; font-weight: 700; color: #334155; margin: 1.1rem 0 0.4rem 0; }
+    .markdown-render p { margin-bottom: 0.95rem; font-size: 0.9rem; }
+    .markdown-render ul, .markdown-render ol { margin-left: 1.4rem; margin-bottom: 1.1rem; font-size: 0.9rem; }
+    .markdown-render code { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.82rem; color: #2563eb; }
+    .markdown-render pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; margin-bottom: 1rem; }
 
     /* RAG Chat */
-    .rag-chat-wrap {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-
     .rag-chip-row {
       padding: 0.5rem 0.75rem;
-      background: rgba(17, 19, 24, 0.6);
+      background: #fafafa;
       border-bottom: 1px solid var(--border);
       display: flex;
-      gap: 0.3rem;
+      gap: 0.35rem;
       overflow-x: auto;
     }
 
     .rag-chip-btn {
-      background: var(--bg-card);
+      background: #ffffff;
       border: 1px solid var(--border);
-      color: #94a3b8;
-      font-size: 0.7rem;
-      padding: 0.2rem 0.55rem;
-      border-radius: 12px;
+      color: var(--text-sub);
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 0.25rem 0.6rem;
+      border-radius: 14px;
       cursor: pointer;
       white-space: nowrap;
       transition: all 0.15s;
     }
     .rag-chip-btn:hover {
-      background: var(--primary);
-      border-color: var(--primary);
-      color: #fff;
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: var(--primary);
     }
 
     .chat-stream-box {
@@ -407,71 +419,75 @@ const htmlContent = `<!DOCTYPE html>
       padding: 1rem;
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.85rem;
+      background: #f8fafc;
     }
 
     .bubble {
       max-width: 92%;
-      padding: 0.75rem 0.95rem;
+      padding: 0.75rem 1rem;
       border-radius: var(--radius);
-      font-size: 0.82rem;
-      line-height: 1.55;
+      font-size: 0.84rem;
+      line-height: 1.6;
     }
 
     .bubble.user {
       align-self: flex-end;
       background: var(--primary);
       color: #fff;
+      box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
     }
 
     .bubble.ai {
       align-self: flex-start;
-      background: var(--bg-card);
+      background: #ffffff;
       border: 1px solid var(--border);
-      color: #f1f5f9;
+      color: #1e293b;
+      box-shadow: var(--shadow-sm);
     }
 
     .citation-btn {
       display: inline-flex;
       align-items: center;
       gap: 0.25rem;
-      padding: 0.15rem 0.45rem;
+      padding: 0.2rem 0.5rem;
       border-radius: 4px;
-      background: rgba(59, 130, 246, 0.1);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      color: #93c5fd;
-      font-size: 0.7rem;
-      margin-top: 0.45rem;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #2563eb;
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
       cursor: pointer;
     }
     .citation-btn:hover {
-      background: rgba(59, 130, 246, 0.25);
+      background: #dbeafe;
     }
 
     .chat-bottom-input {
       padding: 0.65rem;
       border-top: 1px solid var(--border);
-      background: var(--bg-panel);
+      background: #ffffff;
       display: flex;
       gap: 0.4rem;
     }
 
-    /* Modal Styling */
+    /* Modal */
     .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px);
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px);
       z-index: 2000; display: none; align-items: center; justify-content: center;
     }
     .modal-backdrop.active { display: flex; }
     .modal-box {
-      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+      background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius);
       width: 90%; max-width: 700px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
-    .modal-head { padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-    .modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; }
-    .modal-foot { padding: 0.85rem 1.25rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.5rem; }
+    .modal-head { padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: #f8fafc; }
+    .modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; background: #ffffff; }
+    .modal-foot { padding: 0.85rem 1.25rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.5rem; background: #f8fafc; }
 
-    /* Studio Stage */
+    /* Studio Stage in Light Mode */
     .studio-layout {
       display: grid;
       grid-template-columns: 260px 1fr 340px;
@@ -481,18 +497,23 @@ const htmlContent = `<!DOCTYPE html>
 
     .canvas-box {
       flex: 1;
-      background: #020408;
+      background: #ffffff;
+      background-image: 
+        linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
+      background-size: 20px 20px;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      box-shadow: var(--shadow-sm);
     }
 
     .canvas-bar {
       padding: 0.5rem 0.85rem;
       border-bottom: 1px solid var(--border);
-      background: rgba(17, 19, 24, 0.8);
+      background: rgba(255, 255, 255, 0.9);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -507,23 +528,23 @@ const htmlContent = `<!DOCTYPE html>
       justify-content: center;
     }
 
-    .edgePath path { stroke: #38bdf8 !important; stroke-width: 2px !important; }
+    .edgePath path { stroke: #2563eb !important; stroke-width: 2px !important; }
     .edgePath.animated path { stroke-dasharray: 6, 6; animation: dashFlow 1s linear infinite; }
     @keyframes dashFlow { to { stroke-dashoffset: -40; } }
 
-    /* Table clean styling */
+    /* Clean Light Table */
     .clean-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.82rem;
+      font-size: 0.84rem;
       text-align: left;
     }
-    .clean-table th { padding: 0.65rem; border-bottom: 2px solid var(--border); color: var(--text-dim); }
+    .clean-table th { padding: 0.65rem; border-bottom: 2px solid var(--border); color: var(--text-sub); font-weight: 700; background: #fafafa; }
     .clean-table td { padding: 0.65rem; border-bottom: 1px solid var(--border); }
     
     .qty-box {
-      background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px;
-      color: #fff; padding: 0.2rem 0.4rem; width: 60px; text-align: center; font-weight: 700;
+      background: #ffffff; border: 1px solid var(--border); border-radius: 4px;
+      color: var(--text-main); padding: 0.2rem 0.4rem; width: 60px; text-align: center; font-weight: 700;
     }
   </style>
 </head>
@@ -535,13 +556,13 @@ const htmlContent = `<!DOCTYPE html>
       <div class="brand-section">
         <div class="brand-logo">GW</div>
         <div class="brand-text">
-          GIJO WIKI <span class="version-tag">v5.1.0</span>
+          GIJO WIKI <span class="version-tag">v5.2.0</span>
         </div>
       </div>
 
       <nav class="nav-tabs">
         <button id="tabBtn-wiki" class="tab-btn active" onclick="switchView('wiki')">
-          <i data-lucide="book-open" style="width:14px; height:14px;"></i> 지식고 & RAG
+          <i data-lucide="book-open" style="width:14px; height:14px;"></i> 사내 지식고 & RAG
         </button>
         <button id="tabBtn-studio" class="tab-btn" onclick="switchView('studio')">
           <i data-lucide="cpu" style="width:14px; height:14px;"></i> 아키텍처 스튜디오
@@ -576,16 +597,16 @@ const htmlContent = `<!DOCTYPE html>
       <div class="wiki-grid">
         
         <!-- Left: My Docs Vault -->
-        <aside class="clean-panel">
+        <aside class="white-panel">
           <div class="panel-head">
-            <span class="panel-head-title"><i data-lucide="folder" style="width:14px; height:14px;"></i> 사내 지식고 (<span id="totalDocCount">0</span>)</span>
+            <span class="panel-head-title"><i data-lucide="folder" style="width:14px; height:14px; color:var(--primary);"></i> GIJO AS 원본 지식고 (<span id="totalDocCount">0</span>)</span>
             <button class="btn" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="createNewWikiDoc()">
               <i data-lucide="plus" style="width:12px; height:12px;"></i> 추가
             </button>
           </div>
 
           <div class="search-input-wrap">
-            <input type="text" id="wikiSearchInput" class="search-input" placeholder="사내 규정, WAF, AIBOM 검색..." oninput="filterWikiDocs()">
+            <input type="text" id="wikiSearchInput" class="search-input" placeholder="사내 규정, CVE, AIBOM 검색..." oninput="filterWikiDocs()">
           </div>
 
           <div class="category-filter-strip">
@@ -600,7 +621,7 @@ const htmlContent = `<!DOCTYPE html>
 
           <ul id="wikiDocList" class="doc-list-clean"></ul>
 
-          <div style="padding: 0.5rem; border-top: 1px solid var(--border); display: flex; gap: 0.35rem;">
+          <div style="padding: 0.5rem; border-top: 1px solid var(--border); display: flex; gap: 0.35rem; background:#fafafa;">
             <button class="btn" style="flex:1; justify-content:center; font-size:0.75rem;" onclick="importDocsFile()">가져오기</button>
             <button class="btn" style="flex:1; justify-content:center; font-size:0.75rem;" onclick="exportDocsFile()">내보내기</button>
           </div>
@@ -609,8 +630,8 @@ const htmlContent = `<!DOCTYPE html>
         <!-- Center: Reader / Editor -->
         <article class="wiki-content-panel">
           <div class="panel-head">
-            <div style="font-size:0.8rem; color:var(--text-sub);">
-              <span id="wikiBreadcrumbCat">보안규정</span> &gt; <b id="wikiBreadcrumbTitle" style="color:#fff;">문서 제목</b>
+            <div style="font-size:0.82rem; color:var(--text-sub);">
+              <span id="wikiBreadcrumbCat" style="color:var(--primary); font-weight:600;">보안규정</span> &gt; <b id="wikiBreadcrumbTitle" style="color:var(--text-main);">문서 제목</b>
             </div>
             <div style="display:flex; gap:0.35rem;">
               <button id="btnToggleEdit" class="btn" onclick="toggleEditMode()">
@@ -627,9 +648,9 @@ const htmlContent = `<!DOCTYPE html>
             <div id="wikiReadView" class="markdown-render"></div>
 
             <div id="wikiEditView" style="display: none; height: 100%; flex-direction: column; gap: 0.65rem;">
-              <input type="text" id="editDocTitle" class="search-input" style="font-size:1.1rem; font-weight:700;" placeholder="문서 제목">
+              <input type="text" id="editDocTitle" class="search-input" style="font-size:1.1rem; font-weight:700; background:#fff;" placeholder="문서 제목">
               <div style="display:flex; gap:0.4rem;">
-                <select id="editDocCategory" class="search-input" style="width:140px;">
+                <select id="editDocCategory" class="search-input" style="width:140px; background:#fff;">
                   <option value="보안규정">보안규정</option>
                   <option value="취약점관리">취약점관리</option>
                   <option value="AI보안">AI보안</option>
@@ -638,9 +659,9 @@ const htmlContent = `<!DOCTYPE html>
                   <option value="QA문답집">QA문답집</option>
                   <option value="장애런북">장애런북</option>
                 </select>
-                <input type="text" id="editDocTags" class="search-input" style="flex:1;" placeholder="태그 (쉼표 구분: WAF, 망분리)">
+                <input type="text" id="editDocTags" class="search-input" style="flex:1; background:#fff;" placeholder="태그 (쉼표 구분: WAF, 망분리)">
               </div>
-              <textarea id="editDocContent" class="search-input" style="flex:1; font-family:monospace; line-height:1.6; resize:none;" placeholder="마크다운 문서 내용..."></textarea>
+              <textarea id="editDocContent" class="search-input" style="flex:1; font-family:monospace; line-height:1.6; resize:none; background:#fff;" placeholder="마크다운 문서 내용..."></textarea>
               <div style="display:flex; justify-content:flex-end; gap:0.4rem;">
                 <button class="btn" onclick="cancelDocEdit()">취소</button>
                 <button class="btn btn-primary" onclick="saveDocEdit()">저장 (Ctrl+S)</button>
@@ -650,23 +671,23 @@ const htmlContent = `<!DOCTYPE html>
         </article>
 
         <!-- Right: Local RAG Assistant -->
-        <aside class="clean-panel">
+        <aside class="white-panel">
           <div class="panel-head">
-            <span class="panel-head-title"><i data-lucide="bot" style="width:14px; height:14px; color:var(--primary);"></i> 사내 지식 RAG</span>
-            <span style="font-size:0.68rem; color:var(--success); background:rgba(16,185,129,0.1); padding:0.1rem 0.35rem; border-radius:4px; border:1px solid rgba(16,185,129,0.25);">GB10 / Ollama</span>
+            <span class="panel-head-title"><i data-lucide="bot" style="width:14px; height:14px; color:var(--primary);"></i> GIJO AS RAG 비서</span>
+            <span style="font-size:0.68rem; color:var(--success); background:#ecfdf5; padding:0.1rem 0.35rem; border-radius:4px; border:1px solid #a7f3d0; font-weight:600;">GB10 / 에어갭</span>
           </div>
 
           <div class="rag-chip-row" id="quickChipContainer"></div>
 
           <div class="chat-stream-box" id="ragChatMessages">
             <div class="bubble ai">
-              👋 안녕하세요! <b>GIJO WIKI</b> 사내 지식 비서입니다.<br>
-              등록된 보안 규정, CVE 취약점 런북, AIBOM 가이드, ISMS-P 인증 기준을 기반으로 정확한 원문 출처와 함께 안내합니다.
+              👋 안녕하세요! <b>GIJO AS 공식 원본 지식고</b>가 연동되었습니다.<br>
+              실제 사내 보안제품 관리 지침, 취약점(CVE) 대응 절차, AIBOM 가이드, ISMS-P 인증 기준을 원문 출처와 함께 안내해 드립니다.
             </div>
           </div>
 
           <div class="chat-bottom-input">
-            <input type="text" id="ragQueryInput" class="search-input" placeholder="사내 규정 및 질의 입력..." onkeydown="if(event.key==='Enter') executeRagQuery()">
+            <input type="text" id="ragQueryInput" class="search-input" style="background:#fff;" placeholder="사내 규정 및 아키텍처 질의 입력..." onkeydown="if(event.key==='Enter') executeRagQuery()">
             <button class="btn btn-primary" onclick="executeRagQuery()">
               <i data-lucide="send" style="width:13px; height:13px;"></i>
             </button>
@@ -680,9 +701,9 @@ const htmlContent = `<!DOCTYPE html>
     <section id="view-studio" class="view-page">
       <div class="studio-layout">
         
-        <aside class="clean-panel">
+        <aside class="white-panel">
           <div class="panel-head">
-            <span class="panel-head-title"><i data-lucide="layers" style="width:14px; height:14px;"></i> 템플릿</span>
+            <span class="panel-head-title"><i data-lucide="layers" style="width:14px; height:14px;"></i> 엔터프라이즈 템플릿</span>
           </div>
           <div style="padding:0.65rem; display:flex; flex-direction:column; gap:0.4rem;">
             <button class="btn" style="justify-content:flex-start; text-align:left;" onclick="loadStudioPreset('finance')">
@@ -713,14 +734,14 @@ const htmlContent = `<!DOCTYPE html>
         <main class="canvas-box">
           <div class="canvas-bar">
             <div style="display:flex; align-items:center; gap:0.4rem;">
-              <span style="font-size:0.8rem; font-weight:700; color:#fff;">Stage Pro</span>
-              <span id="canvasZoomLabel" style="font-size:0.7rem; color:var(--text-dim); background:var(--bg-subtle); padding:0.1rem 0.35rem; border-radius:4px;">100%</span>
+              <span style="font-size:0.8rem; font-weight:700; color:var(--text-main);">Architecture Studio</span>
+              <span id="canvasZoomLabel" style="font-size:0.7rem; color:var(--text-sub); background:var(--bg-subtle); padding:0.1rem 0.35rem; border-radius:4px; border:1px solid var(--border);">100%</span>
             </div>
             <div style="display:flex; gap:0.35rem;">
               <button class="btn" onclick="zoomCanvas(0.1)" title="확대"><i data-lucide="zoom-in" style="width:13px; height:13px;"></i></button>
               <button class="btn" onclick="zoomCanvas(-0.1)" title="축소"><i data-lucide="zoom-out" style="width:13px; height:13px;"></i></button>
               <button class="btn" onclick="resetCanvasZoom()" title="맞춤"><i data-lucide="maximize" style="width:13px; height:13px;"></i></button>
-              <button class="btn" id="btnToggleTraffic" onclick="toggleTrafficAnimation()" style="color:#38bdf8;">
+              <button class="btn" id="btnToggleTraffic" onclick="toggleTrafficAnimation()" style="color:var(--primary);">
                 <i data-lucide="activity" style="width:13px; height:13px;"></i> 트래픽 ON
               </button>
             </div>
@@ -731,14 +752,14 @@ const htmlContent = `<!DOCTYPE html>
           </div>
         </main>
 
-        <aside class="clean-panel">
+        <aside class="white-panel">
           <div class="panel-head">
             <span class="panel-head-title"><i data-lucide="code" style="width:14px; height:14px;"></i> 코드 에디터</span>
             <button class="btn" style="padding:0.2rem 0.45rem; font-size:0.75rem;" onclick="renderMermaidFromEditor()">렌더링</button>
           </div>
           <div style="flex:1; display:flex; flex-direction:column; padding:0.65rem; gap:0.4rem;">
-            <textarea id="mermaidCodeEditor" class="search-input" style="flex:1; font-family:monospace; line-height:1.4; resize:none; color:#38bdf8;"></textarea>
-            <div style="background:var(--bg-main); border:1px solid var(--border); border-radius:6px; padding:0.65rem;">
+            <textarea id="mermaidCodeEditor" class="search-input" style="flex:1; font-family:monospace; line-height:1.4; resize:none; color:#2563eb; background:#fff;"></textarea>
+            <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:0.65rem;">
               <div style="font-size:0.75rem; font-weight:700; color:var(--warning); margin-bottom:0.2rem;">SPOF 진단</div>
               <div id="spofAlertMsg" style="font-size:0.72rem; color:var(--text-sub);">✅ 주요 방화벽/WAF 이중화 완비</div>
             </div>
@@ -750,13 +771,13 @@ const htmlContent = `<!DOCTYPE html>
 
     <!-- 3. ERP PORTAL -->
     <section id="view-portal" class="view-page">
-      <div class="clean-panel" style="padding:1.25rem;">
+      <div class="white-panel" style="padding:1.25rem;">
         <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
           <div>
-            <h2 style="font-size:1.2rem; font-weight:700; color:#fff;">보안 솔루션 전사 ERP 카탈로그</h2>
-            <p style="color:var(--text-dim); font-size:0.8rem;">조달청 규격 및 취급 제조사 공식 라이선스 데이터베이스</p>
+            <h2 style="font-size:1.2rem; font-weight:800; color:var(--text-main);">보안 솔루션 전사 ERP 카탈로그</h2>
+            <p style="color:var(--text-sub); font-size:0.8rem;">조달청 규격 및 취급 제조사 공식 라이선스 데이터베이스</p>
           </div>
-          <input type="text" id="portalSearchInput" class="search-input" style="width:240px;" placeholder="솔루션명, 제조사 검색..." oninput="renderPortalCards()">
+          <input type="text" id="portalSearchInput" class="search-input" style="width:240px; background:#fff;" placeholder="솔루션명, 제조사 검색..." oninput="renderPortalCards()">
         </div>
         <div id="portalCardsGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1rem;"></div>
       </div>
@@ -764,9 +785,9 @@ const htmlContent = `<!DOCTYPE html>
 
     <!-- 4. BOM & TCO -->
     <section id="view-bom" class="view-page">
-      <div class="clean-panel" style="padding:1.25rem;">
-        <h2 style="font-size:1.2rem; font-weight:700; color:#fff; margin-bottom:0.3rem;">아키텍처 실시간 BOM (Bill of Materials) & TCO 계산서</h2>
-        <p style="color:var(--text-dim); font-size:0.8rem; margin-bottom:1rem;">도입 수량을 조절하면 CAPEX, OPEX(12%), 3년 TCO가 실시간 재계산됩니다.</p>
+      <div class="white-panel" style="padding:1.25rem;">
+        <h2 style="font-size:1.2rem; font-weight:800; color:var(--text-main); margin-bottom:0.3rem;">아키텍처 실시간 BOM (Bill of Materials) & TCO 계산서</h2>
+        <p style="color:var(--text-sub); font-size:0.8rem; margin-bottom:1rem;">도입 수량을 조절하면 CAPEX, OPEX(12%), 3년 TCO가 실시간 재계산됩니다.</p>
 
         <table class="clean-table" style="margin-bottom:1.5rem;">
           <thead>
@@ -782,18 +803,18 @@ const htmlContent = `<!DOCTYPE html>
           <tbody id="bomTableBody"></tbody>
         </table>
 
-        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; background:var(--bg-main); border:1px solid var(--border); border-radius:var(--radius); padding:1rem;">
+        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; background:#f8fafc; border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem;">
           <div>
-            <div style="font-size:0.75rem; color:var(--text-dim);">총 도입비 (CAPEX)</div>
-            <div id="totalCapex" style="font-size:1.4rem; font-weight:700; color:#38bdf8;">₩ 0</div>
+            <div style="font-size:0.75rem; color:var(--text-sub);">총 도입비 (CAPEX)</div>
+            <div id="totalCapex" style="font-size:1.4rem; font-weight:800; color:#2563eb;">₩ 0</div>
           </div>
           <div>
-            <div style="font-size:0.75rem; color:var(--text-dim);">연간 유지보수비 (OPEX)</div>
-            <div id="totalOpex" style="font-size:1.4rem; font-weight:700; color:#c084fc;">₩ 0 / 년</div>
+            <div style="font-size:0.75rem; color:var(--text-sub);">연간 유지보수비 (OPEX)</div>
+            <div id="totalOpex" style="font-size:1.4rem; font-weight:800; color:#7c3aed;">₩ 0 / 년</div>
           </div>
           <div>
-            <div style="font-size:0.75rem; color:var(--text-dim);">3년 예상 TCO (Capex + 3*Opex)</div>
-            <div id="totalTco" style="font-size:1.4rem; font-weight:700; color:var(--success);">₩ 0</div>
+            <div style="font-size:0.75rem; color:var(--text-sub);">3년 예상 TCO (Capex + 3*Opex)</div>
+            <div id="totalTco" style="font-size:1.4rem; font-weight:800; color:var(--success);">₩ 0</div>
           </div>
         </div>
       </div>
@@ -801,9 +822,9 @@ const htmlContent = `<!DOCTYPE html>
 
     <!-- 5. ISMS-P AUDITOR -->
     <section id="view-audit" class="view-page">
-      <div class="clean-panel" style="padding:1.25rem;">
-        <h2 style="font-size:1.2rem; font-weight:700; color:#fff; margin-bottom:0.3rem;">ISMS-P 5대 통제영역 자동 적합성 진단기</h2>
-        <p style="color:var(--text-dim); font-size:0.8rem; margin-bottom:1rem;">사내 지식고(My Docs) 및 현재 아키텍처 구성을 교차 검증하여 결함 항목 식별</p>
+      <div class="white-panel" style="padding:1.25rem;">
+        <h2 style="font-size:1.2rem; font-weight:800; color:var(--text-main); margin-bottom:0.3rem;">ISMS-P 5대 통제영역 자동 적합성 진단기</h2>
+        <p style="color:var(--text-sub); font-size:0.8rem; margin-bottom:1rem;">사내 지식고(My Docs) 및 현재 아키텍처 구성을 교차 검증하여 결함 항목 식별</p>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:0.85rem;" id="auditResultsGrid"></div>
       </div>
     </section>
@@ -814,23 +835,23 @@ const htmlContent = `<!DOCTYPE html>
   <div id="llmSettingsModal" class="modal-backdrop" onclick="if(event.target===this) closeLlmSettingsModal()">
     <div class="modal-box">
       <div class="modal-head">
-        <span style="font-weight:700; color:#fff;"><i data-lucide="settings" style="width:14px; height:14px;"></i> LLM 엔드포인트 설정</span>
+        <span style="font-weight:700; color:var(--text-main);"><i data-lucide="settings" style="width:14px; height:14px;"></i> LLM 엔드포인트 설정</span>
         <button style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:1.2rem;" onclick="closeLlmSettingsModal()">&times;</button>
       </div>
       <div class="modal-body" style="display:flex; flex-direction:column; gap:0.85rem;">
         <div>
           <label style="font-size:0.8rem; color:var(--text-sub); display:block; margin-bottom:0.3rem;">로컬 LLM 엔드포인트 URL</label>
-          <input type="text" id="settingLlmUrl" class="search-input" value="http://localhost:11434">
+          <input type="text" id="settingLlmUrl" class="search-input" value="http://localhost:11434" style="background:#fff;">
         </div>
         <div>
           <label style="font-size:0.8rem; color:var(--text-sub); display:block; margin-bottom:0.3rem;">엔진 유형</label>
-          <select id="settingEngineType" class="search-input">
+          <select id="settingEngineType" class="search-input" style="background:#fff;">
             <option value="ollama">Ollama (Local / Air-Gap)</option>
             <option value="gb10">GB10 온프레미스 AI 엔진 (177B)</option>
             <option value="vllm">vLLM / OpenAI Compatible</option>
           </select>
         </div>
-        <div style="font-size:0.75rem; color:var(--text-dim); background:var(--bg-main); padding:0.65rem; border-radius:6px; border:1px solid var(--border);">
+        <div style="font-size:0.75rem; color:var(--text-sub); background:#f8fafc; padding:0.65rem; border-radius:6px; border:1px solid var(--border);">
           🔒 <b>에어갭 보안 모드</b>: 사내 문서는 일체 외부로 전송되지 않으며 지정된 로컬 인스턴스에서만 처리됩니다.
         </div>
       </div>
@@ -845,7 +866,7 @@ const htmlContent = `<!DOCTYPE html>
   <div id="nodeWikiModal" class="modal-backdrop" onclick="if(event.target===this) closeNodeWikiModal()">
     <div class="modal-box" style="max-width: 600px;">
       <div class="modal-head">
-        <span style="font-weight:700; color:#fff;" id="nodeWikiTitle">장비 가이드</span>
+        <span style="font-weight:700; color:var(--text-main);" id="nodeWikiTitle">장비 가이드</span>
         <button style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:1.2rem;" onclick="closeNodeWikiModal()">&times;</button>
       </div>
       <div class="modal-body" id="nodeWikiBody"></div>
@@ -857,9 +878,10 @@ const htmlContent = `<!DOCTYPE html>
   </div>
 
   <script>
+    // Initialize Mermaid with Light Theme
     mermaid.initialize({
       startOnLoad: false,
-      theme: 'dark',
+      theme: 'default',
       securityLevel: 'loose',
       flowchart: { curve: 'basis', htmlLabels: true }
     });
@@ -975,9 +997,10 @@ const htmlContent = `<!DOCTYPE html>
   PolicyEngine -.-> ZTX\`
     };
 
+    // Use dedicated key for clean real data load
     function loadStoredDocs() {
       try {
-        const stored = localStorage.getItem('gijo_wiki_docs_v5');
+        const stored = localStorage.getItem('gijo_wiki_docs_real_v52');
         if (stored) return JSON.parse(stored);
       } catch(e) {}
       return defaultWikiDocs;
@@ -985,7 +1008,7 @@ const htmlContent = `<!DOCTYPE html>
 
     function saveDocsToStorage(docs) {
       try {
-        localStorage.setItem('gijo_wiki_docs_v5', JSON.stringify(docs));
+        localStorage.setItem('gijo_wiki_docs_real_v52', JSON.stringify(docs));
       } catch(err) {
         if (err.name === 'QuotaExceededError') {
           alert('⚠️ 브라우저 용량 한도 초과. [백업 내보내기]를 이용해 주세요.');
@@ -1076,7 +1099,7 @@ const htmlContent = `<!DOCTYPE html>
 
       const renderedHtml = parseMarkdownToHtml(doc.content);
       document.getElementById('wikiReadView').innerHTML = 
-        '<div style="margin-bottom: 0.85rem; display:flex; gap:0.35rem; flex-wrap:wrap;">' +
+        '<div style="margin-bottom: 1rem; display:flex; gap:0.35rem; flex-wrap:wrap;">' +
         doc.tags.map(t => '<span class="meta-badge">#' + sanitizeHtml(t) + '</span>').join('') +
         '</div>' + renderedHtml;
 
@@ -1192,7 +1215,7 @@ const htmlContent = `<!DOCTYPE html>
         if (query.includes('에어갭') && (doc.tags.includes('에어갭') || doc.content.includes('에어갭'))) score += 10;
         if (query.includes('CVE') && (doc.tags.includes('CVE') || doc.title.includes('CVE'))) score += 10;
         if (query.includes('ISMS-P') && (doc.tags.includes('ISMS-P') || doc.title.includes('ISMS-P'))) score += 10;
-        if (query.includes('DDoS') && (doc.tags.includes('DDoS') || doc.title.includes('DDoS'))) score += 10;
+        if (query.includes('체크리스트') && (doc.tags.includes('체크리스트') || doc.title.includes('체크리스트'))) score += 10;
 
         if (score > 0) matchedDocs.push({ doc, score });
       });
@@ -1208,8 +1231,8 @@ const htmlContent = `<!DOCTYPE html>
 
       let answerText = '';
       if (topDoc) {
-        let summary = topDoc.content.slice(0, 260).replace(/#/g, '');
-        answerText = '사내 지식에 따른 분석 결과입니다:<br><br>' + sanitizeHtml(summary) + '...';
+        let summary = topDoc.content.slice(0, 280).replace(/#/g, '');
+        answerText = '사내 원본 지식에 따른 분석 결과입니다:<br><br>' + sanitizeHtml(summary) + '...';
       } else {
         answerText = '일치하는 특정 규정을 찾지 못했으나, 보안 원칙상 <b>경계 방화벽 통제</b> 및 <b>최소 권한 부여</b> 기준을 준수해야 합니다.';
       }
@@ -1279,10 +1302,10 @@ const htmlContent = `<!DOCTYPE html>
       let matched = currentDocs.find(d => nodeText.includes(d.title) || d.tags.some(t => nodeText.includes(t)));
       if (!matched) matched = currentDocs[0];
 
-      document.getElementById('nodeWikiTitle').innerText = nodeText + ' 보안 가이드';
+      document.getElementById('nodeWikiTitle').innerText = nodeText + ' 사내 보안 가이드';
       document.getElementById('nodeWikiBody').innerHTML = 
         '<div style="margin-bottom:0.75rem;"><span class="meta-badge">' + sanitizeHtml(matched.category) + '</span> <b>' + sanitizeHtml(matched.title) + '</b></div>' +
-        '<div style="font-size:0.85rem; color:#cbd5e1; line-height:1.6;">' + parseMarkdownToHtml(matched.content.slice(0, 320)) + '...</div>';
+        '<div style="font-size:0.85rem; color:#475569; line-height:1.6;">' + parseMarkdownToHtml(matched.content.slice(0, 350)) + '...</div>';
       
       document.getElementById('btnGoToWikiDoc').onclick = () => {
         closeNodeWikiModal();
@@ -1325,7 +1348,7 @@ const htmlContent = `<!DOCTYPE html>
       btn.innerHTML = isTrafficFlowing 
         ? '<i data-lucide="activity" style="width:13px; height:13px;"></i> 트래픽 ON' 
         : '<i data-lucide="pause" style="width:13px; height:13px;"></i> 트래픽 OFF';
-      btn.style.color = isTrafficFlowing ? '#38bdf8' : 'var(--text-dim)';
+      btn.style.color = isTrafficFlowing ? 'var(--primary)' : 'var(--text-dim)';
       applyTrafficAnimation();
       lucide.createIcons();
     }
@@ -1347,26 +1370,27 @@ const htmlContent = `<!DOCTYPE html>
         .filter(s => s.name.toLowerCase().includes(search) || s.vendor.toLowerCase().includes(search) || s.category.toLowerCase().includes(search))
         .forEach(sol => {
           const card = document.createElement('div');
-          card.style.background = 'var(--bg-main)';
+          card.style.background = '#ffffff';
           card.style.border = '1px solid var(--border)';
           card.style.borderRadius = 'var(--radius)';
-          card.style.padding = '1rem';
+          card.style.padding = '1.25rem';
           card.style.display = 'flex';
           card.style.flexDirection = 'column';
           card.style.justifyContent = 'space-between';
+          card.style.boxShadow = 'var(--shadow-sm)';
 
           card.innerHTML = 
             '<div>' +
               '<div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">' +
                 '<span class="meta-badge">' + sanitizeHtml(sol.category) + '</span>' +
-                '<span style="font-size:0.72rem; color:var(--text-dim);">' + sanitizeHtml(sol.vendor) + '</span>' +
+                '<span style="font-size:0.75rem; color:var(--text-dim);">' + sanitizeHtml(sol.vendor) + '</span>' +
               '</div>' +
-              '<h3 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:0.35rem;">' + sanitizeHtml(sol.name) + '</h3>' +
-              '<div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:0.75rem;">ISMS-P: ' + sanitizeHtml(sol.ismsMapping) + '</div>' +
+              '<h3 style="font-size:1.05rem; font-weight:800; color:var(--text-main); margin-bottom:0.35rem;">' + sanitizeHtml(sol.name) + '</h3>' +
+              '<div style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.85rem;">ISMS-P: ' + sanitizeHtml(sol.ismsMapping) + '</div>' +
             '</div>' +
-            '<div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.65rem; border-top:1px solid var(--border);">' +
-              '<div><div style="font-size:0.68rem; color:var(--text-dim);">단가</div><b style="color:#38bdf8; font-size:0.85rem;">₩ ' + sol.price.toLocaleString() + '</b></div>' +
-              '<button class="btn" style="font-size:0.72rem;" onclick="insertNodeToCode(\\'' + sol.category + '\\', \\'' + sol.name + '\\')">스튜디오 추가</button>' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.75rem; border-top:1px solid var(--border);">' +
+              '<div><div style="font-size:0.7rem; color:var(--text-dim);">도입 단가</div><b style="color:var(--primary); font-size:0.95rem;">₩ ' + sol.price.toLocaleString() + '</b></div>' +
+              '<button class="btn" style="font-size:0.75rem;" onclick="insertNodeToCode(\\'' + sol.category + '\\', \\'' + sol.name + '\\')">스튜디오 추가</button>' +
             '</div>';
           grid.appendChild(card);
         });
@@ -1396,12 +1420,12 @@ const htmlContent = `<!DOCTYPE html>
 
         const tr = document.createElement('tr');
         tr.innerHTML = 
-          '<td style="font-weight:600; color:#fff;">' + sanitizeHtml(sol.name) + '</td>' +
+          '<td style="font-weight:700; color:var(--text-main);">' + sanitizeHtml(sol.name) + '</td>' +
           '<td><span class="meta-badge">' + sanitizeHtml(sol.category) + '</span></td>' +
           '<td>₩ ' + sol.price.toLocaleString() + '</td>' +
           '<td style="text-align:center;"><input type="number" class="qty-box" min="1" max="100" value="' + qty + '" onchange="updateBomQty(\\'' + sol.id + '\\', this.value)"></td>' +
-          '<td style="color:#c084fc;">₩ ' + Math.round(rowOpex).toLocaleString() + ' /년</td>' +
-          '<td style="font-weight:700; color:#38bdf8;">₩ ' + rowTotal.toLocaleString() + '</td>';
+          '<td style="color:#7c3aed; font-weight:600;">₩ ' + Math.round(rowOpex).toLocaleString() + ' /년</td>' +
+          '<td style="font-weight:800; color:var(--primary);">₩ ' + rowTotal.toLocaleString() + '</td>';
         tbody.appendChild(tr);
       });
 
@@ -1424,19 +1448,20 @@ const htmlContent = `<!DOCTYPE html>
 
       items.forEach(it => {
         const card = document.createElement('div');
-        card.style.background = 'var(--bg-main)';
+        card.style.background = '#ffffff';
         card.style.border = '1px solid var(--border)';
         card.style.borderRadius = 'var(--radius)';
-        card.style.padding = '0.85rem';
+        card.style.padding = '1rem';
+        card.style.boxShadow = 'var(--shadow-sm)';
 
         card.innerHTML = 
           '<div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">' +
-            '<b style="color:#60a5fa; font-size:0.82rem;">[' + it.code + '] ' + it.title + '</b>' +
-            '<span style="font-size:0.68rem; padding:0.1rem 0.35rem; border-radius:3px; font-weight:700; background:rgba(16,185,129,0.15); color:var(--success);">' +
+            '<b style="color:var(--primary); font-size:0.85rem;">[' + it.code + '] ' + it.title + '</b>' +
+            '<span style="font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:3px; font-weight:700; background:#ecfdf5; color:var(--success); border:1px solid #a7f3d0;">' +
               it.status +
             '</span>' +
           '</div>' +
-          '<p style="font-size:0.75rem; color:var(--text-dim);">' + it.desc + '</p>';
+          '<p style="font-size:0.78rem; color:var(--text-sub);">' + it.desc + '</p>';
         grid.appendChild(card);
       });
     }
@@ -1445,7 +1470,7 @@ const htmlContent = `<!DOCTYPE html>
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentDocs, null, 2));
       const a = document.createElement('a');
       a.setAttribute("href", dataStr);
-      a.setAttribute("download", "GIJO_WIKI_Docs_v5.1.0_" + new Date().toISOString().slice(0,10) + ".json");
+      a.setAttribute("download", "GIJO_WIKI_Docs_v5.2.0_" + new Date().toISOString().slice(0,10) + ".json");
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1479,7 +1504,7 @@ const htmlContent = `<!DOCTYPE html>
     function exportFullProjectBackup() {
       const projectData = {
         name: "GIJO WIKI Suite",
-        version: "5.1.0",
+        version: "5.2.0",
         exportedAt: new Date().toISOString(),
         docs: currentDocs,
         currentDiagram: document.getElementById('mermaidCodeEditor').value
@@ -1487,7 +1512,7 @@ const htmlContent = `<!DOCTYPE html>
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData, null, 2));
       const a = document.createElement('a');
       a.setAttribute("href", dataStr);
-      a.setAttribute("download", "GIJO_WIKI_Project_v5.1.0_" + new Date().toISOString().slice(0,10) + ".json");
+      a.setAttribute("download", "GIJO_WIKI_Project_v5.2.0_" + new Date().toISOString().slice(0,10) + ".json");
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1529,9 +1554,9 @@ const htmlContent = `<!DOCTYPE html>
 </html>`;
 
 fs.writeFileSync(targetHtmlPath, htmlContent, 'utf8');
-fs.writeFileSync(copyV3Path, htmlContent, 'utf8');
+// Do not touch any GIJO AS files (strict isolation)
 if (fs.existsSync(path.dirname(electronIndexPath))) {
   fs.writeFileSync(electronIndexPath, htmlContent, 'utf8');
 }
 
-console.log('✅ GIJO WIKI v5.1.0 Clean & Minimalist Design overhaul completed across all targets!');
+console.log('✅ GIJO WIKI v5.2.0 Clean White Theme & Real Data successfully deployed (GIJO AS untouched)!');
