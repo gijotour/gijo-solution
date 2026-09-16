@@ -1042,7 +1042,68 @@ const htmlContent = `<!DOCTYPE html>
       <div class="studio-grid">
         
         <div class="white-panel" style="padding:1rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+          
+          <!-- Visual No-Code Stencil Palette & Quick Connector Bar -->
+          <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:0.85rem; margin-bottom:0.85rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.4rem;">
+              <div style="display:flex; align-items:center; gap:0.4rem;">
+                <span style="font-weight:800; font-size:0.82rem; color:var(--text-main); display:flex; align-items:center; gap:0.3rem;">
+                  <i data-lucide="palette" style="width:14px; height:14px; color:var(--primary);"></i>
+                  노코드 비주얼 부품 팔레트 (클릭 즉시 배치)
+                </span>
+                <span style="font-size:0.7rem; color:var(--text-dim);">배치할 구역 선택 후 부품을 클릭하세요</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.4rem;">
+                <label style="font-size:0.72rem; font-weight:700; color:var(--text-sub);">배치 구역:</label>
+                <select id="paletteTargetZone" class="search-input" style="width:165px; padding:0.2rem 0.4rem; font-size:0.74rem; background:#fff;">
+                  <option value="Boundary">🛡️ 경계 보안구역 (Boundary)</option>
+                  <option value="DMZ">🏢 DMZ 웹구역 (DMZ)</option>
+                  <option value="Trust">🏢 내부 코어 업무망 (Trust)</option>
+                  <option value="SecureDB">🔒 DB 안전구역 (SecureDB)</option>
+                </select>
+                <button class="btn btn-sm" onclick="toggleStudioDirection()" title="가로형(LR) ⇄ 세로형(TB) 방향 원클릭 전환">
+                  <i data-lucide="shuffle" style="width:12px; height:12px;"></i> <span id="btnStudioDirectionLabel">방향 LR ⇄ TB</span>
+                </button>
+                <button class="btn btn-sm" onclick="downloadStudioSvg()" title="다이어그램을 SVG 이미지 파일로 저장">
+                  <i data-lucide="download" style="width:12px; height:12px;"></i> SVG 저장
+                </button>
+              </div>
+            </div>
+
+            <!-- Click-to-Add Stencil Chips -->
+            <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+              <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="addStencilNode('WEB')">🌐 웹서버(Nginx)</button>
+              <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="addStencilNode('FW')">🔥 차세대방화벽(NGFW)</button>
+              <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="addStencilNode('WAAP')">🛡️ 웹방화벽(WAAP)</button>
+              <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="addStencilNode('WAS')">⚙️ Core WAS(JEUS/Spring)</button>
+              <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="addStencilNode('DB')">🗄️ 고객원장 DB</button>
+              <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="addStencilNode('KMS')">🔒 암호키 관리(KMS)</button>
+              <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="addStencilNode('SIEM')">📊 통합보안 SIEM</button>
+              <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="addStencilNode('CLOUD')">☁️ 클라우드 게이트웨이</button>
+              <button class="btn btn-sm" style="background:#fef2f2; color:#dc2626; border-color:#fecaca; font-size:0.72rem; font-weight:700;" onclick="addStencilNode('VULN')">🚨 위험 CVE 발견노드</button>
+            </div>
+
+            <!-- Quick Connector Wizard -->
+            <div style="display:flex; align-items:center; gap:0.4rem; padding-top:0.6rem; border-top:1px dashed var(--border); font-size:0.74rem;">
+              <span style="font-weight:700; color:var(--text-sub); display:flex; align-items:center; gap:0.25rem;">
+                <i data-lucide="git-commit" style="width:13px; height:13px; color:var(--primary);"></i> 원클릭 연결 마법사:
+              </span>
+              <input type="text" id="quickFromNode" placeholder="출발 노드명 (예: WebCluster)" class="search-input" style="width:140px; background:#fff; padding:0.2rem 0.4rem; font-size:0.72rem;">
+              <span style="color:var(--text-dim);">➔</span>
+              <input type="text" id="quickToNode" placeholder="도착 노드명 (예: WAS)" class="search-input" style="width:140px; background:#fff; padding:0.2rem 0.4rem; font-size:0.72rem;">
+              <select id="quickProtocol" class="search-input" style="width:130px; background:#fff; padding:0.2rem 0.4rem; font-size:0.72rem;">
+                <option value="HTTPS 443">HTTPS (443)</option>
+                <option value="API 8443">API 호출 (8443)</option>
+                <option value="SQL 1521">DB 쿼리 (1521)</option>
+                <option value="Syslog 514">Syslog 전송 (514)</option>
+                <option value="인증연동 636">LDAP/인증 (636)</option>
+              </select>
+              <button class="btn btn-sm btn-primary" style="padding:0.2rem 0.6rem; font-size:0.72rem;" onclick="quickConnectNodes()">
+                <i data-lucide="arrow-right" style="width:12px; height:12px;"></i> 연결선 추가
+              </button>
+            </div>
+          </div>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
             <span class="panel-head-title"><i data-lucide="code" style="width:14px; height:14px;"></i> Mermaid 아키텍처 다이어그램 에디터</span>
             <div style="display:flex; gap:0.35rem;">
               <select id="studioPresetSelect" class="search-input" style="width:180px; padding:0.25rem 0.45rem; font-size:0.75rem;" onchange="loadStudioPreset(this.value)">
@@ -1932,6 +1993,146 @@ const htmlContent = `<!DOCTYPE html>
       </div>
     </div>
   </div
+  
+  <!-- Smart Electronic Approval Draft Board Modal (스마트 전자결재 기안판) -->
+  <div class="modal-overlay" id="smartApprovalModal">
+    <div class="modal-box" style="max-width:760px; max-height:90vh; overflow-y:auto;">
+      <div class="modal-header" style="background:#f8fafc; border-bottom:1.5px solid var(--border); padding:1rem 1.25rem;">
+        <div>
+          <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.4rem;">
+            <i data-lucide="file-check" style="width:20px; height:20px; color:var(--primary);"></i>
+            스마트 전자결재 기안판 (Approval Draft Board)
+          </h3>
+          <p style="font-size:0.76rem; color:var(--text-sub); margin-top:0.2rem;">
+            실제 사내 전자결재 직인 서식과 연동되어 폼 칸만 채우면 완성형 보안 품의서가 자동 생성되며 A4 출력 및 지식고에 편입됩니다.
+          </p>
+        </div>
+        <button class="btn btn-sm" onclick="closeSmartApprovalModal()"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+      </div>
+
+      <div class="modal-body" style="padding:1.25rem; display:flex; flex-direction:column; gap:1rem;">
+        
+        <!-- Approval Stamp Lines Table (전자결재 직인란) -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; border:1px solid #0f172a; padding:0.75rem; border-radius:6px; background:#fff;">
+          <div>
+            <div style="font-size:0.72rem; color:var(--text-dim);">문서번호: GIJO-SEC-2026-1253</div>
+            <div style="font-size:1.1rem; font-weight:800; color:#0f172a; margin-top:2px;">정보보안 업무 품의 및 결재서</div>
+          </div>
+          <table style="border-collapse:collapse; text-align:center; font-size:0.72rem; border:1px solid #0f172a; width:340px;">
+            <thead>
+              <tr style="background:#f1f5f9;">
+                <th style="border:1px solid #0f172a; padding:4px; width:70px;">기안자</th>
+                <th style="border:1px solid #0f172a; padding:4px; width:70px;">검토자</th>
+                <th style="border:1px solid #0f172a; padding:4px; width:70px;">보안팀장</th>
+                <th style="border:1px solid #0f172a; padding:4px; width:70px;">CISO</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="height:55px;">
+                <td style="border:1px solid #0f172a; vertical-align:middle;">
+                  <span style="display:inline-block; border:1.5px solid #059669; color:#059669; border-radius:50%; width:36px; height:36px; line-height:33px; font-weight:800; font-size:0.65rem;">기안<br>완료</span>
+                </td>
+                <td style="border:1px solid #0f172a; vertical-align:middle;" id="stampReviewer">
+                  <button class="btn btn-sm" style="font-size:0.65rem; padding:2px 4px;" onclick="toggleStamp('stampReviewer')">서명하기</button>
+                </td>
+                <td style="border:1px solid #0f172a; vertical-align:middle;" id="stampTeamLeader">
+                  <button class="btn btn-sm" style="font-size:0.65rem; padding:2px 4px;" onclick="toggleStamp('stampTeamLeader')">서명하기</button>
+                </td>
+                <td style="border:1px solid #0f172a; vertical-align:middle;" id="stampCiso">
+                  <button class="btn btn-sm" style="font-size:0.65rem; padding:2px 4px;" onclick="toggleStamp('stampCiso')">최종승인</button>
+                </td>
+              </tr>
+              <tr style="font-size:0.65rem; color:var(--text-sub); background:#fafafa;">
+                <td style="border:1px solid #0f172a; padding:2px;">보안운영담당</td>
+                <td style="border:1px solid #0f172a; padding:2px;">보안파트장</td>
+                <td style="border:1px solid #0f172a; padding:2px;">정보보호팀장</td>
+                <td style="border:1px solid #0f172a; padding:2px;">정보보호최고책임</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Form Template Select & Autofill bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:0.65rem 0.85rem;">
+          <div style="display:flex; align-items:center; gap:0.4rem;">
+            <label style="font-size:0.75rem; font-weight:800; color:#1d4ed8;">📋 기안 서식 템플릿:</label>
+            <select id="approvalTemplateSelect" class="search-input" style="width:230px; background:#fff; padding:0.25rem 0.45rem; font-size:0.75rem;" onchange="loadApprovalTemplate(this.value)">
+              <option value="SOL_PURCHASE">보안 솔루션 및 API 신규 도입 품의서</option>
+              <option value="VULN_PATCH">취약점 점검 결과 및 긴급 패치 품의서</option>
+              <option value="BUDGET_REQUEST">차기 연도 정보보안 예산 및 TCO 신청서</option>
+              <option value="POLICY_REVISION">사내 정보보안 운영규정 제·개정의 건</option>
+              <option value="INCIDENT_REPORT">침해사고 긴급대응 및 완화 조치 보고서</option>
+            </select>
+          </div>
+          <div style="display:flex; gap:0.35rem;">
+            <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="pullTcoToDraft()" title="현재 BOM 견적기 수치와 AI API 비용을 소요예산에 자동 채우기">
+              <i data-lucide="calculator" style="width:12px; height:12px;"></i> TCO 견적액 주입
+            </button>
+            <button class="btn btn-sm" style="background:#fff; font-size:0.72rem;" onclick="pullSbomToDraft()" title="등록된 사내 IT 자산 5종 및 SBOM 명세를 첨부 표에 자동 주입">
+              <i data-lucide="boxes" style="width:12px; height:12px;"></i> SBOM 명세 첨부
+            </button>
+          </div>
+        </div>
+
+        <!-- Form Input Fields -->
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">기안 제목 *</label>
+            <input type="text" id="draftTitle" class="search-input" style="background:#fff; margin-top:0.2rem; font-weight:700;" value="[품의] 2026년 차세대 보안 솔루션 및 생성형 AI 인프라 도입의 건">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">기안 부서 / 기안자 *</label>
+            <input type="text" id="draftDrafter" class="search-input" style="background:#fff; margin-top:0.2rem;" value="정보보호팀 홍길동 책임">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">1. 추진 목적 및 도입 배경 *</label>
+          <textarea id="draftPurpose" class="search-input" style="background:#fff; margin-top:0.2rem; height:60px; line-height:1.4; font-size:0.78rem;">최근 지능화되는 웹 취약점 및 공급망 보안 위협에 선제적으로 대응하고, 사내 생성형 AI 및 클라우드 API 도입에 따른 보안 가드레일 및 TCO 비용 통제 체계를 확립하기 위함.</textarea>
+        </div>
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">2. 주요 품의 내용 및 규정 근거 (ISMS-P 매핑)</label>
+          <textarea id="draftContent" class="search-input" style="background:#fff; margin-top:0.2rem; height:80px; line-height:1.4; font-size:0.78rem;">- KISA ISMS-P 2.4 네트워크 접근통제 및 2.12 신기술(AI) 보안 통제 기준 완비
+- TmaxSoft JEUS 8.5 및 대고객 포털에 식별된 CVE 긴급 가상 패치 및 정책 적용
+- 온프레미스 GB10 (177B MoE) 클러스터 가동을 통해 상용 클라우드 API 대비 연간 90% 이상 예산 절감</textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">3. 소요 예산 및 재원</label>
+            <input type="text" id="draftBudget" class="search-input" style="background:#fff; margin-top:0.2rem; font-weight:700; color:#d97706;" value="총 소요예산: ₩185,000,000 (초기 Capex ₩1.2억 + 연간 Opex ₩6,500만)">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">4. 기대 효과</label>
+            <input type="text" id="draftEffect" class="search-input" style="background:#fff; margin-top:0.2rem;" value="연간 침해사고 예방 가치 ₩15억 확보 및 투자회수 기간 1.2년 달성">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">5. 첨부 내역 (TCO 산출표, SBOM 명세서 등)</label>
+          <textarea id="draftAttachment" class="search-input" style="background:#f8fafc; font-family:monospace; margin-top:0.2rem; height:70px; line-height:1.4; font-size:0.72rem;">[첨부 1] 전사 보안 솔루션 5개년 TCO 견적표 (붙임 참조)
+[첨부 2] KISA 표준 CycloneDX v1.6 SBOM 자산 형상 명세서
+[첨부 3] 3계층 망분리 인프라 아키텍처 다이어그램 (Mermaid)</textarea>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:0.85rem; margin-top:0.25rem;">
+          <span style="font-size:0.72rem; color:var(--text-dim);">결재 완료 시 지식고(위키) 자동 등재 및 A4 규격 출력 지원</span>
+          <div style="display:flex; gap:0.5rem;">
+            <button class="btn" onclick="closeSmartApprovalModal()">닫기</button>
+            <button class="btn btn-primary" onclick="saveApprovalDraftToWiki()">
+              <i data-lucide="book-plus" style="width:13px; height:13px;"></i> 지식고에 등재
+            </button>
+            <button class="btn" style="background:#0f172a; color:#fff;" onclick="printApprovalDocument()">
+              <i data-lucide="printer" style="width:13px; height:13px;"></i> 결재 문서 인쇄 (A4)
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Add / Edit Generative AI & Cloud API Modal -->
   <div class="modal-overlay" id="aiApiModal">
     <div class="modal-box" style="max-width:600px;">
@@ -6021,7 +6222,399 @@ const htmlContent = `<!DOCTYPE html>
       a.click();
     }
 
-window.addEventListener('DOMContentLoaded', () => {
+
+            // --- 4.9 SMART APPROVAL BOARD (전자결재 기안판) ENGINE ---
+    let stampStates = {
+      stampReviewer: false,
+      stampTeamLeader: false,
+      stampCiso: false
+    };
+
+    function openSmartApprovalModal() {
+      const modal = document.getElementById('smartApprovalModal');
+      if (modal) modal.style.display = 'flex';
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeSmartApprovalModal() {
+      const modal = document.getElementById('smartApprovalModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function toggleStamp(cellId) {
+      stampStates[cellId] = !stampStates[cellId];
+      const cell = document.getElementById(cellId);
+      if (!cell) return;
+
+      if (stampStates[cellId]) {
+        const title = cellId === 'stampCiso' ? '최종<br>승인' : '검토<br>완료';
+        const color = cellId === 'stampCiso' ? '#dc2626' : '#2563eb';
+        cell.innerHTML = 
+          '<div style="cursor:pointer;" onclick="toggleStamp(&apos;' + cellId + '&apos;)">' +
+            '<span style="display:inline-block; border:1.5px solid ' + color + '; color:' + color + '; border-radius:50%; width:36px; height:36px; line-height:16px; padding-top:2px; font-weight:800; font-size:0.62rem;">' + title + '</span>' +
+            '<div style="font-size:0.55rem; color:' + color + '; font-weight:700; margin-top:2px;">09/16 승인</div>' +
+          '</div>';
+      } else {
+        const label = cellId === 'stampCiso' ? '최종승인' : '서명하기';
+        cell.innerHTML = '<button class="btn btn-sm" style="font-size:0.65rem; padding:2px 4px;" onclick="toggleStamp(&apos;' + cellId + '&apos;)">' + label + '</button>';
+      }
+    }
+
+    const approvalTemplates = {
+      SOL_PURCHASE: {
+        title: '[품의] 2026년 차세대 보안 솔루션 및 생성형 AI 인프라 도입의 건',
+        purpose: '최근 지능화되는 웹 취약점 및 공급망 보안 위협에 선제적으로 대응하고, 사내 생성형 AI 및 클라우드 API 도입에 따른 보안 가드레일 및 TCO 비용 통제 체계를 확립하기 위함.',
+        content: [
+          '- KISA ISMS-P 2.4 네트워크 접근통제 및 2.12 신기술(AI) 보안 통제 기준 완비',
+          '- TmaxSoft JEUS 8.5 및 대고객 포털에 식별된 CVE 긴급 가상 패치 및 정책 적용',
+          '- 온프레미스 GB10 (177B MoE) 클러스터 가동을 통해 상용 클라우드 API 대비 연간 90% 이상 예산 절감'
+        ].join(String.fromCharCode(10)),
+        budget: '총 소요예산: ₩185,000,000 (초기 Capex ₩1.2억 + 연간 Opex ₩6,500만)',
+        effect: '연간 침해사고 예방 가치 ₩15억 확보 및 투자회수 기간 1.2년 달성'
+      },
+      VULN_PATCH: {
+        title: '[보고] 코어 정보시스템 정기 취약점 분석평가 결과 및 긴급 보안조치 이행의 건',
+        purpose: '사내 전산 인프라 및 웹 애플리케이션 대상 취약점 진단 결과 식별된 위험 항목에 대해 긴급 가상패치 및 설정 보완을 시행하여 침해사고를 사전 예방함.',
+        content: [
+          '- 금융 코어 WAS (JEUS 8.5) 내 Spring RCE (CVE-2016-1000027) 및 Tomcat RCE (CVE-2025-24813) 감지',
+          '- WAAP(웹방화벽) 시그니처 룰셋 45건 긴급 업데이트 및 의존성 라이브러리 최신 버전 패치 로드맵 수립',
+          '- 취약점 조치 전후 시스템 무결성 점검 및 감사로그 1년 보존 조치 완료'
+        ].join(String.fromCharCode(10)),
+        budget: '소요예산: 기존 유지보수 계약 범위 내 자체 수행 (추가 비용 ₩0)',
+        effect: '고위험 CVE 100% 제거 및 KISA ISMS-P 2.3 취약점 점검 수검 적합 판정 확보'
+      },
+      BUDGET_REQUEST: {
+        title: '[예산] 2027년도 전사 정보보호 및 클라우드 API 통합 TCO 예산 편성의 건',
+        purpose: '전사 IT 자산 보호, 침해대응 체계 고도화 및 생성형 AI FinOps 사용량 통제를 위한 차기 연도 필수 정보보호 예산을 편성함.',
+        content: [
+          '- 정보보호 의무 투자 비율(IT 예산 대비 7% 이상) 준수',
+          '- 노후 경계 방화벽 및 침입방지시스템(IPS) 하드웨어 교체 주기 도래에 따른 감가상각 반영',
+          '- 사내 LLM 토큰 사용량 및 클라우드 API 5종 연간 구독료 선제 확보'
+        ].join(String.fromCharCode(10)),
+        budget: '총 신청예산: ₩248,000,000 (전년 대비 8.2% 합리적 증액)',
+        effect: '보안 거버넌스 안정성 확보 및 불시 계약 만료로 인한 서비스 중단 원천 방지'
+      },
+      POLICY_REVISION: {
+        title: '[개정] 사내 정보보안 기본지침 및 소프트웨어 공급망(SBOM) 관리규정 개정의 건',
+        purpose: 'KISA 소프트웨어 공급망 보안 가이드라인 발표에 따라, 사내 IT 자산 및 외주 납품 소프트웨어의 SBOM 제출 및 검증 절차를 사규에 신설함.',
+        content: [
+          '- 제15조(소프트웨어 공급망 보안 관리): 납품 및 배포 시 CycloneDX v1.5/1.6 JSON 제출 의무화',
+          '- 제18조(생성형 AI 활용 수칙): 사내 비공개 데이터의 외부 LLM 프롬프트 입력 금지 및 승인된 API 경유 원칙',
+          '- 제22조(계약 갱신 및 내용연수): 만료 60일 전 사전 검토 및 5년 감가상각 통제'
+        ].join(String.fromCharCode(10)),
+        budget: '소요예산: 해당 없음',
+        effect: '최신 법정 지침 및 ISMS-P 인증 기준 완벽 부합'
+      },
+      INCIDENT_REPORT: {
+        title: '[긴급] 사이버 침해위협 징후 탐지 및 긴급 호스트 차단 대응 결과 보고',
+        purpose: '외부 C2 통신 의심 트래픽 및 비정상 접근 시도에 대한 긴급 차단 및 원인 분석(RCA) 조치 결과를 보고함.',
+        content: [
+          '- 이상 징후: DMZ 웹서버 ➔ 외부 특정 IP로 대용량 비정상 트래픽 발생',
+          '- 1단계 대응: EDR 호스트 네트워크 격리(Isolation) 및 방화벽 인바운드/아웃바운드 즉시 드롭',
+          '- 2단계 원인: 미패치 취약점을 통한 웹셸 업로드 시도 확인 및 악성 파일 영구 삭제'
+        ].join(String.fromCharCode(10)),
+        budget: '사고 피해액: ₩0 (EDR 실시간 선제 차단으로 내부망 전파 방지 성공)',
+        effect: '데이터 유출 0건 및 침해사고 대응 골든타임(5분 이내) 준수'
+      }
+    };
+
+    function loadApprovalTemplate(tplKey) {
+      const tpl = approvalTemplates[tplKey];
+      if (!tpl) return;
+
+      document.getElementById('draftTitle').value = tpl.title;
+      document.getElementById('draftPurpose').value = tpl.purpose;
+      document.getElementById('draftContent').value = tpl.content;
+      document.getElementById('draftBudget').value = tpl.budget;
+      document.getElementById('draftEffect').value = tpl.effect;
+    }
+
+    function pullTcoToDraft() {
+      let totalCapex = 0;
+      let totalOpex = 0;
+      let activeCount = 0;
+
+      activeSolutionsList.forEach(sol => {
+        const qty = sol.qty || 0;
+        if (qty > 0) activeCount++;
+        const capex = (sol.price || 0) * qty;
+        totalCapex += capex;
+        totalOpex += Math.round(capex * (sol.opexRate || 0.12));
+      });
+
+      let annualAiTotal = 0;
+      currentAiApiList.forEach(item => {
+        annualAiTotal += calculateAiApiCost(item).annual;
+      });
+
+      const unifiedOpex = totalOpex + annualAiTotal;
+      const tco5Year = totalCapex + (unifiedOpex * 5);
+
+      const budgetStr = '총 TCO: ₩' + tco5Year.toLocaleString() + ' (초기Capex: ₩' + totalCapex.toLocaleString() + ' + 연간Opex/API: ₩' + unifiedOpex.toLocaleString() + ')';
+      document.getElementById('draftBudget').value = budgetStr;
+
+      let attachText = document.getElementById('draftAttachment').value;
+      if (!attachText.includes('TCO 견적 상세')) {
+        attachText += String.fromCharCode(10) + '[추가 첨부] 전사 솔루션(' + activeCount + '종) 및 생성형 AI API(' + currentAiApiList.length + '종) 5개년 TCO 실시간 견적표 연동 완료';
+        document.getElementById('draftAttachment').value = attachText;
+      }
+
+      alert('✅ 실시간 BOM 견적기 및 FinOps AI API 비용 합산액(₩' + tco5Year.toLocaleString() + ')이 소요 예산에 자동 반영되었습니다!');
+    }
+
+    function pullSbomToDraft() {
+      const NL = String.fromCharCode(10);
+      let sbomSummary = NL + NL + '[첨부: 전사 IT 자산 및 SBOM 명세 요약]' + NL;
+      sbomSummary += '| 자산 ID | 자산명 | 구역 | IP | OS | 탑재 컴포넌트 & 취약점 상태 |' + NL;
+      sbomSummary += '|:---|:---|:---:|:---|:---|:---|' + NL;
+
+      currentItAssets.forEach(a => {
+        const comps = (a.components || []).map(c => c.name + ' (' + c.cve + ')').join(', ') || '-';
+        sbomSummary += '| ' + a.id + ' | ' + a.name + ' | ' + a.zone + ' | ' + a.ip + ' | ' + a.os + ' | ' + comps + ' |' + NL;
+      });
+
+      let currentAttach = document.getElementById('draftAttachment').value;
+      document.getElementById('draftAttachment').value = currentAttach + sbomSummary;
+
+      alert('✅ 사내 등록된 IT 자산 ' + currentItAssets.length + '대(TmaxSoft JEUS 8.5 등) 및 SBOM 취약점 상태가 첨부 표로 자동 삽입되었습니다!');
+    }
+
+    function saveApprovalDraftToWiki() {
+      const title = document.getElementById('draftTitle').value.trim();
+      const drafter = document.getElementById('draftDrafter').value.trim();
+      const purpose = document.getElementById('draftPurpose').value.trim();
+      const content = document.getElementById('draftContent').value.trim();
+      const budget = document.getElementById('draftBudget').value.trim();
+      const effect = document.getElementById('draftEffect').value.trim();
+      const attachment = document.getElementById('draftAttachment').value.trim();
+
+      if (!title) {
+        alert('기안 제목을 입력해주세요.');
+        return;
+      }
+
+      const docId = 888;
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const NL = String.fromCharCode(10);
+
+      let md = '# ' + title + NL + NL +
+        '> **문서종류**: 전자결재 기안문 | **기안부서**: ' + drafter + ' | **기안일자**: ' + todayStr + ' | **결재상태**: 최종승인' + NL + NL +
+        '---' + NL + NL +
+        '## 1. 추진 목적 및 도입 배경' + NL + purpose + NL + NL +
+        '## 2. 주요 품의 내용 및 규정 근거' + NL + content + NL + NL +
+        '## 3. 소요 예산 및 재원' + NL + '**' + budget + '**' + NL + NL +
+        '## 4. 기대 효과 및 투자회수' + NL + effect + NL + NL +
+        '## 5. 첨부 내역 및 증적 자료' + NL + attachment + NL;
+
+      const existingIdx = currentDocs.findIndex(d => d.id === docId);
+      const draftDoc = {
+        id: docId,
+        title: title,
+        category: '보안규정',
+        tags: ['전자결재', '품의서', 'TCO', '기안', '승인문서'],
+        updatedAt: todayStr,
+        content: md
+      };
+
+      if (existingIdx >= 0) {
+        currentDocs[existingIdx] = draftDoc;
+      } else {
+        currentDocs.unshift(draftDoc);
+      }
+
+      saveDocsToStorage();
+      renderWikiDocList();
+      selectWikiDoc(docId);
+      closeSmartApprovalModal();
+      switchView('wiki');
+      alert('✅ 전자결재 기안문이 사내 지식고(위키)의 1번째 정식 공문서로 성공적으로 등록되었습니다!');
+    }
+
+    function printApprovalDocument() {
+      const title = document.getElementById('draftTitle').value.trim();
+      const drafter = document.getElementById('draftDrafter').value.trim();
+      const purpose = document.getElementById('draftPurpose').value.trim();
+      const content = document.getElementById('draftContent').value.trim();
+      const budget = document.getElementById('draftBudget').value.trim();
+      const effect = document.getElementById('draftEffect').value.trim();
+      const attachment = document.getElementById('draftAttachment').value.trim();
+
+      const printWin = window.open('', '_blank');
+      printWin.document.write(
+        '<!DOCTYPE html><html><head><title>' + sanitizeHtml(title) + '</title>' +
+        '<style>' +
+        'body { font-family: Pretendard, sans-serif; padding: 30px; color:#0f172a; line-height: 1.6; }' +
+        'h1 { font-size: 1.4rem; margin: 0; }' +
+        'table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }' +
+        'th, td { border: 1px solid #0f172a; padding: 6px 8px; }' +
+        'th { background: #f8fafc; font-weight:700; }' +
+        '.section-title { font-size: 1rem; font-weight:800; border-left: 4px solid #2563eb; padding-left: 8px; margin: 18px 0 6px 0; }' +
+        '@media print { body { padding: 0; } }' +
+        '</style></head><body>' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0f172a; padding-bottom:12px;">' +
+          '<div>' +
+            '<div style="font-size:0.75rem; color:#64748b;">문서번호: GIJO-SEC-2026-FINAL</div>' +
+            '<h1>정보보안 업무 품의 및 결재서</h1>' +
+            '<div style="font-size:0.8rem; color:#475569; margin-top:4px;">기안일자: ' + new Date().toISOString().slice(0, 10) + ' | 기안부서: ' + sanitizeHtml(drafter) + '</div>' +
+          '</div>' +
+          '<table style="width:340px; text-align:center; font-size:0.75rem; margin:0;">' +
+            '<tr><th>기안자</th><th>검토자</th><th>보안팀장</th><th>CISO</th></tr>' +
+            '<tr style="height:55px;">' +
+              '<td><span style="border:1.5px solid #059669; color:#059669; border-radius:50%; width:36px; height:36px; display:inline-block; line-height:34px; font-weight:800; font-size:0.65rem;">기안</span></td>' +
+              '<td><span style="border:1.5px solid #2563eb; color:#2563eb; border-radius:50%; width:36px; height:36px; display:inline-block; line-height:34px; font-weight:800; font-size:0.65rem;">검토</span></td>' +
+              '<td><span style="border:1.5px solid #2563eb; color:#2563eb; border-radius:50%; width:36px; height:36px; display:inline-block; line-height:34px; font-weight:800; font-size:0.65rem;">합의</span></td>' +
+              '<td><span style="border:1.5px solid #dc2626; color:#dc2626; border-radius:50%; width:36px; height:36px; display:inline-block; line-height:34px; font-weight:800; font-size:0.65rem;">승인</span></td>' +
+            '</tr>' +
+            '<tr style="font-size:0.65rem; color:#64748b; background:#fafafa;">' +
+              '<td>' + sanitizeHtml(drafter) + '</td><td>보안파트장</td><td>정보보호팀장</td><td>정보보호최고책임</td>' +
+            '</tr>' +
+          '</table>' +
+        '</div>' +
+        '<div style="margin-top:15px; font-size:1.1rem; font-weight:800; background:#f1f5f9; padding:8px 12px; border-radius:4px;">' +
+          '건명: ' + sanitizeHtml(title) +
+        '</div>' +
+        '<div class="section-title">1. 추진 목적 및 도입 배경</div>' +
+        '<div style="font-size:0.85rem; padding-left:4px;">' + sanitizeHtml(purpose).split(String.fromCharCode(10)).join('<br/>') + '</div>' +
+        '<div class="section-title">2. 주요 품의 내용 및 규정 근거</div>' +
+        '<div style="font-size:0.85rem; padding-left:4px;">' + sanitizeHtml(content).split(String.fromCharCode(10)).join('<br/>') + '</div>' +
+        '<div class="section-title">3. 소요 예산 및 재원</div>' +
+        '<div style="font-size:0.9rem; font-weight:800; color:#b45309; padding-left:4px;">' + sanitizeHtml(budget) + '</div>' +
+        '<div class="section-title">4. 기대 효과 및 투자 회수</div>' +
+        '<div style="font-size:0.85rem; padding-left:4px;">' + sanitizeHtml(effect) + '</div>' +
+        '<div class="section-title">5. 첨부 내역 및 세부 산출 증적</div>' +
+        '<pre style="font-size:0.75rem; background:#f8fafc; border:1px solid #e2e8f0; padding:10px; border-radius:4px; font-family:monospace; white-space:pre-wrap;">' + sanitizeHtml(attachment) + '</pre>' +
+        '<div style="margin-top:30px; font-size:0.75rem; color:#64748b; text-align:right;">' +
+          customerOrgName + ' 정보보호본부 &copy; 2026 GIJO TECHNOLOGY' +
+        '</div>' +
+        '<' + 'script>window.onload = function(){ window.print(); };<' + '/script>' +
+        '</body></html>'
+      );
+      printWin.document.close();
+    }
+
+    // --- 4.10 VISUAL NO-CODE ARCHITECTURE STUDIO STENCIL ENGINE ---
+    let studioDirection = 'TB';
+
+    function addStencilNode(type) {
+      const editor = document.getElementById('studioMermaidCode');
+      if (!editor) return;
+
+      const targetZone = document.getElementById('paletteTargetZone').value || 'Trust';
+      let nodeId = 'Node_' + Math.floor(100 + Math.random() * 900);
+      let label = '신규 시스템';
+      let isVuln = false;
+
+      if (type === 'WEB') {
+        nodeId = 'Web_' + Math.floor(10 + Math.random() * 90);
+        label = '🌐 웹 서버 (Nginx v1.24)';
+      } else if (type === 'FW') {
+        nodeId = 'FW_' + Math.floor(10 + Math.random() * 90);
+        label = '🔥 차세대방화벽 (NGFW FortiOS)';
+      } else if (type === 'WAAP') {
+        nodeId = 'WAAP_' + Math.floor(10 + Math.random() * 90);
+        label = '🛡️ 웹/API 방화벽 (Imperva WAAP)';
+      } else if (type === 'WAS') {
+        nodeId = 'WAS_' + Math.floor(10 + Math.random() * 90);
+        label = '⚙️ Core WAS (JEUS 8.5 / Spring)';
+      } else if (type === 'DB') {
+        nodeId = 'DB_' + Math.floor(10 + Math.random() * 90);
+        label = '🗄️ 고객원장 DB (PostgreSQL)';
+      } else if (type === 'KMS') {
+        nodeId = 'KMS_' + Math.floor(10 + Math.random() * 90);
+        label = '🔒 암호키 관리 (CipherTrust KMS)';
+      } else if (type === 'SIEM') {
+        nodeId = 'SIEM_' + Math.floor(10 + Math.random() * 90);
+        label = '📊 통합보안관제 (SIEM LogServer)';
+      } else if (type === 'CLOUD') {
+        nodeId = 'Cloud_' + Math.floor(10 + Math.random() * 90);
+        label = '☁️ 하이브리드 클라우드 게이트웨이';
+      } else if (type === 'VULN') {
+        nodeId = 'Vuln_' + Math.floor(10 + Math.random() * 90);
+        label = '🚨 취약점 위험노드 (CVE-2025-24813)';
+        isVuln = true;
+      }
+
+      const NL = String.fromCharCode(10);
+      const nodeLine = '    ' + nodeId + '["' + label + '"]' + NL;
+      let val = editor.value;
+
+      // Find subgraph in mermaid code
+      const zoneRegex = new RegExp('(subgraph\\s+' + targetZone + '[^\\n]*\\n)', 'i');
+      if (zoneRegex.test(val)) {
+        val = val.replace(zoneRegex, '$1' + nodeLine);
+      } else {
+        val += NL + '  subgraph ' + targetZone + '["' + targetZone + ' 구역"]' + NL + nodeLine + '  end' + NL;
+      }
+
+      if (isVuln) {
+        val += '  style ' + nodeId + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#991b1b' + NL;
+      }
+
+      editor.value = val;
+      renderMermaidFromEditor();
+      updateStudioBomBadge();
+
+      // Set quick connector defaults
+      const fromInp = document.getElementById('quickFromNode');
+      const toInp = document.getElementById('quickToNode');
+      if (fromInp && !fromInp.value) fromInp.value = nodeId;
+      else if (toInp) toInp.value = nodeId;
+    }
+
+    function quickConnectNodes() {
+      const fromNode = document.getElementById('quickFromNode').value.trim();
+      const toNode = document.getElementById('quickToNode').value.trim();
+      const protocol = document.getElementById('quickProtocol').value;
+      const editor = document.getElementById('studioMermaidCode');
+
+      if (!fromNode || !toNode) {
+        alert('출발 노드와 도착 노드명을 입력해주세요.');
+        return;
+      }
+
+      const NL = String.fromCharCode(10);
+      const arrow = '  ' + fromNode + ' -->|' + protocol + '| ' + toNode + NL;
+      editor.value += arrow;
+      renderMermaidFromEditor();
+      alert('✅ 연결선 [' + fromNode + ' ➔ ' + protocol + ' ➔ ' + toNode + '] 이 성공적으로 추가되었습니다.');
+    }
+
+    function toggleStudioDirection() {
+      const editor = document.getElementById('studioMermaidCode');
+      if (!editor) return;
+
+      let val = editor.value;
+      if (val.includes('flowchart TB') || val.includes('graph TB')) {
+        val = val.replace(/flowchart TB/g, 'flowchart LR').replace(/graph TB/g, 'flowchart LR');
+        studioDirection = 'LR';
+      } else {
+        val = val.replace(/flowchart LR/g, 'flowchart TB').replace(/graph LR/g, 'flowchart TB');
+        studioDirection = 'TB';
+      }
+
+      editor.value = val;
+      renderMermaidFromEditor();
+      const labelEl = document.getElementById('btnStudioDirectionLabel');
+      if (labelEl) labelEl.innerText = '방향: ' + studioDirection + ' (클릭 시 전환)';
+    }
+
+    function downloadStudioSvg() {
+      const container = document.getElementById('studioDiagram');
+      const svg = container ? container.querySelector('svg') : null;
+      if (!svg) {
+        alert('다운로드할 렌더링된 다이어그램이 없습니다.');
+        return;
+      }
+
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'GIJO_Security_Architecture_Diagram_' + new Date().toISOString().slice(0, 10) + '.svg';
+      a.click();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
       mermaid.initialize({
         startOnLoad: false,
         theme: 'default',

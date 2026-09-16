@@ -1,6 +1,26 @@
 # GIJO AS Lite / GIJO WIKI 버전 관리 대장 (Changelog)
 
 ## [v5.2.0] - 2026-09-16
+### 📋 스마트 전자결재 기안판(Smart Approval Board) 및 노코드 비주얼 아키텍처 스튜디오 탑재
+- **스마트 전자결재 기안판 (Smart Approval Board & A4 Print)**:
+  - 기안자, 검토자, 보안팀장, CISO 4단 결재선 및 직인 클릭 토글 인터랙션(기안/검토완료/최종승인 관인 날인 체계).
+  - **5대 표준 결재 서식 원클릭 로드**:
+    1. 차세대 보안 솔루션 및 생성형 AI 인프라 도입 품의서
+    2. 코어 정보시스템 정기 취약점 분석평가 결과 및 긴급 보안조치 이행 보고서
+    3. 차기년도 전사 정보보호 및 클라우드 API 통합 TCO 예산 편성 요청서
+    4. 사내 정보보안 기본지침 및 소프트웨어 공급망(SBOM) 관리규정 개정안
+    5. 사이버 침해위협 징후 탐지 및 긴급 호스트 차단 대응 결과 보고서
+  - **실시간 BOM & TCO 견적 자동 주입 (`pullTcoToDraft`)**: 견적기의 활성 솔루션과 FinOps AI API 비용을 결합하여 5개년 누적 TCO 예산 및 첨부 증적으로 자동 반영.
+  - **전사 IT 자산 & SBOM 취약점 명세 자동 주입 (`pullSbomToDraft`)**: 등록된 IT 자산(TmaxSoft JEUS 8.5 등) 및 CVE 취약점 상태 요약표를 결재 첨부 문서로 자동 편성.
+  - **사내 지식고(위키) 정식 공문서 자동 등재 (`saveApprovalDraftToWiki`)**: 승인된 결재문을 사내 지식고 1번째 공문서(ID: 888)로 즉시 편입하여 AI Copilot RAG 질의응답 지원.
+  - **A4 정식 결재판 규격 인쇄 (`printApprovalDocument`)**: 공공/금융 기관 표준 전자결재 서식과 인쇄 미디어 쿼리가 적용된 결재문서 즉각 인쇄.
+- **노코드 비주얼 아키텍처 스튜디오 (No-Code Visual Stencil Palette & Quick Connector)**:
+  - Mermaid 텍스트 코딩에 익숙하지 않은 사용자를 위한 **클릭형 스텐실 팔레트 9종**(웹서버, 방화벽, WAAP, WAS, DB, KMS, SIEM, 클라우드 게이트웨이, 취약점 위험노드) 신설.
+  - 구역(Zone) 선택 후 부품 클릭 시 해당 서브그래프 내부로 노드가 자동 배치 및 스타일링.
+  - **원클릭 퀵 커넥터 (Quick Connector)**: 출발 노드, 도착 노드, 통신 프로토콜(HTTPS, mTLS, SQL, Syslog 등) 선택 후 버튼 클릭 시 연결 화살표 자동 추가.
+  - **원클릭 다이어그램 방향 전환**: 가로형(`LR`) ⇄ 세로형(`TB`) 원클릭 즉시 토글 지원.
+  - **고해상도 벡터 SVG 다운로드 (`downloadStudioSvg`)**: 다이어그램을 고해상도 SVG 벡터 이미지로 즉시 내보내기.
+
 ### 🤖 생성형 AI & 클라우드 API 실시간 FinOps TCO 및 계약 생애주기(Lifecycle) D-Day 탑재
 - **생성형 AI & 클라우드 API 사용량/비용 실시간 통제 (FinOps TCO)**:
   - 사내에서 활용하는 상용 LLM(`OpenAI GPT-4o Enterprise`, `Anthropic Claude 3.5 Sonnet`, `Google Gemini 1.5 Pro`) 및 사내 임베딩/OCR API의 토큰 및 호출 종량제 사용량 등록 체계 신설.

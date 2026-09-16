@@ -127,5 +127,52 @@ dataTokens.forEach(token => {
   }
 });
 
+// 7. Check Smart Approval Board (전자결재 기안판)
+const approvalTokens = [
+  'id="smartApprovalModal"',
+  'function openSmartApprovalModal',
+  'function toggleStamp',
+  'function loadApprovalTemplate',
+  'function pullTcoToDraft',
+  'function pullSbomToDraft',
+  'function saveApprovalDraftToWiki',
+  'function printApprovalDocument',
+  'SOL_PURCHASE',
+  'VULN_PATCH',
+  'BUDGET_REQUEST',
+  'stampCiso'
+];
+
+approvalTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Smart Approval Board Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing Smart Approval Token: ' + token);
+    process.exit(1);
+  }
+});
+
+// 8. Check Visual Architecture Studio Stencils & Quick Connector
+const studioTokens = [
+  'id="paletteTargetZone"',
+  'function addStencilNode',
+  'function quickConnectNodes',
+  'function toggleStudioDirection',
+  'function downloadStudioSvg',
+  'id="quickFromNode"',
+  'id="quickToNode"',
+  'id="quickProtocol"'
+];
+
+studioTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Visual Studio Stencil Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing Studio Token: ' + token);
+    process.exit(1);
+  }
+});
+
 console.log('================================================================');
-console.log('🎉 ALL 33 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+console.log('🎉 ALL 53 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+
