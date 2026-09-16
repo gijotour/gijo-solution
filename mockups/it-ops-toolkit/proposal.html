@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIJO AS Lite — IT 실무 도구함 (Ops Toolkit) 추천 시안</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --bg-main: #f8fafc;
+      --bg-panel: #ffffff;
+      --border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --text-dim: #94a3b8;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
+    body { background: var(--bg-main); color: var(--text-main); padding: 1.5rem; }
+    
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    
+    .toolkit-subnav {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1.5px solid var(--border);
+      padding-bottom: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .toolkit-subbtn {
+      padding: 0.45rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text-sub);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.15s;
+    }
+    .toolkit-subbtn:hover { background: #f1f5f9; color: var(--text-main); }
+    .toolkit-subbtn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .subview-pane { display: none; }
+    .subview-pane.active { display: block; }
+
+    .excel-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+    .excel-table th, .excel-table td { border: 1px solid var(--border); padding: 6px 10px; }
+    .excel-table th { background: #f8fafc; font-weight: 700; color: var(--text-sub); text-align: left; }
+    .excel-table tr:hover { background: #f8fafc; }
+    
+    .badge { padding: 2px 7px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; display: inline-block; }
+    .badge.success { background: #ecfdf5; color: #059669; }
+    .badge.warning { background: #fffbeb; color: #b45309; }
+    .badge.danger { background: #fee2e2; color: #dc2626; }
+    .badge.info { background: #eff6ff; color: #2563eb; }
+
+    .btn {
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .input-box {
+      padding: 0.45rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <div>
+        <span class="badge info" style="margin-bottom:4px;">IT Ops & SecOps Toolkit</span>
+        <h2 style="font-size:1.25rem; font-weight:800;">🛠️ IT 실무 도구함 (현장 운영 & 보안 자동화 스위트)</h2>
+        <p style="font-size:0.78rem; color:var(--text-sub); margin-top:3px;">
+          방화벽 정책 신청, SSL 인증서 만료 관리, KISA 취약점 서버 하드닝 스크립트, 핵심 포트 헬스체크를 원스톱으로 처리합니다.
+        </p>
+      </div>
+      <span class="badge success">실무 생산성 극대화</span>
+    </div>
+
+    <!-- 4 Sub-Tabs Navigation -->
+    <div class="toolkit-subnav">
+      <button class="toolkit-subbtn active" onclick="switchToolSub('fw')">
+        <i data-lucide="shield-alert" style="width:14px; height:14px;"></i> 🔥 방화벽 정책 & 망분리 검증기
+      </button>
+      <button class="toolkit-subbtn" onclick="switchToolSub('ssl')">
+        <i data-lucide="lock" style="width:14px; height:14px;"></i> 📜 SSL/TLS 인증서 D-Day 체커
+      </button>
+      <button class="toolkit-subbtn" onclick="switchToolSub('hardening')">
+        <i data-lucide="terminal" style="width:14px; height:14px;"></i> 💻 KISA 서버 하드닝 스크립트
+      </button>
+      <button class="toolkit-subbtn" onclick="switchToolSub('health')">
+        <i data-lucide="activity" style="width:14px; height:14px;"></i> 🌐 핵심 포트 & 데몬 헬스체크
+      </button>
+    </div>
+
+    <!-- SUBVIEW 1: 방화벽 정책 신청 & 망분리 검증기 -->
+    <div id="toolView-fw" class="subview-pane active">
+      <div style="display:grid; grid-template-columns: 360px 1fr; gap:1.2rem;">
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; flex-direction:column; gap:0.75rem;">
+          <h4 style="font-size:0.85rem; font-weight:800;">📝 신규 방화벽 오픈 정책 신청서 작성</h4>
+          
+          <div>
+            <label style="font-size:0.73rem; font-weight:700;">출발지 자산 (Source IP)</label>
+            <select id="fwSrcSelect" class="input-box" onchange="verifyFwPolicy()">
+              <option value="10.10.40.20|TRUST|금융 코어 WAS (JEUS 8.5)">[내부망] 금융 코어 WAS (10.10.40.20)</option>
+              <option value="192.168.10.5|DMZ|웹 서버 (Apache 2.4)">[DMZ] 웹 서버 (192.168.10.5)</option>
+              <option value="10.10.50.10|TRUST|내부 오라클 DB (19c)">[내부망] 내부 오라클 DB (10.10.50.10)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="font-size:0.73rem; font-weight:700;">목적지 자산 (Destination IP)</label>
+            <select id="fwDstSelect" class="input-box" onchange="verifyFwPolicy()">
+              <option value="192.168.10.5|DMZ|대외계 WAS (Tomcat 10.1)">[DMZ] 대외계 WAS (192.168.10.5)</option>
+              <option value="10.10.50.10|TRUST|내부 오라클 DB (19c)">[내부망] 내부 오라클 DB (10.10.50.10)</option>
+              <option value="0.0.0.0/0|EXT|공용 인터넷 망">[외부망] 공용 인터넷 망 (0.0.0.0/0)</option>
+            </select>
+          </div>
+
+          <div style="display:flex; gap:0.5rem;">
+            <div style="flex:1;">
+              <label style="font-size:0.73rem; font-weight:700;">프로토콜</label>
+              <select id="fwProtoSelect" class="input-box" onchange="verifyFwPolicy()">
+                <option value="TCP">TCP</option>
+                <option value="UDP">UDP</option>
+              </select>
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:0.73rem; font-weight:700;">목적지 포트</label>
+              <input type="text" id="fwPortInput" class="input-box" value="8080" oninput="verifyFwPolicy()">
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size:0.73rem; font-weight:700;">신청 사유</label>
+            <input type="text" id="fwReasonInput" class="input-box" value="금융 코어 WAS와 대외계 AP 간 mTLS REST 결제 연동">
+          </div>
+
+          <button class="btn primary" onclick="submitFwToApproval()">
+            <i data-lucide="send" style="width:13px; height:13px;"></i> 스마트 전자결재 품의서로 자동 전송
+          </button>
+        </div>
+
+        <!-- Verification Result & Generated Rule -->
+        <div style="display:flex; flex-direction:column; gap:1rem;">
+          <div id="fwVerifBox" style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:1rem;">
+            <div style="font-weight:800; font-size:0.85rem; color:#059669; display:flex; align-items:center; gap:0.4rem;">
+              <i data-lucide="check-circle-2" style="width:16px; height:16px;"></i>
+              망분리 트래픽 통제 규정 준수 (허용 가능 구간)
+            </div>
+            <p style="font-size:0.75rem; color:#065f46; margin-top:4px;">
+              구간: <b>내부망(TRUST) ➔ DMZ</b> | 금융보안원 전자금융감독규정 제15조(망분리) 예외 결재 승인 대상입니다.
+            </p>
+          </div>
+
+          <div style="background:#1e293b; color:#f8fafc; border-radius:8px; padding:1rem; font-family:monospace; font-size:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; color:#94a3b8; font-size:0.7rem;">
+              <span>⚡ 자동 생성된 FOCS & iptables 방화벽 룰셋 구문</span>
+              <button class="btn" style="background:#334155; color:#fff; border-color:#475569; padding:2px 6px; font-size:0.68rem;" onclick="alert('방화벽 룰셋이 클립보드에 복사되었습니다!')">복사</button>
+            </div>
+            <code id="fwRuleOutput"># [FOCS Firewall Rule]<br>set security policies from-zone TRUST to-zone DMZ policy ALLOW_PAYMENT_WAS match source-address 10.10.40.20 destination-address 192.168.10.5 application TCP_8080<br>set security policies from-zone TRUST to-zone DMZ policy ALLOW_PAYMENT_WAS then permit<br><br># [iptables Standard Rule]<br>iptables -A FORWARD -s 10.10.40.20 -d 192.168.10.5 -p tcp --dport 8080 -j ACCEPT</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBVIEW 2: SSL/TLS 인증서 & 도메인 만료 체커 -->
+    <div id="toolView-ssl" class="subview-pane">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <span style="font-size:0.82rem; font-weight:800;">📋 전사 주요 도메인 & mTLS 인증서 수명주기 대장 (Excel Grid)</span>
+        <button class="btn primary" onclick="alert('CSR(인증서 서명 요청) 생성 모달 오픈')">
+          <i data-lucide="key" style="width:13px; height:13px;"></i> OpenSSL CSR 원클릭 생성
+        </button>
+      </div>
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">No</th>
+            <th>서비스 도메인 / 시스템 식별자</th>
+            <th>적용 대상 자산</th>
+            <th>인증서 발급 기관 (CA)</th>
+            <th>알고리즘 / 키길이</th>
+            <th>만료 예정일</th>
+            <th>잔여일수 (D-Day)</th>
+            <th>상태</th>
+            <th>조치 액션</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><b>api.banking.gijo.internal</b></td>
+            <td>금융 코어 WAS (JEUS 8.5) [ASSET-05]</td>
+            <td>사내 사설 Root CA (KMS mTLS)</td>
+            <td>RSA 4096-bit (SHA-256)</td>
+            <td>2026-10-15</td>
+            <td><b style="color:#b45309;">D-29</b></td>
+            <td><span class="badge warning">갱신 도래</span></td>
+            <td><button class="btn" style="padding:2px 6px; font-size:0.68rem;" onclick="alert('WizCLM 및 구매팀 갱신 품의서 작성')">갱신 품의</button></td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><b>portal.gijo.internal</b></td>
+            <td>사내 업무 포털 (WebLogic) [ASSET-01]</td>
+            <td>Sectigo RSA Domain Validation</td>
+            <td>RSA 2048-bit (SHA-256)</td>
+            <td>2027-04-30</td>
+            <td>D-226</td>
+            <td><span class="badge success">정상 유효</span></td>
+            <td><button class="btn" style="padding:2px 6px; font-size:0.68rem;">상세 정보</button></td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><b>pay-gw.gijo.co.kr</b></td>
+            <td>금융 대외계 AP (Tomcat) [ASSET-02]</td>
+            <td>DigiCert Global Root G2</td>
+            <td>ECC SECP384R1</td>
+            <td>2026-11-20</td>
+            <td>D-65</td>
+            <td><span class="badge success">정상 유효</span></td>
+            <td><button class="btn" style="padding:2px 6px; font-size:0.68rem;">상세 정보</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SUBVIEW 3: KISA 기술적 보안 서버 하드닝 스크립트 -->
+    <div id="toolView-hardening" class="subview-pane">
+      <div style="display:grid; grid-template-columns: 320px 1fr; gap:1.2rem;">
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; flex-direction:column; gap:0.75rem;">
+          <h4 style="font-size:0.85rem; font-weight:800;">⚙️ 점검 대상 환경 및 항목 선택</h4>
+          <div>
+            <label style="font-size:0.73rem; font-weight:700;">운영체제 / 미들웨어</label>
+            <select id="hardTarget" class="input-box" onchange="updateHardeningPreview()">
+              <option value="linux">Rocky / RHEL Linux 9 (기반시설 가이드)</option>
+              <option value="jeus">TmaxSoft JEUS 8.5 (웹애플리케이션서버)</option>
+              <option value="tomcat">Apache Tomcat 10.1 (오픈소스 WAS)</option>
+              <option value="windows">Windows Server 2022</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.73rem; font-weight:700;">포함 점검 항목 (KISA 4대 분야)</label>
+            <div style="display:flex; flex-direction:column; gap:0.3rem; font-size:0.75rem; margin-top:4px;">
+              <label><input type="checkbox" checked> 1. 계정 관리 (root 원격접속 차단, 패스워드 복잡도)</label>
+              <label><input type="checkbox" checked> 2. 파일 및 디렉토리 권한 (umask 022, 주요 설정 파일 600)</label>
+              <label><input type="checkbox" checked> 3. 불필요 서비스 비활성화 (rlogin, finger, telnet)</label>
+              <label><input type="checkbox" checked> 4. 로그 및 패치 감사 (syslog auditd 가동 여부)</label>
+            </div>
+          </div>
+          <button class="btn primary" onclick="downloadHardeningScript()">
+            <i data-lucide="download" style="width:13px; height:13px;"></i> 원클릭 점검 스크립트 (.sh) 다운로드
+          </button>
+        </div>
+
+        <div style="background:#1e293b; color:#f8fafc; border-radius:8px; padding:1rem; font-family:monospace; font-size:0.74rem; overflow-y:auto; max-height:280px;">
+          <div style="color:#94a3b8; font-size:0.7rem; margin-bottom:0.5rem;">📄 표준 자동 점검 및 조치 스크립트 프리뷰 (KISA 주요정보통신기반시설 기준)</div>
+          <pre id="hardPreview">#!/bin/bash
+# ========================================================
+# KISA 주요정보통신기반시설 기술적 취약점 조치 스크립트
+# 대상: Rocky / RHEL Linux | 생성: GIJO Security Suite
+# ========================================================
+
+echo "[*] 1. root 원격 접속 제한 점검 (sshd_config)"
+sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+systemctl restart sshd
+echo "[+] PermitRootLogin -> NO 적용 완료"
+
+echo "[*] 2. 기본 umask 022 설정 점검"
+echo "umask 022" >> /etc/profile
+
+echo "[*] 3. 주요 기밀 파일 권한 통제 (shadow, passwd)"
+chmod 600 /etc/shadow
+chmod 644 /etc/passwd
+
+echo "[+] 모든 KISA 필수 조치가 성공적으로 이행되었습니다."</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBVIEW 4: 핵심 포트 & 데몬 헬스체크 매트릭스 -->
+    <div id="toolView-health" class="subview-pane">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <span style="font-size:0.82rem; font-weight:800;">🌐 사내 5대 핵심 인프라 서비스 포트 실시간 헬스체크 대장</span>
+        <div style="display:flex; gap:0.4rem;">
+          <button class="btn" onclick="runAllPortScan()">
+            <i data-lucide="refresh-cw" style="width:13px; height:13px;"></i> 전사 포트 실시간 핑/스캔
+          </button>
+          <button class="btn primary" onclick="syncHealthToChecklist()">
+            <i data-lucide="calendar-check" style="width:13px; height:13px;"></i> 일일 보안 점검 일지에 자동 기입
+          </button>
+        </div>
+      </div>
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">No</th>
+            <th>대상 시스템 식별자</th>
+            <th>호스트 IP</th>
+            <th>망분리 구역</th>
+            <th>점검 서비스 및 포트</th>
+            <th>응답 속도 (Latency)</th>
+            <th>통신 상태</th>
+            <th>최근 점검 일시</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><b>금융 코어 WAS [ASSET-05]</b></td>
+            <td>10.10.40.20</td>
+            <td>TRUST</td>
+            <td>JEUS HTTP (8088), JEUS Admin (9736)</td>
+            <td>1.2 ms</td>
+            <td><span class="badge success">UP (정상)</span></td>
+            <td>2026-09-16 23:30</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><b>내부 오라클 DB [ASSET-03]</b></td>
+            <td>10.10.50.10</td>
+            <td>TRUST</td>
+            <td>Oracle TNS Listener (1521)</td>
+            <td>0.8 ms</td>
+            <td><span class="badge success">UP (정상)</span></td>
+            <td>2026-09-16 23:30</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><b>금융 대외계 AP [ASSET-02]</b></td>
+            <td>192.168.10.5</td>
+            <td>DMZ</td>
+            <td>Tomcat HTTPS (8443)</td>
+            <td>2.4 ms</td>
+            <td><span class="badge success">UP (정상)</span></td>
+            <td>2026-09-16 23:30</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><b>경계 방화벽 FOCS [SOL-01]</b></td>
+            <td>192.168.1.1</td>
+            <td>DMZ/EXT</td>
+            <td>FOCS HTTPS Mgmt (443)</td>
+            <td>0.5 ms</td>
+            <td><span class="badge success">UP (정상)</span></td>
+            <td>2026-09-16 23:30</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    function switchToolSub(subId) {
+      document.querySelectorAll('.toolkit-subbtn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.subview-pane').forEach(p => p.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      const target = document.getElementById('toolView-' + subId);
+      if (target) target.classList.add('active');
+      lucide.createIcons();
+    }
+
+    function verifyFwPolicy() {
+      const src = document.getElementById('fwSrcSelect').value.split('|');
+      const dst = document.getElementById('fwDstSelect').value.split('|');
+      const port = document.getElementById('fwPortInput').value;
+      const box = document.getElementById('fwVerifBox');
+      const rule = document.getElementById('fwRuleOutput');
+
+      const isViolating = (src[1] === 'EXT' && dst[1] === 'TRUST');
+      
+      if (isViolating) {
+        box.style.background = '#fee2e2';
+        box.style.borderColor = '#fca5a5';
+        box.innerHTML = '<div style="font-weight:800; font-size:0.85rem; color:#dc2626;">🚨 망분리 중대 위반 (차단 정책)</div>' +
+          '<p style="font-size:0.75rem; color:#991b1b; margin-top:4px;">외부망(EXT)에서 내부망(TRUST)으로의 직접 인바운드는 금융감독원 망분리 규정상 전면 금지됩니다.</p>';
+      } else {
+        box.style.background = '#ecfdf5';
+        box.style.borderColor = '#a7f3d0';
+        box.innerHTML = '<div style="font-weight:800; font-size:0.85rem; color:#059669;">✅ 망분리 규정 준수 (허용 가능 구간)</div>' +
+          '<p style="font-size:0.75rem; color:#065f46; margin-top:4px;">구간: <b>' + src[1] + ' ➔ ' + dst[1] + '</b> | 포트: ' + port + ' 오픈 가능</p>';
+      }
+
+      rule.innerHTML = '# [FOCS Firewall Rule]<br>' +
+        'set security policies from-zone ' + src[1] + ' to-zone ' + dst[1] + ' policy OPEN_REQ match source-address ' + src[0] + ' destination-address ' + dst[0] + ' application TCP_' + port + '<br>' +
+        'set security policies from-zone ' + src[1] + ' to-zone ' + dst[1] + ' policy OPEN_REQ then ' + (isViolating ? 'deny' : 'permit');
+    }
+
+    function submitFwToApproval() {
+      alert('📋 스마트 전자결재 기안판에 [방화벽 포트 오픈 정책 신청서] 서식이 100% 자동 주입되었습니다! CISO 결재 승인 후 FOCS에 반영됩니다.');
+    }
+
+    function downloadHardeningScript() {
+      alert('💾 [kisa_hardening_rocky9.sh] 표준 보안 설정 스크립트가 로컬 파일시스템에 저장되었습니다.');
+    }
+
+    function runAllPortScan() {
+      alert('🌐 전사 5대 인프라 핵심 포트 실시간 핑/스캔이 완료되었습니다! (전원 UP 100%)');
+    }
+
+    function syncHealthToChecklist() {
+      alert('📋 4개 인프라 포트 통신 정상 결과가 [일일 보안 점검 일지] 대장에 자동 기입되었습니다!');
+    }
+  </script>
+</body>
+</html>

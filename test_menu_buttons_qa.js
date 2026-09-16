@@ -333,5 +333,29 @@ sidebarTokens.forEach(token => {
   }
 });
 
+// 16. Check IT Ops & SecOps Toolkit (4 Practical Tools)
+const toolkitTokens = [
+  'id="tabBtn-toolkit"',
+  'id="view-toolkit"',
+  'id="toolSubBtn-fw"',
+  'id="toolSubBtn-ssl"',
+  'id="toolSubBtn-hardening"',
+  'id="toolSubBtn-health"',
+  'function switchToolkitSub',
+  'function verifyFwPolicy',
+  'function renderSslVaultTable',
+  'function updateHardeningPreview',
+  'function renderPortHealthTable'
+];
+
+toolkitTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] IT Ops Toolkit Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing Toolkit Token: ' + token);
+    process.exit(1);
+  }
+});
+
 console.log('================================================================');
-console.log('🎉 ALL 122 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+console.log('🎉 ALL 133 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
