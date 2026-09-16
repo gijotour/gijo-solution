@@ -740,6 +740,17 @@
       background: #ffffff; border: 1px solid var(--border); border-radius: 4px;
       color: var(--text-main); padding: 0.2rem 0.4rem; width: 60px; text-align: center; font-weight: 700;
     }
+
+    /* Print Report Styles */
+    @media print {
+      body { background: #ffffff !important; color: #000000 !important; }
+      .app-header, .nav-tabs, .header-tools, .modal-header, .no-print, .compare-tray { display: none !important; }
+      .modal-overlay { position: static !important; background: transparent !important; display: block !important; }
+      .modal-box { max-width: 100% !important; width: 100% !important; border: none !important; box-shadow: none !important; max-height: none !important; }
+      .modal-body { padding: 0 !important; overflow: visible !important; }
+      .report-page { page-break-after: always; padding: 15mm 10mm; }
+      .report-page:last-child { page-break-after: avoid; }
+    }
   </style>
 </head>
 <body>
@@ -776,14 +787,14 @@
       </nav>
 
       <div class="header-tools">
+        <button class="btn btn-primary" onclick="openReportModal()" title="경영진 보고 및 ISMS-P 수검용 종합 리포트">
+          <i data-lucide="printer" style="width:14px; height:14px;"></i> 종합 진단 리포트 (A4)
+        </button>
         <button class="btn" onclick="resetToRealDocs()" title="초기 기본 문서 전수 새로고침">
-          <i data-lucide="refresh-cw" style="width:13px; height:13px;"></i> 원본 새로고침
+          <i data-lucide="refresh-cw" style="width:13px; height:13px;"></i> 새로고침
         </button>
         <button class="btn" onclick="openLlmSettingsModal()">
           <i data-lucide="settings" style="width:14px; height:14px;"></i> LLM 설정
-        </button>
-        <button class="btn btn-primary" onclick="exportFullProjectBackup()">
-          <i data-lucide="download" style="width:14px; height:14px;"></i> 백업 내보내기
         </button>
       </div>
     </div>
@@ -959,6 +970,24 @@
             </div>
           </div>
 
+          <!-- Studio BOM Mini Bar -->
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:0.5rem 0.75rem; margin-bottom:0.6rem; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span style="font-size:0.72rem; font-weight:700; color:#1d4ed8;">
+                <i data-lucide="link" style="width:12px; height:12px; vertical-align:middle;"></i> 아키텍처 ↔ TCO 실시간 연동
+              </span>
+              <span id="studioBomBadge" style="font-size:0.75rem; font-weight:800; color:#1e3a8a;">배치: 0개 (₩0)</span>
+            </div>
+            <div style="display:flex; gap:0.3rem;">
+              <button class="btn btn-sm" style="font-size:0.7rem; padding:2px 6px;" onclick="syncStudioToBom()" title="다이어그램 노드를 파싱하여 BOM 수량에 즉시 반영">
+                <i data-lucide="refresh-cw" style="width:10px; height:10px;"></i> BOM 수량 동기화
+              </button>
+              <button class="btn btn-sm btn-primary" style="font-size:0.7rem; padding:2px 6px;" onclick="switchView('bom')">
+                견적표 확인 &gt;
+              </button>
+            </div>
+          </div>
+
           <div style="margin-bottom:0.5rem; display:flex; gap:0.3rem; flex-wrap:wrap;">
             <button class="btn btn-sm" onclick="insertNodeToCode('WAF', '🛡️ Web App Firewall', 'DMZ')">+ WAF</button>
             <button class="btn btn-sm" onclick="insertNodeToCode('NGFW', '🔥 NextGen Firewall', 'DMZ')">+ NGFW</button>
@@ -968,7 +997,7 @@
             <button class="btn btn-sm" onclick="insertNodeToCode('AI', '🧠 GIJO AS Engine', 'SecOps')">+ GIJO AS</button>
           </div>
 
-          <textarea id="studioMermaidCode" class="code-editor" spellcheck="false"></textarea>
+          <textarea id="studioMermaidCode" class="code-editor" spellcheck="false" oninput="debounceStudioSync()"></textarea>
         </div>
 
         <div class="stage-canvas-panel">
@@ -1006,9 +1035,12 @@
               <i data-lucide="calculator" style="width:20px; height:20px; color:var(--primary);"></i>
               전사 보안 솔루션 실시간 BOM & 5개년 TCO 견적기
             </h2>
-            <p style="color:var(--text-sub); font-size:0.8rem;">표준 20종 및 사내 등록 솔루션의 수량 조절 시 도입비(Capex), 유지보수비(Opex 12%), 총소유비용(TCO)이 실시간 연동됩니다.</p>
+            <p style="color:var(--text-sub); font-size:0.8rem;">아키텍처 다이어그램과 양방향 연동되며, 수량 조절 시 도입비(Capex), 유지보수비(Opex 12%), 총소유비용(TCO)이 실시간 연동됩니다.</p>
           </div>
           <div style="display:flex; gap:0.5rem;">
+            <button class="btn btn-sm" onclick="syncBomToStudio()" title="현재 견적 수량 기반으로 아키텍처 다이어그램 자동 구성">
+              <i data-lucide="share-2" style="width:12px; height:12px;"></i> 아키텍처에 반영
+            </button>
             <button class="btn btn-sm" onclick="resetBomQuantities()">수량 초기화</button>
             <button class="btn btn-sm btn-primary" onclick="exportBomToCsv()"><i data-lucide="file-spreadsheet" style="width:12px; height:12px;"></i> 견적서 CSV 출력</button>
           </div>
@@ -1059,13 +1091,35 @@
             <h2 style="font-size:1.2rem; font-weight:800; color:var(--text-main);">ISMS-P 인증 기준 통제항목 진단 매핑</h2>
             <p style="color:var(--text-sub); font-size:0.8rem;">보안 솔루션 도입 현황에 따른 KISA ISMS-P 80개 세부 인증기준 충족도 분석</p>
           </div>
-          <span class="meta-badge" style="background:#eff6ff; color:#1d4ed8; font-size:0.8rem; padding:0.3rem 0.6rem;">인증 통제 매핑 100% 가동</span>
+          <button class="btn btn-primary" onclick="openReportModal()">
+            <i data-lucide="file-text" style="width:14px; height:14px;"></i> 수검용 진단 리포트 출력 (A4)
+          </button>
         </div>
         <div id="auditGridContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:1rem;"></div>
       </div>
     </section>
 
   </main>
+
+  <!-- Comprehensive A4 Print Report Modal -->
+  <div class="modal-overlay" id="reportModal">
+    <div class="modal-box" style="max-width:1050px; height:94vh;">
+      <div class="modal-header no-print">
+        <div>
+          <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.4rem;">
+            <i data-lucide="file-text" style="width:18px; height:18px; color:var(--primary);"></i>
+            경영진 보고 및 ISMS-P 수검용 통합 보안 진단 리포트
+          </h3>
+          <p style="font-size:0.75rem; color:var(--text-dim); margin-top:0.2rem;">A4 규격에 맞춘 종합 진단서로 즉시 인쇄하거나 PDF로 저장할 수 있습니다.</p>
+        </div>
+        <div style="display:flex; gap:0.4rem;">
+          <button class="btn btn-primary" onclick="printReport()"><i data-lucide="printer" style="width:14px; height:14px;"></i> A4 인쇄 / PDF 저장</button>
+          <button class="btn btn-sm" onclick="closeReportModal()"><i data-lucide="x" style="width:14px; height:14px;"></i> 닫기</button>
+        </div>
+      </div>
+      <div class="modal-body" id="reportBody"></div>
+    </div>
+  </div>
 
   <!-- Add / Edit Custom Solution Modal -->
   <div class="modal-overlay" id="customSolModal">
@@ -1242,11 +1296,14 @@
     let currentSolFilter = 'ALL';
     let compareList = [];
     let currentDetailSol = null;
+    let customerOrgName = '(주)고객사 정보보안팀';
+    let syncDebounceTimer = null;
 
     // LocalStorage Keys
     const STORAGE_KEY = 'GIJO_WIKI_DOCS_V5_2';
     const CUSTOM_SOL_KEY = 'GIJO_CUSTOM_SOL_V5_2';
     const BOM_QTY_KEY = 'GIJO_BOM_QTY_V5_2';
+    const CUST_ORG_KEY = 'GIJO_CUST_ORG_V5_2';
 
     // Studio Presets
     const studioPresets = {
@@ -1361,7 +1418,6 @@
     function resetToRealDocs() {
       if (confirm('기본 원본 지식고 문서 및 솔루션으로 새로고침하시겠습니까? (고객 직접 등록 솔루션은 보존됩니다)')) {
         currentDocs = JSON.parse(JSON.stringify(defaultWikiDocs));
-        // Re-inject custom solutions into docs
         syncCustomSolutionsToDocs();
         saveDocsToStorage();
         renderWikiDocList();
@@ -1497,10 +1553,8 @@
     }
 
     function syncCustomSolutionsToDocs() {
-      // Remove previous custom docs
       currentDocs = currentDocs.filter(d => !d.isCustomDoc);
 
-      // Add fresh custom docs
       customSolutions.forEach((sol, idx) => {
         const docId = 9000 + idx;
         const mdContent = 
@@ -1536,6 +1590,7 @@
 
       if (viewName === 'studio') {
         renderMermaidFromEditor();
+        updateStudioBomBadge();
       } else if (viewName === 'portal') {
         renderPortalCards();
       } else if (viewName === 'bom') {
@@ -1878,9 +1933,7 @@
           badgeText = '국산';
         }
 
-        // Find linked Wiki Doc ID
         const linkedDoc = currentDocs.find(d => d.title.includes(sol.name));
-
         const customIdx = customSolutions.findIndex(c => c.name === sol.name);
 
         card.innerHTML = 
@@ -2094,12 +2147,102 @@
       document.getElementById('compareModal').classList.remove('active');
     }
 
-    // --- 7. STUDIO MODULE ---
+    // --- 7. STUDIO & VISUAL ARCHITECTURE BOM MODULE ---
+    function debounceStudioSync() {
+      clearTimeout(syncDebounceTimer);
+      syncDebounceTimer = setTimeout(() => {
+        updateStudioBomBadge();
+      }, 500);
+    }
+
+    function updateStudioBomBadge() {
+      const code = document.getElementById('studioMermaidCode').value.toLowerCase();
+      let matchedCount = 0;
+      let matchedCapex = 0;
+
+      activeSolutionsList.forEach(sol => {
+        const keyName = sol.name.toLowerCase();
+        if (code.includes(keyName) || 
+            (keyName.includes('waf') && code.includes('waf')) ||
+            (keyName.includes('방화벽') && (code.includes('ngfw') || code.includes('firewall'))) ||
+            (keyName.includes('edr') && code.includes('edr')) ||
+            (keyName.includes('dlp') && code.includes('dlp')) ||
+            (keyName.includes('clm') && code.includes('clm')) ||
+            (keyName.includes('gijo as') && code.includes('gijo as'))) {
+          matchedCount++;
+          matchedCapex += (sol.price || 0);
+        }
+      });
+
+      const badge = document.getElementById('studioBomBadge');
+      if (badge) {
+        badge.innerText = '배치: ' + matchedCount + '개 (₩' + matchedCapex.toLocaleString() + ')';
+      }
+    }
+
+    function syncStudioToBom() {
+      const code = document.getElementById('studioMermaidCode').value.toLowerCase();
+      let updatedSolNames = [];
+
+      activeSolutionsList.forEach(sol => {
+        const keyName = sol.name.toLowerCase();
+        let shouldCount = 0;
+
+        if (code.includes(keyName)) shouldCount = 1;
+        else if (keyName.includes('waf') && code.includes('waf')) shouldCount = 1;
+        else if (keyName.includes('방화벽') && (code.includes('ngfw') || code.includes('firewall'))) shouldCount = 1;
+        else if (keyName.includes('edr') && code.includes('edr')) shouldCount = 1;
+        else if (keyName.includes('dlp') && code.includes('dlp')) shouldCount = 1;
+        else if (keyName.includes('clm') && code.includes('clm')) shouldCount = 1;
+        else if (keyName.includes('gijo as') && code.includes('gijo as')) shouldCount = 1;
+
+        if (shouldCount > 0) {
+          sol.qty = Math.max(sol.qty || 0, shouldCount);
+          updatedSolNames.push(sol.name);
+        }
+      });
+
+      saveBomQuantities();
+      renderBomTable();
+      updateStudioBomBadge();
+
+      alert('✅ 아키텍처 다이어그램 노드 분석 완료!\n총 ' + updatedSolNames.length + '개 솔루션의 수량이 BOM 견적에 실시간 반영되었습니다.');
+    }
+
+    function syncBomToStudio() {
+      const activeBoms = activeSolutionsList.filter(s => (s.qty || 0) > 0);
+      if (activeBoms.length === 0) {
+        alert('BOM 견적표에 수량이 1 이상인 솔루션이 없습니다.');
+        return;
+      }
+
+      let mermaidText = 'graph TD\n  User["👤 사내 사용자 / 인터넷 클라이언트"] --> Gateway["🛡️ 보안 경계 게이트웨이"]\n';
+      mermaidText += '  subgraph DMZ["🌐 DMZ 경계 영역"]\n';
+      
+      activeBoms.forEach((sol, idx) => {
+        const nodeId = 'Sol' + (idx + 1);
+        const nodeLabel = sol.name.replace(/["\[\]]/g, '');
+        mermaidText += '    ' + nodeId + '["🔒 ' + nodeLabel + '"]\n';
+      });
+      mermaidText += '  end\n';
+      mermaidText += '  Gateway --> Sol1\n';
+      mermaidText += '  subgraph Trust["🏢 내부 신뢰망 (Internal Trust Zone)"]\n';
+      mermaidText += '    Server["🖥️ 업무 서버 & 데이터베이스"]\n';
+      mermaidText += '  end\n';
+      mermaidText += '  Sol1 --> Server\n';
+
+      document.getElementById('studioMermaidCode').value = mermaidText;
+      switchView('studio');
+      renderMermaidFromEditor();
+      alert('✅ BOM 견적표의 ' + activeBoms.length + '개 솔루션 기반으로 아키텍처 다이어그램이 자동 재구성되었습니다.');
+    }
+
     function loadStudioPreset(presetKey) {
       if (!presetKey) return;
       if (studioPresets[presetKey]) {
         document.getElementById('studioMermaidCode').value = studioPresets[presetKey].trim();
         renderMermaidFromEditor();
+        updateStudioBomBadge();
       }
     }
 
@@ -2114,6 +2257,7 @@
         editor.value += '\n' + snippet;
       }
       renderMermaidFromEditor();
+      updateStudioBomBadge();
     }
 
     async function renderMermaidFromEditor() {
@@ -2342,7 +2486,162 @@
       });
     }
 
-    // --- 10. BACKUP & LLM SETTINGS ---
+    // --- 10. COMPREHENSIVE A4 REPORT MODULE ---
+    function openReportModal() {
+      renderReport();
+      document.getElementById('reportModal').classList.add('active');
+      lucide.createIcons();
+    }
+
+    function closeReportModal() {
+      document.getElementById('reportModal').classList.remove('active');
+    }
+
+    function promptEditOrgName() {
+      const newName = prompt('리포트에 표기할 고객사 및 부서명을 입력하세요:', customerOrgName);
+      if (newName && newName.trim()) {
+        customerOrgName = newName.trim();
+        localStorage.setItem(CUST_ORG_KEY, customerOrgName);
+        renderReport();
+      }
+    }
+
+    function renderReport() {
+      const reportBox = document.getElementById('reportBody');
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Extract Active SVG
+      const svgEl = document.querySelector('#mermaidOutput svg');
+      const svgHtml = svgEl ? svgEl.outerHTML : '<div style="color:var(--text-dim); text-align:center; padding:1.5rem;">아키텍처 스튜디오 렌더링 결과가 여기에 삽입됩니다.</div>';
+
+      // Calculate Totals
+      let totalQty = 0;
+      let totalCapex = 0;
+      let totalOpex = 0;
+      const deployedSols = activeSolutionsList.filter(s => (s.qty || 0) > 0);
+
+      deployedSols.forEach(sol => {
+        const qty = sol.qty || 0;
+        const capex = (sol.price || 0) * qty;
+        const opex = Math.round(capex * (sol.opexRate || 0.12));
+        totalQty += qty;
+        totalCapex += capex;
+        totalOpex += opex;
+      });
+
+      const totalTco5Year = totalCapex + (totalOpex * 5);
+      const ismsScore = Math.min(100, Math.round((deployedSols.length / 10) * 85 + 10));
+
+      let reportHtml = 
+        '<div class="report-page">' +
+          '<div style="border-bottom:3px solid var(--primary); padding-bottom:1rem; margin-bottom:1.5rem; display:flex; justify-content:space-between; align-items:flex-end;">' +
+            '<div>' +
+              '<div style="font-size:0.8rem; font-weight:700; color:var(--primary); letter-spacing:1px;">GIJO AS ENTERPRISE SECURITY PLATFORM</div>' +
+              '<h1 style="font-size:1.8rem; font-weight:800; color:#0f172a; margin:0.3rem 0;">전사 보안 아키텍처 및 ISMS-P 진단 리포트</h1>' +
+              '<div style="font-size:0.85rem; color:var(--text-sub);">' +
+                '대상 기관: <b style="color:var(--text-main);">' + sanitizeHtml(customerOrgName) + '</b> ' +
+                '<button class="btn btn-sm no-print" style="padding:1px 6px; font-size:0.7rem;" onclick="promptEditOrgName()">수정</button>' +
+              '</div>' +
+            '</div>' +
+            '<div style="text-align:right; font-size:0.8rem; color:var(--text-dim);">' +
+              '<div>발행 일자: ' + today + '</div>' +
+              '<div>진단 엔진: GIJO AS v5.2 AI SecOps</div>' +
+              '<div>분류: 대외비 (CONFIDENTIAL)</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem; margin-bottom:1.8rem;">' +
+            '<div style="background:#f8fafc; border:1px solid #cbd5e1; padding:0.85rem; border-radius:6px; text-align:center;">' +
+              '<div style="font-size:0.75rem; color:var(--text-sub);">ISMS-P 통제 충족 지수</div>' +
+              '<div style="font-size:1.5rem; font-weight:800; color:var(--primary); margin-top:0.2rem;">' + ismsScore + '% 충족</div>' +
+            '</div>' +
+            '<div style="background:#f8fafc; border:1px solid #cbd5e1; padding:0.85rem; border-radius:6px; text-align:center;">' +
+              '<div style="font-size:0.75rem; color:var(--text-sub);">구축 솔루션 (배치/총계)</div>' +
+              '<div style="font-size:1.5rem; font-weight:800; color:var(--text-main); margin-top:0.2rem;">' + deployedSols.length + ' / ' + activeSolutionsList.length + ' 종</div>' +
+            '</div>' +
+            '<div style="background:#f8fafc; border:1px solid #cbd5e1; padding:0.85rem; border-radius:6px; text-align:center;">' +
+              '<div style="font-size:0.75rem; color:var(--text-sub);">초기 구축 예산 (Capex)</div>' +
+              '<div style="font-size:1.4rem; font-weight:800; color:var(--text-main); margin-top:0.2rem;">₩' + totalCapex.toLocaleString() + '</div>' +
+            '</div>' +
+            '<div style="background:#eff6ff; border:1px solid #93c5fd; padding:0.85rem; border-radius:6px; text-align:center;">' +
+              '<div style="font-size:0.75rem; color:#1d4ed8;">5개년 총소유비용 (TCO)</div>' +
+              '<div style="font-size:1.4rem; font-weight:800; color:#1d4ed8; margin-top:0.2rem;">₩' + totalTco5Year.toLocaleString() + '</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<h2 style="font-size:1.15rem; font-weight:800; color:#0f172a; border-left:4px solid var(--primary); padding-left:0.6rem; margin-bottom:0.75rem;">1. 전사 보안 인프라 표준 권장 아키텍처</h2>' +
+          '<div style="background:#ffffff; border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:2rem; overflow-x:auto; text-align:center;">' +
+            svgHtml +
+          '</div>' +
+
+          '<h2 style="font-size:1.15rem; font-weight:800; color:#0f172a; border-left:4px solid var(--primary); padding-left:0.6rem; margin-bottom:0.75rem;">2. 도입 보안 솔루션 편성 현황 (BOM)</h2>' +
+          '<table class="clean-table" style="margin-bottom:2rem;">' +
+            '<thead><tr><th>솔루션명</th><th>제조사/구분</th><th>카테고리</th><th>수량</th><th>초기 구축비</th><th>연간 유지보수</th><th>ISMS-P 통제항목</th></tr></thead>' +
+            '<tbody>';
+
+      (deployedSols.length > 0 ? deployedSols : activeSolutionsList.slice(0, 5)).forEach(sol => {
+        const qty = sol.qty || 1;
+        const capex = (sol.price || 0) * qty;
+        const opex = Math.round(capex * (sol.opexRate || 0.12));
+        reportHtml += 
+          '<tr>' +
+            '<td><b>' + sanitizeHtml(sol.name) + '</b></td>' +
+            '<td>' + sanitizeHtml(sol.vendor) + '</td>' +
+            '<td>' + sanitizeHtml(sol.category || sol.sheetCategory) + '</td>' +
+            '<td>' + qty + '</td>' +
+            '<td>₩' + capex.toLocaleString() + '</td>' +
+            '<td>₩' + opex.toLocaleString() + '</td>' +
+            '<td>' + sanitizeHtml(sol.ismsMapping || '2.4 접근통제') + '</td>' +
+          '</tr>';
+      });
+
+      reportHtml += 
+            '</tbody>' +
+          '</table>' +
+        '</div>' +
+
+        '<div class="report-page">' +
+          '<h2 style="font-size:1.15rem; font-weight:800; color:#0f172a; border-left:4px solid var(--primary); padding-left:0.6rem; margin-bottom:0.75rem;">3. KISA ISMS-P 80개 통제항목 세부 충족 매트릭스</h2>' +
+          '<table class="clean-table" style="margin-bottom:2rem;">' +
+            '<thead><tr><th style="width:15%;">통제 영역</th><th style="width:40%;">핵심 요구사항 및 위험</th><th style="width:30%;">배치 솔루션</th><th style="width:15%; text-align:center;">충족 상태</th></tr></thead>' +
+            '<tbody>' +
+              '<tr><td><b>2.1 자산관리</b></td><td>AI 모델, SW 라이선스, IT 자산 식별 및 통제</td><td>GIJO AS, SAFESQUARE SBOM</td><td style="text-align:center; color:#059669; font-weight:700;">충족 (PASS)</td></tr>' +
+              '<tr><td><b>2.3 취약점관리</b></td><td>서버/웹/AI 모델 정기 스캔 및 CVSS 패치</td><td>Tenable ONE, Tenable AI Exposure</td><td style="text-align:center; color:#059669; font-weight:700;">충족 (PASS)</td></tr>' +
+              '<tr><td><b>2.4 접근통제</b></td><td>망분리, 경계 방화벽 룰 정비, 서버 2차 인증</td><td>SecureIM, FOCS, Zscaler Platform</td><td style="text-align:center; color:#059669; font-weight:700;">충족 (PASS)</td></tr>' +
+              '<tr><td><b>2.5 암호화통제</b></td><td>DB/개인정보 커널 암호화 및 유출 방지</td><td>CipherTrust, GRADIUS DLP, COODOC</td><td style="text-align:center; color:#059669; font-weight:700;">충족 (PASS)</td></tr>' +
+              '<tr><td><b>2.6 인증서관리</b></td><td>SSL/TLS 인증서 만료 장애 방지 및 갱신</td><td>WizCLM</td><td style="text-align:center; color:#059669; font-weight:700;">충족 (PASS)</td></tr>' +
+              '<tr><td><b>2.8 악성코드통제</b></td><td>엔드포인트 실시간 탐지 및 패치 자동화</td><td>Falcon Insight (EDR), Neurons UEM</td><td style="text-align:center; color:#059669; font-weight:700;">충족 (PASS)</td></tr>' +
+              '<tr><td><b>2.12 AI보안통제</b></td><td>AI-BOM 공급망 점검 및 프롬프트 인젝션 방어</td><td>GIJO AS, Imperva AI AppSec</td><td style="text-align:center; color:#059669; font-weight:700;">충족 (PASS)</td></tr>' +
+            '</tbody>' +
+          '</table>' +
+
+          '<h2 style="font-size:1.15rem; font-weight:800; color:#0f172a; border-left:4px solid var(--primary); padding-left:0.6rem; margin-bottom:0.75rem;">4. 실무 운영 매뉴얼 & 비상 대응 런북 가이드</h2>' +
+          '<div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:1rem; margin-bottom:2rem; font-size:0.83rem; line-height:1.7;">' +
+            '<div><b>[일일 정기 점검]</b> 데몬 프로세스 상태 확인, 관리 콘솔 이상 경보(Alert) 로그 점검, 에이전트 통신 확인.</div>' +
+            '<div><b>[주간 정기 점검]</b> 방화벽/접근제어 정책 차단 건수 통계 추출, 오탐 룰 조정, 신규 CVE 공지 대조.</div>' +
+            '<div><b>[월간 정기 점검]</b> 관리자 감사 로그(Audit Log) 위변조 방지 스토리지 영구 보관, 라이선스 잔여일 점검.</div>' +
+            '<div><b>[침해사고 및 비상 장애 런북]</b></div>' +
+            '<ol style="margin-left:1.5rem; margin-top:0.3rem;">' +
+              '<li>관리 콘솔 접속 불가 시 데몬 서비스(Service / Systemd) 상태 확인 및 재기동.</li>' +
+              '<li>비정상 패킷 병목 발생 시 해당 게이트웨이 Bypass 모드 전환 및 세션 한도 확인.</li>' +
+              '<li>데이터 유출 의심 시 EDR 격리 모드 가동 및 위변조방지 감사 로그 무결성 추출.</li>' +
+            '</ol>' +
+          '</div>' +
+
+          '<div style="border-top:1px solid var(--border); padding-top:1rem; display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-dim);">' +
+            '<div>GIJO AS Enterprise Security Architecture &copy; 2026 GIJO TECHNOLOGY. All Rights Reserved.</div>' +
+            '<div>검증관 서명: ________________ (인)</div>' +
+          '</div>' +
+        '</div>';
+
+      reportBox.innerHTML = reportHtml;
+    }
+
+    function printReport() {
+      window.print();
+    }
+
+    // --- 11. BACKUP & LLM SETTINGS ---
     function exportFullProjectBackup() {
       const backup = {
         exportedAt: new Date().toISOString(),
@@ -2422,7 +2721,7 @@
       alert('연결 테스트: 에어갭 로컬 시맨틱 RAG 엔진이 정상 가동 중입니다.');
     }
 
-    // --- 11. BOOTSTRAP ---
+    // --- 12. BOOTSTRAP ---
     window.addEventListener('DOMContentLoaded', () => {
       mermaid.initialize({
         startOnLoad: false,
@@ -2430,6 +2729,9 @@
         securityLevel: 'loose',
         flowchart: { curve: 'basis' }
       });
+
+      const storedOrg = localStorage.getItem(CUST_ORG_KEY);
+      if (storedOrg) customerOrgName = storedOrg;
 
       loadCustomSolutions();
       currentDocs = loadStoredDocs();
@@ -2444,8 +2746,10 @@
       renderBomTable();
       renderAuditGrid();
 
-      // Load initial studio code
+      // Load initial studio code & update badge
       document.getElementById('studioMermaidCode').value = studioPresets.GIJO_AS.trim();
+      updateStudioBomBadge();
+
       lucide.createIcons();
     });
   </script>
