@@ -7,6 +7,10 @@
   - **오프라인 에어갭 모드 (기본)**: 외부망/사내망 단절 상태에서도 사내 공식 규정 9종(96,847자)의 즉각적인 마크다운 브라우징, 시맨틱 RAG 검색, 스마트 아키텍처 스튜디오, TCO 견적 산출 100% 단독 구동.
   - **GB10 177B 연동 모드**: 온프레미스 고출력 DGX 클러스터(`10.8.0.12`) 또는 운영 서버(`10.8.0.1`) 활성화 시 177B MoE 엔진의 심층 추론 자동 연계.
 - **데스크톱 산출물 일원화**: `GIJO AS Lite (GIJO WIKI Edition)` 명칭으로 인스톨러 및 실행 파일 동기화.
+- **실물 20종 보안 솔루션 카탈로그 및 v2.2 표준 다이어그램 편집기 전면 통합**:
+  - 국산/외산 20종 실물 보안 제품(GIJO AS, WizCLM, SecureIM, SAFESQUARE SBOM, Tenable AI Exposure, Zscaler, Imperva WAAP/DSF, NeoCISO, 수지비, BAT Insight, Tenable ONE, CipherTrust, COODOC, FOCS, Falcon EDR, GRADIUS DLP, Ivanti UEM 등) 카탈로그 데이터셋 탑재.
+  - 제품별 기능/규정/효과/도입목적/대체재 비교 상세 뷰 및 실시간 솔루션 비교 트레이(Compare Tray) 제공.
+  - v2.2 스마트 아키텍처 표준 편집기(`GIJO_DIAG`) 내장 (포트/앵커 연결, 존 분리, SVG 내보내기).
 
 ### ☀️ 화이트 & 라이트 테마 (Clean White & Slate Light) 전면 전환
 - **배경색 화이트 전환**: 눈이 편안하고 문서 가독성이 극대화된 소프트 화이트 & 슬레이트 라이트 테마(`--bg-main: #ffffff`, `--bg-panel: #f8fafc`, `--border: #e2e8f0`) 적용.
