@@ -9,6 +9,8 @@
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- PDF.js Engine (for PDF Manual & Catalog Extraction) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     :root {
       --bg-main: #f8fafc;
@@ -741,6 +743,47 @@
       color: var(--text-main); padding: 0.2rem 0.4rem; width: 60px; text-align: center; font-weight: 700;
     }
 
+    /* PDF Dropzone Styles */
+    .pdf-drop-zone {
+      border: 2px dashed #93c5fd;
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 0.9rem 1.2rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      position: relative;
+    }
+    .pdf-drop-zone:hover, .pdf-drop-zone.dragover {
+      border-color: var(--primary);
+      background: #eff6ff;
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+    .pdf-drop-content {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      text-align: left;
+      width: 100%;
+    }
+    .pdf-status-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.65rem;
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
     /* Print Report Styles */
     @media print {
       body { background: #ffffff !important; color: #000000 !important; }
@@ -1134,6 +1177,26 @@
       <div class="modal-body" style="display:flex; flex-direction:column; gap:0.85rem;">
         <input type="hidden" id="customSolEditIndex" value="-1">
         
+        <!-- PDF Drag and Drop Uploader Zone -->
+        <div id="pdfDropZone" class="pdf-drop-zone" onclick="document.getElementById('custSolPdfInput').click()">
+          <input type="file" id="custSolPdfInput" accept=".pdf" style="display:none;" onchange="handlePdfUpload(event)">
+          <div class="pdf-drop-content">
+            <div style="background:#eff6ff; padding:0.6rem; border-radius:8px; border:1px solid #bfdbfe;">
+              <i data-lucide="file-up" style="width:24px; height:24px; color:var(--primary);"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="color:var(--text-main); font-size:0.85rem;">📄 제품 소개서 또는 실무 매뉴얼 PDF 끌어다 놓기 (클릭하여 파일 선택)</strong>
+                <span style="font-size:0.7rem; color:var(--primary); font-weight:700;">PDF.js & 오프라인 파서 자동 분석</span>
+              </div>
+              <p style="font-size:0.75rem; color:var(--text-dim); margin-top:0.2rem;">
+                PDF를 올리면 제품명, 개요, 목차, 텍스트/명령어를 자동 추출하여 매뉴얼 에디터에 채우고 사내 지식고/RAG에 즉시 학습시킵니다.
+              </p>
+            </div>
+          </div>
+          <div id="pdfUploadStatus" style="display:none; width:100%; margin-top:0.5rem; text-align:left;"></div>
+        </div>
+        
         <div style="display:grid; grid-template-columns: 2fr 1.5fr 1fr; gap:0.6rem;">
           <div>
             <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">솔루션 제품명 *</label>
@@ -1214,7 +1277,22 @@
         </div>
 
         <div id="subTabContent-spec" class="markdown-render"></div>
-        <div id="subTabContent-manual" class="markdown-render" style="display:none;"></div>
+        <div id="subTabContent-manual" style="display:none;">
+          <div class="no-print" style="margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:0.5rem 0.75rem; border-radius:6px; border:1px solid var(--border);">
+            <div style="font-size:0.75rem; color:var(--text-sub); display:flex; align-items:center; gap:0.4rem;">
+              <i data-lucide="info" style="width:14px; height:14px; color:var(--primary);"></i>
+              <span>벤더사 PDF 매뉴얼을 업로드하여 실무 런북과 사내 지식고(AI Copilot RAG)를 즉시 최신화할 수 있습니다.</span>
+            </div>
+            <div>
+              <input type="file" id="detailPdfInput" accept=".pdf" style="display:none;" onchange="handleDetailPdfUpload(event)">
+              <button class="btn btn-sm btn-primary" onclick="document.getElementById('detailPdfInput').click()">
+                <i data-lucide="upload-cloud" style="width:13px; height:13px;"></i> PDF 매뉴얼 업데이트
+              </button>
+            </div>
+          </div>
+          <div id="detailPdfStatus" style="display:none; margin-bottom:0.75rem;"></div>
+          <div id="subTabContent-manual-body" class="markdown-render"></div>
+        </div>
         <div id="subTabContent-diagram" class="markdown-render" style="display:none;"></div>
 
       </div>
@@ -1436,6 +1514,206 @@
       }
     }
 
+    // --- 2.8 PDF MANUAL & INTRO EXTRACTION MODULE (PDF.js + Pure-JS Offline Fallback) ---
+    async function parsePdfFile(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      let extractedText = '';
+      let pageCount = 0;
+
+      // 1. Try PDF.js Engine
+      if (window.pdfjsLib) {
+        try {
+          if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          }
+          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+          const pdfDoc = await loadingTask.promise;
+          pageCount = pdfDoc.numPages;
+
+          const pagesArr = [];
+          for (let p = 1; p <= pageCount; p++) {
+            const page = await pdfDoc.getPage(p);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items
+              .map(item => (item.str || '').trim())
+              .filter(s => s.length > 0)
+              .join(' ')
+              .replace(/\s+/g, ' ');
+            if (pageText) {
+              pagesArr.push('### [제 ' + p + ' 쪽]\n' + pageText);
+            }
+          }
+          extractedText = pagesArr.join('\n\n');
+        } catch (pdfErr) {
+          console.warn('PDF.js parse warning, activating offline parser:', pdfErr);
+        }
+      }
+
+      // 2. Pure-JS Airgap Fallback (텍스트 스트림 및 Tj 문자열 추출)
+      if (!extractedText || extractedText.length < 50) {
+        try {
+          const rawBytes = new Uint8Array(arrayBuffer);
+          let rawStr = '';
+          const chunkSize = 16384;
+          for (let i = 0; i < rawBytes.length; i += chunkSize) {
+            const slice = rawBytes.subarray(i, i + chunkSize);
+            rawStr += String.fromCharCode.apply(null, slice);
+          }
+          const matches = [];
+          const tjRegex = /\(([^()]{2,})\)\s*Tj/g;
+          let m;
+          while ((m = tjRegex.exec(rawStr)) !== null) {
+            const cleaned = m[1].replace(/\\([()])/g, '$1').trim();
+            if (cleaned.length > 1) matches.push(cleaned);
+          }
+          if (matches.length > 5) {
+            extractedText = '### [PDF 추출 본문 (오프라인 파서)]\n' + matches.join(' ');
+            pageCount = Math.max(1, Math.round(matches.length / 30));
+          }
+        } catch (fbErr) {
+          console.warn('Fallback parser error:', fbErr);
+        }
+      }
+
+      return {
+        fileName: file.name,
+        pageCount: pageCount || 1,
+        text: extractedText,
+        charCount: extractedText.length
+      };
+    }
+
+    async function handlePdfUpload(event) {
+      const file = (event.target.files && event.target.files[0]) || (event.dataTransfer && event.dataTransfer.files[0]);
+      if (!file) return;
+
+      const statusEl = document.getElementById('pdfUploadStatus');
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = '<div style="color:var(--primary); font-size:0.75rem; font-weight:700;">⏳ [' + sanitizeHtml(file.name) + '] PDF 분석 및 텍스트 추출 중...</div>';
+
+      try {
+        const result = await parsePdfFile(file);
+        if (!result.text || result.text.length < 20) {
+          statusEl.innerHTML = '<div style="color:var(--danger); font-size:0.75rem; font-weight:700;">⚠️ 텍스트를 충분히 추출하지 못했습니다. (스캔 이미지 PDF이거나 암호화 문서일 수 있습니다)</div>';
+          return;
+        }
+
+        const nameInput = document.getElementById('custSolName');
+        if (!nameInput.value.trim()) {
+          const guessedName = file.name.replace(/\.pdf$/i, '').replace(/[_-]/g, ' ').trim();
+          nameInput.value = guessedName;
+        }
+
+        const purposeInput = document.getElementById('custSolPurpose');
+        if (!purposeInput.value.trim()) {
+          const firstSnippet = result.text.replace(/^###.*\n?/, '').slice(0, 180).trim();
+          if (firstSnippet) purposeInput.value = firstSnippet;
+        }
+
+        const manualMd = 
+          '# ' + file.name.replace(/\.pdf$/i, '') + ' 실무 운영 가이드\n' +
+          '> **문서 원본**: ' + file.name + ' (총 ' + result.pageCount + '쪽, ' + result.charCount.toLocaleString() + '자 발췌)\n' +
+          '> **학습 상태**: 사내 지식고(위키) 및 AI Copilot RAG 자동 인입 대상\n\n' +
+          '## 1. 추출된 실무 운영 매뉴얼 원문\n\n' +
+          result.text;
+
+        document.getElementById('custSolManual').value = manualMd;
+
+        statusEl.innerHTML = 
+          '<div style="display:flex; align-items:center; gap:0.5rem;">' +
+            '<span class="pdf-status-tag">✅ ' + sanitizeHtml(file.name) + ' (' + result.pageCount + '쪽 / ' + result.charCount.toLocaleString() + '자) 추출 완료</span>' +
+          '</div>' +
+          '<div style="font-size:0.72rem; color:var(--text-sub); margin-top:0.25rem;">운영 매뉴얼에 자동 반영되었습니다. [솔루션 저장]을 누르면 사내 지식고와 AI Copilot에 즉시 학습됩니다.</div>';
+        lucide.createIcons();
+      } catch (err) {
+        console.error('PDF error:', err);
+        statusEl.innerHTML = '<div style="color:var(--danger); font-size:0.75rem; font-weight:700;">❌ PDF 분석 실패: ' + sanitizeHtml(err.message) + '</div>';
+      }
+    }
+
+    async function handleDetailPdfUpload(event) {
+      const file = (event.target.files && event.target.files[0]) || (event.dataTransfer && event.dataTransfer.files[0]);
+      if (!file || !currentDetailSol) return;
+
+      const statusEl = document.getElementById('detailPdfStatus');
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = '<div style="font-size:0.75rem; color:var(--primary); font-weight:700;">⏳ [' + sanitizeHtml(file.name) + '] 최신 매뉴얼 파싱 및 RAG 재학습 중...</div>';
+
+      try {
+        const result = await parsePdfFile(file);
+        if (!result.text || result.text.length < 20) {
+          statusEl.innerHTML = '<div style="font-size:0.75rem; color:var(--danger); font-weight:700;">⚠️ 텍스트를 충분히 추출하지 못했습니다.</div>';
+          return;
+        }
+
+        const newManual = 
+          '# ' + currentDetailSol.name + ' 최신 실무 운영 매뉴얼\n' +
+          '> **문서 원본**: ' + file.name + ' (총 ' + result.pageCount + '쪽, ' + result.charCount.toLocaleString() + '자 최신화)\n' +
+          '> **갱신 시각**: ' + new Date().toLocaleString() + '\n\n' +
+          result.text;
+
+        currentDetailSol.manual = newManual;
+
+        const customIdx = customSolutions.findIndex(s => s.name === currentDetailSol.name);
+        if (customIdx >= 0) {
+          customSolutions[customIdx].manual = newManual;
+          saveCustomSolutions();
+        } else {
+          const overrideSol = Object.assign({}, currentDetailSol, { isCustom: true, manual: newManual });
+          customSolutions.unshift(overrideSol);
+          saveCustomSolutions();
+        }
+
+        syncCustomSolutionsToDocs();
+        saveDocsToStorage();
+        renderWikiDocList();
+
+        document.getElementById('subTabContent-manual-body').innerHTML = 
+          '<div style="background:#f8fafc; border:1px solid var(--border); padding:1rem; border-radius:6px; margin-bottom:1rem;">' +
+            '<div style="font-weight:700; font-size:0.9rem; margin-bottom:0.4rem; color:var(--primary);">' +
+              '<i data-lucide="book-open" style="width:14px; height:14px; vertical-align:middle;"></i> ' + sanitizeHtml(currentDetailSol.name) + ' 실무 운영 매뉴얼 & 런북' +
+            '</div>' +
+            '<div style="font-size:0.83rem; line-height:1.7;">' + parseMarkdownToHtml(newManual) + '</div>' +
+          '</div>';
+
+        statusEl.innerHTML = 
+          '<div class="pdf-status-tag">✅ ' + sanitizeHtml(file.name) + ' 반영 완료 (' + result.pageCount + '쪽 / ' + result.charCount.toLocaleString() + '자)</div>' +
+          '<div style="font-size:0.72rem; color:var(--success); font-weight:600; margin-top:0.2rem;">사내 지식고(위키) 및 AI Copilot RAG에 즉시 재학습되었습니다.</div>';
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Detail PDF error:', err);
+        statusEl.innerHTML = '<div style="font-size:0.75rem; color:var(--danger); font-weight:700;">❌ PDF 반영 실패: ' + sanitizeHtml(err.message) + '</div>';
+      }
+    }
+
+    function initPdfDropZone() {
+      const dropZone = document.getElementById('pdfDropZone');
+      if (!dropZone) return;
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.add('dragover');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.remove('dragover');
+        }, false);
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length > 0) {
+          handlePdfUpload({ target: { files: dt.files } });
+        }
+      }, false);
+    }
+
     // --- 3. CUSTOM SOLUTION MANAGEMENT MODULE ---
     function openAddCustomSolModal() {
       document.getElementById('customSolEditIndex').value = '-1';
@@ -1449,6 +1727,11 @@
       document.getElementById('custSolPurpose').value = '';
       document.getElementById('custSolManual').value = '- 콘솔 접속: https://sec-admin.internal:8443\n- 일일 점검: 데몬 정상 동작 및 이벤트 로그 확인\n- 장애 런북: 데몬 재기동(systemctl restart sec-agent) 후 비상 연락';
       document.getElementById('custSolDiagram').value = 'graph LR\n  User --> SecurityGateway --> InternalServer';
+
+      const statusEl = document.getElementById('pdfUploadStatus');
+      if (statusEl) { statusEl.style.display = 'none'; statusEl.innerHTML = ''; }
+      const pdfInput = document.getElementById('custSolPdfInput');
+      if (pdfInput) pdfInput.value = '';
 
       document.getElementById('customSolModal').classList.add('active');
       lucide.createIcons();
@@ -1469,6 +1752,11 @@
       document.getElementById('custSolPurpose').value = sol.purpose || '';
       document.getElementById('custSolManual').value = sol.manual || '';
       document.getElementById('custSolDiagram').value = sol.architectureDiagram || '';
+
+      const statusEl = document.getElementById('pdfUploadStatus');
+      if (statusEl) { statusEl.style.display = 'none'; statusEl.innerHTML = ''; }
+      const pdfInput = document.getElementById('custSolPdfInput');
+      if (pdfInput) pdfInput.value = '';
 
       document.getElementById('customSolModal').classList.add('active');
       lucide.createIcons();
@@ -2014,7 +2302,12 @@
           '</div>' +
           '<div style="font-size:0.83rem; line-height:1.7;">' + parseMarkdownToHtml(manualContent) + '</div>' +
         '</div>';
-      document.getElementById('subTabContent-manual').innerHTML = manualHtml;
+      const statusEl = document.getElementById('detailPdfStatus');
+      if (statusEl) { statusEl.style.display = 'none'; statusEl.innerHTML = ''; }
+      const detailInput = document.getElementById('detailPdfInput');
+      if (detailInput) detailInput.value = '';
+
+      document.getElementById('subTabContent-manual-body').innerHTML = manualHtml;
 
       // 3. Diagram Tab HTML
       let diagramHtml = '';
@@ -2749,6 +3042,9 @@
       // Load initial studio code & update badge
       document.getElementById('studioMermaidCode').value = studioPresets.GIJO_AS.trim();
       updateStudioBomBadge();
+
+      // Initialize PDF drag and drop zone
+      initPdfDropZone();
 
       lucide.createIcons();
     });
