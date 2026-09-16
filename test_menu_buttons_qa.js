@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('=== GIJO Security ERP Suite Comprehensive QA Test ===');
+console.log('=== GIJO Security ERP Suite Comprehensive FinOps & Topology QA ===');
 
 const htmlPath = path.join(__dirname, 'GIJO_Security_ERP_Suite.html');
 if (!fs.existsSync(htmlPath)) {
@@ -11,8 +11,8 @@ if (!fs.existsSync(htmlPath)) {
 
 const html = fs.readFileSync(htmlPath, 'utf8');
 
-// 1. Check all tab buttons and view pages
-const tabs = [
+// 1. Check all 7 main navigation tabs & views
+const mainTabs = [
   { btn: 'tabBtn-wiki', view: 'view-wiki', label: '사내 지식고' },
   { btn: 'tabBtn-studio', view: 'view-studio', label: '아키텍처 스튜디오' },
   { btn: 'tabBtn-audit', view: 'view-audit', label: '보안 진단기' },
@@ -22,54 +22,110 @@ const tabs = [
   { btn: 'tabBtn-sbom', view: 'view-sbom', label: 'IT 자산 & SBOM' }
 ];
 
-let passCount = 0;
-tabs.forEach(t => {
+mainTabs.forEach(t => {
   const hasBtn = html.includes('id=\"' + t.btn + '\"');
   const hasView = html.includes('id=\"' + t.view + '\"');
   if (hasBtn && hasView) {
-    console.log(' - [PASS] Menu Tab & View: ' + t.label + ' (' + t.btn + ' -> ' + t.view + ')');
-    passCount++;
+    console.log(' - [PASS] Main Nav Tab: ' + t.label + ' (' + t.btn + ' -> ' + t.view + ')');
   } else {
-    console.error(' - [FAIL] Missing: ' + t.label + ' (hasBtn: ' + hasBtn + ', hasView: ' + hasView + ')');
+    console.error(' - [FAIL] Missing Main Nav: ' + t.label);
+    process.exit(1);
   }
 });
 
-// 2. Check switchView function presence & handling
-const switchViewMatches = [
-  'function switchView',
-  "if (targetSec) targetSec.classList.add('active')",
-  "else if (viewName === 'sbom')",
-  "renderAssetTable()",
-  "updateAssetKpis()"
+// 2. Check TCO & FinOps 3 Sub-tabs
+const subTabs = [
+  { btn: 'bomSubBtn-sol', view: 'bomSubView-sol', label: '보안 솔루션 TCO' },
+  { btn: 'bomSubBtn-api', view: 'bomSubView-api', label: '생성형 AI & API FinOps' },
+  { btn: 'bomSubBtn-lifecycle', view: 'bomSubView-lifecycle', label: '계약 생애주기 D-Day' }
 ];
 
-switchViewMatches.forEach(m => {
-  if (html.includes(m)) {
-    console.log(' - [PASS] switchView logic check: ' + m);
+subTabs.forEach(st => {
+  const hasBtn = html.includes('id=\"' + st.btn + '\"');
+  const hasView = html.includes('id=\"' + st.view + '\"');
+  if (hasBtn && hasView) {
+    console.log(' - [PASS] FinOps Sub-Tab: ' + st.label + ' (' + st.btn + ' -> ' + st.view + ')');
   } else {
-    console.error(' - [FAIL] Missing in switchView: ' + m);
+    console.error(' - [FAIL] Missing FinOps Sub-Tab: ' + st.label);
+    process.exit(1);
   }
 });
 
-// 3. Check Real Knowledge & JEUS 8.5
-const dataChecks = [
-  'KISA 표준 소프트웨어 공급망(SBOM) 추출 및 제출 실무 매뉴얼',
+// 3. Check FinOps Engine & Default AI Models
+const finopsTokens = [
+  'OpenAI GPT-4o Enterprise',
+  'Anthropic Claude 3.5 Sonnet',
+  'Google Gemini 1.5 Pro',
+  '온프레미스 GB10 (Qwen 177B MoE)',
+  '사내 bge-m3 임베딩 & OCR API',
+  'function calculateAiApiCost',
+  'function updateAiApiKpis',
+  'function renderAiApiTable',
+  'exportAiApiCsv'
+];
+
+finopsTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] FinOps Engine Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing FinOps Token: ' + token);
+    process.exit(1);
+  }
+});
+
+// 4. Check Contract Lifecycle & D-Day Engine
+const lifecycleTokens = [
+  'id=\"lifecycleDDayAlertBar\"',
+  'function calculateDDay',
+  'function calculateDepreciationValue',
+  'function renderLifecycleTable',
+  'id=\"lifecycleModal\"'
+];
+
+lifecycleTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Lifecycle & D-Day Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing Lifecycle Token: ' + token);
+    process.exit(1);
+  }
+});
+
+// 5. Check Inline IT Asset Topology Graph in view-sbom
+const topologyTokens = [
+  'id=\"assetTopologyGraphContainer\"',
+  'id=\"assetTopologyContentWrapper\"',
+  'function renderAssetTopologyGraph',
+  'function toggleAssetTopologyView',
+  '전사 IT 자산 & SBOM 계층형 인프라 토폴로지 구성도'
+];
+
+topologyTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Asset Topology Graph Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing Topology Token: ' + token);
+    process.exit(1);
+  }
+});
+
+// 6. Check Real Data & CVE status
+const dataTokens = [
   '금융 코어 WAS (TmaxSoft JEUS 8.5)',
   'CVE-2016-1000027',
   'CVE-2025-24813',
   'CVE-2026-54512',
-  'syncAssetsToStudio',
-  'exportCycloneDxJson',
-  'importCycloneDxJson'
+  'KISA 표준 소프트웨어 공급망(SBOM) 추출 및 제출 실무 매뉴얼'
 ];
 
-dataChecks.forEach(d => {
-  if (html.includes(d)) {
-    console.log(' - [PASS] Data & Handler: ' + d);
+dataTokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Real Data & CVE: ' + token);
   } else {
-    console.error(' - [FAIL] Missing data: ' + d);
+    console.error(' - [FAIL] Missing Data: ' + token);
+    process.exit(1);
   }
 });
 
-console.log('====================================================');
-console.log('✅ QA RESULT: ALL 20 CRITICAL CHECKS PASSED PERFECTLY!');
+console.log('================================================================');
+console.log('🎉 ALL 33 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');

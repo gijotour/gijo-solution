@@ -1111,93 +1111,235 @@
     <!-- 4. BOM & TCO VIEW -->
     <section id="view-bom" class="view-page">
       <div class="white-panel" style="padding:1.25rem; height:100%; overflow-y:auto;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        
+        <!-- Header -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
           <div>
             <h2 style="font-size:1.2rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
               <i data-lucide="calculator" style="width:20px; height:20px; color:var(--primary);"></i>
-              전사 보안 솔루션 실시간 BOM & 5개년 TCO 견적기
+              전사 보안 솔루션 & 생성형 AI 실시간 TCO / FinOps 워크스페이스
             </h2>
-            <p style="color:var(--text-sub); font-size:0.8rem;">아키텍처 다이어그램과 양방향 연동되며, 수량 조절 시 도입비(Capex), 유지보수비(Opex 12%), 총소유비용(TCO)이 실시간 연동됩니다.</p>
+            <p style="color:var(--text-sub); font-size:0.8rem;">
+              온프레미스 보안 솔루션 Capex/Opex뿐만 아니라 사내 생성형 AI/클라우드 API 토큰 비용을 실시간 추적하고 계약 생애주기(D-Day)를 관리합니다.
+            </p>
           </div>
-          <div style="display:flex; gap:0.5rem;">
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
             <button class="btn btn-sm" onclick="syncBomToStudio()" title="현재 견적 수량 기반으로 아키텍처 다이어그램 자동 구성">
               <i data-lucide="share-2" style="width:12px; height:12px;"></i> 아키텍처에 반영
             </button>
-            <button class="btn btn-sm" onclick="resetBomQuantities()">수량 초기화</button>
-            <button class="btn btn-sm btn-primary" onclick="exportBomToCsv()"><i data-lucide="file-spreadsheet" style="width:12px; height:12px;"></i> 견적서 CSV 출력</button>
+            <button class="btn btn-sm btn-primary" onclick="exportUnifiedTcoCsv()">
+              <i data-lucide="file-spreadsheet" style="width:12px; height:12px;"></i> 전사 TCO/FinOps CSV 출력
+            </button>
           </div>
         </div>
 
+        <!-- Unified Top 4 KPI Cards -->
         <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem; margin-bottom:1.25rem;">
           <div style="background:#f8fafc; border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
-            <div style="font-size:0.75rem; color:var(--text-sub); font-weight:600;">선택된 보안 솔루션</div>
-            <div id="bomTotalQtyCount" style="font-size:1.4rem; font-weight:800; color:var(--primary); margin-top:0.25rem;">0 개</div>
+            <div style="font-size:0.75rem; color:var(--text-sub); font-weight:600;">통합 관리 항목</div>
+            <div id="bomTotalQtyCount" style="font-size:1.35rem; font-weight:800; color:var(--primary); margin-top:0.25rem;">0 개 솔루션 + 5종 API</div>
           </div>
           <div style="background:#f8fafc; border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
             <div style="font-size:0.75rem; color:var(--text-sub); font-weight:600;">초기 도입비 (Capex)</div>
-            <div id="bomTotalCapex" style="font-size:1.4rem; font-weight:800; color:var(--text-main); margin-top:0.25rem;">₩0</div>
+            <div id="bomTotalCapex" style="font-size:1.35rem; font-weight:800; color:var(--text-main); margin-top:0.25rem;">₩0</div>
           </div>
           <div style="background:#f8fafc; border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
-            <div style="font-size:0.75rem; color:var(--text-sub); font-weight:600;">연간 유지보수비 (Opex 12%)</div>
-            <div id="bomTotalOpex" style="font-size:1.4rem; font-weight:800; color:#d97706; margin-top:0.25rem;">₩0</div>
+            <div style="font-size:0.75rem; color:var(--text-sub); font-weight:600;">연간 운영 & API 총비용</div>
+            <div id="bomTotalOpex" style="font-size:1.35rem; font-weight:800; color:#d97706; margin-top:0.25rem;">₩0</div>
           </div>
           <div style="background:#eff6ff; border:1px solid #bfdbfe; padding:1rem; border-radius:var(--radius);">
-            <div style="font-size:0.75rem; color:#1d4ed8; font-weight:600;">5개년 총소유비용 (TCO)</div>
-            <div id="bomTotalTco" style="font-size:1.4rem; font-weight:800; color:#1d4ed8; margin-top:0.25rem;">₩0</div>
+            <div style="font-size:0.75rem; color:#1d4ed8; font-weight:600;">5개년 통합 총소유비용 (TCO)</div>
+            <div id="bomTotalTco" style="font-size:1.35rem; font-weight:800; color:#1d4ed8; margin-top:0.25rem;">₩0</div>
           </div>
         </div>
 
-        <table class="clean-table">
-          <thead>
-            <tr>
-              <th style="width:180px;">솔루션명</th>
-              <th style="width:130px;">제조사 / 구분</th>
-              <th style="width:160px;">카테고리</th>
-              <th style="width:130px;">단가 (소비자가)</th>
-              <th style="width:80px; text-align:center;">도입수량</th>
-              <th style="width:140px;">도입비 합계</th>
-              <th style="width:140px;">연간 유지보수</th>
-              <th>ISMS-P 통제항목 매핑</th>
-            </tr>
-          </thead>
-          <tbody id="bomTableBody"></tbody>
-        </table>
+        <!-- TCO & FinOps Sub Navigation Tabs -->
+        <div style="display:flex; gap:0.4rem; border-bottom:2px solid var(--border); margin-bottom:1.25rem; padding-bottom:0.4rem;">
+          <button id="bomSubBtn-sol" class="btn btn-sm btn-primary" onclick="switchBomSubView('sol')">
+            <i data-lucide="shield" style="width:13px; height:13px;"></i> 보안 솔루션 TCO & BOM
+          </button>
+          <button id="bomSubBtn-api" class="btn btn-sm" style="background:#f8fafc; color:var(--text-sub);" onclick="switchBomSubView('api')">
+            <i data-lucide="bot" style="width:13px; height:13px;"></i> 생성형 AI & 클라우드 API FinOps
+          </button>
+          <button id="bomSubBtn-lifecycle" class="btn btn-sm" style="background:#f8fafc; color:var(--text-sub);" onclick="switchBomSubView('lifecycle')">
+            <i data-lucide="calendar" style="width:13px; height:13px;"></i> 계약 기간 & 생애주기 D-Day
+          </button>
+        </div>
 
-        <!-- ROI & Economic Impact Matrix Section -->
-        <div style="margin-top:2rem; background:#f8fafc; border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <!-- SUB VIEW 1: SECURITY SOLUTIONS BOM & TCO -->
+        <div id="bomSubView-sol">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+            <span style="font-weight:700; font-size:0.9rem; color:var(--text-main);">🛡️ 보안 솔루션별 단가 및 수량 산정</span>
+            <button class="btn btn-sm" onclick="resetBomQuantities()">수량 초기화</button>
+          </div>
+          <table class="clean-table">
+            <thead>
+              <tr>
+                <th style="width:180px;">솔루션명</th>
+                <th style="width:130px;">제조사 / 구분</th>
+                <th style="width:160px;">카테고리</th>
+                <th style="width:130px;">단가 (소비자가)</th>
+                <th style="width:80px; text-align:center;">도입수량</th>
+                <th style="width:140px;">도입비 합계</th>
+                <th style="width:140px;">연간 유지보수</th>
+                <th>ISMS-P 통제항목 매핑</th>
+              </tr>
+            </thead>
+            <tbody id="bomTableBody"></tbody>
+          </table>
+
+          <!-- ROI & Economic Impact Matrix Section -->
+          <div style="margin-top:2rem; background:#f8fafc; border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+              <div>
+                <h3 style="font-size:1.05rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.4rem;">
+                  <i data-lucide="trending-up" style="width:16px; height:16px; color:var(--success);"></i>
+                  경영진 보고용 보안 투자 회수(ROI) & 사고 피해 예방 분석 매트릭스
+                </h3>
+                <p style="font-size:0.75rem; color:var(--text-sub); margin-top:0.2rem;">KISA 및 글로벌 침해사고 피해 통계를 기반으로 솔루션 도입 시 절감되는 사고 리스크 및 인건비를 자동 산출합니다.</p>
+              </div>
+              <span class="meta-badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-weight:700;">투자 회수 모델 v2.0</span>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem;">
+              <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
+                <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">연간 침해사고 예방 가치</div>
+                <div id="roiBreachAvoidance" style="font-size:1.25rem; font-weight:800; color:var(--success); margin-top:0.25rem;">₩0</div>
+                <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">평균 15억원 랜섬웨어/유출 완화율</div>
+              </div>
+              <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
+                <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">과징금 리스크 경감 가치</div>
+                <div id="roiPenaltyAvoidance" style="font-size:1.25rem; font-weight:800; color:var(--primary); margin-top:0.25rem;">₩0</div>
+                <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">개인정보보호법 매출 3% 리스크 회피</div>
+              </div>
+              <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
+                <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">보안운영 인건비 절감액</div>
+                <div id="roiLaborSaving" style="font-size:1.25rem; font-weight:800; color:#7c3aed; margin-top:0.25rem;">₩0</div>
+                <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">수동 로그 분석·감사 60% 자동화</div>
+              </div>
+              <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
+                <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">예상 투자 회수 기간 (Payback)</div>
+                <div id="roiPaybackPeriod" style="font-size:1.25rem; font-weight:800; color:#d97706; margin-top:0.25rem;">-</div>
+                <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">순편익 발생 기준 소요 기간</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB VIEW 2: GENERATIVE AI & CLOUD API FINOPS -->
+        <div id="bomSubView-api" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
             <div>
               <h3 style="font-size:1.05rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.4rem;">
-                <i data-lucide="trending-up" style="width:16px; height:16px; color:var(--success);"></i>
-                경영진 보고용 보안 투자 회수(ROI) & 사고 피해 예방 분석 매트릭스
+                <i data-lucide="cpu" style="width:16px; height:16px; color:var(--primary);"></i>
+                사내 생성형 AI (LLM) & 클라우드 API 사용량 및 FinOps 비용 통제
               </h3>
-              <p style="font-size:0.75rem; color:var(--text-sub); margin-top:0.2rem;">KISA 및 글로벌 침해사고 피해 통계를 기반으로 솔루션 도입 시 절감되는 사고 리스크 및 인건비를 자동 산출합니다.</p>
+              <p style="font-size:0.75rem; color:var(--text-sub); margin-top:0.2rem;">OpenAI, Anthropic, Gemini 및 온프레미스 GB10 클러스터의 월간 토큰 사용량과 API 호출 비용을 실시간 정산합니다.</p>
             </div>
-            <span class="meta-badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-weight:700;">투자 회수 모델 v2.0</span>
+            <div style="display:flex; gap:0.5rem;">
+              <button class="btn btn-sm btn-primary" onclick="openAddAiApiModal()">
+                <i data-lucide="plus" style="width:13px; height:13px;"></i> AI / API 서비스 등록
+              </button>
+              <button class="btn btn-sm" onclick="exportAiApiCsv()">
+                <i data-lucide="download" style="width:13px; height:13px;"></i> FinOps CSV 출력
+              </button>
+            </div>
           </div>
 
-          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem;">
-            <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
-              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">연간 침해사고 예방 가치</div>
-              <div id="roiBreachAvoidance" style="font-size:1.25rem; font-weight:800; color:var(--success); margin-top:0.25rem;">₩0</div>
-              <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">평균 15억원 랜섬웨어/유출 완화율</div>
+          <!-- FinOps 4 KPI Cards -->
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem; margin-bottom:1.25rem;">
+            <div style="background:#ffffff; border:1px solid var(--border); padding:1rem; border-radius:6px; box-shadow:var(--shadow-sm);">
+              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">등록된 AI/API 서비스</div>
+              <div id="aiApiCountDisplay" style="font-size:1.35rem; font-weight:800; color:var(--primary); margin-top:0.25rem;">0 종</div>
+              <div style="font-size:0.68rem; color:var(--text-sub); margin-top:0.2rem;">상용 클라우드 + 사내 모델</div>
             </div>
-            <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
-              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">과징금 리스크 경감 가치</div>
-              <div id="roiPenaltyAvoidance" style="font-size:1.25rem; font-weight:800; color:var(--primary); margin-top:0.25rem;">₩0</div>
-              <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">개인정보보호법 매출 3% 리스크 회피</div>
+            <div style="background:#ffffff; border:1px solid var(--border); padding:1rem; border-radius:6px; box-shadow:var(--shadow-sm);">
+              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">월간 예상 API 총비용</div>
+              <div id="aiApiMonthlyTotalDisplay" style="font-size:1.35rem; font-weight:800; color:var(--text-main); margin-top:0.25rem;">₩0</div>
+              <div style="font-size:0.68rem; color:var(--text-sub); margin-top:0.2rem;">토큰 + 호출 종량제 합산</div>
             </div>
-            <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
-              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">보안운영 인건비 절감액</div>
-              <div id="roiLaborSaving" style="font-size:1.25rem; font-weight:800; color:#7c3aed; margin-top:0.25rem;">₩0</div>
-              <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">수동 로그 분석·감사 60% 자동화</div>
+            <div style="background:#ffffff; border:1px solid var(--border); padding:1rem; border-radius:6px; box-shadow:var(--shadow-sm);">
+              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">연간 예상 API 총비용</div>
+              <div id="aiApiAnnualTotalDisplay" style="font-size:1.35rem; font-weight:800; color:#d97706; margin-top:0.25rem;">₩0</div>
+              <div style="font-size:0.68rem; color:var(--text-sub); margin-top:0.2rem;">12개월 환산 누적액</div>
             </div>
-            <div style="background:#fff; border:1px solid var(--border); padding:1rem; border-radius:6px;">
-              <div style="font-size:0.72rem; color:var(--text-dim); font-weight:600;">예상 투자 회수 기간 (Payback)</div>
-              <div id="roiPaybackPeriod" style="font-size:1.25rem; font-weight:800; color:#d97706; margin-top:0.25rem;">-</div>
-              <div style="font-size:0.68rem; color:var(--text-dim); margin-top:0.2rem;">순편익 발생 기준 소요 기간</div>
+            <div style="background:#ecfdf5; border:1px solid #a7f3d0; padding:1rem; border-radius:6px; box-shadow:var(--shadow-sm);">
+              <div style="font-size:0.72rem; color:#065f46; font-weight:600;">온프레미스 GB10 연간 절감액</div>
+              <div id="aiApiGb10SavingsDisplay" style="font-size:1.35rem; font-weight:800; color:#059669; margin-top:0.25rem;">₩0</div>
+              <div style="font-size:0.68rem; color:#047857; margin-top:0.2rem;">사내 177B 추론 대체 효과 (90% 절감)</div>
             </div>
           </div>
+
+          <!-- Department Budget Usage Progress -->
+          <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:1rem; margin-bottom:1.25rem;">
+            <div style="font-size:0.8rem; font-weight:700; color:var(--text-main); margin-bottom:0.75rem; display:flex; justify-content:space-between;">
+              <span>📊 주요 부서별 생성형 AI 토큰 예산 소진율 (FinOps Allocation)</span>
+              <span style="font-size:0.72rem; color:var(--text-dim);">월간 할당 예산 대비 실사용액</span>
+            </div>
+            <div id="aiApiDeptBudgetsContainer" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem;"></div>
+          </div>
+
+          <table class="clean-table">
+            <thead>
+              <tr>
+                <th style="width:190px;">서비스 / 모델명</th>
+                <th style="width:120px;">제공사(Vendor)</th>
+                <th style="width:130px;">과금 방식</th>
+                <th style="width:120px;">단위 단가</th>
+                <th style="width:120px; text-align:center;">월간 사용량</th>
+                <th style="width:130px;">월간 예상액</th>
+                <th style="width:130px;">연간 환산액</th>
+                <th style="width:110px;">주 사용부서</th>
+                <th style="width:90px; text-align:right;">관리</th>
+              </tr>
+            </thead>
+            <tbody id="aiApiTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- SUB VIEW 3: CONTRACT LIFECYCLE & D-DAY RENEWAL CALENDAR -->
+        <div id="bomSubView-lifecycle" style="display:none;">
+          
+          <!-- D-Day Urgent Alert Banner -->
+          <div id="lifecycleDDayAlertBar" style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:6px; padding:0.9rem 1.1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+              <i data-lucide="bell-ring" style="width:20px; height:20px; color:#d97706;"></i>
+              <div>
+                <div id="lifecycleDDayAlertTitle" style="font-weight:800; font-size:0.88rem; color:#92400e;">계약 갱신 임박 D-Day 모니터링 가동 중</div>
+                <div id="lifecycleDDayAlertDesc" style="font-size:0.75rem; color:#b45309; margin-top:2px;">60일 이내 만료 예정인 솔루션 및 API 계약에 대해 선제적 예산 편성이 필요합니다.</div>
+              </div>
+            </div>
+            <div id="lifecycleRenewalBudgetSum" style="font-size:1.15rem; font-weight:800; color:#b45309;">차기 갱신 소요액: ₩0</div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+            <div class="portal-filter-tabs" style="margin:0;">
+              <button class="portal-filter-tab active" onclick="filterLifecycleStatus('ALL', this)">전체 (<span id="countLifecycleAll">0</span>)</button>
+              <button class="portal-filter-tab" onclick="filterLifecycleStatus('ACTIVE', this)">정상 운용 (<span id="countLifecycleActive">0</span>)</button>
+              <button class="portal-filter-tab" onclick="filterLifecycleStatus('D60', this)">갱신 임박 D-60 (<span id="countLifecycleD60">0</span>)</button>
+              <button class="portal-filter-tab" onclick="filterLifecycleStatus('D30', this)">긴급 갱신 D-30 (<span id="countLifecycleD30">0</span>)</button>
+              <button class="portal-filter-tab" onclick="filterLifecycleStatus('EXPIRED', this)">만료 (<span id="countLifecycleExpired">0</span>)</button>
+            </div>
+            <span style="font-size:0.75rem; color:var(--text-dim);">기준일자: 2026-09-16 (실시간 자동 D-Day 계산)</span>
+          </div>
+
+          <table class="clean-table">
+            <thead>
+              <tr>
+                <th style="width:190px;">대상 솔루션 / 자산명</th>
+                <th style="width:100px;">분류</th>
+                <th style="width:105px;">계약 시작일</th>
+                <th style="width:105px;">계약 만료일</th>
+                <th style="width:100px;">계약 형태</th>
+                <th style="width:110px; text-align:center;">D-Day 상태</th>
+                <th style="width:130px;">차기 갱신 예상액</th>
+                <th style="width:130px;">감가상각 잔존가치(5년)</th>
+                <th style="width:100px;">관리 담당자</th>
+                <th style="width:70px; text-align:right;">설정</th>
+              </tr>
+            </thead>
+            <tbody id="lifecycleTableBody"></tbody>
+          </table>
         </div>
 
       </div>
@@ -1253,6 +1395,38 @@
       <div style="display:flex; flex-direction:column; gap:1rem;">
         
         <!-- Header & Action Bar -->
+        
+        <!-- Inline IT Asset Topology Graph Panel (한눈에 보는 전사 IT 자산 & SBOM 토폴로지 구성도) -->
+        <div class="white-panel" style="padding:1.1rem; border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow-sm); margin-bottom:1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span style="font-weight:800; font-size:0.95rem; color:var(--text-main); display:flex; align-items:center; gap:0.4rem;">
+                <i data-lucide="network" style="width:16px; height:16px; color:var(--primary);"></i>
+                전사 IT 자산 & SBOM 계층형 인프라 토폴로지 구성도
+              </span>
+              <span class="meta-badge" style="background:#eff6ff; color:#1d4ed8; font-size:0.7rem; font-weight:700;">실시간 자동 렌더링</span>
+            </div>
+            <div style="display:flex; gap:0.4rem;">
+              <button class="btn btn-sm" onclick="renderAssetTopologyGraph()" title="자산 등록부 변경사항을 그래프에 즉시 새로고침">
+                <i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> 그래프 새로고침
+              </button>
+              <button class="btn btn-sm" style="background:#eff6ff; color:#1d4ed8;" onclick="syncAssetsToStudio()" title="아키텍처 스튜디오에서 직접 다이어그램 편집">
+                <i data-lucide="edit-3" style="width:12px; height:12px;"></i> 스튜디오에서 편집
+              </button>
+              <button class="btn btn-sm" id="btnToggleTopology" onclick="toggleAssetTopologyView()">접기 ▲</button>
+            </div>
+          </div>
+          
+          <div id="assetTopologyContentWrapper">
+            <div style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">
+              등록된 IT 자산의 망분리 구역(경계 보안 ➔ DMZ ➔ 내부 업무망 ➔ DB 안전구역) 및 취약점(CVE) 상태를 실시간 시각화합니다.
+            </div>
+            <div id="assetTopologyGraphContainer" style="min-height:260px; background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:1rem; display:flex; justify-content:center; align-items:center; overflow-x:auto;">
+              <div style="color:var(--text-dim); font-size:0.8rem;">토폴로지 그래프 렌더링 준비 중...</div>
+            </div>
+          </div>
+        </div>
+
         <div class="portal-filter-bar">
           <div>
             <h2 style="font-size:1.15rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
@@ -1746,7 +1920,138 @@
         </div>
       </div>
     </div>
+  </div
+  <!-- Add / Edit Generative AI & Cloud API Modal -->
+  <div class="modal-overlay" id="aiApiModal">
+    <div class="modal-box" style="max-width:600px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="aiApiModalTitle" style="font-size:1.05rem; font-weight:800; color:var(--text-main);">생성형 AI & 클라우드 API 등록</h3>
+          <p style="font-size:0.75rem; color:var(--text-dim); margin-top:0.2rem;">사내에서 활용 중인 LLM 및 클라우드 API 사용량을 등록하고 실시간 FinOps 비용을 추적합니다.</p>
+        </div>
+        <button class="btn btn-sm" onclick="closeAiApiModal()"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:0.85rem; padding:1.25rem;">
+        <input type="hidden" id="aiApiModalId" value="">
+
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">서비스 / 모델명 *</label>
+            <input type="text" id="aiApiModalName" class="search-input" placeholder="예: OpenAI GPT-4o Enterprise, Claude 3.5..." style="background:#fff; margin-top:0.25rem;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">공급사 / 벤더 *</label>
+            <input type="text" id="aiApiModalVendor" class="search-input" placeholder="예: OpenAI, Anthropic, Google, 사내..." style="background:#fff; margin-top:0.25rem;">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">과금 방식 *</label>
+            <select id="aiApiModalBillingType" class="search-input" style="background:#fff; margin-top:0.25rem;" onchange="updateBillingUnitLabel(this.value)">
+              <option value="TOKEN_1M">토큰 종량제 (1M 토큰당 단가)</option>
+              <option value="CALL_1K">호출 종량제 (1,000건당 단가)</option>
+              <option value="SUBSCRIPTION">고정 구독형 (월정액)</option>
+              <option value="ONPREM_SERVER">온프레미스 인프라 (전력·감가상각)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);" id="aiApiUnitCostLabel">단위 단가 (₩ / 1M 토큰) *</label>
+            <input type="number" id="aiApiModalUnitCost" class="search-input" placeholder="예: 12000" style="background:#fff; margin-top:0.25rem;">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);" id="aiApiUsageQtyLabel">월간 예상 사용량 (M 토큰) *</label>
+            <input type="number" step="0.1" id="aiApiModalMonthlyUsage" class="search-input" placeholder="예: 15.0" style="background:#fff; margin-top:0.25rem;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">월간 할당 예산 (₩) *</label>
+            <input type="number" id="aiApiModalMonthlyBudget" class="search-input" placeholder="예: 2000000" style="background:#fff; margin-top:0.25rem;">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">주 사용 부서 *</label>
+          <input type="text" id="aiApiModalDepartment" class="search-input" placeholder="예: AI엔진개발팀, 보안운영팀, 전사 공통..." style="background:#fff; margin-top:0.25rem;">
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px solid var(--border); padding-top:0.75rem; margin-top:0.25rem;">
+          <button class="btn" onclick="closeAiApiModal()">취소</button>
+          <button class="btn btn-primary" onclick="saveAiApi()"><i data-lucide="check" style="width:13px; height:13px;"></i> 저장하기</button>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- Edit Contract Lifecycle Modal -->
+  <div class="modal-overlay" id="lifecycleModal">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="font-size:1.05rem; font-weight:800; color:var(--text-main);">계약 기간 및 생애주기 설정</h3>
+          <p style="font-size:0.75rem; color:var(--text-dim); margin-top:0.2rem;">계약 시작/종료일 및 갱신 주기, 감가상각 내용연수를 설정합니다.</p>
+        </div>
+        <button class="btn btn-sm" onclick="closeLifecycleModal()"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:0.85rem; padding:1.25rem;">
+        <input type="hidden" id="lifecycleModalId" value="">
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">대상 솔루션 / 자산명</label>
+          <input type="text" id="lifecycleModalName" class="search-input" disabled style="background:#f1f5f9; color:var(--text-sub); margin-top:0.25rem;">
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">계약 시작일 *</label>
+            <input type="date" id="lifecycleModalStart" class="search-input" style="background:#fff; margin-top:0.25rem;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">계약 만료일 *</label>
+            <input type="date" id="lifecycleModalEnd" class="search-input" style="background:#fff; margin-top:0.25rem;">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">계약 형태 *</label>
+            <select id="lifecycleModalContractType" class="search-input" style="background:#fff; margin-top:0.25rem;">
+              <option value="1년 연간계약">1년 연간계약</option>
+              <option value="3년 다년계약">3년 다년계약</option>
+              <option value="월간 구독">월간 구독 (Monthly)</option>
+              <option value="영구 라이선스+유지보수">영구 라이선스 + 유지보수</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">차기 갱신 예상액 (₩) *</label>
+            <input type="number" id="lifecycleModalRenewalCost" class="search-input" placeholder="예: 12000000" style="background:#fff; margin-top:0.25rem;">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">내용연수 (감가상각) *</label>
+            <select id="lifecycleModalUsefulYears" class="search-input" style="background:#fff; margin-top:0.25rem;">
+              <option value="5">5년 (정액법)</option>
+              <option value="3">3년 (정액법)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">관리 담당자</label>
+            <input type="text" id="lifecycleModalManager" class="search-input" placeholder="예: 인프라보안팀 김책임" style="background:#fff; margin-top:0.25rem;">
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px solid var(--border); padding-top:0.75rem; margin-top:0.25rem;">
+          <button class="btn" onclick="closeLifecycleModal()">취소</button>
+          <button class="btn btn-primary" onclick="saveLifecycleItem()"><i data-lucide="check" style="width:13px; height:13px;"></i> 설정 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+>
 
   <!-- Suite Core Client Scripts -->
   <script>
@@ -2453,6 +2758,7 @@
       } else if (viewName === 'sbom') {
         renderAssetTable();
         updateAssetKpis();
+        renderAssetTopologyGraph();
       }
       lucide.createIcons();
     }
@@ -3075,6 +3381,117 @@
         asset.components.splice(compIdx, 1);
         saveItAssetsToStorage();
         renderAssetTable();
+      }
+    }
+
+    
+    // --- 4.7.1 INLINE ASSET TOPOLOGY GRAPH RENDERER ---
+    let isAssetTopologyCollapsed = false;
+    function toggleAssetTopologyView() {
+      const wrapper = document.getElementById('assetTopologyContentWrapper');
+      const btn = document.getElementById('btnToggleTopology');
+      if (!wrapper || !btn) return;
+
+      isAssetTopologyCollapsed = !isAssetTopologyCollapsed;
+      wrapper.style.display = isAssetTopologyCollapsed ? 'none' : 'block';
+      btn.innerText = isAssetTopologyCollapsed ? '펼치기 ▼' : '접기 ▲';
+    }
+
+    let topologyRenderId = 0;
+    async function renderAssetTopologyGraph() {
+      const container = document.getElementById('assetTopologyGraphContainer');
+      if (!container) return;
+      if (isAssetTopologyCollapsed) return;
+
+      if (!currentItAssets || currentItAssets.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-dim); font-size:0.8rem; padding:2rem; text-align:center;">등록된 IT 자산이 없습니다. 자산을 등록하시면 토폴로지 구성도가 자동 생성됩니다.</div>';
+        return;
+      }
+
+      const perimeterAssets = currentItAssets.filter(a => a.zone === 'PERIMETER');
+      const dmzAssets = currentItAssets.filter(a => a.zone === 'DMZ');
+      const trustAssets = currentItAssets.filter(a => a.zone === 'TRUST');
+      const dbAssets = currentItAssets.filter(a => a.zone === 'SECURE_DB');
+
+      let code = 'flowchart LR\n';
+      code += '  subgraph ClientZone["🌐 외부 사용자"]\n';
+      code += '    ExtUser["👤 웹/모바일 단말\n(HTTPS 443)"]\n';
+      code += '  end\n\n';
+
+      let styleSnippets = '';
+
+      if (perimeterAssets.length > 0) {
+        code += '  subgraph PeriZone["🛡️ 경계 보안구역"]\n';
+        perimeterAssets.forEach((a, i) => {
+          const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
+          const nodeIcon = hasCrit ? '🚨 ' : '🔥 ';
+          code += '    G_P' + i + '["' + nodeIcon + a.name + '<br/><small>' + a.ip + '</small>"]\n';
+          if (hasCrit) styleSnippets += '  style G_P' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
+        });
+        code += '  end\n\n';
+      }
+
+      if (dmzAssets.length > 0) {
+        code += '  subgraph DmzZone["🏢 DMZ 웹구간"]\n';
+        dmzAssets.forEach((a, i) => {
+          const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
+          const nodeIcon = hasCrit ? '🚨 ' : '🌐 ';
+          code += '    G_D' + i + '["' + nodeIcon + a.name + '<br/><small>' + a.ip + '</small>"]\n';
+          if (hasCrit) styleSnippets += '  style G_D' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
+        });
+        code += '  end\n\n';
+      }
+
+      if (trustAssets.length > 0) {
+        code += '  subgraph TrustZone["🏢 내부 코어 업무망"]\n';
+        trustAssets.forEach((a, i) => {
+          const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
+          const nodeIcon = hasCrit ? '🚨 ' : '⚙️ ';
+          const critTag = hasCrit ? '<br/><b>[🚨 위험 CVE 발견]</b>' : '';
+          code += '    G_T' + i + '["' + nodeIcon + a.name + '<br/><small>' + a.ip + '</small>' + critTag + '"]\n';
+          if (hasCrit) styleSnippets += '  style G_T' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
+        });
+        code += '  end\n\n';
+      }
+
+      if (dbAssets.length > 0) {
+        code += '  subgraph DbZone["🔒 DB 안전구역"]\n';
+        dbAssets.forEach((a, i) => {
+          const hasCrit = (a.components || []).some(c => (c.cve || '').includes('위험'));
+          const nodeIcon = hasCrit ? '🚨 ' : '🗄️ ';
+          code += '    G_DB' + i + '["' + nodeIcon + a.name + '<br/><small>' + a.ip + '</small>"]\n';
+          if (hasCrit) styleSnippets += '  style G_DB' + i + ' fill:#fee2e2,stroke:#dc2626,stroke-width:2px\n';
+        });
+        code += '  end\n\n';
+      }
+
+      if (perimeterAssets.length > 0) code += '  ClientZone -->|인바운드 443| PeriZone\n';
+      if (perimeterAssets.length > 0 && dmzAssets.length > 0) code += '  PeriZone -->|패킷 검사| DmzZone\n';
+      else if (dmzAssets.length > 0) code += '  ClientZone -->|HTTPS 443| DmzZone\n';
+
+      if (dmzAssets.length > 0 && trustAssets.length > 0) code += '  DmzZone -->|API 호출 8443| TrustZone\n';
+      if (trustAssets.length > 0 && dbAssets.length > 0) code += '  TrustZone -->|SQL 쿼리 암호화| DbZone\n';
+
+      if (styleSnippets) {
+        code += '\n  %% Critical CVE Highlights\n' + styleSnippets;
+      }
+
+      topologyRenderId++;
+      const renderUniqueId = 'assetTopoGraphSvg_' + topologyRenderId;
+
+      try {
+        if (window.mermaid) {
+          const { svg } = await mermaid.render(renderUniqueId, code);
+          container.innerHTML = svg;
+          const svgEl = container.querySelector('svg');
+          if (svgEl) {
+            svgEl.style.maxWidth = '100%';
+            svgEl.style.height = 'auto';
+          }
+        }
+      } catch (err) {
+        console.warn('Asset topology render warning:', err);
+        container.innerHTML = '<div style="padding:1.5rem; color:var(--text-sub); font-size:0.75rem; text-align:center;">토폴로지 그래프 렌더링 중입니다. (자산 수: ' + currentItAssets.length + '대)</div>';
       }
     }
 
@@ -4624,6 +5041,7 @@
 
       // Update ROI & Risk Avoidance Metrics
       updateRoiMetrics(totalCapex, totalOpex);
+      updateUnifiedTcoSummary();
     }
 
     function exportBomToCsv() {
@@ -4934,7 +5352,665 @@
     }
 
     // --- 12. BOOTSTRAP ---
-    window.addEventListener('DOMContentLoaded', () => {
+    
+    // --- 4.8 REAL-TIME FINOPS TCO & CONTRACT LIFECYCLE MODULE ---
+    let currentBomSubView = 'sol';
+    function switchBomSubView(subView) {
+      currentBomSubView = subView;
+      const subViews = ['sol', 'api', 'lifecycle'];
+      subViews.forEach(v => {
+        const viewEl = document.getElementById('bomSubView-' + v);
+        const btnEl = document.getElementById('bomSubBtn-' + v);
+        if (viewEl) viewEl.style.display = (v === subView ? 'block' : 'none');
+        if (btnEl) {
+          if (v === subView) {
+            btnEl.className = 'btn btn-sm btn-primary';
+            btnEl.style.background = '';
+            btnEl.style.color = '';
+          } else {
+            btnEl.className = 'btn btn-sm';
+            btnEl.style.background = '#f8fafc';
+            btnEl.style.color = 'var(--text-sub)';
+          }
+        }
+      });
+
+      if (subView === 'api') {
+        renderAiApiTable();
+        updateAiApiKpis();
+      } else if (subView === 'lifecycle') {
+        renderLifecycleTable();
+      }
+      lucide.createIcons();
+    }
+
+    // --- 4.8.1 GENERATIVE AI & CLOUD API FINOPS ENGINE ---
+    const AI_API_STORAGE_KEY = 'GIJO_AI_API_V5_2';
+    let currentAiApiList = [];
+
+    const defaultAiApiServices = [
+      {
+        id: 'AI-01',
+        name: 'OpenAI GPT-4o Enterprise',
+        vendor: 'OpenAI',
+        billingType: 'TOKEN_1M',
+        unitCost: 12000,
+        monthlyUsage: 15.0,
+        monthlyBudget: 2500000,
+        dept: 'AI엔진개발팀'
+      },
+      {
+        id: 'AI-02',
+        name: 'Anthropic Claude 3.5 Sonnet',
+        vendor: 'Anthropic',
+        billingType: 'TOKEN_1M',
+        unitCost: 15000,
+        monthlyUsage: 8.0,
+        monthlyBudget: 1500000,
+        dept: '보안운영팀'
+      },
+      {
+        id: 'AI-03',
+        name: 'Google Gemini 1.5 Pro',
+        vendor: 'Google Cloud',
+        billingType: 'TOKEN_1M',
+        unitCost: 6000,
+        monthlyUsage: 20.0,
+        monthlyBudget: 1500000,
+        dept: '경영기획팀'
+      },
+      {
+        id: 'AI-04',
+        name: '온프레미스 GB10 (Qwen 177B MoE)',
+        vendor: '온프레미스 클러스터',
+        billingType: 'ONPREM_SERVER',
+        unitCost: 1200,
+        monthlyUsage: 720.0,
+        monthlyBudget: 1000000,
+        dept: '사내 전용 인프라'
+      },
+      {
+        id: 'AI-05',
+        name: '사내 bge-m3 임베딩 & OCR API',
+        vendor: '사내 인프라',
+        billingType: 'CALL_1K',
+        unitCost: 150,
+        monthlyUsage: 120.0,
+        monthlyBudget: 300000,
+        dept: '지능형 워크스페이스'
+      }
+    ];
+
+    function loadAiApiServices() {
+      try {
+        const stored = localStorage.getItem(AI_API_STORAGE_KEY);
+        if (stored) {
+          currentAiApiList = JSON.parse(stored);
+        } else {
+          currentAiApiList = JSON.parse(JSON.stringify(defaultAiApiServices));
+          saveAiApiServices();
+        }
+      } catch (e) {
+        currentAiApiList = JSON.parse(JSON.stringify(defaultAiApiServices));
+      }
+    }
+
+    function saveAiApiServices() {
+      try {
+        localStorage.setItem(AI_API_STORAGE_KEY, JSON.stringify(currentAiApiList));
+      } catch (e) {}
+    }
+
+    function updateBillingUnitLabel(billingType) {
+      const costLabel = document.getElementById('aiApiUnitCostLabel');
+      const usageLabel = document.getElementById('aiApiUsageQtyLabel');
+      if (billingType === 'TOKEN_1M') {
+        if (costLabel) costLabel.innerText = '단위 단가 (₩ / 1M 토큰) *';
+        if (usageLabel) usageLabel.innerText = '월간 예상 사용량 (M 토큰) *';
+      } else if (billingType === 'CALL_1K') {
+        if (costLabel) costLabel.innerText = '단위 단가 (₩ / 1,000회 호출) *';
+        if (usageLabel) usageLabel.innerText = '월간 예상 호출수 (천 건) *';
+      } else if (billingType === 'ONPREM_SERVER') {
+        if (costLabel) costLabel.innerText = '시간당 운영단가 (₩ / 시간) *';
+        if (usageLabel) usageLabel.innerText = '월간 가동 시간 (시간) *';
+      } else {
+        if (costLabel) costLabel.innerText = '월 고정 구독료 (₩) *';
+        if (usageLabel) usageLabel.innerText = '구독 계정 수 (개) *';
+      }
+    }
+
+    function calculateAiApiCost(item) {
+      const unitCost = Number(item.unitCost) || 0;
+      const usage = Number(item.monthlyUsage) || 0;
+      const monthly = Math.round(unitCost * usage);
+      const annual = monthly * 12;
+      return { monthly: monthly, annual: annual };
+    }
+
+    function updateAiApiKpis() {
+      let monthlyTotal = 0;
+      let annualTotal = 0;
+      let gb10Savings = 0;
+
+      const deptBudgets = {};
+
+      currentAiApiList.forEach(item => {
+        const cost = calculateAiApiCost(item);
+        monthlyTotal += cost.monthly;
+        annualTotal += cost.annual;
+
+        // Calculate GB10 on-premise savings (assuming 90% cost savings compared to cloud LLMs)
+        if (item.billingType === 'ONPREM_SERVER') {
+          const equivalentCloudCost = (cost.monthly * 10) - cost.monthly;
+          gb10Savings += (equivalentCloudCost * 12);
+        }
+
+        const dept = item.dept || '기타';
+        if (!deptBudgets[dept]) deptBudgets[dept] = { spent: 0, budget: 0 };
+        deptBudgets[dept].spent += cost.monthly;
+        deptBudgets[dept].budget += (Number(item.monthlyBudget) || cost.monthly);
+      });
+
+      const countEl = document.getElementById('aiApiCountDisplay');
+      const monthlyEl = document.getElementById('aiApiMonthlyTotalDisplay');
+      const annualEl = document.getElementById('aiApiAnnualTotalDisplay');
+      const savingsEl = document.getElementById('aiApiGb10SavingsDisplay');
+
+      if (countEl) countEl.innerText = currentAiApiList.length + ' 종';
+      if (monthlyEl) monthlyEl.innerText = '₩' + monthlyTotal.toLocaleString();
+      if (annualEl) annualEl.innerText = '₩' + annualTotal.toLocaleString();
+      if (savingsEl) savingsEl.innerText = '₩' + gb10Savings.toLocaleString();
+
+      // Render department budget bars
+      const deptContainer = document.getElementById('aiApiDeptBudgetsContainer');
+      if (deptContainer) {
+        deptContainer.innerHTML = '';
+        Object.entries(deptBudgets).forEach(([deptName, bInfo]) => {
+          const ratio = bInfo.budget > 0 ? Math.min(100, Math.round((bInfo.spent / bInfo.budget) * 100)) : 100;
+          const isOver = bInfo.spent > bInfo.budget;
+          const barColor = isOver ? '#dc2626' : (ratio >= 80 ? '#d97706' : '#2563eb');
+
+          const dBox = document.createElement('div');
+          dBox.style.cssText = 'background:#fff; border:1px solid var(--border); border-radius:6px; padding:0.75rem;';
+          dBox.innerHTML = 
+            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">' +
+              '<span style="font-weight:700; font-size:0.78rem; color:var(--text-main);">' + sanitizeHtml(deptName) + '</span>' +
+              '<span style="font-size:0.72rem; font-weight:800; color:' + barColor + ';">' + ratio + '% 소진' + (isOver ? ' (초과)' : '') + '</span>' +
+            '</div>' +
+            '<div style="width:100%; height:6px; background:#f1f5f9; border-radius:999px; overflow:hidden; margin-bottom:0.35rem;">' +
+              '<div style="width:' + ratio + '%; height:100%; background:' + barColor + '; border-radius:999px;"></div>' +
+            '</div>' +
+            '<div style="display:flex; justify-content:space-between; font-size:0.68rem; color:var(--text-dim);">' +
+              '<span>실사용: ₩' + bInfo.spent.toLocaleString() + '</span>' +
+              '<span>예산: ₩' + bInfo.budget.toLocaleString() + '</span>' +
+            '</div>';
+          deptContainer.appendChild(dBox);
+        });
+      }
+
+      // Update Unified Top TCO summary cards
+      updateUnifiedTcoSummary(annualTotal);
+    }
+
+    function renderAiApiTable() {
+      const tbody = document.getElementById('aiApiTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      currentAiApiList.forEach((item, idx) => {
+        const cost = calculateAiApiCost(item);
+        const billingBadge = item.billingType === 'TOKEN_1M' ? '<span class="meta-badge badge-global">1M 토큰</span>'
+          : (item.billingType === 'CALL_1K' ? '<span class="meta-badge badge-kr">1,000건</span>'
+          : (item.billingType === 'ONPREM_SERVER' ? '<span class="meta-badge badge-custom">온프렘 시간제</span>' : '<span class="meta-badge">월 구독</span>'));
+
+        const usageUnit = item.billingType === 'TOKEN_1M' ? 'M 토큰'
+          : (item.billingType === 'CALL_1K' ? '천 건'
+          : (item.billingType === 'ONPREM_SERVER' ? '시간' : '계정'));
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = 
+          '<td><b>' + sanitizeHtml(item.name) + '</b></td>' +
+          '<td>' + sanitizeHtml(item.vendor) + '</td>' +
+          '<td>' + billingBadge + '</td>' +
+          '<td>₩' + Number(item.unitCost).toLocaleString() + '</td>' +
+          '<td style="text-align:center;">' +
+            '<input type="number" step="0.1" class="qty-box" style="width:75px;" value="' + item.monthlyUsage + '" onchange="updateAiApiUsage(' + idx + ', this.value)"> ' +
+            '<span style="font-size:0.7rem; color:var(--text-dim);">' + usageUnit + '</span>' +
+          '</td>' +
+          '<td style="font-weight:700; color:var(--text-main);">₩' + cost.monthly.toLocaleString() + '</td>' +
+          '<td style="color:#d97706; font-weight:700;">₩' + cost.annual.toLocaleString() + '</td>' +
+          '<td><span class="meta-badge" style="background:#f1f5f9;">' + sanitizeHtml(item.dept) + '</span></td>' +
+          '<td style="text-align:right;">' +
+            '<button class="btn btn-sm" style="padding:1px 5px; font-size:0.68rem; margin-right:3px;" onclick="openEditAiApiModal(\'' + item.id + '\')">수정</button>' +
+            '<button class="btn btn-sm" style="padding:1px 5px; font-size:0.68rem; color:var(--danger);" onclick="deleteAiApi(\'' + item.id + '\')">삭제</button>' +
+          '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateAiApiUsage(idx, newVal) {
+      if (currentAiApiList[idx]) {
+        currentAiApiList[idx].monthlyUsage = Math.max(0, parseFloat(newVal) || 0);
+        saveAiApiServices();
+        renderAiApiTable();
+        updateAiApiKpis();
+      }
+    }
+
+    function openAddAiApiModal() {
+      document.getElementById('aiApiModalId').value = '';
+      document.getElementById('aiApiModalTitle').innerText = '생성형 AI & 클라우드 API 신규 등록';
+      document.getElementById('aiApiModalName').value = '';
+      document.getElementById('aiApiModalVendor').value = '';
+      document.getElementById('aiApiModalBillingType').value = 'TOKEN_1M';
+      document.getElementById('aiApiModalUnitCost').value = '';
+      document.getElementById('aiApiModalMonthlyUsage').value = '';
+      document.getElementById('aiApiModalMonthlyBudget').value = '';
+      document.getElementById('aiApiModalDepartment').value = '';
+      updateBillingUnitLabel('TOKEN_1M');
+      document.getElementById('aiApiModal').style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function openEditAiApiModal(apiId) {
+      const item = currentAiApiList.find(a => a.id === apiId);
+      if (!item) return;
+
+      document.getElementById('aiApiModalId').value = item.id;
+      document.getElementById('aiApiModalTitle').innerText = 'AI / API 서비스 수정';
+      document.getElementById('aiApiModalName').value = item.name;
+      document.getElementById('aiApiModalVendor').value = item.vendor;
+      document.getElementById('aiApiModalBillingType').value = item.billingType || 'TOKEN_1M';
+      document.getElementById('aiApiModalUnitCost').value = item.unitCost;
+      document.getElementById('aiApiModalMonthlyUsage').value = item.monthlyUsage;
+      document.getElementById('aiApiModalMonthlyBudget').value = item.monthlyBudget || '';
+      document.getElementById('aiApiModalDepartment').value = item.dept;
+      updateBillingUnitLabel(item.billingType || 'TOKEN_1M');
+      document.getElementById('aiApiModal').style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function closeAiApiModal() {
+      document.getElementById('aiApiModal').style.display = 'none';
+    }
+
+    function saveAiApi() {
+      const apiId = document.getElementById('aiApiModalId').value.trim();
+      const name = document.getElementById('aiApiModalName').value.trim();
+      const vendor = document.getElementById('aiApiModalVendor').value.trim();
+      const billingType = document.getElementById('aiApiModalBillingType').value;
+      const unitCost = Number(document.getElementById('aiApiModalUnitCost').value) || 0;
+      const monthlyUsage = Number(document.getElementById('aiApiModalMonthlyUsage').value) || 0;
+      const monthlyBudget = Number(document.getElementById('aiApiModalMonthlyBudget').value) || (unitCost * monthlyUsage);
+      const dept = document.getElementById('aiApiModalDepartment').value.trim() || '전사 공통';
+
+      if (!name) {
+        alert('서비스 / 모델명을 입력해주세요.');
+        return;
+      }
+
+      if (apiId) {
+        const item = currentAiApiList.find(a => a.id === apiId);
+        if (item) {
+          item.name = name;
+          item.vendor = vendor;
+          item.billingType = billingType;
+          item.unitCost = unitCost;
+          item.monthlyUsage = monthlyUsage;
+          item.monthlyBudget = monthlyBudget;
+          item.dept = dept;
+        }
+      } else {
+        const newId = 'AI-' + String(currentAiApiList.length + 1).padStart(2, '0');
+        currentAiApiList.push({
+          id: newId,
+          name: name,
+          vendor: vendor,
+          billingType: billingType,
+          unitCost: unitCost,
+          monthlyUsage: monthlyUsage,
+          monthlyBudget: monthlyBudget,
+          dept: dept
+        });
+      }
+
+      saveAiApiServices();
+      closeAiApiModal();
+      renderAiApiTable();
+      updateAiApiKpis();
+    }
+
+    function deleteAiApi(apiId) {
+      if (confirm('해당 AI/API 서비스를 목록에서 삭제하시겠습니까?')) {
+        currentAiApiList = currentAiApiList.filter(a => a.id !== apiId);
+        saveAiApiServices();
+        renderAiApiTable();
+        updateAiApiKpis();
+      }
+    }
+
+    function exportAiApiCsv() {
+      let csv = 'ID,서비스명,공급사,과금방식,단위단가,월사용량,월간비용,연간비용,부서,월예산\n';
+      currentAiApiList.forEach(item => {
+        const cost = calculateAiApiCost(item);
+        csv += '"' + item.id + '","' + item.name + '","' + item.vendor + '","' + item.billingType + '",' + item.unitCost + ',' + item.monthlyUsage + ',' + cost.monthly + ',' + cost.annual + ',"' + item.dept + '",' + (item.monthlyBudget || 0) + '\n';
+      });
+
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'GIJO_Generative_AI_FinOps_' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.click();
+    }
+
+    // --- 4.8.2 CONTRACT LIFECYCLE & D-DAY ENGINE ---
+    const LIFECYCLE_STORAGE_KEY = 'GIJO_LIFECYCLE_V5_2';
+    let currentLifecycleList = [];
+    let currentLifecycleFilter = 'ALL';
+
+    const defaultLifecycleList = [
+      {
+        id: 'LC-01',
+        name: 'GIJO AS 폐쇄망 에이전트',
+        category: '보안솔루션',
+        startDate: '2026-01-01',
+        endDate: '2026-10-15',
+        contractType: '1년 연간계약',
+        renewalCost: 25000000,
+        usefulYears: 5,
+        manager: '정보보호팀 최책임'
+      },
+      {
+        id: 'LC-02',
+        name: 'WizCLM 인증서 자동화',
+        category: '보안솔루션',
+        startDate: '2025-11-01',
+        endDate: '2026-10-31',
+        contractType: '1년 연간계약',
+        renewalCost: 15000000,
+        usefulYears: 5,
+        manager: '인프라팀 김수석'
+      },
+      {
+        id: 'LC-03',
+        name: 'OpenAI GPT-4o Enterprise',
+        category: '클라우드API',
+        startDate: '2026-03-01',
+        endDate: '2027-02-28',
+        contractType: '1년 연간계약',
+        renewalCost: 24000000,
+        usefulYears: 3,
+        manager: 'AI엔진팀 박팀장'
+      },
+      {
+        id: 'LC-04',
+        name: 'CipherTrust 투명 DB 암호화',
+        category: '보안솔루션',
+        startDate: '2024-05-15',
+        endDate: '2027-05-14',
+        contractType: '3년 다년계약',
+        renewalCost: 35000000,
+        usefulYears: 5,
+        manager: '데이터팀 이수석'
+      },
+      {
+        id: 'LC-05',
+        name: '대고객 포털 웹서버 (Nginx)',
+        category: 'IT인프라',
+        startDate: '2022-09-01',
+        endDate: '2026-08-31',
+        contractType: '영구 라이선스+유지보수',
+        renewalCost: 3000000,
+        usefulYears: 5,
+        manager: '인프라팀 홍책임'
+      }
+    ];
+
+    function loadLifecycleData() {
+      try {
+        const stored = localStorage.getItem(LIFECYCLE_STORAGE_KEY);
+        if (stored) {
+          currentLifecycleList = JSON.parse(stored);
+        } else {
+          currentLifecycleList = JSON.parse(JSON.stringify(defaultLifecycleList));
+          saveLifecycleData();
+        }
+      } catch (e) {
+        currentLifecycleList = JSON.parse(JSON.stringify(defaultLifecycleList));
+      }
+    }
+
+    function saveLifecycleData() {
+      try {
+        localStorage.setItem(LIFECYCLE_STORAGE_KEY, JSON.stringify(currentLifecycleList));
+      } catch (e) {}
+    }
+
+    function calculateDDay(endDateStr) {
+      if (!endDateStr) return { days: 999, label: '-', status: 'ACTIVE' };
+      const today = new Date('2026-09-16');
+      const end = new Date(endDateStr);
+      const diffTime = end.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
+        return { days: diffDays, label: '만료 (' + Math.abs(diffDays) + '일 지남)', status: 'EXPIRED' };
+      } else if (diffDays === 0) {
+        return { days: 0, label: 'D-Day (오늘 만료)', status: 'D30' };
+      } else if (diffDays <= 30) {
+        return { days: diffDays, label: 'D-' + diffDays + ' (긴급)', status: 'D30' };
+      } else if (diffDays <= 60) {
+        return { days: diffDays, label: 'D-' + diffDays + ' (갱신임박)', status: 'D60' };
+      } else {
+        return { days: diffDays, label: 'D-' + diffDays, status: 'ACTIVE' };
+      }
+    }
+
+    function calculateDepreciationValue(item) {
+      const today = new Date('2026-09-16');
+      const start = new Date(item.startDate || '2026-01-01');
+      const usefulYears = Number(item.usefulYears) || 5;
+      const initialCost = Number(item.renewalCost) || 10000000;
+
+      const elapsedMonths = Math.max(0, (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()));
+      const totalMonths = usefulYears * 12;
+      const remainingRatio = Math.max(0, 1 - (elapsedMonths / totalMonths));
+      return Math.round(initialCost * remainingRatio);
+    }
+
+    function filterLifecycleStatus(status, btn) {
+      currentLifecycleFilter = status;
+      document.querySelectorAll('#bomSubView-lifecycle .portal-filter-tab').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderLifecycleTable();
+    }
+
+    function renderLifecycleTable() {
+      const tbody = document.getElementById('lifecycleTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      let countAll = 0, countActive = 0, countD60 = 0, countD30 = 0, countExpired = 0;
+      let urgentBudgetSum = 0;
+      let urgentCount = 0;
+
+      currentLifecycleList.forEach(item => {
+        countAll++;
+        const dday = calculateDDay(item.endDate);
+        if (dday.status === 'ACTIVE') countActive++;
+        else if (dday.status === 'D60') countD60++;
+        else if (dday.status === 'D30') countD30++;
+        else if (dday.status === 'EXPIRED') countExpired++;
+
+        if (dday.status === 'D30' || dday.status === 'D60') {
+          urgentCount++;
+          urgentBudgetSum += (Number(item.renewalCost) || 0);
+        }
+      });
+
+      const elAll = document.getElementById('countLifecycleAll');
+      const elActive = document.getElementById('countLifecycleActive');
+      const elD60 = document.getElementById('countLifecycleD60');
+      const elD30 = document.getElementById('countLifecycleD30');
+      const elExpired = document.getElementById('countLifecycleExpired');
+      if (elAll) elAll.innerText = countAll;
+      if (elActive) elActive.innerText = countActive;
+      if (elD60) elD60.innerText = countD60;
+      if (elD30) elD30.innerText = countD30;
+      if (elExpired) elExpired.innerText = countExpired;
+
+      // Update Alert Banner
+      const bannerTitle = document.getElementById('lifecycleDDayAlertTitle');
+      const bannerDesc = document.getElementById('lifecycleDDayAlertDesc');
+      const bannerSum = document.getElementById('lifecycleRenewalBudgetSum');
+      if (bannerTitle) bannerTitle.innerText = '계약 갱신 임박 D-Day 모니터링: ' + urgentCount + '건 선제 조치 대상';
+      if (bannerDesc) bannerDesc.innerText = '60일 이내 만료 예정 계약에 대해 사전 품의 및 차기 예산 확보가 권고됩니다.';
+      if (bannerSum) bannerSum.innerText = '차기 갱신 소요액: ₩' + urgentBudgetSum.toLocaleString();
+
+      const filtered = currentLifecycleList.filter(item => {
+        if (currentLifecycleFilter === 'ALL') return true;
+        const dday = calculateDDay(item.endDate);
+        return dday.status === currentLifecycleFilter;
+      });
+
+      filtered.forEach((item, idx) => {
+        const dday = calculateDDay(item.endDate);
+        const depVal = calculateDepreciationValue(item);
+
+        const ddayBadgeColor = dday.status === 'EXPIRED' ? '#475569'
+          : (dday.status === 'D30' ? '#dc2626'
+          : (dday.status === 'D60' ? '#d97706' : '#059669'));
+        const ddayBadgeBg = dday.status === 'EXPIRED' ? '#f1f5f9'
+          : (dday.status === 'D30' ? '#fee2e2'
+          : (dday.status === 'D60' ? '#fef3c7' : '#ecfdf5'));
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = 
+          '<td><b>' + sanitizeHtml(item.name) + '</b></td>' +
+          '<td><span class="meta-badge" style="font-size:0.7rem;">' + sanitizeHtml(item.category) + '</span></td>' +
+          '<td>' + sanitizeHtml(item.startDate || '-') + '</td>' +
+          '<td>' + sanitizeHtml(item.endDate || '-') + '</td>' +
+          '<td>' + sanitizeHtml(item.contractType || '연간계약') + '</td>' +
+          '<td style="text-align:center;"><span style="background:' + ddayBadgeBg + '; color:' + ddayBadgeColor + '; padding:3px 8px; border-radius:999px; font-weight:800; font-size:0.72rem;">' + dday.label + '</span></td>' +
+          '<td style="font-weight:700; color:#d97706;">₩' + Number(item.renewalCost).toLocaleString() + '</td>' +
+          '<td style="color:var(--text-sub);">₩' + depVal.toLocaleString() + ' (' + item.usefulYears + '년)</td>' +
+          '<td>' + sanitizeHtml(item.manager || '담당자') + '</td>' +
+          '<td style="text-align:right;">' +
+            '<button class="btn btn-sm" style="padding:1px 6px; font-size:0.7rem;" onclick="openEditLifecycleModal(\'' + item.id + '\')">설정</button>' +
+          '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openEditLifecycleModal(lcId) {
+      const item = currentLifecycleList.find(l => l.id === lcId);
+      if (!item) return;
+
+      document.getElementById('lifecycleModalId').value = item.id;
+      document.getElementById('lifecycleModalName').value = item.name;
+      document.getElementById('lifecycleModalStart').value = item.startDate || '';
+      document.getElementById('lifecycleModalEnd').value = item.endDate || '';
+      document.getElementById('lifecycleModalContractType').value = item.contractType || '1년 연간계약';
+      document.getElementById('lifecycleModalRenewalCost').value = item.renewalCost || 0;
+      document.getElementById('lifecycleModalUsefulYears').value = item.usefulYears || 5;
+      document.getElementById('lifecycleModalManager').value = item.manager || '';
+
+      document.getElementById('lifecycleModal').style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function closeLifecycleModal() {
+      document.getElementById('lifecycleModal').style.display = 'none';
+    }
+
+    function saveLifecycleItem() {
+      const lcId = document.getElementById('lifecycleModalId').value;
+      const item = currentLifecycleList.find(l => l.id === lcId);
+      if (!item) return;
+
+      item.startDate = document.getElementById('lifecycleModalStart').value;
+      item.endDate = document.getElementById('lifecycleModalEnd').value;
+      item.contractType = document.getElementById('lifecycleModalContractType').value;
+      item.renewalCost = Number(document.getElementById('lifecycleModalRenewalCost').value) || 0;
+      item.usefulYears = Number(document.getElementById('lifecycleModalUsefulYears').value) || 5;
+      item.manager = document.getElementById('lifecycleModalManager').value.trim();
+
+      saveLifecycleData();
+      closeLifecycleModal();
+      renderLifecycleTable();
+    }
+
+    // --- 4.8.3 UNIFIED TCO CALCULATION ENGINE ---
+    function updateUnifiedTcoSummary(aiAnnualTotal) {
+      let annualAi = aiAnnualTotal;
+      if (annualAi === undefined) {
+        annualAi = 0;
+        currentAiApiList.forEach(item => {
+          annualAi += calculateAiApiCost(item).annual;
+        });
+      }
+
+      let totalSolQty = 0;
+      let totalSolCapex = 0;
+      let totalSolOpex = 0;
+
+      activeSolutionsList.forEach(sol => {
+        const qty = sol.qty || 0;
+        const price = sol.price || 0;
+        const capex = price * qty;
+        const opex = Math.round(capex * (sol.opexRate || 0.12));
+        totalSolQty += qty;
+        totalSolCapex += capex;
+        totalSolOpex += opex;
+      });
+
+      const unifiedAnnualOpex = totalSolOpex + annualAi;
+      const unified5YearTco = totalSolCapex + (unifiedAnnualOpex * 5);
+
+      const qtyEl = document.getElementById('bomTotalQtyCount');
+      const capexEl = document.getElementById('bomTotalCapex');
+      const opexEl = document.getElementById('bomTotalOpex');
+      const tcoEl = document.getElementById('bomTotalTco');
+
+      if (qtyEl) qtyEl.innerText = totalSolQty + '개 솔루션 + ' + currentAiApiList.length + '종 API';
+      if (capexEl) capexEl.innerText = '₩' + totalSolCapex.toLocaleString();
+      if (opexEl) opexEl.innerText = '₩' + unifiedAnnualOpex.toLocaleString();
+      if (tcoEl) tcoEl.innerText = '₩' + unified5YearTco.toLocaleString();
+    }
+
+    function exportUnifiedTcoCsv() {
+      let csv = '=== 1. 전사 보안 솔루션 TCO ===\n';
+      csv += '솔루션명,제조사,카테고리,단가,수량,도입비(Capex),연간유지보수(Opex),5개년TCO\n';
+      activeSolutionsList.forEach(sol => {
+        const qty = sol.qty || 0;
+        const capex = (sol.price || 0) * qty;
+        const opex = Math.round(capex * (sol.opexRate || 0.12));
+        const tco = capex + (opex * 5);
+        csv += '"' + sol.name + '","' + sol.vendor + '","' + (sol.category || '') + '",' + (sol.price || 0) + ',' + qty + ',' + capex + ',' + opex + ',' + tco + '\n';
+      });
+
+      csv += '\n=== 2. 생성형 AI & 클라우드 API FinOps ===\n';
+      csv += '서비스명,공급사,과금방식,단위단가,월사용량,월간비용,연간비용,부서\n';
+      currentAiApiList.forEach(item => {
+        const cost = calculateAiApiCost(item);
+        csv += '"' + item.name + '","' + item.vendor + '","' + item.billingType + '",' + item.unitCost + ',' + item.monthlyUsage + ',' + cost.monthly + ',' + cost.annual + ',"' + item.dept + '"\n';
+      });
+
+      csv += '\n=== 3. 솔루션 & API 계약 생애주기 (Lifecycle) ===\n';
+      csv += '대상명,구분,계약시작일,계약만료일,계약형태,D-Day상태,차기갱신예상액,담당자\n';
+      currentLifecycleList.forEach(item => {
+        const dday = calculateDDay(item.endDate);
+        csv += '"' + item.name + '","' + item.category + '","' + (item.startDate || '') + '","' + (item.endDate || '') + '","' + item.contractType + '","' + dday.label + '",' + item.renewalCost + ',"' + (item.manager || '') + '"\n';
+      });
+
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'GIJO_Unified_Security_AI_FinOps_TCO_' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.click();
+    }
+
+window.addEventListener('DOMContentLoaded', () => {
       mermaid.initialize({
         startOnLoad: false,
         theme: 'default',
@@ -4963,12 +6039,18 @@
       updateStudioBomBadge();
 
       // Initialize PDF drag and drop zone
-      initPdfDropZone();
+      
+      // Initialize FinOps & Contract Lifecycle
+      loadAiApiServices();
+      loadLifecycleData();
+      updateAiApiKpis();
+initPdfDropZone();
 
       // Initialize IT Assets & SBOM
       loadItAssets();
       renderAssetTable();
       updateAssetKpis();
+      renderAssetTopologyGraph();
 
       lucide.createIcons();
     });
