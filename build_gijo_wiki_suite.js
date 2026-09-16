@@ -14,7 +14,7 @@ const htmlContent = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>GIJO AS Lite — GIJO WIKI Edition v5.2.0 (보안 지식고 & 20종 솔루션 포털)</title>
+  <title>GIJO AS Lite — GIJO WIKI & ERP v5.2.0 (지능형 보안 워크스페이스)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
   <!-- Mermaid.js Engine -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -192,6 +192,12 @@ const htmlContent = `<!DOCTYPE html>
       border-color: var(--primary-hover);
     }
 
+    .btn-success {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+
     .btn-sm {
       padding: 0.25rem 0.55rem;
       font-size: 0.75rem;
@@ -366,6 +372,12 @@ const htmlContent = `<!DOCTYPE html>
       background: #faf5ff;
       color: #7e22ce;
       border-color: #e9d5ff;
+    }
+
+    .meta-badge.badge-custom {
+      background: #ecfdf5;
+      color: #059669;
+      border-color: #a7f3d0;
     }
 
     /* Wiki Content Panel */
@@ -693,9 +705,9 @@ const htmlContent = `<!DOCTYPE html>
       background: #ffffff;
       border: 1px solid var(--border);
       border-radius: 12px;
-      width: 90%;
+      width: 92%;
       max-width: 950px;
-      max-height: 88vh;
+      max-height: 90vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -714,6 +726,15 @@ const htmlContent = `<!DOCTYPE html>
     .modal-body {
       padding: 1.5rem;
       overflow-y: auto;
+    }
+
+    /* Detail Modal Tabs */
+    .modal-sub-tabs {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 1.2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
     }
 
     /* BOM Table */
@@ -752,7 +773,7 @@ const htmlContent = `<!DOCTYPE html>
           <i data-lucide="book-open" style="width:14px; height:14px;"></i> 사내 지식고 & RAG
         </button>
         <button id="tabBtn-portal" class="tab-btn" onclick="switchView('portal')">
-          <i data-lucide="shield-check" style="width:14px; height:14px;"></i> 솔루션 ERP (20종)
+          <i data-lucide="shield-check" style="width:14px; height:14px;"></i> 솔루션 ERP & 매뉴얼
         </button>
         <button id="tabBtn-studio" class="tab-btn" onclick="switchView('studio')">
           <i data-lucide="cpu" style="width:14px; height:14px;"></i> 아키텍처 스튜디오
@@ -766,7 +787,7 @@ const htmlContent = `<!DOCTYPE html>
       </nav>
 
       <div class="header-tools">
-        <button class="btn" onclick="resetToRealDocs()" title="29종 원본 문서 전수 새로고침">
+        <button class="btn" onclick="resetToRealDocs()" title="초기 기본 문서 전수 새로고침">
           <i data-lucide="refresh-cw" style="width:13px; height:13px;"></i> 원본 새로고침
         </button>
         <button class="btn" onclick="openLlmSettingsModal()">
@@ -789,7 +810,7 @@ const htmlContent = `<!DOCTYPE html>
         <!-- Left: My Docs Vault -->
         <aside class="white-panel">
           <div class="panel-head">
-            <span class="panel-head-title"><i data-lucide="folder" style="width:14px; height:14px; color:var(--primary);"></i> GIJO 실물 지식고 (<span id="totalDocCount">0</span>)</span>
+            <span class="panel-head-title"><i data-lucide="folder" style="width:14px; height:14px; color:var(--primary);"></i> 실물 지식고 (<span id="totalDocCount">0</span>)</span>
             <button class="btn btn-sm" onclick="createNewWikiDoc()">
               <i data-lucide="plus" style="width:12px; height:12px;"></i> 추가
             </button>
@@ -801,12 +822,12 @@ const htmlContent = `<!DOCTYPE html>
 
           <div class="category-filter-strip">
             <button class="pill-cat active" id="pill-ALL" onclick="filterByCat('ALL')">전체</button>
-            <button class="pill-cat" id="pill-보안솔루션" onclick="filterByCat('보안솔루션')">보안솔루션(20)</button>
+            <button class="pill-cat" id="pill-사내솔루션" onclick="filterByCat('사내솔루션')">사내운용(자사)</button>
+            <button class="pill-cat" id="pill-보안솔루션" onclick="filterByCat('보안솔루션')">표준솔루션(20)</button>
             <button class="pill-cat" id="pill-보안규정" onclick="filterByCat('보안규정')">보안규정</button>
             <button class="pill-cat" id="pill-취약점관리" onclick="filterByCat('취약점관리')">취약점</button>
             <button class="pill-cat" id="pill-AI보안" onclick="filterByCat('AI보안')">AI보안</button>
             <button class="pill-cat" id="pill-아키텍처설계" onclick="filterByCat('아키텍처설계')">아키텍처</button>
-            <button class="pill-cat" id="pill-QA문답집" onclick="filterByCat('QA문답집')">QA문답</button>
           </div>
 
           <ul id="wikiDocList" class="doc-list-clean"></ul>
@@ -859,7 +880,7 @@ const htmlContent = `<!DOCTYPE html>
               <i data-lucide="bot" style="width:14px; height:14px; color:var(--primary);"></i> AI Copilot & 지식 학습 질의
             </span>
             <span id="llmStatusIndicator" style="font-size:0.68rem; color:#059669; font-weight:600; display:flex; align-items:center; gap:3px;">
-              <span style="width:6px; height:6px; background:#059669; border-radius:50%;"></span> 에어갭 RAG (29종 전수)
+              <span style="width:6px; height:6px; background:#059669; border-radius:50%;"></span> 실시간 RAG 인덱스 가동
             </span>
           </div>
 
@@ -867,13 +888,13 @@ const htmlContent = `<!DOCTYPE html>
 
           <div class="rag-chat-history" id="ragChatMessages">
             <div class="bubble ai">
-              안녕하세요! <b>GIJO AS 보안 실무 지식고 및 20종 솔루션 카탈로그</b>가 RAG 엔진에 100% 학습/탑재되었습니다.<br><br>
-              사내 보안 지침, 망분리 규제뿐만 아니라 <b>WizCLM, SAFESQUARE SBOM, FOCS, Tenable AI Exposure, SecureIM, Imperva WAAP 등 20종 실물 솔루션</b>의 스펙, 도입효과, 규제 근거를 자유롭게 질문해 보세요!
+              안녕하세요! <b>GIJO AS 보안 실무 지식고 및 20종 솔루션 + 사내 커스텀 제품</b>이 RAG 엔진에 통합되었습니다.<br><br>
+              사내 보안 지침, 망분리 규정, <b>20종 솔루션 스펙/매뉴얼</b>뿐 아니라 <b>고객님이 직접 등록하신 사내 솔루션의 운영 절차 및 장애 대응</b>도 실시간으로 질문해 보세요!
             </div>
           </div>
 
           <div class="rag-input-box">
-            <input type="text" id="ragQueryInput" class="search-input" style="background:#fff;" placeholder="솔루션 기능, 규제 준수, CVE 조치 등 질의..." onkeydown="if(event.key==='Enter') executeRagQuery()">
+            <input type="text" id="ragQueryInput" class="search-input" style="background:#fff;" placeholder="솔루션 기능, 운영 매뉴얼, CVE 조치 등 질의..." onkeydown="if(event.key==='Enter') executeRagQuery()">
             <button class="btn btn-primary" onclick="executeRagQuery()">
               <i data-lucide="send" style="width:13px; height:13px;"></i>
             </button>
@@ -891,21 +912,31 @@ const htmlContent = `<!DOCTYPE html>
           <div>
             <h2 style="font-size:1.15rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
               <i data-lucide="layers" style="width:20px; height:20px; color:var(--primary);"></i>
-              20종 보안 솔루션 전사 ERP 카탈로그
+              보안 솔루션 전사 ERP & 실무 매뉴얼 포털
             </h2>
-            <p style="color:var(--text-sub); font-size:0.78rem;">공식 제조사 및 단독 총판 라이선스, 아키텍처 다이어그램 및 ISMS-P 통제항목 연동</p>
+            <p style="color:var(--text-sub); font-size:0.78rem;">공식 20종 카탈로그 및 고객사 자체 사용 제품을 직접 등록하고 실무 운영 매뉴얼을 관리합니다.</p>
           </div>
 
-          <div style="display:flex; align-items:center; gap:0.75rem;">
-            <div class="portal-tags-row">
-              <button class="pill-cat active" id="solFilter-ALL" onclick="filterSolutions('ALL')">전체 (20)</button>
-              <button class="pill-cat" id="solFilter-KR" onclick="filterSolutions('KR')">국산 솔루션</button>
-              <button class="pill-cat" id="solFilter-GLOBAL" onclick="filterSolutions('GLOBAL')">외산 솔루션</button>
-              <button class="pill-cat" id="solFilter-AI" onclick="filterSolutions('AI')">AI보안/SPM</button>
-              <button class="pill-cat" id="solFilter-NETWORK" onclick="filterSolutions('NETWORK')">네트워크/경계</button>
-              <button class="pill-cat" id="solFilter-DATA" onclick="filterSolutions('DATA')">데이터/엔드포인트</button>
-            </div>
-            <input type="text" id="portalSearchInput" class="search-input" style="width:220px; background:#fff;" placeholder="솔루션명, 벤더, 키워드..." oninput="renderPortalCards()">
+          <div style="display:flex; align-items:center; gap:0.6rem;">
+            <button class="btn btn-sm btn-primary" onclick="openAddCustomSolModal()">
+              <i data-lucide="plus-circle" style="width:13px; height:13px;"></i> 솔루션 직접 등록
+            </button>
+            <input type="text" id="portalSearchInput" class="search-input" style="width:200px; background:#fff;" placeholder="솔루션명, 벤더, 매뉴얼 검색..." oninput="renderPortalCards()">
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.25rem 0.5rem;">
+          <div class="portal-tags-row">
+            <button class="pill-cat active" id="solFilter-ALL" onclick="filterSolutions('ALL')">전체 (<span id="totalSolutionsDisplayCount">0</span>)</button>
+            <button class="pill-cat" id="solFilter-CUSTOM" onclick="filterSolutions('CUSTOM')" style="border-color:#a7f3d0; color:#059669;">🏢 사내 운용 (<span id="customSolCount">0</span>)</button>
+            <button class="pill-cat" id="solFilter-KR" onclick="filterSolutions('KR')">국산 솔루션</button>
+            <button class="pill-cat" id="solFilter-GLOBAL" onclick="filterSolutions('GLOBAL')">외산 솔루션</button>
+            <button class="pill-cat" id="solFilter-AI" onclick="filterSolutions('AI')">AI보안/SPM</button>
+            <button class="pill-cat" id="solFilter-NETWORK" onclick="filterSolutions('NETWORK')">네트워크/경계</button>
+            <button class="pill-cat" id="solFilter-DATA" onclick="filterSolutions('DATA')">데이터/엔드포인트</button>
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-dim);">
+            고객사 사용 제품은 [직접 등록]으로 추가하면 위키/RAG/TCO에 즉시 융합됩니다.
           </div>
         </div>
 
@@ -984,9 +1015,9 @@ const htmlContent = `<!DOCTYPE html>
           <div>
             <h2 style="font-size:1.2rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
               <i data-lucide="calculator" style="width:20px; height:20px; color:var(--primary);"></i>
-              20종 보안 솔루션 실시간 BOM & 5개년 TCO 견적기
+              전사 보안 솔루션 실시간 BOM & 5개년 TCO 견적기
             </h2>
-            <p style="color:var(--text-sub); font-size:0.8rem;">솔루션 카탈로그 수량 조절 시 1개년 구축비(Capex), 유지보수비(Opex 12%), 총소유비용(TCO)이 실시간 연동됩니다.</p>
+            <p style="color:var(--text-sub); font-size:0.8rem;">표준 20종 및 사내 등록 솔루션의 수량 조절 시 도입비(Capex), 유지보수비(Opex 12%), 총소유비용(TCO)이 실시간 연동됩니다.</p>
           </div>
           <div style="display:flex; gap:0.5rem;">
             <button class="btn btn-sm" onclick="resetBomQuantities()">수량 초기화</button>
@@ -1037,7 +1068,7 @@ const htmlContent = `<!DOCTYPE html>
         <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
           <div>
             <h2 style="font-size:1.2rem; font-weight:800; color:var(--text-main);">ISMS-P 인증 기준 통제항목 진단 매핑</h2>
-            <p style="color:var(--text-sub); font-size:0.8rem;">20종 솔루션 도입 현황에 따른 KISA ISMS-P 80개 세부 인증기준 충족도 분석</p>
+            <p style="color:var(--text-sub); font-size:0.8rem;">보안 솔루션 도입 현황에 따른 KISA ISMS-P 80개 세부 인증기준 충족도 분석</p>
           </div>
           <span class="meta-badge" style="background:#eff6ff; color:#1d4ed8; font-size:0.8rem; padding:0.3rem 0.6rem;">인증 통제 매핑 100% 가동</span>
         </div>
@@ -1046,6 +1077,79 @@ const htmlContent = `<!DOCTYPE html>
     </section>
 
   </main>
+
+  <!-- Add / Edit Custom Solution Modal -->
+  <div class="modal-overlay" id="customSolModal">
+    <div class="modal-box" style="max-width:850px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="customSolModalTitle" style="font-size:1.1rem; font-weight:800; color:var(--text-main);">사내 보안 솔루션 직접 등록</h3>
+          <p style="font-size:0.75rem; color:var(--text-dim); margin-top:0.2rem;">등록 즉시 사내 지식고(위키)와 AI Copilot RAG, ERP 카탈로그, TCO 계산기에 실시간 반영됩니다.</p>
+        </div>
+        <button class="btn btn-sm" onclick="closeCustomSolModal()"><i data-lucide="x" style="width:14px; height:14px;"></i> 닫기</button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:0.85rem;">
+        <input type="hidden" id="customSolEditIndex" value="-1">
+        
+        <div style="display:grid; grid-template-columns: 2fr 1.5fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">솔루션 제품명 *</label>
+            <input type="text" id="custSolName" class="search-input" placeholder="예: FortiGate 100F, 사내 DB 접근제어..." style="background:#fff; margin-top:0.25rem;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">제조사 / 공급사 *</label>
+            <input type="text" id="custSolVendor" class="search-input" placeholder="예: 포티넷, 안랩, 자체구축..." style="background:#fff; margin-top:0.25rem;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">구분</label>
+            <select id="custSolVendorType" class="search-input" style="background:#fff; margin-top:0.25rem;">
+              <option value="국산">국산</option>
+              <option value="외산">외산</option>
+              <option value="자체구축">자체구축</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.6rem;">
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">카테고리</label>
+            <input type="text" id="custSolCategory" class="search-input" placeholder="예: 방화벽, EDR, DLP, 접근제어..." style="background:#fff; margin-top:0.25rem;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">표준 도입단가 (원)</label>
+            <input type="number" id="custSolPrice" class="search-input" placeholder="예: 30000000" style="background:#fff; margin-top:0.25rem;" value="25000000">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">ISMS-P 인증 매핑</label>
+            <input type="text" id="custSolIsms" class="search-input" placeholder="예: 2.4 네트워크 접근통제" style="background:#fff; margin-top:0.25rem;" value="2.4 네트워크 접근통제">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">솔루션 개요 및 도입 목적</label>
+          <textarea id="custSolPurpose" class="search-input" style="height:60px; resize:none; background:#fff; margin-top:0.25rem;" placeholder="솔루션의 주 역할과 사내 도입 목적을 기재하세요."></textarea>
+        </div>
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub); display:flex; justify-content:space-between;">
+            <span>📖 실무 운영 매뉴얼 & 점검 절차 (담당자가 쉽게 확인하는 가이드) *</span>
+            <span style="font-weight:400; color:var(--text-dim);">콘솔 접속 경로, 일일 점검 항목, 장애 런북 등</span>
+          </label>
+          <textarea id="custSolManual" class="code-editor" style="height:120px; margin-top:0.25rem;" placeholder="- 관리 콘솔 접속: https://sec-admin.internal:8443&#10;- 일일 점검: 데몬 상태 및 이상 경보 로그 확인&#10;- 장애 발생 시: 1차 데몬 재기동 후 비상 연락망(내선 112) 인계&#10;- 정기 유지보수: 매월 마지막 주 금요일 정기 점검"></textarea>
+        </div>
+
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub);">권장 아키텍처 다이어그램 (Mermaid, 선택사항)</label>
+          <textarea id="custSolDiagram" class="code-editor" style="height:80px; margin-top:0.25rem;" placeholder="graph LR&#10;  User --> Firewall --> InternalServer"></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px solid var(--border); padding-top:0.75rem;">
+          <button class="btn" onclick="closeCustomSolModal()">취소</button>
+          <button class="btn btn-primary" onclick="saveCustomSolution()"><i data-lucide="check" style="width:13px; height:13px;"></i> 솔루션 저장 및 위키/RAG 동기화</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Solution Detail Modal -->
   <div class="modal-overlay" id="solDetailModal">
@@ -1058,7 +1162,19 @@ const htmlContent = `<!DOCTYPE html>
         </div>
         <button class="btn btn-sm" onclick="closeSolDetailModal()"><i data-lucide="x" style="width:14px; height:14px;"></i> 닫기</button>
       </div>
-      <div class="modal-body" id="modalSolContent"></div>
+      <div class="modal-body">
+        
+        <div class="modal-sub-tabs">
+          <button class="pill-cat active" id="subTabBtn-spec" onclick="switchDetailSubTab('spec')">스펙 및 규제 요약</button>
+          <button class="pill-cat" id="subTabBtn-manual" onclick="switchDetailSubTab('manual')">📖 실무 운영 매뉴얼 & 런북</button>
+          <button class="pill-cat" id="subTabBtn-diagram" onclick="switchDetailSubTab('diagram')">권장 아키텍처</button>
+        </div>
+
+        <div id="subTabContent-spec" class="markdown-render"></div>
+        <div id="subTabContent-manual" class="markdown-render" style="display:none;"></div>
+        <div id="subTabContent-diagram" class="markdown-render" style="display:none;"></div>
+
+      </div>
     </div>
   </div>
 
@@ -1124,9 +1240,11 @@ const htmlContent = `<!DOCTYPE html>
     // --- 1. DATA PACKAGES ---
     const defaultWikiDocs = ${docsJson};
     const quickQuestions = ${quickQuestionsJson};
-    const solutionCatalog = ${solutionsCatalogJson};
+    const defaultSolutionCatalog = ${solutionsCatalogJson};
 
     let currentDocs = [];
+    let customSolutions = [];
+    let activeSolutionsList = [];
     let currentActiveDocId = 1;
     let isEditingMode = false;
     let canvasZoom = 1.0;
@@ -1134,9 +1252,11 @@ const htmlContent = `<!DOCTYPE html>
     let currentFilterCat = 'ALL';
     let currentSolFilter = 'ALL';
     let compareList = [];
+    let currentDetailSol = null;
 
     // LocalStorage Keys
     const STORAGE_KEY = 'GIJO_WIKI_DOCS_V5_2';
+    const CUSTOM_SOL_KEY = 'GIJO_CUSTOM_SOL_V5_2';
     const BOM_QTY_KEY = 'GIJO_BOM_QTY_V5_2';
 
     // Studio Presets
@@ -1204,6 +1324,36 @@ const htmlContent = `<!DOCTYPE html>
         .replace(/'/g, '&#039;');
     }
 
+    function loadCustomSolutions() {
+      try {
+        const stored = localStorage.getItem(CUSTOM_SOL_KEY);
+        if (stored) {
+          customSolutions = JSON.parse(stored);
+        } else {
+          customSolutions = [];
+        }
+      } catch (e) {
+        console.warn('Custom solutions parse fail:', e);
+        customSolutions = [];
+      }
+      rebuildActiveSolutions();
+    }
+
+    function saveCustomSolutions() {
+      try {
+        localStorage.setItem(CUSTOM_SOL_KEY, JSON.stringify(customSolutions));
+      } catch (e) {
+        console.error('Save custom solutions fail:', e);
+      }
+      rebuildActiveSolutions();
+    }
+
+    function rebuildActiveSolutions() {
+      activeSolutionsList = [...customSolutions, ...defaultSolutionCatalog];
+      document.getElementById('customSolCount').innerText = customSolutions.length;
+      document.getElementById('totalSolutionsDisplayCount').innerText = activeSolutionsList.length;
+    }
+
     function loadStoredDocs() {
       try {
         const storedStr = localStorage.getItem(STORAGE_KEY);
@@ -1220,14 +1370,16 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     function resetToRealDocs() {
-      if (confirm('29종 실물 지식고 문서(사내 지침 9종 + 20종 솔루션 규격)로 초기화하시겠습니까?')) {
+      if (confirm('기본 원본 지식고 문서 및 솔루션으로 새로고침하시겠습니까? (고객 직접 등록 솔루션은 보존됩니다)')) {
         currentDocs = JSON.parse(JSON.stringify(defaultWikiDocs));
+        // Re-inject custom solutions into docs
+        syncCustomSolutionsToDocs();
         saveDocsToStorage();
         renderWikiDocList();
         selectWikiDoc(currentDocs[0].id);
         renderPortalCards();
         renderBomTable();
-        alert('✅ 29종 원본 지식고 및 20종 솔루션 데이터가 성공적으로 동기화되었습니다.');
+        alert('✅ 지식고 및 솔루션 카탈로그가 초기 원본 기준으로 동기화되었습니다.');
       }
     }
 
@@ -1239,7 +1391,150 @@ const htmlContent = `<!DOCTYPE html>
       }
     }
 
-    // --- 3. VIEW SWITCHER ---
+    // --- 3. CUSTOM SOLUTION MANAGEMENT MODULE ---
+    function openAddCustomSolModal() {
+      document.getElementById('customSolEditIndex').value = '-1';
+      document.getElementById('customSolModalTitle').innerText = '사내 보안 솔루션 직접 등록';
+      document.getElementById('custSolName').value = '';
+      document.getElementById('custSolVendor').value = '';
+      document.getElementById('custSolVendorType').value = '국산';
+      document.getElementById('custSolCategory').value = '';
+      document.getElementById('custSolPrice').value = '25000000';
+      document.getElementById('custSolIsms').value = '2.4 네트워크 접근통제';
+      document.getElementById('custSolPurpose').value = '';
+      document.getElementById('custSolManual').value = '- 콘솔 접속: https://sec-admin.internal:8443\\n- 일일 점검: 데몬 정상 동작 및 이벤트 로그 확인\\n- 장애 런북: 데몬 재기동(systemctl restart sec-agent) 후 비상 연락';
+      document.getElementById('custSolDiagram').value = 'graph LR\\n  User --> SecurityGateway --> InternalServer';
+
+      document.getElementById('customSolModal').classList.add('active');
+      lucide.createIcons();
+    }
+
+    function openEditCustomSolModal(customIdx) {
+      const sol = customSolutions[customIdx];
+      if (!sol) return;
+
+      document.getElementById('customSolEditIndex').value = customIdx;
+      document.getElementById('customSolModalTitle').innerText = '사내 보안 솔루션 수정: ' + sol.name;
+      document.getElementById('custSolName').value = sol.name;
+      document.getElementById('custSolVendor').value = sol.vendor;
+      document.getElementById('custSolVendorType').value = sol.vendorType || '국산';
+      document.getElementById('custSolCategory').value = sol.category || '';
+      document.getElementById('custSolPrice').value = sol.price || 0;
+      document.getElementById('custSolIsms').value = sol.ismsMapping || '';
+      document.getElementById('custSolPurpose').value = sol.purpose || '';
+      document.getElementById('custSolManual').value = sol.manual || '';
+      document.getElementById('custSolDiagram').value = sol.architectureDiagram || '';
+
+      document.getElementById('customSolModal').classList.add('active');
+      lucide.createIcons();
+    }
+
+    function closeCustomSolModal() {
+      document.getElementById('customSolModal').classList.remove('active');
+    }
+
+    function saveCustomSolution() {
+      const name = document.getElementById('custSolName').value.trim();
+      const vendor = document.getElementById('custSolVendor').value.trim();
+      if (!name || !vendor) {
+        alert('솔루션 제품명과 제조사/공급사는 필수 입력 항목입니다.');
+        return;
+      }
+
+      const editIdx = parseInt(document.getElementById('customSolEditIndex').value, 10);
+      const vendorType = document.getElementById('custSolVendorType').value;
+      const category = document.getElementById('custSolCategory').value.trim() || '보안솔루션';
+      const price = parseInt(document.getElementById('custSolPrice').value, 10) || 0;
+      const ismsMapping = document.getElementById('custSolIsms').value.trim() || '2.4 네트워크 접근통제';
+      const purpose = document.getElementById('custSolPurpose').value.trim();
+      const manual = document.getElementById('custSolManual').value.trim();
+      const diagram = document.getElementById('custSolDiagram').value.trim();
+
+      const newSol = {
+        isCustom: true,
+        name,
+        vendor: vendor + ' [' + vendorType + ']',
+        vendorType,
+        category,
+        sheetCategory: category,
+        target: '사내 보안담당자 및 운영팀',
+        role: category + ' 실무 운용',
+        overview: purpose || (name + ' 사내 운영 솔루션'),
+        purpose: purpose || '사내 보안 정책 통제 및 규제 준수',
+        features: '사내 맞춤형 정책 적용 및 실시간 점검 체계',
+        highlights: '고객사 환경에 최적화된 온프레미스/사내망 운용',
+        regulation: ismsMapping + ' 인증 기준 준수',
+        effects: '보안 가시성 확보 및 전사 보안 거버넌스 강화',
+        manual: manual || '실무 매뉴얼 작성 예정',
+        architectureDiagram: diagram || '',
+        price,
+        qty: 1,
+        opexRate: 0.12,
+        ismsMapping
+      };
+
+      if (editIdx >= 0 && editIdx < customSolutions.length) {
+        customSolutions[editIdx] = newSol;
+      } else {
+        customSolutions.unshift(newSol);
+      }
+
+      saveCustomSolutions();
+      syncCustomSolutionsToDocs();
+      saveDocsToStorage();
+
+      closeCustomSolModal();
+      renderPortalCards();
+      renderWikiDocList();
+      renderBomTable();
+
+      alert('✅ [' + name + '] 솔루션이 등록되었으며 사내 지식고(위키), AI RAG, TCO 견적에 실시간 반영되었습니다.');
+    }
+
+    function deleteCustomSolution(customIdx) {
+      const sol = customSolutions[customIdx];
+      if (!sol) return;
+
+      if (confirm('[' + sol.name + '] 솔루션을 삭제하시겠습니까? (연동된 위키 문서 및 견적도 함께 정리됩니다)')) {
+        customSolutions.splice(customIdx, 1);
+        saveCustomSolutions();
+        syncCustomSolutionsToDocs();
+        saveDocsToStorage();
+
+        renderPortalCards();
+        renderWikiDocList();
+        renderBomTable();
+      }
+    }
+
+    function syncCustomSolutionsToDocs() {
+      // Remove previous custom docs
+      currentDocs = currentDocs.filter(d => !d.isCustomDoc);
+
+      // Add fresh custom docs
+      customSolutions.forEach((sol, idx) => {
+        const docId = 9000 + idx;
+        const mdContent = 
+          '# [사내 솔루션] ' + sol.name + ' (' + sol.vendor + ')\\n\\n' +
+          '> **분류**: ' + sol.category + ' | **공급사**: ' + sol.vendor + ' | **사내 운용 솔루션**\\n\\n' +
+          '## 1. 솔루션 개요 및 도입 목적\\n' + (sol.purpose || sol.overview || '상세 정보 없음') + '\\n\\n' +
+          '## 2. 실무 운영 매뉴얼 & 점검 절차 (Operation Manual)\\n' + (sol.manual || '등록된 매뉴얼 없음') + '\\n\\n' +
+          '## 3. 관련 규제 및 ISMS-P 매핑\\n' + (sol.ismsMapping || '2.4 접근통제') + '\\n\\n' +
+          (sol.architectureDiagram ? '## 4. 권장 아키텍처 다이어그램\\n\\x60\\x60\\x60mermaid\\n' + sol.architectureDiagram + '\\n\\x60\\x60\\x60\\n' : '');
+
+        currentDocs.unshift({
+          id: docId,
+          isCustomDoc: true,
+          title: '[사내솔루션] ' + sol.name + ' — ' + sol.vendor,
+          category: '사내솔루션',
+          tags: ['사내솔루션', sol.name, sol.category, '실무매뉴얼'],
+          updatedAt: new Date().toISOString().slice(0, 10),
+          content: mdContent
+        });
+      });
+    }
+
+    // --- 4. VIEW SWITCHER ---
     function switchView(viewName) {
       document.querySelectorAll('.view-page').forEach(sec => sec.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -1262,7 +1557,7 @@ const htmlContent = `<!DOCTYPE html>
       lucide.createIcons();
     }
 
-    // --- 4. WIKI & RAG MODULE ---
+    // --- 5. WIKI & RAG MODULE ---
     function renderQuickChips() {
       const chipBox = document.getElementById('quickQuestionsChipBox');
       chipBox.innerHTML = '';
@@ -1287,7 +1582,7 @@ const htmlContent = `<!DOCTYPE html>
         const matchesCat = (currentFilterCat === 'ALL' || doc.category === currentFilterCat);
         const matchesSearch = !searchVal || 
           doc.title.toLowerCase().includes(searchVal) ||
-          doc.tags.some(t => t.toLowerCase().includes(searchVal)) ||
+          (doc.tags && doc.tags.some(t => t.toLowerCase().includes(searchVal))) ||
           doc.content.toLowerCase().includes(searchVal);
         return matchesCat && matchesSearch;
       });
@@ -1299,8 +1594,9 @@ const htmlContent = `<!DOCTYPE html>
         li.className = 'doc-entry' + (doc.id === currentActiveDocId ? ' active' : '');
         li.onclick = () => selectWikiDoc(doc.id);
 
-        const isSol = doc.category === '보안솔루션';
-        const badgeClass = isSol ? (doc.title.includes('국산') ? 'badge-kr' : 'badge-global') : '';
+        let badgeClass = '';
+        if (doc.category === '사내솔루션') badgeClass = 'badge-custom';
+        else if (doc.category === '보안솔루션') badgeClass = (doc.title.includes('국산') ? 'badge-kr' : 'badge-global');
 
         li.innerHTML = 
           '<div class="doc-entry-title">' + sanitizeHtml(doc.title) + '</div>' +
@@ -1488,7 +1784,9 @@ const htmlContent = `<!DOCTYPE html>
           if (doc.content.toLowerCase().includes(term)) score += 2;
         });
 
-        // Exact match boosts
+        // Boost matches
+        if (query.includes('매뉴얼') && doc.content.includes('매뉴얼')) score += 15;
+        if (query.includes('장애') && doc.content.includes('장애')) score += 15;
         if (query.includes('WizCLM') && doc.title.includes('WizCLM')) score += 20;
         if (query.includes('SBOM') && (doc.title.includes('SBOM') || doc.title.includes('SAFESQUARE'))) score += 20;
         if (query.includes('FOCS') && doc.title.includes('FOCS')) score += 20;
@@ -1496,11 +1794,6 @@ const htmlContent = `<!DOCTYPE html>
         if (query.includes('Tenable') && doc.title.includes('Tenable')) score += 20;
         if (query.includes('CipherTrust') && doc.title.includes('CipherTrust')) score += 20;
         if (query.includes('WAAP') && doc.title.includes('WAAP')) score += 20;
-        if (query.includes('EDR') && doc.title.includes('EDR')) score += 20;
-        if (query.includes('DLP') && doc.title.includes('DLP')) score += 20;
-        if (query.includes('AIBOM') && doc.title.includes('AIBOM')) score += 15;
-        if (query.includes('에어갭') && doc.content.includes('에어갭')) score += 10;
-        if (query.includes('CVE') && doc.title.includes('취약점')) score += 10;
 
         if (score > 0) matchedDocs.push({ doc, score });
       });
@@ -1510,14 +1803,14 @@ const htmlContent = `<!DOCTYPE html>
 
       const aiBubble = document.createElement('div');
       aiBubble.className = 'bubble ai';
-      aiBubble.innerHTML = '<div>실물 지식고 29종 분석 중...</div>';
+      aiBubble.innerHTML = '<div>실시간 지식고 & 매뉴얼 분석 중...</div>';
       chatBox.appendChild(aiBubble);
       chatBox.scrollTop = chatBox.scrollHeight;
 
       let answerText = '';
       if (topDoc) {
         let summary = topDoc.content.slice(0, 320).replace(/#/g, '').replace(/\\*/g, '');
-        answerText = '<b>[' + sanitizeHtml(topDoc.title) + ']</b> 원본 지식 근거 분석:<br><br>' + 
+        answerText = '<b>[' + sanitizeHtml(topDoc.title) + ']</b> 근거 분석:<br><br>' + 
           sanitizeHtml(summary) + '...';
       } else {
         answerText = '질의하신 내용에 부합하는 사내 지침 또는 솔루션을 특정하기 어렵습니다. 좌측 지식고 검색창이나 솔루션 ERP 탭에서 관련 키워드를 확인해 보세요.';
@@ -1549,7 +1842,7 @@ const htmlContent = `<!DOCTYPE html>
       }
     }
 
-    // --- 5. SOLUTIONS PORTAL (20 PRODUCTS) MODULE ---
+    // --- 6. SOLUTIONS PORTAL & MANUAL MODULE ---
     function filterSolutions(filterType) {
       currentSolFilter = filterType;
       document.querySelectorAll('.portal-tags-row .pill-cat').forEach(p => p.classList.remove('active'));
@@ -1563,9 +1856,10 @@ const htmlContent = `<!DOCTYPE html>
       const search = (document.getElementById('portalSearchInput')?.value || '').toLowerCase().trim();
       grid.innerHTML = '';
 
-      const filtered = solutionCatalog.filter(sol => {
+      const filtered = activeSolutionsList.filter(sol => {
         let matchesType = true;
-        if (currentSolFilter === 'KR') matchesType = sol.vendor.includes('국산') || sol.vendorType === '국산';
+        if (currentSolFilter === 'CUSTOM') matchesType = !!sol.isCustom;
+        else if (currentSolFilter === 'KR') matchesType = sol.vendor.includes('국산') || sol.vendorType === '국산';
         else if (currentSolFilter === 'GLOBAL') matchesType = sol.vendor.includes('외산') || sol.vendorType === '외산';
         else if (currentSolFilter === 'AI') matchesType = sol.name.includes('AI') || (sol.category && sol.category.includes('AI'));
         else if (currentSolFilter === 'NETWORK') matchesType = sol.category.includes('방화벽') || sol.category.includes('WAAP') || sol.name.includes('Zscaler');
@@ -1575,21 +1869,30 @@ const htmlContent = `<!DOCTYPE html>
           sol.name.toLowerCase().includes(search) ||
           sol.vendor.toLowerCase().includes(search) ||
           (sol.category && sol.category.toLowerCase().includes(search)) ||
-          (sol.overview && sol.overview.toLowerCase().includes(search));
+          (sol.overview && sol.overview.toLowerCase().includes(search)) ||
+          (sol.manual && sol.manual.toLowerCase().includes(search));
 
         return matchesType && matchesSearch;
       });
 
-      filtered.forEach((sol, idx) => {
+      filtered.forEach((sol, globalIdx) => {
         const card = document.createElement('div');
         card.className = 'sol-card';
 
-        const isKr = sol.vendor.includes('국산') || sol.vendorType === '국산';
-        const badgeClass = isKr ? 'badge-kr' : 'badge-global';
-        const badgeText = isKr ? '국산' : '외산';
+        let badgeClass = 'badge-global';
+        let badgeText = sol.vendorType || '외산';
+        if (sol.isCustom) {
+          badgeClass = 'badge-custom';
+          badgeText = '사내 운용';
+        } else if (sol.vendor.includes('국산') || sol.vendorType === '국산') {
+          badgeClass = 'badge-kr';
+          badgeText = '국산';
+        }
 
         // Find linked Wiki Doc ID
         const linkedDoc = currentDocs.find(d => d.title.includes(sol.name));
+
+        const customIdx = customSolutions.findIndex(c => c.name === sol.name);
 
         card.innerHTML = 
           '<div>' +
@@ -1600,20 +1903,25 @@ const htmlContent = `<!DOCTYPE html>
                 '<div class="sol-card-title" style="margin-top:0.35rem;">' + sanitizeHtml(sol.name) + '</div>' +
                 '<div class="sol-card-vendor">' + sanitizeHtml(sol.vendor) + '</div>' +
               '</div>' +
-              '<input type="checkbox" title="비교함에 담기" ' + (compareList.some(c => c.name === sol.name) ? 'checked' : '') + ' onchange="toggleCompareSol(\\'' + sol.name.replace(/'/g, "\\\\'") + '\\', this.checked)">' +
+              '<div style="display:flex; align-items:center; gap:0.4rem;">' +
+                (sol.isCustom ? '<button class="btn btn-sm" style="padding:2px 6px;" onclick="openEditCustomSolModal(' + customIdx + ')" title="수정"><i data-lucide="edit-2" style="width:11px; height:11px;"></i></button>' +
+                                '<button class="btn btn-sm" style="padding:2px 6px; color:var(--danger);" onclick="deleteCustomSolution(' + customIdx + ')" title="삭제"><i data-lucide="trash-2" style="width:11px; height:11px;"></i></button>' : '') +
+                '<input type="checkbox" title="비교함에 담기" ' + (compareList.some(c => c.name === sol.name) ? 'checked' : '') + ' onchange="toggleCompareSol(\\'' + sol.name.replace(/'/g, "\\\\'") + '\\', this.checked)">' +
+              '</div>' +
             '</div>' +
             '<div class="sol-card-desc">' + sanitizeHtml(sol.overview || sol.purpose || '상세 규격 및 기능 제공') + '</div>' +
             '<div style="font-size:0.75rem; color:var(--text-dim); margin-top:0.4rem;">' +
-              '<div><b>표준 단가</b>: ₩' + Number(sol.price || 0).toLocaleString() + ' (조달/ERP)</div>' +
+              '<div><b>표준 단가</b>: ₩' + Number(sol.price || 0).toLocaleString() + '</div>' +
               '<div><b>통제 매핑</b>: ' + sanitizeHtml(sol.ismsMapping || '2.4 접근통제') + '</div>' +
             '</div>' +
           '</div>' +
           '<div class="sol-card-footer">' +
             '<div style="display:flex; gap:0.3rem;">' +
-              '<button class="btn btn-sm" onclick="openSolDetailModal(' + idx + ')"><i data-lucide="info" style="width:11px; height:11px;"></i> 상세</button>' +
-              (linkedDoc ? '<button class="btn btn-sm" onclick="jumpToWikiDoc(' + linkedDoc.id + ')"><i data-lucide="book-open" style="width:11px; height:11px;"></i> 위키</button>' : '') +
+              '<button class="btn btn-sm" onclick="openSolDetailModal(' + globalIdx + ', \\'manual\\')"><i data-lucide="book" style="width:11px; height:11px;"></i> 매뉴얼</button>' +
+              '<button class="btn btn-sm" onclick="openSolDetailModal(' + globalIdx + ', \\'spec\\')"><i data-lucide="info" style="width:11px; height:11px;"></i> 상세</button>' +
+              (linkedDoc ? '<button class="btn btn-sm" onclick="jumpToWikiDoc(' + linkedDoc.id + ')"><i data-lucide="file-text" style="width:11px; height:11px;"></i> 위키</button>' : '') +
             '</div>' +
-            '<button class="btn btn-sm btn-primary" onclick="addSolToBom(\\'' + sol.name.replace(/'/g, "\\\\'") + '\\')">+ BOM 견적</button>' +
+            '<button class="btn btn-sm btn-primary" onclick="addSolToBom(\\'' + sol.name.replace(/'/g, "\\\\'") + '\\')">+ BOM</button>' +
           '</div>';
 
         grid.appendChild(card);
@@ -1626,37 +1934,73 @@ const htmlContent = `<!DOCTYPE html>
       selectWikiDoc(docId);
     }
 
-    function openSolDetailModal(idx) {
-      const sol = solutionCatalog[idx];
+    function openSolDetailModal(idx, initialTab = 'spec') {
+      const sol = activeSolutionsList[idx];
       if (!sol) return;
+      currentDetailSol = sol;
 
       document.getElementById('modalSolCategory').innerText = sol.category || sol.sheetCategory;
       document.getElementById('modalSolTitle').innerText = sol.name;
-      document.getElementById('modalSolVendor').innerText = sol.vendor + ' | 대상: ' + (sol.target || '-');
+      document.getElementById('modalSolVendor').innerText = sol.vendor + ' | 대상: ' + (sol.target || '전사 보안');
 
-      let modalHtml = 
-        '<div class="markdown-render">' +
-          '<h3>1. 솔루션 개요</h3><p>' + sanitizeHtml(sol.overview || '-') + '</p>' +
-          '<h3>2. 도입 목적 및 필요성</h3><p>' + sanitizeHtml(sol.purpose || '-').replace(/\\n/g, '<br>') + '</p>' +
-          '<h3>3. 핵심 기능</h3><p>' + sanitizeHtml(sol.features || '-').replace(/\\n/g, '<br>') + '</p>' +
-          '<h3>4. 특장점 및 차별성</h3><p>' + sanitizeHtml(sol.highlights || '-').replace(/\\n/g, '<br>') + '</p>' +
-          '<h3>5. 관련 규제 및 기대효과</h3><p>' + sanitizeHtml(sol.regulation || '-').replace(/\\n/g, '<br>') + '<br>' + sanitizeHtml(sol.effects || '-').replace(/\\n/g, '<br>') + '</p>';
+      // 1. Spec Tab HTML
+      const specHtml = 
+        '<h3>1. 솔루션 개요</h3><p>' + sanitizeHtml(sol.overview || '-') + '</p>' +
+        '<h3>2. 도입 목적 및 필요성</h3><p>' + sanitizeHtml(sol.purpose || '-').replace(/\\n/g, '<br>') + '</p>' +
+        '<h3>3. 핵심 기능</h3><p>' + sanitizeHtml(sol.features || '-').replace(/\\n/g, '<br>') + '</p>' +
+        '<h3>4. 관련 규제 및 기대효과</h3><p>' + sanitizeHtml(sol.regulation || '-').replace(/\\n/g, '<br>') + '<br>' + sanitizeHtml(sol.effects || '-').replace(/\\n/g, '<br>') + '</p>';
+      document.getElementById('subTabContent-spec').innerHTML = specHtml;
 
+      // 2. Manual Tab HTML
+      let manualContent = sol.manual;
+      if (!manualContent) {
+        manualContent = 
+          '**[기본 실무 운영 가이드]**\\n\\n' +
+          '- **일일 점검**: 엔진 데몬 프로세스 상태 확인, 관리 콘솔 대시보드 경보(Alert) 로그 확인.\\n' +
+          '- **주간 점검**: 차단 및 예외 정책 통계 추출, 에이전트 버전 무결성 점검.\\n' +
+          '- **월간 점검**: 관리자 접근 감사 로그 백업, 라이선스 만료일 점검, ISMS-P 증적 자료 추출.\\n' +
+          '- **긴급 장애 런북**:\\n' +
+          '  1. 관리 콘솔 접속 불가 시 데몬 서비스 상태 확인 및 프로세스 재기동.\\n' +
+          '  2. 네트워크 차단 지연 시 긴급 Bypass 모드 전환.\\n' +
+          '  3. 기술지원 비상 핫라인 티켓 인계.';
+      }
+
+      const manualHtml = 
+        '<div style="background:#f8fafc; border:1px solid var(--border); padding:1rem; border-radius:6px; margin-bottom:1rem;">' +
+          '<div style="font-weight:700; font-size:0.9rem; margin-bottom:0.4rem; color:var(--primary);">' +
+            '<i data-lucide="book-open" style="width:14px; height:14px; vertical-align:middle;"></i> ' + sanitizeHtml(sol.name) + ' 실무 운영 매뉴얼 & 런북' +
+          '</div>' +
+          '<div style="font-size:0.83rem; line-height:1.7;">' + parseMarkdownToHtml(manualContent) + '</div>' +
+        '</div>';
+      document.getElementById('subTabContent-manual').innerHTML = manualHtml;
+
+      // 3. Diagram Tab HTML
+      let diagramHtml = '';
       if (sol.architectureDiagram) {
-        modalHtml += 
-          '<h3>6. 권장 아키텍처 다이어그램</h3>' +
-          '<div style="margin:0.5rem 0; display:flex; justify-content:flex-end;">' +
+        diagramHtml = 
+          '<div style="margin-bottom:0.75rem; display:flex; justify-content:flex-end;">' +
             '<button class="btn btn-sm btn-primary" onclick="loadDiagramToStudio(\\'' + sol.name.replace(/'/g, "\\\\'") + '\\')"><i data-lucide="cpu" style="width:12px; height:12px;"></i> 아키텍처 스튜디오에서 편집</button>' +
           '</div>' +
           '<div class="mermaid" style="background:#f8fafc; padding:1rem; border-radius:6px; border:1px solid var(--border);">' + sol.architectureDiagram + '</div>';
+      } else {
+        diagramHtml = '<div style="color:var(--text-dim); padding:2rem; text-align:center;">등록된 권장 아키텍처 다이어그램이 없습니다.</div>';
       }
+      document.getElementById('subTabContent-diagram').innerHTML = diagramHtml;
 
-      modalHtml += '</div>';
-
-      document.getElementById('modalSolContent').innerHTML = modalHtml;
+      switchDetailSubTab(initialTab);
       document.getElementById('solDetailModal').classList.add('active');
       lucide.createIcons();
       mermaid.run();
+    }
+
+    function switchDetailSubTab(subTabName) {
+      document.querySelectorAll('.modal-sub-tabs .pill-cat').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById('subTabBtn-' + subTabName);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      document.getElementById('subTabContent-spec').style.display = (subTabName === 'spec' ? 'block' : 'none');
+      document.getElementById('subTabContent-manual').style.display = (subTabName === 'manual' ? 'block' : 'none');
+      document.getElementById('subTabContent-diagram').style.display = (subTabName === 'diagram' ? 'block' : 'none');
     }
 
     function closeSolDetailModal() {
@@ -1664,7 +2008,7 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     function loadDiagramToStudio(solName) {
-      const sol = solutionCatalog.find(s => s.name === solName);
+      const sol = activeSolutionsList.find(s => s.name === solName);
       if (!sol || !sol.architectureDiagram) return;
       closeSolDetailModal();
       document.getElementById('studioMermaidCode').value = sol.architectureDiagram;
@@ -1673,7 +2017,7 @@ const htmlContent = `<!DOCTYPE html>
 
     // Compare Tray Logic
     function toggleCompareSol(solName, isChecked) {
-      const sol = solutionCatalog.find(s => s.name === solName);
+      const sol = activeSolutionsList.find(s => s.name === solName);
       if (!sol) return;
 
       if (isChecked) {
@@ -1738,11 +2082,9 @@ const htmlContent = `<!DOCTYPE html>
         { label: '구분', key: 'vendorType' },
         { label: '도입 목적', key: 'purpose' },
         { label: '핵심 기능', key: 'features' },
-        { label: '특장점', key: 'highlights' },
-        { label: '규제 준수', key: 'regulation' },
-        { label: '기대 효과', key: 'effects' },
-        { label: '표준 단가', custom: s => '₩' + Number(s.price || 0).toLocaleString() },
-        { label: 'ISMS 매핑', key: 'ismsMapping' }
+        { label: '실무 매뉴얼', key: 'manual' },
+        { label: 'ISMS 매핑', key: 'ismsMapping' },
+        { label: '표준 단가', custom: s => '₩' + Number(s.price || 0).toLocaleString() }
       ];
 
       fields.forEach(f => {
@@ -1763,7 +2105,7 @@ const htmlContent = `<!DOCTYPE html>
       document.getElementById('compareModal').classList.remove('active');
     }
 
-    // --- 6. STUDIO MODULE ---
+    // --- 7. STUDIO MODULE ---
     function loadStudioPreset(presetKey) {
       if (!presetKey) return;
       if (studioPresets[presetKey]) {
@@ -1864,9 +2206,9 @@ const htmlContent = `<!DOCTYPE html>
       URL.revokeObjectURL(url);
     }
 
-    // --- 7. BOM & TCO MODULE ---
+    // --- 8. BOM & TCO MODULE ---
     function addSolToBom(solName) {
-      const sol = solutionCatalog.find(s => s.name === solName);
+      const sol = activeSolutionsList.find(s => s.name === solName);
       if (!sol) return;
       sol.qty = (sol.qty || 0) + 1;
       saveBomQuantities();
@@ -1878,7 +2220,7 @@ const htmlContent = `<!DOCTYPE html>
         const stored = localStorage.getItem(BOM_QTY_KEY);
         if (stored) {
           const map = JSON.parse(stored);
-          solutionCatalog.forEach(sol => {
+          activeSolutionsList.forEach(sol => {
             if (typeof map[sol.name] === 'number') sol.qty = map[sol.name];
           });
         }
@@ -1889,7 +2231,7 @@ const htmlContent = `<!DOCTYPE html>
 
     function saveBomQuantities() {
       const map = {};
-      solutionCatalog.forEach(sol => {
+      activeSolutionsList.forEach(sol => {
         map[sol.name] = sol.qty || 0;
       });
       localStorage.setItem(BOM_QTY_KEY, JSON.stringify(map));
@@ -1897,14 +2239,14 @@ const htmlContent = `<!DOCTYPE html>
 
     function updateBomQty(index, newQty) {
       const qty = Math.max(0, parseInt(newQty, 10) || 0);
-      solutionCatalog[index].qty = qty;
+      activeSolutionsList[index].qty = qty;
       saveBomQuantities();
       renderBomTable();
     }
 
     function resetBomQuantities() {
       if (confirm('모든 솔루션 도입 수량을 초기화하시겠습니까?')) {
-        solutionCatalog.forEach((sol, idx) => { sol.qty = (idx < 3 ? 1 : 0); });
+        activeSolutionsList.forEach((sol, idx) => { sol.qty = (idx < 3 ? 1 : 0); });
         saveBomQuantities();
         renderBomTable();
       }
@@ -1918,7 +2260,7 @@ const htmlContent = `<!DOCTYPE html>
       let totalCapex = 0;
       let totalOpex = 0;
 
-      solutionCatalog.forEach((sol, idx) => {
+      activeSolutionsList.forEach((sol, idx) => {
         const qty = sol.qty || 0;
         const price = sol.price || 0;
         const capex = price * qty;
@@ -1930,7 +2272,7 @@ const htmlContent = `<!DOCTYPE html>
 
         const tr = document.createElement('tr');
         tr.innerHTML = 
-          '<td><b>' + sanitizeHtml(sol.name) + '</b></td>' +
+          '<td><b>' + sanitizeHtml(sol.name) + '</b> ' + (sol.isCustom ? '<span class="meta-badge badge-custom">사내</span>' : '') + '</td>' +
           '<td>' + sanitizeHtml(sol.vendor) + '</td>' +
           '<td><span class="meta-badge">' + sanitizeHtml(sol.category || sol.sheetCategory) + '</span></td>' +
           '<td>₩' + Number(price).toLocaleString() + '</td>' +
@@ -1952,7 +2294,7 @@ const htmlContent = `<!DOCTYPE html>
 
     function exportBomToCsv() {
       let csv = '솔루션명,제조사,카테고리,단가,수량,도입비(Capex),연간유지보수(Opex),5개년TCO,ISMS-P항목\\n';
-      solutionCatalog.forEach(sol => {
+      activeSolutionsList.forEach(sol => {
         const qty = sol.qty || 0;
         const capex = (sol.price || 0) * qty;
         const opex = Math.round(capex * (sol.opexRate || 0.12));
@@ -1969,7 +2311,7 @@ const htmlContent = `<!DOCTYPE html>
       URL.revokeObjectURL(url);
     }
 
-    // --- 8. AUDIT GRID MODULE ---
+    // --- 9. AUDIT GRID MODULE ---
     function renderAuditGrid() {
       const container = document.getElementById('auditGridContainer');
       container.innerHTML = '';
@@ -2011,18 +2353,19 @@ const htmlContent = `<!DOCTYPE html>
       });
     }
 
-    // --- 9. BACKUP & LLM SETTINGS ---
+    // --- 10. BACKUP & LLM SETTINGS ---
     function exportFullProjectBackup() {
       const backup = {
         exportedAt: new Date().toISOString(),
         wikiDocs: currentDocs,
-        solutions: solutionCatalog
+        customSolutions: customSolutions,
+        standardSolutions: defaultSolutionCatalog
       };
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'GIJO_AS_Lite_WIKI_Suite_Backup.json';
+      a.download = 'GIJO_AS_Lite_WIKI_Full_Backup.json';
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -2032,7 +2375,7 @@ const htmlContent = `<!DOCTYPE html>
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'GIJO_AS_Wiki_Docs_29.json';
+      a.download = 'GIJO_AS_Wiki_Docs.json';
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -2048,13 +2391,19 @@ const htmlContent = `<!DOCTYPE html>
         reader.onload = (re) => {
           try {
             const imported = JSON.parse(re.target.result);
-            if (Array.isArray(imported)) {
+            if (imported.wikiDocs) {
+              currentDocs = imported.wikiDocs;
+              if (imported.customSolutions) customSolutions = imported.customSolutions;
+              saveCustomSolutions();
+            } else if (Array.isArray(imported)) {
               currentDocs = imported;
-              saveDocsToStorage();
-              renderWikiDocList();
-              selectWikiDoc(currentDocs[0].id);
-              alert('✅ 문서 ' + imported.length + '건을 성공적으로 가져왔습니다.');
             }
+            saveDocsToStorage();
+            renderWikiDocList();
+            renderPortalCards();
+            renderBomTable();
+            selectWikiDoc(currentDocs[0].id);
+            alert('✅ 데이터가 성공적으로 복원되었습니다.');
           } catch (err) {
             alert('JSON 파싱 실패: 올바른 백업 파일을 선택하세요.');
           }
@@ -2076,7 +2425,7 @@ const htmlContent = `<!DOCTYPE html>
       const model = document.getElementById('llmModelInput').value;
 
       localStorage.setItem('GIJO_LLM_CONFIG', JSON.stringify({ mode, endpoint, model }));
-      document.getElementById('llmStatusIndicator').innerText = mode === 'gb10' ? '⚡ GB10 177B 연동' : (mode === 'win' ? '🟢 로컬 서버' : '🟢 에어갭 RAG (29종 전수)');
+      document.getElementById('llmStatusIndicator').innerText = mode === 'gb10' ? '⚡ GB10 177B 연동' : (mode === 'win' ? '🟢 로컬 서버' : '🟢 에어갭 RAG (실시간 인덱스)');
       closeLlmSettingsModal();
       alert('✅ LLM 추론 설정이 저장되었습니다.');
     }
@@ -2084,7 +2433,7 @@ const htmlContent = `<!DOCTYPE html>
       alert('연결 테스트: 에어갭 로컬 시맨틱 RAG 엔진이 정상 가동 중입니다.');
     }
 
-    // --- 10. BOOTSTRAP ---
+    // --- 11. BOOTSTRAP ---
     window.addEventListener('DOMContentLoaded', () => {
       mermaid.initialize({
         startOnLoad: false,
@@ -2093,8 +2442,11 @@ const htmlContent = `<!DOCTYPE html>
         flowchart: { curve: 'basis' }
       });
 
-      loadBomQuantities();
+      loadCustomSolutions();
       currentDocs = loadStoredDocs();
+      syncCustomSolutionsToDocs();
+
+      loadBomQuantities();
 
       renderQuickChips();
       renderWikiDocList();
@@ -2114,6 +2466,6 @@ const htmlContent = `<!DOCTYPE html>
 fs.writeFileSync(targetHtmlPath, htmlContent, 'utf8');
 fs.writeFileSync(electronIndexPath, htmlContent, 'utf8');
 
-console.log('✅ GIJO Security Suite & WIKI successfully generated:');
+console.log('✅ GIJO Security Suite & WIKI (Custom Sol & Manual Support) successfully generated:');
 console.log(' - ' + targetHtmlPath + ' (' + fs.statSync(targetHtmlPath).size + ' bytes)');
 console.log(' - ' + electronIndexPath + ' (' + fs.statSync(electronIndexPath).size + ' bytes)');

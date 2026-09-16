@@ -7,11 +7,11 @@
   - **오프라인 에어갭 모드 (기본)**: 외부망/사내망 단절 상태에서도 사내 공식 규정 9종(96,847자)의 즉각적인 마크다운 브라우징, 시맨틱 RAG 검색, 스마트 아키텍처 스튜디오, TCO 견적 산출 100% 단독 구동.
   - **GB10 177B 연동 모드**: 온프레미스 고출력 DGX 클러스터(`10.8.0.12`) 또는 운영 서버(`10.8.0.1`) 활성화 시 177B MoE 엔진의 심층 추론 자동 연계.
 - **데스크톱 산출물 일원화**: `GIJO AS Lite (GIJO WIKI Edition)` 명칭으로 인스톨러 및 실행 파일 동기화.
-- **실물 20종 보안 솔루션의 사내 지식고(My Docs Vault) & AI Copilot 학습 & 솔루션 ERP 탭 전면 융합**:
-  - **사내 지식고(My Docs Vault) 29종 통합**: 기존 사내 공식 규정 9종에 20종 실물 보안 제품(GIJO AS, WizCLM, SecureIM, SAFESQUARE SBOM, Tenable AI Exposure, Zscaler, Imperva WAAP/DSF, NeoCISO, 수지비, BAT Insight, Tenable ONE, CipherTrust, COODOC, FOCS, Falcon EDR, GRADIUS DLP, Ivanti UEM 등)의 상세 규격서(개요, 도입목적, 핵심기능, 규제근거, 기대효과, 권장 아키텍처)를 위키 문서로 생성하여 총 29종 지식고로 확장.
-  - **AI Copilot & RAG 엔진 전수 학습**: 20종 솔루션 질의(WizCLM 인증서 관리, SBOM 공급망 보안, FOCS 방화벽 정책, Tenable AI Exposure 섀도우 AI 등) 시 해당 솔루션 원본 규격을 즉시 인용하고 원클릭으로 해당 위키 문서로 이동 지원.
-  - **솔루션 ERP 탭(20종 카탈로그)**: 국산/외산/AI보안/네트워크/데이터 필터, 실시간 키워드 검색, 카드 뷰, 상세 모달, 아키텍처 스튜디오 즉시 연동, 4종 나란히 비교 트레이 제공.
-  - **실시간 5개년 TCO & BOM 계산기 연동**: 20개 솔루션별 수량 조절 시 도입비(Capex), 유지보수비(Opex 12%), 총소유비용(TCO), ISMS-P 80개 통제항목 자동 매핑.
+- **고객사 사용 솔루션 직접 등록/관리 및 실무 운영 매뉴얼 뷰어 탑재**:
+  - **솔루션 직접 등록 (CRUD)**: 고객(보안담당자)이 자사에서 운용 중인 보안 솔루션을 직접 등록(`[+ 솔루션 직접 등록]`), 수정, 삭제할 수 있는 기능 신설.
+  - **위키 · RAG · TCO 즉시 연동**: 고객 등록 제품은 로컬스토리지에 영구 보존되며, 사내 지식고(위키 문서 자동 생성), AI Copilot 실시간 RAG 질의, 5개년 TCO/BOM 계산기에 실시간 반영.
+  - **실무 운영 매뉴얼(Manual) 탭 & 런북 연동**: 각 솔루션 상세 모달에 [📖 실무 운영 매뉴얼 & 런북] 전용 탭을 추가하여, 콘솔 접속 경로, 일일/주간 점검 체크리스트, 긴급 장애 대응 절차를 한눈에 확인 가능.
+  - **20종 솔루션 학습 데이터셋 산출**: 20종 솔루션별 RAG 인입 마크다운 20건(`rag-seed/security-references/sol_*.md`) 및 LLM 파인튜닝용 88건 지시학습 데이터셋(`rag-seed/solutions_instruction_train.jsonl`) 구축 완료.
 
 ### ☀️ 화이트 & 라이트 테마 (Clean White & Slate Light) 전면 전환
 - **배경색 화이트 전환**: 눈이 편안하고 문서 가독성이 극대화된 소프트 화이트 & 슬레이트 라이트 테마(`--bg-main: #ffffff`, `--bg-panel: #f8fafc`, `--border: #e2e8f0`) 적용.
