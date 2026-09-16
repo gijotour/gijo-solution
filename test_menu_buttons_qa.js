@@ -173,6 +173,33 @@ studioTokens.forEach(token => {
   }
 });
 
+// 9. Check Advanced Synapse RAG 2.0 & CiteGuard Multi-Evidence
+const rag2Tokens = [
+  'id="ragCat-ALL"',
+  'id="ragCat-REG"',
+  'id="ragCat-TECH"',
+  'id="ragCat-FIN"',
+  'id="ragCat-ASSET"',
+  'function filterRagCategory',
+  'function buildSemanticChunks',
+  'function injectRagToApproval',
+  'function injectRagToStudio',
+  'function copyRagAnswerMarkdown',
+  'Synapse RAG 2.0',
+  '1차 직접 근거',
+  '교차 검증 출처'
+];
+
+rag2Tokens.forEach(token => {
+  if (html.includes(token)) {
+    console.log(' - [PASS] Synapse RAG 2.0 Token: ' + token);
+  } else {
+    console.error(' - [FAIL] Missing RAG 2.0 Token: ' + token);
+    process.exit(1);
+  }
+});
+
 console.log('================================================================');
-console.log('🎉 ALL 53 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+console.log('🎉 ALL 66 COMPREHENSIVE QA CHECKS PASSED WITH ZERO DEFECTS!');
+
 

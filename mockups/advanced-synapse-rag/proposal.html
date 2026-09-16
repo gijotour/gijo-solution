@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>차세대 지능형 하이브리드 RAG 2.0 (Synapse RAG & CiteGuard) 단일 추천 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<style>
+  :root {
+    --bg-main: #f8fafc;
+    --bg-panel: #ffffff;
+    --bg-card: #ffffff;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text-main: #0f172a;
+    --text-sub: #64748b;
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --success: #059669;
+    --success-light: #ecfdf5;
+    --warning: #d97706;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+    --radius: 10px;
+    --shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Pretendard, -apple-system, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-main);
+    padding: 24px;
+    line-height: 1.5;
+  }
+  .header-area {
+    margin-bottom: 20px;
+    background: #fff;
+    padding: 18px 22px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .header-area h1 {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header-area p {
+    font-size: 0.82rem;
+    color: var(--text-sub);
+    margin-top: 4px;
+  }
+  .proposal-grid {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 20px;
+  }
+  .panel {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+  }
+  .panel-title {
+    font-size: 0.92rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* Category Pills */
+  .cat-pills {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .cat-pill {
+    font-size: 0.72rem;
+    padding: 4px 9px;
+    border-radius: 20px;
+    border: 1px solid var(--border-strong);
+    background: #f8fafc;
+    color: var(--text-sub);
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .cat-pill.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+  }
+  /* Question Preset Cards */
+  .preset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .preset-item {
+    font-size: 0.78rem;
+    padding: 9px 12px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .preset-item:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+  .preset-tag {
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: #e2e8f0;
+    color: var(--text-sub);
+    white-space: nowrap;
+    font-weight: 700;
+  }
+  /* RAG Chat & Result Container */
+  .chat-view {
+    display: flex;
+    flex-direction: column;
+    height: 600px;
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-right: 6px;
+  }
+  .bubble {
+    max-width: 90%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 0.84rem;
+    line-height: 1.6;
+  }
+  .bubble.user {
+    align-self: flex-end;
+    background: var(--primary);
+    color: #fff;
+    border-bottom-right-radius: 2px;
+  }
+  .bubble.ai {
+    align-self: flex-start;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    border-bottom-left-radius: 2px;
+  }
+  /* CiteGuard Card Inside AI Bubble */
+  .citeguard-box {
+    margin-top: 10px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+  }
+  .cite-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.72rem;
+  }
+  .cite-badge-confidence {
+    background: var(--success-light);
+    color: var(--success);
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 12px;
+    border: 1px solid rgba(5,150,105,0.3);
+  }
+  .cite-title {
+    font-weight: 800;
+    color: var(--primary);
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .cite-snippet {
+    background: #f8fafc;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: #334155;
+    border-left: 3px solid var(--primary);
+    margin: 6px 0;
+  }
+  .cite-multi-sources {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .source-pill {
+    font-size: 0.68rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    border: 1px solid var(--border);
+    color: var(--text-sub);
+    cursor: pointer;
+  }
+  .source-pill:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+  /* Action Toolbar */
+  .rag-action-bar {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+  }
+  .action-btn {
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: #fff;
+    color: var(--text-main);
+    cursor: pointer;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s;
+  }
+  .action-btn:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  /* Input bar */
+  .chat-input-area {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .chat-input {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    font-size: 0.85rem;
+    outline: none;
+  }
+  .chat-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
+  }
+  .btn-submit {
+    padding: 0 16px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .highlight-code {
+    background: #fef08a;
+    color: #854d0e;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<div class="header-area">
+  <h1>🧠 차세대 지능형 하이브리드 RAG 2.0 (Synapse Semantic Chunking & CiteGuard) 단일 시안</h1>
+  <p>단순 문서 앞부분 요약에서 벗어나, <b>보안 코드/약어 렉시컬 게이트</b> 및 <b>단락 핀포인트 매칭</b>, <b>다원 근거 투명성(CiteGuard)</b> 및 <b>원클릭 결재판/스튜디오 연동</b>을 제공합니다.</p>
+</div>
+
+<div class="proposal-grid">
+  <!-- Left: Knowledge Domain & Quick Prompts -->
+  <div class="panel">
+    <div class="panel-title">
+      <span>📚 실무 지식 카테고리 & 퀵 쿼리</span>
+      <span style="font-size:0.7rem; color:var(--success); font-weight:700;">30종 문서 + IT자산 연동</span>
+    </div>
+
+    <div class="cat-pills">
+      <button class="cat-pill active" onclick="filterCategory('ALL')">전체</button>
+      <button class="cat-pill" onclick="filterCategory('REG')">규정/컴플라이언스</button>
+      <button class="cat-pill" onclick="filterCategory('TECH')">취약점/조치</button>
+      <button class="cat-pill" onclick="filterCategory('FIN')">FinOps/TCO</button>
+      <button class="cat-pill" onclick="filterCategory('ASSET')">자산/SBOM</button>
+    </div>
+
+    <div class="preset-list" id="presetList">
+      <div class="preset-item" onclick="simulateQuestion('금융 코어 WAS(JEUS 8.5)에 발견된 CVE-2025-24813 취약점의 조치 방안과 가상패치 솔루션은?')">
+        <span class="preset-tag">취약점</span>
+        <span>JEUS 8.5 CVE-2025-24813 조치 방안 및 가상패치 솔루션은?</span>
+      </div>
+      <div class="preset-item" onclick="simulateQuestion('KISA 표준에 따른 소프트웨어 공급망(SBOM) 추출 필수 체크리스트 5가지는?')">
+        <span class="preset-tag">SBOM</span>
+        <span>KISA 표준 소프트웨어 공급망(SBOM) 추출 필수 체크리스트는?</span>
+      </div>
+      <div class="preset-item" onclick="simulateQuestion('OpenAI GPT-4o 대비 온프레미스 GB10(177B) 도입 시 연간 TCO 절감액은?')">
+        <span class="preset-tag">FinOps</span>
+        <span>OpenAI GPT-4o 대비 온프레미스 GB10 도입 시 연간 TCO 절감액은?</span>
+      </div>
+      <div class="preset-item" onclick="simulateQuestion('WizCLM 인증서 수명주기 관리 솔루션과 금융보안원 전자서명 규제 연관성은?')">
+        <span class="preset-tag">솔루션</span>
+        <span>WizCLM 인증서 자동화 솔루션과 금융보안원 규제 연관성은?</span>
+      </div>
+      <div class="preset-item" onclick="simulateQuestion('KISA ISMS-P 2.4 네트워크 접근통제 기준에 부합하는 망분리 예외 절차는?')">
+        <span class="preset-tag">규정</span>
+        <span>KISA ISMS-P 2.4 기준 망분리 예외 신청 및 승인 절차는?</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: RAG Copilot Conversation & Action Bar -->
+  <div class="panel chat-view">
+    <div class="panel-title">
+      <span style="display:flex; align-items:center; gap:6px;">
+        🤖 Synapse AI Copilot (실시간 단락 핀포인트 RAG)
+      </span>
+      <span style="font-size:0.7rem; background:#ecfdf5; color:#059669; border:1px solid rgba(5,150,105,0.3); padding:2px 8px; border-radius:12px; font-weight:700;">
+        ⚡ 하이브리드 인덱스 준비완료
+      </span>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="bubble ai">
+        안녕하세요! <b>GIJO AS 보안 실무 지식고(30종 원본 문서), 전사 IT 자산(JEUS 8.5/SBOM), FinOps 실시간 TCO</b>가 단락(Paragraph) 단위로 하이브리드 RAG 엔진에 완전 색인되었습니다.<br><br>
+        궁금한 취약점 조치, 보안 규정, 솔루션 스펙, 예산 절감 방안을 질문해 주세요.
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <input type="text" id="userInput" class="chat-input" placeholder="질문을 입력하거나 좌측 퀵 쿼리를 클릭하세요..." onkeydown="if(event.key==='Enter') sendChat()">
+      <button class="btn-submit" onclick="sendChat()">질의하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function simulateQuestion(q) {
+    document.getElementById('userInput').value = q;
+    sendChat();
+  }
+
+  function sendChat() {
+    const inp = document.getElementById('userInput');
+    const query = inp.value.trim();
+    if (!query) return;
+
+    const chatBox = document.getElementById('chatMessages');
+
+    // User bubble
+    const userEl = document.createElement('div');
+    userEl.className = 'bubble user';
+    userEl.innerText = query;
+    chatBox.appendChild(userEl);
+    inp.value = '';
+
+    // AI bubble loading
+    const aiEl = document.createElement('div');
+    aiEl.className = 'bubble ai';
+    aiEl.innerHTML = '<i>지식고 30종 문서 및 IT 자산 SBOM 단락 딥매칭 검색 중...</i>';
+    chatBox.appendChild(aiEl);
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    setTimeout(() => {
+      let title = '근거 분석 결과';
+      let snippet = '';
+      let confidence = '96%';
+      let primaryDoc = 'GIJO_AS_취약점관리_지침.md';
+      let relatedDocs = ['ASSET-05: TmaxSoft JEUS 8.5', 'Imperva WAAP'];
+
+      if (query.includes('JEUS') || query.includes('24813')) {
+        title = '금융 코어 WAS (JEUS 8.5) 긴급 취약점 조치 권고안';
+        primaryDoc = 'GIJO_AS_취약점관리_지침.md [제14조 고위험 취약점 긴급대응]';
+        snippet = '<b>[핵심 발췌]</b> Tomcat AJP RCE (<span class="highlight-code">CVE-2025-24813</span>)는 미인가 원격 명령 실행이 가능한 치명적(CVSS 9.8) 위험입니다. WAS 벤더 공식 패치 배포 전까지 <b>Imperva WAAP 웹방화벽에 가상패치 룰셋(Rule #4501)</b>을 긴급 활성화하고, AJP Connector 비활성화(server.xml) 조치를 즉시 이행해야 합니다.';
+        confidence = '98.4%';
+        relatedDocs = ['ASSET-05: TmaxSoft JEUS 8.5 (DMZ 내부)', 'Imperva WAAP (웹/API 방화벽)', 'CVE-2025-24813 보안권고문'];
+      } else if (query.includes('SBOM') || query.includes('체크리스트')) {
+        title = 'KISA 표준 SBOM 추출 및 제출 필수 체크리스트 5대 기준';
+        primaryDoc = 'GIJO_AS_SBOM_추출및제출_가이드.md [제3장 수검 검증 체크리스트]';
+        snippet = '<b>[핵심 발췌]</b> 1) 포맷 준수(CycloneDX v1.5/1.6 JSON), 2) 필수 메타데이터 누락 여부(자산명, 공급사, 버전), 3) 전체 의존성 트리 포함(Direct/Transitive), 4) 오픈소스 라이선스 명시(SPDX ID), 5) 식별된 CVE 취약점 매핑 및 조치 계획 수립.';
+        confidence = '99.1%';
+        relatedDocs = ['KISA 소프트웨어 공급망 보안 가이드라인', 'SAFESQUARE SBOM 공급망 보안'];
+      } else if (query.includes('GB10') || query.includes('GPT-4o') || query.includes('TCO')) {
+        title = '온프레미스 GB10 (177B MoE) 도입에 따른 연간 TCO 절감 분석';
+        primaryDoc = '사내 FinOps AI API TCO 분석 대장 [GB10 클러스터 경제성 평가]';
+        snippet = '<b>[핵심 발췌]</b> 상용 OpenAI GPT-4o Enterprise 연간 예상 지출액 ₩4,320,000 대비 온프레미스 GB10(177B) 클러스터를 통해 사내 질의를 90% 이상 흡수할 경우, <b>연간 약 ₩3,888,000의 직접 비용이 절감</b>되며 민감 정보의 외부 유출 위험을 원천 차단합니다.';
+        confidence = '95.7%';
+        relatedDocs = ['FinOps AI API 사용량 통제 대장', 'GB10 MoE 추론 인프라 명세'];
+      } else {
+        title = '사내 보안 규정 및 솔루션 종합 분석';
+        primaryDoc = 'GIJO_AS_보안제품관리_지침.md';
+        snippet = '질의하신 내용에 부합하는 사내 보안 지침 규정 및 관련 솔루션의 운영 기준을 검토하였습니다. 구체적인 조치 절차는 아래 연계 문서를 참고하십시오.';
+        confidence = '91.2%';
+        relatedDocs = ['사내 정보보안 기본지침', 'ISMS-P 인증 기준'];
+      }
+
+      aiEl.innerHTML = `
+        <div style="font-weight:800; font-size:0.9rem; margin-bottom:6px; color:var(--text-main);">
+          📌 \${title}
+        </div>
+        <div class="citeguard-box">
+          <div class="cite-header">
+            <span class="cite-title">
+              🛡️ CiteGuard 근거: \${primaryDoc}
+            </span>
+            <span class="cite-badge-confidence">신뢰도 \${confidence}</span>
+          </div>
+          <div class="cite-snippet">
+            \${snippet}
+          </div>
+          <div style="font-size:0.7rem; color:var(--text-sub); margin-top:6px;"><b>연관 출처 교차 검증:</b></div>
+          <div class="cite-multi-sources">
+            \${relatedDocs.map(d => `<span class="source-pill">🔗 \${d}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="rag-action-bar">
+          <button class="action-btn" onclick="alert('✅ RAG 분석 내용이 [📋 전자결재 기안판]의 품의 내용으로 자동 주입되었습니다!')">
+            📋 결재판 기안문에 주입
+          </button>
+          <button class="action-btn" onclick="alert('✅ 관련 인프라 노드 및 연결선이 [아키텍처 스튜디오] 다이어그램에 자동 반영되었습니다!')">
+            🏗️ 아키텍처 스튜디오 반영
+          </button>
+          <button class="action-btn" onclick="alert('✅ RAG 답변 및 근거 출처가 클립보드에 마크다운으로 복사되었습니다!')">
+            📑 마크다운 복사
+          </button>
+        </div>
+      `;
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }, 400);
+  }
+
+  function filterCategory(cat) {
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
